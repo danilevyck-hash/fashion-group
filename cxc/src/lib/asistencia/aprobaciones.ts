@@ -149,6 +149,9 @@ export interface DiaExtra {
   minutos: number;
   diurnoMin: number;
   nocturnoMin: number;
+  /** 🔴 Lo trabajado en domingo o feriado (10-sep-2026): se aprueba igual que la extra, con SU recargo. */
+  domFerMin: number;
+  tipo: "extra" | "domingo" | "feriado";
 }
 
 /**
@@ -166,7 +169,13 @@ export function diasConExtra(
   const out: DiaExtra[] = [];
   for (const d of p.dias) {
     const c = clasificarDia(d, reglas);
-    const minutos = c.extraDiurnoMin + c.extraNocturnoMin;
+    // 🔴 EL DOMINGO Y EL FERIADO TRABAJADOS TAMBIÉN SE OFRECEN (10-sep-2026,
+    // Daniel: *«domingo también necesita aprobación»*). 🩸 Hasta ese día esta
+    // lista solo traía la hora extra de lunes a viernes, así que un domingo
+    // NUNCA se podía aprobar y lo trabajado se perdía en silencio: 5 personas el
+    // 26-jul y 7 el 23-ago-2026 (la contable pagó $90,38 y $223,88; el sistema $0).
+    const domFerMin = c.domingoMin + c.feriadoMin;
+    const minutos = c.extraDiurnoMin + c.extraNocturnoMin + domFerMin;
     if (minutos <= 0) continue;
     out.push({
       fecha: d.fecha,
@@ -175,6 +184,8 @@ export function diasConExtra(
       minutos,
       diurnoMin: c.extraDiurnoMin,
       nocturnoMin: c.extraNocturnoMin,
+      domFerMin,
+      tipo: c.feriadoMin > 0 ? "feriado" : c.domingoMin > 0 ? "domingo" : "extra",
     });
   }
   return out;
@@ -246,6 +257,9 @@ export interface PersonaEnDia {
   minutos: number;
   diurnoMin: number;
   nocturnoMin: number;
+  /** Lo trabajado en domingo o feriado, y de qué tipo es el día (10-sep-2026). */
+  domFerMin: number;
+  tipo: "extra" | "domingo" | "feriado";
   aprobado: boolean;
   por: string | null;
   cuando: string | null;
@@ -330,6 +344,8 @@ export function armarDiasAprobacion(opts: OpcionesDias): DiaAprobacion[] {
         minutos: d.minutos,
         diurnoMin: d.diurnoMin,
         nocturnoMin: d.nocturnoMin,
+        domFerMin: d.domFerMin,
+        tipo: d.tipo,
         aprobado: estaAprobado(a),
         por: a?.por ?? null,
         cuando: a?.cuando ?? null,

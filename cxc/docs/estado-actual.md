@@ -1304,3 +1304,35 @@ horario), `asistencia-planilla-cerrar-quincena` (el calendario ya no va en líne
 ⚠️ Dejado a propósito: la columna «Terceros» de los montos a mano de la Planilla no se tocó (es otra
 cosa que Préstamos); en el celular la tarjeta muestra las mismas dos líneas de «Qué falta» bajo el
 nombre.
+
+---
+
+## 10-sep-2026 (noche) — Lo que definió el backtest contra los Excel de la contable
+
+Informe: `~/.claude/jobs/a93eb587/tmp/backtest/informe.md` (§ 3 y § 5). Daniel, textual: *«a, sí.
+b, se descuenta obvio. c, se paga días trabajados. kener 40h, reloj»* · *«ISR a mano por ahora, quién
+aprueba horas extra de cada empresa: daniel y contabilidad en todas las empresas incluyendo boston,
+david solo boston»* · corrigiendo: *«bodega también aprueba fashion wear y vistana. domingo también
+necesita aprobación»* · *«si salió 20 minutos antes no debería de haber tolerancia»* · sobre los
+centavos: **«a) el sistema manda y ella se adapta»**.
+
+| # | Regla | Qué cambió |
+|---|---|---|
+| 1 | Domingo/feriado trabajado | 🩸 No se podía aprobar (Aprobaciones solo ofrecía L–V): se perdía en silencio. Ahora se OFRECE con su tipo, el aviso ámbar y el freno del cierre lo cuentan, y **sigue necesitando aprobación** (aprobado → `recargo_domingo_feriado`; no aprobado → no se paga, se ve) |
+| 2 | Salida antes de la hora | Se descuenta **desde el minuto uno** (sin tolerancia; los 10 min son solo de la entrada): `salidaTemprana` en Planilla, Excel, PDF, comprobante y cierre (`salida_temprana`, migración `20261104120000` aplicada) |
+| 3 | Entra o sale a mitad de quincena | Cobra los **días trabajados**: quincenal ÷ hábiles L–V de la quincena × hábiles trabajados (`prorrateo-ingreso.ts`), dicho al lado del nombre y congelado. Reemplaza al «Tú decides» del 25-ago. Yeritza (51): **$125,00** (5 de 12) vs $115,38 de la contable (600 ÷ 26 × 5) |
+| 4 | Horas extra exactas | Verificado: `extraMin = brutoSeg / 60`, sin cuartos. Nada cambió |
+| 5 | Aprobadores | Migración `20261103120000` (aplicada, solo INSERT): daniel ×4, Contabilidad ×4 (entró Multifashion), david Boston, **Bodega sigue** en Fashion Wear y Vistana. Verificado leyendo la tabla: 11 filas |
+| 6 | Kener (17) | Jornada 48 → **40 h** (`_ajustar-kener-jornada.mjs`, aprobado). Rata $2,88 → $3,46 |
+| 7 | ISR | Sigue a mano. Y los centavos: el sistema manda (rata × 8, 2 decimales); no se copia el ÷ 26 ni los 4 decimales de la contable |
+
+**Medido contra producción, quincena 16–30 ago 2026 (40 colaboradores, solo lectura):** cambian de
+neto **6**: por salida temprana 5 (**−$68,08**: Andrea 16 −11,93 · Eloyn 29 −21,51 · María B. 49 −14,18 ·
+Yeishka 54 −5,69 · Angela 7 −14,77) y Kener +0,52 por la jornada. Domingo/feriado pagados: 0 (los 7 del
+domingo 23-ago quedan en Aprobaciones, pendientes de que alguien los apruebe). Prorrateo: nadie en esa
+quincena (Yeritza entró el 27-jul: en la 16–31 jul cobra $125,00).
+
+**Candados:** `asistencia-reglas-de-la-contable.test.ts`. Cambiaron con nota fechada, ninguno se borró:
+`asistencia-planilla-guardada` (25 cifras de dinero / 22 del reloj; la migración nueva entra al barrido),
+`asistencia-planilla-rango` (la columna nueva), `asistencia-dias-que-no-pasaron` (Yeishka cobra 5 de 10
+hábiles, $150, y sigue sin cobrar $300).

@@ -491,6 +491,17 @@ export default function AprobacionesTab() {
                           <span className="hidden shrink-0 text-xs text-gray-500 sm:block">
                             {g.empresaEtiqueta ?? ""}
                           </span>
+                          {/* 🔴 Un domingo o feriado trabajado se aprueba acá igual que la
+                              extra, y se DICE qué es: se paga con su propio recargo
+                              (10-sep-2026, Daniel: «domingo también necesita aprobación»). */}
+                          {g.tipo && g.tipo !== "extra" && (
+                            <span
+                              className="shrink-0 rounded bg-amber-50 px-1.5 text-[11px] text-amber-800"
+                              title="Trabajado en un día que no es hábil: se paga con el recargo de domingo y feriado."
+                            >
+                              {g.tipo}
+                            </span>
+                          )}
                           {g.salida && (
                             <span className="min-w-[44px] shrink-0 text-right text-xs text-gray-500">{g.salida}</span>
                           )}

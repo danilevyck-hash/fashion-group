@@ -597,18 +597,29 @@ describe("🔴 LA RUTA de la planilla — el bug original y los tres arreglos", 
     expect(l.horas.ausenciaDias).toBeGreaterThan(0);
   });
 
-  it("🔴 YEISHKA (ingreso 10-ago) no produce un número: sale para decidir", async () => {
+  it("🔴 YEISHKA (ingreso 10-ago) cobra los DÍAS TRABAJADOS: 5 de 10 hábiles, quincenal $150", async () => {
+    // 🔴 CAMBIÓ DE DIRECCIÓN el 10-sep-2026. Daniel, textual, sobre el backtest
+    // contra los Excel de la contable: *«c, se paga días trabajados»*. Hasta ese
+    // día quien entraba a mitad de la quincena salía en «Tú decides» sin número
+    // (la regla del 25-ago: ni completo ni prorrateado). Ahora: sueldo quincenal
+    // ÷ días hábiles de la quincena × días hábiles desde que entró — y se DICE
+    // al lado del nombre. Lo que este candado sigue protegiendo: YEISHKA NO
+    // COBRA $300 por 6 días. Ver `asistencia-reglas-de-la-contable.test.ts`.
     db.personas = [filaDb("54", { nombre: "YEISHKA", fecha_ingreso: "2026-08-10" })];
     db.marcaciones = ["2026-08-10", "2026-08-11", "2026-08-12", "2026-08-13"]
       .flatMap((d) => marcasDb("54", d));
     const r = await pedirPlanilla("2026-08-1", "confecciones_boston");
     const l = r.lineas.find((x) => x.codigo === "54")!;
-    expect(l.dinero).toBeNull();
-    expect(l.decidirAMano).toBe("entró el 10 de agosto de 2026");
-    expect(l.quincenalReferencia).toBe(300);
-    expect(r.totales.netoPagar).toBe(0);
-    expect(r.totales.decidirAMano).toBe(1);
+    expect(l.dinero).not.toBeNull();
+    // 1–15 ago 2026: 10 hábiles (3-7 y 10-14); desde el 10: 5 → 300 × 5/10.
+    expect(l.dinero!.salarioQuincenal).toBe(150);
+    expect(l.prorrateo).toBe("entró el 10 de agosto de 2026: 5 de 10 días hábiles");
+    expect(l.decidirAMano).toBeNull();
+    expect(l.quincenalReferencia).toBeNull();
+    expect(r.totales.decidirAMano).toBe(0);
     expect(r.totales.sinConfigurar).toBe(0);
+    expect(r.totales.netoPagar).toBeGreaterThan(0);
+    expect(r.totales.netoPagar).toBeLessThan(300);
   });
 
   it("🔴 RODRIGO (justificado, sin una sola marca) sale para decidir, no en ámbar", async () => {

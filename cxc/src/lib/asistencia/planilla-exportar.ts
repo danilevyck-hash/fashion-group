@@ -146,7 +146,7 @@ export function nombreArchivo(d: DatosPlanillaExport, ext: "xlsx" | "pdf"): stri
   return `planilla-${emp}-${periodo}.${ext}`;
 }
 
-// ── Las 19 columnas del cuadro, en el orden de la contable ───────────────────
+// ── Las 20 columnas del cuadro, en el orden de la contable (19 + «Salida temprana», 10-sep-2026) ──
 
 const COLUMNAS: ReportColumn[] = [
   { header: "Colaborador", wch: 28 },
@@ -155,6 +155,8 @@ const COLUMNAS: ReportColumn[] = [
   { header: "Horas extra 1.25", wch: 14, align: "right", fmt: MONEY_FMT },
   { header: "Ausencias", wch: 12, align: "right", fmt: MONEY_FMT },
   { header: "Tardanzas", wch: 12, align: "right", fmt: MONEY_FMT },
+  // 🔴 10-sep-2026: salir antes de la hora se descuenta (Daniel: «b, se descuenta obvio»).
+  { header: "Salida temprana", wch: 14, align: "right", fmt: MONEY_FMT },
   { header: "Horas extra 1.50", wch: 14, align: "right", fmt: MONEY_FMT },
   { header: "Excedente", wch: 14, align: "right", fmt: MONEY_FMT },
   { header: "Domingos", wch: 12, align: "right", fmt: MONEY_FMT },
@@ -200,7 +202,7 @@ function filaPlanilla(l: LineaPlanilla): ReportCell[] {
       { v: capitalizarNombre(l.etiqueta), ...FUERA },
       l.codigo,
       { v: textoDecidir(l), ...FUERA },
-      ...Array<ReportCell>(17).fill(null),
+      ...Array<ReportCell>(18).fill(null),
     ];
   }
   if (l.fueraDePlanilla) {
@@ -210,7 +212,7 @@ function filaPlanilla(l: LineaPlanilla): ReportCell[] {
       { v: capitalizarNombre(l.etiqueta), ...FUERA },
       l.codigo,
       { v: MOTIVO_FUERA_DE_PLANILLA, ...FUERA },
-      ...Array<ReportCell>(17).fill(null),
+      ...Array<ReportCell>(18).fill(null),
     ];
   }
   if (!l.dinero) {
@@ -219,13 +221,13 @@ function filaPlanilla(l: LineaPlanilla): ReportCell[] {
       { v: capitalizarNombre(l.etiqueta), ...PENDIENTE },
       l.codigo,
       { v: `⚠ ${l.faltaConfigurar.join(" · ")}`, ...PENDIENTE },
-      ...Array<ReportCell>(17).fill(null),
+      ...Array<ReportCell>(18).fill(null),
     ];
   }
   const d = l.dinero;
   return [
     capitalizarNombre(l.etiqueta), l.codigo,
-    d.salarioQuincenal, c0(d.extraDiurno), c0(d.ausencias), c0(d.tardanzas),
+    d.salarioQuincenal, c0(d.extraDiurno), c0(d.ausencias), c0(d.tardanzas), c0(d.salidaTemprana ?? 0),
     c0(d.extraNocturno), c0(d.excedente), c0(d.domingos), c0(d.feriados),
     d.totalBruto, d.seguroSocial, d.seguroEducativo,
     c0(d.isr), c0(d.prestamo), c0(d.terceros), c0(d.mercancia),
@@ -236,7 +238,7 @@ function filaPlanilla(l: LineaPlanilla): ReportCell[] {
 function filaTotales(t: TotalesPlanilla): ReportCell[] {
   return [
     `TOTAL — ${t.personas} ${t.personas === 1 ? "colaborador" : "colaboradores"}`, "",
-    t.salarioQuincenal, t.extraDiurno, t.ausencias, t.tardanzas,
+    t.salarioQuincenal, t.extraDiurno, t.ausencias, t.tardanzas, t.salidaTemprana ?? 0,
     t.extraNocturno, t.excedente, t.domingos, t.feriados,
     t.totalBruto, t.seguroSocial, t.seguroEducativo,
     t.isr, t.prestamo, t.terceros, t.mercancia,
@@ -359,7 +361,8 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
       [""],
       ["⚠ Quien aparece en rojo", "No tiene todo lo que hace falta para calcularle un número. NO vale $0: quedó fuera del total y hay que configurarlo en la pestaña Configuración."],
       ["Quien aparece en gris", `No va en planilla (${EXPLICACION_SERVICIO_PROFESIONAL} No es un pendiente: es como se le paga), o lo decide una persona: está justificada, o entró o salió a mitad del período. En ese caso el motivo va escrito en su fila, junto con lo que le daría la quincena completa; para pagarle lo suyo se usa el rango de fechas.`],
-      ["Quien entró o salió a mitad del período", "NO se le calcula pago, ni completo ni prorrateado. Pagarle la quincena entera sería regalarle los días en que no trabajaba aquí; descontársela entera, inventarle una renuncia. Lo decide una persona y se saca con el rango de fechas."],
+      ["Quien entró o salió a mitad del período", "Cobra los días TRABAJADOS: sueldo quincenal ÷ días hábiles (lunes a viernes) de la quincena × días hábiles desde que entró (o hasta que salió). El prorrateo se dice al lado de su nombre. (Daniel, 10-sep-2026: «se paga días trabajados».)"],
+      ["Salida temprana", "Salir antes de la hora se descuenta desde el primer minuto: minutos × valor del minuto, sin tolerancia (los 10 minutos de gracia son solo de la entrada). (Daniel, 10-sep-2026: «se descuenta obvio», «si salió 20 minutos antes no debería de haber tolerancia».)"],
       ["Días que todavía no pasaron", d.periodoAbierto
         ? `${d.periodoAbierto.texto} Un día que no pasó no cuenta como falta ni como presente: todavía no existe.`
         : "Este período ya terminó: todos sus días se contaron."],
@@ -439,14 +442,14 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
     FORMULA_NETO,
     "En rojo: falta configurar a ese colaborador — no vale $0 y NO entra al total.  "
     + "En gris: no se le calcula pago — o no va en planilla (servicio profesional), "
-    + "o lo decide una persona (justificada, o entró o salió a mitad del período).",
+    + "o lo decide una persona (justificada el período entero). Quien entró o salió a mitad del período cobra los días trabajados, y se dice al lado de su nombre.",
   ], PIE_PT, PIE_MARGEN);
 
   const t = d.totales;
   autoTable(doc, {
     startY: 24,
     head: [[
-      "Colaborador", "Salario\nquincenal", "Extra\n1.25", "Ausen-\ncias", "Tar-\ndanzas",
+      "Colaborador", "Salario\nquincenal", "Extra\n1.25", "Ausen-\ncias", "Tar-\ndanzas", "Salida\ntemprana",
       "Extra\n1.50", "Exce-\ndente", "Domin-\ngos", "Feria-\ndos", "Total\nbruto",
       "Seguro\nsocial", "Seguro\neducativo", "ISR", "Prés-\ntamo", "Ter-\nceros",
       "Mercan-\ncía", "Total\ndeducc.", "Otros\nserv. (+)", "Neto a\npagar",
@@ -456,14 +459,14 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
         return [
           `${capitalizarNombre(l.etiqueta)} (${l.codigo})`,
           textoDecidir(l),
-          ...Array<string>(17).fill(""),
+          ...Array<string>(18).fill(""),
         ];
       }
       if (l.fueraDePlanilla) {
         return [
           `${capitalizarNombre(l.etiqueta)} (${l.codigo})`,
           MOTIVO_FUERA_DE_PLANILLA,
-          ...Array<string>(17).fill(""),
+          ...Array<string>(18).fill(""),
         ];
       }
       if (!l.dinero) {
@@ -473,13 +476,13 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
         return [
           `${capitalizarNombre(l.etiqueta)} (${l.codigo})`,
           `falta configurar: ${l.faltaConfigurar.join(" · ")}`,
-          ...Array<string>(17).fill(""),
+          ...Array<string>(18).fill(""),
         ];
       }
       const x = l.dinero;
       return [
         capitalizarNombre(l.etiqueta),
-        m2(x.salarioQuincenal), m2(c0(x.extraDiurno)), m2(c0(x.ausencias)), m2(c0(x.tardanzas)),
+        m2(x.salarioQuincenal), m2(c0(x.extraDiurno)), m2(c0(x.ausencias)), m2(c0(x.tardanzas)), m2(c0(x.salidaTemprana ?? 0)),
         m2(c0(x.extraNocturno)), m2(c0(x.excedente)), m2(c0(x.domingos)), m2(c0(x.feriados)),
         m2(x.totalBruto), m2(x.seguroSocial), m2(x.seguroEducativo),
         m2(c0(x.isr)), m2(c0(x.prestamo)), m2(c0(x.terceros)), m2(c0(x.mercancia)),
@@ -488,7 +491,7 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
     }),
     foot: [[
       `TOTAL — ${t.personas} ${t.personas === 1 ? "colaborador" : "colaboradores"}`,
-      m2(t.salarioQuincenal), m2(t.extraDiurno), m2(t.ausencias), m2(t.tardanzas),
+      m2(t.salarioQuincenal), m2(t.extraDiurno), m2(t.ausencias), m2(t.tardanzas), m2(t.salidaTemprana ?? 0),
       m2(t.extraNocturno), m2(t.excedente), m2(t.domingos), m2(t.feriados),
       m2(t.totalBruto), m2(t.seguroSocial), m2(t.seguroEducativo),
       m2(t.isr), m2(t.prestamo), m2(t.terceros), m2(t.mercancia),

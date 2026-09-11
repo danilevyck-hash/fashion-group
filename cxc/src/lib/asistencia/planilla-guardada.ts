@@ -156,6 +156,9 @@ export const COLUMNAS_DINERO: Record<keyof DineroLinea, string> = {
   ausenciaDeDiaCompleto: "ausencia_de_dia_completo",
   vacacionesYaPagadas: "vacaciones_ya_pagadas",
   tardanzas: "tardanzas",
+  // 🔴 10-sep-2026: la salida antes de la hora se descuenta (columna nueva,
+  // migración 20261104120000). Son 25 cifras, no 24.
+  salidaTemprana: "salida_temprana",
   totalBruto: "total_bruto",
   baseSeguros: "base_seguros",
   seguroSocial: "seguro_social",
@@ -172,14 +175,14 @@ export const COLUMNAS_DINERO: Record<keyof DineroLinea, string> = {
 /**
  * Las 20 columnas del reloj → su columna. Mismo candado de tipo.
  *
- * ⚠️ `extraNoAprobadaDiurnoMin` / `extraNoAprobadaNocturnoMin` (3-sep-2026) se
- * EXCLUYEN a propósito y por nombre: son el desglose de `extraNoAprobadaMin`
+ * ⚠️ `extraNoAprobadaDiurnoMin` / `extraNoAprobadaNocturnoMin` (3-sep-2026) y
+ * `extraNoAprobadaDomFerMin` (10-sep-2026) se EXCLUYEN a propósito y por nombre: son el desglose de `extraNoAprobadaMin`
  * —que sí se congela— y existen para VALUAR el aviso ámbar en el momento, no
  * para leerse después. La tabla guardada sigue con sus 20 columnas. Si algún
  * día se quieren congelar, es una migración y dos filas acá, no un `Partial`.
  */
 export const COLUMNAS_HORAS: Record<
-  Exclude<keyof HorasPersona, "extraNoAprobadaDiurnoMin" | "extraNoAprobadaNocturnoMin">,
+  Exclude<keyof HorasPersona, "extraNoAprobadaDiurnoMin" | "extraNoAprobadaNocturnoMin" | "extraNoAprobadaDomFerMin">,
   string
 > = {
   extraDiurnoMin: "extra_diurno_min",
@@ -191,6 +194,8 @@ export const COLUMNAS_HORAS: Record<
   tardanzaMin: "tardanza_min",
   tardanzaGraveMin: "tardanza_grave_min",
   tardanzaGraveDias: "tardanza_grave_dias",
+  // 🔴 10-sep-2026: la salida antes de la hora se descuenta (migración 20261104120000).
+  salidaTempranaMin: "salida_temprana_min",
   ausenciaMin: "ausencia_min",
   ausenciaDias: "ausencia_dias",
   ausenciaJustificadaDias: "ausencia_justificada_dias",
@@ -231,6 +236,9 @@ export function filaDeLinea(planillaId: string, empresa: string, l: LineaPlanill
     grupo: grupoDeLinea(l),
     falta_configurar: l.faltaConfigurar,
     decidir_a_mano: l.decidirAMano,
+    // 🔴 El prorrateo de quien entró o salió a mitad del período, congelado con
+    // su texto (10-sep-2026): sin esto, un cierre no podría explicar el número.
+    prorrateo: l.prorrateo,
     fuera_de_planilla: l.fueraDePlanilla,
     paga_seguros: l.pagaSeguros,
     no_marca_reloj: l.noMarcaReloj,

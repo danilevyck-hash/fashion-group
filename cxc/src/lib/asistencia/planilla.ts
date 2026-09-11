@@ -407,6 +407,14 @@ export interface HorasPersona {
   extraNoAprobadaDiurnoMin: number;
   extraNoAprobadaNocturnoMin: number;
   /**
+   * 🔴 Lo trabajado en DOMINGO o FERIADO que nadie aprobó (10-sep-2026, Daniel:
+   * *«domingo también necesita aprobación»*). Ya está adentro de
+   * `extraNoAprobadaMin`; se aparta para valuarlo con SU recargo
+   * (`recargoDomingoFeriado`) en el aviso ámbar. Solo para VALUAR, como los
+   * dos de arriba.
+   */
+  extraNoAprobadaDomFerMin: number;
+  /**
    * 🔴 LOS MINUTOS DE EXTRA QUE SE PAGARON SIN QUE NADIE LOS APROBARA, porque
    * son el horario de la tienda (ACS cierra a las 7 p.m.: 30 min por día).
    * SOLO PARA MOSTRAR — ya están adentro de `extraDiurnoMin`/`extraNocturnoMin`
@@ -448,6 +456,10 @@ export interface HorasPersona {
   tardanzaGraveMin: number;
   /** Cuántos días fueron así. Es lo que se escribe en el aviso y en el papel. */
   tardanzaGraveDias: number;
+  /** 🔴 Minutos de salida ANTES de la hora, desde el primero — sin tolerancia
+   *  (10-sep-2026, Daniel: *«si salió 20 minutos antes no debería de haber
+   *  tolerancia»*). Se valúan como una tardanza. */
+  salidaTempranaMin: number;
   /** Ausencias sin justificar, en minutos de jornada. SE RESTAN. */
   ausenciaMin: number;
   ausenciaDias: number;
@@ -486,9 +498,9 @@ export interface HorasPersona {
 
 export const HORAS_CERO: HorasPersona = {
   extraDiurnoMin: 0, extraNocturnoMin: 0, excedenteMin: 0, extraNoAprobadaMin: 0,
-  extraNoAprobadaDiurnoMin: 0, extraNoAprobadaNocturnoMin: 0, extraAutoMin: 0,
+  extraNoAprobadaDiurnoMin: 0, extraNoAprobadaNocturnoMin: 0, extraNoAprobadaDomFerMin: 0, extraAutoMin: 0,
   domingoMin: 0, feriadoMin: 0, tardanzaMin: 0,
-  tardanzaGraveMin: 0, tardanzaGraveDias: 0,
+  tardanzaGraveMin: 0, tardanzaGraveDias: 0, salidaTempranaMin: 0,
   ausenciaMin: 0, ausenciaDias: 0, ausenciaJustificadaDias: 0,
   vacacionesYaPagadasMin: 0, vacacionesYaPagadasDias: 0, vacacionesDias: 0,
   sabadoMin: 0, diasTrabajados: 0, diasARevisar: 0,
@@ -694,12 +706,12 @@ export function clasificarDia(
   HorasPersona,
   | "extraDiurnoMin" | "extraNocturnoMin" | "excedenteMin"
   | "domingoMin" | "feriadoMin" | "tardanzaMin" | "ausenciaMin" | "sabadoMin"
-  | "vacacionesYaPagadasMin"
+  | "vacacionesYaPagadasMin" | "salidaTempranaMin"
 > {
   const cero = {
     extraDiurnoMin: 0, extraNocturnoMin: 0, excedenteMin: 0,
     domingoMin: 0, feriadoMin: 0, tardanzaMin: 0, ausenciaMin: 0, sabadoMin: 0,
-    vacacionesYaPagadasMin: 0,
+    vacacionesYaPagadasMin: 0, salidaTempranaMin: 0,
   };
 
   // ── 🔴 VACACIONES: VA PRIMERO, ANTES QUE EL FERIADO Y QUE TODO ─────────────
@@ -739,8 +751,15 @@ export function clasificarDia(
   if (!d.marcas.length) return cero;
 
   const tardanzaMin = d.tardeMin;
+  // 🔴 SALIR ANTES DE LA HORA SE DESCUENTA DESDE EL MINUTO UNO (10-sep-2026,
+  // Daniel: *«b, se descuenta obvio»* y, sobre la tolerancia, *«si salió 20
+  // minutos antes no debería de haber tolerancia»*). Los 10 minutos de gracia
+  // son SOLO de la entrada. El Reporte ya medía la salida temprana; acá entra
+  // al dinero tal cual. Caso real: María B. el 21-ago-2026 salió a las 12:04
+  // p.m. (5,75 h) y la contable lo descontó; el sistema lo medía y no lo hacía.
+  const salidaTempranaMin = Math.max(0, d.salidaTempranaMin || 0);
   const extra = d.extraMin;
-  if (extra <= 0) return { ...cero, tardanzaMin };
+  if (extra <= 0) return { ...cero, tardanzaMin, salidaTempranaMin };
 
   // La ventana efectiva termina en la última marca del día.
   const fin = d.salida ? hhmmAMin(d.salida) : 0;
@@ -759,6 +778,7 @@ export function clasificarDia(
   return {
     ...cero,
     tardanzaMin,
+    salidaTempranaMin,
     extraDiurnoMin: diurno,
     extraNocturnoMin: nocturno,
     excedenteMin: 0,
@@ -812,6 +832,20 @@ export function medirHoras(
     // algo que alguien conceda.
     const pagaExtra =
       !aprob?.exigir || aprob.claves.has(`${aprob.codigo}|${d.fecha}`);
+    // 🔴 EL DOMINGO Y EL FERIADO TRABAJADOS TAMBIÉN NECESITAN APROBACIÓN
+    // (10-sep-2026, Daniel: *«domingo también necesita aprobación»*). 🩸 Lo que
+    // estaba roto era que Aprobaciones NUNCA LOS OFRECÍA —solo días hábiles con
+    // hora extra—, así que no se podían aprobar y se perdían EN SILENCIO: 5
+    // personas el domingo 26-jul y 7 el 23-ago-2026 (la contable pagó $90,38 y
+    // $223,88; el sistema, $0, sin decirlo). Ahora se ofrecen, y lo no aprobado
+    // se aparta abajo (`extraNoAprobadaDomFerMin`) para que el aviso lo diga.
+    if (!pagaExtra) {
+      // Lo trabajado en domingo o feriado sin aprobar: NO se paga, pero SE VE
+      // (se aparta con su recargo para el aviso ámbar y el freno del cierre).
+      // ⚠️ Va ANTES del bloque de los 30 min de ACS, que solo toca la hora extra.
+      h.extraNoAprobadaDomFerMin += c.domingoMin + c.feriadoMin;
+      h.extraNoAprobadaMin += c.domingoMin + c.feriadoMin;
+    }
     if (pagaExtra) {
       h.extraDiurnoMin += c.extraDiurnoMin;
       h.extraNocturnoMin += c.extraNocturnoMin;
@@ -854,6 +888,7 @@ export function medirHoras(
       h.extraNoAprobadaNocturnoMin += c.extraNocturnoMin - pagaNocturno;
     }
     h.tardanzaMin += c.tardanzaMin;
+    h.salidaTempranaMin += c.salidaTempranaMin;
     // 🔴 EL RÓTULO, NO EL DINERO. Un día de más de 30 minutos tarde se sigue
     // sumando entero a `tardanzaMin` —que es lo que se valúa— y además se
     // aparta acá para poder MOSTRARLO en la columna «Ausencia». El umbral se
@@ -1029,7 +1064,7 @@ const COLUMNAS_EXTRA = [
   "extraDiurnoMin", "extraNocturnoMin", "excedenteMin", "extraNoAprobadaMin",
   // 🔑 El desglose de lo no aprobado va con su total, a la MISMA parte: es lo
   // que hace que el aviso «sin aprobar» salga en la empresa que pagaría.
-  "extraNoAprobadaDiurnoMin", "extraNoAprobadaNocturnoMin",
+  "extraNoAprobadaDiurnoMin", "extraNoAprobadaNocturnoMin", "extraNoAprobadaDomFerMin",
 ] as const;
 
 /**
@@ -1130,6 +1165,8 @@ export interface DineroLinea {
    */
   vacacionesYaPagadas: number;
   tardanzas: number;
+  /** 🔴 Lo que se descuenta por salir antes de la hora (10-sep-2026): minutos × valor del minuto. */
+  salidaTemprana: number;
   totalBruto: number;
   /**
    * El monto sobre el que se calcularon los seguros, cuando NO fue el bruto.
@@ -1232,6 +1269,9 @@ export interface LineaPlanilla {
    * pendientes deja de servir para lo único que sirve.
    */
   decidirAMano: string | null;
+  /** 🔴 «entró el 27 de julio de 2026: 5 de 12 días hábiles» — el prorrateo de
+   *  quien entró o salió a mitad del período (10-sep-2026). `null` = período entero. */
+  prorrateo: string | null;
   /**
    * Lo que le tocaría de sueldo quincenal en este período, para que quien
    * decide no tenga que calcularlo aparte.
@@ -1280,7 +1320,7 @@ export interface LineaPlanilla {
    * al aprobar; en la otra es `null`. Por eso se lee de `horasEfectivas` y no
    * de `horasMedidas` como `extraMedido`: un aviso por persona, no por línea.
    */
-  extraNoAprobada: { minutos: number; diurnoMin: number; nocturnoMin: number; monto: number | null } | null;
+  extraNoAprobada: { minutos: number; diurnoMin: number; nocturnoMin: number; domFerMin: number; monto: number | null } | null;
   /**
    * ¿Se le pagaron esas horas extra?
    *
@@ -1483,6 +1523,9 @@ export function calcularDinero(
   const tardanzaTotal = centavos(horas.tardanzaMin * valorMinuto);
   const ausenciaPorTardanza = centavos((horas.tardanzaGraveMin || 0) * valorMinuto);
   const tardanzas = centavos(tardanzaTotal - ausenciaPorTardanza);
+  // 🔴 La salida temprana se valúa IGUAL que una tardanza: minutos × valor del
+  // minuto (10-sep-2026). Columna propia para que se vea qué fue.
+  const salidaTemprana = centavos((horas.salidaTempranaMin || 0) * valorMinuto);
 
   // 🔴 LAS VACACIONES «YA PAGADAS» SE VALÚAN COMO UN DÍA NO TRABAJADO: jornada
   // × rata, SIN recargo, exactamente igual que una ausencia de día completo. No
@@ -1497,7 +1540,7 @@ export function calcularDinero(
 
   const totalBruto = centavos(
     salarioQuincenal + extraDiurno + extraNocturno + excedente + domingos + feriados
-    - ausencias - tardanzas,
+    - ausencias - tardanzas - salidaTemprana,
   );
 
   // Los dos seguros salen del BRUTO, no del quincenal: así lo confirmó la
@@ -1577,7 +1620,7 @@ export function calcularDinero(
     rataHora, valorMinuto, salarioQuincenal,
     extraDiurno, extraNocturno, excedente, domingos, feriados,
     ausencias, ausenciaPorTardanza, ausenciaDeDiaCompleto, vacacionesYaPagadas,
-    tardanzas, totalBruto,
+    tardanzas, salidaTemprana, totalBruto,
     // 🔑 `null` con los seguros apagados aunque haya base: ahí lo que hay que
     // mostrar es «sin seguros», no una base que no se usó para nada.
     baseSeguros: conSeguros ? basePropia : null,
@@ -1606,17 +1649,20 @@ export function resumenExtra(
   nocturnoMin: number,
   rataHora: number | null,
   reglas: ReglasAsistencia,
-): { minutos: number; diurnoMin: number; nocturnoMin: number; monto: number | null } | null {
-  const minutos = diurnoMin + nocturnoMin;
+  /** 🔴 Lo trabajado en domingo o feriado sin aprobar (10-sep-2026): se valúa con SU recargo. */
+  domFerMin = 0,
+): { minutos: number; diurnoMin: number; nocturnoMin: number; domFerMin: number; monto: number | null } | null {
+  const minutos = diurnoMin + nocturnoMin + domFerMin;
   if (!(minutos > 0)) return null;
   const monto =
     rataHora === null
       ? null
       : centavos(
         centavos((diurnoMin / 60) * reglas.recargoExtraDiurno * rataHora)
-        + centavos((nocturnoMin / 60) * reglas.recargoExtraNocturno * rataHora),
+        + centavos((nocturnoMin / 60) * reglas.recargoExtraNocturno * rataHora)
+        + centavos((domFerMin / 60) * reglas.recargoDomingoFeriado * rataHora),
       );
-  return { minutos, diurnoMin, nocturnoMin, monto };
+  return { minutos, diurnoMin, nocturnoMin, domFerMin, monto };
 }
 
 /**
@@ -1640,6 +1686,7 @@ export function sinHorasExtra(h: HorasPersona): HorasPersona {
     ...h,
     extraDiurnoMin: 0, extraNocturnoMin: 0, excedenteMin: 0,
     extraNoAprobadaMin: 0, extraNoAprobadaDiurnoMin: 0, extraNoAprobadaNocturnoMin: 0,
+    extraNoAprobadaDomFerMin: 0,
     domingoMin: 0, feriadoMin: 0,
   };
 }
@@ -1672,6 +1719,13 @@ export function armarLinea(
    * existiera, hasta el centavo. Ver `ParteReparto` y `reparto.ts`.
    */
   parte: ParteReparto | null = null,
+  /**
+   * 🔴 EL PRORRATEO DE QUIEN ENTRÓ O SALIÓ A MITAD DEL PERÍODO (10-sep-2026,
+   * Daniel: *«c, se paga días trabajados»*). El FACTOR ya viene multiplicado en
+   * `factorBase`; acá solo viaja el texto para decirlo en pantalla y en el papel.
+   * Reemplaza a la regla del 25-ago («ni completo ni prorrateado: Tú decides»).
+   */
+  prorrateoTexto: string | null = null,
 ): LineaPlanilla {
   const faltaConfigurar = faltantesDe(ficha, reglas);
   // 🔴 EL CANDADO DEL PAGO, Y ES ESTA LÍNEA. Quien está marcado como servicio
@@ -1836,6 +1890,8 @@ export function armarLinea(
     horasEfectivas.extraNoAprobadaNocturnoMin || 0,
     rataDeLaLinea,
     reglas,
+    // 🔴 El domingo y el feriado sin aprobar también se dicen (10-sep-2026).
+    horasEfectivas.extraNoAprobadaDomFerMin || 0,
   );
 
   return {
@@ -1861,6 +1917,7 @@ export function armarLinea(
         : null,
     noMarcaReloj: noMarca,
     decidirAMano: motivoDecidir,
+    prorrateo: prorrateoTexto,
     quincenalReferencia,
     codigo: ficha.codigo,
     etiqueta: etiquetaPersona(ficha.codigo, ficha.nombre),
@@ -1917,6 +1974,12 @@ export interface OpcionesPlanilla {
    * Es lo que hace que las 29 fichas sin `fecha_ingreso` se comporten como hoy.
    */
   decidirAMano?: ReadonlyMap<string, string>;
+  /**
+   * 🔴 Quien entró o salió a mitad del período cobra los días TRABAJADOS
+   * (10-sep-2026): `factor` multiplica al sueldo quincenal y `texto` lo dice.
+   * Ver `prorrateo-ingreso.ts`.
+   */
+  prorrateo?: ReadonlyMap<string, { factor: number; texto: string }>;
   /**
    * Código → justificación viva, para quien NO marcó ni un día en el período.
    *
@@ -2042,8 +2105,12 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
         : partes.filter((pt) => !empresa || pt.empresa === empresa);
 
     for (const parte of paraEstaEmpresa) {
+      // 🔴 El prorrateo de quien entró o salió a mitad del período se COMPONE con
+      // el del rango libre: son dos fracciones distintas del mismo sueldo.
+      const pr = opts.prorrateo?.get(cod) ?? null;
+      const factorDeEsta = pr ? factorBase * pr.factor : factorBase;
       const linea = armarLinea(
-        ficha, h, normalizarManuales(opts.manuales?.get(cod)), reglas, factorBase, motivo,
+        ficha, h, normalizarManuales(opts.manuales?.get(cod)), reglas, factorDeEsta, motivo,
         {
           exigirAprobacion: opts.exigirAprobacionExtra === true,
           // 🔑 Ya no es «este código está aprobado»: es «no le quedó ni un minuto
@@ -2052,6 +2119,7 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
           aprobada: h.extraNoAprobadaMin <= 0,
         },
         parte,
+        pr?.texto ?? null,
       );
       // 🔑 A quien no va en planilla no se le agrega «no marcó ni un día»: eso es
       // un motivo por el que NO SE PUDO PAGAR, y acá no hay nada que pagar. Si le
@@ -2122,7 +2190,7 @@ export type TotalesPlanilla =
 export const TOTALES_CERO: TotalesPlanilla = {
   salarioQuincenal: 0, extraDiurno: 0, extraNocturno: 0, excedente: 0,
   domingos: 0, feriados: 0, ausencias: 0, ausenciaPorTardanza: 0,
-  ausenciaDeDiaCompleto: 0, vacacionesYaPagadas: 0, tardanzas: 0, totalBruto: 0,
+  ausenciaDeDiaCompleto: 0, vacacionesYaPagadas: 0, tardanzas: 0, salidaTemprana: 0, totalBruto: 0,
   seguroSocial: 0, seguroEducativo: 0, isr: 0, prestamo: 0, terceros: 0,
   mercancia: 0, totalDeducciones: 0, otrosServicios: 0, netoPagar: 0,
   personas: 0, sinConfigurar: 0, fueraDePlanilla: 0, decidirAMano: 0,
@@ -2158,6 +2226,7 @@ export function totalizar(lineas: readonly LineaPlanilla[]): TotalesPlanilla {
     t.feriados = centavos(t.feriados + d.feriados);
     t.ausencias = centavos(t.ausencias + d.ausencias);
     t.tardanzas = centavos(t.tardanzas + d.tardanzas);
+    t.salidaTemprana = centavos(t.salidaTemprana + d.salidaTemprana);
     t.totalBruto = centavos(t.totalBruto + d.totalBruto);
     // Los dos desgloses de la ausencia se suman para poder EXPLICAR el total
     // («de los $18,26 de ausencia, $12,40 son de días que llegó muy tarde»).
@@ -2257,6 +2326,6 @@ export function separarSinFicha(lineas: readonly LineaPlanilla[]): {
  * PDF real, no en un harness.
  */
 export const FORMULA_NETO =
-  "Total bruto = quincenal + extras + domingos + feriados - ausencias - tardanzas.  "
+  "Total bruto = quincenal + extras + domingos + feriados - ausencias - tardanzas - salida temprana.  "
   + "Neto a pagar = total bruto - total deducciones + otros servicios "
   + "(otros servicios se SUMA: es un pago extra, no un descuento).";

@@ -170,6 +170,7 @@ export const CLAVES_RENGLON = [
   "feriado",
   "ausencia",
   "tardanzas",
+  "salidaTemprana",
   "totalDevengado",
   "__deducciones",
   "seguroSocial",
@@ -311,6 +312,8 @@ export function armarComprobante(
     R("ausencia", "AUSENCIA", v(d?.ausencias), "dato", false),
     R("tardanzas", "TARDANZAS", v(d?.tardanzas), "dato", false,
       notaTardanza(linea.horas)),
+    // 🔴 10-sep-2026: salir antes de la hora se descuenta (Daniel: «b, se descuenta obvio»).
+    R("salidaTemprana", "SALIDA TEMPRANA", v(d?.salidaTemprana), "dato", false),
     R("totalDevengado", "TOTAL DEVENGADO", v(d?.totalBruto), "total", false),
 
     R("__deducciones", "DEDUCCIONES:", null, "seccion", false),

@@ -394,6 +394,9 @@ describe("⚠️ décimo tercer mes y vacaciones: NO se provisionan", () => {
       "domingos", "excedente", "extraDiurno", "extraNocturno",
       "feriados", "isr", "mercancia", "netoPagar", "otrosServicios", "prestamo",
       "rataHora", "salarioQuincenal", "seguroEducativo", "seguroSocial",
+      // 🔴 10-sep-2026: «salidaTemprana» — salir antes de la hora se descuenta
+      // (Daniel: «b, se descuenta obvio»). Sigue sin provisiones: ese es el candado.
+      "salidaTemprana",
       "tardanzas", "terceros", "totalBruto", "totalDeducciones", "valorMinuto",
       "vacacionesYaPagadas",
     ].sort());

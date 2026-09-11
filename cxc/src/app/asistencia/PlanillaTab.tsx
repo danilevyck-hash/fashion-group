@@ -1440,7 +1440,7 @@ export default function PlanillaTab() {
                   <tr className="border-b border-gray-200 text-[10px] uppercase tracking-wide text-gray-400">
                     <th className="sticky left-0 z-10 bg-white px-3 py-2.5 text-left font-medium">Colaborador</th>
                     {[
-                      "Salario\nquincenal", "Extra\n1.25", "Ausen-\ncias", "Tar-\ndanzas",
+                      "Salario\nquincenal", "Extra\n1.25", "Ausen-\ncias", "Tar-\ndanzas", "Salida\ntemprana",
                       "Extra\n1.50", "Exce-\ndente", "Domin-\ngos", "Feria-\ndos", "Total\nbruto",
                       "Seguro\nsocial", "Seguro\neducativo", "ISR", "Prés-\ntamo", "Ter-\nceros",
                       "Mercan-\ncía", "Total\ndeducc.",
@@ -1513,7 +1513,7 @@ export default function PlanillaTab() {
                     </td>
                     {[
                       data.totales.salarioQuincenal, data.totales.extraDiurno, data.totales.ausencias,
-                      data.totales.tardanzas, data.totales.extraNocturno, data.totales.excedente,
+                      data.totales.tardanzas, data.totales.salidaTemprana ?? 0, data.totales.extraNocturno, data.totales.excedente,
                       data.totales.domingos, data.totales.feriados, data.totales.totalBruto,
                       data.totales.seguroSocial, data.totales.seguroEducativo, data.totales.isr,
                       data.totales.prestamo, data.totales.terceros, data.totales.mercancia,
@@ -2026,6 +2026,17 @@ function Fila({
         {/* 🔴 EL AJUSTE DE LA QUINCENA ANTERIOR. Sin el chip, un neto que no da
             lo esperado no tiene explicación a la vista. El signo lo dice todo:
             + se le descuenta, − se le devuelve. */}
+        {/* 🔴 EL PRORRATEO SE DICE AL LADO DEL NOMBRE (10-sep-2026): «entró el 27 de
+            julio de 2026: 5 de 12 días hábiles». Sin esto, un quincenal más chico
+            que el sueldo ÷ 2 se lee como un error. */}
+        {l.prorrateo && (
+          <span
+            className="ml-1.5 rounded bg-blue-50 px-1.5 py-0.5 text-[11px] text-blue-800"
+            title="Cobra los días trabajados: sueldo quincenal ÷ días hábiles de la quincena × días hábiles trabajados."
+          >
+            {l.prorrateo}
+          </span>
+        )}
         {!!l.ajusteAnterior && (
           <span
             className="ml-1.5 rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-800"
@@ -2055,6 +2066,7 @@ function Fila({
         )}
       </td>
       {num(d.tardanzas, "text-red-700")}
+      {num(d.salidaTemprana ?? 0, "text-red-700")}
       {num(d.extraNocturno)}
       {num(d.excedente)}
       {num(d.domingos)}
@@ -2144,6 +2156,7 @@ function Tarjeta({
               cuadrar con los dólares de al lado sin que nadie lo note. */}
           {linea(`Ausencias (${textoAusencias(h)})`, d.ausencias, true)}
           {linea(`Tardanzas (${textoTardanzas(h)})`, d.tardanzas, true)}
+          {linea(`Salida temprana (${Math.round(h.salidaTempranaMin ?? 0)} min)`, d.salidaTemprana ?? 0, true)}
           <div className="mt-1 flex justify-between border-t border-gray-200 pt-1 font-semibold">
             <span>Total bruto</span>
             <span className="tabular-nums">${$(d.totalBruto)}</span>

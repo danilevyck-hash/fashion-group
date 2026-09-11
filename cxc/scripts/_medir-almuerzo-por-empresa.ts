@@ -15,7 +15,8 @@ import {
   baseSegurosDeFila, noMarcaRelojDeFila, leerJustificaciones, leerVacaciones, leerRepartos,
 } from "@/lib/asistencia/config-server";
 import { agruparPorCodigo, partesDe } from "@/lib/asistencia/reparto";
-import { codigosFueraDeRango, motivoPeriodoParcial } from "@/lib/asistencia/vigencia";
+import { codigosFueraDeRango } from "@/lib/asistencia/vigencia";
+import { prorrateoPorVigencia } from "@/lib/asistencia/prorrateo-ingreso";
 import { motivosDeQuienNoMarco } from "@/lib/asistencia/periodo";
 import { hoyPanama } from "@/lib/fecha-panama";
 import {
@@ -88,10 +89,11 @@ async function main() {
   const horarioDe = new Map(horarios.map((h) => [h.empleado_codigo, h]));
   const personasVigentes = personas.filter((p) => !fuera.has(p.codigo));
   const decidirAMano = new Map<string, string>();
+  const prorrateo = new Map<string, { factor: number; texto: string }>();
   for (const [codigo, v] of vigencias) {
     if (fuera.has(codigo)) continue;
-    const motivo = motivoPeriodoParcial(v, q.desde, q.hasta);
-    if (motivo) decidirAMano.set(codigo, motivo);
+    const p = prorrateoPorVigencia(v, q.desde, q.hasta);
+    if (p) prorrateo.set(codigo, { factor: p.factor, texto: p.texto });
   }
   const justificados = motivosDeQuienNoMarco({ justificaciones: jRes.filas, vacaciones: vRes.filas });
   const aprobaciones = indexarAprobaciones(aprRes.filas);
@@ -101,7 +103,7 @@ async function main() {
     personas: personasVigentes, fichas, manuales: manualesLeidos.porCodigo,
     jornadaDiariaMin: (c: string) => jornadaDiariaMin(horarioDe.get(c)),
     reglas, empresa: null, exigirAprobacionExtra: true, diasExtraAprobados,
-    factorBase: q.factorBase, decidirAMano, justificados,
+    factorBase: q.factorBase, decidirAMano, prorrateo, justificados,
   });
   const { lineas } = separarSinFicha(todas);
 
@@ -116,6 +118,8 @@ async function main() {
       extraMin: p.resumen.extraMin,
       ausencias: p.resumen.ausenciasSinJustificar,
       dinero: lineas.find((l) => l.codigo === p.codigo)?.dinero ?? null,
+      decidir: lineas.find((l) => l.codigo === p.codigo)?.decidirAMano ?? null,
+      prorrateo: lineas.find((l) => l.codigo === p.codigo)?.prorrateo ?? null,
     }))
     .sort((a, b) => a.codigo.localeCompare(b.codigo));
   writeFileSync(salida, JSON.stringify({ quincena: clave, hoy, personas: porPersona }, null, 1));

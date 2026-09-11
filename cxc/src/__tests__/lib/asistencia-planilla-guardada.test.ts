@@ -50,7 +50,7 @@ const DINERO: DineroLinea = {
   rataHora: 3.02, valorMinuto: 3.02 / 60, salarioQuincenal: 261.74,
   extraDiurno: 12.58, extraNocturno: 0, excedente: 0,
   domingos: 0, feriados: 0, ausencias: 24.16, ausenciaPorTardanza: 1.51,
-  ausenciaDeDiaCompleto: 22.65, vacacionesYaPagadas: 0, tardanzas: 2.37,
+  ausenciaDeDiaCompleto: 22.65, vacacionesYaPagadas: 0, tardanzas: 2.37, salidaTemprana: 0,
   totalBruto: 250.16, baseSeguros: null, seguroSocial: 24.39, seguroEducativo: 3.13,
   isr: 0, prestamo: 50, terceros: 0, mercancia: 10,
   totalDeducciones: 87.52, otrosServicios: 0, netoPagar: 162.64,
@@ -91,12 +91,15 @@ describe("🔴 se congela TODO: las 24 cifras de dinero y las 20 del reloj", () 
     // los minutos que se pagan SIN aprobación porque son el horario de la
     // tienda de ACS. La regla que este candado protege no cambió — el número
     // exacto y que NINGUNA columna se repita entre los dos mapas.
-    expect(dinero.length).toBe(24);
-    expect(horas.length).toBe(21);
-    expect(new Set(dinero).size).toBe(24);
-    expect(new Set(horas).size).toBe(21);
+    // 🔴 10-sep-2026 (tarde): dinero 24 → 25 (`salida_temprana`: salir antes de la
+    // hora se descuenta, Daniel: «b, se descuenta obvio») y horas 21 → 22
+    // (`salida_temprana_min`). Migración 20261104120000. La regla no cambió.
+    expect(dinero.length).toBe(25);
+    expect(horas.length).toBe(22);
+    expect(new Set(dinero).size).toBe(25);
+    expect(new Set(horas).size).toBe(22);
     // Una columna de dinero con el nombre de una de horas se pisaría en la fila.
-    expect(new Set([...dinero, ...horas]).size).toBe(45);
+    expect(new Set([...dinero, ...horas]).size).toBe(47);
   });
 
   it("la fila escrita trae TODAS las columnas, con el valor de la línea", () => {
@@ -441,7 +444,11 @@ describe("🔴 la migración sostiene lo que el código promete", () => {
     // `extra_auto_min` con los 30 minutos de ACS. La regla no cambió —ninguna
     // columna del mapa puede faltar en la base— pero la base ya no se describe
     // en un solo archivo.
+    // 🔴 10-sep-2026: `salida_temprana` / `salida_temprana_min` / `prorrateo`
+    // viven en su propia migración aditiva (20261104120000). La regla no cambió:
+    // toda columna de los dos mapas tiene que existir en ALGÚN SQL del repo.
     const TODAS = [SQL,
+      leerMigracion("20261104120000_planilla_guardada_salida_temprana.sql"),
       leerMigracion("20261028120000_planilla_unida.sql"),
       leerMigracion("20261101120000_acs_aprueba_daniel.sql"),
     ].join("\n");

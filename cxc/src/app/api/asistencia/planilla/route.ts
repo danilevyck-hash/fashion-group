@@ -65,9 +65,9 @@ import { etiquetaPersona } from "@/lib/asistencia/directorio";
 import {
   codigosFueraDeRango,
   marcoDespuesDeLaBaja,
-  motivoPeriodoParcial,
   ultimoDiaConMarcas,
 } from "@/lib/asistencia/vigencia";
+import { prorrateoPorVigencia } from "@/lib/asistencia/prorrateo-ingreso";
 import {
   avisoPeriodoAbierto,
   textoCodigosSinFicha,
@@ -525,15 +525,17 @@ export async function GET(req: NextRequest) {
 
     // ── QUIÉN NECESITA QUE LO DECIDA UNA PERSONA ─────────────────────────────
     //
-    // 🔴 (a) QUIEN ENTRÓ O SALIÓ A MITAD DEL PERÍODO. No se le calcula pago, ni
-    // completo ni prorrateado: las dos cuentas automáticas están mal por lados
-    // opuestos (ver `motivoPeriodoParcial`). Sale con el motivo escrito y fuera
-    // del total, y la contadora saca lo suyo con el rango de fechas libre.
+    // 🔴 (a) QUIEN ENTRÓ O SALIÓ A MITAD DEL PERÍODO COBRA LOS DÍAS TRABAJADOS
+    // (10-sep-2026, Daniel: *«c, se paga días trabajados»*): sueldo quincenal ÷
+    // días hábiles de la quincena × días hábiles desde que entró (o hasta que
+    // salió). Hasta ese día salía en «Tú decides» sin número. Ver
+    // `prorrateo-ingreso.ts`; el motivo sigue escrito al lado del pago.
     const decidirAMano = new Map<string, string>();
+    const prorrateo = new Map<string, { factor: number; texto: string }>();
     for (const [codigo, v] of vigencias) {
       if (fuera.has(codigo)) continue;
-      const motivo = motivoPeriodoParcial(v, q.desde, q.hasta);
-      if (motivo) decidirAMano.set(codigo, motivo);
+      const p = prorrateoPorVigencia(v, q.desde, q.hasta);
+      if (p) prorrateo.set(codigo, { factor: p.factor, texto: p.texto });
     }
 
     // 🔴 (b) QUIEN TIENE UNA JUSTIFICACIÓN VIVA Y NO MARCÓ NI UN DÍA. RODRIGO
@@ -580,6 +582,7 @@ export async function GET(req: NextRequest) {
       // 🔴 Lo que prorratea el sueldo. 1 cuando el período es una quincena.
       factorBase: q.factorBase,
       decidirAMano,
+      prorrateo,
       justificados,
     });
 
