@@ -5,6 +5,7 @@ import { fetchVentasResumen, fetchClientes, fetchMultifashion, fetchAvailableYea
 import { lineaDeRechazos } from "@/lib/rechazos-de-switch";
 import { VentasShell } from "./VentasShell";
 import { verifySession } from "@/lib/session-cookie";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 export const dynamic = "force-dynamic";
 // El SSR de esta página cruza el empalme switch_facturas/ventas_raw (blend
@@ -23,14 +24,20 @@ export default async function VentasPage() {
   if (!role) redirect("/");
   if (role !== "admin") redirect("/home");
 
-  const now = new Date();
-  const year = now.getFullYear();
+  // 🔴 EL «HOY» ES EL DE PANAMÁ, no el del servidor (11-sep-2026). Esta página
+  // corre en Vercel, que va en UTC: las últimas 5 horas de cada día —después de
+  // las 7 p.m. de Panamá— el día UTC ya es el siguiente, así que cada 31 le
+  // pedía a Multifashion el mes que viene, y la noche del 31-dic la pantalla
+  // abría en el año nuevo, vacío. Es el mismo defecto que ya se corrigió en
+  // Comisiones (6-sep) y en `ventas_dashboard_prev_same_period_v3` (3-sep).
+  const hoy = hoyPanama();
+  const year = Number(hoy.slice(0, 4));
   // mes 1-indexed = mes en curso del calendario. multifashion_mensual_v6
   // suma WHERE mes <= p_mes para los KPIs YTD (retail.ytdVentas, ticketProm,
   // margen tienda completa, etc.) — pasarlo como mes en curso garantiza que la data parcial
   // del mes (ej. mayo 1–9) entra al YTD. retail.meses[mes_en_curso] marca
   // es_periodo_parcial=true así que el footer / label sub muestran el corte.
-  const mes = now.getMonth() + 1;
+  const mes = Number(hoy.slice(5, 7));
 
   // ⚠️ El aviso de montos va DENTRO del mismo Promise.all: en serie le sumaría
   // ~380 ms a una pantalla que ya es la más pesada del sistema. Es UNA consulta

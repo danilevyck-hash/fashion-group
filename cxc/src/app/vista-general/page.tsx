@@ -6,6 +6,7 @@ import useSWR from "swr";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useUrlState } from "@/lib/hooks/useUrlState";
+import { hoyPanama } from "@/lib/fecha-panama";
 // Módulo PURO (no arrastra supabase al navegador): las etiquetas de "por qué no
 // hay número" salen del MISMO lugar que las usa el servidor.
 import RentabilidadPorEmpresa, {
@@ -54,9 +55,15 @@ const MESES_ES = [
 ];
 const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
+// 🔴 EL MES CON QUE ABRE ESTA PANTALLA ES EL DE **PANAMÁ**, no el del reloj
+// del navegador (11-sep-2026). Decía `new Date()` y `getMonth()`, o sea la
+// zona horaria del aparato: un iPhone puesto en Tokio abre Vista General en el
+// mes siguiente antes de tiempo, y el 1 de cada mes a las 7 p.m. de Panamá el
+// mes ya habría cambiado para quien tenga el reloj adelantado. Es el mismo
+// defecto que ya se corrigió en Comisiones (6-sep) y en la RPC del año
+// anterior (3-sep). `hoyPanama()` es la única fuente de «hoy» de la casa.
 function mesActual(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  return hoyPanama().slice(0, 7);
 }
 
 function mesValido(ym: string): boolean {
