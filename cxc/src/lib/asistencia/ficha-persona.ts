@@ -20,6 +20,7 @@
 
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { etiquetaEmpresa } from "./config";
+import { CHIP_NO_COBRA_HORAS_EXTRA, EXPLICACION_NO_COBRA_HORAS_EXTRA } from "./cobra-horas-extra";
 
 /** Lo que la página necesita saber de una persona para dibujarla. */
 export interface PersonaFicha {
@@ -43,6 +44,8 @@ export interface PersonaFicha {
   baseSeguros: number | null;
   /** `true` = marca el reloj pero NO va en planilla. */
   servicioProfesional: boolean;
+  /** `false` = no cobra horas extra (10-sep-2026). Ausente = sí, como todos. */
+  cobraHorasExtra?: boolean;
   /** Las partes de un sueldo repartido entre dos empresas. Vacío = una sola. */
   reparto?: readonly { empresa: string; salarioMensual: number }[];
   /** «Renunció el 12 de agosto de 2026». `null` = sigue trabajando. */
@@ -149,6 +152,14 @@ export function excepcionesDeLaFicha(p: PersonaFicha): EtiquetaExcepcion[] {
       clave: "no-marca",
       texto: "No marca reloj",
       ayuda: "Cobra fijo: sus horas no salen del reloj.",
+    });
+  }
+  if (p.cobraHorasExtra === false) {
+    out.push({
+      clave: "sin-horas-extra",
+      texto: CHIP_NO_COBRA_HORAS_EXTRA,
+      ayuda: EXPLICACION_NO_COBRA_HORAS_EXTRA,
+      ojo: true,
     });
   }
   if (!p.pagaSeguros) {

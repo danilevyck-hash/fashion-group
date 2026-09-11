@@ -132,6 +132,7 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
           pagaSeguros: b.pagaSeguros,
           baseSeguros: b.baseSeguros.trim() === "" ? null : b.baseSeguros.trim(),
           noMarcaReloj: b.noMarcaReloj,
+          cobraHorasExtra: b.cobraHorasExtra,
           saldoVacacionesDias: b.saldoVacaciones.trim() === "" ? null : b.saldoVacaciones.trim(),
           posicion: b.posicion.trim(),
           cedula: b.cedula.trim(),

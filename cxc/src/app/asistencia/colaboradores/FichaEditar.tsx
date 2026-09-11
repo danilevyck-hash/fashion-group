@@ -24,6 +24,10 @@
  * que decide qué es válido.
  * ────────────────────────────────────────────────────────────────────────── */
 
+import {
+  ETIQUETA_COBRA_HORAS_EXTRA, ETIQUETA_NO_COBRA_HORAS_EXTRA, EXPLICACION_NO_COBRA_HORAS_EXTRA,
+  PREGUNTA_COBRA_HORAS_EXTRA,
+} from "@/lib/asistencia/cobra-horas-extra";
 import { useState } from "react";
 
 import { EMPRESAS_ASISTENCIA, etiquetaEmpresa, JORNADAS } from "@/lib/asistencia/config";
@@ -66,6 +70,8 @@ export interface BorradorFicha {
   pagaSeguros: boolean;
   baseSeguros: string;
   noMarcaReloj: boolean;
+  /** Sí por defecto para todos (10-sep-2026). */
+  cobraHorasExtra: boolean;
   fechaSalida: string;
   motivoSalida: string;
 }
@@ -88,6 +94,7 @@ export function borradorDe(p: PersonaDeLaPagina | null, codigo: string): Borrado
     pagaSeguros: p?.pagaSeguros ?? true,
     baseSeguros: p?.baseSeguros === null || p?.baseSeguros === undefined ? "" : String(p.baseSeguros),
     noMarcaReloj: p?.noMarcaReloj ?? false,
+    cobraHorasExtra: p?.cobraHorasExtra ?? true,
     fechaSalida: p?.fechaSalida ?? "",
     motivoSalida: p?.motivoSalida ?? "",
   };
@@ -95,7 +102,7 @@ export function borradorDe(p: PersonaDeLaPagina | null, codigo: string): Borrado
 
 /** ¿Esta ficha tiene alguna excepción prendida? Decide si el bloque abre solo. */
 function tieneExcepciones(b: BorradorFicha): boolean {
-  return b.servicioProfesional || !b.pagaSeguros || b.baseSeguros.trim() !== "" || b.noMarcaReloj;
+  return b.servicioProfesional || !b.pagaSeguros || b.baseSeguros.trim() !== "" || b.noMarcaReloj || !b.cobraHorasExtra;
 }
 
 const CAMPO =
@@ -246,6 +253,16 @@ export default function FichaEditar({
                 onChange={(e) => set({ noMarcaReloj: e.target.value === "no" })}>
                 <option value="si">{ETIQUETA_MARCA_RELOJ}</option>
                 <option value="no">{ETIQUETA_NO_MARCA_RELOJ}</option>
+              </select>
+            </Campo>
+            {/* 🔴 «Cobra horas extra», en Sí para todos (10-sep-2026, Daniel:
+                «por default a todos sí»). Apagada: no sale en Aprobaciones y
+                no se le paga recargo; tardanzas y ausencias siguen. */}
+            <Campo etiqueta={PREGUNTA_COBRA_HORAS_EXTRA} ayuda={b.cobraHorasExtra ? undefined : EXPLICACION_NO_COBRA_HORAS_EXTRA}>
+              <select className={CAMPO} value={b.cobraHorasExtra ? "si" : "no"}
+                onChange={(e) => set({ cobraHorasExtra: e.target.value === "si" })}>
+                <option value="si">{ETIQUETA_COBRA_HORAS_EXTRA}</option>
+                <option value="no">{ETIQUETA_NO_COBRA_HORAS_EXTRA}</option>
               </select>
             </Campo>
             {/* ⚠️ LO DE TERCEROS NO ESTÁ ACÁ A PROPÓSITO. El monto y la cuota

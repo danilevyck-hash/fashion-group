@@ -20,6 +20,8 @@ export interface PersonaDeLaPagina {
   pagaSeguros: boolean;
   baseSeguros: number | null;
   noMarcaReloj: boolean;
+  /** `false` = no cobra horas extra (10-sep-2026). Ausente = sí. */
+  cobraHorasExtra?: boolean;
   posicion?: string | null;
   cedula?: string | null;
   /** La rata por hora, ya calculada por el servidor. */
