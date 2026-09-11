@@ -86,7 +86,7 @@ import type {
   SugerenciaPrestamo,
 } from "@/lib/asistencia/prestamos-planilla";
 import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
-import { PESTANA_FICHAS } from "@/lib/asistencia/persona-en-el-centro";
+import { PESTANA_FICHAS, dondeSeCargaLaFicha } from "@/lib/asistencia/persona-en-el-centro";
 import { netoConAjuste, textoCorte } from "@/lib/asistencia/corte-quincena";
 // 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
@@ -1378,7 +1378,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           {data.avisos.sinHorario === 1 ? "colaborador no tiene" : "colaboradores no tienen"} su hora de
           salida confirmada. Mientras tanto se asume {data.avisos.salidaAsumida} para las horas
           extra, y un día de ausencia se cuenta como{" "}
-          <b>{data.avisos.horasAusenciaDefault} horas</b>. Revísalo en <b>Horarios</b>.
+          <b>{data.avisos.horasAusenciaDefault} horas</b>. Se confirma {dondeSeCargaLaFicha()}, en <b>{PESTANA_FICHAS}</b>.
         </p>
       )}
       {!!data?.avisos.conSabado && (

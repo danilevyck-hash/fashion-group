@@ -7,7 +7,7 @@
 // está al lado del número que genera la discusión. Sin jerga y sin fórmulas.
 
 import { useEffect, useState } from "react";
-import { PESTANA_FICHAS } from "@/lib/asistencia/persona-en-el-centro";
+import { PESTANA_FICHAS, dondeSeCargaLaFicha } from "@/lib/asistencia/persona-en-el-centro";
 import { textoAlmuerzo, REGLAS_DEFAULT, type ReglasAsistencia } from "@/lib/asistencia/config";
 import { MOTIVOS_JUSTIFICACION } from "@/lib/asistencia/motivos";
 
@@ -129,7 +129,7 @@ export default function ComoFuncionaTab() {
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         <h3 className="text-sm font-medium text-gray-900">Antes de descontarle a alguien</h3>
         <ul className="mt-1 space-y-1.5 text-[13px] leading-relaxed text-gray-600">
-          <li>· Revisa en <b>Horarios</b> que la hora de salida de ese colaborador sea la correcta. La que trae el reloj viene equivocada seguido.</li>
+          <li>· Revisa {dondeSeCargaLaFicha()} que su hora de salida sea la correcta. La que trae el reloj viene equivocada seguido.</li>
           <li>· Mira si sus minutos vienen de <b>días a revisar</b>: ahí el número puede estar inflado porque no marcó.</li>
           <li>· Comprueba que las <b>justificaciones</b> del período ya estén cargadas.</li>
           <li>· Los números de arriba se cambian en <b>{PESTANA_FICHAS}</b> si la regla cambia.</li>
