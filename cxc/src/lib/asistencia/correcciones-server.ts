@@ -23,6 +23,8 @@ import {
   TABLA_CORRECCIONES,
   type Correccion,
 } from "./correcciones";
+import { desdeDeLaVentana, motivosFrecuentes } from "./motivos-frecuentes";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 /** Las columnas que se leen. Una sola lista, para que no se puedan separar. */
 const COLS =
@@ -150,6 +152,35 @@ export async function leerHistorialDelDia(
     })),
     faltaMigracion: false,
   };
+}
+
+/**
+ * Los motivos más usados de los últimos 90 días, para los botones de la ventana
+ * (11-sep-2026). SOLO LECTURA de `motivo` y `creada_en`; la regla entera vive
+ * en `motivos-frecuentes.ts`. Sin la tabla (o si falla la lectura) devuelve
+ * vacío: la ventana sigue sirviendo con el campo libre, que es lo que se guarda.
+ */
+export async function leerMotivosFrecuentes(hoy = hoyPanama()): Promise<string[]> {
+  try {
+    const { data, error } = await supabaseServer
+      .from(TABLA_CORRECCIONES)
+      .select("motivo, creada_en")
+      .gte("creada_en", `${desdeDeLaVentana(hoy)}T00:00:00-05:00`)
+      .order("creada_en", { ascending: false })
+      .limit(1000);
+    if (error) {
+      if (esTablaFaltante(error, TABLA_CORRECCIONES)) return [];
+      throw new Error(error.message);
+    }
+    const filas = (data ?? []) as Array<{ motivo: string; creada_en: string }>;
+    return motivosFrecuentes(
+      filas.map((f) => ({ motivo: String(f.motivo ?? ""), creadaEn: String(f.creada_en ?? "") })),
+      hoy,
+    );
+  } catch (e) {
+    console.error("[asistencia/correcciones motivos]", e instanceof Error ? e.message : String(e));
+    return [];
+  }
 }
 
 export interface NuevaCorreccion {
