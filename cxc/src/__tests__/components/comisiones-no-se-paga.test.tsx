@@ -24,10 +24,10 @@ vi.mock("@/lib/ventas/comisionExcel", async (importOriginal) => ({
   exportComisionesConsolidado: async (c: never) => { excelRecibido.consolidado = c; },
 }));
 
-import { ComisionesPorEmpresaView } from "@/components/ventas/ComisionesPorEmpresaView";
-import { ComisionesConsolidadoView } from "@/components/ventas/ComisionesConsolidadoView";
+import { ComisionesPorEmpresaView } from "@/components/comisiones/ComisionesPorEmpresaView";
+import { ComisionesConsolidadoView } from "@/components/comisiones/ComisionesConsolidadoView";
 import { buildComisionesResumenSheet, buildComisionesConsolidadoSheet } from "@/lib/ventas/comisionExcel";
-import type { ExcelApi } from "@/components/ventas/ComisionesView";
+import type { ExcelApi } from "@/components/comisiones/ComisionesView";
 
 const fila = (vendedor: string, cobro: number, se_paga: boolean) => ({
   vendedor,

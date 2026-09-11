@@ -56,10 +56,10 @@ vi.mock("@/lib/ventas/comisionExcel", async (importOriginal) => ({
   exportComisionesConsolidado: async (c: never) => { excelRecibido.consolidado = c; },
 }));
 
-import { ComisionesPorEmpresaView } from "@/components/ventas/ComisionesPorEmpresaView";
-import { ComisionesConsolidadoView } from "@/components/ventas/ComisionesConsolidadoView";
-import { ComisionesDetalleModal } from "@/components/ventas/ComisionesDetalleModal";
-import { ComisionesConfiguracionView } from "@/components/ventas/ComisionesConfiguracionView";
+import { ComisionesPorEmpresaView } from "@/components/comisiones/ComisionesPorEmpresaView";
+import { ComisionesConsolidadoView } from "@/components/comisiones/ComisionesConsolidadoView";
+import { ComisionesDetalleModal } from "@/components/comisiones/ComisionesDetalleModal";
+import { ComisionesConfiguracionView } from "@/components/comisiones/ComisionesConfiguracionView";
 import {
   buildComisionesResumenSheet,
   buildComisionesConsolidadoSheet,
@@ -73,7 +73,7 @@ import { nombreVendedorEnPantalla, type AliasVendedor } from "@/lib/comisiones/a
 // encabezado lo arma este módulo puro, no la pantalla.
 import { encabezadoReporte } from "@/lib/comisiones/reporte-comision";
 import { ETIQUETA_DEFAULT } from "@/lib/comisiones/vendedor-default";
-import type { ExcelApi } from "@/components/ventas/ComisionesView";
+import type { ExcelApi } from "@/components/comisiones/ComisionesView";
 
 const CANONICO = "REYNALDO ESPINOSA";
 const BONITO = "Reynaldo Espinosa";

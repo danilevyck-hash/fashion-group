@@ -114,17 +114,17 @@ describe("🔴 con «Todo el año» no hay flecha por vendedor (el papel del per
     // comporte igual»*. El papel de arriba es LA MATRIZ, que existe igual para
     // el año; el que es de un mes es el reporte por VENDEDOR, y ése sigue
     // condicionado (CONTROL abajo).
-    const shell = plano(leer("src/components/ventas/ComisionesView.tsx"));
+    const shell = plano(leer("src/components/comisiones/ComisionesView.tsx"));
     expect(shell).toContain("rotuloDescargarPdf(mes)");
     expect(shell).toContain("onClick={() => pdfRef.current?.()}");
     // Y la vista que lo alimenta registra su papel.
-    expect(plano(leer("src/components/ventas/ComisionesConsolidadoView.tsx")))
+    expect(plano(leer("src/components/comisiones/ComisionesConsolidadoView.tsx")))
       .toContain("onPdf?.(");
-    expect(plano(leer("src/components/ventas/ComisionesPorEmpresaView.tsx")))
+    expect(plano(leer("src/components/comisiones/ComisionesPorEmpresaView.tsx")))
       .toContain("onPdf?.(");
     // CONTROL AL REVÉS — la regla original sigue viva donde nació: la flechita
     // de la celda SÍ cuelga de que haya un mes elegido.
-    expect(plano(leer("src/components/ventas/ComisionesConsolidadoView.tsx")))
+    expect(plano(leer("src/components/comisiones/ComisionesConsolidadoView.tsx")))
       .toContain("conDescargaPorVendedor(mes)");
   });
 
@@ -186,7 +186,7 @@ describe("🔴 el PDF y el Excel del mismo alcance se llaman IGUAL", () => {
 // ═══ 6 · Lo que NO se tocó ══════════════════════════════════════════════════
 
 describe("🔴 la flecha AGREGA un camino; no reemplaza ninguno", () => {
-  const matriz = plano(leer("src/components/ventas/ComisionesConsolidadoView.tsx"));
+  const matriz = plano(leer("src/components/comisiones/ComisionesConsolidadoView.tsx"));
 
   it("tocar el número sigue abriendo el detalle", () => {
     expect(matriz).toContain("detalleDe(k, r.vendedor)");
@@ -195,7 +195,7 @@ describe("🔴 la flecha AGREGA un camino; no reemplaza ninguno", () => {
   });
 
   it("y la flecha PARA el clic, para que los dos caminos convivan", () => {
-    const menu = plano(leer("src/components/ventas/comisiones-detalle/MenuDescargaComision.tsx"));
+    const menu = plano(leer("src/components/comisiones/comisiones-detalle/MenuDescargaComision.tsx"));
     expect(menu).toContain("e.stopPropagation()");
   });
 
@@ -206,10 +206,10 @@ describe("🔴 la flecha AGREGA un camino; no reemplaza ninguno", () => {
     // paso a imprimir?»* — ahora el papel es el PDF de `pdf-comision`, y la
     // regla es la misma: el archivo de la flecha y el de adentro del detalle
     // salen del MISMO generador.
-    const motor = plano(leer("src/components/ventas/comisiones-detalle/useDescargaComision.tsx"));
+    const motor = plano(leer("src/components/comisiones/comisiones-detalle/useDescargaComision.tsx"));
     expect(motor).toContain("exportComisionDetalle");
     expect(motor).toContain("descargarPdfComision");
-    const modal = plano(leer("src/components/ventas/ComisionesDetalleModal.tsx"));
+    const modal = plano(leer("src/components/comisiones/ComisionesDetalleModal.tsx"));
     expect(modal).toContain("descargarPdfComision");
     // Y la MISMA lectura que hace el detalle, con los mismos parámetros.
     expect(motor).toContain("/api/ventas/comisiones/detalle?");
@@ -222,7 +222,7 @@ describe("🔴 la flecha AGREGA un camino; no reemplaza ninguno", () => {
     // atrás); lo que cambió es que ya no hace falta taparlo con CSS: el PDF se
     // arma SOLO con las hojas que se le pasan, así que nada montado en <body>
     // puede colarse. Se exige que el motor no lea el DOM.
-    const motor = plano(leer("src/components/ventas/comisiones-detalle/useDescargaComision.tsx"));
+    const motor = plano(leer("src/components/comisiones/comisiones-detalle/useDescargaComision.tsx"));
     expect(motor).not.toContain("createPortal");
     expect(motor).not.toContain("document.body");
     expect(motor).not.toContain("window.print");
@@ -234,12 +234,12 @@ describe("🔴 la flecha AGREGA un camino; no reemplaza ninguno", () => {
     expect(papel).not.toContain("window.print");
     // CONTROL de la regla original: el archivo de la hoja HTML NO se borró —
     // conserva la guardia de CSS que documenta el defecto que la obligó.
-    expect(leer("src/components/ventas/comisiones-detalle/ImpresionTablaComisiones.tsx"))
+    expect(leer("src/components/comisiones/comisiones-detalle/ImpresionTablaComisiones.tsx"))
       .toContain("body > [data-cds-print]:not([data-cds-tabla]) { display: none !important; }");
   });
 
   it("⚠️ el papel del detalle sigue llevando la factura LARGA y la columna Tipo", () => {
-    const papel = plano(leer("src/components/ventas/comisiones-detalle/ImpresionComision.tsx"));
+    const papel = plano(leer("src/components/comisiones/comisiones-detalle/ImpresionComision.tsx"));
     expect(papel).toContain("{v.secuencial}");
     expect(papel).toContain("tipoDocCorto(v.tipo)");
   });
@@ -248,7 +248,7 @@ describe("🔴 la flecha AGREGA un camino; no reemplaza ninguno", () => {
 // ═══ 7 · El botón de arriba trae LAS SEIS ══════════════════════════════════
 
 describe("🔴 el botón de arriba trae las 6 empresas, no una", () => {
-  const matriz = plano(leer("src/components/ventas/ComisionesConsolidadoView.tsx"));
+  const matriz = plano(leer("src/components/comisiones/ComisionesConsolidadoView.tsx"));
 
   it("el papel del período recorre la MISMA lista de empresas que la tabla", () => {
     // 🔄 9-SEP-2026 — CAMBIA DE DIRECCIÓN, NO SE BORRA. El papel dejó de ser una
@@ -282,21 +282,21 @@ describe("🔴 el botón de arriba trae las 6 empresas, no una", () => {
 describe("🔴 quién decide qué se dibuja vive en el módulo puro", () => {
   it("ninguna pantalla se escribe su propia condición", () => {
     for (const f of [
-      "src/components/ventas/ComisionesConsolidadoView.tsx",
-      "src/components/ventas/ComisionesTarjetas.tsx",
+      "src/components/comisiones/ComisionesConsolidadoView.tsx",
+      "src/components/comisiones/ComisionesTarjetas.tsx",
     ]) {
       const src = plano(leer(f));
       // Nada de `val !== 0 &&` o `val !== undefined &&` decidiendo la flecha.
       expect(src, f).not.toMatch(/val\s*!==\s*(0|undefined)\s*&&/);
     }
-    const matriz = plano(leer("src/components/ventas/ComisionesConsolidadoView.tsx"));
+    const matriz = plano(leer("src/components/comisiones/ComisionesConsolidadoView.tsx"));
     expect(matriz).toContain("hayQueDescargar(");
     expect(matriz).toContain("hayQueDescargarTotal(");
     expect(matriz).toContain("conDescargaPorVendedor(mes)");
   });
 
   it("las tarjetas del celular no saben nada de rutas ni de archivos", () => {
-    const tarjetas = plano(leer("src/components/ventas/ComisionesTarjetas.tsx"));
+    const tarjetas = plano(leer("src/components/comisiones/ComisionesTarjetas.tsx"));
     expect(tarjetas).not.toContain("fetch(");
     expect(tarjetas).not.toContain("exportComision");
     // Reciben la flecha ya dibujada por la vista, que es la dueña.

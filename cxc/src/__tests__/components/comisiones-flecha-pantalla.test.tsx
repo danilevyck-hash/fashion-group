@@ -45,7 +45,7 @@ vi.mock("@/lib/ventas/comisionExcel", async (original) => {
   };
 });
 
-import { ComisionesConsolidadoView } from "@/components/ventas/ComisionesConsolidadoView";
+import { ComisionesConsolidadoView } from "@/components/comisiones/ComisionesConsolidadoView";
 
 const REYNALDO = "REYNALDO ESPINOSA";
 

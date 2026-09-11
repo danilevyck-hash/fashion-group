@@ -441,7 +441,7 @@ describe("el toggle del descuento solo lo ve quien puede escribirlo", () => {
 
   async function abrir(rol: string) {
     sessionStorage.setItem("cxc_role", rol);
-    const { ComisionesDetalleModal } = await import("@/components/ventas/ComisionesDetalleModal");
+    const { ComisionesDetalleModal } = await import("@/components/comisiones/ComisionesDetalleModal");
     render(
       <ComisionesDetalleModal
         empresa="vistana" empresaNombre="Vistana" year={2026} mes={7}
@@ -470,7 +470,7 @@ describe("el toggle del descuento solo lo ve quien puede escribirlo", () => {
   it("🔴 la lista del gate de UI es ESPEJO del `requireRole` del POST", async () => {
     // Si el server se afloja o se cierra y la UI no se entera, vuelve el botón
     // que da 403 (o desaparece uno que sí funcionaba).
-    const { ROLES_EDITAR_DESCUENTOS } = await import("@/components/ventas/ComisionesDetalleModal");
+    const { ROLES_EDITAR_DESCUENTOS } = await import("@/components/comisiones/ComisionesDetalleModal");
     const ruta = plano(leer("src/app/api/ventas/comisiones/descuentos/route.ts"));
     const post = ruta.slice(ruta.indexOf("export async function POST"));
     const lista = /requireRole\(req,\s*\[([^\]]*)\]\)/.exec(post)!;
@@ -485,9 +485,9 @@ describe("el toggle del descuento solo lo ve quien puede escribirlo", () => {
     // CAMBIÓ DE DIRECCIÓN el 3-sep-2026 (noche): el botón «Configurar» de Por
     // empresa se quitó (Daniel: «configuración en dos lados»); la única entrada
     // es el chip «Configuración» del shell, que solo se dibuja al admin.
-    const porEmpresa = plano(leer("src/components/ventas/ComisionesPorEmpresaView.tsx"));
+    const porEmpresa = plano(leer("src/components/comisiones/ComisionesPorEmpresaView.tsx"));
     expect(porEmpresa).not.toMatch(/Configurar/);
-    const shell = plano(leer("src/components/ventas/ComisionesView.tsx"));
+    const shell = plano(leer("src/components/comisiones/ComisionesView.tsx"));
     expect(shell).toMatch(/const hayConfig = esAdmin && conConfiguracion;/);
     // 🔄 6-sep-2026: era un chip entre las 4 pestañas y hoy es el ⚙ que se
     // dibuja SOLO con `hayConfig`. La condición no cambió.

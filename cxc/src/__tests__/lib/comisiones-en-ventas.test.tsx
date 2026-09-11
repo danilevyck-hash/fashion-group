@@ -123,10 +123,10 @@ describe("🔁 Comisiones YA NO es una pestaña de Ventas (5-sep-2026)", () => {
     // RECORTADA. Si /comisiones perdiera `conConfiguracion`, el cambio habría
     // dejado a todo el mundo con la pantalla chica.
     const cliente = plano(leer("src/app/comisiones/ComisionesPageClient.tsx"));
-    expect(cliente).toContain('from "@/components/ventas/ComisionesView"');
+    expect(cliente).toContain('from "@/components/comisiones/ComisionesView"');
     expect(cliente).toContain("<ComisionesView");
     expect(cliente).toContain("conConfiguracion");
-    expect(existsSync(path.join(raiz, "src/components/ventas/ComisionesView.tsx"))).toBe(true);
+    expect(existsSync(path.join(raiz, "src/components/comisiones/ComisionesView.tsx"))).toBe(true);
   });
 
   it("el aviso de los COBROS se fue con la pestaña, y el de Ventas se queda", () => {
@@ -217,7 +217,7 @@ describe("las DOS vistas siguen ahí — «Fashion Group» y una empresa suelta"
 
   it("el modo viejo «todas» abre la matriz de Fashion Group", async () => {
     localStorage.setItem("fg_comisiones_mode", "todas");
-    const { ComisionesView } = await import("@/components/ventas/ComisionesView");
+    const { ComisionesView } = await import("@/components/comisiones/ComisionesView");
     render(<ComisionesView availableYears={[2026, 2025]} />);
     const tabla = await screen.findByRole("table");
     // La matriz: una columna por empresa, con el nombre CORTO.
@@ -230,7 +230,7 @@ describe("las DOS vistas siguen ahí — «Fashion Group» y una empresa suelta"
   it("el modo viejo «empresa» abre la última empresa usada", async () => {
     localStorage.setItem("fg_comisiones_mode", "empresa");
     localStorage.setItem("fg_last_comision_empresa", "fashion_wear");
-    const { ComisionesView } = await import("@/components/ventas/ComisionesView");
+    const { ComisionesView } = await import("@/components/comisiones/ComisionesView");
     render(<ComisionesView availableYears={[2026, 2025]} />);
     const tabla = await screen.findByRole("table");
     // La vista de UNA empresa: sus cinco columnas de números.
@@ -240,9 +240,9 @@ describe("las DOS vistas siguen ahí — «Fashion Group» y una empresa suelta"
   });
 
   it("las dos vistas hijas existen y el shell las monta a las dos", () => {
-    expect(existsSync(path.join(raiz, "src/components/ventas/ComisionesConsolidadoView.tsx"))).toBe(true);
-    expect(existsSync(path.join(raiz, "src/components/ventas/ComisionesPorEmpresaView.tsx"))).toBe(true);
-    const vista = plano(leer("src/components/ventas/ComisionesView.tsx"));
+    expect(existsSync(path.join(raiz, "src/components/comisiones/ComisionesConsolidadoView.tsx"))).toBe(true);
+    expect(existsSync(path.join(raiz, "src/components/comisiones/ComisionesPorEmpresaView.tsx"))).toBe(true);
+    const vista = plano(leer("src/components/comisiones/ComisionesView.tsx"));
     expect(vista).toContain("<ComisionesConsolidadoView");
     expect(vista).toContain("<ComisionesPorEmpresaView");
   });

@@ -290,7 +290,7 @@ describe("5 · Vendedoras", () => {
   });
 
   it("🔴 el ESPEJO de Comisiones conserva sus seis píldoras (no se toca)", () => {
-    const comisiones = leer("src/components/ventas/ComisionesView.tsx");
+    const comisiones = leer("src/components/comisiones/ComisionesView.tsx");
     // ⚠️ CAMBIÓ DE DIRECCIÓN EL 11-SEP-2026, NO SE BORRÓ: el año es el ELEGIDO
     // en el shell (`year`), no el del arranque — en enero `inicial.year` abría
     // el ranking sobre el año pasado. Las píldoras propias siguen intactas.

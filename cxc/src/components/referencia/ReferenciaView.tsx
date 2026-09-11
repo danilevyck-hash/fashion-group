@@ -1,8 +1,10 @@
 "use client";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Tab "Referencia" de /ventas (solo admin — el guard real es el SSR de la
-// página + requireRole en el API; esta vista es solo la cara).
+// La vista del módulo Referencia (`/referencia`, desde el 12-ago-2026; fue una
+// pestaña de /ventas hasta ese día). El guard real es el SSR de la página +
+// requireRole en el API; esta vista es solo la cara. Vive en
+// `components/referencia/` desde el 11-sep-2026: ya no es de Ventas.
 //
 // 🔴 LA ESPECIFICACIÓN ES UNA FRASE DE DANIEL, y la pantalla no muestra nada más:
 //   *"yo lo que quiero ver en cuanto tiempo se me mueve el articulo, para saber

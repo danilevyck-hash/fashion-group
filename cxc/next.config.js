@@ -90,6 +90,9 @@ const nextConfig = {
         destination: "/comisiones",
         permanent: false,
       },
+      // `/ventas/reporte` era una página de 7 líneas que solo redirigía a /ventas
+      // (retirada el 11-sep-2026). El marcador viejo sigue llegando, sin código.
+      { source: "/ventas/reporte", destination: "/ventas", permanent: false },
       // 🔴 DATA HEALTH SE FUE DE LA PANTALLA (11-sep-2026). Daniel, textual:
       // «data health quiero que el sistema o tú mida todo pero no verlo… no lo
       // uso y no lo quiero usar». LA MEDICIÓN SE QUEDA ENTERA — el cron

@@ -915,7 +915,7 @@ describe("las cuatro pestañas, y las Metas adentro de Vendedoras", () => {
     expect(view).toContain("conMetas");
     expect(vendedoras).toContain("conMetas &&");
     const comisiones = readFileSync(
-      path.join(process.cwd(), "src/components/ventas/ComisionesView.tsx"),
+      path.join(process.cwd(), "src/components/comisiones/ComisionesView.tsx"),
       "utf-8",
     );
     // ⚠️ CAMBIÓ DE DIRECCIÓN EL 11-SEP-2026, NO SE BORRÓ: el año es el ELEGIDO

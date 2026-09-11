@@ -3,7 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { ComisionesView } from "@/components/ventas/ComisionesView";
+import { ComisionesView } from "@/components/comisiones/ComisionesView";
 
 export function ComisionesPageClient({
   availableYears,

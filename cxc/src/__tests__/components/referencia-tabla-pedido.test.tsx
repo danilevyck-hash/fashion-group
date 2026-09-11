@@ -13,7 +13,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 
-import { ReferenciaView } from "@/components/ventas/ReferenciaView";
+import { ReferenciaView } from "@/components/referencia/ReferenciaView";
 import { ordenarComoPegado } from "@/lib/ventas/referencia";
 import type { ArticuloCompras, ComprasApiResp } from "@/lib/ventas/compras";
 

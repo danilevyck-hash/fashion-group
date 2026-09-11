@@ -147,7 +147,7 @@ describe("el enlace viejo /ventas?tab=referencia lleva a /referencia", () => {
 describe("/referencia sigue siendo la pantalla viva", () => {
   const pageRel = "app/referencia/page.tsx";
   const clientRel = "app/referencia/ReferenciaClient.tsx";
-  const vistaRel = "components/ventas/ReferenciaView.tsx";
+  const vistaRel = "components/referencia/ReferenciaView.tsx";
 
   it("los tres archivos existen", () => {
     for (const rel of [pageRel, clientRel, vistaRel]) {
@@ -169,7 +169,7 @@ describe("/referencia sigue siendo la pantalla viva", () => {
 
   it("la pantalla REUSA ReferenciaView (no una copia)", () => {
     const client = read(path.join(src, clientRel));
-    expect(client).toContain('from "@/components/ventas/ReferenciaView"');
+    expect(client).toContain('from "@/components/referencia/ReferenciaView"');
     expect(client).toContain("<ReferenciaView />");
   });
 

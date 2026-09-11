@@ -42,9 +42,9 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, within, fireEvent, waitFor, act } from "@testing-library/react";
-import { ComisionesConfiguracionView } from "@/components/ventas/ComisionesConfiguracionView";
-import { ComisionesView } from "@/components/ventas/ComisionesView";
-import { ComisionesPorEmpresaView } from "@/components/ventas/ComisionesPorEmpresaView";
+import { ComisionesConfiguracionView } from "@/components/comisiones/ComisionesConfiguracionView";
+import { ComisionesView } from "@/components/comisiones/ComisionesView";
+import { ComisionesPorEmpresaView } from "@/components/comisiones/ComisionesPorEmpresaView";
 import { fmtDate } from "@/lib/format";
 import { AVISO_NINGUNA_CASILLA } from "@/lib/comisiones/exclusiones";
 

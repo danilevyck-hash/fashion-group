@@ -57,9 +57,9 @@ const leer = (rel: string) => readFileSync(path.join(raiz, rel), "utf8");
 const plano = (t: string) =>
   t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 
-const MATRIZ = "src/components/ventas/ComisionesConsolidadoView.tsx";
-const EMPRESA = "src/components/ventas/ComisionesPorEmpresaView.tsx";
-const SHELL = "src/components/ventas/ComisionesView.tsx";
+const MATRIZ = "src/components/comisiones/ComisionesConsolidadoView.tsx";
+const EMPRESA = "src/components/comisiones/ComisionesPorEmpresaView.tsx";
+const SHELL = "src/components/comisiones/ComisionesView.tsx";
 const GENERADOR = "src/lib/comisiones/pdf-tabla-comisiones.ts";
 
 async function textoDelPdf(doc: { output: (t: "arraybuffer") => ArrayBuffer }): Promise<string> {
@@ -118,7 +118,7 @@ describe("🔴 1. el papel del período se BAJA, no se manda al diálogo del nav
   });
 
   it("⚠️ y la hoja HTML NO se borró: queda con su nota fechada", () => {
-    const hoja = leer("src/components/ventas/comisiones-detalle/ImpresionTablaComisiones.tsx");
+    const hoja = leer("src/components/comisiones/comisiones-detalle/ImpresionTablaComisiones.tsx");
     expect(hoja).toContain("RETIRADO EL 9-SEP-2026");
     // Nadie la monta ya.
     for (const vista of [MATRIZ, EMPRESA]) {

@@ -25,11 +25,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 
-import { ReferenciaView } from "@/components/ventas/ReferenciaView";
+import { ReferenciaView } from "@/components/referencia/ReferenciaView";
 import { UtilidadView } from "@/components/ventas/UtilidadView";
-import { ComisionesConfiguracionView } from "@/components/ventas/ComisionesConfiguracionView";
-import { ComisionesConsolidadoView } from "@/components/ventas/ComisionesConsolidadoView";
-import { ComisionesDetalleModal } from "@/components/ventas/ComisionesDetalleModal";
+import { ComisionesConfiguracionView } from "@/components/comisiones/ComisionesConfiguracionView";
+import { ComisionesConsolidadoView } from "@/components/comisiones/ComisionesConsolidadoView";
+import { ComisionesDetalleModal } from "@/components/comisiones/ComisionesDetalleModal";
 import type { Compra, ComprasApiResp } from "@/lib/ventas/compras";
 import type { UtilidadClienteResponse } from "@/lib/ventas/utilidad-cliente";
 import type { ComisionDetalle } from "@/lib/ventas/comisionExcel";
@@ -462,9 +462,9 @@ describe("Referencia · los cuatro grandes y la línea de ritmo", () => {
     const fuente = (
       await Promise.all(
         [
-          "src/components/ventas/ReferenciaView.tsx",
-          "src/components/ventas/ReferenciaTarjeta.tsx",
-          "src/components/ventas/ReferenciaTablaPedido.tsx",
+          "src/components/referencia/ReferenciaView.tsx",
+          "src/components/referencia/ReferenciaTarjeta.tsx",
+          "src/components/referencia/ReferenciaTablaPedido.tsx",
         ].map((f) => fs.readFile(f, "utf8")),
       )
     ).join("\n");

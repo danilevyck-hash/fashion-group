@@ -28,7 +28,7 @@ import { readFileSync } from "fs";
 import path from "path";
 
 const leer = (rel: string) => readFileSync(path.join(process.cwd(), rel), "utf8");
-const vista = leer("src/components/ventas/ComisionesConsolidadoView.tsx");
+const vista = leer("src/components/comisiones/ComisionesConsolidadoView.tsx");
 const ruta = leer("src/app/api/ventas/comisiones/descuentos/route.ts");
 // 12-ago-2026: la lectura de descuentos se mudó a un módulo compartido y la
 // tabla pasó a pedir UNA sola vez, al endpoint consolidado.
@@ -189,9 +189,9 @@ describe("🔴 UNA llamada, no diez (12-ago-2026)", () => {
     // se suma a la lista: era la CUARTA copia, escrita a mano.
     expect(leer("src/lib/comisiones/empresas.ts")).toContain("B2B_EMPRESA_KEYS");
     for (const rel of [
-      "src/components/ventas/ComisionesConsolidadoView.tsx",
-      "src/components/ventas/ComisionesPorEmpresaView.tsx",
-      "src/components/ventas/ComisionesView.tsx",
+      "src/components/comisiones/ComisionesConsolidadoView.tsx",
+      "src/components/comisiones/ComisionesPorEmpresaView.tsx",
+      "src/components/comisiones/ComisionesView.tsx",
       "src/app/api/ventas/comisiones/consolidado/route.ts",
     ]) {
       expect(leer(rel), rel).toContain("EMPRESAS_COMISIONAN");

@@ -5,7 +5,7 @@
 // esta pantalla dijera algo distinto que el tab de Ventas, serían dos verdades.
 
 import AppHeader from "@/components/AppHeader";
-import { ReferenciaView } from "@/components/ventas/ReferenciaView";
+import { ReferenciaView } from "@/components/referencia/ReferenciaView";
 
 export default function ReferenciaClient() {
   return (

@@ -752,10 +752,10 @@ describe("🔴 barridos", () => {
   // lo mismo, ahora sobre el shell Y sus tres tarjetas.
   it("la pantalla de configuración no lleva la nota «N nombres en Switch» (Daniel la quitó) ni escribe REINALDO con I", () => {
     const archivos = [
-      "src/components/ventas/ComisionesConfiguracionView.tsx",
-      "src/components/ventas/comisiones-config/TasasPorVendedor.tsx",
-      "src/components/ventas/comisiones-config/ClientesQueNoComisionan.tsx",
-      "src/components/ventas/comisiones-config/Descuentos.tsx",
+      "src/components/comisiones/ComisionesConfiguracionView.tsx",
+      "src/components/comisiones/comisiones-config/TasasPorVendedor.tsx",
+      "src/components/comisiones/comisiones-config/ClientesQueNoComisionan.tsx",
+      "src/components/comisiones/comisiones-config/Descuentos.tsx",
     ];
     const todo = archivos.map(leer).join("\n");
     expect(todo).not.toMatch(/nombres en Switch/);

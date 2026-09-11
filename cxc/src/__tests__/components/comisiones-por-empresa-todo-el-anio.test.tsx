@@ -9,7 +9,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, within, fireEvent } from "@testing-library/react";
-import { ComisionesPorEmpresaView } from "@/components/ventas/ComisionesPorEmpresaView";
+import { ComisionesPorEmpresaView } from "@/components/comisiones/ComisionesPorEmpresaView";
 import { MES_TODO_EL_ANIO } from "@/lib/comisiones/periodo";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 

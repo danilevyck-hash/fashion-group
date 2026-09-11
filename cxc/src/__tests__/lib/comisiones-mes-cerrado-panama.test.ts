@@ -49,8 +49,8 @@ describe("🔴 ultimoMesCerrado: el mes anterior al que corre hoy en Panamá", (
 });
 
 describe("🔴 la pantalla no mira el reloj del navegador", () => {
-  const shell = sinComentarios(leer("src/components/ventas/ComisionesView.tsx"));
-  const periodo = sinComentarios(leer("src/components/ventas/ComisionesPeriodo.tsx"));
+  const shell = sinComentarios(leer("src/components/comisiones/ComisionesView.tsx"));
+  const periodo = sinComentarios(leer("src/components/comisiones/ComisionesPeriodo.tsx"));
 
   it("🔴 ni el shell ni el selector de período llaman a `new Date()`", () => {
     expect(shell).not.toMatch(/new Date\(\)/);

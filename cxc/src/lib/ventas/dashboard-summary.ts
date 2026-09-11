@@ -1,6 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // La lectura del resumen mensual por empresa (`ventas_dashboard_summary_v2`),
-// compartida por Ventas › Resumen, Vista General y /api/ventas/v2.
+// compartida por Ventas › Resumen y Vista General. (`/api/ventas/v2` se retiró el
+// 11-sep-2026: 124 líneas sin un solo llamador.)
 //
 // 🩸 POR QUÉ HAY UNA `_v2` (3-sep-2026): el costo del mes en curso salía de
 // `switch_articulo_diario`, que NO trae notas de débito. Active Wear agosto

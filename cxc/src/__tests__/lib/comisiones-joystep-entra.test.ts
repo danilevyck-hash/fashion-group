@@ -80,9 +80,9 @@ const codigo = (rel: string) =>
 
 const ARCHIVOS_DE_COMISIONES = [
   "src/lib/comisiones/empresas.ts",
-  "src/components/ventas/ComisionesView.tsx",
-  "src/components/ventas/ComisionesConsolidadoView.tsx",
-  "src/components/ventas/ComisionesPorEmpresaView.tsx",
+  "src/components/comisiones/ComisionesView.tsx",
+  "src/components/comisiones/ComisionesConsolidadoView.tsx",
+  "src/components/comisiones/ComisionesPorEmpresaView.tsx",
   "src/app/api/ventas/comisiones/consolidado/route.ts",
   "src/app/api/ventas/comisiones/route.ts",
 ];

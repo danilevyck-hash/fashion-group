@@ -249,9 +249,9 @@ describe("🔑 UNA sola resta: la regla vive en la librería, no en las vistas",
     sinComentarios(readFileSync(path.join(process.cwd(), rel), "utf8"));
 
   const VISTAS = [
-    "src/components/ventas/ComisionesConsolidadoView.tsx",
-    "src/components/ventas/ComisionesPorEmpresaView.tsx",
-    "src/components/ventas/ComisionesTarjetas.tsx",
+    "src/components/comisiones/ComisionesConsolidadoView.tsx",
+    "src/components/comisiones/ComisionesPorEmpresaView.tsx",
+    "src/components/comisiones/ComisionesTarjetas.tsx",
   ];
 
   for (const rel of VISTAS) {

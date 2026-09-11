@@ -325,11 +325,14 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // Contabilidad: prestamos and ventas
+  // Contabilidad: solo préstamos. 🩸 Hasta el 11-sep-2026 también recibía
+  // `ventas`, y `/ventas` es admin-only: se le ofrecía un resultado que la
+  // mandaba a una puerta cerrada. Sus rutas de datos también se cerraron a
+  // admin ese día (`ventas-puerta-cerrada.test.ts`).
   if (role === "contabilidad") {
     return NextResponse.json({
       ...empty,
-      ventas: allResults.ventas,
+      ventas: [],
       prestamos: allResults.prestamos,
     });
   }

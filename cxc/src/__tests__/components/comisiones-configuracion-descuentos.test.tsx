@@ -22,8 +22,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { render, screen, cleanup, within, fireEvent, waitFor, act } from "@testing-library/react";
-import { ComisionesConfiguracionView } from "@/components/ventas/ComisionesConfiguracionView";
-import { mesEnPalabras, hastaEnPalabras, ROTULO_DESCUENTOS } from "@/components/ventas/comisiones-config/Descuentos";
+import { ComisionesConfiguracionView } from "@/components/comisiones/ComisionesConfiguracionView";
+import { mesEnPalabras, hastaEnPalabras, ROTULO_DESCUENTOS } from "@/components/comisiones/comisiones-config/Descuentos";
 
 const RAIZ = process.cwd();
 const leer = (rel: string) => readFileSync(path.join(RAIZ, rel), "utf8");
@@ -288,10 +288,10 @@ describe("🔴 «Descuentos»: la tercera tarjeta, minimalista", () => {
 // ═══ 3. Los 800 y el molde ═══════════════════════════════════════════════════
 describe("🔴 el archivo se partió y las tres tarjetas comparten molde", () => {
   const archivos = [
-    "src/components/ventas/ComisionesConfiguracionView.tsx",
-    "src/components/ventas/comisiones-config/TasasPorVendedor.tsx",
-    "src/components/ventas/comisiones-config/ClientesQueNoComisionan.tsx",
-    "src/components/ventas/comisiones-config/Descuentos.tsx",
+    "src/components/comisiones/ComisionesConfiguracionView.tsx",
+    "src/components/comisiones/comisiones-config/TasasPorVendedor.tsx",
+    "src/components/comisiones/comisiones-config/ClientesQueNoComisionan.tsx",
+    "src/components/comisiones/comisiones-config/Descuentos.tsx",
   ];
 
   it("ninguno pasa las 800 líneas de la casa", () => {

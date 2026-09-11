@@ -203,7 +203,7 @@ const sinComentarios = (src: string): string =>
 
 // ═══ 6. Multifashion dentro de Comisiones ════════════════════════════════════
 describe("🔴 Multifashion en Comisiones: una opción más, nunca una suma", () => {
-  const shell = leer("src/components/ventas/ComisionesView.tsx");
+  const shell = leer("src/components/comisiones/ComisionesView.tsx");
   const vista = leer("src/components/multifashion/VendedorasSubtab.tsx");
 
   it("🔴 REUSA la vista del módulo Multifashion; no hay una segunda copia", () => {
@@ -227,13 +227,13 @@ describe("🔴 Multifashion en Comisiones: una opción más, nunca una suma", ()
     // conocen, y `EMPRESAS_COMISIONAN` sigue siendo las 6 del grupo.
     // 🔄 Se barre el CÓDIGO, sin comentarios: el porqué de la regla se escribe
     // arriba de la regla, y nombrarla en una nota no es sumarla.
-    expect(sinComentarios(leer("src/components/ventas/ComisionesConsolidadoView.tsx")))
+    expect(sinComentarios(leer("src/components/comisiones/ComisionesConsolidadoView.tsx")))
       .not.toMatch(/multifashion|american_classic/i);
-    expect(sinComentarios(leer("src/components/ventas/ComisionesPorEmpresaView.tsx")))
+    expect(sinComentarios(leer("src/components/comisiones/ComisionesPorEmpresaView.tsx")))
       .not.toMatch(/american_classic/i);
     expect(leer("src/lib/comisiones/empresas.ts")).toContain("export const EMPRESAS_COMISIONAN = B2B_EMPRESA_KEYS;");
     // Y la matriz de Fashion Group se dibuja SOLO con esas 6.
-    expect(leer("src/components/ventas/ComisionesConsolidadoView.tsx"))
+    expect(leer("src/components/comisiones/ComisionesConsolidadoView.tsx"))
       .toContain("const EMPRESAS = EMPRESAS_COMISIONAN;");
   });
 
@@ -266,7 +266,7 @@ describe("🔴 Multifashion en Comisiones: una opción más, nunca una suma", ()
 // ─────────────────────────────────────────────────────────────────────────────
 describe("🔴 Multifashion en Comisiones recibe el año elegido en el shell", () => {
   it("`selectedYear={year}` — y ya no `inicial.year`", () => {
-    const src = leer("src/components/ventas/ComisionesView.tsx");
+    const src = leer("src/components/comisiones/ComisionesView.tsx");
     const codigo = src.replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     expect(codigo).toContain("<VendedorasSubtab selectedYear={year} />");
     expect(codigo).not.toContain("selectedYear={inicial.year}");

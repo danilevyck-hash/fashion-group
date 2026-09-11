@@ -36,7 +36,7 @@ const leer = (rel: string) => fs.readFileSync(path.join(RAIZ, rel), "utf8");
 const sinComentarios = (src: string) =>
   src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^[ \t]*\/\/.*$/gm, "");
 
-const VISTA = leer("src/components/ventas/ReferenciaView.tsx");
+const VISTA = leer("src/components/referencia/ReferenciaView.tsx");
 const RUTA_POST = leer("src/app/api/ventas/referencia/actualizar/route.ts");
 const RUTA_GET = leer("src/app/api/ventas/referencia/route.ts");
 const PAGINA = leer("src/app/referencia/page.tsx");

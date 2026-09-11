@@ -37,9 +37,9 @@ vi.mock("@/lib/ventas/comisionExcel", async (original) => {
   };
 });
 
-import { ComisionesConsolidadoView } from "@/components/ventas/ComisionesConsolidadoView";
-import { ComisionesPorEmpresaView } from "@/components/ventas/ComisionesPorEmpresaView";
-import { ComisionesView } from "@/components/ventas/ComisionesView";
+import { ComisionesConsolidadoView } from "@/components/comisiones/ComisionesConsolidadoView";
+import { ComisionesPorEmpresaView } from "@/components/comisiones/ComisionesPorEmpresaView";
+import { ComisionesView } from "@/components/comisiones/ComisionesView";
 import { ROTULO_NO_SE_PAGA } from "@/lib/comisiones/sin-pago";
 import { ROTULO_TODO_EL_ANIO } from "@/lib/comisiones/periodo";
 

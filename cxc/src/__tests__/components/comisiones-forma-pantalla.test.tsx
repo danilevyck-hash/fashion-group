@@ -18,8 +18,8 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/comisiones",
 }));
 
-import { ComisionesConsolidadoView } from "@/components/ventas/ComisionesConsolidadoView";
-import { ComisionesDetalleModal } from "@/components/ventas/ComisionesDetalleModal";
+import { ComisionesConsolidadoView } from "@/components/comisiones/ComisionesConsolidadoView";
+import { ComisionesDetalleModal } from "@/components/comisiones/ComisionesDetalleModal";
 // El papel dejó de ser HTML: lo que lleva sale del módulo puro del reporte.
 import { COLUMNAS_VENTAS, filasVentas } from "@/lib/comisiones/reporte-comision";
 

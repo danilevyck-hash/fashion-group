@@ -78,7 +78,7 @@ describe("🔴 1 · la factura se muestra corta y se guarda larga", () => {
     const src = leer("src/lib/comisiones/factura-en-pantalla.ts");
     expect(src).toContain('from "@/lib/guias/numero-factura"');
     // Y no hay una segunda implementación escondida en el detalle.
-    const modal = plano(leer("src/components/ventas/ComisionesDetalleModal.tsx"));
+    const modal = plano(leer("src/components/comisiones/ComisionesDetalleModal.tsx"));
     expect(modal).toContain("facturaParaMostrar(v.secuencial)");
     expect(modal).not.toMatch(/slice\(-4\)/);
   });
@@ -87,7 +87,7 @@ describe("🔴 1 · la factura se muestra corta y se guarda larga", () => {
     const excel = plano(leer("src/lib/ventas/comisionExcel.ts"));
     expect(excel).toContain("td(v.secuencial, alt)");
     expect(excel).not.toContain("facturaParaMostrar");
-    const impresion = plano(leer("src/components/ventas/comisiones-detalle/ImpresionComision.tsx"));
+    const impresion = plano(leer("src/components/comisiones/comisiones-detalle/ImpresionComision.tsx"));
     expect(impresion).toContain("{v.secuencial}");
     expect(impresion).not.toContain("facturaParaMostrar");
   });
@@ -97,11 +97,11 @@ describe("🔴 1 · la factura se muestra corta y se guarda larga", () => {
 
 describe("🔴 2 · el módulo dice «Vistana», no «Vistana International»", () => {
   const superficies = [
-    "src/components/ventas/ComisionesView.tsx",
-    "src/components/ventas/ComisionesConsolidadoView.tsx",
-    "src/components/ventas/ComisionesPorEmpresaView.tsx",
-    "src/components/ventas/comisiones-config/ClientesQueNoComisionan.tsx",
-    "src/components/ventas/comisiones-config/Descuentos.tsx",
+    "src/components/comisiones/ComisionesView.tsx",
+    "src/components/comisiones/ComisionesConsolidadoView.tsx",
+    "src/components/comisiones/ComisionesPorEmpresaView.tsx",
+    "src/components/comisiones/comisiones-config/ClientesQueNoComisionan.tsx",
+    "src/components/comisiones/comisiones-config/Descuentos.tsx",
   ];
 
   it("ninguna superficie de Comisiones usa ya el nombre largo", () => {
@@ -139,8 +139,8 @@ describe("🔴 3 · el guion es la única forma de decir «nada»", () => {
 
   it("la decisión vive en UN módulo puro y la usan la tabla y las tarjetas", () => {
     for (const f of [
-      "src/components/ventas/ComisionesConsolidadoView.tsx",
-      "src/components/ventas/ComisionesTarjetas.tsx",
+      "src/components/comisiones/ComisionesConsolidadoView.tsx",
+      "src/components/comisiones/ComisionesTarjetas.tsx",
     ]) {
       expect(plano(leer(f)), f).toContain("celdaVacia(");
     }
@@ -151,7 +151,7 @@ describe("🔴 3 · el guion es la única forma de decir «nada»", () => {
 
 describe("🔴 5 · «Clientes que no comisionan» ya no muestra «Desde»", () => {
   it("decía la misma fecha en todas las filas: no distinguía nada", () => {
-    const src = plano(leer("src/components/ventas/comisiones-config/ClientesQueNoComisionan.tsx"));
+    const src = plano(leer("src/components/comisiones/comisiones-config/ClientesQueNoComisionan.tsx"));
     expect(src).not.toContain(">Desde<");
     expect(src).not.toContain("fechaPanamaDe");
     expect(src).not.toContain("fmtDate");
@@ -167,14 +167,14 @@ describe("🔴 5 · «Clientes que no comisionan» ya no muestra «Desde»", () 
 
 describe("🔴 6 · el detalle en PANTALLA no repite el tipo del documento", () => {
   it("la nota de crédito ya se dice en rojo y con el monto en negativo", () => {
-    const modal = plano(leer("src/components/ventas/ComisionesDetalleModal.tsx"));
+    const modal = plano(leer("src/components/comisiones/ComisionesDetalleModal.tsx"));
     expect(modal).not.toContain("tipoDocCorto");
     expect(modal).toContain('text-rose-600');
   });
 
   it("⚠️ en el Excel y en el papel SÍ se queda: ahí se concilia contra Switch", () => {
     expect(plano(leer("src/lib/ventas/comisionExcel.ts"))).toContain("tipoDocCorto(v.tipo)");
-    expect(plano(leer("src/components/ventas/comisiones-detalle/ImpresionComision.tsx")))
+    expect(plano(leer("src/components/comisiones/comisiones-detalle/ImpresionComision.tsx")))
       .toContain("tipoDocCorto(v.tipo)");
   });
 });
@@ -284,8 +284,8 @@ describe("🔴 12 · el PDF ya no se llama «Fashion Group.pdf»", () => {
     // de fondo —el archivo NO se llama «Fashion Group.pdf»— no cambió: ahora se
     // cumple porque el nombre se le pasa al generador.
     for (const vista of [
-      "src/components/ventas/ComisionesConsolidadoView.tsx",
-      "src/components/ventas/ComisionesPorEmpresaView.tsx",
+      "src/components/comisiones/ComisionesConsolidadoView.tsx",
+      "src/components/comisiones/ComisionesPorEmpresaView.tsx",
     ]) {
       const v = plano(leer(vista));
       expect(v, vista).not.toContain("imprimirComo(");
@@ -300,16 +300,16 @@ describe("🔴 12 · el PDF ya no se llama «Fashion Group.pdf»", () => {
     // verdad (`descargarPdfComision`), con el nombre puesto por nosotros y no
     // por el `document.title`. La regla de fondo —el archivo NO se llama
     // «Fashion Group.pdf»— se conserva, y se exige el mismo nombre de siempre.
-    const modal = plano(leer("src/components/ventas/ComisionesDetalleModal.tsx"));
+    const modal = plano(leer("src/components/comisiones/ComisionesDetalleModal.tsx"));
     expect(modal).not.toContain("imprimirComo(");
     expect(modal).toContain("descargarPdfComision(");
     expect(modal).toContain("nombreArchivo,");
     // Y NADIE se escribe su propia copia.
     for (const f of [
-      "src/components/ventas/ComisionesDetalleModal.tsx",
-      "src/components/ventas/ComisionesConsolidadoView.tsx",
-      "src/components/ventas/ComisionesPorEmpresaView.tsx",
-      "src/components/ventas/comisiones-detalle/useDescargaComision.tsx",
+      "src/components/comisiones/ComisionesDetalleModal.tsx",
+      "src/components/comisiones/ComisionesConsolidadoView.tsx",
+      "src/components/comisiones/ComisionesPorEmpresaView.tsx",
+      "src/components/comisiones/comisiones-detalle/useDescargaComision.tsx",
     ]) {
       expect(plano(leer(f)), f).not.toContain("function imprimirComo(");
     }
@@ -335,7 +335,7 @@ describe("🔴 14 · la celda dice que adentro hay un descuento", () => {
   });
 
   it("el descuento por empresa viaja hasta la celda, no solo el total", () => {
-    const vista = plano(leer("src/components/ventas/ComisionesConsolidadoView.tsx"));
+    const vista = plano(leer("src/components/comisiones/ComisionesConsolidadoView.tsx"));
     expect(vista).toContain("descuentoPorEmpresa");
     expect(vista).toContain("desgloseDeCelda(val, desc)");
   });
@@ -460,9 +460,9 @@ describe("🔴 16 · «Clientes que no comisionan» acepta VARIAS empresas", () 
 describe("🔴 18 · se fue el renglón que decía que no hay nada que decir", () => {
   it("ninguna superficie lo escribe", () => {
     for (const f of [
-      "src/components/ventas/ComisionesConsolidadoView.tsx",
-      "src/components/ventas/ComisionesPorEmpresaView.tsx",
-      "src/components/ventas/ComisionesTarjetas.tsx",
+      "src/components/comisiones/ComisionesConsolidadoView.tsx",
+      "src/components/comisiones/ComisionesPorEmpresaView.tsx",
+      "src/components/comisiones/ComisionesTarjetas.tsx",
     ]) {
       expect(plano(leer(f)), f).not.toMatch(/sin actividad/i);
     }
@@ -481,7 +481,7 @@ describe("🔴 19 · los botones dicen QUÉ traen, y el verbo es «Descargar»",
     // mismo rótulo. CONTROL de que la regla original sigue viva: el «el mes» /
     // «el año» sigue saliendo de un solo lugar, y con el año elegido el botón
     // dice exactamente lo de siempre.
-    expect(plano(leer("src/components/ventas/ComisionesView.tsx"))).toContain("rotuloDescargarExcel(mes)");
+    expect(plano(leer("src/components/comisiones/ComisionesView.tsx"))).toContain("rotuloDescargarExcel(mes)");
     // 🔄 9-SEP-2026 — el año TAMBIÉN lleva formato en el rótulo, porque ahora
     // tiene los dos archivos. El «el mes» / «el año» sigue saliendo de UN solo
     // lugar: los dos rótulos se lo pegan a `rotuloDescargarPeriodo`.
@@ -491,7 +491,7 @@ describe("🔴 19 · los botones dicen QUÉ traen, y el verbo es «Descargar»",
   });
 
   it("el del detalle dice que es el detalle", () => {
-    expect(plano(leer("src/components/ventas/ComisionesDetalleModal.tsx"))).toContain("Descargar el detalle");
+    expect(plano(leer("src/components/comisiones/ComisionesDetalleModal.tsx"))).toContain("Descargar el detalle");
   });
 
   it("🔴 y los 5 botones del sistema que decían «Exportar» o «Bajar» ya dicen «Descargar»", () => {
@@ -508,7 +508,7 @@ describe("🔴 19 · los botones dicen QUÉ traen, y el verbo es «Descargar»",
       ["src/app/cxc/components/MenuDescargar.tsx", "Descargar"],
       ["src/app/proveedores/ProveedoresListClient.tsx", "Descargar Excel"],
       ["src/app/marketing/components/DetallePeriodoView.tsx", "Descargar ZIP"],
-      ["src/components/ventas/ReferenciaView.tsx", "Descargar Excel"],
+      ["src/components/referencia/ReferenciaView.tsx", "Descargar Excel"],
       ["src/components/catalogo/ComprobantesPanel.tsx", "Descargar Excel"],
     ];
     for (const [f, texto] of esperado) {
@@ -530,8 +530,8 @@ describe("🔴 20 · los que no se pagan, detrás de «Ver los que no se pagan»
     expect(sinPago).toContain('export const VENDEDORES_SIN_PAGO: readonly string[] = ["DEFAULT", "DANIEL LEVY"];');
     expect(sinPago).toContain("export function sumarPagable");
     for (const f of [
-      "src/components/ventas/ComisionesConsolidadoView.tsx",
-      "src/components/ventas/ComisionesPorEmpresaView.tsx",
+      "src/components/comisiones/ComisionesConsolidadoView.tsx",
+      "src/components/comisiones/ComisionesPorEmpresaView.tsx",
     ]) {
       expect(plano(leer(f)), f).toContain("sumarPagable(");
     }
@@ -540,7 +540,7 @@ describe("🔴 20 · los que no se pagan, detrás de «Ver los que no se pagan»
   it("🔴 y el Excel los SIGUE llevando: esconderlos en pantalla no los borra del papel", () => {
     const excel = plano(leer("src/lib/ventas/comisionExcel.ts"));
     expect(excel).toContain("ROTULO_NO_SE_PAGA");
-    expect(plano(leer("src/components/ventas/ComisionesConsolidadoView.tsx")))
+    expect(plano(leer("src/components/comisiones/ComisionesConsolidadoView.tsx")))
       .toContain("vendedores: conActividad.map(");
   });
 });
@@ -548,7 +548,7 @@ describe("🔴 20 · los que no se pagan, detrás de «Ver los que no se pagan»
 // ═══ La estructura: un selector, sin pestañas ═══════════════════════════════
 
 describe("🔴 se fueron las CUATRO pestañas: un selector y un ⚙", () => {
-  const shell = plano(leer("src/components/ventas/ComisionesView.tsx"));
+  const shell = plano(leer("src/components/comisiones/ComisionesView.tsx"));
 
   it("la primera opción se llama «Fashion Group», NUNCA «Todas»", () => {
     expect(ROTULO_GRUPO).toBe("Fashion Group");
@@ -570,7 +570,7 @@ describe("🔴 se fueron las CUATRO pestañas: un selector y un ⚙", () => {
     // contra 0,5 % sobre toda la venta). Medido en agosto 2026: $5.978,55
     // contra $255,27.
     expect(esVistaDeEmpresa(VISTA_MULTIFASHION)).toBe(false);
-    expect(plano(leer("src/components/ventas/ComisionesConsolidadoView.tsx")))
+    expect(plano(leer("src/components/comisiones/ComisionesConsolidadoView.tsx")))
       .not.toMatch(/american_classic/i);
   });
 

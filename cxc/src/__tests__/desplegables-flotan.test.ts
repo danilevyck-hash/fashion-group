@@ -122,9 +122,9 @@ const EXCEPCIONES: Record<string, string> = {
   // `DesplegableFlotante` hace `return null` cuando está cerrado, así que un
   // port directo desmonta el SyncStatus y **el aviso solo aparecería después de
   // abrir el ⓘ — o sea, nunca**. Hay que sacar el SyncStatus del panel primero.
-  "components/ventas/ComisionesCriterios.tsx":
+  "components/comisiones/ComisionesCriterios.tsx":
     "ⓘ Criterios de Comisiones — medido SANO en los 3 anchos y los 2 modos (30-jul-2026)",
-  "components/ventas/ComisionesPeriodo.tsx":
+  "components/comisiones/ComisionesPeriodo.tsx":
     "selector de período de Comisiones — medido SANO en los 3 anchos y los 2 modos (30-jul-2026)",
 };
 
@@ -185,10 +185,12 @@ describe("Las excepciones siguen siendo las que se decidieron", () => {
     // venir acá y explicarse.
     expect(Object.keys(EXCEPCIONES).sort()).toEqual([
       "app/cxc/components/PanelCxcMobile.tsx",
+      // Comisiones vive en `components/comisiones/` desde el 11-sep-2026 (antes
+      // en `components/ventas/`, donde ya no era de Ventas).
+      "components/comisiones/ComisionesCriterios.tsx",
+      "components/comisiones/ComisionesPeriodo.tsx",
       "components/shared/SyncNowButton.tsx",
       "components/ui.tsx",
-      "components/ventas/ComisionesCriterios.tsx",
-      "components/ventas/ComisionesPeriodo.tsx",
       "lib/catalogo/marcas-ui.tsx",
     ]);
     for (const motivo of Object.values(EXCEPCIONES)) {

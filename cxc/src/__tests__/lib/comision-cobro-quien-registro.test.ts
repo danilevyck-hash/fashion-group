@@ -335,9 +335,9 @@ describe("🔴 «no me autopago»: DEFAULT y DANIEL LEVY se muestran pero no ent
     const sinComentarios = (src: string) =>
       src.replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
     for (const rel of [
-      "src/components/ventas/ComisionesConsolidadoView.tsx",
-      "src/components/ventas/ComisionesPorEmpresaView.tsx",
-      "src/components/ventas/ComisionesTarjetas.tsx",
+      "src/components/comisiones/ComisionesConsolidadoView.tsx",
+      "src/components/comisiones/ComisionesPorEmpresaView.tsx",
+      "src/components/comisiones/ComisionesTarjetas.tsx",
       "src/lib/ventas/comisionExcel.ts",
     ]) {
       const src = sinComentarios(readFileSync(path.join(RAIZ, rel), "utf8"));

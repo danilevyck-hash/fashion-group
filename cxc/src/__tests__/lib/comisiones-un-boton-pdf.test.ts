@@ -111,7 +111,7 @@ const hoja = (data: ComisionDetalle, empresaNombre: string, descuentos: HojaRepo
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("🔴 1. el detalle tiene UN botón de papel y dice «PDF»", () => {
-  const modal = plano(leer("src/components/ventas/ComisionesDetalleModal.tsx"));
+  const modal = plano(leer("src/components/comisiones/ComisionesDetalleModal.tsx"));
 
   it("el botón dice PDF", () => {
     expect(modal).toContain("> PDF");
@@ -125,7 +125,7 @@ describe("🔴 1. el detalle tiene UN botón de papel y dice «PDF»", () => {
   it("🩸 el detalle ya NO manda el reporte por el diálogo del navegador", () => {
     expect(modal).not.toContain("window.print");
     expect(modal).not.toContain("imprimirComo(");
-    const motor = plano(leer("src/components/ventas/comisiones-detalle/useDescargaComision.tsx"));
+    const motor = plano(leer("src/components/comisiones/comisiones-detalle/useDescargaComision.tsx"));
     expect(motor).not.toContain("window.print");
     expect(motor).not.toContain("imprimirComo(");
   });
@@ -150,9 +150,9 @@ describe("🔴 2. el archivo NO se llama «Fashion Group.pdf»", () => {
     const gen = plano(leer("src/lib/comisiones/pdf-comision.ts"));
     expect(gen).not.toContain("document.title");
     // Los dos caminos (el botón del detalle y la flechita) le pasan el nombre.
-    expect(plano(leer("src/components/ventas/ComisionesDetalleModal.tsx")))
+    expect(plano(leer("src/components/comisiones/ComisionesDetalleModal.tsx")))
       .toContain("nombreArchivo,");
-    expect(plano(leer("src/components/ventas/comisiones-detalle/useDescargaComision.tsx")))
+    expect(plano(leer("src/components/comisiones/comisiones-detalle/useDescargaComision.tsx")))
       .toContain("nombreDe(empresas, vendedor)");
   });
 });
@@ -193,8 +193,8 @@ describe("🩸 3. el PDF de una empresa no se lleva el de otra pegado atrás", (
 describe("🔴 4. las dos formas del detalle bajan el MISMO archivo", () => {
   it("hay UN solo generador y las dos superficies lo llaman", () => {
     for (const f of [
-      "src/components/ventas/ComisionesDetalleModal.tsx",
-      "src/components/ventas/comisiones-detalle/useDescargaComision.tsx",
+      "src/components/comisiones/ComisionesDetalleModal.tsx",
+      "src/components/comisiones/comisiones-detalle/useDescargaComision.tsx",
     ]) {
       expect(plano(leer(f)), f).toContain("descargarPdfComision");
       // Nadie se escribe su propio jsPDF.
@@ -203,17 +203,17 @@ describe("🔴 4. las dos formas del detalle bajan el MISMO archivo", () => {
   });
 
   it("el modal y el detalle inline son el MISMO componente", () => {
-    const modal = plano(leer("src/components/ventas/ComisionesDetalleModal.tsx"));
+    const modal = plano(leer("src/components/comisiones/ComisionesDetalleModal.tsx"));
     expect(modal).toContain('data-comision-detalle="inline"');
     expect(modal).toContain('data-comision-detalle="modal"');
   });
 
   it("🔄 y ya no hay hoja HTML montada en <body> (el portal se retiró)", () => {
-    const modal = plano(leer("src/components/ventas/ComisionesDetalleModal.tsx"));
+    const modal = plano(leer("src/components/comisiones/ComisionesDetalleModal.tsx"));
     expect(modal).not.toContain("ImpresionComision");
     expect(modal).not.toContain("createPortal");
     // ⚠️ El archivo NO se borra: queda con su nota fechada y su calibración.
-    expect(leer("src/components/ventas/comisiones-detalle/ImpresionComision.tsx"))
+    expect(leer("src/components/comisiones/comisiones-detalle/ImpresionComision.tsx"))
       .toContain("RETIRADO EL 9-SEP-2026");
   });
 });

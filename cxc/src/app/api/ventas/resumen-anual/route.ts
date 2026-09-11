@@ -55,7 +55,10 @@ interface MvRow {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "contabilidad"]);
+  // 🔴 Solo admin, como la pantalla (11-sep-2026): `/ventas` manda a casa a todo
+  // lo que no sea admin, pero esta ruta dejaba entrar a contabilidad — con su
+  // sesión y la dirección se llevaba los datos del grupo sin abrir la pantalla.
+  const auth = requireRole(req, ["admin"]);
   if (auth instanceof NextResponse) return auth;
 
   try {

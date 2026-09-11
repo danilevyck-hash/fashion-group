@@ -43,12 +43,12 @@ import path from "path";
 const leer = (rel: string) => readFileSync(path.join(process.cwd(), "src", rel), "utf-8");
 
 const page = leer("app/comisiones/ComisionesPageClient.tsx");
-const shell = leer("components/ventas/ComisionesView.tsx");
-const criterios = leer("components/ventas/ComisionesCriterios.tsx");
-const periodo = leer("components/ventas/ComisionesPeriodo.tsx");
-const consolidado = leer("components/ventas/ComisionesConsolidadoView.tsx");
-const porEmpresa = leer("components/ventas/ComisionesPorEmpresaView.tsx");
-const tarjetas = leer("components/ventas/ComisionesTarjetas.tsx");
+const shell = leer("components/comisiones/ComisionesView.tsx");
+const criterios = leer("components/comisiones/ComisionesCriterios.tsx");
+const periodo = leer("components/comisiones/ComisionesPeriodo.tsx");
+const consolidado = leer("components/comisiones/ComisionesConsolidadoView.tsx");
+const porEmpresa = leer("components/comisiones/ComisionesPorEmpresaView.tsx");
+const tarjetas = leer("components/comisiones/ComisionesTarjetas.tsx");
 
 /** Techo acordado: el primer número tiene que verse en la primera pantalla. */
 const PRESUPUESTO_PX = 200;
@@ -443,7 +443,7 @@ describe("🔴 sincronizar y no refrescar es peor que no sincronizar", () => {
 
   it("Comisiones recarga la tabla al terminar", () => {
     const vista = readFileSync(
-      path.join(process.cwd(), "src/components/ventas/ComisionesView.tsx"),
+      path.join(process.cwd(), "src/components/comisiones/ComisionesView.tsx"),
       "utf8",
     );
     expect(vista).toContain("onSuccess={() => setRefreshKey((k) => k + 1)}");
@@ -452,8 +452,8 @@ describe("🔴 sincronizar y no refrescar es peor que no sincronizar", () => {
 
   it("y las dos vistas hijas vuelven a pedir los datos", () => {
     for (const f of [
-      "src/components/ventas/ComisionesPorEmpresaView.tsx",
-      "src/components/ventas/ComisionesConsolidadoView.tsx",
+      "src/components/comisiones/ComisionesPorEmpresaView.tsx",
+      "src/components/comisiones/ComisionesConsolidadoView.tsx",
     ]) {
       const src = readFileSync(path.join(process.cwd(), f), "utf8");
       expect(src, f).toContain("refreshKey");

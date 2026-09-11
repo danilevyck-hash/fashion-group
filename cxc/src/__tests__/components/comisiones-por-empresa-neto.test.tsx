@@ -24,9 +24,9 @@ vi.mock("@/lib/ventas/comisionExcel", () => ({
   },
 }));
 
-import { ComisionesPorEmpresaView } from "@/components/ventas/ComisionesPorEmpresaView";
-import { ComisionesConsolidadoView } from "@/components/ventas/ComisionesConsolidadoView";
-import type { ExcelApi } from "@/components/ventas/ComisionesView";
+import { ComisionesPorEmpresaView } from "@/components/comisiones/ComisionesPorEmpresaView";
+import { ComisionesConsolidadoView } from "@/components/comisiones/ComisionesConsolidadoView";
+import type { ExcelApi } from "@/components/comisiones/ComisionesView";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 
 const REINALDO = "REINALDO ESPINOSA";
