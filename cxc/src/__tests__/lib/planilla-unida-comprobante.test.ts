@@ -79,7 +79,7 @@ const claves = (c: ReturnType<typeof armarComprobante>) => c.renglones.map((r) =
 describe("A. UN SOLO FORMATO — el renglón en cero se DIBUJA, no se esconde", () => {
   // 🔴 Daniel, textual: *«Un solo formato, si alguien no lo lleva se pone 0 en
   // el de esa persona»*. Es la regla entera del papel.
-  it("están los 23 renglones, en su orden, aunque casi todos den 0.00", () => {
+  it("están los 22 renglones, en su orden, aunque casi todos den 0.00 (eran 23 hasta el 11-sep-2026: se fue «AJUSTE QUINCENA ANTERIOR»)", () => {
     const c = armarComprobante({ linea: linea() }, PERIODO);
     expect(claves(c)).toEqual([...CLAVES_RENGLON]);
   });
@@ -91,7 +91,7 @@ describe("A. UN SOLO FORMATO — el renglón en cero se DIBUJA, no se esconde", 
     expect(isr.rotulo).toBe("IMPUESTO SOBRE LA RENTA");
   });
 
-  it("una persona SIN nada más que el sueldo trae igual los 23 renglones", () => {
+  it("una persona SIN nada más que el sueldo trae igual los 22 renglones", () => {
     const pelado = { ...DINERO, extraDiurno: 0, prestamo: 0, totalDeducciones: 0, netoPagar: 261.74 };
     const c = armarComprobante({ linea: linea({ dinero: pelado }) }, PERIODO);
     expect(claves(c)).toEqual([...CLAVES_RENGLON]);
@@ -147,32 +147,40 @@ describe("B. EL PAPEL NO PUEDE DECIR UN NETO QUE LA PLANILLA NO PAGÓ", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("C. EL AJUSTE DE LA QUINCENA ANTERIOR VA EN SU PROPIO RENGLÓN", () => {
-  // 🔴 NUNCA mezclado con AUSENCIA. Son dos cosas distintas y sumarlas pierde
-  // para siempre la explicación de por qué el neto no da lo que se esperaba.
-  it("el renglón existe SIEMPRE, aunque el ajuste sea cero", () => {
+describe("C. EL AJUSTE DE LA QUINCENA ANTERIOR YA NO ES UN RENGLÓN — va en las columnas, y el papel lo dice al pie", () => {
+  // 🔴 CAMBIÓ DE DIRECCIÓN EL 11-sep-2026. Hasta ese día el ajuste era un
+  // renglón propio, «AJUSTE QUINCENA ANTERIOR», dentro de DESCUENTOS. La
+  // contadora (Yulissa), textual: *«no puedes netear las horas extras con las
+  // horas de tardanza o de ausencia porque valen diferente… debe poner lo que
+  // llegó en tardanza en tardanza y lo que llegó como extra en extra»*.
+  // Daniel: *«el ajuste separado como lo hace ella»* → *«sí»*. Ahora el ajuste
+  // entra en las columnas de siempre ANTES de llegar acá (`aplicarAjusteEnLinea`,
+  // ya adentro de `linea.dinero`) y el papel lo dice en una nota al pie.
+  it("el renglón «AJUSTE QUINCENA ANTERIOR» ya no existe", () => {
+    expect(CLAVES_RENGLON as readonly string[]).not.toContain("ajusteAnterior");
     const c = armarComprobante({ linea: linea() }, PERIODO);
-    const a = c.renglones.find((r) => r.clave === "ajusteAnterior")!;
-    expect(a.monto).toBe(0);
-    expect(a.rotulo).toBe("AJUSTE QUINCENA ANTERIOR");
+    expect(c.renglones.map((r) => r.rotulo)).not.toContain("AJUSTE QUINCENA ANTERIOR");
   });
 
-  it("un ajuste NO toca el renglón de AUSENCIA", () => {
-    const c = armarComprobante({ linea: linea(), ajusteAnterior: 12.5 }, PERIODO);
-    expect(c.renglones.find((r) => r.clave === "ausencia")!.monto).toBe(0);
-    expect(c.renglones.find((r) => r.clave === "ajusteAnterior")!.monto).toBe(12.5);
-  });
-
-  it("el ajuste entra a TOTAL DE DESCUENTOS y baja el salario a pagar", () => {
-    const c = armarComprobante({ linea: linea(), ajusteAnterior: 12.5 }, PERIODO);
+  // CONTROL: la ausencia sigue siendo la de `dinero` y el neto del papel es el
+  // neto de la planilla, tal cual — este módulo no le mueve un centavo.
+  it("el salario a pagar ES `dinero.netoPagar`, sin restar nada", () => {
+    const c = armarComprobante({ linea: linea() }, PERIODO);
     const m = (k: string) => c.renglones.find((r) => r.clave === k)!.monto!;
-    expect(m("totalDescuentos")).toBeCloseTo(45 + 12.5, 2);
-    expect(m("salarioAPagar")).toBeCloseTo(229.95 - 12.5, 2);
+    expect(m("salarioAPagar")).toBeCloseTo(229.95, 2);
+    expect(m("totalDescuentos")).toBeCloseTo(45, 2);
+    expect(m("ausencia")).toBe(0);
   });
 
-  it("un ajuste NEGATIVO devuelve plata", () => {
-    const c = armarComprobante({ linea: linea(), ajusteAnterior: -8 }, PERIODO);
-    expect(c.renglones.find((r) => r.clave === "salarioAPagar")!.monto).toBeCloseTo(237.95, 2);
+  it("con ajuste adentro de la línea, el papel lleva la nota al pie; sin ajuste, nada", () => {
+    const sin = armarComprobante({ linea: linea() }, PERIODO);
+    expect(sin.nota).toBeNull();
+    const con = armarComprobante({
+      linea: linea({ ajusteAnterior: -2, ajusteDetalle: { desde: "2026-09-14", hasta: "2026-09-15", reparto: { extraDiurno: 5, tardanzas: 3 } } }),
+    }, PERIODO);
+    expect(con.nota).toBe("Horas extra 1.25 y Tardanzas incluyen los días 14–15 sep, que la quincena anterior pagó sin medir.");
+    // Y el dibujo la escribe (barrido sobre el I/O del PDF).
+    expect(leerSinComentarios("src/lib/asistencia/comprobante-pdf.ts")).toMatch(/if \(c\.nota\)/);
   });
 });
 
