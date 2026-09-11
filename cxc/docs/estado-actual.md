@@ -2091,3 +2091,46 @@ cerrar», la migración, la pantalla) · `planilla-manual-cero-route.test.ts` (l
 `asistencia-prestamo-planilla` (`casillaAutomatica(0, 50)` ya da 0; vacía es `null`) ·
 `planilla-prestamo-sin-aprobacion` · `planilla-unida-cierre-prestamo` (entra `sin-descontar`).
 Verificación por mutación: `scripts/_mutar-candados-sin-descontar.sh`.
+
+---
+
+## 11-sep-2026 (noche) — Catálogos y Multifashion: nueve defectos de la auditoría, arreglados
+
+Los hallazgos de `grupo-2.md` (Catálogos · Multifashion), aprobados por Daniel. **Arreglar, no rediseñar**:
+ningún precio, existencia ni visibilidad de producto cambió; ningún cálculo de Multifashion cambió.
+
+**Medido antes y después** (`scripts/_medir-catalogos-multifashion-defectos.mjs`, solo lectura):
+
+| | antes | después |
+|---|---|---|
+| Escondidos a mano | 25 (Reebok 1 · Tommy 16 · Calvin 6 · Joybees 2), ninguno activo | **25, idénticos** |
+| Filas del catálogo público | 232 · 475 · 83 · 81 | **iguales** |
+| Multifashion 2025, fila del año | $509.291,64 (8 de 12 meses) | **$652.420,19** = la tarjeta |
+| Multifashion 2026, fila del año | $374.793,11 (suma de meses al corte) | **$375.573,44** = la tarjeta (la diferencia son las ventas del día de corte) |
+
+**Catálogos (las 4 marcas):**
+1. El chip «Escondidos (N)» aparece y desde ahí se puede «Mostrar» — `seAdministra` en `admin-chips.ts`.
+2. La foto subida a mano marca `foto_manual = true` (el servidor solo acepta `true` y con `image_url`).
+3. Bodega y `gerente_boston` ven el catálogo en solo lectura: sin «Agregar», carrito ni «Ver pedido»; la regla es `PEDIDO_ROLES` (`lib/catalogo/roles.ts`) y de ahí salen `createRoles`, el checkout, `send-order` y el detalle.
+4. `?tab=pedidos` viejo redirige ANTES del guard de administrar.
+5. `GET /orders/[id]` exige `COMPROBANTES_ROLES`; `/catalogo/[marca]/pedidos` tiene guard SSR.
+6. `POST /api/catalogo/joybees/import` retirada (quinta ruta del candado; `require-admin-no-miente` 9 → 8).
+7. El aviso negro se cierra solo en `catalogos/marcas` y en el catálogo del vendedor.
+
+**Multifashion:**
+8. La fila del año de «Mes a mes» dice lo de la tarjeta «Año» y se llama «Año»; el Δ va sobre los meses comparables y lo dice (`lib/multifashion/fila-anio.ts`).
+9. Jennifer tiene «Actualizar ahora» (`roles={ROLES_MULTIFASHION}`); el rol se muestra con nombre («Gerente Multifashion», «Gerente Boston») desde `src/lib/roles-etiquetas.ts`, derivado de `SYSTEM_ROLES`; el desplegable de período tiene placeholder; la lista del shell se lee de `acceso.ts`.
+
+**Candados nuevos:** `catalogo-escondidos-y-solo-lectura.test.tsx` · `catalogo-foto-a-mano-protegida.test.ts` ·
+`catalogo-comprobantes-guard.test.ts` · `multifashion-anio-una-vez.test.ts` · `roles-etiquetas.test.ts`.
+**Cambiaron de dirección con nota fechada:** `catalogo-admin-una-lista` · `catalogo-admin-pantalla-cerrada` ·
+`pedidos-link-flujo-vendedor` · `catalogo-modo-pedido` · `catalogo-superficie` · `rutas-de-catalogo-retiradas` ·
+`require-admin-no-miente`.
+
+**Decisiones que quedaron a interpretación (Daniel las puede corregir):**
+- En el detalle de un comprobante, a bodega se le esconden los dos CORREOS («Avisar a Fashion Group», «Enviar al
+  cliente», que mueren en 403) y se le deja «Descargar PDF» (se arma en el navegador, no pide permiso).
+- El rol `admin` pasa a mostrarse como «Administrador» (era «Admin») porque la etiqueta ahora sale de
+  `SYSTEM_ROLES`, la misma de Usuarios.
+- Los hallazgos 🟡 de Multifashion que NO estaban en el encargo siguen abiertos: el `?subtab=` viejo no se
+  normaliza en la URL, y en la pestaña espejo de Comisiones el año es el del arranque.
