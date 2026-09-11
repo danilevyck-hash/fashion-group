@@ -159,7 +159,15 @@ describe("⚠️ las vistas SIN dato del servidor siguen pidiendo", () => {
     // Lo único que se pide por red es la columna «Compró», aparte a propósito:
     // leer las facturas del año de 150 clientes cuesta ~2.280 filas y la tabla
     // no tiene por qué esperarla.
-    expect(src).toContain("/api/clientes/ytd?codigos=");
+    // ⚠️ 11-sep-2026: la columna se pide por **POST** con la lista en el cuerpo.
+    // Iba por GET con los códigos en la URL y la ruta tenía tope de 200 con el
+    // comentario «el listado pagina de a 50» — falso desde que esta lista dejó
+    // de paginar: hoy manda los 148 juntos (~1.900 caracteres) y a los 200 la
+    // columna se apagaba en silencio. El tope subió a 1.000. La regla que este
+    // candado protege NO cambió: la LISTA no se vuelve a pedir; lo único que
+    // viaja por red es esta columna.
+    expect(src).toContain('fetch("/api/clientes/ytd"');
+    expect(src).toContain('method: "POST"');
   });
 
   it("Ventas y Multifashion solo consideran del servidor el año inicial", () => {

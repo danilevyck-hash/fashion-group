@@ -24,8 +24,12 @@ import { verifySession } from "@/lib/session-cookie";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { comprasDelCliente, pagosDelCliente } from "@/lib/clientes/ficha-datos";
 import ClienteDetail, { type ClienteDetailData, type FilaAging } from "./ClienteDetail";
+import { rolesClientes } from "@/lib/clientes/roles";
 
-const ALLOWED_ROLES = ["admin", "secretaria", "vendedor", "bodega"];
+// 🔴 Los roles salen de `ROLES_CLIENTES`, no de una copia escrita acá: es la
+// MISMA lista que el catálogo de módulos. Hasta el 11-sep-2026 decía además
+// `bodega`, que no tiene el módulo y entraba escribiendo la dirección.
+const ALLOWED_ROLES = rolesClientes();
 
 export const dynamic = "force-dynamic";
 

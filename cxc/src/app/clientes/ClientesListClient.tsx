@@ -23,6 +23,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { rolesClientes } from "@/lib/clientes/roles";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { EmptyState, PullToRefresh, ScrollableTable, SkeletonTable } from "@/components/ui";
 import SyncNowButton from "@/components/shared/SyncNowButton";
@@ -65,7 +66,9 @@ const CHIPS_VALIDOS: ChipId[] = ["todos", "sin-contacto", "sin-correo", "sin-tel
 export default function ClientesListClient({ initialClientes }: { initialClientes: Cliente[] }) {
   const { authChecked } = useAuth({
     moduleKey: "directorio",
-    allowedRoles: ["admin", "secretaria", "vendedor", "bodega"],
+    // 🔴 La MISMA lista que el guard SSR de la página y que el catálogo de
+    // módulos. Decía además `bodega`, que no tiene el módulo (11-sep-2026).
+    allowedRoles: rolesClientes(),
   });
   const router = useRouter();
 
@@ -101,7 +104,16 @@ export default function ClientesListClient({ initialClientes }: { initialCliente
   const { data: ytdData, mutate } = useSWR<YtdResp>(
     authChecked && codigos ? (["clientes-ytd", codigos] as const) : null,
     async ([, lista]: readonly [string, string]): Promise<YtdResp> => {
-      const res = await fetch(`/api/clientes/ytd?codigos=${encodeURIComponent(lista)}`, { cache: "no-store" });
+      // 🩸 Va por POST desde el 11-sep-2026: la lista dejó de paginar el 5-sep
+      // y manda el directorio ENTERO, que hoy son 148 códigos (~1.900
+      // caracteres de URL) contra un tope de 200 en la ruta. Con el cuerpo no
+      // hay largo de URL que cortar. La ruta calcula exactamente lo mismo.
+      const res = await fetch("/api/clientes/ytd", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codigos: lista.split(",").filter(Boolean) }),
+        cache: "no-store",
+      });
       if (!res.ok) throw new Error("Error al cargar compras del año");
       return (await res.json()) as YtdResp;
     },

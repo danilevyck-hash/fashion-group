@@ -29,6 +29,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { rolesClientes } from "@/lib/clientes/roles";
 import { Toast, AccordionContent } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -125,7 +126,9 @@ const EDITABLE_ROLES = ["admin", "secretaria"];
 export default function ClienteDetail({ initialData }: { initialData: ClienteDetailData }) {
   const { authChecked, role } = useAuth({
     moduleKey: "directorio",
-    allowedRoles: ["admin", "secretaria", "vendedor", "bodega"],
+    // 🔴 La MISMA lista que el guard SSR de la ficha y que el catálogo de
+    // módulos (11-sep-2026). `bodega` no tiene el módulo Clientes.
+    allowedRoles: rolesClientes(),
   });
   const router = useRouter();
 

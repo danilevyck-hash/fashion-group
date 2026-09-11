@@ -1,5 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /api/clientes/ytd?codigos=D-108,D-170,…
+// POST /api/clientes/ytd  { "codigos": ["D-108","D-170",…] }
+// GET  /api/clientes/ytd?codigos=D-108,D-170,…   (la puerta vieja, se queda)
 //
 // Compras del año de los clientes de UNA página del listado. Devuelve
 // { anio, ytd: { "D-108": 210702.5, … } }. Los clientes sin compras NO vienen
@@ -25,18 +26,32 @@ export const dynamic = "force-dynamic";
 
 const ALLOWED_ROLES = ["admin", "secretaria", "vendedor", "bodega"];
 
-/** Tope de códigos por llamada: el listado pagina de a 50 y el máximo que
- *  acepta la lista es 200. Más que eso es alguien usando el endpoint para otra
- *  cosa, y no queremos que una URL larga dispare una lectura enorme. */
-const MAX_CODIGOS = 200;
+// ─────────────────────────────────────────────────────────────────────────────
+// 🩸 EL TOPE ERA 200 Y EL LISTADO YA NO PAGINA (11-sep-2026).
+//
+// El comentario de acá arriba decía «el listado pagina de a 50»: dejó de
+// hacerlo el 5-sep-2026, cuando la lista de Clientes pasó a mostrar el
+// directorio entero con scroll. Desde ese día manda TODOS los códigos juntos,
+// y hoy son **148** — así que funciona de casualidad, a 52 clientes del 400.
+// El día que el directorio pase de 200, la ruta contesta 400 y la columna
+// «Compró <año>» se queda con «…» para siempre, sin un solo mensaje en
+// pantalla: el `useSWR` de la lista tira el error y nadie lo dibuja.
+//
+// Lo que cambia:
+//   · el tope sube a 1.000, que es el techo de la casa (`db-max-rows`) y deja
+//     seis veces el directorio de hoy;
+//   · nace un **POST** que recibe la lista en el cuerpo, porque 148 códigos en
+//     la URL ya son ~1.900 caracteres y algunos intermediarios cortan ahí.
+//     La pantalla pasó a usarlo; el GET se queda vivo y sin cambios para
+//     cualquier enlace o prueba que lo tenga escrito.
+//
+// El cálculo no cambia ni un centavo: los dos verbos llaman al MISMO
+// `comprasDelAnioPorCodigo`, que ya lee paginado.
+// ─────────────────────────────────────────────────────────────────────────────
+const MAX_CODIGOS = 1000;
 
-export async function GET(req: NextRequest) {
-  const authError = requireAuth(req, ALLOWED_ROLES);
-  if (authError) return authError;
-
-  const crudo = (req.nextUrl.searchParams.get("codigos") ?? "").trim();
-  const codigos = crudo ? crudo.split(",").map(c => c.trim()).filter(Boolean) : [];
-
+/** La respuesta, igual para los dos verbos. */
+async function responder(codigos: string[]): Promise<NextResponse> {
   if (codigos.length === 0) {
     return NextResponse.json({ anio: anioEnCursoPanama(), ytd: {} });
   }
@@ -58,4 +73,28 @@ export async function GET(req: NextRequest) {
     console.error("[api/clientes/ytd] error:", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
+}
+
+export async function GET(req: NextRequest) {
+  const authError = requireAuth(req, ALLOWED_ROLES);
+  if (authError) return authError;
+
+  const crudo = (req.nextUrl.searchParams.get("codigos") ?? "").trim();
+  return responder(crudo ? crudo.split(",").map(c => c.trim()).filter(Boolean) : []);
+}
+
+export async function POST(req: NextRequest) {
+  const authError = requireAuth(req, ALLOWED_ROLES);
+  if (authError) return authError;
+
+  let codigos: string[] = [];
+  try {
+    const body = (await req.json()) as { codigos?: unknown };
+    if (Array.isArray(body.codigos)) {
+      codigos = body.codigos.map((c) => String(c ?? "").trim()).filter(Boolean);
+    }
+  } catch {
+    return NextResponse.json({ error: "Body inválido." }, { status: 400 });
+  }
+  return responder(codigos);
 }
