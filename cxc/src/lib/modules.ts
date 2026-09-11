@@ -207,10 +207,15 @@ export const ALL_MODULES: AppModule[] = [
 
   // Administración
   //
-  // 🔴 UN SOLO MÓDULO, Y EL GRUPO SE QUEDA (13-ago-2026). "Data Health" dejó de
-  // ser una ficha suelta y pasó a ser la 2ª PESTAÑA de Usuarios
-  // (`/admin/usuarios?tab=data-health`; la dirección vieja redirige en
-  // next.config.js). No se perdió nada: la pantalla es la misma, movida.
+  // 🔴 UN SOLO MÓDULO, Y EL GRUPO SE QUEDA (13-ago-2026 · 11-sep-2026).
+  // "Data Health" dejó de ser una ficha suelta el 13-ago (pasó a ser la 2ª
+  // PESTAÑA de Usuarios) y el 11-sep la PANTALLA se retiró entera. Daniel,
+  // textual: «data health quiero que el sistema o tú mida todo pero no verlo…
+  // no lo uso y no lo quiero usar». 🔴 LA MEDICIÓN SE QUEDÓ COMPLETA: el cron
+  // `integrity-check` corre a las 12:00 UTC, `data_integrity_checks` sigue
+  // recibiendo filas y un check crítico sigue avisando por 🔧 SISTEMA; se
+  // consulta por `GET /api/diag/data-health`. Lo que se fue es lo que nadie
+  // abría. `/admin/data-health` y `/data-health` redirigen al Inicio.
   //
   // Por qué el grupo NO se disuelve mudando Usuarios a "Operación":
   //   · "Administración" es admin-only — el único que lo ve es Daniel. Mudarlo a

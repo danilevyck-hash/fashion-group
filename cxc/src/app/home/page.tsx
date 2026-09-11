@@ -24,8 +24,6 @@ export default function HomePage() {
   const [displayName, setDisplayName] = useState("");
   const [fgModules, setFgModules] = useState<string[] | null>(null);
   const [darkMode, setDarkMode] = useState(false);
-  const [dhAlert, setDhAlert] = useState<{ critical: number; warning: number } | null>(null);
-  const [dhDismissed, setDhDismissed] = useState(false);
   const [frequents, setFrequents] = useState<AppModule[]>([]);
 
   // El botón de arriba a la derecha tiene que REVOCAR la sesión en el server
@@ -98,23 +96,14 @@ export default function HomePage() {
     if (casa) router.push(casa.href);
   }, [authChecked, role, fgModules, router]);
 
-  // Aviso proactivo de Data Health (solo admin): si hay checks critical/warning,
-  // avisa al entrar en vez de esperar a que abra el dashboard. (Tras PR #33 los
-  // warnings solo viven en el dashboard.)
-  useEffect(() => {
-    if (!authChecked || role !== "admin") return;
-    let cancelled = false;
-    fetch("/api/admin/data-health", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j: { latest?: { severity: string }[] } | null) => {
-        if (cancelled || !j?.latest) return;
-        const critical = j.latest.filter((x) => x.severity === "critical").length;
-        const warning = j.latest.filter((x) => x.severity === "warning").length;
-        if (critical + warning > 0) setDhAlert({ critical, warning });
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [authChecked, role]);
+  // 🔴 EL AVISO DE DATA HEALTH SE RETIRÓ DEL INICIO (11-sep-2026). Daniel,
+  // textual: «data health quiero que el sistema o tú mida todo pero no verlo…
+  // no lo uso y no lo quiero usar». Era una franja que aparecía al entrar y
+  // llevaba a una pantalla que él nunca abrió; sin pantalla a la que llevar, el
+  // aviso no tiene a dónde ir. LA MEDICIÓN NO SE TOCÓ: el cron
+  // `integrity-check` corre a las 12:00 UTC, escribe `data_integrity_checks` y
+  // los checks CRÍTICOS siguen avisando por Telegram 🔧 SISTEMA — que es el
+  // canal que Daniel sí lee. Los `warning` vuelven a vivir solo en la tabla.
 
   // "Tus frecuentes": top módulos por clics del usuario (localStorage). Se lee
   // tras montar (client-only) para no romper SSR/hidratación; se recalcula si
@@ -187,26 +176,6 @@ export default function HomePage() {
         {/* Global Search — admin, secretaria */}
         {["admin", "secretaria"].includes(role) && (
           <SearchBar darkMode={darkMode} />
-        )}
-
-        {/* Aviso proactivo de Data Health (solo admin) */}
-        {role === "admin" && dhAlert && !dhDismissed && (
-          <div className={`mb-4 flex items-center justify-between gap-3 rounded-lg border px-4 py-2.5 text-sm ${
-            dhAlert.critical > 0
-              ? "border-red-200 bg-red-50 text-red-800"
-              : "border-amber-200 bg-amber-50 text-amber-900"
-          }`}>
-            {/* Data Health es la 2ª pestaña de Usuarios (13-ago-2026). El link
-                va DIRECTO a la pestaña: el redirect de `/admin/data-health`
-                existe para los marcadores viejos, no para que la app siga
-                usando una dirección que ya no es la suya. */}
-            <button onClick={() => router.push("/admin/usuarios?tab=data-health")} className="text-left font-medium hover:underline">
-              {dhAlert.critical > 0
-                ? `${dhAlert.critical} check${dhAlert.critical === 1 ? "" : "s"} crítico${dhAlert.critical === 1 ? "" : "s"} en Data Health`
-                : `${dhAlert.warning} check${dhAlert.warning === 1 ? "" : "s"} en alerta en Data Health`} — toca para revisar
-            </button>
-            <button onClick={() => setDhDismissed(true)} aria-label="Descartar" className="shrink-0 px-1 opacity-60 hover:opacity-100">×</button>
-          </div>
         )}
 
         {/* Tus frecuentes: los módulos más usados por el usuario (aprendido de

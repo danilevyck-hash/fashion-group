@@ -5,10 +5,9 @@ import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, SkeletonTable, EmptyState, ConfirmModal, Avatar, Chip } from "@/components/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users as UsersIcon, ShieldCheck, Megaphone } from "lucide-react";
+import { Users as UsersIcon, Megaphone } from "lucide-react";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import VendedorSwitchSection from "./VendedorSwitchSection";
-import DataHealthTab from "./DataHealthTab";
 import NovedadesTab from "./NovedadesTab";
 import IconButton from "@/components/IconButton";
 import { ALL_MODULES, getDefaultModulesForRole } from "@/lib/modules";
@@ -37,13 +36,19 @@ function relativeTime(iso: string): string {
 }
 
 // Las dos pestañas. `?tab=` en la URL para que un marcador, un refresh y el
-// back/forward caigan donde estaba el usuario — y para que la dirección vieja
-// `/admin/data-health` pueda aterrizar en la de Data Health (el redirect vive
-// en next.config.js, como el resto de los slugs viejos).
+// back/forward caigan donde estaba el usuario.
 // «Novedades» (9-sep-2026) es la lista de avisos de «qué cambió» y quién ya
 // los leyó. Va acá y no en un módulo nuevo: ésta ya es la pantalla admin-only
 // donde se mira quién es quién.
-const TABS = ["usuarios", "data-health", "novedades"] as const;
+//
+// 🔴 «Data Health» ERA la 2ª pestaña y se retiró el 11-sep-2026. Daniel,
+// textual: «data health quiero que el sistema o tú mida todo pero no verlo…
+// no lo uso y no lo quiero usar». Lo que se fue es la PANTALLA: el cron
+// `integrity-check` sigue corriendo a las 12:00 UTC, `data_integrity_checks`
+// sigue llenándose y los críticos siguen avisando por 🔧 SISTEMA. Un
+// `?tab=data-health` guardado cae en Usuarios (no en blanco), y
+// `/admin/data-health` redirige al Inicio en next.config.js.
+const TABS = ["usuarios", "novedades"] as const;
 
 // Misma clase que las pestañas de Ventas y Multifashion. No se inventa un
 // patrón nuevo: subrayado teal, sin píldora, 44px de alto al tacto.
@@ -68,18 +73,18 @@ function UsuariosPageInner() {
   // ALL_MODULE_KEYS). Cambiarlo a "usuarios" abriría la pantalla a quien tenga
   // esa key asignada a mano: MEDIDO el 13-ago-2026 en producción, `Angela`
   // (secretaria) la tiene en `modulos_override` — o sea que ese cambio le
-  // regalaría Usuarios Y Data Health de un saque. Se queda como estaba.
+  // regalaría la pantalla entera de un saque. Se queda como estaba.
   const { authChecked, role } = useAuth({ moduleKey: "admin", allowedRoles: ["admin"] });
   const [tabRaw, setTab] = useUrlState("tab", "usuarios");
-  // Data Health es SOLO de admin y sigue siéndolo. El guard de arriba ya cierra
-  // la pantalla entera, pero la pestaña se condiciona igual: así el permiso se
-  // lee en el componente y un test lo puede exigir, en vez de depender de que
-  // nadie afloje el `moduleKey`.
+  // «Novedades» es SOLO de admin. El guard de arriba ya cierra la pantalla
+  // entera, pero la pestaña se condiciona igual: así el permiso se lee en el
+  // componente y un test lo puede exigir, en vez de depender de que nadie
+  // afloje el `moduleKey`.
   const esAdmin = role === "admin";
   // Un `?tab=` desconocido —o uno que este rol no puede ver— cae en la pestaña
   // por defecto, NUNCA en blanco: Radix no dibuja nada si el `value` no tiene
   // trigger (misma convención que /ventas, /admin y el Depurador).
-  const SOLO_ADMIN: readonly string[] = ["data-health", "novedades"];
+  const SOLO_ADMIN: readonly string[] = ["novedades"];
   const tab = TABS.some((t) => t === tabRaw) && (!SOLO_ADMIN.includes(tabRaw) || esAdmin)
     ? tabRaw
     : "usuarios";
@@ -242,7 +247,7 @@ function UsuariosPageInner() {
             visible encima de una pestaña con la misma palabra es el nombre 3×,
             la poda que este repo ya hizo en el resto de las pantallas. Queda
             `sr-only` para no dejar el documento sin encabezado, y es el ÚNICO
-            h1 de la página (Data Health, por eso, ya no trae el suyo). */}
+            h1 de la página. */}
         <h1 className="sr-only">Usuarios</h1>
 
         <Tabs value={tab} onValueChange={setTab}>
@@ -250,12 +255,6 @@ function UsuariosPageInner() {
             <TabsTrigger value="usuarios" className={TAB_TRIGGER_CLASS}>
               <UsersIcon className="hidden h-3.5 w-3.5 sm:block" /> Usuarios
             </TabsTrigger>
-            {/* La pestaña de Data Health SOLO existe para admin. */}
-            {esAdmin && (
-              <TabsTrigger value="data-health" className={TAB_TRIGGER_CLASS}>
-                <ShieldCheck className="hidden h-3.5 w-3.5 sm:block" /> Data Health
-              </TabsTrigger>
-            )}
             {/* La lista de avisos de «qué cambió» — también SOLO de admin. */}
             {esAdmin && (
               <TabsTrigger value="novedades" className={TAB_TRIGGER_CLASS}>
@@ -667,15 +666,6 @@ function UsuariosPageInner() {
         </section>
           </TabsContent>
 
-          {/* Data Health — la pantalla de siempre, entera, como 2ª pestaña.
-              Solo se monta para admin: sin este `esAdmin` la pestaña seguiría
-              cerrada por el guard de arriba, pero el permiso dejaría de estar
-              escrito acá. */}
-          {esAdmin && (
-            <TabsContent value="data-health" className="mt-0">
-              <DataHealthTab />
-            </TabsContent>
-          )}
           {esAdmin && (
             <TabsContent value="novedades" className="mt-0">
               <NovedadesTab />

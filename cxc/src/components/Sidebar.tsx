@@ -48,7 +48,7 @@ function activeGroupForPath(pathname: string): string | null {
   );
   if (direct) return direct.key;
   // Match vía el href del módulo, MÁS ESPECÍFICO (href más largo gana). Evita
-  // que /admin/usuarios o /admin/data-health (grupo "administracion") resalten
+  // que /admin/usuarios (grupo "administracion") resalte
   // otro módulo solo por compartir prefijo. (CXC vive en "/cxc" desde el
   // 5-sep-2026, así que ese par ya no colisiona; la regla se queda porque
   // protege a cualquier módulo futuro que cuelgue de otro.)

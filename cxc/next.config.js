@@ -90,20 +90,26 @@ const nextConfig = {
         destination: "/comisiones",
         permanent: false,
       },
-      // Data Health dejó de ser un módulo suelto (13-ago-2026): vive como 2ª
-      // PESTAÑA de Usuarios, con la MISMA pantalla. La dirección vieja la tienen
-      // en marcadores y la escriben las alertas de integridad
-      // (`integrity-check-run.ts` mandó ese link a Telegram durante meses), así
-      // que tiene que seguir llegando — acá, y no con un `page.tsx` que
-      // redirige, para que ni siquiera se descargue la pantalla equivocada.
-      // Temporal (307) como los demás: no se quema en el caché del navegador.
-      { source: "/admin/data-health", destination: "/admin/usuarios?tab=data-health", permanent: false },
+      // 🔴 DATA HEALTH SE FUE DE LA PANTALLA (11-sep-2026). Daniel, textual:
+      // «data health quiero que el sistema o tú mida todo pero no verlo… no lo
+      // uso y no lo quiero usar». LA MEDICIÓN SE QUEDA ENTERA — el cron
+      // `integrity-check` sigue a las 12:00 UTC, `data_integrity_checks` sigue
+      // recibiendo filas y los críticos siguen avisando por 🔧 SISTEMA. Lo que
+      // se retiró es la PANTALLA que nadie abría.
+      //
+      // Las dos direcciones viejas siguen llegando —la del módulo suelto de
+      // antes del 13-ago y la de la pestaña— y ahora las dos van al Inicio.
+      // Acá y no con un `page.tsx` que redirige, para que ni siquiera se
+      // descargue la pantalla que ya no existe. Temporal (307) como todos los
+      // de este archivo: no se quema en el caché del navegador.
+      { source: "/admin/data-health", destination: "/home", permanent: false },
+      { source: "/data-health", destination: "/home", permanent: false },
       // Cuentas por Cobrar dejó de vivir en /admin (5-sep-2026): la dirección
       // ahora dice lo que es, `/cxc`. El RÓTULO no cambió — sigue siendo
       // "Cuentas por Cobrar" en el home, el sidebar, la barra y la búsqueda.
       //
-      // ⚠️ `source: "/admin"` matchea SOLO esa ruta exacta: /admin/usuarios y
-      // /admin/data-health siguen donde estaban (Usuarios NO se movió). Y Next
+      // ⚠️ `source: "/admin"` matchea SOLO esa ruta exacta: /admin/usuarios
+      // sigue donde estaba (Usuarios NO se movió). Y Next
       // arrastra la query al destino, así que los enlaces guardados con
       // `?search=`, `?tab=boston`, `?risk=` o `?empresa=` siguen llegando
       // enteros.
