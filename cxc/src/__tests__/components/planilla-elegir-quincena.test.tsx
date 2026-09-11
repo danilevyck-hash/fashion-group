@@ -134,13 +134,14 @@ describe("🔴 la pantalla: dos botones, el corte a la vista, Generar negro", ()
     expect(screen.queryByText(/Elige el período$/)).toBeNull();
   });
 
-  it("🔴 «Cortar el reloj el» se ve DESDE EL INICIO, vacío, y Excel/PDF/Comprobantes NO están", async () => {
+  // ⚠️ 11-sep-2026: Excel, PDF y Comprobantes viven en UN botón «Descargar ⌄»
+  // (mockup «Antes de cerrar»). Cambió dónde están, no cuándo aparecen.
+  it("🔴 «Cortar el reloj el» se ve DESDE EL INICIO, vacío, y «Descargar» NO está", async () => {
     servir(); montar();
     expect(corteInput().value).toBe("");
     expect(screen.getByText("Vacío: se lee la quincena entera.")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /^Excel$/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /^PDF$/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /^Comprobantes$/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Descargar/ })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: /^Excel$/ })).toBeNull();
     expect(boton(/^Generar$/).disabled).toBe(true);
   });
 
@@ -151,6 +152,8 @@ describe("🔴 la pantalla: dos botones, el corte a la vista, Generar negro", ()
     expect(boton("16 – 30 sep").getAttribute("aria-pressed")).toBe("false");
     expect(corteInput().value).toBe("2026-09-13");
     expect(screen.getByText("Del 14 al 15 se paga normal y se ajusta en la siguiente.")).toBeTruthy();
+    // Y el chip dice el corte corto (11-sep-2026, mockup): «Corte 13 sep».
+    expect(screen.getByText("Corte 13 sep")).toBeTruthy();
     expect(boton(/^Generar$/).disabled).toBe(false);
     expect(boton(/^Generar$/).className).toContain("bg-black");
   });
@@ -162,15 +165,16 @@ describe("🔴 la pantalla: dos botones, el corte a la vista, Generar negro", ()
     expect(screen.getByText("Del 29 al 30 se paga normal y se ajusta en la siguiente.")).toBeTruthy();
   });
 
-  it("🔴 Generar pide EL MISMO rango y corte que los botones muestran, y recién ahí salen Excel/PDF/Comprobantes", async () => {
+  it("🔴 Generar pide EL MISMO rango y corte que los botones muestran, y recién ahí sale «Descargar» con Excel/PDF/Comprobantes", async () => {
     const ll = servir(); montar();
     fireEvent.click(boton("1 – 15 sep"));
     generar();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
     expect(urlDelCuadro(ll)).toBe("/api/asistencia/planilla?desde=2026-09-01&hasta=2026-09-15&empresa=confecciones_boston&corte=2026-09-13");
-    expect(boton(/^Excel$/)).toBeTruthy();
-    expect(boton(/^PDF$/)).toBeTruthy();
-    expect(boton(/^Comprobantes$/)).toBeTruthy();
+    fireEvent.click(boton(/^Descargar/));
+    expect(screen.getByRole("menuitem", { name: /^Excel$/ })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: /^PDF$/ })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: /^Comprobantes$/ })).toBeTruthy();
   });
 
   it("🔴 EL MISMO PEDIDO POR CALENDARIO: elegir 1–15 sep en «Otro rango» arma la MISMA URL que el botón", async () => {

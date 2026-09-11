@@ -160,24 +160,27 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("🔴 arreglo 1 · el aviso del período sin terminar se ve arriba", () => {
-  it("dice cuántos días hábiles faltan y que los que no pasaron no se cuentan", async () => {
+  // ⚠️ 11-sep-2026: la caja azul del período se fue con el mockup «Antes de
+  // cerrar»: cuántos días hábiles faltan lo dice el ENCABEZADO de la lista. El
+  // texto largo («Esta quincena todavía no termina — … Los días que no pasaron
+  // no se cuentan») sigue viajando en `avisos.periodoAbierto.texto` para el
+  // Excel y el PDF.
+  it("dice cuántos días hábiles faltan, en el encabezado de «Antes de cerrar»", async () => {
     servir(respuesta());
     montar();
     elegirPeriodo();
-    expect(
-      await screen.findByText(/Esta quincena todavía no termina — falta 1 día hábil/),
-    ).toBeTruthy();
-    expect(screen.getByText(/Los días que no pasaron no se cuentan/)).toBeTruthy();
+    expect(await screen.findByText(/Antes de cerrar · borrador, falta 1 día hábil/)).toBeTruthy();
   });
 
-  it("y no se muestra cuando el período ya cerró", async () => {
+  it("y cuando el período ya cerró dice «quincena terminada»", async () => {
     const r = respuesta();
     (r.avisos as Record<string, unknown>).periodoAbierto = null;
     servir(r);
     montar();
     elegirPeriodo();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
-    expect(screen.queryByText(/todavía no termina/)).toBeNull();
+    expect(screen.queryByText(/falta 1 día hábil/)).toBeNull();
+    expect(screen.getByText(/Antes de cerrar · borrador, quincena terminada/)).toBeTruthy();
   });
 });
 
@@ -250,13 +253,17 @@ describe("🔴 arreglo 2 y 3 · «Tú decides» es su propio grupo, en gris", ()
 });
 
 describe("🔴 arreglo 3 · el código sin ficha, una sola vez y fuera del cuadro", () => {
-  it("el aviso está arriba y dice que no se le puede calcular pago", async () => {
+  // ⚠️ 11-sep-2026: el aviso es UNA línea de «Antes de cerrar» («1 código del
+  // reloj sin ficha (50) → Colaboradores ›»), no la caja con el párrafo. El
+  // texto largo sigue viajando en `avisos.avisoSinFicha` para el Excel y el PDF.
+  // La regla —arriba, UNA vez, con a dónde ir— no cambió.
+  it("el aviso está arriba y lleva a las fichas", async () => {
     servir(respuesta());
     montar();
     elegirPeriodo();
-    const aviso = await screen.findByText(/1 código marcó 53 veces y no tiene ficha/);
-    expect(aviso.textContent).toContain("no se le puede calcular pago");
-    expect(aviso.textContent).toContain("Configuración");
+    const aviso = (await screen.findByText(/código del reloj sin ficha \(50\)/)).closest("li")!;
+    expect(aviso.textContent).toContain("1");
+    expect(aviso.textContent).toMatch(/Colaboradores ›|Configuración ›/);
   });
 
   it("🔴 y aparece UNA sola vez en toda la pantalla, no una por empresa", async () => {
@@ -264,7 +271,7 @@ describe("🔴 arreglo 3 · el código sin ficha, una sola vez y fuera del cuadr
     montar();
     elegirPeriodo();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
-    expect(screen.getAllByText(/no tiene ficha \(código 50\)/)).toHaveLength(1);
+    expect(screen.getAllByText(/código del reloj sin ficha \(50\)/)).toHaveLength(1);
     // Y no quedó ninguna fila suya adentro del cuadro.
     expect(screen.queryByText(/sin ficha en Configuración/)).toBeNull();
   });

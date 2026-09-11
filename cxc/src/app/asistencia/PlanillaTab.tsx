@@ -36,7 +36,7 @@
 // el POST recibe empresa y fechas, y la ruta vuelve a calcular y congela ESO
 // (ver `planilla-guardada.ts`). Acá solo se muestra el estado y se pide.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { esTodas } from "@/lib/asistencia/empresa-para-todo";
 import { createPortal } from "react-dom";
 import { useToast } from "@/components/ToastSystem";
@@ -76,9 +76,7 @@ import { baseSeguros, chipBaseSeguros } from "@/lib/asistencia/seguros-base";
 import type { AvisoPeriodoAbierto, CodigoSinFicha } from "@/lib/asistencia/periodo";
 import Link from "next/link";
 import {
-  cabeceraExtraNoAprobada,
   enlaceAprobaciones,
-  horasBonitas,
   type ExtraNoAprobada,
 } from "@/lib/asistencia/aprobaciones";
 import type {
@@ -86,8 +84,11 @@ import type {
   SugerenciaPrestamo,
 } from "@/lib/asistencia/prestamos-planilla";
 import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
-import { PESTANA_FICHAS, dondeSeCargaLaFicha } from "@/lib/asistencia/persona-en-el-centro";
-import { notaAjuste, notaCeldaAjuste, textoCorte } from "@/lib/asistencia/corte-quincena";
+import { PESTANA_FICHAS } from "@/lib/asistencia/persona-en-el-centro";
+import { notaAjuste, notaCeldaAjuste } from "@/lib/asistencia/corte-quincena";
+import { armarAntesDeCerrar } from "@/lib/asistencia/antes-de-cerrar";
+import AntesDeCerrar from "./AntesDeCerrar";
+import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 // 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { textoExtraAutomatico } from "@/lib/asistencia/extra-automatico";
@@ -354,6 +355,9 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
   // 🔴 EL CORTE (día 13/28). "" = la quincena entera, el comportamiento de
   // siempre. Solo se usa con el interruptor. Cambiarlo vuelve viejo el cuadro.
   const [corte, setCorte] = useState("");
+  // «Descargar ⌄»: Excel · PDF · Comprobantes en un solo botón (11-sep-2026).
+  const [descargaOpen, setDescargaOpen] = useState(false);
+  const descargaRef = useRef<HTMLButtonElement>(null);
   const [data, setData] = useState<Respuesta | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -894,6 +898,9 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                   Quincena entera
                 </button>
               )}
+              {corte && (
+                <span className="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-700">Corte {fechaCortaCorte(corte)}</span>
+              )}
               <span className="text-[12px] text-gray-500">
                 {corte && elegido
                   ? (fraseCorte(corte, hasta) ?? `Se lee el reloj hasta el ${fechaCortaCorte(corte)}.`)
@@ -905,35 +912,45 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
 
         {botonGenerar}
 
-        {/* 🔴 Excel, PDF y Comprobantes SOLO con la planilla ya generada: un
-            botón apagado a la vista es una promesa que todavía no se puede
-            cumplir. */}
+        {/* 🔴 «Descargar ⌄» (Excel · PDF · Comprobantes) SOLO con la planilla ya
+            generada: un botón apagado a la vista es una promesa que todavía no
+            se puede cumplir. Un solo botón para las tres salidas (11-sep-2026,
+            mockup): dice QUÉ trae, como el resto del sistema. */}
         {!!data?.lineas.length && (
-        <div className="flex gap-2">
-          <button
-            type="button" onClick={bajarExcel} disabled={!data?.lineas.length}
-            className="min-h-[44px] rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:opacity-40"
-          >
-            Excel
-          </button>
-          <button
-            type="button" onClick={bajarPdf} disabled={!data?.lineas.length}
-            className="min-h-[44px] rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:opacity-40"
-          >
-            PDF
-          </button>
-          {/* 🔴 EL PAPEL QUE SE FIRMA. Va con los otros dos y no escondido en un
-              «···»: es el entregable de la quincena, no una acción secundaria.
-              Dice QUÉ trae, como el resto del sistema. */}
-          {PLANILLA_UNIDA && (
+          <div className="relative">
             <button
-              type="button" onClick={bajarComprobantes} disabled={!data?.lineas.length}
-              className="min-h-[44px] rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:opacity-40"
+              ref={descargaRef}
+              type="button"
+              onClick={() => setDescargaOpen((v) => !v)}
+              aria-haspopup="menu"
+              aria-expanded={descargaOpen}
+              className="min-h-[44px] rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
             >
-              Comprobantes
+              Descargar <span aria-hidden className="text-gray-400">⌄</span>
             </button>
-          )}
-        </div>
+            <DesplegableFlotante abierto={descargaOpen} anclaRef={descargaRef} onCerrar={() => setDescargaOpen(false)} role="menu" marca="planilla-descargar" className="min-w-[180px] rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+              <button role="menuitem" type="button" onClick={() => { setDescargaOpen(false); void bajarExcel(); }} className="block min-h-[44px] w-full px-4 text-left text-sm hover:bg-gray-50">Excel</button>
+              <button role="menuitem" type="button" onClick={() => { setDescargaOpen(false); void bajarPdf(); }} className="block min-h-[44px] w-full px-4 text-left text-sm hover:bg-gray-50">PDF</button>
+              {/* 🔴 EL PAPEL QUE SE FIRMA: el entregable de la quincena. */}
+              {PLANILLA_UNIDA && (
+                <button role="menuitem" type="button" onClick={() => { setDescargaOpen(false); void bajarComprobantes(); }} className="block min-h-[44px] w-full px-4 text-left text-sm hover:bg-gray-50">Comprobantes</button>
+              )}
+            </DesplegableFlotante>
+          </div>
+        )}
+
+        {/* 🔴 CERRAR QUINCENA, negro y a la derecha (11-sep-2026, mockup). Solo
+            a quien la firma; el borrador ya no tiene su propio párrafo: lo dice
+            el encabezado de «Antes de cerrar». */}
+        {!!data && !vieja && !cerrada && !!data.lineas.length && puedeCerrarla && (
+          <button
+            type="button"
+            onClick={() => setModal("cerrar")}
+            disabled={!sePuedeCerrar}
+            className="ml-auto min-h-[44px] shrink-0 rounded-md bg-black px-4 text-sm font-medium text-white transition active:scale-[0.97] disabled:opacity-40"
+          >
+            Cerrar quincena
+          </button>
         )}
       </div>
 
@@ -1089,237 +1106,42 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
         </div>
       )}
 
-      {/* 🔴 EL CORTE Y EL AJUSTE — solo con el interruptor y cuando hay algo que
-          decir. El corte dice hasta dónde se leyó el reloj; el ajuste, con
-          nombre y monto, es la corrección de los días que la quincena pasada
-          pagó sin medir. La misma regla de Daniel: lo que mueve plata se dice. */}
-      {PLANILLA_UNIDA && !!data && !vieja && (
-        <>
-          {data.corte && textoCorte(data.periodo.hasta, data.corte,
-            Math.max(0, Math.round((Date.parse(`${data.periodo.hasta}T12:00:00Z`) - Date.parse(`${data.corte}T12:00:00Z`)) / 86400000))) && (
-            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
-              <p className="text-[13px] text-gray-700">
-                {textoCorte(data.periodo.hasta, data.corte,
-                  Math.max(0, Math.round((Date.parse(`${data.periodo.hasta}T12:00:00Z`) - Date.parse(`${data.corte}T12:00:00Z`)) / 86400000)))}
-              </p>
-            </div>
-          )}
-          {/* 🔴 El ajuste de la quincena anterior YA NO tiene caja ni chip
-              (11-sep-2026): entra en las columnas de siempre y se dice al pie
-              del cuadro, en la celda (title) y en el detalle de cada tarjeta. */}
-        </>
-      )}
-
-      {/* 🔴 BORRADOR: todavía no se guardó nada. Va con el botón de cerrar al
-          lado, que es la única acción que hay que tomar acá. */}
+      {/* 🔴 «ANTES DE CERRAR» — UNA lista, no siete cajas (11-sep-2026, mockup
+          aprobado por Daniel). Arriba lo que hay que ARREGLAR (número en negrita,
+          enlace a la derecha); abajo en gris lo informativo (el corte, los que no
+          salen). Sin nombres sueltos —están en Aprobaciones, y «ver quiénes» los
+          trae—, sin el párrafo del borrador —lo dice el encabezado— y sin la
+          caja de préstamos —ya no se aprueba—. Los avisos siguen viajando como
+          DATOS en `avisos`: el Excel y el PDF los leen igual. La regla vive en
+          `lib/asistencia/antes-de-cerrar.ts`. */}
       {!!data && !vieja && !cerrada && !!data.lineas.length && (
-        <div className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-blue-900">Todavía no está cerrada</p>
-            <p className="mt-0.5 text-[13px] text-blue-900">
-              Esto es un borrador: se vuelve a calcular cada vez que lo generas y no queda
-              registrado en ningún lado. Al cerrar la quincena los números quedan congelados,
-              con tu nombre y la fecha.
-              {!puedeCerrarla && " La cierra contabilidad; aquí puedes generarla, revisarla e imprimirla."}
-            </p>
-          </div>
-          {puedeCerrarla && (
-            <button
-              type="button"
-              onClick={() => setModal("cerrar")}
-              disabled={!sePuedeCerrar}
-              className="min-h-[44px] shrink-0 rounded-md bg-black px-4 text-sm font-medium text-white transition active:scale-[0.97] disabled:opacity-40"
-            >
-              Cerrar quincena
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* ── Avisos: todo lo que hay que saber ANTES de descontarle plata a nadie ── */}
-      {/* 🔴 EL PERÍODO NO TERMINÓ. Va arriba de todo: los días que no pasaron
-          dejaron de contarse como falta —eran $866,99 de $1.127,78 el día que
-          se midió— y un número que baja sin explicación se lee como un número
-          que no cuadra. */}
-      {data?.avisos.periodoAbierto && (
-        <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[13px] text-blue-900">
-          {data.avisos.periodoAbierto.texto}
-        </p>
-      )}
-      {/* 🔴 El código que marca y no tiene ficha: UNA vez, arriba, fuera del
-          cuadro de cada empresa. Antes salía tres veces —una por empresa— como
-          si fueran tres personas distintas. */}
-      {/* 🔴 NADA SE DESCARTA EN SILENCIO. Si la planilla dejó de pagar días por
-          una vacación marcada, se dice acá: nombre, rango y monto. Va ARRIBA,
-          con los avisos de plata, no escondido en el detalle de una fila. */}
-      {data?.avisos.avisoVacacionesNoPagadas && (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
-          {data.avisos.avisoVacacionesNoPagadas}
-        </p>
-      )}
-
-      {data?.avisos.faltaMigracionVacaciones && (
-        <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
-          {data.avisos.faltaMigracionVacaciones}
-        </p>
-      )}
-
-      {/* 🔴 LO MISMO CON LAS HORAS EXTRA SIN APROBAR. Contadora, textual: *«Sólo
-          se pagan las horas extras autorizadas y las reportadas por Julio
-          Garay»*. No se pagan — pero se DICEN, con nombre y cantidad, arriba y
-          en ámbar. Rechazar sí, esconder no. */}
-      {/* 🔴 Y CADA PERSONA ES UN ENLACE (3-sep-2026). Daniel, textual: *«al
-          hacer clic en el mensaje de aprobacion, que te lleve al colaborador
-          para aprobar»*. Lleva a la pestaña Aprobaciones con `persona=<código>`
-          y el MISMO rango que se está mirando; la pestaña abre el primer día
-          que esa persona tiene sin aprobar y la resalta. Mismo nivel del
-          breadcrumb → `replace`, el Atrás no cicla. `avisoExtraSinAprobar`
-          (el párrafo de antes) queda en la respuesta para el Excel/PDF y para
-          quien lo lea; acá se arma con la lista. */}
-      {!!data?.avisos.extraSinAprobar?.length && (
-        <div
-          data-testid="aviso-extra-sin-aprobar"
-          className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900"
-        >
-          <p>{cabeceraExtraNoAprobada(data.avisos.extraSinAprobar.length)}</p>
-          <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-            {data.avisos.extraSinAprobar.map((e) => (
-              <li key={e.codigo}>
-                <Link
-                  href={enlaceAprobaciones(e.codigo, pedido ? { desde: pedido.desde, hasta: pedido.hasta } : null)}
-                  replace
-                  scroll={false}
-                  className="inline-flex min-h-[44px] items-center gap-1 font-medium tabular-nums underline underline-offset-2 hover:text-amber-950"
-                >
-                  {e.etiqueta} · {horasBonitas(e.minutos)}{e.monto === null ? "" : ` · $${e.monto.toFixed(2)}`}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* 🔴 LO QUE EL GUARD RECHAZÓ SE DICE, con el nombre y el motivo. Sin
-          esto, la persona cobraría en una sola planilla y el reparto se vería
-          «deshecho solo». Ámbar y no rojo: no se rompió nada, está mal cargado. */}
-      {data?.avisos.avisoRepartoRechazado && (
-        <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
-          {data.avisos.avisoRepartoRechazado}
-        </p>
-      )}
-      {data?.avisos.faltaMigracionReparto && (
-        <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
-          {data.avisos.faltaMigracionReparto}
-        </p>
-      )}
-      {data?.avisos.faltaMigracionAprobaciones && (
-        <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
-          {data.avisos.faltaMigracionAprobaciones}
-        </p>
-      )}
-
-      {/* 🔴 EL PRÉSTAMO DICE SOLO LO QUE NO ES LO DE SIEMPRE (11-sep-2026): la
-          última cuota (se descuenta el saldo) y quien debe pero no cobra aquí.
-          La cuota entra sola a la casilla; ya no hay nada que aprobar. */}
-      {data?.avisos.avisoPrestamo && (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
-          {data.avisos.avisoPrestamo}
-        </p>
-      )}
-
-      {/* 🔴 Un préstamo con saldo que no es de nadie es plata que NUNCA se va a
-          descontar. Va en rojo: pide que una persona haga algo. */}
-      {data?.avisos.avisoPrestamoSinAtar && (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800">
-          {data.avisos.avisoPrestamoSinAtar}
-        </p>
-      )}
-
-      {data?.avisos.faltaMigracionAmarrePrestamos && (
-        <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
-          {data.avisos.faltaMigracionAmarrePrestamos}
-        </p>
-      )}
-
-      {data?.avisos.avisoSinFicha && (
-        <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
-          {data.avisos.avisoSinFicha}{" "}
-          Se le da de alta en <b>{PESTANA_FICHAS}</b>.
-        </p>
-      )}
-      {/* 🔴 EL AVISO DEL RANGO LIBRE. Va PRIMERO y no se esconde detrás de un ⓘ:
-          en un rango que no es una quincena, el sueldo base se reparte y los
-          montos escritos a mano no entran. Quien imprima este cuadro para pagar
-          tiene que leer eso antes que cualquier otra cosa. */}
-      {/* 🔴 UNA LÍNEA, NO UN PÁRRAFO. Eran tres viñetas, escritas cuando el
-          rango era la excepción; hoy es el único modo y ese bloque saldría en
-          cada cuadro que no cuadre con una quincena. Se conserva lo único que
-          es PLATA —que el sueldo base se reparte, y en qué proporción—, porque
-          eso cambia el número y nada se descarta en silencio. Lo de los montos
-          a mano se dice donde están los campos, no acá. */}
-      {data?.avisos.rangoLibre && (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
-          <b>Estas fechas no son una quincena</b> ({data.avisos.diasCalendario} días): del sueldo
-          base se paga <b>{(data.avisos.factorBase * 100).toFixed(1)} %</b> de un quincenal.
-        </p>
-      )}
-      {data?.avisos.faltaMigracionConfiguracion && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-[13px] text-red-800">
-          {data.avisos.faltaMigracionConfiguracion}
-        </p>
-      )}
-      {data?.avisos.faltaMigracionManual && (
-        <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
-          {data.avisos.faltaMigracionManual}
-        </p>
-      )}
-      {data?.avisos.faltaMigracionBajas && (
-        <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
-          {data.avisos.faltaMigracionBajas}
-        </p>
-      )}
-      {data?.avisos.faltaMigracionServicioProfesional && (
-        <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
-          {data.avisos.faltaMigracionServicioProfesional}
-        </p>
-      )}
-      {/* 🩸 Que alguien siga marcando después de darse de baja no se esconde:
-          o volvió, o alguien está usando su huella. Va en ROJO porque las dos
-          explicaciones piden que una persona haga algo. */}
-      {!!data?.avisos.marcoDespuesDeIrse && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-[13px] text-red-800">
-          <b>{data.avisos.marcoDespuesDeIrse}</b>{" "}
-          {data.avisos.marcoDespuesDeIrse === 1
-            ? "colaborador marcó en el reloj después de la fecha en que salió"
-            : "colaboradores marcaron en el reloj después de la fecha en que salieron"}
-          . O volvieron a trabajar —hay que reactivarlas en <b>{PESTANA_FICHAS}</b> o la planilla
-          les paga cero— o alguien más está usando su huella.
-        </p>
-      )}
-      {!!data?.avisos.fueraPorBaja && (
-        <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
-          <b>{data.avisos.fueraPorBaja}</b>{" "}
-          {data.avisos.fueraPorBaja === 1 ? "colaborador no sale" : "colaboradores no salen"} en esta
-          quincena: ya no trabajaban aquí, o entraron después. Las quincenas en las que sí
-          trabajaron siguen igual — se ven eligiendo esa quincena arriba.
-        </p>
-      )}
-      {!!data?.avisos.sinHorario && (
-        <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
-          <b>{data.avisos.sinHorario}</b>{" "}
-          {data.avisos.sinHorario === 1 ? "colaborador no tiene" : "colaboradores no tienen"} su hora de
-          salida confirmada. Mientras tanto se asume {data.avisos.salidaAsumida} para las horas
-          extra, y un día de ausencia se cuenta como{" "}
-          <b>{data.avisos.horasAusenciaDefault} horas</b>. Se confirma {dondeSeCargaLaFicha()}, en <b>{PESTANA_FICHAS}</b>.
-        </p>
-      )}
-      {!!data?.avisos.conSabado && (
-        <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
-          <b>{data.avisos.conSabado}</b>{" "}
-          {data.avisos.conSabado === 1 ? "colaborador trabajó" : "colaboradores trabajaron"} un sábado. El
-          cuadro no tiene columna para el sábado, así que esas horas <b>no se pagan aquí</b>: las
-          ves en la hoja «Horas» del Excel.
-        </p>
+        <AntesDeCerrar datos={armarAntesDeCerrar({
+          periodoAbierto: data.avisos.periodoAbierto,
+          esQuincena: !data.avisos.rangoLibre,
+          rango: pedido ? { desde: pedido.desde, hasta: pedido.hasta } : null,
+          extraSinAprobar: data.avisos.extraSinAprobar ?? [],
+          sinFicha: data.avisos.sinFicha ?? [],
+          sinHorario: data.avisos.sinHorario ?? 0,
+          corte: PLANILLA_UNIDA ? data.corte ?? null : null,
+          hasta: data.periodo.hasta,
+          fueraPorBaja: data.avisos.fueraPorBaja ?? 0,
+          marcoDespuesDeIrse: data.avisos.marcoDespuesDeIrse ?? 0,
+          repartosRechazados: data.avisos.repartosRechazados ?? [],
+          prestamoSinAtar: data.avisos.prestamoSinAtar ?? [],
+          avisoPrestamo: data.avisos.avisoPrestamo ?? null,
+          vacacionesNoPagadas: data.avisos.vacacionesNoPagadas ?? [],
+          conSabado: data.avisos.conSabado ?? 0,
+          rangoLibre: !!data.avisos.rangoLibre,
+          factorBase: data.avisos.factorBase ?? 1,
+          diasCalendario: data.avisos.diasCalendario ?? 0,
+          migraciones: [
+            data.avisos.faltaMigracionConfiguracion, data.avisos.faltaMigracionManual,
+            data.avisos.faltaMigracionBajas, data.avisos.faltaMigracionServicioProfesional,
+            data.avisos.faltaMigracionVacaciones, data.avisos.faltaMigracionAprobaciones,
+            data.avisos.faltaMigracionReparto, data.avisos.faltaMigracionAmarrePrestamos,
+          ].filter((m): m is string => !!m),
+          pestanaFichas: PESTANA_FICHAS,
+        })} />
       )}
 
       {/* 🔴 EL VACÍO ES EL ESTADO INICIAL, y dice qué hacer. No es un error ni

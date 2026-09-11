@@ -232,12 +232,16 @@ describe("🔴 el calendario a la vista, y el cuadro solo cuando se pide", () =>
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("🔴 BORRADOR — todavía no se guardó nada", () => {
+  // ⚠️ 11-sep-2026: la caja «Todavía no está cerrada / Esto es un borrador…» se
+  // fue con el mockup «Antes de cerrar»: lo dice el ENCABEZADO de la lista
+  // («Antes de cerrar · borrador, …»). El botón «Cerrar quincena» pasó a la fila
+  // de arriba, a la derecha. Cambió dónde se lee, no la regla.
   it("lo dice, y ofrece cerrar la quincena", async () => {
     servir(guionBase());
     montar();
     generar();
     await cuadroEnPantalla();
-    expect(screen.getByText(/Todavía no está cerrada/)).toBeTruthy();
+    expect(screen.getByText(/Antes de cerrar · borrador/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Cerrar quincena" })).toBeTruthy();
   });
 
@@ -248,7 +252,7 @@ describe("🔴 BORRADOR — todavía no se guardó nada", () => {
     generar();
     await cuadroEnPantalla();
     // Ve el cuadro entero y sabe en qué estado está…
-    expect(screen.getByText(/Todavía no está cerrada/)).toBeTruthy();
+    expect(screen.getByText(/Antes de cerrar · borrador/)).toBeTruthy();
     // …pero no firma el pago.
     expect(screen.queryByRole("button", { name: "Cerrar quincena" })).toBeNull();
   });
@@ -393,7 +397,8 @@ describe("⚠️ falta correr la migración: es ÁMBAR, y la pantalla sigue ente
     await cuadroEnPantalla();
     expect(screen.getByText(new RegExp(MIGRACION_PLANILLA_GUARDADA))).toBeTruthy();
     expect((screen.getByRole("button", { name: "Cerrar quincena" }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getAllByRole("button", { name: "Excel" })[0] as HTMLButtonElement).disabled).toBe(false);
+    // ⚠️ 11-sep-2026: Excel, PDF y Comprobantes viven en «Descargar ⌄».
+    expect((screen.getByRole("button", { name: /^Descargar/ }) as HTMLButtonElement).disabled).toBe(false);
   });
 });
 

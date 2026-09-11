@@ -329,6 +329,12 @@ describe("4. 🔴 ningún aviso de Asistencia manda a «Horarios», que ya no es
   it("el aviso de la hora de salida manda a la ficha del colaborador, desde el módulo puro", () => {
     const rep = puro("app/asistencia/ReporteTab.tsx");
     expect(rep).toMatch(/su hora de salida\s+confirmada\. Mientras tanto se asume 5:00 p\.m\. — se confirma \{dondeSeCargaLaFicha\(\)\}, en <b>\{PESTANA_FICHAS\}<\/b>\./);
-    expect(puro("app/asistencia/PlanillaTab.tsx")).toMatch(/Se confirma \{dondeSeCargaLaFicha\(\)\}, en <b>\{PESTANA_FICHAS\}<\/b>\./);
+    // ⚠️ 11-sep-2026: en la Planilla el aviso es una línea de «Antes de cerrar»
+    // («N sin hora de salida confirmada → Colaboradores ›»), armada en el módulo
+    // puro con el nombre de la pestaña de las fichas. Sigue mandando a la ficha.
+    const adc = puro("lib/asistencia/antes-de-cerrar.ts");
+    expect(adc).toMatch(/texto: "sin hora de salida confirmada",\s*enlace: fichas,/);
+    expect(adc).toMatch(/rotulo: `\$\{e\.pestanaFichas\} ›`, href: HREF_FICHAS/);
+    expect(puro("app/asistencia/PlanillaTab.tsx")).toMatch(/pestanaFichas: PESTANA_FICHAS,/);
   });
 });

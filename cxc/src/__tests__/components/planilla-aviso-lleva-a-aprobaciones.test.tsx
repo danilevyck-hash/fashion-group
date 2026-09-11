@@ -163,13 +163,17 @@ describe("🔴 PLANILLA: cada persona del aviso es un enlace a Aprobaciones", ()
     render(<ToastProvider><PlanillaTab /></ToastProvider>);
     generar();
     const aviso = await screen.findByTestId("aviso-extra-sin-aprobar");
-// 🔴 10-sep-2026: «persona» pasó a «colaborador» en todo texto visible del módulo
-// (Daniel: *«no lo llames personas, sino colaboradores»*). Este candado cambió de
-// texto, no de regla. Ver `asistencia-colaboradores-no-personas.test.ts`.
-    expect(aviso.textContent).toContain("2 colaboradores tienen horas extra sin aprobar");
-    expect(aviso.textContent).toContain("Se aprueban en la pestaña Aprobaciones");
+    // ⚠️ 11-sep-2026: el aviso es UNA línea de la lista «Antes de cerrar»
+    // («2 con horas extra sin decidir · H:MM h → Aprobaciones ›»); los nombres van
+    // detrás de «ver quiénes» y cada uno SIGUE llevando a su día en Aprobaciones —
+    // la regla de Daniel (3-sep-2026) no cambió, cambió dónde se lee.
+    expect(aviso.textContent).toContain("2");
+    expect(aviso.textContent).toContain("con horas extra sin decidir");
+    expect(within(aviso).getByRole("link", { name: /Aprobaciones ›/ }).getAttribute("href"))
+      .toBe("/asistencia?tab=aprobaciones&desde=2026-08-01&hasta=2026-08-15");
+    fireEvent.click(within(aviso).getByRole("button", { name: "ver quiénes" }));
 
-    const enlaces = within(aviso).getAllByRole("link");
+    const enlaces = within(aviso).getAllByRole("link").filter((a) => (a.getAttribute("href") ?? "").includes("persona="));
     expect(enlaces).toHaveLength(2);
     expect(enlaces[0].getAttribute("href")).toBe(ESPERADO_KEVIN);
     expect(enlaces[0].textContent).toContain("KEVIN LUBO");
