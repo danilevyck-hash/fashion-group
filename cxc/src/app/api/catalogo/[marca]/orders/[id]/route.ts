@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { leerCategoriaYBulto, leerPreciosLista } from "@/lib/catalogo/bulto-productos";
 import { getSession } from "@/lib/require-auth";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
+import { comprobantesRoles } from "@/lib/catalogo/roles";
 import { getEnvioActivo, switchLockResponse, fetchReemplazoInfo } from "@/lib/catalogo/switch-lock";
 
 const EDIT_ROLES = ["admin", "secretaria", "vendedor"];
@@ -46,6 +47,10 @@ async function fetchStockConfirmacion(
   }
 }
 const DELETE_ROLES = ["admin", "secretaria"];
+// 🩸 El detalle exigía solo SESIÓN (hasta el 11-sep-2026) mientras la lista
+// exige `COMPROBANTES_ROLES`: con el uuid, contabilidad y gerente_boston leían
+// cliente, correo y montos de cualquier pedido. Misma lista que la lista.
+const VIEW_ROLES = comprobantesRoles();
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +60,7 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
 
   const session = getSession(req);
   if (!session) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  if (!VIEW_ROLES.includes(session.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
 
   const db = await cfg.db();
   const itemCols = `id, order_id, product_id, sku, name, image_url, quantity, unit_price, created_at${cfg.itemsHasPreorder ? ", is_preorder" : ""}`;

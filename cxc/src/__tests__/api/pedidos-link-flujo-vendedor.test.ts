@@ -179,23 +179,22 @@ describe("el flujo del pedido del link, rol por rol", () => {
     }
   }
 
-  // ⚠️ HALLAZGO PRE-EXISTENTE, NO SE TOCÓ Y SE DEJA ESCRITO.
-  //
-  // `GET /orders/[id]` (el detalle) NO mira el rol: le alcanza con que haya
-  // sesión (`if (!session) → 401`). O sea que bodega y contabilidad pueden
-  // LEER un pedido por URL, aunque la lista les responda 403 y no tengan de
-  // dónde sacar el id.
-  //
-  // NO se cerró en este PR a propósito: es anterior a este cambio, cerrarlo es
-  // QUITAR un permiso que nadie pidió quitar, y este PR es sobre quién puede
-  // trabajar un pedido del link. **Bodega no gana nada acá: ya lo tenía.**
-  // Queda escrito para que se decida aparte, y el test fija el estado real —
-  // si mañana alguien lo cierra, este test se lo dice.
-  it("⚠️ el detalle GET solo exige sesión (hallazgo pre-existente, sin tocar)", async () => {
+  // 🔴 ESTE CANDADO CAMBIÓ DE DIRECCIÓN (11-sep-2026). Hasta hoy fijaba un
+  // hallazgo pre-existente: `GET /orders/[id]` (el detalle) NO miraba el rol —
+  // con sesión bastaba— y decía «si mañana alguien lo cierra, este test se lo
+  // dice». Se cerró, aprobado por Daniel: con el uuid, contabilidad y
+  // gerente_boston leían cliente, correo y montos de cualquier pedido mientras
+  // la lista les contestaba 403. El detalle exige ahora los MISMOS roles que la
+  // lista (`COMPROBANTES_ROLES`). **Bodega no pierde nada: está en la lista.**
+  it("🔴 el detalle GET exige los mismos roles que la lista (cerrado el 11-sep-2026)", async () => {
     expect((await ordenGet(makeReq("/x"), { params: { marca: MARCA, id: OID } })).status).toBe(401);
-    for (const rol of ["admin", "secretaria", "vendedor", "bodega", "contabilidad"]) {
+    for (const rol of ["admin", "secretaria", "vendedor", "bodega"]) {
       const res = await ordenGet(makeReq("/x", { role: rol }), { params: { marca: MARCA, id: OID } });
-      expect([401, 403]).not.toContain(res.status);
+      expect([401, 403], rol).not.toContain(res.status);
+    }
+    for (const rol of ["contabilidad", "gerente_boston", "gerente_acs"]) {
+      const res = await ordenGet(makeReq("/x", { role: rol }), { params: { marca: MARCA, id: OID } });
+      expect(res.status, rol).toBe(403);
     }
   });
 
