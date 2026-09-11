@@ -15,6 +15,7 @@ import { AGING, type AgingKey } from "@/lib/cxc-aging";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { ROLES_SYNC_PROVEEDORES } from "@/components/shared/syncNowOpciones";
+import { rotuloPorPagar } from "@/lib/proveedores/rotulo";
 
 // Las empresas con CxP (empresasConCxp): 6 B2B + Multifashion (american_classic).
 const EMPRESAS = empresasConCxp();
@@ -83,7 +84,14 @@ function ProveedoresList() {
   const [loading, setLoading] = useState(true);
   const [showSinSaldo, setShowSinSaldo] = useState(false);
   const [exportando, setExportando] = useState(false);
+  const [falloLectura, setFalloLectura] = useState(false);
 
+  // ── 🔴 UNA LECTURA QUE FALLA SE DICE, NO SE DISFRAZA DE «no hay nada» ──────
+  // 🩸 11-sep-2026. Este `fetch` ignoraba todo lo que no fuera 200: no guardaba
+  // el error, no reintentaba, y la pantalla se quedaba con la lista vacía —o
+  // sea, con el cartel «Sin proveedores — No hay datos sincronizados aún»,
+  // que es MENTIRA: los datos están, lo que se cayó fue la consulta. Con
+  // $4.696.830,50 en la cartera, «no hay nada» es la peor respuesta posible.
   const fetchList = useCallback(async (emp: string, query: string) => {
     setLoading(true);
     try {
@@ -91,12 +99,16 @@ function ProveedoresList() {
       if (emp) params.set("empresa", emp);
       if (query) params.set("q", query);
       const res = await fetch(`/api/proveedores?${params}`, { cache: "no-store" });
-      if (res.ok) {
-        const json = await res.json();
-        setItems(json.proveedores ?? []);
-        setGrupoSaldo(json.grupo_saldo ?? 0);
-        setAvisoMontos(json.avisoMontos ?? null);
-      }
+      if (!res.ok) throw new Error(String(res.status));
+      const json = await res.json();
+      setItems(json.proveedores ?? []);
+      setGrupoSaldo(json.grupo_saldo ?? 0);
+      setAvisoMontos(json.avisoMontos ?? null);
+      setFalloLectura(false);
+    } catch {
+      // No se pisa lo que ya se había leído: si la pantalla tenía datos, se
+      // quedan y arriba aparece el aviso con «Intenta de nuevo».
+      setFalloLectura(true);
     } finally {
       setLoading(false);
     }
@@ -212,10 +224,29 @@ function ProveedoresList() {
               que en el CXC. Sin rechazos no se dibuja nada. */}
           <AvisoRechazosSwitch texto={avisoMontos} className="mb-3" />
 
+          {falloLectura && (
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+              <span>No se pudo cargar. Intenta de nuevo en unos segundos.</span>
+              <button
+                type="button"
+                onClick={() => { void fetchList(empresa, q); }}
+                className="min-h-[44px] rounded-md border border-red-300 bg-white px-3 text-sm font-medium text-red-800 transition active:scale-[0.97]"
+              >
+                Intentar de nuevo
+              </button>
+            </div>
+          )}
+
           {/* Total por pagar (grupo o empresa filtrada) */}
           <div className="border border-gray-200 rounded-lg p-4 mb-4">
+            {/* 🔴 EL RÓTULO DICE DE QUÉ ES EL NÚMERO QUE TIENE DEBAJO.
+                🩸 11-sep-2026: con una búsqueda escrita el total ya era solo el
+                de lo buscado, pero el rótulo seguía diciendo «grupo» — escribir
+                «boston» dejaba en pantalla «Por pagar · grupo $4,165.96» contra
+                los $4.696.830,50 de verdad. Con el chip de empresa sí cambiaba.
+                El buscador manda sobre el chip porque es el filtro más fino. */}
             <div className="text-xs uppercase tracking-[0.05em] text-gray-400">
-              {empresa ? `Por pagar · ${empresaLabel(empresa)}` : "Por pagar · grupo"}
+              {rotuloPorPagar(empresa ? empresaLabel(empresa) : null, q)}
             </div>
             <div className={`text-2xl font-semibold tabular-nums mt-1 ${grupoSaldo < 0 ? "text-blue-600" : "text-purple-700"}`}>
               {grupoSaldo < 0 ? `Saldo a favor $${fmt(Math.abs(grupoSaldo))}` : `$${fmt(grupoSaldo)}`}
@@ -247,7 +278,10 @@ function ProveedoresList() {
             // Con el buscador lleno delante, "probá con otra búsqueda" no agrega
             // nada a "Sin proveedores". Sin búsqueda, la segunda línea dice algo
             // distinto (no hay datos) y se queda.
-            <EmptyState title="Sin proveedores" subtitle={q ? undefined : "No hay datos sincronizados aún."} />
+            <EmptyState
+              title={falloLectura ? "No se pudo cargar" : "Sin proveedores"}
+              subtitle={falloLectura ? "Intenta de nuevo en unos segundos." : q ? undefined : "No hay datos sincronizados aún."}
+            />
           ) : (
             <>
               <div className="flex items-center justify-between gap-3 mb-2">
