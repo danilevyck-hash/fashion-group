@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
 import { requireRole } from "@/lib/requireRole";
+import { pedidoRoles } from "@/lib/catalogo/roles";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
 import { buildCatalogoOrderPdf } from "@/lib/catalogo/order-pdf";
 import { buildOrderEmailHtml, escapeHtml } from "@/lib/catalogo/order-email";
@@ -18,7 +19,8 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
   const cfg = getMarcaConfig(params.marca);
   if (!cfg) return NextResponse.json({ error: "Marca desconocida" }, { status: 404 });
 
-  const auth = requireRole(req, ["admin", "secretaria", "vendedor"]);
+  // Quién arma (y manda) pedidos: `PEDIDO_ROLES`, UNA lista (11-sep-2026).
+  const auth = requireRole(req, pedidoRoles());
   if (auth instanceof NextResponse) return auth;
   const body = await req.json();
   const RESEND_KEY = process.env.RESEND_API_KEY;

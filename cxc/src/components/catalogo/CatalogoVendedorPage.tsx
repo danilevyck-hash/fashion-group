@@ -37,7 +37,7 @@ import {
   groupByModel, getDisplaySection, type DisplaySection, SECTION_ORDER, SECTION_LABELS,
   type GroupedProduct, type JoybeesProduct,
 } from "./groupByModel";
-import { COMPROBANTES_ROLES } from "@/lib/catalogo/roles";
+import { COMPROBANTES_ROLES, puedeArmarPedido } from "@/lib/catalogo/roles";
 import { precioTexto } from "@/lib/catalogo/precio";
 import { opcionesConDatos } from "@/lib/catalogo/filtros-derivados";
 import { leerCarrito, guardarCarrito, limpiarCarrito } from "@/lib/catalogo/carrito";
@@ -161,6 +161,14 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   // rechazaría.
   const [role, setRole] = useState("");
   useEffect(() => { setRole(sessionStorage.getItem("cxc_role") || ""); }, []);
+  // 🔴 VER ≠ PEDIR (11-sep-2026). Quien VE el catálogo pero no arma pedidos
+  // (bodega, gerente_boston) recibe las fichas en SOLO LECTURA: sin «Agregar»,
+  // sin carrito y sin «Ver pedido» — antes llenaba el carrito y topaba con el
+  // 403 del checkout («No se pudo cargar el directorio», «Sin permiso»). La
+  // regla se LEE de `PEDIDO_ROLES` (la misma del checkout), nunca se escribe
+  // acá. Mientras el rol no se conoce (primer render, antes del efecto) la
+  // ficha se dibuja como siempre: el vendedor no ve aparecer el botón.
+  const soloLectura = role !== "" && !puedeArmarPedido(role);
   const agregarA = idAgregarA(searchParams);
   const avisar = useCallback((m: string) => {
     setToast(m);
@@ -595,6 +603,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                       cartMap={cartMap}
                       onQtyChange={onQtyChange}
                       showStock
+                      soloLectura={soloLectura}
                     />
                   ))}
                 </div>
@@ -612,6 +621,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                 cartMap={cartMap}
                 onQtyChange={onQtyChange}
                 showStock
+                soloLectura={soloLectura}
               />
             ))}
           </div>
@@ -635,6 +645,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                     qty={cartMap.get(p.id) || 0}
                     onQtyChange={onQtyChange}
                     showStock
+                    soloLectura={soloLectura}
                   />
                 ))}
               </div>
@@ -652,6 +663,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
               qty={cartMap.get(p.id) || 0}
               onQtyChange={onQtyChange}
               showStock
+              soloLectura={soloLectura}
             />
           ))}
         </div>
@@ -782,7 +794,9 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
         {/* ── Grid ── */}
         {loading ? skeletonGrid : filteredCount === 0 ? emptyState : productGrid}
 
-        <Toast message={toast} />
+        {/* `onDismiss` es lo que lo cierra solo (11-sep-2026): sin él, «Link
+            copiado» se quedaba pegado abajo tapando la barra del carrito. */}
+        <Toast message={toast} onDismiss={() => setToast(null)} />
 
         {showScrollTop && (
           /* El botón de subir vive `bottom-24` (96 px) en el tema. Con la
@@ -794,8 +808,9 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
             className={theme.grid.scrollTopBtn}>&uarr;</button>
         )}
 
-        {/* ── Sticky cart bar ── (jamás en modo pedido: ahí no hay carrito) */}
-        {!modo.activo && cartCount > 0 && (
+        {/* ── Sticky cart bar ── (jamás en modo pedido: ahí no hay carrito, y
+            jamás en solo lectura: no hay «Ver pedido» que ofrecer) */}
+        {!modo.activo && !soloLectura && cartCount > 0 && (
           <CatalogoStickyCartBar
             marca={marca}
             cart={cart}

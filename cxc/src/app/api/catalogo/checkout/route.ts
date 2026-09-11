@@ -29,6 +29,7 @@ import {
 import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
 import { requireRole } from "@/lib/requireRole";
+import { pedidoRoles } from "@/lib/catalogo/roles";
 import { MARCAS_CONFIG } from "@/lib/catalogo/marcas";
 import { enviarPedidoSwitch, type EnvioItem } from "@/lib/catalogo/switch-envio";
 import { normalizarDocumento } from "@/lib/catalogo/documento-switch";
@@ -38,7 +39,9 @@ export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 export const maxDuration = 300;
 
-const ROLES = ["admin", "secretaria", "vendedor"];
+// Quién arma pedidos: UNA lista (`PEDIDO_ROLES`), la misma que lee el catálogo
+// para esconderle «Agregar» a quien solo mira (11-sep-2026).
+const ROLES = pedidoRoles();
 
 interface CheckoutItem extends EnvioItem {
   image_url?: string | null;

@@ -48,6 +48,7 @@ import { hrefCatalogoAgregando } from "@/lib/catalogo/modo-pedido";
 import { avisosBloqueantes, type AvisoEnvio } from "@/lib/catalogo/switch-prevalidacion";
 import { fmtPrecio } from "@/lib/catalogo/precio";
 import { PANEL_COMPROBANTES } from "@/lib/catalogo/numeros-pedido";
+import { puedeArmarPedido } from "@/lib/catalogo/roles";
 import {
   SIN_CLIENTE_ELEGIDO,
   esPedidoDelLink,
@@ -194,7 +195,9 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(null), 3000); };
 
-  const isEditorRole = ["admin", "secretaria", "vendedor"].includes(role);
+  // Quién TRABAJA el pedido: `PEDIDO_ROLES`, la misma lista que el checkout y
+  // el catálogo (11-sep-2026). Bodega y `gerente_boston` lo ven en solo lectura.
+  const isEditorRole = puedeArmarPedido(role);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -213,9 +216,10 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         setOrder(d); setItems(sortItems((d[theme.itemsField] as OrderItem[]) || [])); setClientName(d.client_name || "");
         setReemplazadoPor(d.reemplazado_por || null); setPedidoOriginal(d.original || null);
         if (d.client_email) setClientEmail(d.client_email);
-        // Estado del envío a Switch (admin/secretaria/vendedor — el vendedor
-        // también necesita ver el candado post-envío; otros roles se ignoran)
-        if (["admin", "secretaria", "vendedor"].includes(r)) {
+        // Estado del envío a Switch (quien arma pedidos — el vendedor también
+        // necesita ver el candado post-envío; otros roles se ignoran). La lista
+        // es `PEDIDO_ROLES`, la misma del checkout (11-sep-2026).
+        if (puedeArmarPedido(r)) {
           try {
             const er = await fetch(`${theme.api}/orders/${id}/enviar-switch`);
             if (er.ok) { const ed = await er.json(); setSwitchEnvio(ed.envio || null); }
@@ -1303,7 +1307,12 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
               </button>
               {/* El correo interno a Fashion Group ya NO sale solo al confirmar:
                   Daniel confirmó que es solo suyo y nadie lo usa como lista de
-                  trabajo. Queda como botón aparte, cuando lo quiera. */}
+                  trabajo. Queda como botón aparte, cuando lo quiera.
+                  🔴 Los DOS correos solo para quien arma pedidos (11-sep-2026):
+                  `send-order` le contesta 403 a bodega y a gerente_boston, y el
+                  botón les moría en «No se pudo enviar el correo». El PDF sí se
+                  queda: se arma en el navegador y no pide permiso a nadie. */}
+              {isEditorRole && (<>
               <button onClick={avisarPorCorreo} disabled={enviandoAviso}
                 className="text-xs text-gray-500 hover:text-black transition text-left flex items-center gap-2 min-h-[44px] disabled:opacity-40">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
@@ -1330,6 +1339,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                     className="text-xs text-gray-400 hover:text-black transition min-h-[44px] px-2">x</button>
                 </div>
               )}
+              </>)}
             </div>
           </div>
 

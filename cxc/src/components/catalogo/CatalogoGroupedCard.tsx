@@ -51,10 +51,14 @@ interface CatalogoGroupedCardProps {
   /** Cards del primer viewport: foto eager + prioridad alta (LCP). Ver
    *  CatalogoProductCard — misma regla en las dos cards. */
   priority?: boolean;
+  /** 🔴 SOLO LECTURA (11-sep-2026): sin «Agregar» ni control de cantidad, para
+   *  quien ve el catálogo pero no arma pedidos. Espejo exacto de
+   *  CatalogoProductCard (regla de PARIDAD de las dos tarjetas). */
+  soloLectura?: boolean;
 }
 
 export default function CatalogoGroupedCard({
-  marca, group, cartMap, onQtyChange, disabled, showStock, priority,
+  marca, group, cartMap, onQtyChange, disabled, showStock, priority, soloLectura,
 }: CatalogoGroupedCardProps) {
   const theme = getMarcaTheme(marca)!;
   const t = theme.card;
@@ -329,6 +333,7 @@ export default function CatalogoGroupedCard({
               de Reebok cumple los 44. También se fue el `xl:min-h-[38px]` de
               «Agregar»: si bajara a 38 en escritorio, la fila SÍ saltaría al
               entrar al pedido, que es lo que este bloque existe para evitar. */}
+          {!soloLectura && (
           <div className="mt-1.5">
               {(() => {
                 const v = sel;
@@ -405,6 +410,7 @@ export default function CatalogoGroupedCard({
                 );
               })()}
             </div>
+          )}
         </div>
       </div>
 

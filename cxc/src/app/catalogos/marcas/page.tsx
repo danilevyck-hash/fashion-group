@@ -284,7 +284,9 @@ export default function CatalogosMarcasPage() {
           })}
         </div>
       </div>
-      <Toast message={toast} />
+      {/* `onDismiss` es lo que lo cierra solo (11-sep-2026): sin él, «Link
+          copiado» se quedaba pegado hasta cambiar de pantalla. */}
+      <Toast message={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 }

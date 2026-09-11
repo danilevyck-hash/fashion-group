@@ -145,8 +145,9 @@ describe("candados estáticos", () => {
     const src = GRID();
     expect(src).toContain("const onQtyChange = modo.activo ? modo.setQty : handleQtyChange;");
     expect(src).toContain("modo.activo ? modo.enPedido :");
-    // La barra del carrito no puede aparecer en modo pedido.
-    expect(src).toContain("{!modo.activo && cartCount > 0 && (");
+    // La barra del carrito no puede aparecer en modo pedido (ni en solo
+    // lectura, desde el 11-sep-2026: `soloLectura` se sumó a la misma condición).
+    expect(src).toContain("{!modo.activo && !soloLectura && cartCount > 0 && (");
   });
 
   it("el carrito solo se toca por lib/catalogo/carrito (nadie escribe storage a mano)", () => {

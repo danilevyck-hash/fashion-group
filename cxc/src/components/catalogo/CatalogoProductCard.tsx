@@ -43,10 +43,15 @@ interface CatalogoProductCardProps {
   /** Cards del primer viewport: la foto se pide YA y con prioridad alta (LCP).
    *  El resto va lazy — es lo que evita bajar cientos de fotos al abrir. */
   priority?: boolean;
+  /** 🔴 SOLO LECTURA (11-sep-2026): la ficha sin «Agregar» ni control de
+   *  cantidad, para quien VE el catálogo pero no arma pedidos (bodega,
+   *  gerente_boston — `puedeArmarPedido`). Antes llenaban el carrito y topaban
+   *  con el 403 del checkout. Todo lo demás de la ficha se dibuja igual. */
+  soloLectura?: boolean;
 }
 
 export default function CatalogoProductCard({
-  marca, product, qty, onQtyChange, disabled, showStock, priority,
+  marca, product, qty, onQtyChange, disabled, showStock, priority, soloLectura,
 }: CatalogoProductCardProps) {
   const theme = getMarcaTheme(marca)!;
   const t = theme.card;
@@ -260,7 +265,7 @@ export default function CatalogoProductCard({
               fue el `xl:min-h-[38px]` de «Agregar»: si el botón de agregar
               bajara a 38 en escritorio, la fila SÍ saltaría al entrar al
               pedido, que es lo que este bloque existe para evitar. */}
-          {inOrder ? (
+          {soloLectura ? null : inOrder ? (
             <div className="mt-1.5">
               <div className={t.qtyWrap}>
                 <button

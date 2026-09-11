@@ -46,7 +46,7 @@ import {
 import { checkPedidoRateLimit as calvinCheckPedidoRateLimit } from "@/lib/calvin-pedido-rate-limit";
 import { sortReebokOrderItems } from "@/lib/reebok-order-sort";
 import { STORAGE_PREFIX } from "@/lib/catalogos/variantes-paths";
-import { catalogoAdminRoles } from "@/lib/catalogo/roles";
+import { catalogoAdminRoles, pedidoRoles, ROL_LEGACY_CLIENTE } from "@/lib/catalogo/roles";
 
 export type MarcaKey = "reebok" | "joybees" | "tommy" | "calvin";
 
@@ -305,7 +305,9 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     itemsHasPreorder: true,
     ordersSelectExtra: ", origen_original, origen_short_id",
     exportCols: "origen, cliente, vendor, items, total, created_at",
-    createRoles: ["admin", "secretaria", "vendedor", "cliente"], // quirk heredado ('cliente' legacy)
+    // Quién arma pedidos sale de UNA lista (`PEDIDO_ROLES`, 11-sep-2026); Reebok
+    // suma su 'cliente' legacy (quirk heredado, no es un rol del sistema).
+    createRoles: [...pedidoRoles(), ROL_LEGACY_CLIENTE],
     upload: { roles: catalogoAdminRoles(), storage: "marca", pathPrefix: STORAGE_PREFIX.reebok },
     telegramEmoji: "🛒",
     switchDirectorioLabel: "Active Shoes",
@@ -406,7 +408,7 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     itemsHasPreorder: false,
     ordersSelectExtra: "",
     exportCols: "origen, cliente, vendor, items, created_at",
-    createRoles: ["admin", "secretaria", "vendedor"],
+    createRoles: pedidoRoles(),
     upload: { roles: catalogoAdminRoles(), storage: "main", pathPrefix: STORAGE_PREFIX.joybees },
     telegramEmoji: "🐝",
     switchDirectorioLabel: "Joystep",
@@ -490,7 +492,7 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     itemsHasPreorder: false,
     ordersSelectExtra: "",
     exportCols: "origen, cliente, vendor, items, created_at",
-    createRoles: ["admin", "secretaria", "vendedor"],
+    createRoles: pedidoRoles(),
     upload: { roles: catalogoAdminRoles(), storage: "main", pathPrefix: STORAGE_PREFIX.tommy },
     telegramEmoji: "🔵",
     switchDirectorioLabel: "Fashion Shoes",
@@ -576,7 +578,7 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     itemsHasPreorder: false,
     ordersSelectExtra: "",
     exportCols: "origen, cliente, vendor, items, created_at",
-    createRoles: ["admin", "secretaria", "vendedor"],
+    createRoles: pedidoRoles(),
     upload: { roles: catalogoAdminRoles(), storage: "main", pathPrefix: STORAGE_PREFIX.calvin },
     telegramEmoji: "⚫",
     switchDirectorioLabel: "Vistana International",
