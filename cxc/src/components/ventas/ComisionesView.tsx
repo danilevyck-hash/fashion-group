@@ -342,10 +342,14 @@ export function ComisionesView({
         <ComisionesConfiguracionView />
       ) : esVistaMultifashion(vista) ? (
         /* Multifashion, con SU año y SUS chips de período: la MISMA vista del
-           módulo Multifashion, no una copia. No se le pasa el período del shell
+           módulo Multifashion, no una copia. No se le pasa el MES del shell
            porque la de allá tampoco lo usa — sus chips mandan, y así los dos
-           lados dicen lo mismo. */
-        <VendedorasSubtab selectedYear={inicial.year} />
+           lados dicen lo mismo.
+           🔴 EL AÑO SÍ ES EL ELEGIDO (11-sep-2026). 🩸 Iba `inicial.year`, el del
+           arranque del módulo: en enero `periodoInicial` abre en diciembre del
+           año anterior, así que el ranking salía sobre el año pasado y sus chips
+           rotulaban «Diciembre (en curso)» sobre un año cerrado. */
+        <VendedorasSubtab selectedYear={year} />
       ) : esVistaGrupo(vista) ? (
         <ComisionesConsolidadoView year={year} mes={mes} onExcel={registrarExcel} onPdf={registrarPdf} refreshKey={refreshKey} />
       ) : (

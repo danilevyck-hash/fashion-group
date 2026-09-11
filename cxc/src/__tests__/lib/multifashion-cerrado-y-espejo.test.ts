@@ -255,3 +255,20 @@ describe("🔴 Multifashion en Comisiones: una opción más, nunca una suma", ()
     expect(shell).toContain("!esVistaMultifashion(vista)");
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 EL ESPEJO USA EL AÑO ELEGIDO, NO EL DEL ARRANQUE (11-sep-2026)
+//
+// 🩸 `<VendedorasSubtab selectedYear={inicial.year} />` usaba el período inicial
+// del módulo: en enero `periodoInicial` devuelve diciembre del año anterior, así
+// que el ranking abría sobre el año pasado y sus chips rotulaban «Diciembre (en
+// curso)» sobre un año cerrado.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("🔴 Multifashion en Comisiones recibe el año elegido en el shell", () => {
+  it("`selectedYear={year}` — y ya no `inicial.year`", () => {
+    const src = leer("src/components/ventas/ComisionesView.tsx");
+    const codigo = src.replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    expect(codigo).toContain("<VendedorasSubtab selectedYear={year} />");
+    expect(codigo).not.toContain("selectedYear={inicial.year}");
+  });
+});
