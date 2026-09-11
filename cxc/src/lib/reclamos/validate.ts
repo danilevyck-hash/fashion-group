@@ -17,6 +17,8 @@ export interface ReclamoHeaderInput {
   nro_factura?: unknown;
   fecha_reclamo?: unknown;
   nro_orden_compra?: unknown;
+  /** Solo lo mira `validateReclamoNuevo`: el PDF es obligatorio al CREAR. */
+  factura_pdf_path?: unknown;
 }
 
 export interface ReclamoItemInput {
@@ -75,4 +77,18 @@ export function validateReclamoItems(items: unknown): string | null {
 /** Validación completa para crear/editar (cabecera + ítems). null si OK. */
 export function validateReclamoFull(h: ReclamoHeaderInput, items: unknown): string | null {
   return validateReclamoHeader(h) ?? validateReclamoItems(items);
+}
+
+export const FALTA_PDF = "Falta el PDF de la factura.";
+
+/**
+ * Al CREAR un reclamo el PDF de la factura es OBLIGATORIO (Daniel, 10-sep-2026:
+ * *«PDF obligatorio»*): de él salen el proveedor, el número, la fecha de la
+ * factura y los renglones. ⚠️ Solo al crear: editar un reclamo viejo sin PDF
+ * (30 de 34 vivos no lo tienen) sigue guardando — la exigencia no puede
+ * dejar inservible lo que ya existe.
+ */
+export function validateReclamoNuevo(h: ReclamoHeaderInput, items: unknown): string | null {
+  if (!s(h.factura_pdf_path)) return FALTA_PDF;
+  return validateReclamoFull(h, items);
 }

@@ -1,8 +1,10 @@
 import { supabaseServer } from "@/lib/supabase-server";
+import { firmarFotos } from "./fotos-storage";
 
-// Bucket reclamo-fotos es PÚBLICO → URL pública directa, sin re-firmar (a
-// diferencia de Marketing, cuyo bucket es privado y re-firma en cada carga).
-const SUPA_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+// 🔴 El bucket `reclamo-fotos` es PRIVADO desde el 11-sep-2026 («Link público
+// ciérralo»). La galería que ve el PROVEEDOR sigue abriéndose con el token HMAC
+// de siempre (el link del Excel no cambia y no se rompe): la página FIRMA las
+// fotos al cargar, con vida corta, igual que Marketing re-firma en cada carga.
 
 export interface GaleriaFoto {
   url: string;
@@ -24,7 +26,7 @@ interface FotoRow {
  * Datos de la galería pública de UN reclamo.
  *
  * SEGURIDAD: expone ÚNICAMENTE el N° de reclamo + empresa (para el título) y las
- * URLs públicas de las fotos de ESE reclamo. NUNCA montos, ítems, proveedores,
+ * URLs FIRMADAS (vida corta) de las fotos de ESE reclamo. NUNCA montos, ítems, proveedores,
  * ni fotos de otro reclamo.
  */
 export async function getGaleriaReclamo(reclamoId: string): Promise<GaleriaReclamo> {
@@ -45,10 +47,10 @@ export async function getGaleriaReclamo(reclamoId: string): Promise<GaleriaRecla
     .slice()
     .sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? ""));
 
-  const fotos: GaleriaFoto[] = rows.map((f, i) => ({
-    url: f.url || `${SUPA_URL}/storage/v1/object/public/reclamo-fotos/${f.storage_path}`,
-    nombre: `Foto ${i + 1}`,
-  }));
+  const firmadas = await firmarFotos(rows);
+  const fotos: GaleriaFoto[] = firmadas
+    .filter((f) => !!f.url)
+    .map((f, i) => ({ url: f.url, nombre: `Foto ${i + 1}` }));
 
   return { nombre, fotos };
 }
