@@ -1,35 +1,36 @@
 "use client";
 
 /* ─────────────────────────────────────────────────────────────────────────────
- * APROBACIONES — las horas extra que el reloj midió y todavía nadie autorizó.
+ * APROBACIONES — una sola lista de decisiones (10-sep-2026).
  *
- * ── 🔴 LA UNIDAD ES EL DÍA (27-ago-2026) ────────────────────────────────────
+ * Daniel, textual: *«Aprobaciones es una sola lista de decisiones. Cada renglón
+ * es una persona en la quincena, con sus horas extra sumadas. Dos botones: Sí y
+ * No. Se decide, y el renglón se va»* · *«Cobra horas extra por default a todos
+ * sí»* · *«y si quiero poder ver por día y por persona? con un tab arriba que
+ * diga colaborador / día»*.
  *
- * Daniel, textual: *«debe de ser que el usuario entre y vea por dias quienes y
- * cuantas horas, y pueda aprobar seleccionando todos o individualmente, por
- * dia, por semana»*.
+ * ── 🔴 TRES ESTADOS: SÍ · NO · PENDIENTE ─────────────────────────────────────
  *
- * Y no es una preferencia de pantalla: **el corte de la quincena lo mueve la
- * contadora** (cuenta del 13 al 27, no del 16 al 31, y avisó que las fechas van
- * a variar). Guardado por período, cada corrimiento del corte volvía a
- * preguntar TODO desde cero. Un día es un hecho — «el martes 5 Kevin se quedó
- * hasta las 7» — y el período que se arme después lo recoge, corte donde corte.
+ * 🩸 Hasta hoy la casilla era true/false y `false` era PENDIENTE: no existía
+ * «lo miré y no se paga». Lo que nadie marcaba quedaba pendiente para siempre,
+ * en el aviso ámbar y frenando el cierre. Ahora un «No» es una decisión: no se
+ * paga (igual que antes) y deja de ser pendiente. Un «Sí» es EXACTAMENTE lo que
+ * era aprobar. Ver `aprobaciones.ts` › TRES ESTADOS.
  *
- * ⚠️ Aprobar «por semana» o «todo» es cómo se SELECCIONA. Lo que se guarda es
- * siempre una fila por persona y día.
+ * ── 🔴 DOS VISTAS, UNA FUENTE ────────────────────────────────────────────────
  *
- * ── 🔴 TOCAR LA CASILLA APRUEBA. NO HAY BOTÓN DE CONFIRMAR ──────────────────
+ * «Colaborador» (abre por defecto): un renglón por persona con sus extras
+ * sumadas. «Día»: lo mismo agrupado por día, como era hasta hoy. Las dos salen
+ * del MISMO `DiaAprobacion[]` y las arma `aprobaciones-vistas.ts` (puro).
  *
- * Daniel: *«con un clic se aprueba y ya, maximo 3 clics»*. Un paso de
- * confirmación duplicaría cada aprobación, y no protege nada: volver a tocar
- * desaprueba, y la fila conserva quién la tocó por última vez.
+ * ── LO QUE NO CAMBIÓ ─────────────────────────────────────────────────────────
  *
- * ── 🔴 SE APRUEBA UN PERMISO, NUNCA UN NÚMERO ───────────────────────────────
- *
- * Los minutos se recalculan en cada carga con la base vigente. Si mañana la
- * salida pasa de 17:00 a 16:30, esta pantalla muestra los números nuevos sola.
- * Lo único que se guarda de un número es el TESTIGO, y cuando el testigo y lo
- * medido no coinciden la fila lo dice con los dos a la vista.
+ * · La unidad guardada sigue siendo el DÍA (27-ago-2026): decidir sobre una
+ *   persona manda una fila por cada uno de sus días pendientes.
+ * · Se decide un PERMISO, nunca un número: los minutos se recalculan siempre.
+ * · Tocar decide en el acto (optimista); el POST va detrás; si falla, vuelve.
+ * · «Aprobar todo» sigue: ahora se llama «Sí a todo lo pendiente». No hay «No a
+ *   todo»: un No de una quincena entera no se decide de un toque.
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -38,50 +39,36 @@ import { useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ToastSystem";
 import RangoFechas, { ultimoRango } from "@/components/ui/RangoFechas";
 import { useUrlState } from "@/lib/hooks/useUrlState";
+import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { esFechaDeCalendario, quincenasHasta } from "@/lib/asistencia/planilla";
 import {
   claveDia,
-  etiquetaDia,
   etiquetaDePersona,
-  horasBonitas,
   PARAM_PERSONA,
   primerDiaPendienteDe,
-  resumenPendientes,
-  type DiaAprobacion,
-  type PersonaEnDia,
   previoDe,
   aplicarAprobacionLocal,
   revertirAprobacionLocal,
+  type Decision,
+  type DiaAprobacion,
+  type ToqueAprobacion,
 } from "@/lib/asistencia/aprobaciones";
-
-const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-
-/** Panamá es UTC−5 fijo. En UTC pelado, de noche el día salta al siguiente. */
-function cuandoBonito(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(Date.parse(iso) - 5 * 3600_000);
-  if (Number.isNaN(d.getTime())) return "";
-  const hh = String(d.getUTCHours()).padStart(2, "0");
-  const mm = String(d.getUTCMinutes()).padStart(2, "0");
-  return `${d.getUTCDate()} ${MESES[d.getUTCMonth()]} ${hh}:${mm}`;
-}
-
-/** «Semana del 17 – 23 ago» */
-function etiquetaSemana(lunes: string, dias: readonly DiaAprobacion[]): string {
-  const a = dias[0]?.fecha ?? lunes;
-  const b = dias[dias.length - 1]?.fecha ?? lunes;
-  const dd = (f: string) => Number(f.slice(8, 10));
-  const mes = MESES[Number(b.slice(5, 7)) - 1];
-  return a === b
-    ? `Semana del ${dd(a)} ${mes}`
-    : `Semana del ${dd(a)} – ${dd(b)} ${mes}`;
-}
-
-/** Horas en «3:45». Es como se lee un rato, no como se lee un decimal. */
-function hm(minutos: number): string {
-  const m = Math.round(minutos);
-  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
-}
+import {
+  PARAM_VISTA,
+  RECORDAR_VISTA,
+  VISTAS,
+  agruparPorColaborador,
+  agruparPorDia,
+  hm,
+  separarPorDecidir,
+  textoPorDecidir,
+  toquesPendientes,
+  vistaElegida,
+  type Vista,
+} from "@/lib/asistencia/aprobaciones-vistas";
+import PorColaborador from "./aprobaciones/PorColaborador";
+import PorDia from "./aprobaciones/PorDia";
+import YaDecididas from "./aprobaciones/YaDecididas";
 
 interface Respuesta {
   aprobaciones: DiaAprobacion[] | null;
@@ -89,37 +76,11 @@ interface Respuesta {
   avisos: { faltaMigracionAprobaciones: string | null; faltaMigracionAprobador?: string | null };
 }
 
-/** Una casilla que sabe estar a medias. */
-function Casilla({
-  estado,
-  onChange,
-  disabled,
-  label,
-}: {
-  estado: "no" | "si" | "medias";
-  onChange: () => void;
-  disabled?: boolean;
-  label: string;
-}) {
-  const ref = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (ref.current) ref.current.indeterminate = estado === "medias";
-  }, [estado]);
-  return (
-    <input
-      ref={ref}
-      type="checkbox"
-      aria-label={label}
-      checked={estado === "si"}
-      disabled={disabled}
-      onChange={onChange}
-      className="h-[19px] w-[19px] shrink-0 cursor-pointer accent-emerald-600 disabled:opacity-40"
-    />
-  );
-}
-
 /** La recarga completa del período va UNA vez, este tiempo después del último toque. */
 export const RECARGA_MS = 1500;
+
+/** El rótulo del botón de arriba. Era «Aprobar todo»; hace lo mismo. */
+export const ROTULO_SI_A_TODO = "Sí a todo lo pendiente";
 
 export default function AprobacionesTab({ empresa = "" }: {
   /** El selector de arriba de las pestañas (10-sep-2026). «todas» o vacío = todas. */
@@ -133,15 +94,10 @@ export default function AprobacionesTab({ empresa = "" }: {
   );
   // ── 🔴 SE LLEGA DESDE LA PLANILLA, A UNA PERSONA (3-sep-2026) ─────────────
   //
-  // Daniel, textual: *«al hacer clic en el mensaje de aprobacion, que te lleve
-  // al colaborador para aprobar»*. El aviso ámbar de la planilla y el freno del
-  // cierre traen a esta pestaña con `?persona=<código>` y el rango que se
-  // estaba mirando (`desde`/`hasta`). Acá: el rango de la URL manda sobre el
-  // recordado, se abre el primer día que esa persona tiene sin aprobar, su
-  // fila se resalta y arriba un chip dice a quién se está mirando, con «ver a
-  // todos» para limpiarlo. ⚠️ NO SE FILTRA A LOS DEMÁS: se ve todo, con la
-  // persona resaltada — esconder al resto es cómo se aprueba a uno y se olvida
-  // a veinte. Mismo nivel del breadcrumb → `replace` (default de `useUrlState`).
+  // El aviso ámbar y el freno del cierre traen `?persona=<código>` y el rango.
+  // Acá: el rango de la URL manda, su renglón se abre y se resalta (en «Día»,
+  // el primer día donde está pendiente), y arriba un chip dice a quién se
+  // mira, con «ver a todos». ⚠️ NO SE FILTRA A LOS DEMÁS.
   const [persona, setPersona] = useUrlState(PARAM_PERSONA, "");
   const sp = useSearchParams();
   const rangoUrl = useMemo(() => {
@@ -151,17 +107,15 @@ export default function AprobacionesTab({ empresa = "" }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // El período arranca PUESTO en la quincena en curso: elegirlo a mano sería un
-  // toque antes de empezar. Si la URL trae un rango (se llegó desde la
-  // planilla), manda ése: hay que aterrizar en la MISMA quincena.
+  // ── 🔴 LA VISTA: URL (mismo nivel → `replace`) y recordada por usuario ────
+  const [vistaUrl, setVistaUrl] = useUrlState<string>(PARAM_VISTA, "");
+  const [vistaRecordada, recordarVista] = useLastUsed(RECORDAR_VISTA, "");
+  const vista: Vista = vistaElegida(vistaUrl || vistaRecordada);
+  const cambiarVista = (v: Vista) => { setVistaUrl(v); recordarVista(v); };
+
   const quincenaEnCurso = useMemo(() => quincenasHasta(hoy, 1)[0], [hoy]);
   const [desde, setDesde] = useState(rangoUrl?.desde ?? quincenaEnCurso.desde);
   const [hasta, setHasta] = useState(rangoUrl?.hasta ?? quincenaEnCurso.hasta);
-
-  // 🔑 EL ÚLTIMO RANGO, por dispositivo. Es lo que reemplaza a los presets que
-  // se fueron: el segundo día ya abre donde lo dejaste. Corre UNA vez al montar
-  // —si no, pisaría cada cambio del usuario con el valor guardado. Y NO pisa el
-  // rango que vino en la URL: ése es el de la planilla que se estaba mirando.
   useEffect(() => {
     if (rangoUrl) return;
     const r = ultimoRango("asistencia_aprobaciones");
@@ -172,30 +126,22 @@ export default function AprobacionesTab({ empresa = "" }: {
   const [dias, setDias] = useState<DiaAprobacion[] | null>(null);
   const [puedeAprobar, setPuedeAprobar] = useState(true);
   const [avisoMigracion, setAvisoMigracion] = useState<string | null>(null);
-  /** Falta la tabla del reparto por empresa: nadie está segmentado todavía. */
   const [avisoAprobador, setAvisoAprobador] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /**
-   * 🔴 SOLO LA CASILLA QUE VIAJA SE APAGA (10-sep-2026). Antes `guardando`
-   * apagaba la pantalla entera ~1 s por toque (Daniel: *«se pone como un
-   * segundo cada vez que aprieto»*). Ahora viajan las claves `codigo|fecha` en
-   * vuelo, y las demás siguen tocables: dos toques seguidos son dos POST.
-   */
+  /** 🔴 SOLO LO QUE VIAJA SE APAGA: claves `codigo|fecha` en vuelo. */
   const [enVuelo, setEnVuelo] = useState<ReadonlySet<string>>(new Set());
-  /** La recarga completa, UNA sola, 1,5 s después del último toque. */
   const recarga = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [abierto, setAbierto] = useState<string | null>(null);
+  /** Qué está abierto: códigos (vista colaborador) o fechas (vista día). */
+  const [abiertos, setAbiertos] = useState<ReadonlySet<string>>(new Set());
+  const alternar = useCallback((k: string) => {
+    setAbiertos((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+  }, []);
 
   const cargar = useCallback(async (silenciosa = false) => {
-    // 🔑 La recarga de después de un toque es SILENCIOSA: no tapa la lista con
-    // «Cargando…» — la pantalla ya dice lo que la persona hizo.
     if (!silenciosa) setCargando(true);
     setError(null);
     try {
-      // 🔴 POR EMPRESA (10-sep-2026, Daniel: *«Aprobaciones también se debería
-      // de poder ver por empresa»*): la ruta ya filtra las líneas por empresa,
-      // así que los días, los contadores y «Aprobar todo» ven solo lo filtrado.
       const p = new URLSearchParams({ desde, hasta, aprobaciones: "1" });
       const emp = empresaParaPedir(empresa);
       if (emp) p.set("empresa", emp);
@@ -216,7 +162,11 @@ export default function AprobacionesTab({ empresa = "" }: {
 
   useEffect(() => { void cargar(); }, [cargar]);
 
-  const pend = useMemo(() => resumenPendientes(dias ?? []), [dias]);
+  // ── Los dos agrupamientos, de la MISMA fuente ─────────────────────────────
+  const personas = useMemo(() => agruparPorColaborador(dias ?? []), [dias]);
+  const { porDecidir, decididas } = useMemo(() => separarPorDecidir(personas), [personas]);
+  const porDia = useMemo(() => agruparPorDia(dias ?? []), [dias]);
+  const minutosPendientes = useMemo(() => porDecidir.reduce((a, p) => a + p.minutosPendientes, 0), [porDecidir]);
 
   // ── La persona que trajo la URL ───────────────────────────────────────────
   const personaCodigo = persona.trim();
@@ -228,50 +178,36 @@ export default function AprobacionesTab({ empresa = "" }: {
     () => (personaCodigo ? primerDiaPendienteDe(dias ?? [], personaCodigo) : null),
     [dias, personaCodigo],
   );
-  /** A quién ya se le abrió el día y se le hizo scroll: UNA vez por persona. */
   const enfocada = useRef<string | null>(null);
-  const filaResaltada = useRef<HTMLLabelElement | null>(null);
+  const filaResaltada = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!personaCodigo || dias === null) return;
     if (enfocada.current === personaCodigo) return;
     enfocada.current = personaCodigo;
-    if (primerDiaPendiente) setAbierto(primerDiaPendiente);
-  }, [personaCodigo, dias, primerDiaPendiente]);
+    if (!primerDiaPendiente) return;
+    // En «Colaborador» se abre su renglón; en «Día», el primer día pendiente.
+    setAbiertos((s) => new Set([...s, vista === "dia" ? primerDiaPendiente : personaCodigo]));
+  }, [personaCodigo, dias, primerDiaPendiente, vista]);
   const scrolleada = useRef<string | null>(null);
   useEffect(() => {
-    // El scroll va cuando la fila ya existe en el DOM (el día abierto), UNA
-    // vez por persona. jsdom no implementa `scrollIntoView`: se pregunta antes.
     const el = filaResaltada.current;
     if (!el || !personaCodigo || scrolleada.current === personaCodigo) return;
-    if (abierto !== primerDiaPendiente) return;
     scrolleada.current = personaCodigo;
     if (typeof el.scrollIntoView === "function") el.scrollIntoView({ block: "center" });
-  }, [abierto, primerDiaPendiente, personaCodigo]);
-
-  /** Las semanas, en orden, cada una con sus días. */
-  const semanas = useMemo(() => {
-    const m = new Map<string, DiaAprobacion[]>();
-    for (const d of dias ?? []) {
-      const arr = m.get(d.semana) ?? [];
-      arr.push(d);
-      m.set(d.semana, arr);
-    }
-    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [dias]);
+  }, [abiertos, personaCodigo]);
 
   /**
-   * Aprueba o desaprueba. UNA función para las cuatro formas de tocar: la
-   * persona, el día, la semana y «Aprobar todo» mandan lo mismo con distinta
-   * lista.
+   * UNA función para todas las formas de decidir: la persona, el día, la
+   * persona en un día y «Sí a todo» mandan lo mismo con distinta lista.
    */
-  const marcar = useCallback(
-    async (items: Array<{ codigo: string; fecha: string; minutos: number }>, aprobado: boolean) => {
+  const decidir = useCallback(
+    async (items: ToqueAprobacion[], decision: Decision) => {
       if (items.length === 0) return;
-      // 🔴 OPTIMISTA (CLAUDE.md › UX): la casilla y los contadores cambian EN EL
-      // ACTO desde el estado local; el POST va detrás; si falla, se revierte.
+      // 🔴 OPTIMISTA: la pantalla cambia EN EL ACTO; el POST va detrás; si
+      // falla, se revierte y se dice.
       const claves = items.map((i) => claveDia(i.codigo, i.fecha));
-      let previo: ReadonlyMap<string, boolean> = new Map();
-      setDias((d) => { previo = previoDe(d ?? [], items); return aplicarAprobacionLocal(d ?? [], items, aprobado); });
+      let previo: ReadonlyMap<string, Decision> = new Map();
+      setDias((d) => { previo = previoDe(d ?? [], items); return aplicarAprobacionLocal(d ?? [], items, decision); });
       setEnVuelo((v) => new Set([...v, ...claves]));
       try {
         // 🔴 Con empresa elegida, la ruta rechaza cualquier código de otra empresa.
@@ -279,20 +215,17 @@ export default function AprobacionesTab({ empresa = "" }: {
         const res = await fetch(`/api/asistencia/aprobaciones${emp ? `?empresa=${encodeURIComponent(emp)}` : ""}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ aprobado, dias: items }),
+          body: JSON.stringify({ decision, dias: items }),
         });
         const j = await res.json();
         if (!res.ok) throw new Error(j.error ?? "No se pudo guardar");
         if (j.ok === false) throw new Error(j.aviso ?? "No se pudo guardar");
       } catch (e) {
-        // 🔴 POST FALLA → LA CASILLA VUELVE A COMO ESTABA, y se dice.
         setDias((d) => revertirAprobacionLocal(d ?? [], previo));
         toast(e instanceof Error ? e.message : "No se pudo guardar", "error");
       } finally {
         setEnVuelo((v) => { const n = new Set(v); for (const k of claves) n.delete(k); return n; });
-        // 🔴 EL SERVIDOR MANDA: una sola recarga completa, 1,5 s después del último
-        // toque, para que los totales de plata queden como los calcula la planilla.
-        // Lo que diga reemplaza lo local.
+        // 🔴 EL SERVIDOR MANDA: una sola recarga, 1,5 s después del último toque.
         if (recarga.current) clearTimeout(recarga.current);
         recarga.current = setTimeout(() => { recarga.current = null; void cargar(true); }, RECARGA_MS);
       }
@@ -301,9 +234,7 @@ export default function AprobacionesTab({ empresa = "" }: {
   );
   useEffect(() => () => { if (recarga.current) clearTimeout(recarga.current); }, []);
 
-  // 🩸 La librería de Excel se baja al TOCAR el botón, no al abrir la pestaña:
-  // `xlsx-js-style` pesa y esta pantalla se abre para aprobar, no para exportar.
-  // Es el mismo patrón que ya usa el Excel del Reporte.
+  // 🩸 La librería de Excel se baja al TOCAR el botón, no al abrir la pestaña.
   const bajarExcel = useCallback(async () => {
     if (!dias || dias.length === 0) return;
     try {
@@ -319,27 +250,15 @@ export default function AprobacionesTab({ empresa = "" }: {
     }
   }, [dias, desde, hasta, empresa]);
 
-  const deDia = (d: DiaAprobacion) =>
-    d.gente.map((g) => ({ codigo: g.codigo, fecha: d.fecha, minutos: g.minutos }));
-
-  const estadoDe = (gente: readonly PersonaEnDia[]): "no" | "si" | "medias" => {
-    const n = gente.filter((g) => g.aprobado).length;
-    if (n === 0) return "no";
-    return n === gente.length ? "si" : "medias";
-  };
-
   const bloqueado = !puedeAprobar || avisoMigracion !== null;
-  const viaja = (d: DiaAprobacion, codigo?: string) =>
-    codigo ? enVuelo.has(claveDia(codigo, d.fecha)) : d.gente.some((g) => enVuelo.has(claveDia(g.codigo, d.fecha)));
+  const pendientes = useMemo(() => toquesPendientes(dias ?? []), [dias]);
 
   return (
     <div className="py-4">
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <RangoFechas desde={desde} hasta={hasta} recordarComo="asistencia_aprobaciones" onChange={(d, h) => { setDesde(d); setHasta(h); }} />
         <div className="flex-1" />
-        {/* 🔴 EXPORTAR NO ES APROBAR: se puede bajar el archivo aunque no se
-            tenga permiso de aprobar y aunque no quede nada pendiente. Por eso
-            NO mira `bloqueado` — solo que haya algo que bajar. */}
+        {/* 🔴 EXPORTAR NO ES APROBAR: se puede bajar aunque no se pueda decidir. */}
         <button
           type="button"
           disabled={!dias || dias.length === 0}
@@ -350,16 +269,11 @@ export default function AprobacionesTab({ empresa = "" }: {
         </button>
         <button
           type="button"
-          disabled={bloqueado || pend.pendientes === 0}
-          onClick={() => {
-            const todos = (dias ?? []).flatMap((d) =>
-              d.gente.filter((g) => !g.aprobado).map((g) => ({ codigo: g.codigo, fecha: d.fecha, minutos: g.minutos })),
-            );
-            void marcar(todos, true);
-          }}
+          disabled={bloqueado || pendientes.length === 0}
+          onClick={() => void decidir(pendientes, "si")}
           className="min-h-[44px] rounded-md bg-black px-5 text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-30"
         >
-          Aprobar todo
+          {ROTULO_SI_A_TODO}
         </button>
       </div>
 
@@ -368,10 +282,6 @@ export default function AprobacionesTab({ empresa = "" }: {
           {avisoMigracion}
         </div>
       )}
-      {/* ⚠️ ÁMBAR, no rojo: nada se rompió. Lo que falta es el reparto por
-          empresa, y mientras tanto se aprueba como antes — que es exactamente
-          lo que hay que saber para no creer que ya está puesto. NO bloquea el
-          botón: bloquearlo dejaría a Julio sin aprobar por una DDL pendiente. */}
       {avisoAprobador && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           {avisoAprobador}
@@ -383,7 +293,6 @@ export default function AprobacionesTab({ empresa = "" }: {
         </div>
       )}
 
-      {/* 🔴 El chip de «a quién estoy mirando». Solo con `persona` en la URL. */}
       {personaCodigo && !cargando && dias !== null && (
         <div
           data-testid="chip-persona"
@@ -404,21 +313,38 @@ export default function AprobacionesTab({ empresa = "" }: {
         </div>
       )}
 
+      {/* ── El control de dos opciones y el contador, en una línea ──────────── */}
       {!cargando && dias !== null && (
-        <div className="mb-4 flex items-baseline gap-2 tabular-nums">
-          {pend.pendientes === 0 ? (
-            <>
-              <span className="text-[30px] font-semibold leading-none text-emerald-700">✓</span>
-              <span className="text-sm text-gray-600">Todo aprobado</span>
-            </>
-          ) : (
-            <>
-              <span className="text-[30px] font-semibold leading-none tracking-tight">{pend.pendientes}</span>
-              <span className="text-sm text-gray-600">
-                sin aprobar · {Math.round(pend.minutos / 60)} h
-              </span>
-            </>
-          )}
+        <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div role="radiogroup" aria-label="Ver por" className="inline-flex rounded-md border border-gray-200 p-0.5">
+            {VISTAS.map((v) => (
+              <button
+                key={v.key}
+                type="button"
+                role="radio"
+                aria-checked={vista === v.key}
+                onClick={() => cambiarVista(v.key)}
+                className={`min-h-[40px] rounded px-4 text-sm font-medium transition ${
+                  vista === v.key ? "bg-black text-white" : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                {v.etiqueta}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-baseline gap-2 tabular-nums" data-testid="por-decidir">
+            {porDecidir.length === 0 ? (
+              <>
+                <span className="text-[30px] font-semibold leading-none text-emerald-700">✓</span>
+                <span className="text-sm text-gray-600">{textoPorDecidir(0, 0)}</span>
+              </>
+            ) : (
+              <>
+                <span className="text-[30px] font-semibold leading-none tracking-tight">{porDecidir.length}</span>
+                <span className="text-sm text-gray-600">por decidir · {hm(minutosPendientes)} h</span>
+              </>
+            )}
+          </div>
         </div>
       )}
 
@@ -430,147 +356,35 @@ export default function AprobacionesTab({ empresa = "" }: {
         </div>
       )}
 
-      {semanas.map(([lunes, delaSemana]) => {
-        const gente = delaSemana.flatMap((d) => d.gente);
-        const est = estadoDe(gente);
-        return (
-          <div key={lunes} className="mb-3.5">
-            <label className="flex cursor-pointer items-center gap-3 px-1 pb-2 pt-1.5">
-              <Casilla
-                estado={est}
-                disabled={bloqueado || delaSemana.some((d) => viaja(d))}
-                label={`Aprobar la semana del ${lunes}`}
-                onChange={() =>
-                  void marcar(delaSemana.flatMap(deDia), est !== "si")
-                }
-              />
-              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                {etiquetaSemana(lunes, delaSemana)}
-              </span>
-              <span className="ml-auto text-xs tabular-nums text-gray-500">
-                <b className="font-semibold text-gray-700">{gente.length}</b>
-                {" · "}
-                {hm(gente.reduce((a, g) => a + g.minutos, 0))} h
-              </span>
-            </label>
+      {!cargando && dias !== null && dias.length > 0 && (
+        vista === "dia" ? (
+          <PorDia
+            dias={porDia}
+            onDecidir={decidir}
+            enVuelo={enVuelo}
+            bloqueado={bloqueado}
+            abiertos={abiertos}
+            onAbrir={alternar}
+            personaResaltada={personaCodigo}
+            refResaltada={filaResaltada}
+          />
+        ) : (
+          <PorColaborador
+            personas={porDecidir}
+            onDecidir={decidir}
+            enVuelo={enVuelo}
+            bloqueado={bloqueado}
+            abiertos={abiertos}
+            onAbrir={alternar}
+            personaResaltada={personaCodigo}
+            refResaltada={filaResaltada}
+          />
+        )
+      )}
 
-            {delaSemana.map((d) => {
-              const e = estadoDe(d.gente);
-              const abierta = abierto === d.fecha;
-              return (
-                <div
-                  key={d.fecha}
-                  className={`mb-1.5 overflow-hidden rounded-[10px] border ${
-                    e === "si" ? "border-emerald-200 bg-emerald-50/60" : "border-gray-200 bg-white"
-                  }`}
-                >
-                  <div className="flex min-h-[52px] items-center gap-3 px-3.5 tabular-nums">
-                    <label className="-ml-3.5 flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center pl-3.5">
-                      <Casilla
-                        estado={e}
-                        disabled={bloqueado || viaja(d)}
-                        label={`Aprobar ${etiquetaDia(d.fecha)}`}
-                        onChange={() => void marcar(deDia(d), e !== "si")}
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setAbierto(abierta ? null : d.fecha)}
-                      className="flex min-h-[44px] flex-1 items-center gap-3 text-left"
-                      aria-expanded={abierta}
-                    >
-                      <span className="text-sm text-gray-600">
-                        <b className="font-semibold text-gray-900">{d.etiqueta.slice(0, d.etiqueta.lastIndexOf(" "))}</b>
-                        {d.etiqueta.slice(d.etiqueta.lastIndexOf(" "))}
-                      </span>
-                      <span className="ml-auto text-sm text-gray-500">{d.gente.length}</span>
-                      <span className="min-w-[58px] text-right text-sm font-semibold">{hm(d.minutos)} h</span>
-                      <svg
-                        viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
-                        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                        className={`shrink-0 text-gray-400 transition-transform ${abierta ? "rotate-180" : ""}`}
-                        aria-hidden="true"
-                      >
-                        <path d="m6 9 6 6 6-6" />
-                      </svg>
-                    </button>
-                  </div>
-
-                  {abierta && (
-                    <div className="border-t border-gray-100">
-                      {d.gente.map((g, i) => {
-                        // 🔴 La persona que trajo la URL, resaltada (3-sep-2026).
-                        const esLaBuscada = personaCodigo !== "" && g.codigo === personaCodigo;
-                        return (
-                        <label
-                          key={g.codigo}
-                          ref={esLaBuscada && d.fecha === primerDiaPendiente ? filaResaltada : undefined}
-                          aria-current={esLaBuscada ? "true" : undefined}
-                          className={`flex min-h-[44px] cursor-pointer items-center gap-3 border-b border-gray-100 px-3.5 tabular-nums last:border-b-0 ${
-                            esLaBuscada
-                              ? "bg-amber-100"
-                              : e === "si" ? "" : i % 2 === 0 ? "bg-gray-50/60" : ""
-                          }`}
-                        >
-                          <Casilla
-                            estado={g.aprobado ? "si" : "no"}
-                            disabled={bloqueado || viaja(d, g.codigo)}
-                            label={`Aprobar ${g.etiqueta} el ${d.etiqueta}`}
-                            onChange={() =>
-                              void marcar(
-                                [{ codigo: g.codigo, fecha: d.fecha, minutos: g.minutos }],
-                                !g.aprobado,
-                              )
-                            }
-                          />
-                          <span className="min-w-0 flex-1 truncate text-[13.5px]">{g.etiqueta}</span>
-                          <span className="hidden shrink-0 text-xs text-gray-500 sm:block">
-                            {g.empresaEtiqueta ?? ""}
-                          </span>
-                          {/* 🔴 Un domingo o feriado trabajado se aprueba acá igual que la
-                              extra, y se DICE qué es: se paga con su propio recargo
-                              (10-sep-2026, Daniel: «domingo también necesita aprobación»). */}
-                          {g.tipo && g.tipo !== "extra" && (
-                            <span
-                              className="shrink-0 rounded bg-amber-50 px-1.5 text-[11px] text-amber-800"
-                              title="Trabajado en un día que no es hábil: se paga con el recargo de domingo y feriado."
-                            >
-                              {g.tipo}
-                            </span>
-                          )}
-                          {g.salida && (
-                            <span className="min-w-[44px] shrink-0 text-right text-xs text-gray-500">{g.salida}</span>
-                          )}
-                          <span className="min-w-[50px] shrink-0 text-right text-[13.5px] font-semibold">
-                            {hm(g.minutos)}
-                          </span>
-                        </label>
-                        );
-                      })}
-                      {d.gente.some((g) => g.cambio) && (
-                        <div className="border-t border-amber-200 bg-amber-50 px-3.5 py-2 text-xs text-amber-800">
-                          {d.gente
-                            .filter((g) => g.cambio)
-                            .map((g) => `${g.etiqueta}: se aprobaron ${horasBonitas(g.minutosVistos ?? 0)} y hoy son ${horasBonitas(g.minutos)}`)
-                            .join(" · ")}
-                        </div>
-                      )}
-                      {d.gente.some((g) => g.aprobado && g.por) && (
-                        <div className="border-t border-gray-100 px-3.5 py-2 text-xs text-gray-500">
-                          {(() => {
-                            const g = d.gente.find((x) => x.aprobado && x.por)!;
-                            return `Aprobado por ${g.por} · ${cuandoBonito(g.cuando)}`;
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        );
-      })}
+      {!cargando && dias !== null && (
+        <YaDecididas personas={decididas} onDecidir={decidir} enVuelo={enVuelo} bloqueado={bloqueado} />
+      )}
     </div>
   );
 }
