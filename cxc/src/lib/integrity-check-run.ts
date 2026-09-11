@@ -10,11 +10,17 @@
 import { runAllChecks, persistCheckResults, summarize, type CheckResult } from "@/lib/integrity-checks";
 import { enviarSistema } from "@/lib/alertas/canal";
 
-// Data Health pasó a ser la 2ª pestaña de Usuarios (13-ago-2026). El link de la
-// alerta apunta DIRECTO a la pestaña; `/admin/data-health` sigue redirigiendo
-// (next.config.js) para los mensajes viejos que ya están en el Telegram de
-// Daniel, que no se pueden reescribir.
-const DASHBOARD_URL = "https://fashiongr.com/admin/usuarios?tab=data-health";
+// 🔴 EL MENSAJE YA NO LLEVA LINK (11-sep-2026). Data Health dejó de tener
+// pantalla —Daniel: «data health quiero que el sistema o tú mida todo pero no
+// verlo… no lo uso y no lo quiero usar»— y mandar un enlace a una pantalla que
+// no existe es exactamente el marcador roto que este repo evita en todos lados.
+// El aviso se basta solo: dice el check, la tabla, cuántas filas y el detalle.
+// Para mirar los chequeos sin pantalla está `GET /api/diag/data-health`
+// (CRON_SECRET o sesión de admin), que NO se nombra acá a propósito: es una
+// ruta de diagnóstico para quien mantiene el sistema, no una instrucción para
+// Daniel. ⚠️ Los mensajes VIEJOS que ya están en su Telegram traen el link de
+// antes; `/admin/data-health` redirige al Inicio (next.config.js) para que ese
+// toque llegue a algún lado en vez de a un 404.
 
 function buildCriticalAlert(criticals: CheckResult[]): string {
   const lineas = criticals
@@ -25,8 +31,7 @@ function buildCriticalAlert(criticals: CheckResult[]): string {
     .join("\n");
   return (
     `🔴 Integridad: ${criticals.length} check${criticals.length === 1 ? "" : "s"} crítico${criticals.length === 1 ? "" : "s"}\n` +
-    `${lineas}\n` +
-    `Dashboard: ${DASHBOARD_URL}`
+    `${lineas}`
   );
 }
 
