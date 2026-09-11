@@ -4,6 +4,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { verifySession } from "@/lib/session-cookie";
 import ReclamosClient from "./ReclamosClient";
 import type { Reclamo, Contacto } from "./components/types";
+import { LISTA_SELECT } from "@/lib/reclamos/lista-select";
 
 const RECLAMOS_ROLES = ["admin", "secretaria"];
 
@@ -50,11 +51,12 @@ export default async function ReclamosPage({
   const detailId = params.view === "detail" && params.id ? params.id : null;
 
   // 3. Queries paralelas — replica /api/reclamos + /api/reclamos/contactos +
-  //    /api/reclamos/motivos + /api/reclamos/[id] (condicional)
-  const [reclamosRes, contactosRes, motivosRes, detailRes] = await Promise.all([
+  //    /api/reclamos/[id] (condicional). Los motivos personalizados se
+  //    retiraron del formulario el 10-sep-2026 (0 usos en toda la historia).
+  const [reclamosRes, contactosRes, detailRes] = await Promise.all([
     supabaseServer
       .from("reclamos")
-      .select("*, reclamo_items(*), reclamo_fotos(*), reclamo_seguimiento(*)")
+      .select(LISTA_SELECT)
       .eq("deleted", false)
       .order("created_at", { ascending: false }),
     supabaseServer
@@ -62,9 +64,6 @@ export default async function ReclamosPage({
       .select("*")
       .eq("activo", true)
       .order("empresa"),
-    supabaseServer
-      .from("reclamo_custom_motivos")
-      .select("motivo"),
     detailId
       ? supabaseServer
           .from("reclamos")
@@ -77,14 +76,11 @@ export default async function ReclamosPage({
 
   const reclamos = (reclamosRes.data || []) as Reclamo[];
   const contactos = (contactosRes.data || []) as Contacto[];
-  const customMotivos = ((motivosRes.data || []) as { motivo: string }[])
-    .map((r) => r.motivo)
-    .filter(Boolean);
   const detail = (detailRes.data ?? null) as Reclamo | null;
 
   return (
     <ReclamosClient
-      initialData={{ reclamos, contactos, customMotivos, detail }}
+      initialData={{ reclamos, contactos, detail }}
     />
   );
 }

@@ -1,16 +1,24 @@
 "use client";
 
-import { useRef, useState, useMemo } from "react";
+import { useRef, useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
-import { Toast, StatusBadge, ConfirmDeleteModal, FotoLightbox, ScrollableTable, PdfLightbox } from "@/components/ui";
-import { Ayuda } from "@/components/shared/Ayuda";
+import { hoyPanama } from "@/lib/fecha-panama";
+import { Toast, ConfirmDeleteModal, FotoLightbox, ScrollableTable, PdfLightbox } from "@/components/ui";
 import { Reclamo, RItem, Contacto } from "./types";
-import { EMPRESAS, GENEROS, generoLabel, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, reclamoTaxes, esActiveShoes, impLabel, itbmsLabel, estadoLabel } from "./constants";
-import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
-import SuggestionCard from "@/components/SuggestionCard";
+import { EMPRESAS, GENEROS, generoLabel, DEFAULT_MOTIVOS, emptyItem, calcSub, empresaDesdeIA, reclamoTaxes, esActiveShoes, impLabel, itbmsLabel, esPendiente } from "./constants";
 import FotoBadge from "./FotoBadge";
 import FacturaPdfUploader, { type FacturaIAData } from "./FacturaPdfUploader";
+import FacturasChips from "./FacturasChips";
+import { facturasEnPantalla } from "@/lib/reclamos/facturas";
+import { diasDesde } from "@/lib/reclamos/dias";
+import { textoReclamado, estaReclamado } from "@/lib/reclamos/reclamado";
+import { FALTA_FECHA_FACTURA } from "@/lib/reclamos/orden";
+import { filaRepetida } from "@/lib/reclamos/lineas-factura";
+import { motivoEnPantalla, notaEnPantalla } from "@/lib/reclamos/texto";
+import EnviarProveedorModal from "./EnviarProveedorModal";
+import OverflowMenu from "@/components/ui/OverflowMenu";
+import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 
 interface Props {
   current: Reclamo;
@@ -22,12 +30,12 @@ interface Props {
   setEditMode: (v: boolean) => void;
   editEmpresa: string;
   setEditEmpresa: (v: string) => void;
-  editFactura: string;
-  setEditFactura: (v: string) => void;
+  editFacturas: string[];
+  setEditFacturas: (v: string[]) => void;
   editPedido: string;
   setEditPedido: (v: string) => void;
-  editFecha: string;
-  setEditFecha: (v: string) => void;
+  editFechaFactura: string;
+  setEditFechaFactura: (v: string) => void;
   editNotas: string;
   setEditNotas: (v: string) => void;
   editFacturaPdfPath: string | null;
@@ -38,12 +46,6 @@ interface Props {
   /** Entra a modo edición poblando los campos (lo maneja el contenedor). */
   onStartEdit: () => void;
   toast: string | null;
-  customMotivos: string[];
-  setCustomMotivos: React.Dispatch<React.SetStateAction<string[]>>;
-  addingEditMotivo: number | null;
-  setAddingEditMotivo: (v: number | null) => void;
-  newMotivoText: string;
-  setNewMotivoText: (v: string) => void;
   onBack: () => void;
   onBackToEmpresa?: () => void;
   onBackToReclamos?: () => void;
@@ -56,95 +58,78 @@ interface Props {
   onDeleteFoto: (fotoId: string, path: string) => void;
   onAddSettlement: (rows: { monto: number; nota_credito: string; fecha: string }[]) => void;
   onRemoveSettlement: (sid: string) => void;
+  /** Recarga la lista (después de una descarga, para que diga «Reclamado»). */
+  onReload?: () => void;
   showToast: (msg: string) => void;
 }
 
-const SUPA_URL = typeof window !== "undefined" ? (process.env.NEXT_PUBLIC_SUPABASE_URL || "") : "";
-
+// ─────────────────────────────────────────────────────────────────────────────
+// EL RECLAMO, ADENTRO (rediseño del 10/11-sep-2026).
+//
+// Lo que cambió: la ficha dice FECHA DE FACTURA (la que mide los días; si falta
+// lo dice en rojo y Editar la pide), CREADO EL (la fecha de creación se ve
+// aquí, no en la tabla) y RECLAMADO («Reclamado 17 jul 2026» o «Sin reclamar»).
+// Las facturas van separadas por «·» y en edición son chips. «En proceso» se
+// fue de la pantalla (0 usos en 3 meses): un reclamo está por cobrar o cobrado.
+// Quitar una nota de crédito PREGUNTA antes (es plata cobrada). Los motivos son
+// la lista cerrada de siempre. Las fotos y el comprobante llegan FIRMADOS del
+// servidor (el bucket es privado desde el 11-sep-2026).
+// ─────────────────────────────────────────────────────────────────────────────
 export default function ReclamoDetail({
   current, role, nota, setNota, editMode, setEditMode,
-  editEmpresa, setEditEmpresa, editFactura, setEditFactura, editPedido, setEditPedido,
-  editFecha, setEditFecha, editNotas, setEditNotas,
+  editEmpresa, setEditEmpresa, editFacturas, setEditFacturas, editPedido, setEditPedido,
+  editFechaFactura, setEditFechaFactura, editNotas, setEditNotas,
   editFacturaPdfPath, setEditFacturaPdfPath,
   editItems, setEditItems, editSaving,
-  onStartEdit, toast,
-  customMotivos, setCustomMotivos, addingEditMotivo, setAddingEditMotivo,
-  newMotivoText, setNewMotivoText, onBack, onBackToEmpresa, onBackToReclamos,
+  onStartEdit, toast, onBack, onBackToEmpresa, onBackToReclamos,
   onAddNota, onChangeEstado,
   onDeleteReclamo, onSaveEdit, onUploadFoto, uploadingFoto, onDeleteFoto,
-  onAddSettlement, onRemoveSettlement,
+  onAddSettlement, onRemoveSettlement, onReload,
   showToast,
+  contacto,
 }: Props) {
   const fotoRef = useRef<HTMLInputElement>(null);
-  const MOTIVOS = [...DEFAULT_MOTIVOS, ...customMotivos];
   const [deleteFotoTarget, setDeleteFotoTarget] = useState<{ id: string; path: string } | null>(null);
+  const [quitarNc, setQuitarNc] = useState<{ id: string; monto: number } | null>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [excelBusy, setExcelBusy] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [facturaLightbox, setFacturaLightbox] = useState<string | null>(null);
+  const [correoOpen, setCorreoOpen] = useState(false);
+  const [descargaOpen, setDescargaOpen] = useState(false);
+  const descargaRef = useRef<HTMLButtonElement>(null);
 
   // La IA rellena la cabecera en edición (campos editables); NO toca los ítems.
   function aplicarIA(data: FacturaIAData) {
-    const emp = empresaDesdeIA(data.proveedor, data.marca);
+    const emp = empresaDesdeIA(data.proveedor, data.marca, data.empresa_facturada);
     if (emp) setEditEmpresa(emp);
-    if (data.nro_factura) setEditFactura(data.nro_factura);
-    if (data.fecha_factura) setEditFecha(data.fecha_factura);
+    if (data.nro_factura) setEditFacturas([data.nro_factura]);
+    if (data.fecha_factura) setEditFechaFactura(data.fecha_factura);
     if (data.nro_orden_compra) setEditPedido(data.nro_orden_compra);
   }
 
-  async function downloadExcel() {
-    if (excelBusy) return;
-    setExcelBusy(true);
+  async function descargar(tipo: "excel" | "pdf") {
+    const busy = tipo === "excel" ? excelBusy : pdfBusy;
+    if (busy) return;
+    (tipo === "excel" ? setExcelBusy : setPdfBusy)(true);
     try {
-      const res = await fetch(`/api/reclamos/proveedor/${encodeURIComponent(current.empresa)}/export-zip`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reclamo_ids: [current.id] }),
+      const res = await fetch(`/api/reclamos/proveedor/${encodeURIComponent(current.empresa)}/${tipo === "excel" ? "export-zip" : "export-pdf"}`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reclamo_ids: [current.id] }),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error || "Error al generar el Excel.");
-      }
+      if (!res.ok) { const err = await res.json().catch(() => null); throw new Error(err?.error || "No se pudo armar el archivo. Intenta de nuevo."); }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Reclamo-${current.nro_reclamo}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.download = `Reclamo-${current.nro_reclamo}-${hoyPanama()}.${tipo === "excel" ? "xlsx" : "pdf"}`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast("Excel descargado");
+      showToast(`${tipo === "excel" ? "Excel" : "PDF"} descargado`);
+      onReload?.();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Error al generar el Excel");
+      showToast(err instanceof Error ? err.message : "No se pudo armar el archivo. Intenta de nuevo.");
     } finally {
-      setExcelBusy(false);
-    }
-  }
-
-  async function downloadPdf() {
-    if (pdfBusy) return;
-    setPdfBusy(true);
-    try {
-      const res = await fetch(`/api/reclamos/proveedor/${encodeURIComponent(current.empresa)}/export-pdf`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reclamo_ids: [current.id] }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error || "Error al generar el PDF.");
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Reclamo-${current.nro_reclamo}-${new Date().toISOString().slice(0, 10)}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-      showToast("PDF descargado");
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Error al generar el PDF");
-    } finally {
-      setPdfBusy(false);
+      (tipo === "excel" ? setExcelBusy : setPdfBusy)(false);
     }
   }
 
@@ -152,18 +137,18 @@ export default function ReclamoDetail({
   const seg = current.reclamo_seguimiento ?? [];
   const fotos = current.reclamo_fotos ?? [];
   const sub = calcSub(items);
-  // Totales: en modo edición se recalculan EN VIVO desde editItems mientras el
-  // usuario cambia cantidades/precios; en modo ver, desde los ítems guardados.
-  // La lógica fiscal sale de reclamoTaxes(empresa): Active Shoes = importación 15%
-  // sin ITBMS; el resto = importación 10% + ITBMS 7% sobre (subtotal + importación).
   const totalsSub = editMode ? calcSub(editItems) : sub;
-  // Empresa que rige los impuestos (en edición puede estar cambiándose).
   const totalsEmpresa = editMode ? editEmpresa : current.empresa;
   const totalsTax = reclamoTaxes(totalsEmpresa, totalsSub);
-  const days = daysSince(current.fecha_reclamo);
+  const dias = diasDesde(current.fecha_factura, hoyPanama());
+  const pendiente = esPendiente(current);
+  // Las columnas vacías no se dibujan (Género, Factura y PO cuando ninguna fila las trae).
+  const conGenero = items.some((i) => !!i.genero);
+  const conFactura = items.some((i) => !!i.nro_factura);
+  const conPO = items.some((i) => !!i.nro_orden_compra);
 
-  // Comprobante del reclamo (foto o PDF + nota opcional). Se muestra en todos los
-  // estados cuando existe. Foto → lightbox; PDF → se abre en otra pestaña.
+  // Comprobante del reclamo (foto o PDF + nota opcional). La URL viene firmada
+  // del servidor (bucket privado). Foto → lightbox; PDF → se abre en otra pestaña.
   const comprobanteEsPdf = /\.pdf(\?|$)/i.test(current.comprobante_path || current.comprobante_url || "");
   const comprobanteCard = current.comprobante_url ? (
     <div className="mb-3 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
@@ -178,27 +163,24 @@ export default function ReclamoDetail({
         </button>
       )}
       <div className="min-w-0">
-        <div className="text-xs font-semibold text-amber-800">Comprobante{comprobanteEsPdf ? " (PDF)" : ""}</div>
+        <div className="text-xs font-semibold text-amber-800">Comprobante de pago{comprobanteEsPdf ? " (PDF)" : ""}</div>
         {current.comprobante_nota
-          ? <p className="mt-0.5 text-xs text-gray-600 whitespace-pre-wrap break-words">{current.comprobante_nota}</p>
+          ? <p className="mt-0.5 text-sm text-gray-600 whitespace-pre-wrap break-words">{current.comprobante_nota}</p>
           : <p className="mt-0.5 text-xs text-gray-400 italic">Sin nota</p>}
       </div>
     </div>
   ) : null;
 
-  // ── Settlement (recuperación / notas de crédito) ──
+  // ── Recuperación / notas de crédito ──
   const settlements = (current.reclamo_settlements ?? []).filter((s) => !s.deleted);
   const recuperado = settlements.reduce((s, x) => s + (Number(x.monto) || 0), 0);
-  // Reclamado: snapshot congelado al marcar Pagado; si aún no, el vivo (impuestos por empresa).
   const reclamado = current.monto_reclamado_snapshot ?? reclamoTaxes(current.empresa, sub).total;
   const deltaRec = reclamado - recuperado;
   const pctRec = reclamado > 0 ? (recuperado / reclamado) * 100 : 0;
   const [ncOpen, setNcOpen] = useState(false);
   const [ncMonto, setNcMonto] = useState("");
   const [ncNum, setNcNum] = useState("");
-  const [ncFecha, setNcFecha] = useState(() =>
-    new Intl.DateTimeFormat("en-CA", { timeZone: "America/Panama" }).format(new Date()),
-  );
+  const [ncFecha, setNcFecha] = useState(() => hoyPanama());
   function submitNc() {
     const m = Number(ncMonto);
     if (!Number.isFinite(m) || m <= 0) { showToast("Escribe un monto recuperado mayor a 0."); return; }
@@ -206,22 +188,6 @@ export default function ReclamoDetail({
     onAddSettlement([{ monto: m, nota_credito: ncNum.trim(), fecha: ncFecha }]);
     setNcOpen(false); setNcMonto(""); setNcNum("");
   }
-
-  // ── Smart suggestion: escalation ──
-  const reclamoSuggestions = useMemo<SmartSuggestion[]>(() => {
-    if (days <= 45 || current.estado === "Pagado") return [];
-    const esCreado = current.estado === "Creado";
-    return [{
-      id: `reclamo-escalate-${current.id}`,
-      message: esCreado
-        ? `Este reclamo lleva ${days} días abierto. Pásalo a En proceso, o márcalo como Pagado si ya se resolvió.`
-        : `Este reclamo lleva ${days} días abierto. Si el proveedor ya lo acreditó, márcalo como Pagado.`,
-      actionLabel: esCreado ? "Pasar a En proceso" : "Marcar como Pagado",
-      onAction: () => onChangeEstado(esCreado ? "En proceso" : "Pagado"),
-    }];
-  }, [current.id, current.estado, days, onChangeEstado]);
-
-  const { suggestion: reclamoSuggestion, dismiss: dismissReclamo } = useSmartSuggestions(reclamoSuggestions);
 
   function updateEditItem(idx: number, field: string, val: string | number) {
     setEditItems((prev) => prev.map((item, i) => {
@@ -242,8 +208,6 @@ export default function ReclamoDetail({
         ]}
       />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-12">
-      {/* Los dos "volver" eran líneas de texto de 18 px de alto. -my-2 y -ml-2
-          absorben el padding para que la fila siga donde estaba. */}
       <div className="-mt-2 mb-2 flex items-center flex-wrap">
         <button onClick={onBackToEmpresa ?? onBack} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -ml-2">← {current.empresa}</button>
         {onBackToReclamos && (
@@ -264,322 +228,186 @@ export default function ReclamoDetail({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 mt-3 max-w-2xl">
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-gray-500">Empresa *</span>
-                {/* Cabecera en edición: py-1.5 sobre text-sm dejaba los campos en
-                    ~34 px y con 14px Safari hacía zoom al enfocar. En sm+ vuelve
-                    al tamaño denso original. */}
                 <select value={editEmpresa} onChange={(e) => setEditEmpresa(e.target.value)} className="border-b border-gray-200 py-2.5 sm:py-1.5 text-base sm:text-sm outline-none bg-transparent min-h-[44px] xl:min-h-0">
                   {EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}
                 </select>
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-xs text-gray-500">N° Factura *</span>
-                <input type="text" value={editFactura} onChange={(e) => setEditFactura(e.target.value)} className="border-b border-gray-200 py-2.5 sm:py-1.5 text-base sm:text-sm outline-none min-h-[44px] xl:min-h-0" />
+                <span className="text-xs text-gray-500">Fecha de factura *</span>
+                <input type="date" value={editFechaFactura} onChange={(e) => setEditFechaFactura(e.target.value)} className="border-b border-gray-200 py-2.5 sm:py-1.5 text-base sm:text-sm outline-none min-h-[44px] xl:min-h-0" />
               </label>
+              <div className="sm:col-span-2">
+                <FacturasChips facturas={editFacturas} onChange={setEditFacturas} />
+              </div>
               {!esActiveShoes(editEmpresa) && (
                 <label className="flex flex-col gap-1">
                   <span className="text-xs text-gray-500">N° Pedido *</span>
                   <input type="text" value={editPedido} onChange={(e) => setEditPedido(e.target.value)} className="border-b border-gray-200 py-2.5 sm:py-1.5 text-base sm:text-sm outline-none min-h-[44px] xl:min-h-0" />
                 </label>
               )}
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-gray-500">Fecha *</span>
-                <input type="date" value={editFecha} onChange={(e) => setEditFecha(e.target.value)} className="border-b border-gray-200 py-2.5 sm:py-1.5 text-base sm:text-sm outline-none min-h-[44px] xl:min-h-0" />
-              </label>
               <label className="flex flex-col gap-1 sm:col-span-2">
                 <span className="text-xs text-gray-500">Notas</span>
                 <textarea
                   value={editNotas}
-                  onChange={(e) => {
-                    setEditNotas(e.target.value);
-                    // Auto-grow: ajusta el alto al contenido (con tope por maxHeight + scroll).
-                    e.target.style.height = "auto";
-                    e.target.style.height = `${e.target.scrollHeight}px`;
-                  }}
+                  onChange={(e) => { setEditNotas(e.target.value); e.target.style.height = "auto"; e.target.style.height = `${e.target.scrollHeight}px`; }}
                   rows={3}
-                  /* text-base en móvil: con 14px Safari hace zoom al enfocar. */
                   className="rounded-md border border-gray-200 px-3 py-2 text-base sm:text-sm outline-none focus:border-black transition resize-y overflow-auto"
                   style={{ minHeight: "4.5rem", maxHeight: "12rem" }}
                 />
               </label>
               <div className="sm:col-span-2 flex flex-col gap-1">
-                <span className="text-xs text-gray-500">Factura (PDF) — autocompletar</span>
-                <FacturaPdfUploader
-                  pdfUrl={current.factura_pdf_url}
-                  onUploaded={setEditFacturaPdfPath}
-                  onExtracted={aplicarIA}
-                />
+                <span className="text-xs text-gray-500">Factura (PDF)</span>
+                <FacturaPdfUploader pdfUrl={current.factura_pdf_url} onUploaded={setEditFacturaPdfPath} onExtracted={aplicarIA} />
               </div>
             </div>
           ) : (
-            <>
-              <p className="text-sm text-gray-500 mt-1">{current.empresa} · {current.marca}</p>
-              <dl className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-3 max-w-xl">
-                <div>
-                  <dt className="text-xs text-gray-500">Factura</dt>
-                  <dd className="text-sm text-gray-900 tabular-nums">{current.nro_factura || "—"}</dd>
-                </div>
-                {!esActiveShoes(current.empresa) && (
-                  <div>
-                    <dt className="text-xs text-gray-500">Pedido</dt>
-                    <dd className="text-sm text-gray-900 tabular-nums">{current.nro_orden_compra || "—"}</dd>
-                  </div>
-                )}
-                <div>
-                  <dt className="text-xs text-gray-500">Fecha</dt>
-                  <dd className="text-sm text-gray-900">{fmtDate(current.fecha_reclamo)}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-gray-500">Proveedor</dt>
-                  <dd className="text-sm text-gray-900">{current.proveedor || "—"}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-gray-500">Antigüedad</dt>
-                  <dd className="text-sm text-gray-900">{days} días</dd>
-                </div>
-              </dl>
-              {current.factura_pdf_url && (
-                <button
-                  type="button"
-                  onClick={() => setFacturaLightbox(current.factura_pdf_url ?? null)}
-                  /* py-1.5 sobre text-xs dejaba el botón en 28 px de alto. */
-                  className="mt-2 inline-flex items-center justify-center gap-1.5 text-xs font-medium text-gray-700 hover:text-black border border-gray-200 rounded px-3 min-h-[44px] active:scale-[0.97] transition"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-                  Ver factura
-                </button>
-              )}
-            </>
+            /* Cabecera en UNA línea (mockup 11-sep-2026): factura · fecha de la
+               factura · proveedor · marca · días; la orden de compra y «creado el»
+               solo si aportan algo. */
+            <p className="text-sm text-gray-500 mt-1 leading-relaxed" data-medir="reclamo-cabecera">
+              Factura{facturasEnPantalla(current.nro_factura).includes("·") ? "s" : ""} <span className="text-gray-900 font-medium tabular-nums">{facturasEnPantalla(current.nro_factura) || "—"}</span>
+              {" · "}
+              {current.fecha_factura
+                ? <span className="text-gray-900">{fmtDate(current.fecha_factura)}</span>
+                : <span className="text-red-600">{FALTA_FECHA_FACTURA}</span>}
+              {" · "}{current.proveedor || "—"}{current.marca ? ` · ${current.marca}` : ""}
+              {dias !== null && <> · <span className="text-gray-900 font-medium tabular-nums">{dias} día{dias === 1 ? "" : "s"}</span></>}
+              {!esActiveShoes(current.empresa) && current.nro_orden_compra && <> · OC {current.nro_orden_compra}</>}
+              {current.created_at && <> · creado el {fmtDate(current.created_at.slice(0, 10))}</>}
+            </p>
+          )}
+          {!editMode && current.factura_pdf_url && (
+            <button
+              type="button"
+              onClick={() => setFacturaLightbox(current.factura_pdf_url ?? null)}
+              className="mt-2 inline-flex items-center justify-center gap-1.5 text-xs font-medium text-gray-700 hover:text-black border border-gray-200 rounded px-3 min-h-[44px] active:scale-[0.97] transition"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+              Ver factura
+            </button>
           )}
         </div>
-        {/* UN solo indicador de estado: el pill (solo en modo ver). En edición,
-            un rótulo mínimo sin acciones — el estado no se edita aquí. */}
+        {/* UN chip con lo único que importa: sin reclamar · reclamado · pagado. */}
         {editMode ? (
-          <span className="text-xs text-gray-400 whitespace-nowrap shrink-0">Editando · {estadoLabel(current.estado)}</span>
+          <span className="text-xs text-gray-400 whitespace-nowrap shrink-0">Editando</span>
         ) : (
-          <StatusBadge estado={current.estado} />
+          <span className={`shrink-0 text-xs px-2.5 py-1 rounded-full border ${!pendiente ? "bg-green-50 text-green-700 border-green-200" : estaReclamado(current) ? "bg-gray-100 text-gray-600 border-gray-200" : "bg-red-50 text-red-600 border-red-100 font-medium"}`}>
+            {!pendiente ? "Pagado" : textoReclamado(current)}
+          </span>
         )}
       </div>
 
-      {!editMode && reclamoSuggestion && <SuggestionCard suggestion={reclamoSuggestion} onDismiss={dismissReclamo} />}
-
-      {/* Action bar — en edición se vuelve Guardar / Cancelar (edición in-place) */}
+      {/* UNA fila de botones (mockup 11-sep-2026): lo diario a la izquierda —
+          Correo (principal), Descargar (Excel o PDF), «···» con Editar y
+          Eliminar— y «Marcar como pagado» apartado a la derecha, que se usa
+          pocas veces. En edición se vuelve Guardar / Cancelar. */}
       {editMode ? (
         <div className="flex items-center gap-4 mb-6 flex-wrap">
-          {/* "Guardar" quedaba en 40 px y "Cancelar" en 18. */}
           <button onClick={onSaveEdit} disabled={editSaving} className="bg-black text-white px-6 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50 inline-flex items-center justify-center min-h-[44px]">
             {editSaving ? "Guardando…" : "Guardar"}
           </button>
           <button onClick={() => setEditMode(false)} disabled={editSaving} className="text-sm text-gray-400 hover:text-black transition disabled:opacity-50 inline-flex items-center justify-center min-h-[44px] px-2">Cancelar</button>
         </div>
       ) : (
-        /* `flex-wrap` YA baja de renglón, así que el `overflow-x-auto` que
-           estaba acá al lado no aportaba nada y arrastraba 8px en los CUATRO
-           anchos —incluido 1440—: un scroller que nadie necesita, sobre una
-           fila que nunca desborda. Es la misma lección de los filtros del
-           catálogo: gana `flex-wrap`, una sola clase. */
         <div className="flex items-center gap-2 mb-6 flex-wrap pb-1">
-          {/* Las 3 píldoras quedaban en ~38 px de alto en iPhone (py-2.5 sobre
-              text-xs). min-h-[44px] solo en móvil: en escritorio la barra sigue
-              compacta con su py-1.5. */}
-          <button onClick={onStartEdit} className="text-xs border border-gray-200 px-3 py-2.5 xl:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 active:bg-gray-100 transition-all flex items-center justify-center gap-1 min-h-[44px] xl:min-h-0">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
-            Editar
+          {pendiente && (
+            <button onClick={() => setCorreoOpen(true)} className="bg-black text-white px-5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all inline-flex items-center justify-center min-h-[44px]">Correo</button>
+          )}
+          <button ref={descargaRef} onClick={() => setDescargaOpen((v) => !v)} disabled={excelBusy || pdfBusy} aria-haspopup="menu" aria-expanded={descargaOpen} className="text-sm border border-gray-200 px-4 rounded-md text-gray-600 hover:text-black hover:border-gray-400 transition inline-flex items-center justify-center gap-1 min-h-[44px] disabled:opacity-40">
+            {excelBusy ? "Armando el Excel…" : pdfBusy ? "Armando el PDF…" : "Descargar"} <span aria-hidden className="text-gray-400">⌄</span>
           </button>
-          <button onClick={downloadExcel} disabled={excelBusy} title="Descargar el Excel de este reclamo (con links a la factura y fotos que abren con un clic)" className="text-xs border border-gray-200 px-3 py-2.5 xl:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center justify-center gap-1 disabled:opacity-40 min-h-[44px] xl:min-h-0">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
-            {excelBusy ? "Generando Excel…" : "Descargar Excel"}
-          </button>
-          <button onClick={downloadPdf} disabled={pdfBusy} title="Descargar el PDF de este reclamo (datos, ítems, recuperación y evidencia fotográfica)" className="text-xs border border-gray-200 px-3 py-2.5 xl:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center justify-center gap-1 disabled:opacity-40 min-h-[44px] xl:min-h-0">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-            {pdfBusy ? "Generando PDF…" : "Descargar PDF"}
-          </button>
-          {role === "admin" && (
-            // Acción destructiva de solo texto: era una línea de 16 px de alto.
-            <button onClick={() => onDeleteReclamo(current.id)} className="text-xs text-red-400 hover:text-red-600 transition ml-auto flex items-center justify-center gap-1 min-h-[44px] px-2 -mr-2">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
-              Eliminar
+          <DesplegableFlotante abierto={descargaOpen} anclaRef={descargaRef} onCerrar={() => setDescargaOpen(false)} role="menu" marca="reclamo-descargar" className="rounded-md border border-gray-200 bg-white shadow-lg py-1 min-w-[180px]">
+            <button role="menuitem" onClick={() => { setDescargaOpen(false); void descargar("excel"); }} className="block w-full text-left text-sm px-4 min-h-[44px] hover:bg-gray-50">Descargar en Excel</button>
+            <button role="menuitem" onClick={() => { setDescargaOpen(false); void descargar("pdf"); }} className="block w-full text-left text-sm px-4 min-h-[44px] hover:bg-gray-50">Descargar en PDF</button>
+          </DesplegableFlotante>
+          <OverflowMenu
+            ariaLabel={`Más opciones del reclamo ${current.nro_reclamo}`}
+            items={[
+              { label: "Editar", onClick: onStartEdit },
+              ...(role === "admin" ? [{ label: "Eliminar", onClick: () => onDeleteReclamo(current.id), destructive: true }] : []),
+            ]}
+          />
+          {pendiente ? (
+            <button onClick={() => onChangeEstado("Pagado")} className="ml-auto border border-gray-300 text-gray-700 px-4 rounded-md text-sm font-medium hover:bg-gray-50 active:scale-[0.97] transition-all inline-flex items-center justify-center gap-2 min-h-[44px]">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+              Marcar como pagado
             </button>
+          ) : (
+            <button onClick={() => onChangeEstado("Creado")} className="ml-auto text-xs text-gray-400 hover:text-gray-700 transition inline-flex items-center justify-center min-h-[44px] px-2" title="Si fue un error: vuelve a la lista de por cobrar">← Volver a por cobrar</button>
           )}
         </div>
       )}
 
-      {/* Acción de estado — pipeline de 3 estados: Creado → En proceso → Pagado,
-          con salto directo Creado → Pagado (reclamos que se pagan de inmediato). */}
-      {!editMode && current.estado === "Creado" && (
-        <div className="mb-6">
-          {comprobanteCard}
-          <div className="flex items-center gap-3 flex-wrap">
-            <button onClick={() => onChangeEstado("En proceso")} className="bg-black text-white px-5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center justify-center gap-2 min-h-[44px]">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" /><circle cx="12" cy="13" r="3" /></svg>
-              Pasar a En proceso
-            </button>
-            {/* Botones de cambio de estado: py-2.5 sobre text-sm daba 40 px. */}
-            <button onClick={() => onChangeEstado("Pagado")} className="border border-gray-300 text-gray-700 px-5 rounded-md text-sm font-medium hover:bg-gray-50 active:scale-[0.97] transition-all flex items-center justify-center gap-2 min-h-[44px]" title="Salto directo: reclamo pagado de inmediato">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-              Marcar como Pagado
-            </button>
-          </div>
-          {/* La regla de comprobantes se aprende una vez y se repetía también
-              en la ventana de "En proceso": ahora vive acá, en el ⓘ. Lo que
-              FRENA de verdad —"obligatorio para marcar Pagado"— sigue en
-              pantalla dentro de esa ventana, al lado del adjunto. */}
-          <div className="mt-1.5 -ml-2">
-            <Ayuda titulo="Cuándo hace falta el comprobante" etiqueta="Cuándo hace falta el comprobante">
-              <p>El comprobante es opcional para En proceso; para marcar Pagado es obligatorio (foto o PDF).</p>
-            </Ayuda>
-          </div>
-        </div>
-      )}
-      {!editMode && current.estado === "En proceso" && (
-        <div className="mb-6">
-          {comprobanteCard}
-          <div className="flex items-center gap-3 flex-wrap">
-            <button onClick={() => onChangeEstado("Pagado")} className="bg-black text-white px-5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center justify-center gap-2 min-h-[44px]">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-              Marcar como Pagado
-            </button>
-            {/* Rollback de estado: era una línea de texto de 16 px de alto. */}
-            <button onClick={() => onChangeEstado("Creado")} className="text-xs text-gray-400 hover:text-gray-700 transition inline-flex items-center justify-center min-h-[44px] px-2" title="Corrección: regresar a Creado">← Volver a Creado</button>
-          </div>
-        </div>
-      )}
-      {!editMode && current.estado === "Pagado" && (
-        <div className="mb-6">
-          {comprobanteCard}
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="inline-flex items-center gap-2 bg-green-50 text-green-700 border border-green-200 px-4 py-2.5 rounded-md text-sm font-medium">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-              Ciclo completado — Pagado
-            </span>
-            {/* Rollback de estado: era una línea de texto de 16 px de alto. */}
-            <button onClick={() => onChangeEstado("En proceso")} className="text-xs text-gray-400 hover:text-gray-700 transition inline-flex items-center justify-center min-h-[44px] px-2" title="Corrección: regresar a En proceso">← Volver a En proceso</button>
-          </div>
-        </div>
-      )}
+      {!editMode && comprobanteCard}
 
-      {/* El stepper "Creado -> Pagado ?" se elimino: el pill de estado (arriba) es
-          el UNICO indicador de estado. La linea "Ultimo cambio" tambien se fue
-          (poda de textos, ago-2026): la ficha de arriba ya muestra Fecha y
-          Antiguedad, y el Seguimiento de mas abajo lleva la fecha, la hora y el
-          autor de cada movimiento. */}
-
-      {/* Totals — en edición se recalculan en vivo desde los ítems editados */}
-      {/* "Totales" queda `sr-only`: las tarjetas de abajo se llaman Subtotal,
-          Imp. importación, ITBMS y Total — el rótulo no agregaba nada a la
-          vista, pero la sección seguiría sin encabezado para un lector. */}
-      <div className="flex items-center justify-end mb-2 mt-6">
-        <h2 className="sr-only">Totales</h2>
-        {editMode && <span className="text-xs text-gray-400">Actualizando en vivo</span>}
-      </div>
-      <div className={`grid grid-cols-2 ${totalsTax.hasItbms ? "sm:grid-cols-4" : "sm:grid-cols-3"} gap-3 sm:gap-4 mb-8`}>
-        <div className="border border-gray-200 rounded-xl p-4 text-center"><div className="text-xs text-gray-500">Subtotal</div><div className="text-[17px] font-semibold tabular-nums mt-1.5">${fmt(totalsSub)}</div></div>
-        <div className="border border-gray-200 rounded-xl p-4 text-center"><div className="text-xs text-gray-500">Imp. importación ({impLabel(totalsEmpresa)})</div><div className="text-[17px] font-semibold tabular-nums mt-1.5">${fmt(totalsTax.importacion)}</div></div>
-        {totalsTax.hasItbms && <div className="border border-gray-200 rounded-xl p-4 text-center"><div className="text-xs text-gray-500">ITBMS ({itbmsLabel(totalsEmpresa)})</div><div className="text-[17px] font-semibold tabular-nums mt-1.5">${fmt(totalsTax.itbms)}</div></div>}
-        <div className="bg-gray-900 rounded-xl p-4 text-center"><div className="text-xs text-white/70">Total</div><div className="text-[19px] font-semibold tabular-nums mt-1.5 text-white">${fmt(totalsTax.total)}</div></div>
-      </div>
-
-      {/* Settlement — recuperación / notas de crédito */}
-      {(current.estado === "Pagado" || settlements.length > 0) && (
+      {/* Recuperación / notas de crédito */}
+      {(!pendiente || settlements.length > 0) && (
         <div className="mb-8 border border-gray-200 rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-semibold text-gray-700">Recuperación</div>
             <span className="text-xs font-medium text-emerald-700 tabular-nums">{pctRec.toFixed(0)}% recuperado</span>
           </div>
-
           <div className="grid grid-cols-3 gap-3 mb-3">
-            <div className="text-center">
-              <div className="text-xs text-gray-500">Reclamado</div>
-              <div className="text-sm font-semibold tabular-nums mt-1">${fmt(reclamado)}</div>
-            </div>
-            <div className="text-center">
-              <div className="text-xs text-gray-500">Recuperado</div>
-              <div className="text-sm font-semibold tabular-nums mt-1 text-emerald-700">${fmt(recuperado)}</div>
-            </div>
-            <div className="text-center">
-              <div className="text-xs text-gray-500">{deltaRec >= 0 ? "Pendiente" : "A favor"}</div>
-              <div className={`text-sm font-semibold tabular-nums mt-1 ${deltaRec > 0 ? "text-amber-600" : "text-gray-500"}`}>${fmt(Math.abs(deltaRec))}</div>
-            </div>
+            <div className="text-center"><div className="text-xs text-gray-500">Reclamado</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(reclamado)}</div></div>
+            <div className="text-center"><div className="text-xs text-gray-500">Recuperado</div><div className="text-sm font-semibold tabular-nums mt-1 text-emerald-700">${fmt(recuperado)}</div></div>
+            <div className="text-center"><div className="text-xs text-gray-500">{deltaRec >= 0 ? "Pendiente" : "A favor"}</div><div className={`text-sm font-semibold tabular-nums mt-1 ${deltaRec > 0 ? "text-amber-600" : "text-gray-500"}`}>${fmt(Math.abs(deltaRec))}</div></div>
           </div>
-
-          {/* Barra de progreso recuperado */}
           <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden mb-4">
             <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${Math.min(100, Math.max(0, pctRec))}%` }} />
           </div>
-
-          {/* Lista de notas de crédito */}
-          {/* Sin NC no se dibuja nada: el KPI "Recuperado" y la barra de
-              arriba ya lo dicen en la misma tarjeta. */}
           {settlements.length > 0 && (
             <ul className="divide-y divide-gray-100 mb-3">
               {settlements.map((s) => (
                 <li key={s.id} className="flex items-center justify-between py-2 text-sm">
                   <div className="min-w-0">
                     <span className="tabular-nums font-medium">${fmt(s.monto)}</span>
-                    {s.nota_credito && <span className="text-gray-500"> · NC {s.nota_credito}</span>}
+                    {s.nota_credito && <span className="text-gray-500"> · nota de crédito {s.nota_credito}</span>}
                     <span className="text-gray-400"> · {fmtDate(s.fecha)}</span>
                   </div>
-                  {/* Quitar una NC: era una línea de texto de 16 px de alto. */}
-                  <button
-                    onClick={() => onRemoveSettlement(s.id)}
-                    className="text-xs text-gray-400 hover:text-red-600 transition shrink-0 ml-1 inline-flex items-center justify-center min-h-[44px] px-2 -my-2"
-                  >
-                    Quitar
-                  </button>
+                  {/* Quitar PREGUNTA antes: es plata cobrada. */}
+                  <button onClick={() => setQuitarNc({ id: s.id, monto: Number(s.monto) || 0 })} className="text-xs text-gray-400 hover:text-red-600 transition shrink-0 ml-1 inline-flex items-center justify-center min-h-[44px] px-2 -my-2">Quitar</button>
                 </li>
               ))}
             </ul>
           )}
-
-          {/* Agregar NC (settlement fraccionado) */}
           {ncOpen ? (
-            /* Alta de nota de crédito: los 3 campos venían con text-sm (zoom de
-               Safari al enfocar) y ~36 px de alto; los 2 botones, 36. */
             <div className="rounded-md border border-gray-200 p-3">
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="text-xs text-gray-500">Monto recuperado *</span>
-                  <input type="number" inputMode="decimal" min="0" step="0.01" value={ncMonto}
-                    onChange={(e) => setNcMonto(e.target.value)} placeholder="0.00"
-                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-base sm:text-sm tabular-nums outline-none focus:border-black transition min-h-[44px]" />
+                  <input type="number" inputMode="decimal" min="0" step="0.01" value={ncMonto} onChange={(e) => setNcMonto(e.target.value)} placeholder="0.00" className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-base sm:text-sm tabular-nums outline-none focus:border-black transition min-h-[44px]" />
                 </label>
                 <label className="block">
                   <span className="text-xs text-gray-500">Fecha *</span>
-                  <input type="date" value={ncFecha} onChange={(e) => setNcFecha(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-base sm:text-sm outline-none focus:border-black transition min-h-[44px]" />
+                  <input type="date" value={ncFecha} onChange={(e) => setNcFecha(e.target.value)} className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-base sm:text-sm outline-none focus:border-black transition min-h-[44px]" />
                 </label>
                 <label className="col-span-2 block">
                   <span className="text-xs text-gray-500">N° nota de crédito (opcional)</span>
-                  <input type="text" value={ncNum} onChange={(e) => setNcNum(e.target.value)} placeholder="Ej. 4020000422"
-                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-base sm:text-sm outline-none focus:border-black transition min-h-[44px]" />
+                  <input type="text" value={ncNum} onChange={(e) => setNcNum(e.target.value)} placeholder="Ej. 4020000422" className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-base sm:text-sm outline-none focus:border-black transition min-h-[44px]" />
                 </label>
               </div>
               <div className="mt-3 flex gap-2">
-                <button onClick={() => { setNcOpen(false); setNcMonto(""); setNcNum(""); }}
-                  className="flex-1 rounded-md border border-gray-200 text-sm hover:bg-gray-50 transition inline-flex items-center justify-center min-h-[44px]">Cancelar</button>
-                <button onClick={submitNc}
-                  className="flex-1 rounded-md bg-black text-sm text-white active:scale-[0.97] transition inline-flex items-center justify-center min-h-[44px]">Guardar NC</button>
+                <button onClick={() => { setNcOpen(false); setNcMonto(""); setNcNum(""); }} className="flex-1 rounded-md border border-gray-200 text-sm hover:bg-gray-50 transition inline-flex items-center justify-center min-h-[44px]">Cancelar</button>
+                <button onClick={submitNc} className="flex-1 rounded-md bg-black text-sm text-white active:scale-[0.97] transition inline-flex items-center justify-center min-h-[44px]">Guardar la nota de crédito</button>
               </div>
             </div>
           ) : (
-            /* Enlace de solo texto: era una línea de 16 px de alto. */
-            <button onClick={() => setNcOpen(true)} className="text-xs font-medium text-blue-600 hover:underline inline-flex items-center min-h-[44px] px-2 -mx-2 -mb-2">
-              + Agregar nota de crédito
-            </button>
+            <button onClick={() => setNcOpen(true)} className="text-xs font-medium text-blue-600 hover:underline inline-flex items-center min-h-[44px] px-2 -mx-2 -mb-2">+ Agregar nota de crédito</button>
           )}
         </div>
       )}
 
-      {/* Items table — UNA sola tabla: editable in-place cuando editMode, read-only si no */}
+      {/* Renglones — UNA sola tabla: editable in-place cuando editMode, read-only si no */}
       {(editMode || items.length > 0) && (
         <div className="mb-8">
-          <div className="text-sm font-semibold text-gray-700 mb-3">Ítems</div>
+          <div className="text-sm font-semibold text-gray-700 mb-3">Renglones</div>
           {editMode ? (
             <>
               <ScrollableTable minWidth={700} className="mb-4">
                 <table className="w-full text-sm [&_td]:py-3 [&_th]:pb-3 [&_th]:px-5 [&_td]:px-5 [&_th:first-child]:pl-0 [&_td:first-child]:pl-0 [&_th:last-child]:pr-0 [&_td:last-child]:pr-0">
                   <thead className="sticky top-0 bg-white z-10">
                     <tr className="border-b border-gray-200 text-xs uppercase tracking-wide font-medium text-gray-500">
-                      <th className="pb-2 font-medium text-left">Código *</th>
+                      <th className="pb-2 font-medium text-left">Estilo *</th>
                       <th className="pb-2 font-medium text-left">Descripción *</th>
                       <th className="pb-2 font-medium text-left" style={{ minWidth: 70 }}>Talla *</th>
                       <th className="pb-2 font-medium text-left" style={{ minWidth: 90 }}>Género *</th>
@@ -599,154 +427,93 @@ export default function ReclamoDetail({
                         <td className="py-2 pr-1">
                           <select value={item.genero || ""} onChange={(e) => updateEditItem(idx, "genero", e.target.value)} className={`w-full border-b border-gray-200 py-1 text-sm outline-none bg-transparent ${item.genero ? "text-black" : "text-gray-400"}`} style={{ minWidth: 80 }}>
                             <option value="">Género…</option>
-                            {/* value = lo que se GUARDA (inglés, lo exige el CHECK de la base); el texto = lo que se LEE. */}
                             {GENEROS.map((g) => <option key={g} value={g}>{generoLabel(g)}</option>)}
                           </select>
                         </td>
                         <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateEditItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-right" /></td>
                         <td className="py-2 pr-1"><input type="number" step="0.50" min={0} value={item.precio_unitario} onChange={(e) => updateEditItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-right" /></td>
                         <td className="py-2 pr-1">
-                          {addingEditMotivo === idx ? (
-                            <div className="flex items-center gap-1">
-                              <input type="text" value={newMotivoText} onChange={(e) => setNewMotivoText(e.target.value)} placeholder="Nuevo motivo..." className="w-full border-b border-gray-200 py-1 text-sm outline-none" autoFocus
-                                onKeyDown={(e) => { if (e.key === "Enter" && newMotivoText.trim()) { saveCustomMotivo(newMotivoText.trim()); setCustomMotivos(loadCustomMotivos()); updateEditItem(idx, "motivo", newMotivoText.trim()); setNewMotivoText(""); setAddingEditMotivo(null); } }} />
-                              {/* "OK" / "x" quedaban en 36 px de alto con py-2. */}
-                              <button onClick={() => { if (newMotivoText.trim()) { saveCustomMotivo(newMotivoText.trim()); setCustomMotivos(loadCustomMotivos()); updateEditItem(idx, "motivo", newMotivoText.trim()); } setNewMotivoText(""); setAddingEditMotivo(null); }} className="text-xs text-gray-400 hover:text-black inline-flex items-center justify-center min-w-[44px] min-h-[44px] shrink-0">OK</button>
-                              <button aria-label="Cancelar el motivo nuevo" onClick={() => { setNewMotivoText(""); setAddingEditMotivo(null); }} className="text-xs text-gray-300 hover:text-black inline-flex items-center justify-center min-w-[44px] min-h-[44px] shrink-0">x</button>
-                            </div>
-                          ) : (
-                            <select value={item.motivo} onChange={(e) => { if (e.target.value === "__add__") { setAddingEditMotivo(idx); setNewMotivoText(""); } else updateEditItem(idx, "motivo", e.target.value); }} className="w-full border-b border-gray-200 py-1 text-sm outline-none bg-transparent">
-                              <option value="">--</option>
-                              {MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}
-                              <option value="__add__">+ Agregar motivo</option>
-                            </select>
-                          )}
+                          <select value={item.motivo} onChange={(e) => updateEditItem(idx, "motivo", e.target.value)} className="w-full border-b border-gray-200 py-1 text-sm outline-none bg-transparent">
+                            <option value="">--</option>
+                            {DEFAULT_MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}
+                            {item.motivo && !DEFAULT_MOTIVOS.includes(item.motivo) && <option value={item.motivo}>{item.motivo}</option>}
+                          </select>
                         </td>
                         <td className="py-2 text-right tabular-nums text-gray-500 text-xs">${fmt((Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0))}</td>
-                        {/* Solo ícono ("×"): sin área mínima quedaba en ~10×20 px. */}
-                        <td className="py-2 text-center">{editItems.length > 1 && <button aria-label="Quitar ítem" title="Quitar ítem" onClick={() => setEditItems((p) => p.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-black text-sm inline-flex items-center justify-center min-w-[44px] min-h-[44px]">×</button>}</td>
+                        <td className="py-2 text-center">{editItems.length > 1 && <button aria-label="Quitar renglón" title="Quitar renglón" onClick={() => setEditItems((p) => p.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-black text-sm inline-flex items-center justify-center min-w-[44px] min-h-[44px]">×</button>}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </ScrollableTable>
-              {/* Botón de solo texto: medía 21 px de alto. */}
-              <button onClick={() => setEditItems((p) => [...p, emptyItem()])} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2">+ Agregar fila</button>
+              <div className="flex flex-wrap items-center gap-x-4">
+                <button onClick={() => setEditItems((p) => [...p, emptyItem()])} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2">+ Agregar renglón</button>
+                <button onClick={() => setEditItems((p) => (p.length ? [...p, filaRepetida(p[p.length - 1])] : [emptyItem()]))} className="text-sm text-gray-700 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2 font-medium">Repetir el anterior</button>
+              </div>
             </>
           ) : (
-            /* ── 🩸 LOS ÍTEMS DEL RECLAMO, MEDIDOS (30-jul-2026) ──────────────
-               10 columnas dentro de un ScrollableTable de 700px de piso. En
-               iPhone arrastraba 310px y en iPad 138px, y lo que quedaba fuera
-               era **PRECIO y SUBTOTAL** — o sea cuánto se le reclama al
-               proveedor, que es la razón de ser de la pantalla. También MOTIVO,
-               FACTURA y PO.
-
-               El ancho ÚTIL es el que decide: la barra lateral se lleva ~224px,
-               así que un iPad de 834 deja ~562. Por eso el corte es `lg` (1024)
-               —donde la tabla ya entraba sola, medido en 0px— y no `md`.
-
-               Patrón: tarjetas, el mismo de `admin/components/PanelCxcMobile.tsx`
-               y `components/ventas/ResumenViewMobile.tsx`. No se inventa otro.
-               `data-medir` es FIJO (no una clase de breakpoint) para que el
-               arnés compare los MISMOS números en los 4 anchos: buscar por
-               `.lg\:hidden` devuelve vacío en cuanto se mueve el corte y el
-               chequeo pasaría sin comparar nada. */
+            /* Medido (30-jul-2026): por debajo de `lg` la tabla de 10 columnas
+               dejaba fuera PRECIO y SUBTOTAL; tarjetas hasta lg, tabla de ahí. */
             <div data-medir="reclamo-items">
-              {/* Celular e iPad vertical: una tarjeta por ítem. 0px de arrastre
-                  por construcción — no hay contenedor con scroll lateral. */}
               <ul className="lg:hidden space-y-2" data-vista="tarjetas">
                 {items.map((item, i) => {
                   const cant = Number(item.cantidad) || 0;
                   const precio = Number(item.precio_unitario) || 0;
                   return (
                     <li key={i} className="rounded-lg border border-gray-200 p-3">
-                      {/* Encabezado: el código manda, el subtotal es lo que se mira. */}
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="font-medium truncate">{item.referencia}</div>
-                          {item.descripcion && (
-                            <div className="text-xs text-gray-500 truncate">{item.descripcion}</div>
-                          )}
+                          {item.descripcion && <div className="text-xs text-gray-500 truncate">{item.descripcion}</div>}
                         </div>
                         <div className="shrink-0 text-right">
                           <div className="text-xs text-gray-400">Subtotal</div>
                           <div className="font-medium tabular-nums">${fmt(cant * precio)}</div>
                         </div>
                       </div>
-
                       <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-                        <div className="flex justify-between gap-2">
-                          <dt className="text-gray-400">Cant.</dt>
-                          <dd className="tabular-nums">{cant}</dd>
-                        </div>
-                        <div className="flex justify-between gap-2">
-                          <dt className="text-gray-400">Precio</dt>
-                          <dd className="tabular-nums">${fmt(item.precio_unitario)}</dd>
-                        </div>
-                        <div className="flex justify-between gap-2">
-                          <dt className="text-gray-400">Talla</dt>
-                          <dd className="text-gray-600 truncate">{item.talla || "—"}</dd>
-                        </div>
-                        <div className="flex justify-between gap-2">
-                          <dt className="text-gray-400">Género</dt>
-                          <dd className="text-gray-600 truncate">{generoLabel(item.genero) || "—"}</dd>
-                        </div>
-                        {item.motivo && (
-                          <div className="col-span-2 flex justify-between gap-2">
-                            <dt className="text-gray-400 shrink-0">Motivo</dt>
-                            <dd className="text-gray-600 text-right">{item.motivo}</dd>
-                          </div>
-                        )}
-                        {item.nro_factura && (
-                          <div className="flex justify-between gap-2">
-                            <dt className="text-gray-400">Factura</dt>
-                            <dd className="text-gray-600 truncate">{item.nro_factura}</dd>
-                          </div>
-                        )}
-                        {item.nro_orden_compra && (
-                          <div className="flex justify-between gap-2">
-                            <dt className="text-gray-400">PO</dt>
-                            <dd className="text-gray-600 truncate">{item.nro_orden_compra}</dd>
-                          </div>
-                        )}
+                        <div className="flex justify-between gap-2"><dt className="text-gray-400">Cant.</dt><dd className="tabular-nums">{cant}</dd></div>
+                        <div className="flex justify-between gap-2"><dt className="text-gray-400">Precio</dt><dd className="tabular-nums">${fmt(item.precio_unitario)}</dd></div>
+                        <div className="flex justify-between gap-2"><dt className="text-gray-400">Talla</dt><dd className="text-gray-600 truncate">{item.talla || "—"}</dd></div>
+                        {item.genero && <div className="flex justify-between gap-2"><dt className="text-gray-400">Género</dt><dd className="text-gray-600 truncate">{generoLabel(item.genero)}</dd></div>}
+                        {item.motivo && <div className="col-span-2 flex justify-between gap-2"><dt className="text-gray-400 shrink-0">Motivo</dt><dd className="text-gray-600 text-right">{motivoEnPantalla(item.motivo)}</dd></div>}
+                        {item.nro_factura && <div className="flex justify-between gap-2"><dt className="text-gray-400">Factura</dt><dd className="text-gray-600 truncate">{item.nro_factura}</dd></div>}
+                        {item.nro_orden_compra && <div className="flex justify-between gap-2"><dt className="text-gray-400">PO</dt><dd className="text-gray-600 truncate">{item.nro_orden_compra}</dd></div>}
                       </dl>
                     </li>
                   );
                 })}
               </ul>
-
-              {/* ≥lg: la tabla de siempre, intacta. Solo se le agregó el
-                  `hidden lg:block` del contenedor que la esconde en angosto. */}
               <div className="hidden lg:block" data-vista="tabla">
                 <ScrollableTable minWidth={700}>
                   <table className="w-full text-sm [&_td]:py-3 [&_th]:pb-3">
                     <thead className="sticky top-0 bg-white z-10">
                       <tr className="border-b border-gray-200 text-xs uppercase tracking-wide font-medium text-gray-500">
-                        <th className="text-left pb-2 font-medium">Código</th>
+                        <th className="text-left pb-2 font-medium">Estilo</th>
                         <th className="text-left pb-2 font-medium">Descripción</th>
                         <th className="text-left pb-2 font-medium">Talla</th>
-                        <th className="text-left pb-2 font-medium">Género</th>
+                        {conGenero && <th className="text-left pb-2 font-medium">Género</th>}
                         <th className="text-right pb-2 font-medium">Cant.</th>
                         <th className="text-right pb-2 font-medium">Precio</th>
                         <th className="text-right pb-2 font-medium">Subtotal</th>
                         <th className="text-left pb-2 font-medium">Motivo</th>
-                        <th className="text-left pb-2 font-medium">Factura</th>
-                        <th className="text-left pb-2 font-medium">PO</th>
+                        {conFactura && <th className="text-left pb-2 font-medium">Factura</th>}
+                        {conPO && <th className="text-left pb-2 font-medium">PO</th>}
                       </tr>
                     </thead>
                     <tbody>
                       {items.map((item, i) => (
                         <tr key={i} className="border-b border-gray-200">
-                          <td className="py-2">{item.referencia}</td>
+                          <td className="py-2 tabular-nums">{item.referencia}</td>
                           <td className="py-2 text-gray-500">{item.descripcion}</td>
-                          <td className="py-2 text-gray-500">{item.talla}</td>
-                          <td className="py-2 text-gray-500 text-xs">{generoLabel(item.genero) || "—"}</td>
+                          <td className="py-2 text-gray-500">{item.talla || "—"}</td>
+                          {conGenero && <td className="py-2 text-gray-500">{generoLabel(item.genero) || "—"}</td>}
                           <td className="py-2 text-right tabular-nums">{Number(item.cantidad) || 0}</td>
                           <td className="py-2 text-right tabular-nums">${fmt(item.precio_unitario)}</td>
                           <td className="py-2 text-right tabular-nums font-medium">${fmt((Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0))}</td>
-                          <td className="py-2 text-gray-500 text-xs">{item.motivo}</td>
-                          <td className="py-2 text-gray-500 text-xs">{item.nro_factura}</td>
-                          <td className="py-2 text-gray-500 text-xs">{item.nro_orden_compra}</td>
+                          <td className="py-2 text-gray-500">{motivoEnPantalla(item.motivo)}</td>
+                          {conFactura && <td className="py-2 text-gray-500">{item.nro_factura}</td>}
+                          {conPO && <td className="py-2 text-gray-500">{item.nro_orden_compra}</td>}
                         </tr>
                       ))}
                     </tbody>
@@ -755,45 +522,47 @@ export default function ReclamoDetail({
               </div>
             </div>
           )}
+
+          {/* Los totales ABAJO, a la derecha, uno debajo del otro — como el pie
+              de la factura del proveedor (Daniel: *«no es mejor ponerlo abajo tal
+              cual como viene en la factura en ese orden»*). En edición se
+              recalculan en vivo desde los renglones editados. */}
+          <table className="ml-auto mt-4 text-sm" data-medir="reclamo-totales">
+            <caption className="sr-only">Totales</caption>
+            <tbody>
+              <tr><td className="text-gray-500 pr-6 py-0.5">Subtotal</td><td className="text-right tabular-nums py-0.5">{fmt(totalsSub)}</td></tr>
+              <tr><td className="text-gray-500 pr-6 py-0.5">Importación {impLabel(totalsEmpresa)}</td><td className="text-right tabular-nums py-0.5">{fmt(totalsTax.importacion)}</td></tr>
+              {totalsTax.hasItbms && <tr><td className="text-gray-500 pr-6 py-0.5">ITBMS ({itbmsLabel(totalsEmpresa)})</td><td className="text-right tabular-nums py-0.5">{fmt(totalsTax.itbms)}</td></tr>}
+              <tr className="border-t border-gray-300"><td className="font-semibold pr-6 pt-1.5">Total</td><td className="text-right tabular-nums font-semibold pt-1.5">${fmt(totalsTax.total)}</td></tr>
+            </tbody>
+          </table>
         </div>
       )}
 
-      {/* Evidencia fotográfica */}
+      {/* Fotos — llegan firmadas del servidor (bucket privado). */}
       <div className="mb-8">
-        <div className="text-sm font-semibold text-gray-700 mb-3">Evidencia fotográfica</div>
-
-        {/* Thumbnail row — horizontal scroll on mobile */}
+        <div className="text-sm font-semibold text-gray-700 mb-3">Fotos</div>
         {fotos.length > 0 && (
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 mb-3" style={{ scrollSnapType: "x mandatory" }}>
-            {fotos.map((f) => {
-              const src = f.url || `${SUPA_URL}/storage/v1/object/public/reclamo-fotos/${f.storage_path}`;
-              return (
-                <div key={f.id} className="relative flex-shrink-0 cursor-pointer" style={{ scrollSnapAlign: "start" }} onClick={() => setLightboxSrc(src)}>
-                  <img src={src} alt="" className="w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-lg border border-gray-200" />
-                  {/* El círculo se ve de 28 px a propósito (más grande taparía la
-                      miniatura), pero el área de toque real llega a 44 con el
-                      pseudo-elemento transparente ::after. */}
-                  <button aria-label="Eliminar foto" title="Eliminar foto" onClick={(e) => { e.stopPropagation(); setDeleteFotoTarget({ id: f.id, path: f.storage_path }); }} className="absolute -top-1.5 -right-1.5 w-7 h-7 bg-black text-white rounded-full text-xs flex items-center justify-center after:absolute after:-inset-2 after:rounded-full after:content-['']">×</button>
-                </div>
-              );
-            })}
+            {fotos.filter((f) => !!f.url).map((f) => (
+              <div key={f.id} className="relative flex-shrink-0 cursor-pointer" style={{ scrollSnapAlign: "start" }} onClick={() => setLightboxSrc(f.url)}>
+                <img src={f.url} alt="" className="w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-lg border border-gray-200" />
+                <button aria-label="Eliminar foto" title="Eliminar foto" onClick={(e) => { e.stopPropagation(); setDeleteFotoTarget({ id: f.id, path: f.storage_path }); }} className="absolute -top-1.5 -right-1.5 w-7 h-7 bg-black text-white rounded-full text-xs flex items-center justify-center after:absolute after:-inset-2 after:rounded-full after:content-['']">×</button>
+              </div>
+            ))}
           </div>
         )}
-
-        {/* Upload area */}
-        {fotos.length < 5 && (
+        {fotos.length < 5 ? (
           <>
             <input ref={fotoRef} type="file" accept="image/*" multiple className="hidden" disabled={uploadingFoto} onChange={(e) => { const files = Array.from(e.target.files ?? []); if (files.length) onUploadFoto(files); if (fotoRef.current) fotoRef.current.value = ""; }} />
-            <button
-              onClick={() => fotoRef.current?.click()}
-              disabled={uploadingFoto}
-              className="w-full sm:w-auto border-2 border-dashed border-gray-300 hover:border-gray-400 rounded-lg px-6 py-4 sm:py-3 flex items-center justify-center gap-2 text-gray-400 hover:text-gray-600 transition active:bg-gray-50 min-h-[44px] disabled:opacity-50"
-            >
+            <button onClick={() => fotoRef.current?.click()} disabled={uploadingFoto} className="w-full sm:w-auto border-2 border-dashed border-gray-300 hover:border-gray-400 rounded-lg px-6 py-4 sm:py-3 flex items-center justify-center gap-2 text-gray-400 hover:text-gray-600 transition active:bg-gray-50 min-h-[44px] disabled:opacity-50">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-              <span className="text-sm font-medium">{uploadingFoto ? "Subiendo…" : "Adjuntar fotos"}</span>
-              <span className="text-xs text-gray-300 hidden sm:inline">({fotos.length}/5)</span>
+              <span className="text-sm font-medium">{uploadingFoto ? "Subiendo…" : "Agregar fotos"}</span>
+              <span className="text-xs text-gray-300">({fotos.length} de 5)</span>
             </button>
           </>
+        ) : (
+          <p className="text-xs text-gray-400">Ya están las 5 fotos que caben en un reclamo.</p>
         )}
       </div>
 
@@ -804,30 +573,49 @@ export default function ReclamoDetail({
         <div className="text-sm font-semibold text-gray-700 mb-3">Seguimiento</div>
         <div className="flex gap-2 mb-3">
           <input type="text" value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Agregar nota..." className="flex-1 border-b border-gray-200 py-3 sm:py-1.5 text-base sm:text-sm outline-none min-h-[44px] xl:min-h-0" />
-          {/* py-1.5 dejaba "Agregar" en 32 px de alto. */}
           <button onClick={onAddNota} disabled={!nota.trim()} className="text-sm bg-black text-white px-4 rounded-full hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50 inline-flex items-center justify-center min-h-[44px] shrink-0">Agregar</button>
         </div>
-        {seg.map((s) => (
-          <div key={s.id} className="border-b border-gray-50 py-2">
-            <p className="text-sm">{s.nota}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{fmtDate(s.created_at.slice(0, 10))} {new Date(s.created_at).toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit" })} — {s.autor}</p>
-          </div>
-        ))}
+        {seg.map((s) => {
+          const leida = notaEnPantalla(s.nota, s.autor);
+          return (
+            <div key={s.id} className="border-b border-gray-50 py-2">
+              <p className="text-sm">{leida.texto}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{fmtDate(s.created_at.slice(0, 10))}, {new Date(s.created_at).toLocaleTimeString("es-PA", { hour: "numeric", minute: "2-digit" })}{leida.autor ? ` — ${leida.autor}` : ""}</p>
+            </div>
+          );
+        })}
       </div>
 
-      {/* El borrado del reclamo usa el ÚNICO modal del contenedor (ReclamosClient),
-          abierto vía onDeleteReclamo. Aquí solo queda el de la foto. */}
       <ConfirmDeleteModal
         open={!!deleteFotoTarget}
         title="¿Eliminar esta foto?"
-        description="Se eliminará la foto de evidencia del reclamo. Esta acción no se puede deshacer."
+        description="Se elimina la foto de evidencia del reclamo."
         onConfirm={() => { if (deleteFotoTarget) { onDeleteFoto(deleteFotoTarget.id, deleteFotoTarget.path); setDeleteFotoTarget(null); } }}
         onCancel={() => setDeleteFotoTarget(null)}
+      />
+      <ConfirmDeleteModal
+        open={!!quitarNc}
+        title="¿Quitar esta nota de crédito?"
+        description={`Se quita el registro de $${fmt(quitarNc?.monto ?? 0)} recuperado. Si te equivocas, vuelve a agregarla.`}
+        confirmLabel="Quitar"
+        loadingLabel="Quitando…"
+        onConfirm={() => { if (quitarNc) { onRemoveSettlement(quitarNc.id); setQuitarNc(null); } }}
+        onCancel={() => setQuitarNc(null)}
       />
 
       <FotoLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
       <PdfLightbox src={facturaLightbox} titulo="Factura" onClose={() => setFacturaLightbox(null)} />
-
+      <EnviarProveedorModal
+        open={correoOpen}
+        empresa={current.empresa}
+        reclamoIds={[current.id]}
+        defaultTo={contacto?.correo || ""}
+        contactoNombre={contacto?.nombre_contacto || contacto?.nombre}
+        count={1}
+        defaultSubject={`Reclamo ${current.nro_reclamo} — ${current.empresa}`}
+        onClose={() => setCorreoOpen(false)}
+        onSent={(msg) => { showToast(msg); setCorreoOpen(false); onReload?.(); }}
+      />
 
       <Toast message={toast} />
       </div>

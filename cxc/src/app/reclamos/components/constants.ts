@@ -9,15 +9,20 @@ export { ESTADO_PAGADO, esPendiente, soloPendientes } from "@/lib/reclamos/pendi
 // (lo lee también el servidor, que es quien escribe el código al guardar).
 export { EMPRESAS_MAP, EMPRESAS, datosDeEmpresa, empresaKeyDeReclamo } from "@/lib/reclamos/empresas";
 import { EMPRESAS_MAP } from "@/lib/reclamos/empresas";
+import { empresaDesdeFacturada } from "@/lib/reclamos/empresas-con-reclamos";
 
-/** Mapea proveedor/marca extraídos por IA a la "empresa" del reclamo (que
- *  determina proveedor+marca al guardar). Match por marca+proveedor; si la marca
- *  es ambigua (Tommy→FW/FS, Reebok→AS/AW) gana el primer match — el usuario
- *  puede corregir. Devuelve null si no hay match. */
+/** Mapea lo que leyó la IA a la "empresa" del reclamo (que determina
+ *  proveedor+marca al guardar). Primero la EMPRESA FACTURADA (el «Cliente» del
+ *  PDF: «FASHION WEAR», «Active Shoes SA»), que es la que no se confunde; si el
+ *  PDF no la trae, marca+proveedor; si la marca es ambigua (Tommy→FW/FS) gana
+ *  el primer match — el usuario confirma en el desplegable. null si no hay match. */
 export function empresaDesdeIA(
   proveedor: string | null | undefined,
   marca: string | null | undefined,
+  empresaFacturada?: string | null,
 ): string | null {
+  const facturada = empresaDesdeFacturada(empresaFacturada);
+  if (facturada) return facturada;
   const m = (marca || "").toLowerCase().trim();
   const p = (proveedor || "").toLowerCase().trim();
   if (!m && !p) return null;
@@ -78,59 +83,6 @@ export const GENERO_LABEL: Record<string, string> = {
 export function generoLabel(valor: string | null | undefined): string {
   if (!valor) return "";
   return GENERO_LABEL[valor] ?? valor;
-}
-
-export const ESTADOS = ["Creado", "En proceso", "Pagado"];
-
-/** Display-friendly names for estados (use in buttons/labels) */
-export const ESTADO_DISPLAY: Record<string, string> = {};
-
-/** Get display name for an estado, falls back to the estado itself */
-export function estadoLabel(estado: string): string {
-  return ESTADO_DISPLAY[estado] || estado;
-}
-
-export const EC: Record<string, string> = {
-  "Creado": "bg-gray-100 text-gray-600",
-  "En proceso": "bg-amber-50 text-amber-700",
-  "Pagado": "bg-green-50 text-green-700",
-};
-
-/** Load custom motivos — tries API first, falls back to localStorage */
-export function loadCustomMotivos(): string[] {
-  try { return JSON.parse(localStorage.getItem("fg_custom_motivos") || "[]"); } catch { return []; }
-}
-
-/** Fetch custom motivos from Supabase. Falls back to localStorage if API fails. */
-export async function fetchCustomMotivos(): Promise<string[]> {
-  try {
-    const res = await fetch("/api/reclamos/motivos");
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        // Sync to localStorage as cache
-        localStorage.setItem("fg_custom_motivos", JSON.stringify(data));
-        return data;
-      }
-    }
-  } catch { /* fall through */ }
-  // Fallback: load from localStorage
-  return loadCustomMotivos();
-}
-
-/** Save a custom motivo — persists to Supabase and localStorage */
-export async function saveCustomMotivo(m: string) {
-  // Save to localStorage immediately for instant feedback
-  const cur = loadCustomMotivos();
-  if (!cur.includes(m)) { cur.push(m); localStorage.setItem("fg_custom_motivos", JSON.stringify(cur)); }
-  // Persist to Supabase in background
-  try {
-    await fetch("/api/reclamos/motivos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ motivo: m }),
-    });
-  } catch { /* localStorage already has it as fallback */ }
 }
 
 export function emptyItem(): RItem {

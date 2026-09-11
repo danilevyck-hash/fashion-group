@@ -4,16 +4,13 @@ import { useRef, useState, type DragEvent } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { PdfLightbox } from "@/components/ui";
 
+import type { FacturaExtraida } from "@/lib/reclamos/lector-factura";
+
 const MAX_MB = 10;
 
-// Campos que la IA puede extraer de la factura (cualquiera puede ser null).
-export interface FacturaIAData {
-  proveedor: string | null;
-  marca: string | null;
-  nro_factura: string | null;
-  fecha_factura: string | null;
-  nro_orden_compra: string | null;
-}
+// Lo que la IA saca de la factura: cabecera, empresa facturada y renglones.
+// El tipo vive en `lib/reclamos/lector-factura.ts` (lo comparte el backfill).
+export type FacturaIAData = FacturaExtraida;
 
 interface Props {
   /** Signed URL del PDF ya guardado (habilita "Ver factura"). null si aún no hay. */
@@ -69,7 +66,7 @@ export default function FacturaPdfUploader({ pdfUrl, onUploaded, onExtracted }: 
       if (iaRes.ok) {
         const data = (await iaRes.json()) as FacturaIAData;
         onExtracted(data);
-        toast("Datos pre-llenados con IA. Revísalos.", "success");
+        toast("Factura leída. Revisa los datos.", "success");
       } else {
         toast("No pudimos leer el PDF — llena los campos a mano.", "warning");
       }
@@ -174,7 +171,7 @@ export default function FacturaPdfUploader({ pdfUrl, onUploaded, onExtracted }: 
           <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M21 12a9 9 0 1 1-6.219-8.56" />
           </svg>
-          Leyendo PDF con IA…
+          Leyendo la factura…
         </div>
       )}
       <PdfLightbox src={pdfLightbox} titulo="Factura" onClose={() => setPdfLightbox(null)} />

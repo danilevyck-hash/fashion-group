@@ -2,32 +2,32 @@
 
 import { useState } from "react";
 import AppHeader from "@/components/AppHeader";
-import { fmt, fmtDate } from "@/lib/format";
+import { fmt } from "@/lib/format";
+import { hoyPanama } from "@/lib/fecha-panama";
+import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { mailtoHref } from "@/lib/contact-links";
+import { useUrlState } from "@/lib/hooks/useUrlState";
 import { Reclamo, Contacto } from "./types";
-import { ESTADOS, daysSince, calcSub, reclamoTaxes, estadoLabel, esPendiente, soloPendientes } from "./constants";
+import { calcSub, reclamoTaxes, esPendiente, empresaKeyDeReclamo } from "./constants";
 import { matchReclamo, matchHint } from "./search";
-import { EmptyState, StatusBadge, Toast } from "@/components/ui";
+import { EmptyState, Toast } from "@/components/ui";
+import OverflowMenu from "@/components/ui/OverflowMenu";
 import FotoBadge from "./FotoBadge";
 import EnviarProveedorModal from "./EnviarProveedorModal";
+import { facturasEnPantalla } from "@/lib/reclamos/facturas";
+import { diasDesde } from "@/lib/reclamos/dias";
+import { textoReclamado, estaReclamado } from "@/lib/reclamos/reclamado";
+import { FALTA_FECHA_FACTURA, filtroDesdeUrl, filtrarPorEstado, ordenarPorFactura, type FiltroEstado } from "@/lib/reclamos/orden";
 
 interface Props {
   role: string;
   activeEmpresa: string;
   reclamos: Reclamo[];
   contactos: Contacto[];
-  search: string;
-  setSearch: (v: string) => void;
-  filterEstado: string;
-  setFilterEstado: (v: string) => void;
   selectionMode: boolean;
   setSelectionMode: (v: boolean) => void;
   selectedIds: string[];
   setSelectedIds: React.Dispatch<React.SetStateAction<string[]>>;
-  sortCol: "fecha" | "dias" | "total" | "estado";
-  setSortCol: (v: "fecha" | "dias" | "total" | "estado") => void;
-  sortDir: "asc" | "desc";
-  setSortDir: React.Dispatch<React.SetStateAction<"asc" | "desc">>;
   onBack: () => void;
   onNewReclamo: () => void;
   onLoadDetail: (id: string) => void;
@@ -36,217 +36,153 @@ interface Props {
   onDeleteReclamo: (id: string) => void;
   /** Borrado en lote de los seleccionados (admin). */
   onDeleteSelected: (ids: string[]) => void;
-  /** Recarga los reclamos tras enviar el correo (el envío no cambia el estado). */
+  /** Recarga los reclamos tras mandar el correo o descargar (para ver «Reclamado»). */
   onReload: () => void;
 }
 
-type BulkAction = "excel" | "pdf";
+type Descarga = "excel" | "pdf";
 
-// Íconos de acción por fila — discretos, hover. stroke currentColor para heredar color.
-const IconMail = (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
-);
-const IconPencil = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
-);
 const IconTrash = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
 );
-const IconDownload = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
-);
-const IconSpinner = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="animate-spin"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" /><path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>
-);
-const IconPdf = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-);
 
+function descargar(blob: Blob, nombre: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombre;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LA PÁGINA DE UNA EMPRESA (rediseño del 10-sep-2026, mockup aprobado).
+//
+// Abre en «Por cobrar N · $» (Daniel: *«los pipeline tener default los no
+// pagados»*) con «Cobrados N» al lado; «En proceso» se fue de la pantalla
+// (0 usos en 3 meses; el valor de la base cuenta como por cobrar). Orden: la
+// FACTURA más vieja primero (*«viejo es factura, no creado»*); los que no
+// tienen fecha van al final y lo dicen.
+//
+// Columnas: N° · Factura(s) · Días · Reclamado («Reclamado 17 jul 2026» o «Sin
+// reclamar» en rojo) · Total · acciones. Tocar la fila abre el reclamo; en la
+// fila quedan a la vista solo «Correo» y «Descargar», y el «···» lleva el
+// papel, editar y borrar (el patrón de Guías). La fecha de creación se ve
+// adentro, no en la tabla.
+//
+// 🔴 EL ARCHIVO Y EL CORREO SIN SELECCIÓN LLEVAN LO QUE SE ESTÁ MIRANDO, que
+// por default es lo POR COBRAR: mandar un reclamo ya pagado es cobrarle dos
+// veces al proveedor (medido: $5.306,62 en 5 reclamos, 24-ago-2026). Por eso
+// «Correo» no se ofrece sobre los cobrados.
+//
+// Filtro y búsqueda viven en la URL (`useUrlState`, replace): se comparten por
+// link y no ensucian el Atrás.
+// ─────────────────────────────────────────────────────────────────────────────
 export default function EmpresaList({
-  role, activeEmpresa, reclamos, contactos, search, setSearch,
-  filterEstado, setFilterEstado, selectionMode, setSelectionMode,
-  selectedIds, setSelectedIds, sortCol, setSortCol, sortDir, setSortDir,
+  role, activeEmpresa, reclamos, contactos,
+  selectionMode, setSelectionMode, selectedIds, setSelectedIds,
   onBack, onNewReclamo, onLoadDetail, onEditReclamo, onDeleteReclamo, onDeleteSelected, onReload,
 }: Props) {
   const isAdmin = role === "admin";
+  const hoy = hoyPanama();
+  const [filtroUrl, setFiltroUrl] = useUrlState("estado", "");
+  const filtro: FiltroEstado = filtroDesdeUrl(filtroUrl);
+  const [search, setSearch] = useUrlState("q", "");
   const [toast, setToast] = useState<string | null>(null);
-  const [busy, setBusy] = useState<BulkAction | null>(null);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [pdfDownloadingId, setPdfDownloadingId] = useState<string | null>(null);
+  const [busy, setBusy] = useState<Descarga | null>(null);
+  const [filaBusy, setFilaBusy] = useState<string | null>(null);
   const [sendOpen, setSendOpen] = useState(false);
-  // Envío de UN solo reclamo desde el botón de mail de la fila (independiente del
-  // envío en lote por selección). Guarda el reclamo objetivo; null = modal cerrado.
   const [mailRec, setMailRec] = useState<Reclamo | null>(null);
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
   const allEmpresaRecs = reclamos.filter((r) => r.empresa === activeEmpresa);
-  const empresaRecs = allEmpresaRecs.filter((r) => {
-    if (filterEstado !== "all" && r.estado !== filterEstado) return false;
-    // N° reclamo, factura (header + ítems) y código de ítem — ver search.ts.
-    if (search && matchReclamo(r, search) === null) return false;
-    return true;
-  });
-
+  const porCobrar = filtrarPorEstado(allEmpresaRecs, "por-cobrar");
+  const cobrados = filtrarPorEstado(allEmpresaRecs, "cobrados");
+  const montoPorCobrar = porCobrar.reduce((s, r) => s + reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total, 0);
+  const visibles = ordenarPorFactura(
+    filtrarPorEstado(allEmpresaRecs, filtro).filter((r) => !search || matchReclamo(r, search) !== null),
+  );
   const c = contactos.find((ct) => ct.empresa === activeEmpresa) || null;
-
-  const sortedRecs = [...empresaRecs].sort((a, b) => {
-    let av: number | string = 0, bv: number | string = 0;
-    if (sortCol === "fecha") { av = a.fecha_reclamo || ""; bv = b.fecha_reclamo || ""; }
-    if (sortCol === "dias") { av = daysSince(a.fecha_reclamo); bv = daysSince(b.fecha_reclamo); }
-    if (sortCol === "total") { av = reclamoTaxes(a.empresa, calcSub(a.reclamo_items ?? [])).total; bv = reclamoTaxes(b.empresa, calcSub(b.reclamo_items ?? [])).total; }
-    if (sortCol === "estado") { av = ESTADOS.indexOf(a.estado); bv = ESTADOS.indexOf(b.estado); }
-    if (av < bv) return sortDir === "asc" ? -1 : 1;
-    if (av > bv) return sortDir === "asc" ? 1 : -1;
-    return 0;
-  });
-
-  // Selección para enviar/Excel y borrar → TODOS los reclamos son seleccionables
-  // (antes solo "Creado"; se quitó la restricción porque ahora también borra).
-  const allSelectableIds = sortedRecs.map((r) => r.id);
-  const allSelected = allSelectableIds.length > 0 && allSelectableIds.every((id) => selectedIds.includes(id));
-
-  function toggleSelect(id: string) {
-    setSelectedIds((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
-  }
-
-  function toggleSort(col: typeof sortCol) {
-    if (sortCol === col) setSortDir((d) => d === "asc" ? "desc" : "asc");
-    else { setSortCol(col); setSortDir("desc"); }
-  }
-
+  const key = empresaKeyDeReclamo(activeEmpresa);
+  const nombreCorto = key ? nombreCortoEmpresa(key) : activeEmpresa;
   const empresaPath = encodeURIComponent(activeEmpresa);
 
-  async function downloadBulkExcel() {
-    if (busy || selectedIds.length === 0) return;
-    setBusy("excel");
-    try {
-      const res = await fetch(`/api/reclamos/proveedor/${empresaPath}/export-zip`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reclamo_ids: selectedIds }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error || "Error al generar el Excel.");
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      const safe = activeEmpresa.replace(/[^A-Za-z0-9_-]+/g, "_");
-      a.href = url;
-      a.download = `Reclamos_${safe}_${new Date().toISOString().slice(0, 10)}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
-      showToast(`Excel descargado con ${selectedIds.length} reclamo${selectedIds.length === 1 ? "" : "s"}`);
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Error al generar el Excel");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  // Descarga directa del Excel de UN reclamo (1 clic, sin abrir el detalle).
-  // Reusa el endpoint single [id]/excel → con 1 reclamo el Excel no lleva tab
-  // Resumen, solo la hoja del reclamo (con sus links de factura/fotos web).
-  async function downloadSingleExcel(r: Reclamo) {
-    if (downloadingId) return;
-    setDownloadingId(r.id);
-    try {
-      const res = await fetch(`/api/reclamos/${r.id}/excel`);
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error || "Error al generar el Excel.");
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      const safe = (r.nro_reclamo || "reclamo").replace(/[^A-Za-z0-9_-]+/g, "_");
-      a.href = url;
-      a.download = `Reclamo-${safe}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
-      showToast(`Excel de ${r.nro_reclamo} descargado`);
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Error al generar el Excel");
-    } finally {
-      setDownloadingId(null);
-    }
-  }
-
-  // PDF consolidado de los reclamos seleccionados (mismo payload que el Excel bulk).
-  async function downloadBulkPdf() {
-    if (busy || selectedIds.length === 0) return;
-    setBusy("pdf");
-    try {
-      const res = await fetch(`/api/reclamos/proveedor/${empresaPath}/export-pdf`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reclamo_ids: selectedIds }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error || "Error al generar el PDF.");
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      const safe = activeEmpresa.replace(/[^A-Za-z0-9_-]+/g, "_");
-      a.href = url;
-      a.download = `Reclamos_${safe}_${new Date().toISOString().slice(0, 10)}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-      showToast(`PDF descargado con ${selectedIds.length} reclamo${selectedIds.length === 1 ? "" : "s"}`);
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Error al generar el PDF");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  // PDF directo de UN reclamo desde la fila (via endpoint por-proveedor con 1 id).
-  async function downloadSinglePdf(r: Reclamo) {
-    if (pdfDownloadingId) return;
-    setPdfDownloadingId(r.id);
-    try {
-      const res = await fetch(`/api/reclamos/proveedor/${empresaPath}/export-pdf`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reclamo_ids: [r.id] }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error || "Error al generar el PDF.");
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      const safe = (r.nro_reclamo || "reclamo").replace(/[^A-Za-z0-9_-]+/g, "_");
-      a.href = url;
-      a.download = `Reclamo-${safe}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-      showToast(`PDF de ${r.nro_reclamo} descargado`);
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Error al generar el PDF");
-    } finally {
-      setPdfDownloadingId(null);
-    }
-  }
-
-  function cancelSelection() {
-    setSelectionMode(false);
-    setSelectedIds([]);
-  }
-
+  const allSelected = visibles.length > 0 && visibles.every((r) => selectedIds.includes(r.id));
+  const toggleSelect = (id: string) => setSelectedIds((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
   const selCount = selectedIds.length;
   const hasSelection = selectionMode && selCount > 0;
+  /** Lo que viaja en el archivo o el correo: la selección, o lo que se está mirando. */
+  const idsObjetivo = hasSelection ? selectedIds : visibles.map((r) => r.id);
+  const sufijo = filtro === "cobrados" ? "cobrados" : "pendientes";
+
+  async function descargarLote(tipo: Descarga) {
+    if (busy || idsObjetivo.length === 0) return;
+    setBusy(tipo);
+    try {
+      const res = await fetch(`/api/reclamos/proveedor/${empresaPath}/${tipo === "excel" ? "export-zip" : "export-pdf"}`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reclamo_ids: idsObjetivo }),
+      });
+      if (!res.ok) { const err = await res.json().catch(() => null); throw new Error(err?.error || "No se pudo armar el archivo. Intenta de nuevo."); }
+      descargar(await res.blob(), `Reclamos-${sufijo}-${nombreCorto}-${hoy}.${tipo === "excel" ? "xlsx" : "pdf"}`);
+      showToast(`${tipo === "excel" ? "Excel" : "PDF"} descargado — ${idsObjetivo.length} reclamo${idsObjetivo.length === 1 ? "" : "s"}`);
+      onReload();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "No se pudo armar el archivo. Intenta de nuevo.");
+    } finally { setBusy(null); }
+  }
+
+  // Descarga de UN reclamo desde la fila. El Excel es lo que se le manda al
+  // proveedor; el PDF (el papel) va en el «···».
+  async function descargarUno(r: Reclamo, tipo: Descarga) {
+    if (filaBusy) return;
+    setFilaBusy(r.id);
+    try {
+      const res = tipo === "excel"
+        ? await fetch(`/api/reclamos/${r.id}/excel`)
+        : await fetch(`/api/reclamos/proveedor/${empresaPath}/export-pdf`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reclamo_ids: [r.id] }) });
+      if (!res.ok) { const err = await res.json().catch(() => null); throw new Error(err?.error || "No se pudo armar el archivo. Intenta de nuevo."); }
+      const safe = (r.nro_reclamo || "reclamo").replace(/[^A-Za-z0-9_-]+/g, "_");
+      descargar(await res.blob(), `Reclamo-${safe}.${tipo === "excel" ? "xlsx" : "pdf"}`);
+      showToast(`${tipo === "excel" ? "Excel" : "PDF"} de ${r.nro_reclamo} descargado`);
+      onReload();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "No se pudo armar el archivo. Intenta de nuevo.");
+    } finally { setFilaBusy(null); }
+  }
+
+  function cancelSelection() { setSelectionMode(false); setSelectedIds([]); }
+
+  const pill = "inline-flex min-h-[44px] items-center justify-center text-xs px-3 rounded-full transition";
+  const accion = "inline-flex min-h-[44px] items-center justify-center text-xs font-medium border border-gray-200 rounded-md px-3 text-gray-600 hover:text-black hover:border-gray-400 transition disabled:opacity-40";
+
+  function celdaDias(r: Reclamo) {
+    const d = diasDesde(r.fecha_factura, hoy);
+    if (d === null) return <span className="text-xs text-red-600">{FALTA_FECHA_FACTURA}</span>;
+    return <span className="tabular-nums">{d}</span>;
+  }
+  function celdaReclamado(r: Reclamo) {
+    if (!esPendiente(r)) return <span className="text-gray-400">Cobrado</span>;
+    const sin = !estaReclamado(r);
+    return <span className={sin ? "text-red-600 font-medium" : "text-gray-500"}>{textoReclamado(r)}</span>;
+  }
+  const acciones = (r: Reclamo) => (
+    <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+      <button type="button" onClick={() => setMailRec(r)} className={accion} aria-label={`Mandar por correo el reclamo ${r.nro_reclamo}`}>Correo</button>
+      <button type="button" onClick={() => descargarUno(r, "excel")} disabled={filaBusy !== null} className={accion} aria-label={`Descargar el Excel del reclamo ${r.nro_reclamo}`}>{filaBusy === r.id ? "…" : "Descargar"}</button>
+      <OverflowMenu
+        ariaLabel={`Más opciones del reclamo ${r.nro_reclamo}`}
+        items={[
+          { label: "Descargar el PDF", onClick: () => { void descargarUno(r, "pdf"); } },
+          { label: "Editar", onClick: () => onEditReclamo(r.id) },
+          ...(isAdmin ? [{ label: "Eliminar", onClick: () => onDeleteReclamo(r.id), destructive: true }] : []),
+        ]}
+      />
+    </div>
+  );
 
   return (
     <div>
-      <AppHeader
-        module="Reclamos"
-        breadcrumbs={[{ label: activeEmpresa }]}
-      />
+      <AppHeader module="Reclamos" breadcrumbs={[{ label: nombreCorto }]} />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-12">
       <div className="mb-4">
         <button onClick={onBack} className="inline-flex min-h-[44px] items-center text-sm text-gray-400 hover:text-black transition">← Reclamos</button>
@@ -254,250 +190,126 @@ export default function EmpresaList({
 
       <div className="flex items-end justify-between mb-4 sm:mb-6 flex-wrap gap-4">
         <div>
-          <h1 className="text-xl font-light tracking-tight">{activeEmpresa}</h1>
-          {c && <p className="text-xs text-gray-400 mt-1">Contacto: {(c.nombre_contacto || c.nombre || "equipo")} | {mailtoHref(c.correo) ? <a href={mailtoHref(c.correo)!} className="relative text-blue-600 hover:underline after:absolute after:-inset-y-[14px] after:inset-x-0 after:content-['']">{c.correo}</a> : c.correo}</p>}
+          <h1 className="text-xl font-light tracking-tight">{nombreCorto}</h1>
+          {c && <p className="text-sm text-gray-500 mt-1">{c.nombre_contacto || c.nombre || "Contacto"} · {mailtoHref(c.correo) ? <a href={mailtoHref(c.correo)!} className="text-blue-600 hover:underline">{c.correo}</a> : c.correo}</p>}
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          {hasSelection ? (
+        <div className="flex items-center gap-2 flex-wrap">
+          {selectionMode && <span className="text-sm text-gray-500">{selCount > 0 ? `${selCount} seleccionado${selCount === 1 ? "" : "s"}` : "Selecciona reclamos…"}</span>}
+          {/* Correo y descargas: sobre la selección, o sobre lo que se está mirando. */}
+          {filtro === "por-cobrar" && idsObjetivo.length > 0 && (
+            <button onClick={() => setSendOpen(true)} disabled={busy !== null} className={accion} aria-label="Mandar por correo al proveedor">Correo</button>
+          )}
+          {idsObjetivo.length > 0 && (
             <>
-              <span className="text-sm text-gray-500">
-                {selCount} seleccionado{selCount === 1 ? "" : "s"}
-              </span>
-              <button
-                onClick={() => setSendOpen(true)}
-                disabled={busy !== null}
-                title="Enviar por correo al proveedor el Excel resumen + fotos"
-                className="text-sm bg-black text-white px-5 py-2 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50"
-              >
-                Enviar al proveedor
-              </button>
-              <button
-                onClick={downloadBulkExcel}
-                disabled={busy !== null}
-                title="Descargar Excel con links a las facturas y fotos (abren con un clic)"
-                className="text-sm border border-gray-200 px-4 py-2 rounded-md text-gray-500 hover:text-black transition disabled:opacity-50"
-              >
-                {busy === "excel" ? "Generando Excel..." : "Descargar Excel"}
-              </button>
-              <button
-                onClick={downloadBulkPdf}
-                disabled={busy !== null}
-                title="Descargar PDF consolidado de los reclamos seleccionados (resumen + detalle con fotos)"
-                className="text-sm border border-gray-200 px-4 py-2 rounded-md text-gray-500 hover:text-black transition disabled:opacity-50"
-              >
-                {busy === "pdf" ? "Generando PDF..." : "Descargar PDF"}
-              </button>
-              {isAdmin && (
-                <button
-                  onClick={() => onDeleteSelected(selectedIds)}
-                  disabled={busy !== null}
-                  title="Eliminar los reclamos seleccionados"
-                  className="text-sm border border-red-200 text-red-600 px-4 py-2 rounded-md hover:bg-red-50 active:scale-[0.97] transition disabled:opacity-50 inline-flex items-center gap-1.5"
-                >
-                  {IconTrash}
-                  Eliminar seleccionados
-                </button>
-              )}
-              <button
-                onClick={cancelSelection}
-                disabled={busy !== null}
-                className="text-sm border border-gray-200 px-4 py-2 rounded-md text-gray-400 hover:text-black transition disabled:opacity-40"
-              >
-                Cancelar
-              </button>
+              <button onClick={() => descargarLote("excel")} disabled={busy !== null} className={accion}>{busy === "excel" ? "Armando el Excel…" : "Descargar Excel"}</button>
+              <button onClick={() => descargarLote("pdf")} disabled={busy !== null} className={accion}>{busy === "pdf" ? "Armando el PDF…" : "Descargar PDF"}</button>
             </>
-          ) : (
-            <>
-              {selectionMode && (
-                <span className="text-sm text-gray-400">Selecciona reclamos…</span>
-              )}
-              <button
-                onClick={() => { setSelectionMode(!selectionMode); setSelectedIds([]); }}
-                className={`inline-flex min-h-[44px] items-center justify-center text-sm border px-4 rounded-md transition ${selectionMode ? "border-black text-black bg-gray-50" : "border-gray-200 text-gray-400 hover:text-black"}`}
-              >
-                {selectionMode ? "Cancelar" : "Seleccionar"}
-              </button>
-              <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">Nuevo Reclamo</button>
-            </>
+          )}
+          {hasSelection && isAdmin && (
+            <button onClick={() => onDeleteSelected(selectedIds)} disabled={busy !== null} className="inline-flex min-h-[44px] items-center gap-1.5 text-xs border border-red-200 text-red-600 px-3 rounded-md hover:bg-red-50 transition disabled:opacity-50">{IconTrash} Eliminar seleccionados</button>
+          )}
+          <button
+            onClick={() => (selectionMode ? cancelSelection() : (setSelectionMode(true), setSelectedIds([])))}
+            className={`inline-flex min-h-[44px] items-center justify-center text-sm border px-4 rounded-md transition ${selectionMode ? "border-black text-black bg-gray-50" : "border-gray-200 text-gray-400 hover:text-black"}`}
+          >
+            {selectionMode ? "Cancelar" : "Seleccionar"}
+          </button>
+          {!selectionMode && (
+            <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">Nuevo Reclamo</button>
           )}
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-4">
-        <button onClick={() => setFilterEstado("all")} className={`inline-flex min-h-[44px] items-center justify-center text-xs px-3 rounded-full transition ${filterEstado === "all" ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
-          Todos <span className="ml-1 opacity-60">{allEmpresaRecs.length}</span>
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <button onClick={() => setFiltroUrl("")} aria-pressed={filtro === "por-cobrar"} className={`${pill} ${filtro === "por-cobrar" ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+          Por cobrar <span className="ml-1 opacity-70 tabular-nums">{porCobrar.length} · ${fmt(montoPorCobrar)}</span>
         </button>
-        {ESTADOS.map((e) => {
-          const count = allEmpresaRecs.filter((r) => r.estado === e).length;
-          return (
-            <button key={e} onClick={() => setFilterEstado(e)} className={`inline-flex min-h-[44px] items-center justify-center text-xs px-3 rounded-full transition ${filterEstado === e ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
-              {estadoLabel(e)} <span className="ml-1 opacity-60">{count}</span>
-            </button>
-          );
-        })}
+        <button onClick={() => setFiltroUrl("cobrados")} aria-pressed={filtro === "cobrados"} className={`${pill} ${filtro === "cobrados" ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+          Cobrados <span className="ml-1 opacity-70 tabular-nums">{cobrados.length}</span>
+        </button>
+        <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por N° reclamo, factura o estilo…" aria-label="Buscar" className="min-h-[44px] border-b border-gray-200 text-base sm:text-sm outline-none w-full sm:w-64 sm:ml-2" />
       </div>
 
-      <div className="mb-6">
-        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por N° reclamo, factura o ítem…" className="min-h-[44px] border-b border-gray-200 text-base sm:text-sm outline-none w-full max-w-xs" />
-      </div>
-
-      {/* Mobile card list — visible on small screens only */}
-      {sortedRecs.length > 0 && (
-        /* 🩸 El corte era `sm` (640) y a 834 la tabla arrastraba 107px, dejando
-           fuera la columna ACCIONES. Lo que decide es el ancho ÚTIL: la barra
-           lateral se lleva ~224px, así que un iPad de 834 deja ~562 — más
-           angosto que un iPhone acostado. Las tarjetas ya existían y estaban
-           probadas; solo se amplió su tramo hasta `lg` (medido: 0px a 1024). */
-        <div className="lg:hidden space-y-2 mb-4" data-vista="tarjetas">
-          {sortedRecs.map((r) => {
-            const days = daysSince(r.fecha_reclamo);
-            const total = reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total;
-            const isOpen = esPendiente(r);
-            return (
-              <div
-                key={r.id}
-                onClick={() => selectionMode ? toggleSelect(r.id) : onLoadDetail(r.id)}
-                className="border border-gray-200 rounded-lg p-4 active:bg-gray-50 transition cursor-pointer"
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    {selectionMode && (
-                      <input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} className="accent-black" />
-                    )}
-                    <div>
-                      <p className="text-sm font-medium flex items-center gap-1.5">
-                        {r.nro_reclamo}
-                        <FotoBadge count={r.reclamo_fotos?.length ?? 0} />
-                      </p>
-                      <p className="text-xs text-gray-400 mt-0.5">{r.nro_factura}</p>
-                      {search && matchHint(r, matchReclamo(r, search)) && (
-                        <p className="text-xs text-gray-400 mt-0.5">{matchHint(r, matchReclamo(r, search))}</p>
-                      )}
-                    </div>
-                  </div>
-                  <StatusBadge estado={r.estado} />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 text-xs text-gray-400">
-                    <span>{fmtDate(r.fecha_reclamo)}</span>
-                    <span className={`tabular-nums ${days > 60 && isOpen ? "text-red-600 font-medium" : days > 30 && isOpen ? "text-amber-600" : ""}`}>{days}d</span>
-                  </div>
-                  <span className="text-sm font-semibold tabular-nums">${fmt(total)}</span>
-                </div>
-                {!selectionMode && (
-                  <div className="flex items-center justify-end gap-1 mt-3 pt-3 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
-                    <button onClick={() => setMailRec(r)} title="Enviar al proveedor" aria-label="Enviar al proveedor" className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-gray-400 hover:text-black rounded-md transition active:bg-gray-100">{IconMail}</button>
-                    <button onClick={() => downloadSingleExcel(r)} disabled={downloadingId !== null} title="Descargar Excel" aria-label="Descargar Excel" className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-gray-400 hover:text-black rounded-md transition active:bg-gray-100 disabled:opacity-40">{downloadingId === r.id ? IconSpinner : IconDownload}</button>
-                    <button onClick={() => downloadSinglePdf(r)} disabled={pdfDownloadingId !== null} title="Descargar PDF" aria-label="Descargar PDF" className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-gray-400 hover:text-black rounded-md transition active:bg-gray-100 disabled:opacity-40">{pdfDownloadingId === r.id ? IconSpinner : IconPdf}</button>
-                    <button onClick={() => onEditReclamo(r.id)} title="Editar" aria-label="Editar" className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-gray-400 hover:text-black rounded-md transition active:bg-gray-100">{IconPencil}</button>
-                    {isAdmin && (
-                      <button onClick={() => onDeleteReclamo(r.id)} title="Eliminar" aria-label="Eliminar" className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-gray-400 hover:text-red-600 rounded-md transition active:bg-red-50">{IconTrash}</button>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {sortedRecs.length === 0 ? (() => {
-        const openCount = soloPendientes(allEmpresaRecs).length;
-        if (allEmpresaRecs.length > 0 && openCount === 0 && filterEstado === "all" && !search) {
-          return (
-            <div className="flex flex-col items-center py-16 text-center">
-              <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mb-4">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-              </div>
-              <p className="text-sm font-medium text-gray-600 mb-1">No hay reclamos abiertos para {activeEmpresa}</p>
-              <p className="text-xs text-emerald-600">Todo al dia — {allEmpresaRecs.length} reclamo{allEmpresaRecs.length > 1 ? "s" : ""} resuelto{allEmpresaRecs.length > 1 ? "s" : ""}</p>
-            </div>
-          );
-        }
-        if (allEmpresaRecs.length > 0) {
-          return (
-            <div className="flex flex-col items-center py-12 text-center">
-              <p className="text-sm text-gray-400">
-                {search ? `No encontramos reclamos para "${search}"` : `No hay reclamos ${filterEstado !== "all" ? estadoLabel(filterEstado).toLowerCase() : ""} para esta empresa`}
-              </p>
-            </div>
-          );
-        }
-        return <EmptyState title="Sin reclamos para esta empresa" />;
+      {visibles.length === 0 ? (() => {
+        if (search) return <div className="py-12 text-center text-sm text-gray-400">No encontramos reclamos para &quot;{search}&quot;</div>;
+        if (allEmpresaRecs.length === 0) return <EmptyState title="Todavía sin reclamos" />;
+        if (filtro === "por-cobrar") return (
+          <div className="flex flex-col items-center py-16 text-center">
+            <p className="text-sm font-medium text-gray-600 mb-1">Nada por cobrar a {nombreCorto}</p>
+            <p className="text-sm text-emerald-600">{cobrados.length} reclamo{cobrados.length === 1 ? "" : "s"} cobrado{cobrados.length === 1 ? "" : "s"}</p>
+          </div>
+        );
+        return <div className="py-12 text-center text-sm text-gray-400">Todavía no se cobró ninguno</div>;
       })() : (
-        <div className="overflow-x-auto -mx-4 lg:mx-0 hidden lg:block" data-vista="tabla">
-          <div className="min-w-[600px] px-4 sm:px-0">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-white z-10">
-            <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
-              {selectionMode && <th className="pb-3 w-8">
-                <input type="checkbox" checked={allSelected} onChange={() => allSelected ? setSelectedIds([]) : setSelectedIds(allSelectableIds)} className="accent-black" title="Seleccionar todos los visibles" />
-              </th>}
-              <th className="text-left pb-3 font-medium">N° Reclamo</th>
-              <th className="text-left pb-3 font-medium">Factura</th>
-              <th onClick={() => toggleSort("fecha")} className="text-left pb-3 font-medium cursor-pointer hover:text-black select-none">Fecha {sortCol === "fecha" ? (sortDir === "asc" ? "↑" : "↓") : ""}</th>
-              <th onClick={() => toggleSort("dias")} className="text-right pb-3 font-medium cursor-pointer hover:text-black select-none">Antigüedad {sortCol === "dias" ? (sortDir === "asc" ? "↑" : "↓") : ""}</th>
-              <th onClick={() => toggleSort("estado")} className="text-left pb-3 font-medium cursor-pointer hover:text-black select-none">Estado {sortCol === "estado" ? (sortDir === "asc" ? "↑" : "↓") : ""}</th>
-              <th onClick={() => toggleSort("total")} className="text-right pb-3 font-medium cursor-pointer hover:text-black select-none">Total {sortCol === "total" ? (sortDir === "asc" ? "↑" : "↓") : ""}</th>
-              {!selectionMode && <th className="pb-3 text-right font-medium"><span className="sr-only">Acciones</span></th>}
-            </tr>
-          </thead>
-          <tbody>
-            {sortedRecs.map((r) => {
-              const days = daysSince(r.fecha_reclamo);
+        <>
+          {/* Celular e iPad vertical (por debajo de lg): una tarjeta por reclamo. */}
+          <div className="lg:hidden space-y-2 mb-4" data-vista="tarjetas">
+            {selectionMode && (
+              <button onClick={() => (allSelected ? setSelectedIds([]) : setSelectedIds(visibles.map((r) => r.id)))} className="text-sm text-gray-500 hover:text-black min-h-[44px] px-2 -mx-2">{allSelected ? "Quitar la selección" : `Seleccionar los ${visibles.length}`}</button>
+            )}
+            {visibles.map((r) => {
               const total = reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total;
-              const isOpen = esPendiente(r);
+              const d = diasDesde(r.fecha_factura, hoy);
               return (
-                <tr key={r.id}
-                  onClick={() => selectionMode ? toggleSelect(r.id) : onLoadDetail(r.id)}
-                  className="border-b border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer">
-                  {selectionMode && (
-                    <td className="py-3">
-                      <input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} className="accent-black" />
-                    </td>
-                  )}
-                  <td className="py-3 font-medium text-xs">
-                    <span className="inline-flex items-center gap-1.5">
-                      {r.nro_reclamo}
-                      <FotoBadge count={r.reclamo_fotos?.length ?? 0} />
-                    </span>
-                    {search && matchHint(r, matchReclamo(r, search)) && (
-                      <span className="block font-normal text-xs text-gray-400 mt-0.5">{matchHint(r, matchReclamo(r, search))}</span>
-                    )}
-                  </td>
-                  <td className="py-3 text-gray-500">{r.nro_factura}</td>
-                  <td className="py-3 text-gray-500">{fmtDate(r.fecha_reclamo)}</td>
-                  <td className={`py-3 text-right tabular-nums ${days > 60 && isOpen ? "text-red-600 font-medium" : days > 30 && isOpen ? "text-amber-600" : "text-gray-400"}`}>{days}d</td>
-                  <td className="py-3"><StatusBadge estado={r.estado} /></td>
-                  <td className="py-3 text-right tabular-nums">${fmt(total)}</td>
-                  {!selectionMode && (
-                    <td className="py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                      {/* ⚠️ Estos 5 íconos quedan en 26px A PROPÓSITO, y solo
-                          viven de `lg` para arriba. Agrandarlos a 44 —o darles
-                          el área de toque con un ::after de 9px— ensancha la
-                          columna y **devuelve 8px de arrastre a 1024 y 1440**
-                          (medido). El escritorio no puede empeorar, así que
-                          manda esa restricción. Quien toca con el dedo entra
-                          por debajo de `lg`, donde la misma fila es una TARJETA
-                          con sus targets de 44px. */}
-                      <div className="flex items-center justify-end gap-0.5">
-                        <button onClick={() => setMailRec(r)} title="Enviar al proveedor" aria-label="Enviar al proveedor" className="p-1.5 text-gray-400 hover:text-black rounded transition">{IconMail}</button>
-                        <button onClick={() => downloadSingleExcel(r)} disabled={downloadingId !== null} title="Descargar Excel" aria-label="Descargar Excel" className="p-1.5 text-gray-400 hover:text-black rounded transition disabled:opacity-40">{downloadingId === r.id ? IconSpinner : IconDownload}</button>
-                        <button onClick={() => downloadSinglePdf(r)} disabled={pdfDownloadingId !== null} title="Descargar PDF" aria-label="Descargar PDF" className="p-1.5 text-gray-400 hover:text-black rounded transition disabled:opacity-40">{pdfDownloadingId === r.id ? IconSpinner : IconPdf}</button>
-                        <button onClick={() => onEditReclamo(r.id)} title="Editar" aria-label="Editar" className="p-1.5 text-gray-400 hover:text-black rounded transition">{IconPencil}</button>
-                        {isAdmin && (
-                          <button onClick={() => onDeleteReclamo(r.id)} title="Eliminar" aria-label="Eliminar" className="p-1.5 text-gray-400 hover:text-red-600 rounded transition">{IconTrash}</button>
-                        )}
+                <div key={r.id} onClick={() => (selectionMode ? toggleSelect(r.id) : onLoadDetail(r.id))} className="border border-gray-200 rounded-lg p-4 active:bg-gray-50 transition cursor-pointer">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="flex items-start gap-2 min-w-0">
+                      {selectionMode && <input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} className="accent-black mt-1" />}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium flex items-center gap-1.5">{r.nro_reclamo}<FotoBadge count={r.reclamo_fotos?.length ?? 0} /></p>
+                        <p className="text-sm text-gray-500 tabular-nums break-words">{facturasEnPantalla(r.nro_factura) || "—"}</p>
+                        {search && matchHint(r, matchReclamo(r, search)) && <p className="text-xs text-gray-400 mt-0.5">{matchHint(r, matchReclamo(r, search))}</p>}
                       </div>
-                    </td>
-                  )}
-                </tr>
+                    </div>
+                    <span className="text-sm font-semibold tabular-nums shrink-0">${fmt(total)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-gray-500">{d === null ? <span className="text-red-600">{FALTA_FECHA_FACTURA}</span> : `${d} día${d === 1 ? "" : "s"}`}</span>
+                    {celdaReclamado(r)}
+                  </div>
+                  {!selectionMode && <div className="mt-3 pt-3 border-t border-gray-100">{acciones(r)}</div>}
+                </div>
               );
             })}
-          </tbody>
-        </table>
           </div>
-        </div>
+
+          <div className="overflow-x-auto -mx-4 lg:mx-0 hidden lg:block" data-vista="tabla">
+            <div className="min-w-[600px] px-4 sm:px-0">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-white z-10">
+                  <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
+                    {selectionMode && <th className="pb-3 w-8"><input type="checkbox" checked={allSelected} onChange={() => (allSelected ? setSelectedIds([]) : setSelectedIds(visibles.map((r) => r.id)))} className="accent-black" title="Seleccionar todos los visibles" /></th>}
+                    <th className="text-left pb-3 font-medium">N° Reclamo</th>
+                    <th className="text-left pb-3 font-medium">Factura(s)</th>
+                    <th className="text-right pb-3 font-medium">Días</th>
+                    <th className="text-left pb-3 pl-4 font-medium">Reclamado</th>
+                    <th className="text-right pb-3 font-medium">Total</th>
+                    {!selectionMode && <th className="pb-3 text-right font-medium"><span className="sr-only">Acciones</span></th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibles.map((r) => {
+                    const total = reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total;
+                    return (
+                      <tr key={r.id} onClick={() => (selectionMode ? toggleSelect(r.id) : onLoadDetail(r.id))} className="border-b border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer">
+                        {selectionMode && <td className="py-3"><input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} className="accent-black" /></td>}
+                        <td className="py-3 font-medium">
+                          <span className="inline-flex items-center gap-1.5">{r.nro_reclamo}<FotoBadge count={r.reclamo_fotos?.length ?? 0} /></span>
+                          {search && matchHint(r, matchReclamo(r, search)) && <span className="block font-normal text-xs text-gray-400 mt-0.5">{matchHint(r, matchReclamo(r, search))}</span>}
+                        </td>
+                        <td className="py-3 text-gray-500 tabular-nums">{facturasEnPantalla(r.nro_factura) || "—"}</td>
+                        <td className="py-3 text-right text-gray-600">{celdaDias(r)}</td>
+                        <td className="py-3 pl-4">{celdaReclamado(r)}</td>
+                        <td className="py-3 text-right tabular-nums">${fmt(total)}</td>
+                        {!selectionMode && <td className="py-2 text-right">{acciones(r)}</td>}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
 
       <Toast message={toast} />
@@ -506,18 +318,13 @@ export default function EmpresaList({
       <EnviarProveedorModal
         open={sendOpen || mailRec !== null}
         empresa={activeEmpresa}
-        reclamoIds={mailRec ? [mailRec.id] : selectedIds}
+        reclamoIds={mailRec ? [mailRec.id] : idsObjetivo}
         defaultTo={c?.correo || ""}
         contactoNombre={c?.nombre_contacto || c?.nombre}
-        count={mailRec ? 1 : selCount}
+        count={mailRec ? 1 : idsObjetivo.length}
         defaultSubject={mailRec ? `Reclamo ${mailRec.nro_reclamo} — ${activeEmpresa}` : undefined}
         onClose={() => { setSendOpen(false); setMailRec(null); }}
-        onSent={(msg) => {
-          showToast(msg);
-          if (mailRec) setMailRec(null);
-          else cancelSelection();
-          onReload();
-        }}
+        onSent={(msg) => { showToast(msg); if (mailRec) setMailRec(null); else cancelSelection(); onReload(); }}
       />
     </div>
   );

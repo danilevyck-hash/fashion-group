@@ -335,6 +335,24 @@ export const NOVEDADES: readonly Novedad[] = [
     desde: ARRANQUE,
     texto: "El papel del proveedor decía «ITBMS 7.7%», una tasa que no existe en Panamá: ahora dice 7%. La plata es la misma.",
   },
+  {
+    id: "reclamos-la-portada-dice-a-quien-no-se-le-reclamo",
+    modulo: "reclamos",
+    fecha: "2026-09-11",
+    texto: "Arriba ves cuánto falta por cobrar y, en rojo, cuánto todavía no se le ha reclamado al proveedor; cada empresa dice cuántos días lleva su factura más vieja.",
+  },
+  {
+    id: "reclamos-reclamado-se-marca-solo",
+    modulo: "reclamos",
+    fecha: "2026-09-11",
+    texto: "«Reclamado» se marca solo al mandar el correo o descargar el reclamo; ya no existe «En proceso» y la lista abre en lo que falta por cobrar.",
+  },
+  {
+    id: "reclamos-nuevo-reclamo-desde-el-pdf",
+    modulo: "reclamos",
+    fecha: "2026-09-11",
+    texto: "Nuevo reclamo: primero el PDF de la factura, y los renglones se buscan y se marcan en la factura en vez de teclearlos.",
+  },
 
   /* ── Plantilla Switch (era «Depurador») — módulo `cargar` ───────────────── */
   {

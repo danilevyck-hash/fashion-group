@@ -55,6 +55,10 @@ export interface Reclamo {
   nro_factura: string;
   nro_orden_compra: string;
   fecha_reclamo: string;
+  /** Fecha de la factura del proveedor (la que mide los días). null = falta. */
+  fecha_factura?: string | null;
+  /** Primera vez que salió hacia el proveedor (correo o descarga). null = sin reclamar. */
+  reclamado_en?: string | null;
   estado: string;
   notas: string;
   created_at: string;
