@@ -23,7 +23,7 @@ cd "$(dirname "$0")/.."
 TESTS="src/__tests__/lib/prestamos-dos-cuentas.test.ts \
 src/__tests__/lib/prestamos-tope.test.ts \
 src/__tests__/lib/prestamos-un-solo-lugar.test.ts \
-src/__tests__/lib/prestamos-salida-con-deuda.test.ts \
+src/__tests__/lib/prestamos-salida-con-deuda.test.tsx \
 src/__tests__/lib/prestamos-amarre-migracion.test.ts \
 src/__tests__/lib/asistencia-prestamo-planilla.test.ts \
 src/__tests__/api/prestamos-tope-y-duplicados.test.ts \

@@ -29,6 +29,7 @@ import {
   RUTA_PERSONAS,
 } from "@/lib/asistencia/persona-en-el-centro";
 import { tituloDePersona } from "@/lib/asistencia/ficha-persona";
+import { avisoGuardadoConSalida } from "@/lib/asistencia/salida-con-deuda";
 import { textoConfirmar } from "@/lib/asistencia/codigos-ignorados";
 import FichaTexto from "./FichaTexto";
 import FichaEditar, { type BorradorFicha, borradorDe } from "./FichaEditar";
@@ -140,7 +141,15 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error ?? "No se pudo guardar");
-      toast("Listo, guardado", "success");
+      // 🔴 Con fecha de salida, el aviso dice desde cuándo y —si debe— cuánto
+      // hay que descontarle de la liquidación: la ficha se cierra al guardar y
+      // el cartel del formulario se va con ella. Ámbar y 8 s cuando hay deuda.
+      const deuda = persona?.deudaPrestamo ?? 0;
+      if (b.fechaSalida) {
+        toast(avisoGuardadoConSalida(titulo, b.fechaSalida, deuda), deuda > 0 ? "warning" : "success");
+      } else {
+        toast("Listo, guardado", "success");
+      }
       await cargar();
       setRefresco((n) => n + 1);
       setEditando(false);
@@ -210,6 +219,7 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
                 guardando={guardando}
                 nueva={nueva}
                 permisos={permisos}
+                deudaPrestamo={persona?.deudaPrestamo ?? 0}
                 puedeEditar={puedeEditar}
                 onCambioFoto={() => setRefresco((n) => n + 1)}
               />

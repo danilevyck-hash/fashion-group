@@ -29,6 +29,7 @@
 // esconderlo detrás de una lista vacía.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { avisoGuardadoConSalida, avisoSalidaConDeuda } from "@/lib/asistencia/salida-con-deuda";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { filtrarPorEmpresa } from "@/lib/asistencia/empresa-para-todo";
 import { useToast } from "@/components/ToastSystem";
@@ -787,12 +788,13 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
         const debe = p.deudaPrestamo ?? 0;
         toast(
           fechaSalida
-            ? `Listo. ${quien} no sale en las quincenas posteriores al ${fechaSalida}; las anteriores quedan igual.`
-              // 🔴 El recordatorio viaja también en el toast: la ficha se cierra
-              // al guardar y el aviso del formulario se va con ella.
-              + (debe > 0 ? ` Debe $${debe.toFixed(2)} en Préstamos — descuéntalo de la liquidación.` : "")
+            // 🔴 El recordatorio viaja también en el toast: la ficha se cierra
+            // al guardar y el aviso del formulario se va con ella. El texto
+            // vive en `lib/asistencia/salida-con-deuda.ts`, el mismo de la
+            // página de la persona.
+            ? avisoGuardadoConSalida(quien, fechaSalida, debe)
             : `Listo. ${quien} vuelve a salir en la planilla.`,
-          "success",
+          fechaSalida && debe > 0 ? "warning" : "success",
         );
       } catch (e) {
         toast(e instanceof Error ? e.message : "No se pudo guardar", "error");
@@ -1976,9 +1978,9 @@ function BloqueBaja({
           fecha de salida de alguien con deuda, avisar en ese momento — es
           cuando se decide la liquidación. Después ya cobró y la plata se fue.
           Sin Telegram: el aviso va donde se toma la decisión. */}
-      {(persona.deudaPrestamo ?? 0) > 0 && (
+      {avisoSalidaConDeuda(persona.deudaPrestamo) && (
         <p className="mt-2 rounded bg-amber-50 px-2 py-1.5 text-[12px] font-medium text-amber-800">
-          Debe ${(persona.deudaPrestamo ?? 0).toFixed(2)} en Préstamos — descuéntalo de la liquidación.
+          {avisoSalidaConDeuda(persona.deudaPrestamo)}
         </p>
       )}
 

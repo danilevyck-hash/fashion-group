@@ -24,6 +24,7 @@
  * que decide qué es válido.
  * ────────────────────────────────────────────────────────────────────────── */
 
+import { avisoSalidaConDeuda } from "@/lib/asistencia/salida-con-deuda";
 import {
   ETIQUETA_COBRA_HORAS_EXTRA, ETIQUETA_NO_COBRA_HORAS_EXTRA, EXPLICACION_NO_COBRA_HORAS_EXTRA,
   PREGUNTA_COBRA_HORAS_EXTRA,
@@ -109,7 +110,7 @@ const CAMPO =
   "min-h-[44px] w-full rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm";
 
 export default function FichaEditar({
-  borrador: b, onCambio, onGuardar, onCancelar, guardando, nueva, permisos, puedeEditar, onCambioFoto,
+  borrador: b, onCambio, onGuardar, onCancelar, guardando, nueva, permisos, puedeEditar, onCambioFoto, deudaPrestamo,
 }: {
   borrador: BorradorFicha;
   onCambio: (b: BorradorFicha) => void;
@@ -120,6 +121,8 @@ export default function FichaEditar({
   permisos: PermisosDeLaPagina | null;
   puedeEditar: boolean;
   onCambioFoto: () => void;
+  /** Lo que debe en Préstamos (las tres cuentas). Se dice al dar de baja. */
+  deudaPrestamo?: number | null;
 }) {
   const [verExcepciones, setVerExcepciones] = useState(() => tieneExcepciones(b));
   const [verBaja, setVerBaja] = useState(false);
@@ -301,6 +304,15 @@ export default function FichaEditar({
           </button>
           {verBaja && (
             <div className="mt-2 grid gap-3 sm:grid-cols-2">
+              {/* 🔴 QUIEN SE VA DEBIENDO, SE DICE ACÁ (Daniel, 5-sep-2026): es
+                  cuando se decide la liquidación. Sin Telegram. La regla y el
+                  texto viven en `lib/asistencia/salida-con-deuda.ts`. */}
+              {avisoSalidaConDeuda(deudaPrestamo) && (
+                <p data-testid="aviso-salida-con-deuda"
+                  className="rounded bg-amber-50 px-2 py-1.5 text-[12px] font-medium text-amber-800 sm:col-span-2">
+                  {avisoSalidaConDeuda(deudaPrestamo)}
+                </p>
+              )}
               <Campo etiqueta="Su último día">
                 <input type="date" className={CAMPO} value={b.fechaSalida}
                   disabled={!!permisos && !permisos.puedeDarDeBaja}
