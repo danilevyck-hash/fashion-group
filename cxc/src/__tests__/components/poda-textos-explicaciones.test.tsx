@@ -193,7 +193,10 @@ describe("Asistencia · el motivo sigue siendo OBLIGATORIO sin la frase que lo d
   it("🔴 el asterisco, el campo y el freno de guardar SIGUEN", () => {
     pintar();
     // El rótulo con su `*`.
-    expect(screen.getByText(/Por qué se corrige/i).textContent).toContain("*");
+    // 🔴 11-sep-2026: el rótulo pasó de «Por qué se corrige» a «Por qué» (mockup
+    // aprobado por Daniel); la REGLA de este candado —obligatorio, con
+    // asterisco, con freno— no cambió. Ver `asistencia-corregir-hora.test.tsx`.
+    expect(screen.getByText(/^Por qué/i).textContent).toContain("*");
     const motivo = document.querySelector("textarea") as HTMLTextAreaElement;
     expect(motivo).toBeTruthy();
     // Sin motivo, Guardar sigue apagado: la REGLA no se fue con el texto.
