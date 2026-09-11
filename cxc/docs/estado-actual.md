@@ -1260,3 +1260,14 @@ cuota que se muestra sigue siendo préstamo + daño.
 Tres cambiaron con nota fechada, ninguno se borró: `persona-en-el-centro` (el enlace de
 justificaciones vive en el componente), `asistencia-poda-textos` (la frase del almuerzo),
 `asistencia-almuerzo-fijo` (sus casos siguen valiendo: sin ficha se escribe 30).
+
+**Punto 9 — las 5 fichas de Multifashion, cargadas en producción (10-sep-2026).** Daniel,
+textual: *«a los de multifashion que te mandé la foto configúralos»* — la única escritura en
+producción, aprobada por él. `scripts/_cargar-acs-fichas.mjs` (idempotente; `--escribir` para
+escribir) creó **5 fichas** (`asistencia_personas`: 301 Jenifer Miranda · 302 Milagros Torres ·
+303 Jailine Quispe · 304 Sheynee Batista · 305 Angel Pizza, empresa `american_classic`, salario
+NULL: lo llena la contable) y **5 horarios** (`asistencia_horarios`: 10:00 → 19:00, almuerzo 60).
+Nadie más se tocó (el 1000 tampoco). Verificado con la regla de la lista
+(`_medir-falta-configurar.ts`): los 5 salen con Multifashion y en «Falta para pagar» **solo por el
+salario** (y en «Falta completar» por cargo, cédula, saldo y fecha de ingreso). Los chips quedan
+en **Falta para pagar (11) · Falta completar (42)**.
