@@ -7,8 +7,20 @@ import autoTable from "jspdf-autotable";
 // generara de verdad, y por eso el rótulo del ITBMS pudo mentir a gusto.
 import { supabaseServer } from "@/lib/supabase-server";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
-import { reclamoTaxes, ocultaPedido, impLabel, itbmsLabel, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL } from "@/lib/reclamos/tax";
+import { reclamoTaxes, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL } from "@/lib/reclamos/tax";
 import { facturasEnPantalla } from "@/lib/reclamos/facturas";
+import { fmtDate as fmtDiaLargo } from "@/lib/format";
+import {
+  columnasDelPapel,
+  datosDelPapel,
+  fechaDeLaCabecera,
+  itemsDelPapel,
+  PIE_PAPEL,
+  totalesDelPapel,
+  valorDeCelda,
+  type ColumnaPapel,
+  type ContactoDePapel,
+} from "@/lib/reclamos/papel";
 
 const PAGE_W = 216;
 const PAGE_H = 279;
@@ -47,6 +59,9 @@ export interface ReclamoFull {
   nro_factura?: string;
   nro_orden_compra?: string;
   fecha_reclamo?: string;
+  /** La fecha de la FACTURA del proveedor — la que mide los días desde el
+   *  rediseño del 10-sep-2026. Es la que sale en la cabecera del papel. */
+  fecha_factura?: string | null;
   estado?: string;
   notas?: string;
   monto_reclamado_snapshot?: number | null;
@@ -55,9 +70,11 @@ export interface ReclamoFull {
   reclamo_settlements?: ReclamoSettlement[];
 }
 
-// Items vigentes (no borrados) — evita sobrecontar líneas soft-deleted.
+// Items vigentes (no borrados) — evita sobrecontar líneas soft-deleted. La
+// regla vive en `papel.ts`, que es también la que usa el Excel: dos papeles del
+// mismo reclamo no pueden contar renglones distintos.
 function itemsVivos(rec: ReclamoFull): ReclamoItem[] {
-  return (rec.reclamo_items || []).filter((i) => !i.deleted);
+  return itemsDelPapel(rec) as ReclamoItem[];
 }
 
 function subtotalDe(rec: ReclamoFull): number {
@@ -116,80 +133,124 @@ function drawCoverHeader(doc: jsPDF, empresa: string, count: number, grandTotal:
   doc.setFont("helvetica", "normal");
 }
 
-function drawReclamoSectionHeader(doc: jsPDF, rec: ReclamoFull, startY: number): number {
-  doc.setFillColor(27, 58, 92);
-  doc.rect(MARGIN, startY, PAGE_W - 2 * MARGIN, 9, "F");
-  doc.setTextColor(255, 255, 255);
+/**
+ * 🔴 LA CABECERA DEL PAPEL, EN EL ORDEN DE LA PANTALLA (mockup 11-sep-2026):
+ * a la izquierda el logo, «FASHION GROUP» y la empresa debajo; a la derecha el
+ * N° de reclamo y la FECHA DE LA FACTURA. Reemplaza a la banda azul con el
+ * número adentro y a la rejilla de metadatos en tres columnas.
+ */
+function drawCabecera(doc: jsPDF, rec: ReclamoFull, startY: number): number {
+  let y = startY;
+  try {
+    doc.addImage(FG_LOGO_BASE64, "JPEG", MARGIN, y, FG_LOGO_WIDTH, FG_LOGO_HEIGHT);
+  } catch { /* el papel sale igual sin el logo */ }
+  const xTexto = MARGIN + FG_LOGO_WIDTH + 4;
+
+  doc.setTextColor(20, 20, 20);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.text(rec.nro_reclamo || "Reclamo", MARGIN + 3, startY + 6);
+  doc.setFontSize(13);
+  doc.text("FASHION GROUP", xTexto, y + 5);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text(`Factura: ${facturasEnPantalla(rec.nro_factura) || "—"}`, PAGE_W - MARGIN - 3, startY + 6, { align: "right" });
-  return startY + 13;
-}
+  doc.setFontSize(9.5);
+  doc.setTextColor(110, 110, 110);
+  doc.text(rec.empresa || "", xTexto, y + 10.5);
 
-function drawMetaBlock(doc: jsPDF, rec: ReclamoFull, startY: number): number {
-  doc.setTextColor(60, 60, 60);
-  doc.setFontSize(9);
-  const col1X = MARGIN;
-  const col2X = MARGIN + 70;
-  const col3X = MARGIN + 130;
-
+  const xDer = PAGE_W - MARGIN;
+  doc.setTextColor(20, 20, 20);
   doc.setFont("helvetica", "bold");
-  doc.text("Empresa", col1X, startY);
-  doc.text("Proveedor", col2X, startY);
-  doc.text("Marca", col3X, startY);
-  doc.setFont("helvetica", "normal");
-  doc.text(rec.empresa || "—", col1X, startY + 5);
-  doc.text(rec.proveedor || "—", col2X, startY + 5);
-  doc.text(rec.marca || "—", col3X, startY + 5);
-
-  const sinPedido = ocultaPedido(rec.empresa); // Active Shoes no usa N° de pedido
-  doc.setFont("helvetica", "bold");
-  doc.text("Fecha", col1X, startY + 12);
-  if (!sinPedido) doc.text("Orden de Compra", col2X, startY + 12);
-  doc.text("Estado", col3X, startY + 12);
-  doc.setFont("helvetica", "normal");
-  doc.text(fmtDate(rec.fecha_reclamo), col1X, startY + 17);
-  if (!sinPedido) doc.text(rec.nro_orden_compra || "—", col2X, startY + 17);
-  doc.text(rec.estado || "—", col3X, startY + 17);
-
-  return startY + 24;
-}
-
-function drawTotalsBlock(doc: jsPDF, empresa: string | undefined, subtotal: number, startY: number): number {
-  // Impuestos por empresa (Active Shoes: importación 15%, sin ITBMS).
-  const tx = reclamoTaxes(empresa, subtotal);
-  const labels = [
-    { label: "Subtotal", value: subtotal, dark: false },
-    { label: `Importación ${impLabel(empresa)}`, value: tx.importacion, dark: false },
-    ...(tx.hasItbms ? [{ label: `ITBMS ${itbmsLabel(empresa)}`, value: tx.itbms, dark: false }] : []),
-    { label: "TOTAL", value: tx.total, dark: true },
-  ];
-  const boxW = (PAGE_W - 2 * MARGIN - 3 * (labels.length - 1)) / labels.length;
-  labels.forEach((l, i) => {
-    const x = MARGIN + (boxW + 3) * i;
-    if (l.dark) {
-      doc.setFillColor(27, 58, 92);
-      doc.rect(x, startY, boxW, 14, "F");
-      doc.setTextColor(170, 170, 170);
-    } else {
-      doc.setDrawColor(220, 220, 220);
-      doc.setFillColor(248, 249, 249);
-      doc.rect(x, startY, boxW, 14, "FD");
-      doc.setTextColor(120, 120, 120);
-    }
+  doc.setFontSize(12);
+  doc.text(`Reclamo ${rec.nro_reclamo || ""}`.trim(), xDer, y + 5, { align: "right" });
+  const fecha = fechaDeLaCabecera(rec);
+  if (fecha) {
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.text(l.label.toUpperCase(), x + boxW / 2, startY + 5, { align: "center" });
-    doc.setTextColor(l.dark ? 255 : 30, l.dark ? 255 : 30, l.dark ? 255 : 30);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text(`$${fmt(l.value)}`, x + boxW / 2, startY + 11, { align: "center" });
-  });
+    doc.setFontSize(9.5);
+    doc.setTextColor(110, 110, 110);
+    doc.text(fmtDiaLargo(fecha), xDer, y + 10.5, { align: "right" });
+  }
 
-  return startY + 18;
+  y += FG_LOGO_HEIGHT + 2;
+  doc.setDrawColor(190, 190, 190);
+  doc.setLineWidth(0.3);
+  doc.line(MARGIN, y, PAGE_W - MARGIN, y);
+  return y + 6;
+}
+
+/** Una línea: `Proveedor X · Marca Y · Factura Z · Contacto W`. Lo que no
+ *  existe no se escribe — un «Marca —» es un renglón para no decir nada. */
+function drawLineaDatos(doc: jsPDF, rec: ReclamoFull, contacto: ContactoDePapel | null, startY: number): number {
+  const datos = datosDelPapel(rec, contacto);
+  if (datos.length === 0) return startY;
+  const texto = datos.map((d) => `${d.rotulo} ${d.valor}`).join("   ·   ");
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(70, 70, 70);
+  const lineas = doc.splitTextToSize(texto, PAGE_W - 2 * MARGIN) as string[];
+  doc.text(lineas, MARGIN, startY);
+  return startY + lineas.length * 4.5 + 3;
+}
+
+/**
+ * 🔴 EL PIE DE TOTALES VA A LA DERECHA Y UNO DEBAJO DEL OTRO, como el pie de la
+ * factura que manda el proveedor: Subtotal · Importación N% · ITBMS N% · Total
+ * en negrita con raya arriba. Reemplaza a las CUATRO cajas que abrían el papel
+ * antes de que se supiera de qué reclamo se estaba hablando.
+ */
+function drawPieTotales(doc: jsPDF, empresa: string | undefined, subtotal: number, startY: number): number {
+  const filas = totalesDelPapel(empresa, subtotal);
+  const xValor = PAGE_W - MARGIN;
+  const xRotulo = PAGE_W - MARGIN - 40;
+  let y = startY;
+  for (const f of filas) {
+    if (f.fuerte) {
+      doc.setDrawColor(30, 30, 30);
+      doc.setLineWidth(0.4);
+      doc.line(xRotulo - 4, y - 3.2, xValor, y - 3.2);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      doc.setTextColor(20, 20, 20);
+    } else {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(100, 100, 100);
+    }
+    doc.text(f.rotulo, xRotulo, y, { align: "left" });
+    if (f.fuerte) doc.setTextColor(20, 20, 20);
+    else doc.setTextColor(40, 40, 40);
+    doc.text(`$${fmt(f.valor)}`, xValor, y, { align: "right" });
+    y += f.fuerte ? 6 : 5;
+  }
+  return y + 2;
+}
+
+/** La tabla de renglones, con las columnas que de verdad traen datos. */
+function drawTablaRenglones(doc: jsPDF, rec: ReclamoFull, items: ReclamoItem[], startY: number): number {
+  const columnas: ColumnaPapel[] = columnasDelPapel(items);
+  const cuerpo = items.map((i) =>
+    columnas.map((c) => {
+      const v = valorDeCelda(i, c.clave);
+      if (c.tipo === "dinero") return `$${fmt(Number(v) || 0)}`;
+      if (c.tipo === "entero") return `${Number(v) || 0}`;
+      return String(v);
+    }),
+  );
+  const columnStyles: Record<number, { cellWidth?: number | "auto"; halign?: "right" | "center" | "left" }> = {};
+  columnas.forEach((c, i) => {
+    columnStyles[i] = {
+      cellWidth: c.mm === null ? "auto" : c.mm,
+      halign: c.tipo === "texto" ? "left" : "right",
+    };
+  });
+  autoTable(doc, {
+    startY,
+    head: [columnas.map((c) => c.rotulo)],
+    body: cuerpo,
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: { fillColor: [27, 58, 92], textColor: [255, 255, 255], fontStyle: "bold" },
+    alternateRowStyles: { fillColor: [248, 249, 249] },
+    columnStyles,
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((doc as any).lastAutoTable?.finalY ?? startY) + 6;
 }
 
 // Bloque de recuperación: Reclamado vs Recuperado (Σ NCs) + lista de notas de
@@ -271,7 +332,11 @@ function ensureSpace(doc: jsPDF, cursorY: number, needed: number): number {
   return cursorY;
 }
 
-export async function buildBulkReclamosPdf(reclamos: ReclamoFull[], empresa: string): Promise<jsPDF> {
+export async function buildBulkReclamosPdf(
+  reclamos: ReclamoFull[],
+  empresa: string,
+  contacto: ContactoDePapel | null = null,
+): Promise<jsPDF> {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
 
   // 1 solo reclamo → PDF individual limpio (sin portada ni tabla resumen).
@@ -324,45 +389,20 @@ export async function buildBulkReclamosPdf(reclamos: ReclamoFull[], empresa: str
     if (!single || idx > 0) doc.addPage();
     let cursorY = MARGIN;
 
-    cursorY = drawReclamoSectionHeader(doc, rec, cursorY);
-    cursorY = drawMetaBlock(doc, rec, cursorY);
+    cursorY = drawCabecera(doc, rec, cursorY);
+    cursorY = drawLineaDatos(doc, rec, contacto, cursorY);
 
     const items = itemsVivos(rec);
     const subtotal = subtotalDe(rec);
 
-    cursorY = drawTotalsBlock(doc, rec.empresa, subtotal, cursorY);
-
     if (items.length > 0) {
       cursorY = ensureSpace(doc, cursorY, 30);
-      const itemRows = items.map((i) => [
-        i.referencia || "",
-        i.descripcion || "",
-        i.talla || "",
-        `${Number(i.cantidad) || 0}`,
-        `$${fmt(Number(i.precio_unitario) || 0)}`,
-        `$${fmt((Number(i.cantidad) || 0) * (Number(i.precio_unitario) || 0))}`,
-        i.motivo || "",
-      ]);
-      autoTable(doc, {
-        startY: cursorY,
-        head: [["Código", "Descripción", "Talla", "Cant.", "Precio", "Subtotal", "Motivo"]],
-        body: itemRows,
-        styles: { fontSize: 8, cellPadding: 2 },
-        headStyles: { fillColor: [27, 58, 92], textColor: [255, 255, 255], fontStyle: "bold" },
-        alternateRowStyles: { fillColor: [248, 249, 249] },
-        columnStyles: {
-          0: { cellWidth: 24 },
-          1: { cellWidth: "auto" },
-          2: { cellWidth: 14, halign: "center" },
-          3: { cellWidth: 12, halign: "right" },
-          4: { cellWidth: 18, halign: "right" },
-          5: { cellWidth: 20, halign: "right" },
-          6: { cellWidth: 32 },
-        },
-      });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      cursorY = ((doc as any).lastAutoTable?.finalY ?? cursorY) + 6;
+      cursorY = drawTablaRenglones(doc, rec, items, cursorY);
     }
+
+    // El pie de totales va DESPUÉS de la tabla, a la derecha (mockup 11-sep-2026).
+    cursorY = ensureSpace(doc, cursorY, 30);
+    cursorY = drawPieTotales(doc, rec.empresa, subtotal, cursorY);
 
     // Recuperación (settlements/NCs) — solo si hay pagos o está Pagado.
     const settlementsVivos = (rec.reclamo_settlements || []).filter((s) => !s.deleted);
@@ -409,7 +449,8 @@ export async function buildBulkReclamosPdf(reclamos: ReclamoFull[], empresa: str
     doc.setTextColor(150);
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
-    doc.text(`Fashion Group · Reclamos · ${empresa}`, MARGIN, PAGE_H - 8);
+    // Pie de la casa, el mismo de todos los papeles (mockup 11-sep-2026).
+    doc.text(PIE_PAPEL, MARGIN, PAGE_H - 8);
     doc.text(`Página ${i} de ${pageCount}`, PAGE_W - MARGIN, PAGE_H - 8, { align: "right" });
   }
 

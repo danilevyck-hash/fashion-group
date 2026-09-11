@@ -119,15 +119,48 @@ describe("la FICHA del reclamo también muestra la etiqueta, no el valor", () =>
 describe("el Excel que va al PROVEEDOR sigue llevando el valor guardado", () => {
   // Son marcas extranjeras y el documento sale del sistema hacia afuera:
   // traducirlo NO estaba pedido y cambiaría un papel que ya reciben así.
-  it("excel-reclamo escribe item.genero tal cual, sin pasarlo por generoLabel", () => {
-    const src = readFileSync(
-      path.join(RAIZ, "src/lib/excel-reclamo.ts"),
-      "utf8",
-    )
-      .split("\n")
-      .map((l) => l.replace(/\/\/.*$/, ""))
+  // 🔄 11-sep-2026: el papel (PDF y Excel) pasó al orden de la pantalla y sus
+  // celdas salen de `lib/reclamos/papel.ts` — el MISMO módulo para las dos
+  // superficies. El `String(item.genero || "")` escrito a mano en
+  // `excel-reclamo.ts` se fue con esa unificación; la regla que este candado
+  // protege NO cambió y ahora se comprueba donde de verdad vive: el valor del
+  // género que sale al papel es el GUARDADO, en inglés, y ninguna de las dos
+  // superficies pasa por `generoLabel`.
+  it("el papel devuelve el género GUARDADO, sin pasarlo por generoLabel", async () => {
+    const { valorDeCelda } = await import("@/lib/reclamos/papel");
+    expect(valorDeCelda({ genero: "Men" }, "genero")).toBe("Men");
+    expect(valorDeCelda({ genero: "Kids" }, "genero")).toBe("Kids");
+    expect(valorDeCelda({ genero: null }, "genero")).toBe("");
+  });
+
+  it("ni el Excel ni el PDF ni el módulo del papel conocen generoLabel", () => {
+    for (const ruta of [
+      "src/lib/excel-reclamo.ts",
+      "src/lib/reclamos/pdf-bulk.ts",
+      "src/lib/reclamos/papel.ts",
+    ]) {
+      const src = readFileSync(path.join(RAIZ, ruta), "utf8")
+        .split("\n")
+        .map((l) => l.replace(/\/\/.*$/, ""))
+        .join("\n");
+      expect(src, `${ruta} tradujo el género del papel`).not.toMatch(/generoLabel/);
+    }
+  });
+
+  it("y el Excel de verdad escribe «Men», no «Hombre»", async () => {
+    const XLSX = (await import("xlsx-js-style")).default;
+    const { buildReclamoSheet } = await import("@/lib/excel-reclamo");
+    const ws = buildReclamoSheet(
+      { nro_reclamo: "R-1", empresa: "Fashion Wear" },
+      [{ referencia: "A", descripcion: "Camisa", talla: "M", genero: "Men", cantidad: 1, precio_unitario: 10, motivo: "Faltante" }],
+      [],
+    );
+    const texto = Object.keys(ws)
+      .filter((k) => !k.startsWith("!"))
+      .map((k) => String((ws[k] as { v?: unknown }).v ?? ""))
       .join("\n");
-    expect(src).toMatch(/String\(item\.genero\s*\|\|\s*""\)/);
-    expect(src).not.toMatch(/generoLabel/);
+    expect(texto).toContain("Men");
+    expect(texto).not.toContain("Hombre");
+    expect(XLSX).toBeDefined();
   });
 });

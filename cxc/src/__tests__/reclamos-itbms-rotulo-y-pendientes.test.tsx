@@ -165,10 +165,15 @@ describe.skipIf(!HAY_PDFTOTEXT)("BUG 1 · EL PAPEL: el PDF que recibe el proveed
     execFileSync("pdftotext", ["-layout", pdfPath, path.join(dir, "reclamo.txt")]);
     const texto = readFileSync(path.join(dir, "reclamo.txt"), "utf8");
 
-    // Lo que el proveedor lee, palabra por palabra (los cuadros van en versal).
+    // 🔄 11-sep-2026: el papel pasó al orden de la pantalla y los totales
+    // dejaron de ser CUATRO CAJAS EN VERSAL arriba para ser un pie a la derecha,
+    // uno debajo del otro, como el pie de la factura del proveedor. Por eso el
+    // rótulo ya no llega en mayúsculas. La regla que este candado protege NO
+    // cambió: el porcentaje sale de la constante, nunca escrito a mano, y el
+    // monto de al lado es el de esa tasa.
     expect(texto).toContain("ITBMS 7%");
     expect(texto).toContain("$77.00");
-    expect(texto).toContain("IMPORTACIÓN 10%");
+    expect(texto).toContain("Importación 10%");
     expect(texto).toContain("$1,177.00");
 
     // 🔴 el rótulo viejo NO puede sobrevivir en ninguna parte del papel. Antes
@@ -176,18 +181,13 @@ describe.skipIf(!HAY_PDFTOTEXT)("BUG 1 · EL PAPEL: el PDF que recibe el proveed
     // prohibido es «7.7%», la tasa que en Panamá no existe.
     expect(texto).not.toMatch(/ITBMS\s*\(?7[.,]7\s*%/i);
 
-    // Y el rótulo tiene que quedar SOBRE su propio monto: los cuadros ponen el
-    // título en un renglón y la plata en el de abajo, así que un "7.7%" que
-    // caiga encima de OTRA columna vuelve a mentir igual. Se compara la
-    // posición de la columna en el texto con -layout (mismo cuadro = misma x).
+    // Y el rótulo tiene que quedar PEGADO a su propio monto: un «7.7%» que
+    // caiga al lado de OTRO número vuelve a mentir igual. 🔄 11-sep-2026: con
+    // el pie a la derecha el rótulo y la plata van en la MISMA línea (antes el
+    // cuadro ponía el título arriba y el monto abajo), así que se comprueba eso.
     const lineas = texto.split("\n");
-    const iRotulo = lineas.findIndex((l) => l.includes("ITBMS 7%"));
-    expect(iRotulo).toBeGreaterThan(-1);
-    const iMonto = lineas.findIndex((l, i) => i > iRotulo && l.includes("$77.00"));
-    expect(iMonto).toBeGreaterThan(-1);
-    const xRotulo = lineas[iRotulo].indexOf("ITBMS 7%");
-    const xMonto = lineas[iMonto].indexOf("$77.00");
-    expect(Math.abs(xRotulo - xMonto)).toBeLessThanOrEqual(12);
+    const linea = lineas.find((l) => l.includes("ITBMS 7%") && l.includes("$77.00"));
+    expect(linea).toBeDefined();
   });
 
   it("Active Shoes: sin cuadro de ITBMS y con importación 15%", async () => {
@@ -197,7 +197,8 @@ describe.skipIf(!HAY_PDFTOTEXT)("BUG 1 · EL PAPEL: el PDF que recibe el proveed
     writeFileSync(pdfPath, Buffer.from(doc.output("arraybuffer")));
     execFileSync("pdftotext", ["-layout", pdfPath, path.join(dir, "as.txt")]);
     const texto = readFileSync(path.join(dir, "as.txt"), "utf8");
-    expect(texto).toContain("IMPORTACIÓN 15%");
+    // 🔄 11-sep-2026: el pie dejó de ir en versal (ver la nota de arriba).
+    expect(texto).toContain("Importación 15%");
     expect(texto).not.toMatch(/ITBMS/i);
     expect(texto).toContain("$1,150.00");
   });
@@ -223,9 +224,12 @@ describe("BUG 1 · EL EXCEL por reclamo, armado y leído celda por celda", () =>
     const etiqueta = todas.find((k) => typeof ws[k].v === "string" && String(ws[k].v).includes("ITBMS"));
     expect(etiqueta).toBeDefined();
     // Decía "ITBMS (7.7%):" cuando la cuenta iba sobre el subtotal pelado.
-    expect(String(ws[etiqueta!].v)).toBe("ITBMS (7%):");
+    // 🔄 11-sep-2026: el pie del Excel pasó a ser el MISMO de `papel.ts` que
+    // dibuja el PDF, y ahí el rótulo va sin paréntesis («ITBMS 7%»). Que las
+    // dos superficies escriban lo mismo es justo lo que el candado quiere.
+    expect(String(ws[etiqueta!].v)).toBe("ITBMS 7%:");
 
-    // El valor vive en la columna de al lado (labels col 6, valores col 7).
+    // El valor vive en la columna de al lado (rótulo y monto, pegados).
     const { r, c } = XLSX.utils.decode_cell(etiqueta!);
     const valor = ws[XLSX.utils.encode_cell({ r, c: c + 1 })];
     expect(valor.t).toBe("n");

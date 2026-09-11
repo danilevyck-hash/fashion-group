@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
 import { hoyPanama } from "@/lib/fecha-panama";
-import { Toast, ConfirmDeleteModal, FotoLightbox, ScrollableTable, PdfLightbox } from "@/components/ui";
+import { Toast, ConfirmDeleteModal, FotoLightbox, ScrollableTable } from "@/components/ui";
 import { Reclamo, RItem, Contacto } from "./types";
 import { EMPRESAS, GENEROS, generoLabel, DEFAULT_MOTIVOS, emptyItem, calcSub, empresaDesdeIA, reclamoTaxes, esActiveShoes, impLabel, itbmsLabel, esPendiente } from "./constants";
 import FotoBadge from "./FotoBadge";
@@ -94,7 +94,7 @@ export default function ReclamoDetail({
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [excelBusy, setExcelBusy] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
-  const [facturaLightbox, setFacturaLightbox] = useState<string | null>(null);
+  const [facturaBusy, setFacturaBusy] = useState(false);
   const [correoOpen, setCorreoOpen] = useState(false);
   const [descargaOpen, setDescargaOpen] = useState(false);
   const descargaRef = useRef<HTMLButtonElement>(null);
@@ -106,6 +106,32 @@ export default function ReclamoDetail({
     if (data.nro_factura) setEditFacturas([data.nro_factura]);
     if (data.fecha_factura) setEditFechaFactura(data.fecha_factura);
     if (data.nro_orden_compra) setEditPedido(data.nro_orden_compra);
+  }
+
+  // 🔴 LA FACTURA DEL PROVEEDOR SE BAJA DE UN TOQUE (mockup 11-sep-2026). Antes
+  // solo se podía «Ver» en el navegador y bajarla era otro paso. La URL ya
+  // viene FIRMADA del servidor (bucket privado, vida corta): acá no se firma
+  // nada ni se arma una ruta nueva.
+  async function descargarFactura() {
+    const url = current.factura_pdf_url;
+    if (!url || facturaBusy) return;
+    setFacturaBusy(true);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("No se pudo bajar la factura. Intenta de nuevo.");
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = `${current.nro_reclamo}-factura.pdf`;
+      a.click();
+      URL.revokeObjectURL(href);
+      showToast("Factura descargada");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "No se pudo bajar la factura. Intenta de nuevo.");
+    } finally {
+      setFacturaBusy(false);
+    }
   }
 
   async function descargar(tipo: "excel" | "pdf") {
@@ -276,16 +302,11 @@ export default function ReclamoDetail({
               {current.created_at && <> · creado el {fmtDate(current.created_at.slice(0, 10))}</>}
             </p>
           )}
-          {!editMode && current.factura_pdf_url && (
-            <button
-              type="button"
-              onClick={() => setFacturaLightbox(current.factura_pdf_url ?? null)}
-              className="mt-2 inline-flex items-center justify-center gap-1.5 text-xs font-medium text-gray-700 hover:text-black border border-gray-200 rounded px-3 min-h-[44px] active:scale-[0.97] transition"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-              Ver factura
-            </button>
-          )}
+          {/* 🩸 El botón suelto «Ver factura» se RETIRÓ (mockup 11-sep-2026): la
+              factura del proveedor vive ahora dentro de «Descargar», que la baja
+              de un toque en vez de solo mostrarla. Era un botón más compitiendo
+              con la fila de acciones para hacer MENOS. El visor de PDF no se
+              perdió: sigue en `FacturaPdfUploader`, en la pantalla de edición. */}
         </div>
         {/* UN chip con lo único que importa: sin reclamar · reclamado · pagado. */}
         {editMode ? (
@@ -313,12 +334,18 @@ export default function ReclamoDetail({
           {pendiente && (
             <button onClick={() => setCorreoOpen(true)} className="bg-black text-white px-5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all inline-flex items-center justify-center min-h-[44px]">Correo</button>
           )}
-          <button ref={descargaRef} onClick={() => setDescargaOpen((v) => !v)} disabled={excelBusy || pdfBusy} aria-haspopup="menu" aria-expanded={descargaOpen} className="text-sm border border-gray-200 px-4 rounded-md text-gray-600 hover:text-black hover:border-gray-400 transition inline-flex items-center justify-center gap-1 min-h-[44px] disabled:opacity-40">
-            {excelBusy ? "Armando el Excel…" : pdfBusy ? "Armando el PDF…" : "Descargar"} <span aria-hidden className="text-gray-400">⌄</span>
+          <button ref={descargaRef} onClick={() => setDescargaOpen((v) => !v)} disabled={excelBusy || pdfBusy || facturaBusy} aria-haspopup="menu" aria-expanded={descargaOpen} className="text-sm border border-gray-200 px-4 rounded-md text-gray-600 hover:text-black hover:border-gray-400 transition inline-flex items-center justify-center gap-1 min-h-[44px] disabled:opacity-40">
+            {excelBusy ? "Armando el Excel…" : pdfBusy ? "Armando el PDF…" : facturaBusy ? "Bajando la factura…" : "Descargar"} <span aria-hidden className="text-gray-400">⌄</span>
           </button>
           <DesplegableFlotante abierto={descargaOpen} anclaRef={descargaRef} onCerrar={() => setDescargaOpen(false)} role="menu" marca="reclamo-descargar" className="rounded-md border border-gray-200 bg-white shadow-lg py-1 min-w-[180px]">
             <button role="menuitem" onClick={() => { setDescargaOpen(false); void descargar("excel"); }} className="block w-full text-left text-sm px-4 min-h-[44px] hover:bg-gray-50">Descargar en Excel</button>
             <button role="menuitem" onClick={() => { setDescargaOpen(false); void descargar("pdf"); }} className="block w-full text-left text-sm px-4 min-h-[44px] hover:bg-gray-50">Descargar en PDF</button>
+            {/* Solo si existe: no se ofrece bajar un archivo que nadie subió. */}
+            {current.factura_pdf_url && (
+              <button role="menuitem" onClick={() => { setDescargaOpen(false); void descargarFactura(); }} className="block w-full text-left text-sm px-4 min-h-[44px] hover:bg-gray-50">
+                Factura del proveedor <span className="text-gray-400">PDF original</span>
+              </button>
+            )}
           </DesplegableFlotante>
           <OverflowMenu
             ariaLabel={`Más opciones del reclamo ${current.nro_reclamo}`}
@@ -604,7 +631,6 @@ export default function ReclamoDetail({
       />
 
       <FotoLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
-      <PdfLightbox src={facturaLightbox} titulo="Factura" onClose={() => setFacturaLightbox(null)} />
       <EnviarProveedorModal
         open={correoOpen}
         empresa={current.empresa}

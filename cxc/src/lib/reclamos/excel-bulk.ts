@@ -51,6 +51,7 @@ interface ReclamoFull {
 
 interface Contacto {
   nombre?: string;
+  /** El nombre de la persona con quien se habla — entra a la ficha del papel. */
   nombre_contacto?: string;
   correo?: string;
 }
@@ -166,11 +167,12 @@ function safeSheetName(name: string, used: Set<string>): string {
 
 export async function buildBulkReclamosExcel(
   reclamos: ReclamoFull[],
-  // La empresa ya NO se escribe adentro del libro (vivía en el subtítulo, y el
-  // nombre del archivo la dice). Se conserva en la firma porque la pasan las 3
-  // rutas que arman este Excel; sacarla del parámetro no compra nada.
+  // Este parámetro no se usa: la empresa que sale en cada hoja es la DEL
+  // RECLAMO (`rec.empresa`), no la del filtro — un lote puede traer reclamos de
+  // una sola empresa, pero el papel tiene que decir la suya. Se conserva en la
+  // firma porque la pasan las 3 rutas que arman este Excel.
   _empresa: string,
-  _contacto: Contacto | null,
+  contacto: Contacto | null,
   opts: OpcionesHojaReclamo = {},
 ): Promise<Buffer> {
   const conLinks = opts.conLinks !== false;
@@ -192,7 +194,10 @@ export async function buildBulkReclamosExcel(
   for (const rec of recs) {
     const items = (rec.reclamo_items || []) as Record<string, unknown>[];
     const fotos = (rec.reclamo_fotos || []) as ReclamoFoto[];
-    const sheet = buildReclamoSheet(rec as unknown as Record<string, unknown>, items, fotos, { conLinks });
+    const sheet = buildReclamoSheet(rec as unknown as Record<string, unknown>, items, fotos, {
+      conLinks,
+      contacto: contacto ?? null,
+    });
     sheets.push({ name: safeSheetName(rec.nro_reclamo || "Reclamo", used), ws: sheet });
   }
 

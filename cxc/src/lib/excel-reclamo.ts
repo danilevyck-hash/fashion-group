@@ -1,7 +1,45 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// RECLAMOS — LA HOJA EXCEL DE UN RECLAMO, CON LA FORMA DEL PAPEL
+// (11-sep-2026, mockup aprobado por Daniel).
+//
+// 🔴 LAS FILAS Y EL PIE SALEN DE `lib/reclamos/papel.ts`, el MISMO módulo que
+// dibuja el PDF. Antes cada superficie tenía su propia lista de columnas —el
+// Excel ocho fijas, el PDF siete distintas, la pantalla diez condicionales— y
+// las tres decían cosas distintas del mismo reclamo. Separarlas otra vez es
+// volver a eso.
+//
+// Lo que cambió con el mockup:
+//   · La cabecera dice FASHION GROUP y la empresa, y la ficha arranca por el
+//     N° de reclamo y la FECHA DE LA FACTURA (la que mide los días).
+//   · Las columnas vacías (Género, Factura, PO) no se dibujan.
+//   · El pie de totales va a la derecha y uno debajo del otro —Subtotal ·
+//     Importación N% · ITBMS N% · Total con raya arriba—, como el pie de la
+//     factura del proveedor. Se fue la banda «TOTAL A ACREDITAR».
+//
+// Los links son URLs WEB que abren con un clic en el navegador (Mac/Windows),
+// sin extraer nada ni permisos:
+//   - Factura: rec.factura_pdf_url (signed URL larga; bucket privado, no expuesto).
+//   - Fotos:   galería web del reclamo (página con todas las fotos, token HMAC).
+// El caller adjunta factura_pdf_url vía adjuntarFacturaUrls (factura-storage.ts).
+// 🔴 Con `conLinks: false` esa sección NO se dibuja: es el Excel del CORREO,
+// donde la factura y las fotos viajan ADJUNTAS.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import XLSX from "xlsx-js-style";
 import { reclamoGaleriaUrl } from "@/lib/reclamos/gallery-token";
-import { reclamoTaxes, ocultaPedido, impLabel, itbmsLabel } from "@/lib/reclamos/tax";
-import { facturasEnPantalla } from "@/lib/reclamos/facturas";
+import { fmtDate } from "@/lib/format";
+import {
+  columnasDelPapel,
+  datosDelPapel,
+  fechaDeLaCabecera,
+  itemsDelPapel,
+  subtotalDelPapel,
+  totalesDelPapel,
+  valorDeCelda,
+  type ContactoDePapel,
+  type ItemDePapel,
+  type ReclamoDePapel,
+} from "@/lib/reclamos/papel";
 import { addr, makeCellStyles, CASA_PALETTE, MONEY_FMT } from "@/lib/excel-export";
 
 interface ReclamoFoto {
@@ -18,7 +56,9 @@ const { B, fillRow, hdr, td, tdN, band, palette } = makeCellStyles(CASA_PALETTE)
 const LBL_BG = "EBF5FB";
 const VAL_BG = "FDFEFE";
 const LINK_FG = "0563C1"; // azul de hyperlink
-const CMAX = 7; // 8 columnas (0..7): Código, Descripción, Talla, Género, Cant., Precio, Subtotal, Motivo
+/** Ancho mínimo de la hoja en columnas, para que las bandas de arriba no queden
+ *  apretadas cuando el reclamo trae pocas columnas con datos. */
+const COLUMNAS_MINIMAS = 7;
 
 export interface OpcionesHojaReclamo {
   /**
@@ -31,16 +71,10 @@ export interface OpcionesHojaReclamo {
    * los archivos, y sin ellos Andrea se quedaría sin la factura y sin las fotos.
    */
   conLinks?: boolean;
+  /** El contacto del proveedor, para la ficha (mismo dato que la línea del PDF). */
+  contacto?: ContactoDePapel | null;
 }
 
-/**
- * Hoja Excel de un reclamo. Con `conLinks` (el default) los links son URLs WEB
- * que abren con un clic en el navegador (Mac/Windows), sin extraer nada ni
- * permisos:
- *   - Factura: rec.factura_pdf_url (signed URL larga; bucket privado, no expuesto).
- *   - Fotos:   galería web del reclamo (página con todas las fotos, token HMAC).
- * El caller adjunta factura_pdf_url vía adjuntarFacturaUrls (factura-storage.ts).
- */
 export function buildReclamoSheet(
   rec: Record<string, unknown>,
   items: Record<string, unknown>[],
@@ -52,28 +86,42 @@ export function buildReclamoSheet(
   const nroReclamo = String(rec.nro_reclamo || "");
   const empresa = String(rec.empresa || "");
   const reclamoId = String(rec.id || "");
+
+  // 🔴 Los renglones y las columnas salen del módulo del papel. `items` llega
+  // por parámetro (así lo llaman las 3 rutas), pero si el reclamo los trae
+  // adentro se usa esa lista, que es la que ya filtra los borrados.
+  const delReclamo = itemsDelPapel(rec as ReclamoDePapel);
+  const renglones: ItemDePapel[] = delReclamo.length
+    ? delReclamo
+    : (items as ItemDePapel[]).filter((i) => !i?.deleted);
+  const columnas = columnasDelPapel(renglones);
+  const CMAX = Math.max(columnas.length, COLUMNAS_MINIMAS) - 1;
+
   const ws: XLSX.WorkSheet = {};
   const h: number[] = [];
   const merges: XLSX.Range[] = [];
   let r = 0;
 
-  // Título / subtítulo / separador — bandas estándar de la casa.
+  // Cabecera: FASHION GROUP y, debajo, la empresa (mockup 11-sep-2026 — antes
+  // decía «Reclamo a Proveedor», que es lo que dice el título del archivo).
   band(ws, r, CMAX, merges, "FASHION GROUP", palette.pri, 18); h[r] = 32; r++;
-  band(ws, r, CMAX, merges, "Reclamo a Proveedor", palette.mid, 12); h[r] = 22; r++;
+  band(ws, r, CMAX, merges, empresa || "Reclamo a Proveedor", palette.mid, 12); h[r] = 22; r++;
   fillRow(ws, r, CMAX, palette.sep); merges.push({ s: { r, c: 0 }, e: { r, c: CMAX } }); h[r] = 6; r++;
 
   // Metadata helpers (layout de ficha: label LBL_BG / valor VAL_BG)
   const mLbl = (v: string) => ({ v, t: "s", s: { font: { bold: true, sz: 10, color: { rgb: palette.pri }, name: "Calibri" }, fill: { fgColor: { rgb: LBL_BG } }, alignment: { horizontal: "left" }, border: B } });
   const mVal = (v: string, bold = false) => ({ v, t: "s", s: { font: { bold, sz: 10, color: { rgb: "111111" }, name: "Calibri" }, fill: { fgColor: { rgb: VAL_BG } }, alignment: { horizontal: "left" }, border: { bottom: { style: "thin", color: { rgb: palette.brd } } } } });
 
-  // Metadata rows: N° Reclamo / Empresa / Proveedor / N° Factura / N° Pedido.
-  // Active Shoes no usa N° de pedido → se omite esa fila.
+  // La ficha, en el orden del papel: N° de reclamo y FECHA DE LA FACTURA
+  // primero, y después la misma línea de datos del PDF (Proveedor · Marca ·
+  // Factura · PO · Contacto), sin los renglones que están vacíos.
+  const fechaCabecera = fechaDeLaCabecera(rec as ReclamoDePapel);
   const meta: [string, string, boolean][] = [
     ["N° Reclamo", nroReclamo, true],
-    ["Empresa", String(rec.empresa || ""), false],
-    ["Proveedor", String(rec.proveedor || ""), false],
-    ["N° Factura", facturasEnPantalla(String(rec.nro_factura || "")), true],
-    ...(ocultaPedido(empresa) ? [] : [["N° Pedido", String(rec.nro_orden_compra || "—"), false] as [string, string, boolean]]),
+    ...(fechaCabecera ? [["Fecha de factura", fmtDate(fechaCabecera), false] as [string, string, boolean]] : []),
+    ...datosDelPapel(rec as ReclamoDePapel, opts.contacto ?? null).map(
+      (d) => [d.rotulo, d.valor, d.rotulo.startsWith("Factura")] as [string, string, boolean],
+    ),
   ];
 
   for (const [lbl, val, bold] of meta) {
@@ -87,27 +135,40 @@ export function buildReclamoSheet(
   // Separator
   fillRow(ws, r, CMAX, palette.sep); merges.push({ s: { r, c: 0 }, e: { r, c: CMAX } }); h[r] = 8; r++;
 
-  // Table header (Género entre Talla y Cant.)
-  const headers = ["Código", "Descripción", "Talla", "Género", "Cant.", "Precio Unit.", "Subtotal", "Motivo"];
-  headers.forEach((hv, i) => { ws[addr(r, i)] = hdr(hv, "center"); });
+  // Encabezados de la tabla — los que de verdad traen datos.
+  columnas.forEach((c, i) => { ws[addr(r, i)] = hdr(c.rotulo, c.tipo === "texto" ? "left" : "center"); });
+  for (let c = columnas.length; c <= CMAX; c++) ws[addr(r, c)] = hdr("", "center");
   h[r] = 22; r++;
 
   // Items (celdas td/tdN del helper; alt=true → fondo dataBg uniforme)
-  let subtotal = 0;
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    const cant = Number(item.cantidad) || 0; const precio = Number(item.precio_unitario) || 0; const sub = cant * precio;
-    subtotal += sub;
-    ws[addr(r, 0)] = td(String(item.referencia || ""), true, { sz: 9 });
-    ws[addr(r, 1)] = td(String(item.descripcion || ""), true, { fg: "111111" });
-    ws[addr(r, 2)] = td(String(item.talla || ""), true, { fg: "555555", sz: 9, ha: "center" });
-    ws[addr(r, 3)] = td(String(item.genero || ""), true, { fg: "555555", sz: 9, ha: "center" });
-    ws[addr(r, 4)] = tdN(cant, true, { fg: "111111" });
-    ws[addr(r, 5)] = tdN(precio, true, { fmt: MONEY_FMT, fg: "111111" });
-    ws[addr(r, 6)] = tdN(sub, true, { fmt: MONEY_FMT, bold: true, fg: "111111" });
-    const motivo = td(String(item.motivo || ""), true, { fg: "666666", sz: 9 });
-    Object.assign(motivo.s.font, { italic: true });
-    ws[addr(r, 7)] = motivo;
+  for (const item of renglones) {
+    columnas.forEach((c, i) => {
+      const v = valorDeCelda(item, c.clave);
+      if (c.tipo === "dinero") {
+        ws[addr(r, i)] = tdN(Number(v) || 0, true, { fmt: MONEY_FMT, bold: c.clave === "subtotal", fg: "111111" });
+        return;
+      }
+      if (c.tipo === "entero") {
+        ws[addr(r, i)] = tdN(Number(v) || 0, true, { fg: "111111" });
+        return;
+      }
+      if (c.clave === "descripcion") {
+        ws[addr(r, i)] = td(String(v), true, { fg: "111111" });
+        return;
+      }
+      if (c.clave === "motivo") {
+        const motivo = td(String(v), true, { fg: "666666", sz: 9 });
+        Object.assign(motivo.s.font, { italic: true });
+        ws[addr(r, i)] = motivo;
+        return;
+      }
+      if (c.clave === "talla" || c.clave === "genero") {
+        ws[addr(r, i)] = td(String(v), true, { fg: "555555", sz: 9, ha: "center" });
+        return;
+      }
+      ws[addr(r, i)] = td(String(v), true, { sz: 9 });
+    });
+    for (let c = columnas.length; c <= CMAX; c++) ws[addr(r, c)] = td("", true, { sz: 9 });
     h[r] = 18; r++;
   }
 
@@ -115,23 +176,21 @@ export function buildReclamoSheet(
   ws[addr(r, 0)] = { v: "", t: "s", s: { fill: { fgColor: { rgb: "FFFFFF" } } } };
   h[r] = 6; r++;
 
-  // Totals (labels en col 6, valores en col 7). Impuestos por empresa
-  // (Active Shoes: importación 15%, sin ITBMS).
-  const tx = reclamoTaxes(empresa, subtotal);
-  const tLbl = (v: string) => ({ v, t: "s", s: { font: { bold: true, sz: 9, color: { rgb: palette.pri }, name: "Calibri" }, fill: { fgColor: { rgb: "FFFFFF" } }, alignment: { horizontal: "right" } } });
-  const tVal = (v: number) => ({ v, t: "n", z: MONEY_FMT, s: { font: { sz: 10, name: "Calibri" }, fill: { fgColor: { rgb: "FFFFFF" } }, alignment: { horizontal: "right" }, border: { bottom: { style: "thin", color: { rgb: palette.brd } } } } });
+  // 🔴 EL PIE DE TOTALES, A LA DERECHA Y UNO DEBAJO DEL OTRO — el mismo de
+  // `papel.ts` que dibuja el PDF, con el Total en negrita y raya arriba. Antes
+  // esto terminaba en una banda azul «TOTAL A ACREDITAR» que ninguna factura de
+  // proveedor tiene.
+  const subtotal = subtotalDelPapel(renglones);
+  const colRotulo = Math.max(CMAX - 1, 0);
+  const colValor = CMAX;
+  const tLbl = (v: string, fuerte: boolean) => ({ v, t: "s", s: { font: { bold: true, sz: fuerte ? 11 : 9, color: { rgb: fuerte ? "111111" : palette.pri }, name: "Calibri" }, fill: { fgColor: { rgb: "FFFFFF" } }, alignment: { horizontal: "right" }, ...(fuerte ? { border: { top: { style: "medium", color: { rgb: "111111" } } } } : {}) } });
+  const tVal = (v: number, fuerte: boolean) => ({ v, t: "n", z: MONEY_FMT, s: { font: { bold: fuerte, sz: fuerte ? 11 : 10, color: { rgb: "111111" }, name: "Calibri" }, fill: { fgColor: { rgb: "FFFFFF" } }, alignment: { horizontal: "right" }, border: fuerte ? { top: { style: "medium", color: { rgb: "111111" } } } : { bottom: { style: "thin", color: { rgb: palette.brd } } } } });
 
-  ws[addr(r, 6)] = tLbl("Subtotal:"); ws[addr(r, 7)] = tVal(subtotal); h[r] = 16; r++;
-  ws[addr(r, 6)] = tLbl(`Importación (${impLabel(empresa)}):`); ws[addr(r, 7)] = tVal(tx.importacion); h[r] = 16; r++;
-  if (tx.hasItbms) { ws[addr(r, 6)] = tLbl(`ITBMS (${itbmsLabel(empresa)}):`); ws[addr(r, 7)] = tVal(tx.itbms); h[r] = 16; r++; }
-
-  // Final total — banda PRI 13pt (layout de ficha, conservado): banda 0..6 + valor en col 7
-  const totalRow = r;
-  const tBand = (v: string, ha: string) => ({ v, t: "s", s: { font: { bold: true, sz: 13, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: palette.pri } }, alignment: { horizontal: ha, vertical: "center" } } });
-  for (let c = 0; c <= 6; c++) ws[addr(r, c)] = tBand(c === 0 ? "TOTAL A ACREDITAR" : "", "center");
-  ws[addr(r, 7)] = { v: tx.total, t: "n", z: MONEY_FMT, s: { font: { bold: true, sz: 13, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: palette.pri } }, alignment: { horizontal: "right", vertical: "center" } } };
-  merges.push({ s: { r: totalRow, c: 0 }, e: { r: totalRow, c: 6 } });
-  h[r] = 28; r++;
+  for (const t of totalesDelPapel(empresa, subtotal)) {
+    ws[addr(r, colRotulo)] = tLbl(`${t.rotulo}:`, t.fuerte);
+    ws[addr(r, colValor)] = tVal(t.valor, t.fuerte);
+    h[r] = t.fuerte ? 22 : 16; r++;
+  }
 
   // Archivos (factura + evidencia) — links WEB de un clic (celdas .l)
   const linkRow = (label: string, linkText: string, target: string) => {
@@ -163,7 +222,7 @@ export function buildReclamoSheet(
 
   ws["!ref"] = `A1:${XLSX.utils.encode_col(CMAX)}${r}`;
   ws["!merges"] = merges;
-  ws["!cols"] = [{ wch: 14 }, { wch: 24 }, { wch: 8 }, { wch: 10 }, { wch: 7 }, { wch: 14 }, { wch: 14 }, { wch: 22 }];
+  ws["!cols"] = Array.from({ length: CMAX + 1 }, (_, i) => ({ wch: columnas[i]?.wch ?? 12 }));
   ws["!rows"] = h.map((v) => ({ hpt: v || 16 }));
 
   return ws;

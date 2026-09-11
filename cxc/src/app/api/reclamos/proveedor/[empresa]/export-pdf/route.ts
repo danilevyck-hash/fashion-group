@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { buildBulkReclamosPdf, type ReclamoFull } from "@/lib/reclamos/pdf-bulk";
 import { fetchReclamosForEmpresa, type BulkSelector } from "@/lib/reclamos/fetch-empresa";
@@ -20,7 +21,15 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
       return NextResponse.json({ error: "No hay reclamos para los criterios indicados." }, { status: 404 });
     }
 
-    const doc = await buildBulkReclamosPdf(reclamos, empresa);
+    // El contacto del proveedor entra a la línea de datos del papel (mockup
+    // 11-sep-2026). Es la MISMA lectura que ya hacían el Excel y el correo.
+    const { data: contactos } = await supabaseServer
+      .from("reclamo_contactos")
+      .select("*")
+      .eq("empresa", empresa)
+      .limit(1);
+
+    const doc = await buildBulkReclamosPdf(reclamos, empresa, contactos?.[0] ?? null);
     // Descargar el archivo es sacarlo de la casa: «reclamado», una sola vez.
     await marcarReclamados(reclamos.map((r) => r.id));
     const buf = doc.output("arraybuffer");

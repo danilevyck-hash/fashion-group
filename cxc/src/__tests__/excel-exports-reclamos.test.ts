@@ -90,21 +90,31 @@ describe("buildReclamoSheet (ficha por reclamo)", () => {
     expect(rt.SheetNames).toEqual(["R-001"]);
     const sheet = rt.Sheets["R-001"];
 
-    // Bandas de título/subtítulo
+    // Bandas de título/subtítulo. 🔄 11-sep-2026: la segunda banda dice la
+    // EMPRESA del reclamo, no «Reclamo a Proveedor» — el mockup pone
+    // «Fashion Group / <empresa>» a la izquierda de la cabecera, igual que el
+    // PDF, y el nombre del archivo ya dice que es un reclamo a proveedor.
     expect(sheet.A1?.v).toBe("FASHION GROUP");
-    expect(sheet.A2?.v).toBe("Reclamo a Proveedor");
+    expect(sheet.A2?.v).toBe("Fashion Wear");
 
     // Hipervínculos web: factura firmada + galería de fotos
     const targets = linkTargets(sheet);
     expect(targets).toContain("https://signed.example/r1/factura.pdf");
     expect(targets.some((t) => t.includes("/reclamos/galeria/"))).toBe(true);
 
-    // Item 1 en fila 11 (título+sub+sep+5 meta+sep+header). Precio col F: número
-    // real con MONEY_FMT; subtotal col G = 2 × 10.50.
-    expect(sheet.F11?.t).toBe("n");
-    expect(sheet.F11?.v).toBe(10.5);
-    expect(sheet.F11?.z).toBe(MONEY_FMT);
-    expect(sheet.G11?.v).toBe(21);
+    // 🔄 11-sep-2026: la fila del primer renglón se mide BUSCÁNDOLA, no contando
+    // renglones de ficha a mano — la ficha dejó de tener 5 filas fijas (ahora
+    // solo escribe los datos que existen: fecha de factura, proveedor, marca,
+    // factura, PO, contacto). Lo que el candado protege no cambió: el precio es
+    // un NÚMERO real con MONEY_FMT y el subtotal es 2 × 10.50.
+    const filaPrecio = Object.keys(sheet)
+      .filter((k) => /^F\d+$/.test(k))
+      .find((k) => (sheet[k] as { v?: unknown }).v === 10.5);
+    expect(filaPrecio).toBeDefined();
+    const n = filaPrecio!.slice(1);
+    expect(sheet[filaPrecio!]?.t).toBe("n");
+    expect(sheet[filaPrecio!]?.z).toBe(MONEY_FMT);
+    expect(sheet[`G${n}`]?.v).toBe(21);
   });
 });
 
