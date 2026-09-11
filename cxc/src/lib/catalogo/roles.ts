@@ -198,11 +198,50 @@ export const COMPROBANTES_ROLES = ["admin", "secretaria", "vendedor", "bodega"] 
 /** Copia mutable para quien reciba `string[]`. */
 export const comprobantesRoles = (): string[] => [...COMPROBANTES_ROLES];
 
+/** ¿Este rol abre la LISTA de comprobantes (`/catalogo/<marca>/pedidos`) y el
+ *  detalle de uno (`GET /orders/[id]`)? Lee `COMPROBANTES_ROLES`, nunca una
+ *  lista propia. */
+export function puedeVerComprobantes(role: string | null | undefined): boolean {
+  return (COMPROBANTES_ROLES as readonly string[]).includes(role ?? "");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 QUIÉN ARMA UN PEDIDO — UNA lista, y las pantallas la LEEN (11-sep-2026)
+//
+// 🩸 Bodega y David (`gerente_boston`) VEN el catálogo (`CATALOGO_ROLES`), y
+// hasta hoy la pantalla les dibujaba «Agregar» en cada producto y «Ver pedido»
+// en la barra del carrito: llenaban el carrito y topaban con el 403 del
+// checkout, del directorio de clientes de Switch y del envío a Switch —
+// «No se pudo cargar el directorio», «Sin permiso». La regla existía
+// (`cfg.createRoles`, el checkout, `isEditorRole` del detalle) pero escrita
+// TRES veces a mano y en ninguna de las tres la leía el catálogo.
+//
+// Ahora es UNA: `PEDIDO_ROLES`. De acá salen `createRoles` de las 4 marcas
+// (Reebok suma su 'cliente' legacy), el guard del checkout y de `send-order`,
+// el `isEditorRole` del detalle y —lo nuevo— el catálogo interno, que a quien
+// no arma pedidos le muestra las fichas en SOLO LECTURA: sin «Agregar», sin
+// carrito, sin «Ver pedido». Ver ≠ pedir, igual que ver ≠ administrar.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** ARMAN pedidos desde el catálogo interno: «Agregar», el carrito, el checkout,
+ *  el envío a Switch y el detalle de un comprobante. */
+export const PEDIDO_ROLES = ["admin", "secretaria", "vendedor"] as const;
+
+/** Copia mutable para quien reciba `string[]`. */
+export const pedidoRoles = (): string[] => [...PEDIDO_ROLES];
+
+/** ¿Este rol arma pedidos (ve «Agregar» y el carrito en el catálogo interno)? */
+export function puedeArmarPedido(role: string | null | undefined): boolean {
+  return (PEDIDO_ROLES as readonly string[]).includes(role ?? "");
+}
+
 /** TRABAJAN un comprobante desde la lista: «Editar» y «Duplicar». Es el mismo
  *  trío que ya aceptaban `EDIT_ROLES` de `orders/[id]`, el `convertir` de un
  *  pedido del link y el POST de `orders` — 🔴 bodega NO está, y su ausencia acá
- *  es lo que evita ofrecerle un botón que muere en 403. */
-export const COMPROBANTES_EDITAR_ROLES = ["admin", "secretaria", "vendedor"] as const;
+ *  es lo que evita ofrecerle un botón que muere en 403. Desde el 11-sep-2026 ES
+ *  la misma lista que arma pedidos (`PEDIDO_ROLES`): eran dos copias del mismo
+ *  trío. */
+export const COMPROBANTES_EDITAR_ROLES = PEDIDO_ROLES;
 
 /** Copia mutable para quien reciba `string[]`. */
 export const comprobantesEditarRoles = (): string[] => [...COMPROBANTES_EDITAR_ROLES];
