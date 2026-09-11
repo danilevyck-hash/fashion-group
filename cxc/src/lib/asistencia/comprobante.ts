@@ -36,6 +36,7 @@
 import type { HorasPersona, LineaPlanilla } from "./planilla";
 import { centavos, minutosTardanzaMostrados } from "./planilla";
 import { fmtMin } from "./reporte";
+import { notaAjuste } from "./corte-quincena";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { fichaFiscal } from "@/lib/cxc/empresa-fiscal";
 
@@ -181,7 +182,6 @@ export const CLAVES_RENGLON = [
   "prestamo",
   "terceros",
   "mercancia",
-  "ajusteAnterior",
   "totalDescuentos",
   "otrosServicios",
   "salarioAPagar",
@@ -199,20 +199,6 @@ export interface DatosComprobante {
   posicion?: string | null;
   /** La cédula de la ficha, para el pie. `null` = la escribe a mano quien firma. */
   cedula?: string | null;
-  /**
-   * 🔴 EL AJUSTE DE LA QUINCENA ANTERIOR, y va en DESCUENTOS con su nombre
-   * completo. Positivo = se le descuenta; negativo = se le devuelve.
-   *
-   * Ver `corte-quincena.ts`: la quincena se cierra el día 13 o el 28 para tener
-   * los pagos listos, así que los 2-3 días que quedan se pagan como días
-   * normales y lo que de verdad pasó en ellos se corrige AQUÍ, en la siguiente.
-   *
-   * 🔑 NUNCA se mezcla con «AUSENCIA». Son dos cosas distintas: una es lo de
-   * esta quincena, la otra es la corrección de la pasada. Sumarlas es perder
-   * para siempre la explicación de por qué el neto no da lo que la persona
-   * esperaba.
-   */
-  ajusteAnterior?: number | null;
 }
 
 export interface Comprobante {
@@ -227,6 +213,18 @@ export interface Comprobante {
   rataPorHora: number;
   renglones: readonly RenglonComprobante[];
   cedula: string;
+  /**
+   * 🔴 LA NOTA DEL AJUSTE (11-sep-2026): «Horas extra 1.25 y Tardanzas
+   * incluyen los días 14–15 sep, que la quincena anterior pagó sin medir.»
+   *
+   * Hasta el 11-sep-2026 el ajuste era un renglón propio, «AJUSTE QUINCENA
+   * ANTERIOR», dentro de DESCUENTOS. La contadora, textual: *«no puedes
+   * netear las horas extras con las horas de tardanza o de ausencia porque
+   * valen diferente»* — así que ahora entra en las columnas de siempre
+   * (`aplicarAjusteEnLinea`, ya adentro de `linea.dinero`) y el papel lo dice
+   * al pie. `null` = sin ajuste, y no se dibuja nada.
+   */
+  nota: string | null;
   /**
    * `true` cuando la línea no produjo dinero (falta ficha, servicio
    * profesional, «tú decides»). NO se dibuja un comprobante de ceros para
@@ -266,11 +264,13 @@ export function notaTardanza(horas: HorasPersona | null | undefined): string | n
  * en dos donde el módulo tiene uno solo:
  *
  *     TOTAL DE DEDUCCIONES = seguros + ISR
- *     TOTAL DE DESCUENTOS  = préstamo + terceros + compras + mercancía + ajuste
+ *     TOTAL DE DESCUENTOS  = préstamo + terceros + mercancía
  *
- * y las dos juntas dan EXACTAMENTE `dinero.totalDeducciones` (más el ajuste,
- * que es nuevo). Hay candado que lo exige: el día que las dos cuentas se
- * separen, el papel diría un neto que la planilla no pagó.
+ * y las dos juntas dan EXACTAMENTE `dinero.totalDeducciones`. Hay candado que
+ * lo exige: el día que las dos cuentas se separen, el papel diría un neto que
+ * la planilla no pagó. El ajuste de la quincena anterior NO es un renglón
+ * (11-sep-2026): ya viene repartido dentro de las columnas del reloj, y el
+ * papel lo dice en `nota`.
  */
 export function armarComprobante(
   datos: DatosComprobante,
@@ -280,18 +280,15 @@ export function armarComprobante(
   const d = linea.dinero;
   const empresa = nombreEmpresaComprobante(linea.empresa, linea.empresaEtiqueta);
   const titulo = tituloPeriodo(periodo);
-  const ajuste = n2(datos.ajusteAnterior);
 
   const v = (x: number | null | undefined) => (d ? n2(x) : 0);
 
   const totalDeducciones = centavos(v(d?.seguroSocial) + v(d?.seguroEducativo) + v(d?.isr));
-  const totalDescuentos = centavos(
-    v(d?.prestamo) + v(d?.terceros) + v(d?.mercancia) + ajuste,
-  );
-  // 🔴 El neto del papel = el neto de la planilla, menos el ajuste. El ajuste es
-  // lo ÚNICO que este módulo le puede mover al neto, y solo porque es un
-  // renglón que la planilla todavía no tiene.
-  const salarioAPagar = centavos(v(d?.netoPagar) - ajuste);
+  const totalDescuentos = centavos(v(d?.prestamo) + v(d?.terceros) + v(d?.mercancia));
+  // 🔴 El neto del papel = el neto de la planilla, TAL CUAL. Este módulo no le
+  // mueve un centavo: el ajuste de la quincena anterior ya viene adentro de
+  // `dinero` (11-sep-2026).
+  const salarioAPagar = v(d?.netoPagar);
 
   const R = (
     clave: ClaveRenglon,
@@ -326,7 +323,6 @@ export function armarComprobante(
     R("prestamo", "PRESTAMO", v(d?.prestamo), "dato", true),
     R("terceros", "DESCUENTO A TERCEROS", v(d?.terceros), "dato", true),
     R("mercancia", "DAÑO DE MERCANCIA", v(d?.mercancia), "dato", true),
-    R("ajusteAnterior", "AJUSTE QUINCENA ANTERIOR", ajuste, "dato", true),
     R("totalDescuentos", "TOTAL DE DESCUENTOS", totalDescuentos, "total", true),
 
     R("otrosServicios", "OTROS SERVICIOS", v(d?.otrosServicios), "dato", false),
@@ -348,6 +344,7 @@ export function armarComprobante(
     rataPorHora: v(d?.rataHora),
     renglones,
     cedula: String(datos.cedula ?? "").trim(),
+    nota: notaAjuste([linea]),
     sinDinero: !d,
   };
 }
