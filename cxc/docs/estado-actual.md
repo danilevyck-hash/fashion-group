@@ -1708,3 +1708,108 @@ a mano, préstamo/daño/terceros desde Préstamos.
 fechada `planilla-unida-comprobante` (bloque C), `planilla-unida-corte-y-cableado` (H e I) y
 `excel-encabezados-fila-1` (27 → 28 hojas). Mutaciones: `scripts/_mutar-candados-ajuste-por-concepto.sh`.
 
+
+---
+
+## 11-sep-2026 — Reclamos: el correo con adjuntos, el papel con el orden de la pantalla, y dos fechas viejas resueltas
+
+Cuatro encargos, cuatro commits. Dos de código y dos migraciones aplicadas y verificadas.
+
+### A · El correo al proveedor lleva la factura y las fotos ADJUNTAS
+
+Daniel, textual: *«la factura y la foto del reclamo que sale por correo en el excel, sale por medio
+de un link… se puede adjuntar directo al correo y quitarlo del excel? Va»*.
+
+Hasta hoy el correo llevaba **un** archivo —el Excel— con dos links adentro: la factura firmada por
+un año contra el bucket privado y la galería pública por token. El proveedor abría el Excel, tocaba
+un link y esperaba al navegador. Ahora:
+
+- Se adjuntan el Excel, la **factura en PDF** de cada reclamo (`REC-2026-0026-factura.pdf`) y sus
+  **fotos** (`REC-2026-0026-foto-1.jpg`), achicadas antes de viajar (**1600 px** de lado mayor,
+  **JPEG 80**, `sharp` con `.rotate()` por el EXIF — el mismo tratamiento del ZIP de Marketing).
+  Si `sharp` no puede leer una, viaja tal cual: pesada es mejor que ausente.
+- 🔴 **El tope es el del correo YA CODIFICADO.** Resend acepta 40 MB y base64 crece 4/3, así que el
+  presupuesto crudo es 3/4 de eso y los dos se derivan uno del otro. Pasarse tira el correo entero.
+- 🔴 **Lo que no cabe se dice.** Se manda lo que quepa —el Excel, después las facturas, y al final
+  las fotos de la más liviana a la más pesada, para que entren más y no menos— y el cuerpo dice
+  «N fotos no cupieron; pídelas si las necesitas». Un archivo enorme no deja fuera a los chicos.
+- El Excel del correo **no contiene un solo `http`**. El que se **descarga** conserva sus links y es
+  a propósito: ahí no hay correo que cargue los archivos. Y sin links **tampoco se firma nada**.
+
+**Medido contra producción** (`scripts/_medir-reclamos-adjuntos.mjs`, solo lectura): de los 33
+reclamos vivos, **4 tienen factura en PDF** (4,57 MB en total, la mayor 2,13 MB) y hay **14 fotos**
+(2,03 MB, la mayor 0,25 MB). Hoy el tope no se toca ni de lejos.
+
+**Candado:** `reclamos-correo-adjuntos.test.ts` (26 casos, con el CONTROL de que el Excel de descarga
+sigue trayendo sus links). Cambió de texto con nota fechada: `poda-textos-ayuda`.
+
+### B · Los reclamos viejos sin fecha de reclamo se marcan con la de su creación
+
+Migración `20261113120000`, **aplicada y verificada**. Daniel: *«todas las hemos reclamado ya que se
+descarga y se envía… los 9 como reclamados con la fecha en que se crearon. Va»*.
+
+⚠️ **Medido, y no eran 9 sino 6.** El número de ayer era 9 sobre 29 por cobrar ($14.939,64); remedido
+hoy antes de escribir la lista: **27 por cobrar ($10.674,19)** y **6 sin reclamar ($3.167,96)**. Los
+tres que faltan no se perdieron — FW-2026-0001 pasó a Pagado hoy 14:32 UTC, y FW-2026-0006 y
+FW-2026-0007 salieron de la casa a las 14:33 y 14:28.
+
+| | por cobrar | sin reclamar |
+|---|---|---|
+| antes | 27 · $10.674,19 | 6 · $3.167,96 |
+| después | 27 · $10.674,19 | **0 · $0,00** |
+
+Las 6 fechas quedaron iguales al centésimo de segundo a su `created_at`.
+Verificación: `scripts/_verif-reclamos-viejos-reclamados.mjs`.
+
+### C · El papel del reclamo con el orden de la pantalla, y un solo «Descargar»
+
+Mockup aprobado. El PDF, el Excel y la pantalla decían lo mismo de tres formas distintas; ahora los
+tres salen del mismo módulo puro (`lib/reclamos/papel.ts`).
+
+- Cabecera: logo · **FASHION GROUP** · la empresa a la izquierda; **Reclamo N° + fecha de la
+  factura** a la derecha. Sin fecha de factura cae a la del reclamo, **nunca a «hoy»**.
+- Una línea: `Proveedor · Marca · Factura · PO · Contacto`, sin escribir lo que no existe. El
+  contacto entra por primera vez al PDF (ya se leía para el Excel y se tiraba).
+- Tabla `Estilo · Descripción · Talla · Cant. · Precio · Subtotal · Motivo`, motivo capitalizado.
+  🔴 Las columnas vacías —Género, Factura, PO— no se dibujan. **Medido: de los 33 vivos, CERO traen
+  Factura o PO por renglón y solo 8 traen Género**, así que el papel normal es de siete columnas.
+- 🔴 El pie de totales a la derecha, uno debajo del otro, con el **Total** en negrita y raya arriba.
+  Se fueron las cuatro cajas de arriba y la banda «TOTAL A ACREDITAR».
+- Pie de página: `Confidencial · fashiongr.com`.
+- La pantalla: **«Descargar ⌄» pasa de dos salidas a tres** — Reclamo en PDF · Reclamo en Excel ·
+  **Factura del proveedor** (el PDF original, solo si existe). Se retiró el botón suelto «Ver
+  factura»; el visor sigue en la pantalla de edición.
+
+**NINGÚN NÚMERO SE MUEVE.** REC-2026-0026 (Vistana, 10 renglones): **$376,65 · $37,67 · $29,00 ·
+$443,32** en las tres superficies. 🔑 El candado los compara con el **mismo formateador de la
+pantalla** y no con `toFixed`: la importación son 37,665 exactos y los dos redondeos difieren.
+
+**Candado:** `reclamos-papel.test.ts` (25 casos, el PDF generado de verdad y leído con `pdftotext`).
+Tres cambiaron de ancla con nota fechada: `reclamos-itbms-rotulo-y-pendientes`,
+`excel-exports-reclamos`, `reclamos-genero-valor-vs-etiqueta`.
+
+### D · Las fechas de factura de los reclamos viejos
+
+Migración `20261114120000`, **aplicada y verificada**. Daniel: *«sobre la fecha de la factura de lo
+viejo que no tiene pdf, ponle fecha tú»*.
+
+⚠️ **Son 29, no 30, y la fecha NO es la de la factura: es la del RECLAMO.** Medido: 33 vivos, 4 con
+fecha —los mismos 4 que tienen PDF— y **29 sin ella, los 29 sin PDF**, del 16-ago-2024 al
+26-ago-2026. Se les puso su `fecha_reclamo`, que es la mejor aproximación que existe: la factura
+siempre es anterior, así que **los días quedan subestimados, nunca inflados**. Quien necesite la
+fecha real la corrige desde «Editar», que pide ese campo.
+
+Después: **0 reclamos vivos sin fecha de factura**, y los 4 con PDF no se tocaron.
+Medición y verificación: `scripts/_medir-reclamos-fecha-factura.mjs` ·
+`scripts/_verif-reclamos-fecha-factura.mjs`.
+
+### ⚠️ Pendiente de Daniel
+
+1. **La factura del proveedor en el correo la firma «Fashion Group»** y el adjunto se llama
+   `<N° de reclamo>-factura.pdf`. Si un proveedor prefiere el nombre original del archivo que subió
+   Andrea, se cambia en una línea (`nombreFactura`, `lib/reclamos/adjuntos-plan.ts`).
+2. **La galería pública por token sigue viva** aunque ya no se cite en ningún Excel nuevo: los links
+   de los Excel viejos, que ya están en los correos del proveedor, no se rompen. Cerrarla es una
+   decisión aparte.
+3. **Las 29 fechas de factura se pueden mejorar una por una** cuando Andrea tenga el papel a mano.
+   Hoy son la fecha del reclamo y así queda dicho acá y en `CLAUDE.md`.
