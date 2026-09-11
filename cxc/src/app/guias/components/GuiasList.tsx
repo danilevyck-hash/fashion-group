@@ -27,6 +27,8 @@ import { observacionesVisibles } from "@/lib/guias/observaciones";
 import { partirGuiasPorVentana } from "@/lib/guias/ventana-lista";
 import { separarPendientes, resumenPendientes } from "@/lib/guias/pendientes-arriba";
 import { cedulaParaMostrar } from "@/lib/guias/cedula";
+import { CHIP_SOLO_PENDIENTES, urlSinPendientes } from "@/lib/guias/filtro-pendientes";
+import { planParaLlegar } from "@/lib/guias/llegar-a-la-guia";
 
 /**
  * 🔴 LA GUÍA QUE SALIÓ SIN EL N° DEL TRANSPORTISTA, DICHO EN LA LISTA.
@@ -344,6 +346,34 @@ export default function GuiasList({
   }
 
   /**
+   * 🔴 EL AVISO DE ARRIBA LLEVA A LA GUÍA, ESTÉ DIBUJADA O NO (11-sep-2026).
+   *
+   * Antes marcaba `expandedId` y listo: con algo escrito en el buscador, o con
+   * una pendiente de más de 30 días, esa fila no existe en pantalla y el toque
+   * no hacía NADA. Acá se abre el camino primero — el qué hacer lo decide un
+   * módulo puro (`planParaLlegar`), no este archivo.
+   */
+  function irALaPendiente(id: string) {
+    const g = guias.find((x) => x.id === id);
+    const { recientes } = partirGuiasPorVentana(guias, new Date());
+    const plan = planParaLlegar({
+      existe: !!g,
+      pasaElBuscador: !!g && coincideGuiaConBusqueda(g, search, nombresPorCodigo),
+      esReciente: !!g && recientes.some((r) => r.id === id),
+      viejasAbiertas: verViejas,
+    });
+    if (plan.navegar) {
+      // A su página, que es donde vive el bloque de despacho: es el MISMO
+      // camino del botón «Despachar» de la fila, no una navegación nueva.
+      onDespachar(id);
+      return;
+    }
+    if (plan.limpiarBusqueda) setSearch("");
+    if (plan.abrirViejas) setVerViejas(true);
+    abrirFila(id);
+  }
+
+  /**
    * 🔄 9-SEP-2026 — SE FUE LA PRECARGA DE FIRMAS. Servía a la IMAGEN que
    * «Compartir» mandaba en el celular; desde que todo sale en PDF (Daniel:
    * *«en guía, quiero todo PDF, quita lo de PNG que lo enredó»*) las firmas las
@@ -501,7 +531,7 @@ export default function GuiasList({
           return (
             <button
               type="button"
-              onClick={() => abrirFila(avisoPendientes.guiaId)}
+              onClick={() => irALaPendiente(avisoPendientes.guiaId)}
               className="w-full bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-900 mb-6 flex items-center justify-between gap-3 text-left hover:bg-amber-100 transition min-h-[44px]"
             >
               <span className="font-medium">{avisoPendientes.texto}</span>
@@ -537,6 +567,33 @@ export default function GuiasList({
                 placeholder="Buscar por transportista, cliente, factura o N° de guía…"
                 className="border border-gray-200 rounded-lg px-3 py-3 md:py-2 text-base md:text-sm outline-none focus:border-black w-full max-w-sm transition"
               />
+              {/* 🔴 EL FILTRO QUE SE VE Y SE PUEDE QUITAR (11-sep-2026).
+                  🩸 Desde ⌘K → «guías pendientes» (`/guias?pendientes=1`) la
+                  lista quedaba en 1 de 229 sin un chip que lo dijera ni un
+                  botón que lo apagara, y recargar lo volvía a aplicar: la
+                  única salida era escribir `/guias` a mano. El filtro se
+                  queda (el enlace sirve); lo que faltaba era la vuelta.
+                  ⚠️ Apagarlo LIMPIA la dirección con `replace` —mismo nivel,
+                  no ensucia el Atrás—: con el `?pendientes=1` puesto, recargar
+                  volvería a filtrar. */}
+              {showPending && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPending(false);
+                    window.history.replaceState(
+                      null,
+                      "",
+                      urlSinPendientes(window.location.pathname, window.location.search),
+                    );
+                  }}
+                  className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-amber-50 border border-amber-200 px-3 text-sm text-amber-900 hover:bg-amber-100 transition"
+                >
+                  {CHIP_SOLO_PENDIENTES}
+                  <span aria-hidden className="text-amber-700">×</span>
+                  <span className="sr-only">— quitar el filtro</span>
+                </button>
+              )}
               {/* 🔴 ACÁ VIVÍA «LISTA PLANA / AGRUPAR POR FECHA», Y SE RETIRÓ
                   (5-sep-2026). Daniel, textual: *«el chip por fecha y todos
                   quítalo. Siempre ordenado por fecha»*.

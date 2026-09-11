@@ -52,13 +52,13 @@ import { validarCodigoParaAtar } from "@/lib/guias/atar-cliente";
 import { armarCorreccion, hayCambioReal } from "@/lib/guias/correccion-item";
 import { camposEditablesDeRenglon } from "@/lib/guias/campos-editables";
 import { validarEmpresasItems } from "@/lib/guias/validar-items";
+import { GUIAS_WRITE_ROLES } from "@/lib/guias/roles-escritura";
 
 export const dynamic = "force-dynamic";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Los mismos que ya pueden escribir sobre una guía. Vendedor sigue de lectura. */
-const GUIAS_WRITE_ROLES = ["admin", "secretaria", "bodega"];
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = requireRole(req, GUIAS_WRITE_ROLES);

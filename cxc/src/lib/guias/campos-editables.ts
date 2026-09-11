@@ -27,6 +27,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { guiaYaDespachada } from "./modo-despacho";
+import { unirEnHumano } from "./falta-para-despachar";
 
 /** Los campos de un renglón que alguien puede corregir desde la pantalla. */
 export const CAMPOS_DE_RENGLON = [
@@ -129,4 +130,63 @@ export function cambiosDeRenglon(
     if (a !== g) cambios[campo] = a;
   }
   return cambios;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EL RENGLÓN QUE EXPLICA EL BOTÓN GRIS DE UNA GUÍA YA DESPACHADA (11-sep-2026).
+//
+// 🩸 En una guía Completada «Guardar Cambios» sale apagado hasta que algo
+// cambie —lo correcto— pero el aviso que tenía que decirlo salía VACÍO: la
+// lista de faltantes es `[]` (en una firmada no se valida el alta) y
+// `textoFalta([])` devuelve `""`. Resultado: botón gris, `title` vacío y un
+// `<p>` ámbar sin una sola palabra adentro.
+//
+// 🔑 EL TEXTO SE DERIVA DE `CAMPOS_DESPACHADA`, no se escribe a mano: el día
+// que se abra o se cierre un campo, la frase se corrige sola. `cliente` y
+// `cliente_codigo` son el mismo dato y se nombran UNA vez.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Cómo se llama cada campo cuando hay que nombrárselo a una persona. */
+const ROTULO_DE_CAMPO: Record<CampoDeRenglon, string> = {
+  numero_guia_transp: "N° del transportista",
+  cliente: "cliente",
+  cliente_codigo: "cliente",
+  facturas: "facturas",
+  direccion: "dirección",
+  empresa: "empresa",
+  bultos: "bultos",
+};
+
+/**
+ * El orden en que se dicen, como los dijo Daniel: *«Se puede corregir N° del
+ * transportista · cliente · facturas»*. Cubre los SIETE campos para que un
+ * campo que se abra mañana tenga lugar en la frase (hay candado).
+ */
+const ORDEN_EN_EL_AVISO: readonly CampoDeRenglon[] = [
+  "numero_guia_transp",
+  "cliente",
+  "cliente_codigo",
+  "facturas",
+  "direccion",
+  "empresa",
+  "bultos",
+];
+
+/** Los nombres de lo corregible en una guía que ya salió, sin repetir. */
+export function rotulosCorregiblesDespachada(): string[] {
+  const vistos = new Set<string>();
+  const out: string[] = [];
+  for (const campo of ORDEN_EN_EL_AVISO) {
+    if (!(CAMPOS_DESPACHADA as readonly string[]).includes(campo)) continue;
+    const rotulo = ROTULO_DE_CAMPO[campo];
+    if (vistos.has(rotulo)) continue;
+    vistos.add(rotulo);
+    out.push(rotulo);
+  }
+  return out;
+}
+
+/** «Ya se despachó: solo se corrigen N° del transportista, cliente y facturas». */
+export function textoYaSeDespacho(): string {
+  return `Ya se despachó: solo se corrigen ${unirEnHumano(rotulosCorregiblesDespachada())}`;
 }

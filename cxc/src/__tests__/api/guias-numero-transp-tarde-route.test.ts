@@ -17,6 +17,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { GUIAS_WRITE_ROLES } from "@/lib/guias/roles-escritura";
 
 vi.mock("@/lib/require-auth", () => ({
   getSession: () => ({ role: "bodega", userName: "Bodega" }),
@@ -267,9 +268,19 @@ describe("🔴 el candado de la guía despachada NO se aflojó por esta puerta",
     expect(codigo).not.toMatch(/from\("guia_transporte"\)\s*\n?\s*\.update/);
   });
 
+  // 🔄 11-sep-2026 — CAMBIA DE DIRECCIÓN, NO SE BORRA. La lista de roles de
+  // escritura dejó de estar escrita a mano en cada `route.ts` y vive en
+  // `src/lib/guias/roles-escritura.ts`: estaba copiada SEIS veces (cinco rutas
+  // y la página de «Nueva guía»), y la copia de la página dejaba entrar al
+  // vendedor a armar la guía entera para chocar con «Sin permiso» al guardar.
+  // Lo que este caso protege —que esta puerta es de ESCRITURA y el vendedor no
+  // entra— no cambió: ahora se comprueba sobre la lista única.
   it("es de escritura: vendedor no entra", () => {
     const codigo = leer("src/app/api/guias/[id]/numero-transp/route.ts");
     expect(codigo).toMatch(/requireRole/);
-    expect(codigo).toMatch(/\["admin", "secretaria", "bodega"\]/);
+    expect(codigo).toMatch(/GUIAS_WRITE_ROLES/);
+    expect(codigo).toMatch(/roles-escritura/);
+    expect([...GUIAS_WRITE_ROLES]).toEqual(["admin", "secretaria", "bodega"]);
+    expect(GUIAS_WRITE_ROLES).not.toContain("vendedor");
   });
 });

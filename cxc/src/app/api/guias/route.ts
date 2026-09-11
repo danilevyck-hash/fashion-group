@@ -4,6 +4,7 @@ import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { transportistaLabel } from "@/lib/transportistaLabel";
 import { validarEmpresasItems } from "@/lib/guias/validar-items";
+import { GUIAS_WRITE_ROLES } from "@/lib/guias/roles-escritura";
 import {
   CAMPOS_OBLIGATORIOS,
   respuestaErrorEscritura,
@@ -11,7 +12,6 @@ import {
 } from "@/lib/campos-obligatorios";
 
 const GUIAS_ROLES = ["admin", "secretaria", "bodega", "vendedor"]; // lectura (GET)
-const GUIAS_WRITE_ROLES = ["admin", "secretaria", "bodega"]; // escritura: vendedor es solo lectura
 
 export const dynamic = "force-dynamic";
 

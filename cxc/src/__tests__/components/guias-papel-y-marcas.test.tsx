@@ -225,7 +225,13 @@ describe("🔴 13 · la guía que salió incompleta queda MARCADA", () => {
 //
 // Va en un archivo aparte del resto porque monta OTRA pantalla.
 // ─────────────────────────────────────────────────────────────────────────────
-import GuiaNuevaPage from "@/app/guias/nueva/page";
+// 🔄 11-sep-2026 — CAMBIA DE ANCLA, NO SE BORRA. `/guias/nueva` se partió en
+// dos: la PÁGINA es ahora un guard SSR (comprueba el rol con la MISMA lista del
+// POST y rebota al vendedor antes de dibujar nada) y el formulario vive en
+// `NuevaGuiaClient`. Lo que este bloque mide —que al guardar te quedás EN la
+// guía— es del formulario, así que monta el cliente. El guard tiene su propio
+// candado en `guias-filtro-y-aviso.test.ts`.
+import GuiaNuevaPage from "@/app/guias/nueva/NuevaGuiaClient";
 
 describe("🔴 12 · al guardar una guía nueva, te quedás EN la guía", () => {
   const ID_CREADA = "77777777-7777-4777-8777-777777777777";

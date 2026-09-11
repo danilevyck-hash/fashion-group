@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/requireRole";
 import { transportistaLabel } from "@/lib/transportistaLabel";
 import { enviarNegocio } from "@/lib/alertas/canal";
 import { validarEmpresasItems } from "@/lib/guias/validar-items";
+import { GUIAS_WRITE_ROLES } from "@/lib/guias/roles-escritura";
 import {
   bultosDespuesDeCorregir,
   type CorreccionDeBultos,
@@ -14,7 +15,6 @@ import {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const GUIAS_ROLES = ["admin", "secretaria", "bodega", "vendedor"]; // lectura (GET)
-const GUIAS_WRITE_ROLES = ["admin", "secretaria", "bodega"]; // escritura: vendedor es solo lectura
 
 interface GuiaForNotify {
   numero: number;

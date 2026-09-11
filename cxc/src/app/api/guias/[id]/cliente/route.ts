@@ -34,13 +34,13 @@ import { requireRole } from "@/lib/requireRole";
 import { logActivity } from "@/lib/log-activity";
 import { leerClientesDelGrupo } from "@/lib/clientes/directorio-cache";
 import { validarCodigoParaAtar } from "@/lib/guias/atar-cliente";
+import { GUIAS_WRITE_ROLES } from "@/lib/guias/roles-escritura";
 
 export const dynamic = "force-dynamic";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Los mismos que ya pueden escribir sobre una guía. Vendedor sigue de lectura. */
-const GUIAS_WRITE_ROLES = ["admin", "secretaria", "bodega"];
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = requireRole(req, GUIAS_WRITE_ROLES);

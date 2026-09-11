@@ -67,6 +67,7 @@ import { EMPRESAS_CANONICAS, claveCampo, faltaParaGuardar, opcionesEmpresa } fro
 import { ENTREGADO_POR_OTRO, entregadoPorElegido, nombreDespachadoPor } from "@/lib/guias/despachado-por";
 import { ETIQUETA_TIPO_DESPACHO } from "@/lib/guias/modo-despacho";
 import { textoFalta } from "@/lib/guias/falta-para-despachar";
+import { textoYaSeDespacho } from "@/lib/guias/campos-editables";
 import { sugerenciasDireccion } from "@/lib/guias/direccion-sugerida";
 import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
 
@@ -521,7 +522,13 @@ export default function GuiaForm({
     ? []
     : faltaParaGuardar({ fecha, modoEntrega, transportistaId, entregadoPor, items });
   const puedeGuardar = soloCorregible ? hayCambios : faltantes.length === 0;
-  const avisoFalta = textoFalta(faltantes);
+  // 🩸 EL AVISO SALÍA VACÍO EN UNA GUÍA YA DESPACHADA (11-sep-2026). Con
+  // `soloCorregible` la lista de faltantes es `[]` y `textoFalta([])` devuelve
+  // `""`: el botón quedaba gris, el `title` vacío y el renglón ámbar era un
+  // `<p>` sin una sola palabra adentro. Ahora dice qué pasó y qué SÍ se puede
+  // tocar, DERIVADO de `campos-editables.ts` — la misma lista que aplican el
+  // formulario, el endpoint que escribe y el candado.
+  const avisoFalta = soloCorregible ? textoYaSeDespacho() : textoFalta(faltantes);
 
   /** El ÚNICO botón de guardar del formulario. Ver la nota de la barra pegajosa. */
   function SaveButton() {
