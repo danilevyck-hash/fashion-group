@@ -5,9 +5,18 @@ import { Movimiento } from "./types";
 import { CONCEPTO_PAGO, ORIGEN_POR_DEFECTO } from "@/lib/prestamos-conceptos";
 import { CONCEPTO_TERCEROS } from "@/lib/prestamos-conceptos";
 
+/** Cómo se dice: éxito, error, o un AVISO que se registra igual (el tope). */
+export type TipoAvisoMovimiento = "success" | "error" | "warning";
+
 interface UseMovimientoFormProps {
   onSuccess: () => void;
-  showToast: (msg: string) => void;
+  /**
+   * 🔴 EL TIPO VIAJA CON EL MENSAJE (11-sep-2026). 🩸 La pestaña de Planilla
+   * clasificaba por el TEXTO (`startsWith("Error")`), y el aviso «Este préstamo
+   * pasa el tope de un sueldo…» salía como éxito verde y se iba a los 3 s.
+   * Quien no lo lea (la página del préstamo) sigue recibiendo solo el mensaje.
+   */
+  showToast: (msg: string, tipo?: TipoAvisoMovimiento) => void;
 }
 
 /**
@@ -59,18 +68,21 @@ export function useMovimientoForm({ onSuccess, showToast }: UseMovimientoFormPro
       const json = await res.json().catch(() => null);
       if (res.ok) {
         const cuotaOk = await guardarCuota(String(movimiento.empleado_id ?? ""), String(movimiento.concepto ?? ""), cuota);
-        // Sobre el tope se registra igual, y el aviso lo dice.
+        // Sobre el tope se registra igual, y el aviso lo dice — en ÁMBAR y
+        // por 8 s: es lo único que frena desde que se quitó la aprobación.
+        const sobreTope = Boolean(json?.sobreTope) || typeof json?.avisoTope === "string";
         showToast(
           (json?.avisoTope ?? "Movimiento registrado")
           + (cuotaOk ? "" : " La cuota no se pudo guardar: cámbiala en Editar."),
+          sobreTope || !cuotaOk ? "warning" : "success",
         );
         onSuccess();
         return true;
       }
-      showToast(json?.error || "Error al guardar");
+      showToast(json?.error || "Error al guardar", "error");
       return false;
     } catch {
-      showToast("Sin conexión. Verifica tu internet e intenta de nuevo.");
+      showToast("Sin conexión. Verifica tu internet e intenta de nuevo.", "error");
       return false;
     }
   }
@@ -85,9 +97,9 @@ export function useMovimientoForm({ onSuccess, showToast }: UseMovimientoFormPro
     setConfirmDeleteMovId(null);
     try {
       const res = await fetch(`/api/prestamos/movimientos/${movId}`, { method: "DELETE" });
-      if (res.ok) { showToast("Movimiento eliminado"); onSuccess(); }
-      else { const err = await res.json().catch(() => null); showToast(err?.error || "Error al eliminar"); }
-    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
+      if (res.ok) { showToast("Movimiento eliminado", "success"); onSuccess(); }
+      else { const err = await res.json().catch(() => null); showToast(err?.error || "Error al eliminar", "error"); }
+    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo.", "error"); }
   }
 
   return {

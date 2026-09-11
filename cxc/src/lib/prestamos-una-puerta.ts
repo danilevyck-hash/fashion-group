@@ -117,6 +117,24 @@ export function destinoDePrestamos(pathname: string, search?: string): string | 
  * Con `sub` (el id de la ficha) es SIEMPRE la página de sus movimientos,
  * `/prestamos/<id>` — desde el 11-sep-2026 esa página no rebota.
  */
+/** El parámetro con el que la pestaña abre «+ Nuevo préstamo» con esa persona ya elegida. */
+export const PARAM_NUEVO_PRESTAMO = "nuevo";
+
+/**
+ * 🔴 «+ PRÉSTAMO» DESDE LA FICHA ABRE EL FORMULARIO CON ESA PERSONA (11-sep-2026).
+ *
+ * 🩸 Llevaba a la lista general y había que volver a buscarla. Sigue siendo la
+ * MISMA puerta (la pestaña y su formulario, no un formulario propio de la
+ * ficha): solo viaja el CÓDIGO en `?nuevo=`, y la pestaña elige a esa persona
+ * como si se la hubiera tocado en la lista. Con el interruptor apagado no hay
+ * pestaña: se va a la lista suelta, como antes.
+ */
+export function enlaceANuevoPrestamo(codigo: string): string {
+  const c = String(codigo ?? "").trim();
+  if (!planillaUnidaPrendida() || !c) return enlaceAPrestamos();
+  return `${PESTANA_PRESTAMOS}&${PARAM_NUEVO_PRESTAMO}=${encodeURIComponent(c)}`;
+}
+
 export function enlaceAPrestamos(sub?: string | null): string {
   const s = String(sub ?? "").trim();
   if (s) return `/prestamos/${encodeURIComponent(s)}`;

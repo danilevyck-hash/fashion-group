@@ -8,11 +8,13 @@
  * Préstamos y la casilla de la planilla— y para ESCRIBIR manda al módulo
  * `/prestamos`, que es donde viven la ficha, el historial y las aprobaciones.
  *
- * 🔴 LA REGLA DE QUIÉN APRUEBA NO CAMBIA: un préstamo nuevo lo aprueba **solo
- * Daniel**. Por eso «+ Préstamo» no abre un formulario acá: lleva a la ficha de
- * esa persona en Préstamos. Un segundo lugar para crear un préstamo sería un
- * segundo camino a la misma plata — que es exactamente el defecto que costó
- * $95,00 de diferencia entre el módulo y la casilla de la planilla en agosto.
+ * 🔴 «+ Préstamo» NO abre un formulario acá: lleva a la pestaña Préstamos con
+ * ESTA persona ya elegida (`enlaceANuevoPrestamo`, 11-sep-2026 — 🩸 antes caía
+ * en la lista general y había que volver a buscarla). Un segundo lugar para
+ * crear un préstamo sería un segundo camino a la misma plata — que es
+ * exactamente el defecto que costó $95,00 de diferencia entre el módulo y la
+ * casilla de la planilla en agosto. (La aprobación de Daniel se retiró el
+ * 11-sep-2026: ya no hay nada que aprobar.)
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { useCallback, useEffect, useState } from "react";
@@ -20,7 +22,7 @@ import Link from "next/link";
 // 🔴 El destino lo decide el interruptor: con la pestaña prendida el módulo
 // suelto ya no existe, y un enlace a una dirección que redirige es un rebote
 // de más. Sigue sin haber una tercera copia: acá se MUESTRA y se enlaza.
-import { enlaceAPrestamos } from "@/lib/prestamos-una-puerta";
+import { enlaceANuevoPrestamo, enlaceAPrestamos } from "@/lib/prestamos-una-puerta";
 
 import { desgloseDeuda, textoDeuda } from "@/lib/asistencia/ficha-persona";
 import Seccion, { Vacio } from "./Seccion";
@@ -89,9 +91,9 @@ export default function SeccionPrestamos({ codigo, refresco }: { codigo: string;
 
       <div className="mt-3 flex flex-wrap gap-2">
         {/* 🔴 LOS DOS BOTONES LLEVAN AL MÓDULO DE PRÉSTAMOS, no abren un
-            formulario propio: ahí viven la ficha, los movimientos y la regla
-            de que un préstamo lo aprueba Daniel. */}
-        <Link href={enlaceAPrestamos()}
+            formulario propio: ahí viven la ficha y los movimientos. El primero
+            llega con ESTA persona ya elegida. */}
+        <Link href={enlaceANuevoPrestamo(codigo)}
           className="inline-flex min-h-[44px] items-center rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black">
           + Préstamo
         </Link>

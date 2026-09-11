@@ -560,7 +560,10 @@ describe("H. 🔴 LAS CUATRO SECCIONES, CON LOS ENDPOINTS DE SIEMPRE", () => {
     // 🔑 LA REGLA QUE PROTEGE NO CAMBIÓ y su control se conserva INTACTO: acá
     // no se crea nada — ni un `<form>`, ni un POST. Se enlaza.
     const src = puro("app/asistencia/colaboradores/SeccionPrestamos.tsx");
-    expect(src).toMatch(/enlaceAPrestamos\(\)/);
+    // ⚠️ CAMBIÓ DE DIRECCIÓN EL 11-SEP-2026, NO SE BORRÓ: «+ Préstamo» llega a
+    // la MISMA pestaña con esta persona ya elegida (`enlaceANuevoPrestamo`),
+    // en vez de a la lista general. Sigue siendo un enlace, no un formulario.
+    expect(src).toMatch(/enlaceANuevoPrestamo\(codigo\)/);
     expect(src).not.toMatch(/method: "POST"/);
     expect(src).not.toMatch(/<form/);
   });

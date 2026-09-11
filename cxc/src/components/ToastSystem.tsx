@@ -1,5 +1,6 @@
 'use client'
 
+import { duracionToastMs } from '@/lib/ui/toast-duracion'
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
 import { useBackdropDismiss, useEscapeClose } from '@/lib/hooks/useModalDismiss'
 
@@ -33,7 +34,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const toast = useCallback((message: string, type: ToastType = 'success') => {
     const id = ++idCounter
     setToasts(prev => [...prev, { id, message, type }])
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000)
+    // La regla de la casa (CLAUDE.md): éxitos 3 s, errores y avisos 8 s. Un
+    // solo número por clase, en `lib/ui/toast-duracion.ts`.
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), duracionToastMs(type))
   }, [])
 
   const dismiss = useCallback((id: number) => {

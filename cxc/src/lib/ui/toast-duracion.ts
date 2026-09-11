@@ -15,7 +15,13 @@
 export const TOAST_MS_EXITO = 3000;
 export const TOAST_MS_ERROR = 8000;
 
-/** Milisegundos que un aviso se queda en pantalla antes de irse solo. */
-export function duracionToastMs(tipo: "success" | "error"): number {
-  return tipo === "error" ? TOAST_MS_ERROR : TOAST_MS_EXITO;
+/**
+ * Milisegundos que un aviso se queda en pantalla antes de irse solo.
+ *
+ * 🔴 UN AVISO (`warning`) DURA LO QUE UN ERROR (11-sep-2026): dice algo que hay
+ * que alcanzar a leer. 🩸 El «pasa el tope de un sueldo» de Préstamos salía
+ * como éxito verde y se iba a los 3 s.
+ */
+export function duracionToastMs(tipo: "success" | "error" | "warning"): number {
+  return tipo === "success" ? TOAST_MS_EXITO : TOAST_MS_ERROR;
 }

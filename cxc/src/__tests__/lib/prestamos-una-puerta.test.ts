@@ -209,7 +209,10 @@ describe("E. El cableado está puesto donde tiene que estar", () => {
 // (Daniel: *«no lo llames personas, sino colaboradores»*). Este candado cambió de
 // texto, no de regla. Ver `asistencia-colaboradores-no-personas.test.ts`.
     const src = leer("src/app/asistencia/colaboradores/SeccionPrestamos.tsx");
-    expect(src).toMatch(/enlaceAPrestamos\(\)/);
+    // ⚠️ CAMBIÓ DE DIRECCIÓN EL 11-SEP-2026, NO SE BORRÓ: «+ Préstamo» va a la
+    // pestaña CON la persona elegida (`enlaceANuevoPrestamo(codigo)`, que se
+    // arma sobre `enlaceAPrestamos()`), no a la lista general.
+    expect(src).toMatch(/enlaceANuevoPrestamo\(codigo\)/);
     expect(src).toMatch(/enlaceAPrestamos\(ficha\.id\)/);
     // 🔴 Ni un `<form>` ni un POST: acá se MUESTRA y se enlaza.
     expect(src).not.toMatch(/<form/);

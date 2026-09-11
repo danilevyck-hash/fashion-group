@@ -37,8 +37,9 @@
 // (`cerrarPlanillaRoles()`); acá solo se dibujan o no los botones y el enlace a
 // los movimientos, para no ofrecer algo que va a contestar 403.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { filtrarPorEmpresa } from "@/lib/asistencia/empresa-para-todo";
 import { useToast } from "@/components/ToastSystem";
 import { NOMBRE_CUENTA, type CuentaPrestamo } from "@/lib/prestamos-saldo";
@@ -46,7 +47,7 @@ import { ORIGENES_ABONO } from "@/lib/asistencia/abono-extra";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { quincenasHasta } from "@/lib/asistencia/planilla";
-import { enlaceAPrestamos } from "@/lib/prestamos-una-puerta";
+import { PARAM_NUEVO_PRESTAMO, enlaceAPrestamos } from "@/lib/prestamos-una-puerta";
 import type { Colaborador, DatosPrestamos } from "@/lib/prestamos-lista-server";
 import ElegirPersonaModal from "@/app/prestamos/components/ElegirPersonaModal";
 import NuevoMovimientoModal from "@/app/prestamos/components/NuevoMovimientoModal";
@@ -126,19 +127,45 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
 
   const movForm = useMovimientoForm({
     onSuccess: () => { setPersonaElegida(null); setDatosModulo(null); void cargar(); },
-    showToast: (m) => toast(m, m.startsWith("Error") || m.startsWith("Sin conexión") ? "error" : "success"),
+    // 🔴 El TIPO lo dice el hook, no el texto (11-sep-2026): el aviso del tope
+    // sale en ámbar y por 8 s. Antes se clasificaba por `startsWith("Error")`.
+    showToast: (m, tipo) => toast(m, tipo ?? "success"),
   });
 
-  async function abrirNuevoPrestamo() {
+  async function leerColaboradores(): Promise<DatosPrestamos | null> {
     try {
       const r = await fetch("/api/prestamos/empleados", { cache: "no-store" });
       if (!r.ok) throw new Error();
-      setDatosModulo((await r.json()) as DatosPrestamos);
-      setEligiendo(true);
+      const d = (await r.json()) as DatosPrestamos;
+      setDatosModulo(d);
+      return d;
     } catch {
       toast("No se pudo abrir la lista de colaboradores. Intenta de nuevo.", "error");
+      return null;
     }
   }
+
+  async function abrirNuevoPrestamo() {
+    if (await leerColaboradores()) setEligiendo(true);
+  }
+
+  // ── 🔴 SE LLEGA DESDE LA FICHA, CON LA PERSONA YA ELEGIDA (11-sep-2026) ────
+  // «+ Préstamo» de la ficha trae `?nuevo=<código>`: se abre el MISMO formulario
+  // como si se la hubiera tocado en la lista. Una vez por montaje.
+  const sp = useSearchParams();
+  const nuevoDeUrl = (sp?.get(PARAM_NUEVO_PRESTAMO) ?? "").trim();
+  const abiertoDesdeUrl = useRef(false);
+  useEffect(() => {
+    if (!nuevoDeUrl || !puedeAnotar || abiertoDesdeUrl.current) return;
+    abiertoDesdeUrl.current = true;
+    void (async () => {
+      const d = await leerColaboradores();
+      const c = d?.colaboradores.find((x) => String(x.codigo) === nuevoDeUrl);
+      if (c) void elegirPersona(c);
+      else toast("No encontré a esa persona entre los colaboradores activos.", "error");
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nuevoDeUrl, puedeAnotar]);
 
   /** Elegir a la persona crea (o encuentra) su ficha y abre el formulario — igual que el módulo. */
   async function elegirPersona(c: Colaborador) {
@@ -183,9 +210,11 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
 
   const modales = (
     <>
+      {/* 🔴 SOLO LOS DE LA EMPRESA ELEGIDA ARRIBA (11-sep-2026): la lista y el
+          total ya filtraban, el alta ofrecía a las 4. Con «Todas», todos. */}
       <ElegirPersonaModal
         open={eligiendo}
-        colaboradores={datosModulo?.colaboradores ?? []}
+        colaboradores={filtrarPorEmpresa(datosModulo?.colaboradores ?? [], props.empresa)}
         onClose={() => setEligiendo(false)}
         onElegir={(c) => void elegirPersona(c)}
       />
