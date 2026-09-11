@@ -617,11 +617,15 @@ describe("las pantallas grandes: el texto se fue del CÓDIGO y lo de al lado sig
       fuera: ["Un divisor + extra para todas las filas", "Cada marca usa su fórmula guardada", "{desc}"],
       sigue: ["Una fórmula para todo", "Fórmula guardada por marca", "Bloqueado: hay"],
     },
-    {
-      archivo: "app/admin/usuarios/DataHealthTab.tsx",
-      fuera: ["peor severity del día", "Gris = sin corrida"],
-      sigue: ["Historial 30 días"],
-    },
+    // 🔄 CAMBIO DE DIRECCIÓN, CON NOTA FECHADA (11-sep-2026). Acá vivía el caso
+    // de `app/admin/usuarios/DataHealthTab.tsx` («peor severity del día» y
+    // «Gris = sin corrida» fuera, «Historial 30 días» adentro). Esa PANTALLA se
+    // retiró entera — Daniel: «data health quiero que el sistema o tú mida todo
+    // pero no verlo… no lo uso y no lo quiero usar»—, así que el archivo no
+    // existe y no hay textos que podar. El caso no se aflojó: dejó de haber
+    // superficie, y quien lo exige ahora es
+    // `lib/data-health-sin-pantalla.test.ts` (el archivo no puede volver).
+    // La MEDICIÓN no se tocó: cron `integrity-check` + `data_integrity_checks`.
     {
       archivo: "app/clientes/[codigo]/ClienteDetail.tsx",
       fuera: ["editable en fashiongr"],

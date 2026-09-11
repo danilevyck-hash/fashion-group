@@ -17,14 +17,19 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import path from "path";
 
 const leer = (rel: string) => readFileSync(path.join(process.cwd(), "src", rel), "utf-8");
 
-// Data Health vive dentro de Usuarios desde el 13-ago-2026 (2ª pestaña). El
-// contrato táctil no cambió: es el mismo marcado, movido de archivo.
-const dataHealth = leer("app/admin/usuarios/DataHealthTab.tsx");
+// 🔄 CAMBIO DE DIRECCIÓN, CON NOTA FECHADA (11-sep-2026). Data Health vivió
+// dentro de Usuarios como 2ª pestaña desde el 13-ago-2026 y ese día su PANTALLA
+// se retiró entera — Daniel: «data health quiero que el sistema o tú mida todo
+// pero no verlo… no lo uso y no lo quiero usar». El archivo
+// `DataHealthTab.tsx` ya no existe, así que el bloque táctil que lo medía
+// cambió de dirección (ver abajo) en vez de borrarse: ahora exige que NO haya
+// nada que medir. La medición de integridad no se tocó — vive en el cron
+// `integrity-check` y en `data_integrity_checks`.
 const usuarios = leer("app/admin/usuarios/page.tsx");
 const panelCxc = leer("app/cxc/components/PanelCxcMobile.tsx");
 const clientes = leer("app/clientes/ClientesListClient.tsx");
@@ -39,49 +44,25 @@ function tamanosArbitrarios(src: string): number[] {
   return [...src.matchAll(/text-\[(\d+(?:\.\d+)?)px\]/g)].map((m) => parseFloat(m[1]));
 }
 
-describe("Data Health — la tabla de estado se puede leer entera en iPhone", () => {
-  // 🩸 ACTUALIZADO 30-jul-2026. La garantía se hizo MÁS FUERTE, no se aflojó.
-  //
-  // Este bloque nació cuando la card tenía `overflow-hidden` y la tabla (691px)
-  // se recortaba a 340px SIN scroll: 351px inalcanzables, justo Severity y Rows.
-  // El arreglo de entonces fue un `overflow-x-auto` — el dato dejaba de ser
-  // INALCANZABLE, pero seguía habiendo que arrastrar: 353px medidos a 390 y
-  // 133px a 834.
-  //
-  // Ahora, hasta `lg`, la tabla es TARJETAS y el arrastre es **0**; la tabla
-  // (con su scroller y su `min-w`) sigue igual de `lg` para arriba, que es donde
-  // entra sola. Por eso el test ya no exige el scroller a secas: exige las DOS
-  // vistas. Detalle en `__tests__/lib/depurador-reclamos-datahealth-anchos`.
-  it("en angosto son tarjetas (0px de arrastre), no una tabla que se arrastra", () => {
-    const i = dataHealth.indexOf("Estado actual por check");
-    expect(i).toBeGreaterThan(-1);
-    const j = dataHealth.indexOf("</table>", i);
-    const bloque = dataHealth.slice(i, j);
-    expect(bloque).toContain('data-medir="dh-checks"');
-    expect(bloque).toContain('lg:hidden divide-y');
-    // Y la tarjeta sigue mostrando lo que se perdía: Severity y Rows.
-    expect(bloque).toContain("badge.label");
-    expect(bloque).toContain("r.rows_affected");
+describe("Data Health — ya no hay pantalla que medir (11-sep-2026)", () => {
+  // El bloque anterior exigía tarjetas en angosto, tabla con scroller de `lg`
+  // para arriba y un botón de 44px dentro de `DataHealthTab.tsx`. Esa pantalla
+  // se retiró, así que la garantía pasó a ser la contraria: el archivo no
+  // existe y nada del sistema lo importa. Lo que medía no se aflojó — dejó de
+  // haber superficie.
+  it("`DataHealthTab.tsx` no existe", () => {
+    expect(existsSync(path.join(process.cwd(), "src/app/admin/usuarios/DataHealthTab.tsx"))).toBe(false);
   });
 
-  it("de lg para arriba sigue la tabla, con su scroller y su min-w", () => {
-    const i = dataHealth.indexOf("Estado actual por check");
-    const j = dataHealth.indexOf("</table>", i);
-    const bloque = dataHealth.slice(i, j);
-    expect(bloque).toContain('<div className="hidden lg:block overflow-x-auto" data-vista="tabla">');
-    // min-w evita que la tabla se comprima en vez de scrollear.
-    expect(bloque).toMatch(/<table className="w-full min-w-\[\d+px\] text-sm">/);
+  it("la página de Usuarios no lo monta ni lo importa", () => {
+    expect(usuarios).not.toContain("DataHealthTab");
   });
 
-  it("el div que scrollea se cierra (no queda JSX desbalanceado)", () => {
-    const i = dataHealth.indexOf('<div className="hidden lg:block overflow-x-auto" data-vista="tabla">');
-    const j = dataHealth.indexOf("</table>", i);
-    expect(dataHealth.slice(j, j + 60)).toContain("</div>");
-  });
-
-  it("'Correr checks ahora' llega a 44px", () => {
-    expect(dataHealth).toContain("min-h-[44px]");
-    expect(dataHealth).not.toContain("min-h-[40px]");
+  // CONTROL: lo que SÍ quedó de esa pantalla —las otras pestañas— sigue
+  // cumpliendo el contrato táctil de 44px. Sin esto, el bloque de arriba
+  // pasaría igual con la pantalla de Usuarios rota.
+  it("CONTROL: Usuarios conserva sus tocables de 44px", () => {
+    expect(usuarios).toContain("min-h-[44px]");
   });
 });
 
@@ -161,7 +142,7 @@ describe("Nombres cortados — letra más chica, nunca por debajo de 12px", () =
   });
 
   it("ninguna de estas pantallas baja del piso de 12px", () => {
-    for (const [nombre, src] of Object.entries({ panelCxc, vistaGeneral, proveedores, clientes, usuarios, dataHealth })) {
+    for (const [nombre, src] of Object.entries({ panelCxc, vistaGeneral, proveedores, clientes, usuarios })) {
       for (const px of tamanosArbitrarios(src)) {
         // text-[10px]/[11px] existen como decoración (badges, sufijos de
         // empresa), NO como el dato principal. El piso aplica a los nombres.

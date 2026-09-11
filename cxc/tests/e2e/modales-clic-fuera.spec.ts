@@ -132,21 +132,21 @@ conSesion("usuarios: el formulario a medio llenar no se pierde por un clic", asy
   await expect(modal).toBeVisible();
 });
 
-// ── 6. Data health: detalle del check cierra con clic fuera y con Escape ──
-conSesion("data-health: el detalle cierra con clic fuera y con Escape", async ({ context, page }) => {
+// ── 6. Data health: la pantalla se retiró (11-sep-2026) ──
+//
+// 🔄 CAMBIO DE DIRECCIÓN, CON NOTA FECHADA. NO SE BORRÓ.
+//
+// Este caso abría `/admin/data-health`, tocaba una fila y comprobaba que el
+// detalle cerrara con clic fuera y con Escape. Daniel retiró esa PANTALLA:
+// «data health quiero que el sistema o tú mida todo pero no verlo… no lo uso y
+// no lo quiero usar». Sin pantalla no hay modal que cerrar, así que el caso
+// pasa a comprobar lo único que queda de esa dirección: que no dé 404 y lleve
+// al Inicio. La MEDICIÓN sigue entera (cron `integrity-check` +
+// `data_integrity_checks`) y se consulta por `GET /api/diag/data-health`.
+conSesion("data-health: la dirección vieja lleva al Inicio, no a un 404", async ({ context, page }) => {
   await autenticar(context, page);
   await page.goto(`${BASE}/admin/data-health`);
-  const fila = page.locator("tbody tr").first();
-  await fila.waitFor({ timeout: 25_000 });
-  await fila.click();
-
-  const modal = page.locator("div.fixed.inset-0.z-50").first();
-  await expect(modal).toBeVisible({ timeout: 10_000 });
-  await clicEnBackdrop(page, modal);
-  await expect(modal).toBeHidden();
-
-  await fila.click();
-  await expect(modal).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(modal).toBeHidden();
+  await page.waitForURL(`${BASE}/home`, { timeout: 25_000 });
+  // CONTROL: llegó al Inicio de verdad, no a una pantalla en blanco.
+  await expect(page.locator("h1, h2").first()).toBeVisible({ timeout: 10_000 });
 });

@@ -18,6 +18,28 @@
  * Por eso los tests de acá miran las DOS direcciones:
  *   · nadie que no fuera admin gana Data Health (ni por rol, ni por override);
  *   · nadie que tuviera algo lo pierde (los 5 roles no-admin quedan idénticos).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * 🔄 CAMBIO DE DIRECCIÓN, CON NOTA FECHADA (11-sep-2026). NINGÚN CASO SE BORRÓ.
+ *
+ * Daniel, textual: «data health quiero que el sistema o tú mida todo pero no
+ * verlo… no lo uso y no lo quiero usar». Y antes: «yo no uso Data Health,
+ * nunca lo veo». La PANTALLA se retiró entera: se fue la 2ª pestaña, se fue el
+ * aviso del Inicio y `DataHealthTab.tsx` dejó de existir.
+ *
+ * 🔴 LA MEDICIÓN NO SE TOCÓ Y ES LO QUE IMPORTA: el cron `integrity-check`
+ * sigue a las 12:00 UTC, `data_integrity_checks` sigue insert-only (870 filas
+ * y 121 corridas al 11-sep-2026), `LIVE_CHECK_NAMES` no cambió y un check
+ * `critical` sigue avisando por 🔧 SISTEMA. Lo que queda para MIRARLO sin
+ * pantalla es `GET /api/diag/data-health` (CRON_SECRET o sesión de admin).
+ * Eso lo exige el candado nuevo, `data-health-sin-pantalla.test.ts`.
+ *
+ * Acá, los bloques 3 (la pestaña), 4 (el redirect) y 5 (la mudanza llegó
+ * entera) cambiaron de dirección: exigen lo CONTRARIO, con el mismo detalle y
+ * con controles para que la ausencia no sea un test que pasa por vacío. Los
+ * bloques 1, 2, 6 y 7 —el catálogo, quién ve qué, un solo h1 y el patrón de
+ * pestañas— siguen EXACTAMENTE como estaban: eran sobre Usuarios, no sobre
+ * Data Health, y esa pantalla no se movió.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "fs";
@@ -48,6 +70,8 @@ function plano(src: string): string {
 }
 
 const PAGINA = "src/app/admin/usuarios/page.tsx";
+// 🔄 11-sep-2026: este archivo YA NO EXISTE. La constante se conserva porque
+// varios casos de abajo exigen justamente su ausencia.
 const PESTANA = "src/app/admin/usuarios/DataHealthTab.tsx";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -192,12 +216,19 @@ describe("la pantalla sigue siendo solo de admin", () => {
       .not.toContain('moduleKey: "usuarios"');
   });
 
-  it("la pestaña de Data Health solo se dibuja y solo se monta para admin", () => {
+  // 🔄 CAMBIO DE DIRECCIÓN (11-sep-2026). Exigía que la pestaña de Data Health
+  // se dibujara y se montara SOLO para admin. La pestaña se retiró, así que
+  // ahora se exige que no exista — ni el trigger ni el contenido.
+  it("la pestaña de Data Health ya no se dibuja ni se monta", () => {
     const src = plano(leer(PAGINA));
     expect(src).toContain('const esAdmin = role === "admin"');
-    // El trigger y el contenido, los dos detrás del mismo gate.
-    expect(src).toMatch(/\{esAdmin && \(\s*<TabsTrigger value="data-health"/);
-    expect(src).toMatch(/\{esAdmin && \(\s*<TabsContent value="data-health"/);
+    expect(src).not.toContain('<TabsTrigger value="data-health"');
+    expect(src).not.toContain('<TabsContent value="data-health"');
+    expect(src).not.toContain("DataHealthTab");
+    // CONTROL: el gate de admin sigue vivo y sigue protegiendo a la pestaña
+    // que SÍ quedó («Novedades»). Sin esto, borrar `esAdmin` entero pasaría.
+    expect(src).toMatch(/\{esAdmin && \(\s*<TabsTrigger value="novedades"/);
+    expect(src).toMatch(/\{esAdmin && \(\s*<TabsContent value="novedades"/);
   });
 
   // ⚠️ CAMBIÓ DE DIRECCIÓN EL 9-sep-2026, y no se borró.
@@ -210,18 +241,29 @@ describe("la pantalla sigue siendo solo de admin", () => {
   // pestaña que se le abre a quien no debe.
   //
   // Lo que el candado protege NO cambió: un `?tab=` que este rol no puede ver
-  // cae en «Usuarios», nunca en blanco. Ahora se exige eso mismo sobre la lista,
-  // y que Data Health SIGA adentro de ella — el control original.
+  // cae en «Usuarios», nunca en blanco.
+  //
+  // 🔄 11-sep-2026: `data-health` salió de `SOLO_ADMIN` porque salió de `TABS`.
+  // Un `?tab=data-health` guardado en un marcador ahora cae en Usuarios por la
+  // MISMA regla que cualquier basura: no está en `TABS`. Se exige eso.
   it("un `?tab=` que este rol no puede ver cae en Usuarios, nunca en blanco", () => {
     const src = plano(leer(PAGINA));
-    expect(src).toMatch(/const SOLO_ADMIN[^\n]*=\s*\[[^\]]*"data-health"/);
+    expect(src).toMatch(/const SOLO_ADMIN[^\n]*=\s*\[[^\]]*"novedades"/);
     expect(src).toContain("!SOLO_ADMIN.includes(tabRaw) || esAdmin");
     expect(src).toContain(': "usuarios"');
+    // `data-health` no está en TABS: un marcador viejo cae en Usuarios.
+    expect(src).toMatch(/const TABS = \["usuarios", "novedades"\] as const/);
   });
 
-  it("la API de Data Health sigue exigiendo admin", () => {
-    const api = plano(leer("src/app/api/admin/data-health/route.ts"));
-    expect(api).toMatch(/requireRole\(req,\s*\["admin"\]\)/);
+  // 🔄 CAMBIO DE DIRECCIÓN (11-sep-2026). Exigía que
+  // `/api/admin/data-health` pidiera admin. Esa ruta servía a la pantalla y se
+  // retiró; la lectura vive ahora en `/api/diag/data-health`, con CRON_SECRET
+  // o sesión de admin. El detalle de su puerta lo exige el candado nuevo.
+  it("la ruta que servía a la pantalla se retiró, y la de lectura pide auth", () => {
+    expect(existsSync(join(raiz, "src/app/api/admin/data-health/route.ts"))).toBe(false);
+    const api = plano(leer("src/app/api/diag/data-health/route.ts"));
+    expect(api).toContain("process.env.CRON_SECRET");
+    expect(api).toContain('verifySession(req.cookies.get("cxc_session")?.value)?.role === "admin"');
   });
 });
 
@@ -229,32 +271,48 @@ describe("la pantalla sigue siendo solo de admin", () => {
 // 4. La dirección vieja tiene que seguir llegando
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("`/admin/data-health` sigue funcionando", () => {
-  it("hay un redirect a la pestaña, con el mismo mecanismo que los slugs viejos", () => {
+describe("`/admin/data-health` sigue llegando a algún lado", () => {
+  // 🔄 CAMBIO DE DIRECCIÓN (11-sep-2026). El destino era la pestaña; ahora es
+  // el Inicio, porque la pestaña no existe. Lo que este bloque protege NO
+  // cambió: la dirección vieja —que Daniel tiene en marcadores y que las
+  // alertas de integridad le mandaron por Telegram durante meses— no puede
+  // terminar en un 404.
+  it("redirige al Inicio, con el mismo mecanismo que los slugs viejos", () => {
     const cfg = leer("next.config.js");
-    expect(cfg).toContain('source: "/admin/data-health"');
-    expect(cfg).toContain('destination: "/admin/usuarios?tab=data-health"');
-    // Temporal, como el resto: no se quema en el caché del navegador.
-    const linea = cfg.split("\n").find((l) => l.includes('source: "/admin/data-health"'))!;
-    expect(linea).toContain("permanent: false");
+    for (const ruta of ["/admin/data-health", "/data-health"]) {
+      const linea = cfg.split("\n").find((l) => l.includes(`source: "${ruta}"`));
+      expect(linea, `falta el redirect de ${ruta}`).toBeTruthy();
+      expect(linea!).toContain('destination: "/home"');
+      // Temporal, como el resto: no se quema en el caché del navegador.
+      expect(linea!).toContain("permanent: false");
+    }
   });
 
   it("la ruta vieja ya no existe (si existiera, ganaría sobre el redirect)", () => {
     expect(existsSync(join(raiz, "src/app/admin/data-health/page.tsx"))).toBe(false);
+    expect(existsSync(join(raiz, "src/app/data-health"))).toBe(false);
   });
 
-  it("la alerta de integridad y el aviso del Inicio apuntan a la pestaña", () => {
-    expect(plano(leer("src/lib/integrity-check-run.ts")))
-      .toContain("https://fashiongr.com/admin/usuarios?tab=data-health");
-    expect(plano(leer("src/app/home/page.tsx")))
-      .toContain('router.push("/admin/usuarios?tab=data-health")');
+  // 🔄 CAMBIO DE DIRECCIÓN (11-sep-2026). Exigía que la alerta y el aviso del
+  // Inicio apuntaran a la pestaña. El aviso del Inicio se retiró y la alerta
+  // dejó de llevar link: mandar a Daniel a una pantalla que no existe es el
+  // marcador roto que este repo evita. El aviso 🔧 SISTEMA se basta solo.
+  it("la alerta de integridad ya no manda a ninguna pantalla", () => {
+    const alerta = plano(leer("src/lib/integrity-check-run.ts"));
+    expect(alerta).not.toContain("https://fashiongr.com");
+    expect(alerta).not.toContain("Dashboard:");
+    // CONTROL: sigue diciendo lo que pasó (check, tabla, filas) y sigue
+    // saliendo por el canal de sistema. Sin esto, vaciar la función pasaría.
+    expect(alerta).toContain("🔴 Integridad:");
+    expect(alerta).toContain("r.check_name");
+    expect(alerta).toContain("enviarSistema(buildCriticalAlert(criticals))");
   });
 
   it("no quedó ningún enlace VIVO a la dirección vieja dentro de la app", () => {
-    // La API `/api/admin/data-health` NO se tocó y no cuenta acá.
-    for (const archivo of [PAGINA, PESTANA, "src/app/home/page.tsx", "src/lib/integrity-check-run.ts", "src/lib/modules.ts"]) {
-      const src = plano(leer(archivo)).replace(/\/api\/admin\/data-health/g, "");
+    for (const archivo of [PAGINA, "src/app/home/page.tsx", "src/lib/integrity-check-run.ts", "src/lib/modules.ts"]) {
+      const src = plano(leer(archivo));
       expect(src, `${archivo} todavía enlaza la dirección vieja`).not.toContain("/admin/data-health");
+      expect(src, `${archivo} todavía enlaza la pestaña vieja`).not.toContain("?tab=data-health");
     }
   });
 });
@@ -263,43 +321,39 @@ describe("`/admin/data-health` sigue funcionando", () => {
 // 5. No se perdió NADA de Data Health — es una mudanza
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("la pantalla de Data Health llegó entera", () => {
-  // 🩸 SIN COMENTARIOS, Y NO ES UN DETALLE. La primera versión de este bloque
-  // leía el archivo crudo, y el comentario de cabecera de `DataHealthTab.tsx`
-  // enumera justamente las piezas que hay que conservar ("…el detalle en modal
-  // y el botón «Correr checks ahora»"). Verificado por mutación: borrar el
-  // BOTÓN dejaba el test en VERDE, porque se daba por satisfecho con su propia
-  // explicación. Un candado así da permiso para romper.
-  const src = plano(leer(PESTANA));
-
-  it("existe como pestaña y la página la monta", () => {
-    expect(existsSync(join(raiz, PESTANA))).toBe(true);
-    expect(plano(leer(PAGINA))).toContain('import DataHealthTab from "./DataHealthTab"');
-    expect(plano(leer(PAGINA))).toContain("<DataHealthTab />");
+describe("la pantalla de Data Health se retiró entera (11-sep-2026)", () => {
+  // 🔄 CAMBIO DE DIRECCIÓN, CON NOTA FECHADA. NADA SE BORRÓ.
+  //
+  // Este bloque exigía que la MUDANZA del 13-ago no perdiera nada: las cuatro
+  // piezas de la pantalla, las dos lecturas y las seis explicaciones de checks,
+  // todo dentro de `DataHealthTab.tsx`. El 11-sep Daniel pidió lo contrario:
+  // «data health quiero que el sistema o tú mida todo pero no verlo… no lo uso
+  // y no lo quiero usar». Así que ahora se exige que la pantalla NO esté —y,
+  // pieza por pieza, que lo que MIDE siga estando—. Un test de ausencia pasa
+  // por vacío con una ruta mal escrita, así que cada caso lleva su CONTROL.
+  it("el componente no existe y la página no lo monta", () => {
+    expect(existsSync(join(raiz, PESTANA))).toBe(false);
+    const pag = plano(leer(PAGINA));
+    expect(pag).not.toContain('import DataHealthTab from "./DataHealthTab"');
+    expect(pag).not.toContain("<DataHealthTab />");
   });
 
-  it("conserva las cuatro piezas de la pantalla", () => {
-    // KPI por severidad, lista de checks, mapa de 30 días y detalle en modal.
-    for (const pieza of [
-      "Estado actual por check",
-      "Historial 30 días",
-      "Detalles técnicos",
-      "Correr checks ahora",
-      "SEVERITY_MEANING",
-      "CHECK_INFO",
-      "buildLast30Days",
-      "<ModalOverlay",
-    ]) {
-      expect(src, `falta "${pieza}"`).toContain(pieza);
-    }
+  it("🔴 CONTROL: lo que MIDE sigue entero — el cron, los checks y la tabla", () => {
+    // La lógica que corre los chequeos, intacta.
+    expect(existsSync(join(raiz, "src/lib/integrity-checks.ts"))).toBe(true);
+    expect(existsSync(join(raiz, "src/lib/integrity-check-run.ts"))).toBe(true);
+    expect(existsSync(join(raiz, "src/app/api/cron/integrity-check/route.ts"))).toBe(true);
+    const checks = plano(leer("src/lib/integrity-checks.ts"));
+    expect(checks).toContain("export const LIVE_CHECK_NAMES");
+    // Escribe en la tabla, que es insert-only y no se toca.
+    expect(checks).toContain('from("data_integrity_checks")');
   });
 
-  it("sigue leyendo y sigue pudiendo correr los checks a mano", () => {
-    expect(src).toContain('fetch("/api/admin/data-health", { cache: "no-store" })');
-    expect(src).toContain('fetch("/api/cron/integrity-check", { cache: "no-store" })');
-  });
-
-  it("los 6 checks explicados siguen explicados", () => {
+  it("🔴 CONTROL: los 6 checks vivos siguen vivos", () => {
+    // Eran las seis explicaciones de la PANTALLA; ahora se exigen donde de
+    // verdad importan: en la allowlist que decide qué se mide y se muestra.
+    const checks = plano(leer("src/lib/integrity-checks.ts"));
+    const lista = checks.slice(checks.indexOf("export const LIVE_CHECK_NAMES"));
     for (const check of [
       "cheques_criticos_null",
       "prestamos_saldo_anomalo",
@@ -308,18 +362,8 @@ describe("la pantalla de Data Health llegó entera", () => {
       "aging_dias_anomalo",
       "switch_facturas_continuidad",
     ]) {
-      // 🩸 Se exige la ENTRADA del diccionario, no el texto suelto. Con un
-      // `toContain(check)` a secas, renombrar la clave a `aging_dias_anomalo_XX`
-      // —que rompe el pareo con `check_name` y deja el check sin explicación en
-      // pantalla— seguía pasando en verde: el nombre viejo es prefijo del nuevo.
-      // Verificado por mutación.
-      expect(src, `se perdió la explicación de ${check}`).toContain(`${check}: {`);
+      expect(lista, `se perdió el check ${check}`).toContain(`"${check}"`);
     }
-  });
-
-  it("dejó de ser una página: sin AppHeader y sin su propio guard", () => {
-    expect(src).not.toContain("AppHeader");
-    expect(src).not.toContain("useAuth");
   });
 });
 
@@ -334,14 +378,18 @@ describe("la página tiene UN encabezado, no dos", () => {
     expect((p.match(/<h1\b/g) || []).length).toBe(1);
   });
 
-  it("🔴 la pestaña NO trae h1 propio (si no, el documento tendría dos)", () => {
-    expect((plano(leer(PESTANA)).match(/<h1\b/g) || []).length).toBe(0);
+  // 🔄 11-sep-2026: exigía que `DataHealthTab.tsx` no trajera h1 propio. El
+  // archivo se retiró, así que la garantía es más fuerte: no hay segundo h1
+  // posible porque no hay segundo archivo. El conteo de arriba lo cubre.
+  it("🔴 no quedó ninguna pestaña con h1 propio", () => {
+    expect(existsSync(join(raiz, PESTANA))).toBe(false);
+    // CONTROL: la pestaña que SÍ quedó tampoco trae uno.
+    expect((plano(leer("src/app/admin/usuarios/NovedadesTab.tsx")).match(/<h1\b/g) || []).length).toBe(0);
   });
 
   it("las filas que quedaron con un solo botón dicen `justify-end`", () => {
     // Sin esto el botón se va al borde IZQUIERDO y se ve colgando.
     expect(plano(leer(PAGINA))).toContain("flex items-end justify-end gap-4 flex-wrap");
-    expect(plano(leer(PESTANA))).toContain("flex flex-wrap items-start justify-end gap-4 mb-6");
   });
 });
 
@@ -367,8 +415,12 @@ describe("las pestañas siguen el patrón de Ventas y Multifashion", () => {
     expect(src).toMatch(/<Suspense>\s*<UsuariosPageInner \/>\s*<\/Suspense>/);
   });
 
-  it("las dos pestañas se llaman como se llamaban las dos pantallas", () => {
+  // 🔄 11-sep-2026: eran dos pestañas (Usuarios · Data Health) y hoy son dos
+  // distintas (Usuarios · Novedades). Data Health se retiró y no puede volver
+  // por acá sin que el candado nuevo lo cace.
+  it("las pestañas dicen su nombre, y ninguna dice Data Health", () => {
     expect(src).toContain("> Usuarios");
-    expect(src).toContain("> Data Health");
+    expect(src).toContain("> Novedades");
+    expect(src).not.toContain("Data Health");
   });
 });

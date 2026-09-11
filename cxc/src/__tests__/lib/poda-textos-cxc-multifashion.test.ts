@@ -236,9 +236,12 @@ const SE_FUE: { archivo: string; que: string; texto: string }[] = [
   { archivo: "app/cxc/components/PanelCxcMobile.tsx", que: "CXC celular · h1 grande 'Cuentas por Cobrar' (el de escritorio ya se había ido)", texto: "text-[22px] font-medium leading-tight" },
   { archivo: "app/clientes/ClientesListClient.tsx", que: "Clientes · h1 grande 'Clientes'", texto: 'tracking-tight">Clientes' },
   { archivo: "app/proveedores/ProveedoresListClient.tsx", que: "Proveedores · h1 grande 'Proveedores'", texto: 'tracking-tight">Proveedores' },
-  // Data Health pasó a ser la 2ª pestaña de Usuarios (13-ago-2026): el archivo
-  // se mudó y el h1 se fue del todo (la página tiene UNO solo, "Usuarios").
-  { archivo: "app/admin/usuarios/DataHealthTab.tsx", que: "Data Health · h1 grande 'Data Health'", texto: 'text-2xl font-semibold text-gray-900">Data Health' },
+  // 🔄 CAMBIO DE DIRECCIÓN, CON NOTA FECHADA (11-sep-2026). Acá vivía el caso de
+  // `DataHealthTab.tsx` (su h1 grande se había ido el 13-ago al volverse
+  // pestaña). Esa pantalla se retiró entera — Daniel: «data health quiero que el
+  // sistema o tú mida todo pero no verlo… no lo uso y no lo quiero usar» — así
+  // que no hay archivo ni h1 que vigilar. Lo exige
+  // `lib/data-health-sin-pantalla.test.ts`. La medición no se tocó.
   // Usuarios estrenó pestañas en el mismo cambio, y su h1 visible decía la
   // misma palabra que la pestaña de al lado: pasa a `sr-only`.
   { archivo: "app/admin/usuarios/page.tsx", que: "Usuarios · h1 grande 'Usuarios' (la pestaña ya lo dice)", texto: 'text-2xl sm:text-[28px] text-gray-900' },
@@ -379,11 +382,9 @@ const ENCABEZADO_SR_ONLY: { archivo: string; nombre: string }[] = [
   { archivo: "app/cxc/components/PanelCxcMobile.tsx", nombre: "Cuentas por Cobrar" },
   { archivo: "app/clientes/ClientesListClient.tsx", nombre: "Clientes" },
   { archivo: "app/proveedores/ProveedoresListClient.tsx", nombre: "Proveedores" },
-  // Data Health dejó de ser una PÁGINA el 13-ago-2026: es la 2ª pestaña de
-  // Usuarios, así que su encabezado ahora es el de Usuarios. El invariante no
-  // se aflojó — se mudó de archivo y encima se volvió más estricto: hay un test
-  // aparte que exige que `DataHealthTab.tsx` NO tenga h1, para que la página no
-  // termine con dos.
+  // Data Health dejó de ser una PÁGINA el 13-ago-2026 (pasó a 2ª pestaña de
+  // Usuarios) y el 11-sep-2026 la pantalla se retiró entera. El encabezado que
+  // queda es el de Usuarios, y sigue siendo UNO solo y `sr-only`.
   { archivo: "app/admin/usuarios/page.tsx", nombre: "Usuarios" },
   { archivo: "app/guias/components/GuiasList.tsx", nombre: "Guías de Despacho" },
   { archivo: "app/reclamos/components/EmpresaSelector.tsx", nombre: "Reclamos" },

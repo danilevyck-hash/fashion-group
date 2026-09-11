@@ -36,7 +36,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import path from "path";
 
 const leer = (rel: string) => readFileSync(path.join(process.cwd(), rel), "utf8");
@@ -44,9 +44,15 @@ const leer = (rel: string) => readFileSync(path.join(process.cwd(), rel), "utf8"
 const CARGAR = "src/app/productos/cargar/page.tsx";
 const HISTORIAL = "src/app/productos/cargar/HistorialView.tsx";
 const FORMULAS = "src/app/productos/cargar/FormulasConfig.tsx";
-// Data Health dejó de ser un módulo suelto el 13-ago-2026: es la 2ª PESTAÑA
-// de Usuarios. La pantalla es la MISMA (mudanza, no recorte), así que estos
-// candados siguen valiendo tal cual — solo cambió dónde vive el archivo.
+// 🔄 CAMBIO DE DIRECCIÓN, CON NOTA FECHADA (11-sep-2026). Data Health dejó de
+// ser un módulo suelto el 13-ago-2026 (pasó a 2ª pestaña de Usuarios) y el
+// 11-sep su PANTALLA se retiró entera — Daniel: «data health quiero que el
+// sistema o tú mida todo pero no verlo… no lo uso y no lo quiero usar». Los
+// tres candados de anchos que había acá cambiaron de dirección (abajo): ya no
+// hay tabla, ni mapa de 30 días, ni leyenda que medir. No se aflojó nada —
+// dejó de haber superficie. La MEDICIÓN sigue entera en el cron
+// `integrity-check` y en `data_integrity_checks`; se consulta por
+// `GET /api/diag/data-health`.
 const DATAHEALTH = "src/app/admin/usuarios/DataHealthTab.tsx";
 const RECLAMO_DETALLE = "src/app/reclamos/components/ReclamoDetail.tsx";
 const EMPRESA_LIST = "src/app/reclamos/components/EmpresaList.tsx";
@@ -130,25 +136,18 @@ describe("Depurador › Fórmulas — era la peor pestaña en área táctil", ()
   });
 });
 
-describe("Data Health — tabla de checks y mapa de 30 días", () => {
-  it("la tabla de checks tiene marca fija y corte lg", () => {
-    const src = leer(DATAHEALTH);
-    expect(src).toContain('data-medir="dh-checks"');
-    expect(src).toContain("lg:hidden divide-y");
-    expect(src).toContain("hidden lg:block overflow-x-auto");
+describe("Data Health — la pantalla se retiró (11-sep-2026)", () => {
+  it("el archivo que se medía ya no existe", () => {
+    expect(existsSync(path.join(process.cwd(), DATAHEALTH))).toBe(false);
   });
 
-  it("el mapa de 30 días ENVUELVE hasta xl — no es una tabla, es una cuadrícula", () => {
-    const src = leer(DATAHEALTH);
-    expect(src).toContain("xl:hidden space-y-3");
-    expect(src).toContain("hidden xl:block overflow-x-auto");
-    // Los puntos bajan de renglón: 0px de arrastre por construcción.
-    expect(src).toContain("flex flex-wrap gap-1");
-  });
-
-  it("la leyenda de severidad envuelve (la card la RECORTA: overflow-hidden sin scroller)", () => {
-    const src = leer(DATAHEALTH);
-    expect(src).toContain("flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 text-xs");
+  // CONTROL al revés: las otras pantallas de este archivo SÍ siguen existiendo.
+  // Sin él, un `existsSync` mal escrito daría `false` para todas y el bloque de
+  // arriba pasaría sin probar nada.
+  it("CONTROL: las otras pantallas de anchos siguen ahí", () => {
+    for (const f of [CARGAR, HISTORIAL, FORMULAS, RECLAMO_DETALLE, EMPRESA_LIST, GUIA_DETAIL]) {
+      expect(existsSync(path.join(process.cwd(), f)), f).toBe(true);
+    }
   });
 });
 
