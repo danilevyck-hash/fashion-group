@@ -149,9 +149,12 @@ describe("Préstamos · el barrido del resto del módulo", () => {
     expect(existsSync(join(src, "app", "prestamos", "aprobaciones", "page.tsx"))).toBe(false);
   });
 
-  it("detalle · Pago Quincenal y + Nuevo Movimiento llegan a 44 (medían 37)", () => {
+  it("detalle · Pago Quincenal, Anotar abono y + Nuevo préstamo llegan a 44 (medían 37)", () => {
+    // ⚠️ 11-sep-2026: eran 2 botones (Pago Quincenal · + Nuevo Movimiento); son 3
+    // («Anotar abono» y «+ Nuevo préstamo a …» son los dos caminos del mockup, y
+    // Pago Quincenal solo sin la planilla unida). Los tres miden 44.
     expect(detalle).not.toMatch(/px-5 py-2 rounded-md text-sm/);
-    expect((detalle.match(/min-h-\[44px\]/g) ?? []).length).toBe(2);
+    expect((detalle.match(/min-h-\[44px\]/g) ?? []).length).toBe(3);
   });
 
   it("EmpleadoHeader · Editar y ← Colaboradores llegan a 44 (medían 39)", () => {
@@ -185,9 +188,10 @@ describe("Préstamos · el barrido del resto del módulo", () => {
     expect(danger).not.toContain("Forzar Archivado");
   });
 
-  it("NuevoMovimientoModal · los 3 conceptos y las píldoras llegan a 44", () => {
+  it("NuevoMovimientoModal · los 4 conceptos y las píldoras llegan a 44", () => {
     // 🩸 La flecha «atrás» de 16×16 se fue con el modal de dos pasos: el
-    // formulario es UNO solo (tres conceptos, no seis tarjetas para cinco).
+    // formulario es UNO solo (cuatro conceptos desde el 11-sep-2026 —entró
+    // «Descuento a terceros»—, no seis tarjetas para cinco).
     expect(movModal).not.toContain('className="text-gray-400 hover:text-black transition"');
     // Los tres conceptos, las dos cuentas de «Baja de» y los cinco orígenes.
     expect((movModal.match(/min-h-\[44px\]/g) ?? []).length).toBeGreaterThanOrEqual(6);

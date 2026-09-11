@@ -6,6 +6,7 @@ import {
   CONCEPTO_DANO,
   CONCEPTO_PAGO,
   CONCEPTO_PRESTAMO,
+  CONCEPTO_TERCEROS,
   ORIGENES_QUE_SE_OFRECEN,
 } from "@/lib/prestamos-conceptos";
 import {
@@ -37,10 +38,18 @@ import { MOV_TIPOS } from "./types";
  * no decide nada (Daniel: *«Aprobar préstamos: eso también se quita»*): el
  * préstamo se registra igual y el aviso dice los números y que se le avisa a
  * Daniel. El botón siempre dice «Registrar».
+ *
+ * 🔴 LA CUOTA VA EN EL MISMO FORMULARIO (11-sep-2026, mockup de la pestaña:
+ * *«concepto, monto, cuota»*). Un préstamo o un descuento a terceros nuevo
+ * pregunta «¿cuánto se descuenta por quincena?», con la cuota actual de la
+ * ficha puesta; el daño no pregunta nada (no propone cuota, la contadora
+ * escribe el monto cada quincena). La cuota viaja en el payload como `cuota`
+ * y la escribe en la FICHA quien recibe el payload (`useMovimientoForm`), en
+ * una segunda llamada: el movimiento y la ficha son dos cosas.
  */
 export default function NuevoMovimientoModal({
   nombre, empleadoId, saldoPrestamo, saldoDano, cuentaMasVieja, salarioMensual, hoy,
-  onCancelar, onGuardar,
+  conceptoInicial, cuotaActual, onCancelar, onGuardar,
 }: {
   nombre: string;
   empleadoId: string;
@@ -49,10 +58,19 @@ export default function NuevoMovimientoModal({
   cuentaMasVieja: CuentaPrestamo | null;
   salarioMensual: number | null;
   hoy: string;
+  /** Con qué concepto abre. Préstamo si no se dice. */
+  conceptoInicial?: string;
+  /** Las cuotas de la ficha hoy, para preguntar la cuota junto al monto. Sin esto no se pregunta. */
+  cuotaActual?: { prestamo: number; terceros: number } | null;
   onCancelar: () => void;
   onGuardar: (payload: Record<string, unknown>) => Promise<void>;
 }) {
-  const [concepto, setConcepto] = useState<string>(CONCEPTO_PRESTAMO);
+  const [concepto, setConcepto] = useState<string>(conceptoInicial ?? CONCEPTO_PRESTAMO);
+  const [cuota, setCuota] = useState<string>(() => {
+    if (!cuotaActual) return "";
+    const c = conceptoInicial === CONCEPTO_TERCEROS ? cuotaActual.terceros : cuotaActual.prestamo;
+    return c > 0 ? String(c) : "";
+  });
   const [fecha, setFecha] = useState(hoy);
   const [monto, setMonto] = useState("");
   const [cuenta, setCuenta] = useState<CuentaPrestamo>(cuentaMasVieja ?? CUENTA_PRESTAMO);
@@ -63,6 +81,15 @@ export default function NuevoMovimientoModal({
   const debeLasDos = saldoPrestamo > 0 && saldoDano > 0;
   const deudaTotal = saldoPrestamo + saldoDano;
   const esPago = concepto === CONCEPTO_PAGO;
+  // La cuota se pregunta en préstamo y terceros, nunca en daño ni en un pago.
+  const preguntaCuota = !!cuotaActual && (concepto === CONCEPTO_PRESTAMO || concepto === CONCEPTO_TERCEROS);
+
+  function elegirConcepto(c: string) {
+    setConcepto(c);
+    if (!cuotaActual) return;
+    const actual = c === CONCEPTO_TERCEROS ? cuotaActual.terceros : cuotaActual.prestamo;
+    setCuota(actual > 0 ? String(actual) : "");
+  }
 
   // 🔴 El tope solo mira el PRÉSTAMO. Un daño de mercancía se registra siempre:
   // no es plata que se entrega, es plata que ya se perdió.
@@ -79,6 +106,7 @@ export default function NuevoMovimientoModal({
   async function guardar() {
     if (!listo) return;
     setGuardando(true);
+    const cuotaNum = Number(cuota);
     await onGuardar({
       empleado_id: empleadoId,
       fecha,
@@ -86,6 +114,8 @@ export default function NuevoMovimientoModal({
       monto: Number(monto),
       notas: notas.trim() || null,
       ...(esPago ? { origen_pago: origen, cuenta: debeLasDos ? cuenta : undefined } : {}),
+      // La cuota SOLO cuando se preguntó y es un número: `undefined` = no tocar la ficha.
+      ...(preguntaCuota && Number.isFinite(cuotaNum) && cuotaNum >= 0 && cuota !== "" ? { cuota: cuotaNum } : {}),
     });
     setGuardando(false);
   }
@@ -95,12 +125,12 @@ export default function NuevoMovimientoModal({
       <h2 className="font-medium mb-1">Nuevo movimiento</h2>
       <p className="mb-4 text-sm text-gray-500">{nombre}</p>
 
-      <div className="grid grid-cols-3 gap-2 mb-4">
+      <div className="grid grid-cols-2 gap-2 mb-4 sm:grid-cols-4">
         {MOV_TIPOS.map((t) => (
           <button
             key={t.concepto}
             type="button"
-            onClick={() => setConcepto(t.concepto)}
+            onClick={() => elegirConcepto(t.concepto)}
             className={`min-h-[44px] rounded-lg border px-2 py-2 text-left text-xs transition ${
               concepto === t.concepto ? t.color : "border-gray-200 text-gray-500 hover:border-gray-400"
             }`}
@@ -141,6 +171,14 @@ export default function NuevoMovimientoModal({
           <label className="text-xs text-gray-400 uppercase">Monto ($) *</label>
           <input type="number" step="0.01" min="0.01" value={monto} onChange={e => setMonto(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
         </div>
+
+        {preguntaCuota && (
+          <div>
+            <label className="text-xs text-gray-400 uppercase">Cuota por quincena ($)</label>
+            <input type="number" step="0.01" min="0" value={cuota} onChange={e => setCuota(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
+            <p className="mt-1 text-xs text-gray-400">Se descuenta sola en cada planilla hasta pagarlo. Queda guardada en la ficha.</p>
+          </div>
+        )}
 
         {esPago && (
           <div>

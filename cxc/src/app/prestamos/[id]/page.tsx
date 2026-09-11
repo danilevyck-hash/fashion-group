@@ -3,13 +3,21 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
+import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { fmt, fmtDate } from "@/lib/format";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, ConfirmModal } from "@/components/ui";
 import { PRESTAMOS_ADMIN_ROLES, PRESTAMOS_ROLES } from "@/lib/prestamos-roles";
 import { calcularSaldoPrestamo, cuentaMasVieja } from "@/lib/prestamos-saldo";
-import { CONCEPTO_PAGO, ORIGEN_POR_DEFECTO, etiquetaConcepto } from "@/lib/prestamos-conceptos";
+import { CONCEPTO_PAGO, CONCEPTO_PRESTAMO, ORIGEN_POR_DEFECTO, etiquetaConcepto } from "@/lib/prestamos-conceptos";
 import { getQuincenaRangePanama, hoyPanamaYmd } from "@/lib/prestamos-quincena";
+// 🔴 A dónde vuelve «← Préstamos»: la pestaña con la planilla unida, la lista
+// suelta sin ella. UNA definición (11-sep-2026).
+import { enlaceVolverAPrestamos } from "@/lib/prestamos-una-puerta";
+// 🔴 Con la planilla unida el descuento de la quincena lo escribe el CIERRE de
+// la planilla, así que «Pago Quincenal» a mano sería una segunda puerta a la
+// misma plata (el error de KEVIN LUBO: tecleado en dos pantallas).
+import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
 
 import { Empleado } from "../components/types";
 import EmpleadoHeader from "../components/EmpleadoHeader";
@@ -33,6 +41,9 @@ export default function PrestamoDetallePage() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [showNuevoMov, setShowNuevoMov] = useState(false);
+  // Con qué concepto abre el formulario: «Anotar abono» → Pago; «+ Nuevo préstamo» → Préstamo.
+  const [conceptoInicial, setConceptoInicial] = useState<string>(CONCEPTO_PRESTAMO);
+  const volver = enlaceVolverAPrestamos();
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
@@ -41,10 +52,10 @@ export default function PrestamoDetallePage() {
     try {
       const res = await fetch(`/api/prestamos/empleados/${id}`);
       if (res.ok) setEmpleado(await res.json());
-      else router.push("/prestamos");
-    } catch { router.push("/prestamos"); }
+      else router.push(volver);
+    } catch { router.push(volver); }
     setLoading(false);
-  }, [id, router]);
+  }, [id, router, volver]);
 
   useEffect(() => { if (authChecked) loadEmpleado(); }, [authChecked, loadEmpleado]);
 
@@ -56,7 +67,7 @@ export default function PrestamoDetallePage() {
     empleadoId: id,
     empleado: empleado ?? ({} as Empleado),
     onSuccess: loadEmpleado,
-    onDeleted: () => router.push("/prestamos"),
+    onDeleted: () => router.push(volver),
     showToast,
   });
 
@@ -104,7 +115,7 @@ export default function PrestamoDetallePage() {
       <AppHeader
         module="Préstamos"
         breadcrumbs={[
-          { label: "Préstamos", onClick: () => router.push("/prestamos") },
+          { label: "Préstamos", onClick: () => router.push(volver) },
           { label: empleado.nombre },
         ]}
       />
@@ -113,7 +124,7 @@ export default function PrestamoDetallePage() {
         <EmpleadoHeader
           empleado={empleado}
           onEdit={actions.openEditModal}
-          onBack={() => router.push("/prestamos")}
+          onBack={() => router.push(volver)}
         />
 
         <SummaryCards
@@ -129,16 +140,33 @@ export default function PrestamoDetallePage() {
         />
 
         <div className="flex flex-wrap gap-3 mb-6">
+          {/* 🔴 «Pago Quincenal» SOLO sin la planilla unida: con ella, el descuento
+              de la quincena lo anota el cierre de la planilla y teclearlo acá
+              sería la segunda puerta a la misma plata. */}
+          {!PLANILLA_UNIDA && (
+            <button
+              onClick={() => actions.pagoQuincenal(cuota, cuentaMasVieja(s))}
+              disabled={s.saldo <= 0 || cuota <= 0}
+              title={s.saldo <= 0 ? "No debe nada — no hay saldo por deducir" : cuota <= 0 ? "Esta persona no tiene cuota quincenal" : undefined}
+              className="inline-flex min-h-[44px] items-center justify-center bg-emerald-600 text-white px-5 rounded-md text-sm hover:bg-emerald-700 transition font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Pago Quincenal · ${fmt(cuota)}
+            </button>
+          )}
+          {/* 🔴 Los dos caminos del mockup (11-sep-2026): «Anotar abono» abre el
+              MISMO formulario en Pago; «+ Nuevo préstamo a <nombre>» lo abre en
+              Préstamo. Es un formulario, no dos. */}
           <button
-            onClick={() => actions.pagoQuincenal(cuota, cuentaMasVieja(s))}
-            disabled={s.saldo <= 0 || cuota <= 0}
-            title={s.saldo <= 0 ? "No debe nada — no hay saldo por deducir" : cuota <= 0 ? "Esta persona no tiene cuota quincenal" : undefined}
-            className="inline-flex min-h-[44px] items-center justify-center bg-emerald-600 text-white px-5 rounded-md text-sm hover:bg-emerald-700 transition font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+            onClick={() => { setConceptoInicial(CONCEPTO_PAGO); setShowNuevoMov(true); }}
+            className="inline-flex min-h-[44px] items-center justify-center border border-gray-300 text-gray-700 px-5 rounded-md text-sm hover:border-black hover:text-black transition"
           >
-            Pago Quincenal · ${fmt(cuota)}
+            Anotar abono
           </button>
-          <button onClick={() => setShowNuevoMov(true)} className="inline-flex min-h-[44px] items-center justify-center bg-black text-white px-5 rounded-md text-sm hover:bg-gray-800 transition">
-            + Nuevo Movimiento
+          <button
+            onClick={() => { setConceptoInicial(CONCEPTO_PRESTAMO); setShowNuevoMov(true); }}
+            className="inline-flex min-h-[44px] items-center justify-center bg-black text-white px-5 rounded-md text-sm hover:bg-gray-800 transition"
+          >
+            + Nuevo préstamo a {capitalizarNombre(empleado.nombre).split(" ")[0]}
           </button>
         </div>
 
@@ -170,6 +198,11 @@ export default function PrestamoDetallePage() {
               cuentaMasVieja={cuentaMasVieja(s)}
               salarioMensual={empleado.salario_mensual}
               hoy={hoy}
+              conceptoInicial={conceptoInicial}
+              cuotaActual={{
+                prestamo: Number(empleado.deduccion_quincenal ?? 0),
+                terceros: Number(empleado.deduccion_terceros ?? 0),
+              }}
               onCancelar={() => setShowNuevoMov(false)}
               onGuardar={async (payload) => {
                 const ok = await movForm.crear(payload);

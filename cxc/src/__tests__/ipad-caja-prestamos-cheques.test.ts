@@ -108,16 +108,18 @@ describe("El corte tarjetas/tabla queda POR ENCIMA del ancho que la barra latera
 });
 
 describe("Los mismos datos en las dos vistas, marcados con `data-` estables (no por clase de breakpoint)", () => {
-  it("Préstamos: fila + fecha/concepto/notas/monto/saldo/espera, en tarjeta Y en tabla", () => {
+  it("Préstamos: fila + fecha/concepto/notas/monto/saldo, en tarjeta Y en tabla", () => {
     expect(veces(movimientos, /data-mov-fila=/g)).toBe(2);
     // ⚠️ `estado` se fue el 5-sep-2026 con las 4 pestañas: con 443 filas de 443
-    // en `aprobado` la columna nunca se pintaba. Lo reemplaza `espera`, que es
-    // el dato que SÍ hay que ver — «Esperando a Daniel · hace N días» —, y por
-    // eso viaja en las DOS vistas igual que los demás.
-    for (const campo of ["fecha", "concepto", "notas", "monto", "saldo", "espera"]) {
+    // en `aprobado` la columna nunca se pintaba. Lo reemplazó `espera` («esperando
+    // a Daniel · hace N días»), y ⚠️ `espera` se fue el 11-sep-2026 con la
+    // aprobación de préstamos (Daniel: «Aprobar préstamos: eso también se
+    // quita»): nada espera. Los cinco datos que quedan viajan en las DOS vistas.
+    for (const campo of ["fecha", "concepto", "notas", "monto", "saldo"]) {
       expect(veces(movimientos, new RegExp(`data-mov-campo="${campo}"`, "g"))).toBe(2);
     }
     expect(veces(movimientos, /data-mov-campo="estado"/g)).toBe(0);
+    expect(veces(movimientos, /data-mov-campo="espera"/g)).toBe(0);
   });
 
   it("Caja › Períodos: fila + fondo/gastado/saldo, en tarjeta Y en tabla", () => {

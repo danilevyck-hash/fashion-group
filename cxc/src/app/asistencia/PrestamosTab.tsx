@@ -5,9 +5,19 @@
 // Daniel, textual: *«asistencia se ingresa la info y prestamos seria para como
 // ver la info y hacer pagos extraordinarios como abonos etc»*.
 //
-// O sea, esta pantalla hace DOS cosas y ninguna más:
-//   1. VER cuánto debe cada quien, en sus dos cuentas.
+// O sea, esta pantalla hace estas cosas y ninguna más:
+//   1. VER cuánto debe cada quien, en sus cuentas.
 //   2. Anotar un abono EXTRAORDINARIO — un pago que no salió de la quincena.
+//   3. 🔴 Crear un préstamo nuevo (11-sep-2026, Daniel: *«sí, arregla lo de
+//      préstamos»*, con el mockup aprobado) — el MISMO formulario del módulo de
+//      Préstamos, elegido de las fichas activas, con concepto, monto y cuota.
+//   4. 🔴 Tocar el nombre abre SUS MOVIMIENTOS (`/prestamos/<id>`, la página del
+//      módulo de siempre, con «← Préstamos» de vuelta a esta pestaña).
+//
+// 🩸 Del 10 al 11-sep-2026, con la «una sola puerta» prendida, esta pestaña
+// tenía SOLO «Anotar abono»: no se podía crear un préstamo, ver los
+// movimientos de nadie ni llegar a la ficha, porque todo lo que colgaba de
+// `/prestamos/` rebotaba acá. Se reusa lo del módulo viejo en vez de dibujar copias.
 //
 // ── 🔴 LO QUE SALE DE LA QUINCENA YA NO SE TECLEA ───────────────────────────
 //
@@ -24,10 +34,11 @@
 // ── 🔴 LA SECRETARIA SOLO MIRA ──────────────────────────────────────────────
 //
 // Daniel: *«La secretaria entra a Préstamos solo a VER»*. Lo decide el SERVIDOR
-// (`cerrarPlanillaRoles()`); acá solo se dibuja o no el botón, para no ofrecer
-// algo que va a contestar 403.
+// (`cerrarPlanillaRoles()`); acá solo se dibujan o no los botones y el enlace a
+// los movimientos, para no ofrecer algo que va a contestar 403.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { filtrarPorEmpresa } from "@/lib/asistencia/empresa-para-todo";
 import { useToast } from "@/components/ToastSystem";
 import { NOMBRE_CUENTA, type CuentaPrestamo } from "@/lib/prestamos-saldo";
@@ -35,6 +46,11 @@ import { ORIGENES_ABONO } from "@/lib/asistencia/abono-extra";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { quincenasHasta } from "@/lib/asistencia/planilla";
+import { enlaceAPrestamos } from "@/lib/prestamos-una-puerta";
+import type { Colaborador, DatosPrestamos } from "@/lib/prestamos-lista-server";
+import ElegirPersonaModal from "@/app/prestamos/components/ElegirPersonaModal";
+import NuevoMovimientoModal from "@/app/prestamos/components/NuevoMovimientoModal";
+import { useMovimientoForm } from "@/app/prestamos/components/useMovimientoForm";
 
 interface FichaDeuda {
   id: string;
@@ -49,6 +65,7 @@ interface FichaDeuda {
   empresa?: string | null;
   cuota: number;
   cuotaDano: number;
+  cuotaTerceros?: number;
   yaDescontado: number;
 }
 
@@ -56,6 +73,12 @@ interface FichaDeuda {
 function money(n: number): string {
   const abs = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return n < 0 ? `−$${abs}` : `$${abs}`;
+}
+
+/** 🔴 Los ceros van con guion (11-sep-2026, mockup): un $0.00 en una columna de plata se lee como dato. */
+function plataOGuion(n: number | undefined) {
+  const v = n ?? 0;
+  return v > 0 || v < 0 ? money(v) : <span className="text-gray-400">—</span>;
 }
 
 export default function PrestamosTab(props: { desde?: string; hasta?: string; empresa?: string } = {}) {
@@ -72,6 +95,14 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
   const [puedeAnotar, setPuedeAnotar] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [abonando, setAbonando] = useState<FichaDeuda | null>(null);
+
+  // ── «+ Nuevo préstamo»: la misma elección y el mismo formulario del módulo ──
+  // Los colaboradores (las fichas activas de Asistencia) y las filas con saldo
+  // se piden al TOCAR el botón, no al abrir la pestaña: esta lista se lee
+  // muchas más veces de las que se crea un préstamo.
+  const [datosModulo, setDatosModulo] = useState<DatosPrestamos | null>(null);
+  const [eligiendo, setEligiendo] = useState(false);
+  const [personaElegida, setPersonaElegida] = useState<Colaborador | null>(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -93,6 +124,38 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
 
   useEffect(() => { void cargar(); }, [cargar]);
 
+  const movForm = useMovimientoForm({
+    onSuccess: () => { setPersonaElegida(null); setDatosModulo(null); void cargar(); },
+    showToast: (m) => toast(m, m.startsWith("Error") || m.startsWith("Sin conexión") ? "error" : "success"),
+  });
+
+  async function abrirNuevoPrestamo() {
+    try {
+      const r = await fetch("/api/prestamos/empleados", { cache: "no-store" });
+      if (!r.ok) throw new Error();
+      setDatosModulo((await r.json()) as DatosPrestamos);
+      setEligiendo(true);
+    } catch {
+      toast("No se pudo abrir la lista de colaboradores. Intenta de nuevo.", "error");
+    }
+  }
+
+  /** Elegir a la persona crea (o encuentra) su ficha y abre el formulario — igual que el módulo. */
+  async function elegirPersona(c: Colaborador) {
+    setEligiendo(false);
+    if (c.fichaId) { setPersonaElegida({ ...c }); return; }
+    try {
+      const res = await fetch("/api/prestamos/empleados", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ empleado_codigo: c.codigo }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) { toast(json?.error || "No se pudo abrir la ficha", "error"); return; }
+      setPersonaElegida({ ...c, fichaId: json.id });
+    } catch { toast("Sin conexión. Intenta de nuevo.", "error"); }
+  }
+
   const total = useMemo(
     () => (fichas ?? []).reduce((a, f) => a + f.saldo, 0),
     [fichas],
@@ -107,25 +170,79 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
   // es una columna que no dice nada.
   const hayTerceros = fichas.some((f) => (f.saldoTerceros ?? 0) > 0);
 
+  const botonNuevo = puedeAnotar && (
+    <button type="button" onClick={() => void abrirNuevoPrestamo()}
+      className="min-h-[44px] rounded-md bg-black px-4 text-sm text-white transition active:scale-[0.97]">
+      + Nuevo préstamo
+    </button>
+  );
+
+  const filaDelModulo = personaElegida?.fichaId
+    ? datosModulo?.filas.find((f) => f.id === personaElegida.fichaId) ?? null
+    : null;
+
+  const modales = (
+    <>
+      <ElegirPersonaModal
+        open={eligiendo}
+        colaboradores={datosModulo?.colaboradores ?? []}
+        onClose={() => setEligiendo(false)}
+        onElegir={(c) => void elegirPersona(c)}
+      />
+      {personaElegida?.fichaId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setPersonaElegida(null)}>
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-6" onClick={(e) => e.stopPropagation()}>
+            <NuevoMovimientoModal
+              nombre={personaElegida.nombre}
+              empleadoId={personaElegida.fichaId}
+              saldoPrestamo={filaDelModulo?.saldoPrestamo ?? 0}
+              saldoDano={filaDelModulo?.saldoDano ?? 0}
+              cuentaMasVieja={filaDelModulo?.cuentaMasVieja ?? null}
+              salarioMensual={personaElegida.salarioMensual}
+              hoy={hoyPanama()}
+              cuotaActual={{ prestamo: filaDelModulo?.cuotaPrestamo ?? 0, terceros: filaDelModulo?.cuotaTerceros ?? 0 }}
+              onCancelar={() => setPersonaElegida(null)}
+              onGuardar={async (payload) => { await movForm.crear(payload); }}
+            />
+          </div>
+        </div>
+      )}
+    </>
+  );
+
   if (!fichas.length) {
     // 🔑 Nunca un «$0.00» grande: se dice con palabras qué pasa.
     return (
-      <p className="rounded-lg border border-gray-200 px-4 py-6 text-center text-sm text-gray-600">
-        Nadie debe nada en este momento.
-      </p>
+      <div className="space-y-4">
+        {botonNuevo && <div className="flex justify-end">{botonNuevo}</div>}
+        <p className="rounded-lg border border-gray-200 px-4 py-6 text-center text-sm text-gray-600">
+          Nadie debe nada en este momento.
+        </p>
+        {modales}
+      </div>
     );
   }
 
+  /** El nombre: enlace a sus movimientos para quien puede escribir; texto para quien solo mira. */
+  const nombre = (f: FichaDeuda, clase: string) =>
+    puedeAnotar
+      ? (
+        <Link href={enlaceAPrestamos(f.id)} className={`${clase} underline-offset-2 hover:underline`}>
+          {capitalizarNombre(f.nombre)} <span className="text-gray-400">›</span>
+        </Link>
+      )
+      : <span className={clase}>{capitalizarNombre(f.nombre)}</span>;
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-gray-600">
           {fichas.length === 1 ? "1 colaborador con deuda" : `${fichas.length} colaboradores con deuda`}
-        </p>
-        <p className="text-sm tabular-nums text-gray-900">
+          <span className="text-gray-400"> · </span>
           <span className="text-gray-500">Total </span>
-          <span className="font-medium">{money(total)}</span>
+          <span className="font-medium tabular-nums text-gray-900">{money(total)}</span>
         </p>
+        {botonNuevo}
       </div>
 
       {/* 🔴 EL DESLIZAMIENTO VIVE ADENTRO DE LA TABLA, nunca en la página: en el
@@ -148,7 +265,7 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
             {fichas.map((f) => (
               <tr key={f.id} className="border-b border-gray-100 last:border-0">
                 <td className="px-3 py-2">
-                  <span className="text-gray-900">{capitalizarNombre(f.nombre)}</span>
+                  {nombre(f, "text-gray-900")}
                   {/* 🔴 SIN CÓDIGO NO HAY A QUIÉN DESCONTARLE, y se DICE. El
                       amarre es por código y nunca por parecido de nombre. */}
                   {!f.codigo && (
@@ -157,15 +274,15 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
                     </span>
                   )}
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums text-gray-600">{money(f.saldoPrestamo)}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-gray-600">{money(f.saldoDano)}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-gray-600">{plataOGuion(f.saldoPrestamo)}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-gray-600">{plataOGuion(f.saldoDano)}</td>
                 {hayTerceros && (
                   <td className="px-3 py-2 text-right tabular-nums text-gray-600">
                     {(f.saldoTerceros ?? 0) > 0 ? money(f.saldoTerceros ?? 0) : <span className="text-gray-400">—</span>}
                   </td>
                 )}
                 <td className="px-3 py-2 text-right tabular-nums font-medium text-gray-900">{money(f.saldo)}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-gray-600">{money(f.cuota + f.cuotaDano)}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-gray-600">{plataOGuion(f.cuota + (f.cuotaTerceros ?? 0))}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-gray-600">
                   {f.yaDescontado > 0 ? money(f.yaDescontado) : <span className="text-gray-400">—</span>}
                 </td>
@@ -189,7 +306,7 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
         {fichas.map((f) => (
           <div key={f.id} className="rounded-lg border border-gray-200 p-3">
             <div className="flex items-baseline justify-between gap-2">
-              <p className="text-sm font-medium text-gray-900">{capitalizarNombre(f.nombre)}</p>
+              <p className="text-sm font-medium text-gray-900">{nombre(f, "text-gray-900")}</p>
               <p className="text-sm tabular-nums font-medium text-gray-900">{money(f.saldo)}</p>
             </div>
             <p className="mt-1 text-sm text-gray-500">
@@ -197,7 +314,7 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
               {(f.saldoTerceros ?? 0) > 0 && ` · ${NOMBRE_CUENTA.terceros} ${money(f.saldoTerceros ?? 0)}`}
             </p>
             <p className="mt-0.5 text-sm text-gray-500">
-              Cuota {money(f.cuota + f.cuotaDano)}
+              Cuota {money(f.cuota + (f.cuotaTerceros ?? 0))}
               {f.yaDescontado > 0 && ` · esta quincena ${money(f.yaDescontado)}`}
             </p>
             {!f.codigo && (
@@ -214,8 +331,9 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
       </div>
 
       <p className="text-sm text-gray-500">
-        El descuento de la quincena lo anota el cierre de la planilla. Aquí solo van los
-        abonos que no salieron del sueldo.
+        El descuento de la quincena lo anota el cierre de la planilla. Aquí van los
+        abonos que no salieron del sueldo y los préstamos nuevos; tocando el nombre
+        se ven todos los movimientos.
       </p>
 
       {abonando && (
@@ -227,6 +345,8 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
           onListo={() => { setAbonando(null); void cargar(); }}
         />
       )}
+
+      {modales}
     </div>
   );
 }
@@ -235,9 +355,9 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
  * Anotar un abono. Cuatro campos: de qué cuenta, cuánto, cuándo y de dónde salió.
  *
  * 🔴 «Quincena» NO está entre los orígenes, y el servidor lo rechaza aunque
- * alguien lo mande a mano: ese origen lo escribe el cierre. Un abono anotado
- * así lo leería la casilla como «ya descontado» y esa quincena no le
- * descontaría nada a la persona.
+ * alguien lo mande a mano: ese origen lo escribe el cierre y solo el cierre.
+ * Un abono anotado como Quincena se leería como «ya descontado» y esa quincena
+ * no se le descontaría nada a la persona.
  */
 function AbonoModal(props: {
   ficha: FichaDeuda;

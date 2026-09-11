@@ -8,8 +8,11 @@
 //                hoy, sin una coma de diferencia. Es la mitad que protege a
 //                producción el día que esto se sube con el interruptor en cero.
 //   · PRENDIDO → la pestaña es la ÚNICA puerta: la ficha sale del menú y del
-//                home, `/prestamos` y sus subrutas redirigen con 307 y la query
-//                intacta, y la pestaña la autoriza el módulo PRÉSTAMOS.
+//                home, `/prestamos` EXACTO redirige con 307 y la query intacta,
+//                y la pestaña la autoriza el módulo PRÉSTAMOS.
+//                ⚠️ 11-sep-2026: `/prestamos/<id>` (los movimientos de una
+//                persona) YA NO redirige — la pestaña la ENLAZA. Daniel: *«sí,
+//                arregla lo de préstamos»*. Ver la sección B.
 //
 // 🔴 Lo que este candado NO deja pasar nunca, en ningún estado del interruptor:
 // que `/api/prestamos/*` se redirija (son las rutas que la pestaña usa para
@@ -51,6 +54,7 @@ describe("A. APAGADO — el módulo es exactamente el de hoy", () => {
     const m = await conInterruptor(false);
     expect(m.enlaceAPrestamos()).toBe("/prestamos");
     expect(m.enlaceAPrestamos("42")).toBe("/prestamos/42");
+    expect(m.enlaceVolverAPrestamos()).toBe("/prestamos");
   });
 
   it("🔴 Asistencia NO tiene pestaña de Préstamos", async () => {
@@ -69,11 +73,17 @@ describe("B. PRENDIDO — la pestaña es la única puerta", () => {
     expect(m.moduloPrestamosEnElMenu()).toBe(false);
   });
 
-  it("🔴 `/prestamos` y sus subrutas van a la pestaña", async () => {
+  // ⚠️ CAMBIÓ DE DIRECCIÓN EL 11-SEP-2026, NO SE BORRÓ. Decía «`/prestamos` y sus
+  // subrutas van a la pestaña» y probaba `/prestamos/42` → pestaña. Con eso
+  // desapareció la ÚNICA pantalla que muestra los movimientos de una persona.
+  // Daniel: *«sí, arregla lo de préstamos»* (mockup: tocar el nombre abre los
+  // movimientos). Ahora solo la LISTA rebota; la página de la persona se queda.
+  it("🔴 `/prestamos` EXACTO va a la pestaña; `/prestamos/<id>` (los movimientos) NO rebota", async () => {
     const m = await conInterruptor(true);
     expect(m.destinoDePrestamos("/prestamos", "")).toBe("/asistencia?tab=prestamos");
-    expect(m.destinoDePrestamos("/prestamos/42", "")).toBe("/asistencia?tab=prestamos");
-    expect(m.destinoDePrestamos("/prestamos/aprobaciones", "")).toBe("/asistencia?tab=prestamos");
+    expect(m.destinoDePrestamos("/prestamos/", "")).toBe("/asistencia?tab=prestamos");
+    expect(m.destinoDePrestamos("/prestamos/42", "")).toBeNull();
+    expect(m.esRutaDelModuloPrestamos("/prestamos/42")).toBe(false);
   });
 
   it("🔴 LA QUERY VIAJA INTACTA — un enlace con `persona` no la pierde", async () => {
@@ -91,10 +101,13 @@ describe("B. PRENDIDO — la pestaña es la única puerta", () => {
     expect(new URLSearchParams(d.split("?")[1]).get("tab")).toBe("prestamos");
   });
 
-  it("la página de la persona enlaza a la PESTAÑA, no a una dirección que rebota", async () => {
+  it("la página de la persona enlaza a la PESTAÑA (la lista) y a los MOVIMIENTOS (la ficha)", async () => {
     const m = await conInterruptor(true);
     expect(m.enlaceAPrestamos()).toBe("/asistencia?tab=prestamos");
-    expect(m.enlaceAPrestamos("42")).toBe("/asistencia?tab=prestamos");
+    // ⚠️ 11-sep-2026: con id es la página de sus movimientos, que ya no rebota.
+    expect(m.enlaceAPrestamos("42")).toBe("/prestamos/42");
+    // Y «← Préstamos» desde esa página vuelve a la pestaña.
+    expect(m.enlaceVolverAPrestamos()).toBe("/asistencia?tab=prestamos");
   });
 
   it("la pestaña aparece en la lista de Asistencia", async () => {

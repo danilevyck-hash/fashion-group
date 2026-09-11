@@ -32,11 +32,10 @@ function toSentence(s: string): string {
  * Rechazados). Con 443 filas de 443 en `aprobado` decían siempre `443 · 0 · 0`,
  * la columna Estado nunca se pintaba y el botón verde «Aprobar» era inalcanzable.
  *
- * 🔴 Y LO QUE ESPERA APROBACIÓN NO VUELVE A UNA PESTAÑA: va **resaltado en la
- * misma lista**, con «Esperando a Daniel · hace N días». Esconder lo que espera
- * detrás de un filtro que nadie toca es exactamente cómo los $700 de LUIS
- * ADRIAN ARROYO pasaron 22 días invisibles. Se aprueba en «Préstamos por
- * aprobar», que solo Daniel puede tocar.
+ * ⚠️ Y DESDE EL 11-SEP-2026 NADA ESPERA APROBACIÓN (Daniel: *«Aprobar
+ * préstamos: eso también se quita»*). Hasta ese día lo que esperaba iba
+ * resaltado en esta misma lista, con desde cuándo; hoy un préstamo nace
+ * aprobado y la lista es la lista.
  */
 export default function MovimientoTable({ sortedMovs, saldoByMov, canEdit, canDelete, onEdit, onDelete }: Props) {
   const movs = sortedMovs;

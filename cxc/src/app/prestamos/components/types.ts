@@ -2,6 +2,7 @@ import {
   CONCEPTO_DANO,
   CONCEPTO_PAGO,
   CONCEPTO_PRESTAMO,
+  CONCEPTO_TERCEROS,
   etiquetaConcepto,
 } from "@/lib/prestamos-conceptos";
 
@@ -49,13 +50,19 @@ export function progressColorText(pct: number) {
 }
 
 /**
- * 🔴 TRES CONCEPTOS, NO SEIS TARJETAS.
+ * 🔴 CUATRO CONCEPTOS, NO SEIS TARJETAS.
  *
  * Había SEIS tarjetas para CINCO conceptos («Pago Quincenal» y «Pago Extra» eran
  * las dos el mismo `Pago`), y dos de esos cinco —«Abono extra» y «Pago de
  * responsabilidad»— eran un pago de otro monto con otro nombre. Daniel, al ver
  * el mockup: tres. Lo que decide a qué cuenta va un pago ya no es el concepto,
  * es la casilla «Baja de».
+ *
+ * 🔴 «DESCUENTO A TERCEROS» ES LA CUARTA (11-sep-2026). La cuenta existe desde
+ * el 10-sep (la contadora: *«igual como un préstamo»*) y la ruta ya la
+ * aceptaba, pero el formulario no la ofrecía: la orden externa se podía
+ * descontar y no se podía CARGAR desde ninguna pantalla. El mockup de la
+ * pestaña la lista junto a Préstamo y Daño de mercancía.
  *
  * ⚠️ El VALOR guardado de «Daño de mercancía» sigue siendo `Responsabilidad por
  * daño`: renombrarlo en la base dejaría de contar las 24 filas que ya existen,
@@ -74,6 +81,13 @@ export const MOV_TIPOS = [
     label: etiquetaConcepto(CONCEPTO_DANO),
     icon: "⚠️",
     color: "bg-amber-50 border-amber-200 text-amber-700 hover:border-amber-400",
+    efecto: "Aumenta la deuda",
+  },
+  {
+    concepto: CONCEPTO_TERCEROS,
+    label: etiquetaConcepto(CONCEPTO_TERCEROS),
+    icon: "🏛️",
+    color: "bg-violet-50 border-violet-200 text-violet-700 hover:border-violet-400",
     efecto: "Aumenta la deuda",
   },
   {

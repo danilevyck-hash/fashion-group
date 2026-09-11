@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Movimiento } from "./types";
 import { CONCEPTO_PAGO, ORIGEN_POR_DEFECTO } from "@/lib/prestamos-conceptos";
+import { CONCEPTO_TERCEROS } from "@/lib/prestamos-conceptos";
 
 interface UseMovimientoFormProps {
   onSuccess: () => void;
@@ -19,21 +20,50 @@ interface UseMovimientoFormProps {
  * llamaba, así que el «Deshacer» del módulo no se mostró jamás. Son registros
  * financieros y no llevan deshacer (commit 101edb57).
  */
+/** Escribe la cuota en la ficha. `true` si no había nada que escribir o si se escribió. */
+async function guardarCuota(empleadoId: string, concepto: string, cuota: unknown): Promise<boolean> {
+  if (typeof cuota !== "number" || !Number.isFinite(cuota) || !empleadoId) return true;
+  const campo = concepto === CONCEPTO_TERCEROS ? "deduccion_terceros" : "deduccion_quincenal";
+  try {
+    const res = await fetch(`/api/prestamos/empleados/${empleadoId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [campo]: cuota }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export function useMovimientoForm({ onSuccess, showToast }: UseMovimientoFormProps) {
   const [confirmDeleteMovId, setConfirmDeleteMovId] = useState<string | null>(null);
 
-  /** Devuelve `true` si quedó guardado. */
+  /**
+   * Devuelve `true` si quedó guardado.
+   *
+   * 🔴 `cuota` NO es parte del movimiento: es de la FICHA (`deduccion_quincenal`
+   * o `deduccion_terceros`, según el concepto). Viene en el payload cuando el
+   * formulario la preguntó (11-sep-2026) y se escribe en una SEGUNDA llamada,
+   * después del movimiento: si la segunda falla, el préstamo ya quedó y se
+   * dice que la cuota no.
+   */
   async function crear(payload: Record<string, unknown>): Promise<boolean> {
+    const { cuota, ...movimiento } = payload;
     try {
       const res = await fetch("/api/prestamos/movimientos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(movimiento),
       });
       const json = await res.json().catch(() => null);
       if (res.ok) {
+        const cuotaOk = await guardarCuota(String(movimiento.empleado_id ?? ""), String(movimiento.concepto ?? ""), cuota);
         // Sobre el tope se registra igual, y el aviso lo dice.
-        showToast(json?.avisoTope ?? "Movimiento registrado");
+        showToast(
+          (json?.avisoTope ?? "Movimiento registrado")
+          + (cuotaOk ? "" : " La cuota no se pudo guardar: cámbiala en Editar."),
+        );
         onSuccess();
         return true;
       }
