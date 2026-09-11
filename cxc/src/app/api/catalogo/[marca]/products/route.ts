@@ -44,10 +44,15 @@ const CATALOGO_ROLES = catalogoRoles();
 // descripcion genérica de Switch, y editarlo marca nombre_manual=true para que
 // el sync deje de pisarlo (patrón oculto_manual).
 const EDITABLE_FIELDS = ["image_url", "badge"] as const;
+// `foto_manual` NO es un campo que se edite suelto: solo puede viajar como
+// `true` y junto con `image_url` — es el candado de «esta foto la eligió una
+// persona» que ya ponía el selector de variantes y que la subida a mano NO
+// ponía (11-sep-2026). Ponerlo en `false` sigue siendo cosa del sync.
+const CANDADO_FOTO = "foto_manual";
 const MAX_NAME_LEN = 200;
 
 function editableFieldsDe(cfg: MarcaConfig): readonly string[] {
-  const campos: string[] = [...EDITABLE_FIELDS];
+  const campos: string[] = [...EDITABLE_FIELDS, CANDADO_FOTO];
   if (cfg.products.nombreEditable) campos.push("name");
   // `bulto_pzas` solo donde el bulto varía por estilo (hoy: Tommy). Reebok
   // ramifica por categoría y Joybees es fijo — dejarlo editable ahí abriría una
@@ -216,6 +221,15 @@ async function editProducto(cfg: MarcaConfig, req: NextRequest): Promise<NextRes
       return NextResponse.json({ error: "image_url inválido" }, { status: 400 });
     }
   }
+  // Validar foto_manual: SOLO `true`, y SOLO acompañando a una foto nueva.
+  if (CANDADO_FOTO in updates) {
+    if (updates[CANDADO_FOTO] !== true || typeof updates.image_url !== "string") {
+      return NextResponse.json(
+        { error: "foto_manual solo puede ser true y junto con image_url" },
+        { status: 400 },
+      );
+    }
+  }
   // Validar name (solo marcas con nombreEditable): string no vacío. Editar el
   // nombre marca nombre_manual=true → el sync deja de pisarlo. No hay forma de
   // "volver al automático" desde aquí (a propósito: simple; revertir = poner el
@@ -250,6 +264,12 @@ async function editProducto(cfg: MarcaConfig, req: NextRequest): Promise<NextRes
       );
     }
     ({ data, error } = await guardar(sinColumna(pcfg.cols, "bulto_pzas")));
+  }
+  if (error?.message?.includes(CANDADO_FOTO) && CANDADO_FOTO in updates) {
+    // Mismo respaldo que `guardarFotoElegida`: sin la columna (DDL pendiente)
+    // la foto se guarda igual; lo único que no queda es el candado.
+    delete updates[CANDADO_FOTO];
+    ({ data, error } = await guardar(pcfg.cols));
   }
   if (error) {
     console.error(error);

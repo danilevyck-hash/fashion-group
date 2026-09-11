@@ -141,12 +141,19 @@ export async function uploadProductPhoto(
     }
     const { url } = await upRes.json();
     // QUIRK 5 (respetado desde la UI): Reebok edita por id vía PUT; Joybees por
-    // sku vía POST. Solo { id|sku, image_url } — los endpoints tienen allow-list
-    // y mandar el producto entero pisaría active/stock/price del cron.
+    // sku vía POST. Solo { id|sku, image_url, foto_manual } — los endpoints
+    // tienen allow-list y mandar el producto entero pisaría active/stock/price
+    // del cron.
+    //
+    // 🩸 `foto_manual: true` (11-sep-2026): la foto subida a mano es una
+    // ELECCIÓN, igual que elegir una variante del ZIP, y sin el candado el
+    // próximo ZIP del banco B2B la pisaba sin avisar. Medido: Reebok 0 fotos
+    // protegidas de 390, Joybees 0 de 81, Calvin 0 de 89 — la foto que más
+    // trabajo costó era la única reemplazable.
     const body =
       theme.admin.productEdit.idField === "id"
-        ? { id: producto.id, image_url: url }
-        : { sku: producto.sku, image_url: url };
+        ? { id: producto.id, image_url: url, foto_manual: true }
+        : { sku: producto.sku, image_url: url, foto_manual: true };
     const putRes = await fetch(`${theme.api}/products`, {
       method: theme.admin.productEdit.verb,
       headers: { "Content-Type": "application/json" },

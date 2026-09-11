@@ -212,8 +212,19 @@ describe("🔴 nada de esto puede volver a mostrar un producto escondido", () =>
     }
   });
 
-  it("🔴 la pantalla nunca escribe `foto_manual`: quien lo respeta es el servidor", () => {
-    for (const fuente of PANTALLA) expect(fuente).not.toContain("foto_manual");
+  // 🔴 CAMBIÓ DE DIRECCIÓN (11-sep-2026). Decía «la pantalla nunca escribe
+  // `foto_manual`». Lo que protegía era que nadie lo pusiera en `false` desde el
+  // navegador y devolviera un producto al ZIP sin querer — y eso se sigue
+  // exigiendo. Lo que se abrió es UNA cosa: la subida a mano manda
+  // `foto_manual: true` junto con la foto, igual que elegir una variante, porque
+  // sin eso el próximo ZIP la pisaba (Reebok 0 de 390 protegidas, Joybees 0 de
+  // 81, Calvin 0 de 89). El servidor solo acepta `true` y solo con `image_url`.
+  it("🔴 la pantalla solo escribe `foto_manual: true`, y solo al subir una foto", () => {
+    for (const fuente of PANTALLA) {
+      expect(fuente).not.toMatch(/foto_manual:\s*false/);
+      if (fuente !== upload) expect(fuente).not.toContain("foto_manual");
+    }
+    expect(upload).toContain("image_url: url, foto_manual: true");
     // Y el ZIP sigue yendo por el único camino que respeta la foto elegida.
     expect(subir).toContain("procesarZipB2B");
   });
