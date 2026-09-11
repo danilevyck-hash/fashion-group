@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "paths": {
+      "@/lib/asistencia/guard": ["./scripts/_backtest-planilla-jul-2026-stubs/guard.ts"],
+      "@/*": ["./src/*"]
+    }
+  },
+  "exclude": ["node_modules"]
+}
