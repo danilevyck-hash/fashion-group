@@ -7,6 +7,7 @@
 // Es un RANGO y no un día suelto: unas vacaciones son UNA fila, no diez.
 
 import { NextRequest, NextResponse } from "next/server";
+import { empresaParaPedir } from "@/lib/asistencia/empresa-para-todo";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { requireAsistencia } from "@/lib/asistencia/guard";
 import { supabaseServer } from "@/lib/supabase-server";
@@ -50,7 +51,8 @@ export async function GET(req: NextRequest) {
   // de columnas hace que PostgREST rechace el select ENTERO, así que sin esto
   // Justificaciones no cargaría NI UNA fila hasta que alguien corra el SQL —y
   // el síntoma sería "Asistencia está rota".
-  let [{ data, error }, { personas, faltaMigracion }] = await Promise.all([
+  const empresaFiltro = empresaParaPedir(sp.get("empresa"));
+  let [{ data, error }, { personas, faltaMigracion, filas }] = await Promise.all([
     armar(`${COLS_BASE}, ${COLS_PERMISO_HORAS.join(", ")}`),
     leerPersonasDelModulo(),
   ]);
@@ -60,8 +62,12 @@ export async function GET(req: NextRequest) {
     ({ data, error } = await armar(COLS_BASE));
   }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // 🔴 Filtro por empresa (10-sep-2026): las justificaciones de la gente de ESA empresa.
+  const empresaDe = new Map(filas.map((f) => [String(f.empleado_codigo), f.empresa ?? null]));
+  const lista = ((data ?? []) as unknown as Array<{ empleado_codigo: string }>)
+    .filter((j) => !empresaFiltro || empresaDe.get(String(j.empleado_codigo)) === empresaFiltro);
   return NextResponse.json({
-    justificaciones: data ?? [],
+    justificaciones: lista,
     motivos: MOTIVOS_JUSTIFICACION,
     personas,
     faltaMigracion,

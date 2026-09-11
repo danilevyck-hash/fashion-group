@@ -33,6 +33,7 @@
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { empresaParaPedir } from "@/lib/asistencia/empresa-para-todo";
 import { useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ToastSystem";
 import RangoFechas, { ultimoRango } from "@/components/ui/RangoFechas";
@@ -114,7 +115,10 @@ function Casilla({
   );
 }
 
-export default function AprobacionesTab() {
+export default function AprobacionesTab({ empresa = "" }: {
+  /** El selector de arriba de las pestañas (10-sep-2026). «todas» o vacío = todas. */
+  empresa?: string;
+} = {}) {
   const { toast } = useToast();
 
   const hoy = useMemo(
@@ -173,8 +177,12 @@ export default function AprobacionesTab() {
     setCargando(true);
     setError(null);
     try {
-      // 🔑 SIN `empresa`: se aprueba a la persona, no a la empresa.
+      // 🔴 POR EMPRESA (10-sep-2026, Daniel: *«Aprobaciones también se debería
+      // de poder ver por empresa»*): la ruta ya filtra las líneas por empresa,
+      // así que los días, los contadores y «Aprobar todo» ven solo lo filtrado.
       const p = new URLSearchParams({ desde, hasta, aprobaciones: "1" });
+      const emp = empresaParaPedir(empresa);
+      if (emp) p.set("empresa", emp);
       const res = await fetch(`/api/asistencia/planilla?${p}`, { cache: "no-store" });
       const j = (await res.json()) as Respuesta & { error?: string };
       if (!res.ok) throw new Error(j.error ?? "No se pudo cargar");
@@ -188,7 +196,7 @@ export default function AprobacionesTab() {
     } finally {
       setCargando(false);
     }
-  }, [desde, hasta]);
+  }, [desde, hasta, empresa]);
 
   useEffect(() => { void cargar(); }, [cargar]);
 
@@ -245,7 +253,9 @@ export default function AprobacionesTab() {
       if (items.length === 0) return;
       setGuardando(true);
       try {
-        const res = await fetch("/api/asistencia/aprobaciones", {
+        // 🔴 Con empresa elegida, la ruta rechaza cualquier código de otra empresa.
+        const emp = empresaParaPedir(empresa);
+        const res = await fetch(`/api/asistencia/aprobaciones${emp ? `?empresa=${encodeURIComponent(emp)}` : ""}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ aprobado, dias: items }),
@@ -278,12 +288,12 @@ export default function AprobacionesTab() {
       const { downloadWorkbook } = await import("@/lib/excel-export");
       downloadWorkbook(
         construirExcelAprobaciones({ dias, desde, hasta }),
-        nombreArchivoAprobaciones(desde, hasta),
+        nombreArchivoAprobaciones(desde, hasta, empresa),
       );
     } catch {
       setError("No se pudo armar el Excel. Intenta de nuevo.");
     }
-  }, [dias, desde, hasta]);
+  }, [dias, desde, hasta, empresa]);
 
   const deDia = (d: DiaAprobacion) =>
     d.gente.map((g) => ({ codigo: g.codigo, fecha: d.fecha, minutos: g.minutos }));

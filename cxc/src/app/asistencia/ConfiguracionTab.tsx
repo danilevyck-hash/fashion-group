@@ -30,6 +30,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { filtrarPorEmpresa } from "@/lib/asistencia/empresa-para-todo";
 import { useToast } from "@/components/ToastSystem";
 import { Ayuda } from "@/components/shared/Ayuda";
 import {
@@ -336,7 +337,10 @@ const firma = (b: Borrador) =>
 const bajaCompleta = (b: Borrador) =>
   (b.fechaSalida.trim() === "") === (b.motivoSalida.trim() === "");
 
-export default function ConfiguracionTab({ personaEnElCentro = false }: {
+export default function ConfiguracionTab({ personaEnElCentro = false, empresa = "" }: {
+  /** 🔴 El selector de empresa de arriba de las pestañas (10-sep-2026): reemplaza
+   *  a los chips de empresa que vivían acá. «todas» o vacío = todas. */
+  empresa?: string;
   /**
    * 🔴 EL MISMO COMPONENTE, EN MODO LISTA (10-sep-2026). Prendido:
    *   · la fila LLEVA a la página de esa persona en vez de desplegarse,
@@ -825,7 +829,12 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
    * quién hay que configurarle algo — y la ficha de quien se fue está completa,
    * así que se ve idéntica a la de quien está. Van en su propio bloque, abajo.
    */
-  const activos = useMemo(() => (datos?.personas ?? []).filter((p) => p.activo), [datos]);
+  // 🔴 Filtrados por la empresa de arriba. Un código sin ficha no tiene
+  // empresa: solo sale con «Todas».
+  const activos = useMemo(
+    () => filtrarPorEmpresa((datos?.personas ?? []).filter((p) => p.activo), empresa),
+    [datos, empresa],
+  );
   const bajas = useMemo(() => (datos?.personas ?? []).filter((p) => !p.activo), [datos]);
 
   /**
@@ -987,14 +996,8 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
                   {CHIP_COMPLETAR} ({conteo.completar})
                 </button>
               )}
-              {EMPRESAS_ASISTENCIA.map((e) => (
-                <button key={e} type="button" onClick={() => setFiltro(e)}
-                  className={`${PILL_BASE} ${filtro === e ? PILL_ON : PILL_OFF}`}>
-                  {/* Cuenta ACTIVOS: la planilla de Boston no incluye a los que
-                      se fueron, así que la píldora tampoco puede contarlos. */}
-                  {etiquetaEmpresa(e)} ({activos.filter((p) => p.empresa === e).length})
-                </button>
-              ))}
+              {/* 🔴 Los chips de empresa SE FUERON (10-sep-2026): la empresa se
+                  elige UNA vez arriba de las pestañas, para todo el módulo. */}
             </div>
 
             {/* 🔴 DAR DE ALTA A ALGUIEN ABRE DIRECTO EN EDITAR. Mostrarle una

@@ -28,6 +28,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireAsistencia } from "@/lib/asistencia/guard";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { cerrarPlanillaRoles } from "@/lib/asistencia/planilla-guardada";
+import { leerPersonas } from "@/lib/asistencia/config-server";
 import { leerPrestamosDeQuincena } from "@/lib/asistencia/prestamos-planilla-server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { validarAbono, CONCEPTO_DE_ABONO } from "@/lib/asistencia/abono-extra";
@@ -46,7 +47,9 @@ export async function GET(req: NextRequest) {
   const hasta = url.searchParams.get("hasta") ?? "";
 
   try {
-    const { fichas } = await leerPrestamosDeQuincena(desde, hasta);
+    const [{ fichas }, personas] = await Promise.all([leerPrestamosDeQuincena(desde, hasta), leerPersonas()]);
+    // La empresa de la persona atada, para el filtro de arriba de las pestañas (10-sep-2026).
+    const empresaDe = new Map(personas.filas.map((p) => [String(p.empleado_codigo), p.empresa ?? null]));
     // 🔴 SE MUESTRA A QUIEN DEBE, y también a quien tiene saldo a FAVOR
     // (negativo): esconder un saldo a favor es esconder plata que es de la
     // persona. Quien llegó a cero sale solo de la lista.
@@ -65,6 +68,8 @@ export async function GET(req: NextRequest) {
         // resta que no cierra a la vista es exactamente lo que hace desconfiar
         // del número entero. Es ADITIVO: quien no la lee sigue igual.
         saldoTerceros: f.saldoTerceros,
+        // Para el filtro por empresa de la pestaña (10-sep-2026).
+        empresa: f.codigo ? empresaDe.get(String(f.codigo)) ?? null : null,
         cuota: f.cuota,
         cuotaDano: f.cuotaDano,
         cuotaTerceros: f.cuotaTerceros,

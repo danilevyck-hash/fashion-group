@@ -22,6 +22,7 @@ import RangoFechas, { ultimoRango } from "@/components/ui/RangoFechas";
 import EstadoReloj from "./EstadoReloj";
 import JustificacionesDelPeriodo from "./JustificacionesDelPeriodo";
 import { PERSONA_EN_EL_CENTRO, PESTANA_FICHAS } from "@/lib/asistencia/persona-en-el-centro";
+import { empresaParaPedir, nombreArchivoPorEmpresa } from "@/lib/asistencia/empresa-para-todo";
 import CorregirMarcacionModal, { type MarcaParaCorregir } from "./CorregirMarcacionModal";
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
@@ -45,7 +46,10 @@ const n = (v: number) =>
 const SIN_EXTRA_TITULO = "Servicio profesional: no se le cuentan horas extra, solo tardanzas y ausencias.";
 const sinExtra = () => <span className="text-gray-300" title={SIN_EXTRA_TITULO}>—</span>;
 
-export default function ReporteTab() {
+export default function ReporteTab({ empresa = "" }: {
+  /** El selector de arriba de las pestañas (10-sep-2026). «todas» o vacío = todas. */
+  empresa?: string;
+} = {}) {
   const { toast } = useToast();
   // 🔑 EL MISMO "hoy" QUE USA EL SERVIDOR. Acá había una segunda cuenta a mano
   // (`Date.now() - 5h`), correcta pero aparte: si las dos se separaran, la
@@ -93,6 +97,10 @@ export default function ReporteTab() {
     try {
       const p = new URLSearchParams({ desde, hasta });
       if (q.trim()) p.set("q", q.trim());
+      // 🔴 El filtro por empresa lo aplica el SERVIDOR: la tabla, los totales y
+      // los avisos salen ya filtrados, y el Excel/PDF llevan lo mismo.
+      const emp = empresaParaPedir(empresa);
+      if (emp) p.set("empresa", emp);
       const res = await fetch(`/api/asistencia/reporte?${p}`, { cache: "no-store" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "No se pudo cargar");
@@ -108,7 +116,7 @@ export default function ReporteTab() {
       setError(e instanceof Error ? e.message : "No se pudo cargar");
       setPersonas(null);
     } finally { setCargando(false); }
-  }, [desde, hasta, q]);
+  }, [desde, hasta, q, empresa]);
 
   useEffect(() => { void cargar(); }, [cargar]);
 
@@ -129,7 +137,7 @@ export default function ReporteTab() {
     try {
       const XLSX = (await import("xlsx-js-style")).default;
       const { construirExcel } = await import("@/lib/asistencia/exportar");
-      XLSX.writeFile(construirExcel({ personas, desde, hasta, reglas: reglas ?? undefined }), `Asistencia ${desde} a ${hasta}.xlsx`);
+      XLSX.writeFile(construirExcel({ personas, desde, hasta, reglas: reglas ?? undefined }), nombreArchivoPorEmpresa("Asistencia", empresa, desde, hasta, "xlsx"));
       toast("Excel listo — revisa tu carpeta de descargas", "success");
     } catch {
       toast("No se pudo armar el Excel. Intenta de nuevo.", "error");
@@ -139,7 +147,7 @@ export default function ReporteTab() {
     if (!personas?.length) return;
     try {
       const { construirPdf } = await import("@/lib/asistencia/exportar");
-      construirPdf({ personas, desde, hasta, reglas: reglas ?? undefined }).save(`Asistencia ${desde} a ${hasta}.pdf`);
+      construirPdf({ personas, desde, hasta, reglas: reglas ?? undefined }).save(nombreArchivoPorEmpresa("Asistencia", empresa, desde, hasta, "pdf"));
       toast("PDF listo — revisa tu carpeta de descargas", "success");
     } catch {
       toast("No se pudo armar el PDF. Intenta de nuevo.", "error");
@@ -190,7 +198,7 @@ export default function ReporteTab() {
           {/* 🔴 El enlace «Justificaciones del período» lo dibuja el componente,
               y SOLO cuando hay alguna (10-sep-2026): un título sobre una lista
               vacía es una palabra de más. */}
-          <JustificacionesDelPeriodo desde={desde} hasta={hasta} />
+          <JustificacionesDelPeriodo desde={desde} hasta={hasta} empresa={empresa} />
         </div>
       )}
 

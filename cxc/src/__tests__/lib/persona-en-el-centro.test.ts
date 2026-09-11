@@ -147,21 +147,24 @@ describe("A. 🔴 EL INTERRUPTOR ARRANCA APAGADO", () => {
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("B. 🔴 DE 6 A 4 PESTAÑAS, Y PERSONAS ES LA PRIMERA", () => {
-  it("prendido: Personas · Planilla · Préstamos · Aprobaciones · Reporte", () => {
+  it("prendido: Colaboradores · Asistencia · Aprobaciones · Planilla · Préstamos", () => {
+    // 🔴 10-sep-2026 (noche): «Reporte pasa a llamarse Asistencia. Tu orden»
+    // (Daniel). El orden es el del trabajo: la gente, lo que marcó el reloj, lo
+    // que se aprueba, lo que se paga. Ver `asistencia-empresa-para-todo.test.ts`.
     expect(pestanasDeAsistencia({ personaEnElCentro: true, planillaUnida: true }))
       .toEqual([
         ["colaboradores", "Colaboradores"],
+        ["asistencia", "Asistencia"],
+        ["aprobaciones", "Aprobaciones"],
         ["planilla", "Planilla"],
         ["prestamos", "Préstamos"],
-        ["aprobaciones", "Aprobaciones"],
-        ["reporte", "Reporte"],
       ]);
   });
 
   it("🔴 son CUATRO sin Préstamos — las que Daniel aprobó", () => {
     const claves = pestanasDeAsistencia({ personaEnElCentro: true, planillaUnida: false })
       .map(([k]) => k);
-    expect(claves).toEqual(["colaboradores", "planilla", "aprobaciones", "reporte"]);
+    expect(claves).toEqual(["colaboradores", "asistencia", "aprobaciones", "planilla"]);
   });
 
   it("🔴 Justificaciones y Vacaciones dejaron de ser pestañas", () => {
@@ -187,7 +190,9 @@ describe("B. 🔴 DE 6 A 4 PESTAÑAS, Y PERSONAS ES LA PRIMERA", () => {
   it("la pantalla monta «Personas» con el MISMO componente, no con uno nuevo", () => {
     // 🔴 Un segundo componente sería una segunda lista de personas.
     const src = puro(CLIENTE);
-    expect(src).toMatch(/tab === "colaboradores" && <ConfiguracionTab personaEnElCentro \/>/);
+    // 🔴 10-sep-2026 (noche): la pestaña recibe la empresa del selector de todo
+    // el módulo (`empresa={empresa}`). Ver `asistencia-empresa-para-todo.test.ts`.
+    expect(src).toMatch(/tab === "colaboradores" && <ConfiguracionTab personaEnElCentro empresa=\{empresa\} \/>/);
     expect(src).toMatch(/tab === "configuracion" && <ConfiguracionTab \/>/);
     // Y la decisión de qué pestañas hay NO vive en el JSX.
     expect(src).toMatch(/pestanasDeAsistencia\(/);
@@ -210,9 +215,11 @@ describe("C. 🔴 LAS DIRECCIONES VIEJAS NO CAEN EN BLANCO", () => {
     expect(pestanaQueSeAbre("vacaciones", VISIBLES)).toBe("colaboradores");
   });
 
-  it("🔴 `?tab=justificaciones` → REPORTE, que es lo que explican", () => {
-    expect(pestanaMudada("justificaciones")).toBe("reporte");
-    expect(pestanaQueSeAbre("justificaciones", VISIBLES)).toBe("reporte");
+  it("🔴 `?tab=justificaciones` → ASISTENCIA (era Reporte), que es lo que explican", () => {
+    // 🔴 10-sep-2026 (noche): «Reporte» se llama «Asistencia» (Daniel: «Reporte
+    // pasa a llamarse Asistencia. Tu orden»). Ver `asistencia-empresa-para-todo.test.ts`.
+    expect(pestanaMudada("justificaciones")).toBe("asistencia");
+    expect(pestanaQueSeAbre("justificaciones", VISIBLES)).toBe("asistencia");
   });
 
   it("basura, vacío o nulo caen en la primera visible — nunca en blanco", () => {
@@ -231,7 +238,10 @@ describe("C. 🔴 LAS DIRECCIONES VIEJAS NO CAEN EN BLANCO", () => {
 
   it("una pestaña que este rol SÍ ve se respeta tal cual", () => {
     expect(pestanaQueSeAbre("planilla", VISIBLES)).toBe("planilla");
-    expect(pestanaQueSeAbre("reporte", VISIBLES)).toBe("reporte");
+    // 🔴 10-sep-2026 (noche): «Reporte» se llama «Asistencia» (Daniel: «Reporte
+    // pasa a llamarse Asistencia. Tu orden»). Ver `asistencia-empresa-para-todo.test.ts`.
+    expect(pestanaQueSeAbre("asistencia", VISIBLES)).toBe("asistencia");
+    expect(pestanaQueSeAbre("reporte", VISIBLES)).toBe("asistencia");
   });
 });
 
@@ -615,7 +625,9 @@ describe("I. 🔴 EL SALDO EN PERSONAS, LAS JUSTIFICACIONES EN REPORTE", () => {
   it("Reporte trae «Justificaciones del período» como VISTA, no como bloque", () => {
     const src = puro(REPORTE);
     expect(src).toMatch(/PERSONA_EN_EL_CENTRO && \(/);
-    expect(src).toMatch(/<JustificacionesDelPeriodo desde=\{desde\} hasta=\{hasta\} \/>/);
+    // 🔴 10-sep-2026 (noche): la pestaña recibe la empresa del selector de todo
+    // el módulo (`empresa={empresa}`). Ver `asistencia-empresa-para-todo.test.ts`.
+    expect(src).toMatch(/<JustificacionesDelPeriodo desde=\{desde\} hasta=\{hasta\} empresa=\{empresa\} \/>/);
     // 🔴 10-sep-2026: el enlace «Justificaciones del período» y el «arranca
     // cerrada» se mudaron ADENTRO del componente, que además no dibuja nada
     // cuando no hay ninguna (Daniel revisó la pantalla: un título sobre nada es

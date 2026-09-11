@@ -909,7 +909,9 @@ describe("higiene", () => {
       .toContainEqual(["configuracion", "Configuración"]);
     expect(src).toContain("<ConfiguracionTab />");
     // Y con el acomodo nuevo es la MISMA pantalla, en modo lista.
-    expect(src).toContain("<ConfiguracionTab personaEnElCentro />");
+    // 🔴 10-sep-2026 (noche): la pestaña recibe la empresa del selector de todo el
+    // módulo. Ver `asistencia-empresa-para-todo.test.ts`.
+    expect(src).toContain("<ConfiguracionTab personaEnElCentro empresa={empresa} />");
   });
 
   it("la migración es aditiva e idempotente (no toca nada existente)", () => {

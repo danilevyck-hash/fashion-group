@@ -20,6 +20,7 @@
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { useCallback, useEffect, useState } from "react";
+import { empresaParaPedir } from "@/lib/asistencia/empresa-para-todo";
 import Link from "next/link";
 
 import { useToast } from "@/components/ToastSystem";
@@ -37,7 +38,8 @@ interface Justificacion {
   nota: string | null;
 }
 
-export default function JustificacionesDelPeriodo({ desde, hasta }: {
+export default function JustificacionesDelPeriodo({ desde, hasta, empresa = "" }: {
+  empresa?: string;
   desde: string; hasta: string;
 }) {
   const { toast } = useToast();
@@ -52,7 +54,7 @@ export default function JustificacionesDelPeriodo({ desde, hasta }: {
       // que ya sabía hacer la ruta: unas vacaciones que arrancan antes del
       // rango igual cubren días de adentro.
       const r = await fetch(
-        `/api/asistencia/justificaciones?desde=${desde}&hasta=${hasta}`,
+        `/api/asistencia/justificaciones?desde=${desde}&hasta=${hasta}${empresaParaPedir(empresa) ? `&empresa=${encodeURIComponent(empresaParaPedir(empresa)!)}` : ""}`,
         { cache: "no-store" },
       );
       const d = await r.json();
@@ -62,7 +64,7 @@ export default function JustificacionesDelPeriodo({ desde, hasta }: {
     } catch {
       setLista([]);
     }
-  }, [desde, hasta]);
+  }, [desde, hasta, empresa]);
 
   useEffect(() => { void leer(); }, [leer]);
 

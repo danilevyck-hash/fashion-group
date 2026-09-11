@@ -713,7 +713,9 @@ describe("higiene de la planilla", () => {
       expect(pestanasDeAsistencia({ personaEnElCentro: modo, planillaUnida: true }))
         .toContainEqual(["planilla", "Planilla"]);
     }
-    expect(src).toContain("<PlanillaTab />");
+    // 🔴 10-sep-2026 (noche): la pestaña recibe la empresa del selector de todo el
+    // módulo. Ver `asistencia-empresa-para-todo.test.ts`.
+    expect(src).toContain("<PlanillaTab empresa={empresa} />");
   });
 
   it("🔴 el PDF no usa glifos que su fuente no tiene (salían como & y \")", () => {

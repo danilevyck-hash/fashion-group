@@ -76,7 +76,9 @@ describe("A. 🔴 la pestaña se llama «Colaboradores»", () => {
 
   it("la pantalla monta la pestaña por su clave nueva, y la vieja no existe como clave", () => {
     const src = puro("src/app/asistencia/AsistenciaClient.tsx");
-    expect(src).toMatch(/tab === "colaboradores" && <ConfiguracionTab personaEnElCentro \/>/);
+    // 🔴 10-sep-2026 (noche): la pestaña recibe la empresa del selector de todo
+    // el módulo (`empresa={empresa}`). Ver `asistencia-empresa-para-todo.test.ts`.
+    expect(src).toMatch(/tab === "colaboradores" && <ConfiguracionTab personaEnElCentro empresa=\{empresa\} \/>/);
     expect(src).not.toMatch(/tab === "personas"/);
   });
 });

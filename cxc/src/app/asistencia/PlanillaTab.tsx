@@ -37,6 +37,7 @@
 // (ver `planilla-guardada.ts`). Acá solo se muestra el estado y se pide.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { esTodas } from "@/lib/asistencia/empresa-para-todo";
 import { createPortal } from "react-dom";
 import { useToast } from "@/components/ToastSystem";
 import { Ayuda } from "@/components/shared/Ayuda";
@@ -291,8 +292,17 @@ const MANUALES: Array<[keyof ManualesLinea, string, "+" | "−"]> = [
   ["otrosServicios", "Otros servicios", "+"],
 ];
 
-export default function PlanillaTab() {
+export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
+  /**
+   * 🔴 LA EMPRESA VIENE DEL SELECTOR DE ARRIBA DE LAS PESTAÑAS (10-sep-2026): se
+   * unificó con el de todo el módulo. «Todas» no vale acá: la planilla es de UNA
+   * empresa, y se pide elegirla. Sin la prop (la pestaña sola), la primera.
+   */
+  empresa?: string;
+} = {}) {
   const { toast } = useToast();
+  const empresa = empresaElegidaArriba ?? EMPRESAS_ASISTENCIA[0];
+  const sinEmpresa = esTodas(empresa);
 
   // 🔑 `hoy` se calcula UNA vez y en hora de Panamá. Recalcularlo en cada
   // render haría que la lista de quincenas cambiara sola a la medianoche
@@ -338,7 +348,6 @@ export default function PlanillaTab() {
   const [hasta, setHasta] = useState(quincenaEnCurso.hasta);
   /** `false` hasta que alguien elige un período. Sin esto no se pide nada. */
   const [elegido, setElegido] = useState(false);
-  const [empresa, setEmpresa] = useState<string>(EMPRESAS_ASISTENCIA[0]);
   // 🔴 EL CORTE (día 13/28). "" = la quincena entera, el comportamiento de
   // siempre. Solo se usa con el interruptor. Cambiarlo vuelve viejo el cuadro.
   const [corte, setCorte] = useState("");
@@ -400,7 +409,7 @@ export default function PlanillaTab() {
   const [sugerido, setSugerido] = useState<{ inicio: string; ultimaHasta: string } | null>(null);
   useEffect(() => {
     // Ya se generó algo, o la persona ya eligió: lo que manda es su elección.
-    if (pedido || elegido) return;
+    if (pedido || elegido || sinEmpresa) return;
     let vivo = true;
     void (async () => {
       try {
@@ -480,9 +489,9 @@ export default function PlanillaTab() {
 
   /** Generar / Regenerar: pedir el cuadro de lo que está elegido AHORA. */
   const generar = useCallback(() => {
-    if (!elegido) return;
+    if (!elegido || sinEmpresa) return;
     setPedido({ desde, hasta, empresa, corte });
-  }, [desde, elegido, empresa, hasta, corte]);
+  }, [desde, elegido, empresa, hasta, corte, sinEmpresa]);
 
   // ── LO QUE SE DERIVA DEL ESTADO ────────────────────────────────────────────
   /** ¿El cuadro en pantalla es de lo que está elegido arriba? */
@@ -848,7 +857,7 @@ export default function PlanillaTab() {
     <button
       type="button"
       onClick={generar}
-      disabled={!elegido || cargando}
+      disabled={!elegido || cargando || sinEmpresa}
       className={`min-h-[44px] rounded-md px-4 text-sm font-medium transition active:scale-[0.97] disabled:opacity-40 ${
         data && !vieja
           ? "border border-gray-300 text-gray-700 hover:border-black hover:text-black"
@@ -861,21 +870,15 @@ export default function PlanillaTab() {
 
   return (
     <div className="space-y-4">
+      {/* 🔴 «Todas» no arma una planilla: es de UNA empresa. Se pide elegirla
+          arriba, donde vive el selector de todo el módulo. */}
+      {sinEmpresa && (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+          Elige <b>una empresa</b> arriba para armar su planilla: con «Todas» no se paga nada.
+        </p>
+      )}
       {/* ── Elegir qué se va a pagar ── */}
       <div className="flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-gray-500">Empresa</span>
-          <select
-            value={empresa}
-            onChange={(e) => setEmpresa(e.target.value)}
-            className="min-h-[44px] rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm"
-          >
-            {EMPRESAS_ASISTENCIA.map((k) => (
-              <option key={k} value={k}>{etiquetaEmpresa(k)}</option>
-            ))}
-          </select>
-        </label>
-
         {/* 🔴 LA QUINCENA: dos botones con el mes en curso, y «Otro rango» para
             el calendario. El botón prendido es el que coincide EXACTO con lo
             elegido; un rango libre no prende ninguno. */}

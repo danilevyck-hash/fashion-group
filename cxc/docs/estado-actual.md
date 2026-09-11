@@ -1353,3 +1353,33 @@ hábiles, $150, y sigue sin cobrar $300).
    «Se cargan en la ficha de cada colaborador». Candado con barrido:
    `asistencia-pestana-fichas-y-26.test.ts` (ningún texto visible de `src/app/asistencia` ni
    `src/lib/asistencia` escribe «Configuración» ni «Personas» a mano).
+
+---
+
+## 10-sep-2026 (noche, 3) — «Asistencia» en vez de «Reporte», y un selector de empresa para todo
+
+Daniel, textual: *«Reporte pasa a llamarse Asistencia. Tu orden»* · *«que reporte se pueda filtrar
+también por empresa y sacar un excel filtrado para revisar tardanzas, ausencia, etc. Aprobaciones
+también se debería de poder ver por empresa, todo por empresa no?»*.
+
+- **Pestañas:** Colaboradores · Asistencia · Aprobaciones · Planilla · Préstamos (el orden del
+  trabajo). `?tab=reporte` sigue llegando (MUDANZA → asistencia); aterriza en Colaboradores.
+- **Un selector de empresa** arriba de las pestañas (`lib/asistencia/empresa-para-todo.ts`): «Todas»
+  + las 4 con nombre corto; en la URL (`?empresa=`) y recordado por usuario; las opciones salen del
+  rol (David solo Boston, sin «Todas»). Filtra Asistencia (servidor: tabla, totales, «A revisar»,
+  justificaciones del período), Aprobaciones (días, contadores, «Aprobar todo» y el aviso),
+  Colaboradores (se fueron los chips de empresa) y Préstamos (lista y total). Planilla lo reusa: con
+  «Todas» pide elegir una. Excel/PDF filtrados y con la empresa en el nombre
+  (`Asistencia-Boston-2026-09-01_2026-09-15.xlsx`).
+- 🔴 Lectura pura: nada de lo que se guarda cambia. `POST /api/asistencia/aprobaciones?empresa=`
+  rechaza (400, todo o nada) cualquier código de otra empresa.
+
+**Medido contra producción (1–15 sep 2026, `scripts/_medir-asistencia-por-empresa.ts`):** «Todas» =
+**45 filas, las mismas que hoy**; Boston **20** (todas de Boston) · Vistana 8 · Fashion Wear 7 ·
+Multifashion 5 · sin ficha 5 = 45, cuadra.
+
+**Candados:** `asistencia-empresa-para-todo.test.ts` (orden y nombre, opciones por rol, filtro de
+lectura, nombre del archivo, la ruta que rechaza otra empresa, y que cada pestaña cuelga del mismo
+selector). Cambiaron con nota fechada, ninguno se borró: `persona-en-el-centro`,
+`asistencia-colaboradores-no-personas`, `asistencia-siete-pantallas`, `asistencia-planilla`,
+`asistencia-config`, `asistencia-planilla-cerrar-quincena`, `aprobaciones-excel`, `peso-muerto-js`.

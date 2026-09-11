@@ -499,14 +499,15 @@ describe("🔴 DESACTUALIZADA — nada se recalcula por debajo", () => {
 
   it("🔴 cambiar la empresa también deja el cuadro viejo — no se recarga solo", async () => {
     const llamadas = servir(guionBase());
-    montar();
+    // 🔴 10-sep-2026 (noche): la empresa ya no se elige en la Planilla sino en
+    // el selector de todo el módulo, que se la pasa como prop. La regla no
+    // cambió: cambiarla deja el cuadro viejo y no recarga sola.
+    const vista = render(<ToastProvider><PlanillaTab empresa="confecciones_boston" /></ToastProvider>);
     generar();
     await cuadroEnPantalla();
     const antes = llamadas.filter((c) => c.url.includes("/api/asistencia/planilla?")).length;
 
-    const select = screen.getByRole("combobox") as HTMLSelectElement;
-    const otra = [...select.options].map((o) => o.value).find((v) => v !== select.value)!;
-    fireEvent.change(select, { target: { value: otra } });
+    vista.rerender(<ToastProvider><PlanillaTab empresa="vistana" /></ToastProvider>);
 
     await screen.findByText(/Cambiaste el período o la empresa/);
     expect(llamadas.filter((c) => c.url.includes("/api/asistencia/planilla?")).length).toBe(antes);

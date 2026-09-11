@@ -124,7 +124,9 @@ describe("🔴 Asistencia: Excel y PDF se bajan al TOCAR el botón", () => {
     const rep = leer("src/app/asistencia/ReporteTab.tsx");
     expect(rep).toContain("construirExcel({ personas, desde, hasta, reglas");
     expect(rep).toContain("construirPdf({ personas, desde, hasta, reglas");
-    expect(rep).toContain("`Asistencia ${desde} a ${hasta}.xlsx`");
+    // 🔴 10-sep-2026 (noche): el nombre lleva la empresa (o «Todas»), armado por
+    // `nombreArchivoPorEmpresa`. Mismo motor, mismo rango en el nombre.
+    expect(rep).toContain('nombreArchivoPorEmpresa("Asistencia", empresa, desde, hasta, "xlsx")');
     const pla = leer("src/app/asistencia/PlanillaTab.tsx");
     expect(pla).toContain("downloadWorkbook(construirExcelPlanilla(exportables), nombreArchivo(exportables, \"xlsx\"))");
     expect(pla).toContain("construirPdfPlanilla(exportables).save(nombreArchivo(exportables, \"pdf\"))");

@@ -5,6 +5,7 @@
 // acá solo se junta el dato.
 
 import { NextRequest, NextResponse } from "next/server";
+import { empresaParaPedir } from "@/lib/asistencia/empresa-para-todo";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { requireAsistencia } from "@/lib/asistencia/guard";
 import { supabaseServer } from "@/lib/supabase-server";
@@ -65,6 +66,10 @@ export async function GET(req: NextRequest) {
   //
   // ⚠️ ADITIVO: sin este parámetro la ruta se comporta exactamente como antes.
   const soloCodigo = (sp.get("codigo") ?? "").trim();
+  // 🔴 Filtro POR EMPRESA (10-sep-2026): lo aplica el servidor para que la
+  // tabla, los totales y el Excel/PDF digan lo mismo. Sin ficha no hay empresa:
+  // esos códigos solo salen con «Todas».
+  const empresaFiltro = empresaParaPedir(sp.get("empresa"));
 
   try {
     // Paginado con verificación contra el COUNT: un mes de dos relojes con 4
@@ -218,9 +223,11 @@ export async function GET(req: NextRequest) {
     const sinHorasExtra = new Set(
       personasDb.filas.filter(servicioProfesionalDeFila).map((f) => String(f.empleado_codigo)),
     );
-    const personasConBandera = personas.map((p) =>
-      sinHorasExtra.has(p.codigo) ? { ...p, servicioProfesional: true } : p,
-    );
+    const empresaDe = new Map(personasDb.filas.map((f) => [String(f.empleado_codigo), f.empresa ?? null]));
+    const personasConBandera = personas
+      .map((p) => ({ ...p, empresa: empresaDe.get(p.codigo) ?? null }))
+      .map((p) => (sinHorasExtra.has(p.codigo) ? { ...p, servicioProfesional: true } : p))
+      .filter((p) => !empresaFiltro || p.empresa === empresaFiltro);
 
     return NextResponse.json({
       personas: personasConBandera,
@@ -239,7 +246,7 @@ export async function GET(req: NextRequest) {
       reglas,
       // Para que la pantalla pueda avisar si alguien no tiene horario fijado:
       // sin él se asume 17:00 y el número puede estar mal.
-      sinHorario: personas.filter((p) => !(hRes.data ?? []).some((h) => h.empleado_codigo === p.codigo)).length,
+      sinHorario: personasConBandera.filter((p) => !(hRes.data ?? []).some((h) => h.empleado_codigo === p.codigo)).length,
       marcaciones: enRango.length,
       // Cuántas personas quedaron fuera por no estar trabajando en este rango
       // (se fueron antes o entraron después). La pantalla lo dice en una línea.

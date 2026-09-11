@@ -16,6 +16,8 @@
 // Acá solo se ESCRIBE.
 
 import { NextRequest, NextResponse } from "next/server";
+import { empresaParaPedir } from "@/lib/asistencia/empresa-para-todo";
+import { etiquetaEmpresa } from "@/lib/asistencia/config";
 import { aprobacionesRoles } from "@/lib/asistencia/roles";
 import { requireAsistencia } from "@/lib/asistencia/guard";
 import {
@@ -87,6 +89,23 @@ export async function POST(req: NextRequest) {
     // La empresa NO viene en el cuerpo y no podría: la manda el navegador. Sale
     // de la FICHA de cada persona, que es la misma fuente con la que se arma el
     // cuadro que se está aprobando.
+    // 🔴 CON `?empresa=` NO SE APRUEBA NADA DE OTRA EMPRESA (10-sep-2026). El
+    // selector de arriba filtra lo que se VE; esto es el candado del lado del
+    // servidor para que «Aprobar todo» con Boston elegido no pueda tocar a
+    // nadie de Vistana aunque el navegador mande de más. Todo o nada.
+    const empresaFiltro = empresaParaPedir(req.nextUrl.searchParams.get("empresa"));
+    if (empresaFiltro) {
+      const fichas = await leerPersonas();
+      const empresaDe = new Map(fichas.filas.map((f) => [String(f.empleado_codigo), f.empresa ?? null]));
+      const deOtra = dias.filter((d) => empresaDe.get(d.codigo) !== empresaFiltro).map((d) => d.codigo);
+      if (deOtra.length > 0) {
+        return NextResponse.json(
+          { error: `No se aprobó nada: ${deOtra.length === 1 ? "hay un colaborador que no es" : `hay ${deOtra.length} colaboradores que no son`} de ${etiquetaEmpresa(empresaFiltro)}.`, fuera: [...new Set(deOtra)] },
+          { status: 400 },
+        );
+      }
+    }
+
     const alcance = await leerAlcanceAprobador(auth.role, auth.userName);
     if (alcance.empresas !== null) {
       const fichas = await leerPersonas();

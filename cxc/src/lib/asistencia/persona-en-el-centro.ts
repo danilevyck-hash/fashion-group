@@ -62,7 +62,7 @@ export const PERSONA_EN_EL_CENTRO = personaEnElCentroPrendida();
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type ClavePestana =
-  | "colaboradores" | "reporte" | "planilla" | "prestamos"
+  | "colaboradores" | "asistencia" | "reporte" | "planilla" | "prestamos"
   | "justificaciones" | "vacaciones" | "aprobaciones" | "configuracion";
 
 export type Pestana = readonly [ClavePestana, string];
@@ -102,11 +102,14 @@ export const PESTANAS_HOY: readonly Pestana[] = [
  * trabajo. La página de la persona muestra lo SUYO; la pestaña, el conjunto.
  */
 export const PESTANAS_PERSONA_EN_EL_CENTRO: readonly Pestana[] = [
+  // 🔴 «Reporte pasa a llamarse Asistencia. Tu orden» (Daniel, 10-sep-2026,
+  // noche). El orden es el del TRABAJO: primero la gente, después lo que marcó
+  // el reloj, después lo que se aprueba, después lo que se paga.
   ["colaboradores", "Colaboradores"],
+  ["asistencia", "Asistencia"],
+  ["aprobaciones", "Aprobaciones"],
   ["planilla", "Planilla"],
   ["prestamos", "Préstamos"],
-  ["aprobaciones", "Aprobaciones"],
-  ["reporte", "Reporte"],
 ] as const;
 
 /**
@@ -153,7 +156,10 @@ export function pestanasDeAsistencia(opts: {
 
 const MUDANZA: Readonly<Record<string, ClavePestana>> = Object.freeze({
   configuracion: "colaboradores",
-  justificaciones: "reporte",
+  justificaciones: "asistencia",
+  // 🔴 «Reporte» se llama «Asistencia» desde el 10-sep-2026 (noche): el enlace
+  // viejo (`?tab=reporte`, y el de la sección de la ficha) sigue llegando.
+  reporte: "asistencia",
   vacaciones: "colaboradores",
   // 🔴 `personas` fue la clave de esta misma pestaña del 10-sep-2026 (mañana) al
   // 10-sep-2026 (tarde), cuando Daniel pidió «colaboradores». Un enlace guardado

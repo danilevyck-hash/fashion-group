@@ -84,6 +84,10 @@ import {
   pestanasDeAsistencia,
   type ClavePestana,
 } from "@/lib/asistencia/persona-en-el-centro";
+import {
+  PARAM_EMPRESA, RECORDAR_EMPRESA, empresaElegida, opcionesDeEmpresa,
+} from "@/lib/asistencia/empresa-para-todo";
+import { useLastUsed } from "@/lib/hooks/useLastUsed";
 
 // 🩸 ESTA LISTA SE MUDÓ A UN MÓDULO PURO (10-sep-2026). Vivía acá abajo, con
 // todas sus notas, y `asistencia-pestanas.test.ts` la leía como TEXTO de este
@@ -137,6 +141,15 @@ function AsistenciaInner() {
   // 🔴 CON EL INTERRUPTOR APAGADO, PRÉSTAMOS NO EXISTE. Ni en la barra, ni por
   // la URL: el `?tab=prestamos` de alguien cae en la pestaña por defecto, igual
   // que cualquier valor desconocido. Ver `planilla-unida.ts`.
+  // 🔴 UN SELECTOR DE EMPRESA PARA TODO EL MÓDULO (10-sep-2026). Daniel: *«todo
+  // por empresa no?»*. Vive en la URL (mismo nivel → `replace`) y se recuerda
+  // por usuario; las opciones salen del rol (David solo ve Boston, sin «Todas»).
+  const [empresaUrl, setEmpresaUrl] = useUrlState<string>(PARAM_EMPRESA, "");
+  const [empresaRecordada, recordarEmpresa] = useLastUsed(RECORDAR_EMPRESA, "");
+  const opciones = opcionesDeEmpresa(rol);
+  const empresa = empresaElegida(empresaUrl || empresaRecordada, rol);
+  const elegirEmpresa = (e: string) => { setEmpresaUrl(e); recordarEmpresa(e); };
+
   const visibles = pestanasDeAsistencia({
     personaEnElCentro: PERSONA_EN_EL_CENTRO,
     planillaUnida: PLANILLA_UNIDA,
@@ -181,6 +194,22 @@ function AsistenciaInner() {
             ))}
           </div>
 
+          {/* La empresa, arriba de las pestañas y para TODAS: filtra lo que se
+              mira en cada una y es el selector de la Planilla. */}
+          <label className="mb-1 flex shrink-0 items-center gap-2">
+            <span className="sr-only">Empresa</span>
+            <select
+              aria-label="Empresa"
+              value={empresa}
+              onChange={(e) => elegirEmpresa(e.target.value)}
+              className="min-h-[44px] rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm"
+            >
+              {opciones.map((o) => (
+                <option key={o.clave} value={o.clave}>{o.etiqueta}</option>
+              ))}
+            </select>
+          </label>
+
           {/* Ayuda, no pestaña: discreto, redondo y con el nombre completo para
               quien navegue con lector de pantalla o se quede encima con el mouse. */}
           <button
@@ -215,12 +244,14 @@ function AsistenciaInner() {
             </div>
           ) : (
             <>
-              {tab === "planilla" && <PlanillaTab />}
-              {tab === "prestamos" && <PrestamosTab />}
-              {tab === "reporte" && <ReporteTab />}
+              {tab === "planilla" && <PlanillaTab empresa={empresa} />}
+              {tab === "prestamos" && <PrestamosTab empresa={empresa} />}
+              {/* «Reporte» se llama «Asistencia» desde el 10-sep-2026; la clave
+                  vieja sigue montando la misma pantalla con el interruptor apagado. */}
+              {(tab === "reporte" || tab === "asistencia") && <ReporteTab empresa={empresa} />}
               {tab === "justificaciones" && <JustificacionesTab />}
               {tab === "vacaciones" && <VacacionesTab />}
-              {tab === "aprobaciones" && <AprobacionesTab />}
+              {tab === "aprobaciones" && <AprobacionesTab empresa={empresa} />}
               {/* 🔴 «COLABORADORES» ES LA MISMA PANTALLA, EN MODO LISTA. Daniel:
                   *«te acepto la queja»* — «Configuración» se llama Personas; y
                   desde el 10-sep-2026, *«no lo llames personas, sino colaboradores»*. No
@@ -228,7 +259,7 @@ function AsistenciaInner() {
                   llevando a la página de cada quien en vez de desplegarse, y
                   con Horarios, Feriados y Reglas exactamente donde estaban. Un
                   segundo componente sería una segunda lista de personas. */}
-              {tab === "colaboradores" && <ConfiguracionTab personaEnElCentro />}
+              {tab === "colaboradores" && <ConfiguracionTab personaEnElCentro empresa={empresa} />}
               {tab === "configuracion" && <ConfiguracionTab />}
             </>
           )}

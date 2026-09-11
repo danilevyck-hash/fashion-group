@@ -74,8 +74,12 @@ describe("la hoja", () => {
   });
 
   it("el nombre del archivo lleva el rango elegido", () => {
+    // 🔴 10-sep-2026 (noche): el nombre lleva la empresa (o «Todas»), como el
+    // Excel de Asistencia. La regla no cambió: el rango va en el nombre.
     expect(nombreArchivoAprobaciones("2026-07-01", "2026-07-31"))
-      .toBe("Horas extra 2026-07-01 a 2026-07-31.xlsx");
+      .toBe("Horas-extra-Todas-2026-07-01_2026-07-31.xlsx");
+    expect(nombreArchivoAprobaciones("2026-07-01", "2026-07-31", "vistana"))
+      .toBe("Horas-extra-Vistana-2026-07-01_2026-07-31.xlsx");
   });
 });
 

@@ -97,7 +97,9 @@ describe("3. 🔴 «Justificaciones del período» no se dibuja sin justificacio
     expect(j).toMatch(/const \[abierta, setAbierta\] = useState\(false\);/);
     const rep = puro("src/app/asistencia/ReporteTab.tsx");
     expect(rep).not.toMatch(/verJustificaciones/);
-    expect(rep).toMatch(/<JustificacionesDelPeriodo desde=\{desde\} hasta=\{hasta\} \/>/);
+    // 🔴 10-sep-2026 (noche): la pestaña recibe la empresa del selector de todo
+    // el módulo (`empresa={empresa}`). Ver `asistencia-empresa-para-todo.test.ts`.
+    expect(rep).toMatch(/<JustificacionesDelPeriodo desde=\{desde\} hasta=\{hasta\} empresa=\{empresa\} \/>/);
   });
 });
 

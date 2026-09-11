@@ -28,6 +28,7 @@ import {
   type ReportCell,
   type ReportColumn,
 } from "@/lib/excel-export";
+import { nombreArchivoPorEmpresa } from "./empresa-para-todo";
 import type { DiaAprobacion } from "./aprobaciones";
 
 /** Minutos con dos decimales: se miden AL SEGUNDO desde el 13-ago-2026. */
@@ -60,8 +61,9 @@ export interface OpcionesExcelAprobaciones {
 }
 
 /** El nombre del archivo lleva el rango: es lo que dice de qué período es. */
-export function nombreArchivoAprobaciones(desde: string, hasta: string): string {
-  return `Horas extra ${desde} a ${hasta}.xlsx`;
+/** «Horas extra-Boston-2026-09-01_2026-09-15.xlsx»: la empresa (o «Todas») va en el nombre (10-sep-2026). */
+export function nombreArchivoAprobaciones(desde: string, hasta: string, empresa?: string | null): string {
+  return nombreArchivoPorEmpresa("Horas extra", empresa, desde, hasta, "xlsx");
 }
 
 export function construirExcelAprobaciones(opts: OpcionesExcelAprobaciones) {

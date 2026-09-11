@@ -28,6 +28,7 @@
 // algo que va a contestar 403.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { filtrarPorEmpresa } from "@/lib/asistencia/empresa-para-todo";
 import { useToast } from "@/components/ToastSystem";
 import { NOMBRE_CUENTA, type CuentaPrestamo } from "@/lib/prestamos-saldo";
 import { ORIGENES_ABONO } from "@/lib/asistencia/abono-extra";
@@ -44,6 +45,8 @@ interface FichaDeuda {
   saldoDano: number;
   /** Lo que debe por «Descuento a terceros». Opcional: un payload viejo no lo trae. */
   saldoTerceros?: number;
+  /** La empresa de la persona atada (10-sep-2026): por ella filtra el selector de arriba. */
+  empresa?: string | null;
   cuota: number;
   cuotaDano: number;
   yaDescontado: number;
@@ -55,7 +58,7 @@ function money(n: number): string {
   return n < 0 ? `−$${abs}` : `$${abs}`;
 }
 
-export default function PrestamosTab(props: { desde?: string; hasta?: string } = {}) {
+export default function PrestamosTab(props: { desde?: string; hasta?: string; empresa?: string } = {}) {
   const { toast } = useToast();
   // 🔑 Sin período dado, la quincena EN CURSO — y el «hoy» es el de PANAMÁ, no
   // el del navegador. Solo decide la columna «esta quincena»: el SALDO es
@@ -77,7 +80,8 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string } =
       const r = await fetch(`/api/asistencia/prestamos-deuda?${q}`, { cache: "no-store" });
       const j = (await r.json()) as { fichas?: FichaDeuda[]; puedeAnotar?: boolean; error?: string };
       if (!r.ok) throw new Error(j.error ?? "No se pudo leer la deuda");
-      setFichas(j.fichas ?? []);
+      // 🔴 Filtrado por la empresa de arriba: la lista y el total (10-sep-2026).
+      setFichas(filtrarPorEmpresa(j.fichas ?? [], props.empresa));
       setPuedeAnotar(!!j.puedeAnotar);
     } catch {
       toast("No se pudo leer la deuda. Intenta de nuevo.", "error");
@@ -85,7 +89,7 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string } =
     } finally {
       setCargando(false);
     }
-  }, [desde, hasta, toast]);
+  }, [desde, hasta, toast, props.empresa]);
 
   useEffect(() => { void cargar(); }, [cargar]);
 
