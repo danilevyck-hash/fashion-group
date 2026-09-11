@@ -648,28 +648,19 @@ describe("🔴 sin aprobar NO se cierra — es un freno, no un aviso", () => {
     expect(db.cabeceras.length).toBe(0);
   });
 
-  it("🔴 un préstamo sin aprobar también frena", async () => {
+  // ⚠️ CAMBIÓ DE DIRECCIÓN EL 11-SEP-2026, NO SE BORRÓ. Acá había dos casos:
+  // «un préstamo sin aprobar también frena» (409 con el nombre y el monto) y
+  // «un préstamo YA aprobado no frena». Daniel: *«quita lo de aprobación a
+  // préstamos, no es necesario»* — la cuota entra sola a la casilla y el
+  // préstamo ya no tiene nada que frenar. Lo que se protege ahora: que el
+  // cierre NO vuelva a mirar `prestamos` para frenar.
+  it("🔴 el préstamo YA NO frena el cierre: con la cuota propuesta y sin nada escrito, 200", async () => {
     const c = cuadroPorDefecto();
     c.prestamos = [{
       codigo: "9", etiqueta: "LUIS ARROYO", empresa: "vistana", empresaEtiqueta: "Vistana",
       nombrePrestamos: "LUIS ADRIAN ARROYO", cuota: 50, saldo: 700, sugerido: 50,
-      origen: "cuota", aprobado: false, por: null, cuando: null, montoVisto: null, enCasilla: 0,
-    }];
-    cuadro = c;
-    const r = await POST(pedir("POST", "admin", "daniel", CUERPO));
-    expect(r.status).toBe(409);
-    const j = await r.json();
-    expect(j.error).toContain("LUIS ARROYO");
-    expect(j.error).toContain("$50.00");
-    expect(db.cabeceras.length).toBe(0);
-  });
-
-  it("⚠️ un préstamo YA aprobado no frena: se cierra normal", async () => {
-    const c = cuadroPorDefecto();
-    c.prestamos = [{
-      codigo: "9", etiqueta: "LUIS ARROYO", empresa: "vistana", empresaEtiqueta: "Vistana",
-      nombrePrestamos: "LUIS ADRIAN ARROYO", cuota: 50, saldo: 700, sugerido: 50,
-      origen: "cuota", aprobado: true, por: "daniel", cuando: "2026-08-16", montoVisto: 50, enCasilla: 50,
+      origen: "cuota", enCasilla: 0,
+      cuotaTerceros: 0, saldoTerceros: 0, sugeridoTerceros: 0, enCasillaTerceros: 0,
     }];
     cuadro = c;
     const r = await POST(pedir("POST", "admin", "daniel", CUERPO));

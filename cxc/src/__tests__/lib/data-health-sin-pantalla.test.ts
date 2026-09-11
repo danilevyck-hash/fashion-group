@@ -129,11 +129,16 @@ describe("🔴 la medición no se tocó", () => {
     expect(entradas[0].schedule).toBe("0 12 * * *");
   });
 
-  it("🔴 el total de entradas de cron NO cambia: siguen siendo 81", () => {
+  it("🔴 el total de entradas de cron NO cambia por retirar una pantalla: son 80", () => {
     // Retirar una PANTALLA no puede mover el cronograma. Si este número baja,
     // se llevó por delante una tarea; si sube, entró una sin registrar.
+    // ⚠️ Eran 81 hasta el 11-sep-2026 (cuando se retiró Data Health de la
+    // pantalla): ese mismo día, y por OTRO encargo, se retiró el cron
+    // `prestamos-caducan` con la aprobación de préstamos (Daniel: «Aprobar
+    // préstamos: eso también se quita»). Este candado cambió de número con
+    // nota, no de regla: la medición (`integrity-check`) sigue intacta.
     const vercel = JSON.parse(leer("vercel.json")) as { crons: unknown[] };
-    expect(vercel.crons).toHaveLength(81);
+    expect(vercel.crons).toHaveLength(80);
   });
 
   // Mismo motivo que la allowlist de checks: `cron-telemetry.ts` construye el

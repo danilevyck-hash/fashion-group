@@ -75,11 +75,28 @@ describe("🔴 el permiso de horas: las dos, o ninguna", () => {
     expect("hora_hasta" in insertados[0]).toBe(false);
   });
 
-  it("con las dos horas se guardan las dos", async () => {
-    const res = await POST(pedido({ ...base, horaDesde: "08:00", horaHasta: "10:00" }));
+  // ⚠️ 11-sep-2026: las horas SOLO van con Constancia (Daniel: «que se ponga
+  // rango de hora solamente en constancia»). Estos casos mandaban «Escolares»
+  // con horas y guardaban; cambiaron de motivo, no de regla. Ver
+  // `justificar-horas-solo-constancia.test.ts`.
+  const constancia = { ...base, motivo: "Constancia" };
+
+  it("con las dos horas (y Constancia) se guardan las dos", async () => {
+    const res = await POST(pedido({ ...constancia, horaDesde: "08:00", horaHasta: "10:00" }));
     expect(res.status).toBe(200);
     expect(insertados[0].hora_desde).toBe("08:00");
     expect(insertados[0].hora_hasta).toBe("10:00");
+    expect(insertados[0].motivo).toBe("Constancia");
+  });
+
+  it("🔴 un motivo de día completo con horas se rechaza ANTES de tocar la base", async () => {
+    for (const motivo of ["Escolares", "Incapacidad", "Catástrofe", "Trabajo de vendedor"]) {
+      insertados.length = 0;
+      const res = await POST(pedido({ ...base, motivo, horaDesde: "08:00", horaHasta: "10:00" }));
+      expect(res.status, motivo).toBe(400);
+      expect((await res.json()).error).toContain("solo van con Constancia");
+      expect(insertados).toHaveLength(0);
+    }
   });
 
   it("media ventana y una ventana al revés se rechazan ANTES de tocar la base", async () => {
@@ -91,7 +108,7 @@ describe("🔴 el permiso de horas: las dos, o ninguna", () => {
       { horaDesde: "veinticinco", horaHasta: "10:00" },
     ]) {
       insertados.length = 0;
-      const res = await POST(pedido({ ...base, ...malo }));
+      const res = await POST(pedido({ ...constancia, ...malo }));
       expect(res.status, JSON.stringify(malo)).toBe(400);
       expect(insertados).toHaveLength(0);
     }
@@ -111,7 +128,7 @@ describe("🔴 el permiso de horas: las dos, o ninguna", () => {
     // 🩸 Una justificación que se traga las horas pasa a justificar el DÍA
     // ENTERO —ocho horas de sueldo— y nadie sabría por qué.
     respuestas = [{ error: { code: "42703", message: "column hora_desde does not exist" } }];
-    const res = await POST(pedido({ ...base, horaDesde: "08:00", horaHasta: "10:00" }));
+    const res = await POST(pedido({ ...constancia, horaDesde: "08:00", horaHasta: "10:00" }));
     expect(res.status).toBe(503);
     const d = await res.json();
     expect(d.faltaMigracionHoras).toBe(true);
