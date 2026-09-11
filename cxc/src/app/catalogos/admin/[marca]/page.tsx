@@ -18,6 +18,12 @@ import { puedeAdministrarCatalogo } from "@/lib/catalogo/roles";
 // con `/saldos-banco` y con los slugs viejos de `/g/` — se cambia a dónde
 // lleva, nunca la llave con la que alguien lo tiene anotado.
 //
+// 🩸 Y ESE REDIRECT VA ANTES DEL GUARD DE ROL (11-sep-2026). Del 6 al 11-sep
+// corría DESPUÉS: el marcador viejo mandaba a `/home` justo a vendedor y bodega,
+// que SÍ ven comprobantes — el comentario de arriba prometía lo contrario. La
+// pantalla de destino tiene su propio guard (`/catalogo/<marca>/pedidos`,
+// `COMPROBANTES_ROLES`), así que quien no puede verla rebota allá, no acá.
+//
 // 🩸 ESTA PÁGINA NO COMPROBABA NINGÚN ROL (hasta el 6-sep-2026). Resolvía la
 // marca y montaba el componente; el único guardia era del navegador y el
 // middleware solo valida que la sesión EXISTA, así que cualquiera con sesión
@@ -38,10 +44,13 @@ export default async function AdminCatalogoPage({
 }) {
   const role = verifySession((await cookies()).get("cxc_session")?.value)?.role ?? null;
   if (!role) redirect("/");
-  if (!puedeAdministrarCatalogo(role)) redirect("/home");
 
   const theme = getMarcaTheme(params.marca);
   if (!theme) notFound();
+  // Compatibilidad del marcador viejo, ANTES de preguntar si administra: los
+  // comprobantes no son de esta pantalla y tienen su propio guard.
   if (searchParams?.tab === TAB_COMPROBANTES_KEY) redirect(`/catalogo/${theme.marca}/pedidos`);
+
+  if (!puedeAdministrarCatalogo(role)) redirect("/home");
   return <AdminCatalogoClient marca={theme.marca} />;
 }

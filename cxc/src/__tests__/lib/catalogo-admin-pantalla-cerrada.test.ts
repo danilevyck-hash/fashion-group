@@ -54,10 +54,10 @@ import { ALL_MODULES } from "@/lib/modules";
 const MARCAS = ["reebok", "joybees", "tommy", "calvin"] as const;
 
 /** Abre la pantalla con ese rol. Devuelve `"ok"` si la dibujó, o a dónde mandó. */
-async function abrir(role: string | null, marca: string): Promise<string> {
+async function abrir(role: string | null, marca: string, tab?: string): Promise<string> {
   sesion = role ? `sesion-de-${role}` : undefined;
   try {
-    await AdminCatalogoPage({ params: { marca }, searchParams: {} });
+    await AdminCatalogoPage({ params: { marca }, searchParams: tab ? { tab } : {} });
     return "ok";
   } catch (e) {
     if (e instanceof Redirigido) return e.destino;
@@ -104,22 +104,52 @@ describe("quién abre /catalogos/admin/<marca>", () => {
     });
   }
 
+  // ⚠️ CAMBIÓ (11-sep-2026): antes el vendedor rebotaba a `/home` sin que la
+  // marca se mirara; ahora la marca se resuelve ANTES del guard de rol (para
+  // que el marcador `?tab=pedidos` pueda redirigir con ella), así que una marca
+  // inventada es 404 para todos. Sigue sin abrir para nadie.
   it("una marca inventada no abre para nadie", async () => {
     expect(await abrir("admin", "bonobo")).toBe("404");
-    expect(await abrir("vendedor", "bonobo")).toBe("/home");
+    expect(await abrir("vendedor", "bonobo")).toBe("404");
+  });
+
+  // 🔴 EL MARCADOR VIEJO `?tab=pedidos` (11-sep-2026). Del 6 al 11-sep el
+  // redirect de compatibilidad corría DESPUÉS del guard: vendedor y bodega
+  // —que SÍ ven comprobantes— caían en `/home`, y el comentario del archivo
+  // prometía lo contrario. Ahora llegan a la pantalla nueva; quien no puede
+  // verla rebota ALLÁ (esa página tiene su propio guard), no acá.
+  it("🔴 `?tab=pedidos` lleva a los comprobantes ANTES de preguntar si administra", async () => {
+    for (const role of ["vendedor", "bodega", "admin", "secretaria"]) {
+      expect(await abrir(role, "reebok", "pedidos"), role).toBe("/catalogo/reebok/pedidos");
+    }
+    expect(await abrir("vendedor", "tommy", "pedidos")).toBe("/catalogo/tommy/pedidos");
+    // Sin sesión sigue siendo el login, y otra pestaña no redirige.
+    expect(await abrir(null, "reebok", "pedidos")).toBe("/");
+    expect(await abrir("vendedor", "reebok", "otra")).toBe("/home");
   });
 });
 
 describe("el guard corre ANTES de dibujar, y la lista no se escribe a mano", () => {
   const page = readFileSync(path.join(process.cwd(), "src/app/catalogos/admin/[marca]/page.tsx"), "utf8");
 
-  it("la comprobación del rol va antes de resolver la marca y de montar el cliente", () => {
+  // ⚠️ CAMBIÓ DE DIRECCIÓN (11-sep-2026): el orden es sesión → marca → el
+  // redirect del marcador viejo → el guard de rol → montar. Lo que NO cambió y
+  // sigue exigido: el guard va ANTES de montar el cliente, y la sesión antes
+  // que todo.
+  it("el orden: sesión, marca, el redirect de `?tab=pedidos`, el guard de rol, y recién ahí el cliente", () => {
     // Solo el CUERPO de la función: los `import` de arriba nombran las mismas
     // cosas y compararlos contra ellos no diría nada.
     const cuerpo = page.slice(page.indexOf("export default async function"));
-    expect(cuerpo.indexOf('redirect("/home")')).toBeLessThan(cuerpo.indexOf("getMarcaTheme("));
-    expect(cuerpo.indexOf('redirect("/home")')).toBeLessThan(cuerpo.indexOf("<AdminCatalogoClient"));
-    expect(cuerpo.indexOf('redirect("/home")')).toBeGreaterThan(0);
+    const iSesion = cuerpo.indexOf('redirect("/")');
+    const iMarca = cuerpo.indexOf("getMarcaTheme(");
+    const iTab = cuerpo.indexOf("TAB_COMPROBANTES_KEY");
+    const iRol = cuerpo.indexOf('redirect("/home")');
+    const iMontar = cuerpo.indexOf("<AdminCatalogoClient");
+    expect(iSesion).toBeGreaterThan(0);
+    expect(iSesion).toBeLessThan(iMarca);
+    expect(iMarca).toBeLessThan(iTab);
+    expect(iTab).toBeLessThan(iRol);
+    expect(iRol).toBeLessThan(iMontar);
   });
 
   it("🔴 la lista se DERIVA de lib/catalogo/roles.ts — ningún rol escrito a mano", () => {
