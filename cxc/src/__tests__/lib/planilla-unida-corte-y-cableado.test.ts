@@ -356,8 +356,14 @@ describe("H. EL CORTE Y EL AJUSTE, CABLEADOS (10-sep-2026)", () => {
     const bloque = ruta.slice(ruta.indexOf("async function medirAjusteAnterior"), ruta.indexOf("export async function GET"));
     expect(bloque).toMatch(/url\.searchParams\.set\("desde", restante\.desde\)/);
     expect(bloque).not.toMatch(/set\("corte"/);
-    // y usa `ajusteDeDiasSinMedir` sobre el dinero medido.
-    expect(bloque).toMatch(/ajusteDeDiasSinMedir\(l\.dinero\)/);
+    // 🔴 11-sep-2026: ya no reduce el dinero a UN número acá. Devuelve el
+    // `dinero` de los días sin medir tal cual, y es `aplicarAjusteEnLinea` la
+    // que lo reparte concepto por concepto (la contadora: «valen diferente»).
+    expect(bloque).toMatch(/dinero\.set\(l\.codigo, l\.dinero\)/);
+    expect(bloque).not.toMatch(/ajusteDeDiasSinMedir/);
+    expect(ruta).toMatch(/aplicarAjusteEnLinea\(l, medido\.dinero\.get\(l\.codigo\), medido\.dias\)/);
+    // Y los totales salen de las líneas YA con el ajuste adentro.
+    expect(ruta).toMatch(/totales: totalizar\(lineasFinal\)/);
   });
 
   // 🔴 EL CIERRE GUARDA EL CORTE Y LO PASA AL CÁLCULO.
@@ -384,8 +390,12 @@ describe("I. EL AJUSTE, LA CUENTA (pura)", () => {
     expect(netoConAjuste(229.95, undefined)).toBeCloseTo(229.95, 2);
   });
 
-  // 🔴 EL NETO GUARDADO ES EL QUE SE PAGA: netoPagar − ajuste.
-  it("totalesDe resta el ajuste del total neto", async () => {
+  // 🔴 EL NETO GUARDADO ES EL QUE SE PAGA: `netoPagar` TAL CUAL.
+  // Cambió de dirección el 11-sep-2026: hasta entonces restaba `ajusteAnterior`
+  // porque el ajuste vivía FUERA de `dinero`. Ahora entra en las columnas
+  // (`aplicarAjusteEnLinea`) y `netoPagar` ya lo trae; restarlo otra vez lo
+  // cobraría dos veces. `ajusteAnterior` queda como testigo y NO mueve el total.
+  it("totalesDe suma netoPagar tal cual, y el testigo `ajusteAnterior` no lo mueve", async () => {
     const { totalesDe } = await import("@/lib/asistencia/planilla-guardada");
     const base = { horas: {}, faltaConfigurar: [], fueraDePlanilla: false } as unknown as Record<string, unknown>;
     const linea = (neto: number, ajuste?: number) => ({
@@ -393,7 +403,7 @@ describe("I. EL AJUSTE, LA CUENTA (pura)", () => {
       ajusteAnterior: ajuste,
     }) as unknown as import("@/lib/asistencia/planilla").LineaPlanilla;
     const t = totalesDe([linea(200, 15), linea(300)]);
-    expect(t.totalNeto).toBeCloseTo(200 - 15 + 300, 2);
+    expect(t.totalNeto).toBeCloseTo(200 + 300, 2);
   });
 
   // La quincena anterior: la 2ª de un mes → la 1ª; la 1ª → la 2ª del mes pasado.
