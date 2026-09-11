@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
 
 interface TimeGroupHeaderProps {
   label: string;
@@ -33,7 +34,12 @@ export default function TimeGroupHeader({
         // ("Esta semana (15 guías)") y la comparten Guías y Cheques, así que un
         // solo `min-h-[44px]` cubre los dos. Se saca `py-2`: con el min-h y el
         // `items-center` el alto lo pone la caja, no el padding.
-        className={`sticky top-14 z-[5] w-full flex items-center gap-3 px-4 min-h-[44px] text-left transition-colors bg-gray-50/90 backdrop-blur-sm border-b border-gray-200`}
+        // 🩸 El tope eran 56 px escritos a mano, y el encabezado no
+        // mide 56 en ninguna de las dos pantallas: en el escritorio mide ≈70
+        // (lleva el breadcrumb) y la cabecera del grupo se le metía encima; en
+        // el celular mide ≈46 y quedaba una franja de 10 px por la que se veía
+        // pasar la lista. Ahora el tope es el alto MEDIDO del encabezado.
+        className={`${CLASE_BARRA_PEGAJOSA} w-full flex items-center gap-3 px-4 min-h-[44px] text-left transition-colors bg-gray-50/90 backdrop-blur-sm border-b border-gray-200`}
       >
         <svg
           className={`w-3 h-3 ${color} transition-transform shrink-0 ${open ? "rotate-90" : ""}`}

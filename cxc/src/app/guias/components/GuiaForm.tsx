@@ -68,6 +68,7 @@ import { ENTREGADO_POR_OTRO, entregadoPorElegido, nombreDespachadoPor } from "@/
 import { ETIQUETA_TIPO_DESPACHO } from "@/lib/guias/modo-despacho";
 import { textoFalta } from "@/lib/guias/falta-para-despachar";
 import { sugerenciasDireccion } from "@/lib/guias/direccion-sugerida";
+import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
 
 interface GuiaFormProps {
   editingId: string | null;
@@ -842,8 +843,10 @@ export default function GuiaForm({
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-      {/* Sticky top bar */}
-      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 mb-6 border-b border-gray-200">
+      {/* Barra pegajosa de arriba. Se pega DEBAJO del encabezado de la app
+          (11-sep-2026): se pegaba en el tope CERO y le pasaba por encima al
+          logo y al breadcrumb, igual que la de Ventas › Clientes. */}
+      <div className={`${CLASE_BARRA_PEGAJOSA} bg-white/95 backdrop-blur -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 mb-6 border-b border-gray-200`}>
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
           {/* Volver: era una línea de texto de 18 px de alto. -mx-2 para que el

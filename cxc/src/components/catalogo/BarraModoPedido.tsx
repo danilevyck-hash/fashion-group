@@ -11,6 +11,7 @@
 
 import Link from "next/link";
 import type { EstadoModoPedido } from "@/lib/hooks/useModoPedido";
+import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
 
 export default function BarraModoPedido({
   titulo, totalBultos, hrefVolver, estado,
@@ -25,7 +26,9 @@ export default function BarraModoPedido({
   return (
     <div
       data-modo-pedido={estado}
-      className={`sticky top-0 z-30 -mx-4 px-4 py-2.5 mb-4 border-b ${
+      // Se pega DEBAJO de la navbar del catálogo, que es el encabezado de esta
+      // pantalla (11-sep-2026): con `top-0` quedaba escondida detrás de ella.
+      className={`${CLASE_BARRA_PEGAJOSA} -mx-4 px-4 py-2.5 mb-4 border-b ${
         problema ? "bg-amber-50 border-amber-300" : "bg-black border-black"
       }`}
     >

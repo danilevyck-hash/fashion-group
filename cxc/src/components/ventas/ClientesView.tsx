@@ -20,6 +20,7 @@ import { ControlSegmentado } from "./ControlSegmentado";
 import { UtilidadView } from "./UtilidadView";
 import { type ModoClientes } from "@/lib/ventas/pestanas";
 import { exportClientesToExcel } from "@/lib/ventas/clientes-excel";
+import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
 import { exportUtilidadToExcel, type UtilidadClienteResponse, type UtilidadClienteRow } from "@/lib/ventas/utilidad-cliente";
 import { nombreCortoEmpresa, B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { coincideBusqueda } from "@/lib/buscar-normalizado";
@@ -507,8 +508,13 @@ export function ClientesView({
         </div>
       )}
 
-      {/* Sticky header: control de modo + buscador + universo + Excel + pills. */}
-      <div className="sticky top-0 z-20 -mx-1 space-y-2 border-b border-gray-200 bg-gray-50 px-1 pb-2.5 pt-2.5">
+      {/* Barra pegajosa: control de modo + buscador + universo + Excel + pills.
+          🩸 Se pegaba en el tope CERO y con más z-index que el encabezado, así
+          que al hacer scroll se montaba ENCIMA del logo, del breadcrumb y del
+          usuario — es la captura con la que Daniel abrió el encargo
+          (11-sep-2026). Ahora se pega debajo del encabezado, midiéndolo.
+          Ver src/lib/ui/barra-pegajosa.ts. */}
+      <div className={cn(CLASE_BARRA_PEGAJOSA, "-mx-1 space-y-2 border-b border-gray-200 bg-gray-50 px-1 pb-2.5 pt-2.5")}>
         {/* 🔴 VENTAS · UTILIDAD · MARGEN % — el MISMO control segmentado que el
             Resumen, con las mismas palabras (5-sep-2026). «Utilidad» era una
             pestaña aparte que respondía la misma pregunta que ésta —quién
