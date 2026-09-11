@@ -87,7 +87,7 @@ import type {
 } from "@/lib/asistencia/prestamos-planilla";
 import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
 import { PESTANA_FICHAS, dondeSeCargaLaFicha } from "@/lib/asistencia/persona-en-el-centro";
-import { netoConAjuste, textoCorte } from "@/lib/asistencia/corte-quincena";
+import { notaAjuste, notaCeldaAjuste, textoCorte } from "@/lib/asistencia/corte-quincena";
 // 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { textoExtraAutomatico } from "@/lib/asistencia/extra-automatico";
@@ -128,14 +128,18 @@ interface Respuesta {
   empresaEtiqueta: string | null;
   lineas: LineaPlanilla[];
   totales: TotalesPlanilla;
-  /** El ajuste de la quincena anterior, para restarlo del neto que se congela. */
-  ajusteTotal?: number;
   reglas: ReglasAsistencia;
   /** 🔴 El corte con el que se midió (día 13/28). `null` = quincena entera. */
   corte?: string | null;
   /** 🔴 El ajuste de la quincena anterior, con nombre y monto. Solo con el
-   *  interruptor y cuando la quincena pasada se cerró con corte. */
-  ajusteQuincenaAnterior?: { total: number; personas: { codigo: string; etiqueta: string; monto: number }[] };
+   *  interruptor y cuando la quincena pasada se cerró con corte.
+   *  ⚠️ `total` ya está ADENTRO de `totales.netoPagar` (11-sep-2026): el
+   *  ajuste entra en las columnas de siempre. Es un testigo, no se resta. */
+  ajusteQuincenaAnterior?: {
+    total: number;
+    personas: { codigo: string; etiqueta: string; monto: number }[];
+    dias?: { desde: string; hasta: string } | null;
+  };
   /** 🔴 Lo que el módulo de Préstamos dice que hay que descontar esta quincena,
    *  persona por persona. Vacío en un rango libre.
    *
@@ -810,7 +814,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
       const hojas = lineasConComprobante(data.lineas).map((l) => {
         const extra = porCodigo.get(l.codigo);
         return armarComprobante(
-          { linea: l, posicion: extra?.posicion ?? null, cedula: extra?.cedula ?? null, ajusteAnterior: l.ajusteAnterior },
+          { linea: l, posicion: extra?.posicion ?? null, cedula: extra?.cedula ?? null },
           periodo,
         );
       });
@@ -1053,9 +1057,9 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
               con los datos de HOY; el cerrado es de cuando se cerró. Si no dan
               lo mismo, algo cambió después del pago y hay que saberlo — pero lo
               que vale sigue siendo lo cerrado. */}
-          {!!data && Math.abs((data.totales.netoPagar - (data.ajusteQuincenaAnterior?.total ?? 0)) - cerrada.totalNeto) > 0.005 && (
+          {!!data && Math.abs(data.totales.netoPagar - cerrada.totalNeto) > 0.005 && (
             <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[12px] text-amber-900">
-              Ojo: el cuadro que ves ahora da <b>${$(data.totales.netoPagar - (data.ajusteQuincenaAnterior?.total ?? 0))}</b> y lo que se cerró
+              Ojo: el cuadro que ves ahora da <b>${$(data.totales.netoPagar)}</b> y lo que se cerró
               fue <b>${$(cerrada.totalNeto)}</b>. Cambió algo después del cierre. Vale lo cerrado;
               si hay que rehacerlo, hay que reabrir la quincena.
             </p>
@@ -1148,26 +1152,9 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
               </p>
             </div>
           )}
-          {!!data.ajusteQuincenaAnterior && data.ajusteQuincenaAnterior.personas.length > 0 && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
-              <p className="text-sm font-medium text-amber-900">
-                {data.ajusteQuincenaAnterior.personas.length === 1
-                  ? "1 colaborador trae un ajuste de la quincena anterior"
-                  : `${data.ajusteQuincenaAnterior.personas.length} colaboradores traen un ajuste de la quincena anterior`}
-              </p>
-              <p className="mt-0.5 text-[13px] text-amber-900">
-                Son los días que la quincena pasada pagó sin medir (después del corte).
-                {" "}+ se le descuenta, − se le devuelve.
-              </p>
-              <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[13px] text-amber-900">
-                {data.ajusteQuincenaAnterior.personas.map((a) => (
-                  <li key={a.codigo} className="tabular-nums">
-                    {a.etiqueta}: {a.monto > 0 ? "−" : "+"}${$(Math.abs(a.monto))}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {/* 🔴 El ajuste de la quincena anterior YA NO tiene caja ni chip
+              (11-sep-2026): entra en las columnas de siempre y se dice al pie
+              del cuadro, en la celda (title) y en el detalle de cada tarjeta. */}
         </>
       )}
 
@@ -1522,7 +1509,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                       data.totales.seguroSocial, data.totales.seguroEducativo, data.totales.isr,
                       data.totales.prestamo, data.totales.terceros, data.totales.mercancia,
                       data.totales.totalDeducciones, data.totales.otrosServicios,
-                      data.totales.netoPagar - (data.ajusteQuincenaAnterior?.total ?? 0),
+                      data.totales.netoPagar,
                     ].map((v, i) => (
                       <td key={i} className="px-2 py-2.5 text-right tabular-nums">
                         {v === 0 ? <span className="text-gray-400">—</span> : $$(v)}
@@ -1543,6 +1530,14 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                 que una tardanza</b> — la columna solo cambia de nombre, el total bruto es el mismo.
                 Pasa el cursor por el número para ver cuánto y de cuántos días.
               </p>
+            )}
+            {/* 🔴 EL AJUSTE DE LA QUINCENA ANTERIOR, DICHO AL PIE (11-sep-2026).
+                Ya no es una columna: cada monto entró en la suya —extra en
+                extra, tardanza en tardanza— porque «valen diferente»
+                (la contadora). El pie dice cuáles columnas lo traen y de qué
+                días; la celda lo repite en su `title`. */}
+            {notaAjuste(buenas) && (
+              <p className="mt-2 px-1 text-[12px] text-gray-600">{notaAjuste(buenas)}</p>
             )}
           </div>
 
@@ -1596,7 +1591,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                 {data.totales.personas === 1 ? "colaborador" : "colaboradores"}
               </p>
               <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">
-                ${$(data.totales.netoPagar - (data.ajusteQuincenaAnterior?.total ?? 0))}
+                ${$(data.totales.netoPagar)}
               </p>
               <p className="text-[13px] text-gray-500">
                 Bruto ${$(data.totales.totalBruto)} · deducciones ${$(data.totales.totalDeducciones)}
@@ -1648,7 +1643,6 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           empresa={data.empresaEtiqueta ?? etiquetaEmpresa(empresa)}
           rango={etiquetaRangoGuardado({ desde, hasta })}
           totales={data.totales}
-          ajusteTotal={data.ajusteQuincenaAnterior?.total ?? 0}
           cerrada={cerrada}
           trabajando={trabajandoCierre}
           onConfirmar={(motivo) => { void (modal === "cerrar" ? cerrarQuincena() : reabrir(motivo)); }}
@@ -1686,14 +1680,13 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ModalCierre({
-  modo, empresa, rango, totales, ajusteTotal, cerrada, trabajando, onConfirmar, onCerrar,
+  modo, empresa, rango, totales, cerrada, trabajando, onConfirmar, onCerrar,
 }: {
   modo: "cerrar" | "reabrir";
   empresa: string;
   rango: string;
   totales: TotalesPlanilla;
   /** El ajuste de la quincena anterior, para restarlo del neto que se congela. */
-  ajusteTotal?: number;
   cerrada: CabeceraGuardada | null;
   trabajando: boolean;
   onConfirmar: (motivo: string) => void;
@@ -1769,7 +1762,7 @@ function ModalCierre({
                   de que está elegida la empresa equivocada antes de firmar. */}
               <p className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-[13px] tabular-nums text-gray-700">
                 Se congelan <b>{totales.personas} {totales.personas === 1 ? "colaborador" : "colaboradores"}</b>,
-                con un <b>neto a pagar de ${$(totales.netoPagar - (ajusteTotal ?? 0))}</b> — bruto ${$(totales.totalBruto)},
+                con un <b>neto a pagar de ${$(totales.netoPagar)}</b> — bruto ${$(totales.totalBruto)},
                 deducciones ${$(totales.totalDeducciones)}.
               </p>
               <p className="text-[13px] text-gray-600">
@@ -1972,11 +1965,14 @@ function Fila({
   const d = l.dinero!;
   /** El monto sobre el que se calcularon los seguros, si no fue el bruto. */
   const sobreQueBase = baseSeguros(d.baseSeguros);
-  const num = (v: number, extra = "") => (
-    <td className={`px-2 py-1.5 text-right tabular-nums ${extra}`}>
+  const num = (v: number, extra = "", title?: string | null) => (
+    <td className={`px-2 py-1.5 text-right tabular-nums ${extra}`} title={title ?? undefined}>
       {v === 0 ? <span className="text-gray-300">—</span> : $(v)}
     </td>
   );
+  // 🔴 La celda que trae ajuste de la quincena anterior lo dice en su `title`
+  // (11-sep-2026): «Incluye $5.00 de los días 14–15 sep…». Sin ajuste, nada.
+  const conAjuste = (campo: Parameters<typeof notaCeldaAjuste>[0]) => notaCeldaAjuste(campo, l.ajusteDetalle);
   return (
     <tr className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
       <td className="sticky left-0 z-10 bg-white px-3 py-1.5 text-gray-900 hover:bg-gray-50">
@@ -2027,9 +2023,6 @@ function Fila({
             {textoExtraAutomatico(l.horas.extraAutoMin, l.empresaEtiqueta)}
           </span>
         )}
-        {/* 🔴 EL AJUSTE DE LA QUINCENA ANTERIOR. Sin el chip, un neto que no da
-            lo esperado no tiene explicación a la vista. El signo lo dice todo:
-            + se le descuenta, − se le devuelve. */}
         {/* 🔴 EL PRORRATEO SE DICE AL LADO DEL NOMBRE (10-sep-2026): «entró el 27 de
             julio de 2026: 5 de 12 días hábiles». Sin esto, un quincenal más chico
             que el sueldo ÷ 2 se lee como un error. */}
@@ -2041,17 +2034,9 @@ function Fila({
             {l.prorrateo}
           </span>
         )}
-        {!!l.ajusteAnterior && (
-          <span
-            className="ml-1.5 rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-800"
-            title={`Ajuste de la quincena anterior: ${l.ajusteAnterior > 0 ? "se le descuentan" : "se le devuelven"} $${$(Math.abs(l.ajusteAnterior))} por los días que la quincena pasada pagó sin medir.`}
-          >
-            {l.ajusteAnterior > 0 ? "−" : "+"}${$(Math.abs(l.ajusteAnterior))} ajuste
-          </span>
-        )}
       </td>
       {num(d.salarioQuincenal)}
-      {num(d.extraDiurno)}
+      {num(d.extraDiurno, "", conAjuste("extraDiurno"))}
       {/* 🔴 EL ASTERISCO NO ES ADORNO. En el escritorio esta celda es todo lo
           que la contadora ve de la ausencia, y desde el 25-ago-2026 puede traer
           minutos de alguien que VINO TODOS LOS DÍAS. Sin la marca, ella lee una
@@ -2060,21 +2045,24 @@ function Fila({
       <td className={`px-2 py-1.5 text-right tabular-nums text-red-700 ${d.ausencias === 0 ? "" : ""}`}>
         {d.ausencias === 0 ? <span className="text-gray-300">—</span> : (
           <span
-            title={d.ausenciaPorTardanza > 0
-              ? `${$(d.ausenciaPorTardanza)} de estos ${$(d.ausencias)} son de ${l.horas.tardanzaGraveDias} día(s) en que llegó más de ${MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos tarde. Se descuentan los minutos, igual que una tardanza.`
-              : undefined}
+            title={[
+              d.ausenciaPorTardanza > 0
+                ? `${$(d.ausenciaPorTardanza)} de estos ${$(d.ausencias)} son de ${l.horas.tardanzaGraveDias} día(s) en que llegó más de ${MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos tarde. Se descuentan los minutos, igual que una tardanza.`
+                : null,
+              conAjuste("ausencias"),
+            ].filter(Boolean).join(" ") || undefined}
           >
             {$(d.ausencias)}
             {d.ausenciaPorTardanza > 0 && <span className="ml-0.5 text-amber-700">*</span>}
           </span>
         )}
       </td>
-      {num(d.tardanzas, "text-red-700")}
+      {num(d.tardanzas, "text-red-700", conAjuste("tardanzas"))}
       {num(d.salidaTemprana ?? 0, "text-red-700")}
-      {num(d.extraNocturno)}
-      {num(d.excedente)}
-      {num(d.domingos)}
-      {num(d.feriados)}
+      {num(d.extraNocturno, "", conAjuste("extraNocturno"))}
+      {num(d.excedente, "", conAjuste("excedente"))}
+      {num(d.domingos, "", conAjuste("domingos"))}
+      {num(d.feriados, "", conAjuste("feriados"))}
       {num(d.totalBruto, "font-semibold text-gray-900")}
       {num(d.seguroSocial)}
       {num(d.seguroEducativo)}
@@ -2089,9 +2077,10 @@ function Fila({
         <CeldaManual codigo={l.codigo} campo="otrosServicios" valor={l.manuales.otrosServicios}
           onGuardar={onGuardar} bloqueo={bloqueo} />
       </td>
-      {/* 🔴 EL NETO REAL = netoPagar MENOS el ajuste, por `netoConAjuste`, la
-          MISMA cuenta que el papel. Sin ajuste da idéntico. */}
-      {num(netoConAjuste(d.netoPagar, l.ajusteAnterior), "font-semibold text-gray-900")}
+      {/* 🔴 EL NETO ES `netoPagar` TAL CUAL: el ajuste de la quincena anterior
+          ya viene adentro de `dinero` (11-sep-2026), la MISMA cuenta que el
+          papel y el cierre. */}
+      {num(d.netoPagar, "font-semibold text-gray-900")}
     </tr>
   );
 }
@@ -2139,7 +2128,7 @@ function Tarjeta({
         </span>
         <span className="shrink-0 text-right">
           <span className="block text-lg font-semibold tabular-nums text-gray-900">
-            ${$(netoConAjuste(d.netoPagar, l.ajusteAnterior))}
+            ${$(d.netoPagar)}
           </span>
           <span className="text-[11px] text-gray-400">{abierta ? "cerrar" : "ver detalle"}</span>
         </span>
@@ -2211,20 +2200,16 @@ function Tarjeta({
               <span className="tabular-nums text-emerald-700">+${$(d.otrosServicios)}</span>
             </div>
           )}
-          {/* 🔴 EL AJUSTE DE LA QUINCENA ANTERIOR, en su propio renglón, nunca
-              mezclado con la ausencia. + descuenta, − devuelve. */}
-          {!!l.ajusteAnterior && (
-            <div className="flex justify-between">
-              <span className="text-gray-500">Ajuste quincena anterior</span>
-              <span className={`tabular-nums ${l.ajusteAnterior > 0 ? "text-red-700" : "text-emerald-700"}`}>
-                {l.ajusteAnterior > 0 ? "−" : "+"}${$(Math.abs(l.ajusteAnterior))}
-              </span>
-            </div>
-          )}
           <div className="flex justify-between font-semibold">
             <span>Neto a pagar</span>
-            <span className="tabular-nums">${$(netoConAjuste(d.netoPagar, l.ajusteAnterior))}</span>
+            <span className="tabular-nums">${$(d.netoPagar)}</span>
           </div>
+          {/* 🔴 EL AJUSTE DE LA QUINCENA ANTERIOR ya está adentro de las líneas
+              de arriba (11-sep-2026): extra en extra, tardanza en tardanza.
+              Una línea gris dice cuáles y de qué días. Sin ajuste, nada. */}
+          {notaAjuste([l]) && (
+            <p className="mt-1 text-[12px] text-gray-500">{notaAjuste([l])}</p>
+          )}
 
           {h.diasARevisar > 0 && (
             <p className="mt-2 rounded bg-amber-50 px-2 py-1.5 text-[12px] text-amber-800">
