@@ -1,5 +1,9 @@
 /* ─────────────────────────────────────────────────────────────────────────────
- * CANDADO DEL AVISO DE SALIDA CON DEUDA — y del cron que caduca lo pendiente.
+ * CANDADO DEL AVISO DE SALIDA CON DEUDA.
+ *
+ * ⚠️ Hasta el 11-sep-2026 también amarraba «el cron que caduca lo pendiente»
+ * (`prestamos-caducan`). Se retiró con la aprobación de préstamos (Daniel:
+ * *«Aprobar préstamos: eso también se quita»*); ver la sección de abajo.
  *
  * 🔴 Daniel, 5-sep-2026: al marcar la fecha de salida de alguien con deuda hay
  * que avisar **ahí mismo**: «Debe $100 — descuéntalo de la liquidación». Es el
@@ -14,7 +18,7 @@
  * ─────────────────────────────────────────────────────────────────────────── */
 
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const leer = (...p: string[]) => readFileSync(join(process.cwd(), ...p), "utf8");
@@ -22,7 +26,6 @@ const leer = (...p: string[]) => readFileSync(join(process.cwd(), ...p), "utf8")
 const configTab = leer("src", "app", "asistencia", "ConfiguracionTab.tsx");
 const configRoute = leer("src", "app", "api", "asistencia", "configuracion", "route.ts");
 const listaServer = leer("src", "lib", "prestamos-lista-server.ts");
-const cron = leer("src", "app", "api", "cron", "prestamos-caducan", "route.ts");
 const vercel = JSON.parse(leer("vercel.json")) as { crons: Array<{ path: string; schedule: string }> };
 
 describe("🔴 quien se va debiendo, se dice al dar de baja", () => {
@@ -66,44 +69,19 @@ describe("🔴 quien se va debiendo, se dice al dar de baja", () => {
   });
 });
 
-describe("🔴 lo pendiente caduca solo a los 7 días", () => {
-  it("hay UNA entrada de cron, y una entrada es una ocurrencia al día", () => {
-    const entradas = vercel.crons.filter((c) => c.path.startsWith("/api/cron/prestamos-caducan"));
-    expect(entradas).toHaveLength(1);
-    // Una sola hora: nada de listas `0 13,19 * * *` (la regla de la casa).
-    expect(entradas[0].schedule).toBe("15 13 * * *");
-    expect(entradas[0].schedule).not.toContain(",");
-  });
-
-  it("la regla vive en el módulo PURO, no en el route", () => {
-    expect(cron).toContain("pendienteCaducado");
-    expect(cron).toContain("DIAS_CADUCIDAD_PENDIENTE");
-    // Nada de un umbral escrito a mano acá.
-    expect(cron).not.toMatch(/7\s*\*\s*86400000/);
-  });
-
-  it("🔴 solo toca lo que está ESPERANDO, y con soft delete", () => {
-    // DOS veces: al LEER y al ESCRIBIR. Con el filtro solo en la lectura, un
-    // update sin condición borraría movimientos aprobados si la lista cambió
-    // entre las dos consultas.
-    expect((cron.match(/\.eq\("estado", ESTADO_PENDIENTE\)/g) ?? []).length).toBe(2);
-    expect(cron).toContain("{ deleted: true }");
-    // Ni un DELETE real: es la tabla de plata.
-    expect(cron).not.toMatch(/\.delete\(\)/);
-  });
-
-  it("🔴 se DICE: un préstamo que se borra solo sin avisar es plata que desaparece", () => {
-    expect(cron).toContain("enviarNegocioPrivado");
-    expect(cron).toContain("se eliminó solo por no responder");
-    // Y queda en el log de auditoría, persona por persona.
-    expect(cron).toContain('"prestamo_caducado"');
-  });
-
-  it("sin nada que caducar NO manda ningún mensaje, pero registra el heartbeat", () => {
-    const i = cron.indexOf("if (borrados > 0)");
-    expect(i).toBeGreaterThan(-1);
-    // El heartbeat se registra DESPUÉS del bloque del aviso: una corrida sin
-    // nada que caducar es una corrida exitosa, no una fila que falta.
-    expect(cron.lastIndexOf("await recordCronHeartbeat")).toBeGreaterThan(i);
+// ⚠️ CAMBIÓ DE DIRECCIÓN EL 11-SEP-2026, NO SE BORRÓ. Acá vivía «🔴 lo pendiente
+// caduca solo a los 7 días»: una entrada de cron, la regla en el módulo puro,
+// soft delete, aviso por Telegram y heartbeat. Daniel: *«Aprobar préstamos: eso
+// también se quita»* — sin estado pendiente no hay nada que caducar, y el cron
+// salió de `vercel.json`, del registro (`cron-telemetry.ts`) y de la lista de
+// crons que avisan. Medido antes: 0 préstamos esperando.
+describe("🔴 el cron `prestamos-caducan` se retiró entero", () => {
+  it("no está en vercel.json ni en el registro, y su route no existe", () => {
+    expect(vercel.crons.some((c) => c.path.includes("prestamos-caducan"))).toBe(false);
+    const telemetry = leer("src", "lib", "cron-telemetry.ts").replace(/\/\/.*$/gm, "");
+    expect(telemetry).not.toContain('"prestamos-caducan"');
+    const avisan = leer("src", "lib", "alertas", "crons-que-avisan.ts").replace(/\/\/.*$/gm, "");
+    expect(avisan).not.toContain('"prestamos-caducan"');
+    expect(existsSync(join(process.cwd(), "src", "app", "api", "cron", "prestamos-caducan", "route.ts"))).toBe(false);
   });
 });

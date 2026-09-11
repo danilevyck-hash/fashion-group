@@ -14,11 +14,7 @@ import {
   NOMBRE_CUENTA,
   type CuentaPrestamo,
 } from "@/lib/prestamos-saldo";
-import {
-  BOTON_MANDAR_APROBACION,
-  evaluarTopePrestamo,
-  textoAvisoTope,
-} from "@/lib/prestamos-tope";
+import { evaluarTopePrestamo, textoAvisoTope } from "@/lib/prestamos-tope";
 import { MOV_TIPOS } from "./types";
 
 /**
@@ -37,9 +33,10 @@ import { MOV_TIPOS } from "./types";
  *     hoy eso solo se sabe si alguien lo escribió a mano en la nota).
  *   · **La nota es opcional.** 8 de cada 10 eran un eco del concepto.
  *
- * 🔴 EL TOPE SE CALCULA EN PANTALLA PARA DECIRLO ANTES, no para decidir: la
- * decisión es del servidor. Acá solo cambia el texto del botón, y el aviso dice
- * los números para que se entienda de dónde sale.
+ * 🔴 EL TOPE SE CALCULA EN PANTALLA PARA DECIRLO ANTES. Desde el 11-sep-2026
+ * no decide nada (Daniel: *«Aprobar préstamos: eso también se quita»*): el
+ * préstamo se registra igual y el aviso dice los números y que se le avisa a
+ * Daniel. El botón siempre dice «Registrar».
  */
 export default function NuevoMovimientoModal({
   nombre, empleadoId, saldoPrestamo, saldoDano, cuentaMasVieja, salarioMensual, hoy,
@@ -72,7 +69,7 @@ export default function NuevoMovimientoModal({
   const evaluacion = concepto === CONCEPTO_PRESTAMO && Number(monto) > 0
     ? evaluarTopePrestamo({ deudaActual: deudaTotal, monto: Number(monto), salarioMensual })
     : null;
-  const necesitaAprobacion = evaluacion !== null && !evaluacion.pasa;
+  const pasaElTope = evaluacion !== null && !evaluacion.pasa;
 
   // 🔴 EN UN PAGO HAY QUE ELEGIR DE DÓNDE SALIÓ. Ya no viene ninguna puesta
   // (ver `ORIGENES_QUE_SE_OFRECEN`), así que si no se exige, el campo se salta
@@ -165,7 +162,7 @@ export default function NuevoMovimientoModal({
           </div>
         )}
 
-        {necesitaAprobacion && evaluacion && (
+        {pasaElTope && evaluacion && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             {textoAvisoTope(evaluacion)}
           </div>
@@ -180,7 +177,7 @@ export default function NuevoMovimientoModal({
       <div className="flex gap-3 mt-6">
         <button onClick={onCancelar} className="flex-1 inline-flex min-h-[44px] items-center justify-center border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
         <button onClick={guardar} disabled={!listo} className="flex-1 inline-flex min-h-[44px] items-center justify-center bg-black text-white rounded-md text-sm hover:bg-gray-800 transition disabled:opacity-50">
-          {guardando ? "Guardando..." : necesitaAprobacion ? BOTON_MANDAR_APROBACION : "Registrar"}
+          {guardando ? "Guardando..." : "Registrar"}
         </button>
       </div>
     </>

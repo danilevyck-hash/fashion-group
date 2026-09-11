@@ -83,7 +83,9 @@ describe("1) los crons cuya caída no deja rastro en ningún dato", () => {
       "cheques-alert",
       "grupo-resumen-mensual",
       "guias-pendientes",
-      "prestamos-caducan",
+      // ⚠️ `prestamos-caducan` estuvo acá hasta el 11-sep-2026: se retiró con la
+      // aprobación de préstamos (Daniel: «Aprobar préstamos: eso también se
+      // quita»). Son CINCO.
     ]);
     // El io la lee del módulo puro: ni un nombre repetido a mano. (La
     // reconciliación nombra algunos de estos crons por OTRO motivo —la
@@ -151,12 +153,12 @@ describe("1) los crons cuya caída no deja rastro en ningún dato", () => {
     ).toEqual(["grupo-resumen-mensual"]);
   });
 
-  it("sin fila de heartbeat cuenta como caído (fail-closed): los seis llevan meses corriendo", () => {
+  it("sin fila de heartbeat cuenta como caído (fail-closed): los cinco llevan meses corriendo", () => {
     const r = cronsQueAvisanCaidos(
-      heartbeats({ "prestamos-caducan": null }),
+      heartbeats({ "guias-pendientes": null }),
       AHORA,
     );
-    expect(r.map((c) => c.cronName)).toEqual(["prestamos-caducan"]);
+    expect(r.map((c) => c.cronName)).toEqual(["guias-pendientes"]);
     expect(r[0].horas).toBeNull();
     expect(mensajeCronsSinCorrer(r)).toContain("no hay registro");
   });

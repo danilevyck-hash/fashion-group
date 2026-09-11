@@ -32,7 +32,8 @@ export function useMovimientoForm({ onSuccess, showToast }: UseMovimientoFormPro
       });
       const json = await res.json().catch(() => null);
       if (res.ok) {
-        showToast(json?.pendiente ? "Se mandó a aprobación de Daniel" : "Movimiento registrado");
+        // Sobre el tope se registra igual, y el aviso lo dice.
+        showToast(json?.avisoTope ?? "Movimiento registrado");
         onSuccess();
         return true;
       }

@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   const dias45 = new Date(now.getTime() - 45 * 86400000).toISOString().slice(0, 10);
 
   // All queries in parallel for speed
-  const [chequesRes, reclamosRes, prestamosRes, guiasRes, cxcUploadsRes] = await Promise.all([
+  const [chequesRes, reclamosRes, guiasRes, cxcUploadsRes] = await Promise.all([
     // Cheques: pendiente + vencen esta semana calendario (today → domingo)
     supabaseServer
       .from("cheques")
@@ -39,13 +39,6 @@ export async function GET(req: NextRequest) {
       .eq("deleted", false)
       .not("estado", "in", `(Aplicado,Rechazado,Aplicada,${ESTADO_PAGADO})`)
       .lt("fecha_reclamo", dias45),
-
-    // Préstamos: movimientos pendientes de aprobación
-    supabaseServer
-      .from("prestamos_movimientos")
-      .select("id", { count: "exact", head: true })
-      .eq("estado", "pendiente_aprobacion")
-      .eq("deleted", false),
 
     // Guías: Pendiente Bodega
     supabaseServer
@@ -87,7 +80,10 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     cheques: chequesRes.count || 0,
     reclamos: reclamosRes.count || 0,
-    prestamos: prestamosRes.count || 0,
+    // ⚠️ Constante desde el 11-sep-2026: un préstamo ya no espera aprobación
+    // (Daniel: «Aprobar préstamos: eso también se quita»). La clave se conserva
+    // porque quien lee los badges la espera.
+    prestamos: 0,
     guias: guiasRes.count || 0,
     cxc: cxcStale,
   });

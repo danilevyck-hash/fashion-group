@@ -1,29 +1,34 @@
 /* ─────────────────────────────────────────────────────────────────────────────
- * CANDADO DEL TOPE: NADIE DEBE MÁS DE UN SUELDO MENSUAL.
+ * CANDADO DEL TOPE: NADIE DEBE MÁS DE UN SUELDO MENSUAL — Y EL TOPE AVISA, NO FRENA.
  *
  * Daniel, 5-sep-2026. Lo que este archivo amarra, en orden de qué duele más si
  * se rompe:
  *
  *   1. 🔴 El tope mira la deuda **TOTAL** (préstamo + daño), no solo la de
  *      préstamos. Mirar solo una cuenta deja pasar exactamente el caso que el
- *      tope existe para frenar.
+ *      tope existe para señalar.
  *   2. 🔴 El **daño de mercancía NUNCA se frena**. No es plata que se entrega:
  *      es plata que ya se perdió, y no anotarla no la devuelve.
  *   3. Sin salario cargado el tope es **$500** — no «sin tope» ni «cero», que
  *      serían dos decisiones que nadie tomó.
- *   4. Lo pendiente **caduca a los 7 días**, por DÍA de Panamá.
+ *   4. 🔴 Desde el 11-sep-2026 NO HAY APROBACIÓN (Daniel: *«Aprobar préstamos:
+ *      eso también se quita»*): el aviso dice que SE REGISTRA IGUAL, y el
+ *      Telegram a Daniel es para enterarse, no para decidir.
+ *
+ * ⚠️ CAMBIÓ DE DIRECCIÓN EL 11-SEP-2026, NO SE BORRÓ. Hasta ese día el punto 4
+ * decía «lo pendiente caduca a los 7 días, por DÍA de Panamá», y había casos
+ * para `DIAS_CADUCIDAD_PENDIENTE`, `pendienteCaducado`, `desdeCuandoEspera` y
+ * el botón «Mandar aprobación». Todo eso se retiró con el estado pendiente
+ * (medido antes: 0 préstamos esperando en producción).
  *
  * Módulo puro: fechas fijas, nunca `new Date()`.
  * ─────────────────────────────────────────────────────────────────────────── */
 
 import { describe, it, expect } from "vitest";
+import * as tope from "@/lib/prestamos-tope";
 import {
-  BOTON_MANDAR_APROBACION,
-  DIAS_CADUCIDAD_PENDIENTE,
   TOPE_SIN_SALARIO,
-  desdeCuandoEspera,
   evaluarTopePrestamo,
-  pendienteCaducado,
   textoAvisoTope,
   textoTelegramTope,
   topeDePrestamo,
@@ -63,11 +68,11 @@ describe("🔴 el tope mira la deuda TOTAL, no solo la de préstamos", () => {
     expect(evaluarTopePrestamo({ deudaActual: 700, monto: 100.01, salarioMensual: 800 }).pasa).toBe(false);
   });
 
-  it("⚠️ a quien YA pasa el tope no se le pide nada por lo que ya debe", () => {
+  it("⚠️ a quien YA pasa el tope no se le dice nada por lo que ya debe", () => {
     // ÁNGELA GARCÍA: $1.798,05 con sueldo $800. Su deuda de hoy no dispara nada
     // — el tope solo mira un préstamo NUEVO, y `monto: 0` no es un préstamo.
     const e = evaluarTopePrestamo({ deudaActual: 1798.05, monto: 0, salarioMensual: 800 });
-    expect(e.pasa).toBe(false); // pediría aprobación SI pidiera algo…
+    expect(e.pasa).toBe(false); // pasaría el tope SI pidiera algo…
     expect(e.monto).toBe(0);    // …y no está pidiendo nada.
   });
 
@@ -80,15 +85,19 @@ describe("🔴 el tope mira la deuda TOTAL, no solo la de préstamos", () => {
   });
 });
 
-describe("el aviso dice los números, no solo «necesita aprobación»", () => {
+describe("🔴 el aviso dice los números Y que se registra igual", () => {
   it("con sueldo cargado nombra el sueldo", () => {
     const e = evaluarTopePrestamo({ deudaActual: 400, monto: 300, salarioMensual: 600 });
     const t = textoAvisoTope(e);
-    expect(t).toContain("Este préstamo necesita aprobación de Daniel");
+    expect(t).toContain("pasa el tope");
     expect(t).toContain("$400.00");
     expect(t).toContain("$300.00");
     expect(t).toContain("$700.00");
     expect(t).toContain("su sueldo mensual ($600.00)");
+    // 🔴 Lo que cambió el 11-sep-2026: no «necesita aprobación», sino que se
+    // registra igual y se le avisa a Daniel.
+    expect(t).toContain("Se registra igual");
+    expect(t).not.toMatch(/necesita aprobación/i);
   });
 
   it("sin sueldo cargado DICE que falta, en vez de inventar un techo", () => {
@@ -96,49 +105,32 @@ describe("el aviso dice los números, no solo «necesita aprobación»", () => {
     expect(textoAvisoTope(e)).toContain("no tiene sueldo cargado en Asistencia");
   });
 
-  it("el botón lo dice antes de tocarlo", () => {
-    expect(BOTON_MANDAR_APROBACION).toBe("Mandar aprobación");
-  });
-
-  it("🔴 el Telegram trae los CINCO datos con los que se decide sin abrir la app", () => {
+  it("🔴 el Telegram trae los CINCO datos, quién lo registró, y no pide nada", () => {
     const t = textoTelegramTope({
       nombre: "ANGELA GARCIA",
       empresa: "Vistana International",
       evaluacion: evaluarTopePrestamo({ deudaActual: 1798.05, monto: 200, salarioMensual: 800 }),
+      registradoPor: "Contabilidad",
     });
-    expect(t).toContain("ANGELA GARCIA");            // quién
-    expect(t).toContain("Pide: $200.00");            // cuánto pide
-    expect(t).toContain("Ya debe: $1798.05");        // cuánto debe
-    expect(t).toContain("Sueldo mensual: $800.00");  // su sueldo
-    expect(t).toContain("Quedaría debiendo: $1998.05"); // cuánto quedaría
-    // 🔴 NO lleva el prefijo de sistema: un préstamo que espera no es una avería.
+    expect(t).toContain("ANGELA GARCIA");             // quién
+    expect(t).toContain("Pidió: $200.00");            // cuánto pidió
+    expect(t).toContain("Ya debía: $1798.05");        // cuánto debía
+    expect(t).toContain("Sueldo mensual: $800.00");   // su sueldo
+    expect(t).toContain("Queda debiendo: $1998.05");  // cuánto queda
+    expect(t).toContain("Lo registró Contabilidad");  // quién
+    // 🔴 NO lleva el prefijo de sistema: un préstamo grande no es una avería.
     expect(t).not.toContain("SISTEMA");
-    expect(t).toContain(`${DIAS_CADUCIDAD_PENDIENTE} días`);
+    // 🔴 Y no hay nada que aprobar ni nada que caduque.
+    expect(t).not.toMatch(/aprob|se elimina solo|días/i);
+    expect(t).toContain("ya registrado");
   });
 });
 
-describe("🔴 lo pendiente caduca a los 7 días, por DÍA de Panamá", () => {
-  it("son 7, y ni uno menos", () => {
-    expect(DIAS_CADUCIDAD_PENDIENTE).toBe(7);
-    expect(pendienteCaducado("2026-09-01", "2026-09-07")).toBe(false); // día 6
-    expect(pendienteCaducado("2026-09-01", "2026-09-08")).toBe(true);  // día 7
-    expect(pendienteCaducado("2026-09-01", "2026-09-20")).toBe(true);
-  });
-
-  it("cruza meses y años sin trucos", () => {
-    expect(pendienteCaducado("2026-12-28", "2027-01-04")).toBe(true);
-    expect(pendienteCaducado("2026-12-28", "2027-01-03")).toBe(false);
-    expect(pendienteCaducado("2028-02-25", "2028-03-03")).toBe(true); // año bisiesto
-  });
-
-  it("una fecha que no es fecha NO caduca nada — en la duda, no se borra plata", () => {
-    expect(pendienteCaducado("", "2026-09-20")).toBe(false);
-    expect(pendienteCaducado("ayer", "2026-09-20")).toBe(false);
-  });
-
-  it("«desde cuándo espera» se lee en español neutro", () => {
-    expect(desdeCuandoEspera("2026-09-05", "2026-09-05")).toBe("hoy");
-    expect(desdeCuandoEspera("2026-09-04", "2026-09-05")).toBe("desde ayer");
-    expect(desdeCuandoEspera("2026-09-01", "2026-09-05")).toBe("hace 4 días");
+describe("🔴 lo que se retiró el 11-sep-2026 no vuelve", () => {
+  it("ni caducidad, ni «desde cuándo espera», ni el botón de mandar aprobación", () => {
+    const m = tope as Record<string, unknown>;
+    for (const nombre of ["DIAS_CADUCIDAD_PENDIENTE", "pendienteCaducado", "desdeCuandoEspera", "BOTON_MANDAR_APROBACION"]) {
+      expect(nombre in m, nombre).toBe(false);
+    }
   });
 });

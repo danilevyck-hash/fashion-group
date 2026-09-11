@@ -16,7 +16,6 @@ import {
 import {
   CUENTA_DANO,
   CUENTA_PRESTAMO,
-  ESTADO_PENDIENTE,
   calcularSaldoPrestamo,
   cuentaDeMovimiento,
   cuentaMasVieja,
@@ -177,24 +176,28 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // ── EL TOPE: UN SUELDO MENSUAL ─────────────────────────────────────────────
+  // ── EL TOPE: UN SUELDO MENSUAL — AVISA, NO FRENA ───────────────────────────
   //
-  // 🔴 Solo frena el PRÉSTAMO. El daño de mercancía se registra SIEMPRE: no es
-  // plata que se entrega, es plata que ya se perdió, y no anotarla no la
-  // devuelve. Y el tope mira la deuda TOTAL (préstamo + daño), no solo la de
-  // préstamos.
+  // 🔴 Solo mira el PRÉSTAMO. El daño de mercancía se registra SIEMPRE y sin
+  // aviso: no es plata que se entrega, es plata que ya se perdió. Y el tope
+  // mira la deuda TOTAL (préstamo + daño), no solo la de préstamos.
   //
-  // 🔴 «DESCUENTO A TERCEROS» TAMPOCO ESPERA APROBACIÓN (10-sep-2026), y no es
-  // un olvido: es una ORDEN EXTERNA —una pensión, un embargo—, no un favor que
-  // Daniel concede. Daniel lo decidió así: la contadora la carga con su total y
-  // su cuota y queda activa al instante. La regla del préstamo NO se tocó: sigue
-  // frenándose sobre el tope y aprobándola solo Daniel.
+  // 🔴 «DESCUENTO A TERCEROS» tampoco pasa por acá (10-sep-2026): es una ORDEN
+  // EXTERNA —una pensión, un embargo—, no un favor.
   //
-  // ⚠️ Este `if` es lo único que decide quién espera. Agregar el concepto de
-  // terceros acá pondría una orden judicial a esperar un permiso que nadie tiene
-  // por qué dar; hay candado que lo impide.
-  let estado = "aprobado";
+  // 🔴 YA NO HAY APROBACIÓN (11-sep-2026). Daniel, textual: *«Aprobar
+  // préstamos: eso también se quita»*. Hasta ese día un préstamo sobre el tope
+  // se guardaba `pendiente_aprobacion` y esperaba a Daniel; ahora queda
+  // `aprobado` de una, lo registre quien lo registre. Lo único que sigue es el
+  // AVISO: en pantalla (`avisoTope`) y por Telegram al chat privado de Daniel,
+  // para que se entere. Medido antes de retirarlo: 0 préstamos esperando.
+  //
+  // ⚠️ Este `if` es lo único que decide a quién se le avisa. Agregar el
+  // concepto de terceros acá le mandaría a Daniel una orden judicial como si
+  // fuera un favor; hay candado que lo impide.
+  const estado = "aprobado";
   let avisoTope: string | null = null;
+  let sobreTope = false;
   if (concepto === CONCEPTO_PRESTAMO) {
     const { data: ficha } = await supabaseServer
       .from("prestamos_empleados")
@@ -218,15 +221,17 @@ export async function POST(req: NextRequest) {
       salarioMensual,
     });
     if (!evaluacion.pasa) {
-      estado = ESTADO_PENDIENTE;
+      sobreTope = true;
       avisoTope = textoAvisoTope(evaluacion);
       // 🔴 Al chat PRIVADO de Daniel (destino de sistema, trato de negocio, SIN
-      // el prefijo 🔧 SISTEMA): un préstamo esperando no es una avería.
+      // el prefijo 🔧 SISTEMA): un préstamo grande no es una avería. Es para que
+      // se ENTERE; no hay nada que aprobar.
       await enviarNegocioPrivado(
         textoTelegramTope({
           nombre: String(ficha?.nombre ?? "Sin nombre"),
           empresa: ficha?.empresa ?? null,
           evaluacion,
+          registradoPor: auth.userName || auth.role,
         }),
       );
     }
@@ -250,12 +255,12 @@ export async function POST(req: NextRequest) {
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   await logActivity(
     auth.role,
-    estado === ESTADO_PENDIENTE ? "prestamo_mov_pendiente" : "prestamo_mov_create",
+    "prestamo_mov_create",
     "prestamos",
-    { movimientoId: data.id, empleadoId: empleado_id, concepto, monto: Number(monto), cuenta },
+    { movimientoId: data.id, empleadoId: empleado_id, concepto, monto: Number(monto), cuenta, sobreTope },
     auth.userName,
   );
-  return NextResponse.json({ ...data, pendiente: estado === ESTADO_PENDIENTE, avisoTope });
+  return NextResponse.json({ ...data, sobreTope, avisoTope });
 }
 
 /**

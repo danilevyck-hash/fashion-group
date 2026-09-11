@@ -101,7 +101,6 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
 
   const filas = datos.filas;
   const totalSaldo = filas.reduce((s, f) => s + f.saldo, 0);
-  const totalPendiente = filas.reduce((s, f) => s + f.pendiente, 0);
 
   // A quién le toca el descuento de esta quincena, y a quién ya se le hizo.
   // 🔴 El DAÑO ya no propone cuota (10-sep-2026): las que descuentan solas son
@@ -211,7 +210,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
     });
     const json = await res.json().catch(() => null);
     if (res.ok) {
-      showToast(json?.pendiente ? "Se mandó a aprobación de Daniel" : "Movimiento registrado");
+      showToast(json?.avisoTope ?? "Movimiento registrado");
       setShowMovModal(false);
       setPersonaElegida(null);
       recargar();
@@ -269,18 +268,9 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
           )}
         </div>
 
-        {/* 🔴 LO QUE ESPERA APROBACIÓN SE VE. No suma al saldo —no se entregó—
-            pero esconderlo es exactamente cómo se perdieron los $700 de Luis
-            Arroyo durante 22 días. */}
-        {totalPendiente > 0 && (
-          <button
-            onClick={() => router.push("/prestamos/aprobaciones")}
-            className="mb-5 flex min-h-[44px] w-full items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3.5 text-left text-sm text-gray-600 transition hover:border-gray-400"
-          >
-            <span className="font-medium text-gray-900">Esperando aprobación ${fmt(totalPendiente)}</span>
-            <span className="text-gray-500">· no suma al saldo hasta que Daniel lo apruebe</span>
-          </button>
-        )}
+        {/* 🩸 Acá vivía el total de lo que esperaba a Daniel, «no suma al saldo
+            hasta que lo apruebe» (5 → 11-sep-2026). Se fue con la aprobación de
+            préstamos: Daniel, «Aprobar préstamos: eso también se quita». */}
 
         <div className="flex flex-wrap items-center gap-3 mb-6">
           <button onClick={() => setShowElegirPersona(true)} className="inline-flex min-h-[44px] items-center justify-center bg-black text-white px-5 rounded-md text-sm hover:bg-gray-800 transition">+ Nuevo préstamo</button>
@@ -288,7 +278,6 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
             align="left"
             items={[
               { label: exportando ? "Descargando…" : "Descargar historial", onClick: () => setPreguntaExcel(true), disabled: exportando },
-              { label: "Préstamos por aprobar", onClick: () => router.push("/prestamos/aprobaciones") },
             ]}
           />
 
@@ -332,7 +321,6 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
 
                     const badges = [
                       !emp.trabaja ? <span key="notrabaja" className="shrink-0 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-md">Ya no trabaja · no se descuenta</span> : null,
-                      emp.pendiente > 0 ? <span key="pendiente" className="shrink-0 text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-md">Esperando ${fmt(emp.pendiente)}</span> : null,
                     ].filter(Boolean);
 
                     const chipQuincena = !emp.trabaja || cuota <= 0 ? null

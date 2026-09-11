@@ -3,15 +3,18 @@
  *
  * Cuatro cosas, y las cuatro son plata:
  *
- *   1. 🔴 **El tope guarda PENDIENTE y avisa a Daniel** — y lo pendiente no
- *      suma al saldo. El daño de mercancía **nunca** se frena.
+ *   1. 🔴 **El tope AVISA a Daniel y el préstamo se registra igual** (desde el
+ *      11-sep-2026, Daniel: *«Aprobar préstamos: eso también se quita»*; hasta
+ *      ese día guardaba PENDIENTE y esperaba). El daño de mercancía **nunca**
+ *      pasa por el tope.
  *   2. 🔴 **El freno de duplicados mira concepto + fecha, NUNCA la nota.**
  *      🩸 Medido: 18 filas vivas escritas «DEDUCCION QUINCENAL », «DEDUCCION DE
  *      QUINCENA», «DESCUENTO QUINCENAL »… burlaban el freno viejo porque
  *      `ilike` no ignora los acentos. El candado estaba apagado y nadie lo
  *      sabía.
  *   3. Un pago no puede exceder lo que **ESA cuenta** debe.
- *   4. 🔴 **Solo Daniel aprueba**: rol admin **y** que sea él. Hay dos admins.
+ *   4. ⚠️ CAMBIÓ DE DIRECCIÓN el 11-sep-2026: decía «Solo Daniel aprueba». Ya
+ *      nadie aprueba nada — la ruta `/api/prestamos/pendientes` no existe.
  *
  * Fechas FIJAS: el reloj se congela con `vi.setSystemTime`.
  * ─────────────────────────────────────────────────────────────────────────── */
@@ -93,7 +96,6 @@ vi.mock("@/lib/alertas/canal", () => ({
 }));
 
 const { POST } = await import("@/app/api/prestamos/movimientos/route");
-const { POST: DECIDIR, GET: LISTAR } = await import("@/app/api/prestamos/pendientes/route");
 
 function pedir(url: string, body: unknown, role = "contabilidad", userName = "Contabilidad") {
   const cookie = signSession({ role, userId: "u1", userName, sessionToken: "t1", modules: ["prestamos"] });
@@ -123,24 +125,34 @@ describe("🔴 el tope: un sueldo mensual", () => {
     const j = await res.json();
     expect(res.status).toBe(200);
     expect(j.estado).toBe("aprobado");
-    expect(j.pendiente).toBe(false);
+    expect(j.sobreTope).toBe(false);
+    expect(j.avisoTope).toBeNull();
     expect(telegramas).toHaveLength(0);
   });
 
-  it("🔴 por encima se guarda PENDIENTE, se dice por qué y le llega a Daniel", async () => {
+  // ⚠️ CAMBIÓ DE DIRECCIÓN EL 11-SEP-2026, NO SE BORRÓ. Decía: «por encima se
+  // guarda PENDIENTE, se dice por qué y le llega a Daniel». Daniel: *«Aprobar
+  // préstamos: eso también se quita»*. Lo que se conserva: se dice por qué y le
+  // llega a Daniel. Lo que cambió: queda `aprobado` de una.
+  it("🔴 por encima se registra IGUAL (aprobado), se dice por qué y le llega a Daniel", async () => {
     db.movimientos = [{ id: "a", empleado_id: "e1", fecha: "2026-01-01", concepto: "Préstamo", monto: 700, estado: "aprobado" }];
     const res = await POST(pedir("/api/prestamos/movimientos", {
       empleado_id: "e1", fecha: "2026-09-05", concepto: "Préstamo", monto: 200,
     }));
     const j = await res.json();
     expect(res.status).toBe(200);
-    expect(j.estado).toBe("pendiente_aprobacion");
-    expect(j.pendiente).toBe(true);
-    expect(j.avisoTope).toContain("necesita aprobación de Daniel");
-    // 🔴 Al chat PRIVADO, con trato de negocio (sin el prefijo de sistema).
+    expect(j.estado).toBe("aprobado");
+    expect(j.sobreTope).toBe(true);
+    expect(j.avisoTope).toContain("pasa el tope");
+    expect(j.avisoTope).toContain("Se registra igual");
+    // 🔴 Al chat PRIVADO, con trato de negocio (sin el prefijo de sistema), y
+    // diciendo quién lo registró.
     expect(telegramas).toHaveLength(1);
     expect(telegramas[0]).toContain("ANGELA GARCIA");
+    expect(telegramas[0]).toContain("Lo registró Contabilidad");
     expect(telegramas[0]).not.toContain("SISTEMA");
+    // Y lo que se escribió en la base dice `aprobado`, no otra cosa.
+    expect(db.updates).toHaveLength(0);
   });
 
   it("🔴 SIN SUELDO CARGADO el tope es $500 — no «sin tope»", async () => {
@@ -149,7 +161,9 @@ describe("🔴 el tope: un sueldo mensual", () => {
     const res = await POST(pedir("/api/prestamos/movimientos", {
       empleado_id: "e1", fecha: "2026-09-05", concepto: "Préstamo", monto: 100,
     }));
-    expect((await res.json()).estado).toBe("pendiente_aprobacion");
+    const j = await res.json();
+    expect(j.estado).toBe("aprobado");
+    expect(j.sobreTope).toBe(true);
   });
 
   it("🔴 EL DAÑO DE MERCANCÍA NUNCA SE FRENA — ya se perdió, no anotarla no la devuelve", async () => {
@@ -172,17 +186,21 @@ describe("🔴 el tope: un sueldo mensual", () => {
       empleado_id: "e1", fecha: "2026-09-05", concepto: "Préstamo", monto: 100,
     }));
     // 400 + 350 + 100 = 850 > 800. Con solo la cuenta de préstamo habría pasado.
-    expect((await res.json()).estado).toBe("pendiente_aprobacion");
+    const j = await res.json();
+    expect(j.estado).toBe("aprobado");
+    expect(j.sobreTope).toBe(true);
   });
 
-  it("🔴 lo PENDIENTE no cuenta como deuda para el tope siguiente: no se entregó", async () => {
+  it("una fila vieja en `pendiente_aprobacion` no cuenta como deuda (no se entregó)", async () => {
     db.movimientos = [
       { id: "a", empleado_id: "e1", fecha: "2026-01-01", concepto: "Préstamo", monto: 700, estado: "pendiente_aprobacion" },
     ];
     const res = await POST(pedir("/api/prestamos/movimientos", {
       empleado_id: "e1", fecha: "2026-09-05", concepto: "Préstamo", monto: 100,
     }));
-    expect((await res.json()).estado).toBe("aprobado");
+    const j = await res.json();
+    expect(j.estado).toBe("aprobado");
+    expect(j.sobreTope).toBe(false);
   });
 });
 
@@ -287,46 +305,35 @@ describe("un pago no puede exceder lo que ESA cuenta debe", () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-describe("🔴 solo Daniel aprueba", () => {
-  beforeEach(() => {
-    db.movimientos = [
-      { id: "p1", empleado_id: "e1", fecha: "2026-09-01", concepto: "Préstamo", monto: 200, estado: "pendiente_aprobacion" },
-    ];
+// ⚠️ CAMBIÓ DE DIRECCIÓN EL 11-SEP-2026, NO SE BORRÓ. Acá vivía «🔴 solo Daniel
+// aprueba»: Contabilidad y el otro admin recibían 403 en
+// `POST /api/prestamos/pendientes`, Daniel aprobaba o rechazaba, y Contabilidad
+// lo VEÍA aunque no pudiera tocarlo. Daniel: *«Aprobar préstamos: eso también
+// se quita»*. Medido antes de retirarlo: 0 préstamos esperando en producción.
+describe("🔴 ya nadie aprueba un préstamo — la puerta no existe", () => {
+  it("la ruta `/api/prestamos/pendientes` y la pantalla «Por aprobar» se fueron", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const raiz = process.cwd();
+    expect(fs.existsSync(path.join(raiz, "src/app/api/prestamos/pendientes/route.ts"))).toBe(false);
+    expect(fs.existsSync(path.join(raiz, "src/app/prestamos/aprobaciones/page.tsx"))).toBe(false);
+    expect(fs.existsSync(path.join(raiz, "src/app/api/cron/prestamos-caducan/route.ts"))).toBe(false);
   });
 
-  it("Contabilidad NO puede aprobar", async () => {
-    const res = await DECIDIR(pedir("/api/prestamos/pendientes", { id: "p1", accion: "aprobar" }, "contabilidad", "Contabilidad"));
-    expect(res.status).toBe(403);
-    expect(db.updates).toHaveLength(0);
+  it("y el módulo de roles ya no tiene «quién aprueba»", async () => {
+    const roles = (await import("@/lib/prestamos-roles")) as Record<string, unknown>;
+    expect("puedeAprobarPrestamo" in roles).toBe(false);
+    expect("USUARIO_APRUEBA_PRESTAMOS" in roles).toBe(false);
   });
 
-  it("⚠️ el OTRO admin tampoco: hay dos, y esto lo decide una persona", async () => {
-    const res = await DECIDIR(pedir("/api/prestamos/pendientes", { id: "p1", accion: "aprobar" }, "admin", "alberto"));
-    expect(res.status).toBe(403);
-    expect(db.updates).toHaveLength(0);
-  });
-
-  it("Daniel sí, y al aprobar el movimiento pasa a contar (entra a la quincena en curso)", async () => {
-    const res = await DECIDIR(pedir("/api/prestamos/pendientes", { id: "p1", accion: "aprobar" }, "admin", "daniel"));
-    expect(res.status).toBe(200);
-    expect(db.updates).toEqual([{ tabla: "prestamos_movimientos", patch: { estado: "aprobado" } }]);
-  });
-
-  it("rechazar lo elimina (soft delete), no lo deja esperando para siempre", async () => {
-    const res = await DECIDIR(pedir("/api/prestamos/pendientes", { id: "p1", accion: "rechazar" }, "admin", "daniel"));
-    expect(res.status).toBe(200);
-    expect(db.updates).toEqual([{ tabla: "prestamos_movimientos", patch: { deleted: true } }]);
-  });
-
-  it("🔴 pero Contabilidad LO VE — esconderlo es el error que costó $700", async () => {
-    const cookie = signSession({ role: "contabilidad", userId: "u1", userName: "Contabilidad", sessionToken: "t1", modules: ["prestamos"] });
-    const req = new NextRequest("https://fashiongr.com/api/prestamos/pendientes", { headers: { cookie: `cxc_session=${cookie}` } });
-    const res = await LISTAR(req);
+  it("🔴 y NADA escribe `pendiente_aprobacion`: un préstamo sobre el tope nace aprobado", async () => {
+    db.salario = 100;
+    const res = await POST(pedir("/api/prestamos/movimientos", {
+      empleado_id: "e1", fecha: "2026-09-05", concepto: "Préstamo", monto: 5000,
+    }, "contabilidad", "Contabilidad"));
     const j = await res.json();
     expect(res.status).toBe(200);
-    expect(j.items).toHaveLength(1);
-    expect(j.items[0].monto).toBe(200);
-    // Lo ve, pero no lo puede tocar.
-    expect(j.puedeDecidir).toBe(false);
+    expect(j.estado).toBe("aprobado");
+    expect(j.sobreTope).toBe(true);
   });
 });

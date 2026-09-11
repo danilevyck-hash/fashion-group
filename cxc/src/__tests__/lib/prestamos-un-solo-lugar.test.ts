@@ -19,7 +19,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { globSync } from "glob";
 
-import { PRESTAMOS_ADMIN_ROLES, PRESTAMOS_ROLES, USUARIO_APRUEBA_PRESTAMOS, puedeAprobarPrestamo } from "@/lib/prestamos-roles";
+import { PRESTAMOS_ADMIN_ROLES, PRESTAMOS_ROLES } from "@/lib/prestamos-roles";
 
 const RAIZ = process.cwd();
 const leer = (f: string) => readFileSync(f, "utf8");
@@ -119,19 +119,16 @@ describe("🔴 PRESTAMOS_ROLES se dice una vez", () => {
   });
 });
 
-describe("🔴 quién aprueba es una PERSONA, no un rol", () => {
-  it("hace falta ser admin Y ser él — hay dos admins en producción", () => {
-    expect(USUARIO_APRUEBA_PRESTAMOS).toBe("daniel");
-    expect(puedeAprobarPrestamo({ role: "admin", userName: "daniel" })).toBe(true);
-    expect(puedeAprobarPrestamo({ role: "admin", userName: "alberto" })).toBe(false);
-    expect(puedeAprobarPrestamo({ role: "contabilidad", userName: "daniel" })).toBe(false);
-    expect(puedeAprobarPrestamo({ role: "gerente_boston", userName: "david" })).toBe(false);
-    expect(puedeAprobarPrestamo(null)).toBe(false);
-  });
-
-  it("no distingue mayúsculas ni espacios, como el login del sistema", () => {
-    expect(puedeAprobarPrestamo({ role: "admin", userName: " Daniel " })).toBe(true);
-    expect(puedeAprobarPrestamo({ role: "admin", userName: "DANIEL" })).toBe(true);
+// ⚠️ CAMBIÓ DE DIRECCIÓN EL 11-SEP-2026, NO SE BORRÓ. Acá vivía «🔴 quién aprueba
+// es una PERSONA, no un rol» (`puedeAprobarPrestamo`: admin **y** `daniel`, porque
+// hay dos admins). Daniel: *«Aprobar préstamos: eso también se quita»*. La
+// función se retiró; lo que se protege ahora es que no vuelva en silencio.
+describe("🔴 ya nadie aprueba un préstamo: la función se retiró", () => {
+  it("`prestamos-roles.ts` solo contesta quién entra y quién toca la zona peligrosa", async () => {
+    const roles = (await import("@/lib/prestamos-roles")) as Record<string, unknown>;
+    expect(Object.keys(roles).sort()).toEqual([
+      "PRESTAMOS_ADMIN_ROLES", "PRESTAMOS_ROLES", "esAdminDePrestamos", "esRolDePrestamos",
+    ]);
   });
 });
 

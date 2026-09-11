@@ -4,13 +4,11 @@ import { fmt, fmtDate } from "@/lib/format";
 import { Movimiento } from "./types";
 import { EmptyState } from "@/components/ui";
 import { etiquetaConcepto, esCargo } from "@/lib/prestamos-conceptos";
-import { ESTADO_PENDIENTE, NOMBRE_CUENTA, cuentaDeMovimiento } from "@/lib/prestamos-saldo";
-import { desdeCuandoEspera } from "@/lib/prestamos-tope";
+import { NOMBRE_CUENTA, cuentaDeMovimiento } from "@/lib/prestamos-saldo";
 
 interface Props {
   sortedMovs: Movimiento[];
   saldoByMov: Map<string, number>;
-  hoy: string;
   canEdit: boolean;
   canDelete: boolean;
   onEdit: (m: Movimiento) => void;
@@ -40,7 +38,7 @@ function toSentence(s: string): string {
  * ADRIAN ARROYO pasaron 22 días invisibles. Se aprueba en «Préstamos por
  * aprobar», que solo Daniel puede tocar.
  */
-export default function MovimientoTable({ sortedMovs, saldoByMov, hoy, canEdit, canDelete, onEdit, onDelete }: Props) {
+export default function MovimientoTable({ sortedMovs, saldoByMov, canEdit, canDelete, onEdit, onDelete }: Props) {
   const movs = sortedMovs;
   const total = movs.length;
   const hayDano = movs.some((m) => cuentaDeMovimiento(m) === "dano");
@@ -70,13 +68,12 @@ export default function MovimientoTable({ sortedMovs, saldoByMov, hoy, canEdit, 
             const cargo = esCargo(m.concepto);
             const sign = cargo ? "+" : "−";
             const saldo = saldoByMov.get(m.id);
-            const espera = m.estado === ESTADO_PENDIENTE;
-            const puedeEditar = canEdit && (espera || (Date.now() - new Date(m.created_at).getTime() < 24 * 60 * 60 * 1000));
+            const puedeEditar = canEdit && Date.now() - new Date(m.created_at).getTime() < 24 * 60 * 60 * 1000;
             return (
               <div
                 key={m.id}
                 data-mov-fila={m.id}
-                className={`rounded-lg border p-3 ${espera ? "border-amber-300 bg-amber-50" : "border-gray-200"}`}
+                className="rounded-lg border border-gray-200 p-3"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -86,16 +83,10 @@ export default function MovimientoTable({ sortedMovs, saldoByMov, hoy, canEdit, 
                   <div className="text-right shrink-0">
                     <p className="text-sm font-medium tabular-nums text-gray-900" data-mov-campo="monto">{sign}${fmt(m.monto)}</p>
                     <p className="text-xs tabular-nums text-gray-500 mt-0.5" data-mov-campo="saldo">
-                      {espera ? "No suma" : saldo !== undefined ? `Saldo $${fmt(saldo)}` : "Saldo —"}
+                      {saldo !== undefined ? `Saldo $${fmt(saldo)}` : "Saldo —"}
                     </p>
                   </div>
                 </div>
-
-                {espera && (
-                  <p className="mt-2 text-xs font-medium text-amber-800" data-mov-campo="espera">
-                    Esperando a Daniel · {desdeCuandoEspera(m.fecha, hoy)}
-                  </p>
-                )}
 
                 <p className="text-xs text-gray-500 mt-2 break-words" data-mov-campo="notas">
                   {[hayDano ? NOMBRE_CUENTA[cuentaDeMovimiento(m)] : null, m.origen_pago, m.notas ? toSentence(m.notas) : null]
@@ -146,17 +137,11 @@ export default function MovimientoTable({ sortedMovs, saldoByMov, hoy, canEdit, 
                 // Sin color por concepto: el signo del monto carga la semántica.
                 const sign = cargo ? "+" : "−";
                 const saldo = saldoByMov.get(m.id);
-                const espera = m.estado === ESTADO_PENDIENTE;
                 return (
-                <tr key={m.id} data-mov-fila={m.id} className={`${espera ? "bg-amber-50" : i % 2 === 1 ? "bg-gray-50/50" : ""} hover:bg-gray-50 transition-colors`}>
+                <tr key={m.id} data-mov-fila={m.id} className={`${i % 2 === 1 ? "bg-gray-50/50" : ""} hover:bg-gray-50 transition-colors`}>
                   <td className="py-3 px-4 tabular-nums text-gray-600" data-mov-campo="fecha">{fmtDate(m.fecha)}</td>
                   <td className="py-3 px-4 font-medium text-gray-900" data-mov-campo="concepto">
                     {etiquetaConcepto(m.concepto)}
-                    {espera && (
-                      <span className="ml-2 text-xs font-medium text-amber-800" data-mov-campo="espera">
-                        Esperando a Daniel · {desdeCuandoEspera(m.fecha, hoy)}
-                      </span>
-                    )}
                   </td>
                   {hayDano && (
                     <td className="py-3 px-4 text-xs text-gray-500" data-mov-campo="cuenta">{NOMBRE_CUENTA[cuentaDeMovimiento(m)]}</td>
@@ -168,12 +153,11 @@ export default function MovimientoTable({ sortedMovs, saldoByMov, hoy, canEdit, 
                   </td>
                   <td className="py-3 px-4 text-right tabular-nums font-medium text-gray-900" data-mov-campo="monto">{sign}${fmt(m.monto)}</td>
                   <td className="py-3 px-4 text-right tabular-nums font-medium text-gray-700" data-mov-campo="saldo">
-                    {espera ? <span className="text-xs text-gray-400">No suma</span>
-                      : saldo !== undefined ? `$${fmt(saldo)}` : <span className="text-gray-300">—</span>}
+                    {saldo !== undefined ? `$${fmt(saldo)}` : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-1">
-                      {canEdit && (m.estado === ESTADO_PENDIENTE || (Date.now() - new Date(m.created_at).getTime() < 24 * 60 * 60 * 1000)) && (
+                      {canEdit && Date.now() - new Date(m.created_at).getTime() < 24 * 60 * 60 * 1000 && (
                         <button onClick={() => onEdit(m)} className="inline-flex h-11 w-11 items-center justify-center hover:bg-blue-50 rounded-lg transition text-gray-400 hover:text-blue-500" title="Editar">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
                         </button>

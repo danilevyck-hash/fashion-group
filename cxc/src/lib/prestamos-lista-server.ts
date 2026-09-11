@@ -31,7 +31,6 @@ import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import {
   calcularSaldoPrestamo,
   cuentaMasVieja,
-  pendienteDeAprobacion,
   type CuentaPrestamo,
   type MovimientoParaSaldo,
 } from "@/lib/prestamos-saldo";
@@ -82,8 +81,6 @@ export interface FilaPrestamo {
   prestado: number;
   pagado: number;
   pct: number;
-  /** 🔴 Lo que espera la aprobación de Daniel. NO suma al saldo, pero se ve. */
-  pendiente: number;
   /** `false` = ya no trabaja: aparece con su saldo, pero no se le descuenta. */
   trabaja: boolean;
   /** Cuál cuenta cobra primero. `null` si no debe nada. */
@@ -182,7 +179,6 @@ export async function leerDatosPrestamos(hoy: string = hoyPanamaYmd()): Promise<
   for (const e of empleados) {
     const movs = (e.prestamos_movimientos ?? []).filter((m) => m.deleted !== true);
     const s = calcularSaldoPrestamo(movs);
-    const pend = pendienteDeAprobacion(movs);
     const cod = String(e.empleado_codigo ?? "").trim();
     const persona = cod ? porCodigo.get(cod) : undefined;
     const nombre = String(persona?.nombre ?? e.nombre ?? "").trim() || "Sin nombre";
@@ -194,9 +190,8 @@ export async function leerDatosPrestamos(hoy: string = hoyPanamaYmd()): Promise<
       if (!prev || s.saldo > prev.saldo) fichaDe.set(cod, { id: e.id, saldo: s.saldo });
     }
 
-    // 🔴 Solo quien debe. Quien llega a cero sale solo — y lo que espera
-    // aprobación también entra, porque esconderlo es el error que ya costó $700.
-    if (s.saldo <= 0 && pend.total <= 0) continue;
+    // 🔴 Solo quien debe. Quien llega a cero sale solo.
+    if (s.saldo <= 0) continue;
 
     // Los pagos de QUINCENA (nunca «Abono extra»: es plata del bolsillo, no del
     // sueldo, y descontarla otra vez sería cobrarle dos veces).
@@ -219,7 +214,6 @@ export async function leerDatosPrestamos(hoy: string = hoyPanamaYmd()): Promise<
       prestado: s.prestado,
       pagado: s.pagado,
       pct: s.pct,
-      pendiente: pend.total,
       trabaja,
       cuentaMasVieja: cuentaMasVieja(s),
       deducidaQuincena: fechasPagos.some((f) => f >= q.start && f <= q.end),

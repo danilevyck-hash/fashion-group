@@ -36,16 +36,16 @@ TOPE="src/lib/prestamos-tope.ts"
 CONCEPTOS="src/lib/prestamos-conceptos.ts"
 ROLES="src/lib/prestamos-roles.ts"
 MOVS="src/app/api/prestamos/movimientos/route.ts"
-PEND="src/app/api/prestamos/pendientes/route.ts"
 PLANILLA="src/lib/asistencia/prestamos-planilla.ts"
 LISTA="src/lib/prestamos-lista-server.ts"
 MIGRA="supabase/migrations/20260925120000_prestamos_dos_cuentas_y_tope.sql"
-CRON="src/app/api/cron/prestamos-caducan/route.ts"
 CONFIG="src/app/asistencia/ConfiguracionTab.tsx"
 EXCEL="src/lib/exports/prestamos-excel.ts"
 TABLA="src/app/prestamos/components/MovimientoTable.tsx"
 
-ARCHIVOS=("$SALDO" "$TOPE" "$CONCEPTOS" "$ROLES" "$MOVS" "$PEND" "$PLANILLA" "$LISTA" "$MIGRA" "$CRON" "$CONFIG" "$EXCEL" "$TABLA")
+# ⚠️ 11-sep-2026: se fueron `$PEND` (la ruta de aprobar) y `$CRON` (prestamos-caducan)
+# con la aprobación de préstamos. Las mutaciones 2, 3, 19 y 21–24 se retiraron.
+ARCHIVOS=("$SALDO" "$TOPE" "$CONCEPTOS" "$ROLES" "$MOVS" "$PLANILLA" "$LISTA" "$MIGRA" "$CONFIG" "$EXCEL" "$TABLA")
 
 RESPALDO="$(mktemp -d)"
 for f in "${ARCHIVOS[@]}"; do
@@ -97,18 +97,8 @@ mutar "$SALDO" \
   '    if (m.estado === "rechazado") continue;' \
   "lo pendiente suma al saldo"
 
-# 2. 🔴 Contabilidad puede aprobar.
-mutar "$ROLES" \
-  '  if (!s || !esAdminDePrestamos(s.role)) return false;
-  return String(s.userName ?? "").trim().toLowerCase() === USUARIO_APRUEBA_PRESTAMOS;' \
-  '  return !!s && esRolDePrestamos(s.role);' \
-  "Contabilidad puede aprobar"
-
-# 3. ⚠️ Cualquier admin puede aprobar (hay dos: daniel y alberto).
-mutar "$ROLES" \
-  '  return String(s.userName ?? "").trim().toLowerCase() === USUARIO_APRUEBA_PRESTAMOS;' \
-  '  return true;' \
-  "el otro admin también aprueba"
+# 2 y 3 (Contabilidad / el otro admin pueden aprobar) se retiraron el 11-sep-2026:
+# ya nadie aprueba (`puedeAprobarPrestamo` no existe).
 
 # 4. 🔴 El freno de duplicados vuelve a leer la NOTA.
 mutar "$MOVS" \
@@ -215,11 +205,7 @@ mutar "$TOPE" \
   '  return { pasa: quedaria < tope,' \
   "el borde del tope se corre"
 
-# 19. Lo pendiente deja de verse en la ficha.
-mutar "$TABLA" \
-  '                    Esperando a Daniel · {desdeCuandoEspera(m.fecha, hoy)}' \
-  '                    Registrado' \
-  "la ficha deja de decir que espera a Daniel"
+# 19 (la ficha deja de decir que espera a Daniel) se retiró el 11-sep-2026: nada espera.
 
 # 20. Lo pendiente sale en el Excel como si fuera plata entregada.
 mutar "$EXCEL" \
@@ -227,30 +213,7 @@ mutar "$EXCEL" \
   '      .filter((m) => m.deleted !== true)' \
   "el Excel publica lo que todavía espera"
 
-# 21. La caducidad se corre de 7 días.
-mutar "$TOPE" \
-  'export const DIAS_CADUCIDAD_PENDIENTE = 7;' \
-  'export const DIAS_CADUCIDAD_PENDIENTE = 30;' \
-  "lo pendiente caduca a los 30 días"
-
-# 22. Una fecha inválida caduca el préstamo igual.
-mutar "$TOPE" \
-  '  if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return false;
-  return hoy >= sumarDias(f, DIAS_CADUCIDAD_PENDIENTE);' \
-  '  return true;' \
-  "una fecha rota borra plata"
-
-# 23. El cron borra también lo aprobado.
-mutar "$CRON" \
-  '      .eq("estado", ESTADO_PENDIENTE);' \
-  '      .not("id", "is", null);' \
-  "el cron borra movimientos aprobados"
-
-# 24. El cron caduca en silencio.
-mutar "$CRON" \
-  '  if (borrados > 0) {' \
-  '  if (borrados > 99999) {' \
-  "el cron caduca sin avisar"
+# 21–24 (la caducidad y el cron) se retiraron el 11-sep-2026 con `prestamos-caducan`.
 
 echo "═══ LO QUE NO PUEDE VOLVER ══════════════════════════════════════════════"
 

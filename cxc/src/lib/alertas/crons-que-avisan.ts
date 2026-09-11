@@ -69,8 +69,9 @@ export const CRONS_CUYO_TRABAJO_ES_UN_MENSAJE: Readonly<Record<string, string>> 
   "acs-resumen-diario": "el resumen de ventas de Multifashion de la noche",
   // Día 1 de cada mes, 13:00 UTC.
   "grupo-resumen-mensual": "el resumen del mes de las 8 empresas",
-  // 13:15 UTC = 8:15 a.m. de Panamá. Los préstamos que llevan 7 días esperando.
-  "prestamos-caducan": "el aviso de préstamos que llevan una semana esperando tu aprobación",
+  // ⚠️ `prestamos-caducan` estuvo acá hasta el 11-sep-2026 (los préstamos que
+  // llevaban 7 días esperando). Se retiró con la aprobación de préstamos
+  // (Daniel: «Aprobar préstamos: eso también se quita»): ya no hay cron.
   // 🔑 Éste NO manda ningún mensaje: baja el directorio de clientes de
   // Multifashion y el descuento de fidelización. Entra por el otro motivo — no
   // deja fila en `switch_sync_log`, así que ninguna otra regla puede verlo.

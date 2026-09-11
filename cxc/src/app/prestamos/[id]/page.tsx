@@ -7,12 +7,7 @@ import { fmt, fmtDate } from "@/lib/format";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, ConfirmModal } from "@/components/ui";
 import { PRESTAMOS_ADMIN_ROLES, PRESTAMOS_ROLES } from "@/lib/prestamos-roles";
-import {
-  calcularSaldoPrestamo,
-  cuentaMasVieja,
-  pendienteDeAprobacion,
-  ESTADO_PENDIENTE,
-} from "@/lib/prestamos-saldo";
+import { calcularSaldoPrestamo, cuentaMasVieja } from "@/lib/prestamos-saldo";
 import { CONCEPTO_PAGO, ORIGEN_POR_DEFECTO, etiquetaConcepto } from "@/lib/prestamos-conceptos";
 import { getQuincenaRangePanama, hoyPanamaYmd } from "@/lib/prestamos-quincena";
 
@@ -71,7 +66,6 @@ export default function PrestamoDetallePage() {
   // Era la advertencia que `prestamos-saldo.ts` existe para evitar, escrita en
   // el único archivo que no lo usaba.
   const s = useMemo(() => calcularSaldoPrestamo(movs), [movs]);
-  const pend = useMemo(() => pendienteDeAprobacion(movs), [movs]);
 
   if (!authChecked || loading || !empleado) return null;
 
@@ -131,7 +125,6 @@ export default function PrestamoDetallePage() {
           pagado={s.pagado}
           saldo={s.saldo}
           pct={s.pct}
-          pendiente={pend.total}
           quincenaEstado={quincenaEstado}
         />
 
@@ -152,7 +145,6 @@ export default function PrestamoDetallePage() {
         <MovimientoTable
           sortedMovs={sortedMovs}
           saldoByMov={saldoByMov}
-          hoy={hoy}
           canEdit={canEdit}
           canDelete={canDelete}
           onEdit={editMov.openEditMov}
@@ -244,7 +236,7 @@ export default function PrestamoDetallePage() {
         onConfirm={movForm.doDeleteMov}
         title="¿Eliminar movimiento?"
         message={movToDelete
-          ? `Vas a eliminar ${etiquetaConcepto(movToDelete.concepto).toLowerCase()} de $${fmt(movToDelete.monto)} del ${fmtDate(movToDelete.fecha)}${movToDelete.estado === ESTADO_PENDIENTE ? " (todavía esperaba aprobación)" : ""} de la cuenta de ${empleado.nombre}. Queda registrado en el log de auditoría.`
+          ? `Vas a eliminar ${etiquetaConcepto(movToDelete.concepto).toLowerCase()} de $${fmt(movToDelete.monto)} del ${fmtDate(movToDelete.fecha)} de la cuenta de ${empleado.nombre}. Queda registrado en el log de auditoría.`
           : ""}
         confirmLabel="Eliminar"
         destructive

@@ -261,6 +261,11 @@ export function cuentaMasVieja(s: SaldoPrestamo): CuentaPrestamo | null {
  * lo que espera es literalmente cómo se perdieron los $700 de LUIS ARROYO
  * durante 22 días (#651).
  */
+// ⚠️ SIN LECTORES EN LA APP DESDE EL 11-SEP-2026. Daniel: *«Aprobar préstamos:
+// eso también se quita»* — un préstamo nace `aprobado` siempre, y medido ese día
+// no quedaba ninguno en este estado (447 movimientos, todos `aprobado`). La
+// constante y `pendienteDeAprobacion` se conservan para poder LEER una fila
+// vieja que apareciera; nada las escribe.
 export const ESTADO_PENDIENTE = "pendiente_aprobacion";
 
 export interface PendienteDeAprobacion {

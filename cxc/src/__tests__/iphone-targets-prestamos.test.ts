@@ -25,7 +25,7 @@
  * no puede medir un getBoundingClientRect. Se congela la CAUSA, no la medición.
  */
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 
 const src = join(__dirname, "..");
@@ -40,7 +40,6 @@ const danger = read("app", "prestamos", "components", "DangerZone.tsx");
 // 5-sep-2026: hay TRES conceptos y el formulario vive en NuevoMovimientoModal.
 const movModal = read("app", "prestamos", "components", "NuevoMovimientoModal.tsx");
 const elegirPersona = read("app", "prestamos", "components", "ElegirPersonaModal.tsx");
-const aprobaciones = read("app", "prestamos", "aprobaciones", "page.tsx");
 const editEmp = read("app", "prestamos", "components", "EditEmpleadoModal.tsx");
 const editMov = read("app", "prestamos", "components", "EditMovimientoModal.tsx");
 const confirms = read("app", "prestamos", "components", "ConfirmModals.tsx");
@@ -53,7 +52,6 @@ const TODOS: Record<string, string> = {
   "DangerZone.tsx": danger,
   "NuevoMovimientoModal.tsx": movModal,
   "ElegirPersonaModal.tsx": elegirPersona,
-  "aprobaciones/page.tsx": aprobaciones,
   "EditEmpleadoModal.tsx": editEmp,
   "EditMovimientoModal.tsx": editMov,
   "ConfirmModals.tsx": confirms,
@@ -138,27 +136,17 @@ describe("Préstamos · el barrido del resto del módulo", () => {
     }
   });
 
-  it("🔴 lo que ESPERA APROBACIÓN se ve en las tres superficies", () => {
-    // En la lista: el total, con su explicación de que no suma.
-    expect(lista).toContain("Esperando aprobación");
-    expect(lista).toContain("no suma al saldo hasta que Daniel lo apruebe");
-    // En la ficha: el movimiento resaltado, con desde cuándo espera — en las
-    // DOS vistas (tarjeta y tabla), como todo dato de esta pantalla desde el
-    // rediseño de iPad. Con una sola, el iPhone se queda sin saberlo.
-    // (3 apariciones: la tarjeta, la tabla y el comentario que explica por qué
-    // no vuelve a una pestaña.)
-    expect((tabla.match(/Esperando a Daniel/g) ?? []).length).toBe(3);
-    expect((tabla.match(/desdeCuandoEspera\(m\.fecha, hoy\)/g) ?? []).length).toBe(2);
-    // Y su pantalla propia, con los dos botones.
-    expect(aprobaciones).toContain("Aprobar");
-    expect(aprobaciones).toContain("Rechazar");
-  });
-
-  it("🔴 quien NO puede decidir lo ve igual, en gris — no se le esconde", () => {
-    expect(aprobaciones).toContain("puedeDecidir");
-    expect(aprobaciones).toContain("Esto lo aprueba Daniel. Aquí se ve, pero no se puede tocar.");
-    // Los botones se APAGAN, no desaparecen.
-    expect(aprobaciones).toMatch(/disabled=\{!puedeDecidir \|\| ocupado === p\.id\}/);
+  // ⚠️ CAMBIÓ DE DIRECCIÓN EL 11-SEP-2026, NO SE BORRÓ. Acá había dos casos:
+  // «lo que ESPERA APROBACIÓN se ve en las tres superficies» y «quien NO puede
+  // decidir lo ve igual, en gris». Daniel: *«Aprobar préstamos: eso también se
+  // quita»* — nada espera, así que no hay nada que mostrar ni en gris. Lo que
+  // se protege ahora es que esas superficies no vuelvan a medias.
+  it("🔴 nada espera aprobación: ni en la lista, ni en la ficha, ni una pantalla propia", () => {
+    expect(lista).not.toContain("Esperando aprobación");
+    expect(lista).not.toContain("/prestamos/aprobaciones");
+    expect(tabla).not.toContain("Esperando a Daniel");
+    expect(tabla).not.toContain("desdeCuandoEspera");
+    expect(existsSync(join(src, "app", "prestamos", "aprobaciones", "page.tsx"))).toBe(false);
   });
 
   it("detalle · Pago Quincenal y + Nuevo Movimiento llegan a 44 (medían 37)", () => {

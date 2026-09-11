@@ -18,9 +18,9 @@ import { progressColor, progressColorText } from "./types";
  * de los cuales uno dice $0,00 son un renglón de ruido. La suma sigue siendo la
  * misma de siempre.
  *
- * 🔴 Y lo que ESPERA APROBACIÓN va en gris, aparte, fuera del total: no se
- * entregó, así que no es deuda — pero se ve. Esconderlo es lo que dejó $700 de
- * Luis Arroyo invisibles 22 días.
+ * ⚠️ Hasta el 11-sep-2026 acá también iba, en gris, lo que ESPERABA APROBACIÓN.
+ * Se fue con la aprobación de préstamos (Daniel: «Aprobar préstamos: eso
+ * también se quita»): nada espera.
  */
 interface Props {
   saldoPrestamo: number;
@@ -31,12 +31,11 @@ interface Props {
   pagado: number;
   saldo: number;
   pct: number;
-  pendiente: number;
   quincenaEstado?: "deducida" | "pendiente" | null;
 }
 
 export default function SummaryCards({
-  saldoPrestamo, saldoDano, cuotaPrestamo, cuotaTerceros, prestado, pagado, saldo, pct, pendiente, quincenaEstado,
+  saldoPrestamo, saldoDano, cuotaPrestamo, cuotaTerceros, prestado, pagado, saldo, pct, quincenaEstado,
 }: Props) {
   const saldoColor = saldo > 0 ? "text-red-600" : saldo < 0 ? "text-blue-600" : "text-gray-400";
   const dosCuentas = saldoPrestamo !== 0 && saldoDano !== 0;
@@ -74,11 +73,6 @@ export default function SummaryCards({
           <div className="text-sm text-gray-400 mt-1 tabular-nums">
             Prestado ${fmt(prestado)} · Pagado ${fmt(pagado)}
           </div>
-          {pendiente > 0 && (
-            <div className="text-sm text-gray-500 mt-2 tabular-nums">
-              Esperando aprobación ${fmt(pendiente)}
-            </div>
-          )}
         </div>
 
         {quincenaEstado === "deducida" && (
