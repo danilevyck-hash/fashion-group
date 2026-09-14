@@ -11,7 +11,7 @@
 ## 🔴 Mueven plata
 
 ### 1. ~~El daño de mercancía no propone cuota~~ → **HECHO el 14-sep-2026**
-Daniel: *«Tanto el chico como el grande que sea por cuota, ¿no? Agregan el daño como se hace un préstamo, se elige la cuota y listo»*. El daño se registra con su cuota y entra solo a la planilla hasta saldarse. Migración `20261122120000` (mercancía con los tres estados), **pendiente de aplicar**.
+Daniel: *«Tanto el chico como el grande que sea por cuota, ¿no? Agregan el daño como se hace un préstamo, se elige la cuota y listo»*. El daño se registra con su cuota y entra solo a la planilla hasta saldarse. Migración `20261122120000` (mercancía con los tres estados), **aplicada y verificada el 14-sep-2026**.
 
 **Cerrado entero el mismo día**, con lo que Daniel decidió punto por punto (*«1. Sí, con opción de editar. 2. Sí. 3. …»*):
 1. ✅ **La cuota de daño se edita** en «Editar ficha», junto a las otras dos. Un `0` apaga la cuota y **no borra la deuda**.
