@@ -7,6 +7,102 @@
 
 ---
 
+## 🔴 LOS OCHO NÚMEROS DEL HUB LOS SUMA LA BASE — 462,8 KB → 181 BYTES (14-sep-2026)
+
+Daniel, textual: *«5. ok va»*.
+
+### 🩸 Qué pasaba
+
+El hub `/catalogos/marcas` dibuja cuatro tarjetas que dicen «182 productos a la
+venta · 12 sin foto». Para escribir esos **ocho números**, el navegador se
+descargaba el **catálogo entero de las cuatro marcas**. Medido contra producción
+el 14-sep-2026:
+
+| Marca   | Productos bajados | Peso |
+|---------|------------------:|-----:|
+| Tommy   | 477 | 227,4 KB |
+| Reebok  | 232 | 107,9 KB |
+| Calvin  |  83 |  39,8 KB |
+| Joybees |  81 |  38,2 KB |
+| `inventory` de Reebok | 391 filas | 49,5 KB |
+| **TOTAL** | | **462,8 KB** |
+
+Nombre, precio, color, descripción y fechas viajaban para tirarse después de
+contar. Sentry medía **24.384 ms de p95** en esa ruta.
+
+### 🔴 El riesgo del cambio, y cómo se cerró
+
+Contar en la base pide escribir «a la venta» en SQL — y **una segunda definición
+de la misma regla es exactamente cómo el hub y el catálogo terminaron diciendo
+232 contra 182** en septiembre (ver `lib/catalogo/a-la-venta.ts`).
+
+La salida fue **no escribir ese SQL a mano**:
+
+1. **El SQL se GENERA** desde `src/lib/catalogo/contadores.ts`, cláusula por
+   cláusula de `estaALaVenta`, con cada `or` pegado al `return true` que copia.
+2. **La migración es la salida impresa** de ese módulo
+   (`npx tsx scripts/_generar-migracion-contadores.ts`), y el candado la compara
+   **byte a byte**: editarla a mano pone el build ROJO.
+3. **El candado cuenta las cláusulas**: si `estaALaVenta` gana un `return true`
+   y el SQL no gana su `or`, el build se pone ROJO.
+4. **El camino de respaldo cuenta con `productosALaVenta`**, la función de
+   verdad, con un barrido que prohíbe escribir una condición propia adentro.
+5. **Y se comparan sobre datos reales**: `scripts/_verif-contadores-hub.ts` corre
+   los dos caminos contra producción y compara los ocho números uno por uno.
+
+La regla de «sin foto» vivía suelta dentro de un `.filter()` del hub; se sacó a
+`sinFoto()` para que la base pudiera copiarla de un lugar que exista.
+
+### ⚠️ Las cuatro tablas NO son simétricas
+
+Medido contra `information_schema.columns`:
+
+| Tabla | Columnas de stock | `is_regalia` |
+|---|---|---|
+| `products` (Reebok) | `disponibilidad` · `existencia` — **sin `stock`**; su existencia por talla se suma desde `inventory` | no |
+| `joybees_products` | `disponibilidad` · `existencia` · `stock` | **sí** |
+| `tommy_products` | `disponibilidad` · `existencia` · `stock` | no |
+| `calvin_products` | `disponibilidad` · `existencia` · `stock` | no |
+
+El **orden** de las columnas en el `coalesce` no es decorativo: es el orden en
+que `disponibleVendible` las prueba, y el primero que no sea nulo gana.
+
+### 🔴 Falla ABIERTA
+
+`/api/catalogo/contadores` intenta la función `catalogos_contadores_hub()`; ante
+**cualquier** problema (empezando por que la migración no esté aplicada) cuenta
+leyendo las filas con la regla de siempre. El hub no ve la diferencia y el
+navegador igual recibe menos de 1 KB. Ninguna pantalla en blanco.
+
+⚠️ **Ninguna ruta vieja cambió.** `/api/catalogo/[marca]/products` y
+`/api/catalogo/reebok/inventory` conservan forma y permisos: los usan el catálogo
+del vendedor y la pantalla de administrar.
+
+### Medido antes y después (solo lectura)
+
+| Marca | A la venta (antes → después) | Sin foto (antes → después) |
+|---|---|---|
+| Reebok | 178 → **178** | 0 → **0** |
+| Joybees | 81 → **81** | 0 → **0** |
+| Tommy | 453 → **453** | 0 → **0** |
+| Calvin | 82 → **82** | 0 → **0** |
+
+Hoy los cuatro contadores de foto dan **0** porque todo lo que no tiene foto está
+apagado; un 0 contra un 0 no prueba nada, así que la cláusula se comparó aparte
+sobre **todas** las filas de cada tabla — **1 · 2 · 8 · 6**, idénticas por los dos
+caminos. Un tercer control comprueba que el camino de respaldo, que pide **solo
+las columnas que la regla lee**, da lo mismo que pedir todas.
+
+La migración se probó dentro de `begin; … rollback;` contra producción: compila y
+devuelve esos mismos ocho números sin dejar nada creado.
+
+**Candado:** `catalogo-contadores-una-regla.test.ts` (22 casos);
+**13 mutaciones, 13 cazadas** con 2 controles
+(`scripts/_mutar-candados-contadores-hub.sh`).
+**Medición:** `scripts/_verif-contadores-hub.ts`.
+
+---
+
 ## 🔴 CUATRO ARREGLOS DE CATÁLOGOS — LA EXISTENCIA CONGELADA, LA FOTO DE CALVIN, LA PUERTA ABIERTA Y CUATRO RUTAS SIN DUEÑO (6-sep-2026)
 
 > Cuatro cosas independientes que salieron de una auditoría del módulo. Ninguna

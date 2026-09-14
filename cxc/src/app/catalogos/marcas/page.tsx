@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
 import { Toast } from "@/components/ui";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
-import { estaALaVenta } from "@/lib/catalogo/a-la-venta";
+import type { ContadoresDelHub, ContadoresMarca } from "@/lib/catalogo/contadores";
 import { CATALOGO_ADMIN_ROLES, COMPROBANTES_ROLES, catalogoRoles } from "@/lib/catalogo/roles";
 
 // Catálogos en UNA pantalla: una tarjeta por marca con sus acciones adentro
@@ -49,6 +49,23 @@ import { CATALOGO_ADMIN_ROLES, COMPROBANTES_ROLES, catalogoRoles } from "@/lib/c
 // catálogo, importada de `lib/catalogo/a-la-venta` (una sola definición), y el
 // rótulo lo dice: «182 productos a la venta».
 //
+// 🔴 LOS OCHO NÚMEROS LOS SUMA LA BASE (14-sep-2026). Daniel: *«5. ok va»*.
+//
+// 🩸 Para escribir esas ocho cifras, esta pantalla se bajaba el CATÁLOGO ENTERO
+// de las cuatro marcas más el inventario por talla de Reebok: **462,8 KB
+// medidos** contra producción (Tommy 227 · Reebok 108 + 50 · Calvin 40 ·
+// Joybees 38) y **24.384 ms de p95** en Sentry. Nombre, precio, color,
+// descripción y fechas viajaban para tirarse después de contar.
+//
+// Ahora es UNA petición a `/api/catalogo/contadores`, que responde **menos de
+// 200 bytes**. 🔴 La REGLA no se duplicó: el servidor la cuenta con la función
+// de la base, cuyo SQL se GENERA desde `lib/catalogo/contadores.ts` cláusula por
+// cláusula de `estaALaVenta`; y mientras esa migración no esté aplicada, cuenta
+// leyendo las filas con `productosALaVenta`, la misma de siempre.
+//
+// ⚠️ La pantalla NO cambió: los mismos ocho números, los mismos rótulos, el
+// mismo diseño. Lo único que cambió es de dónde salen.
+//
 // Los COLORES de cada tarjeta salen del tema de la marca (MARCA_THEME.hub) —
 // aquí solo vive la identidad no-visual (nombre, rutas). Agregar una marca =
 // agregar una entrada a BRANDS + su tema.
@@ -57,17 +74,9 @@ import { CATALOGO_ADMIN_ROLES, COMPROBANTES_ROLES, catalogoRoles } from "@/lib/c
 // describía la marca a gente que trabaja con esa marca todos los días. Lo que sí
 // se queda son los contadores, que son los que hacen tocar la tarjeta.
 
-interface BrandCounters {
-  /** Productos que se ven al entrar al catálogo (los vendibles). */
-  aLaVenta: number;
-  sinFoto: number;
-}
-
 interface Brand {
   key: MarcaUiKey;
   name: string;
-  productsUrl: string;   // endpoint para contar (active=true)
-  inventoryUrl?: string; // Reebok: la existencia por talla vive aparte
   catalogoHref: string;  // "Ver catálogo"
   adminHref: string;     // "Administrar" (CATALOGO_ADMIN_ROLES)
 }
@@ -76,44 +85,28 @@ const BRANDS: Brand[] = [
   {
     key: "reebok",
     name: "REEBOK",
-    productsUrl: "/api/catalogo/reebok/products?active=true",
-    inventoryUrl: "/api/catalogo/reebok/inventory",
     catalogoHref: "/catalogo/reebok",
     adminHref: "/catalogos/admin/reebok",
   },
   {
     key: "joybees",
     name: "JOYBEES",
-    productsUrl: "/api/catalogo/joybees/products?active=true",
     catalogoHref: "/catalogo/joybees",
     adminHref: "/catalogos/admin/joybees",
   },
   {
     key: "tommy",
     name: "TOMMY HILFIGER",
-    productsUrl: "/api/catalogo/tommy/products?active=true",
     catalogoHref: "/catalogo/tommy",
     adminHref: "/catalogos/admin/tommy",
   },
   {
     key: "calvin",
     name: "CALVIN KLEIN",
-    productsUrl: "/api/catalogo/calvin/products?active=true",
     catalogoHref: "/catalogo/calvin",
     adminHref: "/catalogos/admin/calvin",
   },
 ];
-
-/** Fila de producto tal como llega del endpoint de conteo. */
-interface FilaContada {
-  id?: string;
-  image_url?: string | null;
-  disponibilidad?: number | null;
-  existencia?: number | null;
-  stock?: number | null;
-  is_regalia?: boolean | null;
-  badge?: string | null;
-}
 
 export default function CatalogosMarcasPage() {
   const { authChecked, role } = useAuth({
@@ -121,34 +114,22 @@ export default function CatalogosMarcasPage() {
     allowedRoles: catalogoRoles(),
   });
 
-  const [counters, setCounters] = useState<Record<string, BrandCounters | null>>({});
+  // `undefined` = todavía cargando · `null` = no se pudo · objeto = los números.
+  const [counters, setCounters] = useState<ContadoresDelHub | null | undefined>(undefined);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authChecked) return;
     let cancelled = false;
-    for (const b of BRANDS) {
-      // Reebok necesita `inventory` como respaldo de existencia (su stock por
-      // talla no vive en la fila del producto) — es el MISMO respaldo que usa
-      // el catálogo, así que los dos números no pueden separarse.
-      Promise.all([
-        fetch(b.productsUrl, { cache: "no-store" }).then((r) => (r.ok ? r.json() : Promise.reject(r))),
-        b.inventoryUrl
-          ? fetch(b.inventoryUrl, { cache: "no-store" }).then((r) => (r.ok ? r.json() : []))
-          : Promise.resolve([]),
-      ])
-        .then(([rows, inv]: [FilaContada[], { product_id: string; quantity: number }[]]) => {
-          if (cancelled || !Array.isArray(rows)) return;
-          const stockMap: Record<string, number> = {};
-          for (const i of Array.isArray(inv) ? inv : []) {
-            stockMap[i.product_id] = (stockMap[i.product_id] || 0) + i.quantity;
-          }
-          const visibles = rows.filter((p) => estaALaVenta(p, p.id ? stockMap[p.id] : undefined));
-          const sinFoto = visibles.filter((p) => !p.image_url || !String(p.image_url).trim()).length;
-          setCounters((prev) => ({ ...prev, [b.key]: { aLaVenta: visibles.length, sinFoto } }));
-        })
-        .catch(() => { if (!cancelled) setCounters((prev) => ({ ...prev, [b.key]: null })); });
-    }
+    // UNA petición para las cuatro tarjetas. El servidor decide cómo contarlas
+    // (la base o las filas) y acá llega el resultado ya sumado.
+    fetch("/api/catalogo/contadores", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      .then((json: { contadores?: ContadoresDelHub }) => {
+        if (cancelled) return;
+        setCounters(json?.contadores ?? null);
+      })
+      .catch(() => { if (!cancelled) setCounters(null); });
     return () => { cancelled = true; };
   }, [authChecked]);
 
@@ -198,7 +179,11 @@ export default function CatalogosMarcasPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
           {BRANDS.map((b) => {
-            const c = counters[b.key];
+            // Misma regla de siempre para la tarjeta: cargando · no disponible ·
+            // los dos números. Una marca que el servidor no pudo contar llega
+            // sin entrada y cae en «Contadores no disponibles».
+            const c: ContadoresMarca | null | undefined =
+              counters === undefined ? undefined : (counters?.[b.key] ?? null);
             // Paleta de la tarjeta desde el tema de la marca (no hardcodear).
             const theme = getMarcaTheme(b.key)!;
             const hub = theme.hub;
