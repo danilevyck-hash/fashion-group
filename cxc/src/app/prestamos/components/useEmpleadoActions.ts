@@ -26,6 +26,13 @@ export function useEmpleadoActions({ empleadoId, empleado, onSuccess, onDeleted,
   const [showEditModal, setShowEditModal] = useState(false);
   const [fCuotaPrestamo, setFCuotaPrestamo] = useState("");
   const [fCuotaTerceros, setFCuotaTerceros] = useState("");
+  // 🔴 LA CUOTA DEL DAÑO VOLVIÓ (14-sep-2026). Daniel: *«Tanto el chico como
+  // el grande que sea por cuota. Agregan el daño como se hace un préstamo, se
+  // elige la cuota y listo»*. Se había retirado el 10-sep porque el daño no
+  // proponía cuota y el campo prometía algo que no pasaba; desde hoy sí la
+  // propone, así que tiene que poder cambiarse y apagarse. Un 0 apaga la
+  // cuota y NO borra la deuda: el saldo del daño sigue vivo.
+  const [fCuotaDano, setFCuotaDano] = useState("");
   const [fCodigo, setFCodigo] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
@@ -48,6 +55,7 @@ export function useEmpleadoActions({ empleadoId, empleado, onSuccess, onDeleted,
   function openEditModal() {
     setFCuotaPrestamo(String(empleado.deduccion_quincenal ?? 0));
     setFCuotaTerceros(String(empleado.deduccion_terceros ?? 0));
+    setFCuotaDano(String(empleado.deduccion_dano ?? 0));
     setFCodigo(empleado.empleado_codigo ?? "");
     setShowEditModal(true);
   }
@@ -58,6 +66,7 @@ export function useEmpleadoActions({ empleadoId, empleado, onSuccess, onDeleted,
       const body: Record<string, unknown> = {
         deduccion_quincenal: Number(fCuotaPrestamo) || 0,
         deduccion_terceros: Number(fCuotaTerceros) || 0,
+        deduccion_dano: Number(fCuotaDano) || 0,
       };
       if (fCodigo && fCodigo !== (empleado.empleado_codigo ?? "")) body.empleado_codigo = fCodigo;
       const res = await fetch(`/api/prestamos/empleados/${empleadoId}`, {
@@ -137,6 +146,7 @@ export function useEmpleadoActions({ empleadoId, empleado, onSuccess, onDeleted,
     showEditModal, setShowEditModal,
     fCuotaPrestamo, setFCuotaPrestamo,
     fCuotaTerceros, setFCuotaTerceros,
+    fCuotaDano, setFCuotaDano,
     fCodigo, setFCodigo,
     colaboradores,
     savingEdit,

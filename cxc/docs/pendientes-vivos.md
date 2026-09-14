@@ -13,10 +13,11 @@
 ### 1. ~~El daño de mercancía no propone cuota~~ → **HECHO el 14-sep-2026**
 Daniel: *«Tanto el chico como el grande que sea por cuota, ¿no? Agregan el daño como se hace un préstamo, se elige la cuota y listo»*. El daño se registra con su cuota y entra solo a la planilla hasta saldarse. Migración `20261122120000` (mercancía con los tres estados), **pendiente de aplicar**.
 
-🔴 **Quedaron tres cosas que decide Daniel:**
-1. **Editar la cuota de daño después no tiene pantalla.** Se carga al registrar; para cambiarla o apagarla no hay dónde (queda escribir 0 en la planilla esa quincena). Devolver el campo a «Editar ficha» son ~8 líneas, espejo del de terceros.
-2. **El cierre anota el pago del daño solo**, igual que el préstamo — el cierre ya leía `dinero.mercancia`. Es lo que se buscaba, pero conviene saberlo.
-3. **Boston › Préstamos** dice «descuenta $X por quincena» sumando préstamo y terceros; con cuota de daño quedaría corto.
+**Cerrado entero el mismo día**, con lo que Daniel decidió punto por punto (*«1. Sí, con opción de editar. 2. Sí. 3. …»*):
+1. ✅ **La cuota de daño se edita** en «Editar ficha», junto a las otras dos. Un `0` apaga la cuota y **no borra la deuda**.
+2. ✅ **El cierre anota el pago del daño solo**, igual que el préstamo (ya leía `dinero.mercancia`).
+3. ✅ **Boston suma las tres cuotas** en su «descuenta $X por quincena».
+4. ✅ **La fecha del movimiento NO decide la quincena** y se queda así (Daniel: *«2. Sí»*): lo que se descuenta es una cuota que se repite hasta saldarse, no el evento. Para saltarse una quincena se escribe `0`.
 
 ### 2. ~~Tres quincenas cerradas sin descontar préstamos~~ → **no era un problema: son PRUEBAS**
 Daniel, **14-sep-2026**: *«A nadie se le ha pagado nada. La contadora está probando el sistema, aún no lo entiende.»*

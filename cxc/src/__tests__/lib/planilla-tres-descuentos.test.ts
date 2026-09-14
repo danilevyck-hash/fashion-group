@@ -147,11 +147,46 @@ describe("B. UNA CASILLA, UNA CUENTA — y el daño propone en la SUYA, nunca en
     expect(srv).toMatch(/yaDescontadoTerceros: descontadoTercerosDe/);
   });
 
-  // 🔴 Y NADIE le vuelve a poner una cuota al daño desde la ficha.
-  it("la ficha ya no ofrece «cuota de daño»", () => {
+  // 🔴 CAMBIÓ DE DIRECCIÓN EL 14-sep-2026, CON NOTA. Hasta el 13-sep este caso
+  // exigía que la ficha NO ofreciera «cuota de daño»: se había retirado el
+  // 10-sep porque el daño no proponía cuota y el campo prometía algo que no
+  // pasaba. Daniel lo devolvió: *«Tanto el chico como el grande que sea por
+  // cuota. Agregan el daño como se hace un préstamo, se elige la cuota y
+  // listo»* y *«sí, con opción de editar»*. Ahora se exige lo contrario, y
+  // el motivo viejo ya no aplica porque la cuota SÍ se lee.
+  it("la ficha ofrece las TRES cuotas, y la del daño se puede editar", () => {
     const modal = leer("src/app/prestamos/components/EditEmpleadoModal.tsx");
+    expect(modal).toMatch(/Cuota de préstamo/);
     expect(modal).toMatch(/Cuota de terceros/);
-    expect(modal).not.toMatch(/<label[^>]*>Cuota de daño/);
+    expect(modal).toMatch(/Cuota de daño/);
+    // Y el campo GUARDA: la prop viaja al input, no es un rótulo suelto.
+    expect(modal).toMatch(/onChangeCuotaDano/);
+    // Se dice que un 0 apaga la cuota sin borrar la deuda: sin eso, apagarla
+    // se leería como «ya no debe nada».
+    expect(modal).toMatch(/no borra la deuda/i);
+  });
+
+  it("y el guardado manda la cuota del daño al servidor", () => {
+    const hook = sinComentarios("src/app/prestamos/components/useEmpleadoActions.ts");
+    expect(hook).toMatch(/deduccion_dano: Number\(fCuotaDano\)/);
+    // El PUT ya la aceptaba desde antes; lo que faltaba era mandársela.
+    const ruta = sinComentarios("src/app/api/prestamos/empleados/[id]/route.ts");
+    expect(ruta).toMatch(/body\.deduccion_dano/);
+  });
+
+  // 🔴 BOSTON: el «descuenta $X por quincena» de David suma LAS TRES cuotas.
+  // 🩸 El 11-sep se arregló al revés (pedía el daño y no terceros). Dejar el
+  // daño afuera hoy, que sí propone cuota, repetiría el mismo defecto.
+  it("Boston suma las tres cuotas en «por quincena»", () => {
+    const ruta = sinComentarios("src/app/api/boston/prestamos/route.ts");
+    const i = ruta.indexOf("deduccionQuincenal:");
+    expect(i).toBeGreaterThan(-1);
+    const linea = ruta.slice(i, i + 220);
+    expect(linea).toMatch(/deduccion_quincenal/);
+    expect(linea).toMatch(/deduccion_terceros/);
+    expect(linea).toMatch(/deduccion_dano/);
+    // Y la columna viaja en el select: sin eso llegaría siempre undefined.
+    expect(ruta).toMatch(/deduccion_dano, prestamos_movimientos/);
   });
 });
 

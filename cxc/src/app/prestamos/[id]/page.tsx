@@ -218,12 +218,14 @@ export default function PrestamoDetallePage() {
         show={actions.showEditModal}
         fCuotaPrestamo={actions.fCuotaPrestamo}
         fCuotaTerceros={actions.fCuotaTerceros}
+        fCuotaDano={actions.fCuotaDano}
         fCodigo={actions.fCodigo}
         colaboradores={actions.colaboradores}
         saving={actions.savingEdit}
         onClose={() => actions.setShowEditModal(false)}
         onChangeCuotaPrestamo={actions.setFCuotaPrestamo}
         onChangeCuotaTerceros={actions.setFCuotaTerceros}
+        onChangeCuotaDano={actions.setFCuotaDano}
         onChangeCodigo={actions.setFCodigo}
         onSave={actions.saveEdit}
       />

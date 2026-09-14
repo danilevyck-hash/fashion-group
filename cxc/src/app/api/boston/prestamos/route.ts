@@ -51,6 +51,8 @@ interface EmpleadoFila {
   deduccion_quincenal: number | string | null;
   /** La cuota de «Descuento a terceros» (10-sep-2026). Puede no venir si la DDL no corrió. */
   deduccion_terceros?: number | string | null;
+  /** La cuota del daño de mercancía. Volvió a proponerse el 14-sep-2026. */
+  deduccion_dano?: number | string | null;
   prestamos_movimientos: (MovimientoParaSaldo & { fecha?: string | null })[] | null;
 }
 
@@ -60,9 +62,16 @@ interface EmpleadoFila {
 // nunca `deduccion_terceros`, que sí se descuenta sola. Así el «descuenta $X
 // por quincena» que veía David era menor al que la planilla aplica. Ahora:
 // saldo = las tres cuentas por `calcularSaldoPrestamo` (la MISMA cuenta del
-// módulo) y cuota = préstamo + terceros, que es lo que la quincena propone.
+// módulo) y cuota = lo que la quincena propone.
+//
+// ⚠️ 14-sep-2026: la cuota pasó a ser préstamo + terceros + DAÑO. Daniel:
+// *«Tanto el chico como el grande que sea por cuota. Agregan el daño como se
+// hace un préstamo, se elige la cuota y listo»*. Desde ese día el daño propone
+// cuota como las otras dos, así que dejarlo afuera volvería a mostrarle a David
+// un número menor al que la planilla aplica — el MISMO defecto del 11-sep, al
+// revés.
 const SELECT_FICHA =
-  "id, nombre, empresa, deduccion_quincenal, deduccion_terceros, prestamos_movimientos(concepto, monto, estado, deleted, fecha, cuenta)";
+  "id, nombre, empresa, deduccion_quincenal, deduccion_terceros, deduccion_dano, prestamos_movimientos(concepto, monto, estado, deleted, fecha, cuenta)";
 /** Sin la columna de terceros (DDL pendiente) se lee sin ella: la cuota es la del préstamo. */
 const SELECT_FICHA_SIN_TERCEROS = SELECT_FICHA.replace("deduccion_terceros, ", "");
 
@@ -107,11 +116,14 @@ export async function GET(req: NextRequest) {
       // ("Confecciones Boston"), no la key — al revés que `asistencia_personas`.
       // No se traduce acá: se muestra tal cual lo guardó Contabilidad.
       empresa: e.empresa ?? "Sin empresa",
-      // 🔴 Lo que se le descuenta por quincena: préstamo + terceros (el daño no
-      // propone cuota). Es lo que la planilla propone y David tiene que ver.
-      deduccionQuincenal: round2(Number(e.deduccion_quincenal ?? 0) + Number(e.deduccion_terceros ?? 0)),
+      // 🔴 Lo que se le descuenta por quincena: LAS TRES cuotas. Es lo que la
+      // planilla propone y David tiene que ver.
+      deduccionQuincenal: round2(
+        Number(e.deduccion_quincenal ?? 0) + Number(e.deduccion_terceros ?? 0) + Number(e.deduccion_dano ?? 0),
+      ),
       deduccionPrestamo: Number(e.deduccion_quincenal ?? 0),
       deduccionTerceros: Number(e.deduccion_terceros ?? 0),
+      deduccionDano: Number(e.deduccion_dano ?? 0),
       // Las tres cuentas separadas. El total es su suma.
       saldoPrestamo: round2(c.cuentas.prestamo.saldo),
       saldoDano: round2(c.cuentas.dano.saldo),

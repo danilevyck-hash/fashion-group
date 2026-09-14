@@ -6,6 +6,14 @@
 // descuenta sola cada quincena. Así el descuento que veía David era menor al
 // que la planilla aplica. Ahora: saldo por `calcularSaldoPrestamo` (las tres
 // cuentas, la MISMA cuenta del módulo) y cuota = préstamo + terceros.
+//
+// ⚠️ CAMBIÓ DE DIRECCIÓN EL 14-sep-2026, CON NOTA. Ese día el daño volvió a
+// proponer cuota (Daniel: *«Tanto el chico como el grande que sea por cuota.
+// Agregan el daño como se hace un préstamo, se elige la cuota y listo»*), así
+// que `deduccion_dano` dejó de ser una columna sin lectores: ahora se descuenta
+// sola como las otras dos. Dejarla afuera repetiría el defecto del 11-sep al
+// revés — el número de David volvería a quedar corto. La cuota pasa a ser
+// préstamo + terceros + daño; el SALDO no cambia, ya eran las tres cuentas.
 // ─────────────────────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import { NextRequest } from "next/server";
@@ -20,7 +28,7 @@ afterAll(() => { process.env.SESSION_SECRET = SECRET_PREV; });
 const selects: string[] = [];
 const FILAS = [{
   id: "f1", nombre: "KEVIN LUBO", empresa: "Confecciones Boston",
-  deduccion_quincenal: 20, deduccion_terceros: 15,
+  deduccion_quincenal: 20, deduccion_terceros: 15, deduccion_dano: 5,
   prestamos_movimientos: [
     { concepto: "Préstamo", monto: 200, estado: "aprobado", deleted: false, fecha: "2026-08-01", cuenta: "prestamo" },
     { concepto: "Pago", monto: 50, estado: "aprobado", deleted: false, fecha: "2026-08-15", cuenta: "prestamo" },
@@ -48,21 +56,24 @@ function pedir(role: string) {
 }
 
 describe("GET /api/boston/prestamos", () => {
-  it("🔴 pide `deduccion_terceros` y NO `deduccion_dano` (sin lectores desde el 10-sep)", async () => {
+  it("🔴 pide LAS TRES cuotas (el daño volvió a proponer el 14-sep-2026)", async () => {
     await pedir("gerente_boston");
+    expect(selects[0]).toContain("deduccion_quincenal");
     expect(selects[0]).toContain("deduccion_terceros");
-    expect(selects[0]).not.toContain("deduccion_dano");
+    expect(selects[0]).toContain("deduccion_dano");
   });
-  it("🔴 el saldo son las tres cuentas y la cuota es préstamo + terceros", async () => {
+  it("🔴 el saldo son las tres cuentas y la cuota es la suma de las TRES", async () => {
     const j = await (await pedir("gerente_boston")).json();
     const k = j.empleados.find((e: { nombre: string }) => e.nombre === "KEVIN LUBO");
     expect(k.saldoPrestamo).toBe(150);
     expect(k.saldoDano).toBe(30);
     expect(k.saldoTerceros).toBe(90);
     expect(k.saldo).toBe(270);
-    expect(k.deduccionQuincenal).toBe(35);
+    // 20 + 15 + 5: si el daño se cayera, diría 35 y le mentiría a David.
+    expect(k.deduccionQuincenal).toBe(40);
     expect(k.deduccionPrestamo).toBe(20);
     expect(k.deduccionTerceros).toBe(15);
+    expect(k.deduccionDano).toBe(5);
     expect(j.totales.saldo).toBe(270);
   });
   it("la pantalla dibuja esa cuota como «descuenta $X por quincena»", () => {
