@@ -39,26 +39,40 @@ export async function GET(req: NextRequest) {
     return noAutorizado();
   }
 
-  // El token tiene que existir en user_sessions, NO estar revocado, y ser del
-  // mismo usuario que la cookie dice ser. Un error de la base también es 401:
-  // en el peor caso el usuario escribe su contraseña, como hoy.
-  const { data: ses, error: sesErr } = await supabaseServer
-    .from("user_sessions")
-    .select("user_name")
-    .eq("session_token", parsed.sessionToken)
-    .eq("revoked", false)
-    .maybeSingle();
+  // 🔑 LAS DOS LECTURAS VAN EN EL MISMO VIAJE (14-sep-2026). Eran dos `await`
+  // en serie y la segunda NO depende de la primera: las dos se arman con lo que
+  // ya trae la cookie (`sessionToken` y `userId`). Esto es lo PRIMERO que hace
+  // la app al abrirse —la pantalla de login no dibuja nada hasta que conteste—,
+  // así que una ida y vuelta de menos se ve en cada arranque.
+  //
+  // ⚠️ LOS CANDADOS NO SE MUEVEN: se siguen comprobando EN EL MISMO ORDEN y con
+  // las MISMAS condiciones, y cualquier duda sigue siendo 401 (fail-closed). Lo
+  // único que cambia es que la consulta de `fg_users` ya salió cuando se la
+  // necesita; si la sesión no sirve, su resultado se descarta sin mirarlo.
+  const [
+    { data: ses, error: sesErr },
+    { data: user, error: userErr },
+  ] = await Promise.all([
+    // El token tiene que existir en user_sessions, NO estar revocado, y ser del
+    // mismo usuario que la cookie dice ser. Un error de la base también es 401:
+    // en el peor caso el usuario escribe su contraseña, como hoy.
+    supabaseServer
+      .from("user_sessions")
+      .select("user_name")
+      .eq("session_token", parsed.sessionToken)
+      .eq("revoked", false)
+      .maybeSingle(),
+    // El usuario tiene que seguir existiendo y ACTIVO.
+    supabaseServer
+      .from("fg_users")
+      .select("id, name, role, active, is_owner, associated_company, modulos_override")
+      .eq("id", parsed.userId)
+      .eq("active", true)
+      .maybeSingle(),
+  ]);
   if (sesErr || !ses || ses.user_name !== parsed.userName) {
     return noAutorizado();
   }
-
-  // El usuario tiene que seguir existiendo y ACTIVO.
-  const { data: user, error: userErr } = await supabaseServer
-    .from("fg_users")
-    .select("id, name, role, active, is_owner, associated_company, modulos_override")
-    .eq("id", parsed.userId)
-    .eq("active", true)
-    .maybeSingle();
   if (userErr || !user) {
     return noAutorizado();
   }

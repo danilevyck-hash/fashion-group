@@ -112,26 +112,32 @@ export async function GET(req: NextRequest) {
   try {
     const desde = new Date(Date.now() - DIAS_VENTANA * 86_400_000).toISOString();
 
+    // 🔑 LA LECTURA DEL RELOJ VA EN EL MISMO VIAJE QUE LAS OTRAS CINCO
+    // (14-sep-2026). Estaba ARRIBA del `Promise.all`, con su propio `await`, así
+    // que las otras cinco no arrancaban hasta que terminaran sus SIETE páginas
+    // (6.998 filas en 180 días: PostgREST corta en 1.000 y el helper pagina de a
+    // una). Medido contra producción: 1.588 ms el paginado + 449 ms las cinco
+    // lecturas, en serie. Ninguna de las cinco usa `marcas`, así que esperarla
+    // era tiempo regalado. NADA de lo que devuelve la ruta cambia: mismas
+    // consultas, mismos datos, mismo `catch` con el mismo 500.
+    //
     // Paginado con verificación contra el COUNT: PostgREST corta en 1.000 filas
     // EN SILENCIO, y con 3.287 marcaciones cargadas eso dejaría códigos afuera.
-    const marcas = await leerTodoPaginado<FilaMarca>(
-      "asistencia_marcaciones (configuración)",
-      (pedirCount, from, to) =>
-        supabaseServer
-          .from("asistencia_marcaciones")
-          .select(
-            "empleado_codigo, empleado_nombre, ocurrio_en, dispositivo",
-            pedirCount ? { count: "exact" } : {},
-          )
-          .gte("ocurrio_en", desde)
-          .order("ocurrio_en", { ascending: true })
-          .order("id", { ascending: true })
-          .range(from, to),
-    );
-
-    // Si cualquiera de las tres lecturas falla, se sale por el `catch` con un
-    // 500 y el mensaje (tolerancia a la DDL retirada el 3-sep-2026).
-    const [{ reglas }, { filas }, repRes, deudaDe, conHorario] = await Promise.all([
+    const [marcas, { reglas }, { filas }, repRes, deudaDe, conHorario] = await Promise.all([
+      leerTodoPaginado<FilaMarca>(
+        "asistencia_marcaciones (configuración)",
+        (pedirCount, from, to) =>
+          supabaseServer
+            .from("asistencia_marcaciones")
+            .select(
+              "empleado_codigo, empleado_nombre, ocurrio_en, dispositivo",
+              pedirCount ? { count: "exact" } : {},
+            )
+            .gte("ocurrio_en", desde)
+            .order("ocurrio_en", { ascending: true })
+            .order("id", { ascending: true })
+            .range(from, to),
+      ),
       leerReglas(),
       leerPersonas(),
       leerRepartos(),

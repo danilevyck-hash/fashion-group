@@ -72,42 +72,51 @@ export async function GET(req: NextRequest) {
   const empresaFiltro = empresaParaPedir(sp.get("empresa"));
 
   try {
+    // 🔑 LAS NUEVE LECTURAS VAN EN UN SOLO VIAJE (14-sep-2026). Eran TRES olas
+    // en serie —las marcaciones con su propio `await`, después cuatro lecturas,
+    // después otras cuatro— y ninguna de las ocho de abajo usa nada de las
+    // anteriores: todas se arman con `desde`/`hasta`, que vienen de la URL. La
+    // pantalla esperaba tres idas y vueltas donde alcanzaba una. NADA cambia de
+    // lo que devuelve la ruta: mismas consultas, mismos datos, mismo `catch`.
+    //
+    // ⚠️ `leerDirectorio()` y `leerPersonas()` leen `asistencia_personas` con el
+    // MISMO select —la primera devuelve esas filas en `DirectorioLeido.filas`—,
+    // o sea que es la misma consulta dos veces. Se dejan las dos A PROPÓSITO:
+    // ahora salen en el mismo viaje, así que la consulta de más no cuesta
+    // tiempo, y quitarla obliga a tocar el stub de
+    // `asistencia-reporte-hoy-y-vigencia.test.ts`, que mockea `leerDirectorio`
+    // SIN `filas`. Unificarlas es una decisión aparte, no un colateral de esto.
+    //
     // Paginado con verificación contra el COUNT: un mes de dos relojes con 4
     // marcas diarias pasa de 1.000 filas, y PostgREST corta ahí EN SILENCIO.
     // Un reporte de horas recortado sin avisar es peor que uno que falla.
-    const marcaciones = await leerTodoPaginado<MarcacionConId>(
-      "asistencia_marcaciones (reporte)",
-      (pedirCount, from, to) => {
-        let sel = supabaseServer
-          .from("asistencia_marcaciones")
-          // 🔑 El `id` es lo que ata la corrección a SU marcación. Sin él no se
-          // podría saber cuál de las 4 marcas del día se corrigió.
-          .select("id, empleado_codigo, empleado_nombre, ocurrio_en", pedirCount ? { count: "exact" } : {})
-          .gte("ocurrio_en", iDesde)
-          .lte("ocurrio_en", iHasta);
-        if (dispositivo) sel = sel.eq("dispositivo", dispositivo);
-        return sel.order("ocurrio_en", { ascending: true }).order("id", { ascending: true }).range(from, to);
-      },
-    );
-
-    // Las reglas configuradas. Sin la migración corrida devuelve los valores por
-    // defecto en vez de tirar: el reporte tiene que salir igual.
-    // El directorio, en el mismo viaje: es el único lugar que traduce el código
-    // del reloj a un nombre, y de él salen también el Excel y el PDF.
-    const [{ reglas }, { directorio }, correcciones, personasDb] = await Promise.all([
+    const [marcaciones, { reglas }, { directorio }, correcciones, personasDb, hRes, jRes, vRes, fRes] = await Promise.all([
+      leerTodoPaginado<MarcacionConId>(
+        "asistencia_marcaciones (reporte)",
+        (pedirCount, from, to) => {
+          let sel = supabaseServer
+            .from("asistencia_marcaciones")
+            // 🔑 El `id` es lo que ata la corrección a SU marcación. Sin él no se
+            // podría saber cuál de las 4 marcas del día se corrigió.
+            .select("id, empleado_codigo, empleado_nombre, ocurrio_en", pedirCount ? { count: "exact" } : {})
+            .gte("ocurrio_en", iDesde)
+            .lte("ocurrio_en", iHasta);
+          if (dispositivo) sel = sel.eq("dispositivo", dispositivo);
+          return sel.order("ocurrio_en", { ascending: true }).order("id", { ascending: true }).range(from, to);
+        },
+      ),
+      // Las reglas configuradas. Sin la migración corrida devuelve los valores por
+      // defecto en vez de tirar: el reporte tiene que salir igual.
       leerReglas(),
+      // El directorio: es el único lugar que traduce el código del reloj a un
+      // nombre, y de él salen también el Excel y el PDF. Sus `filas` son LAS
+      // FICHAS, de donde sale QUIÉN estaba trabajando en el rango.
       leerDirectorio(),
       // Sin la tabla corrida devuelve CERO correcciones, o sea exactamente los
       // números que este reporte daba antes de que las correcciones existieran.
       leerCorrecciones(desde, hasta),
       // Las fichas: de acá sale QUIÉN estaba trabajando en el rango. Ver abajo.
       leerPersonas(),
-    ]);
-    const nombres = new Map<string, string>(
-      directorio.codigos().map((c) => [c, directorio.etiqueta(c)]),
-    );
-
-    const [hRes, jRes, vRes, fRes] = await Promise.all([
       supabaseServer.from("asistencia_horarios").select("empleado_codigo, entrada, salida, almuerzo_minutos"),
       // 🔑 Por la fuente ÚNICA, no con un `select` copiado: es lo que hace que
       // el reporte y la planilla no puedan leer distinto la misma fila.
@@ -118,6 +127,9 @@ export async function GET(req: NextRequest) {
       leerVacaciones(desde, hasta),
       supabaseServer.from("asistencia_feriados").select("fecha, nombre").gte("fecha", desde).lte("fecha", hasta),
     ]);
+    const nombres = new Map<string, string>(
+      directorio.codigos().map((c) => [c, directorio.etiqueta(c)]),
+    );
     if (hRes.error) throw new Error(hRes.error.message);
     if (fRes.error) throw new Error(fRes.error.message);
 
