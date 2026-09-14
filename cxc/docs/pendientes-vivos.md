@@ -124,15 +124,15 @@ Son **21 artículos · 65 piezas**. Es tarea de Daniel en Switch. Su gemelo (`Me
 ### 20. Cristiam: nadie sabe si sigue trabajando
 > *«cristian no sé si trabaja o no, que la contable haga lo suyo, ¿no?»* — **11-sep-2026**. Pregunta abierta para la contadora.
 
-### 21. «Solo Angela» en un módulo
-> *«Andrea 16, Julio 11, Rodrigo 13. estos no deben de estar en el módulo, solo Angela»* — **7-sep-2026**
+### 21. ~~«Solo Angela» en un módulo~~ → **es Caja Menuda. Resuelto el 14-sep-2026**
+> *«Andrea 16, Julio 11, Rodrigo 13. estos no deben de estar en el módulo, solo Angela»* — **7-sep-2026**. Daniel confirmó el **14-sep**: *«Caja»*.
 
-⚠️ **No se pudo confirmar de qué módulo hablaba.** Venía de Caja Menuda y del Depurador (*«Angela lo usa en la computadora, no en el celular»*). Hoy `caja` y `cargar` son `admin` + `secretaria`, o sea que Andrea entra a los dos; Julio (bodega) y Rodrigo (vendedor) no entran a ninguno por rol. **Hay que preguntárselo.**
+**Medido ese día:** Caja tiene **77 gastos vivos y los 77 los escribió Angela**. Entran hoy los admin (alberto, daniel) y quien tenga `caja` en su `modulos_override`: **Angela y andrea, nadie más**. ⚠️ **Rodrigo (vendedor) y Bodega ya no entraban** — su rol no trae `caja` y no tienen override. De los tres que nombró, solo andrea entraba.
 
-### 22. La conversación con la contadora quedó a mitad de frase
-Los tres últimos mensajes de la sesión, **13-sep 18:08 a 18:25**: *«Me dijo. Es que como ya le comentamos el corte es para las horas extras»* · *«la b, ¿por qué no recomiendas?»* · *«¿Qué le respondo? ¿Lo que escribí u otra cosa? ¿Pongo send o no?»*
+🔴 **Daniel decidió que NO se toca** (14-sep-2026). Andrea conserva Caja. La migración que se había preparado se borró para que nadie la corra por error; si algún día se retoma, el patrón es `array_remove` sobre `modulos_override` por `name` exacto, sin tocar `role_permissions`.
 
-**El hilo termina sin que se sepa qué se le respondió a Yulissa ni si el mensaje se envió.** Es lo más reciente que existe.
+### 22. ~~La conversación con la contadora quedó a mitad de frase~~ → **cerrada**
+Los tres últimos mensajes de la sesión (**13-sep 18:08 a 18:25**) terminaban en *«¿Qué le respondo? ¿Pongo send o no?»*. Daniel confirmó el **14-sep** que **sí se lo respondió**. El tema era que el corte de la quincena es para las horas extras, y eso ya quedó escrito como regla.
 
 ### 23. El botón «Últimos pagos ›» que pidió se construyó y se borró 48 horas después
 > *«último 3 pagos lo quiero ahí mismo pero con un botón para expandir, no solo al expandir el card, tendría que hacer dos expandir para verlo»* — **3-sep-2026**
