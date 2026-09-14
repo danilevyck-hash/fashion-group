@@ -17,25 +17,15 @@
 
 ⚠️ **`CLAUDE.md` lo escribe como si fuera una decisión de diseño** («el daño no propone cuota»). No lo es: Daniel pidió lo contrario cuatro días antes de que esa regla se escribiera. Hoy el daño hay que teclearlo a mano cada quincena — el mismo paso manual que el 11-sep se eliminó para el préstamo, y por el mismo motivo: *un paso que hay que dar cada quincena para que pase lo que siempre pasa es un paso que un día no se da*.
 
-### 2. Tres quincenas quedaron cerradas como «rango libre», sin descontar préstamos
-**Medido contra producción el 14-sep-2026.** De las **6** quincenas cerradas en toda la historia, **5** se cerraron sin `quincena` y sin `corte`, o sea como rango libre. En rango libre el motor prorratea el sueldo **y apaga todos los montos escritos a mano** (ISR, préstamo, terceros, mercancía, otros) — es una regla del sistema, está en el código y se avisa en pantalla.
+### 2. ~~Tres quincenas cerradas sin descontar préstamos~~ → **no era un problema: son PRUEBAS**
+Daniel, **14-sep-2026**: *«A nadie se le ha pagado nada. La contadora está probando el sistema, aún no lo entiende.»*
 
-| empresa | rango | factor | estado |
-|---|---|---|---|
-| fashion_wear | 15 → 28 ago | 0,879 | **cerrada** |
-| confecciones_boston | 15 → 25 ago | **0,692** | **cerrada** |
-| vistana | 15 → 28 ago | 0,879 | **cerrada** |
-| confecciones_boston | 15 → 31 ago | 1,067 | reabierta |
-| vistana | 29 ago → 10 sep | 0,854 | reabierta |
+Las 6 quincenas guardadas son de **Roxana (la contadora) probando el módulo**, no planillas pagadas. Ninguna plata salió, así que **no hay nada que recuperar ni que corregir hacia atrás**. Las 5 armadas como rango libre —que prorratean el sueldo y apagan los montos a mano— son parte del aprendizaje.
 
-**La prueba de que no se descontó nada:** en toda la historia hay **dos** pagos de préstamo escritos por un cierre ($25 y $70), y los dos salen de la **única** quincena bien armada (fashion_wear 1-15 sep, con quincena y corte).
+🔴 **Lo que sí queda, y es de USO, no de plata: el corte no se entiende.** Roxana, por WhatsApp el 14-sep: *«Un poco complicado el tema del corte»* · *«Los préstamos no me salían pero cuando generé ya lo hizo»*. Está esperando la planilla de Yulissa para comparar. La pregunta abierta: **si la pantalla debe frenar (o avisar fuerte) cuando el período que se va a cerrar no es una quincena real.**
 
-La contadora ya lo detectó sola: reabrió la de Vistana con el motivo *«No se esta haciendo descuento de prestamo y el salario quincenal hay que revisarlo»*. El sistema hace lo que dice; lo que falla es que **5 de 6 veces la pantalla dejó armar el período de la forma que rompe los descuentos**. Decisión de Daniel: qué hacer con las 3 cerradas, y si la pantalla debe frenar un rango que no es una quincena.
-
-### 3. Una factura de agosto no le llegó a Rey en Comisiones
-> *«porque 2026-08-03 Factura 11-000000502 City Mall Paso Canoa 15220 no aparece en comisiones de rey de active shoes en agosto?»* · *«no, esa factura debe de estar en rey»* — **7-sep-2026**
-
-**Comprobado:** el número no aparece en ningún documento del repo. Es un arreglo **en Switch** (cambiarle el vendedor a esa factura), no en el sistema. Sin señal de que se hiciera. Es comisión de una persona.
+### 3. ~~Una factura de agosto no le llegó a Rey~~ → **cerrado: no es del sistema**
+Daniel, **14-sep-2026**: *«Olvídalo, no es problema del sistema»*. La factura 11-000000502 tiene otro vendedor **en Switch**; el sistema lee lo que Switch manda. No hay nada que arreglar aquí.
 
 ### 4. El cuadre del estado de cuenta llegó muerto
 **Medido el 14-sep-2026:** `switch_estadocuenta_saldo` se escribe en cada corrida, pero **las 835 filas traen `saldo_total` y `saldos` en NULL — cero llenas**. Switch no manda esos dos campos con el nombre que el sync busca, así que el aviso «esto no cuadra» **no puede saltar nunca** y el cajón se comporta como si siempre cuadrara.
