@@ -24,7 +24,7 @@ import {
 import { leerCorrecciones } from "@/lib/asistencia/correcciones-server";
 import {
   leerReglas, leerDirectorio, leerPersonas, vigenciasDeFilas, servicioProfesionalDeFila, cobraHorasExtraDeFila, leerJustificaciones,
-  leerVacaciones,
+  leerVacaciones, leerTrabajaAfuera,
 } from "@/lib/asistencia/config-server";
 import { codigosFueraDeRango } from "@/lib/asistencia/vigencia";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
     // Paginado con verificación contra el COUNT: un mes de dos relojes con 4
     // marcas diarias pasa de 1.000 filas, y PostgREST corta ahí EN SILENCIO.
     // Un reporte de horas recortado sin avisar es peor que uno que falla.
-    const [marcaciones, { reglas }, { directorio }, correcciones, personasDb, hRes, jRes, vRes, fRes] = await Promise.all([
+    const [marcaciones, { reglas }, { directorio }, correcciones, personasDb, afuera, hRes, jRes, vRes, fRes] = await Promise.all([
       leerTodoPaginado<MarcacionConId>(
         "asistencia_marcaciones (reporte)",
         (pedirCount, from, to) => {
@@ -117,6 +117,9 @@ export async function GET(req: NextRequest) {
       leerCorrecciones(desde, hasta),
       // Las fichas: de acá sale QUIÉN estaba trabajando en el rango. Ver abajo.
       leerPersonas(),
+      // 🔴 QUIÉN TRABAJA AFUERA (14-sep-2026). Lectura APARTE y tolerante: con
+      // la migración sin aplicar viene vacía y el reporte es el de siempre.
+      leerTrabajaAfuera(),
       supabaseServer.from("asistencia_horarios").select("empleado_codigo, entrada, salida, almuerzo_minutos"),
       // 🔑 Por la fuente ÚNICA, no con un `select` copiado: es lo que hace que
       // el reporte y la planilla no puedan leer distinto la misma fila.
@@ -224,6 +227,10 @@ export async function GET(req: NextRequest) {
       diaEnCurso: hoyPanama(),
       // Solo para MOSTRAR: las horas corregidas ya vienen dentro de `enRango`.
       correccionesPorDia: efectivas.porDia,
+      // 🔴 A quien trabaja afuera, el día hábil sin marca deja de ser ausencia
+      // (14-sep-2026): la MISMA lectura y la MISMA regla que usa la planilla,
+      // para que las dos pantallas no digan cosas distintas del mismo día.
+      trabajaAfuera: afuera,
     });
 
     // 🔴 QUIEN NO COBRA HORAS EXTRA NO LAS CUENTA EN EL REPORTE. Hasta el

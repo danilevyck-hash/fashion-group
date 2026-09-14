@@ -21,6 +21,7 @@
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { etiquetaEmpresa } from "./config";
 import { CHIP_NO_COBRA_HORAS_EXTRA, EXPLICACION_NO_COBRA_HORAS_EXTRA } from "./cobra-horas-extra";
+import { CHIP_TRABAJA_AFUERA, EXPLICACION_TRABAJA_AFUERA } from "./trabaja-afuera";
 
 /** Lo que la página necesita saber de una persona para dibujarla. */
 export interface PersonaFicha {
@@ -46,6 +47,8 @@ export interface PersonaFicha {
   servicioProfesional: boolean;
   /** `false` = no cobra horas extra (10-sep-2026). Ausente = sí, como todos. */
   cobraHorasExtra?: boolean;
+  /** `true` = trabaja afuera (14-sep-2026): el día sin marca se paga. Ausente = no. */
+  trabajaAfuera?: boolean;
   /** Las partes de un sueldo repartido entre dos empresas. Vacío = una sola. */
   reparto?: readonly { empresa: string; salarioMensual: number }[];
   /** «Renunció el 12 de agosto de 2026». `null` = sigue trabajando. */
@@ -160,6 +163,15 @@ export function excepcionesDeLaFicha(p: PersonaFicha): EtiquetaExcepcion[] {
       texto: CHIP_NO_COBRA_HORAS_EXTRA,
       ayuda: EXPLICACION_NO_COBRA_HORAS_EXTRA,
       ojo: true,
+    });
+  }
+  // 🔴 Trabaja afuera (14-sep-2026): gris, no ámbar — no es plata que se le
+  // quita, es un día sin marca que SÍ se le paga. Igual que «No marca reloj».
+  if (p.trabajaAfuera === true) {
+    out.push({
+      clave: "trabaja-afuera",
+      texto: CHIP_TRABAJA_AFUERA,
+      ayuda: EXPLICACION_TRABAJA_AFUERA,
     });
   }
   if (!p.pagaSeguros) {

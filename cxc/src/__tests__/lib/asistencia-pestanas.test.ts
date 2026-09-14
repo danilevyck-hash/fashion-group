@@ -391,9 +391,18 @@ describe("la rata que se MUESTRA es la que se USA para calcular", () => {
   });
 
   it("el servidor devuelve la rata del CÁLCULO, no la de 4 decimales", () => {
+    // ⚠️ CAMBIÓ DE DIRECCIÓN, NO SE BORRÓ (14-sep-2026). Armar la persona se
+    // mudó a `lib/asistencia/ficha-de-configuracion.ts`, que es el ÚNICO lugar
+    // donde una fila se vuelve una persona desde que la ficha de un colaborador
+    // tiene su propia ruta. La regla no se movió: la rata que se muestra es la
+    // del cálculo, a centavos, y no la de 4 decimales.
+    const armador = leer("lib/asistencia/ficha-de-configuracion.ts");
+    expect(armador).toMatch(/rataHora: rataPorHoraCalculo\(/);
+    expect(armador).not.toMatch(/rataHora: rataPorHora\(/);
+    // 🔑 Y el CONTROL: la ruta de la lista sigue armando la persona con ESA
+    // función, no con una copia suya.
     const route = leer("app/api/asistencia/configuracion/route.ts");
-    expect(route).toMatch(/rataHora: rataPorHoraCalculo\(/);
-    expect(route).not.toMatch(/rataHora: rataPorHora\(/);
+    expect(route).toMatch(/armarPersonaDeConfiguracion\(/);
   });
 });
 

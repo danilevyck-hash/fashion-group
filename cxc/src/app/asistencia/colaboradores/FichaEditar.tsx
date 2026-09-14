@@ -29,6 +29,9 @@ import {
   ETIQUETA_COBRA_HORAS_EXTRA, ETIQUETA_NO_COBRA_HORAS_EXTRA, EXPLICACION_NO_COBRA_HORAS_EXTRA,
   PREGUNTA_COBRA_HORAS_EXTRA,
 } from "@/lib/asistencia/cobra-horas-extra";
+import {
+  ETIQUETA_NO_TRABAJA_AFUERA, ETIQUETA_TRABAJA_AFUERA, EXPLICACION_TRABAJA_AFUERA, PREGUNTA_TRABAJA_AFUERA,
+} from "@/lib/asistencia/trabaja-afuera";
 import { useState } from "react";
 
 import { EMPRESAS_ASISTENCIA, etiquetaEmpresa, JORNADAS } from "@/lib/asistencia/config";
@@ -73,6 +76,8 @@ export interface BorradorFicha {
   noMarcaReloj: boolean;
   /** Sí por defecto para todos (10-sep-2026). */
   cobraHorasExtra: boolean;
+  /** No por defecto para todos (14-sep-2026): el día sin marca es ausencia. */
+  trabajaAfuera: boolean;
   fechaSalida: string;
   motivoSalida: string;
 }
@@ -96,6 +101,7 @@ export function borradorDe(p: PersonaDeLaPagina | null, codigo: string): Borrado
     baseSeguros: p?.baseSeguros === null || p?.baseSeguros === undefined ? "" : String(p.baseSeguros),
     noMarcaReloj: p?.noMarcaReloj ?? false,
     cobraHorasExtra: p?.cobraHorasExtra ?? true,
+    trabajaAfuera: p?.trabajaAfuera ?? false,
     fechaSalida: p?.fechaSalida ?? "",
     motivoSalida: p?.motivoSalida ?? "",
   };
@@ -103,7 +109,8 @@ export function borradorDe(p: PersonaDeLaPagina | null, codigo: string): Borrado
 
 /** ¿Esta ficha tiene alguna excepción prendida? Decide si el bloque abre solo. */
 function tieneExcepciones(b: BorradorFicha): boolean {
-  return b.servicioProfesional || !b.pagaSeguros || b.baseSeguros.trim() !== "" || b.noMarcaReloj || !b.cobraHorasExtra;
+  return b.servicioProfesional || !b.pagaSeguros || b.baseSeguros.trim() !== "" || b.noMarcaReloj || !b.cobraHorasExtra
+    || b.trabajaAfuera;
 }
 
 const CAMPO =
@@ -266,6 +273,17 @@ export default function FichaEditar({
                 onChange={(e) => set({ cobraHorasExtra: e.target.value === "si" })}>
                 <option value="si">{ETIQUETA_COBRA_HORAS_EXTRA}</option>
                 <option value="no">{ETIQUETA_NO_COBRA_HORAS_EXTRA}</option>
+              </select>
+            </Campo>
+            {/* 🔴 «Trabaja afuera», en No para todos (14-sep-2026). Prendida:
+                el día hábil sin marca se paga completo, sin cargar nada; el
+                día que marca se mide del reloj como siempre. NO es «marca el
+                reloj»: aquélla apaga el reloj SIEMPRE. Ver `trabaja-afuera.ts`. */}
+            <Campo etiqueta={PREGUNTA_TRABAJA_AFUERA} ayuda={b.trabajaAfuera ? EXPLICACION_TRABAJA_AFUERA : undefined}>
+              <select className={CAMPO} value={b.trabajaAfuera ? "si" : "no"}
+                onChange={(e) => set({ trabajaAfuera: e.target.value === "si" })}>
+                <option value="no">{ETIQUETA_NO_TRABAJA_AFUERA}</option>
+                <option value="si">{ETIQUETA_TRABAJA_AFUERA}</option>
               </select>
             </Campo>
             {/* ⚠️ LO DE TERCEROS NO ESTÁ ACÁ A PROPÓSITO. El monto y la cuota

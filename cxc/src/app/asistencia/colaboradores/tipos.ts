@@ -22,6 +22,8 @@ export interface PersonaDeLaPagina {
   noMarcaReloj: boolean;
   /** `false` = no cobra horas extra (10-sep-2026). Ausente = sí. */
   cobraHorasExtra?: boolean;
+  /** `true` = trabaja afuera (14-sep-2026): el día sin marca se paga. Ausente = no. */
+  trabajaAfuera?: boolean;
   posicion?: string | null;
   cedula?: string | null;
   /** La rata por hora, ya calculada por el servidor. */

@@ -185,10 +185,25 @@ describe("D. 🔴 la pantalla usa el módulo puro, y los chips viejos no vuelven
 });
 
 describe("E. el servidor manda si tiene horario, fallando ABIERTO", () => {
+  // ⚠️ CAMBIÓ DE DIRECCIÓN, NO SE BORRÓ (14-sep-2026). La LECTURA de
+  // `asistencia_horarios` se mudó a `lib/asistencia/ficha-de-configuracion-server.ts`,
+  // porque desde ese día la comparten la lista y la ficha de UNA persona
+  // (`/api/asistencia/configuracion/persona`, que abre en ~200 ms en vez de
+  // 2.008). La REGLA que este caso protege no cambió ni un poco: se lee esa
+  // tabla y, si no se puede leer, viene `null` y no se acusa a nadie de que le
+  // falta el horario. Se comprueba donde ahora vive, y que la ruta la siga
+  // usando igual.
   const src = puro(RUTA);
+  const lector = puro("src/lib/asistencia/ficha-de-configuracion-server.ts");
   it("lee `asistencia_horarios` y lo manda como `tieneHorario`; sin lectura, `null`", () => {
-    expect(src).toMatch(/from\("asistencia_horarios"\)/);
-    expect(src).toMatch(/if \(error\) return null;/);
+    expect(lector).toMatch(/from\("asistencia_horarios"\)/);
+    expect(lector).toMatch(/if \(error\) return null;/);
     expect(src).toMatch(/tieneHorario: conHorario \? conHorario\.has\(codigo\) : null/);
+  });
+  it("la ficha de UNA persona pregunta lo mismo, y también falla abierto", () => {
+    expect(lector).toMatch(/export async function tieneHorarioDe/);
+    // 🔑 El mismo fallo abierto: sin lectura, `null`. Los dos caminos tienen que
+    // decir lo mismo — lo exige `asistencia-ficha-una-persona.test.ts`.
+    expect(lector).toMatch(/tieneHorario: conHorario,/);
   });
 });

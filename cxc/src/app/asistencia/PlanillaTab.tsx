@@ -66,6 +66,7 @@ import {
   type TotalesPlanilla,
 } from "@/lib/asistencia/planilla";
 import { CHIP_NO_MARCA_RELOJ } from "@/lib/asistencia/sueldo-fijo";
+import { CHIP_TRABAJA_AFUERA } from "@/lib/asistencia/trabaja-afuera";
 import { CHIP_REPARTIDO, type RepartoRechazado } from "@/lib/asistencia/reparto";
 // 🔑 `baseSeguros` es EL MISMO LECTOR que usan el servidor y el motor. Acá hace
 // falta de verdad: una línea armada a mano —hay fixtures de tests que lo hacen,
@@ -1756,6 +1757,13 @@ function Fila({
             {CHIP_NO_MARCA_RELOJ}
           </span>
         )}
+        {/* 🔴 Trabaja afuera (14-sep-2026): un 0,00 de ausencias en alguien
+            que casi no marca está en cero A PROPÓSITO. Sale de la ficha. */}
+        {l.trabajaAfuera && (
+          <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500">
+            {CHIP_TRABAJA_AFUERA}
+          </span>
+        )}
         {/* 🔴 SU SUELDO SE PAGA ENTRE DOS EMPRESAS, Y ESTA LÍNEA ES SOLO UNA
             PARTE. Sin el chip, un quincenal de $400 donde la ficha dice $1.000
             se lee como un error de carga. Dice cuánto paga ESTA empresa y si
@@ -1891,6 +1899,7 @@ function Tarjeta({
           <span className="text-xs text-gray-400">
             {l.codigo} · bruto ${$(d.totalBruto)}
             {l.noMarcaReloj && ` · ${CHIP_NO_MARCA_RELOJ}`}
+            {l.trabajaAfuera && ` · ${CHIP_TRABAJA_AFUERA}`}
             {/* El mismo sello que en el escritorio, con las MISMAS palabras. */}
             {l.parte && ` · ${CHIP_REPARTIDO}`}
             {/* El mismo sello que en el escritorio, y con las MISMAS palabras:

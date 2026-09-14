@@ -25,6 +25,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { COLUMNA_COBRA_HORAS_EXTRA, validarCobraHorasExtra } from "@/lib/asistencia/cobra-horas-extra";
+import {
+  avisoMigracionTrabajaAfuera, COLUMNA_TRABAJA_AFUERA, esColumnaTrabajaAfueraFaltante, validarTrabajaAfuera,
+} from "@/lib/asistencia/trabaja-afuera";
+import { leerTrabajaAfuera } from "@/lib/asistencia/config-server";
 import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { requireAsistencia } from "@/lib/asistencia/guard";
@@ -34,26 +38,31 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { diaPanama } from "@/lib/asistencia/reporte";
 import {
   validarPersona,
-  valorMinuto,
   REGLAS_DEFAULT,
-  type Jornada,
 } from "@/lib/asistencia/config";
-import { rataPorHoraCalculo } from "@/lib/asistencia/rata";
-import { agruparPorCodigo, partesDe, validarReparto } from "@/lib/asistencia/reparto";
-import type { ParteReparto } from "@/lib/asistencia/planilla";
+import { agruparPorCodigo } from "@/lib/asistencia/reparto";
 import {
   leerReglas,
   leerPersonas,
   TABLA_PERSONAS,
   DIAS_VENTANA_PERSONAS,
-  vigenciaDeFila,
-  servicioProfesionalDeFila,
-  pagaSegurosDeFila,
-  baseSegurosDeFila,
-  noMarcaRelojDeFila,
-  cobraHorasExtraDeFila,
   leerRepartos,
 } from "@/lib/asistencia/config-server";
+// 🔴 EL MAPEO DE UNA FILA A UNA PERSONA VIVE EN UN SOLO LUGAR, y esta ruta y la
+// de una sola persona lo LLAMAN las dos. Ver el encabezado de ese archivo y su
+// candado (`asistencia-ficha-una-persona.test.ts`).
+import {
+  agruparMarcas,
+  armarPersonaDeConfiguracion,
+  BANDERAS_DE_CONFIGURACION,
+  type FilaMarca,
+} from "@/lib/asistencia/ficha-de-configuracion";
+// Las MISMAS seis lecturas, del mismo archivo que usa la ficha de una persona.
+import {
+  arranqueDeLaVentana,
+  leerCodigosConHorario,
+  leerMarcasDeLaVentana,
+} from "@/lib/asistencia/ficha-de-configuracion-server";
 import {
   COLUMNA_SERVICIO_PROFESIONAL,
   validarServicioProfesional,
@@ -75,9 +84,6 @@ import { hoyPanama } from "@/lib/fecha-panama";
 import { crearDirectorio, compararPersonas } from "@/lib/asistencia/directorio";
 import {
   avisoMarcasPosteriores,
-  fraseBaja,
-  marcoDespuesDeLaBaja,
-  tieneBaja,
   validarVigencia,
   type MarcaPosterior,
 } from "@/lib/asistencia/vigencia";
@@ -89,28 +95,12 @@ export const maxDuration = 60;
  *  pantalla que ve 180 días y otra que ve 90 mostrarían universos distintos. */
 const DIAS_VENTANA = DIAS_VENTANA_PERSONAS;
 
-interface FilaMarca {
-  empleado_codigo: string | null;
-  empleado_nombre: string | null;
-  ocurrio_en: string;
-  dispositivo: string | null;
-}
-
-/** Los códigos con fila en `asistencia_horarios`. `null` si no se pudo leer. */
-async function leerCodigosConHorario(): Promise<Set<string> | null> {
-  const { data, error } = await supabaseServer
-    .from("asistencia_horarios")
-    .select("empleado_codigo");
-  if (error) return null;
-  return new Set((data ?? []).map((h) => String(h.empleado_codigo ?? "").trim()).filter(Boolean));
-}
-
 export async function GET(req: NextRequest) {
   const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
 
   try {
-    const desde = new Date(Date.now() - DIAS_VENTANA * 86_400_000).toISOString();
+    const desde = arranqueDeLaVentana();
 
     // 🔑 LA LECTURA DEL RELOJ VA EN EL MISMO VIAJE QUE LAS OTRAS CINCO
     // (14-sep-2026). Estaba ARRIBA del `Promise.all`, con su propio `await`, así
@@ -123,21 +113,10 @@ export async function GET(req: NextRequest) {
     //
     // Paginado con verificación contra el COUNT: PostgREST corta en 1.000 filas
     // EN SILENCIO, y con 3.287 marcaciones cargadas eso dejaría códigos afuera.
-    const [marcas, { reglas }, { filas }, repRes, deudaDe, conHorario] = await Promise.all([
-      leerTodoPaginado<FilaMarca>(
-        "asistencia_marcaciones (configuración)",
-        (pedirCount, from, to) =>
-          supabaseServer
-            .from("asistencia_marcaciones")
-            .select(
-              "empleado_codigo, empleado_nombre, ocurrio_en, dispositivo",
-              pedirCount ? { count: "exact" } : {},
-            )
-            .gte("ocurrio_en", desde)
-            .order("ocurrio_en", { ascending: true })
-            .order("id", { ascending: true })
-            .range(from, to),
-      ),
+    const [marcas, { reglas }, { filas }, repRes, deudaDe, conHorario, afuera] = await Promise.all([
+      // 🔑 La MISMA lectura que usa la ficha de una persona, sin acotar por
+      // código. Ver `ficha-de-configuracion-server.ts`.
+      leerMarcasDeLaVentana(desde),
       leerReglas(),
       leerPersonas(),
       leerRepartos(),
@@ -151,6 +130,9 @@ export async function GET(req: NextRequest) {
       // pregunta que hace el Reporte: ¿hay fila en `asistencia_horarios`?
       // Falla ABIERTA: si la lectura falla viene `null` y no se acusa a nadie.
       leerCodigosConHorario(),
+      // 🔴 QUIÉN TRABAJA AFUERA (14-sep-2026). Lectura APARTE y tolerante: con
+      // la migración sin aplicar viene vacía y nadie lleva el chip.
+      leerTrabajaAfuera(),
     ]);
 
     // El día de hoy en Panamá. Solo decide cómo se REDACTA la baja («Renunció»
@@ -158,35 +140,7 @@ export async function GET(req: NextRequest) {
     const hoy = diaPanama(new Date().toISOString());
 
     // Qué se sabe de cada código POR EL RELOJ.
-    interface Visto {
-      marcaciones: number;
-      ultima: string;
-      nombreReloj: string | null;
-      dispositivo: string | null;
-    }
-    const vistos = new Map<string, Visto>();
-    for (const m of marcas) {
-      const cod = (m.empleado_codigo ?? "").trim();
-      if (!cod) continue;
-      const v = vistos.get(cod);
-      if (!v) {
-        vistos.set(cod, {
-          marcaciones: 1,
-          ultima: m.ocurrio_en,
-          // El reloj lo manda vacío en todas las filas medidas; se guarda igual
-          // por si alguna vez llega, y sirve de semilla del nombre.
-          nombreReloj: (m.empleado_nombre ?? "").trim() || null,
-          dispositivo: m.dispositivo,
-        });
-      } else {
-        v.marcaciones += 1;
-        if (m.ocurrio_en > v.ultima) v.ultima = m.ocurrio_en;
-        if (!v.nombreReloj && (m.empleado_nombre ?? "").trim()) {
-          v.nombreReloj = (m.empleado_nombre ?? "").trim();
-        }
-        if (!v.dispositivo) v.dispositivo = m.dispositivo;
-      }
-    }
+    const vistos = agruparMarcas(marcas);
 
     // 🔴 QUIÉN REPARTE SU SUELDO ENTRE DOS EMPRESAS. Se valida con la MISMA
     // función que usa la planilla: si la ficha enseñara un reparto que el motor
@@ -207,139 +161,25 @@ export async function GET(req: NextRequest) {
     // pendientes de configurar, que es lo que son.
     const marcasPosteriores: MarcaPosterior[] = [];
 
+    // 🔴 UNA POR UNA, CON LA MISMA FUNCIÓN QUE USA LA FICHA DE UNA PERSONA.
+    // Ver `lib/asistencia/ficha-de-configuracion.ts`: acá no se decide nada.
     const personas = [...codigos].map((codigo) => {
-      const v = vistos.get(codigo);
-      const f = fichas.get(codigo);
-      const salario =
-        f?.salario_mensual === null || f?.salario_mensual === undefined
-          ? null
-          : Number(f.salario_mensual);
-      const jornada = (Number(f?.jornada_semanal) === 40 ? 40 : 48) as Jornada;
-
-      // La baja de esta persona, si la tiene.
-      const vig = f ? vigenciaDeFila(f) : null;
-      // 🔴 Sin ficha NO se puede estar fuera de planilla: la bandera vive en la
-      // ficha. Un código que marca y nadie configuró sigue siendo un pendiente.
-      const servicioProfesional = f ? servicioProfesionalDeFila(f) : false;
-      // 🔑 Sin ficha, SÍ paga seguros: es el default de siempre y lo que hace
-      // que un código todavía sin configurar no aparezca como una excepción.
-      const pagaSeguros = f ? pagaSegurosDeFila(f) : true;
-      // 🔑 Sin ficha NO hay base propia: los seguros salen del bruto, que es el
-      // default de siempre. Es el monto de UNA QUINCENA — ver `seguros-base.ts`.
-      const baseSeguros = f ? baseSegurosDeFila(f) : null;
-      // 🔴 Sin ficha NO se puede cobrar fijo: la bandera vive en la ficha. Un
-      // código que marca y nadie configuró sigue siendo un pendiente.
-      const noMarcaReloj = f ? noMarcaRelojDeFila(f) : false;
-      // 🔑 Sin ficha SÍ cobra horas extra: es el default de siempre (10-sep-2026).
-      const cobraHorasExtra = f ? cobraHorasExtraDeFila(f) : true;
-      // 🔴 EL REPARTO, ya validado. Vacío = cobra entero en su empresa, que es
-      // el caso de 36 de las 37 fichas. `motivoReparto` trae el porqué cuando
-      // hay filas cargadas y el guard las rechaza — rechazar sí, esconder no.
-      const filasReparto = repartoPorCodigo.get(codigo);
-      const reparto: ParteReparto[] = partesDe(salario, filasReparto);
-      const motivoReparto =
-        filasReparto && filasReparto.length > 0 && reparto.length === 0
-          ? (validarReparto(salario, filasReparto) as { ok: false; error: string }).error
-          : null;
-      const ultimaMarca = v ? diaPanama(v.ultima) : null;
-      const etiqueta = directorio.nombre(codigo) ?? v?.nombreReloj ?? `Código ${codigo}`;
-      if (vig && marcoDespuesDeLaBaja(vig, ultimaMarca)) {
-        marcasPosteriores.push({
-          etiqueta,
-          fechaSalida: vig.fechaSalida!,
-          ultimaMarca: ultimaMarca!,
-        });
-      }
-
-      return {
+      const { persona, marcaPosterior } = armarPersonaDeConfiguracion({
         codigo,
-        // Del directorio, no de un `??` escrito acá: la regla de respaldo vive
-        // en un solo lugar. El nombre del reloj queda de último por si algún día
-        // el aparato empieza a mandarlo (hoy viene vacío en las 3.287 filas).
-        nombre: directorio.nombre(codigo) ?? v?.nombreReloj ?? null,
-        salarioMensual: Number.isFinite(salario as number) ? (salario as number) : null,
-        jornadaSemanal: jornada,
-        empresa: f?.empresa ?? null,
-        // `false` = el código marca en el reloj pero nadie dijo quién es. Es
-        // exactamente lo que la pantalla tiene que destacar.
-        configurado: !!f,
-        // 🔴 «Va en planilla» o «servicio profesional». La segunda mitad del
-        // dato: sigue en el control de asistencia, fuera de todo cálculo de pago.
-        servicioProfesional,
-        // 🔴 ¿Se le descuentan el social y el educativo? Los dos JUNTOS —ver
-        // `seguros.ts`—. `true` mientras nadie diga lo contrario: es el
-        // comportamiento que la planilla tenía para las 38 fichas.
-        pagaSeguros,
-        // 🔴 Sobre QUÉ MONTO se le calculan, por quincena. `null` = sobre el
-        // bruto, como toda la vida. No enciende nada: con `pagaSeguros` en
-        // `false` las dos columnas siguen en $0,00 aunque haya base.
-        baseSeguros,
-        // 🔴 Cobra fijo y no pasa por el reloj. Sigue en la planilla, con
-        // seguros y todo; lo que se le ignora son las marcaciones.
-        noMarcaReloj,
-        // 🔴 ¿Cobra horas extra? `true` para todos salvo que alguien lo apague
-        // en la ficha (10-sep-2026, Daniel: «por default a todos sí»).
-        cobraHorasExtra,
-        // 🔴 LOS DOS TEXTOS QUE SOLO EXISTEN PARA EL COMPROBANTE DE PAGO: el
-        // cargo («POSICION DESEMPEÑADA») y la cédula del pie. `null` = todavía
-        // no se cargó, y el papel escribe un guion o deja la línea en blanco.
-        // Ninguno de los dos toca el cálculo. Ver `datos-del-papel.ts`.
-        posicion: f?.posicion ?? null,
-        cedula: f?.cedula ?? null,
-        // 🔴 ¿Tiene hora de salida cargada? `null` = no se pudo leer (no se acusa).
-        // Lo lee `lib/asistencia/que-le-falta.ts` para el chip «Falta para pagar».
-        tieneHorario: conHorario ? conHorario.has(codigo) : null,
-        // 🔴 Su sueldo se paga entre dos empresas y sale en las dos planillas.
-        // Es de SOLO LECTURA en esta pantalla: la regla la fija la contadora y
-        // los montos tienen que sumar el salario de la ficha. Ver `reparto.ts`.
-        reparto,
-        motivoReparto,
-        // Falta el sueldo, pero la empresa ya está: se puede emitir la planilla
-        // de las otras y saber a quién le falta el dato.
-        //
-        // 🔴 A QUIEN NO VA EN PLANILLA NO LE FALTA EL SALARIO: no lo necesita.
-        // Sin esta condición, YULISSA saldría para siempre en «les falta el
-        // salario» y ese aviso —el que la contable usa para saber cuánto le
-        // queda— dejaría de significar algo.
-        faltaSalario:
-          !!f && !servicioProfesional && (salario === null || !Number.isFinite(salario as number)),
-        marcaciones: v?.marcaciones ?? 0,
-        ultimaMarca,
-        dispositivo: v?.dispositivo ?? null,
-        // ── ALTAS Y BAJAS ────────────────────────────────────────────────────
-        // 🔑 `activo` es DERIVADO de la fecha, no un campo aparte: dos fuentes
-        // para el mismo hecho es la forma de que se contradigan.
-        fechaIngreso: vig?.fechaIngreso ?? null,
-        // 🔴 EL SALDO DE VACACIONES, y su FECHA DE CORTE. Los dos juntos o
-        // ninguno: un saldo sin fecha es un saldo a un día que nadie sabe, y de
-        // esa fecha depende qué vacaciones se restan después. Ver
-        // `lib/asistencia/saldo-vacaciones.ts`.
-        // 🩸 Normalizado a NÚMERO: la columna es `numeric` y PostgREST la manda
-        // como texto. Sin esto la pantalla recibiría `"12.5"` donde su tipo
-        // dice `number`, y cualquier comparación numérica de acá en adelante
-        // fallaría en silencio.
-        saldoVacacionesDias: numeroDeDias(f?.saldo_vacaciones_dias),
-        saldoVacacionesCorte: f?.saldo_vacaciones_corte ?? null,
-        fechaSalida: vig?.fechaSalida ?? null,
-        motivoSalida: vig?.motivoSalida ?? null,
-        activo: !tieneBaja(vig),
-        /** «Renunció el 12 de agosto de 2026». `null` si sigue trabajando. */
-        baja: fraseBaja(vig, hoy),
-        marcoDespuesDeLaBaja: marcoDespuesDeLaBaja(vig, ultimaMarca),
-        // Derivados, solo para mirar: confirman que los números configurados
-        // producen una rata creíble antes de que se calcule ninguna planilla.
-        //
-        // 🔴 `rataPorHoraCalculo` y NO `rataPorHora`: la primera devuelve la
-        // rata A CENTAVOS, que es la que multiplica de verdad en `planilla.ts`.
-        // La segunda devuelve 4 decimales y la pantalla enseñaba `$3.0201` donde
-        // la planilla de la contable dice `$3.02`. Ver `lib/asistencia/rata.ts`.
-        // 🔴 LO QUE DEBE EN PRÉSTAMOS. Se muestra al dar de baja, con nombre y
-        // monto: rechazar sí, esconder no — y acá ni siquiera se rechaza nada,
-        // solo se dice a tiempo. 0 = no debe.
+        visto: vistos.get(codigo),
+        ficha: fichas.get(codigo),
+        directorio,
+        reglas,
+        filasReparto: repartoPorCodigo.get(codigo),
         deudaPrestamo: deudaDe.get(codigo) ?? 0,
-        rataHora: rataPorHoraCalculo(salario, jornada, reglas),
-        valorMinuto: valorMinuto(salario, jornada, reglas),
-      };
+        tieneHorario: conHorario ? conHorario.has(codigo) : null,
+        hoy,
+      });
+      if (marcaPosterior) marcasPosteriores.push(marcaPosterior);
+      // 🔴 «Trabaja afuera» se PEGA acá y no adentro de `armarPersonaDeConfiguracion`:
+      // su columna se lee aparte (migración sin aplicar, ver `leerTrabajaAfuera`)
+      // y la ruta de una persona hace exactamente lo mismo con la misma lectura.
+      return { ...persona, trabajaAfuera: afuera.has(codigo) };
     });
 
     // ⚠️ ACÁ el orden es al revés que en el resto del módulo, y a propósito:
@@ -394,21 +234,10 @@ export async function GET(req: NextRequest) {
       // dejar fallar el guardado. Las siete migraciones existen; si una lectura
       // falla hoy, esta respuesta no se arma (500 más abajo). Se conservan
       // con su valor «todo bien» porque `ConfiguracionTab` los lee.
-      faltaMigracion: false,
-      avisoMigracion: null,
-      avisoMigracionBajas: null,
-      puedeDarDeBaja: true,
-      avisoMigracionServicioProfesional: null,
-      puedeMarcarServicioProfesional: true,
-      avisoMigracionSeguros: null,
-      puedeQuitarSeguros: true,
-      avisoMigracionBaseSeguros: null,
-      puedeCargarBaseSeguros: true,
-      avisoMigracionNoMarcaReloj: null,
-      puedeMarcarSueldoFijo: true,
-      avisoMigracionSaldoVacaciones: null,
-      avisoMigracionReparto: null,
-      puedeCargarSaldoVacaciones: true,
+      //
+      // 🔴 Desde el 14-sep-2026 salen de UN solo lugar, porque las manda también
+      // la ruta de una persona: escritas dos veces, una se quedaría atrás.
+      ...BANDERAS_DE_CONFIGURACION,
       // 🩸 El que no se puede esconder: dada de baja y sigue marcando.
       avisoBajas: avisoMarcasPosteriores(marcasPosteriores),
     });
@@ -474,6 +303,11 @@ export async function PUT(req: NextRequest) {
   const rhe = validarCobraHorasExtra(body);
   if (!rhe.ok) return NextResponse.json({ error: rhe.error }, { status: 400 });
   const cobraHorasExtraValor = rhe.valor;
+
+  // Y lo mismo con «trabaja afuera» (14-sep-2026): OTRA pregunta, ausente = no.
+  const rta = validarTrabajaAfuera(body);
+  if (!rta.ok) return NextResponse.json({ error: rta.error }, { status: 400 });
+  const trabajaAfueraValor = rta.valor;
 
   // Y lo mismo con el saldo de vacaciones: es OTRA pregunta —cuántos días le
   // quedan— y no debería poder tumbar el guardado de un nombre.
@@ -607,5 +441,37 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "No se pudo guardar. Intenta de nuevo." }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, persona: { ...p, ...v, servicioProfesional, pagaSeguros, baseSeguros, noMarcaReloj: noMarcaRelojValor, cobraHorasExtra: cobraHorasExtraValor, saldoVacacionesDias, saldoVacacionesCorte } });
+  // ── 🔴 «TRABAJA AFUERA» SE ESCRIBE APARTE, DESPUÉS, Y SOLO SI CAMBIÓ (14-sep-2026)
+  //
+  // Su columna nace con la migración SIN APLICAR (`MIGRACION_TRABAJA_AFUERA`):
+  // si viajara en el upsert de arriba, guardar un NOMBRE fallaría en producción
+  // por un archivo SQL que Daniel todavía no corrió. Por eso va en un segundo
+  // `update`, sobre la fila que el upsert acaba de asegurar, solo su columna, y
+  // SOLO cuando lo que vino es distinto de lo que hay (`leerTrabajaAfuera`, la
+  // misma lectura tolerante del GET): con la casilla en su valor de siempre no
+  // se escribe nada, y la ficha se guarda exactamente como hasta hoy.
+  //
+  //   · Cambió y la columna existe → se escribe (true o false).
+  //   · Cambió a `true` y la columna NO existe → error con el nombre del
+  //     archivo. Un «guardado» que se traga la casilla es peor que un error: la
+  //     persona seguiría con ausencias y nadie lo vería hasta el día de pago.
+  //     Lo demás de la ficha YA quedó guardado, y el aviso lo dice. (Sin `503`:
+  //     esta ruta no contesta «falta un paso» desde el 3-sep-2026, hay candado.)
+  //   · Cualquier otro error → 500, como el upsert.
+  const afueraHoy = (await leerTrabajaAfuera()).has(p.codigo);
+  if (afueraHoy !== trabajaAfueraValor) {
+    const escr = await supabaseServer
+      .from(TABLA_PERSONAS)
+      .update({ [COLUMNA_TRABAJA_AFUERA]: trabajaAfueraValor })
+      .eq("empleado_codigo", p.codigo);
+    if (escr.error) {
+      if (esColumnaTrabajaAfueraFaltante(escr.error)) {
+        return NextResponse.json({ error: avisoMigracionTrabajaAfuera() }, { status: 500 });
+      }
+      console.error("[asistencia/configuracion PUT trabaja_afuera]", escr.error.message);
+      return NextResponse.json({ error: "No se pudo guardar. Intenta de nuevo." }, { status: 500 });
+    }
+  }
+
+  return NextResponse.json({ ok: true, persona: { ...p, ...v, servicioProfesional, pagaSeguros, baseSeguros, noMarcaReloj: noMarcaRelojValor, cobraHorasExtra: cobraHorasExtraValor, trabajaAfuera: trabajaAfueraValor, saldoVacacionesDias, saldoVacacionesCorte } });
 }

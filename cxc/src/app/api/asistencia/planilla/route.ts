@@ -51,6 +51,7 @@ import {
   baseSegurosDeFila,
   noMarcaRelojDeFila,
   cobraHorasExtraDeFila,
+  leerTrabajaAfuera,
   leerJustificaciones,
   leerVacaciones,
   leerRepartos,
@@ -337,9 +338,12 @@ export async function GET(req: NextRequest) {
           .range(from, to),
     );
 
-    const [{ reglas }, personasDb, correcciones, manualesLeidos, aprRes, repRes, hRes, jRes, vRes, fRes] = await Promise.all([
+    const [{ reglas }, personasDb, afuera, correcciones, manualesLeidos, aprRes, repRes, hRes, jRes, vRes, fRes] = await Promise.all([
       leerReglas(),
       leerPersonas(),
+      // 🔴 QUIÉN TRABAJA AFUERA (14-sep-2026). Lectura APARTE y tolerante: con
+      // la migración sin aplicar viene vacía y la planilla es la de siempre.
+      leerTrabajaAfuera(),
       // 🔴 ACÁ ES DONDE LA CORRECCIÓN LLEGA AL PAGO. Si no llegara, corregir una
       // hora no serviría para nada: la pantalla diría una cosa y la planilla
       // pagaría otra. Sin la tabla corrida devuelve CERO correcciones, o sea la
@@ -457,6 +461,9 @@ export async function GET(req: NextRequest) {
         // 🔴 Sin esto la casilla «cobra horas extra» no llegaría al motor y a
         // quien la tiene apagada se le seguirían pagando (10-sep-2026).
         cobraHorasExtra: cobraHorasExtraDeFila(f),
+        // 🔴 Trabaja afuera (14-sep-2026): sin esto, a quien no marcó ni un día
+        // se le seguiría pidiendo «no marcó ni un día» en vez de pagarle.
+        trabajaAfuera: afuera.has(codigo),
         // 🔴 Sin esto el reparto no llegaría al motor y JULIO seguiría cobrando
         // sus $1.000 en una sola planilla, con el 11 % de seguros encima de sus
         // horas extra. Ver `reparto.ts`.
@@ -503,6 +510,9 @@ export async function GET(req: NextRequest) {
       diaEnCurso: hoy,
       // Solo para mostrar: las horas corregidas ya están adentro de arriba.
       correccionesPorDia: efectivas.porDia,
+      // 🔴 A quien trabaja afuera, el día hábil sin marca deja de ser ausencia
+      // (14-sep-2026). Vacío = la planilla de siempre. Ver `trabaja-afuera.ts`.
+      trabajaAfuera: afuera,
     });
 
     // Cuánto dura el día de cada quien. Es lo que vale una ausencia.

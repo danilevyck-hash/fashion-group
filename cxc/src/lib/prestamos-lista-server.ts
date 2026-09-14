@@ -287,19 +287,28 @@ export async function leerSalarioMensual(codigo: string | null): Promise<number 
  * Asistencia porque Préstamos no contestó sería cambiar un aviso que falta por
  * una planilla que no sale.
  */
-export async function leerDeudaPorCodigo(): Promise<Map<string, number>> {
+export async function leerDeudaPorCodigo(soloCodigo?: string): Promise<Map<string, number>> {
   const deuda = new Map<string, number>();
   try {
     const filas = await leerTodoPaginado<{ empleado_codigo: string | null; prestamos_movimientos: MovimientoParaSaldo[] | null }>(
       "prestamos_empleados (deuda por código)",
-      (pedirCount, from, to) =>
-        supabaseServer
+      (pedirCount, from, to) => {
+        const q = supabaseServer
           .from("prestamos_empleados")
           .select("empleado_codigo, prestamos_movimientos(concepto, monto, estado, deleted, cuenta)", pedirCount ? { count: "exact" } : {})
           // `deleted` es NULLABLE en préstamos: un `.eq("deleted", false)` pierde filas.
-          .or("deleted.is.null,deleted.eq.false")
+          .or("deleted.is.null,deleted.eq.false");
+        // 🔴 EL MISMO CÁLCULO, MENOS FILAS. `soloCodigo` no cambia ni una línea
+        // de cómo se suma: recorta lo que la base manda, para la ficha de UNA
+        // persona (14-sep-2026). El `.trim()` de abajo sigue igual, y medido
+        // contra producción ese día ningún `empleado_codigo` trae espacios a los
+        // bordes — si algún día trajera, acá se perdería la fila y en la lista
+        // no, así que el candado `asistencia-ficha-una-persona` compara los dos
+        // caminos sobre el universo entero.
+        return (soloCodigo ? q.eq("empleado_codigo", soloCodigo) : q)
           .order("id", { ascending: true })
-          .range(from, to),
+          .range(from, to);
+      },
     );
     for (const f of filas) {
       const cod = String(f.empleado_codigo ?? "").trim();

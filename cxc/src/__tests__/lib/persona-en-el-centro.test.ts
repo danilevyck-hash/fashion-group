@@ -299,9 +299,23 @@ describe("D. 🔴 LA FICHA SE LEE, Y SE EDITA CON UN BOTÓN «Editar»", () => {
     // no caza nada: la misma ruta aparece en la lectura, así que un PUT mandado
     // a `/api/asistencia/persona` habría pasado con el candado flojo.
     expect(src).toMatch(/fetch\(\s*"\/api\/asistencia\/configuracion",\s*\{\s*method: "PUT"/);
-    // Y lee de esa misma ruta: una sola lectura de la ficha.
-    expect(src).toMatch(/fetch\("\/api\/asistencia\/configuracion", \{ cache: "no-store" \}\)/);
-    // Ninguna ruta inventada para la ficha.
+    // ⚠️ LA LECTURA CAMBIÓ DE DIRECCIÓN, NO SE BORRÓ (14-sep-2026). Acá se
+    // exigía que la página LEYERA de `/api/asistencia/configuracion`, o sea la
+    // lista entera, para quedarse con una fila: 6.998 marcaciones de 180 días
+    // (835 KB) para dibujar a una persona, 2.008 ms medidos contra producción.
+    // Ahora pide a SU persona y abre en ~200 ms.
+    //
+    // 🔴 EL MIEDO DE ESTE CASO SIGUE CUBIERTO, y mejor que antes: lo que no
+    // puede haber son dos CÁLCULOS de la misma ficha, y de ella sale lo que se
+    // le paga a la gente. Las dos rutas llaman la MISMA función
+    // (`armarPersonaDeConfiguracion`) y hay un candado que las corre a las dos
+    // sobre los 51 colaboradores y exige igualdad campo por campo:
+    // `asistencia-ficha-una-persona.test.ts`.
+    expect(src).toMatch(/fetch\(\s*`\/api\/asistencia\/configuracion\/persona\?codigo=/);
+    // 🔴 Y LO QUE NO CAMBIÓ: la puerta de ESCRITURA sigue siendo UNA. La ruta
+    // nueva es de solo lectura — no tiene PUT ni POST (lo barre el otro candado).
+    expect(src).not.toMatch(/method: "PUT"[\s\S]{0,200}configuracion\/persona/);
+    // Ninguna ruta inventada para la ficha: sigue colgando de `configuracion`.
     expect(src).not.toMatch(/\/api\/asistencia\/(persona|ficha)"/);
   });
 

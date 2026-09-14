@@ -1042,6 +1042,16 @@ export interface FichaPlanilla {
    */
   cobraHorasExtra?: boolean;
   /**
+   * 🔴 `true` = TRABAJA AFUERA (14-sep-2026). Ver `trabaja-afuera.ts`. Ausente
+   * o `false` = el día sin marca es ausencia, como las 47 fichas del día que
+   * nació. El efecto sobre los DÍAS lo aplica el motor del reporte (un día
+   * hábil sin marca deja de ser ausencia); acá lo único que decide es que a
+   * quien la tiene no se le pide «no marcó ni un día»: no marcar es su forma
+   * de trabajar, igual que en `noMarcaReloj` — con la diferencia de que el
+   * reloj SÍ se le mide los días que marca.
+   */
+  trabajaAfuera?: boolean;
+  /**
    * 🔴 SU SUELDO SE PAGA ENTRE DOS EMPRESAS Y SALE EN LAS DOS PLANILLAS. Ver
    * `reparto.ts` y `ParteReparto` acá abajo. Ausente o vacío = una sola línea,
    * que es como estaban las 37 fichas antes de que este campo existiera.
@@ -1296,6 +1306,12 @@ export interface LineaPlanilla {
    * aviso no la cuenta. Ausente o `true` = cobra. Sale de la ficha.
    */
   cobraHorasExtra?: boolean;
+  /**
+   * `true` = trabaja afuera (14-sep-2026): es lo que se muestra —un chip— para
+   * que un 0,00 de ausencias en alguien que casi no marca no se lea como un
+   * error de cálculo. Sale de la ficha, no de mirar los días.
+   */
+  trabajaAfuera: boolean;
   /**
    * 🔴 ESTA LÍNEA ES **UNA PARTE** DE UN SUELDO REPARTIDO ENTRE DOS EMPRESAS.
    * `null` = la persona cobra entero acá, que es el caso de 36 de las 37 fichas.
@@ -2037,6 +2053,7 @@ export function armarLinea(
         : null,
     noMarcaReloj: noMarca,
     cobraHorasExtra: !noCobraExtra,
+    trabajaAfuera: ficha.trabajaAfuera === true,
     decidirAMano: motivoDecidir,
     prorrateo: prorrateoTexto,
     quincenalReferencia,
@@ -2259,7 +2276,15 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
       // ⚠️ Lo que le falte de FICHA se conserva igual —si no tiene salario, sigue
       // diciendo «falta el salario»—: esta bandera apaga el reloj, no la
       // obligación de tener los datos completos.
-      if (linea.fueraDePlanilla || linea.noMarcaReloj) {
+      //
+      // 🔴 Y A QUIEN TRABAJA AFUERA TAMPOCO (14-sep-2026): no marcar es su forma
+      // de trabajar, así que una quincena entera sin marcas no es un pendiente —
+      // es una quincena entera afuera, y el quincenal la cubre. Con cero marcas
+      // `h` es `HORAS_CERO`: sin ausencias, sin extras, el quincenal tal cual.
+      // ⚠️ A diferencia de `noMarcaReloj`, `motivo` SÍ se le miró arriba: una
+      // justificación de período completo (una incapacidad de quince días)
+      // sigue mandándola a «Tú decides», porque eso no es trabajar afuera.
+      if (linea.fueraDePlanilla || linea.noMarcaReloj || linea.trabajaAfuera) {
         lineas.push(linea);
         continue;
       }

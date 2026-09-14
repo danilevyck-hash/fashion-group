@@ -95,6 +95,7 @@ import { ALMUERZO_FIJO_MIN, REGLAS_DEFAULT, type ReglasAsistencia } from "./conf
 // 🔑 Un motivo de justificación puede significar "trabajó, pero no acá". El
 // motor lo necesita para NO contar esos días como ausencias justificadas.
 import { esTrabajoDeVendedor } from "./motivos";
+import { motivoAutomaticoDelDiaSinMarca } from "./trabaja-afuera";
 import { minutosPerdonados, textoPermiso, ventanaDe } from "./permiso-horas";
 // 🔴 UN DÍA DE VACACIONES NO SE CALCULA. Ver `vacaciones.ts`: aunque la persona
 // haya pasado por el reloj, ese día no genera horas, ni tardanza, ni ausencia.
@@ -552,6 +553,16 @@ export function armarReporte(opts: {
    * números que daba antes de que las correcciones existieran.
    */
   correccionesPorDia?: ReadonlyMap<string, readonly CorreccionVisible[]>;
+  /**
+   * 🔴 Los códigos con la casilla «Trabaja afuera» de la ficha (14-sep-2026).
+   * Ver `trabaja-afuera.ts`. Para ellos, un día hábil sin marca y sin otra
+   * explicación NO es ausencia: se le pone «Trabajo de vendedor» solo. El día
+   * que SÍ marcan se mide exactamente igual que el de todos.
+   *
+   * 🔑 SIN ESTO NADA CAMBIA: vacío por defecto, y con la migración sin aplicar
+   * la lectura devuelve vacío. El motor da los mismos números que hoy.
+   */
+  trabajaAfuera?: ReadonlySet<string>;
 }): PersonaReporte[] {
   const { marcaciones, horarios, justificaciones, feriados, desde, hasta, nombres } = opts;
   const vacaciones = opts.vacaciones ?? [];
@@ -687,6 +698,17 @@ export function armarReporte(opts: {
       // simplemente no sea día de trabajo. 🔑 Lo último solo puede pasar con
       // `incluirNoHabiles`, y sin el guard un domingo libre contaría como falta.
       if (crudas.length === 0) {
+        // 🔴 «TRABAJA AFUERA» (14-sep-2026): a quien tiene la casilla, el día
+        // hábil sin marca y sin otra explicación se le pone «Trabajo de
+        // vendedor» SOLO — la MISMA condición que abajo lo haría ausencia, y
+        // nada más: un feriado, un fin de semana, un día en curso o un día ya
+        // justificado no se tocan. La regla vive en `trabaja-afuera.ts`; acá
+        // solo se le pregunta. Sin la casilla, `justificadoDelDia` ES
+        // `justificado` y este renglón es el de siempre.
+        const justificadoDelDia = justificado ?? motivoAutomaticoDelDiaSinMarca({
+          trabajaAfuera: opts.trabajaAfuera?.has(codigo) === true,
+          habil, feriado, enCurso, justificado,
+        });
         dias.push({
           fecha, marcas: [], marcasIds: [], entrada: null, salida: null,
           tardeMin: 0, excesoAlmuerzoMin: 0, salidaTempranaMin: 0, extraMin: 0, trabajadoMin: 0,
@@ -696,9 +718,9 @@ export function armarReporte(opts: {
           // todavía. Sin este guard, el día en curso metía a media oficina en
           // "ausencias sin justificar" cada mañana — el mismo error que el de
           // los días mal marcados, con otro nombre.
-          ausente: !enCurso && habil && !feriado && !justificado,
+          ausente: !enCurso && habil && !feriado && !justificadoDelDia,
           vacacion: null,
-          justificado, permiso, permisoPerdonaMin: 0, feriado, habil,
+          justificado: justificadoDelDia, permiso, permisoPerdonaMin: 0, feriado, habil,
           correcciones,
         });
         continue;

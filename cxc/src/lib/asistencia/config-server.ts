@@ -37,6 +37,7 @@
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { COLUMNA_COBRA_HORAS_EXTRA, cobraHorasExtra } from "./cobra-horas-extra";
+import { COLUMNA_TRABAJA_AFUERA, esColumnaTrabajaAfueraFaltante, trabajaAfuera } from "./trabaja-afuera";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
@@ -233,8 +234,13 @@ const COLS_CON_HORAS_EXTRA = `${COLS_CON_PAPEL}, ${COLUMNA_COBRA_HORAS_EXTRA}`;
  * el mismo código — plata mal pagada con la pantalla tranquila. Cualquier
  * error se propaga.
  */
-export async function leerPersonas(): Promise<PersonasLeidas> {
-  const { data, error } = await supabaseServer.from(TABLA_PERSONAS).select(COLS_CON_HORAS_EXTRA);
+export async function leerPersonas(soloCodigo?: string): Promise<PersonasLeidas> {
+  // 🔴 `soloCodigo` NO cambia qué columnas se piden ni cómo se leen: recorta la
+  // consulta a UNA ficha, para la página de un colaborador (14-sep-2026). La
+  // lista de columnas sigue siendo una sola — dos listas para la misma ficha es
+  // cómo una pantalla termina sin una casilla que la otra sí muestra.
+  const q = supabaseServer.from(TABLA_PERSONAS).select(COLS_CON_HORAS_EXTRA);
+  const { data, error } = await (soloCodigo ? q.eq("empleado_codigo", soloCodigo) : q);
   if (error) {
     throw new Error(`No se pudieron leer las fichas de asistencia: ${error.message}`);
   }
@@ -287,6 +293,42 @@ export function noMarcaRelojDeFila(f: FilaPersonaDb): boolean {
  */
 export function cobraHorasExtraDeFila(f: FilaPersonaDb): boolean {
   return cobraHorasExtra(f.cobra_horas_extra);
+}
+
+/**
+ * 🔴 QUIÉN TRABAJA AFUERA — los códigos con la casilla prendida (14-sep-2026).
+ * Ver `trabaja-afuera.ts`.
+ *
+ * VA APARTE de `leerPersonas` A PROPÓSITO. La migración que crea la columna
+ * queda SIN APLICAR hasta que Daniel decida prenderle la casilla a alguien, y
+ * `leerPersonas` ya no tolera una columna ausente (3-sep-2026): meterla en su
+ * `select` tumbaría la planilla entera en producción por un archivo SQL que
+ * todavía no corrió. Acá la lectura falla ABIERTA a «nadie la tiene», que es
+ * EXACTAMENTE el sistema de hoy; y solo cuando el error NOMBRA la columna —
+ * cualquier otro (permisos, red, RLS) se propaga, como en el resto del módulo.
+ *
+ * 🔑 Devuelve SOLO los códigos en `true`: es el conjunto que el motor necesita,
+ * y con la columna en su `DEFAULT false` la respuesta es vacía. El día que la
+ * migración corra NO SE MUEVE UN CENTAVO. (Se filtra acá y no con un `.eq` en
+ * la consulta: son 47 filas, y así la lectura es la MISMA forma de `select`
+ * que el resto del archivo.)
+ */
+export async function leerTrabajaAfuera(): Promise<ReadonlySet<string>> {
+  const { data, error } = await supabaseServer
+    .from(TABLA_PERSONAS)
+    .select(`empleado_codigo, ${COLUMNA_TRABAJA_AFUERA}`);
+  if (error) {
+    if (esColumnaTrabajaAfueraFaltante(error)) return new Set();
+    throw new Error(`No se pudo leer quién trabaja afuera: ${error.message}`);
+  }
+  const out = new Set<string>();
+  const filas = Array.isArray(data)
+    ? (data as unknown as Array<{ empleado_codigo: unknown; trabaja_afuera: unknown }>)
+    : [];
+  for (const f of filas) {
+    if (trabajaAfuera(f.trabaja_afuera)) out.add(String(f.empleado_codigo));
+  }
+  return out;
 }
 
 /**

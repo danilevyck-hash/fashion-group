@@ -64,12 +64,32 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
   const cargar = useCallback(async () => {
     setError(null);
     try {
-      // 🔑 EL MISMO GET DE SIEMPRE. No se estrena una ruta «de una persona»:
-      // dos lecturas de la misma ficha es cómo nacen dos verdades.
-      const r = await fetch("/api/asistencia/configuracion", { cache: "no-store" });
+      // 🔴 SE PIDE A ESTA PERSONA, NO LA LISTA ENTERA (14-sep-2026).
+      //
+      // Acá decía: *«EL MISMO GET DE SIEMPRE. No se estrena una ruta "de una
+      // persona": dos lecturas de la misma ficha es cómo nacen dos verdades»*.
+      // 🔑 EL MIEDO ERA EL CORRECTO —de esta ficha sale lo que se le paga a la
+      // gente— y lo que estaba mal era el remedio: lo que no puede haber son dos
+      // CÁLCULOS, no dos lecturas. Pedir la lista para quedarse con una fila
+      // costaba leer las 6.998 marcaciones de 180 días (835 KB en siete páginas
+      // de PostgREST): **1.656 ms medidos contra producción**, contra 189-408 ms
+      // pidiendo solo a esta persona.
+      //
+      // 🔴 NO HAY DOS CÁLCULOS: el mapeo de una fila a una persona vive en
+      // `lib/asistencia/ficha-de-configuracion.ts` y las DOS rutas llaman la
+      // MISMA función. Y hay candado que corre los dos caminos sobre el universo
+      // entero y exige igualdad campo por campo
+      // (`asistencia-ficha-una-persona.test.ts`): el día que difieran en uno
+      // solo, el build se pone rojo.
+      //
+      // ⚠️ Guardar sigue siendo el `PUT /api/asistencia/configuracion` de
+      // siempre, unas líneas más abajo: la puerta de ESCRITURA sigue siendo una.
+      const r = await fetch(
+        `/api/asistencia/configuracion/persona?codigo=${encodeURIComponent(codigo)}`,
+        { cache: "no-store" },
+      );
       const d = await r.json();
       if (!r.ok) throw new Error(d.error ?? "No se pudo cargar");
-      const lista = (d.personas ?? []) as PersonaDeLaPagina[];
       setPermisos({
         puedeDarDeBaja: !!d.puedeDarDeBaja,
         puedeMarcarServicioProfesional: !!d.puedeMarcarServicioProfesional,
@@ -78,7 +98,9 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
         puedeMarcarSueldoFijo: !!d.puedeMarcarSueldoFijo,
         puedeCargarSaldoVacaciones: !!d.puedeCargarSaldoVacaciones,
       });
-      setPersona(lista.find((p) => String(p.codigo) === String(codigo)) ?? null);
+      // `null` = o no existe, o el código está ignorado — exactamente lo que
+      // devolvía el `find` sobre la lista, que ya venía sin los ignorados.
+      setPersona((d.persona ?? null) as PersonaDeLaPagina | null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar");
     } finally {
@@ -134,6 +156,7 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
           baseSeguros: b.baseSeguros.trim() === "" ? null : b.baseSeguros.trim(),
           noMarcaReloj: b.noMarcaReloj,
           cobraHorasExtra: b.cobraHorasExtra,
+          trabajaAfuera: b.trabajaAfuera,
           saldoVacacionesDias: b.saldoVacaciones.trim() === "" ? null : b.saldoVacaciones.trim(),
           posicion: b.posicion.trim(),
           cedula: b.cedula.trim(),
