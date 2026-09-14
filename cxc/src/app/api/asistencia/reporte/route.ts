@@ -23,7 +23,7 @@ import {
 } from "@/lib/asistencia/correcciones";
 import { leerCorrecciones } from "@/lib/asistencia/correcciones-server";
 import {
-  leerReglas, leerDirectorio, leerPersonas, vigenciasDeFilas, servicioProfesionalDeFila, leerJustificaciones,
+  leerReglas, leerDirectorio, leerPersonas, vigenciasDeFilas, servicioProfesionalDeFila, cobraHorasExtraDeFila, leerJustificaciones,
   leerVacaciones,
 } from "@/lib/asistencia/config-server";
 import { codigosFueraDeRango } from "@/lib/asistencia/vigencia";
@@ -214,19 +214,27 @@ export async function GET(req: NextRequest) {
       correccionesPorDia: efectivas.porDia,
     });
 
-    // 🔴 EL SERVICIO PROFESIONAL NO CUENTA HORAS EXTRA (3-sep-2026). Daniel:
-    // *«yulisa marca pero no deberia de calcular ya que es salario fijo, es
-    // solo para ver sus tardanzas y ausencias»*. La bandera sale de la FICHA
-    // —la misma fuente que la planilla— y viaja con la persona: la pantalla, el
-    // Excel y el PDF muestran «—» en esa columna y no la suman. El motor no se
-    // toca: sus tardanzas y ausencias siguen saliendo igual que las de todos.
+    // 🔴 QUIEN NO COBRA HORAS EXTRA NO LAS CUENTA EN EL REPORTE. Hasta el
+    // 14-sep-2026 acá se miraba `servicioProfesionalDeFila` (3-sep-2026,
+    // Daniel sobre Yulissa: *«es solo para ver sus tardanzas y ausencias»*).
+    // Hoy se mira la CASILLA de la ficha —`cobra_horas_extra`—, que es la
+    // misma que lee la planilla: Daniel, textual, *«los servicios profesionales
+    // de fashion wear sí llevan horas extras»*, *«solo yulissa no cobra, todos
+    // los demás sí»*. Yulissa (26) la tiene en NO y sigue con «—»; un servicio
+    // profesional con la casilla en SÍ ve su número como todos. La bandera de
+    // servicio profesional sigue viajando, informativa. El motor no se toca:
+    // tardanzas y ausencias salen igual que las de todos.
     const sinHorasExtra = new Set(
+      personasDb.filas.filter((f) => !cobraHorasExtraDeFila(f)).map((f) => String(f.empleado_codigo)),
+    );
+    const servicioProfesional = new Set(
       personasDb.filas.filter(servicioProfesionalDeFila).map((f) => String(f.empleado_codigo)),
     );
     const empresaDe = new Map(personasDb.filas.map((f) => [String(f.empleado_codigo), f.empresa ?? null]));
     const personasConBandera = personas
       .map((p) => ({ ...p, empresa: empresaDe.get(p.codigo) ?? null }))
-      .map((p) => (sinHorasExtra.has(p.codigo) ? { ...p, servicioProfesional: true } : p))
+      .map((p) => (servicioProfesional.has(p.codigo) ? { ...p, servicioProfesional: true } : p))
+      .map((p) => (sinHorasExtra.has(p.codigo) ? { ...p, cobraHorasExtra: false } : p))
       .filter((p) => !empresaFiltro || p.empresa === empresaFiltro);
 
     return NextResponse.json({

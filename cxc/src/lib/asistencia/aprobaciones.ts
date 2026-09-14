@@ -368,15 +368,21 @@ export function armarDiasAprobacion(opts: OpcionesDias): DiaAprobacion[] {
     const l = lineaDe.get(p.codigo);
     // Sin línea no hay a quién pagarle: alguien que marcó y no tiene ficha.
     if (!l) continue;
-    // 🔴 EL SERVICIO PROFESIONAL NO SE OFRECE (3-sep-2026). Daniel: *«yulisa
+    // 🔴 EL SERVICIO PROFESIONAL NO SE OFRECÍA (3-sep-2026). Daniel: *«yulisa
     // marca pero no deberia de calcular ya que es salario fijo, es solo para
-    // ver sus tardanzas y ausencias»*. Sus horas extra no se pagan nunca —el
-    // motor las cierra en `sinHorasExtra`—, así que acá no hay nada que
-    // aprobar: ofrecerla es pedirle a Julio que autorice plata que no existe.
-    // Si alguien la aprobó antes de esta fecha, esas filas se IGNORAN, no se
-    // borran: el registro de quién tocó qué se conserva.
-    if (l.fueraDePlanilla) continue;
-    // 🔴 QUIEN NO COBRA HORAS EXTRA TAMPOCO SE OFRECE (10-sep-2026). La casilla
+    // ver sus tardanzas y ausencias»*. Hasta el 14-sep-2026 acá había un
+    // `if (l.fueraDePlanilla) continue;`.
+    //
+    // 🔴 14-sep-2026 — YA NO: LO DECIDE LA CASILLA DE LA FICHA, abajo. Daniel,
+    // textual: *«los servicios profesionales de fashion wear sí llevan horas
+    // extras»* y *«solo yulissa no cobra, todos los demás sí»*. Yulissa sigue
+    // sin ofrecerse porque su ficha (26) tiene «¿Cobra horas extra?» en NO —
+    // la misma regla del 3-sep, en el lugar donde vive la excepción—. Un
+    // servicio profesional con la casilla en SÍ se ofrece como cualquiera:
+    // sus horas se miden y quien le paga por fuera necesita saber cuáles se
+    // autorizaron. Ofrecerla ya no es «autorizar plata que no existe».
+    //
+    // 🔴 QUIEN NO COBRA HORAS EXTRA NO SE OFRECE (10-sep-2026). La casilla
     // de la ficha (`cobra_horas_extra`, Daniel: *«por default a todos sí»*)
     // apaga el recargo en el motor, así que acá no hay nada que decidir:
     // ofrecerla era pedir un «No» sobre la misma persona cada quincena.

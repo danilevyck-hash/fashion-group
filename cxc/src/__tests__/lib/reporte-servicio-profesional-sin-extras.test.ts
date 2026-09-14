@@ -7,10 +7,19 @@
  * fijo, es solo para ver sus tardanzas y ausencias»*.
  *
  * El motor (`armarReporte`) sigue midiendo `extraMin` —es lo que marcó el
- * reloj—; la bandera `servicioProfesional` la pone la ruta desde la ficha. Acá
- * se prueba lo que SE VE: la fila del Excel, el total del Excel y el PDF. CONTROL:
- * la misma persona sin la bandera sale con su número.
+ * reloj—; la bandera la pone la ruta desde la ficha. Acá se prueba lo que SE
+ * VE: la fila del Excel, el total del Excel y el PDF. CONTROL: la misma persona
+ * sin la bandera sale con su número.
  * Fechas fijas (agosto 2026), nunca `new Date()`.
+ *
+ * ⚠️ CAMBIÓ DE DIRECCIÓN EL 14-sep-2026. La bandera que apaga la columna ya NO
+ * es `servicioProfesional` sino la casilla de la ficha, `cobraHorasExtra: false`
+ * — Daniel, textual: *«los servicios profesionales de fashion wear sí llevan
+ * horas extras»*, *«solo yulissa no cobra, todos los demás sí. Ella es la única
+ * excepción hoy y siempre»*. Yulissa (26) tiene esa casilla en NO, así que lo
+ * que este archivo prueba de ELLA no cambió: «—» y fuera del total. Lo que se
+ * agregó es el CONTROL AL REVÉS: un servicio profesional con la casilla en SÍ
+ * ve su número — la regla de antes (la bandera sola apagaba) ya no vale.
  * ─────────────────────────────────────────────────────────────────────────── */
 import { describe, it, expect } from "vitest";
 import * as XLSX from "xlsx-js-style";
@@ -36,13 +45,21 @@ const horarios: HorarioPersona[] = [
   { empleado_codigo: "26", entrada: "08:00", salida: "17:00", almuerzo_minutos: 30 },
 ];
 
-function reporte(servicioProfesional: boolean): PersonaReporte[] {
+function reporte(noCobraExtra: boolean): PersonaReporte[] {
   const personas = armarReporte({
     marcaciones, horarios, justificaciones: [], feriados: new Map(),
     desde: DESDE, hasta: HASTA, reglas: R, nombres: new Map([["26", "YULISSA JUAREZ"]]),
   });
-  // Es lo que hace la ruta `/api/asistencia/reporte` con la ficha.
-  return servicioProfesional ? personas.map((p) => ({ ...p, servicioProfesional: true })) : personas;
+  // Es lo que hace la ruta `/api/asistencia/reporte` con la ficha de Yulissa:
+  // servicio profesional Y la casilla «¿Cobra horas extra?» en NO (14-sep-2026).
+  return noCobraExtra
+    ? personas.map((p) => ({ ...p, servicioProfesional: true, cobraHorasExtra: false }))
+    : personas;
+}
+
+/** CONTROL AL REVÉS (14-sep-2026): servicio profesional con la casilla en SÍ. */
+function reporteServicioProfesionalQueCobra(): PersonaReporte[] {
+  return reporte(false).map((p) => ({ ...p, servicioProfesional: true, cobraHorasExtra: true }));
 }
 
 const filas = (wb: XLSX.WorkBook, hoja: string) =>
@@ -56,7 +73,19 @@ describe("el motor mide igual; la bandera decide qué se cuenta", () => {
     expect(extraQueCuenta(p)).toBeCloseTo(60, 6);
   });
 
-  it("🔴 con la bandera: el reloj midió lo mismo, pero NO se cuenta; tardanza y ausencia intactas", () => {
+  it("🔴 CONTROL AL REVÉS (14-sep-2026): servicio profesional con la casilla en SÍ, se cuentan", () => {
+    const [sp] = reporteServicioProfesionalQueCobra();
+    expect(sp.servicioProfesional).toBe(true);
+    expect(cuentaHorasExtra(sp)).toBe(true);
+    expect(extraQueCuenta(sp)).toBeCloseTo(60, 6);
+    // Y en el Excel sale el número, no «—».
+    const f = filas(construirExcel({ personas: reporteServicioProfesionalQueCobra(), desde: DESDE, hasta: HASTA, reglas: R }), "Resumen");
+    const c = (f[0] as string[]).indexOf("Extras (min)");
+    const fila = f.find((r) => String(r[0]).includes("YULISSA"))!;
+    expect(Number(fila[c])).toBeCloseTo(60, 6);
+  });
+
+  it("🔴 con la casilla en NO: el reloj midió lo mismo, pero NO se cuenta; tardanza y ausencia intactas", () => {
     const [sp] = reporte(true);
     const [normal] = reporte(false);
     expect(sp.resumen.extraMin).toBeCloseTo(normal.resumen.extraMin, 6);

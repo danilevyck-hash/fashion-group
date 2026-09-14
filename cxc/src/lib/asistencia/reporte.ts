@@ -272,8 +272,18 @@ export interface PersonaReporte {
    * el Excel y el PDF muestran «—» en esa columna y no la suman al total.
    * Opcional a propósito: sin ficha, o en cualquier llamada vieja, no cambia
    * nada. Quien decida algo con esto pregunta por `cuentaHorasExtra`.
+   * ⚠️ Desde el 14-sep-2026 es INFORMATIVA: ya no decide si se cuentan las
+   * horas extra. Eso lo dice `cobraHorasExtra`, abajo.
    */
   servicioProfesional?: boolean;
+  /**
+   * 🔴 ¿Se le cuentan las horas extra? La casilla «¿Cobra horas extra?» de la
+   * FICHA (14-sep-2026). Daniel, textual: *«solo yulissa no cobra, todos los
+   * demás sí. Ella es la única excepción hoy y siempre»*. La pone la ruta
+   * desde la ficha; ausente = sí, como las 46 fichas el día que nació la
+   * casilla. Es lo ÚNICO que mira `cuentaHorasExtra`.
+   */
+  cobraHorasExtra?: boolean;
   dias: DiaReporte[];
   resumen: {
     diasTrabajados: number;
@@ -337,17 +347,26 @@ export interface PersonaReporte {
 }
 
 /**
- * ¿Se le cuentan las horas extra a esta persona? Al servicio profesional no
- * (3-sep-2026). Es la ÚNICA pregunta que hacen la pantalla, el Excel y el PDF
- * del Reporte antes de mostrar o sumar `extraMin`: una sola definición, para
- * que la columna y el total no puedan discrepar.
+ * ¿Se le cuentan las horas extra a esta persona? Es la ÚNICA pregunta que
+ * hacen la pantalla, el Excel y el PDF del Reporte antes de mostrar o sumar
+ * `extraMin`: una sola definición, para que la columna y el total no puedan
+ * discrepar.
+ *
+ * 🔴 14-sep-2026 — LA CONTESTA LA CASILLA DE LA FICHA, no la bandera de
+ * servicio profesional. Hasta hoy decía `servicioProfesional !== true`
+ * (3-sep-2026, Daniel sobre Yulissa: *«es solo para ver sus tardanzas y
+ * ausencias»*). Daniel, hoy: *«los servicios profesionales de fashion wear sí
+ * llevan horas extras»*, *«solo yulissa no cobra»*. Yulissa sigue con «—»
+ * porque su ficha tiene la casilla en NO; la regla es la MISMA que aplica el
+ * motor de la planilla (`armarLinea`), así que el Reporte y la Planilla no
+ * pueden decir cosas distintas de la misma persona.
  */
-export function cuentaHorasExtra(p: Pick<PersonaReporte, "servicioProfesional">): boolean {
-  return p.servicioProfesional !== true;
+export function cuentaHorasExtra(p: Pick<PersonaReporte, "cobraHorasExtra">): boolean {
+  return p.cobraHorasExtra !== false;
 }
 
 /** `extraMin` si se le cuenta; 0 si no. Para los totales. */
-export function extraQueCuenta(p: Pick<PersonaReporte, "servicioProfesional" | "resumen">): number {
+export function extraQueCuenta(p: Pick<PersonaReporte, "cobraHorasExtra" | "resumen">): number {
   return cuentaHorasExtra(p) ? p.resumen.extraMin : 0;
 }
 

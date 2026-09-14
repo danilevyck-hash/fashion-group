@@ -349,9 +349,13 @@ describe("H. «CONSTANCIA» — un motivo más, y PAGA como los otros", () => {
     expect(motivoSeOfrece("Constancia")).toBe(true);
   });
 
-  it("son cinco, y los cuatro de antes no se movieron", () => {
+  // ⚠️ CAMBIÓ DE DIRECCIÓN EL 14-sep-2026: entró «Compensatorio», al lado de
+  // Incapacidad (Daniel: *«así como incapacidad, una opción de compensatorio de
+  // días que le debemos libres; al poner qué día será compensatorio, no se le
+  // descuente»*). Son SEIS; los cinco de antes siguen en su orden.
+  it("son seis, y los cinco de antes no se movieron entre sí", () => {
     expect([...MOTIVOS_JUSTIFICACION]).toEqual([
-      "Incapacidad", "Catástrofe", "Escolares", "Trabajo de vendedor", "Constancia",
+      "Incapacidad", "Compensatorio", "Catástrofe", "Escolares", "Trabajo de vendedor", "Constancia",
     ]);
   });
 

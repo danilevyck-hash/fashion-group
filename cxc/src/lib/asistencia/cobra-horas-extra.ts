@@ -19,8 +19,10 @@
  *
  *   APAGA  → hora extra diurna y nocturna, excedente, domingo y feriado: no se
  *            pagan, no salen en Aprobaciones, no cuentan en el aviso ni frenan
- *            el cierre. Es la MISMA mitad que `sinHorasExtra` cierra para el
- *            servicio profesional.
+ *            el cierre. Es la mitad que `sinHorasExtra` cierra — y desde el
+ *            14-sep-2026 es la ÚNICA llave que la cierra: ser servicio
+ *            profesional ya no apaga las extras por su cuenta (Daniel: *«solo
+ *            yulissa no cobra, todos los demás sí»*; Yulissa la tiene en NO).
  *   SIGUE  → tardanzas, ausencias y salida antes de la hora: son lo que pasó,
  *            no algo que alguien conceda. Y la persona sigue en planilla con su
  *            quincenal, sus seguros y su neto.

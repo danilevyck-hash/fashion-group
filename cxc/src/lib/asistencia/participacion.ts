@@ -4,8 +4,16 @@
  * 🔴 3-sep-2026 — Daniel precisó CUÁL mitad se conserva: *«yulisa marca pero no
  * deberia de calcular ya que es salario fijo, es solo para ver sus tardanzas y
  * ausencias»*. Tardanzas y ausencias SÍ; horas extra (y domingo, feriado,
- * excedente) NO: el motor las cierra en `sinHorasExtra` (`planilla.ts`), la
- * pestaña Aprobaciones no la ofrece y el Reporte muestra «—» en su columna.
+ * excedente) NO: el motor las cerraba en `sinHorasExtra` (`planilla.ts`), la
+ * pestaña Aprobaciones no la ofrecía y el Reporte mostraba «—» en su columna.
+ *
+ * 🔴 14-sep-2026 — ESA MITAD YA NO LA DECIDE ESTA BANDERA. Daniel, textual:
+ * *«los servicios profesionales de fashion wear sí llevan horas extras»* y
+ * *«solo yulissa no cobra, todos los demás sí. Ella es la única excepción hoy
+ * y siempre»*. Las horas extra las apaga SOLO la casilla «¿Cobra horas
+ * extra?» de la ficha (`cobra-horas-extra.ts`); Yulissa la tiene en NO y por
+ * eso sigue igual que el 3-sep. Lo que esta bandera SÍ sigue decidiendo, y
+ * nada más: que no se le calcule `dinero` (quincenal, seguros, neto).
  *
  * Módulo PURO: sin base, sin red. Acá vive el DATO y las palabras; el efecto
  * sobre el dinero lo aplica `planilla.ts` (que es donde se decide si una línea

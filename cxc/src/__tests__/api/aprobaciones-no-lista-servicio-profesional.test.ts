@@ -9,6 +9,15 @@
 // aparecía ahí con sus 0,72 h y Julio podía «aprobar» horas que la planilla
 // nunca iba a pagar. Acá se LLAMA a la ruta real con dos personas que salieron
 // a la misma hora —una normal y una servicio profesional— y se mira quién sale.
+//
+// ⚠️ CAMBIÓ DE DIRECCIÓN EL 14-sep-2026. Lo que saca a Yulissa de la lista ya
+// no es ser servicio profesional: es la casilla «¿Cobra horas extra?» de su
+// ficha, en NO. Daniel, textual: *«los servicios profesionales de fashion wear
+// sí llevan horas extras»*, *«solo yulissa no cobra, todos los demás sí»*. Su
+// caso no cambia (sigue fuera); lo que se agregó es el CONTROL AL REVÉS: un
+// servicio profesional con la casilla en SÍ (Daniel Levy, 52) SÍ se ofrece,
+// con `fueraDePlanilla: true` y sin dinero — se le miden las horas, y cuánto
+// valen lo decide quien le paga por fuera.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi } from "vitest";
@@ -25,6 +34,7 @@ vi.mock("@/lib/requireRole", () => ({
 const HORARIOS = [
   { empleado_codigo: "11", entrada: "08:00:00", salida: "17:00:00", almuerzo_minutos: 30 },
   { empleado_codigo: "26", entrada: "08:00:00", salida: "17:00:00", almuerzo_minutos: 30 },
+  { empleado_codigo: "52", entrada: "08:00:00", salida: "17:00:00", almuerzo_minutos: 30 },
 ];
 vi.mock("@/lib/supabase-server", () => ({
   HAS_SERVICE_ROLE: true,
@@ -46,6 +56,9 @@ vi.mock("@/lib/supabase-paginado", () => ({
     { id: "m2", empleado_codigo: "11", empleado_nombre: "", ocurrio_en: "2026-08-03T23:00:00.000Z" },
     { id: "m3", empleado_codigo: "26", empleado_nombre: "", ocurrio_en: "2026-08-03T13:00:00.000Z" },
     { id: "m4", empleado_codigo: "26", empleado_nombre: "", ocurrio_en: "2026-08-03T23:00:00.000Z" },
+    // 14-sep-2026: Daniel Levy, servicio profesional con la casilla en SÍ, la misma hora.
+    { id: "m5", empleado_codigo: "52", empleado_nombre: "", ocurrio_en: "2026-08-03T13:00:00.000Z" },
+    { id: "m6", empleado_codigo: "52", empleado_nombre: "", ocurrio_en: "2026-08-03T23:00:00.000Z" },
   ],
 }));
 vi.mock("@/lib/asistencia/correcciones-server", () => ({
@@ -81,8 +94,16 @@ vi.mock("@/lib/asistencia/config-server", async (orig) => ({
         jornada_semanal: 48, empresa: "vistana", activo: true, servicio_profesional: false,
       },
       {
+        // 🔴 Como su ficha real: servicio profesional Y «¿Cobra horas extra?» en NO.
         empleado_codigo: "26", nombre: "YULISSA JUAREZ", salario_mensual: null,
         jornada_semanal: null, empresa: "vistana", activo: true, servicio_profesional: true,
+        cobra_horas_extra: false,
+      },
+      {
+        // 🔴 CONTROL AL REVÉS (14-sep-2026): servicio profesional que SÍ cobra extras.
+        empleado_codigo: "52", nombre: "DANIEL LEVY", salario_mensual: null,
+        jornada_semanal: 40, empresa: "vistana", activo: true, servicio_profesional: true,
+        cobra_horas_extra: true,
       },
     ],
     faltaMigracion: false, faltaColumnasBajas: false,
@@ -96,8 +117,8 @@ vi.mock("@/lib/asistencia/config-server", async (orig) => ({
 const pedir = () =>
   new NextRequest("http://localhost/api/asistencia/planilla?desde=2026-08-01&hasta=2026-08-15&aprobaciones=1");
 
-describe("🔴 GET /api/asistencia/planilla?aprobaciones=1 — el servicio profesional no se ofrece", () => {
-  it("Julio (normal) sale con su hora; Yulissa (servicio profesional) NO está en la lista", async () => {
+describe("🔴 GET /api/asistencia/planilla?aprobaciones=1 — quien no cobra extras no se ofrece", () => {
+  it("Julio (normal) sale con su hora; Yulissa (casilla en NO) NO está; Daniel Levy (servicio profesional, casilla en SÍ) SÍ está", async () => {
     const { GET } = await import("@/app/api/asistencia/planilla/route");
     const res = await GET(pedir());
     expect(res.status).toBe(200);
@@ -107,16 +128,28 @@ describe("🔴 GET /api/asistencia/planilla?aprobaciones=1 — el servicio profe
       .flatMap((d) => d.gente.map((g) => g.codigo));
     expect(codigos).toContain("11");
     expect(codigos).not.toContain("26");
+    // 🔴 14-sep-2026: ser servicio profesional ya no lo saca de la lista.
+    expect(codigos).toContain("52");
     // CONTROL: el día existe y trae a Julio con sus 60 minutos.
     expect(j.aprobaciones[0].fecha).toBe("2026-08-03");
-    expect(j.aprobaciones[0].gente[0].minutos).toBeCloseTo(60, 6);
+    const julio = j.aprobaciones[0].gente.find((g: { codigo: string }) => g.codigo === "11");
+    expect(julio.minutos).toBeCloseTo(60, 6);
+    const daniel = j.aprobaciones[0].gente.find((g: { codigo: string }) => g.codigo === "52");
+    expect(daniel.minutos).toBeCloseTo(60, 6);
   });
 
   it("🔴 y en el cuadro: Yulissa sin aviso de extras, sin extras, CON su fila y sus horas de asistencia", async () => {
     const { GET } = await import("@/app/api/asistencia/planilla/route");
     const j = await (await GET(pedir())).json();
-    const codigosAviso = (j.avisos.extraSinAprobar as Array<{ codigo: string }>).map((e) => e.codigo);
-    expect(codigosAviso).toEqual(["11"]);
+    const codigosAviso = (j.avisos.extraSinAprobar as Array<{ codigo: string }>).map((e) => e.codigo).sort();
+    // 🔴 14-sep-2026: Daniel Levy (52) SÍ entra al aviso; Yulissa (26) no.
+    expect(codigosAviso).toEqual(["11", "52"]);
+    const dl = (j.lineas as Array<Record<string, unknown>>).find((l) => l.codigo === "52")!;
+    expect(dl.fueraDePlanilla).toBe(true);
+    expect(dl.dinero).toBeNull();
+    expect((dl.extraNoAprobada as { minutos: number; monto: number | null }).minutos).toBeCloseTo(60, 6);
+    // Sin rata (no hay dinero) el monto no se inventa.
+    expect((dl.extraNoAprobada as { monto: number | null }).monto).toBeNull();
     const y = (j.lineas as Array<Record<string, unknown>>).find((l) => l.codigo === "26")!;
     expect(y).toBeTruthy();
     expect(y.fueraDePlanilla).toBe(true);

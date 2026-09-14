@@ -82,14 +82,82 @@ export const MOTIVO_TRABAJO_FUERA_ANTES = "Trabajo fuera de la oficina";
  */
 export const MOTIVO_CONSTANCIA = "Constancia";
 
-/** Los cinco que la pantalla ofrece. */
+/**
+ * 🔴 «COMPENSATORIO» — el sexto, desde el 14-sep-2026.
+ *
+ * Daniel, textual: *«compensatorio es cuando por ejemplo trabajan un día
+ * domingo y se le compensa ese día por uno de la semana»* y *«debería de haber,
+ * así como incapacidad, una opción de compensatorio de días que le debemos
+ * libres; al poner qué día será compensatorio, no se le descuente»*.
+ *
+ * Es un día libre que la empresa le DEBE, y se comporta como Incapacidad: el
+ * día no se descuenta. Nada más cambia — no genera horas, no toca el domingo
+ * que lo originó (ese se pagó o se aprobó por su lado en Aprobaciones), y es de
+ * día completo (sin horas: `motivoAdmiteHoras` sigue siendo solo Constancia).
+ * ⚠️ Sin CHECK en la base sobre `motivo` (a propósito, ver las migraciones
+ * `20260825140000` y `20260825160000`): no hace falta migración.
+ */
+export const MOTIVO_COMPENSATORIO = "Compensatorio";
+
+/** Los seis que la pantalla ofrece. Compensatorio va al lado de Incapacidad
+ *  (Daniel: *«así como incapacidad»*). */
 export const MOTIVOS_JUSTIFICACION = [
   "Incapacidad",
+  MOTIVO_COMPENSATORIO,
   "Catástrofe",
   "Escolares",
   MOTIVO_TRABAJO_VENDEDOR,
   MOTIVO_CONSTANCIA,
 ] as const;
+
+/**
+ * 🔴 EL DÍA AFUERA SE PAGA COMO UN DÍA NORMAL DE 9 A 6 (14-sep-2026).
+ *
+ * Daniel, textual: *«a ellas cuando están afuera se les paga el día regular
+ * como si hubiesen trabajado las 8 horas, en horario de 9-6, con una hora de
+ * almuerzo»* y *«alguien va a decir cada quincena qué días estuvieron afuera,
+ * así como a Rodrigo, siempre y cuando no marquen»*.
+ *
+ * Es «Trabajo de vendedor» con RANGO de fechas, desde la ficha: el motivo ya
+ * hacía exactamente eso (no es ausencia, no descuenta, no genera extras).
+ *
+ * 🔑 EL HORARIO NO SE GUARDA, y no es un olvido. 9:00 a 18:00 con una hora de
+ * almuerzo son las 8 horas de un día normal, y un día normal es lo que el
+ * quincenal ya paga cuando el día no se descuenta: no hay nada que sumar ni
+ * restar. Y guardarlo como `hora_desde`/`hora_hasta` sería PEOR que inútil:
+ * en este módulo un rango de horas es un PERMISO (perdona tardanza dentro de
+ * la ventana y el día NO queda justificado — ver `permiso-horas.ts`), así que
+ * un «9:00 a 18:00» guardado convertiría el día afuera en una AUSENCIA.
+ * 🩸 Ya pasó: Rodrigo (13) tiene dos filas del 14-ago-2026 con «Trabajo de
+ * vendedor» de 08:00 a 16:30, cargadas antes de que las horas se cerraran a
+ * Constancia, y ese día para el motor es un permiso de horas, no un día
+ * afuera. Por eso el texto se DICE en el formulario y las horas no viajan.
+ *
+ * 🔴 SOLO CUENTA LOS DÍAS SIN MARCA. Daniel: *«siempre y cuando no marquen»*.
+ * Si la persona marcó ese día, manda el reloj — es lo que el motor hace desde
+ * siempre (`reporte.ts`: con marcas, `justificado` es solo un rótulo).
+ */
+export const TEXTO_DIA_AFUERA =
+  "Se paga como un día normal de 8 horas (9:00 a 18:00 con una hora de almuerzo). "
+  + "Cuenta solo los días en que no marcó el reloj; si marcó, manda el reloj.";
+
+/** Lo que se le dice a quien justifica un día compensatorio. Una línea. */
+export const TEXTO_DIA_COMPENSATORIO =
+  "Un día libre que se le debe (por un domingo o feriado trabajado). No se descuenta.";
+
+/**
+ * La nota de UNA línea que el formulario muestra debajo del motivo elegido.
+ * `null` = ese motivo no necesita explicación (los de siempre).
+ *
+ * 🔑 Vive acá, en el módulo puro, para que la ficha y la fila del día —que
+ * montan el MISMO `JustificarForm`— digan lo mismo, y para que el candado lo
+ * pruebe sin montar nada.
+ */
+export function notaDelMotivo(motivo: string | null | undefined): string | null {
+  if (esTrabajoDeVendedor(motivo)) return TEXTO_DIA_AFUERA;
+  if (String(motivo ?? "").trim() === MOTIVO_COMPENSATORIO) return TEXTO_DIA_COMPENSATORIO;
+  return null;
+}
 
 /**
  * Los que ya NO se ofrecen pero SIGUEN GUARDADOS en la base.
@@ -155,7 +223,9 @@ export function esTrabajoDeVendedor(motivo: string | null | undefined): boolean 
  * se lea como "ya no trabaja acá".
  */
 export function textoDiaJustificado(motivo: string): string {
-  return esTrabajoDeVendedor(motivo)
-    ? "Trabajando fuera de la oficina (vendedor)"
-    : `Ausencia justificada — ${motivo}`;
+  if (esTrabajoDeVendedor(motivo)) return "Trabajando fuera de la oficina (vendedor)";
+  // 🔴 Un compensatorio tampoco es una «ausencia»: es un día libre que se le
+  // debía (14-sep-2026). Se lee como lo que es.
+  if (motivo.trim() === MOTIVO_COMPENSATORIO) return "Día compensatorio (libre que se le debía)";
+  return `Ausencia justificada — ${motivo}`;
 }

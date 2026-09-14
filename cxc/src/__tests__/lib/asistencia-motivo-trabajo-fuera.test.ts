@@ -255,9 +255,12 @@ describe("El motivo, la lista y el reconocedor", () => {
   // 🔑 LA REGLA QUE ESTE CANDADO PROTEGE NO CAMBIÓ: la lista es CERRADA y
   // EXACTA. Lo que se agregó es un motivo más que PAGA como los otros cuatro —
   // no un tipo nuevo de justificación.
-  it("la lista que ofrece la pantalla son EXACTAMENTE los cinco de Daniel", () => {
+  // ⚠️ SON SEIS DESDE EL 14-sep-2026: entró «Compensatorio», al lado de
+  // Incapacidad (Daniel: *«así como incapacidad, una opción de compensatorio de
+  // días que le debemos libres»*). Paga como los demás; la lista sigue CERRADA.
+  it("la lista que ofrece la pantalla son EXACTAMENTE los seis de Daniel", () => {
     expect([...MOTIVOS_JUSTIFICACION]).toEqual([
-      "Incapacidad", "Catástrofe", "Escolares", MOTIVO_TRABAJO_VENDEDOR, "Constancia",
+      "Incapacidad", "Compensatorio", "Catástrofe", "Escolares", MOTIVO_TRABAJO_VENDEDOR, "Constancia",
     ]);
   });
 

@@ -46,7 +46,9 @@ const n = (v: number) =>
   v ? <span className="tabular-nums">{fmtMin(v)}</span> : <span className="text-gray-300">—</span>;
 
 /** La raya de «acá no se cuenta», con el motivo al pasar el cursor. */
-const SIN_EXTRA_TITULO = "Servicio profesional: no se le cuentan horas extra, solo tardanzas y ausencias.";
+// 🔴 14-sep-2026: lo que apaga la columna es la casilla «¿Cobra horas extra?»
+// de la ficha, no ser servicio profesional (Daniel: *«solo yulissa no cobra»*).
+const SIN_EXTRA_TITULO = "No cobra horas extra (casilla de su ficha): solo se le cuentan tardanzas y ausencias.";
 const sinExtra = () => <span className="text-gray-300" title={SIN_EXTRA_TITULO}>—</span>;
 
 export default function ReporteTab({ empresa = "" }: {

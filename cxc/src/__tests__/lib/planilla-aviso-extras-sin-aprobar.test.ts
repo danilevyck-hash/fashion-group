@@ -299,7 +299,15 @@ describe("f. sueldo repartido en dos empresas: el aviso sale UNA vez, donde se p
   });
 });
 
-describe("g. 🔴 SERVICIO PROFESIONAL: sin horas extra, con tardanzas y ausencias", () => {
+// ⚠️ EL BLOQUE (g) CAMBIÓ DE DIRECCIÓN EL 14-sep-2026. Lo que apaga las horas
+// extra ya NO es la bandera de servicio profesional sino la casilla «¿Cobra
+// horas extra?» de la ficha (Daniel, textual: *«los servicios profesionales de
+// fashion wear sí llevan horas extras»*, *«solo yulissa no cobra, todos los
+// demás sí»*). `FICHA_SP` es ahora la ficha REAL de Yulissa: servicio
+// profesional Y casilla en NO — así todo lo que este bloque decía de ella sigue
+// verde. Y hay un CONTROL AL REVÉS nuevo al final: servicio profesional con la
+// casilla en SÍ mide sus extras, sale en el aviso y en Aprobaciones, sin dinero.
+describe("g. 🔴 SERVICIO PROFESIONAL (con la casilla en NO): sin horas extra, con tardanzas y ausencias", () => {
   // Llega 08:40 el martes: 40 min tarde (30 pasada la tolerancia de 10) y se
   // queda hasta las 17:22. El miércoles no viene: ausencia. Sin aprobar nada.
   const TARDE: DiaReporte = {
@@ -316,10 +324,15 @@ describe("g. 🔴 SERVICIO PROFESIONAL: sin horas extra, con tardanzas y ausenci
   const FICHA_SP: FichaPlanilla = {
     codigo: "26", nombre: "YULISSA JUAREZ", salarioMensual: null, jornadaSemanal: null,
     empresa: "vistana", servicioProfesional: true,
+    // 🔴 14-sep-2026: la excepción vive en la casilla, como en su ficha real.
+    cobraHorasExtra: false,
   };
   const FICHA_NORMAL: FichaPlanilla = {
     ...FICHA_SP, salarioMensual: 1000, jornadaSemanal: 40, servicioProfesional: false,
+    cobraHorasExtra: true,
   };
+  /** CONTROL AL REVÉS (14-sep-2026): servicio profesional que SÍ cobra extras. */
+  const FICHA_SP_COBRA: FichaPlanilla = { ...FICHA_SP, cobraHorasExtra: true };
 
   function cuadro(ficha: FichaPlanilla) {
     const lineas = armarPlanilla({
@@ -398,6 +411,26 @@ describe("g. 🔴 SERVICIO PROFESIONAL: sin horas extra, con tardanzas y ausenci
     expect(dias).toEqual([]);
     expect(l.extraMedido).toBeNull();
     expect(l.dinero).toBeNull();
+  });
+
+  it("🔴 CONTROL AL REVÉS (14-sep-2026): servicio profesional con la casilla en SÍ mide sus extras, avisa y se ofrece — sin dinero", () => {
+    const { lineas, l } = cuadro(FICHA_SP_COBRA);
+    expect(l.fueraDePlanilla).toBe(true);
+    expect(l.dinero).toBeNull();
+    expect(l.cobraHorasExtra).toBe(true);
+    // Los 22 minutos sin aprobar se ven y frenan, como los de cualquiera.
+    expect(l.extraNoAprobada!.minutos).toBeCloseTo(22, 6);
+    // Sin rata no hay monto: no se inventa plata para quien no va en planilla.
+    expect(l.extraNoAprobada!.monto).toBeNull();
+    expect(extrasNoAprobadas(lineas).map((e) => e.codigo)).toEqual(["26"]);
+    expect(frenosParaCerrar(lineas).map((f) => f.tipo)).toEqual(["horas-extra"]);
+    const dias = armarDiasAprobacion({
+      lineas, personas: [YULISSA], reglas: R, aprobaciones: indexarAprobaciones([]),
+    });
+    expect(dias.flatMap((d) => d.gente.map((g) => g.codigo))).toEqual(["26"]);
+    // Tardanza y ausencia, iguales que con la casilla en NO.
+    expect(l.horas.tardanzaMin).toBe(cuadro(FICHA_SP).l.horas.tardanzaMin);
+    expect(l.horas.ausenciaDias).toBe(cuadro(FICHA_SP).l.horas.ausenciaDias);
   });
 
   it("junto a otra persona, la otra sale igual que siempre", () => {

@@ -16,6 +16,16 @@
  *    y ausencias»*. Sus columnas de extra, excedente, domingo y feriado salen
  *    en CERO (`sinHorasExtra`), `extraMedido` y `extraNoAprobada` en `null`:
  *    no entra al aviso ámbar, no frena el cierre y no aparece en Aprobaciones.
+ *    🔴 14-sep-2026 — ESO YA NO LO DECIDE LA BANDERA DE SERVICIO PROFESIONAL,
+ *    LO DECIDE LA CASILLA «¿Cobra horas extra?» DE LA FICHA. Daniel, textual:
+ *    *«los servicios profesionales de fashion wear sí llevan horas extras»* y
+ *    *«solo yulissa no cobra, todos los demás sí. Ella es la única excepción
+ *    hoy y siempre»*. Lo que dijo el 3-sep sigue siendo cierto PARA ELLA, y
+ *    por eso su ficha (código 26) tiene la casilla en «no»: la regla se mudó
+ *    del motor a la ficha, que es donde vive la excepción. Un servicio
+ *    profesional con la casilla en «sí» mide sus horas extra, sale en
+ *    Aprobaciones y en el aviso ámbar — pero sigue SIN `dinero` (punto 0):
+ *    lo que se le paga por esas horas lo decide quien le paga por fuera.
  *
  * 1. NO INVENTA UN NÚMERO CUANDO LE FALTA UN DATO. Una persona sin salario o
  *    sin jornada NO produce una línea de $0: produce una línea con
@@ -1852,18 +1862,30 @@ export function armarLinea(
   // saltear. La jornada diaria se conserva —es del horario, no del reloj— para
   // que la línea siga sabiendo cuánto dura su día.
   const noMarca = ficha.noMarcaReloj === true;
-  // 🔴 Y QUIEN NO COBRA HORAS EXTRA (ficha, 10-sep-2026) recibe el MISMO trato
-  // que el servicio profesional en esta mitad: `sinHorasExtra`. Solo un `false`
-  // explícito lo apaga; ausente es «cobra», como las 46 fichas de ese día.
+  // 🔴 Y QUIEN NO COBRA HORAS EXTRA (ficha, 10-sep-2026) se queda sin las
+  // horas que se pagan con recargo: `sinHorasExtra`. Solo un `false` explícito
+  // lo apaga; ausente es «cobra», como las 46 fichas de ese día.
   const noCobraExtra = ficha.cobraHorasExtra === false;
-  const sinRecargos = fueraDePlanilla || noCobraExtra;
-  // 🔴 Y EL SERVICIO PROFESIONAL SE QUEDA SIN LAS HORAS QUE SE PAGAN CON
+  // 🔴 Y EL SERVICIO PROFESIONAL SE QUEDABA SIN LAS HORAS QUE SE PAGAN CON
   // RECARGO (3-sep-2026). Daniel: *«yulisa marca pero no deberia de calcular
   // ya que es salario fijo, es solo para ver sus tardanzas y ausencias»*. Va
   // ANTES de `extraMedido` / `extraNoAprobada` a propósito: los dos salen de
   // estas horas, así que con esto quedan en `null` sin una segunda condición
   // que pueda olvidarse — y sin ellos no hay aviso, ni freno, ni fila en
   // Aprobaciones. Tardanza y ausencia pasan intactas.
+  //
+  // 🔴 14-sep-2026 — LA REGLA SE MUDÓ A LA FICHA. Hasta hoy esto decía
+  // `fueraDePlanilla || noCobraExtra`: ser servicio profesional apagaba las
+  // extras por su cuenta, sin mirar la casilla. Daniel, textual: *«los
+  // servicios profesionales de fashion wear sí llevan horas extras»* y *«solo
+  // yulissa no cobra, todos los demás sí. Ella es la única excepción hoy y
+  // siempre»*. Lo del 3-sep sigue valiendo PARA YULISSA, y por eso su ficha
+  // (código 26) tiene «¿Cobra horas extra?» en NO: sigue sin extras, ahora por
+  // su casilla, que es donde vive la excepción — no por una regla escondida
+  // acá que se llevaba a todos los servicios profesionales por delante.
+  // ⚠️ `fueraDePlanilla` NO se toca: el servicio profesional sigue sin
+  // `dinero`. Lo que se mide es la HORA; cuánto vale la decide quien le paga.
+  const sinRecargos = noCobraExtra;
   const horasMedidas: HorasPersona = noMarca
     ? { ...HORAS_CERO, jornadaDiariaMin: horas.jornadaDiariaMin }
     : sinRecargos
@@ -1886,9 +1908,10 @@ export function armarLinea(
   // todo, como hasta ahora. Fail-closed acá sería dejar a treinta personas sin
   // sus extras porque falta un archivo SQL. Se avisa, ver `aprobaciones.ts`.
   const exigir = extra.exigirAprobacion === true;
-  // 🔑 El servicio profesional no tiene nada que aprobar: el rótulo dice
+  // 🔑 Quien no cobra horas extra no tiene nada que aprobar: el rótulo dice
   // «nada quedó afuera» aunque `armarPlanilla` haya visto minutos sin aprobar
   // en `h` — esos minutos se cerraron arriba y no se van a pagar nunca.
+  // (Hasta el 14-sep-2026 acá decía «el servicio profesional»; ver arriba.)
   const extraAprobada = sinRecargos || !exigir || extra.aprobada === true;
 
   // 🔴 EL FILTRO VIVE EN `medirHoras`, Y ACÁ NO SE REPITE (27-ago-2026).

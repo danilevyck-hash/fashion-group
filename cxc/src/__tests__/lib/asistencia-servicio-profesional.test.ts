@@ -159,13 +159,29 @@ describe("🔴 MITAD 1 — fuera de TODO cálculo de pago", () => {
     expect(l.horas.diasTrabajados).toBe(10);
     // 🔴 3-sep-2026 — Daniel precisó cuál mitad: *«yulisa marca pero no deberia
     // de calcular ya que es salario fijo, es solo para ver sus tardanzas y
-    // ausencias»*. Las horas con recargo salen en CERO (antes viajaban enteras:
-    // 120 diurnas, 60 nocturnas, 480 de domingo).
-    expect(l.horas.extraDiurnoMin).toBe(0);
-    expect(l.horas.extraNocturnoMin).toBe(0);
-    expect(l.horas.domingoMin).toBe(0);
-    expect(l.extraMedido).toBeNull();
-    expect(l.extraNoAprobada).toBeNull();
+    // ausencias»*. Las horas con recargo salían en CERO.
+    // ⚠️ CAMBIÓ DE DIRECCIÓN EL 14-sep-2026: eso ya no lo decide la bandera
+    // sino la casilla «¿Cobra horas extra?» (Daniel: *«los servicios
+    // profesionales de fashion wear sí llevan horas extras»*, *«solo yulissa no
+    // cobra»*). Con la casilla en SÍ (el default) las horas VIAJAN enteras —
+    // 120 diurnas, 60 nocturnas, 480 de domingo— y `extraMedido` las dice, sin
+    // monto porque no hay rata: la plata sigue sin calcularse.
+    expect(l.horas.extraDiurnoMin).toBe(120);
+    expect(l.horas.extraNocturnoMin).toBe(60);
+    expect(l.horas.domingoMin).toBe(480);
+    expect(l.extraMedido).not.toBeNull();
+    expect(l.extraMedido!.minutos).toBe(180);
+    expect(l.extraMedido!.monto).toBeNull();
+    // Y el CONTROL que sigue cazando lo del 3-sep para Yulissa: con la casilla
+    // en NO, todo en cero, como ese día.
+    const y = linea(fichaCompleta({ servicioProfesional: true, cobraHorasExtra: false }), horas);
+    expect(y.dinero).toBeNull();
+    expect(y.horas.extraDiurnoMin).toBe(0);
+    expect(y.horas.extraNocturnoMin).toBe(0);
+    expect(y.horas.domingoMin).toBe(0);
+    expect(y.extraMedido).toBeNull();
+    expect(y.extraNoAprobada).toBeNull();
+    expect(y.horas.tardanzaMin).toBe(45);
   });
 
   it("no entra al total, y NO se cuenta como pendiente", () => {

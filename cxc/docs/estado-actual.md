@@ -2395,3 +2395,23 @@ De ahí salió la memoria [[lo-escrito-caduca]] y el candado de tamaño ya exist
 - **El punto 21 no se pudo confirmar**: *«Andrea 16, Julio 11, Rodrigo 13, estos no deben de estar en el módulo, solo Angela»* — no se sabe de qué módulo hablaba. Hay que preguntárselo.
 - **El hilo con la contadora quedó a mitad de frase** el 13-sep 18:25: *«¿Qué le respondo? ¿Pongo send o no?»*. Nadie sabe qué se le contestó a Yulissa.
 - 🩸 **`estado-actual.md` salta del 5-sep al 9-sep**: el 6, 7 y 8 de septiembre no tienen una sola línea y viven solo en los commits.
+
+
+---
+
+## 14-sep-2026 (noche) — Extras del servicio profesional, días afuera y Compensatorio
+
+Tres definiciones de Daniel después de mirar las planillas reales de la contadora. 🔴 **Medido contra producción antes y después (solo lectura, `scripts/_medir-almuerzo-por-empresa.ts`, 1–15 sep y 16–31 ago): 0 cambios de neto, de extras y de ausencias** — 45 y 40 colaboradores, neto total $10.864,30 = $10.864,30 y $10.488,92 = $10.488,92.
+
+### Lo que se hizo
+1. **El servicio profesional cobra horas extra, menos Yulissa.** Daniel: *«los servicios profesionales de fashion wear sí llevan horas extras»*, *«solo yulissa no cobra, todos los demás sí. Ella es la única excepción hoy y siempre»*. `armarLinea`: `sinRecargos = noCobraExtra` (era `fueraDePlanilla || noCobraExtra`). Aprobaciones dejó de saltarse al servicio profesional; el Reporte y su ruta preguntan por la casilla `cobra_horas_extra`. El comentario del 3-sep sobre Yulissa se conserva con la nota de hoy. Yulissa (26) ya tenía la casilla en NO: no cambia. Daniel Levy (52) está inactivo y sin marcas desde el 7-ago: no cambia. ⚠️ El servicio profesional sigue sin `dinero`: sus extras se MIDEN y `monto` es `null`.
+2. **Los días afuera.** «Trabajo de vendedor» por rango desde la ficha ya existía; se agregó la nota bajo el motivo (`TEXTO_DIA_AFUERA`): se paga como un día normal de 8 horas (9:00 a 18:00 con una hora de almuerzo), solo los días sin marca. **El horario NO se guarda** — como horas sería un permiso y el día pasaría a ausencia (medido: Rodrigo tiene dos filas así del 14-ago). Rodrigo ya tiene 7 justificaciones día por día en septiembre (2, 3, 4, 7, 8, 9, 10) y una sola marca (1-sep).
+3. **«Compensatorio»**, sexto motivo, al lado de Incapacidad, no descuenta, sin migración (no hay CHECK sobre `motivo`).
+
+Candados: `servicio-profesional-cobra-extra.test.ts` · `dias-afuera-y-compensatorio.test.ts` · `justificar-form-nota-motivo.test.tsx`; seis cambiaron de dirección con nota fechada. Mutación: `scripts/_mutar-candados-dias-afuera-y-extras-sp.sh` (20/20, 2 controles). `npm test` y `npx next build` verdes. **Sin commit.**
+
+### ⚠️ Dejado a propósito / pendiente de Daniel
+- **Marcar a los 7 de Fashion Wear como servicio profesional los SACA de la planilla** (sin quincenal, sin seguros, sin neto): suman $1.888,81 en 1–15 sep. Si lo que quiere es «sin seguros» o «fuera de planilla pero con las extras calculadas», es otra definición.
+- **El horario 9–18 no se puede cambiar en pantalla** (no se guarda). Si un día afuera fuera de medio día, hoy no hay cómo decirlo.
+- **Quien está afuera la quincena ENTERA y no marca ni un día cae en «Tú decides»** (regla vigente de justificación de período completo), no en pago automático. Hoy no le pasa a nadie con salario.
+- **Los 30 min de extra automáticos de Multifashion** no se generan en un día afuera (no hay marcas). Las 5 fichas de Multifashion siguen sin salario.

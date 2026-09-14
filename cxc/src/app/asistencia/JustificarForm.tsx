@@ -17,16 +17,27 @@
  * se ponga rango de hora solamente en constancia, porque no siempre es todo el
  * día, sino unas horas»*. Al elegir Constancia aparecen los dos selectores de
  * hora (`type="time"`, como el de corregir una hora); vacíos = el día completo.
- * Los otros cuatro motivos siguen de día completo y no muestran horas. La regla
+ * Los otros motivos siguen de día completo y no muestran horas. La regla
  * es `motivoAdmiteHoras` (`lib/asistencia/permiso-horas.ts`), la misma que la
  * ruta aplica al guardar.
+ *
+ * 🔴 LOS DÍAS AFUERA SON «TRABAJO DE VENDEDOR» CON RANGO (14-sep-2026). Daniel:
+ * *«a ellas cuando están afuera se les paga el día regular como si hubiesen
+ * trabajado las 8 horas, en horario de 9-6, con una hora de almuerzo»* — las
+ * impulsadoras de Multifashion y Rodrigo (13). No nace un mecanismo: es este
+ * mismo formulario, con «Días» de-hasta, que ya existía. Lo que se agregó es
+ * la NOTA debajo del motivo (`notaDelMotivo`): dice que se paga como un día
+ * normal de 9 a 6 y que solo cuenta los días sin marca. El horario NO se
+ * guarda y NO se teclea — ver `TEXTO_DIA_AFUERA` en `motivos.ts` por qué
+ * guardarlo como horas convertiría el día en una ausencia. Compensatorio lleva
+ * su nota igual.
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { useState } from "react";
 
 import { useToast } from "@/components/ToastSystem";
 import RangoFechas from "@/components/ui/RangoFechas";
-import { MOTIVOS_JUSTIFICACION } from "@/lib/asistencia/motivos";
+import { MOTIVOS_JUSTIFICACION, notaDelMotivo } from "@/lib/asistencia/motivos";
 import { horasParaGuardar, motivoAdmiteHoras, ventanaDe } from "@/lib/asistencia/permiso-horas";
 
 export default function JustificarForm({
@@ -49,6 +60,8 @@ export default function JustificarForm({
   const [horaDesde, setHoraDesde] = useState("");
   const [horaHasta, setHoraHasta] = useState("");
   const conHoras = motivoAdmiteHoras(motivo);
+  // 🔴 Una línea para «Trabajo de vendedor» y «Compensatorio»; nada para los demás.
+  const notaMotivo = notaDelMotivo(motivo);
 
   async function agregar() {
     // Las dos horas viajan juntas y hacia adelante: la MISMA función que usa el
@@ -92,6 +105,9 @@ export default function JustificarForm({
         <RangoFechas desde={desde} hasta={hasta} label="Días"
           onChange={(d, h) => { setDesde(d); setHasta(h); }} />
       </div>
+      {notaMotivo && (
+        <p className="text-[12px] text-gray-500 sm:col-span-2" data-nota-motivo>{notaMotivo}</p>
+      )}
       {/* 🔴 SOLO CON CONSTANCIA. Dos selectores del sistema, como el de corregir
           una hora; vacíos = el día completo. Se dice qué hacen antes de guardar:
           la diferencia entre «el día entero» y «de 8 a 10» es ocho horas de sueldo. */}
