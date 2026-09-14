@@ -2342,3 +2342,20 @@ Encargo de Daniel sobre el mapa medido de Ventas (`_paraclaude`/`tmp/ventas/mapa
 - **Clientes › Utilidad sirve el año** aunque el selector diga «Últimos 12 meses»: `utilidad_por_cliente_v2` no tiene ventanas. La pantalla lo dice («· Año 2026»). Agregarle ventanas es otra RPC.
 - **Al pasar por el Resumen con «Últimos 12 meses» elegido, el Resumen muestra el año en curso** y el desplegable dice «Año 2026»; al volver a Productos la ventana sigue ahí (la URL la conserva). Es la regla «cada pestaña sirve lo que sabe».
 - **Los tests de `src/__tests__` con errores de tipos preexistentes** (266 en `main`; ninguno nuevo de este trabajo) siguen igual: no era parte del encargo.
+
+---
+
+## 14-sep-2026 — CLAUDE.md cabe otra vez en el harness
+
+Claude Code corta CLAUDE.md a **150.000 caracteres** y no dice qué quedó afuera. El archivo pesaba **333.000**: desde algún punto de Guías para abajo —Asistencia, Préstamos, Crons, Ventas, Clientes, Multifashion, «Dónde vive cada dato», los crons— **ninguna sesión lo estaba leyendo**. Daniel: *«A»* (recortarlo ahora).
+
+### Lo que se hizo
+- **CLAUDE.md pasó de 333.000 a 105.000 caracteres.** Ningún texto se borró: cada bloque de «Invariantes por módulo» se movió **verbatim** a su postmortem, bajo un título «Lo que decía CLAUDE.md hasta el 14-sep-2026», y en CLAUDE.md quedó un resumen de una o dos líneas por regla.
+- **Criterio del recorte, en dos pasadas.** Primera: fuera mediciones, citas, conteos de mutaciones y la historia de cada 🩸. Segunda, porque no alcanzó: en CLAUDE.md quedan las reglas de **DATOS y PLATA** (qué se guarda, calcula, paga, manda; permisos; flags con su estado; migraciones pendientes; umbrales; decisiones pendientes de Daniel; candados); las reglas de **PANTALLA** (qué se dibuja, dónde, rótulos, tamaños) viven solo en el postmortem, y el encabezado de la sección manda a leerlo antes de tocar una pantalla.
+- **Siete postmortems nuevos** para módulos que no tenían: `reclamos.md` · `caja-menuda.md` · `marketing-gastos.md` · `proveedores.md` · `usuarios-inicio-teclado.md` · `clientes.md` · `barras-pegajosas.md`.
+- **Dos docs de referencia nuevos**: `docs/donde-vive-cada-dato.md` (el mapa por pregunta, entero) y `docs/crons.md` (la tabla de 80 entradas). CLAUDE.md deja un puntero y las reglas que no cambian.
+- **Candado nuevo `claude-md-bajo-el-tope.test.ts`**: build rojo si CLAUDE.md pasa de **130.000** caracteres (20.000 de margen antes del corte) o si deja de apuntar a los docs movidos. La regla de la casa desde hoy está escrita en la cabecera de «Invariantes por módulo»: una regla nueva entra en UNA línea y el detalle va al postmortem.
+
+### ⚠️ Dejado a propósito / pendiente de Daniel
+- Los postmortems crecieron con el texto movido (guias.md 243 KB, catalogos-pedidos.md 244 KB, ventas-referencia.md 234 KB). No los lee el harness solo; se leen cuando se toca el módulo. Si algún día molestan, se parten por fecha — pero no hoy.
+- Los agentes reportaron cuatro reglas de datos que quedaron solo en el postmortem por espacio: en Préstamos, que `mercancia`, `isr` y `otros_servicios` siguen `NOT NULL DEFAULT 0`; en Recordatorios, que el código no degrada sin la DDL; en Gastos, «Todavía no hay gastos registrados» en vez de `$0.00`; en Boston, que cerrar y reabrir la quincena son de quien cierra. Todas siguen con su candado.

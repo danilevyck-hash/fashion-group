@@ -377,3 +377,10 @@
 ### Attempted & Reverted
 - Face ID (WebAuthn): implemented and removed — too unstable on serverless (DER/P1363 format issues, challenge storage in memory)
 - Trading bot dashboard: added and removed — localhost IBKR gateway not accessible from Vercel
+
+
+---
+
+## Packing Lists (movido desde CLAUDE.md › Módulos el 14-sep-2026, verbatim)
+
+> 🩸 **«Packing Lists» (key `packing-lists`) se RETIRÓ el 10-sep-2026.** Daniel, textual: *«packing list no se usa, eliminar»*. Medido ese día contra producción: `packing_lists` y `pl_items` con **0 filas** —vacías desde el 14-may-2026, cuando el cron viejo borró de verdad las 28 que había— y **34 rastros** en `activity_logs` en toda su historia: 7 cargas y 3 borrados, todos de `daniel`, entre el 18 y el 22-abr-2026, más 24 latidos del cron. **Bodega y las secretarias, que lo tenían en el menú, no lo usaron nunca.** Se fueron la ficha, la pantalla, las 3 rutas API, el lector de PDF y el cron `cleanup-packing-lists`; **las tablas NO se dropean** (patrón `mayor_lineas`) y quedan clasificadas `retirada` — fuera del respaldo, que se puede porque no hay una sola fila que proteger. `/packing-lists` y `/packing-lists/<id>` redirigen a `/home` (307). Migración `20261110120000` (aplicada): saca la key de `role_permissions` (admin · secretaria · bodega) y de los dos `modulos_override` (Angela y andrea), y barre el heartbeat huérfano del cron. Candado: `packing-lists-retirado.test.ts`.

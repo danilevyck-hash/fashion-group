@@ -368,3 +368,70 @@ aprobación no sale**: en un papel sin su contexto se leería como si ya se hubi
    $100. Si de verdad se fue, la baja se marca en **Asistencia**.
 2. ⚠️ **STEPHANY MORALES** queda con préstamo −$254,50 / daño +$254,50 (neto $0). Se respeta lo
    registrado; si Daniel quiere que se reasigne, es una migración aparte y a propósito.
+
+
+---
+
+## Lo que decía CLAUDE.md hasta el 14-sep-2026 (movido acá, verbatim)
+
+> El 14-sep-2026 CLAUDE.md pasaba de 333 mil caracteres (el tope del harness es 150 mil) y las instrucciones se cortaban a la mitad. Se dejó ahí un resumen de las reglas vigentes y el texto completo —mediciones, citas de Daniel, candados y mutaciones— se movió acá sin cambiar una palabra.
+
+### Préstamos — [docs/postmortems/prestamos.md](docs/postmortems/prestamos.md)
+
+- 🔴 **Cada persona tiene DOS cuentas con su propia cuota: Préstamo y Daño de mercancía.** El total es
+  la suma de las dos y **no cambió**: medido antes de partirlo, 14 personas y **$5.062,01** ($4.962,01
+  + $100 de BRICEIDA MONTERO). Las 14 están congeladas una por una en `prestamos-dos-cuentas.test.ts`.
+- 🔴 **La pantalla ofrece TRES conceptos** (Préstamo · Daño de mercancía · Pago) pero **la base guarda
+  los CINCO de siempre**. `Responsabilidad por daño` NO se renombró: «Daño de mercancía» es una
+  ETIQUETA. Renombrar un concepto no revienta nada — **deja de contarse en silencio**.
+- Un **Pago baja UNA cuenta**; con las dos debiendo, «Baja de» viene puesto en la **más vieja** y se
+  puede cambiar. Sin fechas el desempate es **estable** (préstamo), nunca el orden del array.
+- 🔴 **El saldo se calcula en UN solo lugar** (`src/lib/prestamos-saldo.ts`). Había **ocho**, y el
+  único que no lo usaba era la ficha, con un `console.warn` admitiendo que podía no cuadrar.
+  `PRESTAMOS_ROLES` vive en `src/lib/prestamos-roles.ts`, no en seis archivos.
+- 🔴 **La bandera `activo` de la ficha se retiró**: nunca significó «trabaja acá» sino «tiene algo
+  abierto» (a ESMER le archivaron la ficha al terminar de pagar y sigue trabajando). **La columna NO
+  se borra** — queda sin lectores, con `COMMENT` y test que pone el build rojo si se dropea o si
+  alguien vuelve a filtrar por ella. La lista muestra **solo a quien debe**; quien llega a cero sale
+  solo; **quien ya no trabaja pero debe SÍ aparece**, marcado y sin descuento.
+- 🔴 **La persona sale de Asistencia**: el nombre, si trabaja y el salario. Una ficha nueva **nace con
+  su `empleado_codigo`**, elegido de las 37 personas activas — y ese código **ya se puede editar desde
+  la pantalla** (hasta el 5-sep-2026 no se podía desde ningún lado, y el aviso de la planilla decía que
+  sí; así nacieron **$400** de deuda que la planilla no podía descontar).
+- 🔴 **Nada se ata por parecido**, ni acá ni nunca: lista escrita a mano con el nombre que ese código
+  tiene que tener en Asistencia, y el UPDATE lo EXIGE. Barrido en `prestamos-amarre-migracion.test.ts`
+  sobre las **dos** migraciones del amarre.
+- 🔴 **NADIE APRUEBA UN PRÉSTAMO (11-sep-2026).** Daniel, textual: *«Aprobar préstamos: eso también se
+  quita»*. Un préstamo nace `aprobado` de una, lo registre quien lo registre. **El tope de UN SUELDO
+  MENSUAL** sobre la deuda **TOTAL** (préstamo + daño; **sin sueldo cargado, $500**) se sigue
+  calculando pero solo **AVISA**: en pantalla («pasa el tope… se registra igual y se le avisa a
+  Daniel») y por Telegram al chat privado, diciendo quién lo registró. **El daño de mercancía nunca
+  pasa por el tope** — ya se perdió, y no anotarla no la devuelve. Medido antes de retirarlo: **0
+  préstamos esperando** (447 movimientos, todos `aprobado`), así que no hubo nada que aprobar por
+  migración.
+- 🩸 **Lo que se fue con la aprobación**: la ruta `/api/prestamos/pendientes`, la pantalla «Por
+  aprobar», `puedeAprobarPrestamo` (admin **y** `daniel`), el estado pendiente en la lista, la ficha y
+  las tarjetas, y el cron **`prestamos-caducan`** (7 días sin respuesta → se borraba solo): salió de
+  `vercel.json`, del registro y de los crons que avisan. `ESTADO_PENDIENTE` y `pendienteDeAprobacion`
+  quedan en `prestamos-saldo.ts` sin lectores, para leer una fila vieja si apareciera. Candados que
+  cambiaron de dirección con nota: `prestamos-tope` · `prestamos-tope-y-duplicados` ·
+  `prestamos-un-solo-lugar` · `prestamos-salida-con-deuda` · `iphone-targets-prestamos` ·
+  `alertas-que-llegan` · `ipad-caja-prestamos-cheques`.
+- 🩸 **El freno de duplicados mira concepto + origen + fecha, NUNCA la nota.** Leía `notas ilike
+  'Deducción quincenal%'` y `ilike` no ignora acentos: **18 filas vivas lo burlaban**. `origen_pago`
+  en NULL se lee como Quincena — en la duda se omite, nunca se cobra dos veces. **La nota es opcional**
+  (8 de cada 10 eran un eco del concepto).
+- La planilla propone la cuota del **préstamo** en su casilla y la de **terceros** en la suya (el daño
+  no propone cuota), cada una capeada a SU saldo — y desde el 11-sep-2026 **entran solas**, sin
+  aprobar (ver Asistencia).
+- 🔴 **«No descontar el préstamo esta quincena» se decide en la FILA de la planilla, escribiendo 0** (11-sep-2026, Daniel: *«sí»* a poder saltarse una quincena). Las casillas «Préstamo» y «Terceros» de `asistencia_planilla_manual` tienen **tres estados** (migración `20261115120000`, **aplicada**): `NULL` = nadie escribió nada, va la cuota automática · `0` = escrito a propósito, **esta quincena no se descuenta** · monto = se descuenta ese monto. 🩸 Eran `NOT NULL DEFAULT 0` y el 0 se leía como «vacío → la cuota»: borrar la casilla traía la cuota, escribir 0 traía la cuota; el único camino era bajar la cuota en la ficha y volver a subirla. La regla vive en `lib/asistencia/casilla-sin-descontar.ts` (`estadoCasilla` · `valorTecleado`, la MISMA función para la pantalla y para `normalizarManuales`). Con 0 la celda muestra el 0 y debajo, **visible**, «No se descuenta esta quincena»; «Antes de cerrar» lo lista en la parte informativa (*«N préstamos sin descontar esta quincena, a propósito (nombre · $cuota)»*); el cierre **no anota pago** y lo dice como decisión (`sin-descontar`), no como olvido. **El 0 se muestra solo donde había una cuota que saltar.** La ficha del préstamo y «Anotar abono» **no se tocaron**. Backfill: **todo 0 pasó a NULL** — medido: 28 filas, `prestamo = 0` en 6 y `terceros = 0` en 28; hasta ese día un 0 solo podía significar «vacío», y así **nadie cambia de neto** (1–15 sep, 3 empresas: 12 personas, $495,00 antes = $495,00 después, 0 cambios; `scripts/_medir-sin-descontar-esta-quincena.ts`). ⚠️ `mercancia`, `isr` y `otros_servicios` siguen `NOT NULL DEFAULT 0`: no proponen cuota, así que 0 y vacío dicen lo mismo. Candados: `planilla-sin-descontar.test.ts` · `planilla-manual-cero-route.test.ts`; verificación por mutación en `scripts/_mutar-candados-sin-descontar.sh`.
+- 🩸 **«Eliminar Todo el Historial» dejó de ser el único hard delete del repo**: soft delete con
+  `logActivity`.
+- Al marcar la **fecha de salida** de alguien con deuda, Asistencia lo dice ahí mismo: *«Debe $100 —
+  descuéntalo de la liquidación»*. Sin Telegram.
+
+- 🔴 **El aviso «pasa el tope de un sueldo» sale en ÁMBAR y por 8 s** (11-sep-2026). 🩸 Salía como éxito verde y se iba a los 3 s: la pestaña clasificaba por el TEXTO (`startsWith("Error")`). Ahora `useMovimientoForm` manda el TIPO con el mensaje (`warning` con `sobreTope`, `error` ante un error, `success` si no), y `ToastSystem` lee `duracionToastMs(tipo)` — la regla de la casa: éxitos 3 s, errores y avisos 8 s — en vez de un 3000 escrito a mano.
+- 🔴 **«+ Préstamo» de la ficha abre el formulario CON esa persona** (`enlaceANuevoPrestamo(codigo)` → `?tab=prestamos&nuevo=<código>`; la pestaña elige a esa persona como si se la hubiera tocado). Sigue siendo LA MISMA puerta, no un formulario propio. 🩸 Llevaba a la lista general y había que volver a buscarla.
+- 🔴 **«+ Nuevo préstamo» ofrece solo a los de la empresa elegida arriba** (con «Todas», todos). 🩸 La lista y el total filtraban; el alta ofrecía a las 4.
+- 🩸 **`cron_heartbeats` conservaba la fila `prestamos-caducan`** (el cron se retiró el 11-sep): migración `20261116120000_borrar_heartbeat_prestamos_caducan.sql` (DELETE por nombre EXACTO, patrón `sync-mayor`), **aplicada y verificada** (0 filas). Candados: `prestamos-tope-ambar-y-nuevo-desde-ficha.test.tsx` · `prestamos-salida-con-deuda.test.tsx` (la migración).
+

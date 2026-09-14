@@ -372,3 +372,29 @@ candados que faltan no se ven leyendo los que hay.**
 | **Correr `20260925130000_recordatorios_rediseno.sql`** | 🔴 pendiente. El código **no degrada** sin ella (la tolerancia a «falta el DDL» se retiró de este módulo el 3-sep-2026, a propósito) |
 | «Recordarme este cliente» desde la hoja **Cobrar** del CXC | pendiente — toca archivos del módulo CXC, que se estaba tocando en paralelo |
 | Un chat privado por admin | ⚠️ no existe y no se inventó. Ver § 4 |
+
+
+---
+
+## Lo que decía CLAUDE.md hasta el 14-sep-2026 (movido acá, verbatim)
+
+> El 14-sep-2026 CLAUDE.md pasaba de 333 mil caracteres (el tope del harness es 150 mil) y las instrucciones se cortaban a la mitad. Se dejó ahí un resumen de las reglas vigentes y el texto completo —mediciones, citas de Daniel, candados y mutaciones— se movió acá sin cambiar una palabra.
+
+### Recordatorios (era Cheques) — [docs/postmortems/recordatorios.md](docs/postmortems/recordatorios.md)
+
+- La pantalla vive en **`/recordatorios`** desde el 5-sep-2026 (era `/cheques`, con redirect 307 en `next.config.js`). 🔴 **La `key` del módulo sigue siendo `cheques`** — está en `role_permissions` y en `fg_users.modulos_override`. Entran **admin y secretaria**, nadie más.
+- 🔴 **UNA sola lista, sin pestañas**, con cheques y recordatorios juntos, agrupada por CUÁNDO: **Vencido · Hoy · Esta semana · Después · Se repiten**. Eran **8 pestañas**; cuatro de ellas —vencido, vencen hoy, vencen mañana, vencen esta semana— **nunca fueron estados: son CUÁNDO**, y una fecha ya lo dice. «Rebotado» dejó de ser pestaña (cero filas en toda la historia): es una marca roja, y el cheque **se queda** hasta que se redeposite o se borre.
+- 🔴 **La lista muestra solo lo ABIERTO. Lo depositado NO está en la lista pero SÍ aparece al BUSCARLO** (por cliente o número de cheque): el buscador mira TODO y es la única puerta a lo depositado.
+- 🔴 **NINGÚN total sumado, en ninguna parte** — ni tarjetas arriba, ni al pie de un grupo, ni en el calendario. Los montos por fila se quedan; el encabezado dice CUÁNTOS. `lib/recordatorios/agenda.ts` **no tiene una sola operación de suma** y hay candado que lo exige.
+- 🔴 **Escribir un recordatorio es UN RENGLÓN** siempre visible (`¿Qué te recuerdo?` + Cuándo + A quién + Cliente opcional + Guardar). Seis pastillas de «Cuándo»: `Mañana · Lunes · Elegir fecha · Cada día · Cada semana · Cada mes`, más un **«Hasta…» opcional** que **corta INCLUSIVE** y solo existe con repetición.
+- 🔴 **«Hoy» NO existe como opción y NO hay selector de hora.** Todo sale en **UN mensaje diario a las 9:00 a.m.** de Panamá; el primero disponible es MAÑANA. Guardar para un día que ya pasó **no se permite y se dice por qué**, en pantalla y en el servidor (con la fecha de Panamá). ⚠️ **Editar no exige mover la fecha**: el freno solo mira la fecha cuando CAMBIÓ — si no, un semanal arrancado en junio no se podría corregir nunca.
+- 🔴 **`destino` = `equipo` (📊 el grupo) o `privado` (el chat de Daniel). Lo decide el ROL en el SERVIDOR** (`destinoPermitido`): la opción la ven solo los admin y lo de una secretaria va SIEMPRE al equipo. Ante la duda, `equipo` — caer en privado escondería del grupo un aviso que nadie pidió esconder. ⚠️ **Hay UN solo chat privado y DOS admin**: si Alberto marca «solo a mí», le llega a **Daniel**. Aprobado así.
+- 🔴 **Un recordatorio NO se marca como hecho** (Daniel: *«No quiero tener que meterme para poner que lo hice. Se supone que sí.»*) y **un cheque que no se va a cobrar SE BORRA**, no se marca (*«no lo quiero marcar»*). No existe ningún estado de completado ni de «no se cobró».
+- 🩸 **UN CHEQUE QUE VENCIÓ Y NADIE MARCÓ NO SE VOLVÍA A MENCIONAR JAMÁS** — el aviso solo miraba hoy y el próximo día hábil. Medido el 5-sep-2026: Vistana chq 018094, Edwin, **$18.393,32**, vencía el 31-ago y seguía pendiente 5 días después. Bloque nuevo `🔴 N cheque(s) venció…`, que sale **UNA SOLA VEZ** y no se repite nunca más (memoria en `cheques.aviso_vencido_en`). **Se marca DESPUÉS de que Telegram confirme** — marcar antes y que el envío falle quemaría el único aviso de ese cheque. Un **rebotado no avisa**.
+- 🔴 **A los 365 días un cheque DEPOSITADO se retira solo**, con **soft delete** (`deleted` + `deleted_at`), nunca un DELETE, y **solo los depositados**: lo que se debe se queda para siempre. Se cuenta desde `fecha_depositado` (sin ella, `fecha_deposito`; **nunca «hoy»**). Corre **dentro de `cheques-alert`, sin cron nuevo** — ese cron ya toca la tabla, y hoy son 82 entradas de un tope de 100. ⚠️ No corre fin de semana; con 365 días de umbral da igual.
+- 🔴 **Se QUITÓ la línea `WhatsApp seguimiento: +50766745522, +50766494096`** del aviso de cheques (Daniel: *«nada, es recordatorio nada más»*). **El resto del texto no se tocó, palabra por palabra.**
+- 🔴 **El Excel se retiró** (Daniel: *«se va»*). Los datos siguen en la base; lo que se fue es la descarga. El candado de «N lugares arman una hoja» bajó de **25 a 24** a propósito y con nota.
+- El archivo de la pantalla pasó de **1.693 líneas a 800** (el límite de la casa), repartido en seis piezas bajo `src/app/recordatorios/`, con las decisiones en módulos PUROS (`lib/recordatorios/{agenda,cuando,recordatorio}.ts`, `lib/cheques-{vencidos-aviso,retencion}.ts`).
+- Migración **`20260925130000_recordatorios_rediseno.sql`** (**aplicada**, verificada el 5-sep-2026): `recordatorios` gana `hasta` y `destino` y el CHECK de `repeticion` gana `cada_dia`; `cheques` gana `aviso_vencido_en` y `deleted_at`. **Aditiva** — ni una fila cambia de valor. ⚠️ El código **no degrada** sin ella (la tolerancia a «falta el DDL» se retiró de este módulo el 3-sep-2026, a propósito).
+- Candados: `recordatorios-rediseno.test.ts` · `recordatorios-pantalla.test.tsx` · `recordatorios-permiso-y-aviso.test.ts` · `recordatorios-cuando-tocan.test.ts` · `cheques-aviso-vencimiento.test.ts`; **56 mutaciones, 56 cazadas** (`scripts/_mutar-candados-recordatorios.sh`, con 2 controles).
+
