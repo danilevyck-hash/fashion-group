@@ -521,6 +521,14 @@ export interface PrestamoAutomatico {
    * y «Antes de cerrar» (`prestamosSinDescontar`).
    */
   sinDescontar?: { prestamo: number; terceros: number; mercancia: number };
+  /**
+   * 🔴 Lo que se proponía y NO entró porque el neto no alcanzaba (14-sep-2026,
+   * Daniel: *«descuenta lo que alcance y el resto queda debiendo»*). Lo pone
+   * `recortarAlNeto` (`neto-no-negativo.ts`) al final de la ruta; `prestamo` /
+   * `terceros` / `mercancia` de arriba ya vienen achicados a lo que SÍ entró.
+   * Lo leen la celda, «Antes de cerrar» y el cierre.
+   */
+  recortado?: { prestamo: number; terceros: number; mercancia: number };
 }
 
 /**

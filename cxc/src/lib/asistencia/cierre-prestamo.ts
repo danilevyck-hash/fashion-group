@@ -109,6 +109,14 @@ export type MotivoOmision =
    * la respeta — no anota pago y no la confunde con «casilla-en-cero».
    */
   | "sin-descontar"
+  /**
+   * 🔴 El neto no alcanzó ni para una parte de la cuota (14-sep-2026,
+   * `neto-no-negativo.ts`): esta quincena no se le descontó nada de esa cuenta
+   * y el saldo sigue igual. No es un olvido ni una decisión de la contadora:
+   * es la red de seguridad, y se dice como tal. (Un recorte PARCIAL no pasa por
+   * acá: se anota el pago por lo que sí entró, que es lo que dice `dinero`.)
+   */
+  | "neto-no-alcanzo"
   /** El módulo ya tenía el pago de esta quincena. Regla 2. */
   | "ya-registrado"
   /** No debe nada en ninguna de las dos cuentas. */
@@ -186,6 +194,14 @@ export function planDeCierre(opts: {
       const saldo = deuda ? n(deuda[c.saldo] as number) : 0;
 
       if (monto <= 0) {
+        // 🔴 LA CUOTA SE RECORTÓ A CERO PORQUE EL NETO NO ALCANZABA (14-sep-2026).
+        // Vale para las TRES cuentas, el daño incluido: no se anota pago y el
+        // saldo queda igual — el resto se cobra la próxima. Se mira ANTES del
+        // 0 a propósito y de la casilla en cero, que son otras dos historias.
+        if (n(l.prestamoAutomatico?.recortado?.[c.campo]) > 0) {
+          omisiones.push({ codigo: l.codigo, etiqueta: l.etiqueta, monto: 0, motivo: "neto-no-alcanzo" });
+          continue;
+        }
         // 🔴 UN 0 ESCRITO A PROPÓSITO NO ES UNA CASILLA EN CERO. La contadora
         // decidió no descontar esta quincena: no se anota pago, y se dice como
         // decisión, no como algo que faltó. Solo las dos casillas automáticas
@@ -259,6 +275,7 @@ export function textoPlan(plan: PlanDeCierre): string | null {
 export const TEXTO_OMISION: Readonly<Record<MotivoOmision, string>> = {
   "casilla-en-cero": "debe, pero esta quincena no se le descontó nada",
   "sin-descontar": "esta quincena no se le descuenta, a propósito (casilla en 0)",
+  "neto-no-alcanzo": "el neto no alcanzó para la cuota: esta quincena no se le descontó y sigue debiendo",
   "ya-registrado": "el pago de esta quincena ya estaba anotado en Préstamos",
   "sin-saldo": "se le descontó, pero ya no debe nada",
   "sin-ficha": "se le descontó, pero no está atado a ninguna ficha de Préstamos",

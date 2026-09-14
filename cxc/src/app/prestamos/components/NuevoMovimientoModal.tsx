@@ -16,6 +16,7 @@ import {
   type CuentaPrestamo,
 } from "@/lib/prestamos-saldo";
 import { evaluarTopePrestamo, textoAvisoTope } from "@/lib/prestamos-tope";
+import { queFaltaParaRegistrar, textoFaltaRegistrar } from "@/lib/prestamos-registrar";
 import { MOV_TIPOS } from "./types";
 
 /**
@@ -119,7 +120,14 @@ export default function NuevoMovimientoModal({
   // 🔴 EN UN PAGO HAY QUE ELEGIR DE DÓNDE SALIÓ. Ya no viene ninguna puesta
   // (ver `ORIGENES_QUE_SE_OFRECEN`), así que si no se exige, el campo se salta
   // — que es exactamente lo que pasó las 434 veces anteriores.
-  const listo = Number(monto) > 0 && !!fecha && !guardando && (!esPago || !!origen);
+  //
+  // 🔴 Y LA CUOTA ES OBLIGATORIA (14-sep-2026, Daniel: *«a) La cuota es
+  // obligatoria: no te deja guardar sin ella»*): un préstamo, un daño o un
+  // descuento a terceros sin cuota no se descuenta NUNCA solo. Un pago no la
+  // pide. La regla y la frase «Falta: …» viven en `lib/prestamos-registrar.ts`.
+  const faltantes = queFaltaParaRegistrar({ fecha, monto, cuota, pideCuota: preguntaCuota, esPago, origen });
+  const textoFalta = textoFaltaRegistrar(faltantes);
+  const listo = faltantes.length === 0 && !guardando;
 
   async function guardar() {
     if (!listo) return;
@@ -192,8 +200,8 @@ export default function NuevoMovimientoModal({
 
         {preguntaCuota && (
           <div>
-            <label className="text-xs text-gray-400 uppercase">Cuota por quincena ($)</label>
-            <input type="number" step="0.01" min="0" value={cuota} onChange={e => setCuota(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
+            <label className="text-xs text-gray-400 uppercase">Cuota por quincena ($) *</label>
+            <input type="number" step="0.01" min="0.01" value={cuota} onChange={e => setCuota(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
             <p className="mt-1 text-xs text-gray-400">Se descuenta sola en cada planilla hasta pagarlo. Queda guardada en la ficha.</p>
           </div>
         )}
@@ -230,9 +238,14 @@ export default function NuevoMovimientoModal({
         </div>
       </div>
 
-      <div className="flex gap-3 mt-6">
+      {/* 🔴 El botón apagado DICE qué falta (patrón de Guías: «Falta: …»),
+          visible y no solo en el `title`: en el iPad no hay mouse. */}
+      {textoFalta && !guardando && (
+        <p className="mt-4 text-xs text-amber-700" data-testid="falta-para-registrar">{textoFalta}</p>
+      )}
+      <div className={`flex gap-3 ${textoFalta && !guardando ? "mt-2" : "mt-6"}`}>
         <button onClick={onCancelar} className="flex-1 inline-flex min-h-[44px] items-center justify-center border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
-        <button onClick={guardar} disabled={!listo} className="flex-1 inline-flex min-h-[44px] items-center justify-center bg-black text-white rounded-md text-sm hover:bg-gray-800 transition disabled:opacity-50">
+        <button onClick={guardar} disabled={!listo} title={textoFalta || undefined} className="flex-1 inline-flex min-h-[44px] items-center justify-center bg-black text-white rounded-md text-sm hover:bg-gray-800 transition disabled:opacity-50">
           {guardando ? "Guardando..." : "Registrar"}
         </button>
       </div>

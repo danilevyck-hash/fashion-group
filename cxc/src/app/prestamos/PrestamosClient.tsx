@@ -428,6 +428,15 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
               cuentaMasVieja={filas.find((f) => f.id === personaElegida.fichaId)?.cuentaMasVieja ?? null}
               salarioMensual={personaElegida.salarioMensual}
               hoy={hoy}
+              // 🔴 SIN ESTO EL FORMULARIO NO PREGUNTA LA CUOTA (14-sep-2026). Esta
+              // lista es la puerta VIVA mientras la planilla unida esté apagada,
+              // y desde aquí un préstamo se registraba sin cuota: no se
+              // descontaba nunca. Misma forma que la pestaña y la ficha.
+              cuotaActual={{
+                prestamo: filas.find((f) => f.id === personaElegida.fichaId)?.cuotaPrestamo ?? 0,
+                terceros: filas.find((f) => f.id === personaElegida.fichaId)?.cuotaTerceros ?? 0,
+                dano: filas.find((f) => f.id === personaElegida.fichaId)?.cuotaDano ?? 0,
+              }}
               onCancelar={() => { setShowMovModal(false); setPersonaElegida(null); }}
               onGuardar={crearMovimiento}
             />

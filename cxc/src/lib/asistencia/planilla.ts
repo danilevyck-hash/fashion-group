@@ -1406,6 +1406,12 @@ export interface LineaPlanilla {
      * aplica. Es lo que la celda y «Antes de cerrar» dicen.
      */
     sinDescontar?: { prestamo: number; terceros: number; mercancia: number };
+    /**
+     * 🔴 La parte de la cuota que NO entró porque el neto no alcanzaba
+     * (14-sep-2026, `neto-no-negativo.ts`): se descontó lo que alcanzó y el
+     * resto queda debiendo. Los tres de arriba ya vienen achicados. 0 = no aplica.
+     */
+    recortado?: { prestamo: number; terceros: number; mercancia: number };
   };
   ajusteAnterior?: number;
   /**

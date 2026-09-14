@@ -136,6 +136,7 @@ import {
   type PersonaEnCuadro,
 } from "@/lib/asistencia/prestamos-planilla";
 import { leerPrestamosDeQuincena } from "@/lib/asistencia/prestamos-planilla-server";
+import { recortarAlNeto } from "@/lib/asistencia/neto-no-negativo";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -837,6 +838,17 @@ export async function GET(req: NextRequest) {
         totalAjuste = Math.round(totalAjuste * 100) / 100;
       }
     }
+
+    // ── 🔴 EL NETO NUNCA QUEDA EN NEGATIVO (14-sep-2026) ─────────────────────
+    //
+    // Daniel: *«Que nunca pase del neto: descuenta lo que alcance y el resto
+    // queda debiendo»*. Va AL FINAL, después de la cuota y del ajuste: el neto
+    // que se mira es el que se paga. Solo achica lo AUTOMÁTICO (lo escrito a
+    // mano manda), en el orden daño → terceros → préstamo, y deja anotado en
+    // `prestamoAutomatico.recortado` cuánto quedó afuera para que la celda,
+    // «Antes de cerrar» y el cierre lo digan. Sin nada que recortar, la línea
+    // vuelve con la MISMA referencia. Regla en `neto-no-negativo.ts`.
+    lineasFinal = lineasFinal.map((l) => recortarAlNeto(l));
 
     return NextResponse.json({
       // `quincena` se mantiene con el mismo nombre y forma para no romper a

@@ -25,6 +25,7 @@ import { fechaCortaCorte, fraseCorte } from "./elegir-quincena";
 import type { CodigoSinFicha } from "./periodo";
 import type { PrestamoSinAtar } from "./prestamos-planilla";
 import { textoSinDescontar, type SinDescontar } from "./casilla-sin-descontar";
+import { textoCuotasRecortadas, type CuotaRecortada } from "./neto-no-negativo";
 import { PESTANA_PRESTAMOS } from "@/lib/prestamos-una-puerta";
 
 /** Una persona detrás de una línea (las de «ver quiénes»). */
@@ -90,6 +91,12 @@ export interface EntradaAntesDeCerrar {
    * el cuadro, no algo que arreglar. Opcional: sin pasarlo, nada cambia.
    */
   sinDescontar?: readonly SinDescontar[];
+  /**
+   * 🔴 Las cuotas que NO entraron enteras porque el neto no alcanzaba
+   * (14-sep-2026, `neto-no-negativo.ts`). Es plata que se movió: va con nombre
+   * y monto, en ámbar. Opcional: sin pasarlo, nada cambia.
+   */
+  recortadas?: readonly CuotaRecortada[];
   /** El aviso de las vacaciones ya pagadas, ya redactado (nombre, rango y monto). */
   avisoVacacionesNoPagadas: string | null;
   conSabado: number;
@@ -231,6 +238,13 @@ export function armarAntesDeCerrar(e: EntradaAntesDeCerrar): AntesDeCerrar {
   const sinDescontar = textoSinDescontar(e.sinDescontar ?? []);
   if (sinDescontar) {
     info.push({ clave: "sin-descontar", numero: e.sinDescontar!.length, texto: sinDescontar, enlace: null, tono: "info" });
+  }
+  // 🔴 «N cuotas recortadas para que el neto no quede en negativo» — plata que
+  // NO salió del sueldo y sigue debiéndose (14-sep-2026). Con nombre y monto,
+  // en ámbar: un recorte silencioso es lo que esta casa no hace.
+  const recortadas = textoCuotasRecortadas(e.recortadas ?? []);
+  if (recortadas) {
+    info.push({ clave: "recortadas", numero: e.recortadas!.length, texto: recortadas, enlace: null, tono: "plata" });
   }
   if (e.avisoVacacionesNoPagadas) info.push({ clave: "vacaciones", numero: null, texto: e.avisoVacacionesNoPagadas, enlace: null, tono: "plata" });
   if (e.conSabado > 0) {

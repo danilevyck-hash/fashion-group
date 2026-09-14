@@ -96,6 +96,12 @@ import {
   prestamosSinDescontar,
   valorTecleado,
 } from "@/lib/asistencia/casilla-sin-descontar";
+import {
+  TITULO_RECORTE,
+  cuotasRecortadas,
+  recorteDeCasilla,
+  textoRecorteCelda,
+} from "@/lib/asistencia/neto-no-negativo";
 import AntesDeCerrar from "./AntesDeCerrar";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 // 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
@@ -1158,6 +1164,9 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           // 🔴 Las casillas con 0 a propósito, calculadas de las MISMAS líneas
           // que dibuja la tabla (11-sep-2026).
           sinDescontar: prestamosSinDescontar(data.lineas),
+          // 🔴 Las cuotas que el neto no alcanzó a cubrir, de las MISMAS
+          // líneas que dibuja la tabla (14-sep-2026, `neto-no-negativo.ts`).
+          recortadas: cuotasRecortadas(data.lineas),
           avisoVacacionesNoPagadas: data.avisos.avisoVacacionesNoPagadas ?? null,
           conSabado: data.avisos.conSabado ?? 0,
           rangoLibre: !!data.avisos.rangoLibre,
@@ -1616,9 +1625,19 @@ function esSinDescontar(l: LineaPlanilla, campo: keyof ManualesLinea): boolean {
   return (l.prestamoAutomatico?.sinDescontar?.[campo] ?? 0) > 0;
 }
 
+/**
+ * 🔴 ¿La cuota entró recortada porque el neto no alcanzaba? (14-sep-2026).
+ * `null` = no. Se lee de la LÍNEA (`prestamoAutomatico.recortado`), no de una
+ * segunda cuenta: la regla vive en `neto-no-negativo.ts`.
+ */
+function recorteDe(l: LineaPlanilla, campo: keyof ManualesLinea): { propuesto: number; descontado: number } | null {
+  if (!esCasillaAutomatica(campo)) return null;
+  return recorteDeCasilla(l, campo);
+}
+
 /** Una celda de dinero que se escribe a mano. Guarda al salir del campo. */
 function CeldaManual({
-  codigo, campo, valor, onGuardar, ancho = "w-20", bloqueo, automatico = false, sinDescontar = false,
+  codigo, campo, valor, onGuardar, ancho = "w-20", bloqueo, automatico = false, sinDescontar = false, recorte = null,
 }: {
   codigo: string; campo: keyof ManualesLinea;
   /** `null` = se ve vacía. `0` solo llega con `sinDescontar`. */
@@ -1630,6 +1649,12 @@ function CeldaManual({
   automatico?: boolean;
   /** 🔴 Hay un 0 escrito a propósito: se ve el 0 y, debajo, «No se descuenta esta quincena». */
   sinDescontar?: boolean;
+  /**
+   * 🔴 La cuota entró recortada porque el neto no alcanzaba (14-sep-2026): se
+   * ve lo que SÍ entró y, debajo, «Se descontó $X de los $Y de cuota; el resto
+   * queda debiendo». `null` = no hubo recorte.
+   */
+  recorte?: { propuesto: number; descontado: number } | null;
 }) {
   const bloqueada = !!bloqueo;
   // 🔑 Estado local mientras se escribe: si el valor viniera del padre en cada
@@ -1649,9 +1674,11 @@ function CeldaManual({
           ? bloqueo.title
           : sinDescontar
             ? TITULO_SIN_DESCONTAR
-            : automatico
-              ? "Es la cuota que propone Préstamos. Escribe otro monto para corregirla en esta quincena, o 0 para no descontar."
-              : undefined}
+            : recorte
+              ? TITULO_RECORTE
+              : automatico
+                ? "Es la cuota que propone Préstamos. Escribe otro monto para corregirla en esta quincena, o 0 para no descontar."
+                : undefined}
         onChange={(e) => setTexto(e.target.value)}
         onBlur={() => onGuardar(codigo, campo, texto)}
         onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
@@ -1661,6 +1688,13 @@ function CeldaManual({
       {sinDescontar && !bloqueada && (
         <span className="block text-right text-[11px] leading-tight text-gray-500" data-testid="sin-descontar">
           {TEXTO_SIN_DESCONTAR}
+        </span>
+      )}
+      {/* 🔴 El recorte se DICE, visible y en ámbar: es plata que sigue
+          debiéndose (14-sep-2026). */}
+      {recorte && !bloqueada && (
+        <span className="block text-right text-[11px] leading-tight text-amber-700" data-testid="cuota-recortada">
+          {textoRecorteCelda(recorte)}
         </span>
       )}
     </>
@@ -1778,7 +1812,7 @@ function Fila({
         <td key={campo} className="px-1 py-1.5 text-right">
           <CeldaManual codigo={l.codigo} campo={campo} valor={valorCasilla(l, campo)}
             onGuardar={onGuardar} bloqueo={bloqueo} automatico={esAutomatica(l, campo)}
-            sinDescontar={esSinDescontar(l, campo)} />
+            sinDescontar={esSinDescontar(l, campo)} recorte={recorteDe(l, campo)} />
         </td>
       ))}
       {num(d.totalDeducciones)}
@@ -1894,7 +1928,7 @@ function Tarjeta({
                 <CeldaManual
                   codigo={l.codigo} campo={campo} valor={valorCasilla(l, campo)}
                   onGuardar={onGuardar} ancho="w-full" bloqueo={bloqueo} automatico={esAutomatica(l, campo)}
-                  sinDescontar={esSinDescontar(l, campo)}
+                  sinDescontar={esSinDescontar(l, campo)} recorte={recorteDe(l, campo)}
                 />
               </label>
             ))}
