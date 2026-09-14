@@ -202,6 +202,7 @@ export default function PrestamoDetallePage() {
               cuotaActual={{
                 prestamo: Number(empleado.deduccion_quincenal ?? 0),
                 terceros: Number(empleado.deduccion_terceros ?? 0),
+                dano: Number(empleado.deduccion_dano ?? 0),
               }}
               onCancelar={() => setShowNuevoMov(false)}
               onGuardar={async (payload) => {

@@ -72,13 +72,15 @@ function ficha(p: Partial<FichaPrestamo> & { nombre: string }): FichaPrestamo {
     cuotaTerceros: p.cuotaTerceros ?? 0,
     saldoTerceros: saldoT,
     yaDescontadoTerceros: p.yaDescontadoTerceros ?? 0,
+    // 14-sep-2026: el daño también lleva «ya descontado».
+    yaDescontadoDano: p.yaDescontadoDano ?? 0,
   };
 }
 
 function persona(
   codigo: string, etiqueta: string, enCasilla = 0, enCasillaTerceros = 0,
 ): PersonaEnCuadro {
-  return { codigo, etiqueta, empresa: null, empresaEtiqueta: null, enCasilla, enCasillaTerceros };
+  return { codigo, etiqueta, empresa: null, empresaEtiqueta: null, enCasilla, enCasillaTerceros, enCasillaDano: 0 };
 }
 
 
@@ -147,7 +149,7 @@ describe("de dónde sale el monto de la casilla", () => {
     expect(montoDeFicha({ ...f, saldoPrestamo: 0 }).monto).toBe(0);
   });
 
-  it("🔴 la CUOTA que se muestra es la del préstamo, no una suma", () => {
+  it("🔴 la CUOTA que se muestra es la del préstamo, no una suma — y el daño va en SU casilla (14-sep-2026)", () => {
     const out = sugerirPrestamos({
       fichas: [ficha({
         nombre: "CON DAÑO", codigo: "21",
@@ -161,6 +163,11 @@ describe("de dónde sale el monto de la casilla", () => {
     expect(out[0].sugerido).toBe(30);
     // Y el daño no se cuela por la puerta de terceros.
     expect(out[0].sugeridoTerceros).toBe(0);
+    // ⚠️ Desde el 14-sep-2026 el daño CON cuota propone en su propia casilla
+    // (`sugeridoDano`): $10 de cuota sobre $50 de saldo. Antes daba 0 siempre.
+    expect(out[0].sugeridoDano).toBe(10);
+    expect(out[0].cuotaDano).toBe(10);
+    expect(out[0].saldoDano).toBe(50);
   });
 
   // 🔴 LA TERCERA CUENTA: «igual como un préstamo» (la contadora), con su propia
@@ -329,7 +336,8 @@ describe("🔴 la cuota entra SOLA — la aprobación quincenal se retiró el 11
     expect(con.dinero!.prestamo).toBe(60);
     expect(con.dinero!.totalDeducciones).toBe(60);
     expect(con.dinero!.netoPagar).toBe(200);
-    expect(con.prestamoAutomatico).toEqual({ prestamo: 60, terceros: 0 });
+    // (`mercancia: 0` desde el 14-sep-2026: el daño es la tercera casilla automática.)
+    expect(con.prestamoAutomatico).toEqual({ prestamo: 60, terceros: 0, mercancia: 0 });
     // 🔑 `manuales` es la foto de la tabla: la pantalla la manda de vuelta entera
     // al guardar el ISR; si la cuota viviera ahí, editar el ISR la congelaría.
     expect(con.manuales.prestamo).toBeNull();
@@ -352,7 +360,7 @@ describe("🔴 la cuota entra SOLA — la aprobación quincenal se retiró el 11
     expect(con.dinero!.terceros).toBe(40);
     expect(con.dinero!.prestamo).toBe(0);
     expect(con.dinero!.netoPagar).toBe(220);
-    expect(con.prestamoAutomatico).toEqual({ prestamo: 0, terceros: 40 });
+    expect(con.prestamoAutomatico).toEqual({ prestamo: 0, terceros: 40, mercancia: 0 });
   });
 
   it("sin `dinero` (servicio profesional, «Tú decides») no se toca nada", () => {

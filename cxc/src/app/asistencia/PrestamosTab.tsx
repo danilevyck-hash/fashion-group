@@ -74,9 +74,15 @@ interface FichaDeuda {
   /** La empresa de la persona atada (10-sep-2026): por ella filtra el selector de arriba. */
   empresa?: string | null;
   cuota: number;
+  /** La cuota de daño de mercancía. Desde el 14-sep-2026 también se descuenta sola. */
   cuotaDano: number;
   cuotaTerceros?: number;
   yaDescontado: number;
+}
+
+/** 🔴 Lo que se le descuenta por quincena: las TRES cuotas (el daño desde el 14-sep-2026). */
+function cuotaPorQuincena(f: FichaDeuda): number {
+  return f.cuota + (f.cuotaTerceros ?? 0) + (f.cuotaDano ?? 0);
 }
 
 /** Plata con centavos y menos tipográfico, como en todo el sistema. */
@@ -253,7 +259,7 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
               cuentaMasVieja={filaDelModulo?.cuentaMasVieja ?? null}
               salarioMensual={personaElegida.salarioMensual}
               hoy={hoyPanama()}
-              cuotaActual={{ prestamo: filaDelModulo?.cuotaPrestamo ?? 0, terceros: filaDelModulo?.cuotaTerceros ?? 0 }}
+              cuotaActual={{ prestamo: filaDelModulo?.cuotaPrestamo ?? 0, terceros: filaDelModulo?.cuotaTerceros ?? 0, dano: filaDelModulo?.cuotaDano ?? 0 }}
               onCancelar={() => setPersonaElegida(null)}
               onGuardar={async (payload) => { await movForm.crear(payload); }}
             />
@@ -348,7 +354,7 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
                   </td>
                 )}
                 <td className="px-3 py-2 text-right tabular-nums font-medium text-gray-900">{money(f.saldo)}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-gray-600">{plataOGuion(f.cuota + (f.cuotaTerceros ?? 0))}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-gray-600">{plataOGuion(cuotaPorQuincena(f))}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-gray-600">
                   {f.yaDescontado > 0 ? money(f.yaDescontado) : <span className="text-gray-400">—</span>}
                 </td>
@@ -382,7 +388,7 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
               {(f.saldoTerceros ?? 0) > 0 && ` · ${NOMBRE_CUENTA.terceros} ${money(f.saldoTerceros ?? 0)}`}
             </p>
             <p className="mt-0.5 text-sm text-gray-500">
-              Cuota {money(f.cuota + (f.cuotaTerceros ?? 0))}
+              Cuota {money(cuotaPorQuincena(f))}
               {f.yaDescontado > 0 && ` · esta quincena ${money(f.yaDescontado)}`}
             </p>
             {!f.codigo && (

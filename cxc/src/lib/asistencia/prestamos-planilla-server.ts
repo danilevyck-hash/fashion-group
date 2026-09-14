@@ -26,6 +26,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { esDescuentoDeQuincena, type FichaPrestamo } from "./prestamos-planilla";
 import {
+  CUENTA_DANO,
   CUENTA_PRESTAMO,
   CUENTA_TERCEROS,
   calcularSaldoPrestamo,
@@ -128,6 +129,7 @@ export async function leerPrestamosDeQuincena(
   const movsDe = new Map<string, FilaMovimiento[]>();
   const descontadoDe = new Map<string, number>();
   const descontadoTercerosDe = new Map<string, number>();
+  const descontadoDanoDe = new Map<string, number>();
   for (const m of movimientos) {
     const emp = String(m.empleado_id ?? "");
     if (!emp) continue;
@@ -156,9 +158,14 @@ export async function leerPrestamosDeQuincena(
           descontadoTercerosDe.set(emp, (descontadoTercerosDe.get(emp) ?? 0) + num(m.monto));
         } else if (cuenta === CUENTA_PRESTAMO) {
           descontadoDe.set(emp, (descontadoDe.get(emp) ?? 0) + num(m.monto));
+        } else if (cuenta === CUENTA_DANO) {
+          // 🔴 El DAÑO también lleva «ya descontado» desde el 14-sep-2026: ahora
+          // propone cuota (`montoDanoDeFicha`), así que el «Pago de
+          // responsabilidad» que el cierre ya anotó tiene que ganarle a la
+          // estimación — si no, regenerar después de cerrar propondría la
+          // cuota SIGUIENTE. Misma cuenta que `cierre-prestamo-server.ts`.
+          descontadoDanoDe.set(emp, (descontadoDanoDe.get(emp) ?? 0) + num(m.monto));
         }
-        // ⚠️ El DAÑO no lleva «ya descontado»: no propone cuota, así que no hay
-        // ninguna estimación a la que un hecho consumado le pueda ganar.
       }
     }
   }
@@ -179,6 +186,7 @@ export async function leerPrestamosDeQuincena(
       cuotaTerceros: num(e.deduccion_terceros),
       saldoTerceros: s.cuentas.terceros.saldo,
       yaDescontadoTerceros: descontadoTercerosDe.get(String(e.id)) ?? 0,
+      yaDescontadoDano: descontadoDanoDe.get(String(e.id)) ?? 0,
     };
   });
 

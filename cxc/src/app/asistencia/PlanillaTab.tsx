@@ -547,9 +547,9 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
       const linea = data.lineas.find((l) => l.codigo === codigo);
       if (!linea) return;
       // 🔴 Lo tecleado pasa por `valorTecleado` (módulo puro, 11-sep-2026): en
-      // «Préstamo» y «Terceros» vacío = null (vuelve la cuota) y «0» = 0 (esta
-      // quincena no se descuenta); en las otras tres, como siempre. Es la MISMA
-      // función que usa el servidor al guardar.
+      // «Préstamo», «Terceros» y «Mercancía» (14-sep-2026) vacío = null (vuelve
+      // la cuota) y «0» = 0 (esta quincena no se descuenta); en las otras dos,
+      // como siempre. Es la MISMA función que usa el servidor al guardar.
       const limpio = valorTecleado(campo, valor);
       if (limpio === linea.manuales[campo]) return; // no se escribió nada nuevo
       // 🔴 SIN QUINCENA NO HAY DÓNDE GUARDARLO. El campo ya va deshabilitado en
@@ -1429,8 +1429,9 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           <p>{FORMULA_NETO}</p>
           <p className="mt-1.5">
             Los recargos, los porcentajes de seguro y la hora de corte se cambian en{" "}
-            <b>{PESTANA_FICHAS}</b>. El ISR, el préstamo, los terceros, la mercancía y los otros
-            servicios se escriben a mano aquí: no salen de ningún sistema.
+            <b>{PESTANA_FICHAS}</b>. El ISR y los otros servicios se escriben a mano aquí: no salen
+            de ningún sistema. El préstamo, los terceros y la mercancía entran solos con la cuota
+            de Préstamos, y también se pueden escribir a mano (0 = esta quincena no se descuenta).
           </p>
         </Ayuda>
       </div>
@@ -1578,12 +1579,14 @@ function ModalCierre({
 type OnGuardar = (codigo: string, campo: keyof ManualesLinea, valor: string) => void;
 
 /**
- * 🔴 LO QUE LA CASILLA MUESTRA (11-sep-2026). «Préstamo» y «Terceros» tienen
- * TRES estados (`casilla-sin-descontar.ts`): vacía → la cuota que entró sola
- * (`prestamoAutomatico`, ya adentro de `dinero`) · escrita → lo escrito, que
- * manda · 0 a propósito → «0», y la celda dice que esta quincena no se
- * descuenta. Las otras tres son lo de siempre. `null` = la casilla se ve vacía.
- * Se lee de la LÍNEA, no de una segunda cuenta.
+ * 🔴 LO QUE LA CASILLA MUESTRA (11-sep-2026). «Préstamo», «Terceros» y —desde
+ * el 14-sep-2026— «Mercancía» tienen TRES estados (`casilla-sin-descontar.ts`):
+ * vacía → la cuota que entró sola (`prestamoAutomatico`, ya adentro de
+ * `dinero`) · escrita → lo escrito, que manda · 0 a propósito → «0», y la
+ * celda dice que esta quincena no se descuenta. Las otras dos son lo de
+ * siempre. `null` = la casilla se ve vacía. Se lee de la LÍNEA, no de una
+ * segunda cuenta. La mercancía entró acá sin código nuevo: `esCasillaAutomatica`
+ * la reconoce y `prestamoAutomatico.mercancia` trae su cuota.
  */
 function valorCasilla(l: LineaPlanilla, campo: keyof ManualesLinea): number | null {
   const escrito = l.manuales[campo];

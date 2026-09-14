@@ -774,6 +774,8 @@ export async function GET(req: NextRequest) {
       // cuadro, igual que la del préstamo: lo que la pantalla dice que hay y lo
       // que la planilla suma no pueden separarse.
       enCasillaTerceros: l.manuales.terceros ?? 0,
+      // 🔴 La casilla del DAÑO (14-sep-2026): misma fuente, las líneas del cuadro.
+      enCasillaDano: l.manuales.mercancia ?? 0,
     }));
     const prestamos = sugerirPrestamos({
       fichas: presRes.fichas,
@@ -783,8 +785,9 @@ export async function GET(req: NextRequest) {
     // ── 🔴 LA CUOTA ENTRA SOLA A LA LÍNEA (11-sep-2026) ──────────────────────
     //
     // Daniel: *«quita lo de aprobación a préstamos, no es necesario»*. La
-    // propuesta del módulo —préstamo y terceros, cada una capeada a su saldo—
-    // va DERECHO a `dinero.prestamo` / `dinero.terceros`, al total de
+    // propuesta del módulo —préstamo, terceros y, desde el 14-sep-2026, el daño
+    // de mercancía, cada una capeada a su saldo— va DERECHO a
+    // `dinero.prestamo` / `dinero.terceros` / `dinero.mercancia`, al total de
     // deducciones y al neto, salvo que la casilla ya tenga un monto escrito a
     // mano (ése manda). `manuales` NO se toca: es la foto de la tabla y la
     // pantalla la manda de vuelta entera al guardar cualquier otra casilla.

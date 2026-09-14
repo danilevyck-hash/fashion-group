@@ -59,12 +59,13 @@ export async function leerManuales(quincenaClave: string): Promise<ManualesLeido
   for (const f of (data ?? []) as FilaManual[]) {
     porCodigo.set(String(f.empleado_codigo), normalizarManuales({
       isr: Number(f.isr ?? 0),
-      // 🔴 `null` se CONSERVA en préstamo y terceros (11-sep-2026): NULL = nadie
-      // escribió nada (va la cuota), 0 = «esta quincena no se descuenta».
-      // Un `?? 0` acá convertiría cada casilla vacía en un «no descontar».
+      // 🔴 `null` se CONSERVA en préstamo, terceros y mercancía (11-sep-2026;
+      // la mercancía desde el 14-sep-2026): NULL = nadie escribió nada (va la
+      // cuota), 0 = «esta quincena no se descuenta». Un `?? 0` acá convertiría
+      // cada casilla vacía en un «no descontar».
       prestamo: f.prestamo === null || f.prestamo === undefined ? null : Number(f.prestamo),
       terceros: f.terceros === null || f.terceros === undefined ? null : Number(f.terceros),
-      mercancia: Number(f.mercancia ?? 0),
+      mercancia: f.mercancia === null || f.mercancia === undefined ? null : Number(f.mercancia),
       otrosServicios: Number(f.otros_servicios ?? 0),
     }));
   }

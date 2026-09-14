@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Movimiento } from "./types";
 import { CONCEPTO_PAGO, ORIGEN_POR_DEFECTO } from "@/lib/prestamos-conceptos";
-import { CONCEPTO_TERCEROS } from "@/lib/prestamos-conceptos";
+import { CONCEPTO_DANO, CONCEPTO_TERCEROS } from "@/lib/prestamos-conceptos";
 
 /** Cómo se dice: éxito, error, o un AVISO que se registra igual (el tope). */
 export type TipoAvisoMovimiento = "success" | "error" | "warning";
@@ -32,7 +32,13 @@ interface UseMovimientoFormProps {
 /** Escribe la cuota en la ficha. `true` si no había nada que escribir o si se escribió. */
 async function guardarCuota(empleadoId: string, concepto: string, cuota: unknown): Promise<boolean> {
   if (typeof cuota !== "number" || !Number.isFinite(cuota) || !empleadoId) return true;
-  const campo = concepto === CONCEPTO_TERCEROS ? "deduccion_terceros" : "deduccion_quincenal";
+  // 🔴 El daño también escribe SU cuota en la ficha (14-sep-2026, Daniel: *«se
+  // elige la cuota y listo»*): mismo PUT, otra columna.
+  const campo = concepto === CONCEPTO_TERCEROS
+    ? "deduccion_terceros"
+    : concepto === CONCEPTO_DANO
+      ? "deduccion_dano"
+      : "deduccion_quincenal";
   try {
     const res = await fetch(`/api/prestamos/empleados/${empleadoId}`, {
       method: "PUT",

@@ -394,7 +394,12 @@ describe("los montos escritos a mano van con el RELOJ, a una sola línea", () =>
     expect(lineas[0].dinero!.mercancia).toBe(10);
     expect(lineas[1].dinero!.mercancia).toBe(0);
     expect(lineas[0].manuales.mercancia).toBe(10);
-    expect(lineas[1].manuales.mercancia).toBe(0);
+    // ⚠️ 14-sep-2026 (migración 20261122120000): «Mercancía» pasó a ser casilla
+    // automática con tres estados, y la línea sin reloj lleva la casilla VACÍA
+    // (`null`), no 0 — 0 ahora significa «esta quincena no se descuenta».
+    // Decía `toBe(0)`. Lo que este caso protege no cambió: `dinero.mercancia`
+    // de esa línea es 0 y el neto es el mismo.
+    expect(lineas[1].manuales.mercancia).toBeNull();
     expect(lineas[0].dinero!.netoPagar).toBe(346);
     expect(lineas[1].dinero!.netoPagar).toBe(196.97);
   });

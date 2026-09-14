@@ -103,9 +103,10 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
   const totalSaldo = filas.reduce((s, f) => s + f.saldo, 0);
 
   // A quién le toca el descuento de esta quincena, y a quién ya se le hizo.
-  // 🔴 El DAÑO ya no propone cuota (10-sep-2026): las que descuentan solas son
-  // préstamo y terceros.
-  const conCuota = filas.filter((f) => f.trabaja && f.saldo > 0 && (f.cuotaPrestamo > 0 || f.cuotaTerceros > 0));
+  // 🔴 Las TRES cuotas descuentan solas (el daño desde el 14-sep-2026, Daniel:
+  // *«Agregan el daño como se hace un préstamo, se elige la cuota y listo»*;
+  // del 10 al 14-sep el daño no proponía cuota).
+  const conCuota = filas.filter((f) => f.trabaja && f.saldo > 0 && (f.cuotaPrestamo > 0 || f.cuotaTerceros > 0 || f.cuotaDano > 0));
   const deducidas = conCuota.filter((f) => f.deducidaQuincena);
   const deduccionesAplicadas = deducidas.length;
   const deduccionesTotal = conCuota.length;
@@ -114,7 +115,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
 
   const personasQuincena = conCuota.map((f) => ({
     nombre: f.nombre,
-    deduccion: f.cuotaPrestamo + f.cuotaTerceros,
+    deduccion: f.cuotaPrestamo + f.cuotaTerceros + f.cuotaDano,
     saldo: f.saldo,
     fechasPagos: f.fechasPagosQuincena ?? [],
   }));
@@ -316,8 +317,8 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
                 <ul className="space-y-2">
                   {items.map((emp) => {
                     const deducida = emp.deducidaQuincena;
-                    const pendienteDed = emp.trabaja && !deducida && emp.saldo > 0 && (emp.cuotaPrestamo + emp.cuotaTerceros) > 0;
-                    const cuota = emp.cuotaPrestamo + emp.cuotaTerceros;
+                    const cuota = emp.cuotaPrestamo + emp.cuotaTerceros + emp.cuotaDano;
+                    const pendienteDed = emp.trabaja && !deducida && emp.saldo > 0 && cuota > 0;
 
                     const badges = [
                       !emp.trabaja ? <span key="notrabaja" className="shrink-0 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-md">Ya no trabaja · no se descuenta</span> : null,

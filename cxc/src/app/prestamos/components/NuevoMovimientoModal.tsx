@@ -40,13 +40,30 @@ import { MOV_TIPOS } from "./types";
  * Daniel. El botón siempre dice «Registrar».
  *
  * 🔴 LA CUOTA VA EN EL MISMO FORMULARIO (11-sep-2026, mockup de la pestaña:
- * *«concepto, monto, cuota»*). Un préstamo o un descuento a terceros nuevo
- * pregunta «¿cuánto se descuenta por quincena?», con la cuota actual de la
- * ficha puesta; el daño no pregunta nada (no propone cuota, la contadora
- * escribe el monto cada quincena). La cuota viaja en el payload como `cuota`
- * y la escribe en la FICHA quien recibe el payload (`useMovimientoForm`), en
- * una segunda llamada: el movimiento y la ficha son dos cosas.
+ * *«concepto, monto, cuota»*). Un préstamo, un descuento a terceros o —desde
+ * el 14-sep-2026— un daño de mercancía nuevo pregunta «¿cuánto se descuenta
+ * por quincena?», con la cuota actual de la ficha puesta. La cuota viaja en el
+ * payload como `cuota` y la escribe en la FICHA quien recibe el payload
+ * (`useMovimientoForm`), en una segunda llamada: el movimiento y la ficha son
+ * dos cosas.
+ *
+ * 🔴 EL DAÑO TAMBIÉN PREGUNTA LA CUOTA (14-sep-2026). Daniel, textual: *«Tanto
+ * el chico como el grande que sea por cuota, ¿no? Agregan el daño como se hace
+ * un préstamo, se elige la cuota y listo»*. Del 10 al 14-sep el daño no
+ * preguntaba nada (la contadora escribía el monto cada quincena). Es el MISMO
+ * camino que préstamo y terceros: la misma casilla, la misma segunda llamada,
+ * que escribe `deduccion_dano` en la ficha. Un pago sigue sin preguntar.
  */
+/** La cuota que HOY tiene la ficha para el concepto elegido. Un pago no tiene cuota. */
+function cuotaDeConcepto(
+  actual: { prestamo: number; terceros: number; dano?: number },
+  concepto: string,
+): number {
+  if (concepto === CONCEPTO_TERCEROS) return actual.terceros;
+  if (concepto === CONCEPTO_DANO) return actual.dano ?? 0;
+  return actual.prestamo;
+}
+
 export default function NuevoMovimientoModal({
   nombre, empleadoId, saldoPrestamo, saldoDano, cuentaMasVieja, salarioMensual, hoy,
   conceptoInicial, cuotaActual, onCancelar, onGuardar,
@@ -60,15 +77,16 @@ export default function NuevoMovimientoModal({
   hoy: string;
   /** Con qué concepto abre. Préstamo si no se dice. */
   conceptoInicial?: string;
-  /** Las cuotas de la ficha hoy, para preguntar la cuota junto al monto. Sin esto no se pregunta. */
-  cuotaActual?: { prestamo: number; terceros: number } | null;
+  /** Las cuotas de la ficha hoy, para preguntar la cuota junto al monto. Sin esto no se pregunta.
+   *  `dano` es opcional (14-sep-2026): sin él, el daño abre con la casilla vacía. */
+  cuotaActual?: { prestamo: number; terceros: number; dano?: number } | null;
   onCancelar: () => void;
   onGuardar: (payload: Record<string, unknown>) => Promise<void>;
 }) {
   const [concepto, setConcepto] = useState<string>(conceptoInicial ?? CONCEPTO_PRESTAMO);
   const [cuota, setCuota] = useState<string>(() => {
     if (!cuotaActual) return "";
-    const c = conceptoInicial === CONCEPTO_TERCEROS ? cuotaActual.terceros : cuotaActual.prestamo;
+    const c = cuotaDeConcepto(cuotaActual, conceptoInicial ?? CONCEPTO_PRESTAMO);
     return c > 0 ? String(c) : "";
   });
   const [fecha, setFecha] = useState(hoy);
@@ -81,13 +99,13 @@ export default function NuevoMovimientoModal({
   const debeLasDos = saldoPrestamo > 0 && saldoDano > 0;
   const deudaTotal = saldoPrestamo + saldoDano;
   const esPago = concepto === CONCEPTO_PAGO;
-  // La cuota se pregunta en préstamo y terceros, nunca en daño ni en un pago.
-  const preguntaCuota = !!cuotaActual && (concepto === CONCEPTO_PRESTAMO || concepto === CONCEPTO_TERCEROS);
+  // La cuota se pregunta en préstamo, terceros y daño (14-sep-2026), nunca en un pago.
+  const preguntaCuota = !!cuotaActual && (concepto === CONCEPTO_PRESTAMO || concepto === CONCEPTO_TERCEROS || concepto === CONCEPTO_DANO);
 
   function elegirConcepto(c: string) {
     setConcepto(c);
     if (!cuotaActual) return;
-    const actual = c === CONCEPTO_TERCEROS ? cuotaActual.terceros : cuotaActual.prestamo;
+    const actual = cuotaDeConcepto(cuotaActual, c);
     setCuota(actual > 0 ? String(actual) : "");
   }
 

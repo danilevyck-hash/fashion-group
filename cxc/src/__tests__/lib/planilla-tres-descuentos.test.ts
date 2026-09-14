@@ -14,6 +14,13 @@
  *    quincenalmente la cantidad a descontar.»
  *
  * Y Daniel: *«olvida descuento por compras»*.
+ *
+ * ⚠️ 14-sep-2026: el DAÑO volvió a ir por cuota (Daniel: *«Agregan el daño
+ * como se hace un préstamo, se elige la cuota y listo»*), en SU casilla
+ * («Mercancía» → `montoDanoDeFicha`). Lo que este archivo sigue exigiendo no
+ * cambió: `montoDeFicha` (la casilla «Préstamo») NO mira la cuota de daño, y
+ * cada casilla va a su cuenta. El candado del daño por cuota vive en
+ * `planilla-dano-por-cuota.test.ts`.
  * ────────────────────────────────────────────────────────────────────────── */
 
 import fs from "node:fs";
@@ -100,7 +107,7 @@ describe("A. LA TERCERA CUENTA — «igual como un préstamo»", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("B. UNA CASILLA, UNA CUENTA — y el daño no propone", () => {
+describe("B. UNA CASILLA, UNA CUENTA — y el daño propone en la SUYA, nunca en la del préstamo", () => {
   it("las tres casillas van cada una a su cuenta", () => {
     expect(CASILLA_DE_CUENTA.map((c) => [c.campo, c.cuenta])).toEqual([
       ["prestamo", "prestamo"],
@@ -115,7 +122,10 @@ describe("B. UNA CASILLA, UNA CUENTA — y el daño no propone", () => {
     expect(CONCEPTO_DE_CUENTA.terceros).toBe("Pago de terceros");
   });
 
-  // 🔴 EL DAÑO NO PROPONE CUOTA. `montoDeFicha` no puede volver a mirarla.
+  // 🔴 LA CASILLA «PRÉSTAMO» NO MIRA LA CUOTA DE DAÑO. Desde el 14-sep-2026 el
+  // daño propone en `montoDanoDeFicha` (su casilla); `montoDeFicha` sigue sin
+  // sumarlo: hasta el 10-sep las dos cuotas iban juntas en una casilla y eso
+  // es lo que la contadora pidió deshacer.
   it("el motor del préstamo NO mira la cuota de daño", () => {
     const puro = sinComentarios("src/lib/asistencia/prestamos-planilla.ts");
     const i = puro.indexOf("export function montoDeFicha");

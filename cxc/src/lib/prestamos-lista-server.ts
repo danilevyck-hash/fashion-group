@@ -70,7 +70,7 @@ export interface FilaPrestamo {
   empresa: string | null;
   empleadoCodigo: string | null;
   cuotaPrestamo: number;
-  /** ⚠️ Sin lectores desde el 10-sep-2026: el daño no propone cuota. */
+  /** La cuota de daño de mercancía. 🔴 Desde el 14-sep-2026 se descuenta sola en la planilla, como las otras dos. */
   cuotaDano: number;
   /** 🔴 La cuota quincenal de «Descuento a terceros». */
   cuotaTerceros: number;

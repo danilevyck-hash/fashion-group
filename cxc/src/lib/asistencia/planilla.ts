@@ -944,24 +944,29 @@ export function medirHoras(
 /**
  * Lo que NO sale del reloj y la contable escribe a mano.
  *
- * 🔴 «Préstamo» y «Terceros» tienen TRES estados (11-sep-2026, migración
- * `20261115120000`): `null` = nadie escribió nada, va la cuota automática de
+ * 🔴 «Préstamo», «Terceros» y «Mercancía» tienen TRES estados (11-sep-2026,
+ * migración `20261115120000`; la mercancía desde el 14-sep-2026, migración
+ * `20261122120000`): `null` = nadie escribió nada, va la cuota automática de
  * Préstamos · `0` = escrito a propósito, ESTA quincena no se descuenta ·
- * monto = se descuenta ese monto. Las otras tres no proponen cuota, así que en
+ * monto = se descuenta ese monto. Las otras dos no proponen cuota, así que en
  * ellas 0 y vacío dicen lo mismo y siguen siendo `number`. La regla vive en
  * `casilla-sin-descontar.ts`.
+ *
+ * 🔴 El DAÑO DE MERCANCÍA entró a las automáticas el 14-sep-2026 (Daniel:
+ * *«Agregan el daño como se hace un préstamo, se elige la cuota y listo»*).
+ * Hasta ese día era `number` y se escribía a mano cada quincena.
  */
 export interface ManualesLinea {
   isr: number;
   prestamo: number | null;
   terceros: number | null;
-  mercancia: number;
+  mercancia: number | null;
   otrosServicios: number;
 }
 
-/** Nada escrito. ⚠️ Préstamo y terceros van en `null`, no en 0: 0 es «no descontar». */
+/** Nada escrito. ⚠️ Préstamo, terceros y mercancía van en `null`, no en 0: 0 es «no descontar». */
 export const MANUALES_CERO: ManualesLinea = {
-  isr: 0, prestamo: null, terceros: null, mercancia: 0, otrosServicios: 0,
+  isr: 0, prestamo: null, terceros: null, mercancia: null, otrosServicios: 0,
 };
 
 /** La ficha de planilla de una persona, tal como está guardada. */
@@ -1384,20 +1389,23 @@ export interface LineaPlanilla {
    * congela en `ajuste_anterior`) — NO se vuelve a restar en ningún lado.
    */
   /**
-   * 🔴 Lo que entró SOLO a las casillas «Préstamo» y «Terceros» (11-sep-2026,
-   * Daniel: *«quita lo de aprobación a préstamos, no es necesario»*). Ya está
-   * ADENTRO de `dinero`; `manuales` sigue siendo la foto de la tabla (lo que
-   * alguien escribió a mano, 0 = nada). Lo pone `aplicarPrestamoEnLinea`.
+   * 🔴 Lo que entró SOLO a las casillas «Préstamo», «Terceros» y «Mercancía»
+   * (11-sep-2026, Daniel: *«quita lo de aprobación a préstamos, no es
+   * necesario»*; la mercancía desde el 14-sep-2026: *«Agregan el daño como se
+   * hace un préstamo, se elige la cuota y listo»*). Ya está ADENTRO de
+   * `dinero`; `manuales` sigue siendo la foto de la tabla (lo que alguien
+   * escribió a mano, null = nada). Lo pone `aplicarPrestamoEnLinea`.
    */
   prestamoAutomatico?: {
     prestamo: number;
     terceros: number;
+    mercancia: number;
     /**
      * La cuota que Préstamos proponía y NO entró porque la casilla tiene un 0
      * escrito a propósito («no descontar esta quincena», 11-sep-2026). 0 = no
      * aplica. Es lo que la celda y «Antes de cerrar» dicen.
      */
-    sinDescontar?: { prestamo: number; terceros: number };
+    sinDescontar?: { prestamo: number; terceros: number; mercancia: number };
   };
   ajusteAnterior?: number;
   /**
@@ -1477,12 +1485,13 @@ const num = (v: unknown): number => {
 export function normalizarManuales(m: Partial<ManualesLinea> | null | undefined): ManualesLinea {
   return {
     isr: num(m?.isr),
-    // 🔴 Las dos casillas automáticas conservan el `null` (vacía) y el `0`
+    // 🔴 Las tres casillas automáticas conservan el `null` (vacía) y el `0`
     // exacto (no descontar): son estados distintos. Basura y negativos caen en
     // `null` — en la duda, la cuota de siempre. Ver `casilla-sin-descontar.ts`.
+    // La mercancía entró acá el 14-sep-2026 (antes era `num`, 0 = vacío).
     prestamo: valorTecleado("prestamo", m?.prestamo),
     terceros: valorTecleado("terceros", m?.terceros),
-    mercancia: num(m?.mercancia),
+    mercancia: valorTecleado("mercancia", m?.mercancia),
     otrosServicios: num(m?.otrosServicios),
   };
 }
@@ -1668,11 +1677,11 @@ export function calcularDinero(
     : 0;
 
   const totalDeducciones = centavos(
-    // `null` en préstamo/terceros = nada escrito: suma 0 acá y la cuota
-    // automática entra después (`aplicarPrestamoEnLinea`). Un 0 escrito también
-    // suma 0 — y ahí la cuota NO entra: eso es «no descontar esta quincena».
+    // `null` en préstamo/terceros/mercancía = nada escrito: suma 0 acá y la
+    // cuota automática entra después (`aplicarPrestamoEnLinea`). Un 0 escrito
+    // también suma 0 — y ahí la cuota NO entra: eso es «no descontar esta quincena».
     seguroSocial + seguroEducativo + manuales.isr + (manuales.prestamo ?? 0)
-    + (manuales.terceros ?? 0) + manuales.mercancia,
+    + (manuales.terceros ?? 0) + (manuales.mercancia ?? 0),
   );
 
   // 🔴 "OTROS SERVICIOS" SUMA. NO ES UN DESCUENTO: ES UN PAGO EXTRA.
@@ -1703,7 +1712,7 @@ export function calcularDinero(
     baseSeguros: conSeguros ? basePropia : null,
     seguroSocial, seguroEducativo,
     isr: manuales.isr, prestamo: manuales.prestamo ?? 0,
-    terceros: manuales.terceros ?? 0, mercancia: manuales.mercancia,
+    terceros: manuales.terceros ?? 0, mercancia: manuales.mercancia ?? 0,
     totalDeducciones, otrosServicios: manuales.otrosServicios, netoPagar,
   };
 }

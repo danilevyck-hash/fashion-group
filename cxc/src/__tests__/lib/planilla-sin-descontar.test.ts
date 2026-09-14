@@ -72,7 +72,8 @@ const MANUAL = (o: Partial<ManualesLinea> = {}): ManualesLinea => ({ ...MANUALES
 const SUG = (o: Partial<SugerenciaPrestamo> = {}): SugerenciaPrestamo => ({
   codigo: "10", etiqueta: "LUIS PARAJON", empresa: "fashion_wear", empresaEtiqueta: "Fashion Wear",
   nombrePrestamos: "LUIS PARAJON", cuota: 70, saldo: 500, sugerido: 70, origen: "cuota", enCasilla: 0,
-  cuotaTerceros: 0, saldoTerceros: 0, sugeridoTerceros: 0, enCasillaTerceros: 0, ...o,
+  cuotaTerceros: 0, saldoTerceros: 0, sugeridoTerceros: 0, enCasillaTerceros: 0,
+  cuotaDano: 0, saldoDano: 0, sugeridoDano: 0, enCasillaDano: 0, ...o,
 });
 const linea = (manuales: ManualesLinea, etiqueta = "LUIS PARAJON", codigo = "10") =>
   ({ codigo, etiqueta, nombre: etiqueta, horas: {}, manuales, dinero: DINERO() }) as unknown as LineaPlanilla;
@@ -95,11 +96,16 @@ describe("A. los tres estados de la casilla: null · 0 · monto", () => {
     expect(estadoCasilla(50)).toBe("escrita");
   });
 
-  it("solo Préstamo y Terceros son automáticas: en las otras tres 0 y vacío dicen lo mismo", () => {
-    expect([...CASILLAS_AUTOMATICAS]).toEqual(["prestamo", "terceros"]);
+  it("Préstamo, Terceros y Mercancía son automáticas: en las otras dos 0 y vacío dicen lo mismo", () => {
+    // ⚠️ CAMBIÓ DE DIRECCIÓN el 14-sep-2026 (migración 20261122120000): la
+    // mercancía ENTRÓ a las automáticas — Daniel: *«Agregan el daño como se
+    // hace un préstamo, se elige la cuota y listo»*. Este caso decía que eran
+    // dos y que `mercancia` no lo era. El candado del daño por cuota vive en
+    // `planilla-dano-por-cuota.test.ts`.
+    expect([...CASILLAS_AUTOMATICAS]).toEqual(["prestamo", "terceros", "mercancia"]);
     expect(esCasillaAutomatica("prestamo")).toBe(true);
     expect(esCasillaAutomatica("terceros")).toBe(true);
-    expect(esCasillaAutomatica("mercancia")).toBe(false);
+    expect(esCasillaAutomatica("mercancia")).toBe(true);
     expect(esCasillaAutomatica("isr")).toBe(false);
     expect(esCasillaAutomatica("otrosServicios")).toBe(false);
   });
@@ -115,10 +121,12 @@ describe("A. los tres estados de la casilla: null · 0 · monto", () => {
     expect(valorTecleado("prestamo", "-5")).toBeNull();
     expect(valorTecleado("terceros", "0")).toBe(0);
     expect(valorTecleado("terceros", null)).toBeNull();
-    // Las otras tres: como siempre, número > 0 o 0.
+    // Las otras dos: como siempre, número > 0 o 0. (La mercancía pasó a
+    // automática el 14-sep-2026: un negativo cae en null, como en préstamo.)
     expect(valorTecleado("isr", "")).toBe(0);
     expect(valorTecleado("isr", "0")).toBe(0);
-    expect(valorTecleado("mercancia", "-4")).toBe(0);
+    expect(valorTecleado("mercancia", "-4")).toBeNull();
+    expect(valorTecleado("mercancia", "0")).toBe(0);
     expect(valorTecleado("otrosServicios", "20")).toBe(20);
   });
 
@@ -129,9 +137,12 @@ describe("A. los tres estados de la casilla: null · 0 · monto", () => {
     expect(normalizarManuales({ prestamo: "0" as unknown as number }).prestamo).toBe(0);
     expect(normalizarManuales({ prestamo: 35 }).prestamo).toBe(35);
     expect(normalizarManuales({ prestamo: null }).prestamo).toBeNull();
-    expect(normalizarManuales({ mercancia: undefined }).mercancia).toBe(0);
+    // 14-sep-2026: la mercancía vacía también es `null`.
+    expect(normalizarManuales({ mercancia: undefined }).mercancia).toBeNull();
+    expect(normalizarManuales({ mercancia: 0 }).mercancia).toBe(0);
     expect(MANUALES_CERO.prestamo).toBeNull();
     expect(MANUALES_CERO.terceros).toBeNull();
+    expect(MANUALES_CERO.mercancia).toBeNull();
   });
 
   it("el motor suma 0 con la casilla en null Y con 0: la diferencia la hace `aplicarPrestamoEnLinea`", () => {
@@ -155,14 +166,15 @@ describe("B. con 0 escrito la cuota NO entra, y se anota cuánto se saltó", () 
     const con = aplicarPrestamoEnLinea(linea(MANUAL()), SUG());
     expect(con.dinero!.prestamo).toBe(70);
     expect(con.dinero!.netoPagar).toBe(190);
-    expect(con.prestamoAutomatico).toEqual({ prestamo: 70, terceros: 0 });
+    // (`mercancia: 0` desde el 14-sep-2026: la tercera casilla automática.)
+    expect(con.prestamoAutomatico).toEqual({ prestamo: 70, terceros: 0, mercancia: 0 });
   });
 
   it("🔴 casilla en 0: NO entra la cuota, el neto no baja, y `sinDescontar` dice los $70 que se saltaron", () => {
     const con = aplicarPrestamoEnLinea(linea(MANUAL({ prestamo: 0 })), SUG());
     expect(con.dinero!.prestamo).toBe(0);
     expect(con.dinero!.netoPagar).toBe(260);
-    expect(con.prestamoAutomatico).toEqual({ prestamo: 0, terceros: 0, sinDescontar: { prestamo: 70, terceros: 0 } });
+    expect(con.prestamoAutomatico).toEqual({ prestamo: 0, terceros: 0, mercancia: 0, sinDescontar: { prestamo: 70, terceros: 0, mercancia: 0 } });
     // Y `manuales` sigue siendo la foto de la tabla: el 0 no se toca.
     expect(con.manuales.prestamo).toBe(0);
   });
@@ -173,7 +185,7 @@ describe("B. con 0 escrito la cuota NO entra, y se anota cuánto se saltó", () 
     expect(con.dinero!.prestamo).toBe(0);
     expect(con.dinero!.terceros).toBe(40);
     expect(con.dinero!.netoPagar).toBe(220);
-    expect(con.prestamoAutomatico).toEqual({ prestamo: 0, terceros: 40, sinDescontar: { prestamo: 70, terceros: 0 } });
+    expect(con.prestamoAutomatico).toEqual({ prestamo: 0, terceros: 40, mercancia: 0, sinDescontar: { prestamo: 70, terceros: 0, mercancia: 0 } });
   });
 
   it("un 0 sobre alguien SIN cuota que saltar no anota nada: es la misma línea", () => {
@@ -256,7 +268,7 @@ describe("C. el cierre respeta el 0: no anota pago, y lo dice como decisión", (
     expect(plan.omisiones).toEqual([{ codigo: "10", etiqueta: "LUIS PARAJON", monto: 0, motivo: "sin-descontar" }]);
   });
 
-  it("un 0 de alguien sin deuda no es noticia, y «mercancía» en 0 nunca es «sin-descontar»", () => {
+  it("un 0 de alguien sin deuda no es noticia, y en el CIERRE «mercancía» en 0 sigue sin ser «sin-descontar» (el cierre no se tocó el 14-sep-2026)", () => {
     const plan = planDeCierre({
       lineas: [linea(MANUAL({ prestamo: 0, terceros: 0 }))],
       deudas: mapa(deuda({ codigo: "10" })),

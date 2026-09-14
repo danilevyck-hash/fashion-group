@@ -10,12 +10,13 @@
 
 ## 🔴 Mueven plata
 
-### 1. El daño de mercancía no propone cuota, y Daniel pidió que sí
-> *«El daño debe de tener cuota como prestamo»* · *«Acuerdate que los prestamos o pago de daños se descuenta de la quincena.»* — **5-sep-2026**
+### 1. ~~El daño de mercancía no propone cuota~~ → **HECHO el 14-sep-2026**
+Daniel: *«Tanto el chico como el grande que sea por cuota, ¿no? Agregan el daño como se hace un préstamo, se elige la cuota y listo»*. El daño se registra con su cuota y entra solo a la planilla hasta saldarse. Migración `20261122120000` (mercancía con los tres estados), **pendiente de aplicar**.
 
-**Comprobado:** la columna `deduccion_dano` existe y se edita (`api/prestamos/empleados/route.ts`), y el dato viaja al navegador (`cuotaDano` en `api/asistencia/prestamos-deuda`). **No la lee nadie**: `aplicarPrestamoEnLinea` (`lib/asistencia/prestamos-planilla.ts`) solo usa préstamo y terceros.
-
-⚠️ **`CLAUDE.md` lo escribe como si fuera una decisión de diseño** («el daño no propone cuota»). No lo es: Daniel pidió lo contrario cuatro días antes de que esa regla se escribiera. Hoy el daño hay que teclearlo a mano cada quincena — el mismo paso manual que el 11-sep se eliminó para el préstamo, y por el mismo motivo: *un paso que hay que dar cada quincena para que pase lo que siempre pasa es un paso que un día no se da*.
+🔴 **Quedaron tres cosas que decide Daniel:**
+1. **Editar la cuota de daño después no tiene pantalla.** Se carga al registrar; para cambiarla o apagarla no hay dónde (queda escribir 0 en la planilla esa quincena). Devolver el campo a «Editar ficha» son ~8 líneas, espejo del de terceros.
+2. **El cierre anota el pago del daño solo**, igual que el préstamo — el cierre ya leía `dinero.mercancia`. Es lo que se buscaba, pero conviene saberlo.
+3. **Boston › Préstamos** dice «descuenta $X por quincena» sumando préstamo y terceros; con cuota de daño quedaría corto.
 
 ### 2. ~~Tres quincenas cerradas sin descontar préstamos~~ → **no era un problema: son PRUEBAS**
 Daniel, **14-sep-2026**: *«A nadie se le ha pagado nada. La contadora está probando el sistema, aún no lo entiende.»*

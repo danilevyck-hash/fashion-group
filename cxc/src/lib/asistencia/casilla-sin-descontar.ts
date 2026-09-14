@@ -21,9 +21,19 @@
  *     0      → «sin-descontar»  escrito a propósito: ESTA quincena no se descuenta
  *     monto  → «escrita»        escrito a mano: se descuenta ESE monto, no la cuota
  *
- * Vale para las DOS casillas con cuota automática: «Préstamo» y «Terceros».
- * «Mercancía», «ISR» y «Otros servicios» no proponen cuota, así que en ellas
- * 0 y vacío dicen lo mismo y siguen siendo `number`.
+ * Vale para las TRES casillas con cuota automática: «Préstamo», «Terceros» y,
+ * desde el 14-sep-2026, «Mercancía» (migración 20261122120000). «ISR» y «Otros
+ * servicios» no proponen cuota, así que en ellas 0 y vacío dicen lo mismo y
+ * siguen siendo `number`.
+ *
+ * ── 🔴 EL DAÑO DE MERCANCÍA TAMBIÉN VA POR CUOTA (14-sep-2026) ───────────────
+ *
+ * Daniel, textual: *«Si está en cuota, que se haga automático»* y *«Agregan el
+ * daño como se hace un préstamo, se elige la cuota y listo»*. Hasta ese día la
+ * casilla «Mercancía» se escribía a mano cada quincena (la contadora: *«debe
+ * permanecer en blanco…»*) y por eso no tenía tres estados. Ahora los tiene:
+ * vacía = la cuota de daño de la ficha, 0 = esta quincena no, monto = ese monto.
+ * Escribir el monto a mano SIGUE siendo posible: es el tercer estado.
  *
  * 🔑 Dónde se decide: en la FILA de la planilla, que es donde la contadora está
  * cuando decide. La ficha del préstamo (`/prestamos/[id]`) y «Anotar abono» no
@@ -32,8 +42,11 @@
 
 import type { ManualesLinea } from "./planilla";
 
-/** Las dos casillas que Préstamos llena solo. */
-export const CASILLAS_AUTOMATICAS = ["prestamo", "terceros"] as const;
+/**
+ * Las TRES casillas que Préstamos llena solo. ⚠️ `mercancia` entró el
+ * 14-sep-2026: hasta ese día eran dos y el daño se escribía a mano.
+ */
+export const CASILLAS_AUTOMATICAS = ["prestamo", "terceros", "mercancia"] as const;
 export type CasillaAutomatica = (typeof CASILLAS_AUTOMATICAS)[number];
 
 export function esCasillaAutomatica(campo: keyof ManualesLinea): campo is CasillaAutomatica {
@@ -66,7 +79,7 @@ export function estadoCasilla(escrito: number | null | undefined): EstadoCasilla
  *
  *   · casilla automática: vacío → `null` (vuelve la cuota) · «0» → 0 (no se
  *     descuenta) · «50» → 50 · basura o negativo → `null`.
- *   · las otras tres: como siempre — un monto > 0, o 0.
+ *   · las otras dos (ISR y otros servicios): como siempre — un monto > 0, o 0.
  *
  * Es UNA función para la pantalla y para `normalizarManuales`: lo que se
  * guarda y lo que se suma no pueden separarse.
@@ -110,7 +123,7 @@ export function prestamosSinDescontar(
     codigo: string;
     etiqueta: string;
     manuales: ManualesLinea;
-    prestamoAutomatico?: { sinDescontar?: { prestamo: number; terceros: number } };
+    prestamoAutomatico?: { sinDescontar?: Record<CasillaAutomatica, number> };
   }[],
 ): SinDescontar[] {
   const out: SinDescontar[] = [];
@@ -125,6 +138,13 @@ export function prestamosSinDescontar(
   return out;
 }
 
+/** Cómo se distingue la cuenta en la línea de «Antes de cerrar». El préstamo va sin sufijo. */
+const SUFIJO_CUENTA: Record<CasillaAutomatica, string> = {
+  prestamo: "",
+  terceros: " (terceros)",
+  mercancia: " (daño de mercancía)",
+};
+
 /**
  * La línea informativa de «Antes de cerrar»:
  * «2 préstamos sin descontar esta quincena, a propósito (Ana Pérez · $50.00 — Luis Parajón · $70.00)».
@@ -133,7 +153,7 @@ export function prestamosSinDescontar(
 export function textoSinDescontar(items: readonly SinDescontar[]): string | null {
   if (items.length === 0) return null;
   const detalle = items
-    .map((s) => `${s.etiqueta}${s.cuenta === "terceros" ? " (terceros)" : ""} · $${s.monto.toFixed(2)}`)
+    .map((s) => `${s.etiqueta}${SUFIJO_CUENTA[s.cuenta]} · $${s.monto.toFixed(2)}`)
     .join(" — ");
   const cabeza = items.length === 1
     ? "préstamo sin descontar esta quincena, a propósito"

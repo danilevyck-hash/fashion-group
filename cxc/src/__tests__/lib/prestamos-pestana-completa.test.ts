@@ -81,19 +81,22 @@ describe("2. tocar el nombre abre sus movimientos, y de ahí se vuelve a la pest
 });
 
 describe("3. la cuota se pregunta con el monto y va a la FICHA en una segunda llamada", () => {
-  it("el formulario la pregunta en préstamo y terceros, nunca en daño ni en un pago", () => {
+  it("el formulario la pregunta en préstamo, terceros y daño, nunca en un pago", () => {
+    // ⚠️ CAMBIÓ DE DIRECCIÓN el 14-sep-2026. Daniel: *«Agregan el daño como se
+    // hace un préstamo, se elige la cuota y listo»*. Decía «nunca en daño».
     const modal = sinComentarios(MODAL);
-    expect(modal).toMatch(/const preguntaCuota = !!cuotaActual && \(concepto === CONCEPTO_PRESTAMO \|\| concepto === CONCEPTO_TERCEROS\);/);
+    expect(modal).toMatch(/const preguntaCuota = !!cuotaActual && \(concepto === CONCEPTO_PRESTAMO \|\| concepto === CONCEPTO_TERCEROS \|\| concepto === CONCEPTO_DANO\);/);
     expect(modal).toContain("Cuota por quincena");
     // Sin `cuotaActual` (el módulo viejo desde la lista) no pregunta nada: nada cambia ahí.
-    expect(modal).toMatch(/cuotaActual\?: \{ prestamo: number; terceros: number \} \| null;/);
+    expect(modal).toMatch(/cuotaActual\?: \{ prestamo: number; terceros: number; dano\?: number \} \| null;/);
   });
 
   it("`crear` separa `cuota` del movimiento y la escribe con PUT en la ficha, después del POST", () => {
     const form = sinComentarios(FORM);
     expect(form).toMatch(/const \{ cuota, \.\.\.movimiento \} = payload;/);
     expect(form).toMatch(/body: JSON\.stringify\(movimiento\)/);
-    expect(form).toMatch(/const campo = concepto === CONCEPTO_TERCEROS \? "deduccion_terceros" : "deduccion_quincenal";/);
+    // 14-sep-2026: el daño escribe `deduccion_dano` por el MISMO PUT.
+    expect(form).toMatch(/const campo = concepto === CONCEPTO_TERCEROS\s*\? "deduccion_terceros"\s*: concepto === CONCEPTO_DANO\s*\? "deduccion_dano"\s*: "deduccion_quincenal";/);
     expect(form).toMatch(/fetch\(`\/api\/prestamos\/empleados\/\$\{empleadoId\}`, \{\s*method: "PUT"/);
     // El PUT va DESPUÉS del POST: si el movimiento no se guardó, no se toca la ficha.
     expect(form.indexOf("await guardarCuota(")).toBeGreaterThan(form.indexOf('"/api/prestamos/movimientos"'));
@@ -101,12 +104,14 @@ describe("3. la cuota se pregunta con el monto y va a la FICHA en una segunda ll
     const put = sinComentarios("src/app/api/prestamos/empleados/[id]/route.ts");
     expect(put).toMatch(/deduccion_quincenal/);
     expect(put).toMatch(/deduccion_terceros/);
+    expect(put).toMatch(/deduccion_dano/);
   });
 
   it("la ficha pasa la cuota actual y el concepto con el que abre", () => {
     const ficha = sinComentarios(FICHA);
     expect(ficha).toMatch(/conceptoInicial=\{conceptoInicial\}/);
-    expect(ficha).toMatch(/cuotaActual=\{\{\s*prestamo: Number\(empleado\.deduccion_quincenal \?\? 0\),\s*terceros: Number\(empleado\.deduccion_terceros \?\? 0\),\s*\}\}/);
+    // 14-sep-2026: viaja también la cuota de daño.
+    expect(ficha).toMatch(/cuotaActual=\{\{\s*prestamo: Number\(empleado\.deduccion_quincenal \?\? 0\),\s*terceros: Number\(empleado\.deduccion_terceros \?\? 0\),\s*dano: Number\(empleado\.deduccion_dano \?\? 0\),\s*\}\}/);
     expect(ficha).toMatch(/setConceptoInicial\(CONCEPTO_PAGO\)/);
     expect(ficha).toMatch(/setConceptoInicial\(CONCEPTO_PRESTAMO\)/);
     expect(ficha).toContain("Anotar abono");
@@ -128,7 +133,9 @@ describe("5. los ceros van con guion", () => {
     expect(tab).toMatch(/function plataOGuion\(n: number \| undefined\)/);
     expect(tab).toMatch(/\{plataOGuion\(f\.saldoPrestamo\)\}/);
     expect(tab).toMatch(/\{plataOGuion\(f\.saldoDano\)\}/);
-    expect(tab).toMatch(/\{plataOGuion\(f\.cuota \+ \(f\.cuotaTerceros \?\? 0\)\)\}/);
+    // 14-sep-2026: la columna «Cuota» suma las TRES cuotas (`cuotaPorQuincena`), el daño incluido.
+    expect(tab).toMatch(/\{plataOGuion\(cuotaPorQuincena\(f\)\)\}/);
+    expect(tab).toMatch(/return f\.cuota \+ \(f\.cuotaTerceros \?\? 0\) \+ \(f\.cuotaDano \?\? 0\);/);
     expect(tab).toMatch(/font-medium text-gray-900">\{money\(f\.saldo\)\}/);
   });
 });

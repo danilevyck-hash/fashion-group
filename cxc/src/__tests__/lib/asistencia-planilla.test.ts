@@ -591,7 +591,10 @@ describe("Los centavos y lo que se escribe a mano", () => {
     expect(normalizarManuales({ prestamo: 0 }).prestamo).toBe(0);
     expect(normalizarManuales({ terceros: -1 }).terceros).toBeNull();
     expect(m.isr).toBe(25.5);
-    expect(m.mercancia).toBe(0);
+    // ⚠️ 14-sep-2026 (migración 20261122120000): la mercancía pasó a
+    // automática y su basura cae en null, como préstamo. Decía `toBe(0)`.
+    expect(m.mercancia).toBeNull();
+    expect(normalizarManuales({ mercancia: 0 }).mercancia).toBe(0);
     expect(m.otrosServicios).toBe(0);
   });
 

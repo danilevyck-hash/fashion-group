@@ -66,11 +66,17 @@ describe("POST /api/asistencia/planilla — el 0 de préstamo/terceros se guarda
     expect((await post({ quincena: "2026-09-1", codigo: "10", prestamo: "abc" })).json.manuales.prestamo).toBeNull();
   });
 
-  it("CONTROL: en las otras tres casillas el 0 sigue siendo 0 y el vacío también (no hay null)", async () => {
+  it("CONTROL: en ISR y otros servicios el 0 sigue siendo 0 y el vacío también (no hay null)", async () => {
+    // ⚠️ CAMBIÓ DE DIRECCIÓN el 14-sep-2026 (migración 20261122120000): la
+    // mercancía pasó a ser la tercera casilla automática, así que su vacío
+    // viaja como null y su 0 como 0 — igual que préstamo. Este control decía
+    // «las otras tres» y ponía `mercancia: null → 0`.
     const r = await post({ quincena: "2026-09-1", codigo: "10", isr: "", mercancia: null, otrosServicios: -3 });
     expect(r.json.manuales.isr).toBe(0);
-    expect(r.json.manuales.mercancia).toBe(0);
+    expect(r.json.manuales.mercancia).toBeNull();
     expect(r.json.manuales.otrosServicios).toBe(0);
-    expect(UPSERT).toMatchObject({ isr: 0, mercancia: 0, otros_servicios: 0 });
+    expect(UPSERT).toMatchObject({ isr: 0, mercancia: null, otros_servicios: 0 });
+    expect((await post({ quincena: "2026-09-1", codigo: "10", mercancia: 0 })).json.manuales.mercancia).toBe(0);
+    expect((await post({ quincena: "2026-09-1", codigo: "10", mercancia: 16 })).json.manuales.mercancia).toBe(16);
   });
 });

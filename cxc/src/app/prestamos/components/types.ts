@@ -25,8 +25,9 @@ export interface Empleado {
   empresa: string | null;
   empleado_codigo: string | null;
   deduccion_quincenal: number;
-  /** ⚠️ SIN LECTORES desde el 10-sep-2026: el daño no propone cuota. La
-   *  contadora escribe el monto de cada quincena en la casilla. */
+  /** La cuota quincenal de «Daño de mercancía». 🔴 Desde el 14-sep-2026 la
+   *  planilla la descuenta sola (Daniel: *«se elige la cuota y listo»*); del
+   *  10 al 14-sep no tenía lectores y el monto se escribía a mano. */
   deduccion_dano: number;
   /** 🔴 La cuota quincenal de «Descuento a terceros» (10-sep-2026). */
   deduccion_terceros: number;
