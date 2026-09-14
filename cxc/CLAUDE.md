@@ -73,6 +73,10 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 > Las fichas del home y del sidebar NO llevan subtítulo (auditoría de textos, #278): el campo `subtitle` se eliminó de `AppModule`.
 > Páginas de grupo: `/g/[grupo]` con los 3 slugs nuevos. Los slugs viejos redirigen en `next.config.js` (`/g/sistema` → `/g/administracion`; `/g/plata-entra`, `/g/plata-sale`, `/g/productos` → `/home`).
 
+## Pendientes vivos
+
+🔴 **Lo que Daniel pidió y sigue sin hacerse vive en [docs/pendientes-vivos.md](docs/pendientes-vivos.md)** (24 puntos al 14-sep-2026, cada uno con su cita y su comprobación). Ábrelo al empezar una sesión, junto con `docs/estado-actual.md`. Daniel: *«no te olvides de las cosas porque yo me olvido y se pasan cosas»*. Cuatro de esos puntos **mueven plata**: el daño de mercancía sin cuota · tres quincenas cerradas sin descontar préstamos · una factura de agosto que no le llegó a Rey · el cuadre del estado de cuenta que llega vacío.
+
 ## Invariantes por módulo
 
 Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene que caber en 150.000 caracteres** (el harness lo corta ahí, en silencio): una regla nueva entra aquí en UNA línea, y su detalle —mediciones, citas de Daniel, candados, mutaciones— va al postmortem de su módulo (`docs/postmortems/`). Candado: `claude-md-bajo-el-tope.test.ts`.
@@ -98,8 +102,8 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 **La planilla de David = la de Yulissa.**
 
 - 🔴 **Las columnas de dinero salen de UN lugar** (`lib/asistencia/columnas-dinero-planilla.ts`, 19): `PlanillaTab` y `PlanillaBoston` leen la MISMA lista.
-- 🔴 **Boston pide con el MISMO corte que la contadora**: el guardado de la quincena cerrada, o el sugerido 13/28 (`corteParaBoston`). `GET /api/asistencia/planilla-guardada` acepta a `gerente_boston` **forzándole Boston** (`?id=` ajeno → 404).
-- 🔴 **Su Préstamos suma las tres cuentas**: saldo = `calcularSaldoPrestamo` (préstamo + daño + terceros), cuota = préstamo + terceros.
+- 🔴 **Boston pide con el MISMO corte que la contadora**: el guardado de la quincena cerrada, o el sugerido (`corteParaBoston`). `GET /api/asistencia/planilla-guardada` acepta a `gerente_boston` **forzándole Boston** (`?id=` ajeno → 404).
+- 🔴 **Su Préstamos suma las tres cuentas**: saldo = `calcularSaldoPrestamo` (préstamo + daño + terceros), cuota = préstamo + terceros (el daño sin cuota es **pendiente**, no diseño — ver [docs/pendientes-vivos.md](docs/pendientes-vivos.md)).
 - Candados: `boston-planilla-mismas-columnas` · `boston-prestamos-tres-cuentas` · `boston-planilla-con-dinero` · `integration/boston-planilla-mismos-numeros`.
 
 **El rediseño.** Vive en **`/cxc`**; `/admin` EXACTO redirige 307 con su query.
@@ -122,10 +126,11 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 **Nada se pliega por valer menos de $50**, en los DOS cajones; si se vuelve a plegar, se agrupa **POR MONTO y NUNCA por tipo** (valor absoluto). `documentos-chicos.ts` se conserva sin lectores.
 - 🔴 **El nombre del cliente es el que escribe Switch**, no el `nombre_normalized` que se usa para PAREAR; sin él se capitaliza respetando siglas.
 - 🔴 **«Vence» se DERIVA de la fecha + el `plazo_credito`** (Switch no guarda vencimiento). ⚠️ **Con plazo 0 la celda va VACÍA**.
-- 🔴 **El cuadre**: `Saldos[]` y `saldoTotal` de `/apicliente/estadocuenta` caen en `switch_estadocuenta_saldo` (migración `20261023120000`, **pendiente**; `Saldos[]` crudo en jsonb). El cajón y «Cobrar» avisan si no coincide, con **un centavo** de tolerancia; sin dato de Switch no se afirma nada, y sin la DDL todo sigue igual. ⚠️ El desfase **NO va en el papel del cliente**.
+- 🔴 **El cuadre**: `Saldos[]` y `saldoTotal` de `/apicliente/estadocuenta` caen en `switch_estadocuenta_saldo` (migración `20261023120000`, **aplicada** (verificado contra producción el 14-sep-2026)). El cajón y «Cobrar» avisan si no coincide, con **un centavo** de tolerancia; sin dato de Switch no se afirma nada. ⚠️ El desfase **NO va en el papel del cliente**.
+- 🩸 **EL CUADRE LLEGÓ MUERTO Y SIGUE MUERTO (medido el 14-sep-2026).** La tabla se escribe cada corrida (`synced_at` de hace minutos) pero **las filas llegan con `saldo_total` y `saldos` en NULL: CERO de 835**. Switch no manda esos dos campos con el nombre que el sync busca, así que el aviso «esto no cuadra» **no puede saltar nunca** y el cajón se comporta como si siempre cuadrara. 🔴 **Pendiente de Daniel, y él ya dijo cómo**: primero investigar qué manda de verdad `/apicliente/estadocuenta` y **reportárselo antes de tocar nada**.
 - ⚠️ **«Comentario» va vacía**: el API de Switch no manda ese campo.
-- ⚠️ **La empresa acreedora sale de una lista ESCRITA A MANO** (`lib/cxc/empresa-fiscal.ts`), no del `numero_fiscal`. **Hoy solo Fashion Wear**; las otras cinco van con su nombre corto, **nunca con datos de otra empresa**. **Pendiente**: Daniel dicta sus cuatro líneas.
-- ⚠️ **Boston no tiene papel**: su «Cobrar» sigue sin mandar correos — **pendiente de Daniel**: quién firma ese texto.
+- ⚠️ **La empresa acreedora sale de una lista ESCRITA A MANO** (`lib/cxc/empresa-fiscal.ts`), no del `numero_fiscal`. **Las OCHO empresas ya están cargadas** (verificado el 14-sep-2026): la nota de «solo Fashion Wear» quedó vieja. Una empresa sin líneas sale con su nombre corto, **nunca con datos de otra empresa**. **Pendiente**: Daniel dicta sus cuatro líneas.
+- 🔴 **Boston FIRMA COMO BOSTON** (10-sep-2026, Daniel: *«Firma Confecciones Boston»*; ya no es pendiente). La casa del papel se pregunta por `empresa_key` en `lib/cxc/casa-del-papel.ts`: el de Boston sale **sin el logo del grupo y sin `fashiongr.com` en el pie**. 🔴 **Lo que no se sabe no se inventa ni se presta**: Boston no tiene dominio propio, así que el correo viaja por Resend desde `fashiongr.com` con el nombre cambiado — **verificarle un dominio propio sigue pendiente de Daniel**.
 - Candados: `cxc-estado-cuenta-forma-switch` · `cxc-papel-vocabulario` · `pdf-cliente-layout`.
 
 ### Guías — [docs/postmortems/guias.md](docs/postmortems/guias.md)
@@ -155,7 +160,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 **Cinco columnas retiradas de `guia_transporte`** (`firma_transportista`, `nombre_entregador`, `cedula_entregador`, `motivo_rechazo`, `monto_total`): **no se dropean**, quedan con `COMMENT` (`20261006120000`, **pendiente**) y candado que pone el build ROJO si se borran o si el código las toca. ⚠️ Las dos firmas en uso **no se tocan**.
 - 🔴 **«Rechazada» se retiró**: `guiaYaDespachada` solo reconoce «Completada»; el PATCH ya no acepta `motivo_rechazo`.
 - 🔴 **Compartir**: IMAGEN hasta 6 renglones y PDF de ahí para arriba (`formatoParaCompartir`, `MAX_RENGLONES_PNG = 6`); en computadora, **siempre PDF** —el aparato se reconoce **por el dedo** (`pointer: coarse`), no por el nombre (`aparato.ts`)—. La imagen se dibuja **sin un solo `await`**, las firmas se **precargan al abrir la guía** y una sin decodificar **no se inventa**. ⚠️ `png-guia.ts` **no arrastra jsPDF**; imprimir no cambia.
-- 🔴 **«Changuinola» con «u»** en `DEFAULT_DIRECCIONES` (`20261005120000`, **pendiente**; **valor exacto**, nunca un `LIKE`).
+- 🔴 **«Changuinola» con «u»** en `DEFAULT_DIRECCIONES` (`20261005120000`, **aplicada** (verificado contra producción el 14-sep-2026); **valor exacto**, nunca un `LIKE`).
 - Candados: `guias-numero-factura.test.ts` · `guias-american-classics.test.ts` · `guias-bultos-de-bodega.test.ts` · `guias-restos-y-ambar.test.ts` · `guias-compartir-png.test.ts` · `guias-bultos-y-guardar.test.tsx`.
 
 **El panel y los defectos del 11-sep-2026.**
@@ -167,7 +172,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 
 **La lista de destinos (7-sep-2026) y varios clientes (10-sep-2026).**
 
-- 🔴 **La lista de destinos del campo dirección es DEL EQUIPO, no de un navegador**: `guias_destino_lista` (`20261014120000`, **pendiente**), en Guías › Configuración. ⚠️ **NO se fusiona con `guias_destino_cliente`**. Agregar: admin · secretaria · bodega; quitar: admin · secretaria. 🔴 **Soft delete firmado, NUNCA DELETE**; el repetido se rechaza por `claveDestino` (exacto, jamás por parecido). **Sin la DDL falla ABIERTA** a `DESTINOS_BASE` y el GET contesta 200 vacío.
+- 🔴 **La lista de destinos del campo dirección es DEL EQUIPO, no de un navegador**: `guias_destino_lista` (`20261014120000`, **aplicada** (verificado contra producción el 14-sep-2026)), en Guías › Configuración. ⚠️ **NO se fusiona con `guias_destino_cliente`**. Agregar: admin · secretaria · bodega; quitar: admin · secretaria. 🔴 **Soft delete firmado, NUNCA DELETE**; el repetido se rechaza por `claveDestino` (exacto, jamás por parecido). **Sin la DDL falla ABIERTA** a `DESTINOS_BASE` y el GET contesta 200 vacío.
 - 🔴 **La semilla sale del uso REAL, nunca del `localStorage` de nadie**: **3+ usos**, grafía más usada, salvo la ya definida en `guias_destino_cliente`.
 - 🔴 **Una guía lleva facturas de VARIOS CLIENTES, de a UN CLIENTE A LA VEZ** (un renglón por cliente-empresa); **reusa el MISMO `ClientePicker`** y **nada de lo que se guarda cambia** (`GUIAS_ATAJOS_NUEVOS`).
 - Candados: `guias-destinos-compartidos.test.ts` · `guias-papel-uno-solo.test.ts` · `guias-destinos-compartidos-pantalla.test.tsx` · `guias-varios-clientes-y-dias.test.ts` · `guias-varios-clientes-y-dias.test.tsx`.
@@ -193,10 +198,12 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 **Sync, clasificación y puertas.**
 
 - **Las escrituras del sync que no cambian nada no se hacen**; ante la duda, se escribe. **El precio lo manda Switch**: a mano solo `image_url`/`badge` (+`name` en Tommy, que marca `nombre_manual`).
+- 🔴 **CADA MARCA CLASIFICA EL GÉNERO DE OTRA FORMA. Un solo mapa rompe dos marcas.** Tommy y Calvin lo sacan **de la DESCRIPCIÓN** (el guion de `Women-Slippers`), en `tommy-gender.ts` y `calvin-gender.ts`, y el pareo es por **igualdad sobre una tabla de alias, NUNCA por `includes`** — «female» contiene «male» y «women» contiene «men». Reebok no: usa `rubro`/`subrubro` con desempate por nombre. Daniel: *«Pero tommy y calvin es por descripción. No como reebok»*.
+- 🔑 **Lo que entra a Switch en Active Shoes SALE de la plantilla del Depurador.** La cadena es **Depurador → Excel de 25 columnas → se sube a Switch → el cron lo lee → catálogo público**, así que un producto mal clasificado en el catálogo **no se arregla en el catálogo**: se arregla en la plantilla o en Switch.
 - **La clasificación de Reebok la manda Switch** (`reebok-clasificacion.ts`): la MARCA da la categoría, el SUBRUBRO el género, el `rubro` es plan B; `UNISEX` → Hombre y solo ahí desempata el nombre. Lo desconocido cae en `otros`/`sin_clasificar` y **nunca pisa** lo ya clasificado.
 - 🔴 **«Todavía no llegó» NO es «llegó algo que no entiendo»** (`fichaLlego`): sin `ficha_at` no se avisa **ni se clasifica**; con `ficha_at`, un valor desconocido o vacío sí avisa.
 - 🔴 **La existencia de un escondido NO se congela**: entra al conjunto que se le pregunta a Switch (`ocultosManualSkus`). 🔴 **Esconder sigue siendo esconder**: manda `esVisibleEnCatalogo`, donde `oculto_manual` gana SIEMPRE y con ella se recalcula `active`. ⚠️ Sin la columna, todo como antes.
-- 🔴 **La foto a mano queda protegida**: viaja `foto_manual: true` con la foto y el servidor acepta **solo `true` y solo con `image_url`**; el `false` es del sync. ⚠️ Calvin necesita `20261011120000_calvin_foto_manual.sql`, **pendiente de aplicar**.
+- 🔴 **La foto a mano queda protegida**: viaja `foto_manual: true` con la foto y el servidor acepta **solo `true` y solo con `image_url`**; el `false` es del sync. ⚠️ La de Calvin (`20261011120000_calvin_foto_manual.sql`) está **aplicada** (verificado contra producción el 14-sep-2026).
 - 🔴 Guard SSR en `/catalogos/admin/[marca]` con la lista derivada de `CATALOGO_ADMIN_ROLES` (`puedeAdministrarCatalogo`); `?tab=pedidos` redirige **antes** del guard; `orders/[id]` exige `COMPROBANTES_ROLES` y `/catalogo/[marca]/pedidos`, `puedeVerComprobantes`.
 - 🔴 **Cinco rutas retiradas**: `joybees/seed`, `joybees/import`, `[marca]/pedidos-unificado`, `reebok/stats`, `reebok/inventory/bulk`. ⚠️ `reebok/inventory` y `pedidos-export` siguen vivos. 🔴 **Las tablas no se tocan** (patrón `mayor_lineas`).
 - 🩸 Borrar de verdad es la excepción (`20260924120000`, aplicada): lista de **ids**, nunca un `LIKE`; el que tenga envío vivo se saca; solo lo ya `deleted`.
@@ -243,7 +250,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 
 > Detalle: [postmortem](docs/postmortems/marketing-gastos.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
 
-- ⚠️ **Todo cuelga de `MARKETING_PDF_EN_LA_PUERTA` (`src/lib/marketing/pdf-en-la-puerta.ts`), hoy en `false`**; se prende poniéndola en `true`, sin migración.
+- ⚠️ **Todo cuelga de `MARKETING_PDF_EN_LA_PUERTA` (`src/lib/marketing/pdf-en-la-puerta.ts`), hoy en `true`** — Daniel lo prendió el 10-sep-2026 (verificado el 14-sep). Se apaga poniéndola en `false`, sin migración.
 - 🔴 **«Foto» pasa a «Foto o factura» y acepta PDF**: imagen = `foto_factura`; PDF = la factura (`pdf_factura`), tope **10 MB** (`MAX_PDF_MB`). La puerta conecta la IA.
 - 🔴 **El mismo PDF NUNCA se sube dos veces**: sube una vez para la IA y al guardar solo se registra el adjunto con ESE `path` (`adjuntarPdfDeFactura`); un `ref` frena la relectura.
 - 🔴 **Cada gasto con su prueba**: en **Factura** y **«Otro gasto»** el PDF es OBLIGATORIO (`pdfObligatorio`), Impulsadora exige su comprobante y Mueble no cambia. ⚠️ Es una PROP: el proyecto y la EDICIÓN guardan sin PDF.
@@ -283,7 +290,8 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 Son **COLABORADORES**, no «personas», en todo texto del sistema. `/asistencia/personas/:codigo` redirige **307** con la query intacta; ⚠️ los identificadores NO cambian (`asistencia_personas`, `persona=<código>`).
 - 🔴 Selector de empresa (`empresa-para-todo.ts`, `?empresa=`): opciones = rol ∩ `GET /api/asistencia/alcance` (`null` = las cuatro); hasta que conteste, lo del rol. Es filtro de LECTURA; `POST …/aprobaciones?empresa=` **rechaza (400) un código ajeno, todo o nada**.
 - 🔴 Almuerzo **por empresa** (`ALMUERZO_POR_EMPRESA`): **30 min**, **60 en Multifashion**; sin casilla, el PUT de Horarios escribe el de la empresa de la ficha y conserva la entrada.
-- La quincena paga `salario ÷ 2`; un rango libre prorratea por la fracción cubierta y **no aplica los montos escritos a mano**. Corte propuesto **13 o 28**; vacío = quincena entera.
+- La quincena paga `salario ÷ 2`; un rango libre prorratea por la fracción cubierta y **no aplica los montos escritos a mano**.
+- 🔴 **EL DÍA DEL CORTE LO ELIGE LA CONTADORA, NO EL SISTEMA.** Daniel: *«los cortes no son 13 y 28, es depende de la contable cuando elige la fecha del corte»*. `CORTE_SUGERIDO = { 1: 13, 2: 28 }` es **solo lo que se propone** en la casilla; ella escribe el que quiera y vacío = quincena entera. La quincena real (1-15 · 16-fin) **sí es fija**; lo que el corte mueve es hasta dónde se LEE EL RELOJ, y los días que quedan se pagan normal y se ajustan en la siguiente.
 - 🔴 **El día vale sueldo mensual ÷ 26** (`DIAS_PAGADOS_POR_MES`); quien entra o sale a mitad de quincena cobra **días hábiles trabajados** (`prorrateo-ingreso.ts`), congelado en el cierre.
 - 🔴 Salir antes se descuenta **desde el minuto uno, sin tolerancia** (los 10 min de gracia son solo de la entrada) y tiene concepto propio en el cierre.
 - Horas extra exactas del reloj (`brutoSeg / 60`, sin cuartos); ISR a mano. 🔴 Centavos: **manda el sistema y la contable se adapta**: 1–4 centavos no son defecto.
@@ -299,23 +307,27 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 Las casillas de préstamo y terceros tienen **tres estados**: `NULL` = cuota automática · `0` = esta quincena **no se descuenta** y el cierre **no anota pago** · monto = ese monto (`casilla-sin-descontar.ts`, misma función para pantalla y guardado). ⚠️ `mercancia`, `isr` y `otros_servicios` siguen `NOT NULL DEFAULT 0`.
 - 🔴 Las horas de una justificación **solo van con «Constancia»** (`permiso-horas.ts`): la ruta rechaza con **400** un motivo de día completo que llegue con horas; el motor honra las horas guardadas sin mirar el motivo.
 - 🔴 La salida temprana entra al ajuste del corte (`CONCEPTOS_DEL_RELOJ` son **ocho**) y **los seguros se calculan sobre el bruto CON el ajuste** (`aplicarAjusteEnLinea`, respeta `paga_seguros`).
-- 🔴 El corte (13/28) y el ajuste de los días sin medir entran **cada concepto en su columna — nunca una línea neta**, cada monto con SU rata (`corte-quincena.ts`, antes de totalizar: `dinero.netoPagar` ES el neto que se paga). **El neto por persona no cambia.** ⚠️ Los seguros no se recalculan sobre lo repartido — **pendiente de Daniel**.
+- 🔴 El corte y el ajuste de los días sin medir entran **cada concepto en su columna — nunca una línea neta**, cada monto con SU rata (`corte-quincena.ts`, antes de totalizar: `dinero.netoPagar` ES el neto que se paga). **El neto por persona no cambia.** ⚠️ Los seguros no se recalculan sobre lo repartido — **pendiente de Daniel**.
 - 🔴 **O el total sigue al filtro, o no hay buscador** (`buscar-en-lista.ts`): filtra lo ya cargado por **subcadena exacta normalizada, nunca por parecido**, con el texto en la URL (`?buscar=`). 🔴 **Planilla no tiene buscador** —su pie es plata que se paga—, con barrido sobre `PlanillaTab.tsx`. Los avisos de «Antes de cerrar» (`antes-de-cerrar.ts`) viajan como datos: Excel y PDF los leen igual.
 - 🔴 **Lo que sale de la pantalla nunca se recorta** (Excel, PDF, cierre, lotes), salvo un botón que DIGA a cuántos afecta. ⚠️ Asistencia, Clientes y ⌘K buscan contra el SERVIDOR.
 - 🔴 Dar de baja a alguien con deuda **avisa** (`salida-con-deuda.ts`), y la deuda son las **tres cuentas** (`calcularSaldoPrestamo`). 🔴 Las columnas de dinero salen de **un solo lugar**: `columnas-dinero-planilla.ts` (**19**), leído por `PlanillaTab` y `PlanillaBoston`.
+- 🔴 **JUSTIFICAR SIGNIFICA QUE SE PAGA. No existe «justificado pero no se paga».** Daniel: *«no hagamos justificar que no pague, ensucia»*. La lista de motivos es **cerrada** (`motivos.ts`): Incapacidad · Catástrofe · Escolares · Trabajo de vendedor · Constancia.
+- 🔑 **Tres reglas de la planilla son de la CONTADORA (Yulissa), no de Daniel** — por eso no se renegocian con él: la información *«se le configura en el perfil y la debe tomar de allí»*, nunca a mano; **terceros se maneja igual que un préstamo** (monto inicial + cuota quincenal); y **daño de mercancía permanece en blanco**, con la cantidad escrita quincena por quincena.
+- **«Descuento por compras» y «Daño de mercancía» son LA MISMA línea**, no dos conceptos.
+- ⚠️ **Un colaborador sin cédula ni salario no siempre es un dato olvidado**: Daniel, *«creo que porque no tienen permiso de trabajo»*.
 - La incapacidad justificada **se paga**; «Trabajo fuera de la oficina» **no es ausencia**; un sueldo repartido saca la rata del **sueldo COMPLETO** y las partes deben sumar el salario de la ficha o se rechaza entero.
 - Corregir una hora: el porqué es obligatorio; los motivos frecuentes se derivan de lo guardado en **90 días** por clave normalizada (**igualdad exacta, nada por parecido**), **4** con **2+** usos (`motivos-frecuentes.ts`, solo lectura).
 - Candados: `asistencia-colaboradores-no-personas` · `asistencia-falta-configurar` · `asistencia-siete-pantallas` · `asistencia-lista-que-falta` · `planilla-elegir-quincena` · `asistencia-reglas-de-la-contable` · `asistencia-empresa-para-todo` · `asistencia-alcance-route` · `aprobaciones-por-persona` · `aprobaciones-optimista` · `vacaciones-el-motor-las-honra` · `asistencia-prestamo-planilla` · `planilla-sin-descontar` · `justificar-horas-solo-constancia` · `planilla-ajuste-por-concepto` · `planilla-antes-de-cerrar` · `asistencia-buscadores` · `prestamos-salida-con-deuda` · `asistencia-corregir-hora`.
 
-### La Planilla Unida — TODO detrás de DOS interruptores, los dos APAGADOS (10-sep-2026)
+### La Planilla Unida — los dos interruptores, PRENDIDOS en producción (11-sep-2026)
 
 > Detalle completo: [el postmortem](docs/postmortems/asistencia-planilla.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026». ⚠️ Sus reglas de PANTALLA viven SOLO ahí: léelo antes de tocar una pantalla suya.
 
-> 🔴 **Los dos están APAGADOS en producción y el módulo es EXACTAMENTE el de siempre.** Se prenden con variable en Vercel + despliegue (Next reemplaza `NEXT_PUBLIC_*` como TEXTO al compilar). Daniel los prende uno por uno.
+> 🔴 **Los dos están PRENDIDOS en producción desde el 11-sep-2026** (`NEXT_PUBLIC_PLANILLA_UNIDA="1"` y `NEXT_PUBLIC_PERSONA_EN_EL_CENTRO="1"` en Vercel, verificado el 14-sep-2026), así que lo de abajo es lo que Daniel VE hoy. Apagarlos pide cambiar la variable **y volver a desplegar**: Next reemplaza `NEXT_PUBLIC_*` como TEXTO al compilar. Daniel los prende uno por uno.
 
 | Interruptor | Dónde vive | Qué prende |
 |---|---|---|
-| `NEXT_PUBLIC_PLANILLA_UNIDA` | `planilla-unida.ts:26` | El comprobante de pago · el cierre que escribe el pago del préstamo (reabrir lo revierte) · el corte 13/28 y el «Ajuste quincena anterior» · Préstamos con «una sola puerta» |
+| `NEXT_PUBLIC_PLANILLA_UNIDA` | `planilla-unida.ts:26` | El comprobante de pago · el cierre que escribe el pago del préstamo (reabrir lo revierte) · el corte de quincena y el «Ajuste quincena anterior» · Préstamos con «una sola puerta» |
 | `NEXT_PUBLIC_PERSONA_EN_EL_CENTRO` | `persona-en-el-centro.ts:43` | El acomodo nuevo y `/asistencia/personas/[codigo]` con Editar |
 
 ⚠️ **No cuelga de un interruptor, es aditivo por datos** y hoy inerte: la tercera cuenta «Descuento a terceros», `asistencia_codigos_ignorados` (vacía), ACS como cuarta empresa (CHECK más anchos) y sus 30 min de extra automáticos (`EXTRA_AUTOMATICO_POR_EMPRESA`: las otras tres en **0**).
@@ -325,7 +337,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - La sección Préstamos de la persona **enlaza, no duplica** (`enlaceAPrestamos`): no dibuja formulario ni hace POST, y la ficha NO ofrece «Pago Quincenal»: lo escribe el cierre.
 - 🔴 El comprobante de pago es UNO para las cuatro empresas, una hoja por persona, con todos los renglones aunque vayan en 0.00. Multifashion sale con `MULTI FASHION HOLDING CORP.` · `155638923-2-2016`, de la lista fiscal del estado de cuenta, sin correo ni teléfono; sin cargo va un guion, no se inventa.
 - 🔴 El pago del préstamo lo escribe el CIERRE, con `await`, y **reabrir lo revierte** con soft delete; cerrar dos veces no cobra dos veces (índice único).
-- 🔴 El corte (13/28) **no prorratea el sueldo**: el período queda entero y solo se recorta hasta dónde se mide el reloj (`hastaReloj`); el «Ajuste quincena anterior» va en **renglón propio**, nunca dentro de la ausencia.
+- 🔴 El corte **no prorratea el sueldo**: el período queda entero y solo se recorta hasta dónde se mide el reloj (`hastaReloj`); el «Ajuste quincena anterior» va en **renglón propio**, nunca dentro de la ausencia.
 - 🔴 En ACS aprueba `daniel`, no la contadora; **cerrar no sale de esa tabla**: ella sigue cerrando las cuatro.
 - Los nombres se capitalizan con `nombre-en-pantalla.ts` y **no se inventan acentos**. La cédula vive en el bucket **privado `asistencia-cedulas`**: se guarda la RUTA y la URL se **firma al leer**, una hora.
 - Candados: `planilla-unida-comprobante` · `planilla-unida-cierre-prestamo` · `planilla-unida-corte-y-cableado` · `planilla-tres-descuentos` · `persona-en-el-centro` · `prestamos-una-puerta` · `prestamos-pestana-completa`.
@@ -342,7 +354,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 La persona sale de Asistencia y la ficha nace con su `empleado_codigo`, editable. Nada se ata por parecido: lista a mano, y el UPDATE lo EXIGE.
 - 🔴 NADIE APRUEBA UN PRÉSTAMO: nace `aprobado`. El tope de UN SUELDO MENSUAL sobre la deuda TOTAL (sin sueldo, $500) solo AVISA, en pantalla y Telegram privado; el daño nunca pasa por el tope.
 - 🔴 El freno de duplicados mira concepto + origen + fecha, NUNCA la nota (`origen_pago` NULL = Quincena). Soft delete con `logActivity` hasta en «Eliminar Todo el Historial».
-- 🔴 La planilla propone la cuota del préstamo y la de terceros (el daño no propone), capeadas a SU saldo, y entran solas, sin aprobar.
+- 🔴 La planilla propone la cuota del préstamo y la de terceros, capeadas a SU saldo, y entran solas, sin aprobar. ⚠️ **El daño de mercancía NO propone cuota, y eso es un pendiente, no un diseño**: Daniel lo pidió (*«El daño debe de tener cuota como prestamo»*, 5-sep-2026), `deduccion_dano` existe y `cuotaDano` viaja al navegador, pero `aplicarPrestamoEnLinea` no lo lee — hoy se teclea a mano cada quincena. Ver [docs/pendientes-vivos.md](docs/pendientes-vivos.md).
 - 🔴 «No descontar esta quincena» = un 0 en la FILA: `asistencia_planilla_manual` tiene tres estados (`NULL` = cuota · `0` = no se descuenta · monto) en `lib/asistencia/casilla-sin-descontar.ts`, la MISMA para pantalla y `normalizarManuales`; con 0 el cierre no anota pago.
 - Candados: `prestamos-dos-cuentas.test.ts` · `planilla-sin-descontar.test.ts`.
 
@@ -480,11 +492,11 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - Cada descarga de Ventas se anota en `activity_logs` (`descarga_excel`) y baja **lo que está en pantalla**.
 - 🔴 **«Todas las empresas» cuando la lista son solo las 6 del grupo; «Fashion Group» solo si mezcla grupo y no-grupo** (`rotuloDeTodas`, `lib/ventas/rotulo-empresas.ts`; las seis DERIVAN de `B2B_EMPRESA_KEYS`, sin Boston ni Multifashion).
 - 🔴 **`clientes_empresa_12m_vw` es MATERIALIZADA aunque termine en `_vw`**, y la refresca `switch-sync tipo=facturas|all` cuando alguna de las 6 termina bien (tolerante). Los TRES caminos dejan la marca `clientes-vw-refrescada` en `cron_heartbeats` (`HEARTBEATS_NO_CRON`); sin marca, no se dice frescura.
-- 🔴 **Nunca se rotula un período que no se sumó** (`rotuloCompras`). ⚠️ Las ventanas de Clientes salen de la migración **`20261121120000`** (**pendiente**, aditiva); sin ella el servidor sirve el año y lo dice (`ventana: null`).
+- 🔴 **Nunca se rotula un período que no se sumó** (`rotuloCompras`). ⚠️ Las ventanas de Clientes salen de la migración **`20261121120000`** (**aplicada** (verificado contra producción el 14-sep-2026), aditiva); sin ella el servidor sirve el año y lo dice (`ventana: null`).
 - 🔴 **«Nuevo» en vez de «+0 %»** para el cliente sin base comparativa (`delta: null`), y va al final al ordenar por cambio.
 - 🔴 **Multifashion fuera del selector de Ventas › Productos** (`PRODUCTOS_EMPRESAS` deriva de `B2B_EMPRESA_KEYS`): no tiene filas en `switch_factura_lineas`. **Boston NO entra.**
 - 🔴 **La puerta de atrás se cerró**: las 6 rutas de datos de Ventas son **solo `admin`**; `/api/ventas/v2`, `/v2/status`, `/años`, `/ventas/reporte` y `/api/ventas/resumen-anual` se retiraron; la búsqueda global no le ofrece «Ventas» a contabilidad.
-- ⚠️ **Pendientes de Daniel**: aplicar las dos migraciones (`20261120120000` el corte del costo; `20261121120000` las ventanas de Clientes); en Clientes › Utilidad el período sigue siendo el año (esa ruta no tiene ventanas).
+- ⚠️ **Pendiente de Daniel**: en Clientes › Utilidad el período sigue siendo el año (las dos migraciones, `20261120120000` y `20261121120000`, ya están **aplicada** (verificado contra producción el 14-sep-2026)) (esa ruta no tiene ventanas).
 - Candados: `mes-de-panama-vista-general-y-ventas` · `ventas-selector-periodo-unico` · `ventas-resumen-13-cambios` · `ventas-clientes-desplegable-y-nuevo` · `ventas-clientes-periodo-y-frescura` · `ventas-productos-selector-unico` · `ventas-puerta-cerrada`.
 
 ### El módulo Clientes — la ficha y la lista (5-sep-2026)
@@ -528,7 +540,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 Nombres capitalizados (`nombreVendedorEnPantalla`): solo cambia cómo se MUESTRA, la clave sigue en mayúsculas.
 - 🩸 «Cuándo vende la tienda»: cada línea dice su período — «Día más fuerte» y «Hora pico» de los últimos 3 meses (`patrones.ts`), «Mejor / peor día» del MES. 🔑 El promedio de N meses no es el de sus promedios: se suman `promedio × días` y días.
 - 🔴 «Hoy» es UNA línea y no escribe «$0» si el día no arrancó; «Actualizar ahora» al ☰.
-- 🔴 Las vendedoras con dos códigos se juntan (`20261009120000_multifashion_vendedora_alias.sql`, ⚠️ PENDIENTE): identidad = CÓDIGO, tabla firmada, soft delete nunca DELETE, única entre activas, RLS service_role; lo resuelve `multifashion_vendedora_canonica` y las RPC v4 caen a la v3 sin la DDL.
+- 🔴 Las vendedoras con dos códigos se juntan (`20261009120000_multifashion_vendedora_alias.sql`, **aplicada** (verificado contra producción el 14-sep-2026)): identidad = CÓDIGO, tabla firmada, soft delete nunca DELETE, única entre activas, RLS service_role; lo resuelve `multifashion_vendedora_canonica` y las RPC v4 caen a la v3 sin la DDL.
 - ⚠️ Juntar los códigos NO arregla la diferencia entre Vendedoras y el mes: falta `DEFAULT`, excluido a propósito.
 - 🩸 La fila «YTD» pasa a «Año» con el total de la tarjeta (`fila-anio.ts`); el Δ va sobre los meses comparables. ⚠️ En el año en curso puede diferir por el día de corte.
 - 🩸 `SyncNowButton` con `roles={ROLES_MULTIFASHION}`; el rol sale de `lib/roles-etiquetas.ts`, derivado de `SYSTEM_ROLES`.
@@ -600,6 +612,8 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 ## Switch Soft (ERP externo)
 - 🗺️ **El mapa de flujo, dato por dato: [`docs/switch-flujo.md`](docs/switch-flujo.md)** (3-sep-2026) — para cada cosa que el sistema sabe de Switch: por qué endpoint o reporte sale, qué cron lo trae y a qué hora, en qué tabla cae y qué campos descarta, en qué pantalla se ve, qué empresas entran y cuáles no, qué lo rompe y cómo consultarlo al momento. Más las dos vías de entrada (API vs panel, **sesión por USUARIO**), las trampas transversales y el árbol de «por dónde empezar». **Léelo antes de decir que un dato «no existe», «no llega» o «viene de tal endpoint».** Cruza con `docs/donde-vive-cada-dato.md` (por pregunta) y con `switch-referencia.md` (por endpoint).
 - 📖 **Documentación oficial cruzada con el código: [`docs/switch-referencia.md`](docs/switch-referencia.md)** — los 52 métodos del API (cuáles usamos, qué campos tiramos, 7 endpoints que usamos sin documentar), lo que las 13 guías explican del sistema, y la lista de lo que la doc corrige del repo (sesión única es por USUARIO, `rubroId` en `/apiarticulos/lista`, `detalle[]` en `/apiingresomercancia/info`, precio por cliente). El manual del panel sigue en `docs/switch-panel.md`.
+- 🔑 **Por dónde se entra a mirar: una dirección por empresa** (Daniel las dictó el 3-sep-2026; el subdominio **no se deriva del nombre**). `vistanainternacional` · `fashionwear` · **`fashionshoesholding`** · `activeshoes` · `activewear` · **`joystepcorp`** · `confeccionesboston` · **`americanclassicstore`**, todas `.switch-soft.com`. ⚠️ Entrar **expulsa a quien esté adentro**: la sesión es por USUARIO y el sistema entra como `daniel`.
+- 🔑 **Para disparar un cron a mano** hace falta `CRON_SECRET` (está en Vercel, en las variables del proyecto; no confundirla con las otras dos parecidas): `curl -H "Authorization: Bearer $CRON_SECRET" https://fashiongr.com/api/cron/<nombre>`. Sin ella contesta `{"ok":false,"error":"Unauthorized"}`.
 - **Dos vías de entrada** (detalle en `docs/switch-flujo.md` › A): el **API JSON** con token (`client.ts`; `SWITCH_<EMPRESA>_API_*`) y el **panel web** Laravel con sesión (`web-client.ts`; `SWITCH_<EMPRESA>_WEB_*`, login con `changesession="SI"` que **expulsa** a quien esté en el panel). **La sesión es por USUARIO**, y el sistema entra como `daniel`: cada cron o script saca a Daniel del panel de esa empresa, y viceversa. Los crons de la misma empresa van a ≥ 15 min; los de login web, de madrugada de Panamá.
 - Lo que llega por **CSV** hoy son solo los reportes del panel que el sync baja solo (egresos varios e ingresos de mercancía, con `;`). ⚠️ Aquí decía hasta el 3-sep-2026 «Upload: 100% manual (drag-drop), no hay API/SFTP» — describía el sistema de antes de jun-2026 (`ventas_raw`/`cxc_rows`, congeladas). Hoy hay 25 endpoints del API en uso y ~40 entradas de cron que tocan Switch.
 
@@ -646,12 +660,13 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 - **Modals:** ConfirmModal (normal), ConfirmDeleteModal (destructivo, 1s delay), BottomSheet (mobile)
 - **Spacing:** 4px base, py-6 containers, mb-4 sections, p-3 cards
 - **Depth:** borders-only (no shadows en cards/modules)
-- **Module colors:** CXC=blue, Guías=emerald, Cheques=amber, Reclamos=orange, Caja=violet, Directorio=cyan, Préstamos=rose, Ventas=indigo, Reebok=red (2px accent en header)
+- **Module colors:** la lista viva son **18 módulos** en `src/lib/moduleColors.ts` (2px de acento en el encabezado) — CXC=blue · Guías=emerald · Recordatorios=amber · Reclamos=orange · Caja=violet · Directorio=cyan · Préstamos=rose · Ventas=indigo · Reebok=red, más Comisiones · Asistencia · Boston · Proveedores · Plantilla Switch · Gastos · Marketing · Multifashion. 🔴 **No la copies aquí: léela en el archivo**, que es el único lugar donde está completa.
 - **Animations:** AccordionContent (CSS grid 250ms), page transitions (slide-right/left/crossfade 180ms), KPI count-up, deposit flash, saldo shake, new row highlight
 - 🔴 **Barras pegajosas: se pegan DEBAJO del encabezado, nunca encima** (11-sep-2026; detalle en [docs/postmortems/barras-pegajosas.md](docs/postmortems/barras-pegajosas.md)). El encabezado NO tiene alto fijo (72 px con breadcrumb, 46 en celular): se MIDE con `ResizeObserver` y viaja en `--fg-altura-encabezado`, publicada por `AppHeader` y `CatalogoNavbar`. **La única forma de pegar una barra de contenido es `CLASE_BARRA_PEGAJOSA`** (`src/lib/ui/barra-pegajosa.ts` + `.fg-barra-pegajosa`): `top: var(--fg-altura-encabezado)` y z-index 9, por debajo del 10 del encabezado. Un `<thead>` o la cabecera de un modal con `sticky top-0` se pegan a SU contenedor y se dejan como están (lista de exentos viva en el candado). ⚠️ Pendiente de Daniel: los dos `sticky top-0` del overlay de Marketing › Proyecto. Candados: `barras-pegajosas.test.ts` · `barras-pegajosas.test.tsx`.
 
 ## UX Principles
 - Usuarios: secretarias, bodegueros, vendedores en Panamá. NO tech-savvy.
+- 🔴 **«Pedido» para Daniel es la orden de un CLIENTE, nunca una petición HTTP.** Decirle *«la lista no manda ningún pedido de escritura»* lo hizo entender que Guías mandaba pedidos a Switch. Para hablar de red: **«no escribe nada», «no guarda nada», «solo lee»**. Igual de cargadas: factura · traslado · abono · pago.
 - Labels en español simple. Cero jerga (CXC → "Cuentas por Cobrar")
 - Botones descriptivos ("Guardar gasto", no "Guardar")
 - Errores accionables y humanos ("No se pudo guardar. Intenta de nuevo en unos segundos.")

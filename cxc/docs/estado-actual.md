@@ -2359,3 +2359,39 @@ Claude Code corta CLAUDE.md a **150.000 caracteres** y no dice qué quedó afuer
 ### ⚠️ Dejado a propósito / pendiente de Daniel
 - Los postmortems crecieron con el texto movido (guias.md 243 KB, catalogos-pedidos.md 244 KB, ventas-referencia.md 234 KB). No los lee el harness solo; se leen cuando se toca el módulo. Si algún día molestan, se parten por fecha — pero no hoy.
 - Los agentes reportaron cuatro reglas de datos que quedaron solo en el postmortem por espacio: en Préstamos, que `mercancia`, `isr` y `otros_servicios` siguen `NOT NULL DEFAULT 0`; en Recordatorios, que el código no degrada sin la DDL; en Gastos, «Todavía no hay gastos registrados» en vez de `$0.00`; en Boston, que cerrar y reabrir la quincena son de quien cierra. Todas siguen con su candado.
+
+---
+
+## 14-sep-2026 (tarde) — Lo que estaba enterrado en la sesión anterior
+
+Daniel: *«No era solo de eso. Con 33k mensajes había mucha más info y contexto del proyecto. Míralo»*. La sesión anterior (a93eb587) va del **31-ago al 13-sep-2026**: 33.215 mensajes, **1.197 de ellos escritos por él**. Se extrajeron los suyos, se repartieron en tres tramos y tres agentes los leyeron enteros contra `CLAUDE.md`, `estado-actual.md`, los postmortems y el código.
+
+### 🩸 CLAUDE.md tenía cinco datos falsos, y esta mañana los copié al recortarlo
+No los introdujo el recorte: ya estaban viejos. Verificados contra el código y contra producción, y corregidos hoy:
+
+| Decía | La verdad (verificada el 14-sep) |
+|---|---|
+| Planilla Unida y Persona en el Centro, «los dos APAGADOS» | `NEXT_PUBLIC_PLANILLA_UNIDA="1"` y `NEXT_PUBLIC_PERSONA_EN_EL_CENTRO="1"` en Vercel producción desde el 11-sep |
+| `MARKETING_PDF_EN_LA_PUERTA` en `false` | En `true` desde el 10-sep (commit `5ac6695e`) |
+| **Nueve** migraciones «pendientes de aplicar» | **Las nueve aplicadas**, comprobadas columna por columna contra PostgREST |
+| Datos fiscales: «hoy solo Fashion Wear» | Las **ocho** empresas cargadas en `empresa-fiscal.ts` |
+| «El corte 13/28» | `CORTE_SUGERIDO` es **solo una propuesta**; Daniel: *«los cortes no son 13 y 28, es depende de la contable cuando elige la fecha del corte»* |
+
+De ahí salió la memoria [[lo-escrito-caduca]] y el candado de tamaño ya existente.
+
+### 🔴 Dos cosas vivas que quedaron abiertas al cortarse la sesión
+
+**1. El cuadre del estado de cuenta llegó muerto.** `switch_estadocuenta_saldo` se escribe en cada corrida, pero **las 835 filas traen `saldo_total` y `saldos` en NULL — cero llenas**. Switch no manda esos campos con el nombre que el sync busca, así que el aviso «esto no cuadra» no puede saltar nunca. Daniel ya dijo cómo tratarlo: investigar qué manda de verdad `/apicliente/estadocuenta` y **reportárselo antes de tocar nada**.
+
+**2. Tres quincenas cerradas sin descontar préstamos.** De las **6** cerradas en la historia, **5** se cerraron como rango libre (sin `quincena` y sin `corte`), y en rango libre el motor prorratea el sueldo **y apaga todos los montos a mano**. Prueba: en toda la historia hay **dos** pagos de préstamo escritos por un cierre, los dos de la única quincena bien armada. Siguen cerradas así: fashion_wear y vistana 15-28 ago (factor 0,879) y confecciones_boston 15-25 ago (**0,692**). La contadora ya reabrió una quejándose de eso mismo.
+
+### Lo que se escribió
+- **`docs/pendientes-vivos.md`** — 24 pedidos suyos sin hacer, cada uno con su cita textual, su fecha y **qué se comprobó**. Cuatro mueven plata. `CLAUDE.md` abre con un puntero a ese archivo.
+- **Contexto de negocio que no estaba en ningún lado** y entró a `CLAUDE.md`: que **Tommy y Calvin clasifican el género por la DESCRIPCIÓN y Reebok no** (un solo mapa rompe dos marcas); la cadena **Depurador → Switch → catálogo**; las ocho direcciones del panel de Switch (el subdominio no se deriva del nombre); cómo se dispara un cron a mano; que **justificar significa que se paga**; que tres reglas de la planilla son **de la contadora, no de Daniel**; y que **«pedido» para él es la orden de un cliente, nunca una petición HTTP**.
+- **Cuatro memorias nuevas**: un tema a la vez · discusión-mockup-volver a discutir · nunca a mi criterio lo que mueve plata ni de lugar · lo escrito caduca.
+
+### ⚠️ Dejado a propósito / pendiente de Daniel
+- **Los 24 puntos de `docs/pendientes-vivos.md` no se ejecutaron**: son suyos para priorizar, uno por vez.
+- **El punto 21 no se pudo confirmar**: *«Andrea 16, Julio 11, Rodrigo 13, estos no deben de estar en el módulo, solo Angela»* — no se sabe de qué módulo hablaba. Hay que preguntárselo.
+- **El hilo con la contadora quedó a mitad de frase** el 13-sep 18:25: *«¿Qué le respondo? ¿Pongo send o no?»*. Nadie sabe qué se le contestó a Yulissa.
+- 🩸 **`estado-actual.md` salta del 5-sep al 9-sep**: el 6, 7 y 8 de septiembre no tienen una sola línea y viven solo en los commits.
