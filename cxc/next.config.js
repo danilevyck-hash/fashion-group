@@ -169,6 +169,18 @@ const nextConfig = {
     ];
   },
   experimental: {
+    // 🔴 Enciende `src/instrumentation.ts`, que es donde arranca Sentry del
+    // lado del servidor y del edge. En Next.js 14 este permiso es OBLIGATORIO
+    // y explícito: «you must explicitly opt in by defining
+    // `experimental.instrumentationHook = true`» (documentación de Next 14).
+    // De la 15 en adelante deja de hacer falta y hay que quitarlo.
+    //
+    // ⚠️ Va escrito aquí a propósito (14-sep-2026), aunque hoy la bandera ya
+    // quedaba puesta: `withSentryConfig` la enciende solo cuando detecta
+    // Next 14. Depender de ese efecto de costado significaba que el día que
+    // Sentry se saque o cambie esa lógica, el servidor se queda sin arrancar
+    // y sin que nada lo diga. Dicho aquí, el permiso es nuestro.
+    instrumentationHook: true,
     // sharp es un binario nativo: externalizarlo evita que webpack lo empaquete
     // (requerido para que funcione en las funciones serverless de Vercel).
     serverComponentsExternalPackages: ["sharp"],
