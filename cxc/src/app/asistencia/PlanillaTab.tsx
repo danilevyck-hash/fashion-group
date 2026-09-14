@@ -97,10 +97,15 @@ import {
   valorTecleado,
 } from "@/lib/asistencia/casilla-sin-descontar";
 import {
+  TITULO_NETO_NEGATIVO,
   TITULO_RECORTE,
+  avisoCeldaNeto,
   cuotasRecortadas,
+  netosNegativos,
   recorteDeCasilla,
+  textoAvisoCeldaNeto,
   textoRecorteCelda,
+  type AvisoCeldaNeto,
 } from "@/lib/asistencia/neto-no-negativo";
 import AntesDeCerrar from "./AntesDeCerrar";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
@@ -1167,6 +1172,9 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           // 🔴 Las cuotas que el neto no alcanzó a cubrir, de las MISMAS
           // líneas que dibuja la tabla (14-sep-2026, `neto-no-negativo.ts`).
           recortadas: cuotasRecortadas(data.lineas),
+          // 🔴 Los netos en negativo por montos a mano, de las MISMAS líneas
+          // (14-sep-2026): la misma decisión que el aviso de la celda.
+          netosNegativos: netosNegativos(data.lineas),
           avisoVacacionesNoPagadas: data.avisos.avisoVacacionesNoPagadas ?? null,
           conSabado: data.avisos.conSabado ?? 0,
           rangoLibre: !!data.avisos.rangoLibre,
@@ -1638,6 +1646,7 @@ function recorteDe(l: LineaPlanilla, campo: keyof ManualesLinea): { propuesto: n
 /** Una celda de dinero que se escribe a mano. Guarda al salir del campo. */
 function CeldaManual({
   codigo, campo, valor, onGuardar, ancho = "w-20", bloqueo, automatico = false, sinDescontar = false, recorte = null,
+  avisoNeto,
 }: {
   codigo: string; campo: keyof ManualesLinea;
   /** `null` = se ve vacía. `0` solo llega con `sinDescontar`. */
@@ -1655,6 +1664,14 @@ function CeldaManual({
    * queda debiendo». `null` = no hubo recorte.
    */
   recorte?: { propuesto: number; descontado: number } | null;
+  /**
+   * 🔴 ¿Lo que se está tecleando deja el neto en negativo? (14-sep-2026). Se
+   * pregunta EN CADA TECLA, con el texto del campo, y la respuesta sale de
+   * `avisoCeldaNeto` (`neto-no-negativo.ts`), la misma función que alimenta
+   * «Antes de cerrar». Es un AVISO: la celda se marca y dice el máximo y lo que
+   * quedaría, pero se sigue escribiendo y guardando — lo escrito a mano manda.
+   */
+  avisoNeto?: (texto: string) => AvisoCeldaNeto | null;
 }) {
   const bloqueada = !!bloqueo;
   // 🔑 Estado local mientras se escribe: si el valor viniera del padre en cada
@@ -1663,6 +1680,8 @@ function CeldaManual({
   const mostrar = (v: number | null) => (v === null || (v === 0 && !sinDescontar) ? "" : String(v));
   const [texto, setTexto] = useState(mostrar(valor));
   useEffect(() => { setTexto(mostrar(valor)); }, [valor, sinDescontar]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 🔴 Mientras se escribe, no solo al guardar: se calcula del texto vivo.
+  const aviso = !bloqueada && avisoNeto ? avisoNeto(texto) : null;
 
   return (
     <>
@@ -1670,9 +1689,12 @@ function CeldaManual({
         type="text" inputMode="decimal" value={bloqueada ? "" : texto}
         placeholder={bloqueo ? bloqueo.placeholder : "—"}
         disabled={bloqueada}
+        aria-invalid={aviso ? true : undefined}
         title={bloqueo
           ? bloqueo.title
-          : sinDescontar
+          : aviso
+            ? TITULO_NETO_NEGATIVO
+            : sinDescontar
             ? TITULO_SIN_DESCONTAR
             : recorte
               ? TITULO_RECORTE
@@ -1682,8 +1704,15 @@ function CeldaManual({
         onChange={(e) => setTexto(e.target.value)}
         onBlur={() => onGuardar(codigo, campo, texto)}
         onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-        className={`${ancho} min-h-[44px] rounded border border-gray-200 bg-white px-1.5 text-right text-sm tabular-nums outline-none transition focus:border-black disabled:bg-gray-100 disabled:text-gray-400 disabled:placeholder:text-[10px]`}
+        className={`${ancho} min-h-[44px] rounded border ${aviso ? "border-red-400 bg-red-50 focus:border-red-600" : "border-gray-200 bg-white focus:border-black"} px-1.5 text-right text-sm tabular-nums outline-none transition disabled:bg-gray-100 disabled:text-gray-400 disabled:placeholder:text-[10px]`}
       />
+      {/* 🔴 EL NETO QUEDARÍA EN NEGATIVO: se dice al escribir, visible y en
+          rojo, con el máximo que cabe. NUNCA bloquea (14-sep-2026). */}
+      {aviso && (
+        <span className="block text-right text-[11px] leading-tight text-red-700" data-testid="neto-negativo">
+          {textoAvisoCeldaNeto(aviso)}
+        </span>
+      )}
       {/* 🔴 Se ve, no solo en el `title`: en el iPad no hay mouse. */}
       {sinDescontar && !bloqueada && (
         <span className="block text-right text-[11px] leading-tight text-gray-500" data-testid="sin-descontar">
@@ -1716,7 +1745,7 @@ function Fila({
   // (11-sep-2026): «Incluye $5.00 de los días 14–15 sep…». Sin ajuste, nada.
   const conAjuste = (campo: Parameters<typeof notaCeldaAjuste>[0]) => notaCeldaAjuste(campo, l.ajusteDetalle);
   return (
-    <tr className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+    <tr className="border-b border-gray-100 last:border-0 hover:bg-gray-50" data-fila-planilla={l.codigo}>
       <td className="sticky left-0 z-10 bg-white px-3 py-1.5 text-gray-900 hover:bg-gray-50">
         {capitalizarNombre(l.etiqueta)}
         <span className="ml-1.5 text-xs text-gray-400">{l.codigo}</span>
@@ -1812,13 +1841,14 @@ function Fila({
         <td key={campo} className="px-1 py-1.5 text-right">
           <CeldaManual codigo={l.codigo} campo={campo} valor={valorCasilla(l, campo)}
             onGuardar={onGuardar} bloqueo={bloqueo} automatico={esAutomatica(l, campo)}
-            sinDescontar={esSinDescontar(l, campo)} recorte={recorteDe(l, campo)} />
+            sinDescontar={esSinDescontar(l, campo)} recorte={recorteDe(l, campo)}
+            avisoNeto={(t) => avisoCeldaNeto(l, campo, t)} />
         </td>
       ))}
       {num(d.totalDeducciones)}
       <td className="px-1 py-1.5 text-right">
         <CeldaManual codigo={l.codigo} campo="otrosServicios" valor={l.manuales.otrosServicios}
-          onGuardar={onGuardar} bloqueo={bloqueo} />
+          onGuardar={onGuardar} bloqueo={bloqueo} avisoNeto={(t) => avisoCeldaNeto(l, "otrosServicios", t)} />
       </td>
       {/* 🔴 EL NETO ES `netoPagar` TAL CUAL: el ajuste de la quincena anterior
           ya viene adentro de `dinero` (11-sep-2026), la MISMA cuenta que el
@@ -1851,7 +1881,7 @@ function Tarjeta({
     );
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white">
+    <div className="rounded-lg border border-gray-200 bg-white" data-fila-planilla={l.codigo}>
       <button
         type="button" onClick={onToggle}
         className="flex min-h-[44px] w-full items-center justify-between gap-3 px-3 py-2.5 text-left"
@@ -1929,6 +1959,7 @@ function Tarjeta({
                   codigo={l.codigo} campo={campo} valor={valorCasilla(l, campo)}
                   onGuardar={onGuardar} ancho="w-full" bloqueo={bloqueo} automatico={esAutomatica(l, campo)}
                   sinDescontar={esSinDescontar(l, campo)} recorte={recorteDe(l, campo)}
+                  avisoNeto={(t) => avisoCeldaNeto(l, campo, t)}
                 />
               </label>
             ))}

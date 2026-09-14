@@ -14,6 +14,22 @@ import { useState } from "react";
 import Link from "next/link";
 import { TODO_LISTO, type AntesDeCerrar as Datos, type LineaAntesDeCerrar } from "@/lib/asistencia/antes-de-cerrar";
 
+/**
+ * 🔴 Un enlace con `#` lleva a una FILA del cuadro de abajo (el neto negativo,
+ * 14-sep-2026), no a otra pantalla: no pasa por el router. La tabla y las
+ * tarjetas se montan las dos (una se esconde por CSS según el ancho), así que
+ * se busca la fila con `data-fila-planilla` y se baja a la que se VE; sin
+ * ninguna visible (jsdom), a la primera.
+ */
+function irAFila(hash: string) {
+  const codigo = decodeURIComponent(hash.replace(/^#planilla-fila-/, ""));
+  if (typeof document === "undefined") return;
+  const filas = Array.from(document.querySelectorAll<HTMLElement>("[data-fila-planilla]"))
+    .filter((f) => f.dataset.filaPlanilla === codigo);
+  const visible = filas.find((f) => f.getClientRects().length > 0) ?? filas[0];
+  visible?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+}
+
 function Linea({ l }: { l: LineaAntesDeCerrar }) {
   const [verQuienes, setVerQuienes] = useState(false);
   const info = l.tono === "info";
@@ -43,7 +59,15 @@ function Linea({ l }: { l: LineaAntesDeCerrar }) {
             </>
           )}
         </span>
-        {l.enlace && (
+        {l.enlace && (l.enlace.href.startsWith("#") ? (
+          <a
+            href={l.enlace.href}
+            onClick={(ev) => { ev.preventDefault(); irAFila(l.enlace!.href); }}
+            className="inline-flex min-h-[44px] shrink-0 items-center text-[12px] text-gray-600 underline underline-offset-2 hover:text-gray-900"
+          >
+            {l.enlace.rotulo}
+          </a>
+        ) : (
           <Link
             href={l.enlace.href}
             replace
@@ -52,7 +76,7 @@ function Linea({ l }: { l: LineaAntesDeCerrar }) {
           >
             {l.enlace.rotulo}
           </Link>
-        )}
+        ))}
       </div>
       {verQuienes && l.personas && (
         <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 pl-4">

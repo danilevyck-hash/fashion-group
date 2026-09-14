@@ -25,7 +25,13 @@ import { fechaCortaCorte, fraseCorte } from "./elegir-quincena";
 import type { CodigoSinFicha } from "./periodo";
 import type { PrestamoSinAtar } from "./prestamos-planilla";
 import { textoSinDescontar, type SinDescontar } from "./casilla-sin-descontar";
-import { textoCuotasRecortadas, type CuotaRecortada } from "./neto-no-negativo";
+import {
+  hrefFilaPlanilla,
+  textoCuotasRecortadas,
+  textoNetosNegativos,
+  type CuotaRecortada,
+  type NetoNegativo,
+} from "./neto-no-negativo";
 import { PESTANA_PRESTAMOS } from "@/lib/prestamos-una-puerta";
 
 /** Una persona detrás de una línea (las de «ver quiénes»). */
@@ -97,6 +103,13 @@ export interface EntradaAntesDeCerrar {
    * y monto, en ámbar. Opcional: sin pasarlo, nada cambia.
    */
   recortadas?: readonly CuotaRecortada[];
+  /**
+   * 🔴 Los netos que quedaron en NEGATIVO por montos escritos a mano
+   * (14-sep-2026, `neto-no-negativo.ts` › `netosNegativos`). Va en la parte de
+   * ARREGLAR, con nombre, monto y enlace a su fila — pero NO frena el cierre:
+   * Daniel dejó el freno para después, a propósito. Opcional: sin pasarlo, nada cambia.
+   */
+  netosNegativos?: readonly NetoNegativo[];
   /** El aviso de las vacaciones ya pagadas, ya redactado (nombre, rango y monto). */
   avisoVacacionesNoPagadas: string | null;
   conSabado: number;
@@ -211,6 +224,22 @@ export function armarAntesDeCerrar(e: EntradaAntesDeCerrar): AntesDeCerrar {
       numero: e.prestamoSinAtar.length,
       texto: `${e.prestamoSinAtar.length === 1 ? "préstamo con saldo sin atar a nadie: no se descuenta" : "préstamos con saldo sin atar a nadie: no se descuentan"} (${detalle})`,
       enlace: { rotulo: "Préstamos ›", href: PESTANA_PRESTAMOS },
+      tono: "arreglar",
+    });
+  }
+  // 🔴 «N colaborador queda con neto negativo (X · −$125.16): baja lo que le
+  // escribiste a mano en su fila» (14-sep-2026). Sale de la MISMA función que
+  // el aviso de la celda (`faltanteDeNeto`). Es ámbar CON acción —hay que
+  // mirarlo antes de cerrar— y aun así el cierre NO se frena: el freno quedó
+  // fuera por decisión de Daniel (la contadora está aprendiendo el módulo).
+  const negativos = e.netosNegativos ?? [];
+  const textoNegativos = textoNetosNegativos(negativos);
+  if (textoNegativos) {
+    arreglar.push({
+      clave: "neto-negativo",
+      numero: negativos.length,
+      texto: textoNegativos,
+      enlace: { rotulo: negativos.length === 1 ? "Ver su fila ›" : "Ver sus filas ›", href: hrefFilaPlanilla(negativos[0].codigo) },
       tono: "arreglar",
     });
   }

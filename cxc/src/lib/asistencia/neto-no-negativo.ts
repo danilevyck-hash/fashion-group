@@ -49,7 +49,7 @@
 
 import { centavos } from "./planilla";
 import type { DineroLinea, ManualesLinea } from "./planilla";
-import type { CasillaAutomatica } from "./casilla-sin-descontar";
+import { CASILLAS_AUTOMATICAS, esCasillaAutomatica, valorTecleado, type CasillaAutomatica } from "./casilla-sin-descontar";
 import type { PrestamoAutomatico } from "./prestamos-planilla";
 
 /**
@@ -179,4 +179,203 @@ export function textoCuotasRecortadas(items: readonly CuotaRecortada[]): string 
     ? "cuota recortada para que el neto no quede en negativo"
     : "cuotas recortadas para que el neto no quede en negativo";
   return `${cabeza} (${detalle}); el resto queda debiendo`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EL AVISO — cuando lo ESCRITO A MANO deja el neto en negativo (14-sep-2026)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// El recorte de arriba solo achica lo AUTOMÁTICO: lo escrito a mano manda
+// (punto 3). O sea que un neto negativo hecho de montos a mano SÍ puede salir
+// —y salir al Excel, al comprobante y al cierre— sin que nadie lo haya visto.
+// Caso real medido el 14-sep-2026: colaborador 56 (Boston, 1–15 sep), bruto
+// $74,84, sin préstamo; con $200 de mercancía escritos a mano, neto −$125,16.
+//
+// Daniel aprobó DOS AVISOS y dejó el freno del cierre para después, A PROPÓSITO:
+// el caso nunca ha pasado y la contadora recién está aprendiendo el módulo, así
+// que el aviso le enseña y el freno la bloquearía. 🔴 Por eso `frenosParaCerrar`
+// NO se toca: sigue frenando solo por horas extra sin decidir.
+//
+//   1. LA CELDA AVISA AL ESCRIBIR: se marca y dice el máximo que cabe y cuánto
+//      quedaría («El máximo es $74.84. Le quedaría −$125.16.»). Se sigue
+//      pudiendo escribir y guardar: NUNCA es un bloqueo — lo escrito a mano
+//      manda, ésa es la regla de la casa.
+//   2. «ANTES DE CERRAR» LO NOMBRA, en la parte de arreglar, con cuántos son,
+//      quiénes y el enlace a su fila del cuadro.
+//   3. 🔴 LOS DOS SALEN DE LA MISMA FUNCIÓN (`faltanteDeNeto`): que la celda y
+//      «Antes de cerrar» puedan decir cosas distintas del mismo hecho es lo que
+//      esta casa evita.
+//   4. 🔴 SE MIRA EL NETO QUE DE VERDAD SE PAGA. La ruta arma el neto así:
+//      motor (con los manuales) → cuota automática → ajuste de la quincena
+//      anterior → recorte. `dinero.netoPagar` es ese final. Para simular lo
+//      tecleado sin volver al servidor, `netoSiEscribe` deshace el recorte
+//      (`prestamoAutomatico.recortado` dice cuánto se devolvió), cambia SOLO
+//      esa casilla y vuelve a recortar lo automático — la misma cuenta que
+//      `recortarAlNeto`, al revés y de nuevo.
+
+
+/**
+ * 🔴 LA ÚNICA DECISIÓN: ¿este neto queda negativo y por cuánto?
+ * Devuelve lo que FALTA (positivo) o `null` si el neto es cero o más. La leen
+ * la celda (sobre el neto simulado) y «Antes de cerrar» (sobre el de la ruta).
+ */
+export function faltanteDeNeto(neto: number): number | null {
+  const n = centavos(num(neto));
+  return n < 0 ? centavos(-n) : null;
+}
+
+/** Lo que una línea necesita para simular el neto sin volver al servidor. */
+export type LineaParaNeto = {
+  manuales: ManualesLinea;
+  dinero: DineroLinea | null;
+  prestamoAutomatico?: PrestamoAutomatico;
+};
+
+/** La cuota que SE PROPONÍA en una casilla automática: lo que entró + lo recortado. */
+function propuestaDe(auto: PrestamoAutomatico | undefined, cuenta: CasillaAutomatica): number {
+  return centavos(Math.max(0, num(auto?.[cuenta])) + Math.max(0, num(auto?.recortado?.[cuenta])));
+}
+
+/**
+ * El neto que DE VERDAD se pagaría si la casilla `campo` llevara lo tecleado.
+ *
+ * - `neto`: después del recorte de lo automático, como lo devolvería la ruta.
+ * - `maximo`: lo más que cabe en ESA casilla sin que el neto baje de cero (para
+ *   «Otros servicios», que suma, no aplica: `null`). Nunca negativo: si otra
+ *   casilla ya dejó el neto en rojo, acá cabe $0.00.
+ *
+ * `null` sin dinero (una línea que no paga no tiene neto que cuidar).
+ */
+export function netoSiEscribe(
+  linea: LineaParaNeto,
+  campo: keyof ManualesLinea,
+  tecleado: unknown,
+): { neto: number; maximo: number | null; casilla: number } | null {
+  const d = linea.dinero;
+  if (!d) return null;
+  const auto = linea.prestamoAutomatico;
+  const rec = auto?.recortado;
+  const devuelto = centavos(num(rec?.prestamo) + num(rec?.terceros) + num(rec?.mercancia));
+  // El neto ANTES de la red de seguridad: lo que la cuenta daba sin recortar.
+  const netoSinRecorte = centavos(num(d.netoPagar) - devuelto);
+
+  const esAuto = esCasillaAutomatica(campo);
+  // Lo que esa casilla lleva HOY, antes del recorte (lo escrito, o la cuota entera).
+  const hoy = esAuto
+    ? centavos(num(d[campo]) + num(rec?.[campo]))
+    : centavos(num(d[campo]));
+
+  const v = valorTecleado(campo, tecleado);
+  let nueva: number;
+  let recortable = 0;
+  if (esAuto) {
+    // Vacía → vuelve la cuota, que SÍ se recorta. Escrita (o 0) → manda, no se recorta.
+    if (v === null) { nueva = propuestaDe(auto, campo); recortable = nueva; }
+    else nueva = centavos(v);
+  } else {
+    nueva = centavos(v ?? 0);
+  }
+  // Lo automático de las OTRAS casillas: la ruta lo recorta antes de dejar el neto en rojo.
+  let recortableOtras = 0;
+  for (const c of CASILLAS_AUTOMATICAS) {
+    if (c === campo) continue;
+    recortableOtras = centavos(recortableOtras + propuestaDe(auto, c));
+  }
+  recortable = centavos(recortable + recortableOtras);
+
+  const suma = campo === "otrosServicios";
+  const antes = suma
+    ? centavos(netoSinRecorte - hoy + nueva)
+    : centavos(netoSinRecorte + hoy - nueva);
+  const neto = antes >= 0 ? antes : centavos(Math.min(0, antes + recortable));
+  const maximo = suma ? null : centavos(Math.max(0, netoSinRecorte + hoy + recortableOtras));
+  return { neto, maximo, casilla: nueva };
+}
+
+/** Lo que la celda dice cuando lo tecleado deja el neto en negativo. */
+export interface AvisoCeldaNeto {
+  /** Lo más que cabe en esa casilla. `null` en «Otros servicios» (suma). */
+  maximo: number | null;
+  /** Cuánto queda por debajo de cero (positivo). */
+  faltante: number;
+}
+
+/**
+ * El aviso de UNA celda con lo que se está tecleando, o `null`.
+ *
+ * 🔑 Avisa la casilla que LLEVA plata: una casilla en 0 no puede ser la causa,
+ * y avisar en las cinco a la vez taparía la que sí es. En «Otros servicios»
+ * avisa solo si BAJARLO es lo que deja el neto en rojo.
+ */
+export function avisoCeldaNeto(
+  linea: LineaParaNeto,
+  campo: keyof ManualesLinea,
+  tecleado: unknown,
+): AvisoCeldaNeto | null {
+  const r = netoSiEscribe(linea, campo, tecleado);
+  if (!r) return null;
+  const faltante = faltanteDeNeto(r.neto);
+  if (faltante === null) return null;
+  if (campo === "otrosServicios") {
+    const hoy = centavos(num(linea.dinero?.otrosServicios));
+    return r.casilla < hoy ? { maximo: null, faltante } : null;
+  }
+  if (r.casilla <= 0) return null;
+  return { maximo: r.maximo, faltante };
+}
+
+/** «El máximo es $74.84. Le quedaría −$125.16.» */
+export function textoAvisoCeldaNeto(a: AvisoCeldaNeto): string {
+  const queda = `Le quedaría −${plata(a.faltante)}.`;
+  return a.maximo === null ? queda : `El máximo es ${plata(a.maximo)}. ${queda}`;
+}
+
+/** El `title` de esa celda: es un aviso, no un freno. */
+export const TITULO_NETO_NEGATIVO =
+  "Con ese monto el neto queda por debajo de cero. Se puede guardar igual: lo escrito a mano manda. Revísalo antes de cerrar.";
+
+/** Una línea del cuadro cuyo neto quedó en negativo, para «Antes de cerrar». */
+export interface NetoNegativo {
+  codigo: string;
+  etiqueta: string;
+  /** Cuánto queda por debajo de cero (positivo). */
+  faltante: number;
+}
+
+/**
+ * Los netos negativos de un cuadro, de las MISMAS líneas que dibuja la tabla:
+ * `dinero.netoPagar` ya es el neto final de la ruta, y la decisión es la MISMA
+ * `faltanteDeNeto` de la celda.
+ */
+export function netosNegativos(
+  lineas: readonly { codigo: string; etiqueta: string; dinero: DineroLinea | null }[],
+): NetoNegativo[] {
+  const out: NetoNegativo[] = [];
+  for (const l of lineas) {
+    if (!l.dinero) continue;
+    const faltante = faltanteDeNeto(l.dinero.netoPagar);
+    if (faltante === null) continue;
+    out.push({ codigo: l.codigo, etiqueta: l.etiqueta, faltante });
+  }
+  return out;
+}
+
+/**
+ * La línea de «Antes de cerrar»: «colaborador queda con neto negativo (Ana
+ * Pérez · −$125.16): baja lo que le escribiste a mano en su fila». `null` sin
+ * ninguno — un cartel permanente se deja de leer.
+ */
+export function textoNetosNegativos(items: readonly NetoNegativo[]): string | null {
+  if (items.length === 0) return null;
+  const detalle = items.map((n) => `${n.etiqueta} · −${plata(n.faltante)}`).join(" — ");
+  const cabeza = items.length === 1
+    ? "colaborador queda con neto negativo"
+    : "colaboradores quedan con neto negativo";
+  const arreglo = items.length === 1 ? "en su fila" : "en sus filas";
+  return `${cabeza} (${detalle}): baja lo que le escribiste a mano ${arreglo}`;
+}
+
+/** El ancla de la fila de ese colaborador en el cuadro (la lleva `data-fila-planilla`). */
+export function hrefFilaPlanilla(codigo: string): string {
+  return `#planilla-fila-${encodeURIComponent(codigo)}`;
 }
