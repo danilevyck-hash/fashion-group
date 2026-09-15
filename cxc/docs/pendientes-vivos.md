@@ -38,6 +38,13 @@ Daniel, **14-sep-2026**: *«Olvídalo, no es problema del sistema»*. La factura
 
 ## 🟠 Módulos a medio terminar
 
+### 5-bis. Reebok: en pausa hasta que Daniel junte cuatro archivos
+Daniel, **14-sep-2026**: *«deja que me llegue lo que son: 1. OB, que es lo pendiente para despachar. 2. El Excel de lo facturado. 3. Las facturas en PDF. Y voy a querer también hacer lo de subir un Excel con referencias y pegar las fotos. Son 4 archivos; cuando lo tenga vemos ese tema de Reebok. Te aviso»*.
+
+🔴 **No se toca Reebok hasta que él avise.** Lo que quedó a medias y espera esos archivos:
+- **«Precio Especial» es su costo FOB** y el sistema no reconoce esa columna. Hoy busca `WholesalePrice OFF`, que **no existe en ningún Excel real de Reebok** (ni el de agosto ni el de septiembre). O sea que el descuento del proveedor **se está ignorando en las dos salidas** y esos artículos entran a Switch con el precio completo. Medirlo y conectarlo es lo primero cuando se retome.
+- Lo que ya está hecho y no espera nada: el flete elegible 1,10 / 1,15 y el costo único entre las dos salidas.
+
 ### 5. Reebok: el CIF está clavado en 1,10 y tiene que poder ser 1,15
 > *«Costo CIF seria 1.1 o 1.15 (default 1.1)»* · *«porque tengo que pagar el flete que es 1.1 siempre es tommy y 1.1 y 1.15 en reebok»* · *«que pueda cambiar el default en configuracion de reebok»* — **7 y 8-sep-2026**
 

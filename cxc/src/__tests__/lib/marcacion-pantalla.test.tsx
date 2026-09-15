@@ -205,9 +205,9 @@ describe("La pantalla del teléfono", () => {
   });
 
   it("sin usuario atado a un colaborador se DICE, no se inventa a quién marcarle", async () => {
-    respuesta = { codigo: null, aviso: "Tu usuario todavía no está atado a ningún colaborador, así que no hay a quién marcarle. Avísale a Daniel.", ahora: AHORA_SERVIDOR };
+    respuesta = { codigo: null, aviso: "Esta pantalla es para las personas que marcan su entrada y su salida. Tu usuario no tiene una ficha de colaborador, así que no hay a quién marcarle.", ahora: AHORA_SERVIDOR };
     render(<MarcacionClient />);
-    expect(await screen.findByText(/no está atado a ningún colaborador/)).toBeTruthy();
+    expect(await screen.findByText(/no tiene una ficha de colaborador/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Marcar/ })).toBeNull();
   });
 });

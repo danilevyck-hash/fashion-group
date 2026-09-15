@@ -46,7 +46,8 @@ export const maxDuration = 60;
 
 /** Sin código atado no hay a quién marcarle. Se DICE, no se inventa uno. */
 const SIN_CODIGO =
-  "Tu usuario todavía no está atado a ningún colaborador, así que no hay a quién marcarle. Avísale a Daniel.";
+  "Esta pantalla es para las personas que marcan su entrada y su salida. "
+  + "Tu usuario no tiene una ficha de colaborador, así que no hay a quién marcarle.";
 
 /** El estado que dibuja la pantalla. Una sola forma para el GET y el POST, así
  *  después de marcar la pantalla queda igual que si se hubiera recargado. */

@@ -25,6 +25,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import AppHeader from "@/components/AppHeader";
+import { ROTULO_MARCACION } from "@/lib/marcacion/rol";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import {
   diaCorto,
@@ -347,7 +348,10 @@ export default function MarcacionClient() {
 
   return (
     <div className="min-h-screen bg-white">
-      <AppHeader module="marcacion" />
+      {/* 🔴 El breadcrumb lleva el RÓTULO, no la key. Sin esto el encabezado
+          escribía «marcacion» en minúscula y sin tilde, que es el nombre
+          interno del módulo y no el que nadie debería leer (14-sep-2026). */}
+      <AppHeader module="marcacion" breadcrumbs={[{ label: ROTULO_MARCACION }]} />
       <input
         ref={archivoRef}
         type="file"
