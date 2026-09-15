@@ -10,6 +10,18 @@
 
 ## 🔴 Mueven plata
 
+### 0. El reloj de la quincena 1–15 de septiembre cortó el **10**, y solo Fashion Wear quedó cerrada así
+Daniel, **15-sep-2026**, textual: *«el 10 de septiembre se cortó el reloj de la planilla manual del excel»* y *«acuérdate que el reloj cortó el 10, así que para la próxima quincena es desde el 11 hasta cuando corte contabilidad»*.
+
+**Medido contra producción el 15-sep-2026.** De las cuatro empresas, la quincena 1–15 de septiembre está guardada **solo en Fashion Wear**, con `corte = 2026-09-10`. Vistana, Confecciones Boston y Multifashion **no la tienen cerrada**, y lo que sí tienen son rangos que no son quincenas (`2026-08-29 → 2026-09-10` en Vistana, `2026-08-15 → 2026-08-31` y `→ 2026-08-25` en Boston), de cuando Roxana estaba probando.
+
+🔴 **Por qué importa:** el «Ajuste quincena anterior» —los días 11 al 15, que se pagaron sin medir— sale del corte **GUARDADO** de la quincena cerrada. Sin cerrar 1–15 con corte el 10, esos cinco días **no se ajustan en la del 16–30 y se pierden en silencio**.
+
+**Qué falta:** cerrar 1–15 de septiembre con corte **2026-09-10** en Vistana, Confecciones Boston y Multifashion. Lo hace la contadora, no se puede hacer por ella: cerrar es suyo.
+
+⚠️ Y el corte **NO es siempre el 10**: lo elige ella cada quincena (`CORTE_SUGERIDO` solo propone). La regla que se repite es *desde el día siguiente al último corte, hasta donde ella corte*.
+
+
 ### 1. ~~El daño de mercancía no propone cuota~~ → **HECHO el 14-sep-2026**
 Daniel: *«Tanto el chico como el grande que sea por cuota, ¿no? Agregan el daño como se hace un préstamo, se elige la cuota y listo»*. El daño se registra con su cuota y entra solo a la planilla hasta saldarse. Migración `20261122120000` (mercancía con los tres estados), **aplicada y verificada el 14-sep-2026**.
 
