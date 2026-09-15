@@ -168,6 +168,13 @@ describe("2. 🔴 salir antes de la hora se descuenta desde el minuto uno, sin t
 
 // ── 3 ─────────────────────────────────────────────────────────────────────────
 describe("3. 🔴 quien entra a mitad de la quincena cobra los días trabajados", () => {
+  // 🔄 NOTA DEL 15-sep-2026, y el caso NO cambió: la MECÁNICA sigue siendo
+  // exactamente ésta. Lo que cambió es el rango que el sistema propone — la 2ª
+  // quincena de julio se PAGA del 16 al 30, no al 31 (Daniel: *«Que el 31 no se
+  // pague nunca»*), así que en la quincena de verdad a Yeritza le tocan 4 días
+  // hábiles y $92,31, que es lo que también le paga la contadora. Este caso se
+  // conserva con las fechas a mano porque prueba la fórmula; el de la quincena
+  // real está en `asistencia-dia-31.test.ts`.
   it("Yeritza (51): entró el 27-jul-2026 → 5 días hábiles × (600 ÷ 26) = $115,38", () => {
     // 🔴 CAMBIÓ DE DIRECCIÓN esa misma noche (10-sep-2026): la primera versión
     // dividía el quincenal entre los hábiles de la quincena ($125,00). Daniel

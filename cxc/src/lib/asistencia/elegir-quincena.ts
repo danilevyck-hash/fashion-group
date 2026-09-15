@@ -14,6 +14,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { quincena, type Quincena } from "./planilla";
 import { corteSugerido } from "./corte-quincena";
+import { finDeLaMedicion } from "./dia-31";
+
+export { textoDelDia31 } from "./dia-31";
 
 const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
@@ -23,7 +26,14 @@ export function quincenasDelMes(hoy: string): [Quincena, Quincena] {
   return [quincena(a, m, 1), quincena(a, m, 2)];
 }
 
-/** «1 – 15 sep» · «16 – 30 sep» (el último día es el REAL del mes: 28, 30 o 31). */
+/**
+ * «1 – 15 sep» · «16 – 30 sep».
+ *
+ * 🔴 EL SEGUNDO BOTÓN NUNCA DICE 31 (15-sep-2026). Daniel: *«Que el 31 no se
+ * pague nunca»*. El último día es el que PAGA sueldo: 28, 29 o 30, nunca 31
+ * (`ultimoDiaQueSePaga`, que es de donde `quincena()` saca el rango). El 31
+ * igual se mide — ver `dia-31.ts` y `textoDelDia31`.
+ */
 export function rotuloQuincena(q: Quincena): string {
   const d1 = Number(q.desde.slice(8, 10));
   const d2 = Number(q.hasta.slice(8, 10));
@@ -47,11 +57,15 @@ export function fechaCortaCorte(f: string): string {
  */
 export function fraseCorte(corte: string, hasta: string): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(corte) || !/^\d{4}-\d{2}-\d{2}$/.test(hasta)) return null;
-  if (corte >= hasta) return null;
+  // 🔑 Hasta donde se MIDE: en agosto la quincena paga hasta el 30 y el reloj
+  // llega al 31, así que con corte el 28 la frase dice «Del 29 al 31», que es
+  // lo que de verdad se ajusta en la quincena siguiente (15-sep-2026).
+  const hastaMedido = finDeLaMedicion(hasta);
+  if (corte >= hastaMedido) return null;
   const d = new Date(`${corte}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + 1);
   const siguiente = Number(d.toISOString().slice(8, 10));
-  const fin = Number(hasta.slice(8, 10));
+  const fin = Number(hastaMedido.slice(8, 10));
   const dias = siguiente === fin ? `El ${fin}` : `Del ${siguiente} al ${fin}`;
   return `${dias} se paga normal y se ajusta en la siguiente.`;
 }

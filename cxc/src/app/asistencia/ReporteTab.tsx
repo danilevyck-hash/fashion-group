@@ -11,6 +11,7 @@ import { useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ToastSystem";
 import { esFechaDeCalendario } from "@/lib/asistencia/planilla";
 import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, fmtMin, cuentaHorasExtra, extraQueCuenta, type DiaReporte, type PersonaReporte, type ReglasReporte } from "@/lib/asistencia/reporte";
+import { TEXTO_DIA_FUERA_DE_VIGENCIA } from "@/lib/asistencia/vigencia";
 import { etiquetaPersona } from "@/lib/asistencia/directorio";
 // 🔴 Los nombres se MUESTRAN capitalizados, como en la lista; lo guardado sigue
 // en mayúsculas (10-sep-2026: el Reporte mezclaba «YULISSA JUAREZ» con «Andrea Perez»).
@@ -564,7 +565,9 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJu
   /** 🔴 «Justificar» se ofrece donde una justificación puede cambiar algo:
    *  no en un feriado, ni en vacaciones, ni en un día que ya está justificado
    *  (un control que no ofrece nada no se dibuja). */
-  const seJustifica = !d.feriado && !d.vacacion && !d.justificado;
+  // 🔴 Ni en un día que no era suyo (15-sep-2026): no hay nada que justificar
+  //    en un día anterior al ingreso o posterior a la salida.
+  const seJustifica = !d.feriado && !d.vacacion && !d.justificado && !d.fueraDeVigencia;
   const justificar = () => onJustificar({ codigo, persona, fecha: d.fecha });
   const enlaceJustificar = (
     <button type="button" onClick={justificar}
@@ -646,6 +649,14 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJu
               {d.enCurso && (
                 <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600">En curso</span>
               )}
+              {/* 🔴 Marcó un día que no era suyo. No cuesta un centavo —el
+                  motor lo dejó todo en cero— pero la marca está y se dice: o
+                  volvió a trabajar, o alguien más usó su huella. */}
+              {d.fueraDeVigencia && (
+                <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600">
+                  {TEXTO_DIA_FUERA_DE_VIGENCIA}
+                </span>
+              )}
               {/* 🔴 EL PERMISO DE HORAS SE VE EN EL DÍA, y en AZUL: no es una
                   advertencia (ámbar) ni un problema (rojo) — es una decisión ya
                   tomada. Sin esto, la persona aparece con menos minutos tarde
@@ -660,7 +671,7 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJu
               )}
               {/* Agregar la marca que falta. Es el caso más común de todos: quien
                   olvidó marcar no tiene nada que corregir. */}
-              {puedeCorregir && (
+              {puedeCorregir && !d.fueraDeVigencia && (
                 <button type="button" onClick={agregar}
                   className="ml-1.5 min-h-[44px] rounded px-1 text-xs text-gray-500 underline decoration-dotted underline-offset-2 transition hover:text-black">
                   Agregar hora
@@ -705,8 +716,13 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJu
               // 🔴 Hoy sin marcas NO es una falta: a las 8:59 nadie faltó
               // todavía. En rojo diría lo contrario, así que va en gris.
               : d.enCurso ? <span className="text-gray-500">Todavía no marcó — el día va corriendo</span>
+              // 🔴 EL DÍA ANTERIOR AL INGRESO —O POSTERIOR A LA SALIDA— NO ES
+              // UNA FALTA (15-sep-2026). En gris y no en rojo, por lo mismo que
+              // el día en curso: la planilla ya no lo cobra, y un rojo acá
+              // diría lo contrario de lo que se paga.
+              : d.fueraDeVigencia ? <span className="text-gray-500">{TEXTO_DIA_FUERA_DE_VIGENCIA}</span>
               : <span className="font-medium text-red-700">Ausencia sin justificar</span>}
-            {puedeCorregir && !d.feriado && (
+            {puedeCorregir && !d.feriado && !d.fueraDeVigencia && (
               <button type="button" onClick={agregar}
                 className="ml-2 min-h-[44px] rounded px-1 text-xs text-gray-500 underline decoration-dotted underline-offset-2 transition hover:text-black">
                 Agregar marcación

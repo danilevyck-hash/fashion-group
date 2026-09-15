@@ -142,6 +142,7 @@ import RangoFechas from "@/components/ui/RangoFechas";
 // Daniel); el calendario queda detrás de «Otro rango». Módulo puro.
 import {
   corteInicial, esLaQuincena, fechaCortaCorte, fraseCorte, quincenasDelMes, rotuloQuincena,
+  textoDelDia31,
 } from "@/lib/asistencia/elegir-quincena";
 interface Respuesta {
   quincena: Quincena;
@@ -911,6 +912,14 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
               }}
             />
           </div>
+          {/* 🔴 EL DÍA 31 NO PAGA SUELDO, PERO SÍ SE MIDE (15-sep-2026). Daniel:
+              *«el día 31 no se paga, pero si no viene o llega tarde se
+              descuenta»*. Sale SOLO en los meses de 31 días —un aviso que sale
+              siempre deja de avisar— y va a la VISTA, no a un `title`: en el
+              iPad no hay mouse, y esto es plata. Ver `dia-31.ts`. */}
+          {elegido && textoDelDia31(hasta) && (
+            <span className="text-[12px] text-gray-500">{textoDelDia31(hasta)}</span>
+          )}
         </div>
 
         {/* 🔴 EL CORTE — hasta qué día se lee el reloj (día 13/28). Se ve DESDE

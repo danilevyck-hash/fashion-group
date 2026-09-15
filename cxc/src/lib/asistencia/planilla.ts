@@ -88,6 +88,7 @@ import { PESTANA_FICHAS } from "./persona-en-el-centro";
 import { etiquetaPersona } from "./directorio";
 import { esHabil, fmtMin, type DiaReporte, type PersonaReporte } from "./reporte";
 import { minutosExtraAutomaticos } from "./extra-automatico";
+import { ultimoDiaQueSePaga } from "./dia-31";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CENTAVOS — el redondeo, en un solo lugar
@@ -142,22 +143,33 @@ const MESES = [
 
 const p2 = (n: number) => String(n).padStart(2, "0");
 
-/** Último día del mes. Febrero y los meses de 30 salen solos. */
-export function ultimoDiaDelMes(anio: number, mes: number): number {
-  return new Date(Date.UTC(anio, mes, 0)).getUTCDate();
-}
+// 🔑 `ultimoDiaDelMes` se mudó a `dia-31.ts` —el módulo donde vive la regla del
+// día 31— y se re-exporta acá para que quien lo importaba de este archivo siga
+// igual. Es la MISMA función, no una copia.
+export { ultimoDiaDelMes } from "./dia-31";
 
 /**
- * La quincena: del 1 al 15, y del 16 al fin de mes.
+ * La quincena: del 1 al 15, y del 16 al ÚLTIMO DÍA QUE SE PAGA — que nunca es
+ * el 31 (`ultimoDiaQueSePaga`). Febrero sigue cerrando el 28 o el 29.
  *
- * 🔑 EL DÍA 31 NO SE PAGA PERO SÍ SE DESCUENTA, y así queda implementado sin
- * un solo `if`: el quincenal es `salario ÷ 2` FIJO —un mes de 31 días no paga
- * base de más— pero el rango llega hasta el 31, así que una ausencia de ese
- * día entra al cálculo igual que cualquier otra. La asimetría es a propósito y
- * así la trabaja la contable; que a nadie se le ocurra "arreglarla".
+ * 🔴 EL DÍA 31 NO SE PAGA PERO SÍ SE DESCUENTA (15-sep-2026). Daniel, textual:
+ * *«Que el 31 no se pague nunca»* y *«el día 31 no se paga, pero si no viene o
+ * llega tarde se descuenta»*. Comprobado contra los tres Excel de la contadora:
+ * los de agosto dicen todos «DEL 16 AL 30 DE AGOSTO».
+ *
+ * 🔑 EL SUELDO NO SE MUEVE UN CENTAVO, y es por dónde va el recorte: la
+ * quincena mide 15 días en vez de 16, así que `factorBaseDeRango` sigue dando
+ * **exactamente 1** (sus días ÷ sus días) y el quincenal sigue siendo
+ * `salario ÷ 2`. 🩸 Recortarlo desde afuera —pedir 16–30 con la quincena
+ * todavía terminando el 31— da factor 15/16 y le quita un 6,25 % a TODO el
+ * mundo: medido el 15-sep-2026 contra producción, $10.421,28 → $9.641,04.
+ *
+ * ⚠️ El 31 igual SE MIDE: la ruta lee el reloj hasta `finDeLaMedicion(q.hasta)`
+ * y de ahí salen sus ausencias, tardanzas, salidas tempranas y horas extra. La
+ * asimetría —no suma, pero sí resta— es a propósito. Ver `dia-31.ts`.
  */
 export function quincena(anio: number, mes: number, n: NumeroQuincena): Quincena {
-  const fin = n === 1 ? 15 : ultimoDiaDelMes(anio, mes);
+  const fin = n === 1 ? 15 : ultimoDiaQueSePaga(anio, mes);
   const ini = n === 1 ? 1 : 16;
   return {
     anio,

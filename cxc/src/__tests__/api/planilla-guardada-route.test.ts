@@ -315,11 +315,14 @@ describe("🔴 el solapamiento — nadie pagado dos veces por el mismo día", ()
     expect(ops).toEqual([]);
   });
 
-  it("la quincena de al lado (16-31) SÍ se guarda", async () => {
+  // 🔄 15-sep-2026: la segunda quincena de agosto se PAGA hasta el 30, no hasta
+  // el 31 (Daniel: *«Que el 31 no se pague nunca»*). El caso no cambió de
+  // sentido: la quincena de al lado se sigue guardando.
+  it("la quincena de al lado (16-30) SÍ se guarda", async () => {
     yaCerrada();
     cuadro = {
       empresa: "vistana",
-      periodo: { desde: "2026-08-16", hasta: "2026-08-31", claveManuales: "2026-08-2", factorBase: 1 },
+      periodo: { desde: "2026-08-16", hasta: "2026-08-30", claveManuales: "2026-08-2", factorBase: 1 },
       lineas: [JSON.parse(JSON.stringify(LINEA_CALCULADA))],
     };
     const r = await POST(pedir("POST", "admin", "daniel", { empresa: "vistana", quincena: "2026-08-2" }));

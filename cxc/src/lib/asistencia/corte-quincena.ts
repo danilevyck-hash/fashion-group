@@ -83,7 +83,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { DineroLinea, Quincena } from "./planilla";
-import { centavos, ultimoDiaDelMes } from "./planilla";
+import { centavos } from "./planilla";
+import { finDeLaMedicion, ultimoDiaQueSePaga } from "./dia-31";
 
 /**
  * El día del mes en que se corta cada quincena. Daniel: *«por ejemplo 13 o 28»*.
@@ -108,17 +109,29 @@ const p2 = (n: number) => String(n).padStart(2, "0");
  */
 export function corteSugerido(q: Quincena): string | null {
   const dia = CORTE_SUGERIDO[q.n];
-  const fin = q.n === 1 ? 15 : ultimoDiaDelMes(q.anio, q.mes);
+  // 🔑 El fin es el último día que se PAGA (nunca el 31), el mismo con el que
+  // `quincena()` arma el rango. Da los mismos cortes de siempre: un 28 cae
+  // adentro de una segunda quincena que termina el 30 igual que de una que
+  // terminaba el 31, y un febrero de 28 sigue sin proponer corte.
+  const fin = q.n === 1 ? 15 : ultimoDiaQueSePaga(q.anio, q.mes);
   const ini = q.n === 1 ? 1 : 16;
   if (dia < ini || dia >= fin) return null;
   return `${q.anio}-${p2(q.mes)}-${p2(dia)}`;
 }
 
-/** ¿La fecha de corte sirve para este rango? Tiene que caer adentro y no ser el final. */
+/**
+ * ¿La fecha de corte sirve para este rango? Tiene que caer adentro y no ser el
+ * final.
+ *
+ * 🔑 «El final» es el último día que se MIDE, no el último que se paga: en una
+ * segunda quincena de un mes de 31, cortar el 30 sigue siendo un corte de
+ * verdad — deja el 31 sin medir, y ese día se ajusta en la quincena siguiente.
+ * Sin esto, ese corte se rechazaría en silencio y el reloj se leería entero.
+ */
 export function corteValido(desde: string, hasta: string, corte: string | null): boolean {
   if (corte === null) return true;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(corte)) return false;
-  return corte >= desde && corte < hasta;
+  return corte >= desde && corte < finDeLaMedicion(hasta);
 }
 
 /**
@@ -133,11 +146,15 @@ export function diasSinMedir(
   corte: string | null,
 ): { desde: string; hasta: string } | null {
   if (!corte || !corteValido(desde, hasta, corte)) return null;
+  // 🔴 Hasta donde se MIDE, no hasta donde se paga: en agosto la quincena paga
+  // hasta el 30 y el reloj llega al 31, así que los días que la quincena
+  // siguiente tiene que volver a mirar son 29, 30 **y 31** (15-sep-2026).
+  const fin = finDeLaMedicion(hasta);
   const d = new Date(`${corte}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + 1);
   const siguiente = d.toISOString().slice(0, 10);
-  if (siguiente > hasta) return null;
-  return { desde: siguiente, hasta };
+  if (siguiente > fin) return null;
+  return { desde: siguiente, hasta: fin };
 }
 
 /**
@@ -429,5 +446,7 @@ export function textoCorte(
 ): string | null {
   if (!corte || cuantosDias <= 0) return null;
   const dias = cuantosDias === 1 ? "1 día" : `${cuantosDias} días`;
-  return `El reloj se leyó hasta el ${corte}. Los ${dias} que faltan hasta el ${hasta} se pagan como días normales, y lo que de verdad pasó en ellos se corrige en la quincena siguiente.`;
+  // El último día que se MIDE: en un mes de 31 el ajuste alcanza al 31, aunque
+  // la quincena pague hasta el 30 (15-sep-2026).
+  return `El reloj se leyó hasta el ${corte}. Los ${dias} que faltan hasta el ${finDeLaMedicion(hasta)} se pagan como días normales, y lo que de verdad pasó en ellos se corrige en la quincena siguiente.`;
 }

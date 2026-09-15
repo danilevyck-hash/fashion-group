@@ -104,12 +104,24 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); sessionStorage.clear(); });
 
 describe("el módulo puro: las dos quincenas del mes, con el último día real", () => {
-  it("septiembre: 1 – 15 sep y 16 – 30 sep; febrero 2026: 16 – 28 feb; julio: 16 – 31 jul", () => {
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 15-sep-2026, y no se borró: julio decía «16 – 31
+  // jul» y ahora dice «16 – 30 jul». Daniel: *«Que el 31 no se pague nunca»*, y
+  // los tres Excel de la contadora dicen «DEL 16 AL 30 DE AGOSTO». Febrero y los
+  // meses de 30 NO se tocaron — el recorte es solo del 31.
+  it("septiembre: 1 – 15 sep y 16 – 30 sep; febrero 2026: 16 – 28 feb; julio: 16 – 30 jul", () => {
     const [a, b] = quincenasDelMes("2026-09-10");
     expect([rotuloQuincena(a), rotuloQuincena(b)]).toEqual(["1 – 15 sep", "16 – 30 sep"]);
     expect(rotuloQuincena(quincenasDelMes("2026-02-03")[1])).toBe("16 – 28 feb");
-    expect(rotuloQuincena(quincenasDelMes("2026-07-31")[1])).toBe("16 – 31 jul");
+    expect(rotuloQuincena(quincenasDelMes("2026-07-31")[1])).toBe("16 – 30 jul");
     expect(a.desde).toBe("2026-09-01"); expect(b.hasta).toBe("2026-09-30");
+  });
+
+  it("⚠️ CONTROL: en septiembre (30 días) la pantalla NO dice nada del 31 (15-sep-2026)", () => {
+    // Un aviso que sale siempre deja de avisar. El caso al revés —agosto, donde
+    // SÍ sale— está en `asistencia-planilla-cerrar-quincena.test.tsx`.
+    montar();
+    fireEvent.click(screen.getByRole("button", { name: "16 – 30 sep" }));
+    expect(screen.queryByText(/El 31 no paga sueldo/)).toBeNull();
   });
   it("el corte propuesto es el 13 o el 28, y la frase dice qué pasa con los días de después", () => {
     const [a, b] = quincenasDelMes("2026-09-10");

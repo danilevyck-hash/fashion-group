@@ -215,6 +215,65 @@ export function motivoPeriodoParcial(
   return partes.length ? partes.join(" y ") : null;
 }
 
+/**
+ * ¿ESTA PERSONA TRABAJABA ACÁ ESE DÍA?
+ *
+ * ── 🩸 EL DÍA ANTERIOR AL INGRESO NO ES UNA AUSENCIA (15-sep-2026) ───────────
+ *
+ * ENRIQUE SÁNCHEZ (56, Confecciones Boston) entró el **7 de septiembre**. En la
+ * quincena del 1 al 15 el sistema le hacía las DOS cuentas a la vez:
+ *
+ *   · le prorrateaba el sueldo por los 7 días hábiles que sí trabajó —bien, y
+ *     coincide al centavo con la contadora: **$175,00**— y
+ *   · encima le cobraba **4 ausencias** (1, 2, 3 y 4 de septiembre) por
+ *     **−$100,16**, días en que todavía no trabajaba acá.
+ *
+ * Neto del sistema **$74,84**; el de la contadora, **$175,00**. Lo castigaba
+ * dos veces por lo mismo, y se iba a repetir con cada alta y cada baja.
+ *
+ * 🔑 ES LA MISMA FORMA DE PENSAR QUE «LOS DÍAS QUE NO PASARON NO SE CUENTAN»
+ * (`diaEnCurso` en `reporte.ts`): un día que no le corresponde a esa persona no
+ * genera nada. Allá el día todavía no llegó; acá no le tocaba. En los dos casos
+ * el veredicto se SUSPENDE, no se calcula y se anula después.
+ *
+ * 🔴 NO SUMA, NO RESTA, NO EXISTE PARA ELLA: ni ausencia, ni tardanza, ni salida
+ * temprana, ni hora extra. El prorrateo del sueldo NO se toca — ese ya estaba
+ * bien y es lo único que decide cuánto se le paga por esos días.
+ *
+ * ⚠️ Los bordes son INCLUSIVOS, al revés que `motivoPeriodoParcial`: el día que
+ * entró y el día que salió SÍ trabajó. Sin ficha, o sin ninguna de las dos
+ * fechas, contesta `true` siempre: son las 9 fichas sin `fecha_ingreso` y todos
+ * los códigos que marcan sin ficha, y para ellas NADA cambia.
+ */
+export function trabajaEseDia(
+  v: Vigencia | null | undefined,
+  fecha: string,
+): boolean {
+  if (!v || !esFechaValida(fecha)) return true;
+  if (esFechaValida(v.fechaIngreso) && fecha < v.fechaIngreso!) return false;
+  if (esFechaValida(v.fechaSalida) && fecha > v.fechaSalida!) return false;
+  return true;
+}
+
+/**
+ * Cómo se lee ese día en la pantalla de Asistencia.
+ *
+ * 🔴 UNA SOLA FRASE PARA LOS DOS LADOS —el antes del ingreso y el después de la
+ * salida—: el renglón no tiene por qué explicar cuál de las dos cosas pasó, y
+ * la ficha del colaborador ya dice desde y hasta cuándo trabajó. Lo que NO puede
+ * seguir diciendo es «Ausencia sin justificar» en rojo sobre un día que la
+ * planilla ya no cobra: la pantalla y el pago tienen que decir lo mismo.
+ */
+export const TEXTO_DIA_FUERA_DE_VIGENCIA = "No trabajaba aquí ese día";
+
+/** Lo mismo al revés, que es como se lee en el motor: «ese día no era suyo». */
+export function diaFueraDeVigencia(
+  v: Vigencia | null | undefined,
+  fecha: string,
+): boolean {
+  return !trabajaEseDia(v, fecha);
+}
+
 /** ¿Ya tiene fecha de salida puesta? (Aunque sea de mañana: la baja ya se cargó.) */
 export function tieneBaja(v: Vigencia | null | undefined): boolean {
   return !!v && esFechaValida(v.fechaSalida);

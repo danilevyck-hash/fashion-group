@@ -130,10 +130,14 @@ describe("el rango libre: cuánto se paga", () => {
     expect(diasDelRango("2026-07-31", "2026-07-01")).toBe(0); // al revés no es un rango
   });
 
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 15-sep-2026, y no se borró: la 2ª quincena pasó de
+  // 16 días a 15 porque el 31 NO PAGA SUELDO (Daniel: *«Que el 31 no se pague
+  // nunca»*). Lo que el caso protege —que cada quincena aporte su parte— no
+  // cambió; cambiaron los denominadores. Ver `asistencia-dia-31.test.ts`.
   it("🔑 un rango partido paga la parte de CADA quincena que toca", () => {
-    // Del 25-jul al 10-ago: 7 días de la 2ª de julio (que tiene 16) + 10 de la
-    // 1ª de agosto (que tiene 15).
-    const esperado = 7 / 16 + 10 / 15;
+    // Del 25-jul al 10-ago: 6 días de la 2ª de julio (25 al 30, que son 15 días;
+    // el 31 no paga) + 10 de la 1ª de agosto (que tiene 15).
+    const esperado = 6 / 15 + 10 / 15;
     expect(factorBaseDeRango("2026-07-25", "2026-08-10")).toBeCloseTo(esperado, 12);
 
     const p = periodoDesdeRango("2026-07-25", "2026-08-10")!;
@@ -149,13 +153,22 @@ describe("el rango libre: cuánto se paga", () => {
   });
 
   it("un solo día paga un día de su quincena", () => {
-    expect(factorBaseDeRango("2026-07-20", "2026-07-20")).toBeCloseTo(1 / 16, 12);
+    // 🔄 15-sep-2026: era 1/16. La 2ª quincena de un mes de 31 días tiene 15.
+    expect(factorBaseDeRango("2026-07-20", "2026-07-20")).toBeCloseTo(1 / 15, 12);
     expect(factorBaseDeRango("2026-07-06", "2026-07-06")).toBeCloseTo(1 / 15, 12);
   });
 
+  it("🔴 …y EL DÍA 31 SOLO NO PAGA NINGÚN SUELDO (15-sep-2026)", () => {
+    // Daniel: *«el día 31 no se paga, pero si no viene o llega tarde se
+    // descuenta»*. Pedir solo ese día no produce base: lo que produce son sus
+    // ausencias, tardanzas y horas extra.
+    expect(factorBaseDeRango("2026-07-31", "2026-07-31")).toBe(0);
+  });
+
   it("cruzar el año no rompe la cuenta", () => {
-    // 6 días de la 2ª de diciembre (16 días) + 5 de la 1ª de enero (15).
-    expect(factorBaseDeRango("2026-12-26", "2027-01-05")).toBeCloseTo(6 / 16 + 5 / 15, 12);
+    // 🔄 15-sep-2026: 5 días de la 2ª de diciembre —del 26 al 30, porque el 31 no
+    // paga— sobre sus 15 días, + 5 de la 1ª de enero (15).
+    expect(factorBaseDeRango("2026-12-26", "2027-01-05")).toBeCloseTo(5 / 15 + 5 / 15, 12);
   });
 
   it("media quincena paga cerca de media, no exactamente: los días mandan", () => {

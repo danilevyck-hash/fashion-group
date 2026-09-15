@@ -44,6 +44,7 @@ async function main() {
   if (!qq) throw new Error(`quincena inválida: ${clave}`);
   const q = periodoDeQuincena(qq);
   const aprobarTodo = args.includes("--aprobar-todo");
+  const sinVigencias = args.includes("--sin-vigencias");
   const hastaReloj = corte ?? q.hasta;
 
   const PANAMA = "-05:00";
@@ -102,6 +103,11 @@ async function main() {
     feriados: new Map((fRes.data ?? []).map((f) => [String(f.fecha), String(f.nombre)])),
     desde: q.desde, hasta: hastaReloj, reglas, nombres, incluirNoHabiles: true, diaEnCurso: hoy,
     correccionesPorDia: efectivas.porDia, trabajaAfuera: afuera,
+    // 🔴 El día anterior al ingreso (o posterior a la salida) no es ausencia
+    // (15-sep-2026). `--sin-vigencias` es el CONTROL: apaga la regla y devuelve
+    // exactamente los números de antes del arreglo, para medir el antes/después
+    // con el MISMO instrumento.
+    vigencias: sinVigencias ? undefined : vigencias,
   });
   const horarioDe = new Map(horarios.map((h) => [h.empleado_codigo, h]));
   const personasVigentes = personas.filter((p) => !fuera.has(p.codigo));
@@ -162,7 +168,7 @@ async function main() {
   }).sort((a, b) => String(a.linea).localeCompare(String(b.linea)) || a.codigo.localeCompare(b.codigo, "es", { numeric: true }));
 
   writeFileSync(salida, JSON.stringify({
-    quincena: clave, aprobarTodo, desde: q.desde, hasta: q.hasta, hastaReloj, corte, hoy,
+    quincena: clave, aprobarTodo, sinVigencias, desde: q.desde, hasta: q.hasta, hastaReloj, corte, hoy,
     factorBase: q.factorBase, prendidos: [...prender], spExtra: [...spExtra],
     afueraEnLaBase: [...enLaBase],
     reglas, totales: totalizar(finales), sinFicha: sinFicha.map((s) => s.codigo),

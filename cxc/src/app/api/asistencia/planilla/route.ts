@@ -103,6 +103,7 @@ import {
 // interruptor: sin él, `hastaReloj` es `q.hasta` y no se computa ningún ajuste,
 // o sea el módulo de siempre. Ver `planilla-unida.ts` y `corte-quincena.ts`.
 import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
+import { finDeLaMedicion } from "@/lib/asistencia/dia-31";
 import {
   aplicarAjusteEnLinea,
   corteValido,
@@ -292,7 +293,22 @@ export async function GET(req: NextRequest) {
     PLANILLA_UNIDA && q.esQuincena && corteRaw && corteValido(q.desde, q.hasta, corteRaw)
       ? corteRaw
       : null;
-  const hastaReloj = corte ?? q.hasta;
+
+  // ── 🔴 EL DÍA 31 NO SE PAGA, PERO SÍ SE MIDE (15-sep-2026) ────────────────
+  //
+  // Daniel: *«el día 31 no se paga, pero si no viene o llega tarde se
+  // descuenta»*. Desde hoy la segunda quincena de un mes de 31 días PAGA hasta
+  // el 30 (`quincena()`), así que el reloj tiene que leerse UN DÍA MÁS que el
+  // período: `finDeLaMedicion`. De ahí salen las ausencias, las tardanzas, la
+  // salida temprana y las horas extra de ese 31.
+  //
+  // ⚠️ Solo en una QUINCENA. Un rango libre se lee exactamente como se pidió:
+  // estirarle un día al «Otro rango» de alguien sería moverle el período sin
+  // que lo pidiera.
+  // 🔑 No cambia nada de lo de antes: en una quincena que ya terminaba el 31,
+  // `finDeLaMedicion` devuelve ese mismo 31.
+  const finMedicion = q.esQuincena ? finDeLaMedicion(q.hasta) : q.hasta;
+  const hastaReloj = corte ?? finMedicion;
 
   const empresaRaw = (sp.get("empresa") ?? "").trim();
   // 🔴 A `gerente_boston` la empresa NO se la decide la URL: ES Boston. Mismo
@@ -513,6 +529,12 @@ export async function GET(req: NextRequest) {
       // 🔴 A quien trabaja afuera, el día hábil sin marca deja de ser ausencia
       // (14-sep-2026). Vacío = la planilla de siempre. Ver `trabaja-afuera.ts`.
       trabajaAfuera: afuera,
+      // 🔴 EL DÍA ANTERIOR AL INGRESO NO ES UNA AUSENCIA (15-sep-2026). ENRIQUE
+      // SÁNCHEZ (56) entró el 7 de septiembre y esta quincena le cobraba cuatro
+      // ausencias del 1 al 4 —−$100,16— encima de prorratearle el sueldo por
+      // los 7 días que sí trabajó. El MISMO mapa que ya se lee arriba para
+      // `codigosFueraDeRango`; sin fechas cargadas no cambia un centavo.
+      vigencias,
     });
 
     // Cuánto dura el día de cada quien. Es lo que vale una ausencia.
@@ -741,7 +763,7 @@ export async function GET(req: NextRequest) {
         avisos: {
           // Constante desde el 3-sep-2026 (tolerancia a la DDL retirada).
           faltaMigracionConfiguracion: null,
-          periodoAbierto: avisoPeriodoAbierto(q.desde, q.hasta, hoy, q.esQuincena),
+          periodoAbierto: avisoPeriodoAbierto(q.desde, finMedicion, hoy, q.esQuincena),
           sinFicha: codigosSinFicha,
           avisoSinFicha: textoCodigosSinFicha(codigosSinFicha),
         },
@@ -919,7 +941,7 @@ export async function GET(req: NextRequest) {
         // 🔴 EL PERÍODO TODAVÍA NO TERMINÓ. Va arriba del cuadro: los días que
         // no pasaron dejaron de descontarse, y un número que baja sin
         // explicación se lee como un número que no cuadra.
-        periodoAbierto: avisoPeriodoAbierto(q.desde, q.hasta, hoy, q.esQuincena),
+        periodoAbierto: avisoPeriodoAbierto(q.desde, finMedicion, hoy, q.esQuincena),
         // 🔴 Los códigos que marcaron y no tienen ficha, UNA sola vez y fuera
         // del cuadro de cada empresa.
         sinFicha: codigosSinFicha,

@@ -19,6 +19,7 @@ import {
   HORAS_CERO, JORNADA_DIARIA_DEFAULT_MIN, MANUALES_CERO,
   type FichaPlanilla, type HorasPersona, type ManualesLinea,
 } from "@/lib/asistencia/planilla";
+import { finDeLaMedicion } from "@/lib/asistencia/dia-31";
 import { REGLAS_DEFAULT, type ReglasAsistencia } from "@/lib/asistencia/config";
 import { armarReporte, type Marcacion, type HorarioPersona } from "@/lib/asistencia/reporte";
 import { pestanasDeAsistencia } from "@/lib/asistencia/persona-en-el-centro";
@@ -509,9 +510,16 @@ describe("🔴 La quincena — y el día 31", () => {
     expect([q.desde, q.hasta]).toEqual(["2026-07-01", "2026-07-15"]);
   });
 
-  it("🩸 la segunda de julio llega hasta el 31, no hasta el 30", () => {
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 15-sep-2026, y no se borró. Decía que la segunda
+  // de julio llegaba hasta el 31. Daniel: *«Que el 31 no se pague nunca»*, y los
+  // tres Excel de la contadora dicen «DEL 16 AL 30». Lo que SE CONSERVA es lo
+  // que este caso protegía de verdad —que el 31 no hace cobrar de más— y está
+  // dos casos más abajo («el día 31 NO PAGA base») y en `asistencia-dia-31`.
+  it("🔴 la segunda de julio se PAGA hasta el 30 (15-sep-2026)", () => {
     const q = quincena(2026, 7, 2);
-    expect([q.desde, q.hasta]).toEqual(["2026-07-16", "2026-07-31"]);
+    expect([q.desde, q.hasta]).toEqual(["2026-07-16", "2026-07-30"]);
+    // …y el 31 igual se MIDE: el reloj se lee un día más.
+    expect(finDeLaMedicion(q.hasta)).toBe("2026-07-31");
   });
 
   it("en un mes de 30 la segunda cierra el 30, y en febrero el 28", () => {
@@ -540,7 +548,10 @@ describe("🔴 La quincena — y el día 31", () => {
       }],
       horarios: [{ empleado_codigo: "8", entrada: "08:00", salida: "17:00", almuerzo_minutos: 30 }],
       justificaciones: [], feriados: new Map(),
-      desde: "2026-07-30", hasta: quincena(2026, 7, 2).hasta,
+      // 🔄 15-sep-2026: el reloj se lee hasta `finDeLaMedicion`, no hasta el
+      // final de la quincena — que desde hoy es el 30. El caso NO cambió de
+      // sentido: el 31 sigue descontándose si la persona no vino.
+      desde: "2026-07-30", hasta: finDeLaMedicion(quincena(2026, 7, 2).hasta),
       reglas: R, incluirNoHabiles: true,
     })[0];
     const h = medirHoras(p, R, 8 * 60);
@@ -550,7 +561,9 @@ describe("🔴 La quincena — y el día 31", () => {
 
   it("la clave va y vuelve", () => {
     expect(quincena(2026, 7, 2).clave).toBe("2026-07-2");
-    expect(quincenaDesdeClave("2026-07-2")?.hasta).toBe("2026-07-31");
+    // 🔄 15-sep-2026: era "2026-07-31". La clave no se movió; el último día que
+    // se PAGA, sí.
+    expect(quincenaDesdeClave("2026-07-2")?.hasta).toBe("2026-07-30");
     expect(quincenaDesdeClave("basura")).toBeNull();
     expect(quincenaDesdeClave("2026-13-1")).toBeNull();
     expect(quincenaDesdeClave("2026-07-3")).toBeNull();

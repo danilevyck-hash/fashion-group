@@ -338,7 +338,14 @@ describe("H. EL CORTE Y EL AJUSTE, CABLEADOS (10-sep-2026)", () => {
   it("el reloj se mide con `hastaReloj`, pero el período queda entero", () => {
     // El corte solo nace con el interruptor, en una quincena, y si es válido.
     expect(ruta).toMatch(/PLANILLA_UNIDA && q\.esQuincena && corteRaw && corteValido/);
-    expect(ruta).toMatch(/const hastaReloj = corte \?\? q\.hasta;/);
+    // 🔄 CAMBIÓ DE DIRECCIÓN EL 15-sep-2026, y no se borró: el reloj ya no se
+    // lee hasta `q.hasta` sino hasta `finMedicion`, que en un mes de 31 días es
+    // UN DÍA MÁS que el período que se paga (Daniel: *«el día 31 no se paga,
+    // pero si no viene o llega tarde se descuenta»*). Lo que este caso protege
+    // —que el corte recorte SOLO el reloj y nunca el sueldo— no cambió: el
+    // `factorBase: q.factorBase` de abajo sigue siendo el candado.
+    expect(ruta).toMatch(/const finMedicion = q\.esQuincena \? finDeLaMedicion\(q\.hasta\) : q\.hasta;/);
+    expect(ruta).toMatch(/const hastaReloj = corte \?\? finMedicion;/);
     // La medición usa hastaReloj…
     expect(ruta).toMatch(/leerCorrecciones\(q\.desde, hastaReloj\)/);
     expect(ruta).toMatch(/leerVacaciones\(q\.desde, hastaReloj\)/);

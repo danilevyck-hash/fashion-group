@@ -189,7 +189,24 @@ describe("🔴 el calendario a la vista, y el cuadro solo cuando se pide", () =>
     montar();
     expect(screen.getByTestId("rango").getAttribute("data-inline")).toBe("no");
     expect(screen.getByRole("button", { name: "1 – 15 ago" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "16 – 31 ago" })).toBeTruthy();
+    // 🔄 15-sep-2026: el botón decía «16 – 31 ago». El 31 no se paga nunca.
+    expect(screen.getByRole("button", { name: "16 – 30 ago" })).toBeTruthy();
+  });
+
+  it("🔴 en un mes de 31 días la pantalla DICE que el 31 no paga sueldo pero sí resta (15-sep-2026)", () => {
+    // Daniel: *«el día 31 no se paga, pero si no viene o llega tarde se
+    // descuenta»*. Acá estamos en agosto (31 días), así que el aviso sale. El
+    // CONTROL —que en un mes de 30 NO sale— vive en
+    // `planilla-elegir-quincena.test.tsx`, que monta la misma pantalla en
+    // septiembre. Ver `dia-31.ts`.
+    servir(guionBase());
+    montar();
+    // Antes de elegir el período no se dice nada; al tocar «16 – 30 ago», sí.
+    expect(screen.queryByText(/El 31 no paga sueldo/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "16 – 30 ago" }));
+    expect(
+      screen.getByText("El 31 no paga sueldo, pero sus ausencias, tardanzas, salidas tempranas y horas extra sí entran."),
+    ).toBeTruthy();
   });
 
   it("🔴 elegir el período NO pide el cuadro: hay que tocar Generar", async () => {

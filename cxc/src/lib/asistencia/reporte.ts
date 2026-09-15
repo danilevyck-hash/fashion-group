@@ -100,6 +100,7 @@ import { minutosPerdonados, textoPermiso, ventanaDe } from "./permiso-horas";
 // 🔴 UN DÍA DE VACACIONES NO SE CALCULA. Ver `vacaciones.ts`: aunque la persona
 // haya pasado por el reloj, ese día no genera horas, ni tardanza, ni ausencia.
 import { vacacionDe, type DiaVacacion, type Vacacion } from "./vacaciones";
+import { diaFueraDeVigencia, type Vigencia } from "./vigencia";
 // 🔑 SOLO EL TIPO. `correcciones.ts` importa `diaPanama` de acá (un valor), así
 // que un import normal armaría un ciclo en tiempo de ejecución; `import type`
 // se borra al compilar y no queda ninguno.
@@ -204,6 +205,26 @@ export interface DiaReporte {
    * suspender y el cálculo es idéntico al de siempre.
    */
   enCurso: boolean;
+  /**
+   * 🔴 ESE DÍA ESA PERSONA NO TRABAJABA ACÁ (15-sep-2026): es anterior a su
+   * `fecha_ingreso` o posterior a su `fecha_salida`. La regla vive en
+   * `vigencia.ts` (`diaFueraDeVigencia`); acá solo se le pregunta.
+   *
+   * 🔴 Mientras esto sea `true`, TODOS los minutos van en cero y `ausente` y
+   * `revisar` van en `false`: el día no suma, no resta y no existe para ella.
+   * Es el hermano de `enCurso` —allá el día todavía no llegó, acá no le
+   * tocaba— y por eso se resuelve igual: el veredicto se suspende, no se
+   * calcula y se anula después.
+   *
+   * ⚠️ Las MARCAS de ese día se conservan tal cual, aunque no cuenten para
+   * nada: son lo único con lo que el aviso «marcó después de irse» puede
+   * existir (`marcoDespuesDeLaBaja`). Descartar un dato está bien; esconderlo
+   * no.
+   *
+   * `false` en todos los días de quien trabajó el período entero —y en las 9
+   * fichas sin `fecha_ingreso`—: ahí no hay nada que suspender.
+   */
+  fueraDeVigencia: boolean;
   ausente: boolean;
   /**
    * Este día está cubierto por unas VACACIONES. `null` = no lo está.
@@ -563,6 +584,18 @@ export function armarReporte(opts: {
    * la lectura devuelve vacío. El motor da los mismos números que hoy.
    */
   trabajaAfuera?: ReadonlySet<string>;
+  /**
+   * 🔴 DESDE CUÁNDO Y HASTA CUÁNDO TRABAJA CADA QUIEN (15-sep-2026), por
+   * código. Un día anterior a su `fecha_ingreso` —o posterior a su
+   * `fecha_salida`— deja de generar ausencia, tardanza, salida temprana y hora
+   * extra: esa persona no trabajaba acá ese día. La regla vive en
+   * `vigencia.ts`; acá solo se le pregunta.
+   *
+   * 🔑 SIN ESTO NADA CAMBIA: vacío por defecto, y una ficha sin ninguna de las
+   * dos fechas se comporta exactamente como hoy. Lo pasan el Reporte y la
+   * Planilla, que ya leían este mapa para otra cosa (`codigosFueraDeRango`).
+   */
+  vigencias?: ReadonlyMap<string, Vigencia>;
 }): PersonaReporte[] {
   const { marcaciones, horarios, justificaciones, feriados, desde, hasta, nombres } = opts;
   const vacaciones = opts.vacaciones ?? [];
@@ -654,6 +687,46 @@ export function armarReporte(opts: {
       // ninguna cuenta — ver la nota de `correccionesPorDia`.
       const correcciones = [...(opts.correccionesPorDia?.get(`${codigo}|${fecha}`) ?? [])];
 
+      // ── 🔴 ESE DÍA NO ERA SUYO: VA ANTES QUE TODO, HASTA DE LAS VACACIONES ──
+      //
+      // 🩸 ENRIQUE SÁNCHEZ (56) entró el 7 de septiembre y en la quincena del 1
+      // al 15 el sistema le cobraba CUATRO ausencias —el 1, 2, 3 y 4— por
+      // −$100,16, días en que todavía no trabajaba acá. Encima de eso ya le
+      // prorrateaba el sueldo por los 7 días que sí trabajó ($175,00, que es lo
+      // que paga la contadora): lo castigaba dos veces por lo mismo.
+      //
+      // 🔴 VA PRIMERO, Y ESO ES LA MITAD DEL ARREGLO. Igual que con las
+      // vacaciones: cualquier cosa que se calcule antes es una cuenta que
+      // después hay que acordarse de anular, y basta olvidarse de una para que
+      // un día anterior al ingreso aparezca con tardanza el día de pago. Y va
+      // antes que las vacaciones porque es un hecho más fuerte: unas vacaciones
+      // «ya pagadas» de un día en que la persona ni existía para la empresa se
+      // le descontarían de su primera quincena.
+      //
+      // ⚠️ LAS MARCAS SE CONSERVAN. No se pierden ni se esconden: son lo único
+      // con lo que el aviso «marcó después de irse» puede existir
+      // (`marcoDespuesDeLaBaja`, que mira `ultimoDiaConMarcas`). Lo que se
+      // suspende es el VEREDICTO, no el dato.
+      if (diaFueraDeVigencia(opts.vigencias?.get(codigo), fecha)) {
+        dias.push({
+          fecha,
+          marcas: crudas.map(
+            (seg) =>
+              `${p2(Math.floor(seg / 3600))}:${p2(Math.floor((seg % 3600) / 60))}:${p2(seg % 60)}`,
+          ),
+          marcasIds: crudas.map((seg) => p.ids.get(fecha)?.get(seg) ?? null),
+          entrada: null, salida: null,
+          tardeMin: 0, excesoAlmuerzoMin: 0, salidaTempranaMin: 0, extraMin: 0, trabajadoMin: 0,
+          // 🔴 Los tres veredictos, suspendidos: no faltó, no hay nada que
+          // revisar, y el día no se juzga por ningún lado.
+          revisar: false, enCurso, fueraDeVigencia: true, ausente: false,
+          vacacion: null, justificado: null, permiso: null, permisoPerdonaMin: 0,
+          feriado, habil,
+          correcciones,
+        });
+        continue;
+      }
+
       // ── 🔴 VACACIONES: ACÁ NO SE CALCULA NADA, Y VA PRIMERO ────────────────
       //
       // Antes de mirar las marcas, antes de la tardanza, antes de la ausencia.
@@ -675,6 +748,7 @@ export function armarReporte(opts: {
           tardeMin: 0, excesoAlmuerzoMin: 0, salidaTempranaMin: 0, extraMin: 0, trabajadoMin: 0,
           revisar: false,
           enCurso,
+          fueraDeVigencia: false,
           // 🔴 NUNCA una ausencia. Quien está de vacaciones no faltó.
           ausente: false,
           vacacion: {
@@ -714,6 +788,7 @@ export function armarReporte(opts: {
           tardeMin: 0, excesoAlmuerzoMin: 0, salidaTempranaMin: 0, extraMin: 0, trabajadoMin: 0,
           revisar: false,
           enCurso,
+          fueraDeVigencia: false,
           // 🔴 Regla 6, la otra mitad: a las 8:59 de la mañana NADIE faltó
           // todavía. Sin este guard, el día en curso metía a media oficina en
           // "ausencias sin justificar" cada mañana — el mismo error que el de
@@ -806,7 +881,7 @@ export function armarReporte(opts: {
         // `null` y no la hora de entrada: no sabemos cuándo se fue.
         salida: soloUna ? null : fmt(sal),
         tardeMin, excesoAlmuerzoMin, salidaTempranaMin, extraMin, trabajadoMin,
-        revisar, enCurso, ausente: false, vacacion: null, justificado, permiso, permisoPerdonaMin, feriado, habil,
+        revisar, enCurso, fueraDeVigencia: false, ausente: false, vacacion: null, justificado, permiso, permisoPerdonaMin, feriado, habil,
         correcciones,
       });
     }

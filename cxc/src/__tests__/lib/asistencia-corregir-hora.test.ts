@@ -300,7 +300,15 @@ describe("3. 🔴 «Justificar» en la fila abre el MISMO formulario de la ficha
   it("la fila del día ofrece «Justificar» al lado de «Agregar hora», sin menú «···», y solo donde una justificación cambia algo", () => {
     const rep = puro("app/asistencia/ReporteTab.tsx");
     expect(rep).toMatch(/Justificar\s*<\/button>/);
-    expect(rep).toMatch(/const seJustifica = !d\.feriado && !d\.vacacion && !d\.justificado;/);
+    // ⚠️ CAMBIÓ DE DIRECCIÓN el 15-sep-2026, no de intención: la condición ganó
+    // un cuarto caso en el que una justificación tampoco cambia nada — un día
+    // ANTERIOR al ingreso o POSTERIOR a la salida, que desde hoy no es ausencia
+    // y no cuesta un centavo. La regla que protege este caso —«solo donde una
+    // justificación cambia algo»— es la misma. Ver
+    // `asistencia-dia-antes-del-ingreso.test.ts`.
+    expect(rep).toMatch(
+      /const seJustifica = !d\.feriado && !d\.vacacion && !d\.justificado && !d\.fueraDeVigencia;/,
+    );
     expect(rep).toMatch(/onJustificar\(\{ codigo, persona, fecha: d\.fecha \}\)/);
     expect(rep).not.toMatch(/OverflowMenu|···/);
   });

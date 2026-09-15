@@ -255,6 +255,12 @@ export async function GET(req: NextRequest) {
       // (14-sep-2026): la MISMA lectura y la MISMA regla que usa la planilla,
       // para que las dos pantallas no digan cosas distintas del mismo día.
       trabajaAfuera: afuera,
+      // 🔴 El día anterior al ingreso —o posterior a la salida— no es ausencia
+      // (15-sep-2026). El MISMO mapa que ya se lee arriba para
+      // `codigosFueraDeRango`, y la MISMA regla que usa la planilla: la
+      // pantalla de Asistencia no puede marcarle una falta a alguien que ese
+      // día todavía no trabajaba acá.
+      vigencias,
     });
 
     // 🔴 QUIEN NO COBRA HORAS EXTRA NO LAS CUENTA EN EL REPORTE. Hasta el
