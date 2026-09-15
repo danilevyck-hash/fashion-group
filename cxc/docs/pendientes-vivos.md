@@ -10,6 +10,17 @@
 
 ## 🔴 Mueven plata
 
+### 0-bis. Lo que quedó abierto del cuadre contra el Excel de Yulissa (15-sep-2026)
+
+Daniel contestó ocho preguntas del cuadre el 15-sep. **Lo cerrado se escribió directo en producción** (salarios de Ramón Miranda y Carlos Ruíz, bajas de Cristiam Blanco y Héctor Leonel Pérez, tres nombres, «Trabaja afuera» a los cuatro). Queda abierto:
+
+1. 🔴 **Las fechas de entrada de las seis de Multifashion.** Jenifer Miranda · Jailine Quispe · Milagros Torres · Sheynee Batista · Yeisibeth Muñoz · Cindy De Gracia. Daniel, **15-sep-2026**: *«4. ponlo en la lista de pendientes»*. Sin ellas, el sistema cuenta como falta todos los días anteriores a que empezaran.
+2. ⚠️ **El motivo de salida de los dos que salieron va como «otro».** Cristiam Blanco (30-ago-2026) y Héctor Leonel Pérez A. (2-sep-2026). El CHECK `asistencia_personas_baja_completa` exige fecha **y** motivo juntos, y el motivo no se sabe. **La liquidación lo necesita**: hay que cambiarlo a `despido` o `renuncia`.
+3. ⚠️ **Julio, código 11, se llama distinto en cada empresa DENTRO del Excel de Yulissa**: «Julio Guzmán» en la hoja de Vistana y «Julio Garay» en la de Fashion Wear. Es UNA sola ficha (el reloj, organización VISTANA, lo tiene como `JULIO GAR…`, id 11). Por eso **no se renombró**: hay que preguntar cuál es el apellido.
+4. ⚠️ **«Otros servicios» no existe como campo.** Daniel, **15-sep-2026**: *«debería de haber un campo en la ficha que diga "otros servicios", y a qué quincena se le aplica ese extra (debe de ser la misma en la que trabajó)»*. Hoy solo se puede escribir en la casilla de la fila de la planilla, quincena por quincena. Diseño sin definir.
+5. ⚠️ **Tres códigos del reloj sin ficha son FANTASMAS, no personas.** 39 (4 marcaciones, 1 y 2 de septiembre), 55 (7 marcaciones, 1 y 2 de septiembre) y 9999 (4 marcaciones, 7 de septiembre), todos en el reloj de Boston y **sin nombre**. Daniel mandó las cuatro fotos del iVMS-4200: ninguno de los tres está en la lista de personas del reloj. Son altas de prueba que se crearon y se borraron. **Decidir si se ignoran** (existe `asistencia_codigos_ignorados`, hoy vacía).
+6. ⚠️ **Ana Trejos (2), Cindy De Gracia (3) y Yeisibeth Muñoz (306) no están dadas de alta en el reloj**, y `luis` (id 1000, organización AMERICAN CLASSICS) sí está en el reloj y **nunca marcó ni tiene ficha**. Medido contra las fotos del 15-sep-2026.
+
 ### 0. El reloj de la quincena 1–15 de septiembre cortó el **10**, y solo Fashion Wear quedó cerrada así
 Daniel, **15-sep-2026**, textual: *«el 10 de septiembre se cortó el reloj de la planilla manual del excel»* y *«acuérdate que el reloj cortó el 10, así que para la próxima quincena es desde el 11 hasta cuando corte contabilidad»*.
 
