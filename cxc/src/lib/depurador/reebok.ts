@@ -66,6 +66,42 @@ export function fobReebok(dept: Cell, wholesale: number, off: number | null): nu
   return wholesale * (esFootwear(dept) ? 0.8 : 0.7);
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 🔴 EL COSTO DE UN ARTÍCULO DE REEBOK SE DECIDE ACÁ, Y EN NINGÚN OTRO LADO.
+ *
+ * Daniel, textual (14-sep-2026): «que el pedido use el mismo costo que Switch.
+ * Un solo costo por producto».
+ *
+ * 🩸 Hasta hoy eran DOS cuentas distintas para el mismo artículo. La plantilla
+ * de Switch usaba `fobReebok` —0.80 en footwear, 0.70 en ropa y accesorios, y el
+ * «WholesalePrice OFF» del proveedor cuando viene con valor— y el pedido para
+ * cliente tenía su propio `× 0.80` escrito a mano, que ignoraba las dos reglas.
+ * Resultado medido sobre el archivo real de septiembre: de 526 artículos, **207
+ * salían con un costo en la plantilla y otro en el pedido** — el mismo producto
+ * valiendo dos cosas según qué archivo se bajara. Y como el pedido es el que ve
+ * el cliente, la ropa se estaba cotizando sobre un costo MÁS ALTO que el real,
+ * y unos pocos zapatos un centavo por debajo.
+ *
+ * 🔑 NO SE COPIA LA REGLA: SE LLAMA. Duplicarla es cómo nacieron los dos costos.
+ * El día que cambie el 0.70, el 0.80 o el trato del descuento, cambia una sola
+ * línea y las dos salidas se mueven juntas.
+ *
+ * ⚠️ El redondeo también vive acá y es el de la plantilla: se redondea el FOB a
+ * centavos y RECIÉN AHÍ se le aplica el flete. Redondear una sola vez al final
+ * daba un centavo distinto en 66 artículos del archivo de septiembre.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/** Costo FOB y CIF de UN artículo. `null` si el proveedor no mandó WholesalePrice.
+ *  Es la ÚNICA fuente de costo de las dos salidas (plantilla Switch y pedido). */
+export function costoReebok(
+  dept: Cell, wholesale: number | null, off: number | null, fleteCrudo: unknown,
+): { fob: number | null; cif: number | null } {
+  if (wholesale === null) return { fob: null, cif: null };
+  const flete = normalizarFlete(fleteCrudo);
+  const fob = round2(fobReebok(dept, wholesale, off));
+  return { fob, cif: round2(fob * flete) };
+}
+
 /* ============ DETECCIÓN DE HOJA / HEADERS ============ */
 export interface ReebokCols {
   po: number; newArticle: number; sku: number; name: number; department: number;
@@ -379,8 +415,10 @@ function pickSample(group: ReebokItem[]): SampleResult {
 }
 
 /* ============ SALIDA A · CATÁLOGO CLIENTES ============ */
-// Una fila por PO NAME + New Article. Costo = WholesalePrice × 0.80 × flete (flat;
-// el flete es 1.10 por defecto y 1.15 si se elige — ver `flete.ts`).
+// Una fila por PO NAME + New Article. Costo = el MISMO que la plantilla de Switch
+// (`costoReebok`): FOB por `fobReebok` —0.80 footwear · 0.70 el resto · el
+// «WholesalePrice OFF» del proveedor cuando viene— y el flete del embarque encima
+// (1.10 por defecto, 1.15 si se elige — ver `flete.ts`). 🔴 Un solo costo por producto.
 // Precio A/B = fórmulas editables (default ÷0.75 / ÷0.80, redondeo par). Orden PO/Name/Género.
 
 export interface CatalogoRow {
@@ -403,7 +441,6 @@ export interface CatalogoConfig {
 }
 
 export function buildCatalogo(items: ReebokItem[], cfg: CatalogoConfig): CatalogoRow[] {
-  const flete = normalizarFlete(cfg.flete);
   const groups = new Map<string, ReebokItem[]>();
   for (const it of items) {
     const key = `${it.po}|||${it.newArticle}`;
@@ -414,7 +451,8 @@ export function buildCatalogo(items: ReebokItem[], cfg: CatalogoConfig): Catalog
   for (const [, group] of groups) {
     const first = group[0];
     const w = first.wholesale;
-    const costo = w === null ? null : round2(w * 0.8 * flete);
+    // 🔴 EL MISMO costo que la plantilla de Switch, de la MISMA función.
+    const { cif: costo } = costoReebok(first.department, w, first.wholesaleOff, cfg.flete);
     // Jerarquía por Name: precio fijo > fórmula del Name > fórmula de marca (A/B).
     const exc = excForName(cfg.excByName, first.name);
     const precioA = precioDescripcion(costo, exc, cfg.formulaA);
@@ -496,7 +534,6 @@ export interface SwitchRow {
 
 /** Filas Switch, una por artículo, ordenadas por PO/Name/Género. */
 export function buildSwitchRows(items: ReebokItem[], cfg: SwitchBuildConfig): SwitchRow[] {
-  const flete = normalizarFlete(cfg.flete);
   const groups = new Map<string, ReebokItem[]>();
   for (const it of items) {
     if (!it.newArticle) continue;
@@ -509,8 +546,7 @@ export function buildSwitchRows(items: ReebokItem[], cfg: SwitchBuildConfig): Sw
     const sample = pickSample(group);
     const qty = group.reduce((s, it) => s + (it.piezas || 0), 0);
     const w = first.wholesale;
-    const fob = w === null ? null : round2(fobReebok(first.department, w, first.wholesaleOff));
-    const cif = fob === null ? null : round2(fob * flete);
+    const { fob, cif } = costoReebok(first.department, w, first.wholesaleOff, cfg.flete);
     // Jerarquía por Name: precio fijo > fórmula del Name > fórmula de marca (A/B).
     const precio = precioDescripcion(cif, excForName(cfg.excByName, first.name), cfg.formula);
     out.push({
