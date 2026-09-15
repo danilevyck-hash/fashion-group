@@ -34,17 +34,51 @@ const RAIZ = path.resolve(__dirname, "../../..");
 const SRC = path.join(RAIZ, "src");
 
 /**
- * LA ÚNICA puerta. Es la ruta que recibe al agente que corre en la oficina, y
- * la que aplica `ignoreDuplicates` sobre `(dispositivo, evento_id)`.
+ * LA ÚNICA puerta: el módulo que aplica `ignoreDuplicates` sobre
+ * `(dispositivo, evento_id)`.
+ *
+ * ⚠️ CAMBIÓ DE DIRECCIÓN EL 14-sep-2026, Y NO SE AFLOJÓ — SE APRETÓ. Hasta hoy
+ * la puerta era `api/asistencia/ingest/route.ts`, que hacía el upsert adentro.
+ * Con el reloj del teléfono hay una segunda FUENTE de marcaciones
+ * (`/api/marcacion`), así que el upsert se mudó a un módulo y las DOS fuentes
+ * lo llaman: antes la forma de escribir vivía dentro de un archivo y cualquier
+ * fuente nueva podía escribir a su manera; ahora hay UNA función y este
+ * candado exige que siga siendo una sola.
  *
  * Agregar un archivo a esta lista NO es una formalidad: significa aceptar otra
- * fuente de marcaciones y, con ella, otra llave anti-duplicado. Si vas a
- * hacerlo, primero medí qué pasa con un día que YA trajo el reloj.
+ * forma de escribir y, con ella, otra llave anti-duplicado. Si vas a hacerlo,
+ * primero medí qué pasa con un día que YA trajo el reloj.
  */
-const PUERTA_UNICA = ["src/app/api/asistencia/ingest/route.ts"];
+const PUERTA_UNICA = ["src/lib/asistencia/guardar-marcaciones.ts"];
 
-/** El único módulo que arma el `evento_id` con el que se deduplica. */
-const ACUÑA_EVENTO_ID = ["src/lib/asistencia/ingest.ts"];
+/**
+ * Los módulos que arman el `evento_id` con el que se deduplica: UNO por
+ * FUENTE de marcaciones.
+ *
+ * ⚠️ CAMBIÓ DE DIRECCIÓN EL 14-sep-2026 (de uno a dos), con su porqué. Era UNO
+ * solo porque había una sola fuente. Daniel aprobó el reloj del teléfono, y su
+ * regla fue que *«la marca cae en la MISMA tabla que los relojes físicos, con
+ * su origen anotado»* — una fuente nueva NECESITA acuñar su propio
+ * identificador, porque el `serialNo` del aparato Hikvision no existe del lado
+ * del teléfono.
+ *
+ * 🔑 POR QUÉ ESTO NO ES EL DEFECTO DE AGOSTO. Lo que reventó entonces fueron
+ * DOS llaves distintas para EL MISMO punch (el reloj mandaba `serialNo`, el
+ * Excel un hash de la fila, y el índice único no los reconocía como iguales).
+ * Acá son dos APARATOS distintos: un punch del reloj de la tienda y una marca
+ * del teléfono son dos hechos distintos, y el `dispositivo` los separa. Daniel
+ * lo decidió así, textual: *«el sistema junta todo»* — la primera del día es
+ * la entrada y la última la salida, venga de donde venga.
+ *
+ * Lo que este candado sigue exigiendo, y es lo que de verdad protegía: que
+ * dentro de CADA fuente el identificador sea estable, para que reenviar lo
+ * mismo no lo guarde dos veces (el repaso nocturno del reloj, y el reenvío de
+ * una marca que esperó señal).
+ */
+const ACUÑA_EVENTO_ID = [
+  "src/app/api/marcacion/route.ts",
+  "src/lib/asistencia/ingest.ts",
+];
 
 function archivosDeCodigo(dir: string): string[] {
   const out: string[] = [];
@@ -107,6 +141,30 @@ describe("asistencia: una sola vía de entrada de marcaciones", () => {
   it("solo un módulo acuña el evento_id con el que se deduplica", () => {
     const acuñan = ARCHIVOS.filter((a) => /\bevento_id\s*:/.test(a.codigo)).map((a) => a.ruta);
     expect(acuñan.sort()).toEqual(ACUÑA_EVENTO_ID);
+  });
+
+  it("🔑 CONTROL: la puerta única deduplica por `(dispositivo, evento_id)` e ignora repetidos", () => {
+    // Es la mitad que no se puede perder: si alguien le saca el `onConflict` o
+    // el `ignoreDuplicates`, el repaso nocturno del reloj —y el reenvío de una
+    // marca que esperó señal— empiezan a duplicar horas en silencio.
+    const puerta = ARCHIVOS.find((a) => a.ruta === PUERTA_UNICA[0]);
+    expect(puerta, "no está el módulo que escribe").toBeTruthy();
+    expect(puerta!.codigo).toMatch(/onConflict:\s*["'`]dispositivo,evento_id["'`]/);
+    expect(puerta!.codigo).toMatch(/ignoreDuplicates:\s*true/);
+  });
+
+  it("🔑 CONTROL: ninguna fuente escribe marcaciones sin pasar por esa función", () => {
+    // El defecto de agosto empezó por una pantalla que escribía por su cuenta.
+    // Las dos fuentes vivas —el agente del reloj y el reloj del teléfono— tienen
+    // que NOMBRAR a `guardarMarcaciones`, no armar su propio upsert.
+    for (const fuente of [
+      "src/app/api/asistencia/ingest/route.ts",
+      "src/app/api/marcacion/route.ts",
+    ]) {
+      const a = ARCHIVOS.find((x) => x.ruta === fuente);
+      expect(a, fuente).toBeTruthy();
+      expect(a!.codigo, fuente).toContain("guardarMarcaciones");
+    }
   });
 
   it("nadie inventa un `dispositivo` desde la app: lo dice el aparato", () => {

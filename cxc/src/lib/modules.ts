@@ -34,10 +34,12 @@ import {
   LayoutDashboard,
   ScanSearch,
   Factory,
+  Fingerprint,
   type LucideIcon,
 } from "lucide-react";
 import { asistenciaRoles, aprobacionesRoles } from "@/lib/asistencia/roles";
 import { MODULO_BOSTON, ROL_BOSTON, ROLES_MODULO_BOSTON } from "@/lib/boston/rol";
+import { MODULO_MARCACION, ROL_MARCACION, ROLES_MODULO_MARCACION, ROTULO_MARCACION, RUTA_MARCACION } from "@/lib/marcacion/rol";
 import { ROLES_CXC } from "@/lib/cxc/roles";
 import { ROLES_CLIENTES } from "@/lib/clientes/roles";
 import { catalogoRoles } from "@/lib/catalogo/roles";
@@ -197,6 +199,18 @@ export const ALL_MODULES: AppModule[] = [
   // `role_permissions` y en `fg_users.modulos_override`, y renombrarla rompería
   // los permisos sin comprar nada.
   { key: "asistencia",     label: "Asistencia y Planilla", href: "/asistencia",   icon: Clock,         roles: [...new Set([...asistenciaRoles(), ...aprobacionesRoles()])],                       group: "operacion" },
+  // 🔴 MARCACIÓN — el reloj del teléfono (14-sep-2026). Daniel: *«ponle
+  // marcación al módulo»*. Para quien trabaja afuera y no pasa por ningún reloj
+  // físico: Ana (2), Cindy (3), Yeisibeth (306) —rol `marcacion`, que NO ve
+  // nada más— y Rodrigo (13), que es bodega y lo recibe por su override.
+  //
+  // 🔑 `roles[]` sale de `ROLES_MODULO_MARCACION` (`lib/marcacion/rol.ts`) y
+  // NO incluye `bodega` a propósito: el módulo se da POR PERSONA (ver
+  // `MODULOS_POR_PERSONA` y `modulos-ofrecibles.ts`), así ningún otro bodega
+  // lo hereda. Va pegado a Asistencia porque es su pariente: lo que se marca
+  // acá lo lee la contadora allá. ⚠️ NO es una pestaña de Asistencia — quien
+  // marca no puede ver Asistencia.
+  { key: MODULO_MARCACION, label: ROTULO_MARCACION, href: RUTA_MARCACION,    icon: Fingerprint,   roles: [...ROLES_MODULO_MARCACION],                    group: "operacion" },
   { key: "reclamos",       label: "Reclamos",          href: "/reclamos",         icon: AlertTriangle, roles: ["admin", "secretaria"],                       group: "operacion" },
   { key: "cargar",         label: "Plantilla Switch",  href: "/productos/cargar", icon: PackagePlus,   roles: ["admin", "secretaria"],                       group: "operacion" },
   { key: "marketing",      label: "Marketing",         href: "/marketing",        icon: Megaphone,     roles: ["admin", "secretaria"],                       group: "operacion" },
@@ -267,6 +281,11 @@ export const SYSTEM_ROLES: { key: string; label: string }[] = [
   // `gerente_acs` — sus módulos salen de role_permissions (fila gerente_boston)
   // y el `roles[]` del módulo de arriba es el fallback si la tabla no responde.
   { key: ROL_BOSTON, label: "Gerente Boston" },
+  // Quien SOLO marca (14-sep-2026): el reloj del teléfono. Mismo molde que los
+  // dos gerentes — un rol de un solo módulo. Sus módulos salen de
+  // role_permissions (fila `marcacion`, migración 20261125120000) y el
+  // `roles[]` del módulo es el fallback si la tabla no responde.
+  { key: ROL_MARCACION, label: ROTULO_MARCACION },
 ];
 
 /** Lista de keys de todos los roles del sistema. */
@@ -390,6 +409,10 @@ export const MODULO_HEREDA_PERMISO_DE: Record<string, string> = {
 /** Rol → la key del módulo donde aterriza al entrar, aunque tenga varios. */
 export const MODULO_CASA_POR_ROL: Record<string, string> = {
   [ROL_BOSTON]: MODULO_BOSTON,
+  // Quien solo marca aterriza en Marcación. Hoy es su ÚNICO módulo y el
+  // auto-redirect de módulo único ya lo llevaría; la casa queda fijada para
+  // que el día que gane una segunda ficha no caiga en el Inicio del grupo.
+  [ROL_MARCACION]: MODULO_MARCACION,
 };
 
 /** La casa de este rol, o `null` si no tiene una fijada. */

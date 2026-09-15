@@ -28,6 +28,8 @@ import fs from "fs";
 import path from "path";
 import { ALL_MODULES, SYSTEM_ROLE_KEYS } from "@/lib/modules";
 import { modulosOfrecibles, moduloOfrecible } from "@/lib/modulos-ofrecibles";
+import { MODULOS_POR_PERSONA, esModuloPorPersona } from "@/lib/marcacion/rol";
+import { puedeAbrirMarcacion } from "@/lib/marcacion/acceso";
 
 const RAIZ = process.cwd();
 const leer = (rel: string) => fs.readFileSync(path.join(RAIZ, rel), "utf8");
@@ -35,12 +37,44 @@ const sinComentarios = (src: string) =>
   src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^[ \t]*\/\/.*$/gm, "");
 
 describe("🔴 la lista de módulos ofrecibles sale del catálogo, por rol", () => {
-  it("cada rol solo recibe los módulos que su rol abre", () => {
+  // ⚠️ Nota fechada (14-sep-2026): el candado ganó UNA excepción, declarada y
+  // enumerada — los módulos POR PERSONA (`MODULOS_POR_PERSONA`). Hoy es uno
+  // solo, «Marcación»: Daniel pidió *«rodrigo es bodega con marcacion»* y
+  // ponerle `bodega` al `roles[]` del módulo se lo habría abierto a TODOS los
+  // bodegas por la puerta de la URL. Se le da a UNA persona, por su override.
+  //
+  // 🔑 LA REGLA DE FONDO NO SE ABLANDÓ — «no se ofrece un módulo que la
+  // pantalla rebota»—: lo que cambia es que el guard de un módulo por persona
+  // NO mira solo el rol, mira también el módulo de la cookie firmada
+  // (`lib/marcacion/acceso.ts`). Los dos casos de abajo lo exigen juntos: la
+  // excepción solo vale para módulos que están en esa lista, y esa lista solo
+  // puede contener módulos con un guard que acepte por módulo. Un módulo por
+  // persona SIN ese guard sería exactamente el `multifashion` de andrea.
+  it("cada rol solo recibe los módulos que su rol abre, salvo los de por persona", () => {
     for (const rol of SYSTEM_ROLE_KEYS) {
       for (const m of modulosOfrecibles(rol)) {
+        if (esModuloPorPersona(m.key)) continue;
         expect(m.roles, `${rol} no debería poder recibir «${m.key}»`).toContain(rol);
       }
     }
+  });
+
+  it("🔴 la excepción es UNA lista corta y enumerada, no una puerta abierta", () => {
+    // Si esta lista crece, la regla de arriba deja de proteger algo — por eso
+    // se congela acá y hay que venir a explicar cada módulo que se sume.
+    expect([...MODULOS_POR_PERSONA]).toEqual(["marcacion"]);
+    expect(esModuloPorPersona("multifashion")).toBe(false);
+    expect(esModuloPorPersona("boston")).toBe(false);
+  });
+
+  it("🔴 y cada módulo por persona tiene un guard que acepta por MÓDULO, no solo por rol", () => {
+    // Rodrigo es `bodega` y `bodega` no está en el `roles[]` de Marcación: si
+    // el guard mirara solo el rol, la ficha se le pintaría y la pantalla lo
+    // rebotaría.
+    const sesion = { role: "bodega", modules: ["guias", "catalogos", "referencia", "marcacion"] };
+    expect(puedeAbrirMarcacion(sesion)).toBe(true);
+    // Y sin el módulo, no entra — aunque sea el mismo rol.
+    expect(puedeAbrirMarcacion({ role: "bodega", modules: ["guias"] })).toBe(false);
   });
 
   it("🔴 el caso que lo destapó: Multifashion NO se le puede dar a una secretaria", () => {
@@ -66,6 +100,10 @@ describe("🔴 la lista de módulos ofrecibles sale del catálogo, por rol", () 
     }
   });
 
+  // 14-sep-2026: este caso destapó un hueco REAL de la excepción de arriba —
+  // `modulosOfrecibles("inventado")` devolvía «Marcación». Se cerró en
+  // `modulos-ofrecibles.ts`: un rol que `SYSTEM_ROLE_KEYS` no declara no recibe
+  // nada, tampoco un módulo por persona.
   it("un rol vacío o desconocido no recibe nada", () => {
     expect(modulosOfrecibles("")).toEqual([]);
     expect(modulosOfrecibles(null)).toEqual([]);

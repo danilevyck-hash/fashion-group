@@ -48,6 +48,8 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { verifySession } from "@/lib/session-cookie";
 import { recordCronHeartbeat } from "@/lib/cron-telemetry";
 import { enviarSistema } from "@/lib/alertas/canal";
+import { hoyPanama } from "@/lib/fecha-panama";
+import { borrarSelfiesVencidas } from "@/lib/marcacion/retencion";
 import {
   HORAS_PARA_VIGIA,
   DIAS_RECUPERACION_AGENTE,
@@ -184,6 +186,25 @@ export async function GET(req: NextRequest) {
     console.error("[asistencia-vigia] chequeo de hueco falló (el resto sigue):", e);
   }
 
+  // ── Chequeo 3: las selfies que ya cumplieron 90 días ──────────────────────
+  //
+  // 🔴 SIN CRON NUEVO (14-sep-2026). Daniel, sobre las fotos del reloj del
+  // teléfono: *«se borran solas a los 90 días»*. Cuelga de acá —el cron de
+  // este módulo, que ya corre 3 veces al día— igual que la retención de 365
+  // días de los cheques depositados cuelga de `cheques-alert`. Una entrada de
+  // cron más para borrar unos pocos archivos sería una fila más que vigilar.
+  //
+  // ⚠️ Solo toca Storage: NI UNA FILA de `asistencia_marcaciones` se edita (la
+  // tabla es append-only). Y va en su propio try/catch: un tropiezo borrando
+  // una foto no puede llevarse por delante el aviso del reloj apagado, que es
+  // para lo que existe este cron.
+  let selfiesBorradas = 0;
+  try {
+    selfiesBorradas = (await borrarSelfiesVencidas(hoyPanama())).borradas;
+  } catch (e) {
+    console.error("[asistencia-vigia] retención de selfies falló (el resto sigue):", e);
+  }
+
   // Que el vigía tenga su propio vigía: si un día deja de correr, el tablero de
   // salud lo ve. Va al final y solo si se llegó hasta acá.
   await recordCronHeartbeat("asistencia-vigia");
@@ -194,5 +215,6 @@ export async function GET(req: NextRequest) {
     avisados,
     huecosAvisados,
     huecosCerrados,
+    selfiesBorradas,
   });
 }

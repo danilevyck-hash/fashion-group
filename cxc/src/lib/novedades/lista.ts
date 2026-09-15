@@ -327,6 +327,17 @@ export const NOVEDADES: readonly Novedad[] = [
     dibujo: "el-aviso-es-un-enlace",
   },
 
+  /* ── Marcación — módulo `marcacion` ─────────────────────────────────────── */
+  {
+    id: "marcacion-marcas-desde-tu-telefono",
+    modulo: "marcacion",
+    fecha: "2026-09-14",
+    // No `ARRANQUE`: el módulo nació hoy, así que se avisa desde hoy. Una
+    // novedad no puede avisarse antes del día en que el cambio salió.
+    desde: "2026-09-14",
+    texto: "Ahora marcas tu entrada y tu salida desde tu propio teléfono: una foto, y listo. Dos marcas al día.",
+  },
+
   /* ── Reclamos — módulo `reclamos` ───────────────────────────────────────── */
   {
     id: "reclamos-el-itbms-dice-7",

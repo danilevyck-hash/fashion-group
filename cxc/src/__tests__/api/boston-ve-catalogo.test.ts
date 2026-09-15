@@ -376,10 +376,16 @@ describe("🔴 las dos fugas del #659 siguen tapadas", () => {
     expect(visibles.find((m) => m.key === moduloCasaDeRol(ROL))?.href).toBe("/boston");
   });
 
-  it("FUGA 2 · y ningún otro rol ganó una casa de rebote", () => {
+  // ⚠️ Nota fechada (14-sep-2026): decía «ningún otro rol tiene casa fijada» y
+  // ahora hay DOS. Nació `marcacion` —el reloj del teléfono— y su casa es su
+  // único módulo. El candado no se ablandó: en vez de «uno solo», congela la
+  // LISTA COMPLETA de casas, así que una casa nueva sigue obligando a pasar por
+  // acá y a explicarla. Lo que protegía la fuga nº 2 de Boston no cambió.
+  const CASAS = { gerente_boston: "boston", marcacion: "marcacion" } as const;
+  it("FUGA 2 · y ningún rol ganó una casa de rebote", () => {
     for (const rol of SYSTEM_ROLE_KEYS) {
-      if (rol === ROL) continue;
-      expect(moduloCasaDeRol(rol), `${rol} ganó una casa`).toBeNull();
+      const esperada = (CASAS as Record<string, string>)[rol] ?? null;
+      expect(moduloCasaDeRol(rol), `${rol} ganó una casa`).toBe(esperada);
     }
   });
 });

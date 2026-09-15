@@ -12,7 +12,7 @@ function ForgotPassword() {
       <button type="button" onClick={() => setShow(!show)} className="inline-flex min-h-[44px] items-center justify-center px-4 text-xs text-gray-400 hover:text-gray-600 transition">
         ¿Olvidaste tu contraseña?
       </button>
-      {show && <p className="text-xs text-gray-500 mt-2">Contacta al administrador para restablecer tu contraseña.</p>}
+      {show && <p className="text-xs text-gray-500 mt-2">Contacta al administrador para restablecer tu contraseña. Una vez adentro, puedes cambiarla tú desde tu nombre, en «Contraseña».</p>}
     </div>
   );
 }

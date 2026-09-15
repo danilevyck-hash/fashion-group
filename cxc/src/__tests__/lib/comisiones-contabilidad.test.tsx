@@ -149,6 +149,11 @@ const VE_COMISIONES: Record<string, boolean> = {
   // group"*. Boston además NO comisiona en este sistema (`utilidad: false` en
   // `EMPRESA_SYNC_CAPABILITIES`), así que no hay ni una comisión suya que ver.
   gerente_boston: false,
+  // 🔴 SOLO Marcación (14-sep-2026). Quien marca desde su teléfono no ve nada
+  // más del sistema: ni planilla, ni sueldos, ni comisiones. Ana, Cindy y
+  // Yeisibeth son impulsadoras de Multifashion — si algún día se les pagara
+  // comisión, la verían donde ya se ve, no acá.
+  marcacion: false,
 };
 
 describe("el mapa rol → Comisiones queda congelado", () => {

@@ -45,6 +45,15 @@ const MODULE_COLORS: Record<string, ModuleColor> = {
   // no choca con el esmeralda de Guías ni con el verde de Gastos.
   comisiones:  { border: "border-pink-500",    text: "text-pink-500",    hex: "#ec4899" },
   asistencia:  { border: "border-lime-500",    text: "text-lime-500",    hex: "#84cc16" },
+  // Marcación — el reloj del teléfono (14-sep-2026). Amarillo, el último tono
+  // libre de la paleta. Se había descartado en su momento por vecino del ámbar
+  // de Recordatorios, y acá esa objeción no aplica: de las cuatro personas que
+  // usan Marcación, NINGUNA tiene Recordatorios (tres solo ven este módulo y
+  // Rodrigo es bodega), así que los dos acentos no pueden verse el mismo día
+  // en la misma sesión. No se le da el lima de Asistencia aunque sean
+  // parientes: el acento existe justamente para saber en cuál de los dos se
+  // está parado.
+  marcacion:   { border: "border-yellow-500",  text: "text-yellow-500",  hex: "#eab308" },
 };
 
 /** El acento de un módulo por su KEY (la de `src/lib/modules.ts`).
@@ -76,6 +85,7 @@ export function getModuleKeyFromPath(pathname: string): string | null {
   if (pathname.startsWith("/gastos-contabilidad")) return "gastos-contabilidad";
   if (pathname.startsWith("/comisiones"))      return "comisiones";
   if (pathname.startsWith("/asistencia"))      return "asistencia";
+  if (pathname.startsWith("/marcacion"))       return "marcacion";
   return null;
 }
 

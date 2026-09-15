@@ -29,6 +29,8 @@ import {
 import { marcaKey, computeTotales, type Redondeo, type MarcaFormula, type MarcaRubroFormula } from "@/lib/depurador/logic";
 import type { SheetRow } from "@/lib/depurador/logic";
 import { mensajeDivisorEnPantalla } from "@/lib/depurador/divisor";
+import { FLETE_OPCIONES, FLETE_DEFAULT, etiquetaFlete, normalizarFlete } from "@/lib/depurador/flete";
+import type { Flete } from "@/lib/depurador/flete";
 import { hoyPanama } from "@/lib/fecha-panama";
 import {
   indexarFotos,
@@ -86,6 +88,17 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
   const [precioAB, setPrecioAB] = useState<PrecioAB>("A");
   const [tasa] = useState("07"); // código de Switch para el 7% (texto)
 
+  // ── El FLETE (Costo FOB × flete = Costo CIF) ───────────────────────────────
+  // Daniel: «Costo CIF seria 1.1 o 1.15 (default 1.1)». Son DOS cosas distintas
+  // y por eso hay dos estados: `flete` es el de ESTA corrida (arriba, junto a
+  // qué se genera) y `fleteDefault` es el que viene puesto, guardado en la base
+  // y compartido por todo el equipo (abajo, con las fórmulas que se reusan).
+  const [flete, setFlete] = useState<Flete>(FLETE_DEFAULT);
+  const [fleteDefault, setFleteDefault] = useState<Flete>(FLETE_DEFAULT);
+  const [guardandoFlete, setGuardandoFlete] = useState(false);
+  const [flashFlete, setFlashFlete] = useState(false);
+  const [errorFlete, setErrorFlete] = useState("");
+
   // Fórmulas editables Reebok (Precio A / Precio B), guardadas en marca_formulas.
   const [formulaA, setFormulaA] = useState<PriceFormula>(REEBOK_FORMULA_A_DEFAULT);
   const [formulaB, setFormulaB] = useState<PriceFormula>(REEBOK_FORMULA_B_DEFAULT);
@@ -128,6 +141,46 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
       .catch(() => {});
     return () => { alive = false; };
   }, []);
+
+  // Flete por defecto (compartido). Falla ABIERTO: si no contesta, queda 1.10,
+  // que es lo que el sistema hacía antes de que el flete se pudiera elegir.
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/productos/cargar/flete")
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("fetch"))))
+      .then((d: { flete: number }) => {
+        if (!alive) return;
+        const f = normalizarFlete(d.flete);
+        setFleteDefault(f);
+        setFlete(f); // la corrida arranca en el default; cambiarlo es un toque
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  const guardarFleteDefault = async (f: Flete) => {
+    if (guardandoFlete) return;
+    setGuardandoFlete(true);
+    setErrorFlete("");
+    try {
+      const res = await fetch("/api/productos/cargar/flete", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flete: f }),
+      });
+      if (!res.ok) {
+        setErrorFlete("No se pudo guardar el flete por defecto. Intenta de nuevo en unos segundos.");
+        return;
+      }
+      setFleteDefault(f);
+      setFlashFlete(true);
+      setTimeout(() => setFlashFlete(false), 1500);
+    } catch {
+      setErrorFlete("No se pudo guardar el flete por defecto. Intenta de nuevo en unos segundos.");
+    } finally {
+      setGuardandoFlete(false);
+    }
+  };
 
   // Cargar excepciones por Name (marca "Reebok") de la tabla de excepciones (reusa CK/TH).
   const reloadExc = useCallback(() => {
@@ -235,8 +288,8 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
   const filtrarSinPiezas = monthColIdx !== -1;
 
   const catalogoTodo: CatalogoRow[] = useMemo(
-    () => (items ? buildCatalogo(items, { formulaA, formulaB, excByName }) : []),
-    [items, formulaA, formulaB, excByName],
+    () => (items ? buildCatalogo(items, { formulaA, formulaB, excByName, flete }) : []),
+    [items, formulaA, formulaB, excByName, flete],
   );
   const { rows: catalogo, omitidos: catalogoOmitidos } = useMemo(
     () => (filtrarSinPiezas ? filtrarConPiezas(catalogoTodo) : { rows: catalogoTodo, omitidos: 0 }),
@@ -244,8 +297,8 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
   );
   // Filas Switch (una por artículo) para preview y descarga.
   const switchRowsTodo: SwitchRow[] = useMemo(
-    () => (items ? buildSwitchRows(items, { formula: precioAB === "A" ? formulaA : formulaB, temporada, tasa, excByName }) : []),
-    [items, precioAB, formulaA, formulaB, temporada, tasa, excByName],
+    () => (items ? buildSwitchRows(items, { formula: precioAB === "A" ? formulaA : formulaB, temporada, tasa, excByName, flete }) : []),
+    [items, precioAB, formulaA, formulaB, temporada, tasa, excByName, flete],
   );
   const { rows: switchRows, omitidos: switchOmitidos } = useMemo(
     () => (filtrarSinPiezas ? filtrarConPiezas(switchRowsTodo) : { rows: switchRowsTodo, omitidos: 0 }),
@@ -642,6 +695,26 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                 ))}
               </select>
             </Field>
+            {/* 🔴 EL FLETE MUEVE PLATA: Costo FOB × flete = Costo CIF, y del CIF
+                sale el precio. Daniel: «tengo que pagar el flete que es 1.1 y
+                1.15 en reebok». SON DOS BOTONES Y NO UN CAMPO: un «11» tecleado
+                donde va «1.1» mandaría a Switch costos diez veces mal. */}
+            <Field
+              label="Flete (Costo CIF)"
+              note={flete === fleteDefault ? "Costo FOB × flete = Costo CIF." : `Costo FOB × flete = Costo CIF. Por defecto es ${etiquetaFlete(fleteDefault)}.`}
+            >
+              <div className="flex overflow-hidden rounded-lg border border-stone-300">
+                {FLETE_OPCIONES.map((f, i) => (
+                  <PriceBtn
+                    key={f}
+                    active={flete === f}
+                    onClick={() => setFlete(f)}
+                    label={etiquetaFlete(f)}
+                    last={i === FLETE_OPCIONES.length - 1}
+                  />
+                ))}
+              </div>
+            </Field>
             {salida === "switch" && (
               <Field label="Precio de venta (Switch)" note="Usa la fórmula A o B (editables abajo).">
                 <div className="flex overflow-hidden rounded-lg border border-stone-300">
@@ -659,6 +732,27 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
             </div>
             <FormulaRow label="Precio A" f={formulaA} onChange={setFormulaA} onSave={() => saveFormula("A")} saving={savingF === "A"} flashed={flashF === "A"} divisorMsg={msgFormulaA} />
             <FormulaRow label="Precio B" f={formulaB} onChange={setFormulaB} onSave={() => saveFormula("B")} saving={savingF === "B"} flashed={flashF === "B"} divisorMsg={msgFormulaB} />
+
+            {/* El flete que viene PUESTO. Vive en la base, no en este navegador:
+                lo que Daniel deje acá lo ve también la secretaria. */}
+            <div className="mt-2.5 flex flex-wrap items-center gap-3 border-t border-stone-200 pt-2.5">
+              <span className="text-[13px] font-semibold text-stone-700">Flete por defecto</span>
+              <div className="flex overflow-hidden rounded-lg border border-stone-300">
+                {FLETE_OPCIONES.map((f, i) => (
+                  <PriceBtn
+                    key={f}
+                    active={fleteDefault === f}
+                    onClick={() => guardarFleteDefault(f)}
+                    label={etiquetaFlete(f)}
+                    last={i === FLETE_OPCIONES.length - 1}
+                  />
+                ))}
+              </div>
+              <span className="text-[12px] text-stone-500">
+                {guardandoFlete ? "Guardando…" : flashFlete ? "Listo, guardado" : "Es el que viene puesto arriba, para todo el equipo."}
+              </span>
+            </div>
+            {errorFlete && <p className="mt-1 text-[12px] font-semibold text-red-700">{errorFlete}</p>}
           </div>
 
           {/* Excepciones por modelo (Name): fórmula propia o precio fijo (gana a la marca) */}
@@ -1027,7 +1121,7 @@ function PriceBtn({ active, onClick, label, last }: { active: boolean; onClick: 
     <button
       type="button"
       onClick={onClick}
-      className={`flex-1 px-3 py-2 text-sm font-semibold transition ${last ? "" : "border-r border-stone-300"} ${
+      className={`min-h-[44px] flex-1 px-3 py-2 text-sm font-semibold transition ${last ? "" : "border-r border-stone-300"} ${
         active ? "bg-red-600 text-white" : "bg-white text-stone-700 hover:bg-stone-50"
       }`}
     >

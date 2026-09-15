@@ -16,9 +16,15 @@ import { SYSTEM_ROLE_KEYS } from "@/lib/modules";
 const leer = (rel: string) => readFileSync(path.join(process.cwd(), rel), "utf8");
 
 describe("las etiquetas de rol", () => {
-  it("cubren los SIETE roles del sistema, y nada más (nada de `cliente`)", () => {
+  // ⚠️ Nota fechada (14-sep-2026): eran SIETE y son OCHO. Nació `marcacion`,
+  // el reloj del teléfono para quien trabaja afuera (Ana, Cindy, Yeisibeth y
+  // Rodrigo). El candado no cambió de idea —la lista se sigue DERIVANDO de
+  // `SYSTEM_ROLES` y ningún rol puede quedar sin nombre—; lo único que se
+  // movió es el conteo, que está a propósito para que un rol nuevo obligue a
+  // pasar por acá.
+  it("cubren los OCHO roles del sistema, y nada más (nada de `cliente`)", () => {
     expect(Object.keys(ROLE_LABELS).sort()).toEqual([...SYSTEM_ROLE_KEYS].sort());
-    expect(SYSTEM_ROLE_KEYS).toHaveLength(7);
+    expect(SYSTEM_ROLE_KEYS).toHaveLength(8);
     expect(ROLE_LABELS).not.toHaveProperty("cliente");
     for (const k of SYSTEM_ROLE_KEYS) expect(ROLE_LABELS[k].trim().length, k).toBeGreaterThan(0);
   });
@@ -27,6 +33,8 @@ describe("las etiquetas de rol", () => {
     expect(etiquetaDeRol("gerente_acs")).toBe("Gerente Multifashion");
     expect(etiquetaDeRol("gerente_boston")).toBe("Gerente Boston");
     expect(etiquetaDeRol("admin")).toBe("Administrador");
+    // Y el rol nuevo tampoco se muestra crudo (14-sep-2026).
+    expect(etiquetaDeRol("marcacion")).toBe("Marcación");
   });
 
   it("un rol que el sistema no declara se muestra tal cual, nunca vacío", () => {

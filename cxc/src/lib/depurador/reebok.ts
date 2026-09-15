@@ -11,6 +11,7 @@
 import { OUT_COLS, TEXT_COLS, ceilPar, precioDescripcion, marcaKey, tasaSwitch } from "./logic";
 import type { Cell, SheetRow, Redondeo, MarcaRubroFormula } from "./logic";
 import { COL_FOTO, TEXTO_SIN_FOTO } from "./fotos-excel";
+import { normalizarFlete } from "./flete";
 
 export { OUT_COLS, TEXT_COLS, ceilPar };
 
@@ -378,7 +379,8 @@ function pickSample(group: ReebokItem[]): SampleResult {
 }
 
 /* ============ SALIDA A · CATÁLOGO CLIENTES ============ */
-// Una fila por PO NAME + New Article. Costo = WholesalePrice × 0.80 × 1.1 (flat).
+// Una fila por PO NAME + New Article. Costo = WholesalePrice × 0.80 × flete (flat;
+// el flete es 1.10 por defecto y 1.15 si se elige — ver `flete.ts`).
 // Precio A/B = fórmulas editables (default ÷0.75 / ÷0.80, redondeo par). Orden PO/Name/Género.
 
 export interface CatalogoRow {
@@ -395,9 +397,13 @@ export interface CatalogoConfig {
   formulaB: PriceFormula;
   /** Excepciones por Name (marcaKey(Name) → excepción). Ganan a la fórmula de marca. */
   excByName?: Map<string, MarcaRubroFormula>;
+  /** Flete del embarque: 1.10 o 1.15 (ver `flete.ts`). Sin valor → 1.10, el de
+   *  siempre. Es el MISMO flete de la plantilla Switch: un solo embarque. */
+  flete?: number;
 }
 
 export function buildCatalogo(items: ReebokItem[], cfg: CatalogoConfig): CatalogoRow[] {
+  const flete = normalizarFlete(cfg.flete);
   const groups = new Map<string, ReebokItem[]>();
   for (const it of items) {
     const key = `${it.po}|||${it.newArticle}`;
@@ -408,7 +414,7 @@ export function buildCatalogo(items: ReebokItem[], cfg: CatalogoConfig): Catalog
   for (const [, group] of groups) {
     const first = group[0];
     const w = first.wholesale;
-    const costo = w === null ? null : round2(w * 0.8 * 1.1);
+    const costo = w === null ? null : round2(w * 0.8 * flete);
     // Jerarquía por Name: precio fijo > fórmula del Name > fórmula de marca (A/B).
     const exc = excForName(cfg.excByName, first.name);
     const precioA = precioDescripcion(costo, exc, cfg.formulaA);
@@ -468,6 +474,9 @@ export interface SwitchBuildConfig {
   formula: PriceFormula;
   temporada: string;
   tasa: string;
+  /** Flete del embarque: 1.10 o 1.15 (ver `flete.ts`). Es lo que convierte el
+   *  Costo FOB en Costo CIF. Sin valor → 1.10, el de siempre. */
+  flete?: number;
   /** Excepciones por Name (marcaKey(Name) → excepción). Ganan a la fórmula de marca. */
   excByName?: Map<string, MarcaRubroFormula>;
 }
@@ -487,6 +496,7 @@ export interface SwitchRow {
 
 /** Filas Switch, una por artículo, ordenadas por PO/Name/Género. */
 export function buildSwitchRows(items: ReebokItem[], cfg: SwitchBuildConfig): SwitchRow[] {
+  const flete = normalizarFlete(cfg.flete);
   const groups = new Map<string, ReebokItem[]>();
   for (const it of items) {
     if (!it.newArticle) continue;
@@ -500,7 +510,7 @@ export function buildSwitchRows(items: ReebokItem[], cfg: SwitchBuildConfig): Sw
     const qty = group.reduce((s, it) => s + (it.piezas || 0), 0);
     const w = first.wholesale;
     const fob = w === null ? null : round2(fobReebok(first.department, w, first.wholesaleOff));
-    const cif = fob === null ? null : round2(fob * 1.1);
+    const cif = fob === null ? null : round2(fob * flete);
     // Jerarquía por Name: precio fijo > fórmula del Name > fórmula de marca (A/B).
     const precio = precioDescripcion(cif, excForName(cfg.excByName, first.name), cfg.formula);
     out.push({

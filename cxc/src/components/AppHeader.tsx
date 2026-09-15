@@ -13,6 +13,7 @@ import { moduloDeRuta } from "@/lib/novedades/seleccion";
 import { usePublicarAlturaEncabezado } from "@/lib/hooks/usePublicarAlturaEncabezado";
 import { Z_ENCABEZADO } from "@/lib/ui/barra-pegajosa";
 import { etiquetaDeRol } from "@/lib/roles-etiquetas";
+import { BotonCambiarContrasena } from "@/components/CambiarContrasena";
 
 // Cómo se llama cada rol: UN solo lugar, `lib/roles-etiquetas.ts` (11-sep-2026).
 
@@ -115,6 +116,11 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
                 <div className="text-sm text-gray-700 font-medium leading-tight">{userName.split(" ")[0]}</div>
                 <div className="text-xs text-gray-400 leading-tight">{etiquetaDeRol(userRole)}</div>
               </div>
+              {/* Cambiar MI contraseña (14-sep-2026), para todos los roles. ⚠️ El
+                  comentario no nombra al botón de cerrar sesión: el candado
+                  `toque-44` busca su texto por la PRIMERA vez que aparece en el
+                  archivo, y una mención acá lo dejaría midiendo el comentario. */}
+              <BotonCambiarContrasena />
               <button onClick={handleLogout} title="Cerrar sesión" aria-label="Cerrar sesión" className="inline-flex h-11 w-11 items-center justify-center text-gray-300 hover:text-gray-600 transition">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
               </button>
@@ -205,6 +211,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
                 {/* El drawer es 100% móvil: acá no hay mouse, solo dedo. El -mr-2
                     recupera el aire que suma el área táctil para que el botón siga
                     alineado con el borde de la fila. */}
+                <BotonCambiarContrasena variante="texto" />
                 <button onClick={() => { handleLogout(); setDrawerOpen(false); }} className="min-h-[44px] min-w-[44px] -mr-2 flex items-center justify-center text-xs text-gray-400 hover:text-red-600 transition">Salir</button>
               </div>
             )}

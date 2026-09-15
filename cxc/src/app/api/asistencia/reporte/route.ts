@@ -28,6 +28,7 @@ import {
 } from "@/lib/asistencia/config-server";
 import { codigosFueraDeRango } from "@/lib/asistencia/vigencia";
 import { hoyPanama } from "@/lib/fecha-panama";
+import { leerMarcasDelTelefono } from "@/lib/marcacion/reporte-server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -90,7 +91,7 @@ export async function GET(req: NextRequest) {
     // Paginado con verificación contra el COUNT: un mes de dos relojes con 4
     // marcas diarias pasa de 1.000 filas, y PostgREST corta ahí EN SILENCIO.
     // Un reporte de horas recortado sin avisar es peor que uno que falla.
-    const [marcaciones, { reglas }, { directorio }, correcciones, personasDb, afuera, hRes, jRes, vRes, fRes] = await Promise.all([
+    const [marcaciones, { reglas }, { directorio }, correcciones, personasDb, afuera, hRes, jRes, vRes, fRes, telefono] = await Promise.all([
       leerTodoPaginado<MarcacionConId>(
         "asistencia_marcaciones (reporte)",
         (pedirCount, from, to) => {
@@ -129,6 +130,15 @@ export async function GET(req: NextRequest) {
       // Sin la tabla corrida devuelve CERO filas y el reporte es el de siempre.
       leerVacaciones(desde, hasta),
       supabaseServer.from("asistencia_feriados").select("fecha, nombre").gte("fecha", desde).lte("fecha", hasta),
+      // 🔴 LAS MARCAS DEL RELOJ DEL TELÉFONO (14-sep-2026), para que la
+      // contadora vea la selfie, el mapa y si se marcó sin señal. Lectura
+      // APARTE y tolerante a propósito: las columnas nuevas NO se le agregan al
+      // `select` de arriba, porque con la migración sin aplicar eso tiraría el
+      // reporte entero de todo el mundo. Sin ella, esto viene vacío y la
+      // pantalla es la de siempre. NADA de lo que calcula el motor depende de
+      // esta lectura: para el cálculo, una marca del teléfono ya era una marca
+      // más (la primera del día es la entrada y la última la salida).
+      leerMarcasDelTelefono(iDesde, iHasta),
     ]);
     const nombres = new Map<string, string>(
       directorio.codigos().map((c) => [c, directorio.etiqueta(c)]),
@@ -281,6 +291,9 @@ export async function GET(req: NextRequest) {
       // El día que sigue corriendo, si cae dentro del rango. `null` cuando el
       // rango termina antes de hoy: ahí no hay nada en curso que aclarar.
       diaEnCurso: hoyPanama() >= desde && hoyPanama() <= hasta ? hoyPanama() : null,
+      // Las marcas del teléfono, por `codigo|fecha`. Vacío = no hay ninguna (o
+      // la migración todavía no corrió): la pantalla no dibuja nada de más.
+      marcasTelefono: telefono,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

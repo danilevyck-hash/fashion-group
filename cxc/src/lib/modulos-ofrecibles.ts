@@ -31,16 +31,30 @@
 // hoy le funciona.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { ALL_MODULES, type AppModule } from "@/lib/modules";
+import { ALL_MODULES, SYSTEM_ROLE_KEYS, type AppModule } from "@/lib/modules";
+import { esModuloPorPersona } from "@/lib/marcacion/rol";
 
 /**
  * Los módulos que el editor de Usuarios puede OFRECER para un rol: los que ese
  * rol puede de verdad abrir. Conserva el orden del catálogo.
+ *
+ * 🔴 LA ÚNICA EXCEPCIÓN, DECLARADA: los módulos POR PERSONA (14-sep-2026,
+ * `MODULOS_POR_PERSONA` en `lib/marcacion/rol.ts`). «Marcación» se le da a UNA
+ * persona por su override —Rodrigo, que es bodega— sin que `bodega` esté en su
+ * `roles[]`, porque ahí abriría el módulo a todos los bodegas. La regla de la
+ * casa sigue valiendo: se ofrece solo lo que la pantalla deja entrar, y el
+ * guard de Marcación (`lib/marcacion/acceso.ts`) deja entrar por módulo de la
+ * cookie, no solo por rol. Un módulo por persona sin ese guard sería
+ * exactamente el `multifashion` de andrea.
  */
 export function modulosOfrecibles(rol: string | null | undefined): AppModule[] {
   const r = (rol ?? "").trim();
   if (!r) return [];
-  return ALL_MODULES.filter((m) => m.roles.includes(r));
+  // 🔴 Un rol que el sistema no declara no recibe NADA — tampoco un módulo por
+  // persona. Sin esta línea, la excepción de abajo se lo daba a cualquier
+  // palabra que llegara en el cuerpo de la petición.
+  if (!(SYSTEM_ROLE_KEYS as readonly string[]).includes(r)) return [];
+  return ALL_MODULES.filter((m) => m.roles.includes(r) || esModuloPorPersona(m.key));
 }
 
 /** ¿Se le puede dar este módulo a este rol sin que la pantalla lo rebote? */

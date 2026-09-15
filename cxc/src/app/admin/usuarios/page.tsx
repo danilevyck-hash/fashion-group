@@ -452,6 +452,7 @@ function UsuariosPageInner() {
                     <option value="vendedor">Vendedor — catálogo y CXC</option>
                     <option value="contabilidad">Contabilidad — préstamos y ventas</option>
                     <option value="bodega">Bodega — despacho de guías</option>
+                    <option value="marcacion">Marcación — solo marca desde el teléfono</option>
                   </select>
                   {editUserId === currentUserId && uRole !== "admin" && (
                     <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5 mt-2">

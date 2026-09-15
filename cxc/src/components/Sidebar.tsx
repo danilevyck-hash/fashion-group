@@ -18,6 +18,7 @@ import { useSidebarCollapsed, writeSidebarCollapsed } from "@/lib/hooks/useSideb
 import { sinBarraLateral } from "@/lib/catalogo/rutas-publicas";
 import { recordModuleClick } from "@/lib/module-frequents";
 import { etiquetaDeRol } from "@/lib/roles-etiquetas";
+import { BotonCambiarContrasena } from "@/components/CambiarContrasena";
 
 // Cómo se llama cada rol: UN solo lugar, `lib/roles-etiquetas.ts` (11-sep-2026).
 
@@ -389,6 +390,11 @@ export default function Sidebar() {
                 <div className="text-xs font-medium text-gray-800 truncate">{userName}</div>
                 <div className="text-xs text-gray-400">{etiquetaDeRol(userRole)}</div>
               </div>
+              {/* Cambiar MI contraseña (14-sep-2026), para todos los roles. ⚠️ El
+                  comentario no nombra al botón de cerrar sesión: el candado
+                  `toque-44` busca su texto por la PRIMERA vez que aparece en el
+                  archivo, y una mención acá lo dejaría midiendo el comentario. */}
+              <BotonCambiarContrasena className="flex-shrink-0 -my-2 hover:!text-gray-600" />
               <button
                 onClick={handleLogout}
                 title="Cerrar sesión"

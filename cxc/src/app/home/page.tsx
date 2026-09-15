@@ -6,6 +6,7 @@ import Link from "next/link";
 import FGLogo from "@/components/FGLogo";
 import SearchBar, { SEARCH_ROLES } from "@/components/SearchBar";
 import IconButton from "@/components/IconButton";
+import { BotonCambiarContrasena } from "@/components/CambiarContrasena";
 import { getVisibleGroups, getVisibleModules, getModulesInGroup, moduloCasaDeRol, type AppModule } from "@/lib/modules";
 import { recordModuleClick, getFrequentModules } from "@/lib/module-frequents";
 import { fmtDate } from "@/lib/format";
@@ -164,6 +165,11 @@ export default function HomePage() {
             >
               {darkMode ? "☀" : "◑"}
             </IconButton>
+            {/* Cambiar MI contraseña (14-sep-2026), para todos los roles. ⚠️ El
+                  comentario no nombra al botón de cerrar sesión: el candado
+                  `toque-44` busca su texto por la PRIMERA vez que aparece en el
+                  archivo, y una mención acá lo dejaría midiendo el comentario. */}
+            <BotonCambiarContrasena variante="texto" className="text-sm" />
             <button
               onClick={cerrarSesion}
               className="min-h-[44px] min-w-[44px] flex items-center justify-center text-sm text-gray-400 hover:text-black transition active:scale-[0.97]"

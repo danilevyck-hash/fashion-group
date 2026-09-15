@@ -3,12 +3,9 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
 import { SYSTEM_ROLE_KEYS, ALL_MODULE_KEYS } from "@/lib/modules";
 import { moduloOfrecible } from "@/lib/modulos-ofrecibles";
+import { AVISO_CONTRASENA_REPETIDA, contrasenaEnUso } from "@/lib/auth/contrasena-en-uso";
 
 export const dynamic = "force-dynamic";
-
-function isBcryptHash(s: string): boolean {
-  return s.startsWith("$2a$") || s.startsWith("$2b$");
-}
 
 /**
  * Valida server-side `role` y `modulos_override` contra las fuentes de verdad
@@ -60,26 +57,9 @@ async function wouldLeaveNoActiveAdmin(targetId: string): Promise<boolean> {
   return activeAdmins.length === 1 && activeAdmins[0].id === targetId;
 }
 
-/**
- * ¿La contraseña ya está en uso por otro usuario? El login es password-only:
- * dos usuarios con la misma contraseña lo hacen ambiguo (un usuario entraría
- * con la identidad/rol de otro). Se valida unicidad GLOBAL (incluye inactivos,
- * por si se reactivan) y se espeja la normalización del login (exacto + lowercase).
- */
-async function passwordInUse(plaintext: string, excludeId?: string): Promise<boolean> {
-  const { data: users } = await supabaseServer.from("fg_users").select("id, password");
-  if (!users) return false;
-  const bcrypt = (await import("bcryptjs")).default;
-  const lower = plaintext.toLowerCase();
-  for (const u of users) {
-    if (excludeId && u.id === excludeId) continue;
-    if (!u.password || !isBcryptHash(u.password)) continue;
-    if ((await bcrypt.compare(plaintext, u.password)) || (await bcrypt.compare(lower, u.password))) {
-      return true;
-    }
-  }
-  return false;
-}
+// ¿La contraseña ya la usa otro? — `contrasenaEnUso` (`lib/auth/contrasena-en-uso.ts`),
+// la MISMA comprobación que usa el cambio de contraseña propio (14-sep-2026).
+// Vivía acá como `passwordInUse`; se movió para que no hubiera dos.
 
 export async function GET(req: NextRequest) {
   const authError = requireAuth(req, ["admin"]);
@@ -119,8 +99,8 @@ export async function POST(req: NextRequest) {
   if (existing && existing.length > 0) return NextResponse.json({ error: "Ya existe un usuario con ese nombre" }, { status: 400 });
 
   // Unicidad de contraseña (login password-only → colisión = login ambiguo).
-  if (await passwordInUse(password)) {
-    return NextResponse.json({ error: "Esa contraseña ya está en uso, elige otra." }, { status: 400 });
+  if (await contrasenaEnUso(password)) {
+    return NextResponse.json({ error: AVISO_CONTRASENA_REPETIDA }, { status: 400 });
   }
 
   const bcrypt = (await import("bcryptjs")).default;
@@ -181,8 +161,8 @@ export async function PUT(req: NextRequest) {
   if (password !== undefined) {
     if (password.length < 8) return NextResponse.json({ error: "La contraseña debe tener al menos 8 caracteres" }, { status: 400 });
     // Unicidad de contraseña, excluyendo al propio usuario editado.
-    if (await passwordInUse(password, id)) {
-      return NextResponse.json({ error: "Esa contraseña ya está en uso, elige otra." }, { status: 400 });
+    if (await contrasenaEnUso(password, id)) {
+      return NextResponse.json({ error: AVISO_CONTRASENA_REPETIDA }, { status: 400 });
     }
     const bcrypt = (await import("bcryptjs")).default;
     update.password = await bcrypt.hash(password, 10);

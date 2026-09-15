@@ -27,6 +27,12 @@ import { PERSONA_EN_EL_CENTRO, PESTANA_FICHAS, dondeSeCargaLaFicha } from "@/lib
 import { empresaParaPedir, nombreArchivoPorEmpresa } from "@/lib/asistencia/empresa-para-todo";
 import CorregirMarcacionModal, { type MarcaParaCorregir } from "./CorregirMarcacionModal";
 import JustificarDiaModal, { type DiaParaJustificar } from "./JustificarDiaModal";
+// 🔴 EL RELOJ DEL TELÉFONO EN EL REPORTE (14-sep-2026). Lo que Daniel pidió que
+// viera la contadora: la selfie y el mapa, y de dónde salió cada marca. Es una
+// capa de ARRIBA: el motor no sabe nada de esto y sus minutos no cambian.
+import SelfieMarcacionModal, { type SelfieParaVer } from "./SelfieMarcacionModal";
+import { llaveDelDia, type MarcaTelefonoUI } from "@/lib/marcacion/en-el-reporte";
+import { rotuloDeLaMarca } from "@/lib/marcacion/marcacion";
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 const DOW = ["dom","lun","mar","mié","jue","vie","sáb"];
@@ -121,6 +127,10 @@ export default function ReporteTab({ empresa = "" }: {
   // cuál es el día que todavía va corriendo (`null` si el rango ya cerró).
   const [fueraDelRango, setFueraDelRango] = useState(0);
   const [diaEnCurso, setDiaEnCurso] = useState<string | null>(null);
+  // Las marcas del teléfono del período, por `codigo|fecha`. Vacío cuando no
+  // hay ninguna (o la migración todavía no corrió).
+  const [marcasTelefono, setMarcasTelefono] = useState<Record<string, MarcaTelefonoUI[]>>({});
+  const [verSelfie, setVerSelfie] = useState<SelfieParaVer | null>(null);
 
   const cargar = useCallback(async () => {
     setCargando(true); setError(null);
@@ -142,6 +152,7 @@ export default function ReporteTab({ empresa = "" }: {
       setAvisoCorreccion(data.avisoCorrecciones ?? null);
       setFueraDelRango(data.fueraDelRango ?? 0);
       setDiaEnCurso(data.diaEnCurso ?? null);
+      setMarcasTelefono(data.marcasTelefono ?? {});
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar");
       setPersonas(null);
@@ -316,6 +327,7 @@ export default function ReporteTab({ empresa = "" }: {
             <tbody>
               {personas.map((p) => (
                 <FilaPersona key={p.codigo} p={p} abierta={abierta === p.codigo}
+                  marcasTelefono={marcasTelefono} onVerSelfie={setVerSelfie}
                   onToggle={() => setAbierta(abierta === p.codigo ? null : p.codigo)}
                   puedeCorregir={puedeCorregir}
                   onCorregir={setCorrigiendo}
@@ -382,6 +394,7 @@ export default function ReporteTab({ empresa = "" }: {
           onGuardado={() => void cargar()}
         />
       )}
+      <SelfieMarcacionModal marca={verSelfie} onClose={() => setVerSelfie(null)} />
       {justificando && (
         <JustificarDiaModal
           dia={justificando}
@@ -393,13 +406,15 @@ export default function ReporteTab({ empresa = "" }: {
   );
 }
 
-function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir, onJustificar }: {
+function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir, onJustificar, marcasTelefono, onVerSelfie }: {
   p: PersonaReporte;
   abierta: boolean;
   onToggle: () => void;
   puedeCorregir: boolean;
   onCorregir: (m: MarcaParaCorregir) => void;
   onJustificar: (d: DiaParaJustificar) => void;
+  marcasTelefono: Record<string, MarcaTelefonoUI[]>;
+  onVerSelfie: (m: SelfieParaVer) => void;
 }) {
   const r = p.resumen;
   const persona = p.nombre
@@ -483,7 +498,9 @@ function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir, onJustif
                   <FilaDia key={d.fecha} d={d} codigo={p.codigo} persona={persona}
                     conExtra={cuentaHorasExtra(p)}
                     puedeCorregir={puedeCorregir} onCorregir={onCorregir}
-                    onJustificar={onJustificar} />
+                    onJustificar={onJustificar}
+                    delTelefono={marcasTelefono[llaveDelDia(p.codigo, d.fecha)] ?? []}
+                    onVerSelfie={onVerSelfie} />
                 ))}
               </tbody>
             </table>
@@ -502,7 +519,7 @@ function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir, onJustif
  * corrección debajo. Debajo de la fila, una línea por corrección dice qué se
  * cambió, por qué, quién y cuándo — sin abrir nada más.
  */
-function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJustificar }: {
+function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJustificar, delTelefono, onVerSelfie }: {
   d: DiaReporte;
   codigo: string;
   persona: string;
@@ -511,6 +528,9 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJu
   puedeCorregir: boolean;
   onCorregir: (m: MarcaParaCorregir) => void;
   onJustificar: (d: DiaParaJustificar) => void;
+  /** Las marcas que ese día salieron del teléfono. Vacío = ninguna. */
+  delTelefono: MarcaTelefonoUI[];
+  onVerSelfie: (m: SelfieParaVer) => void;
 }) {
   /** La corrección que produjo la marca de esa posición, si la hay. */
   const correccionDe = (idx: number) =>
@@ -700,6 +720,35 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJu
       {/* 🔴 LO QUE DIJO EL RELOJ Y LO QUE SE CORRIGIÓ, LAS DOS COSAS. Sin esto
           la fila de arriba mostraría una hora escrita a mano como si el reloj
           la hubiera registrado. */}
+      {/* 🔴 LO QUE SALIÓ DEL TELÉFONO SE DICE ACÁ, Y NUNCA CON LA PALABRA
+          «llegó» (14-sep-2026). El mockup decía «Llegó a las 11:30» y Daniel
+          avisó que la contadora iba a entender que llegó a TRABAJAR a esa hora:
+          a las 11:30 el teléfono recién encontró señal. La hora que CUENTA ya
+          está arriba, en su columna; esto es chico y gris, y dice «envió». La
+          redacción vive en `textoParaLaContadora` (módulo puro), no acá. */}
+      {delTelefono.map((m) => {
+        const idx = d.marcas.findIndex((h) => h.startsWith(m.hora));
+        const rotulo = rotuloDeLaMarca(idx < 0 ? 0 : idx, d.marcas.length);
+        return (
+          <tr key={m.id} className="border-b border-gray-100">
+            <td></td>
+            <td colSpan={8} className="px-2 pb-1.5 text-[12px] text-gray-500">
+              <b className="font-semibold text-gray-800">{rotulo} {m.horaLarga}</b>
+              {" · "}{m.detalle}
+              {(m.tieneFoto || m.lat !== null) && (
+                <button
+                  type="button"
+                  onClick={() => onVerSelfie({ ...m, persona, fecha: d.fecha, rotulo })}
+                  className="ml-1.5 min-h-[44px] rounded px-1 underline decoration-dotted underline-offset-2 transition hover:text-black"
+                >
+                  Ver la selfie y el mapa
+                </button>
+              )}
+            </td>
+          </tr>
+        );
+      })}
+
       {d.correcciones.map((c) => (
         <tr key={c.id} className="border-b border-gray-100 bg-blue-50/40">
           <td></td>

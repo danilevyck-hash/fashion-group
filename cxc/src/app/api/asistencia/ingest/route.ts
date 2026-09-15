@@ -23,6 +23,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
 import { supabaseServer } from "@/lib/supabase-server";
 import { normalizarEventos, ultimoInstante, type EventoCrudo } from "@/lib/asistencia/ingest";
+import { guardarMarcaciones } from "@/lib/asistencia/guardar-marcaciones";
 import { enviarSistema } from "@/lib/alertas/canal";
 import {
   decidirAlerta,
@@ -190,12 +191,16 @@ export async function POST(req: NextRequest) {
   const { filas, descartados } = normalizarEventos(dispositivo, eventos);
 
   if (filas.length > 0) {
-    // `ignoreDuplicates` es el corazón del diseño: el repaso nocturno vuelve a
-    // mandar días ya guardados y esto los ignora en silencio en vez de
-    // duplicarlos. Sin esto, las horas trabajadas se inflarían cada noche.
-    const { error } = await supabaseServer
-      .from("asistencia_marcaciones")
-      .upsert(filas, { onConflict: "dispositivo,evento_id", ignoreDuplicates: true });
+    // 🔴 SE ESCRIBE POR LA PUERTA ÚNICA (14-sep-2026). El upsert vivía acá
+    // adentro y se mudó a `lib/asistencia/guardar-marcaciones.ts` cuando nació
+    // la segunda FUENTE de marcaciones (el reloj del teléfono, /api/marcacion):
+    // las dos tienen que escribir con el MISMO `onConflict` sobre
+    // `(dispositivo, evento_id)` e `ignoreDuplicates`, que es el corazón del
+    // diseño —el repaso nocturno vuelve a mandar días ya guardados y esto los
+    // ignora en silencio en vez de duplicarlos—. Dos escrituras con dos formas
+    // de deduplicar es exactamente cómo se duplicaron las 134 marcaciones de
+    // agosto (ver `asistencia-una-sola-entrada.test.ts`).
+    const { error } = await guardarMarcaciones(filas);
     if (error) {
       // No se avanza `leido_hasta`: el rango se vuelve a pedir en la próxima
       // corrida. Preferimos repetir trabajo antes que perder una marcación.
