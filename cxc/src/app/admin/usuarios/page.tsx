@@ -413,7 +413,7 @@ function UsuariosPageInner() {
                       type={showModalPw ? "text" : "password"}
                       value={uPassword}
                       onChange={e => setUPassword(e.target.value)}
-                      placeholder={editUserId ? "Dejar vacío para no cambiar" : "Mínimo 8 caracteres"}
+                      placeholder={editUserId ? "Dejar vacío para no cambiar" : "La que quieras"}
                       /* text-base en móvil (anti-zoom de Safari) y pr-12 para
                          dejarle 44px al botón del ojo, que antes cabía en 40. */
                       className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 pr-12 text-base sm:text-sm font-mono placeholder:text-gray-400 placeholder:font-sans focus:outline-none focus:border-teal-700 transition"

@@ -89,7 +89,14 @@ export async function POST(req: NextRequest) {
   const { name, password, role, associated_company, modulos_override } = await req.json();
   if (!name || !password) return NextResponse.json({ error: "Nombre y contraseña requeridos" }, { status: 400 });
   if (name.trim().length < 3) return NextResponse.json({ error: "El nombre debe tener al menos 3 caracteres" }, { status: 400 });
-  if (password.length < 8) return NextResponse.json({ error: "La contraseña debe tener al menos 8 caracteres" }, { status: 400 });
+  // 🔴 LA CONTRASEÑA NO TIENE LARGO MÍNIMO (15-sep-2026). Daniel, textual:
+  // *«lo quiero sin restricciones»*. Antes se exigían 8 caracteres, acá y en
+  // `PUT`, y también en `/api/auth/contrasena` cuando cada quien cambia la suya.
+  // ⚠️ Se le dijo el riesgo y lo decidió igual: en este sistema la contraseña ES
+  // la identidad (el login no pide usuario), así que una de un carácter es
+  // entrar como esa persona. Lo que SIGUE en pie es que no puede estar vacía
+  // (la línea de arriba) y que no puede repetir la de otro (`contrasenaEnUso`),
+  // que es lo que impide que dos personas colisionen.
 
   const validationError = validateRoleAndModulos(role, modulos_override);
   if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
@@ -159,8 +166,7 @@ export async function PUT(req: NextRequest) {
     update.name = trimmed;
   }
   if (password !== undefined) {
-    if (password.length < 8) return NextResponse.json({ error: "La contraseña debe tener al menos 8 caracteres" }, { status: 400 });
-    // Unicidad de contraseña, excluyendo al propio usuario editado.
+      // Unicidad de contraseña, excluyendo al propio usuario editado.
     if (await contrasenaEnUso(password, id)) {
       return NextResponse.json({ error: AVISO_CONTRASENA_REPETIDA }, { status: 400 });
     }

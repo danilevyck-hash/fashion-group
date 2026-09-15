@@ -40,7 +40,6 @@ import { getLoginLock, registerLoginFailure } from "@/lib/login-rate-limit";
 export const dynamic = "force-dynamic";
 
 const COOKIE_NAME = "cxc_session";
-const MINIMO = 8;
 
 function ipDe(req: NextRequest): string {
   return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
@@ -82,9 +81,9 @@ export async function PUT(req: NextRequest) {
   if (!actual || !nueva) {
     return NextResponse.json({ error: "Escribe la contraseña actual y la nueva." }, { status: 400 });
   }
-  if (nueva.length < MINIMO) {
-    return NextResponse.json({ error: `La nueva tiene que tener al menos ${MINIMO} caracteres.` }, { status: 400 });
-  }
+  // 🔴 SIN LARGO MÍNIMO (15-sep-2026). Daniel: *«lo quiero sin restricciones»*.
+  // Lo único que se sigue exigiendo es que no venga vacía (arriba) y que no sea
+  // la de otra persona (`contrasenaEnUso`, más abajo).
 
   // 🔴 El usuario es el de la cookie. Nada del cuerpo decide a quién se le cambia.
   const { data: user, error } = await supabaseServer
