@@ -17,7 +17,13 @@
 // debajo del renglón. Así ni un minuto de la planilla depende de este archivo.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { diaPanamaDe, horaAmPm, horaCorta, textoParaLaContadora } from "./marcacion";
+import {
+  diaPanamaDe,
+  horaAmPm,
+  horaCorta,
+  textoParaLaContadora,
+  textoRelojCorrido,
+} from "./marcacion";
 
 /** Una marca del teléfono, como la guarda la base. */
 export interface MarcaTelefonoCruda {
@@ -27,6 +33,9 @@ export interface MarcaTelefonoCruda {
   tipo: string | null;
   sin_senal: boolean | null;
   created_at: string | null;
+  /** La hora que tenía el teléfono al tomar la selfie. Con señal es solo
+   *  testigo — y ese testigo es lo que delata un reloj corrido. */
+  hora_telefono: string | null;
   foto_path: string | null;
   lat: number | null;
   lng: number | null;
@@ -41,6 +50,12 @@ export interface MarcaTelefonoUI {
   horaLarga: string;
   /** «Marcada sin señal · el teléfono la envió 11:30». Nunca dice «llegó». */
   detalle: string;
+  /** «el reloj de su teléfono está corrido 2 h», o `null` si está en hora.
+   *  No cambia ningún cálculo: la hora que cuenta es la del servidor. */
+  relojCorrido: string | null;
+  /** La persona la deshizo desde su teléfono: NO cuenta. La fila sigue en la
+   *  base — se ve tachada, nunca se esconde. */
+  quitada: boolean;
   tieneFoto: boolean;
   lat: number | null;
   lng: number | null;
@@ -76,6 +91,12 @@ export function marcasPorDia(
         // inventa un instante.
         creadoEn: f.created_at ?? f.ocurrio_en,
       }),
+      // 🔴 EL RELOJ CORRIDO SE DICE AUNQUE HAYA HABIDO SEÑAL (14-sep-2026).
+      // Con señal la hora que entra es la del servidor y no pasa nada; pero el
+      // día que esa misma persona marque SIN señal, la que entra es la de su
+      // teléfono. Saberlo antes vale.
+      relojCorrido: textoRelojCorrido(f.ocurrio_en, f.hora_telefono),
+      quitada: false,
       tieneFoto: Boolean(String(f.foto_path ?? "").trim()),
       lat: typeof f.lat === "number" ? f.lat : null,
       lng: typeof f.lng === "number" ? f.lng : null,
@@ -83,6 +104,35 @@ export function marcasPorDia(
   }
   for (const k of Object.keys(salida)) {
     salida[k].sort((a, b) => (a.hora < b.hora ? -1 : 1));
+  }
+  return salida;
+}
+
+/**
+ * Señala las marcas que se DESHICIERON, por `id` y nunca por hora.
+ *
+ * 🔴 SE SEÑALAN, NO SE ESCONDEN. La marca existió y la fila sigue en la base:
+ * taparla sería descartar un dato en silencio, que es justo lo que esta casa no
+ * hace. El motor ya dejó de contarla (`aplicarCorrecciones`); acá solo se dice.
+ *
+ * Devuelve un mapa NUEVO: no muta el que recibe.
+ */
+export function senalarQuitadas(
+  porDia: Readonly<Record<string, MarcaTelefonoUI[]>>,
+  idsQuitadas: ReadonlySet<string>,
+): Record<string, MarcaTelefonoUI[]> {
+  if (idsQuitadas.size === 0) return porDia as Record<string, MarcaTelefonoUI[]>;
+  const salida: Record<string, MarcaTelefonoUI[]> = {};
+  for (const [k, lista] of Object.entries(porDia)) {
+    salida[k] = lista.map((m) =>
+      idsQuitadas.has(m.id)
+        ? {
+            ...m,
+            quitada: true,
+            detalle: textoParaLaContadora({ sinSenal: false, creadoEn: m.hora, quitada: true }),
+          }
+        : m,
+    );
   }
   return salida;
 }

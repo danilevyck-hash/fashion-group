@@ -81,13 +81,34 @@ export function horaCorta(iso: string): string {
   return `${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}`;
 }
 
+/**
+ * 🔴 CÓMO SE VE UNA HORA DE 12 HORAS — UN SOLO LUGAR (14-sep-2026).
+ *
+ * Daniel, textual: *«quiero que la hora salga en formato 12 h»* y, al
+ * preguntarle si valía para todo el módulo: *«pero para la planilla sí se usa
+ * formato 24 horas, ¿no? Formato de 12 horas solo para esto, ¿no?»* — sí.
+ * 🔴 Esto es SOLO para la pantalla de marcar: el reporte, la planilla, los
+ * Excel, el PDF y el selector de corregir una hora siguen en 24 h, porque
+ * quien concilia una planilla trabaja en 24 h. Hay candado en las dos
+ * direcciones.
+ *
+ * «18:04» → «6:04 p. m.». Es la forma de la casa (`docs/diccionario.md` § 2.3:
+ * «1:45 a. m.», 12 h, sin cero adelante y con el espacio adentro de «a. m.»),
+ * la MISMA que produce `Intl.DateTimeFormat("es-PA", { hour12: true })` — pero
+ * escrita a mano para que no dependa de la versión de ICU del teléfono.
+ */
+export function enDoceHoras(hhmm: string): string {
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(hhmm ?? "").trim());
+  if (!m) return String(hhmm ?? "");
+  const h24 = Number(m[1]);
+  if (!Number.isFinite(h24) || h24 > 23) return String(hhmm ?? "");
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h12}:${m[2]} ${h24 < 12 ? "a. m." : "p. m."}`;
+}
+
 /** «9:12 a. m.» / «6:04 p. m.», hora de Panamá — como lo lee la gente. */
 export function horaAmPm(iso: string): string {
-  const d = new Date(Date.parse(iso) - PANAMA_OFFSET_MS);
-  const h24 = d.getUTCHours();
-  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
-  const mm = String(d.getUTCMinutes()).padStart(2, "0");
-  return `${h12}:${mm} ${h24 < 12 ? "a. m." : "p. m."}`;
+  return enDoceHoras(horaCorta(iso));
 }
 
 const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
@@ -294,6 +315,9 @@ export interface MarcaDelTelefono {
   sinSenal: boolean;
   /** Cuándo llegó al servidor (`created_at`). */
   creadoEn: string;
+  /** La persona la deshizo desde su teléfono dentro de los 2 minutos. La marca
+   *  NO se borró —nunca se borra—: dejó de contar. */
+  quitada?: boolean;
 }
 
 /**
@@ -302,8 +326,72 @@ export interface MarcaDelTelefono {
  * entendería que llegó a trabajar a esa hora (Daniel, 14-sep-2026).
  */
 export function textoParaLaContadora(m: MarcaDelTelefono): string {
+  // 🔴 UNA MARCA DESHECHA SE DICE Y NO SE ESCONDE (14-sep-2026). La fila sigue
+  // en la tabla —es append-only— y deja de contar por una corrección encima;
+  // taparla acá sería descartar un dato en silencio.
+  if (m.quitada) return "La deshizo desde su teléfono · no cuenta";
   if (m.sinSenal) return `Marcada sin señal · el teléfono la envió ${horaCorta(m.creadoEn)}`;
   return "Marcada desde el teléfono";
+}
+
+// ── EL RELOJ DEL TELÉFONO, CORRIDO ───────────────────────────────────────────
+
+/**
+ * Desde cuánto desfase se le dice a la contadora. Cinco minutos: menos que eso
+ * es un reloj que nadie ajustó y no cambia nada; más, conviene saberlo ANTES
+ * de que esa persona marque un día sin señal, que es el único caso en que la
+ * hora del teléfono es la que entra.
+ */
+export const DESFASE_QUE_SE_DICE_MS = 5 * 60_000;
+
+/**
+ * Cuánto está corrido el reloj del teléfono respecto del que cuenta, en ms
+ * (positivo = adelantado). `null` si falta una de las dos horas.
+ *
+ * 🩸 EL DATO YA SE GUARDABA Y NO LO VEÍA NADIE (14-sep-2026). Daniel probó el
+ * módulo con el reloj de su iPhone movido DOS HORAS y con señal: el sistema
+ * hizo lo correcto —guardó 22:50:40, la del servidor, e ignoró 00:49:40— pero
+ * el aviso a la contadora solo salía cuando la marca venía `sin_senal`. La
+ * diferencia quedaba en `hora_telefono` y nadie la miraba.
+ */
+export function desfaseDelTelefonoMs(
+  ocurrioEn: string,
+  horaTelefono: string | null | undefined,
+): number | null {
+  if (!horaTelefono) return null;
+  const a = Date.parse(ocurrioEn);
+  const b = Date.parse(horaTelefono);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  return b - a;
+}
+
+/** «2 h» · «1 h 30 min» · «7 min». Siempre en positivo: adelantado o atrasado
+ *  se lee igual de mal, y el número exacto no le sirve a nadie. */
+export function cuantoCorrido(ms: number): string {
+  const min = Math.round(Math.abs(ms) / 60_000);
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const resto = min % 60;
+  return resto === 0 ? `${h} h` : `${h} h ${resto} min`;
+}
+
+/**
+ * Lo que ve la contadora cuando el reloj de ese teléfono está corrido, o
+ * `null` cuando no hay nada que decir.
+ *
+ * ⚠️ NO ES UNA ACUSACIÓN Y EL TEXTO NO PUEDE SONAR A ESO: la causa común es un
+ * teléfono mal configurado, no una trampa. Se dice el hecho y para qué sirve
+ * saberlo, y nada más. La hora que cuenta no cambia: es la del servidor.
+ *
+ * 🔴 Y NUNCA la palabra «llegó» — ver el encabezado del archivo.
+ */
+export function textoRelojCorrido(
+  ocurrioEn: string,
+  horaTelefono: string | null | undefined,
+): string | null {
+  const ms = desfaseDelTelefonoMs(ocurrioEn, horaTelefono);
+  if (ms === null || Math.abs(ms) <= DESFASE_QUE_SE_DICE_MS) return null;
+  return `el reloj de su teléfono está corrido ${cuantoCorrido(ms)}`;
 }
 
 /** Qué es la marca `idx` de un día con `total` marcas: la primera es la

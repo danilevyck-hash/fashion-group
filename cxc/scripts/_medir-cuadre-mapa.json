@@ -1,0 +1,137 @@
+{
+  "archivos": {
+    "sep": {
+      "vistana": {
+        "archivo": "VIST ANA Planilla Quincenal -15 de septiembre de 2026.xlsx",
+        "hoja": "15 DE SEPT"
+      },
+      "fashion_wear": {
+        "archivo": "FASHION WEAR  Planilla Quincenal -15 de septiembre  de 2026.xlsx",
+        "hoja": "15 DE SEPT"
+      },
+      "confecciones_boston": {
+        "archivo": "BOSTON Planilla Quincenal -15 de septiembre   de 2026.xlsx",
+        "hoja": "15 DE SEPT"
+      }
+    },
+    "ago": {
+      "vistana": {
+        "archivo": "VIST ANA Planilla Quincenal -30 de agosto de 2026.xlsx",
+        "hoja": "AGOSTO"
+      },
+      "fashion_wear": {
+        "archivo": "FASHION WEAR  Planilla Quincenal -30 de agosto de 2026.xlsx",
+        "hoja": "AGOSTO"
+      },
+      "confecciones_boston": {
+        "archivo": "BOSTON Planilla Quincenal -30 de agosto  de 2026.xlsx",
+        "hoja": "AGOSTO"
+      },
+      "american_classic": {
+        "archivo": "Planilla Quincenal -30 de agosto de  2026.xlsx",
+        "hoja": "30 DE AGOSTO"
+      }
+    }
+  },
+  "personas": {
+    "sep": {
+      "vistana": {
+        "Julio Guzmán": "11",
+        "Lucía Angela García": "7",
+        "Edwin Gomez": "V-EG",
+        "Roxana Hernandez": "1",
+        "Rodrigo Miranda": "13",
+        "Luis Adrián Arroyo": "9",
+        "ANDREA  PEREZ": "16",
+        "Jorman Hernández": "5"
+      },
+      "fashion_wear": {
+        "Eloyn Mendoza": "29",
+        "Luis Parajón": "10",
+        "Esmer Cruz": "12",
+        "Kevin Lubo": "6",
+        "Carlos Baltodano": "37",
+        "Jhony Flores": "40",
+        "Samuel Gómez": "41",
+        "Julio Garay": "11"
+      },
+      "confecciones_boston": {
+        "BRICEIDA MONTERO": "8",
+        "ALEJANDRA CAMANO": "22",
+        "KENNY VARGAS": "28",
+        "KENER HERNÁNDEZ": "17",
+        "DOMINGO HENRÍQUEZ": "32",
+        "JULICAR CORONA": "15",
+        "RAMON MIRANDA": "21",
+        "LUZ LOPEZ": "18",
+        "LAURA L. CASIANO V.": "38",
+        "SAMIR POLO ARRIETA": "42",
+        "MARTA A. CHAVARRIA": "43",
+        "CARLOS RUÍZ": "44",
+        "LUIS BALLESTA": "46",
+        "María Bethancourt": "49",
+        "Enrique Sánchez": "56",
+        "YERITZA Y. SOLIS CASTRO": "51",
+        "Gabriela Jaramillo": "53",
+        "ANDRES  A. GONZALEZ C.": "23",
+        "Yeishka I.  Días M.": "54"
+      }
+    },
+    "ago": {
+      "vistana": {
+        "Julio Guzmán": "11",
+        "Lucía Angela García": "7",
+        "Edwin Gomez": "V-EG",
+        "Roxana Hernandez": "1",
+        "Rodrigo Miranda": "13",
+        "Luis Adrián Arroyo": "9",
+        "ANDREA  PEREZ": "16",
+        "Jorman Hernández": "5",
+        "ANDREA PEREZ": "16"
+      },
+      "fashion_wear": {
+        "Eloyn Mendoza": "29",
+        "Luis Parajón": "10",
+        "Esmer Cruz": "12",
+        "Kevin Lubo": "6",
+        "Carlos Baltodano": "37",
+        "Jhony Flores": "40",
+        "Samuel Gómez": "41",
+        "Julio Garay": "11"
+      },
+      "confecciones_boston": {
+        "BRICEIDA MONTERO": "8",
+        "ALEJANDRA CAMANO": "22",
+        "KENNY VARGAS": "28",
+        "KENER HERNÁNDEZ": "17",
+        "DOMINGO HENRÍQUEZ": "32",
+        "JULICAR CORONA": "15",
+        "RAMON MIRANDA": "21",
+        "LUZ LOPEZ": "18",
+        "LAURA L. CASIANO V.": "38",
+        "SAMIR POLO ARRIETA": "42",
+        "MARTA A. CHAVARRIA": "43",
+        "CARLOS RUÍZ": "44",
+        "LUIS BALLESTA": "46",
+        "María Bethancourt": "49",
+        "YERITZA Y. SOLIS CASTRO": "51",
+        "Gabriela Jaramillo": "53",
+        "ANDRES  A. GONZALEZ C.": "23",
+        "Yeishka I.  Días M.": "54",
+        "CRISTIAN BLANCO": "25",
+        "Hector L. Pérez A": "48",
+        "ANDRES A. GONZALEZ C.": "23"
+      },
+      "american_classic": {
+        "Jenifer Miranda": "301",
+        "Ana Trejos": "2",
+        "Angel Pizza": "305",
+        "Jailine Quispe": "303",
+        "Milagros Torres": "302",
+        "Yeisibeth Muñoz": "306",
+        "Cindy De Gracia": "3",
+        "Sheynee Batista": "304"
+      }
+    }
+  }
+}

@@ -29,6 +29,7 @@ import {
 import { codigosFueraDeRango } from "@/lib/asistencia/vigencia";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { leerMarcasDelTelefono } from "@/lib/marcacion/reporte-server";
+import { senalarQuitadas } from "@/lib/marcacion/en-el-reporte";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -151,6 +152,19 @@ export async function GET(req: NextRequest) {
     // encima, más las marcaciones que el reloj nunca registró. La tabla
     // `asistencia_marcaciones` queda intacta — acá solo se toca una COPIA.
     const efectivas = aplicarCorrecciones(marcaciones, correcciones.correcciones);
+
+    // 🔴 LA MARCA QUE ALGUIEN DESHIZO SE VE TACHADA, NO SE ESCONDE (14-sep-2026).
+    // El motor ya dejó de contarla dos líneas arriba; acá se señala en la línea
+    // del teléfono, atándola por `id` y nunca por hora. Sin correcciones que
+    // quiten nada, esto devuelve el MISMO objeto y no cuesta nada.
+    const telefonoConQuitadas = senalarQuitadas(
+      telefono,
+      new Set(
+        correcciones.correcciones
+          .filter((c) => c.quita && c.marcacionId)
+          .map((c) => String(c.marcacionId)),
+      ),
+    );
 
     // 🔑 El filtro va DESPUÉS de aplicar: una marcación AGREGADA no trae nombre
     // del reloj, así que filtrarla antes la dejaría fuera de la búsqueda por
@@ -293,7 +307,7 @@ export async function GET(req: NextRequest) {
       diaEnCurso: hoyPanama() >= desde && hoyPanama() <= hasta ? hoyPanama() : null,
       // Las marcas del teléfono, por `codigo|fecha`. Vacío = no hay ninguna (o
       // la migración todavía no corrió): la pantalla no dibuja nada de más.
-      marcasTelefono: telefono,
+      marcasTelefono: telefonoConQuitadas,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

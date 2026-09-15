@@ -726,15 +726,29 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJu
           a las 11:30 el teléfono recién encontró señal. La hora que CUENTA ya
           está arriba, en su columna; esto es chico y gris, y dice «envió». La
           redacción vive en `textoParaLaContadora` (módulo puro), no acá. */}
+      {/* 🔴 EL RELOJ CORRIDO SE DICE ACÁ, Y NO ES UNA ACUSACIÓN (14-sep-2026).
+          Daniel probó el módulo con el reloj de su iPhone movido DOS HORAS y
+          con señal: el sistema guardó la hora buena —la del servidor— pero esa
+          diferencia quedaba guardada y no la veía nadie. La causa común es un
+          teléfono mal configurado, no una trampa: se dice el hecho y nada más.
+          Importa porque el día que esa persona marque SIN señal, la hora que
+          entra es la de su teléfono. */}
+      {/* 🔴 Y UNA MARCA DESHECHA SE VE TACHADA, NO SE ESCONDE: la fila sigue en
+          la base (append-only) y dejó de contar por una corrección encima. */}
       {delTelefono.map((m) => {
         const idx = d.marcas.findIndex((h) => h.startsWith(m.hora));
-        const rotulo = rotuloDeLaMarca(idx < 0 ? 0 : idx, d.marcas.length);
+        const rotulo = m.quitada ? "Marca" : rotuloDeLaMarca(idx < 0 ? 0 : idx, d.marcas.length);
         return (
           <tr key={m.id} className="border-b border-gray-100">
             <td></td>
             <td colSpan={8} className="px-2 pb-1.5 text-[12px] text-gray-500">
-              <b className="font-semibold text-gray-800">{rotulo} {m.horaLarga}</b>
+              <b className={`font-semibold ${m.quitada ? "text-gray-400 line-through" : "text-gray-800"}`}>
+                {rotulo} {m.horaLarga}
+              </b>
               {" · "}{m.detalle}
+              {m.relojCorrido && (
+                <span className="ml-1.5 text-amber-800">· {m.relojCorrido}</span>
+              )}
               {(m.tieneFoto || m.lat !== null) && (
                 <button
                   type="button"
@@ -753,7 +767,10 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJu
         <tr key={c.id} className="border-b border-gray-100 bg-blue-50/40">
           <td></td>
           <td colSpan={8} className="px-2 pb-1.5 text-[12px] text-blue-900">
-            {c.agregada ? (
+            {c.quitada ? (
+              // 🔴 «quitada», nunca «borrada»: la marcación sigue en la base.
+              <>Marcación <b>quitada</b>: <b className="tabular-nums line-through">{c.hora}</b> — no cuenta</>
+            ) : c.agregada ? (
               <>Marcación <b>agregada</b>: <b className="tabular-nums">{c.hora}</b> — el reloj no registró nada</>
             ) : (
               <>Reloj <span className="tabular-nums line-through decoration-blue-300">{c.relojHora}</span>{" "}

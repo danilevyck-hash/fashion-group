@@ -128,8 +128,14 @@ describe("La pantalla del teléfono", () => {
 
   it("🔴 B. la hora grande es la del SERVIDOR (8:58), no la del teléfono (11:58)", async () => {
     render(<MarcacionClient />);
-    expect(await screen.findByText("08:58")).toBeTruthy();
+    // ⚠️ CAMBIÓ DE DIRECCIÓN EL 14-sep-2026, con nota: la pantalla de marcar
+    // habla en 12 HORAS (Daniel: *«quiero que la hora salga en formato 12 h»*),
+    // así que «08:58» pasó a «8:58 a. m.». 🔴 EL CONTROL NO CAMBIÓ Y ES EL
+    // MISMO: la hora del teléfono adelantado (11:58) no aparece de ninguna de
+    // las dos formas — que es lo que este candado protege.
+    expect(await screen.findByText("8:58 a. m.")).toBeTruthy();
     expect(screen.queryByText("11:58")).toBeNull();
+    expect(screen.queryByText("11:58 a. m.")).toBeNull();
     expect(screen.getByText(/hora de Panamá/)).toBeTruthy();
   });
 
@@ -198,7 +204,8 @@ describe("La pantalla del teléfono", () => {
     render(<MarcacionClient />);
     expect(await screen.findByText("Mis marcas")).toBeTruthy();
     expect(screen.getByText("1 – 15 sep")).toBeTruthy();
-    expect(screen.getByText("08:58 – 18:04")).toBeTruthy();
+    // ⚠️ CAMBIÓ DE DIRECCIÓN EL 14-sep-2026, con nota: 12 horas en esta pantalla.
+    expect(screen.getByText("8:58 a. m. – 6:04 p. m.")).toBeTruthy();
     expect(screen.getByText("falta la salida")).toBeTruthy();
     // CONTROL: no se dibuja nada de plata ni de nadie más.
     expect(screen.queryByText(/salario|planilla|neto/i)).toBeNull();

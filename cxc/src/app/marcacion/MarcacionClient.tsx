@@ -15,6 +15,16 @@
 // puro, contando las marcas del día — las del teléfono, las del reloj físico y
 // las que todavía esperan señal, todas juntas.
 //
+// 🔴 LA HORA SE LEE EN 12 HORAS, Y SOLO ACÁ (14-sep-2026). Daniel: *«quiero
+// que la hora salga en formato 12 h»* · *«para la planilla sí se usa formato 24
+// horas, ¿no? Formato de 12 horas solo para esto»*. Cómo se ve lo decide
+// `enDoceHoras` del módulo puro; esta pantalla NO llama a `horaCorta`, y hay
+// candado que lo exige y que exige lo contrario en el reporte.
+//
+// 🔴 «DESHACER» LA ÚLTIMA MARCA, DOS MINUTOS. Daniel marcó la salida cinco
+// minutos después de la entrada, por error de dedo. Pasados los dos minutos el
+// botón no está. Deshacer NO borra nada: ver `deshacer.ts`.
+//
 // ⚠️ SIN SEÑAL: la marca se guarda en el teléfono (`cola-offline.ts`) y se
 // manda sola. «Sola» quiere decir: al volver la señal con la pantalla abierta,
 // al volver a abrir la app, o cada minuto mientras haya algo esperando. NO hay
@@ -30,10 +40,10 @@ import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import {
   diaCorto,
   diasDeLaQuincena,
+  enDoceHoras,
   estadoDelBoton,
   fechaLarga,
   horaAmPm,
-  horaCorta,
   marcasDelDia,
   notaDespuesDe,
   QUIEN_CORRIGE,
@@ -41,6 +51,12 @@ import {
   type MarcaSimple,
   type TipoMarca,
 } from "@/lib/marcacion/marcacion";
+import {
+  cuentaRegresiva,
+  queSeDeshace,
+  rotuloDeshacer,
+  type Deshacible,
+} from "@/lib/marcacion/deshacer";
 import {
   borrarPendiente,
   guardarPendiente,
@@ -58,6 +74,15 @@ interface EstadoServidor {
   quincena?: { desde: string; hasta: string };
   rotuloQuincena?: string;
   marcas?: MarcaSimple[];
+  /** Lo que el SERVIDOR dice que se puede deshacer. `null` = nada. */
+  deshacer?: Deshacible | null;
+}
+
+/** ¿Lo que contestó el servidor es un estado completo? Después de marcar y de
+ *  deshacer, la respuesta YA TRAE el estado nuevo: usarlo evita una segunda
+ *  vuelta a la red que es justo la que falla cuando la señal está volviendo. */
+function esEstado(j: unknown): j is EstadoServidor {
+  return typeof j === "object" && j !== null && "ahora" in j && "codigo" in j;
 }
 
 /** Cada cuánto se reintenta la cola mientras haya algo esperando. */
@@ -77,25 +102,34 @@ export default function MarcacionClient() {
   const [tipoEnCurso, setTipoEnCurso] = useState<TipoMarca | null>(null);
   const [ubicacion, setUbicacion] = useState<GeolocationCoordinates | null>(null);
   const [buscandoUbicacion, setBuscandoUbicacion] = useState(false);
-  const [aviso, setAviso] = useState<{ tono: "error" | "guardada"; texto: string } | null>(null);
+  const [aviso, setAviso] = useState<{ tono: "error" | "guardada" | "listo"; texto: string } | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [deshaciendo, setDeshaciendo] = useState(false);
 
   const archivoRef = useRef<HTMLInputElement | null>(null);
   const enviandoCola = useRef(false);
 
   // ── El dato del servidor ───────────────────────────────────────────────────
+
+  /** 🔑 UN SOLO LUGAR APLICA UN ESTADO NUEVO. Lo usan la carga, el envío de una
+   *  marca y el deshacer: si cada uno lo hiciera a su manera, la pantalla
+   *  quedaría distinta según por dónde se llegó. */
+  const aplicarEstado = useCallback((j: EstadoServidor) => {
+    setEstado(j);
+    setDesfase(Date.parse(j.ahora) - Date.now());
+    setErrorCarga(null);
+  }, []);
+
   const cargar = useCallback(async () => {
     try {
       const res = await fetch("/api/marcacion", { cache: "no-store" });
       const j = (await res.json()) as EstadoServidor & { error?: string };
       if (!res.ok) throw new Error(j.error ?? "No se pudo cargar");
-      setEstado(j);
-      setDesfase(Date.parse(j.ahora) - Date.now());
-      setErrorCarga(null);
+      aplicarEstado(j);
     } catch {
       setErrorCarga("No se pudo cargar tu reloj. Revisa la señal e intenta de nuevo.");
     }
-  }, []);
+  }, [aplicarEstado]);
 
   const refrescarCola = useCallback(async () => {
     try {
@@ -113,6 +147,16 @@ export default function MarcacionClient() {
   const vaciarCola = useCallback(async () => {
     if (enviandoCola.current) return;
     enviandoCola.current = true;
+    // 🩸 SE GUARDA EL ESTADO QUE CONTESTA EL PROPIO ENVÍO (14-sep-2026). Daniel
+    // marcó en modo avión; la marca subió sola y perfecta —23:02:59, con su
+    // selfie— y LA PANTALLA NO SE ENTERÓ: seguía diciendo «Todavía no tienes
+    // marcas», el botón seguía ofreciendo «Marcar entrada» y el aviso viejo
+    // seguía prometiendo que se iba a enviar sola. El refresco de después
+    // dependía de una SEGUNDA vuelta a la red, justo en el momento en que la
+    // señal está volviendo: si esa fallaba, quedaba en pantalla el estado con
+    // el que se había abierto la pantalla, y nada lo decía. El riesgo no es
+    // cosmético: ella lo lee, cree que no marcó y vuelve a marcar.
+    let fresco: EstadoServidor | null = null;
     try {
       const cola = await leerPendientes();
       for (const m of cola) {
@@ -137,6 +181,10 @@ export default function MarcacionClient() {
         // reintenta: eso sí se puede arreglar solo.
         if (res.ok || res.status === 400 || res.status === 409) {
           await borrarPendiente(m.eventoId);
+          if (res.ok) {
+            const j = await res.json().catch(() => null);
+            if (esEstado(j)) fresco = j;
+          }
         } else {
           break;
         }
@@ -144,9 +192,19 @@ export default function MarcacionClient() {
     } finally {
       enviandoCola.current = false;
       await refrescarCola();
-      await cargar();
+      // Con el estado que vino en la respuesta no hace falta pedirlo de nuevo.
+      if (fresco) aplicarEstado(fresco);
+      else await cargar();
     }
-  }, [cargar, refrescarCola]);
+  }, [aplicarEstado, cargar, refrescarCola]);
+
+  // La regla de la casa: los éxitos se van solos a los 3 s; los errores y los
+  // avisos se quedan hasta que dejan de ser ciertos.
+  useEffect(() => {
+    if (aviso?.tono !== "listo") return;
+    const t = setTimeout(() => setAviso(null), 3000);
+    return () => clearTimeout(t);
+  }, [aviso]);
 
   useEffect(() => {
     setEnLinea(navigator.onLine);
@@ -201,6 +259,28 @@ export default function MarcacionClient() {
   const nota = notaDespuesDe(marcasHoy);
   const dias = diasDeLaQuincena(todas, hoy);
   const hoyMarcado = dias.find((d) => d.fecha === hoy) ?? null;
+
+  // 🔴 QUÉ SE PUEDE DESHACER — la última marca, dos minutos. La regla entera
+  // vive en el módulo puro; acá solo se le pasan las dos fuentes y los dos
+  // relojes. Pasados los dos minutos esto es `null` y el botón no se dibuja.
+  const sePuedeDeshacer = queSeDeshace({
+    servidor: estado?.deshacer ?? null,
+    pendientes: pendientes.map((p) => ({
+      eventoId: p.eventoId,
+      tipo: p.tipo,
+      horaTelefono: p.horaTelefono,
+    })),
+    ahoraServidorIso: isoServidor,
+    ahoraTelefonoIso: new Date(ahora).toISOString(),
+  });
+
+  // 🔴 EL AVISO «se va a enviar sola» NO PUEDE SOBREVIVIR A LA COLA. Daniel vio
+  // en su iPhone «Conexión restaurada» en verde y, justo debajo, «Se va a
+  // enviar sola cuando vuelva la señal» — dos avisos que se contradicen, con la
+  // marca ya guardada. Se DERIVA de que quede algo esperando, así no puede
+  // quedarse pegado por olvidarse de apagarlo en algún camino.
+  const avisoVisible =
+    aviso && (aviso.tono !== "guardada" || pendientes.length > 0) ? aviso : null;
 
   // ── Marcar ─────────────────────────────────────────────────────────────────
 
@@ -329,9 +409,55 @@ export default function MarcacionClient() {
         return;
       }
       cerrarFoto();
-      await cargar();
+      // El POST contesta con el estado nuevo: se usa ése. Ver la nota de
+      // `vaciarCola` — una segunda vuelta a la red es una que puede fallar.
+      if (esEstado(j)) aplicarEstado(j as EstadoServidor);
+      else await cargar();
     } finally {
       setEnviando(false);
+    }
+  }
+
+  /**
+   * DESHACER la última marca.
+   *
+   * 🔴 Dos puertas y una sola regla: lo que todavía no salió del teléfono se
+   * saca de la cola —nunca fue una marca, no hay nada que anular— y lo que ya
+   * está guardado se quita con una corrección firmada, que la escribe el
+   * SERVIDOR. Acá no se nombra ninguna marca: el servidor vuelve a calcular
+   * cuál es la última y si todavía está dentro de los dos minutos.
+   */
+  async function deshacer() {
+    if (!sePuedeDeshacer || deshaciendo) return;
+    const { donde, tipo } = sePuedeDeshacer;
+    setDeshaciendo(true);
+    setAviso(null);
+    try {
+      if (donde === "telefono") {
+        await borrarPendiente(sePuedeDeshacer.eventoId);
+        await refrescarCola();
+        setAviso({ tono: "listo", texto: `Listo, se deshizo la ${tipo}. Puedes marcar de nuevo.` });
+        return;
+      }
+      let res: Response;
+      try {
+        res = await fetch("/api/marcacion/deshacer", { method: "POST" });
+      } catch {
+        setAviso({ tono: "error", texto: "No hay señal para deshacerla. Intenta de nuevo en unos segundos." });
+        return;
+      }
+      const j = (await res.json()) as { error?: string; aviso?: string };
+      if (!res.ok) {
+        setAviso({ tono: "error", texto: j.error ?? "No se pudo deshacer. Intenta de nuevo." });
+        // Lo que el servidor sepa manda: puede que ya no se pueda deshacer.
+        await cargar();
+        return;
+      }
+      if (esEstado(j)) aplicarEstado(j as EstadoServidor);
+      else await cargar();
+      setAviso({ tono: "listo", texto: j.aviso ?? `Listo, se deshizo la ${tipo}.` });
+    } finally {
+      setDeshaciendo(false);
     }
   }
 
@@ -370,6 +496,15 @@ export default function MarcacionClient() {
           </p>
         )}
 
+        {/* 🩸 Y CON LA PANTALLA YA DIBUJADA TAMBIÉN SE DICE. Antes el error de
+            refresco solo se mostraba cuando no había NADA en pantalla: con algo
+            cargado, una lectura caída dejaba a la vista el estado viejo como si
+            fuera la verdad — que es cómo alguien lee «Todavía no tienes marcas»
+            después de haber marcado. */}
+        {errorCarga && estado && (
+          <p className="mb-3 text-sm text-gray-500">{errorCarga}</p>
+        )}
+
         {sinCodigo && (
           <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
             {estado?.aviso}
@@ -382,8 +517,9 @@ export default function MarcacionClient() {
               Hola, <b className="font-semibold text-black">{capitalizarNombre(estado.nombre) || `Código ${estado.codigo}`}</b>
             </p>
 
-            <p className="mt-3 text-[54px] font-semibold leading-none tracking-tight tabular-nums">
-              {horaCorta(isoQueCuenta)}
+            {/* 🔴 12 HORAS, y es la hora que se va a GUARDAR (ver el encabezado). */}
+            <p className="mt-3 text-[46px] font-semibold leading-none tracking-tight tabular-nums">
+              {horaAmPm(isoQueCuenta)}
             </p>
             <p className="mt-2 text-sm text-gray-500">
               {enLinea
@@ -395,20 +531,39 @@ export default function MarcacionClient() {
             {hoyMarcado && (
               <p className="mt-4 rounded-md bg-green-50 px-3 py-2.5 text-sm font-medium text-green-800">
                 ✓ {hoyMarcado.salida
-                  ? `Entrada ${hoyMarcado.entrada} · Salida ${hoyMarcado.salida}`
-                  : `Entrada de hoy: ${horaAmPmDeCorta(hoyMarcado.entrada)}`}
+                  ? `Entrada ${enDoceHoras(hoyMarcado.entrada)} · Salida ${enDoceHoras(hoyMarcado.salida)}`
+                  : `Entrada de hoy: ${enDoceHoras(hoyMarcado.entrada)}`}
               </p>
             )}
 
-            {aviso && (
+            {/* 🔴 DESHACER LA ÚLTIMA MARCA — dos minutos, y después no está.
+                Va pegado a lo que deshace. No pregunta «¿estás seguro?»: la
+                ventana de dos minutos ES el freno, y si se toca por error se
+                vuelve a marcar. */}
+            {sePuedeDeshacer && (
+              <button
+                type="button"
+                onClick={deshacer}
+                disabled={deshaciendo}
+                className="mt-2 min-h-[44px] w-full rounded-md px-3 py-2 text-sm text-gray-600 underline decoration-dotted underline-offset-2 transition active:scale-[0.97] disabled:text-gray-400"
+              >
+                {deshaciendo
+                  ? "Deshaciendo…"
+                  : `${rotuloDeshacer(sePuedeDeshacer.tipo)} · ${cuentaRegresiva(sePuedeDeshacer.restanMs)}`}
+              </button>
+            )}
+
+            {avisoVisible && (
               <p
                 className={`mt-3 rounded-md px-3 py-2.5 text-sm font-medium ${
-                  aviso.tono === "error"
+                  avisoVisible.tono === "error"
                     ? "bg-red-50 text-red-800"
-                    : "bg-amber-50 text-amber-900"
+                    : avisoVisible.tono === "listo"
+                      ? "bg-green-50 text-green-800"
+                      : "bg-amber-50 text-amber-900"
                 }`}
               >
-                {aviso.texto}
+                {avisoVisible.texto}
               </p>
             )}
 
@@ -444,7 +599,7 @@ export default function MarcacionClient() {
           <>
             <p className="text-sm text-gray-600">
               {tipoEnCurso === "entrada" ? "Entrada" : "Salida"} ·{" "}
-              <span className="tabular-nums">{horaCorta(isoQueCuenta)}</span>
+              <span className="tabular-nums">{horaAmPm(isoQueCuenta)}</span>
             </p>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -506,12 +661,12 @@ function MisMarcas({ dias, rotulo, hoy }: { dias: DiaMarcado[]; rotulo: string; 
           <li key={d.fecha} className="flex items-center justify-between py-2.5 text-sm tabular-nums">
             <span className="text-gray-600">{diaCorto(d.fecha)}</span>
             {d.salida ? (
-              <span className="font-semibold">{d.entrada} – {d.salida}</span>
+              <span className="font-semibold">{enDoceHoras(d.entrada)} – {enDoceHoras(d.salida)}</span>
             ) : d.faltaSalida ? (
               <span className="font-semibold text-amber-700">falta la salida</span>
             ) : (
               <span className="font-semibold">
-                {d.entrada}{d.fecha === hoy ? " –" : ""}
+                {enDoceHoras(d.entrada)}{d.fecha === hoy ? " –" : ""}
               </span>
             )}
           </li>
@@ -527,10 +682,6 @@ function horaISOaDia(iso: string): string {
   return new Date(Date.parse(iso) - 5 * 3600_000).toISOString().slice(0, 10);
 }
 
-/** «8:58» → «8:58 a. m.», para el renglón verde de hoy. */
-function horaAmPmDeCorta(hhmm: string): string {
-  return horaAmPm(`2000-01-01T${hhmm}:00-05:00`);
-}
 
 /** Un identificador para esta marca. `randomUUID` donde existe; si no, uno
  *  armado a mano — un navegador viejo no puede quedarse sin poder marcar. */

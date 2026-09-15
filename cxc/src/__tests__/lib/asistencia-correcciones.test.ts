@@ -297,7 +297,16 @@ describe("aplicar correcciones", () => {
         CORR({ id: "c", marcacionId: null, empleadoCodigo: "8", hora: "17:30:00" }),
       ],
     );
-    expect(contarCorrecciones(porDia)).toEqual({ correcciones: 3, dias: 2, agregadas: 2 });
+    // ⚠️ CAMBIÓ DE DIRECCIÓN EL 14-sep-2026, con nota: el conteo gana `quitadas`
+    // porque nació la TERCERA forma de corrección (quitar una marcación, con el
+    // «Deshacer» de dos minutos del reloj del teléfono). Acá no hay ninguna, y
+    // ese 0 es el CONTROL: las correcciones de hora siguen contándose igual.
+    expect(contarCorrecciones(porDia)).toEqual({
+      correcciones: 3,
+      dias: 2,
+      agregadas: 2,
+      quitadas: 0,
+    });
   });
 });
 

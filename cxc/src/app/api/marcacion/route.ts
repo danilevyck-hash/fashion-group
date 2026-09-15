@@ -17,10 +17,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextResponse, type NextRequest } from "next/server";
-import { hoyPanama } from "@/lib/fecha-panama";
 import { guardarMarcaciones } from "@/lib/asistencia/guardar-marcaciones";
 import { leerEmpleadoCodigo, requireMarcacion } from "@/lib/marcacion/acceso";
 import {
+  armarEstadoDeLaPantalla as estado,
   leerMarcasDeLaQuincena,
   marcaYaGuardada,
   nombreDeLaFicha,
@@ -30,13 +30,10 @@ import {
   AVISO_FALTA_MIGRACION,
   DISPOSITIVO_TELEFONO,
   diaPanamaDe,
-  diasDeLaQuincena,
   estadoDelBoton,
   faltaLaMigracion,
   horaQueCuenta,
   marcasDelDia,
-  notaDespuesDe,
-  rotuloQuincena,
   rutaDeSelfie,
   validarPayloadMarca,
 } from "@/lib/marcacion/marcacion";
@@ -48,34 +45,6 @@ export const maxDuration = 60;
 const SIN_CODIGO =
   "Esta pantalla es para las personas que marcan su entrada y su salida. "
   + "Tu usuario no tiene una ficha de colaborador, así que no hay a quién marcarle.";
-
-/** El estado que dibuja la pantalla. Una sola forma para el GET y el POST, así
- *  después de marcar la pantalla queda igual que si se hubiera recargado. */
-async function estado(codigo: string, nombre: string | null) {
-  const ahora = new Date().toISOString();
-  const hoy = hoyPanama();
-  const { quincena, marcas } = await leerMarcasDeLaQuincena(codigo, hoy);
-  const marcasHoy = marcasDelDia(marcas, hoy);
-  return {
-    codigo,
-    nombre,
-    ahora,
-    hoy,
-    marcasHoy,
-    boton: estadoDelBoton(marcasHoy),
-    nota: notaDespuesDe(marcasHoy),
-    quincena,
-    rotuloQuincena: rotuloQuincena(quincena),
-    dias: diasDeLaQuincena(marcas, hoy),
-    // 🔑 LAS MARCAS CRUDAS VIAJAN TAMBIÉN (≤32 en una quincena). No es un dato
-    // de más: el teléfono le SUMA las que todavía esperan señal y vuelve a
-    // pasar la lista por las MISMAS funciones puras (`marcasDelDia`,
-    // `estadoDelBoton`, `diasDeLaQuincena`). Así, después de una marca sin
-    // señal, el botón dice «Marcar salida» sin que el servidor se haya
-    // enterado — y lo dice con la regla del servidor, no con una copia.
-    marcas: marcas.map((m) => ({ ocurrioEn: m.ocurrioEn })),
-  };
-}
 
 export async function GET(req: NextRequest) {
   const auth = requireMarcacion(req);

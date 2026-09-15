@@ -12,10 +12,13 @@
  * EFECTIVA (una copia, con las horas corregidas) y, al lado, el detalle de qué
  * se corrigió para que la pantalla pueda mostrar las DOS horas.
  *
- * ── LAS DOS FORMAS DE CORRECCIÓN, y por qué la segunda es la más usada ───────
+ * ── LAS TRES FORMAS DE CORRECCIÓN, y por qué la segunda es la más usada ──────
  *
  *   1. PISAR la hora de una marcación que sí existe (`marcacionId` con valor).
  *   2. AGREGAR una marcación que el reloj nunca registró (`marcacionId` null).
+ *   3. QUITAR una marcación, que nació el 14-sep-2026 con el «Deshacer» de dos
+ *      minutos del reloj del teléfono (`quita`). No borra nada: la marcación
+ *      deja de contar y queda dicho quién la quitó y cuándo.
  *
  * La 2 es el caso que Daniel no nombró y es el más común: quien OLVIDÓ marcar
  * no tiene registro que corregir. Medido en producción el 13-ago-2026 sobre las
@@ -66,12 +69,20 @@ export interface Correccion {
   empleadoCodigo: string;
   /** YYYY-MM-DD, día-calendario de Panamá. */
   fecha: string;
-  /** "HH:MM:SS". */
+  /** "HH:MM:SS". Vacío o nulo SOLO cuando la corrección QUITA la marcación:
+   *  ahí no hay hora que valga, porque no vale ninguna. */
   hora: string;
   motivo: string;
   creadaPor: string;
   /** ISO. */
   creadaEn: string;
+  /**
+   * 🔴 LA TERCERA FORMA (14-sep-2026): QUITAR la marcación. No la borra —nada
+   * se borra— : deja de contar. Nació con el «Deshacer» de dos minutos del
+   * reloj del teléfono y exige `marcacionId` (no se puede quitar una marcación
+   * que no existe). Sin la migración `20261128120000` no hay ninguna.
+   */
+  quita?: boolean;
 }
 
 /**
@@ -80,12 +91,16 @@ export interface Correccion {
  */
 export interface CorreccionVisible {
   id: string;
-  /** La hora que MANDA para el cálculo. "HH:MM:SS". */
+  /** La hora que MANDA para el cálculo. "HH:MM:SS". Cuando la marcación se
+   *  QUITÓ, es la hora que decía el reloj — para poder decir cuál se quitó. */
   hora: string;
   /** Lo que dijo el reloj. `null` cuando la marcación fue AGREGADA. */
   relojHora: string | null;
   /** `true` = el reloj nunca registró esta marcación; se agregó a mano. */
   agregada: boolean;
+  /** `true` = esa marcación se QUITÓ y no cuenta para nada. La fila sigue en
+   *  `asistencia_marcaciones`: lo que cambia es que el motor ya no la mira. */
+  quitada: boolean;
   motivo: string;
   creadaPor: string;
   creadaEn: string;
@@ -253,7 +268,11 @@ export function aplicarCorrecciones(
   const agregadas: Correccion[] = [];
   for (const c of correcciones) {
     if (c.marcacionId) porId.set(c.marcacionId, c);
-    else agregadas.push(c);
+    // ⚠️ Una corrección con `quita` y sin `marcacionId` no puede existir (lo
+    // impide el CHECK de la migración). Si apareciera una, NO se agrega como
+    // marcación nueva: se ignora. Agregar una marcación a las 00:00:00 porque
+    // una fila vino rara es inventar una hora que nadie marcó.
+    else if (!c.quita) agregadas.push(c);
   }
 
   const porDia = new Map<string, CorreccionVisible[]>();
@@ -274,12 +293,17 @@ export function aplicarCorrecciones(
     // 🔑 EL DÍA SALE DE LA MARCACIÓN, no de la corrección. Ver el encabezado:
     // corregir la hora no puede mover horas de una quincena a otra.
     const dia = diaPanama(m.ocurrio_en);
-    salida.push({ ...m, ocurrio_en: instantePanama(dia, c.hora) });
+    const reloj = horaPanamaConSegundos(m.ocurrio_en);
+    // 🔴 QUITADA: no entra a la lista que va al motor. La fila de la base no se
+    // toca (append-only) y la corrección queda anotada, así que el día sigue
+    // diciendo que esa marcación existió y que alguien la quitó.
+    if (!c.quita) salida.push({ ...m, ocurrio_en: instantePanama(dia, c.hora) });
     anotar((m.empleado_codigo ?? c.empleadoCodigo ?? "").trim(), dia, {
       id: c.id,
-      hora: c.hora,
-      relojHora: horaPanamaConSegundos(m.ocurrio_en),
+      hora: c.quita ? reloj : c.hora,
+      relojHora: reloj,
       agregada: false,
+      quitada: Boolean(c.quita),
       motivo: c.motivo,
       creadaPor: c.creadaPor,
       creadaEn: c.creadaEn,
@@ -299,6 +323,7 @@ export function aplicarCorrecciones(
       hora: c.hora,
       relojHora: null,
       agregada: true,
+      quitada: false,
       motivo: c.motivo,
       creadaPor: c.creadaPor,
       creadaEn: c.creadaEn,
@@ -320,15 +345,18 @@ export function contarCorrecciones(porDia: ReadonlyMap<string, readonly Correcci
   correcciones: number;
   dias: number;
   agregadas: number;
+  quitadas: number;
 } {
   let correcciones = 0;
   let agregadas = 0;
+  let quitadas = 0;
   let dias = 0;
   for (const lista of porDia.values()) {
     if (lista.length === 0) continue;
     dias += 1;
     correcciones += lista.length;
     agregadas += lista.filter((c) => c.agregada).length;
+    quitadas += lista.filter((c) => c.quitada).length;
   }
-  return { correcciones, dias, agregadas };
+  return { correcciones, dias, agregadas, quitadas };
 }

@@ -19,7 +19,7 @@ import { DISPOSITIVO_TELEFONO } from "./marcacion";
 import { marcasPorDia, type MarcaTelefonoCruda, type MarcaTelefonoUI } from "./en-el-reporte";
 
 const COLUMNAS =
-  "id, empleado_codigo, ocurrio_en, tipo, sin_senal, created_at, foto_path, lat, lng";
+  "id, empleado_codigo, ocurrio_en, tipo, sin_senal, created_at, hora_telefono, foto_path, lat, lng";
 
 /**
  * Las marcas del teléfono del período, agrupadas por `codigo|fecha`.

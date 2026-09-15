@@ -27,18 +27,48 @@ import { desdeDeLaVentana, motivosFrecuentes } from "./motivos-frecuentes";
 import { hoyPanama } from "@/lib/fecha-panama";
 
 /** Las columnas que se leen. Una sola lista, para que no se puedan separar. */
-const COLS =
+const COLS_BASE =
   "id, marcacion_id, empleado_codigo, fecha, hora, motivo, creada_por, creada_en";
+
+/**
+ * 🩸 `quita` SE LEE APARTE, Y NO ES UN CAPRICHO (14-sep-2026). Si la migración
+ * `20261128120000` no corrió, PostgREST contesta «column
+ * asistencia_correcciones.quita does not exist» — un mensaje que NOMBRA LA
+ * TABLA y dice «does not exist», o sea exactamente lo que `esTablaFaltante`
+ * busca. Sin este apartado, faltar UNA COLUMNA se leería como «falta la tabla»
+ * y el resultado sería CERO correcciones en silencio: la planilla se pagaría
+ * con las horas del reloj, que es justo lo que alguien corrigió. Se memoriza
+ * para no pagar dos consultas por lectura.
+ */
+let hayColumnaQuita: boolean | null = null;
+
+function cols(): string {
+  return hayColumnaQuita === false ? COLS_BASE : `${COLS_BASE}, quita`;
+}
+
+/** ¿Este error es «esa COLUMNA no existe»? Se mira el nombre de la columna. */
+function esColumnaFaltante(err: unknown, columna: string): boolean {
+  if (!err) return false;
+  const e = err as { code?: string | null; message?: string | null };
+  const texto = String(e.message ?? "");
+  if (!texto.includes(columna)) return false;
+  return (
+    String(e.code ?? "") === "42703" ||
+    String(e.code ?? "") === "PGRST204" ||
+    /does not exist|no existe|could not find|schema cache/i.test(texto)
+  );
+}
 
 interface FilaCorreccion {
   id: string;
   marcacion_id: string | null;
   empleado_codigo: string;
   fecha: string;
-  hora: string;
+  hora: string | null;
   motivo: string;
   creada_por: string;
   creada_en: string;
+  quita?: boolean | null;
 }
 
 function aCorreccion(f: FilaCorreccion): Correccion {
@@ -49,10 +79,12 @@ function aCorreccion(f: FilaCorreccion): Correccion {
     fecha: String(f.fecha).slice(0, 10),
     // Postgres devuelve `time` como "08:00:00"; con milisegundos vendría
     // "08:00:00.5". Se corta a los segundos, que es la unidad del módulo.
-    hora: String(f.hora).slice(0, 8),
+    // ⚠️ Una corrección que QUITA no tiene hora: la columna viene NULL.
+    hora: String(f.hora ?? "").slice(0, 8),
     motivo: String(f.motivo ?? ""),
     creadaPor: String(f.creada_por ?? ""),
     creadaEn: String(f.creada_en ?? ""),
+    quita: Boolean(f.quita),
   };
 }
 
@@ -82,7 +114,7 @@ export async function leerCorrecciones(
       (pedirCount, from, to) =>
         supabaseServer
           .from(TABLA_CORRECCIONES)
-          .select(COLS, pedirCount ? { count: "exact" } : {})
+          .select(cols(), pedirCount ? { count: "exact" } : {})
           .is("anulada_en", null)
           .gte("fecha", desde)
           .lte("fecha", hasta)
@@ -90,9 +122,17 @@ export async function leerCorrecciones(
           .order("id", { ascending: true })
           .range(from, to),
     );
+    hayColumnaQuita = hayColumnaQuita ?? true;
     return { correcciones: filas.map(aCorreccion), faltaMigracion: false };
   } catch (e) {
-    if (esTablaFaltante(errorDeLectura(e), TABLA_CORRECCIONES)) {
+    const err = errorDeLectura(e);
+    // 🔴 PRIMERO la columna, DESPUÉS la tabla. Al revés, faltar `quita` se
+    // leería como faltar la tabla entera y se perderían TODAS las correcciones.
+    if (hayColumnaQuita !== false && esColumnaFaltante(err, "quita")) {
+      hayColumnaQuita = false;
+      return leerCorrecciones(desde, hasta);
+    }
+    if (esTablaFaltante(err, TABLA_CORRECCIONES)) {
       return { correcciones: [], faltaMigracion: true };
     }
     throw e;
@@ -130,12 +170,17 @@ export async function leerHistorialDelDia(
 ): Promise<{ historial: CorreccionHistorial[]; faltaMigracion: boolean }> {
   const { data, error } = await supabaseServer
     .from(TABLA_CORRECCIONES)
-    .select(`${COLS}, anulada_en, anulada_por`)
+    .select(`${cols()}, anulada_en, anulada_por`)
     .eq("empleado_codigo", codigo)
     .eq("fecha", fecha)
     .order("creada_en", { ascending: false });
 
   if (error) {
+    // El mismo orden que arriba: la columna antes que la tabla.
+    if (hayColumnaQuita !== false && esColumnaFaltante(error, "quita")) {
+      hayColumnaQuita = false;
+      return leerHistorialDelDia(codigo, fecha);
+    }
     if (esTablaFaltante(error, TABLA_CORRECCIONES)) {
       return { historial: [], faltaMigracion: true };
     }
@@ -187,9 +232,12 @@ export interface NuevaCorreccion {
   marcacionId: string | null;
   empleadoCodigo: string;
   fecha: string;
-  hora: string;
+  /** `null` SOLO con `quita`: una marcación que se quita no tiene hora nueva. */
+  hora: string | null;
   motivo: string;
   creadaPor: string;
+  /** 🔴 La tercera forma: la marcación deja de contar. Exige `marcacionId`. */
+  quita?: boolean;
 }
 
 export type ResultadoEscritura =
@@ -214,6 +262,10 @@ export async function crearCorreccion(c: NuevaCorreccion): Promise<ResultadoEscr
       hora: c.hora,
       motivo: c.motivo,
       creada_por: c.creadaPor,
+      // ⚠️ La columna viaja SOLO cuando se quita. Mandar `quita: false` en toda
+      // corrección rompería el alta mientras la migración no corra, y hoy se
+      // corrigen horas todos los días.
+      ...(c.quita ? { quita: true } : {}),
     })
     .select("id")
     .single();
