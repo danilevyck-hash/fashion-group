@@ -304,31 +304,63 @@ export function decidirAlerta(prev: ContadorAlerta, evento: "falla" | "exito", a
  * falsa alarma diaria. NO se tocó `HORAS_PARA_VIGIA`: el umbral está bien, lo
  * que estaba mal era la hora a la que se preguntaba.
  *
- * ⚠️ TODOS LOS DÍAS, incluidos sábado y domingo. La oficina cierra, pero la PC
- * no: el agente reporta cada 3 minutos aunque no haya nadie. Un domingo mudo
- * es una PC apagada de verdad, y enterarse el domingo a las 9 de la mañana es
- * mejor que enterarse el lunes con dos días de asistencia sin entrar.
+ * 🩸 SOLO DE LUNES A VIERNES, y esto cambió de dirección el 15-sep-2026.
+ * Acá decía «TODOS LOS DÍAS, incluidos sábado y domingo. La oficina cierra,
+ * pero la PC no». Era falso: Daniel, textual, *«sábado y domingo la PC
+ * permanece apagada»*. Con la regla vieja el sábado a las 10 a.m. siempre se
+ * cruzaban las 6 h de silencio, así que el vigía avisaba de algo que es el
+ * horario normal — y peor, ESE aviso gastaba el candado y dejaba mudo el lunes.
  *
- * Que corra tres veces NO multiplica los avisos: `alertado_en` es el candado
- * y deja pasar uno solo por episodio (ver `vigiaDebeAlertar`). Las otras dos
- * pasadas solo achican la demora entre que la PC se apaga y Daniel se entera.
+ * 🩸 MEDIDO, el caso que lo destapó (15-sep-2026): los dos relojes dejaron de
+ * reportar el viernes 11 a las 7:52 p.m.; el sábado 12 a las 10:00 a.m. el
+ * vigía avisó y marcó `alertado_en`; y el lunes 14 y el martes 15 —dos días
+ * hábiles enteros sin una sola marcación, con 34 colaboradores saliendo como
+ * ausentes— no sonó ni una vez. Un aviso el sábado y silencio el lunes es
+ * exactamente al revés de lo que hace falta.
+ *
+ * 🔴 Y AHORA REPITE mientras la PC siga apagada, una vez por pasada (Daniel:
+ * *«telegram me tiene que avisar»*). El candado no se fue: `alertado_en` sigue
+ * frenando el doble aviso dentro de la misma pasada y cualquier reintento del
+ * cron. Lo que cambió es que deja de ser UNO POR EPISODIO y pasa a ser uno cada
+ * `HORAS_ENTRE_AVISOS_VIGIA`. Se apaga solo: el ingest pone `alertado_en` en
+ * NULL apenas el agente vuelve a reportar.
+ *
+ * Los días y las horas los filtra `vercel.json` (`0 15 * * 1-5`, `0 20 * * 1-5`,
+ * `15 22 * * 1-5`), no una condición acá: un cron que corre y decide no hacer
+ * nada gasta invocación y deja logs que confunden.
  */
 export const HORAS_PARA_VIGIA = 6;
 
 /**
+ * Cuánto tiene que pasar para volver a avisar del MISMO silencio.
+ *
+ * 🔑 Sale de la separación real entre pasadas: 10:00 a.m. → 3:00 p.m. son 5 h y
+ * 3:00 p.m. → 5:15 p.m. son 2 h 15. Con 2 h, cada pasada del día avisa una vez
+ * y ni una de más; con un número mayor, la de las 5:15 se perdería.
+ */
+export const HORAS_ENTRE_AVISOS_VIGIA = 2;
+
+/**
  * ¿El vigía tiene que escribir? Solo si (a) el agente alguna vez existió —no se
  * avisa de algo que nunca se instaló—, (b) lleva más de `horas` sin dar señales
- * y (c) no se avisó ya de este mismo episodio.
+ * y (c) no se avisó de este mismo silencio hace menos de `horasEntreAvisos`.
  */
 export function vigiaDebeAlertar(
   fila: FilaDispositivo | null,
   ahoraMs: number,
   horas: number = HORAS_PARA_VIGIA,
+  horasEntreAvisos: number = HORAS_ENTRE_AVISOS_VIGIA,
 ): boolean {
   if (!fila?.visto_en) return false; // nunca se instaló: no hay nada que reclamar
-  if (fila.alertado_en) return false; // ya se avisó de este episodio
   const mins = minutosDesde(fila.visto_en, ahoraMs);
-  return mins !== null && mins > horas * 60;
+  if (mins === null || mins <= horas * 60) return false;
+  if (fila.alertado_en) {
+    // Ya se avisó: solo se repite si pasó el respiro. Una fecha ilegible se
+    // trata como «recién avisado» — ante la duda, callar.
+    const desdeAviso = minutosDesde(fila.alertado_en, ahoraMs);
+    if (desdeAviso === null || desdeAviso <= horasEntreAvisos * 60) return false;
+  }
+  return true;
 }
 
 /* ── El hueco que el programa ya no alcanza ─────────────────────────────────

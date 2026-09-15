@@ -175,10 +175,41 @@ describe("🔴 el vigía: el silencio no ejecuta código", () => {
     expect(vigiaDebeAlertar({ dispositivo: "d", visto_en: haceMin(7 * 60) }, AHORA, 6)).toBe(true);
   });
 
-  it("no repite el mismo aviso al día siguiente", () => {
+  /* 🩸 CAMBIÓ DE DIRECCIÓN EL 15-sep-2026, con motivo. Este caso exigía lo
+   * contrario: «no repite el mismo aviso al día siguiente». Esa regla —UN aviso
+   * por episodio— dejó a Daniel sin enterarse de dos días hábiles enteros sin
+   * marcaciones: los relojes callaron el viernes 11 a las 7:52 p.m., el vigía
+   * avisó el SÁBADO a las 10 a.m. (el día en que la PC está apagada a
+   * propósito) y con eso gastó el candado; el lunes 14 y el martes 15 no sonó.
+   * Daniel, textual: «telegram me tiene que avisar, sábado y domingo la pc
+   * permanece apagada». El sábado y el domingo los saca `vercel.json` (`1-5`);
+   * la repetición se resuelve acá. */
+  it("vuelve a avisar en la pasada siguiente mientras siga apagada", () => {
     expect(
       vigiaDebeAlertar(
         { dispositivo: "d", visto_en: haceMin(30 * 60), alertado_en: haceMin(20 * 60) },
+        AHORA,
+        6,
+      ),
+    ).toBe(true);
+  });
+
+  /* CONTROL de lo anterior: el candado NO se fue. Dos pasadas del cron muy
+   * pegadas —o un reintento— no pueden mandar dos mensajes por lo mismo. */
+  it("no manda dos avisos seguidos por el mismo silencio", () => {
+    expect(
+      vigiaDebeAlertar(
+        { dispositivo: "d", visto_en: haceMin(30 * 60), alertado_en: haceMin(20) },
+        AHORA,
+        6,
+      ),
+    ).toBe(false);
+  });
+
+  it("una fecha de aviso ilegible se trata como recién avisado: ante la duda, calla", () => {
+    expect(
+      vigiaDebeAlertar(
+        { dispositivo: "d", visto_en: haceMin(30 * 60), alertado_en: "no-es-fecha" },
         AHORA,
         6,
       ),

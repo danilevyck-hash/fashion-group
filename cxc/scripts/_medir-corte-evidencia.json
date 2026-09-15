@@ -1,0 +1,123 @@
+{
+ "dia": "2026-09-13",
+ "rangoPosible": [
+  "2026-09-11",
+  "2026-09-13"
+ ],
+ "seguro": true,
+ "evidencia": "El lunes 14 el sistema marca ausencia de día completo a 34 colaboradores y su Excel no le cobra ausencia a ninguno de ellos: con el reloj hasta el 14 o el 15 cuadran 130 celdas de 210, y hasta el 13 cuadran 157. Por abajo, el viernes 11 hay 5 personas con tardanza en el reloj y en 4 de ellas su Excel se parece más al sistema CON el 11 adentro. Entre el 11, el 12 y el 13 no hay nada que medir: la última marcación de la quincena es del viernes 11, y el 12 y el 13 son sábado y domingo. O sea que el corte de su Excel está entre el viernes 11 y el domingo 13, y correr el sistema con el 13 —el que propone— da exactamente lo mismo que con el 11.",
+ "loQueSeProbo": [
+  {
+   "relojHasta": "2026-09-08",
+   "cuadran": 160,
+   "celdas": 210,
+   "brecha": 472.33
+  },
+  {
+   "relojHasta": "2026-09-09",
+   "cuadran": 160,
+   "celdas": 210,
+   "brecha": 453.7
+  },
+  {
+   "relojHasta": "2026-09-10",
+   "cuadran": 159,
+   "celdas": 210,
+   "brecha": 417.45
+  },
+  {
+   "relojHasta": "2026-09-11",
+   "cuadran": 157,
+   "celdas": 210,
+   "brecha": 452.92
+  },
+  {
+   "relojHasta": "2026-09-12",
+   "cuadran": 157,
+   "celdas": 210,
+   "brecha": 452.92
+  },
+  {
+   "relojHasta": "2026-09-13",
+   "cuadran": 157,
+   "celdas": 210,
+   "brecha": 452.92
+  },
+  {
+   "relojHasta": "2026-09-14",
+   "cuadran": 130,
+   "celdas": 210,
+   "brecha": 1333.64
+  },
+  {
+   "relojHasta": "2026-09-15",
+   "cuadran": 130,
+   "celdas": 210,
+   "brecha": 1333.64
+  }
+ ],
+ "elLunes14": {
+  "colaboradoresQueElSistemaMarcaAusentes": 34,
+  "ausenciasEnSuExcel": [
+   {
+    "nombre": "DOMINGO HENRÍQUEZ",
+    "monto": 24.16
+   },
+   {
+    "nombre": "MARTA A. CHAVARRIA",
+    "monto": 24.16
+   },
+   {
+    "nombre": "María Bethancourt",
+    "monto": 23.04
+   },
+   {
+    "nombre": "Gabriela Jaramillo",
+    "monto": 11.33
+   }
+  ]
+ },
+ "elViernes11": [
+  {
+   "nombre": "Jorman Hernández",
+   "minutosEse11": 11,
+   "excel": 1.33,
+   "sinEl11": 0.63,
+   "conEl11": 1.29,
+   "seParece": "con el 11"
+  },
+  {
+   "nombre": "BRICEIDA MONTERO",
+   "minutosEse11": 11,
+   "excel": 0,
+   "sinEl11": 0,
+   "conEl11": 0.62,
+   "seParece": "sin el 11"
+  },
+  {
+   "nombre": "ANDRES A. GONZALEZ C.",
+   "minutosEse11": 12,
+   "excel": 3.2,
+   "sinEl11": 2.52,
+   "conEl11": 3.36,
+   "seParece": "con el 11"
+  },
+  {
+   "nombre": "SAMIR POLO ARRIETA",
+   "minutosEse11": 11,
+   "excel": 5.74,
+   "sinEl11": 2.4,
+   "conEl11": 2.97,
+   "seParece": "con el 11"
+  },
+  {
+   "nombre": "MARTA A. CHAVARRIA",
+   "minutosEse11": 15,
+   "excel": 25.87,
+   "sinEl11": 25.3,
+   "conEl11": 26.08,
+   "seParece": "con el 11"
+  }
+ ],
+ "ultimaMarcacionDeLaQuincena": "viernes 11 de septiembre de 2026"
+}

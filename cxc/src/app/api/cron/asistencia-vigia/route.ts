@@ -7,7 +7,7 @@
 // el agente no reporta nada: no hay falla, hay silencio. Y el silencio no
 // ejecuta código. Alguien del lado de Vercel tiene que mirar el reloj de pared.
 //
-// ── POR QUÉ SOLO DE DÍA, Y POR QUÉ AHORA TAMBIÉN SÁBADO Y DOMINGO ────────────
+// ── POR QUÉ SOLO DE DÍA, Y SOLO DE LUNES A VIERNES ───────────────────────────
 // De día: un aviso a las 3 a.m. diciendo que hay que prender una PC no lo va a
 // atender nadie hasta la mañana, y una alerta que no se puede accionar en el
 // momento es lo que enseña a silenciar el canal. Tres pasadas entre las 10:00
@@ -23,24 +23,27 @@
 // es a las 10 a.m.: a esa hora la oficina ya abrió, y que nadie haya prendido la
 // PC sí merece que suene.
 //
-// 🩸 Todos los días, y ANTES eran solo lunes a viernes (`0 15 * * 1-5`). El
-// razonamiento viejo —"la PC apagada el fin de semana es lo normal"— confundía
-// la OFICINA con la PC: la oficina cierra, pero el agente reporta cada 3
-// minutos haya gente o no. Con la regla vieja, una PC que se apagaba el viernes
-// a las 6 p.m. se avisaba recién el lunes a las 10 a.m.: 64 horas de silencio,
-// y el lunes ya con dos días de asistencia sin entrar.
+// 🩸 LUNES A VIERNES, y esto volvió a cambiar el 15-sep-2026. Entre agosto y
+// esa fecha corría todos los días, con el argumento de que "la oficina cierra
+// pero la PC no". Daniel, textual: *«sábado y domingo la pc permanece
+// apagada»*. O sea que el sábado a las 10 a.m. las 6 h de silencio se cruzaban
+// SIEMPRE, y ese aviso —falso— se llevaba puesto el candado y dejaba mudo el
+// lunes. Medido en el episodio que lo destapó: los dos relojes callaron el
+// viernes 11 a las 7:52 p.m., sonó el sábado 12 a las 10 a.m., y el lunes 14 y
+// el martes 15 —dos días hábiles sin una marcación— no sonó ni una vez.
 //
 // El horario y los días los filtra el propio `vercel.json`, no una condición
 // acá: un cron que corre y decide no hacer nada gasta invocación y deja logs
 // que confunden.
 //
-// ⚠️ Correr 3 veces NO multiplica los avisos — `alertado_en` deja pasar UNO por
-// episodio (ver `vigiaDebeAlertar`). Lo único que se achica es la demora entre
-// que la PC se apaga y Daniel se entera.
+// 🔴 Correr 3 veces sí manda 3 avisos, y es a propósito desde el 15-sep-2026
+// (Daniel: *«telegram me tiene que avisar»*). `alertado_en` sigue siendo el
+// candado, pero ahora con respiro (`HORAS_ENTRE_AVISOS_VIGIA`): frena el doble
+// aviso de una misma pasada y deja pasar el de la siguiente mientras la PC siga
+// apagada. Se corta solo — el ingest lo pone en NULL apenas el agente vuelve.
 //
 // ⚠️ NO manda nada si el agente nunca se instaló (`visto_en` vacío): no se
-// reclama por algo que todavía no existe. Y no repite: `alertado_en` es el
-// candado, y el "ya volvió" lo manda el propio ingest cuando el agente vuelve.
+// reclama por algo que todavía no existe.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
