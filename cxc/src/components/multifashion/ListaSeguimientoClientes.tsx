@@ -38,12 +38,12 @@ import { cn } from "@/lib/utils";
 import { fmtMoney } from "@/lib/ventas/format";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { nombreEnPantalla } from "@/lib/multifashion/nombres";
-import { FILAS_CLIENTES_AL_ABRIR } from "@/lib/multifashion/clientes-cobertura";
 import type { ClienteUniverso } from "@/lib/multifashion/clientes-universo";
 import type { UltimoContacto } from "@/lib/multifashion/contacto-registro";
 import {
   CHIPS,
   CHIP_INICIAL,
+  FILAS_SEGUIMIENTO_AL_ABRIR,
   ROTULO_CHIP,
   conteoPorChip,
   esChip,
@@ -88,8 +88,8 @@ export function ListaSeguimientoClientes({ clientes, hoy }: Props) {
   const conteos = useMemo(() => conteoPorChip(clientes), [clientes]);
   const lista = useMemo(() => listaDeSeguimiento(clientes, chip), [clientes, chip]);
 
-  const recorta = !verTodos && lista.length > FILAS_CLIENTES_AL_ABRIR;
-  const visibles = recorta ? lista.slice(0, FILAS_CLIENTES_AL_ABRIR) : lista;
+  const recorta = !verTodos && lista.length > FILAS_SEGUIMIENTO_AL_ABRIR;
+  const visibles = recorta ? lista.slice(0, FILAS_SEGUIMIENTO_AL_ABRIR) : lista;
 
   const cambiarChip = (c: Chip) => {
     setChip(c);

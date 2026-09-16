@@ -161,3 +161,18 @@ export function lineaDelRenglon(
     : null;
   return { dias, contacto };
 }
+
+/**
+ * Cuántas filas se ven antes de tocar «Ver los N» en la LISTA DE SEGUIMIENTO.
+ *
+ * 🔴 ES SU PROPIA CONSTANTE, y no la de Mayoreo, A PROPÓSITO (16-sep-2026).
+ * `FILAS_CLIENTES_AL_ABRIR` (10, en `clientes-cobertura.ts`) es para un RANKING:
+ * se abre, se leen los de arriba y se cierra. Esta lista es una COLA DE TRABAJO:
+ * se abre y se baja llamando uno por uno. Son dos preguntas distintas y por eso
+ * son dos números; compartirlos obligaba a mover Mayoreo para tocar ésta.
+ *
+ * Daniel, 16-sep-2026, sobre las 25: *«2. Sí»*. Medido ese día: el chip que abre
+ * («No vuelven») trae **668 filas**, así que diez se acaban en dos segundos de
+ * trabajo y las 668 de una son una página que no termina nunca.
+ */
+export const FILAS_SEGUIMIENTO_AL_ABRIR = 25;

@@ -341,12 +341,21 @@ describe("6 · Clientes", () => {
   // tampoco —se abre con 10 filas y el botón dice CUÁNTAS faltan, nunca «Ver
   // más»—: cambia el archivo donde se le exige. La tabla que se quedó en la
   // pestaña (Mayoreo) conserva su propio recorte.
-  it("la lista abre con 10 filas y ofrece «Ver los N»", () => {
+  it("la lista de seguimiento abre con 25 filas, y Mayoreo conserva sus 10", () => {
+    // 🩸 CAMBIÓ DE ALCANCE EL 16-sep-2026, con motivo. Este número sigue siendo
+    // 10 y sigue siendo el de MAYOREO, que es un ranking: se abre, se leen los
+    // de arriba y se cierra. La lista de SEGUIMIENTO nació ese día con su propia
+    // constante en 25 (`FILAS_SEGUIMIENTO_AL_ABRIR`), porque es una cola de
+    // trabajo y no un ranking. Daniel: «2. Sí» a las 25. Compartirlas obligaba a
+    // mover Mayoreo para tocar la otra.
     expect(FILAS_CLIENTES_AL_ABRIR).toBe(10);
-    expect(lista).toContain("FILAS_CLIENTES_AL_ABRIR");
+    expect(lista).toContain("FILAS_SEGUIMIENTO_AL_ABRIR");
     expect(lista).toContain("Ver los {lista.length}");
     // Y lo que se dibuja es el recorte, no la lista entera.
-    expect(lista).toContain("const visibles = recorta ? lista.slice(0, FILAS_CLIENTES_AL_ABRIR) : lista");
+    expect(lista).toContain("const visibles = recorta ? lista.slice(0, FILAS_SEGUIMIENTO_AL_ABRIR) : lista");
+    // 🔴 CONTROL: la lista de seguimiento NO usa el número de Mayoreo. Si alguien
+    // vuelve a compartirlos, mover uno mueve el otro sin que nadie lo pida.
+    expect(lista).not.toContain("FILAS_CLIENTES_AL_ABRIR");
   });
 
   it("la tabla de Mayoreo conserva el suyo, con el mismo texto", () => {

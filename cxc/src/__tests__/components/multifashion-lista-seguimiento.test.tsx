@@ -26,6 +26,7 @@ import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { SWRConfig } from "swr";
 import { ListaSeguimientoClientes } from "@/components/multifashion/ListaSeguimientoClientes";
 import { armarUniverso, type FilaFactura, type FilaRegistrado } from "@/lib/multifashion/clientes-universo";
+import { FILAS_SEGUIMIENTO_AL_ABRIR } from "@/lib/multifashion/clientes-seguimiento";
 
 const HOY = "2026-09-16";
 
@@ -182,16 +183,19 @@ describe("la lista aguanta lo raro sin romperse", () => {
     expect(screen.queryByText(/le escribieron/)).toBeNull();
   });
 
-  it("abre con 10 filas y ofrece «Ver los N» cuando hay más", () => {
+  /* 🩸 ERAN 10 HASTA EL 16-sep-2026. Daniel: «2. Sí» a las 25. Medido ese día:
+   * el chip que abre trae 668 filas, así que diez se acaban en dos segundos de
+   * trabajo. Mayoreo se queda en 10 y por eso son dos constantes. */
+  it("abre con 25 filas y ofrece «Ver los N» cuando hay más", () => {
     const muchos = armarUniverso(
-      Array.from({ length: 14 }, (_, i) => reg(i + 10, `CLIENTE ${i + 10}`, "6212-0673")),
-      Array.from({ length: 14 }, (_, i) => fac(i + 10, "2025-12-01")),
+      Array.from({ length: 30 }, (_, i) => reg(i + 10, `CLIENTE ${i + 10}`, "6212-0673")),
+      Array.from({ length: 30 }, (_, i) => fac(i + 10, "2025-12-01")),
       HOY,
     ).clientes;
     montar({ clientes: muchos, hoy: HOY });
-    expect(screen.getAllByText(/días sin comprar/).length).toBe(10);
-    const ver = screen.getByRole("button", { name: "Ver los 14" });
+    expect(screen.getAllByText(/días sin comprar/).length).toBe(FILAS_SEGUIMIENTO_AL_ABRIR);
+    const ver = screen.getByRole("button", { name: "Ver los 30" });
     fireEvent.click(ver);
-    expect(screen.getAllByText(/días sin comprar/).length).toBe(14);
+    expect(screen.getAllByText(/días sin comprar/).length).toBe(30);
   });
 });
