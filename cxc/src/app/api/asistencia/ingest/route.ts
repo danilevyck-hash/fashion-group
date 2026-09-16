@@ -24,15 +24,7 @@ import { timingSafeEqual } from "crypto";
 import { supabaseServer } from "@/lib/supabase-server";
 import { normalizarEventos, ultimoInstante, type EventoCrudo } from "@/lib/asistencia/ingest";
 import { guardarMarcaciones } from "@/lib/asistencia/guardar-marcaciones";
-import { enviarSistema } from "@/lib/alertas/canal";
-import {
-  decidirAlerta,
-  esColumnaFaltante,
-  nombreRelojEnPantalla,
-  textoCaido,
-  textoRecuperado,
-  type FilaDispositivo,
-} from "@/lib/asistencia/agente";
+import { esColumnaFaltante, type FilaDispositivo } from "@/lib/asistencia/agente";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -154,30 +146,26 @@ export async function POST(req: NextRequest) {
   // saltado para siempre y esas marcaciones no se recuperarían nunca.
   if (body.error) {
     const motivo = String(body.error).slice(0, 500);
-    // Regla de las tres: se avisa a la TERCERA falla seguida, no a la primera.
-    // Un reinicio del reloj o un corte de dos minutos se arregla solo, y eso es
-    // el sistema funcionando bien — no un incidente que despierte a nadie.
-    const d = decidirAlerta(
-      { fallosSeguidos: previa?.fallos_seguidos ?? 0, alertadoEn: previa?.alertado_en ?? null },
-      "falla",
-      ahora,
-    );
-    const { faltaMigracion } = await guardarEstado(
+    // 🩸 ACÁ SE MANDABA «Falló 3 veces seguidas» POR TELEGRAM. Se retiró el
+    // 15-sep-2026: el reloj de Multifashion vive en la tienda, que cierra a las
+    // 7, así que todas las noches se acumulaban tres fallas y sonaba el
+    // teléfono (cuatro mensajes en 35 minutos, la noche que Daniel lo mostró).
+    // Ahora avisa UN solo lugar, el vigía, a las 24 h sin poder LEER el reloj y
+    // de lunes a viernes. Ver `agente.ts`.
+    //
+    // 🔴 NO SE TOCA `alertado_en` EN ESTA RAMA: es el candado del vigía, y un
+    // reporte de error no cierra ni abre su episodio. Lo pone en NULL el camino
+    // del ÉXITO, que es cuando el problema de verdad se arregló.
+    //
+    // `fallos_seguidos` se sigue llevando como DIAGNÓSTICO (la columna no se
+    // dropea, patrón `mayor_lineas`): se ve en la base cuando hace falta
+    // entender un episodio, y nadie decide nada con ella.
+    const fallos = Math.max(0, previa?.fallos_seguidos ?? 0) + 1;
+    await guardarEstado(
       { dispositivo, visto_en: ahora, ultimo_error: motivo, updated_at: ahora },
-      {
-        fallos_seguidos: d.fallosSeguidos,
-        alertado_en: d.alertadoEn,
-        ...extraPedido,
-        ...extraVersion,
-      },
+      { fallos_seguidos: fallos, ...extraPedido, ...extraVersion },
     );
-    // Sin la migración corrida no hay contador que persista, así que NO se
-    // avisa: mandar Telegram con un contador que siempre vale 1 sería avisar en
-    // cada tropiezo, justo lo que la regla prohíbe. El vigía diario igual lo ve.
-    if (d.alerta === "caido" && !faltaMigracion) {
-      await enviarSistema(textoCaido(nombreRelojEnPantalla(dispositivo), motivo));
-    }
-    return NextResponse.json({ ok: true, registrado: "error", fallosSeguidos: d.fallosSeguidos });
+    return NextResponse.json({ ok: true, registrado: "error", fallosSeguidos: fallos });
   }
 
   const eventos = Array.isArray(body.eventos) ? body.eventos : [];
@@ -221,12 +209,23 @@ export async function POST(req: NextRequest) {
 
   // `leido_hasta` solo avanza si TODO salió bien.
   const hasta = ultimoInstante(filas);
-  const d = decidirAlerta(
-    { fallosSeguidos: previa?.fallos_seguidos ?? 0, alertadoEn: previa?.alertado_en ?? null },
-    "exito",
-    ahora,
-  );
-  const { faltaMigracion } = await guardarEstado(
+  // 🔴 ACÁ SE ESCRIBE `leido_ok_en`, Y SOLO ACÁ (15-sep-2026). Es el instante
+  // en que el reloj se pudo LEER, que es lo que el vigía mide para decir «lleva
+  // más de 24 horas sin poder leerse». No es `visto_en`: ese se mueve también
+  // en la rama del error, y por eso un reloj inalcanzable con la PC prendida
+  // —el caso de Multifashion— nunca habría sonado.
+  //
+  // ⚠️ Se escribe aunque no venga ni una marcación nueva: una vuelta que llegó
+  // al reloj y encontró el día vacío ES una lectura buena. `leido_hasta`, en
+  // cambio, solo avanza cuando hay algo que traer.
+  //
+  // 🩸 Y ACÁ SE MANDABA EL «ya volvieron a entrar las marcaciones». Se retiró
+  // con el aviso de la caída: con un umbral de 24 h, tranquilizar por un bajón
+  // corto no le sirve a nadie, y era la mitad del ruido nocturno.
+  //
+  // `alertado_en: null` SE QUEDA: es lo que rearma el candado del vigía cuando
+  // el problema se arregló de verdad.
+  await guardarEstado(
     {
       dispositivo,
       visto_en: ahora,
@@ -234,14 +233,8 @@ export async function POST(req: NextRequest) {
       ...(hasta ? { leido_hasta: hasta } : {}),
       updated_at: ahora,
     },
-    { fallos_seguidos: 0, alertado_en: null, ...extraPedido, ...extraVersion },
+    { fallos_seguidos: 0, alertado_en: null, leido_ok_en: ahora, ...extraPedido, ...extraVersion },
   );
-
-  // El "ya volvió" NO es ruido: sin él Daniel se queda con la última noticia
-  // mala y va a la oficina a revisar algo que ya se arregló solo.
-  if (d.alerta === "recuperado" && !faltaMigracion) {
-    await enviarSistema(textoRecuperado(nombreRelojEnPantalla(dispositivo)));
-  }
 
   if (descartados.length > 0) {
     // Nunca en silencio: si el reloj empieza a mandar algo que no entendemos,

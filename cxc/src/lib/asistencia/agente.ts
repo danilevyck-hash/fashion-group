@@ -11,8 +11,9 @@
  *   1. QUÉ SE MUESTRA EN PANTALLA cuando la PC está apagada. Un botón que gira
  *      para siempre es peor que un cartel que dice "prende la PC".
  *   2. CUÁNDO SE AVISA POR TELEGRAM. Regla de las tres de CLAUDE.md: si se
- *      recupera solo, NO se avisa. Un corte de luz de dos minutos no es un
- *      incidente.
+ *      recupera solo, NO se avisa. Desde el 15-sep-2026 eso es UN solo aviso —
+ *      el vigía, a las 24 h sin poder leer el reloj y de lunes a viernes— y ni
+ *      uno más: ver la nota de «acá vivía la regla de las tres alertas».
  *   3. CÓMO SE SABE QUE FALTA EL DDL. Los DDL los corre Daniel a mano y varios
  *      esperaron semanas; todo lo de acá tiene que funcionar sin la migración.
  *
@@ -82,6 +83,7 @@ const COLUMNAS_NUEVAS = [
   "alertado_en",
   "agente_version",
   "hueco_alertado_en",
+  "leido_ok_en",
 ] as const;
 
 export function esColumnaFaltante(error: { code?: string; message?: string } | null): boolean {
@@ -116,6 +118,18 @@ export interface FilaDispositivo {
   /** Candado del aviso "hay un hueco que el programa ya no alcanza".
    *  DDL: 20260812130000_asistencia_hueco_alertado.sql — sin correr, no viene. */
   hueco_alertado_en?: string | null;
+  /**
+   * 🔴 Cuándo se LEYÓ el reloj bien por última vez (15-sep-2026).
+   *
+   * ⚠️ NO ES `visto_en`. `visto_en` es el último contacto de la PC, y se mueve
+   * también cuando el agente reporta que NO pudo leer el reloj. Esta se mueve
+   * SOLO en el camino del éxito, y es la que hace medible «lleva más de 24
+   * horas sin poder leerse».
+   *
+   * DDL: 20261130120000_asistencia_leido_ok_en.sql — sin correr, no viene, y
+   * el vigía cae a `visto_en` (la conducta de antes).
+   */
+  leido_ok_en?: string | null;
 }
 
 export type SaludAgente = "nunca" | "al_dia" | "callado" | "con_error";
@@ -233,64 +247,46 @@ export function estadoAgente(fila: FilaDispositivo | null, ahoraMs: number): Est
   };
 }
 
-/* ── La regla de las tres alertas ───────────────────────────────────────── */
+/* ── 🩸 ACÁ VIVÍA «LA REGLA DE LAS TRES ALERTAS». SE RETIRÓ EL 15-sep-2026. ──
+ *
+ * `FALLOS_PARA_ALERTAR = 3`, `decidirAlerta`, `textoCaido` y `textoRecuperado`
+ * eran la máquina que avisaba a la TERCERA falla seguida y mandaba el «ya
+ * volvió» al recuperarse. Funcionaba exactamente como estaba escrita — y eso
+ * era el problema.
+ *
+ * 🩸 EL CASO, con la captura de Telegram delante: cuatro mensajes en 35 minutos
+ * por el reloj de Multifashion —«falló 3 veces» / «ya volvió» / «falló 3 veces»
+ * / «ya volvió»—, a las 11:04, 11:11, 11:22 y 11:39 de la noche. El dato que
+ * faltaba lo puso Daniel: *«pero la PC del reloj está apagada a estas horas»*.
+ * El reloj de Multifashion vive EN LA TIENDA, que cierra a las 7. Que de noche
+ * no se pueda leer NO ES UNA AVERÍA: es que la tienda está cerrada. Nueve
+ * minutos de reloj mudo son, ahí, el horario normal — y un aviso que suena
+ * todas las noches es la forma más barata de perder el aviso de verdad.
+ *
+ * Su decisión, textual: *«¿que me avise si lleva más de 24 horas, si de lunes a
+ * viernes?»*. Queda UN solo aviso, el del vigía, con umbral de 24 h y de lunes
+ * a viernes (`HORAS_PARA_VIGIA`, abajo). El «ya volvió» se fue con ellos: con
+ * un umbral de 24 horas, tranquilizar por un bajón corto no le sirve a nadie.
+ *
+ * ⚠️ NADA SE PIERDE POR AVISAR UN DÍA DESPUÉS: el reloj guarda las marcaciones
+ * adentro y el agente recupera 15 días hacia atrás al volver
+ * (`DIAS_RECUPERACION_AGENTE`). Medido el 15-sep-2026: la PC estuvo caída del
+ * viernes 11 al martes 15 y al volver entraron solas las 141 marcaciones del
+ * lunes y las 136 del martes.
+ *
+ * ⚠️ `asistencia_dispositivos.fallos_seguidos` NO se dropea (patrón
+ * `mayor_lineas`): el ingest la sigue llevando como diagnóstico y `alertado_en`
+ * sigue siendo el candado del vigía.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/* ── El vigía: el ÚNICO aviso del reloj ─────────────────────────────────── */
 
 /**
- * Cuántas fallas SEGUIDAS antes de escribirle a Daniel.
+ * 🩸 POR QUÉ ESTO EXISTE, Y POR QUÉ DESDE EL 15-sep-2026 ES LO ÚNICO QUE AVISA.
  *
- * 🩸 El punto 2 de la regla de sistema de CLAUDE.md: "si se arregla solo, NO se
- * avisa". El agente reintenta cada 3 minutos, así que tres fallas seguidas son
- * ~9 minutos de reloj mudo de verdad. Avisar a la primera convertiría cada
- * reinicio del aparato en una notificación al celular, y en dos semanas Daniel
- * silenciaría el canal — que es exactamente cómo se pierde una alerta real.
- */
-export const FALLOS_PARA_ALERTAR = 3;
-
-export interface ContadorAlerta {
-  fallosSeguidos: number;
-  alertadoEn: string | null;
-}
-
-export type QueAlerta = "ninguna" | "caido" | "recuperado";
-
-export interface DecisionAlerta extends ContadorAlerta {
-  alerta: QueAlerta;
-}
-
-/**
- * Máquina de estados del aviso. Sube el contador con cada falla, lo pone en
- * cero con cada éxito, y avisa UNA sola vez por episodio.
- *
- * `alertadoEn` cumple dos funciones a la vez: es el candado que evita repetir
- * el mismo aviso en cada vuelta, y es la memoria de que hubo un episodio
- * abierto — sin él no se sabría si hace falta mandar el "ya volvió".
- *
- * El "ya volvió" NO es ruido: sin él, Daniel se queda con la última noticia
- * mala y va a la oficina a revisar algo que ya se arregló.
- */
-export function decidirAlerta(prev: ContadorAlerta, evento: "falla" | "exito", ahoraIso: string): DecisionAlerta {
-  if (evento === "exito") {
-    if (prev.alertadoEn) {
-      return { fallosSeguidos: 0, alertadoEn: null, alerta: "recuperado" };
-    }
-    return { fallosSeguidos: 0, alertadoEn: null, alerta: "ninguna" };
-  }
-  const fallos = Math.max(0, prev.fallosSeguidos ?? 0) + 1;
-  if (fallos >= FALLOS_PARA_ALERTAR && !prev.alertadoEn) {
-    return { fallosSeguidos: fallos, alertadoEn: ahoraIso, alerta: "caido" };
-  }
-  return { fallosSeguidos: fallos, alertadoEn: prev.alertadoEn ?? null, alerta: "ninguna" };
-}
-
-/* ── El vigía: cuando la PC está apagada, NADIE llama ───────────────────── */
-
-/**
- * 🩸 EL CASO QUE LA MÁQUINA DE ARRIBA NO PUEDE VER.
- *
- * `decidirAlerta` sube el contador cuando el agente REPORTA una falla. Pero si
- * la PC está apagada, el agente no reporta nada: no hay falla, hay silencio. Y
- * el silencio no dispara ningún código. Por eso hace falta que alguien del lado
- * de Vercel mire el reloj de pared una vez al día.
+ * Cuando la PC está apagada el agente no reporta nada: no hay falla, hay
+ * silencio. Y el silencio no dispara ningún código. Por eso hace falta que
+ * alguien del lado de Vercel mire el reloj de pared un par de veces al día.
  *
  * ⚠️ SOLO CORRE DE DÍA, Y ESO LO DECIDE `vercel.json`, NO ESTE ARCHIVO. Tres
  * pasadas entre las 10:00 a.m. y las 5:15 p.m. de Panamá (15:00, 20:00 y 22:15
@@ -300,9 +296,9 @@ export function decidirAlerta(prev: ContadorAlerta, evento: "falla" | "exito", a
  *
  * 🩸 Y TAMPOCO a primera hora: la pasada de las 8:45 a.m. (13:45 UTC) se quitó
  * el 10-ago-2026. Daniel apaga la PC de la oficina a las 5/6 p.m., así que a las
- * 8:45 a.m. lleva ~14 h de silencio y estas 6 h se cruzan SIEMPRE — era una
- * falsa alarma diaria. NO se tocó `HORAS_PARA_VIGIA`: el umbral está bien, lo
- * que estaba mal era la hora a la que se preguntaba.
+ * 8:45 a.m. llevaba ~14 h de silencio y el umbral de entonces (6 h) se cruzaba
+ * SIEMPRE — era una falsa alarma diaria. Con las 24 h de hoy ese caso ya no se
+ * cruzaría, pero la pasada no vuelve: a las 8:45 la oficina todavía no abrió.
  *
  * 🩸 SOLO DE LUNES A VIERNES, y esto cambió de dirección el 15-sep-2026.
  * Acá decía «TODOS LOS DÍAS, incluidos sábado y domingo. La oficina cierra,
@@ -328,8 +324,22 @@ export function decidirAlerta(prev: ContadorAlerta, evento: "falla" | "exito", a
  * Los días y las horas los filtra `vercel.json` (`0 15 * * 1-5`, `0 20 * * 1-5`,
  * `15 22 * * 1-5`), no una condición acá: un cron que corre y decide no hacer
  * nada gasta invocación y deja logs que confunden.
+ *
+ * ── 🔴 EL UMBRAL: 24 HORAS, Y CAMBIÓ EL 15-sep-2026 (antes eran 6) ───────────
+ *
+ * Daniel, textual: *«¿que me avise si lleva más de 24 horas, si de lunes a
+ * viernes?»*. Con 6 h, el reloj de Multifashion —que vive EN LA TIENDA, y la
+ * tienda cierra a las 7— cruzaba el umbral todas las noches: el aviso sonaba
+ * por el horario normal. Con 24 h, una noche cerrada no suena y un día hábil
+ * entero sin poder leer el reloj sí.
+ *
+ * ⚠️ NADA SE PIERDE POR AVISAR UN DÍA DESPUÉS: el reloj guarda las marcaciones
+ * adentro y el agente recupera `DIAS_RECUPERACION_AGENTE` (15) días hacia atrás
+ * al volver. Medido el 15-sep-2026: la PC estuvo caída del viernes 11 al martes
+ * 15 y al volver entraron solas las 141 marcaciones del lunes y las 136 del
+ * martes.
  */
-export const HORAS_PARA_VIGIA = 6;
+export const HORAS_PARA_VIGIA = 24;
 
 /**
  * Cuánto tiene que pasar para volver a avisar del MISMO silencio.
@@ -341,9 +351,29 @@ export const HORAS_PARA_VIGIA = 6;
 export const HORAS_ENTRE_AVISOS_VIGIA = 2;
 
 /**
+ * 🔴 CUÁNDO SE PUDO LEER EL RELOJ POR ÚLTIMA VEZ — y NO cuándo se supo de la PC.
+ *
+ * 🩸 LA DIFERENCIA ES EL CASO QUE ORIGINÓ TODO ESTO. `visto_en` es el último
+ * contacto de la PC de la oficina, y el ingest lo mueve TAMBIÉN cuando el
+ * agente reporta que NO pudo leer el reloj. En el episodio del 15-sep-2026 la
+ * PC estaba PRENDIDA —por eso llegaron los cuatro mensajes de «falló 3 veces»—
+ * y el reloj de Multifashion inalcanzable: midiendo `visto_en`, ese caso no
+ * habría sonado NUNCA. Daniel pidió que avise «si lleva más de 24 horas sin
+ * poder leerse»: el RELOJ, no la PC.
+ *
+ * ⚠️ FALLA ABIERTA. Sin la migración `20261130120000` corrida, `leido_ok_en` no
+ * viene y se cae a `visto_en`: la conducta de antes (24 h de silencio de la PC),
+ * que es correcta y solo cubre menos. Nunca al revés — nunca callar de más.
+ */
+function ultimaLecturaBuena(fila: FilaDispositivo): string | null | undefined {
+  return fila.leido_ok_en ?? fila.visto_en;
+}
+
+/**
  * ¿El vigía tiene que escribir? Solo si (a) el agente alguna vez existió —no se
- * avisa de algo que nunca se instaló—, (b) lleva más de `horas` sin dar señales
- * y (c) no se avisó de este mismo silencio hace menos de `horasEntreAvisos`.
+ * avisa de algo que nunca se instaló—, (b) hace más de `horas` que no se puede
+ * LEER el reloj y (c) no se avisó de este mismo silencio hace menos de
+ * `horasEntreAvisos`.
  */
 export function vigiaDebeAlertar(
   fila: FilaDispositivo | null,
@@ -351,8 +381,13 @@ export function vigiaDebeAlertar(
   horas: number = HORAS_PARA_VIGIA,
   horasEntreAvisos: number = HORAS_ENTRE_AVISOS_VIGIA,
 ): boolean {
-  if (!fila?.visto_en) return false; // nunca se instaló: no hay nada que reclamar
-  const mins = minutosDesde(fila.visto_en, ahoraMs);
+  // Nunca se instaló —ni una lectura buena, ni un contacto de la PC—: no hay
+  // nada que reclamar. Se pregunta por la MISMA función que después mide, para
+  // que las dos no puedan opinar distinto sobre qué cuenta como «hubo algo».
+  if (!fila) return false;
+  const ultima = ultimaLecturaBuena(fila);
+  if (!ultima) return false;
+  const mins = minutosDesde(ultima, ahoraMs);
   if (mins === null || mins <= horas * 60) return false;
   if (fila.alertado_en) {
     // Ya se avisó: solo se repite si pasó el respiro. Una fecha ilegible se
@@ -445,25 +480,22 @@ export function vigiaHuecoCerrado(
  * para el negocio · QUÉ hacer. Es el formato que pide CLAUDE.md para el canal
  * de sistema, y el que hace que se pueda actuar sin abrir la computadora.
  */
-export function textoCaido(dispositivo: string, motivo: string): string {
-  return [
-    `El agente de asistencia no puede leer el reloj (${dispositivo}).`,
-    `Falló ${FALLOS_PARA_ALERTAR} veces seguidas. Detalle: ${motivo}`,
-    "Qué significa: las marcaciones de hoy no están entrando. El reloj las guarda, así que no se pierden — entran cuando se restablezca.",
-    "Qué hacer: revisar que el reloj de la entrada esté prendido y en la red.",
-  ].join("\n");
-}
-
+/**
+ * 🔴 EL ÚNICO MENSAJE QUE QUEDA (15-sep-2026). Dice QUÉ pasó · QUÉ significa ·
+ * QUÉ hacer, que es el formato del canal de sistema.
+ *
+ * ⚠️ Habla del RELOJ, no de la PC: desde que el umbral mide `leido_ok_en`, esto
+ * suena tanto con la PC apagada como con la PC prendida y el reloj inalcanzable
+ * (el caso de Multifashion). Decir «la PC no manda marcaciones» mandaría a
+ * Daniel a mirar una PC que está perfectamente prendida. Las dos causas van en
+ * «qué hacer», en orden de probabilidad.
+ */
 export function textoSilencio(dispositivo: string, minutos: number): string {
   return [
-    `Hace ${hace(minutos).replace("hace ", "")} que la PC de la oficina no manda marcaciones (${dispositivo}).`,
-    "Qué significa: la asistencia de hoy está sin actualizar. El reloj las guarda, no se pierde ninguna.",
-    "Qué hacer: prender la PC del iVMS. Sola se pone al día en unos minutos.",
+    `Hace ${hace(minutos).replace("hace ", "")} que no se puede leer el reloj (${dispositivo}).`,
+    "Qué significa: la asistencia de esos días está sin actualizar. El reloj las guarda adentro, así que no se pierde ninguna — entran solas cuando se restablezca.",
+    "Qué hacer: prender la PC del iVMS de la oficina; si ya está prendida, revisar que el reloj esté encendido y en la red.",
   ].join("\n");
-}
-
-export function textoRecuperado(dispositivo: string): string {
-  return `Ya volvieron a entrar las marcaciones del reloj (${dispositivo}). No hay que hacer nada.`;
 }
 
 /**

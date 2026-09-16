@@ -381,17 +381,22 @@ describe("el nombre que se lee en pantalla sale de una lista escrita a mano", ()
     expect(nombreRelojEnPantalla("reloj bodega")).toBe("reloj bodega");
   });
 
+  /* 🩸 CAMBIÓ EL 15-sep-2026: eran CINCO salidas de sistema y quedaron TRES.
+   * `textoCaido` («falló 3 veces seguidas») y `textoRecuperado` («ya volvió»)
+   * se retiraron — el reloj de Multifashion vive en la tienda, que cierra a las
+   * 7, y los dos sonaban todas las noches. Daniel: *«¿que me avise si lleva más
+   * de 24 horas, si de lunes a viernes?»*. Lo que este caso protege —que el
+   * mensaje diga el nombre legible y no la llave— vale igual para las tres que
+   * quedan, y el candado se pone rojo si alguna deja de traducir. */
   it("🔴 el Telegram también dice el nombre legible, no la llave", () => {
     // Con dos relojes, «no puede leer el reloj (reloj acs)» no le dice a nadie
-    // cuál se cayó. Las cinco salidas de sistema pasan por el mismo traductor.
+    // cuál se cayó. Las tres salidas de sistema pasan por el mismo traductor.
     const rutas = [
       "src/app/api/asistencia/ingest/route.ts",
       "src/app/api/cron/asistencia-vigia/route.ts",
     ].map((r) => fs.readFileSync(path.join(process.cwd(), r), "utf8"));
     const juntas = rutas.join("\n");
     for (const texto of [
-      "textoCaido",
-      "textoRecuperado",
       "textoSilencio",
       "textoHuecoViejo",
       "textoHuecoCerrado",
@@ -403,6 +408,22 @@ describe("el nombre que se lee en pantalla sale de una lista escrita a mano", ()
         expect(u).toContain("nombreRelojEnPantalla");
       }
     }
+  });
+
+  /* CONTROL de lo anterior: las dos que se retiraron no vuelven por la puerta
+   * de atrás. Si alguien las reintroduce, este candado lo dice. */
+  it("🩸 y las dos retiradas no volvieron: ni «falló 3 veces» ni «ya volvió»", () => {
+    const juntas = [
+      "src/app/api/asistencia/ingest/route.ts",
+      "src/app/api/cron/asistencia-vigia/route.ts",
+      "src/lib/asistencia/agente.ts",
+    ]
+      .map((r) => fs.readFileSync(path.join(process.cwd(), r), "utf8"))
+      .join("\n")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+    expect(juntas).not.toContain("textoCaido");
+    expect(juntas).not.toContain("textoRecuperado");
   });
 });
 

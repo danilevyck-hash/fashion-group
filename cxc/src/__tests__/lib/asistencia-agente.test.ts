@@ -6,17 +6,20 @@
 import { describe, it, expect } from "vitest";
 import {
   DISPOSITIVO_FG,
-  FALLOS_PARA_ALERTAR,
+  HORAS_PARA_VIGIA,
   MINUTOS_PARA_CALLADO,
   MINUTOS_PEDIDO_SIN_ATENDER,
-  decidirAlerta,
   esColumnaFaltante,
   estadoAgente,
   hace,
   vigiaDebeAlertar,
-  textoCaido,
   textoSilencio,
 } from "@/lib/asistencia/agente";
+import fs from "node:fs";
+import path from "node:path";
+
+const RAIZ = path.resolve(__dirname, "../../..");
+const leer = (p: string) => fs.readFileSync(path.join(RAIZ, p), "utf8");
 
 const AHORA = Date.parse("2026-08-06T15:00:00Z");
 const haceMin = (m: number) => new Date(AHORA - m * 60_000).toISOString();
@@ -110,55 +113,59 @@ describe("🔴 el botón no puede girar para siempre", () => {
   });
 });
 
-describe("🔴 la regla de las tres alertas", () => {
-  it("a la PRIMERA falla no se avisa — casi siempre se arregla solo", () => {
-    const d = decidirAlerta({ fallosSeguidos: 0, alertadoEn: null }, "falla", "T");
-    expect(d.alerta).toBe("ninguna");
-    expect(d.fallosSeguidos).toBe(1);
+/* 🩸 ACÁ VIVÍA «LA REGLA DE LAS TRES ALERTAS», y CAMBIÓ DE DIRECCIÓN EL
+ * 15-sep-2026. Este bloque probaba que a la TERCERA falla seguida se avisaba y
+ * que al recuperarse salía el «ya volvió». La máquina funcionaba exactamente
+ * como estaba probada — y ese era el problema.
+ *
+ * Daniel, con la captura de Telegram: cuatro mensajes en 35 minutos por el
+ * reloj de Multifashion, a las 11:04, 11:11, 11:22 y 11:39 de la noche. Y el
+ * dato que faltaba: *«pero la PC del reloj está apagada a estas horas»* — ese
+ * reloj vive en la tienda, que cierra a las 7. Su decisión, textual: *«¿que me
+ * avise si lleva más de 24 horas, si de lunes a viernes?»*.
+ *
+ * Ahora se prueba lo contrario: que esa máquina NO EXISTE. Y el CONTROL de que
+ * no se perdió el aviso está abajo — el vigía sigue sonando, con 24 h. */
+describe("🩸 la regla de las tres alertas se RETIRÓ (15-sep-2026)", () => {
+  const modulo = leer("src/lib/asistencia/agente.ts");
+  const ingest = leer("src/app/api/asistencia/ingest/route.ts");
+
+  it("no queda ninguna de las cuatro piezas exportada", () => {
+    for (const pieza of [
+      "export const FALLOS_PARA_ALERTAR",
+      "export function decidirAlerta",
+      "export function textoCaido",
+      "export function textoRecuperado",
+    ]) {
+      expect(modulo).not.toContain(pieza);
+    }
   });
 
-  it("a la segunda tampoco", () => {
-    const d = decidirAlerta({ fallosSeguidos: 1, alertadoEn: null }, "falla", "T");
-    expect(d.alerta).toBe("ninguna");
+  it("🔴 el ingest ya no le escribe a nadie por Telegram", () => {
+    // Las dos ramas —la del error y la del éxito— dejaron de avisar. El único
+    // aviso del reloj es el vigía.
+    expect(ingest).not.toContain("enviarSistema");
+    expect(ingest).not.toContain("textoCaido");
+    expect(ingest).not.toContain("textoRecuperado");
   });
 
-  it(`a la ${FALLOS_PARA_ALERTAR}ª seguida sí, y UNA sola vez`, () => {
-    const tercera = decidirAlerta({ fallosSeguidos: 2, alertadoEn: null }, "falla", "T");
-    expect(tercera.alerta).toBe("caido");
-    expect(tercera.alertadoEn).toBe("T");
-
-    // La cuarta, quinta y vigésima no repiten: el canal se silencia si repite.
-    const cuarta = decidirAlerta(tercera, "falla", "T2");
-    expect(cuarta.alerta).toBe("ninguna");
-    expect(cuarta.alertadoEn).toBe("T");
+  it("🔴 y la rama del ERROR no toca `alertado_en`: es el candado del vigía", () => {
+    // Si un reporte de error marcara el candado, el vigía se quedaría mudo
+    // justo cuando el reloj lleva un día sin poder leerse.
+    // Con los comentarios borrados: la nota SÍ lo nombra, y tiene que poder.
+    const rama = ingest
+      .slice(ingest.indexOf("if (body.error) {"), ingest.indexOf("const eventos ="))
+      .replace(/^\s*\/\/.*$/gm, "");
+    expect(rama).not.toContain("alertado_en");
+    // El contador se conserva como diagnóstico: la columna no se dropea.
+    expect(rama).toContain("fallos_seguidos");
   });
 
-  it("🔴 dos fallas y una recuperación NO avisan nada", () => {
-    // El caso más importante: el sistema que se repara solo es el sistema
-    // funcionando bien, no un incidente.
-    let e = decidirAlerta({ fallosSeguidos: 0, alertadoEn: null }, "falla", "T");
-    e = decidirAlerta(e, "falla", "T");
-    e = decidirAlerta(e, "exito", "T");
-    expect(e.alerta).toBe("ninguna");
-    expect(e.fallosSeguidos).toBe(0);
-  });
-
-  it("después de un aviso real, el 'ya volvió' SÍ se manda", () => {
-    // Sin él, Daniel se queda con la última noticia mala y va a la oficina a
-    // revisar algo que ya se arregló.
-    const caido = { fallosSeguidos: 5, alertadoEn: "T" };
-    const e = decidirAlerta(caido, "exito", "T2");
-    expect(e.alerta).toBe("recuperado");
-    expect(e.alertadoEn).toBeNull();
-    expect(e.fallosSeguidos).toBe(0);
-  });
-
-  it("un episodio nuevo después de recuperarse vuelve a avisar", () => {
-    let e = decidirAlerta({ fallosSeguidos: 3, alertadoEn: "T" }, "exito", "T2");
-    e = decidirAlerta(e, "falla", "T3");
-    e = decidirAlerta(e, "falla", "T3");
-    e = decidirAlerta(e, "falla", "T3");
-    expect(e.alerta).toBe("caido");
+  it("⚠️ el camino del ÉXITO sí lo limpia: ahí es cuando se arregló de verdad", () => {
+    // Con los comentarios borrados: la nota del éxito nombra `alertado_en: null`
+    // y sin esto el candado se conformaría con la nota en vez del código.
+    const codigo = ingest.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    expect(codigo).toContain("alertado_en: null");
   });
 });
 
@@ -218,15 +225,23 @@ describe("🔴 el vigía: el silencio no ejecuta código", () => {
 });
 
 describe("los textos que llegan al celular", () => {
-  it("dicen qué pasó, qué significa y qué hacer", () => {
-    const t = textoCaido("reloj cboston", "ETIMEDOUT");
+  it("el único que queda dice qué pasó, qué significa y qué hacer", () => {
+    const t = textoSilencio("reloj cboston", 30 * 60);
     expect(t).toContain("Qué significa");
     expect(t).toContain("Qué hacer");
-    expect(t).toContain("no se pierden");
+    expect(t).toContain("no se pierde ninguna");
   });
 
-  it("el de silencio pide lo único que hay que hacer: prender la PC", () => {
-    expect(textoSilencio("reloj cboston", 400)).toContain("prender la PC");
+  /* 🩸 CAMBIÓ EL 15-sep-2026: decía «que la PC de la oficina no manda
+   * marcaciones» y ahora dice que no se puede LEER EL RELOJ. Desde que el
+   * umbral mide la última lectura buena, esto suena también con la PC prendida
+   * y el reloj inalcanzable (el caso de Multifashion): mandar a Daniel a mirar
+   * una PC que está perfectamente prendida sería el aviso equivocado. */
+  it("habla del RELOJ, y ofrece las dos causas en orden de probabilidad", () => {
+    const t = textoSilencio("Reloj de Multifashion", 30 * 60);
+    expect(t).toContain("no se puede leer el reloj");
+    expect(t).toContain("prender la PC");
+    expect(t).toContain("en la red");
   });
 
   it("el tiempo se dice en cristiano", () => {
