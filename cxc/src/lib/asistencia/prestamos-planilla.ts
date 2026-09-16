@@ -108,7 +108,40 @@
 import { centavos } from "./planilla";
 import type { DineroLinea, ManualesLinea } from "./planilla";
 import { ORIGEN_POR_DEFECTO } from "@/lib/prestamos-conceptos";
-import { estadoCasilla } from "./casilla-sin-descontar";
+import { CASILLAS_AUTOMATICAS, estadoCasilla, type CasillaAutomatica } from "./casilla-sin-descontar";
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 🔴 EL INTERRUPTOR: EL PRÉSTAMO DEJA DE DESCONTARSE SOLO (15-sep-2026)
+ *
+ * Daniel, textual: *«que no se descuente hasta que contabilidad lo haga a mano
+ * por ahora, hasta que el módulo esté terminado»*.
+ *
+ * 🩸 POR QUÉ, MEDIDO EL 15-sep-2026. El Excel de la contadora descontó **$773,01**
+ * del 1 al 15 de septiembre en 13 personas (préstamo $624,28 · terceros $130,93 ·
+ * mercancía $17,80). El sistema tiene anotados **DOS** movimientos, los que
+ * escribió el cierre de Fashion Wear: Luis Parajón $70,00 (correcto) y **Eloyn
+ * Mendoza $25,00, que su planilla NO le descontó**. O sea que el automático ya
+ * escribió un pago que no fue, y los otros $703,01 no están registrados.
+ * Mientras los saldos no cuadren, que el sistema decida el monto es cómo se
+ * ensucia la deuda de una persona.
+ *
+ * ── QUÉ HACE `false` ─────────────────────────────────────────────────────────
+ *
+ *   · las tres casillas —Préstamo, Terceros y Mercancía— arrancan VACÍAS;
+ *   · vale exactamente lo que teclee contabilidad, y el CIERRE anota eso mismo
+ *     (es lo que arregla el caso de Eloyn: lo que se registra como pago es lo
+ *     que de verdad se descontó);
+ *   · la fila sigue MOSTRANDO cuánto debe y cuál sería su cuota, al lado de la
+ *     casilla (`prestamoAutomatico.deuda`). Se le quita al sistema la DECISIÓN,
+ *     no la INFORMACIÓN.
+ *
+ * ── QUÉ NO CAMBIA ────────────────────────────────────────────────────────────
+ *
+ * Los TRES estados de la casilla (`null` = vacía · `0` · monto) siguen iguales,
+ * y al volver a poner esto en `true` todo vuelve a como estaba: el automático
+ * entero está detrás de UNA sola función (`cuotaPropuesta`).
+ * ────────────────────────────────────────────────────────────────────────── */
+export const PRESTAMO_AUTOMATICO = false;
 
 /** Los archivos que Daniel tiene que correr. Se le muestran tal cual. */
 export const MIGRACION_AMARRE_PRESTAMOS =
@@ -529,6 +562,22 @@ export interface PrestamoAutomatico {
    * Lo leen la celda, «Antes de cerrar» y el cierre.
    */
   recortado?: { prestamo: number; terceros: number; mercancia: number };
+  /**
+   * 🔴 CUÁNTO DEBE Y CUÁL SERÍA SU CUOTA, cuenta por cuenta (15-sep-2026).
+   * Es INFORMACIÓN, no decisión: no mueve un centavo y la casilla sigue vacía.
+   *
+   * ⚠️ Solo viaja con `PRESTAMO_AUTOMATICO` en `false`. Con el automático
+   * prendido la casilla YA muestra la cuota y repetirla al lado sería una
+   * palabra de más — la regla de la casa sobre los chips pegados a un dato.
+   */
+  deuda?: Record<CasillaAutomatica, DeudaCuenta>;
+}
+
+/** Lo que se debe de UNA cuenta, y la cuota que tiene cargada. */
+export interface DeudaCuenta {
+  saldo: number;
+  /** 0 = no tiene cuota cargada. */
+  cuota: number;
 }
 
 /**
@@ -544,8 +593,30 @@ export interface PrestamoAutomatico {
  * ⚠️ Hasta ese día el 0 se leía como «vacío» y no había forma de saltarse una
  * quincena. Los tres estados viven en `casilla-sin-descontar.ts`.
  */
-export function casillaAutomatica(enCasilla: number | null | undefined, sugerido: number): number {
+export function casillaAutomatica(
+  enCasilla: number | null | undefined,
+  sugerido: number,
+  automatico: boolean = PRESTAMO_AUTOMATICO,
+): number {
   if (estadoCasilla(enCasilla) !== "vacia") return 0;
+  return cuotaPropuesta(sugerido, automatico);
+}
+
+/**
+ * 🔴 EL ÚNICO LUGAR DONDE SE DECIDE SI HAY PROPUESTA, y por eso el interruptor
+ * es de verdad uno solo: con el automático apagado el módulo NO PROPONE NADA
+ * (15-sep-2026, Daniel: *«que no se descuente hasta que contabilidad lo haga a
+ * mano por ahora, hasta que el módulo esté terminado»*). Lo leen la casilla y
+ * el «se saltó a propósito», que son las dos formas en que una propuesta podía
+ * llegar a la línea.
+ *
+ * 🔑 `automatico` ENTRA POR PARÁMETRO, con la constante como valor por defecto
+ * —el mismo patrón que `vigiaDebeAlertar(fila, ahora, HORAS_PARA_VIGIA)`—: la
+ * app nunca lo pasa (usa el interruptor) y los candados pueden probar las DOS
+ * direcciones sin tocar el archivo.
+ */
+function cuotaPropuesta(sugerido: number, automatico: boolean): number {
+  if (!automatico) return 0;
   return centavos(Math.max(0, num(sugerido)));
 }
 
@@ -568,27 +639,38 @@ export function aplicarPrestamoEnLinea<
 >(
   linea: L,
   sugerencia: SugerenciaPrestamo | null | undefined,
+  /** 🔑 Solo los candados lo pasan; la app usa el interruptor. */
+  automatico: boolean = PRESTAMO_AUTOMATICO,
 ): L & { prestamoAutomatico?: PrestamoAutomatico } {
   const d = linea.dinero;
   if (!d || !sugerencia) return linea;
-  const prestamo = casillaAutomatica(linea.manuales.prestamo, sugerencia.sugerido);
-  const terceros = casillaAutomatica(linea.manuales.terceros, sugerencia.sugeridoTerceros);
+  const prestamo = casillaAutomatica(linea.manuales.prestamo, sugerencia.sugerido, automatico);
+  const terceros = casillaAutomatica(linea.manuales.terceros, sugerencia.sugeridoTerceros, automatico);
   // 🔴 El daño (14-sep-2026): la MISMA cuenta, sobre `manuales.mercancia`. Sin
   // cuota cargada `sugeridoDano` es 0 y acá no entra nada — la casilla sigue a mano.
-  const mercancia = casillaAutomatica(linea.manuales.mercancia, sugerencia.sugeridoDano);
+  const mercancia = casillaAutomatica(linea.manuales.mercancia, sugerencia.sugeridoDano, automatico);
   // 🔴 Lo que se proponía y se dejó afuera A PROPÓSITO (casilla en 0). No mueve
   // un centavo: se anota para que la celda y «Antes de cerrar» lo digan.
+  // 🔑 Pasa por `cuotaPropuesta`: con el automático apagado no había cuota que
+  // saltar, así que un 0 en la casilla no dice «me salté $50» — no dice nada.
   const saltado = (escrito: number | null, propuesto: number) =>
-    estadoCasilla(escrito) === "sin-descontar" ? centavos(Math.max(0, num(propuesto))) : 0;
+    estadoCasilla(escrito) === "sin-descontar" ? cuotaPropuesta(propuesto, automatico) : 0;
   const sinDescontar = {
     prestamo: saltado(linea.manuales.prestamo, sugerencia.sugerido),
     terceros: saltado(linea.manuales.terceros, sugerencia.sugeridoTerceros),
     mercancia: saltado(linea.manuales.mercancia, sugerencia.sugeridoDano),
   };
   const haySaltado = sinDescontar.prestamo > 0 || sinDescontar.terceros > 0 || sinDescontar.mercancia > 0;
+  // 🔴 CON EL AUTOMÁTICO APAGADO, LA FILA SIGUE DICIENDO CUÁNTO DEBE
+  // (15-sep-2026). No mueve un centavo: viaja al lado de la casilla, que queda
+  // vacía. `undefined` con el automático prendido — ahí la casilla ya lo dice.
+  const deuda = deudaDeLaSugerencia(sugerencia, automatico);
   if (prestamo <= 0 && terceros <= 0 && mercancia <= 0) {
-    if (!haySaltado) return linea;
-    return { ...linea, prestamoAutomatico: { prestamo: 0, terceros: 0, mercancia: 0, sinDescontar } };
+    if (!haySaltado && !deuda) return linea;
+    const auto: PrestamoAutomatico = { prestamo: 0, terceros: 0, mercancia: 0 };
+    if (haySaltado) auto.sinDescontar = sinDescontar;
+    if (deuda) auto.deuda = deuda;
+    return { ...linea, prestamoAutomatico: auto };
   }
   const extra = centavos(prestamo + terceros + mercancia);
   const dinero: DineroLinea = {
@@ -601,7 +683,49 @@ export function aplicarPrestamoEnLinea<
   };
   const auto: PrestamoAutomatico = { prestamo, terceros, mercancia };
   if (haySaltado) auto.sinDescontar = sinDescontar;
+  if (deuda) auto.deuda = deuda;
   return { ...linea, dinero, prestamoAutomatico: auto };
+}
+
+/**
+ * Lo que la fila MUESTRA cuando el automático está apagado: cuánto debe de cada
+ * cuenta y cuál sería su cuota. `null` con el automático prendido (la casilla ya
+ * lo dice) y también cuando no debe nada — un «Debe $0.00» es ruido.
+ */
+function deudaDeLaSugerencia(
+  s: SugerenciaPrestamo,
+  automatico: boolean,
+): Record<CasillaAutomatica, DeudaCuenta> | null {
+  if (automatico) return null;
+  const deuda: Record<CasillaAutomatica, DeudaCuenta> = {
+    prestamo: { saldo: centavos(num(s.saldo)), cuota: centavos(num(s.cuota)) },
+    terceros: { saldo: centavos(num(s.saldoTerceros)), cuota: centavos(num(s.cuotaTerceros)) },
+    mercancia: { saldo: centavos(num(s.saldoDano)), cuota: centavos(num(s.cuotaDano)) },
+  };
+  // 🔑 La lista de cuentas es LA MISMA que la de las casillas automáticas
+  // (`casilla-sin-descontar.ts`). Escribir acá las tres a mano sería una segunda
+  // lista, y el día que nazca una cuarta cuenta se olvidaría una de las dos.
+  const algo = CASILLAS_AUTOMATICAS.some((c) => deuda[c].saldo > 0.004);
+  return algo ? deuda : null;
+}
+
+/**
+ * «Debe $254.50 · cuota $50.00» — la pista gris debajo de la casilla.
+ * `null` = no hay nada que decir de esa cuenta (no debe, o el automático está
+ * prendido y la casilla ya trae el número).
+ *
+ * 🔑 Sin cuota cargada lo dice, y eso importa: una deuda sin cuota no se
+ * descuenta sola ni cuando el automático vuelva a prenderse.
+ */
+export function textoDeudaCasilla(
+  linea: { prestamoAutomatico?: PrestamoAutomatico },
+  cuenta: CasillaAutomatica,
+): string | null {
+  const d = linea.prestamoAutomatico?.deuda?.[cuenta];
+  if (!d || d.saldo <= 0.004) return null;
+  return d.cuota > 0.004
+    ? `Debe ${plata(d.saldo)} · cuota ${plata(d.cuota)}`
+    : `Debe ${plata(d.saldo)} · sin cuota`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -625,7 +749,15 @@ export type AvisoPrestamo =
  * todas las quincenas. Solo sobre la propuesta (`origen: "cuota"`): un hecho
  * consumado no es una estimación y no hay nada que explicar.
  */
-export function avisosDeUltimaCuota(sugerencias: readonly SugerenciaPrestamo[]): AvisoPrestamo[] {
+export function avisosDeUltimaCuota(
+  sugerencias: readonly SugerenciaPrestamo[],
+  automatico: boolean = PRESTAMO_AUTOMATICO,
+): AvisoPrestamo[] {
+  // 🔴 Con el automático apagado (15-sep-2026) no entra ninguna cuota, así que
+  // «se le descuenta el saldo y no su cuota» describiría algo que no pasa. El
+  // aviso de quien debe y NO cobra aquí (`prestamosDeQuienNoCobra`) sigue vivo:
+  // ese es cierto pase lo que pase.
+  if (!automatico) return [];
   const out: AvisoPrestamo[] = [];
   for (const s of sugerencias) {
     if (s.origen !== "cuota") continue;

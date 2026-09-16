@@ -1,4 +1,21 @@
 /* ─────────────────────────────────────────────────────────────────────────────
+ * 🩸 CAMBIÓ DE DIRECCIÓN EL 15-sep-2026, con motivo.
+ *
+ * Daniel: *«que no se descuente hasta que contabilidad lo haga a mano por
+ * ahora, hasta que el módulo esté terminado»*. `PRESTAMO_AUTOMATICO` quedó en
+ * `false` (`lib/asistencia/prestamos-planilla.ts`), así que POR DEFECTO ninguna
+ * cuota entra sola.
+ *
+ * Todo lo que este archivo prueba sigue siendo VERDAD, y sigue probándose: pasa
+ * a ser el CONTROL de que **con el automático PRENDIDO nada cambió**. Por eso
+ * cada llamada lleva ahora un `true` explícito al final — el tercer parámetro
+ * que fuerza el automático. El día que Daniel lo vuelva a prender, esto es lo
+ * que garantiza que vuelve a funcionar exactamente igual.
+ *
+ * La dirección NUEVA —apagado, las casillas arrancan vacías y vale lo tecleado—
+ * vive en `prestamo-no-automatico.test.ts`.
+ * ────────────────────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────────────
  * LA CUOTA ES OBLIGATORIA, Y EL DESCUENTO NUNCA DEJA EL NETO EN NEGATIVO —
  * el candado (14-sep-2026).
  *
@@ -94,7 +111,7 @@ const linea = (manuales: ManualesLinea, dinero: DineroLinea | null = DINERO(), c
 function conCuotas(neto: number, auto: { prestamo?: number; terceros?: number; mercancia?: number }, manuales = MANUAL()) {
   const base = linea(manuales, DINERO({ netoPagar: neto }));
   const sug = SUG({ sugerido: auto.prestamo ?? 0, sugeridoTerceros: auto.terceros ?? 0, sugeridoDano: auto.mercancia ?? 0 });
-  return aplicarPrestamoEnLinea(base, sug);
+  return aplicarPrestamoEnLinea(base, sug, true);
 }
 
 function montar(props: Partial<React.ComponentProps<typeof NuevoMovimientoModal>> = {}) {
@@ -272,7 +289,7 @@ describe("D. CONTROL: lo escrito a mano NO se recorta", () => {
   it("un neto negativo hecho SOLO de montos a mano se queda como está (misma referencia)", () => {
     // La contadora escribió $300 de préstamo sobre $260 de neto: decisión humana.
     const aMano = linea(MANUAL({ prestamo: 300 }), DINERO({ prestamo: 300, totalDeducciones: 300, netoPagar: -40 }));
-    const con = aplicarPrestamoEnLinea(aMano, SUG({ sugerido: 70 }));
+    const con = aplicarPrestamoEnLinea(aMano, SUG({ sugerido: 70 }), true);
     expect(con).toBe(aMano); // lo escrito manda: la cuota no entró
     expect(recortarAlNeto(con)).toBe(con);
     expect(con.dinero!.netoPagar).toBe(-40);
@@ -282,7 +299,7 @@ describe("D. CONTROL: lo escrito a mano NO se recorta", () => {
     // Préstamo $300 a mano (neto −40) + daño automático $20 → se recorta el
     // daño entero; el préstamo escrito no se toca y quedan −$20, que son de ella.
     const base = linea(MANUAL({ prestamo: 300 }), DINERO({ prestamo: 300, totalDeducciones: 300, netoPagar: -40 }));
-    const con = aplicarPrestamoEnLinea(base, SUG({ sugerido: 70, sugeridoDano: 20 }));
+    const con = aplicarPrestamoEnLinea(base, SUG({ sugerido: 70, sugeridoDano: 20 }), true);
     expect(con.dinero!.netoPagar).toBe(-60);
     const r = recortarAlNeto(con);
     expect(r.dinero!.prestamo).toBe(300);

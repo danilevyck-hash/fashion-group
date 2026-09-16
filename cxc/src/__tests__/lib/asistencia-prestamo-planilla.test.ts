@@ -1,4 +1,21 @@
 /* ─────────────────────────────────────────────────────────────────────────────
+ * 🩸 CAMBIÓ DE DIRECCIÓN EL 15-sep-2026, con motivo.
+ *
+ * Daniel: *«que no se descuente hasta que contabilidad lo haga a mano por
+ * ahora, hasta que el módulo esté terminado»*. `PRESTAMO_AUTOMATICO` quedó en
+ * `false` (`lib/asistencia/prestamos-planilla.ts`), así que POR DEFECTO ninguna
+ * cuota entra sola.
+ *
+ * Todo lo que este archivo prueba sigue siendo VERDAD, y sigue probándose: pasa
+ * a ser el CONTROL de que **con el automático PRENDIDO nada cambió**. Por eso
+ * cada llamada lleva ahora un `true` explícito al final — el tercer parámetro
+ * que fuerza el automático. El día que Daniel lo vuelva a prender, esto es lo
+ * que garantiza que vuelve a funcionar exactamente igual.
+ *
+ * La dirección NUEVA —apagado, las casillas arrancan vacías y vale lo tecleado—
+ * vive en `prestamo-no-automatico.test.ts`.
+ * ────────────────────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────────────
  * EL PRÉSTAMO EN LA PLANILLA — el candado.
  *
  * Contadora, textual: *«El préstamo si debe ser por aprobarlo»*.
@@ -320,19 +337,19 @@ describe("🔴 la cuota entra SOLA — la aprobación quincenal se retiró el 11
   it("🔴 vacía = lo que propone el módulo; escrito a mano = lo escrito (manda)", () => {
     // ⚠️ CAMBIÓ DE DIRECCIÓN el 11-sep-2026 (migración 20261115120000): la
     // casilla vacía es `null`, y el 0 es «esta quincena no se descuenta» —
-    // con 0 escrito NO entra la cuota. Antes `casillaAutomatica(0, 50)` daba 50.
-    expect(casillaAutomatica(null, 50)).toBe(50);
-    expect(casillaAutomatica(undefined, 50)).toBe(50);
-    expect(casillaAutomatica(0, 50)).toBe(0);    // 0 a propósito: nada entra
-    expect(casillaAutomatica(35, 50)).toBe(0);   // hay algo escrito: no entra nada automático
-    expect(casillaAutomatica(null, 0)).toBe(0);
-    expect(casillaAutomatica(-3, 50)).toBe(50);  // basura negativa = vacío
+    // con 0 escrito NO entra la cuota. Antes `casillaAutomatica(0, 50, true)` daba 50.
+    expect(casillaAutomatica(null, 50, true)).toBe(50);
+    expect(casillaAutomatica(undefined, 50, true)).toBe(50);
+    expect(casillaAutomatica(0, 50, true)).toBe(0);    // 0 a propósito: nada entra
+    expect(casillaAutomatica(35, 50, true)).toBe(0);   // hay algo escrito: no entra nada automático
+    expect(casillaAutomatica(null, 0, true)).toBe(0);
+    expect(casillaAutomatica(-3, 50, true)).toBe(50);  // basura negativa = vacío
   });
 
   it("🔴 la cuota entra a `dinero` (préstamo, deducciones y neto) y NUNCA a `manuales`", () => {
     const [sug] = sugerirPrestamos({ fichas: [fichas[1]], personas: [personas[1]] });
     const linea = { codigo: "53", manuales: MANUAL(), dinero: DINERO() };
-    const con = aplicarPrestamoEnLinea(linea, sug);
+    const con = aplicarPrestamoEnLinea(linea, sug, true);
     expect(con.dinero!.prestamo).toBe(60);
     expect(con.dinero!.totalDeducciones).toBe(60);
     expect(con.dinero!.netoPagar).toBe(200);
@@ -348,7 +365,7 @@ describe("🔴 la cuota entra SOLA — la aprobación quincenal se retiró el 11
   it("lo escrito a mano manda: con $35 en la casilla no entra la cuota de $60", () => {
     const [sug] = sugerirPrestamos({ fichas: [fichas[1]], personas: [persona("53", "GABRIELA JARAMILLO", 35)] });
     const linea = { codigo: "53", manuales: MANUAL({ prestamo: 35 }), dinero: DINERO({ prestamo: 35, totalDeducciones: 35, netoPagar: 225 }) };
-    const con = aplicarPrestamoEnLinea(linea, sug);
+    const con = aplicarPrestamoEnLinea(linea, sug, true);
     expect(con).toBe(linea); // misma referencia: nada que meter
     expect(con.dinero!.prestamo).toBe(35);
   });
@@ -356,7 +373,7 @@ describe("🔴 la cuota entra SOLA — la aprobación quincenal se retiró el 11
   it("terceros entra a SU casilla, aparte del préstamo", () => {
     const f = ficha({ nombre: "CON TERCEROS", codigo: "23", cuota: 0, saldoPrestamo: 0, cuotaTerceros: 40, saldoTerceros: 79.94, saldo: 79.94 });
     const [sug] = sugerirPrestamos({ fichas: [f], personas: [persona("23", "ANDRES GONZALEZ")] });
-    const con = aplicarPrestamoEnLinea({ codigo: "23", manuales: MANUAL(), dinero: DINERO() }, sug);
+    const con = aplicarPrestamoEnLinea({ codigo: "23", manuales: MANUAL(), dinero: DINERO() }, sug, true);
     expect(con.dinero!.terceros).toBe(40);
     expect(con.dinero!.prestamo).toBe(0);
     expect(con.dinero!.netoPagar).toBe(220);
@@ -366,8 +383,8 @@ describe("🔴 la cuota entra SOLA — la aprobación quincenal se retiró el 11
   it("sin `dinero` (servicio profesional, «Tú decides») no se toca nada", () => {
     const [sug] = sugerirPrestamos({ fichas: [fichas[1]], personas: [personas[1]] });
     const linea = { codigo: "53", manuales: MANUAL(), dinero: null };
-    expect(aplicarPrestamoEnLinea(linea, sug)).toBe(linea);
-    expect(aplicarPrestamoEnLinea({ ...linea, dinero: DINERO() }, undefined).prestamoAutomatico).toBeUndefined();
+    expect(aplicarPrestamoEnLinea(linea, sug, true)).toBe(linea);
+    expect(aplicarPrestamoEnLinea({ ...linea, dinero: DINERO() }, undefined, true).prestamoAutomatico).toBeUndefined();
   });
 
   it("🔴 se avisa la ÚLTIMA cuota: cuota $45 sobre saldo $40 → se descuenta $40, y se dice", () => {
@@ -376,7 +393,7 @@ describe("🔴 la cuota entra SOLA — la aprobación quincenal se retiró el 11
       personas: [persona("10", "LUIS PARAJON")],
     });
     expect(out[0].sugerido).toBe(40);
-    const avisos = avisosDeUltimaCuota(out);
+    const avisos = avisosDeUltimaCuota(out, true);
     expect(avisos).toEqual([{ tipo: "ultima-cuota", codigo: "10", etiqueta: "LUIS PARAJON", cuenta: "prestamo", cuota: 45, saldo: 40 }]);
     const texto = textoAvisoPrestamo(avisos)!;
     expect(texto).toContain("LUIS PARAJON");
@@ -386,12 +403,12 @@ describe("🔴 la cuota entra SOLA — la aprobación quincenal se retiró el 11
   });
 
   it("una cuota normal NO avisa nada, y un hecho consumado tampoco", () => {
-    expect(avisosDeUltimaCuota(sugerirPrestamos({ fichas, personas }))).toEqual([]);
+    expect(avisosDeUltimaCuota(sugerirPrestamos({ fichas, personas }), true)).toEqual([]);
     const ya = sugerirPrestamos({
       fichas: [ficha({ nombre: "YA", codigo: "6", cuota: 50, saldo: 0, yaDescontado: 50 })],
       personas: [persona("6", "KEVIN LUBO")],
     });
-    expect(avisosDeUltimaCuota(ya)).toEqual([]);
+    expect(avisosDeUltimaCuota(ya, true)).toEqual([]);
     expect(textoAvisoPrestamo([])).toBeNull();
   });
 

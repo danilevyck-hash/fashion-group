@@ -80,6 +80,7 @@ import {
   enlaceAprobaciones,
   type ExtraNoAprobada,
 } from "@/lib/asistencia/aprobaciones";
+import { textoDeudaCasilla } from "@/lib/asistencia/prestamos-planilla";
 import type {
   PrestamoSinAtar,
   SugerenciaPrestamo,
@@ -1678,10 +1679,20 @@ function recorteDe(l: LineaPlanilla, campo: keyof ManualesLinea): { propuesto: n
   return recorteDeCasilla(l, campo);
 }
 
+/**
+ * 🔴 «Debe $254.50 · cuota $50.00» debajo de la casilla (15-sep-2026). Se lee
+ * de la LÍNEA, y la línea solo lo trae con `PRESTAMO_AUTOMATICO` en `false`:
+ * la decisión de mostrarlo vive en `prestamos-planilla.ts`, no acá.
+ */
+function deudaDe(l: LineaPlanilla, campo: keyof ManualesLinea): string | null {
+  if (!esCasillaAutomatica(campo)) return null;
+  return textoDeudaCasilla(l, campo);
+}
+
 /** Una celda de dinero que se escribe a mano. Guarda al salir del campo. */
 function CeldaManual({
   codigo, campo, valor, onGuardar, ancho = "w-20", bloqueo, automatico = false, sinDescontar = false, recorte = null,
-  avisoNeto,
+  avisoNeto, deuda = null,
 }: {
   codigo: string; campo: keyof ManualesLinea;
   /** `null` = se ve vacía. `0` solo llega con `sinDescontar`. */
@@ -1707,6 +1718,12 @@ function CeldaManual({
    * quedaría, pero se sigue escribiendo y guardando — lo escrito a mano manda.
    */
   avisoNeto?: (texto: string) => AvisoCeldaNeto | null;
+  /**
+   * 🔴 «Debe $254.50 · cuota $50.00» — con el préstamo automático APAGADO
+   * (15-sep-2026), la casilla arranca vacía y el dato se dice al lado: se le
+   * quita al sistema la decisión, no la información. `null` = nada que decir.
+   */
+  deuda?: string | null;
 }) {
   const bloqueada = !!bloqueo;
   // 🔑 Estado local mientras se escribe: si el valor viniera del padre en cada
@@ -1759,6 +1776,14 @@ function CeldaManual({
       {recorte && !bloqueada && (
         <span className="block text-right text-[11px] leading-tight text-amber-700" data-testid="cuota-recortada">
           {textoRecorteCelda(recorte)}
+        </span>
+      )}
+      {/* 🔴 CUÁNTO DEBE Y CUÁL SERÍA SU CUOTA (15-sep-2026). Sale SOLO con el
+          automático apagado: con el automático prendido la casilla ya trae la
+          cuota y repetirla sería una palabra de más. */}
+      {deuda && !bloqueada && (
+        <span className="block text-right text-[11px] leading-tight text-gray-500" data-testid="deuda-casilla">
+          {deuda}
         </span>
       )}
     </>
@@ -1884,6 +1909,7 @@ function Fila({
           <CeldaManual codigo={l.codigo} campo={campo} valor={valorCasilla(l, campo)}
             onGuardar={onGuardar} bloqueo={bloqueo} automatico={esAutomatica(l, campo)}
             sinDescontar={esSinDescontar(l, campo)} recorte={recorteDe(l, campo)}
+            deuda={deudaDe(l, campo)}
             avisoNeto={(t) => avisoCeldaNeto(l, campo, t)} />
         </td>
       ))}
@@ -2002,6 +2028,7 @@ function Tarjeta({
                   codigo={l.codigo} campo={campo} valor={valorCasilla(l, campo)}
                   onGuardar={onGuardar} ancho="w-full" bloqueo={bloqueo} automatico={esAutomatica(l, campo)}
                   sinDescontar={esSinDescontar(l, campo)} recorte={recorteDe(l, campo)}
+                  deuda={deudaDe(l, campo)}
                   avisoNeto={(t) => avisoCeldaNeto(l, campo, t)}
                 />
               </label>

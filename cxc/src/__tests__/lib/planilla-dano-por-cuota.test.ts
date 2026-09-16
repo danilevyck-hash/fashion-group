@@ -1,4 +1,21 @@
 /* ─────────────────────────────────────────────────────────────────────────────
+ * 🩸 CAMBIÓ DE DIRECCIÓN EL 15-sep-2026, con motivo.
+ *
+ * Daniel: *«que no se descuente hasta que contabilidad lo haga a mano por
+ * ahora, hasta que el módulo esté terminado»*. `PRESTAMO_AUTOMATICO` quedó en
+ * `false` (`lib/asistencia/prestamos-planilla.ts`), así que POR DEFECTO ninguna
+ * cuota entra sola.
+ *
+ * Todo lo que este archivo prueba sigue siendo VERDAD, y sigue probándose: pasa
+ * a ser el CONTROL de que **con el automático PRENDIDO nada cambió**. Por eso
+ * cada llamada lleva ahora un `true` explícito al final — el tercer parámetro
+ * que fuerza el automático. El día que Daniel lo vuelva a prender, esto es lo
+ * que garantiza que vuelve a funcionar exactamente igual.
+ *
+ * La dirección NUEVA —apagado, las casillas arrancan vacías y vale lo tecleado—
+ * vive en `prestamo-no-automatico.test.ts`.
+ * ────────────────────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────────────
  * EL DAÑO DE MERCANCÍA ENTRA A LA PLANILLA POR CUOTA — el candado (14-sep-2026).
  *
  * Daniel, textual: *«Si está en cuota, que se haga automático»*, *«Si alguien
@@ -156,7 +173,7 @@ describe("A. con cuota cargada, el daño entra solo, capeado a SU saldo", () => 
   it("🔴 entra a `dinero.mercancia`, al total de deducciones y al neto — y NUNCA a `manuales`", () => {
     const [sug] = sugerirPrestamos({ fichas: [ficha({ ...STEPHANY, cuotaDano: 25 })], personas: [persona("30", "STEPHANY MORALES")] });
     const l = linea(MANUAL());
-    const con = aplicarPrestamoEnLinea(l, sug);
+    const con = aplicarPrestamoEnLinea(l, sug, true);
     expect(con.dinero!.mercancia).toBe(25);
     expect(con.dinero!.totalDeducciones).toBe(25);
     expect(con.dinero!.netoPagar).toBe(235);
@@ -173,7 +190,7 @@ describe("A. con cuota cargada, el daño entra solo, capeado a SU saldo", () => 
   it("las tres cuotas juntas mueven el neto por la MISMA cuenta", () => {
     const f = ficha({ ...STEPHANY, cuota: 30, saldoPrestamo: 220, cuotaTerceros: 40, saldoTerceros: 100, cuotaDano: 25 });
     const [sug] = sugerirPrestamos({ fichas: [f], personas: [persona("30", "STEPHANY MORALES")] });
-    const con = aplicarPrestamoEnLinea(linea(MANUAL()), sug);
+    const con = aplicarPrestamoEnLinea(linea(MANUAL()), sug, true);
     expect(con.dinero!.prestamo).toBe(30);
     expect(con.dinero!.terceros).toBe(40);
     expect(con.dinero!.mercancia).toBe(25);
@@ -184,14 +201,14 @@ describe("A. con cuota cargada, el daño entra solo, capeado a SU saldo", () => 
   it("lo escrito a mano MANDA: con $10 en la casilla no entra la cuota de $25", () => {
     const [sug] = sugerirPrestamos({ fichas: [ficha({ ...STEPHANY, cuotaDano: 25 })], personas: [persona("30", "STEPHANY MORALES", 10)] });
     const l = linea(MANUAL({ mercancia: 10 }));
-    const con = aplicarPrestamoEnLinea(l, sug);
+    const con = aplicarPrestamoEnLinea(l, sug, true);
     expect(con).toBe(l); // misma referencia: nada que meter
   });
 
   it("se avisa la ÚLTIMA cuota del daño: cuota $300 sobre saldo $254,50 → se descuenta $254,50, y se dice", () => {
     const out = sugerirPrestamos({ fichas: [ficha({ ...STEPHANY, cuotaDano: 300 })], personas: [persona("30", "STEPHANY MORALES")] });
     expect(out[0].sugeridoDano).toBe(254.5);
-    const avisos = avisosDeUltimaCuota(out);
+    const avisos = avisosDeUltimaCuota(out, true);
     expect(avisos).toEqual([{ tipo: "ultima-cuota", codigo: "30", etiqueta: "STEPHANY MORALES", cuenta: "dano", cuota: 300, saldo: 254.5 }]);
     const texto = textoAvisoPrestamo(avisos)!;
     expect(texto).toContain("$254.50");
@@ -207,7 +224,7 @@ describe("B. CONTROL: con la casilla vacía y sin cuota (hoy, las 31 fichas) NAD
     const out = sugerirPrestamos({ fichas: [ficha(STEPHANY)], personas: [persona("30", "STEPHANY MORALES")] });
     expect(out).toHaveLength(0);
     const l = linea(MANUAL());
-    expect(aplicarPrestamoEnLinea(l, undefined)).toBe(l);
+    expect(aplicarPrestamoEnLinea(l, undefined, true)).toBe(l);
     expect(l.dinero!.netoPagar).toBe(260);
   });
 
@@ -227,7 +244,7 @@ describe("B. CONTROL: con la casilla vacía y sin cuota (hoy, las 31 fichas) NAD
   it("con cuota de préstamo y SIN cuota de daño, la línea es exactamente la de ayer", () => {
     const f = ficha({ ...STEPHANY, cuota: 30, saldoPrestamo: 220 });
     const [sug] = sugerirPrestamos({ fichas: [f], personas: [persona("30", "STEPHANY MORALES")] });
-    const con = aplicarPrestamoEnLinea(linea(MANUAL()), sug);
+    const con = aplicarPrestamoEnLinea(linea(MANUAL()), sug, true);
     expect(con.dinero!.prestamo).toBe(30);
     expect(con.dinero!.mercancia).toBe(0);
     expect(con.dinero!.netoPagar).toBe(230);
@@ -261,7 +278,7 @@ describe("C. un 0 explícito en «Mercancía» no descuenta, y se dice", () => {
 
   it("🔴 casilla en 0: NO entra la cuota, el neto no baja, y `sinDescontar.mercancia` dice los $25 que se saltaron", () => {
     const [sug] = sugerirPrestamos({ fichas: [ficha({ ...STEPHANY, cuotaDano: 25 })], personas: [persona("30", "STEPHANY MORALES", 0)] });
-    const con = aplicarPrestamoEnLinea(linea(MANUAL({ mercancia: 0 })), sug);
+    const con = aplicarPrestamoEnLinea(linea(MANUAL({ mercancia: 0 })), sug, true);
     expect(con.dinero!.mercancia).toBe(0);
     expect(con.dinero!.netoPagar).toBe(260);
     expect(con.prestamoAutomatico).toEqual({
@@ -274,7 +291,7 @@ describe("C. un 0 explícito en «Mercancía» no descuenta, y se dice", () => {
   it("un 0 en mercancía no toca el préstamo, y viceversa", () => {
     const f = ficha({ ...STEPHANY, cuota: 30, saldoPrestamo: 220, cuotaDano: 25 });
     const [sug] = sugerirPrestamos({ fichas: [f], personas: [persona("30", "STEPHANY MORALES", 0)] });
-    const con = aplicarPrestamoEnLinea(linea(MANUAL({ mercancia: 0 })), sug);
+    const con = aplicarPrestamoEnLinea(linea(MANUAL({ mercancia: 0 })), sug, true);
     expect(con.dinero!.prestamo).toBe(30);
     expect(con.dinero!.mercancia).toBe(0);
     expect(con.dinero!.netoPagar).toBe(230);
@@ -283,14 +300,14 @@ describe("C. un 0 explícito en «Mercancía» no descuenta, y se dice", () => {
 
   it("un 0 sobre alguien SIN cuota de daño que saltar no anota nada: es la misma línea (como hoy)", () => {
     const l = linea(MANUAL({ mercancia: 0 }));
-    expect(aplicarPrestamoEnLinea(l, undefined)).toBe(l);
+    expect(aplicarPrestamoEnLinea(l, undefined, true)).toBe(l);
     const [sug] = sugerirPrestamos({ fichas: [ficha({ ...STEPHANY, cuota: 30, saldoPrestamo: 220 })], personas: [persona("30", "STEPHANY MORALES", 0)] });
-    expect(aplicarPrestamoEnLinea(l, sug).prestamoAutomatico!.sinDescontar).toBeUndefined();
+    expect(aplicarPrestamoEnLinea(l, sug, true).prestamoAutomatico!.sinDescontar).toBeUndefined();
   });
 
   it("«Antes de cerrar» lo lista con la cuenta, y el texto dice «(daño de mercancía)»", () => {
     const [sug] = sugerirPrestamos({ fichas: [ficha({ ...STEPHANY, cuotaDano: 25 })], personas: [persona("30", "STEPHANY MORALES", 0)] });
-    const con = aplicarPrestamoEnLinea(linea(MANUAL({ mercancia: 0 })), sug);
+    const con = aplicarPrestamoEnLinea(linea(MANUAL({ mercancia: 0 })), sug, true);
     const items = prestamosSinDescontar([con as LineaPlanilla]);
     expect(items).toEqual([{ codigo: "30", etiqueta: "STEPHANY MORALES", cuenta: "mercancia", monto: 25 }]);
     expect(textoSinDescontar(items)).toBe("préstamo sin descontar esta quincena, a propósito (STEPHANY MORALES (daño de mercancía) · $25.00)");
@@ -314,9 +331,9 @@ describe("D. sin `dinero` (servicio profesional, «Tú decides») no se toca nad
   it("la línea vuelve tal cual, con o sin sugerencia", () => {
     const [sug] = sugerirPrestamos({ fichas: [ficha({ ...STEPHANY, cuotaDano: 25 })], personas: [persona("30", "STEPHANY MORALES")] });
     const l = { codigo: "30", manuales: MANUAL(), dinero: null };
-    expect(aplicarPrestamoEnLinea(l, sug)).toBe(l);
-    expect(aplicarPrestamoEnLinea(l, undefined)).toBe(l);
-    expect(aplicarPrestamoEnLinea({ ...l, manuales: MANUAL({ mercancia: 0 }) }, sug).prestamoAutomatico).toBeUndefined();
+    expect(aplicarPrestamoEnLinea(l, sug, true)).toBe(l);
+    expect(aplicarPrestamoEnLinea(l, undefined, true)).toBe(l);
+    expect(aplicarPrestamoEnLinea({ ...l, manuales: MANUAL({ mercancia: 0 }) }, sug, true).prestamoAutomatico).toBeUndefined();
   });
 });
 

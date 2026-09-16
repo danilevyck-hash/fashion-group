@@ -1,4 +1,21 @@
 /* ─────────────────────────────────────────────────────────────────────────────
+ * 🩸 CAMBIÓ DE DIRECCIÓN EL 15-sep-2026, con motivo.
+ *
+ * Daniel: *«que no se descuente hasta que contabilidad lo haga a mano por
+ * ahora, hasta que el módulo esté terminado»*. `PRESTAMO_AUTOMATICO` quedó en
+ * `false` (`lib/asistencia/prestamos-planilla.ts`), así que POR DEFECTO ninguna
+ * cuota entra sola.
+ *
+ * Todo lo que este archivo prueba sigue siendo VERDAD, y sigue probándose: pasa
+ * a ser el CONTROL de que **con el automático PRENDIDO nada cambió**. Por eso
+ * cada llamada lleva ahora un `true` explícito al final — el tercer parámetro
+ * que fuerza el automático. El día que Daniel lo vuelva a prender, esto es lo
+ * que garantiza que vuelve a funcionar exactamente igual.
+ *
+ * La dirección NUEVA —apagado, las casillas arrancan vacías y vale lo tecleado—
+ * vive en `prestamo-no-automatico.test.ts`.
+ * ────────────────────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────────────
  * NADIE CIERRA UNA QUINCENA CON UN NETO NEGATIVO SIN HABERLO VISTO — el candado
  * (14-sep-2026).
  *
@@ -113,7 +130,7 @@ function comoLaRuta(manuales: ManualesLinea, cuotaPrestamo = 0): LineaPlanilla {
       netoPagar: Math.round((74.84 - ded + manuales.otrosServicios) * 100) / 100,
     }),
   });
-  const con = aplicarPrestamoEnLinea(base, SUG({ sugerido: cuotaPrestamo, cuota: cuotaPrestamo, saldo: 500 }));
+  const con = aplicarPrestamoEnLinea(base, SUG({ sugerido: cuotaPrestamo, cuota: cuotaPrestamo, saldo: 500 }), true);
   return recortarAlNeto(con) as LineaPlanilla;
 }
 

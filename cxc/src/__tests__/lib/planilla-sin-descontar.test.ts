@@ -1,4 +1,21 @@
 /* ─────────────────────────────────────────────────────────────────────────────
+ * 🩸 CAMBIÓ DE DIRECCIÓN EL 15-sep-2026, con motivo.
+ *
+ * Daniel: *«que no se descuente hasta que contabilidad lo haga a mano por
+ * ahora, hasta que el módulo esté terminado»*. `PRESTAMO_AUTOMATICO` quedó en
+ * `false` (`lib/asistencia/prestamos-planilla.ts`), así que POR DEFECTO ninguna
+ * cuota entra sola.
+ *
+ * Todo lo que este archivo prueba sigue siendo VERDAD, y sigue probándose: pasa
+ * a ser el CONTROL de que **con el automático PRENDIDO nada cambió**. Por eso
+ * cada llamada lleva ahora un `true` explícito al final — el tercer parámetro
+ * que fuerza el automático. El día que Daniel lo vuelva a prender, esto es lo
+ * que garantiza que vuelve a funcionar exactamente igual.
+ *
+ * La dirección NUEVA —apagado, las casillas arrancan vacías y vale lo tecleado—
+ * vive en `prestamo-no-automatico.test.ts`.
+ * ────────────────────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────────────
  * «NO DESCONTAR EL PRÉSTAMO ESTA QUINCENA» — el candado.
  *
  * Daniel (11-sep-2026): *«sí»* a poder saltarse una quincena.
@@ -157,13 +174,13 @@ describe("A. los tres estados de la casilla: null · 0 · monto", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe("B. con 0 escrito la cuota NO entra, y se anota cuánto se saltó", () => {
   it("`casillaAutomatica`: null → la cuota · 0 → nada · monto → nada", () => {
-    expect(casillaAutomatica(null, 70)).toBe(70);
-    expect(casillaAutomatica(0, 70)).toBe(0);
-    expect(casillaAutomatica(35, 70)).toBe(0);
+    expect(casillaAutomatica(null, 70, true)).toBe(70);
+    expect(casillaAutomatica(0, 70, true)).toBe(0);
+    expect(casillaAutomatica(35, 70, true)).toBe(0);
   });
 
   it("🔴 casilla en null: entra la cuota de $70 y el neto baja", () => {
-    const con = aplicarPrestamoEnLinea(linea(MANUAL()), SUG());
+    const con = aplicarPrestamoEnLinea(linea(MANUAL()), SUG(), true);
     expect(con.dinero!.prestamo).toBe(70);
     expect(con.dinero!.netoPagar).toBe(190);
     // (`mercancia: 0` desde el 14-sep-2026: la tercera casilla automática.)
@@ -171,7 +188,7 @@ describe("B. con 0 escrito la cuota NO entra, y se anota cuánto se saltó", () 
   });
 
   it("🔴 casilla en 0: NO entra la cuota, el neto no baja, y `sinDescontar` dice los $70 que se saltaron", () => {
-    const con = aplicarPrestamoEnLinea(linea(MANUAL({ prestamo: 0 })), SUG());
+    const con = aplicarPrestamoEnLinea(linea(MANUAL({ prestamo: 0 })), SUG(), true);
     expect(con.dinero!.prestamo).toBe(0);
     expect(con.dinero!.netoPagar).toBe(260);
     expect(con.prestamoAutomatico).toEqual({ prestamo: 0, terceros: 0, mercancia: 0, sinDescontar: { prestamo: 70, terceros: 0, mercancia: 0 } });
@@ -181,7 +198,7 @@ describe("B. con 0 escrito la cuota NO entra, y se anota cuánto se saltó", () 
 
   it("préstamo en 0 y terceros en null: se salta uno y entra el otro", () => {
     const sug = SUG({ cuotaTerceros: 40, saldoTerceros: 100, sugeridoTerceros: 40 });
-    const con = aplicarPrestamoEnLinea(linea(MANUAL({ prestamo: 0 })), sug);
+    const con = aplicarPrestamoEnLinea(linea(MANUAL({ prestamo: 0 })), sug, true);
     expect(con.dinero!.prestamo).toBe(0);
     expect(con.dinero!.terceros).toBe(40);
     expect(con.dinero!.netoPagar).toBe(220);
@@ -190,17 +207,18 @@ describe("B. con 0 escrito la cuota NO entra, y se anota cuánto se saltó", () 
 
   it("un 0 sobre alguien SIN cuota que saltar no anota nada: es la misma línea", () => {
     const l = linea(MANUAL({ prestamo: 0 }));
-    expect(aplicarPrestamoEnLinea(l, SUG({ sugerido: 0 }))).toBe(l);
-    expect(aplicarPrestamoEnLinea(l, undefined)).toBe(l);
+    expect(aplicarPrestamoEnLinea(l, SUG({ sugerido: 0 }), true)).toBe(l);
+    expect(aplicarPrestamoEnLinea(l, undefined, true)).toBe(l);
   });
 
   it("`prestamosSinDescontar` lista SOLO las casillas con 0 y cuota saltada, por cuenta", () => {
-    const a = aplicarPrestamoEnLinea(linea(MANUAL({ prestamo: 0 })), SUG());
+    const a = aplicarPrestamoEnLinea(linea(MANUAL({ prestamo: 0 })), SUG(), true);
     const b = aplicarPrestamoEnLinea(
       linea(MANUAL({ terceros: 0 }), "ANDRES GONZALEZ", "23"),
       SUG({ codigo: "23", sugerido: 0, cuotaTerceros: 40, saldoTerceros: 79.94, sugeridoTerceros: 40 }),
-    );
-    const c = aplicarPrestamoEnLinea(linea(MANUAL(), "YULICAR", "15"), SUG({ codigo: "15", sugerido: 25 }));
+    true,
+);
+    const c = aplicarPrestamoEnLinea(linea(MANUAL(), "YULICAR", "15"), SUG({ codigo: "15", sugerido: 25 }), true);
     const d = linea(MANUAL({ prestamo: 0 }), "SIN PRÉSTAMO", "99"); // 0 sin nada que saltar
     expect(prestamosSinDescontar([a, b, c, d] as LineaPlanilla[])).toEqual([
       { codigo: "10", etiqueta: "LUIS PARAJON", cuenta: "prestamo", monto: 70 },
@@ -244,7 +262,7 @@ describe("C. el cierre respeta el 0: no anota pago, y lo dice como decisión", (
   });
 
   it("CONTROL: con la cuota metida en `dinero` (casilla null) SÍ se anota el pago", () => {
-    const con = aplicarPrestamoEnLinea(linea(MANUAL()), SUG());
+    const con = aplicarPrestamoEnLinea(linea(MANUAL()), SUG(), true);
     const plan = planDeCierre({
       lineas: [con as LineaPlanilla],
       deudas: mapa(deuda({ codigo: "10", saldoPrestamo: 500, cuotaPrestamo: 70 })),
@@ -258,7 +276,8 @@ describe("C. el cierre respeta el 0: no anota pago, y lo dice como decisión", (
     const l = aplicarPrestamoEnLinea(
       linea(MANUAL({ terceros: 0 })),
       SUG({ cuotaTerceros: 40, saldoTerceros: 100, sugeridoTerceros: 40 }),
-    );
+    true,
+);
     const plan = planDeCierre({
       lineas: [l as LineaPlanilla],
       deudas: mapa(deuda({ codigo: "10", saldoPrestamo: 500, saldoTerceros: 100 })),
