@@ -37,6 +37,7 @@ import type { HorasPersona, LineaPlanilla } from "./planilla";
 import { centavos, minutosTardanzaMostrados } from "./planilla";
 import { fmtMin } from "./reporte";
 import { notaAjuste } from "./corte-quincena";
+import { notaOtrosServicios } from "./otros-servicios";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { fichaFiscal } from "@/lib/cxc/empresa-fiscal";
 
@@ -199,6 +200,15 @@ export interface DatosComprobante {
   posicion?: string | null;
   /** La cédula de la ficha, para el pie. `null` = la escribe a mano quien firma. */
   cedula?: string | null;
+  /**
+   * 🔴 LOS CONCEPTOS DE «OTROS SERVICIOS» DE ESTA PERSONA (15-sep-2026).
+   *
+   * El renglón `OTROS SERVICIOS` NO cambia de lugar ni de monto: gana una NOTA
+   * debajo con el detalle («mensajería y flete $31.00 · fiesta religiosa
+   * $120.00»), reusando el mismo mecanismo que ya tiene `TARDANZAS`. Sin nada
+   * esa quincena, sale en cero y sin nota, como hoy.
+   */
+  otrosServicios?: readonly { concepto: string; monto: number }[];
 }
 
 export interface Comprobante {
@@ -325,7 +335,11 @@ export function armarComprobante(
     R("mercancia", "DAÑO DE MERCANCIA", v(d?.mercancia), "dato", true),
     R("totalDescuentos", "TOTAL DE DESCUENTOS", totalDescuentos, "total", true),
 
-    R("otrosServicios", "OTROS SERVICIOS", v(d?.otrosServicios), "dato", false),
+    // 🔴 EL MONTO Y EL LUGAR NO CAMBIAN (15-sep-2026): lo único que se agrega
+    // es la nota con los conceptos, para que nadie tenga que abrir otra
+    // pantalla para saber de dónde salieron esos dólares.
+    R("otrosServicios", "OTROS SERVICIOS", v(d?.otrosServicios), "dato", false,
+      notaOtrosServicios(datos.otrosServicios ?? [])),
     R("salarioAPagar", "SALARIO A PAGAR", salarioAPagar, "total", false),
   ];
 

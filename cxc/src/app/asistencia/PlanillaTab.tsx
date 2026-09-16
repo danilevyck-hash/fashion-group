@@ -110,6 +110,7 @@ import {
   type AvisoCeldaNeto,
 } from "@/lib/asistencia/neto-no-negativo";
 import { enlaceDiasDe, marcasImparesDeLineas } from "@/lib/asistencia/marcas-impares";
+import type { OtroServicio } from "@/lib/asistencia/otros-servicios";
 import AntesDeCerrar from "./AntesDeCerrar";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 // 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
@@ -177,6 +178,10 @@ interface Respuesta {
    *  Declararlo obligatorio le mentiría al compilador sobre lo que de verdad
    *  puede llegar, y el precio sería la planilla en blanco. */
   prestamos?: SugerenciaPrestamo[];
+  /** 🔴 El detalle de «Otros servicios» de la quincena (15-sep-2026). Opcional
+   *  por el mismo motivo que `prestamos`: una respuesta guardada por SWR de
+   *  ANTES de este cambio no lo trae, y no tiene por qué romper la pantalla. */
+  otrosServicios?: OtroServicio[];
   avisos: {
     faltaMigracionConfiguracion: string | null;
     faltaMigracionManual: string | null;
@@ -737,6 +742,10 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
       // la pantalla.
       avisoPrestamo: data.avisos.avisoPrestamo ?? null,
       avisoPrestamoSinAtar: data.avisos.avisoPrestamoSinAtar ?? null,
+      // 🔴 El detalle de «Otros servicios» viaja al Excel: en el cuadro es UNA
+      // casilla con el total, y el porqué de cada monto vive en su hoja. Sin
+      // nada, la hoja no nace.
+      otrosServicios: data.otrosServicios ?? [],
     };
   }, [data]);
 
@@ -816,10 +825,25 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
         etiqueta: data.periodo?.etiqueta ?? "",
       };
 
+      // 🔴 Los conceptos de «Otros servicios», por CÓDIGO. Salen de los MISMOS
+      // datos que el Excel y que la casilla del cuadro: el papel no vuelve a
+      // leer la base ni recalcula el total (15-sep-2026).
+      const otrosDe = new Map<string, { concepto: string; monto: number }[]>();
+      for (const r of data.otrosServicios ?? []) {
+        const lista = otrosDe.get(r.codigo) ?? [];
+        lista.push({ concepto: r.concepto, monto: r.monto });
+        otrosDe.set(r.codigo, lista);
+      }
+
       const hojas = lineasConComprobante(data.lineas).map((l) => {
         const extra = porCodigo.get(l.codigo);
         return armarComprobante(
-          { linea: l, posicion: extra?.posicion ?? null, cedula: extra?.cedula ?? null },
+          {
+            linea: l,
+            posicion: extra?.posicion ?? null,
+            cedula: extra?.cedula ?? null,
+            otrosServicios: otrosDe.get(l.codigo) ?? [],
+          },
           periodo,
         );
       });

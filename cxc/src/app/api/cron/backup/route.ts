@@ -248,6 +248,9 @@ const DATASETS: Dataset[] = [
   { table: "asistencia_feriados" },
   { table: "asistencia_reglas" },
   { table: "asistencia_planilla_manual" },
+  // 🔴 «Otros servicios» (15-sep-2026): plata que se SUMA al neto, escrita a
+  // mano con su concepto. No se puede volver a conseguir de ningún lado.
+  { table: "asistencia_otros_servicios" },
   { table: "asistencia_prestamo_aprobado" },
   { table: "asistencia_reparto_empresa" },
   { table: "asistencia_aprobador_empresa" },

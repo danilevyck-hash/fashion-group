@@ -34,6 +34,10 @@ import { textoConfirmar } from "@/lib/asistencia/codigos-ignorados";
 import FichaTexto from "./FichaTexto";
 import FichaEditar, { type BorradorFicha, borradorDe } from "./FichaEditar";
 import SeccionPrestamos from "./SeccionPrestamos";
+// 🔴 «Otros servicios» va entre Préstamos y Justificaciones (15-sep-2026,
+// mockup aprobado por Daniel): es lo que se le SUMA al neto, al lado de lo que
+// se le resta.
+import SeccionOtrosServicios from "./SeccionOtrosServicios";
 import SeccionJustificaciones from "./SeccionJustificaciones";
 import SeccionVacaciones from "./SeccionVacaciones";
 import SeccionAsistencia from "./SeccionAsistencia";
@@ -263,6 +267,7 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
             {!nueva && persona && (
               <>
                 <SeccionPrestamos codigo={codigo} refresco={refresco} />
+                <SeccionOtrosServicios codigo={codigo} refresco={refresco} />
                 <SeccionJustificaciones codigo={codigo} refresco={refresco} />
                 <SeccionVacaciones codigo={codigo} refresco={refresco} />
                 <SeccionAsistencia codigo={codigo} refresco={refresco} />

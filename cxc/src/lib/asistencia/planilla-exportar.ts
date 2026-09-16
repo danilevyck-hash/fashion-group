@@ -49,6 +49,7 @@ import {
   type TotalesPlanilla,
 } from "./planilla";
 import type { AvisoPeriodoAbierto } from "./periodo";
+import { totalOtrosServicios, type OtroServicio } from "./otros-servicios";
 // 🔴 El pie se PARTE contra el ancho de la hoja. `doc.text` no envuelve solo:
 // la línea de avisos llegaba a 491 mm en una hoja de 335. Ver `pdf-pie.ts`.
 import { armarPie, dibujarPie } from "./pdf-pie";
@@ -114,6 +115,15 @@ export interface DatosPlanillaExport {
    * forma en que se perdieron $700 durante 22 días (ver #651).
    */
   avisoPrestamoSinAtar?: string | null;
+  /**
+   * 🔴 EL DETALLE DE «OTROS SERVICIOS», renglón por renglón (15-sep-2026).
+   *
+   * Daniel: *«que sea como está, el total, ya el detalle debería estar en el
+   * perfil»* — en el cuadro sigue siendo UNA casilla con el total, y acá nace
+   * una hoja con el porqué de cada monto. Ausente o vacío = la hoja NO NACE,
+   * el mismo patrón que «Ajuste anterior».
+   */
+  otrosServicios?: readonly OtroServicio[];
 }
 
 /** El encabezado que lleva el PDF (el papel que se firma). */
@@ -371,8 +381,12 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
       ["Llegar más de 30 minutos tarde", "Se muestra en la columna «Ausencias», no en «Tardanzas» — pero SE DESCUENTAN LOS MINUTOS, exactamente igual que una tardanza. La columna solo cambia de nombre: el total bruto y el neto son los mismos. Hasta 30 minutos va en «Tardanzas»."],
       ["Seguro social", `${r.seguroSocialPct} % del total bruto.`],
       ["Seguro educativo", `${r.seguroEducativoPct} % del total bruto.`],
-      ["ISR, préstamo, terceros, mercancía y otros servicios", "No salen de ningún sistema: los escribe la contable a mano."],
-      ["Otros servicios", "SE SUMA al neto: es un pago extra, no un descuento. Los otros cuatro se restan."],
+      // 🩸 Esta línea decía «ISR, préstamo, terceros, mercancía y otros
+      // servicios — No salen de ningún sistema: los escribe la contable a
+      // mano», y dejó de ser cierta el 15-sep-2026: «Otros servicios» ahora
+      // entra solo desde la ficha del colaborador. Se partió en dos.
+      ["ISR, préstamo, terceros y mercancía", "No salen de ningún sistema: los escribe la contable a mano."],
+      ["Otros servicios", "SE SUMA al neto: es un pago extra, no un descuento. Entra solo desde la ficha del colaborador, donde cada monto lleva su concepto —el detalle está en la hoja «Otros servicios»— y se puede escribir otro monto a mano encima, que manda."],
       [""],
       ["Total bruto", "Quincenal + extras + domingos + feriados − ausencias − tardanzas. ⚠ Que unos minutos se muestren en «Ausencias» en vez de en «Tardanzas» NO cambia este número: se resta lo mismo de los dos lados."],
       ["Neto a pagar", "Total bruto − total deducciones + otros servicios."],
@@ -412,12 +426,57 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
   // poder cotejar contra su propio cuadro.
   const hojaAjuste = hojaAjusteAnterior(d.lineas);
 
+  // Hoja 5 — SOLO cuando alguien tiene algo: una fila por concepto, con quién,
+  // cuánto y quién lo anotó. 🔴 Si nadie tiene nada, la hoja NO NACE — el mismo
+  // patrón que «Ajuste anterior»: una hoja vacía es una pregunta sin respuesta.
+  const hojaOtros = hojaOtrosServicios(d);
+
   return workbookFromSheets([
     { name: "Planilla", ws: hojaPlanilla },
     { name: "Horas", ws: hojaHoras },
     { name: "Cómo se calcula", ws: hojaReglas },
     ...(hojaAjuste ? [{ name: "Ajuste anterior", ws: hojaAjuste }] : []),
+    ...(hojaOtros ? [{ name: "Otros servicios", ws: hojaOtros }] : []),
   ]);
+}
+
+/**
+ * La hoja «Otros servicios»: una fila por CONCEPTO (15-sep-2026).
+ *
+ * 🔴 EL CUADRO NO CAMBIA. En la hoja «Planilla» sigue habiendo UNA casilla con
+ * el total, que es como la contadora la mira. Acá está el porqué de ese número:
+ * colaborador · concepto · se aplica a · monto · lo anotó, y su total.
+ *
+ * 🔑 El nombre sale de las LÍNEAS del cuadro, por CÓDIGO — nunca por nombre—;
+ * un código sin línea (alguien que no cobra en esta empresa) se muestra con su
+ * código tal cual, que es lo que hace el resto del módulo.
+ */
+function hojaOtrosServicios(d: DatosPlanillaExport): XLSX.WorkSheet | null {
+  const renglones = d.otrosServicios ?? [];
+  if (!renglones.length) return null;
+  const nombreDe = new Map(d.lineas.map((l) => [l.codigo, capitalizarNombre(l.etiqueta)]));
+  const columns: ReportColumn[] = [
+    { header: "Colaborador", wch: 28 },
+    { header: "Código", wch: 8, align: "center" },
+    { header: "Concepto", wch: 34 },
+    { header: "Se aplica a", wch: 16, align: "center" },
+    { header: "Monto", wch: 12, align: "right", fmt: MONEY_FMT },
+    { header: "Lo anotó", wch: 16 },
+  ];
+  const rows = renglones.map((r) => [
+    nombreDe.get(r.codigo) ?? r.codigo,
+    r.codigo,
+    r.concepto,
+    d.quincena.etiqueta,
+    r.monto,
+    r.anotadoPor,
+  ] as ReportCell[]);
+  rows.push(["TOTAL", "", "", "", totalOtrosServicios(renglones), ""] as ReportCell[]);
+  return buildReportSheet({
+    columns,
+    rows,
+    nota: "Estos montos ya están sumados en la columna «Otros servicios» de la hoja «Planilla». SE SUMAN al neto —son un pago extra, no un descuento— y no pagan seguro social ni educativo.",
+  });
 }
 
 /**

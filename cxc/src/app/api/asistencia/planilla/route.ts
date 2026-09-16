@@ -139,6 +139,12 @@ import {
 } from "@/lib/asistencia/prestamos-planilla";
 import { leerPrestamosDeQuincena } from "@/lib/asistencia/prestamos-planilla-server";
 import { recortarAlNeto } from "@/lib/asistencia/neto-no-negativo";
+import {
+  aplicarOtrosServiciosEnLinea,
+  totalPorCodigo,
+  type OtroServicio,
+} from "@/lib/asistencia/otros-servicios";
+import { leerOtrosServicios } from "@/lib/asistencia/otros-servicios-server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -828,6 +834,27 @@ export async function GET(req: NextRequest) {
     const sugerenciaDe = new Map(prestamos.map((s) => [s.codigo, s]));
     const lineasConPrestamo = lineas.map((l) => aplicarPrestamoEnLinea(l, sugerenciaDe.get(l.codigo)));
 
+    // ── 🔴 «OTROS SERVICIOS» ENTRA SOLO DESDE LA FICHA (15-sep-2026) ─────────
+    //
+    // Daniel: *«debería de haber un campo en la ficha que diga "otros
+    // servicios"»* · *«que sea como está, el total, ya el detalle debería estar
+    // en el perfil»*. La casilla del cuadro NO cambia de forma: sigue siendo UNA
+    // con el total. Lo que cambia es que el número entra solo, y se puede seguir
+    // escribiendo a mano encima (ése manda) — el mismo trato que la cuota.
+    //
+    // ⚠️ Solo en una QUINCENA: los renglones se guardan con la clave de la
+    // quincena, igual que los montos a mano. En un rango libre no hay nada que
+    // sumar, y repartir un pago extra por días sería inventar plata.
+    //
+    // 🔑 UNA sola lectura para todo el cuadro, y falla ABIERTA: sin la
+    // migración corrida vuelve vacío y la casilla se escribe a mano como hoy.
+    const otrosRes = claveQ
+      ? await leerOtrosServicios({ quincena: claveQ })
+      : { renglones: [] as OtroServicio[], faltaTabla: false };
+    const otrosPorCodigo = totalPorCodigo(otrosRes.renglones);
+    const lineasConOtros = lineasConPrestamo.map((l) =>
+      aplicarOtrosServiciosEnLinea(l, otrosPorCodigo.get(l.codigo) ?? 0));
+
     // 🔴 Lo que se DICE, solo cuando algo no es lo de siempre: la última cuota
     // (cuota mayor que el saldo: se descuenta el saldo) y quien debe pero NO
     // está en el cuadro (salió, o no cobra aquí: no se le descuenta). Y los
@@ -849,7 +876,7 @@ export async function GET(req: NextRequest) {
     // tardanza— por `aplicarAjusteEnLinea` (11-sep-2026, la contadora: «valen
     // diferente»). Después de esto `dinero.netoPagar` ES el neto que se paga y
     // `totalizar` lo suma solo. `undefined` sin todo esto → el módulo de siempre.
-    let lineasFinal = lineasConPrestamo;
+    let lineasFinal = lineasConOtros;
     let totalAjuste = 0;
     let diasAjuste: { desde: string; hasta: string } | null = null;
     const ajustePersonas: { codigo: string; etiqueta: string; monto: number }[] = [];
@@ -859,7 +886,7 @@ export async function GET(req: NextRequest) {
         diasAjuste = medido.dias;
         // 🔴 Y los seguros se recalculan sobre el bruto CON el ajuste (11-sep-2026,
         // Daniel: «los seguros, va»): van los porcentajes vigentes de las reglas.
-        lineasFinal = lineasConPrestamo.map((l) => aplicarAjusteEnLinea(
+        lineasFinal = lineasConOtros.map((l) => aplicarAjusteEnLinea(
           l, medido.dinero.get(l.codigo), medido.dias,
           { seguroSocialPct: reglas.seguroSocialPct, seguroEducativoPct: reglas.seguroEducativoPct },
         ));
@@ -898,6 +925,10 @@ export async function GET(req: NextRequest) {
       // testigo, no algo que haya que volver a restar.
       corte,
       ajusteQuincenaAnterior: { total: totalAjuste, personas: ajustePersonas, dias: diasAjuste },
+      // 🔴 El DETALLE de «Otros servicios», renglón por renglón. Viaja como
+      // DATOS: de acá salen la hoja del Excel y la nota del comprobante, sin
+      // que ninguno de los dos vuelva a leer la base ni recalcule el total.
+      otrosServicios: otrosRes.renglones,
       reglas,
       // La lista de la pestaña Aprobaciones. `null` para quien no puede aprobar
       // o cuando no se pidió: no se manda una lista de nombres y horas a quien

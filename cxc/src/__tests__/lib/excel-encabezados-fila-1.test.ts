@@ -368,7 +368,14 @@ describe("6 · la `nota` es la EXCEPCIÓN, no la puerta de atrás", () => {
     // aprobó sobre el mockup): en Ventas es el archivo de siempre, byte a byte;
     // en Utilidad, la utilidad de cada mes con el margen del año. Sube A
     // PROPÓSITO: una hoja que antes no existía, no una que se duplicó.
-    expect(total).toBe(29);
+    //
+    // 🔁 30 desde el 15-sep-2026: **la hoja «Otros servicios» del Excel de la
+    // Planilla** (`src/lib/asistencia/planilla-exportar.ts`). Daniel: *«que sea
+    // como está, el total, ya el detalle debería estar en el perfil»* — el
+    // cuadro sigue con UNA casilla y esta hoja trae el porqué de cada monto
+    // (colaborador · concepto · se aplica a · monto · lo anotó). SOLO nace
+    // cuando alguien tiene algo, igual que «Ajuste anterior». Sube A PROPÓSITO.
+    expect(total).toBe(30);
   });
 });
 

@@ -63,6 +63,10 @@ export const TABLAS_PERSONAS = [
   // El singleton con TODA la parametrización del cálculo (id = 1).
   "asistencia_reglas",
   "asistencia_planilla_manual",
+  // 🔴 Los renglones de «Otros servicios» (15-sep-2026): plata que se SUMA al
+  // neto y que NO se puede volver a conseguir de ningún lado — la escribe una
+  // persona a mano, con su concepto.
+  "asistencia_otros_servicios",
   "asistencia_prestamo_aprobado",
   "asistencia_reparto_empresa",
   "asistencia_aprobador_empresa",

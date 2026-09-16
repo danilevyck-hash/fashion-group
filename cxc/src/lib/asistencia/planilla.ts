@@ -1477,6 +1477,15 @@ export interface LineaPlanilla {
    * La regla vive en `marcas-impares.ts`.
    */
   marcasImpares?: DiaImpar[];
+  /**
+   * 🔴 LO QUE ENTRÓ SOLO A LA CASILLA «OTROS SERVICIOS» DESDE LA FICHA
+   * (15-sep-2026). Ausente o 0 = nada entró (o alguien escribió el monto a
+   * mano, que manda). Ya está ADENTRO de `dinero.otrosServicios` y del neto;
+   * `manuales` sigue siendo la foto de la tabla. Lo pone
+   * `aplicarOtrosServiciosEnLinea`, y con el sueldo repartido cae en UNA sola
+   * línea: la del reloj.
+   */
+  otrosServiciosDeFicha?: number;
   dinero: DineroLinea | null;
   manuales: ManualesLinea;
 }

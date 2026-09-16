@@ -45,10 +45,14 @@ describe("1. la ruta de la planilla: la cuota entra sola, y no se aprueba nada",
 
   it("mete la cuota con `aplicarPrestamoEnLinea` y los totales salen de ESAS líneas", () => {
     expect(ruta).toMatch(/lineas\.map\(\(l\) => aplicarPrestamoEnLinea\(l, sugerenciaDe\.get\(l\.codigo\)\)\)/);
-    // El ajuste de la quincena anterior se aplica ENCIMA de la cuota, y los
-    // totales se suman de `lineasFinal`, que arranca en `lineasConPrestamo`.
-    expect(ruta).toMatch(/let lineasFinal = lineasConPrestamo;/);
-    expect(ruta).toMatch(/lineasConPrestamo\.map\(\(l\) => aplicarAjusteEnLinea/);
+    // ⚠️ 15-sep-2026: entre la cuota y el ajuste entró «Otros servicios» desde
+    // la ficha (`lineasConOtros`), así que la cadena ahora es
+    // `lineas → lineasConPrestamo → lineasConOtros → lineasFinal`. Lo que este
+    // caso protege no cambió: la cuota entra PRIMERO, el ajuste va ENCIMA, y
+    // los totales se suman de la línea FINAL — nunca de una intermedia.
+    expect(ruta).toMatch(/aplicarOtrosServiciosEnLinea\(l, otrosPorCodigo/);
+    expect(ruta).toMatch(/let lineasFinal = lineasConOtros;/);
+    expect(ruta).toMatch(/lineasConOtros\.map\(\(l\) => aplicarAjusteEnLinea/);
     expect(ruta).toMatch(/totales: totalizar\(lineasFinal\)/);
   });
 
