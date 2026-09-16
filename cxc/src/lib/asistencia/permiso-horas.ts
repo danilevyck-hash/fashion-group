@@ -16,10 +16,26 @@
  *    🩸 Sin esta regla, cargar «de 8 a 9» borraría el descuento del día entero
  *    —ocho horas de sueldo— y nadie lo vería hasta el día de pago.
  *
- * 2. SOLO CUENTA LO QUE SE SOLAPA CON EL ATRASO DE VERDAD. Un permiso de 2 a 4
- *    de la tarde no perdona haber llegado a las 8:45. Se cruza la ventana del
- *    permiso con la ventana del atraso —de la hora de entrada a la primera
- *    marca— y se perdona la intersección, ni un minuto más.
+ * 2. SOLO CUENTA LO QUE SE SOLAPA CON EL INCUMPLIMIENTO DE VERDAD. Un permiso
+ *    de 2 a 4 de la tarde no perdona haber llegado a las 8:45. Se cruza la
+ *    ventana del permiso con la ventana del incumplimiento y se perdona la
+ *    intersección, ni un minuto más.
+ *
+ * ── 🔴 UNA SOLA REGLA, TRES COLUMNAS (16-sep-2026) ───────────────────────────
+ *
+ * Daniel, textual: *«El permiso perdona lo que se solape con la ventana, sea
+ * tardanza, salida temprana o exceso de almuerzo. Una sola regla, tres
+ * columnas.»* y *«permiso justificado se paga»*.
+ *
+ * 🩸 EL DEFECTO, medido contra producción el 16-sep-2026: este módulo solo
+ * sabía perdonar tardanza de ENTRADA. Andrea Pérez (16) el 1-sep entró 08:04
+ * —puntual— y su última marca es 12:07:32, con una Constancia de 12:00 a 17:00
+ * que cubre exactamente lo que pasó. El sistema le descontaba **292,47 minutos
+ * de salida temprana ($16,43)** y la pantalla le escribía «Permiso 0 min».
+ * Briceida Montero (8) el 7-sep, lo mismo: **237,05 minutos ($12,92)**.
+ *
+ * La regla no cambió: se perdona la INTERSECCIÓN. Lo que cambió es que ahora
+ * hay tres ventanas de incumplimiento en vez de una. Ver `VentanaIncumplimiento`.
  *
  * ── ⚠️ UNA JUSTIFICACIÓN SIN HORAS NO CAMBIA NADA ────────────────────────────
  *
@@ -107,27 +123,57 @@ export function ventanaDe(
 }
 
 /**
- * Cuántos MINUTOS de atraso perdona este permiso.
+ * El BORDE de la ventana del incumplimiento que salió del reloj.
  *
- * `entradaSeg` es la hora a la que la persona TENÍA que entrar y `marcaSeg` la
- * hora a la que de verdad entró. Se perdona la intersección de las dos
- * ventanas, en minutos, con decimales (el módulo mide al segundo desde el
- * 13-ago-2026).
+ * El permiso se teclea en MINUTOS y el reloj mide en SEGUNDOS, así que el borde
+ * donde la ventana del permiso se topa con una marcación real es el que se
+ * estira para cubrir el minuto entero. Ver la nota del 27-ago-2026 más abajo.
+ *
+ * - `"fin"`  — la marca CIERRA el incumplimiento (llegó tarde: entró a las
+ *   08:10:24; volvió del almuerzo a las 13:16:14).
+ * - `"inicio"` — la marca ABRE el incumplimiento (se fue temprano: su última
+ *   marca es 12:07:32 y el día terminaba a las 17:00).
+ */
+export type BordeDelReloj = "inicio" | "fin";
+
+/**
+ * La ventana de UN incumplimiento, en segundos del día.
+ *
+ * 🔴 LAS TRES COLUMNAS SE MIDEN CON LA MISMA REGLA (16-sep-2026). Daniel,
+ * textual: *«El permiso perdona lo que se solape con la ventana, sea tardanza,
+ * salida temprana o exceso de almuerzo. Una sola regla, tres columnas.»*
+ *
+ * | Columna           | Ventana                                               |
+ * |-------------------|-------------------------------------------------------|
+ * | Tardanza          | `[entrada programada, primera marca]`      → fin       |
+ * | Salida temprana   | `[última marca, salida programada]`        → inicio    |
+ * | Exceso de almuerzo| `[sale + almuerzo permitido, vuelve]`      → fin       |
+ */
+export interface VentanaIncumplimiento {
+  desdeSeg: number;
+  hastaSeg: number;
+  bordeDelReloj: BordeDelReloj;
+}
+
+/**
+ * Cuántos MINUTOS de ESTE incumplimiento perdona el permiso.
+ *
+ * Se perdona la INTERSECCIÓN de las dos ventanas, ni un minuto más, en minutos
+ * con decimales (el módulo mide al segundo desde el 13-ago-2026).
  *
  * Devuelve 0 —nunca un negativo— cuando no hay solape, cuando no hay permiso, o
- * cuando la persona llegó a tiempo.
+ * cuando no hubo incumplimiento que perdonar.
  */
-export function minutosPerdonados(
+export function minutosPerdonadosDe(
   ventana: VentanaPermiso | null,
-  entradaSeg: number,
-  marcaSeg: number,
+  incumplimiento: VentanaIncumplimiento,
 ): number {
   if (!ventana) return 0;
-  if (!Number.isFinite(entradaSeg) || !Number.isFinite(marcaSeg)) return 0;
-  if (marcaSeg <= entradaSeg) return 0;
-  const desde = Math.max(ventana.desdeSeg, entradaSeg);
+  const { desdeSeg: abre, hastaSeg: cierra, bordeDelReloj } = incumplimiento;
+  if (!Number.isFinite(abre) || !Number.isFinite(cierra)) return 0;
+  if (cierra <= abre) return 0;
 
-  // 🔴 SI LA MARCA CAE EN EL MISMO MINUTO QUE EL FINAL DEL PERMISO, SE PERDONA
+  // 🔴 SI LA MARCA CAE EN EL MISMO MINUTO QUE EL BORDE DEL PERMISO, SE PERDONA
   // ENTERA (27-ago-2026).
   //
   // 🩸 EL CASO REAL. El lunes 17 de agosto llovió y llegaron tarde diez
@@ -140,14 +186,46 @@ export function minutosPerdonados(
   // le va a acertar nunca. Y «hasta las 8:10» no significa «hasta el segundo 0
   // de las 8:10».
   //
+  // 🔴 SE ESTIRA EL BORDE QUE MIRA A LA MARCA, Y SOLO ÉSE (16-sep-2026). En la
+  // tardanza la marca cierra la ventana y el que se estira es el FINAL del
+  // permiso —conducta de siempre, intacta—. En la salida temprana la marca la
+  // ABRE (la persona se va 12:07:32 con permiso «desde las 12:00») y entonces
+  // el que se estira es el PRINCIPIO. El borde que NO mira a una marca no se
+  // corre: un permiso de 08:05 a 08:10 no perdona el atraso de 08:00 a 08:05.
+  //
   // ⚠️ ACOTADO AL MISMO MINUTO, y por eso no vive en `ventanaDe`. Estirar la
   // ventana 59 s a secas le regalaba casi un minuto a CUALQUIER permiso —un
   // «de 8 a 10» pasaba a perdonar 120,98— y convertía una ventana de duración
   // cero (dos horas iguales, que es un tipeo) en un permiso de 59 segundos.
   // Los dos candados que ya existían lo cazaron.
-  const mismoMinuto = Math.floor(ventana.hastaSeg / 60) === Math.floor(marcaSeg / 60);
-  const hasta = mismoMinuto ? marcaSeg : Math.min(ventana.hastaSeg, marcaSeg);
+  const estiraFin =
+    bordeDelReloj === "fin" && Math.floor(ventana.hastaSeg / 60) === Math.floor(cierra / 60);
+  const estiraInicio =
+    bordeDelReloj === "inicio" && Math.floor(ventana.desdeSeg / 60) === Math.floor(abre / 60);
+
+  const desde = estiraInicio ? abre : Math.max(ventana.desdeSeg, abre);
+  const hasta = estiraFin ? cierra : Math.min(ventana.hastaSeg, cierra);
   return Math.max(0, (hasta - desde) / 60);
+}
+
+/**
+ * Cuántos MINUTOS de atraso de ENTRADA perdona este permiso.
+ *
+ * `entradaSeg` es la hora a la que la persona TENÍA que entrar y `marcaSeg` la
+ * hora a la que de verdad entró.
+ *
+ * 🔑 Es la tardanza vista por `minutosPerdonadosDe`, con el mismo resultado que
+ * daba antes del 16-sep-2026. Se conserva con su firma porque la nombran los
+ * candados de la lluvia del 17-ago y el de «solo Constancia».
+ */
+export function minutosPerdonados(
+  ventana: VentanaPermiso | null,
+  entradaSeg: number,
+  marcaSeg: number,
+): number {
+  return minutosPerdonadosDe(ventana, {
+    desdeSeg: entradaSeg, hastaSeg: marcaSeg, bordeDelReloj: "fin",
+  });
 }
 
 /** Cómo se lee un permiso de horas, en pantalla y en el papel. Fuente única. */
@@ -159,6 +237,112 @@ export function textoPermiso(
   const v = ventanaDe(horaDesde, horaHasta);
   if (!v) return motivo;
   return `${motivo} — permiso de ${segundosAHora(v.desdeSeg)} a ${segundosAHora(v.hastaSeg)}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 NADA CALLADO (16-sep-2026)
+//
+// Daniel, textual: *«La columna muestra los minutos reales y, al lado, cuánto
+// se perdonó. Nada callado.»* y *«y si tuviese tardanza, deberia de salir en
+// tardanza no callado»*.
+//
+// 🩸 Hasta hoy el perdón se restaba y el minuto DESAPARECÍA: la columna quedaba
+// en «—» y el día se leía como si la persona hubiera llegado puntual y se
+// hubiera ido a la hora. Encima el chip decía «Permiso 0 min» —Andrea Pérez, el
+// 1-sep-2026, con un permiso que le cubría la tarde entera— porque solo sabía
+// contar tardanza.
+//
+// El texto sale de ACÁ, no de un `.tsx`: la pantalla, el título y el Excel
+// tienen que decir exactamente lo mismo.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Lo que un permiso perdonó en UN día, columna por columna. */
+export interface PerdonDelDia {
+  tardeMin: number;
+  salidaTempranaMin: number;
+  almuerzoMin: number;
+}
+
+export const PERDON_CERO: PerdonDelDia = { tardeMin: 0, salidaTempranaMin: 0, almuerzoMin: 0 };
+
+/** Los tres, juntos. */
+export function totalPerdonado(p: PerdonDelDia): number {
+  return p.tardeMin + p.salidaTempranaMin + p.almuerzoMin;
+}
+
+/** El rango del permiso para el chip: «12:00–17:00». `null` sin ventana. */
+export function rangoPermiso(
+  horaDesde: string | null | undefined,
+  horaHasta: string | null | undefined,
+): string | null {
+  const v = ventanaDe(horaDesde, horaHasta);
+  if (!v) return null;
+  return `${segundosAHora(v.desdeSeg)}–${segundosAHora(v.hastaSeg)}`;
+}
+
+/** Los minutos como se escriben en pantalla: sin decimales, redondeados. */
+function min(n: number): string {
+  return String(Math.round(n));
+}
+
+/**
+ * Qué perdonó, en palabras y sin jerga:
+ *   «perdona 292 min de salida temprana»
+ *   «perdona 12 min de tardanza y 3 min de exceso de almuerzo»
+ *   «no perdona minutos de este día»  ← cuando el permiso no se solapó con nada
+ */
+export function textoPerdon(p: PerdonDelDia): string {
+  const partes = partesDelPerdon(p);
+  if (partes.length === 0) return "no perdona minutos de este día";
+  return `perdona ${enLista(partes)}`;
+}
+
+/**
+ * 🔑 El orden es el del DÍA: primero la entrada, después el almuerzo y al final
+ * la salida. Es el orden en que la persona vivió el día, y el mismo en la
+ * pantalla, en el título y en el Excel.
+ */
+function partesDelPerdon(p: PerdonDelDia): string[] {
+  const partes: string[] = [];
+  if (p.tardeMin > 0) partes.push(`${min(p.tardeMin)} min de tardanza`);
+  if (p.almuerzoMin > 0) partes.push(`${min(p.almuerzoMin)} min de exceso de almuerzo`);
+  if (p.salidaTempranaMin > 0) partes.push(`${min(p.salidaTempranaMin)} min de salida temprana`);
+  return partes;
+}
+
+function enLista(partes: readonly string[]): string {
+  if (partes.length <= 1) return partes[0] ?? "";
+  return `${partes.slice(0, -1).join(", ")} y ${partes[partes.length - 1]}`;
+}
+
+/**
+ * La línea del resumen de una persona: qué perdonaron sus permisos en todo el
+ * período. `null` cuando no perdonaron nada — no se dibuja un aviso vacío.
+ */
+export function textoPerdonDelPeriodo(p: PerdonDelDia): string | null {
+  const partes = partesDelPerdon(p);
+  if (partes.length === 0) return null;
+  return `Los permisos de horas perdonaron ${enLista(partes)}. `
+    + "Esos minutos ya NO se descuentan.";
+}
+
+/**
+ * El chip del día: «Permiso 12:00–17:00 · perdona 292 min de salida temprana».
+ *
+ * Sin rango —no debería pasar: sin ventana no hay permiso— se dice «Permiso» a
+ * secas antes que inventar un horario.
+ */
+export function etiquetaPermisoDelDia(rango: string | null, p: PerdonDelDia): string {
+  return `Permiso${rango ? ` ${rango}` : ""} · ${textoPerdon(p)}`;
+}
+
+/**
+ * El texto largo: el título de la pantalla y la celda del Excel.
+ * `permiso` es lo que devuelve `textoPermiso` («Constancia — permiso de 12:00 a
+ * 17:00»).
+ */
+export function textoPermisoDelDia(permiso: string, p: PerdonDelDia): string {
+  return `${permiso} · ${textoPerdon(p)}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

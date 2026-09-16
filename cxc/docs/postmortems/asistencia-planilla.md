@@ -7,6 +7,76 @@
 
 ---
 
+## 🔴 El permiso de horas perdona las TRES columnas (16-sep-2026)
+
+> Daniel, textual:
+> *«1. El permiso perdona lo que se solape con la ventana, sea tardanza, salida temprana o exceso de almuerzo. Una sola regla, tres columnas. 2. La columna muestra los minutos reales y, al lado, cuánto se perdonó. Nada callado. — haslo»*
+> *«permiso justificado se paga»*
+> *«y si tuviese tardanza, deberia de salir en tardanza no callado»*
+
+### 🩸 El defecto, medido contra producción el 16-sep-2026
+
+`minutosPerdonados` solo sabía cruzar la ventana del permiso con **el atraso de ENTRADA**, y `reporte.ts` lo llamaba en UN solo lugar. La salida temprana y el exceso de almuerzo se calculaban sin mirar el permiso:
+
+| Colaborador | Día | Permiso cargado | Marcas | Se le descontaba |
+|---|---|---|---|---:|
+| **Andrea Pérez (16)** | 1-sep-2026 | Constancia **12:00–17:00** | 08:04:03 · 12:07:32 | **292,47 min · $16,43** |
+| **Briceida Montero (8)** | 7-sep-2026 | Constancia **12:30–16:30** | 08:05:29 · 12:32:57 | **237,05 min · $12,92** |
+
+Andrea **entró puntual** (08:04, dentro de la tolerancia de 10 min) y su permiso cubría **exactamente** lo que pasó — y la pantalla le escribía **«Permiso 0 min»**, porque el chip también contaba solo tardanza. Los minutos se descontaban y el renglón se veía como un día normal: lo que Daniel llama «callado».
+
+Hay **23 justificaciones con horas** en producción. La mayoría son del día de lluvia del **17-ago** (nueve personas, permisos de mañana) y ésas **ya funcionaban**: no se podían romper.
+
+### La regla — una sola, tres ventanas
+
+Se perdona la **INTERSECCIÓN** de la ventana del permiso con la del incumplimiento, **ni un minuto más**, y cada perdón se capea a **su propio bruto** (perdonar de más sería regalar minutos de otra columna). La regla vive entera en `src/lib/asistencia/permiso-horas.ts` → `minutosPerdonadosDe`:
+
+| Columna | Ventana del incumplimiento | Borde del reloj |
+|---|---|---|
+| Tardanza | `[entrada programada, primera marca]` | `fin` |
+| **Salida temprana** | `[última marca, salida programada]` | **`inicio`** |
+| **Exceso de almuerzo** | `[sale + almuerzo permitido, vuelve]` | `fin` |
+
+🔴 **El estiramiento del MISMO MINUTO (27-ago-2026) se generaliza al borde que mira a la marca, y a ése solo.** El permiso se teclea en MINUTOS y el reloj mide en SEGUNDOS: en la tardanza la marca CIERRA la ventana y el que se estira es el FINAL del permiso —conducta intacta, la de las nueve personas de la lluvia—; en la salida temprana la marca la **ABRE** (se fue 12:07:32 con permiso «desde las 12:00») y el que se estira es el **PRINCIPIO**. El borde que no mira a una marca **no se corre**: un permiso de 08:05 a 08:10 sigue sin perdonar el atraso de 08:00 a 08:05.
+
+🔴 **Las dos reglas viejas siguen en pie**: un permiso de horas **NO justifica el día entero** (quien no vino sigue siendo ausencia de día completo — es el test que protege ocho horas de sueldo) y **solo se perdona lo que SE SOLAPA**. `minutosPerdonados` conserva **firma y conducta** y hoy es un envoltorio de `minutosPerdonadosDe` con `bordeDelReloj: "fin"`.
+
+⚠️ **Con 2 marcas no se inventa un almuerzo.** El exceso solo se mide con 4+ marcas (ya era así) y sin exceso no hay nada que perdonar.
+
+### 🔴 Nada callado
+
+- `DiaReporte` lleva los **tres perdones por separado** —`permisoPerdonaMin` (tardanza, conserva nombre y significado porque lo leen la pantalla, el Excel y tres candados), `permisoPerdonaSalidaMin` y `permisoPerdonaAlmuerzoMin`— más `permisoRango` («12:00–17:00»).
+- El resumen por persona suma los tres en `minutosPerdonadosPorPermiso` y los abre en `minutosPerdonadosTarde` · `...SalidaTemprana` · `...Almuerzo`. Para un permiso de mañana —lo que había en producción— el total da **exactamente el mismo número que antes**.
+- El chip del día pasó de **«Permiso 0 min»** a **«Permiso 12:00–17:00 · perdona 292 min de salida temprana»**, y el título lleva el texto largo. En el detalle de la persona aparece una línea azul: *«Los permisos de horas perdonaron 292 min de salida temprana. Esos minutos ya NO se descuentan.»*
+- 🔑 **El texto sale de un módulo PURO** (`textoPerdon` · `etiquetaPermisoDelDia` · `textoPermisoDelDia` · `textoPerdonDelPeriodo`), nunca escrito dentro del `.tsx`: la pantalla, el título y el **Excel** dicen lo mismo, palabra por palabra. El Excel decía `perdona N min` a secas y ahora usa el mismo módulo.
+
+### La medición contra producción, antes y después
+
+`scripts/_medir-vs-yulissa.ts` (solo lectura), el mismo instrumento de las dos tandas anteriores.
+
+**1–15 sep, corte 10-sep** — 46 líneas, **2 se mueven**:
+
+| Código | Colaborador | Salida temprana (min) | Salida temprana ($) | Neto |
+|---|---|---:|---:|---:|
+| 16 | Andrea Pérez (vistana) | 292,47 → **0** | 16,43 → **0** | 285,53 → **301,96** (+16,43) |
+| 8 | Briceida Montero (Boston) | 237,05 → **0** | 12,92 → **0** | 240,60 → **252,10** (+11,50) |
+
+Briceida paga seguros: su bruto sube $12,92 y el seguro social y educativo suben $1,42, así que el neto sube **$11,50**. **Nadie más se movió**; neto total del período **11.286,36 → 11.314,29**.
+
+**16–30 ago** (el día de lluvia) — 46 líneas, **0 diferencias de plata**, neto **11.091,64 → 11.091,64**.
+
+⚠️ **Un cambio que NO es plata**: el 17-ago, Luis Ballesta (42) tiene DOS justificaciones cargadas y el motor toma la primera, que dice **08:00 a 20:00** (un tipeo del día de lluvia). Con la regla nueva esa ventana le perdona **2,62 minutos de exceso de almuerzo**. El exceso de almuerzo **no es un concepto de la planilla** —solo entra a `tiempoNoTrabajadoMin`, el número que se MIRA en el Reporte—, así que no mueve un centavo. Se deja anotado porque es la única fila del período que cambia de aspecto.
+
+### Candados
+
+`src/__tests__/lib/permiso-tres-columnas.test.ts` (32 casos), con los tres casos reales como fixtures: Andrea, Briceida y el día de lluvia **que no cambia**. Bordes cubiertos: permiso sin solape, permiso que cubre de más, ventana de duración cero y al revés, día sin marcas (sigue siendo ausencia), día con una sola marca, día con dos marcas (sin almuerzo que medir), y los dos bordes del mismo minuto por separado.
+
+**Verificado por mutación: `scripts/_mutar-candados-permiso-tres-columnas.sh` — 15 de 15 cazadas, 0 corridas muertas, 2 de 2 controles en verde.** La corrida incluye los dos candados viejos (`asistencia-permiso-horas` y `justificar-horas-solo-constancia`), que pasan **sin tocarlos**.
+
+🩸 **Cuatro mutaciones se escaparon en la primera vuelta y el candado se arregló, no se bajó la vara**: el estiramiento del borde en la salida temprana no se estaba probando con un permiso que tuviera SEGUNDOS (con horas al minuto la resta da lo mismo por los dos caminos), y la línea del resumen se comprobaba por «¿se llama a la función?» — un `false &&` delante la apagaba sin borrar la llamada. Ahora se exige el guard exacto.
+
+---
+
 ## Asistencia — el almuerzo es FIJO y quién marca sin ir en planilla (13-ago-2026)
 
 > Daniel va a usar la **planilla** de verdad (calcular pago, horas extra, tardanzas), así que estas dos cosas dejaron de ser cosméticas.

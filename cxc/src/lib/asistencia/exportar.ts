@@ -22,6 +22,9 @@ import { textoAlmuerzo } from "./config";
 import { etiquetaPersona } from "./directorio";
 import { MOTIVO_TRABAJO_VENDEDOR, textoDiaJustificado } from "./motivos";
 import { textoDiaVacaciones } from "./vacaciones";
+// 🔑 El texto del permiso sale de un módulo PURO: el Excel y la pantalla
+// dicen lo mismo, palabra por palabra.
+import { textoPermisoDelDia } from "./permiso-horas";
 // 🔴 El pie se PARTE contra el ancho de la hoja. `doc.text` no envuelve solo:
 // ver el encabezado de `pdf-pie.ts` para los milímetros que se perdían.
 import { armarPie, dibujarPie } from "./pdf-pie";
@@ -151,8 +154,15 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
           : d.ausente ? "Sin justificar"
           : d.justificado ? textoDiaJustificado(d.justificado)
           // 🔴 El permiso de HORAS es OTRA cosa que una justificación de día
-          // entero, y el papel lo dice: perdonó N minutos y nada más.
-          : d.permiso ? `${d.permiso} · perdona ${n0(d.permisoPerdonaMin)} min`
+          // entero, y el papel lo dice: qué cubre y cuánto perdonó de cada
+          // columna. 🔑 El MISMO texto que el chip de la pantalla
+          // (`textoPermisoDelDia`): el Excel es lo que se manda por correo y no
+          // puede decir menos que la pantalla.
+          : d.permiso ? textoPermisoDelDia(d.permiso, {
+            tardeMin: d.permisoPerdonaMin,
+            salidaTempranaMin: d.permisoPerdonaSalidaMin,
+            almuerzoMin: d.permisoPerdonaAlmuerzoMin,
+          })
           : d.feriado ? `Feriado — ${d.feriado}` : "",
         // 🔴 El archivo es el que se manda por correo y sobrevive a la
         // discusión: si la pantalla avisa que una hora se tocó a mano y el

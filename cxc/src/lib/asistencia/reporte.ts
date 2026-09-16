@@ -96,7 +96,7 @@ import { ALMUERZO_FIJO_MIN, REGLAS_DEFAULT, type ReglasAsistencia } from "./conf
 // motor lo necesita para NO contar esos días como ausencias justificadas.
 import { esTrabajoDeVendedor } from "./motivos";
 import { motivoAutomaticoDelDiaSinMarca } from "./trabaja-afuera";
-import { minutosPerdonados, textoPermiso, ventanaDe } from "./permiso-horas";
+import { minutosPerdonadosDe, rangoPermiso, textoPermiso, ventanaDe } from "./permiso-horas";
 // 🔴 UN DÍA DE VACACIONES NO SE CALCULA. Ver `vacaciones.ts`: aunque la persona
 // haya pasado por el reloj, ese día no genera horas, ni tardanza, ni ausencia.
 import { vacacionDe, type DiaVacacion, type Vacacion } from "./vacaciones";
@@ -248,9 +248,26 @@ export interface DiaReporte {
    * el día. Ver `permiso-horas.ts`.
    */
   permiso: string | null;
-  /** Cuántos minutos de tardanza perdonó ese permiso. Ya están descontados de
-   *  `tardeMin`: esto es para poder EXPLICARLO, no para volver a restarlo. */
+  /**
+   * Solo el rango del permiso, para el chip del día: «12:00–17:00». `null` = no
+   * hay permiso. Es el MISMO dato que va dentro de `permiso`, separado para que
+   * la pantalla no tenga que recortar un texto.
+   */
+  permisoRango: string | null;
+  /**
+   * 🔴 LOS TRES PERDONES VIAJAN POR SEPARADO (16-sep-2026). Daniel: *«La columna
+   * muestra los minutos reales y, al lado, cuánto se perdonó. Nada callado.»*
+   *
+   * Cada uno ya está descontado de su columna (`tardeMin`, `salidaTempranaMin`,
+   * `excesoAlmuerzoMin`): esto es para poder EXPLICARLO, no para volver a
+   * restarlo. Juntos en `totalPerdonado` (`permiso-horas.ts`).
+   *
+   * ⚠️ `permisoPerdonaMin` conserva su nombre y su significado —los minutos de
+   * TARDANZA— porque lo leen la pantalla, el Excel y tres candados.
+   */
   permisoPerdonaMin: number;
+  permisoPerdonaSalidaMin: number;
+  permisoPerdonaAlmuerzoMin: number;
   feriado: string | null;
   /**
    * El día cae de lunes a viernes.
@@ -343,9 +360,23 @@ export interface PersonaReporte {
     /** Días cubiertos por un permiso de HORAS (no son ausencias: la persona
      *  vino, con permiso para llegar más tarde). */
     diasConPermiso: number;
-    /** Minutos de tardanza que perdonaron esos permisos. Ya están FUERA de
-     *  `minutosTarde`; se guardan para poder explicar la diferencia. */
+    /**
+     * 🔴 TODO lo que perdonaron esos permisos, las TRES columnas juntas
+     * (16-sep-2026). Ya está FUERA de `minutosTarde`, `excesoAlmuerzoMin` y
+     * `salidaTempranaMin`; se guarda para poder explicar la diferencia.
+     *
+     * ⚠️ Hasta el 16-sep-2026 solo contaba la TARDANZA, porque era lo único que
+     * el permiso sabía perdonar. El nombre no cambió —lo leen los candados— y
+     * para un permiso de mañana, que es lo que había en producción, sigue
+     * dando exactamente el mismo número.
+     */
     minutosPerdonadosPorPermiso: number;
+    /** De ese total, cuánto era tardanza de entrada. */
+    minutosPerdonadosTarde: number;
+    /** De ese total, cuánto era salida temprana. */
+    minutosPerdonadosSalidaTemprana: number;
+    /** De ese total, cuánto era exceso de almuerzo. */
+    minutosPerdonadosAlmuerzo: number;
     excesoAlmuerzoMin: number;
     salidaTempranaMin: number;
     extraMin: number;
@@ -677,6 +708,8 @@ export function armarReporte(opts: {
       const permiso = just && ventana
         ? textoPermiso(just.motivo, just.hora_desde, just.hora_hasta)
         : null;
+      /** Solo el rango, para el chip del día: «12:00–17:00». */
+      const permisoRango = just && ventana ? rangoPermiso(just.hora_desde, just.hora_hasta) : null;
       const habil = esHabil(fecha);
       // Regla 6. Hoy sigue corriendo y mañana ni empezó: no se los juzga.
       // 🔴 `>=`, no `===`. Ver la nota de `diaEnCurso`.
@@ -720,7 +753,8 @@ export function armarReporte(opts: {
           // 🔴 Los tres veredictos, suspendidos: no faltó, no hay nada que
           // revisar, y el día no se juzga por ningún lado.
           revisar: false, enCurso, fueraDeVigencia: true, ausente: false,
-          vacacion: null, justificado: null, permiso: null, permisoPerdonaMin: 0,
+          vacacion: null, justificado: null, permiso: null, permisoRango: null,
+          permisoPerdonaMin: 0, permisoPerdonaSalidaMin: 0, permisoPerdonaAlmuerzoMin: 0,
           feriado, habil,
           correcciones,
         });
@@ -762,7 +796,8 @@ export function armarReporte(opts: {
           // el renglón tiene que decir «Vacaciones» y una sola cosa. Dos
           // etiquetas para el mismo día es la forma de que la pantalla y el
           // papel terminen diciendo cosas distintas.
-          justificado: null, permiso: null, permisoPerdonaMin: 0,
+          justificado: null, permiso: null, permisoRango: null,
+          permisoPerdonaMin: 0, permisoPerdonaSalidaMin: 0, permisoPerdonaAlmuerzoMin: 0,
           feriado, habil,
           correcciones,
         });
@@ -795,7 +830,8 @@ export function armarReporte(opts: {
           // los días mal marcados, con otro nombre.
           ausente: !enCurso && habil && !feriado && !justificadoDelDia,
           vacacion: null,
-          justificado: justificadoDelDia, permiso, permisoPerdonaMin: 0, feriado, habil,
+          justificado: justificadoDelDia, permiso, permisoRango,
+          permisoPerdonaMin: 0, permisoPerdonaSalidaMin: 0, permisoPerdonaAlmuerzoMin: 0, feriado, habil,
           correcciones,
         });
         continue;
@@ -822,24 +858,55 @@ export function armarReporte(opts: {
       // Regla 1. Tolerancia para CLASIFICAR; una vez pasada, se cuenta desde
       // la hora de entrada, no desde el fin de la tolerancia.
       const tardeBrutaMin = ent > entradaProgSeg + toleranciaSeg ? (ent - entradaProgSeg) / 60 : 0;
-      // 🔴 EL PERMISO PERDONA SOLO LO QUE SE SOLAPA CON EL ATRASO DE VERDAD.
-      // Un permiso de 2 a 4 de la tarde no perdona haber llegado a las 8:45:
-      // se cruza la ventana del permiso con la del atraso —de la hora de
-      // entrada a la primera marca— y se perdona la intersección, ni un minuto
-      // más. Sin ventana el número es 0 y esta línea no cambia nada.
-      const permisoPerdonaMin = Math.min(tardeBrutaMin, minutosPerdonados(ventana, entradaProgSeg, ent));
+      // ── 🔴 EL PERMISO PERDONA LAS TRES COLUMNAS (16-sep-2026) ──────────────
+      //
+      // Daniel, textual: *«El permiso perdona lo que se solape con la ventana,
+      // sea tardanza, salida temprana o exceso de almuerzo. Una sola regla,
+      // tres columnas.»*
+      //
+      // La regla es la de siempre y vive entera en `permiso-horas.ts`: se cruza
+      // la ventana del permiso con la del INCUMPLIMIENTO y se perdona la
+      // intersección, ni un minuto más. Acá solo se dice cuál es la ventana de
+      // cada columna y se capea el perdón a SU propio bruto — perdonar más de
+      // lo que se incumplió sería regalar minutos de otra columna.
+      //
+      // 🩸 Hasta hoy solo se perdonaba la tardanza de ENTRADA, y Andrea Pérez
+      // (16), que el 1-sep entró PUNTUAL y se fue a las 12:07:32 con permiso de
+      // 12:00 a 17:00, perdía $16,43 por «salida temprana».
+      //
+      // Sin ventana los tres números son 0 y nada de esto cambia una coma.
+      const permisoPerdonaMin = Math.min(tardeBrutaMin, minutosPerdonadosDe(ventana, {
+        // La marca CIERRA el atraso: se llegó tarde hasta que se marcó.
+        desdeSeg: entradaProgSeg, hastaSeg: ent, bordeDelReloj: "fin",
+      }));
       const tardeMin = Math.max(0, tardeBrutaMin - permisoPerdonaMin);
 
       // Regla 2. Solo se puede medir con 4 marcas (o más): las del medio son
       // el almuerzo. Con 2 marcas no hay almuerzo que medir.
+      // ⚠️ Y sin almuerzo que medir no hay nada que perdonar: no se inventa un
+      // almuerzo donde no hay marcas.
       let excesoAlmuerzoMin = 0;
+      let permisoPerdonaAlmuerzoMin = 0;
       let almuerzoTomado = 0;
       if (crudas.length >= 4) {
         almuerzoTomado = crudas[2] - crudas[1]; // segundos
-        excesoAlmuerzoMin = Math.max(0, (almuerzoTomado - almuerzoProgSeg) / 60);
+        const excesoAlmuerzoBrutoMin = Math.max(0, (almuerzoTomado - almuerzoProgSeg) / 60);
+        permisoPerdonaAlmuerzoMin = Math.min(excesoAlmuerzoBrutoMin, minutosPerdonadosDe(ventana, {
+          // El exceso empieza cuando se acabó el almuerzo permitido y termina
+          // cuando la persona volvió a marcar: esa marca lo CIERRA.
+          desdeSeg: crudas[1] + almuerzoProgSeg, hastaSeg: crudas[2], bordeDelReloj: "fin",
+        }));
+        excesoAlmuerzoMin = Math.max(0, excesoAlmuerzoBrutoMin - permisoPerdonaAlmuerzoMin);
       }
 
-      const salidaTempranaMin = soloUna ? 0 : Math.max(0, (salidaProgSeg - sal) / 60);
+      const salidaTempranaBrutaMin = soloUna ? 0 : Math.max(0, (salidaProgSeg - sal) / 60);
+      const permisoPerdonaSalidaMin = Math.min(salidaTempranaBrutaMin, minutosPerdonadosDe(ventana, {
+        // 🔑 Acá la marca ABRE el incumplimiento —se fue a las 12:07:32 y le
+        // faltaba hasta las 17:00—, así que el borde que se estira al minuto
+        // entero es el PRINCIPIO del permiso, no el final.
+        desdeSeg: sal, hastaSeg: salidaProgSeg, bordeDelReloj: "inicio",
+      }));
+      const salidaTempranaMin = Math.max(0, salidaTempranaBrutaMin - permisoPerdonaSalidaMin);
       // Regla 3. LA HORA EXTRA ES BRUTA: un mínimo que hay que pasar, y nada
       // más. Dos decisiones de Daniel del 1-sep-2026, las dos textuales:
       //
@@ -881,7 +948,8 @@ export function armarReporte(opts: {
         // `null` y no la hora de entrada: no sabemos cuándo se fue.
         salida: soloUna ? null : fmt(sal),
         tardeMin, excesoAlmuerzoMin, salidaTempranaMin, extraMin, trabajadoMin,
-        revisar, enCurso, fueraDeVigencia: false, ausente: false, vacacion: null, justificado, permiso, permisoPerdonaMin, feriado, habil,
+        revisar, enCurso, fueraDeVigencia: false, ausente: false, vacacion: null, justificado, permiso, permisoRango,
+        permisoPerdonaMin, permisoPerdonaSalidaMin, permisoPerdonaAlmuerzoMin, feriado, habil,
         correcciones,
       });
     }
@@ -907,7 +975,11 @@ export function armarReporte(opts: {
       diasConPermiso: dias.filter((d) => d.permiso !== null).length,
       /** Minutos de tardanza que perdonaron esos permisos. Ya NO están en
        *  `minutosTarde`: se muestran para poder explicar la diferencia. */
-      minutosPerdonadosPorPermiso: dias.reduce((a, d) => a + d.permisoPerdonaMin, 0),
+      minutosPerdonadosPorPermiso: dias.reduce(
+        (a, d) => a + d.permisoPerdonaMin + d.permisoPerdonaSalidaMin + d.permisoPerdonaAlmuerzoMin, 0),
+      minutosPerdonadosTarde: dias.reduce((a, d) => a + d.permisoPerdonaMin, 0),
+      minutosPerdonadosSalidaTemprana: dias.reduce((a, d) => a + d.permisoPerdonaSalidaMin, 0),
+      minutosPerdonadosAlmuerzo: dias.reduce((a, d) => a + d.permisoPerdonaAlmuerzoMin, 0),
       excesoAlmuerzoMin: conMarcas.reduce((a, d) => a + d.excesoAlmuerzoMin, 0),
       salidaTempranaMin: conMarcas.reduce((a, d) => a + d.salidaTempranaMin, 0),
       extraMin: conMarcas.reduce((a, d) => a + d.extraMin, 0),

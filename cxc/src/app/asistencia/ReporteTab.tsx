@@ -19,6 +19,9 @@ import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { textoAlmuerzo, MINUTOS_TARDE_QUE_SON_AUSENCIA } from "@/lib/asistencia/config";
 import { esTrabajoDeVendedor, textoDiaJustificado } from "@/lib/asistencia/motivos";
 import { textoDiaVacaciones } from "@/lib/asistencia/vacaciones";
+// 🔴 El texto del permiso sale de un módulo PURO, nunca escrito acá: la
+// pantalla, el título y el Excel tienen que decir exactamente lo mismo.
+import { etiquetaPermisoDelDia, textoPerdonDelPeriodo, textoPermisoDelDia, type PerdonDelDia } from "@/lib/asistencia/permiso-horas";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { Ayuda } from "@/components/shared/Ayuda";
 import RangoFechas, { ultimoRango } from "@/components/ui/RangoFechas";
@@ -481,6 +484,13 @@ function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir, onJustif
               de días sin las 4 marcas. Míralos antes de descontar.
             </p>
           )}
+          {/* 🔴 NADA CALLADO (16-sep-2026): el permiso baja las tres columnas y
+              acá se dice cuánto bajó cada una. Sin esto, la persona aparece con
+              menos minutos de los que marcó el reloj y no hay forma de saber
+              por qué. El texto sale de `permiso-horas.ts`. */}
+          {perdonDelPeriodo(r) && (
+            <p className="mb-2 text-[13px] text-blue-900">{perdonDelPeriodo(r)}</p>
+          )}
           <div className="overflow-x-auto rounded-md border border-gray-200 bg-white">
             <table className="w-full text-[13px]">
               <thead><tr className="border-b border-gray-200 text-[10px] uppercase tracking-wide text-gray-400">
@@ -510,6 +520,24 @@ function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir, onJustif
       )}
     </>
   );
+}
+
+/** Lo que perdonaron los permisos de TODO el período de una persona. */
+function perdonDelPeriodo(r: PersonaReporte["resumen"]): string | null {
+  return textoPerdonDelPeriodo({
+    tardeMin: r.minutosPerdonadosTarde,
+    salidaTempranaMin: r.minutosPerdonadosSalidaTemprana,
+    almuerzoMin: r.minutosPerdonadosAlmuerzo,
+  });
+}
+
+/** Los tres perdones del día, tal como los pide el módulo de textos. */
+function perdonDelDia(d: DiaReporte): PerdonDelDia {
+  return {
+    tardeMin: d.permisoPerdonaMin,
+    salidaTempranaMin: d.permisoPerdonaSalidaMin,
+    almuerzoMin: d.permisoPerdonaAlmuerzoMin,
+  };
 }
 
 /**
@@ -661,12 +689,20 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJu
                   advertencia (ámbar) ni un problema (rojo) — es una decisión ya
                   tomada. Sin esto, la persona aparece con menos minutos tarde
                   que los que marcó el reloj y no hay forma de saber por qué. */}
+              {/* 🔴 NADA CALLADO (16-sep-2026). Daniel: *«La columna muestra
+                  los minutos reales y, al lado, cuánto se perdonó. Nada
+                  callado.»* 🩸 Acá decía «Permiso 0 min» en el día en que
+                  Andrea Pérez tenía la tarde entera cubierta: el chip solo
+                  sabía contar tardanza, y los 292 minutos de salida temprana
+                  que se le descontaban no aparecían por ningún lado. El texto
+                  sale de `permiso-horas.ts` para que la pantalla, el título y
+                  el Excel digan lo mismo. */}
               {d.permiso && (
                 <span
                   className="ml-1.5 rounded bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-blue-900"
-                  title={`${d.permiso}. Perdona ${fmtMin(d.permisoPerdonaMin)} minutos de tardanza. NO justifica el día entero.`}
+                  title={`${textoPermisoDelDia(d.permiso, perdonDelDia(d))}. NO justifica el día entero.`}
                 >
-                  Permiso {fmtMin(d.permisoPerdonaMin)} min
+                  {etiquetaPermisoDelDia(d.permisoRango, perdonDelDia(d))}
                 </span>
               )}
               {/* Agregar la marca que falta. Es el caso más común de todos: quien
