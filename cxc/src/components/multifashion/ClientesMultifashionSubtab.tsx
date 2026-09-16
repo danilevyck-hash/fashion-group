@@ -1,12 +1,9 @@
 "use client";
 
-// Sub-tab "Clientes" de Multifashion — DOS layouts, según el ancho útil.
-//
-// Escritorio (≥lg): la grilla compacta de siempre, sin tocar.
-// Celular e iPad (<lg): una tarjeta por cliente — ver `ClienteTarjeta` al final
-// del archivo para el porqué medido (a 390 px quedaban 288 px de la grilla
-// fuera de la pantalla y SIN forma de alcanzarlos, y el nombre del cliente
-// colapsaba a 0 px de ancho).
+// Sub-tab "Clientes" de Multifashion. La tabla de Mayoreo tiene DOS layouts
+// según el ancho ÚTIL: la grilla en escritorio (≥lg) y una tarjeta por cliente
+// en celular e iPad (<lg) — el porqué medido está en `ClienteTarjeta`, al final
+// del archivo.
 //
 // Período: el ÚNICO del módulo, elegido en el encabezado (6-sep-2026). Antes
 // esta pestaña tenía sus CUATRO píldoras propias.
@@ -17,25 +14,37 @@
 //
 // Dos secciones:
 //   1. Mayoreo: clientes con is_wholesale=true (la columna sigue llamándose
-//      así en la DB; la UI dice "Mayoreo" — cero jerga en inglés).
-//   2. Clientes identificados (retail): ranking por monto, nombre real.
-//      Identidad normalizada en el RPC (TRIM + colapsa espacios) para no partir
-//      un cliente por variantes; VENTAS MAHER excluido (revendedor). El bucket
-//      "Anónimos (mostrador)" suma CONTADO / CONSUMIDOR FINAL aparte.
+//      así en la DB; la UI dice "Mayoreo" — cero jerga en inglés). Conserva la
+//      tabla ancha del escritorio, sus tarjetas del celular y el sparkline.
+//      La columna "#" es la POSICIÓN en el ranking por monto (no un id).
+//   2. Clientes identificados: la LISTA DE SEGUIMIENTO —
+//      `ListaSeguimientoClientes` — con el bucket "Anónimos (mostrador)"
+//      (CONTADO / CONSUMIDOR FINAL) aparte.
 //
-// La columna "#" es la POSICIÓN en el ranking por monto (no un id de cliente).
-// Click en una row expande sparkline mensual (un cliente expandido a la vez).
+// 🔴 QUÉ CAMBIÓ EL 16-sep-2026. La sección 2 era el TOP 50 del período por
+// monto y pasó a ser la lista de seguimiento y postventa: TODOS los clientes
+// con compras, del que más tiempo lleva sin volver. El porqué, lo medido y las
+// citas de Daniel viven en `ListaSeguimientoClientes.tsx` y en
+// `lib/multifashion/clientes-universo.ts`. Dos cosas que hay que saber acá:
+//
+// ⚠️ Esa lista NO sigue el período del módulo, a propósito: «quién no vuelve»
+// es una foto de HOY, igual que las cuatro tarjetas. El período sigue mandando
+// en la cobertura, en Mayoreo y en el bucket anónimo.
+//
+// 🔴 Y NO SE PAREA MÁS POR NOMBRE: la lista ES el universo de fidelización y su
+// identidad es el CÓDIGO de Switch.
 
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { Card } from "@/components/ui/card";
-import { Package, Users, ChevronDown, Store, Repeat, UserPlus, Moon, Percent, MessageCircle } from "lucide-react";
+import { Package, Users, ChevronDown, Store, Repeat, UserPlus, Moon, Percent } from "lucide-react";
 import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
 import { Ayuda } from "@/components/shared/Ayuda";
-import { useUrlState } from "@/lib/hooks/useUrlState";
 import { nombreEnPantalla } from "@/lib/multifashion/nombres";
 import { coberturaDeClientes, FILAS_CLIENTES_AL_ABRIR } from "@/lib/multifashion/clientes-cobertura";
 import { etiquetaPeriodo, type Periodo } from "@/lib/multifashion/periodo";
+import { ListaSeguimientoClientes } from "./ListaSeguimientoClientes";
+import type { ClienteUniverso } from "@/lib/multifashion/clientes-universo";
 
 // "Escala compartida entre mayoreo y retail" vivía escrito DOS veces —una en la
 // lista vertical del celular, otra en la tira del escritorio— y por eso podían
@@ -101,41 +110,12 @@ interface RetailResp {
 
 // ─── Fidelización ACS (endpoint /api/multifashion/fidelizacion) ─────────────
 
-export interface FidelCliente {
-  cliente_switch_id: number;
-  nombre: string;
-  nombre_norm: string;
-  telefono_wa: string | null;
-  registrado: boolean;
-  visitas: number;
-  visitas_90d: number;
-  ultima_compra: string | null;
-  estado5: "disponible" | "usado" | null;
-  frecuente: boolean;
-  dormido: boolean;
-  nuevo_mes: boolean;
-  cinco_pendiente: boolean;
-}
-
 interface FidelResp {
   hoy: string;
   detalle_activo: boolean;
   cards: { frecuentes: number; nuevos_mes: number; dormidos: number; cinco_pendiente: number };
-  clientes: FidelCliente[];
+  clientes: ClienteUniverso[];
 }
-
-type SegFiltro = "todos" | "frecuentes" | "dormidos" | "cinco";
-
-const SEG_OPCIONES: { value: SegFiltro; label: string }[] = [
-  { value: "todos", label: "Todos" },
-  { value: "frecuentes", label: "Frecuentes" },
-  { value: "dormidos", label: "Dormidos" },
-  { value: "cinco", label: "5% disponible" },
-];
-
-// Misma normalización de identidad que el RPC del ranking y el endpoint.
-const normNombre = (s: string): string =>
-  s.normalize("NFKC").replace(/\s+/g, " ").trim().toUpperCase();
 
 interface ClientesMultifashionSubtabProps {
   selectedYear: number;
@@ -245,10 +225,10 @@ export function ClientesMultifashionSubtab({ selectedYear, mes, periodo }: Clien
   const loading = isLoading && !data;
   const errorMsg = error ? (error instanceof Error ? error.message : "error inesperado") : null;
 
-  // ── Fidelización ACS: segmentos + estado 5% + WhatsApp ────────────────────
-  // Independiente del rango del tab (snapshot "hoy"). Si el endpoint falla,
-  // la pestaña degrada a lo de siempre (sin tarjetas/chips/columnas nuevas).
-  const [seg, setSeg] = useUrlState<SegFiltro>("mfCliSeg", "todos");
+  // ── El universo de clientes (snapshot de HOY, sin período) ───────────────
+  // De acá salen las CUATRO tarjetas y la lista de seguimiento. Si el endpoint
+  // falla, la pestaña degrada a lo de siempre: cobertura, Mayoreo y el bucket
+  // anónimo se dibujan igual, sin tarjetas y sin lista.
   const { data: fidel } = useSWR<FidelResp>(
     "multifashion-fidelizacion",
     async () => {
@@ -258,22 +238,6 @@ export function ClientesMultifashionSubtab({ selectedYear, mes, periodo }: Clien
     },
     { dedupingInterval: 5 * 60_000, revalidateOnFocus: false },
   );
-  const fidelMap = useMemo(
-    () => new Map((fidel?.clientes ?? []).map((c) => [c.nombre_norm, c])),
-    [fidel],
-  );
-  // Chips: filtran la tabla de identificados por segmento (match por nombre).
-  const retailFiltrado = useMemo(() => {
-    const base = retail?.clientes ?? [];
-    if (!fidel || seg === "todos") return base;
-    return base.filter((c) => {
-      const i = fidelMap.get(normNombre(c.nombre));
-      if (!i) return false;
-      if (seg === "frecuentes") return i.frecuente;
-      if (seg === "dormidos") return i.dormido;
-      return i.estado5 === "disponible";
-    });
-  }, [retail, fidel, fidelMap, seg]);
 
   // Al cambiar el rango, colapsa la fila expandida (igual que el efecto original
   // hacía con setExpandedId(null) en cada cambio de params).
@@ -281,7 +245,10 @@ export function ClientesMultifashionSubtab({ selectedYear, mes, periodo }: Clien
     setExpandedId(null);
   }, [range.fecha_inicio, range.fecha_fin]);
 
-  // Pico mensual compartido (escala visual unificada entre ambas secciones).
+  // Pico mensual de los sparklines de Mayoreo. 🔴 Sigue mirando TAMBIÉN el
+  // retail del período aunque esa sección ya no dibuje barras: la escala se
+  // llama «compartida entre mayoreo y retail» en la pantalla y tiene que seguir
+  // significando eso, o el rótulo miente.
   const peakMes = useMemo(() => Math.max(
     ...(wholesale?.clientes ?? []).flatMap(c => c.meses.map(m => m.ventas)),
     ...(retail?.clientes ?? []).flatMap(c => c.meses.map(m => m.ventas)),
@@ -357,30 +324,14 @@ export function ClientesMultifashionSubtab({ selectedYear, mes, periodo }: Clien
                   sub="sin segunda visita"
                 />
               </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                {SEG_OPCIONES.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setSeg(opt.value)}
-                    // 44 px, igual que las píldoras de período de arriba. Medían
-                    // 28 y son el filtro principal de la tabla de identificados.
-                    className={cn(
-                      "inline-flex min-h-[44px] items-center rounded-full border px-3 text-xs font-medium transition",
-                      seg === opt.value
-                        ? "border-teal-700 bg-teal-700 text-white"
-                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-gray-900",
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-                {!fidel.detalle_activo && (
-                  <span className="ml-1 text-xs text-gray-400">
-                    El estado &quot;usado&quot; del 5% se activa cuando corra la migración de detalle.
-                  </span>
-                )}
-              </div>
+              {/* 🔴 LOS CHIPS SE MUDARON A LA LISTA (16-sep-2026) y pasaron de
+                  cuatro a TRES: filtran la lista de seguimiento, así que van
+                  pegados a ella. Ver `ListaSeguimientoClientes`. */}
+              {!fidel.detalle_activo && (
+                <p className="text-xs text-gray-400">
+                  El estado &quot;usado&quot; del 5% se activa cuando corra la migración de detalle.
+                </p>
+              )}
             </section>
           )}
 
@@ -409,29 +360,10 @@ export function ClientesMultifashionSubtab({ selectedYear, mes, periodo }: Clien
             />
           )}
 
-          {/* Sección 2: Clientes identificados (retail por monto) */}
-          <ClientesSection
-            key={`rt-${range.fecha_inicio}-${range.fecha_fin}-${seg}`}
-            prefix="rt"
-            title="Clientes identificados"
-            subtitle={retail
-              ? `${retail.clientes_identificados ?? retail.total_clientes} con nombre · top ${retail.limit} por monto${seg !== "todos" ? ` · filtro: ${SEG_OPCIONES.find(o => o.value === seg)?.label}` : ""}`
-              : "—"}
-            /* La lista abre con 10 filas. Medido el 6-sep-2026: septiembre trae
-               33 clientes y los dibujaba los 33 de una, bajando hasta $20,72. */
-            filasAlAbrir={FILAS_CLIENTES_AL_ABRIR}
-            icon={<Users className="h-4 w-4" />}
-            iconTone="teal"
-            clientes={retailFiltrado}
-            fidelMap={fidel ? fidelMap : undefined}
-            peakMes={peakMes}
-            spansYears={spansYears}
-            expandedId={expandedId}
-            onToggleRow={toggleRow}
-            emptyText={seg !== "todos"
-              ? `Ningún cliente del período cae en "${SEG_OPCIONES.find(o => o.value === seg)?.label}".`
-              : `No hay clientes retail con nombre en ${periodoStr}.`}
-          />
+          {/* Sección 2: la LISTA DE SEGUIMIENTO — todos los clientes con
+              compras, del que más tiempo lleva sin volver. Snapshot de HOY: no
+              sigue el período del módulo, igual que las cuatro tarjetas. */}
+          {fidel && <ListaSeguimientoClientes clientes={fidel.clientes} hoy={fidel.hoy} />}
 
           {/* Bucket anónimo (mostrador): CONTADO / CONSUMIDOR FINAL, sin nombre. */}
           {retail && (retail.ventas_anonimas > 0 || retail.tickets_anonimos > 0) && (
@@ -491,9 +423,18 @@ function SegCard({ icon, tone, valor, label, sub }: {
   );
 }
 
+/**
+ * La sección con tabla ancha en escritorio y tarjetas en celular.
+ *
+ * ⚠️ 16-sep-2026: hoy la usa SOLO Mayoreo. La sección de clientes
+ * identificados pasó a ser `ListaSeguimientoClientes`, que es UNA sola fila
+ * igual en los dos anchos. Se conserva genérica —`prefix`, `filasAlAbrir`—
+ * porque Mayoreo es exactamente el caso para el que existe: seis columnas de
+ * cifras que a 390 px no entran.
+ */
 function ClientesSection({
   prefix, title, subtitle, icon, iconTone,
-  clientes, fidelMap, peakMes, spansYears, expandedId, onToggleRow, emptyText,
+  clientes, peakMes, spansYears, expandedId, onToggleRow, emptyText,
   filasAlAbrir,
 }: {
   prefix: "ws" | "rt";
@@ -502,8 +443,6 @@ function ClientesSection({
   icon: React.ReactNode;
   iconTone: "amber" | "teal";
   clientes: ClienteRow[];
-  /** Fidelización ACS por nombre normalizado — solo la sección retail la recibe. */
-  fidelMap?: Map<string, FidelCliente>;
   peakMes: number;
   spansYears: boolean;
   expandedId: string | null;
@@ -549,7 +488,6 @@ function ClientesSection({
                 id={id}
                 rank={idx + 1}
                 cliente={c}
-                fidel={fidelMap ? fidelMap.get(normNombre(c.nombre)) ?? null : undefined}
                 peakMes={peakMes}
                 spansYears={spansYears}
                 isExpanded={expandedId === id}
@@ -562,9 +500,7 @@ function ClientesSection({
         <Card data-vista="tabla" className="hidden overflow-hidden p-0 lg:block">
           <div className={cn(
             "items-center gap-3 border-b border-gray-200 bg-gray-50 px-3.5 py-2 text-xs font-medium uppercase tracking-[0.04em] text-gray-500",
-            fidelMap
-              ? "grid grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_5.5rem_2.5rem_1.25rem]"
-              : "grid grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_1.25rem]",
+            "grid grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_1.25rem]",
           )}>
             <span className="text-right" title="Posición en el ranking por monto">#</span>
             <span>Cliente</span>
@@ -572,8 +508,6 @@ function ClientesSection({
             <span className="text-right">Tickets</span>
             <span className="text-right">T. prom</span>
             <span className="text-right">Última</span>
-            {fidelMap && <span className="text-center" title="Fidelización: disponible = registrado sin usar el 5%">5%</span>}
-            {fidelMap && <span className="text-center" title="WhatsApp">WA</span>}
             <span />
           </div>
 
@@ -586,7 +520,6 @@ function ClientesSection({
                 id={id}
                 rank={idx + 1}
                 cliente={c}
-                fidel={fidelMap ? fidelMap.get(normNombre(c.nombre)) ?? null : undefined}
                 peakMes={peakMes}
                 spansYears={spansYears}
                 isExpanded={isExpanded}
@@ -636,17 +569,18 @@ function ClientesSection({
  * deja 552 — más angosto que un iPhone acostado. A 1024 quedan ~800 y la grilla
  * de 644 entra cómoda. El ESCRITORIO no cambia.
  *
- * NINGÚN número cambia: son las mismas 6 cifras de la fila, más el 5% y el
- * WhatsApp de retail.
+ * NINGÚN número cambia: son las mismas 6 cifras de la fila.
+ *
+ * ⚠️ 16-sep-2026: el 5 % y el botón de WhatsApp salieron de acá. No se
+ * perdieron — se fueron a `ListaSeguimientoClientes`, que es donde la tienda
+ * escribe. Esta tarjeta hoy la usa solo Mayoreo, que nunca los tuvo.
  */
 function ClienteTarjeta({
-  id, rank, cliente, fidel, peakMes, spansYears, isExpanded, onToggle,
+  id, rank, cliente, peakMes, spansYears, isExpanded, onToggle,
 }: {
   id: string;
   rank: number;
   cliente: ClienteRow;
-  /** undefined = sección sin fidelización (mayoreo); null = sin match ACS. */
-  fidel?: FidelCliente | null;
   peakMes: number;
   spansYears: boolean;
   isExpanded: boolean;
@@ -655,7 +589,6 @@ function ClienteTarjeta({
   const ticketProm = cliente.ticket_prom != null
     ? cliente.ticket_prom
     : (cliente.tickets_ytd > 0 ? cliente.total_ytd / cliente.tickets_ytd : 0);
-  const conFidel = fidel !== undefined;
 
   return (
     <article className="overflow-hidden rounded-lg border border-gray-200 bg-white">
@@ -684,31 +617,6 @@ function ClienteTarjeta({
           isExpanded && "rotate-180",
         )} />
       </button>
-
-      {conFidel && (fidel?.estado5 || fidel?.telefono_wa) && (
-        <div className="flex items-center gap-2 border-t border-gray-100 px-3 py-1.5">
-          {fidel?.estado5 === "disponible" ? (
-            <span className="rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700">5% disponible</span>
-          ) : fidel?.estado5 === "usado" ? (
-            <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-500">5% usado ✓</span>
-          ) : null}
-          {fidel?.telefono_wa && (
-            /* 44 px de alto (regla de la casa). El `-my-1.5` le devuelve al
-               renglón el aire que suma el área de tap, así que crecer de 24 a 44
-               no separa la tarjeta. */
-            <a
-              href={fidel.telefono_wa}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="-my-1.5 ml-auto inline-flex min-h-[44px] items-center gap-1.5 px-2 text-xs font-medium text-emerald-700 active:opacity-70"
-            >
-              <MessageCircle className="h-4 w-4" />
-              WhatsApp
-            </a>
-          )}
-        </div>
-      )}
 
       {isExpanded && (
         <div className="border-t border-gray-100">
@@ -775,14 +683,19 @@ function ClienteMesesLista({
   );
 }
 
+/**
+ * La fila de la tabla ancha del escritorio. Hoy la usa solo Mayoreo.
+ *
+ * ⚠️ 16-sep-2026: se fueron las columnas del 5 % y de WhatsApp — Mayoreo nunca
+ * las recibió, y los clientes identificados pasaron a
+ * `ListaSeguimientoClientes`. Por eso la grilla es UNA sola, ya no dos.
+ */
 function ClienteRowItem({
-  id, rank, cliente, fidel, peakMes, spansYears, isExpanded, onToggle,
+  id, rank, cliente, peakMes, spansYears, isExpanded, onToggle,
 }: {
   id: string;
   rank: number;
   cliente: ClienteRow;
-  /** undefined = sección sin fidelización (wholesale); null = sin match ACS. */
-  fidel?: FidelCliente | null;
   peakMes: number;
   spansYears: boolean;
   isExpanded: boolean;
@@ -791,11 +704,9 @@ function ClienteRowItem({
   const ticketProm = cliente.ticket_prom != null
     ? cliente.ticket_prom
     : (cliente.tickets_ytd > 0 ? cliente.total_ytd / cliente.tickets_ytd : 0);
-  const conFidel = fidel !== undefined;
 
   return (
     <div className="border-t border-gray-200">
-      {/* div role=button (no <button>): la celda WhatsApp anida un <a>. */}
       <div
         role="button"
         tabIndex={0}
@@ -804,9 +715,7 @@ function ClienteRowItem({
         aria-expanded={isExpanded}
         className={cn(
           "grid w-full cursor-pointer items-center gap-3 px-3.5 py-2.5 text-left text-sm transition",
-          conFidel
-            ? "grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_5.5rem_2.5rem_1.25rem]"
-            : "grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_1.25rem]",
+          "grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_1.25rem]",
           "hover:bg-gray-50/60",
           isExpanded && "bg-gray-50/80",
         )}
@@ -817,35 +726,6 @@ function ClienteRowItem({
         <span className="text-right font-mono text-gray-700 tabular-nums">{cliente.tickets_ytd.toLocaleString()}</span>
         <span className="text-right font-mono text-gray-700 tabular-nums">${ticketProm.toFixed(2)}</span>
         <span className="text-right font-mono text-xs text-gray-500 tabular-nums">{formatFechaShort(cliente.ultima_compra)}</span>
-        {conFidel && (
-          <span className="flex justify-center">
-            {fidel?.estado5 === "disponible" ? (
-              <span className="rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700">Disponible</span>
-            ) : fidel?.estado5 === "usado" ? (
-              <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-500">Usado ✓</span>
-            ) : (
-              <span className="text-xs text-gray-300">—</span>
-            )}
-          </span>
-        )}
-        {conFidel && (
-          <span className="flex justify-center">
-            {fidel?.telefono_wa ? (
-              <a
-                href={fidel.telefono_wa}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                title={`WhatsApp a ${nombreEnPantalla(cliente.nombre)}`}
-                className="flex h-6 w-6 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 active:scale-[0.95]"
-              >
-                <MessageCircle className="h-3.5 w-3.5" />
-              </a>
-            ) : (
-              <span className="text-xs leading-tight text-gray-300" title="Sin teléfono en el maestro de Switch">sin tel.</span>
-            )}
-          </span>
-        )}
         <ChevronDown className={cn(
           "h-3.5 w-3.5 text-gray-400 transition-transform",
           isExpanded && "rotate-180",
