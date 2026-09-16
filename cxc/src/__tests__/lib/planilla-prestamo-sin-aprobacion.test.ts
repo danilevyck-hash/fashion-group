@@ -112,13 +112,25 @@ describe("2. la pantalla: sin bloque de aprobación, y la casilla muestra lo aut
 });
 
 describe("3. el cierre ya no frena por préstamo", () => {
-  it("`frenosParaCerrar` recibe SOLO las líneas y el único tipo es horas-extra", () => {
+  /* 🩸 CAMBIÓ DE DIRECCIÓN EL 15-sep-2026, con motivo. Este caso exigía que el
+   * tipo del freno fuera EXACTAMENTE `tipo: "horas-extra";` — o sea, uno solo.
+   * Era un proxy de lo que de verdad importa acá: que el PRÉSTAMO no frene
+   * (Daniel, 11-sep: *«quita lo de aprobación a préstamos, no es necesario»*).
+   * Ese día nació el segundo freno, el del día hábil con un número IMPAR de
+   * marcaciones (Daniel: *«frenan»*), que no tiene nada que ver con préstamos.
+   * Ahora se afirma la lista COMPLETA de tipos, que es más fuerte que «uno». */
+  it("`frenosParaCerrar` recibe SOLO las líneas, y ningún freno es de préstamo", () => {
     const g = sinComentarios(GUARDADA);
     expect(g).toMatch(/export function frenosParaCerrar\(lineas: readonly LineaPlanilla\[\]\): FrenoCierre\[\]/);
-    expect(g).toMatch(/tipo: "horas-extra";/);
     expect(g).not.toMatch(/prestamosSinAprobar|tipo: "prestamo"/);
     const cerrar = sinComentarios("src/app/api/asistencia/planilla-guardada/route.ts");
     expect(cerrar).toMatch(/frenosParaCerrar\(lineas\)/);
+  });
+
+  /* CONTROL de lo anterior: la lista de frenos no se abrió a cualquier cosa.
+   * Son exactamente estos dos y nada más; un tercero pone el build rojo. */
+  it("los frenos siguen siendo una lista CERRADA de dos", () => {
+    expect(sinComentarios(GUARDADA)).toMatch(/tipo: "horas-extra" \| "marcas-impares";/);
   });
 });
 

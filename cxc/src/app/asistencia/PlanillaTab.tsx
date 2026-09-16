@@ -108,6 +108,7 @@ import {
   textoRecorteCelda,
   type AvisoCeldaNeto,
 } from "@/lib/asistencia/neto-no-negativo";
+import { enlaceDiasDe, marcasImparesDeLineas } from "@/lib/asistencia/marcas-impares";
 import AntesDeCerrar from "./AntesDeCerrar";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 // 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
@@ -1147,6 +1148,26 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                     </>
                   )
                 )}
+                {/* 🔴 EL DÍA MAL MARCADO SE ARREGLA EN ASISTENCIA, con «Agregar
+                    hora» (15-sep-2026). UN solo enlace y no uno por nombre: el
+                    texto del freno ya trae a cada persona con sus días, y
+                    repetir los nombres como enlaces taparía los datos. */}
+                {f.tipo === "marcas-impares" && (
+                  <>
+                    {" "}
+                    <Link
+                      href={enlaceDiasDe(
+                        f.codigos?.[0] ?? "",
+                        pedido ? { desde: pedido.desde, hasta: pedido.hasta } : null,
+                      )}
+                      replace
+                      scroll={false}
+                      className="inline-flex min-h-[44px] items-center font-medium underline underline-offset-2"
+                    >
+                      Ir a Asistencia
+                    </Link>
+                  </>
+                )}
               </li>
             ))}
           </ul>
@@ -1185,6 +1206,10 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           // 🔴 Los netos en negativo por montos a mano, de las MISMAS líneas
           // (14-sep-2026): la misma decisión que el aviso de la celda.
           netosNegativos: netosNegativos(data.lineas),
+          // 🔴 Los días hábiles con un número IMPAR de marcaciones, de las
+          // MISMAS líneas que dibuja la tabla (15-sep-2026). Es lo que el
+          // servidor vuelve a mirar para frenar el cierre.
+          marcasImpares: marcasImparesDeLineas(data.lineas),
           avisoVacacionesNoPagadas: data.avisos.avisoVacacionesNoPagadas ?? null,
           conSabado: data.avisos.conSabado ?? 0,
           rangoLibre: !!data.avisos.rangoLibre,

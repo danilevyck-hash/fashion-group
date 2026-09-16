@@ -29,8 +29,11 @@
  *      simulación de la celda da EXACTAMENTE el neto que la ruta produciría:
  *      mira el neto que de verdad se paga, después de la cuota automática, del
  *      ajuste y del recorte — no uno intermedio.
- *   E. 🔴 CONTROL: `frenosParaCerrar` sigue teniendo UN solo freno (horas
- *      extra). Un neto negativo NO frena el cierre: Daniel lo dejó afuera.
+ *   E. 🔴 CONTROL: un neto negativo NO frena el cierre — Daniel lo dejó afuera.
+ *      ⚠️ Hasta el 15-sep-2026 esto se probaba como «`frenosParaCerrar` tiene UN
+ *      solo freno»; ese día nació el segundo (el día con marcas impares) y el
+ *      candado pasó a afirmar la CONDUCTA, con su propio control de que la lista
+ *      de frenos son exactamente dos y no cualquier cosa.
  * ─────────────────────────────────────────────────────────────────────────── */
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
@@ -271,17 +274,35 @@ describe("C. «Antes de cerrar» lo nombra, en la parte de arreglar", () => {
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("E. 🔴 CONTROL: el cierre NO se frena por un neto negativo", () => {
-  it("`frenosParaCerrar` sigue con UN solo freno, el de horas extra — Daniel lo dejó afuera a propósito", () => {
+  /* 🩸 CAMBIÓ DE DIRECCIÓN EL 15-sep-2026, con motivo. Este caso exigía que
+   * `frenosParaCerrar` tuviera UN SOLO freno (`tipo: "` una sola vez). Era un
+   * proxy: lo que Daniel dejó afuera es el freno POR NETO NEGATIVO, no el
+   * segundo freno en general. Ese día se sumó el del día hábil con un número
+   * IMPAR de marcaciones (Daniel: *«frenan»*, ver `marcas-impares.ts`), así que
+   * ahora son DOS tipos. Lo que este candado protege —el neto negativo avisa y
+   * NO frena— se sigue probando igual, y con más fuerza: se afirma sobre la
+   * conducta, no sobre cuántas veces aparece una cadena. */
+  it("un neto negativo AVISA y NO frena — Daniel lo dejó afuera a propósito", () => {
     const rojo = comoLaRuta(MANUAL({ mercancia: 200 }));
     expect(rojo.dinero!.netoPagar).toBeLessThan(0);
+    // 🔴 LA CONDUCTA: con el neto en rojo y sin nada más, el cierre no se frena.
     expect(frenosParaCerrar([rojo])).toEqual([]);
     const src = sinComentarios("src/lib/asistencia/planilla-guardada.ts");
     const cuerpo = src.slice(src.indexOf("export function frenosParaCerrar("), src.indexOf("export function textoFrenos("));
-    expect(cuerpo.match(/tipo: "/g)).toEqual(['tipo: "']);
-    expect(cuerpo).toContain('tipo: "horas-extra"');
+    // Y el que decide los frenos no mira el neto por ningún lado.
     expect(cuerpo).not.toMatch(/neto/i);
-    // Y el tipo del freno solo conoce ese uno.
-    expect(src).toMatch(/tipo: "horas-extra";/);
+  });
+
+  /* CONTROL de lo anterior: la lista de frenos NO se abrió a cualquier cosa.
+   * Son exactamente dos, nombrados, y los dos existen en el tipo. Un tercero
+   * que aparezca sin pasar por acá pone el build rojo. */
+  it("los frenos son exactamente DOS: horas extra y marcas impares", () => {
+    const src = sinComentarios("src/lib/asistencia/planilla-guardada.ts");
+    const cuerpo = src.slice(src.indexOf("export function frenosParaCerrar("), src.indexOf("export function textoFrenos("));
+    expect(cuerpo.match(/tipo: "/g)).toEqual(['tipo: "', 'tipo: "']);
+    expect(cuerpo).toContain('tipo: "horas-extra"');
+    expect(cuerpo).toContain('tipo: "marcas-impares"');
+    expect(src).toMatch(/tipo: "horas-extra" \| "marcas-impares";/);
   });
 });
 

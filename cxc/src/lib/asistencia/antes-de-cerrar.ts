@@ -33,6 +33,13 @@ import {
   type NetoNegativo,
 } from "./neto-no-negativo";
 import { PESTANA_PRESTAMOS } from "@/lib/prestamos-una-puerta";
+import {
+  contarDias,
+  detalleDias,
+  enlaceDiasDe,
+  partirImpares,
+  type PersonaConMarcasImpares,
+} from "./marcas-impares";
 
 /** Una persona detrás de una línea (las de «ver quiénes»). */
 export interface PersonaDeLinea {
@@ -110,6 +117,13 @@ export interface EntradaAntesDeCerrar {
    * Daniel dejó el freno para después, a propósito. Opcional: sin pasarlo, nada cambia.
    */
   netosNegativos?: readonly NetoNegativo[];
+  /**
+   * 🔴 Los días hábiles con un número IMPAR de marcaciones (15-sep-2026,
+   * `marcas-impares.ts`). Van en ARREGLAR y FRENAN el cierre (Daniel:
+   * *«frenan»*), separados en los de marcas de MENOS y los de MÁS: no son el
+   * mismo problema. Opcional: sin pasarlo, nada cambia.
+   */
+  marcasImpares?: readonly PersonaConMarcasImpares[];
   /** El aviso de las vacaciones ya pagadas, ya redactado (nombre, rango y monto). */
   avisoVacacionesNoPagadas: string | null;
   conSabado: number;
@@ -242,6 +256,45 @@ export function armarAntesDeCerrar(e: EntradaAntesDeCerrar): AntesDeCerrar {
       enlace: { rotulo: negativos.length === 1 ? "Ver su fila ›" : "Ver sus filas ›", href: hrefFilaPlanilla(negativos[0].codigo) },
       tono: "arreglar",
     });
+  }
+  // 🔴 «N días con una marca de menos: falta una hora» (15-sep-2026). Dos
+  // líneas y no una: al día que le FALTA una marca el motor le lee como salida
+  // una marca que no lo es y le descuenta horas trabajadas; al que le SOBRA,
+  // casi siempre los números salen bien. ⚠️ La regla es IMPAR, así que un día
+  // de 6 marcas no está acá — es par, y puede ser correcto.
+  const impares = e.marcasImpares ?? [];
+  if (impares.length > 0) {
+    const { deMenos, deMas } = partirImpares(impares);
+    const linea = (
+      clave: string,
+      gente: readonly PersonaConMarcasImpares[],
+      texto: string,
+    ): void => {
+      if (gente.length === 0) return;
+      arreglar.push({
+        clave,
+        numero: contarDias(gente),
+        texto,
+        enlace: { rotulo: "Asistencia ›", href: enlaceDiasDe(gente[0].codigo, e.rango) },
+        tono: "arreglar",
+        personas: gente.map((p) => ({
+          codigo: p.codigo,
+          etiqueta: p.etiqueta,
+          href: enlaceDiasDe(p.codigo, e.rango),
+          detalle: detalleDias(p.dias),
+        })),
+      });
+    };
+    linea(
+      "marcas-de-menos",
+      deMenos,
+      "con una marca de MENOS: falta ponerles la hora con «Agregar hora»",
+    );
+    linea(
+      "marcas-de-mas",
+      deMas,
+      "con una marca de MÁS: sobra una hora, revísalos",
+    );
   }
   for (const [i, m] of e.migraciones.entries()) {
     arreglar.push({ clave: `migracion-${i}`, numero: null, texto: m, enlace: null, tono: "arreglar" });

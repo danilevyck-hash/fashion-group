@@ -89,6 +89,7 @@ import { etiquetaPersona } from "./directorio";
 import { esHabil, fmtMin, type DiaReporte, type PersonaReporte } from "./reporte";
 import { minutosExtraAutomaticos } from "./extra-automatico";
 import { ultimoDiaQueSePaga } from "./dia-31";
+import { diasConMarcasImpares, type DiaImpar } from "./marcas-impares";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CENTAVOS — el redondeo, en un solo lugar
@@ -1465,6 +1466,17 @@ export interface LineaPlanilla {
       number
     >>;
   };
+  /**
+   * 🔴 LOS DÍAS HÁBILES CON UN NÚMERO IMPAR DE MARCACIONES (15-sep-2026).
+   * Ausente o vacío = ninguno. Daniel: *«Si alguien marcó 3x, se le marca así
+   * tal cual a la regla y yo me doy cuenta en asistencia»*.
+   *
+   * 🔴 NO MUEVE UN CENTAVO: el cálculo es el de siempre (el motor sigue leyendo
+   * la última marca del día como la salida). Esto solo APARTA los días para
+   * decirlos en «Antes de cerrar» y para frenar el cierre hasta arreglarlos.
+   * La regla vive en `marcas-impares.ts`.
+   */
+  marcasImpares?: DiaImpar[];
   dinero: DineroLinea | null;
   manuales: ManualesLinea;
 }
@@ -2254,6 +2266,11 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
     // entra al cuadro por CUALQUIERA de sus partes, pero solo la parte de ESTA
     // empresa produce una línea. Sin esto, pedir el cuadro de Vistana traería
     // también la línea de Fashion Wear.
+    // 🔴 LOS DÍAS IMPARES, UNA VEZ POR PERSONA. Se calculan del reporte —no del
+    // dinero— y son los mismos para las dos líneas de un sueldo repartido: el
+    // reloj es uno solo. Ver `marcas-impares.ts`; no mueve ni un centavo.
+    const impares = p ? diasConMarcasImpares(p.dias) : [];
+
     const partes = partesUsables(ficha);
     const paraEstaEmpresa: Array<ParteReparto | null> =
       partes.length === 0
@@ -2265,7 +2282,7 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
       // el del rango libre: son dos fracciones distintas del mismo sueldo.
       const pr = opts.prorrateo?.get(cod) ?? null;
       const factorDeEsta = pr ? factorBase * pr.factor : factorBase;
-      const linea = armarLinea(
+      const lineaBase = armarLinea(
         ficha, h, normalizarManuales(opts.manuales?.get(cod)), reglas, factorDeEsta, motivo,
         {
           exigirAprobacion: opts.exigirAprobacionExtra === true,
@@ -2277,6 +2294,10 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
         parte,
         pr?.texto ?? null,
       );
+      // 🔑 Se agrega DESPUÉS y solo si hay algo: una línea sin días impares
+      // sale EXACTAMENTE como salía antes, sin el campo.
+      const linea: LineaPlanilla =
+        impares.length > 0 ? { ...lineaBase, marcasImpares: impares } : lineaBase;
       // 🔑 A quien no va en planilla no se le agrega «no marcó ni un día»: eso es
       // un motivo por el que NO SE PUDO PAGAR, y acá no hay nada que pagar. Si le
       // faltan marcas, se ve en el reporte de asistencia, que es donde importa.

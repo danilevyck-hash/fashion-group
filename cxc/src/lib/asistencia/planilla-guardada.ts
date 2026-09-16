@@ -61,6 +61,7 @@ import {
 import { EMPRESAS_ASISTENCIA } from "./config";
 import { asistenciaRoles } from "./roles";
 import { extrasNoAprobadas } from "./aprobaciones";
+import { marcasImparesDeLineas, textoFrenoMarcasImpares } from "./marcas-impares";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LA MIGRACIÓN QUE FALTA CORRER
@@ -473,10 +474,13 @@ export function versionSiguiente(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface FrenoCierre {
-  /** 🔴 Solo las horas extra desde el 11-sep-2026: el préstamo ya no se aprueba
-   *  (Daniel: *«quita lo de aprobación a préstamos, no es necesario»*), así que
-   *  no hay nada suyo que pueda frenar el cierre. */
-  tipo: "horas-extra";
+  /**
+   * 🔴 DOS FRENOS DESDE EL 15-sep-2026. El préstamo ya no se aprueba (Daniel,
+   * 11-sep: *«quita lo de aprobación a préstamos, no es necesario»*), así que
+   * no hay nada suyo que frene; lo que se sumó es el día hábil con un número
+   * IMPAR de marcaciones (Daniel: *«frenan»*, ver `marcas-impares.ts`).
+   */
+  tipo: "horas-extra" | "marcas-impares";
   /** Cuántas personas. Es lo que se cuenta en el texto. */
   personas: number;
   /** Los nombres, para que el freno se pueda actuar sin abrir nada. */
@@ -524,6 +528,27 @@ export function frenosParaCerrar(lineas: readonly LineaPlanilla[]): FrenoCierre[
         + `(${lista(extras.map((e) => `${e.etiqueta} · ${e.minutos.toFixed(2)} min`))}). `
         + "Ve a la pestaña «Aprobaciones», aprueba o deja sin aprobar esas horas, y vuelve a cerrar. "
         + "Si se cierra así, esas horas no se pagan y no hay forma de arreglarlo después sin reabrir.",
+    });
+  }
+
+  // 🔴 EL DÍA HÁBIL CON UN NÚMERO IMPAR DE MARCACIONES (15-sep-2026). Daniel,
+  // textual: *«Si alguien marcó 3x, se le marca así tal cual a la regla y yo me
+  // doy cuenta en asistencia. ¿Para eso está, no? Para arreglarlo»* y, sobre si
+  // frena el cierre: *«frenan»*.
+  //
+  // 🔑 Con dos marcas no se puede PROBAR que falte una; con tres, sí. Por eso
+  // la regla es IMPAR y no un umbral de minutos — un umbral sería adivinar a
+  // qué hora se fue. El CÁLCULO no se toca: la salida temprana se descuenta
+  // igual que siempre. Ver `marcas-impares.ts`.
+  const impares = marcasImparesDeLineas(lineas);
+  const textoImpares = textoFrenoMarcasImpares(impares);
+  if (textoImpares) {
+    frenos.push({
+      tipo: "marcas-impares",
+      personas: impares.length,
+      quienes: impares.map((p) => p.etiqueta),
+      codigos: impares.map((p) => p.codigo),
+      texto: textoImpares,
     });
   }
 
