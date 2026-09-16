@@ -135,6 +135,7 @@ import {
   type CabeceraGuardada,
   type FrenoCierre,
 } from "@/lib/asistencia/planilla-guardada";
+import { ConfirmDeleteModal } from "@/components/ui";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 // 🔴 DEL MÓDULO PURO, NUNCA de `CalendarioRango`: ese archivo trae
 // `react-day-picker` y un import estático anularía el `dynamic()` del selector.
@@ -268,6 +269,14 @@ interface Cierre {
   cerrada: CabeceraGuardada | null;
   /** Las que PISAN el rango sin ser la misma: son las que impiden cerrar. */
   solapadas: CabeceraGuardada[];
+  /**
+   * 🔴 La REABIERTA de este mismo rango, si la hay. No estorba nada —por eso no
+   * sale en `solapadas`— pero es la ÚNICA que se puede borrar, así que sin esto
+   * no habría dónde poner el botón.
+   */
+  reabierta: CabeceraGuardada | null;
+  /** `null` = se puede borrar. Con texto, es el porqué, redactado por el servidor. */
+  noSePuedeEliminar: string | null;
   /** ⚠️ Falta correr la migración. NO es un error — ver la nota del aviso. */
   aviso: string | null;
 }
@@ -405,6 +414,8 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
   /** Lo que impidió cerrar la última vez (el 409 de los frenos). */
   const [frenos, setFrenos] = useState<FrenoCierre[]>([]);
   const [modal, setModal] = useState<"cerrar" | "reabrir" | null>(null);
+  /** 🔴 Borrar es destructivo: va por su propia ventana, no por la de cerrar. */
+  const [borrando, setBorrando] = useState(false);
   const [trabajandoCierre, setTrabajandoCierre] = useState(false);
   /**
    * 🔴 LA QUINCENA SE ELIGE CON BOTONES, Y NADA MÁS (10-sep-2026 · 15-sep-2026).
@@ -504,6 +515,8 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
       setCierre({
         cerrada: (j.cerrada ?? null) as CabeceraGuardada | null,
         solapadas: Array.isArray(j.solapadas) ? (j.solapadas as CabeceraGuardada[]) : [],
+        reabierta: (j.reabierta ?? null) as CabeceraGuardada | null,
+        noSePuedeEliminar: typeof j.noSePuedeEliminar === "string" ? j.noSePuedeEliminar : null,
         aviso: typeof j.aviso === "string" ? j.aviso : null,
       });
     } catch { /* el estado del cierre es información, no un requisito */ }
@@ -550,6 +563,8 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
   const vieja = !!data && (!coincide || desactualizada);
   const cerrada = cierre?.cerrada ?? null;
   const solapadas = cierre?.solapadas ?? [];
+  const reabierta = cierre?.reabierta ?? null;
+  const noSePuedeEliminar = cierre?.noSePuedeEliminar ?? null;
   /** ⚠️ Falta correr el SQL. La pantalla entera sigue andando; el cierre no. */
   const faltaMigracionCierre = cierre?.aviso ?? null;
   const puedeCerrarla = puedeCerrar(rol);
@@ -654,6 +669,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
       if (res.status === 503) {
         setCierre((c) => ({
           cerrada: c?.cerrada ?? null, solapadas: c?.solapadas ?? [],
+          reabierta: c?.reabierta ?? null, noSePuedeEliminar: c?.noSePuedeEliminar ?? null,
           aviso: typeof j.aviso === "string" ? j.aviso : "Falta preparar la base de datos.",
         }));
         toast("Todavía no se puede cerrar: falta preparar la base. Lee el aviso de arriba.", "warning");
@@ -664,7 +680,9 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
         if (Array.isArray(j.solapadas) && j.solapadas.length > 0) {
           setCierre((c) => ({
             cerrada: c?.cerrada ?? null,
-            solapadas: j.solapadas as CabeceraGuardada[], aviso: c?.aviso ?? null,
+            solapadas: j.solapadas as CabeceraGuardada[],
+            reabierta: c?.reabierta ?? null, noSePuedeEliminar: c?.noSePuedeEliminar ?? null,
+            aviso: c?.aviso ?? null,
           }));
         }
         // El texto largo va al cartel, no al toast: son tres renglones con
@@ -707,6 +725,36 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
       setTrabajandoCierre(false);
     }
   }, [cerrada, pedido, pedirCierre, toast]);
+
+  // ── 🔴 ELIMINAR — solo una REABIERTA, y solo si no bajó ninguna deuda ──────
+  //
+  // Daniel, 16-sep-2026: *«quiero que sea sencillo»*. El flujo queda en dos
+  // pasos y sin decisiones: cerrada → Reabrir (devuelve la plata, pide el
+  // porqué) → Eliminar (se va la fila). Nunca se borra una firma de pago de un
+  // clic, y lo que le bajó la deuda a alguien no se borra nunca.
+  //
+  // ⚠️ El servidor vuelve a comprobar las dos condiciones: este botón no es el
+  // candado, es lo que evita ofrecer algo que después se rechaza.
+  const eliminar = useCallback(async () => {
+    if (!reabierta || !pedido) return;
+    setTrabajandoCierre(true);
+    try {
+      const res = await fetch("/api/asistencia/planilla-guardada", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: reabierta.id }),
+      });
+      const j = await res.json();
+      if (!res.ok || j.ok === false) throw new Error(j.error ?? "No se pudo borrar");
+      setBorrando(false);
+      toast("Listo — esa planilla se borró. El período queda libre.", "success");
+      await pedirCierre(pedido);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "No se pudo borrar", "error");
+    } finally {
+      setTrabajandoCierre(false);
+    }
+  }, [reabierta, pedido, pedirCierre, toast]);
 
   /** Ir a mirar una quincena cerrada que pisa estas fechas: se genera ESA. */
   const irACerrada = useCallback((c: CabeceraGuardada) => {
@@ -1117,6 +1165,45 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
         </div>
       )}
 
+      {/* 🔴 ESTA QUINCENA SE CERRÓ Y SE REABRIÓ. Hasta el 16-sep-2026 esto no se
+          veía en ningún lado: una reabierta no estorba ningún cierre, así que la
+          pantalla se comportaba como si no existiera. Ahora se dice —con quién
+          la cerró, quién la reabrió y por qué— y es el único lugar desde donde
+          se puede borrar. */}
+      {!cerrada && reabierta && (
+        <div className="rounded-lg border border-gray-300 bg-gray-50 px-3 py-2.5">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-900">
+                Esta quincena se cerró y se reabrió
+                {reabierta.version > 1 ? ` · versión ${reabierta.version}` : ""}
+              </p>
+              <p className="mt-0.5 text-[13px] text-gray-600">
+                La cerró <b>{reabierta.cerradaPor}</b> y la reabrió{" "}
+                <b>{reabierta.reabiertaPor ?? "alguien"}</b>
+                {reabierta.reabiertaEn ? ` el ${cuandoBonito(reabierta.reabiertaEn)}` : ""}
+                {reabierta.motivoReabrir ? `: «${reabierta.motivoReabrir}»` : "."}
+                {" "}No se le está pagando nada: el período está libre para generar y cerrar otra vez.
+              </p>
+              {/* 🔴 CUANDO NO SE PUEDE BORRAR, SE DICE POR QUÉ. Esconder el botón
+                  sin explicar deja a la contadora buscando algo que no existe. */}
+              {noSePuedeEliminar && (
+                <p className="mt-1.5 text-[12px] text-gray-500">{noSePuedeEliminar}</p>
+              )}
+            </div>
+            {puedeCerrarla && !noSePuedeEliminar && (
+              <button
+                type="button"
+                onClick={() => setBorrando(true)}
+                className="min-h-[44px] shrink-0 rounded-md border border-gray-300 px-3 text-sm font-medium text-red-700 transition hover:border-red-500 active:scale-[0.97]"
+              >
+                Eliminar
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 🔴 SE PISA CON UNA CERRADA. Una persona no puede quedar pagada dos
           veces por el mismo día: no se puede cerrar, y se NOMBRA cuál estorba
           con un botón para ir a verla. */}
@@ -1508,6 +1595,28 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           onCerrar={() => { if (!trabajandoCierre) setModal(null); }}
         />
       )}
+
+      {/* 🔴 BORRAR VA POR LA VENTANA ROJA DEL SISTEMA, con su segundo de espera:
+          es la misma que usa todo lo destructivo del repo. ⚠️ NO se ofrece
+          «Deshacer» de 5 s como en el resto: acá no hay nada que devolver — la
+          fila y sus renglones se van de la base. Por eso el freno es ANTES. */}
+      <ConfirmDeleteModal
+        open={borrando && !!reabierta}
+        title="¿Borrar esta planilla?"
+        description={
+          reabierta
+            ? `Se va el cuadro del ${reabierta.etiqueta || etiquetaRangoGuardado(reabierta)}`
+              + ` con sus ${reabierta.personas} ${reabierta.personas === 1 ? "renglón" : "renglones"}.`
+              + " No se puede deshacer. Nadie deja de cobrar por esto: esa planilla estaba reabierta,"
+              + " así que no le estaba pagando a nadie."
+            : ""
+        }
+        loading={trabajandoCierre}
+        confirmLabel="Borrar la planilla"
+        loadingLabel="Borrando..."
+        onConfirm={() => { void eliminar(); }}
+        onCancel={() => { if (!trabajandoCierre) setBorrando(false); }}
+      />
 
       <div className="-ml-2">
         <Ayuda titulo="Cómo se calcula el neto" etiqueta="Cómo se calcula el neto">

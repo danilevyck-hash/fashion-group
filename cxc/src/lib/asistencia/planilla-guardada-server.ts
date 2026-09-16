@@ -33,6 +33,10 @@ import {
   type TotalesGuardados,
 } from "./planilla-guardada";
 
+// 🔑 El amarre vive en `cierre-prestamo-server.ts` (es su tabla). Se importa en
+// vez de repetir el nombre: dos literales iguales es cómo nace que uno cambie.
+import { TABLA_AMARRE } from "./cierre-prestamo-server";
+
 export const TABLA_GUARDADA = "asistencia_planilla_guardada";
 export const TABLA_GUARDADA_LINEA = "asistencia_planilla_guardada_linea";
 
@@ -293,4 +297,64 @@ export async function reabrirPlanilla(
   }
   const tocadas = ((data ?? []) as unknown[]).length;
   return tocadas > 0 ? { ok: true } : { ok: false, yaReabierta: true };
+}
+
+/**
+ * Cuántos pagos de préstamo escribió ESE cierre. Cuenta las filas del amarre
+ * **estén o no revertidas**: la fila es la constancia de que la deuda se tocó, y
+ * es lo que hace que ese cuadro no se pueda borrar.
+ */
+export async function pagosDePrestamoDe(planillaId: string): Promise<number> {
+  const { count, error } = await supabaseServer
+    .from(TABLA_AMARRE)
+    .select("id", { count: "exact", head: true })
+    .eq("planilla_id", planillaId);
+  if (error) throw new Error(`No se pudo leer ${TABLA_AMARRE}: ${error.message}`);
+  return count ?? 0;
+}
+
+/**
+ * ELIMINAR una planilla reabierta. Las líneas primero: el FK es
+ * `ON DELETE RESTRICT` a propósito.
+ *
+ * 🔴 EL `.eq("estado", "reabierta")` NO ES UN ADORNO: es el último freno. La
+ * ruta ya comprobó el estado, pero entre esa lectura y este borrado alguien
+ * pudo volver a cerrar el período desde otra pantalla — y entonces esto sería
+ * un DELETE sobre una firma de pago viva. Con el filtro, no borra nada y la
+ * ruta lo dice.
+ *
+ * ⚠️ Las líneas se borran ANTES de saber si la cabecera se va a poder borrar.
+ * Es seguro porque Supabase corre cada llamada por separado pero este par está
+ * protegido por el mismo filtro: si la cabecera ya no está `reabierta`, el
+ * DELETE de las líneas tampoco corre (se pregunta primero).
+ */
+export async function eliminarPlanilla(
+  id: string,
+): Promise<{ ok: boolean; yaNoEsReabierta?: boolean }> {
+  // 1. ¿Sigue reabierta? Se pregunta en la misma tabla, con el mismo filtro que
+  //    va a usar el DELETE, para no borrar líneas de algo que no se va a borrar.
+  const { data: viva, error: errLeer } = await supabaseServer
+    .from(TABLA_GUARDADA)
+    .select("id")
+    .eq("id", id)
+    .eq("estado", "reabierta")
+    .maybeSingle();
+  if (errLeer) throw new Error(`No se pudo leer ${TABLA_GUARDADA}: ${errLeer.message}`);
+  if (!viva) return { ok: false, yaNoEsReabierta: true };
+
+  const { error: errLin } = await supabaseServer
+    .from(TABLA_GUARDADA_LINEA)
+    .delete()
+    .eq("planilla_id", id);
+  if (errLin) throw new Error(`No se pudieron borrar los renglones: ${errLin.message}`);
+
+  const { data, error } = await supabaseServer
+    .from(TABLA_GUARDADA)
+    .delete()
+    .eq("id", id)
+    .eq("estado", "reabierta")
+    .select("id");
+  if (error) throw new Error(`No se pudo borrar en ${TABLA_GUARDADA}: ${error.message}`);
+
+  return ((data ?? []) as unknown[]).length > 0 ? { ok: true } : { ok: false, yaNoEsReabierta: true };
 }

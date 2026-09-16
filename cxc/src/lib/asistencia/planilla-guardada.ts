@@ -432,6 +432,89 @@ export function estadoDelCuadro(
   return solapadasDe(empresa, rango, guardadas).length > 0 ? "cerrada" : "borrador";
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 ELIMINAR — SOLO UNA REABIERTA, Y SOLO SI NUNCA BAJÓ UNA DEUDA (16-sep-2026)
+//
+// Daniel, textual: *«¿hace sentido reabrir y no eliminar? ¿no es lo mismo?
+// quiero q sea sencillo»*. No son lo mismo, y la diferencia es una sola:
+//
+//   · REABRIR  = me equivoqué en un número. Devuelve los pagos de préstamo, el
+//                período vuelve a ser borrador y la fila QUEDA. Se puede volver
+//                a cerrar, y el cuadro viejo se sigue pudiendo leer entero.
+//   · ELIMINAR = esta planilla nunca debió existir. La fila se va.
+//
+// 🔴 NUNCA SE BORRA UNA CERRADA DE UN TIRÓN. Primero hay que reabrirla —que es
+// el paso que devuelve la plata y pide el porqué por escrito— y recién ahí se
+// ofrece eliminar. Un botón que borre una firma de pago en un clic es la forma
+// de perder la prueba de lo que se pagó.
+//
+// 🩸 Y EL SEGUNDO FRENO ES EL QUE IMPORTA: si ese cuadro le bajó la deuda a
+// alguien, NO se borra ni estando reabierta. El amarre
+// (`asistencia_planilla_prestamo`) apunta al movimiento del préstamo con FK
+// `ON DELETE RESTRICT`, y su regla es de las viejas del repo: *«NUNCA un DELETE,
+// ni de esta fila ni del movimiento: lo que se pagó una vez se tiene que poder
+// leer después»*. Es la MISMA guarda que la migración
+// `20261201120000_borrar_planillas_de_prueba.sql` puso a mano el 15-sep-2026
+// («ABORTADO: hay N pago(s) de préstamo atados»), ahora en un botón.
+//
+// ⚠️ Que el pago esté REVERTIDO no alcanza: la fila del amarre sigue ahí, y su
+// razón de ser es poder contar después qué pasó con esa deuda.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Por qué NO se puede eliminar, o `null` si sí se puede. Texto de pantalla. */
+export function porQueNoSePuedeEliminar(
+  cabecera: Pick<CabeceraGuardada, "estado">,
+  pagosDePrestamo: number,
+): string | null {
+  if (esCerrada(cabecera.estado)) {
+    return "Esta quincena está cerrada. Para borrarla hay que reabrirla primero: "
+      + "es el paso que devuelve los descuentos de préstamo y deja escrito el porqué.";
+  }
+  if (cabecera.estado !== "reabierta") {
+    return "Este cuadro se está cerrando en este momento. Espera a que termine.";
+  }
+  if (pagosDePrestamo > 0) {
+    const n = pagosDePrestamo;
+    return `Este cierre le bajó la deuda a ${n === 1 ? "un colaborador" : `${n} colaboradores`}. `
+      + "Eso no se borra: el pago quedó anulado al reabrir, pero la constancia de que pasó se queda. "
+      + "Déjala reabierta.";
+  }
+  return null;
+}
+
+export function sePuedeEliminar(
+  cabecera: Pick<CabeceraGuardada, "estado">,
+  pagosDePrestamo: number,
+): boolean {
+  return porQueNoSePuedeEliminar(cabecera, pagosDePrestamo) === null;
+}
+
+/**
+ * La REABIERTA de ese rango exacto, si la hay. Es la que la pantalla muestra
+ * con el botón de eliminar.
+ *
+ * 🔴 Rango EXACTO, nunca solapamiento: una reabierta no estorba ningún cierre
+ * (`solapadasDe` solo mira las cerradas), así que ofrecerle borrar «la que se
+ * pisa» sería ofrecerle borrar un cuadro que no está mirando.
+ *
+ * ⚠️ Con varias (v1 reabierta, v2 reabierta), gana la de VERSIÓN MÁS ALTA: es
+ * la última que existió.
+ */
+export function reabiertaDe(
+  empresa: string,
+  rango: RangoGuardado,
+  guardadas: readonly CabeceraGuardada[],
+): CabeceraGuardada | null {
+  let mejor: CabeceraGuardada | null = null;
+  for (const g of guardadas) {
+    if (g.empresa !== empresa) continue;
+    if (g.desde !== rango.desde || g.hasta !== rango.hasta) continue;
+    if (g.estado !== "reabierta") continue;
+    if (!mejor || g.version > mejor.version) mejor = g;
+  }
+  return mejor;
+}
+
 /**
  * La versión que le toca al próximo cierre de ESE rango exacto.
  *

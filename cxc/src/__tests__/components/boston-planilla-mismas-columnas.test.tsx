@@ -159,8 +159,14 @@ describe("2. 🔴 el corte de Boston es el de la contadora", () => {
     expect(ruta).toContain("requireAsistencia(req, [...asistenciaRoles(), ROL_BOSTON], MODULOS_PLANILLA)");
     expect(ruta).toContain('const empresa = deBoston ? EMPRESA_BOSTON : (sp.get("empresa") ?? "").trim();');
     expect(ruta).toContain("deBoston && cabecera.empresa !== EMPRESA_BOSTON");
-    // cerrar y reabrir siguen siendo de quien cierra
-    expect(ruta.match(/requireAsistencia\(req, cerrarPlanillaRoles\(\)\)/g)?.length).toBe(2);
+    // 🔴 Cerrar, reabrir y —desde el 16-sep-2026— ELIMINAR siguen siendo de
+    // quien cierra. Este número pasó de 2 a 3 ese día, con el DELETE que borra
+    // una planilla reabierta (Daniel: *«quiero botón de eliminar ya que no
+    // quiero errores. Es plata»*). Lo que el candado cuida no es el número: es
+    // que ninguna de esas tres puertas se abra con otra lista de roles — y en
+    // particular que David, que SÍ puede preguntar qué hay cerrado, no pueda
+    // tocar ninguna de las tres.
+    expect(ruta.match(/requireAsistencia\(req, cerrarPlanillaRoles\(\)\)/g)?.length).toBe(3);
   });
 });
 

@@ -88,6 +88,8 @@ import {
   textoFrenos,
   motivoReaperturaValido,
   cerrarPlanillaRoles,
+  reabiertaDe,
+  porQueNoSePuedeEliminar,
 } from "@/lib/asistencia/planilla-guardada";
 import type { SugerenciaPrestamo } from "@/lib/asistencia/prestamos-planilla";
 // 🔴 EL CIERRE ANOTA EL PAGO DEL PRÉSTAMO. Ver `cierre-prestamo.ts`: hasta hoy
@@ -95,6 +97,7 @@ import type { SugerenciaPrestamo } from "@/lib/asistencia/prestamos-planilla";
 // el módulo decía 9 descuentos por $360,00 y la casilla 7 por $265,00.
 import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
 import { corteValido } from "@/lib/asistencia/corte-quincena";
+import { logActivity } from "@/lib/log-activity";
 import {
   escribirPagosDelCierre,
   planearCierre,
@@ -106,6 +109,8 @@ import {
   leerCabeceras,
   leerLineasGuardadas,
   reabrirPlanilla,
+  eliminarPlanilla,
+  pagosDePrestamoDe,
 } from "@/lib/asistencia/planilla-guardada-server";
 
 /** El período que se pidió, por cualquiera de los dos caminos. */
@@ -166,6 +171,14 @@ export async function GET(req: NextRequest) {
       ? solapadas.find((c) => c.desde === rango.desde && c.hasta === rango.hasta) ?? null
       : null;
 
+    // 🔴 LA REABIERTA DE ESTE RANGO, Y SI LE BAJÓ LA DEUDA A ALGUIEN. Las dos
+    // cosas viajan juntas porque el botón de eliminar las necesita juntas: sin
+    // el conteo, la pantalla ofrecería borrar algo que el servidor va a
+    // rechazar, que es exactamente lo que `porQueNoSePuedeEliminar` evita.
+    // ⚠️ La consulta extra solo sale cuando HAY una reabierta.
+    const reabierta = rango ? reabiertaDe(empresa, rango, cabeceras) : null;
+    const reabiertaPagos = reabierta ? await pagosDePrestamoDe(reabierta.id) : 0;
+
     return NextResponse.json({
       ok: true,
       empresa,
@@ -173,6 +186,12 @@ export async function GET(req: NextRequest) {
       // no tenga que deducirlo: o el período está CERRADO, o es un BORRADOR.
       estado: rango ? estadoDelCuadro(empresa, rango, cabeceras) : null,
       cerrada,
+      // 🔴 LA REABIERTA DE ESTE MISMO RANGO. Es la única que la pantalla puede
+      // ofrecer borrar, y sin esto no se ve en ningún lado: una reabierta no
+      // estorba ningún cierre, así que no sale por `solapadas`.
+      reabierta,
+      // `null` = se puede borrar. Con texto, es el porqué, ya redactado.
+      noSePuedeEliminar: reabierta ? porQueNoSePuedeEliminar(reabierta, reabiertaPagos) : null,
       // Las que se pisan SIN ser la misma: son las que impiden cerrar.
       solapadas: solapadas.filter((c) => c.id !== cerrada?.id),
       // ⚠️ El historial trae TAMBIÉN las reabiertas. Reabrir no borra, así que
@@ -434,6 +453,75 @@ export async function PATCH(req: NextRequest) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[asistencia/planilla-guardada PATCH]", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE — ELIMINAR UNA QUINCENA REABIERTA (16-sep-2026)
+//
+// Daniel: *«¿reabrir y eliminar no es lo mismo?»*. No: reabrir devuelve la plata
+// y deja la fila; eliminar la saca. La regla de cuándo se puede vive en
+// `planilla-guardada.ts` (`porQueNoSePuedeEliminar`), en UNA función que esta
+// ruta y la pantalla leen igual — así el botón nunca ofrece algo que el
+// servidor después rechaza.
+//
+// 🔴 DOS FRENOS, Y EL SEGUNDO ES EL QUE IMPORTA:
+//   1. Solo una REABIERTA. Una cerrada hay que reabrirla primero, que es el
+//      paso que devuelve los descuentos de préstamo y pide el porqué.
+//   2. Si ese cierre le bajó la deuda a alguien, NO se borra ni reabierta. Es
+//      la misma guarda que la migración `20261201120000` puso a mano.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function DELETE(req: NextRequest) {
+  // Borrar un cuadro de pago es la misma puerta que cerrarlo y reabrirlo.
+  const auth = requireAsistencia(req, cerrarPlanillaRoles());
+  if (auth instanceof NextResponse) return auth;
+
+  try {
+    const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+    const id = typeof body?.id === "string" ? body.id.trim() : "";
+    if (!id) return NextResponse.json({ error: "Falta cuál planilla borrar." }, { status: 400 });
+
+    const usuario = String(auth.userName ?? "").trim();
+    if (!usuario) return NextResponse.json({ error: "La sesión no dice quién eres." }, { status: 400 });
+
+    const { cabecera } = await leerCabecera(id);
+    if (!cabecera) return NextResponse.json({ error: "Esa planilla guardada no existe." }, { status: 404 });
+
+    const pagos = await pagosDePrestamoDe(id);
+    const no = porQueNoSePuedeEliminar(cabecera, pagos);
+    if (no) return NextResponse.json({ ok: false, error: no }, { status: 409 });
+
+    const r = await eliminarPlanilla(id);
+    if (!r.ok) {
+      return NextResponse.json(
+        { ok: false, error: "Esa quincena dejó de estar reabierta mientras borrabas. No se borró nada." },
+        { status: 409 },
+      );
+    }
+
+    // 🔑 Queda el rastro de QUIÉN la borró: la fila ya no está, así que el único
+    // lugar donde puede quedar escrito es la bitácora.
+    await logActivity(
+      String(auth.role ?? ""),
+      "eliminar_planilla",
+      "asistencia",
+      {
+        empresa: cabecera.empresa,
+        periodo: cabecera.etiqueta,
+        version: cabecera.version,
+        cerrada_por: cabecera.cerradaPor,
+        reabierta_por: cabecera.reabiertaPor,
+        motivo_reabrir: cabecera.motivoReabrir,
+      },
+      usuario,
+    );
+
+    return NextResponse.json({ ok: true, id });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[asistencia/planilla-guardada DELETE]", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
