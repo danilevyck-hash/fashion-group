@@ -325,6 +325,9 @@ const DATASETS: Dataset[] = [
   { table: "multifashion_metas" },
   { table: "multifashion_meta_participantes" },
   { table: "multifashion_vendedora_alias" },
+  // A quién ya le escribió la tienda (16-sep-2026). Lo teclea una persona al
+  // apretar el botón de WhatsApp; Switch no sabe nada de esto y no vuelve.
+  { table: "multifashion_contactos" },
   // Cheques / Recordatorios / Reclamos que faltaban.
   { table: "cheque_vendedores" },
   { table: "recordatorios" },

@@ -210,6 +210,11 @@ export const TABLAS_PERSONAS = [
   "mk_mobiliario_notas_proveedor",
 
   // ── Multifashion (las metas se escriben a mano)
+  // 🔴 `multifashion_contactos` (16-sep-2026): a quién ya le escribió la
+  // tienda. Lo escribe una PERSONA al apretar el botón de WhatsApp y NO se
+  // puede volver a deducir de ningún lado — Switch no sabe nada de esto.
+  // Perderla es perder el «no le vuelvas a escribir, ya le escribiste».
+  "multifashion_contactos",
   "multifashion_metas",
   "multifashion_meta_participantes",
   // El amarre de las vendedoras con DOS códigos en Switch (6-sep-2026). Lo
