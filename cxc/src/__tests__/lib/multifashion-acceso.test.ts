@@ -175,6 +175,15 @@ describe("candado estructural — /api/multifashion/**", () => {
       "bonos",
       "caja",
       "clientes-wholesale",
+      // 16-sep-2026 · NOTA FECHADA — ruta NUEVA, y este candado hizo exactamente
+      // lo que tenía que hacer: obligó a mirarla antes de que existiera.
+      // `contactos` guarda a quién ya le escribió la tienda por WhatsApp
+      // (GET el último contacto de cada cliente, POST la anotación). Cumple las
+      // tres reglas que este bloque exige: `requireRole(req, ROLES_MULTIFASHION)`
+      // con su corte por `instanceof NextResponse`, no importa la ventana
+      // retirada y NO lee la empresa de la URL (Multifashion ES
+      // `american_classic`, constante del servidor).
+      "contactos",
       "detalle-mensual",
       "fidelizacion",
       // `metas` NO acepta fechas del navegador: su período sale de la fila de la

@@ -33,6 +33,7 @@ const leer = (rel: string) => readFileSync(path.join(raiz, rel), "utf8");
 
 const resumen = leer("components/multifashion/MultifashionResumenView.tsx");
 const clientes = leer("components/multifashion/ClientesMultifashionSubtab.tsx");
+const lista = leer("components/multifashion/ListaSeguimientoClientes.tsx");
 
 describe("la tabla se puede medir sin adivinar", () => {
   // 🩸 Sin marcas fijas hay que buscar por clase de breakpoint, y eso devuelve
@@ -114,9 +115,20 @@ describe("blancos táctiles de Multifashion › Clientes", () => {
     expect(clientes).not.toContain("mfCliRango");
   });
 
-  it("los chips de segmento llegan a 44 px", () => {
-    // Medían 28. Son el filtro principal de la tabla de identificados.
-    expect(clientes).toMatch(/SEG_OPCIONES\.map[\s\S]{0,600}min-h-\[44px\]/);
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 16-sep-2026. Pedía los 44 px de los chips donde
+  // vivían: `SEG_OPCIONES` en la pestaña. Los chips **se mudaron** a la lista
+  // de seguimiento (`ListaSeguimientoClientes`) y pasaron de cuatro a TRES —
+  // se retiró «Frecuentes» (Daniel: el que compra seguido no necesita que lo
+  // busquen). La REGLA es la misma y se le exige al archivo nuevo; y para que
+  // esto no pase en verde sin mirar nada, se comprueba ADEMÁS que los chips ya
+  // no estén en la pestaña, que es el CONTROL de que se buscó en el lugar
+  // correcto.
+  it("los tres chips de la lista llegan a 44 px, donde ahora viven", () => {
+    expect(lista).toMatch(/CHIPS\.map[\s\S]{0,600}min-h-\[44px\]/);
+  });
+
+  it("y ya no están en la pestaña (si no, este candado miraría el archivo viejo)", () => {
+    expect(clientes).not.toContain("SEG_OPCIONES");
   });
 
   it("ninguno volvió al py-1 / py-0.5 que los dejaba chicos", () => {

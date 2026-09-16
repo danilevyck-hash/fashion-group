@@ -95,10 +95,22 @@ describe("el corte es lg, porque a sm y md la tabla NO entra", () => {
 describe("la grilla de Multifashion › Clientes ya no puede recortar sin salida", () => {
   const src = leer(ARCHIVOS.multiClientes);
 
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 16-sep-2026. Pedía la grilla de NUEVE columnas
+  // —`… 5.5rem 2.5rem 1.25rem`, las dos últimas eran el 5 % y el WhatsApp—,
+  // que era la de los clientes identificados. **Esa sección ya no es una
+  // tabla**: pasó a ser la lista de seguimiento, UNA sola fila igual en el
+  // teléfono y en la computadora (Daniel: «una vendedora no ordena: abre y
+  // baja»). La que queda es la de MAYOREO, de SIETE columnas, y es la que este
+  // bloque vigila: sigue siendo de ancho fijo dentro de una Card con
+  // `overflow-hidden`, o sea que sigue pudiendo recortar sin salida si alguien
+  // la dibuja por debajo de `lg`. La regla no se aflojó.
   it("sigue existiendo la grilla de ancho fijo, pero SOLO en el layout de tabla", () => {
     // La grilla en sí no es el problema — en una pantalla ancha entra y es mejor
     // que las tarjetas. El problema era dibujarla donde no cabe.
-    expect(src).toContain("grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_5.5rem_2.5rem_1.25rem]");
+    expect(src).toContain("grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_1.25rem]");
+    // CONTROL: la grilla de nueve se fue de verdad, no quedó escrita en otro
+    // lado. Si vuelve, este candado estaría mirando una tabla que ya no manda.
+    expect(src).not.toContain("5.5rem_2.5rem_1.25rem");
     expect(src).toMatch(/data-vista="tabla"[^>]*overflow-hidden[^>]*lg:block/);
   });
 
@@ -115,9 +127,19 @@ describe("la grilla de Multifashion › Clientes ya no puede recortar sin salida
     expect(src).toContain("Escala compartida entre mayoreo y retail");
   });
 
-  it("el WhatsApp de la tarjeta llega a 44 px", () => {
-    // En la grilla mide 24×24. La regla de la casa son 44.
-    expect(src).toMatch(/min-h-\[44px\][^"]*"\s*\n?\s*>\s*\n?\s*<MessageCircle|MessageCircle[\s\S]{0,200}min-h-\[44px\]|min-h-\[44px\][\s\S]{0,200}MessageCircle/);
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 16-sep-2026. El WhatsApp **se mudó** con los
+  // clientes identificados: la tarjeta de Mayoreo nunca lo tuvo. La REGLA —44
+  // px, nunca los 24×24 de la grilla— se le exige al archivo nuevo, y el
+  // CONTROL comprueba que ya no esté en el viejo, para que este candado no pase
+  // en verde mirando un archivo donde el botón ya no existe.
+  it("el WhatsApp llega a 44 px donde ahora vive", () => {
+    const lista = leer("components/multifashion/ListaSeguimientoClientes.tsx");
+    expect(lista).toMatch(/min-h-\[44px\][\s\S]{0,400}MessageCircle/);
+    expect(lista).not.toMatch(/h-6 w-6[\s\S]{0,200}MessageCircle/);
+  });
+
+  it("y ya no está en la pestaña (el control de que se miró el archivo bueno)", () => {
+    expect(src).not.toContain("MessageCircle");
   });
 });
 

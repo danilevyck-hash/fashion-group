@@ -57,6 +57,7 @@ const view = leer("src/components/multifashion/MultifashionView.tsx");
 const resumen = leer("src/components/multifashion/MultifashionResumenView.tsx");
 const vendedoras = leer("src/components/multifashion/VendedorasSubtab.tsx");
 const clientes = leer("src/components/multifashion/ClientesMultifashionSubtab.tsx");
+const lista = leer("src/components/multifashion/ListaSeguimientoClientes.tsx");
 const productos = leer("src/components/multifashion/ProductosSubtab.tsx");
 const ventaHoy = leer("src/components/multifashion/VentaHoyCard.tsx");
 const bonos = leer("src/components/multifashion/BonosSection.tsx");
@@ -334,11 +335,22 @@ describe("6 · Clientes", () => {
     expect(coberturaDeClientes(null).texto).toBeNull();
   });
 
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 16-sep-2026. La sección de clientes
+  // identificados dejó de ser la tabla del ranking y pasó a ser la lista de
+  // seguimiento, en su propio archivo. La REGLA no cambió y la CONSTANTE
+  // tampoco —se abre con 10 filas y el botón dice CUÁNTAS faltan, nunca «Ver
+  // más»—: cambia el archivo donde se le exige. La tabla que se quedó en la
+  // pestaña (Mayoreo) conserva su propio recorte.
   it("la lista abre con 10 filas y ofrece «Ver los N»", () => {
     expect(FILAS_CLIENTES_AL_ABRIR).toBe(10);
-    expect(clientes).toContain("filasAlAbrir={FILAS_CLIENTES_AL_ABRIR}");
-    expect(clientes).toContain("Ver los {clientes.length}");
+    expect(lista).toContain("FILAS_CLIENTES_AL_ABRIR");
+    expect(lista).toContain("Ver los {lista.length}");
     // Y lo que se dibuja es el recorte, no la lista entera.
+    expect(lista).toContain("const visibles = recorta ? lista.slice(0, FILAS_CLIENTES_AL_ABRIR) : lista");
+  });
+
+  it("la tabla de Mayoreo conserva el suyo, con el mismo texto", () => {
+    expect(clientes).toContain("Ver los {clientes.length}");
     expect(clientes).toContain("const visibles = recorta ? clientes.slice(0, filasAlAbrir) : clientes");
   });
 
@@ -369,15 +381,25 @@ describe("7 · los nombres se capitalizan", () => {
     expect(clientes).toContain("nombreEnPantalla(cliente.nombre)");
   });
 
-  it("🔴 SOLO cambia cómo se MUESTRA — la clave de agrupación no se toca", () => {
-    // `normNombre` (MAYÚSCULAS, sin colapsar nada más) sigue siendo quien cruza
-    // con fidelización. Si la capitalización se metiera ahí, «MARIA APARICIO» y
-    // «Maria Aparicio» dejarían de ser la misma persona para el cruce.
-    expect(clientes).toContain("normNombre(c.nombre)");
-    expect(clientes).toMatch(
-      /const normNombre = \(s: string\): string =>\s*\n\s*s\.normalize\("NFKC"\)\.replace\(\/\\s\+\/g, " "\)\.trim\(\)\.toUpperCase\(\);/,
-    );
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 16-sep-2026, y para MÁS estricto. Pedía que el
+  // cruce con fidelización siguiera hecho con `normNombre` y no con el nombre
+  // capitalizado. 🩸 Ese cruce **se retiró entero**: la lista ES el universo de
+  // fidelización y su identidad es el CÓDIGO de Switch. Medido ese día contra
+  // producción: por nombre, tres personas distintas caen bajo «JOSE MORALES»
+  // ($332,10 · $327,42 · $31,92 sumados en una sola fila de $691,44) y el
+  // código 425 salía PARTIDO en dos («rafael rodriguez» $295,28 + «RAFAEL
+  // RODRIGUEZ» $115,40 = $410,68) — ese cliente estaba en el mockup, con medio
+  // monto. Lo que se exige ahora es que nadie vuelva a atar por nombre.
+  it("🔴 SOLO cambia cómo se MUESTRA — y ya nada se ata por NOMBRE", () => {
+    // La capitalización sigue siendo solo de pantalla.
     expect(sinComentarios(clientes)).not.toContain("normNombre(nombreEnPantalla");
+    expect(sinComentarios(lista)).not.toContain("normNombre(nombreEnPantalla");
+    // Y el cruce por nombre no volvió por la puerta de atrás.
+    expect(sinComentarios(clientes)).not.toContain("normNombre(");
+    expect(sinComentarios(lista)).not.toContain("normNombre(");
+    // CONTROL: la lista sí parea por el CÓDIGO, en las dos puntas.
+    expect(lista).toContain("c.cliente_switch_id");
+    expect(lista).toContain("cliente_switch_id: id");
   });
 });
 

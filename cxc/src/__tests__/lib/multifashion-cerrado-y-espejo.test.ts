@@ -107,14 +107,20 @@ describe("🔴 /multifashion comprueba el rol ANTES de cargar la data", () => {
   });
 });
 
-// ═══ 3. Las 11 rutas ═════════════════════════════════════════════════════════
+// ═══ 3. Las 12 rutas ═════════════════════════════════════════════════════════
+//
+// 16-sep-2026 · NOTA FECHADA — eran 11 y son 12: nació `contactos` (a quién ya
+// le escribió la tienda por WhatsApp, en la pestaña Clientes). La regla NO se
+// aflojó: este bloque exige que CADA ruta pida sus roles a una de las tres
+// listas del módulo, y la nueva usa `ROLES_MULTIFASHION` como las demás. El
+// número está acá justamente para que una ruta nueva obligue a mirarla.
 describe("🔴 ninguna ruta de Multifashion escribe su lista de roles a mano", () => {
   const todas = rutas();
 
-  it("son las 11 de siempre (si nace una nueva, este número la delata)", () => {
+  it("son las 12 de siempre (si nace una nueva, este número la delata)", () => {
     expect(todas.map((r) => r.grupo).sort()).toEqual([
-      "bonos", "caja", "clientes-wholesale", "detalle-mensual", "fidelizacion", "metas",
-      "overview", "productos", "retail-recurrentes", "vendedoras", "venta-hoy",
+      "bonos", "caja", "clientes-wholesale", "contactos", "detalle-mensual", "fidelizacion",
+      "metas", "overview", "productos", "retail-recurrentes", "vendedoras", "venta-hoy",
     ]);
   });
 
