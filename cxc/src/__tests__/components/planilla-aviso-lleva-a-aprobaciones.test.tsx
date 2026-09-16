@@ -142,8 +142,22 @@ function servirPlanilla(conFreno = false) {
   }));
 }
 
+/**
+ * 🩸 15-sep-2026: acá se tocaba «Elige el período» del doble del calendario.
+ * La Planilla ya no monta el calendario (Daniel: *«si la quincena es fija, que
+ * no haya opción de rango, solo las opciones»*): se elige con CUATRO botones —
+ * las dos quincenas del mes anterior y las dos del mes en curso—.
+ *
+ * 🔑 Se toca el TERCERO, que es la primera quincena del MES EN CURSO. Por
+ * posición y no por rótulo: así el caso no depende de en qué mes se corra.
+ */
+function elegirQuincenaEnCurso() {
+  const botones = screen.getAllByRole("button", { name: /^\d{1,2} – \d{1,2} \w{3}$/ });
+  fireEvent.click(botones[2]);
+}
+
 function generar() {
-  fireEvent.click(screen.getAllByRole("button", { name: /Elige el período/ })[0]);
+  elegirQuincenaEnCurso();
   fireEvent.click(screen.getAllByRole("button", { name: /^Generar$/ })[0]);
 }
 

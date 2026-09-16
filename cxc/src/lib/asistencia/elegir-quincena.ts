@@ -1,16 +1,43 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// ELEGIR LA QUINCENA CON DOS BOTONES (10-sep-2026). Módulo PURO.
+// ELEGIR LA QUINCENA CON BOTONES (10-sep-2026). Módulo PURO.
 //
 // Daniel aprobó el mockup: la Planilla se elige con «1 – 15 sep» y «16 – 30 sep»
-// —el mes en curso de Panamá y el último día REAL del mes— más «Otro rango ⌄»
-// que despliega el calendario de siempre. El campo «Cortar el reloj el» se ve
-// desde el inicio, con el corte sugerido puesto (13 o 28) y una frase corta que
-// dice qué pasa con los días de después.
+// —el mes en curso de Panamá y el último día REAL del mes—. El campo «Cortar el
+// reloj el» se ve desde el inicio, con el corte sugerido puesto (13 o 28) y una
+// frase corta que dice qué pasa con los días de después.
 //
-// 🔴 LO QUE SE GUARDA Y LO QUE SE CALCULA NO CAMBIA: los botones solo ponen el
-// mismo `desde`/`hasta`/`corte` que ponía el calendario; el pedido al servidor
-// es el MISMO para el mismo rango (hay candado). Sin `new Date()`: el «hoy»
-// entra por parámetro y sale de `hoyPanama()`.
+// ── 🔴 LA QUINCENA ES FIJA: EL RANGO LIBRE SE FUE DE LA PANTALLA (15-sep-2026)
+//
+// Daniel, textual: *«si la quincena es fija, que no haya opción de rango, solo
+// las opciones»*.
+//
+// 🩸 POR QUÉ. El calendario («Otro rango ⌄») es de donde salen los enredos: un
+// rango que no es una quincena prorratea el sueldo por `factorBase`, APAGA los
+// montos escritos a mano (ISR, préstamo, terceros, mercancía, otros servicios)
+// y deja guardadas cabeceras que no son quincenas — y por eso el ajuste de la
+// quincena anterior NUNCA se dispara (`medirAjusteAnterior` exige que la
+// anterior esté cerrada COMO quincena y con su corte). Medido en producción el
+// 15-sep-2026, lo guardado eran rangos así: `2026-08-29 → 2026-09-10` en
+// Vistana, `2026-08-15 → 2026-08-31` y `→ 2026-08-25` en Boston. Ninguna es una
+// quincena.
+//
+// 🔴 SON CUATRO BOTONES, NO DOS: las dos quincenas del mes en curso y las dos
+// del mes ANTERIOR (`quincenasElegibles`). Sin las del mes anterior, estando ya
+// en octubre no habría forma de abrir ni cerrar la quincena 1–15 de septiembre,
+// y ese es el trabajo real de la contadora — cierra la quincena después de que
+// termina, no durante.
+//
+// 🔴 ⚠️ LA RUTA SIGUE ACEPTANDO `desde`/`hasta` LIBRES, y tiene que seguir
+// aceptándolos: `medirAjusteAnterior` (`api/asistencia/planilla/route.ts`)
+// vuelve a llamar a la MISMA ruta con el rango corto de los días que quedaron
+// sin medir, para valuarlos sin duplicar el motor. Lo que se quita es la OPCIÓN
+// DE LA PANTALLA. Si se cierra la ruta, se muere el ajuste de la quincena
+// anterior.
+//
+// 🔴 LO QUE SE GUARDA Y LO QUE SE CALCULA NO CAMBIA: los botones ponen el mismo
+// `desde`/`hasta`/`corte` de siempre; el pedido al servidor es el MISMO para el
+// mismo rango (hay candado). Sin `new Date()`: el «hoy» entra por parámetro y
+// sale de `hoyPanama()`.
 // ─────────────────────────────────────────────────────────────────────────────
 import { quincena, type Quincena } from "./planilla";
 import { corteSugerido } from "./corte-quincena";
@@ -27,9 +54,31 @@ export function quincenasDelMes(hoy: string): [Quincena, Quincena] {
 }
 
 /**
+ * 🔴 LAS CUATRO QUINCENAS QUE SE PUEDEN ELEGIR (15-sep-2026): las dos del mes
+ * ANTERIOR y las dos del mes en curso, en orden de calendario.
+ *
+ * 🔑 El mes anterior no es un lujo: la contadora cierra una quincena DESPUÉS de
+ * que termina, y con «Otro rango» retirado, sin estos dos botones la quincena
+ * 1–15 de septiembre sería inalcanzable desde octubre. Enero cae en diciembre
+ * del año anterior, que es lo que hace que el 1 de enero no deje a nadie sin
+ * poder cerrar diciembre.
+ */
+export function quincenasElegibles(hoy: string): Quincena[] {
+  const [a, m] = hoy.split("-").map(Number);
+  const anteriorMes = m === 1 ? 12 : m - 1;
+  const anteriorAnio = m === 1 ? a - 1 : a;
+  return [
+    quincena(anteriorAnio, anteriorMes, 1),
+    quincena(anteriorAnio, anteriorMes, 2),
+    quincena(a, m, 1),
+    quincena(a, m, 2),
+  ];
+}
+
+/**
  * «1 – 15 sep» · «16 – 30 sep».
  *
- * 🔴 EL SEGUNDO BOTÓN NUNCA DICE 31 (15-sep-2026). Daniel: *«Que el 31 no se
+ * 🔴 EL BOTÓN DE LA SEGUNDA QUINCENA NUNCA DICE 31 (15-sep-2026). Daniel: *«Que el 31 no se
  * pague nunca»*. El último día es el que PAGA sueldo: 28, 29 o 30, nunca 31
  * (`ultimoDiaQueSePaga`, que es de donde `quincena()` saca el rango). El 31
  * igual se mide — ver `dia-31.ts` y `textoDelDia31`.

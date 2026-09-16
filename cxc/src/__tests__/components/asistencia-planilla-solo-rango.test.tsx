@@ -178,13 +178,31 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
  * Generar** (4-sep-2026). Elegir ya no dispara la consulta sola: el flujo que
  * aprobó Daniel es elegir → Generar → revisar → Cerrar.
  */
-async function elegirPeriodo(d?: string, h?: string) {
-  if (d === "2026-08-04" || h === "2026-08-20") {
-    fireEvent.click(screen.getByTestId("elegir-4-20"));
-  } else {
-    fireEvent.click(control());
-  }
+/**
+ * 🩸 15-sep-2026: acá se tocaba el doble del calendario, y cuando el caso pedía
+ * un rango que NO es quincena se tocaba «elegir 4–20». La Planilla ya no monta
+ * el calendario (Daniel: *«si la quincena es fija, que no haya opción de rango,
+ * solo las opciones»*): se elige con CUATRO botones.
+ *
+ * 🔑 Los argumentos se conservan y SE IGNORAN a propósito: los casos del rango
+ * libre no dependen de lo que se toque, sino de lo que el SERVIDOR devuelve
+ * (`respuestaRangoLibre()`), y eso no cambió. Lo que este archivo protege —que
+ * los montos a mano se bloqueen y no se manden cuando el período no es una
+ * quincena— se sigue probando entero.
+ */
+async function elegirPeriodo(_d?: string, _h?: string) {
+  elegirQuincenaEnCurso();
   generar();
+}
+
+/**
+ * Toca la primera quincena del MES EN CURSO (el tercero de los cuatro botones:
+ * los dos primeros son el mes anterior). Por posición y no por rótulo, para que
+ * el caso no dependa de en qué mes se corra.
+ */
+function elegirQuincenaEnCurso() {
+  const botones = screen.getAllByRole("button", { name: /^\d{1,2} – \d{1,2} \w{3}$/ });
+  fireEvent.click(botones[2]);
 }
 
 /** El botón que de verdad pide el cuadro. */
@@ -192,25 +210,15 @@ function generar() {
   fireEvent.click(screen.getAllByRole("button", { name: /^Generar$/ })[0]);
 }
 
-// 🩸 `getAllByRole(...)[0]`, no `getByRole`: en jsdom no hay Tailwind, así que
-// el botón de desktop (`hidden lg:block`) y el de móvil (`lg:hidden`) se montan
-// los DOS y `getByRole` revienta con «Found multiple elements».
-// 🔑 Y matchea las DOS caras del control: «Elige el período» antes de elegir, y
-// «1 ago – 15 ago 2026 · 15 días» después.
-const control = () =>
-  screen.getAllByRole("button", { name: /Elige el período|·\s*\d+\s*d[ií]as?/ })[0];
-
 /**
- * 🔴 10-sep-2026 (mockup aprobado por Daniel): la quincena se elige con DOS
- * BOTONES («1 – 15 sep» / «16 – 30 sep») y el calendario queda detrás de «Otro
- * rango». Cuando lo elegido ES una quincena del mes, el que lo refleja es el
- * botón prendido (`aria-pressed`), y el control del calendario sigue diciendo
- * su texto vacío. Lo que este candado protege no cambió: se elige POR RANGO y
- * lo elegido se ve. Ver `planilla-elegir-quincena.test.tsx`.
+ * 🔴 10-sep-2026 (mockup aprobado por Daniel) y 15-sep-2026: la quincena se
+ * elige con BOTONES y NADA MÁS. Lo elegido se ve en el botón PRENDIDO
+ * (`aria-pressed`). 🩸 Acá había además un `control()` que leía el texto del
+ * calendario («1 ago – 15 ago 2026 · 15 días»); se fue con el calendario. Lo
+ * que este candado protege no cambió: se elige un período y lo elegido se ve.
  */
 const quincenaPrendida = () => screen.queryAllByRole("button", { pressed: true })[0] ?? null;
-const loElegidoSeVe = () =>
-  quincenaPrendida() !== null || !/Elige el período/.test(control().textContent ?? "");
+const loElegidoSeVe = () => quincenaPrendida() !== null;
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", () => {
@@ -231,11 +239,12 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
   // mostrando la quincena en curso. Daniel: *«la quincena se paga según el
   // rango de fecha seleccionado»* — un rango puesto solo AFIRMA un período de
   // pago que nadie pidió. Ahora abre invitando a elegirlo.
-  it("🔴 abre SIN período puesto: dice «Elige el período»", async () => {
+  it("🔴 abre SIN período puesto: dice «Elige el período que vas a pagar»", async () => {
     servir(respuestaQuincena());
     montar();
-    await waitFor(() => expect(control().textContent).toMatch(/Elige el período/));
-    expect(control().textContent).not.toMatch(/días/);
+    await waitFor(() => expect(screen.getByText(/Elige el período que vas a pagar/)).toBeTruthy());
+    // Ningún botón prendido: nadie eligió nada todavía.
+    expect(quincenaPrendida()).toBeNull();
   });
 
   it("y después de elegirlo, dice el rango y cuántos días son", async () => {
@@ -266,10 +275,10 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
     vi.setSystemTime(new Date("2026-08-10T15:00:00Z"));
     const llamadas = servir(respuestaQuincena());
     montar();
-    await waitFor(() => expect(control().textContent).toMatch(/Elige el período/));
-    // Ni una llamada al CUADRO. (El calendario sí puede pedir sus días, y la
-    // pantalla pregunta qué hay cerrado para recomendar por dónde empezar: esa
-    // URL también empieza con `/api/asistencia/planilla`, de ahí el `?`.)
+    await waitFor(() => expect(screen.getByText(/Elige el período que vas a pagar/)).toBeTruthy());
+    // Ni una llamada al CUADRO. (La pantalla pregunta qué hay cerrado para
+    // recomendar por dónde empezar: esa URL también empieza con
+    // `/api/asistencia/planilla`, de ahí el `?`.)
     expect(llamadas.filter((c) => c.url.includes("/api/asistencia/planilla?"))).toEqual([]);
     expect(screen.getByText(/Elige el período que vas a pagar/)).toBeTruthy();
     vi.useRealTimers();

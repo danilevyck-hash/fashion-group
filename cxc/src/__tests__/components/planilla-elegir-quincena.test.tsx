@@ -1,16 +1,27 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// 🔴 PLANILLA: LA QUINCENA SE ELIGE CON DOS BOTONES (10-sep-2026, mockup
-// aprobado por Daniel)
+// 🔴 PLANILLA: LA QUINCENA SE ELIGE CON BOTONES (10-sep-2026, mockup aprobado
+// por Daniel), Y CON NADA MÁS (15-sep-2026).
 //
-// «1 – 15 sep» y «16 – 30 sep» —el mes en curso de Panamá y el último día REAL
-// del mes— más «Otro rango ⌄» que despliega el calendario de siempre. El campo
-// «Cortar el reloj el» se ve DESDE EL INICIO con el corte propuesto (13 o 28) y
-// una frase corta; vacío = quincena entera. «Generar» negro. Excel / PDF /
-// Comprobantes aparecen solo con la planilla ya generada.
+// CUATRO botones: las dos quincenas del mes anterior y las dos del mes en curso
+// de Panamá, con el último día REAL del mes. El campo «Cortar el reloj el» se ve
+// DESDE EL INICIO con el corte propuesto (13 o 28) y una frase corta; vacío =
+// quincena entera. «Generar» negro. Excel / PDF / Comprobantes aparecen solo con
+// la planilla ya generada.
 //
-// 🔴 LO QUE SE GUARDA Y LO QUE SE CALCULA NO CAMBIA: la misma llamada, con el
-// mismo rango y el mismo corte, elija uno por botón o por calendario. Hay
-// candado que compara las dos URL.
+// 🩸 CAMBIÓ DE DIRECCIÓN EL 15-sep-2026. Hasta ese día había además un «Otro
+// rango ⌄» con el calendario de siempre, y este archivo probaba que por ahí se
+// podía pedir un rango libre. Daniel, textual: *«si la quincena es fija, que no
+// haya opción de rango, solo las opciones»*. De ahí salían los rangos que
+// prorratean el sueldo por `factorBase`, APAGAN los montos escritos a mano y
+// dejan guardadas cabeceras que no son quincenas — y por eso el ajuste de la
+// quincena anterior no se disparaba nunca.
+//
+// 🔴 LO QUE SE GUARDA Y LO QUE SE CALCULA NO CAMBIA: el botón pide el MISMO
+// `desde`/`hasta`/`corte` que pedía el calendario para ese mismo rango.
+//
+// 🔴 ⚠️ Y LA RUTA SIGUE ACEPTANDO RANGOS LIBRES: `medirAjusteAnterior` se llama
+// a sí misma con el rango corto de los días sin medir. Lo que se quitó es la
+// OPCIÓN DE LA PANTALLA. Hay un caso abajo que lo sostiene.
 // ─────────────────────────────────────────────────────────────────────────────
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
@@ -20,31 +31,13 @@ import {
   HORAS_CERO, TOTALES_CERO, MANUALES_CERO, quincena, periodoDeQuincena, type LineaPlanilla,
 } from "@/lib/asistencia/planilla";
 import {
-  corteInicial, esLaQuincena, fraseCorte, quincenasDelMes, rotuloQuincena,
+  corteInicial, esLaQuincena, fraseCorte, quincenasDelMes, quincenasElegibles, rotuloQuincena,
 } from "@/lib/asistencia/elegir-quincena";
 
 vi.mock("@/lib/asistencia/planilla-unida", () => ({ planillaUnidaPrendida: () => true, PLANILLA_UNIDA: true }));
 
-// El calendario de siempre, doblado: un botón que dice lo suyo y otro que
-// «elige por calendario» exactamente el 1–15 de septiembre.
-vi.mock("@/components/ui/RangoFechas", () => ({
-  __esModule: true,
-  default: ({ desde, hasta, vacio, inline, textoVacio, onChange }: {
-    desde: string; hasta: string; vacio?: boolean; inline?: boolean; textoVacio?: string;
-    onChange: (d: string, h: string) => void;
-  }) => (
-    <div data-testid="rango" data-inline={inline ? "si" : "no"}>
-      <button type="button">{vacio ? (textoVacio ?? "Elige el período") : `${desde} – ${hasta}`}</button>
-      <button type="button" data-testid="calendario-1-15-sep" onClick={() => onChange("2026-09-01", "2026-09-15")}>
-        calendario 1-15 sep
-      </button>
-      <button type="button" data-testid="calendario-libre" onClick={() => onChange("2026-09-03", "2026-09-20")}>
-        calendario libre
-      </button>
-    </div>
-  ),
-  ultimoRango: () => null,
-}));
+// 🩸 Acá vivía el doble del calendario (`RangoFechas`). Se fue el 15-sep-2026
+// con «Otro rango ⌄»: la Planilla ya no lo monta.
 
 import PlanillaTab from "@/app/asistencia/PlanillaTab";
 
@@ -137,12 +130,15 @@ describe("el módulo puro: las dos quincenas del mes, con el último día real",
 });
 
 describe("🔴 la pantalla: dos botones, el corte a la vista, Generar negro", () => {
-  it("abre con «1 – 15 sep», «16 – 30 sep» y «Otro rango»; el calendario NO va en línea", async () => {
+  it("abre con los CUATRO botones —agosto y septiembre— y sin ningún calendario", async () => {
     servir(); montar();
+    expect(boton("1 – 15 ago")).toBeTruthy();
+    expect(boton("16 – 30 ago")).toBeTruthy();
     expect(boton("1 – 15 sep")).toBeTruthy();
     expect(boton("16 – 30 sep")).toBeTruthy();
-    expect(screen.getAllByText("Otro rango").length).toBeGreaterThan(0);
-    expect(screen.getByTestId("rango").getAttribute("data-inline")).toBe("no");
+    // 🔴 Y ni rastro del rango libre.
+    expect(screen.queryByText("Otro rango")).toBeNull();
+    expect(screen.queryByTestId("rango")).toBeNull();
     expect(screen.queryByText(/Elige el período$/)).toBeNull();
   });
 
@@ -189,33 +185,33 @@ describe("🔴 la pantalla: dos botones, el corte a la vista, Generar negro", ()
     expect(screen.getByRole("menuitem", { name: /^Comprobantes$/ })).toBeTruthy();
   });
 
-  it("🔴 EL MISMO PEDIDO POR CALENDARIO: elegir 1–15 sep en «Otro rango» arma la MISMA URL que el botón", async () => {
-    const porBoton = servir(); montar();
-    fireEvent.click(boton("1 – 15 sep"));
+  /* 🩸 CAMBIÓ DE DIRECCIÓN EL 15-sep-2026. Acá había dos casos: «elegir 1–15 sep
+   * por calendario arma la MISMA URL que el botón» y «un rango libre por
+   * calendario se pide TAL CUAL». Los dos probaban una puerta que Daniel mandó
+   * cerrar: *«si la quincena es fija, que no haya opción de rango, solo las
+   * opciones»*. Quedan estos dos en su lugar. */
+  it("🔴 la quincena del MES ANTERIOR se pide de verdad — es para lo que están esos dos botones", async () => {
+    // Sin ella, estando en octubre no habría forma de abrir ni cerrar la
+    // quincena 1–15 de septiembre, que es cuando la contadora la cierra.
+    const ll = servir(); montar();
+    fireEvent.click(boton("16 – 30 ago"));
+    expect(corteInput().value).toBe("2026-08-28");
     generar();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
-    const urlBoton = urlDelCuadro(porBoton);
-    cleanup();
-
-    const porCalendario = servir(); montar();
-    fireEvent.click(screen.getByTestId("calendario-1-15-sep"));
-    // El calendario que cae en una quincena exacta propone el mismo corte.
-    expect(corteInput().value).toBe("2026-09-13");
-    // Y el botón de esa quincena se prende igual: es el mismo rango.
-    expect(boton("1 – 15 sep").getAttribute("aria-pressed")).toBe("true");
-    generar();
-    await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
-    expect(urlDelCuadro(porCalendario)).toBe(urlBoton);
+    expect(urlDelCuadro(ll)).toBe("/api/asistencia/planilla?desde=2026-08-16&hasta=2026-08-30&empresa=confecciones_boston&corte=2026-08-28");
   });
 
-  it("un rango libre por calendario no prende ningún botón, se lee la quincena entera, y se pide TAL CUAL", async () => {
-    const ll = servir(); montar();
-    fireEvent.click(screen.getByTestId("calendario-libre"));
-    expect(screen.queryAllByRole("button", { pressed: true })).toHaveLength(0);
-    expect(corteInput().value).toBe("");
-    expect(screen.getAllByText("2026-09-03 – 2026-09-20").length).toBeGreaterThan(0);
-    generar();
-    await waitFor(() => expect(urlDelCuadro(ll)).toBe("/api/asistencia/planilla?desde=2026-09-03&hasta=2026-09-20&empresa=confecciones_boston"));
+  it("🔴 CONTROL: la RUTA sigue aceptando rangos libres — de eso vive el ajuste de la quincena anterior", async () => {
+    // `medirAjusteAnterior` vuelve a llamar a la MISMA ruta con el rango corto
+    // de los días que quedaron sin medir, para valuarlos sin duplicar el motor.
+    // Si alguien cierra la ruta «ya que el calendario no está», se muere el
+    // ajuste. Esto se verifica en el servidor, no en la pantalla.
+    const { readFileSync } = await import("node:fs");
+    const ruta = readFileSync("src/app/api/asistencia/planilla/route.ts", "utf-8");
+    expect(ruta).toContain("medirAjusteAnterior");
+    // La ruta lee `desde`/`hasta` de la query, sin exigir que sean una quincena.
+    expect(ruta).toMatch(/sp\.get\("desde"\)/);
+    expect(ruta).toMatch(/sp\.get\("hasta"\)/);
   });
 
   it("«Quincena entera» vacía el corte y el pedido va sin `corte`", async () => {

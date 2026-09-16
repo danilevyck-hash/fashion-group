@@ -139,11 +139,14 @@ import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 // `react-day-picker` y un import estático anularía el `dynamic()` del selector.
 import { aIso, deIso } from "@/components/ui/rango-fechas-iso";
 
-import RangoFechas from "@/components/ui/RangoFechas";
-// 🔴 LA QUINCENA SE ELIGE CON DOS BOTONES (10-sep-2026, mockup aprobado por
-// Daniel); el calendario queda detrás de «Otro rango». Módulo puro.
+// 🔴 LA QUINCENA SE ELIGE CON BOTONES Y NADA MÁS (10-sep-2026, mockup aprobado
+// por Daniel; el calendario se retiró el 15-sep-2026). Módulo puro.
+//
+// 🩸 Acá había un `import RangoFechas from "@/components/ui/RangoFechas"`. Se
+// fue con «Otro rango ⌄»: el componente sigue vivo y lo usan otras pantallas
+// (Asistencia, Aprobaciones), pero la Planilla ya no elige rangos libres.
 import {
-  corteInicial, esLaQuincena, fechaCortaCorte, fraseCorte, quincenasDelMes, rotuloQuincena,
+  corteInicial, esLaQuincena, fechaCortaCorte, fraseCorte, quincenasElegibles, rotuloQuincena,
   textoDelDia31,
 } from "@/lib/asistencia/elegir-quincena";
 interface Respuesta {
@@ -399,18 +402,29 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
   const [modal, setModal] = useState<"cerrar" | "reabrir" | null>(null);
   const [trabajandoCierre, setTrabajandoCierre] = useState(false);
   /**
-   * 🔴 LA QUINCENA SE ELIGE CON DOS BOTONES (10-sep-2026): «1 – 15 sep» y
-   * «16 – 30 sep», con el mes en curso de Panamá y el último día real del mes.
-   * El calendario de siempre queda detrás de «Otro rango ⌄» para lo que no es
-   * una quincena. Reemplaza al calendario a la vista del 4-sep (Daniel: *«no
-   * veo lo de poner las fechas»*): dos toques menos por quincena, y las 18
-   * columnas de plata tienen el ancho entero desde el principio.
+   * 🔴 LA QUINCENA SE ELIGE CON BOTONES, Y NADA MÁS (10-sep-2026 · 15-sep-2026).
+   *
+   * Son CUATRO: las dos del mes anterior y las dos del mes en curso de Panamá,
+   * con el último día real del mes. Daniel, 15-sep-2026: *«si la quincena es
+   * fija, que no haya opción de rango, solo las opciones»* — el calendario
+   * («Otro rango ⌄») se retiró de esta pantalla. El mes anterior está porque la
+   * contadora cierra una quincena DESPUÉS de que termina: sin esos dos botones,
+   * en octubre no habría forma de abrir la quincena 1–15 de septiembre.
+   *
+   * 🩸 De «Otro rango» salían los rangos que prorratean el sueldo por
+   * `factorBase`, APAGAN los montos escritos a mano y dejan guardadas cabeceras
+   * que no son quincenas — y por eso el ajuste de la quincena anterior no se
+   * disparaba nunca.
+   *
+   * ⚠️ LA RUTA SIGUE ACEPTANDO RANGOS LIBRES a propósito: `medirAjusteAnterior`
+   * se llama a sí misma con el rango corto de los días sin medir. Lo que se
+   * quitó es la opción de la PANTALLA, no la capacidad del servidor.
    *
    * 🔴 LO QUE SE PIDE NO CAMBIA: los botones ponen el mismo `desde`/`hasta`/
-   * `corte` que ponía el calendario, y `generar` arma el MISMO pedido.
+   * `corte` de siempre, y `generar` arma el MISMO pedido.
    */
-  const lasDosQuincenas = useMemo(() => quincenasDelMes(hoy), [hoy]);
-  const elegirQuincena = useCallback((q: (typeof lasDosQuincenas)[number]) => {
+  const quincenasParaElegir = useMemo(() => quincenasElegibles(hoy), [hoy]);
+  const elegirQuincena = useCallback((q: (typeof quincenasParaElegir)[number]) => {
     setDesde(q.desde);
     setHasta(q.hasta);
     setElegido(true);
@@ -548,7 +562,6 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
    * sitios donde vive el control (la píldora y el calendario en línea): dos
    * copias es cómo una se queda marcando después de que la persona eligió.
    */
-  const diaSugerido = elegido ? null : sugerido?.inicio ?? null;
   const bloqueoManuales: Bloqueo = cerrada
     ? BLOQUEO_CERRADA
     : data?.avisos.rangoLibre
@@ -880,13 +893,18 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
       )}
       {/* ── Elegir qué se va a pagar ── */}
       <div className="flex flex-wrap items-end gap-3">
-        {/* 🔴 LA QUINCENA: dos botones con el mes en curso, y «Otro rango» para
-            el calendario. El botón prendido es el que coincide EXACTO con lo
-            elegido; un rango libre no prende ninguno. */}
+        {/* 🔴 LA QUINCENA: cuatro botones —las dos del mes anterior y las dos
+            del mes en curso—. El botón prendido es el que coincide EXACTO con
+            lo elegido.
+
+            🩸 Acá vivía «Otro rango ⌄» con el calendario de siempre. Se retiró
+            el 15-sep-2026 (Daniel: *«si la quincena es fija, que no haya opción
+            de rango, solo las opciones»*). ⚠️ La RUTA sigue aceptando
+            `desde`/`hasta` libres: los usa `medirAjusteAnterior`. */}
         <div className="flex flex-col gap-1">
           <span className="text-xs text-gray-500">Quincena</span>
           <div className="flex flex-wrap items-center gap-2">
-            {lasDosQuincenas.map((q) => {
+            {quincenasParaElegir.map((q) => {
               const prendido = elegido && esLaQuincena(q, desde, hasta);
               return (
                 <button key={q.clave} type="button" onClick={() => elegirQuincena(q)}
@@ -898,21 +916,6 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                 </button>
               );
             })}
-            <RangoFechas
-              desde={desde} hasta={hasta} label={null}
-              vacio={!elegido || lasDosQuincenas.some((q) => esLaQuincena(q, desde, hasta))}
-              textoVacio="Otro rango"
-              sugerido={diaSugerido}
-              onChange={(d, h) => {
-                setDesde(d); setHasta(h); setElegido(true);
-                // Si el rango libre resulta ser una quincena, el corte viene
-                // propuesto igual; si no, quincena entera.
-                if (PLANILLA_UNIDA) {
-                  const q = lasDosQuincenas.find((x) => esLaQuincena(x, d, h));
-                  setCorte(q ? corteInicial(q) : "");
-                }
-              }}
-            />
           </div>
           {/* 🔴 EL DÍA 31 NO PAGA SUELDO, PERO SÍ SE MIDE (15-sep-2026). Daniel:
               *«el día 31 no se paga, pero si no viene o llega tarde se
@@ -1007,12 +1010,17 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           sigue empieza al otro: decirlo evita las dos formas de equivocarse —
           dejar días sin pagar, o pisar una quincena que ya se pagó (que el
           servidor rechaza al cerrar). Se dice y se marca; no se elige solo. */}
-      {sugerido && !pedido && (
+      {/* ⚠️ Decía «está marcado en el calendario. Puedes elegir otro día si hace
+          falta» — dos frases que dejaron de ser ciertas el 15-sep-2026, cuando
+          se retiró «Otro rango»: ya no hay calendario ni días sueltos que
+          elegir. Lo que el aviso sigue haciendo es lo único que importaba:
+          decir dónde quedó la quincena pasada, para no dejar días sin pagar ni
+          pisar una que ya se pagó. */}
+      {sugerido && !elegido && !pedido && (
         <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[13px] text-blue-900">
           La última quincena cerrada de <b>{etiquetaEmpresa(empresa)}</b> terminó el{" "}
           <b>{fechaCorta(sugerido.ultimaHasta)}</b>, así que esta empieza el{" "}
-          <b>{fechaCorta(sugerido.inicio)}</b> — está marcado en el calendario. Puedes elegir otro
-          día si hace falta.
+          <b>{fechaCorta(sugerido.inicio)}</b> — es la quincena que sigue arriba.
         </p>
       )}
 
@@ -1232,7 +1240,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
         <div className="rounded-lg border border-dashed border-gray-200 px-4 py-12 text-center">
           <p className="text-sm font-medium text-gray-700">Elige el período que vas a pagar</p>
           <p className="mt-1 text-[13px] text-gray-500">
-            Toca la quincena arriba —o un rango en «Otro rango»— y después <b>Generar</b>.
+            Toca la quincena arriba y después <b>Generar</b>.
           </p>
         </div>
       )}

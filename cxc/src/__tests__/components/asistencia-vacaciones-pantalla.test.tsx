@@ -91,6 +91,20 @@ function servir(respuestas: Array<[string, unknown]>) {
 }
 const montar = (ui: React.ReactElement) => render(<ToastProvider>{ui}</ToastProvider>);
 
+/**
+ * 🩸 15-sep-2026: acá se tocaba «Elige el período» del doble del calendario.
+ * La Planilla ya no monta el calendario (Daniel: *«si la quincena es fija, que
+ * no haya opción de rango, solo las opciones»*): se elige con CUATRO botones —
+ * las dos quincenas del mes anterior y las dos del mes en curso—.
+ *
+ * 🔑 Se toca el TERCERO, que es la primera quincena del MES EN CURSO. Por
+ * posición y no por rótulo: así el caso no depende de en qué mes se corra.
+ */
+function elegirQuincenaEnCurso() {
+  const botones = screen.getAllByRole("button", { name: /^\d{1,2} – \d{1,2} \w{3}$/ });
+  fireEvent.click(botones[2]);
+}
+
 // 🔴 LA PLANILLA ABRE VACÍA (1-sep-2026): no pide nada hasta que alguien elige
 // el período. Daniel, textual: *«la quincena se paga según el rango de fecha
 // seleccionado»* — abrir mostrando plata de un período que nadie eligió es lo
@@ -105,7 +119,7 @@ const montar = (ui: React.ReactElement) => render(<ToastProvider>{ui}</ToastProv
 // las vistas `lg:hidden` y `hidden lg:block` se montan LAS DOS y `getByRole`
 // revienta con «Found multiple elements».
 function elegirPeriodo() {
-  fireEvent.click(screen.getAllByRole("button", { name: /Elige el período/ })[0]);
+  elegirQuincenaEnCurso();
   // 🔴 Y GENERAR (4-sep-2026): elegir el período ya no pide el cuadro solo.
   fireEvent.click(screen.getAllByRole("button", { name: /^Generar$/ })[0]);
 }

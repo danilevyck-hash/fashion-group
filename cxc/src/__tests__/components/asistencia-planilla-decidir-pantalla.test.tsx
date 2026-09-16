@@ -140,6 +140,20 @@ function servir(json: unknown) {
 }
 const montar = () => render(<ToastProvider><PlanillaTab /></ToastProvider>);
 
+/**
+ * 🩸 15-sep-2026: acá se tocaba «Elige el período» del doble del calendario.
+ * La Planilla ya no monta el calendario (Daniel: *«si la quincena es fija, que
+ * no haya opción de rango, solo las opciones»*): se elige con CUATRO botones —
+ * las dos quincenas del mes anterior y las dos del mes en curso—.
+ *
+ * 🔑 Se toca el TERCERO, que es la primera quincena del MES EN CURSO. Por
+ * posición y no por rótulo: así el caso no depende de en qué mes se corra.
+ */
+function elegirQuincenaEnCurso() {
+  const botones = screen.getAllByRole("button", { name: /^\d{1,2} – \d{1,2} \w{3}$/ });
+  fireEvent.click(botones[2]);
+}
+
 // 🔴 LA PLANILLA ABRE VACÍA (1-sep-2026), así que ningún caso de este archivo
 // recibe datos por el solo hecho de montar: primero hay que hacer lo que hace
 // la persona, que es ELEGIR el período. El doble contesta con el rango que ya
@@ -149,7 +163,7 @@ const montar = () => render(<ToastProvider><PlanillaTab /></ToastProvider>);
 // las vistas `lg:hidden` y `hidden lg:block` se montan LAS DOS y `getByRole`
 // revienta con «Found multiple elements».
 function elegirPeriodo() {
-  fireEvent.click(screen.getAllByRole("button", { name: /Elige el período/ })[0]);
+  elegirQuincenaEnCurso();
   // 🔴 Y GENERAR (4-sep-2026): elegir el período ya no pide el cuadro solo. El
   // flujo que aprobó Daniel es elegir → Generar → revisar → Cerrar.
   fireEvent.click(screen.getAllByRole("button", { name: /^Generar$/ })[0]);
