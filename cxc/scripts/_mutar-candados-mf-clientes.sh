@@ -16,6 +16,7 @@ ARCHIVOS=(
   "src/lib/multifashion/clientes-universo.ts"
   "src/lib/multifashion/clientes-lectura.ts"
   "src/lib/multifashion/clientes-seguimiento.ts"
+  "src/lib/multifashion/fuera-de-seguimiento.ts"
   "src/lib/multifashion/contacto-registro.ts"
   "src/app/api/multifashion/contactos/route.ts"
   "src/app/api/multifashion/fidelizacion/route.ts"
@@ -97,7 +98,26 @@ mutar "la lista abre en «Todos» en vez de en los que no vuelven" \
   's{export const CHIP_INICIAL: Chip = "no_vuelven";}{export const CHIP_INICIAL: Chip = "todos";}'
 mutar "«No vuelven» pasa a contar también a los que nunca compraron" \
   "src/lib/multifashion/clientes-seguimiento.ts" \
-  's{return clientes\.filter\(\(c\) => c\.visitas > 0\);}{return [...clientes];}'
+  's{c\.visitas > 0 && !estaFueraDeSeguimiento\(c\.cliente_switch_id\)}{!estaFueraDeSeguimiento(c.cliente_switch_id)}'
+
+mutar "«Nuevos» vuelve a ser «lo registraron este mes»" \
+  "src/lib/multifashion/clientes-seguimiento.ts" \
+  's{return clientes\.filter\(\(c\) => c\.primera_compra_este_mes\);}{return clientes.filter((c) => c.nuevo_mes);}'
+
+echo
+echo "── 4-bis. El revendedor ────────────────────────────────────────────────"
+mutar "Maher vuelve a la lista de llamar" \
+  "src/lib/multifashion/clientes-seguimiento.ts" \
+  's{c\.visitas > 0 && !estaFueraDeSeguimiento\(c\.cliente_switch_id\)}{c.visitas > 0}'
+mutar "se le olvidan dos de sus tres códigos" \
+  "src/lib/multifashion/fuera-de-seguimiento.ts" \
+  's{    codigo: 48,}{    codigo: 9048,}'
+mutar "el revendedor se reconoce por NOMBRE (y se lleva puesta a una MAHERLIN)" \
+  "src/lib/multifashion/fuera-de-seguimiento.ts" \
+  's{return typeof codigo === "number" && CODIGOS\.has\(codigo\);}{return String(codigo).toLowerCase().includes("maher");}'
+mutar "un código queda sin decir por qué está afuera" \
+  "src/lib/multifashion/fuera-de-seguimiento.ts" \
+  's/porque: "Revendedor: le compra a la tienda para volver a vender \(Daniel, 16-sep-2026\)\."/porque: "x."/'
 
 echo
 echo "── 5. Sin teléfono no se dibuja el botón ───────────────────────────────"

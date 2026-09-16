@@ -8,6 +8,7 @@
 import { createClient } from "@supabase/supabase-js";
 import * as fs from "fs";
 import { armarUniverso } from "../src/lib/multifashion/clientes-universo";
+import { baseDeSeguimiento, conteoPorChip } from "../src/lib/multifashion/clientes-seguimiento";
 import { waLink } from "../src/lib/phone-wa";
 
 const env = fs.readFileSync("/Users/daniellevy/Code/fashion-group/cxc/.env.local", "utf8");
@@ -129,12 +130,18 @@ async function main() {
   for (const e of ejemplos.slice(0, 10)) console.log("   ·", e);
   for (const s of sobran.slice(0, 10)) console.log("   · sobra:", s.cliente_switch_id, s.nombre, `visitas=${s.visitas}`);
 
+  // La lista tal como la ve Jennifer: base → chip, con las funciones de verdad.
   const conCompras = b.clientes.filter((c) => c.visitas > 0);
+  const base = baseDeSeguimiento(b.clientes);
   console.log("\n— LA LISTA DE SEGUIMIENTO —");
   console.log(`  con compras: ${conCompras.length}`);
-  console.log(`  chip «No vuelven» (dormidos): ${conCompras.filter((c) => c.dormido).length}`);
-  console.log(`  chip «Nuevos»: ${conCompras.filter((c) => c.nuevo_mes).length}`);
-  console.log(`  sin teléfono (sin botón): ${conCompras.filter((c) => !c.telefono_wa).length}`);
+  console.log(`  fuera de seguimiento (revendedores): ${conCompras.length - base.length}`);
+  const conteos = conteoPorChip(b.clientes);
+  console.log(`  chip «No vuelven» : ${conteos.no_vuelven}`);
+  console.log(`  chip «Nuevos»     : ${conteos.nuevos}   (la TARJETA de arriba dice ${b.cards.nuevos_mes}: registrados, no primeras compras)`);
+  console.log(`  chip «Todos»      : ${conteos.todos}`);
+  console.log(`  sin teléfono (sin botón): ${base.filter((c) => !c.telefono_wa).length}`);
+  console.log(`  de los que no vuelven, con DOS compras o más: ${base.filter((c) => c.dormido && c.visitas >= 2).length}`);
   // ⚠️ A PROPÓSITO NO SE IMPRIME UNA SUMA DE «cuánto compró». Este universo y
   // el del ranking de la pantalla NO son el mismo conjunto —el ranking excluye
   // VENTAS MAHER y las empresas del grupo— así que un total de acá no se puede

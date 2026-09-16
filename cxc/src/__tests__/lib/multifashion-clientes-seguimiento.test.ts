@@ -60,6 +60,10 @@ import {
   ordenarParaSeguimiento,
 } from "@/lib/multifashion/clientes-seguimiento";
 import {
+  FUERA_DE_SEGUIMIENTO,
+  estaFueraDeSeguimiento,
+} from "@/lib/multifashion/fuera-de-seguimiento";
+import {
   CANALES_CONTACTO,
   diasDesdeContacto,
   esCanalContacto,
@@ -115,7 +119,8 @@ function fac(id: number, fecha: string, extra: Partial<FilaFactura> = {}): FilaF
 
 describe("1 · la lista trae a TODOS los clientes identificados", () => {
   it("🔴 el universo NO se recorta: 120 clientes entran 120", () => {
-    const registrados = Array.from({ length: 120 }, (_, i) => reg(i + 2));
+    // Desde el 100 para no chocar con los códigos de `fuera-de-seguimiento`.
+    const registrados = Array.from({ length: 120 }, (_, i) => reg(i + 100));
     const facturas = registrados.map((r) => fac(r.cliente_switch_id, "2026-01-10"));
     const { clientes } = armarUniverso(registrados, facturas, HOY);
     expect(clientes.length).toBe(120);
@@ -267,14 +272,102 @@ describe("4 · los chips", () => {
     expect(conteoPorChip(clientes)).toEqual({ no_vuelven: 1, nuevos: 0, todos: 2 });
   });
 
-  it("«Nuevos» usa la MISMA definición que la tarjeta de arriba (registrado este mes)", () => {
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 16-sep-2026. Pedía que «Nuevos» usara la misma
+  // definición que la tarjeta —registrado este mes—. Daniel lo corrigió al ver
+  // los números: *«no existe registrar y no compró»*. En la lista, «Nuevos» es
+  // quien COMPRÓ por primera vez este mes; la TARJETA sigue contando los
+  // registrados, y por eso los dos números pueden diferir (31 contra 33,
+  // medidos ese día). Este bloque exige las DOS cosas, para que nadie los
+  // vuelva a igualar sin querer.
+  it("🔴 «Nuevos» es quien COMPRÓ por primera vez este mes", () => {
     const { clientes } = armarUniverso(
-      [reg(1, { raw_data: { fechaCreacion: "2026-09-02" } }), reg(2, { raw_data: { fechaCreacion: "2026-08-02" } })],
-      [fac(1, "2026-09-03"), fac(2, "2026-08-03")],
+      [reg(1), reg(2)],
+      // El 1 compra por primera vez este mes. El 2 ya compraba desde agosto.
+      [fac(1, "2026-09-03"), fac(2, "2026-08-03"), fac(2, "2026-09-04")],
       HOY,
     );
     expect(filtrarPorChip(baseDeSeguimiento(clientes), "nuevos").map((c) => c.cliente_switch_id))
       .toEqual([1]);
+  });
+
+  it("🔴 y NO es «lo registraron este mes»: el que se registró y no compró queda afuera", () => {
+    const { clientes, cards } = armarUniverso(
+      // Registrado este mes, compró por primera vez hace un año.
+      [reg(1, { raw_data: { fechaCreacion: "2026-09-02" } }),
+       // Registrado el año pasado, compró por primera vez este mes.
+       reg(2, { raw_data: { fechaCreacion: "2025-01-02" } }),
+       // Registrado este mes y sin comprar nunca: cuenta en la TARJETA y no en la lista.
+       reg(3, { raw_data: { fechaCreacion: "2026-09-05" } })],
+      [fac(1, "2025-09-03"), fac(2, "2026-09-04")],
+      HOY,
+    );
+    expect(filtrarPorChip(baseDeSeguimiento(clientes), "nuevos").map((c) => c.cliente_switch_id))
+      .toEqual([2]);
+    // ⚠️ Y la TARJETA sigue contando los registrados: DOS, no uno.
+    expect(cards.nuevos_mes).toBe(2);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 4-bis. EL REVENDEDOR NO ES UN CLIENTE DE TIENDA
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("4-bis · a Maher no se le hace postventa", () => {
+  const conMaher = armarUniverso(
+    [reg(47, { nombre: "VENTAS MAHER" }), reg(48, { nombre: "VENTAS MAHER" }),
+     reg(49, { nombre: "VENTAS MAHER" }), reg(500, { nombre: "JOISY CAMARENA" })],
+    [fac(47, "2026-09-15"), fac(48, "2024-06-05"), fac(49, "2024-06-05"), fac(500, "2025-12-22")],
+    HOY,
+  ).clientes;
+
+  it("🔴 sale de la lista, con los TRES chips", () => {
+    for (const chip of CHIPS) {
+      expect(filtrarPorChip(baseDeSeguimiento(conMaher), chip).map((c) => c.cliente_switch_id))
+        .not.toContain(47);
+    }
+    expect(baseDeSeguimiento(conMaher).map((c) => c.cliente_switch_id)).toEqual([500]);
+  });
+
+  it("🔴 son SUS TRES CÓDIGOS, no uno: 48 y 49 ni siquiera tienen ficha", () => {
+    expect(FUERA_DE_SEGUIMIENTO.map((f) => f.codigo)).toEqual([47, 48, 49]);
+    for (const c of [47, 48, 49]) expect(estaFueraDeSeguimiento(c)).toBe(true);
+    expect(estaFueraDeSeguimiento(500)).toBe(false);
+    expect(estaFueraDeSeguimiento(null)).toBe(false);
+  });
+
+  it("🔴 se compara por CÓDIGO, nunca por nombre — una «MAHERLIN» no desaparece", () => {
+    const maherlin = armarUniverso(
+      [reg(501, { nombre: "MAHERLIN PEREZ" })],
+      [fac(501, "2025-12-22")],
+      HOY,
+    ).clientes;
+    expect(baseDeSeguimiento(maherlin).map((c) => c.cliente_switch_id)).toEqual([501]);
+    // Y el módulo no tiene una sola comparación de texto.
+    const src = plano(leer("src/lib/multifashion/fuera-de-seguimiento.ts"));
+    expect(src).not.toMatch(/ILIKE|includes\(|toLowerCase\(|\.test\(/);
+  });
+
+  it("🔴 cada código dice POR QUÉ está afuera", () => {
+    for (const f of FUERA_DE_SEGUIMIENTO) {
+      expect(f.porque.length, `${f.codigo} sin motivo`).toBeGreaterThan(20);
+      expect(f.nombre.length).toBeGreaterThan(0);
+    }
+    expect(FUERA_DE_SEGUIMIENTO[0].porque).toMatch(/[Rr]evendedor/);
+  });
+
+  it("⚠️ pero las CUATRO TARJETAS lo siguen contando: son otra pregunta", () => {
+    const { cards } = armarUniverso(
+      [reg(47, { nombre: "VENTAS MAHER" })],
+      [fac(47, correrDias(HOY, -90))],
+      HOY,
+    );
+    // Dormido en la tarjeta, afuera de la lista. Es a propósito.
+    expect(cards.dormidos).toBe(1);
+    expect(baseDeSeguimiento(armarUniverso(
+      [reg(47, { nombre: "VENTAS MAHER" })],
+      [fac(47, correrDias(HOY, -90))],
+      HOY,
+    ).clientes)).toEqual([]);
   });
 });
 

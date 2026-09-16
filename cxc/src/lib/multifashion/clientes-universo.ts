@@ -192,6 +192,21 @@ export interface ClienteUniverso {
    */
   total_comprado: number;
   ultima_compra: string | null;
+  /** El día de su PRIMERA compra. `null` si nunca compró. */
+  primera_compra: string | null;
+  /**
+   * ¿Compró por PRIMERA VEZ en el mes en curso de Panamá?
+   *
+   * 🔑 NO es lo mismo que `nuevo_mes`, y la diferencia es deliberada
+   * (16-sep-2026). `nuevo_mes` es «lo REGISTRARON este mes» (sale de
+   * `raw_data.fechaCreacion`) y es lo que cuenta la TARJETA de arriba; esto es
+   * «COMPRÓ por primera vez este mes» y es lo que filtra el chip «Nuevos» de la
+   * lista. Daniel, textual: *«no existe registrar y no compró»* — en la tienda
+   * te registran cuando compras, así que para él son la misma pregunta. Se
+   * separan igual porque la tarjeta no se toca y los dos números pueden
+   * diferir: medido hoy, 31 registrados contra 33 primeras compras.
+   */
+  primera_compra_este_mes: boolean;
   /** Días desde la última compra. `null` si nunca compró. */
   dias_sin_comprar: number | null;
   estado5: "disponible" | "usado" | null;
@@ -226,6 +241,7 @@ export function armarUniverso(
 
   interface Agg {
     dias: Set<string>;
+    primera: string;
     ultima: string;
     tickets: number;
     total: number;
@@ -234,7 +250,7 @@ export function armarUniverso(
   }
   const porCliente = new Map<number, Agg>();
   const vacio = (): Agg =>
-    ({ dias: new Set<string>(), ultima: "", tickets: 0, total: 0, uso5: false, nombreFactura: null });
+    ({ dias: new Set<string>(), primera: "", ultima: "", tickets: 0, total: 0, uso5: false, nombreFactura: null });
 
   for (const f of facturas) {
     const a = porCliente.get(f.cliente_switch_id) ?? vacio();
@@ -248,6 +264,7 @@ export function armarUniverso(
       a.dias.add(dia);
       a.tickets += 1;
       if (dia > a.ultima) a.ultima = dia;
+      if (!a.primera || dia < a.primera) a.primera = dia;
       if (Number(f.descuento_global_pct) === 5) a.uso5 = true;
       if (!a.nombreFactura && f.cliente_nombre) a.nombreFactura = f.cliente_nombre;
     }
@@ -284,6 +301,8 @@ export function armarUniverso(
       tickets: a?.tickets ?? 0,
       total_comprado: aCentavos(a?.total ?? 0),
       ultima_compra: ultima,
+      primera_compra: a?.primera || null,
+      primera_compra_este_mes: (a?.primera ?? "").slice(0, 7) === mesActual,
       dias_sin_comprar: diasEntre(ultima, hoy),
       estado5: uso5 ? "usado" : "disponible",
       frecuente: visitas90 >= 2,
@@ -311,6 +330,8 @@ export function armarUniverso(
       tickets: a.tickets,
       total_comprado: aCentavos(a.total),
       ultima_compra: a.ultima || null,
+      primera_compra: a.primera || null,
+      primera_compra_este_mes: a.primera.slice(0, 7) === mesActual,
       dias_sin_comprar: diasEntre(a.ultima || null, hoy),
       estado5: null,
       frecuente: visitas90 >= 2,

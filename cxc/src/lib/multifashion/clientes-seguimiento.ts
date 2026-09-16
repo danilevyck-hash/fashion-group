@@ -18,6 +18,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { diasDesdeContacto, textoUltimoContacto, type UltimoContacto } from "./contacto-registro";
+import { estaFueraDeSeguimiento } from "./fuera-de-seguimiento";
 import type { ClienteUniverso } from "./clientes-universo";
 
 /**
@@ -44,25 +45,39 @@ export function esChip(v: unknown): v is Chip {
 }
 
 /**
- * La base de la lista: los que YA COMPRARON.
+ * La base de la lista: los que YA COMPRARON y a los que SÍ se les hace
+ * postventa.
  *
  * 🔴 Postventa es «vuelve a comprar»: a quien nunca compró no se le hace
  * seguimiento de compra. Medido el 16-sep-2026: de 1.060 fichas, **967 tienen
  * compras** y 93 nunca compraron.
+ *
+ * 🔴 Y los revendedores no entran: a Maher no se le llama para que vuelva
+ * (Daniel: *«Maher es revendedor»*). La lista de quiénes y por qué vive en
+ * `fuera-de-seguimiento.ts`, POR CÓDIGO y nunca por nombre.
+ *
+ * ⚠️ Esto NO toca las cuatro tarjetas de arriba: ésas cuentan el universo de
+ * fidelización y van a decir uno más que la lista. Es a propósito.
  */
 export function baseDeSeguimiento(
   clientes: readonly ClienteUniverso[],
 ): ClienteUniverso[] {
-  return clientes.filter((c) => c.visitas > 0);
+  return clientes.filter((c) => c.visitas > 0 && !estaFueraDeSeguimiento(c.cliente_switch_id));
 }
 
 /**
  * El filtro de cada chip, sobre la base de arriba.
  *
- * ⚠️ «Nuevos» usa la MISMA definición que la tarjeta de arriba —registrado este
- * mes (`raw_data.fechaCreacion`)—, no «compró por primera vez este mes». Son
- * dos preguntas distintas y acá no se inventa una tercera definición; lo único
- * que cambia es la base, que son los que ya compraron.
+ * 🔴 «NUEVOS» ES QUIEN COMPRÓ POR PRIMERA VEZ ESTE MES, no quien fue registrado
+ * este mes (16-sep-2026). Daniel, textual: *«no existe registrar y no
+ * compró»* — en la tienda te registran cuando compras, así que para él las dos
+ * preguntas son la misma y el que se registró sin comprar no debería estar.
+ *
+ * ⚠️ LA TARJETA DE ARRIBA SIGUE CONTANDO LOS REGISTRADOS (`nuevo_mes`), y los
+ * dos números pueden no coincidir: medido el 16-sep-2026, **31 registrados
+ * contra 33 primeras compras**. Si algún día alguien ve 31 arriba y 33 abajo,
+ * es esto: arriba «lo registraron este mes», abajo «compró por primera vez este
+ * mes». Ninguno de los dos está mal.
  */
 export function filtrarPorChip(
   clientes: readonly ClienteUniverso[],
@@ -70,7 +85,7 @@ export function filtrarPorChip(
 ): ClienteUniverso[] {
   if (chip === "todos") return [...clientes];
   if (chip === "no_vuelven") return clientes.filter((c) => c.dormido);
-  return clientes.filter((c) => c.nuevo_mes);
+  return clientes.filter((c) => c.primera_compra_este_mes);
 }
 
 /**
