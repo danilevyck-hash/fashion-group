@@ -398,7 +398,14 @@ descontó. La escalera vive en `lib/asistencia/movimientos-quincena.ts` y tiene 
    casilla de la planilla para no cobrar dos veces. Medido el 17-sep-2026: **440 de 441 movimientos
    vivos tienen `origen_pago` en NULL** (el campo nació el 8-sep-2026), así que sin este peldaño la
    pantalla diría «a mano» de toda la historia.
-4. **Todo lo demás es a mano**, y dice de dónde salió cuando se sabe («a mano · Liquidación»).
+4. **Todo lo demás es a mano.**
+
+⚠️ **La celda dice DOS cosas y ninguna más: «del cierre» o «a mano».** El peldaño 4 nació agregando
+de dónde salió el pago de bolsillo —«a mano · Liquidación»— y Daniel lo mandó sacar el mismo día
+(17-sep-2026), textual: *«Es información de más, quítala»*. **El dato no se borró: se dejó de
+MOSTRAR.** `prestamos_movimientos.origen_pago` se sigue guardando, lo sigue leyendo
+`esDescuentoDeQuincena` —es lo que hace que ese mismo pago diga «a mano» y no «del cierre»— y la
+ficha de la persona lo sigue enseñando.
 
 ### 🔴 Por quincena, no por rango libre — y está medido
 

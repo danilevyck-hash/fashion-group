@@ -168,16 +168,25 @@ describe("4. la columna «Origen»", () => {
     expect(origenDelMovimiento(m, new Set())).toBe("cierre");
   });
 
-  it("un pago de bolsillo es a mano y DICE de dónde salió", () => {
+  it("un pago de bolsillo dice SOLO «a mano»", () => {
+    // 🩸 17-sep-2026: la celda decía «a mano · Liquidación» y Daniel lo mandó
+    // sacar el mismo día — *«Es información de más, quítala»*. ⚠️ El dato NO se
+    // borró: `origen_pago` se sigue guardando y `esDescuentoDeQuincena` lo sigue
+    // leyendo (por eso este mismo movimiento es «a mano» y no «del cierre»).
+    // Lo que se retiró es MOSTRARLO en esta columna.
     const m = mov({ concepto: CONCEPTO_PAGO, monto: 125, fecha: "2026-09-07", origen_pago: "Liquidación" });
     expect(origenDelMovimiento(m, new Set())).toBe("mano");
-    expect(fila(m).origenEtiqueta).toBe("a mano · Liquidación");
+    expect(fila(m).origenEtiqueta).toBe("a mano");
   });
 
-  it("nunca se escribe «a mano · Quincena»: sería contradecirse en la celda", () => {
-    expect(etiquetaDeOrigen("mano", "Quincena")).toBe("a mano");
-    expect(etiquetaDeOrigen("mano", null)).toBe("a mano");
-    expect(etiquetaDeOrigen("cierre", "Liquidación")).toBe("del cierre");
+  it("la celda tiene DOS etiquetas y ninguna más", () => {
+    expect(etiquetaDeOrigen("mano")).toBe("a mano");
+    expect(etiquetaDeOrigen("cierre")).toBe("del cierre");
+    // Ningún origen escrito se cuela por el costado, venga el que venga.
+    for (const o of ["Liquidación", "Décimo", "Vacaciones", "Abono", "Quincena", null]) {
+      const f = fila(mov({ concepto: CONCEPTO_PAGO, monto: 10, fecha: "2026-09-07", origen_pago: o }));
+      expect(["a mano", "del cierre"]).toContain(f.origenEtiqueta);
+    }
   });
 
   it("los dos rótulos son los del mockup aprobado", () => {

@@ -108,13 +108,15 @@ export function bloqueDeMovimiento(concepto: string): Bloque | null {
 //      17-sep-2026: **440 de 441 movimientos vivos tienen `origen_pago` en
 //      NULL** —el campo nació el 8-sep-2026—, así que sin este peldaño la
 //      pantalla diría «a mano» de toda la historia.
-//   4. **Todo lo demás es a mano**, y se dice de dónde salió cuando se sabe
-//      (Liquidación, Décimo, Vacaciones, Abono).
+//   4. **Todo lo demás es a mano.** ⚠️ Y dice SOLO «a mano»: el 17-sep-2026 la
+//      celda agregaba de dónde salió («a mano · Liquidación») y Daniel lo mandó
+//      sacar el mismo día —*«Es información de más, quítala»*—. El
+//      `origen_pago` se sigue guardando y leyendo; lo que se quitó es mostrarlo.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type OrigenMovimiento = "cierre" | "mano";
 
-/** Cómo se lee cada origen. El de «a mano» puede llevar de dónde salió. */
+/** Cómo se lee cada origen. DOS palabras y ninguna más (ver `etiquetaDeOrigen`). */
 export const ETIQUETA_ORIGEN: Readonly<Record<OrigenMovimiento, string>> = {
   cierre: "del cierre",
   mano: "a mano",
@@ -144,16 +146,21 @@ export function origenDelMovimiento(
 }
 
 /**
- * «del cierre» · «a mano» · «a mano · Liquidación».
+ * 🔴 DOS ETIQUETAS Y NINGUNA MÁS: «del cierre» o «a mano».
  *
- * 🔑 El origen escrito solo se agrega cuando NO es el de la quincena: decir
- * «a mano · Quincena» sería contradecirse en la misma celda.
+ * 🩸 Nació diciendo además de dónde salió el pago de bolsillo —«a mano ·
+ * Liquidación»— y Daniel lo mandó sacar el mismo día (17-sep-2026), textual:
+ * *«Es información de más, quítala»*. La pregunta de esta columna es UNA
+ * —¿lo anotó el cierre o lo escribió alguien?— y contestarla con dos datos
+ * pegados la vuelve dos preguntas.
+ *
+ * ⚠️ **El dato NO se borró: se dejó de MOSTRAR.** `prestamos_movimientos
+ * .origen_pago` sigue guardándose igual, lo sigue leyendo `esDescuentoDeQuincena`
+ * (el peldaño 3 de la escalera de arriba) y la ficha de la persona lo sigue
+ * enseñando. Lo que se retiró es este renglón de esta celda.
  */
-export function etiquetaDeOrigen(origen: OrigenMovimiento, origenPago?: string | null): string {
-  const base = ETIQUETA_ORIGEN[origen];
-  if (origen === "cierre") return base;
-  const o = String(origenPago ?? "").trim();
-  return o && o !== "Quincena" ? `${base} · ${o}` : base;
+export function etiquetaDeOrigen(origen: OrigenMovimiento): string {
+  return ETIQUETA_ORIGEN[origen];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -237,7 +244,7 @@ export function filaDeMovimiento(
     fecha,
     dia: Number(fecha.slice(8, 10)) || 0,
     origen,
-    origenEtiqueta: etiquetaDeOrigen(origen, m.origen_pago),
+    origenEtiqueta: etiquetaDeOrigen(origen),
     bloque: bloqueDeMovimiento(String(m.concepto ?? "")),
   };
 }

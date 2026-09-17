@@ -81,9 +81,11 @@ echo "== 4. un pago sin origen escrito pasa a ser «a mano» =="
 mutar "$REGLA" '  if (esDescuentoDeQuincena(m)) return "cierre";' '  if (esDescuentoDeQuincena(m) && String(m.origen_pago ?? "") !== "") return "cierre";' \
 && probar 'las 440 filas viejas (origen NULL) dejan de ser del cierre'
 
-echo "== 5. se escribe «a mano · Quincena»: la celda se contradice =="
-mutar "$REGLA" '  return o && o !== "Quincena" ? `${base} · ${o}` : base;' '  return o ? `${base} · ${o}` : base;' \
-&& probar 'el origen de la quincena se agrega a la etiqueta «a mano»'
+# 🩸 17-sep-2026: la celda decía «a mano · Liquidación» y Daniel lo mandó sacar
+# el mismo día. La mutación vuelve a pegarle el origen escrito.
+echo "== 5. la celda vuelve a decir de dónde salió el pago =="
+mutar "$REGLA" '    origenEtiqueta: etiquetaDeOrigen(origen),' '    origenEtiqueta: `${etiquetaDeOrigen(origen)}${m.origen_pago ? ` · ${m.origen_pago}` : ""}`,' \
+&& probar 'el origen_pago se cuela en la columna «Origen»'
 
 echo "== 6. los bloques dejan de derivarse de las listas del saldo =="
 mutar "$REGLA" 'const RESTAN = new Set<string>(CONCEPTOS_RESTAN);' 'const RESTAN = new Set<string>(["Pago"]);' \
