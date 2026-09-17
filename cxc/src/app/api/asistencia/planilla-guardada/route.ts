@@ -96,6 +96,11 @@ import type { SugerenciaPrestamo } from "@/lib/asistencia/prestamos-planilla";
 // lo tecleaba una persona en el otro módulo y por eso el 1-15 de agosto de 2026
 // el módulo decía 9 descuentos por $360,00 y la casilla 7 por $265,00.
 import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
+import type { DiaLibreEnLinea } from "@/lib/asistencia/dia-libre-empresa";
+import {
+  escribirPagosDiaLibre,
+  revertirPagosDiaLibre,
+} from "@/lib/asistencia/dia-libre-empresa-server";
 import { corteValido } from "@/lib/asistencia/corte-quincena";
 import { logActivity } from "@/lib/log-activity";
 import {
@@ -287,7 +292,7 @@ export async function POST(req: NextRequest) {
     const cuadro = (await resp.json()) as {
       empresa: string | null;
       periodo: { desde: string; hasta: string; claveManuales: string | null; factorBase: number };
-      lineas: LineaPlanilla[];
+      lineas: (LineaPlanilla & { diaLibre?: DiaLibreEnLinea })[];
       prestamos?: SugerenciaPrestamo[];
     };
 
@@ -369,9 +374,32 @@ export async function POST(req: NextRequest) {
       prestamosAnotados = { escritos: escrito.escritos, total: escrito.total };
     }
 
+    // ── 🔴 Y EL PAGO DEL DÍA LIBRE, POR LA MISMA REGLA Y EN EL MISMO LUGAR ──
+    //
+    // Se anota lo que las horas extra de ESTE cuadro le pagaron a la deuda
+    // (`dinero` ya salió recortado, así que lo que se anota es exactamente lo
+    // que el cuadro dejó de pagarle). Con `await`: esto mueve plata.
+    //
+    // 🔴 La clave es la QUINCENA, y el índice único `(colaborador, quincena)`
+    // hace que cerrar dos veces no cobre dos veces. En un rango libre no hay
+    // clave y no se anota nada: la deuda se queda entera para la quincena que
+    // sí se cierre.
+    let diaLibreAnotado: { escritos: number; total: number } | null = null;
+    const claveQuincena = cuadro.periodo?.claveManuales ?? null;
+    if (r.id && claveQuincena) {
+      const pagos = lineas
+        .map((l) => ({ codigo: l.codigo, monto: Number(l.diaLibre?.pagado ?? 0) }))
+        .filter((p) => p.monto > 0);
+      const escrito = await escribirPagosDiaLibre({
+        planillaId: r.id, quincena: claveQuincena, pagos, usuario,
+      });
+      diaLibreAnotado = { escritos: escrito.escritos, total: escrito.total };
+    }
+
     return NextResponse.json({
       ok: true, id: r.id, version: r.version, totales: r.totales, empresa, desde, hasta,
       prestamosAnotados,
+      diaLibreAnotado,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -449,7 +477,13 @@ export async function PATCH(req: NextRequest) {
       const rev = await revertirPagosDelCierre({ planillaId: id, usuario });
       prestamosRevertidos = rev.revertidos;
     }
-    return NextResponse.json({ ok: true, id, prestamosRevertidos });
+    // 🔴 Y la deuda del día libre vuelve a subir, por la MISMA razón: si no, al
+    // volver a cerrar sus horas extra pagarían dos veces la misma deuda.
+    // Soft delete firmado, nunca un DELETE.
+    const revDiaLibre = await revertirPagosDiaLibre({ planillaId: id, usuario });
+    return NextResponse.json({
+      ok: true, id, prestamosRevertidos, diaLibreRevertidos: revDiaLibre.revertidos,
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[asistencia/planilla-guardada PATCH]", msg);

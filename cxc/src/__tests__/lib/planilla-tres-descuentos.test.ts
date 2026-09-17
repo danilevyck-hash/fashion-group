@@ -353,10 +353,23 @@ describe("H. «CONSTANCIA» — un motivo más, y PAGA como los otros", () => {
   // Incapacidad (Daniel: *«así como incapacidad, una opción de compensatorio de
   // días que le debemos libres; al poner qué día será compensatorio, no se le
   // descuente»*). Son SEIS; los cinco de antes siguen en su orden.
-  it("son seis, y los cinco de antes no se movieron entre sí", () => {
+  // ⚠️ CAMBIÓ DE DIRECCIÓN OTRA VEZ EL 17-sep-2026: entró «Día libre de la
+  // empresa», último de la lista (Daniel: *«se le paga ese día pero deben las
+  // horas laborales (8 horas para todos)»*). Son SIETE; los seis de antes
+  // siguen en su orden, que es justo lo que el CONTROL de abajo exige.
+  it("son siete, y los seis de antes no se movieron entre sí", () => {
     expect([...MOTIVOS_JUSTIFICACION]).toEqual([
       "Incapacidad", "Compensatorio", "Catástrofe", "Escolares", "Trabajo de vendedor", "Constancia",
+      "Día libre de la empresa",
     ]);
+  });
+
+  // 🔑 CONTROL del cambio de dirección: el motivo nuevo NO se comió a ninguno
+  // de los seis viejos ni los reordenó.
+  it("🔑 CONTROL — los seis de antes siguen ofreciéndose, en orden", () => {
+    const viejos = ["Incapacidad", "Compensatorio", "Catástrofe", "Escolares", "Trabajo de vendedor", "Constancia"];
+    expect((MOTIVOS_JUSTIFICACION as readonly string[]).filter((m) => viejos.includes(m))).toEqual(viejos);
+    for (const m of viejos) expect(motivoSeOfrece(m), m).toBe(true);
   });
 
   // 🔴 NO EXISTE «justificado pero no se paga». Justificar significa que no se

@@ -88,6 +88,11 @@ import type {
 import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
 import { PESTANA_FICHAS } from "@/lib/asistencia/persona-en-el-centro";
 import { notaAjuste, notaCeldaAjuste } from "@/lib/asistencia/corte-quincena";
+import {
+  textoDiaLibreCelda,
+  TITULO_DIA_LIBRE,
+  type DiaLibreEnLinea,
+} from "@/lib/asistencia/dia-libre-empresa";
 import { ROTULOS_DINERO_PLANILLA, montosDePlanilla } from "@/lib/asistencia/columnas-dinero-planilla";
 import { armarAntesDeCerrar } from "@/lib/asistencia/antes-de-cerrar";
 import {
@@ -241,6 +246,10 @@ interface Respuesta {
      *  le descuentan a ninguna persona. */
     prestamoSinAtar?: PrestamoSinAtar[];
     avisoPrestamoSinAtar?: string | null;
+    /** 🔴 El día libre de la empresa: lo que sus horas extra le pagaron a la
+     *  deuda y lo que queda (17-sep-2026). Ya redactado por el servidor. */
+    avisoDiasLibres?: string | null;
+    faltaMigracionDiaLibre?: string | null;
     /** Falta correr el SQL del amarre. La casilla se sigue escribiendo a mano,
      *  como hasta hoy — pero se dice. */
     faltaMigracionAmarrePrestamos?: string | null;
@@ -790,6 +799,10 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
       // la pantalla.
       avisoPrestamo: data.avisos.avisoPrestamo ?? null,
       avisoPrestamoSinAtar: data.avisos.avisoPrestamoSinAtar ?? null,
+      // 🔴 Y el día libre de la empresa: si la pantalla dice por qué la columna
+      // del extra quedó en cero y el papel no, el papel decide un pago con
+      // menos información que la pantalla.
+      avisoDiasLibres: data.avisos.avisoDiasLibres ?? null,
       // 🔴 El detalle de «Otros servicios» viaja al Excel: en el cuadro es UNA
       // casilla con el total, y el porqué de cada monto vive en su hoja. Sin
       // nada, la hoja no nace.
@@ -1331,6 +1344,9 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           // servidor vuelve a mirar para frenar el cierre.
           marcasImpares: marcasImparesDeLineas(data.lineas),
           avisoVacacionesNoPagadas: data.avisos.avisoVacacionesNoPagadas ?? null,
+          // 🔴 El día libre de la empresa: cuánto le pagaron sus horas extra a
+          // la deuda y cuánto queda (17-sep-2026). El servidor ya lo redacta.
+          avisoDiasLibres: data.avisos.avisoDiasLibres ?? null,
           conSabado: data.avisos.conSabado ?? 0,
           rangoLibre: !!data.avisos.rangoLibre,
           factorBase: data.avisos.factorBase ?? 1,
@@ -1340,6 +1356,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
             data.avisos.faltaMigracionBajas, data.avisos.faltaMigracionServicioProfesional,
             data.avisos.faltaMigracionVacaciones, data.avisos.faltaMigracionAprobaciones,
             data.avisos.faltaMigracionReparto, data.avisos.faltaMigracionAmarrePrestamos,
+            data.avisos.faltaMigracionDiaLibre ?? null,
           ].filter((m): m is string => !!m),
           pestanaFichas: PESTANA_FICHAS,
         })} />
@@ -1933,7 +1950,7 @@ function CeldaManual({
 
 function Fila({
   l, onGuardar, bloqueo,
-}: { l: LineaPlanilla; onGuardar: OnGuardar; bloqueo?: Bloqueo }) {
+}: { l: LineaPlanilla & { diaLibre?: DiaLibreEnLinea }; onGuardar: OnGuardar; bloqueo?: Bloqueo }) {
   const d = l.dinero!;
   /** El monto sobre el que se calcularon los seguros, si no fue el bruto. */
   const sobreQueBase = baseSeguros(d.baseSeguros);
@@ -2011,6 +2028,19 @@ function Fila({
             title="Cobra los días trabajados: cada día hábil vale el sueldo mensual ÷ 26."
           >
             {l.prorrateo}
+          </span>
+        )}
+        {/* 🔴 EL DÍA LIBRE DE LA EMPRESA (17-sep-2026). Sin esto, una columna de
+            horas extra en cero —o más chica de lo que la contadora esperaba— se
+            lee como un error del cuadro. El sello dice qué pasó: sus horas
+            extra pagaron la deuda del día libre, y cuánto le queda. */}
+        {l.diaLibre && (
+          <span
+            className="ml-1.5 rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-800"
+            title={TITULO_DIA_LIBRE}
+            data-testid="dia-libre-celda"
+          >
+            {textoDiaLibreCelda(l.diaLibre)}
           </span>
         )}
       </td>

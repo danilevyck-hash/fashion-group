@@ -7,6 +7,108 @@
 
 ---
 
+## 🔴 El día libre de la empresa (17-sep-2026) — se paga completo y deja debiendo 8 horas
+
+### Qué es, en palabras de Daniel
+
+> *«en las fiestas judías hay días libres, dentro de las jornadas ordinarias, que son libres para el colaborador, pero se pagan con el tiempo de horas extra»*
+
+> *«se le paga ese día pero deben las horas laborales (8 horas para todos)»*
+
+> *«debe de ser el dólares pienso, porque no todas las horas valen igual, 8 horas de trabajo normal no son lo mismo que hora extra»*
+
+> *«queda debiendo para la próxima quincena hasta cancelar la deuda de horas»*
+
+> *«A ése [al que sí trabaja ese día] se le paga normal»* · *«[si se va debiendo, se le descuenta de la liquidación] no»* · *«arrastra para siempre hasta que haga horas extra»*
+
+> *«contabilidad y admin [lo cargan] y sí, a todos los colaboradores de esa empresa»* · *«se carga cuando haya ese día… y son pocas al año»*
+
+### 🔑 ESTO YA EXISTÍA, EN EL EXCEL DE LA CONTADORA. No se inventó nada.
+
+Medido el 17-sep-2026 sobre sus tres planillas reales. En la hoja de cada persona hay una línea así:
+
+```
+DESC. POR FIESTA JUDÍA (22 DE MAYO)              18.50
+HORAS EXTRAS (1.25)  1.5*1.25*3.02                5.6625
+HORAS EXTRAS (1.50)  0*1.50*3.02                  0
+EXCEDENTE DE HORAS   0*1.5*1.75*3.02              0
+DOMINGO              0                            0
+FERIADOS                                          0
+HORAS PENDIENTES A DESCONTAR                     12.8375
+```
+
+Una deuda **en dólares**, las horas extra de la quincena la van pagando, y lo que sobra queda pendiente para la siguiente. Andando a mano desde mayo.
+
+**Dos saldos vivos** (a cargar como saldo inicial cuando Daniel confirme):
+
+| Colaborador | Empresa | Debía | Ya pagó | **Le queda** |
+|---|---|---:|---:|---:|
+| Kenny Vargas (28) | Confecciones Boston | $97.46 | $43.77 | **$53.69** |
+| Samir Polo (42) | Confecciones Boston | $18.50 | $5.66 | **$12.84** |
+
+### 🔴 EL NOMBRE NO ES «FIESTA JUDÍA»
+
+> Daniel: *«a veces damos un día libre antes de una fiesta panameña para que los colaboradores vayan a su casa, y cuenta como si fuese un día religioso… ¿habría que cambiar el nombre?»*
+
+Se llama **«Día libre de la empresa»** y es el **séptimo** motivo de `MOTIVOS_JUSTIFICACION`. Va **último**, lejos de «Compensatorio», y con esta nota debajo (`notaDelMotivo` → `TEXTO_DIA_LIBRE_EMPRESA`):
+
+> Se paga el día completo y quedan debiendo 8 horas, que se pagan con sus horas extra hasta saldar. Nunca sale del sueldo.
+
+⚠️ **Es LO CONTRARIO de `MOTIVO_COMPENSATORIO`**, que ya existía: aquél es un libre que la empresa le **DEBÍA** al colaborador (por un domingo trabajado) y **no cuesta nada**; éste es un libre que la empresa **REGALA** y deja debiendo horas. Si los dos textos se parecieran, alguien elegiría el equivocado y eso mueve plata. Hay un CONTROL en `dias-afuera-y-compensatorio.test.ts` que exige que sus notas no se parezcan.
+
+### 🔴 POR QUÉ EN DÓLARES Y NO EN HORAS
+
+Una hora extra diurna vale `1,25 × rata` y una de domingo `1,50 × rata`. Una deuda de «8 horas» se cancelaría con 6,4 horas extra diurnas o con 5,33 de domingo, y nadie podría decir cuánto se le debe sin volver a multiplicar. En dólares la cuenta es una resta y se puede cotejar contra el Excel — que es exactamente lo que ella ya hace.
+
+### La regla, entera
+
+1. **El día se paga COMPLETO.** No es ausencia, no descuenta sueldo, no genera tardanza ni salida temprana. Es una justificación más, y en esta casa **justificar significa que se paga**.
+2. **Nace una deuda de `8 × rata` de ESA persona**, en dólares, el día que se carga. La rata sale de `rata.ts` (`salario ÷ divisorDe(jornada)`), la misma de todo el módulo — y el monto **se congela**: recalcularlo después haría que un aumento de sueldo le subiera, retroactivamente, una deuda que ya estaba andando.
+3. **Se paga SOLO con horas extra**: cada quincena se le resta lo que valen sus horas extra **aprobadas** (las CINCO columnas que suman al bruto: diurna · nocturna · excedente · domingo · feriado).
+4. **Lo que no alcanza queda debiendo.** Arrastra sin límite y no caduca.
+5. **Lo que sobra se le paga**, como hoy.
+6. 🔴 **NUNCA sale del sueldo.** El tope de lo que se cobra es el EXTRA de la quincena, **no el neto** — y por eso este módulo NO se parece a `prestamos-planilla.ts`. Quien nunca haga horas extra se queda con la deuda para siempre: es un beneficio que dio la empresa.
+7. 🔴 **No se descuenta de la liquidación.** Daniel dijo «no», explícito.
+8. **Quien SÍ trabajó ese día cobra normal** y no le nace ninguna deuda: a él no se le cargó el día libre.
+
+### 🔴 CÓMO SE COBRA: se consumen las horas extra, no se agrega un descuento
+
+En el Excel de ella las horas extra de esa quincena simplemente **no se pagan** y el resto queda pendiente. Acá es lo mismo: las cinco columnas del extra bajan hasta cubrir lo cobrado, el bruto baja con ellas y los dos seguros se recalculan sobre el bruto nuevo — el MISMO trato que ya recibe el ajuste de la quincena anterior (`aplicarAjusteEnLinea`, 11-sep-2026, Daniel: *«los seguros, va»*), con sus mismas tres condiciones (porcentajes a mano, paga seguros, sin base propia).
+
+Un descuento aparte habría dejado el bruto —y por lo tanto el seguro social— calculado sobre plata que la persona no cobró.
+
+🔑 El ORDEN en que se consumen las columnas (diurna → nocturna → excedente → domingo → feriado) **no cambia un centavo del total**: solo decide en qué celda se ve la baja. Hay un CONTROL de mutación que lo prueba.
+
+### Dónde vive
+
+- **`lib/asistencia/dia-libre-empresa.ts`** — la regla, módulo PURO.
+- **`lib/asistencia/dia-libre-empresa-server.ts`** — leer, cargar, cerrar y revertir. 🔴 **Una sola puerta** (`cargarDeudasDiaLibre`) para los DOS caminos de alta.
+- **`POST /api/asistencia/dia-libre`** — la carga por EMPRESA, por rango de días, solo **admin y contabilidad** (`diaLibreRoles()`, derivada de `ASISTENCIA_ROLES` sacando a quien mira pero no firma pagos). Escribe la DEUDA primero y la JUSTIFICACIÓN después: sin la migración no se guarda nada, porque una justificación sin su deuda regalaría el día dos veces.
+- **`POST /api/asistencia/justificaciones`** — el alta de UNA persona con ese motivo pasa por la misma puerta y exige el mismo rol.
+- Solo **días hábiles** del rango (`diasHabilesDelRango`, la misma definición de `esHabil` que usa el motor): un domingo adentro del rango no genera deuda porque ese día no había jornada que perdonar.
+- El **cierre** anota el pago (`escribirPagosDiaLibre`, único `(empleado_codigo, quincena)` entre vivas: cerrar dos veces no cobra dos veces) y **reabrir lo revierte** con soft delete firmado — si no, al volver a cerrar sus horas extra pagarían dos veces la misma deuda.
+- Se DICE en cuatro lados: el sello ámbar de la fila (`textoDiaLibreCelda`), «Antes de cerrar», el Excel y el PDF de la planilla, y su propia sección en la ficha del colaborador (**aparte de Préstamos, a propósito**: juntarlas haría que alguien la descuente del sueldo).
+- Migración **`20261203120000_asistencia_dia_libre_empresa.sql`** — dos tablas (`asistencia_dia_libre_deuda` y `asistencia_dia_libre_pago`), soft delete firmado, RLS service_role, las dos en el respaldo (`personas`). **Pendiente de aplicar**; aditiva y tolerada: sin ella no hay deudas, no se cobra nada y el cuadro es EXACTAMENTE el de ayer.
+
+### Medido contra producción (1–15 sep, corte 10-sep, `scripts/_medir-vs-yulissa.ts`)
+
+- **Sin ninguna deuda cargada: 0 diferencias en 46 líneas.** Neto total $11.314,29 antes y después, hasta el centavo.
+- **Con un día libre cargado a SAMIR POLO (42, rata $3,02):** deuda $24,16 · su extra diurno de **$6,28 se va a cero** · bruto y neto bajan exactamente $6,28 ($265,62 → $259,34) · **queda debiendo $17,88** · **nadie más se mueve**.
+
+### Candados
+
+`dia-libre-empresa.test.ts` (37 casos). **15 mutaciones, 15 cazadas**, 2 controles en verde (`scripts/_mutar-candados-dia-libre.sh`).
+
+Cambiaron de dirección con nota fechada **y un CONTROL** (la lista de motivos pasó de seis a siete): `asistencia-motivo-trabajo-fuera` · `planilla-tres-descuentos` (H) · `dias-afuera-y-compensatorio` (4).
+
+### ⚠️ Lo que queda pendiente de Daniel
+
+1. **Cargar los dos saldos vivos** (Kenny $53,69 y Samir $12,84). El sistema no los inventa: hoy la deuda arranca vacía.
+2. **Correr la migración `20261203120000`.**
+3. Confirmar que los seguros se recalculen sobre el bruto sin esas horas. Se hizo así porque es lo que ya decidió para el ajuste del corte (*«los seguros, va»*), pero nadie se lo preguntó **para este caso**.
+
+---
+
 ## 🔴 Los cinco arreglos de pantalla del Reporte (16-sep-2026)
 
 Ninguno mueve plata: los cinco cambian lo que se VE. Daniel, textual, uno por uno.

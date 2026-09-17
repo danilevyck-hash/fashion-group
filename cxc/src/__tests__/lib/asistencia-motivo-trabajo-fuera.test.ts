@@ -258,10 +258,26 @@ describe("El motivo, la lista y el reconocedor", () => {
   // ⚠️ SON SEIS DESDE EL 14-sep-2026: entró «Compensatorio», al lado de
   // Incapacidad (Daniel: *«así como incapacidad, una opción de compensatorio de
   // días que le debemos libres»*). Paga como los demás; la lista sigue CERRADA.
-  it("la lista que ofrece la pantalla son EXACTAMENTE los seis de Daniel", () => {
+  // ⚠️ SON SIETE DESDE EL 17-sep-2026: entró «Día libre de la empresa», y va
+  // ÚLTIMO —lejos de «Compensatorio», que es lo contrario—. Daniel, textual:
+  // *«se le paga ese día pero deben las horas laborales (8 horas para todos)»*.
+  // 🔑 LA REGLA QUE ESTE CANDADO PROTEGE SIGUE SIENDO LA MISMA: la lista es
+  // CERRADA y EXACTA, y el ORDEN de los seis de antes no se movió. Lo que
+  // cambió es que hay un motivo más — y este es el único que crea una deuda.
+  it("la lista que ofrece la pantalla son EXACTAMENTE los siete de Daniel", () => {
     expect([...MOTIVOS_JUSTIFICACION]).toEqual([
       "Incapacidad", "Compensatorio", "Catástrofe", "Escolares", MOTIVO_TRABAJO_VENDEDOR, "Constancia",
+      "Día libre de la empresa",
     ]);
+  });
+
+  // 🔑 EL CONTROL de este cambio de dirección: los SEIS de antes siguen ahí, en
+  // el mismo orden entre ellos. Sin esto, «son siete» se cumpliría igual con la
+  // lista reordenada o con uno de los viejos reemplazado.
+  it("🔑 CONTROL — los seis de antes siguen, en el mismo orden entre ellos", () => {
+    const viejos = ["Incapacidad", "Compensatorio", "Catástrofe", "Escolares", MOTIVO_TRABAJO_VENDEDOR, "Constancia"];
+    expect((MOTIVOS_JUSTIFICACION as readonly string[]).filter((m) => viejos.includes(m)))
+      .toEqual(viejos);
   });
 
   it("🔴 los retirados NO se ofrecen pero SIGUEN reconociéndose", () => {

@@ -99,8 +99,34 @@ export const MOTIVO_CONSTANCIA = "Constancia";
  */
 export const MOTIVO_COMPENSATORIO = "Compensatorio";
 
-/** Los seis que la pantalla ofrece. Compensatorio va al lado de Incapacidad
- *  (Daniel: *«así como incapacidad»*). */
+/**
+ * 🔴 «DÍA LIBRE DE LA EMPRESA» — el séptimo, desde el 17-sep-2026.
+ *
+ * Daniel, textual: *«en las fiestas judías hay días libres, dentro de las
+ * jornadas ordinarias, que son libres para el colaborador, pero se pagan con el
+ * tiempo de horas extra»* y *«se le paga ese día pero deben las horas laborales
+ * (8 horas para todos)»*.
+ *
+ * El día se paga completo —del lado del sueldo se comporta igual que un
+ * compensatorio— y a cambio nace una deuda de 8 horas EN DÓLARES, que se paga
+ * SOLO con horas extra y arrastra entre quincenas hasta saldarse. La regla
+ * entera vive en `dia-libre-empresa.ts`.
+ *
+ * ⚠️ ES LO CONTRARIO DE `MOTIVO_COMPENSATORIO`, y por eso los dos textos de
+ * pantalla están escritos para que no se puedan confundir: el compensatorio es
+ * un libre que la empresa DEBÍA y no cuesta nada; éste es un libre que la
+ * empresa REGALA y deja debiendo horas. Elegir el equivocado mueve plata.
+ *
+ * ⚠️ Sin CHECK en la base sobre `motivo` (a propósito, ver `20260825140000`):
+ * el motivo no necesita migración. La que hace falta es la de la DEUDA
+ * (`20261203120000`), y sin ella el motivo se puede elegir igual: el día se
+ * paga y no nace deuda, que es exactamente lo que pasaba ayer.
+ */
+export const MOTIVO_DIA_LIBRE_EMPRESA = "Día libre de la empresa";
+
+/** Los siete que la pantalla ofrece. Compensatorio va al lado de Incapacidad
+ *  (Daniel: *«así como incapacidad»*); el día libre de la empresa va ÚLTIMO,
+ *  lejos del compensatorio, porque es el único que mueve plata al elegirlo. */
 export const MOTIVOS_JUSTIFICACION = [
   "Incapacidad",
   MOTIVO_COMPENSATORIO,
@@ -108,6 +134,7 @@ export const MOTIVOS_JUSTIFICACION = [
   "Escolares",
   MOTIVO_TRABAJO_VENDEDOR,
   MOTIVO_CONSTANCIA,
+  MOTIVO_DIA_LIBRE_EMPRESA,
 ] as const;
 
 /**
@@ -146,6 +173,23 @@ export const TEXTO_DIA_COMPENSATORIO =
   "Un día libre que se le debe (por un domingo o feriado trabajado). No se descuenta.";
 
 /**
+ * Lo que se le dice a quien carga un día libre de la empresa.
+ *
+ * 🔴 TIENE QUE LEERSE DISTINTO DEL COMPENSATORIO. Es el único motivo de la
+ * lista que crea una deuda, y quien lo elige tiene que enterarse ANTES de
+ * guardar, no cuando la contadora vea el cuadro.
+ */
+export const TEXTO_DIA_LIBRE_EMPRESA =
+  "Se paga el día completo y quedan debiendo 8 horas, que se pagan con sus horas "
+  + "extra hasta saldar. Nunca sale del sueldo.";
+
+/** ¿Es el día libre que regala la empresa (el que deja debiendo 8 horas)? */
+export function esDiaLibreDeLaEmpresa(motivo: string | null | undefined): boolean {
+  if (typeof motivo !== "string") return false;
+  return motivo.trim() === MOTIVO_DIA_LIBRE_EMPRESA;
+}
+
+/**
  * La nota de UNA línea que el formulario muestra debajo del motivo elegido.
  * `null` = ese motivo no necesita explicación (los de siempre).
  *
@@ -156,6 +200,7 @@ export const TEXTO_DIA_COMPENSATORIO =
 export function notaDelMotivo(motivo: string | null | undefined): string | null {
   if (esTrabajoDeVendedor(motivo)) return TEXTO_DIA_AFUERA;
   if (String(motivo ?? "").trim() === MOTIVO_COMPENSATORIO) return TEXTO_DIA_COMPENSATORIO;
+  if (esDiaLibreDeLaEmpresa(motivo)) return TEXTO_DIA_LIBRE_EMPRESA;
   return null;
 }
 
@@ -227,5 +272,9 @@ export function textoDiaJustificado(motivo: string): string {
   // 🔴 Un compensatorio tampoco es una «ausencia»: es un día libre que se le
   // debía (14-sep-2026). Se lee como lo que es.
   if (motivo.trim() === MOTIVO_COMPENSATORIO) return "Día compensatorio (libre que se le debía)";
+  // 🔴 Y el día libre que REGALA la empresa tampoco es una ausencia: se pagó
+  // entero. Se dice lo que lo separa del compensatorio —que deja debiendo— para
+  // que los dos no se lean igual en una lista de días (17-sep-2026).
+  if (esDiaLibreDeLaEmpresa(motivo)) return "Día libre de la empresa (queda debiendo 8 horas)";
   return `Ausencia justificada — ${motivo}`;
 }

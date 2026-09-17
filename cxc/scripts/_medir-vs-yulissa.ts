@@ -29,6 +29,10 @@ async function main() {
   const { sugerirPrestamos, aplicarPrestamoEnLinea } = await import("@/lib/asistencia/prestamos-planilla");
   const { leerPrestamosDeQuincena } = await import("@/lib/asistencia/prestamos-planilla-server");
   const { recortarAlNeto } = await import("@/lib/asistencia/neto-no-negativo");
+  // 🔴 El día libre de la empresa (17-sep-2026): se cobra con las horas extra,
+  // justo antes del recorte al neto, igual que en la ruta.
+  const { aplicarDiaLibreEnLinea, deudaDelDiaLibre } = await import("@/lib/asistencia/dia-libre-empresa");
+  const { leerSaldosDiaLibre } = await import("@/lib/asistencia/dia-libre-empresa-server");
   type FichaPlanilla = import("@/lib/asistencia/planilla").FichaPlanilla;
   type HorarioPersona = import("@/lib/asistencia/reporte").HorarioPersona;
   type MarcacionConId = import("@/lib/asistencia/correcciones").MarcacionConId;
@@ -44,6 +48,13 @@ async function main() {
   if (!qq) throw new Error(`quincena inválida: ${clave}`);
   const q = periodoDeQuincena(qq);
   const aprobarTodo = args.includes("--aprobar-todo");
+  // 🔴 SOLO PARA MEDIR, y NO escribe nada: simula que a estos códigos se les
+  // cargó UN día libre de la empresa (8 × su rata) y mide qué le pasa al cuadro.
+  // Sin la bandera, se leen las deudas REALES de la base (ninguna hoy).
+  const diaLibreSimulado = new Set(
+    (args.find((a) => a.startsWith("--dia-libre=")) ?? "--dia-libre=").slice(12)
+      .split(",").map((x) => x.trim()).filter(Boolean),
+  );
   const sinVigencias = args.includes("--sin-vigencias");
   const hastaReloj = corte ?? q.hasta;
 
@@ -141,7 +152,24 @@ async function main() {
   }));
   const prestamos = sugerirPrestamos({ fichas: presRes.fichas as never, personas: enCuadro as never });
   const sug = new Map(prestamos.map((s: { codigo: string }) => [s.codigo, s]));
-  const finales = lineas.map((l) => recortarAlNeto(aplicarPrestamoEnLinea(l, sug.get(l.codigo) as never)));
+  const conPrestamo = lineas.map((l) => aplicarPrestamoEnLinea(l, sug.get(l.codigo) as never));
+  // Las deudas REALES (vacío sin la migración corrida) más las simuladas.
+  const diaLibreLeido = await leerSaldosDiaLibre();
+  const saldosDiaLibre = new Map(diaLibreLeido.saldos);
+  for (const cod of diaLibreSimulado) {
+    const l = conPrestamo.find((x) => x.codigo === cod);
+    const monto = deudaDelDiaLibre(l?.dinero?.rataHora ?? null);
+    if (monto === null) continue;
+    const previo = saldosDiaLibre.get(cod);
+    const debia = (previo?.debia ?? 0) + monto;
+    const pagado = previo?.pagado ?? 0;
+    saldosDiaLibre.set(cod, { codigo: cod, debia, pagado, queda: debia - pagado });
+  }
+  const conDiaLibre = conPrestamo.map((l) => aplicarDiaLibreEnLinea(
+    l, saldosDiaLibre.get(l.codigo),
+    { seguroSocialPct: reglas.seguroSocialPct, seguroEducativoPct: reglas.seguroEducativoPct },
+  ));
+  const finales = conDiaLibre.map((l) => recortarAlNeto(l));
 
   const reporteDe = new Map(personasVigentes.map((p) => [p.codigo, p]));
   const filas = finales.map((l) => {
@@ -164,11 +192,12 @@ async function main() {
       salidaTempranaMin: p?.resumen.salidaTempranaMin ?? 0,
       extraMin: p?.resumen.extraMin ?? 0,
       dinero: l.dinero, manuales: l.manuales,
+      diaLibre: (l as { diaLibre?: unknown }).diaLibre ?? null,
     };
   }).sort((a, b) => String(a.linea).localeCompare(String(b.linea)) || a.codigo.localeCompare(b.codigo, "es", { numeric: true }));
 
   writeFileSync(salida, JSON.stringify({
-    quincena: clave, aprobarTodo, sinVigencias, desde: q.desde, hasta: q.hasta, hastaReloj, corte, hoy,
+    quincena: clave, aprobarTodo, sinVigencias, diaLibreSimulado: [...diaLibreSimulado], desde: q.desde, hasta: q.hasta, hastaReloj, corte, hoy,
     factorBase: q.factorBase, prendidos: [...prender], spExtra: [...spExtra],
     afueraEnLaBase: [...enLaBase],
     reglas, totales: totalizar(finales), sinFicha: sinFicha.map((s) => s.codigo),

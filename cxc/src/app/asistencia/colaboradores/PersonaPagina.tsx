@@ -34,6 +34,7 @@ import { textoConfirmar } from "@/lib/asistencia/codigos-ignorados";
 import FichaTexto from "./FichaTexto";
 import FichaEditar, { type BorradorFicha, borradorDe } from "./FichaEditar";
 import SeccionPrestamos from "./SeccionPrestamos";
+import SeccionDiaLibre from "./SeccionDiaLibre";
 // 🔴 «Otros servicios» va entre Préstamos y Justificaciones (15-sep-2026,
 // mockup aprobado por Daniel): es lo que se le SUMA al neto, al lado de lo que
 // se le resta.
@@ -267,6 +268,10 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
             {!nueva && persona && (
               <>
                 <SeccionPrestamos codigo={codigo} refresco={refresco} />
+                {/* 🔴 APARTE de Préstamos, a propósito: lo que debe por un día
+                    libre de la empresa se paga SOLO con horas extra y nunca sale
+                    del sueldo. Se dibuja solo cuando hay algo que decir. */}
+                <SeccionDiaLibre codigo={codigo} refresco={refresco} />
                 <SeccionOtrosServicios codigo={codigo} refresco={refresco} />
                 <SeccionJustificaciones codigo={codigo} refresco={refresco} />
                 <SeccionVacaciones codigo={codigo} refresco={refresco} />

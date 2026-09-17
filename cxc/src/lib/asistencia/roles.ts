@@ -188,3 +188,26 @@ export function cerrarPlanillaRoles(): string[] {
 export function puedeCerrar(rol: string): boolean {
   return cerrarPlanillaRoles().includes(rol);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 QUIÉN CARGA UN DÍA LIBRE DE LA EMPRESA (17-sep-2026)
+//
+// Daniel, textual: *«contabilidad y admin [lo cargan] y sí, a todos los
+// colaboradores de esa empresa»*.
+//
+// No es una justificación cualquiera: es el único motivo que CREA UNA DEUDA en
+// dólares, y se carga para la empresa entera de una vez. Por eso no lo abre
+// `ASISTENCIA_ROLES` —que incluye a la secretaria— sino esta lista, que se
+// DERIVA sacando a quien mira pero no firma pagos. Misma gente que cierra la
+// quincena, y por el mismo motivo; se nombra aparte porque es otra pregunta y
+// el día que una de las dos cambie, la otra no tiene por qué seguirla.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function diaLibreRoles(): string[] {
+  const noFirmanPagos = new Set<string>(MIRAN_PERO_NO_CIERRAN);
+  return asistenciaRoles().filter((r) => !noFirmanPagos.has(r));
+}
+
+export function puedeCargarDiaLibre(rol: string): boolean {
+  return diaLibreRoles().includes(rol);
+}

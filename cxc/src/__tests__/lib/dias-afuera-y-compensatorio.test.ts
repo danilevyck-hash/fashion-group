@@ -184,12 +184,30 @@ describe("3. 🔴 el horario de 9 a 6 NO se guarda: se dice", () => {
 });
 
 describe("4. «Compensatorio»: en la lista, al lado de Incapacidad, y no descuenta", () => {
+  // ⚠️ CAMBIÓ DE DIRECCIÓN EL 17-sep-2026: la lista pasó a SIETE con «Día libre
+  // de la empresa» al final. Lo que este caso protege sigue intacto —
+  // Compensatorio se ofrece y va JUSTO DESPUÉS de Incapacidad—, y el CONTROL de
+  // abajo exige que los dos no se confundan: son lo contrario uno del otro.
   it("se ofrece, justo después de Incapacidad; la lista sigue siendo cerrada y exacta", () => {
     expect([...MOTIVOS_JUSTIFICACION]).toEqual([
       "Incapacidad", MOTIVO_COMPENSATORIO, "Catástrofe", "Escolares", MOTIVO_TRABAJO_VENDEDOR, "Constancia",
+      "Día libre de la empresa",
     ]);
     expect(motivoSeOfrece("Compensatorio")).toBe(true);
     expect(MOTIVO_COMPENSATORIO).toBe("Compensatorio");
+  });
+
+  // 🔑 CONTROL — el compensatorio y el día libre de la empresa NO son el mismo
+  // motivo ni dicen lo mismo. Uno es un libre que se le DEBÍA (gratis) y el
+  // otro un libre que la empresa REGALA (deja debiendo 8 horas): si sus textos
+  // se parecieran, alguien elegiría el equivocado y eso mueve plata.
+  it("🔑 CONTROL — compensatorio y día libre de la empresa no se confunden", () => {
+    expect(MOTIVO_COMPENSATORIO).not.toBe("Día libre de la empresa");
+    const a = notaDelMotivo(MOTIVO_COMPENSATORIO)!;
+    const b = notaDelMotivo("Día libre de la empresa")!;
+    expect(a).not.toBe(b);
+    expect(a).toMatch(/se le debe/i);
+    expect(b).toMatch(/8 horas/);
   });
 
   it("🔴 un jueves compensatorio sin marcas NO descuenta: mismo neto que la semana completa", () => {

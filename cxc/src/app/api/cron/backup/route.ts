@@ -251,6 +251,12 @@ const DATASETS: Dataset[] = [
   // 🔴 «Otros servicios» (15-sep-2026): plata que se SUMA al neto, escrita a
   // mano con su concepto. No se puede volver a conseguir de ningún lado.
   { table: "asistencia_otros_servicios" },
+  // 🔴 El día libre de la empresa (17-sep-2026): la DEUDA con su monto
+  // congelado —no se puede recalcular: la rata de hoy ya no es la de ese día—
+  // y el PAGO que escribe el cierre, que es lo único que impide que las mismas
+  // horas extra paguen dos veces la misma deuda.
+  { table: "asistencia_dia_libre_deuda" },
+  { table: "asistencia_dia_libre_pago" },
   { table: "asistencia_prestamo_aprobado" },
   { table: "asistencia_reparto_empresa" },
   { table: "asistencia_aprobador_empresa" },

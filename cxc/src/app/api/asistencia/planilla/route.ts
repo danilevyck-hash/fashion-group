@@ -140,6 +140,13 @@ import {
 import { leerPrestamosDeQuincena } from "@/lib/asistencia/prestamos-planilla-server";
 import { recortarAlNeto } from "@/lib/asistencia/neto-no-negativo";
 import {
+  aplicarDiaLibreEnLinea,
+  avisoMigracionDiaLibre,
+  diasLibresDelCuadro,
+  textoDiasLibres,
+} from "@/lib/asistencia/dia-libre-empresa";
+import { leerSaldosDiaLibre } from "@/lib/asistencia/dia-libre-empresa-server";
+import {
   aplicarOtrosServiciosEnLinea,
   totalPorCodigo,
   type OtroServicio,
@@ -898,6 +905,32 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // ── 🔴 EL DÍA LIBRE DE LA EMPRESA SE COBRA CON LAS HORAS EXTRA ──────────
+    //
+    // Daniel (17-sep-2026): *«se le paga ese día pero deben las horas laborales
+    // (8 horas para todos)»* · *«queda debiendo para la próxima quincena hasta
+    // cancelar la deuda de horas»*. Las cinco columnas del extra bajan hasta
+    // cubrir lo que se debe, el bruto baja con ellas y los seguros se
+    // recalculan sobre el bruto nuevo — el MISMO trato que el ajuste de la
+    // quincena anterior. Regla en `dia-libre-empresa.ts`.
+    //
+    // 🔴 EL TOPE ES EL EXTRA, NUNCA EL NETO: es lo que hace que la deuda no
+    // pueda salir del sueldo. Sin horas extra no se cobra ni un centavo, y la
+    // deuda arrastra.
+    //
+    // 🔑 VA DESPUÉS DEL AJUSTE, a propósito: las horas extra de los días que la
+    // quincena anterior pagó sin medir también pagan la deuda — son horas extra
+    // suyas igual.
+    //
+    // ⚠️ Falla ABIERTA: sin la migración `20261203120000` no hay deudas, no se
+    // cobra nada y el cuadro es EXACTAMENTE el de ayer. Se dice en el aviso.
+    const diaLibreLeido = await leerSaldosDiaLibre();
+    lineasFinal = lineasFinal.map((l) => aplicarDiaLibreEnLinea(
+      l, diaLibreLeido.saldos.get(l.codigo),
+      { seguroSocialPct: reglas.seguroSocialPct, seguroEducativoPct: reglas.seguroEducativoPct },
+    ));
+    const diasLibres = diasLibresDelCuadro(lineasFinal);
+
     // ── 🔴 EL NETO NUNCA QUEDA EN NEGATIVO (14-sep-2026) ─────────────────────
     //
     // Daniel: *«Que nunca pase del neto: descuenta lo que alcance y el resto
@@ -996,6 +1029,12 @@ export async function GET(req: NextRequest) {
         // ARROYO durante 22 días (#651).
         prestamoSinAtar,
         avisoPrestamoSinAtar: textoPrestamoSinAtar(prestamoSinAtar),
+        // 🔴 LO QUE LAS HORAS EXTRA LE PAGARON A UN DÍA LIBRE DE LA EMPRESA, y
+        // lo que queda debiendo. Con nombre y monto: la columna del extra en
+        // cero sin explicación se lee como un error del cuadro.
+        diasLibres,
+        avisoDiasLibres: textoDiasLibres(diasLibres),
+        faltaMigracionDiaLibre: diaLibreLeido.faltaTabla ? avisoMigracionDiaLibre() : null,
         // Constantes desde el 3-sep-2026 — ver arriba.
         faltaMigracionAmarrePrestamos: null,
         // ⚠️ Retirado el 11-sep-2026 con la aprobación quincenal; se conserva en

@@ -67,6 +67,14 @@ export const TABLAS_PERSONAS = [
   // neto y que NO se puede volver a conseguir de ningún lado — la escribe una
   // persona a mano, con su concepto.
   "asistencia_otros_servicios",
+  // 🔴 EL DÍA LIBRE DE LA EMPRESA (17-sep-2026). Las dos: la DEUDA la escribe
+  // una persona al cargar el día libre y su monto está CONGELADO —no se puede
+  // recalcular desde ningún lado, porque la rata de hoy ya no es la de ese
+  // día—; el PAGO lo escribe el cierre y es lo ÚNICO que impide que las mismas
+  // horas extra paguen dos veces la misma deuda. Sin copia, la pérdida es real
+  // y mueve plata en las dos direcciones.
+  "asistencia_dia_libre_deuda",
+  "asistencia_dia_libre_pago",
   "asistencia_prestamo_aprobado",
   "asistencia_reparto_empresa",
   "asistencia_aprobador_empresa",

@@ -126,6 +126,13 @@ export interface EntradaAntesDeCerrar {
   marcasImpares?: readonly PersonaConMarcasImpares[];
   /** El aviso de las vacaciones ya pagadas, ya redactado (nombre, rango y monto). */
   avisoVacacionesNoPagadas: string | null;
+  /**
+   * 🔴 El aviso del DÍA LIBRE DE LA EMPRESA (17-sep-2026, `dia-libre-empresa.ts`):
+   * a quién le pagaron las horas extra parte de la deuda y cuánto le queda. Es
+   * plata que se movió, así que va con nombre y monto. Opcional: sin pasarlo,
+   * nada cambia.
+   */
+  avisoDiasLibres?: string | null;
   conSabado: number;
   rangoLibre: boolean;
   factorBase: number;
@@ -329,6 +336,9 @@ export function armarAntesDeCerrar(e: EntradaAntesDeCerrar): AntesDeCerrar {
     info.push({ clave: "recortadas", numero: e.recortadas!.length, texto: recortadas, enlace: null, tono: "plata" });
   }
   if (e.avisoVacacionesNoPagadas) info.push({ clave: "vacaciones", numero: null, texto: e.avisoVacacionesNoPagadas, enlace: null, tono: "plata" });
+  // 🔴 La columna del extra en cero sin explicación se lee como un error del
+  // cuadro. Acá se dice qué pasó: sus horas extra pagaron un día libre.
+  if (e.avisoDiasLibres) info.push({ clave: "dias-libres", numero: null, texto: e.avisoDiasLibres, enlace: null, tono: "plata" });
   if (e.conSabado > 0) {
     info.push({
       clave: "sabado",

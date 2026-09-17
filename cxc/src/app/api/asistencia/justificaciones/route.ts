@@ -8,10 +8,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { empresaParaPedir } from "@/lib/asistencia/empresa-para-todo";
-import { asistenciaRoles } from "@/lib/asistencia/roles";
+import { asistenciaRoles, diaLibreRoles } from "@/lib/asistencia/roles";
 import { requireAsistencia } from "@/lib/asistencia/guard";
 import { supabaseServer } from "@/lib/supabase-server";
-import { MOTIVOS_JUSTIFICACION, motivoSeOfrece } from "@/lib/asistencia/motivos";
+import { esDiaLibreDeLaEmpresa, MOTIVOS_JUSTIFICACION, motivoSeOfrece } from "@/lib/asistencia/motivos";
+import { avisoMigracionDiaLibre } from "@/lib/asistencia/dia-libre-empresa";
+import { cargarDeudasDiaLibre } from "@/lib/asistencia/dia-libre-empresa-server";
 import {
   avisoMigracionPermisoHoras,
   COLS_PERMISO_HORAS,
@@ -133,6 +135,38 @@ export async function POST(req: NextRequest) {
       { error: "El permiso de horas necesita las DOS horas, y la de fin tiene que ser posterior a la de inicio." },
       { status: 400 },
     );
+  }
+
+  // ── 🔴 EL DÍA LIBRE DE LA EMPRESA DEJA UNA DEUDA, Y VA PRIMERO (17-sep-2026)
+  //
+  // Es el único motivo de la lista que mueve plata al elegirlo: el día se paga
+  // completo y la persona queda debiendo 8 horas en dólares
+  // (`dia-libre-empresa.ts`). Por eso acá se hacen DOS cosas que los otros seis
+  // motivos no necesitan:
+  //
+  //   · se exige el rol que lo puede cargar (admin y contabilidad, Daniel);
+  //   · se anota la DEUDA **antes** de la justificación, por la MISMA puerta
+  //     que usa la carga por empresa (`registrarDeudasDiaLibre`). Si falta la
+  //     migración no se guarda nada: una justificación sin su deuda le regalaría
+  //     el día dos veces y nadie lo vería nunca.
+  if (esDiaLibreDeLaEmpresa(motivo)) {
+    if (!diaLibreRoles().includes(auth.role)) {
+      return NextResponse.json(
+        { error: "Un día libre de la empresa lo carga contabilidad o un administrador." },
+        { status: 403 },
+      );
+    }
+    const r = await cargarDeudasDiaLibre({
+      codigo, desde, hasta, nota: (b.nota ?? "").trim() || null,
+      usuario: auth.userName ?? auth.role,
+    });
+    if (r.faltaTabla) {
+      return NextResponse.json(
+        { error: avisoMigracionDiaLibre(), faltaMigracion: true },
+        { status: 503 },
+      );
+    }
+    if (r.error) return NextResponse.json({ error: r.error }, { status: 400 });
   }
 
   const base = {

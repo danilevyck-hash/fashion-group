@@ -115,6 +115,10 @@ export interface DatosPlanillaExport {
    * forma en que se perdieron $700 durante 22 días (ver #651).
    */
   avisoPrestamoSinAtar?: string | null;
+  /** 🔴 El día libre de la empresa: lo que sus horas extra le pagaron a la deuda
+   *  y lo que queda (17-sep-2026). Sin esto el papel explicaría peor que la
+   *  pantalla por qué la columna del extra quedó en cero. */
+  avisoDiasLibres?: string | null;
   /**
    * 🔴 EL DETALLE DE «OTROS SERVICIOS», renglón por renglón (15-sep-2026).
    *
@@ -414,6 +418,9 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
       ...(d.avisoPrestamoSinAtar
         ? [["Préstamos sin colaborador", d.avisoPrestamoSinAtar]]
         : []),
+      ...(d.avisoDiasLibres
+        ? [["Días libres de la empresa", d.avisoDiasLibres]]
+        : []),
       ["Período", d.periodo && !d.periodo.esQuincena
         ? `Del ${d.periodo.desde} al ${d.periodo.hasta} (${d.periodo.diasCalendario} días). NO es una quincena: el salario base se pagó al ${(d.periodo.factorBase * 100).toFixed(1)} % —la parte de quincena que cubren estas fechas— y los montos escritos a mano (ISR, préstamo, terceros, mercancía, otros servicios) NO se aplicaron, porque se cargan por quincena: para llenarlos hay que pedir el cuadro con las fechas exactas de una quincena.`
         : `Quincena del ${d.quincena.etiqueta}. Salario base completo (salario mensual ÷ 2).`],
@@ -554,6 +561,7 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
     d.avisoExtraSinAprobar,
     d.avisoPrestamo,
     d.avisoPrestamoSinAtar,
+    d.avisoDiasLibres,
     conAusenciaPorTardanza
       ? `Llegar más de ${MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos tarde se muestra en «Ausencias», no en «Tardanzas»: se descuentan los minutos igual que una tardanza y el total bruto no cambia.`
       : null,
