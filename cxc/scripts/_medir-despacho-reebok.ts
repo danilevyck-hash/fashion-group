@@ -69,7 +69,9 @@ for (const ruta of archivos) {
   console.log("     Costo FOB     ", fobViejo, "→", m.cols["Costo FOB *"]);
   console.log("     Costo CIF     ", r2(fobViejo * 1.1), "→", m.cols["Costo CIF *"]);
   console.log("     Precio        ", "(del CIF viejo)", "→", m.cols["Precio *"]);
-  console.log("     Código Barra  ", b.sku, "→", m.cols["Código Barra *"]);
+  // El SKU de la MISMA talla-muestra: comparar contra el de otra talla mentiría.
+  const muestra = items.find((it) => it.newArticle === String(m.cols["Código *"]) && it.talla === m.talla);
+  console.log("     Código Barra  ", muestra?.sku ?? b.sku, "→", m.cols["Código Barra *"], "· talla", m.talla);
   console.log("     Stock Ideal   ", "(piezas del mes)", "→", m.cols["Stock Ideal"]);
   console.log("     rubro", m.cols["rubro *"], "· Marca", m.cols["Marca *"], "· Composición:", String(m.cols["Composición"]).slice(0, 45) || "(vacía)");
   console.log("");

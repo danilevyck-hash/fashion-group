@@ -585,7 +585,10 @@ export function buildSwitchRows(items: ReebokItem[], cfg: SwitchBuildConfig): Sw
         "Código *": first.newArticle,
         "Referencia *": first.newArticle,
         // 🔴 EL CÓDIGO DE BARRAS DE LA TALLA-MUESTRA. Con el Excel de DESPACHO es
-        // el `UPC` de Reebok, que es un código de barras de verdad; con la
+        // el `EAN` de Reebok y, sin él, el `UPC` — en ese orden, porque el EAN es
+        // el que Switch ya tiene cargado (94 de los 183 artículos de Active Shoes
+        // son EAN-13 válidos, 66 con el prefijo `120` del despacho) y porque los
+        // dos son códigos válidos pero NO son el mismo número. Con la
         // confirmación de compra no viene ninguno y se conserva el `SKU`, que es
         // lo que el sistema escribía hasta el 17-sep-2026 (`RBKAPPTR1200M`: no se
         // puede pistolear, pero no se inventa otra cosa). Ver `reebok-despacho.ts`.

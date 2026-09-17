@@ -44,9 +44,32 @@ Medido sobre los dos archivos reales, con `scripts/_medir-despacho-reebok.ts` (s
 Los 9 del calzado son justamente los que traen 25 % y 30 %. Y como el precio de venta
 sale del CIF, **esto mueve el precio que ve el cliente en las dos salidas**.
 
-**2. EL CÓDIGO DE BARRAS NO ERA UN CÓDIGO DE BARRAS.** Se escribía el `SKU` de Reebok
-(`RBKAPPTR1200M`), que no se puede pistolear. Ahora es el **`UPC` de la talla-muestra**
-(`616518422854`). Medido: **0 de 183 artículos** quedan sin un código numérico.
+**2. EL CÓDIGO DE BARRAS NO ERA UN CÓDIGO DE BARRAS — en ropa.** Se escribía el `SKU`
+de Reebok (`RBKAPPTR1200M`), que no se puede pistolear. Ahora sale del **`EAN` de la
+talla-muestra** y, sin él, del `UPC`. Medido: **0 de 183 artículos** quedan sin un
+código numérico.
+
+🔴 **Y el orden EAN → UPC no da igual: está medido, no elegido.** Los dos son códigos de
+barras válidos del mismo producto, pero **no son el mismo número**.
+
+- En el despacho de calzado, sobre sus **1.579 filas**: `EAN` es de 13 dígitos y `UPC`
+  de 12, los **1.579 con dígito verificador válido** en los dos campos, y **`EAN` ≠
+  `UPC` en las 1.579**, sin una sola coincidencia. ZIGNITION 9.5 → EAN `1200186012487`,
+  UPC `199307013049`. El `EAN` arranca con `120` en las 1.579.
+- Sobre lo que **Switch ya tiene cargado** (export de Active Shoes,
+  `listaarticulo_1_17092026024104.csv`, 183 artículos): **94 códigos de barra son EAN-13
+  válidos** —y **66 de esos 94 empiezan con `120`**, el prefijo del despacho—, **4 son
+  UPC-12** y 85 no son ninguno de los dos (correlativos internos de 5 y 6 dígitos:
+  993277, 65388, 984730…).
+
+O sea: **lo que está cargado en Switch es el EAN.** Cargar el UPC teniendo el EAN
+dejaría el catálogo con dos formatos mezclados, y la pistola de la tienda lee el que
+está impreso en la etiqueta.
+
+⚠️ **Y hay una vuelta más, medida:** en el despacho VIEJO de calzado la columna `SKU`
+**ES** el EAN —idénticas en las 1.579 filas—, así que ahí el sistema ya venía
+escribiendo el código bueno sin saberlo. **El defecto del código de barras era real solo
+en ropa.**
 
 **3. LA CANTIDAD ERA UNA PROYECCIÓN** — las piezas de la columna del MES de la
 confirmación. Ahora es `Quantity`, lo que llegó.
@@ -66,6 +89,7 @@ donde sí trae category, solo falta que me agreguen poname y department»*.
 | Alcance | ropa **y** calzado — el de acá en adelante | solo calzado |
 | `Category` · `Color Name` | **sí** | no |
 | `Composición` · `EAN` | **no** (los perdió) | **sí** |
+| | ⬆️ el que hay que pedir de vuelta es el **`EAN`** | |
 
 Los dos se tienen que poder subir: los archivos viejos existen y alguien los va a
 soltar en la pantalla. Por eso la regla de respaldo es **un DATO y no un `if` suelto**
@@ -78,7 +102,7 @@ aceptados, si es obligatoria y de dónde sale si falta.
 | `Category` | es el **rubro** | `SHOES` si el Department es FOOTWEAR; si no, **vacío y se dice** |
 | `Department` | es la **Marca** | se deriva de `Segmento de negocio` (FTW · APP · ACC HW) |
 | `Composición` | va a la columna 21 de Switch | queda vacía, como siempre |
-| `UPC` | es el código de barra | `EAN`; sin ninguno, el `SKU` (y se dice) |
+| `EAN` | es el código de barra | el `UPC`; sin ninguno, el `SKU` (y se dice) |
 | `Color Name` | viaja en el artículo | no se usa |
 
 🔑 **El `PO NAME` tiene TRES escalones.** Daniel: *«por ahora también se puede usar BP
@@ -134,9 +158,13 @@ archivo.
    también los bolsos —`ACCB145` viene en `N SZ`, que es talla única de verdad— y un
    aviso que grita sobre un dato bueno deja de ser un aviso. **No se cambió por cuenta
    propia**, y el candado fija la conducta de hoy para que el cambio sea deliberado.
-3. **`Composición` se perdió en el formato nuevo.** Era la única columna de todo el
-   sistema que podía llenar esa celda de la plantilla de Switch. El mapeo queda escrito
-   y funcionando: el día que Reebok la devuelva, no hay nada que tocar.
+3. **🔴 HAY QUE PEDIRLE EL `EAN` DE VUELTA A REEBOK.** El formato nuevo perdió dos
+   columnas que el viejo traía, `Composición` y `EAN`, y **solo una importa**: la
+   `Composición` Daniel no la usa y no la quiere (esa celda de Switch va vacía en todo
+   el sistema por pedido suyo), pero el `EAN` **es el código de barra que Switch ya
+   tiene cargado**. Mientras no vuelva, el despacho nuevo carga el `UPC`, que es un
+   código válido pero otro número. El mapeo del `EAN` queda escrito y funcionando: el
+   día que Reebok lo devuelva, no hay nada que tocar.
 
 ### Candados
 
@@ -154,7 +182,7 @@ se aplica al despacho, donde 0 recibidas significa «no llegó») y el rótulo d
 columna de piezas (`piezasLabel`). Ninguno de los dos protegía lo que cambió.
 
 Verificación por mutación: `scripts/_mutar-candados-despacho-reebok.sh` —
-**15 mutaciones y 2 controles, 17 de 17 como se esperaba.**
+**16 mutaciones y 2 controles, 18 de 18 como se esperaba.**
 
 Medición: `scripts/_medir-despacho-reebok.ts` (solo lectura, recibe los .xlsx por
 argumento).

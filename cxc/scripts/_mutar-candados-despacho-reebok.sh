@@ -40,41 +40,44 @@ probar "2. el costo lee «Precio Base» (sin descuento) en vez del ya descontado
 perl -0pi -e 's/"Código Barra \*": sample\.codigoBarra \|\| sample\.sku \|\| first\.newArticle,/"Código Barra *": sample.sku || first.newArticle,/' "$REE"
 probar "3. el código de barras vuelve a ser el SKU de Reebok, no el UPC" rojo
 
-perl -0pi -e 's/const codigoBarra = val\(row, indice\.upc\) \|\| val\(row, indice\.ean\);/const codigoBarra = val(row, indice.upc);/' "$DES"
-probar "4. sin UPC ya no se cae al EAN (una columna que se va rompe el archivo)" rojo
+perl -0pi -e 's/const codigoBarra = val\(row, indice\.ean\) \|\| val\(row, indice\.upc\);/const codigoBarra = val(row, indice.upc) || val(row, indice.ean);/' "$DES"
+probar "4. se invierte el orden y gana el UPC: otro código que el que Switch tiene" rojo
+
+perl -0pi -e 's/const codigoBarra = val\(row, indice\.ean\) \|\| val\(row, indice\.upc\);/const codigoBarra = val(row, indice.ean);/' "$DES"
+probar "5. sin EAN ya no se cae al UPC y el formato NUEVO sale sin código" rojo
 
 perl -0pi -e 's/piezas: num\(row\[indice\.quantity\]\) \|\| 0,/piezas: 1,/' "$DES"
-probar "5. la cantidad deja de ser la recibida" rojo
+probar "6. la cantidad deja de ser la recibida" rojo
 
 perl -0pi -e 's/(rotulo: "Category", alias: \["Category", "Categoría", "CATEGORY"\], )obligatoria: false,/$1obligatoria: true,/' "$DES"
-probar "6. «Category» se vuelve obligatoria y el despacho viejo deja de entrar" rojo
+probar "7. «Category» se vuelve obligatoria y el despacho viejo deja de entrar" rojo
 
 perl -0pi -e 's/(rotulo: "Composición", alias: \["Composición", "Composicion"\], )obligatoria: false,/$1obligatoria: true,/' "$DES"
-probar "7. «Composición» se vuelve obligatoria y el formato NUEVO deja de entrar" rojo
+probar "8. «Composición» se vuelve obligatoria y el formato NUEVO deja de entrar" rojo
 
 perl -0pi -e 's/if \(tokens\.has\(token\)\) return department;/if (normH(segmento).includes(token)) return department;/' "$DES"
-probar "8. el Department se decide con «includes» y «HWY» se vuelve HARDWARE" rojo
+probar "9. el Department se decide con «includes» y «HWY» se vuelve HARDWARE" rojo
 
 perl -0pi -e 's/return department === "FOOTWEAR" \? RUBRO_CALZADO : "";/return RUBRO_CALZADO;/' "$DES"
-probar "9. el rubro de respaldo se inventa SHOES también para la ropa" rojo
+probar "10. el rubro de respaldo se inventa SHOES también para la ropa" rojo
 
 perl -0pi -e 's/alias: \["PO NAME", "PO Name", "PONAME", "BP Reference No\.", "BP Reference No", "BP Reference"\]/alias: ["BP Reference No.", "PO NAME", "PO Name", "PONAME"]/' "$DES"
-probar "10. «BP Reference No.» le gana al «PO NAME» que Reebok va a mandar" rojo
+probar "11. «BP Reference No.» le gana al «PO NAME» que Reebok va a mandar" rojo
 
 perl -0pi -e 's/"Composición": composicion,/"Composición": "",/' "$REE"
-probar "11. la Composición vuelve a ir siempre vacía" rojo
+probar "12. la Composición vuelve a ir siempre vacía" rojo
 
 perl -0pi -e 's/\.filter\(\(c\) => !\(c\.obligatoriaSalvo && indice\[c\.obligatoriaSalvo\] !== -1\)\)//' "$DES"
-probar "12. el segmento sigue haciendo falta aunque llegue la columna «Department»" rojo
+probar "13. el segmento sigue haciendo falta aunque llegue la columna «Department»" rojo
 
 perl -0pi -e 's/const FIRMA_DESPACHO = \["SKU FATHER", "QUANTITY"\];/const FIRMA_DESPACHO = ["SKU"];/' "$DES"
-probar "13. la confirmación de compra se confunde con un despacho" rojo
+probar "14. la confirmación de compra se confunde con un despacho" rojo
 
 perl -0pi -e 's/if \(findHeaderRow\(rows\) !== -1 \|\| findHeaderRowDespacho\(rows\) !== -1\)/if (findHeaderRow(rows) !== -1)/' "$DIS"
-probar "14. la dropzone deja de mandar el despacho al flujo Reebok" rojo
+probar "15. la dropzone deja de mandar el despacho al flujo Reebok" rojo
 
 perl -0pi -e 's/const filtrarSinPiezas = formato === "despacho" \|\| monthColIdx !== -1;/const filtrarSinPiezas = monthColIdx !== -1;/' "$CLI"
-probar "15. el despacho deja de filtrar y sube a Switch lo que no llegó" rojo
+probar "16. el despacho deja de filtrar y sube a Switch lo que no llegó" rojo
 
 echo "── CONTROLES (tienen que quedar VERDES) ──"
 perl -0pi -e 's/es el estado normal, y va a volver a pasar/es el estado normal y va a volver a pasar/' "$DES"

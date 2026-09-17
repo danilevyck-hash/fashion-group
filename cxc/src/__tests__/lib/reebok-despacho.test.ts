@@ -151,12 +151,24 @@ describe("🩸 Los TRES números que salían mal", () => {
     expect(ropa.get("ACCS055")!["Costo FOB *"]).not.toBe(3.52);
   });
 
-  it("2. EL CÓDIGO DE BARRAS es el UPC, no el SKU de Reebok", () => {
+  it("2. EL CÓDIGO DE BARRAS es un código de barras, no el SKU de Reebok", () => {
     const cb = String(ropa.get("ACCS055")!["Código Barra *"]);
     expect(cb).toMatch(/^\d{12,13}$/);          // un código de barras de verdad
     expect(cb).not.toMatch(/^RBK/);             // el SKU de Reebok empieza así
-    // Y es el UPC de la TALLA-MUESTRA (M en ropa), no el de cualquier fila.
-    expect(cb).toBe(upcDe(NUEVO.rows, "RBKHWACCS055M"));
+    // Y es el de la TALLA-MUESTRA (M en ropa), no el de cualquier fila. El
+    // formato nuevo solo trae `UPC`, así que ahí es el UPC.
+    expect(cb).toBe(columnaDe(NUEVO.rows, "RBKHWACCS055M", "UPC"));
+  });
+
+  it("🔴 EL EAN LE GANA AL UPC, y no es un empate: son números distintos", () => {
+    // Medido el 17-sep-2026: en el despacho de calzado `EAN` ≠ `UPC` en las
+    // 1.579 filas, los dos con dígito verificador válido. Y de los 183 artículos
+    // de Active Shoes ya cargados en Switch, 94 tienen un EAN-13 válido —66 con
+    // el prefijo `120` del despacho— contra 4 UPC-12. Lo cargado es el EAN.
+    const cb = String(calzado.get("100262679")!["Código Barra *"]);
+    expect(cb).toBe(columnaDe(VIEJO.rows, "1200186012470", "EAN"));
+    expect(cb).toMatch(/^120/);
+    expect(cb).not.toBe(columnaDe(VIEJO.rows, "1200186012470", "UPC"));
   });
 
   it("3. LA CANTIDAD es `Quantity`, lo que llegó", () => {
@@ -167,13 +179,13 @@ describe("🩸 Los TRES números que salían mal", () => {
   });
 });
 
-/** El UPC de una fila del fixture, buscado por su SKU. */
-function upcDe(rows: SheetRow[], sku: string): string {
+/** Una columna de una fila del fixture, buscada por su SKU. */
+function columnaDe(rows: SheetRow[], sku: string, columna: string): string {
   const H = (rows[0] ?? []).map((h) => String(h ?? "").trim());
   const iSku = H.indexOf("SKU");
-  const iUpc = H.indexOf("UPC");
+  const iCol = H.indexOf(columna);
   const fila = rows.slice(1).find((r) => String((r ?? [])[iSku] ?? "").trim() === sku);
-  return String((fila ?? [])[iUpc] ?? "");
+  return String((fila ?? [])[iCol] ?? "");
 }
 
 describe("El mapeo a las 25 columnas de Switch", () => {
@@ -355,22 +367,28 @@ describe("🔴 Las mismas filas, con las columnas nuevas y sin ellas", () => {
     expect(sin.get("100262679")!["Composición"]).toBe("");
   });
 
-  it("🔴 sin `UPC` se cae al `EAN`, y sin ninguno al SKU — nunca se traba", () => {
-    // ⚠️ En el archivo real de calzado el `EAN` y el `SKU` son el MISMO número,
-    // así que para probar el escalón de verdad hay que separarlos: si no, un
-    // respaldo roto se ve idéntico a uno que funciona.
-    const H = (VIEJO.rows[0] ?? []).map((h) => String(h ?? "").trim());
-    const iEan = H.indexOf("EAN");
-    const conEanPropio = VIEJO.rows.map((r, i) =>
-      i === 0 ? r : (r ?? []).map((c, j) => (j === iEan ? "9990000000001" : c)),
-    );
-    const sinUpc = porCodigo(sinColumnas(conEanPropio, ["UPC"]));
-    expect(sinUpc.get("100262679")!["Código Barra *"]).toBe("9990000000001");
+  it("🔴 sin `EAN` se cae al `UPC`, y sin ninguno al SKU — nunca se traba", () => {
+    // El formato NUEVO ya no trae `EAN`: ahí el código sale del `UPC`, solo.
+    const sinEan = porCodigo(sinColumnas(VIEJO.rows, ["EAN"]));
+    expect(sinEan.get("100262679")!["Código Barra *"])
+      .toBe(columnaDe(VIEJO.rows, "1200186012470", "UPC"));
+    expect(porCodigo(NUEVO.rows).get("ACCS055")!["Código Barra *"])
+      .toBe(columnaDe(NUEVO.rows, "RBKHWACCS055M", "UPC"));
 
-    // Y sin ninguno de los dos, el SKU — que no es un código de barras, pero es
-    // lo que el sistema ya escribía: nunca se entrega la celda vacía.
+    // Y sin ninguno de los dos, el SKU — que no es un código de barras en ropa,
+    // pero es lo que el sistema ya escribía: nunca se entrega la celda vacía.
     const pelado = porCodigo(sinColumnas(VIEJO.rows, ["UPC", "EAN"]));
     expect(pelado.get("100262679")!["Código Barra *"]).toBe("1200186012470");
+  });
+
+  it("⚠️ en el despacho VIEJO el `SKU` ES el EAN: ahí el código no cambió", () => {
+    // Medido: idénticos en las 1.579 filas del archivo real. Por eso el defecto
+    // del código de barras era REAL solo en ropa.
+    const H = (VIEJO.rows[0] ?? []).map((h) => String(h ?? "").trim());
+    const iSku = H.indexOf("SKU"), iEan = H.indexOf("EAN");
+    for (const r of VIEJO.rows.slice(1)) {
+      expect(String((r ?? [])[iEan] ?? "")).toBe(String((r ?? [])[iSku] ?? ""));
+    }
   });
 
   it("🔴 NINGUNA de las columnas que hoy faltan es obligatoria", () => {

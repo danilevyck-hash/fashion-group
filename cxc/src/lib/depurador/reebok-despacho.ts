@@ -18,7 +18,9 @@
 //   · FORMATO NUEVO (26 columnas, hoja `Sheet1`) — el que Reebok manda de acá en
 //     adelante, para ropa Y para calzado. Trae `Category`, `Color Name` y
 //     `Lista de Precio`. ⚠️ **PERDIÓ dos columnas que el viejo traía:
-//     `Composición` y `EAN`.**
+//     `Composición` y `EAN`. La que hay que pedirle a Reebok de vuelta es el
+//     `EAN`** —es el código de barra que Switch ya tiene cargado—; la
+//     `Composición` Daniel no la usa y no la quiere.
 //   · FORMATO VIEJO (25 columnas, hoja `Despacho`) — solo calzado. Trae
 //     `Composición` y `EAN`, y NO trae `Category` ni `Color Name`.
 // Los archivos viejos ya existen y alguien los va a soltar en la pantalla, así
@@ -37,9 +39,12 @@
 //      será 20»*. Por eso el descuento **no se reemplaza por otra constante: se
 //      LEE**. Y como el precio de venta sale del CIF, un costo bajo es un precio
 //      bajo: esto mueve plata en las dos salidas.
-//   2. EL CÓDIGO DE BARRAS NO ERA UN CÓDIGO DE BARRAS. Se escribía el `SKU` de
-//      Reebok (`RBKAPPTR1200M`), que no se puede pistolear. El despacho trae el
-//      `UPC` de cada talla.
+//   2. EL CÓDIGO DE BARRAS NO ERA UN CÓDIGO DE BARRAS — **en ropa**. Se escribía
+//      el `SKU` de Reebok (`RBKAPPTR1200M`), que no se puede pistolear. Ahora
+//      sale del `EAN` de cada talla y, sin él, del `UPC`. ⚠️ En el despacho VIEJO
+//      de calzado el `SKU` ES el EAN (idénticos en las 1.579 filas), así que ahí
+//      el sistema ya escribía el código bueno: el defecto era solo de ropa. El
+//      porqué del orden EAN → UPC está medido en la tabla de respaldo.
 //   3. LA CANTIDAD ERA UNA PROYECCIÓN — las piezas de la columna del MES de la
 //      confirmación. El despacho trae `Quantity`.
 //
@@ -82,9 +87,9 @@ function num(v: Cell): number | null {
  * ENTRE SÍ — el formato nuevo GANÓ `Category` y `Color Name` y PERDIÓ
  * `Composición` y `EAN`. La diferencia no es un descuido del proveedor: es el
  * estado normal, y va a volver a pasar. Por eso la regla de respaldo es un DATO
- * y no un `if` suelto en medio del parser: el día que Reebok devuelva la
- * `Composición` al formato nuevo, el mapeo ya está escrito y no hay nada que
- * tocar — el mismo trato que `PO NAME`, `Category` y `Department`.
+ * y no un `if` suelto en medio del parser: el día que Reebok devuelva el `EAN`
+ * al formato nuevo, el mapeo ya está escrito y no hay nada que tocar — el mismo
+ * trato que `PO NAME`, `Category` y `Department`.
  * ══════════════════════════════════════════════════════════════════════════ */
 
 export type CampoDespacho =
@@ -145,15 +150,42 @@ export const COLUMNAS_DESPACHO: ColumnaDespacho[] = [
     respaldo: "se usa «BP Reference No.»; sin ella, se agrupa por «Orden»" },
   { campo: "orden", rotulo: "Orden", alias: ["Orden", "N° Orden", "N Orden", "No Orden", "Nº Orden"], obligatoria: false,
     respaldo: "queda vacío" },
-  { campo: "upc", rotulo: "UPC", alias: ["UPC"], obligatoria: false,
-    respaldo: "se usa el EAN; sin EAN, el SKU de Reebok (que NO es un código de barras)" },
+  /* ─────────────────────────────────────────────────────────────────────────
+   * 🔴 EL CÓDIGO DE BARRA SALE DEL **EAN**, Y RECIÉN DESPUÉS DEL UPC.
+   *
+   * 🩸 Los dos son códigos de barras VÁLIDOS del mismo producto, y NO son el
+   * mismo número — por eso el orden no da igual y está medido, no elegido.
+   *
+   * Medido el 17-sep-2026 sobre las 1.579 filas del despacho de calzado:
+   *   · `EAN` es de 13 dígitos y `UPC` de 12, los **1.579 con dígito
+   *     verificador válido** en los dos campos;
+   *   · **`EAN` ≠ `UPC` en las 1.579**, sin una sola coincidencia
+   *     (ZIGNITION 9.5 → EAN `1200186012487`, UPC `199307013049`);
+   *   · el `EAN` arranca con `120` en las 1.579.
+   *
+   * Y medido sobre lo que Switch YA tiene cargado (export de Active Shoes,
+   * `listaarticulo_1_17092026024104.csv`, 183 artículos): **94 códigos de barra
+   * son EAN-13 válidos** —y **66 de esos 94 empiezan con `120`**, el prefijo del
+   * EAN del despacho—, **4 son UPC-12** y 85 no son ninguno de los dos
+   * (correlativos internos de 5 y 6 dígitos: 993277, 65388, 984730…).
+   *
+   * 🔑 O sea: **lo que está cargado en Switch es el EAN.** Cargar el UPC
+   * teniendo el EAN dejaría el catálogo con dos formatos mezclados, y la pistola
+   * de la tienda lee el que está impreso en la etiqueta.
+   *
+   * ⚠️ Y hay una vuelta más: en el despacho VIEJO de calzado la columna `SKU` ES
+   * el EAN —idénticas en las 1.579 filas—, así que ahí el sistema ya venía
+   * escribiendo el código bueno sin saberlo. El defecto del código de barras era
+   * REAL solo en ropa, donde el `SKU` es `RBKHWACCS055M` y no se puede pistolear.
+   * ────────────────────────────────────────────────────────────────────────── */
   { campo: "ean", rotulo: "EAN", alias: ["EAN"], obligatoria: false,
-    respaldo: "se usa el UPC, que viene en los dos archivos" },
-  // ⚠️ El formato NUEVO la perdió: solo la traía el despacho viejo de calzado, y
-  // era el único archivo de todo el sistema que podía llenar esa columna de la
-  // plantilla de Switch (en CK/TH va siempre vacía por pedido de Daniel). El
-  // mapeo se deja escrito y funcionando para que el día que Reebok la devuelva
-  // no haya que tocar nada.
+    respaldo: "se usa el UPC (también es un código de barras válido, pero es OTRO número que el que Switch tiene cargado)" },
+  { campo: "upc", rotulo: "UPC", alias: ["UPC"], obligatoria: false,
+    respaldo: "se usa el EAN; sin ninguno de los dos, el SKU de Reebok (que en ropa NO es un código de barras)" },
+  // El formato NUEVO la perdió, y **no hay que pedirla de vuelta**: Daniel no la
+  // usa y no la quiere (en CK/TH esa celda de Switch va siempre vacía por pedido
+  // suyo). El mapeo queda escrito y funcionando por si algún día vuelve, pero la
+  // columna que sí importa recuperar es el `EAN` — ver el bloque de arriba.
   { campo: "composicion", rotulo: "Composición", alias: ["Composición", "Composicion"], obligatoria: false,
     respaldo: "la columna de Switch queda vacía, como siempre" },
   { campo: "colorName", rotulo: "Color Name", alias: ["Color Name", "COLOR NAME"], obligatoria: false,
@@ -371,9 +403,9 @@ export function parseDespacho(rows: SheetRow[]): ParseDespachoResult {
     if (precioAfterDisc === null) warnings.push(`${id}: sin «Precio after Disc» (el costo se calcularía con el descuento asumido)`);
     const precioBase = indice.precioBase === -1 ? null : num(row[indice.precioBase]);
 
-    // El código de barra de verdad: UPC, y si no hay, EAN. El SKU es el último
-    // recurso y NO es un código de barras (ver el encabezado de este archivo).
-    const codigoBarra = val(row, indice.upc) || val(row, indice.ean);
+    // 🔴 EL CÓDIGO DE BARRA: **EAN PRIMERO, DESPUÉS UPC**, y el SKU como último
+    // recurso. El porqué del orden está arriba, en la tabla de respaldo.
+    const codigoBarra = val(row, indice.ean) || val(row, indice.upc);
 
     items.push({
       // Sin `PO NAME` se agrupa por la orden: es lo que junta una preforma.
