@@ -9,7 +9,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ToastSystem";
-import { esFechaDeCalendario } from "@/lib/asistencia/planilla";
 import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, fmtMin, cuentaHorasExtra, extraQueCuenta, type DiaReporte, type PersonaReporte, type ReglasReporte } from "@/lib/asistencia/reporte";
 import { TEXTO_DIA_FUERA_DE_VIGENCIA } from "@/lib/asistencia/vigencia";
 import { etiquetaPersona } from "@/lib/asistencia/directorio";
@@ -25,9 +24,18 @@ import { etiquetaPermisoDelDia, textoPerdonDelPeriodo, textoPermisoDelDia, type 
 import { hoyPanama } from "@/lib/fecha-panama";
 import { Ayuda } from "@/components/shared/Ayuda";
 import RangoFechas, { ultimoRango } from "@/components/ui/RangoFechas";
+// 🔴 Los atajos del período y el período en la URL: dos módulos PUROS.
+import { atajosDePeriodo, atajoActivo } from "@/lib/asistencia/atajos-periodo";
+import { periodoInicial, urlTraePeriodo } from "@/lib/asistencia/periodo-en-la-url";
+import { useUrlState } from "@/lib/hooks/useUrlState";
+// 🔴 Dos marcas y la segunda a mediodía: un aviso, nunca un cálculo.
+import { TEXTO_SALIDA_SOSPECHOSA, tituloSalidaSospechosa } from "@/lib/asistencia/salida-sospechosa";
+// 🔴 La columna «Extras» dice cuánto está aprobado.
+import { repartirExtras, textoExtrasDecididas, tituloExtrasDecididas } from "@/lib/asistencia/extras-decididas";
+import type { Decision } from "@/lib/asistencia/aprobaciones";
 import EstadoReloj from "./EstadoReloj";
 import JustificacionesDelPeriodo from "./JustificacionesDelPeriodo";
-import { PERSONA_EN_EL_CENTRO, PESTANA_FICHAS, dondeSeCargaLaFicha } from "@/lib/asistencia/persona-en-el-centro";
+import { PERSONA_EN_EL_CENTRO, PESTANA_FICHAS, dondeSeCargaLaFicha, rutaDePersona } from "@/lib/asistencia/persona-en-el-centro";
 import { empresaParaPedir, nombreArchivoPorEmpresa } from "@/lib/asistencia/empresa-para-todo";
 import CorregirMarcacionModal, { type MarcaParaCorregir } from "./CorregirMarcacionModal";
 import JustificarDiaModal, { type DiaParaJustificar } from "./JustificarDiaModal";
@@ -81,29 +89,62 @@ export default function ReporteTab({ empresa = "" }: {
   // ⚠️ `useSearchParams()` puede ser `null` fuera del App Router (los tests que
   // montan la pestaña sola): sin URL no hay llegada, y nada se rompe.
   const sp = useSearchParams();
-  const llegada = useMemo(() => {
-    const d = sp?.get("desde") ?? "";
-    const h = sp?.get("hasta") ?? "";
-    const rango = esFechaDeCalendario(d) && esFechaDeCalendario(h) && d <= h ? { desde: d, hasta: h } : null;
-    return { rango, q: (sp?.get("q") ?? "").trim() };
+  const llegada = useMemo(() => ({ q: (sp?.get("q") ?? "").trim() }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  const [desde, setDesde] = useState(llegada.rango?.desde ?? hoyPanama(new Date(Date.now() - 14 * 86_400_000)));
-  const [hasta, setHasta] = useState(llegada.rango?.hasta ?? hoy);
+    []);
 
-  // 🔑 EL ÚLTIMO RANGO, por dispositivo. Es lo que reemplaza a los presets que
-  // se fueron: el segundo día ya abre donde lo dejaste. Corre UNA vez al montar
-  // —si no, pisaría cada cambio del usuario con el valor guardado. Con un rango
-  // en la URL no corre: lo que trae el enlace manda.
+  // ── 🔴 EL PERÍODO VIVE EN LA URL (16-sep-2026) ────────────────────────────
+  //
+  // Daniel: *«si estoy en asistencia y voy a planilla y vuelvo se me resetea
+  // asistencia, quiero q se quede»*. 🩸 Eran `useState`, y esta pestaña se
+  // DESMONTA al cambiar de pestaña: volver la montaba de cero con «hace 14
+  // días → hoy». Ahora viaja en `?desde=&hasta=`, con `replace` porque es un
+  // filtro del MISMO nivel y el Atrás del navegador no tiene que ciclar por
+  // cada cambio de fechas (igual que `?tab=` y `?empresa=`).
+  //
+  // 🔑 La precedencia no cambió y vive en `periodo-en-la-url.ts`: manda la URL,
+  // después lo recordado en este dispositivo, y al final la sugerencia. «Ver
+  // sus días ›» desde la ficha sigue mandando su rango y sigue ganando.
+  const [desdeUrl, setDesdeUrl] = useUrlState("desde", "");
+  const [hastaUrl, setHastaUrl] = useUrlState("hasta", "");
+  // 🔴 EL RESPALDO SE FIJA AL MONTAR y la URL se relee siempre: así un enlace
+  // que cambie el rango se aplica, y la basura (media URL, un rango al revés)
+  // cae en lo de siempre en vez de mostrar medio período pedido.
+  const respaldo = useMemo(() => ({
+    recordado: ultimoRango("asistencia_reporte"),
+    haceCatorce: hoyPanama(new Date(Date.now() - 14 * 86_400_000)),
+  }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []);
+  const inicial = useMemo(
+    () => periodoInicial({ url: { desde: desdeUrl, hasta: hastaUrl }, hoy, ...respaldo }),
+    [desdeUrl, hastaUrl, hoy, respaldo],
+  );
+  const { desde, hasta } = inicial;
+  const elegirPeriodo = useCallback((d: string, h: string) => {
+    setDesdeUrl(d); setHastaUrl(h);
+    try { localStorage.setItem("fg_last_asistencia_reporte", `${d}|${h}`); } catch { /* modo privado */ }
+  }, [setDesdeUrl, setHastaUrl]);
+
+  // La URL queda escrita UNA vez al montar, para que el rango sobreviva al
+  // cambio de pestaña aunque nadie haya tocado el selector. Con la URL ya
+  // completa no corre: lo que trae el enlace manda.
   useEffect(() => {
-    if (llegada.rango) return;
-    const r = ultimoRango("asistencia_reporte");
-    if (r) { setDesde(r.desde); setHasta(r.hasta); }
+    if (urlTraePeriodo({ desde: desdeUrl, hasta: hastaUrl })) return;
+    setDesdeUrl(inicial.desde); setHastaUrl(inicial.hasta);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** Los cuatro atajos: Hoy · Ayer · Esta quincena · Quincena pasada. */
+  const atajos = useMemo(() => atajosDePeriodo(hoy), [hoy]);
+  const atajoPrendido = atajoActivo(atajos, desde, hasta);
   const [q, setQ] = useState(llegada.q);
   const [personas, setPersonas] = useState<PersonaReporte[] | null>(null);
   const [sinHorario, setSinHorario] = useState(0);
+  /** Quiénes son, para nombrarlos y enlazar a su ficha. */
+  const [sinHorarioLista, setSinHorarioLista] = useState<Array<{ codigo: string; nombre: string | null }>>([]);
+  /** `codigo|fecha → si|no`. Lo que NO está acá es pendiente. */
+  const [decisionesExtra, setDecisionesExtra] = useState<ReadonlyMap<string, Decision>>(new Map());
   // Los números con los que el SERVIDOR calculó. La pantalla no los inventa:
   // si dijera "5 de tolerancia" mientras el motor usa 10, el texto sería falso.
   const [reglas, setReglas] = useState<Partial<ReglasReporte> | null>(null);
@@ -150,6 +191,8 @@ export default function ReporteTab({ empresa = "" }: {
       if (!res.ok) throw new Error(data.error ?? "No se pudo cargar");
       setPersonas(data.personas ?? []);
       setSinHorario(data.sinHorario ?? 0);
+      setSinHorarioLista(data.sinHorarioLista ?? []);
+      setDecisionesExtra(new Map(Object.entries((data.decisionesExtra ?? {}) as Record<string, Decision>)));
       setReglas(data.reglas ?? null);
       setCorrecciones(data.correcciones ?? { correcciones: 0, dias: 0, agregadas: 0 });
       setPuedeCorregir(Boolean(data.correccionesDisponible));
@@ -216,7 +259,7 @@ export default function ReporteTab({ empresa = "" }: {
       <EstadoReloj onLlegaron={() => void cargar()} />
 
       <div className="flex flex-wrap items-end gap-3">
-        <RangoFechas desde={desde} hasta={hasta} recordarComo="asistencia_reporte" onChange={(d, h) => { setDesde(d); setHasta(h); }} />
+        <RangoFechas desde={desde} hasta={hasta} recordarComo="asistencia_reporte" onChange={elegirPeriodo} />
         <input
           type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar colaborador"
           className="min-h-[44px] flex-1 min-w-[160px] rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm"
@@ -231,6 +274,30 @@ export default function ReporteTab({ empresa = "" }: {
             PDF
           </button>
         </div>
+      </div>
+
+      {/* ── 🔴 LOS ATAJOS DEL PERÍODO (16-sep-2026) ───────────────────────────
+          Daniel: *«arregla la manera de seleccionar en el calendario que se ve
+          raro, tiene que ser normal, facil»*. 🩸 Para mirar UN día había que
+          abrir el calendario y tocar DOS veces (es un selector de rango). Los
+          cuatro botones salen de `atajos-periodo.ts`, que arma las quincenas
+          con la MISMA función que la Planilla — no hay un tercer selector—, y
+          el calendario queda para todo lo demás. */}
+      <div className="flex flex-wrap gap-2">
+        {atajos.map((a) => (
+          <button
+            key={a.clave} type="button"
+            onClick={() => elegirPeriodo(a.desde, a.hasta)}
+            aria-pressed={atajoPrendido === a.clave}
+            className={`min-h-[44px] rounded-md border px-3 text-sm transition active:scale-[0.97] ${
+              atajoPrendido === a.clave
+                ? "border-black bg-black font-medium text-white"
+                : "border-gray-300 text-gray-700 hover:border-black hover:text-black"
+            }`}
+          >
+            {a.rotulo}
+          </button>
+        ))}
       </div>
 
       {/* 🔴 UN ENLACE AL LADO DE LA TABLA, no un bloque suelto ni filas
@@ -256,6 +323,30 @@ export default function ReporteTab({ empresa = "" }: {
         <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
           <b>{sinHorario}</b> {sinHorario === 1 ? "colaborador no tiene" : "colaboradores no tienen"} su hora de salida
           confirmada. Mientras tanto se asume 5:00 p.m. — se confirma {dondeSeCargaLaFicha()}, en <b>{PESTANA_FICHAS}</b>.
+          {/* 🔴 Y SE DICE QUIÉN, CON EL ENLACE A SU FICHA (16-sep-2026).
+              Daniel: *«debería de haber un link directo para ir al problema»*.
+              🩸 El aviso daba el número y nada más, así que había que ir a
+              buscar a mano a cuál de las 40 personas le falta.
+              ⚠️ El enlace solo existe con el acomodo nuevo; apagado, la ficha
+              no tiene página propia y se nombran igual. */}
+          {sinHorarioLista.length > 0 && (
+            <>
+              {" — "}
+              {sinHorarioLista.map((x, i) => (
+                <span key={x.codigo}>
+                  {i > 0 && ", "}
+                  {PERSONA_EN_EL_CENTRO ? (
+                    <a href={rutaDePersona(x.codigo)}
+                      className="font-medium underline decoration-dotted underline-offset-2 hover:text-amber-900">
+                      {capitalizarNombre(etiquetaPersona(x.codigo, x.nombre))}
+                    </a>
+                  ) : (
+                    <b>{capitalizarNombre(etiquetaPersona(x.codigo, x.nombre))}</b>
+                  )}
+                </span>
+              ))}
+            </>
+          )}
         </p>
       )}
 
@@ -335,7 +426,8 @@ export default function ReporteTab({ empresa = "" }: {
                   onToggle={() => setAbierta(abierta === p.codigo ? null : p.codigo)}
                   puedeCorregir={puedeCorregir}
                   onCorregir={setCorrigiendo}
-                  onJustificar={setJustificando} />
+                  onJustificar={setJustificando}
+                  decisionesExtra={decisionesExtra} />
               ))}
             </tbody>
             <tfoot>
@@ -410,7 +502,7 @@ export default function ReporteTab({ empresa = "" }: {
   );
 }
 
-function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir, onJustificar, marcasTelefono, onVerSelfie }: {
+function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir, onJustificar, marcasTelefono, onVerSelfie, decisionesExtra }: {
   p: PersonaReporte;
   abierta: boolean;
   onToggle: () => void;
@@ -419,8 +511,14 @@ function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir, onJustif
   onJustificar: (d: DiaParaJustificar) => void;
   marcasTelefono: Record<string, MarcaTelefonoUI[]>;
   onVerSelfie: (m: SelfieParaVer) => void;
+  /** `codigo|fecha → si|no`. Lo que no está es PENDIENTE. */
+  decisionesExtra: ReadonlyMap<string, Decision>;
 }) {
   const r = p.resumen;
+  // 🔴 LA COLUMNA «EXTRAS» DICE CUÁNTO ESTÁ APROBADO (16-sep-2026). Se reparte
+  // el MISMO número que la columna ya sumaba, día por día, según la decisión de
+  // ese día. No cambia qué se paga: solo lo que se ve.
+  const extras = repartirExtras(p.codigo, p.dias, decisionesExtra);
   const persona = p.nombre
     ? capitalizarNombre(etiquetaPersona(p.codigo, p.nombre))
     : etiquetaPersona(p.codigo, p.nombre);
@@ -468,7 +566,17 @@ function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir, onJustif
         {/* 🔴 El servicio profesional NO cuenta horas extra (3-sep-2026,
             Daniel: *«es solo para ver sus tardanzas y ausencias»*): raya, no 0
             ni el número que midió el reloj. Tardanza y ausencia, intactas. */}
-        <td className="px-2 py-2.5 text-right text-gray-700">{cuentaHorasExtra(p) ? n(r.extraMin) : sinExtra()}</td>
+        {/* 🔴 LOS MINUTOS MEDIDOS ARRIBA Y LO DECIDIDO DEBAJO (16-sep-2026).
+            Daniel, preguntado si tenía que decir las dos cosas: *«Si»*. 🩸 La
+            celda mostraba lo que midió el reloj y se leía como plata que se va
+            a pagar — la planilla paga SOLO lo aprobado. El texto sale del
+            módulo puro `extras-decididas.ts`. */}
+        <td className="px-2 py-2.5 text-right text-gray-700" title={cuentaHorasExtra(p) && r.extraMin > 0 ? tituloExtrasDecididas(extras) : undefined}>
+          {cuentaHorasExtra(p) ? n(r.extraMin) : sinExtra()}
+          {cuentaHorasExtra(p) && textoExtrasDecididas(extras) && (
+            <span className="block text-[11px] font-normal text-gray-500">{textoExtrasDecididas(extras)}</span>
+          )}
+        </td>
         <td className="px-2 py-2.5 text-right">{r.diasARevisar
           ? <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-700">{r.diasARevisar}</span>
           : <span className="text-gray-300">—</span>}</td>
@@ -664,6 +772,21 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJu
             <td className="whitespace-nowrap px-2 py-1.5">
               {d.revisar && (
                 <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800">Revisar</span>
+              )}
+              {/* 🔴 DOS MARCAS Y LA SEGUNDA MUY ANTES DE SU SALIDA (16-sep-2026).
+                  🩸 El caso: Andrea Pérez el 1-sep marcó 08:04 y 12:07 y nada
+                  más; el motor leyó las 12:07 como su salida y le contó 292
+                  minutos. `marcas-impares` no lo atrapa —DOS es par— así que el
+                  día pasaba sin que nadie avisara. Se ve como un «Revisar» más,
+                  y NO cambia un solo minuto: la regla y el umbral (con su
+                  medición) viven en `salida-sospechosa.ts`. */}
+              {d.salidaSospechosa && (
+                <span
+                  className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800"
+                  title={tituloSalidaSospechosa(d.salidaTempranaMin)}
+                >
+                  {TEXTO_SALIDA_SOSPECHOSA}
+                </span>
               )}
               {/* 🔴 GRIS, NUNCA ÁMBAR. El color es la mitad del mensaje: ámbar
                   dice "hay algo que corregir" y acá no lo hay — el día sigue

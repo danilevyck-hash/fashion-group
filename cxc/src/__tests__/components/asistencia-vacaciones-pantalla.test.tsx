@@ -39,6 +39,16 @@ import {
   periodoDeQuincena,
   type LineaPlanilla,
 } from "@/lib/asistencia/planilla";
+// 🔑 EL PERÍODO DEL REPORTE VIVE EN LA URL desde el 16-sep-2026
+// (`?desde=&hasta=`, `useUrlState`), así que la pestaña necesita un router
+// montado. Sin App Router `useRouter()` lanza y el componente no pinta. No se
+// afloja nada de lo que este archivo prueba: es el arnés, no la regla.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
+  usePathname: () => "/asistencia",
+  useSearchParams: () => new URLSearchParams(""),
+}));
+
 import ReporteTab from "@/app/asistencia/ReporteTab";
 import PlanillaTab from "@/app/asistencia/PlanillaTab";
 import VacacionesTab from "@/app/asistencia/VacacionesTab";

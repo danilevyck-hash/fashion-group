@@ -30,6 +30,11 @@ import { codigosFueraDeRango } from "@/lib/asistencia/vigencia";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { leerMarcasDelTelefono } from "@/lib/marcacion/reporte-server";
 import { senalarQuitadas } from "@/lib/marcacion/en-el-reporte";
+// 🔴 LA COLUMNA «EXTRAS» DICE CUÁNTO ESTÁ APROBADO (16-sep-2026). Acá solo se
+// junta la DECISIÓN ya tomada; el reparto lo hace el módulo puro en pantalla,
+// sobre los MISMOS días que la columna ya suma. No cambia qué se paga.
+import { leerAprobaciones } from "@/lib/asistencia/aprobaciones-server";
+import { claveDia, decisionDe } from "@/lib/asistencia/aprobaciones";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -92,7 +97,7 @@ export async function GET(req: NextRequest) {
     // Paginado con verificación contra el COUNT: un mes de dos relojes con 4
     // marcas diarias pasa de 1.000 filas, y PostgREST corta ahí EN SILENCIO.
     // Un reporte de horas recortado sin avisar es peor que uno que falla.
-    const [marcaciones, { reglas }, { directorio }, correcciones, personasDb, afuera, hRes, jRes, vRes, fRes, telefono] = await Promise.all([
+    const [marcaciones, { reglas }, { directorio }, correcciones, personasDb, afuera, hRes, jRes, vRes, fRes, telefono, aprRes] = await Promise.all([
       leerTodoPaginado<MarcacionConId>(
         "asistencia_marcaciones (reporte)",
         (pedirCount, from, to) => {
@@ -140,6 +145,10 @@ export async function GET(req: NextRequest) {
       // esta lectura: para el cálculo, una marca del teléfono ya era una marca
       // más (la primera del día es la entrada y la última la salida).
       leerMarcasDelTelefono(iDesde, iHasta),
+      // 🔴 LAS DECISIONES SOBRE LAS HORAS EXTRA (16-sep-2026). La MISMA
+      // lectura que usa Aprobaciones y la planilla: la columna «Extras» del
+      // Reporte no puede decir que se paga algo que la planilla no paga.
+      leerAprobaciones(desde, hasta),
     ]);
     const nombres = new Map<string, string>(
       directorio.codigos().map((c) => [c, directorio.etiqueta(c)]),
@@ -286,6 +295,21 @@ export async function GET(req: NextRequest) {
       .map((p) => (sinHorasExtra.has(p.codigo) ? { ...p, cobraHorasExtra: false } : p))
       .filter((p) => !empresaFiltro || p.empresa === empresaFiltro);
 
+    // 🔴 QUIÉNES no tienen su hora de salida confirmada, con nombre y código.
+    const conHorario = new Set((hRes.data ?? []).map((h) => String(h.empleado_codigo)));
+    const sinHorarioLista = personasConBandera
+      .filter((p) => !conHorario.has(p.codigo))
+      .map((p) => ({ codigo: p.codigo, nombre: p.nombre ?? null }));
+
+    // 🔴 `codigo|fecha → 'si' | 'no'`. Lo PENDIENTE no viaja: no tener fila ES
+    // pendiente (ver `estaAprobado`), así que mandarlo sería decir dos veces lo
+    // mismo y abrir la puerta a que las dos se separen.
+    const decisionesExtra: Record<string, "si" | "no"> = {};
+    for (const a of aprRes.filas) {
+      const d = decisionDe(a);
+      if (d) decisionesExtra[claveDia(a.codigo, a.fecha)] = d;
+    }
+
     return NextResponse.json({
       personas: personasConBandera,
       desde,
@@ -303,7 +327,13 @@ export async function GET(req: NextRequest) {
       reglas,
       // Para que la pantalla pueda avisar si alguien no tiene horario fijado:
       // sin él se asume 17:00 y el número puede estar mal.
-      sinHorario: personasConBandera.filter((p) => !(hRes.data ?? []).some((h) => h.empleado_codigo === p.codigo)).length,
+      sinHorario: sinHorarioLista.length,
+      // 🔴 Y QUIÉNES SON, CON SU CÓDIGO (16-sep-2026). Daniel: *«debería de
+      // haber un link directo para ir al problema»*. El aviso decía el número y
+      // nada más, así que había que ir a buscar a mano quién era.
+      // ⚠️ Son los del PERÍODO QUE SE MIRA, no todos los del sistema: es lo que
+      // ya contaba el número y está bien así.
+      sinHorarioLista,
       marcaciones: enRango.length,
       // Cuántas personas quedaron fuera por no estar trabajando en este rango
       // (se fueron antes o entraron después). La pantalla lo dice en una línea.
@@ -314,6 +344,10 @@ export async function GET(req: NextRequest) {
       // Las marcas del teléfono, por `codigo|fecha`. Vacío = no hay ninguna (o
       // la migración todavía no corrió): la pantalla no dibuja nada de más.
       marcasTelefono: telefonoConQuitadas,
+      // 🔴 Lo que ya se decidió sobre las horas extra del período. La pantalla
+      // reparte con esto el MISMO número que ya mostraba: aprobado + rechazado
+      // + pendiente es el total, por construcción.
+      decisionesExtra,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

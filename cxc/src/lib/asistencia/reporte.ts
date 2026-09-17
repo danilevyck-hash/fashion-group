@@ -96,6 +96,9 @@ import { ALMUERZO_FIJO_MIN, REGLAS_DEFAULT, type ReglasAsistencia } from "./conf
 // motor lo necesita para NO contar esos días como ausencias justificadas.
 import { esTrabajoDeVendedor } from "./motivos";
 import { motivoAutomaticoDelDiaSinMarca } from "./trabaja-afuera";
+// 🔴 Dos marcas y la segunda a mediodía: un aviso, NUNCA un cálculo. Ver
+// `salida-sospechosa.ts` — no toca `revisar` ni un centavo.
+import { salidaSospechosa } from "./salida-sospechosa";
 import { minutosPerdonadosDe, rangoPermiso, textoPermiso, ventanaDe } from "./permiso-horas";
 // 🔴 UN DÍA DE VACACIONES NO SE CALCULA. Ver `vacaciones.ts`: aunque la persona
 // haya pasado por el reloj, ese día no genera horas, ni tardanza, ni ausencia.
@@ -192,6 +195,17 @@ export interface DiaReporte {
   trabajadoMin: number;
   /** El día no tiene 4 marcas: los números salen igual, pero hay que revisarlo. */
   revisar: boolean;
+  /**
+   * 🔴 DOS MARCAS Y LA SEGUNDA MUY ANTES DE SU HORA DE SALIDA (16-sep-2026):
+   * probablemente le falte la marca de salida. La regla —y el umbral, con su
+   * medición— viven en `salida-sospechosa.ts`; acá solo se le pregunta.
+   *
+   * ⚠️ ES UN AVISO, NO UN CÁLCULO. Los minutos no cambian: la salida temprana
+   * se sigue descontando igual. Y va APARTE de `revisar` a propósito —`revisar`
+   * entra a la planilla que se guarda (`dias_a_revisar`)— así que prender esto
+   * no mueve ningún número de ninguna quincena.
+   */
+  salidaSospechosa: boolean;
   /**
    * El día TODAVÍA NO PASÓ: es hoy (que sigue corriendo) o es posterior a hoy,
    * en hora de Panamá. Ver regla 6.
@@ -752,7 +766,7 @@ export function armarReporte(opts: {
           tardeMin: 0, excesoAlmuerzoMin: 0, salidaTempranaMin: 0, extraMin: 0, trabajadoMin: 0,
           // 🔴 Los tres veredictos, suspendidos: no faltó, no hay nada que
           // revisar, y el día no se juzga por ningún lado.
-          revisar: false, enCurso, fueraDeVigencia: true, ausente: false,
+          revisar: false, salidaSospechosa: false, enCurso, fueraDeVigencia: true, ausente: false,
           vacacion: null, justificado: null, permiso: null, permisoRango: null,
           permisoPerdonaMin: 0, permisoPerdonaSalidaMin: 0, permisoPerdonaAlmuerzoMin: 0,
           feriado, habil,
@@ -780,7 +794,7 @@ export function armarReporte(opts: {
         dias.push({
           fecha, marcas: [], marcasIds: [], entrada: null, salida: null,
           tardeMin: 0, excesoAlmuerzoMin: 0, salidaTempranaMin: 0, extraMin: 0, trabajadoMin: 0,
-          revisar: false,
+          revisar: false, salidaSospechosa: false,
           enCurso,
           fueraDeVigencia: false,
           // 🔴 NUNCA una ausencia. Quien está de vacaciones no faltó.
@@ -821,7 +835,7 @@ export function armarReporte(opts: {
         dias.push({
           fecha, marcas: [], marcasIds: [], entrada: null, salida: null,
           tardeMin: 0, excesoAlmuerzoMin: 0, salidaTempranaMin: 0, extraMin: 0, trabajadoMin: 0,
-          revisar: false,
+          revisar: false, salidaSospechosa: false,
           enCurso,
           fueraDeVigencia: false,
           // 🔴 Regla 6, la otra mitad: a las 8:59 de la mañana NADIE faltó
@@ -938,6 +952,12 @@ export function armarReporte(opts: {
       // tiene 3 marcas a las 3 de la tarde y todavía le falta irse. Eso no es un
       // día mal marcado, es un día a medias.
       const revisar = !enCurso && crudas.length !== 4;
+      // 🔴 DOS MARCAS Y LA SEGUNDA MUY ANTES DE SU SALIDA (16-sep-2026): se
+      // AVISA, no se calcula. Los minutos de arriba ya están decididos y esto
+      // no los toca. La regla y el umbral viven en `salida-sospechosa.ts`.
+      const sospechosa = salidaSospechosa({
+        marcas: crudas, salidaTempranaMin, habil, enCurso, fueraDeVigencia: false, vacacion: null,
+      });
 
       dias.push({
         fecha,
@@ -948,7 +968,8 @@ export function armarReporte(opts: {
         // `null` y no la hora de entrada: no sabemos cuándo se fue.
         salida: soloUna ? null : fmt(sal),
         tardeMin, excesoAlmuerzoMin, salidaTempranaMin, extraMin, trabajadoMin,
-        revisar, enCurso, fueraDeVigencia: false, ausente: false, vacacion: null, justificado, permiso, permisoRango,
+        revisar, salidaSospechosa: sospechosa,
+        enCurso, fueraDeVigencia: false, ausente: false, vacacion: null, justificado, permiso, permisoRango,
         permisoPerdonaMin, permisoPerdonaSalidaMin, permisoPerdonaAlmuerzoMin, feriado, habil,
         correcciones,
       });

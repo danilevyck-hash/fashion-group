@@ -7,6 +7,76 @@
 
 ---
 
+## 🔴 Los cinco arreglos de pantalla del Reporte (16-sep-2026)
+
+Ninguno mueve plata: los cinco cambian lo que se VE. Daniel, textual, uno por uno.
+
+### 1. El calendario se veía raro — cuatro botones
+
+> *«arregla la manera de seleccionar en el calendario que se ve raro, tiene que ser normal, facil»*
+
+🩸 Para mirar UN día había que abrir el calendario y tocar **dos veces**: es un selector de RANGO, así que el primer toque solo pone el ancla y hasta el segundo la pantalla no cambia.
+
+**Hoy · Ayer · Esta quincena · Quincena pasada**, en `lib/asistencia/atajos-periodo.ts`. 🔴 **No es un tercer selector**: las quincenas salen de `quincenasElegibles` y los rótulos de `rotuloQuincena` (`elegir-quincena.ts`), las MISMAS que dibujan los cuatro botones de la Planilla. El calendario NO se fue: queda para todo lo que no es un atajo.
+
+⚠️ **Esto no contradice «un preset que miente es peor que no tenerlo»** (`RangoFechas`). Aquellos cuatro atajos estaban calculados a mano como «del 1 al 15» y «del 16 a fin de mes», y se retiraron porque el corte de quincena de Daniel es VARIABLE. Lo que cambió desde entonces (15-sep-2026): **la quincena es fija** y lo que se mueve es el CORTE DEL RELOJ, que es otra cosa. Éstos salen de esa función, así que no pueden mentir.
+
+🔴 **«Esta quincena» no se recorta en hoy**: es la quincena entera, igual que en la Planilla. Los días que no pasaron ya salen `enCurso` (regla 6) y la pantalla lo dice en una línea.
+
+### 2. El período se reseteaba al cambiar de pestaña
+
+> *«si estoy en asistencia y voy a planilla y vuelvo se me resetea asistencia, quiero q se quede»*
+
+🩸 `desde`/`hasta` eran `useState` dentro de `ReporteTab`, y la pestaña se **desmonta** al cambiar de pestaña: volver la montaba de cero con «hace 14 días → hoy». El rango recordado tapaba el síntoma a medias y solo en el mismo dispositivo.
+
+Ahora viven en `?desde=&hasta=` con `useUrlState` y **`replace`**, porque es un filtro del MISMO nivel y el Atrás del navegador no tiene que ciclar por cada cambio de fechas (igual que `?tab=` y `?empresa=`). La precedencia es la de antes, escrita en un solo lugar (`periodo-en-la-url.ts`): **URL → recordado en este dispositivo → la sugerencia de siempre**. «Ver sus días ›» desde la ficha sigue mandando su rango y sigue ganando.
+
+🔴 **Las dos fechas se validan JUNTAS**: media URL (`?desde=` sin `?hasta=`) o un rango al revés se descartan enteros. Mostrar medio período pedido es peor que mostrar el de siempre — lo sostiene el candado viejo `asistencia-reporte-desde-la-ficha`.
+
+### 3. El aviso de la hora de salida no decía quién
+
+> *«debería de haber un link directo para ir al problema»*
+
+Daba el número y nada más, así que había que buscar a mano a cuál de las cuarenta personas le falta. Ahora los NOMBRA a todos, con enlace a su ficha (`rutaDePersona`, nunca una ruta escrita a mano). La ruta devuelve `sinHorarioLista` junto al conteo.
+
+⚠️ **Sigue contando solo a los que aparecen en el período que se mira**, que es lo que ya hacía y está bien. Medido el 16-sep-2026: sin horario hay 4 en total — Ana Trejos (2), Cindy De Gracia (3), Yeisibeth Muñoz (306) y Enrique Sánchez (56).
+
+### 4. Dos marcas y la segunda a mediodía
+
+🩸 **Andrea Pérez (16), 1-sep-2026**: marcó **08:04:03 y 12:07:32**, y nada más. El motor leyó las 12:07 como su salida y le contó 292 minutos de salida temprana. `marcas-impares.ts` no lo atrapa —y no tiene por qué: **dos es par**— así que el día pasaba entero sin que nadie avisara.
+
+⚠️ **No es «dos marcas»**: sus días 7 y 9 de septiembre también tienen dos y están perfectos (la segunda cae 17:11 y 17:00). Lo sospechoso es **dónde cae la última**.
+
+🔑 **El umbral, medido**: sobre los días hábiles ya cerrados con exactamente dos marcas —**24 días** del 1 al 15 de septiembre y **21** del 16 al 31 de agosto— el reparto por «cuánto antes de su salida cae la última marca» es casi binario: 19 y 17 días en **0 minutos**, **un solo caso intermedio (58,1 min)** y ocho entre **179,7 y 295,4**. **Entre 58 y 180 no hay nada en 45 días.** El umbral queda en **120 minutos**, en el medio de ese hueco (`SALIDA_SOSPECHOSA_MIN`, `lib/asistencia/salida-sospechosa.ts`).
+
+🔴 **Va en su propio campo, nunca dentro de `revisar`**: `revisar` entra a la planilla que se guarda (`dias_a_revisar`), así que prender esto habría movido un número de una quincena cerrada. Se dibuja como un «Revisar» más, en ámbar, en la fila del día.
+
+🔴 **Mira la salida temprana NETA, no la bruta.** Un día cubierto por un permiso de horas ya está explicado —Andrea el 1-sep tiene su Constancia de 12:00 a 17:00, y desde el arreglo de esa misma fecha no se le descuenta nada— y no hay nada que ir a arreglar. El aviso desaparece solo cuando alguien carga el permiso o agrega la marca que falta, que es exactamente lo que se quiere que pase.
+
+**Lo que avisaría hoy, medido**: 1–15 sep, **2 días** (Yulissa Juárez el 11, Daniel Levy el 15 con dos marcas a 2 minutos una de otra); 16–31 ago, **4 días** (Yulissa el 31, María Bethancourth el 21, Eloyn Mendoza el 31, Briceida Montero el 18).
+
+### 5. La columna «Extras» no decía cuánto está aprobado
+
+> Preguntado si la celda tenía que decir las dos cosas: *«Si»*
+
+Mostraba los minutos que midió el reloj y se leía como plata que se va a pagar. No lo es: la planilla paga **solo lo aprobado** (regla de la contadora, *«Sólo se pagan las horas extras autorizadas»*).
+
+`lib/asistencia/extras-decididas.ts` reparte **el MISMO número que la columna ya sumaba** (`d.extraMin`), día por día, según la `decision` de ese día (si · no · null = pendiente), así que **aprobado + rechazado + pendiente es el total por construcción**: no es una segunda cuenta que pueda separarse de la primera. La ruta manda las decisiones ya tomadas, de la MISMA lectura que usa la planilla (`leerAprobaciones`).
+
+🔴 **Lo pendiente se dice primero** cuando existe: es lo único que frena el cierre. Con TODO pendiente la línea no se dibuja — serían los mismos minutos de arriba dichos dos veces.
+
+⚠️ **Medido, y con una diferencia que vale explicar.** Kener Hernández (17), ventana 26-ago → 10-sep: la columna del Reporte suma **326,50 minutos**, que se reparten en **254,05 aprobados y 72,45 rechazados**. El encargo decía 386,50 y 314,05 — **exactamente 60 minutos más** en los dos, porque ese número sale de `diasConExtra`, que además de la hora extra suma el **domingo y el feriado trabajados**, y la columna «Extras» del Reporte nunca los incluyó (son `domingoMin`/`feriadoMin`, no `extraMin`). Se repartió lo que la columna suma: una sub-línea que no cerrara con el número de arriba sería visiblemente falsa. Los **72,45 rechazados coinciden al centavo**.
+
+### Candados
+
+`src/__tests__/components/asistencia-cinco-arreglos.test.tsx` (29 casos), que **renderiza la pestaña real**: que `atajosDePeriodo` devuelva cuatro rangos no prueba que la pantalla dibuje cuatro botones.
+
+**Verificado por mutación: `scripts/_mutar-candados-cinco-arreglos.sh` — 19 de 19 cazadas, 0 corridas muertas, 2 de 2 controles en verde.**
+
+🩸 **Colateral del arreglo 2**: cuatro candados de pantalla que montan `ReporteTab` necesitaron el `vi.mock("next/navigation")` que ya tenía `asistencia-reporte-desde-la-ficha` — sin App Router, `useRouter()` lanza. Es el arnés, no la regla: ninguno cambió lo que prueba.
+
+---
+
 ## 🔴 El permiso de horas perdona las TRES columnas (16-sep-2026)
 
 > Daniel, textual:
