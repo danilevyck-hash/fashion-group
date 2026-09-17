@@ -223,9 +223,13 @@ export default function ReporteTab({ empresa = "" }: {
   async function bajarExcel() {
     if (!personas?.length) return;
     try {
-      const XLSX = (await import("xlsx-js-style")).default;
       const { construirExcel } = await import("@/lib/asistencia/exportar");
-      XLSX.writeFile(construirExcel({ personas, desde, hasta, reglas: reglas ?? undefined }), nombreArchivoPorEmpresa("Asistencia", empresa, desde, hasta, "xlsx"));
+      // 🔴 Por el camino común (`downloadWorkbook`), como todo export.
+      const { downloadWorkbook } = await import("@/lib/excel-export");
+      downloadWorkbook(
+        construirExcel({ personas, desde, hasta, reglas: reglas ?? undefined }),
+        nombreArchivoPorEmpresa("Asistencia", empresa, desde, hasta, "xlsx"),
+      );
       toast("Excel listo — revisa tu carpeta de descargas", "success");
     } catch {
       toast("No se pudo armar el Excel. Intenta de nuevo.", "error");

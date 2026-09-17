@@ -38,6 +38,7 @@ import {
   type FacturaProcessResult,
 } from "@/lib/depurador/tienda";
 import { Ayuda } from "@/components/shared/Ayuda";
+import { workbookBlob, workbookBytes, filtroDesdeA1 } from "@/lib/excel-export";
 
 const BLANK_FORMULA: MarcaFormula = { marca: "", divisor: 0, extra: 0, redondeo: "int" };
 
@@ -365,6 +366,9 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
           }
         }
         ws["!cols"] = aoa[0].map((_c, i) => ({ wch: i === 3 ? 26 : i < 3 ? 16 : 13 }));
+        // 🔴 FILTRO DESDE A1 + FILA DE ENCABEZADOS FIJA, como todo Excel del
+        // sistema. El contenido de las 25 columnas no se toca.
+        ws["!autofilter"] = { ref: filtroDesdeA1(aoa) };
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "upload");
         return wb;
@@ -374,19 +378,15 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
       // el Historial son los MISMOS bytes (xlsx suelto o zip, según salga).
       let archivo: { blob: Blob; nombre: string };
       if (chunks.length === 1) {
-        const data = XLSX.write(buildWorkbook(chunks[0]), { type: "array", bookType: "xlsx" }) as ArrayBuffer;
-        const copia = new ArrayBuffer(data.byteLength);
-        new Uint8Array(copia).set(new Uint8Array(data));
         archivo = {
-          blob: new Blob([copia], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
+          blob: workbookBlob(buildWorkbook(chunks[0])),
           nombre: `PLANT_TIENDA_${temporada}.xlsx`,
         };
       } else {
         const JSZip = (await import("jszip")).default;
         const zip = new JSZip();
         chunks.forEach((chunk, i) => {
-          const data = XLSX.write(buildWorkbook(chunk), { type: "array", bookType: "xlsx" }) as ArrayBuffer;
-          zip.file(`PLANT_TIENDA_${temporada}_${i + 1}de${chunks.length}.xlsx`, data);
+          zip.file(`PLANT_TIENDA_${temporada}_${i + 1}de${chunks.length}.xlsx`, workbookBytes(buildWorkbook(chunk)));
         });
         archivo = {
           blob: await zip.generateAsync({ type: "blob" }),

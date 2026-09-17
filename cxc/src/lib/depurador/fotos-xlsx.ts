@@ -39,6 +39,18 @@ export interface FotoParaExcel {
   /** Sangría dentro de la celda, en píxeles. */
   offsetXPx?: number;
   offsetYPx?: number;
+  /**
+   * 🔴 QUÉ SE VE EN LA FOTO, para el revisor de accesibilidad de Excel
+   * (17-sep-2026). Sin esto, el `Pedido_ActiveShoes_*.xlsx` abría diciendo
+   * «Accesibilidad: es necesario investigar» y el MISMO archivo sin fotos decía
+   * «todo correcto»: cada imagen iba con `name="Foto N"` y sin texto
+   * alternativo. Es un archivo que Daniel le manda a clientes.
+   *
+   * ⚠️ Es OPCIONAL: sin ella el dibujo sale exactamente como salía. Lo que se
+   * pone es la descripción del artículo de ESA fila (el `Name` del pedido, que
+   * en el despacho es `Description SKUs`) — nunca un texto inventado.
+   */
+  descripcion?: string;
 }
 
 export interface OpcionesIncrustar {
@@ -246,7 +258,10 @@ export async function incrustarFotosEnXlsx(
         `<xdr:ext cx="${emu(f.anchoPx)}" cy="${emu(f.altoPx)}"/>` +
         `<xdr:pic>` +
           `<xdr:nvPicPr>` +
-            `<xdr:cNvPr id="${n + 1}" name="Foto ${n}"/>` +
+            // `descr` = el texto alternativo. Va escapado como XML: la
+            // descripción del artículo viene del archivo del proveedor y puede
+            // traer `&` o comillas («BAG & TOTE 11"»).
+            `<xdr:cNvPr id="${n + 1}" name="Foto ${n}"${f.descripcion ? ` descr="${escapar(f.descripcion)}"` : ""}/>` +
             `<xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr>` +
           `</xdr:nvPicPr>` +
           `<xdr:blipFill><a:blip xmlns:r="${NS_R}" r:embed="${rId}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>` +

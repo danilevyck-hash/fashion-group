@@ -46,6 +46,15 @@ export interface OpcionesPreparar {
    * de Daniel y ese camino no los cambia.
    */
   celdaDe?: (indice: number) => CeldaFoto;
+  /**
+   * 🔴 QUÉ SE VE EN LA FOTO de `pares[i]` — el texto alternativo que Excel le
+   * pide a toda imagen (17-sep-2026). Sin esto, la preforma abría con
+   * «Accesibilidad: es necesario investigar».
+   *
+   * ⚠️ Sale del NOMBRE DEL ARTÍCULO que ya está en pantalla, nunca de un texto
+   * inventado; sin nombre, la foto va sin `descr` y todo sigue igual que antes.
+   */
+  descripcionDe?: (indice: number) => string | undefined;
 }
 
 /** Lado mayor de la miniatura que se incrusta. Se pide a `compressImage` en vez
@@ -104,6 +113,7 @@ export async function prepararFotos(
 ): Promise<ResultadoFotos> {
   const filaDe = opts.filaDe ?? ((i: number) => i + 1);
   const celdaDe = opts.celdaDe ?? (() => CELDA_REEBOK);
+  const descripcionDe = opts.descripcionDe ?? (() => undefined);
   const total = pares.filter((p) => p.foto !== null).length;
   const fotos: FotoParaExcel[] = [];
   const fallidas: string[] = [];
@@ -136,6 +146,7 @@ export async function prepararFotos(
         altoPx: caja.alto,
         offsetXPx: caja.offsetX,
         offsetYPx: caja.offsetY,
+        descripcion: descripcionDe(i) || undefined,
       });
       conFoto.add(par.codigo);
     } catch {

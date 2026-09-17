@@ -125,6 +125,24 @@ export function addr(r: number, c: number): string {
   return XLSX.utils.encode_cell({ r, c });
 }
 
+/**
+ * El `ref` del filtro de una hoja armada con `aoa_to_sheet`: encabezados en la
+ * fila 1 y los datos abajo.
+ *
+ * 🔴 EL FILTRO ES LO QUE ENCIENDE EL PANEL FIJO. `congelarEncabezadosXlsx` solo
+ * congela las hojas que YA tienen `<autoFilter>` —la fila que congela la LEE del
+ * `ref`—, así que una hoja sin filtro sale sin fila fija aunque pase por
+ * `workbookBytes`. Las dos cosas van juntas, y por eso se piden juntas.
+ *
+ * ⚠️ Con una hoja de solo encabezados el filtro cubre la fila 1 y nada más:
+ * `A1:A1` es un `ref` válido y Excel lo abre igual.
+ */
+export function filtroDesdeA1(aoa: readonly unknown[][]): string {
+  const filas = Math.max(aoa.length, 1);
+  const columnas = Math.max(aoa[0]?.length ?? 1, 1);
+  return `A1:${addr(filas - 1, columnas - 1)}`;
+}
+
 /** Fecha estándar de reportes: dd/mm/yyyy desde "YYYY-MM-DD" (o ISO). */
 export function fmtFechaExcel(d: string | null | undefined): string {
   if (!d) return "";

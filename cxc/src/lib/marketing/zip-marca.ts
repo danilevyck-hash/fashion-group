@@ -56,6 +56,7 @@
 import JSZip from "jszip";
 import XLSX from "xlsx-js-style";
 import { supabaseServer } from "@/lib/supabase-server";
+import { workbookBuffer } from "@/lib/excel-export";
 import {
   MULTIFASHION_KEY,
   clavesDeSello,
@@ -1101,7 +1102,8 @@ function armarWorkbookDescarga(prep: PrepDescarga): Buffer {
     titulo: `FASHION GROUP — ${prep.marcaNombre}`,
     subtitulo: subtituloDescarga(prep),
   });
-  return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+  // 🔴 Por el camino común (`workbookBuffer`), como todo export.
+  return workbookBuffer(wb);
 }
 
 async function armarZipDescarga(prep: PrepDescarga): Promise<ZipMarcaResult> {

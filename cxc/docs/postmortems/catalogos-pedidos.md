@@ -2120,3 +2120,264 @@ de que antes **ninguna** lo era—; y ninguna migración posterior las saca.
 
 - La lista de valores esperados del **Depurador** (`REEBOK_CATEGORY_ESPERADAS`) es **ESPEJO** del mapa del catálogo y hay candado que compara las dos: agregar en una sin la otra pone el build rojo. `HEADWEAR` (gorras → accesorios) entró el 2-sep-2026 por ahí — por la marca `HARDWARE` ya resolvía bien, pero sin él el Depurador gritaba «valor inesperado» sobre un dato bueno.
 
+
+---
+
+## Las dos pantallas de Plantilla Switch, más útiles (17-sep-2026)
+
+Daniel miró las dos pantallas —la de Reebok y la de Calvin/Tommy/KL— y pidió:
+*«¿cómo me lo mejorarías? más eficiente, ect, lo que ya sabes»*. Después aprobó
+los dos mockups. Y dejó dicho lo que ya sabíamos y el código ya trataba así:
+*«los excel de calvin son los mismos que tommy y kl btw»* — **son DOS pantallas,
+no cuatro**, y tres de las cinco mejoras son el MISMO código en las dos.
+
+🔴 **Todo esto es PANTALLA.** No se movió un número del cálculo: ni el costo, ni
+el precio, ni el redondeo, ni la talla-muestra. Lo único que cambió del archivo
+descargado es el **filtro desde A1 y la fila de encabezados fija**, que
+`CLAUDE.md` ya exigía para todo Excel del sistema y del que estos archivos se
+habían escapado (ver la sección de abajo).
+
+### 1 · El costo del archivo, para cuadrar contra la factura
+
+`src/lib/depurador/resumen-del-archivo.ts` (PURO). Suma `Costo FOB × Stock Ideal`
+y `Costo CIF × Stock Ideal` sobre **las mismas filas que se descargan**.
+
+🔑 **No recalcula: suma lo que las filas YA traen.** El costo de un artículo se
+decide en `costoReebok` (Reebok) y en `processRows` (CK/TH/KL). Si este módulo
+tuviera una multiplicación por un factor, sería la SEGUNDA definición de costo
+del módulo — que es exactamente el defecto que `costoReebok` cerró el 14-sep.
+
+🔴 **Un artículo sin costo NO vale cero**: sale de la suma y se cuenta aparte, y
+la pantalla lo dice. Un total que miente es peor que no tenerlo. ⚠️ Un costo que
+de verdad es 0 —los SERVICIOS de CK/TH, tipo de artículo 02— SÍ cuenta: es un
+número, no un hueco. ⚠️ Y a la fila a la que le falta el FOB pero le sobra el CIF
+se la cuenta como SIN COSTO entera: medio artículo en un total no lo ve nadie.
+
+**Medido el 17-sep-2026 sobre el despacho de ropa real** (229 filas, el archivo
+con las columnas nuevas): **75 artículos · 229 tallas · 1.403 piezas · FOB
+$11.018,30 · CIF $12.117,19**, cero artículos sin costo.
+
+⚠️ **El CIF medido es $12.117,19, no $12.120,13.** Los dos números son de este
+archivo, y la diferencia ($2,94) no es un error de nadie: **$12.120,13 es
+`FOB total × 1,10`**, mientras que **$12.117,19 es la SUMA de la columna
+`Costo CIF *`** — que es lo que va a quedar cargado en Switch. `costoReebok`
+redondea el FOB a centavos y **recién ahí** le aplica el flete, artículo por
+artículo (ese redondeo está medido: daba un centavo distinto en 66 artículos del
+archivo de septiembre). La pantalla dice la suma de la columna, porque es contra
+eso que se cuadra.
+
+**Las facturas del archivo** (`facturasDelArchivo`) salen del `Document Number`
+del despacho —que se agregó a `COLUMNAS_DESPACHO` y **no entra a ninguna de las
+25 columnas**, con candado— y del `Codigo CPBS` en CK/TH, que ya se leía. 🔴 Si
+el archivo no las trae, **no se inventan**: la lista vuelve vacía y no se dibuja
+nada. Medido: el despacho de ropa trae **la 3971 y la 3970**.
+
+### 2 · Qué es nuevo y qué ya está en Switch
+
+`POST /api/productos/cargar/nuevos-en-switch` + `useNuevosEnSwitch`. Se cuenta
+contra `switch_articulo_info`, que el sistema **ya sincroniza** de las seis
+empresas — no hace falta subir nada ni pedirle un archivo a nadie. Medido contra
+producción el 17-sep-2026: active_shoes 1.763 · vistana 8.274 · fashion_wear
+5.117 · fashion_shoes 731 · active_wear 592 · joystep 207.
+
+🔴 **Se compara por `codigo`, acotado a la `empresa_key`** que la pantalla ya
+reconoció: el mismo código nombra artículos distintos en dos empresas. El grano
+es el ARTÍCULO, no la fila (un código repetido cuenta una vez).
+
+⚠️ **Falla ABIERTA**: si la consulta falla, si la empresa no se reconoció o si esa
+empresa no tiene catálogo sincronizado, la línea **no sale** y la pantalla
+funciona igual. Nunca frena la descarga. Y un pedazo de la consulta que falla
+invalida la cuenta entera: decir «40 nuevos» cuando faltó mirar la mitad del
+archivo es peor que no decir nada.
+
+🔑 Se manda la lista de códigos y vuelven DOS números, no 8.274 códigos: el
+catálogo entero de Vistana pesa ~100 KB y viajaría en cada archivo cargado.
+
+**Medido contra producción el 17-sep-2026 sobre el despacho de ropa: 56 nuevos ·
+19 ya están** (de 75). ⚠️ El encargo traía **63 · 12**, medido unas horas antes;
+el total de 75 coincide y los siete de diferencia son artículos que aparecieron
+en `switch_articulo_info` entre las dos mediciones (la corrida de esa mañana
+quedó con `synced_at` de las 04:50 UTC). El mecanismo es el mismo; lo que cambió
+es el catálogo, que es justo el dato que esta línea mira.
+
+### 3 · Los botones se llaman igual en las dos
+
+`src/lib/depurador/rotulos.ts`: **«Descargar plantilla Switch»** y **«Subir otro
+archivo»**. Reebok decía «Descargar plantilla Switch» y CK/TH «Descargar
+plantilla»; las dos decían «Otro archivo», que no decía si era subir otro o bajar
+otro. Barrido que pone el build rojo si un botón vuelve a escribirlos a mano.
+
+### 4a · Reebok — el ámbar que asustaba y no decía qué hacer
+
+🩸 Medido: el aviso marcaba **30 de 75 artículos** (T-SHIRTS 22 · BRA 3 · TOPS 3 ·
+JACKETS 2) y decía «Estos artículos van a quedar sin categoría… Revísalos antes
+de subir el archivo». **No había nada que revisar**: esas cuatro categorías
+vienen BIEN en el archivo de Reebok y el que no las conoce es el catálogo de la
+web (`CATEGORIA_POR_RUBRO`, en `src/lib/reebok-clasificacion.ts`). Con el 40 % de
+la lista en ámbar y sin nada que hacer, la próxima vez nadie lo lee — y ahí
+adentro van los avisos que sí hay que mirar.
+
+`src/lib/depurador/reebok-categorias.ts` parte el resultado de
+`valoresInesperados` en dos problemas distintos. **`valoresInesperados` no se
+tocó**: sigue devolviendo las tres columnas.
+
+- **CATEGORY** → caja gris, sin ámbar, con el texto que Daniel aprobó y el conteo
+  de productos. 🔴 **Una CATEGORY vacía NO es una categoría que falte en el
+  catálogo**: no hay nada que agregarle al catálogo llamado «(vacío)», ahí el
+  dato falta en el ARCHIVO. Medido sobre los dos despachos de CALZADO (que no
+  traen la columna `Category`): sin esa línea el aviso habría dicho «Falta 1
+  categoría en el catálogo: (vacío)», que no significa nada.
+- **Department y GENDER** → **el aviso NO cambió**: mismo ámbar, mismo texto,
+  misma lista de artículos. Ahí el valor sí puede venir mal del proveedor.
+- 🔴 El filtro es «no es CATEGORY», no una lista de columnas a mano: el día que
+  `ValorInesperado` gane una cuarta columna, esa columna entra **sola** al aviso
+  que pide revisar, que es el lado seguro.
+
+⚠️ **El botón «Agregarlas al catálogo» del mockup no existe, y no es un olvido.**
+Las categorías del catálogo Reebok **no viven en una tabla ni en una pantalla**:
+son un mapa del CÓDIGO (`CATEGORIA_POR_RUBRO` + su espejo
+`REEBOK_CATEGORY_ESPERADAS`, con candado que compara las dos listas). No hay
+ninguna pantalla a la que llevar a nadie, así que ese botón habría prometido algo
+que no pasa. En su lugar hay un **«Copiar las categorías»**, que es lo único
+verdadero que se puede hacer hoy. 🔴 **Decisión pendiente de Daniel**: volver ese
+mapa una tabla administrable (y entonces sí, un botón que agregue) o dejarlo en
+el código.
+
+### 4b · Reebok — la caja gris arranca plegada
+
+«Este despacho no trae N columnas · EAN y Composición ⌄», y se abre al tocarla.
+Es correcta y no hay que actuar sobre ella; abierta ocupaba media pantalla
+encima de los avisos que sí piden algo.
+
+### 5a · Calvin/Tommy/KL — el ámbar lleva a los estilos
+
+🔴 **UN SOLO MECANISMO DE FILTRADO** (`src/lib/depurador/filtro-ambar.ts`). La
+tabla ya tenía su desplegable («Todas las descripciones»); «Ver solo esos N» **no
+agrega un segundo filtro**: escribe un valor especial (`__ambar`) EN EL MISMO
+desplegable. Por eso el filtro se ve puesto, se quita por donde se quitan los
+otros, y no hay dos estados que puedan contradecirse. ⚠️ El valor crudo nunca se
+le muestra a nadie (`rotuloFiltro`).
+
+### 5b · «1 marca(s)» pasa a «1 marca»
+
+`plural(n, singular, plural)`: el plural se escribe entero, porque los del
+español no siempre son + «s». Barrido que prohíbe `marca(s)` y `estilo(s)` en la
+fila de totales.
+
+### Los candados
+
+- `src/__tests__/lib/plantilla-switch-mas-util.test.ts` — las cinco mejoras **y
+  la prueba de que el Excel no cambió**: se arma el MISMO libro dos veces (como
+  salía antes, `XLSX.write` a secas y sin filtro; y como sale hoy, por
+  `workbookBytes` con filtro), se leen los dos de vuelta y se comparan **todas
+  las celdas de todas las hojas** —valor, tipo y formato— en las TRES plantillas
+  (Reebok, la preforma y CK/TH). Más los totales medidos, clavados.
+- `scripts/_mutar-candados-plantilla-mas-util.sh` — **30 mutaciones y 2
+  controles, 32 de 32 cazadas**. Entre ellas, las dos que más importan: cambiar
+  `Costo FOB *` por `Costo CIF *` en las 25 columnas, y colar el
+  `Document Number` adentro del Excel.
+- `scripts/_medir-resumen-del-archivo.ts` — SOLO LECTURA, dice para un archivo
+  real exactamente lo que la pantalla va a mostrar.
+
+---
+
+## Todo Excel sale por el camino común (17-sep-2026)
+
+Daniel abrió el `Pedido_ActiveShoes_2026-09.xlsx` —la preforma de Reebok con
+fotos— y preguntó por qué ese Excel «se ve sin el menú de arriba normal». Le
+faltaban el **filtro desde A1** y la **fila de encabezados fija**.
+
+🔴 **Y estaba incumpliendo una regla escrita.** `cxc/CLAUDE.md`: «Los Excel de
+todo el sistema empiezan en la fila 1, con filtro desde A1 y la fila de
+encabezados fija. Todo export sale por `workbookBytes`/`workbookBuffer`/
+`workbookBlob`.» No era un gusto: ya estaba decidido, y **once archivos se habían
+escapado**. Una regla escrita que nadie verifica no es una regla: es una nota.
+
+Los once, todos enchufados al camino común:
+
+| Dónde | Qué archivo | Qué le faltaba |
+|---|---|---|
+| `ReebokClient` (×3) | la preforma sin fotos, la preforma con fotos, la plantilla Switch | filtro y panel |
+| `DepuradorClient` | la plantilla Switch de CK/TH/KL | filtro y panel |
+| `FacturasTiendaClient` | la plantilla Switch de Multifashion (suelta y en ZIP) | filtro y panel |
+| `asistencia/ReporteTab` | el Reporte de asistencia | el camino común |
+| `productos/cargar/BulkExcel` | `Formulas-precio.xlsx` | filtro y panel |
+| `productos/cargar/CurvasView` | el Excel de tallas | el camino común |
+| `api/reclamos/export-excel` y `api/reclamos/[id]/excel` | los dos Excel de Reclamos | el camino común |
+| `marketing/inventario-excel` (×2), `generar-zip`, `zip-export`, `zip-marca` | los Excel de Marketing | el camino común |
+
+🔑 **Enchufarlos es byte-idéntico salvo por el filtro**: `workbookBytes` es
+`XLSX.write` + `congelarEncabezadosXlsx`, y ese último **solo toca las hojas que
+YA tienen `<autoFilter>`** (la fila que congela la LEE del `ref` del filtro). O
+sea: **el filtro es lo que enciende el panel fijo**, y por eso las dos cosas se
+piden juntas. `filtroDesdeA1(aoa)` (en `excel-export.ts`) arma ese `ref`.
+
+🔴 **EN LA PREFORMA CON FOTOS EL ORDEN NO ES LIBRE: PRIMERO EL PANEL, DESPUÉS LAS
+FOTOS.** Los dos parches reescriben el ZIP, pero de formas incompatibles si se
+invierten: `congelarEncabezadosXlsx` **solo sabe tocar entradas SIN COMPRIMIR**
+—así las escribe SheetJS, y por eso ese camino puede ser síncrono— y
+`incrustarFotosEnXlsx` regenera el ZIP con JSZip en **DEFLATE**. Al revés, el
+panel se encontraría con todo comprimido, **fallaría ABIERTO** y el archivo
+saldría sin fila fija **sin que nadie se entere**. En este orden, JSZip se limita
+a agregar las partes del dibujo y el `<pane>` que ya está en la hoja viaja
+intacto. Hay test que lo prueba en los dos sentidos.
+
+⚠️ **Los dos exentos, con su porqué escrito:**
+
+- **`MiExcelFotosClient`** — baja el Excel **DEL USUARIO**, no uno del sistema:
+  se le pegan las fotos al archivo que él subió y se le devuelve. Puede ser
+  `.xlsm` (con macros), que `xlsx-js-style` no sabe reescribir sin romperle el
+  VBA. Ahí no se arma ningún libro.
+- **Curvas de tallas** — **sin filtro a propósito**: esa hoja NO es una tabla con
+  encabezados en la fila 1, lleva **una sección por referencia, cada una con su
+  propia fila de encabezados** (`meta.headerRows`). Un filtro desde A1 filtraría
+  secciones ajenas y la fila fija congelaría el encabezado de la primera sección
+  sobre los datos de las otras. Mismo trato que las fichas de Reclamos. **Igual
+  pasa por el camino común.**
+
+Candado: `src/__tests__/lib/excel-por-el-camino-comun.test.ts` — barrido estático
+que pone el build ROJO si vuelve a aparecer un `XLSX.write`/`XLSX.writeFile`
+fuera de `lib/excel-export.ts`, más la lista de exentos de `saveAs` **con el
+motivo escrito** (y la exige: un exento cuyo archivo ya no existe, o sin motivo,
+también pone el build rojo). Cambió de dirección con nota fechada y su CONTROL:
+`depurador-divisor-tres-caminos` (la preforma bajaba por `XLSX.writeFile`; el
+control es que `writeFile` quede en **cero**).
+
+### El archivo nuevo de Reebok, la misma tarde
+
+Reebok mandó las columnas que Daniel les pidió, con dos sorpresas:
+
+- 🔑 **La columna del PO se llama `PO` a secas** (antes `PO NAME`), **y de paso
+  quitaron `BP Reference No.`**, que era justo el respaldo que se estaba usando:
+  sin el alias nuevo el PO se perdía del todo y el archivo se agrupaba por
+  `Orden`. La escalera quedó **`PO NAME` → `PO` → `BP Reference No.` → `Orden`**,
+  los cuatro como alias de la MISMA entrada de `COLUMNAS_DESPACHO`.
+- ⚠️ **Un archivo trae VARIOS PO.** Medido sobre las 229 filas: **`VIC` en 217 y
+  `ACTIVE SHOES` en 12**. El PO se lee POR FILA; el que asuma «un PO por archivo»
+  junta dos pedidos.
+- 🔴 **`Department` viene, y la derivación era CORRECTA — medido, no supuesto**:
+  la columna (APPAREL 163 · HARDWARE 66) coincide con lo que
+  `departmentDelSegmento` derivaba del «Segmento de negocio» en **229 de 229,
+  cero diferencias**. Por eso se quedan las dos: cuando la columna viene se usa,
+  y cuando no, el respaldo da exactamente lo mismo.
+- **`Category` viene completa**: T-SHIRTS 95 · SOCKS 46 · SHORTS 36 · BAGS 20 ·
+  TOPS 12 · BRA 12 · JACKETS 8. El respaldo a `SHOES` sigue siendo solo para los
+  archivos viejos.
+- 🔴 **El `EAN` SIGUE sin venir**: solo `UPC`. El orden `EAN → UPC → SKU` no
+  cambia y sigue cayendo al UPC. **Es lo único que todavía hay que pedirle a
+  Reebok**, porque el EAN es el que Switch tiene cargado.
+
+El fixture `reebok-despacho-ropa-columnas-nuevas.xlsx` es ese archivo **entero**
+(229 filas, sin recortar), y con él el candado de «el mismo archivo con y sin las
+columnas nuevas» pasó de fabricar las columnas a mano a tener **el caso real**.
+
+### La accesibilidad de la preforma
+
+🩸 Cada foto se escribía como `<xdr:cNvPr id="N" name="Foto N"/>`, **sin el
+atributo `descr`**. Por eso el Excel de la preforma abría diciendo
+«Accesibilidad: es necesario investigar» y el MISMO archivo sin fotos decía «todo
+correcto». Es un archivo que Daniel le manda a clientes. Ahora cada foto lleva
+como texto alternativo **el nombre del artículo de esa fila** (el `Name` del
+pedido), **escapado como XML** —viene del archivo del proveedor y puede traer `&`
+o comillas—. ⚠️ Es OPCIONAL: sin descripción el dibujo sale exactamente como
+salía.

@@ -14,6 +14,7 @@ import {
 } from "@/lib/depurador/curvas";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { logActivityClient } from "@/lib/logActivityClient";
+import { downloadWorkbook } from "@/lib/excel-export";
 
 const keyDe = (c: Curva) => `${c.referencia}|||${c.codigo}`;
 
@@ -103,10 +104,17 @@ export default function CurvasView() {
         }
       }
       ws["!cols"] = [{ wch: 18 }, { wch: 10 }, { wch: 18 }, { wch: 10 }];
+      // ⚠️ SIN FILTRO A PROPÓSITO: esta hoja NO es una tabla con encabezados en
+      // la fila 1 — lleva una sección por referencia, cada una con su propia
+      // fila de encabezados (`meta.headerRows`). Un filtro desde A1 filtraría
+      // secciones ajenas y la fila fija congelaría el encabezado de la primera
+      // sección sobre los datos de las otras. Mismo trato que las fichas de
+      // Reclamos: layout propio, sin filtro. Pasa igual por el camino común.
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "curvas");
-      XLSX.writeFile(wb, curvasFilename(seleccion));
+      // 🔴 Por el camino común, como todo export.
+      downloadWorkbook(wb, curvasFilename(seleccion));
 
       // Rastro de USO (4-sep-2026): Daniel quiere saber en unas semanas si
       // esta pestaña vale la pena. Solo cuenta — no sale en el Historial ni

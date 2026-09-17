@@ -22,8 +22,10 @@ import FacturasTiendaClient from "@/app/productos/cargar/FacturasTiendaClient";
 import type { SheetRow } from "@/lib/depurador/logic";
 import XLSXReal from "xlsx-js-style";
 
-// saveAs capturado (la plantilla Switch y la factura de tienda bajan por ahí);
-// writeFile capturado (el pedido para cliente de Reebok sin fotos baja por ahí).
+// saveAs capturado: desde el 17-sep-2026 bajan por ahí LAS TRES salidas (la
+// plantilla Switch, la factura de tienda y la preforma de Reebok, que hasta ese
+// día usaba `XLSX.writeFile` y por eso salía sin filtro ni fila fija).
+// `writeFile` se sigue capturando como CONTROL: tiene que quedar en cero.
 const { guardados, escritos } = vi.hoisted(() => ({
   guardados: [] as { blob: Blob; nombre: string }[],
   escritos: [] as string[],
@@ -158,13 +160,30 @@ describe("Reebok — el divisor valida en la pantalla y solo la plantilla Switch
     const wb = XLSX.read(await guardados[0].blob.arrayBuffer(), { type: "array" });
     expect(XLSX.utils.sheet_to_json(wb.Sheets["upload"], { header: 1 })[0]).toContain("Código *");
 
-    // Pedido para cliente → baja (writeFile) pero NO registra historial.
+    /* 🔄 CAMBIÓ DE DIRECCIÓN EL 17-sep-2026, a propósito.
+     *
+     * Hasta hoy la preforma («pedido para cliente») bajaba por
+     * `XLSX.writeFile` —escribir a secas—, y por eso salía SIN el filtro desde
+     * A1 y SIN la fila de encabezados fija que `cxc/CLAUDE.md` exige para todo
+     * Excel del sistema. Daniel lo vio en el archivo real: «se ve sin el menú
+     * de arriba normal». Ahora sale por `workbookBlob`, o sea por `saveAs`,
+     * igual que la plantilla Switch.
+     *
+     * Lo que este caso sigue exigiendo NO cambió: la preforma baja, se llama
+     * como se llamaba y **NO registra historial**. */
     fireEvent.click(screen.getByRole("button", { name: "Pedido para cliente" }));
     fireEvent.click(botonDescarga());
-    await waitFor(() => expect(escritos.length).toBe(1));
-    expect(escritos[0]).toMatch(/^Pedido_ActiveShoes_/);
+    await waitFor(() => expect(guardados.length).toBe(2));
+    expect(guardados[1].nombre).toMatch(/^Pedido_ActiveShoes_/);
     expect(hist).toHaveLength(1); // sigue en 1: el pedido no se guarda
-    expect(guardados).toHaveLength(1);
+    // 🔴 CONTROL de que el cambio es real y no un test que se ablandó: NADIE
+    // escribe ya con `XLSX.writeFile`.
+    expect(escritos).toHaveLength(0);
+    // Y el archivo que bajó trae el filtro y la fila fija.
+    const preforma = new Uint8Array(await guardados[1].blob.arrayBuffer());
+    const xml = new TextDecoder().decode(preforma);
+    expect(xml).toContain("<autoFilter ref=\"A1:");
+    expect(xml).toContain("<pane ySplit=\"1\"");
   });
 });
 

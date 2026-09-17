@@ -36,6 +36,7 @@ import XLSX from "xlsx-js-style";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { CASA_PALETTE, MONEY_FMT } from "@/lib/excel-export";
+import { workbookBlob } from "@/lib/excel-export";
 import {
   buildComprobanteEntregaDoc,
   nombreArchivoComprobante,
@@ -375,10 +376,8 @@ function generarRespaldoExcel(
   entregas: ReadonlyArray<EntregaConItems> = [],
 ): Blob {
   const wb = buildRespaldoWorkbook(proyecto, facturas, marcasDelProyecto, entregas);
-  const arrayBuffer = XLSX.write(wb, { type: "array", bookType: "xlsx" });
-  return new Blob([arrayBuffer], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
+  // 🔴 Por el camino común (`workbookBlob`), como todo export.
+  return workbookBlob(wb);
 }
 
 // ----------------------------------------------------------------------------

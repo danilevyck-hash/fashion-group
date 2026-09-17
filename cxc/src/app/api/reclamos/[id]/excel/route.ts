@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import XLSX from "xlsx-js-style";
 import { buildReclamoSheet } from "@/lib/excel-reclamo";
+import { workbookBuffer } from "@/lib/excel-export";
 import { marcarReclamados } from "@/lib/reclamos/marcar-reclamado";
 
 const RECLAMOS_ROLES = ["admin", "secretaria"];
@@ -33,11 +34,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Reclamo");
 
-  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  const buf = workbookBuffer(wb);
   // Descargar el Excel de un reclamo es sacarlo de la casa: se marca «reclamado» (una sola vez).
   await marcarReclamados([id]);
 
-  return new NextResponse(buf, {
+  return new NextResponse(buf as unknown as BodyInit, {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": `attachment; filename="Reclamo-${data.nro_reclamo}.xlsx"`,

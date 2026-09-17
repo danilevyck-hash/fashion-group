@@ -78,6 +78,17 @@ function libro(nombre: string): { hoja: string; rows: SheetRow[] } {
 
 const NUEVO = libro("reebok-despacho-nuevo-ropa.xlsx");
 const VIEJO = libro("reebok-despacho-viejo-calzado.xlsx");
+/* 🔑 LA TERCERA GENERACIÓN (17-sep-2026, la misma tarde): el archivo que Reebok
+ * mandó con las columnas que Daniel les pidió. 229 filas, 27 columnas, ENTERO —
+ * es el despacho de ropa de verdad, no un recorte.
+ *
+ * Trae `Department` y `Category` completas… y DOS sorpresas:
+ *   · la columna del PO se llama **`PO`** a secas (antes `PO NAME`), y de paso
+ *     QUITARON `BP Reference No.`, que era el respaldo que se estaba usando;
+ *   · el `EAN` SIGUE sin venir: solo `UPC`. Es la única que todavía hay que
+ *     pedirle a Reebok, porque el EAN es el que Switch tiene cargado.
+ * Este es el caso REAL de «el mismo archivo con y sin las columnas nuevas». */
+const CON_COLUMNAS = libro("reebok-despacho-ropa-columnas-nuevas.xlsx");
 
 const CFG_SWITCH = { formula: REEBOK_FORMULA_A_DEFAULT, temporada: "2026-09", tasa: "07" };
 
@@ -444,10 +455,13 @@ describe("🔴 Las mismas filas, con las columnas nuevas y sin ellas", () => {
   });
 });
 
-describe("🔴 El PO NAME tiene TRES escalones, en este orden", () => {
-  // Daniel, 17-sep-2026: «por ahora también se puede usar BP Reference No. como
-  // poname». En los archivos reales dice `VIC` en calzado y `VIC- APP FW26` en
-  // ropa — el mismo dato que la confirmación trae en su columna `PO NAME`.
+describe("🔴 El PO tiene CUATRO escalones, en este orden", () => {
+  /* 🔄 ERAN TRES HASTA EL 17-sep-2026. Ese día Reebok mandó el dato que Daniel
+   * pidió, pero con la columna llamada **`PO`** a secas, y QUITÓ
+   * `BP Reference No.` — el respaldo que se estaba usando. Sin el alias nuevo,
+   * el PO se perdía del todo y el archivo se agrupaba por `Orden`. La escalera
+   * quedó `PO NAME` → `PO` → `BP Reference No.` → `Orden`, los cuatro como
+   * alias de la MISMA entrada: no hay una rama nueva. */
   it("sin `PO NAME`, se usa `BP Reference No.`", () => {
     expect(parseDespacho(VIEJO.rows).items[0].po).toBe("VIC");
     expect(parseDespacho(NUEVO.rows).items[0].po).toBe("VIC- APP FW26");
@@ -458,9 +472,107 @@ describe("🔴 El PO NAME tiene TRES escalones, en este orden", () => {
     expect(parseDespacho(con).items[0].po).toBe("PO-FW26");
   });
 
+  it("🔴 el archivo de hoy trae `PO` a secas, y se lee", () => {
+    const cabeceras = (CON_COLUMNAS.rows[0] ?? []).map((h) => String(h ?? "").trim());
+    expect(cabeceras).toContain("PO");
+    expect(cabeceras).not.toContain("BP Reference No.");
+    expect(parseDespacho(CON_COLUMNAS.rows).items[0].po).toBe("VIC");
+  });
+
+  it("🔴 UN ARCHIVO TRAE VARIOS PO: nada puede asumir que hay uno solo", () => {
+    // Medido sobre las 229 filas: `VIC` en 217 y `ACTIVE SHOES` en 12.
+    const cuenta = new Map<string, number>();
+    for (const it of parseDespacho(CON_COLUMNAS.rows).items) {
+      cuenta.set(it.po, (cuenta.get(it.po) ?? 0) + 1);
+    }
+    expect(cuenta.get("VIC")).toBe(217);
+    expect(cuenta.get("ACTIVE SHOES")).toBe(12);
+    expect(cuenta.size).toBe(2);
+  });
+
+  it("`PO NAME` le gana a `PO` cuando vienen las dos", () => {
+    const con = conColumna(CON_COLUMNAS.rows, "PO NAME", () => "PO-FW26");
+    expect(parseDespacho(con).items[0].po).toBe("PO-FW26");
+  });
+
   it("sin ninguna de las dos, se agrupa por `Orden`", () => {
     const pelado = sinColumnas(VIEJO.rows, ["BP Reference No."]);
     expect(parseDespacho(pelado).items[0].po).toBe("3003902");
+  });
+});
+
+describe("🔴 EL MISMO ARCHIVO, CON Y SIN LAS COLUMNAS NUEVAS — el caso REAL", () => {
+  /* Hasta hoy este caso se probaba fabricando las columnas a mano. Ahora hay
+   * dos archivos REALES del mismo despacho de ropa: el de la mañana (sin
+   * `Department`, con `BP Reference No.`) y el de la tarde (con `Department`,
+   * con `PO`). Los dos tienen que entrar y dar lo mismo donde da lo mismo. */
+
+  it("el archivo con las columnas nuevas entra sin reconfigurar nada", () => {
+    const { items, ausentes } = parseDespacho(CON_COLUMNAS.rows);
+    expect(items).toHaveLength(229);
+    // `Department` y `Category` ya no faltan. El `EAN` sí: es lo único que
+    // queda por pedirle a Reebok.
+    expect(ausentes.map((a) => a.rotulo).sort()).toEqual(["Composición", "EAN"]);
+  });
+
+  it("🔴 LA DERIVACIÓN DEL DEPARTMENT ERA CORRECTA: 229 de 229, cero diferencias", () => {
+    // Medido el 17-sep-2026 contra la columna real. Por eso se quedan las dos:
+    // cuando la columna viene se usa, y cuando no, el respaldo da lo mismo.
+    const conColumnaReal = parseDespacho(CON_COLUMNAS.rows).items;
+    const sinLaColumna = parseDespacho(sinColumnas(CON_COLUMNAS.rows, ["Department"])).items;
+    expect(sinLaColumna).toHaveLength(conColumnaReal.length);
+    let diferencias = 0;
+    for (let i = 0; i < conColumnaReal.length; i++) {
+      if (conColumnaReal[i].department !== sinLaColumna[i].department) diferencias++;
+    }
+    expect(diferencias).toBe(0);
+    const cuenta = new Map<string, number>();
+    for (const it of conColumnaReal) cuenta.set(it.department, (cuenta.get(it.department) ?? 0) + 1);
+    expect(cuenta.get("APPAREL")).toBe(163);
+    expect(cuenta.get("HARDWARE")).toBe(66);
+  });
+
+  it("🔴 quitarle `Department` no mueve NI UNA de las 25 columnas", () => {
+    const con = porCodigo(CON_COLUMNAS.rows);
+    const sin = porCodigo(sinColumnas(CON_COLUMNAS.rows, ["Department"]));
+    expect([...sin.keys()].sort()).toEqual([...con.keys()].sort());
+    for (const [codigo, cols] of con) {
+      for (const c of OUT_COLS) {
+        expect({ codigo, columna: c, valor: sin.get(codigo)![c] })
+          .toEqual({ codigo, columna: c, valor: cols[c] });
+      }
+    }
+  });
+
+  it("`Category` viene completa, y el respaldo a SHOES es solo para lo viejo", () => {
+    const rubros = new Map<string, number>();
+    for (const it of parseDespacho(CON_COLUMNAS.rows).items) {
+      rubros.set(it.category, (rubros.get(it.category) ?? 0) + 1);
+    }
+    expect([...rubros.entries()].sort((a, b) => b[1] - a[1])).toEqual([
+      ["T-SHIRTS", 95], ["SOCKS", 46], ["SHORTS", 36], ["BAGS", 20],
+      ["TOPS", 12], ["BRA", 12], ["JACKETS", 8],
+    ]);
+    expect(rubros.has(RUBRO_CALZADO)).toBe(false);
+  });
+
+  it("⚠️ el `EAN` sigue sin venir: el código de barra cae al UPC", () => {
+    const i = indiceDespacho(CON_COLUMNAS.rows[0]);
+    expect(i.ean).toBe(-1);
+    expect(i.upc).toBeGreaterThan(-1);
+    const filas = buildSwitchRows(parseDespacho(CON_COLUMNAS.rows).items, CFG_SWITCH);
+    // Los 75 salen con un código de barra numérico (el UPC de 12 dígitos).
+    expect(filas).toHaveLength(75);
+    for (const f of filas) expect(String(f.cols["Código Barra *"])).toMatch(/^\d{11,14}$/);
+  });
+
+  it("los números medidos del despacho de ropa entero", () => {
+    const filas = buildSwitchRows(parseDespacho(CON_COLUMNAS.rows).items, CFG_SWITCH);
+    expect(filas).toHaveLength(75);
+    expect(filas.reduce((s, f) => s + f.skus, 0)).toBe(229);
+    expect(filas.reduce((s, f) => s + f.piezas, 0)).toBe(1403);
+    const fob = filas.reduce((s, f) => s + Number(f.cols["Costo FOB *"]) * f.piezas, 0);
+    expect(Math.round(fob * 100) / 100).toBe(11018.30);
   });
 });
 

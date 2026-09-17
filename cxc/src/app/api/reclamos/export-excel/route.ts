@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import XLSX from "xlsx-js-style";
 import { buildReclamoSheet } from "@/lib/excel-reclamo";
+import { workbookBuffer } from "@/lib/excel-export";
 
 export async function POST(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria"]);
@@ -29,9 +30,9 @@ export async function POST(req: NextRequest) {
     XLSX.utils.book_append_sheet(wb, ws, name);
   }
 
-  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  const buf = workbookBuffer(wb);
 
-  return new NextResponse(buf, {
+  return new NextResponse(buf as unknown as BodyInit, {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": `attachment; filename="Reclamos-${new Date().toISOString().slice(0, 10)}.xlsx"`,

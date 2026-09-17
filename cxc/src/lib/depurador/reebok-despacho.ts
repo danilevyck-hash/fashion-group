@@ -93,7 +93,7 @@ function num(v: Cell): number | null {
  * ══════════════════════════════════════════════════════════════════════════ */
 
 export type CampoDespacho =
-  | "po" | "orden" | "season" | "talla" | "skuFather" | "segmento" | "department"
+  | "po" | "orden" | "documento" | "season" | "talla" | "skuFather" | "segmento" | "department"
   | "gender" | "ageGroup" | "sku" | "descripcion" | "quantity" | "precioBase"
   | "descuentoPct" | "precioAfterDisc" | "upc" | "ean" | "category" | "colorName"
   | "composicion";
@@ -131,25 +131,47 @@ export const COLUMNAS_DESPACHO: ColumnaDespacho[] = [
   { campo: "segmento", rotulo: "Segmento de negocio", alias: ["Segmento de negocio"], obligatoria: true, obligatoriaSalvo: "department",
     respaldo: "—" },
   // ── De acá para abajo, TODAS opcionales ───────────────────────────────────
+  // 🔑 DESDE EL 17-sep-2026 VIENE, Y LA DERIVACIÓN ERA CORRECTA — está MEDIDO,
+  // no supuesto: sobre las 229 filas del archivo con las columnas nuevas, la
+  // columna `Department` (APPAREL 163 · HARDWARE 66) coincide con lo que
+  // `departmentDelSegmento` derivaba de «Segmento de negocio» en **229 de 229,
+  // cero diferencias**. Por eso se quedan las dos: cuando la columna viene se
+  // usa, y cuando no, el respaldo da exactamente lo mismo.
   { campo: "department", rotulo: "Department", alias: ["Department", "Departamento"], obligatoria: false,
     respaldo: "se deriva de «Segmento de negocio» (FTW → FOOTWEAR · APP → APPAREL · ACC HW → HARDWARE)" },
   // 🔑 Desde el formato nuevo (17-sep-2026) viene SIEMPRE, también en calzado.
   // El respaldo es la red de los despachos viejos, no el camino normal.
   { campo: "category", rotulo: "Category", alias: ["Category", "Categoría", "CATEGORY"], obligatoria: false,
     respaldo: "SHOES cuando el Department es FOOTWEAR; en el resto queda vacío y se dice" },
-  // 🔴 EL PO NAME TIENE TRES ESCALONES, EN ESTE ORDEN (Daniel, 17-sep-2026:
+  // 🔴 EL PO TIENE CUATRO ESCALONES, EN ESTE ORDEN (Daniel, 17-sep-2026:
   // *«por ahora también se puede usar BP Reference No. como poname»*):
-  //   1. `PO NAME`            — el día que Reebok la mande, gana sola, sin tocar nada.
-  //   2. `BP Reference No.`   — es el MISMO dato con otro nombre: medido en los dos
-  //      archivos del 17-sep, dice `VIC` en calzado y `VIC- APP FW26` en ropa, y la
-  //      confirmación de compra trae `VIC` en su columna `PO NAME`.
-  //   3. `Orden`              — el respaldo de abajo, por fila.
+  //   1. `PO NAME`            — el nombre viejo; el día que vuelva, gana sola.
+  //   2. `PO`                 — 🔑 EL NOMBRE NUEVO (17-sep-2026). Reebok mandó el
+  //      dato que Daniel pidió, pero la columna se llama `PO` a secas **y de paso
+  //      QUITARON `BP Reference No.`**, que era justo el respaldo que se estaba
+  //      usando: sin este alias el PO se perdía del todo.
+  //   3. `BP Reference No.`   — es el MISMO dato con otro nombre: medido en los
+  //      archivos del 17-sep, dice `VIC` en calzado y `VIC- APP FW26` en el
+  //      primer despacho de ropa.
+  //   4. `Orden`              — el respaldo de abajo, por fila.
   // El orden de los alias ES la precedencia: `buscarCol` devuelve el primero que
   // encuentra, así que agregar un nombre nuevo es agregarlo a esta lista y nada más.
-  { campo: "po", rotulo: "PO NAME", alias: ["PO NAME", "PO Name", "PONAME", "BP Reference No.", "BP Reference No", "BP Reference"], obligatoria: false,
-    respaldo: "se usa «BP Reference No.»; sin ella, se agrupa por «Orden»" },
+  //
+  // ⚠️ **UN ARCHIVO PUEDE TRAER VARIOS PO, Y NADA PUEDE ASUMIR QUE HAY UNO SOLO.**
+  // Medido sobre el archivo con las columnas nuevas (229 filas): `VIC` en 217 y
+  // `ACTIVE SHOES` en 12. El PO se lee POR FILA y agrupa la preforma por
+  // `po + newArticle`; el que asuma «un PO por archivo» junta dos pedidos.
+  { campo: "po", rotulo: "PO NAME", alias: ["PO NAME", "PO Name", "PONAME", "PO", "BP Reference No.", "BP Reference No", "BP Reference"], obligatoria: false,
+    respaldo: "se usa «PO» o «BP Reference No.»; sin ninguna, se agrupa por «Orden»" },
   { campo: "orden", rotulo: "Orden", alias: ["Orden", "N° Orden", "N Orden", "No Orden", "Nº Orden"], obligatoria: false,
     respaldo: "queda vacío" },
+  // 🔑 EL NÚMERO DE FACTURA DEL PROVEEDOR (17-sep-2026). No entra a ninguna de
+  // las 25 columnas —`Codigo CPBS` sigue vacía en Reebok, igual que siempre— y
+  // por eso agregarlo NO cambia un solo byte del Excel. Es para la PANTALLA: la
+  // fila de totales dice contra qué facturas se está cuadrando el costo. Un
+  // despacho puede traer varias (el de ropa trae la 3970 y la 3971).
+  { campo: "documento", rotulo: "Document Number", alias: ["Document Number", "Documento", "N° Documento"], obligatoria: false,
+    respaldo: "la fila de totales no dice contra qué facturas se cuadra" },
   /* ─────────────────────────────────────────────────────────────────────────
    * 🔴 EL CÓDIGO DE BARRA SALE DEL **EAN**, Y RECIÉN DESPUÉS DEL UPC.
    *
@@ -427,6 +449,8 @@ export function parseDespacho(rows: SheetRow[]): ParseDespachoResult {
       piezas: num(row[indice.quantity]) || 0,
       codigoBarra,
       composicion: val(row, indice.composicion),
+      // Solo para la pantalla: ninguna de las 25 columnas lo lee.
+      documento: val(row, indice.documento),
     });
   }
   if (items.length === 0) throw new Error("No se encontraron filas de productos válidas.");

@@ -31,6 +31,10 @@ export const REEBOK_PROVEEDOR = "LATIN FITNESS GROUP";
 export const REEBOK_MARCA_A = "Reebok Precio A";
 export const REEBOK_MARCA_B = "Reebok Precio B";
 export const REEBOK_EMPRESA = "Active Shoes";
+/** La `empresa_key` de Reebok. Es CONSTANTE del servidor de este flujo, nunca
+ *  se elige: el Excel de Reebok solo sube a Active Shoes. La usa la línea de
+ *  «qué es nuevo en Switch», que acota `switch_articulo_info` por empresa. */
+export const REEBOK_EMPRESA_KEY = "active_shoes";
 
 // Marca usada para las EXCEPCIONES por Name (modelo), en la tabla marca_rubro_formulas.
 // Jerarquía por Name (igual que CK/TH): precio fijo > fórmula del Name > fórmula de
@@ -182,6 +186,11 @@ export interface ReebokItem {
   /** La composición de la prenda («UPPER: 99% TEXTILE…»), tal cual la manda
    *  Reebok. Solo viene en el despacho de calzado. */
   composicion?: string;
+  /** 🔑 El número de factura del proveedor («Document Number» del despacho).
+   *  NO entra a ninguna de las 25 columnas: es para que la fila de totales
+   *  diga contra qué facturas se cuadra el costo. La confirmación de compra no
+   *  lo trae y entonces no se dice nada — no se inventa. */
+  documento?: string;
 }
 
 export interface ParseResult { items: ReebokItem[]; headerRow: number; cols: ReebokCols; warnings: string[] }
@@ -455,6 +464,12 @@ export interface CatalogoRow {
   po: string; newArticle: string; name: string; department: string; category: string;
   ageGroup: string; colorName: string; gender: string;
   wholesale: number | null; costo: number | null; precioA: number | null; precioB: number | null;
+  /** 🔑 El FOB del artículo, el MISMO que `costoReebok` le dio a la plantilla de
+   *  Switch. Se guarda para que la fila de totales pueda decir FOB y CIF también
+   *  cuando lo que se va a bajar es la preforma. ⚠️ NO entra a
+   *  `buildCatalogoAoa`: ese Excel enumera sus columnas y no lleva costos (el
+   *  cliente ve Precio A y B, nunca el costo). */
+  fob: number | null;
   piezas: number;
   /** Cuántas filas del archivo (tallas/SKUs) se agruparon en este artículo. */
   skus: number;
@@ -482,7 +497,7 @@ export function buildCatalogo(items: ReebokItem[], cfg: CatalogoConfig): Catalog
     const first = group[0];
     const w = first.wholesale;
     // 🔴 EL MISMO costo que la plantilla de Switch, de la MISMA función.
-    const { cif: costo } = costoReebok(first.department, w, first.wholesaleOff, cfg.flete);
+    const { fob, cif: costo } = costoReebok(first.department, w, first.wholesaleOff, cfg.flete);
     // Jerarquía por Name: precio fijo > fórmula del Name > fórmula de marca (A/B).
     const exc = excForName(cfg.excByName, first.name);
     const precioA = precioDescripcion(costo, exc, cfg.formulaA);
@@ -491,7 +506,7 @@ export function buildCatalogo(items: ReebokItem[], cfg: CatalogoConfig): Catalog
     out.push({
       po: first.po, newArticle: first.newArticle, name: first.name, department: first.department,
       category: first.category, ageGroup: first.ageGroup, colorName: first.colorName, gender: first.gender,
-      wholesale: w, costo, precioA, precioB, piezas, skus: group.length,
+      wholesale: w, costo, fob, precioA, precioB, piezas, skus: group.length,
     });
   }
   out.sort(cmpPoNameGender);

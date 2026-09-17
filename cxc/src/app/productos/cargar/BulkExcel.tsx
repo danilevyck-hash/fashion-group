@@ -12,6 +12,7 @@ import {
   type MarcaFormula,
   type MarcaRubroFormula,
 } from "@/lib/depurador/logic";
+import { downloadWorkbook, filtroDesdeA1 } from "@/lib/excel-export";
 
 interface Summary { marcaOk: number; descOk: number; delOk: number; errors: string[] }
 
@@ -79,9 +80,13 @@ export default function BulkExcel({ catalogo, onDone }: { catalogo: CatalogoDesc
       ws2["!cols"] = [{ wch: 22 }, { wch: 34 }, { wch: 10 }, { wch: 8 }, { wch: 12 }];
       styleHeader(ws1 as Record<string, { s?: unknown }>, 4);
       styleHeader(ws2 as Record<string, { s?: unknown }>, 5);
+      // 🔴 Filtro desde A1 en las dos hojas: es lo que enciende la fila fija.
+      ws1["!autofilter"] = { ref: filtroDesdeA1(marcaAoa) };
+      ws2["!autofilter"] = { ref: filtroDesdeA1(descAoa) };
       XLSX.utils.book_append_sheet(wb, ws1, "Por marca");
       XLSX.utils.book_append_sheet(wb, ws2, "Por descripción");
-      XLSX.writeFile(wb, "Formulas-precio.xlsx");
+      // 🔴 Por el camino común, como todo export.
+      downloadWorkbook(wb, "Formulas-precio.xlsx");
     } finally {
       setBusy("");
     }

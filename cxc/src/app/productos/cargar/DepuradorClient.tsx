@@ -38,6 +38,12 @@ import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import { useCatalogoDescripciones } from "@/lib/hooks/useCatalogoDescripciones";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import AlarmaDescripcionesNuevas, { type DescripcionNueva } from "./AlarmaDescripcionesNuevas";
+import { workbookBlob, filtroDesdeA1 } from "@/lib/excel-export";
+import { ROTULO_DESCARGAR_PLANTILLA, ROTULO_SUBIR_OTRO_ARCHIVO } from "@/lib/depurador/rotulos";
+import { costoDelArchivo, facturasDelArchivo, plural } from "@/lib/depurador/resumen-del-archivo";
+import { FILTRO_AMBAR, filaVisible, rotuloFiltro } from "@/lib/depurador/filtro-ambar";
+import { useNuevosEnSwitch } from "@/lib/hooks/useNuevosEnSwitch";
+import { CostoDelArchivo, FacturasDelArchivo, NuevosEnSwitch } from "./ResumenDelArchivo";
 
 const DIVISOR_HINTS = [0.70, 0.73, 0.75, 0.63];
 const BLANK_FORMULA: MarcaFormula = { marca: "", divisor: 0, extra: 0, redondeo: "int" };
@@ -565,11 +571,12 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
   // ── Filtro por descripción (visual) + selección masiva de precio ────────────
   const visibleRows = useMemo(() => {
     if (!processed) return [] as { d: ProcessedRow; ri: number }[];
-    const q = norm(descFilter);
     return processed
       .map((d, ri) => ({ d, ri }))
-      // Filtro por descripción exacta (dropdown). "" = todas.
-      .filter(({ d }) => !q || norm(d.cols["Descripción *"]) === q)
+      // 🔴 UN SOLO MECANISMO DE FILTRADO (`filtro-ambar.ts`): "" = todas,
+      // `FILTRO_AMBAR` = solo las que hay que revisar, y cualquier otro valor =
+      // esa descripción, por igualdad normalizada.
+      .filter(({ d }) => filaVisible(d, descFilter))
       // Orden alfabético por Descripción por default (A5). Solo la vista; el
       // índice ri original se mantiene para selección/edición/descarga.
       .sort((a, b) => String(a.d.cols["Descripción *"] || "").localeCompare(String(b.d.cols["Descripción *"] || ""), "es"));
@@ -656,17 +663,19 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
       }
       // anchos cómodos
       ws["!cols"] = aoa[0].map((_c, i) => ({ wch: i === 3 ? 26 : i < 3 ? 16 : 13 }));
+      // 🔴 FILTRO DESDE A1 + FILA DE ENCABEZADOS FIJA, como todo Excel del
+      // sistema. El contenido de las 25 columnas no se toca: lo único que se
+      // agrega es el `<autoFilter>` y, por él, el `<pane>` de `workbookBlob`.
+      ws["!autofilter"] = { ref: filtroDesdeA1(aoa) };
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "upload");
       // 🔴 Los bytes se generan UNA sola vez: lo que baja al disco y lo que se
       // guarda 90 días en el Historial es EL MISMO archivo, byte a byte —
       // escribir dos veces podría diferir (SheetJS estampa la hora de creación).
-      const bytes = XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
-      const salida = new ArrayBuffer(bytes.byteLength);
-      new Uint8Array(salida).set(new Uint8Array(bytes));
+      // 🔴 Y salen por `workbookBlob`, el camino común de todo export.
       const nombre = outputFilename(processed);
-      const blob = new Blob([salida], { type: MIME_XLSX });
+      const blob = workbookBlob(wb);
       saveAs(blob, nombre);
 
       // Historial (Tarea 4 + archivo 4-sep-2026) — lo único que toca el server
@@ -689,6 +698,21 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
   const totalUnits = processed?.reduce((s, d) => s + (Number(d.cols["Stock Ideal"]) || 0), 0) ?? 0;
   const marcas = processed ? [...new Set(processed.map((d) => d.cols["Marca *"]).filter(Boolean))] : [];
   const revisar = processed?.filter((d) => d.fallback).length ?? 0;
+
+  // Las facturas del proveedor que trae el archivo. Ya se leían para el Excel
+  // («Codigo CPBS»): aquí solo se dicen, sin repetir y en orden de aparición.
+  // 🔴 Si el archivo no las trae, la lista vuelve vacía y no se dibuja nada.
+  const facturas = useMemo(
+    () => facturasDelArchivo((processed ?? []).map((d) => d.cols["Codigo CPBS"])),
+    [processed],
+  );
+  // Qué es nuevo y qué ya está en Switch, contra `switch_articulo_info` de la
+  // empresa que la pantalla ya reconoció. Falla ABIERTA: `null` = no se dice.
+  const codigosDelArchivo = useMemo(
+    () => (processed ?? []).map((d) => d.cols["Código *"]),
+    [processed],
+  );
+  const nuevosEnSwitch = useNuevosEnSwitch(empresa, codigosDelArchivo);
 
   // Descripciones huérfanas: bajo una marca CK/TH conocida pero NO en su catálogo,
   // tras aplicar normalización (Tarea 8). Las de marca "Otros"/desconocida NO cuentan
@@ -868,8 +892,18 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
             <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               <span aria-hidden>!</span>
               <div>
-                <b className="font-semibold">{revisar} estilo(s) en ámbar</b>: la regla no encontró
-                la talla esperada y usó la más chica. Revísalos en la tabla y ajusta la talla si hace falta.
+                <b className="font-semibold">{revisar} {plural(revisar, "estilo", "estilos")} en ámbar</b>: la
+                regla no encontró la talla esperada y usó la más chica.
+                {/* 🔴 El aviso LLEVA a los estilos en vez de pedir que se busquen
+                    a mano: escribe el valor especial en el MISMO desplegable de
+                    la vista previa, sin un segundo mecanismo de filtrado. */}
+                <button
+                  type="button"
+                  onClick={() => onFilterChange(FILTRO_AMBAR)}
+                  className="ml-2 rounded-md border border-amber-400 bg-white px-2 py-0.5 text-[12px] font-semibold text-amber-800 transition hover:bg-amber-100 active:scale-[0.97]"
+                >
+                  Ver solo {plural(revisar, "ese", "esos")} {revisar}
+                </button>
               </div>
             </div>
           )}
@@ -898,13 +932,13 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
               disabled={downloading || descsNuevas.length > 0 || !catalogo || divisorBloqueaDescarga}
               className="rounded-md bg-teal-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-stone-300"
             >
-              {downloading ? "Generando…" : "Descargar plantilla"}
+              {downloading ? "Generando…" : ROTULO_DESCARGAR_PLANTILLA}
             </button>
             <button
               onClick={reset}
               className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-semibold text-stone-900 transition hover:border-teal-600 hover:text-teal-800 active:scale-[0.97]"
             >
-              Otro archivo
+              {ROTULO_SUBIR_OTRO_ARCHIVO}
             </button>
           </div>
 
@@ -950,7 +984,12 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
             <span className="text-stone-300">·</span>
             <span><b className="font-semibold text-stone-900">{totalUnits.toLocaleString()}</b> unidades</span>
             <span className="text-stone-300">·</span>
-            <span><b className="font-semibold text-stone-900">{marcas.length}</b> marca(s)</span>
+            <span><b className="font-semibold text-stone-900">{marcas.length}</b> {plural(marcas.length, "marca", "marcas")}</span>
+            {/* 🔴 El costo del archivo: es el número con el que se cuadra contra
+                la factura del proveedor. Se suma sobre las MISMAS filas que se
+                descargan, y el artículo sin costo se dice en vez de valer 0. */}
+            <CostoDelArchivo costo={costoDelArchivo(processed)} />
+            <FacturasDelArchivo facturas={facturas} />
             <span className="text-stone-300">·</span>
             <span className="font-semibold text-stone-900">{String(processed[0].cols["Temporada"])}</span>
             <span className="text-stone-300">·</span>
@@ -958,6 +997,10 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
             <span className="text-stone-300">·</span>
             <span>factor {factor}</span>
           </div>
+
+          {/* Qué va a pasar al subir el archivo: lo nuevo se crea, lo que ya
+              está se pisa. Falla ABIERTA: sin dato, no se dibuja nada. */}
+          <NuevosEnSwitch contra={nuevosEnSwitch} />
 
           {/* Aviso discreto: no se perdió nada, el proveedor no pidió esos artículos */}
           {omitidosSinCantidad > 0 && (
@@ -1148,6 +1191,9 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                   className="max-w-[280px] rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
                 >
                   <option value="">Todas las descripciones</option>
+                  {revisar > 0 && (
+                    <option value={FILTRO_AMBAR}>Solo los {revisar} que hay que revisar</option>
+                  )}
                   {descripciones.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select>
                 <span className="whitespace-nowrap text-[12px] text-stone-500">
@@ -1198,7 +1244,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                   {visibleRows.length === 0 ? (
                     <tr>
                       <td colSpan={PREVIEW_COLS_RENDER.length + 2} className="px-4 py-8 text-center text-stone-400">
-                        Ninguna fila coincide con &quot;{descFilter}&quot;.
+                        Ninguna fila coincide con &quot;{rotuloFiltro(descFilter)}&quot;.
                       </td>
                     </tr>
                   ) : visibleRows.map(({ d, ri }) => {
@@ -1293,7 +1339,6 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
 }
 
 // ── Temporada: helpers puros del campo único (4-sep-2026) ───────────────────
-const MIME_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const MESES_LARGOS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 

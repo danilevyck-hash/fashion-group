@@ -11,6 +11,7 @@
 
 import XLSX from "xlsx-js-style";
 import { CASA_PALETTE, MONEY_FMT } from "@/lib/excel-export";
+import { workbookBytes } from "@/lib/excel-export";
 import type {
   EntregaConItems,
   MkInventarioProducto,
@@ -301,7 +302,8 @@ export function exportarExcelGlobal(args: {
     XLSX.utils.book_append_sheet(wb, hojaTiendaDetalle(f.tienda, detalles), name);
   }
 
-  return XLSX.write(wb, { bookType: "xlsx", type: "array" }) as Uint8Array;
+  // 🔴 Por el camino común (`workbookBytes`), como todo export.
+  return workbookBytes(wb);
 }
 
 export function exportarExcelTienda(args: {
@@ -333,5 +335,5 @@ export function exportarExcelTienda(args: {
       XLSX.utils.book_append_sheet(wb, hojaTiendaDetalle(fila.tienda, detalles), name);
     }
   }
-  return XLSX.write(wb, { bookType: "xlsx", type: "array" }) as Uint8Array;
+  return workbookBytes(wb);
 }

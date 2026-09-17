@@ -16,6 +16,7 @@ import {
   REEBOK_MARCA_B,
   REEBOK_MARCA_EXC,
   REEBOK_EMPRESA,
+  REEBOK_EMPRESA_KEY,
   REEBOK_FORMULA_A_DEFAULT,
   REEBOK_FORMULA_B_DEFAULT,
   type ReebokItem,
@@ -47,6 +48,17 @@ import {
 import { prepararFotos } from "./fotos-carpeta";
 import { saveAs } from "file-saver";
 import { Ayuda } from "@/components/shared/Ayuda";
+import { ROTULO_DESCARGAR_PLANTILLA, ROTULO_SUBIR_OTRO_ARCHIVO } from "@/lib/depurador/rotulos";
+import {
+  costoDelArchivo,
+  costoDeArticulos,
+  facturasDelArchivo,
+  plural,
+} from "@/lib/depurador/resumen-del-archivo";
+import { categoriasQueFaltan, inesperadosQueSeRevisan, listaConY } from "@/lib/depurador/reebok-categorias";
+import { useNuevosEnSwitch } from "@/lib/hooks/useNuevosEnSwitch";
+import { CostoDelArchivo, FacturasDelArchivo, NuevosEnSwitch } from "./ResumenDelArchivo";
+import { workbookBlob, workbookBytes, filtroDesdeA1, XLSX_MIME } from "@/lib/excel-export";
 
 type NameMode = "formula" | "fijo";
 interface NameEdit { divisor: number; extra: number; redondeo: Redondeo; precioFijo: number | null; modo: NameMode; dirty: boolean }
@@ -362,9 +374,16 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
   );
   const revisar = useMemo(() => switchRows.filter((r) => r.fallback).length, [switchRows]);
 
-  // Los CATEGORY/GENDER que el catálogo no va a saber traducir (ver el bloque
-  // ámbar más abajo). Se derivan de lo que ya está en memoria: sin releer nada.
+  // Los Department/CATEGORY/GENDER que el catálogo no va a saber traducir (ver
+  // los bloques más abajo). Se derivan de lo que ya está en memoria: sin releer
+  // nada.
   const inesperados = useMemo(() => (items ? valoresInesperados(items) : []), [items]);
+  // 🔴 SE PARTEN EN DOS PROBLEMAS DISTINTOS (`reebok-categorias.ts`): las
+  // CATEGORY que faltan del lado del CATÁLOGO —no hay nada que revisar en el
+  // archivo— y los Department/GENDER, donde el valor sí puede venir mal del
+  // proveedor y ese aviso NO cambió.
+  const faltanCategorias = useMemo(() => categoriasQueFaltan(inesperados), [inesperados]);
+  const aRevisar = useMemo(() => inesperadosQueSeRevisan(inesperados), [inesperados]);
 
   // Contadores de la barra: SIEMPRE los de la salida elegida, para que lo que se lee en
   // pantalla sea exactamente lo que trae el Excel que se descarga (antes mostraba los
@@ -378,6 +397,28 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
       omitidos: salida === "catalogo" ? catalogoOmitidos : switchOmitidos,
     };
   }, [salida, catalogo, switchRows, catalogoOmitidos, switchOmitidos]);
+
+  // 🔴 EL COSTO DEL ARCHIVO, sobre las MISMAS filas que se van a descargar (por
+  // eso mira `salida`, igual que los contadores de al lado). No se recalcula
+  // nada: se suma lo que `costoReebok` ya decidió.
+  const costo = useMemo(
+    () => (salida === "catalogo"
+      ? costoDeArticulos(catalogo.map((r) => ({ fob: r.fob, cif: r.costo, unidades: r.piezas })))
+      : costoDelArchivo(switchRows)),
+    [salida, catalogo, switchRows],
+  );
+  // Las facturas del proveedor («Document Number» del despacho). La confirmación
+  // de compra no las trae: entonces no se dicen, no se inventan.
+  const facturas = useMemo(
+    () => facturasDelArchivo((items ?? []).map((it) => it.documento)),
+    [items],
+  );
+  // Qué es nuevo y qué ya está en Switch. Falla ABIERTA: `null` = no se dice.
+  const codigosDelArchivo = useMemo(
+    () => (salida === "catalogo" ? catalogo.map((r) => r.newArticle) : switchRows.map((r) => String(r.cols["Código *"] ?? ""))),
+    [salida, catalogo, switchRows],
+  );
+  const nuevosEnSwitch = useNuevosEnSwitch(REEBOK_EMPRESA_KEY, codigosDelArchivo);
 
   // Se filtró y no quedó nada: entregar un Excel vacío en silencio sería lo peor.
   const quedoVacio = filtrarSinPiezas && vista.articulos === 0;
@@ -533,15 +574,26 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
         // Código de artículo como texto (New Article numérico → evita notación científica).
         forceTextCols(XLSX, ws as never, [1]);
         ws["!cols"] = aoa[0].map((_c, i) => ({ wch: i === 2 ? 26 : i === 1 ? 14 : 13 }));
+        // 🔴 FILTRO DESDE A1 + FILA DE ENCABEZADOS FIJA, como todo Excel del
+        // sistema. Este archivo se escapaba de la regla: bajaba por
+        // `XLSX.writeFile`, que es escribir a secas.
+        ws["!autofilter"] = { ref: filtroDesdeA1(aoa) };
         XLSX.utils.book_append_sheet(wb, ws, "Pedido");
-        XLSX.writeFile(wb, nombre);
+        saveAs(workbookBlob(wb), nombre);
         return;
       }
 
       // Con fotos: primero se achican (es lo que tarda), después se arma el Excel.
       setFotoProgreso({ hechas: 0, total: emparejado.conFoto });
-      const prep = await prepararFotos(emparejado.pares, (hechas, total) =>
-        setFotoProgreso({ hechas, total }),
+      // 🔴 Cada foto viaja con el NOMBRE DEL ARTÍCULO como texto alternativo:
+      // sin él, este archivo —que Daniel le manda a clientes— abría diciendo
+      // «Accesibilidad: es necesario investigar». El nombre sale del propio
+      // pedido, nunca se inventa; un código sin nombre va sin `descr`.
+      const nombrePorCodigo = new Map(catalogo.map((r) => [r.newArticle, r.name]));
+      const prep = await prepararFotos(
+        emparejado.pares,
+        (hechas, total) => setFotoProgreso({ hechas, total }),
+        { descripcionDe: (i) => nombrePorCodigo.get(emparejado.pares[i].codigo) },
       );
       setFotoProgreso(null);
 
@@ -555,23 +607,29 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
       }));
       // Filas altas para que la foto entre; el encabezado queda como está.
       ws["!rows"] = aoa.map((_r, i) => (i === 0 ? {} : { hpt: ALTO_FILA_PT }));
+      ws["!autofilter"] = { ref: filtroDesdeA1(aoa) };
       XLSX.utils.book_append_sheet(wb, ws, "Pedido");
 
-      const bytes = XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
+      /* 🔴 EL ORDEN DE LOS DOS PARCHES DEL ZIP NO ES LIBRE: PRIMERO EL PANEL,
+       * DESPUÉS LAS FOTOS.
+       *
+       * Los dos reescriben el ZIP, pero de formas incompatibles si se invierten:
+       * `congelarEncabezadosXlsx` (dentro de `workbookBytes`) solo sabe tocar
+       * entradas SIN COMPRIMIR —así las escribe SheetJS— y `incrustarFotosEnXlsx`
+       * regenera el ZIP con JSZip en DEFLATE. Al revés, el panel se encontraría
+       * con todo comprimido, fallaría ABIERTO y el archivo saldría sin fila fija
+       * y sin que nadie se entere. En este orden, JSZip se limita a agregar las
+       * partes del dibujo y el `<pane>` que ya está en la hoja viaja intacto. */
+      const bytes = workbookBytes(wb);
       // Perezoso: `jszip` solo se descarga cuando de verdad hay fotos que pegar.
       const { incrustarFotosEnXlsx } = await import("@/lib/depurador/fotos-xlsx");
-      const conFotos = await incrustarFotosEnXlsx(new Uint8Array(bytes), prep.fotos);
+      const conFotos = await incrustarFotosEnXlsx(bytes, prep.fotos);
       // Se copia a un ArrayBuffer propio en vez de castear el Uint8Array: `Blob`
       // no acepta una vista sobre un buffer que TypeScript no puede probar que
       // sea `ArrayBuffer`, y un cast acá sería mentirle al compilador.
       const salida = new ArrayBuffer(conFotos.byteLength);
       new Uint8Array(salida).set(conFotos);
-      saveAs(
-        new Blob([salida], {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        }),
-        nombre,
-      );
+      saveAs(new Blob([salida], { type: XLSX_MIME }), nombre);
 
       const mb = salida.byteLength / 1048576;
       const falladas = prep.fallidas.length
@@ -598,17 +656,16 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
       // Código(0), Referencia(1), Código Barra(2) forzados a texto (igual que el Depurador).
       forceTextCols(XLSX, ws as never, TEXT_COLS);
       ws["!cols"] = aoa[0].map((_c, i) => ({ wch: i === 3 ? 26 : i < 3 ? 16 : 13 }));
+      // 🔴 FILTRO DESDE A1 + FILA DE ENCABEZADOS FIJA (el contenido de las 25
+      // columnas no se toca: lo único que se agrega es el `<autoFilter>`).
+      ws["!autofilter"] = { ref: filtroDesdeA1(aoa) };
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "upload");
       // 🔴 UNA sola escritura: lo que baja al disco y lo que guarda el
-      // Historial son los MISMOS bytes.
-      const bytes = XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
-      const copia = new ArrayBuffer(bytes.byteLength);
-      new Uint8Array(copia).set(new Uint8Array(bytes));
+      // Historial son los MISMOS bytes. Y salen por `workbookBlob`, el camino
+      // común de todo export.
       const nombre = `Plantilla_Switch_ActiveShoes_${temporada}.xlsx`;
-      const blob = new Blob([copia], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
+      const blob = workbookBlob(wb);
       saveAs(blob, nombre);
       // Historial: SOLO la plantilla Switch (el pedido para cliente no se guarda).
       if (onDownloaded) {
@@ -709,30 +766,54 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
             </div>
           )}
 
-          {/* 🩸 CATEGORY / GENDER que el catálogo NO va a saber traducir.
-              Se dice ACÁ, antes de subir el archivo a Switch, que es cuando
-              corregirlo cuesta un minuto. Después el error aparece del otro
-              lado —productos en el cajón equivocado y con el bulto equivocado—
-              y hay que corregirlo artículo por artículo en Switch.
+          {/* 🩸 LAS CATEGORÍAS QUE LE FALTAN AL CATÁLOGO (17-sep-2026).
+              Medido: este aviso marcaba 30 de 75 artículos —T-SHIRTS 22 · BRA 3
+              · TOPS 3 · JACKETS 2— y pedía «revísalos». **No había nada que
+              revisar**: esas categorías vienen BIEN en el archivo de Reebok y
+              el que no las conoce es el catálogo de la web. Con el 40 % de la
+              lista en ámbar y sin nada que hacer, la próxima vez nadie lo lee.
+              Ahora dice lo que hay que hacer, una sola vez, y sin ámbar. */}
+          {faltanCategorias && (
+            <div
+              className="mb-4 rounded-lg border border-stone-300 bg-stone-50 px-4 py-3 text-sm text-stone-700"
+              data-categorias-que-faltan={faltanCategorias.categorias.join(",")}
+            >
+              <b className="font-semibold text-stone-900">
+                {plural(faltanCategorias.categorias.length, "Falta", "Faltan")}{" "}
+                {faltanCategorias.categorias.length}{" "}
+                {plural(faltanCategorias.categorias.length, "categoría", "categorías")} en el catálogo.
+              </b>{" "}
+              {listaConY(faltanCategorias.categorias)}{" "}
+              {plural(faltanCategorias.categorias.length, "viene", "vienen")} bien en el archivo, pero el
+              catálogo todavía no {plural(faltanCategorias.categorias.length, "la", "las")} conoce: esos{" "}
+              {faltanCategorias.productos} productos saldrían sin categoría, y sin categoría el bulto se
+              cobra de 6 y no de 12.
+              <CopiarCategorias categorias={faltanCategorias.categorias} />
+            </div>
+          )}
+
+          {/* 🩸 Department y GENDER que el catálogo NO va a saber traducir.
+              ⚠️ ESTE AVISO NO CAMBIÓ: aquí el valor SÍ puede venir mal del
+              proveedor, así que sigue pidiendo que se revise antes de subir.
               AVISA, NO CORRIGE: el archivo sale con el valor del proveedor. */}
-          {inesperados.length > 0 && (
+          {aRevisar.length > 0 && (
             <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               <span aria-hidden>!</span>
               <div>
                 <b className="font-semibold">
-                  {inesperados.length} valor(es) de Department/CATEGORY/GENDER que el catálogo no conoce.
+                  {aRevisar.length} valor(es) de Department/GENDER que el catálogo no conoce.
                 </b>{" "}
                 Estos artículos van a quedar sin categoría o sin género en el catálogo, y un producto
                 sin categoría se cobra por bulto de 6 y no de 12. Revísalos antes de subir el archivo:
                 <ul className="ml-4 mt-1.5 list-disc">
-                  {inesperados.slice(0, 8).map((v, i) => (
+                  {aRevisar.slice(0, 8).map((v, i) => (
                     <li key={i}>
                       <b>{v.columna}</b> «{v.valor}» — {v.articulos.length} artículo(s):{" "}
                       {v.articulos.slice(0, 3).join(", ")}{v.articulos.length > 3 ? "…" : ""}
                     </li>
                   ))}
                 </ul>
-                {inesperados.length > 8 && <div className="mt-1">…y {inesperados.length - 8} más.</div>}
+                {aRevisar.length > 8 && <div className="mt-1">…y {aRevisar.length - 8} más.</div>}
               </div>
             </div>
           )}
@@ -743,17 +824,28 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
               reconfigurando». El archivo entra igual: esto NO es un error, es
               decir qué regla de respaldo se usó. */}
           {ausentes.length > 0 && (
-            <div className="mb-4 rounded-lg border border-stone-300 bg-stone-50 px-4 py-3 text-sm text-stone-700">
-              <b className="font-semibold text-stone-900">
-                Este despacho no trae {ausentes.length} columna{ausentes.length === 1 ? "" : "s"}.
-              </b>{" "}
-              El archivo entra igual; esto es de dónde salió cada dato:
-              <ul className="ml-4 mt-1.5 list-disc">
-                {ausentes.map((c) => (
-                  <li key={c.rotulo}><b>{c.rotulo}</b> — {c.respaldo}</li>
-                ))}
-              </ul>
-            </div>
+            /* 🔑 ARRANCA PLEGADA. Es correcta y NO hay que actuar sobre ella:
+               abierta ocupaba media pantalla arriba de los avisos que sí piden
+               algo. El resumen dice todo lo que hace falta de un vistazo y el
+               detalle se abre al tocarlo. */
+            <details className="group mb-4 rounded-lg border border-stone-300 bg-stone-50 px-4 py-2.5 text-sm text-stone-700">
+              <summary className="cursor-pointer list-none select-none">
+                <b className="font-semibold text-stone-900">
+                  Este despacho no trae {ausentes.length} {plural(ausentes.length, "columna", "columnas")}
+                </b>
+                {" · "}
+                {listaConY(ausentes.map((c) => c.rotulo))}
+                <span className="ml-1 text-stone-400 transition group-open:hidden" aria-hidden>⌄</span>
+              </summary>
+              <div className="mt-2">
+                El archivo entra igual; esto es de dónde salió cada dato:
+                <ul className="ml-4 mt-1.5 list-disc">
+                  {ausentes.map((c) => (
+                    <li key={c.rotulo}><b>{c.rotulo}</b> — {c.respaldo}</li>
+                  ))}
+                </ul>
+              </div>
+            </details>
           )}
 
           {/* El segmento de negocio es de donde sale la Marca de Switch. Si no
@@ -1052,7 +1144,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
           )}
           {salida === "switch" && revisar > 0 && (
             <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] font-medium text-amber-800">
-              {revisar} artículo(s) en ámbar: no se halló la talla-muestra exacta (9/7) y se usó la más cercana. Revísalos.
+              {revisar} {plural(revisar, "artículo", "artículos")} en ámbar: no se halló la talla-muestra exacta (9/7) y se usó la más cercana. Revísalos.
             </div>
           )}
 
@@ -1063,6 +1155,10 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
             <span><b className="font-semibold text-stone-900">{vista.skus.toLocaleString()}</b> tallas/SKUs</span>
             <span className="text-stone-300">·</span>
             <span><b className="font-semibold text-stone-900">{vista.piezas.toLocaleString()}</b> piezas{piezasLabel ? ` (${piezasLabel})` : ""}</span>
+            {/* 🔴 El costo del archivo: es el número con el que se cuadra contra
+                la factura del proveedor. Mismas filas que el Excel. */}
+            <CostoDelArchivo costo={costo} />
+            <FacturasDelArchivo facturas={facturas} />
             <div className="ml-auto flex flex-wrap gap-2">
               <button
                 onClick={handleDownload}
@@ -1075,16 +1171,20 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                     ? "Generando…"
                     : salida === "catalogo"
                       ? emparejado ? "Descargar pedido con fotos" : "Descargar pedido"
-                      : "Descargar plantilla Switch"}
+                      : ROTULO_DESCARGAR_PLANTILLA}
               </button>
               <button
                 onClick={reset}
                 className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-semibold text-stone-900 transition hover:border-red-600 hover:text-red-700 active:scale-[0.97]"
               >
-                Otro archivo
+                {ROTULO_SUBIR_OTRO_ARCHIVO}
               </button>
             </div>
           </div>
+
+          {/* Qué va a pasar al subir el archivo: lo nuevo se crea, lo que ya
+              está se pisa. Falla ABIERTA: sin dato, no se dibuja nada. */}
+          <NuevosEnSwitch contra={nuevosEnSwitch} />
 
           {/* Aviso discreto: no se perdió nada, simplemente no se pidieron esas piezas */}
           {vista.omitidos > 0 && (
@@ -1229,6 +1329,46 @@ function FormulaRow({ label, f, onChange, onSave, saving, flashed, divisorMsg }:
         <p className="mt-1 text-[12px] font-semibold text-red-700">{divisorMsg}</p>
       )}
     </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 🔴 EL BOTÓN DICE LO QUE HACE, Y NO PUEDE DECIR «AGREGARLAS AL CATÁLOGO».
+ *
+ * Las categorías del catálogo Reebok NO viven en una tabla ni en una pantalla:
+ * son un mapa del código —`CATEGORIA_POR_RUBRO` en
+ * `src/lib/reebok-clasificacion.ts`, con su espejo `REEBOK_CATEGORY_ESPERADAS`
+ * en `reebok.ts` y un candado que compara las dos listas—. No hay ninguna
+ * pantalla a la que llevar a nadie, así que un botón «Agregarlas al catálogo»
+ * sería un botón que promete algo que no pasa.
+ *
+ * Lo que sí sirve, y es verdad, es llevarse la lista exacta. El aviso ya dice
+ * qué hay que hacer; esto es para pedirlo sin transcribir a mano.
+ *
+ * ⚠️ DECISIÓN PENDIENTE DE DANIEL: volver ese mapa una tabla administrable (y
+ * entonces sí, un botón que agregue) o dejarlo en el código. Hasta que eso se
+ * decida, el botón no miente.
+ * ══════════════════════════════════════════════════════════════════════════ */
+function CopiarCategorias({ categorias }: { categorias: readonly string[] }) {
+  const [copiado, setCopiado] = useState(false);
+  const copiar = async () => {
+    try {
+      await navigator.clipboard.writeText(categorias.join(", "));
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      // Sin portapapeles (navegador viejo o permiso negado) no pasa nada: la
+      // lista está a la vista, arriba, en el mismo aviso.
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={copiar}
+      className="ml-2 rounded-md border border-stone-300 bg-white px-2 py-0.5 text-[12px] font-semibold text-stone-700 transition hover:border-stone-400 active:scale-[0.97]"
+    >
+      {copiado ? "Copiado" : `Copiar ${plural(categorias.length, "la categoría", "las categorías")}`}
+    </button>
   );
 }
 

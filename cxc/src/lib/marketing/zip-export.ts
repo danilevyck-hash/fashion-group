@@ -27,6 +27,7 @@ import JSZip from "jszip";
 import sharp from "sharp";
 import XLSX from "xlsx-js-style";
 import { addr, CASA_PALETTE, makeCellStyles, MONEY_FMT, MONEY_FMT_GUION } from "@/lib/excel-export";
+import { workbookBuffer } from "@/lib/excel-export";
 import { supabaseServer } from "@/lib/supabase-server";
 import type { MkAdjunto, MkFactura, MkProyecto } from "./types";
 import { esPathStorage } from "./storage";
@@ -798,7 +799,8 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
   }
   const wb = buildResumenGastosWorkbook(clienteObjs);
 
-  const xlsxBuf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+  // 🔴 Por el camino común (`workbookBuffer`), como todo export.
+  const xlsxBuf = workbookBuffer(wb);
   zip.file("resumen_gastos.xlsx", xlsxBuf);
 
   const buffer = await zip.generateAsync({
