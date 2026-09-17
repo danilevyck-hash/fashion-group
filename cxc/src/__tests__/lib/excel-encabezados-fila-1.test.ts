@@ -375,7 +375,15 @@ describe("6 · la `nota` es la EXCEPCIÓN, no la puerta de atrás", () => {
     // cuadro sigue con UNA casilla y esta hoja trae el porqué de cada monto
     // (colaborador · concepto · se aplica a · monto · lo anotó). SOLO nace
     // cuando alguien tiene algo, igual que «Ajuste anterior». Sube A PROPÓSITO.
-    expect(total).toBe(30);
+    //
+    // 🔁 31 desde el 17-sep-2026: **la hoja de «Préstamos › Movimientos»**
+    // (`src/lib/asistencia/movimientos-excel.ts`). Daniel: *«para ver los
+    // movimientos de x quincena?»* — es la pantalla de LECTURA que dice qué se
+    // descontó y qué se prestó en una quincena, y su Excel baja exactamente lo
+    // que se está viendo. Sube A PROPÓSITO: una hoja que antes no existía.
+    // ⚠️ NO usa `nota:` — su pie va en la fila de totales, que ya queda fuera
+    // del filtro. La puerta de la `nota` sigue con sus DOS de siempre.
+    expect(total).toBe(31);
   });
 });
 

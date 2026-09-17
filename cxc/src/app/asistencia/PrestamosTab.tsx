@@ -58,6 +58,13 @@ import {
   vistaDeLista,
 } from "@/lib/buscar-en-lista";
 import { useUrlState } from "@/lib/hooks/useUrlState";
+import MovimientosQuincenaTab from "./MovimientosQuincenaTab";
+import {
+  PARAM_VISTA,
+  VISTAS_PRESTAMOS,
+  VISTA_MOVIMIENTOS,
+  vistaDePrestamos,
+} from "@/lib/asistencia/movimientos-quincena";
 import ElegirPersonaModal from "@/app/prestamos/components/ElegirPersonaModal";
 import NuevoMovimientoModal from "@/app/prestamos/components/NuevoMovimientoModal";
 import { useMovimientoForm } from "@/app/prestamos/components/useMovimientoForm";
@@ -97,7 +104,44 @@ function plataOGuion(n: number | undefined) {
   return v > 0 || v < 0 ? money(v) : <span className="text-gray-400">—</span>;
 }
 
+/**
+ * 🔴 DOS VISTAS, UNA PUERTA (17-sep-2026). Daniel, textual: *«quisiera que en
+ * préstamo tener como que un botón para ver el historial de las quincenas. Ya
+ * que para ver movimiento tengo que meterme a cada perfil. Pero para ver los
+ * movimientos de x quincena?»*.
+ *
+ * «Quiénes deben» es la de siempre y sigue siendo la que abre; «Movimientos» es
+ * una pantalla de LECTURA que no escribe nada. Las dos comparten el selector de
+ * empresa de arriba, los roles y esta misma puerta: no hay una pestaña nueva.
+ */
 export default function PrestamosTab(props: { desde?: string; hasta?: string; empresa?: string } = {}) {
+  // Mismo nivel → `replace` (default): el Atrás del navegador no cicla por vistas.
+  const [subUrl, setSub] = useUrlState(PARAM_VISTA, "");
+  const vista = vistaDePrestamos(subUrl);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-1">
+        {VISTAS_PRESTAMOS.map(([k, label]) => (
+          <button key={k} type="button" onClick={() => setSub(k)}
+            className={`min-h-[44px] whitespace-nowrap rounded-md border px-3 text-sm transition active:scale-[0.97] ${
+              vista === k
+                ? "border-black bg-black font-medium text-white"
+                : "border-gray-300 text-gray-600 hover:border-black hover:text-black"
+            }`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {vista === VISTA_MOVIMIENTOS
+        ? <MovimientosQuincenaTab empresa={props.empresa} />
+        : <ListaDeDeuda {...props} />}
+    </div>
+  );
+}
+
+function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string } = {}) {
   const { toast } = useToast();
   // 🔑 Sin período dado, la quincena EN CURSO — y el «hoy» es el de PANAMÁ, no
   // el del navegador. Solo decide la columna «esta quincena»: el SALDO es

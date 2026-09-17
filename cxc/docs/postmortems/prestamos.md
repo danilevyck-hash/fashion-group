@@ -361,6 +361,107 @@ aprobación no sale**: en un papel sin su contexto se leería como si ya se hubi
 
 ---
 
+## 10 · Los movimientos de una quincena (17-sep-2026)
+
+> **Daniel:** *«quisiera que en préstamo tener como que un botón para ver el historial de las
+> quincenas. Ya que para ver movimiento tengo que meterme a cada perfil. Pero para ver los
+> movimientos de x quincena?»*
+
+Mockup aprobado: `https://claude.ai/artifact/M5UeW346S7eBKSDupT8TXZ`.
+
+🩸 **Qué pasaba.** La pestaña Préstamos lista **quién debe plata HOY** (Colaborador · Préstamo ·
+Daño · Debe · Cuota · Esta quincena). Para saber **qué pasó en una quincena** había que abrir las
+**31 fichas vivas**, una por una.
+
+**Qué se hizo.** Una vista **«Movimientos»** al lado de «Quiénes deben», adentro de la MISMA pestaña
+(no una octava pestaña del módulo: comparte el selector de empresa, los roles y la puerta). Dos
+bloques —**Descuentos** y **Deudas nuevas**—, cinco columnas (Colaborador · Concepto · Monto · Día ·
+Origen), cada bloque con su conteo y su total, y al pie **cuánto se prestó, cuánto se descontó y
+cuánto creció o bajó la deuda del grupo** — la línea que no existía en ninguna pantalla.
+
+🔴 **Es una pantalla de LECTURA.** Su ruta (`GET /api/asistencia/prestamos-movimientos`) no tiene
+POST, PUT, PATCH ni DELETE, y no hay un solo `.insert`/`.update`/`.upsert`/`.delete` adentro. No
+cambia ni un cálculo: el saldo, la casilla de la planilla y el cierre quedaron intactos.
+
+### 🔴 La columna «Origen» es la razón de ser de todo esto
+
+Dice si el movimiento lo anotó **el cierre de la quincena** o lo escribió **alguien a mano**. 🩸 Es
+lo que le habría dejado ver a Daniel de una que el domingo 13-sep-2026 se cerraron seis planillas que
+nadie pidió y se anotaron dos pagos, uno de ellos —$25,00 a ELOYN MENDOZA— que su planilla nunca
+descontó. La escalera vive en `lib/asistencia/movimientos-quincena.ts` y tiene cuatro peldaños:
+
+1. **El amarre manda** (`asistencia_planilla_prestamo`, sin revertir): esa planilla lo reclama como
+   suyo y no hay nada que interpretar. Un amarre revertido NO cuenta — la planilla se reabrió.
+2. **Un CARGO nunca es del cierre**: el cierre descuenta, no presta. ⚠️ Hoy es un cinturón (el
+   peldaño 3 ya filtra por concepto); se deja escrito porque la regla es de esta pantalla.
+3. **Un PAGO que salió de la quincena**, con `esDescuentoDeQuincena` — la MISMA función que usa la
+   casilla de la planilla para no cobrar dos veces. Medido el 17-sep-2026: **440 de 441 movimientos
+   vivos tienen `origen_pago` en NULL** (el campo nació el 8-sep-2026), así que sin este peldaño la
+   pantalla diría «a mano» de toda la historia.
+4. **Todo lo demás es a mano**, y dice de dónde salió cuando se sabe («a mano · Liquidación»).
+
+### 🔴 Por quincena, no por rango libre — y está medido
+
+> **Daniel:** *«¿por quincena? igual a todos se le descuenta casi el mismo día no?»*
+
+Tiene razón en los pagos, y por eso igual va por quincena. Medido sobre los 441 movimientos vivos:
+**el día 15 tiene 152 y el día 30, 153**; los cargos no pasan de 8 en ningún día y están repartidos
+por todo el mes. **Los descuentos caen el 15 y el 30; los préstamos se dan cualquier día.** Agrupar
+por quincena es lo único que pone las dos cosas en la misma pantalla — un rango libre invita a mirar
+media quincena, y ahí los totales no significan nada.
+
+### 🔴 Ningún movimiento queda entre dos quincenas
+
+La quincena **paga** hasta el 30 (`ultimoDiaQueSePaga`: el 31 no se paga nunca), pero un préstamo se
+puede dar el 31. 🩸 Medido: **2 movimientos el 31-mar-2026** —un préstamo de $180 y un pago de $500—.
+Leyendo hasta `q.hasta` esa plata no saldría en NINGUNA quincena y desaparecería sin decir nada. La
+ventana termina en **`finDeLaMedicion(q.hasta)`**, la MISMA función con la que el motor de la
+planilla mide el 31. Comprobado: **441 de 441 movimientos caen en alguna quincena**.
+
+### Lo medido contra producción (17-sep-2026, `scripts/_medir-movimientos-quincena.ts`, solo lectura)
+
+| Quincena | Descuentos | Deudas nuevas | La deuda |
+|---|---:|---:|---:|
+| 1 – 15 jul | 9 · $360,00 | 3 · $450,00 | creció $90,00 |
+| 16 – 30 jul | 11 · $560,00 | 2 · $140,00 | bajó $420,00 |
+| 1 – 15 ago | 11 · $810,00 | 3 · $1.000,00 | creció $190,00 |
+| **16 – 30 ago** | **13 · $752,72** | **6 · $1.410,00** | **creció $657,28** |
+| 1 – 15 sep | 2 · $325,00 | 7 · $10.932,80 | creció $10.607,80 |
+
+Los 13 descuentos de agosto son todos del día 30 y todos del cierre; las 6 deudas son de los días 17,
+18, 19, 20 y 24, todas a mano. El más grande: MARIA V. BETHANCOURTH G., $282,72 de descuento y dos
+préstamos nuevos de $300 y $400. ⚠️ La fila de septiembre es correcta y Daniel ya lo sabe: la tanda
+de la quincena nunca se anotó, y los $10.932,80 incluyen el cargo de terceros de JULIO GUZMÁN, que es
+un relleno viejo.
+
+### Las dos trampas del repo, las dos puestas
+
+- **`deleted` es NULLABLE en préstamos** → `.or("deleted.is.null,deleted.eq.false")`. Un
+  `.eq("deleted", false)` pierde filas, y acá perderlas es plata que no aparece en la pantalla que se
+  hizo para verla toda.
+- **`db-max-rows` = 1000 y corta en silencio** → las **tres** lecturas (movimientos, fichas, amarre)
+  van por `leerTodoPaginado` con `count: "exact"` y `.order("id")`.
+
+### Detalles que no son cosméticos
+
+- Los dos bloques se **derivan** de `CONCEPTOS_RESTAN` / `CONCEPTOS_SUMAN` (`prestamos-saldo.ts`), no
+  de una segunda lista: dos respuestas a «¿esto bajó o subió la deuda?» se separan solas.
+- Un concepto que el sistema no sabe leer **no se cuenta por descarte**: queda fuera de los dos
+  totales y se DICE cuántos son (medido hoy: 0 de 441).
+- El orden es **estable**: de mayor a menor monto, empate por fecha, nombre e id. Dos cargas de la
+  misma quincena dan la misma hoja.
+- **El total sigue al filtro** de empresa, igual que en «Quiénes deben».
+- El Excel sale por `workbookBytes` con los encabezados en la fila 3 (hay título) y el pie en la fila
+  de totales, **fuera del filtro**. ⚠️ **No usa `nota:`** — esa puerta sigue con sus DOS de siempre.
+- Roles: `PRESTAMOS_PESTANA_ROLES` (admin · contabilidad · secretaria), derivados, no tecleados.
+
+Candados: `prestamos-movimientos-quincena.test.ts` (50 casos) ·
+`prestamos-movimientos-pantalla.test.tsx` (9). Verificación por mutación:
+`scripts/_mutar-candados-movimientos-quincena.sh` — **22 mutaciones, 22 cazadas**, 2 controles en
+verde.
+
+---
+
 ## Lo que quedó pendiente de Daniel
 
 1. ⚠️ **BRICEIDA MONTERO**: el brief dice que ya no trabaja; producción dice que sí (activa en la
