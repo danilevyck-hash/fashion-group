@@ -56,6 +56,8 @@ import {
   plural,
 } from "@/lib/depurador/resumen-del-archivo";
 import { categoriasQueFaltan, inesperadosQueSeRevisan, listaConY } from "@/lib/depurador/reebok-categorias";
+import { enlaceParaAgregar } from "@/lib/catalogos/reebok-rubros";
+import { useRubrosDelCatalogoReebok } from "@/lib/hooks/useRubrosDelCatalogoReebok";
 import { useNuevosEnSwitch } from "@/lib/hooks/useNuevosEnSwitch";
 import { CostoDelArchivo, FacturasDelArchivo, NuevosEnSwitch } from "./ResumenDelArchivo";
 import { workbookBlob, workbookBytes, filtroDesdeA1, XLSX_MIME } from "@/lib/excel-export";
@@ -377,7 +379,15 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
   // Los Department/CATEGORY/GENDER que el catálogo no va a saber traducir (ver
   // los bloques más abajo). Se derivan de lo que ya está en memoria: sin releer
   // nada.
-  const inesperados = useMemo(() => (items ? valoresInesperados(items) : []), [items]);
+  // 🔴 LOS RUBROS QUE EL CATÁLOGO CONOCE HOY SALEN DE LA TABLA, no de una
+  // lista del código: agregar uno en Catálogos › Reebok apaga este aviso sin
+  // tocar código. ⚠️ FALLA ABIERTA — mientras no conteste, y para siempre si
+  // contesta mal, son los seis de siempre y el aviso se porta como ayer.
+  const rubrosDelCatalogo = useRubrosDelCatalogoReebok();
+  const inesperados = useMemo(
+    () => (items ? valoresInesperados(items, rubrosDelCatalogo) : []),
+    [items, rubrosDelCatalogo],
+  );
   // 🔴 SE PARTEN EN DOS PROBLEMAS DISTINTOS (`reebok-categorias.ts`): las
   // CATEGORY que faltan del lado del CATÁLOGO —no hay nada que revisar en el
   // archivo— y los Department/GENDER, donde el valor sí puede venir mal del
@@ -788,7 +798,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
               catálogo todavía no {plural(faltanCategorias.categorias.length, "la", "las")} conoce: esos{" "}
               {faltanCategorias.productos} productos saldrían sin categoría, y sin categoría el bulto se
               cobra de 6 y no de 12.
-              <CopiarCategorias categorias={faltanCategorias.categorias} />
+              <AgregarlasAlCatalogo categorias={faltanCategorias.categorias} />
             </div>
           )}
 
@@ -1333,42 +1343,35 @@ function FormulaRow({ label, f, onChange, onSave, saving, flashed, divisorMsg }:
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * 🔴 EL BOTÓN DICE LO QUE HACE, Y NO PUEDE DECIR «AGREGARLAS AL CATÁLOGO».
+ * 🔴 EL BOTÓN AHORA SÍ AGREGA — porque ahora sí hay a dónde ir (17-sep-2026).
  *
- * Las categorías del catálogo Reebok NO viven en una tabla ni en una pantalla:
- * son un mapa del código —`CATEGORIA_POR_RUBRO` en
- * `src/lib/reebok-clasificacion.ts`, con su espejo `REEBOK_CATEGORY_ESPERADAS`
- * en `reebok.ts` y un candado que compara las dos listas—. No hay ninguna
- * pantalla a la que llevar a nadie, así que un botón «Agregarlas al catálogo»
- * sería un botón que promete algo que no pasa.
+ * 🩸 Hasta hoy decía «Copiar las categorías», y decía la verdad: el mapa
+ * `rubro → categoría` vivía en el CÓDIGO, en dos listas espejo, y no existía
+ * ninguna pantalla a la que llevar a nadie. Un botón «Agregarlas al catálogo»
+ * habría prometido algo que no pasaba.
  *
- * Lo que sí sirve, y es verdad, es llevarse la lista exacta. El aviso ya dice
- * qué hay que hacer; esto es para pedirlo sin transcribir a mano.
+ * Daniel dijo **«sí»** a volver ese mapa administrable. Vive en
+ * `reebok_rubro_categoria` y se edita en **Catálogos › Reebok › Categorías del
+ * catálogo**; este botón lleva ahí con los rubros del archivo ya cargados.
  *
- * ⚠️ DECISIÓN PENDIENTE DE DANIEL: volver ese mapa una tabla administrable (y
- * entonces sí, un botón que agregue) o dejarlo en el código. Hasta que eso se
- * decida, el botón no miente.
+ * ⚠️ EL ENLACE NO GUARDA NADA. Solo llena el formulario: del otro lado hay que
+ * elegir a qué cajón va cada rubro y tocar el botón. Una dirección que escribe
+ * en la base es una dirección que cualquiera puede disparar sin querer.
+ *
+ * ⚠️ Se abre en OTRA pestaña a propósito: el archivo cargado vive en la memoria
+ * de esta pantalla y navegar lo perdería.
  * ══════════════════════════════════════════════════════════════════════════ */
-function CopiarCategorias({ categorias }: { categorias: readonly string[] }) {
-  const [copiado, setCopiado] = useState(false);
-  const copiar = async () => {
-    try {
-      await navigator.clipboard.writeText(categorias.join(", "));
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 2000);
-    } catch {
-      // Sin portapapeles (navegador viejo o permiso negado) no pasa nada: la
-      // lista está a la vista, arriba, en el mismo aviso.
-    }
-  };
+function AgregarlasAlCatalogo({ categorias }: { categorias: readonly string[] }) {
   return (
-    <button
-      type="button"
-      onClick={copiar}
-      className="ml-2 rounded-md border border-stone-300 bg-white px-2 py-0.5 text-[12px] font-semibold text-stone-700 transition hover:border-stone-400 active:scale-[0.97]"
+    <a
+      href={enlaceParaAgregar(categorias)}
+      target="_blank"
+      rel="noopener noreferrer"
+      data-testid="agregarlas-al-catalogo"
+      className="ml-2 inline-block rounded-md border border-stone-300 bg-white px-2 py-0.5 text-[12px] font-semibold text-stone-700 transition hover:border-stone-400 active:scale-[0.97]"
     >
-      {copiado ? "Copiado" : `Copiar ${plural(categorias.length, "la categoría", "las categorías")}`}
-    </button>
+      {plural(categorias.length, "Agregarla al catálogo", "Agregarlas al catálogo")}
+    </a>
   );
 }
 

@@ -53,6 +53,10 @@ import {
   detallesDeClasificacion,
   avisarClasificacionDesconocida,
 } from "@/lib/catalogos/clasificacion-aviso";
+// 🔴 El mapa `rubro → categoría` se ADMINISTRA desde el 17-sep-2026
+// (`reebok_rubro_categoria`). `leerMapaDeRubros` NUNCA lanza: sin tabla devuelve
+// las seis reglas del código y este sync clasifica igual que ayer.
+import { leerMapaDeRubros } from "@/lib/catalogos/reebok-rubros-server";
 
 const REEBOK_EMPRESA = "active_shoes";
 
@@ -141,6 +145,9 @@ export async function syncCatalogoReebok(
   opts: { dryRun?: boolean; triggeredBy?: "cron" | "manual" | "backfill" } = {},
 ): Promise<CatalogoSyncResult> {
   const fichas = await cargarFichas(REEBOK_EMPRESA);
+  // 🔴 UNA lectura por corrida, y FALLA ABIERTA. El mapa viaja como argumento
+  // hasta el módulo puro: la clasificación sigue sin tocar la base.
+  const porRubro = await leerMapaDeRubros();
 
   // Lo que Switch mandó y el mapa no supo traducir, juntado a lo largo de la
   // corrida. Se avisa UNA vez al cerrar la empresa, no producto por producto.
@@ -155,10 +162,15 @@ export async function syncCatalogoReebok(
    *  `generoReebok`. */
   const clasificar = (a: SwitchArticulo, guardado: { category?: unknown; gender?: unknown; name?: unknown }) => {
     const nombre = (a.descripcion ?? "").trim() || (typeof guardado.name === "string" ? guardado.name : null);
-    const c = clasificacionDeArticulo(fichas.get(String(a.codigo).trim()), nombre, {
-      category: typeof guardado.category === "string" ? guardado.category : null,
-      gender: typeof guardado.gender === "string" ? guardado.gender : null,
-    });
+    const c = clasificacionDeArticulo(
+      fichas.get(String(a.codigo).trim()),
+      nombre,
+      {
+        category: typeof guardado.category === "string" ? guardado.category : null,
+        gender: typeof guardado.gender === "string" ? guardado.gender : null,
+      },
+      porRubro,
+    );
     for (const d of c.desconocidos) desconocidos.push({ sku: String(a.codigo), ...d });
     return { category: c.category, gender: c.gender };
   };

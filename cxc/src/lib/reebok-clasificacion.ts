@@ -77,7 +77,7 @@ export const GENERO_SIN_CLASIFICAR = "sin_clasificar";
 /** lowercase→UPPER + trim + colapsa espacios. Switch manda con espacios
  *  sobrantes y mayúsculas inconsistentes ("women-Sneakers" existe en los datos
  *  reales de otra marca); acá se compara SIEMPRE normalizado. */
-const U = (v: string | null | undefined): string =>
+export const U = (v: string | null | undefined): string =>
   String(v ?? "").trim().toUpperCase().replace(/\s+/g, " ");
 
 /**
@@ -137,9 +137,31 @@ const CATEGORIA_POR_MARCA: Record<string, CategoriaReebok> = {
  *     Reebok con gorras avisaba en pantalla «valor inesperado» por un valor
  *     perfectamente normal**. Un aviso que grita sobre un dato bueno es el
  *     mismo defecto que la falsa alarma de abajo, en la otra punta del sistema.
- * El candado compara las dos listas y no deja agregar en una sin la otra.
+ *
+ * ═══ 🔴 DESDE EL 17-sep-2026 ESTAS SEIS SON LA **RED**, NO LA FUENTE ═════════
+ *
+ * Daniel dijo **«sí»** a volver este mapa administrable. Ahora vive en la tabla
+ * `reebok_rubro_categoria` (migración `20261205120000`) y se edita en
+ * **Catálogos › Reebok › Categorías del catálogo**. Estas seis líneas son la
+ * SEMILLA de esa tabla y, a la vez, **lo que se usa si la tabla no está o la
+ * consulta falla**: sin base, el catálogo clasifica exactamente igual que ayer.
+ *
+ * 🔴 **Lo que se administra es a CUÁL de las tres categorías va cada rubro**, no
+ * inventar categorías: `CategoriaReebok` sigue cerrado arriba, en el código. Una
+ * categoría nueva cambia pantallas, filtros y el bulto — eso no sale de una
+ * casilla.
+ *
+ * 🔴 **Y la MARCA sigue mandando primero.** `categoriaReebok` mira
+ * `CATEGORIA_POR_MARCA` ANTES que el rubro; el rubro es el plan B de una marca
+ * vacía. Ese orden no lo mueve ninguna tabla.
+ *
+ * 🩸 El espejo que había que tocar a mano (`REEBOK_CATEGORY_ESPERADAS`, en
+ * `depurador/reebok.ts`) ya no es una lista escrita: se DERIVA de acá con
+ * `rubrosQueElCatalogoConoce`. Por eso HEADWEAR ya no necesita agregarse en dos
+ * lugares — y por eso el candado que comparaba las dos listas cambió de
+ * dirección: ahora exige que exista UNA sola fuente.
  */
-const CATEGORIA_POR_RUBRO: Record<string, CategoriaReebok> = {
+export const CATEGORIA_POR_RUBRO_BASE: Readonly<Record<string, CategoriaReebok>> = {
   SHOES: "footwear",
   APPAREL: "apparel",
   SHORTS: "apparel",
@@ -147,6 +169,20 @@ const CATEGORIA_POR_RUBRO: Record<string, CategoriaReebok> = {
   BAGS: "accessories",
   HEADWEAR: "accessories",
 };
+
+/**
+ * Los rubros que el catálogo SABE traducir, en el orden del mapa.
+ *
+ * 🔴 **UNA sola fuente.** De acá sale `REEBOK_CATEGORY_ESPERADAS` (el aviso del
+ * Depurador) y de acá sale la pantalla: nadie vuelve a escribir esta lista a
+ * mano. Recibe el mapa por argumento para que el mismo cálculo sirva con el
+ * mapa del código (la red) y con el que trae la tabla.
+ */
+export function rubrosQueElCatalogoConoce(
+  porRubro: Readonly<Record<string, CategoriaReebok>> = CATEGORIA_POR_RUBRO_BASE,
+): string[] {
+  return Object.keys(porRubro);
+}
 
 /**
  * `subrubro` → género. LISTA CERRADA, igual que la de Tommy: lo que no está,
@@ -205,11 +241,18 @@ export function nombreDiceMujer(nombre: string | null | undefined): boolean {
 export function categoriaReebok(
   rubro: string | null | undefined,
   marca: string | null | undefined,
+  /**
+   * 🔴 EL MAPA `rubro → categoría`, QUE HOY SE ADMINISTRA. Por defecto, la RED:
+   * las seis reglas del código. Quien lea la tabla (`reebok-rubros-server.ts`)
+   * pasa el suyo; quien no, clasifica exactamente como ayer. **La función sigue
+   * siendo PURA**: nunca consulta nada.
+   */
+  porRubro: Readonly<Record<string, CategoriaReebok>> = CATEGORIA_POR_RUBRO_BASE,
 ): CategoriaReebok | null {
   // La MARCA primero, siempre. El rubro es el plan B de una marca vacía.
   const porMarca = CATEGORIA_POR_MARCA[U(marca)];
   if (porMarca) return porMarca;
-  return CATEGORIA_POR_RUBRO[U(rubro)] ?? null;
+  return porRubro[U(rubro)] ?? null;
 }
 
 /**
@@ -352,6 +395,9 @@ export function clasificacionDeArticulo(
    *  (ver `generoReebok`). Ningún otro camino lo mira. */
   nombre: string | null | undefined = null,
   guardado: ClasificacionGuardada = {},
+  /** El mapa `rubro → categoría` que hoy se administra. Sin él, la red del
+   *  código: ver `categoriaReebok`. */
+  porRubro: Readonly<Record<string, CategoriaReebok>> = CATEGORIA_POR_RUBRO_BASE,
 ): Clasificacion {
   const desconocidos: Clasificacion["desconocidos"] = [];
 
@@ -371,7 +417,7 @@ export function clasificacionDeArticulo(
     };
   }
 
-  const cat = categoriaReebok(ficha.rubro, ficha.marca);
+  const cat = categoriaReebok(ficha.rubro, ficha.marca, porRubro);
   if (cat === null) {
     // Se reporta el rubro Y la marca: los dos se miraron y ninguno alcanzó, así
     // que decir solo uno mandaría a corregir el campo equivocado.

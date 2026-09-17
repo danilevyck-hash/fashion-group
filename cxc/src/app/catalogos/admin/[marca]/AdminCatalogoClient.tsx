@@ -35,6 +35,7 @@ import SubirFotos from "./SubirFotos";
 import ProductoFila from "./ProductoFila";
 import { getMarcaTheme, type AdminProducto, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { catalogoAdminRoles } from "@/lib/catalogo/roles";
+import { puedeEditarRubros } from "@/lib/catalogos/reebok-rubros";
 import { normalizarSkuStorage } from "@/lib/catalogos/fotos-b2b";
 import { contarAlternativas, type StorageMarcaKey } from "@/lib/catalogos/variantes-paths";
 import {
@@ -82,7 +83,7 @@ export default function AdminCatalogoClient({ marca }: { marca: MarcaUiKey }) {
 function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
   const theme = getMarcaTheme(marca)!;
   // Administrar catálogos = admin + secretaria (fuente única en lib/catalogo/roles).
-  const { authChecked } = useAuth({ moduleKey: "catalogos", allowedRoles: catalogoAdminRoles() });
+  const { authChecked, role } = useAuth({ moduleKey: "catalogos", allowedRoles: catalogoAdminRoles() });
 
   // El chip elegido vive en la URL (`?ver=`): sobrevive al refresh y se comparte.
   // Es un filtro del MISMO nivel → `replace`, como manda la convención.
@@ -234,6 +235,21 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
               />
             </div>
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+          {/* 🔴 EL MAPA `rubro → categoría` SE ADMINISTRA (17-sep-2026), y solo
+              lo edita admin: mueve el cajón de un producto y, con él, el bulto
+              que se le cobra. ⚠️ Se le pregunta AL TEMA, nunca por el nombre de
+              la marca: hoy solo Reebok tiene mapa de rubros, y cada marca
+              clasifica distinto. */}
+          {theme.admin.rutaCategorias && puedeEditarRubros(role) && (
+            <a
+              href={theme.admin.rutaCategorias}
+              data-testid="enlace-categorias-reebok"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 active:scale-[0.97]"
+            >
+              Categorías del catálogo
+            </a>
+          )}
           {/* 🩸 Con 0 productos sin foto el botón seguía encendido y bajaba un
               Excel vacío. Apagado dice por qué. */}
           <button
@@ -247,6 +263,7 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
             </svg>
             {sinFoto.length === 0 ? "Todos tienen foto" : "Descargar Excel sin foto"}
           </button>
+          </div>
         </div>
 
         {cargando ? (

@@ -19,6 +19,9 @@ import { OUT_COLS, TEXT_COLS, ceilPar, precioDescripcion, marcaKey, tasaSwitch }
 import type { Cell, SheetRow, Redondeo, MarcaRubroFormula } from "./logic";
 import { COL_FOTO, TEXTO_SIN_FOTO } from "./fotos-excel";
 import { normalizarFlete } from "./flete";
+// 🔴 La lista de CATEGORY se DERIVA del mapa del catálogo: UNA sola fuente.
+// Ver `REEBOK_CATEGORY_ESPERADAS`, más abajo.
+import { rubrosQueElCatalogoConoce } from "@/lib/reebok-clasificacion";
 
 export { OUT_COLS, TEXT_COLS, ceilPar };
 
@@ -238,17 +241,28 @@ export interface ParseResult { items: ReebokItem[]; headerRow: number; cols: Ree
  */
 export const REEBOK_DEPARTMENT_ESPERADOS = ["FOOTWEAR", "APPAREL", "HARDWARE"] as const;
 
-/** Los CATEGORY que el catálogo sabe traducir a una categoría (`rubro`), que es
- *  el plan B cuando la marca viene vacía. Espejo del mapa de lectura —
- *  `src/lib/reebok-clasificacion.ts`. Si acá se agrega uno, allá tiene que
- *  existir, y hay candado que compara las dos listas.
+/**
+ * Los CATEGORY que el catálogo sabe traducir a una categoría (`rubro`), que es
+ * el plan B cuando la marca viene vacía.
  *
- *  ⚠️ `HEADWEAR` (gorras) se agregó el 2-sep-2026, cuando llegaron las primeras
- *  400 fichas REALES de Switch: son 7 artículos CON EXISTENCIA y sin él este
- *  aviso gritaba «valor inesperado» sobre un dato perfectamente bueno cada vez
- *  que Reebok mandaba gorras en el archivo. Un centinela que se equivoca deja de
- *  ser un centinela: se vuelve ruido que se aprende a ignorar. */
-export const REEBOK_CATEGORY_ESPERADAS = ["SHOES", "APPAREL", "SHORTS", "SOCKS", "BAGS", "HEADWEAR"] as const;
+ * ═══ 🩸 ESTO ERA UNA LISTA ESCRITA A MANO, Y ERA UN ESPEJO ══════════════════
+ *
+ * Hasta el 17-sep-2026 acá había seis valores tecleados y allá, en
+ * `src/lib/reebok-clasificacion.ts`, los mismos seis otra vez. Un candado
+ * comparaba las dos listas — que es la confesión de que el espejo estaba mal: el
+ * 2-sep-2026 `HEADWEAR` entró en una sola y **cada archivo de Reebok con gorras
+ * avisaba «valor inesperado» sobre un dato perfectamente bueno**. Un centinela
+ * que se equivoca deja de ser un centinela: se vuelve ruido que se aprende a
+ * ignorar.
+ *
+ * 🔴 **Ya no se escribe: se DERIVA.** La fuente es la tabla
+ * `reebok_rubro_categoria` (se administra en Catálogos › Reebok › Categorías del
+ * catálogo) y, cuando no está, las seis reglas del código
+ * (`CATEGORIA_POR_RUBRO_BASE`). Esta constante es el valor POR DEFECTO —el de la
+ * red— para quien llame a `valoresInesperados` sin pasarle nada; la pantalla de
+ * Plantilla Switch le pasa lo que trae la tabla.
+ */
+export const REEBOK_CATEGORY_ESPERADAS: readonly string[] = rubrosQueElCatalogoConoce();
 
 /** Los GENDER que el catálogo sabe traducir a un género (`subrubro`). Mismo
  *  espejo y mismo candado. */
@@ -267,8 +281,17 @@ export interface ValorInesperado {
  * Una celda VACÍA también cuenta: es el caso más peligroso, porque es el que
  * produce una columna renombrada, y en Switch se ve igual que un dato ausente.
  */
-export function valoresInesperados(items: readonly ReebokItem[]): ValorInesperado[] {
-  const esperadas = new Set<string>(REEBOK_CATEGORY_ESPERADAS);
+export function valoresInesperados(
+  items: readonly ReebokItem[],
+  /**
+   * 🔴 LOS RUBROS QUE EL CATÁLOGO CONOCE HOY. Por defecto, la red del código;
+   * la pantalla le pasa los de la tabla `reebok_rubro_categoria`. Así, agregar
+   * un rubro desde Catálogos › Reebok apaga este aviso **sin tocar código**, que
+   * es exactamente lo que el espejo impedía.
+   */
+  rubrosConocidos: readonly string[] = REEBOK_CATEGORY_ESPERADAS,
+): ValorInesperado[] {
+  const esperadas = new Set<string>(rubrosConocidos.map((r) => normH(r)));
   const esperados = new Set<string>(REEBOK_GENDER_ESPERADOS);
   const departamentos = new Set<string>(REEBOK_DEPARTMENT_ESPERADOS);
   const fuera = new Map<string, ValorInesperado>();

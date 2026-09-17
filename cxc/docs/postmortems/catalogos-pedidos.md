@@ -189,6 +189,165 @@ argumento).
 
 ---
 
+## 🔴 LAS CATEGORÍAS DEL CATÁLOGO REEBOK SE ADMINISTRAN, NO SE PROGRAMAN (17-sep-2026)
+
+Preguntado *«¿las categorías del catálogo Reebok las vuelvo administrables? Hoy
+viven en el código, por eso el botón «Agregarlas al catálogo» no se pudo hacer —
+no hay a dónde llevarte. Cada vez que Reebok traiga una categoría nueva hay que
+tocar código»*, Daniel contestó: **«sí»**.
+
+⚠️ La recomendación había sido dejarlo en el código (son pocas al año). **Él dijo
+que sí igual, y manda él.** Esa discusión está cerrada.
+
+### 🩸 Qué pasaba
+
+El mapa `rubro de Switch → categoría del catálogo` vivía en el código, y no en un
+lugar: en **DOS listas** que había que acordarse de tocar juntas.
+
+| Lista | Archivo | Para qué |
+|---|---|---|
+| `CATEGORIA_POR_RUBRO` | `src/lib/reebok-clasificacion.ts` | clasifica el producto |
+| `REEBOK_CATEGORY_ESPERADAS` | `src/lib/depurador/reebok.ts` | decide si el aviso de Plantilla Switch grita o se calla |
+
+Un candado comparaba las dos — **que es exactamente la confesión de que el espejo
+estaba mal**. Y ya había cobrado: el 2-sep-2026 `HEADWEAR` entró en una sola y
+**cada archivo de Reebok con gorras avisaba «valor inesperado» sobre un dato
+perfectamente bueno**.
+
+El 17-sep el despacho de ropa trajo **cuatro rubros que el catálogo no conoce**
+—`T-SHIRTS`, `TOPS`, `BRA`, `JACKETS`— y el aviso marcaba **30 de 75 artículos**
+sin ninguna pantalla a la que llevar a nadie. El botón solo podía decir «Copiar
+las categorías», y su comentario en el código lo admitía: *«un botón
+"Agregarlas al catálogo" sería un botón que promete algo que no pasa»*.
+
+### Lo que se hizo
+
+La tabla **`reebok_rubro_categoria`** (migración `20261205120000`), con su
+pantalla en **Catálogos › Reebok › Categorías del catálogo**. Las dos listas leen
+de ahí.
+
+### 🔴 Las cuatro reglas que no se mueven
+
+1. **Falla ABIERTA.** Sin tabla, sin migración o con la base callada se usa
+   `CATEGORIA_POR_RUBRO_BASE` —las seis reglas de siempre— y el catálogo
+   clasifica exactamente igual que ayer. `leerMapaDeRubros` **nunca lanza**; el
+   `GET` sin la migración contesta **200** con esos seis. Un problema de base no
+   puede dejar un producto sin cajón: el cajón neutro es lo que cambia el bulto
+   de 12 a 6, y eso es plata.
+2. **`CategoriaReebok` sigue CERRADO en el código**: calzado · ropa · accesorios.
+   Lo que se administra es **a cuál de las tres va cada rubro**, no inventar
+   categorías. Lo hacen cumplir el validador, la ruta y un **CHECK en la tabla**.
+   Una categoría nueva cambia pantallas, filtros y el bulto: eso no sale de una
+   casilla.
+3. **La MARCA sigue mandando primero.** `categoriaReebok` mira el `Department`
+   de Switch ANTES que el rubro; el rubro es el plan B de una marca vacía.
+   Ninguna fila de la tabla mueve ese orden — hay caso que lo prueba con una
+   tabla «traviesa» que manda `SHOES` a ropa y no consigue contradecir un
+   `Department = FOOTWEAR`.
+4. **`null` sigue siendo «no sé», nunca «otros»**, y un «no sé» **no pisa** lo
+   que ya está clasificado. Quitar una fila no manda ningún producto vivo al
+   cajón neutro.
+
+### Cómo viaja el mapa sin ensuciar el módulo puro
+
+`categoriaReebok` y `clasificacionDeArticulo` reciben el mapa **por argumento**,
+con la red del código como valor por defecto. Siguen siendo **puras**: no
+consultan nada. Quien lee la tabla es `reebok-rubros-server.ts`, con **import
+dinámico** de `supabase-server` — por la misma razón que `cargarFichas`:
+importar ese módulo nunca puede construir un cliente de Supabase.
+
+### El espejo murió
+
+`REEBOK_CATEGORY_ESPERADAS` ya no se escribe: **se DERIVA** con
+`rubrosQueElCatalogoConoce()`. El candado viejo
+(`depurador-reebok-clasificacion.test.ts`) **cambió de dirección con nota
+fechada**: ya no compara dos listas —comparar una lista consigo misma no protege
+nada— sino que exige que exista **UNA sola fuente** y que nadie escriba la
+segunda a mano, con un barrido que pone el build ROJO si vuelve el arreglo
+literal. Lleva su **CONTROL**: sin el rubro en el mapa, el aviso SÍ salta.
+
+### La pantalla
+
+- **Solo admin** (`RUBROS_ROLES_ESCRITURA`), con guard SSR. Leer es de admin +
+  secretaria, que es el par de Plantilla Switch: el aviso necesita la lista.
+  Escribir no se derivó de `CATALOGO_ADMIN_ROLES` a propósito — cambiar este
+  mapa mueve el cajón de un producto y, con él, el bulto que se le cobra.
+- **Soft delete firmado, NUNCA `DELETE`** (quién y cuándo, con CHECK que lo
+  exige), único **entre activas**, RLS `service_role`, sin `DELETE` en el GRANT.
+  Mismo patrón que `guias_destino_lista` y `comision_exclusion`.
+- El rubro se guarda **en MAYÚSCULAS y sin espacios de más**, que es como llega
+  de Switch (`U()`), y se compara por **igualdad exacta normalizada, NUNCA por
+  parecido**: «T-Shirts» es el mismo que «T-SHIRTS»; «T-SHIRT» en singular **no**.
+- Es de **Reebok y de nadie más**: cualquier otra marca cae en 404. Cada marca
+  clasifica distinto —Tommy y Calvin sacan el género de la DESCRIPCIÓN— así que
+  una pantalla compartida sería el mismo error que un mapa compartido. ⚠️ El
+  enlace desde «Administrar» se pregunta **al TEMA** (`admin.rutaCategorias`),
+  nunca por el nombre de la marca: lo exige `catalogo-admin-una-lista`.
+- Las seis semilla se editan como cualquier otra: **no hay filas intocables**.
+
+### Y el botón que quedó a medias
+
+«Copiar las categorías» pasa a **«Agregarlas al catálogo»** y lleva a la pantalla
+con los rubros del archivo listos para confirmar (`?agregar=T-SHIRTS,TOPS,…`).
+
+⚠️ **El enlace NO guarda nada**: solo llena el formulario. Del otro lado hay que
+elegir a qué cajón va cada rubro y tocar el botón. Una dirección que escribe en
+la base es una dirección que cualquiera dispara sin querer. Se abre en otra
+pestaña porque el archivo cargado vive en la memoria de esa pantalla.
+
+### 📏 Medido contra producción (17-sep-2026)
+
+`scripts/_medir-categorias-reebok.mjs` (solo lectura; la semilla la **lee del
+.sql**, no la teclea — un tercer lugar donde copiarla sería estrenar el mismo
+espejo):
+
+| | |
+|---|---|
+| `switch_articulo_info` · `active_shoes` | **1.763** artículos, los 1.763 con ficha traída |
+| Semilla de la migración vs mapa del código | **idénticas** |
+| **Artículos que cambian de categoría** | 🔴 **0 de 1.763** |
+
+🔑 **Y una cosa que conviene saber antes de tocar este mapa: hoy está DORMIDO en
+producción.** De los 1.763 artículos, **0 traen el `Department` vacío**, así que
+los 1.750 clasificados salen todos por el camino de la MARCA y el mapa del rubro
+—el que se volvió tabla— no llega a consultarse ni una vez. Es el plan B, y por
+eso agregarle un rubro **no mueve ningún cajón hoy**.
+
+**Agregando `T-SHIRTS` · `TOPS` · `BRA` · `JACKETS`:**
+
+| | Antes | Después |
+|---|---|---|
+| Artículos de `active_shoes` que cambian de cajón | — | **0** (ninguno trae hoy esos rubros) |
+| Ámbar del despacho real (`reebok-despacho-ropa-columnas-nuevas.xlsx`, 75 artículos) | **30 productos**, 4 categorías | **0** |
+| Ámbar del despacho chico (`reebok-despacho-nuevo-ropa.xlsx`, 5 artículos) | **2 productos**, 2 categorías | **0** |
+| Ámbar del despacho de calzado | 0 | 0 |
+
+O sea: **lo que se gana es que el aviso deje de gritar sobre datos buenos** —el
+40 % de la lista en ámbar sin nada que hacer— y que el día que un artículo llegue
+con el `Department` vacío el plan B lo sepa traducir. La clasificación de hoy no
+se toca, que es justo lo que se quería probar.
+
+Medición del aviso: `scripts/_medir-aviso-categorias-reebok.ts`, sobre los
+archivos reales que ya están en `src/__tests__/fixtures/`.
+
+**Candado:** `src/__tests__/lib/catalogo-reebok-rubros.test.ts` (46 casos).
+**Verificado por mutación: 19 mutaciones + 2 controles, 21 de 21 cazadas**
+(`bash scripts/_mutar-candados-reebok-rubros.sh`) — la lista vacía deja de caer a
+la red · el servidor deja de fallar abierto · el GET sin migración deja de servir
+los seis · la semilla manda SOCKS a accesorios · la semilla se olvida HEADWEAR ·
+el CHECK deja de cerrar las tres · el validador acepta una categoría inventada ·
+el rubro le gana a la marca · vuelve la lista escrita a mano · `valoresInesperados`
+ignora la lista que recibe · el repetido se caza por parecido · el rubro se guarda
+sin normalizar · quitar pasa a ser un DELETE · la baja deja de firmarse · escribir
+se le abre a la secretaria · la pantalla deja de rebotar · el botón deja de llevar
+a la pantalla · el sync deja de pasar el mapa · la tabla sale del respaldo.
+
+⚠️ **La migración quedó ESCRITA, sin correr.** La aplica Daniel:
+`npm run migrar supabase/migrations/20261205120000_reebok_rubro_categoria.sql`.
+Hasta entonces todo se comporta como antes, por la falla abierta.
+
+---
+
 ## 🔴 LOS OCHO NÚMEROS DEL HUB LOS SUMA LA BASE — 462,8 KB → 181 BYTES (14-sep-2026)
 
 Daniel, textual: *«5. ok va»*.

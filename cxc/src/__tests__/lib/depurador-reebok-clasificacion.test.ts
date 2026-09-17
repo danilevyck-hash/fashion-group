@@ -28,7 +28,12 @@ import {
   REEBOK_DEPARTMENT_ESPERADOS,
   type ReebokItem,
 } from "@/lib/depurador/reebok";
-import { categoriaReebok, generoReebok } from "@/lib/reebok-clasificacion";
+import {
+  categoriaReebok,
+  generoReebok,
+  rubrosQueElCatalogoConoce,
+  CATEGORIA_POR_RUBRO_BASE,
+} from "@/lib/reebok-clasificacion";
 import type { SheetRow } from "@/lib/depurador/logic";
 
 /** Un Book4 mínimo con la fila de encabezados que `findHeaderRow` busca. */
@@ -121,10 +126,25 @@ describe("la lista de valores esperados avisa ANTES de subir el archivo", () => 
   });
 });
 
-describe("🔴 la lista del Depurador es ESPEJO del mapa del catálogo", () => {
-  // Dos listas paralelas que se contradicen es el defecto que este repo ya pagó
-  // (la lección de `empresa-capabilities`). Si el Depurador espera un valor que
-  // el catálogo no sabe traducir, el aviso se calla justo cuando hace falta.
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 ESTE BLOQUE CAMBIÓ DE DIRECCIÓN EL 17-sep-2026 — no se borró.
+//
+// Hasta hoy decía: «la lista del Depurador es ESPEJO del mapa del catálogo», y
+// comprobaba que las dos listas escritas a mano coincidieran. Era lo correcto
+// MIENTRAS hubiera dos listas. 🩸 Pero el espejo era el problema: el 2-sep-2026
+// `HEADWEAR` entró en una sola y cada archivo de Reebok con gorras avisaba
+// «valor inesperado» sobre un dato perfectamente bueno.
+//
+// Daniel dijo **«sí»** a volver el mapa administrable (`reebok_rubro_categoria`)
+// y `REEBOK_CATEGORY_ESPERADAS` pasó a DERIVARSE de la misma fuente. Un test que
+// compara una lista consigo misma no protege nada.
+//
+// Ahora exige lo que de verdad importa: que exista **UNA sola fuente** y que
+// nadie vuelva a escribir la segunda a mano. La comprobación de que el catálogo
+// sabe traducir todo lo esperado se queda —ahora es trivialmente cierta, y ése
+// es el punto: es imposible desincronizarlas.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("🔴 la lista del Depurador se DERIVA del mapa del catálogo (era un espejo)", () => {
   it("🔴 todo Department esperado lo sabe traducir el catálogo — es la fuente PRIMARIA", () => {
     // Department sale a Switch como `Marca *`, y la marca es lo que manda.
     for (const d of REEBOK_DEPARTMENT_ESPERADOS) {
@@ -167,6 +187,40 @@ describe("🔴 la lista del Depurador es ESPEJO del mapa del catálogo", () => {
     // las 233, en la otra punta del sistema.
     expect(REEBOK_CATEGORY_ESPERADAS as readonly string[]).toContain("HEADWEAR");
     expect(categoriaReebok("HEADWEAR", "HARDWARE")).toBe("accessories");
+  });
+
+  it("🔴 17-sep-2026: la lista NO se escribe, se DERIVA — y son el MISMO objeto", () => {
+    // Si alguien vuelve a teclear los valores acá, esto se rompe: un arreglo
+    // literal nunca va a ser igual, elemento por elemento y en orden, a las
+    // claves del mapa… salvo que lo copie bien, y ahí entra la mutación de
+    // abajo (agregar un rubro al mapa y no a la lista).
+    expect([...REEBOK_CATEGORY_ESPERADAS]).toEqual(rubrosQueElCatalogoConoce());
+  });
+
+  it("🔴 un rubro nuevo en el mapa aparece SOLO en la lista del Depurador", () => {
+    // La prueba de que el espejo murió: con el mapa administrado, agregar un
+    // rubro no pide tocar dos archivos. Acá se simula con el mapa por argumento,
+    // que es exactamente lo que la tabla le pasa al código.
+    const conRopaNueva = { ...CATEGORIA_POR_RUBRO_BASE, "T-SHIRTS": "apparel" as const };
+    expect(rubrosQueElCatalogoConoce(conRopaNueva)).toContain("T-SHIRTS");
+    expect(categoriaReebok("T-SHIRTS", null, conRopaNueva)).toBe("apparel");
+    // Y el aviso del Depurador se calla con ese mismo mapa, sin tocar código.
+    const tee: ReebokItem = {
+      po: "PO-1", newArticle: "APPCL999", sku: "EAN9", name: "TEE", department: "APPAREL",
+      category: "T-SHIRTS", ageGroup: "ADULT", colorName: "BLACK", gender: "MALE",
+      sellIn: "Q3", wholesale: 10, wholesaleOff: null, talla: "M", piezas: 6,
+    };
+    expect(valoresInesperados([tee], rubrosQueElCatalogoConoce(conRopaNueva))).toEqual([]);
+  });
+
+  it("🔑 CONTROL: sin ese rubro, el aviso SÍ salta — el test de arriba prueba algo", () => {
+    const tee: ReebokItem = {
+      po: "PO-1", newArticle: "APPCL999", sku: "EAN9", name: "TEE", department: "APPAREL",
+      category: "T-SHIRTS", ageGroup: "ADULT", colorName: "BLACK", gender: "MALE",
+      sellIn: "Q3", wholesale: 10, wholesaleOff: null, talla: "M", piezas: 6,
+    };
+    const v = valoresInesperados([tee]);
+    expect(v.some((x) => x.columna === "CATEGORY" && x.valor === "T-SHIRTS")).toBe(true);
   });
 
   it("un archivo con gorras no dispara ningún aviso", () => {

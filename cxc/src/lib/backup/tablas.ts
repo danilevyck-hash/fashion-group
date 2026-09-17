@@ -130,6 +130,10 @@ export const TABLAS_PERSONAS = [
   "calvin_products",
   "joybees_products",
   "fg_catalogo_publico_switch",
+  // El mapa `rubro de Switch → categoría del catálogo Reebok` (17-sep-2026).
+  // Lo escribe Daniel a mano en Catálogos › Reebok y NO se puede volver a
+  // conseguir: Switch manda el rubro, no dice a qué cajón del catálogo va.
+  "reebok_rubro_categoria",
 
   // ── Pedidos y cotizaciones (los arman clientes y vendedores)
   "reebok_orders",

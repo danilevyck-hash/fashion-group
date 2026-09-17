@@ -14,6 +14,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import type { ReactNode } from "react";
+import { RUTA_CATEGORIAS_REEBOK } from "@/lib/catalogos/reebok-rubros";
 import { getBultoSize as reebokBulto } from "@/lib/reebok-bulto";
 import { getBultoSize as joybeesBulto } from "@/lib/joybees-bulto";
 import { getBultoSize as tommyBulto } from "@/lib/tommy-bulto";
@@ -469,6 +470,17 @@ export interface MarcaTheme {
      * es quien lo hace cumplir en el servidor — esto solo pinta el control.
      */
     bultoEditable?: boolean;
+    /**
+     * ¿Esta marca tiene una pantalla donde se administra el mapa
+     * `rubro → categoría`? Solo Reebok (17-sep-2026).
+     *
+     * 🔴 Se pregunta AL TEMA y no por el nombre de la marca: cada marca
+     * clasifica distinto —Tommy y Calvin sacan el género de la DESCRIPCIÓN,
+     * Reebok del rubro y el subrubro— así que una pantalla compartida sería el
+     * mismo error que un mapa compartido. La ruta la escribe una sola vez
+     * `reebok-rubros.ts`; acá solo se dice qué marca la tiene.
+     */
+    rutaCategorias?: string;
     pedidos: {
       linkBadge: string;
       linkBadgeCheck: string;
@@ -793,6 +805,9 @@ const REEBOK: MarcaTheme = {
     },
     syncModulo: "catalogo-reebok",
     syncSubtext: "tarda ~3 min",
+    // 🔴 Solo Reebok: el mapa `rubro → categoría` se administra desde el
+    // 17-sep-2026 (`reebok_rubro_categoria`). Ver `RUTA_CATEGORIAS_REEBOK`.
+    rutaCategorias: RUTA_CATEGORIAS_REEBOK,
     toastBg: "fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#1A2656] text-white text-sm px-5 py-2.5 rounded-full shadow-lg z-[9999]",
     tabActive: "bg-white text-[#1A2656] shadow-sm",
     spinner: "w-8 h-8 border-2 border-[#E4002B] border-t-transparent rounded-full animate-spin",

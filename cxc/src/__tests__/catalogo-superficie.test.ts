@@ -74,7 +74,11 @@ const CORE_MARCA = [
 
 // Rutas EXCLUSIVAS de una marca — siguen estáticas bajo su directorio (el
 // snapshot de PR-0 las esperaba ahí y el PR-1 no las generaliza).
-const SOLO_REEBOK = ["inventory", "pedidos-publicos"].sort();
+// 🔴 `rubros` entró el 17-sep-2026: el mapa `rubro → categoría` del catálogo
+// Reebok, que dejó de vivir en el código. Es exclusiva a propósito — cada marca
+// clasifica distinto (Tommy y Calvin sacan el género de la DESCRIPCIÓN), así que
+// una ruta compartida sería el mismo error que un mapa compartido.
+const SOLO_REEBOK = ["inventory", "pedidos-publicos", "rubros"].sort();
 // 🔴 Joybees se quedó SIN rutas exclusivas (11-sep-2026): `import` se retiró
 // (la gemela de `seed`, sin llamadores; ver rutas-de-catalogo-retiradas.test.ts)
 // y con ella se fue la carpeta. Una carpeta vacía o inexistente cuenta como

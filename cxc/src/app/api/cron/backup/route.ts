@@ -323,6 +323,9 @@ const DATASETS: Dataset[] = [
   // que ofrece el campo Dirección — las dos las escriben personas.
   { table: "guias_destino_cliente" },
   { table: "guias_destino_lista" },
+  // Catálogo Reebok: a qué cajón va cada rubro de Switch (17-sep-2026). Lo
+  // escribe Daniel a mano; Switch manda el rubro, no dice a qué categoría va.
+  { table: "reebok_rubro_categoria" },
   // Marketing: períodos, sus documentos, impulsadoras y los costos del proveedor
   // (separados del inventario a propósito — NO fusionar).
   { table: "mk_periodos" },
