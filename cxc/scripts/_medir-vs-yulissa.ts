@@ -160,7 +160,7 @@ async function main() {
       prorrateo: prorrateo.get(l.codigo)?.texto ?? null,
       diasConMarca: p?.resumen.diasTrabajados ?? 0,
       ausenciasDias: p?.resumen.ausenciasSinJustificar ?? 0,
-      tardanzaMin: p?.resumen.tardanzaMin ?? 0,
+      tardanzaMin: p?.resumen.minutosTarde ?? 0,
       salidaTempranaMin: p?.resumen.salidaTempranaMin ?? 0,
       extraMin: p?.resumen.extraMin ?? 0,
       dinero: l.dinero, manuales: l.manuales,
