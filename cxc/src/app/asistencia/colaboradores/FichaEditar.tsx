@@ -55,7 +55,6 @@ import {
   ETIQUETA_NO_MARCA_RELOJ,
   PREGUNTA_MARCA_RELOJ,
 } from "@/lib/asistencia/sueldo-fijo";
-import { ETIQUETA_SALDO_INICIAL } from "@/lib/asistencia/saldo-vacaciones";
 import { MOTIVOS_SALIDA, OPCION_MOTIVO } from "@/lib/asistencia/vigencia";
 import CedulaFoto from "./CedulaFoto";
 import type { PermisosDeLaPagina, PersonaDeLaPagina } from "./tipos";
@@ -69,7 +68,6 @@ export interface BorradorFicha {
   fechaIngreso: string;
   salario: string;
   jornada: number;
-  saldoVacaciones: string;
   servicioProfesional: boolean;
   pagaSeguros: boolean;
   baseSeguros: string;
@@ -94,8 +92,6 @@ export function borradorDe(p: PersonaDeLaPagina | null, codigo: string): Borrado
     fechaIngreso: p?.fechaIngreso ?? "",
     salario: p?.salarioMensual === null || p?.salarioMensual === undefined ? "" : String(p.salarioMensual),
     jornada: p?.jornadaSemanal ?? 40,
-    saldoVacaciones: p?.saldoVacacionesDias === null || p?.saldoVacacionesDias === undefined
-      ? "" : String(p.saldoVacacionesDias),
     servicioProfesional: p?.servicioProfesional ?? false,
     pagaSeguros: p?.pagaSeguros ?? true,
     baseSeguros: p?.baseSeguros === null || p?.baseSeguros === undefined ? "" : String(p.baseSeguros),
@@ -183,7 +179,7 @@ export default function FichaEditar({
             ))}
           </select>
         </Campo>
-        <Campo etiqueta="Empezó" ayuda="Su primer día. Sirve para el saldo de vacaciones.">
+        <Campo etiqueta="Empezó" ayuda="Su primer día. De aquí salen sus días de vacaciones.">
           <input type="date" className={CAMPO} value={b.fechaIngreso}
             onChange={(e) => set({ fechaIngreso: e.target.value })} />
         </Campo>
@@ -214,14 +210,10 @@ export default function FichaEditar({
             ))}
           </select>
         </Campo>
-        <Campo etiqueta={ETIQUETA_SALDO_INICIAL}
-          ayuda={permisos && !permisos.puedeCargarSaldoVacaciones
-            ? "Todavía no se puede cargar: falta correr el archivo de la base."
-            : "Los días que le quedan HOY. La fecha de corte la pone el sistema."}>
-          <input className={CAMPO} value={b.saldoVacaciones} inputMode="decimal"
-            disabled={!!permisos && !permisos.puedeCargarSaldoVacaciones}
-            onChange={(e) => set({ saldoVacaciones: e.target.value })} />
-        </Campo>
+        {/* 🩸 ACÁ VIVÍA «Días de vacaciones que le quedan hoy». Se fue el
+            17-sep-2026 —Daniel: *«Quita lo del saldo vacaciones»*—: los días se
+            CALCULAN desde «Empezó» (30 por cada 11 meses) y se ven en la
+            sección Vacaciones de esta misma página. No se teclean. */}
       </div>
 
       {/* ── EXCEPCIONES (plegadas) ──────────────────────────────────────── */}

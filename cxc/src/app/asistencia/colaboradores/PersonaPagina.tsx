@@ -101,7 +101,6 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
         puedeQuitarSeguros: !!d.puedeQuitarSeguros,
         puedeCargarBaseSeguros: !!d.puedeCargarBaseSeguros,
         puedeMarcarSueldoFijo: !!d.puedeMarcarSueldoFijo,
-        puedeCargarSaldoVacaciones: !!d.puedeCargarSaldoVacaciones,
       });
       // `null` = o no existe, o el código está ignorado — exactamente lo que
       // devolvía el `find` sobre la lista, que ya venía sin los ignorados.
@@ -162,7 +161,6 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
           noMarcaReloj: b.noMarcaReloj,
           cobraHorasExtra: b.cobraHorasExtra,
           trabajaAfuera: b.trabajaAfuera,
-          saldoVacacionesDias: b.saldoVacaciones.trim() === "" ? null : b.saldoVacaciones.trim(),
           posicion: b.posicion.trim(),
           cedula: b.cedula.trim(),
         }),

@@ -7,6 +7,65 @@
 
 ---
 
+## 🔴 Las vacaciones calculadas solas (17-sep-2026) — «Le corresponden N días»
+
+### Qué pidió Daniel
+
+> *«las vacaciones no funciona por día, hay que cambiar eso, funciona que por cada 11 meses trabajado, 1 mes de vacaciones»*
+
+> *«1. Un mes son 30 días corridos. 2. La fecha de ingreso que tiene la ficha. 3. [las ya tomadas] lo vemos después»*
+
+> *«Quita lo del saldo vacaciones»*
+
+### 🩸 Qué reemplaza, y por qué se fue
+
+Hasta hoy el número salía de un **SALDO INICIAL** que contabilidad escribía a mano en la ficha, con su **fecha de corte** (`saldo_vacaciones_dias` y `saldo_vacaciones_corte`, migración `20260826040000`). La idea era buena —contabilidad tiene el número en sus registros, y pedirle que reconstruya siete años no lo haría nadie— y **en la práctica no la usó nadie**.
+
+**Medido el 17-sep-2026 contra producción:** de las **49** fichas, **ninguna** tiene un número cargado — 47 con las dos columnas vacías y **2 con un 0** (Andrea Perez, código 16, corte 26-ago; Luis Adrián Arroyo, código 9, corte 2-sep), que es lo que queda cuando alguien guarda la ficha sin tocar el campo. O sea: la pantalla decía **«Falta el saldo» para todo el mundo**, y el dato que Daniel quería ver —cuántos días le tocan a alguien por su antigüedad— no se veía nunca.
+
+### La regla, entera
+
+- **30 días corridos por cada 11 MESES** trabajados desde `fecha_ingreso` (Código de Trabajo de Panamá, art. 54). Once, no doce.
+- Cada bloque de 11 meses cumplidos suma 30 días enteros; el bloque **en curso** suma `30 ÷ 11 = 2,7272…` por mes cumplido y se **TRUNCA** a día entero. 🔑 Hacia abajo a propósito: un día de más es un día que alguien se va sin haberlo ganado, y eso después se paga en plata.
+- Se le restan las vacaciones **registradas** en `asistencia_vacaciones` — las «ya pagadas» también restan (el derecho se consumió igual) y se cuentan **aparte**, para poder distinguir lo que descansó de lo que le pagaron.
+- Los días son de **CALENDARIO**, domingos adentro: los 30 de la ley son un mes corrido. Descontar solo los hábiles sería comparar dos unidades distintas y regalarle ~8 días por mes tomado.
+- 🔴 **Sin `fecha_ingreso` no sale un número. Ni cero.** Son **9 de las 49** fichas (medido): aparecen igual en la lista diciendo «Falta la fecha de ingreso», que además es la acción que hay que hacer.
+- 🔑 **Puede dar NEGATIVO y se muestra negativo:** se adelantan vacaciones, y recortar a cero escondería justo el caso que hay que mirar.
+
+### 🔴 NO ES UN SALDO, y ése es el punto
+
+Las vacaciones solo existen en el sistema desde el 25-ago-2026, y los días se ganan desde el ingreso — hay fichas de 2019. Así que el número es *lo que le corresponde por antigüedad menos lo registrado acá*, y **nadie sabe qué se tomó antes**. Por eso:
+
+- se lee **«Le corresponden N días»**, nunca «le quedan»;
+- va **siempre** con la línea, en gris: *«No incluye vacaciones tomadas antes del 17 de septiembre de 2026»*;
+- 🔴 **no entra a ningún cálculo de plata** —ni a la planilla ni a una liquidación—, y hay **barrido** que exige que ningún módulo que decide dinero lo importe y que el módulo mismo no nombre una rata, un salario ni `centavos()`.
+
+🩸 Ya pasó una vez: en el PR #626 el número era «ganados desde que entró menos lo tomado», aritméticamente correcto e inútil — ANGELA GARCIA figuraba con **245 días disponibles**. Cierto, y peligroso. La diferencia con hoy no es la cuenta: es que el número **dice lo que es** y no se usa para pagar.
+
+### El saldo a mano se RETIRA, no se dropea
+
+Patrón `mayor_lineas`. Las dos columnas se quedan en `asistencia_personas`, **sin lectores ni escritores**, con su `COMMENT` (migración **`20261204120000`**, pendiente de aplicar). El candado pone el build ROJO si una migración las dropea **o si el código vuelve a nombrarlas** (barrido sobre `src/lib/asistencia`, `src/app/api/asistencia` y `src/app/asistencia`, sin comentarios).
+
+Lo que se fue con ellas: el campo de la ficha (`FichaEditar` y `ConfiguracionTab`), su validación y su escritura en el PUT de `/api/asistencia/configuracion`, `datosSaldoDeFila` en `config-server.ts`, las dos columnas del `select`, y el faltante «saldo de vacaciones» de `que-le-falta.ts` — donde ahora manda la **fecha de ingreso**, que vale el doble.
+
+### Medido
+
+`scripts/_medir-vs-yulissa.ts` sobre 1–15 sep con corte 10-sep: **0 diferencias en 46 líneas**, $11.314,29 = $11.314,29. Era lo esperado —esto no toca plata— y se midió igual.
+
+### Candados
+
+`vacaciones-le-corresponden.test.ts` (28 casos, incluido el barrido de «nada de plata»). **15 mutaciones, 15 cazadas**, 2 controles en verde (`scripts/_mutar-candados-vacaciones-corresponden.sh`).
+
+Cambiaron de dirección con nota fechada **y CONTROL**: `asistencia-falta-configurar` (B) · `asistencia-lista-que-falta` (7 y 9) · `tolerancia-ddl-retirada-asistencia` (1 y 7) · `persona-en-el-centro` (I) · `asistencia-colaboradores-no-personas` · `asistencia-pestana-fichas-y-26` · `vacaciones-el-motor-las-honra`. Dos se rehicieron enteros, con su historia en la cabecera: `asistencia-saldo-configuracion` → **`asistencia-vacaciones-sin-saldo-a-mano`** y `asistencia-vacaciones-saldo` → **`asistencia-vacaciones-corresponden`**.
+
+### ⚠️ Lo que queda pendiente de Daniel
+
+1. **Correr la migración `20261204120000`** (solo pone dos `COMMENT`; no cambia ningún dato).
+2. **Las 9 fichas sin fecha de ingreso**: sin ella no hay número para esa gente.
+3. **Las vacaciones tomadas antes del 17-sep-2026** (*«lo vemos después»*). Hasta que estén cargadas, el número **no se puede usar para pagar**.
+
+---
+
 ## 🔴 El día libre de la empresa (17-sep-2026) — se paga completo y deja debiendo 8 horas
 
 ### Qué es, en palabras de Daniel

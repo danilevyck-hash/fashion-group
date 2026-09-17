@@ -126,7 +126,12 @@ describe("BARRIDO — nadie sacó las vacaciones del camino de cálculo", () => 
 
   it("⛔ la tabla y su lectura NO se borraron con la pestaña", () => {
     expect(() => leer("src/lib/asistencia/vacaciones.ts")).not.toThrow();
-    expect(() => leer("src/lib/asistencia/saldo-vacaciones.ts")).not.toThrow();
+    // ⚠️ CAMBIÓ DE NOMBRE el 17-sep-2026: `saldo-vacaciones.ts` pasó a
+    // `vacaciones-corresponden.ts` porque el número dejó de ser un saldo
+    // escrito a mano y pasó a CALCULARSE desde la fecha de ingreso (Daniel:
+    // *«Quita lo del saldo vacaciones»*). Lo que este caso protege es lo mismo:
+    // el módulo que cuenta los días sigue existiendo y no se borró con nada.
+    expect(() => leer("src/lib/asistencia/vacaciones-corresponden.ts")).not.toThrow();
     expect(() => leer("src/app/api/asistencia/vacaciones/route.ts")).not.toThrow();
     expect(() => leer("src/app/asistencia/VacacionesTab.tsx")).not.toThrow();
   });

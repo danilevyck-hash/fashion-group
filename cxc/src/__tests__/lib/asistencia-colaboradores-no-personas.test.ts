@@ -32,7 +32,7 @@ import {
   rutaDePersona,
 } from "@/lib/asistencia/persona-en-el-centro";
 import { avisoPendientes } from "@/lib/asistencia/configuracion-avisos";
-import { avisoSinSaldo } from "@/lib/asistencia/saldo-vacaciones";
+import { avisoSinFechaIngreso } from "@/lib/asistencia/vacaciones-corresponden";
 import { textoExtraNoAprobada } from "@/lib/asistencia/aprobaciones";
 
 const RAIZ = join(__dirname, "..", "..", "..");
@@ -179,9 +179,13 @@ describe("E. los avisos y el Telegram hablan de colaboradores", () => {
       .toBe("1 colaborador de 38 todavía no sale en la planilla.");
   });
 
-  it("el aviso de quién se quedó sin saldo", () => {
-    expect(avisoSinSaldo(20, 16)).toContain("36 colaboradores no tienen saldo");
-    expect(avisoSinSaldo(1, 0)).toContain("1 colaborador no tiene saldo");
+  // ⚠️ CAMBIÓ DE DIRECCIÓN el 17-sep-2026: el saldo escrito a mano se retiró
+  // (Daniel: *«Quita lo del saldo vacaciones»*) y los días se calculan desde la
+  // fecha de ingreso. Lo que este caso protege NO cambió: el aviso dice
+  // «colaboradores», nunca «personas».
+  it("el aviso de quién se quedó sin fecha de ingreso", () => {
+    expect(avisoSinFechaIngreso(36)).toContain("36 colaboradores no tienen fecha de ingreso");
+    expect(avisoSinFechaIngreso(1)).toContain("1 colaborador no tiene fecha de ingreso");
   });
 
   it("el aviso de horas extra sin aprobar de la planilla", () => {

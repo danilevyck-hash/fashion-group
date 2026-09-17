@@ -618,7 +618,13 @@ describe("I. 🔴 EL SALDO EN PERSONAS, LAS JUSTIFICACIONES EN REPORTE", () => {
   it("Personas trae la columna «Vacaciones», del MISMO motor de siempre", () => {
     const src = puro(CONFIG);
     expect(src).toMatch(/"\/api\/asistencia\/vacaciones"/);
-    expect(src).toMatch(/textoSaldo\(saldo\)/);
+    // ⚠️ CAMBIÓ DE DIRECCIÓN el 17-sep-2026: el saldo escrito a mano se retiró
+    // y la columna muestra los días CALCULADOS (`corresponden`, 30 por cada 11
+    // meses). Lo que este caso protege no cambió: el número sale de la MISMA
+    // ruta que la pestaña Vacaciones, nunca de una segunda cuenta.
+    expect(src).toMatch(/corresponden\.get\(String\(p\.codigo\)\)/);
+    // 🔑 CONTROL: la pantalla NO calcula nada por su cuenta.
+    expect(src).not.toMatch(/MESES_POR_PERIODO|DIAS_POR_PERIODO/);
     expect(leer(CONFIG)).toMatch(/>Vacaciones</);
     // La rejilla del escritorio gana una columna, escrita completa.
     // 🔴 10-sep-2026 (tarde): sin «Rata / hora» y con «Qué falta» ancha al final

@@ -143,6 +143,8 @@ const FICHA_JULIO = {
   empleado_codigo: JULIO, nombre: "JULIO GARAY", salario_mensual: "1000.00",
   jornada_semanal: 40, empresa: "vistana", fecha_ingreso: null, fecha_salida: null,
   motivo_salida: null, servicio_profesional: false, paga_seguros: true,
+  // 🔑 CONTROL de la retirada: las dos columnas SIGUEN en la fila doblada (la
+  // base las tiene, nadie las dropeó) y el módulo ya NO las lee ni las escribe.
   saldo_vacaciones_dias: null, saldo_vacaciones_corte: null, no_marca_reloj: false,
   seguros_base_quincena: null,
 };
@@ -213,8 +215,14 @@ describe("1. config-server.ts — cinco lecturas, ninguna degrada ya", () => {
     // contesta el 42703 SOLO si el `select` nombra la columna (como PostgREST):
     // así una relectura «sin ella» tendría ÉXITO, y se vería. Una sola
     // relectura sin cualquiera de ellas es plata mal pagada.
+    // ⚠️ CAMBIÓ DE DIRECCIÓN el 17-sep-2026: `saldo_vacaciones_dias` salió de
+    // esta lista porque la columna se RETIRÓ —el `select` ya no la nombra, así
+    // que nunca puede dar 42703— y los días se calculan desde la fecha de
+    // ingreso (`vacaciones-corresponden.ts`). Lo que este caso protege sigue
+    // igual para las otras CINCO: una lectura que falla LANZA, nunca reintenta
+    // sin la columna. El CONTROL está abajo: la columna no se lee más.
     for (const col of [
-      "seguros_base_quincena", "no_marca_reloj", "saldo_vacaciones_dias",
+      "seguros_base_quincena", "no_marca_reloj",
       "paga_seguros", "servicio_profesional", "fecha_salida",
     ]) {
       lecturas.length = 0;
@@ -493,10 +501,10 @@ describe("7. /api/asistencia/configuracion — la pantalla ya no dice «falta co
     expect(j.personas.map((p) => p.codigo)).toEqual([JULIO]);
     expect(j.faltaMigracion).toBe(false);
     expect(j.avisoMigracion).toBeNull();
-    for (const k of ["puedeDarDeBaja", "puedeMarcarServicioProfesional", "puedeQuitarSeguros", "puedeCargarBaseSeguros", "puedeMarcarSueldoFijo", "puedeCargarSaldoVacaciones"]) {
+    for (const k of ["puedeDarDeBaja", "puedeMarcarServicioProfesional", "puedeQuitarSeguros", "puedeCargarBaseSeguros", "puedeMarcarSueldoFijo"]) {
       expect(j[k], k).toBe(true);
     }
-    for (const k of ["avisoMigracionBajas", "avisoMigracionServicioProfesional", "avisoMigracionSeguros", "avisoMigracionBaseSeguros", "avisoMigracionNoMarcaReloj", "avisoMigracionSaldoVacaciones", "avisoMigracionReparto"]) {
+    for (const k of ["avisoMigracionBajas", "avisoMigracionServicioProfesional", "avisoMigracionSeguros", "avisoMigracionBaseSeguros", "avisoMigracionNoMarcaReloj", "avisoMigracionReparto"]) {
       expect(j[k], k).toBeNull();
     }
   });
@@ -527,13 +535,15 @@ describe("7. /api/asistencia/configuracion — la pantalla ya no dice «falta co
     expect(res.status).toBe(200);
     expect(escrituras).toHaveLength(1);
     const fila = escrituras[0].payload as Record<string, unknown>;
-    for (const col of ["fecha_salida", "servicio_profesional", "paga_seguros", "saldo_vacaciones_dias", "no_marca_reloj", "seguros_base_quincena"]) {
+    // ⚠️ Sin `saldo_vacaciones_dias` desde el 17-sep-2026: la columna se retiró
+    // y el upsert ya no la escribe. Son SEIS − 1 = cinco.
+    for (const col of ["fecha_salida", "servicio_profesional", "paga_seguros", "no_marca_reloj", "seguros_base_quincena"]) {
       expect(col in fila, col).toBe(true);
     }
   });
 
   it("🔴 PUT con PGRST204 de CADA columna es 500 y un solo upsert — antes reintentaba sin ella (o 503)", async () => {
-    for (const col of ["seguros_base_quincena", "no_marca_reloj", "saldo_vacaciones_dias", "paga_seguros", "servicio_profesional", "fecha_salida"]) {
+    for (const col of ["seguros_base_quincena", "no_marca_reloj", "paga_seguros", "servicio_profesional", "fecha_salida"]) {
       escrituras.length = 0;
       // Como PostgREST: el PGRST204 sale SOLO si el upsert trae la columna. Un
       // reintento «sin ella» tendría ÉXITO y contestaría 200 — y se vería.

@@ -10,9 +10,12 @@
 //     empresa, sin salario (salvo servicio profesional) o sin horario (salvo
 //     quien cobra fijo y no pasa por el reloj). Con cualquiera de estos la
 //     planilla sale mal o no sale.
-//   · «Falta completar»   — sin cargo, sin cédula, sin saldo de vacaciones (el
-//     saldo Y su fecha de corte) o sin fecha de ingreso. La quincena sale
-//     igual; lo que sale mal es el comprobante, el saldo o la antigüedad.
+//   · «Falta completar»   — sin cargo, sin cédula o sin fecha de ingreso. La
+//     quincena sale igual; lo que sale mal es el comprobante o la antigüedad.
+//     🩸 Hasta el 17-sep-2026 acá también estaba «saldo de vacaciones» (el
+//     saldo escrito a mano Y su fecha de corte). Se fue con las columnas —
+//     Daniel: *«Quita lo del saldo vacaciones»*—: los días ahora se CALCULAN
+//     desde la fecha de ingreso, que ya se pide en esta misma lista.
 //
 // 🔴 Los dos cuentan solo ACTIVOS (eso lo filtra quien llama: la lista ya
 // separa a los que se fueron) y un colaborador puede estar en los dos.
@@ -24,7 +27,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type FaltaParaPagar = "empresa" | "salario" | "horario";
-export type FaltaCompletar = "cargo" | "cedula" | "saldo" | "ingreso";
+export type FaltaCompletar = "cargo" | "cedula" | "ingreso";
 
 export interface Faltantes {
   paraPagar: FaltaParaPagar[];
@@ -45,8 +48,6 @@ export interface FichaParaFaltantes {
   posicion?: string | null;
   cedula?: string | null;
   fechaIngreso: string | null;
-  saldoVacacionesDias: number | null;
-  saldoVacacionesCorte: string | null;
 }
 
 const vacio = (v: string | null | undefined) => !v || !String(v).trim();
@@ -68,15 +69,9 @@ export function queLeFalta(p: FichaParaFaltantes): Faltantes {
   const completar: FaltaCompletar[] = [];
   if (vacio(p.posicion)) completar.push("cargo");
   if (vacio(p.cedula)) completar.push("cedula");
-  // 🔴 Los DOS datos: un saldo sin fecha de corte es un saldo a un día que
-  // nadie sabe (mismo CHECK de la tabla).
-  if (
-    p.saldoVacacionesDias === null
-    || !Number.isFinite(p.saldoVacacionesDias)
-    || vacio(p.saldoVacacionesCorte)
-  ) {
-    completar.push("saldo");
-  }
+  // 🔴 LA FECHA DE INGRESO ES LA QUE VALE, y desde el 17-sep-2026 vale el
+  // doble: sin ella no se puede decir cuántos días de vacaciones le
+  // corresponden (`vacaciones-corresponden.ts`).
   if (vacio(p.fechaIngreso)) completar.push("ingreso");
 
   return { paraPagar, completar };
@@ -89,7 +84,6 @@ export const ROTULO_FALTANTE: Readonly<Record<FaltaParaPagar | FaltaCompletar, s
   horario: "horario",
   cargo: "cargo",
   cedula: "cédula",
-  saldo: "saldo de vacaciones",
   ingreso: "fecha de ingreso",
 });
 

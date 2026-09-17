@@ -7,8 +7,11 @@
 // son DOS:
 //   · «Falta para pagar»  — sin ficha · sin salario (salvo servicio
 //     profesional) · sin horario.
-//   · «Falta completar»   — sin cargo · sin cédula · sin saldo de vacaciones
-//     (saldo + fecha de corte) · sin fecha de ingreso.
+//   · «Falta completar»   — sin cargo · sin cédula · sin fecha de ingreso.
+//     ⚠️ CAMBIÓ DE DIRECCIÓN el 17-sep-2026: «saldo de vacaciones» salió de esta
+//     lista. El saldo escrito a mano se retiró (Daniel: *«Quita lo del saldo
+//     vacaciones»*) y los días se calculan desde la FECHA DE INGRESO, que sigue
+//     en la lista y ahora vale el doble. Ver `vacaciones-corresponden.ts`.
 // Los dos cuentan solo ACTIVOS; uno puede estar en los dos. Reemplazan a
 // «Falta configurar» y a «Sin saldo». La regla vive en un módulo PURO y la fila
 // dice en texto corto qué falta, con lo de pagar primero.
@@ -54,8 +57,6 @@ const COMPLETA: FichaParaFaltantes = {
   posicion: "Vendedora",
   cedula: "8-123-456",
   fechaIngreso: "2024-03-01",
-  saldoVacacionesDias: 12,
-  saldoVacacionesCorte: "2026-09-01",
 };
 
 describe("A. 🔴 «Falta para pagar»: lo que hace que la quincena salga mal", () => {
@@ -97,18 +98,22 @@ describe("A. 🔴 «Falta para pagar»: lo que hace que la quincena salga mal", 
 });
 
 describe("B. 🔴 «Falta completar»: la quincena sale, el papel o el saldo no", () => {
-  it("cargo, cédula, saldo y fecha de ingreso, en ese orden", () => {
+  it("cargo, cédula y fecha de ingreso, en ese orden", () => {
     const f = queLeFalta({
-      ...COMPLETA, posicion: "", cedula: null, saldoVacacionesDias: null, fechaIngreso: null,
+      ...COMPLETA, posicion: "", cedula: null, fechaIngreso: null,
     });
-    expect(f.completar).toEqual(["cargo", "cedula", "saldo", "ingreso"]);
+    expect(f.completar).toEqual(["cargo", "cedula", "ingreso"]);
     expect(f.paraPagar).toEqual([]);
   });
 
-  it("🔴 el saldo de vacaciones son DOS datos: sin la fecha de corte también falta", () => {
-    expect(queLeFalta({ ...COMPLETA, saldoVacacionesCorte: null }).completar).toEqual(["saldo"]);
-    expect(queLeFalta({ ...COMPLETA, saldoVacacionesDias: null }).completar).toEqual(["saldo"]);
-    expect(queLeFalta({ ...COMPLETA, saldoVacacionesDias: 0 }).completar).toEqual([]);
+  // ⚠️ CAMBIÓ DE DIRECCIÓN el 17-sep-2026: acá se exigía que el saldo y su
+  // fecha de corte fueran DOS datos. Los dos se retiraron. Lo que queda —y es
+  // el CONTROL de que la retirada no se llevó nada por delante— es que la
+  // FECHA DE INGRESO sigue siendo obligatoria para completar, porque de ella
+  // salen ahora los días de vacaciones.
+  it("🔑 CONTROL — la fecha de ingreso sigue faltando, y el saldo ya no existe", () => {
+    expect(queLeFalta({ ...COMPLETA, fechaIngreso: null }).completar).toEqual(["ingreso"]);
+    expect(queLeFalta(COMPLETA).completar).toEqual([]);
   });
 
   it("un cargo o una cédula en blanco cuentan como faltantes", () => {

@@ -32,8 +32,6 @@ export interface PersonaDeLaPagina {
   fechaIngreso: string | null;
   fechaSalida: string | null;
   motivoSalida: MotivoSalida | null;
-  saldoVacacionesDias: number | null;
-  saldoVacacionesCorte: string | null;
   activo: boolean;
   baja: string | null;
   marcaciones: number;
@@ -55,5 +53,4 @@ export interface PermisosDeLaPagina {
   puedeQuitarSeguros: boolean;
   puedeCargarBaseSeguros: boolean;
   puedeMarcarSueldoFijo: boolean;
-  puedeCargarSaldoVacaciones: boolean;
 }

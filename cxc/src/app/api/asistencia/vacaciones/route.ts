@@ -15,7 +15,6 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { TABLA_VACACIONES, esTablaFaltante } from "@/lib/asistencia/config";
 import {
   avisoMigracionVacaciones,
-  datosSaldoDeFila,
   leerPersonasDelModulo,
   vigenciaDeFila,
   type FilaPersonaDb,
@@ -23,11 +22,12 @@ import {
 import { esYaPagada, type Vacacion } from "@/lib/asistencia/vacaciones";
 import { tieneBaja } from "@/lib/asistencia/vigencia";
 import {
-  avisoSinSaldo,
-  DESDE_CUANDO_CUENTA,
-  saldoDe,
-  type SaldoVacaciones,
-} from "@/lib/asistencia/saldo-vacaciones";
+  avisoSinFechaIngreso,
+  COMO_SE_CALCULA,
+  correspondenA,
+  NO_INCLUYE_ANTES,
+  type DiasCorresponden,
+} from "@/lib/asistencia/vacaciones-corresponden";
 import { hoyPanama } from "@/lib/fecha-panama";
 
 export const dynamic = "force-dynamic";
@@ -82,20 +82,21 @@ export async function GET(req: NextRequest) {
         faltaMigracion,
         puedeCargar: false,
         avisoMigracion: avisoMigracionVacaciones(),
-        // Sin la tabla no hay vacaciones que restar, así que un saldo sería
-        // «todo lo ganado y nada gastado»: un número inventado. No se manda
-        // ninguno — el aviso ámbar de arriba ya dice qué falta.
-        saldos: [],
-        avisoSaldo: null,
-        avisoSaldoIncompleto: null,
-        desdeCuandoCuenta: DESDE_CUANDO_CUENTA,
+        // Sin la tabla no hay vacaciones que restar, así que el número sería
+        // «todo lo ganado y nada gastado»: inventado. No se manda ninguno — el
+        // aviso ámbar de arriba ya dice qué falta.
+        corresponden: [],
+        avisoSinFecha: null,
+        avisoIncompleto: null,
+        comoSeCalcula: COMO_SE_CALCULA,
+        noIncluyeAntes: NO_INCLUYE_ANTES,
       });
     }
     return NextResponse.json({ error: res.error.message }, { status: 500 });
   }
 
   const vacaciones = res.data ?? [];
-  const { saldos, avisoSaldo } = armarSaldos(vacaciones, personas, filas);
+  const { corresponden, avisoSinFecha } = armarCorresponden(vacaciones, personas, filas);
 
   return NextResponse.json({
     vacaciones,
@@ -103,44 +104,48 @@ export async function GET(req: NextRequest) {
     faltaMigracion,
     puedeCargar: true,
     avisoMigracion: null,
-    saldos,
-    avisoSaldo,
+    corresponden,
+    avisoSinFecha,
     // 🔴 Se DICE, no se esconde: si llegaron menos vacaciones de las que hay, el
-    // saldo está restando de menos y quien lo mire tiene que saberlo.
-    avisoSaldoIncompleto:
+    // número está restando de menos y quien lo mire tiene que saberlo.
+    avisoIncompleto:
       typeof res.count === "number" && res.count > vacaciones.length
-        ? `Se están mostrando ${vacaciones.length} de ${res.count} vacaciones: el saldo puede estar restando de menos.`
+        ? `Se están mostrando ${vacaciones.length} de ${res.count} vacaciones: los días pueden estar restando de menos.`
         : null,
-    desdeCuandoCuenta: DESDE_CUANDO_CUENTA,
+    comoSeCalcula: COMO_SE_CALCULA,
+    // 🔴 LA LÍNEA QUE NO SE PUEDE SACAR: sin ella el número se lee como un
+    // saldo, y nadie sabe qué se tomó antes de que se cargaran acá.
+    noIncluyeAntes: NO_INCLUYE_ANTES,
   });
 }
 
 /**
- * El saldo de cada persona ACTIVA, en el orden que ya trae el directorio
- * (nombre alfabético; los códigos sin ficha al final).
+ * Los días que le corresponden a cada persona ACTIVA, en el orden que ya trae el
+ * directorio (nombre alfabético; los códigos sin ficha al final).
  *
- * ── 🔴 A QUIEN LE FALTA UN DATO IGUAL APARECE ───────────────────────────────
+ * ── 🔴 A QUIEN LE FALTA LA FECHA DE INGRESO IGUAL APARECE ───────────────────
  *
- * Con `saldo: null` y `falta` diciendo CUÁL de los dos, que la pantalla pinta
- * como «Falta la fecha de ingreso» / «Falta el saldo». Filtrarlo de la lista
- * sería descartarlo en silencio: hoy son las 36 personas activas (medido por la
- * puerta de la app el 25-ago-2026) y es justamente el trabajo que contabilidad
- * tiene por delante.
+ * Con `dias: null` y `faltaFechaIngreso`, que la pantalla pinta como «Falta la
+ * fecha de ingreso». Filtrarlo de la lista sería descartarlo en silencio — y
+ * además es exactamente el trabajo que hay que hacer para que su número exista.
  *
- * 🔴 Y NUNCA sale un número grande sin respaldo: sin saldo inicial no hay
- * saldo. Ver la cabecera de `saldo-vacaciones.ts` — los 245 días de ANGELA.
+ * ── 🔴 NO ES UN SALDO, Y NO SE USA PARA PAGAR ───────────────────────────────
+ *
+ * Es lo que le corresponde por antigüedad menos lo REGISTRADO en el sistema.
+ * Nadie sabe qué se tomó antes, así que viaja siempre con `noIncluyeAntes` y no
+ * entra a ningún cálculo de plata. Ver `vacaciones-corresponden.ts`.
  *
  * ── ⚠️ QUIEN YA NO TRABAJA ACÁ NO ENTRA ─────────────────────────────────────
  *
- * Misma regla que el resumen de Configuración: el saldo es para decidir quién
+ * Misma regla que el resumen de Configuración: el número es para decidir quién
  * puede irse de vacaciones, y quien ya se fue de la empresa no. Su liquidación
  * es otra cuenta —y otra pantalla— que hoy no existe.
  */
-function armarSaldos(
+function armarCorresponden(
   vacacionesDb: readonly Record<string, unknown>[],
   personas: readonly { codigo: string; etiqueta: string }[],
   filas: readonly FilaPersonaDb[],
-): { saldos: SaldoVacaciones[]; avisoSaldo: string | null } {
+): { corresponden: DiasCorresponden[]; avisoSinFecha: string | null } {
   const fichas = new Map(filas.map((f) => [String(f.empleado_codigo), f]));
   const hoy = hoyPanama();
 
@@ -153,33 +158,24 @@ function armarSaldos(
     ya_pagadas: f.ya_pagadas === true,
   }));
 
-  const saldos = personas
+  const corresponden = personas
     // Sin ficha NO hay baja posible: es un código que marca y nadie configuró
     // todavía, o sea que sigue activo. Es el mismo criterio de Configuración.
     .filter((p) => {
       const f = fichas.get(p.codigo);
       return !f || !tieneBaja(vigenciaDeFila(f));
     })
-    .map((p) => {
-      const f = fichas.get(p.codigo);
-      return saldoDe(
-        p.codigo,
-        p.etiqueta,
-        // Sin ficha no hay ni fecha ni saldo: los dos faltan, y se dice.
-        f ? datosSaldoDeFila(f) : { fechaIngreso: null, saldoInicial: null, corte: null },
-        vacaciones,
-        hoy,
-      );
-    });
+    .map((p) => correspondenA(
+      p.codigo, p.etiqueta,
+      // Sin ficha no hay fecha de ingreso: se dice, no se inventa un número.
+      fichas.get(p.codigo)?.fecha_ingreso ?? null,
+      vacaciones, hoy,
+    ));
 
   return {
-    saldos,
-    // ⚠️ Los dos baldes son DISJUNTOS y suman el total: a quien le falta la
-    // fecha se lo cuenta ahí aunque también le falte el saldo. Solapados, el
-    // aviso diría que hay más gente de la que hay.
-    avisoSaldo: avisoSinSaldo(
-      saldos.filter((s) => s.falta === "fecha" || s.falta === "ambos").length,
-      saldos.filter((s) => s.falta === "saldo").length,
+    corresponden,
+    avisoSinFecha: avisoSinFechaIngreso(
+      corresponden.filter((c) => c.faltaFechaIngreso).length,
     ),
   };
 }

@@ -10,7 +10,7 @@
  * explícito). Juntarlas en la misma sección haría que alguien las descuente.
  *
  * 🔑 Solo se DIBUJA cuando debe algo o cuando tiene días cargados: una sección
- * que dice «no debe nada» en 44 fichas es una sección que se deja de leer.
+ * que dice «no debe nada» en las 49 fichas es una sección que se deja de leer.
  *
  * La regla entera vive en `lib/asistencia/dia-libre-empresa.ts`.
  * ────────────────────────────────────────────────────────────────────────── */

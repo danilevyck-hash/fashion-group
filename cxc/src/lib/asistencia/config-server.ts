@@ -20,6 +20,8 @@
  *   · hora_desde / hora_hasta (justificaciones)       — 20260825140000
  *   · `asistencia_vacaciones`                         — 20260825160000
  *   · saldo_vacaciones_dias / _corte                  — 20260826040000
+ *     🩸 RETIRADAS el 17-sep-2026: sin lectores. Los días de vacaciones se
+ *     calculan desde `fecha_ingreso` (`vacaciones-corresponden.ts`).
  *   · no_marca_reloj                                  — 20260826080000
  *   · seguros_base_quincena                           — 20260826120000
  *   · `asistencia_reparto_empresa`                    — 20260901120000
@@ -62,7 +64,6 @@ import {
 } from "./vigencia";
 import { COLUMNA_SERVICIO_PROFESIONAL, esServicioProfesional } from "./participacion";
 import { COLS_PERMISO_HORAS } from "./permiso-horas";
-import { COLS_SALDO_VACACIONES, numeroDeDias, type DatosSaldo } from "./saldo-vacaciones";
 import type { Justificacion } from "./reporte";
 // 🔑 SOLO EL TIPO: `vacaciones.ts` es PURO y no puede importar de acá. Un
 // import de valor armaría el ciclo al revés y sin necesidad.
@@ -149,14 +150,12 @@ export interface FilaPersonaDb {
    *  QUINCENA — ver `seguros-base.ts`.
    *  ⚠️ `numeric` en la base, y PostgREST lo manda como TEXTO. Ver `baseSeguros`. */
   seguros_base_quincena?: number | string | null;
-  /** El saldo de vacaciones (20260826040000). Los DOS o NINGUNO (lo obliga un
-   *  CHECK). `null` = todavía no se cargó el saldo, y entonces la pantalla dice
-   *  «Falta el saldo» y NO muestra número. */
-  /** ⚠️ `numeric` en la base, y PostgREST lo manda como TEXTO. Ver
-   *  `numeroDeDias` — el mismo motivo por el que `salario_mensual` se lee con
-   *  un `Number(...)` unas líneas más arriba. */
-  saldo_vacaciones_dias?: number | string | null;
-  saldo_vacaciones_corte?: string | null;
+  // 🩸 Acá vivían `saldo_vacaciones_dias` y `saldo_vacaciones_corte`
+  // (20260826040000). Se RETIRARON el 17-sep-2026 —Daniel: *«Quita lo del saldo
+  // vacaciones»*—: de las 49 fichas NINGUNA tenía un número: 47 vacías y 2 con un 0 escrito al guardar la ficha y los días ahora se CALCULAN
+  // desde `fecha_ingreso` (`vacaciones-corresponden.ts`). Las columnas siguen en
+  // la base, sin lectores, con `COMMENT` y con candado que prohíbe volver a
+  // leerlas desde acá. NO se vuelven a agregar a este `select`.
   /** El cargo impreso en «POSICION DESEMPEÑADA» del comprobante (20261028120000).
    *  `null` = todavía no se cargó, y el papel dice un guion. NO toca el cálculo. */
   posicion?: string | null;
@@ -196,10 +195,10 @@ const COLS_CON_BAJAS = `${COLS_BASE}, ${COLUMNAS_BAJAS.join(", ")}`;
 const COLS_CON_SERVICIO = `${COLS_CON_BAJAS}, ${COLUMNA_SERVICIO_PROFESIONAL}`;
 /** Todo, con el interruptor de los seguros. Sale de `seguros.ts` por lo mismo. */
 const COLS_TODO = `${COLS_CON_SERVICIO}, ${COLUMNA_PAGA_SEGUROS}`;
-/** Todo, con el saldo de vacaciones. Salen de `saldo-vacaciones.ts`, por lo mismo. */
-const COLS_CON_SALDO = `${COLS_TODO}, ${COLS_SALDO_VACACIONES.join(", ")}`;
-/** Todo, con el sueldo fijo. Sale de `sueldo-fijo.ts`, por lo mismo. */
-const COLS_CON_RELOJ = `${COLS_CON_SALDO}, ${COLUMNA_NO_MARCA_RELOJ}`;
+/** Todo, con el sueldo fijo. Sale de `sueldo-fijo.ts`, por lo mismo.
+ *  🩸 Acá se sumaban las dos columnas del saldo de vacaciones a mano, retiradas
+ *  el 17-sep-2026. Ver la nota de `FilaPersonaDb`. */
+const COLS_CON_RELOJ = `${COLS_TODO}, ${COLUMNA_NO_MARCA_RELOJ}`;
 /** Todo, con la base propia de seguros. Sale de `seguros-base.ts`, por lo mismo.
  *  Es LA lista que se pide: las de arriba solo documentan de dónde sale cada
  *  columna. */
@@ -360,22 +359,9 @@ export function vigenciaDeFila(f: FilaPersonaDb): Vigencia {
   };
 }
 
-/**
- * Lo que la ficha aporta al saldo de vacaciones.
- *
- * Sin las columnas corridas —o con la migración pendiente— sale «no se cargó»,
- * que es el estado real de las 39 fichas y lo que hace que la pantalla diga
- * «Falta el saldo» en vez de mostrar un número que engaña.
- */
-export function datosSaldoDeFila(f: FilaPersonaDb): DatosSaldo {
-  return {
-    fechaIngreso: f.fecha_ingreso ?? null,
-    // 🩸 `numeroDeDias` y no un `typeof === "number"`: la columna es `numeric` y
-    // PostgREST la manda como TEXTO. Ver la nota de esa función.
-    saldoInicial: numeroDeDias(f.saldo_vacaciones_dias),
-    corte: f.saldo_vacaciones_corte ?? null,
-  };
-}
+// 🩸 Acá vivía `datosSaldoDeFila`, que leía el saldo escrito a mano y su fecha
+// de corte. Se fue el 17-sep-2026 con las columnas: lo único que la ficha aporta
+// hoy a las vacaciones es `fecha_ingreso`, y eso lo lee quien lo necesita.
 
 /** código → vigencia, que es lo que necesita el filtro de la planilla. */
 export function vigenciasDeFilas(filas: readonly FilaPersonaDb[]): Map<string, Vigencia> {

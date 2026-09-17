@@ -28,10 +28,12 @@ import {
   PREGUNTA_YA_COBRADAS,
 } from "@/lib/asistencia/vacaciones";
 import {
+  NO_INCLUYE_ANTES,
+  ROTULO_CORRESPONDEN,
+  textoCorresponden,
   textoDetalle,
-  textoSaldo,
-  type SaldoVacaciones,
-} from "@/lib/asistencia/saldo-vacaciones";
+  type DiasCorresponden,
+} from "@/lib/asistencia/vacaciones-corresponden";
 
 interface VacacionFila {
   id: string;
@@ -56,14 +58,18 @@ export default function VacacionesTab() {
   const [personas, setPersonas] = useState<PersonaListada[]>([]);
   const [puedeCargar, setPuedeCargar] = useState(true);
   const [aviso, setAviso] = useState<string | null>(null);
-  // ── EL SALDO ──────────────────────────────────────────────────────────────
-  // Llega CALCULADO del servidor: la cuenta vive en `saldo-vacaciones.ts` y la
-  // pantalla solo la pinta. Calcularla acá sería una segunda verdad, y el día
-  // que las dos se separen nadie sabría cuál es la buena.
-  const [saldos, setSaldos] = useState<SaldoVacaciones[]>([]);
-  const [avisoSaldo, setAvisoSaldo] = useState<string | null>(null);
-  const [avisoSaldoIncompleto, setAvisoSaldoIncompleto] = useState<string | null>(null);
-  const [desdeCuandoCuenta, setDesdeCuandoCuenta] = useState<string | null>(null);
+  // ── LOS DÍAS QUE LE CORRESPONDEN ──────────────────────────────────────────
+  // Llegan CALCULADOS del servidor: la cuenta vive en
+  // `vacaciones-corresponden.ts` y la pantalla solo la pinta. Calcularla acá
+  // sería una segunda verdad, y el día que las dos se separen nadie sabría cuál
+  // es la buena.
+  // 🔴 NO ES UN SALDO: no incluye lo que se tomó antes de que las vacaciones se
+  // cargaran acá, y por eso viaja con su línea gris.
+  const [corresponden, setCorresponden] = useState<DiasCorresponden[]>([]);
+  const [avisoSinFecha, setAvisoSinFecha] = useState<string | null>(null);
+  const [avisoIncompleto, setAvisoIncompleto] = useState<string | null>(null);
+  const [comoSeCalcula, setComoSeCalcula] = useState<string | null>(null);
+  const [noIncluyeAntes, setNoIncluyeAntes] = useState<string | null>(null);
 
   const [codigo, setCodigo] = useState("");
   const [desde, setDesde] = useState(hoyPanama());
@@ -80,10 +86,11 @@ export default function VacacionesTab() {
     // no al fallar el guardado.
     setPuedeCargar(d.puedeCargar !== false);
     setAviso(d.avisoMigracion ?? null);
-    setSaldos(d.saldos ?? []);
-    setAvisoSaldo(d.avisoSaldo ?? null);
-    setAvisoSaldoIncompleto(d.avisoSaldoIncompleto ?? null);
-    setDesdeCuandoCuenta(d.desdeCuandoCuenta ?? null);
+    setCorresponden(d.corresponden ?? []);
+    setAvisoSinFecha(d.avisoSinFecha ?? null);
+    setAvisoIncompleto(d.avisoIncompleto ?? null);
+    setComoSeCalcula(d.comoSeCalcula ?? null);
+    setNoIncluyeAntes(d.noIncluyeAntes ?? NO_INCLUYE_ANTES);
   }, []);
   useEffect(() => { void cargar(); }, [cargar]);
 
@@ -93,8 +100,8 @@ export default function VacacionesTab() {
   const conNombre = personas.filter((p) => p.configurado);
   const sinNombre = personas.filter((p) => !p.configurado);
 
-  /** El saldo de la persona que está elegida en el formulario, o `null`. */
-  const saldoElegido = codigo ? (saldos.find((s) => s.codigo === codigo) ?? null) : null;
+  /** Los días de la persona elegida en el formulario, o `null`. */
+  const elegido = codigo ? (corresponden.find((s) => s.codigo === codigo) ?? null) : null;
 
   async function agregar() {
     if (!codigo) return toast("Elige al colaborador", "error");
@@ -189,22 +196,23 @@ export default function VacacionesTab() {
                 </optgroup>
               )}
             </select>
-            {/* 🔴 EL SALDO, EN EL MOMENTO EN QUE SE DECIDE. Una línea, debajo
-                del nombre: es acá donde alguien se entera de que la persona ya
-                no tiene días — no en una tabla al final de la pantalla. Sin
-                fecha de ingreso dice qué falta, nunca un cero. */}
-            {saldoElegido && (
+            {/* 🔴 LOS DÍAS, EN EL MOMENTO EN QUE SE DECIDE. Una línea, debajo
+                del nombre: es acá donde alguien se entera de cuántos le tocan —
+                no en una tabla al final de la pantalla. Sin fecha de ingreso
+                dice qué falta, nunca un cero.
+                🔴 «Le corresponden», NUNCA «le quedan»: no es un saldo. */}
+            {elegido && (
               <p
                 className={`mt-1 text-[12px] ${
-                  saldoElegido.falta ? "text-amber-800" : "text-gray-500"
+                  elegido.faltaFechaIngreso ? "text-amber-800" : "text-gray-500"
                 }`}
               >
-                {saldoElegido.falta ? (
-                  textoSaldo(saldoElegido)
+                {elegido.faltaFechaIngreso ? (
+                  textoCorresponden(elegido)
                 ) : (
                   <>
-                    Le quedan <b className="tabular-nums">{textoSaldo(saldoElegido)}</b>
-                    {textoDetalle(saldoElegido) ? ` · ${textoDetalle(saldoElegido)}` : ""}
+                    {ROTULO_CORRESPONDEN} <b className="tabular-nums">{elegido.dias}</b> días
+                    {textoDetalle(elegido) ? ` · ${textoDetalle(elegido)}` : ""}
                   </>
                 )}
               </p>
@@ -297,49 +305,45 @@ export default function VacacionesTab() {
         </ul>
       )}
 
-      {/* ── SALDO POR PERSONA ─────────────────────────────────────────────
-          days ganados − tomados − ya pagados. La cuenta entera vive en
-          `lib/asistencia/saldo-vacaciones.ts`, con el prorrateo y su ejemplo
-          numérico escritos ahí para que se pueda auditar sin leer la función.
+      {/* ── LOS DÍAS QUE LE CORRESPONDEN A CADA QUIEN ─────────────────────
+          Ganados por antigüedad − tomados − ya pagados. La cuenta entera vive
+          en `lib/asistencia/vacaciones-corresponden.ts`, con el prorrateo
+          escrito ahí para que se pueda auditar sin leer la función.
 
           🔴 ACÁ ESTÁN TODOS LOS ACTIVOS, tengan o no fecha de ingreso. Quien no
           la tiene aparece diciendo «Falta la fecha de ingreso» — nunca con un
-          cero, y nunca escondido de la lista. */}
-      {saldos.length > 0 && (
+          cero, y nunca escondido de la lista.
+
+          🔴 NO SE LLAMA «SALDO» (17-sep-2026, Daniel: *«Quita lo del saldo
+          vacaciones»*): el sistema no sabe qué se tomó antes de que las
+          vacaciones se empezaran a cargar acá, así que el número dice lo que
+          es y va con su línea gris. */}
+      {corresponden.length > 0 && (
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <div className="mb-3">
-            <h2 className="text-sm font-medium text-gray-900">Saldo por colaborador</h2>
-            {/* Una línea y corta: 30 días al año, y desde cuándo cuenta la
-                resta. Lo segundo NO se puede sacar: los días ganados vienen
-                desde que la persona entró y las vacaciones solo existen en el
-                sistema desde que se creó la pestaña. */}
+            <h2 className="text-sm font-medium text-gray-900">Días de vacaciones por colaborador</h2>
+            {/* Dos líneas y cortas: la regla, y desde cuándo cuenta la resta.
+                La segunda NO se puede sacar. */}
             <p className="mt-0.5 text-[12px] text-gray-500">
-              30 días por cada 11 meses trabajados.{desdeCuandoCuenta ? ` ${desdeCuandoCuenta}` : ""}
+              {comoSeCalcula ?? "30 días corridos por cada 11 meses trabajados, desde su fecha de ingreso."}
             </p>
-            {/* 🔴 Un número por persona que no hay que ir a buscar: cuántas ya
-                tienen saldo de verdad. Sin esto, la lista de pendientes no
-                muestra el avance y se lee como si nada se hubiera hecho. */}
-            {saldos.some((x) => !x.falta) && (
-              <p className="mt-0.5 text-[12px] text-gray-500">
-                {saldos.filter((x) => !x.falta).length} de {saldos.length} ya tienen saldo.
-              </p>
-            )}
+            <p className="mt-0.5 text-[12px] text-gray-400">{noIncluyeAntes ?? NO_INCLUYE_ANTES}</p>
           </div>
 
           {/* Ámbar, no rojo: no se rompió nada, falta cargar un dato. */}
-          {avisoSaldo && (
+          {avisoSinFecha && (
             <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
-              {avisoSaldo}
+              {avisoSinFecha}
             </p>
           )}
-          {avisoSaldoIncompleto && (
+          {avisoIncompleto && (
             <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
-              {avisoSaldoIncompleto}
+              {avisoIncompleto}
             </p>
           )}
 
           <ul className="divide-y divide-gray-100">
-            {saldos.map((s) => (
+            {corresponden.map((s) => (
               <li
                 key={s.codigo}
                 data-saldo-codigo={s.codigo}
@@ -350,14 +354,13 @@ export default function VacacionesTab() {
                     justo lo que esta lista viene a decir. Crece hacia abajo. */}
                 <span className="min-w-0 break-words text-sm text-gray-900">{s.etiqueta}</span>
                 <span data-saldo-valor className="shrink-0 text-right">
-                  {s.falta ? (
-                    <span className="text-[13px] text-amber-800">{textoSaldo(s)}</span>
+                  {s.faltaFechaIngreso ? (
+                    <span className="text-[13px] text-amber-800">{textoCorresponden(s)}</span>
                   ) : (
                     <>
-                      <span className="text-sm tabular-nums text-gray-900">{textoSaldo(s)}</span>
+                      <span className="text-sm tabular-nums text-gray-900">{textoCorresponden(s)}</span>
                       {/* De dónde salió el número, para poder auditarlo sin
-                          abrir otra pantalla: «12 al 25 ago 2026 · +8 ganados
-                          · tomó 10». */}
+                          abrir otra pantalla: «30 ganados · tomó 10». */}
                       {textoDetalle(s) && (
                         <span className="ml-2 text-[12px] text-gray-500">{textoDetalle(s)}</span>
                       )}

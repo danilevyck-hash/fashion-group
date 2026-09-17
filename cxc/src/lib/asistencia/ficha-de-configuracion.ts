@@ -45,7 +45,6 @@ import {
   cobraHorasExtraDeFila,
   type FilaPersonaDb,
 } from "./config-server";
-import { numeroDeDias } from "./saldo-vacaciones";
 import type { Directorio } from "./directorio";
 import { diaPanama } from "./reporte";
 import {
@@ -164,8 +163,6 @@ export function armarPersonaDeConfiguracion(ins: InsumosDeUnaPersona): {
     ultimaMarca: string | null;
     dispositivo: string | null;
     fechaIngreso: string | null;
-    saldoVacacionesDias: number | null;
-    saldoVacacionesCorte: string | null;
     fechaSalida: string | null;
     motivoSalida: MotivoSalida | null;
     activo: boolean;
@@ -280,16 +277,11 @@ export function armarPersonaDeConfiguracion(ins: InsumosDeUnaPersona): {
       // 🔑 `activo` es DERIVADO de la fecha, no un campo aparte: dos fuentes
       // para el mismo hecho es la forma de que se contradigan.
       fechaIngreso: vig?.fechaIngreso ?? null,
-      // 🔴 EL SALDO DE VACACIONES, y su FECHA DE CORTE. Los dos juntos o
-      // ninguno: un saldo sin fecha es un saldo a un día que nadie sabe, y de
-      // esa fecha depende qué vacaciones se restan después. Ver
-      // `lib/asistencia/saldo-vacaciones.ts`.
-      // 🩸 Normalizado a NÚMERO: la columna es `numeric` y PostgREST la manda
-      // como texto. Sin esto la pantalla recibiría `"12.5"` donde su tipo
-      // dice `number`, y cualquier comparación numérica de acá en adelante
-      // fallaría en silencio.
-      saldoVacacionesDias: numeroDeDias(f?.saldo_vacaciones_dias),
-      saldoVacacionesCorte: f?.saldo_vacaciones_corte ?? null,
+      // 🩸 Acá viajaban el SALDO DE VACACIONES escrito a mano y su fecha de
+      // corte. Se fueron el 17-sep-2026: los días se CALCULAN desde
+      // `fecha_ingreso` —que sí viaja, arriba— con la regla de
+      // `vacaciones-corresponden.ts`. Las columnas quedan en la base sin
+      // lectores; el candado prohíbe volver a traerlas.
       fechaSalida: vig?.fechaSalida ?? null,
       motivoSalida: vig?.motivoSalida ?? null,
       activo: !tieneBaja(vig),
@@ -332,7 +324,5 @@ export const BANDERAS_DE_CONFIGURACION = {
   puedeCargarBaseSeguros: true,
   avisoMigracionNoMarcaReloj: null,
   puedeMarcarSueldoFijo: true,
-  avisoMigracionSaldoVacaciones: null,
   avisoMigracionReparto: null,
-  puedeCargarSaldoVacaciones: true,
 } as const;

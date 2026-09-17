@@ -1,23 +1,26 @@
 /**
  * ─────────────────────────────────────────────────────────────────────────────
- * CARGAR EL SALDO DE VACACIONES, EN LA PANTALLA DE VERDAD.
+ * EL SALDO DE VACACIONES A MANO SE FUE DE LA FICHA (17-sep-2026).
  *
- * 🔴 POR QUÉ ESTE ARCHIVO EXISTE. Que el validador acepte un `12` no prueba
- * NADA sobre lo que contabilidad puede hacer: el campo podía no estar en la
- * ficha, estar deshabilitado, o —peor— existir y NO viajar en el PUT. Y hay un
- * modo de fallo que ningún test de función pura puede ver: **el PUT es un
- * upsert de la fila entera**, así que una pantalla que se olvide de mandar el
- * saldo al dar de baja se lo BORRA a la persona, junto con la fecha de corte
- * que es lo único que impide volver a restar días ya contados.
+ * ⚠️ ESTE ARCHIVO CAMBIÓ DE DIRECCIÓN, y por eso la nota va fechada. Hasta hoy
+ * exigía lo contrario: que el campo «Días de vacaciones que le quedan hoy»
+ * EXISTIERA en la ficha, estuviera editable, VIAJARA en el PUT y sobreviviera a
+ * una baja. Todo eso era cierto — y **no lo usó nadie**: medido el 17-sep-2026,
+ * de las 49 fichas NINGUNA tenía un número:
+ * 47 con el saldo vacío y 2 con un 0.
  *
- * Lo que se sostiene acá, RENDERIZANDO y tocando:
- *   1. el campo existe, se llama en español simple y está EDITABLE;
- *   2. lo que se escribe VIAJA en el PUT (se lee el cuerpo del `fetch`);
- *   3. la pantalla dice a qué día quedó fijado el número — sin esa fecha, «12»
- *      no significa nada;
- *   4. 🔴 dar de baja NO le borra el saldo;
- *   5. sin la migración corrida el campo se ve deshabilitado y LO DICE, antes
- *      de tocarlo y no al fallar el guardado.
+ * Daniel, textual: *«las vacaciones no funciona por día, hay que cambiar eso,
+ * funciona que por cada 11 meses trabajado, 1 mes de vacaciones»* · *«Quita lo
+ * del saldo vacaciones»*.
+ *
+ * Lo que se sostiene acá ahora, RENDERIZANDO:
+ *   1. el campo del saldo YA NO EXISTE en la ficha;
+ *   2. nada de lo que se guarda lleva `saldoVacacionesDias` ni su fecha de corte;
+ *   3. 🔑 CONTROL — «Empezó a trabajar» SIGUE ahí y sigue viajando en el PUT:
+ *      es el dato del que salen ahora los días, así que perderlo sería peor que
+ *      lo que se quitó;
+ *   4. 🔑 CONTROL — dar de baja sigue guardando la fecha de salida (la baja no
+ *      se rompió al sacar el campo de al lado).
  * ─────────────────────────────────────────────────────────────────────────────
  */
 // 🩸 Los nombres se muestran CAPITALIZADOS desde el 10-sep-2026 (Daniel: «no me
@@ -43,7 +46,6 @@ import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/re
 import { ToastProvider } from "@/components/ToastSystem";
 import { REGLAS_DEFAULT } from "@/lib/asistencia/config";
 import ConfiguracionTab from "@/app/asistencia/ConfiguracionTab";
-import { ETIQUETA_SALDO_INICIAL } from "@/lib/asistencia/saldo-vacaciones";
 
 const ANGELA = {
   codigo: "7", nombre: "ANGELA GARCIA", salarioMensual: 850, jornadaSemanal: 48,
@@ -51,7 +53,6 @@ const ANGELA = {
   ultimaMarca: "2026-08-25", rataHora: 4.09, valorMinuto: 0.07,
   servicioProfesional: false, pagaSeguros: true,
   fechaIngreso: "2019-02-16", fechaSalida: null, motivoSalida: null,
-  saldoVacacionesDias: 12, saldoVacacionesCorte: "2026-08-25",
   activo: true, baja: null, marcoDespuesDeLaBaja: false,
 };
 
@@ -69,8 +70,6 @@ const datos = (over: Record<string, unknown> = {}) => ({
   puedeMarcarServicioProfesional: true,
   avisoMigracionSeguros: null,
   puedeQuitarSeguros: true,
-  avisoMigracionSaldoVacaciones: null,
-  puedeCargarSaldoVacaciones: true,
   ...over,
 });
 
@@ -99,131 +98,49 @@ async function abrirFicha(cuerpo: unknown = datos()) {
   fireEvent.click(screen.getAllByRole("button", { name: /ANGELA GARCIA/i })[0]);
 }
 
-/**
- * El campo del saldo, buscado por su etiqueta real.
- *
- * 🩸 Se filtra por `INPUT` a propósito: el botón ⓘ de ayuda lleva el MISMO
- * texto como `aria-label` y sale PRIMERO en el DOM, así que un `[0]` pelado
- * agarra el botón —que nunca está deshabilitado ni tiene valor— y el test pasa
- * o falla mirando el elemento equivocado.
- */
-const campoSaldo = () =>
-  screen
-    .getAllByLabelText(new RegExp(ETIQUETA_SALDO_INICIAL, "i"))
-    .find((e) => e.tagName === "INPUT") as HTMLInputElement;
-
-describe("el campo del saldo, en la ficha", () => {
-  it("existe, se llama en español simple y está EDITABLE", async () => {
+describe("🔴 el campo del saldo se fue de la ficha", () => {
+  it("no hay ningún campo de «días de vacaciones» que teclear", async () => {
     await abrirFicha();
-    const c = campoSaldo();
-    expect(c).toBeTruthy();
-    expect(c.disabled).toBe(false);
-    expect(c.value).toBe("12");
+    expect(screen.queryByLabelText(/días de vacaciones/i)).toBeNull();
+    expect(screen.queryByText(/que le quedan hoy/i)).toBeNull();
   });
 
-  it("🔑 va AL LADO de «Empezó a trabajar», no en otra pantalla", async () => {
+  it("⛔ ni el saldo ni su fecha de corte viajan en lo que se guarda", async () => {
+    await abrirFicha();
+    // Se guarda por cualquier campo: se toca el nombre, que sí sigue existiendo.
+    const nombre = screen.getAllByDisplayValue("ANGELA GARCIA")[0] as HTMLInputElement;
+    fireEvent.change(nombre, { target: { value: "ANGELA GARCIA R" } });
+    fireEvent.blur(nombre);
+    await waitFor(() => expect(enviados.length).toBeGreaterThan(0));
+    for (const cuerpo of enviados) {
+      expect(Object.keys(cuerpo)).not.toContain("saldoVacacionesDias");
+      expect(Object.keys(cuerpo)).not.toContain("saldoVacacionesCorte");
+    }
+  });
+
+  // 🔑 CONTROL — lo que NO se podía perder al sacar el campo de al lado.
+  it("🔑 CONTROL — «Empezó a trabajar» sigue en la ficha y sigue viajando", async () => {
     await abrirFicha();
     expect(screen.getAllByText(/Empezó a trabajar/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(new RegExp(ETIQUETA_SALDO_INICIAL, "i")).length).toBeGreaterThan(0);
-  });
-
-  it("dice a QUÉ DÍA quedó fijado el número — sin eso, «12» no significa nada", async () => {
-    await abrirFicha();
-    expect(screen.getAllByText(/Al 25 de agosto de 2026/).length).toBeGreaterThan(0);
+    const ingreso = screen.getAllByDisplayValue("2019-02-16")[0] as HTMLInputElement;
+    expect(ingreso).toBeTruthy();
+    fireEvent.change(ingreso, { target: { value: "2019-03-16" } });
+    fireEvent.blur(ingreso);
+    await waitFor(() => expect(enviados.length).toBeGreaterThan(0));
+    expect(enviados.some((e) => e.fechaIngreso === "2019-03-16")).toBe(true);
   });
 });
 
-describe("🔴 medios días en el campo", () => {
-  it("el campo se mueve de a MEDIO día", async () => {
+describe("🔑 CONTROL — dar de baja no se rompió", () => {
+  it("el PUT de la baja lleva la fecha de salida", async () => {
     await abrirFicha();
-    expect(campoSaldo().step).toBe("0.5");
-  });
-
-  it("🔑 en el iPhone el teclado trae el punto: `inputMode=decimal`, no `numeric`", async () => {
-    await abrirFicha();
-    expect(campoSaldo().getAttribute("inputmode")).toBe("decimal");
-  });
-
-  it("un 12.5 escrito a mano VIAJA tal cual", async () => {
-    await abrirFicha();
-    const c = campoSaldo();
-    fireEvent.change(c, { target: { value: "12.5" } });
-    fireEvent.blur(c);
-    await waitFor(() => expect(enviados.length).toBeGreaterThan(0));
-    expect(enviados[0].saldoVacacionesDias).toBe("12.5");
-  });
-
-  it("🔴 un saldo entero se ve «12», nunca «12.0»", async () => {
-    await abrirFicha();
-    expect(campoSaldo().value).toBe("12");
-  });
-
-  it("y uno de medio día se ve con su decimal", async () => {
-    await abrirFicha(datos({
-      personas: [{ ...ANGELA, saldoVacacionesDias: 12.5 }],
-    }));
-    expect(campoSaldo().value).toBe("12.5");
-  });
-});
-
-describe("🔴 lo que se escribe VIAJA en el PUT", () => {
-  it("el número nuevo sale en el cuerpo del pedido", async () => {
-    await abrirFicha();
-    const c = campoSaldo();
-    fireEvent.change(c, { target: { value: "20" } });
-    fireEvent.blur(c);
-    await waitFor(() => expect(enviados.length).toBeGreaterThan(0));
-    expect(enviados[0].saldoVacacionesDias).toBe("20");
-  });
-
-  it("🔑 vaciarlo también viaja: es «todavía no lo sé», no «no cambies nada»", async () => {
-    await abrirFicha();
-    const c = campoSaldo();
-    fireEvent.change(c, { target: { value: "" } });
-    fireEvent.blur(c);
-    await waitFor(() => expect(enviados.length).toBeGreaterThan(0));
-    expect(enviados[0].saldoVacacionesDias).toBe("");
-  });
-
-  it("⛔ la FECHA DE CORTE no la manda la pantalla: la pone el servidor", async () => {
-    await abrirFicha();
-    const c = campoSaldo();
-    fireEvent.change(c, { target: { value: "20" } });
-    fireEvent.blur(c);
-    await waitFor(() => expect(enviados.length).toBeGreaterThan(0));
-    expect(Object.keys(enviados[0])).not.toContain("saldoVacacionesCorte");
-  });
-});
-
-describe("🔴 dar de baja NO le borra el saldo", () => {
-  it("el PUT de la baja lleva el saldo de la persona", async () => {
-    await abrirFicha();
-    // El bloque de baja: se elige el motivo y se guarda.
     const fechas = screen.getAllByDisplayValue("") as HTMLInputElement[];
     const fechaSalida = fechas.find((i) => i.type === "date");
     expect(fechaSalida).toBeTruthy();
     fireEvent.change(fechaSalida!, { target: { value: "2026-09-30" } });
     fireEvent.click(screen.getAllByRole("button", { name: /Renunció/ })[0]);
-    const guardar = screen.getAllByRole("button", { name: /Dar de baja|Guardar/ })[0];
-    fireEvent.click(guardar);
+    fireEvent.click(screen.getAllByRole("button", { name: /Dar de baja|Guardar/ })[0]);
     await waitFor(() => expect(enviados.length).toBeGreaterThan(0));
-    // 🩸 El PUT es un upsert de la fila ENTERA: sin este campo, la baja le
-    // dejaría el saldo en NULL y la fecha de corte también.
-    const baja = enviados.find((e) => e.fechaSalida === "2026-09-30");
-    expect(baja).toBeTruthy();
-    expect(baja!.saldoVacacionesDias).toBe("12");
-  });
-});
-
-describe("sin la migración corrida", () => {
-  it("el campo se ve deshabilitado y LO DICE, antes de tocarlo", async () => {
-    await abrirFicha(datos({
-      puedeCargarSaldoVacaciones: false,
-      avisoMigracionSaldoVacaciones: "falta correr el archivo",
-    }));
-    expect(campoSaldo().disabled).toBe(true);
-    expect(
-      screen.getAllByText(/Todavía no se puede cargar el saldo/).length,
-    ).toBeGreaterThan(0);
+    expect(enviados.some((e) => e.fechaSalida === "2026-09-30")).toBe(true);
   });
 });

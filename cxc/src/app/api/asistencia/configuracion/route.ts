@@ -75,12 +75,6 @@ import { cedulaDeFicha, posicionDeFicha, COLUMNA_CEDULA, COLUMNA_POSICION } from
 import { puedeCerrar } from "@/lib/asistencia/roles";
 import { sinIgnorados } from "@/lib/asistencia/codigos-ignorados";
 import { leerIgnorados } from "@/lib/asistencia/codigos-ignorados-server";
-import {
-  COLS_SALDO_VACACIONES,
-  numeroDeDias,
-  validarSaldoInicial,
-} from "@/lib/asistencia/saldo-vacaciones";
-import { hoyPanama } from "@/lib/fecha-panama";
 import { crearDirectorio, compararPersonas } from "@/lib/asistencia/directorio";
 import {
   avisoMarcasPosteriores,
@@ -309,50 +303,12 @@ export async function PUT(req: NextRequest) {
   if (!rta.ok) return NextResponse.json({ error: rta.error }, { status: 400 });
   const trabajaAfueraValor = rta.valor;
 
-  // Y lo mismo con el saldo de vacaciones: es OTRA pregunta —cuántos días le
-  // quedan— y no debería poder tumbar el guardado de un nombre.
-  const rsal = validarSaldoInicial(body);
-  if (!rsal.ok) return NextResponse.json({ error: rsal.error }, { status: 400 });
-  const saldoVacacionesDias = rsal.valor;
-
-  // ── 🔴 LA FECHA DE CORTE LA PONE EL SERVIDOR, NUNCA EL NAVEGADOR ──────────
-  //
-  // El campo que llena contabilidad dice «los días que le quedan HOY», así que
-  // el corte es hoy — pero SOLO cuando el número CAMBIA. Si vuelve a guardar la
-  // ficha sin tocar el saldo, el corte se queda donde estaba: moverlo
-  // absorbería en silencio las vacaciones cargadas entre medio y esos días
-  // dejarían de restar sin que nadie se entere.
-  //
-  // Por eso se relee la fila antes de escribir: el corte guardado es el único
-  // que protege de contar dos veces los mismos días, y creerle al cuerpo del
-  // pedido sería dejar esa protección en manos de quien la puede pisar.
-  let saldoVacacionesCorte: string | null = null;
-  if (saldoVacacionesDias !== null) {
-    const prev = await supabaseServer
-      .from(TABLA_PERSONAS)
-      .select(COLS_SALDO_VACACIONES.join(", "))
-      .eq("empleado_codigo", p.codigo)
-      .maybeSingle();
-    if (prev.error) {
-      // Un error acá es un error (tolerancia a la DDL retirada el 3-sep-2026):
-      // NO se guarda a medias — un "guardado" que se traga el saldo dejaría a
-      // la persona sin número y nadie sabría por qué.
-      return NextResponse.json({ error: prev.error.message }, { status: 500 });
-    }
-    const anterior = prev.data as unknown as {
-      saldo_vacaciones_dias: number | string | null;
-      saldo_vacaciones_corte: string | null;
-    } | null;
-    // 🩸 SE COMPARAN NÚMEROS, NO LO QUE VENGA. La columna es `numeric` y
-    // PostgREST la manda como texto: un `"12.0" === 12` da `false`, y con eso
-    // CADA guardado de la ficha movería la fecha de corte a hoy sin que nadie
-    // tocara el saldo — o sea, absorbería en silencio las vacaciones cargadas
-    // entre medio. Es el modo de fallo exacto que el corte existe para evitar.
-    const mismoNumero =
-      numeroDeDias(anterior?.saldo_vacaciones_dias) === saldoVacacionesDias
-      && !!anterior?.saldo_vacaciones_corte;
-    saldoVacacionesCorte = mismoNumero ? anterior!.saldo_vacaciones_corte : hoyPanama();
-  }
+  // 🩸 ACÁ SE VALIDABA Y SE GUARDABA EL SALDO DE VACACIONES ESCRITO A MANO, con
+  // su fecha de corte puesta por el servidor. Se fue el 17-sep-2026 —Daniel:
+  // *«Quita lo del saldo vacaciones»*—: de las 49 fichas ninguna tenía un número (47 vacías, 2 con un 0) y los días
+  // ahora se CALCULAN desde `fecha_ingreso` (`vacaciones-corresponden.ts`). Las
+  // dos columnas siguen en la base, sin lectores ni escritores, con `COMMENT`
+  // (migración 20261204120000) y con candado que prohíbe volver a escribirlas.
 
   const base = {
     empleado_codigo: p.codigo,
@@ -376,13 +332,8 @@ export async function PUT(req: NextRequest) {
     ...conServicio,
     [COLUMNA_PAGA_SEGUROS]: pagaSeguros,
   };
-  const conSaldo = {
-    ...conTodo,
-    saldo_vacaciones_dias: saldoVacacionesDias,
-    saldo_vacaciones_corte: saldoVacacionesCorte,
-  };
   const conReloj = {
-    ...conSaldo,
+    ...conTodo,
     [COLUMNA_NO_MARCA_RELOJ]: noMarcaRelojValor,
   };
   const conBaseSeguros = {
@@ -473,5 +424,5 @@ export async function PUT(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, persona: { ...p, ...v, servicioProfesional, pagaSeguros, baseSeguros, noMarcaReloj: noMarcaRelojValor, cobraHorasExtra: cobraHorasExtraValor, trabajaAfuera: trabajaAfueraValor, saldoVacacionesDias, saldoVacacionesCorte } });
+  return NextResponse.json({ ok: true, persona: { ...p, ...v, servicioProfesional, pagaSeguros, baseSeguros, noMarcaReloj: noMarcaRelojValor, cobraHorasExtra: cobraHorasExtraValor, trabajaAfuera: trabajaAfueraValor } });
 }

@@ -100,10 +100,10 @@ import {
   type MotivoSalida,
 } from "@/lib/asistencia/vigencia";
 import {
-  ETIQUETA_SALDO_INICIAL,
-  textoSaldo,
-  type SaldoVacaciones,
-} from "@/lib/asistencia/saldo-vacaciones";
+  ROTULO_CORRESPONDEN,
+  textoCorresponden,
+  type DiasCorresponden,
+} from "@/lib/asistencia/vacaciones-corresponden";
 import { excepcionesDeLaFicha } from "@/lib/asistencia/ficha-persona";
 import { rutaDePersona, RUTA_PERSONA_NUEVA } from "@/lib/asistencia/persona-en-el-centro";
 // 🔴 LOS DOS CHIPS DE LA LISTA (10-sep-2026): qué le falta a cada colaborador,
@@ -185,11 +185,6 @@ interface Persona {
   fechaIngreso: string | null;
   fechaSalida: string | null;
   motivoSalida: MotivoSalida | null;
-  /** Los días de vacaciones que le quedaban al corte, cargados por
-   *  contabilidad. `null` = todavía no se cargó y NO hay saldo que mostrar. */
-  saldoVacacionesDias: number | null;
-  /** El día al que ese número es cierto. Lo pone el SERVIDOR, no la pantalla. */
-  saldoVacacionesCorte: string | null;
   /** Derivado de la fecha en el servidor, nunca un campo aparte. */
   activo: boolean;
   /** «Renunció el 12 de agosto de 2026». `null` si sigue trabajando. */
@@ -226,11 +221,9 @@ interface Datos {
   puedeCargarBaseSeguros: boolean;
   avisoMigracionNoMarcaReloj: string | null;
   puedeMarcarSueldoFijo: boolean;
-  avisoMigracionSaldoVacaciones: string | null;
   /** Falta correr el SQL del reparto. Nadie reparte su sueldo, o sea la ficha
    *  de hoy — pero se dice qué archivo falta. */
   avisoMigracionReparto: string | null;
-  puedeCargarSaldoVacaciones: boolean;
 }
 
 /** El formulario guarda TEXTO: hay que poder borrar un campo para reescribirlo.
@@ -261,10 +254,6 @@ interface Borrador {
   baseSeguros: string;
   /** `true` = cobra fijo y no pasa por el reloj. */
   noMarcaReloj: boolean;
-  /** Los días de vacaciones que le quedan HOY, como texto. "" = no se cargó.
-   *  🔑 La FECHA DE CORTE no está acá a propósito: la pone el servidor al
-   *  guardar, y solo cuando el número cambia. Ver la nota del PUT. */
-  saldoVacaciones: string;
   /** El cargo del comprobante. "" = todavía no se cargó. */
   posicion: string;
   /** La cédula del pie del comprobante. "" = se escribe a mano. */
@@ -335,7 +324,7 @@ function reglasAForm(r: ReglasAsistencia): FormReglas {
 const firma = (b: Borrador) =>
   `${b.nombre.trim()}|${b.salario.trim()}|${b.jornada}|${b.empresa}`
   + `|${b.fechaIngreso}|${b.fechaSalida}|${b.motivoSalida}|${b.servicioProfesional}`
-  + `|${b.pagaSeguros}|${b.baseSeguros.trim()}|${b.noMarcaReloj}|${b.saldoVacaciones}`
+  + `|${b.pagaSeguros}|${b.baseSeguros.trim()}|${b.noMarcaReloj}`
   // Los dos textos del comprobante entran a la firma como cualquier otro campo:
   // sin esto, cambiar solo el cargo no dispararía el guardado.
   + `|${b.posicion.trim()}|${b.cedula.trim()}`;
@@ -374,15 +363,16 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
   /**
    * 🔴 EL SALDO DE VACACIONES DE CADA QUIEN, en la lista (10-sep-2026).
    *
-   * Sale de la MISMA ruta que lo calculaba en la pestaña Vacaciones
-   * (`/api/asistencia/vacaciones` → `saldos`), no de una cuenta nueva: el
-   * número que se ve acá tiene que ser el mismo que la contadora ya conocía, y
-   * dos motores para el mismo saldo es cómo nacen dos números.
+   * Sale de la MISMA ruta que lo calcula en la pestaña Vacaciones
+   * (`/api/asistencia/vacaciones` → `corresponden`), no de una cuenta nueva:
+   * dos motores para el mismo número es cómo nacen dos números.
+   * 🔴 Desde el 17-sep-2026 se CALCULA (30 días por cada 11 meses desde la
+   * fecha de ingreso) y **no es un saldo**: nadie sabe qué se tomó antes.
    *
    * ⚠️ Solo se pide con el acomodo nuevo prendido. Apagado, esta pantalla no
    * hace ni una petición de más.
    */
-  const [saldos, setSaldos] = useState<Map<string, SaldoVacaciones>>(new Map());
+  const [corresponden, setCorresponden] = useState<Map<string, DiasCorresponden>>(new Map());
 
   /**
    * 🔴 IGNORAR ESCONDE, NO BORRA. Daniel: *«pon la opción de ignorar código así
@@ -455,9 +445,8 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
     void cargar();
   }, [cargar]);
 
-  // 🔑 FALLA ABIERTA: si los saldos no llegan, la columna dice «Falta el
-  // saldo» y la lista se sigue usando. Un error acá no puede dejar sin ficha a
-  // 37 personas.
+  // 🔑 FALLA ABIERTA: si los días no llegan, la columna muestra un guion y la
+  // lista se sigue usando. Un error acá no puede dejar sin ficha a 37 personas.
   useEffect(() => {
     if (!personaEnElCentro) return;
     let vivo = true;
@@ -466,10 +455,10 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
         const r = await fetch("/api/asistencia/vacaciones", { cache: "no-store" });
         const d = await r.json();
         if (!vivo || !r.ok) return;
-        const lista = (d.saldos ?? []) as SaldoVacaciones[];
-        setSaldos(new Map(lista.map((x) => [String(x.codigo), x])));
+        const lista = (d.corresponden ?? []) as DiasCorresponden[];
+        setCorresponden(new Map(lista.map((x) => [String(x.codigo), x])));
       } catch {
-        /* sin saldos la columna lo dice; no se rompe nada */
+        /* sin el número la columna muestra un guion; no se rompe nada */
       }
     })();
     return () => { vivo = false; };
@@ -493,7 +482,6 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
       pagaSeguros: p.pagaSeguros,
       baseSeguros: p.baseSeguros === null ? "" : String(p.baseSeguros),
       noMarcaReloj: p.noMarcaReloj,
-      saldoVacaciones: p.saldoVacacionesDias === null ? "" : String(p.saldoVacacionesDias),
       posicion: p.posicion ?? "",
       cedula: p.cedula ?? "",
     };
@@ -561,9 +549,6 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
             // limpia y convierte el vacío en `null` (la base rechaza `""`).
             posicion: b.posicion,
             cedula: b.cedula,
-            // Se manda el TEXTO tal cual, igual que el salario: el servidor
-            // decide qué es un saldo válido y le pone la fecha de corte.
-            saldoVacacionesDias: b.saldoVacaciones,
           }),
         });
         const d = await res.json();
@@ -586,8 +571,6 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
               pagaSeguros?: boolean;
               baseSeguros?: number | null;
               noMarcaReloj?: boolean;
-              saldoVacacionesDias?: number | null;
-              saldoVacacionesCorte?: string | null;
             }
           | undefined;
         const salarioTexto = b.salario.trim().replace(",", ".");
@@ -605,8 +588,6 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
           pagaSeguros: b.pagaSeguros,
           baseSeguros: null,
           noMarcaReloj: b.noMarcaReloj,
-          saldoVacacionesDias: null,
-          saldoVacacionesCorte: null,
         };
         // La vigencia que quedó guardada, ya normalizada por el servidor.
         const vig = {
@@ -658,8 +639,6 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                   // 🔑 Lo que quedó GUARDADO, con la fecha de corte que puso el
                   // servidor. Pintar el borrador dejaría la pantalla diciendo
                   // una fecha y la base otra.
-                  saldoVacacionesDias: p.saldoVacacionesDias ?? null,
-                  saldoVacacionesCorte: p.saldoVacacionesCorte ?? null,
                   // 🔴 La MISMA regla del servidor: a quien no va en planilla no
                   // le falta el salario. Dos reglas distintas para lo mismo es
                   // una pantalla que se contradice al recargar.
@@ -757,8 +736,6 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
             // 🔴 Y por lo mismo otra vez: sin esto, dar de baja le BORRARÍA el
             // saldo de vacaciones —y con él la fecha de corte, que es lo único
             // que impide volver a restar días ya contados—.
-            saldoVacacionesDias:
-              p.saldoVacacionesDias === null ? "" : String(p.saldoVacacionesDias),
           }),
         });
         const d = await res.json();
@@ -1077,12 +1054,13 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                   // del módulo puro, nunca de una segunda regla.
                   const queFalta = lineasQueFalta(queLeFalta(p));
                   const abiertaEsta = abierta === p.codigo;
-                  const saldo = saldos.get(String(p.codigo));
-                  // 🔴 SIN SALDO CARGADO, UN GUION GRIS (Daniel: *«un rojo que
-                  // sale siempre no avisa nada»*). Que falta ya lo dice «Qué
-                  // falta»; acá solo se muestra el número cuando existe.
-                  const saldoFalta = !saldo || saldo.saldo === null || saldo.falta !== null;
-                  const saldoTexto = personaEnElCentro && saldo && !saldoFalta ? textoSaldo(saldo) : "—";
+                  const leCorresponden = corresponden.get(String(p.codigo));
+                  // 🔴 SIN FECHA DE INGRESO, UN GUION GRIS (Daniel: *«un rojo
+                  // que sale siempre no avisa nada»*). Que falta ya lo dice
+                  // «Qué falta»; acá solo se muestra el número cuando existe.
+                  const saldoFalta = !leCorresponden || leCorresponden.dias === null;
+                  const saldoTexto = personaEnElCentro && leCorresponden && !saldoFalta
+                    ? `${leCorresponden.dias}` : "—";
                   // 🔴 SOLO LO RARO. Una ficha normal no dibuja ni una etiqueta,
                   // y por eso cuando aparece una se mira. Ver `ficha-persona.ts`.
                   const excepciones = personaEnElCentro ? excepcionesDeLaFicha(p) : [];
@@ -1569,59 +1547,15 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                                 className={`${CAMPO} tabular-nums`}
                               />
                             </div>
-                            <div>
-                              {/* 🔴 EL SALDO ES EL NÚMERO QUE CONTABILIDAD YA
-                                  TIENE, no los días tomados desde que entró.
-                                  Pedirle que reconstruya siete años sería pedirle
-                                  algo que nadie va a hacer, y la pantalla se
-                                  quedaría vacía para siempre. La FECHA DE CORTE
-                                  la pone el servidor: es hoy, y solo se mueve
-                                  cuando el número cambia. */}
-                              <Etiqueta
-                                texto={ETIQUETA_SALDO_INICIAL}
-                                ayuda="Los que le quedan hoy, de tus registros. Puede llevar medio día (12.5). De aquí en adelante el sistema suma lo que gana y resta las vacaciones que se carguen."
-                              />
-                              <input
-                                type="number"
-                                // 🔑 `decimal` y no `numeric`: en el iPhone el
-                                // teclado de `numeric` no trae el punto, y sin
-                                // punto no se puede escribir un 12.5.
-                                inputMode="decimal"
-                                // Medios días. El CHECK de la base y el
-                                // validador exigen lo mismo; esto solo hace que
-                                // las flechitas se muevan de a medio.
-                                step={0.5}
-                                // 🔑 El <label> de `Etiqueta` no está asociado a
-                                // ningún campo (no lleva `htmlFor`), así que sin
-                                // esto un lector de pantalla lee una caja de
-                                // número sin nombre — y un test tampoco la
-                                // encuentra por su etiqueta.
-                                aria-label={ETIQUETA_SALDO_INICIAL}
-                                value={borrador.saldoVacaciones}
-                                disabled={!datos.puedeCargarSaldoVacaciones}
-                                onChange={(e) =>
-                                  setBorrador({ ...borrador, saldoVacaciones: e.target.value })
-                                }
-                                onBlur={() => void guardar(p.codigo, borrador)}
-                                className={`${CAMPO} tabular-nums disabled:bg-gray-100 disabled:text-gray-400`}
-                              />
-                              {/* La fecha a la que ese número quedó fijado. Sin
-                                  esto, «12» no dice a qué día — y de ese día
-                                  depende qué vacaciones se restan después. */}
-                              {p.saldoVacacionesCorte && (
-                                <p className="mt-1 text-[12px] text-gray-500">
-                                  Al {fechaLegible(p.saldoVacacionesCorte)}
-                                </p>
-                              )}
-                              {/* El aviso de que todavía no se puede guardar se
-                                  dice ANTES de tocar, no al fallar. */}
-                              {!datos.puedeCargarSaldoVacaciones && (
-                                <p className="mt-1 text-[12px] text-amber-800">
-                                  Todavía no se puede cargar el saldo: falta correr el archivo de
-                                  la base de datos.
-                                </p>
-                              )}
-                            </div>
+                            {/* 🩸 ACÁ VIVÍA EL CAMPO «Días de vacaciones que le
+                                quedan hoy», que contabilidad escribía a mano
+                                junto con su fecha de corte. Se fue el
+                                17-sep-2026 —Daniel: *«Quita lo del saldo
+                                vacaciones»*—: de las 49 fichas ninguna tenía un número (47 vacías, 2 con un 0), y
+                                los días ahora se CALCULAN desde la fecha de
+                                ingreso (30 por cada 11 meses). El número se ve
+                                en la columna de la lista y en la ficha; NO se
+                                teclea en ningún lado. */}
                           </div>
 
                           <BloqueBaja

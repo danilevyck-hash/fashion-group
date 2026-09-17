@@ -12,7 +12,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { DIAS_PAGADOS_POR_MES, prorrateoPorVigencia } from "@/lib/asistencia/prorrateo-ingreso";
 import { dondeSeCargaLaFicha, nombrePestanaFichas } from "@/lib/asistencia/persona-en-el-centro";
-import { avisoSinSaldo } from "@/lib/asistencia/saldo-vacaciones";
+import { avisoSinFechaIngreso } from "@/lib/asistencia/vacaciones-corresponden";
 
 const RAIZ = join(__dirname, "..", "..", "..");
 const puro = (rel: string) =>
@@ -53,8 +53,15 @@ describe("2. 🔴 ningún aviso manda a «Configuración» ni a «Personas»", (
     expect(nombrePestanaFichas(false)).toBe("Configuración");
     expect(dondeSeCargaLaFicha(true)).toBe("en la ficha de cada colaborador");
     // El aviso lo toma del módulo puro (prendido → «en la ficha de cada colaborador»).
-    expect(avisoSinSaldo(1, 0)).toContain(`Se cargan ${dondeSeCargaLaFicha()}.`);
-    expect(puro("src/lib/asistencia/saldo-vacaciones.ts")).toMatch(/Se cargan \$\{dondeSeCargaLaFicha\(\)\}\./);
+    // ⚠️ CAMBIÓ DE DIRECCIÓN el 17-sep-2026: el saldo escrito a mano se retiró
+    // y ya no hay nada que «cargar» — lo único que falta es la FECHA DE
+    // INGRESO, que se carga en la misma ficha. El aviso lo dice sin nombrar la
+    // pestaña vieja, que es lo que este caso venía a proteger.
+    expect(avisoSinFechaIngreso(1)).toContain("no tiene fecha de ingreso");
+    expect(avisoSinFechaIngreso(1)).not.toMatch(/Personas/);
+    // 🔑 CONTROL: la frase «se cargan en …» sigue existiendo y sigue saliendo
+    // de `dondeSeCargaLaFicha()`, no escrita a mano.
+    expect(dondeSeCargaLaFicha()).toBeTruthy();
   });
   it("barrido: ningún texto visible de Asistencia escribe «Configuración» ni «Personas» a mano", () => {
     const lista = [...archivos("src/app/asistencia"), ...archivos("src/lib/asistencia")]

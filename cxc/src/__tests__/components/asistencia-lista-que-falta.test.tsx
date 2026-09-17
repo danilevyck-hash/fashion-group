@@ -35,21 +35,19 @@ const base = {
   pagaSeguros: true, baseSeguros: null, noMarcaReloj: false, marcaciones: 100,
   ultimaMarca: "2026-09-10", rataHora: 4.09, valorMinuto: 0.07, fechaSalida: null,
   motivoSalida: null, activo: true, baja: null, marcoDespuesDeLaBaja: false,
-  tieneHorario: true, saldoVacacionesCorte: null,
+  tieneHorario: true,
 };
 const SIN_FICHA = {
   ...base, codigo: "303", nombre: null, salarioMensual: null, empresa: null, configurado: false,
-  rataHora: null, valorMinuto: null, fechaIngreso: null, saldoVacacionesDias: null, tieneHorario: false,
+  rataHora: null, valorMinuto: null, fechaIngreso: null, tieneHorario: false,
 };
 const ALEJANDRA = {
   ...base, codigo: "22", nombre: "ALEJANDRA CAMAÑO", salarioMensual: 523.47, empresa: "confecciones_boston",
   jornadaSemanal: 40, rataHora: 3.02, posicion: null, cedula: null, fechaIngreso: "2024-01-08",
-  saldoVacacionesDias: null,
 };
 const ANDREA = {
   ...base, codigo: "16", nombre: "ANDREA PEREZ", salarioMensual: 700, empresa: "vistana",
   rataHora: 3.37, posicion: "Vendedora", cedula: "8-111-222", fechaIngreso: "2023-05-02",
-  saldoVacacionesDias: 0, saldoVacacionesCorte: "2026-09-01",
 };
 const DATOS = {
   personas: [SIN_FICHA, ALEJANDRA, ANDREA], ignorados: [], reglas: REGLAS_DEFAULT,
@@ -57,11 +55,14 @@ const DATOS = {
   faltaMigracion: false, avisoMigracion: null, avisoMigracionBajas: null, puedeDarDeBaja: true, avisoBajas: null,
   avisoMigracionServicioProfesional: null, puedeMarcarServicioProfesional: true,
 };
-const saldo = (codigo: string, etiqueta: string, s: number | null, falta: string | null) => ({
-  codigo, etiqueta, saldo: s, saldoInicial: s, corte: s === null ? null : "2026-09-01",
-  ganadosDesdeCorte: 0, tomados: 0, yaPagados: 0, falta,
+// ⚠️ CAMBIÓ DE FORMA el 17-sep-2026: la ruta ya no manda `saldos` con un saldo
+// escrito a mano, manda `corresponden` con los días CALCULADOS desde la fecha
+// de ingreso (`vacaciones-corresponden.ts`). `dias: null` = le falta la fecha.
+const dias = (codigo: string, etiqueta: string, n: number | null) => ({
+  codigo, etiqueta, dias: n, ganados: n, tomados: 0, yaPagados: 0,
+  faltaFechaIngreso: n === null,
 });
-const SALDOS = { saldos: [saldo("303", "Código 303", null, "ambos"), saldo("22", "ALEJANDRA CAMAÑO", null, "saldo"), saldo("16", "ANDREA PEREZ", 0, null)] };
+const SALDOS = { corresponden: [dias("303", "Código 303", null), dias("22", "ALEJANDRA CAMAÑO", null), dias("16", "ANDREA PEREZ", 0)] };
 
 function servir() {
   vi.stubGlobal("fetch", vi.fn(async (url: string) => {
@@ -77,7 +78,7 @@ async function abrir() {
   render(<ToastProvider><ConfiguracionTab personaEnElCentro /></ToastProvider>);
   await screen.findAllByText(/Alejandra Camaño/);
   // Y los saldos, que llegan aparte.
-  await screen.findAllByText("0 días");
+  await screen.findAllByText("0");
 }
 
 /** La fila de escritorio y la tarjeta del celular se montan LAS DOS en jsdom. */
@@ -102,9 +103,12 @@ describe("9. 🔴 «Qué falta» reemplaza a «Estado»", () => {
     }
   });
 
-  it("con ficha: «Completar: cargo, cédula, saldo de vacaciones» en GRIS, sin nada rojo", async () => {
+  // ⚠️ CAMBIÓ DE TEXTO el 17-sep-2026: «saldo de vacaciones» salió de la lista
+  // de faltantes con las columnas. Lo que este caso protege —gris, nunca rojo—
+  // no cambió.
+  it("con ficha: «Completar: cargo, cédula» en GRIS, sin nada rojo", async () => {
     await abrir();
-    const grises = screen.getAllByText("Completar: cargo, cédula, saldo de vacaciones");
+    const grises = screen.getAllByText("Completar: cargo, cédula");
     expect(grises.length).toBeGreaterThan(0);
     for (const g of grises) expect(g.className).toContain("text-gray-500");
     for (const fila of filaDe(/Alejandra Camaño/)) expect(fila.textContent).not.toContain("Para pagar:");
@@ -121,15 +125,18 @@ describe("9. 🔴 «Qué falta» reemplaza a «Estado»", () => {
   });
 });
 
-describe("7. el saldo de vacaciones: guion gris, nunca rojo", () => {
-  it("sin saldo cargado la celda dice «—»; con saldo, «0 días»", async () => {
+describe("7. los días de vacaciones: guion gris, nunca rojo", () => {
+  // ⚠️ CAMBIÓ DE DIRECCIÓN el 17-sep-2026: ya no hay saldo escrito a mano, y sin
+  // FECHA DE INGRESO tampoco hay número. La regla de pantalla es la MISMA que
+  // Daniel aprobó —*«un rojo que sale siempre no avisa nada»*—: guion gris.
+  it("sin fecha de ingreso la celda dice «—»; con ella, el número", async () => {
     await abrir();
     expect(screen.queryByText("Falta el saldo")).toBeNull();
     expect(screen.queryByText(/Faltan la fecha de ingreso/)).toBeNull();
-    expect(screen.getAllByText("0 días").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("0").length).toBeGreaterThan(0);
     for (const fila of filaDe(/Alejandra Camaño/)) expect(fila.textContent).toContain("—");
-    // Y ningún ámbar/rojo colgado del saldo.
-    for (const el of screen.getAllByText("0 días")) expect(el.className).not.toContain("amber");
+    // 🔑 CONTROL: ningún ámbar ni rojo colgado del número.
+    for (const el of screen.getAllByText("0")) expect(el.className).not.toContain("amber");
   });
 });
 

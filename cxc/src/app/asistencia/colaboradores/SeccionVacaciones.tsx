@@ -1,15 +1,18 @@
 "use client";
 
 /* ─────────────────────────────────────────────────────────────────────────────
- * SUS VACACIONES — el saldo, las cargadas y «+ Vacación».
+ * SUS VACACIONES — los días que le corresponden, las cargadas y «+ Vacación».
  *
  * 🔴 EL MISMO ENDPOINT DE SIEMPRE (`/api/asistencia/vacaciones`), con la
- * persona ya puesta. El saldo sale del MISMO motor que lo calculaba en la
- * pestaña: dos motores para el mismo saldo es cómo nacen dos números.
+ * persona ya puesta. El número sale del MISMO motor que lo calcula en la
+ * pestaña: dos motores para el mismo número es cómo nacen dos números.
  *
- * 🔑 SIN SALDO NO SE INVENTA UN CERO. El saldo lo carga contabilidad junto con
- * su fecha de corte; sin los dos, la sección dice qué falta y lleva a cargarlo,
- * nunca «0 días» — que sería afirmar que ya se las gastó.
+ * 🔴 NO ES UN SALDO (17-sep-2026). Es lo que le corresponde por antigüedad —30
+ * días por cada 11 meses desde su fecha de ingreso— menos lo REGISTRADO acá. El
+ * sistema no sabe qué se tomó antes, y por eso el número va SIEMPRE con la
+ * línea gris que lo dice. 🔴 No se usa para pagar nada.
+ *
+ * 🔑 SIN FECHA DE INGRESO NO SE INVENTA UN CERO: se dice qué falta.
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { useCallback, useEffect, useState } from "react";
@@ -19,10 +22,11 @@ import RangoFechas from "@/components/ui/RangoFechas";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { fmtDate } from "@/lib/format";
 import {
+  NO_INCLUYE_ANTES,
+  textoCorresponden,
   textoDetalle,
-  textoSaldo,
-  type SaldoVacaciones,
-} from "@/lib/asistencia/saldo-vacaciones";
+  type DiasCorresponden,
+} from "@/lib/asistencia/vacaciones-corresponden";
 import {
   efectoDelInterruptor,
   PREGUNTA_YA_COBRADAS,
@@ -42,7 +46,7 @@ export default function SeccionVacaciones({ codigo, refresco }: {
 }) {
   const { toast } = useToast();
   const [lista, setLista] = useState<VacacionFila[]>([]);
-  const [saldo, setSaldo] = useState<SaldoVacaciones | null>(null);
+  const [corresponden, setCorresponden] = useState<DiasCorresponden | null>(null);
   const [puedeCargar, setPuedeCargar] = useState(true);
   const [abierto, setAbierto] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -58,12 +62,12 @@ export default function SeccionVacaciones({ codigo, refresco }: {
       if (!r.ok) throw new Error(d.error ?? "");
       const todas = (d.vacaciones ?? []) as VacacionFila[];
       setLista(todas.filter((v) => String(v.empleado_codigo) === String(codigo)));
-      const saldos = (d.saldos ?? []) as SaldoVacaciones[];
-      setSaldo(saldos.find((s) => String(s.codigo) === String(codigo)) ?? null);
+      const lista = (d.corresponden ?? []) as DiasCorresponden[];
+      setCorresponden(lista.find((s) => String(s.codigo) === String(codigo)) ?? null);
       setPuedeCargar(d.puedeCargar !== false);
     } catch {
       setLista([]);
-      setSaldo(null);
+      setCorresponden(null);
     }
   }, [codigo]);
 
@@ -104,17 +108,24 @@ export default function SeccionVacaciones({ codigo, refresco }: {
     }
   }
 
-  const detalle = saldo ? textoDetalle(saldo) : null;
-  const falta = !saldo || saldo.saldo === null || saldo.falta !== null;
+  const detalle = corresponden ? textoDetalle(corresponden) : null;
+  const falta = !corresponden || corresponden.dias === null;
 
   return (
     <Seccion
       titulo="Vacaciones"
       resumen={
-        <span className={falta ? "text-amber-800" : undefined}>
-          {saldo ? textoSaldo(saldo) : "Falta el saldo"}
-          {detalle && <span className="ml-1 text-gray-400">· {detalle}</span>}
-        </span>
+        <>
+          <span className={falta ? "text-amber-800" : undefined}>
+            {corresponden ? textoCorresponden(corresponden) : "Falta la fecha de ingreso"}
+            {detalle && <span className="ml-1 text-gray-400">· {detalle}</span>}
+          </span>
+          {/* 🔴 LA LÍNEA QUE NO SE PUEDE SACAR: sin ella el número se lee como
+              un saldo, y nadie sabe qué se tomó antes. En gris, como dato. */}
+          {!falta && (
+            <span className="mt-0.5 block text-[12px] text-gray-400">{NO_INCLUYE_ANTES}</span>
+          )}
+        </>
       }
       boton={abierto ? "Cerrar" : "+ Vacación"}
       onBoton={() => setAbierto((v) => !v)}
