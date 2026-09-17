@@ -26,6 +26,11 @@ import {
   type PrecioAB,
   type PriceFormula,
 } from "@/lib/depurador/reebok";
+import {
+  findHeaderRowDespacho,
+  parseDespacho,
+  type ColumnaAusente,
+} from "@/lib/depurador/reebok-despacho";
 import { marcaKey, computeTotales, type Redondeo, type MarcaFormula, type MarcaRubroFormula } from "@/lib/depurador/logic";
 import type { SheetRow } from "@/lib/depurador/logic";
 import { mensajeDivisorEnPantalla } from "@/lib/depurador/divisor";
@@ -47,6 +52,22 @@ type NameMode = "formula" | "fijo";
 interface NameEdit { divisor: number; extra: number; redondeo: Redondeo; precioFijo: number | null; modo: NameMode; dirty: boolean }
 
 type Salida = "catalogo" | "switch";
+
+/* ── 🔴 LAS DOS ENTRADAS DEL MISMO FLUJO (17-sep-2026) ──────────────────────
+ * Reebok manda DOS Excel distintos y los dos entran por acá:
+ *   · «confirmacion» — la confirmación de compra: lo que VA A LLEGAR. Sirve para
+ *     cotizar antes de que la mercancía exista. Es la de siempre y no cambió.
+ *   · «despacho» — lo que DE VERDAD LLEGÓ, con el costo real (el descuento se
+ *     LEE del archivo), el código de barras (`UPC`) y la cantidad recibida.
+ * La pantalla DICE cuál se subió: son dos documentos distintos del proveedor y
+ * confundirlos es cotizar con números que no son.
+ * ────────────────────────────────────────────────────────────────────────── */
+type FormatoReebok = "confirmacion" | "despacho";
+
+const ROTULO_FORMATO: Record<FormatoReebok, string> = {
+  confirmacion: "Confirmación de compra · lo que va a llegar",
+  despacho: "Despacho · lo que llegó",
+};
 
 interface ReebokClientProps {
   /** Archivo inyectado por el dispatcher (mismo tab CK/TH). Si viene, se oculta la
@@ -78,6 +99,11 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
   const [items, setItems] = useState<ReebokItem[] | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState("");
+  const [formato, setFormato] = useState<FormatoReebok>("confirmacion");
+  /** Columnas del despacho que NO vinieron, con la regla que las reemplaza. */
+  const [ausentes, setAusentes] = useState<ColumnaAusente[]>([]);
+  /** Segmentos de negocio que no dicen FTW/APP/HW: salen con la Marca vacía. */
+  const [segmentosRaros, setSegmentosRaros] = useState<Array<{ valor: string; articulos: string[] }>>([]);
   const [downloading, setDownloading] = useState<"" | "catalogo" | "switch">("");
 
   // Config de salida
@@ -203,6 +229,26 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
       const sheetName = wb.SheetNames[0];
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, raw: true, defval: null }) as SheetRow[];
 
+      // 🔴 EL DESPACHO PRIMERO. Son dos archivos distintos y se reconocen por
+      // CONTENIDO, nunca por el nombre de la hoja ni del archivo: hoy el
+      // despacho llega como `Sheet1` en ropa y `Despacho` en calzado, y eso
+      // puede cambiar sin que nadie avise.
+      if (findHeaderRowDespacho(rows) !== -1) {
+        const d = parseDespacho(rows);
+        setRawRows(rows);
+        setItems(d.items);
+        setFormato("despacho");
+        // En el despacho las piezas son `Quantity`: no hay columna de mes que
+        // elegir, y por eso el desplegable no se dibuja.
+        setMonths([]);
+        setMonthColIdx(-1);
+        setWarnings(d.warnings);
+        setAusentes(d.ausentes);
+        setSegmentosRaros(d.segmentosDesconocidos);
+        setError("");
+        return;
+      }
+
       // Detectar headers para poblar el dropdown de "columna de piezas".
       const { findHeaderRow } = await import("@/lib/depurador/reebok");
       const hr = findHeaderRow(rows);
@@ -213,9 +259,12 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
       const { items: parsed, warnings: w } = parseReebok(rows, detected);
       setRawRows(rows);
       setItems(parsed);
+      setFormato("confirmacion");
       setMonths(opts);
       setMonthColIdx(detected);
       setWarnings(w);
+      setAusentes([]);
+      setSegmentosRaros([]);
       setError("");
     } catch (err) {
       setRawRows(null);
@@ -256,6 +305,9 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
     setMonths([]);
     setMonthColIdx(-1);
     setWarnings([]);
+    setAusentes([]);
+    setSegmentosRaros([]);
+    setFormato("confirmacion");
     setError("");
     setFileName("");
     if (inputRef.current) inputRef.current.value = "";
@@ -266,6 +318,9 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
     () => months.find((m) => m.idx === monthColIdx)?.label ?? "",
     [months, monthColIdx],
   );
+  /** Cómo se llama la columna de piezas en pantalla y en el Excel del cliente:
+   *  el mes elegido en la confirmación, «recibidas» en el despacho. */
+  const piezasLabel = formato === "despacho" ? "recibidas" : monthLabel;
 
   // Excepciones por Name indexadas por clave canónica (= excByName de los builders).
   const excByName = useMemo(() => {
@@ -285,7 +340,8 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
   // Los artículos sin piezas del mes NO van al Excel (pedido de Daniel). El filtro se
   // aplica SOLO si hay columna de mes de verdad: sin ella parseReebok deja todo en 0 y
   // filtrar entregaría un archivo vacío (el aviso ámbar de abajo cubre ese caso).
-  const filtrarSinPiezas = monthColIdx !== -1;
+  // En el despacho SIEMPRE se filtra: un artículo con 0 recibidas no llegó.
+  const filtrarSinPiezas = formato === "despacho" || monthColIdx !== -1;
 
   const catalogoTodo: CatalogoRow[] = useMemo(
     () => (items ? buildCatalogo(items, { formulaA, formulaB, excByName, flete }) : []),
@@ -472,7 +528,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
       const wb = XLSX.utils.book_new();
 
       if (!emparejado) {
-        const aoa = buildCatalogoAoa(catalogo, monthLabel);
+        const aoa = buildCatalogoAoa(catalogo, piezasLabel);
         const ws = XLSX.utils.aoa_to_sheet(aoa);
         // Código de artículo como texto (New Article numérico → evita notación científica).
         forceTextCols(XLSX, ws as never, [1]);
@@ -489,7 +545,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
       );
       setFotoProgreso(null);
 
-      const aoa = buildCatalogoAoa(catalogo, monthLabel, (cod) => prep.conFoto.has(cod));
+      const aoa = buildCatalogoAoa(catalogo, piezasLabel, (cod) => prep.conFoto.has(cod));
       const ws = XLSX.utils.aoa_to_sheet(aoa);
       // ⚠️ Con la columna "Foto" adelante, New Article pasó del índice 1 al 2:
       // forzar el índice viejo dejaría los códigos en notación científica.
@@ -615,11 +671,17 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
         </label>
       )}
 
-      {/* Banner Reebok detectado (modo dispatcher) */}
-      {embedded && items && (
+      {/* 🔴 CUÁL DE LOS DOS ARCHIVOS SE SUBIÓ. Se dice SIEMPRE, no solo en modo
+          dispatcher: son dos documentos distintos del proveedor y de cada uno
+          sale un costo distinto. La confirmación es lo que va a llegar; el
+          despacho, lo que llegó. */}
+      {items && (
         <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800">
           <span className="rounded bg-red-600 px-1.5 py-0.5 text-[11px] font-bold text-white">REEBOK</span>
-          <span>Detecté el formato Reebok · Active Shoes. <b>{fileName}</b></span>
+          <span>
+            <b>{ROTULO_FORMATO[formato]}</b>
+            {fileName ? <> · {fileName}</> : null}
+          </span>
         </div>
       )}
 
@@ -675,6 +737,49 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
             </div>
           )}
 
+          {/* 🔴 LAS COLUMNAS QUE NO VINIERON, Y DE DÓNDE SALIÓ CADA COSA.
+              Daniel: «que el sistema acepte este excel, y cuando llegue con lo
+              otro ya sepa y me lo acepte también sin tener que estar
+              reconfigurando». El archivo entra igual: esto NO es un error, es
+              decir qué regla de respaldo se usó. */}
+          {ausentes.length > 0 && (
+            <div className="mb-4 rounded-lg border border-stone-300 bg-stone-50 px-4 py-3 text-sm text-stone-700">
+              <b className="font-semibold text-stone-900">
+                Este despacho no trae {ausentes.length} columna{ausentes.length === 1 ? "" : "s"}.
+              </b>{" "}
+              El archivo entra igual; esto es de dónde salió cada dato:
+              <ul className="ml-4 mt-1.5 list-disc">
+                {ausentes.map((c) => (
+                  <li key={c.rotulo}><b>{c.rotulo}</b> — {c.respaldo}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* El segmento de negocio es de donde sale la Marca de Switch. Si no
+              dice FTW, APP ni ACC HW, NO se adivina: la fila sale con la Marca
+              vacía y acá se dice con el valor crudo. */}
+          {segmentosRaros.length > 0 && (
+            <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <span aria-hidden>!</span>
+              <div>
+                <b className="font-semibold">
+                  {segmentosRaros.length} «Segmento de negocio» que no dice FTW, APP ni ACC HW.
+                </b>{" "}
+                Esos artículos salen con la <b>Marca</b> vacía y hay que ponérsela en Switch:
+                <ul className="ml-4 mt-1.5 list-disc">
+                  {segmentosRaros.slice(0, 8).map((v) => (
+                    <li key={v.valor}>
+                      «{v.valor}» — {v.articulos.length} artículo(s):{" "}
+                      {v.articulos.slice(0, 3).join(", ")}{v.articulos.length > 3 ? "…" : ""}
+                    </li>
+                  ))}
+                </ul>
+                {segmentosRaros.length > 8 && <div className="mt-1">…y {segmentosRaros.length - 8} más.</div>}
+              </div>
+            </div>
+          )}
+
           {/* Config de salida */}
           <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-stone-200 bg-white p-4 sm:grid-cols-3">
             <Field label="¿Qué quieres generar?">
@@ -683,18 +788,28 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                 <PriceBtn active={salida === "switch"} onClick={() => setSalida("switch")} label="Plantilla Switch" last />
               </div>
             </Field>
-            <Field label="Columna de piezas (mes)">
-              <select
-                value={monthColIdx}
-                onChange={(e) => onMonthChange(parseInt(e.target.value))}
-                className={selectCls}
-              >
-                <option value={-1}>— Sin piezas —</option>
-                {months.map((m) => (
-                  <option key={m.idx} value={m.idx}>{m.label}{m.isMonth ? " (mes)" : ""}</option>
-                ))}
-              </select>
-            </Field>
+            {formato === "confirmacion" ? (
+              <Field label="Columna de piezas (mes)">
+                <select
+                  value={monthColIdx}
+                  onChange={(e) => onMonthChange(parseInt(e.target.value))}
+                  className={selectCls}
+                >
+                  <option value={-1}>— Sin piezas —</option>
+                  {months.map((m) => (
+                    <option key={m.idx} value={m.idx}>{m.label}{m.isMonth ? " (mes)" : ""}</option>
+                  ))}
+                </select>
+              </Field>
+            ) : (
+              /* En el despacho no hay nada que elegir: la cantidad es la que
+                 llegó, y por eso se DICE en vez de preguntarse. */
+              <Field label="Piezas" note="Es lo que llegó, no una proyección.">
+                <div className="rounded-lg border border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-900">
+                  Quantity (del despacho)
+                </div>
+              </Field>
+            )}
             {/* 🔴 EL FLETE MUEVE PLATA: Costo FOB × flete = Costo CIF, y del CIF
                 sale el precio. Daniel: «tengo que pagar el flete que es 1.1 y
                 1.15 en reebok». SON DOS BOTONES Y NO UN CAMPO: un «11» tecleado
@@ -921,7 +1036,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
             </div>
           )}
 
-          {monthColIdx === -1 && (
+          {formato === "confirmacion" && monthColIdx === -1 && (
             <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] font-medium text-amber-800">
               No detecté una columna de mes. Elige arriba cuál tiene las piezas por artículo.
               Mientras tanto todo sale con 0 piezas y <b>se incluyen todos los artículos</b>,
@@ -930,8 +1045,9 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
           )}
           {quedoVacio && (
             <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-[13px] font-medium text-red-800">
-              Ningún artículo tiene piezas en {monthLabel || "el mes elegido"}, así que el archivo saldría vacío
-              y no se puede descargar. Revisa arriba si la columna de piezas es la correcta.
+              {formato === "despacho"
+                ? "Ningún artículo del despacho trae piezas recibidas, así que el archivo saldría vacío y no se puede descargar. Revisa que el archivo sea el correcto."
+                : `Ningún artículo tiene piezas en ${monthLabel || "el mes elegido"}, así que el archivo saldría vacío y no se puede descargar. Revisa arriba si la columna de piezas es la correcta.`}
             </div>
           )}
           {salida === "switch" && revisar > 0 && (
@@ -946,7 +1062,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
             <span className="text-stone-300">·</span>
             <span><b className="font-semibold text-stone-900">{vista.skus.toLocaleString()}</b> tallas/SKUs</span>
             <span className="text-stone-300">·</span>
-            <span><b className="font-semibold text-stone-900">{vista.piezas.toLocaleString()}</b> piezas{monthLabel ? ` (${monthLabel})` : ""}</span>
+            <span><b className="font-semibold text-stone-900">{vista.piezas.toLocaleString()}</b> piezas{piezasLabel ? ` (${piezasLabel})` : ""}</span>
             <div className="ml-auto flex flex-wrap gap-2">
               <button
                 onClick={handleDownload}
@@ -974,7 +1090,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
           {vista.omitidos > 0 && (
             <div className="mb-3 px-1 text-[12px] text-stone-500">
               {vista.omitidos.toLocaleString()} artículo{vista.omitidos === 1 ? "" : "s"} sin piezas
-              en {monthLabel || "el mes elegido"} no se {vista.omitidos === 1 ? "incluyó" : "incluyeron"}.
+              {formato === "despacho" ? " recibidas" : ` en ${monthLabel || "el mes elegido"}`} no se {vista.omitidos === 1 ? "incluyó" : "incluyeron"}.
             </div>
           )}
 

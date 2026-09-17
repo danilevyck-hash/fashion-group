@@ -26,7 +26,8 @@ interface DispatcherProps {
 /** Punto de entrada único de «Plantilla › Nuevo»: una sola dropzone. Al soltar
  *  el archivo, olfatea los headers y despacha al flujo correcto SIN tocar la
  *  lógica de ninguno — los tres caminos ya no se nombran en pantalla:
- *   · Reebok = headers Book4 (PO NAME + New Article + WholesalePrice).
+ *   · Reebok = la confirmación de compra (headers Book4: PO NAME + New Article +
+ *     WholesalePrice) o el despacho (SKU Father + Quantity).
  *   · Facturas Tienda = .csv (';') o la factura/reporte que reconoce
  *     detectFactura (4-sep-2026 — antes era una pestaña propia).
  *   · Todo lo demás = CK/TH/KL (DepuradorClient). */
@@ -51,11 +52,16 @@ export default function DepuradorDispatcher({ onDownloaded }: DispatcherProps) {
       const XLSX = (await import("xlsx-js-style")).default;
       const wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
       const { findHeaderRow } = await import("@/lib/depurador/reebok");
+      const { findHeaderRowDespacho } = await import("@/lib/depurador/reebok-despacho");
       const { detectFactura } = await import("@/lib/depurador/tienda");
       let detected: Kind = "ckth";
       for (const sn of wb.SheetNames) {
         const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: null }) as SheetRow[];
-        if (findHeaderRow(rows) !== -1) { detected = "reebok"; break; }
+        // 🔴 Reebok entra por DOS archivos: la confirmación de compra (lo que va
+        // a llegar) y el despacho (lo que llegó). Los dos van al mismo flujo, y
+        // ReebokClient dice cuál se subió. Se olfatean por CONTENIDO, nunca por
+        // el nombre de la hoja: el despacho llega como `Sheet1` o como `Despacho`.
+        if (findHeaderRow(rows) !== -1 || findHeaderRowDespacho(rows) !== -1) { detected = "reebok"; break; }
         if (detectFactura(rows)) { detected = "tienda"; break; }
       }
       setKind(detected);

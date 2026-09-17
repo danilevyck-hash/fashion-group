@@ -1,5 +1,12 @@
 // Flujo Reebok → Active Shoes · lógica pura (sin DOM, sin xlsx).
 //
+// 🔴 DOS ENTRADAS, UN SOLO FLUJO (17-sep-2026). Este archivo lee la CONFIRMACIÓN
+// de compra (lo que va a llegar) y arma las dos salidas. El Excel de DESPACHO
+// (lo que de verdad llegó, con el costo real, el código de barras y la cantidad
+// recibida) lo lee `reebok-despacho.ts`, que produce los MISMOS `ReebokItem` y
+// entra por acá sin un segundo camino. La confirmación NO se retiró: es lo que
+// se usa para cotizar antes de que la mercancía exista.
+//
 // SEPARADO del Depurador CK/TH: Reebok usa otro formato de Excel del proveedor
 // (Book4: headers en la 2.ª fila, columnas New Article / SKU / RRP / WholesalePrice
 // y una columna de mes con piezas por SKU) y otra lógica de precio. NO pasa por
@@ -164,6 +171,17 @@ export interface ReebokItem {
   category: string; ageGroup: string; colorName: string; gender: string;
   sellIn: string; wholesale: number | null; wholesaleOff: number | null;
   talla: string; piezas: number;
+  /* ── Lo que solo trae el Excel de DESPACHO (17-sep-2026) ──────────────────
+   * Los dos son OPCIONALES a propósito: la CONFIRMACIÓN de compra no los trae
+   * y tiene que seguir saliendo exactamente igual que siempre. Sin ellos, cada
+   * columna cae en su valor de siempre — el SKU como código de barra y la
+   * «Composición» vacía. Ver `reebok-despacho.ts`. */
+  /** 🔴 El código de barras DE VERDAD (el `UPC` de Reebok, o el `EAN`). El
+   *  `SKU` que se escribía hasta hoy (`RBKAPPTR1200M`) no se puede pistolear. */
+  codigoBarra?: string;
+  /** La composición de la prenda («UPPER: 99% TEXTILE…»), tal cual la manda
+   *  Reebok. Solo viene en el despacho de calzado. */
+  composicion?: string;
 }
 
 export interface ParseResult { items: ReebokItem[]; headerRow: number; cols: ReebokCols; warnings: string[] }
@@ -371,7 +389,15 @@ export function casoTallaReebok(it: Pick<ReebokItem, "department" | "ageGroup" |
   return g === "MALE" ? "calzado-hombre" : "calzado-dama";
 }
 
-interface SampleResult { sku: string; talla: string; fallback: boolean }
+interface SampleResult {
+  sku: string;
+  /** 🔴 El código de barra de ESA talla (el UPC del despacho). Vacío cuando el
+   *  archivo no lo trae —la confirmación de compra—, y entonces manda el SKU,
+   *  que es lo que el sistema escribía hasta el 17-sep-2026. */
+  codigoBarra: string;
+  talla: string;
+  fallback: boolean;
+}
 
 /** Elige el código de barra representativo (talla-muestra) de un artículo:
  *  - Footwear Male → 9 · Female → 7 · Kids/Unisex → mediana de las tallas.
@@ -380,16 +406,20 @@ interface SampleResult { sku: string; talla: string; fallback: boolean }
 function pickSample(group: ReebokItem[]): SampleResult {
   const first = group[0];
   // Mapa talla → sku (primera aparición). Tallas numéricas ordenadas para mediana/cercanía.
-  const bySize = new Map<string, string>();
-  for (const it of group) { const t = it.talla.trim(); if (t && !bySize.has(t)) bySize.set(t, it.sku); }
+  const bySize = new Map<string, ReebokItem>();
+  for (const it of group) { const t = it.talla.trim(); if (t && !bySize.has(t)) bySize.set(t, it); }
   const nums = [...bySize.keys()]
     .map((t) => ({ t, n: num(t) }))
     .filter((x): x is { t: string; n: number } => x.n !== null)
     .sort((a, b) => a.n - b.n);
-  const skuOf = (t: string): string => bySize.get(t) ?? first.sku;
+  const deTalla = (t: string): ReebokItem => bySize.get(t) ?? first;
+  const muestra = (t: string, fallback: boolean): SampleResult => {
+    const it = deTalla(t);
+    return { sku: it.sku, codigoBarra: (it.codigoBarra ?? "").trim(), talla: t, fallback };
+  };
   const fallbackAll = (): SampleResult => {
     const t = [...bySize.keys()][0] ?? first.talla;
-    return { sku: skuOf(t), talla: t, fallback: bySize.size > 1 };
+    return muestra(t, bySize.size > 1);
   };
 
   const caso = casoTallaReebok(first);
@@ -397,20 +427,20 @@ function pickSample(group: ReebokItem[]): SampleResult {
     if (caso === "calzado-kids") {
       if (nums.length === 0) return fallbackAll();
       const mid = nums[Math.floor((nums.length - 1) / 2)]; // mediana (talla real, sin fallback)
-      return { sku: skuOf(mid.t), talla: mid.t, fallback: false };
+      return muestra(mid.t, false);
     }
     const target = TALLA_OBJETIVO_REEBOK[caso];
     if (nums.length === 0) return fallbackAll();
     const exact = nums.find((x) => x.n === target);
-    if (exact) return { sku: skuOf(exact.t), talla: exact.t, fallback: false };
+    if (exact) return muestra(exact.t, false);
     // Más cercana + fallback ámbar (empate → la menor).
     const nearest = nums.reduce((best, x) =>
       Math.abs(x.n - target) < Math.abs(best.n - target) ? x : best, nums[0]);
-    return { sku: skuOf(nearest.t), talla: nearest.t, fallback: true };
+    return muestra(nearest.t, true);
   }
   // Apparel / Hardware → M; si no hay M → talla única.
   const m = [...bySize.keys()].find((t) => normH(t) === "M");
-  if (m) return { sku: skuOf(m), talla: m, fallback: false };
+  if (m) return muestra(m, false);
   return fallbackAll();
 }
 
@@ -549,11 +579,17 @@ export function buildSwitchRows(items: ReebokItem[], cfg: SwitchBuildConfig): Sw
     const { fob, cif } = costoReebok(first.department, w, first.wholesaleOff, cfg.flete);
     // Jerarquía por Name: precio fijo > fórmula del Name > fórmula de marca (A/B).
     const precio = precioDescripcion(cif, excForName(cfg.excByName, first.name), cfg.formula);
+    const composicion = group.map((it) => (it.composicion ?? "").trim()).find((c) => c !== "") ?? "";
     out.push({
       cols: {
         "Código *": first.newArticle,
         "Referencia *": first.newArticle,
-        "Código Barra *": sample.sku || first.newArticle,
+        // 🔴 EL CÓDIGO DE BARRAS DE LA TALLA-MUESTRA. Con el Excel de DESPACHO es
+        // el `UPC` de Reebok, que es un código de barras de verdad; con la
+        // confirmación de compra no viene ninguno y se conserva el `SKU`, que es
+        // lo que el sistema escribía hasta el 17-sep-2026 (`RBKAPPTR1200M`: no se
+        // puede pistolear, pero no se inventa otra cosa). Ver `reebok-despacho.ts`.
+        "Código Barra *": sample.codigoBarra || sample.sku || first.newArticle,
         "Descripción *": first.name,
         "Precio *": precio,
         "Tasa de Impuesto *": tasaSwitch(cfg.tasa), // «07», texto
@@ -571,7 +607,12 @@ export function buildSwitchRows(items: ReebokItem[], cfg: SwitchBuildConfig): Sw
         "Serie": "",
         "Stock Ideal": qty,
         "Temporada": cfg.temporada,
-        "Composición": "", // SIEMPRE vacía (la columna existe en Switch)
+        // La «Composición» del despacho de calzado («UPPER: 99% TEXTILE…»), tal
+        // cual la manda Reebok. Se toma la PRIMERA no vacía del artículo: las
+        // tallas del mismo estilo comparten material y alguna puede venir en
+        // blanco. ⚠️ Con la confirmación de compra sigue SIEMPRE vacía, que es la
+        // conducta de siempre (Daniel: «vuelve vacía, no la quiero»).
+        "Composición": composicion,
         "Codigo CPBS": "",
         "Codigo CPBS Abrev": "",
         "Bonificación": "",

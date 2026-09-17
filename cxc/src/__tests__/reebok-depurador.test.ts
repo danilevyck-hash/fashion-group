@@ -340,7 +340,19 @@ describe("Reebok — sin columna de mes NO se entrega un Excel vacío", () => {
 
   it("el cliente ata el filtro a que exista columna de mes, y bloquea el archivo vacío", () => {
     const src = readFileSync(join(__dirname, "../app/productos/cargar/ReebokClient.tsx"), "utf8");
-    expect(src).toMatch(/const filtrarSinPiezas = monthColIdx !== -1;/);
+    // 🔴 CAMBIÓ DE DIRECCIÓN (17-sep-2026): decía exactamente
+    // `const filtrarSinPiezas = monthColIdx !== -1;`.
+    // Ese día el flujo Reebok estrenó su SEGUNDA entrada, el Excel de DESPACHO,
+    // donde las piezas son `Quantity` y NO hay columna de mes que elegir: con la
+    // línea vieja el despacho nunca habría filtrado, y un artículo con 0
+    // recibidas —que sencillamente no llegó— se habría subido a Switch igual.
+    // Lo que el candado protege NO cambió: en la CONFIRMACIÓN de compra el
+    // filtro sigue atado a que haya columna de mes, que es lo que evita entregar
+    // un Excel vacío. Ver `reebok-despacho.test.ts`.
+    expect(src).toMatch(/const filtrarSinPiezas = formato === "despacho" \|\| monthColIdx !== -1;/);
+    // CONTROL: la confirmación de compra sigue sin filtrar cuando no hay mes —
+    // la condición del archivo viejo tiene que seguir escrita ahí adentro.
+    expect(src).toContain("monthColIdx !== -1");
     // Sin resultados tras filtrar → no se puede descargar.
     expect(src).toMatch(/const quedoVacio = filtrarSinPiezas && vista\.articulos === 0;/);
     // Desde el 4-sep-2026 la descarga también se apaga con un divisor fuera de
@@ -372,8 +384,16 @@ describe("Reebok — la vista previa y el Excel traen las MISMAS filas", () => {
       expect(src).not.toMatch(new RegExp(`${crudo}\\.length`));   // contadores
     }
     // Los que SÍ se usan son los filtrados.
-    expect(src).toMatch(/buildCatalogoAoa\(catalogo, monthLabel\)/);
+    // 🔴 CAMBIÓ DE DIRECCIÓN (17-sep-2026): decía `buildCatalogoAoa(catalogo,
+    // monthLabel)`. Con la entrada del DESPACHO la columna de piezas ya no es un
+    // mes sino lo recibido, y el rótulo lo decide `piezasLabel` —el mes elegido
+    // en la confirmación, «recibidas» en el despacho—. Lo que este candado
+    // protege es OTRA cosa y no se movió: que al Excel vaya `catalogo` (lo
+    // filtrado) y nunca `catalogoTodo`.
+    expect(src).toMatch(/buildCatalogoAoa\(catalogo, piezasLabel\)/);
     expect(src).toMatch(/buildSwitchAoa\(switchRows\)/);
+    // CONTROL: el rótulo del mes sigue existiendo y sigue saliendo del desplegable.
+    expect(src).toMatch(/const monthLabel = useMemo\(/);
   });
 
   it("CANDADO: los contadores de la barra salen de la salida elegida, no del catálogo", () => {

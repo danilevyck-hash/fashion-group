@@ -7,6 +7,160 @@
 
 ---
 
+## 🔴 EL DESPACHO DE REEBOK ENTRA AL DEPURADOR — TRES NÚMEROS QUE SE INVENTABAN (17-sep-2026)
+
+Daniel, textual: *«te paso un nuevo excel… puede reemplazar al viejo que se subía a
+depurador para reebok»* · *«así agregamos ese Excel también para hacer preforma cliente
+(con foto), plantilla switch, etc»*.
+
+**El flujo Reebok de «Plantilla Switch» ahora tiene DOS entradas, y son dos documentos
+distintos del proveedor:**
+
+| | Qué es | Para qué sirve |
+|---|---|---|
+| **Confirmación de compra** (`RBK FW26 …xlsx`) | lo que **va a llegar** | cotizar antes de que la mercancía exista. **No cambió ni una coma.** |
+| **Despacho** (`Detalle_Despacho…xlsx`) | lo que **de verdad llegó** | la plantilla de Switch y la preforma con los números buenos |
+
+Las dos salidas son las mismas de siempre —preforma para el cliente (con foto) y
+plantilla de Switch de 25 columnas—, y la pantalla **DICE cuál de los dos archivos se
+subió**: confundirlos es cotizar con números que no son.
+
+### 🩸 Los tres números que salían mal, medidos el 17-sep-2026
+
+**1. EL COSTO SE INVENTABA.** `fobReebok` asume el descuento del proveedor —`× 0,80` en
+calzado y `× 0,70` en ropa y accesorios— porque la confirmación no lo dice. El despacho
+lo trae **columna por columna** (`% de descuento` y `Precio after Disc`), y el archivo
+real trae **20 %, 25 % y 30 % en el mismo embarque**. Daniel: *«hay veces que puede
+llegar un porcentaje más alto. No siempre será 20»*. Por eso el descuento **no se
+reemplaza por otra constante: se LEE**.
+
+Medido sobre los dos archivos reales, con `scripts/_medir-despacho-reebok.ts` (solo lectura):
+
+| Archivo | Artículos | Piezas | Costo FOB leído | Costo FOB asumido | Diferencia | Artículos con otro costo |
+|---|---|---|---|---|---|---|
+| Ropa y accesorios | 75 | 1.403 | **$11.018,30** | $9.638,79 | **+$1.379,51** | **75 de 75** |
+| Calzado | 108 | 3.306 | **$101.808,84** | $102.138,78 | **−$329,94** | 9 de 108 |
+
+Los 9 del calzado son justamente los que traen 25 % y 30 %. Y como el precio de venta
+sale del CIF, **esto mueve el precio que ve el cliente en las dos salidas**.
+
+**2. EL CÓDIGO DE BARRAS NO ERA UN CÓDIGO DE BARRAS.** Se escribía el `SKU` de Reebok
+(`RBKAPPTR1200M`), que no se puede pistolear. Ahora es el **`UPC` de la talla-muestra**
+(`616518422854`). Medido: **0 de 183 artículos** quedan sin un código numérico.
+
+**3. LA CANTIDAD ERA UNA PROYECCIÓN** — las piezas de la columna del MES de la
+confirmación. Ahora es `Quantity`, lo que llegó.
+
+### 🔴 La regla que manda sobre todas: el mismo archivo, con o sin las columnas nuevas
+
+Daniel, textual: *«vendrá con poname y category pero por ahora que el sistema acepte
+este excel, y cuando llegue con lo otro ya sepa y me lo acepte también **sin tener que
+estar reconfigurando**»*.
+
+Y el despacho **ya tiene dos generaciones**, así que esto no es hipotético. Daniel:
+*«en el despacho excel que solo trae calzado fue reemplazado por el que tiene accesory
+donde sí trae category, solo falta que me agreguen poname y department»*.
+
+| | Formato **NUEVO** (26 col., hoja `Sheet1`) | Formato **VIEJO** (25 col., hoja `Despacho`) |
+|---|---|---|
+| Alcance | ropa **y** calzado — el de acá en adelante | solo calzado |
+| `Category` · `Color Name` | **sí** | no |
+| `Composición` · `EAN` | **no** (los perdió) | **sí** |
+
+Los dos se tienen que poder subir: los archivos viejos existen y alguien los va a
+soltar en la pantalla. Por eso la regla de respaldo es **un DATO y no un `if` suelto**
+— `COLUMNAS_DESPACHO`, en `src/lib/depurador/reebok-despacho.ts`: columna, alias
+aceptados, si es obligatoria y de dónde sale si falta.
+
+| Columna | Si viene | Si NO viene |
+|---|---|---|
+| `PO NAME` | agrupa la preforma | **`BP Reference No.`** y, sin ella, `Orden` |
+| `Category` | es el **rubro** | `SHOES` si el Department es FOOTWEAR; si no, **vacío y se dice** |
+| `Department` | es la **Marca** | se deriva de `Segmento de negocio` (FTW · APP · ACC HW) |
+| `Composición` | va a la columna 21 de Switch | queda vacía, como siempre |
+| `UPC` | es el código de barra | `EAN`; sin ninguno, el `SKU` (y se dice) |
+| `Color Name` | viaja en el artículo | no se usa |
+
+🔑 **El `PO NAME` tiene TRES escalones.** Daniel: *«por ahora también se puede usar BP
+Reference No. como poname»*. Medido: en calzado dice `VIC` y en ropa `VIC- APP FW26`, y
+la confirmación trae `VIC` en su columna `PO NAME` — **es el mismo dato con otro
+nombre**. El orden de los alias ES la precedencia, así que el día que Reebok mande
+`PO NAME` gana sola, sin que nadie toque nada.
+
+🩸 **El Department se deriva por PALABRA ENTERA, nunca por `includes`.** Los 23
+segmentos de los dos archivos caen en una de tres: `FTW` → FOOTWEAR, `APP` → APPAREL,
+`HW` → HARDWARE. Con `includes`, un `HWY` o un `APPAREL` adentro de un segmento futuro
+clasificaría mal — es la misma trampa que ya quemó al repo con «female» conteniendo
+«male» (`tommy-gender.ts`). ⚠️ Un segmento que no dice ninguna de las tres **no se
+adivina**: la fila sale con la Marca vacía, se cuenta y se dice en pantalla con el
+valor crudo.
+
+🔑 **El archivo de calzado también trae ropa.** `100269032` es «Reebok TRAINING APP
+MEN» adentro del Excel de calzado: el Department se decide **POR FILA**, nunca por el
+archivo.
+
+### Lo que NO cambió, a propósito
+
+- `OUT_COLS`, `TEXT_COLS`, `buildSwitchRows`, `pickSample`, `costoReebok` y
+  `fotos-excel.ts`. El despacho produce los **mismos `ReebokItem`** y entra por el
+  camino de siempre: no hay un segundo generador de las 25 columnas.
+- 🔴 **Un solo costo por producto**: el CIF de la plantilla ES el costo de la preforma,
+  de la misma función. El candado del 14-sep sigue verde.
+- La talla-muestra: **M en ropa, 9 en calzado de hombre, 7 en dama, mediana en niños**.
+- El costo se enchufa sin tocar `costoReebok`: `Precio Base` entra como `wholesale` y
+  `Precio after Disc` como `wholesaleOff`, que es el campo que `fobReebok` ya prefiere
+  cuando viene con valor. **No se escribió una segunda cuenta de costo.**
+
+### ⚠️ Tres decisiones que quedaron abiertas, de Daniel
+
+1. **El rubro fino contra el inventario.** Él preguntó: *«¿si no viene category usará
+   Segmento de negocio y lo convertirá para mantener misma línea que ya existe en el
+   inventario de Active Shoes?»*. Medido contra producción el 17-sep-2026
+   (`switch_articulo_info`, 1.763 artículos de `active_shoes`): el rubro tiene **once
+   valores** y tres cubren casi todo — `SHOES` 1.624 · `APPAREL` 79 · `SOCKS` 24 —, más
+   `BAGS` 15, `HEADWEAR` 7, `GENERAL` 4, `MEN` 3, `DISPLAY & PROMO` 3, `OFERTA` 2,
+   `SHORTS` 1 y `MUEBLES ZAPATOS` 1. El despacho de ropa trae `Category` **más fina**:
+   T-SHIRTS 95 filas, SOCKS 46, SHORTS 36, BAGS 20, TOPS 12, BRA 12, JACKETS 8 — y
+   **cuatro de esas (T-SHIRTS, TOPS, BRA, JACKETS) no existen todavía en el
+   inventario**. Subir el archivo tal cual le agrega valores nuevos al rubro. **Eso ya
+   pasaba antes de este cambio** y no se tocó: es acomodo de Switch y lo decide él. La
+   regla vive en UNA función (`rubroDeRespaldo`) para que el día que decida sea una
+   línea.
+2. **El aviso ámbar de la talla única.** Daniel: *«ACCS063 porque solo hay S, es
+   marcarla en ámbar y poner esa no?»*. La primera mitad ya pasa: se usa la que haya.
+   La segunda **no**, y está medido: el ámbar de `pickSample` se enciende cuando hay
+   VARIAS tallas y ninguna es la buscada (`fallback: bySize.size > 1`); con UNA sola
+   talla no hay nada que elegir. Encenderlo para toda talla única pondría en ámbar
+   también los bolsos —`ACCB145` viene en `N SZ`, que es talla única de verdad— y un
+   aviso que grita sobre un dato bueno deja de ser un aviso. **No se cambió por cuenta
+   propia**, y el candado fija la conducta de hoy para que el cambio sea deliberado.
+3. **`Composición` se perdió en el formato nuevo.** Era la única columna de todo el
+   sistema que podía llenar esa celda de la plantilla de Switch. El mapeo queda escrito
+   y funcionando: el día que Reebok la devuelva, no hay nada que tocar.
+
+### Candados
+
+`src/__tests__/lib/reebok-despacho.test.ts` (50 casos). Los fixtures son los **dos
+archivos reales**, recortados a unos pocos estilos y sin tocar una celda:
+`reebok-despacho-nuevo-ropa.xlsx` y `reebok-despacho-viejo-calzado.xlsx`. El bloque
+central corre **el MISMO conjunto de filas dos veces** —una con las columnas nuevas y
+otra sin ellas— y exige que las **25 columnas de Switch salgan iguales**, salvo
+`Composición` y el rubro, que es justo lo que la columna aporta. Si alguien hace
+obligatoria una columna que hoy falta, el build se pone rojo.
+
+Dos candados **cambiaron de dirección con nota fechada y su CONTROL** en
+`reebok-depurador.test.ts`: el filtro de piezas (`filtrarSinPiezas`, que ahora también
+se aplica al despacho, donde 0 recibidas significa «no llegó») y el rótulo de la
+columna de piezas (`piezasLabel`). Ninguno de los dos protegía lo que cambió.
+
+Verificación por mutación: `scripts/_mutar-candados-despacho-reebok.sh` —
+**15 mutaciones y 2 controles, 17 de 17 como se esperaba.**
+
+Medición: `scripts/_medir-despacho-reebok.ts` (solo lectura, recibe los .xlsx por
+argumento).
+
+---
+
 ## 🔴 LOS OCHO NÚMEROS DEL HUB LOS SUMA LA BASE — 462,8 KB → 181 BYTES (14-sep-2026)
 
 Daniel, textual: *«5. ok va»*.
