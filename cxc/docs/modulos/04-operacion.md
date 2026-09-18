@@ -1809,7 +1809,7 @@ sobra»).
 
 ### 6 · El CSV global
 
-- `GET /api/reclamos/export`. Nombre: `reclamos_<YYYY-MM-DD>.csv`.
+- ~~`GET /api/reclamos/export`~~ — 🩸 **RETIRADA el 17-sep-2026**. Era el último CSV del sistema (Daniel, 8-sep: «en ningún lado quiero exportar csv, solo excel»); sin un solo llamador desde `src/`. Los dos Excel de Reclamos no se tocaron. Ver `docs/postmortems/reclamos.md`.
 - ⚠️ **Tampoco filtra `deleted`.**
 
 ### 7 · La galería pública (no es un archivo, pero es lo que el proveedor abre)

@@ -41,3 +41,26 @@ Daniel, textual, sobre el uso real: *«el uso es poner el reclamo y guardar para
 - Diccionario aplicado: «Descargar», «Correo», nombre corto de empresa, text-sm en datos, 44 px en celular.
 - Candados: `reclamos-rediseno.test.ts` · `reclamos-rediseno.test.tsx`; **34 mutaciones, 34 cazadas** con 2 controles (`scripts/_mutar-candados-reclamos-rediseno.sh`). Seis candados **cambiaron de dirección con nota fechada, ninguno se borró**: `reclamos-itbms-rotulo-y-pendientes` (BUG 2 se prueba en `EmpresaList`), `iphone-targets-operacion`, `iphone-tocables-y-letra` (la tabla vive en `ItemsEditor`), `depurador-reclamos-datahealth-anchos`, `marketing-reclamos-toques` y `poda-textos-ayuda` (el ⓘ del comprobante lo dice la ventana de pago).
 
+
+---
+
+## El CSV se retiró entero (17-sep-2026)
+
+> Daniel, **8-sep-2026**, textual: *«en ningún lado quiero exportar csv, solo excel»*.
+
+🩸 **Qué seguía vivo.** `GET /api/reclamos/export` devolvía un CSV con **todos los reclamos de todas las empresas**, renglón por renglón, con referencias, tallas, cantidades, precios, importación, ITBMS y totales. Medido antes de tocarlo: **ni un solo llamador desde `src/`** — ningún botón, ningún menú, ninguna pantalla. Pero su `requireRole` la abría a **admin y secretaria**, así que cualquiera de los dos que supiera la dirección se bajaba el archivo entero. Un export sin botón no es un export: es una puerta que nadie mira.
+
+Era el **último CSV del sistema**. El del CXC se había ido el 4-sep-2026 con el rediseño de «Descargar».
+
+⚠️ **Lo que NO se toca — los dos Excel de Reclamos siguen enteros:**
+
+- `GET /api/reclamos/[id]/excel` — el de UN reclamo, el que viaja adjunto al correo del proveedor.
+- `GET /api/reclamos/export-excel` — el de la lista.
+
+Son Excel, que es exactamente lo que Daniel sí quiere.
+
+🔴 **`src/lib/csv-export.ts` NO se borra** (patrón `mayor_lineas`, `cxc_favorites`): ahí está escrito por qué un CSV de esta casa necesita el BOM UTF-8 —sin él, Excel en Windows rompe las tildes y la ñ («Garc?a», «Pe?a»)—. Se queda **sin un solo lector**, rotulado, y el candado exige que siga así: el día que alguien vuelva a importarlo, el build se pone rojo y Daniel decide.
+
+🔄 **`cxc-descargas.test.ts` cambió de dirección, con nota fechada.** Su excepción decía textualmente *«pero `lib/csv-export.ts` NO se borró: lo usa Reclamos»* y **apuntaba al archivo de la ruta**. Mientras esa excepción existiera, el barrido de «en ningún lado se exporta CSV» tenía un agujero con nombre propio. Ahora exige que el archivo exista **y** que la ruta no. También cambiaron, con nota: el bloque del CSV en `reclamos-itbms-rotulo-y-pendientes.test.tsx` (medía que su encabezado no clavara un porcentaje; ahora exige que la ruta no vuelva) y el comentario de `src/app/cxc/page.tsx`.
+
+Candado: `src/__tests__/lib/reclamos-csv-retirado.test.ts` (8 casos: la carpeta no existe, nadie la llama, `csv-export` no tiene importadores, sus tres helpers no se usan, y los dos Excel siguen vivos). Verificado por mutación en `scripts/_mutar-candados-navegacion-pdf-csv.sh` — resucitar la ruta y volver a importar `csv-export` se cazan las dos.

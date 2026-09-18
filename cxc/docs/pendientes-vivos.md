@@ -100,10 +100,18 @@ La compañía es un botón que dice cuántas marcas tiene y arranca cerrada. Son
 
 Cada marca arranca plegada, con su conteo al lado («14 descripciones»). ⚠️ **La marca sin descripciones no se pliega ni se esconde** (Daniel: *«no se esconden»*): su texto se lee sin tocar nada. Candado `reglas-marcas-plegadas.test.tsx`.
 
-### 11. El PDF de Comisiones repite el encabezado en cada página
+### 11. ~~El PDF de Comisiones repite el encabezado en cada página~~ → **HECHO el 17-sep-2026**
 > *«no quiero ver en cada pagina lo mismo… solo en la primera»* — **7-sep-2026**
 
-**Comprobado:** `ImpresionComision.tsx` — el propio comentario dice «repetidos en cada hoja».
+El título —«Comisión — Vendedor · Empresa · Agosto 2026»— y el logo salen **solo en la primera hoja de cada reporte**. Medido antes: un reporte de 7 hojas traía siete logos y siete veces el mismo renglón, 32 mm de cada página.
+
+🔑 **El archivo que este pendiente nombraba estaba MUERTO.** `ImpresionComision.tsx` es la hoja HTML que se mandaba a `window.print()`; se retiró el 9-sep-2026 y no la monta nadie. Lo que Daniel ve es el PDF de `lib/comisiones/pdf-comision.ts`, y ahí el defecto seguía vivo: se arregló donde se ve.
+
+- 🔴 **Los nombres de columna SÍ se repiten** en cada hoja: sin ellos la tabla de la hoja 3 son números sueltos. Es lo contrario de lo que pidió, y es lo correcto.
+- ⚠️ **El pie con la numeración no se tocó**: «Página 2 de 7» sigue en todas.
+- Los DOS papeles del módulo (el reporte y la matriz del mes) comparten `pdf-chrome.ts`, así que los dos dejaron de repetirlo.
+
+Candado: `comisiones-titulo-solo-en-la-primera.test.ts` (11), que mide el texto hoja por hoja.
 
 ### 12. ~~Catálogos: `/catalogo` da 404~~ → **HECHO el 17-sep-2026**
 > *«entro a catalogo y sale /catalogos/marcas, después entro a pedidos y sale /catalogo/reebok/pedidos y si pongo /catalogo sale error»* · *«una sola ruta arriba: Inicio › Catálogos › Marcas › Reebok › Pedidos»* — **6-sep-2026**
@@ -114,13 +122,29 @@ Cada marca arranca plegada, con su conteo al lado («14 descripciones»). ⚠️
 
 ⚠️ **Los dos árboles de rutas siguen conviviendo** (`/catalogos/*` para el hub y administrar, `/catalogo/<marca>/*` para el catálogo con sesión). Unificarlos es otra decisión, y no se tomó.
 
-### 13. La auditoría de rutas se hizo, se entregó y nadie la ejecutó
-Vive en `docs/mapas/rutas.md` (6-sep, 53 direcciones) y **cierra con seis preguntas para Daniel que nunca se respondieron** — él pidió un mockup y no lo recibió. Comprobado hoy, siguen vivos: el «atrás» muerto para bodega, Jennifer y David; **cero `not-found.tsx` en todo el sistema** (el 404 sale en inglés, el de Next); el breadcrumb de Usuarios que dice «Sistema» y cae en Cuentas por Cobrar; `?search=` de Préstamos que nadie lee; y «Reclamos sin pagar» de Vista General, que no abre el reclamo.
+### 13. ~~La auditoría de rutas se hizo, se entregó y nadie la ejecutó~~ → **los CUATRO puntos que Daniel aprobó, HECHOS el 17-sep-2026**
+Vive en `docs/mapas/rutas.md` (6-sep, 53 direcciones). Daniel contestó **«todas»**, y se ejecutaron las cuatro:
 
-### 14. El CSV de Reclamos sigue vivo
+1. ✅ **Hay pantalla de 404 propia** (`src/app/not-found.tsx`): «Esta pantalla no existe», una línea que explica por qué, y dos salidas — **Ir al inicio** y **Volver** (que solo se dibuja si hay a dónde volver).
+2. ✅ **«Ir al inicio» es LA CASA DEL ROL**, no `/home` a secas (`lib/navegacion/casa-del-rol.ts`, una sola función para el redirect del home, el 404 y el botón del encabezado). Y `/home` empuja con `replace`, no con `push`: así dejaba la pantalla en el historial y el Atrás rebotaba. Si ya está en su casa, el botón NO se dibuja.
+   🩸 **Medido el 17-sep-2026**: los roles de UN solo módulo son **`gerente_acs`** (Jennifer) y **`marcacion`**; David entra por su CASA. **BODEGA YA NO ES UNO** — tiene cuatro módulos, así que su Atrás nunca estuvo muerto por esto. La auditoría lo contaba entre los tres y esa línea ya era vieja.
+3. ✅ **El breadcrumb de Usuarios** es `Inicio › Administración › Usuarios`, con el grupo derivado de `grupoDeModulo("usuarios")`. Decía «Sistema» y el clic caía en `/admin` → Cuentas por Cobrar.
+4. ✅ **«Reclamos sin pagar» de Vista General abre el reclamo**: `view=detail` (más la empresa cuando se sabe), por `lib/reclamos/enlace.ts`.
+
+Candados: `navegacion-lleva-a-donde-dice.test.ts` (25) · `pantalla-no-existe.test.tsx` (6).
+
+⚠️ **Lo que sigue abierto de esa auditoría, y es decisión de Daniel**: los dos árboles de Catálogos (punto 12 de esta lista), `?search=` de Préstamos que nadie lee, el breadcrumb que cae en 404 desde `/catalogos/marcas` y `/productos/cargar`, y las pestañas sin dirección propia de Comisiones, Comprobantes y Boston.
+
+### 14. ~~El CSV de Reclamos sigue vivo~~ → **HECHO el 17-sep-2026**
 > *«en ningún lado quiero exportar csv, solo excel»* — **8-sep-2026**
 
-**Comprobado:** `/api/reclamos/export` sigue devolviendo CSV. No tiene llamadores desde `src/`, pero cualquier admin o secretaria que sepa la dirección la abre. El candado `cxc-descargas.test.ts` lo deja pasar como excepción («lo usa Reclamos»), y eso ya no es cierto.
+`GET /api/reclamos/export` se retiró. Devolvía un CSV con TODOS los reclamos de TODAS las empresas, con precios y montos; no tenía un solo llamador desde `src/`, pero `requireRole` se lo abría a admin y secretaria, así que cualquiera que supiera la dirección se bajaba el archivo entero.
+
+- ⚠️ **Los dos Excel de Reclamos no se tocaron**: `/api/reclamos/[id]/excel` (el que se manda al proveedor) y `/api/reclamos/export-excel` (el de la lista).
+- 🔴 **`src/lib/csv-export.ts` NO se borra** (patrón `mayor_lineas`): guarda el porqué del BOM. Queda **sin un solo lector**, y el candado exige que siga así.
+- 🔄 **`cxc-descargas.test.ts` cambió de dirección con nota fechada**: su excepción decía «lo usa Reclamos» y por eso el barrido de «en ningún lado se exporta CSV» tenía un agujero con nombre.
+
+Candado: `reclamos-csv-retirado.test.ts` (8).
 
 ---
 

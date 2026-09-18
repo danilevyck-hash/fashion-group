@@ -1294,3 +1294,24 @@ el logo y el otro no.
 - ⚠️ **Decisiones pendientes de Daniel**: aplicar las dos migraciones (`20261120120000` el corte del costo; `20261121120000` las ventanas de Clientes); y en Clientes › Utilidad el período sigue siendo el año (la ruta de utilidad no tiene ventanas) — la pantalla lo dice («· Año 2026»).
 - Candados: `ventas-selector-periodo-unico.test.ts` · `ventas-resumen-13-cambios.test.tsx` · `ventas-clientes-desplegable-y-nuevo.test.tsx` · `ventas-clientes-periodo-y-frescura.test.ts` · `ventas-productos-selector-unico.test.tsx` · `ventas-puerta-cerrada.test.ts`. Cambiaron de dirección con nota fechada, ninguno se borró: `ventas-tres-pestanas` (dos modos; el selector único; sin `alcanceDeLaPestana`), `ventas-coherencia-modulo` (sin Trimestral/Anual/Margen % en las dos caras; el desplegable de empresa), `ventas-rotulos-espanol` (las tarjetas sin el período; «Compras · Año 2026»), `ventas-resumen-cierre-del-anio` (el «vs 2025» al `title`; «MARGEN»), `ventas-proyeccion-meses-gris` (sin Trimestral), `ventas-productos-precio-periodos` y `ventas-productos-filtro-cliente` (el período por prop; un solo descargo), `ventas-clientes-lista-entera`, `ventas-clientes-las-seis-empresas` y `ventas-vista-general-ipad` (el Select; sin universo), `mismos-dias-todas-las-comparaciones` (la ruta Anual retirada; la regla en `prev-same-period`), `swr-datos-del-servidor` (el período del servidor), `pct-variacion` (el espejo de la regla de la vista, con motivo), `excel-encabezados-fila-1` (28 → 29 hojas: la de Utilidad), `barras-pegajosas`, `textos-pendientes-284`, `articulo-info` y `costo-con-notas-de-debito` (rutas y archivos mudados o retirados).
 
+
+---
+
+## El PDF de Comisiones: el título, solo en la primera hoja (17-sep-2026)
+
+> Daniel, **7-sep-2026**, textual: *«no quiero ver en cada pagina lo mismo… solo en la primera»*.
+
+🩸 **Qué se repetía.** `cabecera()` dibujaba el logo de Fashion Group y el renglón «Comisión — Vendedor · Empresa · Agosto 2026» en **todas** las hojas: lo llamaba el `didDrawPage` de las dos tablas (Ventas y Cobros) y otra vez `asegurarEspacio` cada vez que abría hoja para que el CIERRE no quedara huérfano. Medido sobre un reporte de **siete hojas**: siete logos y siete veces el mismo renglón, ocupando **32 mm** de cada página para decir lo que ya se leyó.
+
+⚠️ **El pedido se leyó completo, no al pie de la letra:**
+
+- 🔴 **Los NOMBRES DE COLUMNA sí se repiten en cada hoja.** Sin ellos, la tabla de la hoja 3 son números sueltos: una columna de fechas, una de nombres y tres de cifras sin decir de qué. Los repite `autoTable` solo (`showHead` por defecto), así que acá no hubo nada que hacer salvo no romperlo. Es lo contrario de lo que pidió, y es lo correcto; el mockup lo muestra así y él lo aprobó.
+- ⚠️ **El pie con la numeración NO se toca.** «Página 2 de 7» y «Confidencial · fashiongr.com» siguen en todas: es lo que dice de qué documento es la hoja suelta que quedó en la impresora.
+
+🔑 **El archivo que el pendiente nombraba estaba MUERTO.** El punto 11 de `docs/pendientes-vivos.md` apuntaba a `src/components/comisiones/comisiones-detalle/ImpresionComision.tsx`, cuyo propio comentario decía «Header compacto (una línea) + pie con numeración, **repetidos en cada hoja**». Ese componente es la hoja HTML que se mandaba a `window.print()`; **se retiró el 9-sep-2026** —dos días después de la queja de Daniel— y hoy **no lo monta nadie**: solo lo nombran tests y comentarios. Lo que Daniel ve es el PDF de `lib/comisiones/pdf-comision.ts`, y ahí el defecto **seguía vivo**. Se arregló donde se ve, no donde estaba escrito.
+
+🔴 **Un solo juego de carrocería para los dos papeles.** `pdf-chrome.ts` lo comparten el reporte de un vendedor (`pdf-comision.ts`) y la matriz del mes o del año (`pdf-tabla-comisiones.ts`). Los dos dejan de repetir el título, porque dos copias de la misma regla es cómo se llega a que uno lo repita y el otro no.
+
+**Cómo se hizo**: `autoTable` usa `startY` para la primera hoja y `margin.top` para las que abre después. La cabecera se dibuja una vez, antes de la tabla; el `didDrawPage` que la repetía se fue; `margin.top` pasa de `ALTO_CABECERA` (32 mm) a **`ALTO_CONTINUACION`** (19 mm, el mismo aire que los lados) para que la hoja de continuación no quede con una franja en blanco arriba. `asegurarEspacio` dejó de repetir la cabeza y de pedir el título.
+
+Candado: `src/__tests__/lib/comisiones-titulo-solo-en-la-primera.test.ts` (11 casos). **Mide el texto hoja por hoja con `pdfjs`**, no el código: comprueba que el ejemplo pasa de una hoja (si cupiera en una, no mediría nada), que el título sale una vez, que los encabezados se repiten, que el pie numera todas, y que con DOS reportes cada uno estrena su título en SU primera hoja. Verificado por mutación en `scripts/_mutar-candados-navegacion-pdf-csv.sh`: volver a poner el `didDrawPage`, repetir la cabeza desde `asegurarEspacio`, poner `showHead: "firstPage"` y dejar de numerar se cazan las cuatro.

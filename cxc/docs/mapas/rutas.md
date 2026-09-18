@@ -7,6 +7,12 @@
 
 **Tenía razón.** No fue el único.
 
+> 🔄 **17-sep-2026 — CUATRO DE ESTOS PUNTOS YA SE EJECUTARON.** Daniel leyó la auditoría y contestó **«todas»**. Se hicieron: la **pantalla de 404 propia** (B-4 · tabla C), el **«Ir al inicio» que va a la casa del rol** y el `/home` que empuja con `replace` (B-1), el **breadcrumb de Usuarios** (B-2, última fila) y el **enlace de «Reclamos sin pagar» de Vista General** (B-3, primera fila). El porqué de cada uno, con las mediciones de hoy, en [`docs/postmortems/navegacion.md`](../postmortems/navegacion.md).
+>
+> 🩸 **Y una corrección a esta auditoría, medida el 17-sep-2026: BODEGA NO ERA UNO DE LOS TRES ROLES ATRAPADOS.** Tiene **cuatro módulos** (referencia · catalogos · guias · asistencia), así que ve el Inicio como cualquiera y el auto-redirect nunca lo alcanzó. Los de UN solo módulo son **`gerente_acs`** (Jennifer) y **`marcacion`**; David entra por su CASA. Las 77 sesiones de bodega que esta auditoría sumó a las «108 atrapadas» no lo estaban.
+>
+> Lo demás de este archivo sigue vigente y sin tocar.
+
 ## En números
 
 | | |

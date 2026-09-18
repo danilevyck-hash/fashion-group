@@ -617,7 +617,7 @@ guard vive en el handler compartido (§3).
 | `/reclamos/contactos-email` | GET,POST,PATCH,DELETE | requireRole | admin, secretaria |
 | `/reclamos/contactos` | GET,POST,PATCH | requireRole | admin, secretaria |
 | `/reclamos/export-excel` | POST | requireRole | admin, secretaria |
-| `/reclamos/export` | GET | requireRole | admin, secretaria |
+| ~~`/reclamos/export`~~ | GET | — | 🩸 **RETIRADA el 17-sep-2026** (era el último CSV del sistema; Daniel: «en ningún lado quiero exportar csv, solo excel») |
 | `/reclamos/factura-pdf/upload-url` | POST | requireAdmin | admin, secretaria |
 | `/reclamos/ia/leer-factura` | POST | requireAdmin | admin, secretaria |
 | `/reclamos/motivos` | GET,POST | requireRole | admin, secretaria |

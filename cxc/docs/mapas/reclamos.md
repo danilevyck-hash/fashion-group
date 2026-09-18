@@ -121,7 +121,7 @@ Y en la cabecera pasa lo mismo con el N° de pedido: **25 de los 33 reclamos que
 `src/app/reclamos/components/EmpresaSelector.tsx:217` → `{open.length}` con el rótulo `facturas`. Medido: Fashion Wear muestra **20 «facturas»** cuando son **20 reclamos sobre 17 facturas distintas**. Es el mismo defecto que el «Margen %» de Ventas: rótulo heredado sobre un número que cuenta otra cosa.
 
 **#3 — Los renglones borrados vuelven a salir en el Excel que se le manda al proveedor, y suman.**
-El PDF sí los filtra (`src/lib/reclamos/pdf-bulk.ts:59`). Los **cuatro** caminos de Excel **no**: `src/lib/reclamos/excel-bulk.ts:72` y `:169`, `src/app/api/reclamos/export/route.ts:31`, `src/app/api/reclamos/[id]/excel/route.ts:27`. Y el **total de la lista** tampoco (`EmpresaList.tsx:354` y `:448`).
+El PDF sí los filtra (`src/lib/reclamos/pdf-bulk.ts:59`). Los caminos de Excel **no**: `src/lib/reclamos/excel-bulk.ts:72` y `:169`, `src/app/api/reclamos/[id]/excel/route.ts:27`. ⚠️ **17-sep-2026**: el cuarto camino era `/api/reclamos/export`, el CSV, y **se retiró** (ver `docs/postmortems/reclamos.md`). Y el **total de la lista** tampoco (`EmpresaList.tsx:354` y `:448`).
 Hoy no hace daño porque `reclamo_items` tiene **0 filas marcadas como borradas** — y esa es la segunda mitad del hallazgo:
 
 **#4 — La columna «borrado» de los renglones no la escribe nadie: al editar se borran de verdad.**
