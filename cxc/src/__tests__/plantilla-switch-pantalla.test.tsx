@@ -155,8 +155,16 @@ describe("🔴 las 7 marcas sin descripciones se MUESTRAN", () => {
 });
 
 describe("🔴 la secretaria puede QUITAR una descripción desde aquí", () => {
+  // ⚠️ CAMBIÓ DE DIRECCIÓN EL 17-sep-2026: las marcas arrancan PLEGADAS
+  // (Daniel: «en configuraciones, las marcas deben de estar plegadas y al tocar
+  // desplegar para no irme tanto»), así que el botón de quitar existe igual
+  // pero hay que abrir la marca para llegar a él. Lo que este candado exige NO
+  // cambió —cada descripción trae su ×, y el × desactiva en vez de borrar—:
+  // solo se agregó el clic que abre la tarjeta. El candado de que arranque
+  // cerrada vive en `reglas-marcas-plegadas.test.tsx`.
   it("cada descripción trae su botón de quitar, y desactiva (no borra)", async () => {
     render(<ReglasView />);
+    fireEvent.click(screen.getByText("TH Menswear"));
     const boton = screen.getByLabelText("Quitar Men-Polos S/S de TH Menswear");
     // 44 px de alto, la regla de la casa para todo lo que se toca.
     expect(boton.className).toContain("h-[44px]");

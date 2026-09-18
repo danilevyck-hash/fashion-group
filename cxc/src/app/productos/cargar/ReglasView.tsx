@@ -48,8 +48,43 @@ const GRUPOS = [
  *  Daniel: «no se esconden» — pero un «(0)» pelado no explica qué pasa. */
 export const SIN_DESCRIPCIONES = "Todavía sin descripciones cargadas";
 
+/* ── 🔴 LAS MARCAS ARRANCAN PLEGADAS (17-sep-2026) ───────────────────────────
+ *
+ * Daniel, textual (7-sep-2026): «en configuraciones, las marcas deben de estar
+ * plegadas y al tocar desplegar para no irme tanto».
+ *
+ * Hasta hoy esta pantalla dibujaba las CUATRO empresas con TODAS sus marcas y
+ * TODAS sus descripciones abiertas de una — 26 marcas y 304 descripciones en
+ * producción, una pared que hay que recorrer entera para llegar a la de abajo.
+ *
+ * Lo que cambia es SOLO el plegado:
+ *   · La empresa sigue siendo un título, siempre visible (no se pliega acá; el
+ *     plegado por empresa es de Fórmulas, que es otra pantalla).
+ *   · Cada marca CON descripciones es un botón que dice cuántas tiene y se
+ *     abre al tocarlo. Arranca cerrada.
+ *   · ⚠️ La marca SIN descripciones no se pliega ni se esconde —Daniel: «no se
+ *     esconden»—: su texto (`SIN_DESCRIPCIONES`) se lee sin tocar nada, porque
+ *     adentro no hay nada que abrir.
+ *   · Buscar una DESCRIPCIÓN abre sola la marca que la tiene: si no, el
+ *     buscador dejaría la tarjeta a la vista y el resultado escondido adentro.
+ */
+
+/** «14 descripciones» · «1 descripción». El conteo va al lado del nombre para
+ *  que, plegada, la marca siga diciendo cuánto hay adentro. */
+export function rotuloConteo(n: number): string {
+  return n === 1 ? "1 descripción" : `${n} descripciones`;
+}
+
 export default function ReglasView() {
   const [q, setQ] = useState("");
+  // Marcas abiertas a mano. Vacío = todas plegadas (el arranque).
+  const [abiertas, setAbiertas] = useState<Set<string>>(new Set());
+  const alternar = (marca: string) =>
+    setAbiertas((prev) => {
+      const n = new Set(prev);
+      if (n.has(marca)) n.delete(marca); else n.add(marca);
+      return n;
+    });
   const { catalogo, filas, cargando, fallo, reintentar } = useCatalogoDescripciones();
   const [quitando, setQuitando] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -188,44 +223,61 @@ export default function ReglasView() {
                 {g.label}<span className="ml-2 font-normal normal-case tracking-normal text-stone-500">· {g.brand}</span>
               </div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {marcas.map((m) => (
-                  <div key={m.marca} className="rounded-lg border border-stone-200 bg-white px-3 py-2">
-                    <div className="text-[13px] font-semibold text-stone-900">
-                      {m.marca}
-                      {m.todas.length > 0 && (
-                        <span className="ml-2 text-[12px] font-normal text-stone-400">({m.todas.length})</span>
-                      )}
-                    </div>
+                {marcas.map((m) => {
+                  // Buscar una descripción abre sola la marca que la tiene.
+                  const porBusqueda = !!s && !norm(m.marca).includes(s) && m.ds.length > 0;
+                  const abierta = abiertas.has(m.marca) || porBusqueda;
+                  return (
+                  <div key={m.marca} className="overflow-hidden rounded-lg border border-stone-200 bg-white">
                     {m.todas.length === 0 ? (
-                      // 🔴 La marca se MUESTRA igual (Daniel: «no se esconden»),
-                      // pero diciendo qué le pasa en vez de un «(0)» pelado.
-                      <div className="mt-1 text-[13px] italic text-stone-400">{SIN_DESCRIPCIONES}</div>
+                      // 🔴 La marca se MUESTRA igual (Daniel: «no se esconden») y
+                      // NO se pliega: adentro no hay nada que abrir, así que su
+                      // texto se lee sin tocar nada.
+                      <div className="px-3 py-2">
+                        <div className="text-[13px] font-semibold text-stone-900">{m.marca}</div>
+                        <div className="mt-1 text-[13px] italic text-stone-400">{SIN_DESCRIPCIONES}</div>
+                      </div>
                     ) : (
-                      <ul className="mt-1 flex flex-wrap gap-x-1 gap-y-1">
-                        {m.ds.map((d) => {
-                          const id = idPorClave.get(`${norm(m.marca)}|||${norm(d)}`);
-                          return (
-                            <li key={d} className="inline-flex items-center gap-1 rounded bg-stone-50 pl-1.5 text-[13px] text-stone-600">
-                              <span>{d}</span>
-                              {id && (
-                                <button
-                                  type="button"
-                                  onClick={() => quitar(id)}
-                                  disabled={quitando === id}
-                                  aria-label={`Quitar ${d} de ${m.marca}`}
-                                  title="Quitar del catálogo (no se borra: deja de valer)"
-                                  className="inline-flex h-[44px] w-[32px] items-center justify-center text-stone-400 transition hover:text-red-600 disabled:opacity-50"
-                                >
-                                  {quitando === id ? "…" : "×"}
-                                </button>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => alternar(m.marca)}
+                          aria-expanded={abierta}
+                          className="flex min-h-[44px] w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-stone-50"
+                        >
+                          <span aria-hidden className="text-stone-400">{abierta ? "▾" : "▸"}</span>
+                          <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-stone-900">{m.marca}</span>
+                          <span className="shrink-0 text-[12px] font-normal text-stone-400">{rotuloConteo(m.todas.length)}</span>
+                        </button>
+                        {abierta && (
+                          <ul className="flex flex-wrap gap-x-1 gap-y-1 border-t border-stone-100 px-3 py-2">
+                            {m.ds.map((d) => {
+                              const id = idPorClave.get(`${norm(m.marca)}|||${norm(d)}`);
+                              return (
+                                <li key={d} className="inline-flex items-center gap-1 rounded bg-stone-50 pl-1.5 text-[13px] text-stone-600">
+                                  <span>{d}</span>
+                                  {id && (
+                                    <button
+                                      type="button"
+                                      onClick={() => quitar(id)}
+                                      disabled={quitando === id}
+                                      aria-label={`Quitar ${d} de ${m.marca}`}
+                                      title="Quitar del catálogo (no se borra: deja de valer)"
+                                      className="inline-flex h-[44px] w-[32px] items-center justify-center text-stone-400 transition hover:text-red-600 disabled:opacity-50"
+                                    >
+                                      {quitando === id ? "…" : "×"}
+                                    </button>
+                                  )}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           );
