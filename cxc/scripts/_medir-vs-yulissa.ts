@@ -56,6 +56,14 @@ async function main() {
       .split(",").map((x) => x.trim()).filter(Boolean),
   );
   const sinVigencias = args.includes("--sin-vigencias");
+  // 🔴 Los días laborables y el horario de afuera (18-sep-2026). Este es el
+  // CONTROL: `--sin-horario-configurable` apaga la regla (lunes a viernes, un
+  // horario) y devuelve los números de antes. Y `--simular-migracion` mide
+  // cómo quedaría con la migración corrida SIN correrla: resuelve los días por
+  // la EMPRESA de la ficha (Multifashion, lunes a sábado) aunque la columna no
+  // exista todavía. Solo lectura, como todo lo demás.
+  const sinHorarioConfigurable = args.includes("--sin-horario-configurable");
+  const simularMigracion = args.includes("--simular-migracion");
   const hastaReloj = corte ?? q.hasta;
 
   const PANAMA = "-05:00";
@@ -65,27 +73,38 @@ async function main() {
   const marcaciones = await leerTodoPaginado<MarcacionConId>("marcaciones",
     (pedirCount, from, to) =>
       supabaseServer.from("asistencia_marcaciones")
-        .select("id, empleado_codigo, empleado_nombre, ocurrio_en", pedirCount ? { count: "exact" } : {})
+        .select("id, empleado_codigo, empleado_nombre, ocurrio_en, dispositivo", pedirCount ? { count: "exact" } : {})
         .gte("ocurrio_en", instante(q.desde, false)).lte("ocurrio_en", instante(hastaReloj, true))
         .order("ocurrio_en", { ascending: true }).order("id", { ascending: true }).range(from, to));
 
-  const [{ reglas }, personasDb, enLaBase, correcciones, manualesLeidos, aprRes, repRes, hRes, jRes, vRes, fRes] =
+  const { leerHorarios } = await import("@/lib/asistencia/horarios-server");
+  const { resolverDiasLaborables } = await import("@/lib/asistencia/horario-configurable");
+  const [{ reglas }, personasDb, enLaBase, correcciones, manualesLeidos, aprRes, repRes, horariosLeidos, jRes, vRes, fRes] =
     await Promise.all([
       leerReglas(), leerPersonas(), leerTrabajaAfuera(), leerCorrecciones(q.desde, hastaReloj),
       q.claveManuales ? leerManuales(q.claveManuales) : Promise.resolve({ porCodigo: new Map(), faltaMigracion: false }),
       leerAprobaciones(q.desde, hastaReloj), leerRepartos(),
-      supabaseServer.from("asistencia_horarios").select("empleado_codigo, entrada, salida, almuerzo_minutos"),
+      // 🔴 La MISMA lectura que la ruta: días laborables y horario de afuera.
+      leerHorarios(),
       leerJustificaciones(q.desde, hastaReloj), leerVacaciones(q.desde, hastaReloj),
       supabaseServer.from("asistencia_feriados").select("fecha, nombre").gte("fecha", q.desde).lte("fecha", hastaReloj),
     ]);
-  if (hRes.error) throw new Error(hRes.error.message);
   if (fRes.error) throw new Error(fRes.error.message);
 
   const afuera = new Set<string>([...enLaBase, ...prender]);
-  const horarios = (hRes.data ?? []).map((h) => ({
-    ...h, entrada: String(h.entrada).slice(0, 5), salida: String(h.salida).slice(0, 5),
-  })) as HorarioPersona[];
+  const horarios: HorarioPersona[] = horariosLeidos.horarios;
   const vigencias = vigenciasDeFilas(personasDb.filas);
+  // Los días laborables de cada quien, como los resuelve la ruta. Con
+  // `--simular-migracion` se resuelven aunque la columna no exista (los días
+  // por la empresa; el horario de afuera no se inventa: nadie marca por el
+  // teléfono todavía). Con `--sin-horario-configurable`, vacío = como antes.
+  const diasLaborables = sinHorarioConfigurable
+    ? undefined
+    : resolverDiasLaborables({
+        horarios,
+        empresaDe: new Map(personasDb.filas.map((f) => [String(f.empleado_codigo), f.empresa ?? null])),
+        faltaMigracion: horariosLeidos.faltaMigracion && !simularMigracion,
+      });
   const fuera = codigosFueraDeRango(vigencias, q.desde, q.hasta);
   const repartoPorCodigo = agruparPorCodigo(repRes.filas);
   const fichas = new Map<string, FichaPlanilla>();
@@ -119,6 +138,7 @@ async function main() {
     // exactamente los números de antes del arreglo, para medir el antes/después
     // con el MISMO instrumento.
     vigencias: sinVigencias ? undefined : vigencias,
+    diasLaborables,
   });
   const horarioDe = new Map(horarios.map((h) => [h.empleado_codigo, h]));
   const personasVigentes = personas.filter((p) => !fuera.has(p.codigo));
@@ -197,7 +217,9 @@ async function main() {
   }).sort((a, b) => String(a.linea).localeCompare(String(b.linea)) || a.codigo.localeCompare(b.codigo, "es", { numeric: true }));
 
   writeFileSync(salida, JSON.stringify({
-    quincena: clave, aprobarTodo, sinVigencias, diaLibreSimulado: [...diaLibreSimulado], desde: q.desde, hasta: q.hasta, hastaReloj, corte, hoy,
+    quincena: clave, aprobarTodo, sinVigencias, sinHorarioConfigurable, simularMigracion,
+    faltaMigracionHorario: horariosLeidos.faltaMigracion,
+    diaLibreSimulado: [...diaLibreSimulado], desde: q.desde, hasta: q.hasta, hastaReloj, corte, hoy,
     factorBase: q.factorBase, prendidos: [...prender], spExtra: [...spExtra],
     afueraEnLaBase: [...enLaBase],
     reglas, totales: totalizar(finales), sinFicha: sinFicha.map((s) => s.codigo),

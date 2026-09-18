@@ -86,6 +86,11 @@ import {
 import { valorTecleado } from "./casilla-sin-descontar";
 import { PESTANA_FICHAS } from "./persona-en-el-centro";
 import { etiquetaPersona } from "./directorio";
+// 🔴 Desde el 18-sep-2026 si un día es laborable lo dice el MOTOR en `d.habil`,
+// persona por persona (Multifashion trabaja lunes a sábado). `esHabil` queda
+// solo de RESPALDO para un día que no lo traiga (una llamada vieja): volver a
+// preguntarle al calendario por un día que sí lo trae haría que el Reporte y
+// la Planilla dijeran cosas distintas del mismo sábado.
 import { esHabil, fmtMin, type DiaReporte, type PersonaReporte } from "./reporte";
 import { minutosExtraAutomaticos } from "./extra-automatico";
 import { ultimoDiaQueSePaga } from "./dia-31";
@@ -738,6 +743,10 @@ export function clasificarDia(
     domingoMin: 0, feriadoMin: 0, tardanzaMin: 0, ausenciaMin: 0, sabadoMin: 0,
     vacacionesYaPagadasMin: 0, salidaTempranaMin: 0,
   };
+  // 🔴 LABORABLE LO DICE EL MOTOR (`d.habil`, 18-sep-2026): lunes a viernes, o
+  // los días de esa persona. Un día que no lo traiga cae al calendario de
+  // siempre, para que ninguna llamada vieja cambie de conducta.
+  const habil = typeof d.habil === "boolean" ? d.habil : esHabil(d.fecha);
 
   // ── 🔴 VACACIONES: VA PRIMERO, ANTES QUE EL FERIADO Y QUE TODO ─────────────
   //
@@ -748,11 +757,12 @@ export function clasificarDia(
   //   · sin marcar → todo en cero. El quincenal lo cubre, o sea que se paga.
   //   · marcada    → se descuenta la jornada: esos días ya se cobraron antes.
   //
-  // ⚠️ Solo se descuenta lo que la persona iba a trabajar: día HÁBIL y NO
-  // feriado. Un domingo o un 3 de noviembre adentro del rango no tenían jornada
-  // que pagar, y descontarlos sería cobrarle dos veces el mismo día.
+  // ⚠️ Solo se descuenta lo que la persona iba a trabajar: día LABORABLE (para
+  // ella: `d.habil`) y NO feriado. Un domingo o un 3 de noviembre adentro del
+  // rango no tenían jornada que pagar, y descontarlos sería cobrarle dos veces
+  // el mismo día.
   if (d.vacacion) {
-    if (!d.vacacion.yaPagadas || d.feriado || !esHabil(d.fecha)) return cero;
+    if (!d.vacacion.yaPagadas || d.feriado || !habil) return cero;
     // 🔴 LA MISMA CONSTANTE QUE LA AUSENCIA, y por eso el horario ya no entra
     // acá. Es el mismo hecho: un día que no se trabajó y se resta.
     return { ...cero, vacacionesYaPagadasMin: MIN_DIA_NO_TRABAJADO };
@@ -762,7 +772,12 @@ export function clasificarDia(
   // mide tardanza ni hora extra — ese día no tiene horario que cumplir.
   if (d.feriado) return { ...cero, feriadoMin: d.trabajadoMin };
 
-  if (!esHabil(d.fecha)) {
+  // 🔴 «No laborable» LO DICE EL MOTOR (`d.habil`), no el calendario
+  // (18-sep-2026): para Multifashion el sábado es un día normal y cae más
+  // abajo, con tardanza, extra y ausencia como cualquier otro; para el resto
+  // sigue siendo el sábado de siempre (`sabadoMin`, sin columna). El domingo
+  // nunca es laborable y sigue con su recargo.
+  if (!habil) {
     const esDomingo = dow(d.fecha) === 0;
     return esDomingo
       ? { ...cero, domingoMin: d.trabajadoMin }

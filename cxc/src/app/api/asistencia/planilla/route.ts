@@ -33,9 +33,13 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
   armarReporte,
   SALIDA_DEFAULT,
-  type HorarioPersona,
   type Justificacion,
 } from "@/lib/asistencia/reporte";
+// 🔴 LOS HORARIOS POR LA FUENTE ÚNICA (18-sep-2026), con los días laborables y
+// el horario de afuera. Falla ABIERTA: sin la migración, lunes a viernes y un
+// horario, como siempre. Ver `horarios-server.ts` y `horario-configurable.ts`.
+import { leerHorarios } from "@/lib/asistencia/horarios-server";
+import { avisoMigracionHorario, resolverDiasLaborables } from "@/lib/asistencia/horario-configurable";
 import {
   aplicarCorrecciones,
   contarCorrecciones,
@@ -356,8 +360,10 @@ export async function GET(req: NextRequest) {
         supabaseServer
           .from("asistencia_marcaciones")
           .select(
-            // 🔑 El `id` ata cada corrección a SU marcación.
-            "id, empleado_codigo, empleado_nombre, ocurrio_en",
+            // 🔑 El `id` ata cada corrección a SU marcación. El `dispositivo`
+            // dice si la PRIMERA marca del día vino del teléfono (18-sep-2026):
+            // con eso el motor elige el horario de afuera.
+            "id, empleado_codigo, empleado_nombre, ocurrio_en, dispositivo",
             pedirCount ? { count: "exact" } : {},
           )
           .gte("ocurrio_en", instante(q.desde, false))
@@ -367,7 +373,7 @@ export async function GET(req: NextRequest) {
           .range(from, to),
     );
 
-    const [{ reglas }, personasDb, afuera, correcciones, manualesLeidos, aprRes, repRes, hRes, jRes, vRes, fRes] = await Promise.all([
+    const [{ reglas }, personasDb, afuera, correcciones, manualesLeidos, aprRes, repRes, horariosLeidos, jRes, vRes, fRes] = await Promise.all([
       leerReglas(),
       leerPersonas(),
       // 🔴 QUIÉN TRABAJA AFUERA (14-sep-2026). Lectura APARTE y tolerante: con
@@ -389,9 +395,9 @@ export async function GET(req: NextRequest) {
       // 🔴 QUIÉN REPARTE SU SUELDO ENTRE DOS EMPRESAS. Si no se puede leer, la
       // planilla no sale.
       leerRepartos(),
-      supabaseServer
-        .from("asistencia_horarios")
-        .select("empleado_codigo, entrada, salida, almuerzo_minutos"),
+      // 🔴 Los horarios por la fuente ÚNICA (18-sep-2026): días laborables y
+      // horario de afuera incluidos. Sin la migración, lo de siempre.
+      leerHorarios(),
       // 🔑 Por la fuente ÚNICA, no con un `select` copiado. Ver la nota de
       // `leerJustificaciones`: leer distinto acá que en el reporte es la
       // diferencia entre «el día entero» y «un permiso de dos horas».
@@ -405,15 +411,9 @@ export async function GET(req: NextRequest) {
         .gte("fecha", q.desde)
         .lte("fecha", hastaReloj),
     ]);
-    if (hRes.error) throw new Error(hRes.error.message);
     if (fRes.error) throw new Error(fRes.error.message);
 
-    const horarios = (hRes.data ?? []).map((h) => ({
-      ...h,
-      // Postgres devuelve `time` como "08:00:00"; el motor compara "HH:MM".
-      entrada: String(h.entrada).slice(0, 5),
-      salida: String(h.salida).slice(0, 5),
-    })) as HorarioPersona[];
+    const horarios = horariosLeidos.horarios;
 
     // ── QUIÉN ENTRA A ESTA QUINCENA ──────────────────────────────────────────
     //
@@ -502,6 +502,18 @@ export async function GET(req: NextRequest) {
     const nombres = new Map<string, string>();
     for (const [cod, f] of fichas) if (f.nombre) nombres.set(cod, f.nombre);
 
+    // 🔴 QUÉ DÍAS TRABAJA CADA QUIEN (18-sep-2026): la columna de la persona,
+    // si no la EMPRESA de su ficha (Multifashion, lunes a sábado). Con la
+    // migración sin correr el mapa viene vacío y el motor mide lunes a viernes
+    // para todos, como siempre. Se resuelve sobre TODAS las fichas, no solo
+    // las vigentes: el motor decide solo, y el filtro de bajas va aparte.
+    const empresaDe = new Map<string, string | null>(
+      personasDb.filas.map((f) => [String(f.empleado_codigo), f.empresa ?? null]),
+    );
+    const diasLaborables = resolverDiasLaborables({
+      horarios, empresaDe, faltaMigracion: horariosLeidos.faltaMigracion,
+    });
+
     // 🩸 `incluirNoHabiles` es lo que hace visible el domingo trabajado. Sin
     // esto, las horas del domingo 26-jul (5 personas, medido) no existirían
     // para el cálculo y nadie las echaría de menos.
@@ -548,6 +560,9 @@ export async function GET(req: NextRequest) {
       // los 7 días que sí trabajó. El MISMO mapa que ya se lee arriba para
       // `codigosFueraDeRango`; sin fechas cargadas no cambia un centavo.
       vigencias,
+      // 🔴 Los días laborables de cada quien (18-sep-2026). Vacío = lunes a
+      // viernes para todos, la planilla de siempre.
+      diasLaborables,
     });
 
     // Cuánto dura el día de cada quien. Es lo que vale una ausencia.
@@ -999,9 +1014,15 @@ export async function GET(req: NextRequest) {
         // respuesta para que la pantalla NO lo escriba a mano y no pueda
         // quedar diciendo 8,5 el día que el default cambie.
         horasAusenciaDefault: JORNADA_DIARIA_DEFAULT_MIN / 60,
-        // Sábados trabajados: el cuadro no tiene columna y acá no se inventa
-        // un recargo. Se avisa para que lo resuelva una persona.
+        // Sábados trabajados por quien NO trabaja los sábados: el cuadro no
+        // tiene columna y acá no se inventa un recargo. Se avisa para que lo
+        // resuelva una persona. 🔴 Para quien SÍ los trabaja (Multifashion,
+        // 18-sep-2026) el sábado es un día normal, `sabadoMin` queda en 0 y
+        // este aviso ya no sale.
         conSabado: lineas.filter((l) => l.horas.sabadoMin > 0).length,
+        // 🔴 Los días laborables y el horario de afuera todavía no tienen
+        // columna: todo se mide como siempre. Se dice en «Antes de cerrar».
+        faltaMigracionHorario: horariosLeidos.faltaMigracion ? avisoMigracionHorario() : null,
         // 🔴 EL PERÍODO TODAVÍA NO TERMINÓ. Va arriba del cuadro: los días que
         // no pasaron dejaron de descontarse, y un número que baja sin
         // explicación se lee como un número que no cuadra.

@@ -250,6 +250,9 @@ interface Respuesta {
      *  deuda y lo que queda (17-sep-2026). Ya redactado por el servidor. */
     avisoDiasLibres?: string | null;
     faltaMigracionDiaLibre?: string | null;
+    /** Falta correr el SQL de los días laborables y el horario de afuera
+     *  (18-sep-2026): todo se mide lunes a viernes, con un horario. */
+    faltaMigracionHorario?: string | null;
     /** Falta correr el SQL del amarre. La casilla se sigue escribiendo a mano,
      *  como hasta hoy — pero se dice. */
     faltaMigracionAmarrePrestamos?: string | null;
@@ -1359,6 +1362,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
             data.avisos.faltaMigracionVacaciones, data.avisos.faltaMigracionAprobaciones,
             data.avisos.faltaMigracionReparto, data.avisos.faltaMigracionAmarrePrestamos,
             data.avisos.faltaMigracionDiaLibre ?? null,
+            data.avisos.faltaMigracionHorario ?? null,
           ].filter((m): m is string => !!m),
           pestanaFichas: PESTANA_FICHAS,
         })} />
