@@ -47,12 +47,32 @@ export function textoDePdf(texto: string): string {
 }
 
 export const MARGEN = 19;
-/** Dónde arranca la tabla: debajo de la cabecera, en todas las hojas. */
+/** Dónde arranca la tabla en la PRIMERA hoja: debajo de la cabecera. */
 export const ALTO_CABECERA = 32;
+/**
+ * 🔴 EL TÍTULO VA SOLO EN LA PRIMERA HOJA (17-sep-2026).
+ *
+ * Daniel, textual: *«no quiero ver en cada pagina lo mismo… solo en la
+ * primera»*. El logo y el renglón «Comisión — Vendedor · Empresa · agosto 2026»
+ * se repetían idénticos en las cuatro hojas de un reporte: ocupaban 32 mm de
+ * cada una para decir lo que ya se leyó.
+ *
+ * 🔴 LOS NOMBRES DE COLUMNA SÍ SE REPITEN, y eso es lo contrario de un olvido:
+ * sin ellos la tabla de la hoja 3 son números sueltos. Los repite `autoTable`
+ * solo (`showHead` por defecto), y por eso acá no hay nada que hacer.
+ *
+ * ⚠️ EL PIE CON LA NUMERACIÓN NO SE TOCA (`piePorHoja`): «Página 2 de 4» y
+ * «Confidencial · fashiongr.com» siguen en TODAS las hojas — es lo que dice de
+ * qué documento es la hoja suelta que quedó en la impresora.
+ *
+ * Esto es dónde arranca la tabla en las hojas de continuación, que ya no llevan
+ * cabecera: el mismo aire que los lados, para que no quede una franja en blanco.
+ */
+export const ALTO_CONTINUACION = MARGEN;
 /** Aire de abajo, donde va el pie. */
 export const PIE = 18;
 
-/** La cabeza de cada hoja: logo y de qué es el papel. */
+/** La cabeza del papel: logo y de qué es. Se dibuja UNA vez, en su primera hoja. */
 export function cabecera(doc: jsPDF, titulo: string): void {
   const w = doc.internal.pageSize.getWidth();
   try {
@@ -113,11 +133,13 @@ export function finDeTabla(doc: jsPDF): number {
   return typeof y === "number" ? y : ALTO_CABECERA;
 }
 
-/** Deja lugar para `alto` mm; si no cabe, abre hoja y repite la cabeza. */
-export function asegurarEspacio(doc: jsPDF, y: number, alto: number, titulo: string): number {
+/** Deja lugar para `alto` mm; si no cabe, abre hoja.
+ *
+ *  🔄 17-sep-2026: la hoja nueva ya NO repite la cabeza (ver `ALTO_CONTINUACION`)
+ *  y por eso este ayudante dejó de pedir el título. */
+export function asegurarEspacio(doc: jsPDF, y: number, alto: number): number {
   const h = doc.internal.pageSize.getHeight();
   if (y + alto <= h - PIE) return y;
   doc.addPage();
-  cabecera(doc, titulo);
-  return ALTO_CABECERA;
+  return ALTO_CONTINUACION;
 }

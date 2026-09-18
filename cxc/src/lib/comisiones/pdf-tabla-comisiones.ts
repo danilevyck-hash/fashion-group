@@ -34,6 +34,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
   ALTO_CABECERA,
+  ALTO_CONTINUACION,
   GRIS,
   GRIS_CLARO,
   MARGEN,
@@ -58,7 +59,7 @@ export function construirPdfTablaComisiones(tabla: TablaPapel): jsPDF {
 
   autoTable(doc, {
     startY: ALTO_CABECERA,
-    margin: { top: ALTO_CABECERA, left: MARGEN, right: MARGEN, bottom: PIE },
+    margin: { top: ALTO_CONTINUACION, left: MARGEN, right: MARGEN, bottom: PIE },
     // 🩸 Todo lo que se DIBUJA pasa por `textoDePdf`: el «−» de la plata
     // negativa no existe en la fuente base y mangla el renglón entero. El dato
     // no se toca — ver `pdf-chrome.ts`.
@@ -81,8 +82,10 @@ export function construirPdfTablaComisiones(tabla: TablaPapel): jsPDF {
       }
     },
     ...estilosDeTabla(),
-    // La cabeza se repite en cada hoja: una matriz larga no pierde de qué es.
-    didDrawPage: () => cabecera(doc, titulo),
+    // 🔄 17-sep-2026: la cabeza NO se repite (Daniel: «no quiero ver en cada
+    // pagina lo mismo… solo en la primera»). Lo que evita que una matriz larga
+    // pierda de qué es son los NOMBRES DE COLUMNA, que `autoTable` sí repite en
+    // cada hoja, y el pie con «Página 2 de 4», que no se tocó.
   });
 
   // La nota de la casa: qué ya está descontado. Es la MISMA frase del pie de la

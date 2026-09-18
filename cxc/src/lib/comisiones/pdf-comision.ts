@@ -25,6 +25,14 @@
 // 🔑 QUÉ DICE EL PAPEL vive aparte, en `reporte-comision.ts` (módulo puro): acá
 // solo se dibuja. Es lo mismo que hacen el papel del CXC y el de las guías.
 //
+// 🔴 17-SEP-2026 — EL TÍTULO SALE SOLO EN LA PRIMERA HOJA DE CADA REPORTE.
+// Daniel: *«no quiero ver en cada pagina lo mismo… solo en la primera»*. El logo
+// y el renglón «Comisión — Vendedor · Empresa · agosto 2026» se repetían en las
+// cuatro hojas. ⚠️ Los NOMBRES DE COLUMNA sí se repiten (los repite `autoTable`
+// solo): sin ellos la tabla de la hoja 3 son números sueltos. Y el pie con la
+// numeración no se tocó. Las hojas de continuación arrancan en
+// `ALTO_CONTINUACION` para que no quede una franja en blanco arriba.
+//
 // 🔄 9-SEP-2026 — el logo, la cabeza, el pie y los estilos se mudaron a
 // `pdf-chrome.ts`: desde que la matriz del mes y la del año también son un PDF
 // de verdad, los dos papeles del módulo tienen que verse igual, y dos copias de
@@ -35,6 +43,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
   ALTO_CABECERA,
+  ALTO_CONTINUACION,
   MARGEN,
   NAVY,
   PIE,
@@ -70,12 +79,12 @@ function tituloSeccion(doc: jsPDF, y: number, texto: string): number {
 }
 
 /** La caja de cierre: de dónde sale cada comisión y qué se paga. */
-function dibujarCierre(doc: jsPDF, y: number, hoja: HojaReporte, titulo: string): number {
+function dibujarCierre(doc: jsPDF, y: number, hoja: HojaReporte): number {
   const w = doc.internal.pageSize.getWidth();
   const lineas = lineasDelCierre(hoja.data, hoja.descuentos);
   const alto = 9 + lineas.length * 5 + 3;
   // 🔴 El cierre NUNCA se parte entre dos hojas: es lo que se lee primero.
-  let yy = asegurarEspacio(doc, y, alto, titulo);
+  let yy = asegurarEspacio(doc, y, alto);
 
   doc.setDrawColor(...LINEA);
   doc.setLineWidth(0.3);
@@ -136,7 +145,7 @@ export function construirPdfComision(hojas: HojaReporte[]): jsPDF {
 
     autoTable(doc, {
       startY: y,
-      margin: { top: ALTO_CABECERA, left: MARGEN, right: MARGEN, bottom: PIE },
+      margin: { top: ALTO_CONTINUACION, left: MARGEN, right: MARGEN, bottom: PIE },
       head: [[...COLUMNAS_VENTAS]],
       body: ventas.length
         ? ventas.map((f) => f.celdas.map(textoDePdf))
@@ -153,17 +162,16 @@ export function construirPdfComision(hojas: HojaReporte[]): jsPDF {
         if (d.section === "body" && ventas[d.row.index]?.negativo) d.cell.styles.textColor = ROJO;
       },
       ...estilosDeTabla(),
-      didDrawPage: () => cabecera(doc, titulo),
     });
 
     y = dibujarTotal(doc, finDeTabla(doc) + 2, totalVentas.rotulo, totalVentas.monto);
 
-    y = asegurarEspacio(doc, y + 4, 24, titulo);
+    y = asegurarEspacio(doc, y + 4, 24);
     y = tituloSeccion(doc, y, "Cobros");
 
     autoTable(doc, {
       startY: y,
-      margin: { top: ALTO_CABECERA, left: MARGEN, right: MARGEN, bottom: PIE },
+      margin: { top: ALTO_CONTINUACION, left: MARGEN, right: MARGEN, bottom: PIE },
       head: [[...COLUMNAS_COBROS]],
       body: cobros.length
         ? cobros.map((f) => f.celdas.map(textoDePdf))
@@ -177,12 +185,11 @@ export function construirPdfComision(hojas: HojaReporte[]): jsPDF {
         if (d.section === "body" && cobros[d.row.index]?.negativo) d.cell.styles.textColor = ROJO;
       },
       ...estilosDeTabla(),
-      didDrawPage: () => cabecera(doc, titulo),
     });
 
     y = dibujarTotal(doc, finDeTabla(doc) + 2, totalCobros.rotulo, totalCobros.monto);
-    y = dibujarTotal(doc, asegurarEspacio(doc, y, 12, titulo), totalJuntos.rotulo, totalJuntos.monto);
-    dibujarCierre(doc, y + 3, hoja, titulo);
+    y = dibujarTotal(doc, asegurarEspacio(doc, y, 12), totalJuntos.rotulo, totalJuntos.monto);
+    dibujarCierre(doc, y + 3, hoja);
   });
 
   piePorHoja(doc);
