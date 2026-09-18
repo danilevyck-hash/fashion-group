@@ -60,6 +60,7 @@ import DestinosDelCliente from "./DestinosDelCliente";
 import { destinoParaAutollenar, type DefinidosPorCliente } from "@/lib/guias/destinos-clientes";
 import FacturasDelCliente from "./FacturasDelCliente";
 import EtiquetasPendientes from "./EtiquetasPendientes";
+import { useEtiquetasVivas } from "./useEtiquetasVivas";
 import { CODIGOS_RETIRADOS_DE_GUIAS } from "@/lib/guias/american-classics";
 import ClientePicker from "@/components/ClientePicker";
 import { GUIAS_ATAJOS_NUEVOS } from "@/lib/guias/atajos-facturas";
@@ -339,6 +340,16 @@ export default function GuiaForm({
   onEtiquetasSeleccionadas,
 }: GuiaFormProps) {
   const totalBultos = items.reduce((s, i) => s + (i.bultos || 0), 0);
+
+  // 🔴 UNA SOLA LECTURA DE LAS ETIQUETAS PENDIENTES, y la comparten los DOS
+  // paneles: «Facturas etiquetadas pendientes» (para marcarlas) y «Facturas del
+  // cliente» (para BLOQUEAR la que ya tiene etiqueta). Dos lecturas de lo mismo
+  // se pueden separar —una llega y la otra no— y entonces un panel bloquearía
+  // y el otro no. Falla ABIERTA: sin lista, nada se bloquea.
+  const atajosDeLaGuiaNueva = Boolean(
+    GUIAS_ATAJOS_NUEVOS && !editingId && !soloCorregible && onReemplazarItems,
+  );
+  const etiquetasVivas = useEtiquetasVivas(atajosDeLaGuiaNueva);
 
   // ── "Tocado" = el usuario CAMBIÓ el campo ──────────────────────────────────
   // Antes se marcaba en el onBlur, así que mirar un desplegable y cerrarlo
@@ -1079,6 +1090,7 @@ export default function GuiaForm({
           destinoAutollenadoDe={(codigo) =>
             destinoParaAutollenar(codigo, destinosPorCliente[(codigo || "").trim()] ?? [], definidosPorCliente)
           }
+          etiquetasVivas={etiquetasVivas}
         />
       )}
 
@@ -1090,6 +1102,7 @@ export default function GuiaForm({
       {GUIAS_ATAJOS_NUEVOS && !editingId && !soloCorregible && onReemplazarItems && (
         <EtiquetasPendientes
           items={items}
+          etiquetas={etiquetasVivas}
           onReemplazarItems={onReemplazarItems}
           onSeleccion={onEtiquetasSeleccionadas}
         />

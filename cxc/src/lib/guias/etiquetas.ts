@@ -33,6 +33,7 @@ import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import {
   normalizarEmpresaGuia,
   numerosDeFacturas,
+  type FacturaDelCliente,
   type RenglonDeGuia,
 } from "@/lib/guias/atajos-facturas";
 import { claveDeFactura } from "@/lib/guias/numero-factura";
@@ -419,6 +420,66 @@ export function textoYaEtiquetada(e: Pick<EtiquetaFila, "cajas">): string {
   return `Ya etiquetada · ${e.cajas} ${e.cajas === 1 ? "caja" : "cajas"}`;
 }
 
+// ─── El selector para etiquetar NO ofrece lo ya etiquetado (18-sep-2026) ─────
+//
+// Daniel: *«Reimprimir/corregir solo desde la lista de la pestaña»*.
+//
+// 🩸 Hasta acá las facturas ya etiquetadas SALÍAN en la lista del panel, con un
+// chip verde; elegir una y darle a Imprimir terminaba en el 409 del servidor.
+// O sea: la pantalla ofrecía un camino que no llevaba a ningún lado.
+//
+// 🔴 Y NO SE ESCONDEN EN SILENCIO: se dice cuántas se escondieron y dónde
+// están. Esconder sin contar haría creer que una factura se perdió.
+
+/**
+ * Las facturas que todavía se pueden etiquetar, y cuántas se escondieron por
+ * tener ya su juego. El pareo es por `empresa_key` + `switch_factura_id`
+ * (el id REAL de Switch): una factura sin ese id nunca se esconde.
+ */
+export function facturasParaEtiquetar(
+  facturas: readonly FacturaDelCliente[],
+  etiquetas: readonly EtiquetaFila[],
+): { visibles: FacturaDelCliente[]; escondidas: number } {
+  const visibles = facturas.filter(
+    (f) =>
+      f.switch_factura_id == null ||
+      etiquetaDeLaFactura(etiquetas, f.empresa_key, f.switch_factura_id) === null,
+  );
+  return { visibles, escondidas: facturas.length - visibles.length };
+}
+
+/** Lo que se dice de las escondidas. `null` = no se escondió ninguna. */
+export function textoEscondidasPorEtiqueta(n: number): string | null {
+  if (n <= 0) return null;
+  return n === 1
+    ? "1 factura de este cliente ya está etiquetada — mírala en la lista"
+    : `${n} facturas de este cliente ya están etiquetadas — míralas en la lista`;
+}
+
+/**
+ * 🔴 EL TEXTO DE SWITCH, COMO LO DICTÓ DANIEL (18-sep-2026), verbatim:
+ * *«¿No aparece la factura de hoy? Tráela de Switch»*. Antes decía «¿No está
+ * la factura de hoy? El detalle de Switch entra una vez al día» — una
+ * explicación del mecanismo donde hacía falta una pregunta y qué hacer.
+ */
+export const TEXTO_TRAER_DE_SWITCH = "¿No aparece la factura de hoy? Tráela de Switch";
+
+// ─── Corregir bultos lleva a reimprimir (18-sep-2026) ────────────────────────
+
+/**
+ * 🔴 CORREGIR LOS BULTOS DEJA EL PAPEL VIEJO MAL, Y HAY QUE DECIRLO. Si alguien
+ * corrigió de 14 a 16 cajas, las 14 etiquetas impresas dicen «de 14» y la caja
+ * 15 y la 16 no existen en papel. Por eso guardar abre directo la reimpresión
+ * del JUEGO COMPLETO, con este aviso arriba.
+ *
+ * `null` cuando el número no cambió: no hay nada que rehacer y una frase de más
+ * tapa los datos.
+ */
+export function avisoDeReimpresion(antes: number, despues: number): string | null {
+  if (antes === despues) return null;
+  return `Eran ${antes} ${antes === 1 ? "caja" : "cajas"} y ahora son ${despues}: las etiquetas impresas quedaron mal. Imprime el juego completo.`;
+}
+
 // ─── Marcar etiquetas en Nueva guía: LLENAN los renglones de siempre ─────────
 //
 // 🔴 LA GUÍA SE SIGUE ARMANDO IGUAL QUE HOY. Marcar una etiqueta rellena los
@@ -541,7 +602,15 @@ export function desmarcarEtiqueta(
   return items.map((fila, i) => (i === idx ? { ...fila, facturas, bultos } : fila));
 }
 
-/** Los ids de las etiquetas que están marcadas en los renglones de hoy. */
+/**
+ * Los ids de las etiquetas que están marcadas en los renglones de hoy.
+ *
+ * ⚠️ Desde el 18-sep-2026 el panel NO usa esto para decidir qué atar: una
+ * factura puede estar en el renglón porque la marcó el selector de siempre, y
+ * eso no es una etiqueta marcada. Lo que atar lo dice `idsParaAtar`
+ * (`anti-doble-captura.ts`), que además mira QUIÉN la marcó. Esta función
+ * queda como lo que siempre fue: «¿esta factura está en algún renglón?».
+ */
 export function etiquetasMarcadas(
   items: readonly RenglonDeGuia[],
   etiquetas: readonly EtiquetaFila[],

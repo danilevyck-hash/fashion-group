@@ -52,21 +52,26 @@ import {
 } from "@/lib/guias/destinos-clientes";
 import {
   MAX_CAJAS,
+  TEXTO_TRAER_DE_SWITCH,
+  avisoDeReimpresion,
   cajasDelJuego,
   cuantasPendientes,
   estaImportada,
   etiquetaDeLaFactura,
+  facturasParaEtiquetar,
   filtrarEtiquetas,
   motivoBloqueo,
   nombreArchivoEtiquetas,
   puedeCorregirse,
   rotuloEstado,
+  textoEscondidasPorEtiqueta,
   textoImprimir,
   textoYaEtiquetada,
   validarCajas,
   type EtiquetaFila,
   type FiltroEtiquetas,
 } from "@/lib/guias/etiquetas";
+import { abrirPdfEnPestana } from "@/lib/guias/pdf-en-pestana";
 
 const BOTON_NEGRO =
   "inline-flex items-center justify-center gap-2 bg-black text-white rounded-md px-4 text-sm font-medium " +
@@ -93,10 +98,33 @@ function fechaCorta(iso: string): string {
   }).format(d);
 }
 
-/** Descarga el PDF. jsPDF entra por `import()` para no cargarlo con la pestaña. */
-async function imprimir(e: EtiquetaFila, cajas: readonly number[], caja?: number | null) {
-  const { construirPdfEtiquetas, datosDeEtiqueta } = await import("@/lib/guias/pdf-etiquetas");
-  construirPdfEtiquetas(datosDeEtiqueta(e), cajas).save(nombreArchivoEtiquetas(e, caja ?? null));
+/**
+ * 🔴 EL PDF SE ABRE EN PESTAÑA NUEVA, NO SE BAJA (18-sep-2026). Daniel: *«abrir
+ * el PDF en pestaña nueva (inline), no descargar. Igual que "Ver PDF" de
+ * Catálogos»* — desde ahí es un clic a imprimir y no se llena Descargas.
+ *
+ * ⚠️ Catálogos abre una URL DEL SERVIDOR; acá el PDF se arma en el navegador
+ * (jsPDF entra por `import()` para no cargarlo con la pestaña), así que la
+ * dirección sale de `output("bloburl")`. Mismo resultado, otro camino: no se
+ * copió mal.
+ *
+ * 🔴 Y POR ESO LA PESTAÑA SE ABRE **ANTES** DEL `await`, dentro del clic —lo
+ * hace `abrirPdfEnPestana`—: Safari bloquea una ventana que nace después de un
+ * `await`. Sin pestaña, el archivo se baja como antes.
+ */
+function pdfDeLaEtiqueta(e: EtiquetaFila, cajas: readonly number[], caja?: number | null) {
+  return async () => {
+    const { construirPdfEtiquetas, datosDeEtiqueta } = await import("@/lib/guias/pdf-etiquetas");
+    const doc = construirPdfEtiquetas(datosDeEtiqueta(e), cajas);
+    return {
+      url: doc.output("bloburl") as unknown as string,
+      descargar: () => doc.save(nombreArchivoEtiquetas(e, caja ?? null)),
+    };
+  };
+}
+
+function imprimir(e: EtiquetaFila, cajas: readonly number[], caja?: number | null) {
+  return abrirPdfEnPestana(pdfDeLaEtiqueta(e, cajas, caja));
 }
 
 export default function EtiquetasView() {
@@ -110,7 +138,10 @@ export default function EtiquetasView() {
   const [buscar, setBuscar] = useState("");
 
   const [panel, setPanel] = useState(false);
-  const [reimprimiendo, setReimprimiendo] = useState<EtiquetaFila | null>(null);
+  // 🔴 REIMPRIMIR LLEVA SU AVISO: cuando se llega acá desde «Corregir bultos»,
+  // el modal tiene que DECIR que el papel viejo quedó mal. Por eso es un objeto
+  // y no la etiqueta pelada.
+  const [reimprimiendo, setReimprimiendo] = useState<{ etiqueta: EtiquetaFila; aviso: string | null } | null>(null);
   const [corrigiendo, setCorrigiendo] = useState<EtiquetaFila | null>(null);
   const [borrando, setBorrando] = useState<EtiquetaFila | null>(null);
 
@@ -170,7 +201,7 @@ export default function EtiquetasView() {
           deshabilitado={sinTabla}
           onCerrar={() => setPanel(false)}
           onListo={async (mensaje) => { setToast(mensaje); await cargar(); }}
-          onYaEtiquetada={(e) => setReimprimiendo(e)}
+          onYaEtiquetada={(e) => setReimprimiendo({ etiqueta: e, aviso: null })}
         />
       ) : (
         <>
@@ -243,7 +274,7 @@ export default function EtiquetasView() {
                       <td className="px-3 py-2.5 text-right">
                         <OverflowMenu
                           items={[
-                            { label: "Reimprimir", onClick: () => setReimprimiendo(e) },
+                            { label: "Reimprimir", onClick: () => setReimprimiendo({ etiqueta: e, aviso: null }) },
                             {
                               label: bloqueo ? "Corregir bultos — bloqueado" : "Corregir bultos",
                               onClick: () => setCorrigiendo(e),
@@ -276,13 +307,26 @@ export default function EtiquetasView() {
       )}
 
       {reimprimiendo && (
-        <ModalReimprimir etiqueta={reimprimiendo} onCerrar={() => setReimprimiendo(null)} />
+        <ModalReimprimir
+          etiqueta={reimprimiendo.etiqueta}
+          aviso={reimprimiendo.aviso}
+          onCerrar={() => setReimprimiendo(null)}
+        />
       )}
       {corrigiendo && (
         <ModalCorregir
           etiqueta={corrigiendo}
           onCerrar={() => setCorrigiendo(null)}
-          onListo={async (mensaje) => { setCorrigiendo(null); setToast(mensaje); await cargar(); }}
+          /* 🔴 CORREGIR LOS BULTOS LLEVA DIRECTO A REIMPRIMIR EL JUEGO COMPLETO
+             (18-sep-2026). Si alguien corrigió de 14 a 16 cajas, las 14
+             etiquetas pegadas dicen «de 14» y las cajas 15 y 16 no existen en
+             papel. Antes esto guardaba y cerraba, y nadie se lo decía. */
+          onListo={async (actualizada, antes) => {
+            setCorrigiendo(null);
+            setToast("Bultos corregidos");
+            setReimprimiendo({ etiqueta: actualizada, aviso: avisoDeReimpresion(antes, actualizada.cajas) });
+            await cargar();
+          }}
         />
       )}
       {borrando && (
@@ -387,13 +431,22 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
     }
   }
 
-  const { grupos, diasOcultos } = agruparPorDia(facturas ?? [], diasVisibles);
+  // 🔴 LO YA ETIQUETADO NO SE OFRECE (18-sep-2026). Daniel: *«Reimprimir/
+  // corregir solo desde la lista de la pestaña»*. Antes salían con un chip
+  // verde y, al darle a Imprimir, el servidor contestaba 409: la pantalla
+  // ofrecía un camino que no llevaba a ningún lado. 🔴 Y se DICE cuántas se
+  // escondieron: esconder en silencio haría creer que una factura se perdió.
+  const { visibles, escondidas } = facturasParaEtiquetar(facturas ?? [], etiquetas);
+  const { grupos, diasOcultos } = agruparPorDia(visibles, diasVisibles);
   const diaMasReciente = grupos[0]?.dia ?? null;
   const hoy = hoyPanama();
 
+  // ⚠️ Se busca en lo VISIBLE, no en todo lo que trajo el servidor: una factura
+  // que se etiquetó en otra pestaña desaparece de la lista y no puede quedarse
+  // elegida por detrás.
   const elegida = useMemo(
-    () => (facturas ?? []).find((f) => claveFactura(f) === elegidaClave) ?? null,
-    [facturas, elegidaClave],
+    () => visibles.find((f) => claveFactura(f) === elegidaClave) ?? null,
+    [visibles, elegidaClave],
   );
 
   // 🔴 EL ANTI-DUPLICADO, en la pantalla, con la MISMA función pura que usa el
@@ -435,36 +488,47 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
     }
     setGuardando(true);
     setError(null);
+    // 🔴 LA PESTAÑA DEL PDF NACE DENTRO DEL CLIC, ANTES DEL POST. Todas las
+    // validaciones de arriba son sincrónicas a propósito: `abrirPdfEnPestana`
+    // abre la ventana y RECIÉN ahí espera el guardado y el dibujo del papel. Si
+    // el servidor dice que no, la pestaña vacía se cierra sola.
+    let creada: EtiquetaFila | null = null;
     try {
-      const r = await fetch("/api/guias/etiquetas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          empresa_key: elegida.empresa_key,
-          switch_factura_id: elegida.switch_factura_id,
-          secuencial: elegida.secuencial,
-          fecha_factura: String(elegida.fecha ?? "").slice(0, 10),
-          cliente_codigo: cliente.codigo,
-          cliente_nombre: cliente.nombre,
-          destino: destino.trim(),
-          cajas: v.valor,
-        }),
+      await abrirPdfEnPestana(async () => {
+        const r = await fetch("/api/guias/etiquetas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            empresa_key: elegida.empresa_key,
+            switch_factura_id: elegida.switch_factura_id,
+            secuencial: elegida.secuencial,
+            fecha_factura: String(elegida.fecha ?? "").slice(0, 10),
+            cliente_codigo: cliente.codigo,
+            cliente_nombre: cliente.nombre,
+            destino: destino.trim(),
+            cajas: v.valor,
+          }),
+        });
+        const d = (await r.json().catch(() => ({}))) as {
+          etiqueta?: EtiquetaFila;
+          yaEtiquetada?: EtiquetaFila;
+          error?: string;
+        };
+        if (r.status === 409) {
+          // 🔴 El servidor dijo que ya estaba: no se crea un segundo juego.
+          if (d.yaEtiquetada) onYaEtiquetada(d.yaEtiquetada);
+          setError(d.error || "Esa factura ya está etiquetada");
+          return null;
+        }
+        if (!r.ok || !d.etiqueta) { setError(d.error || "No se pudo guardar"); return null; }
+        creada = d.etiqueta;
+        return pdfDeLaEtiqueta(d.etiqueta, cajasDelJuego(d.etiqueta.cajas))();
       });
-      const d = (await r.json().catch(() => ({}))) as {
-        etiqueta?: EtiquetaFila;
-        yaEtiquetada?: EtiquetaFila;
-        error?: string;
-      };
-      if (r.status === 409) {
-        // 🔴 El servidor dijo que ya estaba: no se crea un segundo juego.
-        if (d.yaEtiquetada) onYaEtiquetada(d.yaEtiquetada);
-        setError(d.error || "Esa factura ya está etiquetada");
-        return;
+      const guardada = creada as EtiquetaFila | null;
+      if (guardada) {
+        await onListo(`Listo · ${guardada.cajas} etiquetas — se abrieron en otra pestaña`);
+        onCerrar();
       }
-      if (!r.ok || !d.etiqueta) { setError(d.error || "No se pudo guardar"); return; }
-      await imprimir(d.etiqueta, cajasDelJuego(d.etiqueta.cajas));
-      await onListo(`Listo · ${d.etiqueta.cajas} etiquetas — revisa tu carpeta de descargas`);
-      onCerrar();
     } catch {
       setError("Sin conexión. No se guardó nada — revisa el internet y vuelve a intentar.");
     } finally {
@@ -509,13 +573,16 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
               <p className="text-sm text-gray-500">Este cliente no tiene facturas registradas.</p>
             )}
 
-            {!cargando && facturas && facturas.length > 0 && (
+            {!cargando && facturas && facturas.length > 0 && visibles.length === 0 && (
+              <p className="text-sm text-gray-500">
+                Todas las facturas de este cliente ya están etiquetadas — míralas en la lista.
+              </p>
+            )}
+
+            {!cargando && visibles.length > 0 && (
               <div className="space-y-4">
                 {grupos.map(({ dia, facturas: fs }) => {
                   const abierto = diaAbierto(dia, diaMasReciente, diasAlternados);
-                  const yaMarcadas = fs.filter(
-                    (f) => f.switch_factura_id != null && etiquetaDeLaFactura(etiquetas, f.empresa_key, f.switch_factura_id),
-                  ).length;
                   return (
                     <div key={dia}>
                       <button
@@ -531,17 +598,12 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
                         <span className="text-xs uppercase tracking-[0.05em] text-gray-400">{tituloDelDia(dia)}</span>
                         <span className="text-xs tabular-nums text-gray-400">
                           {`· ${resumenDelDia(fs.length, 0, true)}`}
-                          {!abierto && yaMarcadas > 0 ? ` · ${yaMarcadas} ya etiquetadas` : ""}
                         </span>
                       </button>
                       {abierto && (
                         <ul>
                           {fs.map((f) => {
                             const clave = claveFactura(f);
-                            const suya =
-                              f.switch_factura_id != null
-                                ? etiquetaDeLaFactura(etiquetas, f.empresa_key, f.switch_factura_id)
-                                : null;
                             return (
                               <li key={clave}>
                                 <label className="flex min-h-[44px] cursor-pointer flex-wrap items-center gap-3 py-1.5 text-sm lg:[@media(pointer:fine)]:min-h-0 lg:[@media(pointer:fine)]:py-1">
@@ -555,11 +617,6 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
                                   <span className="shrink-0 font-mono tabular-nums">{f.secuencial}</span>
                                   <span className="truncate text-gray-500">{f.empresa}</span>
                                   <span className="ml-auto shrink-0 tabular-nums text-gray-600">{fmtMonto(f.total)}</span>
-                                  {suya && (
-                                    <span className="shrink-0 rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-xs text-emerald-800">
-                                      Ya etiquetada
-                                    </span>
-                                  )}
                                 </label>
                               </li>
                             );
@@ -581,9 +638,14 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
               </div>
             )}
 
+            {/* 🔴 LO ESCONDIDO SE CUENTA Y SE DICE DÓNDE ESTÁ. */}
+            {!cargando && escondidas > 0 && (
+              <p className="mt-2 text-xs text-gray-500">{textoEscondidasPorEtiqueta(escondidas)}</p>
+            )}
+
             {!cargando && (
               <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
-                <span>¿No está la factura de hoy? El detalle de Switch entra una vez al día.</span>
+                <span>{TEXTO_TRAER_DE_SWITCH}</span>
                 <button
                   type="button"
                   onClick={() => void traerDeSwitch()}
@@ -707,7 +769,18 @@ function Paso({ n, titulo, ayuda }: { n: number; titulo: string; ayuda: string }
 
 // ─── Reimprimir: el juego completo o una sola caja ───────────────────────────
 
-function ModalReimprimir({ etiqueta, onCerrar }: { etiqueta: EtiquetaFila; onCerrar: () => void }) {
+function ModalReimprimir({
+  etiqueta,
+  aviso = null,
+  onCerrar,
+}: {
+  etiqueta: EtiquetaFila;
+  /** Por qué se está reimprimiendo (viene de «Corregir bultos»), o nada. */
+  aviso?: string | null;
+  onCerrar: () => void;
+}) {
+  // 🔴 ABRE CON EL JUEGO COMPLETO ELEGIDO — que es lo que hace falta después de
+  // corregir los bultos, y lo que se pide nueve de cada diez veces.
   const [modo, setModo] = useState<"juego" | "una">("juego");
   const [caja, setCaja] = useState("1");
 
@@ -727,6 +800,12 @@ function ModalReimprimir({ etiqueta, onCerrar }: { etiqueta: EtiquetaFila; onCer
         <p className="mb-4 text-sm text-gray-600">
           {etiqueta.cliente_nombre} · {etiqueta.empresa} · {etiqueta.cajas} cajas
         </p>
+
+        {aviso && (
+          <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            {aviso}
+          </p>
+        )}
 
         <Opcion
           elegida={modo === "juego"}
@@ -816,7 +895,11 @@ function ModalCorregir({
 }: {
   etiqueta: EtiquetaFila;
   onCerrar: () => void;
-  onListo: (mensaje: string) => Promise<void> | void;
+  /**
+   * 🔴 Devuelve la etiqueta YA CORREGIDA y cuántas cajas tenía antes: con eso
+   * la pantalla abre la reimpresión del juego completo y dice qué cambió.
+   */
+  onListo: (actualizada: EtiquetaFila, antes: number) => Promise<void> | void;
 }) {
   const [cajas, setCajas] = useState(String(etiqueta.cajas));
   const [error, setError] = useState<string | null>(null);
@@ -832,11 +915,13 @@ function ModalCorregir({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cajas: v.valor }),
       });
-      const d = (await r.json().catch(() => ({}))) as { error?: string };
+      const d = (await r.json().catch(() => ({}))) as { error?: string; etiqueta?: EtiquetaFila };
       // 🔴 El servidor puede decir que no: importada = bloqueada, aunque la
       // pantalla haya dejado abrir este modal.
       if (!r.ok) { setError(d.error || "No se pudo guardar"); return; }
-      await onListo("Bultos corregidos");
+      // La etiqueta que devuelve el servidor manda; sin ella, la de la pantalla
+      // con el número nuevo (nunca se inventa un dato que no volvió).
+      await onListo(d.etiqueta ?? { ...etiqueta, cajas: v.valor }, etiqueta.cajas);
     } catch {
       setError("Sin conexión. No se guardó nada — revisa el internet y vuelve a intentar.");
     } finally {
@@ -849,7 +934,7 @@ function ModalCorregir({
       <div className="relative w-full max-w-sm rounded-t-2xl border border-gray-200 bg-white p-6 sm:rounded-lg">
         <h3 className="mb-1 text-base font-semibold">Corregir bultos</h3>
         <p className="mb-4 text-sm text-gray-600">
-          {etiqueta.secuencial} · {etiqueta.cliente_nombre}. Vuelve a imprimir las etiquetas después de corregir.
+          {etiqueta.secuencial} · {etiqueta.cliente_nombre}. Al guardar se abre la reimpresión del juego completo.
         </p>
         <input
           type="number"

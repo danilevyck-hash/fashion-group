@@ -1524,6 +1524,139 @@ se dibujan **siempre**, aunque la hoja tenga cuartos vacíos, para que el papel 
 
 ---
 
+## 🔴 Guías — ETIQUETAS · LOS CINCO ARREGLOS DE DANIEL · Fase 1b (18-sep-2026)
+
+Daniel revisó la Fase 1 y pidió cinco cosas. Los tres primeros eran **huecos reales**; los dos
+últimos, decisiones suyas. ⚠️ **La migración `20261207120000` sigue SIN correr** y así queda: todo
+esto falla ABIERTO sin ella (sin etiquetas no se bloquea nada, no se esconde nada y la pantalla es
+la de siempre).
+
+### 1 · 🔴 ANTI-DOBLE CAPTURA — la misma factura no entra dos veces a la misma guía
+
+Daniel, textual: *«factura importada desde Etiquetas sale marcada/bloqueada en el selector de
+siempre, y viceversa»*.
+
+🩸 **El hueco.** En `/guias/nueva` hay DOS paneles que llenan los MISMOS renglones —«Facturas del
+cliente» (el selector de siempre) y «Facturas etiquetadas pendientes»— y **ninguno sabía del otro**.
+Lo que se descuadraba eran los **BULTOS**: el selector marca la factura pero **no suma las cajas de
+la etiqueta**, así que el renglón salía con la factura puesta y los bultos en cero; y la casilla de
+Etiquetas, al ver su factura ya en el renglón, se dibujaba «marcada» sin serlo — desmarcarla restaba
+cajas que nunca se habían sumado.
+
+🔴 **LA REGLA, EN UNA LÍNEA: una factura CON etiqueta viva se marca SOLO en «Facturas etiquetadas
+pendientes»; una SIN etiqueta, solo en el selector de siempre.** Vive en un módulo puro,
+`src/lib/guias/anti-doble-captura.ts`, que leen los dos paneles — ninguna pantalla reimplementa la
+regla.
+
+- **Dirección 1 (Etiquetas ⇒ selector).** La factura con etiqueta pendiente sale con la casilla
+  **apagada** en «Facturas del cliente», marcada si ya está en la guía, y con el porqué a la vista:
+  **«Ya viene de Etiquetas · 14 cajas»** cuando ya entró, **«Se marca en Etiquetas · 14 cajas»**
+  cuando todavía no. El freno está **también en el toque** (`toggle` pregunta la regla), no solo en
+  el `disabled` que se ve.
+- **Dirección 2 (selector ⇒ Etiquetas).** Si la factura de una etiqueta ya está en un renglón y **no
+  la puso ese panel** —la marcó el selector, o alguien la escribió a mano—, su casilla sale bloqueada
+  con **«Ya está marcada abajo, en «Facturas del cliente»»**.
+
+🔴 **ESTO FRENA, Y «Ya salió en GT-XXX» SOLO AVISA — y la diferencia está escrita en el comentario
+del módulo.** Aquel aviso habla de **otra guía, ya firmada, de otro día**: el sistema puede afirmar
+«ya salió» pero no lo contrario (hay facturas sin guía que son mostrador o retiro en bodega), y a
+veces una factura vuelve a salir de verdad; por eso avisa y la casilla se marca igual — Daniel, *«el
+ya salió no me molesta»*. Esto otro es **la misma guía que se está armando ahora**, con la cuenta de
+bultos abierta: no hay lectura del negocio en que la misma factura entre dos veces al mismo
+despacho. Por eso frena, y dice en la fila por qué.
+
+🔑 **Qué está marcado se sigue DERIVANDO de los renglones.** Lo único que se guarda aparte es **quién
+lo marcó** (el conjunto `mias` del panel), porque el renglón no guarda de dónde salió cada número.
+Marcada = está en el renglón **y** la marcó ese panel, así que **borrar una fila a mano la desmarca
+sola**, exactamente como en la Fase 1. Y lo que se ata al guardar sale de `idsParaAtar`, que exige
+las dos cosas: una factura puesta por el selector **no se ata a ninguna etiqueta**.
+
+🔴 **UNA SOLA LECTURA de la lista, y la comparten los dos paneles** (`useEtiquetasVivas`, leída por
+`GuiaForm`). Dos lecturas de lo mismo se pueden separar —una llega y la otra no— y entonces un panel
+bloquearía y el otro no. ⚠️ El pareo es por **`empresa_key` + `switch_factura_id`** (el id REAL de
+Switch), nunca por el número de factura: sin la empresa en la clave se bloquearía una factura ajena,
+porque los secuenciales se repiten entre empresas.
+
+### 2 · «Corregir bultos» lleva directo a reimprimir el juego completo
+
+🩸 `ModalCorregir` guardaba y cerraba. Si alguien corrigió de 14 a 16 cajas, **las 14 etiquetas ya
+pegadas dicen «de 14» y las cajas 15 y 16 no existen en papel — y nadie se lo decía.** Ahora guardar
+abre `ModalReimprimir` con **el juego completo ya elegido** y un aviso arriba: *«Eran 14 cajas y
+ahora son 16: las etiquetas impresas quedaron mal. Imprime el juego completo.»* El texto es una
+función pura (`avisoDeReimpresion`) y **devuelve `null` si el número no cambió**: una frase de más
+tapa los datos. El modal abre con las cajas NUEVAS, no con las viejas — la etiqueta que devuelve el
+servidor manda.
+
+### 3 · El PDF se ABRE en pestaña nueva, no se baja
+
+Daniel: *«abrir el PDF en pestaña nueva (inline), no descargar. Igual que "Ver PDF" de Catálogos»*.
+
+🔴 **LA TRAMPA DE iOS, Y ES LA DE LA CASA.** Safari solo deja abrir una ventana que nace **dentro del
+gesto**: si entre el clic y el `window.open` hay un `await` —el `import()` de jsPDF, o el POST que
+guarda la etiqueta—, la cuenta del gesto ya se cerró y la pestaña se bloquea **sin decir nada**. Es
+la misma piedra que ya estaba escrita en `imprimir-pdf.ts` y en la nota de entrega de Marketing.
+Por eso `src/lib/guias/pdf-en-pestana.ts` hace el orden al revés de como se escribiría solo:
+**primero la pestaña vacía, después el trabajo lento**, y al final se le pone la dirección del blob.
+En el alta, la pestaña se abre **antes del POST**, no después: todas las validaciones de ese botón
+son sincrónicas a propósito.
+
+⚠️ **Catálogos abre una URL del SERVIDOR; acá el PDF se arma en el navegador**, así que la dirección
+sale de `output("bloburl")`. Mismo resultado para quien mira, otro camino — dicho en el comentario
+para que nadie crea que se copió mal.
+
+🔴 **Y si no se puede, el papel igual sale**: pestaña bloqueada → se intenta la abierta directa con
+la dirección ya en la mano; si tampoco → **se baja el archivo**, como en la Fase 1. Si el servidor
+dijo que no, la pestaña vacía **se cierra sola**. El toast pasó de «revisa tu carpeta de descargas» a
+«se abrieron en otra pestaña».
+
+### 4 · El selector para etiquetar ya no ofrece lo ya etiquetado
+
+Daniel: *«Reimprimir/corregir solo desde la lista de la pestaña»*. 🩸 Las facturas ya etiquetadas
+salían con un chip verde y, al darle a Imprimir, el servidor contestaba **409**: la pantalla ofrecía
+un camino que no llevaba a ningún lado. Ahora **no se dibujan** (`facturasParaEtiquetar`), y 🔴 **se
+dice cuántas se escondieron y dónde están**: *«3 facturas de este cliente ya están etiquetadas —
+míralas en la lista»* (o la frase en singular). Esconder en silencio haría creer que una factura se
+perdió. Con TODAS escondidas se dice entero, en vez de dejar un hueco mudo. ⚠️ Una factura **sin id
+de Switch nunca se esconde**: no se la puede parear. La tarjeta «Ya etiquetada · 14 cajas» del panel
+**se queda**: es la respuesta al 409 del servidor cuando alguien etiquetó desde otra pantalla.
+
+### 5 · El copy de Switch, como lo dictó Daniel
+
+Verbatim: **«¿No aparece la factura de hoy? Tráela de Switch»** (`TEXTO_TRAER_DE_SWITCH`). Antes
+decía «¿No está la factura de hoy? El detalle de Switch entra una vez al día» — una explicación del
+mecanismo donde hacía falta una pregunta y qué hacer. ⚠️ El botón sigue diciendo «Traer de Switch
+ahora»: no se tocó.
+
+### Lo que NO se tocó
+
+- El **índice único parcial** `(empresa_key, switch_factura_id) WHERE NOT deleted` y el
+  `deleted NOT NULL DEFAULT false`: como estaban.
+- El **tope de 300 cajas**, los roles, `GUIAS_ATAJOS_NUEVOS` y el fallar-abierto.
+- **La migración no se corrió.** Nada se escribió en producción.
+- El payload de `POST /api/guias` y la forma de `guia_items`: idénticos.
+
+### Candados
+
+- `src/__tests__/lib/guias-etiquetas-una-sola-vez.test.ts` — la parte pura: las dos direcciones del
+  anti-doble captura, que una frena y la otra avisa, el aviso de reimpresión, el orden
+  pestaña-antes-del-`await` (probado por orden de llamada, no por texto), lo escondido y el copy.
+- `src/__tests__/components/guias-etiquetas-fase1b.test.tsx` — las pantallas dibujadas y tocadas: la
+  casilla apagada con su motivo en los dos paneles, corregir 16 abriendo «Reimprimir» con el juego
+  completo, el conteo de escondidas y la frase de Switch.
+- Mutaciones: `scripts/_mutar-candados-etiquetas-fase1b.sh` — **19 mutaciones, 19 cazadas**, 2
+  controles en verde.
+
+### ⚠️ Lo que queda pendiente de Daniel (Fase 1b)
+
+1. **Correr la migración `20261207120000`.** Sigue pendiente, y hasta que corra nada de esto se ve.
+2. El botón sigue diciendo **«Traer de Switch ahora»** al lado de la frase nueva. Si le suena
+   repetido, es un cambio de una palabra.
+3. Una factura con etiqueta viva queda bloqueada en el selector **aunque no se quiera usar la
+   etiqueta**. Para meterla a la guía sin sus cajas hay que borrar la etiqueta primero. Es
+   deliberado; si algún día hace falta la salida, es otra decisión.
+
+---
+
 ## Lo que decía CLAUDE.md hasta el 14-sep-2026 (movido acá, verbatim)
 
 > El 14-sep-2026 CLAUDE.md pasaba de 333 mil caracteres (el tope del harness es 150 mil) y las instrucciones se cortaban a la mitad. Se dejó ahí un resumen de las reglas vigentes y el texto completo —mediciones, citas de Daniel, candados y mutaciones— se movió acá sin cambiar una palabra.

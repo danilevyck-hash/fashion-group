@@ -18,6 +18,15 @@
 // marcar igual. Y el sistema puede afirmar «ya salió», pero NO lo contrario
 // (hay facturas sin guía que son mostrador o retiro en bodega).
 //
+// 🔴 ANTI-DOBLE CAPTURA (18-sep-2026) — y esto SÍ BLOQUEA. Una factura que ya
+// tiene etiqueta viva se marca SOLO arriba, en «Facturas etiquetadas
+// pendientes»: acá sale con la casilla apagada y el porqué a la vista («Ya
+// viene de Etiquetas · 14 cajas»). Marcarla de este lado pondría la factura en
+// el renglón SIN sus cajas, y el camión saldría con los bultos mal contados.
+// La diferencia entre este freno y el aviso de arriba está escrita en
+// `lib/guias/anti-doble-captura.ts`: aquél habla de OTRA guía ya firmada; éste,
+// de la que se está armando ahora mismo.
+//
 // Fail-open de punta a punta: si la lista no carga, se dice y se escribe a
 // mano como siempre. «Buscar otra vez» dispara la lectura corta de HOY
 // (/api/guias/facturas-hoy) y vuelve a pedir la lista.
@@ -45,9 +54,18 @@ import {
   tituloDelDia,
   type FacturaDelCliente as Factura,
 } from "@/lib/guias/atajos-facturas";
+import { capturaEnElSelector } from "@/lib/guias/anti-doble-captura";
+import type { EtiquetaFila } from "@/lib/guias/etiquetas";
 
 interface Props {
   items: GuiaItem[];
+  /**
+   * Las etiquetas PENDIENTES, leídas una sola vez por `GuiaForm`. Con ellas
+   * esta lista bloquea la factura que ya tiene su juego de etiquetas: se marca
+   * arriba, en «Facturas etiquetadas pendientes», que es donde viven sus cajas.
+   * Sin lista (sin migración, sin red) no se bloquea nada: falla ABIERTA.
+   */
+  etiquetasVivas?: readonly EtiquetaFila[];
   /** Reemplaza los renglones del formulario (el hook renumera y asigna uid). */
   onReemplazarItems: (items: GuiaItem[]) => void;
   /** Clientes más usados en guías, para elegir sin teclear. */
@@ -82,7 +100,13 @@ function horaCorta(iso: string): string {
   }).format(d);
 }
 
-export default function FacturasDelCliente({ items, onReemplazarItems, clientesTop, destinoAutollenadoDe }: Props) {
+export default function FacturasDelCliente({
+  items,
+  onReemplazarItems,
+  clientesTop,
+  destinoAutollenadoDe,
+  etiquetasVivas = [],
+}: Props) {
   const [cliente, setCliente] = useState<{ nombre: string; codigo: string } | null>(null);
   const [facturas, setFacturas] = useState<Factura[] | null>(null);
   const [hasta, setHasta] = useState<string | null>(null);
@@ -152,6 +176,9 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
 
   function toggle(f: Factura) {
     if (!cliente) return;
+    // 🔴 Bloqueada por etiquetas: no se marca de este lado ni por accidente.
+    // El `disabled` de la casilla es lo que se VE; esto es lo que MANDA.
+    if (capturaEnElSelector(items, cliente, f, etiquetasVivas).modo === "de-etiquetas") return;
     const marcada = facturaMarcada(items, cliente, f);
     const nuevos = marcada
       ? desmarcarFactura(items, cliente, f, destinoAuto)
@@ -291,6 +318,13 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
                     <ul>
                       {fs.map((f) => {
                         const marcada = cliente ? facturaMarcada(items, cliente, f) : false;
+                        // 🔴 ANTI-DOBLE CAPTURA: con etiqueta viva, esta fila
+                        // no se toca. La decide una función pura que comparten
+                        // los dos paneles, nunca un `if` escrito acá.
+                        const captura = cliente
+                          ? capturaEnElSelector(items, cliente, f, etiquetasVivas)
+                          : ({ modo: "libre" } as const);
+                        const deEtiquetas = captura.modo === "de-etiquetas";
                         return (
                           <li key={`${f.empresa_key}-${f.secuencial}`}>
                             {/* 44 px con el dedo (celular e iPad); en la
@@ -307,12 +341,17 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
                                 Envolviendo, la etiqueta baja un renglón en vez
                                 de empujar la página. En la computadora todo
                                 entra en una línea y no cambia nada. */}
-                            <label className="flex flex-wrap items-center gap-3 py-1.5 min-h-[44px] lg:[@media(pointer:fine)]:min-h-0 lg:[@media(pointer:fine)]:py-1 cursor-pointer text-sm">
+                            <label
+                              className={`flex flex-wrap items-center gap-3 py-1.5 min-h-[44px] lg:[@media(pointer:fine)]:min-h-0 lg:[@media(pointer:fine)]:py-1 text-sm ${
+                                deEtiquetas ? "cursor-default" : "cursor-pointer"
+                              }`}
+                            >
                               <input
                                 type="checkbox"
                                 checked={marcada}
+                                disabled={deEtiquetas}
                                 onChange={() => toggle(f)}
-                                className="w-4 h-4 shrink-0 accent-black"
+                                className="w-4 h-4 shrink-0 accent-black disabled:opacity-60"
                               />
                               <span className="font-mono tabular-nums shrink-0">{f.secuencial}</span>
                               <span className="text-gray-500 truncate">{f.empresa}</span>
@@ -322,6 +361,15 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
                               <span className="text-gray-400 tabular-nums shrink-0 w-14 text-right">
                                 {rotuloFecha(f.fecha, hoy)}
                               </span>
+                              {/* 🔴 EL BLOQUEO DE ETIQUETAS DICE POR QUÉ, y va
+                                  en verde: no es un problema, es que sus cajas
+                                  viven arriba. Una casilla apagada y muda se
+                                  lee como una falla del sistema. */}
+                              {deEtiquetas && (
+                                <span className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 shrink-0">
+                                  {captura.motivo}
+                                </span>
+                              )}
                               {/* 🔴 AVISO, NUNCA BLOQUEO: se puede marcar igual. */}
                               {f.yaSalioEn != null && (
                                 <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 shrink-0">
