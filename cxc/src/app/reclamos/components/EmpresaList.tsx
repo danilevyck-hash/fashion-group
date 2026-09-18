@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import AppHeader from "@/components/AppHeader";
-import { fmt } from "@/lib/format";
+import { fmt, fmtDate } from "@/lib/format";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { mailtoHref } from "@/lib/contact-links";
@@ -16,6 +16,7 @@ import FotoBadge from "./FotoBadge";
 import EnviarProveedorModal from "./EnviarProveedorModal";
 import { facturasEnPantalla } from "@/lib/reclamos/facturas";
 import { diasDesde } from "@/lib/reclamos/dias";
+import { fechaDeCobro } from "@/lib/reclamos/portada";
 import { textoReclamado, estaReclamado } from "@/lib/reclamos/reclamado";
 import {
   FALTA_FECHA_FACTURA,
@@ -225,6 +226,20 @@ export default function EmpresaList({
     if (d === null) return <span className="text-xs text-red-600">{FALTA_FECHA_FACTURA}</span>;
     return <span className="tabular-nums">{d}</span>;
   }
+  /**
+   * 🔴 CUÁNDO SE COBRÓ, y SOLO en «Cobrados» (18-sep-2026). Daniel: *«en
+   * cobrado me tienes que poner una columna fecha de cobrado»*.
+   *
+   * 🔑 No hizo falta guardar nada nuevo: la fecha ya viaja en el settlement,
+   * que la lista YA pide (`lista-select.ts` trae `reclamo_settlements(monto,
+   * fecha, deleted)`). La regla vive en `fechaDeCobro`, aparte y probada.
+   *
+   * ⚠️ Sin cobro vivo va un GUION, nunca una fecha inventada.
+   */
+  function celdaCobrado(r: Reclamo) {
+    const f = fechaDeCobro(r);
+    return <span className="tabular-nums text-gray-600">{f ? fmtDate(f) : "—"}</span>;
+  }
   function celdaReclamado(r: Reclamo) {
     if (!esPendiente(r)) return <span className="text-gray-400">Cobrado</span>;
     const sin = !estaReclamado(r);
@@ -339,7 +354,7 @@ export default function EmpresaList({
                   </div>
                   <div className="flex items-center justify-between gap-3 text-sm">
                     <span className="text-gray-500">{d === null ? <span className="text-red-600">{FALTA_FECHA_FACTURA}</span> : `${d} día${d === 1 ? "" : "s"}`}</span>
-                    {celdaReclamado(r)}
+                    {filtro === "cobrados" ? celdaCobrado(r) : celdaReclamado(r)}
                   </div>
                   {!selectionMode && <div className="mt-3 pt-3 border-t border-gray-100">{acciones(r)}</div>}
                 </div>
@@ -357,6 +372,7 @@ export default function EmpresaList({
                     <Encabezado columna="factura" orden={orden} onOrdenar={ordenarPor}>Factura(s)</Encabezado>
                     <Encabezado columna="dias" alineacion="right" orden={orden} onOrdenar={ordenarPor}>Días</Encabezado>
                     <Encabezado columna="reclamado" className="pl-4" orden={orden} onOrdenar={ordenarPor}>Reclamado</Encabezado>
+                    {filtro === "cobrados" && <th className="pb-3 font-medium text-left">Cobrado</th>}
                     <Encabezado columna="total" alineacion="right" orden={orden} onOrdenar={ordenarPor}>Total</Encabezado>
                     {!selectionMode && <th className="pb-3 text-right font-medium"><span className="sr-only">Acciones</span></th>}
                   </tr>
@@ -374,6 +390,7 @@ export default function EmpresaList({
                         <td className="py-3 text-gray-500 tabular-nums">{facturasEnPantalla(r.nro_factura) || "—"}</td>
                         <td className="py-3 text-right text-gray-600">{celdaDias(r)}</td>
                         <td className="py-3 pl-4">{celdaReclamado(r)}</td>
+                        {filtro === "cobrados" && <td className="py-3">{celdaCobrado(r)}</td>}
                         <td className="py-3 text-right tabular-nums">${fmt(total)}</td>
                         {!selectionMode && <td className="py-2 text-right">{acciones(r)}</td>}
                       </tr>

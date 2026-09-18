@@ -109,3 +109,31 @@ export function tarjetasPorEmpresa(
   // Por plata, de más a menos; empate → el orden del mapa (sort es estable).
   return tarjetas.sort((a, b) => b.monto - a.monto);
 }
+
+/**
+ * 🔴 CUÁNDO SE COBRÓ (18-sep-2026). Daniel: *«en cobrado me tienes que poner
+ * una columna fecha de cobrado»*.
+ *
+ * 🔑 **El dato ya estaba guardado y no hacía falta ni una columna nueva**: la
+ * fecha vive en el settlement —la nota de crédito con la que entró la plata—,
+ * que es justo de donde sale `cobradoEnElAnio`. Medido contra producción el
+ * 18-sep-2026: los **14 reclamos cobrados tienen su fecha**, y **ninguno tiene
+ * más de un cobro**.
+ *
+ * ⚠️ Aun así se devuelve la MÁS RECIENTE, no «la del único»: un reclamo puede
+ * cobrarse en partes (el modal de cobro lo permite), y ahí la fecha que
+ * importa es la del día en que terminó de entrar la plata.
+ *
+ * 🔴 Los borrados NO cuentan (`deleted`), igual que en `cobradoEnElAnio`: un
+ * cobro que se deshizo no fecha nada.
+ *
+ * Devuelve `null` cuando no hay ningún cobro vivo — y la pantalla escribe un
+ * guion. **No se inventa una fecha**: ni la de creación del reclamo ni «hoy».
+ */
+export function fechaDeCobro(r: ReclamoDePortada): string | null {
+  const fechas = (r.reclamo_settlements ?? [])
+    .filter((s) => !s.deleted && !!s.fecha)
+    .map((s) => String(s.fecha));
+  if (!fechas.length) return null;
+  return fechas.sort()[fechas.length - 1];
+}

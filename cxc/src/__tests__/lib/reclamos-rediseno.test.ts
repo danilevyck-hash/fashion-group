@@ -488,3 +488,59 @@ describe("las tres novedades del rediseño están en la tira", () => {
     for (const x of n) expect(x.id.startsWith("reclamos-")).toBe(true);
   });
 });
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 🔴 CANDADO — LA FECHA DE COBRADO (18-sep-2026).
+ *
+ * Daniel: *«en cobrado me tienes que poner una columna fecha de cobrado»*.
+ *
+ * 🔑 No nació ninguna columna en la base: la fecha ya vive en el settlement —la
+ * nota de crédito con la que entró la plata—, que es de donde sale
+ * `cobradoEnElAnio`, y la lista YA la pide (`lista-select.ts`). Medido contra
+ * producción ese día: los 14 cobrados tienen fecha y ninguno tiene dos cobros.
+ * ────────────────────────────────────────────────────────────────────────── */
+describe("Cuándo se cobró un reclamo", () => {
+  it("devuelve la fecha del cobro", async () => {
+    const { fechaDeCobro } = await import("@/lib/reclamos/portada");
+    expect(fechaDeCobro({ id: "1", empresa: "fashion_wear",
+      reclamo_settlements: [{ monto: 100, fecha: "2026-07-08", deleted: false }] })).toBe("2026-07-08");
+  });
+
+  it("con cobros en partes, la MÁS RECIENTE", async () => {
+    const { fechaDeCobro } = await import("@/lib/reclamos/portada");
+    expect(fechaDeCobro({ id: "1", empresa: "fashion_wear", reclamo_settlements: [
+      { monto: 50, fecha: "2026-07-08", deleted: false },
+      { monto: 50, fecha: "2026-09-02", deleted: false },
+      { monto: 50, fecha: "2026-08-15", deleted: false },
+    ] })).toBe("2026-09-02");
+  });
+
+  it("🔴 un cobro DESHECHO no fecha nada", async () => {
+    const { fechaDeCobro } = await import("@/lib/reclamos/portada");
+    expect(fechaDeCobro({ id: "1", empresa: "fashion_wear", reclamo_settlements: [
+      { monto: 50, fecha: "2026-07-08", deleted: false },
+      { monto: 50, fecha: "2026-09-02", deleted: true },
+    ] })).toBe("2026-07-08");
+  });
+
+  it("🔴 sin cobro vivo devuelve null — NO se inventa una fecha", async () => {
+    const { fechaDeCobro } = await import("@/lib/reclamos/portada");
+    expect(fechaDeCobro({ id: "1", empresa: "fashion_wear", reclamo_settlements: [] })).toBeNull();
+    expect(fechaDeCobro({ id: "1", empresa: "fashion_wear" })).toBeNull();
+    expect(fechaDeCobro({ id: "1", empresa: "fashion_wear",
+      reclamo_settlements: [{ monto: 50, fecha: "2026-07-08", deleted: true }] })).toBeNull();
+  });
+
+  it("la columna sale SOLO en «Cobrados», y con un guion cuando no hay fecha", () => {
+    const src = leer("src/app/reclamos/components/EmpresaList.tsx");
+    expect(src).toContain('{filtro === "cobrados" && <th className="pb-3 font-medium text-left">Cobrado</th>}');
+    expect(src).toContain('{filtro === "cobrados" && <td className="py-3">{celdaCobrado(r)}</td>}');
+    expect(src).toMatch(/celdaCobrado[\s\S]{0,320}\{f \? fmtDate\(f\) : "—"\}/);
+  });
+
+  it("CONTROL: la fecha NO sale de `created_at` ni de «hoy»", () => {
+    const puro = leer("src/lib/reclamos/portada.ts");
+    const fn = puro.slice(puro.indexOf("export function fechaDeCobro"));
+    expect(fn).not.toMatch(/created_at|new Date\(\)|hoyPanama/);
+  });
+});
