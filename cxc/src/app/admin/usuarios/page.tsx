@@ -10,7 +10,7 @@ import { useUrlState } from "@/lib/hooks/useUrlState";
 import VendedorSwitchSection from "./VendedorSwitchSection";
 import NovedadesTab from "./NovedadesTab";
 import IconButton from "@/components/IconButton";
-import { getDefaultModulesForRole } from "@/lib/modules";
+import { getDefaultModulesForRole, grupoDeModulo } from "@/lib/modules";
 import { modulosOfrecibles, moduloOfrecible } from "@/lib/modulos-ofrecibles";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { Ayuda } from "@/components/shared/Ayuda";
@@ -244,7 +244,13 @@ function UsuariosPageInner() {
       {/* Playfair Display para el título de página (carga lazy, no afecta otros módulos) */}
       <link rel="stylesheet" href={PLAYFAIR_HREF} />
 
-      <AppHeader module="Sistema" breadcrumbs={[{ label: "Usuarios" }]} />
+      {/* 🩸 Decía `module="Sistema"` (17-sep-2026): un grupo que dejó de existir
+          con el rediseño del home, y el clic caía en `/admin`, que `next.config`
+          redirige a **Cuentas por Cobrar**. O sea, el único módulo de
+          Administración te sacaba del módulo al tocar su propio nombre.
+          Ahora el breadcrumb es `Inicio › Administración › Usuarios`, y el
+          grupo sale de `grupoDeModulo("usuarios")` — nunca escrito a mano. */}
+      <AppHeader module="Usuarios" grupo={grupoDeModulo("usuarios")} />
 
       <div className="max-w-5xl mx-auto px-6 py-8">
         {/* Sin título grande: la barra sticky (celular), el breadcrumb

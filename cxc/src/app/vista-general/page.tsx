@@ -7,6 +7,7 @@ import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { hoyPanama } from "@/lib/fecha-panama";
+import { enlaceDetalleReclamo } from "@/lib/reclamos/enlace";
 // Módulo PURO (no arrastra supabase al navegador): las etiquetas de "por qué no
 // hay número" salen del MISMO lugar que las usa el servidor.
 import RentabilidadPorEmpresa, {
@@ -413,7 +414,7 @@ function Atencion({ data }: { data: VistaGeneral }) {
             <Empty>Sin reclamos antiguos pendientes.</Empty>
           ) : (
             data.reclamos.antiguos.map((r) => (
-              <Link key={r.id} href={`/reclamos?id=${r.id}`} className={FILA_ALERTA}>
+              <Link key={r.id} href={enlaceDetalleReclamo(r.id, r.empresa)} className={FILA_ALERTA}>
                 <span className={`${NOMBRE_ALERTA} truncate`}>{r.nro}<span className="text-stone-400 text-[12px]"> · {r.empresa}</span></span>
                 <span className="text-sm font-semibold text-amber-600 tabular-nums shrink-0">{r.dias}d</span>
               </Link>

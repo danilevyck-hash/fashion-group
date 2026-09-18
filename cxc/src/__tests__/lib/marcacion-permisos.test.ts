@@ -34,6 +34,7 @@ import {
   RUTA_MARCACION,
   esRolMarcacion,
 } from "@/lib/marcacion/rol";
+import { casaDelRol } from "@/lib/navegacion/casa-del-rol";
 import { puedeAbrirMarcacion, destinoSiNoAbreMarcacion, requireMarcacion } from "@/lib/marcacion/acceso";
 import { modulosOfrecibles } from "@/lib/modulos-ofrecibles";
 
@@ -109,9 +110,16 @@ describe("🔴 Daniel entra a probarlo en su iPhone", () => {
     // El redirect del home se salta al admin antes de mirar nada, y su casa
     // no está fijada. Si alguna de las dos cosas cambiara, Daniel abriría la
     // app y caería en la pantalla de marcar.
+    // 🔄 17-sep-2026 · NOTA FECHADA — la exención del admin se mudó de
+    // `/home` a `lib/navegacion/casa-del-rol.ts`, la función única que ahora
+    // decide a dónde va «Inicio» en las tres puertas (el redirect del home, la
+    // pantalla de 404 y el botón del encabezado). La regla no cambió, y acá se
+    // exige por CONDUCTA: si su casa dejara de ser el Inicio, Daniel abriría la
+    // app y caería en la pantalla de marcar.
     expect(moduloCasaDeRol("admin")).toBeNull();
-    const home = sinComentarios(leer("src/app/home/page.tsx"));
-    expect(home).toContain('if (role === "admin") return;');
+    expect(casaDelRol("admin", null)).toBe("/home");
+    expect(casaDelRol("admin", [MODULO_MARCACION])).toBe("/home");
+    expect(sinComentarios(leer("src/lib/navegacion/casa-del-rol.ts"))).toContain('role === "admin"');
   });
 
   it("🔴 que el admin lo vea no se lo abre a nadie más: la lista por ROL son dos", () => {

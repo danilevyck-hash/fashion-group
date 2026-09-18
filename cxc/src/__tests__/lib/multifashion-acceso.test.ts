@@ -37,6 +37,7 @@ import {
   getDefaultModulesForRole,
   getVisibleModules,
 } from "@/lib/modules";
+import { casaDelRol } from "@/lib/navegacion/casa-del-rol";
 
 const ROL = "gerente_acs";
 
@@ -280,11 +281,19 @@ describe("gerente_acs — /home lo manda solo a Multifashion", () => {
     }
   });
 
-  it("el /home sigue teniendo el auto-redirect de módulo único", () => {
+  // 🔄 CAMBIÓ DE ANCLA EL 17-sep-2026, NO DE REGLA. El destino de `/home` se
+  // mudó a `lib/navegacion/casa-del-rol.ts` —la MISMA función que ahora usan la
+  // pantalla de 404 y el botón «Inicio» del encabezado, para que «ir al inicio»
+  // deje de mandar a Jennifer a una pantalla que su rol rebota— y se empuja con
+  // `replace` en vez de `push`, para que `/home` deje de quedar en el historial
+  // (era el «Atrás muerto» de `docs/mapas/rutas.md` › B-1). La regla se sigue
+  // exigiendo, y ahora además por CONDUCTA.
+  it("el /home sigue mandando al rol de un solo módulo a SU módulo", () => {
     const src = sinComentarios(leer("src/app/home/page.tsx"));
-    expect(src).toMatch(/getVisibleModules\(\s*role\s*,\s*fgModules\s*\)/);
-    expect(src).toMatch(/visible\.length\s*===\s*1/);
-    expect(src).toMatch(/router\.push\(\s*visible\[0\]\.href\s*\)/);
+    expect(src).toMatch(/casaDelRol\(\s*role\s*,\s*fgModules\s*\)/);
+    expect(src).toMatch(/router\.replace\(\s*casa\s*\)/);
+    expect(casaDelRol(ROL, ["multifashion"])).toBe("/multifashion");
+    expect(casaDelRol(ROL, null)).toBe("/multifashion");
   });
 });
 

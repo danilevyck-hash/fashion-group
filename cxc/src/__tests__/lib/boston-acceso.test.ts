@@ -36,6 +36,7 @@ import {
   getVisibleModules,
   moduloCasaDeRol,
 } from "@/lib/modules";
+import { casaDelRol } from "@/lib/navegacion/casa-del-rol";
 import {
   CATALOGO_ADMIN_ROLES,
   CATALOGO_ROLES,
@@ -375,17 +376,23 @@ describe("gerente_boston — /home lo manda solo a Boston", () => {
     expect(getVisibleModules(ROL, [...SUS_MODULOS]).length).toBeGreaterThan(1);
   });
 
-  it("el /home sigue teniendo el auto-redirect de módulo único", () => {
+  // 🔄 LOS DOS CAMBIARON DE ANCLA EL 17-sep-2026, NO DE REGLA. El destino de
+  // `/home` se mudó a `lib/navegacion/casa-del-rol.ts` —la MISMA función que
+  // ahora usan la pantalla de 404 y el botón «Inicio» del encabezado— y se
+  // empuja con `replace` en vez de `push`, para que `/home` deje de quedar en
+  // el historial (era el «Atrás muerto» de `docs/mapas/rutas.md` › B-1). Las
+  // dos reglas se siguen exigiendo, y ahora además por CONDUCTA.
+  it("el /home sigue mandando al rol de un solo módulo a SU módulo", () => {
     const src = sinComentarios(leer("src/app/home/page.tsx"));
-    expect(src).toMatch(/getVisibleModules\(\s*role\s*,\s*fgModules\s*\)/);
-    expect(src).toMatch(/visible\.length\s*===\s*1/);
-    expect(src).toMatch(/router\.push\(\s*visible\[0\]\.href\s*\)/);
+    expect(src).toMatch(/casaDelRol\(\s*role\s*,\s*fgModules\s*\)/);
+    expect(src).toMatch(/router\.replace\(\s*casa\s*\)/);
+    expect(casaDelRol("gerente_acs", null)).toBe("/multifashion");
   });
 
   it("🔴 y el /home aterriza al rol con CASA aunque tenga varios módulos", () => {
-    const src = sinComentarios(leer("src/app/home/page.tsx"));
-    expect(src).toMatch(/moduloCasaDeRol\(\s*role\s*\)/);
-    expect(src).toMatch(/router\.push\(\s*casa\.href\s*\)/);
+    expect(getVisibleModules(ROL, [...SUS_MODULOS]).length).toBeGreaterThan(1);
+    expect(casaDelRol(ROL, [...SUS_MODULOS])).toBe("/boston");
+    expect(casaDelRol(ROL, null)).toBe("/boston");
   });
 
   it("🔴 y el /home NO le dibuja la búsqueda global (fuga nº 1, lado pantalla)", () => {

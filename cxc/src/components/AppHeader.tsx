@@ -7,7 +7,8 @@ import FGLogo from "@/components/FGLogo";
 import SearchBar, { SEARCH_ROLES } from "@/components/SearchBar";
 import NotificationCenter from "@/components/NotificationCenter";
 import { getModuleColor } from "@/lib/moduleColors";
-import { ALL_MODULES, getVisibleGroups } from "@/lib/modules";
+import { ALL_MODULES, getVisibleGroups, type AppGroup } from "@/lib/modules";
+import { casaDelRol, yaEstaEnSuCasa } from "@/lib/navegacion/casa-del-rol";
 import NovedadesAviso from "@/components/NovedadesAviso";
 import { moduloDeRuta } from "@/lib/novedades/seleccion";
 import { usePublicarAlturaEncabezado } from "@/lib/hooks/usePublicarAlturaEncabezado";
@@ -22,6 +23,18 @@ interface AppHeaderProps {
   breadcrumbs?: { label: string; onClick?: () => void }[];
   hideBreadcrumbBar?: boolean;
   /**
+   * El GRUPO del módulo, cuando el breadcrumb tiene que decirlo (17-sep-2026).
+   *
+   * 🩸 Nació por Usuarios: su breadcrumb decía «Sistema» —un grupo que dejó de
+   * existir con el rediseño del home— y el clic caía en `/admin`, que hoy es un
+   * redirect a **Cuentas por Cobrar**. O sea: el único módulo de Administración
+   * te sacaba del módulo al tocar su propio nombre.
+   *
+   * Es OPCIONAL y aditivo: quien no lo pasa dibuja `Inicio › Módulo › …`,
+   * exactamente como antes. Sale de `grupoDeModulo()`, nunca escrito a mano.
+   */
+  grupo?: AppGroup | null;
+  /**
    * Acciones del MÓDULO que en el teléfono viven adentro del menú ☰ (6-sep-2026,
    * estrenado por Multifashion con «Sincronizado …» y «Actualizar ahora»).
    *
@@ -32,7 +45,7 @@ interface AppHeaderProps {
   acciones?: ReactNode;
 }
 
-export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acciones }: AppHeaderProps) {
+export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acciones, grupo }: AppHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -58,6 +71,12 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
   }, []);
 
   const visibleNav = userRole ? getVisibleGroups(userRole, fgModules) : [];
+  // 🔴 «Inicio» lleva a la CASA DEL ROL (17-sep-2026). Bodega, Jennifer y David
+  // tienen un solo módulo: `/home` los rebota ahí mismo, así que el botón se
+  // sentía muerto (108 sesiones en 30 días). Y si ya están en su casa, el botón
+  // NO se dibuja — uno que no hace nada es peor que no tenerlo.
+  const casa = casaDelRol(userRole, fgModules);
+  const enSuCasa = yaEstaEnSuCasa(pathname, casa);
   // Roles fuera de /api/search (ej. gerente_acs): ocultar también el botón de
   // lupa móvil — abriría un overlay vacío (SearchBar se auto-oculta).
   const canSearch = !userRole || SEARCH_ROLES.includes(userRole);
@@ -147,7 +166,8 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
         {!hideBreadcrumbBar && (() => {
           const moduleBaseHref = pathname.split("/").slice(0, 2).join("/") || "/home";
           const segments: { label: string; onClick?: () => void }[] = [
-            { label: "Inicio", onClick: () => router.push("/home") },
+            ...(enSuCasa ? [] : [{ label: "Inicio", onClick: () => router.push(casa) }]),
+            ...(grupo ? [{ label: grupo.label, onClick: () => router.push(grupo.href) }] : []),
             { label: module, onClick: () => router.push(moduleBaseHref) },
             ...(breadcrumbs ?? []).map(b => ({ label: b.label, onClick: b.onClick })),
           ];
@@ -219,13 +239,17 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
               <div className="border-b border-gray-100 px-5 py-3">{acciones}</div>
             )}
             <nav className="flex-1 overflow-y-auto py-2">
-              <button onClick={() => { router.push("/home"); setDrawerOpen(false); }}
-                className="w-full flex items-center gap-3 px-5 py-3 text-sm text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-all">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
-                </svg>
-                Inicio
-              </button>
+              {/* Misma regla que el breadcrumb: la casa del rol, y nada si ya
+                  está parado en ella. */}
+              {!enSuCasa && (
+                <button onClick={() => { router.push(casa); setDrawerOpen(false); }}
+                  className="w-full flex items-center gap-3 px-5 py-3 text-sm text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-all">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                  Inicio
+                </button>
+              )}
               {visibleNav.map(g => {
                 const active = pathname === g.href || pathname.startsWith(g.href + "/");
                 const Icon = g.icon;

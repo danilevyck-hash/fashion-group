@@ -470,6 +470,18 @@ export function getVisibleGroups(role: string, fgModules?: string[] | null): App
   return GROUPS.filter(g => seen.has(g.key));
 }
 
+/** El GRUPO al que pertenece un módulo — para el breadcrumb (17-sep-2026).
+ *
+ *  🩸 El breadcrumb de Usuarios decía «Sistema», un grupo que dejó de existir
+ *  con el rediseño del home, y el clic caía en `/admin` → **Cuentas por
+ *  Cobrar**. El rótulo y la dirección salen de acá para que un grupo que se
+ *  renombre no deje otro marcador viejo escrito a mano en una pantalla. */
+export function grupoDeModulo(moduleKey: string): AppGroup | null {
+  const modulo = ALL_MODULES.find((m) => m.key === moduleKey);
+  if (!modulo) return null;
+  return GROUPS.find((g) => g.key === modulo.group) ?? null;
+}
+
 /** Módulos visibles dentro de un grupo dado. */
 export function getModulesInGroup(group: ModuleGroup, role: string, fgModules?: string[] | null): AppModule[] {
   return getVisibleModules(role, fgModules).filter(m => m.group === group);

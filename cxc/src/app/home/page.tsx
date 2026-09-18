@@ -7,7 +7,8 @@ import FGLogo from "@/components/FGLogo";
 import SearchBar, { SEARCH_ROLES } from "@/components/SearchBar";
 import IconButton from "@/components/IconButton";
 import { BotonCambiarContrasena } from "@/components/CambiarContrasena";
-import { getVisibleGroups, getVisibleModules, getModulesInGroup, moduloCasaDeRol, type AppModule } from "@/lib/modules";
+import { getVisibleGroups, getModulesInGroup, type AppModule } from "@/lib/modules";
+import { casaDelRol, INICIO } from "@/lib/navegacion/casa-del-rol";
 import { recordModuleClick, getFrequentModules } from "@/lib/module-frequents";
 import { fmtDate } from "@/lib/format";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -76,25 +77,22 @@ export default function HomePage() {
     return () => { cancelled = true; };
   }, [authChecked, role]);
 
-  // Auto-redirect si user tiene 1 solo modulo (ej: Bodega → Guías)
+  // Auto-redirect si user tiene 1 solo modulo (ej: Bodega → Guías), y el rol
+  // que tiene UNA CASA aterriza ahí aunque tenga varios módulos.
   //
-  // 🔴 Y el rol que tiene UNA CASA aterriza ahí aunque tenga varios módulos.
-  // El gerente de Confecciones Boston ganó Catálogos el 27-ago-2026 y con eso
-  // dejó de ser "rol de un solo módulo": sin esta segunda rama caería en el
-  // Inicio del GRUPO, que es justo la fuga que su módulo vino a tapar. La casa
-  // sale de `moduloCasaDeRol` y no de un `role === "…"` a mano — el rol se dice
-  // en UN solo lugar (`lib/boston/rol.ts`).
+  // 🔴 LA REGLA SE MUDÓ A `lib/navegacion/casa-del-rol.ts` (17-sep-2026), que
+  // es la MISMA que ahora usan el 404 y el botón «Inicio» del encabezado: sin
+  // un solo lugar, «ir al inicio» mandaba a bodega a `/home` y `/home` lo
+  // devolvía — el botón se sentía muerto.
+  //
+  // 🔴 Y SE EMPUJA CON `replace`, NO CON `push`. Con `push`, `/home` quedaba en
+  // el historial: bodega, Jennifer y David tocaban Atrás, volvían a `/home` y
+  // `/home` los empujaba de nuevo. Atrás quedaba muerto mientras estuvieran en
+  // la app — 108 sesiones en 30 días (`docs/mapas/rutas.md` › B-1).
   useEffect(() => {
     if (!authChecked || !role) return;
-    if (role === "admin") return;
-
-    const visible = getVisibleModules(role, fgModules);
-    if (visible.length === 1) {
-      router.push(visible[0].href);
-      return;
-    }
-    const casa = visible.find((m) => m.key === moduloCasaDeRol(role));
-    if (casa) router.push(casa.href);
+    const casa = casaDelRol(role, fgModules);
+    if (casa !== INICIO) router.replace(casa);
   }, [authChecked, role, fgModules, router]);
 
   // 🔴 EL AVISO DE DATA HEALTH SE RETIRÓ DEL INICIO (11-sep-2026). Daniel,

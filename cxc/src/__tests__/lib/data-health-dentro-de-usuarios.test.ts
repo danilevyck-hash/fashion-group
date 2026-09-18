@@ -56,6 +56,7 @@ import {
   getVisibleGroups,
   getModulesInGroup,
 } from "@/lib/modules";
+import { casaDelRol } from "@/lib/navegacion/casa-del-rol";
 
 const raiz = join(__dirname, "..", "..", "..");
 const leer = (p: string) => readFileSync(join(raiz, p), "utf8");
@@ -198,8 +199,14 @@ describe("quién ve qué — antes y después, rol por rol", () => {
     // es lo único que este candado protege.
     expect(getVisibleModules("bodega").length).toBe(4);
     expect(getVisibleModules("gerente_acs").map((m) => m.href)).toEqual(["/multifashion"]);
-    // Y admin, que es el único con Administración, está exento por código.
-    expect(plano(leer("src/app/home/page.tsx"))).toContain('if (role === "admin") return;');
+    // Y admin, que es el único con Administración, está exento.
+    // 🔄 17-sep-2026 · NOTA FECHADA — la exención se mudó de `/home` a
+    // `lib/navegacion/casa-del-rol.ts`, que es donde ahora se decide a dónde va
+    // «Inicio» para TODAS las puertas (el redirect, el 404 y el encabezado). La
+    // regla no cambió; se exige por CONDUCTA, que es más fuerte que el `if`.
+    expect(casaDelRol("admin", null)).toBe("/home");
+    expect(casaDelRol("bodega", null)).toBe("/home");
+    expect(plano(leer("src/lib/navegacion/casa-del-rol.ts"))).toContain('role === "admin"');
   });
 
   it("los grupos visibles de cada rol no cambian", () => {
