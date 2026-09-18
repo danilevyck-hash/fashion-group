@@ -25,6 +25,8 @@ import { useCatalogoDescripciones } from "@/lib/hooks/useCatalogoDescripciones";
 import { mensajeDivisorEnPantalla } from "@/lib/depurador/divisor";
 import { saveAs } from "file-saver";
 import AlarmaDescripcionesNuevas from "./AlarmaDescripcionesNuevas";
+import { useRegistrarQuePasan } from "./useRegistrarQuePasan";
+import type { ParMarcaDesc } from "./descripciones-que-pasan";
 import {
   EMPRESAS_TIENDA,
   MAX_FILAS_SWITCH,
@@ -425,6 +427,21 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
     return EMPRESAS_TIENDA.filter((e) => keys.has(e.key)).map((e) => e.label);
   }, [rows]);
   const archivos = Math.ceil(rows.length / MAX_FILAS_SWITCH);
+
+  // 🔴 LAS QUE PASAN TAMBIÉN ENTRAN AL CATÁLOGO (17-sep-2026). Daniel: «q siga
+  // pasando pero se agregue al catalogo (para poner formulas en algun
+  // momento)». Corre al PROCESAR, nunca al descargar: el camino del Excel no
+  // se tocó. Ver `descripciones-que-pasan.ts` y `useRegistrarQuePasan.ts`.
+  const paresDelArchivo = useMemo<ParMarcaDesc[]>(
+    () =>
+      rows.map((r) => ({
+        marca: String(r.cols["Marca *"] || ""),
+        desc: String(r.cols["Descripción *"] || ""),
+      })),
+    [rows],
+  );
+  useRegistrarQuePasan(paresDelArchivo, catalogo);
+
   const bloqueos = result?.bloqueos ?? [];
   const pasaronSolas = result?.pasaronSolas ?? 0;
 

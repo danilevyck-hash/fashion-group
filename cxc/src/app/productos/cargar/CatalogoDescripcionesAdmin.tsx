@@ -11,12 +11,16 @@ import { Ayuda } from "@/components/shared/Ayuda";
 // depurador_descripciones), con origen, quién aprobó y cuándo, y toggle
 // Activa/Inactiva. Desactivar NO borra — el histórico queda.
 
+/** Lo que se lee de una descripción que entró sola: nadie la aprobó, pasó el
+ *  veredicto y quedó registrada para poder darle fórmula. */
+export const ROTULO_AUTOMATICA = "Entró sola al pasar";
+
 interface DescRow {
   id: string;
   marca: string;
   descripcion: string;
   activa: boolean;
-  origen: "seed" | "aprobada";
+  origen: "seed" | "aprobada" | "automatica";
   aprobada_por: string | null;
   aprobada_at: string | null;
   created_at: string;
@@ -160,6 +164,13 @@ export default function CatalogoDescripcionesAdmin() {
                         Aprobada
                         {r.aprobada_por ? ` por ${r.aprobada_por}` : ""}
                         {r.aprobada_at ? ` · ${fmtDate(r.aprobada_at.slice(0, 10))}` : ""}
+                      </span>
+                    ) : r.origen === "automatica" ? (
+                      // 🔴 17-sep-2026: la que entró SOLA (veredicto «pasa», las
+                      // dos mitades ya existían en su marca). No la aprobó
+                      // nadie, y decir «Catálogo original» sería mentir.
+                      <span className="rounded bg-teal-50 px-1.5 py-0.5 text-[12px] font-semibold text-teal-700">
+                        {ROTULO_AUTOMATICA}
                       </span>
                     ) : (
                       <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[12px] font-semibold text-stone-500">

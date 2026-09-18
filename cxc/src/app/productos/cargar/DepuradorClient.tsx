@@ -38,6 +38,8 @@ import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import { useCatalogoDescripciones } from "@/lib/hooks/useCatalogoDescripciones";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import AlarmaDescripcionesNuevas, { type DescripcionNueva } from "./AlarmaDescripcionesNuevas";
+import { useRegistrarQuePasan } from "./useRegistrarQuePasan";
+import type { ParMarcaDesc } from "./descripciones-que-pasan";
 import { workbookBlob, filtroDesdeA1 } from "@/lib/excel-export";
 import { ROTULO_DESCARGAR_PLANTILLA, ROTULO_SUBIR_OTRO_ARCHIVO } from "@/lib/depurador/rotulos";
 import { costoDelArchivo, facturasDelArchivo, plural } from "@/lib/depurador/resumen-del-archivo";
@@ -745,6 +747,20 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
     }
     return { descsNuevas: out, pasaronSolas: solas };
   }, [processed, catalogo]);
+
+  // 🔴 LAS QUE PASAN TAMBIÉN ENTRAN AL CATÁLOGO (17-sep-2026). Daniel: «q siga
+  // pasando pero se agregue al catalogo (para poner formulas en algun
+  // momento)». Corre al PROCESAR, nunca al descargar: el camino del Excel no
+  // se tocó. Ver `descripciones-que-pasan.ts` y `useRegistrarQuePasan.ts`.
+  const paresDelArchivo = useMemo<ParMarcaDesc[]>(
+    () =>
+      (processed ?? []).map((r) => ({
+        marca: String(r.cols["Marca *"] || ""),
+        desc: String(r.cols["Descripción *"] || ""),
+      })),
+    [processed],
+  );
+  useRegistrarQuePasan(paresDelArchivo, catalogo);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
