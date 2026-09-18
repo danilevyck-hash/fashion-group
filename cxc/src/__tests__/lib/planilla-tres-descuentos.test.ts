@@ -694,3 +694,42 @@ describe("K. ACS: 30 MIN DE EXTRA AUTOMÁTICOS, Y LAS APRUEBA DANIEL", () => {
     expect(alcanza(alcanceDe("contabilidad", "Contabilidad", []), "american_classic")).toBe(true);
   });
 });
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 🔴 CANDADO — UN CÓDIGO ESCONDIDO TAMPOCO SALE EN EL REPORTE (18-sep-2026).
+ *
+ * 🩸 «Esconder un código» nació el 11-sep-2026 y se enchufó en la Planilla y en
+ * Configuración, pero NO en el Reporte — que es la pantalla donde se ven. Daniel
+ * escondió 39, 55 y 9999 él mismo el 11-sep y los siguió viendo en la pestaña
+ * Asistencia con su «falta configurar»; el 18-sep volvió a pedirlo: *«los 3
+ * codigos del reloj escondelos»*. Ya estaban escondidos: faltaba leerlos acá.
+ *
+ * Medido contra producción el 18-sep-2026: hay SEIS escondidos — 39, 55 y 9999
+ * (fantasmas del reloj de Boston, sin ficha) más 25, 48 y 52 (Cristiam Blanco y
+ * Héctor Pérez, que ya salieron, y Daniel Levy).
+ *
+ * Las DOS mitades, y las dos hacen falta: las marcaciones y la lista final —
+ * sin marcas, una persona igual sale del directorio para contarle las ausencias.
+ * ────────────────────────────────────────────────────────────────────────── */
+describe("El Reporte respeta los códigos escondidos", () => {
+  const ruta = sinComentarios("src/app/api/asistencia/reporte/route.ts");
+
+  it("lee los escondidos con la MISMA función que la Planilla", () => {
+    expect(ruta).toContain("leerIgnorados");
+    expect(ruta).toMatch(/from "@\/lib\/asistencia\/codigos-ignorados-server"/);
+  });
+
+  it("los saca de las marcaciones ANTES de armar el reporte", () => {
+    expect(ruta).toMatch(/ignorados\.has\(String\(m\.empleado_codigo/);
+    expect(ruta).toContain("marcaciones: visiblesEnPantalla");
+  });
+
+  it("y de la lista final, con `sinIgnorados`", () => {
+    expect(ruta).toContain("sinIgnorados(personas, ignorados)");
+  });
+
+  it("CONTROL: no los borra de ningún lado", () => {
+    expect(ruta).not.toMatch(/\.delete\(\)/);
+    expect(ruta).not.toMatch(/asistencia_marcaciones[\s\S]{0,80}(update|delete)/);
+  });
+});

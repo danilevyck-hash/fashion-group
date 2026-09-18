@@ -22,6 +22,8 @@ import {
   type MarcacionConId,
 } from "@/lib/asistencia/correcciones";
 import { leerCorrecciones } from "@/lib/asistencia/correcciones-server";
+import { sinIgnorados } from "@/lib/asistencia/codigos-ignorados";
+import { leerIgnorados } from "@/lib/asistencia/codigos-ignorados-server";
 import {
   leerReglas, leerDirectorio, leerPersonas, vigenciasDeFilas, servicioProfesionalDeFila, cobraHorasExtraDeFila, leerJustificaciones,
   leerVacaciones, leerTrabajaAfuera,
@@ -233,8 +235,26 @@ export async function GET(req: NextRequest) {
         ).size
       : 0;
 
+    // ── 🔴 UN CÓDIGO ESCONDIDO TAMPOCO SALE ACÁ (18-sep-2026) ────────────────
+    //
+    // 🩸 «Esconder un código» se construyó el 11-sep-2026 y quedó enchufado en
+    // la Planilla y en Configuración — pero NO en el Reporte, que es la pantalla
+    // donde se ven. Medido contra producción el 18-sep: los seis escondidos
+    // (39, 55 y 9999, los fantasmas del reloj de Boston, más 25, 48 y 52)
+    // seguían saliendo en la pestaña Asistencia con su «falta configurar».
+    // Daniel había escondido tres de ellos ÉL MISMO el 11-sep y los seguía
+    // viendo; hoy, 18-sep, volvió a pedirlo: *«los 3 codigos del reloj
+    // escondelos»* — ya estaban escondidos, lo que faltaba era esta línea.
+    //
+    // ⚠️ Esconder NO BORRA: ni la marcación (append-only) ni la ficha. Se
+    // vuelve a mostrar desde Configuración y reaparece con todo su histórico.
+    const { codigos: ignorados } = await leerIgnorados();
+    const visiblesEnPantalla = ignorados.size
+      ? enRango.filter((m) => !ignorados.has(String(m.empleado_codigo ?? "").trim()))
+      : enRango;
+
     const personas = armarReporte({
-      marcaciones: enRango,
+      marcaciones: visiblesEnPantalla,
       horarios: (hRes.data ?? []).map((h) => ({
         ...h,
         // Postgres devuelve time como "08:00:00"; el motor compara "HH:MM".
@@ -289,7 +309,10 @@ export async function GET(req: NextRequest) {
       personasDb.filas.filter(servicioProfesionalDeFila).map((f) => String(f.empleado_codigo)),
     );
     const empresaDe = new Map(personasDb.filas.map((f) => [String(f.empleado_codigo), f.empresa ?? null]));
-    const personasConBandera = personas
+    // 🔑 También de la lista FINAL: sin marcas, una persona igual sale del
+    // directorio (para poder contarle las ausencias), así que filtrar las
+    // marcaciones no alcanza.
+    const personasConBandera = sinIgnorados(personas, ignorados)
       .map((p) => ({ ...p, empresa: empresaDe.get(p.codigo) ?? null }))
       .map((p) => (servicioProfesional.has(p.codigo) ? { ...p, servicioProfesional: true } : p))
       .map((p) => (sinHorasExtra.has(p.codigo) ? { ...p, cobraHorasExtra: false } : p))
