@@ -1,6 +1,24 @@
 // GET    /api/asistencia/correcciones?codigo=&fecha=   → el historial de ese día
-// POST   /api/asistencia/correcciones                  → corregir / agregar
+// POST   /api/asistencia/correcciones                  → corregir / agregar / QUITAR
 // DELETE /api/asistencia/correcciones?id=               → deshacer
+//
+// ── 🔴 LA TERCERA FORMA ENTRA POR ACÁ DESDE EL 18-sep-2026 ──────────────────
+//
+// La contadora, por WhatsApp el 17-sep-2026, textual:
+//
+//     «el motivo de que no me deja cerrar es porque hay marcaciones de mas y no
+//      me deja eliminar»
+//
+// y Daniel, aclarando de cuáles habla: *«las marcaciones del reloj, no las del
+// app que hicimos»*.
+//
+// 🩸 QUITAR una marcación existía desde el 14-sep-2026 —`asistencia_correcciones.quita`—
+// pero SOLO por `/api/marcacion/deshacer`, la puerta del reloj del teléfono, que
+// mira la última marca de quien está con la sesión abierta y solo dentro de dos
+// minutos. La pantalla de ella no podía llamarla, así que **una marca del reloj
+// físico no se podía quitar de ninguna forma** y el cierre de la quincena se
+// quedaba trabado. Ahora esta ruta acepta `quita: true` con el MISMO mecanismo,
+// la misma tabla, el mismo motivo obligatorio y el mismo `anulada_en`.
 //
 // ── 🔴 LO QUE ESTA RUTA NO HACE ─────────────────────────────────────────────
 //
@@ -104,8 +122,14 @@ export async function POST(req: NextRequest) {
     }
     const motivo = normalizarMotivo(body?.motivo);
 
-    const hora = normalizarHora(body?.hora);
-    if (!hora) {
+    // 🔴 QUITAR NO LLEVA HORA, Y NO ES UN DESCUIDO: no vale ninguna, porque esa
+    // marcación deja de contar. El CHECK de la base lo exige
+    // (`asistencia_correcciones_quita_sin_hora`) y acá se decide antes de pedir
+    // la hora, para no rechazar una petición correcta por un campo que no va.
+    const quita = body?.quita === true;
+
+    const hora = quita ? null : normalizarHora(body?.hora);
+    if (!quita && !hora) {
       return NextResponse.json(
         { error: "La hora no sirve. Se espera algo como 8:00 o 17:04:30." },
         { status: 400 },
@@ -115,6 +139,16 @@ export async function POST(req: NextRequest) {
     const marcacionId = String(body?.marcacionId ?? "").trim() || null;
     let codigo = String(body?.codigo ?? "").trim();
     let fecha = String(body?.fecha ?? "").trim();
+
+    // 🔴 NO SE QUITA UNA MARCACIÓN QUE NO EXISTE. Sin `marcacionId` no hay nada
+    // que dejar de contar: lo que se «quitaría» sería una marcación agregada a
+    // mano, y ésa se deshace con DELETE (`anulada_en`), que es otra cosa.
+    if (quita && !marcacionId) {
+      return NextResponse.json(
+        { error: "Elige cuál marcación se quita. Solo se puede quitar una que el reloj registró." },
+        { status: 400 },
+      );
+    }
 
     if (marcacionId) {
       // ── CORREGIR una marcación que existe ────────────────────────────────
@@ -150,6 +184,10 @@ export async function POST(req: NextRequest) {
         hora,
         motivo,
         creadaPor: firma(auth),
+        // ⚠️ Viaja SOLO cuando se quita: `crearCorreccion` no manda la columna
+        // si va en `false`, para que el alta de una corrección normal siga
+        // funcionando aunque la migración no hubiera corrido.
+        ...(quita ? { quita: true } : {}),
       }),
     );
   } catch (e) {

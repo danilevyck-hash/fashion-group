@@ -7,6 +7,192 @@
 
 ---
 
+## 🔴 Ver y quitar las marcaciones de MÁS (18-sep-2026) — lo que frenaba el cierre
+
+### Qué pasó
+
+La contadora no podía cerrar la quincena. Lo dijo por WhatsApp el 17-sep-2026, textual:
+
+> «el motivo de que no me deja cerrar es porque hay marcaciones de mas y no me deja eliminar»
+
+Daniel aclaró de cuáles hablaba: *«las marcaciones del reloj, no las del app que hicimos»*. Y al
+día siguiente, mirando el archivo que se descarga:
+
+> «y como veo quien marco de mas? en el excel solo salen max 4 marcaciones el excel que descargo»
+
+Eran **dos problemas encadenados, y el primero era peor**.
+
+### 🩸 Problema 1 — la quinta marca no se veía EN NINGÚN LADO
+
+La pantalla (`ReporteTab.tsx`) dibujaba exactamente cuatro horas y las elegía **por índice**:
+
+```tsx
+<Hora idx={0}      mostrar={d.marcas.length > 0} />
+<Hora idx={1}      mostrar={d.marcas.length >= 4} tenue />
+<Hora idx={2}      mostrar={d.marcas.length >= 4} tenue />
+<Hora idx={ultima} mostrar={d.marcas.length > 1} />
+```
+
+El Excel (`exportar.ts`) hacía lo mismo, con columnas fijas *Entrada · Sale almuerzo · Vuelve ·
+Salida*. O sea: **un día de 5 marcas mostraba la 1.ª, la 2.ª, la 3.ª y la 5.ª. La CUARTA —que
+suele ser justo la repetida— era invisible.** Y con 3 marcas se perdía la del medio, por la misma
+cuenta. Ella veía un día en ámbar con cuatro horas que se ven normales y no tenía cómo saber cuál
+sobraba.
+
+Casos reales (`scripts/_medir-marcas-de-mas.ts`, solo lectura):
+
+```
+Ramón Miranda (21) · 26-ago       Alejandra Camaño (22) · 9-sep
+   08:10:21                          07:59:20
+   13:58:34                          13:03:44
+   14:23:38  ←  se veía               13:33:07  ←  se veía
+   14:23:39  ←  NO se veía            13:33:58  ←  NO se veía
+   18:00:50                          16:58:25
+```
+
+### 🩸 Problema 2 — no había cómo quitarla
+
+`CorregirMarcacionModal.tsx` tenía **dos casos y nada más**, escrito en su propia cabecera:
+corregir una hora que el reloj sí registró, y AGREGAR una que nunca registró. Y
+`POST /api/asistencia/correcciones` **no aceptaba `quita`**: la palabra no aparecía ni una vez.
+
+🔑 **La capacidad EXISTÍA, pero por otra puerta y solo para el teléfono.**
+`asistencia_correcciones.quita` nació el 14-sep-2026 con el «Deshacer» de dos minutos del reloj del
+celular, y lo escribe `/api/marcacion/deshacer`, que la pantalla de ella no puede llamar. Resultado:
+**una marca del reloj físico no se podía quitar de ninguna forma.**
+
+⚠️ La migración `20261128120000_marcacion_deshacer.sql` dice en su encabezado «SIN APLICAR» y
+**eso estaba viejo**: verificado contra producción el 18-sep-2026, la columna `quita` existe y el
+CHECK está puesto. El botón nuevo funciona hoy, sin correr nada.
+
+### Lo medido, antes de tocar nada
+
+`scripts/_medir-marcas-de-mas.ts`, ventana **19-ago → 17-sep**, 3.248 marcaciones, **840
+días-persona con marca**:
+
+| marcas en el día | 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|---|---|
+| días | 9 | 48 | 49 | **679** | 50 | 5 |
+
+- **679 de 840 (80,8 %) tienen exactamente 4** y se ven IGUAL que antes.
+- **55 con 5 o más** (50 de cinco, 5 de seis, ninguno de siete), repartidos en **28 colaboradores**:
+  Yeishka Irene Diaz Markham (54) con 8 días, Martha Asucena Chavarria (43) con 5, Laura Lismari
+  Casiano Vega (38) con 4, Rodrigo Miranda (13) y Julio Guzmán (11) con 3.
+- **108 impares** con la regla que había hasta hoy.
+- **47 de los 55** tienen dos marcas a menos de 5 minutos una de otra; **27 a 3 segundos o menos**
+  (el dedo doble en el reloj). Los **8** que quedan no tienen ningún par cercano y piden ojo humano.
+
+### 🔴 La regla del cierre CAMBIÓ DE DIRECCIÓN: impar **o** más de 4
+
+Daniel, el 18-sep-2026, textual:
+
+> «osea las quincena solo cierran con 4, hay q quitar hasta que llegue a 4 maximo. cuando hay 5 o
+> mas es porq es error. quiero saber todos los que marcaron 5 veces last 30 days y si marcan 5 o
+> mas poder quitarlas»
+
+🩸 `marcas-impares.ts` decía lo contrario, y con todas las letras: *«LA REGLA ES IMPAR, PUNTO — Y 6
+ES PAR, ASÍ QUE NO LA ATRAPA. Esto NO es un olvido y no hay que “arreglarlo”: un día de 6 marcas
+puede ser perfectamente correcto (entró, almorzó, salió a un mandado y volvió)»*. **Ese párrafo se
+conserva entero en el archivo**, con la nota fechada al lado explicando por qué se dio vuelta — y
+lo mismo en su candado (`marcas-impares.test.ts`), donde la prueba «6 marcas: NO entra» pasó a «6
+marcas: SÍ entra».
+
+La pregunta vive ahora en **una sola función**, `marcasMalContadas(n)` = `n % 2 === 1 || n > 4`, y
+el 4 se DERIVA de `MARCAS_NORMALES` (`marcas-del-dia.ts`): `MARCAS_MAXIMO = MARCAS_NORMALES`. Dos
+cuatros separados dejarían dibujar un día completo y frenar el cierre igual.
+
+🔑 **Esto no contradice el «no adivinar» del 15-sep.** No se adivina cuál marca sobra —eso lo sigue
+decidiendo una persona, quitándola a mano—: se dice que un día con más de 4 no se cierra sin
+mirarlo. Y desde hoy hay con qué. **El par de 2 sigue pasando**, deliberadamente (el caso de Andrea
+Pérez, 1-sep: con dos marcas no se puede PROBAR que falte una).
+
+🩸 Y la pantalla ya prometía esta regla: *«"A revisar" es un día TERMINADO sin las 4 marcas»*
+estaba escrito desde siempre, y `revisar` en `reporte.ts` es `crudas.length !== 4`. **El freno del
+cierre era el único de los tres que decía otra cosa.** Los textos se afinaron a «que no tiene
+EXACTAMENTE 4 marcas —le falta alguna, o marcó de más—», en pantalla y en la hoja «Guía» del Excel,
+porque «sin las 4» se leía como «le faltan».
+
+### Lo que se construyó
+
+**1. Un módulo PURO nuevo: `src/lib/asistencia/marcas-del-dia.ts`.** Dice qué se dibuja y nada más.
+
+- `columnasClasicas(n)` es EXACTAMENTE la cuenta que la pantalla hacía a mano, escrita en un solo
+  lugar para poder preguntarle qué esconde. Con 4 devuelve `[0,1,2,3]`: la fila se dibuja idéntica.
+- `marcasEscondidas(n)`: `[]` con 0, 1, 2 y 4; `[1]` con 3; `[3]` con 5; `[3,4]` con 6.
+- `marcasPegadas(marcas)` señala la marca que quedó a menos de **`SEGUNDOS_PEGADAS = 300`** de la
+  anterior.
+
+🔑 **Los 5 minutos no son un número redondo elegido a ojo.** Son el error REAL de Daniel, medido
+por él mismo el 14-sep-2026 al probar el reloj del teléfono: *marcó la SALIDA cinco minutos después
+de la entrada, por error de dedo* (ver el encabezado de `20261128120000_marcacion_deshacer.sql`).
+Y contra los datos: de los 55 días de más de 4 marcas, con ≤3 s se señalan 27, con ≤2 min 40 y con
+**≤5 min, 47**; a 10 minutos ya empieza a marcar salidas cortas que pueden ser de verdad.
+
+🔴 **Es un aviso para el OJO, nunca una regla**: la marca pegada no se quita sola, no cambia un
+minuto y no frena nada.
+
+**2. La pantalla muestra TODAS las marcas.** Si entran en las cuatro columnas —el 80,8 % de los
+días— se dibujan las cuatro columnas de siempre, sin un pixel de diferencia. Si no entran, las
+cuatro celdas se vuelven UNA (`colSpan={4}`) con todas las horas en orden, cada una tocable, el
+rótulo «5 marcas» adelante y la pegada en ámbar con su título («Marcó otra vez 1 segundo después.
+Si sobra, quítala con “Quitar esta marcación”»).
+
+**3. El Excel dice quién marcó de más.** Dos columnas NUEVAS, **H «Todas las marcas»** e **I
+«Cuántas marcas»**, insertadas justo al lado de las horas.
+
+⚠️ **Las cuatro de siempre no se movieron ni cambiaron de contenido**: siguen en D, E, F y G, que es
+como ella las lee. Las posiciones están escritas como constantes exportadas (`COL_ENTRADA`,
+`COL_SALIDA`, `COL_TODAS_LAS_MARCAS`, `COL_CUANTAS_MARCAS`) y el candado las comprueba una por una.
+«Cuántas marcas» va como NÚMERO, no texto: con el filtro de la fila 1 se piden «5 o más» en dos
+clics. El PDF no lleva las marcas (solo el resumen), así que no cambió.
+
+**4. La tercera opción: «Quitar esta marcación».** Al lado de «Corregir la hora», en la misma
+ventana, y solo donde tiene sentido: hace falta una marcación DEL RELOJ sin corrección viva (no se
+ofrece al agregar, ni sobre una ya corregida — ésa primero se deshace).
+
+🔴 **NO BORRA NADA.** `asistencia_marcaciones` es append-only y hay barrido estático que lo exige.
+Quitar es escribir ENCIMA una corrección con `quita = true` — la misma tabla y el mismo mecanismo
+que usa el teléfono todos los días—, con el porqué obligatorio, la firma de quien la quitó y su
+`anulada_en` para deshacerla. El servidor **exige `marcacionId`** (400 si falta: no se quita una
+marcación que no existe) y la persona y el día salen de la MARCACIÓN, nunca del navegador. Mismos
+roles que corregir una hora: no se inventó ninguna lista.
+
+**5. Lo quitado se VE y se cuenta.** La fila de abajo dice «Marcación **quitada**: 14:23:39 — no
+cuenta» (nunca «borrada»), el Excel escribe `QUITADA 14:23:39 (el reloj la registró; no cuenta)` y
+el aviso azul de arriba suma «— 1 es una marcación quitada». Y deja de contar para `revisar` y para
+el freno del cierre solo: `aplicarCorrecciones` la saca de la lista efectiva antes de que el motor
+la mire.
+
+### La medición, antes y después
+
+- **Ningún neto se movió.** `scripts/_medir-vs-yulissa.ts 2026-09-1 --corte=2026-09-10`, las 46
+  líneas, **byte a byte idénticas** antes y después (neto del período: **$11.519,07**). Es una
+  puerta nueva y una columna nueva, no un cambio de cálculo.
+- **La simulación de quitar** (`scripts/_simular-quitar-marcacion.ts 21 2026-08-26 14:23:39`, solo
+  lectura, no escribe nada): el día de Ramón Miranda pasa de 5 marcas a 4, entra en las cuatro
+  columnas y **deja de frenar el cierre**. La tabla sigue con sus 5 filas.
+
+### Candados
+
+`src/__tests__/lib/asistencia-marcas-de-mas.test.ts` (32 casos) ·
+`src/__tests__/components/asistencia-marcas-de-mas.test.tsx` (12 casos).
+
+Cambiaron de dirección, con nota fechada: `marcas-impares.test.ts` (el 6 ahora entra) ·
+`asistencia-corregir-hora.test.ts` (la ventana tiene tres formas) · `asistencia-poda-textos.test.tsx`
+(el ⓘ dice «EXACTAMENTE 4»).
+
+**Verificado por mutación:** `scripts/_mutar-candados-marcas-de-mas.sh` — **16 mutaciones, 16
+cazadas**, 0 corridas muertas, **2 de 2 controles en verde**.
+
+### Lo que NO se hizo
+
+- No se tocó el motor: la última marca sigue siendo la salida y el almuerzo sigue entre la 2.ª y la
+  3.ª (`reporte.ts`, regla 5).
+- No se quita ninguna marca sola, ni se sugiere cuál. El sistema señala; decide la persona.
+- No se corrió ninguna migración ni se escribió una sola fila en producción.
+
+---
+
 ## 🔴 Las vacaciones calculadas solas (17-sep-2026) — «Le corresponden N días»
 
 ### Qué pidió Daniel

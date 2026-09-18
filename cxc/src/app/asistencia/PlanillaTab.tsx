@@ -1282,7 +1282,8 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                   )
                 )}
                 {/* 🔴 EL DÍA MAL MARCADO SE ARREGLA EN ASISTENCIA, con «Agregar
-                    hora» (15-sep-2026). UN solo enlace y no uno por nombre: el
+                    hora» —o, desde el 18-sep-2026, con «Quitar esta marcación»
+                    cuando sobra—. UN solo enlace y no uno por nombre: el
                     texto del freno ya trae a cada persona con sus días, y
                     repetir los nombres como enlaces taparía los datos. */}
                 {f.tipo === "marcas-impares" && (
@@ -1339,9 +1340,10 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           // 🔴 Los netos en negativo por montos a mano, de las MISMAS líneas
           // (14-sep-2026): la misma decisión que el aviso de la celda.
           netosNegativos: netosNegativos(data.lineas),
-          // 🔴 Los días hábiles con un número IMPAR de marcaciones, de las
-          // MISMAS líneas que dibuja la tabla (15-sep-2026). Es lo que el
-          // servidor vuelve a mirar para frenar el cierre.
+          // 🔴 Los días hábiles MAL MARCADOS, de las MISMAS líneas que dibuja
+          // la tabla (15-sep-2026). Es lo que el servidor vuelve a mirar para
+          // frenar el cierre. ⚠️ 18-sep-2026: «mal marcado» pasó a ser impar O
+          // más de 4 (Daniel: *«cuando hay 5 o mas es porq es error»*).
           marcasImpares: marcasImparesDeLineas(data.lineas),
           avisoVacacionesNoPagadas: data.avisos.avisoVacacionesNoPagadas ?? null,
           // 🔴 El día libre de la empresa: cuánto le pagaron sus horas extra a

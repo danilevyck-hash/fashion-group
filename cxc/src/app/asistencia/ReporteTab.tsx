@@ -32,6 +32,13 @@ import { useUrlState } from "@/lib/hooks/useUrlState";
 import { TEXTO_SALIDA_SOSPECHOSA, tituloSalidaSospechosa } from "@/lib/asistencia/salida-sospechosa";
 // 🔴 La columna «Extras» dice cuánto está aprobado.
 import { repartirExtras, textoExtrasDecididas, tituloExtrasDecididas } from "@/lib/asistencia/extras-decididas";
+// 🔴 LAS MARCAS DEL DÍA SE VEN TODAS (18-sep-2026). La contadora: *«y como veo
+// quien marco de mas? en el excel solo salen max 4 marcaciones»*. La cuenta de
+// qué esconden las cuatro columnas vive en un módulo PURO, nunca acá.
+import {
+  cabenEnLasCuatroColumnas, columnasClasicas, cuantasMarcasTexto,
+  indicesPegados, marcasPegadas, tituloPegada,
+} from "@/lib/asistencia/marcas-del-dia";
 import type { Decision } from "@/lib/asistencia/aprobaciones";
 import EstadoReloj from "./EstadoReloj";
 import JustificacionesDelPeriodo from "./JustificacionesDelPeriodo";
@@ -158,7 +165,10 @@ export default function ReporteTab({ empresa = "" }: {
   const [error, setError] = useState<string | null>(null);
   // Correcciones: cuántas hay en el rango, si se pueden hacer (la migración
   // puede no haber corrido) y cuál se está tocando.
-  const [correcciones, setCorrecciones] = useState({ correcciones: 0, dias: 0, agregadas: 0 });
+  // 🔴 `quitadas` desde el 18-sep-2026: el aviso azul tiene que contar también
+  // las marcaciones QUITADAS. Sin esto, quitar una marca del reloj no dejaba
+  // rastro arriba de la tabla y el total de abajo cambiaba sin decir por qué.
+  const [correcciones, setCorrecciones] = useState({ correcciones: 0, dias: 0, agregadas: 0, quitadas: 0 });
   const [puedeCorregir, setPuedeCorregir] = useState(false);
   const [avisoCorreccion, setAvisoCorreccion] = useState<string | null>(null);
   const [corrigiendo, setCorrigiendo] = useState<MarcaParaCorregir | null>(null);
@@ -194,7 +204,7 @@ export default function ReporteTab({ empresa = "" }: {
       setSinHorarioLista(data.sinHorarioLista ?? []);
       setDecisionesExtra(new Map(Object.entries((data.decisionesExtra ?? {}) as Record<string, Decision>)));
       setReglas(data.reglas ?? null);
-      setCorrecciones(data.correcciones ?? { correcciones: 0, dias: 0, agregadas: 0 });
+      setCorrecciones(data.correcciones ?? { correcciones: 0, dias: 0, agregadas: 0, quitadas: 0 });
       setPuedeCorregir(Boolean(data.correccionesDisponible));
       setAvisoCorreccion(data.avisoCorrecciones ?? null);
       setFueraDelRango(data.fueraDelRango ?? 0);
@@ -365,6 +375,11 @@ export default function ReporteTab({ empresa = "" }: {
           {correcciones.agregadas > 0 && (
             <> — {correcciones.agregadas} {correcciones.agregadas === 1 ? "es una marcación agregada" : "son marcaciones agregadas"}</>
           )}
+          {/* 🔴 18-sep-2026: las QUITADAS se dicen aparte. Son las que destraban
+              el cierre, y el aviso tiene que nombrarlas por lo que son. */}
+          {correcciones.quitadas > 0 && (
+            <> — {correcciones.quitadas} {correcciones.quitadas === 1 ? "es una marcación quitada" : "son marcaciones quitadas"}</>
+          )}
           . Los números de abajo ya cuentan con eso. Abre al colaborador para ver qué se cambió y por qué.
         </p>
       )}
@@ -472,7 +487,12 @@ export default function ReporteTab({ empresa = "" }: {
             {MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos tarde: en la planilla esos minutos se muestran
             en la columna <b>Ausencias</b> en vez de en Tardanzas. <b>Se descuentan igual</b> — la
             columna cambia de nombre, no de precio.{" "}
-            <b>&quot;A revisar&quot;</b> es un día TERMINADO sin las 4 marcas: los minutos igual
+            {/* 🔴 18-sep-2026: se dice que son EXACTAMENTE 4. Daniel: *«las
+                quincena solo cierran con 4, hay q quitar hasta que llegue a 4
+                maximo. cuando hay 5 o mas es porq es error»*. «Sin las 4» se
+                podía leer como «le faltan»; también entra el que tiene de más. */}
+            <b>&quot;A revisar&quot;</b> es un día TERMINADO que no tiene EXACTAMENTE 4 marcas
+            —le falta alguna, o marcó de más—: los minutos igual
             cuentan. El día de <b>hoy</b> nunca entra ahí —sigue corriendo, así que todavía no
             se le puede decir que está mal marcado—, y el reporte muestra solo a quien estaba
             trabajando en las fechas que pediste.
@@ -593,7 +613,7 @@ function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir, onJustif
           {r.minutosTardeDeDiasARevisar > 0 && (
             <p className="mb-2 text-[13px] text-amber-800">
               De los <b>{fmtMin(r.minutosTarde)}</b> minutos tarde, <b>{fmtMin(r.minutosTardeDeDiasARevisar)}</b> vienen
-              de días sin las 4 marcas. Míralos antes de descontar.
+              de días que no tienen exactamente 4 marcas. Míralos antes de descontar.
             </p>
           )}
           {/* 🔴 NADA CALLADO (16-sep-2026): el permiso baja las tres columnas y
@@ -716,31 +736,69 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJu
     </button>
   );
 
-  /** Una celda de hora. Tocable solo si se puede corregir. */
-  function Hora({ idx, mostrar, tenue }: { idx: number; mostrar: boolean; tenue?: boolean }) {
-    if (!mostrar) return <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">—</td>;
-    const hora = d.marcas[idx];
+  /**
+   * 🔴 LAS MARCAS PEGADAS SE SEÑALAN (18-sep-2026). Dos marcas a segundos una
+   * de otra son el caso real de «marcó de más»: 14:23:38 y 14:23:39. Se pinta
+   * en ámbar y se dice al pasar el cursor; NO cambia un minuto y no decide cuál
+   * sobra — eso lo decide quien mira, y la quita a mano.
+   */
+  const pegados = indicesPegados(d.marcas);
+  const segundosPegada = (idx: number) =>
+    marcasPegadas(d.marcas).find((p) => p.idx === idx)?.segundos ?? 0;
+
+  /** El texto de una hora, con su color: corregida (azul) o pegada (ámbar). */
+  function textoHora(idx: number, tenue?: boolean) {
     const c = correccionDe(idx);
-    const clase = `tabular-nums ${tenue ? "text-gray-500" : ""}`;
+    const pegada = pegados.has(idx);
+    const base = `tabular-nums ${tenue ? "text-gray-500" : ""}`;
+    const color = c
+      ? "font-semibold text-blue-700"
+      : pegada
+        ? "font-semibold text-amber-800"
+        : "";
+    return {
+      clase: `${base} ${color}`,
+      titulo: pegada ? tituloPegada(segundosPegada(idx)) : undefined,
+      corregida: Boolean(c),
+    };
+  }
+
+  /** Una hora tocable. Tocarla abre la ventana de corregir / quitar. */
+  function HoraBoton({ idx, tenue }: { idx: number; tenue?: boolean }) {
+    const { clase, titulo, corregida } = textoHora(idx, tenue);
+    if (!puedeCorregir) {
+      return <span className={clase} title={titulo}>{d.marcas[idx]}</span>;
+    }
+    return (
+      <button
+        type="button"
+        onClick={() => abrir(idx)}
+        // 🔴 El título DICE que también se puede quitar: hasta el 18-sep-2026
+        // decía solo «Corregir esta hora» y quitar no existía por esta puerta.
+        title={titulo ?? "Corregir o quitar esta marcación"}
+        className={`min-h-[44px] rounded px-1 ${clase} ${corregida ? "underline decoration-blue-300 underline-offset-2" : "underline decoration-dotted decoration-gray-300 underline-offset-2 hover:decoration-black"}`}
+      >
+        {d.marcas[idx]}
+      </button>
+    );
+  }
+
+  /** Una celda de hora de las CUATRO columnas de siempre. */
+  function Hora({ idx }: { idx: number | null }) {
+    if (idx === null) return <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">—</td>;
     return (
       <td className="px-2 py-1.5 text-right">
-        {puedeCorregir ? (
-          <button
-            type="button"
-            onClick={() => abrir(idx)}
-            title="Corregir esta hora"
-            className={`min-h-[44px] rounded px-1 ${clase} ${c ? "font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2" : "underline decoration-dotted decoration-gray-300 underline-offset-2 hover:decoration-black"}`}
-          >
-            {hora}
-          </button>
-        ) : (
-          <span className={`${clase} ${c ? "font-semibold text-blue-700" : ""}`}>{hora}</span>
-        )}
+        <HoraBoton idx={idx} tenue={idx === 1 || idx === 2} />
       </td>
     );
   }
 
-  const ultima = d.marcas.length - 1;
+  // 🔴 LAS CUATRO COLUMNAS DE SIEMPRE, Y CUÁLES ESCONDEN (18-sep-2026). La
+  // cuenta salió de la pantalla a `marcas-del-dia.ts`: acá solo se pregunta.
+  // 🔑 Con 4 marcas —381 de 466 días medidos, el 81,8 %— esto devuelve
+  // [0,1,2,3] y la fila se dibuja EXACTAMENTE igual que antes.
+  const columnas = columnasClasicas(d.marcas.length);
+  const cabenLasCuatro = cabenEnLasCuatroColumnas(d.marcas.length);
 
   return (
     <>
@@ -748,10 +806,34 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJu
         <td className="whitespace-nowrap px-2 py-1.5 text-gray-700">{fechaCorta(d.fecha)}</td>
         {d.marcas.length ? (
           <>
-            <Hora idx={0} mostrar={d.marcas.length > 0} />
-            <Hora idx={1} mostrar={d.marcas.length >= 4} tenue />
-            <Hora idx={2} mostrar={d.marcas.length >= 4} tenue />
-            <Hora idx={ultima} mostrar={d.marcas.length > 1} />
+            {/* 🩸 HASTA EL 18-sep-2026 ACÁ SE ESCONDÍAN MARCAS. Las cuatro
+                celdas se llenaban por índice —0, 1, 2 y la última—, así que un
+                día de 5 marcas mostraba la 1.ª, la 2.ª, la 3.ª y la 5.ª: la
+                CUARTA, que suele ser justo la repetida, no se veía por ningún
+                lado. Y con 3 marcas se perdía la del medio. La contadora veía
+                un día en ámbar con cuatro horas normales y no tenía cómo saber
+                cuál sobraba. Ahora: si TODAS entran en las cuatro columnas, se
+                dibujan las cuatro columnas de siempre; si no, las cuatro celdas
+                se vuelven UNA sola y se ven todas, en orden. */}
+            {cabenLasCuatro ? (
+              <>
+                <Hora idx={columnas[0]} />
+                <Hora idx={columnas[1]} />
+                <Hora idx={columnas[2]} />
+                <Hora idx={columnas[3]} />
+              </>
+            ) : (
+              <td colSpan={4} className="px-2 py-1.5 text-right">
+                <span className="mr-2 text-[11px] font-medium uppercase tracking-wide text-amber-700">
+                  {cuantasMarcasTexto(d.marcas.length)}
+                </span>
+                {d.marcas.map((_, i) => (
+                  <span key={i} className="ml-1.5 inline-block">
+                    <HoraBoton idx={i} tenue={i !== 0 && i !== d.marcas.length - 1} />
+                  </span>
+                ))}
+              </td>
+            )}
             {/* 🔴 EL DÍA DICE SOLO CUÁNTO SE LLEGÓ TARDE, y en rojo cuando esos
                 minutos van a la columna «Ausencia» de la planilla. Es el «para
                 que lo veas» de Daniel: sin esto, un día de 45 minutos y uno de

@@ -34,6 +34,33 @@
  * descartó. El encargo del 15-sep-2026 decía «los de más (5, 6)» por un error de
  * redacción; la medición real partía los IMPARES en menos de 4 y más de 4.
  *
+ * 🔴 **18-sep-2026 — ESTO CAMBIÓ DE DIRECCIÓN. LO DE ARRIBA YA NO VALE, y se
+ * deja escrito para que se entienda por qué el candado se dio vuelta.** Daniel,
+ * textual, después de que la contadora no pudiera cerrar la quincena:
+ *
+ *     «osea las quincena solo cierran con 4, hay q quitar hasta que llegue a 4
+ *      maximo. cuando hay 5 o mas es porq es error. quiero saber todos los que
+ *      marcaron 5 veces last 30 days y si marcan 5 o mas poder quitarlas»
+ *
+ * O sea: el día TOPE son 4 marcas, y 5 o más es error, sea par o impar. La
+ * regla pasa a ser **IMPAR *o* MÁS DE 4**. El 6 ahora SÍ se atrapa.
+ *
+ * 🔑 Esto no contradice el «no adivinar» de arriba: no se está adivinando cuál
+ * marca sobra —eso lo sigue decidiendo una persona, quitándola a mano—, se está
+ * diciendo que un día con más de 4 no se cierra sin mirarlo. Y desde el
+ * 18-sep-2026 hay con qué: las marcas se VEN todas (`marcas-del-dia.ts`) y se
+ * pueden QUITAR desde la pestaña Asistencia.
+ *
+ * 🩸 Y la pantalla ya prometía esta regla: «"A revisar" es un día TERMINADO sin
+ * las 4 marcas» estaba escrito en `ReporteTab.tsx` desde siempre, y `revisar`
+ * en `reporte.ts` es `crudas.length !== 4` — el 6 quedaba en ámbar pero NO
+ * frenaba el cierre. Era la única de las tres que decía otra cosa.
+ *
+ * 🩸 MEDIDO el 18-sep-2026 (`scripts/_medir-marcas-de-mas.ts`, solo lectura),
+ * ventana 19-ago → 17-sep, 840 días-persona con marca: **55 con 5 o más** (50
+ * de cinco, 5 de seis, ninguno de siete) contra 108 impares con la regla vieja.
+ * Los 5 días de SEIS son los que entran nuevos al freno.
+ *
  * ── 🩸 LO MEDIDO, Y EL COSTO QUE DANIEL ACEPTÓ ───────────────────────────────
  *
  * Medido el 15-sep-2026: en la quincena 1–15 sep hay **44 días impares de 349
@@ -48,11 +75,43 @@
  * así que no sale en esta lista. Es el precio de no adivinar.
  * ────────────────────────────────────────────────────────────────────────── */
 
-/** Un día suelto que quedó con un número impar de marcaciones. */
+// 🔑 El 4 vive en UN solo lugar: `marcas-del-dia.ts`. Ver `MARCAS_MAXIMO`.
+import { MARCAS_NORMALES } from "./marcas-del-dia";
+
+/**
+ * Un día suelto que quedó mal marcado.
+ *
+ * ⚠️ El NOMBRE se quedó en «Impar» a propósito (18-sep-2026): lo nombran seis
+ * archivos y dos candados, y renombrarlo no cambiaría ni una conducta. Lo que
+ * cambió es la REGLA, no el tipo — ver el encabezado.
+ */
 export interface DiaImpar {
   fecha: string;
-  /** Cuántas marcas tiene ese día. Siempre impar. */
+  /** Cuántas marcas tiene ese día. Impar, o más de 4. */
   marcas: number;
+}
+
+/**
+ * 🔴 EL TOPE: un día no pasa de 4 marcaciones (18-sep-2026, Daniel: *«las
+ * quincena solo cierran con 4, hay q quitar hasta que llegue a 4 maximo»*).
+ *
+ * 🔑 Se DERIVA de `MARCAS_NORMALES`, no se escribe otra vez: el 4 del freno y
+ * el 4 con el que la pantalla arma sus cuatro columnas tienen que ser el mismo
+ * número, o un día podría dibujarse completo y frenar el cierre igual.
+ */
+export const MARCAS_MAXIMO = MARCAS_NORMALES;
+
+/**
+ * ¿Este día está mal marcado? **Impar, o más de 4.** Una sola función, para que
+ * el freno del cierre, el aviso y el candado no puedan separarse.
+ *
+ * 🔑 El PAR de 2 sigue pasando, y es deliberado: con dos marcas no se puede
+ * PROBAR que falte una (ver el encabezado, el caso de Andrea Pérez). Lo que se
+ * agregó es el techo, no un piso nuevo.
+ */
+export function marcasMalContadas(cuantas: number): boolean {
+  const n = Math.max(0, Math.trunc(cuantas));
+  return n % 2 === 1 || n > MARCAS_MAXIMO;
 }
 
 /**
@@ -93,10 +152,13 @@ export function diasConMarcasImpares(dias: readonly DiaParaImpares[]): DiaImpar[
   const out: DiaImpar[] = [];
   for (const d of dias) {
     if (!d.habil || d.enCurso || d.fueraDeVigencia || d.vacacion) continue;
-    // 🔑 El par se va acá, y con él el día sin marcas: 0 es par. No hace falta
-    // un `n === 0` aparte — un candado que no puede fallar da confianza falsa.
+    // 🔑 El par de 4 o menos se va acá, y con él el día sin marcas: 0 es par y
+    // no pasa del tope. No hace falta un `n === 0` aparte — un candado que no
+    // puede fallar da confianza falsa.
+    // 🔴 18-sep-2026: la pregunta pasó a ser «¿impar O más de 4?» y vive en
+    // `marcasMalContadas`, arriba, con la cita de Daniel.
     const n = d.marcas.length;
-    if (n % 2 === 0) continue;
+    if (!marcasMalContadas(n)) continue;
     out.push({ fecha: d.fecha, marcas: n });
   }
   return out;
@@ -253,10 +315,15 @@ export function textoFrenoMarcasImpares(
   const detalle = personas
     .map((p) => `${p.etiqueta} · ${detalleDias(p.dias)}`)
     .join(" — ");
+  // 🔴 18-sep-2026: el texto dice la regla NUEVA y dice CÓMO se arregla cada
+  // mitad. Daniel: *«hay q quitar hasta que llegue a 4 maximo»*. 🩸 Antes decía
+  // «deshaz la que sobra», que era una instrucción a un botón que no existía:
+  // quitar una marca del reloj no se podía hacer desde ninguna pantalla.
   return (
     `${quien} (${partes.join(" y ")}): ${detalle}. `
-    + "Un día tiene que tener un número PAR de marcaciones. "
-    + "Ve a la pestaña «Asistencia», pon la hora que falta con «Agregar hora» —o deshaz la que sobra—, y vuelve a cerrar. "
+    + `Un día se marca de a pares —entra y sale— y nunca pasa de ${MARCAS_MAXIMO} marcaciones. `
+    + "Ve a la pestaña «Asistencia», abre al colaborador y toca la hora: pon la que falta con «Agregar hora», "
+    + "o abre la que sobra y elige «Quitar esta marcación». Después vuelve a cerrar. "
     + "Si se cierra así, el sistema lee como salida una marca que no lo es y descuenta horas que la persona sí trabajó."
   );
 }
