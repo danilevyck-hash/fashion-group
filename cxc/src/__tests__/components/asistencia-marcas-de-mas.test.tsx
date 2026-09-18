@@ -109,8 +109,11 @@ describe("🔴 1. UN DÍA DE 5 MARCAS MUESTRA LAS CINCO", () => {
     await abrirElDetalle();
     // Las CINCO, una por una. La 14:23:39 era la invisible.
     for (const h of CINCO) expect(screen.getByText(h)).toBeTruthy();
-    // Y se dice cuántas son, para que no haya que contarlas.
-    expect(screen.getByText("5 marcas")).toBeTruthy();
+    // 🔄 18-sep-2026, más tarde el mismo día: el chip «5 marcas» adentro de la
+    // fila se fue. Rompía la grilla —Daniel: *«y aun se ve desordenado»*— y lo
+    // reemplazó la línea de abajo, que además dice qué hacer.
+    expect(screen.getByText(/Marca de más:/)).toBeTruthy();
+    expect(screen.getByText(/el día tiene 5, y son 4/)).toBeTruthy();
   });
 
   it("🔴 LA PEGADA SE SEÑALA A OJO: la 14:23:39 lleva su aviso, la 14:23:38 no", async () => {
@@ -138,7 +141,10 @@ describe("🔴 1. UN DÍA DE 5 MARCAS MUESTRA LAS CINCO", () => {
     montar(<ReporteTab />);
     await abrirElDetalle();
     expect(screen.getByText("12:00:00")).toBeTruthy();
-    expect(screen.getByText("3 marcas")).toBeTruthy();
+    // 🔄 18-sep-2026: con 3 marcas FALTA una, así que la línea lo dice con esas
+    // palabras en vez de un chip que solo contaba.
+    expect(screen.getByText(/Otra marca del día:/)).toBeTruthy();
+    expect(screen.getByText(/le falta una marca/)).toBeTruthy();
   });
 
   it("tocar una hora ofrece corregirla O quitarla, y lo dice el título", async () => {

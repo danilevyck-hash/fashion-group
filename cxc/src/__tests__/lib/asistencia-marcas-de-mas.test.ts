@@ -491,13 +491,37 @@ describe("Las marcas del medio", () => {
     expect(marcasDelMedio(-3)).toEqual([]);
   });
 
-  it("la pantalla ya NO funde las cuatro celdas en una", () => {
+  it("🔴 la pantalla NO rompe la grilla: las cuatro columnas, siempre", () => {
+    // 🔄 18-sep-2026, tercer intento y el bueno. Los dos anteriores fundían
+    // celdas —las cuatro, y después solo las dos del almuerzo— y Daniel corrigió
+    // los dos con la captura: *«no está en su columna, se ve desordenado»* y
+    // *«y aun se ve desordenado»*. Ahora lo que no entra baja a su propia línea.
     const src = fs.readFileSync(path.join(process.cwd(), "src/app/asistencia/ReporteTab.tsx"), "utf8");
     expect(src).not.toContain('<td colSpan={4}');
-    // La primera y la última van a SU columna; solo el almuerzo se funde.
-    expect(src).toContain("<Hora idx={0} />");
-    expect(src).toContain("<Hora idx={d.marcas.length - 1} />");
-    expect(src).toContain('<td colSpan={2}');
+    expect(src).not.toContain('<td colSpan={2}');
+    for (const i of [0, 1, 2, 3]) expect(src).toContain(`<Hora idx={columnas[${i}]} />`);
+    expect(src).toContain("rotuloMarcasSueltas(");
+  });
+
+  it("la línea de abajo dice cosas DISTINTAS según falte o sobre", async () => {
+    const { rotuloMarcasSueltas, notaMarcasSueltas } =
+      await import("@/lib/asistencia/marcas-del-dia");
+    // Con 3 marcas FALTA una: no se sabe cuál de las dos del almuerzo es.
+    expect(rotuloMarcasSueltas(3, 1)).toBe("Otra marca del día:");
+    expect(notaMarcasSueltas(3)).toContain("le falta una marca");
+    // Con 5 o 6 SOBRA: hay que quitarla.
+    expect(rotuloMarcasSueltas(5, 1)).toBe("Marca de más:");
+    expect(rotuloMarcasSueltas(6, 2)).toBe("Marcas de más:");
+    expect(notaMarcasSueltas(5)).toContain("el día tiene 5");
+  });
+
+  it("🔴 CONTROL: el rótulo y la nota van APARTE, para que la hora sea un botón", () => {
+    // 🩸 El primer intento metía la hora adentro de la frase y la marca dejaba
+    // de poderse tocar — justo la que suele sobrar. Ver `rotuloMarcasSueltas`.
+    const src = fs.readFileSync(path.join(process.cwd(), "src/lib/asistencia/marcas-del-dia.ts"), "utf8");
+    expect(src).not.toContain("export function textoMarcasSueltas");
+    const pantalla = fs.readFileSync(path.join(process.cwd(), "src/app/asistencia/ReporteTab.tsx"), "utf8");
+    expect(pantalla).toMatch(/rotuloMarcasSueltas[\s\S]{0,400}<HoraBoton idx=\{i\}[\s\S]{0,200}notaMarcasSueltas/);
   });
 
   it("CONTROL: con 4 marcas se siguen dibujando las cuatro columnas", async () => {

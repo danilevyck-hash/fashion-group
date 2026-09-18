@@ -38,7 +38,10 @@ import { repartirExtras, textoExtrasDecididas, tituloExtrasDecididas } from "@/l
 import {
   cabenEnLasCuatroColumnas, columnasClasicas, cuantasMarcasTexto,
   indicesPegados, marcasPegadas, tituloPegada,
-  marcasDelMedio,} from "@/lib/asistencia/marcas-del-dia";
+  marcasDelMedio,
+  marcasEscondidas,
+  rotuloMarcasSueltas,
+  notaMarcasSueltas,} from "@/lib/asistencia/marcas-del-dia";
 // 🔴 LA MARCA REPETIDA SE OLVIDÓ SOLA (18-sep-2026): el motor ya no la cuenta,
 // y aquí se DICE —tachada en su día, con su porqué, y contada arriba—. El texto
 // sale del módulo puro para que la pantalla y el Excel digan lo mismo.
@@ -953,51 +956,22 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJu
         <td className="whitespace-nowrap px-2 py-1.5 text-gray-700">{fechaCorta(d.fecha)}</td>
         {d.marcas.length ? (
           <>
-            {/* 🩸 HASTA EL 18-sep-2026 ACÁ SE ESCONDÍAN MARCAS. Las cuatro
-                celdas se llenaban por índice —0, 1, 2 y la última—, así que un
-                día de 5 marcas mostraba la 1.ª, la 2.ª, la 3.ª y la 5.ª: la
-                CUARTA, que suele ser justo la repetida, no se veía por ningún
-                lado. Y con 3 marcas se perdía la del medio. La contadora veía
-                un día en ámbar con cuatro horas normales y no tenía cómo saber
-                cuál sobraba. Ahora: si TODAS entran en las cuatro columnas, se
-                dibujan las cuatro columnas de siempre; si no, las cuatro celdas
-                se vuelven UNA sola y se ven todas, en orden. */}
-            {cabenLasCuatro ? (
-              <>
-                <Hora idx={columnas[0]} />
-                <Hora idx={columnas[1]} />
-                <Hora idx={columnas[2]} />
-                <Hora idx={columnas[3]} />
-              </>
-            ) : (
-              /* 🔴 LA PRIMERA EN «ENTRADA» Y LA ÚLTIMA EN «SALIDA», SIEMPRE
-                 (18-sep-2026). Acá las CUATRO celdas se fundían en una y las
-                 horas quedaban corridas a la derecha, con el conteo debajo de
-                 «Entrada». Daniel, con la captura del 15 de septiembre:
-                 *«hay 3 marcas y no se puso en orden… aparte que no está en su
-                 columna, se ve desordenado»*.
-                 ⚠️ Solo se funden las DOS del almuerzo: con 3 marcas, la del
-                 medio puede ser la salida a almorzar o el regreso y el sistema
-                 no tiene cómo saberlo. La primera y la última no se adivinan —
-                 son las que el motor ya lee como entrada y salida. */
-              <>
-                <Hora idx={0} />
-                <td colSpan={2} className="px-2 py-1.5 text-center">
-                  <span className="mr-2 align-middle text-[11px] font-medium uppercase tracking-wide text-amber-700">
-                    {cuantasMarcasTexto(d.marcas.length)}
-                  </span>
-                  {marcasDelMedio(d.marcas.length).map((i) => (
-                    <span key={i} className="ml-1.5 inline-block">
-                      <HoraBoton idx={i} tenue />
-                    </span>
-                  ))}
-                  {marcasDelMedio(d.marcas.length).length === 0 && (
-                    <span className="align-middle tabular-nums text-gray-400">—</span>
-                  )}
-                </td>
-                <Hora idx={d.marcas.length - 1} />
-              </>
-            )}
+            {/* 🔴 LAS CUATRO COLUMNAS SE DIBUJAN SIEMPRE (18-sep-2026).
+                🩸 Hasta hoy acá se ESCONDÍAN marcas: las cuatro celdas se
+                llenaban por índice —0, 1, 2 y la última—, así que un día de 5
+                mostraba la 1.ª, la 2.ª, la 3.ª y la 5.ª, y la CUARTA —que suele
+                ser justo la repetida— no se veía por ningún lado.
+                🩸 Dos intentos antes de éste rompían la grilla —primero las
+                cuatro celdas fundidas en una, después solo las dos del
+                almuerzo— y Daniel corrigió los dos con la captura en la mano:
+                *«no está en su columna, se ve desordenado»* y *«y aun se ve
+                desordenado»*. Lo que no entra en las cuatro baja a una línea
+                debajo del día, que es donde esta pantalla ya cuenta lo que pasa
+                con una marca. Ver `textoMarcasSueltas`. */}
+            <Hora idx={columnas[0]} />
+            <Hora idx={columnas[1]} />
+            <Hora idx={columnas[2]} />
+            <Hora idx={columnas[3]} />
             {/* 🔴 EL DÍA DICE SOLO CUÁNTO SE LLEGÓ TARDE, y en rojo cuando esos
                 minutos van a la columna «Ausencia» de la planilla. Es el «para
                 que lo veas» de Daniel: sin esto, un día de 45 minutos y uno de
@@ -1187,6 +1161,26 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJu
           </tr>
         );
       })}
+
+      {/* 🔴 LO QUE NO ENTRA EN LAS CUATRO COLUMNAS, EN SU PROPIA LÍNEA. Con 4
+          marcas —el 82 % de los días— esto no se dibuja y la fila es la de
+          siempre. */}
+      {marcasEscondidas(d.marcas.length).length > 0 && (
+        <tr className="border-b border-gray-100">
+          <td></td>
+          <td colSpan={8} className="px-2 pb-1.5 text-[12px] text-amber-800">
+            {rotuloMarcasSueltas(d.marcas.length, marcasEscondidas(d.marcas.length).length)}
+            {marcasEscondidas(d.marcas.length).map((i) => (
+              <span key={i} className="mx-1.5 inline-block align-middle">
+                {/* 🔴 SIGUE SIENDO UN BOTÓN: es la marca que suele sobrar, y de
+                    acá se abre «Corregir o quitar esta marcación». */}
+                <HoraBoton idx={i} tenue />
+              </span>
+            ))}
+            {notaMarcasSueltas(d.marcas.length)}
+          </td>
+        </tr>
+      )}
 
       {d.correcciones.map((c) => (
         <tr key={c.id} className="border-b border-gray-100 bg-blue-50/40">

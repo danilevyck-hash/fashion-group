@@ -245,3 +245,41 @@ export function marcasDelMedio(cuantas: number): number[] {
   for (let i = 1; i <= n - 2; i++) out.push(i);
   return out;
 }
+
+/**
+ * 🔴 LA LÍNEA DE LAS MARCAS QUE NO ENTRAN EN LAS CUATRO COLUMNAS (18-sep-2026).
+ *
+ * 🩸 DOS INTENTOS ANTES DE ÉSTE, LOS DOS CORREGIDOS POR DANIEL CON LA CAPTURA
+ * EN LA MANO. Primero las cuatro celdas se fundían en una y las horas quedaban
+ * corridas a la derecha: *«hay 3 marcas y no se puso en orden… no está en su
+ * columna, se ve desordenado»*. Después se fundieron solo las dos del almuerzo,
+ * con el conteo adentro, y siguió igual: *«y aun se ve desordenado»*.
+ *
+ * 🔑 La cura es no romper la grilla NUNCA. Las cuatro columnas se dibujan
+ * siempre —entrada, salida a almorzar, regreso, salida— y lo que no entra baja
+ * a una línea debajo del día, que es donde esta pantalla ya cuenta las cosas de
+ * una marca (las correcciones y las del teléfono viven ahí).
+ *
+ * 🔴 **LA HORA DE ESA LÍNEA SIGUE SIENDO UN BOTÓN.** Es la marca que suele
+ * sobrar: si no se puede tocar para quitarla, la línea no sirve de nada. Por eso
+ * el rótulo y la nota van APARTE —dos textos— y la hora se dibuja en el medio.
+ *
+ * ⚠️ El texto CAMBIA según el porqué, porque son dos problemas opuestos:
+ *   · con menos de 4 FALTA una, y por eso no se sabe en cuál de las dos del
+ *     almuerzo va la del medio;
+ *   · con 5 o más SOBRA, y hay que quitarla.
+ */
+export function rotuloMarcasSueltas(cuantas: number, cuantasSueltas: number): string {
+  const n = Math.max(0, Math.trunc(cuantas));
+  if (n < MARCAS_NORMALES) return "Otra marca del día:";
+  return cuantasSueltas === 1 ? "Marca de más:" : "Marcas de más:";
+}
+
+/** Lo que va DESPUÉS de la hora. Ver `rotuloMarcasSueltas`. */
+export function notaMarcasSueltas(cuantas: number): string {
+  const n = Math.max(0, Math.trunc(cuantas));
+  if (n < MARCAS_NORMALES) {
+    return "— le falta una marca, así que no se sabe si ésta es la salida a almorzar o el regreso";
+  }
+  return `— el día tiene ${n}, y son 4`;
+}
