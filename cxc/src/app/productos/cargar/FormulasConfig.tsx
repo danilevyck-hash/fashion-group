@@ -71,6 +71,12 @@ const SCOPE_CONFIG: Record<FormulasScope, {
   },
 };
 
+/** «9 marcas» · «1 marca». Va al lado del nombre de la compañía para que,
+ *  plegada, siga diciendo cuánto hay adentro. */
+export function rotuloMarcas(n: number): string {
+  return n === 1 ? "1 marca" : `${n} marcas`;
+}
+
 function compactFormula(d: { divisor: number; extra: number; redondeo: Redondeo }): string {
   const r = d.redondeo === "half" ? ".50" : d.redondeo === "par" ? "par" : "entero";
   return `TECHO(CIF ÷ ${d.divisor || "—"})${d.extra > 0 ? ` + ${d.extra}` : ""} → ${r}`;
@@ -109,6 +115,20 @@ export default function FormulasConfig({ scope = "depurador" }: { scope?: Formul
   const [descSaved, setDescSaved] = useState<MarcaRubroFormula[]>([]);
   const [descEdits, setDescEdits] = useState<Record<string, DescEdit>>({});
   const [open, setOpen] = useState<Set<string>>(new Set());
+  // ── 🔴 LA EMPRESA TAMBIÉN SE PLIEGA (17-sep-2026) ────────────────────────
+  //
+  // Daniel, textual (7-sep-2026): «en vistana por ejemplo si toco que se me
+  // despliegue todas las marcas de vistana» · «los nombres no me convencen y
+  // mira el layout no se ve ordenado».
+  //
+  // Hasta hoy el encabezado de la compañía era un <div> estático: las cinco
+  // compañías salían con TODAS sus marcas listadas, y lo único que se plegaba
+  // era cada marca. Ahora son DOS niveles y el de arriba arranca cerrado:
+  // empresa (cerrada) → marca (cerrada) → sus descripciones.
+  //
+  // 🔑 El plegado por MARCA que ya existía NO se tocó (`open`): son dos
+  // conjuntos distintos, y abrir una empresa no abre sus marcas.
+  const [gruposAbiertos, setGruposAbiertos] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
   const [flashId, setFlashId] = useState<string | null>(null);
@@ -239,6 +259,7 @@ export default function FormulasConfig({ scope = "depurador" }: { scope?: Formul
   const descMatch = (marca: string) => !!q && descripcionesDeMarca(descsCatalogo, marca).some((d) => norm(d).includes(q));
   const rowMatch = (row: MarcaRow) => !q || norm(row.marca).includes(q) || descMatch(row.marca);
   const toggle = (id: string) => setOpen((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleGrupo = (id: string) => setGruposAbiertos((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const nuevas = rows.filter((r) => r.isNew && rowMatch(r));
 
@@ -298,13 +319,28 @@ export default function FormulasConfig({ scope = "depurador" }: { scope?: Formul
           (r) => !r.isNew && rowMatch(r) && (g.label ? r.empresa === g.label : !cfg.grupos.some((x) => x.label && x.label === r.empresa))
         );
         if (groupRows.length === 0) return null;
+        const idGrupo = g.label || "otras";
+        // Buscando, la empresa que tiene resultados se abre sola: si no, el
+        // buscador dejaría la coincidencia escondida adentro de una cerrada.
+        const grupoAbierto = gruposAbiertos.has(idGrupo) || !!q;
         return (
-          <div key={g.label || "otras"} className="mb-7">
-            <div className="mb-2 border-b border-stone-200 py-1.5 text-[13px] font-bold uppercase tracking-wide text-teal-800">
-              {g.label || "Otras"}
-              {g.marca && <span className="ml-2 text-[12px] font-normal normal-case tracking-normal text-stone-500">· {g.marca}</span>}
-            </div>
-            {groupRows.map((row) => (
+          <div key={idGrupo} className="mb-7">
+            <button
+              type="button"
+              onClick={() => toggleGrupo(idGrupo)}
+              aria-expanded={grupoAbierto}
+              className="mb-2 flex min-h-[44px] w-full items-center gap-2 border-b border-stone-200 py-1.5 text-left text-[13px] font-bold uppercase tracking-wide text-teal-800 transition hover:bg-stone-50"
+            >
+              <span aria-hidden className="text-stone-400">{grupoAbierto ? "▾" : "▸"}</span>
+              <span className="min-w-0 flex-1 truncate">
+                {g.label || "Otras"}
+                {g.marca && <span className="ml-2 text-[12px] font-normal normal-case tracking-normal text-stone-500">· {g.marca}</span>}
+              </span>
+              <span className="shrink-0 text-[12px] font-normal normal-case tracking-normal text-stone-400">
+                {rotuloMarcas(groupRows.length)}
+              </span>
+            </button>
+            {grupoAbierto && groupRows.map((row) => (
               <MarcaCard
                 key={row.id} row={row} catalogo={descsCatalogo}
                 isOpen={open.has(row.id) || descMatch(row.marca)}
