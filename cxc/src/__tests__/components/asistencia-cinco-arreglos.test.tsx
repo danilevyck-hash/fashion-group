@@ -69,7 +69,7 @@ function servir(respuestas: Array<[string, unknown]>) {
 const montar = (ui: React.ReactElement) => render(<ToastProvider>{ui}</ToastProvider>);
 
 const dia = (over: Record<string, unknown>) => ({
-  fecha: "2026-09-01", marcas: [], marcasIds: [], entrada: null, salida: null,
+  fecha: "2026-09-01", marcas: [], marcasIds: [], repetidas: [], entrada: null, salida: null,
   tardeMin: 0, excesoAlmuerzoMin: 0, salidaTempranaMin: 0, extraMin: 0, trabajadoMin: 0,
   revisar: false, salidaSospechosa: false, enCurso: false, fueraDeVigencia: false,
   ausente: false, vacacion: null, justificado: null,
@@ -406,7 +406,9 @@ describe("lo que la pantalla NO puede escribir a mano", () => {
     expect(ts).not.toMatch(/^import /m);
     const motor = puro("src/lib/asistencia/reporte.ts");
     // El veredicto viaja en SU campo, nunca dentro de `revisar`.
-    expect(motor).toMatch(/const revisar = !enCurso && crudas\.length !== 4;/);
+    // 🔴 18-sep-2026: `buenas`, no `crudas` — la repetida ya se olvidó antes
+    // de contar (`marca-repetida.ts`). La regla «no tiene 4» no cambió.
+    expect(motor).toMatch(/const revisar = !enCurso && buenas\.length !== 4;/);
     expect(motor).toMatch(/salidaSospechosa: sospechosa/);
   });
 });

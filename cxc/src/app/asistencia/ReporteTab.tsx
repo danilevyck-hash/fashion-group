@@ -39,6 +39,10 @@ import {
   cabenEnLasCuatroColumnas, columnasClasicas, cuantasMarcasTexto,
   indicesPegados, marcasPegadas, tituloPegada,
 } from "@/lib/asistencia/marcas-del-dia";
+// 🔴 LA MARCA REPETIDA SE OLVIDÓ SOLA (18-sep-2026): el motor ya no la cuenta,
+// y aquí se DICE —tachada en su día, con su porqué, y contada arriba—. El texto
+// sale del módulo puro para que la pantalla y el Excel digan lo mismo.
+import { avisoRepetidas, contarRepetidas, explicacionRepetida } from "@/lib/asistencia/marca-repetida";
 import type { Decision } from "@/lib/asistencia/aprobaciones";
 import EstadoReloj from "./EstadoReloj";
 import JustificacionesDelPeriodo from "./JustificacionesDelPeriodo";
@@ -381,6 +385,18 @@ export default function ReporteTab({ empresa = "" }: {
             <> — {correcciones.quitadas} {correcciones.quitadas === 1 ? "es una marcación quitada" : "son marcaciones quitadas"}</>
           )}
           . Los números de abajo ya cuentan con eso. Abre al colaborador para ver qué se cambió y por qué.
+        </p>
+      )}
+
+      {/* 🔴 LA MARCA REPETIDA SE OLVIDÓ SOLA, Y SE DICE (18-sep-2026). Daniel:
+          *«quiero que el sistema agarre la primera marcación y olvide la
+          próxima si es en x cantidad de tiempo»* — «1 minuto». Un número que
+          cambia sin explicación es peor que el error: arriba se cuenta cuántas
+          y abajo, en su día, cada una va tachada con su porqué. Gris, no azul:
+          nadie tocó nada a mano. */}
+      {personas && contarRepetidas(personas.flatMap((p) => p.dias)) > 0 && (
+        <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-700">
+          {avisoRepetidas(contarRepetidas(personas.flatMap((p) => p.dias)))}
         </p>
       )}
 
@@ -1038,6 +1054,22 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJu
                 → <b className="tabular-nums">{c.hora}</b></>
             )}
             {" · "}“{c.motivo}” · {c.creadaPor}{c.creadaEn ? ` · ${fechaCortaISO(c.creadaEn)}` : ""}
+          </td>
+        </tr>
+      ))}
+
+      {/* 🔴 LA MARCA REPETIDA SE VE TACHADA, NO SE ESCONDE (18-sep-2026). El
+          motor la olvidó solo —a 60 s o menos de la última que cuenta— y la
+          fila sigue en la base. Se dice con el mismo texto que el Excel
+          (`explicacionRepetida`), en gris: nadie la tocó a mano, y por eso no
+          va en azul como una corrección. */}
+      {/* ⚠️ `?? []`: falla ABIERTA. Un día que llegue sin el campo (una
+          respuesta vieja, un test que arma el día a mano) se dibuja igual. */}
+      {(d.repetidas ?? []).map((r, i) => (
+        <tr key={`repetida-${i}`} className="border-b border-gray-100 bg-gray-50/60">
+          <td></td>
+          <td colSpan={8} className="px-2 pb-1.5 text-[12px] text-gray-600">
+            Marca <b>repetida</b>: <b className="tabular-nums line-through">{r.hora}</b> — {explicacionRepetida(r)}
           </td>
         </tr>
       ))}

@@ -100,6 +100,10 @@ import { motivoAutomaticoDelDiaSinMarca } from "./trabaja-afuera";
 // `salida-sospechosa.ts` — no toca `revisar` ni un centavo.
 import { salidaSospechosa } from "./salida-sospechosa";
 import { minutosPerdonadosDe, rangoPermiso, textoPermiso, ventanaDe } from "./permiso-horas";
+// 🔴 LA MARCA REPETIDA SE OLVIDA SOLA (18-sep-2026): a 60 s o menos de la
+// última que cuenta, no cuenta. La regla y el número viven en
+// `marca-repetida.ts`; aquí solo se le pregunta, sobre las marcas de CADA día.
+import { olvidarRepetidas, type MarcaRepetidaVisible } from "./marca-repetida";
 // 🔴 UN DÍA DE VACACIONES NO SE CALCULA. Ver `vacaciones.ts`: aunque la persona
 // haya pasado por el reloj, ese día no genera horas, ni tardanza, ni ausencia.
 import { vacacionDe, type DiaVacacion, type Vacacion } from "./vacaciones";
@@ -186,6 +190,20 @@ export interface DiaReporte {
    * en ninguna cuenta.
    */
   marcasIds: (string | null)[];
+  /**
+   * 🔴 LAS MARCAS REPETIDAS QUE SE OLVIDARON SOLAS (18-sep-2026). Daniel:
+   * *«quiero que el sistema agarre la primera marcación y olvide la próxima si
+   * es en x cantidad de tiempo»* — y la x es **1 minuto**. Una marca a
+   * `SEGUNDOS_MARCA_REPETIDA` o menos de la última que cuenta NO está en
+   * `marcas` ni entra a ninguna cuenta: viaja aquí, con su hora, la marca que la
+   * hizo repetida y cuántos segundos después llegó, para que la pantalla la
+   * tache y el Excel la escriba. ⚠️ La fila sigue en `asistencia_marcaciones`:
+   * se descarta al LEER, igual que una corrección.
+   *
+   * Vacío en los días de vacaciones, fuera de vigencia y sin marcas: ahí no se
+   * calcula nada y las marcas se muestran tal cual.
+   */
+  repetidas: MarcaRepetidaVisible[];
   entrada: string | null;
   salida: string | null;
   tardeMin: number;
@@ -410,6 +428,9 @@ export interface PersonaReporte {
     diasCorregidos: number;
     /** Cuántas horas se tocaron a mano en total, en todo el rango. */
     correcciones: number;
+    /** Cuántas marcas repetidas del reloj se olvidaron solas en el rango
+     *  (18-sep-2026). Suma de `dias[].repetidas.length`; solo para decirlo. */
+    marcasRepetidas: number;
   };
 }
 
@@ -730,6 +751,39 @@ export function armarReporte(opts: {
       const enCurso = !!opts.diaEnCurso && fecha >= opts.diaEnCurso;
       // Segundos desde medianoche, en orden.
       const crudas = (p.dias.get(fecha) ?? []).slice().sort((a, b) => a - b);
+      // 🔴 LAS MARCAS SE MUESTRAN CON SEGUNDOS. Son el dato crudo del que salen
+      // todos los números de abajo: si el papel dijera 08:00 y 17:04, nadie
+      // podría reproducir a mano las horas que la planilla paga.
+      const fmt = (seg: number) =>
+        `${p2(Math.floor(seg / 3600))}:${p2(Math.floor((seg % 3600) / 60))}:${p2(seg % 60)}`;
+      // ── 🔴 LA MARCA REPETIDA SE OLVIDA SOLA (18-sep-2026) ───────────────────
+      //
+      // Daniel: *«quiero que el sistema agarre la primera marcación y olvide la
+      // próxima si es en x cantidad de tiempo»*, y la x fue **«1 minuto»**.
+      //
+      // 🩸 Ramón Miranda (21), 3-ago: 07:58:36 · 07:58:37 · 13:55:43 · 14:22:04
+      // · 17:10:43. El dedo tocó dos veces al entrar, la 2.ª marca dejó de ser
+      // la salida a almorzar y el Reporte le medía 5 h 57 min de almuerzo (327
+      // minutos de exceso), con el día en ámbar frenando el cierre.
+      //
+      // Se aplica AQUÍ, sobre las marcas que YA QUEDARON después de las
+      // correcciones (una quitada a mano ya no está en `crudas`; una corregida
+      // entra con su hora nueva) y sobre las de ESTE día: no cruza de un día a
+      // otro porque `p.dias` ya está partido por día de Panamá. De aquí para
+      // abajo TODO se calcula sobre `buenas`; las olvidadas viajan en
+      // `repetidas` para que se vean tachadas y con su porqué. La fila de
+      // `asistencia_marcaciones` no se toca: se descarta al LEER.
+      //
+      // ⚠️ Se conserva la PRIMERA. Si el doble toque fue a la SALIDA, la salida
+      // pasa a ser la primera de las dos (hasta 60 s antes): es la regla de
+      // Daniel, y ese minuto se ve en la marca tachada.
+      const { buenas, olvidadas } = olvidarRepetidas(crudas);
+      const repetidas: MarcaRepetidaVisible[] = olvidadas.map((o) => ({
+        hora: fmt(o.seg),
+        despuesDe: fmt(o.despuesDeSeg),
+        segundosDespues: o.segundosDespues,
+        id: p.ids.get(fecha)?.get(o.seg) ?? null,
+      }));
       // Informativo: qué horas de este día se tocaron a mano. No entra en
       // ninguna cuenta — ver la nota de `correccionesPorDia`.
       const correcciones = [...(opts.correccionesPorDia?.get(`${codigo}|${fecha}`) ?? [])];
@@ -762,6 +816,8 @@ export function armarReporte(opts: {
               `${p2(Math.floor(seg / 3600))}:${p2(Math.floor((seg % 3600) / 60))}:${p2(seg % 60)}`,
           ),
           marcasIds: crudas.map((seg) => p.ids.get(fecha)?.get(seg) ?? null),
+          // Las marcas se muestran TAL CUAL, todas: aquí no se calcula nada.
+          repetidas: [],
           entrada: null, salida: null,
           tardeMin: 0, excesoAlmuerzoMin: 0, salidaTempranaMin: 0, extraMin: 0, trabajadoMin: 0,
           // 🔴 Los tres veredictos, suspendidos: no faltó, no hay nada que
@@ -792,7 +848,7 @@ export function armarReporte(opts: {
       if (vac) {
         const marcadas = (p.dias.get(fecha) ?? []).slice().sort((a, b) => a - b);
         dias.push({
-          fecha, marcas: [], marcasIds: [], entrada: null, salida: null,
+          fecha, marcas: [], marcasIds: [], repetidas: [], entrada: null, salida: null,
           tardeMin: 0, excesoAlmuerzoMin: 0, salidaTempranaMin: 0, extraMin: 0, trabajadoMin: 0,
           revisar: false, salidaSospechosa: false,
           enCurso,
@@ -833,7 +889,7 @@ export function armarReporte(opts: {
           habil, feriado, enCurso, justificado,
         });
         dias.push({
-          fecha, marcas: [], marcasIds: [], entrada: null, salida: null,
+          fecha, marcas: [], marcasIds: [], repetidas: [], entrada: null, salida: null,
           tardeMin: 0, excesoAlmuerzoMin: 0, salidaTempranaMin: 0, extraMin: 0, trabajadoMin: 0,
           revisar: false, salidaSospechosa: false,
           enCurso,
@@ -851,12 +907,9 @@ export function armarReporte(opts: {
         continue;
       }
 
-      // 🔴 LAS MARCAS SE MUESTRAN CON SEGUNDOS. Son el dato crudo del que salen
-      // todos los números de abajo: si el papel dijera 08:00 y 17:04, nadie
-      // podría reproducir a mano las horas que la planilla paga.
-      const fmt = (seg: number) =>
-        `${p2(Math.floor(seg / 3600))}:${p2(Math.floor((seg % 3600) / 60))}:${p2(seg % 60)}`;
-      const ent = crudas[0];
+      // 🔑 De aquí para abajo, SOLO las marcas buenas: la repetida ya se fue a
+      // `repetidas` y no existe para ninguna cuenta.
+      const ent = buenas[0];
       // 🩸 CON UNA SOLA MARCA NO SE SABE A QUÉ HORA SE FUE. Antes se tomaba esa
       // misma hora como entrada Y como salida, y salían disparates: en el
       // export histórico de enero-julio (995 días, TODOS con solo la entrada)
@@ -866,8 +919,8 @@ export function armarReporte(opts: {
       // contar lo que la persona marcó; inventarle una salida a partir de esa
       // MISMA marca es usar un dato dos veces para dos cosas distintas. La
       // entrada se conoce, la salida no.
-      const soloUna = crudas.length === 1;
-      const sal = crudas[crudas.length - 1];
+      const soloUna = buenas.length === 1;
+      const sal = buenas[buenas.length - 1];
 
       // Regla 1. Tolerancia para CLASIFICAR; una vez pasada, se cuenta desde
       // la hora de entrada, no desde el fin de la tolerancia.
@@ -902,13 +955,13 @@ export function armarReporte(opts: {
       let excesoAlmuerzoMin = 0;
       let permisoPerdonaAlmuerzoMin = 0;
       let almuerzoTomado = 0;
-      if (crudas.length >= 4) {
-        almuerzoTomado = crudas[2] - crudas[1]; // segundos
+      if (buenas.length >= 4) {
+        almuerzoTomado = buenas[2] - buenas[1]; // segundos
         const excesoAlmuerzoBrutoMin = Math.max(0, (almuerzoTomado - almuerzoProgSeg) / 60);
         permisoPerdonaAlmuerzoMin = Math.min(excesoAlmuerzoBrutoMin, minutosPerdonadosDe(ventana, {
           // El exceso empieza cuando se acabó el almuerzo permitido y termina
           // cuando la persona volvió a marcar: esa marca lo CIERRA.
-          desdeSeg: crudas[1] + almuerzoProgSeg, hastaSeg: crudas[2], bordeDelReloj: "fin",
+          desdeSeg: buenas[1] + almuerzoProgSeg, hastaSeg: buenas[2], bordeDelReloj: "fin",
         }));
         excesoAlmuerzoMin = Math.max(0, excesoAlmuerzoBrutoMin - permisoPerdonaAlmuerzoMin);
       }
@@ -951,19 +1004,23 @@ export function armarReporte(opts: {
       // Regla 6. Salvo que el día siga corriendo: quien entró, almorzó y volvió
       // tiene 3 marcas a las 3 de la tarde y todavía le falta irse. Eso no es un
       // día mal marcado, es un día a medias.
-      const revisar = !enCurso && crudas.length !== 4;
+      // 🔴 18-sep-2026: se cuenta DESPUÉS de olvidar la repetida. Un día de 5
+      // con una repetida deja de estar a revisar; uno de 5 con una marca que
+      // falta sigue estándolo.
+      const revisar = !enCurso && buenas.length !== 4;
       // 🔴 DOS MARCAS Y LA SEGUNDA MUY ANTES DE SU SALIDA (16-sep-2026): se
       // AVISA, no se calcula. Los minutos de arriba ya están decididos y esto
       // no los toca. La regla y el umbral viven en `salida-sospechosa.ts`.
       const sospechosa = salidaSospechosa({
-        marcas: crudas, salidaTempranaMin, habil, enCurso, fueraDeVigencia: false, vacacion: null,
+        marcas: buenas, salidaTempranaMin, habil, enCurso, fueraDeVigencia: false, vacacion: null,
       });
 
       dias.push({
         fecha,
-        marcas: crudas.map(fmt),
+        marcas: buenas.map(fmt),
         // `null` = esa marca no vino del reloj (la agregó una corrección).
-        marcasIds: crudas.map((seg) => p.ids.get(fecha)?.get(seg) ?? null),
+        marcasIds: buenas.map((seg) => p.ids.get(fecha)?.get(seg) ?? null),
+        repetidas,
         entrada: fmt(ent),
         // `null` y no la hora de entrada: no sabemos cuándo se fue.
         salida: soloUna ? null : fmt(sal),
@@ -1015,6 +1072,7 @@ export function armarReporte(opts: {
       // los que tienen marcas la escondería justo donde más raro sería.
       diasCorregidos: dias.filter((d) => d.correcciones.length > 0).length,
       correcciones: dias.reduce((a, d) => a + d.correcciones.length, 0),
+      marcasRepetidas: dias.reduce((a, d) => a + d.repetidas.length, 0),
     };
     // El número de planilla: todo lo que no se trabajó, junto.
     resumen.tiempoNoTrabajadoMin =

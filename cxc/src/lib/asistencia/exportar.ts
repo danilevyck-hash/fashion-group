@@ -28,6 +28,9 @@ import { textoPermisoDelDia } from "./permiso-horas";
 // 🔴 Las marcas del día se escriben TODAS (18-sep-2026). El texto sale de un
 // módulo PURO para que el Excel y la pantalla no puedan contradecirse.
 import { textoTodasLasMarcas } from "./marcas-del-dia";
+// 🔴 La marca repetida que se olvidó sola (18-sep-2026) también va al archivo,
+// dicha con esas palabras: el Excel no puede esconder lo que la pantalla tacha.
+import { SEGUNDOS_MARCA_REPETIDA, textoTodasLasMarcasConRepetidas } from "./marca-repetida";
 // 🔴 El pie se PARTE contra el ancho de la hoja. `doc.text` no envuelve solo:
 // ver el encabezado de `pdf-pie.ts` para los milímetros que se perdían.
 import { armarPie, dibujarPie } from "./pdf-pie";
@@ -177,7 +180,13 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
         // para que se pueda filtrar y ordenar; vacío cuando no hay marcas, que
         // es la regla de `n0` en toda la hoja: un 0 en una columna esconde lo
         // que sí importa.
-        textoTodasLasMarcas(d.marcas),
+        // 🔴 18-sep-2026: la marca REPETIDA que se olvidó sola va aquí también,
+        // en su lugar por hora y dicha («07:58:37 (repetida, no cuenta)»). Sin
+        // repetidas es EXACTAMENTE `textoTodasLasMarcas(d.marcas)`. «Cuántas
+        // marcas» cuenta las que CUENTAN: un día de 5 con una repetida es un
+        // día de 4, y ya no hay que ir a arreglarlo.
+        // ⚠️ `?.length`: falla ABIERTA si el día llega sin el campo.
+        d.repetidas?.length ? textoTodasLasMarcasConRepetidas(d.marcas, d.repetidas) : textoTodasLasMarcas(d.marcas),
         d.marcas.length || "",
         // 🔴 El servicio profesional no cuenta horas extra (3-sep-2026): «—».
         n0(d.tardeMin), n0(d.excesoAlmuerzoMin), n0(d.salidaTempranaMin),
@@ -319,6 +328,9 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
     // texto dice EXACTAMENTE 4 y nombra las dos formas de estar mal.
     ["Días a revisar", "El día no tiene EXACTAMENTE 4 marcas: le falta alguna, o marcó de más. Los minutos SÍ cuentan; la marca es para corregirlo."],
     ["Todas las marcas / Cuántas marcas", "Todas las horas que marcó ese día, en orden, y cuántas son. Las cuatro columnas de la izquierda solo tienen lugar para cuatro, así que la quinta y la sexta se leen aquí. Filtra «Cuántas marcas» por 5 o más para ver quién marcó de más."],
+    // 🔴 18-sep-2026 — Daniel: *«quiero que el sistema agarre la primera
+    // marcación y olvide la próxima si es en x cantidad de tiempo»* · «1 minuto».
+    ["Marca repetida", `Una marca a ${SEGUNDOS_MARCA_REPETIDA} segundos o menos de la anterior es el dedo que tocó dos veces: se conserva la primera y la repetida NO cuenta para nada. Sale en «Todas las marcas» como «(repetida, no cuenta)» y no entra en «Cuántas marcas». El reloj la sigue teniendo guardada.`],
     ["Corregido a mano", "La hora que marcó el reloj NUNCA se borra: la corrección va encima y es la que cuenta. La columna dice la hora del reloj, la corregida, por qué y quién la puso."],
     [],
     ["Todo en MINUTOS, no en horas decimales."],

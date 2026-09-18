@@ -171,7 +171,7 @@ describe("🔴 B. dos marcas pegadas se señalan", () => {
 
 describe("🔴 C. el Excel dice quién marcó de más", () => {
   const dia = (over: Record<string, unknown>) => ({
-    fecha: "2026-08-26", marcas: [] as string[], marcasIds: [], entrada: null, salida: null,
+    fecha: "2026-08-26", marcas: [] as string[], marcasIds: [], repetidas: [], entrada: null, salida: null,
     tardeMin: 0, excesoAlmuerzoMin: 0, salidaTempranaMin: 0, extraMin: 0, trabajadoMin: 0,
     revisar: false, salidaSospechosa: false, enCurso: false, fueraDeVigencia: false,
     ausente: false, vacacion: null, justificado: null, permiso: null, permisoRango: null,
