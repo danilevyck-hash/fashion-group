@@ -315,7 +315,10 @@ describe("el atajo encendido, al crear", () => {
     expect(screen.queryByText("Ver más días")).toBeNull();
   });
 
-  it("«Buscar otra vez» dispara la lectura corta de HOY y vuelve a pedir la lista", async () => {
+  // 🔄 18-sep-2026 — el botón decía «Buscar otra vez». Daniel: *«¿no prefieres
+  // Actualizar ahora?»*, que es lo que dicen los otros cinco módulos. Cambió el
+  // TEXTO y nada más: la lectura corta de HOY es la misma.
+  it("«Actualizar ahora» dispara la lectura corta de HOY y vuelve a pedir la lista", async () => {
     render(<Harness itemsIniciales={[filaVacia()]} />);
     await asentar();
     await elegirCliente();
@@ -324,7 +327,7 @@ describe("el atajo encendido, al crear", () => {
     // (no en un `title`: en el iPad no hay mouse).
     expect(screen.getByText(/Actualizado/)).toBeTruthy();
     await act(async () => {
-      fireEvent.click(screen.getByText("Buscar otra vez"));
+      fireEvent.click(screen.getByText("Actualizar ahora"));
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -372,7 +375,8 @@ describe("🔴 CONTROL — la constante apagada deja la pantalla EXACTAMENTE com
     expect(screen.queryByText("Facturas del cliente")).toBeNull();
     expect(screen.queryByText("Traslado")).toBeNull();
     expect(screen.queryByText("Escribir el número")).toBeNull();
-    expect(screen.queryByText("Buscar otra vez")).toBeNull();
+    // 🔄 18-sep-2026: decía «Buscar otra vez».
+    expect(screen.queryByText("Actualizar ahora")).toBeNull();
   });
 
   it("la pantalla de hoy sigue entera y escribir a mano funciona igual", async () => {

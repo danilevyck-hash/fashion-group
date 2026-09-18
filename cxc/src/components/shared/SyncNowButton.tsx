@@ -35,6 +35,10 @@
 import { useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { postSyncNow, syncConEnganche } from "./syncNowClient";
+// 🔴 Los DOS textos del botón salen de un solo lugar desde el 18-sep-2026:
+// «Actualizar ahora» es la palabra de la casa y Guías tenía otras dos. Ver
+// `lib/ui/actualizar-ahora.ts`.
+import { TEXTO_ACTUALIZANDO, TEXTO_ACTUALIZAR_AHORA } from "@/lib/ui/actualizar-ahora";
 
 export interface SyncNowOpcion {
   /** Módulo del endpoint: estadocuenta | facturas | recibos | clientes-master |
@@ -263,9 +267,9 @@ export default function SyncNowButton({
         <RefreshCw className={`h-3.5 w-3.5 ${running ? "animate-spin" : ""}`} />
         {running
           ? progreso
-            ? `Actualizando… (${progreso.actual}/${progreso.total})`
-            : "Actualizando…"
-          : "Actualizar ahora"}
+            ? `${TEXTO_ACTUALIZANDO} (${progreso.actual}/${progreso.total})`
+            : TEXTO_ACTUALIZANDO
+          : TEXTO_ACTUALIZAR_AHORA}
       </button>
       {subtext && <span className="mt-0.5 text-[12px] text-gray-400">{subtext}</span>}
 

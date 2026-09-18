@@ -260,7 +260,7 @@ export function marcasDelMedio(cuantas: number): number[] {
  * a una línea debajo del día, que es donde esta pantalla ya cuenta las cosas de
  * una marca (las correcciones y las del teléfono viven ahí).
  *
- * 🔴 **LA HORA DE ESA LÍNEA SIGUE SIENDO UN BOTÓN.** Es la marca que suele
+ * 🔴 **LA HORA DE ESA LÍNEA SIGUE SIENDO UN BOTÓN.** Es una de las que pueden
  * sobrar: si no se puede tocar para quitarla, la línea no sirve de nada. Por eso
  * el rótulo y la nota van APARTE —dos textos— y la hora se dibuja en el medio.
  *
@@ -268,18 +268,52 @@ export function marcasDelMedio(cuantas: number): number[] {
  *   · con menos de 4 FALTA una, y por eso no se sabe en cuál de las dos del
  *     almuerzo va la del medio;
  *   · con 5 o más SOBRA, y hay que quitarla.
+ *
+ * ── 🩸 LA LÍNEA DEJÓ DE NOMBRAR CUÁL SOBRA (18-sep-2026), Y COSTÓ UN DÍA MAL
+ *
+ * Hasta hoy decía **«Marca de más: 13:28:13»**. Esa hora no era un diagnóstico:
+ * era la marca que quedaba fuera de las cuatro columnas **por POSICIÓN**, sin
+ * mirar las horas ni un segundo. El módulo lo sabía —`marcasEscondidas` cuenta
+ * índices— pero el rótulo lo leía como si fuera un veredicto.
+ *
+ * El día de **Enrique Sánchez, 7-sep-2026**, la que sobraba era la **11:17:58**
+ * —el doble de la entrada—, no la 13:28:13 que la línea señalaba. La contadora
+ * leyó la línea, quitó la 13:28:13, y **el día quedó igual de mal**: el sistema
+ * le sigue leyendo un almuerzo de 112 minutos, con 82 de exceso.
+ *
+ * Daniel, decidiéndolo: *«no quiero que me recomiende cuál quitar, sino como
+ * está, que me diga abajo las otras marcaciones y la contable decide cómo
+ * arreglarlo»*.
+ *
+ * 🔴 Por eso la línea ahora **cuenta y no acusa**: «El día tiene 5 marcas, y
+ * son 4 — quita la que sobra», con las horas al lado. Las horas **siguen
+ * siendo BOTONES**: se borró media frase, no el botón. Y con **3 marcas el
+ * texto NO se tocó** —«Otra marca del día … le falta una marca, así que no se
+ * sabe si ésta es la salida a almorzar o el regreso»—, porque ahí la
+ * afirmación es VERDAD: con 3, la del medio es la única que puede ser
+ * cualquiera de las dos.
  */
 export function rotuloMarcasSueltas(cuantas: number, cuantasSueltas: number): string {
   const n = Math.max(0, Math.trunc(cuantas));
   if (n < MARCAS_NORMALES) return "Otra marca del día:";
-  return cuantasSueltas === 1 ? "Marca de más:" : "Marcas de más:";
+  // 🔴 Se dice CUÁNTAS hay y cuántas deberían ser. Cuál sobra, no. Ver el
+  // caso de Enrique Sánchez en el comentario de arriba.
+  const quita = cuantasSueltas === 1 ? "quita la que sobra" : "quita las que sobren";
+  return `El día tiene ${cuantasMarcasTexto(n)}, y son ${MARCAS_NORMALES} — ${quita}:`;
 }
 
-/** Lo que va DESPUÉS de la hora. Ver `rotuloMarcasSueltas`. */
+/**
+ * Lo que va DESPUÉS de la hora. Ver `rotuloMarcasSueltas`.
+ *
+ * 🔴 Con 5 o más va VACÍO desde el 18-sep-2026: la frase entera está en el
+ * rótulo y lo único que queda después de las horas es nada. Se conserva la
+ * función —y su llamada en la pantalla— porque con MENOS de 4 sí hay algo que
+ * decir, y porque es lo que mantiene la hora como un botón en el medio.
+ */
 export function notaMarcasSueltas(cuantas: number): string {
   const n = Math.max(0, Math.trunc(cuantas));
   if (n < MARCAS_NORMALES) {
     return "— le falta una marca, así que no se sabe si ésta es la salida a almorzar o el regreso";
   }
-  return `— el día tiene ${n}, y son 4`;
+  return "";
 }

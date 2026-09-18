@@ -461,6 +461,12 @@ cuatro celdas se vuelven UNA (`colSpan={4}`) con todas las horas en orden, cada 
 rótulo «5 marcas» adelante y la pegada en ámbar con su título («Marcó otra vez 1 segundo después.
 Si sobra, quítala con “Quitar esta marcación”»).
 
+> 🔄 **Ese párrafo quedó viejo el MISMO día, dos veces.** Fundir celdas rompía la grilla y Daniel lo
+> corrigió con la captura en la mano —*«no está en su columna, se ve desordenado»* y *«y aun se ve
+> desordenado»*—: hoy **las cuatro columnas se dibujan SIEMPRE** y lo que no entra baja a **su
+> propia línea** debajo del día, con las horas como botones. Y esa línea, más tarde, dejó de
+> nombrar cuál sobra: ver la sección de abajo.
+
 **3. El Excel dice quién marcó de más.** Dos columnas NUEVAS, **H «Todas las marcas»** e **I
 «Cuántas marcas»**, insertadas justo al lado de las horas.
 
@@ -514,6 +520,63 @@ cazadas**, 0 corridas muertas, **2 de 2 controles en verde**.
   3.ª (`reporte.ts`, regla 5).
 - No se quita ninguna marca sola, ni se sugiere cuál. El sistema señala; decide la persona.
 - No se corrió ninguna migración ni se escribió una sola fila en producción.
+
+---
+
+## 🔴 La línea de «más de 4 marcas» dejó de nombrar cuál sobra (18-sep-2026)
+
+### 🩸 Qué costó
+
+La línea decía **«Marca de más: 13:28:13»**. Esa hora no era un diagnóstico: era la marca que
+quedaba fuera de las cuatro columnas **por POSICIÓN** (`marcasEscondidas` cuenta índices), sin
+mirar el reloj ni un segundo. El rótulo la leía como si fuera un veredicto.
+
+El día de **Enrique Sánchez, 7-sep-2026**, la que sobraba era la **11:17:58** —el doble de la
+entrada—, no la 13:28:13 que la línea señalaba. **La contadora leyó la línea, quitó la 13:28:13, y
+el día quedó igual de mal**: el sistema le sigue leyendo un almuerzo de 112 minutos, con 82 de
+exceso.
+
+### Qué decidió Daniel
+
+> «no quiero que me recomiende cuál quitar, sino como está, que me diga abajo las otras marcaciones
+> y la contable decide cómo arreglarlo»
+
+### Cómo quedó
+
+| Marcas | Decía | Dice |
+|---|---|---|
+| 5 | `Marca de más: 16:37:50 — el día tiene 5, y son 4` | `El día tiene 5 marcas, y son 4 — quita la que sobra:` + la hora |
+| 6 | `Marcas de más: … — el día tiene 6, y son 4` | `El día tiene 6 marcas, y son 4 — quita las que sobren:` + las horas |
+| 3 | `Otra marca del día: … — le falta una marca, así que no se sabe si ésta es la salida a almorzar o el regreso` | **IGUAL** |
+| 4 | no se dibuja | igual |
+
+- La frase entera vive ahora en el **rótulo** (`rotuloMarcasSueltas`) y la **nota**
+  (`notaMarcasSueltas`) va vacía con 5 o más. Las dos funciones se conservan —y su llamada en la
+  pantalla— porque con MENOS de 4 sí hay algo que decir, y porque son las que dejan la hora **en el
+  medio**.
+- 🔴 **Las horas siguen siendo BOTONES**: se borró media frase, no el botón. De ahí se abre
+  «Corregir o quitar esta marcación», que es lo único que arregla el día.
+- 🔴 **Con 3 marcas el texto NO se tocó.** Ahí la afirmación SÍ es verdad: falta una, y la del medio
+  es la única que puede ser la salida a almorzar o el regreso.
+- El plural sale de **cuántas sobran**, no del día (5 → «la que sobra», 6 → «las que sobren»), y el
+  **4 de la frase se deriva de `MARCAS_NORMALES`**: no hay un segundo cuatro tecleado.
+
+### 🔴 Ningún número se movió
+
+Es TEXTO. El motor sigue leyendo la última marca como la salida y el almuerzo entre la 2.ª y la
+3.ª; `revisar`, el freno del cierre (`marcasMalContadas`), el Excel y la tabla quedaron **idénticos
+al pixel**.
+
+### Candados
+
+`src/__tests__/lib/asistencia-marcas-de-mas.test.ts` — el texto de 5, 6 y 3 letra por letra, que
+ningún texto de la línea diga «marca de más», el plural por cuántas sobran y el 4 derivado ·
+`src/__tests__/components/asistencia-marcas-de-mas.test.tsx` — la línea dibujada, con la hora
+todavía como `<button>` y el caso de 3 marcas como control.
+
+**Verificado por mutación** junto con el otro cambio de texto del día:
+`scripts/_mutar-candados-una-palabra-y-la-linea.sh` — **12 mutaciones, 12 cazadas**, 0 corridas
+muertas, **2 de 2 controles en verde**.
 
 ---
 

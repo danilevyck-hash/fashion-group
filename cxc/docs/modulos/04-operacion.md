@@ -149,7 +149,8 @@ solo al CREAR — nunca al editar ni en una Completada):
    Sirve para cualquier cliente. **No pide factura, pero la empresa SÍ se elige a mano.**
 7. Botón **«Escribir el número»** — escribe la factura a mano con el cliente ya puesto.
 8. Al pie: *«hasta las HH:MM»* (la frescura, = el sync exitoso más VIEJO de las 6 empresas) y
-   **«Buscar otra vez»**.
+   **«Actualizar ahora»** (decía «Buscar otra vez» hasta el 18-sep-2026: misma función, la palabra
+   de la casa).
 
 **Envíos (uno o más renglones).** Campos por renglón:
 

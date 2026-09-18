@@ -1445,7 +1445,8 @@ Una fila **por FACTURA**: `empresa_key` · `switch_factura_id` · `secuencial` �
   (radio, no casillas).
 - **El destino viene preseleccionado** con «el de siempre» del cliente, por la **misma** función del
   formulario de la guía (`destinoParaAutollenar` + `botonesDeDestino`). Ni una segunda definición.
-- **«Traer de Switch ahora»** reusa `POST /api/guias/facturas-hoy` — 🔴 **no se estrenó un camino a
+- **«Traer de Switch ahora»** (🔄 **desde el 18-sep-2026 dice «Actualizar ahora»**, la palabra de la
+  casa; misma ruta y misma conducta) reusa `POST /api/guias/facturas-hoy` — 🔴 **no se estrenó un camino a
   Switch**: la misma ruta de siempre, acotada al día, con su cooldown de 10 min y su
   `logoutAllSwitchSessions()` en el `finally`.
 - **Anti-duplicado**: la misma factura otra vez **no crea un segundo juego**. Sale «Ya etiquetada ·
@@ -1625,7 +1626,8 @@ de Switch nunca se esconde**: no se la puede parear. La tarjeta «Ya etiquetada 
 Verbatim: **«¿No aparece la factura de hoy? Tráela de Switch»** (`TEXTO_TRAER_DE_SWITCH`). Antes
 decía «¿No está la factura de hoy? El detalle de Switch entra una vez al día» — una explicación del
 mecanismo donde hacía falta una pregunta y qué hacer. ⚠️ El botón sigue diciendo «Traer de Switch
-ahora»: no se tocó.
+ahora»: no se tocó. 🔄 **Ese botón pasó a «Actualizar ahora» horas después, el mismo 18-sep-2026**
+(la palabra de la casa); **la frase de Daniel NO cambió**.
 
 ### Lo que NO se tocó
 
@@ -1649,11 +1651,70 @@ ahora»: no se tocó.
 ### ⚠️ Lo que queda pendiente de Daniel (Fase 1b)
 
 1. **Correr la migración `20261207120000`.** Sigue pendiente, y hasta que corra nada de esto se ve.
-2. El botón sigue diciendo **«Traer de Switch ahora»** al lado de la frase nueva. Si le suena
-   repetido, es un cambio de una palabra.
+2. ~~El botón sigue diciendo **«Traer de Switch ahora»** al lado de la frase nueva. Si le suena
+   repetido, es un cambio de una palabra.~~ **RESUELTO el 18-sep-2026** — Daniel: *«¿no prefieres
+   Actualizar ahora?»*. Ver la sección de abajo.
 3. Una factura con etiqueta viva queda bloqueada en el selector **aunque no se quiera usar la
    etiqueta**. Para meterla a la guía sin sus cajas hay que borrar la etiqueta primero. Es
    deliberado; si algún día hace falta la salida, es otra decisión.
+
+---
+
+## 🔴 Guías — UNA SOLA PALABRA PARA «TRAER DATOS FRESCOS»: «Actualizar ahora» (18-sep-2026)
+
+### Qué decidió Daniel
+
+Mirando el botón que Etiquetas estrenó el día anterior:
+
+> «¿no prefieres Actualizar ahora?»
+
+### 🩸 Eran TRES palabras para la MISMA acción
+
+| Dónde | Decía |
+|---|---|
+| CXC · Catálogos · Proveedores · Referencia · Multifashion (`SyncNowButton`) | **«Actualizar ahora»** |
+| Guías, en el selector de facturas de Nueva guía (`FacturasDelCliente.tsx`) | «Buscar otra vez» |
+| Etiquetas (`EtiquetasView.tsx`), estrenado el 17-sep | «Traer de Switch ahora» |
+
+Los tres hacen lo mismo para quien los toca —ir a buscar datos frescos y volver a dibujar la
+pantalla— y los dos de Guías llaman a la MISMA ruta (`POST /api/guias/facturas-hoy`). Tres nombres
+no le enseñan nada a nadie: le hacen dudar de si son tres cosas distintas.
+
+### Cómo quedó
+
+- Las dos palabras viven en **`src/lib/ui/actualizar-ahora.ts`** (`TEXTO_ACTUALIZAR_AHORA` ·
+  `TEXTO_ACTUALIZANDO`), con el porqué escrito ahí, **para que nadie estrene una cuarta**. Los TRES
+  botones —los cinco módulos incluidos— la leen de ahí; ninguno la teclea.
+- Etiquetas: **la frase de Daniel NO se tocó** — sigue siendo *«¿No aparece la factura de hoy?
+  Tráela de Switch»* (`TEXTO_TRAER_DE_SWITCH`), y al lado el botón dice **«Actualizar ahora»**. El
+  aviso de la factura sin número interno también pasó a decir «Toca «Actualizar ahora»».
+- Nueva guía: el tercer pedazo del pie de una línea pasó de «Buscar otra vez» a **«Actualizar
+  ahora»**; mientras corre dice «Actualizando…» (decía «Buscando…»).
+
+### ⚠️ Lo que NO se tocó, y es de verdad otra cosa
+
+**«Traer ahora» de Asistencia** (`EstadoReloj.tsx`). Ése no lee nada: le deja un pedido a una PC
+concreta para que EMPUJE las marcaciones de SU reloj cuando vuelva a mirar el buzón. Distinta
+acción, distinto nombre, y su texto está explicado en su propio archivo.
+
+### Lo que NO cambió
+
+Ni una ruta, ni un cooldown, ni un permiso, ni el payload de nada. Es TEXTO: los dos botones llaman
+al mismo `POST /api/guias/facturas-hoy` de siempre y recargan la misma lista.
+
+### Candados
+
+`src/__tests__/lib/actualizar-ahora-una-palabra.test.ts` — las dos palabras letra por letra, que los
+tres botones las importen en vez de teclearlas, **un barrido sobre `src/**` que prohíbe que «Buscar
+otra vez» y «Traer de Switch ahora» vuelvan a dibujarse**, la excepción de Asistencia y la frase de
+Daniel intacta.
+
+Cambiaron de dirección, con nota fechada: `guia-form-marcar-facturas.test.tsx` ·
+`guias-varios-clientes-y-dias.test.tsx` · `guias-etiquetas.test.ts`.
+
+**Verificado por mutación** junto con el otro cambio de texto del día:
+`scripts/_mutar-candados-una-palabra-y-la-linea.sh` — **12 mutaciones, 12 cazadas**, 0 corridas
+muertas, **2 de 2 controles en verde**.
 
 ---
 

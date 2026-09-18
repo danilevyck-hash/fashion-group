@@ -28,8 +28,12 @@
 // de la que se está armando ahora mismo.
 //
 // Fail-open de punta a punta: si la lista no carga, se dice y se escribe a
-// mano como siempre. «Buscar otra vez» dispara la lectura corta de HOY
+// mano como siempre. «Actualizar ahora» dispara la lectura corta de HOY
 // (/api/guias/facturas-hoy) y vuelve a pedir la lista.
+//
+// 🔄 18-sep-2026: ese botón decía «Buscar otra vez». Daniel: *«¿no prefieres
+// Actualizar ahora?»* — es la palabra que dicen los otros cinco módulos. Solo
+// cambió el TEXTO; hace exactamente lo mismo. Ver `lib/ui/actualizar-ahora.ts`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useState } from "react";
@@ -55,6 +59,7 @@ import {
   type FacturaDelCliente as Factura,
 } from "@/lib/guias/atajos-facturas";
 import { capturaEnElSelector } from "@/lib/guias/anti-doble-captura";
+import { TEXTO_ACTUALIZANDO, TEXTO_ACTUALIZAR_AHORA } from "@/lib/ui/actualizar-ahora";
 import type { EtiquetaFila } from "@/lib/guias/etiquetas";
 
 interface Props {
@@ -122,7 +127,7 @@ export default function FacturasDelCliente({
   // `diaAbierto`. Así los días que trae «Ver más días» nacen plegados sin
   // ningún efecto de inicialización que los pueda abrir por accidente.
   const [diasAlternados, setDiasAlternados] = useState<ReadonlySet<string>>(new Set());
-  const [buscandoOtraVez, setBuscandoOtraVez] = useState(false);
+  const [actualizando, setActualizando] = useState(false);
   /** Contador para devolverle el foco al buscador DESPUÉS del re-render. */
   const [pedirFoco, setPedirFoco] = useState(0);
 
@@ -158,15 +163,15 @@ export default function FacturasDelCliente({
     if (campo instanceof HTMLInputElement) campo.focus();
   }, [pedirFoco]);
 
-  /** «Buscar otra vez»: primero la lectura corta de HOY, después la lista. */
-  async function buscarOtraVez() {
-    if (!cliente?.codigo || buscandoOtraVez) return;
-    setBuscandoOtraVez(true);
+  /** «Actualizar ahora»: primero la lectura corta de HOY, después la lista. */
+  async function actualizarAhora() {
+    if (!cliente?.codigo || actualizando) return;
+    setActualizando(true);
     try {
       await fetch("/api/guias/facturas-hoy", { method: "POST" }).catch(() => {});
       await cargarFacturas(cliente.codigo);
     } finally {
-      setBuscandoOtraVez(false);
+      setActualizando(false);
     }
   }
 
@@ -403,7 +408,7 @@ export default function FacturasDelCliente({
                 ver más días en guías, se desperdicia mucho espacio con esa
                 info, cómo la puedes hacer más minimalista»* y *«todo siempre
                 minimalista»*. Eran TRES renglones —el «o [Traslado]» en una
-                caja, la frescura y «Buscar otra vez» a la izquierda, «Escribir
+                caja, la frescura y el botón de actualizar a la izquierda, «Escribir
                 el número» empujado a la derecha—; ahora es un renglón de texto
                 chico separado por puntos medios.
 
@@ -447,11 +452,11 @@ export default function FacturasDelCliente({
                 <span aria-hidden="true">·</span>
                 <button
                   type="button"
-                  onClick={() => void buscarOtraVez()}
-                  disabled={buscandoOtraVez}
+                  onClick={() => void actualizarAhora()}
+                  disabled={actualizando}
                   className="hover:text-black transition inline-flex items-center min-h-[44px] md:[@media(pointer:fine)]:min-h-0 md:[@media(pointer:fine)]:py-1 disabled:opacity-40"
                 >
-                  {buscandoOtraVez ? "Buscando…" : "Buscar otra vez"}
+                  {actualizando ? TEXTO_ACTUALIZANDO : TEXTO_ACTUALIZAR_AHORA}
                 </button>
               </div>
             )}

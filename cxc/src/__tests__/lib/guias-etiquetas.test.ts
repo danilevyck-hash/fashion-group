@@ -531,7 +531,9 @@ describe("🔴 11. la pestaña «Etiquetas» tiene su propia puerta", () => {
     expect(form).toMatch(/GUIAS_ATAJOS_NUEVOS && !editingId && !soloCorregible && onReemplazarItems && \(\s*<EtiquetasPendientes/);
   });
 
-  it("«Traer de Switch ahora» reusa la ruta de siempre, sin estrenar un camino a Switch", () => {
+  // 🔄 18-sep-2026 — el botón decía «Traer de Switch ahora». Daniel: *«¿no
+  // prefieres Actualizar ahora?»*. Solo el TEXTO: la ruta es la misma.
+  it("«Actualizar ahora» reusa la ruta de siempre, sin estrenar un camino a Switch", () => {
     expect(vista).toContain('fetch("/api/guias/facturas-hoy", { method: "POST" })');
     const sinComentarios = vista.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/\/\/.*$/gm, "");
     expect(sinComentarios).not.toMatch(/apifactura|switch-api/i);

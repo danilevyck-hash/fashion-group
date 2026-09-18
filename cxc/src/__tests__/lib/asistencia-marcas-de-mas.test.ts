@@ -503,16 +503,61 @@ describe("Las marcas del medio", () => {
     expect(src).toContain("rotuloMarcasSueltas(");
   });
 
+  // 🔄 18-sep-2026 — CAMBIÓ DE DIRECCIÓN, y por un día mal cerrado. La línea
+  // decía «Marca de más: 13:28:13»: una hora elegida por POSICIÓN, sin mirar
+  // el reloj. En el día de Enrique Sánchez (7-sep-2026) la que sobraba era la
+  // 11:17:58 —el doble de la entrada—; la contadora quitó la 13:28:13 que la
+  // línea señalaba y el día quedó igual de mal (almuerzo de 112 min, 82 de
+  // exceso). Daniel: *«no quiero que me recomiende cuál quitar, sino como
+  // está, que me diga abajo las otras marcaciones y la contable decide cómo
+  // arreglarlo»*. Antes este caso exigía «Marca de más:» / «Marcas de más:».
   it("la línea de abajo dice cosas DISTINTAS según falte o sobre", async () => {
     const { rotuloMarcasSueltas, notaMarcasSueltas } =
       await import("@/lib/asistencia/marcas-del-dia");
-    // Con 3 marcas FALTA una: no se sabe cuál de las dos del almuerzo es.
+    // Con 3 marcas FALTA una: no se sabe cuál de las dos del almuerzo es. 🔴
+    // ESTE TEXTO NO SE TOCÓ: ahí la afirmación SÍ es verdad.
     expect(rotuloMarcasSueltas(3, 1)).toBe("Otra marca del día:");
     expect(notaMarcasSueltas(3)).toContain("le falta una marca");
-    // Con 5 o 6 SOBRA: hay que quitarla.
-    expect(rotuloMarcasSueltas(5, 1)).toBe("Marca de más:");
-    expect(rotuloMarcasSueltas(6, 2)).toBe("Marcas de más:");
-    expect(notaMarcasSueltas(5)).toContain("el día tiene 5");
+    // Con 5 o 6 SOBRA: se dice CUÁNTAS hay y cuántas son, nunca cuál sobra.
+    expect(rotuloMarcasSueltas(5, 1)).toBe("El día tiene 5 marcas, y son 4 — quita la que sobra:");
+    expect(rotuloMarcasSueltas(6, 2)).toBe("El día tiene 6 marcas, y son 4 — quita las que sobren:");
+    // Y después de las horas ya no queda nada que decir.
+    expect(notaMarcasSueltas(5)).toBe("");
+    expect(notaMarcasSueltas(6)).toBe("");
+  });
+
+  it("🔴 NINGÚN texto de la línea señala una marca en particular", async () => {
+    const { rotuloMarcasSueltas, notaMarcasSueltas } =
+      await import("@/lib/asistencia/marcas-del-dia");
+    // «de más» seguido de una hora es exactamente lo que se fue: nombraba una
+    // marca elegida por posición como si fuera la culpable.
+    for (const n of [5, 6, 7, 8]) {
+      const linea = `${rotuloMarcasSueltas(n, n - 4)} ${notaMarcasSueltas(n)}`;
+      expect(linea, `${n}`).not.toMatch(/Marcas? de más/);
+      expect(linea, `${n}`).toContain(`El día tiene ${n} marcas, y son 4`);
+    }
+  });
+
+  it("🔴 el plural sale de CUÁNTAS sobran, no del día", async () => {
+    const { rotuloMarcasSueltas } = await import("@/lib/asistencia/marcas-del-dia");
+    expect(rotuloMarcasSueltas(5, 1)).toContain("quita la que sobra");
+    expect(rotuloMarcasSueltas(6, 2)).toContain("quita las que sobren");
+    expect(rotuloMarcasSueltas(7, 3)).toContain("quita las que sobren");
+  });
+
+  it("🔴 el 4 de la frase sale de MARCAS_NORMALES, no está tecleado", () => {
+    const src = fs.readFileSync(path.join(RAIZ, "lib/asistencia/marcas-del-dia.ts"), "utf8");
+    const fn = src.slice(src.indexOf("export function rotuloMarcasSueltas"));
+    const cuerpo = fn.slice(0, fn.indexOf("\n}\n"));
+    expect(cuerpo).toContain("${MARCAS_NORMALES}");
+    expect(cuerpo).not.toMatch(/y son 4/);
+  });
+
+  it("🔴 CONTROL: las horas de esa línea siguen siendo BOTONES", () => {
+    // Se borró media frase, no el botón: sin el botón la línea no sirve de
+    // nada, que es justo lo que hay que tocar para quitar la marca.
+    const pantalla = fs.readFileSync(path.join(RAIZ, "app/asistencia/ReporteTab.tsx"), "utf8");
+    expect(pantalla).toMatch(/rotuloMarcasSueltas[\s\S]{0,400}<HoraBoton idx=\{i\}/);
   });
 
   it("🔴 CONTROL: el rótulo y la nota van APARTE, para que la hora sea un botón", () => {

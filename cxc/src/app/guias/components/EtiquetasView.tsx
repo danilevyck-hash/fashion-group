@@ -45,6 +45,7 @@ import {
   tituloDelDia,
   type FacturaDelCliente as Factura,
 } from "@/lib/guias/atajos-facturas";
+import { TEXTO_ACTUALIZANDO, TEXTO_ACTUALIZAR_AHORA } from "@/lib/ui/actualizar-ahora";
 import {
   botonesDeDestino,
   destinoParaAutollenar,
@@ -369,7 +370,7 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
   const [facturas, setFacturas] = useState<Factura[] | null>(null);
   const [cargando, setCargando] = useState(false);
   const [sinLista, setSinLista] = useState(false);
-  const [trayendo, setTrayendo] = useState(false);
+  const [actualizando, setActualizando] = useState(false);
   const [diasVisibles, setDiasVisibles] = useState(DIAS_CON_FACTURA_VISIBLES);
   const [diasAlternados, setDiasAlternados] = useState<ReadonlySet<string>>(new Set());
   const [elegidaClave, setElegidaClave] = useState<string | null>(null);
@@ -417,17 +418,23 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
     if (cliente?.codigo) void cargarFacturas(cliente.codigo);
   }, [cliente?.codigo, cargarFacturas]);
 
-  /** 🔴 «TRAER DE SWITCH AHORA» reusa la MISMA ruta de siempre: nada de un
-   *  camino nuevo a Switch. Trae solo el día de hoy, con su cooldown de 10 min
-   *  y su cierre de sesiones en el `finally` del servidor. */
-  async function traerDeSwitch() {
-    if (!cliente?.codigo || trayendo) return;
-    setTrayendo(true);
+  /** 🔴 «ACTUALIZAR AHORA» reusa la MISMA ruta de siempre: nada de un camino
+   *  nuevo a Switch. Trae solo el día de hoy, con su cooldown de 10 min y su
+   *  cierre de sesiones en el `finally` del servidor.
+   *
+   *  🔄 18-sep-2026: el botón decía «Traer de Switch ahora», estrenado ayer.
+   *  Daniel: *«¿no prefieres Actualizar ahora?»* — es la palabra que dicen los
+   *  otros cinco módulos. Cambió el TEXTO y nada más; la frase de arriba
+   *  (`TEXTO_TRAER_DE_SWITCH`) es de Daniel y NO se tocó. Ver
+   *  `lib/ui/actualizar-ahora.ts`. */
+  async function actualizarAhora() {
+    if (!cliente?.codigo || actualizando) return;
+    setActualizando(true);
     try {
       await fetch("/api/guias/facturas-hoy", { method: "POST" }).catch(() => {});
       await cargarFacturas(cliente.codigo);
     } finally {
-      setTrayendo(false);
+      setActualizando(false);
     }
   }
 
@@ -483,7 +490,7 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
     if (!v.ok) { setError(v.error); return; }
     if (!destino.trim()) { setError("Escribe el destino del envío"); return; }
     if (elegida.switch_factura_id == null) {
-      setError("Esa factura todavía no tiene su número interno. Toca «Traer de Switch ahora».");
+      setError("Esa factura todavía no tiene su número interno. Toca «Actualizar ahora».");
       return;
     }
     setGuardando(true);
@@ -648,11 +655,11 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
                 <span>{TEXTO_TRAER_DE_SWITCH}</span>
                 <button
                   type="button"
-                  onClick={() => void traerDeSwitch()}
-                  disabled={trayendo}
+                  onClick={() => void actualizarAhora()}
+                  disabled={actualizando}
                   className={`${BOTON_BLANCO} ml-auto min-h-[36px] px-3 text-[13px]`}
                 >
-                  {trayendo ? "Trayendo…" : "Traer de Switch ahora"}
+                  {actualizando ? TEXTO_ACTUALIZANDO : TEXTO_ACTUALIZAR_AHORA}
                 </button>
               </div>
             )}

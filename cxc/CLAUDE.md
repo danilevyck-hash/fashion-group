@@ -698,6 +698,8 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 - Usuarios: secretarias, bodegueros, vendedores en Panamá. NO tech-savvy.
 - 🔴 **«Pedido» para Daniel es la orden de un CLIENTE, nunca una petición HTTP.** Decirle *«la lista no manda ningún pedido de escritura»* lo hizo entender que Guías mandaba pedidos a Switch. Para hablar de red: **«no escribe nada», «no guarda nada», «solo lee»**. Igual de cargadas: factura · traslado · abono · pago.
 - Labels en español simple. Cero jerga (CXC → "Cuentas por Cobrar")
+- 🔴 **Traer datos frescos se dice «Actualizar ahora» en TODO el sistema** (`lib/ui/actualizar-ahora.ts`; Guías decía «Buscar otra vez» y Etiquetas «Traer de Switch ahora» hasta el 18-sep-2026). ⚠️ **«Traer ahora» de Asistencia es OTRA cosa** —le pide a una PC que empuje las marcas de su reloj— y no se toca. Candado: `actualizar-ahora-una-palabra`.
+- 🔴 **La línea de «más de 4 marcas» NO dice cuál sobra** (18-sep-2026): «El día tiene N marcas, y son 4 — quita la que sobra», con las horas como BOTONES. 🩸 Decía «Marca de más: HH:MM:SS» —elegida por POSICIÓN— y la contadora quitó la equivocada en el día de Enrique Sánchez (7-sep). ⚠️ Con 3 marcas el texto NO cambia: ahí sí falta una. Detalle en [asistencia-planilla.md](docs/postmortems/asistencia-planilla.md).
 - Botones descriptivos ("Guardar gasto", no "Guardar")
 - Errores accionables y humanos ("No se pudo guardar. Intenta de nuevo en unos segundos.")
 - Micro-copy con personalidad ("Listo, guardado", "Excel listo — revisa tu carpeta de descargas")

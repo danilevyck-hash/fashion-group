@@ -410,7 +410,8 @@ describe("🔴 el pie es UNA línea, y no perdió ninguna función", () => {
   it("los pedazos viven en el MISMO renglón, en orden y separados por puntos", async () => {
     // (el espacio alrededor del punto lo pone el `gap` del renglón, no el texto)
     const linea = await pie();
-    expect((linea.textContent || "").trim()).toBe("Traslado·Escribir el número·Buscar otra vez");
+    // 🔄 18-sep-2026: el tercer pedazo decía «Buscar otra vez» (misma función).
+    expect((linea.textContent || "").trim()).toBe("Traslado·Escribir el número·Actualizar ahora");
     expect(linea.querySelectorAll("button")).toHaveLength(3);
   });
 
@@ -422,7 +423,7 @@ describe("🔴 el pie es UNA línea, y no perdió ninguna función", () => {
     await elegirCliente(CITY.nombre);
     const linea = screen.getByTestId("pie-facturas");
     expect((linea.textContent || "").trim()).toMatch(
-      /^Traslado·Escribir el número·Actualizado .+·Buscar otra vez$/,
+      /^Traslado·Escribir el número·Actualizado .+·Actualizar ahora$/,
     );
     expect(linea.querySelector("[title]")).toBeNull();
   });
@@ -522,7 +523,7 @@ describe("🔴 CONTROL — con GUIAS_ATAJOS_NUEVOS en false no existe nada de es
     expect(screen.queryByTestId("pie-facturas")).toBeNull();
     expect(screen.queryByText("Traslado")).toBeNull();
     expect(screen.queryByText("Escribir el número")).toBeNull();
-    expect(screen.queryByText("Buscar otra vez")).toBeNull();
+    expect(screen.queryByText("Actualizar ahora")).toBeNull();
     expect(screen.queryByText(/facturas$/)).toBeNull();
     // Y la pantalla de siempre sigue entera.
     expect(screen.getByText("Detalle de Envío")).toBeTruthy();

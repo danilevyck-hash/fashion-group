@@ -112,8 +112,13 @@ describe("🔴 1. UN DÍA DE 5 MARCAS MUESTRA LAS CINCO", () => {
     // 🔄 18-sep-2026, más tarde el mismo día: el chip «5 marcas» adentro de la
     // fila se fue. Rompía la grilla —Daniel: *«y aun se ve desordenado»*— y lo
     // reemplazó la línea de abajo, que además dice qué hacer.
-    expect(screen.getByText(/Marca de más:/)).toBeTruthy();
-    expect(screen.getByText(/el día tiene 5, y son 4/)).toBeTruthy();
+    // 🔄 18-sep-2026, otra vez: esa línea decía «Marca de más: 14:23:39» y
+    // NOMBRABA una marca elegida por POSICIÓN. En el día de Enrique Sánchez
+    // (7-sep) la que sobraba era otra, la contadora quitó la que la línea
+    // señalaba y el día quedó igual de mal. Daniel: *«no quiero que me
+    // recomiende cuál quitar… la contable decide cómo arreglarlo»*.
+    expect(screen.getByText(/El día tiene 5 marcas, y son 4 — quita la que sobra:/)).toBeTruthy();
+    expect(screen.queryByText(/Marcas? de más/)).toBeNull();
   });
 
   it("🔴 LA PEGADA SE SEÑALA A OJO: la 14:23:39 lleva su aviso, la 14:23:38 no", async () => {
@@ -143,8 +148,22 @@ describe("🔴 1. UN DÍA DE 5 MARCAS MUESTRA LAS CINCO", () => {
     expect(screen.getByText("12:00:00")).toBeTruthy();
     // 🔄 18-sep-2026: con 3 marcas FALTA una, así que la línea lo dice con esas
     // palabras en vez de un chip que solo contaba.
+    // 🔴 CONTROL del cambio de más tarde ese mismo día: acá el texto NO se
+    // tocó. Con 3 marcas la afirmación es VERDAD —la del medio es la única que
+    // puede ser la salida a almorzar o el regreso—; lo que se fue es la línea
+    // que NOMBRABA cuál sobra cuando hay 5 o más.
     expect(screen.getByText(/Otra marca del día:/)).toBeTruthy();
     expect(screen.getByText(/le falta una marca/)).toBeTruthy();
+  });
+
+  it("🔴 la hora de esa línea SIGUE SIENDO UN BOTÓN: se borró media frase, no el botón", async () => {
+    servir(respuesta(CINCO));
+    montar(<ReporteTab />);
+    await abrirElDetalle();
+    // La 14:23:39 es la que baja a la línea (la que las cuatro columnas
+    // escondían). Tocarla abre «Corregir o quitar esta marcación».
+    const hora = screen.getByText("14:23:39");
+    expect(hora.tagName).toBe("BUTTON");
   });
 
   it("tocar una hora ofrece corregirla O quitarla, y lo dice el título", async () => {

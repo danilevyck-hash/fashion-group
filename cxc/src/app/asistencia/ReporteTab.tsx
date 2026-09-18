@@ -967,7 +967,7 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJu
                 *«no está en su columna, se ve desordenado»* y *«y aun se ve
                 desordenado»*. Lo que no entra en las cuatro baja a una línea
                 debajo del día, que es donde esta pantalla ya cuenta lo que pasa
-                con una marca. Ver `textoMarcasSueltas`. */}
+                con una marca. Ver `rotuloMarcasSueltas`. */}
             <Hora idx={columnas[0]} />
             <Hora idx={columnas[1]} />
             <Hora idx={columnas[2]} />
@@ -1164,7 +1164,14 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJu
 
       {/* 🔴 LO QUE NO ENTRA EN LAS CUATRO COLUMNAS, EN SU PROPIA LÍNEA. Con 4
           marcas —el 82 % de los días— esto no se dibuja y la fila es la de
-          siempre. */}
+          siempre.
+
+          🩸 18-sep-2026: esta línea DEJÓ DE NOMBRAR cuál sobra. Decía «Marca de
+          más: 13:28:13» —una hora elegida por POSICIÓN, sin mirar el reloj— y
+          en el día de Enrique Sánchez (7-sep) la que sobraba era la 11:17:58:
+          la contadora quitó la que la línea señalaba y el día quedó igual de
+          mal. Ahora cuenta y no acusa. El texto y el porqué, en
+          `rotuloMarcasSueltas`. */}
       {marcasEscondidas(d.marcas.length).length > 0 && (
         <tr className="border-b border-gray-100">
           <td></td>
@@ -1172,8 +1179,8 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJu
             {rotuloMarcasSueltas(d.marcas.length, marcasEscondidas(d.marcas.length).length)}
             {marcasEscondidas(d.marcas.length).map((i) => (
               <span key={i} className="mx-1.5 inline-block align-middle">
-                {/* 🔴 SIGUE SIENDO UN BOTÓN: es la marca que suele sobrar, y de
-                    acá se abre «Corregir o quitar esta marcación». */}
+                {/* 🔴 SIGUE SIENDO UN BOTÓN: es una de las que pueden sobrar,
+                    y de acá se abre «Corregir o quitar esta marcación». */}
                 <HoraBoton idx={i} tenue />
               </span>
             ))}
