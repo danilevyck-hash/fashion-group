@@ -108,6 +108,12 @@ import { olvidarRepetidas, type MarcaRepetidaVisible } from "./marca-repetida";
 // haya pasado por el reloj, ese día no genera horas, ni tardanza, ni ausencia.
 import { vacacionDe, type DiaVacacion, type Vacacion } from "./vacaciones";
 import { diaFueraDeVigencia, type Vigencia } from "./vigencia";
+// 🔴 LOS DÍAS Y LOS DOS HORARIOS, CONFIGURABLES (18-sep-2026). Qué días trabaja
+// cada quien (Multifashion, lunes a sábado) y con qué horario se mide el día
+// (lo decide la PRIMERA marca: teléfono → el de afuera). La regla vive en
+// `horario-configurable.ts`; acá solo se le pregunta. Sin nada configurado,
+// lunes a viernes y un horario: lo de siempre.
+import { esDiaLaborable, horarioDelDia } from "./horario-configurable";
 // 🔑 SOLO EL TIPO. `correcciones.ts` importa `diaPanama` de acá (un valor), así
 // que un import normal armaría un ciclo en tiempo de ejecución; `import type`
 // se borra al compilar y no queda ninguno.
@@ -151,6 +157,14 @@ export interface Marcacion {
    * `id` —no existe en la tabla del reloj— y eso es lo que la distingue.
    */
   id?: string | null;
+  /**
+   * Qué aparato la registró (`asistencia_marcaciones.dispositivo`): un reloj
+   * físico o `telefono`. Opcional a propósito: sin él —una hora agregada a
+   * mano, o una llamada vieja— la marca es del RELOJ y se mide con el horario
+   * de siempre. 🔴 Solo se mira en la PRIMERA marca del día, para elegir el
+   * horario (18-sep-2026). No entra en ninguna otra cuenta.
+   */
+  dispositivo?: string | null;
 }
 
 export interface HorarioPersona {
@@ -158,6 +172,12 @@ export interface HorarioPersona {
   entrada: string;   // "08:00"
   salida: string;    // "16:30" | "17:00"
   almuerzo_minutos: number;
+  /**
+   * El horario de cuando marca por el TELÉFONO (18-sep-2026). Vacío = el
+   * mismo de adentro, campo por campo. Ver `horario-configurable.ts`.
+   */
+  entrada_afuera?: string | null;
+  salida_afuera?: string | null;
 }
 
 export interface Justificacion {
@@ -302,14 +322,24 @@ export interface DiaReporte {
   permisoPerdonaAlmuerzoMin: number;
   feriado: string | null;
   /**
-   * El día cae de lunes a viernes.
+   * El día es LABORABLE para esta persona: lunes a viernes, salvo que tenga
+   * otra lista de días (`diasLaborables`; Multifashion trabaja lunes a
+   * sábado desde el 18-sep-2026). El domingo nunca lo es.
    *
    * 🩸 Existe por la PLANILLA: los domingos se pagan al 1.5 y para eso el motor
    * tiene que verlos (`incluirNoHabiles`). Pero un domingo sin marcas NO es una
    * ausencia —nadie faltó, es domingo—, y sin este campo el mismo `if` que
-   * detecta la ausencia se los tragaría a todos.
+   * detecta la ausencia se los tragaría a todos. 🔴 Es lo que la planilla
+   * mira para decidir sábado/domingo (`clasificarDia`): no se recalcula allá.
    */
   habil: boolean;
+  /**
+   * El día se midió con el horario de AFUERA (la primera marca vino del
+   * teléfono y la persona tiene ese horario configurado). Informativo, para
+   * que la pantalla lo diga; los minutos ya salen calculados con él. Ausente
+   * o `false` = el horario de siempre.
+   */
+  horarioDeAfuera?: boolean;
   /**
    * Las horas de este día que se tocaron a mano (`asistencia_correcciones`).
    *
@@ -535,7 +565,16 @@ export function fmtMin(min: number): string {
   return Number.isInteger(r) ? String(r) : r.toFixed(2);
 }
 
-/** ¿La fecha cae de lunes a viernes? Nadie trabaja sábado de rutina: medido. */
+/**
+ * ¿La fecha cae de lunes a viernes? Es la regla de SIEMPRE, sin mirar a nadie.
+ *
+ * ⚠️ Desde el 18-sep-2026 el MOTOR no la usa para decidir si un día es
+ * laborable: eso lo contesta `esDiaLaborable(fecha, dias)` con los días de
+ * cada persona (Multifashion trabaja lunes a sábado). Esto queda para lo que
+ * cuenta días hábiles del CALENDARIO sin persona adelante (`periodo.ts`,
+ * `prorrateo-ingreso.ts`, `dia-libre-empresa.ts`), y es idéntico a
+ * `esDiaLaborable(fecha)` sin lista.
+ */
 export function esHabil(fecha: string): boolean {
   const dow = new Date(`${fecha}T12:00:00Z`).getUTCDay();
   return dow >= 1 && dow <= 5;
@@ -662,6 +701,16 @@ export function armarReporte(opts: {
    * Planilla, que ya leían este mapa para otra cosa (`codigosFueraDeRango`).
    */
   vigencias?: ReadonlyMap<string, Vigencia>;
+  /**
+   * 🔴 QUÉ DÍAS TRABAJA CADA QUIEN (18-sep-2026), por código: la lista de
+   * `resolverDiasLaborables` (la columna de la persona, si no la empresa de su
+   * ficha). Un día de la lista sin marca es AUSENCIA; uno fuera de la lista
+   * es el sábado/domingo de siempre. El domingo nunca entra.
+   *
+   * 🔑 SIN ESTO NADA CAMBIA: vacío por defecto, y con la migración sin aplicar
+   * la lectura devuelve vacío. Lunes a viernes para todo el mundo, como hoy.
+   */
+  diasLaborables?: ReadonlyMap<string, readonly number[]>;
 }): PersonaReporte[] {
   const { marcaciones, horarios, justificaciones, feriados, desde, hasta, nombres } = opts;
   const vacaciones = opts.vacaciones ?? [];
@@ -676,7 +725,10 @@ export function armarReporte(opts: {
   // ⛔ El almuerzo NO entra por `reglas`: es fijo (ver `ALMUERZO_FIJO_MIN`).
 
   const horarioDe = new Map(horarios.map((h) => [h.empleado_codigo, h]));
-  const habiles = diasDelRango(desde, hasta, opts.incluirNoHabiles === true);
+  // 🔴 Los días se recorren POR PERSONA desde el 18-sep-2026: sin
+  // `incluirNoHabiles`, cada quien ve SUS días laborables (Multifashion, el
+  // sábado incluido). Con él, todos los del rango, como siempre.
+  const todosLosDias = diasDelRango(desde, hasta, true);
 
   // Agrupar marcaciones por persona y día.
   const porPersona = new Map<
@@ -691,6 +743,13 @@ export function armarReporte(opts: {
        * la pantalla sepa qué fila corregir al tocar una hora.
        */
       ids: Map<string, Map<number, string>>;
+      /**
+       * 🔴 `dia` → de qué aparato vino la PRIMERA marca del día (18-sep-2026).
+       * Es lo único que decide con qué horario se mide ese día: teléfono → el
+       * de afuera, reloj → el de siempre. Daniel: *«que se fije por la primera
+       * marcación pues»*. No entra en ninguna otra cuenta.
+       */
+      primera: Map<string, { seg: number; dispositivo: string | null }>;
     }
   >();
   for (const m of marcaciones) {
@@ -699,13 +758,18 @@ export function armarReporte(opts: {
     const dia = diaPanama(m.ocurrio_en);
     if (dia < desde || dia > hasta) continue;
     let p = porPersona.get(cod);
-    if (!p) { p = { nombre: m.empleado_nombre, dias: new Map(), ids: new Map() }; porPersona.set(cod, p); }
+    if (!p) { p = { nombre: m.empleado_nombre, dias: new Map(), ids: new Map(), primera: new Map() }; porPersona.set(cod, p); }
     if (!p.nombre && m.empleado_nombre) p.nombre = m.empleado_nombre;
     const lista = p.dias.get(dia);
     // 🔑 SEGUNDOS, no minutos: el instante exacto que marcó la persona.
     const seg = segundosDelDia(m.ocurrio_en);
     if (lista) lista.push(seg);
     else p.dias.set(dia, [seg]);
+    // La primera del día por HORA, no por orden de llegada: una marca del
+    // teléfono que llegó tarde al servidor (sin señal) sigue siendo la primera
+    // si se tomó antes.
+    const prim = p.primera.get(dia);
+    if (!prim || seg < prim.seg) p.primera.set(dia, { seg, dispositivo: m.dispositivo ?? null });
     if (m.id) {
       const del = p.ids.get(dia);
       if (del) del.set(seg, String(m.id));
@@ -719,17 +783,34 @@ export function armarReporte(opts: {
     // 🔑 TODO EL DÍA SE MIDE EN SEGUNDOS. Los umbrales de negocio siguen siendo
     // en minutos (la tolerancia, el mínimo de extra, el almuerzo) y se escalan
     // acá: medir fino y perdonar en minutos es lo correcto.
-    const entradaProgSeg = hhmmASeg(h?.entrada ?? ENTRADA_DEFAULT);
-    const salidaProgSeg = hhmmASeg(h?.salida ?? SALIDA_DEFAULT);
+    // 🔴 La entrada y la salida se eligen DÍA POR DÍA más abajo (18-sep-2026):
+    // la primera marca del día decide si es el horario del reloj o el del
+    // teléfono. Sin horario de afuera son estos dos, todos los días.
     // 🔑 La columna por persona SE SIGUE LEYENDO —es lo que Daniel pidió que no
     // se tocara— y solo cae al fijo quien todavía no tiene horario guardado.
     const almuerzoProg = h?.almuerzo_minutos ?? ALMUERZO_FIJO_MIN;
     const almuerzoProgSeg = almuerzoProg * 60;
     const toleranciaSeg = toleranciaMin * 60;
     const extraMinimoSeg = extraMinimoMin * 60;
+    // 🔴 SUS días laborables. Sin lista, lunes a viernes: lo de siempre.
+    const diasDeEsta = opts.diasLaborables?.get(codigo);
+    const habiles = opts.incluirNoHabiles === true
+      ? todosLosDias
+      : todosLosDias.filter((f) => esDiaLaborable(f, diasDeEsta));
 
     const dias: DiaReporte[] = [];
     for (const fecha of habiles) {
+      // ── 🔴 CON QUÉ HORARIO SE MIDE ESTE DÍA (18-sep-2026) ──────────────────
+      // Lo decide la PRIMERA marca del día: si vino del teléfono y la persona
+      // tiene horario de afuera, ése; si no, el de siempre. Sin marcas no hay
+      // primera y se mide con el de siempre (que igual no se usa: sin marcas
+      // no hay tardanza ni salida que medir).
+      const horarioHoy = horarioDelDia(
+        h ?? { entrada: ENTRADA_DEFAULT, salida: SALIDA_DEFAULT },
+        p.primera.get(fecha)?.dispositivo,
+      );
+      const entradaProgSeg = hhmmASeg(horarioHoy.entrada);
+      const salidaProgSeg = hhmmASeg(horarioHoy.salida);
       const feriado = feriados.get(fecha) ?? null;
       const just = justificacionDe(justificaciones, codigo, fecha);
       const ventana = just ? ventanaDe(just.hora_desde, just.hora_hasta) : null;
@@ -745,7 +826,9 @@ export function armarReporte(opts: {
         : null;
       /** Solo el rango, para el chip del día: «12:00–17:00». */
       const permisoRango = just && ventana ? rangoPermiso(just.hora_desde, just.hora_hasta) : null;
-      const habil = esHabil(fecha);
+      // 🔴 Laborable PARA ESTA PERSONA (18-sep-2026): lunes a viernes, o su
+      // lista. Multifashion suma el sábado; el domingo nunca entra.
+      const habil = esDiaLaborable(fecha, diasDeEsta);
       // Regla 6. Hoy sigue corriendo y mañana ni empezó: no se los juzga.
       // 🔴 `>=`, no `===`. Ver la nota de `diaEnCurso`.
       const enCurso = !!opts.diaEnCurso && fecha >= opts.diaEnCurso;
@@ -1028,6 +1111,8 @@ export function armarReporte(opts: {
         revisar, salidaSospechosa: sospechosa,
         enCurso, fueraDeVigencia: false, ausente: false, vacacion: null, justificado, permiso, permisoRango,
         permisoPerdonaMin, permisoPerdonaSalidaMin, permisoPerdonaAlmuerzoMin, feriado, habil,
+        // Solo para decirlo: los minutos de arriba ya salieron con ese horario.
+        horarioDeAfuera: horarioHoy.deAfuera,
         correcciones,
       });
     }

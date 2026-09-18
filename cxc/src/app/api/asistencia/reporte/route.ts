@@ -12,9 +12,13 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
   armarReporte,
-  type HorarioPersona,
   type Justificacion,
 } from "@/lib/asistencia/reporte";
+// 🔴 LOS HORARIOS POR LA FUENTE ÚNICA (18-sep-2026), la MISMA que la planilla:
+// días laborables y horario de afuera incluidos. Sin la migración, lo de
+// siempre. Ver `horarios-server.ts` y `horario-configurable.ts`.
+import { leerHorarios } from "@/lib/asistencia/horarios-server";
+import { avisoMigracionHorario, resolverDiasLaborables } from "@/lib/asistencia/horario-configurable";
 import {
   aplicarCorrecciones,
   avisoMigracionCorrecciones,
@@ -99,7 +103,7 @@ export async function GET(req: NextRequest) {
     // Paginado con verificación contra el COUNT: un mes de dos relojes con 4
     // marcas diarias pasa de 1.000 filas, y PostgREST corta ahí EN SILENCIO.
     // Un reporte de horas recortado sin avisar es peor que uno que falla.
-    const [marcaciones, { reglas }, { directorio }, correcciones, personasDb, afuera, hRes, jRes, vRes, fRes, telefono, aprRes] = await Promise.all([
+    const [marcaciones, { reglas }, { directorio }, correcciones, personasDb, afuera, horariosLeidos, jRes, vRes, fRes, telefono, aprRes] = await Promise.all([
       leerTodoPaginado<MarcacionConId>(
         "asistencia_marcaciones (reporte)",
         (pedirCount, from, to) => {
@@ -107,7 +111,9 @@ export async function GET(req: NextRequest) {
             .from("asistencia_marcaciones")
             // 🔑 El `id` es lo que ata la corrección a SU marcación. Sin él no se
             // podría saber cuál de las 4 marcas del día se corrigió.
-            .select("id, empleado_codigo, empleado_nombre, ocurrio_en", pedirCount ? { count: "exact" } : {})
+            // 🔴 Y el `dispositivo`: la PRIMERA marca del día decide el
+            // horario (teléfono → el de afuera, 18-sep-2026).
+            .select("id, empleado_codigo, empleado_nombre, ocurrio_en, dispositivo", pedirCount ? { count: "exact" } : {})
             .gte("ocurrio_en", iDesde)
             .lte("ocurrio_en", iHasta);
           if (dispositivo) sel = sel.eq("dispositivo", dispositivo);
@@ -129,7 +135,10 @@ export async function GET(req: NextRequest) {
       // 🔴 QUIÉN TRABAJA AFUERA (14-sep-2026). Lectura APARTE y tolerante: con
       // la migración sin aplicar viene vacía y el reporte es el de siempre.
       leerTrabajaAfuera(),
-      supabaseServer.from("asistencia_horarios").select("empleado_codigo, entrada, salida, almuerzo_minutos"),
+      // 🔴 Los horarios por la fuente ÚNICA (18-sep-2026), la misma que la
+      // planilla: días laborables y horario de afuera. Sin la migración, lo
+      // de siempre.
+      leerHorarios(),
       // 🔑 Por la fuente ÚNICA, no con un `select` copiado: es lo que hace que
       // el reporte y la planilla no puedan leer distinto la misma fila.
       leerJustificaciones(desde, hasta),
@@ -155,7 +164,6 @@ export async function GET(req: NextRequest) {
     const nombres = new Map<string, string>(
       directorio.codigos().map((c) => [c, directorio.etiqueta(c)]),
     );
-    if (hRes.error) throw new Error(hRes.error.message);
     if (fRes.error) throw new Error(fRes.error.message);
 
     // 🔴 LAS CORRECCIONES SE APLICAN ANTES DE CALCULAR NADA. Lo que se le pasa
@@ -222,6 +230,15 @@ export async function GET(req: NextRequest) {
     // ficha sería peor que mostrarlo de más.
     const vigencias = vigenciasDeFilas(personasDb.filas);
     const fuera = codigosFueraDeRango(vigencias, desde, hasta);
+    // 🔴 QUÉ DÍAS TRABAJA CADA QUIEN (18-sep-2026): la columna de la persona,
+    // si no la EMPRESA de su ficha (Multifashion, lunes a sábado). La MISMA
+    // resolución que la planilla; con la migración sin correr viene vacío y
+    // el reporte es el de siempre.
+    const diasLaborables = resolverDiasLaborables({
+      horarios: horariosLeidos.horarios,
+      empresaDe: new Map(personasDb.filas.map((f) => [String(f.empleado_codigo), f.empresa ?? null])),
+      faltaMigracion: horariosLeidos.faltaMigracion,
+    });
     const enRango = fuera.size
       ? visibles.filter((m) => !fuera.has((m.empleado_codigo ?? "").trim()))
       : visibles;
@@ -255,12 +272,7 @@ export async function GET(req: NextRequest) {
 
     const personas = armarReporte({
       marcaciones: visiblesEnPantalla,
-      horarios: (hRes.data ?? []).map((h) => ({
-        ...h,
-        // Postgres devuelve time como "08:00:00"; el motor compara "HH:MM".
-        entrada: String(h.entrada).slice(0, 5),
-        salida: String(h.salida).slice(0, 5),
-      })) as HorarioPersona[],
+      horarios: horariosLeidos.horarios,
       justificaciones: jRes.filas,
       vacaciones: vRes.filas,
       feriados: new Map((fRes.data ?? []).map((f) => [String(f.fecha), String(f.nombre)])),
@@ -290,6 +302,9 @@ export async function GET(req: NextRequest) {
       // pantalla de Asistencia no puede marcarle una falta a alguien que ese
       // día todavía no trabajaba acá.
       vigencias,
+      // 🔴 Los días laborables de cada quien (18-sep-2026), la MISMA lista que
+      // usa la planilla. Vacío = lunes a viernes para todos.
+      diasLaborables,
     });
 
     // 🔴 QUIEN NO COBRA HORAS EXTRA NO LAS CUENTA EN EL REPORTE. Hasta el
@@ -319,7 +334,7 @@ export async function GET(req: NextRequest) {
       .filter((p) => !empresaFiltro || p.empresa === empresaFiltro);
 
     // 🔴 QUIÉNES no tienen su hora de salida confirmada, con nombre y código.
-    const conHorario = new Set((hRes.data ?? []).map((h) => String(h.empleado_codigo)));
+    const conHorario = new Set(horariosLeidos.horarios.map((h) => h.empleado_codigo));
     const sinHorarioLista = personasConBandera
       .filter((p) => !conHorario.has(p.codigo))
       .map((p) => ({ codigo: p.codigo, nombre: p.nombre ?? null }));
@@ -344,6 +359,9 @@ export async function GET(req: NextRequest) {
       // botón que siempre falla es peor que no tenerlo.
       correccionesDisponible: !correcciones.faltaMigracion,
       avisoCorrecciones: correcciones.faltaMigracion ? avisoMigracionCorrecciones() : null,
+      // 🔴 Los días laborables y el horario de afuera todavía no tienen
+      // columna (18-sep-2026): se mide lunes a viernes con un horario.
+      avisoHorario: horariosLeidos.faltaMigracion ? avisoMigracionHorario() : null,
       // Se devuelven para que la pantalla, el Excel y el PDF digan los MISMOS
       // números que usó el motor. Un pie de página que dice "5 de tolerancia"
       // mientras el cálculo usa 10 es peor que no decir nada.

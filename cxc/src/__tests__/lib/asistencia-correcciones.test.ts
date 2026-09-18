@@ -641,7 +641,9 @@ describe("🔴 la planilla y el reporte aplican las correcciones", () => {
         /marcaciones:\s*marcaciones\s*[,}]/,
       );
       // El `id` tiene que venir en el select, o ninguna corrección se ata.
-      expect(codigo).toMatch(/"id, empleado_codigo, empleado_nombre, ocurrio_en"/);
+      // 18-sep-2026: el select ganó `dispositivo` (la primera marca del día
+      // decide el horario, `horario-configurable.ts`); el `id` sigue primero.
+      expect(codigo).toMatch(/"id, empleado_codigo, empleado_nombre, ocurrio_en, dispositivo"/);
     });
   }
 });

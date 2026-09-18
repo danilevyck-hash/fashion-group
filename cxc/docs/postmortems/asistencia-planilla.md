@@ -7,6 +7,88 @@
 
 ---
 
+## 🔴 Los días y los dos horarios, configurables por persona (18-sep-2026) — Multifashion trabaja el sábado
+
+### Qué decidió Daniel
+
+> *«todo eso de horario que sea configurable por si hay cambios en un futuro»*
+> *«multifashion es de 10-1830»* · *«multifashion sus dias laborales es de lunes a sabado»*
+> *«Ana · Cindy · Yeisibeth su horario es de 9-18 cuando estan afuera. cuando estan afuera marcan por el sistema marcaciones. al igual rodrigo, su horario cambia cuando esta afuera y usa el celular de 10-1830»*
+> *«si marca por el telefono es el horario que te dije, que se fije por la primera marcacion pues. la persona no deberia de marcar en ambos sistemas, o es uno o es el otro»*
+> *«el maximo es 48 a la semana»*
+
+Y sobre el sábado, las dos consecuencias, aprobadas una por una:
+> *«1. Desaparece ese aviso — las horas del sábado dejan de ser un caso raro, son el día normal. 2. El que no viene el sábado, falta. Con su descuento, como cualquier otro día.»*
+
+### 🩸 Los dos supuestos que el motor tenía escritos a fuego
+
+**A · «Hábil = lunes a viernes», para las OCHO empresas.** `esHabil` (`reporte.ts`) era `dow >= 1 && dow <= 5`, global y sin excepción. Por eso los sábados de Multifashion no los pagaba nadie —el motor los medía (`horas.sabadoMin`) y «Antes de cerrar» avisaba *«N trabajaron un sábado: esas horas no se pagan aquí»*—, y al revés: al que no venía el sábado no se le descontaba nada. Fue una abstención deliberada (*«el cuadro no tiene columna y acá no se inventa un recargo»*), y Daniel dio la respuesta.
+
+**B · «Un solo horario por persona».** `asistencia_horarios` tenía UN `entrada` y UN `salida`. La pantalla de Horarios ofrecía **dos botones de salida (16:30 · 17:00)** y nada más: la entrada de las 10:00 de Multifashion no se podía ni ver, y el 18:30 tampoco se podía elegir (estaba en la base, cargado a mano).
+
+### La regla, entera (`src/lib/asistencia/horario-configurable.ts`, puro)
+
+- **Los días que trabaja** son una lista por persona (1 = lunes … 6 = sábado) en `asistencia_horarios.dias_laborables`. **NULL = manda la EMPRESA de la ficha** (`DIAS_LABORABLES_POR_EMPRESA`): Multifashion lunes a sábado; Boston, Vistana y Fashion Wear lunes a viernes. La columna de la persona le gana a la empresa (`resolverDiasLaborables`).
+- Un día laborable sin marca es **AUSENCIA** (8 h × rata, `MIN_DIA_NO_TRABAJADO`, como cualquier día); con marca es un **día NORMAL**: tardanza, salida temprana, hora extra. 🔑 **Para Multifashion el sábado no lleva recargo**: el quincenal ya lo paga. Candado: el neto de un sábado normal es idéntico al del mismo día un lunes.
+- 🔴 **El domingo NO se toca.** `esDiaLaborable` devuelve `false` en domingo pase lo que pase, `normalizarDiasLaborables` descarta el 0, el CHECK de la base lo prohíbe y la pantalla no lo ofrece. Sigue yendo a `domingoMin` con `recargoDomingoFeriado`.
+- **Dos horarios**: `entrada`/`salida` (cuando marca en el RELOJ) y `entrada_afuera`/`salida_afuera` (cuando marca por el TELÉFONO). 🔴 **Cuál aplica lo decide la PRIMERA marca del día** (`horarioDelDia`), por HORA y no por orden de llegada: una marca del teléfono que llegó tarde al servidor (sin señal) sigue siendo la primera si se tomó antes. La segunda marca no decide nada. Una hora agregada a mano no trae aparato: es del reloj.
+- 🔑 **Vacío = el mismo de adentro, campo por campo.** Con las dos horas de afuera vacías, una marca del teléfono se mide con el horario de siempre y el día NO se marca «de afuera».
+- **La planilla ya no le pregunta al calendario**: `clasificarDia` mira `d.habil`, que el motor calcula persona por persona. `esHabil` (lunes a viernes) queda de respaldo para un día que no lo traiga, y para lo que cuenta días hábiles del CALENDARIO sin persona adelante: «faltan N días hábiles» del encabezado (`periodo.ts`), el prorrateo de quien entra a mitad de quincena (`prorrateo-ingreso.ts`) y la deuda del día libre de la empresa (`dia-libre-empresa.ts`). ⚠️ Esos tres siguen contando lunes a viernes también para Multifashion — decisión pendiente de Daniel, no se tocó.
+
+### Dónde vive
+
+| Qué | Dónde |
+|---|---|
+| La regla (días, primera marca, vacío = adentro, validadores, palabras) | `src/lib/asistencia/horario-configurable.ts` |
+| La lectura ÚNICA de `asistencia_horarios`, tolerante a la migración | `src/lib/asistencia/horarios-server.ts` (`leerHorarios`) — la llaman `/planilla`, `/reporte` y `/horarios`; hay barrido que prohíbe un `select` propio |
+| El motor | `reporte.ts`: `Marcacion.dispositivo`, `HorarioPersona.entrada_afuera/salida_afuera`, `diasLaborables` por código, `DiaReporte.horarioDeAfuera` (informativo) |
+| La planilla | `planilla.ts` › `clasificarDia` mira `d.habil` |
+| La pantalla | Asistencia › Configuración › **Horarios** (`HorariosTab.tsx`): por persona, **Días que trabaja** (Lun…Sáb, 44 px), **Cuando marca en el reloj** (entrada → salida, ahora las dos se escriben), **Cuando marca por el teléfono** (vacío = el mismo de arriba), almuerzo como dato. Se guarda al cambiar, sin botón |
+| La ruta | `PUT /api/asistencia/horarios` acepta `entrada`, `salida`, `diasLaborables`, `entradaAfuera`, `salidaAfuera`; lo que el cuerpo no trae se conserva; el almuerzo lo sigue poniendo la empresa |
+| La migración | `supabase/migrations/20261208120000_asistencia_horario_configurable.sql` — ⚠️ **pendiente, la corre Daniel**. Tres columnas NULL + CHECK, y por LISTA de códigos el horario de afuera que él dictó (2 · 3 · 306 → 9:00–18:00; 13 → 10:00–18:30), solo donde esté vacío |
+
+🔴 **Falla ABIERTA, y está medido**: con la migración sin correr, `leerHorarios` vuelve a leer solo lo de siempre y `resolverDiasLaborables` devuelve vacío → lunes a viernes y un horario para todos. Corrido contra producción el 18-sep-2026 (código nuevo, migración sin aplicar) contra la foto de antes: **0 diferencias en las 46 líneas** de 1–15 sep. «Antes de cerrar» y la pantalla de Horarios dicen «Falta correr el SQL …» mientras tanto, y la pantalla esconde los controles nuevos.
+
+### Lo medido, contra producción (solo lectura, `scripts/_medir-vs-yulissa.ts --simular-migracion`)
+
+- **Nadie ha marcado nunca por el teléfono** desde el 1-ago: 4.873 marcas, 4.526 del reloj de Boston, 343 del de Multifashion (que arranca el 29-ago) y **4 del teléfono, todas de Daniel (52) el 15-sep**. Ana 2 · Cindy 3 · Yeisibeth 306 · Rodrigo 13: cero. El horario de afuera no se dispara todavía, y es lo esperado.
+- Multifashion sí trabaja el sábado: días-persona con marca por día de semana (29-ago → 15-sep): lun 14 · mar 14 · mié 14 · jue 20 · vie 18 · **sáb 11** · dom **0**. Sábados: 29-ago (301, 302, 304, 305), 5-sep (los siete: 2, 3, 301–305), **12-sep (solo una marca suelta de Angel Pizza 305 a las 19:15)**.
+- Horarios guardados hoy: los ocho de Multifashion **ya están en 10:00 → 18:30 con 60 de almuerzo** (lo que Daniel dictó); Rodrigo 08:00 → 16:30; el resto 08:00 → 16:30/17:00.
+
+**1–15 sep (quincena entera, sin corte)** — se mueve SOLO Multifashion, **−$87,13 de neto** (11.209,14 → 11.122,01). Boston, Vistana y Fashion Wear: **0 diferencias**.
+
+| Quién | Qué pasó el sábado 12-sep | Ausencia $ antes → después | Neto antes → después |
+|---|---|---|---|
+| Jenifer Miranda (301) | sin marca → **1 ausencia** | 0 → 28,88 | 205,40 → 182,11 |
+| Milagros Torres (302) | sin marca → 1 ausencia | 9,17 → 28,13 | 227,11 → 211,81 |
+| Jailine Quispe (303) | sin marca → 1 ausencia | 5,22 → 24,18 | 230,59 → 215,30 |
+| Sheynee Batista (304) | sin marca → 1 ausencia | 0 → 18,96 | 237,33 → 222,03 |
+| Angel Pizza (305) | UNA marca a las 19:15 → día laborable con **555 min de tardanza** (columna «Ausencia») y **marca de menos** (frena el cierre) | 37,92 → 59,86 | 222,17 → 204,22 |
+| Ana (2) · Cindy (3) · Yeisibeth (306) | trabajan afuera → el sábado sin marca es «Trabajo de vendedor», **se paga** | sin cambio | sin cambio |
+
+⚠️ **El sábado 12-sep no marcó NADIE en la tienda.** Eso huele a tienda cerrada o reloj caído, no a cinco faltas y una tardanza de 9 horas. **No se trata como ausencia sin que Daniel lo confirme**: si la tienda no abrió, va como feriado (Configuración › Feriados) o con justificación ANTES de cerrar la quincena. La migración lo dice en su encabezado.
+
+**16–31 ago** — se mueve SOLO Multifashion, **−$102,92** (1.197,88 → 1.094,96): los sábados 22-ago (sin reloj todavía: 301, 302, 303, 304, 305) y 29-ago (303) pasan a ausencia. ⚠️ Esa quincena ya tenía 8–9 ausencias por persona porque el reloj de Multifashion no existía antes del 29-ago; la contadora la pagó a mano. Lo nuevo se suma a un cuadro que ya no describía lo pagado.
+
+### ⚠️ Las 48 horas
+
+Daniel: *«el máximo es 48 a la semana»*. Con estos horarios nadie se pasa por horario: Multifashion 7,5 h × 6 = **45**; Ana afuera 8 h × 6 = **48**, justo en el tope. Queda anotado como el LÍMITE; **no se construyó un tope semanal**: el extra se mide por DÍA y cambiarlo es otra pregunta.
+
+### Candados
+
+- `src/__tests__/lib/horario-configurable.test.ts` — 36 casos en 8 bloques: sin migración = como hoy · Multifashion lunes a sábado (ausencia, día normal sin recargo, aviso que desaparece, el Reporte recorre el sábado, trabaja afuera) · el domingo no se toca · manda la primera marca (por hora, no por llegada) · vacío = el mismo de adentro · normalización y validadores · barridos de rutas, motor, planilla y pantalla · el PUT (guarda, conserva, rechaza, y sin migración lo dice).
+- `asistencia-correcciones.test.ts` cambió con nota fechada: el `select` de las dos rutas ganó `dispositivo`.
+- Verificación por mutación: `scripts/_mutar-candados-horario-configurable.sh` — **18 mutaciones, 18 cazadas, 2 controles en verde**.
+
+### Lo que NO se hizo
+
+- No se corrió la migración ni se escribió nada en producción; no se cambió ningún horario guardado (los 18:30 de Multifashion ya estaban).
+- No hay recargo de sábado, ni tope de 48 h semanales, ni almuerzo de afuera (el de la fila vale para los dos horarios).
+- No se tocaron `periodo.ts`, `prorrateo-ingreso.ts` ni `dia-libre-empresa.ts`: siguen contando lunes a viernes.
+- No se decidió el 12-sep: es de Daniel.
+
+---
+
 ## 🔴 Encontrar rápido los días a revisar (18-sep-2026) — el número lleva al día
 
 ### Qué decidió Daniel

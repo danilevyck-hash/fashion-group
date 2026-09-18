@@ -1,8 +1,16 @@
-// Horario por persona: hora de salida y minutos de almuerzo.
+// Horario por persona: días que trabaja, hora de entrada y salida (cuando
+// marca en el reloj y cuando marca por el teléfono) y el almuerzo como dato.
 //
 // 🩸 Esta pantalla NO es un extra. El `Turno` de iVMS está mal en 12 de 31
 // personas (medido): Ángela García figura "8 a 4:30" y sale 17:04. Con ese dato
 // le salían 584 minutos de horas extra en 11 días. Lo que se fije acá MANDA.
+//
+// 🔴 DESDE EL 18-sep-2026 SE CONFIGURAN LOS DÍAS Y LOS DOS HORARIOS. Daniel:
+// *«todo eso de horario que sea configurable por si hay cambios en un futuro»*.
+// La regla vive en `lib/asistencia/horario-configurable.ts`; la lectura, en
+// `horarios-server.ts` (la MISMA que usan el Reporte y la Planilla). Falla
+// ABIERTA: sin la migración, la ruta guarda entrada y salida como siempre y
+// DICE que los días y el horario de afuera todavía no se pueden guardar.
 //
 // GET  → todas las personas con marcaciones, con su horario guardado o el
 //        SUGERIDO por sus salidas reales si todavía no tiene.
@@ -17,6 +25,20 @@ import { salidaSugerida, minutosDelDia, diaPanama } from "@/lib/asistencia/repor
 import { ALMUERZO_FIJO_MIN, almuerzoDeEmpresa } from "@/lib/asistencia/config";
 import { leerDirectorio } from "@/lib/asistencia/config-server";
 import { compararPersonas } from "@/lib/asistencia/directorio";
+import { leerHorarios, TABLA_HORARIOS } from "@/lib/asistencia/horarios-server";
+import {
+  COLUMNA_DIAS_LABORABLES,
+  COLUMNA_ENTRADA_AFUERA,
+  COLUMNA_SALIDA_AFUERA,
+  avisoMigracionHorario,
+  diasLaborablesDeEmpresa,
+  esColumnaHorarioFaltante,
+  limpiaHora,
+  normalizarDiasLaborables,
+  validarDiasLaborables,
+  validarHora,
+  validarHoraOpcional,
+} from "@/lib/asistencia/horario-configurable";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -45,14 +67,13 @@ export async function GET(req: NextRequest) {
 
     // El traductor código → nombre. Es el MISMO que usan Justificaciones, el
     // Reporte y los exports: acá no se vuelve a consultar `asistencia_personas`.
-    const [{ data: guardados, error }, { directorio }] = await Promise.all([
-      supabaseServer
-        .from("asistencia_horarios")
-        .select("empleado_codigo, empleado_nombre, entrada, salida, almuerzo_minutos"),
+    // 🔴 Y los horarios por la fuente ÚNICA, la misma del Reporte y la Planilla.
+    const [horariosLeidos, { directorio, filas }] = await Promise.all([
+      leerHorarios(),
       leerDirectorio(),
     ]);
-    if (error) throw new Error(error.message);
-    const porCodigo = new Map((guardados ?? []).map((h) => [String(h.empleado_codigo), h]));
+    const porCodigo = new Map(horariosLeidos.horarios.map((h) => [h.empleado_codigo, h]));
+    const empresaDe = new Map(filas.map((f) => [String(f.empleado_codigo), f.empresa ?? null]));
 
     // Última marca de cada día por persona → mediana → salida sugerida.
     const ultimaPorDia = new Map<string, number>();
@@ -78,6 +99,7 @@ export async function GET(req: NextRequest) {
       const g = porCodigo.get(cod);
       const sug = salidaSugerida(salidas.get(cod) ?? []);
       const p = directorio.persona(cod);
+      const empresa = empresaDe.get(cod) ?? null;
       return {
         codigo: cod,
         // 🩸 El nombre sale del DIRECTORIO, no del reloj. `empleado_nombre` de
@@ -88,11 +110,21 @@ export async function GET(req: NextRequest) {
         // `false` = nadie le puso nombre todavía. Se muestra el código y se
         // marca como pendiente, nunca en blanco.
         configurado: p.configurado,
-        entrada: g ? String(g.entrada).slice(0, 5) : "08:00",
-        salida: g ? String(g.salida).slice(0, 5) : sug,
+        entrada: g ? g.entrada : "08:00",
+        salida: g ? g.salida : sug,
         // Se sigue devolviendo lo GUARDADO (la columna no se toca), pero ya no
         // se puede cambiar: la pantalla lo muestra como dato, no como opción.
         almuerzoMinutos: g?.almuerzo_minutos ?? ALMUERZO_FIJO_MIN,
+        // 🔴 Los días que trabaja (18-sep-2026): los suyos, si no los de su
+        // empresa. `diasPropios` dice si están escritos en su fila o si son
+        // el punto de partida de la empresa. Sin la migración, lunes a
+        // viernes y nada se puede cambiar.
+        diasLaborables: [...(g?.dias_laborables ?? diasLaborablesDeEmpresa(empresa))],
+        diasPropios: !!g?.dias_laborables,
+        // 🔴 El horario de cuando marca por el TELÉFONO. Vacío = el mismo de
+        // arriba.
+        entradaAfuera: g?.entrada_afuera ?? null,
+        salidaAfuera: g?.salida_afuera ?? null,
         // `false` = todavía es la sugerencia, nadie la confirmó. La pantalla lo
         // marca para que Daniel sepa qué le falta revisar.
         guardado: !!g,
@@ -104,7 +136,13 @@ export async function GET(req: NextRequest) {
     // del 49. El comparador es el mismo en todas las pantallas del módulo.
     personas.sort(compararPersonas);
 
-    return NextResponse.json({ personas, sinConfirmar: personas.filter((p) => !p.guardado).length });
+    return NextResponse.json({
+      personas,
+      sinConfirmar: personas.filter((p) => !p.guardado).length,
+      // 🔴 Se DICE cuando los días y el horario de afuera todavía no se pueden
+      // guardar. La pantalla esconde esos controles mientras tanto.
+      faltaMigracion: horariosLeidos.faltaMigracion ? avisoMigracionHorario() : null,
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[asistencia/horarios GET]", msg);
@@ -112,19 +150,80 @@ export async function GET(req: NextRequest) {
   }
 }
 
+interface CuerpoPut {
+  codigo?: string;
+  nombre?: string | null;
+  entrada?: string;
+  salida?: string;
+  diasLaborables?: unknown;
+  entradaAfuera?: unknown;
+  salidaAfuera?: unknown;
+}
+
+/** Lo guardado hoy para esa persona, con las columnas nuevas si existen. */
+async function leerPrevia(codigo: string): Promise<{
+  entrada: string | null;
+  dias: number[] | null;
+  entradaAfuera: string | null;
+  salidaAfuera: string | null;
+  faltaMigracion: boolean;
+}> {
+  const conNuevas = await supabaseServer
+    .from(TABLA_HORARIOS)
+    .select(`entrada, ${COLUMNA_DIAS_LABORABLES}, ${COLUMNA_ENTRADA_AFUERA}, ${COLUMNA_SALIDA_AFUERA}`)
+    .eq("empleado_codigo", codigo)
+    .maybeSingle();
+  if (!conNuevas.error) {
+    const f = (conNuevas.data ?? null) as Record<string, unknown> | null;
+    return {
+      entrada: f?.entrada ? String(f.entrada).slice(0, 5) : null,
+      dias: normalizarDiasLaborables(f?.[COLUMNA_DIAS_LABORABLES]),
+      entradaAfuera: limpiaHora(f?.[COLUMNA_ENTRADA_AFUERA]),
+      salidaAfuera: limpiaHora(f?.[COLUMNA_SALIDA_AFUERA]),
+      faltaMigracion: false,
+    };
+  }
+  if (!esColumnaHorarioFaltante(conNuevas.error)) throw new Error(conNuevas.error.message);
+  const base = await supabaseServer
+    .from(TABLA_HORARIOS)
+    .select("entrada")
+    .eq("empleado_codigo", codigo)
+    .maybeSingle();
+  if (base.error) throw new Error(base.error.message);
+  const f = (base.data ?? null) as { entrada?: unknown } | null;
+  return {
+    entrada: f?.entrada ? String(f.entrada).slice(0, 5) : null,
+    dias: null, entradaAfuera: null, salidaAfuera: null,
+    faltaMigracion: true,
+  };
+}
+
 export async function PUT(req: NextRequest) {
   const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
 
-  // ⚠️ `almuerzoMinutos` YA NO SE ACEPTA. Lo único que se guarda de acá es la
-  // hora de salida; el almuerzo es fijo (ver abajo).
-  let body: { codigo?: string; nombre?: string | null; salida?: string };
+  // ⚠️ `almuerzoMinutos` NO SE ACEPTA. El almuerzo es fijo por empresa (ver
+  // abajo) y no se lee del cuerpo.
+  let body: CuerpoPut;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "JSON inválido" }, { status: 400 }); }
 
   const codigo = (body.codigo ?? "").trim();
   if (!codigo) return NextResponse.json({ error: "Falta el colaborador" }, { status: 400 });
-  const salida = (body.salida ?? "").trim();
-  if (!/^\d{2}:\d{2}$/.test(salida)) return NextResponse.json({ error: "Hora de salida inválida" }, { status: 400 });
+  const salidaV = validarHora(body.salida, "salida");
+  if (!salidaV.ok) return NextResponse.json({ error: salidaV.error }, { status: 400 });
+  // 🔴 La entrada AHORA SE PUEDE FIJAR (18-sep-2026). Si el cuerpo no la trae
+  // —los pedidos viejos no la traían— se conserva la guardada, y sin fila las
+  // 8:00 de siempre: exactamente lo que hacía la ruta hasta hoy.
+  const entradaV = body.entrada === undefined || body.entrada === null || String(body.entrada).trim() === ""
+    ? null
+    : validarHora(body.entrada, "entrada");
+  if (entradaV && !entradaV.ok) return NextResponse.json({ error: entradaV.error }, { status: 400 });
+  const diasV = validarDiasLaborables(body.diasLaborables);
+  if (!diasV.ok) return NextResponse.json({ error: diasV.error }, { status: 400 });
+  const entradaAfueraV = validarHoraOpcional(body.entradaAfuera, "entrada por el teléfono");
+  if (!entradaAfueraV.ok) return NextResponse.json({ error: entradaAfueraV.error }, { status: 400 });
+  const salidaAfueraV = validarHoraOpcional(body.salidaAfuera, "salida por el teléfono");
+  if (!salidaAfueraV.ok) return NextResponse.json({ error: salidaAfueraV.error }, { status: 400 });
 
   // 🔴 EL ALMUERZO LO DECIDE LA EMPRESA DE LA FICHA (10-sep-2026): 30 en las
   // tres de siempre, 60 en Multifashion. Sin ficha, los 30 de siempre. Sigue
@@ -135,30 +234,46 @@ export async function PUT(req: NextRequest) {
     .eq("empleado_codigo", codigo)
     .maybeSingle();
   const almuerzo = almuerzoDeEmpresa((ficha as { empresa?: string | null } | null)?.empresa);
-  // ⚠️ La entrada sigue siendo la GUARDADA si ya hay fila (Multifashion entra a
-  // las 10:00); sin fila, las 8:00 de siempre.
-  const { data: previa } = await supabaseServer
-    .from("asistencia_horarios")
-    .select("entrada")
-    .eq("empleado_codigo", codigo)
-    .maybeSingle();
-  const entrada = previa?.entrada ? String(previa.entrada).slice(0, 5) : "08:00";
 
-  const { error } = await supabaseServer.from("asistencia_horarios").upsert(
-    {
-      empleado_codigo: codigo,
-      empleado_nombre: body.nombre ?? null,
-      entrada,
-      salida,
-      // 🔴 EL ALMUERZO NO SE LEE DEL CUERPO. Es lo que hace que "ya no se puede
-      // elegir" sea verdad: esconder los botones de la pantalla es cosmético
-      // —cualquiera manda un PUT con 60— y el almuerzo entra en la jornada con
-      // la que se valúa una ausencia, o sea en plata. Lo decide la empresa.
-      almuerzo_minutos: almuerzo,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "empleado_codigo" },
-  );
+  let previa: Awaited<ReturnType<typeof leerPrevia>>;
+  try { previa = await leerPrevia(codigo); } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
+  }
+  const entrada = entradaV?.ok ? entradaV.valor : (previa.entrada ?? "08:00");
+
+  const base = {
+    empleado_codigo: codigo,
+    empleado_nombre: body.nombre ?? null,
+    entrada,
+    salida: salidaV.valor,
+    // 🔴 EL ALMUERZO NO SE LEE DEL CUERPO. Es lo que hace que "ya no se puede
+    // elegir" sea verdad: esconder los botones de la pantalla es cosmético
+    // —cualquiera manda un PUT con 60— y el almuerzo entra en la jornada con
+    // la que se valúa una ausencia, o sea en plata. Lo decide la empresa.
+    almuerzo_minutos: almuerzo,
+    updated_at: new Date().toISOString(),
+  };
+  // 🔴 Lo nuevo entra solo con la migración corrida. Lo que el cuerpo NO
+  // trae se conserva: guardar la salida no borra los días ni el horario de
+  // afuera de nadie.
+  const pidioNuevo =
+    body.diasLaborables !== undefined || body.entradaAfuera !== undefined || body.salidaAfuera !== undefined;
+  const fila = previa.faltaMigracion
+    ? base
+    : {
+        ...base,
+        [COLUMNA_DIAS_LABORABLES]: body.diasLaborables !== undefined ? diasV.valor : previa.dias,
+        [COLUMNA_ENTRADA_AFUERA]: body.entradaAfuera !== undefined ? entradaAfueraV.valor : previa.entradaAfuera,
+        [COLUMNA_SALIDA_AFUERA]: body.salidaAfuera !== undefined ? salidaAfueraV.valor : previa.salidaAfuera,
+      };
+
+  const { error } = await supabaseServer.from(TABLA_HORARIOS).upsert(fila, { onConflict: "empleado_codigo" });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // Se guardó la salida (y la entrada), pero lo nuevo no tiene dónde caer: se
+  // DICE, no se calla. La pantalla no manda estos campos mientras el GET avise,
+  // así que llegar acá es raro; igual se contesta con la verdad.
+  if (previa.faltaMigracion && pidioNuevo) {
+    return NextResponse.json({ ok: true, faltaMigracion: avisoMigracionHorario() });
+  }
   return NextResponse.json({ ok: true });
 }
