@@ -83,30 +83,36 @@ Daniel, **14-sep-2026**: *«deja que me llegue lo que son: 1. OB, que es lo pend
 
 **Comprobado:** el código tolera que falte (`wholesaleOff: … ? null`), pero no hay aviso en pantalla, ni medición, ni nota de cuándo el proveedor la manda y cuándo no.
 
-### 8. Una descripción que «pasa» no queda en el catálogo, y no se le puede poner fórmula
+### 8. ~~Una descripción que «pasa» no queda en el catálogo~~ → **HECHO el 17-sep-2026**
 > *«q siga pasando pero se agregue al catalogo (para poner formulas en algun momento)»* — **8-sep-2026**
 
-**Comprobado:** el único camino que escribe en `depurador_descripciones` es `POST …/descripciones/aprobar`, y su único llamador es `AlarmaDescripcionesNuevas.tsx` — o sea, **solo las que alertan**. Una descripción con veredicto `pasa` nunca llega a tener fila.
+La que pasa queda registrada con `origen = 'automatica'` (ni semilla ni aprobada: no la aprobó nadie), y desde ahí se le puede poner fórmula. **«Pasar» no cambió de significado**: sigue pasando, sin alertar y sin frenar nada. Se escribe al PROCESAR el archivo, nunca en el camino de la descarga. Regla pura en `descripciones-que-pasan.ts`, envío en `useRegistrarQuePasan.ts`, ruta `…/descripciones/registrar`. Candado `descripciones-que-pasan-se-registran.test.ts`.
 
-### 9. Fórmulas: desplegar una EMPRESA para ver sus marcas
+⚠️ **Falta aplicar la migración `20261206120000`** (ensancha el CHECK de `origen`). Hasta entonces falla ABIERTA: no registra nada y todo se comporta como antes.
+
+### 9. ~~Fórmulas: desplegar una EMPRESA para ver sus marcas~~ → **HECHO el 17-sep-2026**
 > *«en vistana por ejemplo si toco que se me despliegue todas las marcas de vistana»* · *«los nombres no me convencen y mira el layout no se ve ordenado»* — **7-sep-2026**
 
-**Comprobado:** en `FormulasConfig.tsx` el encabezado de la compañía es un `<div>` estático; solo cada marca se pliega.
+La compañía es un botón que dice cuántas marcas tiene y arranca cerrada. Son **dos niveles**: abrir la compañía no abre sus marcas — el plegado por marca que ya existía se conserva. Buscando, la compañía con resultados se abre sola. Candado `formulas-empresa-plegada.test.tsx`.
 
-### 10. Plantilla Switch › Reglas: las marcas salen todas desplegadas
+### 10. ~~Plantilla Switch › Reglas: las marcas salen todas desplegadas~~ → **HECHO el 17-sep-2026**
 > *«en configuraciones, las marcas deben de estar plegadas y al tocar desplegar para no irme tanto»* — **7-sep-2026**
 
-**Comprobado:** `ReglasView.tsx` dibuja todas las marcas con todas sus descripciones abiertas.
+Cada marca arranca plegada, con su conteo al lado («14 descripciones»). ⚠️ **La marca sin descripciones no se pliega ni se esconde** (Daniel: *«no se esconden»*): su texto se lee sin tocar nada. Candado `reglas-marcas-plegadas.test.tsx`.
 
 ### 11. El PDF de Comisiones repite el encabezado en cada página
 > *«no quiero ver en cada pagina lo mismo… solo en la primera»* — **7-sep-2026**
 
 **Comprobado:** `ImpresionComision.tsx` — el propio comentario dice «repetidos en cada hoja».
 
-### 12. Catálogos: `/catalogo` da 404 y conviven dos árboles de rutas
+### 12. ~~Catálogos: `/catalogo` da 404~~ → **HECHO el 17-sep-2026**
 > *«entro a catalogo y sale /catalogos/marcas, después entro a pedidos y sale /catalogo/reebok/pedidos y si pongo /catalogo sale error»* · *«una sola ruta arriba: Inicio › Catálogos › Marcas › Reebok › Pedidos»* — **6-sep-2026**
 
-**Comprobado:** no existen `src/app/catalogo/page.tsx` ni `src/app/catalogos/page.tsx`, y `next.config.js` no redirige ninguna de las dos. La pantalla de pedidos no monta encabezado ni breadcrumb.
+`/catalogo` y `/catalogos` redirigen (307) a `/catalogos/marcas`, con fuente EXACTA: **ninguna dirección que hoy funciona dejó de funcionar** y los dos árboles de rutas siguen enteros. La pantalla de comprobantes monta el camino completo debajo de la navbar de la marca. Candado `catalogo-una-sola-ruta-arriba.test.ts`.
+
+⚠️ El último tramo dice **«Comprobantes»**, no «Pedidos»: ese mismo 6-sep Daniel decidió *«todo Comprobantes, porque ahí también hay cotizaciones y borradores»* justamente porque este lugar tenía tres nombres. Se DERIVA de `PANEL_COMPROBANTES`.
+
+⚠️ **Los dos árboles de rutas siguen conviviendo** (`/catalogos/*` para el hub y administrar, `/catalogo/<marca>/*` para el catálogo con sesión). Unificarlos es otra decisión, y no se tomó.
 
 ### 13. La auditoría de rutas se hizo, se entregó y nadie la ejecutó
 Vive en `docs/mapas/rutas.md` (6-sep, 53 direcciones) y **cierra con seis preguntas para Daniel que nunca se respondieron** — él pidió un mockup y no lo recibió. Comprobado hoy, siguen vivos: el «atrás» muerto para bodega, Jennifer y David; **cero `not-found.tsx` en todo el sistema** (el 404 sale en inglés, el de Next); el breadcrumb de Usuarios que dice «Sistema» y cae en Cuentas por Cobrar; `?search=` de Préstamos que nadie lee; y «Reclamos sin pagar» de Vista General, que no abre el reclamo.
@@ -161,10 +167,19 @@ Los tres últimos mensajes de la sesión (**13-sep 18:08 a 18:25**) terminaban e
 
 Se construyó el 3-sep y el rediseño del CXC del 5-sep lo eliminó; hoy hay un candado que **prohíbe que vuelva**. ⚠️ **El problema de fondo sí quedó resuelto** (los pagos salen dentro del panel, o sea un solo expandir), pero el control que él pidió ya no existe y nadie se lo dijo. Se anota por honestidad, no como defecto.
 
-### 24. El Historial del Depurador «dividido en los tabs»
+### 24. El Historial del Depurador «dividido en los tabs» — 🔴 **FRENADO el 17-sep-2026: el dato no existe**
 > *«que historial esté dividido en los tabs, con depurador por defecto que es el que más se usará»* — **5-sep-2026**
 
-Hoy solo tiene filtro por compañía. ⚠️ **Puede estar superado por él mismo**: minutos después dijo *«el historial solo quiero los excel para switch»*, y con un solo tipo guardado las pestañas por tipo pierden sentido. Preguntarle antes de construir.
+Hoy solo tiene filtro por compañía. ⚠️ **Puede estar superado por él mismo**: minutos después dijo *«el historial solo quiero los excel para switch»*, y con un solo tipo guardado las pestañas por tipo pierden sentido.
+
+**Se intentó construirlo con pestañas por el CAMINO que generó el archivo (Depurador · Reebok · Facturas Tienda) y se paró: ese camino NO queda registrado en la fila.** Medido contra producción el 17-sep-2026:
+
+- Las columnas de `carga_history` son `id · usuario · empresa · marca · cantidad_estilos · total_unidades · total_costo · created_at · archivo_path · archivo_nombre`. **No hay ninguna que diga por dónde entró el archivo.**
+- El dispatcher SÍ lo sabe al momento de bajar (`kind` = `ckth` · `reebok` · `tienda`), pero el `onDownloaded` de los tres caminos manda lo mismo y el camino se pierde ahí.
+- Deducirlo de la `empresa` funcionaría hoy por casualidad del mapeo (Active Shoes → Reebok, Multifashion → Facturas Tienda, el resto → Depurador). Es exactamente la deducción inventada que hay que evitar: el día que Reebok cargue por otra compañía, la pestaña miente.
+- Y las **145 filas** de junio a septiembre quedarían así: **Depurador 144 · Reebok 1 · Facturas Tienda 0** (no hay ni una fila de Facturas Tienda en toda la historia).
+
+**Qué decide Daniel:** (a) se agrega una columna `camino` que cada camino escribe al descargar, y las 145 filas viejas quedan «sin registrar» o se rellenan por empresa; (b) se deja el filtro por compañía como está, que con 144-1-0 separa lo mismo; (c) otra cosa.
 
 ---
 

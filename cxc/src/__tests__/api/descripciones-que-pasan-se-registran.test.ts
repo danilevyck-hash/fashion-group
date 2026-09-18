@@ -37,6 +37,10 @@ type Fila = Record<string, unknown>;
 
 const estado = vi.hoisted(() => ({
   filas: [] as Fila[],
+  /** Cuántas veces se intentó escribir. Sirve para exigir que lo que YA está no
+   *  se vuelva a mandar: sin la lectura previa el resultado sería el mismo
+   *  (el índice único salva), pero a costa de un intento por fila. */
+  intentosDeInsert: 0,
   /** false = la migración del `origen` no corrió (CHECK 23514). */
   origenAncho: true,
 }));
@@ -64,6 +68,7 @@ vi.mock("@/lib/supabase-server", () => {
     };
     return {
       insert: async (rows: Fila | Fila[]) => {
+        estado.intentosDeInsert++;
         const lote = Array.isArray(rows) ? rows : [rows];
         // Un lote se rechaza ENTERO por una fila mala, como en Postgres.
         for (const r of lote) {
@@ -105,6 +110,7 @@ afterAll(() => { process.env.SESSION_SECRET = SECRET_PREV; });
 
 beforeEach(() => {
   estado.filas = [];
+  estado.intentosDeInsert = 0;
   estado.origenAncho = true;
 });
 
@@ -224,6 +230,29 @@ describe("🔴 la ruta registra, es idempotente y no aprueba nada", () => {
     expect(estado.filas).toHaveLength(1);
   });
 
+  it("lo que ya está NO se vuelve a mandar: cero intentos de escribir", async () => {
+    await POST(req([{ marca: "TH Menswear", descripcion: "Men-Prenda Uno" }]));
+    estado.intentosDeInsert = 0;
+    await POST(req([{ marca: "TH Menswear", descripcion: "Men-Prenda Uno" }]));
+    // Sin la lectura previa el resultado sería el mismo (el índice único salva),
+    // pero se intentaría escribir igual — un viaje por fila con 200 filas.
+    expect(estado.intentosDeInsert).toBe(0);
+  });
+
+  it("y con el lote medio repetido solo viaja lo nuevo, en UNA escritura", async () => {
+    await POST(req([{ marca: "TH Menswear", descripcion: "Men-Prenda Uno" }]));
+    estado.intentosDeInsert = 0;
+    const res = await POST(
+      req([
+        { marca: "TH Menswear", descripcion: "Men-Prenda Uno" },
+        { marca: "TH Menswear", descripcion: "Men-Prenda Dos" },
+      ]),
+    );
+    expect(await res.json()).toMatchObject({ registradas: 1, yaEstaban: 1 });
+    expect(estado.intentosDeInsert).toBe(1);
+    expect(estado.filas).toHaveLength(2);
+  });
+
   it("la misma descripción con otra caja tampoco crea una gemela", async () => {
     await POST(req([{ marca: "TH Menswear", descripcion: "Men-Prenda Uno" }]));
     await POST(req([{ marca: "th menswear", descripcion: "MEN-PRENDA UNO" }]));
@@ -284,9 +313,16 @@ describe("🔴 falla ABIERTA: sin la migración, nadie se entera", () => {
       "utf8",
     );
     expect(sql).toContain("depurador_descripciones_origen_check");
-    expect(sql).toContain("'seed'");
-    expect(sql).toContain("'aprobada'");
-    expect(sql).toContain("'automatica'");
+    // 🔑 Se mira la LÍNEA DEL CHECK, no el archivo entero: los tres valores
+    // también aparecen en el comentario de arriba, y un CHECK que dejara fuera
+    // a 'seed' o 'aprobada' pasaría desapercibido.
+    const check = sql
+      .split("\n")
+      .find((l) => l.trim().startsWith("check (origen in")) as string;
+    expect(check, "falta la línea del CHECK").toBeTruthy();
+    expect(check).toContain("'seed'");
+    expect(check).toContain("'aprobada'");
+    expect(check).toContain("'automatica'");
     // Aditiva: ni un DELETE, ni un DROP TABLE, ni un DROP COLUMN.
     expect(/\bdelete\s+from\b/i.test(sql)).toBe(false);
     expect(/\bdrop\s+table\b/i.test(sql)).toBe(false);
