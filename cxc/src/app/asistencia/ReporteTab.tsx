@@ -43,6 +43,16 @@ import {
 // y aquí se DICE —tachada en su día, con su porqué, y contada arriba—. El texto
 // sale del módulo puro para que la pantalla y el Excel digan lo mismo.
 import { avisoRepetidas, contarRepetidas, explicacionRepetida } from "@/lib/asistencia/marca-repetida";
+// 🔴 ENCONTRAR RÁPIDO LOS DÍAS A REVISAR (18-sep-2026). Daniel: *«opcion a con
+// mockup»* y *«si y nada más el botón de "Solo a revisar"»*. Dos cosas: el
+// número es un enlace a esos días, y un botón deja solo a quien tiene algo.
+// La regla de qué es «a revisar» NO vive acá: la pone el motor (`revisar`).
+import {
+  PARAM_DIAS_DE, PARAM_SOLO_A_REVISAR, ROTULO_SOLO_A_REVISAR, TITULO_NUMERO,
+  VACIO_SIN_A_REVISAR, VALOR_PRENDIDO, VER_A_TODOS,
+  conteoARevisar, diasARevisarDe, enlaceDiasARevisarDe, filtroPrendido,
+  rotuloDescarga, soloConDiasARevisar, textoSoloEstosDias,
+} from "@/lib/asistencia/solo-a-revisar";
 import type { Decision } from "@/lib/asistencia/aprobaciones";
 import EstadoReloj from "./EstadoReloj";
 import JustificacionesDelPeriodo from "./JustificacionesDelPeriodo";
@@ -150,6 +160,16 @@ export default function ReporteTab({ empresa = "" }: {
   const atajos = useMemo(() => atajosDePeriodo(hoy), [hoy]);
   const atajoPrendido = atajoActivo(atajos, desde, hasta);
   const [q, setQ] = useState(llegada.q);
+
+  // ── 🔴 SOLO A REVISAR (18-sep-2026) ───────────────────────────────────────
+  //
+  // Los dos filtros viven en la URL con `replace`, como el período y la
+  // empresa: son del MISMO nivel y el Atrás del navegador no tiene que ciclar
+  // por ellos. `revisar=1` deja en la tabla solo a quien tiene algo; `diasDe=`
+  // dice qué fila está abierta mostrando SOLO sus días a revisar.
+  const [revisarUrl, setRevisarUrl] = useUrlState(PARAM_SOLO_A_REVISAR, "");
+  const [diasDeUrl, setDiasDeUrl] = useUrlState(PARAM_DIAS_DE, "");
+  const soloARevisar = filtroPrendido(revisarUrl);
   const [personas, setPersonas] = useState<PersonaReporte[] | null>(null);
   const [sinHorario, setSinHorario] = useState(0);
   /** Quiénes son, para nombrarlos y enlazar a su ficha. */
@@ -222,6 +242,16 @@ export default function ReporteTab({ empresa = "" }: {
 
   useEffect(() => { void cargar(); }, [cargar]);
 
+  // 🔴 LO QUE SE VE. Con el botón prendido queda solo quien tiene días a
+  // revisar — filtrando lo YA cargado, sin pedirle nada al servidor. Todo lo
+  // que está debajo de los botones se calcula sobre esto: el pie, los avisos,
+  // el Excel y el PDF. **O el total sigue al filtro, o no hay filtro.**
+  const visibles = useMemo(
+    () => (personas === null ? null : soloConDiasARevisar(personas, soloARevisar)),
+    [personas, soloARevisar],
+  );
+  const conteo = conteoARevisar(visibles?.length ?? 0, personas?.length ?? 0, soloARevisar);
+
   // 🩸 LAS LIBRERÍAS DE EXCEL Y PDF SE BAJAN AL TOCAR EL BOTÓN, no al abrir la
   // pantalla (12-ago-2026). Estaban importadas arriba, así que `xlsx-js-style`,
   // `jspdf` y `jspdf-autotable` entraban al bundle inicial de /asistencia
@@ -235,13 +265,17 @@ export default function ReporteTab({ empresa = "" }: {
   // por eso el `await import()` tiene que envolverlo a él también, no solo a
   // xlsx.
   async function bajarExcel() {
-    if (!personas?.length) return;
+    // 🔴 BAJA LO QUE ESTÁ EN PANTALLA (18-sep-2026). Con el buscador ya era así
+    // —filtra en el SERVIDOR, así que el Excel llegaba recortado—; el botón
+    // «Solo a revisar» no puede portarse distinto o la pantalla diría 34 y el
+    // archivo 45. Por eso el botón DICE a cuántos afecta: «Excel · 34».
+    if (!visibles?.length) return;
     try {
       const { construirExcel } = await import("@/lib/asistencia/exportar");
       // 🔴 Por el camino común (`downloadWorkbook`), como todo export.
       const { downloadWorkbook } = await import("@/lib/excel-export");
       downloadWorkbook(
-        construirExcel({ personas, desde, hasta, reglas: reglas ?? undefined }),
+        construirExcel({ personas: visibles, desde, hasta, reglas: reglas ?? undefined }),
         nombreArchivoPorEmpresa("Asistencia", empresa, desde, hasta, "xlsx"),
       );
       toast("Excel listo — revisa tu carpeta de descargas", "success");
@@ -250,17 +284,20 @@ export default function ReporteTab({ empresa = "" }: {
     }
   }
   async function bajarPdf() {
-    if (!personas?.length) return;
+    if (!visibles?.length) return;
     try {
       const { construirPdf } = await import("@/lib/asistencia/exportar");
-      construirPdf({ personas, desde, hasta, reglas: reglas ?? undefined }).save(nombreArchivoPorEmpresa("Asistencia", empresa, desde, hasta, "pdf"));
+      construirPdf({ personas: visibles, desde, hasta, reglas: reglas ?? undefined }).save(nombreArchivoPorEmpresa("Asistencia", empresa, desde, hasta, "pdf"));
       toast("PDF listo — revisa tu carpeta de descargas", "success");
     } catch {
       toast("No se pudo armar el PDF. Intenta de nuevo.", "error");
     }
   }
 
-  const tot = (personas ?? []).reduce((a, p) => ({
+  // 🔴 EL TOTAL SIGUE AL FILTRO: se suma sobre `visibles`, nunca sobre la lista
+  // entera. Un pie de 45 personas arriba de una tabla de 34 hace dudar de cuál
+  // de los dos manda, y ninguna nota al pie arregla esa duda (`buscar-en-lista`).
+  const tot = (visibles ?? []).reduce((a, p) => ({
     aus: a.aus + p.resumen.ausenciasSinJustificar,
     tarde: a.tarde + p.resumen.minutosTarde,
     noTrab: a.noTrab + p.resumen.tiempoNoTrabajadoMin,
@@ -282,16 +319,48 @@ export default function ReporteTab({ empresa = "" }: {
           type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar colaborador"
           className="min-h-[44px] flex-1 min-w-[160px] rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm"
         />
+        {/* ── 🔴 EL BOTÓN «SOLO A REVISAR» (18-sep-2026) ────────────────────
+            Daniel: *«si y nada más el botón de "Solo a revisar"»*. Al lado del
+            buscador y con la misma forma que los atajos del período. Filtra lo
+            YA cargado —no le pide nada al servidor— y se combina con el
+            buscador y con el selector de empresa en vez de pelearlos.
+            🔴 Al apagarlo se suelta también la fila abierta con solo sus días:
+            dejarla recortada bajo un filtro apagado es mentir con la pantalla. */}
+        <button
+          type="button"
+          onClick={() => {
+            const prender = !soloARevisar;
+            setRevisarUrl(prender ? VALOR_PRENDIDO : "");
+            if (!prender) setDiasDeUrl("");
+          }}
+          aria-pressed={soloARevisar}
+          // 🔑 NEGRO, COMO LOS ATAJOS DEL PERÍODO, no ámbar: el ámbar de esta
+          // pantalla significa «esto hay que mirarlo» y vive en el número. Un
+          // botón prendido se ve igual en todo el sistema.
+          className={`min-h-[44px] rounded-md border px-3 text-sm transition active:scale-[0.97] ${
+            soloARevisar
+              ? "border-black bg-black font-medium text-white"
+              : "border-gray-300 text-gray-700 hover:border-black hover:text-black"
+          }`}
+        >
+          {ROTULO_SOLO_A_REVISAR}
+        </button>
         <div className="flex gap-2">
-          <button type="button" onClick={bajarExcel} disabled={!personas?.length}
+          {/* 🔴 EL BOTÓN DICE A CUÁNTOS AFECTA cuando la pantalla está
+              recortada: «Excel · 34». Es la única excepción que admite la regla
+              de que lo que sale de la pantalla nunca se recorta. */}
+          <button type="button" onClick={bajarExcel} disabled={!visibles?.length}
             className="min-h-[44px] rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:opacity-40">
-            Excel
+            {rotuloDescarga("Excel", visibles?.length ?? 0, soloARevisar)}
           </button>
-          <button type="button" onClick={bajarPdf} disabled={!personas?.length}
+          <button type="button" onClick={bajarPdf} disabled={!visibles?.length}
             className="min-h-[44px] rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:opacity-40">
-            PDF
+            {rotuloDescarga("PDF", visibles?.length ?? 0, soloARevisar)}
           </button>
         </div>
+        {/* «34 de 45 colaboradores»: que el total recortado del pie no se lea
+            como el de todos. Solo con el filtro prendido. */}
+        {conteo && <span className="text-[13px] text-gray-500">{conteo}</span>}
       </div>
 
       {/* ── 🔴 LOS ATAJOS DEL PERÍODO (16-sep-2026) ───────────────────────────
@@ -394,9 +463,9 @@ export default function ReporteTab({ empresa = "" }: {
           cambia sin explicación es peor que el error: arriba se cuenta cuántas
           y abajo, en su día, cada una va tachada con su porqué. Gris, no azul:
           nadie tocó nada a mano. */}
-      {personas && contarRepetidas(personas.flatMap((p) => p.dias)) > 0 && (
+      {visibles && contarRepetidas(visibles.flatMap((p) => p.dias)) > 0 && (
         <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-700">
-          {avisoRepetidas(contarRepetidas(personas.flatMap((p) => p.dias)))}
+          {avisoRepetidas(contarRepetidas(visibles.flatMap((p) => p.dias)))}
         </p>
       )}
 
@@ -436,7 +505,20 @@ export default function ReporteTab({ empresa = "" }: {
         </p>
       )}
 
-      {!cargando && !error && !!personas?.length && (
+      {/* 🔴 EL FILTRO QUE NO DEJA A NADIE SE DICE CON PALABRAS, nunca con una
+          tabla en blanco — y con la salida al lado. Es otra cosa que «no hay
+          marcaciones en este rango»: acá sí las hay, y están todas bien. */}
+      {!cargando && !error && !!personas?.length && visibles?.length === 0 && (
+        <p className="py-10 text-center text-sm text-gray-500">
+          {VACIO_SIN_A_REVISAR}.{" "}
+          <button type="button" onClick={() => { setRevisarUrl(""); setDiasDeUrl(""); }}
+            className="font-medium text-gray-900 underline underline-offset-2">
+            {VER_A_TODOS}
+          </button>
+        </p>
+      )}
+
+      {!cargando && !error && !!visibles?.length && (
         <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
           <table className="w-full text-sm">
             <thead>
@@ -455,10 +537,21 @@ export default function ReporteTab({ empresa = "" }: {
               </tr>
             </thead>
             <tbody>
-              {personas.map((p) => (
-                <FilaPersona key={p.codigo} p={p} abierta={abierta === p.codigo}
+              {visibles.map((p) => (
+                <FilaPersona key={p.codigo} p={p}
+                  // 🔴 Una fila abierta por «Ver solo esos días» está abierta
+                  // igual: es la MISMA fila desplegada, con menos días adentro.
+                  abierta={abierta === p.codigo || diasDeUrl === p.codigo}
+                  soloDiasARevisar={diasDeUrl === p.codigo}
+                  rango={{ desde, hasta }}
+                  onVerDiasARevisar={() => { setDiasDeUrl(p.codigo); setAbierta(null); }}
                   marcasTelefono={marcasTelefono} onVerSelfie={setVerSelfie}
-                  onToggle={() => setAbierta(abierta === p.codigo ? null : p.codigo)}
+                  // 🔴 Tocar la fila abierta en «solo esos días» la abre ENTERA:
+                  // es la salida, y no hace falta un control nuevo para tenerla.
+                  onToggle={() => {
+                    if (diasDeUrl === p.codigo) { setDiasDeUrl(""); setAbierta(p.codigo); return; }
+                    setAbierta(abierta === p.codigo ? null : p.codigo);
+                  }}
                   puedeCorregir={puedeCorregir}
                   onCorregir={setCorrigiendo}
                   onJustificar={setJustificando}
@@ -467,7 +560,7 @@ export default function ReporteTab({ empresa = "" }: {
             </tbody>
             <tfoot>
               <tr className="border-t border-gray-200 bg-gray-50 font-semibold">
-                <td className="px-3 py-2.5" colSpan={3}>{personas.length} {personas.length === 1 ? "colaborador" : "colaboradores"}</td>
+                <td className="px-3 py-2.5" colSpan={3}>{visibles.length} {visibles.length === 1 ? "colaborador" : "colaboradores"}</td>
                 <td className="px-2 py-2.5 text-right tabular-nums">{tot.aus || "—"}</td>
                 <td className="px-2 py-2.5"></td>
                 {/* 🩸 Los minutos se miden al segundo y sumarlos da 9544.499999999998:
@@ -542,9 +635,14 @@ export default function ReporteTab({ empresa = "" }: {
   );
 }
 
-function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir, onJustificar, marcasTelefono, onVerSelfie, decisionesExtra }: {
+function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, onToggle, puedeCorregir, onCorregir, onJustificar, marcasTelefono, onVerSelfie, decisionesExtra }: {
   p: PersonaReporte;
   abierta: boolean;
+  /** Abierta por «Ver solo esos días»: adentro van SOLO los días a revisar. */
+  soloDiasARevisar: boolean;
+  /** El período que se está mirando, para que el enlace lo lleve puesto. */
+  rango: { desde: string; hasta: string };
+  onVerDiasARevisar: () => void;
   onToggle: () => void;
   puedeCorregir: boolean;
   onCorregir: (m: MarcaParaCorregir) => void;
@@ -617,13 +715,46 @@ function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir, onJustif
             <span className="block text-[11px] font-normal text-gray-500">{textoExtrasDecididas(extras)}</span>
           )}
         </td>
+        {/* 🔴 EL NÚMERO LLEVA AL DÍA (18-sep-2026). Daniel: *«opcion a con
+            mockup»*. 🩸 Era un número MUERTO: decía cuántos días había que
+            revisar y para saber CUÁLES había que abrir a la persona y recorrer
+            los once días del período, en 34 fichas.
+            🔴 CON 0 DÍAS NO HAY ENLACE: va el guion de siempre. Un enlace que
+            abre una lista vacía es peor que no tenerlo.
+            ⚠️ Es un `<a>` de verdad —se puede copiar y abrir en otra pestaña—,
+            y el clic normal lo resuelve en el acto, sin recargar la pantalla. */}
         <td className="px-2 py-2.5 text-right">{r.diasARevisar
-          ? <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-700">{r.diasARevisar}</span>
+          ? (
+            <a
+              href={enlaceDiasARevisarDe(p.codigo, rango)}
+              title={TITULO_NUMERO}
+              onClick={(e) => {
+                // Con Cmd/Ctrl/medio se deja pasar: abrir en otra pestaña es
+                // una forma legítima de usar el enlace.
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                e.preventDefault();
+                e.stopPropagation();
+                onVerDiasARevisar();
+              }}
+              className="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-700 underline decoration-dotted underline-offset-2 transition hover:bg-amber-100 hover:text-amber-900"
+            >
+              {r.diasARevisar}
+            </a>
+          )
           : <span className="text-gray-300">—</span>}</td>
       </tr>
 
       {abierta && (
         <tr><td colSpan={11} className="bg-gray-50 px-3 py-3">
+          {/* 🔴 SE DICE QUE ESTÁ RECORTADO, Y CÓMO SE SUELTA (18-sep-2026). Un
+              detalle con 3 de 11 días y sin una línea que lo diga se lee como
+              si la persona hubiera trabajado tres días. El texto sale del
+              módulo puro; la salida es tocar la fila, que ya existía. */}
+          {textoSoloEstosDias(diasARevisarDe(p.dias, soloDiasARevisar).length, p.dias.length) && soloDiasARevisar && (
+            <p className="mb-2 text-[13px] text-gray-600">
+              {textoSoloEstosDias(diasARevisarDe(p.dias, true).length, p.dias.length)}
+            </p>
+          )}
           {/* De los minutos tarde, cuántos vienen de días mal marcados. Que
               nadie descuente sin saber de dónde sale el número. */}
           {r.minutosTardeDeDiasARevisar > 0 && (
@@ -653,7 +784,7 @@ function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir, onJustif
                 <th className="px-2 py-2 text-left font-medium"></th>
               </tr></thead>
               <tbody>
-                {p.dias.map((d) => (
+                {diasARevisarDe(p.dias, soloDiasARevisar).map((d) => (
                   <FilaDia key={d.fecha} d={d} codigo={p.codigo} persona={persona}
                     conExtra={cuentaHorasExtra(p)}
                     puedeCorregir={puedeCorregir} onCorregir={onCorregir}

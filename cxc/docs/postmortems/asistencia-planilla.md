@@ -7,6 +7,181 @@
 
 ---
 
+## 🔴 Encontrar rápido los días a revisar (18-sep-2026) — el número lleva al día
+
+### Qué decidió Daniel
+
+Se le mostró un mockup con cuatro cuadros —lo de hoy, la opción A (el número
+como enlace), la opción B (tres botones que parten la columna) y las dos
+juntas—. Eligió, textual:
+
+> «opcion a con mockup»
+
+> «si y nada más el botón de "Solo a revisar"»
+
+O sea **dos cosas, y nada más que esas dos**:
+
+1. **El número de la columna «A revisar» es un enlace.** Se toca y se abre a esa
+   persona con SOLO esos días.
+2. **Un botón «Solo a revisar»** al lado del buscador, que deja en la tabla
+   únicamente a quien tiene algo.
+
+🔴 **Lo que NO se hizo, y es una decisión, no un olvido**: partir la columna en
+«marcó de más» y «le falta una marca». Era la opción B del mockup, se le ofreció
+con sus números medidos y dijo que no. Hay un candado que lo sostiene, para que
+nadie lo agregue «de paso» dentro de seis meses.
+
+### 🩸 El problema
+
+El número de la columna era **muerto**: decía cuántos días había que revisar y
+no decía cuáles. Para trabajar la quincena había que entrar a la ficha de cada
+colaborador con algo y recorrer sus once días, uno por uno.
+
+### Lo medido, contra producción
+
+El encargo traía la medición del 18-sep-2026 por la mañana, quincena 1–15 sep:
+**426 días-persona con marca, 82 a revisar, en 34 colaboradores de 45**.
+
+Se volvió a medir con el motor real esa misma tarde
+(`scripts/_medir-solo-a-revisar.ts`, solo lectura) y **da distinto, con causa
+conocida**:
+
+| | encargo (mañana) | remedido (tarde) |
+|---|---|---|
+| colaboradores en el reporte | 45 | **46** |
+| días-persona con marca | 426 | **433** |
+| **días a revisar** | 82 | **57** |
+| colaboradores con algo | 34 | **26** |
+
+🔑 **La caída de 82 a 57 la explica un cambio de ESTA MISMA MAÑANA**, no este:
+la marca repetida que se olvida sola (commit `6cda3a81`, ver el bloque de abajo
+de este archivo). `revisar` se cuenta **después** de olvidar la repetida
+(`reporte.ts`: `!enCurso && buenas.length !== 4`), así que un día de 5 marcas
+con una repetida dejó de estar a revisar. El script imprime el número con la
+regla vieja para que se pueda comprobar: **66**. Los que faltan para los 82 son
+cohorte —quién entra al reporte y qué se cuenta como «día con marca»—, y
+ninguno de los dos números depende de este cambio.
+
+⚠️ **Y la base se mueve mientras se mide**: dos corridas separadas por dos
+minutos dieron neto 11.497,90 y 11.471,70. Alguien estaba trabajando en
+producción (una aprobación o una corrección). Dos corridas seguidas después
+dieron **exactamente el mismo** número, que es la huella que vale.
+
+### 🔴 Ningún número de plata cambió
+
+El cambio es de PANTALLA y no toca el motor: del código de producción se movió
+**un solo archivo**, `src/app/asistencia/ReporteTab.tsx` (un componente de
+cliente), más un módulo puro nuevo. `reporte.ts`, `planilla.ts`, las rutas del
+API y todo lo que calcula quedan byte a byte iguales.
+
+Medido igual, por si acaso: **46 líneas de planilla, neto total 11.471,70**, con
+la huella persona por persona en el script. Lo que sí cambia —a propósito— es el
+**pie del Reporte**, que ahora se suma sobre lo que se ve:
+
+| | colaboradores | ausencias | min tarde | no trabajado | extras | a revisar |
+|---|---|---|---|---|---|---|
+| filtro apagado | 46 | 81 | 5.279,40 | 7.889,73 | 16.401,92 | **57** |
+| filtro prendido | 26 | 56 | 4.819,52 | 6.729,03 | 10.570,75 | **57** |
+
+🔑 «A revisar» da igual en los dos: quien no tenía nada aportaba cero. Las otras
+cuatro columnas bajan, y **tienen que bajar** — es la regla.
+
+### 🔴 Cómo está construido
+
+Todo lo que decide vive en un módulo PURO, `src/lib/asistencia/solo-a-revisar.ts`
+(sin base, sin red, sin `new Date()`, sin un solo número de plata).
+
+**1. La regla no se inventa acá.** Qué es «a revisar» lo decide el motor y nada
+más: `revisar` por día y `resumen.diasARevisar` por persona. El filtro de filas
+usa `resumen.diasARevisar > 0` —la MISMA cuenta que dibuja la columna, para que
+no pueda haber una fila que el filtro esconda y la columna muestre en ámbar— y
+el recorte de días usa `d.revisar`. El script de medición comprueba que las dos
+cuentas dan lo mismo (26 personas por las dos vías, 57 días por las dos vías).
+
+**2. 🔴 El total sigue al filtro.** Es la regla escrita de la casa
+(`lib/buscar-en-lista.ts`): *«o el total sigue al filtro, o no hay buscador»*.
+El pie se suma sobre `visibles`, el «N colaboradores» del pie cuenta `visibles`,
+y al lado del botón se dice **«26 de 46 colaboradores»** para que el total
+recortado no se lea como el de todos.
+
+**3. 🔴 El filtro va en la URL con `replace`, nunca `push`.** Dos parámetros:
+`?revisar=1` (el botón) y `?diasDe=<código>` (qué fila está abierta mostrando
+solo sus días). Son filtros del MISMO nivel —como `?desde=`, `?buscar=` y
+`?empresa=`—, así que el Atrás del navegador no cicla por ellos. Solo `"1"`
+prende el filtro: un `0` en la URL lo deja apagado.
+
+**4. 🔴 Una sola forma de llegar al día.** El enlace del número se arma **sobre**
+`enlaceDiasDe` (`marcas-impares.ts`), la misma dirección que ya usan «Ver sus
+días ›» de la ficha y el aviso «Antes de cerrar» de la Planilla. Lo único propio
+es el `&diasDe=`. Queda así:
+
+```
+/asistencia?tab=asistencia&q=43&desde=2026-09-01&hasta=2026-09-15&diasDe=43
+```
+
+Es un `<a>` de verdad —se copia, se abre en otra pestaña con Cmd, y un enlace
+compartido llega con la persona ya abierta en sus días—, y el clic normal lo
+resuelve en el acto, sin recargar la pantalla.
+
+**5. 🔴 Con 0 días a revisar no hay enlace**: va el guion de siempre. Un enlace
+que abre una lista vacía es peor que no tenerlo.
+
+**6. El detalle recortado se DICE, y se suelta sin un control nuevo.** Una fila
+abierta con 3 de 11 días lleva una línea gris: «Solo los 3 días a revisar, de 11
+del período. Toca la fila para verlos todos.» Tocar la fila la abre entera —era
+lo que ya hacía—, así que no hizo falta inventar un botón. ⚠️ Cuando **todos**
+los días de la persona son a revisar no se dice nada: no se recortó nada.
+
+**7. Apagar el filtro suelta la fila recortada.** Dejar una fila mostrando 3 de
+11 días bajo un filtro apagado sería mentir con la pantalla.
+
+**8. El vacío se dice con palabras**: «Nadie tiene días a revisar en este
+período», con «Ver a todos» al lado. Nunca una tabla en blanco.
+
+### ⚠️ El Excel y el PDF — decidido a propósito
+
+La regla de la casa es *«lo que sale de la pantalla nunca se recorta, salvo un
+botón que DIGA a cuántos afecta»*. Acá se eligió la excepción, por dos razones:
+
+- **Ya era así.** El buscador de esta pestaña filtra en el **SERVIDOR** (`?q=`),
+  así que con un nombre escrito el Excel y el PDF ya bajaban recortados. Un
+  botón que se portara distinto haría que la pantalla dijera 26 y el archivo 46.
+- **Y el botón lo dice**: con el filtro prendido se llaman **«Excel · 26»** y
+  **«PDF · 26»**; apagados, «Excel» y «PDF» como siempre.
+
+Dos candados lo sostienen: el rótulo (`rotuloDescarga`) y el contenido (los dos
+generadores reciben exactamente las 2 personas visibles del fixture, no las 3).
+
+⚠️ **Dos candados cambiaron de dirección, con nota fechada**:
+`asistencia-config.test.ts` y `peso-muerto-js.test.ts` exigían el literal
+`construirExcel({ personas, desde, hasta, reglas`; ahora exigen
+`construirExcel({ personas: visibles, …`. Lo que sostienen no cambió —mismo
+motor, mismas reglas—; lo que cambió es cuántas filas se le mandan.
+
+### Candados
+
+`src/__tests__/components/asistencia-solo-a-revisar.test.tsx` — **30 casos**.
+Se renderiza la pestaña de verdad, porque que `soloConDiasARevisar` devuelva dos
+personas no prueba que el pie sume sobre esas dos, ni que el filtro se escriba
+con `replace`, ni que la fila sin días muestre un guion en vez de un enlace.
+
+**Verificado por mutación**: `scripts/_mutar-candados-solo-a-revisar.sh` —
+**18 mutaciones, 18 cazadas**, 2 controles en verde, 0 corridas muertas.
+Entre ellas las tres obligatorias del encargo: el pie sumando la lista entera
+sobre una tabla recortada, el filtro pasado a `push`, y el guion convertido en
+un enlace a ningún día.
+
+### Medición
+
+`scripts/_medir-solo-a-revisar.ts` (solo lectura):
+
+```
+DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config \
+  scripts/_medir-solo-a-revisar.ts 2026-09-1
+```
+
+---
+
 ## 🔴 La marca repetida se olvida sola (18-sep-2026) — «1 minuto»
 
 ### Qué decidió Daniel
