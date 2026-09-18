@@ -849,9 +849,14 @@ describe("la pantalla y los archivos dicen los MISMOS números que el motor", ()
   });
 
   it("el Excel y el PDF reciben las reglas del reporte", () => {
+    // ⚠️ 18-sep-2026 — CAMBIÓ DE DIRECCIÓN, con nota fechada: lo que se manda
+    // ya no es `personas` a secas sino `visibles`, la lista con el filtro
+    // «Solo a revisar» puesto. Lo que este candado sostiene NO cambió: los dos
+    // archivos salen del MISMO motor y con las MISMAS reglas que la pantalla.
+    // El porqué del recorte, en `lib/asistencia/solo-a-revisar.ts`.
     const tab = leer("src/app/asistencia/ReporteTab.tsx");
-    expect(tab).toContain("construirExcel({ personas, desde, hasta, reglas");
-    expect(tab).toContain("construirPdf({ personas, desde, hasta, reglas");
+    expect(tab).toContain("construirExcel({ personas: visibles, desde, hasta, reglas");
+    expect(tab).toContain("construirPdf({ personas: visibles, desde, hasta, reglas");
   });
 });
 

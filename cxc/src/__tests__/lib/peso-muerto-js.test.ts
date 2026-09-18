@@ -122,8 +122,13 @@ describe("🔴 Asistencia: Excel y PDF se bajan al TOCAR el botón", () => {
   it("los archivos siguen saliendo con el mismo nombre y el mismo motor", () => {
     // Cambiar CÓMO se carga la librería no puede cambiar lo que produce.
     const rep = leer("src/app/asistencia/ReporteTab.tsx");
-    expect(rep).toContain("construirExcel({ personas, desde, hasta, reglas");
-    expect(rep).toContain("construirPdf({ personas, desde, hasta, reglas");
+    // ⚠️ 18-sep-2026 — CAMBIÓ DE DIRECCIÓN, con nota fechada: pasó de
+    // `personas` a `visibles`, que es lo que la pantalla muestra con el filtro
+    // «Solo a revisar» puesto. El motor y las reglas son los mismos; lo que
+    // cambió es CUÁNTAS filas se le mandan, y el botón lo DICE («Excel · 34»).
+    // Ver `lib/asistencia/solo-a-revisar.ts`.
+    expect(rep).toContain("construirExcel({ personas: visibles, desde, hasta, reglas");
+    expect(rep).toContain("construirPdf({ personas: visibles, desde, hasta, reglas");
     // 🔴 10-sep-2026 (noche): el nombre lleva la empresa (o «Todas»), armado por
     // `nombreArchivoPorEmpresa`. Mismo motor, mismo rango en el nombre.
     expect(rep).toContain('nombreArchivoPorEmpresa("Asistencia", empresa, desde, hasta, "xlsx")');
