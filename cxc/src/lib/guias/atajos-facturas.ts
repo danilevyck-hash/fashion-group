@@ -64,6 +64,14 @@ export const DIAS_POR_VER_MAS = 3;
 /** Una factura del cliente, tal como la sirve `/api/guias/facturas-cliente`. */
 export interface FacturaDelCliente {
   empresa_key: string;
+  /**
+   * 🔴 El id REAL de la factura en Switch (`switch_facturas.switch_factura_id`).
+   * Viaja desde el 18-sep-2026 y lo usan las ETIQUETAS (`guias_etiquetas`): es
+   * el dato que la guía NUNCA guardó, porque su columna `facturas` es texto
+   * libre pareado por empresa + últimos 4 dígitos. ⚠️ ADITIVO: los renglones
+   * de la guía siguen guardándose exactamente igual.
+   */
+  switch_factura_id?: number | null;
   /** Nombre de display de la empresa — el MISMO que escribe el `<select>` del formulario. */
   empresa: string;
   secuencial: string;

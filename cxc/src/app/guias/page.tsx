@@ -13,12 +13,19 @@ import AtarClienteModal from "./components/AtarClienteModal";
 import { refrescarFacturasDelDia } from "./components/refrescarFacturasHoy";
 import { GUIAS_ATAJOS_NUEVOS } from "@/lib/guias/atajos-facturas";
 import { CONFIG_GUIAS_ROLES } from "@/lib/guias/destinos-config";
+import { puedeEtiquetar } from "@/lib/guias/etiquetas";
 
 // LAZY, como los modos de Comisiones: bodega abre /guias todo el día desde el
 // celular y la configuración es de admin/secretaria — su JS solo se descarga
 // al tocar la pestaña. (Medido: importarla de arriba subía la carga inicial
 // de /guias de 196 a 202 kB.)
 const GuiasConfiguracionView = dynamic(() => import("./components/GuiasConfiguracionView"), {
+  ssr: false,
+  loading: () => <div className="py-10 text-center text-sm text-gray-500">Cargando…</div>,
+});
+// La pestaña «Etiquetas» (18-sep-2026), LAZY por la misma razón: arrastra jsPDF
+// al imprimir y bodega abre /guias todo el día desde el celular.
+const EtiquetasView = dynamic(() => import("./components/EtiquetasView"), {
   ssr: false,
   loading: () => <div className="py-10 text-center text-sm text-gray-500">Cargando…</div>,
 });
@@ -119,24 +126,39 @@ export default function GuiasPage() {
   // ⚠️ Tab del MISMO nivel → `replace` sobre window.location, no
   // useSearchParams: ese hook obliga a envolver la página en <Suspense> (la
   // misma razón por la que `pendientes` ya se lee así abajo).
-  const [vista, setVista] = useState<"guias" | "config">("guias");
+  // ── La pestaña «Etiquetas» (18-sep-2026): las etiquetas de las cajas ──
+  // 🔴 NO cuelga de `GUIAS_ATAJOS_NUEVOS`: aquel interruptor es la salida de
+  // emergencia de Nueva guía (volver a la pantalla de antes), y apagarlo no
+  // puede esconder una función nueva que Daniel aprobó aparte. La ven los
+  // MISMOS tres que escriben una guía (admin · secretaria · bodega,
+  // `ETIQUETAS_ROLES` derivado de `GUIAS_WRITE_ROLES`); el vendedor no.
+  type Vista = "guias" | "config" | "etiquetas";
+  const [vista, setVista] = useState<Vista>("guias");
   const hayConfig =
     GUIAS_ATAJOS_NUEVOS && !!role && (CONFIG_GUIAS_ROLES as readonly string[]).includes(role);
+  const hayEtiquetas = puedeEtiquetar(role);
   useEffect(() => {
     if (!authChecked) return;
     const v = new URLSearchParams(window.location.search).get("vista");
-    if (v === "config") setVista("config");
+    if (v === "config" || v === "etiquetas") setVista(v);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authChecked]);
-  function cambiarVista(v: "guias" | "config") {
+  function cambiarVista(v: Vista) {
     setVista(v);
     const params = new URLSearchParams(window.location.search);
-    if (v === "config") params.set("vista", "config");
-    else params.delete("vista");
+    if (v === "guias") params.delete("vista");
+    else params.set("vista", v);
     const qs = params.toString();
     window.history.replaceState(null, "", qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
   }
   const enConfig = hayConfig && vista === "config";
+  const enEtiquetas = hayEtiquetas && vista === "etiquetas";
+  /** Las pestañas que de verdad existen para este rol. Con una sola, no se dibuja la fila. */
+  const pestanas: Array<[Vista, string]> = [
+    ["guias", "Guías"],
+    ...(hayEtiquetas ? ([["etiquetas", "Etiquetas"]] as Array<[Vista, string]>) : []),
+    ...(hayConfig ? ([["config", "Configuración"]] as Array<[Vista, string]>) : []),
+  ];
 
   // Al TOCAR Guías se dispara, en segundo plano, la lectura corta de las
   // facturas de HOY para el panel «Facturas del cliente». Daniel, textual
@@ -194,13 +216,10 @@ export default function GuiasPage() {
         {/* La fila de pestañas solo existe para quien puede configurar
             (admin y secretaria): para bodega y vendedor la pantalla es
             exactamente la de siempre, sin una fila extra. */}
-        {hayConfig && (
+        {pestanas.length > 1 && (
           <div className="max-w-3xl mx-auto px-4 pt-3">
-            <div className="flex items-center gap-1 border-b border-gray-200">
-              {([
-                ["guias", "Guías"],
-                ["config", "Configuración"],
-              ] as ["guias" | "config", string][]).map(([v, label]) => (
+            <div className="flex items-center gap-1 border-b border-gray-200 overflow-x-auto">
+              {pestanas.map(([v, label]) => (
                 <button
                   key={v}
                   type="button"
@@ -220,6 +239,8 @@ export default function GuiasPage() {
         )}
         {enConfig ? (
           <GuiasConfiguracionView />
+        ) : enEtiquetas ? (
+          <EtiquetasView />
         ) : (
         <>
         {/* 🔴 LOS DOS BOTONES DE LA FILA NAVEGAN — ninguno despacha ni guarda.

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast } from "@/components/ui";
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import GuiaForm from "../components/GuiaForm";
 import { useGuiaFormState } from "../components/useGuiaFormState";
 import { refrescarFacturasDelDia } from "../components/refrescarFacturasHoy";
@@ -21,7 +21,25 @@ export default function NuevaGuiaClient() {
     allowedRoles: GUIAS_WRITE_ROLES,
   });
 
-  const s = useGuiaFormState({ editingId: null });
+  // 🔴 LAS ETIQUETAS MARCADAS (18-sep-2026). Viven en un `ref` y no en estado
+  // porque nada de la pantalla depende de ellas: solo hacen falta EN EL
+  // INSTANTE de guardar, para atarlas a los renglones recién creados. Guardarlo
+  // como estado redibujaría el formulario entero en cada casilla.
+  const etiquetasRef = useRef<number[]>([]);
+
+  const atarEtiquetas = useCallback(async (guiaId: string) => {
+    const ids = etiquetasRef.current;
+    if (ids.length === 0) return;
+    // 🔴 FALLA ABIERTA: la guía YA se guardó. Si esto no sale, las etiquetas
+    // simplemente siguen diciendo «Pendiente de guía» — nunca al revés.
+    await fetch("/api/guias/etiquetas/importar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ guia_id: guiaId, ids }),
+    }).catch(() => {});
+  }, []);
+
+  const s = useGuiaFormState({ editingId: null, despuesDeCrear: atarEtiquetas });
 
   // La lectura corta de las facturas de HOY (para el panel «Facturas del
   // cliente»). Desde el 4-sep-2026 el disparo principal vive en la LISTA de
@@ -80,6 +98,7 @@ export default function NuevaGuiaClient() {
         onUpdateItem={s.updateItem}
         onUpdateItemFields={s.updateItemFields}
         onReemplazarItems={s.reemplazarItems}
+        onEtiquetasSeleccionadas={(ids) => { etiquetasRef.current = ids; }}
         onAddRow={s.addRow}
         onRemoveRow={s.removeRow}
         onRestoreRow={s.restoreRow}

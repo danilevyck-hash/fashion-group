@@ -323,6 +323,9 @@ const DATASETS: Dataset[] = [
   // que ofrece el campo Dirección — las dos las escriben personas.
   { table: "guias_destino_cliente" },
   { table: "guias_destino_lista" },
+  // Las etiquetas de las cajas: cuántas lleva cada factura y con qué destino.
+  // Lo escribe una persona antes de que exista la guía; no vuelve de ningún lado.
+  { table: "guias_etiquetas" },
   // Catálogo Reebok: a qué cajón va cada rubro de Switch (17-sep-2026). Lo
   // escribe Daniel a mano; Switch manda el rubro, no dice a qué categoría va.
   { table: "reebok_rubro_categoria" },

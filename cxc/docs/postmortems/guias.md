@@ -1379,6 +1379,151 @@ el **94% tenía 6 renglones o menos**. `MAX_RENGLONES_PNG` queda retirada con es
 
 ---
 
+## 🔴 Guías — ETIQUETAS PARA LAS CAJAS DE UN DESPACHO · Fase 1 (18-sep-2026)
+
+Daniel aprobó el mockup y mandó construir: **elegir una factura, escribir cuántas cajas y que
+salgan las hojas para pegar**. La etiqueta se imprime **primero**; la guía se hace ese mismo día o
+tres días después, y sola se entera.
+
+### 🩸 El hueco, medido contra producción el 18-sep-2026
+
+Tres cosas que el sistema **no sabía** y por las que hizo falta una tabla:
+
+1. **Un bulto no es una cosa en ningún lado.** `guia_items.bultos` es UN NÚMERO POR RENGLÓN (607
+   renglones vivos, 14,2 de promedio, máximo 291 en una guía y 79 en un renglón). No existe caja 1,
+   caja 2, caja 3 — ni tabla, ni columna, ni id. Sin numeración no se puede reimprimir la caja 7
+   tres días después.
+2. **Los bultos se escriben DESPUÉS de lo que Daniel quiere imprimir ANTES.** El número entra al
+   sistema al CREAR la guía. Si la etiqueta sale primero, ese número no tiene dónde vivir.
+3. **La factura del renglón es TEXTO LIBRE y no guarda ningún id de Switch.** Conviven
+   `11-000002556`, `3117`, `0000`, `2980-2982`, `3201, 3203, 3205` y hasta `F-TEST-1`; el pareo es
+   por **empresa + últimos 4 dígitos**, que es una convención, no una relación. Las etiquetas nacen
+   con el `switch_factura_id`, que es lo que permite juntar sin adivinar.
+
+Dos mediciones más que decidieron qué NO lleva la etiqueta: **29 de 145 clientes del grupo no tienen
+dirección en ninguna parte** (y la que hay es un pueblo de una línea), y **Boston y Multifashion no
+tienen ni una línea de factura** (0 de 9.302 y 0 de 30.080 — el cron las rechaza a propósito). Por
+eso el papel lleva el **destino del ENVÍO**, nunca la dirección del directorio, y no dice piezas.
+
+### La tabla — `guias_etiquetas` (migración `20261207120000`, ⚠️ **pendiente**)
+
+Una fila **por FACTURA**: `empresa_key` · `switch_factura_id` · `secuencial` · `fecha_factura` ·
+`cliente_codigo` · `cliente_nombre` · `destino` · `cajas` · `guia_item_id` · soft delete firmado.
+
+- 🔴 **EL ESTADO SE DERIVA, NO SE MANTIENE.** No hay columna «estado». Una etiqueta está «En GT-XXX»
+  si su `guia_item_id` apunta a un renglón **VIVO** de una guía **VIVA**; en cualquier otro caso
+  —sin renglón, renglón con `deleted = true`, guía con `deleted = true`— vuelve sola a «Pendiente de
+  guía». Daniel, al aprobar: *«si la guía o el renglón se borran (soft delete), la etiqueta vuelve
+  sola a Pendiente»*. La regla vive en **una** función pura, `guiaQueSeLlevo`, y mira **los DOS
+  `deleted`** (son independientes: `guia_items` tiene el suyo y `guia_transporte` el suyo).
+- 🔴 **Se ata al RENGLÓN, no a la guía** (`guia_item_id uuid REFERENCES guia_items(id) ON DELETE SET
+  NULL`): una guía lleva varios clientes y varias empresas, y lo que se llevó esta factura es UN
+  renglón.
+- 🔴 **El único es PARCIAL**: `UNIQUE (empresa_key, switch_factura_id) WHERE NOT deleted`. Una
+  factura no tiene dos juegos a la vez, pero **borrado el juego se puede volver a etiquetar**.
+- ⚠️ **La convención de esta tabla, escrita en la migración**: `deleted` es `NOT NULL DEFAULT false`,
+  nunca NULL. En varias tablas de la casa es NULLABLE y hay que filtrar
+  `.or("deleted.is.null,deleted.eq.false")` (préstamos); acá **no** — `NOT NULL` es lo que hace que
+  el índice parcial `WHERE NOT deleted` sea simple y no deje pasar un repetido con `deleted IS NULL`.
+- 🔴 **Soft delete FIRMADO, nunca DELETE**, con CHECK que lo exige y sin `GRANT DELETE`.
+- RLS: solo `service_role`. Clasificada como **`personas`** en `src/lib/backup/tablas.ts` y bajada
+  por el cron de respaldo: la escribe una persona y **no vuelve de ningún lado** (Switch no sabe de
+  cajas).
+- 🔴 **No toca ni una fila de `guia_items` ni de `guia_transporte`.** Lo único que cruza es la
+  LECTURA del renglón (para derivar el estado) y el `guia_item_id` que se anota **de este lado**.
+
+### La pantalla — Guías › **Etiquetas**
+
+- Pestaña nueva al lado de «Guías» y «Configuración». La ven **admin · secretaria · bodega**
+  (`ETIQUETAS_ROLES`, **derivado** de `GUIAS_WRITE_ROLES`, no copiado); el vendedor no.
+- 🔴 **NO cuelga de `GUIAS_ATAJOS_NUEVOS`**: ese interruptor es la salida de emergencia de *Nueva
+  guía* (volver a la pantalla de antes) y apagarlo no puede esconder una función nueva.
+  ⚠️ La sección de `/guias/nueva` **sí** cuelga de él.
+- **Tres toques, un solo panel** (sin pantalla «Nueva»): factura → cajas → Imprimir. Reusa el
+  **ÚNICO** selector de cliente del sistema (`ClientePicker`) y la **misma** lista de facturas por
+  día que Nueva guía (`/api/guias/facturas-cliente` + `agruparPorDia`). **Una factura a la vez**
+  (radio, no casillas).
+- **El destino viene preseleccionado** con «el de siempre» del cliente, por la **misma** función del
+  formulario de la guía (`destinoParaAutollenar` + `botonesDeDestino`). Ni una segunda definición.
+- **«Traer de Switch ahora»** reusa `POST /api/guias/facturas-hoy` — 🔴 **no se estrenó un camino a
+  Switch**: la misma ruta de siempre, acotada al día, con su cooldown de 10 min y su
+  `logoutAllSwitchSessions()` en el `finally`.
+- **Anti-duplicado**: la misma factura otra vez **no crea un segundo juego**. Sale «Ya etiquetada ·
+  14 cajas» con **Reimprimir**, y 🔴 **el 409 lo decide el SERVIDOR** (devolviendo la etiqueta que ya
+  existe, para que la pantalla ofrezca qué hacer con ella). El índice único parcial es la red de
+  abajo, no la regla.
+- **Corregir bultos y borrar: solo mientras está pendiente.** Importada = bloqueada, 🔴 **y el
+  servidor contesta 409**, no solo el botón apagado — que además **DICE** por qué («Ya salió en
+  GT-256»).
+- Sin la migración corrida, 🔴 **la pantalla NO se rompe**: la pestaña se dibuja, dice que falta
+  correr `20261207120000` y que Guías sigue funcionando igual; «＋ Etiquetar una factura» queda
+  apagado y el POST contesta **503** con ese mismo aviso.
+
+### El papel
+
+Hoja **carta partida en cuartos**, **4 etiquetas por hoja**, líneas de corte punteadas, **jsPDF**
+como todo el papel de la casa. 🔴 **No se estrenó ninguna dependencia**: la auditoría confirmó que el
+proyecto no tiene ni una librería de código de barra ni de QR, y la etiqueta aprobada no lleva
+ninguno.
+
+La etiqueta lleva **seis cosas**: EMPRESA (grande, negrita, con línea debajo) · fecha (chica, a la
+derecha, DD-MM-AAAA) · Factura · Cliente (grande) · Destino · **«CAJA X de N»** (muy grande, abajo).
+**SIN transportista, SIN piezas, SIN código de barras, SIN la dirección del directorio.** Las
+proporciones salen del mockup, medidas sobre el ancho de la hoja.
+
+🔴 **UN SOLO GENERADOR**: reimprimir una caja es el MISMO dibujo con una lista de un elemento — una
+hoja, la etiqueta en la **posición 1** (arriba izquierda) y el resto en blanco. Las líneas de corte
+se dibujan **siempre**, aunque la hoja tenga cuartos vacíos, para que el papel se parta igual.
+
+### En `/guias/nueva` — «Facturas etiquetadas pendientes»
+
+- 🔴 **La guía se sigue armando igual que hoy.** Marcar una etiqueta **rellena los MISMOS renglones**
+  que se escriben a mano (cliente, empresa, facturas «A, B», bultos, dirección): el payload del POST
+  no cambia ni un campo, y si no se toca, la pantalla es la de siempre.
+- 🔴 **Se juntan por CLIENTE *y* EMPRESA, con los bultos sumados.** Daniel dio el ejemplo «3 facturas
+  de Nova Lux → 1 renglón»: se juntan las del mismo par, así que dos facturas del mismo cliente en
+  empresas distintas van en **dos** renglones — que es lo que ya pasa de verdad (GT-256 llevó a Nova
+  Lux en **cuatro** renglones, uno por empresa: Fashion Wear 79 bultos, Vistana 68, Fashion Shoes 84,
+  Active Shoes 51).
+- **Lo escrito a mano nunca se pisa**: se agrega al renglón que ya existe para ese par, exactamente
+  como `marcarFactura`. Y **qué está marcado se DERIVA de los renglones**, no se guarda aparte.
+- 🔴 **El amarre lo escribe una ruta APARTE**, `POST /api/guias/etiquetas/importar`, DESPUÉS de que
+  `POST /api/guias` creó la guía y con el id que ése devuelve. **Falla ABIERTA**: si no corre, la
+  guía ya quedó guardada y lo único que pasa es que las etiquetas siguen diciendo «Pendiente».
+  Nunca al revés. El renglón se busca por (`cliente_codigo`, `empresa`) normalizado, **exacto**, y
+  una etiqueta que ya salió en otra guía se salta: no se muda de guía sola.
+
+### Lo que se tocó de lo que ya existía (todo ADITIVO)
+
+- `/api/guias/facturas-cliente` ahora devuelve también `switch_factura_id`. Nada de lo que ya
+  viajaba cambió.
+- `useGuiaFormState` acepta un `despuesDeCrear(guiaId)` opcional. 🩸 Al escribirlo se leyó el cuerpo
+  de la respuesta **dos veces** (`res.clone()`): un `Response` no se consume dos veces y el doble de
+  prueba de `guias-papel-y-marcas` no tiene `clone` — el guardado quedaba sin navegar. Ahora el
+  cuerpo se lee **una sola vez** y de ahí salen las dos cosas que necesitan el id.
+- ⚠️ Las clases de letra del archivo nuevo arrancaron en `text-[10.5px]` / `text-[11.5px]` y el
+  candado `iphone-targets-guias` las cazó: **en Guías nada por debajo de 12 px**.
+
+### Candados
+
+- `src/__tests__/lib/guias-etiquetas.test.ts` — la parte pura y la forma de la tabla (57 casos).
+- `src/__tests__/api/guias-etiquetas-route.test.ts` — las **rutas EJECUTADAS** contra una base
+  doblada: el 409 del anti-duplicado, el 409 de lo importado, el soft delete firmado, el renglón
+  borrado que devuelve la etiqueta a «Pendiente», el fail-open sin tabla y el 403 del vendedor.
+- `src/__tests__/components/guias-etiquetas-pantalla.test.tsx` — la pantalla dibujada de verdad.
+- Mutaciones: `scripts/_mutar-candados-guias-etiquetas.sh` (**24 mutaciones, 24 cazadas**, 2
+  controles en verde).
+
+### ⚠️ Lo que queda pendiente de Daniel
+
+1. **Correr la migración.** Hasta que corra, la pestaña se dibuja y avisa; nada más cambia.
+2. El botón «Imprimir» **descarga el PDF** (el camino de toda la casa), no abre el diálogo de la
+   impresora. Si lo quiere directo a la impresora, es otra decisión.
+3. El tope de cajas quedó en **300** (el récord real de una guía entera son 291 bultos). Si un
+   despacho puede pasar de ahí, hay que subirlo en el CHECK **y** en `MAX_CAJAS`.
+
+---
+
 ## Lo que decía CLAUDE.md hasta el 14-sep-2026 (movido acá, verbatim)
 
 > El 14-sep-2026 CLAUDE.md pasaba de 333 mil caracteres (el tope del harness es 150 mil) y las instrucciones se cortaban a la mitad. Se dejó ahí un resumen de las reglas vigentes y el texto completo —mediciones, citas de Daniel, candados y mutaciones— se movió acá sin cambiar una palabra.

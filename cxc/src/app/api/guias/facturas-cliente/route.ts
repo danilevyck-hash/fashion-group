@@ -54,6 +54,10 @@ interface ParPuente {
 
 interface FacturaFila {
   empresa_key: string;
+  /** 🔴 El id REAL de Switch. Viaja desde el 18-sep-2026 para las ETIQUETAS:
+   *  `guias_etiquetas` lo guarda, y es lo que la guía nunca guardó (su columna
+   *  `facturas` es texto libre). ⚠️ ADITIVO: nada de lo que ya existía cambió. */
+  switch_factura_id: number | null;
   secuencial: string | null;
   fecha: string | null;
   total: number | string | null;
@@ -102,7 +106,7 @@ export async function GET(req: NextRequest) {
 
   const { data: facs, error: fErr } = await supabaseServer
     .from("switch_facturas")
-    .select("empresa_key, secuencial, fecha, total")
+    .select("empresa_key, switch_factura_id, secuencial, fecha, total")
     .eq("tipo_comprobante", TIPO_FACTURA)
     .or(orFiltro)
     .order("fecha", { ascending: false })
@@ -150,6 +154,7 @@ export async function GET(req: NextRequest) {
       return {
         empresa_key: f.empresa_key,
         empresa,
+        switch_factura_id: f.switch_factura_id == null ? null : Number(f.switch_factura_id),
         secuencial: String(f.secuencial),
         fecha: String(f.fecha),
         total: Number(f.total ?? 0),

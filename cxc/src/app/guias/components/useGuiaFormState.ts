@@ -37,6 +37,16 @@ interface Options {
    */
   alGuardar?: () => void;
   /**
+   * 🔴 QUÉ HACER JUSTO DESPUÉS DE QUE LA GUÍA SE CREÓ, con su id (18-sep-2026).
+   *
+   * Lo usa «Facturas etiquetadas pendientes» para ATAR las etiquetas marcadas a
+   * los renglones recién insertados. ⚠️ El POST de la guía NO cambió ni un
+   * campo: esto corre DESPUÉS, con el id que ese POST devuelve, y falla
+   * ABIERTO — si revienta, la guía ya quedó guardada y lo único que pasa es que
+   * las etiquetas siguen diciendo «Pendiente». Nunca al revés.
+   */
+  despuesDeCrear?: (guiaId: string) => Promise<void> | void;
+  /**
    * 🔴 LA GUÍA QUE LA PANTALLA YA TIENE EN LA MANO — para no pedirla dos veces.
    *
    * 🩸 Al tocar «Editar» salían **6 pedidos** y la guía viajaba DOS VECES: una
@@ -123,7 +133,7 @@ function camposDeLaGuia(g: Guia) {
   };
 }
 
-export function useGuiaFormState({ editingId = null, alGuardar, guiaInicial = null }: Options = {}) {
+export function useGuiaFormState({ editingId = null, alGuardar, despuesDeCrear, guiaInicial = null }: Options = {}) {
   const router = useRouter();
 
   const [error, setError] = useState<string | null>(null);
@@ -695,6 +705,20 @@ export function useGuiaFormState({ editingId = null, alGuardar, guiaInicial = nu
         setGuardado(enviada);
         setGuardadoEn(new Date().toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit" }));
         clearGuiaDraft();
+        // ⚠️ El cuerpo de la respuesta se lee UNA SOLA VEZ: un `Response` no se
+        // puede consumir dos veces, y `res.clone()` no existe en todos los
+        // dobles de prueba. De acá salen las dos cosas que necesitan el id de
+        // la guía recién creada: atar las etiquetas y a dónde se navega.
+        const creada = !editingId ? await res.json().catch(() => null) : null;
+        const nuevoId = creada && typeof creada.id === "string" ? creada.id : null;
+        // 🔴 LAS ETIQUETAS SE ATAN DESPUÉS, con ese id (18-sep-2026). Con
+        // `await`, nunca fire-and-forget; y envuelto, porque una falla acá no
+        // puede tirar un guardado que YA salió bien.
+        if (!editingId && despuesDeCrear && nuevoId) {
+          try {
+            await despuesDeCrear(nuevoId);
+          } catch { /* la guía ya está guardada; las etiquetas siguen pendientes */ }
+        }
         // Aviso de creación eliminado (antes mandaba email interno a info@).
         // El único aviso de guías ahora es el de DESPACHO (Telegram), en
         // /api/guias/[id] al pasar a estado "Completada".
@@ -714,8 +738,6 @@ export function useGuiaFormState({ editingId = null, alGuardar, guiaInicial = nu
             // ⚠️ Si el servidor no devolvió el id (no debería pasar: el POST
             // responde la guía insertada), se vuelve al listado como siempre.
             // Quedarse quieto sin decir nada sería peor.
-            const creada = await res.json().catch(() => null);
-            const nuevoId = creada && typeof creada.id === "string" ? creada.id : null;
             router.push(nuevoId ? `/guias/${nuevoId}` : "/guias");
           } else {
             router.push("/guias");

@@ -192,6 +192,11 @@ export const TABLAS_PERSONAS = [
   // La escriben personas —Angela y Andrea al armar una guía— y NO se puede
   // volver a conseguir: antes vivía en el localStorage de cada navegador.
   "guias_destino_lista",
+  // 🔴 Las etiquetas de las cajas (18-sep-2026). Las escribe una persona al
+  // etiquetar —cuántas cajas lleva CADA factura, con qué numeración y a qué
+  // destino— y NO se pueden volver a conseguir de ningún lado: Switch no sabe
+  // de cajas y `guia_items.bultos` es un número por renglón que nace después.
+  "guias_etiquetas",
   "transportistas",
 
   // ── Caja menuda

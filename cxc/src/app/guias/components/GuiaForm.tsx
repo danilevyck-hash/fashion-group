@@ -59,6 +59,7 @@ import AddNewInline from "./AddNewInline";
 import DestinosDelCliente from "./DestinosDelCliente";
 import { destinoParaAutollenar, type DefinidosPorCliente } from "@/lib/guias/destinos-clientes";
 import FacturasDelCliente from "./FacturasDelCliente";
+import EtiquetasPendientes from "./EtiquetasPendientes";
 import { CODIGOS_RETIRADOS_DE_GUIAS } from "@/lib/guias/american-classics";
 import ClientePicker from "@/components/ClientePicker";
 import { GUIAS_ATAJOS_NUEVOS } from "@/lib/guias/atajos-facturas";
@@ -147,6 +148,13 @@ interface GuiaFormProps {
    * (y en una guía Completada) nada de esto aparece.
    */
   onReemplazarItems?: (items: GuiaItem[]) => void;
+  /**
+   * Los ids de las etiquetas marcadas en «Facturas etiquetadas pendientes»
+   * (18-sep-2026). Los recibe quien guarda, para ATARLAS a los renglones DESPUÉS
+   * de que la guía se creó. ⚠️ `POST /api/guias` no cambió: la guía se crea
+   * exactamente igual y este paso escribe solo del lado de `guias_etiquetas`.
+   */
+  onEtiquetasSeleccionadas?: (ids: number[]) => void;
 }
 
 // ── Primitivas del formulario ────────────────────────────────────────────────
@@ -328,6 +336,7 @@ export default function GuiaForm({
   hayCambios = false, instantanea = "", guardadoEn = null,
   soloCorregible = false,
   onReemplazarItems,
+  onEtiquetasSeleccionadas,
 }: GuiaFormProps) {
   const totalBultos = items.reduce((s, i) => s + (i.bultos || 0), 0);
 
@@ -1070,6 +1079,19 @@ export default function GuiaForm({
           destinoAutollenadoDe={(codigo) =>
             destinoParaAutollenar(codigo, destinosPorCliente[(codigo || "").trim()] ?? [], definidosPorCliente)
           }
+        />
+      )}
+
+      {/* 🔴 «FACTURAS ETIQUETADAS PENDIENTES» (18-sep-2026) — el atajo que
+          cierra el círculo: lo que se etiquetó hace tres días LLENA los mismos
+          renglones de siempre, juntando por cliente + empresa con los bultos
+          sumados. La guía se sigue armando igual; si no se toca, no cambia
+          nada. Solo al CREAR, y sin ninguna etiqueta pendiente no se dibuja. */}
+      {GUIAS_ATAJOS_NUEVOS && !editingId && !soloCorregible && onReemplazarItems && (
+        <EtiquetasPendientes
+          items={items}
+          onReemplazarItems={onReemplazarItems}
+          onSeleccion={onEtiquetasSeleccionadas}
         />
       )}
 
