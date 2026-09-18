@@ -7,6 +7,60 @@
 
 ---
 
+## 🔴 Todo de lunes a sábado en Multifashion, y sin deuda de día libre (18-sep-2026, tarde)
+
+### Qué decidió Daniel
+
+> *«obvio todo de lunes a sábado con multifashion»*
+> *«multifashion no se comporta igual, ese día se les regala, igual no van a marcar»* · *«te dije que no hay deuda del día libre a multifashion»*
+> *«no existe que entre semana Multifashion cierre pero las otras trabajen»* — por eso NO hay feriados por empresa: la lista global alcanza.
+
+Son **cuatro** empresas en planilla: `fashion_wear` · `vistana` · `confecciones_boston` · `american_classic`.
+
+### 🩸 Lo que quedó a medias por la mañana
+
+El cambio de los horarios configurables (`784fe1fa`) hizo que el MOTOR contara el sábado de Multifashion como día laborable —para la ausencia y el día normal—, pero dejó **TRES cuentas que seguían preguntando «lunes a viernes» a secas**, cada una con su propio bucle sobre `esHabil`:
+
+| # | Cuenta | Dónde | Qué pasaba |
+|---|---|---|---|
+| 1 | «faltan N días hábiles» del encabezado | `periodo.ts` › `diasHabilesPendientes` | Mirando Multifashion decía 9 cuando faltaban 11 |
+| 2 | El prorrateo de quien entra o sale a mitad de quincena | `prorrateo-ingreso.ts` › `diasHabilesEntre` | A alguien de Multifashion que entrara un lunes le pagaba 7 días en vez de 8: **el sábado trabajado no se le pagaba** |
+| 3 | La deuda del día libre de la empresa | `dia-libre-empresa.ts` › `diasHabilesDelRango` | Un sábado regalado no generaba deuda ni a quien lo trabaja |
+
+Barrido completo de `src/lib/asistencia/**` y `src/app/api/asistencia/**` por `esHabil`, `getUTCDay` y `dow` con `1..5` a mano: **eran exactamente esas tres**, más `planilla.ts:749`, que usa `esHabil` solo como RESPALDO de `clasificarDia` para un día viejo que no traiga `habil` (el motor siempre lo trae; se deja), y el propio `esHabil` de `reporte.ts`, que queda como esa única definición.
+
+### La regla, entera
+
+- 🔴 **UN SOLO CONTADOR**: `diasLaborablesDelRango(desde, hasta, dias, tope)` en `horario-configurable.ts`, y las tres cuentas pasan por él con los días de cada quien (`resolverDiasLaborables`: la columna de la persona, si no la EMPRESA de la ficha; sin la migración, lunes a viernes). Ninguna vuelve a tener bucle propio.
+- **«Faltan N días hábiles»** cuenta con los días de la empresa que se mira; con las cuatro juntas, la **unión** (`diasLaborablesDeEmpresas`, lunes a sábado): un sábado que a Multifashion todavía no se le contó ES un día que falta. Ejemplo real: quincena 16–30 sep, hoy viernes 18 → **9** de lunes a viernes, **11** con el sábado.
+- **El prorrateo** recibe los días de ESA persona (`prorrateoPorVigencia(v, desde, hasta, dias)`): quien entra en Multifashion el lunes 7-sep cobra **8 días** (con el sábado 12), no 7. Yeritza (Vistana, 27-jul) sigue en **5 × $23,08**.
+- **La deuda del día libre** se arma persona por persona con SUS días: Boston debe viernes y lunes de un rango vie→lun; quien tenga el sábado configurado en Horarios, también el sábado.
+- 🔴 **MULTIFASHION NUNCA LLEVA DEUDA DE DÍA LIBRE.** A ellas ese día se les regala: no se descuenta y no queda debiendo nada. La lista es `EMPRESAS_SIN_DIA_LIBRE = ["american_classic"]` en `motivos.ts` (escrita a mano, por `empresa_key` de la ficha). Se cierra en TRES lugares: `planearCargaDiaLibre` rechaza por empresa (antes de leer nada) y por persona (con la ficha en la mano, no con lo que diga el cuerpo); `registrarDeudasDiaLibre` —la única puerta que escribe— se corta sola si alguien le manda una; y la pantalla (`JustificarForm` con `motivosParaElegir(empresa)`) no le ofrece el motivo: a Multifashion se le ofrecen SEIS, a las otras tres los siete. Las dos rutas contestan **400** con `TEXTO_DIA_LIBRE_NO_APLICA`. Cualquier otro motivo le entra a Multifashion como siempre.
+- 🔴 **El domingo no se toca**: ningún contador lo cuenta ni con una lista que lo traiga, y el motor lo sigue mandando a `domingoMin`.
+- Para que la pantalla sepa la empresa: `SeccionJustificaciones` la recibe de la ficha (`persona.empresa`) y la fila del día del Reporte la manda en `DiaParaJustificar.empresa` (la ruta del Reporte ya la pegaba a cada persona). Sin empresa se ofrecen todos y decide el servidor.
+
+### Lo medido, contra producción (solo lectura, `scripts/_medir-vs-yulissa.ts`, migración `20261208120000` YA corrida, feriado 12-sep cargado)
+
+- `asistencia_dia_libre_deuda`: **CERO filas**. No hay nada que limpiar; solo se cerró la puerta.
+- **1–15 sep**, las cuatro empresas, antes → después: **0 diferencias en 46 líneas**. Multifashion 1.887,85 · Boston 4.831,42 · Fashion Wear 2.044,82 · Vistana 2.453,80. Nadie de Multifashion entró ni salió a mitad de quincena y no hay deudas de día libre, así que las dos cuentas que cambian no tenían a quién tocar.
+- **16–31 ago**: **0 diferencias en 46 líneas** (Multifashion 1.094,96 · Boston 5.619,07 · Fashion Wear 2.143,94 · Vistana 2.470,21).
+- 🔑 **El sábado 12-sep, ya con el feriado «Fiesta Judia» puesto**: las cuatro ausencias de Jenifer (301), Milagros (302), Jailine (303) y Sheynee (304) **desaparecieron solas** — el día sale `feriado=Fiesta Judia · ausente=false` para las ocho fichas de Multifashion, y el neto de la tienda pasó de los 1.122,01 medidos ayer a **1.887,85** (con las fichas de Ana, Cindy y Yeisibeth adentro). ⚠️ **Angel Pizza (305)** tiene UNA marca suelta ese día a las 19:15:21: para la PLATA no cuenta nada (día feriado: ni ausencia, ni tardanza, ni recargo porque trabajó 0 min), pero el **Reporte** le sigue mostrando ese día con **555 min de tardanza** y «marca de menos» (una marca sola es impar). Es la conducta de siempre del Reporte en un feriado con marca; no se tocó. Sus 2 ausencias reales son el 8 y el 9 de septiembre.
+
+### Candados
+
+- `src/__tests__/lib/multifashion-sabado-y-dia-libre.test.ts` — 23 casos en 5 bloques: el contador único y las tres cuentas · la regla pura y la pantalla · el servidor rechaza (por empresa sin leer una ficha, por persona, en la puerta que escribe, y las dos rutas con 400) con Boston de control · el domingo con su recargo · las otras tres empresas idénticas a lo de siempre. Barridos: nadie importa `esHabil` en las tres cuentas, ningún «1..5» a mano fuera de `esHabil`, la ruta de planilla y el instrumento de medición pasan los días.
+- Cambiaron de forma con nota fechada (misma conducta): `asistencia-corregir-hora` (`motivosParaElegir(empresa)`, `empresa` en `onJustificar`), `asistencia-dia-31` (quinto argumento del aviso), `asistencia-reglas-de-la-contable` (cuarto argumento del prorrateo).
+- Verificación por mutación: `scripts/_mutar-candados-multifashion-sabado.sh` — **17 mutaciones, 17 cazadas, 2 controles en verde**.
+
+### Lo que NO se hizo, y lo que queda de Daniel
+
+- No se escribió nada en producción; no hay migración nueva.
+- No se construyeron feriados por empresa (Daniel: la lista global alcanza).
+- No se tocó el Reporte del feriado con marca suelta (Angel, 12-sep): muestra tardanza que la planilla no cobra.
+- ⚠️ **Pendiente de Daniel**: si un día entre semana las tres empresas cierran con «día libre de la empresa» (deuda) y Multifashion también cierra, hoy a Multifashion no se le puede cargar NADA que la justifique (el día libre está cerrado para ellas y un feriado global les borraría la deuda a las otras tres). Daniel dijo que ese caso no existe (*«no existe que entre semana Multifashion cierre pero las otras trabajen»*); si un día existe, es una decisión suya, no un mecanismo que se inventa acá.
+
+---
+
 ## 🔴 Los días y los dos horarios, configurables por persona (18-sep-2026) — Multifashion trabaja el sábado
 
 ### Qué decidió Daniel
@@ -33,7 +87,7 @@ Y sobre el sábado, las dos consecuencias, aprobadas una por una:
 - 🔴 **El domingo NO se toca.** `esDiaLaborable` devuelve `false` en domingo pase lo que pase, `normalizarDiasLaborables` descarta el 0, el CHECK de la base lo prohíbe y la pantalla no lo ofrece. Sigue yendo a `domingoMin` con `recargoDomingoFeriado`.
 - **Dos horarios**: `entrada`/`salida` (cuando marca en el RELOJ) y `entrada_afuera`/`salida_afuera` (cuando marca por el TELÉFONO). 🔴 **Cuál aplica lo decide la PRIMERA marca del día** (`horarioDelDia`), por HORA y no por orden de llegada: una marca del teléfono que llegó tarde al servidor (sin señal) sigue siendo la primera si se tomó antes. La segunda marca no decide nada. Una hora agregada a mano no trae aparato: es del reloj.
 - 🔑 **Vacío = el mismo de adentro, campo por campo.** Con las dos horas de afuera vacías, una marca del teléfono se mide con el horario de siempre y el día NO se marca «de afuera».
-- **La planilla ya no le pregunta al calendario**: `clasificarDia` mira `d.habil`, que el motor calcula persona por persona. `esHabil` (lunes a viernes) queda de respaldo para un día que no lo traiga, y para lo que cuenta días hábiles del CALENDARIO sin persona adelante: «faltan N días hábiles» del encabezado (`periodo.ts`), el prorrateo de quien entra a mitad de quincena (`prorrateo-ingreso.ts`) y la deuda del día libre de la empresa (`dia-libre-empresa.ts`). ⚠️ Esos tres siguen contando lunes a viernes también para Multifashion — decisión pendiente de Daniel, no se tocó.
+- **La planilla ya no le pregunta al calendario**: `clasificarDia` mira `d.habil`, que el motor calcula persona por persona. `esHabil` (lunes a viernes) queda de respaldo para un día que no lo traiga, y para lo que cuenta días hábiles del CALENDARIO sin persona adelante: «faltan N días hábiles» del encabezado (`periodo.ts`), el prorrateo de quien entra a mitad de quincena (`prorrateo-ingreso.ts`) y la deuda del día libre de la empresa (`dia-libre-empresa.ts`). ~~⚠️ Esos tres siguen contando lunes a viernes también para Multifashion — decisión pendiente de Daniel, no se tocó.~~ → **RESUELTO esa misma tarde** (Daniel: *«obvio todo de lunes a sábado con multifashion»*): los tres pasan por `diasLaborablesDelRango` con los días de cada quien. Ver la sección de arriba.
 
 ### Dónde vive
 
@@ -84,8 +138,8 @@ Daniel: *«el máximo es 48 a la semana»*. Con estos horarios nadie se pasa por
 
 - No se corrió la migración ni se escribió nada en producción; no se cambió ningún horario guardado (los 18:30 de Multifashion ya estaban).
 - No hay recargo de sábado, ni tope de 48 h semanales, ni almuerzo de afuera (el de la fila vale para los dos horarios).
-- No se tocaron `periodo.ts`, `prorrateo-ingreso.ts` ni `dia-libre-empresa.ts`: siguen contando lunes a viernes.
-- No se decidió el 12-sep: es de Daniel.
+- ~~No se tocaron `periodo.ts`, `prorrateo-ingreso.ts` ni `dia-libre-empresa.ts`: siguen contando lunes a viernes.~~ → hecho esa misma tarde (sección de arriba).
+- ~~No se decidió el 12-sep: es de Daniel.~~ → Daniel cargó el feriado global **12-sep-2026 «Fiesta Judia»** y las cuatro ausencias desaparecieron solas (medido, sección de arriba).
 
 ---
 

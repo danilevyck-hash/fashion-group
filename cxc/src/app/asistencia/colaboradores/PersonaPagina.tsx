@@ -271,7 +271,7 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
                     del sueldo. Se dibuja solo cuando hay algo que decir. */}
                 <SeccionDiaLibre codigo={codigo} refresco={refresco} />
                 <SeccionOtrosServicios codigo={codigo} refresco={refresco} />
-                <SeccionJustificaciones codigo={codigo} refresco={refresco} />
+                <SeccionJustificaciones codigo={codigo} empresa={persona.empresa} refresco={refresco} />
                 <SeccionVacaciones codigo={codigo} refresco={refresco} />
                 <SeccionAsistencia codigo={codigo} refresco={refresco} />
               </>

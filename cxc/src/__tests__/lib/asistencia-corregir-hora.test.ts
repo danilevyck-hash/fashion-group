@@ -292,7 +292,12 @@ describe("3. 🔴 «Justificar» en la fila abre el MISMO formulario de la ficha
     // «que se ponga rango de hora solamente en constancia». Sigue siendo el MISMO
     // cuerpo y la MISMA ruta. Ver `justificar-horas-solo-constancia.test.ts`.
     expect(form).toMatch(/JSON\.stringify\(\{ codigo, desde, hasta, motivo, nota, \.\.\.horas \}\)/);
-    expect(form).toMatch(/MOTIVOS_JUSTIFICACION\.map\(/);
+    // ⚠️ 18-sep-2026: la lista ya no es `MOTIVOS_JUSTIFICACION` a secas sino
+    // `motivosParaElegir(empresa)` — la MISMA lista, menos «Día libre de la
+    // empresa» para Multifashion (Daniel: «ese día se les regala»). Sigue
+    // siendo UN formulario. Ver `multifashion-sabado-y-dia-libre.test.ts`.
+    expect(form).toMatch(/const motivos = motivosParaElegir\(empresa\);/);
+    expect(form).toMatch(/\{motivos\.map\(/);
     // La sección de la ficha abre con HOY.
     expect(puro("app/asistencia/colaboradores/SeccionJustificaciones.tsx"))
       .toMatch(/<JustificarForm[\s\S]*?desdeInicial=\{hoy\}[\s\S]*?hastaInicial=\{hoy\}/);
@@ -316,7 +321,10 @@ describe("3. 🔴 «Justificar» en la fila abre el MISMO formulario de la ficha
     expect(rep).toMatch(
       /const seJustifica = !d\.feriado && !d\.vacacion && !d\.justificado && !d\.fueraDeVigencia;/,
     );
-    expect(rep).toMatch(/onJustificar\(\{ codigo, persona, fecha: d\.fecha \}\)/);
+    // ⚠️ 18-sep-2026: viaja también la `empresa` de la ficha (la trae la ruta del
+    // Reporte), para que el formulario no le ofrezca a Multifashion el día
+    // libre de la empresa. Mismo modal, mismo formulario.
+    expect(rep).toMatch(/onJustificar\(\{ codigo, persona, empresa, fecha: d\.fecha \}\)/);
     expect(rep).not.toMatch(/OverflowMenu|···/);
   });
 

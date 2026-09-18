@@ -22,6 +22,8 @@ import JustificarForm from "./JustificarForm";
 export interface DiaParaJustificar {
   codigo: string;
   persona: string;
+  /** La empresa de la ficha (la trae el Reporte): decide qué motivos se ofrecen. */
+  empresa?: string | null;
   /** YYYY-MM-DD, el día de la fila. */
   fecha: string;
 }
@@ -64,6 +66,7 @@ export default function JustificarDiaModal({ dia, onCerrar, onGuardado }: {
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <JustificarForm
             codigo={dia.codigo}
+            empresa={dia.empresa ?? null}
             desdeInicial={dia.fecha}
             hastaInicial={dia.fecha}
             onGuardado={() => { onGuardado(); onCerrar(); }}

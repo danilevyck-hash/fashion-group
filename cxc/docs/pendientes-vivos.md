@@ -212,6 +212,11 @@ Hoy solo tiene filtro por compañía. ⚠️ **Puede estar superado por él mism
 
 **Qué decide Daniel:** (a) se agrega una columna `camino` que cada camino escribe al descargar, y las 145 filas viejas quedan «sin registrar» o se rellenan por empresa; (b) se deja el filtro por compañía como está, que con 144-1-0 separa lo mismo; (c) otra cosa.
 
+### 26. Multifashion: qué se le carga el día en que las otras tres cierran con «día libre de la empresa»
+> *«multifashion no se comporta igual, ese día se les regala, igual no van a marcar»* · *«no existe que entre semana Multifashion cierre pero las otras trabajen»* — **18-sep-2026**
+
+Hecho ese día: a Multifashion **no se le puede cargar deuda de día libre** (el servidor rechaza, la pantalla no ofrece el motivo; postmortem «Todo de lunes a sábado en Multifashion, y sin deuda de día libre») y el sábado 12-sep quedó como feriado global. Lo que queda es de Daniel: si un día ENTRE SEMANA las tres empresas cierran con día libre (deuda) y Multifashion también cierra, hoy no hay con qué justificarle ese día a Multifashion sin deuda —un feriado global les borraría la deuda a las otras tres—. Él dijo que ese caso no existe; queda anotado por si un día existe.
+
 ---
 
 ## Cómo se llegó a esta lista

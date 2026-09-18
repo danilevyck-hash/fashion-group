@@ -37,8 +37,11 @@ interface Justificacion {
   hora_hasta?: string | null;
 }
 
-export default function SeccionJustificaciones({ codigo, refresco }: {
-  codigo: string; refresco: number;
+export default function SeccionJustificaciones({ codigo, empresa = null, refresco }: {
+  codigo: string;
+  /** La empresa de la ficha: decide qué motivos se ofrecen (ver `JustificarForm`). */
+  empresa?: string | null;
+  refresco: number;
 }) {
   const { toast } = useToast();
   const [lista, setLista] = useState<Justificacion[]>([]);
@@ -85,6 +88,7 @@ export default function SeccionJustificaciones({ codigo, refresco }: {
         <div className="mb-3">
           <JustificarForm
             codigo={codigo}
+            empresa={empresa}
             desdeInicial={hoy}
             hastaInicial={hoy}
             onGuardado={() => { setAbierto(false); void leer(); }}

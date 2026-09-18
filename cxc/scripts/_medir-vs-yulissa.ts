@@ -145,7 +145,7 @@ async function main() {
   const prorrateo = new Map<string, { factor: number; texto: string }>();
   for (const [codigo, v] of vigencias) {
     if (fuera.has(codigo)) continue;
-    const p = prorrateoPorVigencia(v, q.desde, q.hasta);
+    const p = prorrateoPorVigencia(v, q.desde, q.hasta, diasLaborables?.get(codigo));
     if (p) prorrateo.set(codigo, { factor: p.factor, texto: p.texto });
   }
   const justificados = motivosDeQuienNoMarco({ justificaciones: jRes.filas, vacaciones: vRes.filas });

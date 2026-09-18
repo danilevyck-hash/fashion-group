@@ -39,7 +39,7 @@ import {
 // el horario de afuera. Falla ABIERTA: sin la migración, lunes a viernes y un
 // horario, como siempre. Ver `horarios-server.ts` y `horario-configurable.ts`.
 import { leerHorarios } from "@/lib/asistencia/horarios-server";
-import { avisoMigracionHorario, resolverDiasLaborables } from "@/lib/asistencia/horario-configurable";
+import { avisoMigracionHorario, diasLaborablesDeEmpresas, resolverDiasLaborables } from "@/lib/asistencia/horario-configurable";
 import {
   aplicarCorrecciones,
   contarCorrecciones,
@@ -513,6 +513,13 @@ export async function GET(req: NextRequest) {
     const diasLaborables = resolverDiasLaborables({
       horarios, empresaDe, faltaMigracion: horariosLeidos.faltaMigracion,
     });
+    // 🔴 Los días que cuenta «faltan N días hábiles» (18-sep-2026): los de la
+    // empresa que se mira, o la unión de las cuatro cuando el cuadro las trae
+    // juntas (un sábado que a Multifashion no se le contó todavía ES un día
+    // que falta). Sin la migración, lunes a viernes: como siempre.
+    const diasDelAviso = horariosLeidos.faltaMigracion
+      ? undefined
+      : diasLaborablesDeEmpresas(empresa ? [empresa] : EMPRESAS_ASISTENCIA);
 
     // 🩸 `incluirNoHabiles` es lo que hace visible el domingo trabajado. Sin
     // esto, las horas del domingo 26-jul (5 personas, medido) no existirían
@@ -600,7 +607,9 @@ export async function GET(req: NextRequest) {
     const prorrateo = new Map<string, { factor: number; texto: string }>();
     for (const [codigo, v] of vigencias) {
       if (fuera.has(codigo)) continue;
-      const p = prorrateoPorVigencia(v, q.desde, q.hasta);
+      // 🔴 Con SUS días laborables (18-sep-2026): a quien trabaja el sábado se
+      // le paga el sábado que trabajó.
+      const p = prorrateoPorVigencia(v, q.desde, q.hasta, diasLaborables.get(codigo));
       if (p) prorrateo.set(codigo, { factor: p.factor, texto: p.texto });
     }
 
@@ -791,7 +800,7 @@ export async function GET(req: NextRequest) {
         avisos: {
           // Constante desde el 3-sep-2026 (tolerancia a la DDL retirada).
           faltaMigracionConfiguracion: null,
-          periodoAbierto: avisoPeriodoAbierto(q.desde, finMedicion, hoy, q.esQuincena),
+          periodoAbierto: avisoPeriodoAbierto(q.desde, finMedicion, hoy, q.esQuincena, diasDelAviso),
           sinFicha: codigosSinFicha,
           avisoSinFicha: textoCodigosSinFicha(codigosSinFicha),
         },
@@ -1026,7 +1035,7 @@ export async function GET(req: NextRequest) {
         // 🔴 EL PERÍODO TODAVÍA NO TERMINÓ. Va arriba del cuadro: los días que
         // no pasaron dejaron de descontarse, y un número que baja sin
         // explicación se lee como un número que no cuadra.
-        periodoAbierto: avisoPeriodoAbierto(q.desde, finMedicion, hoy, q.esQuincena),
+        periodoAbierto: avisoPeriodoAbierto(q.desde, finMedicion, hoy, q.esQuincena, diasDelAviso),
         // 🔴 Los códigos que marcaron y no tienen ficha, UNA sola vez y fuera
         // del cuadro de cada empresa.
         sinFicha: codigosSinFicha,

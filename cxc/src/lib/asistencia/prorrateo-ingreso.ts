@@ -9,10 +9,14 @@
 //     días hábiles trabajados × (sueldo mensual ÷ 26)
 //
 // 🔴 EL DÍA VALE SUELDO MENSUAL ÷ 26 (10-sep-2026, Daniel eligió «a»: es la
-// costumbre de Panamá y lo que la contable ya paga). «Hábil» es lunes a viernes
-// (`esHabil`, la misma regla del Reporte): los días desde `fecha_ingreso` (o
-// hasta `fecha_salida`), acotados al período. Caso de control: Yeritza (51),
-// entró el 27-jul-2026, 5 días → 5 × (600 ÷ 26) = **$115,38**.
+// costumbre de Panamá y lo que la contable ya paga). «Hábil» son LOS DÍAS QUE
+// TRABAJA ESA PERSONA (18-sep-2026, `diasLaborablesDelRango`: su lista, o la de
+// su empresa —Multifashion lunes a SÁBADO—; sin lista, lunes a viernes): los
+// días desde `fecha_ingreso` (o hasta `fecha_salida`), acotados al período.
+// Caso de control: Yeritza (51), entró el 27-jul-2026, 5 días → 5 × (600 ÷ 26)
+// = **$115,38**. Daniel: *«obvio todo de lunes a sábado con multifashion»* —
+// hasta hoy esto contaba lunes a viernes y a alguien de Multifashion que
+// entrara a mitad de quincena le pagaba de menos el sábado.
 //
 // 🩸 La primera versión (esa misma tarde) dividía el quincenal entre los hábiles
 // de la QUINCENA (5 de 12 → $125,00). Como el motor prorratea con un FACTOR
@@ -21,11 +25,11 @@
 // 🔴 El factor multiplica al `factorBase` del período (que ya prorratea un
 // rango libre): las dos cosas se componen, no se pisan.
 // ─────────────────────────────────────────────────────────────────────────────
-import { esHabil } from "./reporte";
+import { diasLaborablesDelRango } from "./horario-configurable";
 import { esFechaValida, motivoPeriodoParcial, type Vigencia } from "./vigencia";
 
 export interface Prorrateo {
-  /** Los días hábiles (L–V) del período entero. */
+  /** Los días hábiles (los que trabaja esa persona) del período entero. */
   habilesPeriodo: number;
   /** Los días hábiles del período en que la persona ya estaba (o todavía estaba). */
   habilesTrabajados: number;
@@ -35,19 +39,17 @@ export interface Prorrateo {
   texto: string;
 }
 
-const DIA_MS = 86_400_000;
-
 /** 🔴 Los días pagados de un mes, la costumbre de Panamá: el día vale sueldo ÷ 26. */
 export const DIAS_PAGADOS_POR_MES = 26;
 
-/** Los días hábiles (lunes a viernes) entre dos fechas, ambas incluidas. */
-export function diasHabilesEntre(desde: string, hasta: string): number {
+/**
+ * Los días hábiles entre dos fechas, ambas incluidas, para una lista de días
+ * laborables (sin lista, lunes a viernes). Cuenta con `diasLaborablesDelRango`:
+ * el MISMO contador de «faltan N días» y del día libre, no un bucle propio.
+ */
+export function diasHabilesEntre(desde: string, hasta: string, dias?: readonly number[] | null): number {
   if (!esFechaValida(desde) || !esFechaValida(hasta) || hasta < desde) return 0;
-  let n = 0;
-  for (let t = Date.parse(`${desde}T12:00:00Z`); t <= Date.parse(`${hasta}T12:00:00Z`); t += DIA_MS) {
-    if (esHabil(new Date(t).toISOString().slice(0, 10))) n += 1;
-  }
-  return n;
+  return diasLaborablesDelRango(desde, hasta, dias).length;
 }
 
 /**
@@ -58,13 +60,15 @@ export function prorrateoPorVigencia(
   v: Vigencia | null | undefined,
   desde: string,
   hasta: string,
+  /** 🔴 Los días que trabaja ESA persona (`resolverDiasLaborables`). Sin lista, lunes a viernes. */
+  dias?: readonly number[] | null,
 ): Prorrateo | null {
   const motivo = motivoPeriodoParcial(v, desde, hasta);
   if (!motivo || !v) return null;
   const inicio = esFechaValida(v.fechaIngreso) && v.fechaIngreso! > desde ? v.fechaIngreso! : desde;
   const fin = esFechaValida(v.fechaSalida) && v.fechaSalida! < hasta ? v.fechaSalida! : hasta;
-  const habilesPeriodo = diasHabilesEntre(desde, hasta);
-  const habilesTrabajados = fin < inicio ? 0 : diasHabilesEntre(inicio, fin);
+  const habilesPeriodo = diasHabilesEntre(desde, hasta, dias);
+  const habilesTrabajados = fin < inicio ? 0 : diasHabilesEntre(inicio, fin, dias);
   // quincenal × factor = días × (mensual ÷ 26)  ⇔  factor = días ÷ 13
   const factor = habilesTrabajados / DIAS_PAGADOS_POR_MES * 2;
   return {

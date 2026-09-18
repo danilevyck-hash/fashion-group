@@ -21,11 +21,15 @@ import {
   type PagoDiaLibre,
   type SaldoDiaLibre,
 } from "./dia-libre-empresa";
-import { deudaDelDiaLibre, diasHabilesDelRango, MAX_DIAS_DE_UNA_CARGA } from "./dia-libre-empresa";
+import {
+  deudaDelDiaLibre, diasHabilesDelRango, MAX_DIAS_DE_UNA_CARGA, porQueNoLlevaDeuda,
+} from "./dia-libre-empresa";
 import { leerPersonas, leerReglas } from "./config-server";
 import { trabajaEseDia } from "./vigencia";
 import { vigenciasDeFilas } from "./config-server";
 import { rataPorHoraCalculo } from "./rata";
+import { leerHorarios } from "./horarios-server";
+import { DIAS_ELEGIBLES, resolverDiasLaborables } from "./horario-configurable";
 
 export const TABLA_DEUDA = "asistencia_dia_libre_deuda";
 export const TABLA_PAGO = "asistencia_dia_libre_pago";
@@ -114,6 +118,11 @@ export async function registrarDeudasDiaLibre(
   nota: string | null = null,
 ): Promise<ResultadoCarga> {
   if (deudas.length === 0) return { creadas: 0, repetidas: 0, faltaTabla: false };
+  // 🔴 MULTIFASHION NUNCA LLEVA DEUDA (18-sep-2026). `planearCargaDiaLibre` ya
+  // lo rechazó con su texto; acá, en la ÚNICA puerta que escribe, se vuelve a
+  // preguntar para que ningún camino nuevo se la salte. Se corta sin escribir.
+  const noLleva = deudas.find((d) => porQueNoLlevaDeuda(d.empresaKey));
+  if (noLleva) throw new Error(porQueNoLlevaDeuda(noLleva.empresaKey) ?? "");
 
   const { data: yaHay, error: errLee } = await supabaseServer
     .from(TABLA_DEUDA)
@@ -264,7 +273,8 @@ export interface PlanDeCargaDiaLibre {
   codigos: string[];
   /** A quién NO se le pudo calcular la deuda, por NOMBRE. 🔴 Se dice. */
   sinRata: string[];
-  /** Los días hábiles del rango. */
+  /** Los días del rango que son laborables para ALGUIEN (lunes a sábado). Cada
+   *  persona debe solo los SUYOS. */
   dias: string[];
   /** Por qué no se puede cargar. `null` = se puede. */
   error: string | null;
@@ -284,7 +294,10 @@ export async function planearCargaDiaLibre(opts: {
   hasta: string;
 }): Promise<PlanDeCargaDiaLibre> {
   const vacio = { deudas: [], codigos: [], sinRata: [], dias: [] };
-  const dias = diasHabilesDelRango(opts.desde, opts.hasta);
+  // Los días que son laborables para ALGUIEN (lunes a sábado): con eso se
+  // decide si el rango sirve y si es demasiado largo. Qué días debe cada
+  // persona se decide más abajo, con SUS días.
+  const dias = diasHabilesDelRango(opts.desde, opts.hasta, DIAS_ELEGIBLES);
   if (dias.length === 0) {
     return {
       ...vacio,
@@ -297,11 +310,19 @@ export async function planearCargaDiaLibre(opts: {
       error: "Son demasiados días para un día libre de la empresa. Carga un rango más corto.",
     };
   }
-
-  const [{ reglas }, personasDb] = await Promise.all([leerReglas(), leerPersonas()]);
-  const vigencias = vigenciasDeFilas(personasDb.filas);
   const codigo = (opts.codigo ?? "").trim();
   const empresa = (opts.empresa ?? "").trim();
+  // 🔴 MULTIFASHION NUNCA LLEVA DEUDA DE DÍA LIBRE (18-sep-2026). Se rechaza
+  // ANTES de leer nada: la empresa entera, o la persona por la empresa de su
+  // ficha (más abajo).
+  if (!codigo && porQueNoLlevaDeuda(empresa)) {
+    return { ...vacio, dias, error: porQueNoLlevaDeuda(empresa) };
+  }
+
+  const [{ reglas }, personasDb, horariosLeidos] = await Promise.all([
+    leerReglas(), leerPersonas(), leerHorarios(),
+  ]);
+  const vigencias = vigenciasDeFilas(personasDb.filas);
   const elegidas = personasDb.filas.filter((f) => {
     const cod = String(f.empleado_codigo);
     if (codigo) return cod === codigo;
@@ -313,6 +334,18 @@ export async function planearCargaDiaLibre(opts: {
       error: codigo ? "Ese colaborador no tiene ficha." : "No hay colaboradores en esa empresa.",
     };
   }
+  const noLleva = elegidas.map((f) => porQueNoLlevaDeuda(f.empresa)).find((t) => t !== null);
+  if (noLleva) return { ...vacio, dias, error: noLleva };
+
+  // 🔴 Los días que trabaja CADA QUIEN (18-sep-2026): su lista, o la de su
+  // empresa; sin la migración de horarios, lunes a viernes para todos. Es lo
+  // que hace que Boston deba solo los lunes a viernes del rango, y quien tenga
+  // el sábado configurado deba también el sábado que le regalaron.
+  const diasLaborables = resolverDiasLaborables({
+    horarios: horariosLeidos.horarios,
+    empresaDe: new Map(personasDb.filas.map((f) => [String(f.empleado_codigo), f.empresa ?? null])),
+    faltaMigracion: horariosLeidos.faltaMigracion,
+  });
 
   // 🔴 LO QUE SE SALTA SE DICE, CON NOMBRE. Un día libre que se carga «para
   // todos» y deja gente afuera en silencio es la forma de que la contadora
@@ -326,7 +359,7 @@ export async function planearCargaDiaLibre(opts: {
     const rata = rataPorHoraCalculo(salario, Number(f.jornada_semanal ?? 0), reglas);
     const monto = deudaDelDiaLibre(rata);
     let tuvoAlgunDia = false;
-    for (const fecha of dias) {
+    for (const fecha of diasHabilesDelRango(opts.desde, opts.hasta, diasLaborables.get(cod))) {
       // Quien todavía no había entrado —o ya se había ido— no recibió ningún día
       // libre: no se le justifica ni se le cobra nada.
       if (!trabajaEseDia(vigencias.get(cod), fecha)) continue;

@@ -37,13 +37,17 @@ import { useState } from "react";
 
 import { useToast } from "@/components/ToastSystem";
 import RangoFechas from "@/components/ui/RangoFechas";
-import { MOTIVOS_JUSTIFICACION, notaDelMotivo } from "@/lib/asistencia/motivos";
+import { motivosParaElegir, notaDelMotivo } from "@/lib/asistencia/motivos";
 import { horasParaGuardar, motivoAdmiteHoras, ventanaDe } from "@/lib/asistencia/permiso-horas";
 
 export default function JustificarForm({
-  codigo, desdeInicial, hastaInicial, onGuardado,
+  codigo, empresa = null, desdeInicial, hastaInicial, onGuardado,
 }: {
   codigo: string;
+  /** La empresa de la ficha. 🔴 A Multifashion NO se le ofrece «Día libre de la
+   *  empresa» (18-sep-2026, Daniel: *«ese día se les regala»*). Sin empresa se
+   *  ofrecen todos y el servidor decide con la ficha en la mano. */
+  empresa?: string | null;
   /** Con qué días abre. La ficha pasa hoy; la fila del día pasa ese día. */
   desdeInicial: string;
   hastaInicial: string;
@@ -53,8 +57,10 @@ export default function JustificarForm({
   const [guardando, setGuardando] = useState(false);
   const [desde, setDesde] = useState(desdeInicial);
   const [hasta, setHasta] = useState(hastaInicial);
-  // 🔴 Los motivos salen de la MISMA lista que la ruta ofrece y acepta.
-  const [motivo, setMotivo] = useState<string>(MOTIVOS_JUSTIFICACION[0] ?? "");
+  // 🔴 Los motivos salen de la MISMA lista que la ruta ofrece y acepta, menos
+  // el día libre de la empresa donde no aplica (`motivosParaElegir`).
+  const motivos = motivosParaElegir(empresa);
+  const [motivo, setMotivo] = useState<string>(motivos[0] ?? "");
   const [nota, setNota] = useState("");
   // 🔴 El rango de HORAS, solo para Constancia. Vacíos = el día completo.
   const [horaDesde, setHoraDesde] = useState("");
@@ -98,7 +104,7 @@ export default function JustificarForm({
         <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-500">Motivo</span>
         <select value={motivo} onChange={(e) => setMotivo(e.target.value)}
           className="min-h-[44px] w-full rounded-lg border border-gray-200 px-3 text-base outline-none focus:border-black sm:text-sm">
-          {MOTIVOS_JUSTIFICACION.map((m) => <option key={m} value={m}>{m}</option>)}
+          {motivos.map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
       </label>
       <div>
