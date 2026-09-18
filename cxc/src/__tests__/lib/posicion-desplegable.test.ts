@@ -155,3 +155,49 @@ describe("El alto declarado SIEMPRE cabe — si no, volvería el recorte invisib
     }
   });
 });
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 🔴 CANDADO — EL QUE PIDE UN ALTO, LO OBTIENE (18-sep-2026).
+ *
+ * 🩸 `ALTO_MAXIMO` son 288 px pensados para una LISTA de opciones, y le ganaban
+ * en silencio a cualquier `altoDeseado`. El calendario de Asistencia pide 420
+ * porque un mes mide hasta 356, así que la ÚLTIMA SEMANA salía cortada a la
+ * mitad siempre, hubiera el lugar que hubiera. Daniel: *«y no me has arreglado
+ * el calendario mira q raro se siente»*.
+ *
+ * Los dos lados de la regla, y los dos hacen falta:
+ *   · con `altoDeseado`  → manda el pedido (acotado al lugar real);
+ *   · sin `altoDeseado`  → siguen siendo 288, como toda la vida.
+ * ────────────────────────────────────────────────────────────────────────── */
+describe("El alto que pide el llamador le gana al máximo de las listas", () => {
+  const ALTO_DE_UN_MES = 356;
+
+  it("un calendario que pide 420 con lugar de sobra NO se corta en 288", () => {
+    const p = calcularPosicionDesplegable(
+      { top: 200, bottom: 244, left: 100, width: 330 },
+      { width: 1440, height: 900 },
+      { altoDeseado: 420, ancho: 332 },
+    );
+    expect(p.hacia).toBe("abajo");
+    expect(p.maxHeight).toBe(420);
+    // Lo que de verdad importa: el mes ENTERO entra sin scroll interno.
+    expect(p.maxHeight).toBeGreaterThanOrEqual(ALTO_DE_UN_MES);
+  });
+
+  it("y el lugar real sigue mandando: nunca se sale de la pantalla", () => {
+    const p = calcularPosicionDesplegable(
+      { top: 200, bottom: 244, left: 100, width: 330 },
+      { width: 1440, height: 560 },
+      { altoDeseado: 420, ancho: 332 },
+    );
+    expect(p.maxHeight).toBeLessThanOrEqual(560 - 244 - SEPARACION - MARGEN);
+  });
+
+  it("sin pedir alto NO cambia nada: los 288 de siempre", () => {
+    const p = calcularPosicionDesplegable(
+      { top: 200, bottom: 244, left: 100, width: 330 },
+      { width: 1440, height: 900 },
+    );
+    expect(p.maxHeight).toBe(ALTO_MAXIMO);
+  });
+});

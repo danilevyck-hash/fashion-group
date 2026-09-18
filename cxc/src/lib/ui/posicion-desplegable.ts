@@ -87,7 +87,13 @@ export const MARGEN = 8;
  * que el campo justamente porque flota.
  */
 export const ANCHO_MINIMO = 264;
-/** Alto máximo que se le permite (equivale al `max-h-72` de Tailwind). */
+/**
+ * Alto POR DEFECTO de una lista de opciones (el `max-h-72` de Tailwind).
+ *
+ * ⚠️ Es el default, NO un techo: quien pasa `altoDeseado` manda (ver la nota en
+ * `calcularPosicionDesplegable`). Con el techo duro, el calendario de
+ * Asistencia perdía la última semana.
+ */
 export const ALTO_MAXIMO = 288;
 /**
  * Alto que hace que valga la pena abrir hacia abajo. Por debajo de esto se
@@ -139,7 +145,25 @@ export function calcularPosicionDesplegable(
   const espacioAbajo = viewport.height - ancla.bottom - SEPARACION - MARGEN;
   const espacioArriba = ancla.top - SEPARACION - MARGEN;
 
-  const tope = Math.min(altoDeseado, ALTO_MAXIMO);
+  // 🔴 EL QUE PIDE UN ALTO, LO OBTIENE (18-sep-2026). Acá decía
+  // `Math.min(altoDeseado, ALTO_MAXIMO)`, así que los 288 px —pensados para una
+  // LISTA de opciones, el `max-h-72` de Tailwind— le ganaban en silencio a un
+  // `altoDeseado` explícito.
+  //
+  // 🩸 Medido: el calendario de Asistencia pide 420 y un mes de 5 semanas mide
+  // 12 + 44 (mes) + 8 + 16 (LU MA MI…) + 5 × 44 + 12 = 312 px. Con el tope en
+  // 288 la ÚLTIMA SEMANA quedaba cortada a la mitad SIEMPRE, en cualquier
+  // pantalla y por más lugar que hubiera abajo — un mes de 6 semanas perdía
+  // 68 px. Daniel, textual: *«y no me has arreglado el calendario mira q raro
+  // se siente»*. Y el comentario de `RangoFechas` ya decía que pasaba
+  // `altoDeseado` justo «para que las últimas semanas no queden abajo del
+  // corte»: el control lo pedía bien y este módulo lo ignoraba.
+  //
+  // ⚠️ Sin `altoDeseado` NO CAMBIA NADA: siguen siendo 288. El único llamador
+  // que lo pasa es el calendario (`ANCHO_CALENDARIO`/`ALTO_CALENDARIO`).
+  // Y el espacio real sigue mandando más abajo: esto sube el techo, no obliga
+  // a nada a salirse de la pantalla.
+  const tope = o.altoDeseado != null ? altoDeseado : ALTO_MAXIMO;
   // Abajo es el default. Solo se voltea si abajo no da un alto útil Y arriba da
   // más lugar: preferir abajo evita que la lista tape el campo con el teclado
   // del iPhone abierto.
