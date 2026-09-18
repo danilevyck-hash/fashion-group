@@ -570,9 +570,12 @@ export function fmtMin(min: number): string {
  *
  * ⚠️ Desde el 18-sep-2026 el MOTOR no la usa para decidir si un día es
  * laborable: eso lo contesta `esDiaLaborable(fecha, dias)` con los días de
- * cada persona (Multifashion trabaja lunes a sábado). Esto queda para lo que
- * cuenta días hábiles del CALENDARIO sin persona adelante (`periodo.ts`,
- * `prorrateo-ingreso.ts`, `dia-libre-empresa.ts`), y es idéntico a
+ * cada persona (Multifashion trabaja lunes a sábado). Y desde esa misma tarde
+ * TAMPOCO la usan «faltan N días hábiles» (`periodo.ts`), el prorrateo
+ * (`prorrateo-ingreso.ts`) ni el día libre (`dia-libre-empresa.ts`): los tres
+ * cuentan con `diasLaborablesDelRango` y los días de cada quien. Daniel:
+ * *«obvio todo de lunes a sábado con multifashion»*. Queda como respaldo de
+ * `clasificarDia` para un día viejo sin `habil`, y es idéntico a
  * `esDiaLaborable(fecha)` sin lista.
  */
 export function esHabil(fecha: string): boolean {

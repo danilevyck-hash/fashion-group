@@ -36,6 +36,12 @@
  * 🔴 EL DOMINGO NO SE TOCA. Nunca es laborable —aunque alguien lo mande en la
  * lista— y sigue yendo al recargo de domingo (`recargoDomingoFeriado`).
  *
+ * 🔴 Y ES TODO, NO SOLO LA AUSENCIA (18-sep-2026). Daniel: *«obvio todo de
+ * lunes a sábado con multifashion»*. Las tres cuentas que seguían preguntando
+ * «lunes a viernes» a secas —«faltan N días hábiles», el prorrateo de quien
+ * entra o sale a mitad de quincena y la deuda del día libre— pasan por
+ * `diasLaborablesDelRango`, de acá, con los días de cada quien.
+ *
  * ── B · LOS DOS HORARIOS ─────────────────────────────────────────────────────
  *
  * `entrada`/`salida` son los de cuando marca en el RELOJ; `entrada_afuera`/
@@ -104,6 +110,23 @@ export function diasLaborablesDeEmpresa(empresa: string | null | undefined): rea
 }
 
 /**
+ * Los días en que trabaja ALGUNA de estas empresas (la unión, ordenada).
+ *
+ * 🔴 TODO DE LUNES A SÁBADO EN MULTIFASHION (18-sep-2026). Daniel: *«obvio todo
+ * de lunes a sábado con multifashion»*. Es lo que usa el aviso «faltan N días
+ * hábiles» cuando el cuadro muestra las cuatro empresas juntas: un sábado que
+ * a Multifashion todavía no se le contó ES un día que falta, aunque para las
+ * otras tres no lo sea. Con una sola empresa es exactamente su lista.
+ */
+export function diasLaborablesDeEmpresas(
+  empresas: readonly (string | null | undefined)[],
+): readonly number[] {
+  const out = new Set<number>();
+  for (const e of empresas) for (const d of diasLaborablesDeEmpresa(e)) out.add(d);
+  return out.size ? [...out].sort((a, b) => a - b) : DIAS_LABORABLES_DEFAULT;
+}
+
+/**
  * Una lista de días como viene de la base o del cuerpo de un PUT → lista
  * limpia, o `null` si no hay nada que decir (y manda la empresa).
  *
@@ -134,6 +157,41 @@ export function esDiaLaborable(fecha: string, dias?: readonly number[] | null): 
   const dow = diaDeLaSemana(fecha);
   if (dow === DOMINGO) return false;
   return (dias && dias.length ? dias : DIAS_LABORABLES_DEFAULT).includes(dow);
+}
+
+const ES_FECHA = /^\d{4}-\d{2}-\d{2}$/;
+const DIA_MS = 86_400_000;
+
+/**
+ * Los días LABORABLES de un rango, ambas fechas incluidas, para una lista de
+ * días (sin lista, lunes a viernes). 🔴 ES EL ÚNICO CONTADOR DE DÍAS HÁBILES
+ * DEL MÓDULO (18-sep-2026): lo usan «faltan N días hábiles» (`periodo.ts`),
+ * el prorrateo de quien entra o sale a mitad de quincena
+ * (`prorrateo-ingreso.ts`) y la deuda del día libre de la empresa
+ * (`dia-libre-empresa.ts`). Hasta hoy cada uno tenía su bucle con «lunes a
+ * viernes» escrito a mano, y Multifashion —que trabaja el sábado— cobraba de
+ * menos al entrar a mitad de quincena.
+ *
+ * Un rango al revés, una fecha que no es fecha, o el domingo: no dan días.
+ * `tope` corta el recorrido (por defecto 400: el rango libre ya está acotado a
+ * 366 días por la ruta).
+ */
+export function diasLaborablesDelRango(
+  desde: string,
+  hasta: string,
+  dias?: readonly number[] | null,
+  tope = 400,
+): string[] {
+  const out: string[] = [];
+  if (!ES_FECHA.test(desde) || !ES_FECHA.test(hasta)) return out;
+  let t = Date.parse(`${desde}T12:00:00Z`);
+  const fin = Date.parse(`${hasta}T12:00:00Z`);
+  if (!Number.isFinite(t) || !Number.isFinite(fin)) return out;
+  for (let i = 0; t <= fin && i < tope; i += 1, t += DIA_MS) {
+    const iso = new Date(t).toISOString().slice(0, 10);
+    if (esDiaLaborable(iso, dias)) out.push(iso);
+  }
+  return out;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

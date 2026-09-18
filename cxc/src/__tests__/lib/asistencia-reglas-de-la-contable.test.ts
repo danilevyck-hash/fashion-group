@@ -208,7 +208,10 @@ describe("3. 🔴 quien entra a mitad de la quincena cobra los días trabajados"
 
   it("🔴 la ruta ya no manda a «Tú decides» por entrar o salir: usa el prorrateo", () => {
     const r = puro("src/app/api/asistencia/planilla/route.ts");
-    expect(r).toMatch(/prorrateoPorVigencia\(v, q\.desde, q\.hasta\)/);
+    // ⚠️ 18-sep-2026: el prorrateo recibe los días laborables de ESA persona
+    // (Multifashion, lunes a sábado; Daniel: «obvio todo de lunes a sábado con
+    // multifashion»). Misma llamada, un argumento más.
+    expect(r).toMatch(/prorrateoPorVigencia\(v, q\.desde, q\.hasta, diasLaborables\.get\(codigo\)\)/);
     expect(r).not.toMatch(/motivoPeriodoParcial\(v, q\.desde, q\.hasta\)/);
     expect(r).toMatch(/prorrateo,\n\s+justificados,/);
     expect(puro("src/lib/asistencia/planilla-guardada.ts")).toMatch(/prorrateo: l\.prorrateo/);

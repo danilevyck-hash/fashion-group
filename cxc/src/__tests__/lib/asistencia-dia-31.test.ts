@@ -179,7 +179,10 @@ describe("3. 🔴 el 31 se MIDE aunque no se pague", () => {
     // 🔑 LAS DOS SALIDAS, contadas. La ruta arma `avisos` dos veces —el cuadro
     // completo y el recortado de quien solo aprueba— y con un `toContain`
     // pelado una de las dos podía volver a `q.hasta` sin que nadie lo viera.
-    const conFin = ruta.split("avisoPeriodoAbierto(q.desde, finMedicion, hoy, q.esQuincena)").length - 1;
+    // ⚠️ 18-sep-2026: el aviso ganó un quinto argumento, los días laborables que
+    // cuenta (`diasDelAviso`: Multifashion, lunes a sábado). Sigue midiendo
+    // hasta `finMedicion` en las DOS salidas.
+    const conFin = ruta.split("avisoPeriodoAbierto(q.desde, finMedicion, hoy, q.esQuincena, diasDelAviso)").length - 1;
     expect(conFin).toBe(2);
     expect(ruta).not.toContain("avisoPeriodoAbierto(q.desde, q.hasta,");
   });

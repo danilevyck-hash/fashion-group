@@ -84,7 +84,8 @@
 
 import { centavos } from "./planilla";
 import type { DineroLinea } from "./planilla";
-import { esHabil } from "./reporte";
+import { diasLaborablesDelRango } from "./horario-configurable";
+import { ofreceDiaLibreDeLaEmpresa, TEXTO_DIA_LIBRE_NO_APLICA } from "./motivos";
 
 /**
  * Las horas que se deben por cada día libre. Daniel: *«8 horas para todos»* —
@@ -105,25 +106,41 @@ export function deudaDelDiaLibre(rataHora: number | null | undefined): number | 
 }
 
 /**
- * Los días del rango en los que la empresa de verdad cerró: solo los HÁBILES.
+ * Los días del rango en los que la empresa de verdad cerró: solo los HÁBILES
+ * de ESA persona.
  *
  * 🔑 Un domingo adentro del rango no genera deuda porque ese día no había
  * jornada que perdonar. Es la MISMA definición de «hábil» que usa el motor para
- * las ausencias (`esHabil`, lunes a viernes), no una segunda.
+ * las ausencias (`diasLaborablesDelRango` con los días de cada quien; sin
+ * lista, lunes a viernes), no una segunda. Quien tenga el sábado como día
+ * laborable le debe el sábado que le regalaron.
  *
- * ⚠️ Corta a los 31 días: un rango más largo no es un día libre, es un error de
+ * ⚠️ Corta a los 32 días: un rango más largo no es un día libre, es un error de
  * tipeo, y quien llama lo rechaza antes de guardar nada.
  */
-export function diasHabilesDelRango(desde: string, hasta: string): string[] {
-  const out: string[] = [];
-  let t = Date.parse(`${desde}T12:00:00Z`);
-  const fin = Date.parse(`${hasta}T12:00:00Z`);
-  if (!Number.isFinite(t) || !Number.isFinite(fin)) return out;
-  for (let i = 0; t <= fin && i <= 31; i += 1, t += 86_400_000) {
-    const iso = new Date(t).toISOString().slice(0, 10);
-    if (esHabil(iso)) out.push(iso);
-  }
-  return out;
+export function diasHabilesDelRango(desde: string, hasta: string, dias?: readonly number[] | null): string[] {
+  return diasLaborablesDelRango(desde, hasta, dias, 32);
+}
+
+/**
+ * 🔴 MULTIFASHION NUNCA LLEVA DEUDA DE DÍA LIBRE (18-sep-2026).
+ *
+ * Daniel, textual, dos veces el mismo día: *«multifashion no se comporta
+ * igual, ese día se les regala, igual no van a marcar»* · *«te dije que no hay
+ * deuda del día libre a multifashion»*.
+ *
+ * A ellas el día se les REGALA: no se descuenta y no queda debiendo nada. La
+ * regla de quién sí y quién no vive en `motivos.ts`
+ * (`ofreceDiaLibreDeLaEmpresa`), porque la pantalla la necesita para NO
+ * ofrecer el motivo; acá se pregunta antes de armar una sola deuda, y en la
+ * puerta que escribe se vuelve a preguntar. Medido el 18-sep-2026:
+ * `asistencia_dia_libre_deuda` tiene CERO filas, así que no hay nada que
+ * limpiar — solo cerrar la puerta antes de que pase.
+ *
+ * `null` = se puede; un texto = por qué no.
+ */
+export function porQueNoLlevaDeuda(empresa: string | null | undefined): string | null {
+  return ofreceDiaLibreDeLaEmpresa(empresa) ? null : TEXTO_DIA_LIBRE_NO_APLICA;
 }
 
 /** El tope de días que puede cubrir UN día libre. Daniel: *«son pocas al año»*. */

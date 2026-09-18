@@ -280,6 +280,11 @@ Hecho ese mismo día. **Verificado:** `src/lib/asistencia/marca-repetida.ts` con
 
 Lo que queda es de Daniel: **el exceso de almuerzo nunca entró al dinero de la planilla del sistema**, así que el neto de ninguna quincena cambia por esto (medido: 16–30 ago, 0 diferencias). Pero el Excel del Reporte de julio y agosto sí decía «exceso de almuerzo» de hasta 6 horas en 20 días (Ramón Miranda, Andrea Pérez, Yeritza Solís, Laura Casiano, Martha Chavarría, Kenner Hernández, Yeishka Diaz, Eloyn Mendoza, Esmer Cruz, Briceida Montero, Jorman Hernández, Cristiam Blanco): **$169,29 al valor del minuto de cada uno en las quincenas ya pagadas** (jul y ago) y $72,79 en 1–15 sep, que hoy ya se ve bien. **Si Yulissa descontó a mano a partir de esa columna, hay que devolverlo; si no, no hay nada que hacer.** Solo ella lo sabe. En el sistema, la única planilla cerrada que toca es Boston 16–30 ago ($3,24, Cristiam) y **no se reabrió nada**.
 
+### 26. Multifashion: qué se le carga el día en que las otras tres cierran con «día libre de la empresa»
+> *«multifashion no se comporta igual, ese día se les regala, igual no van a marcar»* · *«no existe que entre semana Multifashion cierre pero las otras trabajen»* — **18-sep-2026**
+
+Hecho ese día: a Multifashion **no se le puede cargar deuda de día libre** (el servidor rechaza, la pantalla no ofrece el motivo; postmortem «Todo de lunes a sábado en Multifashion, y sin deuda de día libre») y el sábado 12-sep quedó como feriado global. Lo que queda es de Daniel: si un día ENTRE SEMANA las tres empresas cierran con día libre (deuda) y Multifashion también cierra, hoy no hay con qué justificarle ese día a Multifashion sin deuda —un feriado global les borraría la deuda a las otras tres—. Él dijo que ese caso no existe; queda anotado por si un día existe.
+
 ---
 
 ## Cómo se llegó a esta lista

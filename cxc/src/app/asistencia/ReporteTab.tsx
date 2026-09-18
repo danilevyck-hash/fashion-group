@@ -789,6 +789,7 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
               <tbody>
                 {diasARevisarDe(p.dias, soloDiasARevisar).map((d) => (
                   <FilaDia key={d.fecha} d={d} codigo={p.codigo} persona={persona}
+                    empresa={(p as PersonaReporte & { empresa?: string | null }).empresa ?? null}
                     conExtra={cuentaHorasExtra(p)}
                     puedeCorregir={puedeCorregir} onCorregir={onCorregir}
                     onJustificar={onJustificar}
@@ -830,10 +831,12 @@ function perdonDelDia(d: DiaReporte): PerdonDelDia {
  * corrección debajo. Debajo de la fila, una línea por corrección dice qué se
  * cambió, por qué, quién y cuándo — sin abrir nada más.
  */
-function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJustificar, delTelefono, onVerSelfie }: {
+function FilaDia({ d, codigo, persona, empresa, conExtra, puedeCorregir, onCorregir, onJustificar, delTelefono, onVerSelfie }: {
   d: DiaReporte;
   codigo: string;
   persona: string;
+  /** La empresa de la ficha (la ruta la pega a cada persona): decide qué motivos ofrece «Justificar». */
+  empresa: string | null;
   /** `false` = servicio profesional: la columna Extra va con raya. */
   conExtra: boolean;
   puedeCorregir: boolean;
@@ -878,7 +881,7 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJu
   // 🔴 Ni en un día que no era suyo (15-sep-2026): no hay nada que justificar
   //    en un día anterior al ingreso o posterior a la salida.
   const seJustifica = !d.feriado && !d.vacacion && !d.justificado && !d.fueraDeVigencia;
-  const justificar = () => onJustificar({ codigo, persona, fecha: d.fecha });
+  const justificar = () => onJustificar({ codigo, persona, empresa, fecha: d.fecha });
   const enlaceJustificar = (
     <button type="button" onClick={justificar}
       className="ml-1.5 min-h-[44px] rounded px-1 text-xs text-gray-500 underline decoration-dotted underline-offset-2 transition hover:text-black">

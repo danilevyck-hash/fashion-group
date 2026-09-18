@@ -15,7 +15,7 @@
  * multiplicar nada. Mismo criterio que `vigencia.ts`.
  * ────────────────────────────────────────────────────────────────────────── */
 
-import { esHabil } from "./reporte";
+import { diasLaborablesDelRango } from "./horario-configurable";
 import { fechaCorta } from "./planilla";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -44,22 +44,24 @@ export function diaYaPaso(fecha: string, hoy: string): boolean {
 /**
  * Cuántos días HÁBILES del período todavía no pasaron (hoy incluido).
  *
- * ⚠️ Cuenta lunes a viernes, igual que el motor. Los feriados no se descuentan
- * acá: el número es para decir *"faltan N días"*, no para calcular plata, y
- * pedirle los feriados obligaría a este módulo a saber de la base.
+ * 🔴 «Hábil» son los días de `dias` (18-sep-2026): la lista de la empresa que
+ * se mira —Multifashion, lunes a SÁBADO— o la unión de las cuatro cuando el
+ * cuadro las muestra juntas (`diasLaborablesDeEmpresas`). Sin lista, lunes a
+ * viernes: lo de siempre. Cuenta con `diasLaborablesDelRango`, el MISMO
+ * contador del prorrateo y del día libre. Daniel: *«obvio todo de lunes a
+ * sábado con multifashion»*.
+ *
+ * ⚠️ Los feriados no se descuentan acá: el número es para decir *"faltan N
+ * días"*, no para calcular plata, y pedirle los feriados obligaría a este
+ * módulo a saber de la base.
  */
-export function diasHabilesPendientes(desde: string, hasta: string, hoy: string): number {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || !/^\d{4}-\d{2}-\d{2}$/.test(hasta)) return 0;
-  let n = 0;
-  const d = new Date(`${desde}T12:00:00Z`);
-  const fin = new Date(`${hasta}T12:00:00Z`);
-  // Tope de sanidad: el rango libre ya está acotado a 366 días por la ruta.
-  for (let i = 0; d <= fin && i < 400; i++) {
-    const iso = d.toISOString().slice(0, 10);
-    if (!diaYaPaso(iso, hoy) && esHabil(iso)) n += 1;
-    d.setUTCDate(d.getUTCDate() + 1);
-  }
-  return n;
+export function diasHabilesPendientes(
+  desde: string,
+  hasta: string,
+  hoy: string,
+  dias?: readonly number[] | null,
+): number {
+  return diasLaborablesDelRango(desde, hasta, dias).filter((iso) => !diaYaPaso(iso, hoy)).length;
 }
 
 /** Lo que la pantalla, el Excel y el PDF dicen del período sin terminar. */
@@ -84,10 +86,12 @@ export function avisoPeriodoAbierto(
   hasta: string,
   hoy: string,
   esQuincena = true,
+  /** Los días laborables que se cuentan (ver `diasHabilesPendientes`). */
+  dias?: readonly number[] | null,
 ): AvisoPeriodoAbierto | null {
   // Todo el período ya pasó: no hay nada que aclarar.
   if (diaYaPaso(hasta, hoy)) return null;
-  const diasHabiles = diasHabilesPendientes(desde, hasta, hoy);
+  const diasHabiles = diasHabilesPendientes(desde, hasta, hoy, dias);
   const que = esQuincena ? "Esta quincena" : "Este período";
   const cuantos =
     diasHabiles === 0

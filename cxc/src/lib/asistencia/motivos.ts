@@ -190,6 +190,43 @@ export function esDiaLibreDeLaEmpresa(motivo: string | null | undefined): boolea
 }
 
 /**
+ * 🔴 MULTIFASHION NUNCA LLEVA DEUDA DE DÍA LIBRE (18-sep-2026).
+ *
+ * Daniel, textual, dos veces: *«multifashion no se comporta igual, ese día se
+ * les regala, igual no van a marcar»* · *«te dije que no hay deuda del día
+ * libre a multifashion»*.
+ *
+ * A ellas ese día se les REGALA: no se descuenta y no queda debiendo nada. Por
+ * eso el motivo NO se les ofrece (`motivosParaElegir`) y el servidor rechaza
+ * cargarles la deuda (`dia-libre-empresa-server.ts`) con este texto. La lista
+ * es por `empresa_key` de la ficha, ESCRITA A MANO: una empresa nueva lleva
+ * deuda hasta que Daniel diga lo contrario.
+ */
+export const EMPRESAS_SIN_DIA_LIBRE: readonly string[] = Object.freeze(["american_classic"]);
+
+/** ¿A esta empresa se le carga el día libre (con su deuda)? Sin empresa, sí: lo de siempre. */
+export function ofreceDiaLibreDeLaEmpresa(empresa: string | null | undefined): boolean {
+  return !EMPRESAS_SIN_DIA_LIBRE.includes(String(empresa ?? "").trim());
+}
+
+/** Lo que contesta el servidor —y lo que se lee en pantalla— si alguien lo intenta igual. */
+export const TEXTO_DIA_LIBRE_NO_APLICA =
+  "A Multifashion el día libre de la empresa se le regala: ese día no se descuenta y no queda "
+  + "debiendo horas, así que no se carga como día libre. Si la tienda cerró ese día, va como "
+  + "feriado, en «Feriados y cierres».";
+
+/**
+ * Los motivos que la pantalla ofrece para ESA persona: los siete, menos el día
+ * libre de la empresa donde no aplica. Sin empresa conocida se ofrecen todos
+ * (el servidor lo vuelve a preguntar con la ficha en la mano).
+ */
+export function motivosParaElegir(empresa: string | null | undefined): readonly string[] {
+  return ofreceDiaLibreDeLaEmpresa(empresa)
+    ? MOTIVOS_JUSTIFICACION
+    : MOTIVOS_JUSTIFICACION.filter((m) => !esDiaLibreDeLaEmpresa(m));
+}
+
+/**
  * La nota de UNA línea que el formulario muestra debajo del motivo elegido.
  * `null` = ese motivo no necesita explicación (los de siempre).
  *
