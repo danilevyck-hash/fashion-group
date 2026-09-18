@@ -55,7 +55,8 @@ import {
   puedeCorregirse,
   puedeEtiquetar,
   rotuloEstado,
-  textoCaja,
+  ROTULO_CAJA,
+  numeroDeCaja,
   textoImprimir,
   totalBultos,
   validarCajas,
@@ -349,9 +350,13 @@ describe("🔴 7. hoja carta, cuatro por hoja, líneas de corte", () => {
     expect(hojasDeEtiquetas([7])).toEqual([[7, null, null, null]]);
   });
 
-  it("«CAJA 3 de 14», y la fecha DD-MM-AAAA", () => {
-    expect(textoCaja(3, 14)).toBe("CAJA 3 de 14");
-    expect(fechaDeLaEtiqueta("2026-09-18")).toBe("18-09-2026");
+  // ⚠️ CAMBIÓ DE DIRECCIÓN EL 18-sep-2026, a propósito: «CAJA» y su número son
+  // DOS textos (el rótulo chico arriba, el número enorme abajo) y la fecha pasó
+  // al formato de la casa. Lo fija `guias-etiqueta-rediseno.test.ts`.
+  it("«CAJA» y «3 de 14» son dos textos, y la fecha va en el formato de la casa", () => {
+    expect(ROTULO_CAJA).toBe("CAJA");
+    expect(numeroDeCaja(3, 14)).toBe("3 de 14");
+    expect(fechaDeLaEtiqueta("2026-09-18")).toBe("18 sept 2026");
     expect(fechaDeLaEtiqueta("")).toBe("");
   });
 
@@ -392,7 +397,7 @@ describe("🔴 7. hoja carta, cuatro por hoja, líneas de corte", () => {
 
 describe("🔴 8. la etiqueta lleva seis cosas, y nada más", () => {
   it("lleva empresa, fecha, factura, cliente, destino y la caja", () => {
-    for (const campo of ["empresa", "fecha_factura", "secuencial", "cliente_nombre", "destino", "textoCaja"]) {
+    for (const campo of ["empresa", "fecha_factura", "secuencial", "cliente_nombre", "destino", "numeroDeCaja"]) {
       expect(pdf).toContain(campo);
     }
   });

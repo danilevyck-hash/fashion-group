@@ -23,9 +23,12 @@
 //     segundo juego: se dice lo que ya hay (409 del servidor + índice único
 //     parcial en la base).
 //   · Se juntan por CLIENTE + EMPRESA, exacto y normalizado, nunca por parecido.
-//   · La etiqueta lleva EMPRESA · fecha · Factura · Cliente · Destino · CAJA X
-//     de N. SIN transportista, SIN piezas, SIN código de barras y SIN la
-//     dirección del directorio (ese candado sigue valiendo).
+//   · La etiqueta lleva EMPRESA · fecha · Factura · Cliente · Destino · CAJA
+//     con su número. SIN transportista, SIN piezas, SIN código de barras y SIN
+//     la dirección del directorio (ese candado sigue valiendo).
+//   · 🔴 EL RÓTULO VA ARRIBA DEL DATO y el destino es tan grande como el
+//     cliente (rediseño del 18-sep-2026, mockup de Daniel). El dibujo vive en
+//     `pdf-etiquetas.ts`; acá viven los TEXTOS, para que haya uno solo.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { GUIAS_WRITE_ROLES } from "@/lib/guias/roles-escritura";
@@ -37,6 +40,7 @@ import {
   type RenglonDeGuia,
 } from "@/lib/guias/atajos-facturas";
 import { claveDeFactura } from "@/lib/guias/numero-factura";
+import { fmtDate } from "@/lib/format";
 
 /**
  * 🔴 QUIÉN ENTRA A ETIQUETAS — los MISMOS tres que escriben una guía, y la
@@ -270,9 +274,18 @@ export function cuantasHojas(cantidad: number): number {
   return Math.ceil(Math.max(0, cantidad) / ETIQUETAS_POR_HOJA);
 }
 
-/** Lo grande de la etiqueta, abajo: «CAJA 3 de 14». */
-export function textoCaja(n: number, total: number): string {
-  return `CAJA ${n} de ${total}`;
+/**
+ * 🔴 «CAJA» Y SU NÚMERO SON DOS COSAS (rediseño del 18-sep-2026). Antes era UNA
+ * línea, «CAJA 3 de 14», flotando abajo sin separador. En el mockup de Daniel
+ * son dos renglones centrados debajo de una raya: el rótulo chico y espaciado,
+ * y debajo el número enorme. Están separados acá —y no en el PDF— para que la
+ * pantalla y el papel no puedan decir cosas distintas.
+ */
+export const ROTULO_CAJA = "CAJA";
+
+/** El número de la etiqueta, lo más grande del papel: «3 de 14». */
+export function numeroDeCaja(n: number, total: number): string {
+  return `${n} de ${total}`;
 }
 
 /** Lo que dice el botón: «Imprimir 14 etiquetas · 4 hojas». */
@@ -283,12 +296,22 @@ export function textoImprimir(cantidad: number): string {
   return `Imprimir ${etq} · ${hj}`;
 }
 
-/** La fecha de la etiqueta, DD-MM-AAAA (la forma de la casa para el papel). */
+/**
+ * 🔴 LA FECHA DE LA ETIQUETA VA EN EL FORMATO DE LA CASA: «18 sept 2026»
+ * (18-sep-2026). Sale de `fmtDate`, el MISMO que escribe las fechas de todo el
+ * papel del sistema —la guía, los pedidos, las comisiones, los reclamos—, así
+ * que no hay una segunda forma de escribir una fecha.
+ *
+ * 🩸 Antes decía «18-09-2026»: un formato de máquina que esta función armaba a
+ * mano, y el único del sistema que se leía así.
+ *
+ * ⚠️ La validación se queda: una fecha que no es calendario devuelve cadena
+ * vacía, nunca un «Invalid Date» impreso encima de una caja.
+ */
 export function fechaDeLaEtiqueta(fechaCalendario: string): string {
   const v = String(fechaCalendario ?? "").slice(0, 10);
   if (!esFechaCalendario(v)) return "";
-  const [y, m, d] = v.split("-");
-  return `${d}-${m}-${y}`;
+  return fmtDate(v);
 }
 
 /** Cómo se llama el archivo: se ve en la carpeta de descargas, así que dice qué es. */
