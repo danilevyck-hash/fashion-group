@@ -450,3 +450,60 @@ describe("🔴 la ruta de correcciones no tiene forma de borrar una marcación",
     expect(cuerpo).not.toMatch(/\.delete\(|\.update\(|\.upsert\(/);
   });
 });
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 🔴 CANDADO — LA PRIMERA EN «ENTRADA» Y LA ÚLTIMA EN «SALIDA» (18-sep-2026).
+ *
+ * 🩸 Un día que no entraba en las cuatro columnas fundía las CUATRO celdas en
+ * una sola: las horas quedaban corridas a la derecha y el conteo («3 marcas»)
+ * caía debajo de «Entrada». Daniel, con la captura del 15-sep de Yulissa
+ * —12:40:53 / 13:08:15 / 17:11:19—: *«hay 3 marcas y no se puso en orden…
+ * aparte que no está en su columna, se ve desordenado»*.
+ *
+ * Ahora solo se funden las DOS del almuerzo, porque ésas sí son las que no se
+ * pueden adivinar.
+ * ────────────────────────────────────────────────────────────────────────── */
+describe("Las marcas del medio", () => {
+  it("con 3 marcas, la del medio es UNA sola", async () => {
+    const { marcasDelMedio } = await import("@/lib/asistencia/marcas-del-dia");
+    expect(marcasDelMedio(3)).toEqual([1]);
+  });
+
+  it("con 5 y 6 marcas, todas las del medio", async () => {
+    const { marcasDelMedio } = await import("@/lib/asistencia/marcas-del-dia");
+    expect(marcasDelMedio(5)).toEqual([1, 2, 3]);
+    expect(marcasDelMedio(6)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("🔴 la primera y la última NUNCA son del medio", async () => {
+    const { marcasDelMedio } = await import("@/lib/asistencia/marcas-del-dia");
+    for (const n of [3, 5, 6, 7, 8]) {
+      expect(marcasDelMedio(n), `${n}`).not.toContain(0);
+      expect(marcasDelMedio(n), `${n}`).not.toContain(n - 1);
+    }
+  });
+
+  it("con 2 marcas o menos no hay medio", async () => {
+    const { marcasDelMedio } = await import("@/lib/asistencia/marcas-del-dia");
+    expect(marcasDelMedio(2)).toEqual([]);
+    expect(marcasDelMedio(1)).toEqual([]);
+    expect(marcasDelMedio(0)).toEqual([]);
+    expect(marcasDelMedio(-3)).toEqual([]);
+  });
+
+  it("la pantalla ya NO funde las cuatro celdas en una", () => {
+    const src = fs.readFileSync(path.join(process.cwd(), "src/app/asistencia/ReporteTab.tsx"), "utf8");
+    expect(src).not.toContain('<td colSpan={4}');
+    // La primera y la última van a SU columna; solo el almuerzo se funde.
+    expect(src).toContain("<Hora idx={0} />");
+    expect(src).toContain("<Hora idx={d.marcas.length - 1} />");
+    expect(src).toContain('<td colSpan={2}');
+  });
+
+  it("CONTROL: con 4 marcas se siguen dibujando las cuatro columnas", async () => {
+    const { columnasClasicas, cabenEnLasCuatroColumnas } =
+      await import("@/lib/asistencia/marcas-del-dia");
+    expect(cabenEnLasCuatroColumnas(4)).toBe(true);
+    expect(columnasClasicas(4)).toEqual([0, 1, 2, 3]);
+  });
+});

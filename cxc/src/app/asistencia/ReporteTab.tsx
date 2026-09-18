@@ -38,7 +38,7 @@ import { repartirExtras, textoExtrasDecididas, tituloExtrasDecididas } from "@/l
 import {
   cabenEnLasCuatroColumnas, columnasClasicas, cuantasMarcasTexto,
   indicesPegados, marcasPegadas, tituloPegada,
-} from "@/lib/asistencia/marcas-del-dia";
+  marcasDelMedio,} from "@/lib/asistencia/marcas-del-dia";
 // 🔴 LA MARCA REPETIDA SE OLVIDÓ SOLA (18-sep-2026): el motor ya no la cuenta,
 // y aquí se DICE —tachada en su día, con su porqué, y contada arriba—. El texto
 // sale del módulo puro para que la pantalla y el Excel digan lo mismo.
@@ -970,16 +970,33 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJu
                 <Hora idx={columnas[3]} />
               </>
             ) : (
-              <td colSpan={4} className="px-2 py-1.5 text-right">
-                <span className="mr-2 text-[11px] font-medium uppercase tracking-wide text-amber-700">
-                  {cuantasMarcasTexto(d.marcas.length)}
-                </span>
-                {d.marcas.map((_, i) => (
-                  <span key={i} className="ml-1.5 inline-block">
-                    <HoraBoton idx={i} tenue={i !== 0 && i !== d.marcas.length - 1} />
+              /* 🔴 LA PRIMERA EN «ENTRADA» Y LA ÚLTIMA EN «SALIDA», SIEMPRE
+                 (18-sep-2026). Acá las CUATRO celdas se fundían en una y las
+                 horas quedaban corridas a la derecha, con el conteo debajo de
+                 «Entrada». Daniel, con la captura del 15 de septiembre:
+                 *«hay 3 marcas y no se puso en orden… aparte que no está en su
+                 columna, se ve desordenado»*.
+                 ⚠️ Solo se funden las DOS del almuerzo: con 3 marcas, la del
+                 medio puede ser la salida a almorzar o el regreso y el sistema
+                 no tiene cómo saberlo. La primera y la última no se adivinan —
+                 son las que el motor ya lee como entrada y salida. */
+              <>
+                <Hora idx={0} />
+                <td colSpan={2} className="px-2 py-1.5 text-center">
+                  <span className="mr-2 align-middle text-[11px] font-medium uppercase tracking-wide text-amber-700">
+                    {cuantasMarcasTexto(d.marcas.length)}
                   </span>
-                ))}
-              </td>
+                  {marcasDelMedio(d.marcas.length).map((i) => (
+                    <span key={i} className="ml-1.5 inline-block">
+                      <HoraBoton idx={i} tenue />
+                    </span>
+                  ))}
+                  {marcasDelMedio(d.marcas.length).length === 0 && (
+                    <span className="align-middle tabular-nums text-gray-400">—</span>
+                  )}
+                </td>
+                <Hora idx={d.marcas.length - 1} />
+              </>
             )}
             {/* 🔴 EL DÍA DICE SOLO CUÁNTO SE LLEGÓ TARDE, y en rojo cuando esos
                 minutos van a la columna «Ausencia» de la planilla. Es el «para

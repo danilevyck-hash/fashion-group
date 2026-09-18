@@ -220,3 +220,28 @@ export function textoTodasLasMarcas(marcas: readonly string[]): string {
 export function tieneMarcasDeMas(cuantas: number): boolean {
   return Math.trunc(cuantas) > MARCAS_NORMALES;
 }
+
+/**
+ * 🔴 LAS DEL MEDIO (18-sep-2026). Cuando las marcas no entran en las cuatro
+ * columnas de siempre, la PRIMERA se queda en «Entrada» y la ÚLTIMA en
+ * «Salida» —eso no se adivina, es lo que el motor ya lee— y todo lo del medio
+ * va junto en las dos columnas del almuerzo.
+ *
+ * 🩸 POR QUÉ. Hasta hoy un día que no entraba en las cuatro se dibujaba con
+ * las CUATRO celdas fundidas en una sola, así que las horas quedaban corridas
+ * a la derecha y el conteo («3 marcas») caía debajo de «Entrada». Daniel, con
+ * la captura del 15 de septiembre de Yulissa: *«hay 3 marcas y no se puso en
+ * orden… aparte que no está en su columna, se ve desordenado»*.
+ *
+ * ⚠️ **No se adivina cuál de las dos del almuerzo es.** Con tres marcas, la
+ * del medio puede ser la salida a almorzar o el regreso, y el sistema no tiene
+ * cómo saberlo: por eso van en una celda que cubre las dos columnas y no
+ * repartidas. Lo mismo que hace `columnasClasicas`, que con 3 deja las dos del
+ * almuerzo vacías en vez de inventar una.
+ */
+export function marcasDelMedio(cuantas: number): number[] {
+  const n = Math.max(0, Math.trunc(cuantas));
+  const out: number[] = [];
+  for (let i = 1; i <= n - 2; i++) out.push(i);
+  return out;
+}
