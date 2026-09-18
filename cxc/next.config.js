@@ -49,6 +49,29 @@ const nextConfig = {
       { source: "/g/plata-entra", destination: "/home", permanent: false },
       { source: "/g/plata-sale", destination: "/home", permanent: false },
       { source: "/g/productos", destination: "/home", permanent: false },
+      // 🔴 CATÁLOGOS: `/catalogo` y `/catalogos` DEJAN DE DAR ERROR (17-sep-2026).
+      //
+      // Daniel, 6-sep-2026, textual: «entro a catalogo y sale /catalogos/marcas,
+      // después entro a pedidos y sale /catalogo/reebok/pedidos y si pongo
+      // /catalogo sale error» · «una sola ruta arriba: Inicio › Catálogos ›
+      // Marcas › Reebok › Pedidos».
+      //
+      // 🩸 No era solo un enlace tecleado a mano: el breadcrumb del propio hub
+      // (`AppHeader module="Catálogos"`) DERIVA el enlace del módulo del primer
+      // tramo de la dirección, así que tocar «Catálogos» arriba de
+      // /catalogos/marcas llevaba a `/catalogos` — un 404 en inglés, el de Next.
+      // Lo mismo con el breadcrumb de la pantalla de pedidos, que sale de
+      // `/catalogo`.
+      //
+      // ⚠️ El módulo vive en DOS árboles de rutas —`/catalogos/*` (el hub y
+      // administrar) y `/catalogo/<marca>/*` (el catálogo con sesión)—, y los
+      // dos SIGUEN VIVOS: ninguna dirección que hoy funciona deja de funcionar.
+      // Estas dos fuentes son EXACTAS: `/catalogo` no matchea
+      // `/catalogo/reebok`, ni `/catalogos` a `/catalogos/marcas`.
+      //
+      // Temporal (307) como todos los de este archivo.
+      { source: "/catalogo", destination: "/catalogos/marcas", permanent: false },
+      { source: "/catalogos", destination: "/catalogos/marcas", permanent: false },
       // Referencia dejó de ser la 5ª pestaña de Ventas (12-ago-2026): vive en su
       // propio módulo, /referencia, con la MISMA vista. Un enlace guardado de
       // `/ventas?tab=referencia` habría caído en una pestaña que ya no existe

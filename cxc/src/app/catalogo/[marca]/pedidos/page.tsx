@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import PedidosListClient from "@/components/catalogo/PedidosListClient";
+import RutaArriba from "./RutaArriba";
 import { getMarcaTheme } from "@/lib/catalogo/marcas-ui";
 import { verifySession } from "@/lib/session-cookie";
 import { puedeVerComprobantes } from "@/lib/catalogo/roles";
@@ -20,5 +21,13 @@ export default async function PedidosPage({ params }: { params: { marca: string 
 
   const theme = getMarcaTheme(params.marca);
   if (!theme) notFound();
-  return <PedidosListClient marca={theme.marca} />;
+  // 🔴 «Una sola ruta arriba» (Daniel, 6-sep-2026). Va acá y no en el layout:
+  // el layout envuelve TODAS las sub-rutas del catálogo (/checkout, /pedido/…)
+  // y cada una está en otro lugar del camino. Ver RutaArriba.tsx.
+  return (
+    <>
+      <RutaArriba marca={theme.marca} />
+      <PedidosListClient marca={theme.marca} />
+    </>
+  );
 }
