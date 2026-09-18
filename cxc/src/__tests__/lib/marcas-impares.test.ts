@@ -73,11 +73,25 @@ describe("🔴 la regla es IMPAR, y nada más", () => {
     expect(diasConMarcasImpares([dia("2026-09-01", 2)])).toEqual([]);
   });
 
-  it("🔴 6 marcas: NO entra — es PAR, y puede ser un día correcto", () => {
-    // ⚠️ El encargo del 15-sep-2026 decía «los de más (5, 6)»; fue un error de
-    // redacción. Entró, almorzó, salió a un mandado y volvió = 6 marcas, y está
-    // bien. Ensanchar la regla para atrapar el 6 es volver a adivinar.
-    expect(diasConMarcasImpares([dia("2026-09-03", 6)])).toEqual([]);
+  it("🔴 6 marcas: SÍ entra — 18-sep-2026, ESTE CANDADO CAMBIÓ DE DIRECCIÓN", () => {
+    // ⚠️ El encargo del 15-sep-2026 decía «los de más (5, 6)»; se tomó como un
+    // error de redacción y esta prueba EXIGÍA que el 6 no entrara: «es PAR, y
+    // puede ser un día correcto — entró, almorzó, salió a un mandado y volvió».
+    //
+    // 🔴 Daniel lo decidió al revés el 18-sep-2026, textual, después de que la
+    // contadora no pudiera cerrar la quincena:
+    //
+    //     «osea las quincena solo cierran con 4, hay q quitar hasta que llegue
+    //      a 4 maximo. cuando hay 5 o mas es porq es error. quiero saber todos
+    //      los que marcaron 5 veces last 30 days y si marcan 5 o mas poder
+    //      quitarlas»
+    //
+    // La regla pasó a ser IMPAR **o** MÁS DE 4. Medido el mismo día (19-ago →
+    // 17-sep, 840 días-persona): 5 días de SEIS marcas entran nuevos al freno.
+    // El detalle vive en `asistencia-marcas-de-mas.test.ts`.
+    expect(diasConMarcasImpares([dia("2026-09-03", 6)])).toEqual([
+      { fecha: "2026-09-03", marcas: 6 },
+    ]);
   });
 
   it("0 marcas: NO entra — eso es una ausencia, y ya tiene su columna", () => {

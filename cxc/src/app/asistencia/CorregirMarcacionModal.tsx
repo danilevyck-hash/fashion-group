@@ -24,11 +24,34 @@
  *     vez en el «?» de la pestaña. Se fue «Como 8:00 o 17:04…»: con el selector
  *     no hay formato que explicar.
  *
- * ── LOS DOS CASOS ───────────────────────────────────────────────────────────
+ * ── LOS TRES CASOS ──────────────────────────────────────────────────────────
  *   · Corregir una hora que el reloj sí registró.
  *   · AGREGAR una que nunca registró (olvidó marcar). Medido en producción el
  *     13-ago-2026: 97 días-persona con un número impar de marcas y 24 días
  *     hábiles sin ninguna. Es el caso más común, no el raro.
+ *   · QUITAR una que el reloj registró de más (18-sep-2026 — ver abajo).
+ *
+ * ── 🔴 QUITAR UNA MARCACIÓN (18-sep-2026) ───────────────────────────────────
+ *
+ * La contadora, por WhatsApp el 17-sep-2026, textual:
+ *
+ *     «el motivo de que no me deja cerrar es porque hay marcaciones de mas y no
+ *      me deja eliminar»
+ *
+ * y Daniel, aclarando de cuáles habla: *«las marcaciones del reloj, no las del
+ * app que hicimos»*.
+ *
+ * 🩸 Esta ventana tenía DOS casos y nada más, y estaba escrito acá mismo. La
+ * capacidad de quitar existía desde el 14-sep-2026 —`asistencia_correcciones.quita`—
+ * pero solo por la puerta del reloj del TELÉFONO, que la pantalla de ella no
+ * puede llamar: **una marca del reloj físico no se podía quitar de ninguna
+ * forma**, y el cierre de la quincena se quedaba trabado.
+ *
+ * 🔴 QUITAR NO BORRA NADA. `asistencia_marcaciones` es append-only y hay
+ * barrido estático que lo exige: se escribe ENCIMA una corrección con
+ * `quita = true`, con su motivo obligatorio, su firma y su «deshacer». La fila
+ * del reloj queda para siempre — es la prueba de a qué hora marcó alguien, y
+ * eso define un pago.
  *
  * Patrón de la casa para iOS: `createPortal` + `inset-0` + `useBodyScrollLock`,
  * y SIN `autoFocus` (en iPhone el teclado salta encima de la ventana antes de
@@ -81,6 +104,13 @@ export default function CorregirMarcacionModal({
   useBodyScrollLock(true);
 
   const agregando = marca.marcacionId === null && !marca.correccionId;
+  /**
+   * 🔴 LA TERCERA OPCIÓN, y solo donde tiene sentido: hace falta una marcación
+   * DEL RELOJ que todavía no tenga una corrección viva. No se ofrece al agregar
+   * (no hay nada que quitar) ni sobre una ya corregida (primero se deshace).
+   */
+  const sePuedeQuitar = Boolean(marca.marcacionId) && !marca.correccionId;
+  const [quitando, setQuitando] = useState(false);
   const [hora, setHora] = useState(
     // Se siembra con lo que ya hay, CON SEGUNDOS: corregir 13:22:02 casi
     // siempre es moverla un poco, no escribirla desde cero. Vacío cuando se
@@ -113,12 +143,14 @@ export default function CorregirMarcacionModal({
   const horaGuardar = completarSegundos(hora, marca.relojHora);
   const horaOk = horaGuardar !== null;
   const razonOk = motivoValido(motivo);
-  const puedeGuardar = horaOk && razonOk && !guardando;
+  // 🔴 QUITANDO NO SE PIDE HORA: no vale ninguna. Lo único obligatorio sigue
+  // siendo el porqué, igual que en las otras dos formas.
+  const puedeGuardar = (quitando ? razonOk : horaOk && razonOk) && !guardando;
 
   async function guardar() {
     // Botón apagado + este guard: el botón puede apagarse por CSS, la regla no.
-    if (!razonOk) return toast("Escribe por qué se corrige", "error");
-    if (!horaGuardar) return toast("Elige la hora", "error");
+    if (!razonOk) return toast(quitando ? "Escribe por qué se quita" : "Escribe por qué se corrige", "error");
+    if (!quitando && !horaGuardar) return toast("Elige la hora", "error");
     setGuardando(true);
     try {
       const res = await fetch("/api/asistencia/correcciones", {
@@ -128,13 +160,17 @@ export default function CorregirMarcacionModal({
           marcacionId: marca.marcacionId,
           codigo: marca.codigo,
           fecha: marca.fecha,
-          hora: horaGuardar,
+          // 🔴 Al quitar viaja `hora: null` y `quita: true`. El servidor exige
+          // `marcacionId` y la base tiene un CHECK que no deja una corrección a
+          // medias: o quita una marcación que existe y no trae hora, o trae hora.
+          hora: quitando ? null : horaGuardar,
+          ...(quitando ? { quita: true } : {}),
           motivo,
         }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d.error ?? "No se pudo guardar");
-      toast("Listo, guardado", "success");
+      toast(quitando ? "Listo, esa marcación ya no cuenta" : "Listo, guardado", "success");
       onGuardado();
       onCerrar();
     } catch (e) {
@@ -178,7 +214,7 @@ export default function CorregirMarcacionModal({
         <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
           <div className="min-w-0">
             <h2 className="text-base font-medium text-gray-900">
-              {agregando ? "Agregar una marcación" : "Corregir la hora"}
+              {quitando ? "Quitar esta marcación" : agregando ? "Agregar una marcación" : "Corregir la hora"}
             </h2>
             {/* 🔴 UNA LÍNEA, con lo que marcó el reloj adentro. No se puede tocar. */}
             <p className="mt-0.5 text-[13px] text-gray-500">
@@ -217,6 +253,44 @@ export default function CorregirMarcacionModal({
             </div>
           ) : (
             <>
+              {/* 🔴 LAS DOS COSAS QUE SE LE PUEDEN HACER A UNA MARCACIÓN DEL
+                  RELOJ, una al lado de la otra (18-sep-2026). Sin esto solo se
+                  podía corregir la hora, y una marca de MÁS no se podía sacar
+                  por ningún lado. */}
+              {sePuedeQuitar && (
+                <div className="flex gap-1.5" role="group" aria-label="Qué hacer con esta marcación">
+                  {[
+                    { clave: false, texto: "Corregir la hora" },
+                    { clave: true, texto: "Quitar esta marcación" },
+                  ].map((o) => (
+                    <button
+                      key={String(o.clave)}
+                      type="button"
+                      onClick={() => setQuitando(o.clave)}
+                      aria-pressed={quitando === o.clave}
+                      className={`min-h-[44px] flex-1 rounded-md border px-3 text-[13px] transition active:scale-[0.97] ${
+                        quitando === o.clave
+                          ? "border-black bg-black text-white"
+                          : "border-gray-200 text-gray-600 hover:border-black hover:text-black"
+                      }`}
+                    >
+                      {o.texto}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* 🔴 QUÉ PASA AL QUITARLA, DICHO ANTES DE TOCAR NADA. «Quitada»,
+                  nunca «borrada»: la fila del reloj se queda donde está. */}
+              {quitando ? (
+                <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-[13px] text-amber-900">
+                  La marcación de las <b className="tabular-nums">{marca.relojHora}</b> deja de contar:
+                  el día pasa a tener una marca menos y los minutos se recalculan con las que quedan.
+                  <span className="mt-1 block text-[12px] text-amber-800">
+                    No se borra nada — la marcación del reloj queda guardada, y esto se puede deshacer.
+                  </span>
+                </p>
+              ) : (
               <label className="block">
                 <span className="text-[13px] font-medium text-gray-700">
                   {agregando ? "Hora que se agrega" : "Hora correcta"}
@@ -232,6 +306,7 @@ export default function CorregirMarcacionModal({
                   className="mt-1 min-h-[44px] w-full rounded-lg border border-gray-200 px-3 text-base tabular-nums outline-none transition focus:border-black sm:text-sm"
                 />
               </label>
+              )}
 
               {/* 🩸 El rótulo NO envuelve los botones en un <label>: un botón es
                   «labelable», así que el label se ataría al PRIMER botón y no
@@ -301,7 +376,9 @@ export default function CorregirMarcacionModal({
               disabled={!puedeGuardar}
               className="min-h-[44px] rounded-md bg-black px-4 text-sm font-medium text-white transition active:scale-[0.97] disabled:opacity-40"
             >
-              {guardando ? "Guardando…" : "Guardar"}
+              {guardando
+                ? (quitando ? "Quitando…" : "Guardando…")
+                : (quitando ? "Quitar la marcación" : "Guardar")}
             </button>
           )}
         </div>
@@ -310,7 +387,8 @@ export default function CorregirMarcacionModal({
             explicación se lee como "esta pantalla está rota". */}
         {!marca.correccionId && !puedeGuardar && !guardando && (
           <p className="border-t border-gray-100 px-5 py-2 text-right text-[12px] text-amber-700">
-            Falta{!horaOk && !razonOk ? ": la hora y el porqué" : !horaOk ? ": la hora" : ": el porqué"}
+            {/* Quitando no se pide hora: lo único que puede faltar es el porqué. */}
+            Falta{quitando ? ": el porqué" : !horaOk && !razonOk ? ": la hora y el porqué" : !horaOk ? ": la hora" : ": el porqué"}
           </p>
         )}
       </div>

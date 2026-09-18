@@ -288,7 +288,11 @@ describe("Reporte — la metodología al ⓘ, el estado del reloj en pantalla", 
     // 🔴 Dice "TERMINADO" desde el 13-ago-2026, y no es un adorno: es la
     // diferencia entre un día mal marcado y un día que sigue corriendo. Sin esa
     // palabra, el ⓘ contradice lo que la tabla hace.
-    expect(screen.getByText(/es un día TERMINADO sin las 4 marcas/)).toBeTruthy();
+    // ⚠️ 18-sep-2026: «sin las 4 marcas» pasó a «que no tiene EXACTAMENTE 4
+    // marcas —le falta alguna, o marcó de más—». Daniel: *«las quincena solo
+    // cierran con 4… cuando hay 5 o mas es porq es error»*. «Sin las 4» se
+    // leía como «le faltan», y el que marcó de MÁS también entra.
+    expect(screen.getByText(/es un día TERMINADO que no tiene EXACTAMENTE 4 marcas/)).toBeTruthy();
     // El texto va partido por un <b>hoy</b>, así que se busca el trozo que vive
     // entero en un solo nodo.
     expect(screen.getByText(/nunca entra ahí/)).toBeTruthy();

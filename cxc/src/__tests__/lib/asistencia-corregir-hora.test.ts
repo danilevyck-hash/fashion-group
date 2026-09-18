@@ -75,7 +75,11 @@ describe("1. 🔴 la hora se elige con el selector del sistema, nunca texto libr
   it("la ventana manda al servidor la hora COMPLETADA, con segundos", () => {
     const src = puro("app/asistencia/CorregirMarcacionModal.tsx");
     expect(src).toMatch(/const horaGuardar = completarSegundos\(hora, marca\.relojHora\)/);
-    expect(src).toMatch(/hora: horaGuardar,/);
+    // ⚠️ 18-sep-2026: nació la tercera forma —QUITAR—, que no lleva hora. La
+    // hora completada sigue siendo la que viaja cuando NO se está quitando
+    // (Daniel: *«cuando hay 5 o mas es porq es error»*). Detalle en
+    // `asistencia-marcas-de-mas.test.tsx`.
+    expect(src).toMatch(/hora: quitando \? null : horaGuardar,/);
   });
 
   it("precargada con la hora del reloj CON segundos (no recortada a HH:MM)", () => {
@@ -113,7 +117,10 @@ describe("la ventana dice arriba, en UNA línea, quién, qué día y qué marcó
   it("los botones son «Cerrar» y «Guardar»", () => {
     const src = leer("app/asistencia/CorregirMarcacionModal.tsx");
     expect(src).toMatch(/>\s*Cerrar\s*</);
-    expect(src).toMatch(/"Guardando…" : "Guardar"\}/);
+    // ⚠️ 18-sep-2026: el rótulo cambia cuando se está QUITANDO. «Guardar»
+    // sigue siendo el de corregir y agregar, que es lo que este candado cuida.
+    expect(src).toMatch(/quitando \? "Quitando…" : "Guardando…"/);
+    expect(src).toMatch(/quitando \? "Quitar la marcación" : "Guardar"/);
     expect(src).not.toMatch(/Guardar corrección/);
   });
 });

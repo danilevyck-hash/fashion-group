@@ -118,10 +118,13 @@ export interface EntradaAntesDeCerrar {
    */
   netosNegativos?: readonly NetoNegativo[];
   /**
-   * 🔴 Los días hábiles con un número IMPAR de marcaciones (15-sep-2026,
-   * `marcas-impares.ts`). Van en ARREGLAR y FRENAN el cierre (Daniel:
-   * *«frenan»*), separados en los de marcas de MENOS y los de MÁS: no son el
-   * mismo problema. Opcional: sin pasarlo, nada cambia.
+   * 🔴 Los días hábiles mal marcados (15-sep-2026, `marcas-impares.ts`). Van en
+   * ARREGLAR y FRENAN el cierre (Daniel: *«frenan»*), separados en los de
+   * marcas de MENOS y los de MÁS: no son el mismo problema. Opcional: sin
+   * pasarlo, nada cambia.
+   * ⚠️ 18-sep-2026: la regla pasó de «impar» a «impar O más de 4» (Daniel:
+   * *«cuando hay 5 o mas es porq es error»*). Acá no cambió nada — el tipo y el
+   * reparto son los mismos—; lo que entra son además los días de 6 marcas.
    */
   marcasImpares?: readonly PersonaConMarcasImpares[];
   /** El aviso de las vacaciones ya pagadas, ya redactado (nombre, rango y monto). */
@@ -269,6 +272,11 @@ export function armarAntesDeCerrar(e: EntradaAntesDeCerrar): AntesDeCerrar {
   // una marca que no lo es y le descuenta horas trabajadas; al que le SOBRA,
   // casi siempre los números salen bien. ⚠️ La regla es IMPAR, así que un día
   // de 6 marcas no está acá — es par, y puede ser correcto.
+  // 🔴 18-sep-2026: ESO ÚLTIMO YA NO VALE. Daniel: *«las quincena solo cierran
+  // con 4, hay q quitar hasta que llegue a 4 maximo. cuando hay 5 o mas es porq
+  // es error»*. La regla pasó a «impar O más de 4», así que el día de 6 SÍ está
+  // acá y cae en «marcas-de-mas». La partición no se tocó: `partirImpares`
+  // separa por «menos de 4» y «más de 4», y el 6 ya caía del lado correcto.
   const impares = e.marcasImpares ?? [];
   if (impares.length > 0) {
     const { deMenos, deMas } = partirImpares(impares);
@@ -300,7 +308,9 @@ export function armarAntesDeCerrar(e: EntradaAntesDeCerrar): AntesDeCerrar {
     linea(
       "marcas-de-mas",
       deMas,
-      "con una marca de MÁS: sobra una hora, revísalos",
+      // 🔴 Dice QUÉ hacer, y el botón por su nombre (18-sep-2026): hasta hoy
+      // decía «revísalos» porque quitar una marca del reloj no se podía.
+      "con marcas de MÁS: quítales la que sobra con «Quitar esta marcación»",
     );
   }
   for (const [i, m] of e.migraciones.entries()) {

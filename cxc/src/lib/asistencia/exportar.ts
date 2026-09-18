@@ -25,6 +25,9 @@ import { textoDiaVacaciones } from "./vacaciones";
 // 🔑 El texto del permiso sale de un módulo PURO: el Excel y la pantalla
 // dicen lo mismo, palabra por palabra.
 import { textoPermisoDelDia } from "./permiso-horas";
+// 🔴 Las marcas del día se escriben TODAS (18-sep-2026). El texto sale de un
+// módulo PURO para que el Excel y la pantalla no puedan contradecirse.
+import { textoTodasLasMarcas } from "./marcas-del-dia";
 // 🔴 El pie se PARTE contra el ancho de la hoja. `doc.text` no envuelve solo:
 // ver el encabezado de `pdf-pie.ts` para los milímetros que se perdían.
 import { armarPie, dibujarPie } from "./pdf-pie";
@@ -75,12 +78,32 @@ function textoCorrecciones(d: { correcciones: DiaReporte["correcciones"] }): str
   if (!d.correcciones.length) return "";
   return d.correcciones
     .map((c) =>
-      c.agregada
-        ? `AGREGADA ${c.hora} (el reloj no registró nada) — "${c.motivo}" — ${c.creadaPor}`
-        : `Reloj ${c.relojHora} → ${c.hora} — "${c.motivo}" — ${c.creadaPor}`,
+      // 🔴 QUITADA va primero y se dice con esa palabra, nunca «borrada»: la
+      // fila sigue en `asistencia_marcaciones` y lo único que cambió es que no
+      // cuenta. 🩸 Sin esta rama el archivo escribía «Reloj 14:23:39 →
+      // 14:23:39», que no explica nada y parece un error del sistema.
+      c.quitada
+        ? `QUITADA ${c.hora} (el reloj la registró; no cuenta) — "${c.motivo}" — ${c.creadaPor}`
+        : c.agregada
+          ? `AGREGADA ${c.hora} (el reloj no registró nada) — "${c.motivo}" — ${c.creadaPor}`
+          : `Reloj ${c.relojHora} → ${c.hora} — "${c.motivo}" — ${c.creadaPor}`,
     )
     .join(" · ");
 }
+
+/**
+ * 🔴 DÓNDE CAEN LAS CUATRO COLUMNAS QUE LA CONTADORA LEE POR POSICIÓN, y dónde
+ * las dos nuevas del 18-sep-2026. Están escritas acá —y no solo en el arreglo
+ * de encabezados— porque el candado las comprueba una por una: mover «Salida»
+ * de la G rompe la forma de leer el archivo que ella tiene hace meses.
+ *
+ *   D(3) Entrada · E(4) Sale almuerzo · F(5) Vuelve · G(6) Salida
+ *   H(7) Todas las marcas · I(8) Cuántas marcas   ← NUEVAS, al lado
+ */
+export const COL_ENTRADA = 3;
+export const COL_SALIDA = 6;
+export const COL_TODAS_LAS_MARCAS = 7;
+export const COL_CUANTAS_MARCAS = 8;
 
 const HEAD = { font: { bold: true, sz: 9, color: { rgb: "6B7280" } }, alignment: { horizontal: "left" } };
 const HEAD_R = { ...HEAD, alignment: { horizontal: "right" } };
@@ -121,6 +144,17 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
   // días justificados sin marca llenarían la hoja de renglones vacíos.
   const detalle: unknown[][] = [[
     "Colaborador","Código","Día","Entrada","Sale almuerzo","Vuelve","Salida",
+    // 🔴 LAS DOS COLUMNAS DEL 18-sep-2026, Y VAN JUSTO AL LADO DE LAS HORAS.
+    // La contadora, textual: *«y como veo quien marco de mas? en el excel solo
+    // salen max 4 marcaciones el excel que descargo»*. 🩸 Tenía razón: las
+    // cuatro columnas de arriba se llenan por índice, así que un día de 5
+    // marcas escribía la 1.ª, la 2.ª, la 3.ª y la 5.ª y la CUARTA no aparecía
+    // en ningún lado. Con «Cuántas marcas» el filtro de la fila 1 le da en dos
+    // clics los días de más de 4, y al lado están sus horas.
+    // ⚠️ LAS CUATRO DE SIEMPRE NO SE TOCAN: ella las lee por POSICIÓN (D, E, F
+    // y G) y siguen donde estaban, con el mismo contenido. Lo nuevo se INSERTA
+    // después, nunca en el medio de ellas.
+    "Todas las marcas","Cuántas marcas",
     "Tarde (min)","Exceso almuerzo (min)","Salida temprana (min)","Extra (min)",
     // 🔑 «Ausencia» a secas ya no alcanza: un día de trabajo fuera de la
     // oficina cae en esta misma columna y NO es una ausencia.
@@ -139,6 +173,12 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
         quien(p), p.codigo, fecha(d.fecha),
         d.marcas[0] ?? "", d.marcas[1] ?? "", d.marcas[2] ?? "",
         d.marcas.length > 3 ? d.marcas[d.marcas.length - 1] : (d.marcas.length === 2 ? d.marcas[1] : ""),
+        // 🔴 TODAS, en orden, y CUÁNTAS. El número va como NÚMERO (no texto)
+        // para que se pueda filtrar y ordenar; vacío cuando no hay marcas, que
+        // es la regla de `n0` en toda la hoja: un 0 en una columna esconde lo
+        // que sí importa.
+        textoTodasLasMarcas(d.marcas),
+        d.marcas.length || "",
         // 🔴 El servicio profesional no cuenta horas extra (3-sep-2026): «—».
         n0(d.tardeMin), n0(d.excesoAlmuerzoMin), n0(d.salidaTempranaMin),
         cuentaHorasExtra(p) ? n0(d.extraMin) : "—",
@@ -174,11 +214,15 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
   }
   const h1 = XLSX.utils.aoa_to_sheet(detalle);
   h1["!cols"] = [{wch:24},{wch:8},{wch:12},{wch:9},{wch:13},{wch:9},{wch:9},
+                 // «Todas las marcas» ancha: seis horas con segundos entran.
+                 {wch:56},{wch:14},
                  {wch:11},{wch:19},{wch:19},{wch:11},{wch:14},{wch:9},{wch:24},{wch:52}];
   h1["!freeze"] = { xSplit: 0, ySplit: 1 };
   for (let c = 0; c < detalle[0].length; c++) {
     const ref = XLSX.utils.encode_cell({ r: 0, c });
-    if (h1[ref]) h1[ref].s = c >= 3 && c <= 11 ? HEAD_R : HEAD;
+    // 🔑 A la derecha lo que es número o reloj; «Todas las marcas» (7) es un
+    // texto largo y va a la izquierda, como «Colaborador» y «Día».
+    if (h1[ref]) h1[ref].s = c !== COL_TODAS_LAS_MARCAS && c >= 3 && c <= 13 ? HEAD_R : HEAD;
   }
   XLSX.utils.book_append_sheet(wb, h1, "Detalle");
 
@@ -270,7 +314,11 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
     ["Ausencia", "Día hábil sin ninguna marca, que no sea feriado ni tenga justificación."],
     ["Trabajo de vendedor", `"${MOTIVO_TRABAJO_VENDEDOR}" NO es una ausencia: el colaborador trabajó, solo que en otro lado y sin un reloj donde marcar. No se le descuenta nada, no le consume vacaciones y no genera horas extra (sin marcas no hay horas que medir). Va en columna propia, aparte de las ausencias justificadas.`],
     ["Permiso de horas", "Una justificación puede traer un rango de HORAS (de X a X). Cuando lo trae, NO justifica el día entero: solo perdona los minutos de tardanza que caen adentro de esa ventana, y un día sin ninguna marca sigue contando como ausencia completa."],
-    ["Días a revisar", "El día no tiene las 4 marcas. Los minutos SÍ cuentan; la marca es para corregirlo."],
+    // 🔴 18-sep-2026 — Daniel: *«las quincena solo cierran con 4, hay q quitar
+    // hasta que llegue a 4 maximo. cuando hay 5 o mas es porq es error»*. El
+    // texto dice EXACTAMENTE 4 y nombra las dos formas de estar mal.
+    ["Días a revisar", "El día no tiene EXACTAMENTE 4 marcas: le falta alguna, o marcó de más. Los minutos SÍ cuentan; la marca es para corregirlo."],
+    ["Todas las marcas / Cuántas marcas", "Todas las horas que marcó ese día, en orden, y cuántas son. Las cuatro columnas de la izquierda solo tienen lugar para cuatro, así que la quinta y la sexta se leen aquí. Filtra «Cuántas marcas» por 5 o más para ver quién marcó de más."],
     ["Corregido a mano", "La hora que marcó el reloj NUNCA se borra: la corrección va encima y es la que cuenta. La columna dice la hora del reloj, la corregida, por qué y quién la puso."],
     [],
     ["Todo en MINUTOS, no en horas decimales."],
@@ -320,7 +368,7 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
     // completa y el atraso va aparte (1-sep-2026). El pie del papel firmado
     // no puede decir una regla distinta de la que hizo los números.
     + `extras desde ${g.extraMinimoMin} min y se pagan completas (el atraso se descuenta aparte) · `
-    + "\"A revisar\" = el día no tiene las 4 marcas (los minutos igual cuentan)",
+    + "\"A revisar\" = el día no tiene exactamente 4 marcas, le falta alguna o marcó de más (los minutos igual cuentan)",
     t.corr > 0
       ? `${t.corr} ${t.corr === 1 ? "día tiene" : "días tienen"} una hora corregida a mano (la del reloj se conserva; el detalle está en el Excel)`
       : null,
