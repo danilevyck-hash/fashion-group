@@ -16,9 +16,11 @@ Daniel contestó ocho preguntas del cuadre el 15-sep. **Lo cerrado se escribió 
 
 1. 🔴 **Las fechas de entrada de las seis de Multifashion.** Jenifer Miranda · Jailine Quispe · Milagros Torres · Sheynee Batista · Yeisibeth Muñoz · Cindy De Gracia. Daniel, **15-sep-2026**: *«4. ponlo en la lista de pendientes»*. Sin ellas, el sistema cuenta como falta todos los días anteriores a que empezaran.
 2. ⚠️ **El motivo de salida de los dos que salieron va como «otro».** Cristiam Blanco (30-ago-2026) y Héctor Leonel Pérez A. (2-sep-2026). El CHECK `asistencia_personas_baja_completa` exige fecha **y** motivo juntos, y el motivo no se sabe. **La liquidación lo necesita**: hay que cambiarlo a `despido` o `renuncia`.
-3. ⚠️ **Julio, código 11, se llama distinto en cada empresa DENTRO del Excel de Yulissa**: «Julio Guzmán» en la hoja de Vistana y «Julio Garay» en la de Fashion Wear. Es UNA sola ficha (el reloj, organización VISTANA, lo tiene como `JULIO GAR…`, id 11). Por eso **no se renombró**: hay que preguntar cuál es el apellido.
+3. ~~El apellido de Julio, código 11~~ → **RESUELTO el 18-sep-2026.** Daniel: *«ya te dije q guzman, garay no»*. Verificado contra producción ese día: la ficha ya dice **«Julio Guzmán»**, empresa `vistana`. No había nada que cambiar.
 4. ⚠️ **«Otros servicios» no existe como campo.** Daniel, **15-sep-2026**: *«debería de haber un campo en la ficha que diga "otros servicios", y a qué quincena se le aplica ese extra (debe de ser la misma en la que trabajó)»*. Hoy solo se puede escribir en la casilla de la fila de la planilla, quincena por quincena. Diseño sin definir.
-5. ⚠️ **Tres códigos del reloj sin ficha son FANTASMAS, no personas.** 39 (4 marcaciones, 1 y 2 de septiembre), 55 (7 marcaciones, 1 y 2 de septiembre) y 9999 (4 marcaciones, 7 de septiembre), todos en el reloj de Boston y **sin nombre**. Daniel mandó las cuatro fotos del iVMS-4200: ninguno de los tres está en la lista de personas del reloj. Son altas de prueba que se crearon y se borraron. **Decidir si se ignoran** (existe `asistencia_codigos_ignorados`, hoy vacía).
+5. ~~Tres códigos del reloj sin ficha son FANTASMAS~~ → **RESUELTO el 18-sep-2026.** Daniel: *«los 3 codigos del reloj escondelos»*.
+   🩸 **Ya estaban escondidos, y ése era el problema.** Medido contra producción ese día: 39, 55 y 9999 estaban en `asistencia_codigos_ignorados` **desde el 11-sep-2026, puestos por `daniel`** — y él los seguía viendo en la pestaña Asistencia con su «falta configurar». La razón: esconder se enchufó en la Planilla y en Configuración, pero **el Reporte nunca lo leyó**. Arreglado el 18-sep (`src/app/api/asistencia/reporte/route.ts`, candado en `planilla-tres-descuentos.test.ts`).
+   ⚠️ La tabla **no estaba vacía**: tiene SEIS filas. Las otras tres las puso Contabilidad — 25 (Cristiam Blanco) y 48 (Héctor Pérez), que ya salieron, y 52 (Daniel Levy).
 6. ⚠️ **Ana Trejos (2), Cindy De Gracia (3) y Yeisibeth Muñoz (306) no están dadas de alta en el reloj**, y `luis` (id 1000, organización AMERICAN CLASSICS) sí está en el reloj y **nunca marcó ni tiene ficha**. Medido contra las fotos del 15-sep-2026.
 
 ### 0. El reloj de la quincena 1–15 de septiembre cortó el **10**, y solo Fashion Wear quedó cerrada así
@@ -68,20 +70,20 @@ Daniel, **14-sep-2026**: *«deja que me llegue lo que son: 1. OB, que es lo pend
 - **«Precio Especial» es su costo FOB** y el sistema no reconoce esa columna. Hoy busca `WholesalePrice OFF`, que **no existe en ningún Excel real de Reebok** (ni el de agosto ni el de septiembre). O sea que el descuento del proveedor **se está ignorando en las dos salidas** y esos artículos entran a Switch con el precio completo. Medirlo y conectarlo es lo primero cuando se retome.
 - Lo que ya está hecho y no espera nada: el flete elegible 1,10 / 1,15 y el costo único entre las dos salidas.
 
-### 5. Reebok: el CIF está clavado en 1,10 y tiene que poder ser 1,15
-> *«Costo CIF seria 1.1 o 1.15 (default 1.1)»* · *«porque tengo que pagar el flete que es 1.1 siempre es tommy y 1.1 y 1.15 en reebok»* · *«que pueda cambiar el default en configuracion de reebok»* — **7 y 8-sep-2026**
+### 5. ~~Reebok: el CIF está clavado en 1,10~~ → **HECHO** (verificado el 18-sep-2026)
+> *«Costo CIF seria 1.1 o 1.15 (default 1.1)»* · *«que pueda cambiar el default en configuracion de reebok»* — **7 y 8-sep-2026**
 
-**Comprobado:** `src/lib/depurador/reebok.ts:503` → `round2(fob * 1.1)`, escrito a mano. No hay un solo `1.15` en todo `src/lib/depurador/`. El camino CK/TH sí tiene su `factor` configurable.
+El flete es elegible **1,10 / 1,15**, con 1,10 por defecto (`src/lib/depurador/flete.ts`, leído desde `reebok.ts`). La nota de «clavado en 1,10» quedó vieja.
 
-### 6. Reebok: subir también el segundo Excel, el «Detalle_ Despacho» de 25 columnas
+### 6. ~~Reebok: subir también el «Detalle_ Despacho»~~ → **HECHO el 17-sep-2026** (verificado el 18)
 > *«lo que quiero es poder subir ambos excels»* — **8-sep-2026**
 
-**Comprobado:** `grep -rni "detalle.despacho" src/` → nada. El parser reconoce **un solo** formato (la preforma: `New Article` + `SKU` + `WholesalePrice`).
+Existe `src/lib/depurador/reebok-despacho.ts` y la pantalla dice cuál de los dos archivos se subió. Del despacho se LEE el costo (`Precio after Disc`), el código de barra sale del `EAN` y, sin él, del `UPC`, y la cantidad de `Quantity`.
 
 ### 7. Reebok: estudiar por qué a veces no llega el precio con descuento
 > *«hay algunos excel que no me llega el precio con el descuento… estudia bien el tema de que tiene configurado que recibe vs los excel de la "preforma" enviada»* — **8-sep-2026**
 
-**Comprobado:** el código tolera que falte (`wholesaleOff: … ? null`), pero no hay aviso en pantalla, ni medición, ni nota de cuándo el proveedor la manda y cuándo no.
+**Comprobado el 18-sep-2026:** en el camino del **despacho** ya no se estima: el costo se LEE de `Precio after Disc`. Lo que sigue abierto es el camino de la **preforma**, que busca `WholesalePrice OFF` — una columna que no aparece en ningún Excel real (ver 5-bis) — y que cuando falta no avisa en pantalla.
 
 ### 8. ~~Una descripción que «pasa» no queda en el catálogo~~ → **HECHO el 17-sep-2026**
 > *«q siga pasando pero se agregue al catalogo (para poner formulas en algun momento)»* — **8-sep-2026**
