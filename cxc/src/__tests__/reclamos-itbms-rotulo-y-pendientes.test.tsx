@@ -55,7 +55,7 @@
 import { describe, it, expect, vi, beforeAll, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { execFileSync } from "child_process";
-import { writeFileSync, readFileSync, mkdtempSync } from "fs";
+import { writeFileSync, readFileSync, mkdtempSync, existsSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
 import XLSX from "xlsx-js-style";
@@ -259,7 +259,10 @@ describe("BUG 1 · NINGÚN archivo de Reclamos escribe el porcentaje a mano", ()
     "src/lib/reclamos/pdf-bulk.ts",
     "src/lib/reclamos/excel-bulk.ts",
     "src/lib/excel-reclamo.ts",
-    "src/app/api/reclamos/export/route.ts",
+    // 🔄 17-sep-2026: `src/app/api/reclamos/export/route.ts` salió de la lista
+    // porque la RUTA se retiró (Daniel, 8-sep-2026: «en ningún lado quiero
+    // exportar csv, solo excel»). Los cuatro papeles que quedan —los dos Excel
+    // y los dos PDF— siguen barridos acá.
   ];
   const sinComentarios = (src: string) =>
     src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
@@ -312,17 +315,20 @@ describe("BUG 1 · NINGÚN archivo de Reclamos escribe el porcentaje a mano", ()
   });
 });
 
-describe("BUG 1 · el CSV global no promete un porcentaje que cambia por fila", () => {
-  it("el encabezado dice «Importación» y «ITBMS», sin porcentaje (código sin comentarios)", () => {
-    // Barrido estático con los COMENTARIOS BORRADOS PRIMERO: el comentario que
-    // explica este candado contiene las mismas palabras que busca, y sin esto
-    // el candado se daría por satisfecho con su propia explicación.
-    const crudo = readFileSync(path.join(process.cwd(), "src/app/api/reclamos/export/route.ts"), "utf8");
-    const codigo = crudo.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
-    expect(codigo).toContain('"Importación", "ITBMS"');
-    expect(codigo).not.toContain("ITBMS (7%)");
-    expect(codigo).not.toContain("ITBMS (7.7%)");
-    expect(codigo).not.toContain("Importación (10%)");
+// 🔄 17-sep-2026 · EL CSV GLOBAL YA NO EXISTE, así que este bloque cambió de
+// dirección. Medía que el encabezado de `GET /api/reclamos/export` no clavara
+// un porcentaje —ese CSV mezclaba empresas con tasas distintas—, y la ruta se
+// retiró entera (Daniel, 8-sep-2026: «en ningún lado quiero exportar csv, solo
+// excel»). Lo que se exige ahora es que NO VUELVA; el barrido completo vive en
+// `reclamos-csv-retirado.test.ts`.
+describe("BUG 1 · el CSV global se retiró y no vuelve", () => {
+  it("la ruta ya no existe", () => {
+    expect(existsSync(path.join(process.cwd(), "src/app/api/reclamos/export/route.ts"))).toBe(false);
+  });
+
+  it("⚠️ CONTROL: los dos Excel de Reclamos NO se tocaron", () => {
+    expect(existsSync(path.join(process.cwd(), "src/app/api/reclamos/export-excel/route.ts"))).toBe(true);
+    expect(existsSync(path.join(process.cwd(), "src/app/api/reclamos/[id]/excel/route.ts"))).toBe(true);
   });
 });
 

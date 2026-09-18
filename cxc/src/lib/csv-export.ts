@@ -1,3 +1,21 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// 🩸 ESTE ARCHIVO SE QUEDÓ SIN LECTORES EL 17-sep-2026, Y NO SE BORRA.
+//
+// Daniel, 8-sep-2026, textual: *«en ningún lado quiero exportar csv, solo
+// excel»*. El CXC dejó de ofrecer CSV el 4-sep-2026 y el último que quedaba,
+// `GET /api/reclamos/export`, se retiró hoy. Medido antes de tocarlo: ni un
+// solo llamador desde `src/` — pero cualquier admin o secretaria que supiera la
+// dirección se bajaba un CSV con TODOS los reclamos de todas las empresas.
+//
+// 🔴 EL ARCHIVO SE CONSERVA, COMO `mayor_lineas` Y `cxc_favorites`: acá está
+// escrito por qué un CSV de este sistema necesita el BOM (sin él Excel en
+// Windows rompe las tildes y la ñ). El día que vuelva a hacer falta un CSV
+// —para una importación, no para un export— eso no se vuelve a descubrir.
+//
+// ⚠️ Nadie puede volver a importarlo sin que Daniel lo pida: el candado
+// `reclamos-csv-retirado.test.ts` barre `src/` y pone el build ROJO.
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Exportación de CSV compatible con Excel en Windows y Mac.
 //
 // Excel en Windows interpreta los CSV como ANSI/Latin-1 a menos que el archivo

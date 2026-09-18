@@ -149,9 +149,16 @@ describe("🔴 2 · en ningún lado se exporta CSV", () => {
     expect(plano(CELULAR)).not.toContain("onExportarCsv");
   });
 
-  it("⚠️ pero `lib/csv-export.ts` NO se borró: lo usa Reclamos", () => {
+  // 🔄 17-sep-2026 · CAMBIÓ DE DIRECCIÓN, CON NOTA FECHADA. Esta excepción
+  // decía «lo usa Reclamos» y dejaba pasar `GET /api/reclamos/export`, el
+  // último CSV vivo del sistema. Daniel, 8-sep-2026: *«en ningún lado quiero
+  // exportar csv, solo excel»*. La ruta se retiró, así que la excepción ya no
+  // es cierta y el barrido vuelve a tener dientes: **nadie** importa
+  // `csv-export` desde `src/`. El archivo NO se borra (patrón `mayor_lineas`):
+  // guarda el porqué del BOM. Detalle en `reclamos-csv-retirado.test.ts`.
+  it("🔴 `lib/csv-export.ts` se queda, pero YA NADIE lo importa", () => {
     expect(fs.existsSync(path.join(RAIZ, "src/lib/csv-export.ts"))).toBe(true);
-    expect(plano("src/app/api/reclamos/export/route.ts")).toContain("csv-export");
+    expect(fs.existsSync(path.join(RAIZ, "src/app/api/reclamos/export/route.ts"))).toBe(false);
   });
 });
 

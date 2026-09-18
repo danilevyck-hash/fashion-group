@@ -123,7 +123,10 @@ function buildEmailBody(client: ConsolidatedClient) {
 // export sale por `excel-export.ts`. Las dos descargas que la reemplazan viven
 // en `hooks/useDescargasCartera.ts`, y el celular usa las MISMAS.
 //
-// ⚠️ `lib/csv-export.ts` NO se borró: lo sigue usando el export de Reclamos.
+// ⚠️ `lib/csv-export.ts` NO se borró — pero desde el 17-sep-2026 ya NO lo usa
+// nadie: el último CSV del sistema, `GET /api/reclamos/export`, se retiró.
+// El archivo se queda por el porqué del BOM. Candado:
+// `reclamos-csv-retirado.test.ts`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Main Component ───────────────────────────────────────
