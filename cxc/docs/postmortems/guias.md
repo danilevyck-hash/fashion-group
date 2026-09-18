@@ -1472,6 +1472,11 @@ derecha, DD-MM-AAAA) · Factura · Cliente (grande) · Destino · **«CAJA X de 
 **SIN transportista, SIN piezas, SIN código de barras, SIN la dirección del directorio.** Las
 proporciones salen del mockup, medidas sobre el ancho de la hoja.
 
+> ⚠️ **El ACOMODO de esas seis cosas cambió el 18-sep-2026** (Daniel hizo su propio mockup): el
+> rótulo pasó a ir ARRIBA del dato, el destino se agrandó hasta el tamaño del cliente, «CAJA» y su
+> número se separaron por una raya, y la fecha pasó al formato de la casa. Lo que LLEVA la etiqueta
+> —y lo que no— no se tocó. Ver «EL REDISEÑO DE LA ETIQUETA…» más abajo.
+
 🔴 **UN SOLO GENERADOR**: reimprimir una caja es el MISMO dibujo con una lista de un elemento — una
 hoja, la etiqueta en la **posición 1** (arriba izquierda) y el resto en blanco. Las líneas de corte
 se dibujan **siempre**, aunque la hoja tenga cuartos vacíos, para que el papel se parta igual.
@@ -1715,6 +1720,154 @@ Cambiaron de dirección, con nota fechada: `guia-form-marcar-facturas.test.tsx` 
 **Verificado por mutación** junto con el otro cambio de texto del día:
 `scripts/_mutar-candados-una-palabra-y-la-linea.sh` — **12 mutaciones, 12 cazadas**, 0 corridas
 muertas, **2 de 2 controles en verde**.
+
+---
+
+## 🔴 Guías — EL REDISEÑO DE LA ETIQUETA, Y LAS DOS PESTAÑAS QUE SE SIENTEN FAMILIA (18-sep-2026)
+
+Dos cambios de **PANTALLA** aprobados por Daniel el mismo día. **Ninguno mueve un número**: ni un
+total, ni un bulto, ni una fila de `guias_etiquetas`, ni un campo del payload. Lo que cambia es cómo
+se ve el papel y cómo se acomoda una barra.
+
+---
+
+### 1 · La etiqueta, con el mockup que hizo Daniel
+
+Daniel dibujó su propia versión de la etiqueta y **es mejor que la que se había construido el día
+anterior**. Se copió tal cual, con dos ajustes que él aprobó.
+
+#### 🩸 Qué estaba mal, mirando el papel de verdad
+
+La etiqueta se lee **parada, a un metro, encima de una caja**, en una bodega. Eso obliga a que el
+ojo encuentre el dato sin leer palabras. La versión del 17-sep no lo hacía:
+
+| | Cómo estaba | Cómo quedó |
+|---|---|---|
+| Factura | `Factura 11-000002558` — el rótulo pegado al dato, en la misma línea y del mismo tamaño | **«Factura»** chico y gris ARRIBA; debajo `11-000002558` en negrita |
+| Cliente | `Nova Lux, S.A.` grande, sin rótulo | **«Cliente»** chico y gris arriba; debajo `NOVA LUX, S.A.` |
+| Destino | `Destino: Paso Canoas` — rótulo pegado **y el texto más chico que el cliente** (2,2 % contra 3,3 % del ancho de la hoja) | **«Destino»** arriba; debajo `PASO CANOAS`, **tan grande como el cliente** |
+| Caja | `CAJA 1 de 4` en una sola línea, flotando abajo sin separador | una **raya** horizontal, debajo **«CAJA»** chico y espaciado, y debajo `3 de 14` enorme — todo centrado |
+| Fecha | `18-09-2026` | **`18 sept 2026`** |
+| Empresa | grande, negrita, con su raya debajo | **no se tocó** |
+
+#### Las razones, una por una
+
+- 🔴 **EL RÓTULO VA ARRIBA DEL DATO.** Pegado al lado, el ojo tiene que leer la palabra para llegar
+  al número. Arriba y en gris, se salta y se lee el dato solo.
+- 🔴 **EL DESTINO ES TAN GRANDE COMO EL CLIENTE.** Son **dos lectores distintos**: quien RECIBE
+  busca el cliente; quien CARGA EL CAMIÓN ordena las cajas por destino. Achicar uno de los dos deja
+  a medio proceso leyendo de cerca. En el código **no son dos constantes**: `F_DESTINO = F_CLIENTE`,
+  para que nadie pueda achicar uno sin achicar el otro.
+- 🔴 **«CAJA» Y SU NÚMERO, SEPARADOS.** El número de caja es lo que se busca de lejos, y la palabra
+  «CAJA» no aporta nada a esa distancia. Ahora la palabra es un rótulo chico y espaciado, el número
+  es lo más grande del papel, y una raya separa el bloque del resto. En el módulo puro son **dos
+  textos** (`ROTULO_CAJA` y `numeroDeCaja`), no una línea que alguien pueda volver a juntar.
+- 🔴 **EL NÚMERO SE ANCLA AL BORDE DE ABAJO**, no al final del destino: un nombre de cliente que se
+  parte en dos líneas **no mueve el número de caja**. Medido en el PDF generado: con «Nova Lux,
+  S.A.» y con «Comercializadora Internacional de Calzado y Accesorios del Istmo», la `y` del
+  `3 de 14` es **idéntica**.
+- 🔴 **LA FECHA EN EL FORMATO DE LA CASA.** `fechaDeLaEtiqueta` armaba a mano un `DD-MM-AAAA` que era
+  **el único del sistema que se leía así**; ahora delega en **`fmtDate`** (`src/lib/format.ts`), el
+  mismo que escribe las fechas de la guía, los pedidos, las comisiones y los reclamos. ⚠️ Sale
+  **«18 sept 2026»** (con la «t» de `sept`), que es lo que `fmtDate` produce en `es-PA` — el mockup
+  decía «18 sep»: manda la consistencia con el resto del papel, no el mockup. La **validación se
+  queda**: lo que no es una fecha calendario sale **vacío**, nunca un «Invalid Date» encima de una
+  caja.
+- **El cliente y el destino se escriben en MAYÚSCULAS**, como la empresa — es el mockup de Daniel, y
+  a un metro se lee mejor.
+
+#### Cómo quedó el código
+
+- Los tres campos salen de **UNA sola función**, `bloqueDeCampo` (`src/lib/guias/pdf-etiquetas.ts`):
+  dibuja el rótulo gris arriba y el dato abajo, parte el texto largo y lo corta con puntos
+  suspensivos. Así **nadie puede volver a pegar un rótulo al lado del dato en uno solo de los tres**.
+- Los tamaños siguen **derivados del ancho de la hoja**, como antes: empresa 3,1 % · fecha 1,5 % ·
+  rótulo 1,4 % · factura 2,2 % · cliente 3,1 % · destino = cliente · «CAJA» 1,6 % · el número 5,6 %.
+- ⚠️ **jsPDF mide el ancho contando el espaciado del ÚLTIMO carácter**, que no se dibuja: sin
+  descontarle medio espacio, «CAJA» quedaba 1 mm a la derecha del centro, y se notaba justo encima
+  del número, que sí cae centrado.
+
+#### Lo que NO se tocó
+
+Sigue siendo **jsPDF**, **hoja carta partida en cuartos**, **4 por hoja**, con las **líneas de corte
+punteadas** que se dibujan aunque queden cuartos en blanco. **UN SOLO GENERADOR**: reimprimir una
+caja es el mismo dibujo con una lista de un elemento. **SIN transportista, SIN piezas, SIN código de
+barras, SIN la dirección del directorio.** Y el encabezado de la empresa con su raya, igual.
+
+---
+
+### 2 · Las dos pestañas se sienten familia
+
+> «siento que ambos tabs deben tener el mismo layout, que se sientan familia» — Daniel, 18-sep-2026
+
+#### 🩸 No se parecían
+
+| | Guías | Etiquetas (como estaba) |
+|---|---|---|
+| Fila 1 | las acciones, **arriba a la derecha**: `Seleccionar` · `↓ Excel` · **`Nueva Guía`** (negro) | — |
+| Fila 2 | el **buscador** estirado y sus chips | — |
+| Fila única | — | buscador **+** dos filtros **+** el botón negro: **cinco cosas en una fila** |
+
+Con el buscador estirado, **«＋ Etiquetar una factura» —la acción principal de la pestaña— quedaba
+al final de la derecha, detrás de dos chips**, en un sitio distinto al de Guías.
+
+#### 🔴 Que ETIQUETAS tome la forma de GUÍAS, no al revés
+
+Guías lleva **dos meses en uso** y su acomodo es el del resto del sistema. Etiquetas nació **ayer**.
+Mover la que ya usan todos los días para acomodar a la nueva es el cambio caro y sin ganancia.
+
+Quedó así, con las MISMAS clases de `GuiasList`:
+
+- **Fila 1**, `flex items-center justify-end … flex-wrap gap-4`: la acción, con **«＋ Etiquetar una
+  factura»** como botón negro al final. (Etiquetas no tiene «Seleccionar» ni «↓ Excel»; cuando los
+  tenga, entran a esta misma fila.)
+- **Fila 2**, `flex flex-wrap items-center gap-4`: el **buscador estirado** —`flex-1` con el mismo
+  tope `max-w-sm` de Guías— y, juntos, los filtros **«Pendientes de guía · N»** y **«Todas · N»**.
+
+#### ⚠️ El ORDEN de las pestañas NO cambió
+
+Daniel preguntó si Etiquetas debía ir de primero y quedamos en que **no**: el orden de las pestañas
+sigue **lo que más se abre**, no el orden del proceso. Hoy son **257 guías contra 1 etiqueta**. Si en
+un mes resulta que bodega entra a Etiquetas todos los días y a Guías casi nunca, se cambia — pero
+**con el dato, no con la intuición**. La pestaña no se esconde: está al lado y se ve.
+
+---
+
+### Candados
+
+**`src/__tests__/components/guias-etiqueta-rediseno.test.tsx`** — 24 casos.
+
+🔑 **El PDF se arma DE VERDAD en la prueba**: no alcanza con leer el archivo. Un `setCharSpace` que
+no existiera reventaría recién al tocar «Imprimir», delante de la secretaria. La prueba genera el
+papel, saca del flujo del PDF los textos **en el orden en que se dibujaron** (`(…) Tj`) y sus
+**coordenadas** (`x y Td`), y exige:
+
+- los diez textos, en el orden del mockup: `FASHION SHOES` · `18 sept 2026` · `Factura` ·
+  `11-000002558` · `Cliente` · `NOVA LUX, S.A.` · `Destino` · `PASO CANOAS` · `CAJA` · `3 de 14`;
+- que **cada rótulo se dibuje antes de su dato**, que el dato quede **debajo** (menor `y`) y que los
+  seis compartan el **mismo margen izquierdo** (misma `x`, al cuarto decimal);
+- que **ninguna** línea del papel sea `Factura …`, `Destino: …` ni `CAJA … de …`;
+- que «CAJA» y su número estén **centrados en el mismo eje** y que el número **no se mueva** cuando
+  el nombre del cliente ocupa dos líneas;
+- que el número de caja sea **el texto más grande** del papel y el rótulo gris el más chico.
+
+Y en la pantalla: que el botón negro viva en una fila propia con `justify-end` —comparada contra la
+clase real de `GuiasList`—, que **no comparta padre con el buscador**, que el buscador se estire con
+el mismo tope y que los dos filtros vivan en su fila, contando bien; más que **Guías siga primero**
+en la lista de pestañas.
+
+**Cambió de dirección, con nota fechada** (no se borró): `guias-etiquetas.test.ts` — «CAJA» y su
+número pasaron a ser dos textos, y la fecha al formato de la casa.
+
+**Verificación por mutación**: `scripts/_mutar-candados-etiqueta-rediseno.sh` — **20 mutaciones, 20
+cazadas**, 0 corridas muertas, **2 de 2 controles en verde**.
+
+### ⚠️ Lo que queda pendiente de Daniel
+
+- **Ver la etiqueta impresa de verdad**, sobre una caja: los saltos verticales están calculados, no
+  medidos con una regla contra el papel salido de la impresora.
+- Etiquetas todavía **no tiene «Seleccionar» ni «↓ Excel»**; si algún día los pide, entran a la fila
+  de acciones que este cambio dejó armada.
 
 ---
 

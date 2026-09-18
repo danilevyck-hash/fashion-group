@@ -206,34 +206,57 @@ export default function EtiquetasView() {
         />
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2 mb-4">
+          {/* 🔴 LAS DOS PESTAÑAS SE SIENTEN FAMILIA (18-sep-2026). Daniel:
+              *«siento que ambos tabs deben tener el mismo layout, que se
+              sientan familia»*.
+
+              🩸 Acá vivían las CINCO cosas en una sola fila —buscador, dos
+              filtros y el botón negro—, y con el buscador estirado el botón
+              principal quedaba al final de la derecha, perdido. Guías, en
+              cambio, pone las acciones arriba a la derecha y el buscador en su
+              propia fila debajo.
+
+              🔴 QUE ETIQUETAS TOME LA FORMA DE GUÍAS, NO AL REVÉS: Guías lleva
+              dos meses en uso y se parece al resto del sistema. Es el MISMO
+              acomodo de `GuiasList` —`justify-end` arriba, buscador y chips
+              abajo—, así que el botón negro cae en el mismo sitio en las dos.
+
+              ⚠️ El ORDEN de las pestañas NO cambió: Guías sigue primero. El
+              orden lo decide lo que más se abre, y hoy son 257 guías contra
+              una etiqueta. */}
+          <div className="flex items-center justify-end mb-4 flex-wrap gap-4">
+            <button type="button" onClick={() => setPanel(true)} className={BOTON_NEGRO} disabled={sinTabla}>
+              ＋ Etiquetar una factura
+            </button>
+          </div>
+
+          <div className="mb-4 flex flex-wrap items-center gap-4">
             <input
               type="text"
               value={buscar}
               onChange={(ev) => setBuscar(ev.target.value)}
               placeholder="Buscar factura o cliente"
               aria-label="Buscar factura o cliente"
-              className="flex-1 min-w-[150px] border border-gray-200 rounded-lg px-3 text-base sm:text-sm outline-none focus:border-black transition min-h-[44px]"
+              className="flex-1 min-w-[150px] max-w-sm border border-gray-200 rounded-lg px-3 text-base sm:text-sm outline-none focus:border-black transition min-h-[44px]"
             />
-            <button
-              type="button"
-              aria-pressed={filtro === "pendientes"}
-              onClick={() => setFiltro("pendientes")}
-              className={`${CHIP} ${filtro === "pendientes" ? "border-gray-900 bg-gray-900 font-medium text-white" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
-            >
-              Pendientes de guía · {pendientes}
-            </button>
-            <button
-              type="button"
-              aria-pressed={filtro === "todas"}
-              onClick={() => setFiltro("todas")}
-              className={`${CHIP} ${filtro === "todas" ? "border-gray-900 bg-gray-900 font-medium text-white" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
-            >
-              Todas · {etiquetas.length}
-            </button>
-            <button type="button" onClick={() => setPanel(true)} className={BOTON_NEGRO} disabled={sinTabla}>
-              ＋ Etiquetar una factura
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                aria-pressed={filtro === "pendientes"}
+                onClick={() => setFiltro("pendientes")}
+                className={`${CHIP} ${filtro === "pendientes" ? "border-gray-900 bg-gray-900 font-medium text-white" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
+              >
+                Pendientes de guía · {pendientes}
+              </button>
+              <button
+                type="button"
+                aria-pressed={filtro === "todas"}
+                onClick={() => setFiltro("todas")}
+                className={`${CHIP} ${filtro === "todas" ? "border-gray-900 bg-gray-900 font-medium text-white" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
+              >
+                Todas · {etiquetas.length}
+              </button>
+            </div>
           </div>
 
           {/* ⚠️ La tabla tiene su PROPIO deslizamiento: sin esto empuja la página. */}
