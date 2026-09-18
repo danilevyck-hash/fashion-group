@@ -11,6 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { esPendiente } from "./pendientes";
+import { fechaDeCobro } from "./portada";
 
 export type FiltroEstado = "por-cobrar" | "cobrados";
 export const FILTRO_DEFAULT: FiltroEstado = "por-cobrar";
@@ -70,8 +71,14 @@ export function ordenarPorFactura<T extends Ordenable>(reclamos: readonly T[]): 
 // entre los primeros sería peor. La pantalla ya lo dice en rojo.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Las columnas que se pueden ordenar (son las que la tabla dibuja). */
-export type ColumnaOrden = "numero" | "factura" | "dias" | "reclamado" | "total";
+/**
+ * Las columnas que se pueden ordenar (son las que la tabla dibuja).
+ *
+ * 🔴 «cobrado» entró el 18-sep-2026, con la columna. Daniel: *«reclamos que sea
+ * sortiable las columnas al tocar el nombre»* — las otras cinco ya lo eran
+ * desde el 11-sep; la nueva nació sin ordenar y se notó al primer toque.
+ */
+export type ColumnaOrden = "numero" | "factura" | "dias" | "reclamado" | "total" | "cobrado";
 
 export type SentidoOrden = "asc" | "desc";
 
@@ -93,9 +100,11 @@ const SENTIDO_AL_TOCAR: Record<ColumnaOrden, SentidoOrden> = {
   dias: "desc",
   reclamado: "desc",
   total: "desc",
+  // Lo cobrado hace poco primero: es lo que se está mirando.
+  cobrado: "desc",
 };
 
-const COLUMNAS: readonly ColumnaOrden[] = ["numero", "factura", "dias", "reclamado", "total"];
+const COLUMNAS: readonly ColumnaOrden[] = ["numero", "factura", "dias", "reclamado", "total", "cobrado"];
 
 /** El orden que viene de la URL, o el default si trae basura. */
 export function ordenDesdeUrl(valor: string | null | undefined): Orden {
@@ -131,6 +140,8 @@ export interface Reclamable extends Ordenable {
   nro_reclamo?: string | null;
   nro_factura?: string | null;
   reclamado_en?: string | null;
+  /** Los cobros, para poder ordenar por CUÁNDO se cobró. Ver `fechaDeCobro`. */
+  reclamo_settlements?: { fecha?: string | null; deleted?: boolean | null }[] | null;
 }
 
 function texto(v: unknown): string {
@@ -165,6 +176,18 @@ export function ordenarReclamos<T extends Reclamable>(
       const d = total(a) - total(b);
       if (d !== 0) return signo * d;
       return texto(b.created_at).localeCompare(texto(a.created_at));
+    }
+    if (orden.columna === "cobrado") {
+      // 🔑 La MISMA regla que dibuja la celda (`fechaDeCobro`): el cobro más
+      // reciente, sin contar los deshechos.
+      // ⚠️ Un reclamo sin cobro va al FINAL en los dos sentidos, igual que el
+      // que no tiene fecha de factura: no se ordena por un dato que no existe.
+      const ca = fechaDeCobro(a);
+      const cb = fechaDeCobro(b);
+      if (!ca && !cb) return texto(b.created_at).localeCompare(texto(a.created_at));
+      if (!ca) return 1;
+      if (!cb) return -1;
+      return signo * ca.localeCompare(cb);
     }
     if (orden.columna === "reclamado") {
       // Lo que nunca se reclamó va al FINAL: es lo que hay que mirar, y en la

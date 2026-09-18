@@ -130,7 +130,9 @@ export function tarjetasPorEmpresa(
  * Devuelve `null` cuando no hay ningún cobro vivo — y la pantalla escribe un
  * guion. **No se inventa una fecha**: ni la de creación del reclamo ni «hoy».
  */
-export function fechaDeCobro(r: ReclamoDePortada): string | null {
+export function fechaDeCobro(
+  r: { reclamo_settlements?: SettlementDePortada[] | null },
+): string | null {
   const fechas = (r.reclamo_settlements ?? [])
     .filter((s) => !s.deleted && !!s.fecha)
     .map((s) => String(s.fecha));

@@ -372,7 +372,7 @@ export default function EmpresaList({
                     <Encabezado columna="factura" orden={orden} onOrdenar={ordenarPor}>Factura(s)</Encabezado>
                     <Encabezado columna="dias" alineacion="right" orden={orden} onOrdenar={ordenarPor}>Días</Encabezado>
                     <Encabezado columna="reclamado" className="pl-4" orden={orden} onOrdenar={ordenarPor}>Reclamado</Encabezado>
-                    {filtro === "cobrados" && <th className="pb-3 font-medium text-left">Cobrado</th>}
+                    {filtro === "cobrados" && <Encabezado columna="cobrado" orden={orden} onOrdenar={ordenarPor}>Cobrado</Encabezado>}
                     <Encabezado columna="total" alineacion="right" orden={orden} onOrdenar={ordenarPor}>Total</Encabezado>
                     {!selectionMode && <th className="pb-3 text-right font-medium"><span className="sr-only">Acciones</span></th>}
                   </tr>

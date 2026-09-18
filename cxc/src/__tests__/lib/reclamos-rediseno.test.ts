@@ -502,13 +502,12 @@ describe("las tres novedades del rediseño están en la tira", () => {
 describe("Cuándo se cobró un reclamo", () => {
   it("devuelve la fecha del cobro", async () => {
     const { fechaDeCobro } = await import("@/lib/reclamos/portada");
-    expect(fechaDeCobro({ id: "1", empresa: "fashion_wear",
-      reclamo_settlements: [{ monto: 100, fecha: "2026-07-08", deleted: false }] })).toBe("2026-07-08");
+    expect(fechaDeCobro({ reclamo_settlements: [{ monto: 100, fecha: "2026-07-08", deleted: false }] })).toBe("2026-07-08");
   });
 
   it("con cobros en partes, la MÁS RECIENTE", async () => {
     const { fechaDeCobro } = await import("@/lib/reclamos/portada");
-    expect(fechaDeCobro({ id: "1", empresa: "fashion_wear", reclamo_settlements: [
+    expect(fechaDeCobro({ reclamo_settlements: [
       { monto: 50, fecha: "2026-07-08", deleted: false },
       { monto: 50, fecha: "2026-09-02", deleted: false },
       { monto: 50, fecha: "2026-08-15", deleted: false },
@@ -517,7 +516,7 @@ describe("Cuándo se cobró un reclamo", () => {
 
   it("🔴 un cobro DESHECHO no fecha nada", async () => {
     const { fechaDeCobro } = await import("@/lib/reclamos/portada");
-    expect(fechaDeCobro({ id: "1", empresa: "fashion_wear", reclamo_settlements: [
+    expect(fechaDeCobro({ reclamo_settlements: [
       { monto: 50, fecha: "2026-07-08", deleted: false },
       { monto: 50, fecha: "2026-09-02", deleted: true },
     ] })).toBe("2026-07-08");
@@ -525,15 +524,19 @@ describe("Cuándo se cobró un reclamo", () => {
 
   it("🔴 sin cobro vivo devuelve null — NO se inventa una fecha", async () => {
     const { fechaDeCobro } = await import("@/lib/reclamos/portada");
-    expect(fechaDeCobro({ id: "1", empresa: "fashion_wear", reclamo_settlements: [] })).toBeNull();
-    expect(fechaDeCobro({ id: "1", empresa: "fashion_wear" })).toBeNull();
-    expect(fechaDeCobro({ id: "1", empresa: "fashion_wear",
-      reclamo_settlements: [{ monto: 50, fecha: "2026-07-08", deleted: true }] })).toBeNull();
+    expect(fechaDeCobro({ reclamo_settlements: [] })).toBeNull();
+    expect(fechaDeCobro({})).toBeNull();
+    expect(fechaDeCobro({ reclamo_settlements: [{ monto: 50, fecha: "2026-07-08", deleted: true }] })).toBeNull();
   });
 
   it("la columna sale SOLO en «Cobrados», y con un guion cuando no hay fecha", () => {
+    // 🔄 18-sep-2026, más tarde el mismo día: el encabezado dejó de ser un `<th>`
+    // pelado y pasó a `<Encabezado>`, el componente que ordena. Daniel: *«reclamos
+    // que sea sortiable las columnas al tocar el nombre»*. Lo que este caso
+    // cuida —que SOLO salga en «Cobrados»— no cambió; el candado del orden vive
+    // en «El orden por “Cobrado”», al final del archivo.
     const src = leer("src/app/reclamos/components/EmpresaList.tsx");
-    expect(src).toContain('{filtro === "cobrados" && <th className="pb-3 font-medium text-left">Cobrado</th>}');
+    expect(src).toContain('{filtro === "cobrados" && <Encabezado columna="cobrado"');
     expect(src).toContain('{filtro === "cobrados" && <td className="py-3">{celdaCobrado(r)}</td>}');
     expect(src).toMatch(/celdaCobrado[\s\S]{0,320}\{f \? fmtDate\(f\) : "—"\}/);
   });
@@ -542,5 +545,74 @@ describe("Cuándo se cobró un reclamo", () => {
     const puro = leer("src/lib/reclamos/portada.ts");
     const fn = puro.slice(puro.indexOf("export function fechaDeCobro"));
     expect(fn).not.toMatch(/created_at|new Date\(\)|hoyPanama/);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 🔴 CANDADO — «COBRADO» TAMBIÉN ORDENA (18-sep-2026).
+ *
+ * Daniel: *«reclamos que sea sortiable las columnas al tocar el nombre
+ * minimalista»*. Las otras cinco ordenaban desde el 11-sep; la columna nueva
+ * nació como un encabezado muerto y se notó al primer toque.
+ * ────────────────────────────────────────────────────────────────────────── */
+describe("El orden por «Cobrado»", () => {
+  const conFecha = (id: string, fecha: string | null) => ({
+    nro_reclamo: id,
+    created_at: `2026-01-0${id}T00:00:00Z`,
+    reclamo_settlements: fecha ? [{ fecha, deleted: false }] : [],
+  });
+
+  it("es una columna ordenable más", async () => {
+    const { ordenDesdeUrl, alTocarColumna } = await import("@/lib/reclamos/orden");
+    expect(ordenDesdeUrl("cobrado:asc")).toEqual({ columna: "cobrado", sentido: "asc" });
+    // Primer toque: lo cobrado hace poco arriba.
+    expect(alTocarColumna({ columna: "total", sentido: "desc" }, "cobrado"))
+      .toEqual({ columna: "cobrado", sentido: "desc" });
+    // Tocarlo de nuevo lo invierte, como todas.
+    expect(alTocarColumna({ columna: "cobrado", sentido: "desc" }, "cobrado"))
+      .toEqual({ columna: "cobrado", sentido: "asc" });
+  });
+
+  it("ordena por la fecha del cobro, en los dos sentidos", async () => {
+    const { ordenarReclamos } = await import("@/lib/reclamos/orden");
+    const rs = [conFecha("1", "2026-07-08"), conFecha("2", "2026-09-02"), conFecha("3", "2026-08-15")];
+    const desc = ordenarReclamos(rs, { columna: "cobrado", sentido: "desc" }, () => 0);
+    expect(desc.map((r) => r.nro_reclamo)).toEqual(["2", "3", "1"]);
+    const asc = ordenarReclamos(rs, { columna: "cobrado", sentido: "asc" }, () => 0);
+    expect(asc.map((r) => r.nro_reclamo)).toEqual(["1", "3", "2"]);
+  });
+
+  it("🔴 el que no tiene cobro va al FINAL en los DOS sentidos", async () => {
+    const { ordenarReclamos } = await import("@/lib/reclamos/orden");
+    const rs = [conFecha("1", null), conFecha("2", "2026-09-02"), conFecha("3", "2026-08-15")];
+    for (const sentido of ["asc", "desc"] as const) {
+      const out = ordenarReclamos(rs, { columna: "cobrado", sentido }, () => 0);
+      expect(out[out.length - 1].nro_reclamo, sentido).toBe("1");
+    }
+  });
+
+  it("usa la MISMA regla de la celda: un cobro deshecho no ordena", async () => {
+    const { ordenarReclamos } = await import("@/lib/reclamos/orden");
+    const rs = [
+      { nro_reclamo: "1", created_at: "2026-01-01T00:00:00Z",
+        reclamo_settlements: [{ fecha: "2026-07-08", deleted: false }, { fecha: "2026-12-31", deleted: true }] },
+      { nro_reclamo: "2", created_at: "2026-01-02T00:00:00Z",
+        reclamo_settlements: [{ fecha: "2026-09-02", deleted: false }] },
+    ];
+    const out = ordenarReclamos(rs, { columna: "cobrado", sentido: "desc" }, () => 0);
+    expect(out.map((r) => r.nro_reclamo)).toEqual(["2", "1"]);
+  });
+
+  it("el encabezado de la tabla es el MISMO componente que ordena las otras", () => {
+    const src = leer("src/app/reclamos/components/EmpresaList.tsx");
+    expect(src).toContain('<Encabezado columna="cobrado" orden={orden} onOrdenar={ordenarPor}>Cobrado</Encabezado>');
+    expect(src).not.toContain('<th className="pb-3 font-medium text-left">Cobrado</th>');
+  });
+
+  it("CONTROL: las cinco de antes siguen ordenando", async () => {
+    const { ordenDesdeUrl } = await import("@/lib/reclamos/orden");
+    for (const c of ["numero", "factura", "dias", "reclamado", "total"]) {
+      expect(ordenDesdeUrl(`${c}:asc`).columna, c).toBe(c);
+    }
   });
 });
