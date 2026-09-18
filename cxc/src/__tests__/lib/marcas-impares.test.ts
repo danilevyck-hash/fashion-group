@@ -353,8 +353,11 @@ describe("🔴 este módulo no decide ni un centavo", () => {
   it("⚠️ `revisar` sigue siendo «no tiene 4 marcas», intacto", () => {
     // El motor ya tenía su propia bandera para el día mal marcado y se deja
     // como está: son dos cosas distintas y esto no la reemplaza.
+    // 🔴 18-sep-2026: se cuenta sobre `buenas` —las marcas que quedan después
+    // de olvidar la repetida (`marca-repetida.ts`)—, no sobre `crudas`. La
+    // regla sigue siendo «no tiene 4»; lo que cambió es sobre qué se cuenta.
     expect(leer("src/lib/asistencia/reporte.ts")).toContain(
-      "const revisar = !enCurso && crudas.length !== 4;",
+      "const revisar = !enCurso && buenas.length !== 4;",
     );
   });
 });

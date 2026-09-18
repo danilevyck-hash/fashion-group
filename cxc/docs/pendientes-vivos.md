@@ -193,6 +193,11 @@ Los tres últimos mensajes de la sesión (**13-sep 18:08 a 18:25**) terminaban e
 
 Se construyó el 3-sep y el rediseño del CXC del 5-sep lo eliminó; hoy hay un candado que **prohíbe que vuelva**. ⚠️ **El problema de fondo sí quedó resuelto** (los pagos salen dentro del panel, o sea un solo expandir), pero el control que él pidió ya no existe y nadie se lo dijo. Se anota por honestidad, no como defecto.
 
+### 25. La marca repetida ya no cuenta — ¿se revisa lo que la contadora descontó a mano con el Excel viejo?
+> *«quiero que el sistema agarre la primera marcación y olvide la próxima si es en x cantidad de tiempo»* · *«1 minuto»* — **18-sep-2026**
+
+Hecho ese mismo día (`lib/asistencia/marca-repetida.ts`; postmortem «La marca repetida se olvida sola»). Lo que queda es de Daniel: **el exceso de almuerzo nunca entró al dinero de la planilla del sistema**, así que el neto de ninguna quincena cambia por esto (medido: 16–30 ago, 0 diferencias). Pero el Excel del Reporte de julio y agosto sí decía «exceso de almuerzo» de hasta 6 horas en 20 días (Ramón Miranda, Andrea Pérez, Yeritza Solís, Laura Casiano, Martha Chavarría, Kenner Hernández, Yeishka Diaz, Eloyn Mendoza, Esmer Cruz, Briceida Montero, Jorman Hernández, Cristiam Blanco): **$169,29 al valor del minuto de cada uno en las quincenas ya pagadas** (jul y ago) y $72,79 en 1–15 sep, que hoy ya se ve bien. **Si Yulissa descontó a mano a partir de esa columna, hay que devolverlo; si no, no hay nada que hacer.** Solo ella lo sabe. En el sistema, la única planilla cerrada que toca es Boston 16–30 ago ($3,24, Cristiam) y **no se reabrió nada**.
+
 ### 24. El Historial del Depurador «dividido en los tabs» — 🔴 **FRENADO el 17-sep-2026: el dato no existe**
 > *«que historial esté dividido en los tabs, con depurador por defecto que es el que más se usará»* — **5-sep-2026**
 

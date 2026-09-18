@@ -50,6 +50,7 @@ const CUATRO = ["08:04:08", "12:06:59", "12:39:52", "16:37:50"];
 
 const dia = (over: Record<string, unknown>) => ({
   fecha: "2026-08-26", marcas: [] as string[], marcasIds: [] as Array<string | null>,
+  repetidas: [] as Array<{ hora: string; despuesDe: string; segundosDespues: number; id: string | null }>,
   entrada: null, salida: null,
   tardeMin: 0, excesoAlmuerzoMin: 0, salidaTempranaMin: 0, extraMin: 0, trabajadoMin: 0,
   revisar: false, salidaSospechosa: false, enCurso: false, fueraDeVigencia: false,

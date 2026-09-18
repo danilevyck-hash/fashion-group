@@ -7,6 +7,155 @@
 
 ---
 
+## 🔴 La marca repetida se olvida sola (18-sep-2026) — «1 minuto»
+
+### Qué decidió Daniel
+
+> «quiero que el sistema agarre la primera marcación y olvide la próxima si es en x cantidad de
+> tiempo (esa x la quiero definir contigo)»
+
+Y después de ver la medición por umbral (1 s · 2 s · 30 s · 60 s · 5 min): **«1 minuto»**.
+
+O sea: dentro del MISMO día, una marca que llega a **60 segundos o menos de la última que cuenta**
+NO CUENTA. Se conserva la PRIMERA. Automático, sin que nadie toque nada.
+
+### 🩸 El caso
+
+El motor mide el almuerzo entre la 2.ª y la 3.ª marca. Cuando el dedo toca dos veces al entrar, la
+2.ª marca deja de ser la salida a almorzar:
+
+```
+Ramón Miranda (21) · 3-ago-2026        REAL
+   07:58:36   entrada                   entrada      07:58:36
+   07:58:37   ← repetida, 1 s después   almuerzo     13:55:43 → 14:22:04 = 26 min
+   13:55:43                             salida       17:10:43
+   14:22:04
+   17:10:43
+```
+
+Para el Reporte ese día almorzó **5 h 57 min**: 327 minutos de «exceso de almuerzo» en la pantalla
+y en el Excel que se descarga, y el día en ámbar frenando el cierre.
+
+### ⚠️ Lo que el encargo decía y NO era así: el neto de la planilla no se movía
+
+El encargo llegó como *«hoy se descuenta de más: 17 días, $205,50 mal descontados»*. **Medido: el
+exceso de almuerzo NO entra al dinero de la planilla.** `planilla.ts` no lee `excesoAlmuerzoMin`
+en ningún lado (ya estaba escrito en este mismo archivo, en el bloque del 16-sep: *«no es un
+concepto de la planilla —solo entra a `tiempoNoTrabajadoMin`, el número que se MIRA en el
+Reporte—»*). Lo que la marca repetida rompía era **lo que se muestra y se descarga** (columna
+«Exceso almuerzo» y «Tiempo no trabajado» del Reporte), y **el freno del cierre** (día de 5 marcas).
+Si la contadora descontó a mano a partir de ese Excel, eso pasó fuera del sistema y no se puede
+saber desde aquí — queda como decisión de Daniel en `docs/pendientes-vivos.md`.
+
+Los $205,50 del encargo se reproducen **sobre las marcas crudas del reloj** (sin correcciones):
+`scripts/_medir-marca-repetida.ts --sin-correcciones` da los mismos **107 marcas olvidadas y 50
+días que siguen con más de 4** a 60 s. La diferencia con lo medido «de verdad» es que **la contadora
+cerró HOY las tres planillas de 16–30 ago (Fashion Wear, Boston y Vistana, entre 16:38 y 17:09 UTC)
+y antes quitó marcas a mano**: aplicadas las correcciones —que es como trabaja el motor— quedan
+**1.959 días-persona, 1.644 con exactamente 4, 98 con más de 4, 193 impares**.
+
+### La medición, con las correcciones aplicadas (1-jun → 17-sep, solo lectura)
+
+| umbral | marcas que se olvidan | días de +4 que quedan en 4 | siguen con +4 | almuerzos que cambian |
+|---|---|---|---|---|
+| 1 s | 27 | 20 | 78 | 16 |
+| 2 s | 44 | 31 | 67 | 20 |
+| 30 s | 69 | 45 | 53 | 24 |
+| **60 s** | **78** | **53** | **45** | **26** |
+| 5 min | 103 | 71 | 27 | 31 |
+
+A 60 s cambian **26 almuerzos**: 20 grandes (de 64 a 363 minutos de exceso que desaparecen: Ramón
+Miranda 3-ago, 8-jul y 23-jul · Andrea Pérez 20-jul y 23-jul · Yeishka Diaz 11-sep · Yeritza Solís
+5-ago y 29-jul · Laura Casiano 28-jul y 14-ago · Martha Chavarría 2-jul y 21-jul · Kenner Hernández
+20-jul · Eloyn Mendoza 1-sep · Esmer Cruz 8-sep (07:32:56 → 07:33:56, **60 s exactos**) · Briceida
+Montero 10-sep · Jorman Hernández 15-sep · Cristiam Blanco 24-ago · Martha 16-sep) y 6 chicos en
+sentido contrario (de 0 a entre 0,37 y 6,65 minutos: el doble toque era al salir a almorzar y el
+almuerzo se medía de un segundo). Al valor del minuto de cada uno son **$242,31** de «exceso» que
+el Reporte mostraba y ya no muestra — repartidos **$25,41 en 1–15 jul · $97,06 en 16–31 jul ·
+$43,58 en 1–15 ago · $3,24 en 16–30 ago · $72,79 en 1–15 sep · $0,23 en 16–30 sep**.
+
+- **Días «a revisar»** (terminados, sin exactamente 4 marcas): **314 → 272**. Los 45 días que
+  siguen con más de 4 no tienen ningún par a 60 s: piden ojo humano igual que antes.
+- **Solo uno tiene una justificación encima**: Cristiam Blanco, 24-ago, permiso de 08:00 a 11:06 —
+  no perdona el almuerzo, y ese día queda en 3 marcas y a revisar (antes parecía completo).
+- **Quincenas cerradas EN EL SISTEMA**: solo Boston 16–30 ago (cerrada hoy), $3,24. Lo pagado por
+  la contadora con su Excel (todo lo anterior al 1-sep) suma $169,29 de los $242,31.
+
+### 🔴 Lo que SÍ se mueve además del almuerzo, y por qué
+
+Cuando el doble toque es a la **SALIDA**, conservar la primera corre la salida hasta 60 s antes:
+la hora extra baja **segundos**. Es consecuencia directa de «agarre la primera», no un error del
+motor. `scripts/_medir-vs-yulissa.ts` antes y después:
+
+- **16–30 ago: 0 diferencias** en 46 líneas (neto $11.455,42 = $11.455,42).
+- **1–15 sep (corte 10): 1 línea por la regla.** Sheynee Batista (304, Multifashion), 4-sep: la
+  salida 19:04:25 era un segundo toque 9 s después de 19:04:16 → extra 1.143,65 → 1.143,50 min,
+  bruto −$0,01, seguro social −$0,01, **neto igual**. (Rodrigo Miranda aparece con
+  `otrosServicios` 0 → 194,13: lo escribió Contabilidad a las 17:28:53 UTC, entre las dos
+  corridas; no es de esto.)
+- En todo el rango desde junio, 23 días mueven la salida entre 1 y 58 s (el mayor: Rodrigo Miranda
+  24-jul, 16:57:14 → 16:56:16, un minuto de extra). Y dos días de Daniel Levy (52, inactivo) de DOS
+  marcas a menos de un minuto quedan con UNA: entrada conocida, salida no — que es la verdad.
+
+### Lo que se construyó
+
+**1. Un módulo PURO: `src/lib/asistencia/marca-repetida.ts`.** `SEGUNDOS_MARCA_REPETIDA = 60`, el
+número en UN solo lugar (el motor y el Excel lo importan). `olvidarRepetidas(segundos)` parte las
+marcas de un día en `buenas` y `olvidadas`; se compara contra la **última que CUENTA** —una
+repetida no estira la ventana: 08:00:00 · 08:00:50 · 08:01:40 deja la primera y la tercera— y
+**60 s exactos se olvidan, 61 no**. Los textos (`explicacionRepetida`, `textoTodasLasMarcasConRepetidas`,
+`avisoRepetidas`) viven ahí para que pantalla y Excel digan lo mismo.
+
+**2. El motor la aplica al LEER (`reporte.ts`),** por día de Panamá, sobre las marcas que YA
+QUEDARON después de las correcciones (una quitada a mano ya no está; una corregida entra con su
+hora nueva). De ahí para abajo todo se calcula sobre `buenas`: entrada, salida, almuerzo, extra,
+`revisar` y `salidaSospechosa`. Las olvidadas viajan en **`DiaReporte.repetidas`** (hora, la marca
+que la hizo repetida, segundos después, `id`) y el resumen las cuenta (`marcasRepetidas`). En un día
+de vacaciones o fuera de vigencia no se calcula nada y las marcas se muestran tal cual.
+
+🔴 **`asistencia_marcaciones` no se toca.** Ni un update, delete ni upsert: la fila sigue ahí, con
+su `id` en `repetidas`. Igual que una corrección, se descarta al leer.
+
+**3. Se VE.** En la pestaña Asistencia, debajo del día: «Marca **repetida**: ~~07:58:37~~ —
+repetida, 1 s después de 07:58:36 — no cuenta», en gris (nadie la tocó a mano: no va en azul como
+una corrección). Arriba de la tabla: «N marcaciones repetidas del reloj se olvidaron solas (a 60 s o
+menos de la anterior) — se ven tachadas en su día y no cuentan para nada». En el Excel, «Todas las
+marcas» la lleva en su lugar por hora como «07:58:37 (repetida, no cuenta)», «Cuántas marcas»
+cuenta las que cuentan (4), las cuatro columnas de siempre llevan las buenas y la hoja «Cómo se
+calcula» la explica.
+
+**4. El freno del cierre cuenta DESPUÉS de olvidar.** `marcasMalContadas` no cambió; lo que cambió
+es que `d.marcas` ya no trae la repetida. Un día de 5 con una repetida deja de frenar; uno de 5 sin
+repetida sigue frenando.
+
+### Candados
+
+`src/__tests__/lib/asistencia-marca-repetida.test.ts` (23 casos: la regla, el motor, el Excel, el
+freno, y que nada escribe en la base) · `src/__tests__/components/asistencia-marca-repetida.test.tsx`
+(3 casos: lo que ve la contadora). Cambiaron de dirección con nota fechada: `marcas-impares.test.ts`
+y `asistencia-cinco-arreglos.test.tsx` (`revisar` se cuenta sobre `buenas`).
+
+**Verificado por mutación:** `scripts/_mutar-candados-marca-repetida.sh` — **15 mutaciones, 15
+cazadas**, 0 corridas muertas, **2 de 2 controles en verde** (apagar la regla · 59 y 61 · «menos
+que» en vez de «o menos» · conservar la última · comparar contra la anterior a secas · el motor la
+ignora · el freno sobre las crudas · olvidar en silencio · el resumen en cero · el Excel la esconde
+· la guía no la explica · la pantalla no la tacha · sin aviso arriba · la celda sin «no cuenta»).
+🩸 El script trae un arreglo que los anteriores no tienen: `grep` sin `-q`. Con `set -o pipefail`,
+`grep -q` cierra el tubo al encontrar «Test Files» y el `echo` de una salida grande (vitest imprime
+el archivo entero cuando falla un `toContain` sobre la fuente) muere por SIGPIPE: una mutación
+cazada se leía como «corrida muerta». Pasó con la 8.
+
+### Lo que NO se hizo
+
+- No se reabrió ninguna planilla ni se escribió una sola fila en producción.
+- No se tocó la línea del reloj del teléfono (`senalarQuitadas`): una marca del teléfono repetida
+  se tacha en la fila del día, no en la línea «envió…».
+- No se cambió el umbral de «pegadas» (5 min, ámbar, solo aviso): sigue señalando la que queda
+  entre 61 s y 5 min, para que la quiten a mano.
+- No se adivina cuál sobra cuando el par está a más de 60 s: siguen frenando el cierre.
+
+---
+
 ## 🔴 Ver y quitar las marcaciones de MÁS (18-sep-2026) — lo que frenaba el cierre
 
 ### Qué pasó
