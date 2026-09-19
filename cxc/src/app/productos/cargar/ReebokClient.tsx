@@ -37,6 +37,14 @@ import type { SheetRow } from "@/lib/depurador/logic";
 import { mensajeDivisorEnPantalla } from "@/lib/depurador/divisor";
 import { FLETE_OPCIONES, FLETE_DEFAULT, etiquetaFlete, normalizarFlete } from "@/lib/depurador/flete";
 import type { Flete } from "@/lib/depurador/flete";
+import {
+  CLAVE_DESCUENTO_RECORDADO,
+  DESCUENTO_MAX,
+  avisoDescuento,
+  descuentoNoSeEntiende,
+  normalizarDescuento,
+  resumenDescuento,
+} from "@/lib/depurador/descuento-proveedor";
 import { hoyPanama } from "@/lib/fecha-panama";
 import {
   indexarFotos,
@@ -138,6 +146,31 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
   const [guardandoFlete, setGuardandoFlete] = useState(false);
   const [flashFlete, setFlashFlete] = useState(false);
   const [errorFlete, setErrorFlete] = useState("");
+
+  // ── EL DESCUENTO DEL PROVEEDOR (18-sep-2026) ───────────────────────────────
+  // Daniel: «se debería de poner el descuento yo después de subir el archivo,
+  // pongo el % en número» · «hacerlo como que más fácil, GLOBAL». UN campo para
+  // TODO el archivo, al lado del flete, porque es lo mismo: los dos convierten
+  // el precio del proveedor en el costo que entra a Switch.
+  // 🔴 SOLO en la PREFORMA. En el despacho el descuento viene en el archivo y se
+  // lee; escribirlo ahí sería pisar un dato real con una suposición.
+  // Se recuerda en ESTE navegador, igual que la tasa y el factor del Depurador.
+  const [descuentoTexto, setDescuentoTexto] = useState("");
+  useEffect(() => {
+    try {
+      const guardado = localStorage.getItem(CLAVE_DESCUENTO_RECORDADO);
+      if (guardado !== null) setDescuentoTexto(guardado);
+    } catch { /* sin localStorage: queda vacío, que es lo de siempre */ }
+  }, []);
+  const cambiarDescuento = (v: string) => {
+    setDescuentoTexto(v);
+    try {
+      // 🔑 Vaciarlo TIENE que borrarlo: si no, volver al costo estimado sería
+      // imposible después de recargar la pantalla.
+      if (v.trim() === "") localStorage.removeItem(CLAVE_DESCUENTO_RECORDADO);
+      else localStorage.setItem(CLAVE_DESCUENTO_RECORDADO, v);
+    } catch { /* sin localStorage: esta corrida igual usa lo escrito */ }
+  };
 
   // Fórmulas editables Reebok (Precio A / Precio B), guardadas en marca_formulas.
   const [formulaA, setFormulaA] = useState<PriceFormula>(REEBOK_FORMULA_A_DEFAULT);
@@ -357,9 +390,19 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
   // En el despacho SIEMPRE se filtra: un artículo con 0 recibidas no llegó.
   const filtrarSinPiezas = formato === "despacho" || monthColIdx !== -1;
 
+  /* 🔴 EL DESCUENTO SOLO VIAJA EN LA PREFORMA. En el despacho el costo lo trae
+     el archivo (`Precio after Disc`) y se lee tal cual: mandar acá un número
+     escrito le daría un costo distinto a la línea de despacho que viniera sin
+     ese dato. Dos candados: este `null` y, dentro de `fobReebok`, el
+     «WholesalePrice OFF» que gana siempre. */
+  const descuento = formato === "confirmacion" ? normalizarDescuento(descuentoTexto) : null;
+  /* Lo escrito no se entiende (un «150», una letra): NO se aplica —cae al
+     estimado— y la pantalla lo dice. Nunca en silencio. */
+  const descuentoIlegible = formato === "confirmacion" && descuentoNoSeEntiende(descuentoTexto);
+
   const catalogoTodo: CatalogoRow[] = useMemo(
-    () => (items ? buildCatalogo(items, { formulaA, formulaB, excByName, flete }) : []),
-    [items, formulaA, formulaB, excByName, flete],
+    () => (items ? buildCatalogo(items, { formulaA, formulaB, excByName, flete, descuento }) : []),
+    [items, formulaA, formulaB, excByName, flete, descuento],
   );
   const { rows: catalogo, omitidos: catalogoOmitidos } = useMemo(
     () => (filtrarSinPiezas ? filtrarConPiezas(catalogoTodo) : { rows: catalogoTodo, omitidos: 0 }),
@@ -367,14 +410,26 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
   );
   // Filas Switch (una por artículo) para preview y descarga.
   const switchRowsTodo: SwitchRow[] = useMemo(
-    () => (items ? buildSwitchRows(items, { formula: precioAB === "A" ? formulaA : formulaB, temporada, tasa, excByName, flete }) : []),
-    [items, precioAB, formulaA, formulaB, temporada, tasa, excByName, flete],
+    () => (items ? buildSwitchRows(items, { formula: precioAB === "A" ? formulaA : formulaB, temporada, tasa, excByName, flete, descuento }) : []),
+    [items, precioAB, formulaA, formulaB, temporada, tasa, excByName, flete, descuento],
   );
   const { rows: switchRows, omitidos: switchOmitidos } = useMemo(
     () => (filtrarSinPiezas ? filtrarConPiezas(switchRowsTodo) : { rows: switchRowsTodo, omitidos: 0 }),
     [switchRowsTodo, filtrarSinPiezas],
   );
   const revisar = useMemo(() => switchRows.filter((r) => r.fallback).length, [switchRows]);
+
+  /* 🔴 DE DÓNDE SALE EL COSTO, DICHO SIEMPRE. Se cuenta sobre los MISMOS
+     artículos del archivo, agrupados como los agrupa el costo. Hasta hoy la
+     estimación pasaba en silencio: ese era el defecto de fondo. */
+  const avisoDelDescuento = useMemo(() => {
+    if (!items) return null;
+    const resumen = resumenDescuento(
+      items.map((it) => ({ clave: it.newArticle, wholesaleOff: it.wholesaleOff })),
+      descuento,
+    );
+    return avisoDescuento(resumen, descuento);
+  }, [items, descuento]);
 
   // Los Department/CATEGORY/GENDER que el catálogo no va a saber traducir (ver
   // los bloques más abajo). Se derivan de lo que ya está en memoria: sin releer
@@ -932,6 +987,31 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                 ))}
               </div>
             </Field>
+            {/* 🔴 EL DESCUENTO DEL PROVEEDOR, UNO PARA TODO EL ARCHIVO
+                (18-sep-2026). Daniel: «pongo el % en número» · «hacerlo como que
+                más fácil, GLOBAL». Va al lado del flete porque es lo mismo: los
+                dos convierten el precio del proveedor en el costo de Switch.
+                ⚠️ SOLO en la preforma: en el despacho el descuento viene en el
+                archivo y se lee, y ahí no hay nada que escribir. */}
+            {formato === "confirmacion" && (
+              <Field
+                label="Descuento del proveedor %"
+                note="Se aplica a todas las líneas. Vacío = se estima."
+              >
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  max={DESCUENTO_MAX}
+                  step="any"
+                  placeholder="Ej. 25"
+                  value={descuentoTexto}
+                  onChange={(e) => cambiarDescuento(e.target.value)}
+                  className={inputCls}
+                  data-descuento-proveedor
+                />
+              </Field>
+            )}
             {salida === "switch" && (
               <Field label="Precio de venta (Switch)" note="Usa la fórmula A o B (editables abajo).">
                 <div className="flex overflow-hidden rounded-lg border border-stone-300">
@@ -941,6 +1021,31 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
               </Field>
             )}
           </div>
+
+          {/* 🔴 DE DÓNDE SALE EL COSTO, DICHO SIEMPRE (18-sep-2026). Ámbar solo
+              cuando hay costos SUPUESTOS, que es lo único que pide una acción.
+              🩸 Hasta hoy el sistema estimaba el descuento —20 % al calzado,
+              30 % a la ropa— y no lo decía en ningún lado: la cotización podía
+              salir equivocada y nadie tenía cómo enterarse. */}
+          {descuentoIlegible && (
+            <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900" data-descuento-ilegible>
+              <b className="font-semibold">Ese descuento no se entiende y no se está aplicando.</b>{" "}
+              Escribe un número entre 0 y {DESCUENTO_MAX} (por ejemplo, 25). Mientras tanto el costo
+              se estima, como abajo.
+            </div>
+          )}
+          {avisoDelDescuento && (
+            <div
+              className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+                avisoDelDescuento.tono === "ambar"
+                  ? "border-amber-300 bg-amber-50 text-amber-900"
+                  : "border-stone-300 bg-stone-50 text-stone-700"
+              }`}
+              data-aviso-descuento={avisoDelDescuento.tono}
+            >
+              {avisoDelDescuento.texto}
+            </div>
+          )}
 
           {/* Fórmulas de precio Reebok (editables, guardadas por marca) */}
           <div className="mb-4 rounded-xl border border-stone-200 bg-white p-3.5">
