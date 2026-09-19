@@ -411,7 +411,10 @@ describe("🔴 LOS MONTOS A MANO — lo único que la quincena decidía", () => 
     servir(respuestaRangoLibre());
     montar();
     await elegirPeriodo();
-    const aviso = await screen.findByText(/Los montos a mano se guardan por quincena/);
+    // ⚠️ Decía «Los montos a mano se guardan por quincena» (18-sep-2026):
+    // desde ese día un período así tampoco se CIERRA (Daniel: «si frenalo»), y
+    // el aviso lo dice y ya no manda a escribir fechas que no se pueden escribir.
+    const aviso = await screen.findByText(/Este período no es una quincena/);
     expect(aviso).toBeTruthy();
     // Nada se descarta en silencio, pero tampoco párrafos didácticos.
     expect((aviso.textContent ?? "").length).toBeLessThan(160);

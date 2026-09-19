@@ -1082,7 +1082,10 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
         {/* 🔴 CERRAR QUINCENA, negro y a la derecha (11-sep-2026, mockup). Solo
             a quien la firma; el borrador ya no tiene su propio párrafo: lo dice
             el encabezado de «Antes de cerrar». */}
-        {!!data && !vieja && !cerrada && !!data.lineas.length && puedeCerrarla && (
+        {/* 🔴 Y NUNCA sobre un período que no es una quincena (18-sep-2026,
+            Daniel: «si frenalo»). El servidor lo rechaza igual
+            (`frenoSoloQuincenas`); acá simplemente no se ofrece. */}
+        {!!data && !vieja && !cerrada && !!data.lineas.length && puedeCerrarla && !data.avisos.rangoLibre && (
           <button
             type="button"
             onClick={() => setModal("cerrar")}
@@ -1394,10 +1397,14 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
               que en un rango que no es una quincena no hay dónde guardarlos y
               quedan apagados. Enterarse DESPUÉS de escribir un ISR es el
               problema; el porqué se dice acá, sin párrafo. */}
+          {/* ⚠️ Decía «escribe las fechas exactas de una quincena»: desde el
+              15-sep-2026 no hay dónde escribirlas, y desde el 18-sep un período
+              así tampoco se cierra. Solo puede aparecer si alguien pidió el
+              cuadro por fuera de los cuatro botones. */}
           {data.avisos.rangoLibre && (
             <p className="text-[13px] text-gray-500">
-              Los montos a mano se guardan por quincena — escribe las fechas exactas de una
-              quincena para poder llenarlos.
+              Este período no es una quincena: los montos a mano no se aplican y no se puede
+              cerrar. Elige una de las quincenas de arriba y vuelve a generar.
             </p>
           )}
 

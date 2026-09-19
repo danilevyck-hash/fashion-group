@@ -57,6 +57,7 @@ import {
   type DineroLinea,
   type HorasPersona,
   type LineaPlanilla,
+  type Periodo,
 } from "./planilla";
 import { EMPRESAS_ASISTENCIA } from "./config";
 import { asistenciaRoles } from "./roles";
@@ -677,6 +678,43 @@ export function validarGuardado(empresaRaw: unknown, desdeRaw: unknown, hastaRaw
     return { ok: false, error: `El rango no puede pasar de ${MAX_DIAS_GUARDADO} días.` };
   }
   return { ok: true, empresa, desde, hasta };
+}
+
+/**
+ * 🔴 SOLO SE CIERRAN QUINCENAS (18-sep-2026). Daniel, textual, cuando se le
+ * preguntó si el sistema debía FRENAR ante un período que no es una quincena:
+ * *«si frenalo, quitalo y quita la opcion de poner rango»*.
+ *
+ * 🩸 POR QUÉ ES UN FRENO Y NO UN AVISO. Hasta hoy la pantalla avisaba en gris y
+ * dejaba cerrar igual, y pasó: `asistencia_planilla_guardada` tiene dos
+ * cabeceras de «15–28 de agosto» (Fashion Wear y Vistana), que no es ninguna
+ * quincena — pruebas de Roxana que quedaron guardadas y hubo que reabrir. En un
+ * rango así el sueldo se prorratea por la fracción cubierta, los montos escritos
+ * a mano NO se aplican… y el cierre anotaba igual los pagos de préstamo, como si
+ * fuera una quincena normal: escribía plata sobre un período que nadie iba a
+ * pagar así.
+ *
+ * 🔴 VIVE EN EL SERVIDOR, no solo en la pantalla: «Otro rango ⌄» se retiró de
+ * la Planilla el 15-sep-2026, pero la ruta que cierra seguía aceptando cualquier
+ * `desde`/`hasta`. Esta función es la puerta; la ruta la pregunta ANTES de leer
+ * la base y de calcular nada.
+ *
+ * ⚠️ LA RUTA QUE GENERA (`/api/asistencia/planilla`) NO lleva este freno, y
+ * tiene que seguir sin llevarlo: `medirAjusteAnterior` se llama a sí misma con
+ * el rango corto de los días que quedaron sin medir. Cerrar es otra cosa.
+ *
+ * Devuelve `null` cuando el período ES una quincena, o el texto del rechazo en
+ * palabras normales: qué llegó y que solo se cierran quincenas.
+ */
+export function frenoSoloQuincenas(
+  periodo: Pick<Periodo, "esQuincena" | "desde" | "hasta">,
+): string | null {
+  if (periodo.esQuincena) return null;
+  return (
+    `Solo se cierran quincenas. Llegó del ${fechaCorta(periodo.desde)} al ` +
+    `${fechaCorta(periodo.hasta)}, y eso no es una quincena. ` +
+    `Elige una de las quincenas de arriba y vuelve a generar. No se cerró nada.`
+  );
 }
 
 /**

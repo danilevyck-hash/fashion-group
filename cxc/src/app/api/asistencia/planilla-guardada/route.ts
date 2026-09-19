@@ -1,6 +1,8 @@
 // GET   /api/asistencia/planilla-guardada?empresa=vistana&desde=2026-08-01&hasta=2026-08-15
 // GET   /api/asistencia/planilla-guardada?id=<uuid>        → el cuadro congelado
 // POST  /api/asistencia/planilla-guardada   { empresa, desde, hasta }  → CERRAR
+//       🔴 SOLO UNA QUINCENA (18-sep-2026): cualquier otro rango contesta 400
+//       antes de leer la base (`frenoSoloQuincenas`). Ver el bloque en el POST.
 // PATCH /api/asistencia/planilla-guardada   { id, motivo }             → REABRIR
 //
 // ─────────────────────────────────────────────────────────────────────────────
@@ -86,6 +88,7 @@ import {
   estadoDelCuadro,
   frenosParaCerrar,
   textoFrenos,
+  frenoSoloQuincenas,
   motivoReaperturaValido,
   cerrarPlanillaRoles,
   reabiertaDe,
@@ -240,6 +243,15 @@ export async function POST(req: NextRequest) {
     if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
     const { empresa, desde, hasta } = v;
 
+    // ── 🔴 SOLO SE CIERRAN QUINCENAS (18-sep-2026) ─────────────────────────
+    // Daniel: *«si frenalo, quitalo y quita la opcion de poner rango»*. Antes
+    // de leer la base y antes de calcular: un «15–28 de agosto» no llega ni a
+    // pedir el cuadro. La regla y el porqué viven en `frenoSoloQuincenas`.
+    const noQuincena = frenoSoloQuincenas(periodo);
+    if (noQuincena) {
+      return NextResponse.json({ ok: false, error: noQuincena }, { status: 400 });
+    }
+
     // 🔴 EL CORTE con el que se midió el reloj. Solo con el interruptor y solo
     // si es válido; si no, `null` = la quincena entera, como siempre. Se pasa al
     // cálculo (para que mida hasta ahí) y se guarda en la cabecera (para que la
@@ -335,9 +347,10 @@ export async function POST(req: NextRequest) {
       empresa,
       desde,
       hasta,
-      // La clave de la quincena cuando el rango ES una quincena. `null` en un
-      // rango libre: es la misma clave con la que se guardan los montos a mano,
-      // y su CHECK no acepta otra cosa.
+      // La clave de la quincena: es la misma con la que se guardan los montos
+      // a mano, y su CHECK no acepta otra cosa. Desde el 18-sep-2026 acá SIEMPRE
+      // hay una (el freno de arriba no deja pasar otro rango); el `?? null` es
+      // solo la forma de la columna.
       quincena: cuadro.periodo?.claveManuales ?? null,
       factorBase: cuadro.periodo?.factorBase ?? periodo.factorBase,
       usuario,

@@ -296,10 +296,14 @@ describe("🔴 se congela lo que la ruta CALCULA, no lo que mandó el navegador"
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("🔴 el solapamiento — nadie pagado dos veces por el mismo día", () => {
-  it("guardar 10-20 con 1-15 ya guardada se RECHAZA y no escribe NADA", async () => {
+  // ⚠️ CAMBIÓ DE DIRECCIÓN el 18-sep-2026: cerraba «10-20 con 1-15 ya guardada».
+  // Desde ese día un rango que no es quincena ni llega al freno del
+  // solapamiento —lo rechaza antes `frenoSoloQuincenas` con 400 (Daniel: «si
+  // frenalo»)—, así que lo que se pisa es la MISMA quincena cerrada dos veces.
+  it("guardar 1-15 con 1-15 ya guardada se RECHAZA y no escribe NADA", async () => {
     yaCerrada();
     const r = await POST(pedir("POST", "admin", "daniel", {
-      empresa: "vistana", desde: "2026-08-10", hasta: "2026-08-20",
+      empresa: "vistana", desde: "2026-08-01", hasta: "2026-08-15",
     }));
     expect(r.status).toBe(409);
     expect(db.cabeceras.length).toBe(1);
@@ -311,7 +315,15 @@ describe("🔴 el solapamiento — nadie pagado dos veces por el mismo día", ()
 
   it("🔑 el freno corta ANTES de escribir: no queda ni una cabecera a medias", async () => {
     yaCerrada();
-    await POST(pedir("POST", "admin", "daniel", { empresa: "vistana", desde: "2026-08-15", hasta: "2026-08-31" }));
+    await POST(pedir("POST", "admin", "daniel", { empresa: "vistana", desde: "2026-08-01", hasta: "2026-08-15" }));
+    expect(ops).toEqual([]);
+  });
+
+  it("🔴 y un rango que NO es quincena (15–31 ago) se rechaza con 400 antes de leer la base (18-sep-2026)", async () => {
+    yaCerrada();
+    const r = await POST(pedir("POST", "admin", "daniel", { empresa: "vistana", desde: "2026-08-15", hasta: "2026-08-31" }));
+    expect(r.status).toBe(400);
+    expect((await r.json()).error).toContain("Solo se cierran quincenas");
     expect(ops).toEqual([]);
   });
 
@@ -356,7 +368,14 @@ describe("🔴 el solapamiento — nadie pagado dos veces por el mismo día", ()
     const r = await POST(pedir("POST", "admin", "daniel", { empresa: "vistana", desde: "2026-08-01", hasta: "2026-08-15" }));
     expect(r.status).toBe(200);
     errorAlEscribir = { code: "23P01", message: 'conflicting key value violates exclusion constraint "asistencia_planilla_guardada_sin_solape"' };
-    const r2 = await POST(pedir("POST", "admin", "daniel", { empresa: "vistana", desde: "2026-08-05", hasta: "2026-08-20" }));
+    // ⚠️ Era «05-20» (18-sep-2026): un rango así ya no llega a la base. Se
+    // simula el choque con la quincena de al lado, que sí pasa la puerta.
+    cuadro = {
+      empresa: "vistana",
+      periodo: { desde: "2026-08-16", hasta: "2026-08-30", claveManuales: "2026-08-2", factorBase: 1 },
+      lineas: [JSON.parse(JSON.stringify(LINEA_CALCULADA))],
+    };
+    const r2 = await POST(pedir("POST", "admin", "daniel", { empresa: "vistana", desde: "2026-08-16", hasta: "2026-08-30" }));
     expect(r2.status).toBe(409);
   });
 });

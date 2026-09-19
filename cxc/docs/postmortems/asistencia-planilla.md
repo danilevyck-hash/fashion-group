@@ -7,6 +7,49 @@
 
 ---
 
+## 🔴 Solo se cierran quincenas (18-sep-2026, noche) — el freno es del servidor
+
+### Qué decidió Daniel
+
+Se le preguntó si el sistema debía FRENAR cuando el período a cerrar no es una quincena. Textual: **«si frenalo, quitalo y quita la opcion de poner rango»**.
+
+Son dos cosas, y una ya estaba hecha:
+1. **Quitar de la Planilla la opción de elegir un rango libre.** Hecho el 15-sep-2026 (`fc0b5b7b`: «Otro rango ⌄» se fue, quedan los cuatro botones de `quincenasElegibles`; candado `quincena-fija-sin-rango-libre`). Verificado hoy: `PlanillaTab` no importa `RangoFechas`.
+2. **El cierre FRENA en el SERVIDOR** si aun así llega un período que no es quincena. Esto es lo nuevo.
+
+### 🩸 El caso real
+
+La pantalla avisaba en gris («los montos a mano se guardan por quincena…») y **dejaba cerrar igual**. Medido contra producción el 18-sep-2026: `asistencia_planilla_guardada` tiene **8 filas**, y dos son «15–28 de agosto» —`5bc68925…` Fashion Wear ($1.784,25, 8 personas) y `b7923fbf…` Vistana ($2.318,71, 9 personas)—, con `quincena = NULL`, cerradas por Contabilidad el 13-sep y **reabiertas por Daniel el 16-sep** (*«Pruebas del módulo… se revierte todo para arrancar limpio»*). Las otras tres pruebas (`09bc634d`, `e47211e7`, `4996da0f`) ya no están: la migración `20261201120000` **corrió**.
+
+Lo que pasa al cerrar un rango así: el sueldo se prorratea por `factorBase`, los montos a mano no se aplican (`claveManuales = null`)… y el cierre anotaba igual los pagos de préstamo (`planearCierre` no mira la clave). Plata escrita sobre un período que nadie paga.
+
+### La regla, entera
+
+- 🔴 **`frenoSoloQuincenas(periodo)`** (`lib/asistencia/planilla-guardada.ts`, puro): `null` si `periodo.esQuincena`; si no, el texto: *«Solo se cierran quincenas. Llegó del 15 ago 2026 al 28 ago 2026, y eso no es una quincena. Elige una de las quincenas de arriba y vuelve a generar. No se cerró nada.»*
+- 🔴 **El POST de `/api/asistencia/planilla-guardada` lo pregunta ANTES de leer las cabeceras y antes de pedir el cuadro**: contesta **400** con `ok: false` y ese texto. Ni una lectura de la base, ni una escritura. Da igual la empresa (Boston 15–25 ago también rebota).
+- 🔑 «Quincena» es lo que ya decidía `periodoDesdeRango`: `1–15` y `16–último día que paga` (**nunca el 31**). Por eso 16–31 ago tampoco pasa.
+- ⚠️ **La ruta que GENERA (`/api/asistencia/planilla`) NO lleva el freno y no lo puede llevar**: `medirAjusteAnterior` se llama a sí misma con el rango corto de los días sin medir. El freno es del CIERRE. (Es el control C del candado del 15-sep, y ahora también el bloque D del nuevo.)
+- La pantalla, de paso: el botón «Cerrar quincena» no se dibuja si `avisos.rangoLibre`, y el aviso gris ya no manda a «escribir las fechas» que no se pueden escribir. Solo puede verse si alguien pide el cuadro por fuera de los cuatro botones.
+
+### 🔴 Lo que NO se tocó
+
+- **Lo ya guardado.** Las dos cabeceras de «15–28 ago» se quedan como están (reabiertas). Esto impide que vuelva a pasar; no reescribe el pasado. Hay candado (bloque E): ninguna migración las nombra y la única que borra cabeceras sigue siendo la de las tres pruebas, por lista de ids.
+- **Las otras cinco pantallas** (Reporte, Aprobaciones, Justificaciones, Vacaciones y la planilla de Boston) conservan `RangoFechas`: ahí mirar cualquier rango sigue siendo válido. Candado (bloque C).
+- **La planilla de Boston**: David solo mira; su pestaña hace un GET a `planilla-guardada` y ningún POST.
+- **Ningún número**: esto es una puerta, no un cálculo. `scripts/_medir-vs-yulissa.ts 2026-09-1 --corte=2026-09-10` antes y después: **0 diferencias en 46 líneas** (ver «Medido» abajo).
+
+### Candados
+
+- `src/__tests__/api/planilla-solo-quincenas.test.ts` — 24 casos en 5 bloques: la regla pura · el servidor rechaza sin leer ni escribir (y una quincena de verdad pasa, por fechas y por clave) · las cinco pantallas conservan su rango y la Planilla no lo recupera · control: la ruta que genera no lleva el freno · lo ya guardado no se reescribe.
+- `planilla-guardada-route.test.ts` cambió de dirección con nota fechada en dos casos: el solapamiento se prueba con la MISMA quincena cerrada dos veces (un «10–20» ya no llega a ese freno) y el choque del EXCLUDE con la quincena de al lado.
+- Verificación por mutación: `scripts/_mutar-candados-solo-quincenas.sh` — **13 mutaciones, 13 cazadas, 2 controles en verde**.
+
+### Medido
+
+`scripts/_medir-vs-yulissa.ts 2026-09-1 --corte=2026-09-10`, solo lectura, antes y después del cambio: **46 líneas, las 46 idénticas; totales idénticos** — neto **$11.317,31** (bruto 12.932,68 · préstamo 686,61 · terceros 282,71 · mercancía 17,80). Era lo esperado —es una puerta, no un cálculo— y se midió igual. Mutación: **13 de 13 cazadas, 2 de 2 controles en verde** (`scripts/_mutar-candados-solo-quincenas.sh`).
+
+---
+
 ## 🔴 Todo de lunes a sábado en Multifashion, y sin deuda de día libre (18-sep-2026, tarde)
 
 ### Qué decidió Daniel

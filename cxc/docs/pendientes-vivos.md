@@ -58,7 +58,7 @@ Daniel, **15-sep-2026**, textual: *«el 10 de septiembre se cortó el reloj de l
 | Fashion Wear | 1–15 sep | 2026-09-10 | ⚠️ **reabierta** (cerrada 13-sep, reabierta 16-sep) |
 | Fashion Wear · Vistana | 16–30 ago | 2026-08-28 | cerrada (18-sep) |
 | Confecciones Boston | 16–30 ago | 2026-08-25 | cerrada (18-sep) |
-| Fashion Wear · Vistana | 15–28 ago | — | reabiertas (rangos de prueba de Roxana) |
+| Fashion Wear · Vistana | 15–28 ago | — | reabiertas (rangos de prueba de Roxana). 🔴 Desde el 18-sep un período así **ya no se puede cerrar**: el servidor lo rechaza (Daniel: *«si frenalo»*). Estas dos se quedan como están. |
 
 **Qué queda abierto, y es de la contadora:**
 - 🔴 **Multifashion NO tiene NI UNA planilla guardada**, de ninguna quincena, nunca. Cero filas de `american_classic` en la tabla.
