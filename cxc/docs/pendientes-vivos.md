@@ -91,12 +91,12 @@ Las quincenas guardadas de entonces eran de **Roxana (la contadora) probando el 
 ### 3. ~~Una factura de agosto no le llegó a Rey~~ → **cerrado: no es del sistema**
 Daniel, **14-sep-2026**: *«Olvídalo, no es problema del sistema»*. La factura 11-000000502 tiene otro vendedor **en Switch**; el sistema lee lo que Switch manda. No hay nada que arreglar aquí.
 
-### 4. El cuadre del estado de cuenta llegó muerto — 🔴 **ABIERTO, sin un solo cambio**
-**Remedido el 18-sep-2026:** `switch_estadocuenta_saldo` tiene **835 filas**, `synced_at` de **hoy 18-sep 21:10** — o sea que el sync corre — y **`saldo_total` NO nulo: 0 filas. `saldos` NO nulo: 0 filas.** Cero de 835, exactamente igual que el 14-sep.
+### 4. El cuadre del estado de cuenta llegó muerto — ✅ **ARREGLADO EN CÓDIGO el 18-sep-2026, falta verlo lleno**
+**Remedido el 18-sep-2026:** `switch_estadocuenta_saldo` tenía **835 filas**, `synced_at` de **hoy 18-sep 21:10** — el sync corría — y **`saldo_total` NO nulo: 0 filas. `saldos` NO nulo: 0 filas.**
 
-Switch no manda esos dos campos con el nombre que el sync busca, así que el aviso «esto no cuadra» **no puede saltar nunca** y el cajón se comporta como si siempre cuadrara.
+**Lo que se investigó, como Daniel pidió:** Switch SÍ manda los dos campos, pero **anidados** en `data.estadocuenta` (PDF del API, §5.15, p. 23); el sync los buscaba un piso más arriba porque el tipo los declaró como hermanos. Proveedores tiene la misma forma y ahí sí se leía adentro (65 de 65 llenos). Se arregló la lectura (`lib/switch-api/estadocuenta-cuadre.ts`, con las dos grafías `Saldos`/`saldos`, fallando ABIERTO a NULL) y el tipo. **Sin migración**: la tabla ya existe.
 
-🔴 **Daniel ya dijo cómo tratarlo:** primero investigar qué manda de verdad `/apicliente/estadocuenta`, y **reportárselo antes de tocar nada**.
+🔴 **Lo que queda:** comprobar tras la siguiente corrida de `switch-sync tipo=estadocuenta` que las 835 filas traen `saldo_total` (`select count(*) from switch_estadocuenta_saldo where saldo_total is not null`). Si siguen en NULL, el defecto es OTRO y hay que volver a mirar la respuesta cruda.
 
 ---
 

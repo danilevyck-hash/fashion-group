@@ -32,6 +32,7 @@ import { clearStaleRunning } from "./sync-log";
 import { particionarFilas, campoSkip } from "./monto-guard";
 import { calibrarUmbral, detallesDeRechazo, avisarMontosImposibles } from "./monto-guard-io";
 import { enParalelo } from "./en-paralelo";
+import { filaDeCuadre, type SaldoSwitchRow } from "./estadocuenta-cuadre";
 
 import type { SwitchTotalVentasDia } from "./types";
 
@@ -644,18 +645,6 @@ interface EstadoCuentaRow {
   raw_data: unknown;
 }
 
-/** Una fila de `switch_estadocuenta_saldo`: el cuadre de UN cliente en UNA
- *  empresa, tal cual lo manda Switch. */
-interface SaldoSwitchRow {
-  empresa_key: string;
-  cliente_switch_id: number;
-  cliente_codigo: string | null;
-  saldo_total: number | null;
-  saldos: unknown;
-  synced_at: string;
-  updated_at: string;
-}
-
 /**
  * Guarda el `saldoTotal`/`Saldos[]` de cada cliente. Best-effort a propósito:
  * un fallo acá NO puede tumbar el sync de la cartera, que es lo que la gente
@@ -834,6 +823,9 @@ export async function syncEmpresaEstadoCuenta(
     // NADA CON QUÉ COMPROBARSE: si un documento no llegaba, el estado de cuenta
     // salía al cliente con un número que Switch no reconoce y nada lo decía.
     // No se pide una sola llamada nueva: ya venía en la respuesta.
+    // 🩸 Y del 9 al 18-sep-2026 se leyó del nivel de AFUERA (`data.saldoTotal`)
+    // cuando Switch lo manda ADENTRO (`data.estadocuenta.saldoTotal`): 835
+    // filas con NULL. Hoy lo arma `filaDeCuadre` desde `estadocuenta`.
     const saldosSwitch: SaldoSwitchRow[] = [];
     // Las LECTURAS van de a ESTADOCUENTA_CONCURRENCIA; el PROCESADO y las
     // escrituras siguen en serie y en el orden original de `clientes`. Un
@@ -886,18 +878,18 @@ export async function syncEmpresaEstadoCuenta(
         }
         const ec = lectura.ec;
         if (typeof cliente.id === "number") {
-          const bruto = ec?.saldoTotal;
-          const totalSwitch =
-            bruto == null || bruto === "" ? null : Number(String(bruto).replace(/,/g, ""));
-          saldosSwitch.push({
-            empresa_key: empresaKey,
-            cliente_switch_id: cliente.id,
-            cliente_codigo: cliente.codigo ?? null,
-            saldo_total: totalSwitch != null && Number.isFinite(totalSwitch) ? totalSwitch : null,
-            saldos: (ec?.Saldos ?? null) as SaldoSwitchRow["saldos"],
-            synced_at: runStamp,
-            updated_at: new Date().toISOString(),
-          });
+          // 🔴 El cuadre se lee DESDE ADENTRO de `estadocuenta` (18-sep-2026),
+          // con las dos grafías del aging y fallando ABIERTO a NULL. La regla
+          // entera vive en `estadocuenta-cuadre.ts`; acá no se toca el JSON.
+          saldosSwitch.push(
+            filaDeCuadre({
+              empresaKey,
+              clienteId: cliente.id,
+              clienteCodigo: cliente.codigo,
+              respuesta: ec,
+              runStamp,
+            }),
+          );
         }
         const elements = ec?.estadocuenta?.elements ?? [];
         for (const el of elements) {

@@ -246,24 +246,33 @@ export interface SwitchEstadoCuentaElement {
   [key: string]: unknown;
 }
 
+/** Un tramo del aging que Switch calcula (PDF del API, p. 23): `{ title: "0-30", saldo: 0 }`. */
+export interface SwitchEstadoCuentaSaldoBucket {
+  title?: string;
+  saldo?: number | string | null;
+  [key: string]: unknown;
+}
+
 export interface SwitchEstadoCuentaData {
+  /**
+   * 🔴 EL CUADRE VIVE ADENTRO DE `estadocuenta` (18-sep-2026). La respuesta de
+   * `/apicliente/estadocuenta` trae, junto a los documentos, el aging por
+   * tramos (`Saldos`) y el total que Switch mismo calculó (`saldoTotal`), y los
+   * tres son HERMANOS de `elements` — misma forma que `estadodecuenta` en el
+   * endpoint de proveedores.
+   *
+   * 🩸 Del 9 al 18-sep-2026 este tipo los declaraba un piso más arriba, como
+   * hermanos de `estadocuenta`, y el sync los buscó ahí: 835 filas de
+   * `switch_estadocuenta_saldo` con `saldo_total` y `saldos` en NULL. La
+   * lectura vive en `estadocuenta-cuadre.ts` y acepta `Saldos` y `saldos`.
+   */
   estadocuenta: {
     elements: SwitchEstadoCuentaElement[];
+    Saldos?: SwitchEstadoCuentaSaldoBucket[];
+    saldos?: SwitchEstadoCuentaSaldoBucket[];
+    saldoTotal?: string | number | null;
+    [key: string]: unknown;
   };
-  /**
-   * 🔴 EL CUADRE QUE SWITCH YA MANDABA Y SE TIRABA (9-sep-2026). La respuesta
-   * trae, además de los documentos, el aging de ocho tramos (`Saldos`) y el
-   * total que Switch mismo calculó (`saldoTotal`). Los dos se descartaban a
-   * propósito —está escrito en `docs/switch-referencia.md`— y con eso el
-   * sistema sumaba los documentos sin nada con qué comprobarse.
-   *
-   * ⚠️ `Saldos` va como `unknown`: su forma NO está documentada (el PDF del
-   * API solo dice «aging 0-30…») y nunca se vio en vivo. Se guarda crudo en
-   * `switch_estadocuenta_saldo.saldos`; inventarle campos sería fijar una
-   * suposición en la base. Lo único que se lee es `saldoTotal`.
-   */
-  Saldos?: unknown;
-  saldoTotal?: string | number | null;
   [key: string]: unknown;
 }
 
