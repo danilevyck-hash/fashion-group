@@ -140,3 +140,79 @@ La búsqueda global tenía un atajo que decía **«Buscar préstamos de "Juan"»
 
 - `src/__tests__/lib/registro-de-descargas-y-enlaces.test.ts` — 22 casos (con el contador de descargas del mismo día; ver `docs/pendientes-vivos.md` › 16).
 - `scripts/_mutar-candados-registro-y-enlaces.sh` — **15 mutaciones, 15 cazadas**, 2 controles en verde.
+
+---
+
+# El blanco del primer pintado (19-sep-2026)
+
+> Post-mortem del arreglo de **cuatro pantallas**. Ninguno mueve plata: es pantalla, y nada de lo que se guarda cambió.
+>
+> ⚠️ Estas reglas tampoco están en `CLAUDE.md`, por la misma razón que las seis de arriba: el archivo está a **129.652 caracteres** de un tope de **130.000** y su candado (`claude-md-bajo-el-tope.test.ts`) pone el build rojo. **Sigue pendiente de Daniel decidir qué se poda.**
+
+## Lo que vio Daniel
+
+Ana Trejos abrió la app de marcación en su teléfono. Dos capturas seguidas:
+
+1. **Pantalla en blanco**: solo el encabezado «FG · marcacion» con la raya amarilla. Nada más.
+2. **Un instante después**, todo de golpe: «Hola, Ana Trejos», el reloj grande «5:47 p. m.», «Sábado 19 de septiembre · hora de Panamá», el botón negro «Marcar entrada» y «Todavía no tienes marcas en esta quincena».
+
+Daniel, textual: *«la primera se pone y de una la segunda, se siente lagged. Necesito arreglar eso porque seguro le pasan a otros usuarios con otros módulos»*.
+
+## Por qué pasaba
+
+`src/app/marcacion/page.tsx` pintaba el cascarón y **`MarcacionClient.tsx` pedía los datos DESDE EL NAVEGADOR** (`fetch("/api/marcacion")` dentro de un `useEffect`). Entre que se pintaba el encabezado y que llegaba la respuesta **no había nada que mirar**. En la oficina eso dura 200 ms y no se nota; en la calle, con señal mala, dura segundos — y es justo donde se usa esa pantalla.
+
+🔑 **No era un problema de red, era de orden.** El dato existía y el servidor podía traerlo: nadie se lo había pedido.
+
+## 1 · Marcación — el primer pintado ya trae el contenido
+
+**`page.tsx` pasó a ser un componente de SERVIDOR que arma el estado ahí mismo**, con la **misma** función que contesta la ruta (`armarEstadoDeLaPantalla`, `lib/marcacion/estado-server.ts`). No hay una segunda forma de armarlo, así que la pantalla no puede decir una cosa al abrirse y otra al refrescarse. Lo que arma viaja como la prop `inicial` de `MarcacionClient`.
+
+🔴 **FALLA ABIERTA.** Si la base no contesta, `semillaDeLaPantalla()` devuelve `null` y la pantalla se comporta EXACTAMENTE como antes: pide el dato desde el navegador. Un arreglo de pantalla no puede dejar a nadie sin poder marcar.
+
+🔴 **Y SIN SEMILLA SE DIBUJA UN ESQUELETO, NUNCA UN BLANCO** (`EsqueletoMarcacion.tsx`).
+
+### El reloj, que es la parte delicada
+
+El reloj grande es del cliente —camina, y es la hora de Panamá, no la del teléfono—, así que había que resolverlo **sin parpadear y sin inventar una hora**.
+
+Cómo quedó: con semilla, `ahora` arranca en el **instante que dijo el servidor** y `desfase` en **0**. Por construcción, el primer cuadro dibuja EXACTAMENTE `inicial.ahora` — la hora que contestó el servidor, ni una inventada ni la del teléfono. Al montar, el efecto vuelve a medir el desfase contra este teléfono y el reloj empieza a caminar anclado ahí.
+
+🔑 **Las dos cosas con el MISMO instante:**
+
+```ts
+const enEsteTelefono = Date.now();
+setAhora(enEsteTelefono);
+setDesfase(semilla - enEsteTelefono);
+```
+
+Medirlos por separado (`setDesfase(semilla - Date.now())` a secas, dejando `ahora` en la semilla) hace que `ahora + desfase` valga `semilla × 2 − ahora`: con un teléfono adelantado tres horas, **el reloj se va tres horas para atrás en el primer tic**. La mutación 7 del script existe por eso.
+
+🔑 Y hay un segundo motivo para que el servidor y el navegador dibujen el MISMO texto en el primer cuadro: **si difieren, React corrige la hidratación, y esa corrección se ve como un parpadeo** — el mismo que se estaba arreglando.
+
+### El esqueleto mide lo que reemplaza
+
+🔴 **Un esqueleto que mide distinto no arregla el parpadeo: lo cambia por un salto, que se siente peor.** Por eso cada bloque de `EsqueletoMarcacion.tsx` lleva el número de la pantalla real: el saludo `h-5` (el alto de una línea `text-sm`), el reloj **`h-[46px]`** contra el `text-[46px] leading-none` de la hora, la fecha `h-5`, el botón el **mismo `min-h-[56px]`** y «Mis marcas» `h-5`, con los mismos `mt-3 · mt-2 · mt-6 · mt-8`.
+
+⚠️ **La barra del encabezado del `loading.tsx` mide `h-11` + 2 px de borde**, que es el alto REAL de `AppHeader` en celular — no el `h-14` que usan las otras seis pantallas de la casa, todas de escritorio. Con `h-14` el contenido bajaría 10 px al entrar el encabezado de verdad.
+
+⚠️ **No dice «Cargando…»**: un texto centrado que después desaparece es exactamente el salto que se está evitando.
+
+🔴 **El esqueleto es UNO SOLO**, y por eso vive en su archivo: lo leen las dos esperas de esta pantalla —`loading.tsx` (mientras el servidor arma el estado) y `MarcacionClient` (si el servidor no pudo)—. `loading.tsx` sigue el molde de la casa: `DelayedSkeleton`, para que en una carga rápida no aparezca ni un gris.
+
+🔑 **El texto «sin ficha de colaborador» se mudó al módulo puro** (`AVISO_SIN_CODIGO`). Un archivo de ruta de Next no puede exportar otra cosa que sus métodos, así que la única forma de que la página y la ruta digan lo mismo es que el texto viva afuera de las dos.
+
+## 2 · Las otras tres — medidas primero, arregladas después
+
+🔴 **No se tocaron las 34.** Se midió cuáles parpadean de verdad y se ordenaron por quién las usa, cada cuánto y si se abren en el teléfono. **De 53 pantallas, 34 piden su dato desde el navegador al abrirse; siete quedaban literalmente en blanco.** El resto de la medición, y las que quedan, están en [`docs/pendientes-vivos.md`](../pendientes-vivos.md) › 27.
+
+- **Cuentas por Cobrar** (`src/app/cxc/page.tsx`) — 🩸 la rama de carga dibujaba cinco filas grises **sin `AppHeader` y sin la tira de pestañas**: al llegar el dato aparecían las dos cosas de golpe y **toda la lista bajaba de un salto**. Ahora el encabezado va primero —no necesita ningún dato— y la tira de pestañas reserva su alto (`min-h-[44px]`, el de los botones de `TabsCartera`). No se dibujan las pestañas de verdad porque cuáles van depende del rol.
+- **El checkout del vendedor** (`CheckoutClient.tsx`) — 🩸 decía `if (!loaded) return null`. El vendedor, en la calle, veía la pantalla vacía. Ahora el título «Confirmar pedido» y la salida al catálogo se dibujan desde el primer cuadro y solo los renglones esperan, ocupando su lugar.
+- **«Revisa tu pedido»** (`RevisarPedidoPublico.tsx`) — lo mismo, y es la pantalla donde un **cliente** confirma su pedido, en su teléfono y sin sesión.
+
+⚠️ **No se metió cacheo de navegación.** La app es siempre en línea y el service worker es mínimo a propósito (`CLAUDE.md` › PWA): tapar esto con caché es lo que se retiró en jul-2026 con el Modo Viaje.
+
+## Candado y verificación por mutación
+
+- `src/__tests__/lib/marcacion-sin-blanco.test.tsx` — 24 casos, en siete bloques: el primer pintado trae el contenido · la hora de ese cuadro es la del servidor · sin semilla hay esqueleto · el esqueleto mide lo mismo · el esqueleto es uno solo · la página arma el estado en el servidor y falla abierta · las otras tres pantallas.
+- `scripts/_mutar-candados-sin-blanco.sh` — **17 mutaciones, 17 cazadas**, 2 controles en verde.

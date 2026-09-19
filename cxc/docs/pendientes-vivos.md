@@ -293,6 +293,23 @@ Lo que queda es de Daniel: **el exceso de almuerzo nunca entró al dinero de la 
 
 Hecho ese día: a Multifashion **no se le puede cargar deuda de día libre** (el servidor rechaza, la pantalla no ofrece el motivo; postmortem «Todo de lunes a sábado en Multifashion, y sin deuda de día libre») y el sábado 12-sep quedó como feriado global. Lo que queda es de Daniel: si un día ENTRE SEMANA las tres empresas cierran con día libre (deuda) y Multifashion también cierra, hoy no hay con qué justificarle ese día a Multifashion sin deuda —un feriado global les borraría la deuda a las otras tres—. Él dijo que ese caso no existe; queda anotado por si un día existe.
 
+### 27. Las pantallas que todavía parpadean al abrirse — 🔴 **MEDIDAS, y Daniel decide cuáles se tocan**
+> *«la primera se pone y de una la segunda, se siente lagged. Necesito arreglar eso porque seguro le pasan a otros usuarios con otros módulos»* — **19-sep-2026**, sobre Marcación en el teléfono de Ana Trejos
+
+**Ya se arreglaron cuatro** (19-sep-2026, detalle en [`docs/postmortems/navegacion.md`](postmortems/navegacion.md) › «El blanco del primer pintado»): **Marcación** · **Cuentas por Cobrar** · el **checkout del vendedor** · **«Revisa tu pedido»** del cliente.
+
+**Lo que se midió ese día, contra el código de producción.** De **53** pantallas del sistema, **34** piden su dato desde el navegador al abrirse. De esas 34, **siete quedaban literalmente en blanco** (ni esqueleto ni `loading.tsx`); las otras 27 ya dibujan algo mientras esperan y el parpadeo se siente suave. Con las cuatro arregladas, **quedan tres en blanco**:
+
+| Pantalla | Quién la usa | Dónde | Qué se ve mientras carga |
+|---|---|---|---|
+| `/prestamos/[id]` | admin · contabilidad | 🖥️ oficina | **Blanco total, sin encabezado.** `src/app/prestamos/[id]/page.tsx:81` — `if (!authChecked \|\| loading \|\| !empleado) return null;`. El `loading.tsx` del padre no la cubre. |
+| `/asistencia` y `/asistencia/colaboradores/[codigo]` | admin · secretaria · contabilidad · bodega · gerente_boston | 🖥️ oficina | Encabezado y pestañas sí pintan; el contenido es un **«Cargando…» de texto suelto** que después salta a una tabla entera. |
+| `/home` | **todos**, cada sesión | 📱 + 🖥️ | Blanco hasta que el navegador confirma la sesión, y el saludo dice «Buen día» y después salta a «Buen día, Daniel». |
+
+🔴 **Y una causa de fondo que vale por todas: `src/lib/hooks/useAuth.ts`.** Arranca con `authChecked = false` y solo lo pone en `true` dentro de un efecto del navegador. **46 pantallas** hacen `if (!authChecked) return null;`, así que **el HTML que manda el servidor sale vacío**: la pantalla no existe hasta que baja el JavaScript. Eso pega también en **ocho pantallas que YA hacen todo su trabajo en el servidor y tiran ese trabajo a la basura** — `/clientes`, `/clientes/[codigo]`, `/reclamos`, `/recordatorios`, `/prestamos`, `/multifashion`, `/comisiones` y `/g/[grupo]` —, y es la razón por la que **cinco de los seis `loading.tsx` que existen no sirven de nada**.
+
+**Qué decide Daniel:** (a) se toca `useAuth` una vez y se destapa el HTML del servidor en esas ocho pantallas (un cambio chico en un archivo, pero que roza 46 pantallas: hay que medirlo pantalla por pantalla antes); (b) se arreglan solo las tres de la tabla, una por una, como se hicieron las cuatro de hoy; (c) se deja así — ninguna de las tres es de teléfono ni de calle, que es donde se nota.
+
 ---
 
 ## Cómo se llegó a esta lista

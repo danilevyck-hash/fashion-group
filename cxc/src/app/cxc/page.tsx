@@ -595,10 +595,26 @@ function AdminDashboardInner() {
     );
   }
 
+  // 🔴 EL ENCABEZADO Y LAS PESTAÑAS VAN PRIMERO, TAMBIÉN MIENTRAS CARGA
+  // (19-sep-2026). 🩸 Esta rama dibujaba cinco filas grises SIN `AppHeader` y
+  // sin la tira de pestañas: al llegar el dato aparecían las dos cosas de golpe
+  // y TODA la lista bajaba de un salto. Un esqueleto que no ocupa el lugar de
+  // lo que viene no arregla el parpadeo, lo convierte en un empujón — que se
+  // siente peor. El encabezado no necesita ningún dato para dibujarse, así que
+  // no hay razón para hacerlo esperar.
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {[...Array(5)].map((_, i) => <SkeletonRow key={i} />)}
+      <div>
+        <AppHeader module="Cuentas por Cobrar" />
+        {/* El mismo alto y el mismo borde que `TabsCartera`: sus botones son
+            `min-h-[44px]` dentro de un contenedor con `pt-2`. No se dibujan las
+            pestañas de verdad porque cuáles van depende del rol. */}
+        <div className="max-w-6xl mx-auto px-4 pt-2">
+          <div className="min-h-[44px] border-b border-gray-200" />
+        </div>
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          {[...Array(5)].map((_, i) => <SkeletonRow key={i} />)}
+        </div>
       </div>
     );
   }

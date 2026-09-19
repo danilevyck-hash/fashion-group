@@ -439,6 +439,19 @@ export function faltaLaMigracion(error: { code?: string; message?: string } | nu
   );
 }
 
+/**
+ * Lo que se le dice a quien abre la pantalla y no tiene ficha de colaborador.
+ *
+ * 🔑 VIVE ACÁ Y NO EN LA RUTA porque lo dicen DOS puertas: `GET /api/marcacion`
+ * y la propia página, que desde el 19-sep-2026 arma el estado en el servidor
+ * para que el primer pintado no sea un blanco. Un archivo de ruta de Next no
+ * puede exportar otra cosa que sus métodos, así que la única forma de que las
+ * dos digan lo mismo es que el texto viva en el módulo puro.
+ */
+export const AVISO_SIN_CODIGO =
+  "Esta pantalla es para las personas que marcan su entrada y su salida. "
+  + "Tu usuario no tiene una ficha de colaborador, así que no hay a quién marcarle.";
+
 /** Lo que se le dice a quien intenta marcar antes de que la migración corra. */
 export const AVISO_FALTA_MIGRACION =
   "Todavía falta prender esta pantalla del lado del sistema. Avísale a Daniel: falta correr la migración 20261127120000_marcacion_telefono.sql.";

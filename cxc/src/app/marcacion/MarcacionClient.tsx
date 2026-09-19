@@ -35,6 +35,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import AppHeader from "@/components/AppHeader";
+import { BloquesDelEsqueleto } from "./EsqueletoMarcacion";
 import { ROTULO_MARCACION } from "@/lib/marcacion/rol";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import {
@@ -65,7 +66,7 @@ import {
 } from "@/lib/marcacion/cola-offline";
 import { achicarEnElTelefono } from "@/lib/marcacion/selfie-telefono";
 
-interface EstadoServidor {
+export interface EstadoServidor {
   codigo: string | null;
   nombre?: string | null;
   aviso?: string;
@@ -88,12 +89,36 @@ function esEstado(j: unknown): j is EstadoServidor {
 /** Cada cuánto se reintenta la cola mientras haya algo esperando. */
 const REINTENTO_MS = 60_000;
 
-export default function MarcacionClient() {
-  const [estado, setEstado] = useState<EstadoServidor | null>(null);
+/** El instante de la semilla del servidor, o `null` si no vino o vino rota. */
+function instanteDeLaSemilla(inicial: EstadoServidor | null): number | null {
+  if (!inicial) return null;
+  const t = Date.parse(inicial.ahora);
+  return Number.isFinite(t) ? t : null;
+}
+
+export default function MarcacionClient({ inicial = null }: { inicial?: EstadoServidor | null }) {
+  // ───────────────────────────────────────────────────────────────────────────
+  // 🔴 EL PRIMER PINTADO ES EL DE VERDAD (19-sep-2026). `inicial` viene del
+  // SERVIDOR (ver `page.tsx`): con él, el saludo, la hora y el botón se dibujan
+  // en el primer cuadro y Ana no ve el blanco que veía. Sin él —solo si la base
+  // no contestó— esto arranca en `null` y se pide desde el navegador como
+  // siempre, pero dibujando el ESQUELETO, nunca un blanco.
+  //
+  // 🔴 Y EL RELOJ ARRANCA EN LA HORA DEL SERVIDOR, NO EN LA DEL TELÉFONO: con
+  // semilla, `ahora` arranca en el instante que dijo el servidor y el desfase
+  // en 0, así que ese primer cuadro dibuja EXACTAMENTE `inicial.ahora`. No es
+  // una hora inventada: es la que contestó el servidor. Un segundo después el
+  // efecto de abajo vuelve a medir el desfase contra este teléfono y el reloj
+  // empieza a caminar, anclado ahí. Que el servidor y el navegador dibujen el
+  // MISMO texto en el primer cuadro es además lo que evita que React tenga que
+  // corregir la hidratación — que se vería como un parpadeo.
+  // ───────────────────────────────────────────────────────────────────────────
+  const semilla = instanteDeLaSemilla(inicial);
+  const [estado, setEstado] = useState<EstadoServidor | null>(inicial);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   /** Diferencia entre el reloj del servidor y el de este teléfono. */
-  const [desfase, setDesfase] = useState<number | null>(null);
-  const [ahora, setAhora] = useState<number>(() => Date.now());
+  const [desfase, setDesfase] = useState<number | null>(semilla === null ? null : 0);
+  const [ahora, setAhora] = useState<number>(() => semilla ?? Date.now());
   const [enLinea, setEnLinea] = useState(true);
   const [pendientes, setPendientes] = useState<MarcaPendiente[]>([]);
 
@@ -207,6 +232,21 @@ export default function MarcacionClient() {
   }, [aviso]);
 
   useEffect(() => {
+    // 🔴 ACÁ EL RELOJ EMPIEZA A CAMINAR. Hasta este momento se dibujó, quieta,
+    // la hora que mandó el servidor. Ahora se mide cuánto le lleva (o le
+    // atrasa) el reloj de este teléfono a esa hora, y a partir de ahí el reloj
+    // corre anclado en la del servidor: si alguien mueve la hora del teléfono,
+    // esta pantalla no se mueve. La carga de abajo lo vuelve a medir más fino.
+    // 🔑 LAS DOS COSAS CON EL MISMO INSTANTE. `ahora` deja de ser la hora de la
+    // semilla y pasa a ser el reloj de este teléfono, y el desfase compensa
+    // exactamente esa diferencia: `ahora + desfase` sigue dando la hora del
+    // servidor, sin un salto de un cuadro al otro. Medirlos por separado es
+    // cómo el reloj se iría tres horas para atrás en el primer tic.
+    if (semilla !== null) {
+      const enEsteTelefono = Date.now();
+      setAhora(enEsteTelefono);
+      setDesfase(semilla - enEsteTelefono);
+    }
     setEnLinea(navigator.onLine);
     void cargar();
     void refrescarCola();
@@ -236,7 +276,7 @@ export default function MarcacionClient() {
       clearInterval(reloj);
       clearInterval(reintento);
     };
-  }, [cargar, refrescarCola, vaciarCola]);
+  }, [cargar, refrescarCola, semilla, vaciarCola]);
 
   // ── Qué se dibuja ──────────────────────────────────────────────────────────
   //
@@ -490,6 +530,13 @@ export default function MarcacionClient() {
       />
 
       <main className="mx-auto w-full max-w-md px-4 pb-16 pt-6">
+        {/* 🔴 MIENTRAS NO HAY DATO SE DIBUJA EL ESQUELETO, NUNCA UN BLANCO.
+            Esto solo se ve cuando el servidor no pudo armar el estado (ver
+            `page.tsx`) y el dato tiene que venir del navegador: ocupa el MISMO
+            lugar que la pantalla de verdad, así lo que llega después no empuja
+            nada. */}
+        {!estado && !errorCarga && <BloquesDelEsqueleto />}
+
         {errorCarga && !estado && (
           <p className="rounded-md border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-700">
             {errorCarga}

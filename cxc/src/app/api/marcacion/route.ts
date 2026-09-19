@@ -28,6 +28,7 @@ import {
 import { borrarSelfies, subirSelfie } from "@/lib/marcacion/selfie-servidor";
 import {
   AVISO_FALTA_MIGRACION,
+  AVISO_SIN_CODIGO as SIN_CODIGO,
   DISPOSITIVO_TELEFONO,
   diaPanamaDe,
   estadoDelBoton,
@@ -41,10 +42,9 @@ import {
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-/** Sin código atado no hay a quién marcarle. Se DICE, no se inventa uno. */
-const SIN_CODIGO =
-  "Esta pantalla es para las personas que marcan su entrada y su salida. "
-  + "Tu usuario no tiene una ficha de colaborador, así que no hay a quién marcarle.";
+// Sin código atado no hay a quién marcarle. Se DICE, no se inventa uno. El
+// texto vive en el módulo puro (`AVISO_SIN_CODIGO`) porque la PÁGINA dice lo
+// mismo: ver la nota de ese archivo.
 
 export async function GET(req: NextRequest) {
   const auth = requireMarcacion(req);

@@ -224,7 +224,31 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
     }
   }
 
-  if (!loaded) return null;
+  // 🔴 MIENTRAS SE LEE EL CARRITO NO SE DEVUELVE UN BLANCO (19-sep-2026).
+  // 🩸 Acá decía `if (!loaded) return null`: el vendedor, en la calle y con
+  // señal mala, veía la pantalla vacía y un instante después todo de golpe.
+  // Ahora el título y el enlace al catálogo —que no dependen de ningún dato— se
+  // dibujan desde el primer cuadro, y solo los renglones esperan, ocupando su
+  // lugar. Lo mismo se hizo en `RevisarPedidoPublico`, la pantalla gemela del
+  // cliente.
+  if (!loaded) {
+    return (
+      <div className="mx-auto w-full max-w-3xl px-4 py-6">
+        <div className="mb-5 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight">Confirmar pedido</h1>
+            <p className="text-sm text-gray-500">{cfg.label}</p>
+          </div>
+          <Link href={cfg.catalogHref} className="text-sm text-gray-500 hover:text-black transition">← Catálogo</Link>
+        </div>
+        <div className="space-y-2" aria-hidden="true" data-esqueleto="checkout">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-16 w-full animate-pulse rounded-lg bg-gray-100" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">

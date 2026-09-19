@@ -192,7 +192,35 @@ export default function RevisarPedidoPublico({ marca }: { marca: MarcaUiKey }) {
   // aire para que la última línea no quede pegada a la barra).
   const reservaAbajo = cartCount > 0 && altoBarra > 0 ? altoBarra + 16 : 0;
 
-  if (!cargado) return null;
+  // 🔴 MIENTRAS SE LEE EL CARRITO NO SE DEVUELVE UN BLANCO (19-sep-2026).
+  // 🩸 Acá decía `if (!cargado) return null`. Es la pantalla donde un cliente
+  // confirma su pedido, en su teléfono y sin sesión: verla en blanco un segundo
+  // es lo último que puede pasar ahí. El encabezado de la marca, el título y la
+  // salida al catálogo no dependen de ningún dato y se dibujan ya; solo los
+  // renglones esperan, ocupando su lugar.
+  if (!cargado) {
+    return (
+      <div className={theme.grid.pageBg}>
+        <div className="mx-auto w-full max-w-3xl px-4 py-6">
+          <CatalogoHeader marca={marca} variant="public" />
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight">Revisa tu pedido</h1>
+              <p className="text-sm text-gray-500">{theme.label}</p>
+            </div>
+            <Link href={hrefCatalogo} className="text-sm text-gray-500 hover:text-black transition">
+              ← Seguir viendo
+            </Link>
+          </div>
+          <div className="space-y-2" aria-hidden="true" data-esqueleto="revisar-pedido">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-16 w-full animate-pulse rounded-lg bg-gray-100" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={theme.grid.pageBg}>
