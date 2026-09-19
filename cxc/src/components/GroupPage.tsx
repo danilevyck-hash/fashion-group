@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
+import { useSemillaSesion } from "@/lib/sesion-semilla-provider";
 import {
   GROUP_LABELS,
   getModulesInGroup,
@@ -15,15 +16,20 @@ interface GroupPageProps {
 
 export default function GroupPage({ group }: GroupPageProps) {
   const router = useRouter();
-  const [authChecked, setAuthChecked] = useState(false);
-  const [role, setRole] = useState("");
-  const [fgModules, setFgModules] = useState<string[] | null>(null);
+  // 🔴 El primer pintado arranca con la semilla del servidor (19-sep-2026):
+  // rol y módulos de la cookie firmada, así la lista de fichas del grupo
+  // viaja en el HTML. Sin semilla, como siempre: `null` hasta el efecto.
+  // Detalle en `lib/sesion-semilla.ts`.
+  const semilla = useSemillaSesion();
+  const [authChecked, setAuthChecked] = useState(semilla !== null);
+  const [role, setRole] = useState(semilla?.role ?? "");
+  const [fgModules, setFgModules] = useState<string[] | null>(semilla?.modules ?? null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const r = sessionStorage.getItem("cxc_role") || "";
-    if (!r) { router.push("/"); return; }
-    if (r === "cliente") { router.push("/catalogo/reebok"); return; }
+    if (!r) { setAuthChecked(false); router.push("/"); return; }
+    if (r === "cliente") { setAuthChecked(false); router.push("/catalogo/reebok"); return; }
     setRole(r);
     try {
       const mods = sessionStorage.getItem("fg_modules");

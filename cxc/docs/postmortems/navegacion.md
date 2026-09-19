@@ -216,3 +216,40 @@ Medirlos por separado (`setDesfase(semilla - Date.now())` a secas, dejando `ahor
 
 - `src/__tests__/lib/marcacion-sin-blanco.test.tsx` — 24 casos, en siete bloques: el primer pintado trae el contenido · la hora de ese cuadro es la del servidor · sin semilla hay esqueleto · el esqueleto mide lo mismo · el esqueleto es uno solo · la página arma el estado en el servidor y falla abierta · las otras tres pantallas.
 - `scripts/_mutar-candados-sin-blanco.sh` — **17 mutaciones, 17 cazadas**, 2 controles en verde.
+
+## 3 · El gancho: el primer pintado ya sabe quién mira (19-sep-2026, noche)
+
+Daniel eligió la opción (a) del pendiente 27: tocar `useAuth` una vez en vez de arreglar pantalla por pantalla.
+
+### Lo que pasaba
+
+`src/lib/hooks/useAuth.ts` arrancaba con `authChecked = false` y solo lo ponía en `true` dentro de un `useEffect`, leyendo `sessionStorage`. **29 pantallas** hacen `if (!authChecked) return null` (más `GroupPage` y `/home`, que tienen el mismo chequeo escrito a mano). Medido contra el código: el HTML que mandaba el servidor era **vacío** en las 31 — y Next prerenderizaba **12 de esas rutas como HTML estático vacío** (`/cxc`, `/guias`, `/caja`, `/vista-general`, `/marketing`, `/admin/usuarios`, `/catalogos/marcas`, `/gastos-contabilidad`, `/productos/cargar`, `/marketing/mobiliario`, `/home`, `/`), o sea que el CDN servía el blanco con toda la velocidad del mundo. Las **ocho servidas** (`/clientes`, `/clientes/[codigo]`, `/reclamos`, `/recordatorios`, `/prestamos`, `/multifashion`, `/comisiones`, `/g/[grupo]`) traían sus datos del servidor y `return null` los tiraba: por eso cinco de los seis `loading.tsx` mostraban un esqueleto y después la pantalla se iba a blanco igual.
+
+🔑 **El servidor YA sabía quién era.** La cookie `cxc_session` viaja firmada con HMAC y el login la firma con `{ ...armarPayloadSesion(user), sessionToken }`: **rol, módulos, `isOwner` y nombre van adentro** (`src/app/api/auth/route.ts`). El middleware la verifica y la comprueba contra `user_sessions` antes de que cualquier página se dibuje. Solo faltaba contárselo a la pantalla.
+
+### Cómo quedó
+
+- **`lib/auth-check.ts`** — la regla «¿este rol entra a este módulo?» se sacó a `tieneAccesoAlModulo(role, modules, moduleKey, allowedRoles)`, pura. `hasModuleAccess` (el navegador, con `sessionStorage`) la llama. 🔴 **Es UNA regla**: si el servidor dijera sí y el navegador no, se vería un parpadeo, o algo peor.
+- **`lib/sesion-semilla.ts`** — `semillaDeSesion(payload)` arma `{ role, modules, isOwner, userName }` **enumerando los campos**: 🔴 **nunca el `sessionToken`, nunca el `userId`**, porque la semilla se serializa al navegador con la página. `accesoConSemilla` aplica la misma regla.
+- **`lib/sesion-semilla-servidor.ts`** — `leerSemillaDeSesion()` lee `cookies()` y pasa **solo por `verifySession`** (HMAC en tiempo constante, fail-closed sin `SESSION_SECRET`). Con la cookie forjada, sin firma, o con `cookies()` roto → `null`, y la pantalla se comporta EXACTAMENTE como antes. **Falla abierta hacia la conducta vieja**: un arreglo de pintado no deja a nadie sin pantalla.
+- **`app/layout.tsx`** — el layout raíz lee la semilla y la baja por contexto (`SemillaSesionProvider`). ⚠️ Leer `cookies()` en el layout raíz vuelve **dinámicas** las 12 rutas estáticas: a propósito, porque su HTML estático era el vacío, y el middleware ya corre (con su consulta a Supabase) en cada petición de todos modos.
+- **`hooks/useAuth.ts`** — `authChecked`, `role` e `isOwner` **arrancan en lo que dice la semilla**. Con acceso, el servidor manda la pantalla dibujada con el rol de la cookie; sin acceso o sin semilla, `null` como siempre. 🔴 **El efecto NO cambió**: después de hidratar, `sessionStorage` sigue mandando. Lo único nuevo en él: si niega (o está vacío, una pestaña nueva), `setAuthChecked(false)` **retira lo que el servidor dibujó en ese mismo instante**, antes del toast y del `router.push`.
+- **`components/GroupPage.tsx`** — lo mismo, con su chequeo propio.
+
+### Por qué la seguridad no se movió
+
+- El guard de verdad **sigue siendo el del servidor**: el middleware (sin cookie válida y viva no se sirve ni una página) y los guards SSR de cada página (`/reclamos`, `/clientes`, `/recordatorios`, `/prestamos`, `/multifashion`, `/guias/nueva`, `/catalogos/admin`…), que no se tocaron. La semilla decide qué se **pinta**, no qué se **sirve**.
+- **Nadie ve datos de otro rol, ni un instante.** El rol del primer cuadro es el de la cookie firmada, no una suposición: un botón que solo ve un admin se dibuja solo si la cookie dice admin. Con un rol sin acceso, la pantalla devuelve `null` en el servidor — el candado lo prueba con `renderToString` de `/admin/usuarios` y `/vista-general` para los siete roles que no son admin, con módulos regalados y todo: **HTML vacío**.
+- Los datos que una pantalla pide desde el navegador **no están en el primer cuadro**: la pantalla muestra su estado de carga, que es el mismo que hoy mostraba un instante después.
+- ⚠️ **Lo que sí cambia en una pestaña nueva** (enlace de WhatsApp con la cookie viva y `sessionStorage` vacío): antes, blanco → login → casa del rol; ahora, **la pantalla del usuario un instante → login → casa del rol**. Es su propia pantalla (la cookie es suya y la verificó el middleware), y el enlace se pierde igual que antes. Conservar el enlace pediría que el gancho rehidrate `sessionStorage` desde `/api/auth/sesion` en vez de rebotar — **decisión pendiente de Daniel**, no se hizo.
+
+### Lo que NO se tocó, y por qué
+
+- **`/home`** — tiene su chequeo propio y pinta según el modo oscuro (`localStorage`), que el servidor no puede saber: seeded, un usuario en modo oscuro vería un flash claro, peor que el blanco. Y el saludo pasaría de «Buen día, daniel» (el usuario de login, lo que trae la cookie) a «Buen día, Daniel Levy» (el nombre real, que se pide aparte). Las dos cosas piden una decisión (por ejemplo, guardar la preferencia de modo oscuro en una cookie).
+- **`/prestamos/[id]`** — su `return null` también espera `loading` y `empleado`, que vienen de un `fetch` del navegador: con la semilla ya no espera la sesión, pero sigue en blanco hasta que llega la ficha. Pide traer la ficha en el servidor, como Recordatorios.
+- **Ningún número cambió**: esto es pintado, no cálculo. La suite entera (789 archivos, 16.111 tests) pasó sin tocar un solo test viejo — los que simulan `useAuth` siguen simulándolo igual.
+
+### Candado y verificación por mutación
+
+- `src/__tests__/lib/sesion-semilla-primer-pintado.test.tsx` — 51 casos en siete bloques: la regla es una · la semilla lleva solo lo necesario · el servidor solo cree en la firma y falla abierta · el primer pintado trae contenido (GroupPage real, Comisiones con sus años, Recordatorios con su cheque y **cero `fetch`**) · 🔴 nadie ve lo que no le toca (dos pantallas de admin × siete roles, y la pestaña vieja de bodega que se retira) · el cableado · las 29 pantallas por nombre.
+- `scripts/_mutar-candados-sesion-semilla.sh` — **15 mutaciones, 15 cazadas**, 2 controles en verde. Entre ellas: el defecto original tal cual, «con cookie basta», la cookie forjada, la semilla que arrastra el token, y la pantalla que no se retira cuando `sessionStorage` niega.

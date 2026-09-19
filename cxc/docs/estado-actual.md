@@ -2423,3 +2423,12 @@ Daniel: *«tendría que sumarse ambos vendedores para lo de la comisión ya que 
 
 ### ⚠️ Pendiente de Daniel
 - Correr `supabase/migrations/20261209120000_multifashion_vendedora_canal.sql`. Hasta entonces la pantalla no cambia (las rutas caen a las v4/v2/v1).
+
+### 19-sep-2026 (noche) · El primer pintado ya sabe quién mira — `useAuth` con la semilla del servidor
+
+Daniel eligió la (a) del pendiente 27. `useAuth` arrancaba en «no sé» y **29 pantallas** (+ `GroupPage` y `/home`) mandaban su HTML **vacío**; 12 rutas se prerenderizaban estáticas y vacías. La cookie firmada ya traía rol, módulos, `isOwner` y nombre: ahora el layout raíz la lee (`leerSemillaDeSesion`, solo por `verifySession`, falla abierta) y el gancho arranca con esa semilla usando la MISMA regla que el navegador (`tieneAccesoAlModulo`, en `auth-check.ts`). **Las 29 + `/g/[grupo]` salen dibujadas del servidor; las ocho servidas, con datos.** Seguridad: el guard sigue siendo el del servidor; rol sin acceso → `null` como antes (probado con `renderToString` de dos pantallas de admin × siete roles); tras hidratar `sessionStorage` sigue mandando y **retira** lo dibujado si niega; la semilla nunca lleva el token. Ningún número cambió. Detalle en `docs/postmortems/navegacion.md` › 3. Candado `sesion-semilla-primer-pintado.test.tsx` (51 casos); mutación `scripts/_mutar-candados-sesion-semilla.sh` (**15/15**, 2 controles). Suite completa y build verdes. Commit local, sin push.
+
+### ⚠️ Pendiente de Daniel
+- **`/home`** sigue en blanco hasta hidratar (modo oscuro en `localStorage`; el servidor no lo sabe). Pide guardar la preferencia en una cookie.
+- **`/prestamos/[id]`** sigue en blanco hasta que llega la ficha por `fetch`: pide traerla en el servidor.
+- **Pestaña nueva con cookie viva**: ahora se ve la pantalla propia un instante antes del rebote al login → casa. Conservar el enlace pide rehidratar `sessionStorage` desde `/api/auth/sesion` en vez de rebotar.

@@ -17,6 +17,8 @@ import SWUpdater from "@/components/SWUpdater";
 import SWRProvider from "@/components/SWRProvider";
 import Sidebar, { SidebarAwareMain } from "@/components/Sidebar";
 import PageTransition from "@/components/PageTransition";
+import { SemillaSesionProvider } from "@/lib/sesion-semilla-provider";
+import { leerSemillaDeSesion } from "@/lib/sesion-semilla-servidor";
 import "./globals.css";
 
 // Geist Mono via el package oficial de Vercel (`geist`). Next 14.2.3 todavía
@@ -47,6 +49,11 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // 🔴 LA SEMILLA DE SESIÓN (19-sep-2026): el servidor ya sabe quién mira (la
+  // cookie firmada) y se lo cuenta a `useAuth` para que el PRIMER pintado
+  // traiga contenido en vez de un blanco. Solo rol, módulos, `isOwner` y
+  // nombre; nunca el token. Detalle en `lib/sesion-semilla.ts`.
+  const semilla = leerSemillaDeSesion();
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
@@ -60,6 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-title" content="Fashion Group" />
       </head>
       <body className={`${GeistMono.variable} ${playfair.variable} min-h-screen safe-top`}>
+        <SemillaSesionProvider semilla={semilla}>
         <SWRProvider>
           <OnlineProvider>
             <OfflineBanner />
@@ -73,6 +81,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <SWUpdater />
           </OnlineProvider>
         </SWRProvider>
+        </SemillaSesionProvider>
         {/* El SW (Serwist) lo registra SWUpdater vía @serwist/window
             (next.config tiene register:false): actualización silenciosa
             (swap + reload inmediato con guard de formulario sucio) y

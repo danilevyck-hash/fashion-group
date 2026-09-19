@@ -310,6 +310,11 @@ Hecho ese día: a Multifashion **no se le puede cargar deuda de día libre** (el
 
 **Qué decide Daniel:** (a) se toca `useAuth` una vez y se destapa el HTML del servidor en esas ocho pantallas (un cambio chico en un archivo, pero que roza 46 pantallas: hay que medirlo pantalla por pantalla antes); (b) se arreglan solo las tres de la tabla, una por una, como se hicieron las cuatro de hoy; (c) se deja así — ninguna de las tres es de teléfono ni de calle, que es donde se nota.
 
+✅ **Daniel eligió (a), y se hizo la misma noche (19-sep-2026).** `useAuth` arranca con la semilla de la cookie firmada (rol, módulos, `isOwner`, nombre — nunca el token), con la MISMA regla que el navegador, y **las 29 pantallas del gancho más `/g/[grupo]` mandan su HTML dibujado**; las ocho servidas, con sus datos. Nadie ve lo que no le toca: con un rol sin acceso el servidor manda `null` como antes, y después de hidratar `sessionStorage` sigue mandando y retira lo dibujado si niega. Detalle en [`docs/postmortems/navegacion.md`](postmortems/navegacion.md) › 3. **Lo que queda de este punto, para Daniel:**
+- **`/home`** sigue en blanco hasta hidratar: pinta según el modo oscuro (`localStorage`) y el servidor no lo sabe; seeded, el usuario en modo oscuro vería un flash claro. Arreglarlo pide guardar esa preferencia en una cookie.
+- **`/prestamos/[id]`** ya no espera la sesión, pero sigue en blanco hasta que llega la ficha por `fetch`. Pide traerla en el servidor, como Recordatorios.
+- **Pestaña nueva con la cookie viva** (enlace de WhatsApp): antes blanco → login → casa; ahora la pantalla propia un instante → login → casa. El enlace se pierde igual que antes; conservarlo pide que el gancho rehidrate `sessionStorage` desde `/api/auth/sesion` en vez de rebotar.
+
 ---
 
 ## Cómo se llegó a esta lista
