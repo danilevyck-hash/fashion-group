@@ -27,9 +27,14 @@
 // no «vs año pasado» (decisión de Daniel, 3-sep-2026 — `vendedoras-rotulo.ts`);
 // el año completo y las ventanas de N meses sí comparan contra el año pasado.
 //
-// Server-side: RPC multifashion_vendedoras_v4 (con el amarre de códigos de
-// `multifashion_vendedora_alias`; cae a la v3 mientras la migración no corra) +
-// multifashion_bonos_v4 (vía BonosSection). Sin fórmulas nuevas.
+// Server-side: RPC multifashion_vendedoras_v5 (con el amarre de códigos de
+// `multifashion_vendedora_alias` y el desglose `por_canal`; cae a la v4 y a la
+// v3 mientras las migraciones no corran) + multifashion_bonos_v4 (vía
+// BonosSection). Sin fórmulas nuevas.
+//
+// 5. (18-sep-2026) Debajo del nombre de quien vende por REDES sale el desglose
+//    «tienda $X · redes $Y» (`canales.ts`). UNA fila igual —comisión, tickets y
+//    bono JUNTOS—; el canal lo dice la base por CÓDIGO, nunca el nombre.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useMemo, useState } from "react";
@@ -50,6 +55,7 @@ import { BonosSection } from "./BonosSection";
 import { MetasSubtab } from "./MetasSubtab";
 import { MetasEnVendedoras } from "./MetasEnVendedoras";
 import { nombreEnPantalla } from "@/lib/multifashion/nombres";
+import { desgloseCanales } from "@/lib/multifashion/canales";
 import { notaComparacionVendedoras, rotuloDeltaVendedoras, type ChipVendedoras } from "@/lib/multifashion/vendedoras-rotulo";
 import type { CortePeriodo, Periodo } from "@/lib/multifashion/periodo";
 
@@ -376,6 +382,9 @@ function VendedoraRow({
 }) {
   const dv = formatDeltaRatio(variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct));
   const bono = textoBono(v, badge, pendiente);
+  // «tienda $7,400.00 · redes $1,717.73» — solo en la fila de quien vendió por
+  // un canal aparte (lo dice la base, `por_canal`); para las demás, nada.
+  const desglose = desgloseCanales(v.ventas, v.por_canal);
   return (
     <tr className={rowHighlight(v, badge) ? "bg-amber-50/60" : ""}>
       <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{rank}</td>
@@ -386,6 +395,9 @@ function VendedoraRow({
             <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-xs font-medium text-teal-700">Gerente</span>
           )}
         </div>
+        {desglose && (
+          <p data-desglose-canal className="mt-0.5 font-mono text-xs text-gray-500 tabular-nums">{desglose}</p>
+        )}
       </td>
       <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm text-gray-700 tabular-nums">{v.tickets.toLocaleString()}</td>
       <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-gray-950 tabular-nums">{fmtMoney(v.ventas)}</td>
@@ -413,6 +425,7 @@ function VendedoraCard({
 }) {
   const dv = formatDeltaRatio(variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct));
   const bono = textoBono(v, badge, pendiente);
+  const desglose = desgloseCanales(v.ventas, v.por_canal);
   return (
     <div className={cn(
       "rounded-lg border bg-white px-4 py-3.5",
@@ -432,6 +445,9 @@ function VendedoraCard({
           <span className="ml-1 text-gray-400">{rotuloDelta}</span>
         </span>
       </div>
+      {desglose && (
+        <p data-desglose-canal className="mt-0.5 font-mono text-xs text-gray-500 tabular-nums">{desglose}</p>
+      )}
       <div className="mt-1 text-xs text-gray-500">
         <span className="font-mono tabular-nums">{v.tickets.toLocaleString()}</span> tickets ·{" "}
         <span className="font-mono tabular-nums">${v.ticket_promedio.toFixed(2)}</span> tkt prom ·{" "}

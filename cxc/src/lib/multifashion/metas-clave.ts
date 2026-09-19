@@ -17,6 +17,15 @@
 // corrección de los nombres en Switch es decisión de Daniel y va aparte. Acá
 // solo se AGRUPA al leer, que es reversible y no puede romper nada.
 //
+// 🔴 DESDE EL 18-sep-2026 QUIÉN ES QUIÉN LO DICE LA BASE, POR CÓDIGO. Las
+// filas llegan con el nombre CANÓNICO (`multifashion_meta_ventas_v2` →
+// `multifashion_vendedora_canonica`, el amarre código → persona de
+// `multifashion_vendedora_alias`, el MISMO que usan el ranking, la comisión y el
+// bono). Juntar por nombre normalizado juntaba «ANA TREJOS» con «Ana Trejos» de
+// casualidad, pero jamás «REDES Sheynee» con «Sheynee Batista». `claveVendedora`
+// se queda como está —normaliza lo que ya viene junto— porque es la clave con
+// la que se GUARDARON los participantes de las metas.
+//
 // ── LA REGLA, y por qué es tan chata a propósito ─────────────────────────────
 // Igualdad EXACTA después de: pasar a mayúsculas, sacar los acentos y colapsar
 // los espacios. **Nada de parecido, nada de distancia de edición.** Este repo ya

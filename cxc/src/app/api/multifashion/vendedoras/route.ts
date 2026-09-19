@@ -73,23 +73,18 @@ export async function GET(req: NextRequest) {
     if (mes == null || mes < 1 || mes > 12) {
       return NextResponse.json({ error: "mes (fin de ventana) requerido (1..12)" }, { status: 400 });
     }
-    // v2 = la misma ventana rodante con el amarre de códigos puesto
-    // (`multifashion_vendedora_alias`). Mientras la migración
-    // `20261009120000_multifashion_vendedora_alias.sql` no corra, la v2 no
-    // existe y se cae a la de siempre: la pantalla se comporta exactamente como
-    // antes, con las tres vendedoras todavía partidas en dos.
+    // v3 = la v2 con el desglose por canal (`por_canal`, migración
+    // `20261209120000_multifashion_vendedora_canal.sql`); v2 = la misma ventana
+    // rodante con el amarre de códigos puesto (`multifashion_vendedora_alias`).
+    // Mientras una migración no corra, esa versión no existe y se cae a la
+    // anterior: la pantalla se comporta exactamente como antes.
     const { data, error } = await (async () => {
-      const v2 = await supabaseServer.rpc("multifashion_vendedoras_range_v2", {
-        p_year: year,
-        p_fin_mes: mes,
-        p_n_meses: n,
-      });
+      const args = { p_year: year, p_fin_mes: mes, p_n_meses: n };
+      const v3 = await supabaseServer.rpc("multifashion_vendedoras_range_v3", args);
+      if (!v3.error) return v3;
+      const v2 = await supabaseServer.rpc("multifashion_vendedoras_range_v2", args);
       if (!v2.error) return v2;
-      return supabaseServer.rpc("multifashion_vendedoras_range", {
-        p_year: year,
-        p_fin_mes: mes,
-        p_n_meses: n,
-      });
+      return supabaseServer.rpc("multifashion_vendedoras_range", args);
     })();
     if (error) {
       console.error("[multifashion/vendedoras] range rpc error", error);
@@ -98,7 +93,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(data as VendedorasPeriodo);
   }
 
-  // v4 = v3 con el amarre de códigos (ver la nota de la ventana rodante).
+  // v5 = v4 + el desglose por canal (`por_canal`); v4 = v3 con el amarre de
+  // códigos (ver la nota de la ventana rodante). Cada versión cae a la anterior
+  // mientras su migración no corra.
   const { data, error } = await (async () => {
     const args = {
       p_year: year,
@@ -106,6 +103,8 @@ export async function GET(req: NextRequest) {
       p_mes: periodoRaw === "mes" ? mes : null,
       p_trimestre: periodoRaw === "trimestre" ? trimestre : null,
     };
+    const v5 = await supabaseServer.rpc("multifashion_vendedoras_v5", args);
+    if (!v5.error) return v5;
     const v4 = await supabaseServer.rpc("multifashion_vendedoras_v4", args);
     if (!v4.error) return v4;
     return supabaseServer.rpc("multifashion_vendedoras_v3", args);

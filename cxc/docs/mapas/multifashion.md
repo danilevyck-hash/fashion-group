@@ -18,7 +18,7 @@
 > |---|---|
 > | Seis pestañas | **Cuatro**: Resumen · Vendedoras · Productos · Clientes. Metas se mudó ENTERA adentro de Vendedoras; Caja salió de la navegación (su ruta y su caché se quedan) |
 > | 🩸 #6 «la pestaña Caja» / § 7 «sobra» | **Retirada del menú.** ⚠️ El argumento de que «abre una sesión en Switch» era **FALSO**: tiene caché por día. La razón es que nadie la usa |
-> | 🩸 #3 «tres personas partidas en dos, y el arreglo solo vive en Metas» | **Arreglado en la base**, y por CÓDIGO: `multifashion_vendedora_alias` (12→3 · 13→8 · 14→10) + `multifashion_vendedora_canonica`, que la vista expone y usan las tres RPC. ⚠️ Migración **PENDIENTE** de aplicar |
+> | 🩸 #3 «tres personas partidas en dos, y el arreglo solo vive en Metas» | **Arreglado en la base**, y por CÓDIGO: `multifashion_vendedora_alias` (12→3 · 13→8 · 14→10) + `multifashion_vendedora_canonica`, que la vista expone y usan las tres RPC. Migración **aplicada** (verificado contra producción el 18-sep-2026) |
 > | 🩸 #7 / #8 «las píldoras de Clientes» y «el control escondido» | **Se fueron.** Un solo desplegable de período para todo el módulo (`?mfPeriodo=`), con los meses, el año y últimos 3/6/12 |
 > | 🩸 #9 «un `?subtab=` con basura deja la pantalla en blanco» | **Arreglado**: todo lo desconocido cae en Resumen |
 > | 🩸 #14 «`showMesCerradoHint` no puede ser `true` jamás» · «`HorasChart` importado y nunca renderizado» | **Los dos se retiraron** |

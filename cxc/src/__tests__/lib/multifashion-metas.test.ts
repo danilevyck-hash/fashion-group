@@ -588,6 +588,10 @@ describe("🔴 el avance de una meta GRUPAL es la tienda entera", () => {
 
   beforeEach(() => {
     dobleSupabase.rpc.mockImplementation((async (fn: string) => {
+      // 18-sep-2026: la lectura pide primero la v2 (nombre canónico) y cae a
+      // la v1 si no existe. Acá se simula la base SIN la migración nueva.
+      if (fn === "multifashion_meta_ventas_v2")
+        return { data: null, error: { code: "PGRST202", message: "Could not find the function" } };
       if (fn === "multifashion_meta_ventas_v1") return { data: MAY_JUL, error: null };
       // Sin temporada del año pasado: la proyección se cae a los días y lo dice.
       // Acá no se está probando la proyección, así que se deja fuera del medio.

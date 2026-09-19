@@ -4,7 +4,8 @@
 //
 // 🔴 EL «VENDIDO» ES EL MISMO QUE EL DE LA PANTALLA DE METAS. Sale de
 // `leerVentasDelPeriodo` + `totalDe` (metas-lectura.ts): la RPC
-// `multifashion_meta_ventas_v1` con su caída a la lectura paginada, sobre
+// `multifashion_meta_ventas_v2` (v1 si no corrió la migración) con su caída a
+// la lectura paginada, sobre
 // `_multifashion_sf_vw`, `is_wholesale = false`, subtotal FIRMADO. Ni un filtro
 // distinto: si el Telegram y la pestaña Metas dijeran dos «vendido» distintos,
 // Daniel dejaría de creer en los dos.
