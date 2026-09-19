@@ -213,7 +213,15 @@ La instrumentación se puso ese día (`descarga_tallas` desde `CurvasView.tsx` y
 **Remedido el 18-sep-2026:** `descarga_tallas` = **0 filas** · `descarga_misfotos` = **0 filas**. La tabla `activity_logs` está viva (3.011 filas, la última de hoy).
 
 🩸 **Pero el cero puede no significar nada.** Agrupando `activity_logs` por acción, **NINGUNA acción que empiece por `descarga` tiene una sola fila** — tampoco `descarga_excel`, el de los tres botones de Ventas, que se conectó el 11-sep y lleva una semana en producción. Las tres pasan por el mismo `logActivityClient`. O de verdad nadie descarga nada en ninguno de los tres sitios, o **lo que no llega es el registro**. Hasta saber cuál de las dos es, el 2-oct no se puede decidir nada con este número.
-⚠️ Se anota, no se arregla: este encargo era auditar.
+
+**🔑 INVESTIGADO EL 18-sep-2026 — el registro SÍ llega, y el cero es un cero de verdad.** Se probó la cadena completa de punta a punta, **sin escribir una sola fila en producción**: se levantó la app contra un Supabase de mentira y se mandó el POST con una cookie firmada. El middleware lo deja pasar, la ruta contesta `200 {"ok":true}` y el insert sale con las columnas correctas (`user_role · action · entity_type · details`). El esquema real de `activity_logs` se comparó contra producción y coincide.
+
+Tres cosas explican el cero, y ninguna es un contador roto hoy:
+1. 🩸 **Antes del 4-sep-2026 era imposible que hubiera filas**: el insert nombraba `user_name` y `module`, columnas que la tabla no tiene, y contestaba 500. Se arregló ese mismo día. O sea que la cuenta de «Tallas» y «Fotos a mi Excel» empieza el 4-sep, no antes.
+2. **Solo CINCO botones de todo el sistema anotan**: los tres de Ventas —módulo de **solo admin**, o sea Daniel y Alberto— y estos dos de Plantilla Switch. Los Excel que la contadora baja todos los días (Planilla, Caja, Reclamos…) **nunca se instrumentaron**: que no aparezcan no prueba nada de nada.
+3. 🩸 **El defecto real era el SILENCIO**: `logActivityClient` mandaba el aviso y se tragaba todo —ni miraba si la respuesta era un error—, que es exactamente por qué el insert roto vivió meses sin verse. Arreglado el 18-sep: un fallo se dice en la consola del navegador y en el servidor, y el aviso viaja con `keepalive` para que cerrar la pestaña no se lo lleve. Candado `registro-de-descargas-y-enlaces.test.ts` (15/15 mutaciones cazadas).
+
+**Para el 2-oct:** el número de «Tallas» y «Fotos a mi Excel» se puede leer como lo que es — **veces usadas desde el 4-sep** —, y si sigue en cero, es cero de verdad.
 
 ### 17. Confecciones Boston: verificarle un dominio propio para el correo — **ABIERTO**
 Su correo ya **firma como Boston** (`lib/cxc/casa-del-papel.ts`, decidido el 10-sep): sin logo del grupo, pie «Confidencial» sin `fashiongr.com`, membrete y firma de Boston.

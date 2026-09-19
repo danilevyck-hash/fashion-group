@@ -30,7 +30,13 @@ export async function POST(req: NextRequest) {
     details: Object.keys(merged).length > 0 ? JSON.stringify(merged) : null,
   });
 
-  if (error) return NextResponse.json({ error: "Error al registrar" }, { status: 500 });
+  // 🔴 Y SI FALLA, SE DICE — igual que `logActivity` del servidor. Mientras
+  // esto callaba, el insert con columnas inventadas vivió meses sin que nadie
+  // lo notara (ver `src/lib/logActivityClient.ts`).
+  if (error) {
+    console.error("[api/activity] insert failed:", error.message, { action, module });
+    return NextResponse.json({ error: "Error al registrar" }, { status: 500 });
+  }
   return NextResponse.json({ ok: true });
 }
 

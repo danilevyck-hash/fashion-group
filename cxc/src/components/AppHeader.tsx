@@ -9,6 +9,7 @@ import NotificationCenter from "@/components/NotificationCenter";
 import { getModuleColor } from "@/lib/moduleColors";
 import { ALL_MODULES, getVisibleGroups, type AppGroup } from "@/lib/modules";
 import { casaDelRol, yaEstaEnSuCasa } from "@/lib/navegacion/casa-del-rol";
+import { hrefDelModulo } from "@/lib/navegacion/href-del-modulo";
 import NovedadesAviso from "@/components/NovedadesAviso";
 import { moduloDeRuta } from "@/lib/novedades/seleccion";
 import { usePublicarAlturaEncabezado } from "@/lib/hooks/usePublicarAlturaEncabezado";
@@ -164,7 +165,10 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
         {/* Breadcrumb bar único — desktop only, siempre visible. hideBreadcrumbBar queda como escape hatch.
             Todos los segmentos excepto el último son clicables. El último (página actual) es texto plano. */}
         {!hideBreadcrumbBar && (() => {
-          const moduleBaseHref = pathname.split("/").slice(0, 2).join("/") || "/home";
+          // 🔴 La dirección del módulo la dice `modules.ts`, no el primer tramo
+          // de la URL: recortando, Plantilla Switch apuntaba a `/productos`
+          // (404) y Usuarios a `/admin` (que redirige a Cuentas por Cobrar).
+          const moduleBaseHref = hrefDelModulo(pathname);
           const segments: { label: string; onClick?: () => void }[] = [
             ...(enSuCasa ? [] : [{ label: "Inicio", onClick: () => router.push(casa) }]),
             ...(grupo ? [{ label: grupo.label, onClick: () => router.push(grupo.href) }] : []),
