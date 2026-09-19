@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { KeyRound } from "lucide-react";
 import { Modal } from "@/components/ui";
+import { AVISO_CONTRASENA_CORTA, LARGO_MINIMO_CONTRASENA } from "@/lib/auth/contrasena-en-uso";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CAMBIAR MI CONTRASEÑA — la ventana y el botón que la abre (14-sep-2026).
@@ -17,7 +18,11 @@ import { Modal } from "@/components/ui";
 // puede»), y que se cierren las otras sesiones. Acá solo se pide y se dice.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MINIMO = 8;
+// 🔴 EL LARGO MÍNIMO NO SE ESCRIBE ACÁ (19-sep-2026). Sale de
+// `lib/auth/contrasena-en-uso.ts`, el mismo que leen las dos rutas del
+// servidor. 🩸 Esta ventana tenía su propio `MINIMO = 8` y se quedó viejo
+// cuando el servidor dejó de exigir largo: frenaba contraseñas que el sistema
+// sí aceptaba, y la persona se quedaba con la vieja sin darse cuenta.
 
 export function CambiarContrasenaModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [actual, setActual] = useState("");
@@ -36,7 +41,7 @@ export function CambiarContrasenaModal({ open, onClose }: { open: boolean; onClo
   async function guardar(e: FormEvent) {
     e.preventDefault();
     setError("");
-    if (nueva.trim().length < MINIMO) { setError(`La nueva tiene que tener al menos ${MINIMO} caracteres.`); return; }
+    if (nueva.trim().length < LARGO_MINIMO_CONTRASENA) { setError(AVISO_CONTRASENA_CORTA); return; }
     if (nueva !== repetir) { setError("Las dos nuevas no coinciden."); return; }
     setGuardando(true);
     try {
@@ -81,7 +86,7 @@ export function CambiarContrasenaModal({ open, onClose }: { open: boolean; onClo
               className={campo} autoCapitalize="none" autoCorrect="off" autoComplete="current-password" disabled={guardando} />
           </label>
           <label className="block">
-            <span className="block text-xs text-gray-500 mb-1">Nueva contraseña (mínimo {MINIMO} caracteres)</span>
+            <span className="block text-xs text-gray-500 mb-1">Nueva contraseña (mínimo {LARGO_MINIMO_CONTRASENA} caracteres)</span>
             <input type={ver ? "text" : "password"} value={nueva} onChange={(e) => { setNueva(e.target.value); setError(""); }}
               className={campo} autoCapitalize="none" autoCorrect="off" autoComplete="new-password" disabled={guardando} />
           </label>

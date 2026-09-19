@@ -3,7 +3,13 @@ import bcrypt from "bcryptjs";
 import { supabaseServer } from "@/lib/supabase-server";
 import { verifySession } from "@/lib/session-cookie";
 import { logActivity } from "@/lib/log-activity";
-import { AVISO_CONTRASENA_REPETIDA, contrasenaEnUso, esHashBcrypt } from "@/lib/auth/contrasena-en-uso";
+import {
+  AVISO_CONTRASENA_CORTA,
+  AVISO_CONTRASENA_REPETIDA,
+  LARGO_MINIMO_CONTRASENA,
+  contrasenaEnUso,
+  esHashBcrypt,
+} from "@/lib/auth/contrasena-en-uso";
 import { getLoginLock, registerLoginFailure } from "@/lib/login-rate-limit";
 
 /**
@@ -20,7 +26,7 @@ import { getLoginLock, registerLoginFailure } from "@/lib/login-rate-limit";
  * Cuerpo: `{ actual, nueva }`.
  *   · `actual` tiene que ser la de hoy (misma normalización del login: exacta
  *     o en minúsculas, por el autocapitalizar del iPhone).
- *   · `nueva`: mínimo 8, y NO puede ser la de otra persona —el login es solo
+ *   · `nueva`: mínimo 3 caracteres (`LARGO_MINIMO_CONTRASENA`) y NO puede ser la de otra persona —el login es solo
  *     contraseña, la contraseña ES la identidad—. Se comprueba con la MISMA
  *     función que usa el admin (`contrasenaEnUso`), y la respuesta es la frase
  *     de Daniel: «Crea otra, esa no se puede».
@@ -81,9 +87,13 @@ export async function PUT(req: NextRequest) {
   if (!actual || !nueva) {
     return NextResponse.json({ error: "Escribe la contraseña actual y la nueva." }, { status: 400 });
   }
-  // 🔴 SIN LARGO MÍNIMO (15-sep-2026). Daniel: *«lo quiero sin restricciones»*.
-  // Lo único que se sigue exigiendo es que no venga vacía (arriba) y que no sea
-  // la de otra persona (`contrasenaEnUso`, más abajo).
+  // 🔴 EL ÚNICO LÍMITE: TRES CARACTERES (19-sep-2026). Daniel, textual: *«que
+  // las contraseñas que los usuarios cambien no tenga limite de nada, minimo 3
+  // caracteres nada mas»*. Nada de mayúsculas, números ni símbolos obligatorios.
+  // El número sale de `contrasena-en-uso.ts`, el MISMO que lee la ventana.
+  if (nueva.length < LARGO_MINIMO_CONTRASENA) {
+    return NextResponse.json({ error: AVISO_CONTRASENA_CORTA }, { status: 400 });
+  }
 
   // 🔴 El usuario es el de la cookie. Nada del cuerpo decide a quién se le cambia.
   const { data: user, error } = await supabaseServer

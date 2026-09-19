@@ -16,7 +16,12 @@
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
-import { AVISO_CONTRASENA_REPETIDA, esHashBcrypt } from "@/lib/auth/contrasena-en-uso";
+import {
+  AVISO_CONTRASENA_CORTA,
+  AVISO_CONTRASENA_REPETIDA,
+  LARGO_MINIMO_CONTRASENA,
+  esHashBcrypt,
+} from "@/lib/auth/contrasena-en-uso";
 
 const RAIZ = process.cwd();
 const leer = (rel: string) => fs.readFileSync(path.join(RAIZ, rel), "utf8");
@@ -176,5 +181,50 @@ describe("🔴 todos los roles pueden llegar a cambiarla", () => {
   it("el login ya no dice que solo el administrador puede", () => {
     const src = leer("src/app/page.tsx");
     expect(src).toContain("puedes cambiarla tú");
+  });
+});
+
+/* ═══ 5 · EL LARGO MÍNIMO VIVE EN UN SOLO LUGAR ═══════════════════════════ */
+
+/*
+ * 🔴 CANDADO — TRES CARACTERES, ESCRITOS UNA VEZ (19-sep-2026)
+ *
+ * Daniel, textual: *«y que las contraseñas que los usuarios cambien no tenga
+ * limite de nada, minimo 3 caracteres nada mas»*.
+ *
+ * 🩸 POR QUÉ ESTE CANDADO: el 15-sep se le quitó el mínimo de 8 a las DOS
+ * rutas del servidor, pero la VENTANA de «Cambiar mi contraseña» se quedó con
+ * su propio `const MINIMO = 8`. Cindy se puso una de 6 dígitos el 19-sep, la
+ * ventana la frenó, nunca se guardó, y al entrar con la nueva le salía
+ * «Contraseña incorrecta» —su contraseña seguía siendo la vieja—. Un mínimo
+ * escrito en dos lugares es un mínimo que se desincroniza en silencio, y en
+ * este sistema desincronizarse deja a alguien afuera creyendo que se cambió.
+ */
+describe("🔴 el largo mínimo es UNO y son 3 caracteres", () => {
+  it("el número es 3, y la frase se arma con él", () => {
+    expect(LARGO_MINIMO_CONTRASENA).toBe(3);
+    expect(AVISO_CONTRASENA_CORTA).toContain("3");
+  });
+
+  it("🔴 la ventana y las DOS rutas lo leen del módulo: ninguna escribe su propio número", () => {
+    for (const rel of [RUTA_PROPIA, RUTA_ADMIN, "src/components/CambiarContrasena.tsx"]) {
+      const src = sinComentarios(leer(rel));
+      expect(src, rel).toContain("LARGO_MINIMO_CONTRASENA");
+      expect(src, rel).toContain('from "@/lib/auth/contrasena-en-uso"');
+      // Ni un `MINIMO` propio, ni el 8 de antes escrito a mano.
+      // ⚠️ El `length < 3` del NOMBRE en la ruta del admin es otra cosa y se
+      // queda: lo que se prohíbe es un largo de CONTRASEÑA escrito acá.
+      expect(src, `${rel} vuelve a escribir su propio mínimo`).not.toMatch(/const\s+MINIMO\b/);
+      expect(src, `${rel} conserva el 8 de antes`).not.toMatch(
+        /(password|nueva|contrase\u00f1a)[^\n]*length\s*<\s*\d|length\s*<\s*8/i,
+      );
+    }
+  });
+
+  it("🔴 y no queda ninguna otra exigencia: ni mayúsculas, ni números, ni símbolos", () => {
+    for (const rel of [RUTA_PROPIA, RUTA_ADMIN, "src/components/CambiarContrasena.tsx"]) {
+      const src = sinComentarios(leer(rel));
+      expect(src, rel).not.toMatch(/A-Z.*a-z|\[0-9\].*test|contiene.*mayúscula/i);
+    }
   });
 });

@@ -3,7 +3,12 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
 import { SYSTEM_ROLE_KEYS, ALL_MODULE_KEYS } from "@/lib/modules";
 import { moduloOfrecible } from "@/lib/modulos-ofrecibles";
-import { AVISO_CONTRASENA_REPETIDA, contrasenaEnUso } from "@/lib/auth/contrasena-en-uso";
+import {
+  AVISO_CONTRASENA_CORTA,
+  AVISO_CONTRASENA_REPETIDA,
+  LARGO_MINIMO_CONTRASENA,
+  contrasenaEnUso,
+} from "@/lib/auth/contrasena-en-uso";
 
 export const dynamic = "force-dynamic";
 
@@ -89,14 +94,19 @@ export async function POST(req: NextRequest) {
   const { name, password, role, associated_company, modulos_override } = await req.json();
   if (!name || !password) return NextResponse.json({ error: "Nombre y contraseña requeridos" }, { status: 400 });
   if (name.trim().length < 3) return NextResponse.json({ error: "El nombre debe tener al menos 3 caracteres" }, { status: 400 });
-  // 🔴 LA CONTRASEÑA NO TIENE LARGO MÍNIMO (15-sep-2026). Daniel, textual:
-  // *«lo quiero sin restricciones»*. Antes se exigían 8 caracteres, acá y en
-  // `PUT`, y también en `/api/auth/contrasena` cuando cada quien cambia la suya.
+  // 🔴 LA CONTRASEÑA SOLO TIENE UN LÍMITE: TRES CARACTERES (19-sep-2026).
+  // Daniel, textual: *«que las contraseñas que los usuarios cambien no tenga
+  // limite de nada, minimo 3 caracteres nada mas»*. El 15-sep había dicho *«lo
+  // quiero sin restricciones»* y se quitó el mínimo de 8 entero; ahora queda el
+  // piso de 3, que sale de `contrasena-en-uso.ts` —el MISMO número que leen la
+  // ventana de «Cambiar mi contraseña» y la ruta propia—.
   // ⚠️ Se le dijo el riesgo y lo decidió igual: en este sistema la contraseña ES
-  // la identidad (el login no pide usuario), así que una de un carácter es
-  // entrar como esa persona. Lo que SIGUE en pie es que no puede estar vacía
-  // (la línea de arriba) y que no puede repetir la de otro (`contrasenaEnUso`),
-  // que es lo que impide que dos personas colisionen.
+  // la identidad (el login no pide usuario), así que una corta es entrar como
+  // esa persona. Lo que SIGUE en pie es que no puede repetir la de otro
+  // (`contrasenaEnUso`), que es lo que impide que dos personas colisionen.
+  if (String(password).length < LARGO_MINIMO_CONTRASENA) {
+    return NextResponse.json({ error: AVISO_CONTRASENA_CORTA }, { status: 400 });
+  }
 
   const validationError = validateRoleAndModulos(role, modulos_override);
   if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
@@ -166,7 +176,11 @@ export async function PUT(req: NextRequest) {
     update.name = trimmed;
   }
   if (password !== undefined) {
-      // Unicidad de contraseña, excluyendo al propio usuario editado.
+    // 🔴 El mismo piso de 3 que el alta y que la ventana propia.
+    if (String(password).length < LARGO_MINIMO_CONTRASENA) {
+      return NextResponse.json({ error: AVISO_CONTRASENA_CORTA }, { status: 400 });
+    }
+    // Unicidad de contraseña, excluyendo al propio usuario editado.
     if (await contrasenaEnUso(password, id)) {
       return NextResponse.json({ error: AVISO_CONTRASENA_REPETIDA }, { status: 400 });
     }
