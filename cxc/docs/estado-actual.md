@@ -2415,3 +2415,10 @@ Candados: `servicio-profesional-cobra-extra.test.ts` · `dias-afuera-y-compensat
 - **El horario 9–18 no se puede cambiar en pantalla** (no se guarda). Si un día afuera fuera de medio día, hoy no hay cómo decirlo.
 - **Quien está afuera la quincena ENTERA y no marca ni un día cae en «Tú decides»** (regla vigente de justificación de período completo), no en pago automático. Hoy no le pasa a nadie con salario.
 - **Los 30 min de extra automáticos de Multifashion** no se generan en un día afuera (no hay marcas). Las 5 fichas de Multifashion siguen sin salario.
+
+### 18-sep-2026 · Multifashion: «REDES Sheynee» es Sheynee (ventas por redes)
+
+Daniel: *«tendría que sumarse ambos vendedores para lo de la comisión ya que sigue siendo la misma persona»*. Detalle en `docs/postmortems/multifashion.md` › «Ventas por redes». Amarre **15 → 11** con `canal = 'redes'` en `multifashion_vendedora_alias`; el ranking (v5) sigue siendo UNA fila con «tienda $X · redes $Y» debajo del nombre; el bono no se tocó; Metas lee el canónico (`meta_ventas_v2`). **Medido antes y después: cero ventas con el 15, cero cambios** (sep-2026: Sheynee $44,93 · Jailine $26,83 · Milagros $27,32 · Jennifer $26,08). Tres notas de doc corregidas (la migración del amarre YA estaba aplicada; la comisión es sobre el CONTADO, no «toda la venta»).
+
+### ⚠️ Pendiente de Daniel
+- Correr `supabase/migrations/20261209120000_multifashion_vendedora_canal.sql`. Hasta entonces la pantalla no cambia (las rutas caen a las v4/v2/v1).

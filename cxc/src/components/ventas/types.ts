@@ -318,6 +318,13 @@ export type VendedoraDetalle = {
   top: boolean;
   delta_ventas_pct: number | null;
   delta_tickets_pct: number | null;
+  /**
+   * Ventas por canal DENTRO de esta misma fila (`{ redes: 1717.73 }`), solo
+   * cuando un código con canal vendió en el período; `null`/ausente para las
+   * demás. Lo trae `multifashion_vendedoras_v5`; la v4 no lo manda.
+   * Ver `src/lib/multifashion/canales.ts`.
+   */
+  por_canal?: Partial<Record<"redes", number | string | null>> | null;
 };
 
 /** Shape JSON devuelto por la RPC multifashion_vendedoras. */

@@ -24,10 +24,11 @@
 // leerlos crudos son ~8 viajes paginados y 1,5 s POR CARGA DE PANTALLA, contra
 // una base en compute Micro. Por eso hay dos caminos y el bueno es el primero:
 //
-//   1. `multifashion_meta_ventas_v1` (DDL 20260813170000) — el período ya
-//      sumado por (vendedor, mes) en UNA llamada. Decenas de filas.
-//   2. Si esa función todavía no existe (la DDL la corre Daniel a mano),
-//      lectura paginada con `leerTodoPaginado`. Mismos filtros, mismo número.
+//   1. `multifashion_meta_ventas_v2` (DDL 20261209120000; la v1 de 20260813170000
+//      si no corrió) — el período ya sumado por (vendedor CANÓNICO, mes) en
+//      UNA llamada. Decenas de filas.
+//   2. Si ninguna existe (la DDL la corre Daniel a mano), lectura paginada con
+//      `leerTodoPaginado`. Mismos filtros, mismo número, mismo canónico.
 //
 // El camino 2 NO es decoración: `db-max-rows` = 1000 corta EN SILENCIO, así que
 // sin paginar se leerían 1.000 de 6.610 documentos —el 15% de la venta— sin un
@@ -143,6 +144,8 @@ interface VentaAgrupada {
 interface FilaCruda {
   fecha: string;
   vendedor: string | null;
+  /** La persona detrás del código (`multifashion_vendedora_canonica`), desde la vista. */
+  vendedor_canonico: string | null;
   subtotal: number | string | null;
 }
 
@@ -164,15 +167,27 @@ export function esFuncionAusente(err: unknown): boolean {
   );
 }
 
-/** Camino 1: el período ya sumado por Postgres. */
+/**
+ * Camino 1: el período ya sumado por Postgres.
+ *
+ * 🔴 PRIMERO LA v2, QUE DEVUELVE EL NOMBRE CANÓNICO (18-sep-2026). La v1
+ * devolvía el texto CRUDO de Switch y quien juntaba era `claveVendedora`, por
+ * NOMBRE normalizado: junta «ANA TREJOS» con «Ana Trejos» de casualidad, pero
+ * jamás «REDES Sheynee» con «Sheynee Batista». Con la v2 el amarre por CÓDIGO
+ * (`multifashion_vendedora_alias`) ya viene resuelto desde la base —la MISMA
+ * función que usan el ranking, la comisión y el bono— y `claveVendedora` solo
+ * normaliza. Mientras la migración `20261209120000` no corra, se cae a la v1:
+ * la meta se comporta exactamente como antes.
+ */
 async function ventasPorRpc(desde: string, hasta: string): Promise<VentaAgrupada[] | null> {
-  const { data, error } = await supabaseServer.rpc("multifashion_meta_ventas_v1", {
-    p_desde: desde,
-    p_hasta: hasta,
-  });
+  const args = { p_desde: desde, p_hasta: hasta };
+  let { data, error } = await supabaseServer.rpc("multifashion_meta_ventas_v2", args);
+  if (error && esFuncionAusente(error)) {
+    ({ data, error } = await supabaseServer.rpc("multifashion_meta_ventas_v1", args));
+  }
   if (error) {
     if (esFuncionAusente(error)) return null;
-    throw new Error(`multifashion_meta_ventas_v1: ${error.message}`);
+    throw new Error(`multifashion_meta_ventas: ${error.message}`);
   }
   return ((data ?? []) as VentaAgrupada[]).map((f) => ({
     vendedor: f.vendedor ?? "",
@@ -197,7 +212,7 @@ async function ventasPaginadas(desde: string, hasta: string): Promise<VentaAgrup
     (pedirCount, from, to) =>
       supabaseServer
         .from(VISTA_RETAIL)
-        .select("fecha,vendedor,subtotal", pedirCount ? { count: "exact" } : {})
+        .select("fecha,vendedor,vendedor_canonico,subtotal", pedirCount ? { count: "exact" } : {})
         .eq("is_wholesale", false)
         .gte("fecha", desde)
         .lte("fecha", hasta)
@@ -207,7 +222,9 @@ async function ventasPaginadas(desde: string, hasta: string): Promise<VentaAgrup
 
   const acc = new Map<string, VentaAgrupada>();
   for (const f of filas) {
-    const vendedor = (f.vendedor ?? "").trim();
+    // El canónico, como la v2: el amarre por código ya resuelto en la base.
+    // Sin él (una fila vieja que no lo trajera), el crudo de siempre.
+    const vendedor = (f.vendedor_canonico ?? f.vendedor ?? "").trim();
     const mes = String(f.fecha).slice(0, 7);
     const llave = `${vendedor} ${mes}`;
     const prev = acc.get(llave) ?? { vendedor, mes, ventas: 0, documentos: 0, ultima: null };

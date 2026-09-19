@@ -502,7 +502,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 **El mes NEGATIVO se queda como está**: no cambia el cálculo.
 - 🔴 **El costo del Resumen incluye las notas de débito**: sale de `switch_factura_utilidad` (`switch_costo_unificado_v2` y las RPC del Resumen).
 - 🔴 **Ninguna lectura de costo del Resumen sale de `switch_costo_diario`** (su último día de cada mes vale $0): solo alimenta el **cuadre mensual** (`cuadre-costo.ts`: >2 % y >$100 → 🔧 SISTEMA, anti-loop 7 días por (empresa, mes)).
-- ⚠️ **Multifashion es OTRO módulo de comisiones — NO fusionar**: paga 0,5 % sobre TODA la venta, sin filtro de utilidad, y **nunca se suman en un mismo número**. Su vista recibe el **AÑO ELEGIDO**.
+- ⚠️ **Multifashion es OTRO módulo de comisiones — NO fusionar**: paga 0,5 % solo sobre el CONTADO, sin filtro de utilidad; **nunca se suman en un número**. Su vista recibe el **AÑO ELEGIDO**.
 - 🔴 **`clientes_master` es el directorio del GRUPO y SOLO del grupo**: el sync pide por **INCLUSIÓN** (`.in("empresa_key", EMPRESAS_DEL_GRUPO)`), nunca excluyendo: la tabla **no tiene `empresa_key`**.
 - 🔴 **LA IDENTIDAD DEL CLIENTE ES EL CÓDIGO**: `switch_facturas (empresa_key, cliente_switch_id)` → `switch_clientes` → `codigo` → `clientes_master.codigo`, par **único por construcción**.
 - 🔴 **Nadie une `clientes_master` por `nombre_normalized`, y NO hay fallback por nombre**: un JOIN por nombre contra homónimos **multiplica la factura**.
@@ -574,6 +574,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 «Hoy» es UNA línea y no escribe «$0» si el día no arrancó; «Actualizar ahora» al ☰.
 - 🔴 Las vendedoras con dos códigos se juntan (`20261009120000_multifashion_vendedora_alias.sql`, **aplicada** (verificado contra producción el 14-sep-2026)): identidad = CÓDIGO, tabla firmada, soft delete nunca DELETE, única entre activas, RLS service_role; lo resuelve `multifashion_vendedora_canonica` y las RPC v4 caen a la v3 sin la DDL.
 - ⚠️ Juntar los códigos NO arregla la diferencia entre Vendedoras y el mes: falta `DEFAULT`, excluido a propósito.
+- 🔴 **«REDES Sheynee» (15) ES Sheynee (11)**: columna `canal` del MISMO amarre, NUNCA por nombre; UNA fila (comisión y bono juntos) con «tienda $X · redes $Y» (`canales.ts`, v5); Metas lee el canónico (`meta_ventas_v2`). Migración `20261209120000` **pendiente**.
 - 🩸 La fila «YTD» pasa a «Año» con el total de la tarjeta (`fila-anio.ts`); el Δ va sobre los meses comparables. ⚠️ En el año en curso puede diferir por el día de corte.
 - 🩸 `SyncNowButton` con `roles={ROLES_MULTIFASHION}`; el rol sale de `lib/roles-etiquetas.ts`, derivado de `SYSTEM_ROLES`.
 - Candados: `acs-resumen-meta-ritmo.test.ts` · `multifashion-rediseno.test.ts` · `multifashion-rediseno-pantalla.test.tsx` · `multifashion-anio-una-vez.test.ts` · `roles-etiquetas.test.ts` · `multifashion-cerrado-y-espejo.test.ts`.
