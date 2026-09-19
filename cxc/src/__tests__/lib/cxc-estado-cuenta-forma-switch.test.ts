@@ -455,7 +455,10 @@ describe("🔴 el cuadre contra Switch", () => {
   it("el sync dejó de tirar `saldoTotal`", () => {
     const src = leer("lib/switch-api/sync-empresa.ts");
     expect(src).toContain("await guardarSaldosSwitch(empresaKey, saldosSwitch);");
-    expect(src).toContain("ec?.saldoTotal");
+    // 18-sep-2026: hasta hoy se exigía `ec?.saldoTotal`, y ESA era la lectura
+    // del nivel de afuera que dejaba 835 filas en NULL. La fila la arma
+    // `filaDeCuadre` (candado propio: `cxc-cuadre-desde-adentro.test.ts`).
+    expect(src).toContain("filaDeCuadre({");
     expect(src).toContain('.from("switch_estadocuenta_saldo")');
   });
 

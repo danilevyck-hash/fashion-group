@@ -2382,6 +2382,7 @@ De ahí salió la memoria [[lo-escrito-caduca]] y el candado de tamaño ya exist
 ### 🔴 Dos cosas vivas que quedaron abiertas al cortarse la sesión
 
 **1. El cuadre del estado de cuenta llegó muerto.** `switch_estadocuenta_saldo` se escribe en cada corrida, pero **las 835 filas traen `saldo_total` y `saldos` en NULL — cero llenas**. Switch no manda esos campos con el nombre que el sync busca, así que el aviso «esto no cuadra» no puede saltar nunca. Daniel ya dijo cómo tratarlo: investigar qué manda de verdad `/apicliente/estadocuenta` y **reportárselo antes de tocar nada**.
+> ✅ **18-sep-2026:** se investigó y se arregló. Switch sí los manda, **anidados en `data.estadocuenta`**; el sync los leía del nivel de afuera. Detalle en `docs/postmortems/boston-cxc.md` › «El cuadre se lee desde adentro» y en `docs/pendientes-vivos.md` § 4 (queda comprobar la corrida siguiente).
 
 **2. Tres quincenas cerradas sin descontar préstamos.** De las **6** cerradas en la historia, **5** se cerraron como rango libre (sin `quincena` y sin `corte`), y en rango libre el motor prorratea el sueldo **y apaga todos los montos a mano**. Prueba: en toda la historia hay **dos** pagos de préstamo escritos por un cierre, los dos de la única quincena bien armada. Siguen cerradas así: fashion_wear y vistana 15-28 ago (factor 0,879) y confecciones_boston 15-25 ago (**0,692**). La contadora ya reabrió una quejándose de eso mismo.
 

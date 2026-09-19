@@ -1099,6 +1099,46 @@ quién cobra.
 
 ---
 
+## 🔴 EL CUADRE SE LEE DESDE ADENTRO — el saldo de Switch estaba un piso más abajo (18-sep-2026)
+
+### Lo que pasaba
+
+Desde el 9-sep-2026 el sync guarda en `switch_estadocuenta_saldo` lo que Switch dice que debe cada cliente (`saldoTotal`) y su aging por tramos (`Saldos[]`), para que el cajón y la hoja «Cobrar» avisen cuando nuestra suma de documentos no coincide. **Medido el 14-sep y remedido el 18-sep: 835 filas, `synced_at` de hace horas, y CERO con `saldo_total`, CERO con `saldos`.** El aviso «esto no cuadra» no podía saltar nunca y el cajón se comportaba como si siempre cuadrara.
+
+### Por qué
+
+Switch **sí manda** los dos campos, pero **anidados**. La fuente oficial (`docs/switch/api-documentacion.pdf`, §5.15, p. 23):
+
+```
+data: { estadocuenta: { elements: [...], Saldos: [ { title: "0-30", saldo: 0 }, … ], saldoTotal: 0.00 } }
+```
+
+El sync los buscaba un piso más arriba (`sync-empresa.ts`: `ec?.saldoTotal` y `ec?.Saldos`, donde `ec` es `data`). Ahí no hay nada → NULL siempre. El origen estaba en el tipo: `types.ts` declaraba `Saldos?` y `saldoTotal?` como **hermanos** de `estadocuenta`, y el código se escribió confiando en el tipo.
+
+🔑 **La prueba de que era la ruta y no un campo que falta**: el endpoint gemelo de proveedores (`/apiproveedor/info`) tiene la MISMA forma y `sync-proveedores.ts` sí lee `info.estadodecuenta.saldoTotal` — **65 de 65 proveedores con su saldo lleno**. Se copió ese patrón.
+
+### Lo que cambió
+
+- **`src/lib/switch-api/estadocuenta-cuadre.ts`** (nuevo, puro): `cuadreDeSwitch(data)` lee `data.estadocuenta.saldoTotal` y `data.estadocuenta.Saldos`, **aceptando las dos grafías** `Saldos` (así lo imprime el PDF de clientes) y `saldos` (así lo manda proveedores; no se sabe cuál manda cada empresa). `filaDeCuadre(...)` arma la fila entera de `switch_estadocuenta_saldo`; es la ÚNICA puerta por la que el sync la construye.
+- **`types.ts`**: `Saldos?` · `saldos?` · `saldoTotal?` pasaron **adentro** de `estadocuenta`, con el bucket tipado (`{ title, saldo }`) tal cual el PDF.
+- **`sync-empresa.ts`**: ya no toca el JSON a mano; llama `filaDeCuadre` con la respuesta entera.
+- 🔴 **Falla ABIERTO**: sin el campo se guarda NULL, como hoy, y nada se rompe. **Nunca un cero inventado** — un cero es un saldo, y decir «debe $0» cuando no se sabe es peor que no decir nada. Un `0.00` que SÍ viene es un cero de verdad. Un aging que no sea lista se guarda NULL, no como si lo fuera.
+- ⚠️ **Sin migración**: la tabla existe y ya se escribe. En la siguiente corrida de `switch-sync tipo=estadocuenta` las 835 filas se llenan solas; el cajón y «Cobrar» empiezan a poder avisar sin que nadie toque nada más.
+- ⚠️ **No se llamó a Switch**: `.env.local` no trae las credenciales del API (solo las del panel web) y entrar expulsa a quien esté adentro. Se trabajó con el código, la doc y lo guardado. **Lo que queda es comprobarlo tras la corrida siguiente** (`docs/pendientes-vivos.md` § 4): si las filas siguen en NULL, el defecto es OTRO.
+
+### 🔑 Un segundo cuadre que ya está pagado — y que NO se construyó
+
+Hallazgo de la investigación: cada documento trae `saldoConsecutivo` (el saldo corrido que Switch imprime) y **eso sí lo guardamos** en `switch_estadocuenta.raw_data`. Medido contra las 6 empresas y 1.896 documentos: **227 de 227 clientes con saldo abierto cuadran al centavo, 0 no cuadran.** Es una comprobación más débil que `saldoTotal` y ya está en la base sin costo; Daniel no la pidió, así que **se anota y no se construye**. Si algún día se construye, dos advertencias:
+
+- **(a)** Compara el corrido de Switch contra **los documentos que Switch mandó**, así que **no atrapa una lista que llegue incompleta** — la misma limitación que el cuadre de la cartera de Boston (ver arriba: «un reporte corto cuadra al centavo consigo mismo»). Para eso está `saldoTotal`.
+- **(b)** En los clientes **SIN documentos abiertos el corrido queda viejo y no sirve**: 58 casos no evaluables, y **sin ese filtro salen 66 falsos desajustes**.
+
+### Candados
+
+- **`src/__tests__/lib/cxc-cuadre-desde-adentro.test.ts`** — con la respuesta del PDF tal cual (p. 23): se lee desde `estadocuenta` y el nivel de afuera NO cuenta (un 999 puesto afuera no gana al 50,9 de adentro; solo afuera → NULL) · las dos grafías · sin campo, basura, vacío o ilegible → NULL, nunca 0 · `0.00` → 0 · coma de miles · la fila entera · barrido: el sync arma la fila SOLO por `filaDeCuadre` con la respuesta entera y no vuelve a leer `ec?.saldoTotal`; el tipo declara el cuadre adentro (indentación de 4, no de 2) y compila con la forma del PDF.
+- `cxc-estado-cuenta-forma-switch.test.ts` › «el sync dejó de tirar `saldoTotal`» **cambió de dirección con nota fechada**: exigía `ec?.saldoTotal` — ESA era la lectura del nivel de afuera — y ahora exige `filaDeCuadre({`.
+- **Verificado por mutación: 12 mutaciones, 12 cazadas, 2 controles verdes** (`scripts/_mutar-candados-cuadre-desde-adentro.sh`): leer de `data` en vez de `data.estadocuenta` · solo `Saldos` · solo `saldos` · 0 sin campo · 0 con vacío · 0 con ilegible · «debe $0» sin `estadocuenta` · aging que no es lista guardado tal cual · coma de miles sin quitar · el sync lee el JSON a mano · el sync pasa un pedazo y no la respuesta · el tipo sube `saldoTotal` afuera.
+
 ## Lo que decía CLAUDE.md hasta el 14-sep-2026 (movido acá, verbatim)
 
 > El 14-sep-2026 CLAUDE.md pasaba de 333 mil caracteres (el tope del harness es 150 mil) y las instrucciones se cortaban a la mitad. Se dejó ahí un resumen de las reglas vigentes y el texto completo —mediciones, citas de Daniel, candados y mutaciones— se movió acá sin cambiar una palabra.
