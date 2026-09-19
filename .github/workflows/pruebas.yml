@@ -1,0 +1,38 @@
+# 🔴 EL FRENO QUE FALTABA (19-sep-2026).
+#
+# 🩸 POR QUÉ EXISTE. El 18-sep-2026 entraron a `main` DOS commits con una prueba
+# en rojo (`3712eda5` y `d39ea918`, los dos con `claude-md-bajo-el-tope` roja).
+# No los frenó nada: `main` está protegida, pero la ÚNICA comprobación que
+# exigía era «Vercel» — o sea que el proyecto COMPILE. Compilar y pasar las
+# pruebas son cosas distintas: ese código compilaba perfecto.
+#
+# 🔑 Las 16.111 pruebas solo corrían cuando alguien las corría a mano en su
+# computadora. Esto las corre siempre, en cada push y en cada pull request.
+#
+# ⚠️ Para que además BLOQUEE el push, hay que agregar «pruebas» a las
+# comprobaciones obligatorias de `main` en GitHub (Settings › Branches), al lado
+# de «Vercel». Sin eso, este archivo avisa pero no frena.
+name: pruebas
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pruebas:
+    name: pruebas
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cxc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: cxc/package-lock.json
+      - run: npm ci
+      - name: Las 16.000 pruebas
+        run: npm test
