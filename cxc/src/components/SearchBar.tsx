@@ -84,10 +84,21 @@ function parseQuickAction(query: string): QuickAction | null {
   }
 
   // préstamos de [persona]
-  const prestamoMatch = q.match(/pr[eé]stamos?\s+de\s+(.+)/i);
-  if (prestamoMatch) {
-    const persona = prestamoMatch[1].trim();
-    return { label: `Buscar préstamos de "${persona}"`, href: `/prestamos?search=${encodeURIComponent(persona)}` };
+  //
+  // 🩸 Este atajo prometía BUSCAR y no buscaba (18-sep-2026). Mandaba
+  // `/prestamos?search=<persona>` y **ningún componente lee `search`** en
+  // Préstamos: el parámetro viajaba entero por el middleware —que conserva la
+  // query al redirigir a la pestaña— hasta una pantalla que lo ignora. Se
+  // abría Préstamos completo y el nombre se perdía en el camino.
+  //
+  // Mismo trato que los siete atajos de cheques del 5-sep-2026, arriba: el
+  // atajo se queda porque llevar al módulo sirve, pero DICE lo que hace.
+  //
+  // ⚠️ La pestaña SÍ tiene buscador, y su llave es `buscar` (`PARAM_BUSCAR`,
+  // la misma en todo el sistema), nunca `search`. Hacer que el atajo escriba
+  // en ese buscador es otra pregunta, y la decide Daniel.
+  if (/pr[eé]stamos?\s+de\s+/i.test(q)) {
+    return { label: "Ir a Préstamos", href: "/prestamos" };
   }
 
   // (Los cuatro atajos de estado de cheques —pendientes, rebotados,

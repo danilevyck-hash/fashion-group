@@ -99,6 +99,44 @@ Es la misma familia de defectos que la búsqueda global cerró el 11-sep-2026 (�
 Ninguno de estos se tocó; los cuatro son decisión de Daniel (preguntas 1, 5 y 6 de `docs/mapas/rutas.md`):
 
 - **Catálogos: dos árboles** (`/catalogos/*` y `/catalogo/*`), `/catalogo` en 404 y ninguna pantalla que vuelva al hub. Es el punto 12 de `docs/pendientes-vivos.md`.
-- **El breadcrumb que cae en 404** desde `/catalogos/marcas` (`/catalogos`) y desde `/productos/cargar` (`/productos`).
-- **`?search=` de Préstamos**, que la búsqueda global manda y la pantalla no lee.
+- ~~**El breadcrumb que cae en 404**~~ y ~~**`?search=` de Préstamos**~~ — **los dos se cerraron el 18-sep-2026**, abajo.
 - **Las pestañas y filtros sin dirección propia** de Comisiones, Comprobantes, Boston y Asistencia › Planilla: hoy no se pueden compartir ni sobreviven a un F5.
+
+---
+
+# Lo que se cerró el 18-sep-2026
+
+> Dos de los cuatro puntos que arriba quedaban abiertos. Ninguno mueve plata.
+
+## 5. El breadcrumb adivinaba la dirección del módulo recortando la URL
+
+🩸 El encabezado armaba el enlace del nombre del módulo con `pathname.split("/").slice(0, 2)` — o sea, **el primer tramo de la dirección que uno tiene abierta**. Para 19 de los 22 módulos eso da justo su dirección, y por eso nunca se notó. Para los otros tres, no:
+
+| Pantalla | Módulo | El enlace daba | Y eso es |
+|---|---|---|---|
+| `/productos/cargar` | Plantilla Switch | `/productos` | **404** — no existe |
+| `/admin/usuarios` | Usuarios | `/admin` | **Cuentas por Cobrar** (`next.config` lo redirige) — OTRO módulo |
+| `/catalogos/marcas` | Catálogos | `/catalogos` | vivo **solo** por el redirect que se le puso el 17-sep |
+
+⚠️ **Medido el 18-sep antes de tocar nada**: en Plantilla Switch y en Usuarios el nombre del módulo es hoy el ÚLTIMO pedazo del breadcrumb, y el último no se puede tocar (es texto plano). O sea que el 404 estaba a **un breadcrumb de distancia**, no a un clic: bastaba que esas pantallas ganaran un nivel más —como ya lo tiene Catálogos, que por eso sí caía— para que se abriera. En Catálogos sí se tocaba, y por eso se tapó con un redirect el 17-sep.
+
+**Ahora** (`src/lib/navegacion/href-del-modulo.ts`): la dirección de un módulo la dice **`modules.ts`**, que es donde vive, y no se vuelve a adivinar de la URL. Se reusa `moduloDeRuta` —el mismo que ya elegía qué novedades mostrar—, que gana el `href` **más largo** que calce, así que `/admin/usuarios` es Usuarios y no cualquier cosa que empiece con `/admin`.
+
+🔑 **Falla ABIERTA**: una dirección que no es de ningún módulo (`/catalogo/reebok/pedidos`) se resuelve recortando, exactamente como antes. Esto no puede dejar el encabezado sin enlace.
+
+De paso, `/productos` a secas deja de ser un callejón: redirige a `/productos/cargar`, igual que `/catalogos` → `/catalogos/marcas`. Fuente **EXACTA**, así que `/productos/cargar` no se toca.
+
+## 6. El `?search=` de Préstamos: un parámetro que viajaba y nadie leía
+
+La búsqueda global tenía un atajo que decía **«Buscar préstamos de "Juan"»** y mandaba a `/prestamos?search=Juan`. El parámetro viajaba entero —el middleware conserva la query al redirigir a la pestaña— hasta una pantalla que **lo ignora**: se abría Préstamos completo y el nombre se perdía en el camino.
+
+⚠️ **Comprobado antes de quitarlo**: el único lugar de todo el repo que arma `/prestamos?search=` era ese atajo, y no hay un solo `searchParams.get("search")` en Préstamos. **La pestaña SÍ tiene buscador**, pero su llave es `buscar` (`PARAM_BUSCAR`, la misma en todo el sistema), nunca `search`.
+
+**Ahora**: **«Ir a Préstamos»**, a `/prestamos`. Mismo trato que los siete atajos de cheques del 5-sep-2026, que apuntaban a pestañas que ya no existían y se volvieron uno solo: el atajo se queda porque llevar al módulo sirve, pero **dice lo que hace**.
+
+🔴 **Pendiente de Daniel, no olvido**: hacer que el atajo escriba de verdad en el buscador de la pestaña (`/prestamos?buscar=Juan`) es una decisión suya, no de quien pasa por acá.
+
+## Candado y verificación por mutación
+
+- `src/__tests__/lib/registro-de-descargas-y-enlaces.test.ts` — 22 casos (con el contador de descargas del mismo día; ver `docs/pendientes-vivos.md` › 16).
+- `scripts/_mutar-candados-registro-y-enlaces.sh` — **15 mutaciones, 15 cazadas**, 2 controles en verde.

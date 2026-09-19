@@ -72,6 +72,14 @@ const nextConfig = {
       // Temporal (307) como todos los de este archivo.
       { source: "/catalogo", destination: "/catalogos/marcas", permanent: false },
       { source: "/catalogos", destination: "/catalogos/marcas", permanent: false },
+      // 🔴 Y LO MISMO CON PLANTILLA SWITCH (18-sep-2026). `/productos` no existe
+      // —el módulo vive en `/productos/cargar`— y era la otra dirección
+      // intermedia que la auditoría del 6-sep contó cayendo en el 404. Fuente
+      // EXACTA: `/productos` no matchea `/productos/cargar`, que sigue igual.
+      // ⚠️ El breadcrumb ya no depende de esto: desde hoy saca la dirección del
+      // módulo de `modules.ts` (`lib/navegacion/href-del-modulo.ts`). Esta línea
+      // es para quien recorta la dirección a mano.
+      { source: "/productos", destination: "/productos/cargar", permanent: false },
       // Referencia dejó de ser la 5ª pestaña de Ventas (12-ago-2026): vive en su
       // propio módulo, /referencia, con la MISMA vista. Un enlace guardado de
       // `/ventas?tab=referencia` habría caído en una pestaña que ya no existe
