@@ -2540,3 +2540,118 @@ como texto alternativo **el nombre del artículo de esa fila** (el `Name` del
 pedido), **escapado como XML** —viene del archivo del proveedor y puede traer `&`
 o comillas—. ⚠️ Es OPCIONAL: sin descripción el dibujo sale exactamente como
 salía.
+
+## El descuento del proveedor se escribe, no se inventa (18-sep-2026)
+
+Daniel, textual:
+
+> «se debería de poner el descuento yo después de subir el archivo, pongo el % en
+> número»
+> «como configurar así como la fórmula, pongo el % y que se auto calcule solo»
+> «como a veces vienen muchas líneas, hacerlo como que más fácil, GLOBAL»
+
+### 🩸 El defecto
+
+Reebok manda **dos Excel**. El de **despacho** trae el costo ya descontado
+(`Precio after Disc`) y se **LEE tal cual** desde el 17-sep-2026. La **preforma**
+—la confirmación de compra, con la que se cotiza semanas antes del embarque— **no
+dice el descuento**, y el sistema lo **inventaba**: `fobReebok` multiplicaba por
+**0,80** el calzado y por **0,70** la ropa y los accesorios.
+
+Esos dos números venían de una columna **`WholesalePrice OFF`** que el parser
+busca (`findReebokCols`) y que **no aparece en ningún Excel real** que Daniel
+haya recibido: medido, **cero veces**. Y los descuentos reales de Reebok
+**varían** —**20 %, 25 % y 30 % en el mismo embarque**, medido sobre el despacho
+real del 17-sep-2026, con Daniel diciendo *«hay veces que puede llegar un
+porcentaje más alto. No siempre será 20»*—.
+
+Así que la cotización podía salir equivocada **y nada en pantalla lo decía**. Ese
+silencio era el defecto de fondo: un costo supuesto que se lee igual que uno
+medido no se puede corregir, porque nadie se entera de que hay algo que corregir.
+
+🔴 **Y mueve plata**: el «Costo CIF *» es el costo con el que el artículo entra a
+Switch, y de él sale el precio de venta (`TECHO(CIF ÷ divisor)`).
+
+### Qué se hizo
+
+**Un solo campo**, «Descuento del proveedor %», **al lado del flete** y con la
+misma forma — es lo mismo que el flete: los dos convierten el precio del
+proveedor en el costo que entra a Switch. Se escribe **un número** (25) después
+de subir el archivo, se aplica a **todas** las líneas (`WholesalePrice × (1 −
+%/100)`) y **se recalcula sin volver a subir nada**, igual que al cambiar el
+flete o la tasa. 🔑 **GLOBAL porque una preforma trae ~75 artículos**: teclearlos
+uno por uno no lo hace nadie.
+
+La regla vive en el módulo PURO **`src/lib/depurador/descuento-proveedor.ts`** y
+se **LLAMA desde `fobReebok`**, que sigue siendo el único lugar donde el
+descuento se aplica. 🔴 **No se copia**: duplicar esta cuenta es exactamente cómo
+nacieron los dos costos que el 14-sep-2026 hubo que volver a juntar.
+
+### 🔴 Las tres reglas, en este orden, y no hay una cuarta
+
+1. **El dato real GANA SIEMPRE.** Si el archivo trae el precio ya descontado
+   (`WholesalePrice OFF` en la preforma, `Precio after Disc` en el despacho), el
+   FOB **ES** ese número y el porcentaje escrito no se aplica.
+2. **El porcentaje escrito manda sobre la suposición.** Uno solo, para todo el
+   archivo, en las **dos salidas** (plantilla Switch y pedido para cliente): un
+   solo costo por producto, como el 14-sep.
+3. **Vacío = lo de hoy, pero DICHO.** Sin porcentaje se sigue estimando 0,80 /
+   0,70 —para no romper a nadie— **y la pantalla lo dice en ámbar**, con cuántos
+   artículos son, con qué porcentajes y **dónde escribir el real**.
+
+### 🔴 El despacho no se movió ni un centavo
+
+Dos candados en direcciones distintas, porque uno solo se puede saltar:
+
+- **La pantalla no ofrece el campo en el despacho** y el valor que viaja a los
+  builders se apaga ahí (`formato === "confirmacion" ? … : null`). Escribir un
+  descuento donde el archivo ya lo trae sería pisar un dato real con una
+  suposición.
+- **Y aunque viajara, no haría nada**: dentro de `fobReebok` el
+  `WholesalePrice OFF` gana antes de que el porcentaje se mire. El candado corre
+  los **dos fixtures reales** del despacho (el formato nuevo de ropa y el viejo
+  de calzado) con 25 %, 50 % y 90 % escritos y exige que las **25 columnas salgan
+  idénticas, celda por celda**.
+
+### ⚠️ Es un campo libre, y el flete son dos botones
+
+A propósito, y la diferencia importa. El flete tiene **dos valores que Daniel
+nombró** y un `11` tecleado donde va `1.1` mandaría costos diez veces mal (el
+defecto del divisor, `divisor.ts`). El descuento **no tiene lista**: Reebok manda
+el que quiera. La red contra el tecleo es otra: se acepta **solo 0–95** y
+cualquier otra cosa —un `150`, una letra— **cae al estimado y se dice en
+pantalla**. 🔴 Nunca se aplica un número que no se entendió, y nunca en silencio.
+
+⚠️ **Un `0` escrito es un descuento de verdad** (costo = precio de lista), no un
+campo vacío. Vaciar el campo **borra lo recordado**: si no, volver al costo
+estimado sería imposible después de recargar la pantalla.
+
+### Lo que se recuerda y lo que no
+
+El porcentaje se guarda en **`fg_last_depurador_descuento_reebok`** (este
+navegador, esta persona), la misma familia que la tasa, el factor y el modo de
+precio. ⚠️ **No es** el flete por defecto, que vive en `app_settings` y lo
+comparte todo el equipo: el descuento cambia de embarque en embarque.
+
+### El aviso
+
+Cuenta **artículos, no filas** —una preforma trae una fila por talla, y decir
+«229 costos estimados» donde hay 75 artículos asusta sin informar— y **gana la
+PRIMERA fila del artículo**, que es exactamente la que `buildCatalogo` y
+`buildSwitchRows` usan para el costo del grupo. **Ámbar solo cuando hay costos
+supuestos**, que es lo único que pide una acción; con el porcentaje escrito baja
+a gris y dice cuánto se descontó. Cuando conviven las dos cosas, **dice que el
+del archivo manda**.
+
+### Candados
+
+`src/__tests__/lib/reebok-descuento-proveedor.test.ts` (31 casos, con los
+controles de que la preforma sin porcentaje sale número por número como antes).
+**15 mutaciones, 15 cazadas**, 2 controles
+(`scripts/_mutar-candados-descuento-proveedor.sh`).
+
+⚠️ `reebok-costo-unico.test.ts` **cambió de dirección con nota fechada**, no se
+borró: el 0,80 / 0,70 **se mudó** de `fobReebok` al módulo del descuento
+(`DESCUENTO_ESTIMADO_CALZADO` / `DESCUENTO_ESTIMADO_RESTO`). La regla que ese
+candado protege no cambió —el multiplicador vive en **un solo lugar** y el pedido
+para cliente no puede volver a tener el suyo—; cambió cuál es ese lugar.

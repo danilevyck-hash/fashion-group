@@ -160,21 +160,37 @@ describe("🔴 La regla se LLAMA, no se copia", () => {
     expect(cuerpoSwitch).toContain("costoReebok(");
   });
 
+  /* ⚠️ CAMBIÓ DE DIRECCIÓN EL 18-sep-2026, con la misma intención.
+   * El 0,80 / 0,70 **se mudó** de `fobReebok` al módulo puro
+   * `src/lib/depurador/descuento-proveedor.ts` (`DESCUENTO_ESTIMADO_CALZADO` y
+   * `DESCUENTO_ESTIMADO_RESTO`), porque ahora Daniel puede escribir el descuento
+   * real y el estimado pasó a ser el último recurso. La regla que este candado
+   * protege NO cambió: el multiplicador vive en UN SOLO LUGAR y el pedido para
+   * cliente no puede volver a tener el suyo. Lo único que cambió es cuál es ese
+   * lugar. Candado del cambio: `reebok-descuento-proveedor.test.ts`. */
   it("🔴 en el pedido para cliente no vuelve a aparecer un × 0.8 (ni 0.7) suelto", () => {
     expect(cuerpoCatalogo).not.toMatch(/\*\s*0\.8\b/);
     expect(cuerpoCatalogo).not.toMatch(/\*\s*0\.7\b/);
-    // CONTROL: el multiplicador sí vive —una sola vez— en `fobReebok`.
+    // CONTROL: el porcentaje sí vive —una sola vez— en el módulo del descuento.
+    const descuento = leer("src/lib/depurador/descuento-proveedor.ts");
+    expect(descuento).toMatch(/DESCUENTO_ESTIMADO_CALZADO = 20/);
+    expect(descuento).toMatch(/DESCUENTO_ESTIMADO_RESTO = 30/);
+    // Y `fobReebok` lo PIDE, no lo escribe.
     const cuerpoFob = sinComentarios.slice(
       sinComentarios.indexOf("export function fobReebok"),
       sinComentarios.indexOf("export function costoReebok"),
     );
-    expect(cuerpoFob).toMatch(/0\.8/);
-    expect(cuerpoFob).toMatch(/0\.7/);
+    expect(cuerpoFob).toContain("factorDeDescuento");
   });
 
   it("🔴 el 0.80 y el 0.70 viven en UN solo lugar de todo el módulo", () => {
     const veces = (re: RegExp) => (sinComentarios.match(re) ?? []).length;
-    expect(veces(/\?\s*0\.8\s*:\s*0\.7/g)).toBe(1);
+    // Ya no está en `reebok.ts`: se mudó al módulo del descuento (nota arriba).
+    expect(veces(/\?\s*0\.8\s*:\s*0\.7/g)).toBe(0);
+    const descuento = leer("src/lib/depurador/descuento-proveedor.ts")
+      .split("\n").filter((l) => !l.trim().startsWith("*") && !l.trim().startsWith("/*")).join("\n");
+    expect((descuento.match(/DESCUENTO_ESTIMADO_CALZADO\s*=/g) ?? []).length).toBe(1);
+    expect((descuento.match(/DESCUENTO_ESTIMADO_RESTO\s*=/g) ?? []).length).toBe(1);
   });
 
   it("CONTROL: `fobReebok` sigue exportada y es la que decide el porcentaje", () => {

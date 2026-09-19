@@ -19,6 +19,7 @@ import { OUT_COLS, TEXT_COLS, ceilPar, precioDescripcion, marcaKey, tasaSwitch }
 import type { Cell, SheetRow, Redondeo, MarcaRubroFormula } from "./logic";
 import { COL_FOTO, TEXTO_SIN_FOTO } from "./fotos-excel";
 import { normalizarFlete } from "./flete";
+import { factorDeDescuento, normalizarDescuento } from "./descuento-proveedor";
 // 🔴 La lista de CATEGORY se DERIVA del mapa del catálogo: UNA sola fuente.
 // Ver `REEBOK_CATEGORY_ESPERADAS`, más abajo.
 import { rubrosQueElCatalogoConoce } from "@/lib/reebok-clasificacion";
@@ -73,11 +74,17 @@ function num(v: Cell): number | null {
 const esFootwear = (dept: Cell): boolean => normH(dept).includes("FOOTWEAR");
 const unidadPara = (dept: Cell): string => (esFootwear(dept) ? "PAR" : "PIEZA");
 
-/** Costo FOB de Salida B: usa "WholesalePrice OFF" si viene con valor; si no,
- *  footwear → WholesalePrice×0.8; apparel/hardware → WholesalePrice×0.7. */
-export function fobReebok(dept: Cell, wholesale: number, off: number | null): number {
+/** Costo FOB de Salida B. TRES reglas, en este orden (ver `descuento-proveedor.ts`):
+ *  1. «WholesalePrice OFF» si viene con valor → el dato REAL gana siempre. Es el
+ *     camino del DESPACHO (`Precio after Disc`), que no se toca.
+ *  2. El descuento que Daniel escribió en pantalla, uno solo para todo el archivo.
+ *  3. Sin nada de lo anterior, el ESTIMADO de siempre: footwear → ×0.8;
+ *     apparel/hardware → ×0.7. La pantalla lo dice en ámbar. */
+export function fobReebok(
+  dept: Cell, wholesale: number, off: number | null, descuento?: unknown,
+): number {
   if (off !== null && off > 0) return off;
-  return wholesale * (esFootwear(dept) ? 0.8 : 0.7);
+  return wholesale * factorDeDescuento(normalizarDescuento(descuento), esFootwear(dept));
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -103,16 +110,23 @@ export function fobReebok(dept: Cell, wholesale: number, off: number | null): nu
  * ⚠️ El redondeo también vive acá y es el de la plantilla: se redondea el FOB a
  * centavos y RECIÉN AHÍ se le aplica el flete. Redondear una sola vez al final
  * daba un centavo distinto en 66 artículos del archivo de septiembre.
+ *
+ * 🔴 EL DESCUENTO (18-sep-2026). `descuentoCrudo` es el porcentaje que Daniel
+ * escribe en pantalla para TODO el archivo de la preforma. No es una cuarta
+ * regla: entra por `fobReebok`, detrás del «WholesalePrice OFF», que sigue
+ * ganando siempre. Por eso el camino del DESPACHO —donde ese campo viene con el
+ * `Precio after Disc`— no se mueve ni un centavo. Ver `descuento-proveedor.ts`.
  * ────────────────────────────────────────────────────────────────────────── */
 
 /** Costo FOB y CIF de UN artículo. `null` si el proveedor no mandó WholesalePrice.
  *  Es la ÚNICA fuente de costo de las dos salidas (plantilla Switch y pedido). */
 export function costoReebok(
   dept: Cell, wholesale: number | null, off: number | null, fleteCrudo: unknown,
+  descuentoCrudo?: unknown,
 ): { fob: number | null; cif: number | null } {
   if (wholesale === null) return { fob: null, cif: null };
   const flete = normalizarFlete(fleteCrudo);
-  const fob = round2(fobReebok(dept, wholesale, off));
+  const fob = round2(fobReebok(dept, wholesale, off, descuentoCrudo));
   return { fob, cif: round2(fob * flete) };
 }
 
@@ -506,6 +520,12 @@ export interface CatalogoConfig {
   /** Flete del embarque: 1.10 o 1.15 (ver `flete.ts`). Sin valor → 1.10, el de
    *  siempre. Es el MISMO flete de la plantilla Switch: un solo embarque. */
   flete?: number;
+  /** El descuento del proveedor en %, escrito a mano para TODO el archivo (ver
+   *  `descuento-proveedor.ts`). Sin valor → se estima 20 % en calzado y 30 % en
+   *  el resto, como siempre. ⚠️ Un artículo cuyo archivo trae el precio ya
+   *  descontado NO lo usa: el dato real gana. Es el MISMO descuento de la
+   *  plantilla Switch: un solo costo por producto. */
+  descuento?: string | number | null;
 }
 
 export function buildCatalogo(items: ReebokItem[], cfg: CatalogoConfig): CatalogoRow[] {
@@ -520,7 +540,7 @@ export function buildCatalogo(items: ReebokItem[], cfg: CatalogoConfig): Catalog
     const first = group[0];
     const w = first.wholesale;
     // 🔴 EL MISMO costo que la plantilla de Switch, de la MISMA función.
-    const { fob, cif: costo } = costoReebok(first.department, w, first.wholesaleOff, cfg.flete);
+    const { fob, cif: costo } = costoReebok(first.department, w, first.wholesaleOff, cfg.flete, cfg.descuento);
     // Jerarquía por Name: precio fijo > fórmula del Name > fórmula de marca (A/B).
     const exc = excForName(cfg.excByName, first.name);
     const precioA = precioDescripcion(costo, exc, cfg.formulaA);
@@ -583,6 +603,10 @@ export interface SwitchBuildConfig {
   /** Flete del embarque: 1.10 o 1.15 (ver `flete.ts`). Es lo que convierte el
    *  Costo FOB en Costo CIF. Sin valor → 1.10, el de siempre. */
   flete?: number;
+  /** El descuento del proveedor en %, escrito a mano para TODO el archivo (ver
+   *  `descuento-proveedor.ts`). Sin valor → se estima 20 % / 30 %, como siempre.
+   *  ⚠️ El artículo cuyo archivo trae el precio ya descontado NO lo usa. */
+  descuento?: string | number | null;
   /** Excepciones por Name (marcaKey(Name) → excepción). Ganan a la fórmula de marca. */
   excByName?: Map<string, MarcaRubroFormula>;
 }
@@ -614,7 +638,7 @@ export function buildSwitchRows(items: ReebokItem[], cfg: SwitchBuildConfig): Sw
     const sample = pickSample(group);
     const qty = group.reduce((s, it) => s + (it.piezas || 0), 0);
     const w = first.wholesale;
-    const { fob, cif } = costoReebok(first.department, w, first.wholesaleOff, cfg.flete);
+    const { fob, cif } = costoReebok(first.department, w, first.wholesaleOff, cfg.flete, cfg.descuento);
     // Jerarquía por Name: precio fijo > fórmula del Name > fórmula de marca (A/B).
     const precio = precioDescripcion(cif, excForName(cfg.excByName, first.name), cfg.formula);
     const composicion = group.map((it) => (it.composicion ?? "").trim()).find((c) => c !== "") ?? "";
