@@ -4,7 +4,7 @@ import { workbookFromSheets } from "@/lib/excel-export";
 import { buildGuiasSheet } from "@/app/guias/components/excel-guias";
 import { buildProveedoresSheet } from "@/app/proveedores/excel-proveedores";
 import type { Guia, GuiaItem } from "@/app/guias/components/types";
-import type { ProveedorExportRow } from "@/app/proveedores/excel-proveedores";
+import type { CarteraCxp } from "@/lib/proveedores/por-empresa";
 import fs from "fs";
 import path from "path";
 
@@ -217,37 +217,104 @@ describe("excel-guias — buildGuiasSheet", () => {
 });
 
 describe("excel-proveedores — buildProveedoresSheet", () => {
-  const rows: ProveedorExportRow[] = [
-    { nombre: "Proveedor Uno", aging_current: 200, aging_watch: 50, aging_overdue: 0, saldo_total: 250, ultimo_pago_dias: 12, empresas_count: 2 },
-    { nombre: "Proveedor Dos", aging_current: 0, aging_watch: 0, aging_overdue: 75.25, saldo_total: 75.25, ultimo_pago_dias: null, empresas_count: 1 },
-  ];
+  // 🩸 20-sep-2026: la hoja pasó a tener la MISMA forma que la pantalla —una
+  // fila por EMPRESA y debajo sus proveedores— y la columna «Último pago» dejó
+  // de decir «hace 13d» para decir la FECHA, que sí se puede ordenar.
+  const cartera: CarteraCxp = {
+    empresas: [
+      {
+        empresa_key: "fashion_wear",
+        nombre: "Fashion Wear",
+        tramos: { t0_90: 200, t91_120: 50, t121_365: 0, tMas365: 0 },
+        saldo: { debes: 250, a_favor: 0, por_pagar: 250 },
+        proveedores: [
+          {
+            key: "PROVEEDOR UNO",
+            nombre: "Proveedor Uno",
+            tramos: { t0_90: 200, t91_120: 50, t121_365: 0, tMas365: 0 },
+            saldo: { debes: 250, a_favor: 0, por_pagar: 250 },
+            tambien_en: ["vistana"],
+            ultimo_pago_fecha: "2026-09-07",
+            ultimo_pago_dias: 13,
+          },
+        ],
+        sin_saldo: [],
+      },
+      {
+        empresa_key: "vistana",
+        nombre: "Vistana International",
+        tramos: { t0_90: 0, t91_120: 0, t121_365: 0, tMas365: 75.25 },
+        saldo: { debes: 100.25, a_favor: 25, por_pagar: 75.25 },
+        proveedores: [
+          {
+            key: "PROVEEDOR DOS",
+            nombre: "Proveedor Dos",
+            tramos: { t0_90: 0, t91_120: 0, t121_365: 0, tMas365: 75.25 },
+            saldo: { debes: 100.25, a_favor: 25, por_pagar: 75.25 },
+            tambien_en: [],
+            ultimo_pago_fecha: null,
+            ultimo_pago_dias: null,
+          },
+        ],
+        sin_saldo: [],
+      },
+    ],
+    total: {
+      tramos: { t0_90: 200, t91_120: 50, t121_365: 0, tMas365: 75.25 },
+      saldo: { debes: 350.25, a_favor: 25, por_pagar: 325.25 },
+    },
+    proveedores_con_saldo: 2,
+    synced_at: "2026-09-20T09:32:03.668+00:00",
+  };
 
-  it("round-trip: hoja, headers en la fila 1 y moneda como número", () => {
-    const ws = roundTrip("Proveedores", buildProveedoresSheet(rows));
+  it("round-trip: empresa arriba, sus proveedores debajo y la moneda como número", () => {
+    const ws = roundTrip("Proveedores", buildProveedoresSheet(cartera));
 
-    expect(ws.A1.v).toBe("Proveedor");
-    // "Comprado YTD" ERA la columna B y se ELIMINÓ (27-jul-2026): el ledger de
-    // Switch solo trae lo que todavía se debe. Ahora B es el primer tramo de aging.
-    expect(ws.B1.v).toBe("0-90d");
-    expect(ws.E1.v).toBe("Por pagar");
-    // Moneda: número real con numFmt, no string
+    // Encabezados en la fila 1, con los CUATRO tramos.
+    expect(ws.A1.v).toBe("Empresa / Proveedor");
+    expect(ws.B1.v).toBe("0-90D");
+    expect(ws.C1.v).toBe("91-120D");
+    expect(ws.D1.v).toBe("121-365D");
+    expect(ws.E1.v).toBe("+1 año");
+    expect(ws.F1.v).toBe("Por pagar");
+
+    // 🔴 La empresa, y debajo su proveedor con sangría.
+    expect(ws.A2.v).toBe("Fashion Wear");
+    expect(ws.A3.v).toBe("    Proveedor Uno");
+    expect(ws.A4.v).toBe("Vistana International");
+    expect(ws.A5.v).toBe("    Proveedor Dos");
+
+    // Moneda: número real con numFmt, no string.
     expect(ws.B2.t).toBe("n");
     expect(ws.B2.v).toBe(200);
     expect(ws.B2.z).toBe("$#,##0.00");
-    // Último pago: string; null → "—"
-    expect(ws.F2.v).toBe("hace 12d");
-    expect(ws.F3.v).toBe("—");
-    // Totales en fila 5 (headers 1 + 2 datos + espaciador)
-    expect(ws.A5.v).toBe("2 proveedores");
-    expect(ws.B5.t).toBe("n");
-    expect(ws.B5.v).toBeCloseTo(200, 2);
-    expect(ws.E5.v).toBeCloseTo(325.25, 2);
-    // Candado: ni un encabezado con "YTD" en toda la fila 1.
-    for (const col of ["A", "B", "C", "D", "E", "F", "G"]) {
+
+    // 🔴 LA FECHA REAL, nunca «hace 13d»; sin pago, la celda va vacía.
+    expect(ws.I3.v).toBe("07/09/2026");
+    expect(String(ws.I3.v)).not.toMatch(/hace/);
+    expect(ws.I5?.v ?? "").toBe("");
+
+    // «También en», que reemplazó a la columna «Empresas».
+    expect(ws.J3.v).toBe("también en Vistana International");
+
+    // 🔴 El total al pie es la suma de las empresas (headers 1 + 4 datos + espaciador).
+    expect(ws.A7.v).toBe("Total");
+    expect(ws.F7.t).toBe("n");
+    expect(ws.F7.v).toBeCloseTo(325.25, 2);
+    // Y los cuatro tramos del pie suman ese mismo total.
+    const tramos = ["B7", "C7", "D7", "E7"].map((c) => Number(ws[c].v));
+    expect(tramos.reduce((s, n) => s + n, 0)).toBeCloseTo(325.25, 2);
+
+    // Lo que está a favor se ve también en el archivo.
+    expect(ws.G7.v).toBeCloseTo(350.25, 2);
+    expect(ws.H1.v).toBe("Tienes a favor");
+    expect(ws.H7.v).toBeCloseTo(25, 2);
+
+    // Candado viejo que sigue: ni un encabezado con "YTD".
+    for (const col of ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]) {
       expect(String(ws[`${col}1`]?.v ?? "")).not.toMatch(/YTD/i);
     }
   });
-
 });
 
 /**

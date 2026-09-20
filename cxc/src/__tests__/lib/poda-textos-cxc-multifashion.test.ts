@@ -423,9 +423,12 @@ describe("🔴 podar el título NO deja la pantalla sin encabezado", () => {
     // vivían en la MISMA fila (`flex justify-between`). Al quedar solos,
     // `between` los manda al borde IZQUIERDO — se ven colgando. Estas seis
     // filas quedaron con un único hijo visible y tienen que decir `end`.
+    // ⚠️ Proveedores SALIÓ de esta lista el 20-sep-2026: su fila de arriba
+    // volvió a tener DOS hijos visibles —«Actualizado: …» a la izquierda, los
+    // botones a la derecha—, así que `justify-between` es lo correcto ahí y
+    // exigirle `end` sería exigirle que los junte.
     const filasQueQuedaronConUnSoloBoton = [
       "app/clientes/ClientesListClient.tsx",
-      "app/proveedores/ProveedoresListClient.tsx",
       "app/guias/components/GuiasList.tsx",
       "app/reclamos/components/EmpresaSelector.tsx",
       "app/recordatorios/RecordatoriosClient.tsx",

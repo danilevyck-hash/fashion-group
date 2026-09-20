@@ -11,7 +11,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 
-// buildList/buildFicha son puras, pero viven en un módulo que crea el cliente de
+// buildFicha es pura, pero vive en un módulo que crea el cliente de
 // Supabase al importarse. No se toca la base en ningún test de este archivo.
 vi.mock("@/lib/supabase-server", () => ({ supabaseServer: {} }));
 
@@ -23,7 +23,8 @@ import {
   diasDesde,
   type ElementoLedger,
 } from "@/lib/proveedores-derivados";
-import { buildFicha, buildList, type ProveedorRow } from "@/lib/proveedores/lista";
+import { buildFicha, type ProveedorRow } from "@/lib/proveedores/lista";
+import { buildPorEmpresa, type FilaCxp } from "@/lib/proveedores/por-empresa";
 
 // Renglón con la forma REAL que devuelve /apiproveedor/info (muestra copiada de
 // switch_proveedor_estadocuenta en producción).
@@ -272,15 +273,23 @@ describe("un proveedor con pagos en más de una empresa", () => {
     expect(fs.ultimo_pago_fecha).toBe("2026-06-29");
   });
 
-  it("la lista muestra el pago MÁS RECIENTE entre las empresas", () => {
-    const { proveedores } = buildList(rows, {});
-    const afw = proveedores.find((p) => p.key === "AMERICAN FASHION WEAR SA")!;
-    expect(afw.empresas_count).toBe(2);
-    expect(afw.ultimo_pago_dias).toBe(11); // 16-jul, no 29-jun
+  // ⚠️ 20-sep-2026: la lista son las EMPRESAS, así que el «último pago» ya no
+  // se mezcla entre ellas: cada fila desplegada es el proveedor DENTRO de una
+  // empresa y lleva la fecha de ESA empresa. El Excel baja la fecha real.
+  it("cada empresa conserva SU último pago en la lista desplegada", () => {
+    const cartera = buildPorEmpresa(rows as unknown as FilaCxp[], []);
+    const enEmpresa = (k: string, key: string) => {
+      const e = cartera.empresas.find((x) => x.empresa_key === k)!;
+      return [...e.proveedores, ...e.sin_saldo].find((p) => p.key === key)!;
+    };
+    expect(enEmpresa("fashion_wear", "AMERICAN FASHION WEAR SA").ultimo_pago_fecha).toBe("2026-07-16");
+    expect(enEmpresa("fashion_shoes", "AMERICAN FASHION WEAR SA").ultimo_pago_fecha).toBe("2026-06-29");
   });
 
   it("un proveedor sin pagos en ninguna empresa sigue sin último pago", () => {
-    const { proveedores } = buildList(rows, {});
-    expect(proveedores.find((p) => p.key === "OTRO PROVEEDOR")!.ultimo_pago_dias).toBeNull();
+    const cartera = buildPorEmpresa(rows as unknown as FilaCxp[], []);
+    const todos = cartera.empresas.flatMap((e) => [...e.proveedores, ...e.sin_saldo]);
+    expect(todos.find((p) => p.key === "OTRO PROVEEDOR")!.ultimo_pago_fecha).toBeNull();
+    expect(todos.find((p) => p.key === "OTRO PROVEEDOR")!.ultimo_pago_dias).toBeNull();
   });
 });

@@ -2,7 +2,7 @@
 // 🔴 CUATRO TRAMOS DE EDAD, NO TRES — y lo que está A FAVOR se ve aparte.
 //
 // 🩸 20-sep-2026. La pantalla de Proveedores condensaba los OCHO tramos que
-// manda Switch en TRES (`lib/proveedores-aging.ts`, el vocabulario del CXC):
+// manda Switch en TRES (el vocabulario de aging del CXC):
 // todo lo de más de 120 días caía junto en «121D+». Eso escondía algo grande.
 // Medido contra producción ese día:
 //
@@ -30,8 +30,9 @@
 // emisión, no días de mora: en CxP no hay plazo ni fecha de vencimiento en el
 // dato que manda Switch. Los tramos se nombran por su RANGO —el mismo criterio
 // que el papel que lee el cliente en el CXC (`tramoRango`)—, nunca con el
-// vocabulario de aging del CXC. Ver `lib/proveedores-aging.ts`, que sigue
-// existiendo para la ficha de un proveedor y para nadie más.
+// vocabulario de aging del CXC. `lib/proveedores-aging.ts`, que era el puente
+// hacia ese vocabulario, se borró el mismo día: era lo que había que dejar de
+// usar.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Los OCHO tramos que manda Switch, en su orden, tal como los escribe. */
@@ -151,6 +152,20 @@ export function partirSaldo(
     else aFavor += -v;
   }
   return cerrarPartido(round2(debes), round2(aFavor));
+}
+
+/**
+ * 🔴 LA FRASE QUE LO DICE, EN UN SOLO LUGAR: «Le debes X · Tienes a favor Y ·
+ * Por pagar Z». Devuelve `null` cuando no hay nada a favor — ahí el «Por pagar»
+ * solo ya lo dice todo, y una frase de tres partes con un cero adentro es
+ * ruido.
+ */
+export function frasePartida(
+  s: SaldoPartido,
+  fmt: (n: number) => string,
+): string | null {
+  if (s.a_favor === 0) return null;
+  return `Le debes $${fmt(s.debes)} · Tienes a favor $${fmt(s.a_favor)} · Por pagar $${fmt(s.por_pagar)}`;
 }
 
 /** Suma dos particiones (empresa → pie del grupo) conservando la resta. */

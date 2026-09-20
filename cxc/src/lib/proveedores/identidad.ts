@@ -143,3 +143,24 @@ export const NO_SON_EL_MISMO: readonly {
     daniel: "son diferentes",
   },
 ] as const;
+
+/**
+ * 🔴 EL NOMBRE QUE SE MUESTRA, EN UN SOLO LUGAR.
+ *
+ * El amarre manda si trae uno escrito a mano; si no, la grafía más LARGA de las
+ * que llegaron —la regla de siempre—, con los espacios repetidos colapsados:
+ * Switch manda «CONFECCIONES BOSTON  S.A» con dos espacios y eso no se enseña.
+ *
+ * Vive acá, al lado de `aplicarAmarre`, desde el 20-sep-2026: lo necesitan la
+ * lista por empresa (`por-empresa.ts`) y la ficha (`lista.ts`), y un segundo
+ * criterio de nombre es cómo dos pantallas terminan llamando distinto al mismo
+ * proveedor.
+ */
+export function nombreParaMostrar(
+  filas: readonly { nombre: string }[],
+  escrito: string | null,
+): string {
+  if (escrito) return escrito;
+  const largo = filas.map((f) => f.nombre).sort((a, b) => b.length - a.length)[0] ?? "";
+  return largo.replace(/\s+/g, " ").trim();
+}

@@ -136,9 +136,13 @@ describe("Nombres cortados — letra más chica, nunca por debajo de 12px", () =
     expect(vistaGeneral).not.toContain('className="text-sm text-stone-700 truncate"');
   });
 
-  it("Proveedores: el nombre baja de 16px (heredado) a text-xs", () => {
-    expect(proveedores).toContain('className="font-medium truncate text-xs"');
-    expect(proveedores).not.toContain('className="font-medium truncate"');
+  // ⚠️ 20-sep-2026: la tarjeta de celular de Proveedores ya no es un proveedor
+  // sino una EMPRESA (la lista se dio vuelta). El nombre de la empresa es
+  // corto y cabe en `text-sm`; el del proveedor, que es el largo, quedó en
+  // `text-xs` adentro de la empresa desplegada. El piso de 12px se sigue
+  // midiendo abajo, en «ninguna de estas pantallas baja del piso».
+  it("Proveedores: el nombre del proveedor sigue en text-xs y truncado", () => {
+    expect(proveedores).toContain('className="truncate text-xs"');
   });
 
   it("ninguna de estas pantallas baja del piso de 12px", () => {
@@ -218,13 +222,15 @@ describe("Vista General — filas y links de las alertas", () => {
   });
 });
 
-describe("Proveedores — chips de empresa", () => {
-  it("los chips miden 44px de alto", () => {
-    // Antes: 28px (px-3 py-1) x8 chips.
-    const i = proveedores.indexOf("function Chip(");
-    const bloque = proveedores.slice(i, i + 600);
+describe("Proveedores — lo que se toca", () => {
+  // 🩸 20-sep-2026: los ocho chips de empresa se RETIRARON (Daniel: «¿por qué
+  // buscar proveedor si ya está todo en la lista? solo es desplegar»). Lo que
+  // se toca ahora es la FILA de la empresa, que la despliega.
+  it("la fila de la empresa se toca en el celular con 44px", () => {
+    const i = proveedores.indexOf("function TarjetaEmpresa(");
+    const bloque = proveedores.slice(i, i + 1200);
     expect(bloque).toContain("min-h-[44px]");
-    expect(bloque).not.toContain("py-1 text-xs");
+    expect(bloque).toContain("aria-expanded");
   });
 
   it("el toggle 'Ver N sin saldo' y 'Descargar Excel' llegan a 44px", () => {
@@ -244,6 +250,8 @@ describe("Campos de formulario de las listas", () => {
     // tienen su propia altura y su candado en `clientes-lista-pantalla`.
     expect(clientes).toContain('className="flex-1 border border-gray-200 rounded-md px-3 min-h-[44px] text-sm');
     expect(clientes).not.toContain("Todas las provincias");
-    expect(proveedores).toContain('className="w-full border border-gray-200 rounded-md px-3 min-h-[44px] text-sm');
+    // ⚠️ 20-sep-2026: Proveedores ya no tiene buscador — la lista son las siete
+    // empresas y todo está a un toque. Lo cuida `proveedores-arriba-una-linea`.
+    expect(proveedores).not.toContain('type="search"');
   });
 });

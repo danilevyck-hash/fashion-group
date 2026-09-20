@@ -31,8 +31,8 @@ import { describe, it, expect, vi } from "vitest";
 import fs from "fs";
 import path from "path";
 
-// `buildList`/`buildFicha` son puras pero viven en un módulo que crea el cliente
-// de Supabase al importarse. Acá no se toca la base.
+// `buildFicha` es pura pero vive en un módulo que crea el cliente de Supabase
+// al importarse. Acá no se toca la base.
 vi.mock("@/lib/supabase-server", () => ({ supabaseServer: {} }));
 import {
   aplicarAmarre,
@@ -42,7 +42,8 @@ import {
   NO_SON_EL_MISMO,
   type AmarreProveedor,
 } from "@/lib/proveedores/identidad";
-import { buildFicha, buildList, type ProveedorRow } from "@/lib/proveedores/lista";
+import { buildFicha, type ProveedorRow } from "@/lib/proveedores/lista";
+import { buildPorEmpresa, type FilaCxp } from "@/lib/proveedores/por-empresa";
 
 const RAIZ = process.cwd();
 const leer = (rel: string) => fs.readFileSync(path.join(RAIZ, rel), "utf8");
@@ -396,9 +397,12 @@ describe("🔴 EL BARRIDO: nadie agrupa por cédula ni por parecido", () => {
     expect(lista).not.toMatch(/const\s+k\s*=\s*normProvName\(r\.nombre\)/);
     // La ficha y los reclamos leen las MISMAS filas que la lista.
     expect(leer("src/app/api/proveedores/[key]/route.ts")).toContain("filasDelProveedor(rows, key, amarres)");
-    expect(leer("src/app/api/proveedores/route.ts")).toContain(
-      'buildList(rows, { empresa: sp.get("empresa"), q: sp.get("q"), amarres })',
-    );
+    // 20-sep-2026: la lista la arma `buildPorEmpresa`, que resuelve la
+    // identidad con la MISMA función y con ninguna otra.
+    const porEmpresa = leer("src/lib/proveedores/por-empresa.ts");
+    expect(porEmpresa).toContain("aplicarAmarre");
+    expect(porEmpresa).not.toMatch(/normProvName\(f\.nombre\)/);
+    expect(leer("src/app/api/proveedores/route.ts")).toContain("buildPorEmpresa(rows, amarres)");
   });
 });
 
@@ -473,10 +477,10 @@ describe("🔴 la migración: los cuatro grupos, soft delete y nada de DELETE", 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("🔴 LA PANTALLA: una fila, su saldo y de qué empresas viene", () => {
+describe("🔴 LA PANTALLA: las empresas, y adentro un proveedor por fila", () => {
   const amarres = amarresDeLaMigracion();
-  // Las filas con la forma que pide `buildList` (aging vacío: acá se mide el
-  // agrupado, no los tramos, que ya tienen su propio candado).
+  // Las filas con la forma que pide `buildPorEmpresa` (aging vacío: acá se mide
+  // el agrupado, no los tramos, que ya tienen su propio candado).
   const rows: ProveedorRow[] = filas.map((f) => ({
     ...f,
     dv: null, direccion: null, contacto: null, telefono: null, celular: null,
@@ -484,43 +488,72 @@ describe("🔴 LA PANTALLA: una fila, su saldo y de qué empresas viene", () => 
     ultimo_pago_monto: null, ultimo_pago_fecha: null, ultimo_pago_dias: null,
     synced_at: null,
   }));
+  // 🩸 Con `aging: []` los tramos y el «Por pagar» derivado dan CERO, así que
+  // para medir el agrupado se reparte el saldo de la fila en un bucket. No
+  // cambia quién es quién: cambia solo que el saldo llegue a la partición.
+  const conAging: FilaCxp[] = rows.map((r) => ({
+    ...r,
+    aging: [{ title: "0-30", saldo: r.saldo_total }],
+  }));
+  const cartera = buildPorEmpresa(conAging, amarres);
+  const buscar = (empresaKey: string, key: string) => {
+    const e = cartera.empresas.find((x) => x.empresa_key === empresaKey)!;
+    return [...e.proveedores, ...e.sin_saldo].find((p) => p.key === key)!;
+  };
 
-  it("la lista trae 43 filas y el mismo total de siempre", () => {
-    const { proveedores, total, grupo_saldo } = buildList(rows, { amarres });
-    expect(total).toBe(43);
-    expect(proveedores.length).toBe(43);
-    expect(grupo_saldo).toBe(5199705.82);
+  it("🔴 el total del grupo no se mueve ni un centavo al reagrupar", () => {
+    expect(cartera.total.saldo.por_pagar).toBe(5199705.82);
+    // Y es la SUMA de las empresas, no un número leído aparte.
+    const suma = cartera.empresas.reduce((s, e) => s + e.saldo.por_pagar, 0);
+    expect(Math.round(suma * 100) / 100).toBe(5199705.82);
   });
 
-  it("🔴 cada fila dice DE QUÉ EMPRESAS viene, la de más saldo primero", () => {
-    const { proveedores } = buildList(rows, { amarres });
-    const boston = proveedores.find((p) => p.key === "CONFECCIONES BOSTON")!;
-    expect(boston.saldo_total).toBe(4165.96);
-    // joystep $3.718,16 · fashion_wear $367,55 · american_classic $80,25 · los
-    // dos en cero al final, por nombre.
-    expect(boston.empresas).toEqual([
-      "joystep", "fashion_wear", "american_classic", "active_shoes", "vistana",
-    ]);
-    expect(boston.empresas_count).toBe(5);
+  it("las empresas son las SIETE con CxP, sin Boston, de mayor a menor", () => {
+    expect(cartera.empresas).toHaveLength(7);
+    expect(cartera.empresas.map((e) => e.empresa_key)).not.toContain("confecciones_boston");
+    const montos = cartera.empresas.map((e) => e.saldo.por_pagar);
+    expect([...montos].sort((a, b) => b - a)).toEqual(montos);
+  });
+
+  it("🔴 dentro de UNA empresa, las grafías del mismo proveedor son UNA fila", () => {
+    // Boston llega a Multifashion como «CONFECCIONES BOSTON S A» y es una sola
+    // fila; en las cinco empresas juntas, un solo proveedor.
+    const mf = cartera.empresas.find((e) => e.empresa_key === "american_classic")!;
+    const bostons = [...mf.proveedores, ...mf.sin_saldo].filter((p) => p.key === "CONFECCIONES BOSTON");
+    expect(bostons).toHaveLength(1);
+    expect(buscar("joystep", "CONFECCIONES BOSTON").saldo.por_pagar).toBe(3718.16);
+  });
+
+  it("🔴 «también en …» dice las OTRAS empresas donde tiene saldo", () => {
+    // Boston debe en joystep ($3.718,16), fashion_wear ($367,55) y
+    // american_classic ($80,25); en active_shoes y vistana está en CERO y por
+    // eso no se nombra: mandar a la contadora a una fila en cero es ruido.
+    expect(buscar("joystep", "CONFECCIONES BOSTON").tambien_en)
+      .toEqual(["fashion_wear", "american_classic"]);
+    expect(buscar("fashion_wear", "CONFECCIONES BOSTON").tambien_en)
+      .toEqual(["joystep", "american_classic"]);
+  });
+
+  it("un proveedor de una sola empresa no dice «también en» nada", () => {
+    expect(buscar("american_classic", "FASHION WEAR INC").tambien_en).toEqual([]);
+  });
+
+  it("🔴 proveedores DISTINTOS con saldo: 31, no la suma de las filas", () => {
+    expect(cartera.proveedores_con_saldo).toBe(31);
   });
 
   it("el nombre que se muestra sale del amarre y sin espacios dobles", () => {
-    const { proveedores } = buildList(rows, { amarres });
     // 🩸 Switch manda «CONFECCIONES BOSTON  S.A» con DOS espacios; eso no se
     // enseña. Sin amarre mandaría esa grafía, por ser la más larga.
-    expect(proveedores.find((p) => p.key === "CONFECCIONES BOSTON")!.nombre)
-      .toBe("CONFECCIONES BOSTON S.A");
-    expect(proveedores.find((p) => p.key === "LATIN FITNESS GROUP")!.nombre)
-      .toBe("LATIN FITNESS GROUP INC.");
+    expect(buscar("fashion_wear", "CONFECCIONES BOSTON").nombre).toBe("CONFECCIONES BOSTON S.A");
+    expect(buscar("vistana", "LATIN FITNESS GROUP").nombre).toBe("LATIN FITNESS GROUP INC.");
   });
 
   it("🩸 sin amarre, el nombre pierde el espacio doble que manda Switch", () => {
     // `AMERICAN  SPORTSWEAR` (Multifashion) llega con DOS espacios y no tiene
     // amarre: es la regla de siempre, solo que ya no se enseña el espacio.
-    const { proveedores } = buildList(rows, { amarres });
     expect(filas.some((f) => f.nombre === "AMERICAN  SPORTSWEAR")).toBe(true);
-    expect(proveedores.find((p) => p.key === "AMERICAN SPORTSWEAR")!.nombre)
-      .toBe("AMERICAN SPORTSWEAR");
+    expect(buscar("american_classic", "AMERICAN SPORTSWEAR").nombre).toBe("AMERICAN SPORTSWEAR");
   });
 
   it("🔴 el nombre ESCRITO A MANO le gana a la grafía más larga", () => {
@@ -532,27 +565,13 @@ describe("🔴 LA PANTALLA: una fila, su saldo y de qué empresas viene", () => 
       { empresa_key: "active_shoes", proveedor_switch_id: 8, proveedor_canonico: "GRUPO J NAVARRO", nombre_mostrado: "Grupo J Navarro" },
       { empresa_key: "vistana", proveedor_switch_id: 10, proveedor_canonico: "GRUPO J NAVARRO", nombre_mostrado: "Grupo J Navarro" },
     ];
-    const { proveedores } = buildList(rows, { amarres: escrito });
-    expect(proveedores.find((p) => p.key === "GRUPO J NAVARRO")!.nombre).toBe("Grupo J Navarro");
+    const otra = buildPorEmpresa(conAging, escrito);
+    const as = otra.empresas.find((e) => e.empresa_key === "active_shoes")!;
+    expect([...as.proveedores, ...as.sin_saldo].find((p) => p.key === "GRUPO J NAVARRO")!.nombre)
+      .toBe("Grupo J Navarro");
     // Y la ficha dice con qué grafías llega, para que se entienda la suma.
     expect(buildFicha(rows, "GRUPO J NAVARRO", escrito)!.grafias)
       .toEqual(["GRUPO J NAVARRO", "GRUPO J NAVARRO, S.A."]);
-  });
-
-  it("🔴 buscar «boston» encuentra la fila, se muestre con la grafía que se muestre", () => {
-    const { proveedores } = buildList(rows, { amarres, q: "boston" });
-    // Boston (una fila) + FASHION WEAR, INC no (no dice boston).
-    expect(proveedores.map((p) => p.key)).toEqual(["CONFECCIONES BOSTON"]);
-  });
-
-  it("🔴 buscar por una grafía que ya NO se muestra también encuentra", () => {
-    // Multifashion escribe «CONFECCIONES BOSTON S A» (con espacios). Esa
-    // grafía ya no se muestra —la fila dice «CONFECCIONES BOSTON S.A»— y aun
-    // así tiene que encontrarse: si el buscador solo mirara lo que se enseña,
-    // quien busque como está escrito en SU empresa no encontraría nada.
-    expect(normProvName("CONFECCIONES BOSTON S.A")).not.toContain("BOSTON S A");
-    const { proveedores } = buildList(rows, { amarres, q: "boston s a" });
-    expect(proveedores.map((p) => p.key)).toEqual(["CONFECCIONES BOSTON"]);
   });
 
   it("la ficha suma las 5 empresas de Boston y dice las otras grafías", () => {
@@ -564,11 +583,10 @@ describe("🔴 LA PANTALLA: una fila, su saldo y de qué empresas viene", () => 
     expect(f.grafias).toEqual(["CONFECCIONES BOSTON", "CONFECCIONES BOSTON S A"]);
   });
 
-  it("filtrar por una empresa no cambia quién es quién", () => {
-    const { proveedores } = buildList(rows, { amarres, empresa: "joystep" });
-    const boston = proveedores.find((p) => p.key === "CONFECCIONES BOSTON")!;
-    expect(boston.saldo_total).toBe(3718.16);
-    expect(boston.empresas).toEqual(["joystep"]);
+  it("🩸 FASHION WEAR, INC sigue siendo su propio proveedor (misma cédula que Boston)", () => {
+    const p = buscar("american_classic", "FASHION WEAR INC");
+    expect(p.nombre).toBe("FASHION WEAR, INC");
+    expect(p.saldo.por_pagar).toBe(76165.72);
   });
 });
 

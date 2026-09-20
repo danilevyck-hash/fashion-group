@@ -1,18 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
-import { fetchAllProveedorRows, buildList } from "@/lib/proveedores/lista";
+import { fetchAllProveedorRows } from "@/lib/proveedores/lista";
+import { buildPorEmpresa } from "@/lib/proveedores/por-empresa";
 import { leerAmarresProveedor } from "@/lib/proveedores/amarre-lectura";
 import { lineaDeRechazos } from "@/lib/rechazos-de-switch";
 
 export const dynamic = "force-dynamic";
 
-// Lista de proveedores agrupada (CxP). ?empresa= filtra; ?q= busca por nombre.
+/**
+ * 🔴 LA CARTERA DE CxP, POR EMPRESA (20-sep-2026). Las siete empresas con sus
+ * proveedores adentro, los cuatro tramos de edad y el total al pie.
+ *
+ * ⚠️ Ya no acepta `?empresa=` ni `?q=`: la lista no se filtra. Manda el grupo
+ * entero y la pantalla despliega la empresa que se toque — Daniel: *«¿por qué
+ * buscar proveedor si ya está todo en la lista? solo es desplegar»*. Un enlace
+ * viejo con esos parámetros sigue contestando 200 con la cartera completa.
+ */
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const auth = requireRole(req, ["admin", "contabilidad"]);
   if (auth instanceof NextResponse) return auth;
 
   try {
-    const sp = req.nextUrl.searchParams;
     // En paralelo: el aviso es una consulta acotada y no puede sumarle latencia
     // en serie a la lista. Falla al silencio, así que no puede tumbar la ruta.
     const [rows, amarres, avisoMontos] = await Promise.all([
@@ -22,12 +30,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       lineaDeRechazos({ familias: ["proveedor"] }),
     ]);
     return NextResponse.json({
-      ...buildList(rows, { empresa: sp.get("empresa"), q: sp.get("q"), amarres }),
-      // 🔴 CUÁNDO SE TRAJO ESTO DE SWITCH. La pantalla no lo decía NUNCA, y es
-      // lo primero que pregunta quien mira una cartera de $4,8 millones. Es el
-      // `synced_at` más reciente de las filas leídas: la última corrida que
-      // dejó algo escrito.
-      synced_at: rows.map((r) => r.synced_at).filter(Boolean).sort().reverse()[0] ?? null,
+      // `synced_at` viaja adentro: es la última corrida que dejó algo escrito, y
+      // la pantalla lo dice arriba («Actualizado: …»).
+      ...buildPorEmpresa(rows, amarres),
       avisoMontos,
     });
   } catch (err) {

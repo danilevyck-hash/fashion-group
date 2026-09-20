@@ -28,6 +28,7 @@ const sinComentarios = (src: string) =>
 
 const VISTA = sinComentarios(leer("src/app/proveedores/ProveedoresListClient.tsx"));
 const RUTA = sinComentarios(leer("src/app/api/proveedores/route.ts"));
+const POR_EMPRESA = sinComentarios(leer("src/lib/proveedores/por-empresa.ts"));
 
 describe("🔴 se fueron las pestañas de empresa y el buscador", () => {
   it("🩸 no queda ni un chip de empresa", () => {
@@ -46,21 +47,26 @@ describe("🔴 se fueron las pestañas de empresa y el buscador", () => {
     expect(VISTA).not.toContain('params.set("q"');
   });
 
-  it("CONTROL: la ruta sigue aceptando ?empresa= y ?q= — no se rompe un enlace viejo", () => {
-    expect(RUTA).toContain('sp.get("empresa")');
-    expect(RUTA).toContain('sp.get("q")');
+  it("🔑 un enlace viejo con ?empresa= o ?q= no rompe nada: se ignoran", () => {
+    // La ruta ya no los lee; contesta la cartera entera y devuelve 200.
+    expect(RUTA).not.toContain('sp.get("empresa")');
+    expect(RUTA).not.toContain('sp.get("q")');
+    expect(RUTA).toContain("buildPorEmpresa(rows, amarres)");
+  });
+
+  it("⚠️ ?empresa= sigue vivo en la PANTALLA: es la empresa desplegada", () => {
+    expect(VISTA).toContain('useUrlState("empresa", "")');
   });
 });
 
 describe("🔴 arriba se dice de cuándo es el dato", () => {
   it("la pantalla pinta «Actualizado: …» con la fecha del sync", () => {
-    expect(VISTA).toContain("textoActualizado(sincronizado)");
-    expect(VISTA).toContain("setSincronizado(json.synced_at ?? null)");
+    expect(VISTA).toContain("textoActualizado(cartera.synced_at)");
   });
 
-  it("la ruta manda el `synced_at` más reciente de lo que leyó", () => {
-    expect(RUTA).toContain("synced_at:");
-    expect(RUTA).toContain("rows.map((r) => r.synced_at)");
+  it("el `synced_at` más reciente lo arma el servidor, con la cartera", () => {
+    expect(RUTA).toContain("buildPorEmpresa(rows, amarres)");
+    expect(POR_EMPRESA).toContain("synced_at: filas.map((f) => f.synced_at)");
   });
 
   it("🔑 sin fecha no se afirma nada: ni «—» ni una fecha inventada", () => {
@@ -87,7 +93,7 @@ describe("🔴 arriba se dice de cuándo es el dato", () => {
 
   it("Descargar Excel y Actualizar ahora comparten esa línea de arriba", () => {
     const arriba = VISTA.slice(VISTA.indexOf("<h1"), VISTA.indexOf("<AvisoRechazosSwitch"));
-    expect(arriba).toContain("textoActualizado(sincronizado)");
+    expect(arriba).toContain("textoActualizado(cartera.synced_at)");
     expect(arriba).toContain("Descargar Excel");
     expect(arriba).toContain("<SyncNowButton");
   });
@@ -102,7 +108,9 @@ describe("🩸 el rótulo con filtro se retiró, y el archivo se queda", () => {
         if (e.isDirectory()) {
           if (e.name !== "node_modules") recorrer(rel);
         } else if (/\.tsx?$/.test(e.name) && !rel.includes("__tests__")) {
-          if (leer(rel).includes("proveedores/rotulo")) hits.push(rel);
+          // Sin comentarios: nombrarla al explicar por qué se retiró no es
+          // importarla.
+          if (sinComentarios(leer(rel)).includes("proveedores/rotulo")) hits.push(rel);
         }
       }
     };

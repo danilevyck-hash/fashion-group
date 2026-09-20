@@ -10,11 +10,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { supabaseServer } from "@/lib/supabase-server";
-import { condenseAging } from "@/lib/proveedores-aging";
 import { derivarProveedor, type ElementoLedger } from "@/lib/proveedores-derivados";
 import {
   aplicarAmarre,
   indexarAmarres,
+  nombreParaMostrar,
   normProvName,
   type AmarreProveedor,
 } from "@/lib/proveedores/identidad";
@@ -73,102 +73,23 @@ export async function fetchAllProveedorRows(): Promise<ProveedorRow[]> {
   });
 }
 
-export interface ProveedorListItem {
-  key: string;            // la clave del proveedor (amarre o nombre normalizado)
-  nombre: string;         // display
-  saldo_total: number;    // suma (o de la empresa filtrada)
-  empresas: string[];     // DE QUÉ EMPRESAS viene, en orden de saldo
-  empresas_count: number;
-  ultimo_pago_dias: number | null; // el más reciente entre empresas
-  // Aging condensado al vocabulario CXC (suma de los buckets reales de Switch).
-  aging_current: number;  // 0-90d (por vencer)
-  aging_watch: number;    // 91-120d (vencido reciente)
-  aging_overdue: number;  // 121d+ (vencido crítico)
-}
-
-/**
- * El nombre que se muestra. El amarre manda si trae uno escrito a mano; si no,
- * la grafía más larga de las que llegaron (la regla de siempre), con los
- * espacios repetidos colapsados — Switch manda «CONFECCIONES BOSTON  S.A» con
- * dos espacios y eso no se enseña.
- */
-function nombreParaMostrar(rs: readonly ProveedorRow[], escrito: string | null): string {
-  if (escrito) return escrito;
-  const largo = rs.map((r) => r.nombre).sort((a, b) => b.length - a.length)[0] ?? "";
-  return largo.replace(/\s+/g, " ").trim();
-}
-
-/** Agrupa las filas por proveedor resuelto. Usada por la lista y por la ficha. */
-function agrupar(
-  rows: readonly ProveedorRow[],
-  amarres: readonly AmarreProveedor[],
-): Map<string, { filas: ProveedorRow[]; nombreEscrito: string | null }> {
-  const indice = indexarAmarres(amarres);
-  const byKey = new Map<string, { filas: ProveedorRow[]; nombreEscrito: string | null }>();
-  for (const r of rows) {
-    const { clave, nombreMostrado } = aplicarAmarre(r, indice);
-    const actual = byKey.get(clave);
-    if (actual) {
-      actual.filas.push(r);
-      actual.nombreEscrito = actual.nombreEscrito ?? nombreMostrado;
-    } else {
-      byKey.set(clave, { filas: [r], nombreEscrito: nombreMostrado });
-    }
-  }
-  return byKey;
-}
-
-/** Lista agrupada por proveedor. empresa=filtra a esa empresa; q=busca por nombre. */
-export function buildList(
-  rows: ProveedorRow[],
-  opts: { empresa?: string | null; q?: string | null; amarres?: readonly AmarreProveedor[] },
-): { proveedores: ProveedorListItem[]; total: number; grupo_saldo: number } {
-  const filtered = opts.empresa ? rows.filter((r) => r.empresa_key === opts.empresa) : rows;
-
-  let items: ProveedorListItem[] = [...agrupar(filtered, opts.amarres ?? []).entries()].map(
-    ([key, { filas: rs, nombreEscrito }]) => {
-      const dias = rs.map((r) => r.ultimo_pago_dias).filter((d): d is number => d != null);
-      const aging = condenseAging(rs.flatMap((r) => r.aging ?? []));
-      // De qué empresas viene, la de más saldo primero: es lo que contesta
-      // «¿y las otras dónde están?» sin abrir la ficha.
-      const porEmpresa = new Map<string, number>();
-      for (const r of rs) {
-        porEmpresa.set(r.empresa_key, (porEmpresa.get(r.empresa_key) ?? 0) + Number(r.saldo_total));
-      }
-      const empresas = [...porEmpresa.entries()]
-        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-        .map(([e]) => e);
-      return {
-        key,
-        nombre: nombreParaMostrar(rs, nombreEscrito),
-        saldo_total: round2(rs.reduce((s, r) => s + Number(r.saldo_total), 0)),
-        empresas,
-        empresas_count: empresas.length,
-        ultimo_pago_dias: dias.length ? Math.min(...dias) : null,
-        aging_current: aging.current,
-        aging_watch: aging.watch,
-        aging_overdue: aging.overdue,
-      };
-    },
-  );
-
-  const q = normProvName(opts.q);
-  // 🔴 El buscador mira TODAS las grafías que cayeron en la fila, no solo la
-  // que se muestra: buscar «boston» tiene que encontrar la fila aunque se
-  // enseñe con otra escritura.
-  if (q) {
-    const grafias = agrupar(filtered, opts.amarres ?? []);
-    items = items.filter((i) => {
-      if (normProvName(i.nombre).includes(q)) return true;
-      const g = grafias.get(i.key);
-      return (g?.filas ?? []).some((r) => normProvName(r.nombre).includes(q));
-    });
-  }
-
-  items.sort((a, b) => b.saldo_total - a.saldo_total);
-  const grupo_saldo = round2(items.reduce((s, i) => s + i.saldo_total, 0));
-  return { proveedores: items, total: items.length, grupo_saldo };
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// 🩸 ACÁ VIVÍA `buildList` — LA LISTA DE PROVEEDORES. Se retiró el 20-sep-2026,
+// cuando Daniel dio vuelta la pantalla: la lista son las EMPRESAS y cada una se
+// despliega en sus proveedores. La arma `lib/proveedores/por-empresa.ts`
+// (`buildPorEmpresa`), que sigue resolviendo la identidad con `aplicarAmarre` y
+// con nada más.
+//
+// Se BORRÓ en vez de quedar rotulada, al revés de lo que se hace con las tablas
+// (`mayor_lineas`) y con `lib/proveedores/rotulo.ts`: lo que hacía —condensar
+// los OCHO tramos de Switch en TRES, el vocabulario de aging del CXC— es
+// exactamente lo que se corrigió, así que dejarla ahí sería dejar a mano la
+// función que hay que no volver a usar. Su compañera `lib/proveedores-aging.ts`
+// se fue con ella, por lo mismo.
+//
+// `fetchAllProveedorRows` y `buildFicha` NO se tocaron: son lo que leen la
+// pantalla nueva, la ficha del proveedor y los reclamos.
+// ─────────────────────────────────────────────────────────────────────────────
 
 export interface ProveedorEmpresaTotals {
   empresa: string;
