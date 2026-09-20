@@ -4,7 +4,8 @@ import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
 import { abrirPeriodo } from "@/lib/caja/abrir-periodo";
-import { saldoDelPeriodo } from "@/lib/caja/dinero";
+import { centavos, saldoDelPeriodo } from "@/lib/caja/dinero";
+import { diferenciaDeCaja } from "@/lib/caja/conteo-cierre";
 import { pegarResponsables } from "@/lib/caja/responsable-lectura";
 
 const CAJA_ROLES = ["admin", "secretaria"];
@@ -89,7 +90,17 @@ async function pegarFotos<T extends { id?: string }>(gastos: T[]): Promise<Array
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = requireRole(req, CAJA_ROLES);
   if (auth instanceof NextResponse) return auth;
-  try { await req.json(); } catch { /* cuerpo vacío = cerrar el período */ }
+
+  // 🔴 CUÁNTA PLATA HAY DE VERDAD (20-sep-2026). Lo cuenta quien cierra y viaja
+  // acá; el servidor saca la diferencia contra su propia cuenta y la anota.
+  // 🔴 UN DESCUADRE NO FRENA EL CIERRE: se guarda y se sigue. Sin conteo (un
+  // cuerpo vacío, como antes) se cierra igual, con la diferencia en NULL.
+  let contado: number | null = null;
+  try {
+    const cuerpo = await req.json();
+    const crudo = (cuerpo as { efectivo_contado?: unknown })?.efectivo_contado;
+    if (typeof crudo === "number" && isFinite(crudo) && crudo >= 0) contado = centavos(crudo);
+  } catch { /* cuerpo vacío = cerrar el período sin conteo */ }
 
   const session = getSession(req);
 
@@ -117,23 +128,32 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   // rojo con «−$0.00». La cuenta vive en `src/lib/caja/dinero.ts`, una sola vez.
   const saldo = saldoDelPeriodo(fondo, (gastos || []) as Array<{ total: number | null }>);
 
+  const diferencia = contado === null ? null : diferenciaDeCaja(contado, saldo);
+
   const today = new Date().toISOString().slice(0, 10);
-  // `saldo_cierre` congela la foto del cierre (DDL 20260920120000). Mientras
-  // esa migración no corra, la columna no existe: se cierra igual, sin la foto.
-  let { data, error } = await supabaseServer
-    .from("caja_periodos")
-    .update({ estado: "cerrado", fecha_cierre: today, saldo_cierre: saldo })
-    .eq("id", params.id)
-    .select()
-    .single();
-  if (error) {
-    ({ data, error } = await supabaseServer
+  // 🔴 SE ESCRIBE TODO LO QUE SE PUEDA, EN ESE ORDEN. `saldo_cierre` congela la
+  // foto del cierre (DDL 20260920120000, aplicada) y `efectivo_contado` /
+  // `diferencia_cierre` la plata contada (DDL 20261211120000). Falla ABIERTA en
+  // los dos escalones: sin la DDL nueva se cierra con la foto de siempre, y sin
+  // ninguna de las dos se cierra como antes de que existieran.
+  const cerrado = { estado: "cerrado", fecha_cierre: today };
+  const conFoto = { ...cerrado, saldo_cierre: saldo };
+  const conConteo = { ...conFoto, efectivo_contado: contado, diferencia_cierre: diferencia };
+
+  async function cerrarCon(campos: Record<string, unknown>) {
+    return supabaseServer
       .from("caja_periodos")
-      .update({ estado: "cerrado", fecha_cierre: today })
+      .update(campos)
       .eq("id", params.id)
       .select()
-      .single());
+      .single();
   }
+
+  // Sin conteo no se intenta el escalón nuevo: no hay nada que anotar, y pegarle
+  // a una columna que todavía no existe sería una consulta perdida.
+  let { data, error } = await cerrarCon(contado === null ? conFoto : conConteo);
+  if (error && contado !== null) ({ data, error } = await cerrarCon(conFoto));
+  if (error) ({ data, error } = await cerrarCon(cerrado));
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
 
   // «Cerrar y abrir el N»: el fondo sigue vivo, así que el período siguiente
@@ -150,12 +170,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     periodoId: params.id,
     fecha_cierre: today,
     saldo_cierre: saldo,
+    efectivo_contado: contado,
+    diferencia_cierre: diferencia,
     siguiente_id: apertura.periodo?.id ?? null,
     siguiente_numero: apertura.periodo?.numero ?? null,
   }, session?.userName);
   return NextResponse.json({
     ...data,
     saldo_cierre: saldo,
+    efectivo_contado: contado,
+    diferencia_cierre: diferencia,
     siguiente: apertura.periodo,
     siguiente_motivo: apertura.motivo,
   });

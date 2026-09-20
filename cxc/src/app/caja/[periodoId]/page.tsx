@@ -179,7 +179,7 @@ export default function PeriodoDetailPage() {
       <CerrarPeriodoModal
         open={!!confirmClosePeriodo}
         onClose={() => setConfirmClosePeriodo(null)}
-        onConfirm={doClosePeriodo}
+        onConfirm={(contado) => doClosePeriodo(contado)}
         fondo={detailFondoInicial}
         gastado={detailTotalGastado}
         recibos={detailGastos.length}

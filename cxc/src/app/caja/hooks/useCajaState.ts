@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { CajaPeriodo, CajaGasto, CajaResponsable } from "../components/types";
 import { centavos, totalGastado } from "@/lib/caja/dinero";
+import { hayDescuadre, mensajeDeDiferencia } from "@/lib/caja/conteo-cierre";
 
 function normalizeStr(s: string): string {
   const t = s.trim();
@@ -163,13 +164,24 @@ export function useCajaState(opts?: UseCajaOptions) {
     setConfirmClosePeriodo(id);
   }
 
-  async function doClosePeriodo() {
+  /**
+   * 🔴 EL CIERRE VIAJA CON LA PLATA CONTADA (20-sep-2026). El modal pregunta
+   * cuánta hay de verdad y ese número viene hasta acá: el servidor calcula la
+   * diferencia contra su propia cuenta y la anota. Un descuadre NO frena nada.
+   */
+  async function doClosePeriodo(efectivoContado?: number | null) {
     if (!confirmClosePeriodo) return;
     const id = confirmClosePeriodo;
     setConfirmClosePeriodo(null);
     setAviso(null);
     try {
-      const res = await fetch(`/api/caja/periodos/${id}`, { method: "PATCH" });
+      const res = await fetch(`/api/caja/periodos/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          typeof efectivoContado === "number" ? { efectivo_contado: efectivoContado } : {},
+        ),
+      });
       if (!res.ok) {
         const payload = await res.json().catch(() => null);
         const backendMsg = payload && typeof payload.error === "string" ? payload.error : null;
@@ -180,7 +192,14 @@ export function useCajaState(opts?: UseCajaOptions) {
       // servidor no abre nada y DICE por qué.
       const payload = await res.json().catch(() => null);
       const motivo = payload && typeof payload.siguiente_motivo === "string" ? payload.siguiente_motivo : null;
-      if (motivo) setAviso(motivo);
+      // El descuadre del conteo se dice también DESPUÉS de cerrar: el modal ya
+      // no está en pantalla y el número quedó guardado con el período.
+      const dif = payload && typeof payload.diferencia_cierre === "number" ? payload.diferencia_cierre : null;
+      const descuadre = dif !== null && hayDescuadre(dif)
+        ? `Al cerrar: ${mensajeDeDiferencia(dif)} respecto de la cuenta del sistema. Quedó anotado.`
+        : null;
+      const texto = [descuadre, motivo].filter(Boolean).join(" ");
+      if (texto) setAviso(texto);
       if (current?.id === id) await loadDetail(id);
       loadPeriodos();
     } catch {

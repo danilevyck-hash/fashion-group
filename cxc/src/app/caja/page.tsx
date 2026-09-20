@@ -131,7 +131,7 @@ export default function CajaPage() {
         <CerrarPeriodoModal
           open={!!confirmClosePeriodo}
           onClose={() => setConfirmClosePeriodo(null)}
-          onConfirm={doClosePeriodo}
+          onConfirm={(contado) => doClosePeriodo(contado)}
           fondo={Number(periodoACerrar.fondo_inicial) || 0}
           gastado={Number(periodoACerrar.total_gastado) || 0}
           recibos={recibosACerrar}
