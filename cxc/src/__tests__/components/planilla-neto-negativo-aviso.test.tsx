@@ -280,7 +280,14 @@ describe("C. «Antes de cerrar» lo nombra, en la parte de arreglar", () => {
 
   it("la pantalla lo pasa de las MISMAS líneas que dibuja la tabla, y la fila lleva su ancla", () => {
     const tab = sinComentarios("src/app/asistencia/PlanillaTab.tsx");
-    expect(tab).toMatch(/netosNegativos: netosNegativos\(data\.lineas\)/);
+    const puente = sinComentarios("src/lib/asistencia/antes-de-cerrar-del-cuadro.ts");
+    // 🔄 19-sep-2026 — SE MUDÓ, NO CAMBIÓ. La entrada de «Antes de cerrar»
+    // se arma en un módulo PURO (`antes-de-cerrar-del-cuadro.ts`) porque el
+    // TABLERO de cierre de «Todas» necesita exactamente lo mismo, y dos
+    // copias de quince campos serían dos verdades sobre qué frena un cierre.
+    // Sale de las MISMAS líneas que dibuja la tabla, que es lo que se cuida.
+    expect(tab).toMatch(/antesDeCerrarDelCuadro\(/);
+    expect(puente).toMatch(/netosNegativos: netosNegativos\(data\.lineas\)/);
     // La fila (escritorio) y la tarjeta (celular), las dos con el ancla.
     expect((tab.match(/data-fila-planilla=\{l\.codigo\}/g) ?? []).length).toBe(2);
     // Las cinco casillas a mano preguntan, en las dos formas.

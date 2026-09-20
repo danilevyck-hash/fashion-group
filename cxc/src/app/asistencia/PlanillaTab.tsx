@@ -94,7 +94,10 @@ import {
   type DiaLibreEnLinea,
 } from "@/lib/asistencia/dia-libre-empresa";
 import { ROTULOS_DINERO_PLANILLA, montosDePlanilla } from "@/lib/asistencia/columnas-dinero-planilla";
-import { armarAntesDeCerrar } from "@/lib/asistencia/antes-de-cerrar";
+import { antesDeCerrarDelCuadro } from "@/lib/asistencia/antes-de-cerrar-del-cuadro";
+// 🔴 CON «TODAS», EL TABLERO DE CIERRE (19-sep-2026): una línea por empresa,
+// con personas · neto · qué falta · Cerrar. Nunca un total del grupo.
+import TableroCierre from "./TableroCierre";
 import {
   TEXTO_SIN_DESCONTAR,
   TITULO_SIN_DESCONTAR,
@@ -972,11 +975,19 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
 
   return (
     <div className="space-y-4">
-      {/* 🔴 «Todas» no arma una planilla: es de UNA empresa. Se pide elegirla
-          arriba, donde vive el selector de todo el módulo. */}
+      {/* ══════════════════════════════════════════════════════════════════
+          🔴 CON «TODAS», EL TABLERO DE CIERRE (19-sep-2026).
+          🩸 Hasta hoy acá solo se leía «con «Todas» no se paga nada» y la
+          pantalla quedaba en blanco: para saber cómo venía la quincena había
+          que entrar empresa por empresa, generar y mirar — cuatro veces, seis
+          veces al mes.
+          🔴 El tablero muestra ESTADO, nunca un total del grupo, y cada fila
+          cierra SU empresa por su propia puerta.
+          ══════════════════════════════════════════════════════════════════ */}
       {sinEmpresa && (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
-          Elige <b>una empresa</b> arriba para armar su planilla: con «Todas» no se paga nada.
+        <p className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-[13px] text-gray-700">
+          Así va cada empresa. Para <b>armar y revisar</b> una planilla, elígela arriba:
+          con «Todas» no se paga nada.
         </p>
       )}
       {/* ── Elegir qué se va a pagar ── */}
@@ -1322,53 +1333,32 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           caja de préstamos —ya no se aprueba—. Los avisos siguen viajando como
           DATOS en `avisos`: el Excel y el PDF los leen igual. La regla vive en
           `lib/asistencia/antes-de-cerrar.ts`. */}
+      {/* 🔴 EL TABLERO: una línea por empresa, con la quincena que se eligió
+          arriba. Solo con «Todas»; con una empresa, la pantalla es la de
+          siempre y no se pide nada de más. */}
+      {sinEmpresa && (
+        <TableroCierre
+          rol={rol}
+          desde={desde}
+          hasta={hasta}
+          corte={corte}
+          elegido={elegido}
+          puedeCerrar={puedeCerrarla}
+          onCerrada={() => setDesactualizada(true)}
+        />
+      )}
+
+      {/* 🔴 LA ENTRADA SE ARMA EN UN MÓDULO PURO (19-sep-2026), no acá: el
+          TABLERO de cierre de «Todas» necesita lo mismo, y dos copias de quince
+          campos son dos verdades sobre qué frena un cierre. La regla sigue
+          siendo `armarAntesDeCerrar`. */}
       {!!data && !vieja && !cerrada && !!data.lineas.length && (
-        <AntesDeCerrar datos={armarAntesDeCerrar({
-          periodoAbierto: data.avisos.periodoAbierto,
-          esQuincena: !data.avisos.rangoLibre,
-          rango: pedido ? { desde: pedido.desde, hasta: pedido.hasta } : null,
-          extraSinAprobar: data.avisos.extraSinAprobar ?? [],
-          sinFicha: data.avisos.sinFicha ?? [],
-          sinHorario: data.avisos.sinHorario ?? 0,
-          corte: PLANILLA_UNIDA ? data.corte ?? null : null,
-          hasta: data.periodo?.hasta ?? data.quincena?.hasta ?? "",
-          fueraPorBaja: data.avisos.fueraPorBaja ?? 0,
-          marcoDespuesDeIrse: data.avisos.marcoDespuesDeIrse ?? 0,
-          avisoRepartoRechazado: data.avisos.avisoRepartoRechazado ?? null,
-          prestamoSinAtar: data.avisos.prestamoSinAtar ?? [],
-          avisoPrestamo: data.avisos.avisoPrestamo ?? null,
-          // 🔴 Las casillas con 0 a propósito, calculadas de las MISMAS líneas
-          // que dibuja la tabla (11-sep-2026).
-          sinDescontar: prestamosSinDescontar(data.lineas),
-          // 🔴 Las cuotas que el neto no alcanzó a cubrir, de las MISMAS
-          // líneas que dibuja la tabla (14-sep-2026, `neto-no-negativo.ts`).
-          recortadas: cuotasRecortadas(data.lineas),
-          // 🔴 Los netos en negativo por montos a mano, de las MISMAS líneas
-          // (14-sep-2026): la misma decisión que el aviso de la celda.
-          netosNegativos: netosNegativos(data.lineas),
-          // 🔴 Los días hábiles MAL MARCADOS, de las MISMAS líneas que dibuja
-          // la tabla (15-sep-2026). Es lo que el servidor vuelve a mirar para
-          // frenar el cierre. ⚠️ 18-sep-2026: «mal marcado» pasó a ser impar O
-          // más de 4 (Daniel: *«cuando hay 5 o mas es porq es error»*).
-          marcasImpares: marcasImparesDeLineas(data.lineas),
-          avisoVacacionesNoPagadas: data.avisos.avisoVacacionesNoPagadas ?? null,
-          // 🔴 El día libre de la empresa: cuánto le pagaron sus horas extra a
-          // la deuda y cuánto queda (17-sep-2026). El servidor ya lo redacta.
-          avisoDiasLibres: data.avisos.avisoDiasLibres ?? null,
-          conSabado: data.avisos.conSabado ?? 0,
-          rangoLibre: !!data.avisos.rangoLibre,
-          factorBase: data.avisos.factorBase ?? 1,
-          diasCalendario: data.avisos.diasCalendario ?? 0,
-          migraciones: [
-            data.avisos.faltaMigracionConfiguracion, data.avisos.faltaMigracionManual,
-            data.avisos.faltaMigracionBajas, data.avisos.faltaMigracionServicioProfesional,
-            data.avisos.faltaMigracionVacaciones, data.avisos.faltaMigracionAprobaciones,
-            data.avisos.faltaMigracionReparto, data.avisos.faltaMigracionAmarrePrestamos,
-            data.avisos.faltaMigracionDiaLibre ?? null,
-            data.avisos.faltaMigracionHorario ?? null,
-          ].filter((m): m is string => !!m),
-          pestanaFichas: PESTANA_FICHAS,
-        })} />
+        <AntesDeCerrar datos={antesDeCerrarDelCuadro(
+          data,
+          pedido ? { desde: pedido.desde, hasta: pedido.hasta } : null,
+          PLANILLA_UNIDA,
+          PESTANA_FICHAS,
+        )} />
       )}
 
       {/* 🔴 EL VACÍO ES EL ESTADO INICIAL, y dice qué hacer. No es un error ni
@@ -1678,7 +1668,11 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
 // y SIN `autoFocus` (en iPhone el teclado salta encima antes de que se lea).
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ModalCierre({
+// 🔴 SE EXPORTA (19-sep-2026) para que el TABLERO de cierre de «Todas» muestre
+// EXACTAMENTE esta ventana antes de cerrar una empresa. Es la pantalla donde se
+// ven los números que se van a congelar: dos versiones de ella serían dos
+// formas de mirar la misma plata antes de pagarla.
+export function ModalCierre({
   modo, empresa, rango, totales, cerrada, trabajando, onConfirmar, onCerrar,
 }: {
   modo: "cerrar" | "reabrir";

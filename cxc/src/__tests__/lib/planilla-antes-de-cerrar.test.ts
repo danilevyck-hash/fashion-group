@@ -201,8 +201,15 @@ describe("7. la pantalla", () => {
   const tab = puro("src/app/asistencia/PlanillaTab.tsx");
 
   it("monta la lista con los avisos de la respuesta, y ya no dibuja las cajas viejas", () => {
-    expect(tab).toMatch(/<AntesDeCerrar datos=\{armarAntesDeCerrar\(\{/);
-    expect(tab).toMatch(/pestanaFichas: PESTANA_FICHAS,/);
+    // 🔄 19-sep-2026 — SE MUDÓ, NO CAMBIÓ. La entrada de «Antes de cerrar»
+    // se arma en un módulo PURO (`antes-de-cerrar-del-cuadro.ts`) porque el
+    // TABLERO de cierre de «Todas» necesita exactamente lo mismo, y dos
+    // copias de quince campos serían dos verdades sobre qué frena un cierre.
+    // Sale de las MISMAS líneas que dibuja la tabla, que es lo que se cuida.
+    expect(tab).toMatch(/<AntesDeCerrar datos=\{antesDeCerrarDelCuadro\(/);
+    expect(puro("src/lib/asistencia/antes-de-cerrar-del-cuadro.ts")).toMatch(/armarAntesDeCerrar\(\{/);
+    // El nombre de la pestaña de las fichas lo sigue poniendo la pantalla.
+    expect(tab).toMatch(/PESTANA_FICHAS,\n\s*\)\} \/>/);
     for (const viejo of [
       "Todavía no está cerrada",
       "Esto es un borrador",
