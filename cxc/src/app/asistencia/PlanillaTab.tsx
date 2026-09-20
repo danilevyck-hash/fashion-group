@@ -875,7 +875,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
       ]);
 
       // El cargo y la cédula. Si la lectura falla, el papel sale igual con un
-      // guion en «POSICION DESEMPEÑADA»: quedarse sin comprobantes por un dato
+      // guion en «POSICIÓN DESEMPEÑADA»: quedarse sin comprobantes por un dato
       // que no mueve plata sería peor que imprimirlo incompleto y visible.
       const porCodigo = new Map<string, { posicion: string | null; cedula: string | null }>();
       try {

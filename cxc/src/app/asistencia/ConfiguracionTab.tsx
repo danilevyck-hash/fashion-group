@@ -147,7 +147,7 @@ interface Persona {
   /** `true` = cobra fijo y NO pasa por el reloj. `false` mientras nadie diga lo
    *  contrario: es lo que hacía la planilla con las 39 fichas. */
   noMarcaReloj: boolean;
-  /** El cargo que sale impreso en «POSICION DESEMPEÑADA» del comprobante de
+  /** El cargo que sale impreso en «POSICIÓN DESEMPEÑADA» del comprobante de
    *  pago. `null` = todavía no se cargó, y el papel escribe un guion.
    *  🔴 NO TOCA EL CÁLCULO: es un texto que se imprime. */
   posicion?: string | null;
@@ -1203,7 +1203,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                             {puedeTocarLaFicha && (<>
                             <div>
                               {/* 🔴 SALE IMPRESO EN EL COMPROBANTE, en
-                                  «POSICION DESEMPEÑADA». Hasta el 10-sep-2026
+                                  «POSICIÓN DESEMPEÑADA». Hasta el 10-sep-2026
                                   el sistema no lo conocía y el papel lo lleva:
                                   la contadora lo escribía a mano en cada una de
                                   las 34 hojas.
@@ -1211,7 +1211,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                                   un guion; nunca un cargo inventado. */}
                               <Etiqueta
                                 texto="Cargo"
-                                ayuda="Sale impreso en el comprobante de pago, en «POSICION DESEMPEÑADA». Si lo dejas vacío, el papel escribe un guion."
+                                ayuda="Sale impreso en el comprobante de pago, en «POSICIÓN DESEMPEÑADA». Si lo dejas vacío, el papel escribe un guion."
                               />
                               <input
                                 type="text"

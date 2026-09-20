@@ -384,8 +384,12 @@ describe("H. EL PAPEL DE VERDAD", () => {
     expect(textos).toContain("II QUINCENA DE JULIO DE 2026");
     expect(textos).toContain("Luis Parajón");
     expect(textos).toContain("Asistente de Bodega");
-    expect(textos).toContain("RECIBI CONFORME");
-    expect(textos).toContain("CEDULA");
+    // 🔄 20-sep-2026: el papel ganó sus acentos («RECIBI», «CEDULA») y la
+    // ficha pasó de «EMPLEADO» a «COLABORADOR» — ver
+    // `comprobante-de-pago-legible.test.ts`.
+    expect(textos).toContain("COLABORADOR");
+    expect(textos).toContain("RECIBÍ CONFORME");
+    expect(textos).toContain("CÉDULA");
     expect(textos).toContain("FECHA");
     expect(textos).toContain("8-1010-2403");
   });

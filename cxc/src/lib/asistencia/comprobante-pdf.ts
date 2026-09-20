@@ -74,13 +74,18 @@ export function dibujarComprobante(doc: jsPDF, c: Comprobante): void {
 
   // ── La ficha de la persona.
   //
-  // ⚠️ «POSICION DESEMPEÑADA» y «RATA POR HORA» SALEN IMPRESOS y hasta hoy el
+  // ⚠️ «POSICIÓN DESEMPEÑADA» y «RATA POR HORA» SALEN IMPRESOS y hasta hoy el
   // sistema no los mostraba en ningún lado. El cargo sale de la ficha; sin
   // cargo cargado dice un guion, nunca un cargo inventado.
+  //
+  // 🔴 «COLABORADOR», NO «EMPLEADO» (20-sep-2026). Los otros cuatro papeles del
+  // módulo —Planilla, Reporte, Aprobaciones y Movimientos— ya lo decían así, y
+  // es la palabra que Daniel pidió para todo el sistema. Éste era el único que
+  // seguía diciendo «empleado», y es justo el que la persona firma.
   doc.setFontSize(9.5);
   const ficha: [string, string][] = [
-    ["EMPLEADO", c.empleado],
-    ["POSICION DESEMPEÑADA", c.posicion],
+    ["COLABORADOR", c.empleado],
+    ["POSICIÓN DESEMPEÑADA", c.posicion],
     ["RATA POR HORA", money(c.rataPorHora)],
   ];
   for (const [rotulo, valor] of ficha) {
@@ -137,11 +142,12 @@ export function dibujarComprobante(doc: jsPDF, c: Comprobante): void {
 
   doc.setFont("helvetica", "normal").setFontSize(9);
   const anchoCol = (derecha - MARGEN) / 3;
+  // 🔴 CON SUS ACENTOS (20-sep-2026): decían «RECIBI CONFORME» y «CEDULA».
   const firmas: [string, string][] = [
-    ["RECIBI CONFORME", ""],
+    ["RECIBÍ CONFORME", ""],
     // La cédula sale de la ficha cuando está cargada. Sin ella, la línea queda
     // en blanco para escribirla a mano, que es como se hace hoy.
-    ["CEDULA", c.cedula],
+    ["CÉDULA", c.cedula],
     ["FECHA", ""],
   ];
   firmas.forEach(([rotulo, valor], i) => {
@@ -161,6 +167,26 @@ export function dibujarComprobante(doc: jsPDF, c: Comprobante): void {
 }
 
 /**
+ * 🔴 «HOJA N DE M», CHIQUITO Y A LA DERECHA DEL PIE (20-sep-2026).
+ *
+ * 🩸 En la tanda real de 34 que se imprime y se reparte, NINGUNA hoja decía de
+ * cuál era: si una se caía al piso o se quedaba en la impresora, no había forma
+ * de darse cuenta. El PDF del CXC y el de Comisiones ya lo hacen así.
+ *
+ * Se escribe al FINAL, cuando ya se sabe cuántas hojas son: por eso no vive
+ * adentro de `dibujarComprobante`, que dibuja una sola y no puede saberlo.
+ */
+function numerarHojas(doc: jsPDF): void {
+  const hojas = doc.getNumberOfPages();
+  for (let i = 1; i <= hojas; i++) {
+    doc.setPage(i);
+    doc.setFont("helvetica", "normal").setFontSize(6.5).setTextColor(130);
+    doc.text(`Hoja ${i} de ${hojas}`, HOJA.ancho - MARGEN, HOJA.alto - 8, { align: "right" });
+    doc.setTextColor(0);
+  }
+}
+
+/**
  * El PDF de una tanda de comprobantes: UNA HOJA POR PERSONA.
  *
  * ⚠️ Una lista vacía devuelve un documento de una hoja en blanco y no revienta:
@@ -172,6 +198,7 @@ export function construirPdfComprobantes(comprobantes: readonly Comprobante[]): 
     if (i > 0) doc.addPage();
     dibujarComprobante(doc, c);
   });
+  numerarHojas(doc);
   return doc;
 }
 

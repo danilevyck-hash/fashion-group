@@ -7,7 +7,7 @@
 //
 // ── 🩸 POR QUÉ HACÍAN FALTA ─────────────────────────────────────────────────
 //
-// El comprobante de pago que la contadora arma a mano imprime «POSICION
+// El comprobante de pago que la contadora arma a mano imprime «POSICIÓN
 // DESEMPEÑADA» y, al pie, la cédula de quien firma. Los dos salen impresos en
 // las 34 hojas de julio de 2026 y **ninguno de los dos existía en el sistema**.
 // Sin ellos el papel saldría con dos renglones que nadie puede llenar desde la
@@ -21,7 +21,7 @@
 // se usa siempre. Por eso vive con la persona y no con la quincena.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** El cargo que sale impreso en «POSICION DESEMPEÑADA». */
+/** El cargo que sale impreso en «POSICIÓN DESEMPEÑADA». */
 export const COLUMNA_POSICION = "posicion";
 /** La cédula, para el pie del comprobante. */
 export const COLUMNA_CEDULA = "cedula";
@@ -65,7 +65,7 @@ export function cedulaDeFicha(v: unknown): string | null {
 }
 
 /**
- * Lo que el comprobante escribe en «POSICION DESEMPEÑADA» cuando la ficha no
+ * Lo que el comprobante escribe en «POSICIÓN DESEMPEÑADA» cuando la ficha no
  * lo trae.
  *
  * 🔑 UN GUION, no una invención y no un renglón escondido. El renglón se dibuja

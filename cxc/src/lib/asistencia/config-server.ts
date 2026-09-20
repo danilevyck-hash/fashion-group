@@ -156,7 +156,7 @@ export interface FilaPersonaDb {
   // desde `fecha_ingreso` (`vacaciones-corresponden.ts`). Las columnas siguen en
   // la base, sin lectores, con `COMMENT` y con candado que prohíbe volver a
   // leerlas desde acá. NO se vuelven a agregar a este `select`.
-  /** El cargo impreso en «POSICION DESEMPEÑADA» del comprobante (20261028120000).
+  /** El cargo impreso en «POSICIÓN DESEMPEÑADA» del comprobante (20261028120000).
    *  `null` = todavía no se cargó, y el papel dice un guion. NO toca el cálculo. */
   posicion?: string | null;
   /** La cédula, para el pie del comprobante. `null` = se escribe a mano, como hoy. */

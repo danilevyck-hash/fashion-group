@@ -194,7 +194,7 @@ export interface DatosComprobante {
   /** La línea ya calculada. NO se recalcula nada de acá adentro. */
   linea: LineaPlanilla;
   /**
-   * El cargo que va en «POSICION DESEMPEÑADA». Sale de la ficha de la persona.
+   * El cargo que va en «POSICIÓN DESEMPEÑADA». Sale de la ficha de la persona.
    * `null` = todavía no se cargó, y el papel lo dice: no se inventa un cargo.
    */
   posicion?: string | null;
@@ -330,9 +330,11 @@ export function armarComprobante(
     R("totalDeducciones", "TOTAL DE DEDUCCIONES", totalDeducciones, "total", true),
 
     R("__descuentos", "DESCUENTOS :", null, "seccion", false),
-    R("prestamo", "PRESTAMO", v(d?.prestamo), "dato", true),
+    // 🔴 CON SU ACENTO (20-sep-2026). Decían «PRESTAMO» y «DAÑO DE MERCANCIA»,
+    // y no era la impresora: en ese mismo papel «DESEMPEÑADA» ya llevaba ñ.
+    R("prestamo", "PRÉSTAMO", v(d?.prestamo), "dato", true),
     R("terceros", "DESCUENTO A TERCEROS", v(d?.terceros), "dato", true),
-    R("mercancia", "DAÑO DE MERCANCIA", v(d?.mercancia), "dato", true),
+    R("mercancia", "DAÑO DE MERCANCÍA", v(d?.mercancia), "dato", true),
     R("totalDescuentos", "TOTAL DE DESCUENTOS", totalDescuentos, "total", true),
 
     // 🔴 EL MONTO Y EL LUGAR NO CAMBIAN (15-sep-2026): lo único que se agrega

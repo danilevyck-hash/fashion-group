@@ -1,6 +1,6 @@
 /* ─────────────────────────────────────────────────────────────────────────────
  * LOS DOS DATOS QUE EL COMPROBANTE IMPRIME Y LA PLANILLA NO CONOCE:
- * el cargo («POSICION DESEMPEÑADA») y la cédula del pie.
+ * el cargo («POSICIÓN DESEMPEÑADA») y la cédula del pie.
  *
  * 🔴 ESTA RUTA NO CALCULA NADA. Los montos del comprobante salen de la MISMA
  * respuesta de `/api/asistencia/planilla` que la pantalla ya tiene. Si acá

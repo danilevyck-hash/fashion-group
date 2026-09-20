@@ -248,7 +248,7 @@ export function armarPersonaDeConfiguracion(ins: InsumosDeUnaPersona): {
       // en la ficha (10-sep-2026, Daniel: «por default a todos sí»).
       cobraHorasExtra,
       // 🔴 LOS DOS TEXTOS QUE SOLO EXISTEN PARA EL COMPROBANTE DE PAGO: el
-      // cargo («POSICION DESEMPEÑADA») y la cédula del pie. `null` = todavía
+      // cargo («POSICIÓN DESEMPEÑADA») y la cédula del pie. `null` = todavía
       // no se cargó, y el papel escribe un guion o deja la línea en blanco.
       // Ninguno de los dos toca el cálculo. Ver `datos-del-papel.ts`.
       posicion: f?.posicion ?? null,
