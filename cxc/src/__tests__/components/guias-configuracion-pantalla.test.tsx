@@ -15,7 +15,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, cleanup, act, fireEvent } from "@testing-library/react";
+import { render, cleanup, fireEvent, waitFor } from "@testing-library/react";
 
 const ROUTER = { push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), back: vi.fn(), prefetch: vi.fn() };
 vi.mock("next/navigation", () => ({
@@ -108,10 +108,17 @@ beforeEach(() => {
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
+/** 🔴 SE ESPERA A LA PANTALLA, NO SE CUENTAN MILISEGUNDOS (19-sep-2026).
+ *  Antes acá había `setTimeout(60)`: alcanzaba en esta computadora y NO en la
+ *  del CI, más lenta, donde la afirmación llegaba con la pantalla todavía en
+ *  «Cargando…» («expected 'Guías…Cargando…' to contain 'City Shoes'»). El
+ *  `waitFor` espera lo que de verdad importa —que la pantalla haya terminado
+ *  de dibujar— y sale apenas pasa, así que además corre más rápido. */
 async function abrir(rol: string) {
   sembrarRol(rol);
   const vista = render(<GuiasPage />);
-  await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
+  // `/guias` devuelve `null` hasta confirmar la sesión: con algo dibujado, ya pasó.
+  await waitFor(() => expect(vista.container.firstChild).toBeTruthy());
   return vista;
 }
 
@@ -123,7 +130,11 @@ async function abrirConfiguracion(rol: string) {
   const tab = botonPestania(vista.container);
   expect(tab, "no está la pestaña «Configuración»").toBeTruthy();
   fireEvent.click(tab!);
-  await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
+  // La vista es `dynamic()` y encima pide sus filas: hay DOS «Cargando…»
+  // seguidos. Con un grupo dibujado, los dos terminaron.
+  await waitFor(() =>
+    expect(vista.container.querySelector('[data-testid="grupo-D-35"]')).toBeTruthy(),
+  );
   return vista;
 }
 
@@ -198,11 +209,10 @@ describe("la lista va agrupada por cliente y DICE si autollena", () => {
     expect(deChorrera.checked).toBe(false);
 
     fireEvent.click(deChorrera);
-    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
-    const patches = pedidos.filter((pd) => pd.metodo === "PATCH" && pd.url.includes("destinos-config"));
-    expect(patches).toHaveLength(1);
-    expect(patches[0].url).toContain("id=6");
-    expect(patches[0].body).toEqual({ elDeSiempre: true });
+    const patches = () => pedidos.filter((pd) => pd.metodo === "PATCH" && pd.url.includes("destinos-config"));
+    await waitFor(() => expect(patches()).toHaveLength(1));
+    expect(patches()[0].url).toContain("id=6");
+    expect(patches()[0].body).toEqual({ elDeSiempre: true });
   });
 
   it("el buscador filtra por nombre o código", async () => {
@@ -256,10 +266,9 @@ describe("🔴 nada se escribe solo", () => {
     );
     expect(definir).toBeTruthy();
     fireEvent.click(definir!);
-    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
-    const posts = pedidos.filter((p) => p.metodo === "POST" && p.url.startsWith("/api/guias/destinos-config"));
-    expect(posts).toHaveLength(1);
-    expect(posts[0].body).toMatchObject({ cliente_codigo: "D-87", destino: "Changinola" });
+    const posts = () => pedidos.filter((p) => p.metodo === "POST" && p.url.startsWith("/api/guias/destinos-config"));
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    expect(posts()[0].body).toMatchObject({ cliente_codigo: "D-87", destino: "Changinola" });
   });
 
   it("quitar pide confirmación EN PALABRAS y no manda nada hasta confirmar", async () => {
@@ -275,10 +284,9 @@ describe("🔴 nada se escribe solo", () => {
 
     const confirmar = document.querySelector<HTMLButtonElement>('[data-testid="confirmar-quitar"]');
     fireEvent.click(confirmar!);
-    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
-    const bajas = pedidos.filter((p) => p.metodo === "DELETE");
-    expect(bajas).toHaveLength(1);
-    expect(bajas[0].url).toContain("id=2");
+    const bajas = () => pedidos.filter((p) => p.metodo === "DELETE");
+    await waitFor(() => expect(bajas()).toHaveLength(1));
+    expect(bajas()[0].url).toContain("id=2");
   });
 
   it("editar abre los campos en la fila y guarda por PATCH con el id", async () => {
@@ -295,10 +303,9 @@ describe("🔴 nada se escribe solo", () => {
       (b) => (b.textContent || "").trim() === "Guardar",
     );
     fireEvent.click(guardar!);
-    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
-    const patches = pedidos.filter((p) => p.metodo === "PATCH" && p.url.includes("destinos-config"));
-    expect(patches).toHaveLength(1);
-    expect(patches[0].url).toContain("id=1");
-    expect(patches[0].body).toMatchObject({ destino: "Calle 19 Central" });
+    const patches = () => pedidos.filter((p) => p.metodo === "PATCH" && p.url.includes("destinos-config"));
+    await waitFor(() => expect(patches()).toHaveLength(1));
+    expect(patches()[0].url).toContain("id=1");
+    expect(patches()[0].body).toMatchObject({ destino: "Calle 19 Central" });
   });
 });
