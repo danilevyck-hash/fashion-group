@@ -16,7 +16,6 @@ import { textoActualizado } from "@/lib/proveedores/actualizado";
 import { tonoDeMonto, textoDeMonto } from "@/lib/proveedores/tono";
 import { TRAMOS, TRAMOS_KEYS, frasePartida } from "@/lib/proveedores/tramos";
 import {
-  textoTambienEn,
   type CarteraCxp,
   type EmpresaCxp,
   type ProveedorEnEmpresa,
@@ -384,7 +383,11 @@ function FilaProveedor({
     >
       <td className="py-2 pl-6 pr-1.5 xl:pl-9 xl:pr-3">
         <span className="text-gray-700">{p.nombre}</span>
-        <TambienEn empresas={p.tambien_en} onEmpresa={onEmpresa} />
+        {p.tambien_en.length > 0 && (
+          <span className="ml-2">
+            <TambienEn empresas={p.tambien_en} onEmpresa={onEmpresa} />
+          </span>
+        )}
         {frase && <div className="mt-0.5 text-xs text-gray-400 tabular-nums">{frase}</div>}
       </td>
       {TRAMOS_KEYS.map((k) => (
@@ -409,7 +412,7 @@ function TambienEn({
 }) {
   if (empresas.length === 0) return null;
   return (
-    <span className="ml-2 text-xs text-gray-400">
+    <span className="text-xs text-gray-400">
       también en{" "}
       {empresas.map((e, i) => (
         <span key={e}>
@@ -486,14 +489,13 @@ function TarjetaEmpresa({
                     {textoDeMonto(p.saldo.por_pagar, fmt)}
                   </span>
                 </button>
+                {/* Cada empresa nombrada es su propio botón, igual que en
+                    escritorio: con dos, tocar el texto no puede llevar a una
+                    sola de las dos. */}
                 {p.tambien_en.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => onEmpresa(p.tambien_en[0])}
-                    className="mt-0.5 text-[11px] text-gray-400 underline decoration-dotted underline-offset-2"
-                  >
-                    {textoTambienEn(p.tambien_en)}
-                  </button>
+                  <div className="mt-0.5">
+                    <TambienEn empresas={p.tambien_en} onEmpresa={onEmpresa} />
+                  </div>
                 )}
               </li>
             ))}
