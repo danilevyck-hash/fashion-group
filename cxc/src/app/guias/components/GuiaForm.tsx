@@ -364,12 +364,16 @@ export default function GuiaForm({
     return validationErrors.has(clave) || (touched.has(clave) && !valor.trim());
   }
 
-  // La lista de «Despachado por». Daniel pidió a Eloyn el 14-sep-2026.
+  // La lista de «Despachado por». Daniel pidió a Eloyn el 14-sep-2026 y a
+  // **Jorman** el 19-sep-2026 (*«agrégame a Eloyn y a Jorman a esa lista»*).
   // ⚠️ Lo que alguien agregue con el ＋ vive en el NAVEGADOR (`fg_entregadores`),
   // así que no lo ve nadie más — el mismo defecto que la lista de destinos tuvo
   // hasta el 7-sep-2026, cuando pasó a `guias_destino_lista`. Por eso un nombre
   // que usa todo el equipo va AQUÍ y no en el ＋.
-  const DEFAULT_ENTREGADORES = ["Julio", "Rodrigo", "Eloyn"];
+  // 🔴 EL CAMPO SIGUE ARRANCANDO VACÍO Y SIGUE SIENDO OBLIGATORIO. Daniel dijo
+  // que NO a preseleccionar a nadie: *«porque puede que alguien deje ese por
+  // error»*. Agregar un nombre a la lista es ofrecerlo, nunca ponerlo.
+  const DEFAULT_ENTREGADORES = ["Julio", "Rodrigo", "Eloyn", "Jorman"];
   const [entregadores, setEntregadores] = useState(DEFAULT_ENTREGADORES);
   const [entregadoPorOtro, setEntregadoPorOtro] = useState("");
   useEffect(() => {
