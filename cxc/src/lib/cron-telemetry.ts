@@ -53,6 +53,10 @@ export const CRON_STALE_HOURS_POR_CRON: Record<string, number> = {
   // más largo entre dos éxitos es 7 días, y 8 lo cubren con jitter. Mismo número
   // y mismo motivo que el resumen semanal de fotos.
   "sync-clientes-boston": 8 * 24,
+  // El aviso de reclamos viejos corre los LUNES (14:00 UTC): el hueco más largo
+  // entre dos éxitos es 7 días, y 8 lo cubren con jitter. Mismo número y mismo
+  // motivo que el resumen semanal de fotos.
+  "reclamos-viejos": 8 * 24,
   // Tres pasadas TODOS los días (15:00, 20:00 y 22:15 UTC): entre la última de
   // una noche y la primera de la mañana siguiente pasan 16h45 (22:15 → 15:00 del
   // día siguiente). El umbral de siempre (26h) le sigue quedando holgado —9h15
@@ -518,6 +522,16 @@ export const SEED_TOLERANT_CRONS = [
   // 3-ago-2026: seed-tolerante hasta que siembre su fila. Promover a
   // CRONS_FAIL_CLOSED cuando lleve días corriendo.
   "guias-pendientes",
+  // Aviso SEMANAL de los reclamos que llevan más de 120 días sin cobrarse
+  // (LUNES 14:00 UTC = 9:00 a.m. Panamá). Nacido el 20-sep-2026: seed-tolerante
+  // hasta que siembre su fila — semanal, así que puede tardar hasta una semana.
+  // Umbral propio de 8 días en CRON_STALE_HOURS_POR_CRON, el mismo número y el
+  // mismo motivo que el resumen semanal de fotos. 🔴 No toca Switch: lee solo
+  // Supabase, así que no entra en el cronograma de separación de 15 min.
+  // Promover a CRONS_FAIL_CLOSED cuando lleve semanas corriendo — y ahí también
+  // entra a `CRONS_CUYO_TRABAJO_ES_UN_MENSAJE` (su producto ES el mensaje, pero
+  // ese vigía es fail-CLOSED ante una fila ausente y hoy la fila no existe).
+  "reclamos-viejos",
   // Limpieza de los Excel del Historial del Depurador a los 90 días (03:20
   // UTC; solo DB + Storage, no toca Switch). 🔴 Borra el ARCHIVO, nunca la
   // fila con los totales. Desplegado el 4-sep-2026: seed-tolerante hasta que
