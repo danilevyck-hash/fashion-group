@@ -30,6 +30,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import ReporteTab from "@/app/asistencia/ReporteTab";
+import { TITULO_EDITAR_EL_DIA } from "@/lib/asistencia/editar-el-dia";
 import CorregirMarcacionModal from "@/app/asistencia/CorregirMarcacionModal";
 
 // ── El arnés ─────────────────────────────────────────────────────────────────
@@ -166,11 +167,16 @@ describe("🔴 1. UN DÍA DE 5 MARCAS MUESTRA LAS CINCO", () => {
     expect(hora.tagName).toBe("BUTTON");
   });
 
-  it("tocar una hora ofrece corregirla O quitarla, y lo dice el título", async () => {
+  // 🔄 19-sep-2026 — CAMBIÓ EL TEXTO, NO LA CAPACIDAD. Tocar la hora ya no abre
+  // una ventana por marca: abre el editor del DÍA, donde se corrige, se agrega
+  // y se quita, las cuatro a la vez y con un solo motivo. Por eso el título dice
+  // «Arreglar las marcas de este día» (`TITULO_EDITAR_EL_DIA`). Con el
+  // interruptor `EDITAR_EL_DIA` apagado vuelve a decir lo de antes.
+  it("tocar una hora lleva a arreglar el día, y lo dice el título", async () => {
     servir(respuesta(CINCO));
     montar(<ReporteTab />);
     await abrirElDetalle();
-    expect(screen.getByText("08:10:21").getAttribute("title")).toBe("Corregir o quitar esta marcación");
+    expect(screen.getByText("08:10:21").getAttribute("title")).toBe(TITULO_EDITAR_EL_DIA);
   });
 });
 

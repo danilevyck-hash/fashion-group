@@ -181,12 +181,16 @@ describe("«Justificar» en la fila del día", () => {
     await screen.findByText("lun 31 ago");
   }
 
-  it("🔴 está en la fila del día, al lado de «Agregar hora», y no en el feriado ni en el día ya justificado", async () => {
+  // 🔄 19-sep-2026: «Agregar hora» se llama «Arreglar el día» — es el MISMO
+  // enlace, en el MISMO lugar, y ahora abre el editor de la fila en vez de una
+  // ventana por marca. Lo que este candado cuida —que «Justificar» esté al lado
+  // y no aparezca en el feriado ni en el día ya justificado— no cambió.
+  it("🔴 está en la fila del día, al lado de «Arreglar el día», y no en el feriado ni en el día ya justificado", async () => {
     servir(base);
     montar(<ReporteTab />);
     await abrirPersona();
     const filaDia = screen.getByText("lun 31 ago").closest("tr") as HTMLTableRowElement;
-    expect(within(filaDia).getByRole("button", { name: "Agregar hora" })).toBeTruthy();
+    expect(within(filaDia).getByRole("button", { name: "Arreglar el día" })).toBeTruthy();
     expect(within(filaDia).getByRole("button", { name: "Justificar" })).toBeTruthy();
     const feriado = screen.getByText("mar 1 sep").closest("tr") as HTMLTableRowElement;
     expect(within(feriado).queryByRole("button", { name: "Justificar" })).toBeNull();

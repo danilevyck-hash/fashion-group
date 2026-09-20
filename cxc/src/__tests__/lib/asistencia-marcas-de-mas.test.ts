@@ -499,7 +499,12 @@ describe("Las marcas del medio", () => {
     const src = fs.readFileSync(path.join(process.cwd(), "src/app/asistencia/ReporteTab.tsx"), "utf8");
     expect(src).not.toContain('<td colSpan={4}');
     expect(src).not.toContain('<td colSpan={2}');
-    for (const i of [0, 1, 2, 3]) expect(src).toContain(`<Hora idx={columnas[${i}]} />`);
+    // 🔄 19-sep-2026 — CAMBIÓ DE FORMA, NO DE CONDUCTA. `<Hora>` recibe ahora
+    // también `col`: con el editor del día abierto la celda vacía tiene que
+    // saber DE QUÉ COLUMNA es para poder escribirse (`claveVacia(col)`). Las
+    // cuatro columnas se siguen dibujando siempre, que es lo que este candado
+    // cuida. Ver `lib/asistencia/editar-el-dia.ts`.
+    for (const i of [0, 1, 2, 3]) expect(src).toContain(`<Hora idx={columnas[${i}]} col={${i}} />`);
     expect(src).toContain("rotuloMarcasSueltas(");
   });
 
@@ -557,7 +562,12 @@ describe("Las marcas del medio", () => {
     // Se borró media frase, no el botón: sin el botón la línea no sirve de
     // nada, que es justo lo que hay que tocar para quitar la marca.
     const pantalla = fs.readFileSync(path.join(RAIZ, "app/asistencia/ReporteTab.tsx"), "utf8");
-    expect(pantalla).toMatch(/rotuloMarcasSueltas[\s\S]{0,400}<HoraBoton idx=\{i\}/);
+    // 🔄 19-sep-2026: con el editor del día abierto esa hora es un CAMPO
+    // escribible (`campoEscribible`) y con el editor cerrado sigue siendo el
+    // botón de siempre. Las dos ramas viven en la misma línea, así que la
+    // ventana creció; lo que se cuida —que se pueda TOCAR— no cambió.
+    expect(pantalla).toMatch(/rotuloMarcasSueltas[\s\S]{0,900}<HoraBoton idx=\{i\}/);
+    expect(pantalla).toMatch(/rotuloMarcasSueltas[\s\S]{0,900}campoEscribible\(claveMarca\(i\)/);
   });
 
   it("🔴 CONTROL: el rótulo y la nota van APARTE, para que la hora sea un botón", () => {
@@ -566,7 +576,8 @@ describe("Las marcas del medio", () => {
     const src = fs.readFileSync(path.join(process.cwd(), "src/lib/asistencia/marcas-del-dia.ts"), "utf8");
     expect(src).not.toContain("export function textoMarcasSueltas");
     const pantalla = fs.readFileSync(path.join(process.cwd(), "src/app/asistencia/ReporteTab.tsx"), "utf8");
-    expect(pantalla).toMatch(/rotuloMarcasSueltas[\s\S]{0,400}<HoraBoton idx=\{i\}[\s\S]{0,200}notaMarcasSueltas/);
+    // 🔄 19-sep-2026: misma conducta, más distancia (ver el caso de arriba).
+    expect(pantalla).toMatch(/rotuloMarcasSueltas[\s\S]{0,900}<HoraBoton idx=\{i\}[\s\S]{0,400}notaMarcasSueltas/);
   });
 
   it("CONTROL: con 4 marcas se siguen dibujando las cuatro columnas", async () => {

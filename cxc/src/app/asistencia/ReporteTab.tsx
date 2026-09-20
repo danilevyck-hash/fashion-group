@@ -63,6 +63,15 @@ import { PERSONA_EN_EL_CENTRO, PESTANA_FICHAS, dondeSeCargaLaFicha, rutaDePerson
 import { empresaParaPedir, nombreArchivoPorEmpresa } from "@/lib/asistencia/empresa-para-todo";
 import CorregirMarcacionModal, { type MarcaParaCorregir } from "./CorregirMarcacionModal";
 import JustificarDiaModal, { type DiaParaJustificar } from "./JustificarDiaModal";
+// 🔴 EL DÍA COMPLETO SE ARREGLA EN LA FILA, SIN ABRIR UNA VENTANA (19-sep-2026).
+// La regla de qué se va a escribir vive en un módulo PURO; acá solo se dibuja.
+import {
+  EDITAR_EL_DIA, GUARDAR_EL_DIA, PORQUE, TITULO_EDITAR_EL_DIA,
+  casillasDelDia, claveMarca, claveVacia,
+  faltaParaGuardarElDia, planDelDia, resumenDelPlan, textoGuardado,
+  type CasillaDelDia, type EscritoEnCasilla,
+} from "@/lib/asistencia/editar-el-dia";
+import { MOTIVO_MAX } from "@/lib/asistencia/correcciones";
 // 🔴 EL RELOJ DEL TELÉFONO EN EL REPORTE (14-sep-2026). Lo que Daniel pidió que
 // viera la contadora: la selfie y el mapa, y de dónde salió cada marca. Es una
 // capa de ARRIBA: el motor no sabe nada de esto y sus minutos no cambian.
@@ -199,6 +208,11 @@ export default function ReporteTab({ empresa = "" }: {
   const [puedeCorregir, setPuedeCorregir] = useState(false);
   const [avisoCorreccion, setAvisoCorreccion] = useState<string | null>(null);
   const [corrigiendo, setCorrigiendo] = useState<MarcaParaCorregir | null>(null);
+  // 🔴 LOS MOTIVOS MÁS USADOS SE PIDEN UNA VEZ POR PANTALLA (19-sep-2026), no
+  // una por ventana: ahora el campo del porqué vive en cada fila que se edita y
+  // pedirlos por fila serían 30 peticiones iguales. Sin ellos el campo libre
+  // sigue sirviendo, que es lo que se guarda.
+  const [motivosFrecuentes, setMotivosFrecuentes] = useState<string[]>([]);
   // «Justificar» desde la fila del día (11-sep-2026): el mismo formulario de la
   // ficha, con el colaborador y ese día ya puestos.
   const [justificando, setJustificando] = useState<DiaParaJustificar | null>(null);
@@ -244,6 +258,21 @@ export default function ReporteTab({ empresa = "" }: {
   }, [desde, hasta, q, empresa]);
 
   useEffect(() => { void cargar(); }, [cargar]);
+
+  // Los motivos frecuentes, una sola vez y solo cuando se puede corregir.
+  useEffect(() => {
+    if (!puedeCorregir || !EDITAR_EL_DIA) return;
+    let vivo = true;
+    void fetch("/api/asistencia/correcciones/motivos", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!vivo) return;
+        const lista = Array.isArray(d?.motivos) ? d.motivos.filter((m: unknown) => typeof m === "string") : [];
+        setMotivosFrecuentes(lista as string[]);
+      })
+      .catch(() => { /* sin botones; el campo libre sigue */ });
+    return () => { vivo = false; };
+  }, [puedeCorregir]);
 
   // 🔴 LO QUE SE VE. Con el botón prendido queda solo quien tiene días a
   // revisar — filtrando lo YA cargado, sin pedirle nada al servidor. Todo lo
@@ -558,6 +587,8 @@ export default function ReporteTab({ empresa = "" }: {
                   puedeCorregir={puedeCorregir}
                   onCorregir={setCorrigiendo}
                   onJustificar={setJustificando}
+                  motivosFrecuentes={motivosFrecuentes}
+                  onGuardadoElDia={() => void cargar()}
                   decisionesExtra={decisionesExtra} />
               ))}
             </tbody>
@@ -638,7 +669,7 @@ export default function ReporteTab({ empresa = "" }: {
   );
 }
 
-function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, onToggle, puedeCorregir, onCorregir, onJustificar, marcasTelefono, onVerSelfie, decisionesExtra }: {
+function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, onToggle, puedeCorregir, onCorregir, onJustificar, marcasTelefono, onVerSelfie, decisionesExtra, motivosFrecuentes, onGuardadoElDia }: {
   p: PersonaReporte;
   abierta: boolean;
   /** Abierta por «Ver solo esos días»: adentro van SOLO los días a revisar. */
@@ -654,6 +685,10 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
   onVerSelfie: (m: SelfieParaVer) => void;
   /** `codigo|fecha → si|no`. Lo que no está es PENDIENTE. */
   decisionesExtra: ReadonlyMap<string, Decision>;
+  /** Los motivos más escritos en 90 días, para los botones del porqué. */
+  motivosFrecuentes: readonly string[];
+  /** Se guardó un día: hay que volver a leer el reporte. */
+  onGuardadoElDia: () => void;
 }) {
   const r = p.resumen;
   // 🔴 LA COLUMNA «EXTRAS» DICE CUÁNTO ESTÁ APROBADO (16-sep-2026). Se reparte
@@ -793,6 +828,8 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
                     conExtra={cuentaHorasExtra(p)}
                     puedeCorregir={puedeCorregir} onCorregir={onCorregir}
                     onJustificar={onJustificar}
+                    motivosFrecuentes={motivosFrecuentes}
+                    onGuardadoElDia={onGuardadoElDia}
                     delTelefono={marcasTelefono[llaveDelDia(p.codigo, d.fecha)] ?? []}
                     onVerSelfie={onVerSelfie} />
                 ))}
@@ -831,7 +868,7 @@ function perdonDelDia(d: DiaReporte): PerdonDelDia {
  * corrección debajo. Debajo de la fila, una línea por corrección dice qué se
  * cambió, por qué, quién y cuándo — sin abrir nada más.
  */
-function FilaDia({ d, codigo, persona, empresa, conExtra, puedeCorregir, onCorregir, onJustificar, delTelefono, onVerSelfie }: {
+function FilaDia({ d, codigo, persona, empresa, conExtra, puedeCorregir, onCorregir, onJustificar, delTelefono, onVerSelfie, motivosFrecuentes, onGuardadoElDia }: {
   d: DiaReporte;
   codigo: string;
   persona: string;
@@ -845,7 +882,12 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, puedeCorregir, onCorre
   /** Las marcas que ese día salieron del teléfono. Vacío = ninguna. */
   delTelefono: MarcaTelefonoUI[];
   onVerSelfie: (m: SelfieParaVer) => void;
+  /** Los motivos más escritos en 90 días, para los botones del porqué. */
+  motivosFrecuentes: readonly string[];
+  /** Se guardó este día: el reporte se vuelve a leer. */
+  onGuardadoElDia: () => void;
 }) {
+  const { toast } = useToast();
   /** La corrección que produjo la marca de esa posición, si la hay. */
   const correccionDe = (idx: number) =>
     d.correcciones.find((c) => c.hora === d.marcas[idx]) ?? null;
@@ -873,6 +915,106 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, puedeCorregir, onCorre
       fecha: d.fecha,
       relojHora: null,
     });
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 🔴 EL DÍA COMPLETO SE ARREGLA ACÁ, SIN ABRIR UNA VENTANA (19-sep-2026)
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  // 🩸 Antes: una ventana por cada marca, y para cambiar una hora ya corregida
+  // había que deshacer primero y volver a escribir el motivo. Medido: 58 de 141
+  // días necesitaron 2, 3 y hasta 7 ventanas, y 44 de las 58 correcciones
+  // anuladas fueron seguidas de otra del mismo día en menos de 10 minutos.
+  //
+  // Ahora se toca una hora (o un hueco), la celda se vuelve escribible ahí
+  // mismo, se arreglan las cuatro a la vez, y abajo va UN porqué y UN botón.
+  //
+  // 🔴 Lo que se escribe lo decide `planDelDia` (módulo PURO): una casilla que
+  // nadie tocó no produce nada, y una hora igual a la que ya valía, tampoco.
+  const [editando, setEditando] = useState(false);
+  const [escrito, setEscrito] = useState<Map<string, EscritoEnCasilla>>(new Map());
+  const [motivoDia, setMotivoDia] = useState("");
+  const [guardandoDia, setGuardandoDia] = useState(false);
+  const casillas = useMemo(() => casillasDelDia(d), [d]);
+  const porClave = useMemo(
+    () => new Map(casillas.map((c) => [c.clave, c])),
+    [casillas],
+  );
+  const plan = useMemo(() => planDelDia(casillas, escrito), [casillas, escrito]);
+  const faltaDia = faltaParaGuardarElDia(plan, motivoDia);
+  /** Editar es lo mismo que corregir: mismos roles, misma migración. */
+  const seEdita = EDITAR_EL_DIA && puedeCorregir && !d.fueraDeVigencia;
+
+  function abrirEditor() {
+    if (!seEdita) return;
+    setEscrito(new Map());
+    setMotivoDia("");
+    setEditando(true);
+  }
+  function cerrarEditor() {
+    setEditando(false);
+    setEscrito(new Map());
+    setMotivoDia("");
+  }
+  function escribir(clave: string, cambio: EscritoEnCasilla) {
+    setEscrito((m) => {
+      const n = new Map(m);
+      n.set(clave, cambio);
+      return n;
+    });
+  }
+  function loEscrito(clave: string): EscritoEnCasilla {
+    const e = escrito.get(clave);
+    if (e) return e;
+    return { hora: porClave.get(clave)?.hora ?? "", quitar: false };
+  }
+
+  async function guardarElDia() {
+    if (faltaDia) return;
+    setGuardandoDia(true);
+    try {
+      const res = await fetch("/api/asistencia/correcciones/dia", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          codigo,
+          fecha: d.fecha,
+          motivo: motivoDia,
+          cambios: plan.cambios,
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error ?? "No se pudo guardar");
+      // El aviso sale del módulo puro: dice cuántas horas se tocaron y cómo.
+      toast(textoGuardado(plan), "success");
+      cerrarEditor();
+      onGuardadoElDia();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "No se pudo guardar. Intenta de nuevo.", "error");
+    } finally {
+      setGuardandoDia(false);
+    }
+  }
+
+  /**
+   * Deshacer una corrección ya guardada. Es el MISMO `DELETE` de siempre: la
+   * corrección se ANULA con firma y la fila queda; vuelve a valer lo que dijo
+   * el reloj.
+   */
+  const [deshaciendo, setDeshaciendo] = useState<string | null>(null);
+  async function deshacerCorreccion(id: string) {
+    setDeshaciendo(id);
+    try {
+      const res = await fetch(`/api/asistencia/correcciones?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error ?? "No se pudo deshacer");
+      toast("Listo, se deshizo. Vuelve a valer la hora del reloj.", "success");
+      onGuardadoElDia();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "No se pudo deshacer.", "error");
+    } finally {
+      setDeshaciendo(null);
+    }
   }
 
   /** 🔴 «Justificar» se ofrece donde una justificación puede cambiar algo:
@@ -916,7 +1058,7 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, puedeCorregir, onCorre
     };
   }
 
-  /** Una hora tocable. Tocarla abre la ventana de corregir / quitar. */
+  /** Una hora tocable. Tocarla abre el editor del día (o la ventana de antes). */
   function HoraBoton({ idx, tenue }: { idx: number; tenue?: boolean }) {
     const { clase, titulo, corregida } = textoHora(idx, tenue);
     if (!puedeCorregir) {
@@ -925,10 +1067,10 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, puedeCorregir, onCorre
     return (
       <button
         type="button"
-        onClick={() => abrir(idx)}
+        onClick={() => (seEdita ? abrirEditor() : abrir(idx))}
         // 🔴 El título DICE que también se puede quitar: hasta el 18-sep-2026
         // decía solo «Corregir esta hora» y quitar no existía por esta puerta.
-        title={titulo ?? "Corregir o quitar esta marcación"}
+        title={titulo ?? (seEdita ? TITULO_EDITAR_EL_DIA : "Corregir o quitar esta marcación")}
         className={`min-h-[44px] rounded px-1 ${clase} ${corregida ? "underline decoration-blue-300 underline-offset-2" : "underline decoration-dotted decoration-gray-300 underline-offset-2 hover:decoration-black"}`}
       >
         {d.marcas[idx]}
@@ -936,9 +1078,84 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, puedeCorregir, onCorre
     );
   }
 
+  /**
+   * 🔴 UNA CELDA ESCRIBIBLE. Se dibuja con una FUNCIÓN, no con un componente
+   * anidado: un componente definido adentro cambia de identidad en cada render
+   * y React desmontaría el `<input>` a cada tecla — el foco se perdería y
+   * escribir una hora sería imposible.
+   *
+   * @param clave    la casilla (`m<i>` una marca, `v<c>` un hueco)
+   * @param casilla  lo que hay hoy ahí. `null` = hueco.
+   */
+  function campoEscribible(clave: string, casilla: CasillaDelDia | null, tenue: boolean) {
+    const e = loEscrito(clave);
+    const quitada = e.quitar === true;
+    return (
+      <>
+        <input
+          type="time"
+          step="1"
+          // 🔴 Al quitar no vale ninguna hora: el campo se apaga en vez de
+          // mostrar una que ya no cuenta.
+          value={quitada ? "" : e.hora}
+          disabled={quitada || guardandoDia}
+          aria-label={`Hora ${clave}`}
+          onChange={(ev) => escribir(clave, { hora: ev.target.value, quitar: false })}
+          className={`min-h-[44px] w-full min-w-[6.5rem] rounded-md border px-1.5 text-[13px] tabular-nums outline-none transition focus:border-black disabled:bg-gray-100 disabled:text-gray-400 ${
+            tenue ? "border-gray-200 text-gray-600" : "border-gray-300 text-gray-900"
+          }`}
+        />
+        {/* 🔴 QUITAR SOLO SE OFRECE SOBRE UNA MARCA DEL RELOJ. Una agregada a
+            mano no se quita: se deshace la corrección que la creó, abajo. */}
+        {casilla?.marcacionId && (
+          <button
+            type="button"
+            onClick={() => escribir(clave, { hora: quitada ? casilla.hora : "", quitar: !quitada })}
+            aria-pressed={quitada}
+            disabled={guardandoDia}
+            className={`mt-1 block w-full rounded px-1 text-[11px] transition ${
+              quitada ? "bg-amber-100 font-semibold text-amber-900" : "text-gray-400 hover:text-black"
+            }`}
+          >
+            {quitada ? "Se quita ✕" : "Quitar"}
+          </button>
+        )}
+      </>
+    );
+  }
+
+  /** El campo escribible, ya dentro de su celda de la tabla. */
+  function celdaEscribible(clave: string, casilla: CasillaDelDia | null, tenue: boolean) {
+    return (
+      <td className="px-1 py-1.5 align-top">
+        {campoEscribible(clave, casilla, tenue)}
+      </td>
+    );
+  }
+
   /** Una celda de hora de las CUATRO columnas de siempre. */
-  function Hora({ idx }: { idx: number | null }) {
-    if (idx === null) return <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">—</td>;
+  function Hora({ idx, col }: { idx: number | null; col: number }) {
+    if (editando) {
+      const clave = idx === null ? claveVacia(col) : claveMarca(idx);
+      return celdaEscribible(clave, idx === null ? null : (porClave.get(clave) ?? null), col === 1 || col === 2);
+    }
+    if (idx === null) {
+      // 🔴 EL HUECO TAMBIÉN SE TOCA: la marca que falta es el caso más común, y
+      // antes había que buscar el enlace «Agregar hora» al final de la fila.
+      if (!seEdita) return <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">—</td>;
+      return (
+        <td className="px-2 py-1.5 text-right">
+          <button
+            type="button"
+            onClick={abrirEditor}
+            title={TITULO_EDITAR_EL_DIA}
+            className="min-h-[44px] rounded px-1 tabular-nums text-gray-400 underline decoration-dotted decoration-gray-300 underline-offset-2 transition hover:text-black hover:decoration-black"
+          >
+            —
+          </button>
+        </td>
+      );
+    }
     return (
       <td className="px-2 py-1.5 text-right">
         <HoraBoton idx={idx} tenue={idx === 1 || idx === 2} />
@@ -957,7 +1174,11 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, puedeCorregir, onCorre
     <>
       <tr className={`border-b border-gray-100 ${d.revisar ? "bg-amber-50/60" : ""} ${d.correcciones.length ? "bg-blue-50/40" : ""}`}>
         <td className="whitespace-nowrap px-2 py-1.5 text-gray-700">{fechaCorta(d.fecha)}</td>
-        {d.marcas.length ? (
+        {/* 🔴 CON EL EDITOR ABIERTO SIEMPRE VAN LAS CUATRO COLUMNAS, aunque el
+            día no tenga ni una marca: el caso más común es justamente ése —quien
+            olvidó marcar no tiene nada que corregir— y sin las celdas no habría
+            dónde escribir. */}
+        {d.marcas.length || editando ? (
           <>
             {/* 🔴 LAS CUATRO COLUMNAS SE DIBUJAN SIEMPRE (18-sep-2026).
                 🩸 Hasta hoy acá se ESCONDÍAN marcas: las cuatro celdas se
@@ -971,10 +1192,10 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, puedeCorregir, onCorre
                 desordenado»*. Lo que no entra en las cuatro baja a una línea
                 debajo del día, que es donde esta pantalla ya cuenta lo que pasa
                 con una marca. Ver `rotuloMarcasSueltas`. */}
-            <Hora idx={columnas[0]} />
-            <Hora idx={columnas[1]} />
-            <Hora idx={columnas[2]} />
-            <Hora idx={columnas[3]} />
+            <Hora idx={columnas[0]} col={0} />
+            <Hora idx={columnas[1]} col={1} />
+            <Hora idx={columnas[2]} col={2} />
+            <Hora idx={columnas[3]} col={3} />
             {/* 🔴 EL DÍA DICE SOLO CUÁNTO SE LLEGÓ TARDE, y en rojo cuando esos
                 minutos van a la columna «Ausencia» de la planilla. Es el «para
                 que lo veas» de Daniel: sin esto, un día de 45 minutos y uno de
@@ -1057,10 +1278,10 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, puedeCorregir, onCorre
               )}
               {/* Agregar la marca que falta. Es el caso más común de todos: quien
                   olvidó marcar no tiene nada que corregir. */}
-              {puedeCorregir && !d.fueraDeVigencia && (
-                <button type="button" onClick={agregar}
+              {puedeCorregir && !d.fueraDeVigencia && !editando && (
+                <button type="button" onClick={() => (seEdita ? abrirEditor() : agregar())}
                   className="ml-1.5 min-h-[44px] rounded px-1 text-xs text-gray-500 underline decoration-dotted underline-offset-2 transition hover:text-black">
-                  Agregar hora
+                  {seEdita ? "Arreglar el día" : "Agregar hora"}
                 </button>
               )}
               {/* «Justificar» desde el día (11-sep-2026): el mismo permiso de la
@@ -1108,10 +1329,10 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, puedeCorregir, onCorre
               // diría lo contrario de lo que se paga.
               : d.fueraDeVigencia ? <span className="text-gray-500">{TEXTO_DIA_FUERA_DE_VIGENCIA}</span>
               : <span className="font-medium text-red-700">Ausencia sin justificar</span>}
-            {puedeCorregir && !d.feriado && !d.fueraDeVigencia && (
-              <button type="button" onClick={agregar}
+            {puedeCorregir && !d.feriado && !d.fueraDeVigencia && !editando && (
+              <button type="button" onClick={() => (seEdita ? abrirEditor() : agregar())}
                 className="ml-2 min-h-[44px] rounded px-1 text-xs text-gray-500 underline decoration-dotted underline-offset-2 transition hover:text-black">
-                Agregar marcación
+                {seEdita ? "Arreglar el día" : "Agregar marcación"}
               </button>
             )}
             {seJustifica && enlaceJustificar}
@@ -1137,6 +1358,77 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, puedeCorregir, onCorre
           entra es la de su teléfono. */}
       {/* 🔴 Y UNA MARCA DESHECHA SE VE TACHADA, NO SE ESCONDE: la fila sigue en
           la base (append-only) y dejó de contar por una corrección encima. */}
+      {/* ══════════════════════════════════════════════════════════════════
+          🔴 UN SOLO PORQUÉ Y UN SOLO BOTÓN PARA TODO EL DÍA (19-sep-2026).
+          🩸 Antes cada marca pedía su ventana y su motivo: 58 de 141 días
+          necesitaron 2, 3 y hasta 7. Acá se arreglan las cuatro y se guarda
+          una vez. El motivo sigue siendo OBLIGATORIO.
+          ══════════════════════════════════════════════════════════════════ */}
+      {editando && (
+        <tr className="border-b border-gray-100 bg-blue-50/40">
+          <td></td>
+          <td colSpan={8} className="px-2 pb-3 pt-1">
+            <div>
+              {/* 🩸 El rótulo NO envuelve los botones en un <label>: un botón es
+                  «labelable», así que el label se ataría al PRIMER botón y no al
+                  campo. El campo se rotula por `aria-labelledby`. */}
+              <span id={`porque-${codigo}-${d.fecha}`} className="block text-[12px] font-medium text-gray-700">
+                {PORQUE} <span className="text-red-600">*</span>
+              </span>
+              {/* Los más usados, si los hay. Tocar uno ESCRIBE en el campo. */}
+              {motivosFrecuentes.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {motivosFrecuentes.map((m) => (
+                    <button key={m} type="button" onClick={() => setMotivoDia(m)}
+                      aria-pressed={motivoDia === m}
+                      className={`min-h-[44px] rounded-full border px-3 text-[12px] transition active:scale-[0.97] ${
+                        motivoDia === m
+                          ? "border-black bg-black text-white"
+                          : "border-gray-200 bg-white text-gray-600 hover:border-black hover:text-black"
+                      }`}>
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <input
+                aria-labelledby={`porque-${codigo}-${d.fecha}`}
+                value={motivoDia}
+                onChange={(e) => setMotivoDia(e.target.value.slice(0, MOTIVO_MAX))}
+                placeholder="Escribe el motivo…"
+                disabled={guardandoDia}
+                className="mt-1.5 min-h-[44px] w-full rounded-lg border border-gray-200 bg-white px-3 text-base outline-none transition focus:border-black sm:text-sm"
+              />
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => void guardarElDia()}
+                  disabled={Boolean(faltaDia) || guardandoDia}
+                  className="min-h-[44px] rounded-md bg-black px-4 text-sm font-medium text-white transition active:scale-[0.97] disabled:opacity-40">
+                  {guardandoDia ? "Guardando…" : GUARDAR_EL_DIA}
+                </button>
+                <button type="button" onClick={cerrarEditor} disabled={guardandoDia}
+                  className="min-h-[44px] rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:opacity-40">
+                  Cancelar
+                </button>
+                {/* 🔴 EL BOTÓN APAGADO DICE QUÉ FALTA. Un botón gris sin
+                    explicación se lee como «esta pantalla está rota». */}
+                {faltaDia && !guardandoDia && (
+                  <span className="text-[12px] text-amber-700">{faltaDia}</span>
+                )}
+                {/* Y cuando se puede, se dice QUÉ se va a escribir antes de
+                    escribirlo: «2 horas corregidas · 1 quitada». */}
+                {!faltaDia && resumenDelPlan(plan) && (
+                  <span className="text-[12px] text-gray-600">{resumenDelPlan(plan)}</span>
+                )}
+              </div>
+              <p className="mt-1.5 text-[12px] text-gray-500">
+                No se borra nada: lo que marcó el reloj queda guardado y la corrección va encima,
+                con tu nombre y este motivo.
+              </p>
+            </div>
+          </td>
+        </tr>
+      )}
+
       {delTelefono.map((m) => {
         const idx = d.marcas.findIndex((h) => h.startsWith(m.hora));
         const rotulo = m.quitada ? "Marca" : rotuloDeLaMarca(idx < 0 ? 0 : idx, d.marcas.length);
@@ -1182,9 +1474,17 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, puedeCorregir, onCorre
             {rotuloMarcasSueltas(d.marcas.length, marcasEscondidas(d.marcas.length).length)}
             {marcasEscondidas(d.marcas.length).map((i) => (
               <span key={i} className="mx-1.5 inline-block align-middle">
-                {/* 🔴 SIGUE SIENDO UN BOTÓN: es una de las que pueden sobrar,
-                    y de acá se abre «Corregir o quitar esta marcación». */}
-                <HoraBoton idx={i} tenue />
+                {/* 🔴 SIGUE SIENDO TOCABLE: es una de las que pueden sobrar.
+                    Con el editor abierto se escribe y se quita acá mismo —es
+                    el caso que más importa, porque la que sobra casi nunca es
+                    una de las cuatro columnas—. */}
+                {editando ? (
+                  <span className="inline-block w-[7.5rem] align-top">
+                    {campoEscribible(claveMarca(i), porClave.get(claveMarca(i)) ?? null, true)}
+                  </span>
+                ) : (
+                  <HoraBoton idx={i} tenue />
+                )}
               </span>
             ))}
             {notaMarcasSueltas(d.marcas.length)}
@@ -1206,6 +1506,20 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, puedeCorregir, onCorre
                 → <b className="tabular-nums">{c.hora}</b></>
             )}
             {" · "}“{c.motivo}” · {c.creadaPor}{c.creadaEn ? ` · ${fechaCortaISO(c.creadaEn)}` : ""}
+            {/* 🔴 «DESHACER» SE QUEDA, Y VIVE DONDE VIVE LO YA GUARDADO
+                (19-sep-2026). Editar una hora ya no obliga a deshacer primero
+                —eso lo resuelve el editor de arriba—, pero volver a lo que dijo
+                el reloj sigue siendo deshacer, y la corrección queda anotada
+                con quién la deshizo. 🩸 Una marcación QUITADA no se podía
+                deshacer por ninguna puerta: no está en `marcas`, así que la
+                ventana nunca se abría sobre ella. */}
+            {puedeCorregir && (
+              <button type="button" onClick={() => void deshacerCorreccion(c.id)}
+                disabled={deshaciendo === c.id}
+                className="ml-1.5 min-h-[44px] rounded px-1 text-[12px] text-blue-700 underline decoration-dotted underline-offset-2 transition hover:text-black disabled:opacity-40">
+                {deshaciendo === c.id ? "Deshaciendo…" : "Deshacer"}
+              </button>
+            )}
           </td>
         </tr>
       ))}
