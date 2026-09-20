@@ -83,7 +83,7 @@ function montarDrawer() {
 /** Llena lo obligatorio con un recibo que NO dispara ningún aviso. */
 async function llenarLimpio() {
   fireEvent.change(screen.getByLabelText("Fecha"), { target: { value: "2026-09-04" } });
-  fireEvent.change(screen.getByLabelText("Descripción"), { target: { value: "Almuerzo" } });
+  fireEvent.change(screen.getByLabelText("Nota"), { target: { value: "Almuerzo" } });
   fireEvent.change(screen.getByLabelText("Proveedor"), { target: { value: "Cochez" } });
   fireEvent.change(screen.getByLabelText("Nº de factura"), { target: { value: "750023" } });
   fireEvent.change(screen.getByLabelText("Subtotal"), { target: { value: "1.39" } });
@@ -190,7 +190,7 @@ describe("🔴 2 y 3. EL GASTO NO PIDE RESPONSABLE, Y «ALIMENTACIÓN» VIENE PU
   it("🔴 CONTROL: es una PRESELECCIÓN — «taxi» en el concepto la cambia sola a Transporte", async () => {
     montarDrawer();
     await llenarLimpio();
-    fireEvent.change(screen.getByLabelText("Descripción"), { target: { value: "Taxi al banco" } });
+    fireEvent.change(screen.getByLabelText("Nota"), { target: { value: "Taxi al banco" } });
     fireEvent.click(screen.getByRole("button", { name: "Guardar gasto" }));
     await waitFor(() => expect(posts).toHaveLength(1));
     expect(posts[0].categoria).toBe("Transporte");
@@ -202,8 +202,8 @@ describe("🔴 2 y 3. EL GASTO NO PIDE RESPONSABLE, Y «ALIMENTACIÓN» VIENE PU
     // nunca. Medido: de 10 gastos en «Transporte», 3 dicen comida.
     montarDrawer();
     await llenarLimpio();
-    fireEvent.change(screen.getByLabelText("Descripción"), { target: { value: "Taxi al banco" } });
-    fireEvent.change(screen.getByLabelText("Descripción"), { target: { value: "Comida del equipo" } });
+    fireEvent.change(screen.getByLabelText("Nota"), { target: { value: "Taxi al banco" } });
+    fireEvent.change(screen.getByLabelText("Nota"), { target: { value: "Comida del equipo" } });
     fireEvent.click(screen.getByRole("button", { name: "Guardar gasto" }));
     await waitFor(() => expect(posts).toHaveLength(1));
     expect(posts[0].categoria).toBe("Alimentación");
@@ -299,7 +299,7 @@ describe("🩸 5 y 6. LA FICHA ANGOSTA: «Editar» hace algo, y se ve el N° de 
   it("🔴 «Editar» abre el formulario DENTRO de la ficha, con todos los campos", () => {
     montarFicha({ editando: true, editGasto: { ...GASTO } });
     expect(screen.getByLabelText("Fecha")).toBeTruthy();
-    expect(screen.getByLabelText("Descripción")).toBeTruthy();
+    expect(screen.getByLabelText("Nota")).toBeTruthy();
     expect(screen.getByLabelText("Proveedor")).toBeTruthy();
     expect(screen.getByLabelText("Nº de factura")).toBeTruthy();
     expect(screen.getByLabelText("Subtotal")).toBeTruthy();

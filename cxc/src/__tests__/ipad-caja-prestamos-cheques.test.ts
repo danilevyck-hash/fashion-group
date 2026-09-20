@@ -197,7 +197,9 @@ describe("Textos que se cortaban", () => {
 describe("Nada que se toque por debajo de 44 px", () => {
   it("Los campos del formulario de gasto miden 44 (medían 36) — eran 13 targets chicos", () => {
     expect(gastoForm).not.toContain("height: 36,");
-    expect(veces(gastoForm, /height: 44,/g)).toBe(3);
+    // 20-sep-2026: eran 3 y pasaron a 5 — el «＋» que crea una categoría y su
+    // botón «Crear» nacieron ya medidos en 44.
+    expect(veces(gastoForm, /height: 44,/g)).toBe(5);
   });
 
   it("Ningún botón de Caja se quedó en h-9 (36 px)", () => {

@@ -75,7 +75,7 @@ function montar() {
  *  recordado llega recién cuando carga el catálogo). */
 async function llenarMinimo() {
   fireEvent.change(screen.getByLabelText("Fecha"), { target: { value: FECHA_RECIBO } });
-  fireEvent.change(screen.getByLabelText("Descripción"), { target: { value: "Taxi al banco" } });
+  fireEvent.change(screen.getByLabelText("Nota"), { target: { value: "Taxi al banco" } });
   fireEvent.change(screen.getByLabelText("Proveedor"), { target: { value: "La Gran Parrilla" } });
   fireEvent.change(screen.getByLabelText("Subtotal"), { target: { value: "10" } });
   await waitFor(() => {
@@ -106,7 +106,7 @@ describe("🔴 «Guardar y nuevo» conserva la fecha elegida", () => {
     // La fecha SE QUEDA para el siguiente recibo de la tanda…
     expect((screen.getByLabelText("Fecha") as HTMLInputElement).value).toBe(FECHA_RECIBO);
     // …y lo que sí se limpia, se limpió.
-    expect((screen.getByLabelText("Descripción") as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText("Nota") as HTMLInputElement).value).toBe("");
     expect((screen.getByLabelText("Subtotal") as HTMLInputElement).value).toBe("");
   });
 });

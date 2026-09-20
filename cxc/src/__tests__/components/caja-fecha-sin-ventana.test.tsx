@@ -74,7 +74,7 @@ function montar(periodo: Record<string, unknown> = PERIODO) {
 /** Llena lo obligatorio con la fecha que se le pase. */
 async function llenar(fecha: string) {
   fireEvent.change(screen.getByLabelText("Fecha"), { target: { value: fecha } });
-  fireEvent.change(screen.getByLabelText("Descripción"), { target: { value: "Comida" } });
+  fireEvent.change(screen.getByLabelText("Nota"), { target: { value: "Comida" } });
   fireEvent.change(screen.getByLabelText("Proveedor"), { target: { value: "Super 99" } });
   fireEvent.change(screen.getByLabelText("Subtotal"), { target: { value: "10.59" } });
   await waitFor(() => {
@@ -141,7 +141,7 @@ describe("CONTROL: lo que sigue frenando", () => {
       gastos: [{ fecha: "2026-09-03", proveedor: "Super 99", nro_factura: "196854200", total: 10.59 }],
     });
     fireEvent.change(screen.getByLabelText("Fecha"), { target: { value: "2026-09-03" } });
-    fireEvent.change(screen.getByLabelText("Descripción"), { target: { value: "Comida" } });
+    fireEvent.change(screen.getByLabelText("Nota"), { target: { value: "Comida" } });
     fireEvent.change(screen.getByLabelText("Proveedor"), { target: { value: "Super 99" } });
     fireEvent.change(screen.getByLabelText("Nº de factura"), { target: { value: "196854200" } });
     fireEvent.change(screen.getByLabelText("Subtotal"), { target: { value: "10.59" } });

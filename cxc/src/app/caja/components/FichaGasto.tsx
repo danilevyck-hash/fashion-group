@@ -87,8 +87,8 @@ export default function FichaGasto({
         />
         <input
           type="text"
-          aria-label="Descripción"
-          placeholder="¿En qué se gastó?"
+          aria-label="Nota"
+          placeholder="Nota (opcional)"
           value={editGasto.descripcion || ""}
           onChange={(e) => setEditGasto({ ...editGasto, descripcion: e.target.value })}
           style={campoStyle}
@@ -162,6 +162,10 @@ export default function FichaGasto({
   };
   const items = accionesDelGasto(isOpen).map((a) => porAccion[a]);
 
+  // La nota, si la hay; si no, el proveedor manda la tarjeta.
+  const nota = (g.descripcion || g.nombre || "").trim();
+  const encabezado = nota || g.proveedor || "—";
+
   return (
     <div
       data-gasto-fila={g.id}
@@ -172,12 +176,15 @@ export default function FichaGasto({
       }}
     >
       <div className="flex items-start justify-between gap-2 mb-1.5">
+        {/* 🔴 «Descripción» pasó a «Nota» y es OPCIONAL (20-sep-2026): sin nota
+            el encabezado de la tarjeta es el PROVEEDOR, que es lo que
+            identifica el recibo, y abajo no se repite. */}
         <p
           className="text-sm font-medium truncate flex-1"
           style={{ color: "var(--caja-fg-strong)" }}
           data-gasto-campo="descripcion"
         >
-          {g.descripcion || g.nombre || "—"}
+          {encabezado}
         </p>
         <p className="caja-money caja-money-strong text-sm whitespace-nowrap" data-gasto-campo="total">
           ${fmt(g.total)}
@@ -193,7 +200,7 @@ export default function FichaGasto({
       </div>
       <p className="text-sm caja-mono" style={{ color: "var(--caja-fg-subtle)" }}>
         {fmtDate(g.fecha)}
-        {g.proveedor && ` · ${g.proveedor}`}
+        {nota && g.proveedor ? ` · ${g.proveedor}` : ""}
       </p>
       {/* 🔴 El N° de factura: es lo que distingue dos recibos del mismo día, del
           mismo lugar y por el mismo monto. */}

@@ -220,7 +220,7 @@ export default function GastoTable({
 
   // Desktop column count (excluding actions/⋯). Responsable salió de la tabla
   // (ahora es a nivel período); el dato por gasto se sigue guardando en DB.
-  const dataCols = 5 + (showFiscal ? 2 : 0); // Fecha, Desc, Prov, Cat, (Sub, ITBMS,) Total
+  const dataCols = 5 + (showFiscal ? 2 : 0); // Fecha, Nota, Prov, Cat, (Sub, ITBMS,) Total
   const totalColSpan = 4; // first 4 cols before Sub/ITBMS/Total break
 
   return (
@@ -354,7 +354,8 @@ export default function GastoTable({
                 }}
               >
                 <th className="text-left py-2.5 px-4 font-medium">Fecha</th>
-                <th className="text-left py-2.5 px-4 font-medium">Descripción</th>
+                {/* 🔴 «Descripción» pasó a «Nota», opcional (20-sep-2026). */}
+                <th className="text-left py-2.5 px-4 font-medium">Nota</th>
                 <th className="text-left py-2.5 px-4 font-medium">Proveedor</th>
                 <th className="text-left py-2.5 px-4 font-medium">Categoría</th>
                 {showFiscal && (

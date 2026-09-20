@@ -192,7 +192,10 @@ export default function PeriodoDetailPage() {
           <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200">
             <h3 className="text-base font-medium mb-3">¿Eliminar este gasto?</h3>
             <p className="text-sm text-gray-800 mb-2">
-              Gasto &ldquo;{pendingDeleteGasto.descripcion?.trim() || "Sin descripción"}&rdquo; · ${fmt(pendingDeleteGasto.total)} · {pendingDeleteGasto.categoria || "Sin categoría"} · {pendingDeleteGasto.proveedor || "Sin proveedor"} · {fmtDate(pendingDeleteGasto.fecha)}
+              {/* 🔴 El recibo se nombra por su PROVEEDOR: la nota es opcional
+                  desde el 20-sep-2026 y casi siempre va vacía. */}
+              {pendingDeleteGasto.proveedor || "Sin proveedor"} · ${fmt(pendingDeleteGasto.total)} · {pendingDeleteGasto.categoria || "Sin categoría"} · {fmtDate(pendingDeleteGasto.fecha)}
+              {pendingDeleteGasto.descripcion?.trim() ? ` · ${pendingDeleteGasto.descripcion.trim()}` : ""}
             </p>
             <p className="text-xs text-gray-500 mb-6">
               Podrás restaurarlo desde Gastos eliminados si es un error.

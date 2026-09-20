@@ -2,6 +2,7 @@
 
 import { ReactNode, useState, type CSSProperties } from "react";
 import SearchableSelect from "@/components/ui/SearchableSelect";
+import { motivoParaNoCrear, normalizarCategoria } from "@/lib/caja/categorias";
 
 // Estilo que iguala el look de los <select> nativos de Caja para los
 // SearchableSelect (responsable/categoría).
@@ -56,11 +57,9 @@ interface Props {
   totalNum: number;
   categorias: string[];
   showManageCat: boolean;
-  newCatName: string;
   isOwner: boolean;
   setCategorias: (v: string[]) => void;
   setShowManageCat: (v: boolean) => void;
-  setNewCatName: (v: string) => void;
   /** La foto del recibo: opcional, se arrastra o se toca. Lo pone el llamador. */
   zonaFotos?: ReactNode;
   /**
@@ -315,14 +314,15 @@ function MoneyInputFlat({
 
 /* ---------- Sugerencia de categoría por keywords del concepto ---------- */
 // Preselecciona (no fuerza): solo sugiere si la categoría existe en la lista.
+// 🩸 SE FUERON CUATRO REGLAS QUE NO LLEVABAN A NINGUNA PARTE (20-sep-2026):
+// «Combustible», «Limpieza», «Envios» y «Servicios» no existen en el catálogo
+// —las 6 reales son Materiales · Transporte · Alimentación · Papelería ·
+// Mantenimiento · Otros— así que sus palabras clave no podían preseleccionar
+// nada. Quedan las cuatro que sí tienen categoría detrás.
 const CATEGORIA_KEYWORDS: { cat: string; kws: string[] }[] = [
   { cat: "Transporte", kws: ["taxi", "uber", "didi", "bus", "pasaje", "transporte", "peaje", "estacionamiento", "parqueo"] },
-  { cat: "Combustible", kws: ["gasolina", "combustible", "diesel"] },
   { cat: "Alimentacion", kws: ["comida", "almuerzo", "desayuno", "cena", "restaurante", "cafe", "café", "snack", "agua", "refresco", "soda", "merienda"] },
-  { cat: "Limpieza", kws: ["limpieza", "detergente", "cloro", "escoba", "jabon", "jabón", "toalla", "desinfectante"] },
   { cat: "Papeleria", kws: ["papeleria", "papelería", "tinta", "toner", "tóner", "resma", "boligrafo", "bolígrafo", "lapiz", "lápiz", "impresion", "impresión", "fotocopia", "sobre", "carpeta"] },
-  { cat: "Envios", kws: ["correo", "encomienda", "envio", "envío", "courier", "flete"] },
-  { cat: "Servicios", kws: ["internet", "telefono", "teléfono", "electricidad", "recarga"] },
   { cat: "Mantenimiento", kws: ["ferreteria", "ferretería", "tornillo", "herramienta", "reparacion", "reparación", "mantenimiento", "pintura", "bombillo", "foco"] },
 ];
 
@@ -357,11 +357,9 @@ export default function GastoForm({
   totalNum,
   categorias,
   showManageCat,
-  newCatName,
   isOwner,
   setCategorias,
   setShowManageCat,
-  setNewCatName,
   zonaFotos,
   notaFecha,
 }: Props) {
@@ -375,6 +373,11 @@ export default function GastoForm({
   } = setters;
 
   const [catError, setCatError] = useState<string | null>(null);
+  // El «＋» de la categoría: lo ve cualquiera que tenga el módulo.
+  const [creandoCat, setCreandoCat] = useState(false);
+  const [nuevaCat, setNuevaCat] = useState("");
+  const [nuevaCatError, setNuevaCatError] = useState<string | null>(null);
+  const [creandoCatEnCurso, setCreandoCatEnCurso] = useState(false);
   // Mientras el usuario no toque la categoría a mano, la preseleccionamos según
   // las keywords del concepto. Tras un cambio manual, dejamos de sugerir.
   const [categoriaTouched, setCategoriaTouched] = useState(false);
@@ -385,6 +388,41 @@ export default function GastoForm({
   // cambia: plegado, itbms = 0 igual que hoy.
   const [itbmsPedido, setItbmsPedido] = useState(false);
   const itbmsAbierto = itbmsPedido || parseFloat(gItbmsPct) > 0;
+
+  /**
+   * Crea la categoría en el SERVIDOR y la deja elegida. La repetida se rechaza
+   * por clave exacta (minúsculas y sin acentos), nunca por parecido, y el
+   * servidor vuelve a decidir lo mismo: acá solo se evita el viaje.
+   */
+  async function crearCategoria() {
+    const limpio = normalizarCategoria(nuevaCat);
+    const motivo = motivoParaNoCrear(nuevaCat, categorias);
+    if (motivo) { setNuevaCatError(motivo); return; }
+    setCreandoCatEnCurso(true);
+    try {
+      const res = await fetch("/api/caja/categorias", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre: limpio }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        setNuevaCatError(
+          payload && typeof payload.error === "string" ? payload.error : "No se pudo crear la categoría.",
+        );
+        return;
+      }
+      setCategorias([...categorias, limpio].sort((a, b) => a.localeCompare(b, "es")));
+      setCategoriaTouched(true);
+      setGCategoria(limpio);
+      setNuevaCat("");
+      setCreandoCat(false);
+    } catch {
+      setNuevaCatError("No se pudo crear la categoría. Intenta de nuevo.");
+    } finally {
+      setCreandoCatEnCurso(false);
+    }
+  }
 
   function handleDescripcionChange(v: string) {
     setGDescripcion(v);
@@ -412,12 +450,19 @@ export default function GastoForm({
           <Field label="Fecha" required hint={notaFecha || undefined}>
             <TextInput type="date" value={gFecha} onChange={setGFecha} ariaLabel="Fecha" />
           </Field>
-          <Field label="Descripción" required>
+          {/* 🔴 «DESCRIPCIÓN» OBLIGATORIA PASÓ A SER «NOTA», OPCIONAL
+              (20-sep-2026). Daniel: «opino eliminar descripción y se convierta
+              como nota como en guías, en caso tal que quieran apuntar algo».
+              🩸 Medido: decía «Comida» en 38 de los 77 recibos, con la
+              categoría al lado diciendo «Alimentación» — el mismo dato dos
+              veces. Se guarda en la MISMA columna `descripcion`: nada de lo ya
+              escrito se toca. */}
+          <Field label="Nota">
             <TextInput
               value={gDescripcion}
               onChange={handleDescripcionChange}
-              placeholder="¿En qué se gastó?"
-              ariaLabel="Descripción"
+              placeholder="Algo que quieras apuntar (opcional)"
+              ariaLabel="Nota"
             />
           </Field>
         </div>
@@ -470,15 +515,75 @@ export default function GastoForm({
           className="caja-grid-clasif"
         >
           <Field label="Categoría" required>
-            <SearchableSelect
-              value={gCategoria}
-              onChange={(v) => { setCategoriaTouched(true); setGCategoria(v); }}
-              options={categorias.map((c) => ({ value: c, label: c }))}
-              placeholder="Buscar categoría…"
-              ariaLabel="Categoría"
-              style={cajaInputStyle}
-              focusStyle={cajaInputFocusStyle}
-            />
+            {/* 🔴 EL «＋» CREA UNA CATEGORÍA PARA TODO EL EQUIPO (20-sep-2026).
+                Daniel: «si algún momento hay una categoría nueva, pon el más
+                para configurarla y que los que tengan el módulo las puedan
+                crear para siempre en todos los usuarios». No es una lista del
+                navegador: se guarda en la base, como los destinos de Guías. */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <SearchableSelect
+                  value={gCategoria}
+                  onChange={(v) => { setCategoriaTouched(true); setGCategoria(v); }}
+                  options={categorias.map((c) => ({ value: c, label: c }))}
+                  placeholder="Buscar categoría…"
+                  ariaLabel="Categoría"
+                  style={cajaInputStyle}
+                  focusStyle={cajaInputFocusStyle}
+                />
+              </div>
+              <button
+                type="button"
+                aria-label="Crear categoría"
+                title="Crear categoría"
+                onClick={() => { setNuevaCatError(null); setCreandoCat((v) => !v); }}
+                className="inline-flex items-center justify-center shrink-0 rounded-md transition-colors"
+                style={{
+                  width: 44, height: 44,
+                  color: "var(--caja-fg-muted)",
+                  border: "1px solid var(--caja-border-default)",
+                  background: "#fff",
+                  fontSize: 16,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "var(--caja-accent)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "var(--caja-fg-muted)"; }}
+              >
+                ＋
+              </button>
+            </div>
+            {creandoCat && (
+              <div className="mt-2">
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <input
+                    type="text"
+                    autoFocus
+                    aria-label="Nombre de la categoría nueva"
+                    placeholder="Nombre de la categoría"
+                    value={nuevaCat}
+                    onChange={(e) => { setNuevaCat(e.target.value); setNuevaCatError(null); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void crearCategoria(); } }}
+                    style={{ ...cajaInputStyle, flex: 1, minWidth: 0 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void crearCategoria()}
+                    disabled={creandoCatEnCurso}
+                    className="inline-flex items-center justify-center px-3 rounded-md text-sm font-medium shrink-0 transition-transform active:scale-[0.97] disabled:opacity-40"
+                    style={{ height: 44, background: "var(--caja-accent)", color: "#fff" }}
+                  >
+                    {creandoCatEnCurso ? "Creando…" : "Crear"}
+                  </button>
+                </div>
+                <p className="text-xs mt-1.5" style={{ color: "var(--caja-fg-muted)" }}>
+                  Queda guardada para todos, no solo en esta computadora.
+                </p>
+                {nuevaCatError && (
+                  <p className="text-xs mt-1" style={{ color: "var(--caja-danger-onSoft)" }}>
+                    {nuevaCatError}
+                  </p>
+                )}
+              </div>
+            )}
           </Field>
           {zonaFotos && (
             <Field label="Foto del recibo">
@@ -508,13 +613,13 @@ export default function GastoForm({
                 e.currentTarget.style.color = "var(--caja-fg-muted)";
                 e.currentTarget.style.borderColor = "var(--caja-border-subtle)";
               }}
-              title="Gestionar categorías"
+              title="Quitar categorías"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="3" />
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
               </svg>
-              Gestionar categorías
+              Quitar categorías
             </button>
             {showManageCat && (
               <div
@@ -556,46 +661,9 @@ export default function GastoForm({
                     </button>
                   </div>
                 ))}
-                <div className="flex items-center gap-2 pt-1">
-                  <input
-                    type="text"
-                    value={newCatName}
-                    onChange={(e) => setNewCatName(e.target.value)}
-                    placeholder="Nueva categoría"
-                    className="flex-1 min-h-[44px] text-sm outline-none bg-transparent"
-                    style={{ borderBottom: "1px solid var(--caja-border-default)" }}
-                  />
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setCatError(null);
-                      const normalized = normalizeStr(newCatName);
-                      if (!normalized || categorias.includes(normalized)) return;
-                      const res = await fetch("/api/caja/categorias", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ nombre: normalized }),
-                      });
-                      if (!res.ok) {
-                        const payload = await res.json().catch(() => null);
-                        setCatError(
-                          payload && typeof payload.error === "string"
-                            ? payload.error
-                            : "No se pudo crear la categoría.",
-                        );
-                        return;
-                      }
-                      setCategorias([...categorias, normalized]);
-                      setNewCatName("");
-                    }}
-                    className="inline-flex h-11 w-11 items-center justify-center text-sm -my-1 transition-colors"
-                    style={{ color: "var(--caja-fg-muted)" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = "var(--caja-accent)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = "var(--caja-fg-muted)")}
-                  >
-                    ＋
-                  </button>
-                </div>
+                {/* Crear vive en el «＋» de al lado de la categoría, donde lo
+                    ve todo el que tenga el módulo. Acá quedó lo que solo puede
+                    el dueño: QUITAR. */}
                 {catError && (
                   <p
                     className="text-xs"

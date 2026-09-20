@@ -64,7 +64,6 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
   const [addingGasto, setAddingGasto] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showManageCat, setShowManageCat] = useState(false);
-  const [newCatName, setNewCatName] = useState("");
   const [fotos, setFotos] = useState<File[]>([]);
   const [pendingNeg, setPendingNeg] = useState<{
     fondo: number; gastado: number; nuevo: number; saldoFuturo: number; andNew: boolean;
@@ -240,8 +239,11 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
     return () => document.removeEventListener("keydown", onKey, true);
   }, [pendingNeg, pendingAviso, addingGasto]);
 
+  // 🔴 LA NOTA ES OPCIONAL (20-sep-2026): era «Descripción» y era obligatoria.
+  // 🩸 Medido: decía «Comida» en 38 de los 77 recibos, con la categoría al lado
+  // diciendo «Alimentación». Lo obligatorio es lo que identifica el recibo:
+  // fecha, proveedor, categoría y monto.
   const canSave =
-    !!gDescripcion.trim() &&
     subtotalNum > 0 &&
     !!gCategoria.trim() &&
     !!gProveedor.trim() &&
@@ -298,11 +300,9 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
           totalNum={totalNum}
           categorias={categorias}
           showManageCat={showManageCat}
-          newCatName={newCatName}
           isOwner={isOwner}
           setCategorias={setCategorias}
           setShowManageCat={setShowManageCat}
-          setNewCatName={setNewCatName}
           zonaFotos={<ZonaFotos pendientes={fotos} onPendientes={setFotos} />}
           notaFecha={notaFecha}
         />
