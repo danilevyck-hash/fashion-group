@@ -402,7 +402,13 @@ describe("F. la pantalla: la decisión se toma en la FILA de la planilla, y en n
 
   it("las DOS celdas (escritorio y tarjeta) reciben `sinDescontar`, y la lista lo calcula de las mismas líneas", () => {
     expect((pantalla.match(/sinDescontar=\{esSinDescontar\(l, campo\)\}/g) ?? []).length).toBe(2);
-    expect(pantalla).toMatch(/sinDescontar: prestamosSinDescontar\(data\.lineas\),/);
+    // 🔄 19-sep-2026 — SE MUDÓ, NO CAMBIÓ: la entrada de «Antes de cerrar» se
+    // arma en el módulo puro `antes-de-cerrar-del-cuadro.ts`, porque el TABLERO
+    // de cierre de «Todas» necesita exactamente la misma. Sigue saliendo de las
+    // MISMAS líneas que dibuja la tabla, que es lo que este caso cuida.
+    expect(pantalla).toMatch(/antesDeCerrarDelCuadro\(/);
+    expect(sinComentarios("src/lib/asistencia/antes-de-cerrar-del-cuadro.ts"))
+      .toMatch(/sinDescontar: prestamosSinDescontar\(data\.lineas\),/);
   });
 
   it("la casilla muestra el 0 SOLO cuando había una cuota que saltar", () => {

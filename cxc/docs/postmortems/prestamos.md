@@ -543,3 +543,13 @@ verde.
 - 🔴 **«+ Nuevo préstamo» ofrece solo a los de la empresa elegida arriba** (con «Todas», todos). 🩸 La lista y el total filtraban; el alta ofrecía a las 4.
 - 🩸 **`cron_heartbeats` conservaba la fila `prestamos-caducan`** (el cron se retiró el 11-sep): migración `20261116120000_borrar_heartbeat_prestamos_caducan.sql` (DELETE por nombre EXACTO, patrón `sync-mayor`), **aplicada y verificada** (0 filas). Candados: `prestamos-tope-ambar-y-nuevo-desde-ficha.test.tsx` · `prestamos-salida-con-deuda.test.tsx` (la migración).
 
+
+---
+
+## Lo que decía CLAUDE.md de las tres cuotas y del neto no negativo, hasta el 19-sep-2026 (verbatim)
+
+> El 19-sep-2026 entraron a CLAUDE.md las seis reglas nuevas de Asistencia y el archivo estaba al tope del harness. Estos dos párrafos se resumieron allá; acá quedan ENTEROS, con sus citas y sus mediciones. **Las reglas siguen vigentes**: lo único que se movió es el detalle.
+
+- 🔴 **LAS TRES CUOTAS ENTRAN SOLAS: préstamo, terceros y DAÑO DE MERCANCÍA** (14-sep-2026), cada una capeada a SU saldo y sin aprobar. Daniel: *«Tanto el chico como el grande que sea por cuota. Agregan el daño como se hace un préstamo, se elige la cuota y listo»*. El daño se registra en «+ Nuevo préstamo» **con su cuota, igual que un préstamo**, y desde ahí baja solo hasta saldarse. Las tres casillas tienen los MISMOS tres estados (`NULL` = va la cuota · `0` = no se descuenta esta quincena · monto = ese monto); la de mercancía por la migración `20261122120000` (**aplicada y verificada el 14-sep-2026**: 25 ceros pasaron a vacío, los 4 con monto intactos). 🔑 Lo ya anotado le gana a la cuota: un «Pago de responsabilidad» de otro origen no se vuelve a cobrar. Las tres cuotas **se editan en «Editar ficha»** (un `0` apaga la cuota y **no borra la deuda**). 🔴 **Boston suma las TRES en su «descuenta $X por quincena»**: dejar una afuera le muestra a David menos de lo que la planilla aplica.
+
+- 🔴 **EL DESCUENTO NUNCA DEJA EL NETO EN NEGATIVO** (14-sep-2026, Daniel: *«a) Que nunca pase del neto: descuenta lo que alcance y el resto queda debiendo»*; es red de seguridad). 🩸 El motor no tenía piso. `recortarAlNeto` (`lib/asistencia/neto-no-negativo.ts`) corre **al FINAL de la ruta**, achica **solo lo AUTOMÁTICO** (lo escrito a mano manda), en el orden **daño → terceros → préstamo** (decisión de construcción: el préstamo es el compromiso más viejo), y anota `prestamoAutomatico.recortado`. **El saldo no baja por lo que no se cobró**: el cierre anota solo lo que entró (omisión `neto-no-alcanzo` si quedó en cero). Se DICE en la celda y en «Antes de cerrar». **El ISR sigue a mano.** Medido: la cuota más pesada hoy es $70 sobre ~$262 (27 %).

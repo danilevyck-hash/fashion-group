@@ -7,6 +7,138 @@
 
 ---
 
+## 🔴 Los seis cambios del 19-sep-2026 — el día se arregla en la fila, y el cierre se ve de una
+
+### Qué decidió Daniel
+
+Seis cosas, aprobadas una por una:
+
+1. **Arreglar el día completo sin abrir una ventana**, y **sin ventana** —no una ventana mejor—: que se edite en la misma fila del Reporte.
+2. **Decidir las horas extra desde el Reporte**, sin ir a Aprobaciones.
+3. **Justificar a varios desde el Reporte** seleccionando filas (no la opción del formulario con selector de personas).
+4. **El tablero de cierre con las cuatro empresas**, con «Todas» elegido.
+5. **Quitar la columna «Vacaciones» de la lista de Colaboradores.** Textual: *«se habló que días de vacaciones no existe, sino por plata, ya se habló de eso»*.
+6. **Las direcciones viejas de las pestañas que se mudaron.** Textual: *«no creo que debería de existir, ¿no?»*.
+
+---
+
+### 1 · El día completo se arregla en la fila
+
+#### 🩸 Lo que había
+
+Una ventana (`CorregirMarcacionModal`) **por cada marca**, y para cambiar una hora ya corregida había que **deshacer primero y volver a escribir el motivo** — porque el único parcial de la base admite UNA corrección viva por marcación.
+
+Medido contra producción: **232 correcciones sobre 141 días de 33 personas**; **58 días necesitaron 2, 3 y hasta 7 ventanas**; **58 correcciones se anularon** y **44 de ellas fueron seguidas de otra del mismo día en menos de 10 minutos** — o sea, deshacer-para-reescribir.
+
+#### La regla, entera
+
+- Tocar una hora **o un hueco** vuelve la celda escribible **en la misma fila**: `<input type="time" step="1">` en las cuatro columnas de siempre, más las marcas sueltas de un día de 5 o 6 en su propia línea. Debajo de la fila, **un solo campo de porqué** (con los botones de los motivos más usados) y **un solo botón «Guardar el día»**.
+- 🔴 **Editar es editar, sin deshacer previo.** Cambiar una hora ya corregida **ANULA la anterior** (con firma, `anulada_en`) **y escribe la nueva**. Las dos filas quedan: lo que se ahorra es el viaje, no el rastro.
+- 🔴 **`asistencia_marcaciones` NO se edita ni se borra.** La ruta nueva no nombra esa tabla, no importa la base y no tiene un solo `.update(`/`.delete(`/`.upsert(` — hay barrido.
+- 🔴 **Nada se aplica solo.** Una casilla que nadie tocó no produce nada; una hora igual a la que ya valía, tampoco; vaciar una casilla NO borra la marca (quitar es otra cosa y se pide con su botón). Una hora que no sirve **se DICE** y frena el guardado, nunca se descarta en silencio.
+- 🔴 **El motivo sigue siendo OBLIGATORIO**, y es UNO para todo el día: la razón por la que ese día se tocó. Los motivos frecuentes se siguen derivando de lo guardado en 90 días — ahora se piden **una vez por pantalla**, no una por ventana.
+- 🔴 **«Deshacer» se queda para lo ya guardado**, en la línea de la corrección (donde se lee «Reloj 08:14:22 → 08:00:00»). 🩸 Y ahora alcanza también a una marcación **QUITADA**, que hasta hoy no se podía deshacer por ninguna puerta: no está en `marcas`, así que la ventana nunca se abría sobre ella.
+- 🔴 **El servidor valida TODO antes de escribir NADA** (`POST /api/asistencia/correcciones/dia`): el motivo, cada hora, que lo que se quita exista en el reloj, que ninguna marcación venga dos veces (el único parcial reventaría a mitad de camino) y que **la persona y el día salgan de la MARCACIÓN**, nunca del navegador — aceptar el `fecha` del cuerpo dejaría mover horas de una quincena a otra.
+- **Interruptor `EDITAR_EL_DIA`** (`lib/asistencia/editar-el-dia.ts`), hoy en `true`. En `false` la pantalla es exactamente la de antes, con su ventana, sin migración de por medio.
+
+#### Medido
+
+`scripts/_medir-vs-yulissa.ts`, solo lectura, antes y después: **1–15 sep y 16–31 ago IDÉNTICAS byte a byte** (46 líneas cada una). Es una pantalla, no un cálculo, y se midió igual.
+
+#### Candados
+
+`asistencia-editar-el-dia.test.ts` (36 casos: la regla pura, el servidor, los barridos) y `asistencia-editar-el-dia.test.tsx` (11 casos, renderizando el Reporte de verdad). Mutación: **26 de 26 cazadas, 2 controles en verde** (`scripts/_mutar-candados-editar-el-dia.sh`).
+
+---
+
+### 2 · Las horas extra se deciden desde el Reporte
+
+- La columna «Extras» pasa a tener **Sí / No** en la fila del día, donde ya se está mirando el reloj.
+- 🔴 **Al aprobar manda el SERVIDOR.** Son los MISMOS botones (`aprobaciones/BotonesSiNo`), el MISMO endpoint (`POST /api/asistencia/aprobaciones`), el MISMO cuerpo y el MISMO `?empresa=`: el alcance del aprobador, el filtro por empresa y el «todo o nada» los sigue decidiendo la ruta. Hay barrido que prohíbe que el Reporte importe `diasConExtra`, `clasificarDia` o `recargoDomingoFeriado`.
+- ⚠️ **La pestaña Aprobaciones NO se tocó**, y sigue siendo la única que ofrece el **DOMINGO** y el **FERIADO** trabajados: esos minutos viven en `domingoMin`/`feriadoMin` (`clasificarDia`), no en el `extraMin` que muestra esta columna. Ofrecerlos aquí pediría rehacer la clasificación en la pantalla — una segunda verdad.
+- Los botones solo salen con hora extra y con la casilla «¿Cobra horas extra?» en sí (`seDecideEnElReporte`); quien no puede aprobar no los ve (y el servidor lo frena igual); la decisión se pinta en el acto y **se REVIERTE si el POST falla**, diciendo por qué; volver a tocar el prendido vuelve a pendiente.
+- **Medido**: 0 diferencias en las dos quincenas. Candado `asistencia-extras-en-el-reporte.test.tsx`; mutación **13 de 13 cazadas, 2 controles**.
+
+---
+
+### 3 · Justificar a varios desde el Reporte
+
+#### 🩸 De dónde salió
+
+El **día de lluvia del 17-ago-2026** son **13 justificaciones cargadas una por una con la misma nota** — 13 de las 29 de toda la historia del módulo. Cada una pedía abrir la ficha de esa persona, elegir el motivo, escribir la nota y guardar.
+
+#### La regla, entera
+
+- Cada fila del Reporte lleva su **casilla** (dentro de la celda «Colaborador», no en una columna nueva: la tabla ya tiene once y una doceava la aprieta en el iPad). Con alguien marcado aparece arriba una barra: «N colaboradores seleccionados · Justificar a varios · Quitar la selección».
+- 🔴 **La lista de motivos sigue CERRADA** (`motivos.ts`). Con varios marcados se ofrece la **INTERSECCIÓN** de los suyos (`motivosParaVarios`), nunca la unión: con alguien de Multifashion adentro, «Día libre de la empresa» no se ofrece a nadie — el servidor lo rechazaría y el lote quedaría a medias.
+- 🔴 **El guardado usa la MISMA ruta y la MISMA validación de hoy**, con el cuerpo de siempre, **una petición por persona**. NO nace una ruta «en lote» con reglas propias, que sería una segunda verdad sobre qué se puede justificar y quién puede hacerlo.
+- 🔴 **La ventana monta el MISMO `JustificarForm`** de la ficha y de la fila del día; lo único nuevo es la prop `codigos` y un bucle. El de adentro del bucle se llama `codigo` a propósito: el cuerpo que viaja es letra por letra el de siempre.
+- 🔴 **Se dice a quiénes, POR NOMBRE, antes de guardar** — justificar mueve plata—, y **lo que no entra se dice también por nombre**: «Se guardaron 11 de 13. Faltó: Andrea Perez · Jenifer Gomez.»
+- 🔴 **Abre en UN día** (el primero del período que se mira), nunca el período entero: con los atajos «Hoy» y «Ayer» es exactamente el día buscado, y justificar catorce días por defecto sería regalar media quincena.
+- 🔴 **La selección se deriva de lo que SE VE**: quien sale de la tabla (cambió el período, se prendió «Solo a revisar») sale de la selección, y no se justifica a escondidas.
+- **Medido**: 0 diferencias. Candado `asistencia-justificar-a-varios.test.tsx`; mutación **17 de 17 cazadas, 2 controles**.
+
+⚠️ **Lo que NO se arregló, y Daniel preguntó**: las **3 justificaciones duplicadas** de producción. `asistencia_justificaciones` no tiene soft delete, pero **sí se pueden borrar**: `DELETE /api/asistencia/justificaciones?id=<uuid>` existe desde siempre y hace un DELETE de verdad, y la sección «Justificaciones» de la ficha del colaborador ya lo llama. O sea: **se borran desde la ficha de esa persona**, no hace falta tocar la tabla. Lo que no hay es forma de borrarlas desde la lista del período. No se tocó nada: es una decisión de Daniel.
+
+---
+
+### 4 · El tablero de cierre con las cuatro empresas
+
+#### 🩸 Lo que había
+
+Con «Todas» elegido, la Planilla decía *«Elige una empresa arriba para armar su planilla: con «Todas» no se paga nada»* y **no mostraba nada más**. Para saber cómo venía la quincena había que entrar empresa por empresa, generar y mirar — cuatro veces, seis veces al mes.
+
+#### La regla, entera
+
+- Con «Todas», una línea por empresa: **Empresa · Colabor. · Neto · Qué falta para cerrar · Cerrar**.
+- 🔴 **NUNCA UN TOTAL DEL GRUPO.** El tablero muestra ESTADO, no totales: no hay fila «Total», ni pie (`<tfoot>`), ni un número que sume dos empresas. El módulo puro no tiene una operación de suma entre filas y hay barrido que lo exige. Y **se DICE por qué**, en una línea bajo la tabla: *«Cada empresa se cierra por su lado y paga su propia planilla: aquí no se suman.»* Sin ella, el primer instinto de cualquiera que vea cuatro netos en columna es sumarlos.
+- 🔴 **Cada cierre es el de SU empresa, por su propia puerta.** El botón de una fila manda el MISMO `POST /api/asistencia/planilla-guardada` con `{ empresa, desde, hasta }` de esa empresa, una por vez, detrás de la **MISMA ventana de confirmación** que la Planilla (`ModalCierre`, la que muestra los números que se van a congelar). **No existe un «cerrar todas».**
+- 🔴 **Sigue valiendo que solo se cierran quincenas**: el freno (`frenoSoloQuincenas`) es del servidor y el tablero no tiene uno propio que pueda separarse de aquél.
+- El cuadro de cada empresa sale de **su PROPIA lectura**, a la ruta de siempre (`/api/asistencia/planilla?empresa=K`), que ya fuerza la empresa para David y recorta por el alcance.
+- 🔴 **«Qué falta» sale del MISMO «Antes de cerrar»** que dibuja la Planilla de una empresa. Para eso su entrada —quince campos— se mudó a un módulo puro, `antes-de-cerrar-del-cuadro.ts`: dos copias serían dos verdades sobre qué frena un cierre, y el día que se agregue un aviso una de las dos se quedaría vieja sin que nadie se entere.
+- Detalles: una lectura caída **se DICE** y no se disfraza de «no hay nadie», y no tumba a las demás; una empresa ya cerrada no ofrece cerrar otra vez; quien no cierra no ve un botón; y **se espera al alcance del servidor** antes de armar el tablero — sin eso se arma dos veces, parpadea a «Cargando…» delante de quien mira y les muestra un instante a David y a Julio empresas que su rol no ve.
+- **Medido**: 0 diferencias. Candado `asistencia-tablero-cierre.test.tsx` (21 casos); mutación **16 de 16 cazadas, 2 controles**.
+
+---
+
+### 5 · Los días de vacaciones se van de la lista de Colaboradores
+
+> *«se habló que días de vacaciones no existe, sino por plata, ya se habló de eso»*
+
+🩸 La columna mostraba un número **PELADO**: **Briceida decía 665** — los días acumulados desde su ingreso en 2006, sin restar lo que se tomó antes de que las vacaciones existieran en el sistema (25-ago-2026). Entre los 44 colaboradores sumaban **2.160 días**. En una lista de 44 filas no hay lugar para la línea que explica que ese número no es un saldo, así que el número engaña.
+
+- Se quita **la columna de la LISTA**: el encabezado, la celda de escritorio y el dato de la tarjeta del celular. Con ella se va la lectura que la llenaba, así que la pantalla hace **una petición menos** al abrirse, y la rejilla vuelve a ser UNA (la de cinco columnas de siempre).
+- 🔴 **La FICHA de cada persona NO se toca**: ahí el mismo número se lee **«Le corresponden N días»** con su línea de aviso («No incluye vacaciones tomadas antes del 17 de septiembre de 2026»). Ahí está bien puesto.
+- 🔴 **El cálculo se queda entero** (`vacaciones-corresponden.ts`): la regla de la ley (30 días por cada 11 meses), el `null` cuando falta la fecha de ingreso, y el barrido que exige que **no entre a ningún cálculo de plata**.
+- Candado `asistencia-vacaciones-fuera-de-la-lista.test.ts`; mutación **9 de 9 cazadas, 2 controles**.
+
+---
+
+### 6 · Las direcciones viejas de las pestañas
+
+> *«no creo que debería de existir, ¿no?»*
+
+🩸 `?tab=justificaciones`, `?tab=vacaciones`, `?tab=configuracion` y `?tab=reporte` **se aceptaban y abrían otra pantalla EN SILENCIO**: la URL seguía diciendo «justificaciones» mientras se veía Asistencia. La dirección quedaba viva: se podía volver a compartir, y el Atrás del navegador la devolvía. (Son cuatro, más `personas`, que es la misma mudanza de una tarde de septiembre.)
+
+- Ahora la URL **se reescribe** a la pestaña real, con `replace` —es el mismo nivel, y el Atrás no tiene que pasar por la dirección que se acaba de corregir—.
+- **La mudanza NO cambió**: cada una sigue cayendo donde de verdad vive eso (`MUDANZA`). Lo que cambia es que la dirección vieja deja de existir en cuanto se usa una vez.
+- 🔴 **Sin `?tab=` no se escribe nada.** Entrar a `/asistencia` a secas no puede empezar a poner `?tab=` en el historial de todo el mundo.
+- 🔴 **No se toca nada hasta saber QUIÉN mira.** El rol sale de `sessionStorage` en un efecto y en el primer render no hay ninguna pestaña visible: reescribir ahí convertiría un `?tab=planilla` compartido por WhatsApp en la pestaña por defecto **antes** de saber que esa persona sí ve la Planilla.
+- La regla vive en el módulo puro (`claveQueSeReescribe`), y la pantalla no tiene su propia tabla de mudanzas.
+- ⚠️ **Con el acomodo nuevo APAGADO** (`NEXT_PUBLIC_PERSONA_EN_EL_CENTRO`), esas cuatro claves SON pestañas de verdad y no se corrige nada. En producción el interruptor está prendido.
+- Candado `asistencia-direcciones-viejas.test.tsx`; mutación **10 de 10 cazadas, 2 controles**.
+
+---
+
+### Lo que NO se hizo
+
+- No se escribió nada en producción ni en ninguna base; no hay migración nueva.
+- No se tocó la pestaña Aprobaciones, ni la ficha del colaborador, ni el motor de la planilla.
+- **Los netos no se movieron**: 1–15 sep y 16–31 ago salen idénticas byte a byte antes y después de los seis cambios.
+
+---
+
+
 ## 🔴 Solo se cierran quincenas (18-sep-2026, noche) — el freno es del servidor
 
 ### Qué decidió Daniel
@@ -1914,3 +2046,41 @@ Las únicas **4 marcas de teléfono** de toda la historia son las pruebas de Dan
 - 🔴 **UN PERMISO DE HORAS PERDONA LAS TRES COLUMNAS, CON LA MISMA REGLA (16-sep-2026).** Daniel: *«El permiso perdona lo que se solape con la ventana, sea tardanza, salida temprana o exceso de almuerzo. Una sola regla, tres columnas»* · *«permiso justificado se paga»*. `minutosPerdonadosDe` cruza la ventana del permiso con la del INCUMPLIMIENTO —tardanza `[entrada, 1.ª marca]` · salida temprana `[última marca, salida]` · almuerzo `[sale + permitido, vuelve]`— y perdona la **intersección**, capeada a SU propio bruto. 🩸 Antes solo sabía tardanza de ENTRADA: Andrea Pérez (16) entró **puntual** el 1-sep y se fue 12:07:32 con Constancia de 12:00 a 17:00, y perdía **$16,43**; Briceida Montero (8) el 7-sep, **$12,92**. El estiramiento del **mismo minuto** (27-ago) se generaliza al borde que mira a la marca: el FINAL en tardanza y almuerzo, el **PRINCIPIO** en salida temprana. Siguen valiendo: un permiso de horas **no justifica el día entero** y `minutosPerdonados` conserva firma y conducta. 🔴 **Nada callado**: el día lleva los **tres perdones por separado** (`permisoPerdonaMin` · `...SalidaMin` · `...AlmuerzoMin`) más `permisoRango`, el resumen los suma en `minutosPerdonadosPorPermiso` y los abre en tres, y el chip pasó de «Permiso 0 min» a «Permiso 12:00–17:00 · perdona 292 min de salida temprana» — texto de un módulo PURO que comparten pantalla, título y Excel. **Medido contra producción**: 1-15 sep (corte 10-sep) solo se mueven 16 y 8 (neto 11.286,36 → 11.314,29); 16-30 ago, **0 diferencias**. Candado: `permiso-tres-columnas.test.ts`; **15 mutaciones, 15 cazadas**, 2 controles (`scripts/_mutar-candados-permiso-tres-columnas.sh`).
 
 - 🔴 **CINCO ARREGLOS DE PANTALLA DEL REPORTE (16-sep-2026), y ninguno mueve plata.** (1) **El período se elige con cuatro botones** —Hoy · Ayer · Esta quincena · Quincena pasada— derivados de `quincenasElegibles` (`atajos-periodo.ts`), la MISMA función de la Planilla; el calendario se queda para lo demás. Daniel: *«arregla la manera de seleccionar en el calendario que se ve raro, tiene que ser normal, facil»*. (2) **El período vive en la URL** (`?desde=&hasta=`, `replace`): antes era `useState` y se reseteaba al volver de otra pestaña (*«quiero q se quede»*). Precedencia en `periodo-en-la-url.ts`: URL → recordado → sugerencia, y **media URL o un rango al revés se descartan enteros**. (3) **El aviso de la hora de salida NOMBRA a cada uno**, con enlace a su ficha (`rutaDePersona`); la ruta devuelve `sinHorarioLista`. (4) 🔴 **Dos marcas y la última a más de DOS HORAS de su salida se avisa** (`salida-sospechosa.ts`, `SALIDA_SOSPECHOSA_MIN = 120`): `marcas-impares` no lo atrapa —dos es par—. Viaja en su propio campo, **nunca dentro de `revisar`** (que entra a `dias_a_revisar` de la planilla guardada) y **mira la salida temprana NETA**: un día con permiso ya está explicado. Umbral medido: en 45 días con 2 marcas, **entre 58 y 180 minutos no hay nada**. (5) **La columna «Extras» dice cuánto está aprobado** (`extras-decididas.ts`): reparte el MISMO número que ya sumaba según `decision`, así que aprobado + rechazado + pendiente **es** el total. ⚠️ Cambia lo que se MUESTRA, nunca lo que se paga. Candado: `asistencia-cinco-arreglos.test.tsx`; **19 mutaciones, 19 cazadas**, 2 controles (`scripts/_mutar-candados-cinco-arreglos.sh`).
+
+---
+
+## Lo que decía CLAUDE.md de los dos cambios del 18-sep-2026, hasta el 19-sep-2026 (movido aquí, verbatim)
+
+> El 19-sep-2026 entraron a CLAUDE.md las seis reglas nuevas de Asistencia y el archivo estaba a 14 caracteres del tope del harness. Estos dos párrafos se resumieron allá a una regla cada uno; acá quedan ENTEROS, con sus mediciones y sus candados. **Las reglas siguen vigentes**; lo único que se movió es el detalle.
+
+- 🔴 **LOS DÍAS Y LOS DOS HORARIOS SON CONFIGURABLES POR PERSONA (18-sep-2026):** «hábil» ya no es «lunes a viernes» en el código sino la lista de cada quien (`asistencia_horarios.dias_laborables`; en NULL manda la EMPRESA: **Multifashion lunes a SÁBADO**, las otras lunes a viernes), así que un sábado de Multifashion sin marca es **ausencia** con sus 8 h y con marca es un **día normal sin recargo** (el aviso «trabajó un sábado» desaparece para ellos); **el domingo no se toca**. Y cada persona tiene DOS horarios —el del reloj y el del teléfono (`entrada_afuera`/`salida_afuera`, **vacío = el mismo de adentro**)— y **cuál aplica lo decide la PRIMERA marca del día**. Regla en `lib/asistencia/horario-configurable.ts`, lectura ÚNICA en `horarios-server.ts`; migración `20261208120000` ⚠️ **pendiente (la corre Daniel)** y **falla ABIERTA**: sin ella, todo como hoy. Medido: solo Multifashion se mueve (1–15 sep −$87,13 · 16–31 ago −$102,92); el 12-sep quedó como feriado global y sus 4 ausencias se fueron solas. Candado `horario-configurable` (18 mutaciones, 2 controles). Detalle en el postmortem.
+
+- 🔴 **TODO DE LUNES A SÁBADO EN MULTIFASHION, Y SIN DEUDA DE DÍA LIBRE (18-sep-2026, tarde).** Daniel: *«obvio todo de lunes a sábado con multifashion»* · *«ese día se les regala… no hay deuda del día libre a multifashion»*. Las TRES cuentas que seguían en «lunes a viernes» a secas —«faltan N días hábiles», el prorrateo de quien entra o sale a mitad de quincena y la deuda del día libre— pasan por **UN contador** (`diasLaborablesDelRango`, `horario-configurable.ts`) con los días de cada quien; **el domingo no se toca**. **Multifashion NUNCA lleva deuda de día libre**: `EMPRESAS_SIN_DIA_LIBRE` (`motivos.ts`), el servidor rechaza con 400 por empresa, por persona y en la puerta que escribe, y la pantalla no le ofrece el motivo. **No hay feriados por empresa**. Medido: 0 cambios de neto (1–15 sep y 16–31 ago). Candado `multifashion-sabado-y-dia-libre` (17 mutaciones, 2 controles). Detalle en el postmortem.
+
+### Y lo que decía del día libre de la empresa, hasta el 19-sep-2026 (verbatim)
+
+- 🔴 **EL DÍA LIBRE DE LA EMPRESA: SE PAGA COMPLETO Y QUEDA DEBIENDO 8 HORAS EN DÓLARES, QUE SOLO PAGAN LAS HORAS EXTRA (17-sep-2026).** Séptimo motivo, **lejos de «Compensatorio», que es lo CONTRARIO** (un libre que se le DEBÍA, gratis). Deuda = `8 × rata`, **congelada** al cargarse; se cobra consumiendo las CINCO columnas del extra y los seguros se recalculan sobre el bruto nuevo. 🔴 **El tope es el EXTRA, nunca el neto**: sin horas extra no se cobra un centavo y la deuda arrastra sin caducar, y **no se descuenta de la liquidación**. Una sola puerta (`cargarDeudasDiaLibre`), admin y contabilidad, solo hábiles; el cierre anota el pago y reabrir lo revierte. 🔑 No se inventó: la contadora lo lleva a mano desde mayo. Candado `dia-libre-empresa`.
+
+### Y lo que decía de los tres cambios del 14-sep-2026, hasta el 19-sep-2026 (verbatim)
+
+- 🔴 **LAS HORAS EXTRA LAS APAGA SOLO LA CASILLA «¿Cobra horas extra?» DE LA FICHA — SER SERVICIO PROFESIONAL YA NO LAS APAGA (14-sep-2026).** Daniel: *«solo yulissa no cobra, todos los demás sí»*. Con la casilla en SÍ un servicio profesional **mide** sus extras y sale en Aprobaciones, pero **sigue sin `dinero`** (`fueraDePlanilla` no se tocó): no se inventa una rata. El Reporte y su ruta preguntan por la MISMA casilla. **0 cambios de neto medidos.** ⚠️ Marcar a alguien de Fashion Wear como servicio profesional lo SACA de la planilla entera — es otra pregunta. Candado `servicio-profesional-cobra-extra`. Detalle y citas en el postmortem.
+
+- 🔴 **LOS DÍAS AFUERA SON «TRABAJO DE VENDEDOR» POR RANGO, DESDE LA FICHA, Y EL HORARIO 9–18 NO SE GUARDA (14-sep-2026).** No nació un mecanismo: el motivo ya no descuenta y `JustificarForm` ya tenía «Días» de-hasta; lo nuevo es la nota bajo el motivo (`notaDelMotivo` → `TEXTO_DIA_AFUERA`). 🔴 **El horario NO se guarda**: guardado como `hora_desde`/`hora_hasta` sería un PERMISO y el día pasaría a AUSENCIA (`motivoAdmiteHoras` sigue siendo solo Constancia). 🔴 **Si marcó ese día, manda el reloj.** Candados: `dias-afuera-y-compensatorio` · `justificar-form-nota-motivo`. Detalle y citas en el postmortem.
+
+- 🔴 **«TRABAJA AFUERA» ES UNA CASILLA DE LA FICHA, Y NADIE CARGA NADA (14-sep-2026).** A quien la tiene, un día hábil ya pasado, sin marca, sin feriado y sin justificación —la condición que lo habría hecho ausencia— se le pone «Trabajo de vendedor» solo (`lib/asistencia/trabaja-afuera.ts`). **El día que SÍ marca se mide del reloj.** Feriado, fin de semana, vacación, justificación cargada y día en curso siguen mandando. ⚠️ **NO es `no_marca_reloj`** (ésa apaga el reloj SIEMPRE; con las dos, gana). Se lee APARTE de las fichas (`leerTrabajaAfuera`, tolerante). Candado `planilla-trabaja-afuera`.
+
+### Y lo que decía de «Compensatorio», hasta el 19-sep-2026 (verbatim)
+
+- 🔴 **«COMPENSATORIO» ES EL SEXTO MOTIVO, AL LADO DE INCAPACIDAD, Y NO DESCUENTA (14-sep-2026).** `MOTIVO_COMPENSATORIO` en `MOTIVOS_JUSTIFICACION` (`Incapacidad · Compensatorio · Catástrofe · Escolares · Trabajo de vendedor · Constancia`), de día completo. **Sin migración**: la base no tiene CHECK sobre `motivo`. Sigue valiendo: *justificar significa que se paga*. Candado en `dias-afuera-y-compensatorio`. Detalle y citas en el postmortem.
+
+### Y lo que decía de los días de vacaciones, hasta el 19-sep-2026 (verbatim)
+
+- 🔴 **LOS DÍAS DE VACACIONES SE CALCULAN SOLOS, Y NO SON UN SALDO (17-sep-2026).** **30 días corridos por cada 11 MESES** desde `fecha_ingreso`, período en curso truncado, menos las registradas (`lib/asistencia/vacaciones-corresponden.ts`). 🔴 Se lee **«Le corresponden N días», NUNCA «le quedan»**, con la línea gris de que no incluye lo tomado antes del 17-sep-2026. 🔴 **NO entra a ningún cálculo de plata** —ni planilla ni liquidación—, con barrido que lo exige. 🔴 **Sin `fecha_ingreso` no sale un número, ni cero.** 🩸 El saldo a mano se RETIRÓ (`saldo_vacaciones_dias`/`_corte`, sin lectores, con `COMMENT`). Candado `vacaciones-le-corresponden`.
+
+### Y lo que decía de los cinco arreglos, el corte y el ajuste por concepto, hasta el 19-sep-2026 (verbatim)
+
+- 🔴 **CINCO ARREGLOS DE PANTALLA DEL REPORTE (16-sep-2026), y ninguno mueve plata**: los cuatro botones de período (`atajos-periodo.ts`, los MISMOS de la Planilla), el período en la URL (`periodo-en-la-url.ts`: URL → recordado → sugerencia, y media URL o un rango al revés se descartan enteros), el aviso de la hora de salida que NOMBRA a cada uno, el de **salida sospechosa** (`salida-sospechosa.ts`, **120 min**, en su propio campo y **nunca dentro de `revisar`**) y la columna «Extras», que reparte el MISMO número según `decision` (`extras-decididas.ts`). ⚠️ Cambia lo que se MUESTRA, nunca lo que se paga. Candado: `asistencia-cinco-arreglos`. Detalle en el postmortem.
+
+- 🔴 El corte y el ajuste de los días sin medir entran **cada concepto en su columna — nunca una línea neta**, cada monto con SU rata (`corte-quincena.ts`, antes de totalizar: `dinero.netoPagar` ES el neto que se paga). **El neto por persona no cambia.** 🔴 **Y los seguros SÍ se recalculan sobre el bruto CON el ajuste** desde el 11-sep-2026 (Daniel: *«los seguros, va»*): la ruta le pasa a `aplicarAjusteEnLinea` los porcentajes vigentes. ⚠️ No se tocan con `paga_seguros` apagado ni con base propia (`seguros_base_quincena`), porque ahí el seguro no sale del bruto.
+
+- 🔴 **EL DÍA DEL CORTE LO ELIGE LA CONTADORA, NO EL SISTEMA.** Daniel: *«los cortes no son 13 y 28, es depende de la contable cuando elige la fecha del corte»*. `CORTE_SUGERIDO = { 1: 13, 2: 28 }` es **solo lo que se propone** en la casilla; ella escribe el que quiera y vacío = quincena entera. La quincena real (1-15 · 16-fin) **sí es fija**; lo que el corte mueve es hasta dónde se LEE EL RELOJ, y los días que quedan se pagan normal y se ajustan en la siguiente.

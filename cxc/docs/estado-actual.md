@@ -2432,3 +2432,21 @@ Daniel eligió la (a) del pendiente 27. `useAuth` arrancaba en «no sé» y **29
 - **`/home`** sigue en blanco hasta hidratar (modo oscuro en `localStorage`; el servidor no lo sabe). Pide guardar la preferencia en una cookie.
 - **`/prestamos/[id]`** sigue en blanco hasta que llega la ficha por `fetch`: pide traerla en el servidor.
 - **Pestaña nueva con cookie viva**: ahora se ve la pantalla propia un instante antes del rebote al login → casa. Conservar el enlace pide rehidratar `sessionStorage` desde `/api/auth/sesion` en vez de rebotar.
+
+### 19-sep-2026 · Asistencia: los seis cambios que Daniel aprobó
+
+Detalle entero (mediciones, citas, candados, mutaciones) en [postmortems/asistencia-planilla.md](postmortems/asistencia-planilla.md) › «Los seis cambios del 19-sep-2026».
+
+1. **El día completo se arregla en la fila, sin abrir una ventana.** Se toca una hora (o un hueco) del Reporte y la celda se vuelve escribible ahí mismo: las cuatro marcas a la vez, UN porqué, UN botón «Guardar el día», y **editar es editar — sin deshacer previo** (cambiar una hora ya corregida anula la anterior y escribe la nueva; las dos filas quedan). Medido: 58 de 141 días pedían 2, 3 y hasta 7 ventanas, y 44 de las 58 correcciones anuladas eran deshacer-para-reescribir. Interruptor `EDITAR_EL_DIA` (hoy `true`).
+2. **Las horas extra se deciden desde el Reporte** (Sí / No en la fila), con el MISMO endpoint y las mismas reglas. Aprobaciones no se tocó.
+3. **Se justifica a varios desde el Reporte** marcando filas (el día de lluvia del 17-ago son 13 cargadas una por una). Misma ruta, una petición por persona, motivos por INTERSECCIÓN, y lo que no entra se dice con nombre.
+4. **Con «Todas», el tablero de cierre**: una línea por empresa (personas · neto · qué falta · Cerrar). **Nunca un total del grupo**, y cada cierre por su propia puerta.
+5. **La columna «Vacaciones» se fue de la lista de Colaboradores** (Briceida decía 665; entre los 44, 2.160 días). La ficha y el cálculo no se tocaron.
+6. **Las direcciones viejas de las pestañas dejan de existir**: `?tab=justificaciones` · `vacaciones` · `configuracion` · `reporte` reescriben la URL a la pestaña real.
+
+🔴 **Los netos no se movieron**: 1–15 sep y 16–31 ago salen idénticas byte a byte antes y después de los seis cambios (`scripts/_medir-vs-yulissa.ts`, solo lectura). No se escribió nada en producción ni hay migración nueva.
+
+### ⚠️ Pendiente de Daniel
+
+- **Las 3 justificaciones duplicadas.** No hace falta arreglar nada: `asistencia_justificaciones` no tiene soft delete, pero el `DELETE /api/asistencia/justificaciones?id=` existe desde siempre y la sección «Justificaciones» de la ficha del colaborador ya lo llama — **se borran desde la ficha de esa persona**. Lo que no hay es forma de borrarlas desde la lista del período. Es decisión suya si quiere ese botón ahí.
+- **El interruptor `EDITAR_EL_DIA`** queda en `true`. Si al probarlo con la contadora algo no le gusta, se apaga en el código (`lib/asistencia/editar-el-dia.ts`) y la pantalla vuelve a la ventana de antes, sin migración.
