@@ -31,7 +31,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, cleanup, act, fireEvent, within } from "@testing-library/react";
+import { render, cleanup, act, fireEvent, within, waitFor } from "@testing-library/react";
 
 const ROUTER = { push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), back: vi.fn(), prefetch: vi.fn() };
 vi.mock("next/navigation", () => ({
@@ -142,11 +142,17 @@ beforeEach(() => {
 
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
-/** Monta `/guias` con el rol pedido y deja que la lista termine de cargar. */
+/** Monta `/guias` con el rol pedido y deja que la lista termine de cargar.
+ *
+ *  🔴 SE ESPERA A LA LISTA, NO SE CUENTAN MILISEGUNDOS (19-sep-2026). Aquí
+ *  había `setTimeout(50)`: alcanzaba en esta computadora y no en una cargada,
+ *  donde la afirmación llegaba con la lista todavía vacía. Con una guía
+ *  dibujada, el `GET` terminó y los efectos del montaje —incluido el refresco
+ *  de las facturas de hoy, que arranca antes— ya corrieron. */
 async function abrirLista(rol: string) {
   sembrarRol(rol);
   const vista = render(<GuiasPage />);
-  await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+  await waitFor(() => expect(vista.container.textContent).toContain("GT-231"));
   return vista;
 }
 
@@ -222,7 +228,9 @@ describe("🔴 el «···» está en la fila CERRADA — no hay que abrir la gu
     expect(confirmar.disabled).toBe(true);
 
     fireEvent.change(input, { target: { value: "ELIMINAR" } });
-    await act(async () => { fireEvent.click(confirmar); await new Promise((r) => setTimeout(r, 20)); });
+    await act(async () => { fireEvent.click(confirmar); });
+    // Se espera al DELETE, no a que pasen 20 ms.
+    await waitFor(() => expect(pedidos.some((p) => p.metodo === "DELETE")).toBe(true));
 
     const borrados = pedidos.filter((p) => p.metodo === "DELETE");
     expect(borrados).toHaveLength(1);
@@ -303,7 +311,7 @@ describe("🔴 quien no puede borrar NUNCA ve «Eliminar guía»", () => {
     sembrarRol("admin");
     sessionStorage.setItem("fg_guias_readonly", "1");
     const { container } = render(<GuiasPage />);
-    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+    await waitFor(() => expect(container.textContent).toContain("GT-231"));
     expect(container.textContent).toContain("GT-231");
     expect(menusDeFila(container)).toHaveLength(0);
   });
@@ -352,8 +360,10 @@ describe("⚠️ lo que NO se tocó", () => {
   it("🔁 en modo solo lectura no dispara, ni siendo admin", async () => {
     sembrarRol("admin");
     sessionStorage.setItem("fg_guias_readonly", "1");
-    render(<GuiasPage />);
-    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+    const { container } = render(<GuiasPage />);
+    // La lista dibujada es la prueba de que el montaje entero ya corrió: si el
+    // refresco fuera a dispararse, ya se habría disparado.
+    await waitFor(() => expect(container.textContent).toContain("GT-231"));
     expect(pedidos.filter((p) => p.metodo !== "GET")).toHaveLength(0);
   });
 
@@ -387,7 +397,9 @@ describe("⚠️ lo que NO se tocó", () => {
     const { container } = await abrirLista("admin");
     const fila = Array.from(container.querySelectorAll("button"))
       .find((b) => /GT-231/.test(b.textContent || ""))!;
-    await act(async () => { fireEvent.click(fila); await new Promise((r) => setTimeout(r, 30)); });
+    await act(async () => { fireEvent.click(fila); });
+    // La guía abierta trae su detalle: se espera a que esté, no a 30 ms.
+    await waitFor(() => expect(menusDeFila(container)).toHaveLength(2));
     expect(menusDeFila(container)).toHaveLength(2);
     fireEvent.click(menuDe(container, "GT-231")!);
     expect(itemsAbiertos()).toEqual(["Editar", "Eliminar guía"]);
@@ -399,7 +411,8 @@ describe("⚠️ lo que NO se tocó", () => {
     const { container } = await abrirLista("admin");
     const fila = Array.from(container.querySelectorAll("button"))
       .find((b) => /GT-231/.test(b.textContent || ""))!;
-    await act(async () => { fireEvent.click(fila); await new Promise((r) => setTimeout(r, 30)); });
+    await act(async () => { fireEvent.click(fila); });
+    await waitFor(() => expect(menusDeFila(container)).toHaveLength(2));
     for (const t of menusDeFila(container)) fireEvent.click(t);
     expect(itemsAbiertos().filter((t) => t === "Eliminar guía")).toHaveLength(2); // uno por FILA
     const dentroDelAcordeon = within(container).queryAllByText("Eliminar guía");

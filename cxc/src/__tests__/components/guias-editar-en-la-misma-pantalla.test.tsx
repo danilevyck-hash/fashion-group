@@ -18,7 +18,7 @@
  *   C. el botón apagado que no decía por qué.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, cleanup, act, fireEvent } from "@testing-library/react";
+import { render, screen, cleanup, act, fireEvent, waitFor } from "@testing-library/react";
 
 const push = vi.fn();
 const replace = vi.fn();
@@ -121,21 +121,44 @@ beforeEach(() => {
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
+/** 🔴 SE ESPERA A LA PANTALLA, NO SE CUENTAN MILISEGUNDOS (19-sep-2026).
+ *  Aquí había `setTimeout(300)`: alcanzaba en esta computadora y no en una
+ *  cargada, donde la afirmación llegaba con la guía todavía viajando y el
+ *  botón «Editar» sin dibujar. `waitFor` espera lo que de verdad importa —que
+ *  el esqueleto se haya ido y los datos estén— y sale apenas pasa. */
+async function esperarLaPantallaDeLectura() {
+  await waitFor(() => {
+    expect(document.querySelector(".animate-pulse")).toBeNull();
+    expect(document.body.textContent).toContain("Envíos");
+  });
+}
+
 async function abrirLaGuia() {
   const Page = (await import("@/app/guias/[id]/page")).default;
   render(<Page />);
-  await act(async () => { await new Promise((r) => setTimeout(r, 300)); });
+  await esperarLaPantallaDeLectura();
 }
 
 async function tocarEditar() {
-  const editar = screen.getByRole("button", { name: /^Editar$/i });
+  const editar = await screen.findByRole("button", { name: /^Editar$/i });
   await act(async () => { fireEvent.click(editar); });
-  await act(async () => { await new Promise((r) => setTimeout(r, 300)); });
+  // El formulario es `dynamic()`: hasta que no resuelve hay esqueleto.
+  await waitFor(() => {
+    expect(screen.queryByText(/Editar Guía de Transporte/i)).not.toBeNull();
+    expect(document.querySelector(".animate-pulse")).toBeNull();
+  });
 }
 
-/** El autoguardado espera 1,5 s: se le da el doble, en tramos, antes de mirar. */
+/** El autoguardado espera 1,5 s: se le da el doble, en tramos, antes de mirar.
+ *  ⚠️ ESTA ESPERA SE QUEDA, y no es una espera fija disfrazada: lo que se
+ *  prueba es que pasando el tiempo NO pasa nada, y a un no-evento no se le
+ *  puede hacer `waitFor`. El temporizador del producto corre con el reloj de
+ *  verdad, así que se mide contra el reloj de verdad —no contando vueltas—:
+ *  en una máquina lenta la espera sigue durando 3,2 s de reloj y no se
+ *  multiplica. Los tramos cortos son para que React refresque entre medio. */
 async function dejarPasarElAutoguardado() {
-  for (let i = 0; i < 32; i++) {
+  const hasta = Date.now() + 3200;
+  while (Date.now() < hasta) {
     await act(async () => { await new Promise((r) => setTimeout(r, 100)); });
   }
 }
@@ -215,7 +238,11 @@ describe("la guía pendiente se edita ACÁ, con el formulario del alta", () => {
     await act(async () => { fireEvent.change(obs, { target: { value: "va con hielo" } }); });
     const guardar = screen.getAllByText(/Guardar Cambios/i)[0] as HTMLButtonElement;
     await act(async () => { fireEvent.click(guardar); });
-    await act(async () => { await new Promise((r) => setTimeout(r, 300)); });
+    // Se espera a que el PUT salga, la edición se cierre y la guía vuelva a
+    // dibujarse —al guardar se relee—, no a que pasen 300 ms.
+    await waitFor(() => expect(puts().length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.queryByText(/Editar Guía de Transporte/i)).toBeNull());
+    await esperarLaPantallaDeLectura();
     expect(puts().length).toBeGreaterThan(0);
     // 🔴 Nada de volver al listado: quien estaba por despachar sigue en su guía.
     expect(push).not.toHaveBeenCalledWith("/guias");
@@ -246,7 +273,7 @@ describe("🔴 el N° del transportista de la CABECERA no se puede borrar sin qu
     const obs = visible("textarea") as HTMLTextAreaElement;
     await act(async () => { fireEvent.change(obs, { target: { value: "va con hielo" } }); });
     await act(async () => { fireEvent.click(screen.getAllByText(/Guardar Cambios/i)[0]); });
-    await act(async () => { await new Promise((r) => setTimeout(r, 300)); });
+    await waitFor(() => expect(puts().length).toBeGreaterThan(0));
     expect(puts().length).toBeGreaterThan(0);
     expect(puts()[0].cuerpo.numero_guia_transp).toBe("TR-900");
   });
@@ -257,7 +284,7 @@ describe("🔴 el N° del transportista de la CABECERA no se puede borrar sin qu
     const caja = document.querySelector<HTMLInputElement>('input[id^="numtransp-"][id$="-m"]')!;
     await act(async () => { fireEvent.change(caja, { target: { value: "TR-4471" } }); });
     await act(async () => { fireEvent.click(screen.getAllByText(/Guardar Cambios/i)[0]); });
-    await act(async () => { await new Promise((r) => setTimeout(r, 300)); });
+    await waitFor(() => expect(puts().length).toBeGreaterThan(0));
     expect(puts()[0].cuerpo.numero_guia_transp).toBe("TR-4471");
   });
 });
@@ -325,7 +352,9 @@ describe("A · si se cae la red al guardar, el botón NO se queda en «Guardando
     laRedSeCae = true;
     const guardar = screen.getAllByText(/Guardar Cambios/i)[0] as HTMLButtonElement;
     await act(async () => { fireEvent.click(guardar); });
-    await act(async () => { await new Promise((r) => setTimeout(r, 300)); });
+    // El aviso es lo que se espera: sin él, lo de abajo mediría una pantalla
+    // que todavía no terminó de reaccionar al error.
+    await waitFor(() => expect(document.body.textContent).toMatch(/Sin conexión/i));
 
     // 🩸 Antes el `fetch` reventaba antes del `setSaving(false)` y el botón se
     // quedaba en "Guardando…" para siempre, sin aviso.
@@ -411,7 +440,7 @@ describe("el camino viejo no se pierde", () => {
   it("`/guias/[id]/editar` redirige a la guía con la edición abierta", async () => {
     const Vieja = (await import("@/app/guias/[id]/editar/page")).default;
     render(<Vieja />);
-    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/guias/guia-777?editar=1"));
     expect(replace).toHaveBeenCalledWith("/guias/guia-777?editar=1");
   });
 });
@@ -432,7 +461,16 @@ describe("«Editar» de la fila aterriza con el formulario ABIERTO", () => {
     window.history.replaceState({}, "", `/guias/guia-777${query}`);
     const Page = (await import("@/app/guias/[id]/page")).default;
     render(<Page />);
-    await act(async () => { await new Promise((r) => setTimeout(r, 300)); });
+    // Con `?editar=1` la pantalla que termina de cargar es el FORMULARIO; sin
+    // query, la de lectura. En los dos casos se espera a la pantalla.
+    if (query.includes("editar=1")) {
+      await waitFor(() => {
+        expect(screen.queryByText(/Editar Guía de Transporte/i)).not.toBeNull();
+        expect(document.querySelector(".animate-pulse")).toBeNull();
+      });
+    } else {
+      await esperarLaPantallaDeLectura();
+    }
   }
 
   afterEach(() => { window.history.replaceState({}, "", "/guias/guia-777"); });

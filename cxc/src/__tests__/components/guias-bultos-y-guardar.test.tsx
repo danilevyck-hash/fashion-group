@@ -17,7 +17,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, cleanup, act, fireEvent } from "@testing-library/react";
+import { render, screen, cleanup, act, fireEvent, waitFor } from "@testing-library/react";
 import { useEffect } from "react";
 import { useDespachoGuia } from "@/app/guias/components/useDespachoGuia";
 
@@ -96,14 +96,17 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
+/** 🔴 SE ESPERA A LA PANTALLA, NO SE CUENTAN MILISEGUNDOS (19-sep-2026).
+ *  Aquí había `setTimeout(300)`: alcanzaba en esta computadora y no en una
+ *  cargada, donde la afirmación llegaba con la guía todavía viajando. Se
+ *  espera a que el esqueleto se vaya y los datos estén. */
 async function abrirLaGuia() {
   const Page = (await import("@/app/guias/[id]/page")).default;
   render(<Page />);
-  await act(async () => { await new Promise((r) => setTimeout(r, 300)); });
-}
-
-async function esperar(ms = 300) {
-  await act(async () => { await new Promise((r) => setTimeout(r, ms)); });
+  await waitFor(() => {
+    expect(document.querySelector(".animate-pulse")).toBeNull();
+    expect(document.body.textContent).toContain("Envíos");
+  });
 }
 
 const caja = (idx: number) => document.getElementById(`despacho-bultos-${idx}`) as HTMLInputElement | null;
@@ -163,7 +166,10 @@ describe("🔴 3 · lo que VIAJA al despachar", () => {
   async function montarSonda() {
     let estado: ReturnType<typeof useDespachoGuia> | null = null;
     render(<Sonda alListo={(s) => { estado = s; }} />);
-    await esperar();
+    // La sonda está lista cuando la guía terminó de viajar, no a los 300 ms.
+    await waitFor(() =>
+      expect((estado as { loading?: boolean } | null)?.loading).toBe(false),
+    );
     return () => estado as unknown as ReturnType<typeof useDespachoGuia>;
   }
 
@@ -196,7 +202,8 @@ describe("🔴 5 · guardar manda solo lo que cambió", () => {
     await abrirLaGuia();
     const editar = screen.getByRole("button", { name: /^Editar$/i });
     await act(async () => { fireEvent.click(editar); });
-    await esperar();
+    // El formulario es `dynamic()`: se espera a que esté, no a 300 ms.
+    await screen.findByRole("button", { name: /Guardar Cambios/i });
   }
 
   it("🩸 abrir, mirar y apretar «Guardar Cambios» NO escribe nada", async () => {
@@ -206,7 +213,9 @@ describe("🔴 5 · guardar manda solo lo que cambió", () => {
     escrituras = [];
     const guardar = screen.getByRole("button", { name: /Guardar Cambios/i });
     await act(async () => { fireEvent.click(guardar); });
-    await esperar();
+    // El botón CUMPLE igual: cierra la edición. Eso es lo que se espera —y sin
+    // esperarlo, «cero escrituras» sería verde por no haber pasado nada aún.
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Guardar Cambios/i })).toBeNull());
     expect(escrituras.filter((e) => e.metodo === "PUT")).toHaveLength(0);
   });
 
@@ -215,7 +224,7 @@ describe("🔴 5 · guardar manda solo lo que cambió", () => {
     push.mockClear();
     const guardar = screen.getByRole("button", { name: /Guardar Cambios/i });
     await act(async () => { fireEvent.click(guardar); });
-    await esperar();
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Guardar Cambios/i })).toBeNull());
     // No se queda quieto sin decir nada.
     expect(document.body.textContent).not.toMatch(/Guardando/);
   });
@@ -229,7 +238,8 @@ describe("🔴 5 · guardar manda solo lo que cambió", () => {
     await act(async () => { fireEvent.change(obs, { target: { value: "salió a último segundo" } }); });
     const guardar = screen.getByRole("button", { name: /Guardar Cambios/i });
     await act(async () => { fireEvent.click(guardar); });
-    await esperar();
+    // Se espera al PUT, no a que pasen 300 ms.
+    await waitFor(() => expect(escrituras.some((e) => e.metodo === "PUT")).toBe(true));
     const puts = escrituras.filter((e) => e.metodo === "PUT");
     expect(puts).toHaveLength(1);
     expect(puts[0].cuerpo.observaciones).toBe("salió a último segundo");
@@ -244,7 +254,8 @@ describe("🔴 11 y 12 · un solo Guardar, y BULTOS empieza vacío", () => {
     await abrirLaGuia();
     const editar = screen.getByRole("button", { name: /^Editar$/i });
     await act(async () => { fireEvent.click(editar); });
-    await esperar();
+    // El formulario es `dynamic()`: se espera a que esté, no a 300 ms.
+    await screen.findByRole("button", { name: /Guardar Cambios/i });
   }
 
   it("🔴 hay UN solo botón de guardar en toda la pantalla", async () => {
