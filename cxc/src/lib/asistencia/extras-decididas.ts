@@ -98,3 +98,40 @@ export function tituloExtrasDecididas(e: ExtrasDecididas): string {
     + "Se decide en Aprobaciones."
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 DECIDIR DESDE EL REPORTE (19-sep-2026)
+//
+// Daniel: las horas extra se deciden en la misma fila del día, sin ir a la
+// pestaña Aprobaciones. 🔴 **Al aprobar manda el SERVIDOR**: es el MISMO
+// endpoint (`POST /api/asistencia/aprobaciones`) con el MISMO cuerpo y las
+// mismas reglas (el alcance del aprobador, el filtro por empresa, todo o nada).
+// Acá no se calcula ni se decide nada nuevo: solo se dice DÓNDE se ofrecen los
+// dos botones.
+//
+// ⚠️ La pestaña Aprobaciones NO se toca, y sigue siendo la única que ofrece el
+// DOMINGO y el FERIADO trabajados: esos minutos viven en `domingoMin` y
+// `feriadoMin` (`clasificarDia`), no en el `extraMin` que muestra esta columna.
+// Ofrecerlos acá pediría rehacer la clasificación en la pantalla — o sea, una
+// segunda verdad.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ¿Este día ofrece los botones Sí/No en el Reporte?
+ *
+ * @param extraMin   los minutos que la columna «Extra» de ese día muestra
+ * @param conExtra   `false` = no cobra horas extra (casilla de su ficha): la
+ *                   columna va con raya y no hay nada que decidir
+ */
+export function seDecideEnElReporte(extraMin: number, conExtra: boolean): boolean {
+  return conExtra && Number.isFinite(extraMin) && extraMin > 0;
+}
+
+/** El `aria-label` de los dos botones: de quién y de qué día se decide. */
+export function etiquetaDecidirExtra(persona: string, fechaCorta: string): string {
+  return `${persona} · ${fechaCorta}`;
+}
+
+/** Lo que dice la celda al pasar el cursor sobre los dos botones. */
+export const TITULO_DECIDIR_EXTRA =
+  "Sí se paga · No no se paga. Es la misma decisión de Aprobaciones.";

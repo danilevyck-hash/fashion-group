@@ -31,7 +31,15 @@ import { useUrlState } from "@/lib/hooks/useUrlState";
 // 🔴 Dos marcas y la segunda a mediodía: un aviso, nunca un cálculo.
 import { TEXTO_SALIDA_SOSPECHOSA, tituloSalidaSospechosa } from "@/lib/asistencia/salida-sospechosa";
 // 🔴 La columna «Extras» dice cuánto está aprobado.
-import { repartirExtras, textoExtrasDecididas, tituloExtrasDecididas } from "@/lib/asistencia/extras-decididas";
+import {
+  TITULO_DECIDIR_EXTRA, etiquetaDecidirExtra, repartirExtras, seDecideEnElReporte,
+  textoExtrasDecididas, tituloExtrasDecididas,
+} from "@/lib/asistencia/extras-decididas";
+// 🔴 LOS DOS BOTONES SON LOS MISMOS DE APROBACIONES, no unos nuevos: mismo
+// componente, mismo endpoint, mismas reglas del servidor (19-sep-2026).
+import { BotonesSiNo } from "./aprobaciones/BotonesSiNo";
+import { claveDia } from "@/lib/asistencia/aprobaciones";
+import { aprobacionesRoles } from "@/lib/asistencia/roles";
 // 🔴 LAS MARCAS DEL DÍA SE VEN TODAS (18-sep-2026). La contadora: *«y como veo
 // quien marco de mas? en el excel solo salen max 4 marcaciones»*. La cuenta de
 // qué esconden las cuatro columnas vive en un módulo PURO, nunca acá.
@@ -213,6 +221,15 @@ export default function ReporteTab({ empresa = "" }: {
   // pedirlos por fila serían 30 peticiones iguales. Sin ellos el campo libre
   // sigue sirviendo, que es lo que se guarda.
   const [motivosFrecuentes, setMotivosFrecuentes] = useState<string[]>([]);
+  // 🔑 El rol sale de `sessionStorage`, igual que en `PlanillaTab` y `AppHeader`.
+  // Arranca vacío: solo decide si se DIBUJAN los dos botones; el freno de verdad
+  // está en la ruta, que rechaza a quien no puede aprobar y a quien manda un
+  // código de otra empresa.
+  const [rol, setRol] = useState("");
+  useEffect(() => { setRol(sessionStorage.getItem("cxc_role") || ""); }, []);
+  const puedeDecidirExtra = aprobacionesRoles().includes(rol);
+  /** Las decisiones que están viajando, para apagar sus botones. */
+  const [extrasEnVuelo, setExtrasEnVuelo] = useState<ReadonlySet<string>>(new Set());
   // «Justificar» desde la fila del día (11-sep-2026): el mismo formulario de la
   // ficha, con el colaborador y ese día ya puestos.
   const [justificando, setJustificando] = useState<DiaParaJustificar | null>(null);
@@ -258,6 +275,56 @@ export default function ReporteTab({ empresa = "" }: {
   }, [desde, hasta, q, empresa]);
 
   useEffect(() => { void cargar(); }, [cargar]);
+
+  // ── 🔴 DECIDIR LAS HORAS EXTRA DESDE ACÁ (19-sep-2026) ────────────────────
+  //
+  // Daniel: los dos botones Sí/No en la misma fila del día, sin ir a la pestaña
+  // Aprobaciones —que NO se toca y sigue siendo la que ve el conjunto—.
+  //
+  // 🔴 AL APROBAR MANDA EL SERVIDOR. Es el MISMO endpoint, el MISMO cuerpo y el
+  // MISMO `?empresa=` que usa `AprobacionesTab`: el alcance del aprobador, el
+  // filtro por empresa y el «todo o nada» los sigue decidiendo la ruta. Acá no
+  // se calcula nada; lo único propio es el optimismo de la pantalla.
+  const decidirExtra = useCallback(
+    async (codigo: string, fecha: string, minutos: number, decision: Decision) => {
+      const clave = claveDia(codigo, fecha);
+      let previo: Decision = null;
+      setDecisionesExtra((m) => {
+        previo = m.get(clave) ?? null;
+        const n = new Map(m);
+        if (decision === null) n.delete(clave); else n.set(clave, decision);
+        return n;
+      });
+      setExtrasEnVuelo((v) => new Set([...v, clave]));
+      try {
+        // 🔴 Con empresa elegida, la ruta rechaza cualquier código de otra empresa.
+        const emp = empresaParaPedir(empresa);
+        const res = await fetch(
+          `/api/asistencia/aprobaciones${emp ? `?empresa=${encodeURIComponent(emp)}` : ""}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ decision, dias: [{ codigo, fecha, minutos }] }),
+          },
+        );
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(j.error ?? "No se pudo guardar");
+        if (j.ok === false) throw new Error(j.aviso ?? "No se pudo guardar");
+      } catch (e) {
+        // Se revierte a lo que había y se dice: una decisión que no llegó no
+        // puede quedarse pintada como si hubiera llegado.
+        setDecisionesExtra((m) => {
+          const n = new Map(m);
+          if (previo === null) n.delete(clave); else n.set(clave, previo);
+          return n;
+        });
+        toast(e instanceof Error ? e.message : "No se pudo guardar", "error");
+      } finally {
+        setExtrasEnVuelo((v) => { const n = new Set(v); n.delete(clave); return n; });
+      }
+    },
+    [empresa, toast],
+  );
 
   // Los motivos frecuentes, una sola vez y solo cuando se puede corregir.
   useEffect(() => {
@@ -589,6 +656,9 @@ export default function ReporteTab({ empresa = "" }: {
                   onJustificar={setJustificando}
                   motivosFrecuentes={motivosFrecuentes}
                   onGuardadoElDia={() => void cargar()}
+                  puedeDecidirExtra={puedeDecidirExtra}
+                  onDecidirExtra={decidirExtra}
+                  extrasEnVuelo={extrasEnVuelo}
                   decisionesExtra={decisionesExtra} />
               ))}
             </tbody>
@@ -669,7 +739,7 @@ export default function ReporteTab({ empresa = "" }: {
   );
 }
 
-function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, onToggle, puedeCorregir, onCorregir, onJustificar, marcasTelefono, onVerSelfie, decisionesExtra, motivosFrecuentes, onGuardadoElDia }: {
+function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, onToggle, puedeCorregir, onCorregir, onJustificar, marcasTelefono, onVerSelfie, decisionesExtra, motivosFrecuentes, onGuardadoElDia, puedeDecidirExtra, onDecidirExtra, extrasEnVuelo }: {
   p: PersonaReporte;
   abierta: boolean;
   /** Abierta por «Ver solo esos días»: adentro van SOLO los días a revisar. */
@@ -689,6 +759,11 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
   motivosFrecuentes: readonly string[];
   /** Se guardó un día: hay que volver a leer el reporte. */
   onGuardadoElDia: () => void;
+  /** ¿Este rol puede decidir las horas extra? El freno de verdad es del servidor. */
+  puedeDecidirExtra: boolean;
+  onDecidirExtra: (codigo: string, fecha: string, minutos: number, decision: Decision) => void;
+  /** Las decisiones que están viajando, por `codigo|fecha`. */
+  extrasEnVuelo: ReadonlySet<string>;
 }) {
   const r = p.resumen;
   // 🔴 LA COLUMNA «EXTRAS» DICE CUÁNTO ESTÁ APROBADO (16-sep-2026). Se reparte
@@ -830,6 +905,10 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
                     onJustificar={onJustificar}
                     motivosFrecuentes={motivosFrecuentes}
                     onGuardadoElDia={onGuardadoElDia}
+                    decisionExtra={decisionesExtra.get(claveDia(p.codigo, d.fecha)) ?? null}
+                    puedeDecidirExtra={puedeDecidirExtra}
+                    onDecidirExtra={onDecidirExtra}
+                    extraEnVuelo={extrasEnVuelo.has(claveDia(p.codigo, d.fecha))}
                     delTelefono={marcasTelefono[llaveDelDia(p.codigo, d.fecha)] ?? []}
                     onVerSelfie={onVerSelfie} />
                 ))}
@@ -868,7 +947,7 @@ function perdonDelDia(d: DiaReporte): PerdonDelDia {
  * corrección debajo. Debajo de la fila, una línea por corrección dice qué se
  * cambió, por qué, quién y cuándo — sin abrir nada más.
  */
-function FilaDia({ d, codigo, persona, empresa, conExtra, puedeCorregir, onCorregir, onJustificar, delTelefono, onVerSelfie, motivosFrecuentes, onGuardadoElDia }: {
+function FilaDia({ d, codigo, persona, empresa, conExtra, puedeCorregir, onCorregir, onJustificar, delTelefono, onVerSelfie, motivosFrecuentes, onGuardadoElDia, decisionExtra, puedeDecidirExtra, onDecidirExtra, extraEnVuelo }: {
   d: DiaReporte;
   codigo: string;
   persona: string;
@@ -886,6 +965,12 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, puedeCorregir, onCorre
   motivosFrecuentes: readonly string[];
   /** Se guardó este día: el reporte se vuelve a leer. */
   onGuardadoElDia: () => void;
+  /** Lo decidido para la hora extra de ESTE día. `null` = pendiente. */
+  decisionExtra: Decision;
+  puedeDecidirExtra: boolean;
+  onDecidirExtra: (codigo: string, fecha: string, minutos: number, decision: Decision) => void;
+  /** Esa decisión está viajando: los botones se apagan hasta que conteste. */
+  extraEnVuelo: boolean;
 }) {
   const { toast } = useToast();
   /** La corrección que produjo la marca de esa posición, si la hay. */
@@ -1218,6 +1303,24 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, puedeCorregir, onCorre
             <td className="px-2 py-1.5 text-right text-gray-600">{n(d.excesoAlmuerzoMin)}</td>
             <td className="px-2 py-1.5 text-right text-gray-600">{conExtra ? n(d.extraMin) : sinExtra()}</td>
             <td className="whitespace-nowrap px-2 py-1.5">
+              {/* ══════════════════════════════════════════════════════════
+                  🔴 LAS HORAS EXTRA SE DECIDEN ACÁ (19-sep-2026).
+                  Daniel: Sí / No en la misma fila, sin ir a Aprobaciones.
+                  🔴 AL APROBAR MANDA EL SERVIDOR: los mismos dos botones,
+                  el mismo endpoint y las mismas reglas de siempre.
+                  ⚠️ La pestaña Aprobaciones NO se tocó, y sigue siendo la
+                  única que ofrece el domingo y el feriado trabajados.
+                  ══════════════════════════════════════════════════════════ */}
+              {puedeDecidirExtra && seDecideEnElReporte(d.extraMin, conExtra) && (
+                <span className="mr-1.5 inline-flex align-middle" title={TITULO_DECIDIR_EXTRA}>
+                  <BotonesSiNo
+                    decision={decisionExtra}
+                    etiqueta={etiquetaDecidirExtra(persona, fechaCorta(d.fecha))}
+                    disabled={extraEnVuelo}
+                    onDecidir={(dec) => onDecidirExtra(codigo, d.fecha, d.extraMin, dec)}
+                  />
+                </span>
+              )}
               {d.revisar && (
                 <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800">Revisar</span>
               )}
