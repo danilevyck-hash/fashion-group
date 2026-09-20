@@ -7,11 +7,13 @@
  * 1 · LA ETIQUETA, con el mockup que hizo él:
  *     · 🔴 EL RÓTULO VA ARRIBA DEL DATO, chico y gris. Antes se leía
  *       «Factura 11-000002558» y «Destino: Paso Canoas» pegados en una línea.
- *     · 🔴 EL DESTINO ES TAN GRANDE COMO EL CLIENTE. Quien recibe lee el
- *       cliente; quien carga el camión ordena por destino.
- *     · 🔴 «CAJA» Y SU NÚMERO, SEPARADOS POR UNA RAYA y centrados abajo: el
+ *     · 🔴 EL DESTINO SE LEE DE LEJOS. Quien recibe lee el cliente; quien
+ *       carga el camión ordena por destino. (El 18-sep quedaron iguales; el
+ *       20-sep-2026 el destino pasó a ser el más grande de los dos.)
+ *     · 🔴 EL RÓTULO Y SU NÚMERO, SEPARADOS POR UNA RAYA y centrados abajo: el
  *       rótulo chico arriba y «3 de 14» enorme debajo. Antes era una sola
- *       línea «CAJA 1 de 4» flotando sin separador.
+ *       línea «CAJA 1 de 4» flotando sin separador. (El rótulo dice «BULTO»
+ *       desde el 20-sep-2026, y el número va partido en dos tamaños.)
  *     · 🔴 LA FECHA EN EL FORMATO DE LA CASA («18 sept 2026»), que sale de
  *       `fmtDate` — el mismo de todo el papel del sistema.
  *
@@ -34,10 +36,11 @@ import path from "path";
 import EtiquetasView from "@/app/guias/components/EtiquetasView";
 import { construirPdfEtiquetas, datosDeEtiqueta } from "@/lib/guias/pdf-etiquetas";
 import {
-  ROTULO_CAJA,
+  ROTULO_BULTO,
   cajasDelJuego,
   fechaDeLaEtiqueta,
   numeroDeCaja,
+  partesDelNumeroDeBulto,
   type EtiquetaFila,
 } from "@/lib/guias/etiquetas";
 import { fmtDate } from "@/lib/format";
@@ -103,6 +106,8 @@ function coordenadas(etiqueta: EtiquetaFila, cajas: readonly number[]): Map<stri
 describe("🔴 1. la etiqueta: el rótulo ARRIBA del dato", () => {
   it("el papel se arma de verdad y trae los ocho textos, en el orden del mockup", () => {
     const textos = textosDelPapel(ETQ, [3]);
+    // ⚠️ 20-sep-2026: el rótulo pasó a «BULTO» y el número se parte en «3» y
+    // «de 14», dos tamaños en la MISMA línea. El orden no cambió.
     expect(textos).toEqual([
       "FASHION SHOES",
       "18 sept 2026",
@@ -112,8 +117,9 @@ describe("🔴 1. la etiqueta: el rótulo ARRIBA del dato", () => {
       "NOVA LUX, S.A.",
       "Destino",
       "PASO CANOAS",
-      "CAJA",
-      "3 de 14",
+      "BULTO",
+      "3",
+      "de 14",
     ]);
   });
 
@@ -122,7 +128,7 @@ describe("🔴 1. la etiqueta: el rótulo ARRIBA del dato", () => {
     expect(posicion(t, "Factura")).toBeLessThan(posicion(t, "11-000002558"));
     expect(posicion(t, "Cliente")).toBeLessThan(posicion(t, "NOVA LUX, S.A."));
     expect(posicion(t, "Destino")).toBeLessThan(posicion(t, "PASO CANOAS"));
-    expect(posicion(t, ROTULO_CAJA)).toBeLessThan(posicion(t, "3 de 14"));
+    expect(posicion(t, ROTULO_BULTO)).toBeLessThan(posicion(t, "3"));
   });
 
   it("🩸 y ya NO existen las líneas pegadas de antes: «Factura 11-…», «Destino: …»", () => {
@@ -132,6 +138,8 @@ describe("🔴 1. la etiqueta: el rótulo ARRIBA del dato", () => {
       expect(linea).not.toMatch(/^Destino: /);
       // La línea vieja del pie: «CAJA 3 de 14» en un solo renglón.
       expect(linea).not.toMatch(/^CAJA .+ de .+/);
+      // 🔴 Y NUNCA «3/14»: con la etiqueta sucia la rayita se pierde y se lee «314».
+      expect(linea).not.toMatch(/^\d+\/\d+$/);
     }
     const sinComentarios = PDF.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     expect(sinComentarios).not.toContain("`Factura ${");
@@ -149,15 +157,21 @@ describe("🔴 1. la etiqueta: el rótulo ARRIBA del dato", () => {
   });
 });
 
-describe("🔴 2. el destino, del MISMO tamaño que el cliente", () => {
-  it("no son dos constantes que alguien pueda achicar por separado", () => {
-    expect(PDF).toContain("const F_DESTINO = F_CLIENTE;");
+// ⚠️ CAMBIÓ DE DIRECCIÓN EL 20-sep-2026. El 18-sep el destino quedó del MISMO
+// tamaño que el cliente; hoy es MÁS GRANDE que él, porque se lee desde más
+// lejos. Los milímetros exactos los fija `guias-etiqueta-agrande.test.ts`.
+describe("🔴 2. el destino, tan grande como hace falta", () => {
+  it("🔴 es MÁS grande que el cliente, y los dos salen de la misma regla", () => {
+    expect(PDF).toContain("const MAY_DESTINO = 7.5;");
+    expect(PDF).toContain("const MAY_CLIENTE = 5.5;");
+    expect(PDF).toContain("const F_DESTINO = PT_PARA_MAYUSCULA(MAY_DESTINO);");
   });
 
   it("🩸 y el destino ya no es más chico que el cliente (era 2,2 % contra 3,3 %)", () => {
     const sinComentarios = PDF.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
-    expect(sinComentarios).not.toMatch(/const F_DESTINO = PT\(/);
-    expect(sinComentarios).toContain("const F_CLIENTE = PT(0.031 * HOJA_W);");
+    expect(sinComentarios).not.toMatch(/const F_DESTINO = PT\(0/);
+    // Y ya nadie escribe un tamaño como porcentaje del ancho de la hoja.
+    expect(sinComentarios).not.toMatch(/const F_\w+ = PT\(0\.\d+ \* HOJA_W\)/);
   });
 
   it("el cliente y el destino se escriben en MAYÚSCULAS, como la empresa", () => {
@@ -170,21 +184,23 @@ describe("🔴 2. el destino, del MISMO tamaño que el cliente", () => {
   });
 });
 
-describe("🔴 3. «CAJA» y su número, separados por una raya", () => {
+describe("🔴 3. «BULTO» y su número, separados por una raya", () => {
   it("son DOS textos, no una línea: el rótulo y el número viven aparte", () => {
-    expect(ROTULO_CAJA).toBe("CAJA");
+    expect(ROTULO_BULTO).toBe("BULTO");
     expect(numeroDeCaja(3, 14)).toBe("3 de 14");
     expect(numeroDeCaja(1, 1)).toBe("1 de 1");
+    expect(partesDelNumeroDeBulto(1, 4)).toEqual({ numero: "1", total: "de 4" });
   });
 
   it("🔴 se dibuja una RAYA antes del bloque, y los dos textos van CENTRADOS", () => {
     const sinComentarios = PDF.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     expect(sinComentarios).toMatch(
-      /doc\.line\(izq, yRaya, der, yRaya\);[\s\S]{0,400}ROTULO_CAJA, centro[^,]*, yRotulo, \{ align: "center" \}/,
+      /doc\.line\(izq, yRaya, der, yRaya\);[\s\S]{0,400}ROTULO_BULTO, centro[^,]*, yRotulo, \{ align: "center" \}/,
     );
-    expect(sinComentarios).toMatch(
-      /numeroDeCaja\(caja, d\.cajas\), centro, yNumero, \{ align: "center" \}/,
-    );
+    // El número ya no se centra con `align`: son dos piezas de distinto tamaño
+    // que se centran como UN bloque (`xNumero`).
+    expect(sinComentarios).toContain("partesDelNumeroDeBulto(caja, d.cajas)");
+    expect(sinComentarios).toContain("doc.text(numero, xNumero, yNumero);");
   });
 
   it("🔴 el número se ancla al BORDE DE ABAJO: no se mueve aunque el nombre lleve dos líneas", () => {
@@ -195,22 +211,24 @@ describe("🔴 3. «CAJA» y su número, separados por una raya", () => {
     );
     // El nombre largo SÍ empuja lo suyo hacia abajo…
     expect(largo.get("Destino")!.y).toBeLessThan(corto.get("Destino")!.y);
-    // …y el número de caja NO se mueve ni un punto.
-    expect(largo.get("3 de 14")!.y).toBe(corto.get("3 de 14")!.y);
-    expect(largo.get("CAJA")!.y).toBe(corto.get("CAJA")!.y);
+    // …y el número del bulto NO se mueve ni un punto.
+    expect(largo.get("3")!.y).toBe(corto.get("3")!.y);
+    expect(largo.get("de 14")!.y).toBe(corto.get("de 14")!.y);
+    expect(largo.get("BULTO")!.y).toBe(corto.get("BULTO")!.y);
     expect(PDF).toContain("const yNumero = y0 + CUARTO_H - PAD_Y;");
   });
 
-  it("🔴 «CAJA» va ENCIMA del número, y los dos CENTRADOS en el mismo eje", () => {
+  it("🔴 «BULTO» va ENCIMA del número, y los dos CENTRADOS en el mismo eje", () => {
     const c = coordenadas(ETQ, [3]);
-    const rotulo = c.get("CAJA")!;
-    const numero = c.get("3 de 14")!;
+    const rotulo = c.get("BULTO")!;
+    const numero = c.get("3")!;
     // Encima: en PDF la `y` crece hacia arriba.
     expect(rotulo.y).toBeGreaterThan(numero.y);
+    // Y el «de 14» comparte la base con el número.
+    expect(c.get("de 14")!.y).toBe(numero.y);
     // El eje: el centro del cuarto (107,95 mm ÷ 2) en puntos.
     const centro = (107.95 / 2) / 0.3527777778;
     expect(Math.abs(rotulo.x + 15 - centro)).toBeLessThan(6);
-    expect(Math.abs(numero.x + 58 - centro)).toBeLessThan(6);
   });
 
   it("🔴 y los tres datos arrancan en el MISMO margen izquierdo, uno debajo del otro", () => {
@@ -227,16 +245,17 @@ describe("🔴 3. «CAJA» y su número, separados por una raya", () => {
 
   it("y el número es lo MÁS GRANDE del papel", () => {
     const tam = (nombre: string): number => {
-      const m = PDF.match(new RegExp(`const ${nombre} = PT\\(([\\d.]+) \\* HOJA_W\\)`));
+      const m = PDF.match(new RegExp(`const MAY_${nombre} = ([\\d.]+);`));
       return m ? Number(m[1]) : 0;
     };
-    const caja = tam("F_CAJA");
-    expect(caja).toBeGreaterThan(tam("F_CLIENTE"));
-    expect(caja).toBeGreaterThan(tam("F_EMPRESA"));
-    expect(caja).toBeGreaterThan(tam("F_CAJA_ROTULO"));
+    const bulto = tam("BULTO");
+    expect(bulto).toBeGreaterThan(tam("DESTINO"));
+    expect(bulto).toBeGreaterThan(tam("CLIENTE"));
+    expect(bulto).toBeGreaterThan(tam("EMPRESA"));
+    expect(bulto).toBeGreaterThan(tam("BULTO_ROTULO"));
     // Y el rótulo gris es lo más chico.
-    expect(tam("F_ROTULO")).toBeLessThan(tam("F_FACTURA"));
-    expect(tam("F_ROTULO")).toBeLessThan(tam("F_FECHA") + 0.001);
+    expect(tam("ROTULO")).toBeLessThan(tam("FACTURA"));
+    expect(tam("ROTULO")).toBeLessThan(tam("FECHA") + 0.001);
   });
 });
 

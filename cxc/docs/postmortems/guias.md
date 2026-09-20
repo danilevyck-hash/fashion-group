@@ -2067,3 +2067,112 @@ de la fila y el pie (`guias-panel-que-se-lee`), y las anchuras que ahora se leen
 - 🔴 **«+ Otro cliente» va DEBAJO del cuadro, no adentro, y el pie es UNA sola línea** (10-sep-2026, después de verlo desplegado). Daniel: *«agregar otro cliente debería estar abajo de ese cuadro, no dentro»* y *«abajo de ver más días en guías, se desperdicia mucho espacio con esa info, cómo la puedes hacer más minimalista»* · *«todo siempre minimalista»*. El botón salió del panel con borde y es un enlace gris de ancho natural. El pie pasó de TRES renglones —el «o [Traslado]» en su caja, la frescura con «Buscar otra vez» a la izquierda y «Escribir el número» empujado a la derecha— a uno solo de texto chico: `Traslado · Escribir el número · Actualizado 12:05 p.m. · Buscar otra vez`, sin cajas y con una línea finita arriba; «Ver más días» quedó como enlace chico pegado al final de la lista. 🔴 **No se fue ninguna función** — Traslado y «Escribir el número» siguen siendo los mismos dos caminos, con el mismo texto y sin pedir empresa — y ⚠️ **la frescura sigue A LA VISTA, no en un `title`**: en el iPad no hay mouse. En el celular la línea envuelve y cada enlace se sigue tocando en 44 px.
 - Candados: `guias-varios-clientes-y-dias.test.ts` · `guias-varios-clientes-y-dias.test.tsx`; **31 mutaciones, 31 cazadas** con 4 controles (`scripts/_mutar-candados-guias-varios-clientes.sh`). Un candado **cambió de dirección con nota fechada, no se borró**: `guia-form-marcar-facturas` — los días viejos piden un toque para abrirse (con el CONTROL de que la factura del día que trae «Ver más días» aparece con ese toque), se fue el «o» suelto de Traslado (con el CONTROL de que sigue escribiendo el mismo texto sin pedir empresa) y la frescura dice «Actualizado» en vez de «hasta las».
 
+
+---
+
+## 🔴 Etiquetas — EL TIQUETE SE LEE PARADO, A UN METRO (20-sep-2026)
+
+El rediseño del 18-sep dejó la etiqueta bien ORDENADA pero no más LEGIBLE. Lo que estaba mal,
+medido sobre el PDF real y no sobre el mockup:
+
+| | medido |
+|---|---|
+| Papel en blanco entre el destino y la raya del bulto | **130 pt = 46 mm**, el **33 %** del alto del tiquete |
+| Altura de mayúscula del cliente y del destino | **4,8 mm** (18,97 pt), el límite de lo que se lee a un metro |
+| Altura de mayúscula del número del bulto | 8,7 mm (34,27 pt) |
+
+### La regla con la que se eligieron los tamaños
+
+**Cada milímetro de altura de mayúscula se lee cómodo desde unos 30 cm.** Así que cada dato crece
+hasta la distancia desde la que se lee de verdad, y no «un poco más que antes»:
+
+| dato | desde dónde se lee | antes | ahora |
+|---|---|---|---|
+| **Número del bulto** | contando, de lejos y de cerca | 34,27 pt | **11 mm** (43,43 pt) |
+| **Destino** | ordenando el camión, de lejos | 18,97 pt | **7,5 mm** (29,61 pt), negrita |
+| **Cliente** | al entregar, de cerca | 18,97 pt | **5,5 mm** (21,71 pt) |
+| **Empresa** | separando por empresa en bodega | 18,97 pt | **se queda** |
+| **Factura** | comparando contra un papel | 13,46 pt | **4 mm** (15,79 pt) |
+| **Fecha** | casi nunca | 9,18 pt | **se queda** |
+
+🔴 **LOS MILÍMETROS SON LO APROBADO; LOS PUNTOS SE CALCULAN.** `PT_PARA_MAYUSCULA(mm)` divide por
+`ALTURA_DE_MAYUSCULA = 0.718`, que es el `CapHeight` del AFM de la Helvetica —la fuente estándar del
+PDF, la que usa todo el papel de la casa—. Escribir el punto a mano es lo que permite que un cambio
+de fuente cambie el tamaño REAL sin que nadie se entere. El candado mide los **milímetros** sobre el
+PDF armado, no los puntos del archivo.
+
+### Los otros cambios de la misma tanda
+
+- 🔴 **«CAJA» pasa a «BULTO»**. Es la palabra del resto de Guías —la lista, el papel de la guía, el
+  Excel, «Corregir bultos»— y la que abarca lo que de verdad se despacha: un bulto puede ser una
+  caja, un saco o un rollo. El espaciado entre letras (`BULTO_ESPACIADO = 0.5`) no se tocó.
+  ⚠️ **La PANTALLA de Etiquetas sigue diciendo «cajas»** («¿Cuántas cajas?», «Ya etiquetada · 14
+  cajas», el nombre del archivo `Etiquetas-…-caja-7.pdf`) y los identificadores también
+  (`MAX_CAJAS`, `validarCajas`, la columna `cajas`): **cambió la palabra IMPRESA, nada más**.
+  Unificar el resto es una decisión de Daniel que no está tomada.
+- 🔴 **El número va partido**: el «1» entero y el «de 4» **a la mitad de ese tamaño**, en la misma
+  línea y compartiendo la base. Se parten en `partesDelNumeroDeBulto` —en el módulo PURO, no en el
+  PDF— para que no haya dos formas de escribirlo, y `numeroDeCaja` se DERIVA de ahí.
+  🔴 **Sigue siendo «1 de 4» y NUNCA «1/4»**: «1/4» se lee «un cuarto», y con la etiqueta sucia o
+  despegada de una esquina la rayita se pierde y queda leyéndose «14».
+  Las dos piezas se centran como **UN bloque** (se mide el ancho de las dos y se arranca a la
+  izquierda del centro): centrar cada una por su cuenta las desalinea.
+- ⚠️ **La factura sigue COMPLETA** («11-000002558»), pedido explícito de Daniel.
+- ⚠️ **La fecha NO se tocó.** El encargo pedía pasar de «18 sept 2026» a «18 sep 2026» «que es el
+  `fmtDate` del sistema», pero **medido**: `fmtDate("2026-09-18")` devuelve exactamente
+  `18 sept 2026` — el `es-PA` de `toLocaleDateString` abrevia septiembre con cuatro letras, y es el
+  ÚNICO mes que lo hace (ene · feb · mar · abr · may · jun · jul · ago · **sept** · oct · nov ·
+  dic). La etiqueta ya sale de `fmtDate`; escribir «sep» exigiría una SEGUNDA forma de escribir una
+  fecha, o cambiarle el formato a todo el papel del sistema. **Decisión pendiente de Daniel.**
+
+### El hueco repartido, y por qué los números están calzados
+
+No se movió nada de sitio: el rótulo gris sigue arriba de su dato, el orden sigue siendo empresa ·
+factura · cliente · destino · bulto, el bloque del bulto sigue anclado al BORDE DE ABAJO y siguen
+siendo 4 por hoja con líneas de corte. Lo que creció es el texto, y los saltos se recalcularon:
+`ARRIBA_DE_LOS_CAMPOS` 8 → **10**, `ENTRE_BLOQUES` 11 → **12,5**, el salto rótulo→dato pasó a
+DERIVARSE de la altura del dato (`bajoElRotulo`) y la interlínea, del tamaño del campo (un destino
+de 7,5 mm no puede saltar lo mismo que una factura).
+
+🔴 **EL DESTINO SE QUEDA CON EL HUECO QUE SOBRA** (`hastaY`): en vez de cortar con «…» teniendo papel
+en blanco debajo, el bloque se queda con las líneas que de verdad caben antes de la raya del bulto.
+Con el cliente en una línea son **tres**; con el cliente en dos, las **dos** de siempre.
+
+🔑 **Por qué eso hizo falta**, medido contra los 84 destinos reales de producción: a 7,5 mm con dos
+líneas se cortaban **14 de 84** (contra 2 antes) — «TIENDA 6 WESTLAND MALL» perdía el «MALL» y
+«ALBROOK, PASILLO DE DINOSAURIO» perdía el pasillo. Con la tercera línea se cortan **3**, y los dos
+peores («Calle 19 Central, al lado de la joyería Super Oro», 49 caracteres) ya se cortaban antes.
+Y no es un caso raro: **55 de los 148 clientes reales** ocupan dos líneas a 5,5 mm, así que los
+cinco números están CALZADOS para que el peor caso —cliente de dos líneas **y** destino de tres—
+todavía entre. Aflojar uno solo se come la tercera línea del destino.
+
+🩸 **El «…» se salía del papel.** Pegarlo al final de una línea que ya llegaba al borde la empujaba
+fuera del cuarto: en la Helvetica el «…» mide **un em entero**, que en un destino de 7,5 mm son
+**10 mm** de papel ajeno — con el tamaño viejo ya pasaba, y agrandar lo empeoraba. Ahora se le
+quitan letras a la última línea hasta que el corte QUEPA.
+
+### Lo que se comprobó
+
+Se armó el PDF de verdad y se le leyeron los tamaños, las coordenadas y los anchos al flujo de
+texto, con la MISMA fuente con la que se dibujó cada pieza (normal o negrita — medir todo en negrita
+daba 2 mm de error). Barrido de **696 combinaciones** con los 148 nombres de cliente y los 84
+destinos REALES de producción: **0 textos fuera del margen**, **0 encima del bloque del bulto**, y
+los cuatro tamaños dando **11,00 · 7,50 · 5,50 · 4,00 mm** exactos.
+
+**Candado**: `src/__tests__/components/guias-etiqueta-agrande.test.tsx`.
+**Verificación por mutación**: `scripts/_mutar-candados-etiqueta-y-pedido.sh` — **15 mutaciones, 15
+cazadas**, **1 de 1 control en verde**.
+
+**Cambiaron de dirección, con nota fechada** (no se borraron): `guias-etiqueta-rediseno.test.tsx`
+—el destino ya no es del mismo tamaño que el cliente, el rótulo dice «BULTO» y el número va
+partido— y `guias-etiquetas.test.ts`.
+
+### ⚠️ Lo que queda pendiente de Daniel
+
+- **Ver la etiqueta impresa de verdad**, sobre una caja: los milímetros están medidos sobre el PDF,
+  no con una regla contra el papel salido de la impresora.
+- **La pantalla sigue diciendo «cajas»** mientras el papel dice «BULTO» (ver arriba).
+- **La fecha**: «sept» o una segunda forma de escribirla (ver arriba).
+- Los tres destinos que **siguen cortándose** son direcciones largas escritas a mano
+  («Calle 19 Central, al lado de la joyería Super Oro»). Acortarlas en Guías › Configuración las
+  arregla sin tocar el papel.

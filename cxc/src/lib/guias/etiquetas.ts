@@ -23,7 +23,7 @@
 //     segundo juego: se dice lo que ya hay (409 del servidor + índice único
 //     parcial en la base).
 //   · Se juntan por CLIENTE + EMPRESA, exacto y normalizado, nunca por parecido.
-//   · La etiqueta lleva EMPRESA · fecha · Factura · Cliente · Destino · CAJA
+//   · La etiqueta lleva EMPRESA · fecha · Factura · Cliente · Destino · BULTO
 //     con su número. SIN transportista, SIN piezas, SIN código de barras y SIN
 //     la dirección del directorio (ese candado sigue valiendo).
 //   · 🔴 EL RÓTULO VA ARRIBA DEL DATO y el destino es tan grande como el
@@ -275,17 +275,34 @@ export function cuantasHojas(cantidad: number): number {
 }
 
 /**
- * 🔴 «CAJA» Y SU NÚMERO SON DOS COSAS (rediseño del 18-sep-2026). Antes era UNA
- * línea, «CAJA 3 de 14», flotando abajo sin separador. En el mockup de Daniel
- * son dos renglones centrados debajo de una raya: el rótulo chico y espaciado,
- * y debajo el número enorme. Están separados acá —y no en el PDF— para que la
- * pantalla y el papel no puedan decir cosas distintas.
+ * 🔴 EL RÓTULO Y SU NÚMERO SON DOS COSAS (rediseño del 18-sep-2026). Antes era
+ * UNA línea, «CAJA 3 de 14», flotando abajo sin separador. En el mockup de
+ * Daniel son dos renglones centrados debajo de una raya: el rótulo chico y
+ * espaciado, y debajo el número enorme. Están separados acá —y no en el PDF—
+ * para que la pantalla y el papel no puedan decir cosas distintas.
+ *
+ * 🔴 Y DICE «BULTO», NO «CAJA» (20-sep-2026). Es la palabra del resto de Guías
+ * —la lista, el papel de la guía, el Excel, «Corregir bultos»— y la que abarca
+ * lo que de verdad se despacha: un bulto puede ser una caja, un saco o un rollo.
  */
-export const ROTULO_CAJA = "CAJA";
+export const ROTULO_BULTO = "BULTO";
 
-/** El número de la etiqueta, lo más grande del papel: «3 de 14». */
+/**
+ * 🔴 EL NÚMERO DEL BULTO, PARTIDO EN DOS: el «3» es lo que se cuenta y va
+ * enorme; el «de 14» acompaña, a la mitad del tamaño y en la misma línea. Se
+ * parte ACÁ para que el papel no invente su propia forma de escribirlo.
+ *
+ * 🔴 SIGUE SIENDO «3 de 14» Y NUNCA «3/14»: «1/4» se lee «un cuarto», y con la
+ * etiqueta sucia o despegada de una esquina la rayita se pierde y queda «14».
+ */
+export function partesDelNumeroDeBulto(n: number, total: number): { numero: string; total: string } {
+  return { numero: String(n), total: `de ${total}` };
+}
+
+/** El número de la etiqueta, entero, lo más grande del papel: «3 de 14». */
 export function numeroDeCaja(n: number, total: number): string {
-  return `${n} de ${total}`;
+  const p = partesDelNumeroDeBulto(n, total);
+  return `${p.numero} ${p.total}`;
 }
 
 /** Lo que dice el botón: «Imprimir 14 etiquetas · 4 hojas». */

@@ -9,8 +9,8 @@
 //
 // 🔴 LO QUE LLEVA LA ETIQUETA, y nada más:
 //     EMPRESA (grande, negrita, con línea debajo) · fecha (chica, a la derecha)
-//     Factura · Cliente (grande) · Destino (igual de grande) · «CAJA» con su
-//     número enorme abajo, separado por una raya.
+//     Factura · Cliente (grande) · Destino (más grande todavía) · «BULTO» con
+//     su número enorme abajo, separado por una raya.
 //   SIN transportista, SIN piezas, SIN código de barras y SIN la dirección del
 //   directorio — el candado `clientes-direccion-no-alimenta-guias` sigue
 //   valiendo, y además 29 de 145 clientes no tienen dirección en ninguna parte.
@@ -20,11 +20,13 @@
 //   1. EL RÓTULO VA ARRIBA DEL DATO, chico y gris. Antes era «Factura 11-…» y
 //      «Destino: Paso Canoas» pegados en una línea: el ojo tenía que leer la
 //      palabra para llegar al dato. Ahora se salta el gris y se lee el dato.
-//   2. EL DESTINO ES DEL MISMO TAMAÑO QUE EL CLIENTE. Quien recibe lee el
-//      cliente; quien carga el camión ordena por destino. Los dos de lejos.
-//   3. «CAJA» Y SU NÚMERO, SEPARADOS POR UNA RAYA, centrados y abajo del todo:
-//      el rótulo chico y espaciado, y debajo «3 de 14» enorme. Antes era una
-//      sola línea «CAJA 1 de 4» flotando sin separador.
+//   2. EL DESTINO SE LEE DE LEJOS. Quien recibe lee el cliente; quien carga el
+//      camión ordena por destino. (El 18-sep-2026 quedaron del mismo tamaño; el
+//      20-sep-2026 el destino pasó a ser el más grande de los dos.)
+//   3. EL RÓTULO Y SU NÚMERO, SEPARADOS POR UNA RAYA, centrados y abajo del
+//      todo: el rótulo chico y espaciado, y debajo «3 de 14» enorme. Antes era
+//      una sola línea «CAJA 1 de 4» flotando sin separador. (El rótulo pasó a
+//      decir «BULTO» el 20-sep-2026.)
 //   4. LA FECHA EN EL FORMATO DE LA CASA («18 sept 2026»), que sale de `fmtDate`
 //      — el MISMO que usa todo el papel del sistema. Antes era «18-09-2026».
 //   Y el cliente y el destino se escriben en MAYÚSCULAS, como la empresa: la
@@ -35,17 +37,35 @@
 // izquierda) y el resto en blanco. Dos dibujos del mismo papel es uno que se
 // corrige y otro que se queda viejo.
 //
-// Las proporciones salen del mockup aprobado, medidas sobre el ANCHO DE LA
-// HOJA (215,9 mm): empresa 3,1 % · fecha 1,5 % · rótulo 1,4 % · factura 2,2 %
-// · cliente 3,1 % · destino 3,1 % · «CAJA» 1,6 % · el número 5,6 %.
+// 🔴 EL AGRANDE DEL 20-sep-2026 — la etiqueta se lee PARADO, A UN METRO, ENCIMA
+// DE UNA CAJA, y cada dato se lee desde una distancia distinta. 🩸 Medido sobre
+// el PDF real: entre el destino y la raya del bulto quedaban 130 pt (46 mm) de
+// papel en blanco —un 33 % del alto del tiquete— y por ese hueco el cliente y
+// el destino se imprimían a 4,8 mm de altura de mayúscula, justo en el límite.
+//
+// 🔴 LOS TAMAÑOS SE PIDEN EN MILÍMETROS DE ALTURA DE MAYÚSCULA, NO EN PUNTOS.
+// La regla con la que se eligieron: cada milímetro de altura de mayúscula se
+// lee cómodo desde unos 30 cm, así que cada dato crece hasta la distancia desde
+// la que se lee de verdad:
+//     el número del bulto 11 mm (se cuenta de lejos y de cerca) · el destino
+//     7,5 mm y en NEGRITA (se ordena el camión de lejos) · el cliente 5,5 mm
+//     (se entrega de cerca) · la factura 4 mm (se compara contra un papel) ·
+//     la empresa y la fecha, como estaban.
+// Los milímetros son lo aprobado; los puntos SE CALCULAN de ellos. Escribir el
+// punto a mano es lo que permite que un cambio de fuente cambie el tamaño real
+// sin que nadie se entere.
+//
+// El hueco se repartió entre los campos: no se movió nada de sitio, el rótulo
+// chico y gris sigue arriba de su dato, el orden sigue siendo empresa ·
+// factura · cliente · destino · bulto, y siguen siendo 4 por hoja.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { jsPDF } from "jspdf";
 import {
-  ROTULO_CAJA,
+  ROTULO_BULTO,
   fechaDeLaEtiqueta,
   hojasDeEtiquetas,
-  numeroDeCaja,
+  partesDelNumeroDeBulto,
   type EtiquetaFila,
 } from "@/lib/guias/etiquetas";
 
@@ -62,39 +82,89 @@ const PAD_Y = 9.1;
 /** mm → puntos, que es la unidad de `setFontSize` de jsPDF. */
 const PT = (mm: number): number => mm / 0.3527777778;
 
-// Los tamaños, derivados del ancho de la hoja (las proporciones del mockup).
-const F_EMPRESA = PT(0.031 * HOJA_W);
-const F_FECHA = PT(0.015 * HOJA_W);
-/** El rótulo gris que va ARRIBA del dato: «Factura», «Cliente», «Destino». */
-const F_ROTULO = PT(0.014 * HOJA_W);
-const F_FACTURA = PT(0.022 * HOJA_W);
-const F_CLIENTE = PT(0.031 * HOJA_W);
 /**
- * 🔴 EL DESTINO, DEL MISMO TAMAÑO QUE EL CLIENTE. No es una constante repetida:
- * es la MISMA, para que nadie achique uno sin achicar el otro.
+ * 🔴 CUÁNTO DEL TAMAÑO DE LETRA ES LA MAYÚSCULA. Helvetica —la fuente estándar
+ * del PDF, la que usa todo el papel de la casa— tiene `CapHeight 718` sobre un
+ * em de 1000 en su propio AFM: una «A» de una letra de 10 pt mide 7,18 pt de
+ * alto. Es lo que se MIDE con una regla encima de la caja, y por eso es la
+ * unidad en la que se pidieron los tamaños.
  */
-const F_DESTINO = F_CLIENTE;
-/** «CAJA», chico y espaciado, encima del número. */
-const F_CAJA_ROTULO = PT(0.016 * HOJA_W);
-/** «3 de 14», lo más grande del papel. */
-const F_CAJA = PT(0.056 * HOJA_W);
+const ALTURA_DE_MAYUSCULA = 0.718;
+
+/** El tamaño de letra (pt) cuyas MAYÚSCULAS miden `mm` milímetros. */
+const PT_PARA_MAYUSCULA = (mm: number): number => PT(mm) / ALTURA_DE_MAYUSCULA;
+
+// ── Los tamaños, en MILÍMETROS DE ALTURA DE MAYÚSCULA ────────────────────────
+// Los cuatro primeros no se tocaron el 20-sep-2026: son los milímetros exactos
+// que ya salían de las proporciones del mockup (18,97 pt la empresa, 9,18 pt la
+// fecha, 8,57 pt el rótulo gris y 9,79 pt el rótulo del bulto).
+const MAY_EMPRESA = 4.8055;
+const MAY_FECHA = 2.3252;
+/** El rótulo gris que va ARRIBA del dato: «Factura», «Cliente», «Destino». */
+const MAY_ROTULO = 2.1702;
+/** «BULTO», chico y espaciado, encima del número. */
+const MAY_BULTO_ROTULO = 2.4802;
+/** Se compara contra un papel, de cerca: 4 mm. */
+const MAY_FACTURA = 4.0;
+/** Se lee al entregar, de cerca: 5,5 mm. */
+const MAY_CLIENTE = 5.5;
+/** 🔴 Se lee ordenando el camión, de lejos: 7,5 mm y en negrita. */
+const MAY_DESTINO = 7.5;
+/** 🔴 Se cuenta de lejos y de cerca: 11 mm, lo más grande del papel. */
+const MAY_BULTO = 11.0;
+
+const F_EMPRESA = PT_PARA_MAYUSCULA(MAY_EMPRESA);
+const F_FECHA = PT_PARA_MAYUSCULA(MAY_FECHA);
+const F_ROTULO = PT_PARA_MAYUSCULA(MAY_ROTULO);
+const F_FACTURA = PT_PARA_MAYUSCULA(MAY_FACTURA);
+const F_CLIENTE = PT_PARA_MAYUSCULA(MAY_CLIENTE);
+const F_DESTINO = PT_PARA_MAYUSCULA(MAY_DESTINO);
+const F_BULTO_ROTULO = PT_PARA_MAYUSCULA(MAY_BULTO_ROTULO);
+const F_BULTO = PT_PARA_MAYUSCULA(MAY_BULTO);
+/**
+ * 🔴 «de 4» VA A LA MITAD DEL TAMAÑO DEL «1», en la misma línea. Lo que se
+ * cuenta es el número de este bulto; el total acompaña. Y sigue diciendo
+ * «1 de 4» y NUNCA «1/4»: con la etiqueta sucia o despegada de una esquina la
+ * rayita se pierde y «1/4» queda leyéndose «14».
+ */
+const F_BULTO_TOTAL = F_BULTO / 2;
 
 // ── Los saltos verticales, en milímetros ─────────────────────────────────────
 /** De la raya del encabezado al primer rótulo. */
-const ARRIBA_DE_LOS_CAMPOS = 8.0;
-/** Del rótulo gris al dato, cuando el dato es chico (la factura). */
-const ROTULO_A_DATO_CHICO = 5.4;
-/** Del rótulo gris al dato, cuando el dato es grande (cliente y destino). */
-const ROTULO_A_DATO_GRANDE = 7.0;
+const ARRIBA_DE_LOS_CAMPOS = 10.0;
+/**
+ * Del rótulo gris al dato: la altura de la mayúscula del dato MÁS su aire, así
+ * que agrandar un campo no le pisa el rótulo a nadie.
+ */
+const AIRE_BAJO_EL_ROTULO = 2.1;
+const bajoElRotulo = (mayusculaMm: number): number => mayusculaMm + AIRE_BAJO_EL_ROTULO;
+/**
+ * La segunda línea de un nombre largo: la interlínea propia del tamaño del
+ * campo (un destino de 7,5 mm no puede saltar lo mismo que una factura).
+ */
+const INTERLINEA = 1.10;
+const interlinea = (tamanoPt: number): number => tamanoPt * 0.3527777778 * INTERLINEA;
 /** Del último renglón de un bloque al rótulo del siguiente. */
-const ENTRE_BLOQUES = 11.0;
-/** La segunda línea de un nombre largo. */
-const SALTO_DE_LINEA = 8.2;
-/** Desde el borde de abajo: la raya, «CAJA» y el número. */
-const CAJA_ROTULO_SOBRE_NUMERO = 12.6;
-const CAJA_RAYA_SOBRE_ROTULO = 4.6;
-/** Lo espaciado del rótulo «CAJA» (el `letter-spacing` del mockup). */
-const CAJA_ESPACIADO = 0.5;
+const ENTRE_BLOQUES = 12.5;
+/**
+ * 🔴 EL AIRE QUE EL DESTINO NO PUEDE COMERSE: lo que queda entre su última
+ * línea y la raya del bulto. Cubre el descolgado de la Helvetica (0,207 del em,
+ * que en un destino de 7,5 mm son 2,2 mm — las comas y los paréntesis bajan de
+ * la base) y deja el resto de respiro.
+ *
+ * 🔑 Los cinco números de arriba están CALZADOS: con el cliente en DOS líneas
+ * —55 de los 148 clientes reales lo están a 5,5 mm— el destino todavía entra en
+ * TRES, que es lo que hace falta para que «TIENDA 6 WESTLAND MALL» o
+ * «ALBROOK, PASILLO DE DINOSAURIO» salgan enteros. Aflojar uno solo se los come.
+ */
+const AIRE_SOBRE_LA_RAYA = 3.0;
+/** Desde el borde de abajo: la raya, «BULTO» y el número. */
+const BULTO_ROTULO_SOBRE_NUMERO = 14.0;
+const BULTO_RAYA_SOBRE_ROTULO = 4.6;
+/** Lo espaciado del rótulo «BULTO» (el `letter-spacing` del mockup). */
+const BULTO_ESPACIADO = 0.5;
+/** El aire entre el número grande y su «de N» chico. */
+const BULTO_ANTES_DEL_TOTAL = 2.6;
 
 /** Lo que una etiqueta necesita saber para dibujarse. */
 export interface DatosEtiqueta {
@@ -147,9 +217,27 @@ function bloqueDeCampo(
   doc: jsPDF,
   rotulo: string,
   valor: string,
-  opciones: { izq: number; ancho: number; y: number; tamano: number; salto: number; maxLineas: number },
+  opciones: {
+    izq: number;
+    ancho: number;
+    y: number;
+    mayuscula: number;
+    /** Las líneas que SIEMPRE tiene, salga lo que salga. */
+    maxLineas: number;
+    /**
+     * 🔴 HASTA DÓNDE PUEDE BAJAR ESTE CAMPO. Con este piso, el bloque se queda
+     * con las líneas que de verdad caben antes de él —ni una más— en vez de
+     * cortar con puntos suspensivos teniendo papel en blanco debajo. Es lo que
+     * le deja al DESTINO quedarse con el hueco cuando el cliente entra en una
+     * sola línea: «TIENDA 6 WESTLAND MALL» sale entero, y con el cliente largo
+     * el mismo cálculo le devuelve las dos líneas de siempre.
+     */
+    hastaY?: number;
+  },
 ): number {
-  const { izq, ancho, tamano, salto, maxLineas } = opciones;
+  const { izq, ancho, mayuscula } = opciones;
+  const tamano = PT_PARA_MAYUSCULA(mayuscula);
+  const salto = bajoElRotulo(mayuscula);
   let y = opciones.y;
 
   // El rótulo: chico, gris, ARRIBA del dato.
@@ -166,10 +254,21 @@ function bloqueDeCampo(
   const lineas = doc.splitTextToSize(valor, ancho) as string[];
   // Un texto larguísimo no puede empujar lo de abajo fuera del cuarto: se corta
   // con puntos suspensivos en vez de desbordarse.
+  const cabenPorElPiso =
+    opciones.hastaY == null ? 0 : 1 + Math.floor((opciones.hastaY - y) / interlinea(tamano));
+  const maxLineas = Math.max(opciones.maxLineas, cabenPorElPiso);
   const visibles = lineas.slice(0, maxLineas);
-  if (lineas.length > maxLineas) visibles[maxLineas - 1] = `${visibles[maxLineas - 1]}…`;
+  if (lineas.length > maxLineas) {
+    // 🩸 Los puntos suspensivos NO son gratis: pegarlos al final de una línea que
+    // ya llegaba al borde la empuja fuera del cuarto —en la Helvetica el «…»
+    // mide un em entero, que en un destino de 7,5 mm son 10 mm de papel ajeno—.
+    // Se le quitan letras a la última línea hasta que el corte QUEPA.
+    let ultima = visibles[maxLineas - 1];
+    while (ultima.length > 1 && doc.getTextWidth(`${ultima}…`) > ancho) ultima = ultima.slice(0, -1);
+    visibles[maxLineas - 1] = `${ultima.trimEnd()}…`;
+  }
   visibles.forEach((l, i) => {
-    if (i > 0) y += SALTO_DE_LINEA;
+    if (i > 0) y += interlinea(tamano);
     doc.text(l, izq, y);
   });
   return y;
@@ -181,6 +280,12 @@ function dibujarEtiqueta(doc: jsPDF, d: DatosEtiqueta, caja: number, x0: number,
   const der = x0 + CUARTO_W - PAD_X;
   const ancho = der - izq;
   const centro = x0 + CUARTO_W / 2;
+
+  // 🔴 El bloque del bulto se ancla al BORDE DE ABAJO, así que su raya se sabe
+  // ANTES de escribir un solo campo: es el piso hasta el que pueden bajar.
+  const yNumero = y0 + CUARTO_H - PAD_Y;
+  const yRotulo = yNumero - BULTO_ROTULO_SOBRE_NUMERO;
+  const yRaya = yRotulo - BULTO_RAYA_SOBRE_ROTULO;
 
   doc.setTextColor(17);
 
@@ -209,50 +314,56 @@ function dibujarEtiqueta(doc: jsPDF, d: DatosEtiqueta, caja: number, x0: number,
   y = bloqueDeCampo(doc, "Factura", String(d.secuencial ?? ""), {
     ...campo,
     y: y + ARRIBA_DE_LOS_CAMPOS,
-    tamano: F_FACTURA,
-    salto: ROTULO_A_DATO_CHICO,
+    mayuscula: MAY_FACTURA,
     maxLineas: 1,
   });
   y = bloqueDeCampo(doc, "Cliente", String(d.cliente_nombre ?? "").toUpperCase(), {
     ...campo,
     y: y + ENTRE_BLOQUES,
-    tamano: F_CLIENTE,
-    salto: ROTULO_A_DATO_GRANDE,
+    mayuscula: MAY_CLIENTE,
     maxLineas: 2,
   });
   bloqueDeCampo(doc, "Destino", String(d.destino ?? "").toUpperCase(), {
     ...campo,
     y: y + ENTRE_BLOQUES,
-    tamano: F_DESTINO,
-    salto: ROTULO_A_DATO_GRANDE,
+    mayuscula: MAY_DESTINO,
     maxLineas: 2,
+    hastaY: yRaya - AIRE_SOBRE_LA_RAYA,
   });
 
-  // ── «CAJA» y su número, abajo del todo, centrados y con su raya ──
+  // ── «BULTO» y su número, abajo del todo, centrados y con su raya ──
   // 🔴 Se dibuja DESDE EL BORDE DE ABAJO, no desde donde terminó el destino: el
   // número queda siempre en el mismo sitio, lleve el cliente una línea o dos.
-  const yNumero = y0 + CUARTO_H - PAD_Y;
-  const yRotulo = yNumero - CAJA_ROTULO_SOBRE_NUMERO;
-  const yRaya = yRotulo - CAJA_RAYA_SOBRE_ROTULO;
-
   doc.setDrawColor(17);
   doc.setLineWidth(0.9);
   doc.line(izq, yRaya, der, yRaya);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(F_CAJA_ROTULO);
+  doc.setFontSize(F_BULTO_ROTULO);
   doc.setTextColor(51);
-  doc.setCharSpace(CAJA_ESPACIADO);
+  doc.setCharSpace(BULTO_ESPACIADO);
   // ⚠️ jsPDF mide el ancho contando el espaciado del ÚLTIMO carácter, que no se
-  // dibuja: sin descontarle medio espacio, «CAJA» queda 1 mm a la derecha del
+  // dibuja: sin descontarle medio espacio, «BULTO» queda 1 mm a la derecha del
   // centro y se nota al lado del número, que sí cae centrado.
-  doc.text(ROTULO_CAJA, centro - CAJA_ESPACIADO / 2, yRotulo, { align: "center" });
+  doc.text(ROTULO_BULTO, centro - BULTO_ESPACIADO / 2, yRotulo, { align: "center" });
   doc.setCharSpace(0);
 
+  // 🔴 EL NÚMERO GRANDE Y SU «de N» A LA MITAD, EN LA MISMA LÍNEA. Son dos
+  // `doc.text` porque son dos tamaños, pero comparten la base y se centran como
+  // UN bloque: se mide el ancho de las dos piezas y se arranca a la izquierda
+  // del centro, en vez de centrar cada una por su cuenta.
+  const { numero, total } = partesDelNumeroDeBulto(caja, d.cajas);
   doc.setTextColor(17);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(F_CAJA);
-  doc.text(numeroDeCaja(caja, d.cajas), centro, yNumero, { align: "center" });
+  doc.setFontSize(F_BULTO);
+  const anchoNumero = doc.getTextWidth(numero);
+  doc.setFontSize(F_BULTO_TOTAL);
+  const anchoTotal = doc.getTextWidth(total);
+  const xNumero = centro - (anchoNumero + BULTO_ANTES_DEL_TOTAL + anchoTotal) / 2;
+  doc.setFontSize(F_BULTO);
+  doc.text(numero, xNumero, yNumero);
+  doc.setFontSize(F_BULTO_TOTAL);
+  doc.text(total, xNumero + anchoNumero + BULTO_ANTES_DEL_TOTAL, yNumero);
 }
 
 /**
