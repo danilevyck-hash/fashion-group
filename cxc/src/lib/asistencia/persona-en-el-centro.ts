@@ -214,6 +214,61 @@ export function pestanaQueSeAbre(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 🔴 LAS DIRECCIONES VIEJAS DEJAN DE EXISTIR (19-sep-2026)
+//
+// Daniel, mirando `?tab=justificaciones`: *«no creo que debería de existir,
+// ¿no?»*.
+//
+// 🩸 Hasta hoy esas direcciones **se aceptaban y abrían otra pantalla EN
+// SILENCIO**: `?tab=justificaciones` mostraba Asistencia con la URL diciendo
+// «justificaciones». Son CUATRO —`justificaciones`, `vacaciones`,
+// `configuracion` y `reporte`—, más `personas`, que es la misma mudanza de
+// antes. La dirección quedaba viva, se podía volver a compartir, y el Atrás del
+// navegador la devolvía.
+//
+// La mudanza NO cambia: cada una sigue cayendo donde de verdad vive eso
+// (`MUDANZA`). Lo que cambia es que la URL **se reescribe** a la pestaña real,
+// así que la dirección vieja deja de existir en cuanto se usa una vez.
+//
+// 🔑 Y NO SE REESCRIBE NUNCA UNA URL VACÍA: entrar a `/asistencia` a secas no
+// puede empezar a escribir `?tab=` en el historial de todo el mundo.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ¿Hay que reescribir la URL? `null` = no se toca.
+ *
+ * Devuelve la clave a la que hay que llevarla cuando lo que trae la URL no es
+ * lo que se está mostrando — una dirección mudada, o una que no existe.
+ *
+ * 🔴 SE ESPERA A SABER QUIÉN MIRA. El rol sale de `sessionStorage` en un efecto,
+ * así que en el PRIMER render no hay ninguna pestaña visible y todo resolvería a
+ * la de por defecto. Reescribir ahí le rompería el enlace a cualquiera:
+ * `?tab=planilla` compartido por WhatsApp se convertiría en `?tab=reporte`
+ * antes de que el navegador supiera que esa persona sí ve la Planilla.
+ *
+ * @param clave     lo que trae la URL
+ * @param mostrada  la que resolvió `pestanaQueSeAbre`
+ * @param visibles  las pestañas que este rol ve. Vacío = todavía no se sabe.
+ */
+export function claveQueSeReescribe(
+  clave: string | null | undefined,
+  mostrada: ClavePestana,
+  visibles: readonly Pestana[],
+): ClavePestana | null {
+  // Todavía no se sabe qué ve esta persona: no se toca nada.
+  if (visibles.length === 0) return null;
+  const k = String(clave ?? "").trim();
+  // Sin `?tab=` no hay nada que corregir: es la entrada normal al módulo.
+  if (k === "") return null;
+  // Lo que ya coincide se deja quieto (y así el `replace` no corre en cada render).
+  if (k === mostrada) return null;
+  return mostrada;
+}
+
+/** Las direcciones que dejaron de existir, para poder nombrarlas. */
+export const CLAVES_MUDADAS: readonly string[] = Object.freeze(Object.keys(MUDANZA));
+
+// ─────────────────────────────────────────────────────────────────────────────
 // LA DIRECCIÓN DE UNA PERSONA
 //
 // Ruta propia, como la ficha del cliente (`/clientes/[codigo]`): se puede

@@ -80,6 +80,7 @@ import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
 import {
   PERSONA_EN_EL_CENTRO,
   pestanaPorDefecto,
+  claveQueSeReescribe,
   pestanaQueSeAbre,
   pestanasDeAsistencia,
   type ClavePestana,
@@ -180,6 +181,31 @@ function AsistenciaInner() {
   // `?tab=justificaciones` en Reporte. La regla vive en `pestanaQueSeAbre`;
   // nadie se queda mirando una pantalla en blanco por un enlace viejo.
   const tab: Tab = pestanaQueSeAbre(tabRaw, visibles);
+
+  // ── 🔴 LAS DIRECCIONES VIEJAS DEJAN DE EXISTIR (19-sep-2026) ──────────────
+  //
+  // Daniel, mirando `?tab=justificaciones`: *«no creo que debería de existir,
+  // ¿no?»*. 🩸 Esas cuatro —`justificaciones`, `vacaciones`, `configuracion` y
+  // `reporte`— **se aceptaban y abrían otra pantalla EN SILENCIO**: la URL
+  // seguía diciendo «justificaciones» mientras se veía Asistencia, así que la
+  // dirección quedaba viva, se podía volver a compartir y el Atrás la devolvía.
+  //
+  // Ahora la URL se REESCRIBE a la pestaña real. La mudanza no cambió —cada una
+  // sigue cayendo donde de verdad vive eso—; lo que cambia es que la dirección
+  // vieja deja de existir en cuanto se usa una vez. La regla vive en el módulo
+  // puro (`claveQueSeReescribe`), no en este renglón.
+  //
+  // 🔑 `replace`, no `push`: es la MISMA pantalla, y el Atrás del navegador no
+  // tiene que pasar por la dirección que se acaba de corregir.
+  //
+  // 🔴 Y NO SE TOCA NADA HASTA SABER QUIÉN MIRA: el rol llega en un efecto, y
+  // en el primer render `visibles` está vacío. Reescribir ahí convertiría un
+  // `?tab=planilla` compartido en `?tab=reporte` antes de saber que esa persona
+  // sí ve la Planilla.
+  useEffect(() => {
+    const aEscribir = claveQueSeReescribe(tabRaw, tab, visibles);
+    if (aEscribir) setTab(aEscribir);
+  }, [tabRaw, tab, setTab, visibles]);
 
   return (
     <>
