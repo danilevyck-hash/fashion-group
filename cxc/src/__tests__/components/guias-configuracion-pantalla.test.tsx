@@ -64,6 +64,8 @@ const FRECUENCIAS = {
 
 interface Pedido { metodo: string; url: string; body: unknown }
 let pedidos: Pedido[] = [];
+/** Cuelga el GET de destinos-config para poder mirar la pantalla MIENTRAS relee. */
+let frenarGet: (() => Promise<void>) | null = null;
 
 function memStorage(): Storage {
   let m: Record<string, string> = {};
@@ -84,6 +86,7 @@ function sembrarRol(rol: string) {
 
 beforeEach(() => {
   pedidos = [];
+  frenarGet = null;
   atajosEncendidos = true;
   ROUTER.push.mockClear();
   vi.stubGlobal("localStorage", memStorage());
@@ -95,7 +98,10 @@ beforeEach(() => {
     try { body = init?.body ? JSON.parse(init.body) : null; } catch { body = init?.body ?? null; }
     pedidos.push({ metodo, url: u, body });
     if (u.startsWith("/api/guias/destinos-config")) {
-      if (metodo === "GET") return { ok: true, json: async () => ({ destinos: FILAS }) };
+      if (metodo === "GET") {
+        if (frenarGet) await frenarGet();
+        return { ok: true, json: async () => ({ destinos: FILAS }) };
+      }
       if (metodo === "POST") return { ok: true, status: 201, json: async () => ({ ok: true, id: 50 }) };
       return { ok: true, json: async () => ({ ok: true }) };
     }
@@ -269,6 +275,41 @@ describe("🔴 nada se escribe solo", () => {
     const posts = () => pedidos.filter((p) => p.metodo === "POST" && p.url.startsWith("/api/guias/destinos-config"));
     await waitFor(() => expect(posts()).toHaveLength(1));
     expect(posts()[0].body).toMatchObject({ cliente_codigo: "D-87", destino: "Changinola" });
+  });
+
+  /**
+   * 🔴 RELEER NO BORRA LA LISTA DE LA PANTALLA (19-sep-2026).
+   *
+   * 🩸 Daniel, textual: *«al elegir definir, se me abre una pantalla y se
+   * vuelve, hay un bug»*. No era un modal: `cargar()` encendía «Cargando…» en
+   * CADA relectura, y «Cargando…» REEMPLAZA la lista entera — todos los
+   * grupos desaparecían, la página se encogía a una línea y al volver uno
+   * quedaba arriba del todo, lejos del cliente que estaba tocando.
+   *
+   * El candado mira el estado INTERMEDIO: con el GET de la recarga todavía
+   * colgado, los grupos tienen que seguir dibujados.
+   */
+  it("🔴 tocar «Definir» NO borra la lista mientras relee (el bug del 19-sep-2026)", async () => {
+    const { container } = await abrirConfiguracion("admin");
+    // Se cuelga el GET de la recarga para poder mirar el intermedio.
+    let soltar: (() => void) | null = null;
+    frenarGet = () => new Promise<void>((r) => { soltar = r; });
+
+    const definir = Array.from(container.querySelectorAll("button")).find((b) =>
+      (b.getAttribute("aria-label") || "").includes("Definir «Changinola»"),
+    );
+    fireEvent.click(definir!);
+    await waitFor(() => expect(soltar).toBeTruthy());
+
+    // 🔴 Mientras relee: los grupos SIGUEN en pantalla y no hay «Cargando…».
+    expect(container.querySelector('[data-testid="grupo-D-35"]'), "la lista desapareció al releer").toBeTruthy();
+    expect(container.querySelector('[data-testid="grupo-D-87"]')).toBeTruthy();
+    expect(container.querySelector('[aria-labelledby="destinos-config-titulo"]')!.textContent)
+      .not.toContain("Cargando…");
+
+    soltar!();
+    frenarGet = null;
+    await waitFor(() => expect(container.querySelector('[data-testid="grupo-D-35"]')).toBeTruthy());
   });
 
   it("quitar pide confirmación EN PALABRAS y no manda nada hasta confirmar", async () => {

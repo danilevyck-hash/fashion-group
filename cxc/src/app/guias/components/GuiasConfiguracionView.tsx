@@ -125,8 +125,26 @@ export default function GuiasConfiguracionView() {
   const [aQuitar, setAQuitar] = useState<DestinoConfigurado | null>(null);
   const [quitando, setQuitando] = useState(false);
 
-  const cargar = useCallback(async () => {
-    setCargando(true);
+  /**
+   * 🔴 RELEER NO BORRA LA LISTA DE LA PANTALLA (19-sep-2026).
+   *
+   * 🩸 Daniel, textual: *«al elegir definir, se me abre una pantalla y se
+   * vuelve, hay un bug»*. No era un modal: `cargar()` encendía «Cargando…»
+   * en CADA relectura, y «Cargando…» REEMPLAZA la lista entera. Tocar
+   * «Definir» (o «el de siempre», o «Quitar», o guardar una edición) hacía
+   * desaparecer todos los grupos, la página se encogía a una línea —el
+   * navegador recorta el scroll al alto nuevo— y al volver la lista uno
+   * quedaba arriba del todo, lejos del cliente que estaba tocando. Eso es la
+   * «pantalla que se abre y se vuelve».
+   *
+   * Ahora «Cargando…» es solo de la PRIMERA lectura, cuando de verdad no hay
+   * nada que mostrar. Las relecturas de después son calladas: la lista se
+   * queda en pantalla y se actualiza donde cambió. Y si una relectura callada
+   * falla, lo que ya estaba **no se borra** — se dice el error arriba y los
+   * datos viejos siguen a la vista.
+   */
+  const cargar = useCallback(async (silenciosa = false) => {
+    if (!silenciosa) setCargando(true);
     setErrorCarga(null);
     try {
       const res = await fetch("/api/guias/destinos-config", { cache: "no-store" });
@@ -138,9 +156,9 @@ export default function GuiasConfiguracionView() {
       setFilas(Array.isArray(data.destinos) ? data.destinos : []);
     } catch (err) {
       setErrorCarga(err instanceof Error ? err.message : "No se pudo cargar la lista. Intenta de nuevo en unos segundos.");
-      setFilas([]);
+      if (!silenciosa) setFilas([]);
     } finally {
-      setCargando(false);
+      if (!silenciosa) setCargando(false);
     }
   }, []);
 
@@ -198,7 +216,7 @@ export default function GuiasConfiguracionView() {
       await definir(altaCodigo, altaDestino.trim(), parsearTiendas(altaTiendas));
       setToast("Listo, guardado");
       cerrarAlta();
-      void cargar();
+      void cargar(true);
     } catch (err) {
       setErrorAlta(err instanceof Error ? err.message : "No se pudo guardar. Intenta de nuevo en unos segundos.");
     } finally {
@@ -212,7 +230,7 @@ export default function GuiasConfiguracionView() {
     try {
       await definir(codigo, destino, []);
       setToast("Listo, guardado");
-      void cargar();
+      void cargar(true);
     } catch (err) {
       setToast(err instanceof Error ? err.message : "No se pudo guardar. Intenta de nuevo en unos segundos.");
     } finally {
@@ -242,7 +260,7 @@ export default function GuiasConfiguracionView() {
       }
       setToast("Listo, guardado");
       setEditandoId(null);
-      void cargar();
+      void cargar(true);
     } catch (err) {
       setErrorEdicion(err instanceof Error ? err.message : "No se pudo guardar. Intenta de nuevo en unos segundos.");
     } finally {
@@ -270,7 +288,7 @@ export default function GuiasConfiguracionView() {
         throw new Error(b.error ?? "No se pudo guardar. Intenta de nuevo en unos segundos.");
       }
       setToast("Listo, guardado");
-      void cargar();
+      void cargar(true);
     } catch (err) {
       setToast(err instanceof Error ? err.message : "No se pudo guardar. Intenta de nuevo en unos segundos.");
     } finally {
@@ -291,7 +309,7 @@ export default function GuiasConfiguracionView() {
       }
       setToast("Listo, quitado");
       setAQuitar(null);
-      void cargar();
+      void cargar(true);
     } catch (err) {
       setToast(err instanceof Error ? err.message : "No se pudo quitar. Intenta de nuevo en unos segundos.");
     } finally {
