@@ -104,3 +104,47 @@ export function facturasParaMostrar(campo: string | null | undefined): string {
     })
     .join(", ");
 }
+
+/**
+ * ¿Este número es el `0000` viejo, o sea «este envío no lleva factura»?
+ *
+ * Se reconoce igual que en `claveDeFactura` —todos los dígitos en cero— pero
+ * exigiendo además que **no haya letras**: `Traslado` no tiene dígitos y nunca
+ * entra acá, y un hipotético `Traslado 000` tampoco. 🔴 Es la MISMA regla, no
+ * una segunda: `claveDeFactura` devuelve `""` para los dos casos y acá hay que
+ * distinguirlos, porque `Traslado` SÍ se imprime y el `0000` no.
+ */
+export function esCeroDeFactura(v: string | null | undefined): boolean {
+  const t = String(v ?? "").trim();
+  if (t === "" || /[^\d\s.,/-]/.test(t)) return false;
+  const d = digitos(t);
+  return d !== "" && /^0+$/.test(d);
+}
+
+/**
+ * 🔴 EL CAMPO `facturas` TAL COMO SALE EN EL PAPEL: como en pantalla, pero
+ * **sin el `0000`**.
+ *
+ * 🩸 Daniel, 19-sep-2026: el `0000` se imprimía tal cual en la casilla
+ * FACTURA(S) de la hoja y del PDF. Son **71 renglones vivos** y todavía se
+ * crean (4 guías en septiembre de 2026): es el vocabulario viejo de «este envío
+ * no lleva factura», así que en el papel que firma el transportista es ruido —
+ * cuatro ceros donde no hay nada que declarar.
+ *
+ * 🔴 NO SE TOCA LO QUE ESTÁ GUARDADO. `guia_items.facturas` sigue diciendo
+ * `0000` en sus 71 renglones; lo único que cambia es lo que se DIBUJA en las
+ * dos hojas. La lista, la ficha y el Excel siguen mostrando el campo con
+ * `facturasParaMostrar`, que es donde alguien revisa lo que tecleó.
+ *
+ * ⚠️ `Traslado` SIGUE SALIENDO IMPRESO: es uno de los dos caminos válidos de un
+ * envío sin factura, y borrarlo dejaría el renglón sin decir qué es.
+ */
+export function facturasParaElPapel(campo: string | null | undefined): string {
+  const t = String(campo ?? "");
+  const partes = t.includes(",") ? t.split(",") : [t];
+  return partes
+    .map((p) => p.trim())
+    .filter((p) => p !== "" && !esCeroDeFactura(p))
+    .map((p) => facturaParaMostrar(p))
+    .join(", ");
+}

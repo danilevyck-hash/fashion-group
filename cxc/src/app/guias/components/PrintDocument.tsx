@@ -8,7 +8,8 @@ import {
   tipoDespachoEfectivo,
 } from "@/lib/guias/modo-despacho";
 import { nombreDespachadoPor } from "@/lib/guias/despachado-por";
-import { facturasParaMostrar } from "@/lib/guias/numero-factura";
+import { facturasParaElPapel } from "@/lib/guias/numero-factura";
+import { rayaDeLaCasilla } from "@/lib/guias/casilla-en-blanco";
 import { cedulaParaMostrar } from "@/lib/guias/cedula";
 import { observacionesVisibles } from "@/lib/guias/observaciones";
 import { FG_LOGO_BASE64 } from "@/lib/pdf-logo";
@@ -34,6 +35,13 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
   const transpUnico = numeroTranspUnicoImpreso(guiaItems, g.numero_guia_transp);
   // Un "0" no es una placa: es lo que alguien tecleó para pasar la validación.
   const placa = sinCeroPelado(g.placa);
+  // 🔴 UNA CASILLA VACÍA SALE CON RAYA PARA ESCRIBIRLA A MANO (19-sep-2026).
+  // La que lo pidió fue PLACA / VEHÍCULO —el papel se imprime ANTES de que
+  // llegue el camión—, y la regla vale para todas las del encabezado: la misma
+  // diferencia que las casillas de NOMBRE, CÉDULA y FIRMA ya hacían abajo.
+  // Vive en `casilla-en-blanco.ts` para que el PDF no pueda decir otra cosa.
+  const raya = (v: string | null | undefined) =>
+    `border-b ${rayaDeLaCasilla(v)} flex-1 text-center`;
 
   return (
     <>
@@ -69,58 +77,52 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={FG_LOGO_BASE64} alt="FG" className="w-9 h-9 rounded" />
           <h1 className="text-lg font-bold uppercase tracking-wide">
-            Guia de Transporte Interior
+            Guía de Transporte Interior
           </h1>
         </div>
 
         <div className="print-header grid grid-cols-2 gap-4 mb-4 text-sm">
           <div className="flex gap-2">
-            <span className="font-medium">N GUIA:</span>
-            <span className="border-b border-gray-300 flex-1 text-center">{fmtGuia(g.numero)}</span>
+            <span className="font-medium">N GUÍA:</span>
+            <span className={raya(fmtGuia(g.numero))}>{fmtGuia(g.numero)}</span>
           </div>
           <div className="flex gap-2">
             <span className="font-medium">FECHA:</span>
-            <span className="border-b border-gray-300 flex-1 text-center">{fmtDate(g.fecha)}</span>
+            <span className={raya(fmtDate(g.fecha))}>{fmtDate(g.fecha)}</span>
           </div>
           <div className="flex gap-2">
             <span className="font-medium">TRANSPORTISTA:</span>
-            <span className="border-b border-gray-300 flex-1 text-center">{g.transportista}</span>
+            <span className={raya(g.transportista)}>{g.transportista}</span>
           </div>
           {/* En entrega directa no existe placa que declarar: es nuestro cami\u00F3n. */}
           {!isDirect && (
             <div className="flex gap-2">
-              <span className="font-medium">PLACA / VEHICULO:</span>
-              <span className="border-b border-gray-300 flex-1 text-center">
-                {placa || "\u00A0"}
-              </span>
+              <span className="font-medium">PLACA / VEHÍCULO:</span>
+              <span className={raya(placa)}>{placa || "\u00A0"}</span>
             </div>
           )}
           <div className="flex gap-2">
             <span className="font-medium">DESPACHADO POR:</span>
-            <span className="border-b border-gray-300 flex-1 text-center">
+            <span className={raya(nombreDespachadoPor(g.entregado_por))}>
               {nombreDespachadoPor(g.entregado_por) || "\u00A0"}
             </span>
           </div>
           <div className="flex gap-2">
             <span className="font-medium">TIPO:</span>
-            <span className="border-b border-gray-300 flex-1 text-center">
+            <span className={raya(ETIQUETA_TIPO_DESPACHO[tipoDespachoEfectivo(g)])}>
               {ETIQUETA_TIPO_DESPACHO[tipoDespachoEfectivo(g)]}
             </span>
           </div>
           {!isDirect && transpUnico && (
             <div className="flex gap-2">
-              <span className="font-medium">N GUIA TRANSP.:</span>
-              <span className="border-b border-gray-300 flex-1 text-center">
-                {transpUnico}
-              </span>
+              <span className="font-medium">N GUÍA TRANSP.:</span>
+              <span className={raya(transpUnico)}>{transpUnico}</span>
             </div>
           )}
           {isDirect && g.nombre_chofer && (
             <div className="flex gap-2">
               <span className="font-medium">CHOFER:</span>
-              <span className="border-b border-gray-300 flex-1 text-center">
-                {g.nombre_chofer}
-              </span>
+              <span className={raya(g.nombre_chofer)}>{g.nombre_chofer}</span>
             </div>
           )}
         </div>
@@ -132,12 +134,12 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
             <tr className="bg-gray-100">
               <th className="border border-gray-300 px-2 py-1.5 font-medium w-8">#</th>
               <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">CLIENTE</th>
-              <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">DIRECCION</th>
+              <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">DIRECCIÓN</th>
               <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">EMPRESA</th>
               <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">FACTURA(S)</th>
               <th className="border border-gray-300 px-2 py-1.5 font-medium w-16 text-center">BULTOS</th>
               {!isDirect && (
-                <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">N GUIA TRANSP.</th>
+                <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">N GUÍA TRANSP.</th>
               )}
             </tr>
           </thead>
@@ -148,7 +150,7 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
                 <td className="border border-gray-300 px-2 py-1">{item.cliente}</td>
                 <td className="border border-gray-300 px-2 py-1">{item.direccion}</td>
                 <td className="border border-gray-300 px-2 py-1">{item.empresa}</td>
-                <td className="border border-gray-300 px-2 py-1">{facturasParaMostrar(item.facturas)}</td>
+                <td className="border border-gray-300 px-2 py-1">{facturasParaElPapel(item.facturas)}</td>
                 <td className="border border-gray-300 px-2 py-1 text-center">{item.bultos || ""}</td>
                 {!isDirect && (
                   <td className="border border-gray-300 px-2 py-1">
@@ -168,7 +170,7 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
         </table>
 
         <div className="print-obs mb-8 text-xs">
-          <div className="font-medium uppercase mb-1">Observaciones Generales del Envio</div>
+          <div className="font-medium uppercase mb-1">Observaciones Generales del Envío</div>
           <div className="border border-gray-300 rounded p-2 min-h-[40px] whitespace-pre-wrap">
             {observacionesVisibles(g.observaciones)}
           </div>
@@ -210,7 +212,7 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
               {!g.receptor_nombre && <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span>}
             </div>
             <div className="mb-4">
-              CEDULA:{" "}
+              CÉDULA:{" "}
               {/* Con guiones, como se escribe una cédula. Solo al MOSTRARLA:
                   la base no se toca — ver `lib/guias/cedula.ts`. */}
               <span className="ml-1 font-medium">{cedulaParaMostrar(g.cedula)}</span>
@@ -224,14 +226,14 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
                 <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span>
               )}
             </div>
-            <div className="text-gray-400 mt-2 italic">Nombre, cedula y firma</div>
+            <div className="text-gray-400 mt-2 italic">Nombre, cédula y firma</div>
           </div>
         </div>
 
         <div className="print-footer mt-8 pt-4 border-t border-gray-200 text-xs text-gray-400 text-center leading-relaxed">
-          La firma del transportista constituye aceptacion expresa de la mercancia detallada en este
-          documento, en la cantidad y condicion indicadas. Cualquier faltante o dano no reportado al
-          momento de la recepcion sera responsabilidad exclusiva del transportista.
+          La firma del transportista constituye aceptación expresa de la mercancía detallada en este
+          documento, en la cantidad y condición indicadas. Cualquier faltante o daño no reportado al
+          momento de la recepción será responsabilidad exclusiva del transportista.
         </div>
       </div>
     </>

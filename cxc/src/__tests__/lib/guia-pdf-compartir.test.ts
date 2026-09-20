@@ -88,7 +88,7 @@ describe("🔴 el PDF no se puede separar del papel", () => {
   it("el texto legal es EL MISMO, palabra por palabra", () => {
     // Es la cláusula de responsabilidad del transportista: que difiera entre lo
     // firmado en papel y lo mandado por WhatsApp sería el peor error posible.
-    const enHoja = /La firma del transportista constituye aceptacion expresa[\s\S]{0,400}?transportista\./.exec(
+    const enHoja = /La firma del transportista constituye aceptación expresa[\s\S]{0,400}?transportista\./.exec(
       hoja.replace(/\s+/g, " "),
     );
     expect(enHoja).not.toBeNull();

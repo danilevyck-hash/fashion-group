@@ -193,9 +193,18 @@ describe("candado estático — se muestra corto en las CUATRO superficies", () 
     ["la imagen de WhatsApp", "src/lib/guias/png-guia.ts"],
   ];
 
+  // 🔄 CAMBIO DE DIRECCIÓN (19-sep-2026): los DOS papeles pasan por
+  // `facturasParaElPapel`, que es `facturasParaMostrar` MÁS quitarle el `0000`
+  // (Daniel: que no se imprima). Lo demás —Excel, ficha, acordeón— sigue
+  // mostrando el campo entero, que es donde alguien revisa lo que tecleó.
+  const PAPELES = new Set([
+    "src/app/guias/components/PrintDocument.tsx",
+    "src/lib/guias/pdf-guia.ts",
+  ]);
+
   it.each(superficies)("%s pasa las facturas por facturasParaMostrar", (_n, ruta) => {
     const src = leer(ruta);
-    expect(src).toContain("facturasParaMostrar");
+    expect(src).toContain(PAPELES.has(ruta) ? "facturasParaElPapel" : "facturasParaMostrar");
     // 🔴 Y ninguna dibuja el campo CRUDO por ningún camino. Importar la función
     // y no usarla en la celda es exactamente la mutación que hay que cazar.
     expect(src).not.toMatch(/[^a-zA-Z_](it|item|item\?)\.facturas(?!\s*\))/);

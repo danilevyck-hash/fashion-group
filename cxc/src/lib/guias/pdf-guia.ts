@@ -36,7 +36,8 @@ import autoTable from "jspdf-autotable";
 import { FG_LOGO_BASE64 } from "@/lib/pdf-logo";
 import { fmtDate, fmtGuia } from "@/lib/format";
 import { nombreDespachadoPor } from "@/lib/guias/despachado-por";
-import { facturasParaMostrar } from "./numero-factura";
+import { facturasParaElPapel } from "./numero-factura";
+import { tintaDeLaCasilla } from "./casilla-en-blanco";
 import { cedulaParaMostrar } from "./cedula";
 import { observacionesVisibles } from "./observaciones";
 import type { Guia } from "@/app/guias/components/types";
@@ -54,9 +55,9 @@ const MARGIN = 15;
 const ANCHO = PAGE_W - 2 * MARGIN;
 
 const TEXTO_LEGAL =
-  "La firma del transportista constituye aceptacion expresa de la mercancia detallada en este " +
-  "documento, en la cantidad y condicion indicadas. Cualquier faltante o dano no reportado al " +
-  "momento de la recepcion sera responsabilidad exclusiva del transportista.";
+  "La firma del transportista constituye aceptación expresa de la mercancía detallada en este " +
+  "documento, en la cantidad y condición indicadas. Cualquier faltante o daño no reportado al " +
+  "momento de la recepción será responsabilidad exclusiva del transportista.";
 
 /** Nombre del archivo: se ve en el chat de WhatsApp, así que dice qué es. */
 export function nombreArchivoGuia(g: Guia): string {
@@ -75,7 +76,9 @@ function bloqueCampos(doc: jsPDF, campos: Array<[string, string]>, yInicio: numb
     const anchoEtiqueta = doc.getTextWidth(etiqueta) + 2;
     doc.setFont("helvetica", "normal");
     doc.text(valor || "", x + anchoEtiqueta, y);
-    doc.setDrawColor(200);
+    // 🔴 La casilla VACÍA sale con la raya marcada, para escribirla a mano
+    // (19-sep-2026): la misma regla —y la misma función— que la hoja impresa.
+    doc.setDrawColor(tintaDeLaCasilla(valor));
     doc.line(x + anchoEtiqueta, y + 1, x + colW - 6, y + 1);
     if (i % 2 === 1) y += 7;
   });
@@ -111,7 +114,7 @@ function bloqueFirma(
   cursor += 7;
 
   if (opts.cedula !== undefined) {
-    doc.text(`CEDULA: ${opts.cedula || ""}`, x, cursor);
+    doc.text(`CÉDULA: ${opts.cedula || ""}`, x, cursor);
     if (!opts.cedula) {
       doc.setDrawColor(150);
       doc.line(x + 17, cursor + 1, x + colW - 6, cursor + 1);
@@ -184,23 +187,23 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
   }
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
-  doc.text("GUIA DE TRANSPORTE INTERIOR", PAGE_W / 2, 19, { align: "center" });
+  doc.text("GUÍA DE TRANSPORTE INTERIOR", PAGE_W / 2, 19, { align: "center" });
 
   // ── Datos de la guía ──────────────────────────────────────────────────────
   const campos: Array<[string, string]> = [
-    ["N GUIA:", fmtGuia(g.numero)],
+    ["N GUÍA:", fmtGuia(g.numero)],
     ["FECHA:", fmtDate(g.fecha)],
     ["TRANSPORTISTA:", g.transportista ?? ""],
   ];
   // En entrega directa no hay placa que declarar (nuestro propio camión), y un
   // "0" no es una placa: es lo que alguien tecleó para pasar la validación.
-  if (!esDirecta) campos.push(["PLACA / VEHICULO:", sinCeroPelado(g.placa)]);
+  if (!esDirecta) campos.push(["PLACA / VEHÍCULO:", sinCeroPelado(g.placa)]);
   campos.push(["DESPACHADO POR:", nombreDespachadoPor(g.entregado_por)]);
   campos.push(["TIPO:", ETIQUETA_TIPO_DESPACHO[tipoDespachoEfectivo(g)]]);
   // ⚠️ Solo se anuncia arriba cuando hay UN número en toda la guía; con varios
   // por línea, un encabezado con uno de ellos mentiría. Ver `PrintDocument`.
   const transpUnico = numeroTranspUnicoImpreso(items, g.numero_guia_transp);
-  if (!esDirecta && transpUnico) campos.push(["N GUIA TRANSP.:", transpUnico]);
+  if (!esDirecta && transpUnico) campos.push(["N GUÍA TRANSP.:", transpUnico]);
   if (esDirecta && g.nombre_chofer) campos.push(["CHOFER:", g.nombre_chofer]);
 
   let y = bloqueCampos(doc, campos, 32);
@@ -214,8 +217,8 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
     margin: { left: MARGIN, right: MARGIN },
     head: [
       esDirecta
-        ? ["#", "CLIENTE", "DIRECCION", "EMPRESA", "FACTURA(S)", "BULTOS"]
-        : ["#", "CLIENTE", "DIRECCION", "EMPRESA", "FACTURA(S)", "BULTOS", "N GUIA TRANSP."],
+        ? ["#", "CLIENTE", "DIRECCIÓN", "EMPRESA", "FACTURA(S)", "BULTOS"]
+        : ["#", "CLIENTE", "DIRECCIÓN", "EMPRESA", "FACTURA(S)", "BULTOS", "N GUÍA TRANSP."],
     ],
     body: [
       ...items.map((it, i) => {
@@ -224,7 +227,7 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
           it.cliente ?? "",
           it.direccion ?? "",
           it.empresa ?? "",
-          facturasParaMostrar(it.facturas),
+          facturasParaElPapel(it.facturas),
           it.bultos ? String(it.bultos) : "",
         ];
         // La columna del transportista no se dibuja en entrega directa: no hay
@@ -255,7 +258,7 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
   // ── Observaciones ─────────────────────────────────────────────────────────
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
-  doc.text("OBSERVACIONES GENERALES DEL ENVIO", MARGIN, y);
+  doc.text("OBSERVACIONES GENERALES DEL ENVÍO", MARGIN, y);
   doc.setFont("helvetica", "normal");
   // Sin la línea del cierre en bloque del 3-ago-2026 (54 guías): el papel dice
   // lo que la persona escribió, no el rastro de una operación técnica.
@@ -281,7 +284,7 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
     // Con guiones al imprimirla; lo guardado no se toca.
     cedula: cedulaParaMostrar(g.cedula),
     firma: g.firma_entregador_base64,
-    pie: "Nombre, cedula y firma",
+    pie: "Nombre, cédula y firma",
   });
 
   // ── Pie legal ─────────────────────────────────────────────────────────────
