@@ -418,13 +418,25 @@ export default function BostonTab() {
           </div>
         </div>
 
+        {/* 🔴 LA FILA ABRE LOS DOCUMENTOS, COMO EN EL GRUPO (20-sep-2026).
+            🩸 Acá había DOS botones —«Cobrar» y «Documentos»— metidos en la
+            misma celda `col-span-2` donde el grupo mete uno, y no cabían:
+            **269 de 408 filas (66 %)** dibujaban el monto rojo de 121d+ ENCIMA
+            del negro del Total. Medido a 1280 de ancho, la celda da ~164 px y
+            los dos botones más el monto pedían ~226. «Documentos» sale de la
+            fila y lo abre TOCAR LA FILA, igual que en la cartera del grupo.
+            ⚠️ Las tarjetas del celular conservan los dos botones: ahí van uno al
+            lado del otro a ancho completo y nunca se encimaron. */}
         {filtrados.map((c) => (
           <div key={c.codigo} className="border-b border-gray-50 last:border-0">
-            <div className="grid grid-cols-12 gap-2 px-4 py-3 text-sm items-center">
+            <div
+              className="group grid grid-cols-12 gap-2 px-4 py-3 text-sm items-center cursor-pointer transition-colors hover:bg-gray-50/70"
+              onClick={() => setDocumentosDe(c)}
+            >
               <div className="col-span-4 min-w-0">
                 <span className="flex items-center gap-2 min-w-0">
                   <span className={`w-1 h-8 rounded-full shrink-0 ${colorFila(c)}`} aria-hidden />
-                  <span className="truncate text-gray-900" title={c.nombre}>{c.nombre}</span>
+                  <span className="truncate text-gray-900 group-hover:underline" title={c.nombre}>{c.nombre}</span>
                   {c.tambien_en_grupo && (
                     <span className="shrink-0 px-2 py-0.5 rounded-full bg-gray-100 text-[11px] text-gray-600 whitespace-nowrap">
                       también en el grupo
@@ -446,21 +458,17 @@ export default function BostonTab() {
               <div className={`col-span-2 text-right tabular-nums cursor-help ${c.d121_plus ? AGING.overdue.text : "text-gray-300"}`} title={detalleFino(c, "overdue")}>
                 {c.d121_plus ? fmt(c.d121_plus) : "—"}
               </div>
-              <div className="col-span-2 text-right tabular-nums font-semibold flex items-center justify-end gap-2">
+              {/* `flex-wrap` es el candado de verdad: si a algún ancho el monto
+                  y el botón no entran, el botón baja de renglón. Encimarse deja
+                  de ser posible, no solo improbable. */}
+              <div className="col-span-2 text-right tabular-nums font-semibold flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
                 <span>{fmt(c.total)}</span>
                 <button
                   type="button"
-                  onClick={() => setCobrarA(c)}
+                  onClick={(e) => { e.stopPropagation(); setCobrarA(c); }}
                   className="shrink-0 rounded-md bg-black px-2.5 py-1 text-xs font-medium text-white transition active:scale-[0.97] hover:bg-gray-800"
                 >
                   Cobrar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDocumentosDe(c)}
-                  className="shrink-0 rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 transition active:scale-[0.97]"
-                >
-                  Documentos
                 </button>
               </div>
             </div>
