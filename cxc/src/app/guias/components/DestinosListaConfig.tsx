@@ -26,6 +26,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Ayuda } from "@/components/shared/Ayuda";
 import {
+  AYUDA_DIRECCIONES_QUE_SUGIERE,
+  ROTULO_DIRECCIONES_QUE_SUGIERE,
+} from "@/lib/guias/rotulos-configuracion";
+import {
   DESTINOS_BASE,
   textoQuitarDeLaLista,
   yaEstaEnLaLista,
@@ -179,17 +183,19 @@ export default function DestinosListaConfig({ onAviso }: { onAviso: (m: string) 
       aria-labelledby="destinos-lista-titulo"
       data-testid="destinos-lista-config"
     >
+      {/* 🔴 SE LLAMABAN LAS DOS «destinos» (19-sep-2026). La tarjeta de arriba
+          es a dónde entrega CADA CLIENTE; ésta son los botones de lugares que
+          sugiere el campo dirección, sin dueño. NO se fusionan —tienen
+          permisos distintos—: lo único que cambió son las palabras. */}
       <h2 id="destinos-lista-titulo" className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-900">
-        Destinos que ofrece el campo Dirección
+        {ROTULO_DIRECCIONES_QUE_SUGIERE}
         <Ayuda titulo="Qué hace esta lista">
           <p>Es la lista que se despliega al escribir la dirección de un envío, para cualquier cliente.</p>
           <p>La ve todo el equipo: lo que agregues aquí —o desde el ＋ del campo al armar una guía— le aparece a todos.</p>
-          <p>Quitar un destino no borra nada ni cambia las guías que ya lo usan.</p>
+          <p>Quitar una dirección no borra nada ni cambia las guías que ya la usan.</p>
         </Ayuda>
       </h2>
-      <p className="mb-3 text-xs text-gray-500">
-        La ve todo el equipo. Antes cada quien tenía la suya en su navegador.
-      </p>
+      <p className="mb-3 text-xs text-gray-500">{AYUDA_DIRECCIONES_QUE_SUGIERE}</p>
 
       <div className="mb-4 flex flex-wrap items-start gap-2">
         <div className="min-w-[180px] flex-1">

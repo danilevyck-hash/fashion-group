@@ -20,6 +20,10 @@ import { useState } from "react";
 import { render, screen, fireEvent, cleanup, act, within, waitFor } from "@testing-library/react";
 import GuiaForm from "@/app/guias/components/GuiaForm";
 import DestinosListaConfig from "@/app/guias/components/DestinosListaConfig";
+import {
+  AYUDA_DIRECCIONES_QUE_SUGIERE,
+  ROTULO_DIRECCIONES_QUE_SUGIERE,
+} from "@/lib/guias/rotulos-configuracion";
 import type { GuiaItem } from "@/app/guias/components/types";
 import { invalidarDirectorioClientes } from "@/lib/hooks/useBusquedaClientes";
 
@@ -182,11 +186,19 @@ describe("🔴 2. el ＋ del campo Dirección", () => {
 // ─── 3 · Guías › Configuración: la lista compartida ──────────────────────────
 
 describe("🔴 3. Guías › Configuración lista, agrega y QUITA", () => {
-  it("muestra lo que hay en la base y dice que la ve todo el equipo", async () => {
+  // 🔄 CAMBIO DE DIRECCIÓN (19-sep-2026), no se borró. La línea gris decía
+  // «La ve todo el equipo. Antes cada quien tenía la suya en su navegador.» y
+  // pasó a decir QUÉ ES esta lista, que era lo que faltaba: Daniel preguntó
+  // qué hace «el de siempre» y el problema de fondo era que las dos tarjetas
+  // de la pantalla se llamaban las dos «destinos». Que la ve todo el equipo
+  // sigue dicho en la ayuda «?» y en el aria-label del ＋ del formulario, que
+  // se siguen exigiendo más arriba en este mismo archivo.
+  it("muestra lo que hay en la base y dice QUÉ es esta lista", async () => {
     render(<DestinosListaConfig onAviso={() => {}} />);
     await waitFor(() => expect(screen.getByText("Paso Canoas")).toBeTruthy());
     expect(screen.getByText("David")).toBeTruthy();
-    expect(screen.getByText(/La ve todo el equipo/i)).toBeTruthy();
+    expect(screen.getByText(ROTULO_DIRECCIONES_QUE_SUGIERE)).toBeTruthy();
+    expect(screen.getByText(AYUDA_DIRECCIONES_QUE_SUGIERE)).toBeTruthy();
   });
 
   it("agregar viaja al servidor por POST — no al navegador", async () => {

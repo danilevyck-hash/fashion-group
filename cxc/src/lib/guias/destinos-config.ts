@@ -19,6 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { claveDestino } from "@/lib/guias/destinos-clientes";
+import { ACCION_PONER_SIEMPRE, MARCA_SIEMPRE } from "@/lib/guias/rotulos-configuracion";
 
 /** Roles que ven y editan Guías › Configuración. */
 export const CONFIG_GUIAS_ROLES = ["admin", "secretaria"] as const;
@@ -123,7 +124,7 @@ export function validarDestinoEdicion(body: unknown): ValidacionEdicion {
   }
   if (b.elDeSiempre !== undefined) {
     if (typeof b.elDeSiempre !== "boolean") {
-      return { ok: false, error: "La marca «el de siempre» no es válida" };
+      return { ok: false, error: `La marca «${MARCA_SIEMPRE}» no es válida` };
     }
     valor.elDeSiempre = b.elDeSiempre;
   }
@@ -136,18 +137,22 @@ export function validarDestinoEdicion(body: unknown): ValidacionEdicion {
 /**
  * Qué le pasa al formulario de guías con esta definición — el texto que la
  * pantalla de configuración le dice a quien administra (4-sep-2026, la regla
- * de «el de siempre»):
- *   · con uno marcado «el de siempre» → ese se llena solo; los demás, botones;
+ * del destino que se llena solo):
+ *   · con uno marcado «Siempre» → ese se llena solo; los demás, botones;
  *   · sin ninguno marcado → solo botones, no se llena nada.
+ *
+ * ⚠️ La palabra sale de `rotulos-configuracion.ts`: hasta el 19-sep-2026 esta
+ * frase decía «el de siempre», la MISMA que el renglón usaba como estado y
+ * como acción. Ahora la marca se llama «Siempre» y ponerla, «Poner siempre».
  */
 export function comoSeUsa(n: number, conElDeSiempre: boolean): string {
   if (conElDeSiempre) {
     return n === 1
       ? "Se llena solo al elegir el cliente."
-      : "El de siempre se llena solo al elegir el cliente; los demás salen como botones.";
+      : `El marcado «${MARCA_SIEMPRE}» se llena solo al elegir el cliente; los demás salen como botones.`;
   }
   return n === 1
-    ? "Se ofrece como botón y la persona elige. Marca «el de siempre» para que se llene solo."
+    ? `Se ofrece como botón y la persona elige. Toca «${ACCION_PONER_SIEMPRE}» para que se llene solo.`
     : "Se ofrecen como botones y la persona elige.";
 }
 

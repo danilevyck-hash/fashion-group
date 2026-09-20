@@ -30,6 +30,12 @@ import TransportistasConfig from "./TransportistasConfig";
 import DespachadoresConfig from "./DespachadoresConfig";
 import { Toast } from "@/components/ui";
 import { Ayuda } from "@/components/shared/Ayuda";
+import {
+  ACCION_PONER_SIEMPRE,
+  AYUDA_DONDE_ENTREGA_CADA_CLIENTE,
+  MARCA_SIEMPRE,
+  ROTULO_DONDE_ENTREGA_CADA_CLIENTE,
+} from "@/lib/guias/rotulos-configuracion";
 import { useNombresDeClientes } from "@/lib/hooks/useBusquedaClientes";
 import {
   agruparConfiguracion,
@@ -197,7 +203,7 @@ export default function GuiasConfiguracionView() {
    * Define un destino (el alta y el «Definir» de un histórico van por acá).
    * 🔴 Solo lo dispara un TOQUE — nunca un render ni un efecto.
    */
-  async function definir(codigo: string, destino: string, tiendas: string[]): Promise<boolean> {
+  async function definir(codigo: string, destino: string, tiendas: string[]): Promise<number | null> {
     const res = await fetch("/api/guias/destinos-config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -207,7 +213,8 @@ export default function GuiasConfiguracionView() {
       const b = await res.json().catch(() => ({}));
       throw new Error(b.error ?? "No se pudo guardar. Intenta de nuevo en unos segundos.");
     }
-    return true;
+    const b = (await res.json().catch(() => ({}))) as { id?: number };
+    return typeof b.id === "number" ? b.id : null;
   }
 
   async function guardarAlta() {
@@ -225,11 +232,29 @@ export default function GuiasConfiguracionView() {
     }
   }
 
+  /**
+   * 🔴 EL CHIP DICE LA VERDAD (19-sep-2026). Pasó a llamarse «Poner siempre»
+   * —la MISMA palabra que la casilla del renglón—, así que **tiene que poner
+   * siempre**: un botón que promete una cosa y hace otra es peor que el rótulo
+   * confuso que vino a arreglar.
+   *
+   * ⚠️ Y SOLO cuando el cliente todavía no tiene NINGÚN destino definido, que
+   * es el caso que Daniel miraba. Con destinos ya definidos el chip sigue
+   * diciendo «Definir» y sigue haciendo exactamente lo de antes: mover la
+   * marca de un cliente ya configurado es otra decisión, y nadie la pidió.
+   */
   const [promoviendo, setPromoviendo] = useState<string | null>(null);
-  async function promover(codigo: string, destino: string) {
+  async function promover(codigo: string, destino: string, comoSiempre = false) {
     setPromoviendo(`${codigo}|${destino}`);
     try {
-      await definir(codigo, destino, []);
+      const id = await definir(codigo, destino, []);
+      if (comoSiempre && id !== null) {
+        await fetch(`/api/guias/destinos-config?id=${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ elDeSiempre: true }),
+        });
+      }
       setToast("Listo, guardado");
       void cargar(true);
     } catch (err) {
@@ -325,10 +350,15 @@ export default function GuiasConfiguracionView() {
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
       <section className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5" aria-labelledby="destinos-config-titulo">
         <div className="mb-3 flex items-center justify-between gap-2">
+          {/* 🔴 SE LLAMABAN LAS DOS «destinos» (19-sep-2026). Esta tarjeta es
+              a dónde entrega CADA CLIENTE; la de abajo son los botones de
+              lugares que sugiere el campo dirección, sin dueño. Son dos cosas
+              con permisos distintos y NO se fusionan: lo único que cambió son
+              las palabras. */}
           <h2 id="destinos-config-titulo" className="flex items-center gap-1 text-sm font-medium text-gray-900">
-            Destinos por cliente
+            {ROTULO_DONDE_ENTREGA_CADA_CLIENTE}
             <Ayuda titulo="Qué hace esta lista">
-              <p>Al hacer una guía, el destino marcado como «el de siempre» se llena solo al elegir el cliente; los demás salen como botones. Sin ninguno marcado, no se llena nada.</p>
+              <p>Al hacer una guía, el destino marcado «{MARCA_SIEMPRE}» se llena solo al elegir el cliente; los demás salen como botones. Sin ninguno marcado, no se llena nada.</p>
               <p>El campo Dirección sigue siendo libre: quien quiera puede escribir otra cosa.</p>
               <p>Quitar un destino no borra nada: queda guardado como historial.</p>
             </Ayuda>
@@ -341,6 +371,8 @@ export default function GuiasConfiguracionView() {
             ＋ Agregar destino
           </button>
         </div>
+
+        <p className="mb-3 text-xs text-gray-500">{AYUDA_DONDE_ENTREGA_CADA_CLIENTE}</p>
 
         <input
           type="search"
@@ -540,7 +572,7 @@ function GrupoDeCliente({
   onGuardarEdicion: (f: DestinoConfigurado) => void;
   onCancelarEdicion: () => void;
   onQuitar: (f: DestinoConfigurado) => void;
-  onPromover: (codigo: string, destino: string) => void;
+  onPromover: (codigo: string, destino: string, comoSiempre?: boolean) => void;
   marcandoId: number | null;
   onMarcarSiempre: (f: DestinoConfigurado, valor: boolean) => void;
 }) {
@@ -611,19 +643,29 @@ function GrupoDeCliente({
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-1">
-                {/* 🔴 Una marca por fila: «el de siempre». Marcarla apaga la
-                    de los demás destinos del cliente (lo garantiza el
-                    servidor); sin ninguna marcada, nada se llena solo. */}
-                <label className="inline-flex items-center gap-1.5 text-xs text-gray-500 min-h-[44px] md:[@media(pointer:fine)]:min-h-0 px-1.5 cursor-pointer select-none">
+                {/* 🔴 UNA PALABRA PARA EL ESTADO Y OTRA PARA LA ACCIÓN
+                    (19-sep-2026). Acá decía «el de siempre» marcado y sin
+                    marcar: la MISMA frase servía de estado y de botón, y ése
+                    era el origen de la confusión. El que ya lo es dice
+                    «Siempre»; el que no, «Poner siempre».
+                    ⚠️ Sigue siendo una casilla —no un botón— porque tiene que
+                    poder DESMARCARSE: marcar una apaga la de los demás
+                    destinos del cliente (lo garantiza el servidor), pero
+                    dejar al cliente sin ninguna es una decisión válida. */}
+                <label
+                  className={`inline-flex items-center gap-1.5 text-xs min-h-[44px] md:[@media(pointer:fine)]:min-h-0 px-1.5 cursor-pointer select-none ${
+                    f.el_de_siempre ? "font-medium text-gray-900" : "text-gray-500"
+                  }`}
+                >
                   <input
                     type="checkbox"
                     checked={f.el_de_siempre}
                     disabled={marcandoId !== null}
                     onChange={() => onMarcarSiempre(f, !f.el_de_siempre)}
-                    aria-label={`El de siempre: «${f.destino}» de ${g.nombre ?? g.codigo}`}
+                    aria-label={`${f.el_de_siempre ? MARCA_SIEMPRE : ACCION_PONER_SIEMPRE}: «${f.destino}» de ${g.nombre ?? g.codigo}`}
                     className="w-4 h-4 accent-black"
                   />
-                  el de siempre
+                  {f.el_de_siempre ? MARCA_SIEMPRE : ACCION_PONER_SIEMPRE}
                 </label>
                 <button
                   type="button"
@@ -656,12 +698,16 @@ function GrupoDeCliente({
                   {/* 🔴 Promover es un TOQUE: nada se define solo. */}
                   <button
                     type="button"
-                    onClick={() => onPromover(g.codigo, h)}
+                    onClick={() => onPromover(g.codigo, h, n === 0)}
                     disabled={promoviendo === `${g.codigo}|${h}`}
-                    aria-label={`Definir «${h}» para ${g.nombre ?? g.codigo}`}
+                    aria-label={`${n === 0 ? ACCION_PONER_SIEMPRE : "Definir"} «${h}» para ${g.nombre ?? g.codigo}`}
                     className="rounded px-1.5 min-h-[44px] md:[@media(pointer:fine)]:min-h-0 md:[@media(pointer:fine)]:py-0.5 text-gray-600 hover:text-black hover:bg-gray-100 font-medium transition disabled:opacity-40"
                   >
-                    {promoviendo === `${g.codigo}|${h}` ? "…" : "Definir"}
+                    {/* 🔴 La MISMA palabra que la casilla del renglón cuando el
+                        cliente todavía no tiene nada definido: ahí este toque
+                        deja el destino que se llena solo. Con destinos ya
+                        definidos sigue diciendo «Definir», que es lo que hace. */}
+                    {promoviendo === `${g.codigo}|${h}` ? "…" : n === 0 ? ACCION_PONER_SIEMPRE : "Definir"}
                   </button>
                 </span>
               ))}

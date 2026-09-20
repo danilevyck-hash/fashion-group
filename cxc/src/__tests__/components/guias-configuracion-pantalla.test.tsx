@@ -193,7 +193,10 @@ describe("la lista va agrupada por cliente y DICE si autollena", () => {
     expect(grupoVarios?.textContent).toContain("Se ofrecen como botones y la persona elige.");
     // D-26: varios destinos y UNO marcado — el de siempre se llena solo.
     expect(grupoMixto?.textContent).toContain(
-      "El de siempre se llena solo al elegir el cliente; los demás salen como botones.",
+      // 🔄 19-sep-2026: la frase decía «El de siempre…», la MISMA que el
+      // renglón usaba de estado y de acción. Ahora la marca se llama
+      // «Siempre» y ponerla, «Poner siempre» (ver `rotulos-configuracion.ts`).
+      "El marcado «Siempre» se llena solo al elegir el cliente; los demás salen como botones.",
     );
   });
 
