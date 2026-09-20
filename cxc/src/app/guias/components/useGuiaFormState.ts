@@ -181,10 +181,18 @@ export function useGuiaFormState({ editingId = null, alGuardar, despuesDeCrear, 
     if (inicial) return inicial.transportistaId;
     try { return localStorage.getItem("fg_last_transportista_id") || null; } catch { return null; }
   });
-  const [entregadoPor, setEntregadoPor] = useState(() => {
-    if (inicial) return inicial.entregadoPor;
-    try { return localStorage.getItem("fg_last_entregado_por") || ""; } catch { return ""; }
-  });
+  // 🔴 «DESPACHADO POR» NACE VACÍO, SIEMPRE (19-sep-2026). Daniel, textual:
+  // *«porque puede que alguien deje ese por error»*.
+  //
+  // 🩸 Acá se recordaba el último elegido (`fg_last_entregado_por`), así que
+  // una guía nueva ya venía con un nombre puesto: el de la guía anterior, que
+  // pudo haberla armado otra persona en otro día. El campo es OBLIGATORIO, o
+  // sea que la pantalla no frena a nadie — se guarda el nombre equivocado sin
+  // que nadie lo mire, y sale impreso en el papel que alguien firma.
+  //
+  // ⚠️ Al EDITAR sigue trayendo el que la guía tiene guardado: eso es el dato,
+  // no una sugerencia.
+  const [entregadoPor, setEntregadoPor] = useState(inicial?.entregadoPor ?? "");
   const [observaciones, setObservaciones] = useState(inicial?.observaciones ?? "");
   // ── EL N° DEL TRANSPORTISTA A NIVEL GUÍA ───────────────────────────────────
   // 🔴 YA NO SE TECLEA ACÁ, Y LA COLUMNA TAMPOCO SE RETIRA.
@@ -653,7 +661,6 @@ export function useGuiaFormState({ editingId = null, alGuardar, despuesDeCrear, 
     try {
       localStorage.setItem("fg_last_modo_entrega", modoEntrega);
       if (transportistaId) localStorage.setItem("fg_last_transportista_id", transportistaId);
-      localStorage.setItem("fg_last_entregado_por", entregadoPor);
     } catch { /* */ }
     const validItems = items.filter(
       (i) => i.cliente || i.direccion || i.facturas || i.bultos > 0,
