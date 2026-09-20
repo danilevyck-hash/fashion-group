@@ -69,16 +69,21 @@ describe("la portada", () => {
     expect(sin.textContent).toContain("1 reclamo");
     expect(portada.textContent).toContain(`Cobrado ${hoyPanama().slice(0, 4)}`);
   });
+  // 🔄 20-sep-2026: Active Wear salió de la portada (0 reclamos en toda la
+  // historia) y con ella se fue la única tarjeta que decía «Todavía sin
+  // reclamos» — el rótulo sigue vivo para la próxima empresa sin historia, y su
+  // candado está en `reclamos-portada-al-frente.test.tsx`. Los días del más
+  // viejo pasaron a un chip rojo: el TEXTO no cambió, solo dónde se dibuja.
   it("tarjetas por plata, con el contacto real, los días de la factura más vieja y el chip rojo", () => {
     pintar();
     const grid = document.querySelector('[data-medir="reclamos-tarjetas"]')!;
     const nombres = Array.from(grid.querySelectorAll("p.text-sm.font-semibold")).map((p) => p.textContent);
-    expect(nombres).toEqual(["Fashion Wear", "Vistana", "Fashion Shoes", "Active Shoes", "Active Wear"]);
+    expect(nombres).toEqual(["Fashion Wear", "Vistana", "Fashion Shoes", "Active Shoes"]);
     expect(grid.textContent).toContain("Isaac Amar");
     expect(grid.textContent).toContain(`el más viejo lleva ${diasDesde("2025-02-01", hoyPanama())} días`);
     expect(grid.textContent).toContain("sin reclamar 1");
-    expect(grid.textContent).toContain("Todavía sin reclamos");
     expect(grid.textContent).not.toContain("Joystep");
+    expect(grid.textContent).not.toContain("Active Wear");
     expect(grid.textContent).not.toContain("Alerta");
     expect(grid.textContent).not.toContain("Sin contacto");
   });

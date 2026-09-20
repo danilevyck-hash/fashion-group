@@ -8,6 +8,7 @@ import { Reclamo, Contacto } from "./types";
 import { reclamoTaxes, calcSub, esPendiente, empresaKeyDeReclamo } from "./constants";
 import { matchReclamo, matchHint } from "./search";
 import { resumenPortada, tarjetasPorEmpresa } from "@/lib/reclamos/portada";
+import { resumenViejos, DIAS_RECLAMO_VIEJO } from "@/lib/reclamos/viejos";
 import { textoReclamado, estaReclamado } from "@/lib/reclamos/reclamado";
 import { TODAVIA_SIN_RECLAMOS } from "@/lib/reclamos/empresas-con-reclamos";
 import { SkeletonTable, EmptyState } from "@/components/ui";
@@ -47,7 +48,15 @@ export default function EmpresaSelector({
 }: Props) {
   const hoy = hoyPanama();
   const resumen = resumenPortada(reclamos, hoy);
+  const viejos = resumenViejos(reclamos, hoy);
   const tarjetas = tarjetasPorEmpresa(reclamos, contactos, hoy);
+  // 🔴 UNA CAJA EN CERO NO SE DIBUJA (20-sep-2026). «Sin reclamar» se llevaba un
+  // tercio de la fila para decir «Nada sin reclamar» —medido: hoy hay 0—, y las
+  // dos que SÍ tienen algo que decir quedaban angostas. Cuando vuelva a haber
+  // uno sin reclamar, la caja vuelve sola y en rojo. ⚠️ El NÚMERO no cambia:
+  // sigue saliendo de `resumenPortada`, que no se tocó.
+  const veSinReclamar = resumen.sinReclamar.n > 0;
+  const cajas = veSinReclamar ? "sm:grid-cols-3" : "sm:grid-cols-2";
   const nombreCorto = (empresa: string) => { const k = empresaKeyDeReclamo(empresa); return k ? nombreCortoEmpresa(k) : empresa; };
 
   return (
@@ -60,19 +69,26 @@ export default function EmpresaSelector({
         </div>
 
         {(role === "admin" || role === "secretaria") && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-5" data-medir="reclamos-portada">
+          <div className={`grid grid-cols-1 ${cajas} gap-2 mb-5`} data-medir="reclamos-portada">
             <div className="border border-gray-200 rounded-lg p-4">
               <div className="text-xs text-gray-400 uppercase tracking-widest">Por cobrar</div>
               <div className="text-xl font-semibold mt-1 tabular-nums">${fmt(resumen.porCobrar.monto)}</div>
               <div className="text-sm text-gray-500 mt-0.5">{resumen.porCobrar.n} reclamo{resumen.porCobrar.n === 1 ? "" : "s"}</div>
+              {/* Lo viejo se dice AQUÍ, donde está la plata que se debe cobrar.
+                  El corte vive en UNA constante (`DIAS_RECLAMO_VIEJO`), la misma
+                  que usa el aviso de los lunes: no hay dos definiciones de
+                  «viejo». Sin ninguno, la línea no se dibuja. */}
+              {viejos.n > 0 && (
+                <div className="text-sm text-red-600 mt-0.5 font-medium">{viejos.n} pasa{viejos.n === 1 ? "" : "n"} de {DIAS_RECLAMO_VIEJO} días</div>
+              )}
             </div>
-            <div className={`border rounded-lg p-4 ${resumen.sinReclamar.n > 0 ? "border-red-200 bg-red-50" : "border-gray-200"}`}>
-              <div className="text-xs text-gray-400 uppercase tracking-widest">Sin reclamar</div>
-              <div className={`text-xl font-semibold mt-1 tabular-nums ${resumen.sinReclamar.n > 0 ? "text-red-600" : ""}`}>
-                {resumen.sinReclamar.n > 0 ? `$${fmt(resumen.sinReclamar.monto)}` : "Nada sin reclamar"}
+            {veSinReclamar && (
+              <div className="border rounded-lg p-4 border-red-200 bg-red-50">
+                <div className="text-xs text-gray-400 uppercase tracking-widest">Sin reclamar</div>
+                <div className="text-xl font-semibold mt-1 tabular-nums text-red-600">${fmt(resumen.sinReclamar.monto)}</div>
+                <div className="text-sm text-red-600/80 mt-0.5">{resumen.sinReclamar.n} reclamo{resumen.sinReclamar.n === 1 ? "" : "s"}</div>
               </div>
-              {resumen.sinReclamar.n > 0 && <div className="text-sm text-red-600/80 mt-0.5">{resumen.sinReclamar.n} reclamo{resumen.sinReclamar.n === 1 ? "" : "s"}</div>}
-            </div>
+            )}
             <div className="border border-gray-200 rounded-lg p-4">
               <div className="text-xs text-gray-400 uppercase tracking-widest">Cobrado {resumen.cobrado.anio}</div>
               <div className="text-xl font-semibold mt-1 tabular-nums">{resumen.cobrado.n > 0 ? `$${fmt(resumen.cobrado.monto)}` : `Nada cobrado en ${resumen.cobrado.anio}`}</div>
@@ -131,7 +147,12 @@ export default function EmpresaSelector({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" data-medir="reclamos-tarjetas">
             {tarjetas.map((t) => {
               const sinNada = t.n === 0;
-              const detalle = [t.contacto, t.masViejoDias !== null ? `el más viejo lleva ${t.masViejoDias} día${t.masViejoDias === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ");
+              // 🔴 LOS DÍAS AL FRENTE (20-sep-2026). Iban en gris chico al final
+              // de una línea con el contacto —«Isaac Amar · el más viejo lleva
+              // 103 días»—, o sea el dato que decide a quién apurar, escondido
+              // detrás de un nombre. Ahora es un chip rojo pegado al nombre de
+              // la empresa. El número NO cambió: es el mismo `masViejoDias`.
+              const detalle = t.contacto ?? "";
               return (
                 <div key={t.empresa}
                   role="button"
@@ -139,7 +160,14 @@ export default function EmpresaSelector({
                   onClick={() => onSelectEmpresa(t.empresa)}
                   onKeyDown={(e) => { if (e.key === "Enter") onSelectEmpresa(t.empresa); }}
                   className={`border border-gray-200 rounded-lg p-5 cursor-pointer hover:border-gray-300 transition ${sinNada && !t.tieneHistoria ? "opacity-50" : ""}`}>
-                  <p className="text-sm font-semibold">{t.nombreCorto}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold">{t.nombreCorto}</p>
+                    {!sinNada && t.masViejoDias !== null && (
+                      <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full font-medium border border-red-100 tabular-nums">
+                        el más viejo lleva {t.masViejoDias} día{t.masViejoDias === 1 ? "" : "s"}
+                      </span>
+                    )}
+                  </div>
                   {sinNada ? (
                     <p className="text-sm text-gray-400 mt-1">{t.tieneHistoria ? "Nada por cobrar" : TODAVIA_SIN_RECLAMOS}</p>
                   ) : (

@@ -3,8 +3,21 @@
 //
 // Daniel, textual: *«joystep quítalo»* — Joystep tiene 0 reclamos en toda la
 // historia y su tarjeta ocupaba lugar en $0,00. Y sobre Active Wear, también
-// con 0: *«puede que sí se reclame»* — se queda, diciendo «Todavía sin
+// con 0: *«puede que sí se reclame»* — se quedaba, diciendo «Todavía sin
 // reclamos» en vez de un cero grande.
+//
+// 🔄 ACTIVE WEAR SE FUE TAMBIÉN (20-sep-2026, aprobado por Daniel). Su tarjeta
+// siguió diez días diciendo «Todavía sin reclamos» y sigue teniendo **0
+// reclamos en toda la historia**, igual que Joystep el 10-sep. Se va por el
+// MISMO camino y con la misma regla: sale de la portada **y del desplegable del
+// formulario**, porque los dos leen esta lista (es la invariante del 11-sep:
+// «el formulario ofrece las MISMAS empresas que la portada»; ofrecer una
+// empresa sin tarjeta deja un reclamo sumando arriba y sin dónde abrirse).
+//
+// ⚠️ NADA SE BORRA: `EMPRESAS_MAP` conserva Active Wear con su proveedor, su
+// marca y su código de Switch, y `empresasParaElegir(actual)` le devuelve la
+// opción a cualquier reclamo que YA esté en ella. El día que Daniel diga que se
+// le reclama, se saca este renglón y vuelve entera.
 //
 // 🔴 LA LISTA SE DERIVA de `EMPRESAS` (el mapa de proveedores) y NO se escribe a
 // mano: si mañana nace una séptima empresa que reclama, entra sola. Lo único
@@ -15,7 +28,8 @@ import { EMPRESAS, EMPRESAS_MAP } from "./empresas";
 
 /** Las que Daniel sacó de la portada, con su motivo. */
 export const EMPRESAS_SIN_TARJETA: readonly string[] = [
-  "Joystep", // «joystep quítalo» — 0 reclamos en toda la historia
+  "Joystep", // «joystep quítalo» (10-sep-2026) — 0 reclamos en toda la historia
+  "Active Wear", // 20-sep-2026 — 0 reclamos en toda la historia, igual que Joystep
 ];
 
 /** Las empresas con tarjeta en la portada, en el orden del mapa. */

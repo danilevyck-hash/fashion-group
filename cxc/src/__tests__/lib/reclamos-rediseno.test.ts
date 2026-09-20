@@ -61,11 +61,16 @@ describe("🔴 las facturas de un reclamo son una LISTA, no un renglón de texto
 });
 
 /* ═══ 2 · qué empresas tienen tarjeta ═══════════════════════════════════════ */
-describe("🔴 «joystep quítalo» · «Active Wear puede que sí se reclame»", () => {
-  it("la lista se DERIVA de EMPRESAS menos Joystep, y Active Wear se queda", () => {
-    expect(EMPRESAS_SIN_TARJETA).toEqual(["Joystep"]);
-    expect(EMPRESAS_CON_RECLAMOS).toEqual(EMPRESAS.filter((e) => e !== "Joystep"));
-    expect(EMPRESAS_CON_RECLAMOS).toContain("Active Wear");
+describe("🔴 «joystep quítalo» — y la lista se DERIVA, nunca se escribe a mano", () => {
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 20-sep-2026: hasta hoy este caso exigía que Active
+  // Wear se QUEDARA (*«puede que sí se reclame»*, 10-sep). Daniel la sacó con el
+  // mismo motivo que sacó a Joystep: 0 reclamos en toda la historia. Lo que NO
+  // cambia —y es lo que este caso sigue protegiendo— es que la lista se derive
+  // de `EMPRESAS` menos una resta escrita con su cita, y que el rótulo de la
+  // empresa sin historia siga existiendo.
+  it("la lista se DERIVA de EMPRESAS menos los retirados", () => {
+    expect([...EMPRESAS_SIN_TARJETA].sort()).toEqual(["Active Wear", "Joystep"]);
+    expect(EMPRESAS_CON_RECLAMOS).toEqual(EMPRESAS.filter((e) => !EMPRESAS_SIN_TARJETA.includes(e)));
     expect(EMPRESAS_CON_RECLAMOS).not.toContain("Joystep");
     expect(TODAVIA_SIN_RECLAMOS).toBe("Todavía sin reclamos");
   });
@@ -164,13 +169,17 @@ describe("🔴 la portada: tres números, tarjetas por plata, el contacto real",
     expect(r.cobrado.n).toBe(1);
     expect(r.cobrado.monto).toBeCloseTo(353.1, 6);
   });
-  it("las tarjetas van ORDENADAS POR PLATA, sin Joystep, con Active Wear diciendo que nunca reclamó", () => {
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 20-sep-2026, con nota y sin borrarse: Active Wear
+  // salió de la portada por el MISMO camino que Joystep (0 reclamos en toda la
+  // historia). Lo que este caso sigue vigilando es que la lista se DERIVE y que
+  // una empresa retirada no aparezca. El porqué y el control de que nada se
+  // borró (`EMPRESAS_MAP`, `empresasParaElegir`) viven en
+  // `components/reclamos-portada-al-frente.test.tsx`.
+  it("las tarjetas van ORDENADAS POR PLATA, sin las empresas retiradas", () => {
     const t = tarjetasPorEmpresa(reclamos, contactos, HOY);
-    expect(t.map((x) => x.empresa)).toEqual(["Fashion Shoes", "Fashion Wear", "Vistana International", "Active Shoes", "Active Wear"]);
+    expect(t.map((x) => x.empresa)).toEqual(["Fashion Shoes", "Fashion Wear", "Vistana International", "Active Shoes"]);
     expect(t.find((x) => x.empresa === "Joystep")).toBeUndefined();
-    const aw = t.find((x) => x.empresa === "Active Wear")!;
-    expect(aw.n).toBe(0);
-    expect(aw.tieneHistoria).toBe(false);
+    expect(t.find((x) => x.empresa === "Active Wear")).toBeUndefined();
   });
   it("🩸 el contacto sale de nombre_contacto (la tarjeta leía `nombre`, que no existe)", () => {
     const t = tarjetasPorEmpresa(reclamos, contactos, HOY);
