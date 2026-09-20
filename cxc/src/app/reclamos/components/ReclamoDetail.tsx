@@ -332,8 +332,23 @@ export default function ReclamoDetail({
         </div>
       ) : (
         <div className="flex items-center gap-2 mb-6 flex-wrap pb-1">
+          {/* 🔴 «MARCAR COMO PAGADO» ES EL BOTÓN PRINCIPAL (20-sep-2026).
+              🩸 Estaba apartado a la derecha, con borde, como algo que se usa
+              pocas veces — y es justo al revés. Medido: **9 cobros en 30 días**
+              contra **9 correos en TODA la historia** del módulo, el último
+              hace dos meses. El botón negro es el que se usa todos los días;
+              «Correo» queda al lado, con borde, sin irse a ninguna parte.
+              ⚠️ En un reclamo COBRADO «Correo» sigue sin salir, y el servidor
+              lo sigue rechazando: eso no se tocó (cobrarle dos veces al
+              proveedor, medido: $5.306,62 en 5 reclamos). */}
           {pendiente && (
-            <button onClick={() => setCorreoOpen(true)} className="bg-black text-white px-5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all inline-flex items-center justify-center min-h-[44px]">Correo</button>
+            <button onClick={() => onChangeEstado("Pagado")} className="bg-black text-white px-5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all inline-flex items-center justify-center gap-2 min-h-[44px]">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+              Marcar como pagado
+            </button>
+          )}
+          {pendiente && (
+            <button onClick={() => setCorreoOpen(true)} className="text-sm border border-gray-200 px-4 rounded-md text-gray-600 hover:text-black hover:border-gray-400 transition inline-flex items-center justify-center min-h-[44px]">Correo</button>
           )}
           <button ref={descargaRef} onClick={() => setDescargaOpen((v) => !v)} disabled={excelBusy || pdfBusy || facturaBusy} aria-haspopup="menu" aria-expanded={descargaOpen} className="text-sm border border-gray-200 px-4 rounded-md text-gray-600 hover:text-black hover:border-gray-400 transition inline-flex items-center justify-center gap-1 min-h-[44px] disabled:opacity-40">
             {excelBusy ? "Armando el Excel…" : pdfBusy ? "Armando el PDF…" : facturaBusy ? "Bajando la factura…" : "Descargar"} <span aria-hidden className="text-gray-400">⌄</span>
@@ -355,12 +370,7 @@ export default function ReclamoDetail({
               ...(role === "admin" ? [{ label: "Eliminar", onClick: () => onDeleteReclamo(current.id), destructive: true }] : []),
             ]}
           />
-          {pendiente ? (
-            <button onClick={() => onChangeEstado("Pagado")} className="ml-auto border border-gray-300 text-gray-700 px-4 rounded-md text-sm font-medium hover:bg-gray-50 active:scale-[0.97] transition-all inline-flex items-center justify-center gap-2 min-h-[44px]">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-              Marcar como pagado
-            </button>
-          ) : (
+          {!pendiente && (
             <button onClick={() => onChangeEstado("Creado")} className="ml-auto text-xs text-gray-400 hover:text-gray-700 transition inline-flex items-center justify-center min-h-[44px] px-2" title="Si fue un error: vuelve a la lista de por cobrar">← Volver a por cobrar</button>
           )}
         </div>

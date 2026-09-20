@@ -284,13 +284,19 @@ describe("la pantalla del reclamo (REC-2026-0026)", () => {
     expect(document.body.textContent).not.toMatch(/Antigüedad|Pásalo a En proceso|Cuándo hace falta el comprobante/);
     expect(screen.queryByText("Creado")).toBeNull();
   });
-  it("UNA fila: Correo (principal) · Descargar · ··· · «Marcar como pagado» a la derecha", () => {
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 20-sep-2026, con nota: el botón negro pasó a ser
+  // «Marcar como pagado» y «Correo» quedó al lado con borde (9 cobros en 30
+  // días contra 9 correos en toda la historia). Lo que este caso sigue
+  // vigilando —que la fila sea UNA, que estén los tres botones y que «En
+  // proceso» no vuelva— no cambió. El porqué está en
+  // `reclamos-cobrar-al-frente.test.tsx`.
+  it("UNA fila: Marcar como pagado (principal) · Correo · Descargar · ···", () => {
     const { onChangeEstado } = pintar();
-    expect(screen.getByRole("button", { name: "Correo" }).className).toContain("bg-black");
+    expect(screen.getByRole("button", { name: "Correo" })).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Descargar/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Más opciones del reclamo/ })).toBeTruthy();
     const pagar = screen.getByRole("button", { name: /Marcar como pagado/ });
-    expect(pagar.className).toContain("ml-auto");
+    expect(pagar.className).toContain("bg-black");
     fireEvent.click(pagar);
     expect(onChangeEstado).toHaveBeenCalledWith("Pagado");
     expect(screen.queryByText("Pasar a En proceso")).toBeNull();
