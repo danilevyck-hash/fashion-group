@@ -329,14 +329,23 @@ describe("la forma del papel es la de Switch", () => {
     expect(texto).toContain("N. Fiscal: FE012000040254-103-278837-5400012026061600000031210010114344239888");
   });
 
+  // 🔄 20-sep-2026 · CAMBIÓ DE DIRECCIÓN, CON NOTA FECHADA. Esta lista exigía
+  // «Límite de crédito:» y «Tiempo de Morosidad:» en el papel. Medido contra
+  // producción: las dos valen CERO en los 100 clientes de la cartera, o sea que
+  // esa línea decía `0.00` y `0` para todo el mundo. Daniel pidió quitarlas el
+  // 20-sep-2026, así que ahora se exige lo contrario — y no se borra el candado.
+  // Detalle y medición: `cxc-ficha-sin-lineas-rotas.test.ts`.
   it("el papel trae la ficha del cliente y el «RECIBIDO CONFORME»", async () => {
     const texto = await textoDelPdf(buildEstadoCuentaPDF(D25, "X").doc);
     for (const t of [
       "ESTADO DE CUENTA", "Fecha:", "Nombre:", "Teléfono:", "Identificación:", "Email:",
-      "Código:", "Dirección:", "Límite de crédito:", "Tiempo de Morosidad:",
+      "Código:", "Dirección:",
       "1513069-1-650069", "727-7247", "Paso Canoas", "RECIBIDO CONFORME",
     ]) {
       expect(texto, `falta «${t}» en el papel`).toContain(t);
+    }
+    for (const ido of ["Límite de crédito", "Morosidad"]) {
+      expect(texto, `volvió «${ido}» al papel`).not.toContain(ido);
     }
   });
 

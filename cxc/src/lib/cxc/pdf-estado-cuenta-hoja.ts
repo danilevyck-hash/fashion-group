@@ -113,9 +113,38 @@ export function dibujarCabeza(doc: jsPDF, empresaKey: string, empresaNombre: str
 
 // ── 2. La ficha del cliente, en dos columnas ─────────────────────────────────
 
-/** «Nombre · Teléfono / Identificación · Email / Código · Dirección / Límite de
- *  crédito · Tiempo de Morosidad», exactamente el bloque de Switch. Lo que no
- *  tenemos va vacío, nunca inventado. */
+/** El hueco entre el rótulo en negrita y su valor. */
+const HUECO_ROTULO_MM = 1.5;
+
+/**
+ * Dónde arranca el valor: el borde del rótulo MEDIDO EN NEGRITA, más el hueco.
+ *
+ * 🔴 SE MIDE CON LA NEGRITA PUESTA (20-sep-2026). 🩸 Acá vivía el defecto que
+ * Daniel vio en CADA PÁGINA de CADA estado de cuenta: el rótulo se dibujaba en
+ * negrita y su ancho se medía DESPUÉS de volver a la letra normal, que es más
+ * angosta. Medido a 8 pt: «Identificación:» ocupa **19,05 mm** en negrita y
+ * **17,16 mm** en normal, así que el valor caía en 17,16 + 1,5 = **18,66 mm**,
+ * 0,39 mm ADENTRO del rótulo. De ahí salía `Identificación:1513069-1-650069`,
+ * con el valor comiéndose los dos puntos. Lo mismo con «Límite de crédito:»
+ * (23,45 contra 23,03). Los rótulos cortos —«Nombre:», «Código:»— sobrevivían
+ * porque la diferencia no alcanzaba el hueco de 1,5 mm; por eso salía mal solo
+ * en dos líneas de las cuatro.
+ */
+function inicioDelValor(doc: jsPDF, x: number, rotulo: string): number {
+  doc.setFont("helvetica", "bold");
+  return x + doc.getTextWidth(rotulo) + HUECO_ROTULO_MM;
+}
+
+/**
+ * «Nombre · Teléfono / Identificación · Email / Código · Dirección», el bloque
+ * de Switch. Lo que no tenemos va vacío, nunca inventado.
+ *
+ * 🩸 SE FUERON «LÍMITE DE CRÉDITO» Y «TIEMPO DE MOROSIDAD» (20-sep-2026).
+ * Medido contra producción: valen **CERO en los 100 clientes** de la cartera, o
+ * sea que la cuarta línea del papel decía `0.00` y `0` para todo el mundo. Los
+ * campos NO se borran de `FichaCliente` —el sync de Switch los sigue leyendo—:
+ * lo que se retira es la línea del papel.
+ */
 export function dibujarFichaCliente(
   doc: jsPDF,
   y: number,
@@ -129,26 +158,21 @@ export function dibujarFichaCliente(
     ["Nombre:", nombre, "Teléfono:", ficha.telefono],
     ["Identificación:", ficha.identificacion, "Email:", ficha.email],
     ["Código:", codigo, "Dirección:", ficha.direccion],
-    [
-      "Límite de crédito:",
-      ficha.limiteCredito != null ? monto(ficha.limiteCredito) : "",
-      "Tiempo de Morosidad:",
-      ficha.tiempoMorosidad != null ? String(ficha.tiempoMorosidad) : "",
-    ],
   ];
 
   doc.setFontSize(8);
   for (const [r1, v1, r2, v2] of pares) {
-    doc.setFont("helvetica", "bold");
     doc.setTextColor(...NEGRO);
+
+    const x1 = inicioDelValor(doc, MARGEN, r1);
     doc.text(r1, MARGEN, y);
     doc.setFont("helvetica", "normal");
-    doc.text(v1, MARGEN + doc.getTextWidth(r1) + 1.5, y);
+    doc.text(v1, x1, y);
 
-    doc.setFont("helvetica", "bold");
+    const x2 = inicioDelValor(doc, col2, r2);
     doc.text(r2, col2, y);
     doc.setFont("helvetica", "normal");
-    doc.text(v2, col2 + doc.getTextWidth(r2) + 1.5, y);
+    doc.text(v2, x2, y);
     y += 4.6;
   }
   return y + 3;
