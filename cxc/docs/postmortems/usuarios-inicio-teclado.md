@@ -27,3 +27,18 @@
 ## Lo que el Inicio prometía y no existía — el texto que vivía en CLAUDE.md (movido el 19-sep-2026)
 
 - 🩸 **Tres cosas que esta lista prometía y NO EXISTÍAN EN NINGUNA PANTALLA** (retiradas el 11-sep-2026; Daniel: *«quita lo que no funciona»*): el **feed «Acciones pendientes»** —su ruta `/api/home-stats` seguía viva y consultando la base **sin un solo lector**—, los **contadores del 🔔** (`useBadges` quedó sin importadores en el rediseño del home del **29-abr-2026**) y las **💡 sugerencias proactivas** (`SuggestionCard` no se dibujaba en ningún lado y `useSmartSuggestions` solo se llamaba en `/cxc`, donde el propio código decía «SuggestionCard removed from render» y le pasaba una lista vacía). Se retiró el CÓDIGO MUERTO; no se construyó nada. ⚠️ La **campana 🔔 SÍ existe y funciona** — es el historial de avisos de `NotificationCenter`, que nunca usó ese gancho. ⚠️ `/api/notification-badges` **se queda sin llamadores** porque la nombran por su ruta tres candados de otros módulos (mismo trato que `/api/cxc/contact-log`). Candado: `inicio-sin-promesas.test.ts`.
+
+
+---
+
+## Lo que decía CLAUDE.md del teclado y de la búsqueda global, hasta el 19-sep-2026 (movido aquí, verbatim)
+
+> Mismo motivo que el bloque de arriba: el 19-sep-2026 entró a CLAUDE.md la regla del conector de Supabase y había que hacerle sitio. Allá quedó la regla en una línea; el texto completo, con sus fechas y su 🩸, es éste.
+
+### Teclado
+
+- 🩸 **Todo lo demás se retiró el 11-sep-2026** (Daniel: *«quita lo que no funciona»*). Acá se prometían la `/` para buscar, la ayuda «?», los saltos `G+…` a inicio · CXC · guías · cheques · reclamos, el `J/K` para moverse por filas y la `E` para editar — y **ninguno corría**: `useKeyboardShortcuts` no tenía un solo importador desde el **11-abr-2026**, cuando se borró `KeyboardShortcutsProvider.tsx`, que además nunca se había montado en una pantalla. El costo real: el 5-sep-2026 alguien editó ese archivo y el cambio entero fue `q: "/cheques"` → `q: "/recordatorios"`, o sea que se corrigió con cuidado un atajo que no llevaba a nadie a ninguna parte. ⚠️ La `/` **tampoco existió nunca**: se quitó de la doc en vez de inventarla. Candado: `atajos-de-teclado-retirados.test.ts`.
+
+### Búsqueda global — cada resultado lleva a donde dice (11-sep-2026)
+
+- **Búsqueda global:** 8 módulos (CXC, Reclamos, Guías, Directorio, Cheques, Ventas, Préstamos, Caja). 🔴 **Cada resultado LLEVA a donde dice** (11-sep-2026): una **guía** abre `/guias/<id>` —decía `/guias?id=`, que el middleware convierte en la HOJA DE IMPRIMIR—, un **cliente** abre su ficha `/clientes/<codigo>`, un resultado de **Ventas** abre `?tab=clientes&cliente=<CÓDIGO>` —decía `?search=`, que no lee nadie— y un gasto de **Caja** abre su período `/caja/<id>` —decía `?periodo=`, tampoco leído—. 🔴 El código del cliente de Ventas sale del **puente por ID** (`switch_facturas` → `switch_clientes` → `codigo`), **nunca del nombre**; sin código se abre la pestaña Clientes sin preseleccionar. ⚠️ El gasto de Caja no queda **resaltado** dentro de su período: eso pide que la pantalla de Caja lea un parámetro y hoy no lee ninguno — pendiente, no olvido. Candado: `busqueda-global-destinos.test.ts`.

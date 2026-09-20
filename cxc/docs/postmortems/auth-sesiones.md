@@ -1,0 +1,12 @@
+# Sesiones y autenticación — el porqué
+
+> Post-mortem de cómo vive una sesión en fashiongr.com: la cookie, la reanudación sin contraseña (3-sep-2026) y la expiración, que vive SOLO en el cron (26-jul-2026).
+> Nació el 19-sep-2026 al mover aquí, verbatim, lo que CLAUDE.md decía: entró la regla del conector de Supabase y el archivo estaba a 24 caracteres del tope del harness.
+> La REGLA vigente (sin la historia) vive en «Auth» de `cxc/CLAUDE.md`. El mapa operativo completo —los cuatro pasos del cron, el clasificador, qué pasa si no corre— está en `docs/modulos/06-recordatorios-usuarios-infra.md`.
+
+---
+
+## Lo que decía CLAUDE.md hasta el 19-sep-2026 (movido aquí, verbatim)
+
+- **Reanudar sesión (3-sep-2026):** con la cookie de 7 días viva ya NO se pide contraseña al abrir la app — la pantalla de login pregunta `GET /api/auth/sesion` (fail-closed: firma HMAC + token vivo y del MISMO usuario en `user_sessions` + usuario activo en `fg_users`; rol y módulos salen FRESCOS de la base, payload compartido con el login en `src/lib/sesion-payload.ts`) y manda a la casa del rol; pase vencido, revocado o logout → contraseña como siempre. **NO cambió**: el `maxAge` de 7 días, la validación del middleware, el rate limit, bcrypt ni la retención de sesiones. Colateral: los 3 botones de salir ahora revocan y ESPERAN el DELETE antes de navegar (el del home solo borraba `sessionStorage`). Candado: `sesion-vigente-no-pide-contrasena.test.tsx`.
+- **Expiración de sesión — vive SOLO en el cron (26-jul-2026).** `user_sessions` **no tiene `expires_at`** (columnas reales: id, user_name, user_role, session_token, ip_address, last_seen, created_at, revoked) y la cookie firmada tampoco lleva claim de expiración: del lado del servidor una sesión no vencía nunca. Lo único que la mataba era el `maxAge` de 7 días de la cookie en el navegador — un control del CLIENTE, que quien se quede con el valor de la cookie ignora. Medido antes del fix: 1.190 filas, 259 sin revocar para 9 usuarios (daniel 73, Angela 66), y solo 3 usadas en 24h. Ahora `/api/cron/cleanup-sessions` (02:30 UTC) revoca a los **14 días** sin `last_seen` (el doble de los 7 del `maxAge` → no desloguea a nadie que todavía pudiera estar usando la app), pone un **tope duro de 90 días** de vida por sesión aunque se la mantenga viva a pings, y **borra** las revocadas con `last_seen` > 90 días. Constantes en `src/lib/session-retention.ts`. Si se agrega un `expires_at` algún día, el middleware tiene que respetarlo — hoy no existe nada que respetar.
