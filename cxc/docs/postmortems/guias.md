@@ -2176,3 +2176,30 @@ partido— y `guias-etiquetas.test.ts`.
 - Los tres destinos que **siguen cortándose** son direcciones largas escritas a mano
   («Calle 19 Central, al lado de la joyería Super Oro»). Acortarlas en Guías › Configuración las
   arregla sin tocar el papel.
+
+---
+
+## 🔴 El PDF del pedido de catálogo era el ÚNICO en A4 (20-sep-2026)
+
+No es de Guías, pero es la misma clase de defecto y conviene que esté anotado junto al otro papel.
+
+`order-pdf-core.ts` decía `new jsPDF("portrait")` **sin `format`**, y el default de jsPDF es **A4**.
+Era el único de los quince generadores de PDF del sistema que no decía en qué hoja imprime: los
+otros catorce dicen `format: "letter"` (uno `legal`), incluido el PDF del catálogo del MISMO módulo.
+El cliente imprime ese papel —y en Panamá la bandeja tiene carta—, así que se le recortaba.
+
+🔴 **Y el ancho estaba escrito a mano.** Había **cuatro** `doc.rect(0, 0, 210, 18, "F")` —una banda
+de color por marca; 210 mm es el ancho de A4— y **dos** textos anclados en `196` (= 210 − 14). Sobre
+carta (215,9 mm) esas bandas habrían quedado **5,9 mm cortas**: una franja blanca en el borde
+derecho de cada hoja, justo donde va el color de la marca. También estaba el `290` del guard de
+salto del total, que era el alto de A4 menos 7.
+
+Ahora el ancho, el alto y el margen derecho salen de `medidasDeLaHoja(doc)`, que se lo pregunta al
+documento. Las columnas Cliente / Pedido / Fecha (14 / 90 / 150 mm) **no se movieron**: son
+posiciones de columna, no bordes.
+
+**Comprobado** armando el papel de verdad para las cuatro marcas y con un pedido de **varias hojas**:
+`MediaBox` de 612 × 792 pt, la banda llegando a 215,9 mm, y ni un texto fuera de la hoja.
+**Candado**: `src/__tests__/lib/pedido-pdf-carta.test.ts`, que además barre los quince generadores y
+pone el build ROJO si alguno vuelve a nacer sin decir su formato.
+**Verificación por mutación**: **6 mutaciones, 6 cazadas**, **1 de 1 control en verde**.

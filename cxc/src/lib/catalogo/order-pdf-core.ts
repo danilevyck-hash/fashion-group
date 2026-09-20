@@ -65,6 +65,29 @@ export const ORDER_PDF_IMG_PX = 200;
 // Precio del catálogo: `35` / `12.50` / `4,422` — sin `.00` y sin redondear.
 const fmt = precioTexto;
 
+/**
+ * 🔴 EL PAPEL ES CARTA, COMO TODO EL PAPEL DE LA CASA (20-sep-2026).
+ *
+ * 🩸 Éste era el ÚNICO PDF del sistema en A4: `new jsPDF("portrait")` sin
+ * `format`, y el default de jsPDF es A4. Los otros catorce generadores dicen
+ * `format: "letter"` (uno `legal`), incluido el PDF del catálogo de este mismo
+ * módulo. El cliente imprime este papel —en Panamá no hay A4 en la bandeja— y
+ * la impresora le recortaba el borde.
+ *
+ * 🔴 Y EL ANCHO YA NO SE ESCRIBE A MANO: había cuatro bandas de color dibujadas
+ * contra el ancho de A4 y dos textos anclados a su margen derecho. Sobre carta
+ * (215,9 mm) esas bandas habrían quedado 6 mm cortas, con una franja blanca al
+ * borde derecho de cada hoja. Ahora todo sale de `medidasDeLaHoja`, que le
+ * pregunta el tamaño al documento.
+ */
+export const MARGEN_MM = 14;
+
+/** El ancho y el alto REALES de la hoja del documento, en milímetros. */
+export function medidasDeLaHoja(doc: jsPDF): { ancho: number; alto: number; derecha: number } {
+  const ancho = doc.internal.pageSize.getWidth();
+  return { ancho, alto: doc.internal.pageSize.getHeight(), derecha: ancho - MARGEN_MM };
+}
+
 /** Ancho útil (mm) del nombre del cliente antes de chocar con "Pedido:" (x=90),
  *  descontando la etiqueta "Cliente: " y 2 mm de aire. */
 export const CLIENT_NAME_MAX_MM = 90 - 14 - 2;
@@ -95,33 +118,35 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
   const totalPiezas = resumen.piezas;
   const total = resumen.total;
 
-  const doc = new jsPDF("portrait");
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+  // El ancho y el alto salen de la HOJA, nunca de un número escrito a mano.
+  const hoja = medidasDeLaHoja(doc);
   const fechaLabel = new Date(createdAt + (createdAt.includes("T") ? "" : "T12:00:00"))
     .toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" });
 
   // Header por marca
   if (marca === "reebok") {
     doc.setFillColor(26, 26, 26);
-    doc.rect(0, 0, 210, 18, "F");
+    doc.rect(0, 0, hoja.ancho, 18, "F");
     try { doc.addImage(REEBOK_LOGO_BASE64, "PNG", 14, 5, REEBOK_LOGO_WIDTH, REEBOK_LOGO_HEIGHT); } catch { /* */ }
   } else if (marca === "tommy") {
     // Banda navy Tommy + wordmark BLANCO (el oscuro no se ve sobre navy).
     doc.setFillColor(21, 35, 66);
-    doc.rect(0, 0, 210, 18, "F");
+    doc.rect(0, 0, hoja.ancho, 18, "F");
     try { doc.addImage(TOMMY_LOGO_BLANCO_BASE64, "PNG", 14, 9 - TOMMY_LOGO_HEIGHT / 2, TOMMY_LOGO_WIDTH, TOMMY_LOGO_HEIGHT); } catch { /* */ }
   } else if (marca === "calvin") {
     // Banda negra Calvin + wordmark BLANCO (blanco/negro minimalista).
     doc.setFillColor(10, 10, 10);
-    doc.rect(0, 0, 210, 18, "F");
+    doc.rect(0, 0, hoja.ancho, 18, "F");
     try { doc.addImage(CALVIN_LOGO_BLANCO_BASE64, "PNG", 14, 9 - CALVIN_LOGO_HEIGHT / 2, CALVIN_LOGO_WIDTH, CALVIN_LOGO_HEIGHT); } catch { /* */ }
   } else {
     // Banda navy Joybees + logo BLANCO (el wordmark #404041 no se ve sobre navy).
     doc.setFillColor(26, 38, 86);
-    doc.rect(0, 0, 210, 18, "F");
+    doc.rect(0, 0, hoja.ancho, 18, "F");
     try { doc.addImage(JOYBEES_LOGO_BLANCO_BASE64, "PNG", 14, 9 - JOYBEES_LOGO_HEIGHT / 2, JOYBEES_LOGO_WIDTH, JOYBEES_LOGO_HEIGHT); } catch { /* */ }
   }
   doc.setFontSize(8); doc.setTextColor(255); doc.setFont("helvetica", "normal");
-  doc.text("Fashion Group · Panamá", 196, 12, { align: "right" });
+  doc.text("Fashion Group · Panamá", hoja.derecha, 12, { align: "right" });
 
   // Cliente / Pedido / Fecha en columnas FIJAS (14 / 90 / 150 mm): el nombre del
   // cliente se recorta al ancho disponible o se montaba encima de "Pedido:"
@@ -187,12 +212,12 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
     cursor = drawSectionTable("Pre-orden", cursor, preorderItems);
   }
   // Total al pie — con guard de salto: si la tabla terminó pegada al borde,
-  // el total pasa a una página nueva en vez de desaparecer fuera del A4.
+  // el total pasa a una página nueva en vez de desaparecer fuera de la hoja.
   let fy = cursor + 8;
-  if (fy + 12 > 290) { doc.addPage(); fy = 20; }
+  if (fy + 12 > hoja.alto - 7) { doc.addPage(); fy = 20; }
   doc.setFontSize(10); doc.setTextColor(26); doc.setFont("helvetica", "bold");
   doc.text(`${totalBultos} bultos · ${totalPiezas} piezas`, 14, fy);
-  doc.text(`$${fmt(total)}`, 196, fy, { align: "right" });
+  doc.text(`$${fmt(total)}`, hoja.derecha, fy, { align: "right" });
   doc.setFontSize(7); doc.setTextColor(160); doc.setFont("helvetica", "normal");
   doc.text(
     marca === "reebok"
