@@ -329,14 +329,19 @@ describe("AddNewInline · el ＋ que se escapó de las dos vueltas", () => {
   it("se renderiza UNA vez por lista, no una por fila", () => {
     // El de destinos vivía dentro del <th> de la tabla — que en móvil no existe.
     //
-    // ⚠️ CAMBIÓ DE DIRECCIÓN el 9-sep-2026, no se borró: eran DOS (quien
-    // despacha + destinos) y ahora son TRES. Nació el ＋ del desplegable
-    // «Transportista» — Daniel: *«Ponme opción en configuración de guía para
-    // poder agregar un transportista nuevo.»*, y los seis de la lista se habían
-    // sembrado el 26-may-2026 sin que nadie pudiera agregar uno.
+    // ⚠️ CAMBIÓ DE DIRECCIÓN DOS VECES, y no se borró ninguna:
+    //   · 9-sep-2026: eran DOS (quien despacha + destinos) y pasaron a TRES,
+    //     con el ＋ del desplegable «Transportista» — Daniel: *«Ponme opción en
+    //     configuración de guía para poder agregar un transportista nuevo.»*;
+    //   · 19-sep-2026: volvieron a ser DOS. El ＋ de «quien despacha» SALIÓ del
+    //     formulario — Daniel: *«el + para agregar nombre debe de guardarse
+    //     para todos los navegadores, o más fácil ponlo en configuraciones nada
+    //     más y quita la opción de que sea en la creación de la guía»*. Esa
+    //     lista vive ahora en `guias_despachadores` y se administra en Guías ›
+    //     Configuración.
     //
     // Lo que el candado cuida NO cambió: uno por LISTA, jamás uno por FILA.
-    expect((form.match(/<AddNewInline/g) ?? []).length).toBe(3); // quien despacha + destinos + transportista
+    expect((form.match(/<AddNewInline/g) ?? []).length).toBe(2); // destinos + transportista
   });
 
   it("CONTROL — y ninguno de los tres vive dentro del mapa de renglones", () => {

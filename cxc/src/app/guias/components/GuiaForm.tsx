@@ -66,7 +66,8 @@ import ClientePicker from "@/components/ClientePicker";
 import { GUIAS_ATAJOS_NUEVOS } from "@/lib/guias/atajos-facturas";
 import { ScrollableTable } from "@/components/ui";
 import { EMPRESAS_CANONICAS, claveCampo, faltaParaGuardar, opcionesEmpresa } from "./guia-form-logic";
-import { ENTREGADO_POR_OTRO, entregadoPorElegido, nombreDespachadoPor } from "@/lib/guias/despachado-por";
+import { entregadoPorElegido, nombreDespachadoPor } from "@/lib/guias/despachado-por";
+import { DESPACHADORES_BASE, listaParaElDesplegable } from "@/lib/guias/despachadores";
 import { ETIQUETA_TIPO_DESPACHO } from "@/lib/guias/modo-despacho";
 import { textoFalta } from "@/lib/guias/falta-para-despachar";
 import { textoYaSeDespacho } from "@/lib/guias/campos-editables";
@@ -364,36 +365,36 @@ export default function GuiaForm({
     return validationErrors.has(clave) || (touched.has(clave) && !valor.trim());
   }
 
-  // La lista de «Despachado por». Daniel pidió a Eloyn el 14-sep-2026 y a
-  // **Jorman** el 19-sep-2026 (*«agrégame a Eloyn y a Jorman a esa lista»*).
-  // ⚠️ Lo que alguien agregue con el ＋ vive en el NAVEGADOR (`fg_entregadores`),
-  // así que no lo ve nadie más — el mismo defecto que la lista de destinos tuvo
-  // hasta el 7-sep-2026, cuando pasó a `guias_destino_lista`. Por eso un nombre
-  // que usa todo el equipo va AQUÍ y no en el ＋.
+  // 🔴 LA LISTA DE «DESPACHADO POR» ES DEL EQUIPO, NO DE UN NAVEGADOR
+  // (19-sep-2026). Daniel, textual: *«el + para agregar nombre debe de
+  // guardarse para todos los navegadores, o más fácil ponlo en configuraciones
+  // nada más y quita la opción de que sea en la creación de la guía»*.
+  //
+  // 🩸 Vivía mitad en una constante de este archivo y mitad en el
+  // `localStorage` (`fg_entregadores`): lo que agregaba Angela con el ＋ no lo
+  // veía Andrea, y no se podía quitar desde ninguna pantalla. Ahora vive en
+  // `guias_despachadores` y se administra en **Guías › Configuración**; acá
+  // quedó SOLO el desplegable, sin «＋» y sin «Otro…».
+  //
+  // Best-effort y falla ABIERTA: si la tabla todavía no existe o la red falla,
+  // el desplegable ofrece los cuatro de siempre (`DESPACHADORES_BASE`).
+  //
   // 🔴 EL CAMPO SIGUE ARRANCANDO VACÍO Y SIGUE SIENDO OBLIGATORIO. Daniel dijo
   // que NO a preseleccionar a nadie: *«porque puede que alguien deje ese por
-  // error»*. Agregar un nombre a la lista es ofrecerlo, nunca ponerlo.
-  const DEFAULT_ENTREGADORES = ["Julio", "Rodrigo", "Eloyn", "Jorman"];
-  const [entregadores, setEntregadores] = useState(DEFAULT_ENTREGADORES);
-  const [entregadoPorOtro, setEntregadoPorOtro] = useState("");
+  // error»*.
+  const [entregadores, setEntregadores] = useState<string[]>([...DESPACHADORES_BASE]);
   useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem("fg_entregadores") || "[]") as string[];
-      const merged = [...DEFAULT_ENTREGADORES];
-      for (const s of stored) { if (s && !merged.includes(s)) merged.push(s); }
-      setEntregadores(merged);
-    } catch { /* */ }
+    let cancel = false;
+    fetch("/api/guias/despachadores", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancel) return;
+        const nombres = Array.isArray(d?.nombres) ? (d.nombres as string[]) : [];
+        if (nombres.length > 0) setEntregadores(listaParaElDesplegable(nombres));
+      })
+      .catch(() => { /* el desplegable se queda con la lista de siempre */ });
+    return () => { cancel = true; };
   }, []);
-  function addEntregador(name: string) {
-    if (!name.trim()) return;
-    const n = name.trim();
-    const updated = [...entregadores, n];
-    setEntregadores(updated);
-    const custom = updated.filter(s => !DEFAULT_ENTREGADORES.includes(s));
-    localStorage.setItem("fg_entregadores", JSON.stringify(custom));
-    setEntregadoPor(n);
-    setEntregadoPorOtro("");
-  }
 
   // "Más usados arriba": clientes (por cliente_codigo) y orden de las 8 empresas
   // canónicas, ambos por frecuencia de uso en guías. Aditivo y best-effort.
@@ -1029,12 +1030,12 @@ export default function GuiaForm({
             )}
           </Campo>
 
-          <Campo
-            label="Despachado por"
-            requerido
-            htmlFor="guia-entregado-por"
-            accion={<AddNewInline placeholder="Nombre" onAdd={addEntregador} etiqueta="Agregar quien despacha" />}
-          >
+          {/* 🔴 SOLO EL DESPLEGABLE (19-sep-2026). El «＋» para agregar un
+              nombre —y la opción «Otro…», que era la otra forma de agregarlo—
+              salieron de acá: la lista se administra en Guías › Configuración
+              y la ve todo el equipo. Daniel: *«ponlo en configuraciones nada
+              más y quita la opción de que sea en la creación de la guía»*. */}
+          <Campo label="Despachado por" requerido htmlFor="guia-entregado-por">
             <select
               id="guia-entregado-por"
               value={entregadoPor}
@@ -1043,19 +1044,7 @@ export default function GuiaForm({
             >
               <option value="">Seleccionar...</option>
               {entregadores.map(e => <option key={e} value={e}>{e}</option>)}
-              <option value={ENTREGADO_POR_OTRO}>Otro...</option>
             </select>
-            {entregadoPor === ENTREGADO_POR_OTRO && (
-              <>
-                <input type="text" placeholder="Nombre de quien entrega" value={entregadoPorOtro}
-                  onChange={e => setEntregadoPorOtro(e.target.value)}
-                  onBlur={() => { if (entregadoPorOtro.trim()) addEntregador(entregadoPorOtro); }}
-                  className={`${ctrl(true)} mt-3`} />
-                {/* 🔴 Se dice ANTES de guardar, no después de imprimir: hasta
-                    que haya un nombre, "Despachado por" está SIN elegir. */}
-                <ErrorCampo>Escribe el nombre de quien despacha</ErrorCampo>
-              </>
-            )}
           </Campo>
 
           {/* 🔴 EL N° DEL TRANSPORTISTA SALIÓ DE ACÁ: AHORA VA POR LÍNEA, al

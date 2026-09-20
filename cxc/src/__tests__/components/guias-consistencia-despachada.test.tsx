@@ -446,10 +446,26 @@ describe('🔴 «Agregar destino» vive PEGADO AL CAMPO de Dirección', () => {
     expect(b.className).toContain("min-h-[44px]");
   });
 
-  it("CONTROL — el ＋ de «quién despacha» sigue PELADO: el rótulo no se derrama", async () => {
+  // 🔄 CAMBIO DE DIRECCIÓN (19-sep-2026) — no se borró, cambió de sentido.
+  //
+  // Este control exigía que el ＋ de «quién despacha» siguiera PELADO (sin
+  // rótulo visible), para que el rótulo del ＋ de destinos no se derramara por
+  // toda la pantalla. Ese ＋ **ya no existe**: la lista de «Despachado por»
+  // pasó a `guias_despachadores` y se administra en Guías › Configuración.
+  // Daniel, textual: *«el + para agregar nombre debe de guardarse para todos
+  // los navegadores, o más fácil ponlo en configuraciones nada más y quita la
+  // opción de que sea en la creación de la guía»*.
+  //
+  // Lo que se sigue exigiendo es lo mismo de antes desde el otro lado: que el
+  // campo «Despachado por» sea SOLO un desplegable.
+  it("🔴 «Despachado por» es SOLO un desplegable: ni ＋ ni «Otro…»", async () => {
     await montarPendiente();
-    const b = screen.getByRole("button", { name: /Agregar quien despacha/i });
-    expect((b.textContent || "").replace(/\s/g, "")).toBe("＋");
+    expect(screen.queryByRole("button", { name: /Agregar quien despacha/i })).toBeNull();
+    const select = document.getElementById("guia-entregado-por") as HTMLSelectElement;
+    expect(select).not.toBeNull();
+    const opciones = [...select.options].map((o) => o.textContent || "");
+    expect(opciones.some((o) => /Otro/i.test(o))).toBe(false);
+    expect(opciones).toContain("Julio");
   });
 
   it("hay UNO POR FILA en los dos layouts — en móvil no existe el <th>", async () => {

@@ -323,6 +323,9 @@ const DATASETS: Dataset[] = [
   // que ofrece el campo Dirección — las dos las escriben personas.
   { table: "guias_destino_cliente" },
   { table: "guias_destino_lista" },
+  // Y la lista de «Despachado por» (19-sep-2026): también la escriben personas,
+  // en la misma pantalla de Configuración.
+  { table: "guias_despachadores" },
   // Las etiquetas de las cajas: cuántas lleva cada factura y con qué destino.
   // Lo escribe una persona antes de que exista la guía; no vuelve de ningún lado.
   { table: "guias_etiquetas" },

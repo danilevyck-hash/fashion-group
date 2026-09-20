@@ -198,6 +198,10 @@ export const TABLAS_PERSONAS = [
   // de cajas y `guia_items.bultos` es un número por renglón que nace después.
   "guias_etiquetas",
   "transportistas",
+  // 🔴 La lista de «Despachado por» (19-sep-2026). La escriben personas en
+  // Guías › Configuración y NO se puede volver a conseguir: antes vivía mitad
+  // en una constante del código y mitad en el localStorage de cada navegador.
+  "guias_despachadores",
 
   // ── Caja menuda
   "caja_periodos",

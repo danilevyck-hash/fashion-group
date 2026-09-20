@@ -27,6 +27,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import ClientePicker from "@/components/ClientePicker";
 import DestinosListaConfig from "./DestinosListaConfig";
 import TransportistasConfig from "./TransportistasConfig";
+import DespachadoresConfig from "./DespachadoresConfig";
 import { Toast } from "@/components/ui";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { useNombresDeClientes } from "@/lib/hooks/useBusquedaClientes";
@@ -487,6 +488,15 @@ export default function GuiasConfiguracionView() {
           texto de la guía, saltándose la lista. Tercera tarjeta, no fusionada:
           las de arriba son DESTINOS, ésta es QUIÉN LLEVA. */}
       <TransportistasConfig onAviso={setToast} />
+
+      {/* 🔴 QUIÉN DESPACHA (19-sep-2026) — Daniel: *«el + para agregar nombre
+          debe de guardarse para todos los navegadores, o más fácil ponlo en
+          configuraciones nada más y quita la opción de que sea en la creación
+          de la guía»*. La lista vivía mitad en una constante del código y
+          mitad en el `localStorage` de cada navegador. Cuarta tarjeta: las dos
+          de arriba son DIRECCIONES, la tercera QUIÉN LLEVA y ésta QUIÉN
+          ENTREGA la mercancía al transportista. */}
+      <DespachadoresConfig onAviso={setToast} />
 
       <QuitarDestinoModal
         fila={aQuitar}

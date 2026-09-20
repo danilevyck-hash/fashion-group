@@ -77,10 +77,27 @@ describe("🔴 1. lo que alguien agrega queda para TODOS", () => {
   });
 
   it("⚠️ localStorage SIGUE valiendo para las comodidades de cada persona", () => {
-    // CONTROL: esto no es una cruzada contra localStorage. El último
-    // transportista y quién despacha siguen siendo de cada quien.
-    const form = leer("src/app/guias/components/GuiaForm.tsx");
-    expect(form).toContain("fg_entregadores");
+    // CONTROL: esto no es una cruzada contra localStorage. El último modo de
+    // entrega y el último transportista siguen siendo de cada quien.
+    //
+    // 🔄 CAMBIO DE DIRECCIÓN (19-sep-2026): este control miraba
+    // `fg_entregadores` —la lista de «Despachado por»—, y esa lista dejó de
+    // ser del navegador: pasó a `guias_despachadores`, se administra en Guías
+    // › Configuración y el ＋ salió del formulario. Daniel: *«el + para
+    // agregar nombre debe de guardarse para todos los navegadores, o más
+    // fácil ponlo en configuraciones nada más»*. El ejemplo se cambió por uno
+    // que SÍ es una comodidad personal; la regla no cambió.
+    const estado = leer("src/app/guias/components/useGuiaFormState.ts");
+    expect(estado).toContain("fg_last_transportista_id");
+    expect(estado).toContain("fg_last_modo_entrega");
+  });
+
+  it("🩸 la clave `fg_entregadores` no la USA más ningún archivo", () => {
+    // La lista de «Despachado por» es del EQUIPO desde el 19-sep-2026: alcanza
+    // con que UN archivo la vuelva a leer o escribir para que se parta en dos
+    // otra vez. Se busca la clave ENTRE COMILLAS (el uso), no la palabra.
+    const rastro = barrer(/["']fg_entregadores["']/);
+    expect(rastro, `todavía hay código guardando la lista en el navegador: ${rastro.join(", ")}`).toEqual([]);
   });
 });
 
