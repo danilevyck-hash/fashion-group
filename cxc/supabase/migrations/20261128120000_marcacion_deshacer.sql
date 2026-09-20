@@ -1,5 +1,5 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- DESHACER LA ÚLTIMA MARCA — DOS MINUTOS (14-sep-2026). ⚠️ SIN APLICAR.
+-- DESHACER LA ÚLTIMA MARCA — DOS MINUTOS (14-sep-2026). ✅ APLICADA (verificado contra producción el 19-sep-2026: las columnas existen)
 --
 -- Daniel probó el reloj del teléfono desde su iPhone y marcó la SALIDA cinco
 -- minutos después de la entrada, por error de dedo. Arreglar eso pedía

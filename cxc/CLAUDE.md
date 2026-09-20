@@ -58,7 +58,10 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 | Gerente ACS | `gerente_acs` | SOLO Multifashion (/multifashion + /api/multifashion/*), y **el módulo COMPLETO** — todo el histórico, igual que admin (ver nota abajo). Auto-redirect a Multifashion desde home (único módulo). Módulos vía `role_permissions` |
 | Gerente Confecciones Boston | `gerente_boston` | Confecciones Boston (/boston + /api/boston/*), la cartera `/api/cxc/boston`, la planilla de Boston, y **Catálogos solo para VER** (27-ago-2026). Aterriza en /boston desde home por su CASA (`MODULO_CASA_POR_ROL`), no por el auto-redirect de módulo único. **NO ve la búsqueda global, ni el CXC del grupo, ni Ventas, ni Comisiones, ni Guías, ni la lista de comprobantes, ni administrar catálogos.** Módulos vía `role_permissions` |
 
-> Roles reales del sistema = los 7 de arriba (`src/lib/modules.ts` → `SYSTEM_ROLES`). No existen roles `director` ni `cliente` (el catálogo Reebok es público, sin login).
+| Marcación | `marcacion` | SOLO `/marcacion` — marcar desde el teléfono, con selfie y ubicación. Auto-redirect desde home. 4 de Multifashion (Ana 2 · Cindy 3 · Yeisibeth 306 · Angel 305). ⚠️ **Rodrigo (13) la tiene siendo `bodega`**: es el módulo POR PERSONA de `MODULOS_POR_PERSONA` |
+
+> Roles reales del sistema = los 8 de arriba (`src/lib/modules.ts` → `SYSTEM_ROLES`). No existen roles `director` ni `cliente` (el catálogo Reebok es público, sin login).
+> 🔴 **MARCAR DESDE EL TELÉFONO YA FUNCIONA SIN SEÑAL** (`marcacion/cola-offline.ts`; probado el 15-sep). Con señal la hora la pone el SERVIDOR; sin señal, la del teléfono, ni 10 min adelantada ni 7 días vieja. ⚠️ Con la app CERRADA no sale nada y la cola no está respaldada. 🔑 «Sin señal» **es la palabra del teléfono** y el servidor no puede probarlo — detalle y medición en el postmortem de asistencia.
 
 ## Módulos (src/lib/modules.ts)
 Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home, jul-2026):
@@ -592,8 +595,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - La **nota de entrega** usa un solo generador para compartir e imprimir, y el PDF se arma **antes del clic** (iOS bloquea la hoja de compartir si hay un `await` de red en el medio).
 
 ## Guías — máquina de estados
-- Estado en `guia_transporte.estado` (TEXT, **sin CHECK constraint** — valores válidos por convención de código).
-- Flujo: **Pendiente Bodega** (default al crear) → **Completada** (al despachar; exige receptor, cédula, placa, ≥1 bulto y firmas; queda **bloqueada** para edición) → **Rechazada** (solo desde Completada, con `motivo_rechazo`).
+- `guia_transporte.estado` es TEXT **sin CHECK**: los valores valen por convención. **Pendiente Bodega** (al crear) → **Completada** (exige receptor, cédula, placa, ≥1 bulto y las dos firmas; queda bloqueada). 🩸 **«Rechazada» se retiró** (Guías › la limpieza del 5-sep-2026).
 
 ## Auth
 - Passwords: bcrypt hashed (migración de plaintext completada — todos los usuarios en bcrypt; el login exige bcrypt y rechaza cualquier password no-hasheada)
@@ -734,7 +736,7 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 - **Spotlight:** "cheques que vencen mañana" → ⚡ quick action con deep link
 - **Búsquedas recientes:** últimas 5 + "Ir a..." shortcuts de módulos
 - **Smart defaults:** recuerda última categoría, empresa, banco, transportista (localStorage `fg_last_*`)
-- 🩸 **Tres cosas que esta lista prometía y NO EXISTÍAN EN NINGUNA PANTALLA** (retiradas el 11-sep-2026; Daniel: *«quita lo que no funciona»*): el **feed «Acciones pendientes»** —su ruta `/api/home-stats` seguía viva y consultando la base **sin un solo lector**—, los **contadores del 🔔** (`useBadges` quedó sin importadores en el rediseño del home del **29-abr-2026**) y las **💡 sugerencias proactivas** (`SuggestionCard` no se dibujaba en ningún lado y `useSmartSuggestions` solo se llamaba en `/cxc`, donde el propio código decía «SuggestionCard removed from render» y le pasaba una lista vacía). Se retiró el CÓDIGO MUERTO; no se construyó nada. ⚠️ La **campana 🔔 SÍ existe y funciona** — es el historial de avisos de `NotificationCenter`, que nunca usó ese gancho. ⚠️ `/api/notification-badges` **se queda sin llamadores** porque la nombran por su ruta tres candados de otros módulos (mismo trato que `/api/cxc/contact-log`). Candado: `inicio-sin-promesas.test.ts`.
+- 🩸 **Tres cosas que esta lista prometía y NO EXISTÍAN EN NINGUNA PANTALLA** (retiradas el 11-sep-2026): el feed «Acciones pendientes», los contadores del 🔔 y las 💡 sugerencias. Se retiró CÓDIGO MUERTO; no se construyó nada. ⚠️ La **campana 🔔 SÍ funciona** (`NotificationCenter`, que nunca usó ese gancho) y `/api/notification-badges` se queda sin llamadores porque la nombran tres candados. Detalle en [el postmortem](docs/postmortems/usuarios-inicio-teclado.md). Candado: `inicio-sin-promesas.test.ts`.
 - **Draft auto-save:** formularios de reclamos, guías, cheques se guardan cada 5s en localStorage
 - **Time grouping:** cheques y guías agrupados por "Hoy/Esta semana/Vencidos"- **Contextual color:** tinte rojo/ámbar ambient cuando hay datos urgentes
 - **Inline previews:** último contacto, días para depósito, próxima deducción visibles sin expandir
@@ -778,8 +780,8 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 
 ## Testing
 ```bash
-npm test          # Vitest — 20 tests, run before pushing
-npx next build    # Build check — must pass before push
+npm test          # Vitest — 16.111 pruebas. Las corre también GitHub Actions y el gancho antes de subir.
+npx next build    # El build tiene que pasar antes de subir
 ```
 
 ## Deploy

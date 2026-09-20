@@ -1864,3 +1864,43 @@ esto, verbatim:
 - 🔴 **LOS DÍAS AFUERA SON «TRABAJO DE VENDEDOR» POR RANGO, DESDE LA FICHA, Y EL HORARIO 9–18 NO SE GUARDA (14-sep-2026).** Daniel, textual: *«a ellas cuando están afuera se les paga el día regular como si hubiesen trabajado las 8 horas, en horario de 9-6, con una hora de almuerzo»* · *«alguien va a decir cada quincena qué días estuvieron afuera, así como a Rodrigo, siempre y cuando no marquen»*. Las impulsadoras de Multifashion y Rodrigo (13). 🔑 **No nació un mecanismo**: el motivo ya no descuenta, no genera extras y `JustificarForm` (ficha y fila del día) ya tenía «Días» de-hasta. Lo que se agregó es la **nota debajo del motivo** (`notaDelMotivo` → `TEXTO_DIA_AFUERA`, `motivos.ts`): se paga como un día normal de 8 horas (9:00 a 18:00 con una hora de almuerzo) y cuenta solo los días sin marca. 🔴 **El horario NO se guarda**: 9–18 con almuerzo son las 8 horas que el quincenal ya paga cuando el día no se descuenta; y guardado como `hora_desde`/`hora_hasta` sería un PERMISO de horas, el día NO quedaría justificado y pasaría a ser AUSENCIA — 🩸 medido: Rodrigo tiene **dos filas del 14-ago-2026** con «Trabajo de vendedor» de 08:00 a 16:30, cargadas antes de que las horas se cerraran a Constancia, y ese día para el motor es un permiso, no un día afuera. `motivoAdmiteHoras` sigue siendo solo Constancia. 🔴 **Si marcó ese día, manda el reloj** (con marcas, `justificado` es solo un rótulo — conducta de siempre, ahora con candado). ⚠️ Medido 1–15 sep: Rodrigo ya tiene 7 justificaciones día por día (2, 3, 4, 7, 8, 9 y 10 de septiembre) y UNA sola marca (1-sep); con el rango, es una fila. Candados: `dias-afuera-y-compensatorio.test.ts` · `justificar-form-nota-motivo.test.tsx`.
 
 - 🔴 **«COMPENSATORIO» ES EL SEXTO MOTIVO, AL LADO DE INCAPACIDAD, Y NO DESCUENTA (14-sep-2026).** Daniel, textual: *«compensatorio es cuando por ejemplo trabajan un día domingo y se le compensa ese día por uno de la semana»* · *«así como incapacidad, una opción de compensatorio de días que le debemos libres; al poner qué día será compensatorio, no se le descuente»*. `MOTIVO_COMPENSATORIO` en `MOTIVOS_JUSTIFICACION` (`Incapacidad · Compensatorio · Catástrofe · Escolares · Trabajo de vendedor · Constancia`), de día completo, se lee «Día compensatorio (libre que se le debía)» y no como «ausencia». **Sin migración**: la base no tiene CHECK sobre `motivo` (a propósito desde `20260825140000`). Sigue valiendo: *justificar significa que se paga*. Candado en `dias-afuera-y-compensatorio.test.ts`; `planilla-tres-descuentos` (H) y `asistencia-motivo-trabajo-fuera` cambiaron de «cinco» a «seis» con nota fechada. Verificación por mutación de los tres puntos: `scripts/_mutar-candados-dias-afuera-y-extras-sp.sh` (**20 mutaciones, 20 cazadas**, 2 controles).
+
+---
+
+## Marcar desde el teléfono sin señal — lo que está construido y lo que NO se puede probar (19-sep-2026)
+
+Daniel, textual: *«supuestamente si se puede, busca la mejor manera de que se pueda para que ellas confíen»*. Auditado contra producción antes de proponer nada; el hallazgo fue que **ya estaba construido y andando**.
+
+### Lo que hay
+
+- **`src/lib/marcacion/cola-offline.ts`** (IndexedDB) guarda la marca en el teléfono y la manda sola: al volver el internet, al reabrir la app, al volver a la pestaña **y cada 60 segundos** mientras quede algo esperando.
+- **Probado en producción el 15-sep-2026**: Daniel marcó dos veces en modo avión y las dos entraron solas, una a los 3 min y la otra a 1 min 41 s (`sin_senal = true` en las dos filas).
+- El teléfono manda: `eventoId` (uuid suyo, con índice único `(dispositivo, evento_id)` que impide el duplicado), entrada/salida, `sinSenal`, su hora, lat/lng/precisión y la selfie (achicada a 1.000 px, calidad 0,8, ~70-90 KB) al bucket privado `asistencia-marcaciones`, que se barre a los 90 días dentro de `asistencia-vigia`.
+- **Quién marca sale de la SESIÓN, nunca del pedido.** Selfie y ubicación obligatorias; tope de 2 marcas por día, comprobado en el servidor.
+
+### La hora, que es lo que mueve plata
+
+- **Con señal la pone el SERVIDOR** (hora de Panamá); la del teléfono queda de testigo.
+- **Sin señal vale la del teléfono**, con dos frenos: **no más de 10 minutos adelantada** y **no más de 7 días vieja**. Además se guarda `created_at` (cuándo LLEGÓ) y el desfase entre `hora_telefono` y `ocurrio_en` se le avisa a la contadora desde 5 minutos.
+
+### 🔑 Lo que NINGUNA comprobación del servidor puede probar
+
+Hay que decírselo a Daniel con estas palabras: **una marca sin señal es, por construcción, la palabra del teléfono.**
+
+- Que el internet haya estado caído de verdad: `sinSenal` lo manda el propio teléfono.
+- Un **reloj movido para atrás**: poner el teléfono en las 8:00, activar modo avión, marcar y devolver la hora produce una marca **idéntica** a una legítima.
+- La hora real de la foto: la selfie se vuelve a codificar en el teléfono antes de viajar, y eso borra los metadatos de la cámara.
+- Que la ubicación sea real (hay apps de ubicación falsa) ni que la selfie sea de esa persona en ese momento (una foto de una foto pasa).
+
+Todo lo que se agregue **achica** la ventana manipulable; ninguna la cierra. Hoy esa ventana es de 7 días para atrás y 10 minutos para adelante.
+
+### Los dos huecos reales
+
+1. ⚠️ **Con la app CERRADA no sale nada.** El service worker no se tocó (solo cachea `/_next/static` e imágenes) y en iPhone no existe Background Sync: la marca sale la próxima vez que ella abra la app.
+2. ⚠️ **Una marca en cola no está respaldada en ningún lado.** Teléfono perdido, app borrada o teléfono cambiado = marca perdida, **y el servidor nunca se entera de que existió**. `activity_logs` tiene 0 filas de este módulo.
+
+### El uso, medido el 19-sep-2026
+
+Las únicas **4 marcas de teléfono** de toda la historia son las pruebas de Daniel (7.352 del reloj de Boston · 343 del de ACS). De las cuatro con rol `marcacion`: Ana (2) y Cindy (3) tienen 4 marcas cada una en 60 días —un solo día, el 5-sep—, **Yeisibeth (306) tiene cero en toda la historia** y Angel (305) marca por el reloj. Las tres mujeres tienen `trabaja_afuera = true`, así que hoy el sistema les evita la ausencia y **nadie mide su hora**.
+
+🔴 **El problema no es técnico: es que todavía nadie lo usa.** Antes de construirle nada encima, el paso siguiente es que marquen.

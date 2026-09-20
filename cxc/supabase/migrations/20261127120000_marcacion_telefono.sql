@@ -1,5 +1,5 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- MARCACIÓN — el reloj del teléfono (14-sep-2026). ⚠️ SIN APLICAR.
+-- MARCACIÓN — el reloj del teléfono (14-sep-2026). ✅ APLICADA (verificado contra producción el 19-sep-2026: las columnas existen)
 --
 -- Un reloj más, al lado de los físicos de Boston, Fashion Wear, Vistana y
 -- Multifashion: el aparato es el teléfono de quien trabaja afuera (Ana Trejos

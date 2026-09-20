@@ -24,7 +24,7 @@
 --   · DEFAULT false: nadie la tiene al aplicar y NINGÚN neto cambia. Daniel la
 --     prende ficha por ficha (nombró a 2, 3 y 13; Yeisibeth no tiene ficha).
 --
--- Aditiva. Ninguna fila cambia de valor. 🔴 SIN APLICAR al 14-sep-2026: el
+-- Aditiva. Ninguna fila cambia de valor. ✅ APLICADA (verificado contra producción el 19-sep-2026: las columnas existen): el
 -- código lee la columna aparte y, mientras no exista, se comporta como hoy.
 -- ─────────────────────────────────────────────────────────────────────────────
 

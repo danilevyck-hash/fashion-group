@@ -1,6 +1,6 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 -- EL ROL `marcacion`, EL CÓDIGO DE COLABORADOR EN `fg_users`, Y RODRIGO
--- (14-sep-2026). ⚠️ SIN APLICAR: la corre Daniel con `npm run migrar`.
+-- (14-sep-2026). ✅ APLICADA (verificado contra producción el 19-sep-2026: las columnas existen)
 --
 -- Daniel aprobó el reloj del teléfono para cuatro personas que trabajan afuera
 -- y no pasan por ningún reloj físico. Textual: *«ponle marcación al módulo»*,
