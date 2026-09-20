@@ -44,7 +44,13 @@ export interface DocDelPapel {
 export interface FilaDelPapel {
   fecha: string;        // DD-MM-AAAA
   comprobante: string;  // "Factura", "Nota de Débito"…
-  comentario: string;   // Switch no lo manda por el API (ver abajo)
+  /**
+   * 🩸 YA NO SE DIBUJA (20-sep-2026). Fue la tercera columna del papel hasta
+   * que Daniel la bajó a un comentario general al pie: iba vacía en los 3.003
+   * documentos y se llevaba el 20 % del ancho. El campo se conserva —siempre
+   * `""`— para no tocar la forma de la fila; el papel ya no lo lee.
+   */
+  comentario: string;
   numeroInterno: string;
   debito: string;       // "" cuando es cero — Switch deja la celda en 0.00
   credito: string;
@@ -147,12 +153,13 @@ export function capitalizarNombre(nombre: string): string {
  * calcula en vez de leerse del crudo para que el último renglón sea, por
  * construcción, el total del papel.
  *
- * ⚠️ LA COLUMNA «COMENTARIO» VA VACÍA Y NO ES UN OLVIDO: el API de Switch
+ * ⚠️ EL «COMENTARIO» VA VACÍO Y NO ES UN OLVIDO: el API de Switch
  * (`/apicliente/estadocuenta`) NO manda el comentario del documento — se
  * revisaron las 20 llaves que trae cada renglón y ninguna lo tiene. En el papel
  * de Switch solo las notas lo llevan («RET NC 0928»); las facturas van vacías
  * igual. Inventarlo sería escribir en el papel del cliente algo que el sistema
- * no sabe.
+ * no sabe. 🔄 20-sep-2026: por eso mismo dejó de ser una COLUMNA de la tabla y
+ * bajó a un recuadro en blanco al pie de la hoja, que se escribe a mano.
  */
 export function filasDelPapel(docs: DocDelPapel[]): { filas: FilaDelPapel[]; total: number } {
   let corrido = 0;

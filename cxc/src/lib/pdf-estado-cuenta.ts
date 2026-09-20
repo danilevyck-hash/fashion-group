@@ -35,6 +35,7 @@ import {
   MARGEN,
   FOOTER_RESERVA_MM,
   dibujarCabeza,
+  dibujarComentario,
   dibujarFichaCliente,
   dibujarDocumentos,
   dibujarPie,
@@ -80,6 +81,10 @@ function dibujarCliente(doc: jsPDF, data: EstadoCuenta, nombreDeLaPantalla: stri
     y = dibujarPie(doc, docs.y, emp, docs.total);
     // 🔴 Dónde se le paga a ESTA empresa, antes del «RECIBIDO CONFORME».
     y = dibujarComoPagar(doc, y, emp.empresa_key, emp.empresa_nombre);
+    // 🔴 El comentario general (20-sep-2026): el espacio en blanco que reemplazó
+    // a la columna «Comentario». Va pegado a la firma, con la que comparte que
+    // se llena a mano.
+    y = dibujarComentario(doc, y);
     dibujarRecibidoConforme(doc, y);
   });
 

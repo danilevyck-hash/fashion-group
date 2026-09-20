@@ -297,13 +297,22 @@ describe("🔴 el nombre del cliente no vuelve a MAYÚSCULAS", () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 6. LA FORMA: LAS DIEZ COLUMNAS, LA CABEZA Y EL PIE DE SWITCH
+// 6. LA FORMA: LAS NUEVE COLUMNAS, LA CABEZA Y EL PIE DE SWITCH
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("la forma del papel es la de Switch", () => {
-  it("las diez columnas, en el orden de Switch", () => {
+  // 🔄 20-sep-2026 · CAMBIÓ DE DIRECCIÓN, CON NOTA FECHADA. Esta línea exigía
+  // DIEZ columnas con «Comentario» en tercer lugar. Daniel la bajó a un
+  // comentario general al pie de la hoja: *«deja comentario abajo general como
+  // siempre»*. Medido: esa columna se llevaba **37,9 mm — el 20 % del ancho
+  // útil**, por ser la única en `auto`, e iba **vacía en los 3.003 documentos**
+  // (el API de Switch no manda ese campo), mientras «Comprobante» y
+  // «N. Interno» se partían en dos renglones por falta de sitio.
+  // 🔴 LAS OTRAS NUEVE Y SU ORDEN NO SE TOCARON. Detalle y medición:
+  // `cxc-comentario-abajo.test.ts`.
+  it("🔄 las nueve columnas, en el orden de Switch (20-sep-2026)", () => {
     expect([...COLUMNAS]).toEqual([
-      "Fecha", "Comprobante", "Comentario", "N. Interno",
+      "Fecha", "Comprobante", "N. Interno",
       "Débitos", "Créditos", "Saldo", "Vence", "Plazo", "Días",
     ]);
   });
@@ -498,7 +507,7 @@ describe("«Cobrar a los N» usa la MISMA hoja", () => {
     expect(texto).toContain("City Mall Paso Canoa");
     expect(texto).toContain("City Mall David");
     expect(texto).toContain("Total General: 11,159.82");
-    // La forma de Switch también acá: las diez columnas y el RECIBIDO CONFORME.
+    // La forma de Switch también acá: las nueve columnas y el RECIBIDO CONFORME.
     for (const th of COLUMNAS) expect(texto).toContain(th);
     expect(texto).toContain("RECIBIDO CONFORME");
   });

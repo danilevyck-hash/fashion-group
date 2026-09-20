@@ -175,12 +175,18 @@ describe("el PDF del cliente y la pantalla nombran igual al mismo número", () =
   // sistema debe de mandar el estado de cuenta tal cual como sale en Switch…
   // mismos números, mismos nombres, mismo todo!!!!»*. El cliente ya conoce
   // estos, que son los del papel que recibe de nosotros por el otro lado.
-  it("los encabezados del papel son los DIEZ de Switch", async () => {
+  // 🔄 20-sep-2026 — SEGUNDO CAMBIO DE DIRECCIÓN, CON NOTA FECHADA. «Comentario»
+  // salió de la tabla y bajó a un recuadro general al pie de la hoja (Daniel:
+  // *«deja comentario abajo general como siempre»*): se llevaba el 20 % del
+  // ancho y estaba vacía en los 3.003 documentos. Las otras NUEVE, intactas.
+  it("🔄 los encabezados del papel son los NUEVE de Switch (20-sep-2026)", async () => {
     const { doc } = buildEstadoCuentaPDF(ESTADO, "American Classics Store");
     const texto = await textoDelPdf(doc);
-    for (const th of ["Fecha", "Comprobante", "Comentario", "N. Interno", "Débitos", "Créditos", "Saldo", "Vence", "Plazo", "Días"]) {
+    for (const th of ["Fecha", "Comprobante", "N. Interno", "Débitos", "Créditos", "Saldo", "Vence", "Plazo", "Días"]) {
       expect(texto, `se perdió el encabezado "${th}" del papel`).toContain(th);
     }
+    // …y el comentario sigue en el papel, abajo y en blanco.
+    expect(texto, "se perdió el comentario general del pie").toContain("COMENTARIOS");
     // CONTROL al revés: los seis viejos, que solo existían acá, no vuelven.
     expect(texto, "volvió el encabezado propio «Subtotal»").not.toContain("Subtotal");
   });

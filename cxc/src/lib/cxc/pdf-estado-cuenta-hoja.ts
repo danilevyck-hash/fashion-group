@@ -180,10 +180,29 @@ export function dibujarFichaCliente(
 
 // ── 3. La tabla de diez columnas ─────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 NUEVE COLUMNAS: «COMENTARIO» BAJÓ A UN COMENTARIO GENERAL (20-sep-2026).
+//
+// Daniel, textual: *«deja comentario abajo general como siempre»*.
+//
+// 🩸 «Comentario» era la tercera de DIEZ columnas y se llevaba **37,9 mm — el
+// 20 % del ancho útil** (191,9 mm entre los dos márgenes), porque era la única
+// en `auto`. Y va **VACÍA en los 3.003 documentos**: el API de Switch no manda
+// ese campo (se revisaron las 20 llaves de cada renglón). O sea que una quinta
+// parte del papel del cliente estaba en blanco a propósito, y con esos 37,9 mm
+// «Comprobante» y «N. Interno» se partían en dos renglones.
+//
+// Los 37,9 mm se reparten entre esas dos, y el comentario baja al pie de la hoja
+// como un espacio en blanco —con la forma que ya tiene la guía de despacho en
+// «OBSERVACIONES GENERALES DEL ENVÍO»— para escribirlo a mano.
+//
+// ⚠️ LAS OTRAS NUEVE COLUMNAS Y SU ORDEN NO SE TOCAN: siguen siendo las de
+// Switch, y los números que llevan tampoco se recalculan.
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const COLUMNAS = [
   "Fecha",
   "Comprobante",
-  "Comentario",
   "N. Interno",
   "Débitos",
   "Créditos",
@@ -203,7 +222,7 @@ function cuerpoDeLaTabla(filas: FilaDelPapel[]): Array<Array<string | { content:
   const cuerpo: Array<Array<string | { content: string; colSpan: number; styles: Record<string, unknown> }>> = [];
   for (const f of filas) {
     cuerpo.push([
-      f.fecha, f.comprobante, f.comentario, f.numeroInterno,
+      f.fecha, f.comprobante, f.numeroInterno,
       f.debito, f.credito, f.saldo, f.vence, f.plazo, f.dias,
     ]);
     if (f.numeroFiscal) {
@@ -230,17 +249,19 @@ export function dibujarDocumentos(doc: jsPDF, y: number, emp: EstadoEmpresa): { 
     body: cuerpoDeLaTabla(filas),
     styles: { font: "helvetica", fontSize: 6.6, cellPadding: 1.3, textColor: [...NEGRO], overflow: "linebreak" },
     headStyles: { fillColor: [243, 244, 246], textColor: [...GRIS], fontStyle: "bold", fontSize: 6.4 },
+    // Los 37,9 mm de la columna «Comentario» se reparten entre las dos que se
+    // partían en dos renglones: «Comprobante» pasa de 23 a 42 mm y «N. Interno»
+    // se queda con el resto (`auto`, ~42,9 mm sobre los 24 que tenía).
     columnStyles: {
       0: { cellWidth: 17 },
-      1: { cellWidth: 23 },
+      1: { cellWidth: 42 },
       2: { cellWidth: "auto" },
-      3: { cellWidth: 24 },
+      3: { cellWidth: 17, halign: "right" },
       4: { cellWidth: 17, halign: "right" },
-      5: { cellWidth: 17, halign: "right" },
-      6: { cellWidth: 19, halign: "right", fontStyle: "bold" },
-      7: { cellWidth: 17 },
+      5: { cellWidth: 19, halign: "right", fontStyle: "bold" },
+      6: { cellWidth: 17 },
+      7: { cellWidth: 10, halign: "right" },
       8: { cellWidth: 10, halign: "right" },
-      9: { cellWidth: 10, halign: "right" },
     },
   });
 
@@ -322,6 +343,45 @@ export function dibujarComoPagar(doc: jsPDF, y: number, empresaKey: string, empr
     doc.text(linea, MARGEN + 3, ly);
     ly += 4.2;
   });
+
+  return y + alto + 8;
+}
+
+// ── 4 ter. El comentario general ─────────────────────────────────────────────
+
+/** El rótulo del espacio de comentario, al pie de la hoja. */
+export const ROTULO_COMENTARIO = "COMENTARIOS";
+/** Alto del recuadro en blanco, en mm. Dos renglones escritos a mano. */
+const ALTO_COMENTARIO_MM = 14;
+
+/**
+ * 🔴 EL COMENTARIO ES UN ESPACIO EN BLANCO, NO UN DATO (20-sep-2026).
+ *
+ * Baja acá la columna «Comentario» que se llevaba el 20 % del ancho de la tabla
+ * e iba vacía en los 3.003 documentos. **No se inventa contenido**: Switch no
+ * manda ese campo por ningún lado, así que el recuadro sale en blanco y se
+ * escribe a mano — que es exactamente lo que hace la guía de despacho en
+ * «OBSERVACIONES GENERALES DEL ENVÍO», y de ahí sale esta forma.
+ *
+ * Va ANTES del «RECIBIDO CONFORME»: las dos cosas que se llenan a mano, juntas.
+ */
+export function dibujarComentario(doc: jsPDF, y: number): number {
+  const w = doc.internal.pageSize.getWidth();
+  const ancho = w - MARGEN * 2;
+  const alto = ALTO_COMENTARIO_MM;
+  if (y + alto + 6 > doc.internal.pageSize.getHeight() - FOOTER_RESERVA_MM) {
+    doc.addPage();
+    y = 20;
+  }
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...GRIS);
+  doc.text(ROTULO_COMENTARIO, MARGEN, y);
+
+  doc.setDrawColor(209, 213, 219);
+  doc.setLineWidth(0.2);
+  doc.rect(MARGEN, y + 2, ancho, alto);
 
   return y + alto + 8;
 }
