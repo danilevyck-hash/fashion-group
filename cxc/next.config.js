@@ -195,6 +195,41 @@ const nextConfig = {
       // dos formas, la lista y el detalle de una lista (`/packing-lists/<id>`).
       // Temporal (307) como TODOS los de este archivo: un 308 se quema en el
       // caché del navegador.
+      // 🔴 MARKETING: LAS DIRECCIONES DEL MÓDULO DEJAN DE CONTESTAR «Esa marca
+      // no existe en Marketing.» (20-sep-2026).
+      //
+      // 🩸 `/marketing/reportes` TUVO pantalla propia (`src/app/marketing/
+      // reportes/page.tsx`) hasta el 21-abr-2026, cuando el módulo se
+      // reestructuró y Reportes pasó a ser una VISTA de la misma página
+      // (`/marketing?vista=reportes`). La dirección vieja no se retiró: quedó
+      // cayendo en el segmento `[marca]`, que no adivina y contesta «Esa marca
+      // no existe en Marketing.» — un mensaje sobre marcas para alguien que
+      // buscaba un reporte. Lo mismo las otras siete direcciones que ese mismo
+      // commit borró (papelera, cobranzas, facturas, proyectos) y la gemela
+      // `impulsadoras`, que es la otra tarjeta de Herramientas del menú.
+      //
+      // 🔑 Reportes e Impulsadoras EXISTEN: van a su vista, no al Inicio. Las
+      // pantallas que se retiraron van a `/marketing`, y un proyecto va a su
+      // ficha, que sigue abriéndose por `?proyecto=<id>` (el overlay que la
+      // página raíz conserva justo para no dejar ese enlace muerto).
+      //
+      // ⚠️ FUENTES EXACTAS, sin comodines que se coman una marca:
+      // `/marketing/calvin-klein`, `/marketing/mobiliario` y
+      // `/marketing/galeria/<cliente>` siguen intactas. Ninguna marca se llama
+      // reportes, impulsadoras, papelera, cobranzas, facturas ni proyectos
+      // (MARCAS_BLOQUE = TH · CK · KL · RBK · J, más multifashion y sin-marca).
+      // `/marketing/proyectos/nuevo` va ANTES que `:id` para no abrir el
+      // overlay de un proyecto llamado "nuevo".
+      //
+      // Temporales (307) como TODOS los de este archivo.
+      { source: "/marketing/reportes", destination: "/marketing?vista=reportes", permanent: false },
+      { source: "/marketing/impulsadoras", destination: "/marketing?vista=impulsadoras", permanent: false },
+      { source: "/marketing/papelera", destination: "/marketing", permanent: false },
+      { source: "/marketing/cobranzas", destination: "/marketing", permanent: false },
+      { source: "/marketing/cobranzas/:path*", destination: "/marketing", permanent: false },
+      { source: "/marketing/facturas/:id", destination: "/marketing", permanent: false },
+      { source: "/marketing/proyectos/nuevo", destination: "/marketing", permanent: false },
+      { source: "/marketing/proyectos/:id", destination: "/marketing?proyecto=:id", permanent: false },
       { source: "/packing-lists", destination: "/home", permanent: false },
       { source: "/packing-lists/:path*", destination: "/home", permanent: false },
     ];
