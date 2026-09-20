@@ -33,7 +33,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { StrictMode, type ReactNode } from "react";
-import { render, screen, cleanup, act, fireEvent } from "@testing-library/react";
+import { render, screen, cleanup, act, fireEvent, waitFor } from "@testing-library/react";
 
 const push = vi.fn();
 const ROUTER = { push, replace: vi.fn(), refresh: vi.fn(), back: vi.fn(), prefetch: vi.fn() };
@@ -124,23 +124,39 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
  * autoguardado que se reintenta en bucle se vería igual que uno que se dispara
  * una sola vez — y el candado del bucle pasaría en verde sin haber mirado nada.
  * Con tramos cortos React refresca entre medio, como en el navegador.
+ *
+ * ⚠️ ESTA ESPERA SE QUEDA, y no es una espera fija disfrazada: lo que se prueba
+ * es que pasando el tiempo NO se dispara un segundo guardado, y a un no-evento
+ * no se le puede hacer `waitFor`. Lo que sí cambió (19-sep-2026) es que se mide
+ * contra el RELOJ y no contando vueltas: en una máquina cargada cada vuelta
+ * tarda más de 100 ms, así que 32 vueltas podían volverse medio minuto y
+ * reventar el tope del caso. Con el reloj, la espera dura 3,2 s siempre.
  */
 async function esperarElAutoguardado() {
-  for (let i = 0; i < 32; i++) {
+  const hasta = Date.now() + 3200;
+  while (Date.now() < hasta) {
     await act(async () => { await new Promise((r) => setTimeout(r, 100)); });
   }
 }
 
+/** 🔴 SE ESPERA A LA PANTALLA, NO SE CUENTAN MILISEGUNDOS (19-sep-2026).
+ *  Aquí había dos `setTimeout(300)`. Corriendo la suite entera —con la máquina
+ *  más lenta— el primero se quedaba corto y el candado moría buscando el botón
+ *  «Editar» («Unable to find an accessible element with the role "button" and
+ *  name /^Editar$/i»), sin que nada del producto estuviera mal. */
 async function abrirPantallaDeEditar(envoltorio?: (hijo: ReactNode) => ReactNode) {
   const Page = (await import("@/app/guias/[id]/page")).default;
   const arbol = <Page />;
   render(<>{envoltorio ? envoltorio(arbol) : arbol}</>);
-  await act(async () => { await new Promise((r) => setTimeout(r, 300)); });
   // 🔴 Se entra POR EL BOTÓN, como la gente. Si el botón no estuviera, este
   // candado probaría una pantalla que nadie puede abrir.
-  const editar = screen.getByRole("button", { name: /^Editar$/i });
+  const editar = await screen.findByRole("button", { name: /^Editar$/i });
   await act(async () => { fireEvent.click(editar); });
-  await act(async () => { await new Promise((r) => setTimeout(r, 300)); });
+  // El formulario es `dynamic()`: hasta que no resuelve hay esqueleto.
+  await waitFor(() => {
+    expect(screen.getAllByText(/Guardar Cambios/i).length).toBeGreaterThan(0);
+    expect(document.querySelector(".animate-pulse")).toBeNull();
+  });
   // Si la pantalla no cargó, cualquier "0 escrituras" sería verde por nada.
   expect(screen.getAllByText(/Guardar Cambios/i).length).toBeGreaterThan(0);
 }

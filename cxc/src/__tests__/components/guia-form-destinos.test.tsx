@@ -30,7 +30,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { useState } from "react";
-import { render, screen, fireEvent, cleanup, act, within } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, act, within, waitFor } from "@testing-library/react";
 import GuiaForm from "@/app/guias/components/GuiaForm";
 import type { GuiaItem } from "@/app/guias/components/types";
 import { invalidarDirectorioClientes } from "@/lib/hooks/useBusquedaClientes";
@@ -248,7 +248,14 @@ async function elegirCliente(texto: string) {
   const picker = document.getElementById("cliente-a-m") as HTMLInputElement;
   fireEvent.focus(picker);
   fireEvent.change(picker, { target: { value: texto } });
-  await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+  // 🔴 SE ESPERA AL RESULTADO, NO SE CUENTAN MILISEGUNDOS (19-sep-2026): Enter
+  // elige el PRIMERO de la lista, así que con la búsqueda todavía en
+  // «Buscando…» elegiría a otro cliente —o a ninguno— y el candado mediría
+  // cualquier cosa.
+  await waitFor(() => {
+    expect(document.body.textContent).not.toContain("Buscando…");
+    expect(document.body.textContent).toContain(texto);
+  });
   fireEvent.keyDown(picker, { key: "Enter" });
 }
 

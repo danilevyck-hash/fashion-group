@@ -161,7 +161,9 @@ describe("🔴 10 · «Imprimir» IMPRIME, no abre una pestaña", () => {
   it("no imprime una guía sin renglones: sería un papel sin envíos", async () => {
     lista({ guia_items: [] });
     fireEvent.click(screen.getByRole("button", { name: /Imprimir/ }));
-    await new Promise((r) => setTimeout(r, 30));
+    // Se vacía la cola de microtareas —por ahí saldría el papel— en vez de
+    // contar 30 ms: una guía sin renglones no manda nada a imprimir.
+    await act(async () => { await Promise.resolve(); });
     expect(impresas).toHaveLength(0);
   });
 });
@@ -291,8 +293,10 @@ describe("🔴 12 · al guardar una guía nueva, te quedás EN la guía", () => 
     });
     await act(async () => {
       fireEvent.click(screen.getAllByRole("button", { name: /Guardar Guía/i })[0]);
-      await new Promise((r) => setTimeout(r, 200));
     });
+    // 🔴 Se espera a que la pantalla NAVEGUE —que es lo que hace al terminar de
+    // guardar—, no a que pasen 200 ms.
+    await waitFor(() => expect(push).toHaveBeenCalled());
   }
 
   it("🔴 aterriza en la guía recién creada, lista para imprimir", async () => {

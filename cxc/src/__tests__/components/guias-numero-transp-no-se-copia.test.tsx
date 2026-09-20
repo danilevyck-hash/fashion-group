@@ -13,7 +13,7 @@
  * importa: qué encuentra bodega escrito en los campos.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, cleanup, act } from "@testing-library/react";
+import { render, screen, cleanup, act, waitFor } from "@testing-library/react";
 
 const ROUTER = { push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), back: vi.fn(), prefetch: vi.fn() };
 const PARAMS = { id: "guia-808" };
@@ -75,10 +75,15 @@ beforeEach(() => {
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
+/** 🔴 SE ESPERA A LA PANTALLA, NO SE CUENTAN MILISEGUNDOS (19-sep-2026): con
+ *  `setTimeout(300)` la afirmación podía llegar con la guía todavía viajando. */
 async function abrir() {
   const Page = (await import("@/app/guias/[id]/page")).default;
   render(<Page />);
-  await act(async () => { await new Promise((r) => setTimeout(r, 300)); });
+  await waitFor(() => {
+    expect(document.querySelector(".animate-pulse")).toBeNull();
+    expect(document.body.textContent).toContain("Envíos");
+  });
 }
 
 const cajas = () =>

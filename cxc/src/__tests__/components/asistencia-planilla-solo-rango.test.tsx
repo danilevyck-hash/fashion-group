@@ -32,7 +32,7 @@
 // solo cómo se dibuja— así que lo que estos candados protegen (que la persona
 // aparezca en pantalla, y en qué grupo) no cambió: cambió la grafía.
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor, act } from "@testing-library/react";
 
 import { ToastProvider } from "@/components/ToastSystem";
 import { REGLAS_DEFAULT } from "@/lib/asistencia/config";
@@ -403,7 +403,9 @@ describe("🔴 LOS MONTOS A MANO — lo único que la quincena decidía", () => 
     campo.disabled = false;
     fireEvent.change(campo, { target: { value: "99" } });
     fireEvent.blur(campo);
-    await new Promise((r) => setTimeout(r, 30));
+    // Se vacía la cola de microtareas —por ahí saldría el POST— en vez de
+    // contar 30 ms.
+    await act(async () => { await Promise.resolve(); });
     expect(llamadas.some((c) => c.init?.method === "POST")).toBe(false);
   });
 

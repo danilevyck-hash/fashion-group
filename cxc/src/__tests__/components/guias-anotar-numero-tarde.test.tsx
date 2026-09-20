@@ -23,7 +23,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor, act } from "@testing-library/react";
 
 vi.mock("@/lib/hooks/useAuth", () => ({
   useAuth: () => ({ authChecked: true, role: "bodega" }),
@@ -260,7 +260,9 @@ describe("🔴 lo que se corrige se escribe POR COLUMNA — nunca por el PUT", (
     const boton = screen.getAllByRole("button", { name: "Guardar Cambios" })[0] as HTMLButtonElement;
     expect(boton.disabled).toBe(true);
     fireEvent.click(boton);
-    await new Promise((r) => setTimeout(r, 50));
+    // Se vacía la cola de microtareas —por ahí saldría cualquier escritura—
+    // en vez de contar 50 ms: tocar un botón apagado no dispara nada.
+    await act(async () => { await Promise.resolve(); });
     expect(llamadas.filter((l) => l.method !== "GET")).toHaveLength(0);
   });
 
@@ -269,6 +271,10 @@ describe("🔴 lo que se corrige se escribe POR COLUMNA — nunca por el PUT", (
     // celular. Sobre un papel ya firmado sería una escritura que nadie pidió.
     await editar();
     fireEvent.change(campos("facturas")[0], { target: { value: "F-9999" } });
+    // ⚠️ ESTA ESPERA SE QUEDA: lo que se prueba es que pasado el plazo del
+    // autoguardado (1,5 s) NO sale nada, y a un no-evento no se le puede hacer
+    // `waitFor`. El temporizador del producto corre con el reloj de verdad, así
+    // que aquí se deja pasar ese mismo reloj.
     await new Promise((r) => setTimeout(r, 2200));
     expect(llamadas.filter((l) => l.method !== "GET")).toHaveLength(0);
   });
@@ -371,7 +377,9 @@ describe("🔴 mientras la guía viaja se muestra el esqueleto DEL FORMULARIO", 
     vi.stubGlobal("fetch", vi.fn(() => new Promise(() => { /* nunca contesta */ })));
     window.history.replaceState(null, "", "/guias/x?editar=1");
     render(<GuiaPage />);
-    await new Promise((r) => setTimeout(r, 60));
+    // Se espera al esqueleto, no a 60 ms: el `fetch` no contesta nunca, así que
+    // la pantalla se queda ahí y lo que sigue mide un estado quieto.
+    await waitFor(() => expect(document.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0));
     // El esqueleto del formulario no trae el encabezado de la lectura.
     expect(screen.queryByRole("button", { name: /Atrás/ })).toBeNull();
     expect(screen.queryByText("Envíos")).toBeNull();

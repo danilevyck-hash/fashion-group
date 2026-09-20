@@ -33,7 +33,7 @@
 // solo cómo se dibuja— así que lo que estos candados protegen (que la persona
 // aparezca en pantalla, y en qué grupo) no cambió: cambió la grafía.
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, cleanup, waitFor, within } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor, within, act } from "@testing-library/react";
 
 import { ToastProvider } from "@/components/ToastSystem";
 import { REGLAS_DEFAULT } from "@/lib/asistencia/config";
@@ -158,6 +158,17 @@ function generar() {
 
 const cuadroEnPantalla = () => screen.findAllByText(/ALEJANDRA CAMAÑO/i);
 
+/** 🔴 SE ESPERA A LA RESPUESTA, NO SE CUENTAN MILISEGUNDOS (19-sep-2026).
+ *  Para las afirmaciones que dicen «esto NO aparece» hace falta saber que la
+ *  respuesta YA se aplicó — si no, el verde sería por no haber llegado todavía.
+ *  Se espera a que el pedido esté hecho y se vacía la cola de microtareas, que
+ *  es por donde contesta el doble de `fetch`: sin contar ms, y sin depender de
+ *  lo rápida que sea la máquina. */
+async function respuestaAplicada(llamadas: Llamada[], parte: string) {
+  await waitFor(() => expect(llamadas.some((c) => c.url.includes(parte))).toBe(true));
+  await act(async () => { await Promise.resolve(); });
+}
+
 beforeEach(() => {
   vi.unstubAllGlobals();
   // 🔑 Fecha FIJA, como todo el módulo: la pantalla abre en la quincena en
@@ -226,7 +237,9 @@ describe("🔴 el calendario a la vista, y el cuadro solo cuando se pide", () =>
     const llamadas = servir(guionBase());
     montar();
     fireEvent.click(botonQuincena("1 – 15 ago"));
-    await new Promise((r) => setTimeout(r, 20));
+    // Se vacía la cola de microtareas —por ahí saldría el pedido del cuadro—
+    // en vez de contar 20 ms.
+    await act(async () => { await Promise.resolve(); });
     // ⚠️ `planilla?` con el signo: la pantalla SÍ pregunta al montar qué hay
     // cerrado (para recomendar el inicio), y esa URL también empieza con
     // `/api/asistencia/planilla`. Lo que no puede pasar todavía es el CUADRO.
@@ -508,7 +521,9 @@ describe("🔴 DESACTUALIZADA — nada se recalcula por debajo", () => {
 
     // Se guardó…
     await waitFor(() => expect(llamadas.some((c) => c.init?.method === "POST")).toBe(true));
-    await new Promise((r) => setTimeout(r, 30));
+    // Se espera al cartel de «viejo», que es lo que la pantalla hace en lugar
+    // de recargar. Sin esperarlo, lo de abajo mediría una pantalla a medias.
+    await screen.findByText(/Los números que ves son de antes/);
     // …y NO se volvió a pedir el cuadro.
     expect(cuadrosPedidos()).toBe(antes);
     // Se dice, y se ofrece rehacerlo a mano.
@@ -594,16 +609,16 @@ describe("🔴 el inicio sugerido después de cerrar", () => {
   });
 
   it("una REABIERTA no cuenta: no pagó nada, así que no propone nada", async () => {
-    servir(conHistorial([{ ...CERRADA, estado: "reabierta" }]));
+    const llamadas = servir(conHistorial([{ ...CERRADA, estado: "reabierta" }]));
     montar();
-    await new Promise((r) => setTimeout(r, 30));
+    await respuestaAplicada(llamadas, "planilla-guardada");
     expect(screen.queryByText(/última quincena cerrada/)).toBeNull();
   });
 
   it("sin ninguna cerrada, no se sugiere nada (la pantalla queda como hoy)", async () => {
-    servir(conHistorial([]));
+    const llamadas = servir(conHistorial([]));
     montar();
-    await new Promise((r) => setTimeout(r, 30));
+    await respuestaAplicada(llamadas, "planilla-guardada");
     expect(screen.queryByText(/última quincena cerrada/)).toBeNull();
   });
 
@@ -641,7 +656,9 @@ describe("🔴 el inicio sugerido después de cerrar", () => {
     await screen.findByText(/última quincena cerrada/);
     // La persona elige julio a mano, contra la recomendación.
     fireEvent.click(botonQuincena("1 – 15 jul"));
-    await new Promise((r) => setTimeout(r, 40));
+    // La recomendación ya llegó (se esperó su cartel arriba): se espera a que
+    // la pantalla reaccione al toque, no a que pasen 40 ms.
+    await waitFor(() => expect(botonQuincena("1 – 15 jul").getAttribute("aria-pressed")).toBe("true"));
     // La recomendación no vuelve a moverle nada: el botón de julio sigue prendido.
     expect(botonQuincena("1 – 15 jul").getAttribute("aria-pressed")).toBe("true");
     expect(botonQuincena("16 – 30 ago").getAttribute("aria-pressed")).toBe("false");

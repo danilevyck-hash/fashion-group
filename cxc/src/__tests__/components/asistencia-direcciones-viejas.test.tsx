@@ -22,7 +22,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import fs from "fs";
 import path from "path";
-import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { render, screen, cleanup, waitFor, act } from "@testing-library/react";
 
 import { ToastProvider } from "@/components/ToastSystem";
 import {
@@ -194,7 +194,9 @@ describe("C · la URL se corrige sola", () => {
   it("🔴 una pestaña buena NO se reescribe: nadie le cambia el `tab`", async () => {
     montar("tab=planilla");
     await screen.findByRole("heading", { name: "Asistencia" });
-    await new Promise((r) => setTimeout(r, 60));
+    // Se vacía la cola de microtareas —por ahí saldría un `replace` tardío—
+    // en vez de contar 60 ms.
+    await act(async () => { await Promise.resolve(); });
     for (const t of tabsEscritos()) expect(t).toBe("planilla");
     expect(seSacoElTab()).toBe(false);
   });
@@ -202,7 +204,7 @@ describe("C · la URL se corrige sola", () => {
   it("🔴 sin `?tab=` no se escribe ninguna pestaña en la URL", async () => {
     montar("");
     await screen.findByRole("heading", { name: "Asistencia" });
-    await new Promise((r) => setTimeout(r, 60));
+    await act(async () => { await Promise.resolve(); });
     // Ni uno de los `replace` lleva `tab`: la entrada normal al módulo no
     // escribe una pestaña en el historial de nadie.
     expect(tabsEscritos().filter((t) => t !== null)).toEqual([]);

@@ -17,7 +17,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import fs from "fs";
 import path from "path";
-import { render, screen, fireEvent, cleanup, waitFor, within } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor, within, act } from "@testing-library/react";
 
 import { ToastProvider } from "@/components/ToastSystem";
 import { REGLAS_DEFAULT } from "@/lib/asistencia/config";
@@ -262,7 +262,12 @@ describe("C · una línea por empresa, cada una por su puerta", () => {
   it("sin quincena elegida no se pide nada", async () => {
     const llamadas = servir();
     montar({ elegido: false });
-    await new Promise((r) => setTimeout(r, 30));
+    // 🔴 SE ESPERA A QUE LA PANTALLA ARRANQUE, NO A 30 MS: se espera a la
+    // primera lectura (el alcance, que sale siempre) y se vacía la cola de
+    // microtareas —por ahí saldría el pedido del cuadro—. Sin esto, «no se
+    // pidió nada» podía ser verde por no haber empezado todavía.
+    await waitFor(() => expect(llamadas.some((l) => l.url.includes("/api/asistencia/alcance"))).toBe(true));
+    await act(async () => { await Promise.resolve(); });
     expect(llamadas.filter((l) => l.url.includes("/api/asistencia/planilla?"))).toHaveLength(0);
   });
 });

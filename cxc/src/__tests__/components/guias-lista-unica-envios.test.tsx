@@ -239,6 +239,10 @@ describe("🔴 UNA SOLA PUERTA PARA CORREGIR UN RENGLÓN: «Editar»", () => {
     await waitFor(() =>
       expect(document.querySelectorAll('input[id^="facturas-"][id$="-m"]').length).toBe(ITEMS.length),
     );
+    // ⚠️ ESTA ESPERA SE QUEDA: lo que se prueba es que pasado el plazo del
+    // autoguardado (1,5 s) NO sale una escritura, y a un no-evento no se le
+    // puede hacer `waitFor`. El temporizador del producto corre con el reloj de
+    // verdad, así que aquí se deja pasar ese mismo reloj.
     await new Promise((r) => setTimeout(r, 2200));
     for (const l of llamadas) expect(l.method, l.url).toBe("GET");
   });

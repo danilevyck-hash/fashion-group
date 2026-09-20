@@ -387,6 +387,9 @@ describe("el permiso 0001 se pregunta al editar, UNA vez, y no bloquea si falla"
   it("no se pregunta si no hay ningún precio editado (sesión única de Switch)", async () => {
     const llamadas = stubApi();
     await montar();
+    // ⚠️ ESTA ESPERA SE QUEDA: lo que se prueba es que pasado el plazo del
+    // debounce (1 s) NO se pregunta nada, y a un no-evento no se le puede hacer
+    // `waitFor`. El temporizador del producto corre con el reloj de verdad.
     await new Promise((r) => setTimeout(r, 1100));
     expect(consultas(llamadas)).toHaveLength(0);
   });
@@ -430,6 +433,9 @@ describe("el permiso 0001 se pregunta al editar, UNA vez, y no bloquea si falla"
     const btn = await montar();
     const input = document.querySelector('input[type="number"][step="1"][min="0"]') as HTMLInputElement;
     await act(async () => { fireEvent.change(input, { target: { value: "15" } }); });
+    // ⚠️ ESTA ESPERA SE QUEDA: lo que se prueba es que pasado el plazo del
+    // debounce (1 s) NO se pregunta nada, y a un no-evento no se le puede hacer
+    // `waitFor`. El temporizador del producto corre con el reloj de verdad.
     await new Promise((r) => setTimeout(r, 1100));
     expect(screen.queryByText(/no tiene permiso/)).toBeNull();
     expect((btn as HTMLButtonElement).disabled).toBe(false);
