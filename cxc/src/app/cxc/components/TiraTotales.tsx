@@ -22,8 +22,17 @@
 // fuente única de siempre (`lib/cxc-aging.ts`). Se cambió DÓNDE se dice, no
 // cuántos nombres hay.
 //
-// ⚠️ NI UN NÚMERO SE MOVIÓ: los tramos siguen siendo 0-90 / 91-120 / 121+, los
-// conteos se cuentan igual y tocar un chip sigue avisando con su CLAVE.
+// 🔴 LOS TRES CONTEOS SE FUERON (20-sep-2026, pedido de Daniel).
+//
+// 🩸 Debajo de los montos decía **12 · 32 · 76**. Parecían las tres partes de
+// los 100 clientes de la cartera y NO lo eran: **suman 120**, porque **27 están
+// contados dos veces** —un cliente puede tener plata en los tres tramos a la
+// vez— y **7 en ninguno**. Tres números que invitaban a una suma que nunca
+// cuadraba, pegados a los montos que sí hay que leer.
+//
+// ⚠️ Queda «Total · N», que SÍ es el número de clientes de la lista y no es una
+// parte de nada. Y ni un monto se movió: los tramos siguen siendo
+// 0-90 / 91-120 / 121+ y tocar un chip sigue filtrando con su CLAVE.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { ConsolidatedClient } from "@/lib/types";
@@ -74,19 +83,10 @@ export default function TiraTotales({
   onToggleSinPagar,
 }: Props) {
   const totalCxc = roleClients.reduce((s, c) => s + c.total, 0);
-  const valores: Record<AgingKey, { valor: number; n: number }> = {
-    current: {
-      valor: roleClients.reduce((s, c) => s + c.current, 0),
-      n: roleClients.filter((c) => c.overdue === 0 && c.watch === 0).length,
-    },
-    watch: {
-      valor: roleClients.reduce((s, c) => s + c.watch, 0),
-      n: roleClients.filter((c) => c.watch > 0).length,
-    },
-    overdue: {
-      valor: roleClients.reduce((s, c) => s + c.overdue, 0),
-      n: roleClients.filter((c) => c.overdue > 0).length,
-    },
+  const valores: Record<AgingKey, number> = {
+    current: roleClients.reduce((s, c) => s + c.current, 0),
+    watch: roleClients.reduce((s, c) => s + c.watch, 0),
+    overdue: roleClients.reduce((s, c) => s + c.overdue, 0),
   };
 
   const hayAviso = !!sinPagar && sinPagar.cuantos > 0;
@@ -135,8 +135,8 @@ export default function TiraTotales({
             aria-pressed={activo}
             title={
               activo
-                ? `${tramoLabel(k)}: $${fmt(valores[k].valor)} · ${valores[k].n} clientes — clic para quitar el filtro`
-                : `${tramoLabel(k)}: $${fmt(valores[k].valor)} · ${valores[k].n} clientes — clic para ver solo estos`
+                ? `${tramoLabel(k)}: $${fmt(valores[k])} — clic para quitar el filtro`
+                : `${tramoLabel(k)}: $${fmt(valores[k])} — clic para ver solo estos`
             }
             className={`col-span-2 flex flex-col items-end justify-center rounded-md px-2 py-1 min-h-[44px] transition active:scale-[0.97] ${
               activo ? `border-2 ${BORDE_ACTIVO[k]} ${FONDO_ACTIVO[k]}` : "border border-transparent hover:bg-white hover:border-gray-300"
@@ -147,9 +147,8 @@ export default function TiraTotales({
               {AGING[k].colLabel}
             </span>
             <span className={`text-sm font-semibold tabular-nums ${AGING[k].text}`}>
-              ${fmt(valores[k].valor)}
+              ${fmt(valores[k])}
             </span>
-            <span className="text-[11px] text-gray-400 tabular-nums">{valores[k].n}</span>
           </button>
         );
       })}

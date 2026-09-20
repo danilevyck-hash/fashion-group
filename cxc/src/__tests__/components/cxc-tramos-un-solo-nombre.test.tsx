@@ -153,21 +153,21 @@ describe("⚠️ NINGÚN corte ni número se movió", () => {
     cleanup();
   });
 
-  it("los conteos de clientes por tramo no cambiaron", () => {
+  // 🔄 20-sep-2026 · CAMBIÓ DE DIRECCIÓN, CON NOTA FECHADA. Esta línea fijaba
+  // los conteos por tramo en `["0", "2", "2"]`, y su propio comentario ya
+  // señalaba el matiz que los hacía ilegibles: con dos clientes en la cartera,
+  // «Por vencer» decía **0**. Medido en producción salía **12 · 32 · 76** —120
+  // sobre 100 clientes, 27 contados dos veces y 7 en ninguno—. Daniel pidió el
+  // 20-sep-2026 quitar los tres conteos y dejar solo la plata, así que ahora se
+  // exige lo contrario. Detalle: `cxc-tira-solo-plata.test.tsx`.
+  it("🔄 los chips de tramo ya NO cuentan clientes: el último renglón es la plata", () => {
     const { container } = pintarTira();
-    // 4 botones: los tres tramos + Total. Los conteos son los de siempre —
-    // "Por vencer" cuenta los clientes SIN nada vencido, y los dos del fixture
-    // tienen saldo en los tres tramos, así que ahí van 0. Ese matiz es
-    // PRE-EXISTENTE y este cambio no lo toca: sale acá para que se vea que no
-    // se movió.
-    //
-    // 🔄 5-sep-2026: el orden en la tira es tramos primero y Total al final
-    // (parado sobre SU columna), donde antes el Total iba primero.
     const botones = [...container.querySelectorAll("button")];
     expect(botones.length).toBe(4);
-    // El conteo es el ÚLTIMO renglón del chip (rango · monto · conteo).
+    // El ÚLTIMO renglón de cada chip de tramo es el monto, no un conteo.
     expect(botones.slice(0, 3).map(b => b.lastElementChild?.textContent))
-      .toEqual(["0", "2", "2"]);
+      .toEqual(["$300.00", "$150.00", "$150.00"]);
+    // ⚠️ «Total · N» se queda: ése sí es el número de clientes de la lista.
     expect(botones[3].textContent).toContain("Total · 2");
     cleanup();
   });

@@ -114,17 +114,18 @@ export default function PanelCxcMobile({
   // de riesgo/búsqueda aplicado.
   const totals = useMemo(() => {
     let total = 0, current = 0, watch = 0, overdue = 0;
-    let cCount = 0, wCount = 0, oCount = 0;
+    // 🩸 Acá se contaban además los clientes de cada chip (`cCount/wCount/
+    // oCount`). Se fueron el 20-sep-2026 con los de la computadora: eran un
+    // conteo pegado a la plata que invitaba a una suma que no cuadra. Y peor:
+    // se contaban con OTRA regla —excluyente— que los de la tira del
+    // escritorio, o sea dos definiciones del mismo chip en el mismo módulo.
     for (const c of roleClients) {
       total += c.total;
       current += c.current;
       watch += c.watch;
       overdue += c.overdue;
-      if (c.overdue > 0) oCount++;
-      else if (c.watch > 0) wCount++;
-      else if (c.total !== 0) cCount++;
     }
-    return { total, current, watch, overdue, cCount, wCount, oCount };
+    return { total, current, watch, overdue };
   }, [roleClients]);
 
   // 🔴 EL CELULAR NO REORDENA: muestra la lista EN EL ORDEN QUE YA VIENE
@@ -167,14 +168,13 @@ export default function PanelCxcMobile({
         {/* 🔴 LOS TRAMOS ENTRAN DENTRO DE LA TARJETA NEGRA (5-sep-2026): eran
             tres tarjetas grandes de cuatro renglones cada una debajo del total,
             y entre el total y el primer cliente había que pasar por ellas. Ahora
-            son tres chips adentro de la misma tarjeta, con el rango corto, el
-            monto compacto y el conteo. Siguen FILTRANDO al tocarlos, con el
+            son tres chips adentro de la misma tarjeta, con el rango corto y el
+            monto compacto. Siguen FILTRANDO al tocarlos, con el
             mismo toggle de siempre. Y el aviso «sin pagar hace +90 d» es una
             línea más de esa tarjeta, también tocable. */}
         <MobileHero
           total={totals.total}
           totals={{ current: totals.current, watch: totals.watch, overdue: totals.overdue }}
-          counts={{ current: totals.cCount, watch: totals.wCount, overdue: totals.oCount }}
           active={riskFilter}
           onChange={setRiskFilter}
           sinPagar={sinPagar}
@@ -368,7 +368,6 @@ const AGING_THEME = {
 function MobileHero({
   total,
   totals,
-  counts,
   active,
   onChange,
   sinPagar,
@@ -377,17 +376,16 @@ function MobileHero({
 }: {
   total: number;
   totals: { current: number; watch: number; overdue: number };
-  counts: { current: number; watch: number; overdue: number };
   active: RiskFilter;
   onChange: (v: RiskFilter) => void;
   sinPagar: { cuantos: number; monto: number } | null;
   sinPagarActivo: boolean;
   onToggleSinPagar: () => void;
 }) {
-  const items: { key: Exclude<RiskFilter, "all">; value: number; count: number }[] = [
-    { key: "current", value: totals.current, count: counts.current },
-    { key: "watch", value: totals.watch, count: counts.watch },
-    { key: "overdue", value: totals.overdue, count: counts.overdue },
+  const items: { key: Exclude<RiskFilter, "all">; value: number }[] = [
+    { key: "current", value: totals.current },
+    { key: "watch", value: totals.watch },
+    { key: "overdue", value: totals.overdue },
   ];
   const hayAviso = !!sinPagar && sinPagar.cuantos > 0;
 
@@ -401,7 +399,7 @@ function MobileHero({
       </p>
 
       <div className="mt-3 grid grid-cols-3 gap-2">
-        {items.map(({ key, value, count }) => {
+        {items.map(({ key, value }) => {
           const theme = AGING_THEME[key];
           const activo = active === key;
           return (
@@ -423,7 +421,6 @@ function MobileHero({
               <span className="mt-0.5 block font-mono text-sm font-medium tabular-nums text-white">
                 {formatCompactCurrency(value)}
               </span>
-              <span className="block text-[11px] tabular-nums text-gray-400">{count}</span>
             </button>
           );
         })}
