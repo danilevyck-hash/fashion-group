@@ -86,7 +86,11 @@ describe("CXC mobile — el ancho sale de la derecha, no de la letra", () => {
     expect(panelCxc).not.toContain("isFavorite");
     expect(panelCxc).not.toContain("★");
     // CONTROL: la cabecera de la card sigue ahí, con su nombre.
-    expect(cabeceraCxc()).toContain("{client.nombre_normalized}");
+    // 🔄 20-sep-2026: el nombre que se DIBUJA es el que escribe Switch
+    // (`nombreDeCliente`); `nombre_normalized` quedó como llave de PAREO. El
+    // control es el mismo —la cabecera sigue mostrando el nombre—, solo cambia
+    // de dónde sale. Ver `cxc-un-solo-nombre-del-cliente.test.ts`.
+    expect(cabeceraCxc()).toContain("{nombreDeCliente(client)}");
   });
 
   it("🔄 el nombre gana con tracking-tight, y SUBIÓ a 14px (5-sep-2026)", () => {

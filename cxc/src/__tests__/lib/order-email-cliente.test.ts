@@ -163,7 +163,10 @@ describe("paridad de las 3 marcas — banda del correo al cliente", () => {
     const esperado = {
       reebok: ["#1a1a1a", "reebok-logo.png"],
       joybees: ["#1a2656", "joybees-logo-blanco.png"],
-      tommy: ["#152342", "tommy-horizontal-blanco.png"],
+      // 🔄 20-sep-2026: Tommy pasó al wordmark de COLOR sobre placa blanca —el
+      // blanco tenía la banderita invertida, medido píxel a píxel. La banda
+      // navy de la marca NO cambió. Ver `tommy-logo-que-se-lee.test.ts`.
+      tommy: ["#152342", "tommy-horizontal.png", "background:#ffffff"],
     };
     for (const m of marcas) {
       const banda = MARCAS_CONFIG[m].sendOrder.headerClienteHtml("X-1", "hoy");

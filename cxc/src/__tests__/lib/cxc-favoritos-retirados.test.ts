@@ -120,7 +120,10 @@ describe("el orden del CXC ya no pone a nadie arriba", () => {
 describe("CONTROL — el CXC se sigue dibujando", () => {
   it("la fila del escritorio conserva el nombre, los tramos y el total", () => {
     const fila = codigo("app/cxc/components/ClientRow.tsx");
-    expect(fila).toContain("client.nombre_normalized");
+    // 🔄 20-sep-2026: la fila dibuja el nombre que escribe Switch
+    // (`nombreDeCliente`), no la llave de pareo. El control no cambió —la fila
+    // se sigue dibujando entera—, solo de dónde sale el nombre.
+    expect(fila).toContain("nombreDeCliente(client)");
     expect(fila).toContain("fmt(client.total)");
     // 5-sep-2026: el menú "···" de la fila (`actionsMenu`) se retiró con el
     // rediseño — sus cuatro acciones viven en la hoja «Cobrar», que ahora es un
