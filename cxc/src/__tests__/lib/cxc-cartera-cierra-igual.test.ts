@@ -28,6 +28,7 @@
 
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import type { Company } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
@@ -103,7 +104,13 @@ const DOS: Company[] = B2B_COMPANIES.filter((c) => c.key === "vistana" || c.key 
 /** Lo que dice la PANTALLA al pie: la suma de TODAS las filas, a favor incluido. */
 const TOTAL_DE_LA_PANTALLA = CARTERA.reduce((s, c) => s + c.total, 0); // 1700 − 1166,52
 
-const OPTS = { subtitulo: "x", archivo: "x.pdf", hoy: "2026-09-20" };
+// El generador termina en `doc.save(archivo)`, que en Node escribe de verdad:
+// se le manda a la carpeta temporal del sistema para no ensuciar el repo.
+const OPTS = {
+  subtitulo: "x",
+  archivo: path.join(os.tmpdir(), "cxc-cartera-candado.pdf"),
+  hoy: "2026-09-20",
+};
 
 async function textoDelPdf(doc: { output: (t: "arraybuffer") => ArrayBuffer }): Promise<string> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
