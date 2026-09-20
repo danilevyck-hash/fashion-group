@@ -215,7 +215,7 @@ export async function crearEtiqueta(
     return {
       ok: false,
       status: 409,
-      error: `Esa factura ya está etiquetada (${yaEsta.cajas} ${yaEsta.cajas === 1 ? "caja" : "cajas"})`,
+      error: `Esa factura ya está etiquetada (${yaEsta.cajas} ${yaEsta.cajas === 1 ? "bulto" : "bultos"})`,
       yaEtiquetada: yaEsta,
     };
   }

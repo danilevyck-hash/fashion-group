@@ -116,7 +116,7 @@ export default function EtiquetasPendientes({
                   <span className="shrink-0 text-gray-500">{e.empresa}</span>
                   <span className="min-w-0 truncate">{e.cliente_nombre}</span>
                   <span className="ml-auto shrink-0 tabular-nums text-gray-600">
-                    {e.cajas} {e.cajas === 1 ? "caja" : "cajas"}
+                    {e.cajas} {e.cajas === 1 ? "bulto" : "bultos"}
                   </span>
                   {/* 🔴 EL BLOQUEO DICE POR QUÉ: una casilla apagada y muda se
                       lee como una falla del sistema. */}

@@ -264,10 +264,10 @@ export default function EtiquetasView() {
             <table className="w-full text-sm" style={{ minWidth: 660 }}>
               <thead>
                 <tr className="border-b border-gray-200">
-                  {["Factura", "Cliente", "Empresa", "Cajas", "Estado", "Fecha", ""].map((h, i) => (
+                  {["Factura", "Cliente", "Empresa", "Bultos", "Estado", "Fecha", ""].map((h, i) => (
                     <th
                       key={h || `acc-${i}`}
-                      className={`px-3 py-2.5 text-[12px] uppercase tracking-[0.06em] text-gray-400 font-semibold whitespace-nowrap ${h === "Cajas" ? "text-right" : "text-left"}`}
+                      className={`px-3 py-2.5 text-[12px] uppercase tracking-[0.06em] text-gray-400 font-semibold whitespace-nowrap ${h === "Bultos" ? "text-right" : "text-left"}`}
                     >
                       {h}
                     </th>
@@ -710,7 +710,7 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
       {!yaEtiquetada && (
         <>
           <div className="mt-3 rounded-lg border border-gray-200 p-4">
-            <Paso n={2} titulo="Cuántas cajas" ayuda="Lo único que se escribe." />
+            <Paso n={2} titulo="Cuántos bultos" ayuda="Lo único que se escribe." />
             <input
               type="number"
               inputMode="numeric"
@@ -718,7 +718,7 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
               max={MAX_CAJAS}
               value={cajas}
               onChange={(e) => { setCajas(e.target.value); setError(null); }}
-              aria-label="Cuántas cajas"
+              aria-label="Cuántos bultos"
               className="w-[130px] rounded-md border border-gray-200 px-3 text-center font-mono text-xl font-semibold outline-none transition focus:border-black min-h-[44px]"
             />
 
@@ -828,7 +828,7 @@ function ModalReimprimir({
       <div className="relative w-full max-w-sm rounded-t-2xl border border-gray-200 bg-white p-6 sm:rounded-lg">
         <h3 className="mb-1 text-base font-semibold">Reimprimir · {etiqueta.secuencial}</h3>
         <p className="mb-4 text-sm text-gray-600">
-          {etiqueta.cliente_nombre} · {etiqueta.empresa} · {etiqueta.cajas} cajas
+          {etiqueta.cliente_nombre} · {etiqueta.empresa} · {etiqueta.cajas} bultos
         </p>
 
         {aviso && (
@@ -846,11 +846,11 @@ function ModalReimprimir({
         <Opcion
           elegida={modo === "una"}
           onElegir={() => setModo("una")}
-          titulo="Una sola caja"
+          titulo="Un solo bulto"
           detalle="Una hoja, la etiqueta arriba a la izquierda y el resto en blanco."
         >
           <div className="mt-2 flex items-center gap-2.5">
-            <span className="text-sm text-gray-600">Caja</span>
+            <span className="text-sm text-gray-600">Bulto</span>
             <input
               type="number"
               inputMode="numeric"
@@ -858,7 +858,7 @@ function ModalReimprimir({
               max={etiqueta.cajas}
               value={caja}
               onChange={(e) => setCaja(e.target.value)}
-              aria-label="Cuál caja"
+              aria-label="Cuál bulto"
               onClick={(e) => e.stopPropagation()}
               className="w-[86px] rounded-md border border-gray-200 px-2 text-center font-mono outline-none transition focus:border-black min-h-[44px]"
             />
@@ -973,7 +973,7 @@ function ModalCorregir({
           max={MAX_CAJAS}
           value={cajas}
           onChange={(e) => { setCajas(e.target.value); setError(null); }}
-          aria-label="Cuántas cajas"
+          aria-label="Cuántos bultos"
           className="w-[130px] rounded-md border border-gray-200 px-3 text-center font-mono text-xl font-semibold outline-none transition focus:border-black min-h-[44px]"
         />
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}

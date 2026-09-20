@@ -160,14 +160,14 @@ function servirFacturas() {
 describe("🔴 1. en el selector de siempre, la factura de Etiquetas sale marcada y BLOQUEADA", () => {
   beforeEach(servirFacturas);
 
-  it("ya en la guía: casilla marcada, apagada, y dice «Ya viene de Etiquetas · 14 cajas»", async () => {
+  it("ya en la guía: casilla marcada, apagada, y dice «Ya viene de Etiquetas · 14 bultos»", async () => {
     render(<SelectorHarness itemsIniciales={[filaDeEtiquetas()]} />);
     await asentar();
     await elegirCliente(NOVA.nombre);
     const [etiquetada, libre] = casillas();
     expect(etiquetada.checked).toBe(true);
     expect(etiquetada.disabled).toBe(true);
-    expect(screen.getByText("Ya viene de Etiquetas · 14 cajas")).toBeTruthy();
+    expect(screen.getByText("Ya viene de Etiquetas · 14 bultos")).toBeTruthy();
     // La factura SIN etiqueta sigue como siempre: se puede marcar.
     expect(libre.disabled).toBe(false);
   });
@@ -177,7 +177,7 @@ describe("🔴 1. en el selector de siempre, la factura de Etiquetas sale marcad
     await asentar();
     await elegirCliente(NOVA.nombre);
     expect(casillas()[0].disabled).toBe(true);
-    expect(screen.getByText("Se marca en Etiquetas · 14 cajas")).toBeTruthy();
+    expect(screen.getByText("Se marca en Etiquetas · 14 bultos")).toBeTruthy();
   });
 
   it("🔴 y tocarla no hace nada: el freno no es solo el `disabled` que se ve", async () => {
@@ -269,11 +269,11 @@ describe("🔴 3. corregir los bultos lleva directo a reimprimir el juego comple
     fireEvent.click(items[1]); // Corregir bultos
     expect(await screen.findByText("Corregir bultos")).toBeTruthy();
 
-    fireEvent.change(screen.getByLabelText("Cuántas cajas"), { target: { value: "16" } });
+    fireEvent.change(screen.getByLabelText("Cuántos bultos"), { target: { value: "16" } });
     fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
 
     expect(await screen.findByText(/Reimprimir · 11-000002558/)).toBeTruthy();
-    expect(screen.getByText(/Eran 14 cajas y ahora son 16/)).toBeTruthy();
+    expect(screen.getByText(/Eran 14 bultos y ahora son 16/)).toBeTruthy();
     expect(screen.getAllByText(/juego completo/i).length).toBeGreaterThan(0);
     // 🔴 Y abre con el JUEGO COMPLETO elegido, no con «una sola caja».
     const opciones = screen.getAllByRole("radio");

@@ -170,9 +170,9 @@ function texto(v: unknown): string {
  */
 export function validarCajas(v: unknown): Validacion<number> {
   const n = typeof v === "number" ? v : Number(texto(v));
-  if (!Number.isInteger(n)) return { ok: false, error: "Escribe cuántas cajas son" };
-  if (n < MIN_CAJAS) return { ok: false, error: "Tiene que ser al menos una caja" };
-  if (n > MAX_CAJAS) return { ok: false, error: `Son demasiadas cajas (el tope es ${MAX_CAJAS})` };
+  if (!Number.isInteger(n)) return { ok: false, error: "Escribe cuántos bultos son" };
+  if (n < MIN_CAJAS) return { ok: false, error: "Tiene que ser al menos un bulto" };
+  if (n > MAX_CAJAS) return { ok: false, error: `Son demasiados bultos (el tope es ${MAX_CAJAS})` };
   return { ok: true, valor: n };
 }
 
@@ -335,7 +335,7 @@ export function fechaDeLaEtiqueta(fechaCalendario: string): string {
 export function nombreArchivoEtiquetas(e: Pick<EtiquetaFila, "secuencial">, caja?: number | null): string {
   const sec = String(e.secuencial ?? "").replace(/[^\w.-]+/g, "");
   return caja != null
-    ? `Etiquetas-${sec}-caja-${caja}.pdf`
+    ? `Etiquetas-${sec}-bulto-${caja}.pdf`
     : `Etiquetas-${sec}.pdf`;
 }
 
@@ -457,7 +457,7 @@ export function etiquetaDeLaFactura(
 
 /** El texto de la tarjeta anti-duplicado: «Ya etiquetada · 14 cajas». */
 export function textoYaEtiquetada(e: Pick<EtiquetaFila, "cajas">): string {
-  return `Ya etiquetada · ${e.cajas} ${e.cajas === 1 ? "caja" : "cajas"}`;
+  return `Ya etiquetada · ${e.cajas} ${e.cajas === 1 ? "bulto" : "bultos"}`;
 }
 
 // ─── El selector para etiquetar NO ofrece lo ya etiquetado (18-sep-2026) ─────
@@ -517,7 +517,7 @@ export const TEXTO_TRAER_DE_SWITCH = "¿No aparece la factura de hoy? Tráela de
  */
 export function avisoDeReimpresion(antes: number, despues: number): string | null {
   if (antes === despues) return null;
-  return `Eran ${antes} ${antes === 1 ? "caja" : "cajas"} y ahora son ${despues}: las etiquetas impresas quedaron mal. Imprime el juego completo.`;
+  return `Eran ${antes} ${antes === 1 ? "bulto" : "bultos"} y ahora son ${despues}: las etiquetas impresas quedaron mal. Imprime el juego completo.`;
 }
 
 // ─── Marcar etiquetas en Nueva guía: LLENAN los renglones de siempre ─────────

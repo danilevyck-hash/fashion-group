@@ -126,7 +126,7 @@ describe("🔴 1. la factura con etiqueta viva sale BLOQUEADA en el selector de 
     expect(c.modo).toBe("de-etiquetas");
     if (c.modo !== "de-etiquetas") throw new Error("imposible");
     expect(c.marcada).toBe(true);
-    expect(c.motivo).toBe("Ya viene de Etiquetas · 14 cajas");
+    expect(c.motivo).toBe("Ya viene de Etiquetas · 14 bultos");
   });
 
   it("con etiqueta pendiente y la factura TODAVÍA no marcada: igual bloqueada, y dice dónde se marca", () => {
@@ -134,7 +134,7 @@ describe("🔴 1. la factura con etiqueta viva sale BLOQUEADA en el selector de 
     const c = capturaEnElSelector(VACIO, CLIENTE, fac(), [e]);
     if (c.modo !== "de-etiquetas") throw new Error("tendría que estar bloqueada");
     expect(c.marcada).toBe(false);
-    expect(c.motivo).toBe("Se marca en Etiquetas · 14 cajas");
+    expect(c.motivo).toBe("Se marca en Etiquetas · 14 bultos");
   });
 
   it("🔴 la etiqueta que YA salió en una guía NO bloquea: eso es el aviso «ya salió», que avisa y no frena", () => {
@@ -153,9 +153,9 @@ describe("🔴 1. la factura con etiqueta viva sale BLOQUEADA en el selector de 
     expect(capturaEnElSelector(VACIO, CLIENTE, fac({ switch_factura_id: null }), [e]).modo).toBe("libre");
   });
 
-  it("una caja se dice en singular", () => {
-    expect(textoCajas(1)).toBe("1 caja");
-    expect(textoCajas(14)).toBe("14 cajas");
+  it("un bulto se dice en singular", () => {
+    expect(textoCajas(1)).toBe("1 bulto");
+    expect(textoCajas(14)).toBe("14 bultos");
   });
 });
 
@@ -249,8 +249,8 @@ describe("🔴 4. corregir los bultos lleva directo a reimprimir el juego comple
     expect(avisoDeReimpresion(14, 14)).toBeNull();
   });
 
-  it("una caja se dice en singular", () => {
-    expect(avisoDeReimpresion(1, 3)).toContain("Eran 1 caja");
+  it("un bulto se dice en singular", () => {
+    expect(avisoDeReimpresion(1, 3)).toContain("Eran 1 bulto");
   });
 
   it("🔴 la pantalla abre la reimpresión al guardar, con el aviso, y NO solo cierra", () => {

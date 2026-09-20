@@ -2106,10 +2106,18 @@ PDF armado, no los puntos del archivo.
 - 🔴 **«CAJA» pasa a «BULTO»**. Es la palabra del resto de Guías —la lista, el papel de la guía, el
   Excel, «Corregir bultos»— y la que abarca lo que de verdad se despacha: un bulto puede ser una
   caja, un saco o un rollo. El espaciado entre letras (`BULTO_ESPACIADO = 0.5`) no se tocó.
-  ⚠️ **La PANTALLA de Etiquetas sigue diciendo «cajas»** («¿Cuántas cajas?», «Ya etiquetada · 14
-  cajas», el nombre del archivo `Etiquetas-…-caja-7.pdf`) y los identificadores también
-  (`MAX_CAJAS`, `validarCajas`, la columna `cajas`): **cambió la palabra IMPRESA, nada más**.
-  Unificar el resto es una decisión de Daniel que no está tomada.
+  🔴 **Y EL 20-sep-2026 LA PANTALLA LO SIGUIÓ** (Daniel: *«bultos en todos lados»*). Hasta ese día
+  el papel decía BULTO y la pantalla decía cajas: la columna «Cajas», el paso «Cuántas cajas»,
+  «Una sola caja», «Ya etiquetada · 14 cajas», los tres errores de `validarCajas`, el «14 cajas»
+  de `/guias/nueva` y hasta el archivo que se descarga (`Etiquetas-…-caja-7.pdf`, ahora
+  `-bulto-7.pdf`). Eran **17 textos** en seis archivos.
+  ⚠️ **Los IDENTIFICADORES no se tocaron, a propósito**: `cajas` es la COLUMNA de la base
+  (`guias_etiquetas.cajas`) y el campo del payload del POST y el PATCH; renombrarlos pedía una
+  migración y una versión nueva de la ruta para arreglar una palabra de pantalla. El candado
+  `guias-etiquetas-dice-bultos.test.ts` parte cada archivo en TEXTO y CÓDIGO —comentarios
+  blanqueados—, prohíbe la palabra en los literales y en el texto suelto de JSX, y la EXIGE intacta
+  en una lista cerrada de nombres de código: si alguien renombra la columna sin migración, también
+  se pone rojo. Tres mutaciones plantadas, tres cazadas.
 - 🔴 **El número va partido**: el «1» entero y el «de 4» **a la mitad de ese tamaño**, en la misma
   línea y compartiendo la base. Se parten en `partesDelNumeroDeBulto` —en el módulo PURO, no en el
   PDF— para que no haya dos formas de escribirlo, y `numeroDeCaja` se DERIVA de ahí.

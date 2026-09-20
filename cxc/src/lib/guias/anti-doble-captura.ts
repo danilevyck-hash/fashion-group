@@ -51,7 +51,7 @@ import {
 
 /** «14 cajas» / «1 caja» — una sola forma de decirlo en las dos pantallas. */
 export function textoCajas(n: number): string {
-  return `${n} ${n === 1 ? "caja" : "cajas"}`;
+  return `${n} ${n === 1 ? "bulto" : "bultos"}`;
 }
 
 /**

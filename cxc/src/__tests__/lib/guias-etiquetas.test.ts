@@ -392,7 +392,7 @@ describe("🔴 7. hoja carta, cuatro por hoja, líneas de corte", () => {
     const { construirPdfEtiquetas, datosDeEtiqueta } = await import("@/lib/guias/pdf-etiquetas");
     const doc = construirPdfEtiquetas(datosDeEtiqueta(etq()), [7]);
     expect(doc.getNumberOfPages()).toBe(1);
-    expect(nombreArchivoEtiquetas(etq(), 7)).toBe("Etiquetas-11-000002558-caja-7.pdf");
+    expect(nombreArchivoEtiquetas(etq(), 7)).toBe("Etiquetas-11-000002558-bulto-7.pdf");
     expect(nombreArchivoEtiquetas(etq())).toBe("Etiquetas-11-000002558.pdf");
   });
 });
