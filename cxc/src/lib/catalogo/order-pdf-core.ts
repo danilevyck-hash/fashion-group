@@ -16,7 +16,7 @@ import { jsPDF } from "jspdf";
 import { resolverLineas, resumirPedido } from "./lineas-pedido";
 import autoTable from "jspdf-autotable";
 import { REEBOK_LOGO_BASE64, REEBOK_LOGO_WIDTH, REEBOK_LOGO_HEIGHT } from "@/lib/reebok-logo";
-import { TOMMY_LOGO_BLANCO_BASE64, TOMMY_LOGO_WIDTH, TOMMY_LOGO_HEIGHT } from "@/lib/tommy-logo";
+import { TOMMY_LOGO_BASE64, TOMMY_LOGO_WIDTH, TOMMY_LOGO_HEIGHT } from "@/lib/tommy-logo";
 import { CALVIN_LOGO_BLANCO_BASE64, CALVIN_LOGO_WIDTH, CALVIN_LOGO_HEIGHT } from "@/lib/calvin-logo";
 import { JOYBEES_LOGO_BLANCO_BASE64, JOYBEES_LOGO_WIDTH, JOYBEES_LOGO_HEIGHT } from "@/lib/joybees-logo";
 import { sortReebokOrderItems } from "@/lib/reebok-order-sort";
@@ -130,10 +130,28 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
     doc.rect(0, 0, hoja.ancho, 18, "F");
     try { doc.addImage(REEBOK_LOGO_BASE64, "PNG", 14, 5, REEBOK_LOGO_WIDTH, REEBOK_LOGO_HEIGHT); } catch { /* */ }
   } else if (marca === "tommy") {
-    // Banda navy Tommy + wordmark BLANCO (el oscuro no se ve sobre navy).
+    // 🔴 BANDA NAVY + EL WORDMARK DE COLOR SOBRE PLACA BLANCA (20-sep-2026).
+    //
+    // 🩸 Acá iba el wordmark BLANCO, y su banderita salía ROTA. Medido píxel a
+    // píxel contra el arte de color: dentro del recuadro de la bandera
+    // (x 389-466 de 900) el original tiene 4.004 píxeles opacos —1.105 blancos,
+    // el resto navy y rojo— y la versión blanca tiene 3.051, TODOS blancos: las
+    // 953 franjas BLANCAS de la bandera quedaron transparentes y lo navy y lo
+    // rojo quedaron blancos. O sea que sobre la banda navy la bandera se leía al
+    // revés, como un bloque blanco con muescas. La causa está en la regla del
+    // generador (`scripts/_generar-logo-tommy.mjs`: alfa = oscuridad), que borra
+    // justo lo blanco.
+    //
+    // El arreglo NO inventa un archivo: usa el wordmark OFICIAL de color sobre
+    // una placa blanca, que es exactamente lo que ya hace la pantalla del pedido
+    // público (`marcas-ui.tsx` → `pedidoPublico`). Una versión blanca correcta
+    // pide el master REVERSADO de la marca, y ése lo tiene que mandar Daniel.
     doc.setFillColor(21, 35, 66);
     doc.rect(0, 0, hoja.ancho, 18, "F");
-    try { doc.addImage(TOMMY_LOGO_BLANCO_BASE64, "PNG", 14, 9 - TOMMY_LOGO_HEIGHT / 2, TOMMY_LOGO_WIDTH, TOMMY_LOGO_HEIGHT); } catch { /* */ }
+    const placa = { x: 12, y: 9 - TOMMY_LOGO_HEIGHT / 2 - 1.8, w: TOMMY_LOGO_WIDTH + 4, h: TOMMY_LOGO_HEIGHT + 3.6 };
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(placa.x, placa.y, placa.w, placa.h, 1.2, 1.2, "F");
+    try { doc.addImage(TOMMY_LOGO_BASE64, "PNG", 14, 9 - TOMMY_LOGO_HEIGHT / 2, TOMMY_LOGO_WIDTH, TOMMY_LOGO_HEIGHT); } catch { /* */ }
   } else if (marca === "calvin") {
     // Banda negra Calvin + wordmark BLANCO (blanco/negro minimalista).
     doc.setFillColor(10, 10, 10);

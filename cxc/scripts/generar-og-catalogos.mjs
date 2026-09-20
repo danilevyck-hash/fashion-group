@@ -51,8 +51,17 @@ const MARCAS = [
     acento: "#AE0029",
     texto: "#FFFFFF",
     tenue: "rgba(255,255,255,0.55)",
+    // 🔴 EL WORDMARK DE COLOR SOBRE PLACA BLANCA (20-sep-2026). 🩸 Acá iba la
+    // versión BLANCA, y su banderita sale ROTA: medido píxel a píxel, las 953
+    // franjas blancas de la bandera quedaron transparentes y lo navy y lo rojo
+    // quedaron blancos, así que sobre este fondo navy se leía al revés — y
+    // encima quedaba AL LADO de la bandera buena de la izquierda. Es el mismo
+    // arreglo del PDF y de los correos: arte oficial de color sobre placa
+    // blanca. Detalle: `src/__tests__/lib/tommy-logo-que-se-lee.test.ts`.
     logo: `<img src="${dataUri("tommy/tommy-flag.png")}" style="height:110px" />
-           <img src="${dataUri("tommy/tommy-horizontal-blanco.png")}" style="height:46px" />`,
+           <span style="display:inline-flex;align-items:center;background:#fff;border-radius:12px;padding:14px 18px">
+             <img src="${dataUri("tommy/tommy-horizontal.png")}" style="height:46px;display:block" />
+           </span>`,
   },
   {
     marca: "calvin",

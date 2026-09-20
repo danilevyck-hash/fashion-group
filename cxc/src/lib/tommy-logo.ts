@@ -6,6 +6,22 @@
  * color (bandera navy/rojo + letras navy, para fondos claros) y la blanca (para
  * la banda navy #152342 del PDF de pedidos y los correos). Patrón reebok-logo.
  *
+ * 🩸 LA VERSIÓN BLANCA TIENE LA BANDERA ROTA Y YA NO SE DIBUJA EN NINGÚN LADO
+ * (20-sep-2026). Medido píxel a píxel contra el arte de color: dentro del
+ * recuadro de la bandera, el de color tiene 4.004 píxeles opacos (1.105
+ * blancos, el resto navy y rojo) y el blanco tiene 3.051, todos blancos — o sea
+ * que las 953 franjas BLANCAS de la bandera quedaron transparentes y lo navy y
+ * lo rojo quedaron blancos, así que sobre la banda navy se leía al revés. La
+ * causa es la regla del generador (`scripts/_generar-logo-tommy.mjs`: el alfa
+ * sale de la OSCURIDAD del píxel), que con un wordmark monocromo funciona y con
+ * una bandera de tres colores no.
+ *
+ * El PDF, los dos correos y la vista previa del link usan ahora el wordmark de
+ * COLOR sobre PLACA BLANCA, el mismo patrón que ya tenía el pedido público.
+ * 🔴 La constante NO se borra (patrón `mayor_lineas`): el día que Daniel mande
+ * el master REVERSADO de la marca, acá va. Candado:
+ * `src/__tests__/lib/tommy-logo-que-se-lee.test.ts`.
+ *
  * Hasta el 12-ago-2026 salían de rasterizar public/tommy/tommy-horizontal.svg,
  * un trazado que NO era el arte oficial (aspecto 17.64 contra 17.31 y otro
  * interletrado, 6,8% de los píxeles distintos). Ese SVG se eliminó: el master

@@ -155,7 +155,13 @@ describe("logos de marca — PNG hosteados para correos", () => {
     const urls = [...src.matchAll(/<img src="(https:\/\/[^"]+)"/g)].map((m) => m[1]);
     expect(urls).toContain("https://fashiongr.com/reebok/reebok-logo.png");
     expect(urls).toContain("https://fashiongr.com/joybees/joybees-logo-blanco.png");
-    expect(urls).toContain("https://fashiongr.com/tommy/tommy-horizontal-blanco.png");
+    // 🔄 20-sep-2026 · CAMBIÓ DE DIRECCIÓN, CON NOTA FECHADA. El correo de Tommy
+    // apuntaba al wordmark BLANCO y su banderita salía rota: medido píxel a
+    // píxel, las 953 franjas blancas de la bandera quedaron transparentes y lo
+    // navy y lo rojo quedaron blancos, así que sobre la banda navy se leía al
+    // revés. Ahora va el wordmark de COLOR sobre placa blanca, igual que en la
+    // pantalla del pedido público. Detalle: `tommy-logo-que-se-lee.test.ts`.
+    expect(urls).toContain("https://fashiongr.com/tommy/tommy-horizontal.png");
     expect(urls).toContain("https://fashiongr.com/calvin/calvin-wordmark-blanco.png");
     for (const u of urls) {
       expect(u.endsWith(".png") || u.endsWith(".jpg"), `${u} no es un raster`).toBe(true);

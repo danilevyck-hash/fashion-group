@@ -500,13 +500,13 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
       from: "Tommy Hilfiger Panama <pedidos@fashiongr.com>",
       headerHtml: (orderNumber, clientName, fechaLabel) => `
       <div style="background:#152342;color:white;padding:16px 20px;border-radius:8px 8px 0 0">
-        <img src="https://fashiongr.com/tommy/tommy-horizontal-blanco.png" alt="TOMMY HILFIGER" width="160" height="9" style="display:block;margin-bottom:8px" />
+        <span style="display:inline-block;background:#ffffff;border-radius:6px;padding:7px 10px;margin-bottom:8px"><img src="https://fashiongr.com/tommy/tommy-horizontal.png" alt="TOMMY HILFIGER" width="156" height="9" style="display:block" /></span>
         <h3 style="margin:6px 0 0;font-size:16px;font-weight:normal">Pedido ${orderNumber} — ${clientName}</h3>
         <p style="margin:4px 0 0;font-size:12px;opacity:0.7">Fashion Group · Panama — ${fechaLabel}</p>
       </div>`,
       headerClienteHtml: (orderNumber, fechaLabel) => `
       <div style="background:#152342;color:white;padding:16px 20px;border-radius:8px 8px 0 0">
-        <img src="https://fashiongr.com/tommy/tommy-horizontal-blanco.png" alt="TOMMY HILFIGER" width="160" height="9" style="display:block;margin-bottom:8px" />
+        <span style="display:inline-block;background:#ffffff;border-radius:6px;padding:7px 10px;margin-bottom:8px"><img src="https://fashiongr.com/tommy/tommy-horizontal.png" alt="TOMMY HILFIGER" width="156" height="9" style="display:block" /></span>
         <h2 style="margin:6px 0 0;font-size:18px">Gracias por tu pedido</h2>
         <p style="margin:4px 0 0;font-size:12px;opacity:0.7">Pedido ${orderNumber} · ${fechaLabel}</p>
       </div>`,
