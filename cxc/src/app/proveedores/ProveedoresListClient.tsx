@@ -8,7 +8,8 @@ import { SkeletonTable, EmptyState, ScrollableTable, PullToRefresh } from "@/com
 import { empresasConCxp } from "@/lib/switch-api/empresas";
 import { EMPRESA_KEY_TO_NAME, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { fmt } from "@/lib/format";
-import { AGING, type AgingKey } from "@/lib/cxc-aging";
+import { AGING } from "@/lib/cxc-aging";
+import { tonoDeMonto, textoDeMonto } from "@/lib/proveedores/tono";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { ROLES_SYNC_PROVEEDORES } from "@/components/shared/syncNowOpciones";
@@ -125,9 +126,9 @@ function ProveedoresList() {
       className="border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer"
     >
       <td className="py-2 px-1.5 xl:px-3 font-medium">{it.nombre}</td>
-      <AgingCell value={it.aging_current} aging="current" />
-      <AgingCell value={it.aging_watch} aging="watch" />
-      <AgingCell value={it.aging_overdue} aging="overdue" />
+      <AgingCell value={it.aging_current} />
+      <AgingCell value={it.aging_watch} />
+      <AgingCell value={it.aging_overdue} viejo />
       <SaldoCell value={it.saldo_total} />
       <td className="py-2 px-1.5 xl:px-3 text-right tabular-nums text-gray-500">
         {it.ultimo_pago_dias != null ? `hace ${it.ultimo_pago_dias}d` : <span className="text-gray-300">—</span>}
@@ -160,9 +161,9 @@ function ProveedoresList() {
         ].filter(Boolean).join(" — ")}
       </div>
       {(it.aging_watch !== 0 || it.aging_overdue !== 0) && (
-        <div className="mt-0.5 flex gap-3 text-xs tabular-nums">
-          {it.aging_watch !== 0 && <span className={AGING.watch.text}>{AGING.watch.colLabel} ${fmt(it.aging_watch)}</span>}
-          {it.aging_overdue !== 0 && <span className={AGING.overdue.text}>{AGING.overdue.colLabel} ${fmt(it.aging_overdue)}</span>}
+        <div className="mt-0.5 flex gap-3 text-xs tabular-nums text-gray-500">
+          {it.aging_watch !== 0 && <span>{AGING.watch.colLabel} {textoDeMonto(it.aging_watch, fmt)}</span>}
+          {it.aging_overdue !== 0 && <span className="font-medium">{AGING.overdue.colLabel} {textoDeMonto(it.aging_overdue, fmt)}</span>}
         </div>
       )}
     </li>
@@ -310,13 +311,16 @@ function ProveedoresList() {
 }
 
 
-// Tramo de aging con el color del vocabulario CXC; cero en gris claro,
-// negativo (crédito) en azul.
-function AgingCell({ value, aging }: { value: number; aging: AgingKey }) {
-  const tone = value === 0 ? "text-gray-300" : value < 0 ? "text-blue-600" : AGING[aging].text;
+// 🔴 UN SOLO TONO, nunca rojo ni ámbar: en CxP el dato de Switch es la EDAD del
+// documento, no días de mora, así que el color no puede decir «vencido». El
+// porqué completo, en `lib/proveedores/tono.ts`. El peso lo da la negrita del
+// tramo más viejo, no el color.
+function AgingCell({ value, viejo = false }: { value: number; viejo?: boolean }) {
   return (
-    <td className={`py-2 px-1.5 xl:px-3 text-right tabular-nums ${tone}`}>
-      {value === 0 ? "—" : value < 0 ? `-$${fmt(Math.abs(value))}` : `$${fmt(value)}`}
+    <td
+      className={`py-2 px-1.5 xl:px-3 text-right tabular-nums ${tonoDeMonto(value)} ${viejo && value !== 0 ? "font-medium" : ""}`}
+    >
+      {textoDeMonto(value, fmt)}
     </td>
   );
 }

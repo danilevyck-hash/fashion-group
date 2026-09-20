@@ -8,8 +8,7 @@ import { EmptyState } from "@/components/ui";
 import { fmt, fmtDate } from "@/lib/format";
 import { telHref, mailtoHref } from "@/lib/contact-links";
 import { getCompanyDisplay } from "@/lib/companies";
-import { AGING } from "@/lib/cxc-aging";
-import { agingKeyForBucket } from "@/lib/proveedores-aging";
+import { tonoDeMonto, textoDeMonto } from "@/lib/proveedores/tono";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { ROLES_SYNC_PROVEEDORES } from "@/components/shared/syncNowOpciones";
 import { empresasConCxp } from "@/lib/switch-api/empresas";
@@ -146,13 +145,14 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
               <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
                 {data.total_grupo.aging.map((b) => {
                   const v = b.saldo;
-                  // Mismo vocabulario de color que CXC (0-90 por vencer / 91-120 / 121+).
-                  const tone = v === 0 ? "text-gray-300" : AGING[agingKeyForBucket(b.title)].text;
+                  // 🔴 UN SOLO TONO, nunca rojo ni ámbar: acá el dato es la EDAD
+                  // del documento, no días de mora. Ver `lib/proveedores/tono.ts`.
+                  const tone = tonoDeMonto(v);
                   return (
                     <div key={b.title} className="text-center">
                       <div className="text-xs text-gray-400">{b.title}</div>
-                      <div className={`text-xs tabular-nums mt-0.5 ${tone}`}>
-                        {v < 0 ? `-$${fmt(Math.abs(v))}` : v === 0 ? "—" : `$${fmt(v)}`}
+                      <div className={`text-xs tabular-nums mt-0.5 ${tone} ${b.title === "Mas de 365" && v !== 0 ? "font-medium" : ""}`}>
+                        {textoDeMonto(v, fmt)}
                       </div>
                     </div>
                   );
