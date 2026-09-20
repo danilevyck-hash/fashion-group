@@ -11,7 +11,7 @@ import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { useBackdropDismiss } from "@/lib/hooks/useModalDismiss";
 import { centavos } from "@/lib/caja/dinero";
 import { buscarGastoRepetido, mensajeGastoRepetido, type GastoComparable } from "@/lib/caja/gasto-repetido";
-import { mensajeFechaFueraDelPeriodo } from "@/lib/caja/fecha-en-periodo";
+import { avisoDeFechaPideVentana, mensajeFechaFueraDelPeriodo } from "@/lib/caja/fecha-en-periodo";
 
 /**
  * 🔴 «Alimentación» viene puesta. Es el 61% de los recibos (47 de 77 vivos), y
@@ -106,6 +106,17 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
     // corregirla en cada gasto.
   }
 
+  /**
+   * 🔴 EL RECIBO VIEJO SE DICE EN UNA LÍNEA GRIS, DEBAJO DE LA FECHA
+   * (20-sep-2026). 🩸 La ventana saltaba en 25 de los 26 recibos del período
+   * abierto —36 de 77 en toda la historia— y siempre se contestaba igual,
+   * porque los recibos se cargan de golpe al cerrar. Sigue diciéndose; deja de
+   * pedir un clic.
+   */
+  const notaFecha = avisoDeFechaPideVentana(gFecha, periodo)
+    ? null
+    : mensajeFechaFueraDelPeriodo(gFecha, periodo);
+
   /** Lo que hay que decirle a Angela antes de guardar. Nunca frena: solo dice. */
   function avisosDeEsteGasto(): string[] {
     const mensajes: string[] = [];
@@ -114,8 +125,11 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
       periodo.gastos || [],
     );
     if (repetido) mensajes.push(mensajeGastoRepetido(repetido));
-    const fuera = mensajeFechaFueraDelPeriodo(gFecha, periodo);
-    if (fuera) mensajes.push(fuera);
+    // 🔴 A la VENTANA solo llega la fecha POSTERIOR al cierre, que sí es rara.
+    if (avisoDeFechaPideVentana(gFecha, periodo)) {
+      const fuera = mensajeFechaFueraDelPeriodo(gFecha, periodo);
+      if (fuera) mensajes.push(fuera);
+    }
     return mensajes;
   }
 
@@ -290,6 +304,7 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
           setShowManageCat={setShowManageCat}
           setNewCatName={setNewCatName}
           zonaFotos={<ZonaFotos pendientes={fotos} onPendientes={setFotos} />}
+          notaFecha={notaFecha}
         />
       </div>
 

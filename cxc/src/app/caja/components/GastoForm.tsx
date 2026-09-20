@@ -63,6 +63,14 @@ interface Props {
   setNewCatName: (v: string) => void;
   /** La foto del recibo: opcional, se arrastra o se toca. Lo pone el llamador. */
   zonaFotos?: ReactNode;
+  /**
+   * 🔴 EL RECIBO VIEJO SE DICE EN UNA LÍNEA, NO EN UNA VENTANA (20-sep-2026).
+   * 🩸 El aviso de «este recibo es de antes de que abriera el período» saltaba
+   * en 25 de los 26 recibos del período abierto y siempre se contestaba igual:
+   * los recibos se cargan de golpe al cerrar. Ahora va acá, debajo del campo de
+   * fecha, en gris. La VENTANA queda solo para una fecha posterior al cierre.
+   */
+  notaFecha?: string | null;
 }
 
 /* ---------- Layout primitives ---------- */
@@ -355,6 +363,7 @@ export default function GastoForm({
   setShowManageCat,
   setNewCatName,
   zonaFotos,
+  notaFecha,
 }: Props) {
   const {
     gFecha, gDescripcion, gProveedor, gNroFactura,
@@ -400,7 +409,7 @@ export default function GastoForm({
           }}
           className="caja-grid-comprobante"
         >
-          <Field label="Fecha" required>
+          <Field label="Fecha" required hint={notaFecha || undefined}>
             <TextInput type="date" value={gFecha} onChange={setGFecha} ariaLabel="Fecha" />
           </Field>
           <Field label="Descripción" required>

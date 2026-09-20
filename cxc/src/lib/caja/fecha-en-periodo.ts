@@ -49,6 +49,28 @@ export function fechaFueraDelPeriodo(
 }
 
 /**
+ * 🔴 EL RECIBO VIEJO NO PIDE UN CLIC (20-sep-2026).
+ *
+ * 🩸 Medido: el aviso de fecha saltaba en 25 de los 26 recibos del período
+ * abierto (36 de 77 en toda la historia) y SIEMPRE se contestaba igual, porque
+ * los recibos se cargan de golpe al cerrar. Una ventana que se contesta siempre
+ * que sí no es un aviso: es un trámite.
+ *
+ * Por eso el caso normal —fecha ANTERIOR a la apertura— pasa a ser una línea
+ * gris debajo del campo de fecha: se sigue diciendo, sin ventana ni clic. La
+ * VENTANA queda solo para una fecha POSTERIOR al cierre, que sí es rara.
+ *
+ * ⚠️ El freno de fecha futura vive en el servidor y no se toca: eso no avisa,
+ * rechaza.
+ */
+export function avisoDeFechaPideVentana(
+  fecha: string | null | undefined,
+  periodo: PeriodoConFechas,
+): boolean {
+  return fechaFueraDelPeriodo(fecha, periodo) === "despues";
+}
+
+/**
  * El aviso tal como se lee en pantalla, o `null` cuando la fecha está adentro.
  * Dice el hecho y nada más — la decisión es de quien está cargando.
  */

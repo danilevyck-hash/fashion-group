@@ -122,29 +122,36 @@ describe("🔴 1. AVISA, NUNCA BLOQUEA", () => {
     expect(posts[0].nro_factura).toBe("196854200");
   });
 
-  it("un recibo anterior a la apertura del período avisa, con «Guardar igual»", async () => {
+  // ⚠️ CAMBIÓ DE DIRECCIÓN EL 20-sep-2026. Hasta hoy acá vivían dos casos: «un
+  // recibo anterior a la apertura avisa, con Guardar igual» y su «Cancelar NO
+  // guarda». 🩸 Medido: esa ventana saltaba en 25 de los 26 recibos del período
+  // abierto y siempre se contestaba igual, porque los recibos se cargan de
+  // golpe al cerrar. Ahora el recibo VIEJO se dice en una línea gris bajo la
+  // fecha y guarda derecho; la ventana se quedó para la fecha POSTERIOR al
+  // cierre. El caso vive completo en `caja-fecha-sin-ventana.test.tsx`.
+  it("⚠️ el recibo anterior a la apertura YA NO abre ventana: se dice y guarda derecho", async () => {
     montarDrawer();
     await llenarLimpio();
     fireEvent.change(screen.getByLabelText("Fecha"), { target: { value: "2026-06-23" } });
 
     fireEvent.click(screen.getByRole("button", { name: "Guardar gasto" }));
-    await screen.findByText(/antes de que abriera el período Nº 3/);
-    expect(posts).toHaveLength(0);
-
-    fireEvent.click(screen.getByRole("button", { name: "Guardar igual" }));
     await waitFor(() => expect(posts).toHaveLength(1));
     expect(posts[0].fecha).toBe("2026-06-23");
+    expect(screen.queryByRole("button", { name: "Guardar igual" })).toBeNull();
   });
 
-  it("«Cancelar» NO guarda", async () => {
+  it("«Cancelar» NO guarda (con el aviso que SÍ quedó: el recibo repetido)", async () => {
     montarDrawer();
     await llenarLimpio();
-    fireEvent.change(screen.getByLabelText("Fecha"), { target: { value: "2026-06-23" } });
+    fireEvent.change(screen.getByLabelText("Proveedor"), { target: { value: "Super 99" } });
+    fireEvent.change(screen.getByLabelText("Nº de factura"), { target: { value: "196854200" } });
+    fireEvent.change(screen.getByLabelText("Fecha"), { target: { value: "2026-09-03" } });
+    fireEvent.change(screen.getByLabelText("Subtotal"), { target: { value: "10.59" } });
     fireEvent.click(screen.getByRole("button", { name: "Guardar gasto" }));
-    await screen.findByText(/antes de que abriera/);
+    await screen.findByText(/Ya hay un gasto igual/);
 
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
-    await waitFor(() => expect(screen.queryByText(/antes de que abriera/)).toBeNull());
+    await waitFor(() => expect(screen.queryByText(/Ya hay un gasto igual/)).toBeNull());
     expect(posts).toHaveLength(0);
   });
 
