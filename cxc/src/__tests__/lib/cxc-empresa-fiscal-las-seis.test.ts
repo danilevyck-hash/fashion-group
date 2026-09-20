@@ -10,7 +10,9 @@
  *
  * Dos cosas se apartan de lo que dice Switch, por decisión suya:
  *
- *   · **El teléfono va VACÍO en las seis** — Switch tampoco lo trae.
+ *   · **El teléfono** iba VACÍO en las seis hasta el 20-sep-2026 (Switch tampoco
+ *     lo trae); ese día Daniel dictó uno solo para todas, `212-0790`, junto con
+ *     las cuentas de banco de «Dónde pagar» (ver `cxc-donde-pagar.test.ts`).
  *   · **El correo de las SEIS es `info@fashiongr.com`**. Textual: *«los correos
  *     de todos debe de ser info@fashiongr.com»*. Los papeles de Switch traen
  *     `vistanaa@cwpanama.net`, `alberto@cboston.net`,
@@ -31,6 +33,7 @@ import path from "path";
 import {
   CORREO_DEL_GRUPO,
   EMPRESA_FISCAL,
+  TELEFONO_DE_TODAS,
   fichaFiscal,
 } from "@/lib/cxc/empresa-fiscal";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
@@ -102,7 +105,7 @@ describe("🔴 1. las SEIS empresas del grupo tienen su ficha", () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 2 · EL CORREO ES UNO SOLO, Y EL TELÉFONO VA VACÍO
+// 2 · EL CORREO ES UNO SOLO, Y EL TELÉFONO TAMBIÉN
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("🔴 2. el correo de las seis es info@fashiongr.com", () => {
@@ -138,10 +141,21 @@ describe("🔴 2. el correo de las seis es info@fashiongr.com", () => {
     }
   });
 
-  it("🔴 el teléfono va VACÍO en las seis (decisión de Daniel)", () => {
+  // 🔄 CAMBIÓ DE DIRECCIÓN, CON NOTA (20-sep-2026). Acá se exigía que el
+  // teléfono fuera VACÍO en las seis, porque Switch no lo trae y Daniel no lo
+  // había dictado. Ese día dictó uno solo para todas —`212-0790`— junto con las
+  // cuentas de banco, así que la línea `TEL:` del encabezado ya sale con número.
+  // 🔑 LA REGLA QUE ESTE CANDADO PROTEGE NO CAMBIÓ: el teléfono se escribe UNA
+  // sola vez y es el MISMO en todas; lo que cambió es el valor que Daniel dictó.
+  // ⚠️ Pendiente suyo: lo dijo «para todas» ANTES de dar la cuenta de Boston.
+  it("🔴 el teléfono es el MISMO en las seis, y se escribe una sola vez", () => {
     for (const key of B2B_EMPRESA_KEYS) {
-      expect(fichaFiscal(key, "X").telefono, key).toBe("");
+      expect(fichaFiscal(key, "X").telefono, key).toBe(TELEFONO_DE_TODAS);
     }
+    const telefonos = new Set(B2B_EMPRESA_KEYS.map((k) => fichaFiscal(k, "X").telefono));
+    expect(telefonos.size, "alguna empresa quedó con otro teléfono").toBe(1);
+    const codigo = fuente.replace(/\/\/[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
+    expect((codigo.match(/212-0790/g) ?? []).length, "el teléfono está escrito más de una vez").toBe(1);
   });
 });
 
@@ -210,7 +224,9 @@ describe("🔴 4. la cabeza del papel de Confecciones Boston", () => {
     const f = fichaFiscal(BOSTON, "NO DEBERÍA VERSE");
     expect(f.legal).toBe("CONFECCIONES BOSTON S.A");
     expect(f.identificacion).toBe("655-544-133465");
-    expect(f.telefono).toBe(""); // ⚠️ Switch tampoco lo trae
+    // 🔄 20-sep-2026: Switch no lo trae, pero Daniel dictó el mismo de todas.
+    // ⚠️ Lo dijo ANTES de dar la cuenta de Boston: está pendiente de confirmar.
+    expect(f.telefono).toBe(TELEFONO_DE_TODAS);
     expect(f.correo).toBe("ventas@cboston.net");
   });
 

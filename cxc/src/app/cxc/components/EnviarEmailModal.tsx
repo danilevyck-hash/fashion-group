@@ -21,6 +21,9 @@ interface PreviewData {
   cuerpo: string;
   firma: string;
   resumenHtml: string;
+  /** Dónde pagar, con las cuentas de todas las empresas que van en el correo.
+   *  Lo arma el SERVIDOR: el preview es el mismo HTML que sale por Resend. */
+  cuentasHtml: string;
   empresasNombres: string[];
   sharedCount: number;
   mes: string;
@@ -119,7 +122,12 @@ export default function EnviarEmailModal({ client, onClose, onSent }: Props) {
   if (!open) return null;
 
   const previewHtml = preview
-    ? composeEmailHtml({ cuerpo, resumenHtml: preview.resumenHtml, firma: preview.firma })
+    ? composeEmailHtml({
+        cuerpo,
+        resumenHtml: preview.resumenHtml,
+        firma: preview.firma,
+        cuentasHtml: preview.cuentasHtml,
+      })
     : "";
 
   return (

@@ -48,7 +48,7 @@ import {
   mesLabel,
   resumenBoston,
 } from "@/lib/cxc/boston-correo";
-import { sanitizeFilenamePart } from "@/lib/cxc/estado-cuenta-email";
+import { buildCuentasHtml, sanitizeFilenamePart } from "@/lib/cxc/estado-cuenta-email";
 import { diasDesdeEnvio, esCanalEnvio, textoUltimoEnvio, VENTANA_MARCA_DIAS } from "@/lib/cxc/envios-registro";
 import { buildEstadoCuentaPDF } from "@/lib/pdf-estado-cuenta";
 import type { EstadoCuenta } from "@/lib/cxc/estado-cuenta-tipos";
@@ -209,6 +209,11 @@ export async function POST(req: NextRequest) {
     cuerpo,
     resumenHtml: resumenBoston(empresa.documentos, nombre),
     firma: firmaBoston(remitente?.nombreCompleto ?? ""),
+    // 🔴 SU cuenta, preguntada por SU `empresa_key` — la del papel que va
+    // adjunto. La del grupo no tiene por dónde entrar acá.
+    cuentasHtml: buildCuentasHtml([
+      { empresa_key: empresa.empresa_key, empresa_nombre: empresa.empresa_nombre },
+    ]),
   });
 
   // 🔴 UN SOLO PDF: Boston es UNA compañía, así que no hay desglose por empresa.

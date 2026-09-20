@@ -31,7 +31,7 @@ import type jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { casaDeEmpresa, type CasaDelPapel } from "@/lib/cxc/casa-del-papel";
 import { AGING_ORDER, tramoRango } from "@/lib/cxc-aging";
-import { fichaFiscal } from "@/lib/cxc/empresa-fiscal";
+import { comoPagar, fichaFiscal, lineasDePago } from "@/lib/cxc/empresa-fiscal";
 import type { EstadoEmpresa, FichaCliente } from "@/lib/cxc/estado-cuenta-tipos";
 import {
   filasDelPapel,
@@ -257,6 +257,49 @@ export function dibujarPie(doc: jsPDF, y: number, emp: EstadoEmpresa, total: num
   doc.setTextColor(...NEGRO);
   doc.text(`Total General: ${monto(total)}`, w - MARGEN, y, { align: "right" });
   return y + 12;
+}
+
+// ── 4 bis. Dónde pagar ───────────────────────────────────────────────────────
+
+/**
+ * 🔴 EL PAPEL DICE DÓNDE SE PAGA (20-sep-2026). Hasta hoy le decía al cliente
+ * cuánto debe y ningún lugar donde depositarlo.
+ *
+ * 🔴 LA CUENTA ES LA DE LA EMPRESA DE ESTA HOJA, no una sola del grupo — Daniel
+ * lo eligió así—, y se pregunta por `empresa_key`, el mismo dato del que salen
+ * el logo, la firma y la cabeza fiscal. Por eso el papel de Confecciones Boston
+ * lleva la cuenta de Boston sin que nadie lo pida aparte.
+ *
+ * Va ANTES del «RECIBIDO CONFORME», que no se movió. **Falla ABIERTA**: una
+ * empresa sin cuenta cargada deja la hoja exactamente como estaba.
+ */
+export function dibujarComoPagar(doc: jsPDF, y: number, empresaKey: string, empresaNombre: string): number {
+  const c = comoPagar(empresaKey, empresaNombre);
+  if (!c) return y;
+  const lineas = lineasDePago(c);
+
+  const ANCHO = 104;
+  const alto = 5 + lineas.length * 4.2;
+  if (y + alto + 4 > doc.internal.pageSize.getHeight() - FOOTER_RESERVA_MM) {
+    doc.addPage();
+    y = 20;
+  }
+
+  doc.setDrawColor(209, 213, 219);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(MARGEN, y, ANCHO, alto, 1.2, 1.2);
+
+  let ly = y + 4.6;
+  lineas.forEach((linea, i) => {
+    doc.setFont("helvetica", i === 0 ? "bold" : "normal");
+    doc.setFontSize(7.4);
+    const [r, g, b] = i === 0 ? NEGRO : GRIS;
+    doc.setTextColor(r, g, b);
+    doc.text(linea, MARGEN + 3, ly);
+    ly += 4.2;
+  });
+
+  return y + alto + 8;
 }
 
 /** La línea de firma del papel de Switch. */

@@ -490,7 +490,11 @@ describe("J. ACS (Multifashion) — la CUARTA empresa", () => {
     const { EMPRESA_FISCAL, CORREO_DEL_GRUPO } = await import("@/lib/cxc/empresa-fiscal");
     expect(EMPRESA_FISCAL.american_classic.correo).toBe("");
     expect(EMPRESA_FISCAL.american_classic.correo).not.toBe(CORREO_DEL_GRUPO);
-    expect(EMPRESA_FISCAL.american_classic.telefono).toBe("");
+    // 🔄 20-sep-2026: el TELÉFONO sí lo dictó Daniel, para todas, junto con las
+    // cuentas de banco de «Dónde pagar». El correo sigue vacío — ese no lo dijo.
+    // ⚠️ El comprobante lee solo el nombre legal y la identificación: este
+    // número no aparece en el papel de la planilla.
+    expect(EMPRESA_FISCAL.american_classic.telefono).toBe("212-0790");
   });
 
   // ⚠️ Y una empresa SIN registro sigue sin inventarse nada.

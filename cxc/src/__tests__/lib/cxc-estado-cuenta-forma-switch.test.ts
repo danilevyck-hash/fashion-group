@@ -398,7 +398,11 @@ describe("la forma del papel es la de Switch", () => {
     expect(acs.legal).toBe("MULTI FASHION HOLDING CORP.");
     expect(acs.identificacion).toBe("155638923-2-2016");
     expect(acs.correo).toBe("");
-    expect(acs.telefono).toBe("");
+    // 🔄 20-sep-2026: el TELÉFONO sí lo dictó Daniel, y para todas («212-0790»),
+    // junto con las cuentas de banco. El correo sigue vacío: ese no lo dijo.
+    // ⚠️ El comprobante de ACS solo lee `legal` e `identificacion`, así que este
+    // número no sale hoy en ninguna pantalla suya.
+    expect(acs.telefono).toBe("212-0790");
 
     // Y Boston, que sí la tiene, no toma nada de una del grupo — ni su correo.
     const boston = fichaFiscal("confecciones_boston", "Confecciones Boston");

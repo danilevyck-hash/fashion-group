@@ -15,6 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { EstadoCuentaDoc, EstadoCuentaEmpresa } from "@/lib/cxc/estado-cuenta-data";
+import { comoPagar, lineasDePago, type ComoPagar } from "@/lib/cxc/empresa-fiscal";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -111,6 +112,70 @@ export function buildResumenHtml(empresas: EstadoCuentaEmpresa[], cliente: strin
   </div>`;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DÓNDE PAGAR — TODAS LAS EMPRESAS QUE VAN EN ESE CORREO (20-sep-2026).
+//
+// 🔴 UN CORREO LLEVA VARIAS EMPRESAS. El envío manda SIEMPRE las 6 del grupo,
+// con un PDF por empresa (y el lote, además, varios clientes en un solo papel).
+// Poner una sola cuenta sería decirle al cliente que pague seis saldos en el
+// banco de una — así que van TODAS las que viajan en ese correo, cada una con la
+// suya, en el mismo orden en que salen los adjuntos.
+//
+// 🔴 LAS TRES LÍNEAS SON LAS MISMAS DEL PAPEL (`lineasDePago`): el cliente no
+// tiene que decidir cuál de las dos versiones copia.
+//
+// 🔑 En texto plano y suelto, no en una tabla: esto se copia y se pega en la app
+// del banco. **Falla ABIERTO**: una empresa sin cuenta cargada no sale, y si no
+// sale ninguna el bloque entero desaparece y el correo queda como estaba.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Lo mínimo que hace falta saber de una empresa para decir dónde se le paga. */
+export interface EmpresaDelCorreo {
+  empresa_key: string;
+  empresa_nombre: string;
+}
+
+export function buildCuentasHtml(empresas: readonly EmpresaDelCorreo[]): string {
+  const vistas = new Set<string>();
+  const pagos: ComoPagar[] = [];
+
+  for (const e of empresas) {
+    if (vistas.has(e.empresa_key)) continue;
+    vistas.add(e.empresa_key);
+    const pago = comoPagar(e.empresa_key, e.empresa_nombre);
+    if (pago) pagos.push(pago);
+  }
+  if (pagos.length === 0) return "";
+
+  // ⚠️ EL TELÉFONO, UNA SOLA VEZ CUANDO ES EL MISMO. Hoy las ocho contestan en
+  // el mismo número, así que repetirlo seis veces son doce palabras que tapan
+  // las seis cuentas, que es lo que se vino a leer. Si alguna llega a tener el
+  // suyo, cada bloque vuelve a llevar el propio y no hay línea al pie.
+  const telefonos = new Set(pagos.map((p) => p.telefono).filter(Boolean));
+  const telefonoComun = telefonos.size === 1 && pagos.every((p) => p.telefono)
+    ? [...telefonos][0]
+    : "";
+
+  const bloques = pagos.map((p) => {
+    const lineas = lineasDePago(telefonoComun ? { ...p, telefono: "" } : p)
+      .map((l, i) => (i === 0 ? `<strong>${escapeHtml(l)}</strong>` : escapeHtml(l)))
+      .join("<br>");
+    return `<p style="margin:0 0 12px;font-size:13px;line-height:1.6;color:#111827">${lineas}</p>`;
+  });
+
+  return `
+  <div style="margin:18px 0 0;padding-top:14px;border-top:1px solid #e5e7eb">
+    <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#111827">Dónde pagar</p>
+    ${bloques.length > 1
+      ? `<p style="margin:0 0 12px;font-size:12px;color:#6b7280">Cada empresa recibe su pago en su propia cuenta.</p>`
+      : ""}
+    ${bloques.join("")}
+    ${telefonoComun
+      ? `<p style="margin:0;font-size:13px;line-height:1.6;color:#111827">Tel: ${escapeHtml(telefonoComun)}</p>`
+      : ""}
+  </div>`;
+}
+
 /** Firma del correo: nombre del usuario + línea fija (sin cargo). */
 export function buildFirma(nombreCompleto: string): string {
   return `${nombreCompleto}\nFashion Group Panamá`;
@@ -145,12 +210,25 @@ export function defaultAsunto(empresasNombres: string[], mes: string): string {
 }
 
 /**
- * HTML completo del correo = encabezado + cuerpo editable + resumen + cierre +
- * firma. `cuerpo` es texto plano (se escapa + nl2br). `resumenHtml` ya es HTML
- * (viene de buildResumenHtml, no editable). `firma` es texto plano.
+ * HTML completo del correo = encabezado + cuerpo editable + resumen + dónde
+ * pagar + cierre + firma. `cuerpo` es texto plano (se escapa + nl2br).
+ * `resumenHtml` y `cuentasHtml` ya son HTML (no editables). `firma` es texto
+ * plano.
+ *
+ * 🔴 «Dónde pagar» va al CIERRE, después de los saldos: primero cuánto debe,
+ * después dónde lo deposita. El «Favor confirmar su programación de pagos» del
+ * cuerpo no se tocó — sigue siendo el texto editable de siempre.
+ *
+ * ⚠️ `cuentasHtml` es opcional para que ningún papel se quede sin salir por no
+ * pasarlo: sin él, el correo es EXACTAMENTE el de antes.
  */
-export function composeEmailHtml(opts: { cuerpo: string; resumenHtml: string; firma: string }): string {
-  const { cuerpo, resumenHtml, firma } = opts;
+export function composeEmailHtml(opts: {
+  cuerpo: string;
+  resumenHtml: string;
+  firma: string;
+  cuentasHtml?: string;
+}): string {
+  const { cuerpo, resumenHtml, firma, cuentasHtml = "" } = opts;
   return `
   <div style="font-family:Arial,Helvetica,sans-serif;max-width:720px;margin:0 auto;color:#111827">
     <div style="background:#111827;color:#fff;padding:16px 20px;border-radius:8px 8px 0 0">
@@ -160,6 +238,7 @@ export function composeEmailHtml(opts: { cuerpo: string; resumenHtml: string; fi
     <div style="padding:20px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px">
       <p style="font-size:13px;line-height:1.6;margin:0 0 18px">${nl2br(cuerpo)}</p>
       ${resumenHtml}
+      ${cuentasHtml}
       <p style="font-size:13px;line-height:1.6;margin:18px 0 0">Quedamos atentos a sus comentarios.</p>
       <p style="font-size:13px;line-height:1.6;margin:12px 0 0">Saludos,<br>${nl2br(firma)}</p>
       <p style="color:#9ca3af;font-size:11px;margin:20px 0 0;border-top:1px solid #e5e7eb;padding-top:12px">

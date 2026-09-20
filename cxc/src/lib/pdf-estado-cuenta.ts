@@ -38,6 +38,7 @@ import {
   dibujarFichaCliente,
   dibujarDocumentos,
   dibujarPie,
+  dibujarComoPagar,
   dibujarRecibidoConforme,
   dibujarPieDeLaCasa,
 } from "@/lib/cxc/pdf-estado-cuenta-hoja";
@@ -77,6 +78,8 @@ function dibujarCliente(doc: jsPDF, data: EstadoCuenta, nombreDeLaPantalla: stri
     const docs = dibujarDocumentos(doc, y, emp);
     total += docs.total;
     y = dibujarPie(doc, docs.y, emp, docs.total);
+    // 🔴 Dónde se le paga a ESTA empresa, antes del «RECIBIDO CONFORME».
+    y = dibujarComoPagar(doc, y, emp.empresa_key, emp.empresa_nombre);
     dibujarRecibidoConforme(doc, y);
   });
 

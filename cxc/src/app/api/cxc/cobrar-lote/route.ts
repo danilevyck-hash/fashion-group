@@ -35,6 +35,7 @@ import { leerCorreoDeOverride } from "@/lib/cxc/anotaciones";
 import { fetchEstadoCuentaData, type EstadoCuentaResult } from "@/lib/cxc/estado-cuenta-data";
 import {
   buildResumenHtml,
+  buildCuentasHtml,
   composeEmailHtml,
   buildFirma,
   defaultAsunto,
@@ -163,13 +164,20 @@ export async function POST(req: NextRequest) {
   for (const envio of lote.envios) {
     const cuentas: { data: EstadoCuentaResult; nombre: string }[] = [];
     const empresasNombres = new Set<string>();
+    // 🔴 Dónde pagar: las empresas que van en ESTE papel, de todos los clientes
+    // de esta dirección, sin repetir. `buildCuentasHtml` ya saca las repetidas;
+    // el orden es el de los adjuntos.
+    const empresasDelPapel: { empresa_key: string; empresa_nombre: string }[] = [];
     for (const c of envio.clientes) {
       if (!c.codigo) continue;
       const info = resueltos.find((r) => r.codigo === c.codigo);
       const data = await fetchEstadoCuentaData(c.codigo, empresas);
       if (data.empresas.length === 0) continue; // sin saldo: no se le escribe
       cuentas.push({ data, nombre: info?.nombre ?? c.nombre });
-      for (const e of data.empresas) empresasNombres.add(e.empresa_nombre);
+      for (const e of data.empresas) {
+        empresasNombres.add(e.empresa_nombre);
+        empresasDelPapel.push({ empresa_key: e.empresa_key, empresa_nombre: e.empresa_nombre });
+      }
     }
     if (cuentas.length === 0) continue;
 
@@ -181,7 +189,12 @@ export async function POST(req: NextRequest) {
     // cliente: en una dirección compartida por trece no hay una persona a quien
     // saludar, y elegir a uno de los trece sería peor que no saludar a nadie.
     const contactoDelEnvio = cuentas.length === 1 ? await contactoDe(cuentas[0].data.codigo) : "";
-    const html = composeEmailHtml({ cuerpo: defaultCuerpo(mes, contactoDelEnvio), resumenHtml, firma });
+    const html = composeEmailHtml({
+      cuerpo: defaultCuerpo(mes, contactoDelEnvio),
+      resumenHtml,
+      firma,
+      cuentasHtml: buildCuentasHtml(empresasDelPapel),
+    });
     const { doc, filename } = buildEstadoCuentaLotePDF(clientesPdf);
     const base64 = Buffer.from(doc.output("arraybuffer")).toString("base64");
 

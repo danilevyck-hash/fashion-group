@@ -986,6 +986,79 @@ lista (Boston, Multifashion) sale con el nombre de la pantalla y las tres línea
 
 ---
 
+## 🔴 EL PAPEL DICE DÓNDE SE PAGA — CADA EMPRESA EN SU PROPIA CUENTA (20-sep-2026)
+
+🩸 **Cómo estaba.** El estado de cuenta le decía al cliente cuánto debe y **ningún lugar donde
+pagarlo**: los ocho `telefono` de `empresa-fiscal.ts` estaban en `""`, no había un solo número de
+cuenta en el sistema y el correo cerraba con «Favor confirmar su programación de pagos» — que es
+pedirle que confirme un pago sin decirle a dónde lo manda.
+
+Daniel dictó las ocho cuentas y **eligió que cada empresa cobre en la suya**, no una sola del grupo.
+Todas en **Banco General**, todas **cuenta corriente**, teléfono **212-0790**:
+
+| Empresa | Cuenta |
+|---|---|
+| `fashion_wear` | 03-02-01-094730-4 |
+| `fashion_shoes` | 03-02-01-103566-3 |
+| `vistana` | 03-02-01-119821-6 |
+| `joystep` | 04-02-00-001055-7 |
+| `active_wear` | 04-02-97-548356-3 |
+| `active_shoes` | 04-02-97-602364-7 |
+| `american_classic` | 03-02-01-114161-3 |
+| `confecciones_boston` | 03-02-01-110198-4 |
+
+### Las reglas
+
+- 🔴 **Viven en la MISMA ficha que la identidad fiscal** (`src/lib/cxc/empresa-fiscal.ts`), al lado del
+  nombre legal y la identificación. No se abrió una segunda lista: es el mismo dato —quién cobra— y la
+  cuenta se pregunta por `empresa_key`, igual que el logo, la firma y la cabeza del papel.
+- 🔴 **El banco, el tipo de cuenta y el teléfono se escriben UNA sola vez** (`BANCO_DE_TODAS`,
+  `TIPO_DE_CUENTA`, `TELEFONO_DE_TODAS`), como `CORREO_DEL_GRUPO`. Solo la `cuenta` es de cada una.
+- 🔴 **Las tres líneas salen de UN armador** (`lineasDePago`), que leen el papel y el correo: si el PDF
+  dijera «Cuenta corriente 03-02-01-094730-4» y el correo «Cta. Cte. 03 02 01 094730 4», el cliente
+  tendría que decidir cuál copia. Dicen **a nombre de quién · Banco General · Cuenta corriente · el
+  número · el teléfono**.
+- 🔴 **En el papel va al pie de la hoja de CADA empresa, ANTES del «RECIBIDO CONFORME»**, que no se
+  movió (`dibujarComoPagar`, `pdf-estado-cuenta-hoja.ts`). Un recuadro de tres líneas, 104 mm de ancho,
+  con su propio salto de página: el bloque nunca queda partido ni pisa el pie de la hoja.
+- 🔴 **En el correo van TODAS las empresas que viajan en ese papel** (`buildCuentasHtml`), al cierre,
+  debajo del resumen de saldos. El envío manda SIEMPRE las 6 del grupo con un PDF por empresa, así que
+  una sola cuenta le diría al cliente que pague seis saldos en el banco de una. Se arma del MISMO
+  `result` que hace el resumen y los adjuntos, así que no puede nombrar una empresa que no va en el
+  papel; el lote (`cobrar-lote`) junta las de todos los clientes de esa dirección, sin repetir.
+- 🔴 **Texto plano y suelto, no una tabla**: esto se copia y se pega en la app del banco.
+- ⚠️ **El teléfono se dice UNA vez cuando es el mismo en todas.** Hoy las ocho contestan en el mismo
+  número: repetirlo seis veces tapa las seis cuentas, que es lo que se vino a leer. Si alguna llega a
+  tener el suyo, cada bloque vuelve a llevar el propio.
+- 🔴 **«Favor confirmar su programación de pagos» no se tocó**: sigue siendo el texto editable de
+  siempre, y los datos van debajo.
+- 🔴 **Confecciones Boston cobra en la suya, por su propia ruta** (`/api/cxc/boston/estado-cuenta` y su
+  correo): su papel ya firmaba como Boston y ahora también le paga a Boston. La cuenta se pregunta por
+  su `empresa_key`, así que la del grupo no tiene por dónde entrar — y hay candado en las dos
+  direcciones.
+- 🔴 **Falla ABIERTA en los dos lados**: una empresa sin cuenta cargada deja la hoja y el correo
+  exactamente como estaban. Nunca la cuenta de otra empresa.
+- ⚠️ **El preview del modal muestra el MISMO bloque que sale**: el HTML lo arma el SERVIDOR y viaja
+  como `cuentasHtml`.
+
+### Lo que queda pendiente de Daniel
+
+- ⚠️ **El teléfono de Boston.** Dictó `212-0790` para «todas», pero lo dijo **antes** de dar la cuenta
+  de Confecciones Boston. Está puesto en las ocho; falta que él confirme que Boston contesta ahí.
+
+### Candados
+
+- `src/__tests__/lib/cxc-donde-pagar.test.ts` (23): las ocho con cuenta y teléfono, los ocho números
+  **dígito por dígito** contra lo dictado, ninguna con la de otra, el bloque en el papel antes del
+  «RECIBIDO CONFORME», las seis cuentas en el correo, Boston con la suya y sola, las tres rutas que lo
+  pasan y el preview del modal. Con controles: clave desconocida, lista vacía y correo sin bloque.
+- Dos candados **cambiaron de dirección con nota fechada, no se borraron**: `cxc-empresa-fiscal-las-seis`
+  y `planilla-tres-descuentos` exigían el teléfono VACÍO. La regla que protegían —se escribe UNA vez y
+  es el mismo en todas— no cambió; cambió el valor que Daniel dictó. ⚠️ El comprobante de la planilla
+  solo lee el nombre legal y la identificación: ese número no sale en ningún papel suyo.
+
+---
+
 ## 🔴 EL CORREO DE COBRO DE CONFECCIONES BOSTON — «FIRMA CONFECCIONES BOSTON» (9-sep-2026)
 
 **Daniel, textual:** *«Firma Confecciones Boston»*.

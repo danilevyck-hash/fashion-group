@@ -112,9 +112,22 @@ export function firmaBoston(nombreCompleto: string): string {
   return `${(nombreCompleto || "").trim() || CASA_BOSTON.nombre}\n${CASA_BOSTON.firma}`;
 }
 
-/** El HTML completo del correo. El membrete y el pie son los de Boston. */
-export function composeCorreoBoston(opts: { cuerpo: string; resumenHtml: string; firma: string }): string {
-  const { cuerpo, resumenHtml, firma } = opts;
+/**
+ * El HTML completo del correo. El membrete y el pie son los de Boston.
+ *
+ * 🔴 `cuentasHtml` ES DÓNDE SE LE PAGA A BOSTON, Y SALE DE SU `empresa_key`
+ * (20-sep-2026): la ruta lo arma con el MISMO `buildCuentasHtml` del grupo,
+ * pasándole la empresa que trae SU estado de cuenta. Lo que no se comparte es la
+ * CARTERA, no la forma de escribir un número de cuenta — y como la cuenta se
+ * pregunta por la empresa del papel, la del grupo no tiene por dónde entrar.
+ */
+export function composeCorreoBoston(opts: {
+  cuerpo: string;
+  resumenHtml: string;
+  firma: string;
+  cuentasHtml?: string;
+}): string {
+  const { cuerpo, resumenHtml, firma, cuentasHtml = "" } = opts;
   return `
   <div style="font-family:Arial,Helvetica,sans-serif;max-width:720px;margin:0 auto;color:#111827">
     <div style="background:#111827;color:#fff;padding:16px 20px;border-radius:8px 8px 0 0">
@@ -124,6 +137,7 @@ export function composeCorreoBoston(opts: { cuerpo: string; resumenHtml: string;
     <div style="padding:20px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px">
       <p style="font-size:13px;line-height:1.6;margin:0 0 18px">${nl2br(cuerpo)}</p>
       ${resumenHtml}
+      ${cuentasHtml}
       <p style="font-size:13px;line-height:1.6;margin:18px 0 0">Quedamos atentos a sus comentarios.</p>
       <p style="font-size:13px;line-height:1.6;margin:12px 0 0">Saludos,<br>${nl2br(firma)}</p>
     </div>

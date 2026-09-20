@@ -24,6 +24,7 @@ import { leerCorreoDeOverride } from "@/lib/cxc/anotaciones";
 import { fetchEstadoCuentaData, type EstadoCuentaResult } from "@/lib/cxc/estado-cuenta-data";
 import {
   buildResumenHtml,
+  buildCuentasHtml,
   composeEmailHtml,
   buildFirma,
   defaultAsunto,
@@ -173,13 +174,18 @@ interface Paquete {
   result: EstadoCuentaResult;
   empresasNombres: string[];
   resumenHtml: string;
+  /** 🔴 Dónde pagar: TODAS las empresas que viajan en este correo, cada una con
+   *  su cuenta. Se arma del MISMO `result` que hace el resumen y los adjuntos,
+   *  así que no puede nombrar una empresa que no va en el papel. */
+  cuentasHtml: string;
   mes: string;
 }
 function armarPaquete(result: EstadoCuentaResult, nombre: string): Paquete {
   const mes = mesLabel();
   const empresasNombres = result.empresas.map((e) => e.empresa_nombre);
   const resumenHtml = buildResumenHtml(result.empresas, nombre);
-  return { result, empresasNombres, resumenHtml, mes };
+  const cuentasHtml = buildCuentasHtml(result.empresas);
+  return { result, empresasNombres, resumenHtml, cuentasHtml, mes };
 }
 
 export async function GET(req: NextRequest) {
@@ -212,7 +218,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Error al leer estado de cuenta" }, { status: 500 });
   }
 
-  const { empresasNombres, resumenHtml, mes } = armarPaquete(result, nombre);
+  const { empresasNombres, resumenHtml, cuentasHtml, mes } = armarPaquete(result, nombre);
   const destinatario = await resolveDestinatario(nombreNormalizado, codigo);
   const compartidoPor = await sharedCount(destinatario);
   const contacto = await leerContacto(codigo);
@@ -225,6 +231,7 @@ export async function GET(req: NextRequest) {
     cuerpo: defaultCuerpo(mes, contacto),
     firma,
     resumenHtml,
+    cuentasHtml,
     empresasNombres,
     sharedCount: compartidoPor,
     mes,
@@ -292,9 +299,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Este cliente no tiene documentos con saldo." }, { status: 400 });
   }
 
-  const { resumenHtml, mes } = armarPaquete(result, nombre);
+  const { resumenHtml, cuentasHtml, mes } = armarPaquete(result, nombre);
   const firma = buildFirma(user?.nombreCompleto ?? "Fashion Group");
-  const html = composeEmailHtml({ cuerpo, resumenHtml, firma });
+  const html = composeEmailHtml({ cuerpo, resumenHtml, firma, cuentasHtml });
 
   // Un PDF por empresa (incluye empresas con saldo a favor).
   const attachments: { filename: string; content: string }[] = [];
