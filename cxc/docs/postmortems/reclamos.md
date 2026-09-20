@@ -25,7 +25,7 @@ Daniel, textual, sobre el uso real: *«el uso es poner el reclamo y guardar para
 - 🔴 **«Reclamado» se marca solo** (`reclamos.reclamado_en`, migración `20261111120000`): la PRIMERA vez que el reclamo sale de la casa —se manda el correo (`send-zip`, **después** de que Resend confirma) o se descarga su Excel o PDF (`[id]/excel`, `export-zip`, `export-pdf`)— y **nunca se pisa** (`marcarReclamados`, `.is("reclamado_en", null)`). 🩸 De 29 por cobrar, **9 nunca se le mandaron al proveedor ($9.592,03, el 64% de la plata)** y en pantalla los 29 se veían iguales. El relleno salió de la primera nota «Correo con … adjunto enviado a …» del sistema en `reclamo_seguimiento` (20 de 20).
 - 🔴 **La portada** (`EmpresaSelector` + `lib/reclamos/portada.ts`, puro): tres números —«Por cobrar $ · N», **«Sin reclamar $ · N» en rojo**, «Cobrado <año> $ · N» (lo que entró por nota de crédito ese año)— y tarjetas por empresa **ordenadas por plata** con el contacto, «el más viejo lleva N días» (desde la **FECHA DE FACTURA**), la plata y el chip rojo «sin reclamar N». Se retiraron «Alertas +45 días» y el chip «Alerta» (salían en 28 de 29: *«un color que sale siempre deja de avisar»*). **Joystep se fue** (*«joystep quítalo»*, 0 reclamos en la historia; `EMPRESAS_CON_RECLAMOS` se DERIVA de `EMPRESAS` menos esa resta); **Active Wear se queda** (*«puede que sí se reclame»*) diciendo «Todavía sin reclamos». Nada se da por perdido: *«nunca por perdido»*, no hay corte de días. 🩸 **El contacto decía «Sin contacto» en las 5 empresas que sí lo tienen**: la tarjeta leía `c.nombre` y la columna es `nombre_contacto`.
 - 🔴 **La página de la empresa abre en «Por cobrar N · $»** (*«los pipeline tener default los no pagados»*) con «Cobrados N» al lado; **«En proceso» se retiró de la pantalla** (0 usos en 3 meses; el valor sigue válido en la base y cuenta como por cobrar). Orden: **la factura más vieja primero** (*«viejo es factura, no creado»*); los sin fecha van al final con «Falta la fecha de la factura» en rojo. Columnas `N° · Factura(s) · Días · Reclamado · Total`; tocar la fila abre el reclamo; en la fila solo «Correo» y «Descargar» con rótulo y el «···» con el papel, editar y borrar (patrón Guías). Filtro y búsqueda en la URL (`useUrlState`). Los botones de arriba (Correo · Descargar Excel · Descargar PDF) actúan sobre la selección o sobre **lo que se está mirando** —por default lo por cobrar— y «Correo» no se ofrece sobre los cobrados (cobrarle dos veces al proveedor). Reglas en `lib/reclamos/orden.ts`.
-- 🔴 **`fecha_factura`** (columna aditiva): la fecha que mide los días. El lector de PDF YA la sacaba y se descartaba. Backfill releyendo los PDF que existen (`scripts/_backfill-reclamos-fecha-factura.mjs`, con `npx tsx`; idempotente; escribe SOLO esa columna) — Daniel: *«releo los PDF que existan y el resto lo teclea Andrea»*. Editar la pide. ⚠️ **El backfill quedó SIN correr el 11-sep-2026**: `ANTHROPIC_API_KEY` es la misma en `.env.local` y en Vercel y el API la rechaza («API key is invalid») — o sea que el lector de facturas de Reclamos **y** el de Marketing no leen en producción desde antes de este cambio. Al rotar la llave: `ANTHROPIC_API_KEY=<nueva> npx tsx scripts/_backfill-reclamos-fecha-factura.mjs` (son 4 reclamos con PDF; los otros 30 los teclea Andrea).
+- 🔴 **`fecha_factura`** (columna aditiva): la fecha que mide los días. El lector de PDF YA la sacaba y se descartaba. Backfill releyendo los PDF que existen (`scripts/_backfill-reclamos-fecha-factura.mjs`, con `npx tsx`; idempotente; escribe SOLO esa columna) — Daniel: *«releo los PDF que existan y el resto lo teclea Andrea»*. Editar la pide. 🔄 **CORREGIDO EL 20-sep-2026 — la llave SIRVE y el script ya no tiene trabajo que hacer.** Esto decía que el backfill *«quedó SIN correr porque `ANTHROPIC_API_KEY` es inválida»*; **medido el 20-sep-2026, la llave contesta 200 y el modelo del lector está disponible**, así que el lector de Reclamos y el de Marketing sí leen en producción. Y el backfill tampoco haría nada: solo toca filas con `fecha_factura` en NULL (`.is("fecha_factura", null)`) y la migración `20261114120000` —aplicada el 11-sep— las llenó **todas** con su `fecha_reclamo`. ⚠️ **Lo que SIGUE siendo cierto**: los **33 reclamos vivos tienen `fecha_factura` idéntica a `fecha_reclamo`**, o sea el valor de respaldo, así que los días de la portada están **subestimados en los 33** (la factura siempre es anterior). 🔴 **Y no hay de dónde sacar la real**: de los 33, **solo 4 tienen PDF**. Daniel lo cerró así, textual: *«si puedes sacar la fecha de la factura y arreglarlo, belleza; sino usa la fecha de creación como la de la factura y ya, una sola fecha menos enredo»* — **una sola fecha, sin asteriscos ni advertencias en pantalla**. ⚠️ **Hacia adelante no se arrastra**: al CREAR, el PDF es obligatorio (`validateReclamoNuevo`) y la fecha de la factura también, así que un reclamo nuevo nace con la fecha REAL. El script se conserva rotulado (`scripts/_backfill-reclamos-fecha-factura.mjs`) para el día que haya PDF viejos que releer; **lo corre Daniel, nadie más**.
 - 🔴 **Las facturas son una LISTA** (`lib/reclamos/facturas.ts`): `nro_factura` sigue siendo texto, pero UNA función la parte (`facturasDe`: coma, «·», espacios, y el guion entre espacios o entre dos números de 6+ dígitos — `F-1000` no se parte) y UNA la arma (`facturasATexto`, separador ` - `). En pantalla, correo, Excel y PDF van con **«·»**; en el formulario son chips. 🩸 Dos reclamos vivos traían facturas pegadas sin separador (`30000136603000013658` = 3000013660 y 3000013658) y así salían al proveedor: la migración los corrige **por id explícito y con el valor exacto de hoy** (nada de LIKE).
 - 🔴 **Nuevo reclamo: PDF obligatorio primero** (*«PDF obligatorio»*, `validateReclamoNuevo` — solo al CREAR; editar uno viejo sin PDF sigue guardando). El lector (`lib/reclamos/lector-factura.ts`, un solo prompt compartido con el backfill) llena proveedor, número, fecha de factura, orden de compra, **la empresa facturada** (el «Cliente» del PDF → `empresaDesdeFacturada`, se confirma en el desplegable) y **los renglones**. «¿Qué reclamas? Busca en la factura» (`RenglonesDesdeFactura`): rótulos EXACTOS `Estilo · Descripción · Cantidad · Precio · Talla · Cant. reclamada · Motivo` (Daniel: *«palabras de novatos confunden»*), buscador por estilo y descripción; del PDF salen y no se editan Estilo, Descripción, Cantidad, Precio; Andrea llena como hoy Cant. reclamada, Talla (texto), Motivo (lista cerrada de 6) y Género (que el formulario ya exigía y no se tocó). Sin líneas, la tabla de siempre (`ItemsEditor`) con **«Repetir el anterior»** (copia talla, género, precio y motivo). Se fueron «Paso 1 de 4», «Mostrar todos los campos» y los motivos personalizados (`reclamo_custom_motivos`: 0 usos; la tabla y su ruta se quedan). Fotos como estaban (*«dejar como está»*).
 - 🔴 **La talla, MEDIDA en los PDF reales** (26 archivos en el bucket = **8 distintos**, más la factura de referencia que mandó Daniel, `src/__tests__/fixtures/factura-american-designer-fashion-3000015536.pdf`): American Fashion Wear / American Designer Fashion (7 de 9) **NO traen talla por renglón** — la cantidad es el prepack del estilo; Latin Fitness Group (2 de 9) **sí**, con desglose en la misma línea («8.5 [2], 9 [2]…») y el lector la desglosa: cada talla es un renglón con la talla ya puesta y editable. 4 de las 6 de aswgr son imagen escaneada (sin texto): el lector las lee visualmente. Daniel: *«debe de ser la cantidad y poner la talla como ahora, así como sale en el PDF, no quiero enredo aquí cambiándome algo que ya existe y funciona bien»*.
@@ -64,3 +64,129 @@ Son Excel, que es exactamente lo que Daniel sí quiere.
 🔄 **`cxc-descargas.test.ts` cambió de dirección, con nota fechada.** Su excepción decía textualmente *«pero `lib/csv-export.ts` NO se borró: lo usa Reclamos»* y **apuntaba al archivo de la ruta**. Mientras esa excepción existiera, el barrido de «en ningún lado se exporta CSV» tenía un agujero con nombre propio. Ahora exige que el archivo exista **y** que la ruta no. También cambiaron, con nota: el bloque del CSV en `reclamos-itbms-rotulo-y-pendientes.test.tsx` (medía que su encabezado no clavara un porcentaje; ahora exige que la ruta no vuelva) y el comentario de `src/app/cxc/page.tsx`.
 
 Candado: `src/__tests__/lib/reclamos-csv-retirado.test.ts` (8 casos: la carpeta no existe, nadie la llama, `csv-export` no tiene importadores, sus tres helpers no se usan, y los dos Excel siguen vivos). Verificado por mutación en `scripts/_mutar-candados-navegacion-pdf-csv.sh` — resucitar la ruta y volver a importar `csv-export` se cazan las dos.
+
+---
+
+## Lo del 20-sep-2026 — ocho cosas, y ninguna mueve un número del negocio
+
+Daniel aprobó las ocho de una vez. Todas salieron de mirar el módulo contra producción, no de la documentación.
+
+### 1 · Un solo corte de «viejo»: 120 días
+
+El corte vive en **`DIAS_RECLAMO_VIEJO`** (`src/lib/reclamos/viejos.ts`) y lo leen **la portada y el aviso semanal**. No se eligió a ojo. Medido sobre los 19 reclamos abiertos:
+
+| corte | cuántos | plata |
+|---|---|---|
+| 90 días | 15 de 19 (79 %) | $5.284,97 |
+| **120 días** | **6 de 19 (32 %)** | **$3.190,82** |
+| 180 días | 5 de 19 (26 %) | $3.060,82 |
+
+Nueve reclamos están entre **93 y 103 días**: son UNA MISMA TANDA, así que con 90 el aviso los agarra a todos y deja de señalar nada — el mismo error que el chip «Alerta» que salía en 28 de 29 (*«un color que sale siempre deja de avisar»*). **120 es el primer corte donde el aviso apunta a una minoría de verdad.** Daniel lo eligió con los tres números a la vista; el primer encargo decía 90 y él lo cambió al ver la tabla.
+
+🔴 Hay un barrido que pone el build ROJO si alguien vuelve a clavar el número a mano en `lib/reclamos/**` o `app/reclamos/**`. ⚠️ El barrido mira el 120 **usado como corte de días**, no cualquier 120: el gris de un PDF (`setTextColor(120, 120, 120)`) no tiene nada que ver, y decir que sí convertiría el candado en un estorbo que alguien apagaría.
+
+### 2 · La portada, sin los dos huecos y con los días al frente
+
+- 🩸 **«Sin reclamar» en CERO ocupaba un tercio de la fila** para escribir «Nada sin reclamar». Medido: hoy hay **0 sin reclamar**. Ahora esa caja no se dibuja y las dos que sí dicen algo se reparten el ancho (`sm:grid-cols-2`). Con uno solo sin reclamar vuelve sola, en rojo y con tres columnas. ⚠️ **El número no se tocó**: sigue saliendo de `resumenPortada`.
+- 🩸 **Active Wear salió de la pantalla.** Tiene **0 reclamos en toda la historia**, igual que Joystep el 10-sep. Se fue por el MISMO camino (`EMPRESAS_SIN_TARJETA`), lo que significa que sale de la portada **y del desplegable del formulario** — ésa es la invariante del 11-sep: las dos pantallas leen la MISMA lista, y ofrecer una empresa sin tarjeta deja un reclamo sumando arriba y sin dónde abrirse. 🔄 Cambia de dirección la decisión del 10-sep (*«puede que sí se reclame»*), con nota fechada. ⚠️ **Nada se borra**: `EMPRESAS_MAP` conserva su proveedor, su marca y su código de Switch (`American Unique Brands SA` · Karl Lagerfeld · `126`), y `empresasParaElegir(actual)` le devuelve la opción a cualquier reclamo que ya esté en ella.
+- 🔴 **Los días del más viejo, en un chip rojo al lado del nombre de la empresa.** Iban en gris chico al final de una línea compartida con el contacto —«Isaac Amar · el más viejo lleva 103 días»—, o sea el dato que decide a quién apurar, escondido detrás de un nombre. El número es el mismo `masViejoDias`; sin fecha de factura no se dibuja chip.
+- 🔴 En la caja de **«Por cobrar»** va la línea **«N pasan de 120 días»**, en rojo, y solo si hay alguno.
+
+Candado: `src/__tests__/components/reclamos-portada-al-frente.test.tsx` (20 casos). **4 mutaciones, 4 cazadas**: bajar el corte a 90, devolver Active Wear a la portada, dibujar la caja siempre, y volver el chip a gris.
+
+### 3 · «Marcar como pagado» pasa a ser el botón principal
+
+🩸 Estaba apartado a la derecha (`ml-auto`), con borde gris, como algo que se usa pocas veces; y el botón negro era «Correo». Medido contra producción:
+
+- cobros marcados en los últimos 30 días: **9**
+- correos al proveedor en TODA la historia del módulo: **9**, el último **hace dos meses**
+
+O sea que el botón negro era el que casi nadie toca y lo de todos los días estaba en la esquina. Se invirtió: negro «Marcar como pagado», al lado «Correo» con borde. Ninguno se fue y ninguno cambió lo que hace.
+
+⚠️ **En un reclamo COBRADO no cambió nada**: «Correo» no se ofrece ni en la fila ni en el detalle, y `send-zip` lo sigue rechazando en el SERVIDOR — que es el freno de verdad (cobrarle dos veces al proveedor: $5.306,62 en 5 reclamos, medido el 24-ago-2026).
+
+Candado: `reclamos-cobrar-al-frente.test.tsx` (9 casos). **3 mutaciones, 3 cazadas.**
+
+### 4 · El monto del cobro viene puesto, y el N° de nota de crédito se pliega
+
+Medido sobre los 14 reclamos cobrados:
+
+- **14 de 14** cobros fueron **el total exacto del reclamo, al centavo**.
+- **0 de 14** tienen escrito el **N° de nota de crédito**.
+
+Se tecleaba 14 de 14 veces un número que el sistema ya sabía, y se miraba 14 de 14 veces un campo que nadie llenó nunca.
+
+- 🔴 El monto abre con el total del reclamo, **editable**, y la línea «Reclamado: $X · puede ser parcial» —que ya existía— se queda justo arriba: el cobro parcial sigue siendo posible, solo deja de ser el caso por el que se diseña.
+- 🔴 El N° de nota de crédito se pliega detrás de «**Agregar el N° de nota de crédito**». El campo **no se borró** y se guarda exactamente igual.
+- ⚠️ Sin monto reclamado el campo va **vacío**: no se inventa un cero, que el propio modal rechazaría. Y la **segunda** nota de crédito nace vacía — es el resto, no otro total.
+
+Candado: `reclamos-cobro-monto-puesto.test.tsx` (12 casos). **5 mutaciones, 5 cazadas**, con el control de que el comprobante obligatorio y el rechazo del monto vacío no se movieron.
+
+### 5 · Los renglones se leen: aire entre columnas y tallas sin espacios
+
+🩸 **«Subtotal» y «Motivo» salían pegados**, sin un solo píxel en el medio:
+
+```
+$1,152.00Mercancía manchada
+```
+
+La tabla del detalle llevaba `[&_td]:py-3` (aire arriba y abajo) y **nada a los lados**, mientras las tablas de EDICIÓN sí traían `px-5`. El mismo dato, el mismo módulo, dos criterios — y el que se lee todos los días era el que no tenía aire. Afecta a los **33 reclamos vivos y sus 126 renglones**. Ahora el aire sale de **UNA constante** (`src/lib/reclamos/tabla-renglones.ts`) que leen las TRES tablas de renglones: la del detalle, la de edición del detalle y la del formulario (`ItemsEditor`). Se separaron una vez y una quedó atrás; por eso ahora es un dato y no una clase escrita tres veces.
+
+🩸 **Las tallas se guardaban con un espacio adelante** — `" TODAS"`, `" 8"`, `" 34-32"` — y ese espacio **sale en el papel que recibe el proveedor**. Medido: **32 renglones dicen «TODAS»** y ~25 más arrancan con espacio.
+
+🔑 **De dónde sale, que no es un misterio**: `ItemsEditor` usa **un espacio solo (`" "`) como SEÑAL de «Otros»** —es lo que hace `!TALLAS.includes(t) && t !== ""` y cambia el desplegable por un campo de texto—, y lo que se escribe después se pega detrás. Por eso el recorte va en **`buildReclamoItemRows`**, la única puerta de escritura (la comparten crear y editar), y **NO al teclear**: recortando mientras se escribe, la señal se borra sola y el campo de texto se cierra en la cara de quien lo está usando.
+
+⚠️ **Lo ya guardado se queda como está**: no hay migración de limpieza y no la habrá hasta que Daniel la pida. Hay candado que lo exige.
+
+Candado: `reclamos-renglones-legibles.test.tsx` (13 casos). **3 mutaciones, 3 cazadas.**
+
+### 6 · Un aviso semanal para los reclamos viejos
+
+🩸 **No había NADA**: ni cron, ni Telegram, ni recordatorio. Un reclamo que Andrea carga y nadie vuelve a mirar se quedaba quieto para siempre, y la única forma de enterarse era abrir el módulo. Medido el 20-sep-2026: **15 reclamos pasados de 90 días por $6.220,41**, y uno de **594 días por $929,83**.
+
+Ahora, **los LUNES a las 14:00 UTC (9:00 a.m. de Panamá)**, `/api/cron/reclamos-viejos` manda **una línea** al chat de 📊 NEGOCIO: cuántos pasan de 120 días, cuánto suman y los **tres más viejos** con empresa, días y monto. La regla es pura (`lib/reclamos/aviso-viejos.ts`); el route solo hace I/O.
+
+Las reglas de la casa que se respetaron, una por una:
+
+- 🔴 **`enviarNegocio`, nunca `sendTelegramAlert` directo** (hay barrido). Es plata que se le debe a la empresa, no una avería del sistema: **sin prefijo `🔧 SISTEMA`** y sin ninguna regla anti-ruido; la única que hay es el horario.
+- 🔴 **Una entrada de cron = una ocurrencia.** `0 14 * * 1` en `vercel.json`, sin listas de horas ni de días.
+- 🔴 **Biyección con el registro de código**: entra a `SEED_TOLERANT_CRONS` (es nuevo: su fila de `cron_heartbeats` puede tardar una semana en sembrarse) con **umbral propio de 8 días** en `CRON_STALE_HOURS_POR_CRON` — el mismo número y el mismo motivo que el resumen semanal de fotos. Con las 26 h por defecto lo darían por caído seis días de cada siete.
+- 🔴 **`docs/crons.md` se actualizó a mano** (81 entradas): el candado protege el código, no la tabla.
+- 🔴 **No toca Switch** — lee solo Supabase —, así que la separación de ≥15 min entre crons que comparten empresa en Switch **no le aplica**. El candado exige que siga sin tocarlo, que es lo que hace cierta esa excepción. A las 14:00 del lunes también corren `cheques-alert` y una pasada de `switch-reconciliacion`; ninguno comparte empresa con éste porque éste no abre ninguna sesión de Switch.
+- 🔴 **Sin ningún reclamo viejo NO manda nada.** Nunca un «todo al día ✅» — Daniel, sobre el resumen de fotos: *«solo dime si me faltan fotos, no si no me faltan fotos»*.
+- 🔴 **El heartbeat se registra igual**: «no había nada que avisar» es una corrida exitosa. Si colgara del envío, un mes sin reclamos viejos haría sonar «esta tarea dejó de correr» sin ser cierto.
+- ⚠️ **NO entra todavía a `CRONS_CUYO_TRABAJO_ES_UN_MENSAJE`**, aunque su producto ES el mensaje. Ese vigía es **fail-CLOSED ante una fila ausente** («los cinco llevan meses corriendo, así que la fila que falta no es una siembra pendiente»), y este cron todavía no tiene fila: meterlo hoy le mandaría a Daniel un 🔧 SISTEMA falso antes de su primera corrida. Se promueve cuando lleve semanas sembrado, junto con el paso a `CRONS_FAIL_CLOSED`. Queda escrito en el comentario del registro.
+
+Candado: `src/__tests__/lib/reclamos-aviso-semanal.test.ts` (25 casos). **6 mutaciones, 6 cazadas**: mandar aunque no haya nada, nombrar cinco en vez de tres, salir por `enviarSistema`, pasar el cron a diario, quitarle el umbral semanal y colgar el heartbeat del envío.
+
+### 7 · El formulario nuevo dice qué va a pasar
+
+- 🩸 «Sube el PDF y se llenan solos el proveedor, la marca, la factura, la fecha y el pedido» vivía **dentro del ⓘ**. El ⓘ de esta casa es *«solo para lo que se aprende una vez»*; esto no se aprende una vez: es lo que hace la pantalla cada vez que se abre, y hay que saberlo **ANTES** de subir el archivo. Ahora va bajo el título, en gris. 🔴 **El texto no se borró: se movió.** `poda-textos-ayuda.test.ts` cambió de dirección con nota fechada — la fila salió por la regla de ese mismo candado, no porque la regla se debilitara.
+- 🩸 «**Falta el PDF de la factura**» salía al pie, al lado de «Cancelar», donde se lee como un pie de foto de los botones y no como lo que le falta a ESE campo. Ahora va **pegado a la caja del archivo** y en rojo.
+- ⚠️ **Lo que frena el guardado no cambió**: el mismo `faltaPdf` y el mismo botón apagado. Cambia dónde se lee, no qué se exige. Y la frase sigue saliendo de `validate.ts`, no escrita a mano.
+
+Candado: `reclamos-formulario-dice-que-pasa.test.tsx` (10 casos). **4 mutaciones, 4 cazadas.**
+
+### 8 · Dos limpiezas, y la fecha que se decía dos veces
+
+**La cabecera imprimía la MISMA fecha dos veces** —«26 ago 2026 · American Fashion Wear · 25 días · creado el 26 ago 2026»— en **14 de los 33 reclamos vivos**. No es casualidad: la migración `20261114120000` les puso a los 29 viejos `fecha_factura` = su `fecha_reclamo`, y a un reclamo cargado el mismo día de la factura le pasa igual. El mockup del 11-sep ya decía que la OC y «creado el» van *«solo si aportan»*, y una fecha repetida no aporta: hace leer dos veces para descubrir que dicen lo mismo. La regla es pura (`seDiceCreadoEl`, `lib/reclamos/texto.ts`) y compara el DÍA, no la hora. ⚠️ Cuando las fechas SÍ son distintas se dice, y **sin fecha de factura también**: es la única fecha que hay.
+
+**Dos puertas sin un solo botón, retiradas.** Es el trato que recibió el CSV el 17-sep: *«un export sin botón no es un export: es una puerta que nadie mira»*.
+
+- `POST /api/reclamos/[id]/en-proceso` — **0 reclamos en «En proceso» en toda la historia**, el estado salió de la pantalla el 10-sep (0 usos en 3 meses) y la ruta no tenía un solo llamador desde `src/`. Pero su `requireRole` la abría a admin y secretaria. ⚠️ **El VALOR no se retira**: sigue contando como por cobrar y las transiciones del PATCH no se tocaron.
+- `GET`/`POST /api/reclamos/motivos` — los motivos personalizados. `reclamo_custom_motivos` tiene **0 filas en toda su historia** y los motivos son la lista cerrada de seis desde el rediseño del 10-sep.
+
+🔴 **La tabla NO se dropea** (patrón `mayor_lineas`, `cxc_favorites`, `packing_lists`): queda clasificada **`retirada`**, fuera del respaldo —no hay una sola fila que proteger— y hay candado que pone el build ROJO si una migración la dropea, la trunca o la vacía. ⚠️ `comprobante-storage.ts` y `/[id]/comprobante`, que la ruta retirada compartía, siguen enteros.
+
+Candado: `src/__tests__/lib/reclamos-puertas-sin-boton.test.ts` (18 casos). **5 mutaciones, 5 cazadas.**
+
+### Y lo que se corrigió de la documentación
+
+La doc decía, en CLAUDE.md y acá, que el backfill de `fecha_factura` *«quedó SIN correr porque `ANTHROPIC_API_KEY` es inválida»*. **Medido el 20-sep-2026: la llave SIRVE** — contesta 200 y el modelo del lector está disponible. Ese párrafo llevaba nueve días mintiendo, y de paso decía que el lector de Marketing tampoco leía en producción, que también es falso.
+
+Y lo que **sigue siendo cierto**, escrito donde se lee:
+
+- Los **33 reclamos vivos tienen `fecha_factura` idéntica a `fecha_reclamo`** — el valor de respaldo que les puso `20261114120000` —, así que los días de la portada están **subestimados en los 33** (la factura siempre es ANTERIOR al reclamo).
+- 🔴 **No hay de dónde sacar la fecha real**: de los 33, **solo 4 tienen PDF**. Y el script `_backfill-reclamos-fecha-factura.mjs` **ya no tiene trabajo que hacer** — solo toca filas con `fecha_factura IS NULL` (`.is("fecha_factura", null)`) y la migración las llenó todas. **No está roto**: se quedó sin filas. Queda rotulado con esa explicación y la fecha, para que nadie vuelva a perder una tarde buscando por qué «no corre».
+- Daniel lo cerró así, textual: *«si puedes sacar la fecha de la factura y arreglarlo, belleza; sino usa la fecha de creación como la de la factura y ya, una sola fecha menos enredo»*. O sea: **una sola fecha, sin asteriscos ni advertencias**. Por eso el aviso de Telegram **no** lleva una línea de «los días pueden estar subestimados», y hay candado que lo exige.
+- ⚠️ **Hacia adelante no se arrastra, y se comprobó**: al CREAR, `validateReclamoNuevo` exige el PDF **y** `validateReclamoHeader` exige `fecha_factura`, así que un reclamo nuevo nace con la fecha REAL de la factura. El problema es solo de los 29 viejos.

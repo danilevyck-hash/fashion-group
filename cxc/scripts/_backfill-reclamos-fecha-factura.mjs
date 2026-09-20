@@ -16,6 +16,33 @@
 //   npx tsx scripts/_backfill-reclamos-fecha-factura.mjs --dry-run  # solo mira
 //
 // (Va con `tsx` porque importa el lector en TypeScript.)
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// 🩸 20-sep-2026 — ESTE SCRIPT YA NO TIENE TRABAJO QUE HACER. NO ESTÁ ROTO.
+//
+// Solo toca reclamos con `fecha_factura` en NULL (`sinFecha`, y el UPDATE
+// repite `.is("fecha_factura", null)`), y la migración `20261114120000` —
+// aplicada el 11-sep-2026 — las llenó TODAS con su `fecha_reclamo`. Hoy no
+// queda ni una fila que cruce ese filtro: corre, no encuentra nada y termina.
+//
+// 🔑 Y no es que falte una llave: la `ANTHROPIC_API_KEY` **se verificó el
+// 20-sep-2026 y SIRVE** (contesta 200 y el modelo del lector está disponible).
+// La doc decía que el backfill «quedó sin correr porque la llave es inválida»;
+// eso dejó de ser cierto.
+//
+// 🔴 QUÉ HARÍA FALTA PARA QUE SIRVIERA: que alguien vaciara `fecha_factura` de
+// los 4 reclamos que SÍ tienen PDF, o que llegaran reclamos nuevos sin fecha —
+// y eso último ya no puede pasar: al CREAR, el PDF es obligatorio
+// (`validateReclamoNuevo`) y la fecha de la factura también, así que un reclamo
+// nuevo nace con la fecha REAL. El problema era solo de los 29 viejos, de los
+// cuales **ninguno tiene PDF que releer**.
+//
+// Daniel, 20-sep-2026, textual: *«si puedes sacar la fecha de la factura y
+// arreglarlo, belleza; sino usa la fecha de creación como la de la factura y
+// ya, una sola fecha menos enredo»*.
+//
+// No se borra: el día que haya PDF viejos que releer, esto es lo que hay.
+// ─────────────────────────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────
 import fs from "node:fs";
 import path from "node:path";
