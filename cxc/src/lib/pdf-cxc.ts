@@ -25,8 +25,9 @@
 // de eso vuelve mientras el nombre se derive.
 //
 // 🔴 Y QUÉ SE IMPRIME LO DECIDE `lib/cxc/descargas.ts`, no este archivo: acá solo
-// se dibuja. Ahí vive el saldo a favor que no entra, el nombre capitalizado y —lo
-// que costó un papel que se contradecía a sí mismo— qué empresas se listan.
+// se dibuja. Ahí vive quién va en cada bloque —los que se cobran y los de saldo
+// a favor—, el nombre capitalizado y —lo que costó un papel que se contradecía a
+// sí mismo— qué empresas se listan.
 // ─────────────────────────────────────────────────────────────────────────────
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -34,7 +35,13 @@ import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
 import { tramoLabel } from "@/lib/cxc-aging";
 import { fmtDate } from "@/lib/format";
 import type { BloqueCliente, FilaCliente } from "@/lib/cxc/descargas";
-import { totalDeLasFilas } from "@/lib/cxc/descargas";
+import {
+  ROTULO_TOTAL_GENERAL,
+  ROTULO_TOTAL_POR_COBRAR,
+  rotuloSaldoAFavor,
+  totalDeLasFilas,
+  totalGeneral,
+} from "@/lib/cxc/descargas";
 
 // El nombre del tramo se importa, no se copia (ver el 🔴 de arriba).
 const tramo = tramoLabel;
@@ -129,23 +136,93 @@ function estilosDeTabla() {
   };
 }
 
+type Celda = string | { content: string; colSpan?: number; styles?: Record<string, unknown> };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 EL SALDO A FAVOR TIENE SU PROPIO BLOQUE, Y EL PAPEL CIERRA CON EL TOTAL DE
+// LA PANTALLA (20-sep-2026).
+//
+// 🩸 El papel decía **$4.244.028,67** y la pantalla **$4.242.821,12**. La
+// diferencia, **$1.207,55**, son los **5 clientes con saldo a favor**, que la
+// pantalla muestra en su bloque «SALDO A FAVOR (5)» y del papel desaparecían sin
+// que nada lo dijera.
+//
+// Ahora el papel lleva, en ESE orden: los que se cobran · «Total por cobrar» ·
+// el bloque «Saldo a favor (N)» · y al pie el «Total general», que es el número
+// de la pantalla. Sin nadie a favor el papel sale EXACTAMENTE como antes, con su
+// única fila «Total».
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Fondo del renglón que encabeza un bloque. */
+const FONDO_BLOQUE: [number, number, number] = [237, 242, 247];
+
+/** La fila que suma un bloque: rótulo a la derecha y los cuatro montos en negrita. */
+function filaDeSuma(rotulo: string, t: { t0: number; t1: number; t2: number; total: number }): Celda[] {
+  const negrita = { fontStyle: "bold", halign: "right" };
+  return [
+    "",
+    { content: rotulo, styles: negrita },
+    { content: dinero(t.t0), styles: negrita },
+    { content: dinero(t.t1), styles: negrita },
+    { content: dinero(t.t2), styles: negrita },
+    { content: dinero(t.total), styles: negrita },
+  ];
+}
+
+/** El renglón que abre el bloque «Saldo a favor (N)», ancho de toda la tabla. */
+function tituloSaldoAFavor(cuantos: number): Celda[] {
+  return [
+    {
+      content: rotuloSaldoAFavor(cuantos),
+      colSpan: 6,
+      styles: { fontStyle: "bold", fillColor: FONDO_BLOQUE, textColor: NAVY },
+    },
+  ];
+}
+
+/**
+ * El pie del papel. Con saldo a favor son DOS números —lo que se cobra y el
+ * total general—; sin nadie a favor, el «Total» de siempre y nada más.
+ */
+function pieDelPapel(
+  porCobrar: { t0: number; t1: number; t2: number; total: number }[],
+  aFavor: { t0: number; t1: number; t2: number; total: number }[],
+): Celda[][] {
+  const t = totalDeLasFilas(porCobrar);
+  if (aFavor.length === 0) {
+    return [["", "Total", dinero(t.t0), dinero(t.t1), dinero(t.t2), dinero(t.total)]];
+  }
+  const g = totalGeneral(porCobrar, aFavor);
+  return [["", ROTULO_TOTAL_GENERAL, dinero(g.t0), dinero(g.t1), dinero(g.t2), dinero(g.total)]];
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 1 · «Total por cliente» — un renglón por cliente
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function pdfTotalPorCliente(
   filas: FilaCliente[],
+  aFavor: FilaCliente[],
   opts: { subtitulo: string; archivo: string; hoy: string },
 ): jsPDF {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
-  const t = totalDeLasFilas(filas);
+
+  const renglon = (f: FilaCliente): Celda[] =>
+    [f.codigo, f.nombre, dinero(f.t0), dinero(f.t1), dinero(f.t2), dinero(f.total)];
+
+  const cuerpo: Celda[][] = filas.map(renglon);
+  if (aFavor.length > 0) {
+    cuerpo.push(filaDeSuma(ROTULO_TOTAL_POR_COBRAR, totalDeLasFilas(filas)));
+    cuerpo.push(tituloSaldoAFavor(aFavor.length));
+    for (const f of aFavor) cuerpo.push(renglon(f));
+  }
 
   autoTable(doc, {
     startY: ALTO_CABECERA,
     margin: { top: ALTO_CABECERA, left: MARGEN, right: MARGEN, bottom: 18 },
     head: [["Código", "Cliente", tramo("current"), tramo("watch"), tramo("overdue"), "Total"]],
-    body: filas.map((f) => [f.codigo, f.nombre, dinero(f.t0), dinero(f.t1), dinero(f.t2), dinero(f.total)]),
-    foot: [["", "Total", dinero(t.t0), dinero(t.t1), dinero(t.t2), dinero(t.total)]],
+    body: cuerpo,
+    foot: pieDelPapel(filas, aFavor),
     columnStyles: {
       0: { cellWidth: 18 },
       1: { cellWidth: "auto" },
@@ -168,34 +245,32 @@ export function pdfTotalPorCliente(
 //     del cliente ABAJO de sus compañías
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Celda = string | { content: string; colSpan?: number; styles?: Record<string, unknown> };
-
 export function pdfPorCompania(
   bloques: BloqueCliente[],
+  aFavor: BloqueCliente[],
   opts: { subtitulo: string; archivo: string; hoy: string },
 ): jsPDF {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
-  const t = totalDeLasFilas(bloques);
 
   const cuerpo: Celda[][] = [];
-  for (const b of bloques) {
+  const dibujarBloque = (b: BloqueCliente) => {
     // El nombre del cliente ENCABEZA su bloque.
     cuerpo.push([
-      { content: b.codigo, styles: { fontStyle: "bold", fillColor: [237, 242, 247] } },
-      { content: b.nombre, colSpan: 5, styles: { fontStyle: "bold", fillColor: [237, 242, 247] } },
+      { content: b.codigo, styles: { fontStyle: "bold", fillColor: FONDO_BLOQUE } },
+      { content: b.nombre, colSpan: 5, styles: { fontStyle: "bold", fillColor: FONDO_BLOQUE } },
     ]);
     for (const e of b.empresas) {
       cuerpo.push(["", e.empresa, dinero(e.t0), dinero(e.t1), dinero(e.t2), dinero(e.total)]);
     }
     // …y la suma del cliente va ABAJO de sus compañías, nunca arriba.
-    cuerpo.push([
-      "",
-      { content: `Total ${b.nombre}`, styles: { fontStyle: "bold", halign: "right" } },
-      { content: dinero(b.t0), styles: { fontStyle: "bold", halign: "right" } },
-      { content: dinero(b.t1), styles: { fontStyle: "bold", halign: "right" } },
-      { content: dinero(b.t2), styles: { fontStyle: "bold", halign: "right" } },
-      { content: dinero(b.total), styles: { fontStyle: "bold", halign: "right" } },
-    ]);
+    cuerpo.push(filaDeSuma(`Total ${b.nombre}`, b));
+  };
+
+  for (const b of bloques) dibujarBloque(b);
+  if (aFavor.length > 0) {
+    cuerpo.push(filaDeSuma(ROTULO_TOTAL_POR_COBRAR, totalDeLasFilas(bloques)));
+    cuerpo.push(tituloSaldoAFavor(aFavor.length));
+    for (const b of aFavor) dibujarBloque(b);
   }
 
   autoTable(doc, {
@@ -203,7 +278,7 @@ export function pdfPorCompania(
     margin: { top: ALTO_CABECERA, left: MARGEN, right: MARGEN, bottom: 18 },
     head: [["Código", "Cliente / Compañía", tramo("current"), tramo("watch"), tramo("overdue"), "Total"]],
     body: cuerpo,
-    foot: [["", "Total", dinero(t.t0), dinero(t.t1), dinero(t.t2), dinero(t.total)]],
+    foot: pieDelPapel(bloques, aFavor),
     columnStyles: {
       0: { cellWidth: 18 },
       1: { cellWidth: "auto" },

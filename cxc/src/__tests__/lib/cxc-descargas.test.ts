@@ -44,11 +44,14 @@ import {
   clientesDeLaDescarga,
   codigoDeCliente,
   companiasDeLaVista,
+  filasSaldoAFavor,
   filasTotalPorCliente,
+  bloquesSaldoAFavor,
   nombreArchivoDescarga,
   nombreDeCliente,
   subtituloDelPapel,
   totalDeLasFilas,
+  totalGeneral,
 } from "@/lib/cxc/descargas";
 import { libroPorCompania, libroTotalPorCliente } from "@/lib/cxc/excel-cartera";
 
@@ -168,7 +171,7 @@ describe("🔴 2 · en ningún lado se exporta CSV", () => {
 
 describe("🔴 3 · qué columnas trae cada archivo", () => {
   it("«Total por cliente»: Código · Cliente · tres tramos · Total", () => {
-    const ws = libroTotalPorCliente(filasTotalPorCliente(CARTERA), "x").Sheets["Cartera"];
+    const ws = libroTotalPorCliente(filasTotalPorCliente(CARTERA), filasSaldoAFavor(CARTERA), "x").Sheets["Cartera"];
     const cabecera = ["A3", "B3", "C3", "D3", "E3", "F3"].map((c) => ws[c]?.v);
     expect(cabecera).toEqual([
       "Código", "Cliente",
@@ -177,7 +180,7 @@ describe("🔴 3 · qué columnas trae cada archivo", () => {
   });
 
   it("«Detallado por compañía»: la Compañía entra en el medio y nada más", () => {
-    const ws = libroPorCompania(bloquesPorCompania(CARTERA, DOS), "x").Sheets["Cartera por compañía"];
+    const ws = libroPorCompania(bloquesPorCompania(CARTERA, DOS), bloquesSaldoAFavor(CARTERA, DOS), "x").Sheets["Cartera por compañía"];
     const cabecera = ["A3", "B3", "C3", "D3", "E3", "F3", "G3"].map((c) => ws[c]?.v);
     expect(cabecera).toEqual([
       "Código", "Cliente", "Compañía",
@@ -278,14 +281,28 @@ describe("🩸 6 · el saldo a favor sale del cobro y de las descargas", () => {
     expect(seLeCobra(0)).toBe(false);
   });
 
-  it("no entra a ninguno de los dos archivos", () => {
+  // 🔄 20-sep-2026 · CAMBIÓ DE DIRECCIÓN, CON NOTA FECHADA. Estas dos líneas
+  // exigían que el saldo a favor NO entrara al archivo y que el Total no lo
+  // restara. Medido: por eso el papel cerraba en $4.244.028,67 y la pantalla en
+  // $4.242.821,12 — $1.207,55 de diferencia, los 5 clientes a favor, sin que
+  // nada lo dijera. Daniel pidió el 20-sep-2026 que el archivo lleve su propio
+  // bloque de saldo a favor y cierre con el número de la pantalla.
+  // 🔴 LO QUE NO CAMBIÓ es lo que este bloque vino a proteger: al saldo a favor
+  // SIGUE sin cobrársele. Detalle: `cxc-cartera-cierra-igual.test.ts`.
+  it("🔄 entra a los dos archivos, pero en su PROPIO bloque (20-sep-2026)", () => {
+    // La lista de COBRO sigue siendo solo la de los positivos…
     expect(clientesDeLaDescarga(CARTERA)).toHaveLength(1);
     expect(filasTotalPorCliente(CARTERA).map((f) => f.codigo)).toEqual(["D-25"]);
     expect(bloquesPorCompania(CARTERA, DOS).map((b) => b.codigo)).toEqual(["D-25"]);
+    // …y el saldo a favor va aparte, nunca mezclado con ella.
+    expect(filasSaldoAFavor(CARTERA).map((f) => f.codigo)).toEqual(["D-139"]);
+    expect(bloquesSaldoAFavor(CARTERA, DOS).map((b) => b.codigo)).toEqual(["D-139"]);
   });
 
-  it("🔴 y por eso el Total del archivo no lo resta", () => {
+  it("🔄 el Total POR COBRAR no lo resta; el Total GENERAL sí (20-sep-2026)", () => {
     expect(totalDeLasFilas(filasTotalPorCliente(CARTERA)).total).toBe(1700);
+    expect(totalGeneral(filasTotalPorCliente(CARTERA), filasSaldoAFavor(CARTERA)).total)
+      .toBeCloseTo(552.48, 2);
   });
 
   it("⚠️ en la PANTALLA sigue viéndose, en su bloque «Saldo a favor»", () => {
@@ -334,10 +351,15 @@ describe("🔴 7 · los dos PDF son el MISMO documento", () => {
     // Daniel: «se tiene que sumar el total del cliente y ponerlo ABAJO del
     // cliente, las sumas, no arriba». El encabezado del bloque lleva el nombre;
     // el total va en el renglón que CIERRA el bloque.
-    const bloque = papel.slice(papel.indexOf("for (const b of bloques)"), papel.indexOf("autoTable(doc, {", papel.indexOf("for (const b of bloques)")));
+    // 🔄 20-sep-2026: el dibujo de un bloque salió del `for` a una función
+    // (`dibujarBloque`) para que los de SALDO A FAVOR se dibujen igual que los
+    // demás. El orden que este candado sostiene —nombre, empresas, y la suma
+    // ABAJO— es el mismo, solo se mira adentro de esa función.
+    const desde = papel.indexOf("const dibujarBloque");
+    const bloque = papel.slice(desde, papel.indexOf("for (const b of bloques)", desde));
     const nombre = bloque.indexOf("content: b.nombre");
     const empresas = bloque.indexOf("for (const e of b.empresas)");
-    const total = bloque.indexOf("Total ${b.nombre}");
+    const total = bloque.indexOf("filaDeSuma(`Total ${b.nombre}`");
     expect(nombre).toBeGreaterThan(-1);
     expect(empresas).toBeGreaterThan(nombre);
     expect(total).toBeGreaterThan(empresas);
@@ -350,20 +372,27 @@ describe("🔴 7 · los dos PDF son el MISMO documento", () => {
 
 describe("🔴 8 · el Excel sale por el estándar de la casa", () => {
   it("título en la fila 1, fila 2 VACÍA, encabezados en la 3", () => {
-    const ws = libroTotalPorCliente(filasTotalPorCliente(CARTERA), "Total por cliente — Vistana").Sheets["Cartera"];
+    const ws = libroTotalPorCliente(filasTotalPorCliente(CARTERA), filasSaldoAFavor(CARTERA), "Total por cliente — Vistana").Sheets["Cartera"];
     expect(ws["A1"]?.v).toBe("Total por cliente — Vistana");
     expect(ws["A2"]).toBeUndefined();
     expect(ws["A3"]?.v).toBe("Código");
   });
 
   it("…con FILTRO desde los encabezados, y el Total fuera del filtro", () => {
-    const ws = libroTotalPorCliente(filasTotalPorCliente(CARTERA), "x").Sheets["Cartera"];
-    // 1 cliente cobrable → A3 encabezados, A4 su fila.
-    expect(ws["!autofilter"]).toEqual({ ref: "A3:F4" });
+    // 🔄 20-sep-2026: la hoja ahora trae también el bloque «Saldo a favor», así
+    // que el filtro cubre 4 renglones (el cliente que se cobra · «Total por
+    // cobrar» · el rótulo del bloque · el cliente a favor). Lo que este candado
+    // sostiene no cambió: el filtro arranca en los encabezados y la fila de
+    // totales queda AFUERA.
+    const ws = libroTotalPorCliente(filasTotalPorCliente(CARTERA), filasSaldoAFavor(CARTERA), "x").Sheets["Cartera"];
+    expect(ws["!autofilter"]).toEqual({ ref: "A3:F7" });
+    // Sin nadie a favor, la hoja de siempre: encabezados y una fila.
+    const soloDeuda = libroTotalPorCliente(filasTotalPorCliente([CITY]), filasSaldoAFavor([CITY]), "x").Sheets["Cartera"];
+    expect(soloDeuda["!autofilter"]).toEqual({ ref: "A3:F4" });
   });
 
   it("🔴 la plata es NÚMERO con formato, nunca el texto «$1,234.56»", () => {
-    const ws = libroTotalPorCliente(filasTotalPorCliente(CARTERA), "x").Sheets["Cartera"];
+    const ws = libroTotalPorCliente(filasTotalPorCliente(CARTERA), filasSaldoAFavor(CARTERA), "x").Sheets["Cartera"];
     expect(ws["F4"]?.t).toBe("n");
     expect(ws["F4"]?.v).toBe(1700);
     expect(ws["F4"]?.z).toBe("$#,##0.00");
@@ -372,7 +401,7 @@ describe("🔴 8 · el Excel sale por el estándar de la casa", () => {
   it("🔴 en el Excel el código y el cliente se REPITEN en cada renglón", () => {
     // En el papel las compañías van adentro del cliente; en la hoja no: sin el
     // nombre en cada fila no se puede filtrar ni armar una tabla dinámica.
-    const ws = libroPorCompania(bloquesPorCompania(CARTERA, DOS), "x").Sheets["Cartera por compañía"];
+    const ws = libroPorCompania(bloquesPorCompania(CARTERA, DOS), bloquesSaldoAFavor(CARTERA, DOS), "x").Sheets["Cartera por compañía"];
     expect([ws["A4"]?.v, ws["B4"]?.v, ws["C4"]?.v]).toEqual(["D-25", "City Mall Paso Canoa", "Vistana International"]);
     expect([ws["A5"]?.v, ws["B5"]?.v, ws["C5"]?.v]).toEqual(["D-25", "City Mall Paso Canoa", "Fashion Wear"]);
   });

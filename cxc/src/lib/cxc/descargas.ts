@@ -82,13 +82,34 @@ export function nombreDeCliente(c: ConsolidatedClient): string {
 }
 
 /**
- * 🔴 LO QUE SE DESCARGA ES LO QUE SE ESTÁ VIENDO, MENOS EL SALDO A FAVOR.
+ * 🔴 LO QUE SE DESCARGA ES LO QUE SE ESTÁ VIENDO.
  *
  * Entra la lista ya filtrada por la pantalla (empresa, tramo, búsqueda, «sin
- * pagar»); acá solo se cae el que tiene saldo a favor, que no se cobra.
+ * pagar»); acá se parte en dos, igual que la pantalla: los que SE COBRAN arriba
+ * y los de SALDO A FAVOR en su propio bloque al pie.
  */
 export function clientesDeLaDescarga(clientes: ConsolidatedClient[]): ConsolidatedClient[] {
   return clientes.filter((c) => seLeCobra(c.total));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 EL PAPEL Y EL EXCEL CIERRAN CON EL MISMO TOTAL QUE LA PANTALLA
+// (20-sep-2026, pedido de Daniel).
+//
+// 🩸 QUÉ PASABA. El papel decía **$4.244.028,67** y la pantalla
+// **$4.242.821,12**. La diferencia, **$1.207,55**, son los **5 clientes con
+// saldo a favor**: la pantalla los muestra en su bloque «SALDO A FAVOR (5)» y
+// del papel y del Excel DESAPARECÍAN sin que nada lo dijera. Dos números para
+// la misma cartera, el mismo día, y ninguno de los dos decía por qué.
+//
+// ⚠️ NO CAMBIA A QUIÉN SE LE COBRA (`lib/cxc/cobrable.ts`): el saldo a favor
+// sigue sin botón «Cobrar», sin casilla de lote y fuera de la lista de cobro.
+// Lo que cambia es que ahora SE VE en el archivo, aparte, como en la pantalla.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Los del bloque aparte: a quien le debemos plata. */
+export function clientesConSaldoAFavor(clientes: ConsolidatedClient[]): ConsolidatedClient[] {
+  return clientes.filter((c) => !seLeCobra(c.total));
 }
 
 /**
@@ -102,16 +123,25 @@ export function companiasDeLaVista(companias: Company[], companyFilter: string):
   return companias.filter((co) => co.key === companyFilter);
 }
 
-/** Un renglón por cliente: código, nombre y los tres tramos. */
-export function filasTotalPorCliente(clientes: ConsolidatedClient[]): FilaCliente[] {
-  return clientesDeLaDescarga(clientes).map((c) => ({
+function filaDe(c: ConsolidatedClient): FilaCliente {
+  return {
     codigo: codigoDeCliente(c),
     nombre: nombreDeCliente(c),
     t0: c.current,
     t1: c.watch,
     t2: c.overdue,
     total: c.total,
-  }));
+  };
+}
+
+/** Un renglón por cliente: código, nombre y los tres tramos. */
+export function filasTotalPorCliente(clientes: ConsolidatedClient[]): FilaCliente[] {
+  return clientesDeLaDescarga(clientes).map(filaDe);
+}
+
+/** Los mismos renglones, para los del bloque «Saldo a favor». */
+export function filasSaldoAFavor(clientes: ConsolidatedClient[]): FilaCliente[] {
+  return clientesConSaldoAFavor(clientes).map(filaDe);
 }
 
 /**
@@ -125,7 +155,19 @@ export function bloquesPorCompania(
   clientes: ConsolidatedClient[],
   companias: Company[],
 ): BloqueCliente[] {
-  return clientesDeLaDescarga(clientes).map((c) => {
+  return bloquesDe(clientesDeLaDescarga(clientes), companias);
+}
+
+/** Los mismos bloques, para los del «Saldo a favor». */
+export function bloquesSaldoAFavor(
+  clientes: ConsolidatedClient[],
+  companias: Company[],
+): BloqueCliente[] {
+  return bloquesDe(clientesConSaldoAFavor(clientes), companias);
+}
+
+function bloquesDe(clientes: ConsolidatedClient[], companias: Company[]): BloqueCliente[] {
+  return clientes.map((c) => {
     const empresas: FilaEmpresa[] = [];
     for (const co of companias) {
       const d = c.companies[co.key];
@@ -151,6 +193,26 @@ export function bloquesPorCompania(
       empresas,
     };
   });
+}
+
+/**
+ * 🔴 EL NÚMERO CON EL QUE CIERRA EL ARCHIVO ES EL DE LA PANTALLA: lo que se
+ * cobra MÁS el saldo a favor (que es negativo y por eso resta).
+ */
+export function totalGeneral(
+  porCobrar: { t0: number; t1: number; t2: number; total: number }[],
+  aFavor: { t0: number; t1: number; t2: number; total: number }[],
+) {
+  return totalDeLasFilas([...porCobrar, ...aFavor]);
+}
+
+/** Los tres rótulos del pie, en los DOS formatos. No se escriben dos veces. */
+export const ROTULO_TOTAL_POR_COBRAR = "Total por cobrar";
+export const ROTULO_TOTAL_GENERAL = "Total general";
+
+/** «Saldo a favor (5)» — el MISMO rótulo que la pantalla pone al pie de la lista. */
+export function rotuloSaldoAFavor(cuantos: number): string {
+  return `Saldo a favor (${cuantos})`;
 }
 
 /** La fila de Total al pie: la suma de lo que se está mostrando. */

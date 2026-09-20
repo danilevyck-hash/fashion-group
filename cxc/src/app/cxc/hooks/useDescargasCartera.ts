@@ -6,7 +6,9 @@ import type { ConsolidatedClient } from "@/lib/types";
 import { hoyPanama } from "@/lib/fecha-panama";
 import {
   bloquesPorCompania,
+  bloquesSaldoAFavor,
   companiasDeLaVista,
+  filasSaldoAFavor,
   filasTotalPorCliente,
   nombreArchivoDescarga,
   ROTULO_DESCARGA,
@@ -29,6 +31,10 @@ export type FormatoDescarga = "pdf" | "excel";
  * y el de «sin pagar» ya aplicados. Y las compañías que se listan salen del
  * FILTRO (`companiasDeLaVista`), no del rol.
  *
+ * 🔴 Y SE PARTE EN DOS COMO LA PANTALLA (20-sep-2026): los que se cobran y, en
+ * su propio bloque, los de SALDO A FAVOR — que antes desaparecían del archivo y
+ * hacían que el papel cerrara **$1.207,55** por encima de la pantalla.
+ *
  * ⚠️ jsPDF y xlsx entran por `import()` a propósito: pesan, y la mayoría de las
  * veces que se abre Cuentas por Cobrar nadie descarga nada.
  */
@@ -46,9 +52,10 @@ export function useDescargasCartera(
 
       if (clave === "total-por-cliente") {
         const filas = filasTotalPorCliente(filtered);
+        const aFavor = filasSaldoAFavor(filtered);
         if (formato === "pdf") {
           const { pdfTotalPorCliente } = await import("@/lib/pdf-cxc");
-          pdfTotalPorCliente(filas, {
+          pdfTotalPorCliente(filas, aFavor, {
             subtitulo: titulo,
             archivo: nombreArchivoDescarga(clave, "pdf", hoy),
             hoy,
@@ -60,16 +67,17 @@ export function useDescargasCartera(
           import("@/lib/excel-export"),
         ]);
         downloadWorkbook(
-          libroTotalPorCliente(filas, titulo),
+          libroTotalPorCliente(filas, aFavor, titulo),
           nombreArchivoDescarga(clave, "xlsx", hoy),
         );
         return;
       }
 
       const bloques = bloquesPorCompania(filtered, companias);
+      const bloquesAFavor = bloquesSaldoAFavor(filtered, companias);
       if (formato === "pdf") {
         const { pdfPorCompania } = await import("@/lib/pdf-cxc");
-        pdfPorCompania(bloques, {
+        pdfPorCompania(bloques, bloquesAFavor, {
           subtitulo: titulo,
           archivo: nombreArchivoDescarga(clave, "pdf", hoy),
           hoy,
@@ -81,7 +89,7 @@ export function useDescargasCartera(
         import("@/lib/excel-export"),
       ]);
       downloadWorkbook(
-        libroPorCompania(bloques, titulo),
+        libroPorCompania(bloques, bloquesAFavor, titulo),
         nombreArchivoDescarga(clave, "xlsx", hoy),
       );
     },
