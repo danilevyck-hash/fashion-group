@@ -31,3 +31,29 @@ export function notaEnPantalla(nota: string, autor: string): { texto: string; au
 export function notaCorreoEnviado(destinatarios: readonly string[], cc: readonly string[]): string {
   return `Correo enviado a ${destinatarios.join(", ")}${cc.length ? ` (copia a ${cc.join(", ")})` : ""}`;
 }
+
+/**
+ * 🔴 «CREADO EL» SOLO SI APORTA ALGO (20-sep-2026).
+ *
+ * 🩸 La cabecera del reclamo imprimía la MISMA fecha dos veces —«26 ago 2026 ·
+ * American Fashion Wear · 25 días · creado el 26 ago 2026»— en **14 de los 33
+ * reclamos vivos**. No es casualidad: la migración `20261114120000` les puso a
+ * los 29 viejos `fecha_factura` = su `fecha_reclamo`, y a un reclamo que se
+ * carga el mismo día de la factura le pasa igual.
+ *
+ * El mockup del 11-sep ya decía que la OC y «creado el» van *«solo si aportan»*.
+ * Una fecha repetida no aporta: hace leer dos veces para descubrir que dicen lo
+ * mismo.
+ *
+ * ⚠️ Cuando las fechas SÍ son distintas, «creado el» se queda: ahí sí dice algo
+ * (cuánto tardó en cargarse el reclamo). Y sin fecha de factura también se
+ * queda: es la única fecha que hay.
+ */
+export function seDiceCreadoEl(
+  fechaFactura: string | null | undefined,
+  createdAt: string | null | undefined,
+): boolean {
+  const creado = (createdAt ?? "").slice(0, 10);
+  if (!creado) return false;
+  return creado !== (fechaFactura ?? "").slice(0, 10);
+}

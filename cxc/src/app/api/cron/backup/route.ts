@@ -349,7 +349,9 @@ const DATASETS: Dataset[] = [
   // Cheques / Recordatorios / Reclamos que faltaban.
   { table: "cheque_vendedores" },
   { table: "recordatorios" },
-  { table: "reclamo_custom_motivos" },
+  // 🩸 `reclamo_custom_motivos` salió del respaldo el 20-sep-2026: 0 filas en
+  // toda su historia y su ruta se retiró (ver `lib/backup/tablas.ts`). La tabla
+  // NO se dropea.
   { table: "cxc_emails_enviados" },
   // El mapeo usuario↔vendedor de Switch (sin él los pedidos no pueden salir) y
   // el orden de módulos por usuario.

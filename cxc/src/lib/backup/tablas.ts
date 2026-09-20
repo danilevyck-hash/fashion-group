@@ -182,7 +182,6 @@ export const TABLAS_PERSONAS = [
   "reclamo_contactos",
   "reclamo_fotos",
   "reclamo_seguimiento",
-  "reclamo_custom_motivos",
 
   // ── Guías
   "guia_transporte",
@@ -358,6 +357,17 @@ export const TABLAS_RETIRADAS = [
   // una migración las borra: `packing-lists-retirado.test.ts`.
   "packing_lists",
   "pl_items",
+  // 🩸 Los motivos personalizados de Reclamos — RETIRADOS el 20-sep-2026. La
+  // tabla tiene **0 filas en toda su historia** y su ruta
+  // (`GET/POST /api/reclamos/motivos`) no tenía un solo llamador desde `src/`:
+  // los motivos son la lista cerrada de seis desde el rediseño del 10-sep. Una
+  // puerta sin botón no es una puerta, es una dirección que alguien podría
+  // saber. Estuvo clasificada `personas` y dentro del respaldo hasta hoy: sale
+  // porque no hay una sola fila que proteger y ya no existe pantalla que la
+  // escriba. 🔴 La TABLA NO se dropea (patrón `mayor_lineas`, `cxc_favorites`)
+  // y hay candado que pone el build rojo si una migración la borra:
+  // `reclamos-puertas-sin-boton.test.ts`.
+  "reclamo_custom_motivos",
 ] as const;
 
 // ─── `vista` — nunca se respalda ────────────────────────────────────────────

@@ -1,6 +1,7 @@
 // Subida del COMPROBANTE de un reclamo (foto o PDF) al bucket reclamo-fotos,
-// subcarpeta /comprobante. Compartida por /en-proceso (adjunto opcional al
-// avanzar) y /comprobante (adjuntar sin cambiar estado, requisito para Pagado).
+// subcarpeta /comprobante. La usa `/comprobante` (adjuntar sin cambiar estado,
+// requisito para marcar Pagado). ⚠️ La compartía con `/en-proceso`, que se
+// retiró el 20-sep-2026 por no tener un solo llamador.
 //
 // 🔴 Desde el 11-sep-2026 el bucket es PRIVADO («Link público ciérralo»): lo
 // que se guarda es el PATH; la URL se firma en el detalle con vida corta

@@ -17,7 +17,7 @@ import { textoReclamado, estaReclamado } from "@/lib/reclamos/reclamado";
 import { FALTA_FECHA_FACTURA } from "@/lib/reclamos/orden";
 import { filaRepetida } from "@/lib/reclamos/lineas-factura";
 import { AIRE_ENTRE_COLUMNAS } from "@/lib/reclamos/tabla-renglones";
-import { motivoEnPantalla, notaEnPantalla } from "@/lib/reclamos/texto";
+import { motivoEnPantalla, notaEnPantalla, seDiceCreadoEl } from "@/lib/reclamos/texto";
 import EnviarProveedorModal from "./EnviarProveedorModal";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
@@ -301,7 +301,7 @@ export default function ReclamoDetail({
               {" · "}{current.proveedor || "—"}{current.marca ? ` · ${current.marca}` : ""}
               {dias !== null && <> · <span className="text-gray-900 font-medium tabular-nums">{dias} día{dias === 1 ? "" : "s"}</span></>}
               {!esActiveShoes(current.empresa) && current.nro_orden_compra && <> · OC {current.nro_orden_compra}</>}
-              {current.created_at && <> · creado el {fmtDate(current.created_at.slice(0, 10))}</>}
+              {seDiceCreadoEl(current.fecha_factura, current.created_at) && <> · creado el {fmtDate(current.created_at!.slice(0, 10))}</>}
             </p>
           )}
           {/* 🩸 El botón suelto «Ver factura» se RETIRÓ (mockup 11-sep-2026): la
