@@ -21,6 +21,7 @@
 import { useEffect, useRef } from "react";
 import { Serwist } from "@serwist/window";
 import { isChunkError, attemptChunkRecovery } from "@/lib/chunk-recovery";
+import { reportarFalloSW } from "@/lib/sw-registro-fallo";
 
 const RELOAD_GUARD_KEY = "fg_sw_reloaded";
 const RELOAD_GUARD_MS = 60_000;
@@ -124,7 +125,9 @@ export default function SWUpdater() {
         retryPending();
         return;
       }
-      void serwist.update();
+      // 🔴 Con `.catch()`: sin señal esta promesa se rechaza y, sin atrapar,
+      // el rechazo sube a Sentry como error. No se traga — ver sw-registro-fallo.
+      void serwist.update().catch((err) => reportarFalloSW("update", err));
     };
     document.addEventListener("visibilitychange", onVisible);
 
@@ -141,7 +144,9 @@ export default function SWUpdater() {
     window.addEventListener("error", onError);
     window.addEventListener("unhandledrejection", onRejection);
 
-    void serwist.register();
+    // 🔴 Con `.catch()`: un /sw.js que no carga (señal caída a media descarga)
+    // no rompe nada — la app es siempre online — pero tampoco se calla del todo.
+    void serwist.register().catch((err) => reportarFalloSW("register", err));
 
     return () => {
       navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
