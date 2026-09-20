@@ -18,7 +18,7 @@
 
 export type AgingKey = "current" | "watch" | "overdue";
 export type RiskFilter = "all" | AgingKey;
-export type SortKey = "name" | AgingKey | "total";
+export type SortKey = "name" | AgingKey | "total" | "sinPagar";
 export type SortDir = "asc" | "desc";
 
 export interface Orden {
@@ -43,6 +43,27 @@ export interface OrdenOverride extends Orden {
 export function ordenParaRiskFilter(risk: RiskFilter): Orden {
   return { key: risk === "all" ? "total" : risk, dir: "desc" };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 LA LISTA ABRE POR «MÁS VIEJO SIN PAGAR» (20-sep-2026, pedido de Daniel).
+//
+// 🩸 QUÉ PASABA. Abría por MONTO, y de los 10 clientes más grandes —el 63 % de
+// la plata— NUEVE habían pagado en los últimos 80 días. El que lleva **313 días
+// sin pagar** ($143.713) quedaba en el puesto 8: la fila que había que mirar
+// primero estaba abajo de ocho que ya estaban pagando.
+//
+// Por eso el orden con el que se ABRE no es un tramo: es la EDAD del último
+// pago, el más viejo arriba. Se expresa como un override anclado a «Total
+// pendiente» —no como un cuarto valor de `ordenParaRiskFilter`— para que las
+// tres píldoras de tramo sigan ordenando por SU tramo, exactamente como el
+// 27-jul-2026. Un toque en el título «Total» vuelve al orden por monto.
+//
+// 🔴 El que NUNCA pagó va PRIMERO: es el caso más grave, no el desconocido
+// (misma regla que `avisaSinPagar`, `lib/cxc/sin-pagar.ts`).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** El orden con el que la pantalla ABRE: el más viejo sin pagar, arriba. */
+export const ORDEN_AL_ABRIR: OrdenOverride = { risk: "all", key: "sinPagar", dir: "desc" };
 
 /**
  * Orden que rige de verdad. El override manda solo mientras siga siendo el
@@ -93,6 +114,27 @@ export function pasaFiltroRiesgo(c: ClienteOrdenable, risk: RiskFilter): boolean
   return true;
 }
 
+/** Lo que hace falta para ordenar, además de la lista. */
+export interface OpcionesOrden<T extends ClienteOrdenable = ClienteOrdenable> {
+  orden: Orden;
+  /**
+   * Días sin pagar de un cliente (`null` = nunca pagó). Solo se consulta con
+   * `orden.key === "sinPagar"`. Sin esta función el orden por días **falla
+   * ABIERTO**: todos quedan iguales y desempata el nombre, nunca se inventa una
+   * fecha.
+   */
+  diasSinPagar?: (c: T) => number | null;
+}
+
+/**
+ * La EDAD para ordenar. `null` («nunca ha pagado») pesa más que cualquier
+ * número de días: es el más viejo de todos.
+ */
+function edadSinPagar<T extends ClienteOrdenable>(c: T, de?: (c: T) => number | null): number {
+  const d = de ? de(c) : null;
+  return d === null || d === undefined ? Number.POSITIVE_INFINITY : d;
+}
+
 function montoDe(c: ClienteOrdenable, key: SortKey): number {
   if (key === "current") return c.current;
   if (key === "watch") return c.watch;
@@ -110,10 +152,10 @@ function montoDe(c: ClienteOrdenable, key: SortKey): number {
  * regla nunca movió una fila y el `esFavorito` que la alimentaba obligaba a las
  * dos carteras a cargar un endpoint que a un vendedor le contestaba 403.
  */
-export function compararClientes(
-  a: ClienteOrdenable,
-  b: ClienteOrdenable,
-  opts: { orden: Orden }
+export function compararClientes<T extends ClienteOrdenable>(
+  a: T,
+  b: T,
+  opts: OpcionesOrden<T>
 ): number {
   const aNeg = a.total < 0 ? 1 : 0;
   const bNeg = b.total < 0 ? 1 : 0;
@@ -121,6 +163,16 @@ export function compararClientes(
 
   const porNombre = a.nombre_normalized.localeCompare(b.nombre_normalized, "es", { sensitivity: "base" });
   if (opts.orden.key === "name") return opts.orden.dir === "asc" ? porNombre : -porNombre;
+
+  if (opts.orden.key === "sinPagar") {
+    const da = edadSinPagar(a, opts.diasSinPagar);
+    const db = edadSinPagar(b, opts.diasSinPagar);
+    // Comparar, no restar: `Infinity - Infinity` es NaN y un comparador que
+    // devuelve NaN deja la lista en cualquier orden.
+    const cmp = da === db ? 0 : da < db ? -1 : 1;
+    if (cmp !== 0) return opts.orden.dir === "desc" ? -cmp : cmp;
+    return porNombre;
+  }
 
   const va = montoDe(a, opts.orden.key);
   const vb = montoDe(b, opts.orden.key);
@@ -132,7 +184,7 @@ export function compararClientes(
 /** Ordena una copia (no muta la lista que recibe). */
 export function ordenarClientes<T extends ClienteOrdenable>(
   lista: T[],
-  opts: { orden: Orden }
+  opts: OpcionesOrden<T>
 ): T[] {
   return [...lista].sort((a, b) => compararClientes(a, b, opts));
 }
@@ -146,5 +198,6 @@ export function etiquetaOrden(key: SortKey): string {
   if (key === "current") return "0-90d";
   if (key === "watch") return "91-120d";
   if (key === "overdue") return "121d+";
+  if (key === "sinPagar") return "días sin pagar";
   return "total";
 }

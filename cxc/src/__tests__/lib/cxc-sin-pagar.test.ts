@@ -221,8 +221,16 @@ describe("la pantalla usa la regla, no una copia", () => {
     expect(src).toMatch(/c\.total\s*>\s*0\s*&&\s*avisaSinPagar/);
   });
 
-  it("el «no paga hace N d» de la fila se dibuja SOLO con el filtro encendido", () => {
+  // 🔄 20-sep-2026 · CAMBIÓ DE DIRECCIÓN, CON NOTA FECHADA. Esta línea exigía lo
+  // CONTRARIO: que el «no paga hace N d» se dibujara SOLO con el filtro de
+  // «+90 d» encendido. Daniel pidió el 20-sep-2026 que la lista ABRA ordenada
+  // por días sin pagar (el más viejo arriba), y una lista ordenada por una
+  // antigüedad que no se puede leer en ninguna fila no se entiende. Así que el
+  // dato se ve SIEMPRE y este candado cambia de lado — no se borra.
+  // Detalle y medición: `cxc-abre-por-mas-viejo.test.ts`.
+  it("🔄 el «no paga hace N d» de la fila se dibuja SIEMPRE (20-sep-2026)", () => {
     const src = sinComentarios(leer("src/app/cxc/page.tsx"));
-    expect(src).toMatch(/sinPagarActivo\s*\?\s*textoSinPagar/);
+    expect(src).toContain("textoSinPagar(diasSinPagarDe(c))");
+    expect(src).not.toMatch(/sinPagarActivo\s*\?\s*textoSinPagar/);
   });
 });

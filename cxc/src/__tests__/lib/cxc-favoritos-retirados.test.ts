@@ -129,9 +129,16 @@ describe("CONTROL — el CXC se sigue dibujando", () => {
     expect(fila).toContain("onCobrar");
   });
 
-  it("la card de celular conserva el nombre y el orden por tramo", () => {
+  // 🔄 20-sep-2026 · CAMBIÓ DE FORMA, CON NOTA FECHADA. El celular dejó de
+  // reordenar por su cuenta: `filtered` ya llega ordenado por `compararClientes`
+  // y volver a ordenarlo acá con `ordenParaRiskFilter` habría devuelto el
+  // teléfono al orden por MONTO, mientras la computadora abre por días sin pagar
+  // (ver `cxc-abre-por-mas-viejo.test.ts`). El CONTROL es el mismo —la card se
+  // sigue dibujando con su nombre y en el orden de la lista—, solo cambia de
+  // quién sale ese orden.
+  it("la card de celular conserva el nombre y muestra el orden que ya viene", () => {
     const movil = codigo("app/cxc/components/PanelCxcMobile.tsx");
-    expect(movil).toContain("ordenarClientes(filtered, { orden })");
+    expect(movil).toContain("const sortedMobile = filtered;");
     expect(movil).toContain("{client.nombre_normalized}");
   });
 

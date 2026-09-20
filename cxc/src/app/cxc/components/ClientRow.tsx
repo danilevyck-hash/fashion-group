@@ -20,7 +20,7 @@ interface Props {
   /** Casilla de selección para mandar a varios. */
   seleccionado: boolean;
   onSeleccionar: (client: ConsolidatedClient) => void;
-  /** «no paga hace 298 d» / «nunca ha pagado» — solo con el filtro encendido. */
+  /** «no paga hace 298 d» / «nunca ha pagado». 🔴 Se ve SIEMPRE (20-sep-2026). */
   avisoSinPagar?: string | null;
 }
 
@@ -71,8 +71,10 @@ export default function ClientRow({
             <path d="M3 1l5 4-5 4V1z"/>
           </svg>
           <span className="truncate" title={client.nombre_normalized}>{client.nombre_normalized}</span>
-          {/* Solo con el filtro de «sin pagar» encendido: en las 100 filas
-              normales esta línea sería ruido pegado a cada nombre. */}
+          {/* 🔴 SE VE SIEMPRE (20-sep-2026, pedido de Daniel). 🩸 Se dibujaba
+              solo con el filtro de «+90 d» encendido; desde que la lista ABRE
+              ordenada por estos días, esconderlos dejaba las filas ordenadas por
+              un dato que no se podía leer en ninguna. */}
           {avisoSinPagar && (
             <span className="shrink-0 text-xs text-gray-400 whitespace-nowrap">{avisoSinPagar}</span>
           )}

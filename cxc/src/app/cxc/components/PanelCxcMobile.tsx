@@ -34,11 +34,7 @@ import {
 } from "@/lib/empresa-mapping";
 import { formatCompactCurrency } from "@/lib/ventas/format";
 import { fmt } from "@/lib/format";
-import {
-  ordenParaRiskFilter,
-  ordenarClientes,
-  type RiskFilter,
-} from "@/lib/cxc-orden";
+import { type RiskFilter } from "@/lib/cxc-orden";
 import { rotuloSinPagar } from "@/lib/cxc/sin-pagar";
 import { AGING, tramoLabel } from "@/lib/cxc-aging";
 import MenuDescargar from "./MenuDescargar";
@@ -131,12 +127,16 @@ export default function PanelCxcMobile({
     return { total, current, watch, overdue, cCount, wCount, oCount };
   }, [roleClients]);
 
-  // Ordenamiento mobile: negativos al final, y después por el tramo del chip
-  // encendido (de mayor a menor); sin chip, por total. Misma regla y mismo
-  // comparador que el escritorio (lib/cxc-orden) — en móvil no hay títulos de
-  // columna que tocar, así que el chip es el único que manda el orden.
-  const orden = useMemo(() => ordenParaRiskFilter(riskFilter), [riskFilter]);
-  const sortedMobile = useMemo(() => ordenarClientes(filtered, { orden }), [filtered, orden]);
+  // 🔴 EL CELULAR NO REORDENA: muestra la lista EN EL ORDEN QUE YA VIENE
+  // (20-sep-2026).
+  //
+  // 🩸 Acá se volvía a ordenar con `ordenParaRiskFilter(riskFilter)`, una regla
+  // PROPIA que, sin chip encendido, siempre decía «por total». Desde que la
+  // pantalla abre por DÍAS SIN PAGAR (el más viejo arriba), esa segunda regla
+  // habría devuelto el celular al orden por monto — o sea, dos pantallas del
+  // mismo módulo con el primer cliente distinto. `filtered` ya sale ordenado por
+  // `compararClientes`, el único comparador del módulo.
+  const sortedMobile = filtered;
 
   const [expandedName, setExpandedName] = useState<string | null>(null);
 

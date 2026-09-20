@@ -52,6 +52,7 @@ import {
 import {
   ordenEfectivo,
   ordenAlTocarTitulo,
+  ORDEN_AL_ABRIR,
   siguienteRiskFilter,
   pasaFiltroRiesgo,
   compararClientes,
@@ -190,7 +191,12 @@ function AdminDashboardInner() {
   // El orden se DERIVA del tramo activo. El clic en el título de una columna es
   // un override anclado a ese tramo: sirve para ordenar sin filtrar, y al cambiar
   // de píldora deja de aplicar solo. Así encabezado y píldora nunca se contradicen.
-  const [ordenOverride, setOrdenOverride] = useState<OrdenOverride | null>(null);
+  //
+  // 🔴 ARRANCA EN `ORDEN_AL_ABRIR` (20-sep-2026): la lista se abre por DÍAS SIN
+  // PAGAR, el más viejo arriba. Un toque en el título «Total» vuelve al orden
+  // por monto, y tocar una píldora de tramo sigue ordenando por SU tramo — el
+  // override está anclado a «Total pendiente», así que se descarta solo.
+  const [ordenOverride, setOrdenOverride] = useState<OrdenOverride | null>(ORDEN_AL_ABRIR);
   const orden = ordenEfectivo(riskFilter, ordenOverride);
   const { key: sortKey, dir: sortDir } = orden;
   const [toast, setToast] = useState<string | null>(null);
@@ -352,8 +358,11 @@ function AdminDashboardInner() {
       );
     }
 
+    // `diasSinPagar` solo se consulta cuando se ordena por días; va siempre para
+    // que el comparador no tenga dos formas de llamarse.
     result.sort((a, b) => compararClientes(a, b, {
       orden: { key: sortKey, dir: sortDir },
+      diasSinPagar: diasSinPagarDe,
     }));
 
     return result;
@@ -417,11 +426,17 @@ function AdminDashboardInner() {
     };
   }, [kpiClients, diasSinPagarDe]);
 
-  /** El «no paga hace N d» de una fila — SOLO con el filtro encendido. */
+  /**
+   * El «no paga hace N d» de una fila.
+   *
+   * 🔴 SE VE SIEMPRE (20-sep-2026, pedido de Daniel). 🩸 Hasta hoy se dibujaba
+   * SOLO con el filtro de «+90 d» encendido, así que el dato con el que ahora se
+   * ordena la lista estaba escondido detrás de un botón: se veían las filas en
+   * orden de antigüedad sin poder leer la antigüedad de ninguna.
+   */
   const avisoSinPagarDe = useCallback(
-    (c: ConsolidatedClient): string | null =>
-      sinPagarActivo ? textoSinPagar(diasSinPagarDe(c)) : null,
-    [sinPagarActivo, diasSinPagarDe],
+    (c: ConsolidatedClient): string | null => textoSinPagar(diasSinPagarDe(c)),
+    [diasSinPagarDe],
   );
 
   // 🔴 LAS DOS DESCARGAS. Es el MISMO hook que usa el celular: lo que se baja
