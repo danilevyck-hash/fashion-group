@@ -245,7 +245,7 @@ Daniel eligió la opción (a) del pendiente 27: tocar `useAuth` una vez en vez d
 
 ### Lo que NO se tocó, y por qué
 
-- **`/home`** — tiene su chequeo propio y pinta según el modo oscuro (`localStorage`), que el servidor no puede saber: seeded, un usuario en modo oscuro vería un flash claro, peor que el blanco. Y el saludo pasaría de «Buen día, daniel» (el usuario de login, lo que trae la cookie) a «Buen día, Daniel Levy» (el nombre real, que se pide aparte). Las dos cosas piden una decisión (por ejemplo, guardar la preferencia de modo oscuro en una cookie).
+- **`/home`** — tiene su chequeo propio y pinta según el modo oscuro (`localStorage`), que el servidor no puede saber: seeded, un usuario en modo oscuro vería un flash claro, peor que el blanco. ⚠️ **Su REBOTE sí se mudó al servidor el 19-sep-2026 por la tarde — ver el punto 4 de abajo**: decidir a dónde va la petición no obliga a pintar nada. Y el saludo pasaría de «Buen día, daniel» (el usuario de login, lo que trae la cookie) a «Buen día, Daniel Levy» (el nombre real, que se pide aparte). Las dos cosas piden una decisión (por ejemplo, guardar la preferencia de modo oscuro en una cookie).
 - **`/prestamos/[id]`** — su `return null` también espera `loading` y `empleado`, que vienen de un `fetch` del navegador: con la semilla ya no espera la sesión, pero sigue en blanco hasta que llega la ficha. Pide traer la ficha en el servidor, como Recordatorios.
 - **Ningún número cambió**: esto es pintado, no cálculo. La suite entera (789 archivos, 16.111 tests) pasó sin tocar un solo test viejo — los que simulan `useAuth` siguen simulándolo igual.
 
@@ -253,3 +253,63 @@ Daniel eligió la opción (a) del pendiente 27: tocar `useAuth` una vez en vez d
 
 - `src/__tests__/lib/sesion-semilla-primer-pintado.test.tsx` — 51 casos en siete bloques: la regla es una · la semilla lleva solo lo necesario · el servidor solo cree en la firma y falla abierta · el primer pintado trae contenido (GroupPage real, Comisiones con sus años, Recordatorios con su cheque y **cero `fetch`**) · 🔴 nadie ve lo que no le toca (dos pantallas de admin × siete roles, y la pestaña vieja de bodega que se retira) · el cableado · las 29 pantallas por nombre.
 - `scripts/_mutar-candados-sesion-semilla.sh` — **15 mutaciones, 15 cazadas**, 2 controles en verde. Entre ellas: el defecto original tal cual, «con cookie basta», la cookie forjada, la semilla que arrastra el token, y la pantalla que no se retira cuando `sessionStorage` niega.
+
+---
+
+# 4 · Quien no tiene Inicio no lo ve ni un instante (19-sep-2026, tarde)
+
+Daniel, textual: ***«la persona entra y se ve el home y de una marcaciones, se siente bug»***.
+
+## Lo que se veía
+
+Ana Trejos (2), Cindy De Gracia (3) y Yeisibeth Muñoz (306) tienen el rol `marcacion`: **un solo módulo**. Entraban a `/home`, **veían dibujarse el Inicio** —el saludo, la fecha, las fichas— y un instante después el sistema las botaba a `/marcacion`. Lo mismo Jennifer (`gerente_acs`, un solo módulo → `/multifashion`) y David (`gerente_boston`, tres módulos pero **casa fijada** → `/boston`).
+
+## Por qué pasaba
+
+La regla estaba bien y vivía en un solo lugar (`lib/navegacion/casa-del-rol.ts`, punto 2 de este mismo archivo). Lo que estaba mal era **cuándo** se aplicaba: en un `useEffect` de `src/app/home/page.tsx`, o sea **en el navegador**. El orden real era:
+
+```
+servidor manda el Inicio ENTERO  →  el navegador lo pinta  →  baja el JavaScript
+→  hidrata  →  lee sessionStorage  →  recién ahí sabe el rol  →  router.replace
+```
+
+Cinco pasos con pintura en el medio. No es lentitud de red: el HTML del Inicio **ya había salido** antes de que nadie preguntara quién entraba.
+
+🔑 **Y el servidor ya lo sabía.** Desde el 19-sep por la mañana (punto 3) la cookie firmada se lee en el servidor con `leerSemillaDeSesion()`: trae **rol y módulos**, verificados por HMAC, y el middleware ya la comprobó contra `user_sessions` antes de que la página se dibuje.
+
+## Cómo quedó
+
+**`src/app/home/layout.tsx`** — un componente de **servidor** de seis líneas, que Next corre **antes** que `page.tsx`:
+
+```
+semilla = leerSemillaDeSesion()          ← la cookie FIRMADA, nada más
+casa    = casaDelRol(role, modules)      ← la MISMA regla de siempre
+casa ≠ /home  →  redirect(casa)          ← sale un 307 y no viaja una línea de HTML
+```
+
+Tres decisiones, y las tres importan:
+
+1. 🔴 **La regla no se reescribió.** Es `casaDelRol`, el módulo que ya usan el efecto de `page.tsx`, el 404 y el botón «Ir al inicio» del encabezado. Un segundo lugar que decida «cuál es tu casa» es exactamente el bug que ese archivo vino a cerrar en el punto 2. El candado exige que los **cuatro** lo importen, y que el layout no tenga ni un `role === "…"` ni el nombre de un rol escrito adentro.
+2. 🔴 **Falla ABIERTA.** Sin cookie, con cookie forjada o sin firma, sin `SESSION_SECRET`, con `cookies()` reventando o con un rol desconocido → no redirige a nadie y se sirve el Inicio como siempre. Un redirect equivocado deja a alguien fuera de su trabajo; un pintado de más solo se ve feo.
+3. 🔴 **El efecto del navegador NO se tocó, y no sobra.** Es la red del que entra sin semilla (pestaña con `sessionStorage` vacío), del rol `cliente` del catálogo público de Reebok, y del caso en que la cookie y `sessionStorage` no dicen lo mismo. Sigue empujando con `replace`, nunca con `push`.
+
+⚠️ **Se eligió un `layout.tsx` y no partir `page.tsx` en dos.** `src/app/home/page.tsx` lo leen **diez candados como TEXTO** (`boston-acceso`, `multifashion-acceso`, `toque-44`, `inicio-sin-promesas`, `data-health-sin-pantalla`, `navegacion-lleva-a-donde-dice`…) y dos scripts de mutación. Mover su cuerpo a un `HomeClient.tsx` los habría roto a todos sin arreglar nada de lo que ellos vigilan. El layout deja `page.tsx` **byte por byte igual**.
+
+## El modo oscuro: por qué NO impide esto
+
+Es el motivo real por el que `/home` quedó fuera del arreglo de la mañana, y sigue siendo cierto — **pero es un impedimento para PINTAR, no para DECIDIR**:
+
+- `page.tsx` no usa clases de Tailwind `dark:`; lee `localStorage.getItem("fg_dark_mode")` en un efecto y **arma cada `className` a mano** con un ternario sobre el estado `darkMode` (`fichaBase`, `iconoBase`, `textoBase`, el fondo del `<div>` raíz). El servidor no puede leer `localStorage`, así que si dibujara el Inicio lo dibujaría **siempre en claro**, y quien usa modo oscuro vería un destello blanco. El script del `<head>` del layout raíz pone la clase `dark` en el `<html>` a tiempo, pero **eso no alcanza**: los colores del Inicio no cuelgan de esa clase.
+- El layout nuevo **no pinta nada**: devuelve `children` o se va por el `redirect()`. Quien se queda en el Inicio lo recibe exactamente como antes, sin destello.
+- Que `/home` pinte en el servidor sigue **pendiente de Daniel**, y pide una decisión suya: guardar la preferencia de modo oscuro en una cookie (y de paso el nombre del saludo, que hoy se pide aparte a `/api/auth/perfil`).
+
+## Lo que NO cambió
+
+- **Quien tiene varios módulos ve el Inicio igual que hoy**: admin (21 módulos), secretaria (11), vendedor (5), contabilidad (5) y **bodega (4 — Angel y Rodrigo)**. Medido rol por rol contra `getVisibleModules`.
+- **Nada toca la base ni la planilla**: esto es navegación.
+- La cookie es la de siempre (`cxc_session`, HMAC) y **el `sessionToken` no se lee**: el candado lo exige por texto.
+
+## Candado y verificación por mutación
+
+- `src/__tests__/lib/home-rebote-en-el-servidor.test.tsx` — **25 casos** en seis bloques: la decisión es del servidor (el layout no es `"use client"`, no decodifica la cookie por su cuenta, no pinta nada suyo) · un solo módulo redirige y el Inicio **no se alcanza a renderizar** · varios módulos lo ven, con los **ocho roles del sistema** comparados contra `casaDelRol` · sin sesión falla abierta (seis formas de no tener sesión) · la regla es la de siempre y los cuatro lugares importan el mismo módulo · el efecto del navegador sigue ahí con su `replace`.
+- **5 mutaciones, 5 cazadas**, control en verde: quitar el `redirect` (7 fallos), invertir la condición (13), redirigir sin semilla (6), volverlo `"use client"` (1) e ignorar los módulos para mirar solo el rol (1).

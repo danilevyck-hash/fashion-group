@@ -32,7 +32,11 @@
  *  G. LAS PANTALLAS ALCANZADAS, POR NOMBRE: cada archivo con
  *     `if (!authChecked) return null` pasa por `useAuth`, así el arreglo del
  *     gancho les llega a todas. `/home` NO está: tiene su propio chequeo y
- *     depende del modo oscuro del navegador — decisión pendiente de Daniel.
+ *     elige sus colores con el modo oscuro, que vive en el `localStorage` del
+ *     navegador — pintarlo en el servidor sería un destello de tema claro.
+ *     ⚠️ Lo que SÍ se mudó al servidor el 19-sep-2026 es el REBOTE de quien no
+ *     tiene Inicio (`src/app/home/layout.tsx`): decide a dónde va la petición
+ *     sin pintar nada. Candado: `home-rebote-en-el-servidor.test.tsx`.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, act } from "@testing-library/react";
@@ -436,14 +440,16 @@ describe("G · las pantallas alcanzadas, por nombre", () => {
     "src/app/vista-general/page.tsx",
   ];
   const CON_CHEQUEO_PROPIO_Y_SEMILLA = ["src/components/GroupPage.tsx"];
-  const PENDIENTE_DE_DANIEL = ["src/app/home/page.tsx"];
+  // `/home` pinta en el navegador por el modo oscuro; su REBOTE ya es del
+  // servidor (`src/app/home/layout.tsx`, 19-sep-2026).
+  const PINTA_EN_EL_NAVEGADOR = ["src/app/home/page.tsx"];
 
   it("cada archivo con `if (!authChecked…) return null` está en una de las tres listas", () => {
     const encontrados = [...archivosTsx(path.join(RAIZ, "src/app")), ...archivosTsx(path.join(RAIZ, "src/components"))]
       .filter((p) => /if \(!authChecked[^\n]*\) return null;/.test(readFileSync(p, "utf8")))
       .map((p) => path.relative(RAIZ, p))
       .sort();
-    expect(encontrados).toEqual([...ALCANZADAS_POR_EL_GANCHO, ...CON_CHEQUEO_PROPIO_Y_SEMILLA, ...PENDIENTE_DE_DANIEL].sort());
+    expect(encontrados).toEqual([...ALCANZADAS_POR_EL_GANCHO, ...CON_CHEQUEO_PROPIO_Y_SEMILLA, ...PINTA_EN_EL_NAVEGADOR].sort());
   });
 
   it("las 29 pasan por `useAuth`, así que el arreglo del gancho les llega", () => {
