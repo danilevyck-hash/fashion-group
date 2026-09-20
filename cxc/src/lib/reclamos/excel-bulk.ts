@@ -2,10 +2,10 @@ import XLSX from "xlsx-js-style";
 import { buildReclamoSheet, type OpcionesHojaReclamo } from "@/lib/excel-reclamo";
 import { reclamoTaxes, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL } from "@/lib/reclamos/tax";
 import { facturasEnPantalla } from "@/lib/reclamos/facturas";
+import { fechaDeLaCabecera } from "@/lib/reclamos/papel";
+import { fmtDate } from "@/lib/format";
 import {
-  addr,
   buildReportSheet,
-  fmtFechaExcel,
   workbookFromSheets,
   workbookBuffer,
   MONEY_FMT,
@@ -37,6 +37,9 @@ interface ReclamoFull {
   nro_factura?: string;
   nro_orden_compra?: string;
   fecha_reclamo?: string;
+  /** La fecha de la FACTURA del proveedor — la que mide los días y la que sale
+   *  en las dos hojas del archivo (20-sep-2026). */
+  fecha_factura?: string | null;
   estado?: string;
   notas?: string;
   factura_pdf_path?: string | null;
@@ -59,6 +62,21 @@ interface Contacto {
  * y «Fotos» —la galería pública por token—, las dos dentro de un archivo que
  * se reenvía. La columna «# Fotos» SE QUEDA: es un dato, no un camino a un
  * archivo.
+ *
+ * 🔴 SIN LA COLUMNA «ESTADO» (20-sep-2026). Imprimía nuestras palabras de
+ * adentro —«Creado» en 19 de los 33 reclamos vivos, «Pagado» en 14—, y las dos
+ * le mienten a un proveedor extranjero: «Creado» no le dice nada, y «Pagado»
+ * se lee al revés de lo que significa (acá quiere decir que el proveedor YA
+ * acreditó; él puede entender que se le pagó a él). Adentro del sistema el
+ * estado se sigue viendo igual: lo que cambia es el archivo que SALE.
+ *
+ * 🔴 UNA SOLA FECHA EN TODO EL ARCHIVO, LA DE LA FACTURA (20-sep-2026). Esta
+ * hoja fechaba por `fecha_reclamo` y las hojas de detalle por `fecha_factura`:
+ * dos reglas distintas adentro del mismo Excel. Manda la de la factura, que es
+ * la que mide los días desde el rediseño — y sale por `fechaDeLaCabecera`, el
+ * mismo módulo del papel, así que las dos hojas no se pueden volver a separar.
+ * Escrita con el `fmtDate` de la casa («26 ago 2026»), igual que el detalle y
+ * que el PDF.
  */
 function buildResumenSheet(reclamos: ReclamoFull[]): XLSX.WorkSheet {
   let grandSub = 0;
@@ -85,8 +103,7 @@ function buildResumenSheet(reclamos: ReclamoFull[]): XLSX.WorkSheet {
     const fila: ReportCell[] = [
       { v: rec.nro_reclamo || "", bold: true },
       facturasEnPantalla(rec.nro_factura),
-      fmtFechaExcel(rec.fecha_reclamo),
-      rec.estado || "",
+      fmtDate(fechaDeLaCabecera(rec) ?? ""),
       sub,
       tx.importacion,
       tx.itbms,
@@ -100,8 +117,7 @@ function buildResumenSheet(reclamos: ReclamoFull[]): XLSX.WorkSheet {
     columns: [
       { header: "N° Reclamo", wch: 16 },
       { header: "Factura", wch: 18 },
-      { header: "Fecha", wch: 12, align: "center" },
-      { header: "Estado", wch: 12, align: "center" },
+      { header: "Fecha", wch: 14, align: "center" },
       { header: "Subtotal", wch: 14, align: "right", fmt: MONEY_FMT },
       { header: "Importación", wch: 14, align: "right", fmt: MONEY_FMT },
       { header: "ITBMS", wch: 14, align: "right", fmt: MONEY_FMT },
@@ -109,7 +125,7 @@ function buildResumenSheet(reclamos: ReclamoFull[]): XLSX.WorkSheet {
       { header: "# Fotos", wch: 9, align: "center" },
     ],
     rows,
-    totals: ["TOTAL GENERAL", null, null, null, grandSub, grandImp, grandItbms, grandTotal, grandFotos],
+    totals: ["TOTAL GENERAL", null, null, grandSub, grandImp, grandItbms, grandTotal, grandFotos],
   });
 
   return ws;

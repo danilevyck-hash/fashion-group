@@ -137,16 +137,17 @@ describe("buildBulkReclamosExcel (Resumen + hojas por reclamo)", () => {
 
     // Encabezados en la fila 1: nada arriba de ellos. 🔄 11-sep-2026 (tarde):
     // la última columna es «# Fotos» —un DATO— porque las dos de links,
-    // «Factura PDF» y «Fotos», se retiraron.
+    // «Factura PDF» y «Fotos», se retiraron. 🔄 20-sep-2026: se fue «Estado»,
+    // así que «# Fotos» pasó de la I a la H.
     expect(resumen.A1?.v).toBe("N° Reclamo");
-    expect(resumen.I1?.v).toBe("# Fotos");
-    expect(resumen.J1?.v).toBeUndefined();
+    expect(resumen.H1?.v).toBe("# Fotos");
+    expect(resumen.I1?.v).toBeUndefined();
 
     // Fila de datos del rec1 (fila 2): subtotal 2×10.50 + 1×5 = 26, número real
     expect(resumen.A2?.v).toBe("R-001");
-    expect(resumen.E2?.t).toBe("n");
-    expect(resumen.E2?.v).toBe(26);
-    expect(resumen.E2?.z).toBe(MONEY_FMT);
+    expect(resumen.D2?.t).toBe("n");
+    expect(resumen.D2?.v).toBe(26);
+    expect(resumen.D2?.z).toBe(MONEY_FMT);
 
     // 🔄 11-sep-2026 (tarde): el Resumen tampoco lleva un solo hipervínculo.
     expect(linkTargets(resumen)).toEqual([]);

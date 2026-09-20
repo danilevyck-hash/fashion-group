@@ -10,6 +10,7 @@ import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
 import { reclamoTaxes, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL } from "@/lib/reclamos/tax";
 import { facturasEnPantalla } from "@/lib/reclamos/facturas";
 import { fmtDate as fmtDiaLargo } from "@/lib/format";
+import { hoyPanama } from "@/lib/fecha-panama";
 import {
   columnasDelPapel,
   datosDelPapel,
@@ -88,10 +89,18 @@ function fmt(n: number): string {
   return (n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function fmtDate(d: string | undefined): string {
-  if (!d) return "—";
-  const [y, m, day] = d.split("-");
-  return `${day}/${m}/${y}`;
+/**
+ * 🔴 UN SOLO FORMATO DE FECHA EN TODO EL PAPEL (20-sep-2026): el `fmtDate` de
+ * la casa, «26 ago 2026». Acá vivía un segundo formateador propio que escribía
+ * «26/08/2026», y la portada usaba un TERCERO —`toLocaleDateString("es-PA")`,
+ * que en el servidor sale «09/20/2026», con el mes adelante como en inglés—.
+ * Tres grafías de la misma cosa adentro de un archivo que se le manda a un
+ * proveedor extranjero: una de ellas, la de la portada, hasta le cambia el día
+ * por el mes.
+ */
+function fechaDelPapel(d: string | null | undefined): string {
+  const iso = String(d ?? "").slice(0, 10);
+  return iso ? fmtDiaLargo(iso) : "—";
 }
 
 async function downloadFoto(storagePath: string): Promise<{ base64: string; ext: string } | null> {
@@ -125,7 +134,7 @@ function drawCoverHeader(doc: jsPDF, empresa: string, count: number, grandTotal:
 
   doc.setTextColor(120, 120, 120);
   doc.setFontSize(9);
-  doc.text(`Generado el ${new Date().toLocaleDateString("es-PA")}`, MARGIN, 34);
+  doc.text(`Generado el ${fechaDelPapel(hoyPanama())}`, MARGIN, 34);
   doc.text(`${count} reclamo${count === 1 ? "" : "s"}`, MARGIN, 39);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(27, 58, 92);
@@ -165,7 +174,7 @@ function drawCabecera(doc: jsPDF, rec: ReclamoFull, startY: number): number {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9.5);
     doc.setTextColor(110, 110, 110);
-    doc.text(fmtDiaLargo(fecha), xDer, y + 10.5, { align: "right" });
+    doc.text(fechaDelPapel(fecha), xDer, y + 10.5, { align: "right" });
   }
 
   y += FG_LOGO_HEIGHT + 2;
@@ -307,7 +316,7 @@ function drawSettlementBlock(doc: jsPDF, rec: ReclamoFull, subtotal: number, sta
     doc.setFontSize(8);
     for (const s of settlements) {
       const nc = s.nota_credito ? ` · NC ${s.nota_credito}` : "";
-      doc.text(`${fmtDate(s.fecha)} — $${fmt(Number(s.monto) || 0)}${nc}`, MARGIN + 2, y);
+      doc.text(`${fechaDelPapel(s.fecha)} — $${fmt(Number(s.monto) || 0)}${nc}`, MARGIN + 2, y);
       y += 5;
     }
     y += 2;
@@ -356,9 +365,12 @@ export async function buildBulkReclamosPdf(
       const total = reclamoTaxes(r.empresa, subtotalDe(r)).total;
       return [
         r.nro_reclamo || "",
-        fmtDate(r.fecha_reclamo),
+        // 🔴 LA FECHA DE LA FACTURA, la MISMA que la cabecera de cada hoja de
+        // detalle (`fechaDeLaCabecera`). Hasta el 20-sep-2026 la portada
+        // fechaba por `fecha_reclamo` y el detalle por `fecha_factura`: dos
+        // reglas adentro del mismo papel.
+        fechaDelPapel(fechaDeLaCabecera(r)),
         facturasEnPantalla(r.nro_factura),
-        r.estado || "",
         `${items.length}`,
         `$${fmt(total)}`,
       ];
@@ -366,18 +378,21 @@ export async function buildBulkReclamosPdf(
 
     autoTable(doc, {
       startY: 50,
-      head: [["N° Reclamo", "Fecha", "Factura", "Estado", "Ítems", "Total"]],
+      // 🔴 SIN «ESTADO» (20-sep-2026): son nuestras palabras de adentro
+      // —«Creado», «Pagado»— y al proveedor extranjero la segunda se le lee al
+      // revés. Adentro del sistema el estado no cambia; lo que cambia es el
+      // papel que SALE.
+      head: [["N° Reclamo", "Fecha", "Factura", "Ítems", "Total"]],
       body: summaryRows,
       styles: { fontSize: 9, cellPadding: 2.5 },
       headStyles: { fillColor: [27, 58, 92], textColor: [255, 255, 255], fontStyle: "bold" },
       alternateRowStyles: { fillColor: [248, 249, 249] },
       columnStyles: {
         0: { cellWidth: 28 },
-        1: { cellWidth: 22 },
+        1: { cellWidth: 26 },
         2: { cellWidth: 38 },
-        3: { cellWidth: 24 },
-        4: { halign: "center", cellWidth: 16 },
-        5: { halign: "right", cellWidth: "auto" },
+        3: { halign: "center", cellWidth: 16 },
+        4: { halign: "right", cellWidth: "auto" },
       },
     });
   }
