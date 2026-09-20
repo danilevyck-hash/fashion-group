@@ -152,7 +152,12 @@ describe("E. las pantallas cuelgan del MISMO selector", () => {
     expect(src).not.toMatch(/setEmpresa\(e\.target\.value\)/);
     expect(src).toMatch(/const sinEmpresa = esTodas\(empresa\);/);
     expect(src).toMatch(/if \(!elegido \|\| sinEmpresa\) return;/);
-    expect(src).toMatch(/Elige <b>una empresa<\/b> arriba/);
+    // 🔄 19-sep-2026 — CAMBIÓ EL TEXTO, NO LA REGLA. Con «Todas» ahora sale el
+    // TABLERO de cierre (una línea por empresa, ver `asistencia-tablero-cierre`)
+    // y la línea de arriba dice lo mismo con otras palabras: para ARMAR una
+    // planilla hay que elegir la empresa. La Planilla sigue siendo de UNA.
+    expect(src).toMatch(/elígela arriba/);
+    expect(src).toMatch(/con «Todas» no se paga nada/);
   });
   it("Colaboradores perdió los chips de empresa y filtra por la de arriba", () => {
     const src = puro("src/app/asistencia/ConfiguracionTab.tsx");

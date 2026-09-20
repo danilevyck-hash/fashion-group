@@ -120,7 +120,7 @@ export function encabezadoDelTablero(filas: readonly FilaTablero[]): string {
  * instinto de cualquiera que mire cuatro netos en columna es sumarlos.
  */
 export const POR_QUE_NO_HAY_TOTAL =
-  "Cada empresa se cierra por su lado y paga su propia planilla: acá no se suman.";
+  "Cada empresa se cierra por su lado y paga su propia planilla: aquí no se suman.";
 
 /** La fila en blanco de una empresa, antes de que conteste. */
 export function filaVacia(empresa: string, etiqueta: string): FilaTablero {

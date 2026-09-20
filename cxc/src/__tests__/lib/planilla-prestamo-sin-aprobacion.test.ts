@@ -108,7 +108,13 @@ describe("2. la pantalla: sin bloque de aprobación, y la casilla muestra lo aut
   it("el aviso ámbar que se pinta es `avisoPrestamo` (en la lista «Antes de cerrar»), y viaja al Excel y al PDF", () => {
     // ⚠️ 11-sep-2026, más tarde: la caja pasó a una línea de «Antes de cerrar»;
     // el texto es el mismo `avisoPrestamo` de la ruta (va a la lista y al papel).
-    expect((pantalla.match(/avisoPrestamo: data\.avisos\.avisoPrestamo \?\? null,/g) ?? []).length).toBe(2);
+    // 🔄 19-sep-2026: de las DOS veces que la pantalla lo pasaba, una se mudó
+    // al módulo puro `antes-de-cerrar-del-cuadro.ts` (el tablero de cierre de
+    // «Todas» necesita la misma entrada). El texto sigue siendo el MISMO
+    // `avisoPrestamo` de la ruta, y sigue yendo a la lista y al papel.
+    expect((pantalla.match(/avisoPrestamo: data\.avisos\.avisoPrestamo \?\? null,/g) ?? []).length).toBe(1);
+    expect(sinComentarios("src/lib/asistencia/antes-de-cerrar-del-cuadro.ts"))
+      .toMatch(/avisoPrestamo: a\.avisoPrestamo \?\? null,/);
     const exportar = sinComentarios("src/lib/asistencia/planilla-exportar.ts");
     expect(exportar).toMatch(/d\.avisoPrestamo/);
     expect(exportar).not.toMatch(/avisoPrestamoSinAprobar/);

@@ -615,22 +615,31 @@ describe("H. 🔴 LAS CUATRO SECCIONES, CON LOS ENDPOINTS DE SIEMPRE", () => {
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("I. 🔴 EL SALDO EN PERSONAS, LAS JUSTIFICACIONES EN REPORTE", () => {
-  it("Personas trae la columna «Vacaciones», del MISMO motor de siempre", () => {
+  // 🔄 19-sep-2026 — CAMBIÓ DE DIRECCIÓN, y lo decidió Daniel. Textual:
+  //
+  //     «se habló que días de vacaciones no existe, sino por plata, ya se
+  //      habló de eso»
+  //
+  // 🩸 La columna mostraba un número PELADO —Briceida decía 665— que son los
+  // días acumulados desde 2006 sin restar lo tomado antes de que las
+  // vacaciones existieran en el sistema. Entre los 44 sumaban 2.160 días.
+  // La columna se fue de la LISTA; el número sigue en la ficha de cada
+  // persona, donde se lee «Le corresponden N días» con su línea de aviso.
+  it("🔴 Personas YA NO trae la columna «Vacaciones»: el número vive en la ficha", () => {
     const src = puro(CONFIG);
-    expect(src).toMatch(/"\/api\/asistencia\/vacaciones"/);
-    // ⚠️ CAMBIÓ DE DIRECCIÓN el 17-sep-2026: el saldo escrito a mano se retiró
-    // y la columna muestra los días CALCULADOS (`corresponden`, 30 por cada 11
-    // meses). Lo que este caso protege no cambió: el número sale de la MISMA
-    // ruta que la pestaña Vacaciones, nunca de una segunda cuenta.
-    expect(src).toMatch(/corresponden\.get\(String\(p\.codigo\)\)/);
-    // 🔑 CONTROL: la pantalla NO calcula nada por su cuenta.
-    expect(src).not.toMatch(/MESES_POR_PERIODO|DIAS_POR_PERIODO/);
-    expect(leer(CONFIG)).toMatch(/>Vacaciones</);
-    // La rejilla del escritorio gana una columna, escrita completa.
-    // 🔴 10-sep-2026 (tarde): sin «Rata / hora» y con «Qué falta» ancha al final
-    // (mockup aprobado por Daniel). Ver `asistencia-lista-que-falta.test.tsx`.
-    expect(src).toMatch(/COLUMNAS_CON_VACACIONES/);
-    expect(leer(CONFIG)).toMatch(/lg:grid-cols-\[minmax\(0,1fr\)_9rem_5rem_6\.5rem_5\.5rem_minmax\(0,1fr\)\]/);
+    // Ni la columna, ni la rejilla de seis, ni la lectura que la llenaba.
+    expect(leer(CONFIG)).not.toMatch(/>Vacaciones</);
+    expect(src).not.toMatch(/COLUMNAS_CON_VACACIONES/);
+    expect(src).not.toMatch(/lg:grid-cols-\[minmax\(0,1fr\)_9rem_5rem_6\.5rem_5\.5rem_minmax\(0,1fr\)\]/);
+    expect(src).not.toMatch(/"\/api\/asistencia\/vacaciones"/);
+    expect(src).not.toMatch(/corresponden\.get\(/);
+    // 🔴 Y LA LISTA SIGUE SIENDO LA DE SIEMPRE, con sus cinco columnas.
+    expect(src).toMatch(/const rejilla = COLUMNAS;/);
+    expect(leer(CONFIG)).toMatch(/lg:grid-cols-\[minmax\(0,1fr\)_9rem_5rem_6\.5rem_minmax\(0,1fr\)\]/);
+    // 🔴 CONTROL: la FICHA no se tocó — ahí el número sigue, con su aviso.
+    const ficha = leer("app/asistencia/colaboradores/SeccionVacaciones.tsx");
+    expect(ficha).toMatch(/"\/api\/asistencia\/vacaciones"/);
+    expect(ficha).toMatch(/NO_INCLUYE_ANTES|textoCorresponden/);
   });
 
   it("🔴 el aviso «N no tienen saldo» es ahora un chip QUE FILTRA", () => {

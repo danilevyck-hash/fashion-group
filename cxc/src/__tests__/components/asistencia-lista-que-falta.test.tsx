@@ -77,8 +77,10 @@ async function abrir() {
   servir();
   render(<ToastProvider><ConfiguracionTab personaEnElCentro /></ToastProvider>);
   await screen.findAllByText(/Alejandra Camaño/);
-  // Y los saldos, que llegan aparte.
-  await screen.findAllByText("0");
+  // 🔄 19-sep-2026: ya no se esperan los saldos de vacaciones. La columna se
+  // retiró de la lista (Daniel: *«se habló que días de vacaciones no existe,
+  // sino por plata»*) y la pantalla ni siquiera los pide. El número vive en la
+  // ficha de cada persona. Ver `persona-en-el-centro.test.ts` › bloque I.
 }
 
 /** La fila de escritorio y la tarjeta del celular se montan LAS DOS en jsdom. */
@@ -125,18 +127,31 @@ describe("9. 🔴 «Qué falta» reemplaza a «Estado»", () => {
   });
 });
 
-describe("7. los días de vacaciones: guion gris, nunca rojo", () => {
-  // ⚠️ CAMBIÓ DE DIRECCIÓN el 17-sep-2026: ya no hay saldo escrito a mano, y sin
-  // FECHA DE INGRESO tampoco hay número. La regla de pantalla es la MISMA que
-  // Daniel aprobó —*«un rojo que sale siempre no avisa nada»*—: guion gris.
-  it("sin fecha de ingreso la celda dice «—»; con ella, el número", async () => {
-    await abrir();
-    expect(screen.queryByText("Falta el saldo")).toBeNull();
-    expect(screen.queryByText(/Faltan la fecha de ingreso/)).toBeNull();
-    expect(screen.getAllByText("0").length).toBeGreaterThan(0);
-    for (const fila of filaDe(/Alejandra Camaño/)) expect(fila.textContent).toContain("—");
-    // 🔑 CONTROL: ningún ámbar ni rojo colgado del número.
-    for (const el of screen.getAllByText("0")) expect(el.className).not.toContain("amber");
+describe("7. los días de vacaciones se fueron de la lista", () => {
+  // 🔄 CAMBIÓ DE DIRECCIÓN el 19-sep-2026, y lo decidió Daniel. Textual:
+  //
+  //     «se habló que días de vacaciones no existe, sino por plata, ya se
+  //      habló de eso»
+  //
+  // 🩸 La columna mostraba un número PELADO —Briceida decía 665— que son los
+  // días acumulados desde 2006 sin restar lo tomado antes de que las vacaciones
+  // existieran en el sistema. Entre los 44 sumaban 2.160 días.
+  //
+  // 🔴 LO QUE NO SE TOCÓ: la FICHA de cada persona, donde el mismo número se
+  // lee «Le corresponden N días» con su línea de aviso.
+  it("🔴 no hay columna «Vacaciones», y la lista ni siquiera pide los días", async () => {
+    const llamadas: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      llamadas.push(String(url));
+      return { ok: true, json: async () => (String(url).includes("/configuracion") ? DATOS : {}) } as Response;
+    }));
+    render(<ToastProvider><ConfiguracionTab personaEnElCentro /></ToastProvider>);
+    await screen.findAllByText(/Alejandra Camaño/);
+    expect(screen.queryByText("Vacaciones")).toBeNull();
+    expect(llamadas.some((u) => u.includes("/api/asistencia/vacaciones"))).toBe(false);
+    // 🔑 CONTROL: la lista sigue mostrando lo suyo.
+    expect(screen.getByText("Qué falta")).toBeTruthy();
+    expect(screen.getAllByText(/\$700[.,]00/).length).toBeGreaterThan(0);
   });
 });
 

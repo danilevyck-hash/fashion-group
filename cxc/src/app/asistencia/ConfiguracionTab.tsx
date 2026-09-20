@@ -99,11 +99,6 @@ import {
   tieneBaja,
   type MotivoSalida,
 } from "@/lib/asistencia/vigencia";
-import {
-  ROTULO_CORRESPONDEN,
-  textoCorresponden,
-  type DiasCorresponden,
-} from "@/lib/asistencia/vacaciones-corresponden";
 import { excepcionesDeLaFicha } from "@/lib/asistencia/ficha-persona";
 import { rutaDePersona, RUTA_PERSONA_NUEVA } from "@/lib/asistencia/persona-en-el-centro";
 // 🔴 LOS DOS CHIPS DE LA LISTA (10-sep-2026): qué le falta a cada colaborador,
@@ -283,19 +278,24 @@ const PILL_OFF = "border-gray-200 text-gray-600 hover:border-gray-400";
 const COLUMNAS =
   "lg:grid lg:grid-cols-[minmax(0,1fr)_9rem_5rem_6.5rem_minmax(0,1fr)] lg:items-center lg:gap-x-3";
 
-/**
- * 🔴 LA MISMA REJILLA CON UNA COLUMNA MÁS: VACACIONES (10-sep-2026).
+/*
+ * 🩸 ACÁ VIVÍA `COLUMNAS_CON_VACACIONES`, la rejilla con una columna más para
+ * los días de vacaciones. **Se retiró el 19-sep-2026.** Daniel, textual:
  *
- * Daniel, corrigiendo dónde iba a parar la vista de «todos»: *«Reporte es para
- * otra cosa»*. El saldo de vacaciones es un dato **de la persona**, no del
- * período, así que vive acá — en la lista y en la página de cada quien— y no
- * en una pestaña propia ni adentro del Reporte.
+ *     «se habló que días de vacaciones no existe, sino por plata, ya se habló
+ *      de eso»
  *
- * ⚠️ Va escrita COMPLETA, como la de arriba: Tailwind purga leyendo el archivo
- * como texto y una clase armada con plantillas nunca llega al CSS.
+ * 🩸 La columna mostraba un número PELADO —Briceida decía **665**— que son los
+ * días acumulados desde 2006 sin restar lo que se tomó antes de que las
+ * vacaciones existieran en el sistema (25-ago-2026). Entre los 44 sumaban
+ * **2.160 días**: el número engaña, y en una lista no hay lugar para la línea
+ * que lo explica.
+ *
+ * 🔴 LO QUE NO SE TOCÓ: la **ficha de cada persona**, donde el mismo número se
+ * lee «Le corresponden N días» con su línea de aviso —ahí está bien puesto—, y
+ * el cálculo entero (`vacaciones-corresponden.ts`), con su barrido que exige
+ * que no entre a ningún cálculo de plata.
  */
-const COLUMNAS_CON_VACACIONES =
-  "lg:grid lg:grid-cols-[minmax(0,1fr)_9rem_5rem_6.5rem_5.5rem_minmax(0,1fr)] lg:items-center lg:gap-x-3";
 
 const money = (n: number | null, dec = 2) =>
   n === null
@@ -360,19 +360,13 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
   useEffect(() => { setRol(sessionStorage.getItem("cxc_role") || ""); }, []);
   const puedeTocarLaFicha = puedeCerrar(rol);
   const [verIgnorados, setVerIgnorados] = useState(false);
-  /**
-   * 🔴 EL SALDO DE VACACIONES DE CADA QUIEN, en la lista (10-sep-2026).
-   *
-   * Sale de la MISMA ruta que lo calcula en la pestaña Vacaciones
-   * (`/api/asistencia/vacaciones` → `corresponden`), no de una cuenta nueva:
-   * dos motores para el mismo número es cómo nacen dos números.
-   * 🔴 Desde el 17-sep-2026 se CALCULA (30 días por cada 11 meses desde la
-   * fecha de ingreso) y **no es un saldo**: nadie sabe qué se tomó antes.
-   *
-   * ⚠️ Solo se pide con el acomodo nuevo prendido. Apagado, esta pantalla no
-   * hace ni una petición de más.
+  /*
+   * 🩸 ACÁ SE LEÍAN LOS DÍAS DE VACACIONES DE TODOS, para la columna de la
+   * lista. Se retiró el 19-sep-2026 con la columna (ver arriba): la lista ya no
+   * los pide, así que esta pantalla hace UNA petición menos. El número sigue
+   * vivo en la ficha de cada persona (`SeccionVacaciones`), que lo lee de la
+   * MISMA ruta y con la línea que explica qué no incluye.
    */
-  const [corresponden, setCorresponden] = useState<Map<string, DiasCorresponden>>(new Map());
 
   /**
    * 🔴 IGNORAR ESCONDE, NO BORRA. Daniel: *«pon la opción de ignorar código así
@@ -444,25 +438,6 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
   useEffect(() => {
     void cargar();
   }, [cargar]);
-
-  // 🔑 FALLA ABIERTA: si los días no llegan, la columna muestra un guion y la
-  // lista se sigue usando. Un error acá no puede dejar sin ficha a 37 personas.
-  useEffect(() => {
-    if (!personaEnElCentro) return;
-    let vivo = true;
-    (async () => {
-      try {
-        const r = await fetch("/api/asistencia/vacaciones", { cache: "no-store" });
-        const d = await r.json();
-        if (!vivo || !r.ok) return;
-        const lista = (d.corresponden ?? []) as DiasCorresponden[];
-        setCorresponden(new Map(lista.map((x) => [String(x.codigo), x])));
-      } catch {
-        /* sin el número la columna muestra un guion; no se rompe nada */
-      }
-    })();
-    return () => { vivo = false; };
-  }, [personaEnElCentro]);
 
   function abrir(p: Persona) {
     if (abierta === p.codigo) {
@@ -878,7 +853,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
   // PAGAR. Es el mismo número del chip, para que no haya dos cuentas.
   const pendientes = conteo.paraPagar;
   // La rejilla del escritorio: con el acomodo nuevo lleva una columna más.
-  const rejilla = personaEnElCentro ? COLUMNAS_CON_VACACIONES : COLUMNAS;
+  const rejilla = COLUMNAS;
 
   return (
     <div className="space-y-3">
@@ -1043,7 +1018,6 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                   <span>Empresa</span>
                   <span className="text-right">Jornada</span>
                   <span className="text-right">Salario</span>
-                  {personaEnElCentro && <span className="text-right">Vacaciones</span>}
                   <span>Qué falta</span>
                 </div>
 
@@ -1054,13 +1028,6 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                   // del módulo puro, nunca de una segunda regla.
                   const queFalta = lineasQueFalta(queLeFalta(p));
                   const abiertaEsta = abierta === p.codigo;
-                  const leCorresponden = corresponden.get(String(p.codigo));
-                  // 🔴 SIN FECHA DE INGRESO, UN GUION GRIS (Daniel: *«un rojo
-                  // que sale siempre no avisa nada»*). Que falta ya lo dice
-                  // «Qué falta»; acá solo se muestra el número cuando existe.
-                  const saldoFalta = !leCorresponden || leCorresponden.dias === null;
-                  const saldoTexto = personaEnElCentro && leCorresponden && !saldoFalta
-                    ? `${leCorresponden.dias}` : "—";
                   // 🔴 SOLO LO RARO. Una ficha normal no dibuja ni una etiqueta,
                   // y por eso cuando aparece una se mira. Ver `ficha-persona.ts`.
                   const excepciones = personaEnElCentro ? excepcionesDeLaFicha(p) : [];
@@ -1093,11 +1060,6 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                         <span className="text-right text-[13px] tabular-nums text-gray-600">
                           {money(p.salarioMensual)}
                         </span>
-                        {personaEnElCentro && (
-                          <span className="text-right text-[13px] tabular-nums text-gray-600">
-                            {saldoTexto}
-                          </span>
-                        )}
                         <QueFaltaCelda lineas={queFalta} fueraDePlanilla={p.servicioProfesional} />
                       </span>
 
@@ -1116,9 +1078,6 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                           <Dato etiqueta="Empresa" valor={p.empresa ? etiquetaEmpresa(p.empresa) : "—"} />
                           <Dato etiqueta="Jornada" valor={p.configurado ? `${p.jornadaSemanal} h/semana` : "—"} numero />
                           <Dato etiqueta="Salario" valor={money(p.salarioMensual)} numero />
-                          {personaEnElCentro && (
-                            <Dato etiqueta="Vacaciones" valor={saldoTexto} numero />
-                          )}
                         </span>
                       </span>
                     </>

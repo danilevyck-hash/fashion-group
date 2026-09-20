@@ -194,7 +194,10 @@ export default function TableroCierre({
           <thead>
             <tr className="border-b border-gray-200 text-[10.5px] uppercase tracking-wide text-gray-400">
               <th className="px-3 py-2.5 text-left font-medium">Empresa</th>
-              <th className="px-2 py-2.5 text-right font-medium">Personas</th>
+              {/* 🔴 «Colaboradores», nunca «Personas»: es la palabra del
+                  módulo entero desde el 10-sep-2026 (Daniel: *«no lo llames
+                  personas, sino colaboradores»*), y hay barrido que lo exige. */}
+              <th className="px-2 py-2.5 text-right font-medium">Colabor.</th>
               <th className="px-2 py-2.5 text-right font-medium">Neto</th>
               <th className="px-2 py-2.5 text-left font-medium">Qué falta para cerrar</th>
               <th className="px-2 py-2.5 text-right font-medium"></th>

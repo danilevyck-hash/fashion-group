@@ -362,6 +362,9 @@ describe("4. 🔴 ningún aviso de Asistencia manda a «Horarios», que ya no es
     const adc = puro("lib/asistencia/antes-de-cerrar.ts");
     expect(adc).toMatch(/texto: "sin su hora de salida confirmada",\s*enlace: fichas,/);
     expect(adc).toMatch(/rotulo: `\$\{e\.pestanaFichas\} ›`, href: HREF_FICHAS/);
-    expect(puro("app/asistencia/PlanillaTab.tsx")).toMatch(/pestanaFichas: PESTANA_FICHAS,/);
+    // 🔄 19-sep-2026 — SE MUDÓ, NO CAMBIÓ: la entrada de «Antes de cerrar»
+    // se arma en `antes-de-cerrar-del-cuadro.ts` (el tablero de cierre de
+    // «Todas» necesita lo mismo). Ver `asistencia-tablero-cierre.test.tsx`.
+    expect(puro("lib/asistencia/antes-de-cerrar-del-cuadro.ts")).toMatch(/pestanaFichas,/);
   });
 });
