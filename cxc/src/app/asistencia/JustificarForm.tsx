@@ -31,6 +31,14 @@
  * guarda y NO se teclea — ver `TEXTO_DIA_AFUERA` en `motivos.ts` por qué
  * guardarlo como horas convertiría el día en una ausencia. Compensatorio lleva
  * su nota igual.
+ *
+ * 🔴 Y EL MISMO FORMULARIO JUSTIFICA A VARIOS (19-sep-2026). El día de lluvia
+ * del 17-ago-2026 son 13 justificaciones cargadas una por una con la misma
+ * nota: 13 de las 29 de toda la historia. Daniel eligió seleccionar varias
+ * filas en el Reporte y justificarlas de una vez. Acá eso es UNA prop
+ * (`codigos`) y un bucle: **la ruta, la validación y los motivos son los mismos
+ * de siempre**, una petición por persona. No nace una ruta «en lote» con reglas
+ * propias, que sería una segunda verdad sobre qué se puede justificar.
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { useState } from "react";
@@ -39,15 +47,25 @@ import { useToast } from "@/components/ToastSystem";
 import RangoFechas from "@/components/ui/RangoFechas";
 import { motivosParaElegir, notaDelMotivo } from "@/lib/asistencia/motivos";
 import { horasParaGuardar, motivoAdmiteHoras, ventanaDe } from "@/lib/asistencia/permiso-horas";
+import { motivosParaVarios, resumenDelLote, type FalloDelLote } from "@/lib/asistencia/justificar-a-varios";
 
 export default function JustificarForm({
-  codigo, empresa = null, desdeInicial, hastaInicial, onGuardado,
+  codigo, codigos, etiquetas, empresa = null, empresas, desdeInicial, hastaInicial, onGuardado,
 }: {
   codigo: string;
+  /**
+   * 🔴 VARIOS A LA VEZ. Sin esto (el caso de siempre: la ficha y la fila del
+   * día), se justifica solo a `codigo` y nada cambia.
+   */
+  codigos?: readonly string[];
+  /** `código → nombre`, para poder DECIR quién quedó sin justificar. */
+  etiquetas?: Readonly<Record<string, string>>;
   /** La empresa de la ficha. 🔴 A Multifashion NO se le ofrece «Día libre de la
    *  empresa» (18-sep-2026, Daniel: *«ese día se les regala»*). Sin empresa se
    *  ofrecen todos y el servidor decide con la ficha en la mano. */
   empresa?: string | null;
+  /** Las empresas de `codigos`: los motivos son la INTERSECCIÓN de las suyas. */
+  empresas?: readonly (string | null)[];
   /** Con qué días abre. La ficha pasa hoy; la fila del día pasa ese día. */
   desdeInicial: string;
   hastaInicial: string;
@@ -57,9 +75,13 @@ export default function JustificarForm({
   const [guardando, setGuardando] = useState(false);
   const [desde, setDesde] = useState(desdeInicial);
   const [hasta, setHasta] = useState(hastaInicial);
+  /** A quiénes se les justifica. Sin `codigos`, la persona de siempre. */
+  const aQuienes = codigos && codigos.length > 0 ? codigos : [codigo];
+  const varios = aQuienes.length > 1;
   // 🔴 Los motivos salen de la MISMA lista que la ruta ofrece y acepta, menos
-  // el día libre de la empresa donde no aplica (`motivosParaElegir`).
-  const motivos = motivosParaElegir(empresa);
+  // el día libre de la empresa donde no aplica (`motivosParaElegir`). Con varios
+  // seleccionados es la INTERSECCIÓN: se ofrece solo lo que vale para TODOS.
+  const motivos = varios ? motivosParaVarios(empresas ?? []) : motivosParaElegir(empresa);
   const [motivo, setMotivo] = useState<string>(motivos[0] ?? "");
   const [nota, setNota] = useState("");
   // 🔴 El rango de HORAS, solo para Constancia. Vacíos = el día completo.
@@ -80,17 +102,43 @@ export default function JustificarForm({
     }
     setGuardando(true);
     try {
-      const r = await fetch("/api/asistencia/justificaciones", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ codigo, desde, hasta, motivo, nota, ...horas }),
-      });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error ?? "No se pudo guardar");
-      toast("Listo, guardado", "success");
+      // 🔴 UNA PETICIÓN POR PERSONA, a la MISMA ruta de siempre. Con una sola
+      // seleccionada esto es exactamente el `fetch` que había acá.
+      let guardados = 0;
+      const fallos: FalloDelLote[] = [];
+      // 🔑 El de adentro se llama `codigo` a propósito: el CUERPO que viaja es
+      // exactamente el de siempre, letra por letra, y así lo siguen leyendo los
+      // candados que lo vigilan desde el 11-sep-2026.
+      for (const codigo of aQuienes) {
+        try {
+          const r = await fetch("/api/asistencia/justificaciones", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ codigo, desde, hasta, motivo, nota, ...horas }),
+          });
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(d.error ?? "No se pudo guardar");
+          guardados += 1;
+        } catch (e) {
+          fallos.push({
+            etiqueta: etiquetas?.[codigo] ?? codigo,
+            error: e instanceof Error ? e.message : "No se pudo guardar",
+          });
+        }
+      }
+      // 🔴 Con una sola persona el texto es el de siempre; con varias dice
+      // cuántos entraron y NOMBRA a los que no.
+      if (!varios && fallos.length > 0) throw new Error(fallos[0].error);
+      if (!varios) {
+        toast("Listo, guardado", "success");
+      } else {
+        const r = resumenDelLote(guardados, fallos);
+        toast(r.texto, r.tipo);
+      }
       setNota("");
       setHoraDesde(""); setHoraHasta("");
-      onGuardado();
+      // Con que UNO haya entrado, la pantalla de atrás tiene que releer.
+      if (guardados > 0) onGuardado();
     } catch (e) {
       toast(e instanceof Error ? e.message : "No se pudo guardar", "error");
     } finally {

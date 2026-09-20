@@ -296,7 +296,11 @@ describe("3. 🔴 «Justificar» en la fila abre el MISMO formulario de la ficha
     // `motivosParaElegir(empresa)` — la MISMA lista, menos «Día libre de la
     // empresa» para Multifashion (Daniel: «ese día se les regala»). Sigue
     // siendo UN formulario. Ver `multifashion-sabado-y-dia-libre.test.ts`.
-    expect(form).toMatch(/const motivos = motivosParaElegir\(empresa\);/);
+    // 🔄 19-sep-2026: el formulario también justifica a VARIOS, y ahí los
+    // motivos son la INTERSECCIÓN (`motivosParaVarios`, derivada de la misma
+    // función). Con una sola persona —la ficha y la fila del día, que es lo
+    // que este candado cuida— sigue siendo `motivosParaElegir(empresa)`.
+    expect(form).toMatch(/motivosParaElegir\(empresa\)/);
     expect(form).toMatch(/\{motivos\.map\(/);
     // La sección de la ficha abre con HOY.
     expect(puro("app/asistencia/colaboradores/SeccionJustificaciones.tsx"))

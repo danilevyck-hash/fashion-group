@@ -187,7 +187,15 @@ describe("2. 🔴 MULTIFASHION NUNCA LLEVA DEUDA DE DÍA LIBRE — la regla pura
 
   it("barrido: el formulario filtra por empresa, y las DOS pantallas que lo montan se la pasan", () => {
     const form = puro("src/app/asistencia/JustificarForm.tsx");
-    expect(form).toMatch(/const motivos = motivosParaElegir\(empresa\);/);
+    // 🔄 19-sep-2026 — CAMBIÓ DE FORMA, NO DE CONDUCTA. El formulario también
+    // justifica a VARIOS (el día de lluvia del 17-ago: 13 justificaciones
+    // cargadas una por una), y con varios los motivos son la INTERSECCIÓN de
+    // los suyos (`motivosParaVarios`, que se DERIVA de `motivosParaElegir`).
+    // Con una sola persona —la ficha y la fila del día— sigue siendo
+    // exactamente `motivosParaElegir(empresa)`, y a Multifashion se le siguen
+    // ofreciendo SEIS. La lista sigue sin salir de `MOTIVOS_JUSTIFICACION`.
+    expect(form).toMatch(/motivosParaElegir\(empresa\)/);
+    expect(form).toMatch(/motivosParaVarios\(empresas \?\? \[\]\)/);
     expect(form).not.toMatch(/MOTIVOS_JUSTIFICACION/);
     expect(puro("src/app/asistencia/colaboradores/SeccionJustificaciones.tsx")).toMatch(/<JustificarForm[\s\S]*?empresa=\{empresa\}/);
     expect(puro("src/app/asistencia/colaboradores/PersonaPagina.tsx")).toMatch(/<SeccionJustificaciones codigo=\{codigo\} empresa=\{persona\.empresa\}/);

@@ -71,6 +71,16 @@ import { PERSONA_EN_EL_CENTRO, PESTANA_FICHAS, dondeSeCargaLaFicha, rutaDePerson
 import { empresaParaPedir, nombreArchivoPorEmpresa } from "@/lib/asistencia/empresa-para-todo";
 import CorregirMarcacionModal, { type MarcaParaCorregir } from "./CorregirMarcacionModal";
 import JustificarDiaModal, { type DiaParaJustificar } from "./JustificarDiaModal";
+// 🔴 JUSTIFICAR A VARIOS DESDE EL REPORTE (19-sep-2026). El día de lluvia del
+// 17-ago son 13 justificaciones cargadas una por una con la misma nota. Se
+// seleccionan varias filas y se justifican de una vez, con la MISMA ruta.
+import JustificarVariosModal, { type PersonaSeleccionada } from "./JustificarVariosModal";
+import {
+  JUSTIFICAR_A_VARIOS, QUITAR_LA_SELECCION, hayAQuienJustificar, textoDeLaSeleccion,
+} from "@/lib/asistencia/justificar-a-varios";
+// 🔴 Una barra que se pega se pega DEBAJO del encabezado, nunca encima: la
+// única forma de hacerlo es esta clase (`lib/ui/barra-pegajosa.ts`).
+import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
 // 🔴 EL DÍA COMPLETO SE ARREGLA EN LA FILA, SIN ABRIR UNA VENTANA (19-sep-2026).
 // La regla de qué se va a escribir vive en un módulo PURO; acá solo se dibuja.
 import {
@@ -233,6 +243,9 @@ export default function ReporteTab({ empresa = "" }: {
   // «Justificar» desde la fila del día (11-sep-2026): el mismo formulario de la
   // ficha, con el colaborador y ese día ya puestos.
   const [justificando, setJustificando] = useState<DiaParaJustificar | null>(null);
+  /** 🔴 Los colaboradores marcados para justificar a varios, por CÓDIGO. */
+  const [seleccion, setSeleccion] = useState<ReadonlySet<string>>(new Set());
+  const [justificandoVarios, setJustificandoVarios] = useState(false);
   // Sube cada vez que se guarda una justificación desde acá, para que la lista
   // «Justificaciones del período» se vuelva a leer sin cambiar de rango.
   const [refrescoJustificaciones, setRefrescoJustificaciones] = useState(0);
@@ -350,6 +363,29 @@ export default function ReporteTab({ empresa = "" }: {
     [personas, soloARevisar],
   );
   const conteo = conteoARevisar(visibles?.length ?? 0, personas?.length ?? 0, soloARevisar);
+
+  // 🔴 LA SELECCIÓN SE DERIVA DE LO QUE SE VE. Un código marcado que dejó de
+  // estar en la tabla (cambió el período, se prendió el filtro) no se justifica
+  // a escondidas: desaparece de la selección y del contador.
+  const seleccionados = useMemo<PersonaSeleccionada[]>(
+    () => (visibles ?? [])
+      .filter((p) => seleccion.has(p.codigo))
+      .map((p) => ({
+        codigo: p.codigo,
+        etiqueta: p.nombre
+          ? capitalizarNombre(etiquetaPersona(p.codigo, p.nombre))
+          : etiquetaPersona(p.codigo, p.nombre),
+        empresa: (p as PersonaReporte & { empresa?: string | null }).empresa ?? null,
+      })),
+    [visibles, seleccion],
+  );
+  const alternarSeleccion = useCallback((codigo: string) => {
+    setSeleccion((s) => {
+      const n = new Set(s);
+      if (n.has(codigo)) n.delete(codigo); else n.add(codigo);
+      return n;
+    });
+  }, []);
 
   // 🩸 LAS LIBRERÍAS DE EXCEL Y PDF SE BAJAN AL TOCAR EL BOTÓN, no al abrir la
   // pantalla (12-ago-2026). Estaban importadas arriba, así que `xlsx-js-style`,
@@ -617,6 +653,29 @@ export default function ReporteTab({ empresa = "" }: {
         </p>
       )}
 
+      {/* ══════════════════════════════════════════════════════════════════
+          🔴 JUSTIFICAR A VARIOS (19-sep-2026). 🩸 El día de lluvia del
+          17-ago-2026 son 13 justificaciones cargadas una por una con la misma
+          nota: 13 de las 29 de toda la historia del módulo.
+          La barra aparece SOLO con alguien marcado: un control permanente que
+          casi nunca se usa se vuelve ruido en una pantalla que se mira a diario.
+          ══════════════════════════════════════════════════════════════════ */}
+      {hayAQuienJustificar(seleccionados.length) && (
+        <div className={`flex flex-wrap items-center gap-3 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 ${CLASE_BARRA_PEGAJOSA}`}>
+          <span className="text-[13px] font-medium text-gray-900">
+            {textoDeLaSeleccion(seleccionados.length)}
+          </span>
+          <button type="button" onClick={() => setJustificandoVarios(true)}
+            className="min-h-[44px] rounded-md bg-black px-4 text-sm font-medium text-white transition active:scale-[0.97]">
+            {JUSTIFICAR_A_VARIOS}
+          </button>
+          <button type="button" onClick={() => setSeleccion(new Set())}
+            className="min-h-[44px] rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]">
+            {QUITAR_LA_SELECCION}
+          </button>
+        </div>
+      )}
+
       {!cargando && !error && !!visibles?.length && (
         <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
           <table className="w-full text-sm">
@@ -656,6 +715,8 @@ export default function ReporteTab({ empresa = "" }: {
                   onJustificar={setJustificando}
                   motivosFrecuentes={motivosFrecuentes}
                   onGuardadoElDia={() => void cargar()}
+                  seleccionada={seleccion.has(p.codigo)}
+                  onSeleccionar={alternarSeleccion}
                   puedeDecidirExtra={puedeDecidirExtra}
                   onDecidirExtra={decidirExtra}
                   extrasEnVuelo={extrasEnVuelo}
@@ -728,6 +789,23 @@ export default function ReporteTab({ empresa = "" }: {
         />
       )}
       <SelfieMarcacionModal marca={verSelfie} onClose={() => setVerSelfie(null)} />
+      {justificandoVarios && (
+        <JustificarVariosModal
+          personas={seleccionados}
+          // 🔴 ABRE EN EL PRIMER DÍA DEL PERÍODO QUE SE ESTÁ MIRANDO, no en el
+          // período entero: con los atajos «Hoy» y «Ayer» es exactamente el día
+          // que se quiere justificar, y con un rango largo se ve y se cambia.
+          // Justificar el período completo por defecto sería regalar quincenas.
+          desdeInicial={desde}
+          hastaInicial={desde}
+          onCerrar={() => setJustificandoVarios(false)}
+          onGuardado={() => {
+            setSeleccion(new Set());
+            setRefrescoJustificaciones((n) => n + 1);
+            void cargar();
+          }}
+        />
+      )}
       {justificando && (
         <JustificarDiaModal
           dia={justificando}
@@ -739,7 +817,7 @@ export default function ReporteTab({ empresa = "" }: {
   );
 }
 
-function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, onToggle, puedeCorregir, onCorregir, onJustificar, marcasTelefono, onVerSelfie, decisionesExtra, motivosFrecuentes, onGuardadoElDia, puedeDecidirExtra, onDecidirExtra, extrasEnVuelo }: {
+function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, onToggle, puedeCorregir, onCorregir, onJustificar, marcasTelefono, onVerSelfie, decisionesExtra, motivosFrecuentes, onGuardadoElDia, puedeDecidirExtra, onDecidirExtra, extrasEnVuelo, seleccionada, onSeleccionar }: {
   p: PersonaReporte;
   abierta: boolean;
   /** Abierta por «Ver solo esos días»: adentro van SOLO los días a revisar. */
@@ -764,6 +842,9 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
   onDecidirExtra: (codigo: string, fecha: string, minutos: number, decision: Decision) => void;
   /** Las decisiones que están viajando, por `codigo|fecha`. */
   extrasEnVuelo: ReadonlySet<string>;
+  /** ¿Está marcada para «Justificar a varios»? */
+  seleccionada: boolean;
+  onSeleccionar: (codigo: string) => void;
 }) {
   const r = p.resumen;
   // 🔴 LA COLUMNA «EXTRAS» DICE CUÁNTO ESTÁ APROBADO (16-sep-2026). Se reparte
@@ -780,6 +861,18 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
             Sin nombre configurado se muestra el código —nunca un blanco— y se
             dice qué falta, porque un número suelto no se le reclama a nadie. */}
         <td className="px-3 py-2.5 text-gray-900">
+          {/* 🔴 LA CASILLA VA DENTRO DE «Colaborador», no en una columna nueva:
+              la tabla tiene once y agregar una doceava la aprieta en el iPad.
+              `stopPropagation` porque tocar la fila la despliega — marcar y
+              abrir son dos cosas distintas. */}
+          <input
+            type="checkbox"
+            checked={seleccionada}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => { e.stopPropagation(); onSeleccionar(p.codigo); }}
+            aria-label={`Seleccionar ${persona}`}
+            className="mr-2 h-4 w-4 cursor-pointer align-middle accent-black"
+          />
           {persona}
           {p.nombre ? (
             <span className="ml-1.5 text-xs text-gray-400">{p.codigo}</span>
