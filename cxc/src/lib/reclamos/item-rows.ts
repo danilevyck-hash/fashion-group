@@ -28,7 +28,22 @@ export function buildReclamoItemRows(
     reclamo_id: reclamoId,
     referencia: String(item.referencia || ""),
     descripcion: String(item.descripcion || ""),
-    talla: String(item.talla || ""),
+    // 🔴 LA TALLA SE GUARDA RECORTADA (20-sep-2026).
+    //
+    // 🩸 Se guardaba con un espacio adelante —`" TODAS"`, `" 8"`, `" 34-32"`— y
+    // ese espacio SALE EN EL PAPEL QUE RECIBE EL PROVEEDOR. Medido: **32
+    // renglones dicen «TODAS»** y ~25 más arrancan con espacio.
+    //
+    // 🔑 DE DÓNDE SALE, que no es un misterio: `ItemsEditor` usa un espacio
+    // solo (`" "`) como SEÑAL de «Otros» —es lo que hace `!TALLAS.includes(t)
+    // && t !== ""` y cambia el desplegable por un campo de texto—, y lo que se
+    // escribe después se pega detrás. Por eso el recorte va ACÁ, al GUARDAR, y
+    // no al teclear: recortando mientras se escribe, la señal se borra sola y
+    // el campo de texto se cierra en la cara de quien lo está usando.
+    //
+    // ⚠️ Lo YA guardado se queda como está: no hay migración de limpieza, y no
+    // la habrá hasta que Daniel la pida.
+    talla: String(item.talla || "").trim(),
     genero: item.genero ? String(item.genero) : null,
     cantidad: Number(item.cantidad) || 1,
     precio_unitario: Number(item.precio_unitario) || 0,

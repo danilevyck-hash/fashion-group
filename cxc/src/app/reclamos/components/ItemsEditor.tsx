@@ -4,6 +4,7 @@ import { fmt } from "@/lib/format";
 import { RItem } from "./types";
 import { TALLAS, GENEROS, generoLabel, DEFAULT_MOTIVOS, emptyItem } from "./constants";
 import { filaRepetida } from "@/lib/reclamos/lineas-factura";
+import { AIRE_ENTRE_COLUMNAS } from "@/lib/reclamos/tabla-renglones";
 
 interface Props {
   items: RItem[];
@@ -42,7 +43,7 @@ export default function ItemsEditor({ items, setItems, titulo = "Renglones del r
     <div>
       <div className="text-sm font-semibold text-gray-900 mb-2">{titulo}</div>
       <div className="hidden sm:block overflow-x-auto">
-        <table className="w-full text-sm [&_td]:py-3 [&_th]:pb-3 [&_th]:px-5 [&_td]:px-5 [&_th:first-child]:pl-0 [&_td:first-child]:pl-0 [&_th:last-child]:pr-0 [&_td:last-child]:pr-0">
+        <table className={`w-full text-sm [&_td]:py-3 [&_th]:pb-3 ${AIRE_ENTRE_COLUMNAS}`}>
           <thead>
             <tr className="border-b border-gray-200 text-xs uppercase tracking-wide font-medium text-gray-500">
               <th className="pb-2 font-medium text-left">Estilo *</th>

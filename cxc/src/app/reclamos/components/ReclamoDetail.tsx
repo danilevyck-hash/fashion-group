@@ -16,6 +16,7 @@ import { diasDesde } from "@/lib/reclamos/dias";
 import { textoReclamado, estaReclamado } from "@/lib/reclamos/reclamado";
 import { FALTA_FECHA_FACTURA } from "@/lib/reclamos/orden";
 import { filaRepetida } from "@/lib/reclamos/lineas-factura";
+import { AIRE_ENTRE_COLUMNAS } from "@/lib/reclamos/tabla-renglones";
 import { motivoEnPantalla, notaEnPantalla } from "@/lib/reclamos/texto";
 import EnviarProveedorModal from "./EnviarProveedorModal";
 import OverflowMenu from "@/components/ui/OverflowMenu";
@@ -442,7 +443,7 @@ export default function ReclamoDetail({
           {editMode ? (
             <>
               <ScrollableTable minWidth={700} className="mb-4">
-                <table className="w-full text-sm [&_td]:py-3 [&_th]:pb-3 [&_th]:px-5 [&_td]:px-5 [&_th:first-child]:pl-0 [&_td:first-child]:pl-0 [&_th:last-child]:pr-0 [&_td:last-child]:pr-0">
+                <table className={`w-full text-sm [&_td]:py-3 [&_th]:pb-3 ${AIRE_ENTRE_COLUMNAS}`}>
                   <thead className="sticky top-0 bg-white z-10">
                     <tr className="border-b border-gray-200 text-xs uppercase tracking-wide font-medium text-gray-500">
                       <th className="pb-2 font-medium text-left">Estilo *</th>
@@ -524,7 +525,7 @@ export default function ReclamoDetail({
               </ul>
               <div className="hidden lg:block" data-vista="tabla">
                 <ScrollableTable minWidth={700}>
-                  <table className="w-full text-sm [&_td]:py-3 [&_th]:pb-3">
+                  <table className={`w-full text-sm [&_td]:py-3 [&_th]:pb-3 ${AIRE_ENTRE_COLUMNAS}`}>
                     <thead className="sticky top-0 bg-white z-10">
                       <tr className="border-b border-gray-200 text-xs uppercase tracking-wide font-medium text-gray-500">
                         <th className="text-left pb-2 font-medium">Estilo</th>
