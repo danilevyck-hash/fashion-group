@@ -54,3 +54,35 @@ export function partirGuiasPorVentana<T extends GuiaConFecha>(
   const { recientes, viejos } = partirPorVentana(adaptadas, hoy, dias);
   return { recientes: recientes.map((a) => a.guia), viejas: viejos.map((a) => a.guia) };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 BUSCAR ABRE LA VENTANA ENTERA (19-sep-2026).
+//
+// 🩸 La ventana del último mes se aplicaba DESPUÉS del buscador, así que buscar
+// una guía de hace tres meses dejaba la lista VACÍA y la única coincidencia
+// quedaba escondida detrás de «Ver guías más viejas (1)» — un botón que dice
+// «más viejas» cuando lo que hay detrás es justo lo que se acaba de pedir.
+// Quien busca ya dijo qué quiere ver: la ventana no tiene nada que recortar.
+//
+// ⚠️ Es la VENTANA lo que se abre, no el filtro: lo que no coincide con lo
+// tecleado sigue sin salir. Y sin texto en el buscador, todo como siempre.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** ¿Hay algo escrito en el buscador? Espacios solos no cuentan. */
+export function hayBusqueda(busqueda: string | null | undefined): boolean {
+  return String(busqueda ?? "").trim() !== "";
+}
+
+/**
+ * Lo que la lista dibuja y lo que deja detrás del botón, YA CONTANDO el
+ * buscador: con texto tecleado, todo es «reciente» y no queda nada detrás.
+ */
+export function partirGuiasParaLaLista<T extends GuiaConFecha>(
+  guias: readonly T[],
+  ahora: Date,
+  busqueda: string | null | undefined,
+  dias: number = DIAS_VENTANA_GUIAS,
+): { recientes: T[]; viejas: T[] } {
+  if (hayBusqueda(busqueda)) return { recientes: [...guias], viejas: [] };
+  return partirGuiasPorVentana(guias, ahora, dias);
+}

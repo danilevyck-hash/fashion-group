@@ -19,6 +19,10 @@
  *      que empujaba las columnas ~95 px; ahora es un punto, y **su columna
  *      existe siempre**, con o sin aviso, así que nada se mueve.
  *
+ * Y el buscador (G2): **con algo tecleado la ventana se abre entera.** 🩸
+ * Buscar una guía de hace tres meses dejaba la lista VACÍA y la única
+ * coincidencia escondida detrás de «Ver guías más viejas (1)».
+ *
  * 🔴 CANDADO DE CONDUCTA: se RENDERIZA y se lee el DOM. Un barrido de texto se
  * cumple con el comentario que explica el cambio — en este repo ya pasó cuatro
  * veces.
@@ -35,6 +39,7 @@ import {
   AVISO_SIN_NUMERO_TRANSP,
   avisosDeLaFila,
 } from "@/lib/guias/avisos-de-la-fila";
+import { hayBusqueda, partirGuiasParaLaLista } from "@/lib/guias/ventana-lista";
 
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({}) })));
@@ -229,5 +234,40 @@ describe("🔴 5 · el aviso no grita y NO empuja las columnas", () => {
     const t = tarjeta(container);
     expect(t.textContent).toContain(AVISO_SIN_NUMERO_TRANSP);
     expect(t.innerHTML).not.toContain("bg-amber-50");
+  });
+});
+
+// ─── 6 · el buscador abre la ventana entera ──────────────────────────────────
+
+describe("🔴 6 · buscar una guía vieja la ENCUENTRA, no la esconde", () => {
+  it("🩸 sin esto, buscarla dejaba la lista vacía detrás de «Ver guías más viejas»", () => {
+    const { container } = pintar([guia(), VIEJA], { search: "GT-100" });
+    expect(container.textContent).toContain("GT-100");
+    expect(container.textContent).not.toContain("Ver guías más viejas");
+  });
+
+  it("y lo que no coincide sigue sin salir: se abre la VENTANA, no el filtro", () => {
+    const { container } = pintar([guia(), VIEJA], { search: "GT-100" });
+    expect(container.textContent).not.toContain("GT-240");
+  });
+
+  it("sin nada tecleado, todo como siempre: la vieja espera detrás del botón", () => {
+    const { container } = pintar([guia(), VIEJA]);
+    expect(container.textContent).toContain("Ver guías más viejas (1)");
+    expect(container.textContent).not.toContain("GT-100");
+  });
+
+  it("la regla vive en un módulo puro, y los espacios solos no cuentan", () => {
+    expect(hayBusqueda("")).toBe(false);
+    expect(hayBusqueda("   ")).toBe(false);
+    expect(hayBusqueda(null)).toBe(false);
+    expect(hayBusqueda("GT-100")).toBe(true);
+
+    const ahora = new Date("2026-09-05T15:00:00Z");
+    const lista = [{ fecha: "2026-09-04" }, { fecha: "2026-06-19" }];
+    expect(partirGuiasParaLaLista(lista, ahora, "").viejas).toHaveLength(1);
+    expect(partirGuiasParaLaLista(lista, ahora, "  ").viejas).toHaveLength(1);
+    expect(partirGuiasParaLaLista(lista, ahora, "x").viejas).toHaveLength(0);
+    expect(partirGuiasParaLaLista(lista, ahora, "x").recientes).toHaveLength(2);
   });
 });

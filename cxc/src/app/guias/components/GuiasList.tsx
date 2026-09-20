@@ -23,7 +23,7 @@ import { textoFaltantesDespachada } from "@/lib/guias/faltantes-despacho";
 import { tieneRenglones } from "@/lib/guias/tiene-renglones";
 import { facturasParaMostrar } from "@/lib/guias/numero-factura";
 import { observacionesVisibles } from "@/lib/guias/observaciones";
-import { partirGuiasPorVentana } from "@/lib/guias/ventana-lista";
+import { partirGuiasParaLaLista, partirGuiasPorVentana } from "@/lib/guias/ventana-lista";
 import { avisosDeLaFila } from "@/lib/guias/avisos-de-la-fila";
 import { textoPieDeLista } from "@/lib/guias/pie-de-la-lista";
 import { separarPendientes, resumenPendientes } from "@/lib/guias/pendientes-arriba";
@@ -651,7 +651,11 @@ export default function GuiasList({
                 // 🔴 LA LISTA ABRE CON EL ÚLTIMO MES (5-sep-2026). Medido:
                 // 46 guías de las 222. Antes traía 15 con un «Ver más» que
                 // había que tocar 14 veces para llegar a la primera.
-                const { recientes, viejas } = partirGuiasPorVentana(filtered, new Date());
+                // 🔴 …SALVO CUANDO SE BUSCA (19-sep-2026): con algo tecleado la
+                // ventana se abre entera. 🩸 Buscar una guía de hace tres meses
+                // dejaba la lista VACÍA y la única coincidencia escondida
+                // detrás de «Ver guías más viejas (1)».
+                const { recientes, viejas } = partirGuiasParaLaLista(filtered, new Date(), search);
                 // 🔴 Y LO QUE ESPERA ALGO VA ARRIBA, fuera de los grupos de
                 // fecha: una pendiente del 1-sep no puede quedar enterrada
                 // entre 221 despachadas.
