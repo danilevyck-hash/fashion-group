@@ -411,6 +411,10 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 A los 365 días un cheque DEPOSITADO se retira con soft delete (`deleted` + `deleted_at`), nunca un DELETE, y solo los depositados: lo que se debe se queda para siempre. Cuenta desde `fecha_depositado` (sin ella, `fecha_deposito`; nunca «hoy»).
 - Candados: `recordatorios-rediseno.test.ts` · `cheques-aviso-vencimiento.test.ts`.
 
+### Caja Menuda — [docs/postmortems/caja-menuda.md](docs/postmortems/caja-menuda.md)
+
+> Sus reglas, enteras, en el postmortem.
+
 ### Gastos, mayor y banco — [docs/postmortems/gastos-mayor-banco.md](docs/postmortems/gastos-mayor-banco.md)
 
 > Detalle completo (mediciones, citas, candados, mutaciones): [docs/postmortems/gastos-mayor-banco.md](docs/postmortems/gastos-mayor-banco.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
