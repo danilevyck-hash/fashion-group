@@ -42,6 +42,24 @@ function hoyPanama(): string {
 const money = (n: number) =>
   n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+/**
+ * 🔴 EL MONTO VIENE PUESTO (20-sep-2026). Medido contra producción: **14 de 14
+ * cobros fueron el total exacto del reclamo, al centavo**. Escribirlo a mano 14
+ * de 14 veces es teclear un número que el sistema ya sabe.
+ *
+ * ⚠️ Viene puesto y EDITABLE, y la línea «puede ser parcial» —que ya existía—
+ * se queda justo arriba: el cobro parcial sigue siendo posible, solo deja de
+ * ser el caso por el que se diseña.
+ *
+ * Sin monto reclamado (no debería pasar) va vacío: **no se inventa un cero**,
+ * que el propio modal rechazaría.
+ */
+function montoPropuesto(reclamado: number | undefined): string {
+  return typeof reclamado === "number" && Number.isFinite(reclamado) && reclamado > 0
+    ? reclamado.toFixed(2)
+    : "";
+}
+
 export default function SettlementModal({
   open,
   reclamado,
@@ -53,10 +71,16 @@ export default function SettlementModal({
   onSubmit,
 }: Props) {
   useBodyScrollLock(open);
-  const [rows, setRows] = useState<Row[]>([{ monto: "", nota_credito: "", fecha: hoyPanama() }]);
+  const [rows, setRows] = useState<Row[]>([{ monto: montoPropuesto(reclamado), nota_credito: "", fecha: hoyPanama() }]);
   const [error, setError] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // 🔴 EL N° DE NOTA DE CRÉDITO SE PLIEGA (20-sep-2026). Medido: **0 de 14
+  // cobros lo tienen escrito**. El campo NO se fue —sigue existiendo y se
+  // guarda igual— pero deja de ocupar media ventana para un dato que nadie
+  // llenó nunca. Se abre de un toque y, una vez abierto, se queda abierto para
+  // todas las notas de crédito de esa ventana.
+  const [verNumeroNc, setVerNumeroNc] = useState(false);
 
   // Reset al abrir — EN RENDER, no en un efecto: el modal se queda montado con
   // `open=false`, así que un efecto limpiaría los campos un render TARDE y
@@ -66,9 +90,10 @@ export default function SettlementModal({
   if (open !== prevOpen) {
     setPrevOpen(open);
     if (open) {
-      setRows([{ monto: "", nota_credito: "", fecha: hoyPanama() }]);
+      setRows([{ monto: montoPropuesto(reclamado), nota_credito: "", fecha: hoyPanama() }]);
       setError(null);
       setFile(null);
+      setVerNumeroNc(false);
     }
   }
 
@@ -188,16 +213,26 @@ export default function SettlementModal({
                     className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-black transition"
                   />
                 </label>
-                <label className="col-span-2 block">
-                  <span className="text-xs text-gray-500">N° nota de crédito (opcional)</span>
-                  <input
-                    type="text"
-                    value={r.nota_credito}
-                    onChange={(e) => updateRow(i, { nota_credito: e.target.value })}
-                    placeholder="Ej. 4020000422"
-                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-black transition"
-                  />
-                </label>
+                {verNumeroNc ? (
+                  <label className="col-span-2 block">
+                    <span className="text-xs text-gray-500">N° nota de crédito (opcional)</span>
+                    <input
+                      type="text"
+                      value={r.nota_credito}
+                      onChange={(e) => updateRow(i, { nota_credito: e.target.value })}
+                      placeholder="Ej. 4020000422"
+                      className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-black transition"
+                    />
+                  </label>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setVerNumeroNc(true)}
+                    className="col-span-2 text-left text-xs font-medium text-blue-600 hover:underline"
+                  >
+                    Agregar el N° de nota de crédito
+                  </button>
+                )}
               </div>
             </div>
           ))}
