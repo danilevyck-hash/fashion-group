@@ -39,6 +39,7 @@ import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import UndoToast from "@/components/UndoToast";
 import { hoyPanama } from "@/lib/fecha-panama";
+import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
 import {
   diasSinPagar,
   avisaSinPagar,
@@ -63,8 +64,12 @@ import {
 
 // ── Helpers ──────────────────────────────────────────────
 
+// 🔴 EL NOMBRE ES EL QUE ESCRIBE SWITCH, el mismo del papel (20-sep-2026):
+// estos dos textos son los del WhatsApp y los del «copiar mensaje», o sea que
+// los LEE EL CLIENTE. Decían `nombre_normalized`, la llave de pareo en
+// mayúsculas — el cliente recibía su propio nombre a los gritos.
 function buildEmailSubject(client: ConsolidatedClient) {
-  return `Estado de Cuenta - ${client.nombre_normalized} - Fashion Group`;
+  return `Estado de Cuenta - ${nombreDeCliente(client)} - Fashion Group`;
 }
 
 function buildEmailBody(client: ConsolidatedClient) {
@@ -80,7 +85,7 @@ function buildEmailBody(client: ConsolidatedClient) {
     ``,
     `Le escribimos de Fashion Group para informarle sobre su estado de cuenta actualizado.`,
     ``,
-    `Estado de Cuenta - ${client.nombre_normalized}`,
+    `Estado de Cuenta - ${nombreDeCliente(client)}`,
     ``,
   ];
   for (const co of COMPANIES) {
@@ -552,7 +557,7 @@ function AdminDashboardInner() {
         body: JSON.stringify({
           clientes: elegidos.map((c) => ({
             codigo: codigoDe(c),
-            nombre: Object.values(c.companies).find((x) => x?.nombre)?.nombre ?? c.nombre_normalized,
+            nombre: nombreDeCliente(c),
             nombreNormalizado: c.nombre_normalized,
           })),
         }),
@@ -816,7 +821,7 @@ function AdminDashboardInner() {
           .filter((c) => seleccion.has(codigoDe(c)))
           .map((c) => ({
             codigo: codigoDe(c),
-            nombre: c.nombre_normalized,
+            nombre: nombreDeCliente(c),
             correo: c.correo || null,
             total: c.total,
           }))}

@@ -48,6 +48,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import React from "react";
 import type { ConsolidatedClient } from "@/lib/types";
+import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
 import type { Company } from "@/lib/companies";
 
 // El banner de frescura y el botón de sync salen a la red: no son lo que se
@@ -224,7 +225,8 @@ describe.each([
 describe("el menú de CLICK DERECHO", () => {
   it("🔴 ya no existe: la fila no abre ningún menú propio", () => {
     pintarEscritorio();
-    const filas = document.querySelectorAll(`[title="${CLIENTE.nombre_normalized}"]`);
+    // 🔄 20-sep-2026: el `title` de la fila es el nombre de Switch, no la llave.
+    const filas = document.querySelectorAll(`[title="${nombreDeCliente(CLIENTE)}"]`);
     expect(filas.length).toBeGreaterThan(0); // se pintó una fila de verdad
     for (const fila of filas) fireEvent.contextMenu(fila);
     expect(document.querySelector('[data-menu="contexto"]')).toBeNull();

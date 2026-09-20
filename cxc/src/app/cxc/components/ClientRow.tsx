@@ -3,6 +3,7 @@
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
 import { seLeCobra } from "@/lib/cxc/cobrable";
+import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
 
 function riskInfo(total: number, current: number, watch: number, overdue: number): { border: string; tooltip: string } {
   if (total < 0) return { border: "border-l-blue-400", tooltip: "Saldo a favor: saldo negativo (nota de credito o sobrepago)" };
@@ -44,6 +45,12 @@ export default function ClientRow({
   avisoSinPagar,
 }: Props) {
   const risk = riskInfo(client.total, client.current, client.watch, client.overdue);
+  // 🔴 EL NOMBRE QUE SE LEE ES EL QUE ESCRIBE SWITCH (20-sep-2026). 🩸 Acá se
+  // dibujaba `nombre_normalized` —la llave de PAREO, en mayúsculas—, así que la
+  // lista gritaba «CITY MODA DEL ESTE SA» y el papel del mismo cliente decía
+  // «City Moda Del Este, S.A.». La llave sigue viva: ordena, busca y recuerda la
+  // fila abierta. Solo cambia lo que se dibuja.
+  const nombre = nombreDeCliente(client);
 
   return (
     <div className={`border-l-4 ${risk.border} group`} data-tooltip={risk.tooltip}>
@@ -61,7 +68,7 @@ export default function ClientRow({
               checked={seleccionado}
               onClick={(e) => e.stopPropagation()}
               onChange={() => onSeleccionar(client)}
-              aria-label={`Seleccionar a ${client.nombre_normalized}`}
+              aria-label={`Seleccionar a ${nombre}`}
               className="shrink-0 h-4 w-4 rounded border-gray-300 accent-black cursor-pointer"
             />
           ) : (
@@ -70,7 +77,7 @@ export default function ClientRow({
           <svg width="10" height="10" viewBox="0 0 10 10" className={`flex-shrink-0 text-gray-400 transition-transform ${isExpanded ? "rotate-90" : ""}`} fill="currentColor">
             <path d="M3 1l5 4-5 4V1z"/>
           </svg>
-          <span className="truncate" title={client.nombre_normalized}>{client.nombre_normalized}</span>
+          <span className="truncate" title={nombre}>{nombre}</span>
           {/* 🔴 SE VE SIEMPRE (20-sep-2026, pedido de Daniel). 🩸 Se dibujaba
               solo con el filtro de «+90 d» encendido; desde que la lista ABRE
               ordenada por estos días, esconderlos dejaba las filas ordenadas por

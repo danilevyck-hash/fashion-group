@@ -39,6 +39,7 @@
 import type { Company } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import { seLeCobra } from "./cobrable";
+import { nombreDeCliente } from "./nombre-cliente";
 
 /** Un renglón de «Total por cliente». */
 export interface FilaCliente {
@@ -73,13 +74,14 @@ export function codigoDeCliente(c: ConsolidatedClient): string {
 }
 
 /**
- * El nombre que se LEE: el de Switch (capitalizado), nunca la llave en
- * mayúsculas. Sin nombre de Switch cae a la llave — no se inventa un texto.
+ * El nombre que se LEE: el de Switch, nunca la llave en mayúsculas.
+ *
+ * 🔄 20-sep-2026: la regla salió de acá a `lib/cxc/nombre-cliente.ts`, que la
+ * comparte con las pantallas y con el papel. Único cambio de conducta: sin
+ * nombre de Switch el respaldo sale CAPITALIZADO en vez de a los gritos, que es
+ * lo que el papel ya hacía (`nombreDelPapel`).
  */
-export function nombreDeCliente(c: ConsolidatedClient): string {
-  const nombre = Object.values(c.companies).find((x) => x?.nombre)?.nombre;
-  return (nombre ?? "").trim() || c.nombre_normalized;
-}
+export { nombreDeCliente };
 
 /**
  * 🔴 LO QUE SE DESCARGA ES LO QUE SE ESTÁ VIENDO.

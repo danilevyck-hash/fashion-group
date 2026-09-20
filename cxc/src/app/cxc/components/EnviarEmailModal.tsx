@@ -5,15 +5,17 @@ import { ModalOverlay } from "@/components/ui";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { useFormGuard } from "@/lib/hooks/useModalDismiss";
 import type { ConsolidatedClient } from "@/lib/types";
+import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
 import { composeEmailHtml } from "@/lib/cxc/estado-cuenta-email";
 
 // El código Switch (D-XXX) es el mismo en todas las empresas del cliente.
 function codigoDe(client: ConsolidatedClient): string | null {
   return Object.values(client.companies).find((c) => c?.codigo)?.codigo ?? null;
 }
-function nombreDe(client: ConsolidatedClient): string {
-  return Object.values(client.companies).find((c) => c?.nombre)?.nombre ?? client.nombre_normalized;
-}
+// 🔴 El nombre que se LEE sale de UNA función, la misma del papel
+// (`lib/cxc/nombre-cliente.ts`). Acá vivía una copia suya, sin el respaldo
+// capitalizado. Ver el encabezado de ese archivo (20-sep-2026).
+const nombreDe = (client: ConsolidatedClient): string => nombreDeCliente(client);
 
 interface PreviewData {
   destinatario: string;

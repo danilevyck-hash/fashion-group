@@ -31,6 +31,7 @@
 import { useEffect, useState } from "react";
 import { ModalOverlay } from "@/components/ui";
 import type { ConsolidatedClient } from "@/lib/types";
+import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
 import { fmt, fmtDate } from "@/lib/format";
 import type { EstadoCuenta } from "./EstadoCuentaDrawer";
 import { cuadrarConSwitch } from "@/lib/cxc/estado-cuenta-switch";
@@ -39,9 +40,10 @@ import { cuadrarConSwitch } from "@/lib/cxc/estado-cuenta-switch";
 function codigoDe(client: ConsolidatedClient): string | null {
   return Object.values(client.companies).find((c) => c?.codigo)?.codigo ?? null;
 }
-function nombreDe(client: ConsolidatedClient): string {
-  return Object.values(client.companies).find((c) => c?.nombre)?.nombre ?? client.nombre_normalized;
-}
+// 🔴 El nombre que se LEE sale de UNA función, la misma del papel
+// (`lib/cxc/nombre-cliente.ts`). Acá vivía una copia suya, sin el respaldo
+// capitalizado. Ver el encabezado de ese archivo (20-sep-2026).
+const nombreDe = (client: ConsolidatedClient): string => nombreDeCliente(client);
 
 /** Lo que hay que saber para mandar el correo cuando venzan los 5 segundos. */
 export interface CorreoProgramado {

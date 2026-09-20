@@ -135,7 +135,10 @@ function pintarCelular() {
     />,
   );
   // El desglose por empresa vive dentro de la tarjeta desplegada.
-  fireEvent.click(screen.getByText("CITY MALL PASO CANOA"));
+    // 🔄 20-sep-2026: la lista muestra el nombre que escribe Switch («City Mall
+    // Paso Canoa»), no la llave de pareo en mayúsculas. Cambia por dónde se
+    // agarra la fila; lo que el candado sostiene no se movió.
+  fireEvent.click(screen.getAllByText("City Mall Paso Canoa")[0]);
 }
 
 describe("🔄 PanelCxcMobile (celular) — el desglose se acortó (5-sep-2026)", () => {

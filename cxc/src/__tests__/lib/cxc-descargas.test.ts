@@ -216,9 +216,15 @@ describe("🔴 4 · el nombre del cliente se LEE, no se grita", () => {
     expect(nombreDeCliente(CITY)).not.toBe(CITY.nombre_normalized);
   });
 
-  it("sin nombre de Switch cae a la llave — no se inventa un texto", () => {
+  // 🔄 20-sep-2026 · CAMBIÓ DE FORMA, CON NOTA FECHADA. El respaldo sigue siendo
+  // la llave —no se inventa ningún texto—, pero sale CAPITALIZADO en vez de a
+  // los gritos: la regla del nombre pasó a `lib/cxc/nombre-cliente.ts`, que es
+  // la MISMA que el papel ya usaba (`nombreDelPapel`). Daniel pidió el
+  // 20-sep-2026 que el nombre se escriba igual en todas las pantallas, y dos
+  // respaldos distintos eran justo la forma de que volvieran a separarse.
+  it("🔄 sin nombre de Switch cae a la llave CAPITALIZADA — no se inventa un texto", () => {
     const sinNombre = cliente("SIN NOMBRE", { vistana: empresa("D-99", "", { d0_30: 10 }) });
-    expect(nombreDeCliente(sinNombre)).toBe("SIN NOMBRE");
+    expect(nombreDeCliente(sinNombre)).toBe("Sin Nombre");
   });
 
   it("la identidad sigue siendo el CÓDIGO", () => {

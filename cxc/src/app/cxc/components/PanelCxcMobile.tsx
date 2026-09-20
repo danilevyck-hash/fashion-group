@@ -36,6 +36,7 @@ import { formatCompactCurrency } from "@/lib/ventas/format";
 import { fmt } from "@/lib/format";
 import { type RiskFilter } from "@/lib/cxc-orden";
 import { rotuloSinPagar } from "@/lib/cxc/sin-pagar";
+import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
 import { AGING, tramoLabel } from "@/lib/cxc-aging";
 import MenuDescargar from "./MenuDescargar";
 import { seLeCobra } from "@/lib/cxc/cobrable";
@@ -562,8 +563,11 @@ function MobileClientCard({
                 comían el ancho: la estrella se fue el 4-sep y el "···" el 5, y
                 ese ancho vuelve donde tiene que estar. `tracking-tight` se
                 queda: aprieta el interletrado sin achicar la letra. */}
+            {/* 🔴 El nombre que se LEE es el que escribe Switch (20-sep-2026),
+                el mismo del papel. La llave `nombre_normalized` sigue siendo la
+                del PAREO: ordena, busca y recuerda la tarjeta abierta. */}
             <span className="block truncate text-[14px] font-medium leading-5 tracking-tight text-gray-900">
-              {client.nombre_normalized}
+              {nombreDeCliente(client)}
             </span>
             {avisoSinPagar && (
               <span className="block text-[11px] text-gray-500">{avisoSinPagar}</span>

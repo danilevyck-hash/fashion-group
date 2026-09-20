@@ -65,6 +65,9 @@ const EMPRESAS: Company[] = [
 
 const vacio = { d0_30: 0, d31_60: 0, d61_90: 0, d91_120: 0, d121_180: 0, d181_270: 0, d271_365: 0, mas_365: 0 };
 
+// 🔄 20-sep-2026: la fila se agarra por el nombre que escribe Switch («City
+// Mall Paso Canoa»), no por la llave de pareo en mayúsculas. La llave sigue
+// existiendo en el dato; lo que cambió es lo que se dibuja.
 const CLIENTE: ConsolidatedClient = {
   nombre_normalized: "CITY MALL PASO CANOA",
   companies: {
@@ -195,7 +198,7 @@ describe("🔴 con la lista pintada NO se pide nada", () => {
 describe("🔴 abrir el cliente trae los pagos — UN clic, y en UN solo lugar", () => {
   it("escritorio: al expandir salen las TRES FECHAS con su total y sus empresas", async () => {
     pintarEscritorio();
-    fireEvent.click(screen.getByTitle("CITY MALL PASO CANOA"));
+    fireEvent.click(screen.getByTitle("City Mall Paso Canoa"));
     await waitFor(() => expect(pedidosDePagos()).toHaveLength(1));
     await screen.findByText(/20 ago/);
     const bloque = screen.getByText("Últimos pagos").parentElement!;
@@ -208,7 +211,7 @@ describe("🔴 abrir el cliente trae los pagos — UN clic, y en UN solo lugar",
 
   it("🔴 el bloque se dibuja UNA sola vez, no dos", async () => {
     pintarEscritorio();
-    fireEvent.click(screen.getByTitle("CITY MALL PASO CANOA"));
+    fireEvent.click(screen.getByTitle("City Mall Paso Canoa"));
     await screen.findByText(/20 ago/);
     expect(screen.getAllByText("Últimos pagos")).toHaveLength(1);
   });
@@ -223,7 +226,7 @@ describe("🔴 abrir el cliente trae los pagos — UN clic, y en UN solo lugar",
 
   it("cerrar y volver a abrir no vuelve a pedir", async () => {
     pintarEscritorio();
-    const fila = screen.getByTitle("CITY MALL PASO CANOA");
+    const fila = screen.getByTitle("City Mall Paso Canoa");
     fireEvent.click(fila);
     await waitFor(() => expect(pedidosDePagos()).toHaveLength(1));
     fireEvent.click(fila);
