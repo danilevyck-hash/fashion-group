@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { verifySessionEdge } from "@/lib/session-cookie-edge";
 import { destinoDePrestamos } from "@/lib/prestamos-una-puerta";
+import {
+  COOKIE_ULTIMO_TOQUE,
+  INTERVALO_TOQUE_MS,
+  debeTocarSesion,
+  marcaDeToque,
+} from "@/lib/session-touch";
 
 const COOKIE_NAME = "cxc_session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
@@ -106,7 +112,13 @@ async function isSessionValid(sessionToken: string): Promise<boolean> {
   }
 }
 
-// Update last_seen (fire and forget)
+// Update last_seen (fire and forget).
+//
+// 🔴 NO se llama en cada petición: la decide `debeTocarSesion()`, que la deja
+// pasar como mucho una vez cada 5 minutos por sesión (ver `lib/session-touch.ts`,
+// que explica el porqué y el margen de los 14 días de `session-retention.ts`).
+// Sigue sin `await` a propósito: esperar la respuesta le costaría ~200 ms a cada
+// navegación de cada persona. Lo que se recortó es CUÁNTAS veces ocurre.
 function touchSession(sessionToken: string) {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -132,6 +144,9 @@ function clearSessionAndRedirect(req: NextRequest, pathname: string): NextRespon
     ? NextResponse.json({ error: "Sesión revocada" }, { status: 401 })
     : NextResponse.redirect(new URL("/?expired=1", req.url));
   res.cookies.delete(COOKIE_NAME);
+  // La marca del último toque muere con la sesión: así el próximo login escribe
+  // su `last_seen` en la primera petición, sin esperar los 5 minutos.
+  res.cookies.delete(COOKIE_ULTIMO_TOQUE);
   return res;
 }
 
@@ -202,8 +217,12 @@ export async function middleware(req: NextRequest) {
   if (!valid) {
     return clearSessionAndRedirect(req, pathname);
   }
-  // Update last_seen (fire and forget — non-blocking)
-  touchSession(parsed.sessionToken);
+  // Update last_seen (fire and forget — non-blocking), como mucho una vez cada
+  // 5 minutos por sesión. La marca del último toque viaja con la petición, en su
+  // propia cookie, porque el borde no tiene memoria entre peticiones.
+  const ahora = Date.now();
+  const toca = debeTocarSesion(req.cookies.get(COOKIE_ULTIMO_TOQUE)?.value, ahora);
+  if (toca) touchSession(parsed.sessionToken);
 
   // Auto-refresh: re-set cookie with fresh 7-day maxAge on every request
   const res = NextResponse.next();
@@ -214,6 +233,17 @@ export async function middleware(req: NextRequest) {
     path: "/",
     maxAge: COOKIE_MAX_AGE,
   });
+  if (toca) {
+    // La cookie muere sola a los 5 minutos: si el navegador la descarta antes de
+    // tiempo, o no la guarda, se vuelve a escribir `last_seen` — nunca al revés.
+    res.cookies.set(COOKIE_ULTIMO_TOQUE, marcaDeToque(ahora), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: Math.floor(INTERVALO_TOQUE_MS / 1000),
+    });
+  }
   return res;
 }
 
