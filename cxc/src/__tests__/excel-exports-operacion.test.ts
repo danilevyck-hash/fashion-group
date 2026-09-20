@@ -238,7 +238,17 @@ describe("excel-proveedores — buildProveedoresSheet", () => {
             ultimo_pago_dias: 13,
           },
         ],
-        sin_saldo: [],
+        sin_saldo: [
+          {
+            key: "PLEGADO",
+            nombre: "Proveedor Plegado",
+            tramos: { t0_90: 0, t91_120: 0, t121_365: 0, tMas365: 0 },
+            saldo: { debes: 0, a_favor: 0, por_pagar: 0 },
+            tambien_en: [],
+            ultimo_pago_fecha: "2026-03-23",
+            ultimo_pago_dias: 181,
+          },
+        ],
       },
       {
         empresa_key: "vistana",
@@ -281,8 +291,10 @@ describe("excel-proveedores — buildProveedoresSheet", () => {
     // 🔴 La empresa, y debajo su proveedor con sangría.
     expect(ws.A2.v).toBe("Fashion Wear");
     expect(ws.A3.v).toBe("    Proveedor Uno");
-    expect(ws.A4.v).toBe("Vistana International");
-    expect(ws.A5.v).toBe("    Proveedor Dos");
+    // ⚠️ Lo que en pantalla está PLEGADO igual baja: un archivo no se recorta.
+    expect(ws.A4.v).toBe("    Proveedor Plegado");
+    expect(ws.A5.v).toBe("Vistana International");
+    expect(ws.A6.v).toBe("    Proveedor Dos");
 
     // Moneda: número real con numFmt, no string.
     expect(ws.B2.t).toBe("n");
@@ -292,23 +304,23 @@ describe("excel-proveedores — buildProveedoresSheet", () => {
     // 🔴 LA FECHA REAL, nunca «hace 13d»; sin pago, la celda va vacía.
     expect(ws.I3.v).toBe("07/09/2026");
     expect(String(ws.I3.v)).not.toMatch(/hace/);
-    expect(ws.I5?.v ?? "").toBe("");
+    expect(ws.I6?.v ?? "").toBe("");
 
     // «También en», que reemplazó a la columna «Empresas».
     expect(ws.J3.v).toBe("también en Vistana International");
 
-    // 🔴 El total al pie es la suma de las empresas (headers 1 + 4 datos + espaciador).
-    expect(ws.A7.v).toBe("Total");
-    expect(ws.F7.t).toBe("n");
-    expect(ws.F7.v).toBeCloseTo(325.25, 2);
+    // 🔴 El total al pie es la suma de las empresas (headers 1 + 5 datos + espaciador).
+    expect(ws.A8.v).toBe("Total");
+    expect(ws.F8.t).toBe("n");
+    expect(ws.F8.v).toBeCloseTo(325.25, 2);
     // Y los cuatro tramos del pie suman ese mismo total.
-    const tramos = ["B7", "C7", "D7", "E7"].map((c) => Number(ws[c].v));
+    const tramos = ["B8", "C8", "D8", "E8"].map((c) => Number(ws[c].v));
     expect(tramos.reduce((s, n) => s + n, 0)).toBeCloseTo(325.25, 2);
 
     // Lo que está a favor se ve también en el archivo.
-    expect(ws.G7.v).toBeCloseTo(350.25, 2);
+    expect(ws.G8.v).toBeCloseTo(350.25, 2);
     expect(ws.H1.v).toBe("Tienes a favor");
-    expect(ws.H7.v).toBeCloseTo(25, 2);
+    expect(ws.H8.v).toBeCloseTo(25, 2);
 
     // Candado viejo que sigue: ni un encabezado con "YTD".
     for (const col of ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]) {

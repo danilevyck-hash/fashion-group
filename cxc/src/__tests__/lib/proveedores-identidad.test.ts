@@ -515,6 +515,52 @@ describe("🔴 LA PANTALLA: las empresas, y adentro un proveedor por fila", () =
     expect([...montos].sort((a, b) => b - a)).toEqual(montos);
   });
 
+  it("🔴 una empresa SIN datos sigue en la lista, en cero — no desaparece", () => {
+    // 🩸 Si las empresas salieran de las filas que llegaron, la empresa cuyo
+    // sync se cayó se caería de la pantalla y nadie lo notaría: se vería una
+    // lista completa a la que le falta una fila.
+    const soloUna = conAging.filter((f) => f.empresa_key === "joystep");
+    const rota = buildPorEmpresa(soloUna, amarres);
+    expect(rota.empresas).toHaveLength(7);
+    const vistana = rota.empresas.find((e) => e.empresa_key === "vistana")!;
+    expect(vistana.saldo.por_pagar).toBe(0);
+    expect(vistana.proveedores).toEqual([]);
+    expect(vistana.sin_saldo).toEqual([]);
+  });
+
+  it("🔴 el total de la empresa cuenta TAMBIÉN a los que se pliegan", () => {
+    // Un proveedor cuyo neto es cero pero que tiene tramos vivos: debe $100 a
+    // 91-120 días y tiene $100 a favor a 0-30. Se pliega, pero sus tramos
+    // siguen siendo parte de los de la empresa.
+    const conPlegado: FilaCxp[] = [
+      ...conAging.filter((f) => f.empresa_key === "joystep"),
+      {
+        empresa_key: "joystep",
+        proveedor_switch_id: 999,
+        nombre: "SE PLIEGA PERO SUMA",
+        saldo_total: 0,
+        aging: [
+          { title: "0-30", saldo: -100 },
+          { title: "91-120", saldo: 100 },
+        ],
+        ultimo_pago_fecha: null,
+        ultimo_pago_dias: null,
+        synced_at: null,
+      },
+    ];
+    const js = buildPorEmpresa(conPlegado, amarres).empresas
+      .find((e) => e.empresa_key === "joystep")!;
+    expect(js.sin_saldo.map((p) => p.nombre)).toContain("SE PLIEGA PERO SUMA");
+    expect(js.tramos.t91_120).toBe(100);
+    expect(js.tramos.t0_90).toBeCloseTo(js.proveedores.reduce((s, p) => s + p.tramos.t0_90, 0) - 100, 2);
+    // Y el neto de la empresa no se mueve: el plegado vale cero.
+    expect(js.saldo.por_pagar).toBeCloseTo(
+      buildPorEmpresa(conAging.filter((f) => f.empresa_key === "joystep"), amarres)
+        .empresas.find((e) => e.empresa_key === "joystep")!.saldo.por_pagar,
+      2,
+    );
+  });
+
   it("🔴 dentro de UNA empresa, las grafías del mismo proveedor son UNA fila", () => {
     // Boston llega a Multifashion como «CONFECCIONES BOSTON S A» y es una sola
     // fila; en las cinco empresas juntas, un solo proveedor.

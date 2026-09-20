@@ -22,9 +22,10 @@ import { render, screen, waitFor, fireEvent, within } from "@testing-library/rea
 import ProveedoresListClient from "@/app/proveedores/ProveedoresListClient";
 
 const setUrl = vi.fn();
+const push = vi.fn();
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(""),
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
+  useRouter: () => ({ replace: vi.fn(), push, refresh: vi.fn(), prefetch: vi.fn() }),
   usePathname: () => "/proveedores",
 }));
 vi.mock("@/lib/hooks/useAuth", () => ({ useAuth: () => ({ authChecked: true, role: "admin" }) }));
@@ -117,6 +118,7 @@ const RESPUESTA = {
 
 beforeEach(() => {
   setUrl.mockClear();
+  push.mockClear();
   vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => RESPUESTA })));
 });
 afterEach(() => { vi.unstubAllGlobals(); });
@@ -187,6 +189,15 @@ describe("🔴 tocar la empresa la despliega en sus proveedores", () => {
     const enlace = t.getAllByRole("button", { name: "Fashion Shoes" })[0];
     fireEvent.click(enlace);
     expect(setUrl).toHaveBeenCalledWith("fashion_shoes");
+    // 🔴 Y NO abre la ficha del proveedor: el enlace frena el clic de la fila.
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("CONTROL: tocar la fila del proveedor SÍ abre su ficha", async () => {
+    await pintar();
+    fireEvent.click(within(tabla()).getByText("Fashion Wear"));
+    fireEvent.click(within(tabla()).getByText("THALIA INTERNACIONAL, S.A."));
+    expect(push).toHaveBeenCalledWith("/proveedores/THALIA%20INTERNACIONAL%20SA");
   });
 
   it("el que está en cero se pliega, no se esconde", async () => {
