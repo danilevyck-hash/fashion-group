@@ -58,9 +58,14 @@ const MARCAS = [
     // encima quedaba AL LADO de la bandera buena de la izquierda. Es el mismo
     // arreglo del PDF y de los correos: arte oficial de color sobre placa
     // blanca. Detalle: `src/__tests__/lib/tommy-logo-que-se-lee.test.ts`.
-    logo: `<img src="${dataUri("tommy/tommy-flag.png")}" style="height:110px" />
-           <span style="display:inline-flex;align-items:center;background:#fff;border-radius:12px;padding:14px 18px">
-             <img src="${dataUri("tommy/tommy-horizontal.png")}" style="height:46px;display:block" />
+    // 🔴 Y la bandera suelta de la izquierda se retiró (20-sep-2026). El arte
+    // oficial es navy · blanco · rojo · navy, así que SOBRE ESTE FONDO NAVY sus
+    // dos bandas de arriba y abajo desaparecen y queda un pedazo blanco y rojo
+    // flotando, que no se lee como la bandera de Tommy. Además el wordmark de
+    // al lado YA la trae adentro: eran dos banderas, y la suelta era la que se
+    // veía mal. Queda una sola marca, completa, sobre su placa.
+    logo: `<span style="display:inline-flex;align-items:center;background:#fff;border-radius:14px;padding:18px 24px">
+             <img src="${dataUri("tommy/tommy-horizontal.png")}" style="height:56px;display:block" />
            </span>`,
   },
   {
@@ -102,7 +107,21 @@ const html = (m) => `<!doctype html><html><head><meta charset="utf-8"><style>
 </body></html>`;
 
 mkdirSync(join(PUBLIC, "og"), { recursive: true });
-const browser = await chromium.launch();
+// 🔴 Usa el Chrome que ya está instalado en la máquina (20-sep-2026).
+// `chromium.launch()` a secas pide el navegador propio de Playwright, que no
+// siempre está bajado y hace fallar el script con «Executable doesn't exist».
+// Si no hay Chrome, cae al de Playwright y avisa qué instalar.
+let browser;
+try {
+  browser = await chromium.launch({ channel: "chrome" });
+} catch {
+  try {
+    browser = await chromium.launch();
+  } catch (e) {
+    console.error("No hay navegador. Corre: npx playwright install chromium");
+    throw e;
+  }
+}
 const page = await browser.newPage({ viewport: { width: 1200, height: 630 } });
 for (const m of MARCAS) {
   await page.setContent(html(m), { waitUntil: "load" });
