@@ -2,9 +2,16 @@
 
 import { fmt, fmtDate } from "@/lib/format";
 import { FG_LOGO_BASE64 } from "@/lib/pdf-logo";
-import { CajaPeriodo } from "./types";
-import { reposicionDelPeriodo, saldoDelPeriodo, sumaMontos, totalGastado } from "@/lib/caja/dinero";
+import { CajaGasto, CajaPeriodo } from "./types";
+import { montoEnPantalla, reposicionDelPeriodo, saldoDelPeriodo, saldoEsNegativo, sumaMontos, totalGastado } from "@/lib/caja/dinero";
 import { etiquetaResponsable } from "@/lib/caja/responsable";
+import {
+  COLUMNAS_DE_PLATA,
+  ROTULO_COLUMNA,
+  columnasDelPapel,
+  encabezadoDelPapel,
+  type ColumnaPapel,
+} from "@/lib/caja/papel-caja";
 
 interface Props {
   current: CajaPeriodo;
@@ -31,6 +38,29 @@ export default function PrintView({ current, onBack }: Props) {
       ? { codigo: String(current.responsable_empleado_codigo), nombre: current.responsable_nombre || "" }
       : null,
   ) || "—";
+
+  const columnas = columnasDelPapel(gastos);
+  const esPlata = (c: ColumnaPapel) => COLUMNAS_DE_PLATA.includes(c);
+  const columnasDePlata = columnas.filter(esPlata);
+  const totalDe: Record<string, number> = {
+    subtotal: totalSubtotal,
+    itbms: totalItbms,
+    total: gastado,
+  };
+
+  /** Lo que dice cada celda. El «—» es para lo que no se sabe, nunca un cero. */
+  function celda(g: CajaGasto, c: ColumnaPapel) {
+    switch (c) {
+      case "fecha": return fmtDate(g.fecha);
+      case "nota": return (g.descripcion || g.nombre || "").trim() || "—";
+      case "proveedor": return g.proveedor || "—";
+      case "categoria": return g.categoria || "Varios";
+      case "factura": return g.nro_factura?.trim() || "—";
+      case "subtotal": return `$${fmt(g.subtotal)}`;
+      case "itbms": return `$${fmt(g.itbms)}`;
+      case "total": return `$${fmt(g.total)}`;
+    }
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
@@ -61,12 +91,12 @@ export default function PrintView({ current, onBack }: Props) {
             Reporte de Caja Menuda
           </h1>
         </div>
+        {/* 🔴 EL RANGO REAL DE LOS RECIBOS, NO LA APERTURA (20-sep-2026).
+            🩸 Decía «Apertura: 2 sept 2026» y su primera fila es del 23 de
+            junio: 36 de los 77 recibos caen fuera de la ventana de su período,
+            porque el papel llega tarde y se teclea cuando aparece. */}
         <p className="text-center text-sm text-gray-600 mb-1">
-          Período N° {current.numero} | Apertura:{" "}
-          {fmtDate(current.fecha_apertura)}
-          {current.fecha_cierre
-            ? ` — Cierre: ${fmtDate(current.fecha_cierre)}`
-            : " — Abierto"}
+          {encabezadoDelPapel(current, gastos)}
         </p>
         <p className="text-center text-sm mb-1">
           Fondo Inicial: ${fmt(current.fondo_inicial)}
@@ -75,93 +105,67 @@ export default function PrintView({ current, onBack }: Props) {
           Responsable del período: {responsableLabel}
         </p>
 
+        {/* 🔴 UNA COLUMNA VACÍA NO SE DIBUJA (20-sep-2026). La NOTA sale solo
+            si alguna fila trae una, y Sub-total + ITBMS solo si alguna fila
+            tiene impuesto — lo tienen 9 de 77 recibos, y en el período Nº3 las
+            26 filas van en $0.00 con el Sub-total idéntico al Total. Qué se
+            dibuja lo decide `columnasDelPapel`, no este archivo. */}
         <table className="w-full text-xs border-collapse mb-4">
           <thead>
             <tr className="bg-gray-100">
-              <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">
-                Fecha
-              </th>
-              <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">
-                Descripción
-              </th>
-              <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">
-                Proveedor
-              </th>
-              <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">
-                Categoría
-              </th>
-              <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">
-                N° Factura
-              </th>
-              <th className="border border-gray-300 px-2 py-1.5 font-medium text-right">
-                Sub-total
-              </th>
-              <th className="border border-gray-300 px-2 py-1.5 font-medium text-right">
-                ITBMS
-              </th>
-              <th className="border border-gray-300 px-2 py-1.5 font-medium text-right">
-                Total
-              </th>
+              {columnas.map((c) => (
+                <th
+                  key={c}
+                  className={`border border-gray-300 px-2 py-1.5 font-medium ${esPlata(c) ? "text-right" : "text-left"}`}
+                >
+                  {ROTULO_COLUMNA[c]}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {gastos.map((g) => (
               <tr key={g.id}>
-                <td className="border border-gray-300 px-2 py-1">
-                  {fmtDate(g.fecha)}
-                </td>
-                <td className="border border-gray-300 px-2 py-1">
-                  {g.descripcion || g.nombre}
-                </td>
-                <td className="border border-gray-300 px-2 py-1">
-                  {g.proveedor || "—"}
-                </td>
-                <td className="border border-gray-300 px-2 py-1">
-                  {g.categoria || "Varios"}
-                </td>
-                <td className="border border-gray-300 px-2 py-1">
-                  {g.nro_factura?.trim() || "—"}
-                </td>
-                <td className="border border-gray-300 px-2 py-1 text-right">
-                  ${fmt(g.subtotal)}
-                </td>
-                <td className="border border-gray-300 px-2 py-1 text-right">
-                  ${fmt(g.itbms)}
-                </td>
-                <td className="border border-gray-300 px-2 py-1 text-right">
-                  ${fmt(g.total)}
-                </td>
+                {columnas.map((c) => (
+                  <td
+                    key={c}
+                    className={`border border-gray-300 px-2 py-1 ${esPlata(c) ? "text-right" : ""}`}
+                  >
+                    {celda(g, c)}
+                  </td>
+                ))}
               </tr>
             ))}
             <tr className="font-bold">
               <td
-                colSpan={5}
+                colSpan={columnas.length - columnasDePlata.length}
                 className="border border-gray-300 px-2 py-1.5 text-right uppercase"
               >
                 Totales
               </td>
-              <td className="border border-gray-300 px-2 py-1.5 text-right">
-                ${fmt(totalSubtotal)}
-              </td>
-              <td className="border border-gray-300 px-2 py-1.5 text-right">
-                ${fmt(totalItbms)}
-              </td>
-              <td className="border border-gray-300 px-2 py-1.5 text-right">
-                ${fmt(gastado)}
-              </td>
+              {columnasDePlata.map((c) => (
+                <td key={c} className="border border-gray-300 px-2 py-1.5 text-right">
+                  ${fmt(totalDe[c])}
+                </td>
+              ))}
             </tr>
           </tbody>
         </table>
 
+        {/* 🩸 La plata negativa se escribía «$-1.50», con el menos DENTRO del
+            monto: el papel era la última pantalla de Caja que no pasaba por
+            `montoEnPantalla`, la función que ya usan la lista, el encabezado y
+            el modal de cierre. Ahora dice «−$1.50», como manda el diccionario
+            de la casa. El número no cambia. */}
         <div className="text-sm mb-8 space-y-1">
           <div className="font-bold">
             Saldo Final:{" "}
-            <span className={saldo < 0 ? "text-red-600" : ""}>
-              ${fmt(saldo)}
+            <span className={saldoEsNegativo(saldo) ? "text-red-600" : ""}>
+              {montoEnPantalla(saldo)}
             </span>
           </div>
           <div className="font-bold">
-            A reponer: <span>${fmt(aReponer)}</span>
+            A reponer: <span>{montoEnPantalla(aReponer)}</span>
           </div>
         </div>
 
