@@ -427,16 +427,14 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🩸 La cuenta se lee por el PRINCIPIO: `codigoDeCuenta()` acepta el código seguido de cualquier cosa; `CUENTA_RE` conserva su `$` para el VALOR, seis tramos siguen siendo error, `esGasto` decide con el primero y el nombre sale de `cuentas_contables.nombre_switch`.
 - ⚠️ Vista General SÍ suma gastos entre empresas: otro módulo, suma deliberada; si la regla vale ahí es decisión pendiente de Daniel.
 
-### Proveedores — un proveedor, una fila (6-sep-2026)
+### Proveedores — la lista son las EMPRESAS (20-sep-2026)
 
-> Detalle completo (mediciones, citas, candados, mutaciones): [docs/postmortems/proveedores.md](docs/postmortems/proveedores.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
-> ⚠️ Las reglas de PANTALLA de este módulo (qué se dibuja, dónde, rótulos, tamaños) viven SOLO en ese postmortem: léelo antes de tocar una pantalla suya.
+> Mediciones, citas, candados y las reglas de PANTALLA: [docs/postmortems/proveedores.md](docs/postmortems/proveedores.md). Léelo antes de tocar el módulo.
 
-- 🔴 QUIÉN ES QUIÉN SALE DE UNA LISTA ESCRITA A MANO (`proveedor_amarre`), no del nombre y nunca de la cédula, que miente en las dos direcciones. Nada por parecido.
-- 🔴 El grano es `(empresa_key, proveedor_switch_id)`: la UNIQUE, la llave del upsert y la de su purga. El código solo NO es identidad —nombra proveedores distintos según la empresa— y es nullable.
-- ⚠️ `switch_proveedor_estadocuenta` no tiene soft delete y el sync borra de verdad lo que Switch deja de listar; por eso el amarre vive en su tabla y vale si se cae y vuelve.
-- 🩸 Una lectura caída se dice, nunca se disfraza de «no hay nada», y lo que ya estaba no se borra.
-- Candados: `proveedores-identidad.test.ts` · `proveedores-error-y-rotulo.test.ts`.
+- 🔴 QUIÉN ES QUIÉN SALE DE UNA LISTA ESCRITA A MANO (`proveedor_amarre`), nunca del nombre ni de la cédula. Grano `(empresa_key, proveedor_switch_id)`; lo resuelve `aplicarAmarre` y nadie más. 🩸 Una lectura caída se dice, nunca «no hay nada».
+- 🔴 **LA LISTA SON LAS SIETE EMPRESAS, DESPLEGABLES EN SUS PROVEEDORES** (`por-empresa.ts`): **Empresa · 0-90D · 91-120D · 121-365D · +1 año · Por pagar**, total al pie; salen de `empresasConCxp()`, nunca de las filas, ⚠️ sin Boston, y todo total es SUMA de lo de abajo (**$4.829.819,40**).
+- 🔴 **CUATRO tramos, sumas de los OCHO de Switch, y ningún número cambia** (`tramos.ts`). 🔴 **Nunca «vencido», ni dicho ni pintado** —el dato es EDAD, no mora—: un tono (`tono.ts`). 🔴 **Lo A FAVOR se ve**: «Le debes X · Tienes a favor Y · **Por pagar Z = X − Y**».
+- Candados: `proveedores-identidad` · `-cuadre` · `-cuatro-tramos` · `-sin-rojo` · `-arriba-una-linea`; 26 mutaciones, 26 cazadas.
 
 ### Usuarios, Inicio y teclado — lo que se regalaba y no servía (11-sep-2026)
 
