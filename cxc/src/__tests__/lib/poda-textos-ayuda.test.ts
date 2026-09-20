@@ -62,7 +62,13 @@ const EN_UN_AYUDA: Array<[string, string]> = [
   // los demás módulos siguen una por una.
 
   // ── Reclamos ─────────────────────────────────────────────────────────────
-  ["app/reclamos/components/ReclamoForm.tsx", "la IA rellena proveedor, marca, factura, fecha y pedido"],
+  // 20-sep-2026 · NOTA FECHADA — «la IA rellena proveedor, marca, factura,
+  // fecha y pedido» SALIÓ del ⓘ, y salió por la regla de este mismo candado:
+  // el ⓘ es *«solo para lo que se aprende una vez»*, y esto no se aprende una
+  // vez — es lo que hace la pantalla cada vez que se abre, y hay que saberlo
+  // ANTES de subir el PDF. El texto NO se borró: vive bajo el título, en gris,
+  // y `reclamos-formulario-dice-que-pasa.test.tsx` exige que siga ahí. La
+  // regla no se debilitó: las demás filas siguen una por una.
   ["app/reclamos/components/ReclamoForm.tsx", "se guardan junto con el reclamo en un solo paso"],
   // 🔄 11-sep-2026: el ⓘ «Cuándo hace falta el comprobante» se fue de la
   // pantalla del reclamo (mockup de Daniel: una sola fila de botones, sin ese

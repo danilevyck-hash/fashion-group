@@ -116,18 +116,28 @@ export default function ReclamoForm({
       {draftBanner}
       <h1 className="sr-only">Nuevo Reclamo</h1>
 
-      {/* ── 1. La factura (PDF), obligatoria y primero ── */}
+      {/* ── 1. La factura (PDF), obligatoria y primero ──
+          🔴 LO QUE VA A PASAR SE DICE ANTES, NO DETRÁS DE UN ⓘ (20-sep-2026).
+          La frase estaba escondida en el ⓘ, y el ⓘ es *«solo para lo que se
+          aprende una vez»*: esto no se aprende una vez, es lo que hace la
+          pantalla cada vez que se abre. Andrea tiene que saber ANTES de subir
+          el PDF que no va a tener que teclear proveedor, marca, factura, fecha
+          ni pedido. Va bajo el título, en gris, y el ⓘ se retira. */}
       <div className="mb-10">
-        <div className="flex items-center gap-1 mb-3">
-          <div className="text-sm font-semibold text-gray-900">Factura del proveedor (PDF) *</div>
-          <Ayuda titulo="Qué hace la IA" className="-my-2">
-            <p>
-              Sube el PDF y la IA rellena proveedor, marca, factura, fecha y pedido, y saca los renglones de la factura para que marques cuáles reclamas. Revisa y corrige.
-            </p>
-          </Ayuda>
-        </div>
+        <div className="text-sm font-semibold text-gray-900">Factura del proveedor (PDF) *</div>
+        <p className="text-sm text-gray-500 mt-1 mb-3 max-w-xl">
+          Sube el PDF y se llenan solos el proveedor, la marca, la factura, la fecha y el pedido, más los renglones para que marques cuáles reclamas. Revisa y corrige.
+        </p>
         <div className="max-w-xl">
           <FacturaPdfUploader onUploaded={setFacturaPdfPath} onExtracted={aplicarIA} />
+          {/* 🔴 EL AVISO, PEGADO A LA CAJA DEL ARCHIVO (20-sep-2026). Estaba al
+              lado de «Cancelar», al pie de la pantalla, donde se lee como un
+              pie de foto de los botones y no como lo que le falta a ESTE
+              campo. Lo que frena el guardado no cambió: es el mismo
+              `faltaPdf`, y el botón sigue apagado. */}
+          {faltaPdf && !savedReclamoId && (
+            <p className="text-sm text-red-600 mt-2" data-medir="reclamo-falta-pdf">{FALTA_PDF}</p>
+          )}
         </div>
         {leidaTexto && <p className="text-sm text-gray-500 mt-2">Leída: {leidaTexto}</p>}
       </div>
@@ -300,7 +310,6 @@ export default function ReclamoForm({
               {saving ? "Guardando…" : "Guardar reclamo"}
             </button>
             <button onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center justify-center min-h-[44px] px-2">Cancelar</button>
-            {faltaPdf && <span className="text-sm text-gray-500">{FALTA_PDF}</span>}
           </div>
         </div>
       )}
