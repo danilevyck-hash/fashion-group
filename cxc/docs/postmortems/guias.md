@@ -1871,6 +1871,124 @@ cazadas**, 0 corridas muertas, **2 de 2 controles en verde**.
 
 ---
 
+## 🔴 Guías — LA LISTA SE LEE SOLA, Y EL CHIP «Definir» DEJA DE REBOTAR (19-sep-2026)
+
+Daniel revisó la auditoría de Guías y aprobó de una tanda. Dos cosas había que investigarlas primero.
+
+### 1 · El bug del chip «Definir» — no era un modal, era la lista entera desapareciendo
+
+Daniel, textual: *«al elegir definir, se me abre una pantalla y se vuelve, hay un bug»*.
+
+🩸 **LA CAUSA.** `GuiasConfiguracionView.cargar()` hacía `setCargando(true)` en **cada** relectura, y el render es
+`{cargando ? <div>Cargando…</div> : …la lista…}` — o sea que «Cargando…» **REEMPLAZA la lista entera**. Tocar
+«Definir» disparaba `POST → cargar()`, y en ese intervalo los grupos de clientes desaparecían todos, la página se
+encogía de miles de píxeles a una línea, **el navegador recortó el scroll al alto nuevo** y al volver la lista uno
+quedaba arriba del todo, lejos del cliente que estaba tocando. Eso es la «pantalla que se abre y se vuelve».
+
+Pasaba igual con «el de siempre», «Quitar» y guardar una edición: las cinco escrituras llamaban `cargar()`.
+
+**Reproducido leyendo el código y comprobado montando la pantalla**: con el GET de la recarga colgado a propósito,
+`grupo-D-35` no existía en el DOM y el texto de la tarjeta era `Destinos por cliente ＋ Agregar destino Cargando…`.
+
+🔴 **EL ARREGLO.** `cargar(silenciosa)`: «Cargando…» es solo de la PRIMERA lectura, cuando de verdad no hay nada que
+mostrar. Las relecturas de después son calladas — la lista se queda en pantalla y se actualiza donde cambió. Y una
+relectura callada que falle **no borra lo que ya estaba**: se dice el error arriba y los datos viejos siguen a la vista.
+
+⚠️ Las otras dos tarjetas de la pantalla (`DestinosListaConfig`, `TransportistasConfig`) nunca tuvieron el defecto:
+su «Cargando…» sale **al lado** de la lista, no en su lugar.
+
+Candado: `guias-configuracion-pantalla.test.tsx` mira el estado INTERMEDIO. Verificado por mutación (volver a
+`cargar()` lo pone rojo).
+
+### 2 · «El de siempre» — el diagnóstico (SIN implementar: espera a Daniel)
+
+Daniel: *«veo como que innecesario el botón de "el de siempre", ¿qué hace? ¿se puede simplificar eso, que sea más
+entendible, config y ya?»*
+
+Lo que hay hoy en **Guías › Configuración**, tres tarjetas seguidas que se parecen y no son lo mismo:
+
+| Tarjeta | Tabla | Qué es | Dónde se ve |
+|---|---|---|---|
+| **Destinos por cliente** | `guias_destino_cliente` | los destinos **de un cliente**, con UNA casilla «el de siempre» por cliente | botones bajo el campo Dirección + autollenado al elegir el cliente |
+| **Destinos que ofrece el campo Dirección** | `guias_destino_lista` | la lista **del equipo**, sin dueño | botones del campo Dirección para cualquier cliente |
+| **Transportistas** | `guias_transportistas` | quién lleva | desplegable de transportista |
+
+🔑 **Lo que confunde no es la casilla: es que la palabra «destino» nombra dos cosas distintas en la misma pantalla**,
+una debajo de la otra, con el mismo molde visual. Y encima la casilla «el de siempre» va **pegada al dato**, con un
+rótulo de tres palabras que no dice qué pasa si se apaga.
+
+**La propuesta (5 líneas, pendiente de que Daniel la apruebe):**
+1. La casilla deja de ser casilla y pasa a ser una **marca de UNA palabra en el renglón**: el destino marcado dice
+   **«Siempre»** y los otros ofrecen **«Poner siempre»** — lo que se lee es el estado, no una pregunta.
+2. El texto de ayuda del grupo (`comoSeUsa`) **sube al renglón marcado**: «Se llena solo al elegir el cliente».
+3. La tarjeta de arriba se rotula **«Dónde entrega cada cliente»** y la de abajo **«Direcciones que sugiere el
+   sistema»** — dejan de llamarse las dos «destinos».
+4. Las dos listas **NO se fusionan** (regla vigente): son dueños distintos y permisos distintos.
+5. Nada de esto toca la base ni lo que se guarda: es rótulo y ubicación.
+
+### 3 · «Despachado por»: Jorman entra a la lista
+
+Daniel: *«agrégame a Eloyn y a Jorman a esa lista»*. Eloyn ya estaba desde el 14-sep-2026; entró **Jorman**.
+
+🔴 **El campo NO viene preseleccionado**, y Daniel lo dijo expreso: *«porque puede que alguien deje ese por error»*.
+Agregar un nombre a la lista es OFRECERLO, nunca ponerlo.
+
+⚠️ **Dos hallazgos que Daniel tiene que decidir:**
+- El **＋** de «DESPACHADO POR» **sí funciona** y el nombre nuevo **sí queda guardado para la próxima**… pero en
+  `localStorage` (`fg_entregadores`), o sea **en ese navegador y nada más**: lo que agrega Angela no lo ve Andrea, y
+  no se puede quitar desde ninguna pantalla. Es el MISMO defecto que la lista de destinos tuvo hasta el 7-sep-2026,
+  cuando pasó a `guias_destino_lista`. Por eso Jorman va en la lista del código y no en el ＋.
+- 🩸 **El campo NO arranca vacío hoy.** `useGuiaFormState` lo inicializa con `localStorage.getItem("fg_last_entregado_por")`,
+  o sea **con el último despachador que se usó en ese navegador** — que es exactamente el riesgo que Daniel nombró.
+  **No se tocó**: quitarlo cambia una pantalla que él no pidió cambiar. Decisión pendiente.
+
+### 4 · La lista: encabezados, fecha, pie, borde y el aviso que dejó de gritar
+
+- **Encabezados de columna** (solo `lg+`; debajo manda la tarjeta, donde cada dato ya va con su palabra). 🔴 Las
+  anchuras pasaron a constantes (`COL_*`, `FILA_ESCRITORIO`) que leen **la fila Y el encabezado**: escribirlas dos
+  veces era garantizar que un día dejaran de coincidir, y una tabla desalineada miente sobre qué es cada número. El
+  candado exige que el encabezado **no escriba ni un ancho a mano**.
+- **Columna de FECHA.** Se había ido el 5-sep-2026 porque «el encabezado del día ya la dice» — y ese encabezado dice
+  «Hoy · Ayer · Esta semana · Este mes», así que dentro de «Este mes» no había forma de saber el día sin abrir la guía.
+- **El pie dice «47 guías de 236»** (`textoPieDeLista`), no «236 GUÍAS»: la lista abre con el último mes y el resto
+  espera detrás de un botón. Con todo a la vista vuelve a ser un número solo. ⚠️ **El total de BULTOS no se tocó**:
+  sigue contando todas las filtradas — decisión pendiente de Daniel si quiere que siga a lo que se ve.
+- **El borde de color, solo cuando hay algo que decir.** El verde de «despachada» salía en las 236 filas, la MISMA
+  razón por la que el chip verde ya se había retirado el 5-sep. Queda el ámbar de lo que espera; lo despachado lleva
+  borde transparente y **el hueco de 4 px se conserva** para que las filas no bailen. 🩸 Y se borró la rama que
+  pintaba de AZUL los estados `Confirmada` y `Despachada`: **no existen ni existieron nunca** (el flujo real es
+  «Pendiente Bodega» → «Completada»).
+- 🔴 **El aviso no grita y NO EMPUJA NADA.** Daniel: *«veo desorden más que nada cuando falta N de transportista, que
+  la falta no se vea tan ruidosa»*. Eran dos chips ámbar con fondo, borde y el texto entero **en medio de la fila**:
+  la fila con aviso empujaba sus columnas ~95 px y quedaba desalineada de las de arriba y las de abajo. **El desorden
+  no era el color — era que la fila con aviso no se parecía a las demás.** Ahora es un punto ámbar con el texto en
+  `title` y en `sr-only`, y **su columna existe SIEMPRE, con o sin aviso**. En el teléfono el aviso se lee entero,
+  pero sin fondo. ⚠️ **QUÉ se avisa y CUÁNDO no cambió**: las mismas dos funciones, juntas en
+  `lib/guias/avisos-de-la-fila.ts` para que la pantalla y su candado lean lo mismo.
+
+### 5 · Buscar una guía vieja la ENCUENTRA
+
+🩸 La ventana del último mes se aplicaba **DESPUÉS** del buscador: buscar una guía de hace tres meses dejaba la lista
+VACÍA y la única coincidencia esperaba detrás de «Ver guías más viejas (1)» — un botón que dice «más viejas» cuando
+lo que hay detrás es justo lo que se acaba de pedir.
+
+🔴 Con algo tecleado, **la ventana se abre entera** (`partirGuiasParaLaLista`). ⚠️ Se abre la VENTANA, no el filtro:
+lo que no coincide sigue sin salir. Sin nada tecleado, todo como siempre.
+
+### Candados
+
+`guias-lista-que-se-lee-sola.test.tsx` (nuevo, de CONDUCTA: se renderiza y se lee el DOM) ·
+`guias-configuracion-pantalla.test.tsx` (el estado intermedio de la relectura).
+**Verificado por mutación: 6 de 6 cazadas** — borde verde de vuelta · la columna del aviso volviéndose condicional ·
+la fecha fuera de la fila · el pie volviendo a «2 guías» · el buscador volviendo a recortar · `cargar()` sin el
+`silenciosa` —, con el control sin mutar en verde.
+
+**Tres candados cambian de dirección, con nota fechada adentro:** el borde verde (`guias-sin-rechazo`), la fecha fuera
+de la fila y el pie (`guias-panel-que-se-lee`), y las anchuras que ahora se leen de las constantes
+(`guias-lista-834-columnas`). `guias-numero-transp-no-bloquea` **sigue la marca a su módulo nuevo**: se mudó, no se fue.
+
+---
+
 ## Lo que decía CLAUDE.md hasta el 14-sep-2026 (movido acá, verbatim)
 
 > El 14-sep-2026 CLAUDE.md pasaba de 333 mil caracteres (el tope del harness es 150 mil) y las instrucciones se cortaban a la mitad. Se dejó ahí un resumen de las reglas vigentes y el texto completo —mediciones, citas de Daniel, candados y mutaciones— se movió acá sin cambiar una palabra.
