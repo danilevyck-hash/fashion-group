@@ -23,6 +23,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     ]);
     return NextResponse.json({
       ...buildList(rows, { empresa: sp.get("empresa"), q: sp.get("q"), amarres }),
+      // 🔴 CUÁNDO SE TRAJO ESTO DE SWITCH. La pantalla no lo decía NUNCA, y es
+      // lo primero que pregunta quien mira una cartera de $4,8 millones. Es el
+      // `synced_at` más reciente de las filas leídas: la última corrida que
+      // dejó algo escrito.
+      synced_at: rows.map((r) => r.synced_at).filter(Boolean).sort().reverse()[0] ?? null,
       avisoMontos,
     });
   } catch (err) {

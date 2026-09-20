@@ -1,13 +1,10 @@
 "use client";
 
 import { Suspense, useState, useEffect, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { useUrlState } from "@/lib/hooks/useUrlState";
-import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { SkeletonTable, EmptyState, ScrollableTable, PullToRefresh } from "@/components/ui";
-import { getCompanyDisplay } from "@/lib/companies";
 import { empresasConCxp } from "@/lib/switch-api/empresas";
 import { EMPRESA_KEY_TO_NAME, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { fmt } from "@/lib/format";
@@ -15,7 +12,7 @@ import { AGING, type AgingKey } from "@/lib/cxc-aging";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { ROLES_SYNC_PROVEEDORES } from "@/components/shared/syncNowOpciones";
-import { rotuloPorPagar } from "@/lib/proveedores/rotulo";
+import { textoActualizado } from "@/lib/proveedores/actualizado";
 
 // Las empresas con CxP (empresasConCxp): 6 B2B + Multifashion (american_classic).
 const EMPRESAS = empresasConCxp();
@@ -27,12 +24,6 @@ const SYNC_PROVEEDORES_OPCIONES = EMPRESAS.map((k) => ({
   empresa: k as string,
   label: EMPRESA_KEY_TO_NAME[k] ?? k,
 }));
-
-// Nombre legible por empresa_key. EMPRESA_KEY_TO_NAME cubre las 7 (incl.
-// american_classic → "Multifashion", que companies.ts/getCompanyDisplay no conoce).
-function empresaLabel(key: string): string {
-  return EMPRESA_KEY_TO_NAME[key] ?? getCompanyDisplay(key);
-}
 
 interface ListItem {
   key: string;
@@ -62,25 +53,11 @@ export default function ProveedoresListClient() {
 function ProveedoresList() {
   const { authChecked } = useAuth({ moduleKey: "proveedores", allowedRoles: ["admin", "contabilidad"] });
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [items, setItems] = useState<ListItem[]>([]);
   const [grupoSaldo, setGrupoSaldo] = useState(0);
   const [avisoMontos, setAvisoMontos] = useState<string | null>(null);
-  // Filtro de empresa, receta CXC (D3): la URL (?empresa=) MANDA si está
-  // presente (compartible / sobrevive refresh); si no, cae a la memoria de
-  // useLastUsed. Al cambiarlo se escribe en AMBOS. "" = Todas.
-  const [urlEmpresa, setUrlEmpresa] = useUrlState("empresa", "");
-  const [lastEmpresa, setLastEmpresa] = useLastUsed("proveedores_empresa", "");
-  const empresaParamPresent = searchParams.get("empresa") !== null;
-  const empresaRaw = empresaParamPresent ? urlEmpresa : lastEmpresa;
-  const empresa = (EMPRESAS as string[]).includes(empresaRaw) ? empresaRaw : "";
-  const setEmpresa = useCallback((next: string) => {
-    setUrlEmpresa(next);
-    setLastEmpresa(next);
-  }, [setUrlEmpresa, setLastEmpresa]);
-  // Búsqueda sembrada desde la URL (?q=), igual que ?search= en CXC.
-  const [q, setQ] = useState(() => searchParams.get("q") || "");
+  const [sincronizado, setSincronizado] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showSinSaldo, setShowSinSaldo] = useState(false);
   const [exportando, setExportando] = useState(false);
@@ -92,18 +69,16 @@ function ProveedoresList() {
   // sea, con el cartel «Sin proveedores — No hay datos sincronizados aún»,
   // que es MENTIRA: los datos están, lo que se cayó fue la consulta. Con
   // $4.696.830,50 en la cartera, «no hay nada» es la peor respuesta posible.
-  const fetchList = useCallback(async (emp: string, query: string) => {
+  const fetchList = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (emp) params.set("empresa", emp);
-      if (query) params.set("q", query);
-      const res = await fetch(`/api/proveedores?${params}`, { cache: "no-store" });
+      const res = await fetch(`/api/proveedores`, { cache: "no-store" });
       if (!res.ok) throw new Error(String(res.status));
       const json = await res.json();
       setItems(json.proveedores ?? []);
       setGrupoSaldo(json.grupo_saldo ?? 0);
       setAvisoMontos(json.avisoMontos ?? null);
+      setSincronizado(json.synced_at ?? null);
       setFalloLectura(false);
     } catch {
       // No se pisa lo que ya se había leído: si la pantalla tenía datos, se
@@ -115,9 +90,8 @@ function ProveedoresList() {
   }, []);
 
   useEffect(() => {
-    const h = setTimeout(() => fetchList(empresa, q), q ? 200 : 0);
-    return () => clearTimeout(h);
-  }, [empresa, q, fetchList]);
+    void fetchList();
+  }, [fetchList]);
 
   if (!authChecked) return null;
 
@@ -132,7 +106,7 @@ function ProveedoresList() {
     setExportando(true);
     try {
       const { exportProveedoresExcel } = await import("./excel-proveedores");
-      exportProveedoresExcel(items, empresa ? empresaLabel(empresa) : undefined);
+      exportProveedoresExcel(items);
     } finally {
       setExportando(false);
     }
@@ -142,7 +116,7 @@ function ProveedoresList() {
   // tienen saldo (incluido "a favor" negativo) siempre se muestran.
   const conSaldo = items.filter((it) => Math.abs(it.saldo_total) >= 0.005);
   const sinSaldo = items.filter((it) => Math.abs(it.saldo_total) < 0.005);
-  const colsCount = empresa ? 6 : 7;
+  const colsCount = 7;
 
   const renderRow = (it: ListItem) => (
     <tr
@@ -158,11 +132,9 @@ function ProveedoresList() {
       <td className="py-2 px-1.5 xl:px-3 text-right tabular-nums text-gray-500">
         {it.ultimo_pago_dias != null ? `hace ${it.ultimo_pago_dias}d` : <span className="text-gray-300">—</span>}
       </td>
-      {!empresa && (
-        <td className="py-2 px-1.5 xl:px-3 text-right text-xs text-gray-500">
-          {(it.empresas ?? []).map(nombreCortoEmpresa).join(" · ")}
-        </td>
-      )}
+      <td className="py-2 px-1.5 xl:px-3 text-right text-xs text-gray-500">
+        {(it.empresas ?? []).map(nombreCortoEmpresa).join(" · ")}
+      </td>
     </tr>
   );
 
@@ -183,7 +155,7 @@ function ProveedoresList() {
       </div>
       <div className="mt-0.5 text-xs text-gray-500 tabular-nums">
         {[
-          !empresa ? (it.empresas ?? []).map(nombreCortoEmpresa).join(" · ") : "",
+          (it.empresas ?? []).map(nombreCortoEmpresa).join(" · "),
           it.ultimo_pago_dias != null ? `pago hace ${it.ultimo_pago_dias}d` : "",
         ].filter(Boolean).join(" — ")}
       </div>
@@ -199,25 +171,40 @@ function ProveedoresList() {
   return (
     <div className="min-h-screen bg-white">
       <AppHeader module="Proveedores" />
-      <PullToRefresh onRefresh={() => fetchList(empresa, q)}>
+      <PullToRefresh onRefresh={() => fetchList()}>
         <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
-          {/* Sin título grande: "Proveedores" ya lo dicen la barra sticky
-              (celular) y el breadcrumb (escritorio). Queda sr-only para no
-              dejar la página sin encabezado, y la fila pasa a `justify-end` —
-              con `between` y un solo hijo, el botón se habría corrido a la
-              izquierda. */}
-          <div className="mb-5 flex flex-wrap items-start justify-end gap-3">
+          {/* ── 🔴 ARRIBA, UNA SOLA LÍNEA: CUÁNDO ES EL DATO Y QUÉ SE PUEDE
+                 HACER CON ÉL (20-sep-2026) ──────────────────────────────────
+              Antes acá arriba había un botón solo, y debajo ocho pestañas de
+              empresa y un buscador. Daniel, textual: *«¿por qué buscar
+              proveedor si ya está todo en la lista? solo es desplegar»*. Se
+              fueron las dos cosas; queda lo que no se podía hacer de ninguna
+              otra forma: saber de cuándo es el número y bajarlo. */}
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <h1 className="sr-only">Proveedores</h1>
-            {/* "Actualizar ahora" (admin/secretaria/contabilidad — contabilidad
-                es quien vive acá): un clic actualiza el CxP de las 7 empresas
-                en secuencia desde Switch. */}
-            <SyncNowButton
-              opciones={SYNC_PROVEEDORES_OPCIONES}
-              secuencial
-              roles={ROLES_SYNC_PROVEEDORES}
-              subtext="tarda ~1 min"
-              onSuccess={async () => { await fetchList(empresa, q); }}
-            />
+            {/* 🔑 Sin fecha no se dibuja: nunca «Actualizado: —». */}
+            <p className="text-xs text-gray-500 tabular-nums">{textoActualizado(sincronizado)}</p>
+            <div className="flex flex-wrap items-center gap-3">
+              {/* min-w fijo: el texto cambia a "Preparando…" mientras baja el
+                  chunk de Excel y sin ancho fijo el botón daría un salto. */}
+              <button
+                onClick={exportarExcel}
+                disabled={exportando}
+                className="shrink-0 inline-flex min-h-[44px] min-w-[132px] items-center justify-center rounded-md border border-gray-200 px-4 text-xs font-medium text-gray-700 hover:border-gray-300 transition active:scale-[0.97] disabled:text-gray-400 disabled:active:scale-100"
+              >
+                {exportando ? "Preparando…" : "Descargar Excel"}
+              </button>
+              {/* "Actualizar ahora" (admin/secretaria/contabilidad — contabilidad
+                  es quien vive acá): un clic actualiza el CxP de las 7 empresas
+                  en secuencia desde Switch. */}
+              <SyncNowButton
+                opciones={SYNC_PROVEEDORES_OPCIONES}
+                secuencial
+                roles={ROLES_SYNC_PROVEEDORES}
+                subtext="tarda ~1 min"
+                onSuccess={async () => { await fetchList(); }}
+              />
+            </div>
           </div>
 
           {/* Qué se quedó AFUERA del total de abajo. Arriba del número, igual
@@ -229,7 +216,7 @@ function ProveedoresList() {
               <span>No se pudo cargar. Intenta de nuevo en unos segundos.</span>
               <button
                 type="button"
-                onClick={() => { void fetchList(empresa, q); }}
+                onClick={() => { void fetchList(); }}
                 className="min-h-[44px] rounded-md border border-red-300 bg-white px-3 text-sm font-medium text-red-800 transition active:scale-[0.97]"
               >
                 Intentar de nuevo
@@ -237,69 +224,26 @@ function ProveedoresList() {
             </div>
           )}
 
-          {/* Total por pagar (grupo o empresa filtrada) */}
+          {/* 🔴 Un solo número arriba, y ya no cambia con ningún filtro: la
+              pantalla muestra SIEMPRE el grupo entero. */}
           <div className="border border-gray-200 rounded-lg p-4 mb-4">
-            {/* 🔴 EL RÓTULO DICE DE QUÉ ES EL NÚMERO QUE TIENE DEBAJO.
-                🩸 11-sep-2026: con una búsqueda escrita el total ya era solo el
-                de lo buscado, pero el rótulo seguía diciendo «grupo» — escribir
-                «boston» dejaba en pantalla «Por pagar · grupo $4,165.96» contra
-                los $4.696.830,50 de verdad. Con el chip de empresa sí cambiaba.
-                El buscador manda sobre el chip porque es el filtro más fino. */}
-            <div className="text-xs uppercase tracking-[0.05em] text-gray-400">
-              {rotuloPorPagar(empresa ? empresaLabel(empresa) : null, q)}
-            </div>
+            <div className="text-xs uppercase tracking-[0.05em] text-gray-400">Por pagar · grupo</div>
             <div className={`text-2xl font-semibold tabular-nums mt-1 ${grupoSaldo < 0 ? "text-blue-600" : "text-purple-700"}`}>
               {grupoSaldo < 0 ? `Saldo a favor $${fmt(Math.abs(grupoSaldo))}` : `$${fmt(grupoSaldo)}`}
             </div>
           </div>
 
-          {/* Chips por empresa */}
-          <div className="flex flex-wrap gap-2 mb-3">
-            <Chip active={empresa === ""} onClick={() => setEmpresa("")}>Todas</Chip>
-            {EMPRESAS.map((e) => (
-              <Chip key={e} active={empresa === e} onClick={() => setEmpresa(e)}>
-                {empresaLabel(e)}
-              </Chip>
-            ))}
-          </div>
-
-          {/* Search */}
-          <input
-            type="search"
-            placeholder="Buscar proveedor…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            className="w-full border border-gray-200 rounded-md px-3 min-h-[44px] text-sm outline-none focus:border-black transition mb-4"
-          />
-
           {loading ? (
             <SkeletonTable rows={8} cols={4} />
           ) : items.length === 0 ? (
-            // Con el buscador lleno delante, "probá con otra búsqueda" no agrega
-            // nada a "Sin proveedores". Sin búsqueda, la segunda línea dice algo
-            // distinto (no hay datos) y se queda.
             <EmptyState
               title={falloLectura ? "No se pudo cargar" : "Sin proveedores"}
-              subtitle={falloLectura ? "Intenta de nuevo en unos segundos." : q ? undefined : "No hay datos sincronizados aún."}
+              subtitle={falloLectura ? "Intenta de nuevo en unos segundos." : "No hay datos sincronizados aún."}
             />
           ) : (
             <>
-              <div className="flex items-center justify-between gap-3 mb-2">
-                {/* Sin "· ordenados por monto": el orden acá es fijo y se ve
-                    solo en la primera columna de montos. En CXC esa coletilla sí
-                    se queda, porque ahí el orden cambia con la píldora. */}
-                <div className="text-xs text-gray-500 tabular-nums">
-                  {conSaldo.length} {conSaldo.length === 1 ? "proveedor con saldo" : "proveedores con saldo"}
-                </div>
-                {/* min-w fijo: el texto cambia a "Preparando…" mientras baja
-                    el chunk de Excel y sin ancho fijo el botón daría un salto. */}
-                <button
-                  onClick={exportarExcel}
-                  disabled={exportando}
-                  className="shrink-0 inline-flex min-h-[44px] min-w-[132px] items-center justify-center rounded-md border border-gray-200 px-4 text-xs font-medium text-gray-700 hover:border-gray-300 transition active:scale-[0.97] disabled:text-gray-400 disabled:active:scale-100"
-                >
-                  {exportando ? "Preparando…" : "Descargar Excel"}
-                </button>
+              <div className="text-xs text-gray-500 tabular-nums mb-2">
+                {conSaldo.length} {conSaldo.length === 1 ? "proveedor con saldo" : "proveedores con saldo"}
               </div>
 
               {/* Escritorio. El corte es `lg` y no `sm` porque lo que decide es
@@ -319,7 +263,7 @@ function ProveedoresList() {
                         <th className="py-2 px-1.5 xl:px-3 text-right">{AGING.overdue.colLabel}</th>
                         <th className="py-2 px-1.5 xl:px-3 text-right">Por pagar</th>
                         <th className="py-2 px-1.5 xl:px-3 text-right">Último pago</th>
-                        {!empresa && <th className="py-2 px-1.5 xl:px-3 text-right">Empresas</th>}
+                        <th className="py-2 px-1.5 xl:px-3 text-right">Empresas</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -365,19 +309,6 @@ function ProveedoresList() {
   );
 }
 
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      // min-h-[44px]: los chips medían 28px de alto (iPhone 390x844).
-      className={`inline-flex min-h-[44px] items-center rounded-full px-4 text-xs font-medium border transition active:scale-[0.97] ${
-        active ? "bg-purple-600 text-white border-purple-600" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
 
 // Tramo de aging con el color del vocabulario CXC; cero en gris claro,
 // negativo (crédito) en azul.

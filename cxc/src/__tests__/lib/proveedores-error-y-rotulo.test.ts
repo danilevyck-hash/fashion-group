@@ -55,9 +55,12 @@ describe("🔴 el rótulo dice de QUÉ es el número", () => {
     expect(rotuloPorPagar(null, "boston")).not.toContain("BOSTON");
   });
 
-  it("la pantalla usa la función, no arma el texto a mano", () => {
-    expect(VISTA).toContain("rotuloPorPagar(");
-    expect(VISTA).not.toContain('"Por pagar · grupo"');
+  // ⚠️ 20-sep-2026: la pantalla ya NO llama a esta función. Se fueron los dos
+  // filtros que podían cambiar el rótulo (las pestañas de empresa y el
+  // buscador), así que el cartel nombra siempre al grupo. El módulo se conserva
+  // rotulado y sin lectores; lo exige `proveedores-arriba-una-linea.test.ts`.
+  it("la regla sigue viva aunque hoy no la llame nadie", () => {
+    expect(rotuloPorPagar("Vistana", "boston")).toBe("Por pagar · boston");
   });
 });
 
@@ -71,7 +74,9 @@ describe("🔴 una lectura que falla se dice y se puede reintentar", () => {
   it("el aviso dice qué pasó y ofrece intentar otra vez", () => {
     expect(VISTA).toContain("No se pudo cargar. Intenta de nuevo en unos segundos.");
     expect(VISTA).toContain("Intentar de nuevo");
-    expect(VISTA).toContain("void fetchList(empresa, q)");
+    // 20-sep-2026: la lista ya no lleva filtros, así que `fetchList` no toma
+    // parámetros. Lo que este candado cuida es que el botón VUELVA A PEDIR.
+    expect(VISTA).toContain("void fetchList()");
   });
 
   it("🔴 el vacío deja de afirmar «no hay datos» cuando lo que hubo fue un error", () => {

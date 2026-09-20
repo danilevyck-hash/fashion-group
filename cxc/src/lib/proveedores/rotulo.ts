@@ -1,4 +1,21 @@
 // ─────────────────────────────────────────────────────────────────────────────
+// 🩸 RETIRADO EL 20-sep-2026 — SIN LECTORES, y el archivo se queda.
+//
+// Este rótulo existía porque la lista de Proveedores tenía DOS filtros encima
+// del número grande: ocho pestañas de empresa y un buscador. Los dos se fueron
+// ese día (Daniel: *«¿por qué buscar proveedor si ya está todo en la lista?
+// solo es desplegar»*), así que no queda nada que pueda cambiar de qué es el
+// número: la pantalla muestra SIEMPRE el grupo entero.
+//
+// Se conserva rotulado y sin lectores, como `documentos-chicos.ts` y
+// `csv-export.ts`: la regla que enseñó sigue valiendo para cualquier cartel con
+// filtro encima, y borrarla la borraría de la memoria del repo. Hay candado que
+// exige que siga sin importadores.
+//
+// Lo de abajo es el texto original, intacto.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 🔴 EL RÓTULO DEL CARTEL GRANDE DICE DE QUÉ ES EL NÚMERO QUE TIENE DEBAJO.
 //
 // 🩸 11-sep-2026. La lista de Proveedores muestra arriba un solo número grande
