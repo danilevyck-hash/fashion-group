@@ -1212,6 +1212,181 @@ Hallazgo de la investigación: cada documento trae `saldoConsecutivo` (el saldo 
 - `cxc-estado-cuenta-forma-switch.test.ts` › «el sync dejó de tirar `saldoTotal`» **cambió de dirección con nota fechada**: exigía `ec?.saldoTotal` — ESA era la lectura del nivel de afuera — y ahora exige `filaDeCuadre({`.
 - **Verificado por mutación: 12 mutaciones, 12 cazadas, 2 controles verdes** (`scripts/_mutar-candados-cuadre-desde-adentro.sh`): leer de `data` en vez de `data.estadocuenta` · solo `Saldos` · solo `saldos` · 0 sin campo · 0 con vacío · 0 con ilegible · «debe $0» sin `estadocuenta` · aging que no es lista guardado tal cual · coma de miles sin quitar · el sync lee el JSON a mano · el sync pasa un pedazo y no la respuesta · el tipo sube `saldoTotal` afuera.
 
+## 🔴 LAS CINCO DE DANIEL DEL 20-sep-2026 (Cuentas por Cobrar)
+
+Cinco cosas que Daniel aprobó el mismo día, cada una con su medición y su candado.
+
+### 1 · La lista abre por «más viejo sin pagar»
+
+🩸 **Cómo estaba.** Abría por MONTO. Medido contra producción: de los **10 clientes más grandes**
+—el **63 % de la plata**— **nueve** habían pagado en los **últimos 80 días**, y el que lleva
+**313 días sin pagar** ($143.713) salía en el **puesto 8**. La lista ponía arriba justo a los que
+ya estaban pagando.
+
+Y el dato que ahora ordena estaba ESCONDIDO: `avisoSinPagarDe` devolvía `null` mientras el filtro
+de «+90 d» estuviera apagado, así que la pantalla quedaba ordenada por una antigüedad que no se
+podía leer en ninguna fila.
+
+**Cómo quedó.** `ORDEN_AL_ABRIR` (`lib/cxc-orden.ts`) es un **override anclado a «Total
+pendiente»**, no un cuarto valor de `ordenParaRiskFilter`: por eso las tres píldoras de tramo
+siguen ordenando por SU tramo (regla del 27-jul-2026, intacta) y un toque en el título «Total»
+vuelve al orden por monto. El que **nunca pagó va PRIMERO** —misma regla que `avisaSinPagar`—, y la
+edad se compara, no se resta (`Infinity − Infinity` es `NaN`, y un comparador que devuelve `NaN`
+deja la lista en cualquier orden). **Falla ABIERTO**: sin el resolutor de días, desempata el nombre.
+
+Colateral: el celular **dejó de reordenar por su cuenta**. Volvía a ordenar con
+`ordenParaRiskFilter(riskFilter)`, que sin chip encendido siempre decía «por total» — o sea que las
+dos pantallas del mismo módulo habrían abierto con un primer cliente distinto.
+
+- Candado: `cxc-abre-por-mas-viejo.test.ts` — **7 mutaciones, 7 cazadas**.
+- Cambian de dirección, con nota fechada adentro: `cxc-sin-pagar` (exigía que los días salieran
+  SOLO con el filtro encendido) y el control del celular en `cxc-favoritos-retirados`.
+
+### 2 · El papel del cliente deja de salir con líneas rotas
+
+🩸 **Cómo estaba.** En **cada página de cada** estado de cuenta:
+`Identificación:1513069-1-650069`, `Límite de crédito0.00`, `Tiempo de Morosidad0` — sin espacio, y
+el valor comiéndose los dos puntos.
+
+**La causa, medida a 8 pt.** El rótulo se dibuja en negrita y su ancho se medía **después** de
+volver a la letra normal, que es más angosta:
+
+| Rótulo | Negrita | Normal | Falta | Hueco |
+|---|---|---|---|---|
+| `Nombre:` | 11,57 mm | 10,75 mm | 0,82 mm | 1,5 mm → **entra** |
+| `Identificación:` | 19,05 mm | 17,16 mm | **1,89 mm** | 1,5 mm → **se monta** |
+| `Código:` | 10,64 mm | 9,65 mm | 0,99 mm | 1,5 mm → **entra** |
+| `Límite de crédito:` | 23,45 mm | 21,53 mm | **1,92 mm** | 1,5 mm → **se monta** |
+
+Por eso salía mal en **dos líneas de cuatro** y no en todas: los rótulos cortos se salvaban de
+casualidad. Ahora el ancho lo mide `inicioDelValor()` **con la negrita puesta**, y el hueco de
+1,5 mm es un dato con nombre (`HUECO_ROTULO_MM`).
+
+🩸 **Y se fueron dos líneas**: «Límite de crédito» y «Tiempo de Morosidad» valen **CERO en los 100
+clientes** de la cartera, o sea que esa línea decía `0.00` y `0` para todo el mundo. Los campos
+**no se borran** de `FichaCliente` —el sync de Switch los sigue leyendo—: lo que se retira es la
+línea del papel.
+
+- Candado: `cxc-ficha-sin-lineas-rotas.test.ts`, que **mide el PDF renderizado**: saca con pdfjs la
+  X de cada rótulo y de su valor en las DOS hojas y exige que el valor arranque después de donde el
+  rótulo termina. Un candado de texto («contiene Identificación:») pasaba en verde con el defecto
+  puesto. **4 mutaciones, 4 cazadas.**
+
+### 3 · El Excel y el PDF de la cartera cierran con el total de la pantalla
+
+🩸 **Cómo estaba.** El papel decía **$4.244.028,67** y la pantalla **$4.242.821,12**. La diferencia,
+**$1.207,55**, son los **5 clientes con saldo a favor**: la pantalla los muestra en su bloque
+«SALDO A FAVOR (5)» al pie de la lista y del papel y del Excel **desaparecían sin que nada lo
+dijera**. Dos números para la misma cartera, el mismo día, y ninguno explicaba por qué.
+
+**Cómo quedó.** Los dos formatos llevan, en ese orden: los que se cobran · **«Total por cobrar»** ·
+**«Saldo a favor (N)»** —el mismo rótulo de la pantalla— · sus renglones · **«Total general»**, que
+es el número de la pantalla. Sin nadie a favor el archivo sale **exactamente como antes**, con su
+única fila «Total».
+
+⚠️ **No cambia a quién se le cobra**: `lib/cxc/cobrable.ts` no se tocó. Al saldo a favor sigue sin
+mandársele correo, sin botón «Cobrar» y sin casilla de lote. Lo que cambia es que ahora SE VE.
+
+- Candado: `cxc-cartera-cierra-igual.test.ts` — **8 mutaciones, 8 cazadas**.
+- Cambian de dirección, con nota fechada: las dos líneas de `cxc-descargas` que exigían que el saldo
+  a favor NO entrara al archivo y que el Total no lo restara.
+
+### 4 · Boston: los montos encimados
+
+🩸 **Cómo estaba.** **269 de 408 filas (66 %)** dibujaban el monto rojo de 121d+ **encima** del
+negro del Total. No era el dato: era el ancho. La fila metía **DOS botones** —«Cobrar» y
+«Documentos»— en la misma celda `col-span-2` donde la cartera del grupo mete uno. Medido a 1280 px
+de ventana (menos los 224 de la barra lateral), esa celda da **~164 px** y los dos botones más el
+monto pedían **~226**: los 62 que sobraban se derramaban sobre la columna de al lado.
+
+**Cómo quedó.** «Documentos» sale de la fila y lo abre **tocar la fila**, como en el grupo. Y la
+celda del total lleva `flex-wrap`, que es el candado de verdad: a cualquier ancho en el que no
+entren, el botón baja de renglón en vez de derramarse. La grilla sigue siendo la del grupo
+(4/2/2/2/2), para que la tira de totales siga parada sobre sus columnas, y las tarjetas del celular
+no se tocaron —ahí los dos botones van a ancho completo y nunca se encimaron—.
+
+🔴 **Es DIBUJO, no datos**: ninguna lectura, ruta ni lista de empresas se tocó.
+
+- Candado: `cxc-boston-montos-que-se-leen.test.tsx` — **5 mutaciones, 5 cazadas**.
+
+### 5 · Los tres conteos de la tira se van
+
+🩸 **Cómo estaba.** Debajo de los tres montos decía **12 · 32 · 76**. Parecen las tres partes de los
+**100 clientes** y no lo son: **suman 120**, porque **27 están contados dos veces** —un cliente
+puede tener plata en los tres tramos a la vez— y **7 no están en ninguno**. El chip de 0-90d cuenta
+**excluyendo** (los que no tienen nada en 91-120 ni en 121+) y los otros dos cuentan **a quien tenga
+algo**: por eso se solapan.
+
+Se fueron también los del celular, que además contaban con **otra regla** (excluyente, `else if`)
+—dos definiciones del mismo chip en el mismo módulo—.
+
+⚠️ Queda **«Total · N»**, que sí es el número de clientes de la lista y no es parte de nada, y queda
+la cuenta del aviso «sin pagar hace +90 d», que dice a cuántos hay que ir a buscar. **Ni un monto se
+movió.**
+
+- Candado: `cxc-tira-solo-plata.test.tsx` — **6 mutaciones, 6 cazadas**.
+- Cambia de dirección, con nota fechada: el conteo de `cxc-tramos-un-solo-nombre`, que fijaba
+  `["0", "2", "2"]` y cuyo propio comentario ya señalaba que con dos clientes en los tres tramos
+  «Por vencer» decía **0**.
+
+---
+
+## 🔴 «COMENTARIO» SALE DE LA TABLA Y BAJA AL PIE (20-sep-2026)
+
+Daniel, textual: *«deja comentario abajo general como siempre»*.
+
+🩸 **Cómo estaba.** «Comentario» era la **tercera de las diez columnas** del papel del cliente y la
+**única en `auto`**, así que se quedaba con todo el sobrante: **37,9 mm de los 191,9 útiles — el
+20 % del ancho**. Y va **vacía en los 3.003 documentos**, porque el API de Switch no manda ese
+campo (se revisaron las 20 llaves de cada renglón). Una quinta parte del papel en blanco a
+propósito, mientras «Comprobante» y «N. Interno» se partían en dos renglones por falta de sitio.
+
+**Cómo quedó.** Nueve columnas, el mismo orden de Switch. Los 37,9 mm se reparten entre las dos que
+se partían: «Comprobante» de **23 a 42 mm** y «N. Interno» de 24 a `auto` (**~42,9 mm**). El
+comentario baja al pie como un **recuadro en blanco**, con la forma que ya tiene la guía de despacho
+en «OBSERVACIONES GENERALES DEL ENVÍO», pegado al «RECIBIDO CONFORME» — las dos cosas que se llenan
+a mano.
+
+⚠️ **No se inventa contenido**: el dato no existe en ningún lado de Switch, así que el recuadro sale
+vacío. Ningún número se recalcula y las otras nueve columnas no se tocan.
+
+- Candado: `cxc-comentario-abajo.test.ts`, que mide el PDF renderizado (dónde cae el recuadro y que
+  «Nota de Crédito» entre en un solo renglón). **7 mutaciones, 7 cazadas.**
+- Cambian de dirección, con nota fechada: las «DIEZ columnas» de `cxc-estado-cuenta-forma-switch` y
+  los encabezados de `cxc-papel-vocabulario`.
+
+---
+
+## 🔴 EL NOMBRE DEL CLIENTE SE ESCRIBE IGUAL EN TODAS LAS PANTALLAS (20-sep-2026)
+
+🩸 **Cómo estaba.** La lista del grupo **gritaba** `CITY MODA DEL ESTE SA` —el `nombre_normalized`,
+la llave con la que se consolidan las seis empresas— y el papel del MISMO cliente decía
+`City Moda Del Este, S.A.`. Guías y Reclamos también lo escriben capitalizado, y la pestaña de
+Boston ya usaba el nombre de Switch. El mismo cliente, dos grafías.
+
+Y la regla ya existía: `nombreDelPapel()` —el nombre de Switch tal cual y, solo si Switch no lo
+manda, el normalizado capitalizado respetando siglas—. Lo que faltaba era usarla: había **TRES
+copias sueltas** del `find(...)?.nombre ?? nombre_normalized` (la hoja «Cobrar», el modal de correo
+y el cajón del estado de cuenta), cada una **sin el respaldo capitalizado**, y la lista ni eso.
+
+**Cómo quedó.** La regla vive en `lib/cxc/nombre-cliente.ts` y la comparten la fila del escritorio,
+la tarjeta del celular, la barra de «mandar a varios», los textos del WhatsApp y del «copiar
+mensaje» —que los **lee el cliente**— y las descargas.
+
+🔴 **El pareo NO se toca**: `nombre_normalized` sigue consolidando las seis empresas, ordenando,
+buscando, recordando qué fila está abierta y viajando aparte al lote (`nombreNormalizado`).
+
+🔴 **Y esto no junta a Boston con el grupo.** Daniel, textual: *«no puedes juntar Boston con Fashion
+Gr, nunca te darán los mismos nombres, por eso no se mezclan»*. Boston ya mostraba el nombre de
+Switch y lo lee de SU propia fuente; su pestaña no importa nada del grupo y la regla del grupo no
+sabe de Boston, con candado en las dos direcciones.
+
+- Candado: `cxc-un-solo-nombre-del-cliente.test.ts` — **8 mutaciones, 8 cazadas**.
+- Cambia de forma, con nota fechada: el respaldo sin nombre de Switch en `cxc-descargas` sale
+  capitalizado en vez de a los gritos.
+
+---
+
 ## Lo que decía CLAUDE.md hasta el 14-sep-2026 (movido acá, verbatim)
 
 > El 14-sep-2026 CLAUDE.md pasaba de 333 mil caracteres (el tope del harness es 150 mil) y las instrucciones se cortaban a la mitad. Se dejó ahí un resumen de las reglas vigentes y el texto completo —mediciones, citas de Daniel, candados y mutaciones— se movió acá sin cambiar una palabra.

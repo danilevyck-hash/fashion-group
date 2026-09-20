@@ -2218,6 +2218,68 @@ de que antes **ninguna** lo era—; y ninguna migración posterior las saca.
 
 ---
 
+## 🔴 EL LOGO DE TOMMY SE LEE — su banderita salía invertida (20-sep-2026)
+
+Daniel: *«veo que el logo de TH no está bien»*.
+
+### Qué le pasaba, medido píxel a píxel
+
+El defecto está en la versión **BLANCA** del wordmark
+(`public/tommy/tommy-horizontal-blanco.png`): la **banderita** entre TOMMY y HILFIGER sale
+**invertida**. Comparando los dos PNG (900×52 los dos), dentro del recuadro de la bandera
+(x 389-466):
+
+| Archivo | Opacos en la bandera | Blancos | Navy | Rojo |
+|---|---|---|---|---|
+| `tommy-horizontal.png` (color) | **4.004** | 1.105 | 272 | 851 |
+| `tommy-horizontal-blanco.png` | **3.051** | 3.051 | 0 | 0 |
+
+O sea: las **953 franjas blancas de la bandera quedaron transparentes** y lo navy y lo rojo
+quedaron blancos. Sobre la banda navy del papel eso se lee **al revés** — un bloque blanco con
+muescas donde iban las franjas. En total se perdió el **6,8 %** del arte opaco (15.461 → 14.414
+píxeles), y prácticamente todo cae dentro del recuadro de la bandera.
+
+**La causa** está escrita en `scripts/_generar-logo-tommy.mjs`: el alfa se deriva de la **oscuridad**
+del píxel (`alpha = (255 − min(r,g,b)) / 128`), así que todo lo blanco del arte original se vuelve
+transparente. Con un wordmark monocromo —Calvin, que usa `negate`— esa regla funciona; con una
+bandera de tres colores, no. **Tommy es la única de las cuatro marcas con bandera**, y por eso la
+única rota.
+
+### El arreglo — sin inventar ningún archivo
+
+Se usa el wordmark **OFICIAL de COLOR sobre PLACA BLANCA**, que es exactamente lo que ya hace la
+pantalla del pedido público (`marcas-ui.tsx` → `pedidoPublico`, 25-jul-2026). Mismo arte, mismo
+patrón, cero arte nuevo. Se aplicó en:
+
+| Lugar | Antes | Ahora |
+|---|---|---|
+| PDF del pedido (`order-pdf-core.ts`) | wordmark blanco sobre banda navy | placa blanca redondeada + wordmark de color |
+| Correo al equipo (`marcas.ts`) | `<img blanco 160×9>` | placa blanca + `<img color 156×9>` |
+| Correo al cliente (`marcas.ts`) | igual | igual |
+| Vista previa del link (`generar-og-catalogos.mjs`) | wordmark blanco al lado de la bandera buena | placa blanca + wordmark de color |
+
+⚠️ **De paso, el aplastado del correo.** El PNG es 900×52 (**17,31:1**) y se dibujaba en `160×9`
+(**17,78:1**): un **2,6 % más bajo** de lo que corresponde. Tommy era la única de las cuatro marcas
+que pasaba el 2 % —Reebok −0,1 %, Joybees y Calvin +0,44 %—. Ahora va `156×9` (17,33:1).
+
+### Lo que queda pendiente
+
+- 🔴 **De Daniel: el master REVERSADO de Tommy Hilfiger** (el que la marca publica para fondos
+  oscuros). Ninguna regla automática sobre el arte de color puede inventar el contorno que la
+  bandera necesita para leerse sobre navy, así que **no se genera: se pide**. La constante
+  `TOMMY_LOGO_BLANCO_BASE64` y el PNG blanco **se quedan rotulados** (patrón `mayor_lineas`) para
+  cuando llegue.
+- ⚠️ **De correr**: `node scripts/generar-og-catalogos.mjs` para rehacer
+  `public/og/catalogo-tommy.png` con el logo arreglado. Pide `npx playwright install chromium` (el
+  binario que hay en caché no es el que espera la versión instalada). **El script ya quedó
+  corregido; la imagen sigue siendo la de hoy.**
+
+Candado: `tommy-logo-que-se-lee.test.ts` — **6 mutaciones, 6 cazadas**. Cambia de dirección, con
+nota fechada adentro, la URL del correo de Tommy en `logos-marca`, y la banda del correo al cliente
+en `order-email-cliente`.
+
+---
+
 ## Lo que decía CLAUDE.md hasta el 14-sep-2026 (movido acá, verbatim)
 
 > El 14-sep-2026 CLAUDE.md pasaba de 333 mil caracteres (el tope del harness es 150 mil) y las instrucciones se cortaban a la mitad. Se dejó ahí un resumen de las reglas vigentes y el texto completo —mediciones, citas de Daniel, candados y mutaciones— se movió acá sin cambiar una palabra.
