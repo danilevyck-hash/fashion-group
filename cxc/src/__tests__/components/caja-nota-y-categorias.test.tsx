@@ -103,6 +103,17 @@ describe("🔴 «DESCRIPCIÓN» ES «NOTA», Y ES OPCIONAL", () => {
     expect(screen.queryByLabelText("Descripción")).toBeNull();
   });
 
+  it("no lleva el asterisco rojo: se ve que es opcional", () => {
+    montar();
+    const etiquetas = Array.from(document.querySelectorAll("label"));
+    const nota = etiquetas.find((l) => l.textContent?.trim().startsWith("Nota"));
+    expect(nota).toBeTruthy();
+    expect(nota!.textContent).not.toContain("*");
+    // CONTROL: lo que SÍ es obligatorio lo sigue diciendo.
+    const proveedor = etiquetas.find((l) => l.textContent?.trim().startsWith("Proveedor"));
+    expect(proveedor!.textContent).toContain("*");
+  });
+
   it("🔴 el gasto se guarda SIN nota", async () => {
     montar();
     await llenarSinNota();
