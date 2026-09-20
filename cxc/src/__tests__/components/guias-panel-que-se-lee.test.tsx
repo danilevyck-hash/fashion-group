@@ -221,15 +221,23 @@ describe("5 · la lista abre con el último mes", () => {
     expect(screen.queryByRole("button", { name: /restantes/ })).toBeNull();
   });
 
-  it("⚠️ el TOTAL sigue contando todas las guías filtradas, no solo las dibujadas", () => {
+  it("🔴 el pie dice cuántas se VEN, de cuántas (19-sep-2026)", () => {
+    // ⚠️ CAMBIO DE DIRECCIÓN. Decía «2 guías» al pie de una pantalla donde
+    // había UNA: la otra esperaba detrás de «Ver guías más viejas». Daniel:
+    // el pie tiene que decir «47 guías de 236».
     const { container } = pintar([guia(), VIEJA]);
-    expect(container.textContent).toContain("2 guías");
+    expect(container.textContent).toContain("1 guía de 2");
+    expect(container.textContent).not.toContain("2 guías");
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("6 · el orden de lo que se lee", () => {
-  const fila = (c: HTMLElement) => c.querySelector<HTMLElement>(".hidden.lg\\:flex")!;
+  /** ⚠️ CAMBIO DE DIRECCIÓN (19-sep-2026): desde que la lista lleva
+   *  ENCABEZADOS DE COLUMNA, el primer `.hidden.lg:flex` del DOM es el
+   *  encabezado y no la fila. Se selecciona por `data-testid`, que dice cuál
+   *  de los dos se está mirando. */
+  const fila = (c: HTMLElement) => c.querySelector<HTMLElement>('[data-testid="fila-escritorio"]')!;
   const tarjeta = (c: HTMLElement) => c.querySelector<HTMLElement>(".lg\\:hidden.px-4")!;
 
   it("🔴 ESCRITORIO: Guía · Cliente · Destino · Bultos · Transportista", () => {
@@ -246,9 +254,14 @@ describe("6 · el orden de lo que se lee", () => {
     expect(iBultos).toBeLessThan(iTransp);
   });
 
-  it("🔴 y la FECHA sale de la fila: la dice el encabezado del día", () => {
+  it("🔴 y la FECHA VUELVE a la fila, en su columna (19-sep-2026)", () => {
+    // ⚠️ CAMBIO DE DIRECCIÓN. Este candado exigía lo CONTRARIO desde el
+    // 5-sep-2026 («la dice el encabezado del día»), y el encabezado del día
+    // dice «Hoy · Ayer · Esta semana · Este mes»: dentro de «Este mes» no
+    // había forma de saber el día de una guía sin abrirla. Daniel aprobó la
+    // columna de fecha el 19-sep-2026.
     const { container } = pintar([guia()]);
-    expect(fila(container).textContent).not.toContain(fmtDate("2026-09-04"));
+    expect(fila(container).textContent).toContain(fmtDate("2026-09-04"));
   });
 
   it("🔴 TELÉFONO: el cliente arriba y en negrita, el transportista abajo en gris", () => {

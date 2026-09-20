@@ -203,13 +203,15 @@ describe("⚠️ lo que NO se tocó sigue en pie", () => {
   });
 
   it("una «Completada» se ve como despachada, NO como pendiente", () => {
-    // ⚠️ CAMBIO DE DIRECCIÓN (5-sep-2026). Este caso leía el CHIP verde
-    // «despachada», que Daniel retiró: salía en 221 de 222 filas y *«un color
-    // que sale siempre deja de avisar»*. Lo que se sigue exigiendo es la
-    // distinción, leída en el borde izquierdo —que no se tocó— y en que la
-    // despachada NO se pinta como pendiente.
+    // ⚠️ CAMBIO DE DIRECCIÓN, DOS VECES.
+    // (5-sep-2026) Este caso leía el CHIP verde «despachada», que Daniel
+    // retiró: salía en 221 de 222 filas y *«un color que sale siempre deja de
+    // avisar»*. Se pasó a leer el borde izquierdo verde.
+    // (19-sep-2026) Y el borde verde se fue por la MISMA razón: salía en las
+    // 236 filas. Lo que se sigue exigiendo es lo único que importaba desde el
+    // principio — que la despachada NO se pinte como pendiente.
     const { container } = lista({ estado: "Completada" });
-    expect(container.querySelector(".border-l-emerald-400")).not.toBeNull();
+    expect(container.querySelector(".border-l-emerald-400")).toBeNull();
     expect(container.querySelector(".border-l-amber-400")).toBeNull();
     expect(container.textContent).not.toContain("despachada");
     const { container: pend } = lista({ estado: "Pendiente Bodega" });

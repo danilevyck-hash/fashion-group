@@ -185,10 +185,17 @@ describe("🔴 lo que falta queda MARCADO", () => {
   });
 
   it("la lista de guías dibuja la marca, y la página de la guía también", () => {
+    // ⚠️ SE MUDÓ, NO SE FUE (19-sep-2026). La marca de la lista dejó de ser un
+    // chip ámbar escrito adentro de `GuiasList` y pasó a un punto callado; la
+    // pregunta y el texto viven ahora en `lib/guias/avisos-de-la-fila.ts`,
+    // que es lo que la lista dibuja. Daniel: *«que la falta no se vea tan
+    // ruidosa»* — lo que NO cambió es que se siga marcando.
+    const avisos = leer("src/lib/guias/avisos-de-la-fila.ts");
     const lista = leer("src/app/guias/components/GuiasList.tsx");
     const pagina = leer("src/app/guias/[id]/page.tsx");
-    expect(lista).toContain("guiaSinNumeroTransp(g)");
-    expect(lista).toContain("Falta N° transportista");
+    expect(avisos).toContain("guiaSinNumeroTransp(g)");
+    expect(avisos).toContain("Falta N° transportista");
+    expect(lista).toContain("avisosDeLaFila(g)");
     expect(pagina).toContain("guiaSinNumeroTransp(g)");
   });
 

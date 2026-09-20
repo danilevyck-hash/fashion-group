@@ -13,57 +13,87 @@ import FirmasPlegadas from "./FirmasPlegadas";
 import {
   ETIQUETA_TIPO_DESPACHO,
   esEntregaDirecta,
-  guiaSinNumeroTransp,
   guiaYaDespachada,
   numerosTranspDeLaGuia,
   sinCeroPelado,
   tipoDespachoEfectivo,
 } from "@/lib/guias/modo-despacho";
 import { coincideGuiaConBusqueda } from "@/lib/guias/buscar-guia";
-import { despachadaIncompleta, textoFaltantesDespachada } from "@/lib/guias/faltantes-despacho";
+import { textoFaltantesDespachada } from "@/lib/guias/faltantes-despacho";
 import { tieneRenglones } from "@/lib/guias/tiene-renglones";
 import { facturasParaMostrar } from "@/lib/guias/numero-factura";
 import { observacionesVisibles } from "@/lib/guias/observaciones";
 import { partirGuiasPorVentana } from "@/lib/guias/ventana-lista";
+import { avisosDeLaFila } from "@/lib/guias/avisos-de-la-fila";
+import { textoPieDeLista } from "@/lib/guias/pie-de-la-lista";
 import { separarPendientes, resumenPendientes } from "@/lib/guias/pendientes-arriba";
 import { cedulaParaMostrar } from "@/lib/guias/cedula";
 import { CHIP_SOLO_PENDIENTES, urlSinPendientes } from "@/lib/guias/filtro-pendientes";
 import { planParaLlegar } from "@/lib/guias/llegar-a-la-guia";
 
 /**
- * 🔴 LA GUÍA QUE SALIÓ SIN EL N° DEL TRANSPORTISTA, DICHO EN LA LISTA.
+ * 🔴 LOS AVISOS DE LA FILA, CALLADOS Y SIN MOVER NADA (19-sep-2026).
  *
- * El número dejó de bloquear el despacho (Daniel: *"a veces el transportista lo
- * da, a veces no"*). Que no bloquee no puede significar que se pierda de vista:
- * acá es donde alguien las encuentra después.
+ * Lo que avisan no cambió: que la guía salió sin el número del transportista
+ * (Daniel: *"a veces el transportista lo da, a veces no"*) o sin placa, sin
+ * quién recibió o sin cédula (punto 13: *"Las 68 sin placa y 65 sin recibido →
+ * marcadas para completarlas"*). Que no bloqueen no puede significar que se
+ * pierdan de vista: acá es donde alguien las encuentra después.
+ *
+ * 🩸 Lo que cambió es CÓMO. Eran dos chips ámbar con fondo, borde y el texto
+ * entero, metidos en medio de la fila: la fila con aviso empujaba sus columnas
+ * ~95 px y quedaba desalineada con las de arriba y las de abajo. Daniel:
+ * *«veo desorden más que nada cuando falta N de transportista, que la falta no
+ * se vea tan ruidosa»*.
+ *
+ * ⚠️ **MARCA, NO ABRE.** Esos campos NO están entre las tres cosas que se
+ * pueden corregir en una guía firmada (N° del transportista · cliente ·
+ * facturas) y siguen cerrados. Esto es para poder ENCONTRARLAS.
  */
-function FaltaNumeroTransp() {
+function PuntoDeAviso({ texto }: { texto: string }) {
   return (
-    <span className="inline-flex items-center rounded-md bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 text-xs whitespace-nowrap">
-      Falta N° transportista
+    <span className="inline-flex items-center" title={texto}>
+      <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+      <span className="sr-only">{texto}</span>
+    </span>
+  );
+}
+
+/** El mismo aviso en la tarjeta del teléfono, donde SÍ cabe la frase: punto y
+ *  texto en gris, sin fondo ni borde. Dice lo mismo sin gritarlo. */
+function LineaDeAviso({ texto }: { texto: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 whitespace-nowrap">
+      <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0" />
+      {texto}
     </span>
   );
 }
 
 /**
- * 🔴 LA GUÍA QUE SALIÓ SIN PLACA, SIN QUIÉN RECIBIÓ O SIN CÉDULA.
+ * 🔴 LAS ANCHURAS DE LA FILA DE ESCRITORIO, EN UN SOLO LUGAR (19-sep-2026).
  *
- * Daniel, punto 13: *"Las 68 sin placa y 65 sin recibido → marcadas para
- * completarlas"*. De las 207 despachadas, 190 (92%) tienen algún dato en
- * blanco: se cerraron cuando nada bloqueaba. El bloqueo se puso el 10-ago-2026
- * y desde entonces son 0 de 15.
+ * Daniel aprobó que la lista lleve **encabezados de columna** y una **columna
+ * de fecha**. Un encabezado que se escribe con sus propias anchuras es una
+ * segunda definición de la tabla: el día que alguien ensancha «Destino», el
+ * rótulo se queda donde estaba y la lista miente. Por eso la fila y el
+ * encabezado leen LAS MISMAS constantes, y agregar una columna es tocar una
+ * línea en cada lado, nunca dos anchos que hay que acordarse de igualar.
  *
- * ⚠️ **MARCA, NO ABRE.** Esos tres campos NO están entre las tres cosas que se
- * pueden corregir en una guía firmada (N° del transportista · cliente ·
- * facturas) y siguen cerrados. Esto es para poder ENCONTRARLAS.
+ * ⚠️ Son clases de Tailwind escritas COMPLETAS a propósito: Tailwind escanea
+ * texto y no generaría una clase armada con plantillas.
  */
-function SalioIncompleta() {
-  return (
-    <span className="inline-flex items-center rounded-md bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 text-xs whitespace-nowrap">
-      Salió incompleta
-    </span>
-  );
-}
+const COL_GUIA = "w-16 shrink-0";
+const COL_FECHA = "w-20 shrink-0";
+const COL_CLIENTE = "flex-[3_1_0] min-w-0";
+const COL_DESTINO = "flex-[2_1_0] min-w-0";
+const COL_BULTOS = "w-20 xl:w-24 shrink-0 text-right";
+const COL_TRANSP = "w-28 xl:w-36 shrink-0";
+/** La columna del aviso: existe SIEMPRE, con o sin aviso (ver `PuntoDeAviso`). */
+const COL_AVISOS = "w-8 shrink-0";
+const COL_CHEVRON = "w-4 h-4 shrink-0";
+/** Las clases que ordenan la fila entera, compartidas con el encabezado. */
+const FILA_ESCRITORIO = "hidden lg:flex items-center gap-3 xl:gap-4";
 
 interface GuiasListProps {
   guias: Guia[];
@@ -645,14 +675,24 @@ export default function GuiasList({
                       // historia). Ya no hay estado heredado que contemplar.
                       const isDispatched = guiaYaDespachada(g.estado);
 
-                      // Status-based left border color
-                      // El borde rojo de "Rechazada" se fue con el rechazo
-                      // (14-ago-2026) y el estado entero el 5-sep-2026.
+                      // 🔴 EL BORDE DE COLOR SOLO CUANDO HAY ALGO QUE DECIR
+                      // (19-sep-2026). 🩸 El verde de «despachada» salía en
+                      // las 236 filas: un color que sale siempre no informa
+                      // nada — es la MISMA razón por la que el chip verde ya
+                      // se había retirado el 5-sep. Queda el ámbar de lo que
+                      // todavía espera algo, que es de lo que sí hay que
+                      // enterarse; lo despachado lleva el borde neutro de la
+                      // tarjeta y el hueco de 4 px se conserva para que las
+                      // filas no bailen.
+                      //
+                      // 🩸 Y acá vivía una rama que pintaba de AZUL los
+                      // estados «Confirmada» y «Despachada»: no existen ni
+                      // existieron nunca — el flujo real es «Pendiente
+                      // Bodega» → «Completada» (y «Rechazada» se retiró el
+                      // 5-sep-2026, 0 de 242 guías). Código muerto, borrado.
                       const statusBorderClass = isDispatched
-                        ? "border-l-4 border-l-emerald-400"
-                        : (g.estado === "Confirmada" || g.estado === "Despachada")
-                          ? "border-l-4 border-l-blue-400"
-                          : "border-l-4 border-l-amber-400";
+                        ? "border-l-4 border-l-transparent"
+                        : "border-l-4 border-l-amber-400";
 
                       const cardContent = (
                         <div className={`border rounded-lg transition-all ${statusBorderClass} ${isExpanded ? "border-gray-300" : "border-gray-200 hover:border-gray-200"}`}>
@@ -727,7 +767,7 @@ export default function GuiasList({
                                 sobrante 3:2, así que ninguna puede volver a
                                 valer 0 y el nombre largo del cliente entra
                                 donde antes se cortaba a los 160 px. */}
-                            <div className="hidden lg:flex items-center gap-3 xl:gap-4 px-4 py-3">
+                            <div data-testid="fila-escritorio" className={`${FILA_ESCRITORIO} px-4 py-3`}>
                               {selectionMode && (
                                 <span onClick={(e) => { e.stopPropagation(); toggleSelect(g.id); }} className="shrink-0">
                                   <input type="checkbox" checked={selectedIds.has(g.id)} onChange={() => toggleSelect(g.id)} className="accent-black" />
@@ -747,39 +787,54 @@ export default function GuiasList({
                                   día ya la dice) y el ESTADO también: 221 de 222
                                   decían lo mismo, y el color se reserva para lo
                                   que espera algo. */}
-                              <span className="font-medium w-16 shrink-0 font-mono text-xs">{fmtGuia(g.numero)}</span>
+                              <span className={`${COL_GUIA} font-medium font-mono text-xs`}>{fmtGuia(g.numero)}</span>
+                              {/* 🔴 LA FECHA, DE VUELTA COMO COLUMNA
+                                  (19-sep-2026). Se había ido el 5-sep porque
+                                  «el encabezado del día ya la dice» — pero los
+                                  encabezados son «Hoy · Ayer · Esta semana ·
+                                  Este mes», así que dentro de «Este mes» no
+                                  había forma de saber el día de una guía sin
+                                  abrirla. */}
+                              <span className={`${COL_FECHA} text-gray-500 text-xs`}>{fmtDate(g.fecha)}</span>
                               {/* 🔴 `flex-[3_1_0]` y `flex-[2_1_0]`, NO `flex-1`
                                   + `w-40`: las dos se reparten TODO el sobrante
                                   en proporción 3:2. Con `min-w-0` truncan en vez
                                   de empujar la fila, y como las dos crecen
                                   juntas, ninguna puede quedar en 0 mientras
                                   sobre un píxel. */}
-                              <span className="flex-[3_1_0] min-w-0 truncate font-medium">
+                              <span className={`${COL_CLIENTE} truncate font-medium`}>
                                 {clientesSummary(g.guia_items || []) || "Sin cliente"}
                               </span>
-                              <span className="text-gray-400 text-xs flex-[2_1_0] min-w-0 truncate">
+                              <span className={`${COL_DESTINO} text-gray-400 text-xs truncate`}>
                                 {destinosSummary(g.guia_items || [])}
                               </span>
-                              <span className="tabular-nums w-20 xl:w-24 text-right shrink-0">
+                              <span className={`${COL_BULTOS} tabular-nums`}>
                                 {g.total_bultos} <span className="text-gray-400">bultos</span>
                               </span>
-                              <span className="text-gray-500 w-28 xl:w-36 shrink-0 text-xs truncate">{g.transportista}</span>
-                              {guiaSinNumeroTransp(g) && (
-                                <span className="shrink-0"><FaltaNumeroTransp /></span>
-                              )}
-                              {despachadaIncompleta(g) && (
-                                <span className="shrink-0"><SalioIncompleta /></span>
-                              )}
+                              <span className={`${COL_TRANSP} text-gray-500 text-xs truncate`}>{g.transportista}</span>
+                              {/* 🔴 LA COLUMNA DEL AVISO EXISTE SIEMPRE, CON O
+                                  SIN AVISO: es lo único que impide que la fila
+                                  con aviso empuje sus columnas y quede
+                                  desalineada de las demás. Vacía, es un hueco
+                                  en blanco. */}
+                              <span className={`${COL_AVISOS} inline-flex items-center justify-center gap-1`}>
+                                {avisosDeLaFila(g).map((a) => (
+                                  <PuntoDeAviso key={a} texto={a} />
+                                ))}
+                              </span>
                               {/* 🔴 SOLO SE PINTA LO QUE ESPERA. El chip verde
                                   «despachada» salía en 221 de 222 filas: un color
-                                  que sale siempre deja de avisar. */}
+                                  que sale siempre deja de avisar. El hueco, en
+                                  cambio, está siempre: si apareciera y
+                                  desapareciera, las columnas se moverían en la
+                                  única fila que importa. */}
                               {!isDispatched && (
                                 <span className="shrink-0">
                                   <StatusBadge estado="pendiente" />
                                 </span>
                               )}
                               <svg
-                                className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isExpanded ? "rotate-180" : ""}`}
+                                className={`${COL_CHEVRON} text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
                                 fill="none" stroke="currentColor" viewBox="0 0 24 24"
                               >
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -831,10 +886,11 @@ export default function GuiasList({
                               <div className="mt-1 text-xs text-gray-400 font-mono">
                                 {fmtGuia(g.numero)} · {fmtDate(g.fecha)}
                               </div>
-                              {(guiaSinNumeroTransp(g) || despachadaIncompleta(g)) && (
-                                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                                  {guiaSinNumeroTransp(g) && <FaltaNumeroTransp />}
-                                  {despachadaIncompleta(g) && <SalioIncompleta />}
+                              {avisosDeLaFila(g).length > 0 && (
+                                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+                                  {avisosDeLaFila(g).map((a) => (
+                                    <LineaDeAviso key={a} texto={a} />
+                                  ))}
                                 </div>
                               )}
                             </div>
@@ -1144,6 +1200,34 @@ export default function GuiasList({
 
                 return (
                   <>
+                    {/* 🔴 LOS ENCABEZADOS DE COLUMNA (19-sep-2026). La fila de
+                        escritorio tenía seis columnas y ninguna decía qué era:
+                        «Entrega directa» y el destino se leían igual, y el
+                        número de la derecha podía ser bultos o cualquier cosa.
+                        Solo de `lg` para arriba: debajo de eso manda la
+                        tarjeta, donde cada dato ya va con su palabra.
+                        🔴 Las anchuras salen de las MISMAS constantes que la
+                        fila (`COL_*`): no hay una segunda tabla que se
+                        desalinee cuando alguien toque una columna.
+                        ⚠️ No es pegajoso a propósito: la cabecera del grupo
+                        («Hoy», «Esta semana») ya lo es y se le montaría
+                        encima. */}
+                    <div data-testid="encabezado-lista" className={`${FILA_ESCRITORIO} px-1 pb-1.5 mb-1 border-b border-gray-100 text-xs uppercase tracking-wide text-gray-400`}>
+                      <span className="flex-1 min-w-0 flex items-center gap-3 xl:gap-4 pl-5 pr-4">
+                        <span className={COL_GUIA}>Guía</span>
+                        <span className={COL_FECHA}>Fecha</span>
+                        <span className={COL_CLIENTE}>Cliente</span>
+                        <span className={COL_DESTINO}>Destino</span>
+                        <span className={COL_BULTOS}>Bultos</span>
+                        <span className={COL_TRANSP}>Transportista</span>
+                        <span className={COL_AVISOS} aria-hidden />
+                        <span className={COL_CHEVRON} aria-hidden />
+                      </span>
+                      {/* El hueco de los botones de la fila (Imprimir ·
+                          Compartir · «···»), para que las columnas de arriba
+                          caigan donde caen las de abajo. */}
+                      <span aria-hidden className={`shrink-0 ${canEdit || canDelete ? "w-[140px]" : "w-[96px]"}`} />
+                    </div>
                     {/* 🔴 LO PENDIENTE, ARRIBA Y FUERA DE LOS GRUPOS. Es UNA
                         guía de 222 y es la única con algo que hacer. */}
                     {pendientes.length > 0 && (
@@ -1171,10 +1255,15 @@ export default function GuiasList({
                       </button>
                     )}
 
-                    {/* Totals */}
+                    {/* 🔴 EL PIE DICE CUÁNTAS SE VEN, DE CUÁNTAS (19-sep-2026).
+                        🩸 Decía «236 GUÍAS» al pie de una pantalla donde había
+                        47: el resto espera detrás de «Ver guías más viejas».
+                        Con todo a la vista vuelve a ser un número solo.
+                        ⚠️ El total de BULTOS no cambió: sigue contando todas
+                        las filtradas. */}
                     <div className="flex items-center justify-between px-4 py-3 text-sm border-t border-gray-200 mt-2">
                       <span className="text-gray-400 text-xs uppercase tracking-wide">
-                        {filtered.length} guía{filtered.length !== 1 ? "s" : ""}
+                        {textoPieDeLista(pendientes.length + visible.length, guias.length)}
                       </span>
                       <span className="tabular-nums font-medium">{totalBultos} bultos</span>
                     </div>
