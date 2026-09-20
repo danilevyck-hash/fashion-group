@@ -10,7 +10,7 @@ export default defineConfig({
     // .tsx habilitado para los tests que renderizan componentes de verdad
     // (@testing-library/react), no solo lógica pura.
     include: ["src/__tests__/**/*.test.ts", "src/__tests__/**/*.test.tsx"],
-    setupFiles: [],
+    setupFiles: ["./vitest.setup.ts"],
   },
   resolve: {
     alias: {
