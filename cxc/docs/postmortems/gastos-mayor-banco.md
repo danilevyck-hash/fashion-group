@@ -143,3 +143,18 @@
 - 🩸 **La celda de cuenta contable se lee por el PRINCIPIO, no entera.** Switch reescribió su motor de reportes y desde el 1-sep-2026 manda `6.03.98.00.00 - GASTO DE TARJETA DE CREDITO` donde antes mandaba el código pelado; el ancla `$` del validador tiró los 378 renglones de cada empresa y el módulo se quedó sin datos 2 días. `codigoDeCuenta()` acepta el código seguido de **cualquier cosa** (no se calibró a un separador: el archivo crudo nunca se pudo ver) y `CUENTA_RE` conserva su `$` intacto para el VALOR. Seis tramos siguen siendo error: recortarlos cambiaría de cuenta en silencio y `esGasto` decide con el primer tramo. **El nombre no se toma de ahí** — el autoritativo es `cuentas_contables.nombre_switch`. Es la segunda ola del mismo cambio de Switch; la primera rompió la cartera de Boston el 19-ago.
 - ⚠️ **Vista General SÍ suma gastos entre empresas** — es otro módulo, la suma es deliberada, y si la regla también vale ahí es una decisión pendiente de Daniel.
 
+---
+
+## Lo que decía CLAUDE.md hasta el 22-sep-2026 (movido acá, verbatim)
+
+### Gastos, mayor y banco — [docs/postmortems/gastos-mayor-banco.md](docs/postmortems/gastos-mayor-banco.md)
+
+> Detalle completo (mediciones, citas, candados, mutaciones): [docs/postmortems/gastos-mayor-banco.md](docs/postmortems/gastos-mayor-banco.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
+> ⚠️ Las reglas de PANTALLA de este módulo (qué se dibuja, dónde, rótulos, tamaños) viven SOLO en ese postmortem: léelo antes de tocar una pantalla suya.
+
+- `gastos-contabilidad`: Egresos Varios (fuente ÚNICA) y Saldos de banco. 🔴 Las 8 empresas se ven, pero sus gastos NUNCA se suman entre sí: ni total de grupo, ni pie de tabla, ni export; hay candado.
+- El mayor contable se retiró; `mayor_lineas` y `mayor_importaciones` no se borran; build rojo si una migración las dropea.
+- `bancos_saldos` va con upsert `(empresa_key, fecha_dato)`: repetir la fecha corrige ESE día y nunca pisa otro. Cero `DELETE`.
+- 🩸 Un renglón ilegible de Switch NO desaparece: queda en `switch_sync_log.skip_details`, se dice en pantalla y avisa por 🔧 SISTEMA, anti-loop de 7 días por N. INTERNO, nunca por línea.
+- 🩸 La cuenta se lee por el PRINCIPIO: `codigoDeCuenta()` acepta el código seguido de cualquier cosa; `CUENTA_RE` conserva su `$` para el VALOR, seis tramos siguen siendo error, `esGasto` decide con el primero y el nombre sale de `cuentas_contables.nombre_switch`.
+- ⚠️ Vista General SÍ suma gastos entre empresas: otro módulo, suma deliberada; si la regla vale ahí es decisión pendiente de Daniel.
