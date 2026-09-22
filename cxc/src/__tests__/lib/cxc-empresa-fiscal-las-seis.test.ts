@@ -147,7 +147,8 @@ describe("🔴 2. el correo de las seis es info@fashiongr.com", () => {
   // cuentas de banco, así que la línea `TEL:` del encabezado ya sale con número.
   // 🔑 LA REGLA QUE ESTE CANDADO PROTEGE NO CAMBIÓ: el teléfono se escribe UNA
   // sola vez y es el MISMO en todas; lo que cambió es el valor que Daniel dictó.
-  // ⚠️ Pendiente suyo: lo dijo «para todas» ANTES de dar la cuenta de Boston.
+  // 🔄 Y EL 22-sep-2026 CONFIRMÓ BOSTON, que era lo único en duda: lo había
+  // dicho «para todas» ANTES de dar su cuenta. Su candado: `cxc-boston-telefono`.
   it("🔴 el teléfono es el MISMO en las seis, y se escribe una sola vez", () => {
     for (const key of B2B_EMPRESA_KEYS) {
       expect(fichaFiscal(key, "X").telefono, key).toBe(TELEFONO_DE_TODAS);

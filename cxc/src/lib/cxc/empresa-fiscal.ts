@@ -33,9 +33,10 @@
 //   1. 🔄 **El teléfono.** Hasta el 20-sep-2026 iba VACÍO en todas, porque
 //      Switch tampoco lo trae. Ese día Daniel dictó uno solo para todas —
 //      `212-0790`— junto con las cuentas de banco, así que la línea `TEL:` del
-//      encabezado ya sale con número. ⚠️ Lo dictó **antes** de dar la cuenta de
-//      Confecciones Boston: que Boston use ese mismo teléfono está **pendiente
-//      de que Daniel lo confirme**.
+//      encabezado ya sale con número. 🔴 **Y EL 22-sep-2026 CONFIRMÓ QUE BOSTON
+//      CONTESTA EN ESE MISMO NÚMERO**, que era lo único que quedaba en duda: lo
+//      había dictado «para todas» antes de dar la cuenta de Boston. Ya no hay
+//      excepción — las OCHO llevan `212-0790`, Boston incluida.
 //
 //   2. **El correo de las SEIS es `info@fashiongr.com`.** Textual: *«los correos
 //      de todos debe de ser info@fashiongr.com»*. Los papeles de Switch traen
@@ -81,12 +82,19 @@ export const BANCO_DE_TODAS = "Banco General";
 export const TIPO_DE_CUENTA = "Cuenta corriente";
 
 /**
- * El teléfono que Daniel dictó para TODAS (20-sep-2026).
+ * El teléfono que Daniel dictó para TODAS (20-sep-2026), **Confecciones Boston
+ * incluida y confirmada por él el 22-sep-2026**.
  *
- * ⚠️ Lo dictó junto con las cuentas de las siete del grupo y Multifashion,
- * **antes** de dar la de Confecciones Boston. Que Boston conteste en ese mismo
- * número está pendiente de que él lo confirme; mientras tanto va el dictado,
- * porque dijo «todas».
+ * 🔴 SE ESCRIBE UNA SOLA VEZ, como el correo del grupo y el banco. Repetirlo
+ * ocho veces es cómo se llega a que el día que el número cambie queden siete
+ * empresas corregidas y una vieja. Boston NO lo declara aparte: su ficha lo toma
+ * de acá igual que las otras siete, y hay candado que lo exige dígito por dígito
+ * y que prohíbe que aparezca escrito en un segundo lugar
+ * (`cxc-boston-telefono.test.ts`).
+ *
+ * ⚠️ El día que una empresa conteste en un número propio, se agrega como el
+ * `correo` de Boston —un campo opcional en SU fila del registro—, nunca copiando
+ * la constante.
  */
 export const TELEFONO_DE_TODAS = "212-0790";
 

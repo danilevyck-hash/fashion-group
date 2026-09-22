@@ -18,9 +18,10 @@
  * este candado compara los ocho números **dígito por dígito** contra lo que
  * Daniel dictó, y no contra lo que hoy diga el archivo.
  *
- * ⚠️ PENDIENTE DE DANIEL: el teléfono `212-0790` lo dictó para «todas», pero lo
- * dijo **antes** de dar la cuenta de Confecciones Boston. Que Boston conteste en
- * ese mismo número está por confirmarse.
+ * 🔄 YA NO HAY PENDIENTE (22-sep-2026): el teléfono `212-0790` lo había dictado
+ * para «todas» **antes** de dar la cuenta de Confecciones Boston, y ese día
+ * confirmó que Boston también contesta ahí. El candado de Boston, aparte, está
+ * en `cxc-boston-telefono.test.ts`.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import { describe, it, expect } from "vitest";
