@@ -55,3 +55,18 @@
 - 🔴 NO SE PUEDE REGALAR UN MÓDULO QUE LA PANTALLA REBOTA: los ofrecibles de «permisos personalizados» se derivan (`src/lib/modulos-ofrecibles.ts`) —a un rol solo se le ofrece lo que `ALL_MODULES` le da— y el servidor lo rechaza igual (`/api/admin/users`). Candado: `usuarios-modulos-ofrecibles.test.ts`.
 - ⚠️ El override REEMPLAZA la lista del rol en vez de sumarla, y la pantalla no lo dice. Decisión pendiente de Daniel.
 - 🔴 El teclado y el Inicio dejaron de prometer lo que no existe: se retiraron `useKeyboardShortcuts`, `useBadges`, `useSmartSuggestions`, `SuggestionCard` y `/api/home-stats`, sin lectores; queda `useSessionCheck`, desenchufado a propósito. Candados: `atajos-de-teclado-retirados.test.ts` · `inicio-sin-promesas.test.ts`.
+
+## Smart Features
+- **Búsqueda global:** 8 módulos (CXC, Reclamos, Guías, Directorio, Cheques, Ventas, Préstamos, Caja). 🔴 **Cada resultado LLEVA a donde dice** (11-sep-2026): la **guía** abre `/guias/<id>`, el **cliente** su ficha `/clientes/<codigo>`, el de **Ventas** `?tab=clientes&cliente=<CÓDIGO>` y el gasto de **Caja** su período `/caja/<id>`. 🔴 El código del cliente de Ventas sale del **puente por ID** (`switch_facturas` → `switch_clientes` → `codigo`), **nunca del nombre**. ⚠️ El gasto de Caja no queda resaltado dentro de su período: pendiente, no olvido. Candado: `busqueda-global-destinos.test.ts`. Detalle en [el postmortem](docs/postmortems/usuarios-inicio-teclado.md).
+- **La caja de buscar del Inicio es de los mismos CINCO roles que en todo el sistema** (`SEARCH_ROLES`, 11-sep-2026): estaba escrita a mano como `["admin","secretaria"]`, así que contabilidad y vendedor entraban al Inicio sin caja de buscar y la encontraban arriba en cualquier módulo.
+- **Spotlight:** "cheques que vencen mañana" → ⚡ quick action con deep link
+- **Búsquedas recientes:** últimas 5 + "Ir a..." shortcuts de módulos
+- **Smart defaults:** recuerda última categoría, empresa, banco, transportista (localStorage `fg_last_*`)
+- 🩸 **Tres cosas que esta lista prometía y NO EXISTÍAN EN NINGUNA PANTALLA** (retiradas el 11-sep-2026): el feed «Acciones pendientes», los contadores del 🔔 y las 💡 sugerencias. Se retiró CÓDIGO MUERTO; no se construyó nada. ⚠️ La **campana 🔔 SÍ funciona** (`NotificationCenter`, que nunca usó ese gancho) y `/api/notification-badges` se queda sin llamadores porque la nombran tres candados. Detalle en [el postmortem](docs/postmortems/usuarios-inicio-teclado.md). Candado: `inicio-sin-promesas.test.ts`.
+- **Draft auto-save:** formularios de reclamos, guías, cheques se guardan cada 5s en localStorage
+- **Time grouping:** cheques y guías agrupados por "Hoy/Esta semana/Vencidos"- **Contextual color:** tinte rojo/ámbar ambient cuando hay datos urgentes
+- **Inline previews:** último contacto, días para depósito, próxima deducción visibles sin expandir
+- **Hover preview:** cards ricas al hover sobre el nombre de un cliente — vive en **Ventas › Clientes** (`ClienteHoverCard`), NO en Cuentas por Cobrar (verificado 3-sep-2026: el CXC no tiene hover; su detalle es la fila expandida, con desglose por empresa y «Últimos pagos»)
+- **URL state:** filtros persisten en URL (?risk=vencido&empresa=fashion_wear) — deep links y back/forward funcionan
+- **UI persistence:** filas expandidas y scroll position sobreviven navegación (sessionStorage)
+- **Offline:** banner "Sin conexión" (informativo) + botones deshabilitados sin red. NO hay lectura offline: el Modo Viaje (snapshots localStorage + cache de páginas del SW) se eliminó en jul 2026
