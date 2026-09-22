@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { COMPANIAS_DEPURADOR } from "@/lib/depurador/logic";
-import { textoRetencion } from "@/lib/depurador/historial-archivos";
+import { textoRetencion } from "@/lib/depurador/historial-retencion";
 import BuscadorDeLista, { VacioDeBusqueda } from "@/components/BuscadorDeLista";
 import {
   LIMPIAR_BUSQUEDA,

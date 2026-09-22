@@ -17,18 +17,19 @@
  * totales se queda PARA SIEMPRE — al vencer el archivo la fila pierde el
  * botón, nunca se borra la fila.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
 
 // El módulo arrastra el cliente de Supabase solo para el cron; este candado
 // mira la CONSTANTE y el RÓTULO, que son puros.
-vi.mock("@/lib/supabase-server", () => ({ supabaseServer: {} }));
-
-const {
+// 🩸 El número y el rótulo viven en un módulo PURO, aparte del que habla con
+// Storage: la PANTALLA los necesita y no puede arrastrar el cliente de
+// servidor al navegador. Importarlos desde aquí prueba justamente eso.
+import {
   RETENCION_ARCHIVO_DIAS,
   textoRetencion,
-} = await import("@/lib/depurador/historial-archivos");
+} from "@/lib/depurador/historial-retencion";
 
 const RAIZ = process.cwd();
 const leer = (p: string) => fs.readFileSync(path.join(RAIZ, p), "utf8");
@@ -51,7 +52,9 @@ describe("🔴 El plazo sale de UN solo lugar", () => {
   it("la pantalla lo deriva de la constante, no lo escribe", () => {
     const tsx = leer(PANTALLA);
     expect(tsx).toContain("textoRetencion()");
-    expect(tsx).toContain('from "@/lib/depurador/historial-archivos"');
+    // 🔴 Del módulo PURO, nunca del que importa supabase-server.
+    expect(tsx).toContain('from "@/lib/depurador/historial-retencion"');
+    expect(tsx).not.toContain('from "@/lib/depurador/historial-archivos"');
   });
 
   it("ningún archivo del módulo promete un plazo escrito a mano", () => {
@@ -73,6 +76,11 @@ describe("🔴 El plazo sale de UN solo lugar", () => {
 });
 
 describe("🔴 Lo que NO cambió", () => {
+  it("el módulo del plazo no arrastra el cliente de servidor", () => {
+    const puro = leer("src/lib/depurador/historial-retencion.ts");
+    expect(puro).not.toMatch(/^\s*import /m);
+  });
+
   it("la fila con los totales nunca se borra junto con el archivo", () => {
     const lib = leer("src/lib/depurador/historial-archivos.ts");
     expect(lib).toMatch(/FILA[\s\S]{0,120}(para siempre|se queda)/i);

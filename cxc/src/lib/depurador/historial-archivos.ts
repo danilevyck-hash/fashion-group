@@ -32,25 +32,16 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 
-export const BUCKET_PLANTILLAS = "depurador-plantillas";
+// El número y su rótulo viven en un módulo PURO: la pantalla los necesita y no
+// puede arrastrar el cliente de servidor. Se reexportan para no romper a nadie.
+export { RETENCION_ARCHIVO_DIAS, textoRetencion } from "./historial-retencion";
+import { RETENCION_ARCHIVO_DIAS } from "./historial-retencion";
 
-/** Cuántos días se puede volver a bajar el Excel. Daniel dijo «que el archivo
- *  dure 90 días» el 4-sep-2026 y «sí» a subirlo a un año el 22-sep-2026, una
- *  vez medido que son ~21 MB al año y que no tocan la base. */
-export const RETENCION_ARCHIVO_DIAS = 365;
+export const BUCKET_PLANTILLAS = "depurador-plantillas";
 
 /** Tope de tamaño del archivo guardado (el ZIP más grande medido pesa <5 MB;
  *  25 MB deja aire de sobra sin dejar que un error llene el bucket). */
 export const ARCHIVO_MAX_BYTES = 25 * 1024 * 1024;
-
-/** Cómo se dice la retención en pantalla. 🔴 El rótulo se DERIVA del número:
- *  estaba escrito a mano («por 90 días») y el día que el número se movió a un
- *  año la pantalla siguió prometiendo 90. Un solo lugar, y no vuelve a mentir. */
-export function textoRetencion(dias: number = RETENCION_ARCHIVO_DIAS): string {
-  if (dias === 365) return "un año";
-  if (dias % 365 === 0) return `${dias / 365} años`;
-  return `${dias} días`;
-}
 
 /** Nombre de archivo saneado para la ruta de Storage (sin separadores raros). */
 export function nombreSaneado(nombre: string): string {

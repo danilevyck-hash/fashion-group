@@ -1,7 +1,8 @@
 // @vitest-environment node
 // ─────────────────────────────────────────────────────────────────────────────
 // CANDADO — el Historial del Depurador guarda EL MISMO Excel que se descargó,
-// 90 días, y la fila con los totales se queda para siempre (4-sep-2026).
+// lo que diga RETENCION_ARCHIVO_DIAS, y la fila con los totales se queda para
+// siempre (4-sep-2026; el plazo pasó de 90 días a un año el 22-sep-2026).
 //
 // Daniel, textual: «el historial solo quiero los excel para switch» · «que el
 // archivo dure 90 días» · «todos» (Angela puede bajar lo que corrió Andrea).
@@ -12,14 +13,17 @@
 //      igual, y la fila lo apunta (tiene_archivo → botón Descargar).
 //   2. El GET del archivo devuelve esos mismos bytes; sin archivo → 404;
 //      secretaria puede bajarlo (todos ven todo); sin sesión → 401.
-//   3. 🔴 A los 91 días la limpieza borra el ARCHIVO y la FILA SE QUEDA (sin
-//      botón). A los 89 días no toca nada. DDL pendiente → no-op limpio.
+//   3. 🔴 Pasado el plazo la limpieza borra el ARCHIVO y la FILA SE QUEDA (sin
+//      botón); un día antes no toca nada. El test lo DERIVA de la constante
+//      —tenía 91 y 89 escritos a mano y se cayó al mover el plazo—.
+//      DDL pendiente → no-op limpio.
 //   4. El POST JSON de siempre sigue andando (fila sin archivo, como las ~140
 //      corridas viejas — gris, sin botón).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+import { RETENCION_ARCHIVO_DIAS } from "@/lib/depurador/historial-retencion";
 import { signSession } from "@/lib/session-cookie";
 
 type Fila = Record<string, unknown>;
@@ -236,14 +240,14 @@ describe("🔴 el archivo guardado es BYTE A BYTE el que se descargó", () => {
   });
 });
 
-describe("🔴 a los 90 días se borra el ARCHIVO y la fila con los totales SE QUEDA", () => {
+describe("🔴 pasado el plazo se borra el ARCHIVO y la fila con los totales SE QUEDA", () => {
   const dias = (n: number) => new Date(Date.now() - n * 86400000).toISOString();
 
-  it("91 días → archivo fuera, fila sin botón; 89 días → intacto", async () => {
+  it("un día después del plazo → archivo fuera, fila sin botón; un día antes → intacto", async () => {
     await postConArchivo("admin", "VIEJO.xlsx");
     await postConArchivo("admin", "RECIENTE.xlsx");
-    estado.filas[0].created_at = dias(91);
-    estado.filas[1].created_at = dias(89);
+    estado.filas[0].created_at = dias(RETENCION_ARCHIVO_DIAS + 1);
+    estado.filas[1].created_at = dias(RETENCION_ARCHIVO_DIAS - 1);
 
     const r = await runLimpiezaArchivosDepurador();
     expect(r.ok).toBe(true);
