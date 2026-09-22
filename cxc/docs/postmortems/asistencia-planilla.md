@@ -2137,3 +2137,26 @@ Las únicas **4 marcas de teléfono** de toda la historia son las pruebas de Dan
 - La incapacidad justificada **se paga**; «Trabajo fuera de la oficina» **no es ausencia**; un sueldo repartido saca la rata del **sueldo COMPLETO** y las partes deben sumar el salario de la ficha o se rechaza entero.
 - Corregir una hora: el porqué es obligatorio; los motivos frecuentes se derivan de lo guardado en **90 días** por clave normalizada (**igualdad exacta, nada por parecido**), **4** con **2+** usos (`motivos-frecuentes.ts`, solo lectura).
 - Candados: `asistencia-colaboradores-no-personas` · `asistencia-falta-configurar` · `asistencia-siete-pantallas` · `asistencia-lista-que-falta` · `planilla-elegir-quincena` · `asistencia-reglas-de-la-contable` · `asistencia-empresa-para-todo` · `asistencia-alcance-route` · `aprobaciones-por-persona` · `aprobaciones-optimista` · `vacaciones-el-motor-las-honra` · `asistencia-prestamo-planilla` · `planilla-sin-descontar` · `justificar-horas-solo-constancia` · `planilla-ajuste-por-concepto` · `planilla-antes-de-cerrar` · `asistencia-buscadores` · `prestamos-salida-con-deuda` · `asistencia-corregir-hora`.
+
+### La Planilla Unida — los dos interruptores, PRENDIDOS en producción (11-sep-2026)
+
+> Detalle completo: [el postmortem](docs/postmortems/asistencia-planilla.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026». ⚠️ Sus reglas de PANTALLA viven SOLO ahí: léelo antes de tocar una pantalla suya.
+
+> 🔴 **Los dos están PRENDIDOS en producción desde el 11-sep-2026** (`NEXT_PUBLIC_PLANILLA_UNIDA="1"` y `NEXT_PUBLIC_PERSONA_EN_EL_CENTRO="1"` en Vercel, verificado el 14-sep-2026), así que lo de abajo es lo que Daniel VE hoy. Apagarlos pide cambiar la variable **y volver a desplegar**: Next reemplaza `NEXT_PUBLIC_*` como TEXTO al compilar. Daniel los prende uno por uno.
+
+| Interruptor | Dónde vive | Qué prende |
+|---|---|---|
+| `NEXT_PUBLIC_PLANILLA_UNIDA` | `planilla-unida.ts:26` | El comprobante de pago · el cierre que escribe el pago del préstamo (reabrir lo revierte) · el corte de quincena y el «Ajuste quincena anterior» · Préstamos con «una sola puerta» |
+| `NEXT_PUBLIC_PERSONA_EN_EL_CENTRO` | `persona-en-el-centro.ts:43` | El acomodo nuevo y `/asistencia/personas/[codigo]` con Editar |
+
+⚠️ **No cuelga de un interruptor, es aditivo por datos** y hoy inerte: la tercera cuenta «Descuento a terceros», `asistencia_codigos_ignorados` (vacía), ACS como cuarta empresa (CHECK más anchos) y sus 30 min de extra automáticos (`EXTRA_AUTOMATICO_POR_EMPRESA`: las otras tres en **0**).
+
+- 🔴 Préstamos: **una sola puerta, nunca dos** (`prestamos-una-puerta.ts`). Prendido: la ficha se filtra de `getVisibleModules` (no se borra de `ALL_MODULES`: la key sigue en `role_permissions` y `modulos_override`) y `/prestamos` exacto redirige a `/asistencia?tab=prestamos`, **307 temporal**, query intacta. 🔴 `/prestamos/<id>` **no redirige**, ni `/api/prestamos/*`: son las rutas de la pestaña.
+- 🔴 La pestaña se autoriza por `PRESTAMOS_ROLES`, **no por tener Asistencia**: `PRESTAMOS_PESTANA_ROLES` = admin · contabilidad + secretaria **solo a ver**; bodega y vendedor no, y el «solo ver» lo decide el SERVIDOR.
+- La sección Préstamos de la persona **enlaza, no duplica** (`enlaceAPrestamos`): no dibuja formulario ni hace POST, y la ficha NO ofrece «Pago Quincenal»: lo escribe el cierre.
+- 🔴 El comprobante de pago es UNO para las cuatro empresas, una hoja por persona, con todos los renglones aunque vayan en 0.00. Multifashion sale con `MULTI FASHION HOLDING CORP.` · `155638923-2-2016`, de la lista fiscal del estado de cuenta, sin correo ni teléfono; sin cargo va un guion, no se inventa.
+- 🔴 El pago del préstamo lo escribe el CIERRE, con `await`, y **reabrir lo revierte** con soft delete; cerrar dos veces no cobra dos veces (índice único).
+- 🔴 El corte **no prorratea el sueldo**: el período queda entero y solo se recorta hasta dónde se mide el reloj (`hastaReloj`); el «Ajuste quincena anterior» va en **renglón propio**, nunca dentro de la ausencia.
+- 🔴 En ACS aprueba `daniel`, no la contadora; **cerrar no sale de esa tabla**: ella sigue cerrando las cuatro.
+- Los nombres se capitalizan con `nombre-en-pantalla.ts` y **no se inventan acentos**. La cédula vive en el bucket **privado `asistencia-cedulas`**: se guarda la RUTA y la URL se **firma al leer**, una hora.
+- Candados: `planilla-unida-comprobante` · `planilla-unida-cierre-prestamo` · `planilla-unida-corte-y-cableado` · `planilla-tres-descuentos` · `persona-en-el-centro` · `prestamos-una-puerta` · `prestamos-pestana-completa`.
