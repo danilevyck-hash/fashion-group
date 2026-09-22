@@ -113,8 +113,11 @@ describe("🔴 2. ningún ancho de A4 escrito a mano", () => {
     expect(sinComentarios).toContain("const hoja = medidasDeLaHoja(doc);");
     // Las cuatro bandas de color, una por marca, todas contra el ancho real.
     expect(sinComentarios.match(/doc\.rect\(0, 0, hoja\.ancho, 18, "F"\);/g) ?? []).toHaveLength(4);
-    // Los dos textos pegados a la derecha.
-    expect(sinComentarios.match(/hoja\.derecha/g) ?? []).toHaveLength(2);
+    // Los textos pegados a la derecha. 🔄 22-sep-2026: eran DOS («Fashion Group
+    // · Panamá» y el monto del total) y ahora son TRES — se sumó «Página N de
+    // M», que también vive contra el borde derecho de la hoja REAL. Lo que se
+    // exige no cambió: ninguno se ancla a un número escrito a mano.
+    expect(sinComentarios.match(/hoja\.derecha/g) ?? []).toHaveLength(3);
     expect(MARGEN_MM).toBe(14);
   });
 

@@ -28,9 +28,16 @@ interface UnifiedRow {
 }
 
 /**
- * Exporta la lista unificada completa de pedidos (Míos + Del link) a Excel,
- * con columna Origen. El total se recalcula igual que /pedidos-unificado con
- * la fórmula de la marca (nunca el guardado).
+ * Exporta la lista unificada completa de Comprobantes (del vendedor + del
+ * cliente) a Excel, con columna Origen. El total se recalcula igual que
+ * /pedidos-unificado con la fórmula de la marca (nunca el guardado).
+ *
+ * 🔴 LA HOJA DICE QUÉ ES CADA FILA Y CUÁL NO SALIÓ (22-sep-2026).
+ * El Excel llevaba pedidos, cotizaciones y borradores mezclados, y lo único
+ * que los distinguía era el TEXTO de la última columna. Por eso esta ruta pide
+ * también el `status` de orders y si hay envío ACTIVO: con eso el libro escribe
+ * «Tipo» y «En Switch» en columnas propias, que se filtran. Los dos pasos son
+ * TOLERANTES —si la columna no existiera, el libro sale como salía—.
  *
  * 🔴 EL EXCEL LLEVA LOS MISMOS DOS NÚMEROS QUE LA PANTALLA (25-ago-2026).
  * La lista del admin muestra desde el #593 el número de la casa (PED-018) y el
@@ -91,6 +98,14 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
     const switchNumeros = new Map<string, string>();
     const switchDocumentos = new Map<string, DocumentoSwitch>();
     const numerosPedido = new Map<string, string>();
+    // 🔴 «Está en Switch» es tener envío ACTIVO, NO tener número: un envío sin
+    // `numero_interno` existe en el código y leerlo como "no salió" sería lo
+    // contrario de la verdad. Es el mismo criterio de la pantalla.
+    const enSwitch = new Set<string>();
+    // El `status` de orders, para que la columna «Tipo» sepa distinguir un
+    // BORRADOR de un pedido. Sin él, un borrador se lee como pedido — que es
+    // exactamente como se leía este Excel hasta el 22-sep-2026.
+    const statusPedido = new Map<string, string>();
     const fuenteDe = (r: UnifiedRow): "orders" | "publicos" =>
       r.fuente ?? (r.origen === "link" ? "publicos" : "orders");
     const orderIds = conNumeros
@@ -112,19 +127,26 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
         if (enviosError) continue;
         for (const e of (envios || []) as unknown as Record<string, unknown>[]) {
           const id = String(e.order_id);
+          enSwitch.add(id);
           switchNumeros.set(id, String(e.numero_interno || e.pedido_switch_id || "?"));
           switchDocumentos.set(id, normalizarDocumento(e.documento));
         }
         break;
       }
-      const { data: ords, error: ordsError } = await marcaDb
-        .from(cfg.ordersTable)
-        .select("id, order_number")
-        .in("id", orderIds);
-      if (!ordsError) {
+      // Escalón tolerante igual que el de `documento`: si la tabla de la marca
+      // no tuviera `status`, el libro sale sin saber qué es un borrador en vez
+      // de caerse. Un export que no baja es peor que una columna imprecisa.
+      for (const cols of ["id, order_number, status", "id, order_number"]) {
+        const { data: ords, error: ordsError } = await marcaDb
+          .from(cfg.ordersTable)
+          .select(cols)
+          .in("id", orderIds);
+        if (ordsError) continue;
         for (const o of (ords || []) as unknown as Record<string, unknown>[]) {
           if (o.order_number) numerosPedido.set(String(o.id), String(o.order_number));
+          if (o.status) statusPedido.set(String(o.id), String(o.status));
         }
+        break;
       }
     }
 
@@ -142,6 +164,8 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
         switch_numero: switchNumeros.get(id) ?? null,
         switch_documento: switchDocumentos.get(id) ?? null,
         fuente: fuenteDe(r),
+        status: statusPedido.get(id) ?? null,
+        ...(conNumeros ? { en_switch: enSwitch.has(id) } : {}),
       };
     });
 

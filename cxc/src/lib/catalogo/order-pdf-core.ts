@@ -82,6 +82,42 @@ const fmt = precioTexto;
  */
 export const MARGEN_MM = 14;
 
+/**
+ * 🔴 NINGUNA HOJA SE QUEDA SIN DECIR DE QUIÉN ES (22-sep-2026).
+ *
+ * 🩸 Medido sobre los papeles REALES que recibió el cliente
+ * (`pdf-pedido-reebok-PED-024.pdf`, que adentro es PED-023): la hoja 1 llevaba
+ * la banda de la marca, «Cliente: Nova Lux, S.A.», «Pedido: PED-023» y la
+ * fecha; las hojas 2 y 3 traían la fila de encabezados de la tabla **y nada
+ * más**, sin número, sin cliente, sin fecha y **sin numeración de página**. Si
+ * al cliente se le suelta la hoja 3, no hay forma de saber de qué pedido es —
+ * ni cuántas hojas eran.
+ *
+ * Por eso la cabecera se dibuja en CADA página (la misma función, en el mismo
+ * sitio: y = 26) y cada hoja cierra con «Página N de M». La numeración se
+ * escribe al final, cuando ya se sabe cuántas hojas son.
+ */
+export const TOP_CONTENIDO_MM = 30;
+
+/**
+ * 🔴 EL TOTAL NO SE VA SOLO A UNA HOJA EN BLANCO (22-sep-2026).
+ *
+ * 🩸 En `pdf-cotizacion-tommy.pdf` la hoja 2 traía DOS líneas —«20 bultos · 224
+ * piezas» y «$10,064»— y el **92 % de la hoja en blanco**: la tabla terminó
+ * pegada al borde de la hoja 1 y el guard de salto mandó el total a una página
+ * nueva, solo.
+ *
+ * El arreglo no es mover el total: es **reservar su lugar**. La tabla nunca
+ * baja de `alto − ALTO_PIE_MM`, así que el total y la firma SIEMPRE caben
+ * debajo del último renglón. El guard de salto se queda como red de seguridad
+ * —ya no tiene que dispararse—.
+ *
+ * La cuenta: el total va en `finalY + 8`, la firma en `finalY + 18`, y
+ * «Página N de M» vive fijo en `alto − 10`. Para que la firma no lo pise hace
+ * falta `finalY + 18 < alto − 13`, o sea 31 mm de aire.
+ */
+export const ALTO_PIE_MM = 31;
+
 /** El ancho y el alto REALES de la hoja del documento, en milímetros. */
 export function medidasDeLaHoja(doc: jsPDF): { ancho: number; alto: number; derecha: number } {
   const ancho = doc.internal.pageSize.getWidth();
@@ -124,56 +160,79 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
   const fechaLabel = new Date(createdAt + (createdAt.includes("T") ? "" : "T12:00:00"))
     .toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" });
 
-  // Header por marca
-  if (marca === "reebok") {
-    doc.setFillColor(26, 26, 26);
-    doc.rect(0, 0, hoja.ancho, 18, "F");
-    try { doc.addImage(REEBOK_LOGO_BASE64, "PNG", 14, 5, REEBOK_LOGO_WIDTH, REEBOK_LOGO_HEIGHT); } catch { /* */ }
-  } else if (marca === "tommy") {
-    // 🔴 BANDA NAVY + EL WORDMARK DE COLOR SOBRE PLACA BLANCA (20-sep-2026).
-    //
-    // 🩸 Acá iba el wordmark BLANCO, y su banderita salía ROTA. Medido píxel a
-    // píxel contra el arte de color: dentro del recuadro de la bandera
-    // (x 389-466 de 900) el original tiene 4.004 píxeles opacos —1.105 blancos,
-    // el resto navy y rojo— y la versión blanca tiene 3.051, TODOS blancos: las
-    // 953 franjas BLANCAS de la bandera quedaron transparentes y lo navy y lo
-    // rojo quedaron blancos. O sea que sobre la banda navy la bandera se leía al
-    // revés, como un bloque blanco con muescas. La causa está en la regla del
-    // generador (`scripts/_generar-logo-tommy.mjs`: alfa = oscuridad), que borra
-    // justo lo blanco.
-    //
-    // El arreglo NO inventa un archivo: usa el wordmark OFICIAL de color sobre
-    // una placa blanca, que es exactamente lo que ya hace la pantalla del pedido
-    // público (`marcas-ui.tsx` → `pedidoPublico`). Una versión blanca correcta
-    // pide el master REVERSADO de la marca, y ése lo tiene que mandar Daniel.
-    doc.setFillColor(21, 35, 66);
-    doc.rect(0, 0, hoja.ancho, 18, "F");
-    const placa = { x: 12, y: 9 - TOMMY_LOGO_HEIGHT / 2 - 1.8, w: TOMMY_LOGO_WIDTH + 4, h: TOMMY_LOGO_HEIGHT + 3.6 };
-    doc.setFillColor(255, 255, 255);
-    doc.roundedRect(placa.x, placa.y, placa.w, placa.h, 1.2, 1.2, "F");
-    try { doc.addImage(TOMMY_LOGO_BASE64, "PNG", 14, 9 - TOMMY_LOGO_HEIGHT / 2, TOMMY_LOGO_WIDTH, TOMMY_LOGO_HEIGHT); } catch { /* */ }
-  } else if (marca === "calvin") {
-    // Banda negra Calvin + wordmark BLANCO (blanco/negro minimalista).
-    doc.setFillColor(10, 10, 10);
-    doc.rect(0, 0, hoja.ancho, 18, "F");
-    try { doc.addImage(CALVIN_LOGO_BLANCO_BASE64, "PNG", 14, 9 - CALVIN_LOGO_HEIGHT / 2, CALVIN_LOGO_WIDTH, CALVIN_LOGO_HEIGHT); } catch { /* */ }
-  } else {
-    // Banda navy Joybees + logo BLANCO (el wordmark #404041 no se ve sobre navy).
-    doc.setFillColor(26, 38, 86);
-    doc.rect(0, 0, hoja.ancho, 18, "F");
-    try { doc.addImage(JOYBEES_LOGO_BLANCO_BASE64, "PNG", 14, 9 - JOYBEES_LOGO_HEIGHT / 2, JOYBEES_LOGO_WIDTH, JOYBEES_LOGO_HEIGHT); } catch { /* */ }
-  }
-  doc.setFontSize(8); doc.setTextColor(255); doc.setFont("helvetica", "normal");
-  doc.text("Fashion Group · Panamá", hoja.derecha, 12, { align: "right" });
+  /**
+   * 🔴 LA CABECERA DE UNA HOJA — banda de la marca + de quién es el papel.
+   *
+   * Es la MISMA en la hoja 1 y en la 5: mismo alto, mismo `y = 26`, mismos tres
+   * textos. Por eso es una función y no código suelto — dos copias se separan
+   * solas y la que quede vieja es la que le miente al cliente sobre qué pedido
+   * tiene en la mano.
+   */
+  function dibujarCabecera() {
+    // Header por marca
+    if (marca === "reebok") {
+      doc.setFillColor(26, 26, 26);
+      doc.rect(0, 0, hoja.ancho, 18, "F");
+      try { doc.addImage(REEBOK_LOGO_BASE64, "PNG", 14, 5, REEBOK_LOGO_WIDTH, REEBOK_LOGO_HEIGHT); } catch { /* */ }
+    } else if (marca === "tommy") {
+      // 🔴 BANDA NAVY + EL WORDMARK DE COLOR SOBRE PLACA BLANCA (20-sep-2026).
+      //
+      // 🩸 Acá iba el wordmark BLANCO, y su banderita salía ROTA. Medido píxel a
+      // píxel contra el arte de color: dentro del recuadro de la bandera
+      // (x 389-466 de 900) el original tiene 4.004 píxeles opacos —1.105 blancos,
+      // el resto navy y rojo— y la versión blanca tiene 3.051, TODOS blancos: las
+      // 953 franjas BLANCAS de la bandera quedaron transparentes y lo navy y lo
+      // rojo quedaron blancos. O sea que sobre la banda navy la bandera se leía al
+      // revés, como un bloque blanco con muescas. La causa está en la regla del
+      // generador (`scripts/_generar-logo-tommy.mjs`: alfa = oscuridad), que borra
+      // justo lo blanco.
+      //
+      // El arreglo NO inventa un archivo: usa el wordmark OFICIAL de color sobre
+      // una placa blanca, que es exactamente lo que ya hace la pantalla del pedido
+      // público (`marcas-ui.tsx` → `pedidoPublico`). Una versión blanca correcta
+      // pide el master REVERSADO de la marca, y ése lo tiene que mandar Daniel.
+      doc.setFillColor(21, 35, 66);
+      doc.rect(0, 0, hoja.ancho, 18, "F");
+      const placa = { x: 12, y: 9 - TOMMY_LOGO_HEIGHT / 2 - 1.8, w: TOMMY_LOGO_WIDTH + 4, h: TOMMY_LOGO_HEIGHT + 3.6 };
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(placa.x, placa.y, placa.w, placa.h, 1.2, 1.2, "F");
+      try { doc.addImage(TOMMY_LOGO_BASE64, "PNG", 14, 9 - TOMMY_LOGO_HEIGHT / 2, TOMMY_LOGO_WIDTH, TOMMY_LOGO_HEIGHT); } catch { /* */ }
+    } else if (marca === "calvin") {
+      // Banda negra Calvin + wordmark BLANCO (blanco/negro minimalista).
+      doc.setFillColor(10, 10, 10);
+      doc.rect(0, 0, hoja.ancho, 18, "F");
+      try { doc.addImage(CALVIN_LOGO_BLANCO_BASE64, "PNG", 14, 9 - CALVIN_LOGO_HEIGHT / 2, CALVIN_LOGO_WIDTH, CALVIN_LOGO_HEIGHT); } catch { /* */ }
+    } else {
+      // Banda navy Joybees + logo BLANCO (el wordmark #404041 no se ve sobre navy).
+      doc.setFillColor(26, 38, 86);
+      doc.rect(0, 0, hoja.ancho, 18, "F");
+      try { doc.addImage(JOYBEES_LOGO_BLANCO_BASE64, "PNG", 14, 9 - JOYBEES_LOGO_HEIGHT / 2, JOYBEES_LOGO_WIDTH, JOYBEES_LOGO_HEIGHT); } catch { /* */ }
+    }
+    doc.setFontSize(8); doc.setTextColor(255); doc.setFont("helvetica", "normal");
+    doc.text("Fashion Group · Panamá", hoja.derecha, 12, { align: "right" });
 
-  // Cliente / Pedido / Fecha en columnas FIJAS (14 / 90 / 150 mm): el nombre del
-  // cliente se recorta al ancho disponible o se montaba encima de "Pedido:"
-  // ("COMERCIAL EL MACHETAZO, S.A. — SUCURSAL VÍA ESPAÑA" pisaba el número de
-  // pedido en el PDF que recibe el cliente).
-  doc.setTextColor(100); doc.setFontSize(9);
-  doc.text(`Cliente: ${fitClientName(doc, clientName)}`, 14, 26);
-  doc.text(`${documentoLabel}: ${orderNumber}`, 90, 26);
-  doc.text(`Fecha: ${fechaLabel}`, 150, 26);
+    // Cliente / Pedido / Fecha en columnas FIJAS (14 / 90 / 150 mm): el nombre del
+    // cliente se recorta al ancho disponible o se montaba encima de "Pedido:"
+    // ("COMERCIAL EL MACHETAZO, S.A. — SUCURSAL VÍA ESPAÑA" pisaba el número de
+    // pedido en el PDF que recibe el cliente).
+    doc.setTextColor(100); doc.setFontSize(9);
+    doc.text(`Cliente: ${fitClientName(doc, clientName)}`, 14, 26);
+    doc.text(`${documentoLabel}: ${orderNumber}`, 90, 26);
+    doc.text(`Fecha: ${fechaLabel}`, 150, 26);
+  }
+
+  // Las hojas que YA llevan su cabecera. autoTable avisa por tabla, no por
+  // documento: con dos tablas (Pedido + Pre-orden) el aviso de "página 1"
+  // llega dos veces sobre la MISMA hoja. Se lleva la cuenta contra el número
+  // de página REAL del documento, que es el único que no se repite.
+  const hojasConCabecera = new Set<number>();
+  function cabeceraSiFalta() {
+    const pagina = doc.getCurrentPageInfo().pageNumber;
+    if (hojasConCabecera.has(pagina)) return;
+    hojasConCabecera.add(pagina);
+    dibujarCabecera();
+  }
+  cabeceraSiFalta();
 
   const headFill: [number, number, number] =
     marca === "reebok"
@@ -202,6 +261,14 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
       body: resolverLineas(sectionItems, { bultoSize }).map((l) => [
         "", l.name, l.sku, String(l.bultos), String(l.piezas), `$${fmt(l.unit_price)}`, `$${fmt(l.subtotal)}`,
       ]),
+      // 🔴 El aire de ARRIBA es para la cabecera que se repite, y el de ABAJO es
+      // el lugar RESERVADO del total: la tabla nunca invade ninguno de los dos.
+      // Sin decir nada, autoTable deja 14,1 mm por lado, y por eso la tabla
+      // llegaba al borde y el total terminaba solo en una hoja nueva.
+      margin: { top: TOP_CONTENIDO_MM, bottom: ALTO_PIE_MM },
+      // La hoja nueva nace con la banda de la marca y con de quién es el papel,
+      // ANTES de que se dibuje un solo renglón.
+      willDrawPage: cabeceraSiFalta,
       styles: { fontSize: 8, cellPadding: 2, minCellHeight: 12 },
       headStyles: { fillColor: headFill, textColor: [255, 255, 255] },
       alternateRowStyles: { fillColor: [249, 249, 249] },
@@ -248,6 +315,16 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
     14,
     fy + 10,
   );
+
+  // 🔴 «Página N de M» EN TODAS LAS HOJAS, y se escribe al final porque hasta
+  // acá no se sabe cuántas son. Va pegado al borde derecho, en el mismo gris
+  // chico de la firma, bajo la banda reservada del pie.
+  const hojas = doc.getNumberOfPages();
+  doc.setFontSize(7); doc.setTextColor(160); doc.setFont("helvetica", "normal");
+  for (let n = 1; n <= hojas; n++) {
+    doc.setPage(n);
+    doc.text(`Página ${n} de ${hojas}`, hoja.derecha, hoja.alto - 10, { align: "right" });
+  }
 
   return doc;
 }

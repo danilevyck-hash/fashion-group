@@ -97,8 +97,11 @@ async function hojaDeLaRespuesta(res: Response) {
   // Firma de un .zip (todo .xlsx lo es): si esto no es "PK", no hay archivo.
   expect(buf.subarray(0, 2).toString("latin1")).toBe("PK");
   const wb = XLSX.read(buf, { type: "buffer" });
-  expect(wb.SheetNames).toEqual(["Pedidos"]);
-  return wb.Sheets["Pedidos"];
+  // 🔄 22-sep-2026: la hoja se llama «Comprobantes», como el panel del que se
+  // baja — adentro hay pedidos Y cotizaciones. Lo que se exige sigue siendo
+  // que el libro traiga UNA hoja y que sea ella.
+  expect(wb.SheetNames).toEqual(["Comprobantes"]);
+  return wb.Sheets["Comprobantes"];
 }
 
 describe("1-3. las dos columnas nuevas, al final, con las palabras de la pantalla", () => {
@@ -118,17 +121,25 @@ describe("1-3. las dos columnas nuevas, al final, con las palabras de la pantall
     // Las 6 de siempre, donde estaban.
     expect(["Origen", "Cliente", "Vendedor", "Items", "Total", "Fecha"].map((_, c) => ws[A(HDR_ROW, c)].v))
       .toEqual(["Origen", "Cliente", "Vendedor", "Items", "Total", "Fecha"]);
-    // Y las dos nuevas, AL FINAL.
+    // Y las nuevas, AL FINAL. 🔄 22-sep-2026: eran dos (6 y 7) y ahora son
+    // cuatro — «Tipo» y «En Switch» entran DETRÁS, por la misma razón por la
+    // que aquéllas fueron al final: no se corre ninguna columna vieja.
     expect(ws[A(HDR_ROW, 6)].v).toBe("N° pedido");
     expect(ws[A(HDR_ROW, 7)].v).toBe("Switch");
-    expect(ws[A(HDR_ROW, 8)]).toBeUndefined();
+    expect(ws[A(HDR_ROW, 8)].v).toBe("Tipo");
+    expect(ws[A(HDR_ROW, 9)].v).toBe("En Switch");
+    expect(ws[A(HDR_ROW, 10)]).toBeUndefined();
 
     // El que NO salió lo dice con palabras, no con un guion.
     expect(ws[A(DATA_ROW, 6)].v).toBe("PED-017");
     expect(ws[A(DATA_ROW, 7)].v).toBe("No se ha mandado a Switch");
+    // 🔴 Y se ve sin leer esa frase: una columna de una palabra.
+    expect(ws[A(DATA_ROW, 9)].v).toBe("No");
     // El que salió dice CUÁL de las dos fue.
     expect(ws[A(DATA_ROW + 1, 6)].v).toBe("PED-018");
     expect(ws[A(DATA_ROW + 1, 7)].v).toBe("Cotización en Switch: 16-000000506");
+    expect(ws[A(DATA_ROW + 1, 8)].v).toBe("Cotización");
+    expect(ws[A(DATA_ROW + 1, 9)].v).toBe("Sí");
   });
 
   it("el pedido del LINK sin convertir dice «Se numera al abrirlo»", async () => {

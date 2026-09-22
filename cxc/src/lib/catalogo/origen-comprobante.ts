@@ -18,10 +18,13 @@
 //   · «Del cliente»  — lo armó el cliente desde el link público.
 //   · «Del vendedor» — lo armó alguien de la casa, adentro del sistema.
 //
-// ⚠️ Lo que NO cambió: la llave del filtro (`link` / `mio`), el dato de la base
-// (`del_link`), ni el Excel de la pantalla, que sigue escribiendo «Del link» /
-// «Mío» en su columna Origen — ese archivo tiene su propio candado y su propia
-// decisión.
+// ⚠️ Lo que NO cambió: la llave del filtro (`link` / `mio`) ni el dato de la
+// base (`del_link`).
+//
+// 🔄 22-sep-2026 — EL EXCEL TAMBIÉN USA ESTOS NOMBRES. Hasta acá escribía «Del
+// link» / «Mío» en su columna Origen: la pantalla y el archivo que se baja de
+// ella se llamaban distinto a la misma cosa. Ahora `pedidos-excel.ts` lee
+// `ORIGEN_LABEL`, así que hay UN solo par de nombres en todo el módulo.
 //
 // Módulo PURO: los textos viven en UN lugar porque los leen el chip del filtro
 // Y la etiqueta de la fila. Dos copias es como nace una pantalla que se llama a

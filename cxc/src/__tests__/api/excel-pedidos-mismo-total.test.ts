@@ -104,7 +104,7 @@ async function totalDelExcel(res: Response): Promise<number> {
   expect(res.status).toBe(200);
   const buf = Buffer.from(await res.arrayBuffer());
   expect(buf.subarray(0, 2).toString("latin1")).toBe("PK");
-  const ws = XLSX.read(buf, { type: "buffer" }).Sheets["Pedidos"];
+  const ws = XLSX.read(buf, { type: "buffer" }).Sheets["Comprobantes"];
   // Encabezados en la fila 1; la columna «Total» es la quinta.
   expect(ws[XLSX.utils.encode_cell({ r: 0, c: 4 })].v).toBe("Total");
   return Number(ws[XLSX.utils.encode_cell({ r: 1, c: 4 })].v);

@@ -7,6 +7,7 @@ import AppHeader from "@/components/AppHeader";
 import { Toast } from "@/components/ui";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import type { ContadoresDelHub, ContadoresMarca } from "@/lib/catalogo/contadores";
+import { textoPulso, type PulsoDelHub, type PulsoMarca } from "@/lib/catalogo/pulso-pedidos";
 import { CATALOGO_ADMIN_ROLES, COMPROBANTES_ROLES, catalogoRoles } from "@/lib/catalogo/roles";
 
 // Catálogos en UNA pantalla: una tarjeta por marca con sus acciones adentro
@@ -66,6 +67,27 @@ import { CATALOGO_ADMIN_ROLES, COMPROBANTES_ROLES, catalogoRoles } from "@/lib/c
 // ⚠️ La pantalla NO cambió: los mismos ocho números, los mismos rótulos, el
 // mismo diseño. Lo único que cambió es de dónde salen.
 //
+// 🔴 EL CONTADOR DICE TARJETAS, NO FILAS (22-sep-2026). El hub decía «81
+// productos a la venta» de Joybees y al entrar salían **70 tarjetas**: Joybees
+// es la única marca que junta las tallas de un modelo en UNA tarjeta, y hay 11
+// modelos con dos filas cada uno (`-KIDS`/`-JUNIOR`, `-M`/`-W`), cada una con
+// su inventario y dos pares con precio distinto. Daniel decidió: **el hub dice
+// 70**, que es lo que el cliente ve. La tarjeta lee `c.tarjetas`; el rótulo no
+// cambió. En las otras tres marcas `tarjetas` es el MISMO número que antes.
+//
+// 🔴 CADA TARJETA DICE SU PULSO (22-sep-2026). Antes solo contaba productos, y
+// **Joybees llevaba 29 días sin un comprobante sin que nada lo dijera**. La
+// línea nueva —«14 comprobantes · $79,968.00 · último hace 13 días»— la SUMA LA
+// BASE y viaja en la MISMA petición: el texto lo arma `textoPulso`, que es puro
+// y no sabe qué hora es. Si el pulso no se pudo leer, la línea no se dibuja: la
+// tarjeta nunca se queda sin sus contadores por esto.
+//
+// 🔴 LOS CUATRO BOTONES ARRANCAN A LA MISMA ALTURA. «TOMMY HILFIGER» ocupa dos
+// líneas y las otras tres una, así que su bloque entero bajaba ~36 px y la fila
+// de botones quedaba escalonada. El nombre y el bloque de números reservan su
+// alto (`sm:min-h-*`) desde que hay dos tarjetas por fila; en el celular, con
+// una sola columna, no se reserva nada porque ahí nada se compara.
+//
 // Los COLORES de cada tarjeta salen del tema de la marca (MARCA_THEME.hub) —
 // aquí solo vive la identidad no-visual (nombre, rutas). Agregar una marca =
 // agregar una entrada a BRANDS + su tema.
@@ -116,6 +138,8 @@ export default function CatalogosMarcasPage() {
 
   // `undefined` = todavía cargando · `null` = no se pudo · objeto = los números.
   const [counters, setCounters] = useState<ContadoresDelHub | null | undefined>(undefined);
+  // El pulso viaja en la MISMA respuesta. Sin él, la línea simplemente no sale.
+  const [pulso, setPulso] = useState<PulsoDelHub | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -125,9 +149,10 @@ export default function CatalogosMarcasPage() {
     // (la base o las filas) y acá llega el resultado ya sumado.
     fetch("/api/catalogo/contadores", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(r)))
-      .then((json: { contadores?: ContadoresDelHub }) => {
+      .then((json: { contadores?: ContadoresDelHub; pulso?: PulsoDelHub }) => {
         if (cancelled) return;
         setCounters(json?.contadores ?? null);
+        setPulso(json?.pulso ?? null);
       })
       .catch(() => { if (!cancelled) setCounters(null); });
     return () => { cancelled = true; };
@@ -184,6 +209,7 @@ export default function CatalogosMarcasPage() {
             // sin entrada y cae en «Contadores no disponibles».
             const c: ContadoresMarca | null | undefined =
               counters === undefined ? undefined : (counters?.[b.key] ?? null);
+            const p: PulsoMarca | null = pulso?.[b.key] ?? null;
             // Paleta de la tarjeta desde el tema de la marca (no hardcodear).
             const theme = getMarcaTheme(b.key)!;
             const hub = theme.hub;
@@ -192,26 +218,35 @@ export default function CatalogosMarcasPage() {
               <div key={b.key} className={`relative overflow-hidden rounded-2xl border p-6 ${hub.card}`}>
                 <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -translate-y-10 translate-x-10 ${hub.blob}`} />
                 <div className="relative">
-                  <h2 className={`text-3xl font-extrabold tracking-tight ${hub.name}`}>{b.name}</h2>
+                  {/* `sm:min-h-[4.5rem]` = dos líneas de `text-3xl`: es lo que
+                      mide "TOMMY HILFIGER" y lo que las otras tres reservan
+                      para que los botones de las cuatro empiecen igual. */}
+                  <h2 className={`text-3xl font-extrabold tracking-tight sm:min-h-[4.5rem] ${hub.name}`}>{b.name}</h2>
 
-                  {/* Contadores */}
-                  <div className={`mt-4 text-sm font-medium tabular-nums ${hub.counter}`}>
+                  {/* Contadores + pulso. El bloque reserva sus tres líneas
+                      (`sm:min-h-[3.75rem]`) por el mismo motivo que el nombre:
+                      el pulso de Tommy ocupa dos renglones y el de Joybees uno. */}
+                  <div className={`mt-4 text-sm font-medium tabular-nums sm:min-h-[3.75rem] ${hub.counter}`}>
                     {c === undefined ? (
                       <span className="opacity-50">Cargando…</span>
                     ) : c === null ? (
                       <span className="opacity-50">Contadores no disponibles</span>
                     ) : (
                       <span>
-                        {c.aLaVenta} producto{c.aLaVenta === 1 ? "" : "s"} a la venta
-                        {c.sinFoto > 0 && (
+                        {/* 🔴 `tarjetas`, no `aLaVenta`: lo que el cliente VE. */}
+                        {c.tarjetas} producto{c.tarjetas === 1 ? "" : "s"} a la venta
+                        {c.tarjetasSinFoto > 0 && (
                           <>
                             {" · "}
                             <span className={hub.sinFoto}>
-                              {c.sinFoto} sin foto
+                              {c.tarjetasSinFoto} sin foto
                             </span>
                           </>
                         )}
                       </span>
+                    )}
+                    {p && (
+                      <div className="mt-1 opacity-75">{textoPulso(p)}</div>
                     )}
                   </div>
 

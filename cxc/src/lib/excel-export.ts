@@ -121,6 +121,34 @@ export const MONEY_FMT = "$#,##0.00";
 export const MONEY_FMT_GUION = '$#,##0.00;-$#,##0.00;"–"';
 export const PCT_FMT = "0.0%";
 
+/**
+ * 🔴 UNA FECHA ES UNA FECHA, NO UN TEXTO QUE SE LE PARECE (22-sep-2026).
+ *
+ * 🩸 Medido sobre los cuatro Excel REALES de Comprobantes que se bajaron el
+ * 20-sep-2026 (`excel-comprobantes-reebok/joybees/tommy/calvin.xlsx`): la
+ * columna «Fecha» venía como TEXTO (`"14/09/2026"`, celda de tipo `s`) en los
+ * cuatro archivos. Y es justamente la columna que más se filtra: como texto no
+ * se puede pedir «del 1 al 15 de septiembre» ni ordenar de viejo a nuevo —
+ * "10/01" se ordena antes que "9/12" porque se comparan letras.
+ *
+ * El arreglo es el de la casa para la moneda, aplicado al calendario: la celda
+ * guarda el NÚMERO que Excel usa para las fechas y el formato dice cómo se ve.
+ * Se sigue leyendo `14/09/2026`, y encima se puede filtrar por rango.
+ */
+export const DATE_FMT = "dd/mm/yyyy";
+
+/**
+ * El número con el que Excel guarda una fecha: días desde el 30-dic-1899.
+ *
+ * 🔑 SE ARMA CON EL DÍA CALENDARIO, NUNCA CON LA HORA. Un timestamp lleva hora
+ * y zona; pasarlo entero metería una fracción de día en la celda y el filtro
+ * «igual a 14/09/2026» dejaría la fila afuera por unas horas. Se toman año,
+ * mes y día —los mismos que se venían IMPRIMIENDO— y nada más.
+ */
+export function serialExcel(fecha: Date): number {
+  return Date.UTC(fecha.getFullYear(), fecha.getMonth(), fecha.getDate()) / 86400000 + 25569;
+}
+
 export function addr(r: number, c: number): string {
   return XLSX.utils.encode_cell({ r, c });
 }
@@ -196,12 +224,12 @@ export function makeCellStyles(p: ExcelPalette = CASA_PALETTE) {
   }
 
   /** Celda numérica con zebra; fmt opcional (MONEY_FMT/PCT_FMT/"0"). */
-  function tdN(v: number, alt: boolean, opts: { bold?: boolean; fmt?: string; fg?: string } = {}) {
+  function tdN(v: number, alt: boolean, opts: { bold?: boolean; fmt?: string; fg?: string; ha?: "left" | "center" | "right" } = {}) {
     return {
       v, t: "n" as const, ...(opts.fmt ? { z: opts.fmt } : {}), s: {
         font: { sz: 10, bold: opts.bold || false, color: { rgb: opts.fg || "333333" }, name: "Calibri" },
         fill: { fgColor: { rgb: alt ? p.dataBg : p.altBg } },
-        alignment: { horizontal: "right" },
+        alignment: { horizontal: opts.ha || "right" },
         border: B,
       },
     };
@@ -252,7 +280,13 @@ export type ReportCell =
   | number
   | null
   | undefined
-  | { v: string | number; fg?: string; bold?: boolean; sz?: number; fmt?: string };
+  | { v: string | number; fg?: string; bold?: boolean; sz?: number; fmt?: string }
+  /**
+   * 🔴 Una FECHA de verdad: la celda sale numérica con formato de fecha, así
+   * que Excel la ordena y la filtra por rango. Vacía o inválida = celda en
+   * blanco, nunca un cero (que en fechas se ve como «00/01/1900»).
+   */
+  | { fecha: Date | null | undefined };
 
 export interface ReportSheetOpts {
   columns: ReportColumn[];
@@ -331,6 +365,12 @@ export function buildReportSheet(opts: ReportSheetOpts): XLSX.WorkSheet {
       if (cell === null || cell === undefined) { ws[addr(r, c)] = td("", alt); return; }
       if (typeof cell === "number") { ws[addr(r, c)] = tdN(cell, alt, { fmt: col.fmt }); return; }
       if (typeof cell === "string") { ws[addr(r, c)] = td(cell, alt, { ha: col.align }); return; }
+      if ("fecha" in cell) {
+        const d = cell.fecha;
+        if (!d || isNaN(d.getTime())) { ws[addr(r, c)] = td("", alt, { ha: col.align }); return; }
+        ws[addr(r, c)] = tdN(serialExcel(d), alt, { fmt: col.fmt || DATE_FMT, ha: col.align || "left" });
+        return;
+      }
       if (typeof cell.v === "number") { ws[addr(r, c)] = tdN(cell.v, alt, { fmt: cell.fmt || col.fmt, bold: cell.bold, fg: cell.fg }); return; }
       ws[addr(r, c)] = td(cell.v, alt, { fg: cell.fg, bold: cell.bold, sz: cell.sz, ha: col.align });
     });
@@ -342,7 +382,12 @@ export function buildReportSheet(opts: ReportSheetOpts): XLSX.WorkSheet {
     opts.totals.forEach((cell, c) => {
       const col = opts.columns[c];
       if (cell === null || cell === undefined) { ws[addr(r, c)] = tot("", { ha: "left" }); return; }
-      if (typeof cell === "object") { ws[addr(r, c)] = tot(cell.v, { fmt: cell.fmt || col.fmt, ha: col.align }); return; }
+      if (typeof cell === "object") {
+        // Una fecha no se suma: en la fila de totales la celda va vacía.
+        if ("fecha" in cell) { ws[addr(r, c)] = tot("", { ha: "left" }); return; }
+        ws[addr(r, c)] = tot(cell.v, { fmt: cell.fmt || col.fmt, ha: col.align });
+        return;
+      }
       ws[addr(r, c)] = tot(cell, { fmt: typeof cell === "number" ? col.fmt : undefined, ha: typeof cell === "number" ? col.align || "right" : "left" });
     });
     heights[r] = 22; r++;

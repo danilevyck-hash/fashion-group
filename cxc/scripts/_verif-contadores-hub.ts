@@ -137,7 +137,7 @@ async function main() {
       stockReebok = mapa;
     }
 
-    porFilas[marca] = contarDeFilas(filas, stockPorProducto);
+    porFilas[marca] = contarDeFilas(marca, filas, stockPorProducto);
     console.log(
       `  ${marca.padEnd(8)} ${String(filas.length).padStart(4)} filas bajadas` +
         ` · ${(bytes / 1024).toFixed(1).padStart(6)} KB`,
@@ -146,26 +146,43 @@ async function main() {
   console.log(`\n  Total que viaja hoy al navegador: ${(bytesTotales / 1024).toFixed(1)} KB\n`);
 
   // ── Camino B: el SQL generado por el módulo ────────────────────────────────
-  const filasSql = await sql<{ marca: string; a_la_venta: number; sin_foto: number }>(
-    sqlContadores(),
-  );
+  const filasSql = await sql<{
+    marca: string;
+    a_la_venta: number;
+    sin_foto: number;
+    tarjetas: number;
+    tarjetas_sin_foto: number;
+  }>(sqlContadores());
   const porBase: Record<string, ContadoresMarca> = {};
   for (const f of filasSql) {
-    porBase[f.marca] = { aLaVenta: Number(f.a_la_venta), sinFoto: Number(f.sin_foto) };
+    porBase[f.marca] = {
+      aLaVenta: Number(f.a_la_venta),
+      sinFoto: Number(f.sin_foto),
+      tarjetas: Number(f.tarjetas),
+      tarjetasSinFoto: Number(f.tarjetas_sin_foto),
+    };
   }
 
   // ── Comparación ────────────────────────────────────────────────────────────
-  console.log("  marca     a la venta (filas → base)   sin foto (filas → base)   ¿igual?");
-  console.log("  ─────────────────────────────────────────────────────────────────────────");
+  // 🔴 Las TARJETAS son el número del hub: lo que el cliente ve al entrar. En
+  // Joybees no coincide con las filas a propósito (11 modelos de dos tallas).
+  console.log("  marca      filas (TS → base)   tarjetas (TS → base)   sin foto (TS → base)   ¿igual?");
+  console.log("  ──────────────────────────────────────────────────────────────────────────────────────");
   let diferencias = 0;
   for (const marca of MARCAS_DEL_HUB) {
     const a = porFilas[marca];
     const b = porBase[marca];
-    const igual = !!b && a.aLaVenta === b.aLaVenta && a.sinFoto === b.sinFoto;
+    const igual =
+      !!b &&
+      a.aLaVenta === b.aLaVenta &&
+      a.sinFoto === b.sinFoto &&
+      a.tarjetas === b.tarjetas &&
+      a.tarjetasSinFoto === b.tarjetasSinFoto;
     if (!igual) diferencias++;
     console.log(
       `  ${marca.padEnd(9)} ${String(a.aLaVenta).padStart(6)} → ${String(b?.aLaVenta ?? "—").padStart(6)}` +
-        `           ${String(a.sinFoto).padStart(5)} → ${String(b?.sinFoto ?? "—").padStart(5)}` +
+        `      ${String(a.tarjetas).padStart(6)} → ${String(b?.tarjetas ?? "—").padStart(6)}` +
+        `        ${String(a.sinFoto).padStart(5)} → ${String(b?.sinFoto ?? "—").padStart(5)}` +
         `          ${igual ? "sí" : "🔴 NO"}`,
     );
   }
@@ -182,13 +199,14 @@ async function main() {
       `select=${columnasParaContar(marca)}&active=eq.true`,
     );
     const stock = marca === "reebok" ? stockReebok : undefined;
-    const c = contarDeFilas(filas, stock);
+    const c = contarDeFilas(marca, filas, stock);
     const a = porFilas[marca];
-    const igual = c.aLaVenta === a.aLaVenta && c.sinFoto === a.sinFoto;
+    const igual =
+      c.aLaVenta === a.aLaVenta && c.sinFoto === a.sinFoto && c.tarjetas === a.tarjetas;
     if (!igual) diferencias++;
     console.log(
-      `    ${marca.padEnd(8)} ${String(c.aLaVenta).padStart(4)} / ${String(c.sinFoto).padStart(2)}` +
-        `   contra ${String(a.aLaVenta).padStart(4)} / ${String(a.sinFoto).padStart(2)} con todas las columnas` +
+      `    ${marca.padEnd(8)} ${String(c.aLaVenta).padStart(4)} filas / ${String(c.tarjetas).padStart(4)} tarjetas` +
+        `   contra ${String(a.aLaVenta).padStart(4)} / ${String(a.tarjetas).padStart(4)} con todas las columnas` +
         `   ${igual ? "sí" : "🔴 NO"}`,
     );
   }

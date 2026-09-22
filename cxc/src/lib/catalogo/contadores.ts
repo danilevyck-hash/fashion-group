@@ -42,23 +42,45 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { productosALaVenta, type ProductoALaVenta } from "@/lib/catalogo/a-la-venta";
+import { tarjetasDeModelo, type FilaAgrupable } from "@/lib/catalogo/tarjetas";
+import { KNOWN_SUFFIXES } from "@/components/catalogo/groupByModel";
 
 /** Las cuatro marcas del hub, en el orden en que se dibujan las tarjetas. */
 export const MARCAS_DEL_HUB = ["reebok", "joybees", "tommy", "calvin"] as const;
 export type MarcaContada = (typeof MARCAS_DEL_HUB)[number];
 
-/** Los dos números de una tarjeta. */
+/**
+ * Los números de una tarjeta del hub.
+ *
+ * 🔴 SON DOS PREGUNTAS DISTINTAS, Y POR ESO SON CUATRO NÚMEROS (22-sep-2026):
+ *
+ *   `aLaVenta` / `sinFoto`     — FILAS vendibles. Es la regla de `estaALaVenta`,
+ *                                 intacta, con su SQL generado cláusula por
+ *                                 cláusula y su candado byte a byte.
+ *   `tarjetas` / `tarjetasSinFoto` — lo que el cliente VE al entrar: una tarjeta
+ *                                 por modelo. En las tres marcas que no agrupan
+ *                                 es el MISMO número; en Joybees son 70 contra
+ *                                 81, porque 11 modelos traen dos tallas.
+ *
+ * 🔑 «A la venta» NO se redefinió: la tarjeta es un dato APARTE, encima de las
+ * mismas filas. Cambiar el significado de `aLaVenta` habría partido en dos la
+ * regla que este módulo existe para mantener única.
+ */
 export interface ContadoresMarca {
-  /** Productos que se ven al entrar al catálogo (los vendibles). */
+  /** Filas vendibles (las que pasan `estaALaVenta`). */
   aLaVenta: number;
-  /** De esos, cuántos no tienen foto. */
+  /** De esas filas, cuántas no tienen foto. */
   sinFoto: number;
+  /** Tarjetas que ve el cliente al entrar al catálogo. Es el número del hub. */
+  tarjetas: number;
+  /** Tarjetas donde NINGUNA de sus tallas tiene foto. */
+  tarjetasSinFoto: number;
 }
 
 export type ContadoresDelHub = Partial<Record<MarcaContada, ContadoresMarca>>;
 
 /** Fila mínima para contar: lo que hace falta y nada más. */
-export interface FilaContada extends ProductoALaVenta {
+export interface FilaContada extends ProductoALaVenta, FilaAgrupable {
   id?: string;
   image_url?: string | null;
 }
@@ -73,18 +95,35 @@ export function sinFoto(p: { image_url?: string | null }): boolean {
 }
 
 /**
- * Los dos números a partir de las filas — el camino de respaldo del servidor.
+ * Los cuatro números a partir de las filas — el camino de respaldo del servidor.
  *
- * 🔴 Cuenta con `productosALaVenta`, que ES la regla del catálogo. No hay acá
- * ninguna condición propia: si la hubiera, el respaldo y el camino rápido
- * podrían decir cosas distintas.
+ * 🔴 Cuenta con `productosALaVenta`, que ES la regla del catálogo, y agrupa con
+ * `groupByModel`, que ES la regla de la vitrina. No hay acá ninguna condición
+ * propia: si la hubiera, el respaldo y el camino rápido podrían decir cosas
+ * distintas.
+ *
+ * 🔴 UNA TARJETA ESTÁ «SIN FOTO» CUANDO NINGUNA DE SUS TALLAS TIENE FOTO — es
+ * lo que se ve en la vitrina, donde la tarjeta muestra la foto de cualquiera de
+ * sus variantes. La misma frase está escrita en el SQL (`bool_and`).
  */
 export function contarDeFilas(
+  marca: MarcaContada,
   filas: FilaContada[],
   stockPorProducto?: Record<string, number>,
 ): ContadoresMarca {
   const visibles = productosALaVenta(filas, stockPorProducto);
-  return { aLaVenta: visibles.length, sinFoto: visibles.filter(sinFoto).length };
+  // Las marcas que no agrupan: cada fila es su propia tarjeta. No se llama a
+  // `groupByModel` porque sus SKU no llevan sufijo de talla y agruparlos sería
+  // inventarle a la marca una vitrina que no tiene.
+  const tarjetas = FICHAS[marca].agrupaPorModelo
+    ? tarjetasDeModelo(visibles)
+    : visibles.map((p) => [p]);
+  return {
+    aLaVenta: visibles.length,
+    sinFoto: visibles.filter(sinFoto).length,
+    tarjetas: tarjetas.length,
+    tarjetasSinFoto: tarjetas.filter((t) => t.every(sinFoto)).length,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -114,6 +153,18 @@ interface FichaSql {
   respaldo?: { tabla: string; llave: string; cantidad: string };
   /** ¿Esta tabla tiene la columna `is_regalia`? */
   tieneRegalia: boolean;
+  /**
+   * ¿El catálogo de esta marca junta las tallas de un modelo en UNA tarjeta?
+   *
+   * 🔴 ESPEJO de `MARCA_THEME[marca].features.agrupacionPorModelo`. No se
+   * importa de `marcas-ui.tsx` para no arrastrar 1.800 líneas de tema (y sus
+   * logos) a una ruta de API que solo cuenta; el candado
+   * `catalogo-contadores-una-regla` compara las dos listas y pone el build ROJO
+   * si se separan.
+   */
+  agrupaPorModelo: boolean;
+  /** La tabla de comprobantes de la marca — de ahí sale el pulso de la tarjeta. */
+  tablaPedidos: string;
 }
 
 const FICHAS: Record<MarcaContada, FichaSql> = {
@@ -122,23 +173,36 @@ const FICHAS: Record<MarcaContada, FichaSql> = {
     columnasDeStock: ["disponibilidad", "existencia"],
     respaldo: { tabla: "public.inventory", llave: "product_id", cantidad: "quantity" },
     tieneRegalia: false,
+    agrupaPorModelo: false,
+    tablaPedidos: "reebok_orders",
   },
   joybees: {
     tabla: "public.joybees_products",
     columnasDeStock: ["disponibilidad", "existencia", "stock"],
     tieneRegalia: true,
+    agrupaPorModelo: true,
+    tablaPedidos: "joybees_orders",
   },
   tommy: {
     tabla: "public.tommy_products",
     columnasDeStock: ["disponibilidad", "existencia", "stock"],
     tieneRegalia: false,
+    agrupaPorModelo: false,
+    tablaPedidos: "tommy_orders",
   },
   calvin: {
     tabla: "public.calvin_products",
     columnasDeStock: ["disponibilidad", "existencia", "stock"],
     tieneRegalia: false,
+    agrupaPorModelo: false,
+    tablaPedidos: "calvin_orders",
   },
 };
+
+/** La tabla de comprobantes de una marca (el pulso de su tarjeta). */
+export function tablaDePedidos(marca: MarcaContada): string {
+  return FICHAS[marca].tablaPedidos;
+}
 
 /**
  * Las columnas que hace falta LEER para contar, derivadas de la misma ficha.
@@ -152,6 +216,9 @@ export function columnasParaContar(marca: MarcaContada): string {
   const f = FICHAS[marca];
   const cols = ["id", "image_url", "badge", ...f.columnasDeStock];
   if (f.tieneRegalia) cols.push("is_regalia");
+  // Agrupar por modelo se decide con el SUFIJO del SKU y el NOMBRE: sin esas
+  // dos columnas el respaldo contaría filas y el hub volvería a decir 81.
+  if (f.agrupaPorModelo) cols.push("sku", "name");
   return cols.join(",");
 }
 
@@ -182,6 +249,40 @@ export function clausulasALaVenta(marca: MarcaContada): string[] {
 /** TS: `!p.image_url || !String(p.image_url).trim()` — nulo, vacío o solo espacios. */
 export const CLAUSULA_SIN_FOTO = "coalesce(btrim(p.image_url), '') = ''";
 
+/**
+ * El SUFIJO de talla del SKU, en SQL — el espejo de `parseSuffix`.
+ *
+ * 🔴 LA LISTA SE IMPORTA DE `groupByModel`, no se vuelve a escribir: es la
+ * MISMA constante que usa la vitrina, en el MISMO orden (el más largo primero,
+ * para que `-JUNIOR` gane antes que cualquier sufijo que sea su final).
+ *
+ * TS: `upperSku.endsWith("-" + sfx)` → `right(upper(...), n) = '-SFX'`. Se usa
+ * `right(...)` y no `like '%-SFX'` a propósito: un `%` o un `_` dentro del
+ * sufijo sería un comodín y `like` compararía otra cosa.
+ *
+ * ⚠️ El «sin sufijo» de TS (`null`) acá es la cadena vacía: un `null` dentro de
+ * la llave del grupo se comería la fila entera al concatenar.
+ */
+export function clausulaSufijo(col: string, sangria = ""): string {
+  const casos = KNOWN_SUFFIXES.map(
+    (sfx) => `when right(upper(${col}), ${sfx.length + 1}) = '-${sfx}' then '${sfx}'`,
+  );
+  return `case ${[...casos, "else '' end"].join(`\n${sangria}     `)}`;
+}
+
+/** Las tres piezas del `SELECT` de una marca que NO agrupa: fila = tarjeta. */
+function cuerpoPlano(): string {
+  return (
+    `         count(*)::int as a_la_venta,\n` +
+    `         count(*) filter (where ${CLAUSULA_SIN_FOTO})::int as sin_foto,\n` +
+    // Sin agrupación, la tarjeta ES la fila. Se repiten los mismos dos conteos
+    // en vez de mandar NULL: la pantalla lee siempre las mismas columnas y
+    // nadie tiene que acordarse de cuál marca trae cuál.
+    `         count(*)::int as tarjetas,\n` +
+    `         count(*) filter (where ${CLAUSULA_SIN_FOTO})::int as tarjetas_sin_foto\n`
+  );
+}
+
 /** El bloque `SELECT` de UNA marca. */
 export function selectDeMarca(marca: MarcaContada): string {
   const f = FICHAS[marca];
@@ -193,13 +294,65 @@ export function selectDeMarca(marca: MarcaContada): string {
   const donde = clausulasALaVenta(marca)
     .map((c, i) => `${i === 0 ? "       " : "    or "}${c}`)
     .join("\n");
-  return (
-    `  select '${marca}'::text as marca,\n` +
-    `         count(*)::int as a_la_venta,\n` +
-    `         count(*) filter (where ${CLAUSULA_SIN_FOTO})::int as sin_foto\n` +
+
+  const vendibles =
     `    from ${f.tabla} p${join}\n` +
     `   where p.active is true\n` +
-    `     and (\n${donde}\n     )`
+    `     and (\n${donde}\n     )`;
+
+  if (!f.agrupaPorModelo) {
+    return `  select '${marca}'::text as marca,\n` + cuerpoPlano() + vendibles;
+  }
+
+  // ── La marca que AGRUPA (hoy solo Joybees) ────────────────────────────────
+  //
+  // 🔴 CUÁNTAS TARJETAS SALEN DE UN GRUPO = EL SUFIJO QUE MÁS SE REPITE.
+  // `groupByModel` mete una fila en el primer grupo abierto del mismo
+  // (base, nombre) que NO tenga ya ese sufijo, y abre uno nuevo si todos lo
+  // tienen. O sea: un grupo aguanta como mucho UNA fila por sufijo, así que
+  // hacen falta tantas tarjetas como veces se repita el sufijo más repetido.
+  // Con dos `-KIDS` del mismo modelo salen dos tarjetas — que es justo el
+  // guard de `groupByModel`: un stock nunca queda escondido detrás de otro.
+  // Medido hoy en producción: ningún sufijo se repite, así que cada grupo es
+  // UNA tarjeta y 81 filas dan 70 tarjetas.
+  //
+  // 🔴 «SIN FOTO» A NIVEL TARJETA = NINGUNA DE SUS TALLAS TIENE FOTO
+  // (`bool_and`), la misma frase que `contarDeFilas`.
+  return (
+    `  select '${marca}'::text as marca,\n` +
+    `         coalesce(sum(b.filas), 0)::int as a_la_venta,\n` +
+    `         coalesce(sum(b.filas_sin_foto), 0)::int as sin_foto,\n` +
+    `         coalesce(sum(b.tarjetas), 0)::int as tarjetas,\n` +
+    `         coalesce(sum(case when b.todas_sin_foto then b.tarjetas else 0 end), 0)::int as tarjetas_sin_foto\n` +
+    `    from (\n` +
+    `           select s.llave,\n` +
+    `                  sum(s.filas)::int as filas,\n` +
+    `                  sum(s.filas_sin_foto)::int as filas_sin_foto,\n` +
+    `                  max(s.filas)::int as tarjetas,\n` +
+    `                  bool_and(s.todas_sin_foto) as todas_sin_foto\n` +
+    `             from (\n` +
+    `                   select v.llave,\n` +
+    `                          v.sufijo,\n` +
+    `                          count(*)::int as filas,\n` +
+    `                          count(*) filter (where v.sin_foto)::int as filas_sin_foto,\n` +
+    `                          bool_and(v.sin_foto) as todas_sin_foto\n` +
+    `                     from (\n` +
+    `                           select case when q.sufijo = '' then 'solo:' || q.id::text\n` +
+    `                                       else 'base:' || upper(left(q.sku, length(q.sku) - length(q.sufijo) - 1))\n` +
+    `                                            || '|' || coalesce(q.name, '') end as llave,\n` +
+    `                                  q.sufijo,\n` +
+    `                                  q.sin_foto\n` +
+    `                             from (\n` +
+    `                                   select p.id, p.sku, p.name,\n` +
+    `                                          ${CLAUSULA_SIN_FOTO} as sin_foto,\n` +
+    `                                          ${clausulaSufijo("p.sku", " ".repeat(42))} as sufijo\n` +
+    `                               ${vendibles.replace(/\n/g, "\n                               ")}\n` +
+    `                                  ) q\n` +
+    `                          ) v\n` +
+    `                    group by v.llave, v.sufijo\n` +
+    `                  ) s\n` +
+    `            group by s.llave\n` +
+    `         ) b`
   );
 }
 
