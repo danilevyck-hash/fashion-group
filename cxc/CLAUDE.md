@@ -494,8 +494,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - ⚠️ **Pendiente de Daniel**: «las 6 hojas» se leyó como las 6 EMPRESAS, no seis reportes de detalle.
 ### Vista General y Ventas — el mes es el de Panamá (11-sep-2026)
 
-> Detalle completo (mediciones, citas, candados, mutaciones): [docs/postmortems/ventas-referencia.md](docs/postmortems/ventas-referencia.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
-> ⚠️ Las reglas de PANTALLA de este módulo (qué se dibuja, dónde, rótulos, tamaños) viven SOLO en ese postmortem: léelo antes de tocar una pantalla suya.
+> 📄 Mediciones, citas de Daniel, candados y las reglas de PANTALLA: [docs/postmortems/ventas-referencia.md](docs/postmortems/ventas-referencia.md) › «Lo que decía CLAUDE.md hasta el 22-sep-2026».
 
 - 🔴 **Vista General y Ventas deciden su mes con `hoyPanama()`**, nunca el reloj del navegador ni el del servidor (Vercel corre en UTC). ⚠️ Solo cambia con qué período abre cada pantalla.
 - 🔴 **UN SOLO SELECTOR DE PERÍODO manda en las tres pestañas** (`lib/ventas/periodo.ts`): años y las ventanas de 12 y 6 meses, en la URL (`?periodo=`) y recordado (`fg_last_ventas_periodo`); **manda la URL, después la memoria, después el año en curso de Panamá**.
@@ -504,13 +503,11 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - Cada descarga de Ventas se anota en `activity_logs` (`descarga_excel`) y baja **lo que está en pantalla**.
 - 🔴 **«Todas las empresas» cuando la lista son solo las 6 del grupo; «Fashion Group» solo si mezcla grupo y no-grupo** (`rotuloDeTodas`, `lib/ventas/rotulo-empresas.ts`; las seis DERIVAN de `B2B_EMPRESA_KEYS`, sin Boston ni Multifashion).
 - 🔴 **`clientes_empresa_12m_vw` es MATERIALIZADA aunque termine en `_vw`**, y la refresca `switch-sync tipo=facturas|all` cuando alguna de las 6 termina bien (tolerante). Los TRES caminos dejan la marca `clientes-vw-refrescada` en `cron_heartbeats` (`HEARTBEATS_NO_CRON`); sin marca, no se dice frescura.
-- 🔴 **Nunca se rotula un período que no se sumó** (`rotuloCompras`). ⚠️ Las ventanas de Clientes salen de la migración **`20261121120000`** (**aplicada** (verificado contra producción el 14-sep-2026), aditiva); sin ella el servidor sirve el año y lo dice (`ventana: null`).
+- 🔴 **Nunca se rotula un período que no se sumó** (`rotuloCompras`). ⚠️ Las ventanas de Clientes salen de la migración **`20261121120000`** (**aplicada**, aditiva); sin ella el servidor sirve el año y lo dice (`ventana: null`).
 - 🔴 **«Nuevo» en vez de «+0 %»** para el cliente sin base comparativa (`delta: null`), y va al final al ordenar por cambio.
 - 🔴 **Multifashion fuera del selector de Ventas › Productos** (`PRODUCTOS_EMPRESAS` deriva de `B2B_EMPRESA_KEYS`): no tiene filas en `switch_factura_lineas`. **Boston NO entra.**
 - 🔴 **La puerta de atrás se cerró**: las 6 rutas de datos de Ventas son **solo `admin`**; `/api/ventas/v2`, `/v2/status`, `/años`, `/ventas/reporte` y `/api/ventas/resumen-anual` se retiraron; la búsqueda global no le ofrece «Ventas» a contabilidad.
-- ⚠️ **Pendiente de Daniel**: en Clientes › Utilidad el período sigue siendo el año (las dos migraciones, `20261120120000` y `20261121120000`, ya están **aplicada** (verificado contra producción el 14-sep-2026)) (esa ruta no tiene ventanas).
-- Candados: `mes-de-panama-vista-general-y-ventas` · `ventas-selector-periodo-unico` · `ventas-resumen-13-cambios` · `ventas-clientes-desplegable-y-nuevo` · `ventas-clientes-periodo-y-frescura` · `ventas-productos-selector-unico` · `ventas-puerta-cerrada`.
-
+- ⚠️ **Pendiente de Daniel**: en Clientes › Utilidad el período sigue siendo el año (esa ruta no tiene ventanas).
 ### El módulo Clientes — la ficha y la lista (5-sep-2026)
 
 > Detalle completo: [docs/postmortems/clientes.md](docs/postmortems/clientes.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».

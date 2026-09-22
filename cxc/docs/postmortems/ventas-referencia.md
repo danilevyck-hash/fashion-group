@@ -1359,3 +1359,22 @@ Candado: `src/__tests__/lib/comisiones-titulo-solo-en-la-primera.test.ts` (11 ca
 - ⚠️ **Productos** corta por `ultimoDiaArticuloDiario` (`switch_articulo_diario` llega hasta AYER), parámetro OBLIGATORIO de `productosRangoComparativo`. ⚠️ **Multifashion › Vendedoras compara contra el MES ANTERIOR** y lo dice el rótulo.
 - ⚠️ **Pendiente de Daniel**: «las 6 hojas» se leyó como las 6 EMPRESAS, no seis reportes de detalle.
 - Candados: `clientes-master-solo-del-grupo` · `ventas-clientes-las-seis-empresas` · `clientes-vs-anio-anterior-mismos-dias` · `mismos-dias-todas-las-comparaciones` · `costo-con-notas-de-debito` · `cuadre-costo` · `comision-exclusion-v7` · `comision-alias-v8` · `comision-b2b-v9-por-codigo` · `comisiones-descuentos-vigencia` · `comisiones-mes-cerrado-panama` · `comisiones-por-empresa-todo-el-anio` · `comisiones-no-se-paga` · `referencia-boton-actualizar` · `multifashion-cerrado-y-espejo`.
+
+### Vista General y Ventas — el mes es el de Panamá (11-sep-2026)
+
+> Detalle completo (mediciones, citas, candados, mutaciones): [docs/postmortems/ventas-referencia.md](docs/postmortems/ventas-referencia.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
+> ⚠️ Las reglas de PANTALLA de este módulo (qué se dibuja, dónde, rótulos, tamaños) viven SOLO en ese postmortem: léelo antes de tocar una pantalla suya.
+
+- 🔴 **Vista General y Ventas deciden su mes con `hoyPanama()`**, nunca el reloj del navegador ni el del servidor (Vercel corre en UTC). ⚠️ Solo cambia con qué período abre cada pantalla.
+- 🔴 **UN SOLO SELECTOR DE PERÍODO manda en las tres pestañas** (`lib/ventas/periodo.ts`): años y las ventanas de 12 y 6 meses, en la URL (`?periodo=`) y recordado (`fg_last_ventas_periodo`); **manda la URL, después la memoria, después el año en curso de Panamá**.
+- 🔴 **Cada pestaña ofrece SOLO lo que sabe servir** y un período que no sirve cae al año en curso; en Clientes las ventanas salen **solo cuando la vista las trae** (`ventanasDisponibles`, lo dice el SERVIDOR).
+- 🔴 **EL MARGEN DEL MES EN CURSO NO MEZCLA VENTA DE HOY CON COSTO DE AYER** (`lib/ventas/margen-mes-en-curso.ts`): utilidad y margen se calculan hasta el **ÚLTIMO DÍA CON COSTO**; **la VENTA del mes sigue siendo la de hoy**. El corte lo trae la RPC `ventas_mes_en_curso_corte_costo` (migración `20261120120000`, aplicada); sin ella la lectura **falla ABIERTA**.
+- Cada descarga de Ventas se anota en `activity_logs` (`descarga_excel`) y baja **lo que está en pantalla**.
+- 🔴 **«Todas las empresas» cuando la lista son solo las 6 del grupo; «Fashion Group» solo si mezcla grupo y no-grupo** (`rotuloDeTodas`, `lib/ventas/rotulo-empresas.ts`; las seis DERIVAN de `B2B_EMPRESA_KEYS`, sin Boston ni Multifashion).
+- 🔴 **`clientes_empresa_12m_vw` es MATERIALIZADA aunque termine en `_vw`**, y la refresca `switch-sync tipo=facturas|all` cuando alguna de las 6 termina bien (tolerante). Los TRES caminos dejan la marca `clientes-vw-refrescada` en `cron_heartbeats` (`HEARTBEATS_NO_CRON`); sin marca, no se dice frescura.
+- 🔴 **Nunca se rotula un período que no se sumó** (`rotuloCompras`). ⚠️ Las ventanas de Clientes salen de la migración **`20261121120000`** (**aplicada** (verificado contra producción el 14-sep-2026), aditiva); sin ella el servidor sirve el año y lo dice (`ventana: null`).
+- 🔴 **«Nuevo» en vez de «+0 %»** para el cliente sin base comparativa (`delta: null`), y va al final al ordenar por cambio.
+- 🔴 **Multifashion fuera del selector de Ventas › Productos** (`PRODUCTOS_EMPRESAS` deriva de `B2B_EMPRESA_KEYS`): no tiene filas en `switch_factura_lineas`. **Boston NO entra.**
+- 🔴 **La puerta de atrás se cerró**: las 6 rutas de datos de Ventas son **solo `admin`**; `/api/ventas/v2`, `/v2/status`, `/años`, `/ventas/reporte` y `/api/ventas/resumen-anual` se retiraron; la búsqueda global no le ofrece «Ventas» a contabilidad.
+- ⚠️ **Pendiente de Daniel**: en Clientes › Utilidad el período sigue siendo el año (las dos migraciones, `20261120120000` y `20261121120000`, ya están **aplicada** (verificado contra producción el 14-sep-2026)) (esa ruta no tiene ventanas).
+- Candados: `mes-de-panama-vista-general-y-ventas` · `ventas-selector-periodo-unico` · `ventas-resumen-13-cambios` · `ventas-clientes-desplegable-y-nuevo` · `ventas-clientes-periodo-y-frescura` · `ventas-productos-selector-unico` · `ventas-puerta-cerrada`.
