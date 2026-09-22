@@ -144,8 +144,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 
 ### Guías — [docs/postmortems/guias.md](docs/postmortems/guias.md)
 
-> Detalle completo (mediciones, citas, candados, mutaciones): [docs/postmortems/guias.md](docs/postmortems/guias.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
-> ⚠️ Las reglas de PANTALLA de este módulo (qué se dibuja, dónde, rótulos, tamaños) viven SOLO en ese postmortem: léelo antes de tocar una pantalla suya.
+> 📄 Mediciones, citas de Daniel, candados, mutaciones y las reglas de PANTALLA: el postmortem › «Lo que decía CLAUDE.md hasta el 22-sep-2026». Léelo antes de tocar una pantalla suya.
 
 - **Completada = bloqueada**: el PUT la rechaza. **DOS excepciones que NO miran el estado**, una columna de una línea con `.eq("guia_id", id)`: `PATCH /api/guias/[id]/cliente` y `.../numero-transp`.
 - Despachada se corrigen **TRES campos**: transportista · cliente · facturas; **los bultos NO** (`campos-editables.ts`).
@@ -157,7 +156,6 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 **DOS caminos y nada más: factura o «Traslado»** —del ENVÍO, no del cliente—: escribe el TEXTO `Traslado` en `facturas`, **empresa a mano**. Los `0000` viejos **no se tocan**.
 - **La dirección del renglón es el DESTINO del envío, no la del cliente**: texto libre; los botones **se tocan, nunca se aplican solos** (historia agrupada **exacta**).
 - 🔴 **Destinos definidos en `guias_destino_cliente`**, administrados en Guías › Configuración (**admin y secretaria**; bodega y vendedor 403). **Precedencia en UNA función** (`destinosDefinidosPara`): **tabla → `DESTINOS_DEFINIDOS` (red histórica; `20260918120000` aplicada) → histórico**. Soft delete **firmado, NUNCA DELETE**; única entre activas; RLS service_role; **una sola** `el_de_siempre` por cliente. No toca `guia_items`.
-- Candados: `guias-destinos-precedencia.test.ts` · `guias-destinos-config-route.test.ts` · `guias-configuracion-pantalla.test.tsx`.
 
 **La limpieza del 5-sep-2026.**
 
@@ -169,31 +167,29 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 **Cinco columnas retiradas de `guia_transporte`** (`firma_transportista`, `nombre_entregador`, `cedula_entregador`, `motivo_rechazo`, `monto_total`): **no se dropean**, quedan con `COMMENT` (`20261006120000`, aplicada) y candado que pone el build ROJO si se borran o si el código las toca. ⚠️ Las dos firmas en uso **no se tocan**.
 - 🔴 **«Rechazada» se retiró**: `guiaYaDespachada` solo reconoce «Completada»; el PATCH ya no acepta `motivo_rechazo`.
 - 🔴 **Compartir**: IMAGEN hasta 6 renglones y PDF de ahí para arriba (`formatoParaCompartir`, `MAX_RENGLONES_PNG = 6`); en computadora, **siempre PDF** —el aparato se reconoce **por el dedo** (`pointer: coarse`), no por el nombre (`aparato.ts`)—. La imagen se dibuja **sin un solo `await`**, las firmas se **precargan al abrir la guía** y una sin decodificar **no se inventa**. ⚠️ `png-guia.ts` **no arrastra jsPDF**; imprimir no cambia.
-- 🔴 **«Changuinola» con «u»** en `DEFAULT_DIRECCIONES` (`20261005120000`, **aplicada** (verificado contra producción el 14-sep-2026); **valor exacto**, nunca un `LIKE`).
-- Candados: `guias-numero-factura.test.ts` · `guias-american-classics.test.ts` · `guias-bultos-de-bodega.test.ts` · `guias-restos-y-ambar.test.ts` · `guias-compartir-png.test.ts` · `guias-bultos-y-guardar.test.tsx`.
+- 🔴 **«Changuinola» con «u»** en `DEFAULT_DIRECCIONES` (`20261005120000`, **aplicada**; **valor exacto**, nunca un `LIKE`).
 
 **El panel y los defectos del 11-sep-2026.**
 
 - 🔴 **`/guias/nueva` rebota al vendedor en el SERVIDOR**; los roles de escritura viven en **`roles-escritura.ts`**, con barrido que prohíbe escribirlos a mano. ⚠️ El vendedor sigue viendo Guías en solo lectura.
 - ⚠️ **`GET /api/guias` deja las firmas afuera a propósito**: el papel se pide completo por `/api/guias/[id]`.
 - ⚠️ El borde izquierdo esmeralda de la fila **no se tocó** — decisión pendiente de Daniel.
-- Candados: `guias-filtro-y-aviso.test.ts` · `guias-filtro-y-aviso.test.tsx` · `guias-cedula-con-guiones.test.ts` · `guias-firmas-plegadas.test.ts` · `guias-ventana-y-pendientes.test.ts` · `guias-en-el-telefono.test.tsx` · `guias-panel-que-se-lee.test.tsx`.
 
 **La lista de destinos (7-sep-2026) y varios clientes (10-sep-2026).**
 
-- 🔴 **La lista de destinos del campo dirección es DEL EQUIPO, no de un navegador**: `guias_destino_lista` (`20261014120000`, **aplicada** (verificado contra producción el 14-sep-2026)), en Guías › Configuración. ⚠️ **NO se fusiona con `guias_destino_cliente`**. Agregar: admin · secretaria · bodega; quitar: admin · secretaria. 🔴 **Soft delete firmado, NUNCA DELETE**; el repetido se rechaza por `claveDestino` (exacto, jamás por parecido). **Sin la DDL falla ABIERTA** a `DESTINOS_BASE` y el GET contesta 200 vacío.
+- 🔴 **La lista de destinos del campo dirección es DEL EQUIPO, no de un navegador**: `guias_destino_lista` (`20261014120000`, **aplicada**), en Guías › Configuración. ⚠️ **NO se fusiona con `guias_destino_cliente`**. Agregar: admin · secretaria · bodega; quitar: admin · secretaria. 🔴 **Soft delete firmado, NUNCA DELETE**; el repetido se rechaza por `claveDestino` (exacto, jamás por parecido). **Sin la DDL falla ABIERTA** a `DESTINOS_BASE` y el GET contesta 200 vacío.
 - 🔴 **La semilla sale del uso REAL, nunca del `localStorage` de nadie**: **3+ usos**, grafía más usada, salvo la ya definida en `guias_destino_cliente`.
 - 🔴 **Una guía lleva facturas de VARIOS CLIENTES, de a UN CLIENTE A LA VEZ** (un renglón por cliente-empresa); **reusa el MISMO `ClientePicker`** y **nada de lo que se guarda cambia** (`GUIAS_ATAJOS_NUEVOS`).
-- Candados: `guias-destinos-compartidos.test.ts` · `guias-papel-uno-solo.test.ts` · `guias-destinos-compartidos-pantalla.test.tsx` · `guias-varios-clientes-y-dias.test.ts` · `guias-varios-clientes-y-dias.test.tsx`.
 
-**La lista y «Definir» (19-sep-2026)** — detalle y pendientes en el postmortem.
+**La lista y «Definir» (19-sep-2026).**
 
-- 🔴 Encabezados + columna de **FECHA** (anchuras en UNA constante, compartida) · pie **«47 guías de 236»** · **borde de color solo si dice algo** · el aviso es un **PUNTO en columna que existe siempre** (`avisos-de-la-fila.ts`) · **buscar abre la VENTANA, no el filtro** · **releer no borra la lista en Configuración**. ⚠️ Los BULTOS del pie no se tocaron. **Jorman** entra a «Despachado por» y 🔴 el campo **no se preselecciona**. Candados: `guias-lista-que-se-lee-sola` · `guias-configuracion-pantalla`.
+- 🔴 Encabezados + columna de **FECHA** (anchuras en UNA constante, compartida) · pie **«47 guías de 236»** · **borde de color solo si dice algo** · el aviso es un **PUNTO en columna que existe siempre** (`avisos-de-la-fila.ts`) · **buscar abre la VENTANA, no el filtro** · **releer no borra la lista en Configuración**. ⚠️ Los BULTOS del pie no se tocaron. **Jorman** entra a «Despachado por» y 🔴 el campo **no se preselecciona**.
 
 **Etiquetas para los bultos (18-sep-2026).**
 
-- 🔴 **Guías › «Etiquetas»** (admin · secretaria · bodega, `ETIQUETAS_ROLES` derivado de `GUIAS_WRITE_ROLES`; **NO** cuelga de `GUIAS_ATAJOS_NUEVOS`): se elige UNA factura de las 6 del grupo, se escriben los bultos y salen las hojas — carta en **cuartos, 4 por hoja**, jsPDF, con EMPRESA · fecha · Factura · Cliente · Destino · **«BULTO»** y debajo su número, y **sin** transportista, piezas, código de barras ni la dirección del directorio. 🔴 **LOS TAMAÑOS SE PIDEN EN MILÍMETROS DE ALTURA DE MAYÚSCULA, NO EN PUNTOS** (20-sep-2026, `PT_PARA_MAYUSCULA`): bulto **11** · destino **7,5** · cliente **5,5** · factura **4**. El «1» entero y el «de 4» a la MITAD, misma línea — **nunca «1/4»**. El destino se lleva el hueco hasta la raya (`hastaY`). 🩸 Había **46 mm en blanco** ahí, y el «…» se salía **10 mm** del cuarto. 🔴 **El ESTADO SE DERIVA** de `guias_etiquetas.guia_item_id` (`20261207120000`, aplicada): sin renglón VIVO de guía VIVA vuelve sola a «Pendiente». 🔴 **El anti-duplicado (409) y el bloqueo de lo ya importado los decide el SERVIDOR**; soft delete FIRMADO con único **parcial** `WHERE NOT deleted`, así una factura borrada se puede volver a etiquetar. 🔴 **Falla ABIERTA sin la migración** y **la guía se sigue creando igual**: en `/guias/nueva` las etiquetadas solo LLENAN los renglones de siempre, juntas por cliente **y** empresa con los bultos sumados. Candados: `guias-etiquetas` · `guias-etiquetas-route` · `guias-etiquetas-pantalla` · `guias-etiqueta-agrande` · `guias-etiquetas-dice-bultos`.
-
+- 🔴 **Guías › «Etiquetas»** (admin · secretaria · bodega, `ETIQUETAS_ROLES` derivado de `GUIAS_WRITE_ROLES`; **NO** cuelga de `GUIAS_ATAJOS_NUEVOS`): se elige UNA factura de las 6 del grupo, se escriben los bultos y salen las hojas — carta en **cuartos, 4 por hoja**, jsPDF, con EMPRESA · fecha · Factura · Cliente · Destino · **«BULTO»** y debajo su número, y **sin** transportista, piezas, código de barras ni la dirección del directorio.
+- 🔴 **LOS TAMAÑOS SE PIDEN EN MILÍMETROS DE ALTURA DE MAYÚSCULA, NO EN PUNTOS** (20-sep-2026, `PT_PARA_MAYUSCULA`): bulto **11** · destino **7,5** · cliente **5,5** · factura **4**. El «1» entero y el «de 4» a la MITAD, misma línea — **nunca «1/4»**. El destino se lleva el hueco hasta la raya (`hastaY`).
+- 🔴 **El ESTADO SE DERIVA** de `guias_etiquetas.guia_item_id` (`20261207120000`, aplicada): sin renglón VIVO de guía VIVA vuelve sola a «Pendiente». 🔴 **El anti-duplicado (409) y el bloqueo de lo ya importado los decide el SERVIDOR**; soft delete FIRMADO con único **parcial** `WHERE NOT deleted`, así una factura borrada se puede volver a etiquetar. 🔴 **Falla ABIERTA sin la migración** y **la guía se sigue creando igual**: en `/guias/nueva` las etiquetadas solo LLENAN los renglones de siempre, juntas por cliente **y** empresa con los bultos sumados.
 ### Catálogos, pedidos y cotización — [docs/postmortems/catalogos-pedidos.md](docs/postmortems/catalogos-pedidos.md)
 
 > 📄 Mediciones, citas de Daniel, candados, mutaciones y las reglas de PANTALLA: el postmortem › «Lo que decía CLAUDE.md hasta el 22-sep-2026». Léelo antes de tocar una pantalla suya.
