@@ -48,21 +48,22 @@ O sea: cada respuesta dice **qué módulo/pantalla se toca**, **cómo está hoy*
 Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, Joystep, Confecciones Boston, Multifashion
 
 ## Roles
+
+> 📄 Las notas largas de cada rol, verbatim: [docs/postmortems/navegacion.md](docs/postmortems/navegacion.md) › «Lo que decía CLAUDE.md hasta el 22-sep-2026».
+
 | Rol | DB value | Acceso |
 |-----|----------|--------|
 | Admin | `admin` | Todo |
-| Secretaria | `secretaria` | upload, guias, caja, reclamos, cheques, directorio, marketing, comisiones, **Cuentas por Cobrar** (11-sep-2026, ver el bloque de CXC), **catálogos incluido ADMINISTRAR** (ver nota), KPIs dashboard |
-| Bodega | `bodega` | guias (despacho), catálogos (**solo ver**), referencia, asistencia (solo aprobar), búsqueda global (guías+directorio). Nota: directorio aparece solo en la búsqueda global, NO como módulo navegable. ⚠️ **No hay auto-redirect**: bodega tiene 4 módulos, no uno (esta fila decía «único módulo» y era falso desde que se le abrieron catálogos, referencia y asistencia) |
+| Secretaria | `secretaria` | upload, guias, caja, reclamos, cheques, directorio, marketing, comisiones, **Cuentas por Cobrar**, **catálogos incluido ADMINISTRAR**, KPIs dashboard |
+| Bodega | `bodega` | guias (despacho), catálogos (**solo ver**), referencia, asistencia (solo aprobar), búsqueda global (guías+directorio). El directorio aparece solo en la búsqueda global, NO como módulo navegable. ⚠️ **No hay auto-redirect**: bodega tiene 4 módulos, no uno |
 | Contabilidad | `contabilidad` | prestamos, proveedores, ventas, búsqueda global (ventas+prestamos). En API directorio solo lectura (GET), no edición |
 | Vendedor | `vendedor` | catálogos (**solo ver** + armar pedidos), CXC, directorio, guías (solo lectura), búsqueda global (CXC+directorio) |
-| Gerente ACS | `gerente_acs` | SOLO Multifashion (/multifashion + /api/multifashion/*), y **el módulo COMPLETO** — todo el histórico, igual que admin (ver nota abajo). Auto-redirect a Multifashion desde home (único módulo). Módulos vía `role_permissions` |
-| Gerente Confecciones Boston | `gerente_boston` | Confecciones Boston (/boston + /api/boston/*), la cartera `/api/cxc/boston`, la planilla de Boston, y **Catálogos solo para VER** (27-ago-2026). Aterriza en /boston desde home por su CASA (`MODULO_CASA_POR_ROL`), no por el auto-redirect de módulo único. **NO ve la búsqueda global, ni el CXC del grupo, ni Ventas, ni Comisiones, ni Guías, ni la lista de comprobantes, ni administrar catálogos.** Módulos vía `role_permissions` |
-
-| Marcación | `marcacion` | SOLO `/marcacion` — marcar desde el teléfono, con selfie y ubicación. Auto-redirect desde home. 4 de Multifashion (Ana 2 · Cindy 3 · Yeisibeth 306 · Angel 305). ⚠️ **Rodrigo (13) la tiene siendo `bodega`**: es el módulo POR PERSONA de `MODULOS_POR_PERSONA` |
+| Gerente ACS | `gerente_acs` | SOLO Multifashion (`/multifashion` + `/api/multifashion/*`), y **el módulo COMPLETO** — todo el histórico, igual que admin. Auto-redirect desde home (único módulo). Módulos vía `role_permissions` |
+| Gerente Confecciones Boston | `gerente_boston` | Confecciones Boston (`/boston` + `/api/boston/*`), la cartera `/api/cxc/boston`, la planilla de Boston, y **Catálogos solo para VER**. Aterriza en `/boston` por su CASA (`MODULO_CASA_POR_ROL`), no por el auto-redirect de módulo único. **NO ve la búsqueda global, ni el CXC del grupo, ni Ventas, ni Comisiones, ni Guías, ni la lista de comprobantes, ni administrar catálogos.** Módulos vía `role_permissions` |
+| Marcación | `marcacion` | SOLO `/marcacion` — marcar desde el teléfono, con selfie y ubicación. Auto-redirect desde home. ⚠️ **Rodrigo la tiene siendo `bodega`**: es el módulo POR PERSONA de `MODULOS_POR_PERSONA` |
 
 > Roles reales del sistema = los 8 de arriba (`src/lib/modules.ts` → `SYSTEM_ROLES`). No existen roles `director` ni `cliente` (el catálogo Reebok es público, sin login).
-> 🔴 **MARCAR DESDE EL TELÉFONO YA FUNCIONA SIN SEÑAL** (`marcacion/cola-offline.ts`; probado el 15-sep). Con señal la hora la pone el SERVIDOR; sin señal, la del teléfono, ni 10 min adelantada ni 7 días vieja. ⚠️ Con la app CERRADA no sale nada y la cola no está respaldada. 🔑 «Sin señal» **es la palabra del teléfono** y el servidor no puede probarlo — detalle y medición en el postmortem de asistencia.
-
+> 🔴 **MARCAR DESDE EL TELÉFONO YA FUNCIONA SIN SEÑAL** (`marcacion/cola-offline.ts`). Con señal la hora la pone el SERVIDOR; sin señal, la del teléfono, ni 10 min adelantada ni 7 días vieja. ⚠️ Con la app CERRADA no sale nada y la cola no está respaldada. 🔑 «Sin señal» **es la palabra del teléfono** y el servidor no puede probarlo — detalle y medición en el postmortem de asistencia.
 ## Módulos (src/lib/modules.ts)
 Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home, jul-2026):
 - **Ventas y clientes:** Vista General, Ventas, CXC (`/cxc` — era `/admin`; el rótulo sigue siendo «Cuentas por Cobrar» y `/admin` redirige), Multifashion, **Confecciones Boston** (`/boston`, key `boston`), Clientes/Directorio (`/clientes`), Proveedores, **Referencia** (`/referencia`, key `referencia`), Catálogos (**CUATRO** marcas ENCENDIDAS: Reebok, Joybees, Tommy Hilfiger y **Calvin Klein**, cada una con su tarjeta en el hub /catalogos/marcas, su catálogo público compartible y su pedido público `/pedido-<marca>/[id]` accesibles sin sesión)
