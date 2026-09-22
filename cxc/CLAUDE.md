@@ -238,7 +238,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - ⚠️ **Decisión pendiente de Daniel:** Reebok y Facturas Tienda no validan el divisor en pantalla como CK/TH (el guard de las rutas API sí aplica al guardar).
 ### Reclamos — [docs/postmortems/reclamos.md](docs/postmortems/reclamos.md)
 
-> Detalle: [el postmortem](docs/postmortems/reclamos.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
+> 📄 Mediciones, citas de Daniel, candados, mutaciones y las reglas de PANTALLA: el postmortem › «Lo que decía CLAUDE.md hasta el 22-sep-2026». Léelo antes de tocar una pantalla suya.
 
 **Los cinco defectos (11-sep-2026).**
 
@@ -246,7 +246,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 **Un reclamo cobrado NO se vuelve a mandar**: «Correo» no sale en «Cobrados» **y el servidor lo rechaza**.
 - 🔴 **El orden lo elige quien mira** (`lib/reclamos/orden.ts`): abre con la **factura más RECIENTE arriba**, las cinco columnas ordenan y **sin fecha va al FINAL siempre**.
 - 🔴 **El formulario ofrece las MISMAS empresas que la portada**; uno guardado en una retirada conserva su opción al editar (`empresasParaElegir`).
-- 🔴 **«Fecha de factura \*» es obligatoria**, en pantalla y en el servidor: de ahí salen los días y el orden. Candado: `reclamos-defectos.test.ts`.
+- 🔴 **«Fecha de factura \*» es obligatoria**, en pantalla y en el servidor: de ahí salen los días y el orden.
 
 **El rediseño (10/11-sep-2026).**
 
@@ -260,22 +260,19 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 **El correo lleva la factura y las fotos ADJUNTAS**, achicadas antes de viajar (1600 px, JPEG 80, `sharp` con `.rotate()`); la ilegible viaja TAL CUAL. 🔴 **El tope es el del correo YA CODIFICADO** (`adjuntos-plan.ts`): Resend acepta **40 MB** y base64 crece 4/3 → el presupuesto CRUDO es **3/4**; pasarse tira el correo ENTERO. 🔴 **Lo que no cabe SE DICE**: primero el Excel, después las facturas y al final las fotos **de la más liviana a la más pesada**.
 - 🔴 **El Excel NO lleva links y es UNO SOLO**; **no se firma nada** para el correo, solo lo que se MIRA, por una hora. 🩸 **La galería pública se retiró entera**, con su exención en `PUBLIC_PREFIXES`; los Excel VIEJOS dejan de abrir sus fotos.
 - 🔴 **El papel (PDF y Excel) sale de UN solo módulo**, `lib/reclamos/papel.ts`: **Reclamo N° + fecha de la FACTURA** (sin ella, la del reclamo, **nunca «hoy»**) y **columnas vacías sin dibujar**. ⚠️ **El género viaja EN INGLÉS**, por el CHECK. «Descargar» da PDF, Excel y la factura del proveedor, con URL **firmada del servidor**.
-- 🔴 **Los viejos se rellenaron por lista de IDS, nunca con un UPDATE abierto**: `reclamado_en` = su creación (`20261113120000`) y `fecha_factura` = su `fecha_reclamo` (`20261114120000`), **aplicadas**. ⚠️ Los días quedan **subestimados, nunca inflados** — y así se quedan (abajo).
-- Candados: `reclamos-rediseno.test.ts` · `reclamos-rediseno.test.tsx` · `reclamos-correo-adjuntos.test.ts` · `reclamos-papel.test.ts`.
+- 🔴 **Los viejos se rellenaron por lista de IDS, nunca con un UPDATE abierto**: `reclamado_en` = su creación (`20261113120000`) y `fecha_factura` = su `fecha_reclamo` (`20261114120000`), **aplicadas**. ⚠️ Los días quedan **subestimados, nunca inflados**.
 
 **Lo del 20-sep-2026.**
 
-- 🔴 **UN SOLO CORTE DE «VIEJO»: 120 días** (`DIAS_RECLAMO_VIEJO`, `lib/reclamos/viejos.ts`), que leen la portada **y** el aviso. Medido: 90 d agarra 15 de 19 (nueve son la misma tanda y el aviso deja de señalar nada); 120 d, 6 de 19.
-- 🔴 **La portada sin huecos**: «Sin reclamar» en CERO **no se dibuja** (hoy hay 0) y las dos que quedan se reparten el ancho; los días del más viejo van en **chip rojo** al lado del nombre y «Por cobrar» dice «N pasan de 120 días». 🩸 **Active Wear salió de la pantalla** (0 reclamos en la historia, como Joystep): entra a `EMPRESAS_SIN_TARJETA` y sale de la portada **y del formulario**; `EMPRESAS_MAP` no se toca.
-- 🔴 **«Marcar como pagado» es el botón NEGRO** y «Correo» queda al lado con borde (9 cobros en 30 días contra 9 correos en toda la historia). ⚠️ En un cobrado «Correo» sigue sin salir y el servidor lo rechaza.
-- 🔴 **El cobro abre con el TOTAL puesto y editable** (14 de 14 fueron el total exacto) y el **N° de nota de crédito se pliega** (0 de 14 lo tienen); el campo no se borró ni cambió.
-- 🔴 **El aire entre columnas sale de UNA constante** (`tabla-renglones.ts`) que leen las TRES tablas de renglones: «Subtotal» y «Motivo» salían pegados. 🔴 **La talla se guarda RECORTADA** en `buildReclamoItemRows` —la señal `" "` de «Otros» se pegaba al texto y salía en el papel del proveedor—; ⚠️ **lo ya guardado no se toca**.
+- 🔴 **UN SOLO CORTE DE «VIEJO»: 120 días** (`DIAS_RECLAMO_VIEJO`, `lib/reclamos/viejos.ts`), que leen la portada **y** el aviso.
+- 🔴 **La portada sin huecos**: «Sin reclamar» en CERO **no se dibuja** y las dos que quedan se reparten el ancho; los días del más viejo van en **chip rojo** al lado del nombre y «Por cobrar» dice «N pasan de 120 días». 🩸 **Active Wear salió de la pantalla** (0 reclamos en la historia, como Joystep): entra a `EMPRESAS_SIN_TARJETA` y sale de la portada **y del formulario**; `EMPRESAS_MAP` no se toca.
+- 🔴 **«Marcar como pagado» es el botón NEGRO** y «Correo» queda al lado con borde. ⚠️ En un cobrado «Correo» sigue sin salir y el servidor lo rechaza.
+- 🔴 **El cobro abre con el TOTAL puesto y editable** y el **N° de nota de crédito se pliega**; el campo no se borró ni cambió.
+- 🔴 **El aire entre columnas sale de UNA constante** (`tabla-renglones.ts`) que leen las TRES tablas de renglones. 🔴 **La talla se guarda RECORTADA** en `buildReclamoItemRows` —la señal `" "` de «Otros» se pegaba al texto y salía en el papel del proveedor—; ⚠️ **lo ya guardado no se toca**.
 - 🔴 **Aviso SEMANAL por 📊 NEGOCIO** (`/api/cron/reclamos-viejos`, **lunes 14:00 UTC** = 9 a.m. de Panamá): cuántos pasan de 120 días, cuánto suman y los tres más viejos. Sin ninguno **no manda nada**; no toca Switch.
 - 🔴 **El formulario dice qué va a pasar bajo el título** (salió del ⓘ) y «Falta el PDF de la factura» va **pegado a la caja del archivo**; lo que frena no cambió.
-- 🩸 **Dos puertas sin un solo botón, retiradas**: `[id]/en-proceso` (0 reclamos en ese estado en la historia; el VALOR sigue válido en la base) y `/api/reclamos/motivos` (`reclamo_custom_motivos`, 0 filas). **La tabla no se dropea**: queda `retirada`, fuera del respaldo. 🔴 **La cabecera no dice la misma fecha dos veces** (`seDiceCreadoEl`; pasaba en 14 de 33).
-- 🔑 **LA FECHA DE LA FACTURA ES LA QUE HAY, SIN ASTERISCOS.** `ANTHROPIC_API_KEY` **se verificó el 20-sep-2026 y SIRVE**; el backfill **ya no tiene trabajo** (`20261114120000` llenó todas las `fecha_factura` en NULL). Los **33 vivos tienen `fecha_factura` = `fecha_reclamo`** y **solo 4 tienen PDF**: no hay de dónde sacar la real. Daniel: *«sino usa la fecha de creación como la de la factura y ya, una sola fecha menos enredo»*. ⚠️ **Hacia adelante no se arrastra**: al crear, el PDF y la fecha son obligatorios.
-- Candados (todos `reclamos-*`): `portada-al-frente` · `cobrar-al-frente` · `cobro-monto-puesto` · `renglones-legibles` · `aviso-semanal` · `formulario-dice-que-pasa` · `puertas-sin-boton`.
-
+- 🩸 **Dos puertas sin un solo botón, retiradas**: `[id]/en-proceso` (el VALOR sigue válido en la base) y `/api/reclamos/motivos` (`reclamo_custom_motivos`, 0 filas). **La tabla no se dropea**: queda `retirada`, fuera del respaldo. 🔴 **La cabecera no dice la misma fecha dos veces** (`seDiceCreadoEl`).
+- 🔑 **LA FECHA DE LA FACTURA ES LA QUE HAY, SIN ASTERISCOS.** El backfill **ya no tiene trabajo** (`20261114120000` llenó todas las `fecha_factura` en NULL) y de los vivos casi ninguno tiene PDF: no hay de dónde sacar la real. ⚠️ **Hacia adelante no se arrastra**: al crear, el PDF y la fecha son obligatorios.
 ### Asistencia y planilla — [docs/postmortems/asistencia-planilla.md](docs/postmortems/asistencia-planilla.md)
 
 > 📄 Mediciones, citas de Daniel, candados, mutaciones y las reglas de PANTALLA: el postmortem › «Lo que decía CLAUDE.md hasta el 22-sep-2026». Léelo antes de tocar una pantalla suya.

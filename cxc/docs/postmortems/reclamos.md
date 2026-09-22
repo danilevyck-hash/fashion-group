@@ -190,3 +190,47 @@ Y lo que **sigue siendo cierto**, escrito donde se lee:
 - 🔴 **No hay de dónde sacar la fecha real**: de los 33, **solo 4 tienen PDF**. Y el script `_backfill-reclamos-fecha-factura.mjs` **ya no tiene trabajo que hacer** — solo toca filas con `fecha_factura IS NULL` (`.is("fecha_factura", null)`) y la migración las llenó todas. **No está roto**: se quedó sin filas. Queda rotulado con esa explicación y la fecha, para que nadie vuelva a perder una tarde buscando por qué «no corre».
 - Daniel lo cerró así, textual: *«si puedes sacar la fecha de la factura y arreglarlo, belleza; sino usa la fecha de creación como la de la factura y ya, una sola fecha menos enredo»*. O sea: **una sola fecha, sin asteriscos ni advertencias**. Por eso el aviso de Telegram **no** lleva una línea de «los días pueden estar subestimados», y hay candado que lo exige.
 - ⚠️ **Hacia adelante no se arrastra, y se comprobó**: al CREAR, `validateReclamoNuevo` exige el PDF **y** `validateReclamoHeader` exige `fecha_factura`, así que un reclamo nuevo nace con la fecha REAL de la factura. El problema es solo de los 29 viejos.
+
+---
+
+## Lo que decía CLAUDE.md hasta el 22-sep-2026 (movido acá, verbatim)
+
+### Reclamos — [docs/postmortems/reclamos.md](docs/postmortems/reclamos.md)
+
+> Detalle: [el postmortem](docs/postmortems/reclamos.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
+
+**Los cinco defectos (11-sep-2026).**
+
+- 🔴 **El detalle se lee por UNA puerta** (`lib/reclamos/leer-detalle.ts`): FIRMA cada archivo y trae los settlements; falla **ABIERTA**.
+- 🔴 **Un reclamo cobrado NO se vuelve a mandar**: «Correo» no sale en «Cobrados» **y el servidor lo rechaza**.
+- 🔴 **El orden lo elige quien mira** (`lib/reclamos/orden.ts`): abre con la **factura más RECIENTE arriba**, las cinco columnas ordenan y **sin fecha va al FINAL siempre**.
+- 🔴 **El formulario ofrece las MISMAS empresas que la portada**; uno guardado en una retirada conserva su opción al editar (`empresasParaElegir`).
+- 🔴 **«Fecha de factura \*» es obligatoria**, en pantalla y en el servidor: de ahí salen los días y el orden. Candado: `reclamos-defectos.test.ts`.
+
+**El rediseño (10/11-sep-2026).**
+
+- 🔴 **«Reclamado» se marca solo** (`reclamos.reclamado_en`, `20261111120000`) la PRIMERA vez que sale de la casa —correo confirmado por Resend, o su Excel o PDF— y nunca se pisa.
+- 🔴 **La portada** (`lib/reclamos/portada.ts`) mide los días desde la **FECHA DE FACTURA**; `EMPRESAS_CON_RECLAMOS` se DERIVA de `EMPRESAS`. **Nada se da por perdido**: sin corte de días.
+- 🔴 **La empresa abre en «Por cobrar»**; «En proceso» salió de la pantalla y sigue válido en la base, y los botones de arriba actúan sobre la selección o **lo que se mira**.
+- 🔴 **Las facturas son una LISTA** (`lib/reclamos/facturas.ts`): UNA función la parte (`facturasDe`; `F-1000` no se parte) y UNA la arma (`facturasATexto`).
+- 🔴 **PDF obligatorio al CREAR** (`validateReclamoNuevo`; editar uno viejo sin PDF sigue guardando); del PDF **no se editan** Estilo, Descripción, Cantidad ni Precio, y **la talla sale como viene**: sin desglose la cantidad es el prepack, con desglose cada talla es su renglón.
+- 🔴 **«Volver a por cobrar» conserva comprobante y notas de crédito**; el borrado usa el `UndoToast` de **5 s**.
+- 🔴 **El bucket `reclamo-fotos` es PRIVADO** —fotos y comprobantes—, firmados **1 h** (`fotos-storage.ts`); `url` y `comprobante_url` van NULL: la verdad son `storage_path` y `comprobante_path`.
+- 🔴 **El correo lleva la factura y las fotos ADJUNTAS**, achicadas antes de viajar (1600 px, JPEG 80, `sharp` con `.rotate()`); la ilegible viaja TAL CUAL. 🔴 **El tope es el del correo YA CODIFICADO** (`adjuntos-plan.ts`): Resend acepta **40 MB** y base64 crece 4/3 → el presupuesto CRUDO es **3/4**; pasarse tira el correo ENTERO. 🔴 **Lo que no cabe SE DICE**: primero el Excel, después las facturas y al final las fotos **de la más liviana a la más pesada**.
+- 🔴 **El Excel NO lleva links y es UNO SOLO**; **no se firma nada** para el correo, solo lo que se MIRA, por una hora. 🩸 **La galería pública se retiró entera**, con su exención en `PUBLIC_PREFIXES`; los Excel VIEJOS dejan de abrir sus fotos.
+- 🔴 **El papel (PDF y Excel) sale de UN solo módulo**, `lib/reclamos/papel.ts`: **Reclamo N° + fecha de la FACTURA** (sin ella, la del reclamo, **nunca «hoy»**) y **columnas vacías sin dibujar**. ⚠️ **El género viaja EN INGLÉS**, por el CHECK. «Descargar» da PDF, Excel y la factura del proveedor, con URL **firmada del servidor**.
+- 🔴 **Los viejos se rellenaron por lista de IDS, nunca con un UPDATE abierto**: `reclamado_en` = su creación (`20261113120000`) y `fecha_factura` = su `fecha_reclamo` (`20261114120000`), **aplicadas**. ⚠️ Los días quedan **subestimados, nunca inflados** — y así se quedan (abajo).
+- Candados: `reclamos-rediseno.test.ts` · `reclamos-rediseno.test.tsx` · `reclamos-correo-adjuntos.test.ts` · `reclamos-papel.test.ts`.
+
+**Lo del 20-sep-2026.**
+
+- 🔴 **UN SOLO CORTE DE «VIEJO»: 120 días** (`DIAS_RECLAMO_VIEJO`, `lib/reclamos/viejos.ts`), que leen la portada **y** el aviso. Medido: 90 d agarra 15 de 19 (nueve son la misma tanda y el aviso deja de señalar nada); 120 d, 6 de 19.
+- 🔴 **La portada sin huecos**: «Sin reclamar» en CERO **no se dibuja** (hoy hay 0) y las dos que quedan se reparten el ancho; los días del más viejo van en **chip rojo** al lado del nombre y «Por cobrar» dice «N pasan de 120 días». 🩸 **Active Wear salió de la pantalla** (0 reclamos en la historia, como Joystep): entra a `EMPRESAS_SIN_TARJETA` y sale de la portada **y del formulario**; `EMPRESAS_MAP` no se toca.
+- 🔴 **«Marcar como pagado» es el botón NEGRO** y «Correo» queda al lado con borde (9 cobros en 30 días contra 9 correos en toda la historia). ⚠️ En un cobrado «Correo» sigue sin salir y el servidor lo rechaza.
+- 🔴 **El cobro abre con el TOTAL puesto y editable** (14 de 14 fueron el total exacto) y el **N° de nota de crédito se pliega** (0 de 14 lo tienen); el campo no se borró ni cambió.
+- 🔴 **El aire entre columnas sale de UNA constante** (`tabla-renglones.ts`) que leen las TRES tablas de renglones: «Subtotal» y «Motivo» salían pegados. 🔴 **La talla se guarda RECORTADA** en `buildReclamoItemRows` —la señal `" "` de «Otros» se pegaba al texto y salía en el papel del proveedor—; ⚠️ **lo ya guardado no se toca**.
+- 🔴 **Aviso SEMANAL por 📊 NEGOCIO** (`/api/cron/reclamos-viejos`, **lunes 14:00 UTC** = 9 a.m. de Panamá): cuántos pasan de 120 días, cuánto suman y los tres más viejos. Sin ninguno **no manda nada**; no toca Switch.
+- 🔴 **El formulario dice qué va a pasar bajo el título** (salió del ⓘ) y «Falta el PDF de la factura» va **pegado a la caja del archivo**; lo que frena no cambió.
+- 🩸 **Dos puertas sin un solo botón, retiradas**: `[id]/en-proceso` (0 reclamos en ese estado en la historia; el VALOR sigue válido en la base) y `/api/reclamos/motivos` (`reclamo_custom_motivos`, 0 filas). **La tabla no se dropea**: queda `retirada`, fuera del respaldo. 🔴 **La cabecera no dice la misma fecha dos veces** (`seDiceCreadoEl`; pasaba en 14 de 33).
+- 🔑 **LA FECHA DE LA FACTURA ES LA QUE HAY, SIN ASTERISCOS.** `ANTHROPIC_API_KEY` **se verificó el 20-sep-2026 y SIRVE**; el backfill **ya no tiene trabajo** (`20261114120000` llenó todas las `fecha_factura` en NULL). Los **33 vivos tienen `fecha_factura` = `fecha_reclamo`** y **solo 4 tienen PDF**: no hay de dónde sacar la real. Daniel: *«sino usa la fecha de creación como la de la factura y ya, una sola fecha menos enredo»*. ⚠️ **Hacia adelante no se arrastra**: al crear, el PDF y la fecha son obligatorios.
+- Candados (todos `reclamos-*`): `portada-al-frente` · `cobrar-al-frente` · `cobro-monto-puesto` · `renglones-legibles` · `aviso-semanal` · `formulario-dice-que-pasa` · `puertas-sin-boton`.
