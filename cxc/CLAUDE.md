@@ -626,17 +626,16 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 - A dónde apunta cada canal se verifica sin escribirle a nadie: `GET /api/diag/canales-telegram` (`CRON_SECRET` o sesión de admin).
 
 ## PWA (iOS)
-- `viewport-fit: cover` + `env(safe-area-inset-top/bottom)` para notch/Dynamic Island
-- `apple-mobile-web-app-status-bar-style: black`
-- Standalone mode, start_url: `/home`
-- 🔴 **El sistema vive en `www.fashiongr.com`; el pelado contesta 307** (medido 19-sep-2026). ⚠️ **Un service worker detrás de una redirección NUNCA se registra** (por especificación): quien instale la app desde un enlace **sin `www`** se queda sin service worker en silencio. Hoy no muerde porque la página redirige antes, pero todo enlace que se reparta va con `www`. 🔴 `serwist.register()`/`update()` van con `.catch()` (sin señal: breadcrumb; otro motivo: se reporta). Candado: `sw-registro-con-catch`.
-- Service worker MÍNIMO (Serwist, `src/app/sw.ts`) — la app es SIEMPRE online (Modo Viaje / lectura offline ELIMINADO jul 2026, nunca se usó). Solo cachea assets inmutables (`/_next/static` CacheFirst, imágenes/fuentes SWR); navegación y APIs van directo a la red (sin handler). Sin precache del app shell.
-  - **`matchOptions: { ignoreSearch: true }` en la estrategia de `/_next/static`** — obligatorio mientras `next.config.js` defina `deploymentId` (Skew Protection de Vercel Pro): Next estampa `?dpl=<id>` en cada asset y ese query cambia en CADA deploy, así que sin esto los chunks cuyo contenido no cambió se re-descargan tras cada promoción. Es seguro porque el nombre del archivo lleva el hash del contenido. El fetch a la red (en un MISS) conserva la URL con `?dpl=`, así que el ruteo de Skew Protection no se toca. Candado en `src/__tests__/lib/sw-static-cache-dpl.test.ts`.
-- Actualización automática y SILENCIOSA: `skipWaiting`+`clientsClaim` en sw.ts + `SWUpdater` (`src/components/SWUpdater.tsx`, registra el SW; `next.config` con `register:false`) → al haber build nuevo, swap + reload inmediato SIN UI de versión, con guard de formulario sucio (si hay un input con foco y contenido, difiere hasta blur/submit/ocultar app) y guard anti-loop en sessionStorage.
-- Recovery una-sola-vez: ChunkLoadError / import dinámico fallido tras un deploy → `src/lib/chunk-recovery.ts` (listeners globales en SWUpdater + `error.tsx`/`global-error.tsx` raíz). Guard sessionStorage `fg_chunk_recovery` (1/min); si se repite, error boundary visible "Algo salió mal" con botón Recargar.
-- Roles con 1 solo módulo auto-redirigen desde home (ej: Bodega → Guías)
-- Sin bottom tab bar — navegación por módulos del home + drawer del header
 
+> 📄 Mediciones, citas y candados: [docs/postmortems/navegacion.md](docs/postmortems/navegacion.md) › «Lo que decía CLAUDE.md hasta el 22-sep-2026».
+
+- `viewport-fit: cover` + `env(safe-area-inset-top/bottom)` para notch/Dynamic Island; `apple-mobile-web-app-status-bar-style: black`; standalone, start_url `/home`.
+- 🔴 **El sistema vive en `www.fashiongr.com`; el pelado contesta 307.** ⚠️ **Un service worker detrás de una redirección NUNCA se registra** (por especificación): quien instale la app desde un enlace **sin `www`** se queda sin service worker en silencio. Todo enlace que se reparta va con `www`. 🔴 `serwist.register()`/`update()` van con `.catch()`.
+- Service worker MÍNIMO (Serwist, `src/app/sw.ts`) — la app es SIEMPRE online (Modo Viaje / lectura offline ELIMINADO jul 2026). Solo cachea assets inmutables (`/_next/static` CacheFirst, imágenes/fuentes SWR); navegación y APIs van directo a la red. Sin precache del app shell.
+- 🔴 **`matchOptions: { ignoreSearch: true }` en la estrategia de `/_next/static`** — obligatorio mientras `next.config.js` defina `deploymentId` (Skew Protection): Next estampa `?dpl=<id>` en cada asset y ese query cambia en CADA deploy, así que sin esto los chunks cuyo contenido no cambió se re-descargan tras cada promoción. Es seguro porque el nombre del archivo lleva el hash del contenido; el fetch a la red conserva la URL con `?dpl=`.
+- Actualización automática y SILENCIOSA: `skipWaiting`+`clientsClaim` + `SWUpdater` (`next.config` con `register:false`) → al haber build nuevo, swap + reload inmediato SIN UI de versión, con guard de formulario sucio y guard anti-loop en sessionStorage.
+- Recovery una-sola-vez: ChunkLoadError / import dinámico fallido tras un deploy → `src/lib/chunk-recovery.ts` (listeners en SWUpdater + `error.tsx`/`global-error.tsx`). Guard sessionStorage `fg_chunk_recovery` (1/min); si se repite, error boundary «Algo salió mal» con botón Recargar.
+- Roles con 1 solo módulo auto-redirigen desde home. Sin bottom tab bar — navegación por módulos del home + drawer del header.
 ## Design System
 - **Direction:** Precision & Density + Apple-grade fluidity
 - **Buttons:** `rounded-md`, `bg-black text-white`, `active:scale-[0.97]` tap feedback
