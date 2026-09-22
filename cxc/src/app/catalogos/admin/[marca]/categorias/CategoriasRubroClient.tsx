@@ -23,9 +23,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { Ayuda } from "@/components/shared/Ayuda";
+import { migasDeAppHeader, tramosDeCategorias } from "@/lib/catalogo/camino-de-migas";
 import {
   CATEGORIAS_REEBOK,
   ROTULO_CATEGORIA,
@@ -97,6 +98,7 @@ export default function CategoriasRubroClient() {
 }
 
 function CategoriasRubroInner() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [lista, setLista] = useState<RubroDelCatalogo[]>([]);
   const [sinTabla, setSinTabla] = useState(false);
@@ -208,7 +210,13 @@ function CategoriasRubroInner() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <AppHeader module="Catálogos" />
+      {/* 🔴 EL CAMINO COMPLETO (22-sep-2026), igual que Administrar: esta
+          pantalla cuelga de ahí y decía «Inicio › Catálogos» a secas.
+          Es de Reebok y de nadie más (ver el guard de la página). */}
+      <AppHeader
+        module="Catálogos"
+        breadcrumbs={migasDeAppHeader(tramosDeCategorias("reebok"), (href) => router.push(href))}
+      />
 
       {aviso && (
         <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-md bg-black px-4 py-2 text-sm text-white">

@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
-import { PANEL_COMPROBANTES } from "@/lib/catalogo/numeros-pedido";
+import { type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { tramosDeComprobantes } from "@/lib/catalogo/camino-de-migas";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 🔴 UNA SOLA RUTA ARRIBA (17-sep-2026)
@@ -32,17 +32,16 @@ import { PANEL_COMPROBANTES } from "@/lib/catalogo/numeros-pedido";
 // de la dirección. Antes las dos caían en el 404 de Next, en inglés.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Los tramos, en orden. El último no es enlace: es donde estás parado. */
-export function tramosDeComprobantes(marca: MarcaUiKey): { label: string; href?: string }[] {
-  const theme = getMarcaTheme(marca);
-  return [
-    { label: "Inicio", href: "/home" },
-    { label: "Catálogos", href: "/catalogo" },
-    { label: "Marcas", href: "/catalogos/marcas" },
-    { label: theme?.label ?? "", href: theme?.catalogoHref },
-    { label: PANEL_COMPROBANTES },
-  ];
-}
+/**
+ * Los tramos, en orden. El último no es enlace: es donde estás parado.
+ *
+ * 🔄 22-sep-2026 — LOS TRES CAMINOS DEL MÓDULO VIVEN EN `camino-de-migas.ts`.
+ * Desde que las dos flechas se fueron, el camino es la ÚNICA forma de volver y
+ * tiene que estar COMPLETO en las tres pantallas; armarlo acá dejaba a
+ * Administrar y a Categorías con «Inicio › Catálogos» a secas. Se sigue
+ * exportando con este nombre y desde acá porque es como lo lee su candado.
+ */
+export { tramosDeComprobantes };
 
 export default function RutaArriba({ marca }: { marca: MarcaUiKey }) {
   const tramos = tramosDeComprobantes(marca);

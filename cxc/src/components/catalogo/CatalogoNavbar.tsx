@@ -15,13 +15,16 @@
 // Pedidos", que es el camino que ya existía.
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { hayCaminoDeMigas } from "@/lib/catalogo/camino-de-migas";
 import { usePublicarAlturaEncabezado } from "@/lib/hooks/usePublicarAlturaEncabezado";
 
 export default function CatalogoNavbar({ marca }: { marca: MarcaUiKey }) {
   const theme = getMarcaTheme(marca)!;
   const [role, setRole] = useState("");
+  const pathname = usePathname();
 
   // El catálogo con sesión NO lleva `AppHeader`: su encabezado pegajoso es esta
   // navbar, así que es ella la que publica el alto para las barras de adentro
@@ -34,7 +37,13 @@ export default function CatalogoNavbar({ marca }: { marca: MarcaUiKey }) {
   }, []);
 
   // QUIRK Reebok heredado: "← Inicio" solo con rol de sistema (≠ 'cliente').
-  const showInicio = theme.features.navInicioRequiereRol ? !!role && role !== "cliente" : true;
+  const permiteInicio = theme.features.navInicioRequiereRol ? !!role && role !== "cliente" : true;
+  // 🔴 «← Inicio» SE ESCONDE DONDE HAY CAMINO DE MIGAS (22-sep-2026). En
+  // Comprobantes había TRES formas de volver apiladas en 100 píxeles; se queda
+  // el camino, que además dice dónde estás. ⚠️ En las demás sub-rutas del
+  // catálogo —el catálogo, el checkout, el detalle, la confirmación— NO hay
+  // camino, y esta flecha es la única salida: ahí no se toca.
+  const showInicio = permiteInicio && !hayCaminoDeMigas(pathname);
 
   return (
     <nav ref={navRef} className="sticky top-0 z-50 bg-white">

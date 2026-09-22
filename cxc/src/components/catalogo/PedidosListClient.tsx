@@ -33,7 +33,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useToast } from "@/components/ToastSystem";
 import ComprobantesPanel from "@/components/catalogo/ComprobantesPanel";
 import { filasDeOrders, type FilaComprobante, type FilaDeOrders } from "@/lib/catalogo/fila-comprobante";
@@ -76,8 +75,11 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
-      <Link href={theme.catalogoHref} className="text-xs text-gray-400 hover:text-gray-600 transition">← Catálogo</Link>
-      <h1 className="text-2xl font-light mt-2 mb-6">{PANEL_COMPROBANTES}</h1>
+      {/* 🔴 «← Catálogo» SE FUE (22-sep-2026). Llevaba a `theme.catalogoHref`,
+          exactamente adonde lleva el tramo de la marca del camino de migas —y
+          el logo de la navbar, que ya es un enlace ahí—. Era la tercera forma
+          de volver en 100 píxeles de alto. Ver `lib/catalogo/camino-de-migas`. */}
+      <h1 className="text-2xl font-light mb-6">{PANEL_COMPROBANTES}</h1>
 
       {loading ? (
         <div className="space-y-3">

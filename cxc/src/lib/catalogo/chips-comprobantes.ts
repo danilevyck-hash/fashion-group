@@ -20,10 +20,29 @@
 // casi no se nota; **en octubre sí**: los pedidos de julio caen fuera de los 90
 // días y el chip diría 20 donde la lista muestra 5.
 //
-// 🔑 EL UNIVERSO DE CADA GRUPO ES «TODO MENOS SU PROPIA PREGUNTA». El conteo de
-// «Cotizaciones» se calcula sobre las filas que pasan el origen, la búsqueda y
-// la ventana — pero NO el filtro por tipo. Contarlo sobre el tipo ya aplicado
-// dejaría todos los chips en 0 menos el encendido, que es como decir nada.
+// 🔴 LOS DOS GRUPOS CUENTAN SOBRE EL MISMO UNIVERSO (22-sep-2026)
+//
+// Daniel, mirando la pantalla de Reebok del 19-sep: arriba decía «Todos 13 ·
+// Del cliente 1 · Del vendedor 12» y al lado «Pedidos 13 · Borradores 2».
+// **13 + 2 = 15, pero «Todos» decía 13.**
+//
+// 🩸 No era un error de cuenta: cada grupo se contaba con el OTRO filtro
+// puesto. El de origen salía con «Pedidos» encima —y ese filtro NO se puede
+// apagar, porque el grupo «Qué es» no tiene un «Todos» (Daniel lo pidió fuera
+// el 25-ago)—, así que el chip que se llama «Todos» estaba contando «todos los
+// orígenes, DENTRO de los pedidos». El rótulo prometía todo y entregaba una
+// parte, y los dos grupos nunca podían sumar lo mismo.
+//
+// Hoy los dos grupos se cuentan sobre las MISMAS candidatas, con los DOS
+// filtros quitados: «Todos» es todos de verdad, y la suma de cada grupo da ese
+// mismo número. Medido sobre producción al 19-sep-2026: «Todos 15 · Del cliente
+// 1 · Del vendedor 14» y «Pedidos 13 · Borradores 2» — 15 y 15.
+//
+// ⚠️ LO QUE SE PAGA A CAMBIO, dicho para que nadie lo descubra como un bug: un
+// chip cuenta su balde, no el resultado de tocarlo. Cruzar «Del cliente» con
+// «Borradores» puede dar una lista vacía aunque los dos chips traigan número.
+// Ahí la pantalla dice «Ningún comprobante coincide», que es la verdad; contar
+// cruzado para evitarlo es lo que hacía que «Todos» mintiera.
 //
 // Módulo PURO: recibe las filas y el estado, y devuelve qué chips dibujar.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -114,17 +133,14 @@ export interface EstadoFiltros {
  * Los dos grupos de chips, contados sobre `candidatas` — que quien llama arma
  * con la búsqueda y la ventana YA aplicadas, y con los dos filtros SIN aplicar.
  *
- * Cada grupo se cuenta con el OTRO filtro puesto y el propio quitado.
+ * 🔴 LOS DOS GRUPOS MIRAN EXACTAMENTE ESAS CANDIDATAS, sin cruzarse con el
+ * filtro del otro grupo (ver la cabecera): así «Todos» es todos, y los dos
+ * grupos suman el mismo número.
  */
 export function gruposDeChips(
   candidatas: readonly FilaParaChips[],
   estado: EstadoFiltros,
 ): { origen: GrupoChips<FiltroOrigen>; vista: GrupoChips<VistaComprobante> } {
-  // Para contar el origen: la vista SÍ está puesta, el origen no.
-  const paraOrigen = candidatas.filter((p) => pasaVista(p, estado.vista));
-  // Para contar la vista: el origen SÍ está puesto, la vista no.
-  const paraVista = candidatas.filter((p) => pasaFiltroOrigen(p.origen, estado.origen));
-
   return {
     origen: {
       rotulo: ROTULO_GRUPO_ORIGEN,
@@ -132,7 +148,7 @@ export function gruposDeChips(
         FILTROS_ORIGEN.map((f) => ({
           clave: f.clave,
           label: f.label,
-          conteo: paraOrigen.filter((p) => pasaFiltroOrigen(p.origen, f.clave)).length,
+          conteo: candidatas.filter((p) => pasaFiltroOrigen(p.origen, f.clave)).length,
           activo: estado.origen === f.clave,
         })),
       ),
@@ -143,11 +159,38 @@ export function gruposDeChips(
         VISTAS_COMPROBANTE.map((f) => ({
           clave: f.clave,
           label: f.label,
-          conteo: paraVista.filter((p) => pasaVista(p, f.clave)).length,
+          conteo: candidatas.filter((p) => pasaVista(p, f.clave)).length,
           activo: estado.vista === f.clave,
         })),
       ),
     },
+  };
+}
+
+/**
+ * 🔴 EL CUADRE, COMO DATO: lo que cada grupo suma.
+ *
+ * `todos` es el chip «Todos» del grupo de origen; `origen` y `vista` son las
+ * sumas de cada grupo SIN contar ese chip comodín (que por definición ya vale
+ * el total). Los tres tienen que dar el mismo número, y hay candado que lo
+ * exige — es la cuenta que el 19-sep-2026 daba 13 · 13 · 15.
+ *
+ * Vive acá y no en el candado para que se pueda medir sobre datos de verdad
+ * sin montar la pantalla.
+ */
+export function cuadreDeChips(
+  candidatas: readonly FilaParaChips[],
+  estado: EstadoFiltros,
+): { todos: number; origen: number; vista: number } {
+  const g = gruposDeChips(candidatas, estado);
+  return {
+    todos: g.origen.opciones.find((c) => c.clave === "todos")?.conteo ?? 0,
+    origen: g.origen.opciones.filter((c) => c.clave !== "todos").reduce((s, c) => s + c.conteo, 0),
+    // «Sin mandar» es un SUBCONJUNTO de «Pedidos» (ver arriba): sumarlo contaría
+    // esas filas dos veces. La partición son los tres de `FILTROS_COMPROBANTE`.
+    vista: g.vista.opciones
+      .filter((c) => c.clave !== VISTA_SIN_MANDAR)
+      .reduce((s, c) => s + c.conteo, 0),
   };
 }
 

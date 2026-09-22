@@ -25,6 +25,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useMemo, useState, Suspense } from "react";
+import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -35,6 +36,7 @@ import SubirFotos from "./SubirFotos";
 import ProductoFila from "./ProductoFila";
 import { getMarcaTheme, type AdminProducto, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { catalogoAdminRoles } from "@/lib/catalogo/roles";
+import { migasDeAppHeader, tramosDeAdministrar } from "@/lib/catalogo/camino-de-migas";
 import { puedeEditarRubros } from "@/lib/catalogos/reebok-rubros";
 import { normalizarSkuStorage } from "@/lib/catalogos/fotos-b2b";
 import { contarAlternativas, type StorageMarcaKey } from "@/lib/catalogos/variantes-paths";
@@ -81,6 +83,7 @@ export default function AdminCatalogoClient({ marca }: { marca: MarcaUiKey }) {
 }
 
 function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
+  const router = useRouter();
   const theme = getMarcaTheme(marca)!;
   // Administrar catálogos = admin + secretaria (fuente única en lib/catalogo/roles).
   const { authChecked, role } = useAuth({ moduleKey: "catalogos", allowedRoles: catalogoAdminRoles() });
@@ -213,7 +216,15 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <AppHeader module="Catálogos" />
+      {/* 🔴 EL CAMINO COMPLETO (22-sep-2026). Decía «Inicio › Catálogos» a
+          secas: le faltaban Marcas, la marca y dónde estás. Desde que las
+          flechas de volver se fueron de Comprobantes, el camino es la única
+          salida del módulo y tiene que estar entero en las tres pantallas.
+          Ver `lib/catalogo/camino-de-migas.ts`. */}
+      <AppHeader
+        module="Catálogos"
+        breadcrumbs={migasDeAppHeader(tramosDeAdministrar(marca), (href) => router.push(href))}
+      />
 
       {toast && <div className={theme.admin.toastBg}>{toast}</div>}
 

@@ -152,18 +152,24 @@ describe("3. 🔴 los conteos cuentan lo que se está MIRANDO", () => {
     fila({ origen: "link", fuente: "publicos", status: null, enSwitch: false }), // del link
   ];
 
-  it("el conteo de ORIGEN se calcula con la vista puesta", () => {
-    // Con «Borradores» puesto, «Del cliente» tiene 0 (el del link no es
-    // borrador) y por eso ni se dibuja.
+  // 🔄 22-sep-2026 — ESTAS DOS CAMBIARON DE DIRECCIÓN, CON MOTIVO MEDIDO.
+  //
+  // Decían que cada grupo se contaba con el OTRO filtro puesto. Eso hacía que
+  // «Todos» no fuera todos —el grupo «Qué es» no tiene un «Todos», así que su
+  // filtro está SIEMPRE encima— y que los dos grupos nunca sumaran lo mismo.
+  // En la pantalla de Reebok del 19-sep-2026: «Todos 13» arriba y «Pedidos 13 ·
+  // Borradores 2» al lado. Hoy los dos grupos cuentan sobre las MISMAS
+  // candidatas. El cuadre lo exige `comprobantes-cuadran.test.ts`.
+  it("🔴 el conteo de ORIGEN ya NO se recorta con la vista puesta", () => {
     const { origen } = gruposDeChips(FILAS, { origen: "todos", vista: "borrador" });
-    expect(origen.opciones.find((o) => o.clave === "todos")!.conteo).toBe(1);
-    expect(origen.opciones.find((o) => o.clave === "link")).toBeUndefined();
+    expect(origen.opciones.find((o) => o.clave === "todos")!.conteo).toBe(3);
+    expect(origen.opciones.find((o) => o.clave === "link")!.conteo).toBe(1);
   });
 
-  it("el conteo de VISTA se calcula con el origen puesto", () => {
+  it("🔴 el conteo de VISTA ya NO se recorta con el origen puesto", () => {
     const { vista } = gruposDeChips(FILAS, { origen: "link", vista: "pedido" });
-    expect(vista.opciones.find((o) => o.clave === "pedido")!.conteo).toBe(1);
-    expect(vista.opciones.find((o) => o.clave === "borrador")).toBeUndefined();
+    expect(vista.opciones.find((o) => o.clave === "pedido")!.conteo).toBe(2);
+    expect(vista.opciones.find((o) => o.clave === "borrador")!.conteo).toBe(1);
   });
 
   it("🔑 NINGÚN grupo se cuenta con su PROPIO filtro puesto", () => {

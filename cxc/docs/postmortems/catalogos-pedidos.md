@@ -2905,6 +2905,194 @@ abierta» (`correo-del-cliente.ts`). ⚠️ **Pendiente: esos dos candados hay q
 
 ---
 
+## 🔴 COMPROBANTES — LOS NÚMEROS CUADRAN, Y HAY UNA SOLA FORMA DE VOLVER (22-sep-2026)
+
+Los tres cambios salieron de **mirar la captura**, no el código:
+`~/Desktop/fashiongr-capturas-2026-09-19/09-catalogos/09-catalogo-reebok-pedidos.png`
+— Comprobantes de Reebok, en producción el 19-sep-2026.
+
+Lo que se ve ahí, de arriba abajo: «← Inicio» al lado del logo · el camino
+«Inicio › Catálogos › Marcas › Reebok › Comprobantes» · «← Catálogo» encima del
+título · «Quién lo armó: Todos 13 · Del cliente 1 · Del vendedor 12» · «Qué es:
+Pedidos 13 · Borradores 2» · el buscador · «Seleccionar todos» · «Septiembre de
+2026 (2 comprobantes)» abierto · «Julio de 2026 (11 comprobantes)» plegado ·
+«Ver más (5)».
+
+---
+
+### 1. La casilla de selección — SE QUEDA, porque la acción existe y se usó
+
+Daniel lo leyó como «marcas filas y no pasa nada», y desde la captura es
+exactamente así: el botón rojo **solo aparece cuando ya hay algo marcado**.
+
+**Medido antes de decidir** (`activity_logs`, 90 días):
+
+| acción | usos | qué fue |
+|---|---|---|
+| `pedidos_bulk_delete` | **1** | 24-jul-2026, `catalogo_reebok`, `{"total":12,"eliminados":12,"fallidos":0}` |
+| `pedido_eliminado` (individual) | 0 | — |
+
+O sea: la única vez que alguien borró pedidos en 90 días, borró **doce de un
+saque**, y lo hizo por acá. La ruta existe, está enchufada
+(`POST /api/catalogo/<marca>/orders/bulk-delete`) y el SERVIDOR la tiene cerrada
+a `["admin","secretaria"]`. Quitar la casilla sería quitar la única forma de no
+abrir doce ventanas. **Camino elegido: (a) — darle lo que le faltaba.**
+
+Lo que le faltaba resultó ser **más grave que el botón escondido**:
+
+> 🩸 **«Seleccionar todos» no seleccionaba todos.** Los seleccionables salían de
+> `grupos.filter((g) => isMesOpen(g.key))`: **solo los meses ABIERTOS**. En esa
+> misma captura —septiembre abierto con 2 filas, julio plegado con 11— tocarlo
+> marcaba **2 de 13**, y el botón rojo decía «Eliminar seleccionados (2)».
+
+Arreglado:
+
+- **Los seleccionables son `visibles`**: lo que pasa los dos chips y la ventana,
+  o sea lo que suman los encabezados de mes. El pliegue de un mes es un pliegue,
+  no un filtro.
+- 🔴 **El rótulo DICE a cuántas filas alcanza**, con la pantalla quieta:
+  «Seleccionar todos (13)». Es la regla de la casa —*lo que sale de la pantalla
+  nunca se recorta, salvo un botón que DIGA a cuántos afecta*— aplicada al
+  control que hace la selección, no solo al que la ejecuta.
+- El botón destructivo sigue diciendo su número, ahora desde el mismo módulo
+  (`lib/catalogo/cuantas-comprobantes.ts`).
+- ⚠️ **NUNCA alcanza lo que el «Ver más» esconde**: `visibles` se calcula
+  *después* de la ventana. Eso ya valía y hay candado que lo sigue exigiendo.
+
+**Lo que NO se cambió, y por qué.** La eliminación masiva sigue confirmándose con
+`BulkDeletePedidosModal` (delay de 1 s, «¿Eliminar 13 pedidos?», lista de los que
+ya están en Switch y «Copiar números») en vez de con el `UndoToast` de 5 s.
+Razón: ese modal es lo único que avisa que **los ya enviados siguen vivos en
+Switch y hay que anularlos en el panel** —un `UndoToast` no lo puede decir—, el
+borrado individual de esta misma pantalla usa el mismo patrón, y deshacer de
+verdad pediría una ruta de restauración que Daniel no pidió. **Queda como
+decisión suya**, dicho acá y no escondido.
+
+---
+
+### 2. Tres formas de volver en 100 píxeles — se queda el camino
+
+**Se comprobó a dónde iba cada flecha antes de quitarla:**
+
+| control | a dónde iba | ¿está en el camino? |
+|---|---|---|
+| «← Inicio» (`CatalogoNavbar`) | `/home` | sí — tramo «Inicio» |
+| «← Catálogo» (`PedidosListClient`) | `theme.catalogoHref` (`/catalogo/reebok`) | sí — tramo de la MARCA, y además el logo de la navbar ya es un enlace ahí |
+
+Ninguna llevaba a un sitio que el camino no ofrezca, así que las dos se van y se
+queda el camino, que además **dice dónde estás**.
+
+⚠️ **«← Inicio» NO se borró de la navbar.** Esa barra envuelve TODAS las
+sub-rutas del catálogo —el catálogo, `/checkout`, `/pedido/[id]`,
+`/confirmacion/[id]`, `/productos`— y ninguna de ésas dibuja camino: ahí la
+flecha es la **única** salida. Se esconde **solo donde hay camino**, y eso lo
+decide una función exacta, nunca un `includes`:
+
+```ts
+export function hayCaminoDeMigas(pathname: string | null | undefined): boolean {
+  if (!pathname) return false;
+  return /^\/catalogo\/[^/]+\/pedidos\/?$/.test(pathname);
+}
+```
+
+**Y como el camino pasa a ser la única salida, tiene que estar completo.** No lo
+estaba:
+
+| pantalla | antes | ahora |
+|---|---|---|
+| Comprobantes | Inicio › Catálogos › Marcas › Reebok › Comprobantes | igual |
+| **Administrar** | **Inicio › Catálogos** | Inicio › Catálogos › Marcas › Reebok › **Administrar** |
+| **Categorías** | **Inicio › Catálogos** | … › Reebok › **Administrar** › **Categorías** |
+
+Los tres caminos se arman en `src/lib/catalogo/camino-de-migas.ts` (módulo puro,
+sin React) para que no puedan separarse; `RutaArriba.tsx` lo re-exporta con el
+nombre de siempre porque así lo lee su candado. `migasDeAppHeader` recorta los
+tramos que `AppHeader` ya pone por su cuenta (Inicio y el módulo), calculando el
+corte desde la propia raíz en vez de con un `2` escrito a mano. El último tramo
+de Comprobantes se sigue DERIVANDO de `PANEL_COMPROBANTES`: un cuarto nombre
+para ese lugar es lo que Daniel arregló el 6-sep-2026.
+
+---
+
+### 3. «13 + 2 = 15, pero Todos dice 13»
+
+**Medido contra producción** (reebok, reconstruyendo el feed de `/orders` al
+19-sep-2026 — `reebok_orders` vivos + `reebok_pedidos_publicos` sin convertir +
+`reebok_switch_envios` activos):
+
+```
+20 comprobantes vivos
+├── 15 dentro de la ventana   → 13 «Pedidos» + 2 «Borradores»
+└──  5 detrás de «Ver más»    → los 5 pedidos del LINK sin confirmar
+                                 js6qng2r · tpo0pa62 (13-jul) · 1ba137bb (8-jul)
+                                 jvhc98nq · 4gexexij (7-jul)
+```
+
+**De dónde salía cada número, y por qué no cuadraban:**
+
+- `gruposDeChips` contaba **cada grupo con el OTRO filtro puesto**. El grupo de
+  origen salía con «Pedidos» encima — y ese filtro **no se puede apagar**,
+  porque «Qué es» no tiene un «Todos» (Daniel lo pidió fuera el 25-ago). Así que
+  el chip llamado «Todos» estaba contando *«todos los orígenes, DENTRO de los
+  pedidos»*: **13**. El grupo «Qué es», con origen = todos, contaba las 15.
+  Los dos grupos **nunca podían** sumar lo mismo.
+- El **«Ver más (5)»** son las 5 filas que la ventana dejó fuera (30 días para
+  el pedido del link que nadie confirmó, 90 para todo lo demás). **Ningún chip
+  las contaba**: son «Del cliente» y son «Pedidos», así que «Del cliente 1»
+  estaba describiendo 1 de 6. Por eso el Excel del día siguiente bajó **20
+  filas** contra las 13 de la pantalla — el Excel exporta todo lo vivo, que es
+  la regla de la casa (*lo que sale de la pantalla nunca se recorta*), y la
+  pantalla no tenía dónde decir que había 20.
+
+**Arreglado con la MISMA regla de Guías, no con una nueva.**
+
+1. **Los dos grupos cuentan sobre las mismas candidatas**, con los dos filtros
+   quitados. Al 19-sep-2026 queda: «Todos **15** · Del cliente 1 · Del vendedor
+   **14**» y «Pedidos 13 · Borradores 2» — 15 y 15. `cuadreDeChips` devuelve las
+   tres sumas como DATO, para poder medirlas sobre filas de verdad sin montar la
+   pantalla; «Sin mandar» queda fuera del cuadre porque es un **subconjunto** de
+   «Pedidos», no un cuarto balde.
+2. **El pie dice cuántas se ven de cuántas hay**: «13 comprobantes de 20». Sale
+   de `src/lib/ui/pie-de-lista.ts`, que es el pie de Guías **mudado** allá:
+   Guías (`47 guías de 236`) y Comprobantes leen la misma función, y el texto de
+   Guías no cambió ni un carácter. Con todo a la vista vuelve a ser un solo
+   número.
+
+⚠️ **Lo que se paga a cambio, dicho para que nadie lo descubra como un bug:** un
+chip ahora cuenta su balde, no el resultado de tocarlo. Cruzar «Del cliente» con
+«Borradores» puede dar lista vacía aunque los dos chips traigan número; ahí la
+pantalla dice «Ningún comprobante coincide», que es la verdad. Contar cruzado
+para evitarlo es justo lo que hacía que «Todos» mintiera.
+
+⚠️ **El Excel NO se tocó**: sigue bajando todo lo vivo. Es la regla de la casa, y
+con el pie puesto ya no sorprende — la pantalla dice 20 antes de que el archivo
+lo diga.
+
+---
+
+### Los candados y las mutaciones
+
+| candado | qué cuida |
+|---|---|
+| `lib/comprobantes-cuadran.test.ts` | las 20 filas del 19-sep reproducidas; los dos grupos suman lo mismo en cuatro estados; «Sin mandar» fuera del cuadre; el pie es el MISMO módulo que el de Guías |
+| `components/comprobantes-seleccion-con-accion.test.tsx` | se monta la pantalla y se tocan los controles: el rótulo con su número, las 13 de los meses plegados, lo del «Ver más» fuera, el POST a `bulk-delete` con 13, y el 403 del servidor |
+| `components/comprobantes-una-sola-vuelta.test.tsx` | las dos flechas fuera de Comprobantes y **dentro** del resto del catálogo; `hayCaminoDeMigas` exacta; los tres caminos completos |
+
+Dos candados existentes **cambiaron de dirección, con nota fechada adentro**:
+`comprobantes-rediseno` (los dos conteos cruzados) y `comprobantes-ventana-90-dias`
+(la línea de los seleccionables; la regla que cuidaba —no alcanzar lo escondido—
+se sigue exigiendo, ahora por conducta).
+
+`scripts/_mutar-candados-comprobantes-22sep.sh` — **34 mutaciones, 34 cazadas; 3
+controles en verde; 0 problemas.** Entre ellas: la casilla volviendo a los meses
+abiertos, los dos rótulos perdiendo su número, la selección quedándose sin
+botón, la ruta abriéndose al vendedor, «← Inicio» volviendo, «← Inicio»
+desapareciendo del checkout, `hayCaminoDeMigas` vuelta un `includes`,
+Administrar volviendo al camino a medias, los dos conteos volviendo a cruzarse,
+el pie desapareciendo, y Guías separándose de la regla común.
+
+---
+
 ## Lo que decía CLAUDE.md hasta el 22-sep-2026 (movido acá, verbatim)
 
 ### Catálogos, pedidos y cotización — [docs/postmortems/catalogos-pedidos.md](docs/postmortems/catalogos-pedidos.md)

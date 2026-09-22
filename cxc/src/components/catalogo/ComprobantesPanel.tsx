@@ -62,6 +62,11 @@ import {
 } from "@/lib/catalogo/chips-comprobantes";
 import { pasaFiltroOrigen, type FiltroOrigen } from "@/lib/catalogo/origen-comprobante";
 import {
+  textoEliminarSeleccionados,
+  textoPieDeComprobantes,
+  textoSeleccionarTodos,
+} from "@/lib/catalogo/cuantas-comprobantes";
+import {
   FILTRO_COMPROBANTE_DEFAULT,
   textoBuscablePedido,
   VACIO_NINGUNO_COINCIDE,
@@ -408,10 +413,20 @@ export default function ComprobantesPanel({
   const clienteLabel = (p: FilaComprobante) =>
     p.cliente === "Sin nombre" || !p.cliente?.trim() ? "Sin nombre" : p.cliente;
 
-  // Filas elegibles para selección masiva = las VISIBLES ahora mismo.
-  const visibleRows = grupos.filter((g) => isMesOpen(g.key)).flatMap((g) => g.items);
-  const selectedRows = visibleRows.filter((p) => selected.has(rowKey(p)));
-  const allSelected = visibleRows.length > 0 && selectedRows.length === visibleRows.length;
+  // 🔴 «SELECCIONAR TODOS» ES TODOS LOS QUE LA LISTA TIENE DELANTE (22-sep-2026).
+  //
+  // 🩸 Hasta hoy esto era `grupos.filter(isMesOpen)`: solo las filas de los meses
+  // ABIERTOS. Con la pantalla de Reebok del 19-sep —septiembre abierto (2) y
+  // julio plegado (11)— tocar «Seleccionar todos» marcaba **2 de 13** y el botón
+  // rojo decía «(2)». El pliegue de un mes es un pliegue, no un filtro.
+  //
+  // Son `visibles`: las que pasan los DOS chips y la ventana, o sea exactamente
+  // lo que suman los encabezados de mes. Y el rótulo lo DICE con su número
+  // (`cuantas-comprobantes.ts`), porque lo que alcanza a filas plegadas tiene
+  // que decir a cuántas alcanza.
+  const seleccionables = visibles;
+  const selectedRows = seleccionables.filter((p) => selected.has(rowKey(p)));
+  const allSelected = seleccionables.length > 0 && selectedRows.length === seleccionables.length;
   const selEnviados = selectedRows.filter((p) => !!p.switch_numero);
   const selSinEnviar = selectedRows.length - selEnviados.length;
 
@@ -426,7 +441,7 @@ export default function ComprobantesPanel({
   }
 
   function toggleAll() {
-    setSelected(allSelected ? new Set() : new Set(visibleRows.map(rowKey)));
+    setSelected(allSelected ? new Set() : new Set(seleccionables.map(rowKey)));
   }
 
   // Eliminación masiva: soft-delete por fuente en un solo POST. NUNCA toca Switch.
@@ -561,14 +576,14 @@ export default function ComprobantesPanel({
                   onChange={toggleAll}
                   className="w-4 h-4 accent-black cursor-pointer"
                 />
-                Seleccionar todos
+                {textoSeleccionarTodos(seleccionables.length)}
               </label>
               {selectedRows.length > 0 && (
                 <button
                   onClick={() => setBulkOpen(true)}
                   className="inline-flex items-center gap-2 min-h-[44px] px-4 text-sm font-medium rounded-md bg-red-600 text-white hover:bg-red-700 active:scale-[0.97] transition"
                 >
-                  Eliminar seleccionados ({selectedRows.length})
+                  {textoEliminarSeleccionados(selectedRows.length)}
                 </button>
               )}
             </div>
@@ -610,6 +625,17 @@ export default function ComprobantesPanel({
               </div>
             </MesGroup>
           ))}
+          {/* 🔴 EL PIE DICE CUÁNTAS SE VEN DE CUÁNTAS HAY (22-sep-2026).
+              «13 comprobantes de 20»: los chips contaban 13 y 15, el «Ver más»
+              decía 5 y el Excel bajaba 20 — y nada en la pantalla ataba los
+              cuatro números. Es la MISMA regla y el MISMO módulo que el pie de
+              Guías (`lib/ui/pie-de-lista.ts`): *«o el total sigue al filtro, o
+              no hay buscador»*. Con todo a la vista vuelve a ser un solo número.
+              `visibles` es lo que suman los encabezados de mes; `pedidos` es
+              todo lo vivo que mandó el servidor, antes de filtros y ventana. */}
+          <p data-medir="pie-comprobantes" className="mt-4 text-center text-xs text-gray-400 tabular-nums">
+            {textoPieDeComprobantes(visibles.length, pedidos.length)}
+          </p>
           {/* 🔴 Solo el botón — sin texto explicativo al lado (Daniel: «no me
               gustan tantas palabras extras»). */}
           {hayMas && (

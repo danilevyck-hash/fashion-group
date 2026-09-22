@@ -22,18 +22,25 @@
 // el arreglo que se dibujó; escribir la suma sobre otra lista es lo que dejó
 // pasar el defecto la primera vez.
 //
+// 🔄 22-sep-2026 — LA REGLA SE MUDÓ A `lib/ui/pie-de-lista.ts` Y ACÁ SOLO
+// QUEDAN LAS PALABRAS. El mismo defecto apareció en Comprobantes de los
+// catálogos, y una segunda copia de esta cuenta es justo cómo se llega a que
+// una siga al filtro y la otra no. El texto que sale NO cambió.
+//
 // Módulo PURO: dos números entran, un texto sale.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const plural = (n: number): string => `${n} ${n === 1 ? "guía" : "guías"}`;
+import { textoDelPie } from "@/lib/ui/pie-de-lista";
+
+/** Cómo se nombra lo que esta lista cuenta. */
+const PALABRAS = { singular: "guía", plural: "guías" } as const;
 
 /**
  * `mostradas` = las que están dibujadas en la pantalla ahora mismo.
  * `total` = todas las guías vivas, antes de cualquier filtro o ventana.
  */
 export function textoPieDeLista(mostradas: number, total: number): string {
-  if (mostradas >= total) return plural(total);
-  return `${plural(mostradas)} de ${total}`;
+  return textoDelPie(mostradas, total, PALABRAS);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

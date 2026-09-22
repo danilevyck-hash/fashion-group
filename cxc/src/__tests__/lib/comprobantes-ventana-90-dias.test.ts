@@ -136,10 +136,20 @@ describe("la pantalla usa el corte, y «Ver más» trae el resto", () => {
   });
 
   it("la selección masiva no puede alcanzar lo que la ventana escondió", () => {
-    // `visibleRows` sale de los grupos, y los grupos salen de `visibles`.
-    expect(PANEL_LIMPIO).toContain(
-      "const visibleRows = grupos.filter((g) => isMesOpen(g.key)).flatMap((g) => g.items);",
-    );
+    // 🔄 22-sep-2026 — LA LÍNEA CAMBIÓ, LA REGLA NO. Antes los seleccionables
+    // salían de los MESES ABIERTOS (`grupos.filter(isMesOpen)`), lo que además
+    // dejaba fuera los meses plegados: «Seleccionar todos» marcaba 2 de 13.
+    // Hoy salen de `visibles`, que es lo que pasa los dos chips **después** de
+    // la ventana — así que lo que el «Ver más» esconde sigue sin poder
+    // seleccionarse, que es lo único que esta prueba cuida.
+    expect(PANEL_LIMPIO).toContain("const seleccionables = visibles;");
+    expect(PANEL_LIMPIO).toContain("const selectedRows = seleccionables.filter(");
+    // `visibles` se calcula sobre `candidatas`, y `candidatas` es la ventana.
+    expect(PANEL_LIMPIO).toContain("const candidatas = verTodo ? buscadas : recientes;");
+    expect(PANEL_LIMPIO).toContain("const visibles = candidatas.filter(");
+    // Y nunca sobre la lista entera: eso alcanzaría lo escondido.
+    expect(PANEL_LIMPIO).not.toContain("const seleccionables = pedidos");
+    expect(PANEL_LIMPIO).not.toContain("const seleccionables = buscadas");
   });
 
   it("CONTROL: la lista se sigue dibujando y agrupando por mes", () => {
