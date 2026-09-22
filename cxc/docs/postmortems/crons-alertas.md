@@ -1299,3 +1299,44 @@ Los CHATS siguen siendo dos; lo que hay son **tres tratos**. `enviarNegocioPriva
 - **🔧 SISTEMA** — prefijo `🔧 SISTEMA · ` al principio (se lee en la notificación del iPhone sin abrirla). Regla de tres: **(1)** es real, **(2)** no se arregla solo —si la reconciliación, una 2ª oportunidad o el propio cron lo recupera en horas, NO se avisa—, **(3)** alguien tiene que hacer algo. Y el texto dice **qué pasó / qué significa para el negocio / qué hacer**. Sin nombres de tabla, códigos HTTP ni HTML del proveedor. **Es el chat PRIVADO de Daniel** (el canal de siempre, `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` — en Vercel no existe ninguna variable `*_SISTEMA`, verificado el 2-sep-2026).
 
 > ⚠️ **A dónde apunta cada canal se verifica sin escribirle a nadie:** `GET /api/diag/canales-telegram` (auth: `CRON_SECRET` o sesión de admin). Hasta el 2-sep-2026 el comentario de `src/lib/alertas/canal.ts` decía lo contrario de la realidad —que NEGOCIO era el chat privado— y eso es la clase de dato viejo que hace que el próximo cambio salga al chat equivocado.
+
+---
+
+## Lo que decía CLAUDE.md hasta el 22-sep-2026 (movido acá, verbatim)
+
+### Crons, alertas e infraestructura — [docs/postmortems/crons-alertas.md](docs/postmortems/crons-alertas.md)
+
+> Detalle completo (mediciones, citas, candados, mutaciones): [docs/postmortems/crons-alertas.md](docs/postmortems/crons-alertas.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
+
+- **Una entrada de cron = una ocurrencia al día.** Sub-diario = entradas separadas, NUNCA una lista de horas; biyección `vercel.json` ↔ registro.
+- Crons de la MISMA empresa en Switch, **≥15 min** separados (`SEPARACION_MINIMA_MIN`): un solo token válido por USUARIO.
+- 🔔 **Solo 3 (+2) alertas de SISTEMA, lista cerrada**: dato viejo (+24 h) · 2 fallos seguidos del par `(empresa, sync_type)` · base >80% de memoria · hueco del reloj de asistencia · (+1) el lector de facturas dejó de leer.
+- **El silencio no cuenta como que está bien** (`silencio-de-datos.ts`, en la reconciliación 10/14/18 UTC, sin crons nuevos): **A** = sync con CERO y `status = success` donde siempre trae cientos; **B** = una tabla de negocio dejó de recibir escrituras. 🔴 Un mensaje por MÓDULO, anti-loop **7 días**.
+- 🔴 A y B solo opinan sobre syncs de UNIVERSO COMPLETO (`SYNCS_DE_UNIVERSO_COMPLETO`): en uno selectivo o de mes en curso, el cero es dato del NEGOCIO.
+- 🔴 Tres candados estadísticos por PAR: **≥10** corridas exitosas previas, **mediana ≥10** (no promedio), ni un cero. Sin historia no se vigila. Ante la duda, callar.
+- 🔴 B mira cuándo se ESCRIBIÓ, nunca la fecha del dato; la tabla del DATO, no la del mecanismo (`egresos_varios`, no `egresos_importaciones`). Umbral **40 h**.
+- **Cuadre mensual de costo** (`cuadre-costo.ts`, misma pasada): por (empresa, mes cerrado), el Resumen contra `switch_costo_diario`; solo días comparables (ni el último del mes, ni sin fila, ni leídos antes de cerrar), **>2 % Y >$100**, **≥10 días**, anti-loop **7 días** por (empresa, mes), un mensaje por pasada. 🔴 Telegram, no Data Health.
+- 📊 NEGOCIO no tiene perilla de silenciar ni regla anti-ruido. Todo por `enviarNegocio`/`enviarNegocioPrivado`/`enviarSistema`; nadie llama `sendTelegramAlert` directo.
+- 🔴 El resumen diario de ACS va al chat PRIVADO, sin prefijo de sistema (`enviarNegocioPrivado`), desde DOS lugares que no se separan: el cron de la 01:00 y la recuperación de `switch-reconciliacion`.
+- 🔴 **Nada que no se pueda volver a conseguir se queda sin copia**: la base entera clasificada en `src/lib/backup/tablas.ts` (personas · congelada · switch · bitacora · retirada · vista), build ROJO si una tabla nueva queda sin clasificar o si se saca del respaldo algo que no vuelve. 🩸 Una PK que no sea `id` va en el `ORDER_BY` (`PK_QUE_NO_ES_ID`) o el respaldo sale incompleto. `switch_factura_lineas`, afuera a propósito.
+- 🩸 `db-max-rows` = **1000** y corta EN SILENCIO: lo que pueda pasarlo usa `leerTodoPaginado` con `.order()` estable y `count: "exact"`; la columna única, de desempate.
+- Filtrar por año va por RANGO (`fecha >= … AND fecha < …`), nunca `EXTRACT(YEAR …)`: no es sargable.
+- **Guard de montos imposibles** en las 8 tablas de plata: `max(piso de la familia, 20 × récord de esa empresa)`. Se rechaza la fila, nunca se escribe un 0, y se dice en pantalla.
+- Un sync atascado se suelta solo a los **30 min** (`RUNNING_STALE_MIN`).
+- 🔴 **Hay tareas cuyo producto ES el mensaje, y se vigilan**: cinco en UNA lista (`crons-que-avisan.ts`) — `cheques-alert` · `guias-pendientes` · `acs-resumen-diario` · `grupo-resumen-mensual` + `acs-fidelizacion`, que no manda mensaje y no registra su corrida. 🔴 Ninguno de la lista escribe en `switch_sync_log`. `cronIsStale` (**33 días** el mensual); anti-loop **7 días** por cron, sin entradas nuevas de cron.
+- 🔴 **La regla 2 tiene anti-loop**: llave por (par, arranque de la racha), **48 h** entre repeticiones; el primero no se demora. Fallos seguidos según el RITMO del par: **3 desde 5 corridas/día**, **2** el resto, derivado del cronograma (`corridasPorDiaDelPar`), nunca a mano.
+- 🔴 El dedup de A y B se marca DESPUÉS de que Telegram confirme; igual la regla 2 y los crons. ⚠️ La regla 1 (`datos-frescos.ts`) marca antes, ventana de 20 h: **pendiente de unificar**.
+- ⚠️ `switch_recibos` y `switch_ingresos_mercancia` NO entran a la alerta B: recibos escribe solo lo que cambió y pasa las 40 h estando sano; ingresos reescribe **45 días** y la compra puede no ocurrir. No se agregan sin volver a medir.
+- ⚠️ El resumen «Switch estuvo caído… sin impacto» NO va a Telegram, con candado.
+- Candados: `cron-registro.test.ts` · `silencio-de-datos.test.ts` · `acs-resumen-canal-privado.test.ts` · `backup-nada-sin-copia.test.ts` · `alertas-que-llegan.test.ts`.
+
+**El lector de facturas avisa por Telegram (11-sep-2026)** — la regla 2 sobre un servicio de afuera.
+
+- 🔴 **Avisan TRES causas y nada más** (`clasificarFalloAnthropic`): llave que no sirve (401/403 `authentication_error`/`permission_error`, y la llave AUSENTE), crédito agotado (402, o el 400 cuyo MENSAJE dice `credit balance`/`billing` — el texto, no el status) y tope de uso persistente (429 / `rate_limit_error`).
+- 🔴 **Lo que NO avisa es la mitad del diseño**: PDF ilegible, 400 de documento, timeout, 500 y 529 «overloaded» no suenan.
+- 🔑 «Persistente» está medido: el cliente fija `maxRetries: MAX_REINTENTOS` (**2**) a propósito, no por el default; si se toca, hay que repensar ese mensaje.
+- 🔴 Un solo punto de llamada a Anthropic: `src/lib/ia/anthropic.ts`, sin prompt ni modelo adentro (ningún `claude-…` ahí). El error se vuelve a lanzar tal cual: mismo 500, la pantalla no cambia.
+- 🔴 **Anti-loop de 7 días POR CAUSA** (`cron_email_errors.tipo` = `lector_facturas:<causa>`), marcado DESPUÉS de que Telegram confirme; la causa va en la llave para que una llave vencida no tape un crédito agotado posterior. Fail-OPEN, y avisar NUNCA lanza.
+- El mensaje manda a la pantalla exacta: llave → API Keys y luego Vercel (`ANTHROPIC_API_KEY`, Production); crédito → Billing; tope → Limits; y dice que no se perdió nada. Candados: `lector-facturas-avisa.test.ts`.
+
+- Los Excel de todo el sistema empiezan en la **fila 1**, con filtro desde A1 y la fila de encabezados fija. Todo export sale por `workbookBytes`/`workbookBuffer`/`workbookBlob`.
