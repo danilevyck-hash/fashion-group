@@ -168,3 +168,16 @@ Medición contra producción: `scripts/_medir-proveedores-por-empresa.ts` (solo 
 - 🩸 **UNA LECTURA CAÍDA SE DICE, NO SE DISFRAZA DE «no hay nada» (11-sep-2026).** El `fetch` de la lista ignoraba todo lo que no fuera 200 —sin guardar el error y sin reintentar—, así que cualquier fallo dejaba la pantalla con **«Sin proveedores — No hay datos sincronizados aún»**: con $4.696.830,50 en la cartera, decirle a la contadora que no hay datos es la peor respuesta posible. Ahora dice **«No se pudo cargar. Intenta de nuevo en unos segundos»** con su botón de 44 px, y **lo que ya estaba en pantalla no se borra**.
 - 🩸 **EL CARTEL GRANDE DICE DE QUÉ ES SU NÚMERO (11-sep-2026).** Con una búsqueda escrita el total ya era el de lo buscado y el rótulo seguía diciendo «Por pagar · **grupo**»: escribir «boston» dejaba en pantalla `Por pagar · grupo $4,165.96`. La regla vive en un módulo puro (`lib/proveedores/rotulo.ts`) y **la búsqueda manda sobre el chip de empresa**, que es el filtro más fino; lo buscado se muestra **tal como se tecleó**, solo sin bordes. Candado: `proveedores-error-y-rotulo.test.ts`. *(⚠️ Retirado el 20-sep-2026 con el buscador: el módulo queda rotulado y sin lectores.)*
 - Candados: `proveedores-identidad.test.ts` · `proveedores-una-fila-por-proveedor.test.tsx`; **32 mutaciones, 32 cazadas** (`scripts/_mutar-candados-proveedores-identidad.sh`, con 2 controles); medición `scripts/_medir-proveedores-amarre.mjs`.
+
+---
+
+## Lo que decía CLAUDE.md hasta el 22-sep-2026 (movido acá, verbatim)
+
+### Proveedores — la lista son las EMPRESAS (20-sep-2026)
+
+> Mediciones, citas, candados y las reglas de PANTALLA: [docs/postmortems/proveedores.md](docs/postmortems/proveedores.md). Léelo antes de tocar el módulo.
+
+- 🔴 QUIÉN ES QUIÉN SALE DE UNA LISTA ESCRITA A MANO (`proveedor_amarre`), nunca del nombre ni de la cédula. Grano `(empresa_key, proveedor_switch_id)`; lo resuelve `aplicarAmarre` y nadie más. 🩸 Una lectura caída se dice, nunca «no hay nada».
+- 🔴 **LA LISTA SON LAS SIETE EMPRESAS, DESPLEGABLES EN SUS PROVEEDORES** (`por-empresa.ts`): **Empresa · 0-90D · 91-120D · 121-365D · +1 año · Por pagar**, total al pie; salen de `empresasConCxp()`, nunca de las filas, ⚠️ sin Boston, y todo total es SUMA de lo de abajo (**$4.829.819,40**).
+- 🔴 **CUATRO tramos, sumas de los OCHO de Switch, y ningún número cambia** (`tramos.ts`). 🔴 **Nunca «vencido», ni dicho ni pintado** —el dato es EDAD, no mora—: un tono (`tono.ts`). 🔴 **Lo A FAVOR se ve**: «Le debes X · Tienes a favor Y · **Por pagar Z = X − Y**».
+- Candados: `proveedores-identidad` · `-cuadre` · `-cuatro-tramos` · `-sin-rojo` · `-arriba-una-linea`; 26 mutaciones, 26 cazadas.

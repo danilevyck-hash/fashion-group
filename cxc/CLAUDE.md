@@ -402,13 +402,11 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 
 ### Proveedores — la lista son las EMPRESAS (20-sep-2026)
 
-> Mediciones, citas, candados y las reglas de PANTALLA: [docs/postmortems/proveedores.md](docs/postmortems/proveedores.md). Léelo antes de tocar el módulo.
+> 📄 Mediciones, citas de Daniel, candados y las reglas de PANTALLA: [docs/postmortems/proveedores.md](docs/postmortems/proveedores.md) › «Lo que decía CLAUDE.md hasta el 22-sep-2026». Léelo antes de tocar el módulo.
 
 - 🔴 QUIÉN ES QUIÉN SALE DE UNA LISTA ESCRITA A MANO (`proveedor_amarre`), nunca del nombre ni de la cédula. Grano `(empresa_key, proveedor_switch_id)`; lo resuelve `aplicarAmarre` y nadie más. 🩸 Una lectura caída se dice, nunca «no hay nada».
-- 🔴 **LA LISTA SON LAS SIETE EMPRESAS, DESPLEGABLES EN SUS PROVEEDORES** (`por-empresa.ts`): **Empresa · 0-90D · 91-120D · 121-365D · +1 año · Por pagar**, total al pie; salen de `empresasConCxp()`, nunca de las filas, ⚠️ sin Boston, y todo total es SUMA de lo de abajo (**$4.829.819,40**).
+- 🔴 **LA LISTA SON LAS SIETE EMPRESAS, DESPLEGABLES EN SUS PROVEEDORES** (`por-empresa.ts`): **Empresa · 0-90D · 91-120D · 121-365D · +1 año · Por pagar**, total al pie; salen de `empresasConCxp()`, nunca de las filas, ⚠️ sin Boston, y todo total es SUMA de lo de abajo.
 - 🔴 **CUATRO tramos, sumas de los OCHO de Switch, y ningún número cambia** (`tramos.ts`). 🔴 **Nunca «vencido», ni dicho ni pintado** —el dato es EDAD, no mora—: un tono (`tono.ts`). 🔴 **Lo A FAVOR se ve**: «Le debes X · Tienes a favor Y · **Por pagar Z = X − Y**».
-- Candados: `proveedores-identidad` · `-cuadre` · `-cuatro-tramos` · `-sin-rojo` · `-arriba-una-linea`; 26 mutaciones, 26 cazadas.
-
 ### Usuarios, Inicio y teclado — lo que se regalaba y no servía (11-sep-2026)
 
 > Detalle completo (mediciones, citas, candados, mutaciones): [docs/postmortems/usuarios-inicio-teclado.md](docs/postmortems/usuarios-inicio-teclado.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
