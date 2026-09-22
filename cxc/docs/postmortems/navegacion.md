@@ -313,3 +313,23 @@ Es el motivo real por el que `/home` quedó fuera del arreglo de la mañana, y s
 
 - `src/__tests__/lib/home-rebote-en-el-servidor.test.tsx` — **25 casos** en seis bloques: la decisión es del servidor (el layout no es `"use client"`, no decodifica la cookie por su cuenta, no pinta nada suyo) · un solo módulo redirige y el Inicio **no se alcanza a renderizar** · varios módulos lo ven, con los **ocho roles del sistema** comparados contra `casaDelRol` · sin sesión falla abierta (seis formas de no tener sesión) · la regla es la de siempre y los cuatro lugares importan el mismo módulo · el efecto del navegador sigue ahí con su `replace`.
 - **5 mutaciones, 5 cazadas**, control en verde: quitar el `redirect` (7 fallos), invertir la condición (13), redirigir sin semilla (6), volverlo `"use client"` (1) e ignorar los módulos para mirar solo el rol (1).
+
+---
+
+## Lo que decía CLAUDE.md hasta el 22-sep-2026 (movido acá, verbatim)
+
+### Navegación, 404 y papel — lo que se arregló el 17-sep-2026
+
+> Detalle: [docs/postmortems/navegacion.md](docs/postmortems/navegacion.md).
+
+- 🔴 **«Ir al inicio» es LA CASA DEL ROL, no `/home`** (`lib/navegacion/casa-del-rol.ts`): una sola función para el redirect de `/home`, el 404 y el botón del encabezado. `gerente_acs` y `marcacion` tienen un módulo solo; `/home` los rebota. ⚠️ **Bodega NO está atrapado**: tiene cuatro módulos — la auditoría del 6-sep decía otra cosa y estaba mal.
+- 🔴 **Hay un 404 propio y en español** (`src/app/not-found.tsx`): «Esta pantalla no existe», con «Ir al inicio» y «Volver» —éste solo si hay a dónde—. Antes salía el de Next, en inglés.
+- 🔴 **El PDF de Comisiones dice el título UNA vez**, en la primera hoja (`lib/comisiones/pdf-comision.ts`). ⚠️ Los **nombres de columna SÍ se repiten** y el pie con la numeración no se toca. 🩸 `ImpresionComision.tsx` está muerto desde el 9-sep: el papel sale de `pdf-comision.ts`.
+- 🩸 **El CSV de Reclamos se retiró**: en ningún lado del sistema se exporta CSV. `csv-export.ts` queda rotulado y sin lectores; los dos Excel, intactos. Candado `reclamos-csv-retirado`.
+- 🔴 **`/catalogo` y `/catalogos` redirigen** (307, fuente exacta) a `/catalogos/marcas`: el breadcrumb del propio hub caía ahí y daba el 404 de Next. Comprobantes monta el camino completo. ⚠️ El último tramo dice **«Comprobantes»**, no «Pedidos».
+- 🔴 **Los rubros de Reebok se ADMINISTRAN, no se programan** (`reebok_rubro_categoria`, Catálogos › Reebok): el espejo `REEBOK_CATEGORY_ESPERADAS` se DERIVA de ahí. Falla ABIERTA a las seis reglas del código; `CategoriaReebok` sigue CERRADO —calzado · ropa · accesorios— y **la marca manda antes que el rubro**.
+- 🔴 **Una descripción que «pasa» también queda registrada** (`origen = 'automatica'`, rotulada «Entró sola al pasar»), para poder darle fórmula después. Pasar no cambia de significado; se escribe al PROCESAR, nunca al descargar.
+- 🔴 **Préstamos tiene «Movimientos» por quincena** (`lib/asistencia/movimientos-quincena.ts`): descuentos y deudas nuevas, con una columna **Origen** que dice si lo anotó el CIERRE o una persona. La ventana termina en `finDeLaMedicion` — con `q.hasta` se caían los movimientos de un día 31.
+- ⚠️ **El Historial del depurador NO se divide en pestañas**: los tres caminos dejaron de nombrarse en pantalla el 4-sep-2026 y la tabla no guarda por dónde entró el archivo.
+- 🔴 **El primer pintado ya sabe quién mira** (19-sep): `useAuth` arranca con la semilla de la cookie firmada (`lib/sesion-semilla*.ts`, leída en el layout raíz; rol · módulos · `isOwner` · nombre, **nunca el token**) con la MISMA regla que el navegador (`tieneAccesoAlModulo`); sin acceso o sin semilla, `null` como antes, y `sessionStorage` sigue mandando al hidratar. ⚠️ `/home` no PINTA en el servidor: elige sus colores con el modo oscuro del `localStorage`. Candado `sesion-semilla-primer-pintado`.
+- 🔴 **Quien no tiene Inicio no lo ve ni un instante** (19-sep, Daniel: *«se ve el home y de una marcaciones, se siente bug»*): el rebote a la casa del rol lo decide el SERVIDOR en `src/app/home/layout.tsx` —`leerSemillaDeSesion()` + la MISMA `casaDelRol`, `redirect()` antes de una sola línea de HTML—, así que `marcacion`, `gerente_acs` y `gerente_boston` nunca reciben el Inicio. 🔴 **Falla ABIERTA**: sin cookie, forjada o rol desconocido, no redirige y el efecto del navegador decide como siempre. Candado `home-rebote-en-el-servidor`.
