@@ -1315,3 +1315,47 @@ el logo y el otro no.
 **Cómo se hizo**: `autoTable` usa `startY` para la primera hoja y `margin.top` para las que abre después. La cabecera se dibuja una vez, antes de la tabla; el `didDrawPage` que la repetía se fue; `margin.top` pasa de `ALTO_CABECERA` (32 mm) a **`ALTO_CONTINUACION`** (19 mm, el mismo aire que los lados) para que la hoja de continuación no quede con una franja en blanco arriba. `asegurarEspacio` dejó de repetir la cabeza y de pedir el título.
 
 Candado: `src/__tests__/lib/comisiones-titulo-solo-en-la-primera.test.ts` (11 casos). **Mide el texto hoja por hoja con `pdfjs`**, no el código: comprueba que el ejemplo pasa de una hoja (si cupiera en una, no mediría nada), que el título sale una vez, que los encabezados se repiten, que el pie numera todas, y que con DOS reportes cada uno estrena su título en SU primera hoja. Verificado por mutación en `scripts/_mutar-candados-navegacion-pdf-csv.sh`: volver a poner el `didDrawPage`, repetir la cabeza desde `asegurarEspacio`, poner `showHead: "firstPage"` y dejar de numerar se cazan las cuatro.
+
+---
+
+## Lo que decía CLAUDE.md hasta el 22-sep-2026 (movido acá, verbatim)
+
+### Ventas, Referencia y Comisiones — [docs/postmortems/ventas-referencia.md](docs/postmortems/ventas-referencia.md)
+
+> Detalle completo (mediciones, citas, candados, mutaciones): [docs/postmortems/ventas-referencia.md](docs/postmortems/ventas-referencia.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
+> ⚠️ Las reglas de PANTALLA de este módulo (qué se dibuja, dónde, rótulos, tamaños) viven SOLO en ese postmortem: léelo antes de tocar una pantalla suya.
+
+- `switch_facturas` es la **fuente única de ventas**. Las **notas de crédito RESTAN**.
+- Los tipos de comprobante viven en `lib/ventas/tipos-comprobante.ts`; uno sin clasificar **avisa** (regla 2) en vez de valer CERO en silencio.
+- Las ventas las vigila `lib/datos-frescos.ts`, que **DERIVA** su lista de `empresasConFacturas()` y avisa a las **+24 h**.
+- Referencia — los **TRES GRANDES son de la ÚLTIMA LLEGADA** (`medirTandas`); **Stock es SIEMPRE la existencia real de Switch** y el cuadre **no se fuerza**.
+- La llegada se corta en `min(2, 10% de lo llegado)`. 🔴 **Nada de FIFO**: no se le atribuye una venta a una compra.
+- 🔴 **«Actualizar datos de Switch» lo ve TODO el módulo**: `REFERENCIA_ROLES` (`lib/ventas/referencia.ts`) es UNA lista para todo el módulo; acelerador `SYNC_NOW_COOLDOWN_MIN` = **10 min**. El catálogo se trae **por empresa**.
+- **VENDIDO = `Vendí ÷ (Vendí + Stock)`**. El **FOB se calcula** (`CIF ÷ 1,10`, `fobEstimado()`), **no se usa el de Switch**.
+- **Las 6 del grupo comisionan igual**: **0,5 % sobre la VENTA** de las facturas con `pct_utilidad > 20` — la utilidad es **criterio de entrada**, no base. Retenciones y `TCKCTA` fuera. `comision_b2b_v9` vía `lib/comisiones/rpc`, con red a las versiones previas.
+- 🔴 **Tres vendedores, tres papeles**: `vendedor_nombre` de la factura → **VENTA**; `switch_recibos.vendedor_registro` (quien REGISTRÓ el pago) → **COBRO**; `vendedor_cartera` → **ninguna comisión**.
+- 🔴 **DEFAULT y DANIEL LEVY se calculan y se muestran, pero NO se pagan** (`VENDEDORES_SIN_PAGO`, `lib/comisiones/sin-pago.ts`): el total suma solo lo pagable, pero **el Excel los sigue llevando**.
+- 🔴 **CLIENTES QUE NO COMISIONAN para un vendedor**: grano **(empresa, cliente, vendedor)**: `comision_exclusion` en `UPPER(TRIM())`, **soft delete firmado, nunca DELETE**, única entre ACTIVAS, RLS service_role. Otro vendedor **sí** comisiona; solo admin, una fila por empresa.
+- 🔴 **Distinguen VENTA de COBRO**: `excluye_venta` / `excluye_cobro` (`DEFAULT true`, CHECK «al menos una»); con las dos apagadas **no se guarda y se avisa**.
+- 🔴 **MULTI FASHION HOLDING SE EXCLUYE POR CÓDIGO (D-108), CON COMODÍN `*` = TODOS LOS VENDEDORES**: enumerar nombres deja entrar al nuevo. La v9 = la v8 **byte a byte** salvo eso. Migración `20261008120000`, aplicada.
+- 🔴 **UNA PERSONA, UNA FILA, UNA TASA**: `comision_vendedor_alias` + `comision_vendedor_canonico(text)`; sin alias, el nombre **solo recortado**; canónico **REYNALDO con Y**. **Todo lo que agrupa por vendedor pasa por él**, incluido `aplicarAlias` (**falla abierto**).
+- 🔴 **Los retirados viven en UN solo lugar, `lib/comisiones/retirados.ts`** (`REY STOUTE AGUAS`/`AGUAS`, `COLABORADOR`): `estaRetirado()` compara por el **canónico**, no salen **ni en tablas ni en totales**, el servidor **rechaza** su tasa o exclusión (400) y su fila se **desactiva, nunca DELETE**.
+- 🔴 La columna «activo» de las tasas **no quita la comisión a nadie** y **no se dropea**: sacar a alguien es **solo** por `retirados.ts`.
+- **`nombreVendedorEnPantalla` solo cambia cómo se MUESTRA**: la clave de agrupación, los descuentos y el Excel siguen en mayúsculas.
+- **Los descuentos se restan UNA sola vez, en el SERVIDOR** (`netearComisiones`); ninguna vista resta por su cuenta.
+- 🔴 **UN DESCUENTO TIENE FECHAS**: `desde` / `hasta`, el «hasta» **INCLUSIVE** y **OPCIONAL**, grano **MES**; sin `desde`, como siempre. `lib/comisiones/vigencia.ts`, aplicada en `leerDescuentosEfectivos` **antes** de la excepción del mes. Migración `20261007120000`, aplicada.
+- 🔴 **Se administran en Comisiones › Configuración**: solo admin, **soft delete, NUNCA DELETE**, y el alta REVIVE una fila quitada. ⚠️ La excepción por MES vive en `/api/ventas/comisiones/descuentos`, con otros roles.
+- 🔴 **Comisiones abre en el ÚLTIMO MES CERRADO y el «hoy» es el de PANAMÁ** (`hoyPanama` + `lib/comisiones/mes-inicial.ts`).
+- 🔴 **«Todo el año» es LA SUMA DE SUS MESES**: la misma RPC mes a mes, neteada por `netearComisiones` (`acumular-anio.ts`), cortada en el mes en curso de **Panamá**; **la tasa no se suma: se conserva la vigente**. ⚠️ Ahí no hay detalle ni PDF (`conDetalle = !esTodoElAnio(mes)`): el reporte es de **UN mes**.
+- 🔴 **El mes NEGATIVO se queda como está**: no cambia el cálculo.
+- 🔴 **El costo del Resumen incluye las notas de débito**: sale de `switch_factura_utilidad` (`switch_costo_unificado_v2` y las RPC del Resumen).
+- 🔴 **Ninguna lectura de costo del Resumen sale de `switch_costo_diario`** (su último día de cada mes vale $0): solo alimenta el **cuadre mensual** (`cuadre-costo.ts`: >2 % y >$100 → 🔧 SISTEMA, anti-loop 7 días por (empresa, mes)).
+- ⚠️ **Multifashion es OTRO módulo de comisiones — NO fusionar**: paga 0,5 % solo sobre el CONTADO, sin filtro de utilidad; **nunca se suman en un número**. Su vista recibe el **AÑO ELEGIDO**.
+- 🔴 **`clientes_master` es el directorio del GRUPO y SOLO del grupo**: el sync pide por **INCLUSIÓN** (`.in("empresa_key", EMPRESAS_DEL_GRUPO)`), nunca excluyendo: la tabla **no tiene `empresa_key`**.
+- 🔴 **LA IDENTIDAD DEL CLIENTE ES EL CÓDIGO**: `switch_facturas (empresa_key, cliente_switch_id)` → `switch_clientes` → `codigo` → `clientes_master.codigo`, par **único por construcción**.
+- 🔴 **Nadie une `clientes_master` por `nombre_normalized`, y NO hay fallback por nombre**: un JOIN por nombre contra homónimos **multiplica la factura**.
+- ⚠️ **`TCKCTA` no es un cliente**: es el mostrador, se reconoce por CÓDIGO (`esMostrador`) y nunca por nombre; el grano de los rankings es **(cliente, EMPRESA)**.
+- 🔴 **TODA comparación «vs año pasado» usa los MISMOS DÍAS** (`lib/ventas/clientes-corte-comparativo.ts`): corte = último día **CARGADO** del período en curso, nunca después de HOY en Panamá; 29-feb → 28-feb; un período cerrado va entero contra entero. «Compras \<año\>» no se recorta.
+- ⚠️ **Productos** corta por `ultimoDiaArticuloDiario` (`switch_articulo_diario` llega hasta AYER), parámetro OBLIGATORIO de `productosRangoComparativo`. ⚠️ **Multifashion › Vendedoras compara contra el MES ANTERIOR** y lo dice el rótulo.
+- ⚠️ **Pendiente de Daniel**: «las 6 hojas» se leyó como las 6 EMPRESAS, no seis reportes de detalle.
+- Candados: `clientes-master-solo-del-grupo` · `ventas-clientes-las-seis-empresas` · `clientes-vs-anio-anterior-mismos-dias` · `mismos-dias-todas-las-comparaciones` · `costo-con-notas-de-debito` · `cuadre-costo` · `comision-exclusion-v7` · `comision-alias-v8` · `comision-b2b-v9-por-codigo` · `comisiones-descuentos-vigencia` · `comisiones-mes-cerrado-panama` · `comisiones-por-empresa-todo-el-anio` · `comisiones-no-se-paga` · `referencia-boton-actualizar` · `multifashion-cerrado-y-espejo`.

@@ -3,7 +3,7 @@
 // (4-sep-2026, rediseño aprobado por Daniel).
 //
 //   Plantilla ............ Nuevo · Historial
-//   Tallas y catálogo .... Tallas por bulto · Fotos a mi Excel
+//   Tallas por bulto ..... (vista única)
 //   Configuración ........ Fórmulas · Descripciones (solo admin) · Reglas
 //
 // Lo que se vigila sobre el módulo puro (resolverTab, pestanas.ts):
@@ -12,6 +12,13 @@
 //   · un valor desconocido cae en «Plantilla», nunca en blanco;
 //   · «Descripciones» es solo admin: para secretaria cae a «Fórmulas»;
 //   · nada se borró: los componentes son los mismos, cambió dónde cuelgan.
+//
+// 🔄 22-sep-2026, CAMBIO DE DIRECCIÓN CON NOTA FECHADA: «Fotos a mi Excel»
+// (vista `misfotos`) se RETIRÓ de la pantalla — Daniel: *«si si borra ese»*,
+// cero usos medidos en `activity_logs`. La pestaña quedó con una sola vista y
+// su rótulo pasó a ser «Tallas por bulto»; el id `tallas` NO cambió y
+// `?tab=misfotos` aterriza ahora en `tallas › curvas`. Lo vigila el candado
+// `fotos-a-mi-excel-retirado.test.ts`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect } from "vitest";
@@ -27,21 +34,22 @@ import {
 const leer = (rel: string) => readFileSync(path.join(process.cwd(), rel), "utf8");
 
 describe("las 3 pestañas y sus vistas", () => {
-  it("son exactamente Plantilla · Tallas y catálogo · Configuración", () => {
+  it("son exactamente Plantilla · Tallas por bulto · Configuración", () => {
     expect(PESTANAS.map((p) => p.id)).toEqual(["plantilla", "tallas", "config"]);
-    expect(PESTANAS.map((p) => p.label)).toEqual(["Plantilla", "Tallas y catálogo", "Configuración"]);
+    expect(PESTANAS.map((p) => p.label)).toEqual(["Plantilla", "Tallas por bulto", "Configuración"]);
   });
 
   it("cada pestaña tiene sus vistas, con la primera como default", () => {
     expect(VISTAS_POR_TAB.plantilla.map((v) => v.id)).toEqual(["nuevo", "historial"]);
-    expect(VISTAS_POR_TAB.tallas.map((v) => v.id)).toEqual(["curvas", "misfotos"]);
+    // 🔄 22-sep-2026: una sola vista («Fotos a mi Excel» se retiró).
+    expect(VISTAS_POR_TAB.tallas.map((v) => v.id)).toEqual(["curvas"]);
     expect(VISTAS_POR_TAB.config.map((v) => v.id)).toEqual(["formulas", "descripciones", "reglas"]);
     // «Descripciones» sigue siendo SOLO admin, como cuando colgaba de Fórmulas.
     expect(VISTAS_POR_TAB.config.find((v) => v.id === "descripciones")?.soloAdmin).toBe(true);
   });
 
   it("una pestaña nueva válida pasa tal cual, sin marca de redirección", () => {
-    expect(resolverTab("tallas", "misfotos", false)).toEqual({ tab: "tallas", vista: "misfotos", redirigido: false });
+    expect(resolverTab("tallas", "curvas", false)).toEqual({ tab: "tallas", vista: "curvas", redirigido: false });
     expect(resolverTab("plantilla", "", false)).toEqual({ tab: "plantilla", vista: "nuevo", redirigido: false });
   });
 });
@@ -50,7 +58,8 @@ describe("🔴 los ?tab= viejos redirigen (enlaces guardados no se rompen)", () 
   // Las 7 pestañas que existían hasta el 4-sep-2026, TODAS cubiertas.
   const VIEJAS: Record<string, { tab: string; vista: string }> = {
     depurador: { tab: "plantilla", vista: "nuevo" },
-    misfotos: { tab: "tallas", vista: "misfotos" },
+    // 🔄 22-sep-2026: la vista se retiró, así que aterriza en «Tallas por bulto».
+    misfotos: { tab: "tallas", vista: "curvas" },
     facturas: { tab: "plantilla", vista: "nuevo" },
     curvas: { tab: "tallas", vista: "curvas" },
     formulas: { tab: "config", vista: "formulas" },
@@ -84,10 +93,12 @@ describe("🔴 los ?tab= viejos redirigen (enlaces guardados no se rompen)", () 
 });
 
 describe("nada se borró: los componentes son los mismos, cambia dónde cuelgan", () => {
-  it("la página sigue montando los 7 componentes de siempre", () => {
+  it("la página sigue montando los 6 componentes que quedan en pantalla", () => {
     const page = leer("src/app/productos/cargar/page.tsx");
+    // 🔄 22-sep-2026: eran 7. «MiExcelFotosClient» se retiró de la pantalla y
+    // su ausencia la vigila `fotos-a-mi-excel-retirado.test.ts`.
     for (const comp of [
-      "DepuradorDispatcher", "HistorialView", "CurvasView", "MiExcelFotosClient",
+      "DepuradorDispatcher", "HistorialView", "CurvasView",
       "FormulasConfig", "CatalogoDescripcionesAdmin", "ReglasView",
     ]) {
       expect(page, `${comp} desapareció de la página`).toContain(`<${comp}`);

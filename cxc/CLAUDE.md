@@ -469,14 +469,12 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 
 ### Ventas, Referencia y Comisiones — [docs/postmortems/ventas-referencia.md](docs/postmortems/ventas-referencia.md)
 
-> Detalle completo (mediciones, citas, candados, mutaciones): [docs/postmortems/ventas-referencia.md](docs/postmortems/ventas-referencia.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
-> ⚠️ Las reglas de PANTALLA de este módulo (qué se dibuja, dónde, rótulos, tamaños) viven SOLO en ese postmortem: léelo antes de tocar una pantalla suya.
+> 📄 Mediciones, citas de Daniel, candados, mutaciones y las reglas de PANTALLA: el postmortem › «Lo que decía CLAUDE.md hasta el 22-sep-2026». Léelo antes de tocar una pantalla suya.
 
 - `switch_facturas` es la **fuente única de ventas**. Las **notas de crédito RESTAN**.
 - Los tipos de comprobante viven en `lib/ventas/tipos-comprobante.ts`; uno sin clasificar **avisa** (regla 2) en vez de valer CERO en silencio.
 - Las ventas las vigila `lib/datos-frescos.ts`, que **DERIVA** su lista de `empresasConFacturas()` y avisa a las **+24 h**.
-- Referencia — los **TRES GRANDES son de la ÚLTIMA LLEGADA** (`medirTandas`); **Stock es SIEMPRE la existencia real de Switch** y el cuadre **no se fuerza**.
-- La llegada se corta en `min(2, 10% de lo llegado)`. 🔴 **Nada de FIFO**: no se le atribuye una venta a una compra.
+- Referencia — los **TRES GRANDES son de la ÚLTIMA LLEGADA** (`medirTandas`); **Stock es SIEMPRE la existencia real de Switch** y el cuadre **no se fuerza**. La llegada se corta en `min(2, 10% de lo llegado)`. 🔴 **Nada de FIFO**: no se le atribuye una venta a una compra.
 - 🔴 **«Actualizar datos de Switch» lo ve TODO el módulo**: `REFERENCIA_ROLES` (`lib/ventas/referencia.ts`) es UNA lista para todo el módulo; acelerador `SYNC_NOW_COOLDOWN_MIN` = **10 min**. El catálogo se trae **por empresa**.
 - **VENDIDO = `Vendí ÷ (Vendí + Stock)`**. El **FOB se calcula** (`CIF ÷ 1,10`, `fobEstimado()`), **no se usa el de Switch**.
 - **Las 6 del grupo comisionan igual**: **0,5 % sobre la VENTA** de las facturas con `pct_utilidad > 20` — la utilidad es **criterio de entrada**, no base. Retenciones y `TCKCTA` fuera. `comision_b2b_v9` vía `lib/comisiones/rpc`, con red a las versiones previas.
@@ -486,7 +484,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 **Distinguen VENTA de COBRO**: `excluye_venta` / `excluye_cobro` (`DEFAULT true`, CHECK «al menos una»); con las dos apagadas **no se guarda y se avisa**.
 - 🔴 **MULTI FASHION HOLDING SE EXCLUYE POR CÓDIGO (D-108), CON COMODÍN `*` = TODOS LOS VENDEDORES**: enumerar nombres deja entrar al nuevo. La v9 = la v8 **byte a byte** salvo eso. Migración `20261008120000`, aplicada.
 - 🔴 **UNA PERSONA, UNA FILA, UNA TASA**: `comision_vendedor_alias` + `comision_vendedor_canonico(text)`; sin alias, el nombre **solo recortado**; canónico **REYNALDO con Y**. **Todo lo que agrupa por vendedor pasa por él**, incluido `aplicarAlias` (**falla abierto**).
-- 🔴 **Los retirados viven en UN solo lugar, `lib/comisiones/retirados.ts`** (`REY STOUTE AGUAS`/`AGUAS`, `COLABORADOR`): `estaRetirado()` compara por el **canónico**, no salen **ni en tablas ni en totales**, el servidor **rechaza** su tasa o exclusión (400) y su fila se **desactiva, nunca DELETE**.
+- 🔴 **Los retirados viven en UN solo lugar, `lib/comisiones/retirados.ts`**: `estaRetirado()` compara por el **canónico**, no salen **ni en tablas ni en totales**, el servidor **rechaza** su tasa o exclusión (400) y su fila se **desactiva, nunca DELETE**.
 - 🔴 La columna «activo» de las tasas **no quita la comisión a nadie** y **no se dropea**: sacar a alguien es **solo** por `retirados.ts`.
 - **`nombreVendedorEnPantalla` solo cambia cómo se MUESTRA**: la clave de agrupación, los descuentos y el Excel siguen en mayúsculas.
 - **Los descuentos se restan UNA sola vez, en el SERVIDOR** (`netearComisiones`); ninguna vista resta por su cuenta.
@@ -496,7 +494,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 **«Todo el año» es LA SUMA DE SUS MESES**: la misma RPC mes a mes, neteada por `netearComisiones` (`acumular-anio.ts`), cortada en el mes en curso de **Panamá**; **la tasa no se suma: se conserva la vigente**. ⚠️ Ahí no hay detalle ni PDF (`conDetalle = !esTodoElAnio(mes)`): el reporte es de **UN mes**.
 - 🔴 **El mes NEGATIVO se queda como está**: no cambia el cálculo.
 - 🔴 **El costo del Resumen incluye las notas de débito**: sale de `switch_factura_utilidad` (`switch_costo_unificado_v2` y las RPC del Resumen).
-- 🔴 **Ninguna lectura de costo del Resumen sale de `switch_costo_diario`** (su último día de cada mes vale $0): solo alimenta el **cuadre mensual** (`cuadre-costo.ts`: >2 % y >$100 → 🔧 SISTEMA, anti-loop 7 días por (empresa, mes)).
+- 🔴 **Ninguna lectura de costo del Resumen sale de `switch_costo_diario`** (su último día de cada mes vale $0): solo alimenta el **cuadre mensual** (`cuadre-costo.ts`).
 - ⚠️ **Multifashion es OTRO módulo de comisiones — NO fusionar**: paga 0,5 % solo sobre el CONTADO, sin filtro de utilidad; **nunca se suman en un número**. Su vista recibe el **AÑO ELEGIDO**.
 - 🔴 **`clientes_master` es el directorio del GRUPO y SOLO del grupo**: el sync pide por **INCLUSIÓN** (`.in("empresa_key", EMPRESAS_DEL_GRUPO)`), nunca excluyendo: la tabla **no tiene `empresa_key`**.
 - 🔴 **LA IDENTIDAD DEL CLIENTE ES EL CÓDIGO**: `switch_facturas (empresa_key, cliente_switch_id)` → `switch_clientes` → `codigo` → `clientes_master.codigo`, par **único por construcción**.
@@ -505,8 +503,6 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 **TODA comparación «vs año pasado» usa los MISMOS DÍAS** (`lib/ventas/clientes-corte-comparativo.ts`): corte = último día **CARGADO** del período en curso, nunca después de HOY en Panamá; 29-feb → 28-feb; un período cerrado va entero contra entero. «Compras \<año\>» no se recorta.
 - ⚠️ **Productos** corta por `ultimoDiaArticuloDiario` (`switch_articulo_diario` llega hasta AYER), parámetro OBLIGATORIO de `productosRangoComparativo`. ⚠️ **Multifashion › Vendedoras compara contra el MES ANTERIOR** y lo dice el rótulo.
 - ⚠️ **Pendiente de Daniel**: «las 6 hojas» se leyó como las 6 EMPRESAS, no seis reportes de detalle.
-- Candados: `clientes-master-solo-del-grupo` · `ventas-clientes-las-seis-empresas` · `clientes-vs-anio-anterior-mismos-dias` · `mismos-dias-todas-las-comparaciones` · `costo-con-notas-de-debito` · `cuadre-costo` · `comision-exclusion-v7` · `comision-alias-v8` · `comision-b2b-v9-por-codigo` · `comisiones-descuentos-vigencia` · `comisiones-mes-cerrado-panama` · `comisiones-por-empresa-todo-el-anio` · `comisiones-no-se-paga` · `referencia-boton-actualizar` · `multifashion-cerrado-y-espejo`.
-
 ### Vista General y Ventas — el mes es el de Panamá (11-sep-2026)
 
 > Detalle completo (mediciones, citas, candados, mutaciones): [docs/postmortems/ventas-referencia.md](docs/postmortems/ventas-referencia.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».

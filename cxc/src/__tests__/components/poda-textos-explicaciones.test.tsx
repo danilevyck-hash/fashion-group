@@ -482,6 +482,11 @@ describe("Marketing · los pasos del formulario de factura pierden la bajada, no
 // ───────────────────────────────────────────────────────────────────────────
 import MiExcelFotosClient from "@/app/productos/cargar/MiExcelFotosClient";
 
+// 🩸 22-sep-2026: esta pantalla se RETIRÓ («Fotos a mi Excel», cero usos
+// medidos). El componente no se borró —queda rotulado y sin lectores, patrón
+// `mayor_lineas`— así que esta poda de textos se sigue vigilando tal cual: si
+// alguien lo volviera a montar, ya viene sin la prosa. Que NO esté en ninguna
+// pantalla lo exige `fotos-a-mi-excel-retirado.test.ts`.
 describe("Depurador · 'Mi Excel con fotos' se queda con la regla del nombre, no con la prosa", () => {
   it("las cuatro explicaciones de la puerta NO están", () => {
     render(<MiExcelFotosClient />);

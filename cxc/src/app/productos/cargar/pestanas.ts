@@ -6,22 +6,36 @@
 // nombrarse en pantalla — el dispatcher reconoce el formato del archivo.
 //
 //   Plantilla ............ Nuevo (dropzone única) · Historial
-//   Tallas y catálogo .... Tallas por bulto · Fotos a mi Excel
+//   Tallas por bulto ..... (vista única)
 //   Configuración ........ Fórmulas · Descripciones (solo admin) · Reglas
 //
+// 🩸 «FOTOS A MI EXCEL» SE RETIRÓ DE LA PANTALLA EL 22-sep-2026. Daniel:
+// *«si si borra ese»* — y, en la misma frase, *«y no talla por bulto»*: «Tallas
+// por bulto» SE QUEDA. Medido contra producción antes de tocar nada:
+// `activity_logs` tiene **CERO** filas de `descarga_misfotos` en toda su
+// historia (el contador escribe de verdad desde el 4-sep-2026 y se comprobó
+// con las 3 filas de `descarga_excel` del 20-sep-2026).
+//
+// Al quedar «Tallas y catálogo» con una sola vista, el rótulo de la PESTAÑA
+// pasó a ser «Tallas por bulto» (el «y catálogo» era justamente la vista que
+// se fue) y la fila de vistas desaparece sola (`vistas.length > 1` en
+// `page.tsx`). 🔴 El id de la pestaña sigue siendo `tallas`: `?tab=tallas`
+// no se rompe.
+//
 // Los ?tab= viejos REDIRIGEN a su pestaña nueva: un enlace guardado
-// (?tab=historial, ?tab=misfotos…) no se rompe.
+// (?tab=historial, ?tab=misfotos…) no se rompe. `misfotos` ahora aterriza en
+// «Tallas por bulto», que es lo que existe.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type Tab = "plantilla" | "tallas" | "config";
 export type Vista =
   | "nuevo" | "historial"            // Plantilla
-  | "curvas" | "misfotos"            // Tallas y catálogo
+  | "curvas"                         // Tallas por bulto (vista única)
   | "formulas" | "descripciones" | "reglas"; // Configuración
 
 export const PESTANAS: { id: Tab; label: string }[] = [
   { id: "plantilla", label: "Plantilla" },
-  { id: "tallas", label: "Tallas y catálogo" },
+  { id: "tallas", label: "Tallas por bulto" },
   { id: "config", label: "Configuración" },
 ];
 
@@ -31,9 +45,10 @@ export const VISTAS_POR_TAB: Record<Tab, { id: Vista; label: string; soloAdmin?:
     { id: "nuevo", label: "Nuevo" },
     { id: "historial", label: "Historial" },
   ],
+  // 🔴 UNA sola vista desde el 22-sep-2026: «Fotos a mi Excel» se retiró de la
+  // pantalla. Con una sola vista, `page.tsx` no dibuja la fila de vistas.
   tallas: [
     { id: "curvas", label: "Tallas por bulto" },
-    { id: "misfotos", label: "Fotos a mi Excel" },
   ],
   config: [
     { id: "formulas", label: "Fórmulas" },
@@ -48,7 +63,8 @@ export const TAB_VIEJO_A_NUEVO: Record<string, { tab: Tab; vista: Vista }> = {
   facturas: { tab: "plantilla", vista: "nuevo" },
   historial: { tab: "plantilla", vista: "historial" },
   curvas: { tab: "tallas", vista: "curvas" },
-  misfotos: { tab: "tallas", vista: "misfotos" },
+  // 🔴 `?tab=misfotos` (retirada el 22-sep-2026) aterriza en lo que SÍ existe.
+  misfotos: { tab: "tallas", vista: "curvas" },
   formulas: { tab: "config", vista: "formulas" },
   reglas: { tab: "config", vista: "reglas" },
 };

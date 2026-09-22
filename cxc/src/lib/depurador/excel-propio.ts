@@ -1,3 +1,25 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// 🩸 RETIRADO DE LA PANTALLA EL 22-sep-2026 — «Fotos a mi Excel».
+//
+// Daniel: *«si si borra ese»* (y, en la misma frase, *«y no talla por bulto»*:
+// «Tallas por bulto» SE QUEDA). Medido contra producción antes de tocar nada:
+// `activity_logs` no tiene NI UNA fila de `descarga_misfotos` en toda su
+// historia — cero usos. El contador escribe de verdad (se comprobó con las
+// filas de `descarga_excel` del 20-sep-2026), así que ese cero sí significa
+// «nadie lo usó».
+//
+// 🔴 EL CÓDIGO NO SE BORRA (patrón `mayor_lineas`, `csv-export.ts`,
+// `cxc_favorites`): queda acá, SIN LECTORES, con la explicación de por qué este
+// camino no pasa por `xlsx-js-style`. El candado
+// `src/__tests__/lib/fotos-a-mi-excel-retirado.test.ts` pone el build ROJO si
+// alguien vuelve a montarlo en una pantalla.
+//
+// ⚠️ LO QUE SÍ SIGUE VIVO Y NO SE TOCÓ (lo usa el pedido de Reebok):
+// `lib/depurador/fotos-excel.ts` (el emparejador), `lib/depurador/fotos-xlsx.ts`
+// (el armador del zip) y `app/productos/cargar/fotos-carpeta.ts`
+// (`prepararFotos` → `compressImage`).
+// ─────────────────────────────────────────────────────────────────────────────
+
 // "Tomá MI Excel y ponele las fotos" — el camino aparte del Depurador.
 //
 // 🔴 ESTE CAMINO NO CALCULA NADA. No pasa por el precio (`CEILING(CIF÷divisor)`),

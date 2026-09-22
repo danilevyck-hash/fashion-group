@@ -16,6 +16,13 @@
  *       usó», y son cosas distintas. De ese número depende una decisión (si
  *       «Tallas por bulto» y «Fotos a mi Excel» se quedan o se retiran).
  *
+ *       🔄 22-sep-2026 — LA DECISIÓN SE TOMÓ, y este contador la sostuvo:
+ *       `descarga_misfotos` seguía en CERO en toda la historia, así que
+ *       «Fotos a mi Excel» se retiró de la pantalla (Daniel: *«si si borra
+ *       ese»*) y «Tallas por bulto» se queda. Son CUATRO botones
+ *       instrumentados desde entonces; el quinto vive en un archivo rotulado
+ *       y sin lectores (`fotos-a-mi-excel-retirado.test.ts`).
+ *
  *   2 · **El breadcrumb de Plantilla Switch caía en un 404.** El encabezado
  *       armaba el enlace del módulo recortando la URL a su primer tramo:
  *       `/productos/cargar` → `/productos`, que no existe. Lo mismo
@@ -113,7 +120,7 @@ describe("🔴 1 · lo que se descarga se anota, y si no se pudo anotar SE DICE"
     expect(avisos.join(" ")).toContain("descarga_excel");
   });
 
-  it("los CINCO botones instrumentados siguen anotando", () => {
+  it("los CUATRO botones instrumentados que quedan en pantalla siguen anotando", () => {
     expect(plano("src/lib/ventas/descarga.ts")).toContain('"descarga_excel"');
     for (const rel of [
       "src/components/ventas/ResumenView.tsx",
@@ -123,7 +130,8 @@ describe("🔴 1 · lo que se descarga se anota, y si no se pudo anotar SE DICE"
       expect(plano(rel), `${rel} dejó de anotar su descarga`).toContain("anotarDescarga(");
     }
     expect(plano("src/app/productos/cargar/CurvasView.tsx")).toContain('"descarga_tallas"');
-    expect(plano("src/app/productos/cargar/MiExcelFotosClient.tsx")).toContain('"descarga_misfotos"');
+    // 🔄 22-sep-2026: el quinto era «Fotos a mi Excel», hoy retirado de la
+    // pantalla. Su archivo rotulado lo vigila `fotos-a-mi-excel-retirado`.
   });
 });
 

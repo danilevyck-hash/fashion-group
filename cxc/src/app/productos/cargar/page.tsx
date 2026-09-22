@@ -7,7 +7,6 @@ import { useUrlState } from "@/lib/hooks/useUrlState";
 import AppHeader from "@/components/AppHeader";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import DepuradorDispatcher from "./DepuradorDispatcher";
-import MiExcelFotosClient from "./MiExcelFotosClient";
 import HistorialView from "./HistorialView";
 import FormulasConfig from "./FormulasConfig";
 import ReglasView from "./ReglasView";
@@ -131,8 +130,8 @@ function CargarInner() {
   // Registra la carga en el server al descargar (lo único que toca backend).
   // Desde el 4-sep-2026 viaja también EL ARCHIVO descargado (los mismos bytes),
   // que queda 90 días en Storage para poder volver a bajarlo del Historial.
-  // 🔴 SOLO los Excel de Switch llegan acá: el pedido para cliente de Reebok,
-  // Tallas y Fotos a mi Excel no llaman este callback.
+  // 🔴 SOLO los Excel de Switch llegan acá: el pedido para cliente de Reebok y
+  // Tallas por bulto no llaman este callback.
   const handleDownloaded = async (payload: {
     empresa: string;
     marca: string;
@@ -179,7 +178,8 @@ function CargarInner() {
         </div>
 
         {/* Vistas de la pestaña activa (Nuevo/Historial, Tallas/Fotos,
-            Fórmulas/Descripciones/Reglas), en TODOS los anchos. */}
+            Fórmulas/Descripciones/Reglas), en TODOS los anchos. «Tallas por
+            bulto» quedó con UNA sola vista, así que su fila no se dibuja. */}
         {vistas.length > 1 && (
           <div className="mt-3 flex w-full flex-nowrap overflow-x-auto rounded-lg border border-stone-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {vistas.map((v) => (
@@ -198,11 +198,14 @@ function CargarInner() {
       </div>
       {tab === "plantilla" && vista === "historial" && <HistorialView refreshKey={refreshKey} />}
 
+      {/* 🩸 «Fotos a mi Excel» se retiró de la pantalla el 22-sep-2026 (Daniel:
+          *«si si borra ese»*; CERO usos en `activity_logs` en toda su
+          historia). El componente NO se borró —queda rotulado y sin lectores,
+          patrón `mayor_lineas`— y el candado
+          `fotos-a-mi-excel-retirado.test.ts` pone el build ROJO si vuelve a
+          montarse. «Tallas por bulto» se queda y es la única vista. */}
       <div className={tab === "tallas" && vista === "curvas" ? "" : "hidden"}>
         <CurvasView />
-      </div>
-      <div className={tab === "tallas" && vista === "misfotos" ? "" : "hidden"}>
-        <MiExcelFotosClient />
       </div>
 
       {tab === "config" && vista === "formulas" && <FormulasScopeRow />}

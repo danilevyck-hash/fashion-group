@@ -66,12 +66,14 @@ describe("Depurador — las pestañas son un desplegable en angosto", () => {
   });
 
   // Desde el 4-sep-2026 son 3 pestañas (rediseño aprobado por Daniel):
-  // Plantilla · Tallas y catálogo · Configuración. Los tres caminos de
+  // Plantilla · Tallas por bulto · Configuración. Los tres caminos de
   // generación viven adentro de «Plantilla» y ya no se nombran en pantalla.
   it("las 3 pestañas salen de UNA sola lista (desplegable y píldoras no pueden desincronizarse)", () => {
     const pestanas = leer("src/app/productos/cargar/pestanas.ts");
     const bloque = pestanas.slice(pestanas.indexOf("const PESTANAS"), pestanas.indexOf("];", pestanas.indexOf("const PESTANAS")));
-    for (const label of ["Plantilla", "Tallas y catálogo", "Configuración"]) {
+    // 🔄 22-sep-2026: «Tallas y catálogo» pasó a «Tallas por bulto» al retirarse
+    // la vista «Fotos a mi Excel» (el «y catálogo» era esa vista).
+    for (const label of ["Plantilla", "Tallas por bulto", "Configuración"]) {
       expect(bloque).toContain(`label: "${label}"`);
     }
     // La fila de píldoras se dibuja MAPEANDO esa lista, no repitiendo el marcado.
@@ -95,7 +97,9 @@ describe("Depurador — las pestañas son un desplegable en angosto", () => {
 
   it("cada vista conserva su entrada (nada se borró, cambió dónde cuelga)", () => {
     const pestanas = leer("src/app/productos/cargar/pestanas.ts");
-    for (const label of ["Nuevo", "Historial", "Tallas por bulto", "Fotos a mi Excel", "Fórmulas", "Descripciones", "Reglas"]) {
+    // 🔄 22-sep-2026: «Fotos a mi Excel» se retiró de la pantalla (cero usos
+    // medidos). Las demás vistas siguen todas ahí.
+    for (const label of ["Nuevo", "Historial", "Tallas por bulto", "Fórmulas", "Descripciones", "Reglas"]) {
       expect(pestanas).toContain(`label: "${label}"`);
     }
   });
