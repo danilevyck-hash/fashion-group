@@ -594,13 +594,12 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - **Antes de dar por perdido un dato**: mirar la lista de columnas real (`GET /rest/v1/` devuelve el OpenAPI con todas las tablas y sus columnas) en vez de copiar nombres del código. Ya pasó dos veces: `cron_heartbeats.job` era `cron_name`, y `asistencia_reglas.empresa_key` no existe.
 
 ## Switch Soft (ERP externo)
-- 🗺️ **El mapa de flujo, dato por dato: [`docs/switch-flujo.md`](docs/switch-flujo.md)** (3-sep-2026) — para cada cosa que el sistema sabe de Switch: por qué endpoint o reporte sale, qué cron lo trae y a qué hora, en qué tabla cae y qué campos descarta, en qué pantalla se ve, qué empresas entran y cuáles no, qué lo rompe y cómo consultarlo al momento. Más las dos vías de entrada (API vs panel, **sesión por USUARIO**), las trampas transversales y el árbol de «por dónde empezar». **Léelo antes de decir que un dato «no existe», «no llega» o «viene de tal endpoint».** Cruza con `docs/donde-vive-cada-dato.md` (por pregunta) y con `switch-referencia.md` (por endpoint).
-- 📖 **Documentación oficial cruzada con el código: [`docs/switch-referencia.md`](docs/switch-referencia.md)** — los 52 métodos del API (cuáles usamos, qué campos tiramos, 7 endpoints que usamos sin documentar), lo que las 13 guías explican del sistema, y la lista de lo que la doc corrige del repo (sesión única es por USUARIO, `rubroId` en `/apiarticulos/lista`, `detalle[]` en `/apiingresomercancia/info`, precio por cliente). El manual del panel sigue en `docs/switch-panel.md`.
-- 🔑 **Por dónde se entra a mirar: una dirección por empresa** (Daniel las dictó el 3-sep-2026; el subdominio **no se deriva del nombre**). `vistanainternacional` · `fashionwear` · **`fashionshoesholding`** · `activeshoes` · `activewear` · **`joystepcorp`** · `confeccionesboston` · **`americanclassicstore`**, todas `.switch-soft.com`. ⚠️ Entrar **expulsa a quien esté adentro**: la sesión es por USUARIO y el sistema entra como `daniel`.
-- 🔑 **Para disparar un cron a mano** hace falta `CRON_SECRET` (está en Vercel, en las variables del proyecto; no confundirla con las otras dos parecidas): `curl -H "Authorization: Bearer $CRON_SECRET" https://www.fashiongr.com/api/cron/<nombre>`. Sin ella contesta `{"ok":false,"error":"Unauthorized"}`.
+- 🗺️ **El mapa de flujo, dato por dato: [`docs/switch-flujo.md`](docs/switch-flujo.md)** — por qué endpoint o reporte sale cada cosa, qué cron la trae y a qué hora, en qué tabla cae y qué campos descarta, en qué pantalla se ve, qué empresas entran y cuáles no, qué lo rompe y cómo consultarlo al momento. **Léelo antes de decir que un dato «no existe», «no llega» o «viene de tal endpoint».** Cruza con `docs/donde-vive-cada-dato.md` (por pregunta) y con `switch-referencia.md` (por endpoint).
+- 📖 **Documentación oficial cruzada con el código: [`docs/switch-referencia.md`](docs/switch-referencia.md)** — los métodos del API (cuáles usamos, qué campos tiramos, los que usamos sin documentar) y lo que la doc corrige del repo. El manual del panel sigue en `docs/switch-panel.md`.
+- 🔑 **Por dónde se entra a mirar: una dirección por empresa** (el subdominio **no se deriva del nombre**): `vistanainternacional` · `fashionwear` · **`fashionshoesholding`** · `activeshoes` · `activewear` · **`joystepcorp`** · `confeccionesboston` · **`americanclassicstore`**, todas `.switch-soft.com`. ⚠️ Entrar **expulsa a quien esté adentro**: la sesión es por USUARIO y el sistema entra como `daniel`.
+- 🔑 **Para disparar un cron a mano** hace falta `CRON_SECRET` (está en Vercel; no confundirla con las otras dos parecidas): `curl -H "Authorization: Bearer $CRON_SECRET" https://www.fashiongr.com/api/cron/<nombre>`. Sin ella contesta `{"ok":false,"error":"Unauthorized"}`.
 - **Dos vías de entrada** (detalle en `docs/switch-flujo.md` › A): el **API JSON** con token (`client.ts`; `SWITCH_<EMPRESA>_API_*`) y el **panel web** Laravel con sesión (`web-client.ts`; `SWITCH_<EMPRESA>_WEB_*`, login con `changesession="SI"` que **expulsa** a quien esté en el panel). **La sesión es por USUARIO**, y el sistema entra como `daniel`: cada cron o script saca a Daniel del panel de esa empresa, y viceversa. Los crons de la misma empresa van a ≥ 15 min; los de login web, de madrugada de Panamá.
-- Lo que llega por **CSV** hoy son solo los reportes del panel que el sync baja solo (egresos varios e ingresos de mercancía, con `;`). ⚠️ Aquí decía hasta el 3-sep-2026 «Upload: 100% manual (drag-drop), no hay API/SFTP» — describía el sistema de antes de jun-2026 (`ventas_raw`/`cxc_rows`, congeladas). Hoy hay 25 endpoints del API en uso y ~40 entradas de cron que tocan Switch.
-
+- Lo que llega por **CSV** hoy son solo los reportes del panel que el sync baja solo (egresos varios e ingresos de mercancía, con `;`). ⚠️ No es un sistema de subida manual: hoy hay endpoints del API en uso y decenas de entradas de cron que tocan Switch.
 ## Email (Resend)
 - `noreply@fashiongr.com` — cheques reminders
 - `notificaciones@fashiongr.com` — alertas, reports, guias, reebok
@@ -690,21 +689,11 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 - Nombres de archivo con fecha: `Pedido-RBK001-2026-04-05.pdf`
 
 ## Shared Components (src/components/)
-- **AppHeader** — sticky header con module color accent, user info, search, notifications
-- **SearchBar** — ⌘K + mobile full-screen + recientes + spotlight NLP
-- **MobileBottomBar** — ELIMINADO (abril 2026). Navegación es solo por módulos del home + drawer del header
-- **NotificationCenter** — 🔔 bell con historial de toasts
-- **SessionWarning** — banner/modal antes de expirar sesión
-- **OfflineBanner** — amber offline, green reconexión
-- **ContextMenuWrapper** — right-click menus en desktop
-- **UndoToast** — countdown bar 5s con "Deshacer"
-- **TimeGroupHeader** — headers colapsables por período de tiempo- **OverflowMenu** — "···" dropdown para acciones secundarias
-- **ScrollableTable** — gradient indicators para scroll horizontal
-- **SwipeableRow** — swipe-to-action en mobile
-- **PullToRefresh** — pull down para refrescar en mobile
-- **BottomSheet** — half/full screen draggable (mobile)
-- **AccordionContent** — CSS grid expand/collapse animado
-- **AnimatedNumber** — count-up con easing
+**AppHeader** (sticky, acento de módulo, usuario, búsqueda, notificaciones) · **SearchBar** (⌘K, full-screen móvil, recientes, spotlight) · **NotificationCenter** (🔔 con historial de toasts) · **SessionWarning** (banner antes de expirar) · **OfflineBanner** · **ContextMenuWrapper** · **UndoToast** (5 s) · **TimeGroupHeader** · **OverflowMenu** ("···") · **ScrollableTable** (gradientes de scroll) · **SwipeableRow** · **PullToRefresh** · **BottomSheet** (half/full draggable) · **AccordionContent** · **AnimatedNumber**. 🩸 **MobileBottomBar ELIMINADO** (abril 2026): la navegación es solo por módulos del home + drawer del header.
+
+## Hooks (src/lib/hooks/)
+**useAuth** · **useUrlState** (state ↔ URL) · **useLastUsed** · **useDraftAutoSave** (5 s) · **usePersistedState** (sessionStorage) · **useUndoAction** (ventana de 5 s) · **useOnlineStatus**.
+- **useSessionCheck** — ⚠️ **SIN USO**: no tiene importadores desde el 11-abr-2026, así que el chequeo de sesión cada 2 min NO corre. Se conserva rotulado (candado: `ganchos-sin-uso.test.ts`); enchufarlo es una decisión de Daniel que no está tomada.
 ## Hooks (src/lib/hooks/)
 - **useAuth** — check role, user info
 - **useSessionCheck** — ⚠️ **SIN USO**: no tiene importadores desde el 11-abr-2026, así que el chequeo de sesión cada 2 min NO corre. Se conserva rotulado (candado: `ganchos-sin-uso.test.ts`); enchufarlo es una decisión de Daniel que no está tomada.

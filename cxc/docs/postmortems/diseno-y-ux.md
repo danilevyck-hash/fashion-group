@@ -44,3 +44,20 @@ porqué, las mediciones y las citas.
 - `useUrlState(key, default, { history: "push" })` para params que representan un nivel; default `"replace"` para filtros/tabs.
 - **SPAs de un solo route** (varios niveles bajo un mismo `/route`): el patrón de referencia es **Reclamos** (`src/app/reclamos/ReclamosClient.tsx`) — drill-down/tabs/back-forward vía el router de Next reconstruyendo el estado desde la URL. (El ejemplo anterior, Camisetas, fue eliminado en #35.)
 - Módulos con **routes reales** (Caja, Préstamos, Guías, Clientes detalle) ya son correctos: cada nivel es una URL distinta empujada con `router.push`/`<Link>`. No requieren tratamiento especial.
+
+## Shared Components (src/components/)
+- **AppHeader** — sticky header con module color accent, user info, search, notifications
+- **SearchBar** — ⌘K + mobile full-screen + recientes + spotlight NLP
+- **MobileBottomBar** — ELIMINADO (abril 2026). Navegación es solo por módulos del home + drawer del header
+- **NotificationCenter** — 🔔 bell con historial de toasts
+- **SessionWarning** — banner/modal antes de expirar sesión
+- **OfflineBanner** — amber offline, green reconexión
+- **ContextMenuWrapper** — right-click menus en desktop
+- **UndoToast** — countdown bar 5s con "Deshacer"
+- **TimeGroupHeader** — headers colapsables por período de tiempo- **OverflowMenu** — "···" dropdown para acciones secundarias
+- **ScrollableTable** — gradient indicators para scroll horizontal
+- **SwipeableRow** — swipe-to-action en mobile
+- **PullToRefresh** — pull down para refrescar en mobile
+- **BottomSheet** — half/full screen draggable (mobile)
+- **AccordionContent** — CSS grid expand/collapse animado
+- **AnimatedNumber** — count-up con easing
