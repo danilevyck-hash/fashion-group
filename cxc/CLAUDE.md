@@ -666,7 +666,7 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 > 📄 Detalle y citas: [docs/postmortems/usuarios-inicio-teclado.md](docs/postmortems/usuarios-inicio-teclado.md).
 
 - **`⌘K` / `Ctrl+K` — abrir la búsqueda global.** Tiene su propio listener dentro de `SearchBar.tsx` y nunca dependió de ningún gancho.
-- 🩸 **Todo lo demás se retiró el 11-sep-2026**: la `/` para buscar, la ayuda «?», los saltos `G+…`, el `J/K` por filas y la `E` para editar **nunca corrieron** —`useKeyboardShortcuts` estaba sin un solo importador desde el 11-abr-2026—.
+- 🩸 **Todo lo demás se retiró el 11-sep-2026**: la `/` para buscar, la ayuda «?», los saltos `G+…`, el `J/K` por filas y la `E` para editar **nunca corrieron** —`useKeyboardShortcuts` estaba sin un solo importador desde el 11-abr-2026—. Candado: `atajos-de-teclado-retirados.test.ts`.
 - El **clic derecho** en filas de CXC y Recordatorios se había retirado antes, con el rediseño de esos dos módulos.
 ## Smart Features
 
@@ -675,7 +675,7 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 - **Búsqueda global:** 8 módulos (CXC, Reclamos, Guías, Directorio, Cheques, Ventas, Préstamos, Caja). 🔴 **Cada resultado LLEVA a donde dice**: la guía abre `/guias/<id>`, el cliente su ficha `/clientes/<codigo>`, el de Ventas `?tab=clientes&cliente=<CÓDIGO>` y el gasto de Caja su período `/caja/<id>`. 🔴 El código del cliente de Ventas sale del **puente por ID** (`switch_facturas` → `switch_clientes` → `codigo`), **nunca del nombre**. ⚠️ El gasto de Caja no queda resaltado dentro de su período: pendiente, no olvido.
 - **La caja de buscar del Inicio es de los mismos CINCO roles que en todo el sistema** (`SEARCH_ROLES`).
 - **Spotlight:** "cheques que vencen mañana" → ⚡ quick action con deep link. **Búsquedas recientes:** últimas 5 + "Ir a...". **Smart defaults:** recuerda última categoría, empresa, banco, transportista (localStorage `fg_last_*`).
-- 🩸 **Tres cosas que esta lista prometía y NO EXISTÍAN EN NINGUNA PANTALLA** (retiradas el 11-sep-2026): el feed «Acciones pendientes», los contadores del 🔔 y las 💡 sugerencias. Se retiró CÓDIGO MUERTO; no se construyó nada. ⚠️ La **campana 🔔 SÍ funciona** (`NotificationCenter`) y `/api/notification-badges` se queda sin llamadores porque la nombran tres candados.
+- 🩸 **Tres cosas que esta lista prometía y NO EXISTÍAN EN NINGUNA PANTALLA** (retiradas el 11-sep-2026): el feed «Acciones pendientes», los contadores del 🔔 y las 💡 sugerencias. Se retiró CÓDIGO MUERTO; no se construyó nada. ⚠️ La **campana 🔔 SÍ funciona** (`NotificationCenter`) y `/api/notification-badges` se queda sin llamadores porque la nombran tres candados. Candado: `inicio-sin-promesas.test.ts`.
 - **Draft auto-save** cada 5s en localStorage (reclamos, guías, cheques) · **Time grouping** «Hoy/Esta semana/Vencidos» · **Contextual color** cuando hay datos urgentes · **Inline previews** sin expandir.
 - **Hover preview:** vive en **Ventas › Clientes** (`ClienteHoverCard`), NO en Cuentas por Cobrar (su detalle es la fila expandida).
 - **URL state:** filtros en la URL — deep links y back/forward funcionan. **UI persistence:** filas expandidas y scroll sobreviven la navegación (sessionStorage).
