@@ -129,7 +129,7 @@ function CargarInner() {
 
   // Registra la carga en el server al descargar (lo único que toca backend).
   // Desde el 4-sep-2026 viaja también EL ARCHIVO descargado (los mismos bytes),
-  // que queda 90 días en Storage para poder volver a bajarlo del Historial.
+  // que queda en Storage (RETENCION_ARCHIVO_DIAS) para volver a bajarlo del Historial.
   // 🔴 SOLO los Excel de Switch llegan acá: el pedido para cliente de Reebok y
   // Tallas por bulto no llaman este callback.
   const handleDownloaded = async (payload: {

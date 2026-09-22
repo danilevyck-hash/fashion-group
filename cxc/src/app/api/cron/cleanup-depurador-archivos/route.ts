@@ -9,8 +9,8 @@ export const maxDuration = 60;
 
 const CRON_NAME = "cleanup-depurador-archivos";
 
-// Los Excel del Historial del Depurador duran 90 días (Daniel: «que el archivo
-// dure 90 días»). Este cron borra los vencidos de Storage y le quita el botón
+// Los Excel del Historial del Depurador duran lo que diga RETENCION_ARCHIVO_DIAS
+// (un año desde el 22-sep-2026). Este cron borra los vencidos de Storage y le quita el botón
 // a la fila — 🔴 LA FILA CON LOS TOTALES SE QUEDA PARA SIEMPRE. La lógica core
 // vive en src/lib/depurador/historial-archivos.ts (runLimpiezaArchivosDepurador).
 // Schedule diario 03:20 UTC (solo DB + Storage, no toca Switch).

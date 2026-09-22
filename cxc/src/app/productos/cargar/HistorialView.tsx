@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { COMPANIAS_DEPURADOR } from "@/lib/depurador/logic";
+import { textoRetencion } from "@/lib/depurador/historial-archivos";
 import BuscadorDeLista, { VacioDeBusqueda } from "@/components/BuscadorDeLista";
 import {
   LIMPIAR_BUSQUEDA,
@@ -21,7 +22,7 @@ interface CargaRow {
   total_unidades: number;
   total_costo: number;
   created_at: string;
-  /** true si el Excel descargado sigue guardado (90 días). Las corridas viejas
+  /** true si el Excel descargado sigue guardado. Las corridas viejas
    *  (antes del 4-sep-2026) no tienen archivo: salen en gris, sin botón. */
   tiene_archivo: boolean;
   archivo_nombre: string | null;
@@ -124,8 +125,8 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
           etiqueta="Buscar descarga por marca, compañía, quién la hizo o fecha"
           conteo={conteo}
         />
-        {/* Los archivos se guardan 90 días; la fila con los totales queda. */}
-        <span className="text-[12px] text-stone-500">El Excel se puede volver a bajar por 90 días.</span>
+        {/* El plazo se DERIVA de la constante, nunca se escribe a mano: la fila con los totales queda igual. */}
+        <span className="text-[12px] text-stone-500">El Excel se puede volver a bajar por {textoRetencion()}.</span>
       </div>
 
       {rows === null ? (

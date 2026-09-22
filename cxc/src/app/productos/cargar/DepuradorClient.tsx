@@ -673,7 +673,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "upload");
       // 🔴 Los bytes se generan UNA sola vez: lo que baja al disco y lo que se
-      // guarda 90 días en el Historial es EL MISMO archivo, byte a byte —
+      // guarda en el Historial es EL MISMO archivo, byte a byte —
       // escribir dos veces podría diferir (SheetJS estampa la hora de creación).
       // 🔴 Y salen por `workbookBlob`, el camino común de todo export.
       const nombre = outputFilename(processed);

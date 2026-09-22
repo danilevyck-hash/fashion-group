@@ -6,16 +6,25 @@
 // «Plantilla › Historial». Daniel, textual: «el historial solo quiero los
 // excel para switch» y «que el archivo dure 90 días».
 //
+// 🔴 EL AÑO (22-sep-2026). Daniel volvió sobre los 90 días y dijo que sí a
+// subirlo a un año, después de preguntar si eso podía saturarle la base.
+// No puede, y la respuesta importa más que el número: estos archivos NO
+// viven en la base de datos, viven en Storage, así que no le cuestan una
+// consulta ni un milisegundo a ninguna pantalla. Medido el 22-sep contra
+// producción: 10 archivos guardados, **35 KB de promedio**, y el ritmo real
+// es ~50 plantillas al mes → **~21 MB al año**. Por eso el número se movió
+// sin pedir nada a cambio.
+//
 //   · 🔴 SOLO los Excel de Switch: el pedido para cliente de Reebok (con
-//     fotos), Tallas y Fotos a mi Excel NO se guardan.
-//   · 90 días y se borra solo (cron cleanup-depurador-archivos). 🔴 La FILA
+//     fotos) y Tallas por bulto NO se guardan.
+//   · Un año y se borra solo (cron cleanup-depurador-archivos). 🔴 La FILA
 //     con los totales se queda para siempre: al vencer el archivo, la fila
 //     queda sin botón — nunca se borra la fila junto con el archivo.
 //   · Bucket PRIVADO `depurador-plantillas` (migración 20260921120000). El
 //     acceso es 100% server-side con service role — mismo patrón que
 //     reclamo-facturas. La réplica off-site a R2 NO lo incluye a propósito:
 //     son archivos generados, re-derivables del Excel del proveedor, y con
-//     vencimiento de 90 días.
+//     vencimiento.
 //
 // Módulo compartido por la ruta del historial (subir/bajar) y el cron de
 // limpieza — el nombre del bucket y la retención viven en UN solo lugar.
@@ -25,13 +34,23 @@ import { supabaseServer } from "@/lib/supabase-server";
 
 export const BUCKET_PLANTILLAS = "depurador-plantillas";
 
-/** Cuántos días se puede volver a bajar el Excel. Daniel: «que el archivo
- *  dure 90 días». */
-export const RETENCION_ARCHIVO_DIAS = 90;
+/** Cuántos días se puede volver a bajar el Excel. Daniel dijo «que el archivo
+ *  dure 90 días» el 4-sep-2026 y «sí» a subirlo a un año el 22-sep-2026, una
+ *  vez medido que son ~21 MB al año y que no tocan la base. */
+export const RETENCION_ARCHIVO_DIAS = 365;
 
 /** Tope de tamaño del archivo guardado (el ZIP más grande medido pesa <5 MB;
  *  25 MB deja aire de sobra sin dejar que un error llene el bucket). */
 export const ARCHIVO_MAX_BYTES = 25 * 1024 * 1024;
+
+/** Cómo se dice la retención en pantalla. 🔴 El rótulo se DERIVA del número:
+ *  estaba escrito a mano («por 90 días») y el día que el número se movió a un
+ *  año la pantalla siguió prometiendo 90. Un solo lugar, y no vuelve a mentir. */
+export function textoRetencion(dias: number = RETENCION_ARCHIVO_DIAS): string {
+  if (dias === 365) return "un año";
+  if (dias % 365 === 0) return `${dias / 365} años`;
+  return `${dias} días`;
+}
 
 /** Nombre de archivo saneado para la ruta de Storage (sin separadores raros). */
 export function nombreSaneado(nombre: string): string {
