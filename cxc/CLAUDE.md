@@ -84,7 +84,7 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 
 Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene que caber en 150.000 caracteres** (el harness lo corta ahí, en silencio): una regla nueva entra aquí en UNA línea, y su detalle —mediciones, citas de Daniel, candados, mutaciones— va al postmortem de su módulo (`docs/postmortems/`). Candado: `claude-md-bajo-el-tope.test.ts`.
 
-⚠️ **Antes de tocar un módulo, lee el bloque «Lo que decía CLAUDE.md hasta el 14-sep-2026» de su postmortem**: ahí está, verbatim, todo lo que aquí se resumió el 14-sep-2026 — en particular las reglas de PANTALLA (qué se dibuja, dónde, rótulos, tamaños) que aquí ya no caben.
+⚠️ **Antes de tocar un módulo, lee los bloques «Lo que decía CLAUDE.md hasta el 14-sep-2026» y «…hasta el 22-sep-2026» de su postmortem**: ahí está, verbatim, todo lo que aquí se resumió en esas dos podas —mediciones, citas de Daniel, listas de candados, mutaciones— y en particular las reglas de PANTALLA (qué se dibuja, dónde, rótulos, tamaños) que aquí ya no caben.
 
 ### Boston y CXC — [docs/postmortems/boston-cxc.md](docs/postmortems/boston-cxc.md)
 
