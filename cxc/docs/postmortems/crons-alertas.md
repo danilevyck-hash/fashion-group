@@ -1340,3 +1340,24 @@ Los CHATS siguen siendo dos; lo que hay son **tres tratos**. `enviarNegocioPriva
 - El mensaje manda a la pantalla exacta: llave → API Keys y luego Vercel (`ANTHROPIC_API_KEY`, Production); crédito → Billing; tope → Limits; y dice que no se perdió nada. Candados: `lector-facturas-avisa.test.ts`.
 
 - Los Excel de todo el sistema empiezan en la **fila 1**, con filtro desde A1 y la fila de encabezados fija. Todo export sale por `workbookBytes`/`workbookBuffer`/`workbookBlob`.
+
+## Base de datos
+- **Tablas grandes** (medidas 2-sep-2026): `switch_articulo_diario` 203.536 · `switch_factura_lineas` 163.559 · `switch_facturas` 54.296 (historia oct-2022+, fuente única de ventas) · `ventas_raw` 48.378 (congelada, **sin lectores en la app**) · `switch_recibos` 46.556 · `switch_ingresos_mercancia` 35.475 · `switch_articulo_info` 16.619 · `cxc_rows` 1.097 (legacy, sin lectores). Detalle por pregunta en [docs/donde-vive-cada-dato.md](docs/donde-vive-cada-dato.md).
+
+- **Soft delete (`deleted` boolean), por módulo:**
+  - Caja: `caja_gastos` (+ `deleted_by`, `deleted_at`), `caja_periodos`
+  - Préstamos: `prestamos_empleados`, `prestamos_movimientos`
+  - Reclamos: `reclamos`, `reclamo_items`, `reclamo_settlements`
+  - Recordatorios: `cheques` (+ `deleted_at` desde el 5-sep-2026: lo escribe la retención de 365 días) y `recordatorios`
+  - Guías: `guia_transporte`, `guia_items`
+  - Directorio: `clientes_master` (`directorio_clientes` está retirada desde el 5-sep-2026: sin lectores ni escritores, queda respaldada como congelada)
+  - Nota: `packing_lists` usaba `deleted_at` (timestamp) en vez de la columna `deleted`; **el módulo se retiró el 10-sep-2026** (ver *Módulos*) y la tabla quedó sin escritores.
+- **Vistas / Materialized views:** Convención de nombres: sufijo `_mv` = materialized view, `_vw` = view. (No verificado contra catálogo pg — vía REST no se distingue MV de view; confirmar con acceso a catálogo si se necesita certeza.)
+  - `ventas_rollup_mensual_mv` (única `_mv`), `clientes_agregado_12m_vw`, `clientes_empresa_12m_vw`, `reebok_pedidos_unificado_vw`, `switch_costo_unificado_vw`, `switch_ventas_unificado_vw`, `_multifashion_sf_vw`
+- **Flags de negocio:**
+  - `is_wholesale`: en `ventas_raw`, `switch_facturas` y `_multifashion_sf_vw` (segrega retail/wholesale en Multifashion)
+  - `is_preorder`: en `reebok_order_items` (preventa Reebok)
+- **Tablas UX audit (abril 2026):**
+  - `cxc_favorites` — 🩸 **RETIRADA de la app el 4-sep-2026.** La tabla queda (patrón `mayor_lineas`), sin lectores ni escritores: tuvo **0 filas en toda su historia** y su endpoint le contestaba **403** al vendedor que sí ve el CXC. Daniel: *«quita favoritos»*. Candado: `cxc-favoritos-retirados.test.ts` (ninguna migración puede dropearla; la estrella no vuelve)
+  - `reclamo_custom_motivos` — motivos personalizados de reclamos (antes localStorage)
+  - `reebok_orders.client_email` — email del cliente capturado al crear pedido

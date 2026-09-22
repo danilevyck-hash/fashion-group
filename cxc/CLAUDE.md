@@ -572,26 +572,14 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - Forgot password: link en login → "Contacta al administrador"
 
 ## Base de datos
-- **Tablas grandes** (medidas 2-sep-2026): `switch_articulo_diario` 203.536 · `switch_factura_lineas` 163.559 · `switch_facturas` 54.296 (historia oct-2022+, fuente única de ventas) · `ventas_raw` 48.378 (congelada, **sin lectores en la app**) · `switch_recibos` 46.556 · `switch_ingresos_mercancia` 35.475 · `switch_articulo_info` 16.619 · `cxc_rows` 1.097 (legacy, sin lectores). Detalle por pregunta en [docs/donde-vive-cada-dato.md](docs/donde-vive-cada-dato.md).
 
-- **Soft delete (`deleted` boolean), por módulo:**
-  - Caja: `caja_gastos` (+ `deleted_by`, `deleted_at`), `caja_periodos`
-  - Préstamos: `prestamos_empleados`, `prestamos_movimientos`
-  - Reclamos: `reclamos`, `reclamo_items`, `reclamo_settlements`
-  - Recordatorios: `cheques` (+ `deleted_at` desde el 5-sep-2026: lo escribe la retención de 365 días) y `recordatorios`
-  - Guías: `guia_transporte`, `guia_items`
-  - Directorio: `clientes_master` (`directorio_clientes` está retirada desde el 5-sep-2026: sin lectores ni escritores, queda respaldada como congelada)
-  - Nota: `packing_lists` usaba `deleted_at` (timestamp) en vez de la columna `deleted`; **el módulo se retiró el 10-sep-2026** (ver *Módulos*) y la tabla quedó sin escritores.
-- **Vistas / Materialized views:** Convención de nombres: sufijo `_mv` = materialized view, `_vw` = view. (No verificado contra catálogo pg — vía REST no se distingue MV de view; confirmar con acceso a catálogo si se necesita certeza.)
-  - `ventas_rollup_mensual_mv` (única `_mv`), `clientes_agregado_12m_vw`, `clientes_empresa_12m_vw`, `reebok_pedidos_unificado_vw`, `switch_costo_unificado_vw`, `switch_ventas_unificado_vw`, `_multifashion_sf_vw`
-- **Flags de negocio:**
-  - `is_wholesale`: en `ventas_raw`, `switch_facturas` y `_multifashion_sf_vw` (segrega retail/wholesale en Multifashion)
-  - `is_preorder`: en `reebok_order_items` (preventa Reebok)
-- **Tablas UX audit (abril 2026):**
-  - `cxc_favorites` — 🩸 **RETIRADA de la app el 4-sep-2026.** La tabla queda (patrón `mayor_lineas`), sin lectores ni escritores: tuvo **0 filas en toda su historia** y su endpoint le contestaba **403** al vendedor que sí ve el CXC. Daniel: *«quita favoritos»*. Candado: `cxc-favoritos-retirados.test.ts` (ninguna migración puede dropearla; la estrella no vuelve)
-  - `reclamo_custom_motivos` — motivos personalizados de reclamos (antes localStorage)
-  - `reebok_orders.client_email` — email del cliente capturado al crear pedido
+> 📄 Los conteos medidos, las tablas retiradas y el detalle: [docs/donde-vive-cada-dato.md](docs/donde-vive-cada-dato.md) y [docs/postmortems/crons-alertas.md](docs/postmortems/crons-alertas.md) › «Lo que decía CLAUDE.md hasta el 22-sep-2026».
 
+- **Tablas grandes:** `switch_articulo_diario` · `switch_factura_lineas` · `switch_facturas` (historia oct-2022+, fuente única de ventas) · `ventas_raw` (congelada, **sin lectores en la app**) · `switch_recibos` · `switch_ingresos_mercancia` · `switch_articulo_info` · `cxc_rows` (legacy, sin lectores).
+- **Soft delete (`deleted` boolean), por módulo:** Caja (`caja_gastos` + `deleted_by`/`deleted_at`, `caja_periodos`) · Préstamos (`prestamos_empleados`, `prestamos_movimientos`) · Reclamos (`reclamos`, `reclamo_items`, `reclamo_settlements`) · Recordatorios (`cheques` + `deleted_at`, `recordatorios`) · Guías (`guia_transporte`, `guia_items`) · Directorio (`clientes_master`; `directorio_clientes` retirada, respaldada como congelada). ⚠️ `packing_lists` usaba `deleted_at` en vez de `deleted`; el módulo se retiró y la tabla quedó sin escritores.
+- **Vistas / Materialized views:** sufijo `_mv` = materialized view, `_vw` = view (no verificado contra el catálogo pg). `ventas_rollup_mensual_mv` (única `_mv`), `clientes_agregado_12m_vw`, `clientes_empresa_12m_vw`, `reebok_pedidos_unificado_vw`, `switch_costo_unificado_vw`, `switch_ventas_unificado_vw`, `_multifashion_sf_vw`.
+- **Flags de negocio:** `is_wholesale` (`ventas_raw`, `switch_facturas`, `_multifashion_sf_vw`; segrega retail/wholesale en Multifashion) · `is_preorder` (`reebok_order_items`).
+- 🩸 `cxc_favorites` **RETIRADA de la app el 4-sep-2026**: la tabla queda (patrón `mayor_lineas`), sin lectores ni escritores, y ninguna migración puede dropearla. `reclamo_custom_motivos` y `reebok_orders.client_email` siguen documentadas en el postmortem.
 ## Dónde vive cada dato
 
 🗺️ **El mapa completo, por PREGUNTA, vive en [docs/donde-vive-cada-dato.md](docs/donde-vive-cada-dato.md)** (movido desde aquí el 14-sep-2026): para cada cosa que hace falta saber —artículos, ventas, CXC, compras, gastos, asistencia, cheques, guías, clientes, catálogos, alertas— dice en qué tabla está, el grano, las filas medidas y, sobre todo, para qué **NO** sirve cada tabla. **Léelo antes de decir que un dato «no existe» o «no llega».**
