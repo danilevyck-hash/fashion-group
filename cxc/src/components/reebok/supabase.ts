@@ -15,7 +15,6 @@ export type Product = {
   category: string
   gender: string | null
   sub_category: string | null
-  color: string | null
   image_url: string | null
   active: boolean
   on_sale: boolean

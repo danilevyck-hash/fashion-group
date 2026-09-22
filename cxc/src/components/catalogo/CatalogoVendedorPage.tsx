@@ -360,7 +360,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   );
 
   const filtered = agrupado ? [] : products
-    .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()) || (p.color || "").toLowerCase().includes(search.toLowerCase()))
+    .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()))
     .filter(p => theme.genero.match(p.gender, gender))
     .filter(p => !category || p.category === category)
     // Filtros extra (Tommy). Bultos: se mide contra la DISPONIBILIDAD (lo

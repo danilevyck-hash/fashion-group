@@ -2720,6 +2720,191 @@ para cliente no puede volver a tener el suyo—; cambió cuál es ese lugar.
 
 ---
 
+## 🔴 «SIN MANDAR» DICE DESDE CUÁNDO, Y LA TARJETA SE PODA (22-sep-2026)
+
+Dos cambios de Catálogos aprobados el mismo día. Otros cuatro que se propusieron quedaron
+**rechazados** y no se tocaron.
+
+---
+
+### A · $32.208 QUE NUNCA LLEGARON A SWITCH Y NADIE VEÍA
+
+**Medido contra producción el 22-sep-2026** (las 4 marcas, `<marca>_orders` vivas cruzadas
+contra `<marca>_switch_envios` con envío ACTIVO — `enviado` o `verificado`):
+
+| Pedido | Marca | Cliente | Monto | Creado | Días |
+|---|---|---|---|---|---|
+| **PED-019** | reebok | Contado | **$2.760,00** | 22-jul-2026 | **62** |
+| **TOM-005** | tommy | Contado | **$16.920,00** | 12-ago-2026 | **41** |
+| **TOM-006** | tommy | Contado | **$7.254,00** | 12-ago-2026 | **41** |
+| **CKP-007** | calvin | ACTIVE SHOES, S.A. | **$1.704,00** | 12-ago-2026 | **41** |
+| **TOM-023** | tommy | Wolf Mall Center Int | **$3.570,00** | 20-ago-2026 | **33** |
+| | | **TOTAL** | **$32.208,00** | | |
+
+⚠️ **CKP-007 nació a las 02:35 UTC del 13-ago, o sea el 12-ago de PANAMÁ.** Contarlo en UTC
+diría 40 días donde son 41. Es la trampa de siempre de este repo, y por eso el día llega por
+parámetro desde `hoyPanama()` y nunca se lee un reloj adentro del módulo.
+
+⚠️ **Estos cinco se BORRAN aparte**, en su propio cambio del mismo día
+(`20261213120000_borrar_pedidos_parados.sql`, borrado suave por lista de ids). Esa migración
+los cuenta en **UTC** (61 · 40 · 40 · 40 · 32) y esta tabla en **PANAMÁ** (62 · 41 · 41 · 41 ·
+33): la diferencia de un día es exactamente la trampa que este cambio cierra. Lo de acá no es
+la limpieza de lo que ya pasó, sino que **el próximo no tarde 62 días en verse**.
+
+🔴 **LOS CINCO SON BORRADORES, Y ÉSE ERA EL AGUJERO.** La línea roja del 6-sep-2026
+(`esSinMandar` → `textoSinMandar`) solo agarra los **TERMINADOS** que no salieron, y de ésos
+hoy hay **CERO**: nadie ve esa línea en ninguna marca. Los cinco caían en la otra rama —
+`TEXTO_NO_ENVIADO`, «No se ha mandado a Switch»— **en `text-gray-400`, del mismo tamaño que
+todo lo demás y sin decir hace cuánto**. PED-019 llevaba 62 días ahí y se leía exactamente
+igual que uno armado esa mañana.
+
+#### 🔑 DE DÓNDE SALE EL UMBRAL DE 7 DÍAS
+
+No es un gusto. **Un pedido que sale a Switch, sale en el acto.** Medido sobre los **71
+envíos activos** de las 4 marcas, la distancia entre crear el pedido y mandarlo:
+
+| | |
+|---|---|
+| p50 | **0,00 h** |
+| p75 | 0,01 h |
+| p95 | 0,02 h |
+| p99 | 4,38 h |
+| **máximo** | **4,38 h** |
+| mismo día de Panamá | **71 de 71 — 100 %** |
+
+Ni uno cruzó la medianoche. Y entre «lo normal» (≤ 4,4 horas) y lo trabado (**33 días**, el
+más nuevo de los cinco) **no hay absolutamente nada**: el corte se puede poner en cualquier
+parte de ese hueco sin cambiar a quién agarra. Se eligió **7** por ser el más chico que
+además: es ~38 veces el caso real más lento (ningún pedido sano lo puede tocar, ni con un
+fin de semana largo de por medio), deja **26 días de margen** por debajo del más nuevo de
+los cinco, y se lee como lo que es —«lleva una semana ahí»—, no como un umbral.
+
+#### Qué quedó
+
+- 🔴 **El borrador que se quedó también dice DESDE CUÁNDO**: mismas palabras
+  (`TEXTO_NO_ENVIADO`) más la antigüedad — «No se ha mandado a Switch · hace 41 días».
+- ⚠️ **El del PRIMER día no dice «· hoy» ni cambia de color.** Un borrador armado esta
+  mañana no es noticia, y una alarma que suena siempre no se oye.
+- 🔴 **A partir de los 7 días se pinta como el trabado** (`font-medium text-red-600`). El
+  tono sale de `tonoSinLlegar` + `CLASES_TONO` y **la pantalla no elige ningún color**: la
+  tabla del escritorio y la ficha del teléfono leen la misma tabla y no pueden discrepar.
+- ⚠️ **EL TERMINADO NO ESPERA LA SEMANA.** Un confirmado sin envío activo está mal desde el
+  primer minuto: sigue rojo desde el día cero, igual que el 6-sep-2026. La semana es solo
+  para el borrador.
+- 🔴 **Los días se cuentan en UN solo lugar** (`diasSinLlegarASwitch`), con el día de Panamá
+  por parámetro, y **sin fecha legible no se inventa un número** — «hace NaN días» es peor
+  que no decir cuánto.
+
+#### Lo que **NO** cambió, a propósito
+
+- 🔴 **`esSinMandar` no se tocó.** Quién es «trabado» lo sigue decidiendo el **ENVÍO ACTIVO**,
+  nunca el `status` ni el número (regla del módulo desde el 24-ago-2026). Un envío activo sin
+  número sigue contando como que salió.
+- 🔴 **El chip filtro «Sin mandar» sigue contando solo los CONFIRMADOS** (hoy 0, por eso ni
+  se dibuja). Meter los borradores ahí es una decisión de Daniel que **no está tomada**: la
+  nota del 6-sep-2026 razona justamente en contra («un aviso que exagera se aprende a
+  ignorar»). Los cinco ya son alcanzables por el chip **«Borradores»**, que los tiene a los
+  cinco, y ahora la fila grita.
+- 🔴 **El pedido del LINK sin convertir queda afuera de esta cuenta.** Todavía no es un
+  pedido de la casa y su abandono se mide con la ventana de 30 días
+  (`comprobantes-ventana.ts`).
+
+⚠️ **NOTA FECHADA sobre un candado anterior.** `comprobantes-rediseno-pantalla.test.tsx`
+(6-sep-2026) dice «un BORRADOR conserva su frase gris». Sigue siendo cierto **el primer
+día**; a partir de la semana se pinta como el trabado. Ese candado no se tocó: su borrador
+de prueba nace hoy.
+
+**Candados:** `comprobantes-antiguedad.test.ts` · `comprobantes-antiguedad-pantalla.test.tsx`.
+
+---
+
+### B · LA TARJETA DEL PRODUCTO, PODADA — SE VA EL COLOR, SE QUEDAN EL BADGE Y «CONSULTAR»
+
+Se auditaron los tres adornos de `CatalogoProductCard.tsx` que en producción no se dibujan
+nunca. **El criterio no fue «está vacío», fue «¿hay alguien que lo pueda llenar?»**, y los
+tres dieron respuestas distintas.
+
+| | Medido el 22-sep-2026 | ¿Quién lo puede escribir? | Veredicto |
+|---|---|---|---|
+| **`color`** (puntito + nombre) | vacío en **391 de 391** de Reebok (390 NULL + 1 vacío); **las otras 3 marcas ni tienen la columna** | **NADIE** | 🩸 **SE VA** |
+| **`badge`** (Oferta · Nuevo · Próximamente) | NULL en **1.140 de 1.140** de las 4 marcas | ✅ `PUT`/`POST /api/catalogo/[marca]/products` | 🔴 **SE QUEDA** |
+| **«Consultar»** (producto sin precio) | **0 de 1.140** sin precio (el único con precio 0 está apagado) | el sync y la columna admiten NULL | 🔴 **SE QUEDA** |
+
+#### 🩸 `color` se va: no está vacío por ahora, está muerto
+
+Las cinco vías, verificadas una por una:
+
+1. **Admin** — `AdminProducto` no tiene el campo; ninguna pantalla de `catalogos/**` lo nombra.
+2. **API** — `EDITABLE_FIELDS` es `["image_url", "badge"]`. `color` **no está**, y la ruta lo
+   **rechaza con 400** («Campos no editables: color»).
+3. **Sync de Switch** — ni el genérico ni los cuatro por marca lo escriben, ni en el INSERT
+   ni en el UPDATE.
+4. **Scripts** — ninguno.
+5. **Migraciones** — **cero DDL** que lo toque desde que nació en `reebok-setup.sql`.
+
+Switch **sí** trae un `color` en `/apiarticulos/lista`, y está medido vacío desde el
+6-ago-2026 (migración `20260806120000`: *«`talla` y `color` de /apiarticulos/lista … vacios
+en los 650»*). O sea que aunque se quisiera llenar, **solo podría ser un campo a mano**, y
+ese campo no existe en ninguna pantalla.
+
+**Qué se quitó, y de dónde:** el puntito y el nombre de la tarjeta (con su `COLOR_DOT_MAP` de
+24 hex adivinados por `includes` del texto), las **dos** `cols` de Reebok en `marcas.ts` —así
+**deja de viajar al navegador**, no solo de dibujarse—, los buscadores del catálogo público y
+del vendedor, el PDF del catálogo y los dos tipos (`CatalogoProducto`, `reebok/supabase.Product`).
+🔑 **La COLUMNA `products.color` NO se dropea** (patrón `mayor_lineas`): queda sin lectores.
+
+#### 🔴 `badge` se queda: tiene puerta viva
+
+Está igual de vacío que `color`, pero **esa misma ruta SÍ lo escribe y lo valida** contra tres
+valores (`nuevo` · `oferta` · `proximamente`), con `requireAdminOSecretaria` e invalidación del
+caché público. Los controles de la pantalla se retiraron el 6-sep-2026 por tener 0 usos, pero
+**la puerta quedó abierta a propósito** — reponerlos es solo UI.
+
+Y de `badge` cuelgan **tres cosas vivas**, no una:
+
+- la **PRE-ORDEN** de Reebok (`is_preorder = badge === "proximamente"`, y el botón
+  «Pre-ordenar»);
+- la regla de **«a la venta»** (`a-la-venta.ts`, cláusula 3), que está **espejada byte a byte**
+  en la migración `20261123120000` de los contadores del hub, con candado que compara las dos;
+- el color del precio en el **PDF** del catálogo.
+
+Quitar los tres adornos dejaría la puerta escribiendo un dato que ya nadie dibuja. **No se
+tocó.**
+
+#### 🔴 «Consultar» se queda
+
+`price` es `number | null` en la columna y en el tipo, y un producto sin precio es un estado
+**real y posible** — hoy no hay ninguno activo, pero el sync puede dejarlo. Borrarlo dejaría
+un **hueco en blanco donde va el precio**, que es peor que una palabra. ⚠️ Ojo: la condición
+es `product.price ? … : "Consultar"`, así que un precio **0** también cae ahí.
+
+**Candado:** `catalogo-tarjeta-podada.test.tsx` — build ROJO si el color vuelve a la tarjeta,
+al payload, al buscador o al PDF; **y también** si alguien se lleva el badge, sus tres adornos
+o «Consultar».
+
+---
+
+### Verificado por mutación
+
+`scripts/_mutar-candados-catalogo-22sep.sh` — **31 mutaciones, 31 cazadas; 2 controles en
+verde; 0 problemas.** Entre ellas: la frase sin antigüedad, el «hoy» del navegador en vez del
+de Panamá, la fecha partida en UTC (CKP-007 diciendo 40 en vez de 41), el umbral apagado en
+0 · 3650 · 45, el tono que deja de escalar, el rojo que se vuelve gris, «trabado» deducido del
+número en vez del envío, el color de vuelta en la tarjeta / el payload / el buscador / el PDF,
+y los tres adornos, el badge y «Consultar» sacados.
+
+🩸 **Y de paso se arregló un defecto del arnés viejo.**
+`scripts/_mutar-candados-comprobantes-rediseno.sh` mutaba `fila-comprobante.ts` y
+`numeros-pedido.ts` **sin tenerlos en su lista `ARCHIVOS`**, así que `restaurar()` no los
+tocaba: el script terminaba **dejando los dos archivos rotos en el árbol de trabajo**, y con
+ellos rotos todo lo que corría después del cuarto mutante daba «cazada» por el motivo
+equivocado. Ahora están en la lista. Con el arnés honesto quedan **2 mutantes que SOBREVIVEN**
+y que **no son de este cambio** (los dos archivos están intactos): «los conteos vuelven a
+contar TODO el listado» (`ComprobantesPanel.tsx`) y «el correo del directorio deja de fallar
+abierta» (`correo-del-cliente.ts`). ⚠️ **Pendiente: esos dos candados hay que apretarlos.**
+
+---
+
 ## Lo que decía CLAUDE.md hasta el 22-sep-2026 (movido acá, verbatim)
 
 ### Catálogos, pedidos y cotización — [docs/postmortems/catalogos-pedidos.md](docs/postmortems/catalogos-pedidos.md)

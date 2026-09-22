@@ -16,7 +16,14 @@
 
 import { getMarcaTheme, type MarcaUiKey, type MarcaTheme } from "@/lib/catalogo/marcas-ui";
 import { ORIGEN_LABEL } from "@/lib/catalogo/origen-comprobante";
-import { esSinMandar, textoSinMandar } from "@/lib/catalogo/sin-mandar";
+import {
+  CLASES_TONO,
+  diasSinLlegarASwitch,
+  esSinMandar,
+  textoNoLlegoASwitch,
+  textoSinMandar,
+  tonoSinLlegar,
+} from "@/lib/catalogo/sin-mandar";
 import {
   estaEnSwitch,
   textoEnSwitch,
@@ -76,10 +83,19 @@ export function datosNumeros(pedido: FilaComprobante, esOrders: boolean): Numero
  * Los dos números debajo del nombre.
  *
  * 🔴 EL QUE NO LLEGÓ A SWITCH SE NOTA. La frase existía y estaba en gris del
- * mismo tamaño que todo lo demás: ahora, cuando el pedido está TERMINADO y no
- * salió, va **en rojo y con los días** («Sin mandar a Switch · hace 65 días»).
- * Un borrador sigue con su frase gris de siempre: no se mandó porque no se
- * terminó, y eso no es una alarma.
+ * mismo tamaño que todo lo demás: desde el 6-sep-2026, cuando el pedido está
+ * TERMINADO y no salió, va **en rojo y con los días** («Sin mandar a Switch ·
+ * hace 65 días»).
+ *
+ * 🔴 Y DESDE EL 22-sep-2026 EL BORRADOR TAMBIÉN DICE DESDE CUÁNDO. Los cinco
+ * comprobantes que se quedaron sin llegar a Switch —$32.208— son borradores, y
+ * la frase gris no decía hace cuánto: PED-019 llevaba 62 días ahí y se leía
+ * igual que uno armado esta mañana. Ahora la frase lleva su antigüedad y, a
+ * partir de la SEMANA (`DIAS_SIN_MANDAR_VIEJO`), se pinta como el trabado.
+ *
+ * ⚠️ El borrador del PRIMER día no cambia: sigue gris y sin días. Un borrador
+ * recién armado no es una alarma, y una alarma que suena siempre no se oye.
+ * El tono y el texto los decide `sin-mandar.ts`; acá no se elige ningún color.
  */
 export function NumerosPedido({
   pedido,
@@ -94,6 +110,12 @@ export function NumerosPedido({
   const propio = tieneNumeroPropio(datos);
   const enSwitch = estaEnSwitch(datos);
   const trabado = esSinMandar(datos);
+  // Un borrador de la casa que todavía no salió. El pedido del LINK sin
+  // convertir queda afuera a propósito: su abandono se mide con la ventana de
+  // 30 días (`comprobantes-ventana.ts`), no con esta cuenta.
+  const borradorQuedado = !trabado && !enSwitch && esOrders;
+  const dias = diasSinLlegarASwitch(pedido.created_at, hoy);
+  const tono = tonoSinLlegar(trabado, dias);
   return (
     <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs leading-snug">
       <span className={propio ? "font-medium text-gray-600 tabular-nums" : "text-gray-400"}>
@@ -103,8 +125,12 @@ export function NumerosPedido({
         ·
       </span>
       {trabado ? (
-        <span data-medir="sin-mandar" className="font-medium text-red-600">
+        <span data-medir="sin-mandar" data-tono={tono} className={CLASES_TONO[tono]}>
           {textoSinMandar(pedido.created_at, hoy)}
+        </span>
+      ) : borradorQuedado ? (
+        <span data-medir="sin-llegar" data-tono={tono} className={CLASES_TONO[tono]}>
+          {textoNoLlegoASwitch(pedido.created_at, hoy)}
         </span>
       ) : (
         <span className={enSwitch ? "text-gray-600 tabular-nums" : "text-gray-400"}>

@@ -34,7 +34,6 @@ import {
 interface ItemPdf {
   name: string;
   sku: string;
-  color?: string | null;
   price: number | null;
   image_url: string | null;
   badge: string | null;
@@ -138,7 +137,7 @@ export function useDescargarCatalogoPdf() {
         pdfSections = theme.genero.pdfSections.map(g => ({
           label: g.label,
           items: filtered.filter(p => theme.genero.groupKey(p.gender) === g.key).map(p => ({
-            name: p.name, sku: p.sku || "", color: p.color, price: p.price,
+            name: p.name, sku: p.sku || "", price: p.price,
             image_url: p.image_url || null, badge: p.badge ?? null,
           })),
         }));

@@ -31,7 +31,7 @@
 
 import { diasDesde } from "@/lib/clientes/ficha";
 import { fechaPanamaDe } from "@/lib/fecha-panama";
-import { esBorrador, type NumerosDePedido } from "./numeros-pedido";
+import { TEXTO_NO_ENVIADO, esBorrador, type NumerosDePedido } from "./numeros-pedido";
 
 /** El rótulo del chip. Dice el estado, no el mecanismo. */
 export const CHIP_SIN_MANDAR = "Sin mandar";
@@ -61,23 +61,120 @@ export function esSinMandar(p: FilaSinMandar): boolean {
 }
 
 /**
- * «Sin mandar a Switch · hace 65 días» — lo que la fila dice EN ROJO.
+ * 🔴 LOS DÍAS SE CUENTAN EN UN SOLO LUGAR (22-sep-2026).
  *
- * El «hoy» es el día de Panamá y llega por parámetro. Sin fecha legible se
- * dice la frase sola, sin inventar un número: mostrar «hace NaN días» sería
- * peor que no decir cuánto.
+ * Cuántos días lleva un comprobante sin llegar a Switch, contados contra el
+ * día de PANAMÁ que llega por parámetro. `null` cuando no se puede saber —
+ * sin fecha, con una fecha ilegible o con una fecha del futuro—: ahí no se
+ * inventa un número, porque «hace NaN días» es peor que no decir cuánto.
+ *
+ * Es la ÚNICA forma de contar esos días. El texto rojo del pedido trabado, el
+ * del borrador que se quedó y el tono de los dos salen todos de acá: dos
+ * cuentas para la misma pregunta es cómo se termina diciendo 41 en un lado y
+ * 42 en el otro.
  */
-export function textoSinMandar(createdAt: string | null | undefined, hoyPanamaYmd: string): string {
-  const base = "Sin mandar a Switch";
-  if (!createdAt) return base;
+export function diasSinLlegarASwitch(
+  createdAt: string | null | undefined,
+  hoyPanamaYmd: string,
+): number | null {
+  if (!createdAt) return null;
   // Una fecha ilegible NO revienta ni inventa: `fechaPanamaDe` haría
   // `new Date(NaN).toISOString()`, que tira RangeError.
-  if (Number.isNaN(new Date(createdAt).getTime())) return base;
+  if (Number.isNaN(new Date(createdAt).getTime())) return null;
   const dia = fechaPanamaDe(createdAt);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) return base;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) return null;
   const d = diasDesde(dia, hoyPanamaYmd);
-  if (!Number.isFinite(d) || d < 0) return base;
-  if (d === 0) return `${base} · hoy`;
-  if (d === 1) return `${base} · ayer`;
-  return `${base} · hace ${d} días`;
+  if (!Number.isFinite(d) || d < 0) return null;
+  return d;
 }
+
+/** «· hace 41 días» pegado a la frase que ya dice qué pasó. */
+function conAntiguedad(base: string, dias: number | null, desdeUnDia: boolean): string {
+  if (dias === null) return base;
+  if (dias === 0) return desdeUnDia ? base : `${base} · hoy`;
+  if (dias === 1) return `${base} · ayer`;
+  return `${base} · hace ${dias} días`;
+}
+
+/**
+ * «Sin mandar a Switch · hace 65 días» — lo que la fila dice EN ROJO cuando un
+ * pedido TERMINADO no llegó al ERP.
+ */
+export function textoSinMandar(createdAt: string | null | undefined, hoyPanamaYmd: string): string {
+  return conAntiguedad("Sin mandar a Switch", diasSinLlegarASwitch(createdAt, hoyPanamaYmd), false);
+}
+
+/**
+ * 🔴 EL BORRADOR QUE SE QUEDÓ TAMBIÉN DICE DESDE CUÁNDO (22-sep-2026).
+ *
+ * Mismas palabras de siempre (`TEXTO_NO_ENVIADO`), más la antigüedad. Y la
+ * antigüedad solo aparece **a partir del día siguiente**: un borrador armado
+ * hoy diciendo «· hoy» es ruido, y el ruido es lo que enseña a no mirar.
+ */
+export function textoNoLlegoASwitch(createdAt: string | null | undefined, hoyPanamaYmd: string): string {
+  return conAntiguedad(TEXTO_NO_ENVIADO, diasSinLlegarASwitch(createdAt, hoyPanamaYmd), true);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 A PARTIR DE LA SEMANA, SE VE DE LEJOS (22-sep-2026)
+//
+// 🩸 QUÉ PASÓ. Medido contra producción el 22-sep-2026: **cinco comprobantes
+// vivos nunca llegaron a Switch, $32.208 en total**, y ninguno se veía. Los
+// cinco son BORRADORES, así que la línea roja de arriba no los agarra —
+// `esSinMandar` mira los TERMINADOS, y de ésos hoy hay **cero**—: salían con la
+// frase gris de siempre, del mismo tamaño que todo lo demás y SIN decir hace
+// cuánto.
+//
+//   PED-019 · reebok · Contado               ·  $2.760,00 · 22-jul · 62 días
+//   TOM-005 · tommy  · Contado               · $16.920,00 · 12-ago · 41 días
+//   TOM-006 · tommy  · Contado               ·  $7.254,00 · 12-ago · 41 días
+//   CKP-007 · calvin · ACTIVE SHOES, S.A.    ·  $1.704,00 · 12-ago · 41 días
+//   TOM-023 · tommy  · Wolf Mall Center Int  ·  $3.570,00 · 20-ago · 33 días
+//
+// 🔑 DE DÓNDE SALE EL NÚMERO 7. No es un gusto: **un pedido que sale a Switch,
+// sale EN EL ACTO**. Medido sobre los 71 envíos activos de las 4 marcas, la
+// distancia entre crear el pedido y mandarlo es:
+//
+//     p50 = 0,00 h · p75 = 0,01 h · p95 = 0,02 h · p99 = 4,38 h
+//     máximo = 4,38 h · 71 de 71 (100 %) el MISMO día de Panamá
+//
+// O sea que ni uno solo cruzó la medianoche. Entre «lo normal» (≤ 4,4 horas) y
+// lo que está trabado (33 días, el más nuevo de los cinco) no hay NADA: el
+// corte se puede poner en cualquier parte del medio sin cambiar a quién agarra.
+// Se elige **7 días** porque es el más chico que además:
+//   · es ~38 veces el caso real más lento, así que un pedido sano no lo puede
+//     tocar ni con un fin de semana largo de por medio;
+//   · deja 26 días de margen por debajo del más nuevo de los cinco;
+//   · se lee como lo que es — «lleva una semana ahí» —, y no como un umbral.
+//
+// ⚠️ EL TERMINADO NO ESPERA LA SEMANA. Un pedido CONFIRMADO que no salió está
+// mal desde el primer minuto (eso es lo que `esSinMandar` marca en rojo desde
+// el 6-sep-2026, y no se toca). La semana es para el BORRADOR, que el primer
+// día no es una alarma y a los 33 sí.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 🔴 Los días a partir de los cuales un borrador sin mandar deja de ser normal. */
+export const DIAS_SIN_MANDAR_VIEJO = 7;
+
+/** Cómo se pinta la línea: `calma` es el gris de siempre, `alerta` el rojo. */
+export type TonoSinMandar = "calma" | "alerta";
+
+/**
+ * 🔴 EL TONO SALE DE ACÁ Y DE NINGÚN OTRO LADO.
+ *
+ * `trabado` = terminado y sin envío activo (`esSinMandar`): rojo siempre.
+ * Si no, es un borrador: gris hasta la semana, rojo desde ahí.
+ * Sin fecha no se puede saber cuánto lleva, así que se deja en calma — no se
+ * levanta una alarma sobre un dato que no se tiene.
+ */
+export function tonoSinLlegar(trabado: boolean, dias: number | null): TonoSinMandar {
+  if (trabado) return "alerta";
+  return dias !== null && dias >= DIAS_SIN_MANDAR_VIEJO ? "alerta" : "calma";
+}
+
+/** Las clases de las dos formas. Viven acá para que la tabla y la ficha no
+ *  puedan pintar cosas distintas: las dos leen esta misma tabla. */
+export const CLASES_TONO: Record<TonoSinMandar, string> = {
+  calma: "text-gray-400",
+  alerta: "font-medium text-red-600",
+};

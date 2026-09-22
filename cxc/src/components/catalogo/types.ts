@@ -13,7 +13,8 @@ export interface CatalogoProducto {
   category?: string;
   gender?: string | null;
   sub_category?: string | null;
-  color?: string | null;
+  /** 🩸 `color` se podó el 22-sep-2026: vacío en 391 de 391 y sin nadie que lo
+   *  pueda escribir. La COLUMNA de la base no se dropea. Ver la tarjeta. */
   badge?: string | null;
   description?: string | null;
   active?: boolean;

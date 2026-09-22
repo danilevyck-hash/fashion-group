@@ -347,7 +347,7 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
       authStyle: "scope-admin",
       editVerb: "PUT", // quirk heredado: edición por id
       idField: "id",
-      cols: "id,name,sku,description,category,sub_category,gender,color,price,image_url,badge,on_sale,active,existencia,disponibilidad,created_at",
+      cols: "id,name,sku,description,category,sub_category,gender,price,image_url,badge,on_sale,active,existencia,disponibilidad,created_at",
       readDb: reebokProductsAnonDb,
       writeDb: reebokServerDb,
       hasDelete: true,
@@ -370,7 +370,7 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
       // `disponibilidad` cuando el sync todavía no la escribió, y el servidor
       // resuelve el número antes de responder (lib/catalogo/publico-payload).
       db: reebokServerDb,
-      cols: "id,name,sku,category,gender,color,price,image_url,badge,active,existencia,disponibilidad",
+      cols: "id,name,sku,category,gender,price,image_url,badge,active,existencia,disponibilidad",
       conInventario: true,
     },
     fallback: {

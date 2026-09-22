@@ -16,23 +16,6 @@ import { supabaseThumb } from "@/lib/image-thumb";
 import { fmtPrecio } from "@/lib/catalogo/precio";
 import VisorFoto from "./VisorFoto";
 
-const COLOR_DOT_MAP: Record<string, string> = {
-  black: "#000", negro: "#000", white: "#fff", blanco: "#fff",
-  red: "#E4002B", rojo: "#E4002B", blue: "#1A2656", azul: "#1A2656",
-  green: "#16a34a", verde: "#16a34a", yellow: "#eab308", amarillo: "#eab308",
-  pink: "#ec4899", rosado: "#ec4899", gray: "#9ca3af", gris: "#9ca3af",
-  brown: "#92400e", cafe: "#92400e", orange: "#f97316", naranja: "#f97316",
-  purple: "#9333ea", morado: "#9333ea", navy: "#1e3a5f", beige: "#d4c5a9",
-};
-
-function getColorDot(color: string): string {
-  const lower = color.toLowerCase().trim();
-  for (const [key, hex] of Object.entries(COLOR_DOT_MAP)) {
-    if (lower.includes(key)) return hex;
-  }
-  return "#94a3b8";
-}
-
 interface CatalogoProductCardProps {
   marca: MarcaUiKey;
   product: CatalogoProducto;
@@ -190,20 +173,34 @@ export default function CatalogoProductCard({
           <CatalogoProductName nombre={product.name} className={t.name} />
 
           {/* Código (píldora) — mt-1: nombre y código van juntos (Daniel,
-              25-jul-2026; antes mt-2). El color, cuando existe, viaja como un
-              chip MÁS de esta misma fila para no abrir otra línea. */}
-          {(product.sku || product.color) && (
+              25-jul-2026; antes mt-2).
+
+              🩸 EL PUNTITO DE COLOR SE PODÓ (22-sep-2026). Al lado del código
+              vivía un círculo de color con el nombre del color al lado, con su
+              propio mapa de 24 hex adivinados por `includes` del texto. Medido
+              contra producción ese día: `color` está VACÍO en **391 de 391**
+              productos de Reebok —390 en NULL y uno en cadena vacía— y **las
+              otras tres marcas ni siquiera tienen la columna**. Nunca dibujó
+              nada, en ninguna marca, en toda su historia.
+
+              🔴 Y NO ES «está vacío por ahora»: NADIE puede llenarlo. La única
+              puerta de edición a mano (`PUT/POST /api/catalogo/[marca]/products`)
+              lo RECHAZA con 400 —no está en `EDITABLE_FIELDS`—, el sync de
+              Switch no lo escribe en ninguna de las 4 marcas, y no hay script
+              ni migración que lo toque. Switch sí trae un `color` en
+              `/apiarticulos/lista`, y está medido vacío también.
+
+              ⚠️ Lo que SÍ se queda: el `badge`. Está igual de vacío (NULL en
+              los 1.140), pero esa misma ruta SÍ lo escribe y lo valida
+              (`nuevo · oferta · proximamente`), y de él cuelgan la pre-orden,
+              la regla de «a la venta» y los contadores del hub. Vacío por ahora
+              no es lo mismo que muerto.
+
+              🔑 La COLUMNA `products.color` NO se dropea (patrón `mayor_lineas`):
+              queda sin lectores. */}
+          {product.sku && (
             <div className="flex flex-wrap items-center gap-1 mt-1">
-              {product.sku && <span className={t.skuPill}>{product.sku}</span>}
-              {product.color && (
-                <span className="inline-flex items-center gap-1">
-                  <span
-                    className="w-3 h-3 rounded-full border border-black/10 shrink-0"
-                    style={{ backgroundColor: getColorDot(product.color) }}
-                  />
-                  <span className={t.priceMeta}>{product.color}</span>
-                </span>
-              )}
+              <span className={t.skuPill}>{product.sku}</span>
             </div>
           )}
 

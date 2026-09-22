@@ -41,10 +41,20 @@ CANDADOS=(
   src/__tests__/api/comprobantes-correo-del-cliente.test.ts
   src/__tests__/lib/comprobantes-ventana-90-dias.test.ts
   src/__tests__/lib/numeros-pedido.test.ts
+  src/__tests__/lib/comprobantes-antiguedad.test.ts
+  src/__tests__/components/comprobantes-antiguedad-pantalla.test.tsx
 )
 
+# 🩸 22-sep-2026: `FILACOMP` y `NUMEROS` se MUTABAN y NO estaban en esta lista,
+# así que `restaurar()` no los tocaba y el script terminaba dejándolos rotos en
+# el árbol de trabajo —con los dos controles finales en rojo por culpa de eso, no
+# de los candados—. Todo archivo que aparezca en un `mutar` tiene que estar acá.
+FILACOMP=src/lib/catalogo/fila-comprobante.ts
+NUMEROS=src/lib/catalogo/numeros-pedido.ts
+
 ARCHIVOS=("$ORIGEN" "$CHIPS" "$SINMANDAR" "$VENTANA" "$MES" "$PAPEL" "$CORREO" \
-          "$PANEL" "$FILA" "$ACCIONES" "$FILTROS" "$DETALLE" "$SENDORDER")
+          "$PANEL" "$FILA" "$ACCIONES" "$FILTROS" "$DETALLE" "$SENDORDER" \
+          "$FILACOMP" "$NUMEROS")
 RESPALDO="$(mktemp -d)"
 for f in "${ARCHIVOS[@]}"; do
   mkdir -p "$RESPALDO/$(dirname "$f")"; cp "$f" "$RESPALDO/$f"
@@ -133,7 +143,7 @@ mutar "vuelve «Míos»" "$ORIGEN" \
 mutar "la fila deja de usar los nombres del módulo y escribe el suyo" "$FILA" \
   '        {ORIGEN_LABEL.link}' '        {"Del link"}'
 
-mutar "🩸 el origen empieza a depender del usuario que entró" "src/lib/catalogo/fila-comprobante.ts" \
+mutar "🩸 el origen empieza a depender del usuario que entró" "$FILACOMP" \
   'origen: o.del_link === true || fuente === "publicos" ? "link" : "mio",' \
   'origen: o.del_link === true || fuente === "publicos" ? "link" : (o.vendor_name === sessionStorage.getItem("fg_user_name") ? "mio" : "link"),'
 
@@ -188,23 +198,25 @@ mutar "el chip «Sin mandar» desaparece de la pantalla" "$CHIPS" \
   '  { clave: VISTA_SIN_MANDAR, label: CHIP_SIN_MANDAR },' '  '
 
 mutar "🔴 «Sin mandar» se cuela en FILTROS_COMPROBANTE y rompe la partición" \
-  src/lib/catalogo/numeros-pedido.ts \
+  "$NUMEROS" \
   '  { clave: "borrador", label: "Borradores" },' \
   '  { clave: "borrador", label: "Borradores" },
   { clave: "sin_mandar" as FiltroComprobante, label: "Sin mandar" },'
 
+# ⚠️ 22-sep-2026: los días se mudaron a `conAntiguedad`; el patrón viejo
+# (`if (d === 0)`) quedó muerto. Misma mutación, sobre el lugar nuevo.
 mutar "la frase pierde los días" "$SINMANDAR" \
-  '  if (d === 0) return `${base} · hoy`;' \
+  '  if (dias === null) return base;' \
   '  return base;
-  if (d === 0) return `${base} · hoy`;'
+  if (dias === null) return base;'
 
 mutar "los días se cuentan con el reloj del navegador, no con el de Panamá" "$FILA" \
-  '        <span data-medir="sin-mandar" className="font-medium text-red-600">' \
-  '        <span data-medir="sin-mandar" className="font-medium text-red-600" data-hoy={new Date().toISOString()}>'
+  '  const dias = diasSinLlegarASwitch(pedido.created_at, hoy);' \
+  '  const dias = diasSinLlegarASwitch(pedido.created_at, new Date().toISOString().slice(0, 10));'
 
-mutar "🔴 la frase deja de pintarse en ROJO" "$FILA" \
-  '<span data-medir="sin-mandar" className="font-medium text-red-600">' \
-  '<span data-medir="sin-mandar" className="text-gray-400">'
+mutar "🔴 la frase deja de pintarse en ROJO" "$SINMANDAR" \
+  '  alerta: "font-medium text-red-600",' \
+  '  alerta: "text-gray-400",'
 
 mutar "un BORRADOR también se pinta en rojo (alarma que exagera)" "$FILA" \
   '  const trabado = esSinMandar(datos);' \

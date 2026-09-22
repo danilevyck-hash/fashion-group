@@ -18,7 +18,6 @@ import { fmtPrecio } from "@/lib/catalogo/precio";
 export interface CatalogPdfProduct {
   name: string;
   sku: string;
-  color?: string | null;
   price: number | null;
   image_url: string | null;
   badge?: string | null; // "oferta" | "nuevo" | null
@@ -293,9 +292,10 @@ export function buildCatalogPdfDoc(opts: CatalogPdfOpts): jsPDF {
         doc.setFontSize(6.5);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(...GRAY_LIGHT);
-        const skuText = p.sku || "";
-        const colorText = p.color ? `  ·  ${p.color}` : "";
-        doc.text(skuText + colorText, x + 1, ty);
+        // 🩸 Al lado del código iba «  ·  <color>», y `color` está vacío en
+        // los 391 productos que lo tenían como columna (22-sep-2026). Se podó
+        // con el puntito de la tarjeta; ver `CatalogoProductCard.tsx`.
+        doc.text(p.sku || "", x + 1, ty);
         ty += 5.5;
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
