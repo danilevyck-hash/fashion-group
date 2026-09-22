@@ -22,6 +22,7 @@
 // la card NO crece por el stock.
 
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { MOSTRAR_EXISTENCIA } from "@/lib/catalogo/stock-en-la-tarjeta";
 
 interface CatalogoStockLineProps {
   marca: MarcaUiKey;
@@ -59,9 +60,16 @@ export default function CatalogoStockLine({ marca, disponibilidad, existencia, t
         Disponibilidad {disponibilidad ?? "—"}
         {talla && <span className={`font-normal ${s.soft}`}> · {talla}</span>}
       </div>
-      <div className={`whitespace-nowrap ${s.soft}`}>
-        Existencia {existencia ?? "—"}
-      </div>
+      {/* 🔑 El segundo renglón cuelga de UN interruptor (22-sep-2026): medido,
+          los dos números dicen lo mismo en 643 de 838 productos activos, y en
+          el teléfono son dos renglones de una tarjeta que ya es alta. Arranca
+          PRENDIDO —la pantalla no cambió— porque cuál de los dos se queda lo
+          decide Daniel, no el código. Ver `stock-en-la-tarjeta.ts`. */}
+      {MOSTRAR_EXISTENCIA && (
+        <div className={`whitespace-nowrap ${s.soft}`}>
+          Existencia {existencia ?? "—"}
+        </div>
+      )}
     </div>
   );
 }

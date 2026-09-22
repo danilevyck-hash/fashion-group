@@ -86,14 +86,57 @@ const REEBOK_CATEGORIA_LABEL: Record<string, string> = {
   accessories: "Accessories",
 };
 
-// Joybees es 100% calzado. El "tipo" se deriva del NOMBRE (no hay columna tipo):
-// contiene "Clog" → Clogs, "Sandal" → Sandalias, "Flip" → Flips. Los demás
-// (Flat, Trekking, Popinz…) no caen en ninguna card de tipo.
-function tipoJoybees(name: string): "Clogs" | "Sandalias" | "Flips" | null {
+// ─────────────────────────────────────────────────────────────────────────────
+// LOS CAJONES DE JOYBEES — UNA LISTA, NO TRES `if` (22-sep-2026)
+//
+// 🩸 Hasta este día la pantalla «Administrar» de Joybees decía
+// «Todos 81 · Clogs 35 · Sandalias 11 · Flips 7» y 35 + 11 + 7 = 53: **28
+// productos no entraban en ningún cajón** y no había forma de llegar a ellos
+// desde los chips. Medido contra producción el 22-sep-2026, esos 28 son
+// exactamente tres líneas de la marca: **12 Trekking** (8 «Kids Trekking Shoe»
+// + 4 «Kids Trekking Slide»), **11 Popinz** (los packs de 4, escritos también
+// «POPINSZ») y **5 Flats** («Women Friday Flat»). Con los tres cajones nuevos:
+// 35 + 11 + 7 + 12 + 11 + 5 = **81**, que es el número del chip «Todos».
+//
+// 🔴 EL TIPO SE DERIVA DEL NOMBRE PORQUE NO HAY OTRA COSA DE DÓNDE SACARLO.
+// `joybees_products.category` existe y está medido inservible: dice `"clogs"`
+// en 81 de 83 filas y `"nuevo"` en las otras 2 — o sea, no clasifica. Por eso
+// `categoryOptions` del catálogo público sigue VACÍA y estos cajones viven
+// solo en la pantalla de administrar.
+//
+// 🔴 EL ORDEN DE LA LISTA ES LA PRECEDENCIA, y la primera palabra que aparece
+// en el nombre gana. Las tres reglas viejas van PRIMERO y con las mismas
+// palabras, así que ningún producto de los 53 ya clasificados cambia de cajón.
+//
+// 🔑 Se compara por `includes` sobre el nombre en minúsculas —no por igualdad—
+// porque el nombre es una frase («Kids Trekking Shoe Solid Black») y la palabra
+// del cajón va adentro. NO es la trampa de «female ⊃ male» (`tommy-gender.ts`):
+// ahí se comparaban dos VALORES de un campo cerrado, uno contenido en el otro;
+// acá las seis palabras son disjuntas entre sí y hay candado que lo exige.
+//
+// 🔴 FALLA ABIERTA: un nombre que no trae ninguna de las seis palabras sigue
+// devolviendo `null` —se ve en «Todos» y bajo ningún chip—, igual que antes.
+// Nada se esconde y nada se inventa.
+//
+// ⚠️ Esto NO se administra desde la pantalla, como sí pasa con los rubros de
+// Reebok (`reebok_rubro_categoria`). Ahí el mapa es `rubro → categoría` y el
+// rubro es un CAMPO que manda Switch; acá no hay campo: la llave sería una
+// palabra suelta dentro del nombre, o sea otro mecanismo, no el mismo.
+// ─────────────────────────────────────────────────────────────────────────────
+export const JOYBEES_CAJONES: readonly { value: string; label: string; palabras: readonly string[] }[] = [
+  { value: "Clogs", label: "Clogs", palabras: ["clog"] },
+  { value: "Sandalias", label: "Sandalias", palabras: ["sandal"] },
+  { value: "Flips", label: "Flips", palabras: ["flip"] },
+  { value: "Trekking", label: "Trekking", palabras: ["trekking"] },
+  { value: "Popinz", label: "Popinz", palabras: ["popinz", "popinsz"] },
+  { value: "Flats", label: "Flats", palabras: ["flat"] },
+];
+
+function tipoJoybees(name: string): string | null {
   const n = (name || "").toLowerCase();
-  if (n.includes("clog")) return "Clogs";
-  if (n.includes("sandal")) return "Sandalias";
-  if (n.includes("flip")) return "Flips";
+  for (const c of JOYBEES_CAJONES) {
+    if (c.palabras.some((w) => n.includes(w))) return c.value;
+  }
   return null;
 }
 
@@ -338,9 +381,43 @@ export interface MarcaTheme {
     ring: string;
     checkBubble: string;
     checkStroke: string;
-    /** Contenedor de la foto — 4:3 en las 3 marcas: el calzado es ancho y en
-     *  cuadrado sobraba fondo blanco arriba y abajo (Daniel, 25-jul-2026). */
+    /**
+     * Contenedor de la foto. **LA RELACIÓN DE LA CAJA ES POR MARCA, Y SALE DE
+     * MEDIR SUS FOTOS** (22-sep-2026).
+     *
+     * Daniel, viendo el catálogo en su iPhone: *«Opino aprovechar el espacio en
+     * blanco no?»*. En «CLASSIC LEATHER» el zapato ocupaba media tarjeta y el
+     * resto era fondo beige.
+     *
+     * 🩸 LA CAUSA, MEDIDA SOBRE LAS **838 FOTOS ACTIVAS** (todas, no una
+     * muestra): con `object-contain` una foto CUADRADA dentro de una caja 4:3
+     * se escala hasta el ALTO y deja barras de fondo a los dos lados — pierde
+     * el 25 % del ancho. Y las fotos de Reebok y Joybees son cuadradas:
+     *
+     *   | marca   | fotos | cuadradas | caja 4:3 llena | caja 1:1 llena |
+     *   |---------|-------|-----------|----------------|----------------|
+     *   | Reebok  |  220  |    122    |     72,9 %     |   **79,8 %**   |
+     *   | Joybees |   81  |     77    |     74,6 %     |   **97,5 %**   |
+     *   | Tommy   |  455  |      5    |   **88,9 %**   |     73,3 %     |
+     *   | Calvin  |   82  |      1    |   **63,7 %**   |     55,4 %     |
+     *
+     * («llena» = qué fracción del ÁREA de la caja ocupa la foto, promediada
+     * sobre las fotos de esa marca.) Tommy trae **322 de 455 fotos exactamente
+     * en 4:3** y Calvin es apaisada (mediana 1,78): en esas dos, una caja más
+     * alta solo agrega fondo vacío. Por eso **Reebok y Joybees pasan a caja
+     * CUADRADA y Tommy y Calvin se quedan en 4:3**.
+     *
+     * 🔴 SIGUE SIENDO `object-contain`: no se recorta ni se deforma el producto
+     * — medido el 25-jul-2026, `object-cover` corta PRODUCTO (no margen) en
+     * 67/138 de Reebok y 16/81 de Joybees.
+     * ⚠️ Lo que esto NO arregla es el margen que la foto trae ADENTRO del
+     * archivo: eso solo se quita recortando el archivo, no desde la pantalla.
+     * 🔑 Clase LITERAL (nota JIT de la cabecera): nada de `aspect-[${'{'}x{'}'}]`.
+     */
     imageBg: string;
+    /** Tamaño intrínseco del `<img>` — el mismo dibujo que la caja, para que el
+     *  navegador reserve el hueco y la grilla no salte al cargar la foto. */
+    imageIntrinsic: { ancho: number; alto: number };
     /** object-contain SIEMPRE y SIN padding en las 3 marcas: la foto ocupa el
      *  marco 4:3 completo (el p-3 de Reebok/Tommy encogía el producto ~14% y
      *  además era una divergencia con Joybees). NO se usa object-cover: se
@@ -353,6 +430,45 @@ export interface MarcaTheme {
      *  línea de alto fijo (20px). El ajuste de tamaño 14px→11px y el "…" los
      *  hace CatalogoProductName (Daniel, 25-jul-2026). */
     name: string;
+    /**
+     * ¿La tarjeta dibuja la línea del NOMBRE del producto? (22-sep-2026)
+     *
+     * 🔴 SE PREGUNTA AL TEMA, NUNCA POR EL NOMBRE DE LA MARCA. Lo que decide no
+     * es "Tommy" ni "Calvin": es si el nombre de esa marca DICE el modelo o
+     * repite la categoría que el encabezado de sección ya dice tres centímetros
+     * más arriba.
+     *
+     * 🩸 Medido contra producción el 22-sep-2026, nombres distintos sobre
+     * productos vivos:
+     *   · Tommy   **19 nombres / 455 productos** (4 %) — «Women-Sneakers» ×97
+     *   · Calvin  **6 nombres / 82 productos** (7 %) — «Women-Flip Flops» ×27
+     *   · Reebok  74 / 220 (34 %) — «CLASSIC LEATHER», «ZIG DYNAMICA 6»
+     *   · Joybees 70 / 81 (86 %) — «Kids Varsity Clog Black/Red»
+     * En Tommy y Calvin la línea decía «Women-Sneakers» debajo de un encabezado
+     * que ya decía «SNEAKERS — WOMEN · 92»: la misma palabra dos veces, y el
+     * código —que SÍ distingue una tarjeta de otra— en una píldora gris chica.
+     *
+     * Daniel, sobre cómo le dice su vendedor a un cliente cuál quiere:
+     * *«b) señalando la foto»*. Y sobre la categoría: *«Pero el nombre se vera
+     * visible para saber que categoria es y sera filtrable no?»* — SÍ: la
+     * categoría sigue viviendo en el encabezado de sección y en los filtros,
+     * que no se tocaron.
+     *
+     * ⚠️ EL NOMBRE NO SE BORRA DE NINGUNA PARTE: sigue viajando en el payload,
+     * sigue siendo con lo que se BUSCA, sigue en el PDF, en el Excel, en el
+     * pedido y en el carrito. Lo único que cambia es que la TARJETA no lo pinta
+     * — y aun ahí queda en el `title` del código, al pasar el mouse.
+     */
+    nombreEnLaTarjeta: boolean;
+    /**
+     * El CÓDIGO cuando es él quien encabeza la tarjeta (`nombreEnLaTarjeta` en
+     * `false`). Misma geometría que `name` —`leading-5 h-5 truncate`, una línea
+     * de alto fijo— para que la fila del grid no se desalinee; lo que cambia es
+     * que se lee: color fuerte de la marca en vez del gris al 50 % de la
+     * píldora. Con el nombre puesto, el código sigue en `skuPill` y esta clase
+     * no se usa.
+     */
+    codigoTitulo: string;
     /** Píldora del CÓDIGO (misma posición y forma en las 3 marcas; solo cambia
      *  el color del tema). Antes vivía hardcodeada con los colores de Reebok
      *  en la card plana y como texto mono suelto en la agrupada. */
@@ -673,7 +789,8 @@ const REEBOK: MarcaTheme = {
       { value: "", label: "Todos" },
       { value: "male", label: "Hombre" },
       { value: "female", label: "Mujer" },
-      { value: "kids", label: "Ninos" },
+      // 🔴 «Niños», con eñe (22-sep-2026). Ver `reebok-gender.ts`.
+      { value: "kids", label: "Niños" },
     ],
     categoryOptions: [
       { value: "", label: "Todos" },
@@ -725,7 +842,9 @@ const REEBOK: MarcaTheme = {
     ring: "ring-2 ring-emerald-400 scale-[1.02]",
     checkBubble: "w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg",
     checkStroke: "white",
-    imageBg: "aspect-[4/3] bg-[#F5F0E8] relative overflow-hidden cursor-pointer",
+    // Reebok: 122 de sus 220 fotos son CUADRADAS → caja cuadrada (72,9 % → 79,8 %).
+    imageBg: "aspect-square bg-[#F5F0E8] relative overflow-hidden cursor-pointer",
+    imageIntrinsic: { ancho: 400, alto: 400 },
     imageFit: "w-full h-full object-contain",
     placeholder: (
       <div className="w-full h-full flex items-center justify-center text-gray-300">
@@ -735,6 +854,10 @@ const REEBOK: MarcaTheme = {
       </div>
     ),
     name: "text-sm font-semibold text-[#1A2656] leading-5 h-5 truncate",
+    // Reebok: el nombre DICE el modelo («CLASSIC LEATHER», «ZIG DYNAMICA 6»),
+    // 74 distintos sobre 220 vivos. La línea sirve y se queda.
+    nombreEnLaTarjeta: true,
+    codigoTitulo: "text-sm font-semibold text-[#1A2656] leading-5 h-5 truncate tabular-nums",
     skuPill: "text-xs bg-[#F5F0E8] text-[#1A2656]/50 px-1.5 py-0.5 rounded font-medium tabular-nums",
     priceNormal: "text-xl font-bold tabular-nums text-[#1A2656]",
     priceMeta: "text-xs text-[#1A2656]/40",
@@ -975,7 +1098,10 @@ const JOYBEES: MarcaTheme = {
       { value: "mujer", label: "Mujer" },
       { value: "hombre", label: "Hombre" },
       { value: "adultos", label: "Adultos" },
-      { value: "kids", label: "Kids" },
+      // 🔴 «Niños», no «Kids» (22-sep-2026): Joybees habla ESPAÑOL, como
+      // Reebok. Daniel: *«Entonces esa tommy y ck no. Joybees y reebok si.»*.
+      // El VALOR sigue siendo `kids` — es la clave de `DisplaySection`.
+      { value: "kids", label: "Niños" },
       { value: "accesorios", label: "Accesorios" },
     ],
     categoryOptions: [],
@@ -1019,7 +1145,9 @@ const JOYBEES: MarcaTheme = {
     ring: "ring-2 ring-[#FFE443] scale-[1.02]",
     checkBubble: "w-10 h-10 rounded-full bg-[#FFE443] flex items-center justify-center shadow-lg",
     checkStroke: "#404041",
-    imageBg: "aspect-[4/3] bg-[#FFFEF5] relative overflow-hidden cursor-pointer",
+    // Joybees: 77 de sus 81 fotos son CUADRADAS → caja cuadrada (74,6 % → 97,5 %).
+    imageBg: "aspect-square bg-[#FFFEF5] relative overflow-hidden cursor-pointer",
+    imageIntrinsic: { ancho: 400, alto: 400 },
     imageFit: "w-full h-full object-contain",
     placeholder: (
       <div className="w-full h-full flex items-center justify-center">
@@ -1027,6 +1155,10 @@ const JOYBEES: MarcaTheme = {
       </div>
     ),
     name: "text-sm font-semibold text-[#404041] leading-5 h-5 truncate",
+    // Joybees: 70 nombres distintos sobre 81 vivos — cada uno dice modelo y
+    // color («Kids Varsity Clog Black/Red»). La línea se queda.
+    nombreEnLaTarjeta: true,
+    codigoTitulo: "text-sm font-semibold text-[#404041] leading-5 h-5 truncate tabular-nums",
     skuPill: "text-xs bg-[#FFE443]/25 text-[#404041]/50 px-1.5 py-0.5 rounded font-medium tabular-nums",
     priceNormal: "text-xl font-bold tabular-nums text-[#404041]",
     priceMeta: "text-xs text-[#404041]/40",
@@ -1084,11 +1216,10 @@ const JOYBEES: MarcaTheme = {
     // `categoryOptions` está vacía a propósito (el catálogo público
     // tampoco ofrece ese filtro). El tipo se deriva del NOMBRE, con el
     // mismo `tipoJoybees` que ya usa su Excel — no una lista nueva.
-    categorias: [
-      { value: "Clogs", label: "Clogs" },
-      { value: "Sandalias", label: "Sandalias" },
-      { value: "Flips", label: "Flips" },
-    ],
+    // 🔴 LOS CHIPS SALEN DE LA MISMA LISTA QUE CLASIFICA (`JOYBEES_CAJONES`):
+    // dos listas para la misma pregunta es justo cómo se llegó a los 28
+    // productos sin cajón. Agregar una línea de producto = una entrada allá.
+    categorias: JOYBEES_CAJONES.map((c) => ({ value: c.value, label: c.label })),
     categoriaDe: (p) => tipoJoybees(p.name),
     excelSinFoto: async (sin) => {
       // Imports dinámicos: xlsx-js-style no entra al bundle inicial de la página.
@@ -1346,7 +1477,9 @@ const TOMMY: MarcaTheme = {
     ring: "ring-2 ring-[#152342] scale-[1.02]",
     checkBubble: "w-10 h-10 rounded-full bg-[#152342] flex items-center justify-center shadow-lg",
     checkStroke: "white",
+    // Tommy: 322 de sus 455 fotos son EXACTAMENTE 4:3 → la caja se queda (88,9 %).
     imageBg: "aspect-[4/3] bg-[#F6F7F9] relative overflow-hidden cursor-pointer",
+    imageIntrinsic: { ancho: 400, alto: 300 },
     imageFit: "w-full h-full object-contain",
     placeholder: (
       <div className="w-full h-full flex items-center justify-center text-gray-300">
@@ -1356,6 +1489,10 @@ const TOMMY: MarcaTheme = {
       </div>
     ),
     name: "text-sm font-semibold text-[#152342] leading-5 h-5 truncate",
+    // 🔴 Tommy: 19 nombres para 455 productos. La línea repetía el encabezado
+    // de sección, así que manda el CÓDIGO. Ver `nombreEnLaTarjeta`.
+    nombreEnLaTarjeta: false,
+    codigoTitulo: "text-sm font-semibold text-[#152342] leading-5 h-5 truncate tabular-nums",
     skuPill: "text-xs bg-[#F6F7F9] text-[#152342]/50 px-1.5 py-0.5 rounded font-medium tabular-nums",
     priceNormal: "text-xl font-bold tabular-nums text-[#152342]",
     priceMeta: "text-xs text-[#152342]/40",
@@ -1672,7 +1809,10 @@ const CALVIN: MarcaTheme = {
     ring: "ring-2 ring-[#1A1A1A] scale-[1.02]",
     checkBubble: "w-10 h-10 rounded-full bg-[#1A1A1A] flex items-center justify-center shadow-lg",
     checkStroke: "white",
+    // Calvin: fotos apaisadas (mediana 1,78) → 4:3 es la mejor de las cuatro
+    // relaciones medidas (63,7 %); cuadrada bajaría a 55,4 %.
     imageBg: "aspect-[4/3] bg-[#FAFAFA] relative overflow-hidden cursor-pointer",
+    imageIntrinsic: { ancho: 400, alto: 300 },
     imageFit: "w-full h-full object-contain",
     placeholder: (
       <div className="w-full h-full flex items-center justify-center text-gray-300">
@@ -1682,6 +1822,9 @@ const CALVIN: MarcaTheme = {
       </div>
     ),
     name: "text-sm font-semibold text-[#1A1A1A] leading-5 h-5 truncate",
+    // 🔴 Calvin: 6 nombres para 82 productos. Igual que Tommy.
+    nombreEnLaTarjeta: false,
+    codigoTitulo: "text-sm font-semibold text-[#1A1A1A] leading-5 h-5 truncate tabular-nums",
     skuPill: "text-xs bg-[#1A1A1A]/5 text-[#1A1A1A]/50 px-1.5 py-0.5 rounded font-medium tabular-nums",
     priceNormal: "text-xl font-bold tabular-nums text-[#1A1A1A]",
     priceMeta: "text-xs text-[#1A1A1A]/40",

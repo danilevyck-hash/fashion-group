@@ -57,8 +57,11 @@ describe("1 · lo escondido a mano entra a la pantalla de administrar", () => {
   it("🔴 con un escondido en la lista, el chip «Escondidos (1)» se dibuja", () => {
     const lista = [vivo, apagadoPorSwitch, escondido].filter(seAdministra);
     const chips = chipsDelCatalogo(lista, [{ value: "footwear", label: "Calzado" }], catDe);
+    // 22-sep-2026: «Sin foto 0» ya no se dibuja — un chip en cero se fue de la
+    // fila, con la misma regla del catálogo público (`opcionesConDatos`). Lo
+    // que este candado mide no cambió: el chip «Escondidos» aparece.
     expect(chips.map((c) => `${c.label} ${c.count}`)).toEqual([
-      "Todos 1", "Calzado 1", "Sin foto 0", "Escondidos 1",
+      "Todos 1", "Calzado 1", "Escondidos 1",
     ]);
   });
 
@@ -148,8 +151,12 @@ describe("2 · el catálogo interno en SOLO LECTURA para quien no arma pedidos",
   it("la tarjeta plana sin «Agregar» ni control de cantidad — y con todo lo demás", () => {
     render(<CatalogoProductCard marca="tommy" product={producto} qty={0} onQtyChange={() => {}} showStock soloLectura />);
     expect(screen.queryByText("Agregar")).toBeNull();
-    expect(screen.getByText("Zapato")).toBeTruthy();
+    // ⚠️ 22-sep-2026: en Tommy la tarjeta ya NO dibuja el nombre (19 nombres
+    // para 455 productos; repetía el encabezado de sección). El identificador
+    // es el CÓDIGO, y el nombre queda en el `title`.
+    expect(screen.queryByText("Zapato")).toBeNull();
     expect(screen.getByText("THS10159C000")).toBeTruthy();
+    expect(screen.getByTitle("Zapato")).toBeTruthy();
     cleanup();
     // Con cantidad ya en el carrito tampoco se dibuja el −/+.
     render(<CatalogoProductCard marca="tommy" product={producto} qty={2} onQtyChange={() => {}} showStock soloLectura />);

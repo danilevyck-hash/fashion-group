@@ -94,7 +94,10 @@ function stubRed(e: Escenario = {}) {
 
 const patches = () => llamadas.filter((l) => /\/item$/.test(l.url));
 /** El botón de LA tarjeta de ese producto (el grid ordena por categoría+género,
- *  así que el primer "Agregar" de la pantalla no es necesariamente el buscado). */
+ *  así que el primer "Agregar" de la pantalla no es necesariamente el buscado).
+ *  ⚠️ 22-sep-2026: en Tommy y Calvin la tarjeta se busca por su CÓDIGO, no por
+ *  el nombre — ahí el nombre ya no se dibuja (repetía el encabezado de sección;
+ *  ver `catalogo-tarjeta-nombre-por-marca.test.tsx`). */
 function botonDe(nombreProducto: string, boton: string) {
   const card = screen.getByText(nombreProducto).closest("div.bg-white") as HTMLElement;
   return within(card).getByRole("button", { name: boton });
@@ -129,7 +132,7 @@ describe("la barra dice a qué pedido se está agregando", () => {
     QUERY = "";
     stubRed();
     render(<CatalogoVendedorPage marca="tommy" />);
-    await waitFor(() => expect(screen.getByText("Polo Core")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("TH-001")).toBeTruthy());
     expect(screen.queryByText("Agregando al pedido")).toBeNull();
     expect(llamadas.some((l) => /\/orders\/ORD-1/.test(l.url))).toBe(false);
   });
@@ -138,7 +141,7 @@ describe("la barra dice a qué pedido se está agregando", () => {
     sessionStorage.setItem("cxc_role", "bodega");
     stubRed();
     render(<CatalogoVendedorPage marca="tommy" />);
-    await waitFor(() => expect(screen.getByText("Polo Core")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("TH-001")).toBeTruthy());
     expect(screen.queryByText("Agregando al pedido")).toBeNull();
   });
 });
@@ -147,8 +150,8 @@ describe("agregar escribe en ESE pedido, nunca en el carrito", () => {
   it("Tommy: el PATCH va al pedido con el bulto y el precio del catálogo", async () => {
     stubRed({ items: [] });
     render(<CatalogoVendedorPage marca="tommy" />);
-    await waitFor(() => expect(screen.getByText("Polo Core")).toBeTruthy());
-    fireEvent.click(botonDe("Polo Core", "Agregar"));
+    await waitFor(() => expect(screen.getByText("TH-001")).toBeTruthy());
+    fireEvent.click(botonDe("TH-001", "Agregar"));
     await waitFor(() => expect(patches().length).toBe(1));
 
     expect(patches()[0].url).toBe("/api/catalogo/tommy/orders/ORD-1/item");
@@ -163,7 +166,7 @@ describe("agregar escribe en ESE pedido, nunca en el carrito", () => {
     stubRed({ items: [{ product_id: "p1", quantity: 9, unit_price: 12 }] });
     render(<CatalogoVendedorPage marca="tommy" />);
     await waitFor(() => expect(screen.getByText("9")).toBeTruthy());
-    fireEvent.click(botonDe("Polo Core", "+"));
+    fireEvent.click(botonDe("TH-001", "+"));
     await waitFor(() => expect(patches().length).toBe(1));
     expect(cuerpo().quantity).toBe(10);
     // El precio de la línea del pedido manda (pudo editarse a mano).
@@ -183,8 +186,8 @@ describe("agregar escribe en ESE pedido, nunca en el carrito", () => {
   it("Reebok: la preventa viaja como is_preorder", async () => {
     stubRed({ itemsField: "reebok_order_items", items: [] });
     render(<CatalogoVendedorPage marca="reebok" />);
-    await waitFor(() => expect(screen.getByText("Jeans Slim")).toBeTruthy());
-    fireEvent.click(botonDe("Jeans Slim", "Pre-ordenar"));
+    await waitFor(() => expect(screen.getByText("TH-002")).toBeTruthy());
+    fireEvent.click(botonDe("TH-002", "Pre-ordenar"));
     await waitFor(() => expect(patches().length).toBe(1));
     expect(patches()[0].url).toBe("/api/catalogo/reebok/orders/ORD-1/item");
     expect(cuerpo()).toMatchObject({ product_id: "p2", is_preorder: true });
@@ -193,8 +196,8 @@ describe("agregar escribe en ESE pedido, nunca en el carrito", () => {
   it("Calvin: mismo motor, su propio API", async () => {
     stubRed({ itemsField: "calvin_order_items", items: [] });
     render(<CatalogoVendedorPage marca="calvin" />);
-    await waitFor(() => expect(screen.getByText("Polo Core")).toBeTruthy());
-    fireEvent.click(botonDe("Polo Core", "Agregar"));
+    await waitFor(() => expect(screen.getByText("TH-001")).toBeTruthy());
+    fireEvent.click(botonDe("TH-001", "Agregar"));
     await waitFor(() => expect(patches().length).toBe(1));
     expect(patches()[0].url).toBe("/api/catalogo/calvin/orders/ORD-1/item");
     // Calvin no maneja preventa: el campo ni se manda.
@@ -218,7 +221,7 @@ describe("un pedido que ya está en Switch no acepta nada", () => {
   it("si el candado aparece recién en el 409, la cantidad se revierte y se avisa", async () => {
     stubRed({ items: [], patchStatus: 409 });
     render(<CatalogoVendedorPage marca="tommy" />);
-    await waitFor(() => expect(screen.getByText("Polo Core")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("TH-001")).toBeTruthy());
     fireEvent.click(screen.getAllByRole("button", { name: "Agregar" })[0]);
     await waitFor(() => expect(patches().length).toBe(1));
     await waitFor(() =>

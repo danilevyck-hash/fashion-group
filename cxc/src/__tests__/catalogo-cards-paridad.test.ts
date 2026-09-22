@@ -16,7 +16,8 @@
 //     CatalogoStockLine),
 //   · el botón Agregar mide 44px (era 38 hasta el 6-sep-2026) y el control de
 //     cantidad mide lo mismo,
-//   · la foto es 4:3 con object-contain en las 3 marcas,
+//   · la foto va con object-contain en las 3 marcas (la RELACIÓN de la caja
+//     pasó a ser por marca el 22-sep-2026, medida sobre sus fotos),
 //   · el grid sube a 5 columnas SOLO en xl (iPad y móvil intactos),
 //   · el menú Compartir tiene Copiar link + Descargar PDF en las 3 marcas.
 //
@@ -309,11 +310,16 @@ describe("card de producto — paridad en las 3 marcas", () => {
     expect(PUBLICO).not.toContain("showStock");
   });
 
-  it("foto 4:3 con object-contain (nunca recorta producto) en las 3 marcas", () => {
+  // 🔴 CAMBIÓ DE DIRECCIÓN EL 22-sep-2026: la RELACIÓN de la caja ya no es la
+  // misma en las cuatro marcas, sale de medir las fotos de cada una (Reebok y
+  // Joybees cuadradas; Tommy 4:3; Calvin apaisada). Daniel, en su iPhone:
+  // *«Opino aprovechar el espacio en blanco no?»*. Lo que NO cambió es
+  // `object-contain`, que es lo que este candado protege de verdad. El censo de
+  // las 838 fotos vive en `catalogo-la-foto-aprovecha-su-caja.test.ts`.
+  it("object-contain (nunca recorta producto) en las 3 marcas", () => {
     for (const m of MARCAS) {
       const card = MARCA_THEME[m].card;
-      expect(card.imageBg, m).toContain("aspect-[4/3]");
-      expect(card.imageBg, m).not.toContain("aspect-square");
+      expect(card.imageBg, m).toMatch(/aspect-(square|\[4\/3\])/);
       expect(card.imageFit, m).toContain("object-contain");
       // object-cover NO: medidas 25-jul-2026 sobre las 608 fotos activas — cover
       // corta PRODUCTO (no margen) en 67/138 Reebok y 16/81 Joybees.
@@ -333,9 +339,10 @@ describe("card de producto — paridad en las 3 marcas", () => {
     for (const [nombre, code] of [["plana", PRODUCT_CARD], ["agrupada", GROUPED_CARD]] as const) {
       expect(code, nombre).toContain('loading={priority ? "eager" : "lazy"}');
       expect(code, nombre).toContain('fetchPriority={priority ? "high" : "auto"}');
-      // width/height explícitos en 4:3 → sin reflow al cargar.
-      expect(code, nombre).toContain("width={400}");
-      expect(code, nombre).toContain("height={300}");
+      // width/height explícitos, con el dibujo de la caja de SU marca → sin
+      // reflow al cargar (22-sep-2026: sale del tema, ya no es 4:3 fijo).
+      expect(code, nombre).toContain("width={t.imageIntrinsic.ancho}");
+      expect(code, nombre).toContain("height={t.imageIntrinsic.alto}");
     }
     for (const [nombre, code] of [["vendedor", VENDEDOR], ["publico", PUBLICO]] as const) {
       expect(code, nombre).toContain("FOTOS_PRIORITARIAS");
@@ -390,8 +397,11 @@ describe("menú Compartir — Copiar link + Descargar PDF en las 3 marcas", () =
 describe("taxonomía de género por marca — Tommy no arrastra la de Reebok", () => {
   it("Reebok y Joybees comparten la histórica (español, boys+girls = Niños)", () => {
     expect(MARCA_THEME.reebok.genero).toBe(MARCA_THEME.joybees.genero);
-    expect(MARCA_THEME.reebok.genero.groupLabel("boys")).toBe("Ninos");
-    expect(MARCA_THEME.reebok.genero.groupLabel("girls")).toBe("Ninos");
+    // 22-sep-2026: «Niños», CON EÑE. Decía «Ninos» y no es una palabra; Daniel
+    // pidió español en estas dos marcas y solo en estas dos. El candado de la
+    // eñe vive en `catalogo-la-foto-manda.test.ts`.
+    expect(MARCA_THEME.reebok.genero.groupLabel("boys")).toBe("Niños");
+    expect(MARCA_THEME.reebok.genero.groupLabel("girls")).toBe("Niños");
     expect(MARCA_THEME.reebok.genero.groupLabel("women")).toBe("Mujer");
   });
 

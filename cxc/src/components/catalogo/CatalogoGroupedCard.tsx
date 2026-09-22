@@ -193,8 +193,8 @@ export default function CatalogoGroupedCard({
                   key={`${imageStatus}-${useThumb}`}
                   src={useThumb ? (supabaseThumb(group.image_url, 600) ?? group.image_url) : group.image_url}
                   alt={group.name}
-                  width={400}
-                  height={300}
+                  width={t.imageIntrinsic.ancho}
+                  height={t.imageIntrinsic.alto}
                   loading={priority ? "eager" : "lazy"}
                   fetchPriority={priority ? "high" : "auto"}
                   decoding="async"
@@ -222,13 +222,26 @@ export default function CatalogoGroupedCard({
             COMPACTA (Daniel, 25-jul-2026): p-2.5 y márgenes bajados un escalón,
             EXACTAMENTE los mismos valores que CatalogoProductCard. */}
         <div className="p-2.5">
-          {/* Name — SIEMPRE una línea (alto fijo): ver CatalogoProductName. */}
-          <CatalogoProductName nombre={group.name} className={t.name} />
+          {/* Name — SIEMPRE una línea (alto fijo): ver CatalogoProductName.
+              🔴 La decide `card.nombreEnLaTarjeta` del TEMA, igual que en la
+              card plana: las dos cards se portan igual o vuelve la deriva entre
+              marcas que este esqueleto compartido vino a cerrar. Hoy la única
+              marca agrupada es Joybees, y Joybees SÍ dibuja el nombre (70
+              nombres distintos sobre 81 productos, medido el 22-sep-2026). */}
+          {t.nombreEnLaTarjeta && (
+            <CatalogoProductName nombre={group.name} className={t.name} />
+          )}
 
-          {/* Código (píldora) — mismo componente visual que la card plana. */}
-          <div className="flex flex-wrap items-center gap-1 mt-1">
-            <span className={t.skuPill}>{group.baseSku}</span>
-          </div>
+          {t.nombreEnLaTarjeta ? (
+            /* Código (píldora) — mismo componente visual que la card plana. */
+            <div className="flex flex-wrap items-center gap-1 mt-1">
+              <span className={t.skuPill}>{group.baseSku}</span>
+            </div>
+          ) : (
+            <p className={t.codigoTitulo} title={group.name}>
+              {group.baseSku || group.name}
+            </p>
+          )}
 
           {/* Precio + stock en el MISMO renglón (Daniel, 25-jul-2026): espejo
               EXACTO de CatalogoProductCard — izquierda precio con "Bulto de N"

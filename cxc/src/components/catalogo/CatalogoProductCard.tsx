@@ -143,8 +143,8 @@ export default function CatalogoProductCard({
                   key={`${imageStatus}-${useThumb}`}
                   src={useThumb ? (supabaseThumb(product.image_url, 600) ?? product.image_url) : product.image_url}
                   alt={product.name}
-                  width={400}
-                  height={300}
+                  width={t.imageIntrinsic.ancho}
+                  height={t.imageIntrinsic.alto}
                   loading={priority ? "eager" : "lazy"}
                   fetchPriority={priority ? "high" : "auto"}
                   decoding="async"
@@ -169,8 +169,16 @@ export default function CatalogoProductCard({
             COMPACTA (Daniel, 25-jul-2026): p-2.5 y los márgenes entre bloques
             bajados un escalón — misma medida EXACTA en las 3 marcas. */}
         <div className="p-2.5">
-          {/* Name — SIEMPRE una línea (alto fijo): ver CatalogoProductName. */}
-          <CatalogoProductName nombre={product.name} className={t.name} />
+          {/* Name — SIEMPRE una línea (alto fijo): ver CatalogoProductName.
+              🔴 SOLO EN LAS MARCAS CUYO NOMBRE DICE EL MODELO (22-sep-2026):
+              lo decide `card.nombreEnLaTarjeta` del tema, nunca un `if` con el
+              nombre de la marca escrito acá. En Tommy y Calvin el nombre repite
+              el encabezado de sección («Women-Sneakers» bajo «SNEAKERS —
+              WOMEN»), así que la línea la encabeza el CÓDIGO. El nombre sigue
+              viajando y sigue en el `title`. Ver la medición en marcas-ui. */}
+          {t.nombreEnLaTarjeta && (
+            <CatalogoProductName nombre={product.name} className={t.name} />
+          )}
 
           {/* Código (píldora) — mt-1: nombre y código van juntos (Daniel,
               25-jul-2026; antes mt-2).
@@ -198,10 +206,21 @@ export default function CatalogoProductCard({
 
               🔑 La COLUMNA `products.color` NO se dropea (patrón `mayor_lineas`):
               queda sin lectores. */}
-          {product.sku && (
-            <div className="flex flex-wrap items-center gap-1 mt-1">
-              <span className={t.skuPill}>{product.sku}</span>
-            </div>
+          {t.nombreEnLaTarjeta ? (
+            product.sku && (
+              <div className="flex flex-wrap items-center gap-1 mt-1">
+                <span className={t.skuPill}>{product.sku}</span>
+              </div>
+            )
+          ) : (
+            /* Sin línea de nombre, el código ES el identificador de la tarjeta:
+               misma geometría de una línea de alto fijo, con el color fuerte de
+               la marca. `title` guarda el nombre completo. Si un día llegara un
+               producto sin código, se dibuja el nombre: la tarjeta nunca queda
+               anónima. */
+            <p className={t.codigoTitulo} title={product.name}>
+              {product.sku || product.name}
+            </p>
           )}
 
           {/* Precio + stock en el MISMO renglón (Daniel, 25-jul-2026): a la

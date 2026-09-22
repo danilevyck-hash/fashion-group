@@ -8,9 +8,10 @@
 //
 // Ahora es una fila y nada más:
 //
-//     Todos 232 · Calzado 162 · Ropa 54 · Accesorios 16 · Sin foto 0 · Escondidos 1
+//     Todos 232 · Calzado 162 · Ropa 54 · Accesorios 16 · Escondidos 1
 //
 // 🔴 LOS NÚMEROS SE CALCULAN, NUNCA SE ESCRIBEN A MANO.
+// 🔴 UN CHIP EN CERO NO SE DIBUJA (22-sep-2026) — ver `chipsDelCatalogo`.
 // 🔴 LOS NOMBRES DE CATEGORÍA SALEN DEL MAPA QUE YA EXISTE POR MARCA
 //    (`theme.filtros.categoryOptions`, el MISMO que usa el catálogo público),
 //    no de una traducción escrita en la pantalla. Reebok ya lo tiene en
@@ -19,9 +20,10 @@
 //    toca desde acá: dos listas para la misma pregunta terminan diciendo cosas
 //    distintas.
 //
-// ⚠️ Joybees no tiene columna de categoría (`categoryOptions` está vacía), así
-// que su fila queda en `Todos · Sin foto · Escondidos`. Es lo mismo que ya
-// pasaba en su filtro: no se le inventa una clasificación.
+// ⚠️ Joybees no tiene columna de categoría útil (`categoryOptions` está vacía y
+// `joybees_products.category` dice `"clogs"` en 81 de 83 filas), así que sus
+// chips salen de `JOYBEES_CAJONES` —la MISMA lista que clasifica su Excel—, no
+// de una segunda lista escrita en la pantalla. Ver `marcas-ui.tsx`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Lo mínimo que un producto necesita para contar en un chip. */
@@ -91,32 +93,62 @@ export function categoriasDeLaMarca(categoryOptions: readonly OpcionCategoria[])
  *
  * - «Todos» y las categorías cuentan lo VISIBLE (lo escondido no ensucia el
  *   número que se usa para trabajar).
- * - «Sin foto» sale siempre, aunque valga 0: es la cola de trabajo del módulo y
- *   ver el 0 es la confirmación de que está al día.
  * - «Escondidos» sale SOLO si hay alguno — un chip que al tocarlo deja la lista
  *   vacía no es un filtro, es un callejón.
+ *
+ * 🔴 **UN CHIP EN CERO NO SE DIBUJA** (22-sep-2026), y es la MISMA regla que el
+ * catálogo público ya aplica a sus píldoras desde el 12-ago-2026
+ * (`lib/catalogo/filtros-derivados.ts` → `opcionesConDatos`), no una segunda
+ * regla inventada acá. Daniel, con captura del catálogo Calvin, textual: *"en
+ * los catalogos, si alguna no tiene una categoria como genero o categoria, no
+ * tiene que estar… cuando se agregue boots ahi que salga el filtro
+ * automatico"*.
+ *
+ * 🩸 Medido el 22-sep-2026 contra producción: Calvin dibujaba ONCE chips y tres
+ * de ellos —«Shoes 0 · Slippers 0 · Boots 0»— no tenían una sola fila detrás
+ * (`calvin_products.category` solo trae `flip_flops`, `sandals` y `sneakers`),
+ * más «Sin foto 0». Las CUATRO marcas tienen hoy 0 productos sin foto.
+ *
+ * 🔑 «Sin foto» sigue la misma suerte y ya no sale siempre: un 0 permanente no
+ * es "la confirmación de que está al día", es una fila más de ruido — y el
+ * botón de su Excel, que también decía «Todos tienen foto» apagado, se va con
+ * él. La cola vuelve a aparecer sola el día que entre un producto sin foto.
+ *
+ * 🔴 **LO ELEGIDO NO SE CAE, aunque valga 0** (`elegido`): un link viejo
+ * `?ver=cat:boots` o una categoría que se vació dejarían el filtro ACTIVO y su
+ * píldora invisible — la lista saldría vacía sin nada que apagar. Es la misma
+ * excepción que ya tiene `opcionesConDatos`.
+ *
+ * 🔴 **FALLA ABIERTA**: mientras no llegó un solo producto, "no hay ninguno de
+ * esta categoría" es indistinguible de "todavía no sé", así que con la lista
+ * vacía se devuelven TODOS los chips configurados, como antes.
  */
 export function chipsDelCatalogo<T extends ProductoDeChip>(
   productos: readonly T[],
   categorias: readonly OpcionCategoria[],
   categoriaDe: (p: T) => string | null | undefined,
+  elegido?: string | null,
 ): ChipAdmin[] {
   const visibles = productos.filter((p) => !estaEscondido(p));
   const escondidos = productos.length - visibles.length;
+  const todaviaNoSe = productos.length === 0;
+  const sale = (c: ChipAdmin) => todaviaNoSe || c.count > 0 || c.key === elegido;
 
   const chips: ChipAdmin[] = [{ key: CHIP_TODOS, label: "Todos", count: visibles.length }];
   for (const c of categorias) {
-    chips.push({
+    const chip: ChipAdmin = {
       key: PREFIJO_CATEGORIA + c.value,
       label: c.label,
       count: visibles.filter((p) => (categoriaDe(p) ?? "") === c.value).length,
-    });
+    };
+    if (sale(chip)) chips.push(chip);
   }
-  chips.push({
+  const sinFoto: ChipAdmin = {
     key: CHIP_SIN_FOTO,
     label: "Sin foto",
     count: visibles.filter((p) => !tieneFoto(p)).length,
-  });
+  };
+  if (sale(sinFoto)) chips.push(sinFoto);
   if (escondidos > 0) {
     chips.push({ key: CHIP_ESCONDIDOS, label: "Escondidos", count: escondidos });
   }

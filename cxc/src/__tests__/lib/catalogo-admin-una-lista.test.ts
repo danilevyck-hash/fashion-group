@@ -84,7 +84,11 @@ describe("🔴 se entraba a una pestaña vacía: ahora hay UNA lista", () => {
   });
 
   it("un `?ver=` viejo o inventado cae en «Todos», nunca en una lista vacía", () => {
-    const chips = chipsDelCatalogo([{ image_url: "x" }], [], () => null);
+    // 22-sep-2026: el producto de la muestra va SIN foto, porque desde ese día
+    // un chip en cero no se dibuja y «Sin foto» sin cola ya no existe (ver
+    // `catalogo-la-foto-manda.test.ts`). Lo que se mide acá no cambió: un chip
+    // que no está en la fila cae en «Todos».
+    const chips = chipsDelCatalogo([{ image_url: null }], [], () => null);
     expect(chipValido("escondidos", chips)).toBe(CHIP_TODOS);
     expect(chipValido(null, chips)).toBe(CHIP_TODOS);
     expect(chipValido("sin-foto", chips)).toBe(CHIP_SIN_FOTO);
@@ -142,10 +146,17 @@ describe("🔴 una sola fila de chips, con el número adentro", () => {
     ]);
   });
 
-  it("«Sin foto» sale aunque valga 0; «Escondidos» solo si hay alguno", () => {
+  // 🔴 CAMBIÓ DE DIRECCIÓN EL 22-sep-2026. Hasta ese día esto exigía que «Sin
+  // foto» saliera aunque valiera 0 («ver el 0 es la confirmación de que está al
+  // día»). Medido: las CUATRO marcas llevan 0 sin foto, así que el chip y su
+  // botón eran ruido permanente. Ahora ningún chip en cero se dibuja, con la
+  // MISMA regla que el catálogo público (`opcionesConDatos`). El candado nuevo
+  // vive en `src/__tests__/lib/catalogo-la-foto-manda.test.ts`.
+  it("un chip en 0 no se dibuja; «Escondidos» solo si hay alguno", () => {
     const chips = chipsDelCatalogo([{ image_url: "a.jpg" }], [], catDe);
-    expect(chips.map((c) => c.key)).toEqual([CHIP_TODOS, CHIP_SIN_FOTO]);
-    expect(chips.find((c) => c.key === CHIP_SIN_FOTO)!.count).toBe(0);
+    expect(chips.map((c) => c.key)).toEqual([CHIP_TODOS]);
+    const conCola = chipsDelCatalogo([{ image_url: null }], [], catDe);
+    expect(conCola.find((c) => c.key === CHIP_SIN_FOTO)!.count).toBe(1);
   });
 
   it("las cinco tarjetas de resumen se fueron del tema y de la pantalla", () => {
@@ -175,7 +186,11 @@ describe("🔴 una sola fila de chips, con el número adentro", () => {
   it("Joybees clasifica por el NOMBRE, y esa es la única excepción escrita", () => {
     const j = getMarcaTheme("joybees")!;
     expect(j.filtros.categoryOptions).toEqual([]); // no tiene columna de categoría
-    expect(j.admin.categorias!.map((o) => o.label)).toEqual(["Clogs", "Sandalias", "Flips"]);
+    // 22-sep-2026: eran TRES y dejaban 28 productos fuera de todo chip (35 + 11
+    // + 7 = 53 sobre 81). La suma exacta la vigila `catalogo-la-foto-manda`.
+    expect(j.admin.categorias!.map((o) => o.label)).toEqual([
+      "Clogs", "Sandalias", "Flips", "Trekking", "Popinz", "Flats",
+    ]);
     expect(j.admin.categoriaDe!({ id: "1", sku: "X", name: "Kids Clog", image_url: null })).toBe("Clogs");
     for (const otra of ["reebok", "tommy", "calvin"] as const) {
       expect(getMarcaTheme(otra)!.admin.categorias, otra).toBeUndefined();
@@ -388,9 +403,12 @@ describe("🔴 el cuadro único de subir fotos", () => {
 // 6 · Excel apagado en 0 · «Importar Excel» retirado
 // ─────────────────────────────────────────────────────────────────────────────
 describe("🔴 lo que no tiene nada que hacer, no se ofrece", () => {
-  it("«Excel sin foto» se apaga cuando no hay ninguno, y dice por qué", () => {
-    expect(shell).toContain("disabled={sinFoto.length === 0}");
-    expect(shell).toContain("Todos los productos tienen foto");
+  // 🔴 CAMBIÓ DE DIRECCIÓN EL 22-sep-2026: antes el botón quedaba APAGADO
+  // diciendo «Todos tienen foto». Con 0 sin foto en las cuatro marcas era un
+  // botón que nunca se podía tocar, así que ahora no se dibuja y vuelve solo
+  // cuando hay cola. Candado nuevo en `catalogo-la-foto-manda.test.ts`.
+  it("«Excel sin foto» no se ofrece cuando no hay nada que bajar", () => {
+    expect(shell).toContain("sinFoto.length > 0");
     // Y sale de la MISMA cola de siempre, no de una lista nueva.
     expect(shell).toContain("colaSinFoto(vivos)");
   });

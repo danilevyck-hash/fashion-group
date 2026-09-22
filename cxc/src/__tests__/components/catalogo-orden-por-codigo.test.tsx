@@ -73,9 +73,12 @@ function stubRed(productos: unknown[]) {
   }));
 }
 
-/** Los códigos, en el orden en que la pantalla los pintó. */
+/** Los códigos, en el orden en que la pantalla los pintó.
+ *  ⚠️ 22-sep-2026: el código sale en `<span>` (píldora) en Reebok y Joybees y
+ *  en `<p>` en Tommy y Calvin, donde encabeza la tarjeta porque el nombre no se
+ *  dibuja. Por eso se miran los dos. */
 function codigosEnPantalla(): string[] {
-  return Array.from(document.querySelectorAll("span"))
+  return Array.from(document.querySelectorAll("span, p"))
     .map((s) => (s.textContent || "").trim())
     .filter((t) => /^[A-Z0-9-]{6,}$/.test(t) && CALVIN.some((x) => x.sku === t));
 }
@@ -133,7 +136,7 @@ describe("Tommy: 19 nombres para 453 productos — el nombre no puede ordenar", 
     render(<CatalogoVendedorPage marca="tommy" />);
     await waitFor(() => expect(screen.getByText("FW0FW05034-DW5")).toBeTruthy());
 
-    const orden = Array.from(document.querySelectorAll("span"))
+    const orden = Array.from(document.querySelectorAll("span, p"))
       .map((s) => (s.textContent || "").trim())
       .filter((t) => TOMMY.some((x) => x.sku === t));
     expect(orden).toEqual([
@@ -158,7 +161,7 @@ describe("el desempate va AL FINAL: no mueve nada que hoy no empate", () => {
     render(<CatalogoVendedorPage marca="calvin" />);
     await waitFor(() => expect(screen.getByText("AAA0000001")).toBeTruthy());
 
-    const orden = Array.from(document.querySelectorAll("span"))
+    const orden = Array.from(document.querySelectorAll("span, p"))
       .map((s) => (s.textContent || "").trim())
       .filter((t) => t === "AAA0000001" || t === "ZZZ0000001");
     expect(orden).toEqual(["ZZZ0000001", "AAA0000001"]);
@@ -173,7 +176,7 @@ describe("el desempate va AL FINAL: no mueve nada que hoy no empate", () => {
     render(<CatalogoVendedorPage marca="calvin" />);
     await waitFor(() => expect(screen.getByText("AAA0000001")).toBeTruthy());
 
-    const orden = Array.from(document.querySelectorAll("span"))
+    const orden = Array.from(document.querySelectorAll("span, p"))
       .map((s) => (s.textContent || "").trim())
       .filter((t) => t === "AAA0000001" || t === "ZZZ0000001");
     expect(orden).toEqual(["ZZZ0000001", "AAA0000001"]);
@@ -201,7 +204,7 @@ describe("los DOS pipelines: la vista agrupada (Joybees) también ordena", () =>
     render(<CatalogoVendedorPage marca="joybees" />);
     await waitFor(() => expect(screen.getAllByText("Kids Clog").length).toBe(3));
 
-    const orden = Array.from(document.querySelectorAll("span"))
+    const orden = Array.from(document.querySelectorAll("span, p"))
       .map((s) => (s.textContent || "").trim())
       .filter((t) => /^U(AAAA|MMMM|ZZZZ)\.BLK/.test(t));
     expect(orden.map((s) => s.slice(0, 5))).toEqual(["UAAAA", "UMMMM", "UZZZZ"]);

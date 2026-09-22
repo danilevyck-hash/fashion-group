@@ -127,7 +127,18 @@ export function matchesGenderFilter(rawGender: string | null | undefined, filter
   return g !== null && groups.includes(g);
 }
 
-const GROUP_LABEL: Record<GenderGroup, string> = { hombre: "Hombre", mujer: "Mujer", ninos: "Ninos", unisex: "Unisex" };
+// 🔴 SE ESCRIBE «Niños», CON EÑE (22-sep-2026). Reebok y Joybees hablan
+// ESPAÑOL —lo decidió Daniel: *«Entonces esa tommy y ck no. Joybees y reebok
+// si.»*— y hasta ese día el chip y el encabezado de sección decían «Ninos»,
+// que no es una palabra. ⚠️ Tommy y Calvin NO pasan por acá: tienen su propia
+// taxonomía y se quedan en el vocabulario de la marca (Women · Men · Boys ·
+// Girls), también por decisión de Daniel.
+//
+// 🔑 Esto es SOLO el rótulo. La CLAVE del grupo sigue siendo `ninos` sin eñe
+// (`GenderGroup`), y el pareo de los valores crudos se hace sobre texto
+// normalizado sin tildes (`canonical`): cambiar el label no mueve ni un
+// producto de cajón.
+const GROUP_LABEL: Record<GenderGroup, string> = { hombre: "Hombre", mujer: "Mujer", ninos: "Niños", unisex: "Unisex" };
 const GROUP_ORDER: Record<GenderGroup, number> = { hombre: 0, mujer: 1, ninos: 2, unisex: 3 };
 
 /** Clave de agrupación canónica; desconocido → "otros" (no se mezcla con un grupo real). */
@@ -148,7 +159,7 @@ export function genderGroupOrder(rawGender: string | null | undefined): number {
 }
 
 // Label del valor de botón de filtro (male/female/kids), para subtítulos/PDF.
-const FILTER_LABEL: Record<string, string> = { male: "Hombre", female: "Mujer", kids: "Ninos" };
+const FILTER_LABEL: Record<string, string> = { male: "Hombre", female: "Mujer", kids: "Niños" };
 export function genderFilterLabel(filterValue: string): string {
   return FILTER_LABEL[filterValue] || filterValue;
 }

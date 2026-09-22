@@ -43,8 +43,15 @@ const GENDER_FIELD_LABELS: Record<string, string> = {
   girls: "Niña",
 };
 
-/** Known gender suffixes (longest first so JUNIOR matches before J, etc.) */
-const KNOWN_SUFFIXES = ["JUNIOR", "KIDS", "W", "M"];
+/**
+ * Known gender suffixes (longest first so JUNIOR matches before J, etc.)
+ *
+ * 🔴 SE EXPORTA porque el contador del hub cuenta TARJETAS, no filas, y su SQL
+ * se genera desde esta MISMA lista (`lib/catalogo/contadores.ts`). Agregar un
+ * sufijo acá cambia el SQL generado y el candado byte-a-byte de la migración
+ * pone el build ROJO hasta regenerarla — que es justo el aviso que hace falta.
+ */
+export const KNOWN_SUFFIXES = ["JUNIOR", "KIDS", "W", "M"];
 
 /**
  * Orden de los botones de talla DENTRO de la card: talla chica primero, y Mujer
@@ -253,11 +260,19 @@ const SECTION_ORDER: Record<DisplaySection, number> = {
   otros: 5,
 };
 
+// 🔴 ESTA LISTA ES DE JOYBEES Y ESTÁ EN ESPAÑOL, LAS SEIS (22-sep-2026).
+// «Kids» era la única en inglés y encabezaba una sección del catálogo público
+// justo encima de «Mujer», «Hombre», «Adultos» y «Accesorios». Daniel:
+// *«Entonces esa tommy y ck no. Joybees y reebok si.»*.
+// 🔑 La CLAVE sigue siendo `kids` —es el valor del chip y de `DisplaySection`—:
+// lo único que cambia es el rótulo. ⚠️ El label de TALLA de la card («Kids» vs
+// «Junior», `SUFFIX_LABELS`) NO es esto y no se toca: son los dos tamaños del
+// mismo modelo, no un género.
 const SECTION_LABELS: Record<DisplaySection, string> = {
   mujer: "Mujer",
   hombre: "Hombre",
   adultos: "Adultos",
-  kids: "Kids",
+  kids: "Niños",
   accesorios: "Accesorios",
   otros: "Sin clasificar",
 };

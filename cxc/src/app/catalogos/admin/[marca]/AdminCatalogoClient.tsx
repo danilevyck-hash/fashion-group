@@ -140,9 +140,13 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
     [theme],
   );
 
+  // 🔴 El chip ELEGIDO se pasa CRUDO (de la URL), no el ya validado: `chipValido`
+  // corre DESPUÉS y necesita la fila ya armada. Sirve para que una categoría que
+  // hoy vale 0 pero está activa no desaparezca dejando la lista vacía sin nada
+  // que apagar (ver `chipsDelCatalogo`).
   const chips = useMemo(
-    () => chipsDelCatalogo(vivos, categorias, categoriaDe),
-    [vivos, categorias, categoriaDe],
+    () => chipsDelCatalogo(vivos, categorias, categoriaDe, verBruto),
+    [vivos, categorias, categoriaDe, verBruto],
   );
   const ver = chipValido(verBruto, chips);
 
@@ -250,19 +254,24 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
               Categorías del catálogo
             </a>
           )}
-          {/* 🩸 Con 0 productos sin foto el botón seguía encendido y bajaba un
-              Excel vacío. Apagado dice por qué. */}
+          {/* 🔴 SIN COLA, SIN BOTÓN (22-sep-2026). Antes quedaba apagado diciendo
+              «Todos tienen foto», con su flecha de descarga: un botón que no se
+              puede tocar en NINGUNA de las cuatro marcas —las cuatro están en 0
+              sin foto, medido el 22-sep— y que igual ocupaba el lugar de arriba
+              a la derecha. Vuelve solo el día que entre un producto sin foto,
+              que es cuando sirve, y con el chip «Sin foto» de la misma fila.
+              🩸 Antes de eso bajaba un Excel VACÍO con el botón encendido. */}
+          {sinFoto.length > 0 && (
           <button
             onClick={descargarExcelSinFoto}
-            disabled={sinFoto.length === 0}
-            title={sinFoto.length === 0 ? "Todos los productos tienen foto" : undefined}
-            className="inline-flex min-h-[44px] items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50 active:scale-[0.97] transition disabled:opacity-40 disabled:hover:bg-transparent disabled:active:scale-100"
+            className="inline-flex min-h-[44px] items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50 active:scale-[0.97] transition"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-            {sinFoto.length === 0 ? "Todos tienen foto" : "Descargar Excel sin foto"}
+            Descargar Excel sin foto
           </button>
+          )}
           </div>
         </div>
 

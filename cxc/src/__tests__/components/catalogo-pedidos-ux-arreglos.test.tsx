@@ -220,9 +220,9 @@ describe("🔴 2. UN solo «Ver pedido», en las 4 marcas", () => {
     it(`${marca}: con el carrito lleno hay exactamente 1`, async () => {
       redCatalogo();
       const { container } = render(<CatalogoVendedorPage marca={marca} />);
-      await waitFor(() => expect(screen.getByText("Polo Core")).toBeTruthy());
+      await waitFor(() => expect(screen.getByText("TH-001")).toBeTruthy());
       // Se llena el carrito TOCANDO la tarjeta, como una persona.
-      const card = screen.getByText("Polo Core").closest("div.bg-white") as HTMLElement;
+      const card = screen.getByText("TH-001").closest("div.bg-white") as HTMLElement;
       await act(async () => { fireEvent.click(within(card).getByRole("button", { name: "Agregar" })); });
       await waitFor(() => {
         // `includes`, no `===`: la barra pegajosa de Reebok le pone una flecha
@@ -268,7 +268,7 @@ describe("🔴 5. «no cargó» ≠ «los filtros no dan»", () => {
     const antes = llamadas.filter((l) => l.url.includes("/products")).length;
     redCatalogo(false);
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Reintentar" })); });
-    await waitFor(() => expect(screen.getByText("Polo Core")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("TH-001")).toBeTruthy());
     expect(llamadas.filter((l) => l.url.includes("/products")).length).toBeGreaterThan(0);
     expect(antes).toBeGreaterThan(0);
   });
@@ -303,9 +303,9 @@ describe("🔴 8. el PDF dice que salió filtrado por precio", () => {
     QUERY = "precio_desde=10&precio_hasta=50";
     redCatalogo();
     render(<CatalogoVendedorPage marca="tommy" />);
-    await waitFor(() => expect(screen.getByText("Polo Core")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("TH-001")).toBeTruthy());
     // El filtro FILTRA de verdad: Jeans ($60) queda fuera del rango.
-    expect(screen.queryByText("Jeans Slim")).toBeNull();
+    expect(screen.queryByText("TH-002")).toBeNull();
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Compartir/ })); });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Descargar PDF/ })); });
     await waitFor(() => expect(PDF).toHaveBeenCalled());
@@ -317,7 +317,7 @@ describe("🔴 8. el PDF dice que salió filtrado por precio", () => {
     QUERY = "precio_hasta=20";
     redCatalogo();
     render(<CatalogoVendedorPage marca="tommy" />);
-    await waitFor(() => expect(screen.getByText("Polo Core")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("TH-001")).toBeTruthy());
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Compartir/ })); });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Descargar PDF/ })); });
     await waitFor(() => expect(PDF).toHaveBeenCalled());
@@ -327,7 +327,7 @@ describe("🔴 8. el PDF dice que salió filtrado por precio", () => {
   it("sin filtros el subtítulo sigue VACÍO (no se inventa ruido)", async () => {
     redCatalogo();
     render(<CatalogoVendedorPage marca="tommy" />);
-    await waitFor(() => expect(screen.getByText("Polo Core")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("TH-001")).toBeTruthy());
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Compartir/ })); });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Descargar PDF/ })); });
     await waitFor(() => expect(PDF).toHaveBeenCalled());
