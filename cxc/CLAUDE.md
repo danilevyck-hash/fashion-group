@@ -88,8 +88,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 
 ### Boston y CXC — [docs/postmortems/boston-cxc.md](docs/postmortems/boston-cxc.md)
 
-> Detalle completo (mediciones, citas, candados, mutaciones): [docs/postmortems/boston-cxc.md](docs/postmortems/boston-cxc.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
-> ⚠️ Las reglas de PANTALLA de este módulo (qué se dibuja, dónde, rótulos, tamaños) viven SOLO en ese postmortem: léelo antes de tocar una pantalla suya.
+> 📄 Mediciones, citas de Daniel, candados, mutaciones y las reglas de PANTALLA: el postmortem › «Lo que decía CLAUDE.md hasta el 22-sep-2026». Léelo antes de tocar una pantalla suya.
 
 - 🔴 **Boston NUNCA se mezcla con el CXC del grupo** (ni fila, total ni export); 🔴 **el del grupo SÍ convive con el resto**: aislarlo de más también es error.
 - **Fashion Group son SEIS empresas** (`B2B_EMPRESA_KEYS` = `empresasConCxc()`); Boston y ACS no. La vista **EXCLUYE, no enumera** (`switch_estadocuenta_aging`, `..._aging_mv` la materializa). Toda lectura acota por `empresa_key`.
@@ -100,22 +99,20 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - `/api/clientes/[codigo]` pregunta `esCodigoDelGrupo()` y contesta **404**, nunca 403.
 - 🔴 **Su DIRECTORIO se refresca SEMANAL sin tocar al grupo**: `sync-clientes-boston` (domingos 07:10 UTC) escribe **SOLO `switch_clientes` de Boston**. Para marcar ausente: lista completa y sin encoger bajo el **70%**; vacía = error. Alerta B, **165 h**.
 - 🔴 **La secretaria cobra y ve el módulo** (`ROLES_CXC`). ⚠️ **Boston sigue afuera**: otra lista.
-- Candados: `cxc-boston-fuera-de-toda-superficie` · `boston-acceso` · `boston-cartera-web` · `boston-clientes-no-tocan-el-grupo` · `cxc-secretaria-cobra`.
 
 **La planilla de David = la de Yulissa.**
 
 - 🔴 **Las columnas de dinero salen de UN lugar** (`columnas-dinero-planilla.ts`, 19): `PlanillaTab` y `PlanillaBoston` leen la MISMA lista.
 - 🔴 **Boston pide con el MISMO corte que la contadora**: el de la quincena cerrada, o el sugerido (`corteParaBoston`); `planilla-guardada` le **fuerza Boston** (`?id=` ajeno → 404).
 - 🔴 **Su Préstamos suma las tres cuentas**: saldo = `calcularSaldoPrestamo` (préstamo + daño + terceros), cuota = préstamo + terceros (el daño sin cuota es **pendiente**, no diseño).
-- Candados: `boston-planilla-mismas-columnas` · `boston-prestamos-tres-cuentas` · `boston-planilla-con-dinero` · `integration/boston-planilla-mismos-numeros`.
 
 **El rediseño.** Vive en **`/cxc`**; `/admin` EXACTO redirige 307 con su query.
 
 - 🔴 **Cobra todo el que ve el módulo**, por la única puerta «Cobrar» (correo con **Deshacer de 5 s**).
-- 🔴 **Abre por «más viejo sin pagar»** (20-sep, `ORDEN_AL_ABRIR`, override anclado a «Total pendiente»); el que nunca pagó primero y **los días se ven SIEMPRE en la fila**. `cxc-abre-por-mas-viejo`.
-- 🔴 **El papel y el Excel cierran con el total de la PANTALLA** (20-sep): bloque «Saldo a favor (N)» y «Total general»; faltaban $1.207,55. `cxc-cartera-cierra-igual`.
-- 🔴 **La tira dice plata, no conteos** (20-sep): 12 · 32 · 76 sumaban 120 sobre 100 clientes. `cxc-tira-solo-plata`.
-- 🔴 **En Boston ningún monto se encima** (20-sep): UN botón, y tocar la fila abre los documentos. `cxc-boston-montos-que-se-leen`.
+- 🔴 **Abre por «más viejo sin pagar»** (20-sep, `ORDEN_AL_ABRIR`, override anclado a «Total pendiente»); el que nunca pagó primero y **los días se ven SIEMPRE en la fila**.
+- 🔴 **El papel y el Excel cierran con el total de la PANTALLA** (20-sep): bloque «Saldo a favor (N)» y «Total general».
+- 🔴 **La tira dice plata, no conteos** (20-sep).
+- 🔴 **En Boston ningún monto se encima** (20-sep): UN botón, y tocar la fila abre los documentos.
 - 🔴 **Se mandan SIEMPRE las 6 empresas**, mire lo que mire el filtro: lo decide el SERVIDOR (`empresasDelEnvio()`). ⚠️ El cajón SÍ conserva el filtro: es lo que se MIRA.
 - 🔴 **UN correo por DIRECCIÓN, nunca uno por cliente**: un PDF con una hoja por cliente y un total al final, agrupado en el SERVIDOR. Los **sin correo NO abortan el lote** y se dicen por nombre.
 - 🔴 **«Sin pagar hace +90 d»**: días desde el ÚLTIMO PAGO REAL en las 6, por **CÓDIGO**; **retenciones y recibos en cero no cuentan**, y **el que nunca pagó avisa**. «Hoy» es el de PANAMÁ.
@@ -123,7 +120,6 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 **«Contacto» en la ficha: el sync NUNCA lo pisa**. Lo usa el saludo del correo y del WhatsApp; sin contacto, el de siempre; en un correo compartido **no se saluda a nadie**.
 - 🔴 **Boston: mismo FORMATO, APARTE.** Ruta propia, **no reusa `fetchEstadoCuentaData`**; sus teléfonos y correos de `switch_clientes` acotado a Boston, **nunca de `clientes_master`**.
 - 🩸 `/api/cxc-rows` se retiró; `contact-log` y `cxc-summary` se quedan. `cxc_rows` y `cxc_contact_log` **no se borran**.
-- Candados: `cxc-sin-pagar` · `cxc-correos-por-direccion` · `cxc-estado-cuenta-legible` · `cxc-cobrar-una-hoja` · `cxc-envios-y-pagos-por-fecha` · `cxc-ruta-y-error` · `cxc-contacto-del-cliente` · `cxc-boston-mismo-formato`.
 
 **La FORMA DE SWITCH** — solo documentos ABIERTOS.
 
@@ -131,17 +127,15 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔑 **Los números no se recalculan**: `debito` y `credito` son los de Switch, `debito − credito` el saldo firmado y el corrido se acumula de ahí. 🔴 El orden `(fecha, ccte_id)` **no se mueve**.
 - 🔴 **Los TRES tramos de la pantalla, no los ocho de Switch** (`cxc-aging`). ⚠️ Ante el CLIENTE van por **rango**: **«vencido» está prohibido** —`dias` es EDAD, no mora—.
 - 🔴 **Nada se pliega por valer menos de $50**, en los DOS cajones; si vuelve, se agrupa **POR MONTO y NUNCA por tipo**. `documentos-chicos.ts` se conserva sin lectores.
-- 🔴 **El nombre del cliente es el que escribe Switch**, no el `nombre_normalized` del PAREO; sin él se capitaliza. 🔴 **Y en TODAS las pantallas** (20-sep, `cxc/nombre-cliente.ts`); Boston aparte. `cxc-un-solo-nombre-del-cliente`.
+- 🔴 **El nombre del cliente es el que escribe Switch**, no el `nombre_normalized` del PAREO; sin él se capitaliza. 🔴 **Y en TODAS las pantallas** (20-sep, `cxc/nombre-cliente.ts`); Boston aparte.
 - 🔴 **«Vence» se DERIVA de la fecha + el `plazo_credito`**; con plazo 0 la celda va **VACÍA**.
 - 🔴 **El cuadre**: `Saldos[]` y `saldoTotal` caen en `switch_estadocuenta_saldo` (`20261023120000`, aplicada). El cajón y «Cobrar» avisan con **un centavo** de tolerancia; sin dato de Switch no se afirma nada. ⚠️ El desfase **NO va en el papel del cliente**.
-- 🔴 **SE LEE DESDE ADENTRO (18-sep-2026)**: vienen ANIDADOS en `data.estadocuenta` y los arma `filaDeCuadre` (las DOS grafías), que **falla ABIERTO a NULL — nunca un cero inventado**. ⚠️ `saldoConsecutivo` **NO construido**. Candado `cxc-cuadre-desde-adentro`.
-- 🔴 **«Comentario» bajó al PIE, en blanco** (20-sep): era el 20 % del ancho y vacía en los 3.003 documentos. `cxc-comentario-abajo`.
-- 🔴 **El rótulo de la ficha se mide CON la negrita**, y salen «Límite de crédito» y «Tiempo de Morosidad» (20-sep). `cxc-ficha-sin-lineas-rotas`.
+- 🔴 **SE LEE DESDE ADENTRO (18-sep-2026)**: vienen ANIDADOS en `data.estadocuenta` y los arma `filaDeCuadre` (las DOS grafías), que **falla ABIERTO a NULL — nunca un cero inventado**. ⚠️ `saldoConsecutivo` **NO construido**.
+- 🔴 **«Comentario» bajó al PIE, en blanco** (20-sep).
+- 🔴 **El rótulo de la ficha se mide CON la negrita**, y salen «Límite de crédito» y «Tiempo de Morosidad» (20-sep).
 - ⚠️ **La empresa acreedora sale de una lista ESCRITA A MANO** (`empresa-fiscal.ts`), no del `numero_fiscal`; **las OCHO cargadas**, y la que falte sale con su nombre corto, **nunca con datos de otra**.
-- 🔴 **AHÍ MISMO VIVE DÓNDE SE PAGA, CADA UNA EN SU CUENTA (20-sep-2026)**: las 8 salen por `lineasDePago`, en el PDF al pie de CADA hoja y en el correo con TODAS las del papel. **Falla ABIERTA**. Candado `cxc-donde-pagar`.
-- 🔴 **Boston FIRMA COMO BOSTON** (Daniel: *«Firma Confecciones Boston»*). La casa se pregunta por `empresa_key` (`casa-del-papel.ts`): su papel sale **sin el logo del grupo y sin `fashiongr.com` en el pie**. ⚠️ Su correo sale por Resend desde `fashiongr.com`: **un dominio propio sigue pendiente**.
-- Candados: `cxc-estado-cuenta-forma-switch` · `cxc-papel-vocabulario` · `pdf-cliente-layout`.
-
+- 🔴 **AHÍ MISMO VIVE DÓNDE SE PAGA, CADA UNA EN SU CUENTA (20-sep-2026)**: las 8 salen por `lineasDePago`, en el PDF al pie de CADA hoja y en el correo con TODAS las del papel. **Falla ABIERTA**.
+- 🔴 **Boston FIRMA COMO BOSTON.** La casa se pregunta por `empresa_key` (`casa-del-papel.ts`): su papel sale **sin el logo del grupo y sin `fashiongr.com` en el pie**. ⚠️ Su correo sale por Resend desde `fashiongr.com`: **un dominio propio sigue pendiente**.
 ### Guías — [docs/postmortems/guias.md](docs/postmortems/guias.md)
 
 > 📄 Mediciones, citas de Daniel, candados, mutaciones y las reglas de PANTALLA: el postmortem › «Lo que decía CLAUDE.md hasta el 22-sep-2026». Léelo antes de tocar una pantalla suya.
