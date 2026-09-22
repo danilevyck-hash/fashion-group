@@ -376,8 +376,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 **Quien no tiene Inicio no lo ve ni un instante** (19-sep): el rebote a la casa del rol lo decide el SERVIDOR en `src/app/home/layout.tsx` —`leerSemillaDeSesion()` + la MISMA `casaDelRol`, `redirect()` antes de una sola línea de HTML—, así que `marcacion`, `gerente_acs` y `gerente_boston` nunca reciben el Inicio. 🔴 **Falla ABIERTA**: sin cookie, forjada o rol desconocido, no redirige y el efecto del navegador decide como siempre.
 ### Recordatorios (era Cheques) — [docs/postmortems/recordatorios.md](docs/postmortems/recordatorios.md)
 
-> Detalle completo (mediciones, citas, candados, mutaciones): [docs/postmortems/recordatorios.md](docs/postmortems/recordatorios.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
-> ⚠️ Las reglas de PANTALLA de este módulo (qué se dibuja, dónde, rótulos, tamaños) viven SOLO en ese postmortem: léelo antes de tocar una pantalla suya.
+> 📄 Mediciones, citas de Daniel, candados y las reglas de PANTALLA: el postmortem › «Lo que decía CLAUDE.md hasta el 22-sep-2026».
 
 - `/recordatorios` (era `/cheques`, 307); la `key` sigue siendo `cheques` en `role_permissions` y `modulos_override`; entran admin y secretaria, nadie más.
 - 🔴 Solo se lista lo ABIERTO: lo depositado aparece solo al buscarlo. 🔴 NINGÚN total sumado: `recordatorios/agenda.ts` no tiene una operación de suma.
@@ -385,8 +384,6 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 `destino` = `equipo` o `privado`, y lo decide el ROL en el SERVIDOR (`destinoPermitido`): lo de una secretaria va SIEMPRE al equipo, y ante la duda, `equipo`. ⚠️ Hay UN solo chat privado y DOS admin: lo de Alberto le llega a Daniel.
 - 🔴 Un recordatorio NO se marca como hecho y un cheque que no se cobrará SE BORRA: no hay estado de completado. 🔴 El vencido sin marcar avisa UNA SOLA VEZ (`cheques.aviso_vencido_en`), marcado DESPUÉS de que Telegram confirme; un rebotado no avisa.
 - 🔴 A los 365 días un cheque DEPOSITADO se retira con soft delete (`deleted` + `deleted_at`), nunca un DELETE, y solo los depositados: lo que se debe se queda para siempre. Cuenta desde `fecha_depositado` (sin ella, `fecha_deposito`; nunca «hoy»).
-- Candados: `recordatorios-rediseno.test.ts` · `cheques-aviso-vencimiento.test.ts`.
-
 ### Caja Menuda — [docs/postmortems/caja-menuda.md](docs/postmortems/caja-menuda.md)
 
 > Sus reglas, enteras, en el postmortem.

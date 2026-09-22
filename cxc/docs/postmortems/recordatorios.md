@@ -398,3 +398,19 @@ candados que faltan no se ven leyendo los que hay.**
 - Migración **`20260925130000_recordatorios_rediseno.sql`** (**aplicada**, verificada el 5-sep-2026): `recordatorios` gana `hasta` y `destino` y el CHECK de `repeticion` gana `cada_dia`; `cheques` gana `aviso_vencido_en` y `deleted_at`. **Aditiva** — ni una fila cambia de valor. ⚠️ El código **no degrada** sin ella (la tolerancia a «falta el DDL» se retiró de este módulo el 3-sep-2026, a propósito).
 - Candados: `recordatorios-rediseno.test.ts` · `recordatorios-pantalla.test.tsx` · `recordatorios-permiso-y-aviso.test.ts` · `recordatorios-cuando-tocan.test.ts` · `cheques-aviso-vencimiento.test.ts`; **56 mutaciones, 56 cazadas** (`scripts/_mutar-candados-recordatorios.sh`, con 2 controles).
 
+---
+
+## Lo que decía CLAUDE.md hasta el 22-sep-2026 (movido acá, verbatim)
+
+### Recordatorios (era Cheques) — [docs/postmortems/recordatorios.md](docs/postmortems/recordatorios.md)
+
+> Detalle completo (mediciones, citas, candados, mutaciones): [docs/postmortems/recordatorios.md](docs/postmortems/recordatorios.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
+> ⚠️ Las reglas de PANTALLA de este módulo (qué se dibuja, dónde, rótulos, tamaños) viven SOLO en ese postmortem: léelo antes de tocar una pantalla suya.
+
+- `/recordatorios` (era `/cheques`, 307); la `key` sigue siendo `cheques` en `role_permissions` y `modulos_override`; entran admin y secretaria, nadie más.
+- 🔴 Solo se lista lo ABIERTO: lo depositado aparece solo al buscarlo. 🔴 NINGÚN total sumado: `recordatorios/agenda.ts` no tiene una operación de suma.
+- 🔴 «Hoy» NO existe ni hay selector de hora: UN mensaje diario a las 9:00 a.m. de Panamá y el primero disponible es MAÑANA; un día pasado se rechaza en pantalla y en el servidor. El «Hasta…» corta INCLUSIVE, solo con repetición.
+- 🔴 `destino` = `equipo` o `privado`, y lo decide el ROL en el SERVIDOR (`destinoPermitido`): lo de una secretaria va SIEMPRE al equipo, y ante la duda, `equipo`. ⚠️ Hay UN solo chat privado y DOS admin: lo de Alberto le llega a Daniel.
+- 🔴 Un recordatorio NO se marca como hecho y un cheque que no se cobrará SE BORRA: no hay estado de completado. 🔴 El vencido sin marcar avisa UNA SOLA VEZ (`cheques.aviso_vencido_en`), marcado DESPUÉS de que Telegram confirme; un rebotado no avisa.
+- 🔴 A los 365 días un cheque DEPOSITADO se retira con soft delete (`deleted` + `deleted_at`), nunca un DELETE, y solo los depositados: lo que se debe se queda para siempre. Cuenta desde `fecha_depositado` (sin ella, `fecha_deposito`; nunca «hoy»).
+- Candados: `recordatorios-rediseno.test.ts` · `cheques-aviso-vencimiento.test.ts`.
