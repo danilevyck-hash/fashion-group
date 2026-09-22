@@ -18,6 +18,15 @@
  *
  * 🔴 **No decide qué se ve.** Eso lo hace `agruparAgenda` (módulo puro): lo
  * abierto en la lista, lo depositado solo por el buscador.
+ *
+ * ── 🔴 UN ICONO POR MOTIVO (22-sep-2026) ─────────────────────────────────────
+ *
+ * Daniel: ***«cheque es un motivo de recordatorio»***. Cheques y notas conviven
+ * en esta MISMA lista desde el 5-sep, pero hasta hoy solo la nota llevaba
+ * marca (🔔) y el cheque no llevaba ninguna. Ahora las dos filas empiezan con el
+ * icono de su motivo, y **el icono sale de `lib/recordatorios/motivos.ts`** —
+ * escrito a mano acá, agregar un motivo nuevo dejaría su fila sin marca y nadie
+ * se enteraría hasta verla en producción.
  */
 
 import { Fragment } from "react";
@@ -25,6 +34,7 @@ import { StatusBadge } from "@/components/ui";
 import { fmt, fmtDate } from "@/lib/format";
 import { getCompanyDisplay } from "@/lib/companies";
 import { ETIQUETA_REPETICION } from "@/lib/recordatorios/recordatorio";
+import { iconoDeItem, motivoDeItem } from "@/lib/recordatorios/motivos";
 import type { GrupoDeAgenda, ItemAgenda } from "@/lib/recordatorios/agenda";
 
 interface Props {
@@ -70,8 +80,17 @@ function FilaCheque({
     >
       <div className="px-4 py-3 cursor-pointer" onClick={() => onAbrir(c.id)}>
         <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-medium truncate" data-cheque-campo="cliente">
-            {c.cliente}
+          <span className="flex items-center gap-2 min-w-0">
+            <span
+              aria-hidden
+              className="shrink-0"
+              data-motivo-icono={motivoDeItem(item)}
+            >
+              {iconoDeItem(item)}
+            </span>
+            <span className="text-sm font-medium truncate" data-cheque-campo="cliente">
+              {c.cliente}
+            </span>
           </span>
           <span className="text-sm font-semibold tabular-nums shrink-0" data-cheque-campo="monto">
             ${fmt(c.monto)}
@@ -141,8 +160,12 @@ function FilaRecordatorio({
     >
       <div className="flex items-start justify-between gap-2">
         <span className="flex items-start gap-2 min-w-0">
-          <span aria-hidden className="shrink-0 mt-0.5">
-            🔔
+          <span
+            aria-hidden
+            className="shrink-0 mt-0.5"
+            data-motivo-icono={motivoDeItem(item)}
+          >
+            {iconoDeItem(item)}
           </span>
           <span className="text-sm font-medium break-words" data-recordatorio-campo="texto">
             {r.texto}

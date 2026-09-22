@@ -9,7 +9,8 @@
  * de poder escribir una línea.
  *
  * ── LO QUE ES ────────────────────────────────────────────────────────────────
- * Una línea SIEMPRE VISIBLE arriba de la lista:
+ * Una línea SIEMPRE VISIBLE (desde el 22-sep-2026, DEBAJO de la lista — ver el
+ * bloque del final):
  *
  *   ¿Qué te recuerdo?   [ Cuándo ▾ ]  [ A quién ▾ ]  [ + Cliente ]  [ Guardar ]
  *
@@ -31,6 +32,22 @@
  * siempre al equipo, y eso lo fuerza el SERVIDOR — acá solo se esconde el
  * control. ⚠️ Hay UN solo chat privado (el de Daniel) y DOS admin: si Alberto
  * marca «solo a mí», le llega a Daniel. Aprobado así.
+ *
+ * ── 🔴 ABAJO Y MÁS CHICO (22-sep-2026) ───────────────────────────────────────
+ *
+ * Este renglón vivía ARRIBA de la lista, con todo el ancho y NUEVE botones a la
+ * vista, mientras el cheque era un botón chico en la esquina. Medido: la caja se
+ * usó **2 veces en 17 días** y los cheques son **19 filas** — el orden de la
+ * pantalla estaba al revés de su uso.
+ *
+ * Ahora vive DEBAJO de la lista y, en reposo, es **una sola fila**: el campo y
+ * el botón. Las opciones (Cuándo · A quién · Cliente) aparecen cuando hay algo
+ * escrito o el campo tiene el foco — o sea, cuando sirven de algo.
+ *
+ * 🔴 **No se perdió ninguna opción ni cambió lo que se guarda**: son las mismas
+ * seis pastillas, el mismo «Hasta…», el mismo destino y el mismo cliente. Lo
+ * único que cambió es CUÁNDO se dibujan. La puerta completa, con los dos
+ * motivos, es el botón «＋ Recordar» de arriba.
  */
 
 import { useState } from "react";
@@ -72,7 +89,7 @@ interface Props {
 }
 
 const PASTILLA =
-  "text-sm px-3 min-h-[44px] inline-flex items-center rounded-full border transition whitespace-nowrap";
+  "text-xs px-3 min-h-[44px] inline-flex items-center rounded-full border transition whitespace-nowrap";
 const PASTILLA_ON = "border-blue-500 bg-blue-50 text-blue-700 font-medium";
 const PASTILLA_OFF = "border-gray-200 text-gray-500 hover:border-gray-400 hover:text-black";
 
@@ -84,6 +101,9 @@ export default function LineaNueva({
   onGuardar,
 }: Props) {
   const [texto, setTexto] = useState("");
+  // Las opciones se despliegan al escribir o al enfocar el campo. En reposo la
+  // caja es UNA fila: es un atajo, no la cara del módulo.
+  const [enfocado, setEnfocado] = useState(false);
   const [cuando, setCuando] = useState<OpcionCuando>("manana");
   const [fechaElegida, setFechaElegida] = useState("");
   const [hasta, setHasta] = useState("");
@@ -99,9 +119,11 @@ export default function LineaNueva({
     hoy,
   );
   const puedeGuardar = falta.length === 0 && !guardando && isOnline;
+  const abierta = enfocado || texto.trim() !== "";
 
   function limpiar() {
     setTexto("");
+    setEnfocado(false);
     setCuando("manana");
     setFechaElegida("");
     setHasta("");
@@ -129,7 +151,8 @@ export default function LineaNueva({
     <section
       data-linea-nueva
       aria-label="Escribir un recordatorio"
-      className="border border-gray-200 rounded-lg px-3 py-3 mb-5 bg-white"
+      data-linea-nueva-abierta={abierta ? "si" : "no"}
+      className="border border-gray-200 rounded-lg px-3 py-2 mt-6 bg-gray-50/60"
     >
       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
         {/* No es un <form>: sin submit implícito, un Enter perdido no guarda
@@ -144,21 +167,23 @@ export default function LineaNueva({
           onKeyDown={(e) => {
             if (e.key === "Enter" && puedeGuardar) guardar();
           }}
+          onFocus={() => setEnfocado(true)}
           // text-base en celular: con text-sm (14px) Safari hace zoom al enfocar.
-          className="flex-1 min-w-0 text-base sm:text-sm border-b border-gray-200 px-1 min-h-[44px] outline-none focus:border-black transition"
+          className="flex-1 min-w-0 text-base sm:text-sm border-b border-gray-200 bg-transparent px-1 min-h-[44px] outline-none focus:border-black transition"
         />
         <button
           type="button"
           onClick={guardar}
           disabled={!puedeGuardar}
           title={!isOnline ? "Sin conexión" : undefined}
-          className="bg-black text-white px-5 min-h-[44px] inline-flex items-center justify-center rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+          className="bg-black text-white px-4 min-h-[44px] inline-flex items-center justify-center rounded-md text-xs font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
         >
           {!isOnline ? "Sin conexión" : guardando ? "Guardando..." : "Guardar"}
         </button>
       </div>
 
       {/* ── Cuándo ─────────────────────────────────────────────────────────── */}
+      {abierta && (
       <div
         className="flex flex-wrap items-center gap-2 mt-2"
         role="group"
@@ -203,8 +228,10 @@ export default function LineaNueva({
           </label>
         )}
       </div>
+      )}
 
       {/* ── A quién · Cliente ───────────────────────────────────────────────── */}
+      {abierta && (
       <div className="flex flex-wrap items-center gap-2 mt-2">
         {puedeElegirDestino && (
           <div className="flex flex-wrap items-center gap-2" role="group" aria-label="A quién">
@@ -259,6 +286,7 @@ export default function LineaNueva({
           </div>
         )}
       </div>
+      )}
 
       {/* Lo que falta va DEBAJO del botón apagado, no en un toast: enterarse
           después de tocar es exactamente lo que este patrón evita. Y cuando lo

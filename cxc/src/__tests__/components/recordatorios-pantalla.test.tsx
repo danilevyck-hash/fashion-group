@@ -26,6 +26,18 @@
 //   4. El renglón de escribir guarda lo que la persona puso, y nada solo.
 //   5. «Hoy» no se puede elegir, y se dice por qué.
 //   6. «A quién» solo lo ve un admin.
+//
+// ── 🩸 SEGUNDA VUELTA: 22-SEP-2026, «UNA SOLA PUERTA» ────────────────────────
+//
+// Daniel: ***«cheque es un motivo de recordatorio»***. Dos cosas cambiaron acá:
+//
+//   · El botón **«Nuevo Cheque»** ya no existe: hay UNO solo, «＋ Recordar»,
+//     que pregunta el MOTIVO. El test que exigía «Nuevo Cheque» cambió de
+//     dirección: ahora exige que NO vuelva.
+//   · El renglón de escribir bajó DEBAJO de la lista y, en reposo, es UNA fila:
+//     sus opciones (Cuándo · A quién · + Cliente) se despliegan al escribir o al
+//     enfocar el campo. Los tests que las buscaban sin tocar nada ahora abren la
+//     caja primero — **no se perdió ninguna opción**, cambió cuándo se dibuja.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -152,6 +164,14 @@ function pintar(over: {
   );
 }
 
+/**
+ * Abre la caja de escribir. Desde el 22-sep-2026 vive DEBAJO de la lista y en
+ * reposo es una sola fila: las opciones se despliegan al enfocar el campo.
+ */
+function abrirLinea() {
+  fireEvent.focus(screen.getByLabelText("¿Qué te recuerdo?"));
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 describe("🔴 LOS CHEQUES NO SE PERDIERON — el rediseño no se llevó nada", () => {
   it("el cheque se sigue viendo, con su cliente y su monto", () => {
@@ -160,9 +180,9 @@ describe("🔴 LOS CHEQUES NO SE PERDIERON — el rediseño no se llevó nada", 
     expect(screen.getAllByText("$1,000.00").length).toBeGreaterThan(0);
   });
 
-  it("los botones que quedan siguen ahí: Nuevo Cheque, Lista y Calendario", () => {
+  it("los botones que quedan siguen ahí: Recordar, Lista y Calendario", () => {
     pintar();
-    expect(screen.getByRole("button", { name: /Nuevo Cheque/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Recordar/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Lista$/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Calendario$/ })).toBeTruthy();
   });
@@ -298,6 +318,7 @@ describe("🔴 EL RENGLÓN DE ESCRIBIR — una línea, siempre visible", () => {
 
   it("🔴 «Hoy» NO es una opción — el aviso sale a las 9:00 y ya pasó", () => {
     pintar();
+    abrirLinea();
     const grupo = screen.getByRole("group", { name: "Cuándo" });
     const opciones = within(grupo).getAllByRole("button").map((b) => b.textContent);
     expect(opciones).toEqual([
@@ -397,6 +418,7 @@ describe("🔴 EL RENGLÓN DE ESCRIBIR — una línea, siempre visible", () => {
 describe("🔴 «A QUIÉN» — solo lo ven los admin", () => {
   it("un admin ve las dos opciones", () => {
     pintar({ puedeElegirDestino: true });
+    abrirLinea();
     const grupo = screen.getByRole("group", { name: "A quién" });
     expect(within(grupo).getAllByRole("button").map((b) => b.textContent)).toEqual([
       "Al equipo", "Solo a mí",
@@ -405,12 +427,16 @@ describe("🔴 «A QUIÉN» — solo lo ven los admin", () => {
 
   it("una secretaria NO ve el control (lo suyo va siempre al equipo)", () => {
     pintar({ puedeElegirDestino: false });
+    // Con la caja ABIERTA: si solo estuviera cerrada, este test pasaría sin
+    // probar nada.
+    abrirLinea();
     expect(screen.queryByRole("group", { name: "A quién" })).toBeNull();
     expect(screen.queryByText("Solo a mí")).toBeNull();
   });
 
   it("marcar «Solo a mí» viaja en el POST", async () => {
     pintar({ puedeElegirDestino: true });
+    abrirLinea();
     fireEvent.change(screen.getByLabelText("¿Qué te recuerdo?"), { target: { value: "x" } });
     fireEvent.click(screen.getByRole("button", { name: "Solo a mí" }));
     salidas.length = 0;
@@ -426,6 +452,7 @@ describe("🔴 «A QUIÉN» — solo lo ven los admin", () => {
 describe("🔴 EL CLIENTE es opcional y NO se muestra por defecto", () => {
   it("arranca escondido y se abre con un toque", () => {
     pintar();
+    abrirLinea();
     expect(screen.queryByPlaceholderText(/Buscar cliente/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "+ Cliente" }));
     expect(screen.getByPlaceholderText(/Buscar cliente/)).toBeTruthy();
@@ -504,6 +531,128 @@ describe("editar y borrar un recordatorio siguen existiendo", () => {
     for (const palabra of ["Hecho", "Completado", "Ya lo hice", "Marcar como hecho"]) {
       expect(container.textContent, palabra).not.toContain(palabra);
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("🔴 UNA SOLA PUERTA — «＋ Recordar» (22-sep-2026)", () => {
+  it("🔴 «Nuevo Cheque» ya NO es un botón: la segunda puerta se cerró", () => {
+    pintar();
+    expect(screen.queryByRole("button", { name: /Nuevo Cheque/ })).toBeNull();
+  });
+
+  it("hay UN solo botón de alta, y dice «Recordar»", () => {
+    const { container } = pintar();
+    expect(container.querySelectorAll("[data-puerta-boton]")).toHaveLength(1);
+    expect(
+      (container.querySelector("[data-puerta-boton]") as HTMLElement).textContent,
+    ).toContain("Recordar");
+  });
+
+  it("🔴 tocarlo pregunta el MOTIVO, y ofrece los DOS que existen hoy", () => {
+    const { container } = pintar();
+    // Antes de tocar, no hay ninguna ventana.
+    expect(container.querySelector("[data-puerta-recordar]")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Recordar/ }));
+    const puerta = screen.getByRole("dialog", { name: "Recordar" });
+    expect([...puerta.querySelectorAll("[data-motivo]")].map((n) => n.getAttribute("data-motivo")))
+      .toEqual(["cheque", "nota"]);
+    // Y cada uno dice qué va a pasar ANTES de elegirlo.
+    expect(puerta.textContent).toContain("Te aviso el día que se puede depositar.");
+  });
+
+  it("🔴 abrir la puerta NO guarda nada", async () => {
+    pintar();
+    salidas.length = 0;
+    fireEvent.click(screen.getByRole("button", { name: /Recordar/ }));
+    await act(async () => { await Promise.resolve(); });
+    expect(salidas.filter((s) => s.metodo !== "GET")).toEqual([]);
+  });
+
+  it("🔴 el motivo «Cheque» abre el formulario de CHEQUE", async () => {
+    const { container } = pintar();
+    fireEvent.click(screen.getByRole("button", { name: /Recordar/ }));
+    fireEvent.click(container.querySelector('[data-motivo="cheque"]') as HTMLElement);
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByRole("dialog", { name: /Nuevo cheque/i })).toBeTruthy();
+    // Y pide lo del cheque, no lo de una nota.
+    expect(screen.getByLabelText("N° Cheque")).toBeTruthy();
+    expect(screen.getByLabelText("Monto")).toBeTruthy();
+  });
+
+  it("🔴 el motivo «Nota» abre el formulario de NOTA, y guarda en su tabla", async () => {
+    const { container } = pintar();
+    fireEvent.click(screen.getByRole("button", { name: /Recordar/ }));
+    fireEvent.click(container.querySelector('[data-motivo="nota"]') as HTMLElement);
+    await act(async () => { await Promise.resolve(); });
+
+    const dialogo = screen.getByRole("dialog", { name: /Nuevo recordatorio/ });
+    // 🔴 Nace para MAÑANA: «hoy» no se puede guardar, así que abrirlo con hoy
+    // sería abrirlo frenado.
+    expect((within(dialogo).getByLabelText("Fecha") as HTMLInputElement).value).toBe("2026-08-25");
+
+    fireEvent.change(within(dialogo).getByLabelText("Qué hay que recordar"), {
+      target: { value: "Llamar al banco" },
+    });
+    salidas.length = 0;
+    await act(async () => {
+      fireEvent.click(within(dialogo).getByRole("button", { name: /Guardar recordatorio/ }));
+      await Promise.resolve();
+    });
+    const post = salidas.find((s) => s.metodo === "POST");
+    expect(post, "no salió ningún POST").toBeTruthy();
+    // 🔴 A LA TABLA DE SU MOTIVO, no a la del otro.
+    expect(post!.url).toBe("/api/recordatorios");
+    expect(post!.cuerpo).toMatchObject({ texto: "Llamar al banco", fecha: "2026-08-25" });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("🔴 LA LISTA ARRIBA, LA CAJA DE ESCRIBIR ABAJO Y MÁS CHICA", () => {
+  it("🔴 la lista va ANTES que el renglón de escribir", () => {
+    const { container } = pintar();
+    const lista = container.querySelector('[data-agenda="lista"]') as HTMLElement;
+    const caja = container.querySelector("[data-linea-nueva]") as HTMLElement;
+    expect(lista, "no se dibujó la lista").toBeTruthy();
+    expect(caja, "no se dibujó el renglón de escribir").toBeTruthy();
+    // `DOCUMENT_POSITION_FOLLOWING` = la caja viene DESPUÉS de la lista.
+    expect(lista.compareDocumentPosition(caja) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("🔴 en reposo es UNA fila: un campo y un botón, sin los nueve de antes", () => {
+    const { container } = pintar();
+    const caja = container.querySelector("[data-linea-nueva]") as HTMLElement;
+    expect(caja.getAttribute("data-linea-nueva-abierta")).toBe("no");
+    expect(caja.querySelectorAll("button")).toHaveLength(1);
+    expect(screen.queryByRole("group", { name: "Cuándo" })).toBeNull();
+  });
+
+  it("y se despliega entera al enfocar el campo — no se perdió ninguna opción", () => {
+    const { container } = pintar();
+    abrirLinea();
+    const caja = container.querySelector("[data-linea-nueva]") as HTMLElement;
+    expect(caja.getAttribute("data-linea-nueva-abierta")).toBe("si");
+    expect(within(caja).getByRole("group", { name: "Cuándo" })).toBeTruthy();
+    expect(within(caja).getByRole("group", { name: "A quién" })).toBeTruthy();
+    expect(within(caja).getByRole("button", { name: "+ Cliente" })).toBeTruthy();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("🔴 CADA FILA DICE SU MOTIVO CON UN ICONO", () => {
+  it("el cheque lleva el suyo y la nota el suyo, y no son el mismo", () => {
+    const { container } = pintar({ recordatorios: [{ ...REC, fecha: HOY }] });
+    const delCheque = container.querySelector(
+      '[data-cheque-fila="c1"] [data-motivo-icono]',
+    ) as HTMLElement;
+    const deLaNota = container.querySelector(
+      '[data-recordatorio-fila="r1"] [data-motivo-icono]',
+    ) as HTMLElement;
+    expect(delCheque, "la fila del cheque quedó sin icono de motivo").toBeTruthy();
+    expect(deLaNota, "la fila de la nota quedó sin icono de motivo").toBeTruthy();
+    expect(delCheque.getAttribute("data-motivo-icono")).toBe("cheque");
+    expect(deLaNota.getAttribute("data-motivo-icono")).toBe("nota");
+    expect(delCheque.textContent).not.toBe(deLaNota.textContent);
   });
 });
 

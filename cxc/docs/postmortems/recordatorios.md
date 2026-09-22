@@ -376,6 +376,149 @@ candados que faltan no se ven leyendo los que hay.**
 
 ---
 
+## 13. 🔴 «CHEQUE ES UN MOTIVO DE RECORDATORIO» — la puerta única (22-sep-2026)
+
+Daniel, textual: ***«cheque es un motivo de recordatorio»***.
+
+Esa frase reencuadra el módulo entero. El rediseño del 5-sep juntó las dos cosas
+en UNA lista, pero **las dos PUERTAS seguían siendo dos y no se conocían**:
+
+| Puerta | Dónde estaba | A qué tabla escribía |
+|---|---|---|
+| **«Nuevo Cheque»** | botón negro, arriba a la derecha | `cheques` |
+| **«¿Qué te recuerdo?»** | caja de todo el ancho, NUEVE botones, arriba de la lista | `recordatorios` |
+
+### Lo que se midió antes de tocar nada (22-sep-2026, contra producción)
+
+| Qué | Cuánto |
+|---|---|
+| `cheques` vivos | **19**, y **los 19 depositados** — $279.396,12, **cero pendientes** |
+| Último cheque cargado | **27-jul-2026**; los 14 de esa tanda, en el MISMO minuto |
+| `recordatorios` | **2**, los dos con fecha PASADA (uno real, de $43.806,10; el otro decía «Hola david») |
+| Lo que la pantalla devuelve hoy | **cero filas** → «🔔 Todo al día» |
+| Campo «Notas» del cheque | **0 de 19** |
+| `banco` con dato | **5 de 19** |
+| Uso de la caja de escribir | **2 veces en 17 días** |
+
+🔑 **La lectura:** la caja que se llevaba todo el ancho y nueve botones se usó
+dos veces; el cheque, que es la plata, era un botón chico en la esquina. **El
+orden de la pantalla estaba al revés de su uso.**
+
+### 🔴 EL FRENO: NADA SE FUSIONA EN LA BASE
+
+Lo que se unificó es **la PANTALLA y el FORMULARIO**, no el almacenamiento.
+`cheques` y `recordatorios` siguen existiendo tal cual, con sus columnas y sus
+19 + 2 filas. **El MOTIVO es lo que decide en cuál se guarda.**
+
+🔴 **No hizo falta ninguna columna nueva, ninguna migración y ningún DDL.** El
+motivo se **DERIVA** de en qué tabla vive la fila (`motivoDeItem`), que es un
+dato que ya existe y no se puede desincronizar. Una columna `motivo` guardada se
+podría contradecir con la tabla, y habría que elegir a cuál creerle.
+
+### Lo que quedó
+
+**1 · UNA SOLA PUERTA.** Un botón **«＋ Recordar»** (`components/PuertaRecordar.tsx`).
+Se toca, se elige el MOTIVO —con una línea que dice qué va a pasar ANTES de
+elegirlo— y se abre el formulario de ese motivo, con sus campos obligatorios de
+siempre. Elegir **no guarda nada**.
+
+Los motivos viven en **`lib/recordatorios/motivos.ts`** (módulo PURO), que es el
+único lugar donde está escrito en qué tabla guarda cada uno:
+
+| Motivo | Icono | Tabla | Qué pide |
+|---|---|---|---|
+| **Cheque** | 💵 | `cheques` | Cliente · Monto · Fecha en que se puede depositar |
+| **Nota** | 🔔 | `recordatorios` | Qué hay que recordar · Fecha |
+
+🔴 **Son DOS y no se inventó ninguno más.** Se le preguntó a Daniel qué otros
+motivos usaría y **todavía no contestó**. Lo que sí se construyó es el
+mecanismo: agregar un motivo es agregar una ficha a `FICHA_MOTIVO` y el
+formulario que lo atiende — la puerta, la lista, los iconos y los candados del
+cron salen de esa lista, no de un `if` repartido por la pantalla. Y el `switch`
+de `abrirMotivo` es **exhaustivo** (`const _exhaustivo: never`): un motivo nuevo
+sin formulario deja el **build ROJO** en vez de abrir una ventana vacía en
+producción.
+
+**2 · UNA SOLA LISTA, con el motivo a la vista.** Cheques y notas ya convivían
+desde el 5-sep, pero solo la nota llevaba marca (🔔) y el cheque no llevaba
+ninguna. Ahora **las dos filas empiezan con el icono de su motivo**, sacado del
+registro: escrito a mano, un motivo nuevo saldría sin marca y nadie se enteraría
+hasta verlo en producción.
+
+**3 · LA LISTA ARRIBA, LA CAJA DE ESCRIBIR ABAJO Y MÁS CHICA.** El renglón de
+escribir bajó DEBAJO de la lista y, en reposo, es **UNA fila**: el campo y el
+botón. Las opciones (Cuándo · A quién · + Cliente) se despliegan al escribir o al
+enfocar el campo. 🔴 **No se perdió ninguna opción ni cambió lo que se guarda**:
+son las mismas seis pastillas, el mismo «Hasta…», el mismo destino y el mismo
+cliente. Lo único que cambió es CUÁNDO se dibujan.
+
+⚠️ **Los ~350 px en blanco bajo «Todo al día» se dejaron en blanco.** No hay
+nada útil que poner ahí, y llenarlos con adornos sería peor.
+
+### Lo que NO se tocó, a propósito
+
+- **El cron de las 9:00 y sus reglas**: un mensaje diario, «hoy» no existe, el
+  primero disponible es mañana, el vencido avisa **una sola vez**
+  (`aviso_vencido_en`, marcado DESPUÉS de que Telegram confirme), no suena fin de
+  semana, y sigue leyendo **las DOS tablas**.
+- **`destino` lo decide el ROL en el SERVIDOR** (`destinoPermitido`).
+- **Un recordatorio no se marca como hecho; se borra.**
+- **Solo se lista lo ABIERTO**; lo depositado, solo por el buscador. Y **ningún
+  total sumado** en la agenda.
+- La retención de 365 días, la pestaña **Calendario** (Daniel decidió el 22-sep
+  **dejarla como está**) y el buscador.
+- **Las 21 filas de producción**: ni una cambió de valor.
+
+### 🩸 Colateral: el orquestador se pasó de 800 líneas
+
+Con la puerta única, `RecordatoriosClient.tsx` llegó a **869 líneas** contra el
+límite de la casa de 800, y el candado del propio módulo lo cazó. Las **cuatro
+acciones de un cheque** (depositar · rebotado · re-depositar · eliminar) salieron
+a **`acciones-cheque.ts`** (219 líneas) y el orquestador quedó en **~720**. **Es
+una mudanza: no cambió ni una regla** — la foto + UI optimista + 5 segundos para
+deshacer, y la nota a CXC del rebotado como SECUNDARIA, siguen exactamente igual.
+
+🩸 Eso hizo cambiar de dirección un candado ajeno: `cxc-anotaciones-cartera.test.ts`
+miraba `CARTERA_GRUPO` **dentro del orquestador**. Ahora mira su casa nueva, y de
+paso exige que `CARTERA_BOSTON` no aparezca en **ninguno de los dos** archivos —
+así la nota no puede volver al orquestador apuntando a otra cartera.
+
+### Los candados
+
+`src/__tests__/lib/recordatorios-una-puerta.test.ts` (32 pruebas) +
+`recordatorios-pantalla.test.tsx` (que sumó 10 y cambió de dirección: el test que
+exigía «Nuevo Cheque» ahora exige que **NO vuelva**).
+
+Lo que impiden, en orden de lo que costaría más si se rompe:
+
+1. Que vuelvan las DOS puertas separadas.
+2. Que un motivo guarde en la tabla EQUIVOCADA (incluida la ruta de alta escrita
+   a mano, en la pantalla y en `acciones-cheque.ts`).
+3. Que las dos tablas se fusionen, se crucen o se dropeen (barrido de TODAS las
+   migraciones por `DROP TABLE cheques|recordatorios`).
+4. Que la lista se vuelva a partir en dos, o que una fila quede sin su icono.
+5. Que el cron deje de ver alguna de las dos tablas — **derivado de
+   `TABLAS_DEL_MODULO`**, así que un tercer motivo con tabla propia lo va a
+   exigir solo.
+6. Que `destino` lo decida el navegador.
+7. Que aparezca un total sumado en la agenda.
+8. Que el aviso de vencido suene dos veces, o que la marca se ponga ANTES del
+   envío.
+
+**Verificación por mutación:** `scripts/_mutar-candados-recordatorios-una-puerta.sh`
+— **34 mutaciones + 2 controles, 36 de 36**. Los dos controles se pusieron rojos
+en la primera corrida y **no eran ruido**: era el orquestador pasado de 800
+líneas. Es exactamente para lo que sirve el control.
+
+### Lo que queda abierto
+
+| Qué | Estado |
+|---|---|
+| **Qué otros motivos usaría Daniel** | 🔴 pendiente de él. No se inventó ninguno; el mecanismo ya está |
+| Los ~350 px en blanco bajo «Todo al día» | se dejaron vacíos a propósito |
+
+---
+
 ## Lo que decía CLAUDE.md hasta el 14-sep-2026 (movido acá, verbatim)
 
 > El 14-sep-2026 CLAUDE.md pasaba de 333 mil caracteres (el tope del harness es 150 mil) y las instrucciones se cortaban a la mitad. Se dejó ahí un resumen de las reglas vigentes y el texto completo —mediciones, citas de Daniel, candados y mutaciones— se movió acá sin cambiar una palabra.

@@ -426,11 +426,18 @@ describe("BARRIDO 3 — los dos lados están cableados, cada uno con SU cartera"
   });
 
   it("Cheques escribe en la cartera del grupo (su CXC es el del grupo)", () => {
-    // 5-sep-2026: la pantalla pasó a `/recordatorios`. La nota a CXC del cheque
-    // rebotado es la MISMA y sigue en el orquestador.
-    const ch = lee("app/recordatorios/RecordatoriosClient.tsx");
-    expect(ch).toContain("CARTERA_GRUPO");
-    expect(ch).not.toContain("CARTERA_BOSTON");
+    // 5-sep-2026: la pantalla pasó a `/recordatorios`.
+    // 🩸 22-sep-2026: las cuatro acciones del cheque —la nota a CXC del rebotado
+    // entre ellas— salieron del orquestador a `acciones-cheque.ts` cuando la
+    // puerta única lo empujó sobre el límite de 800 líneas. **La regla NO
+    // cambió**: este candado cambió de dirección y ahora mira su casa nueva. Se
+    // miran los DOS archivos para que la nota no pueda volver al orquestador
+    // apuntando a otra cartera.
+    const acciones = lee("app/recordatorios/acciones-cheque.ts");
+    expect(acciones).toContain("CARTERA_GRUPO");
+    for (const rel of ["app/recordatorios/acciones-cheque.ts", "app/recordatorios/RecordatoriosClient.tsx"]) {
+      expect(lee(rel), rel).not.toContain("CARTERA_BOSTON");
+    }
   });
 
   it("el correo del estado de cuenta se busca en la cartera del GRUPO", () => {
