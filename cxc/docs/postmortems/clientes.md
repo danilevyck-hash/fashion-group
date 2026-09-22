@@ -28,3 +28,23 @@
 - 🔴 **BODEGA NO ENTRA AL DIRECTORIO ESCRIBIENDO LA DIRECCIÓN (11-sep-2026).** Las dos páginas lo nombraban en su `ALLOWED_ROLES` aunque el módulo `directorio` no es suyo: escribiendo `/clientes` veía el directorio completo —correo, teléfono y lo que debe cada uno— y desde ahí la ficha de cualquiera. CLAUDE.md ya decía cómo tenía que ser (*«directorio aparece solo en la búsqueda global, NO como módulo navegable»*); lo que faltaba era que el código lo cumpliera. Los cuatro guards y el catálogo salen de **UNA** lista, `ROLES_CLIENTES` (`src/lib/clientes/roles.ts`). ⚠️ **Bodega no pierde nada de lo suyo**: la búsqueda global le sigue devolviendo clientes, que es de donde saca el teléfono de a quién despacha. ⚠️ `/api/clientes/[codigo]` **no se tocó**. Candado: `clientes-directorio-entero-y-bodega.test.ts`.
 - Candados: `clientes-ficha-y-lista.test.ts` · `clientes-ficha-datos.test.ts` · `clientes-direccion-no-alimenta-guias.test.ts` · `clientes-enlaces-entre-modulos.test.ts` · `clientes-ficha-pantalla.test.tsx` · `clientes-lista-pantalla.test.tsx`; **44 mutaciones, 44 cazadas** (`scripts/_mutar-candados-clientes.sh`).
 
+---
+
+## Lo que decía CLAUDE.md hasta el 22-sep-2026 (movido acá, verbatim)
+
+### El módulo Clientes — la ficha y la lista (5-sep-2026)
+
+> Detalle completo: [docs/postmortems/clientes.md](docs/postmortems/clientes.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
+
+- 🔴 Una página del cliente (`/clientes/[codigo]`) y tres listas distintas: CXC y Ventas › Clientes no se tocan.
+- 🔴 Ficha: cuatro tarjetas, «Empresa por empresa» y «Últimos pagos» por FECHA; sin «Cobrado» ni paginación, con el ITBMS; se edita tocando el dato.
+- 🔴 Nunca `$0.00` en grande: «Sin comprar en \<año\>», «No debe nada», «Nunca ha pagado» (`lib/clientes/ficha.ts`); el cero neto es correcto —las NC restan— y `estadoDeCompras` lo separa de «acreditado».
+- 🔴 «Cobrar» y «Ver los N documentos» abren la MISMA `HojaCobrar` y `EstadoCuentaDrawer` del CXC (`CobrarEnFicha.tsx`): deshacer 5 s, 6 empresas en el servidor, 403 a bodega.
+- 🔴 «Últimos pagos» reusa `lib/cxc/pagos-por-fecha.ts`: sin retenciones ni recibos en cero.
+- 🔴 Lista: el directorio entero con scroll, sin páginas ni corte por «activos»; chips calculados («Deben» = saldo ≠ 0) y faltantes en rojo. 🩸 Sin provincia.
+- 🔴 El ausente (`ausente_desde`) no sale en la lista ni en la búsqueda global; ⚠️ su ficha SÍ abre por enlace directo, con «Ya no está en Switch».
+- 🔴 `clientes_master.direccion_switch` (migración `20260930120000`, aplicada) se ve en la ficha y NO alimenta Guías; solo la escribe `sync-clientes-master`.
+- 🔴 «Ver en Ventas ›» (solo admin) manda el CÓDIGO (`?tab=clientes&cliente=D-25`) y resalta esa fila sin esconder las demás.
+- 🩸 «Compró \<año\>» moría a los 200 clientes: tope 1.000 y la lista va por POST; el GET sigue vivo, con el MISMO `comprasDelAnioPorCodigo`.
+- 🔴 Bodega no entra al directorio por la dirección: los guards salen de `ROLES_CLIENTES` (`lib/clientes/roles.ts`); ⚠️ la búsqueda global le sigue dando clientes.
+- Candados: `clientes-ficha-y-lista.test.ts` · `clientes-ficha-datos.test.ts` · `clientes-direccion-no-alimenta-guias.test.ts` · `clientes-enlaces-entre-modulos.test.ts` · `clientes-ficha-pantalla.test.tsx` · `clientes-lista-pantalla.test.tsx` · `clientes-directorio-entero-y-bodega.test.ts`.

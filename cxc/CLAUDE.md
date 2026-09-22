@@ -510,7 +510,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - ⚠️ **Pendiente de Daniel**: en Clientes › Utilidad el período sigue siendo el año (esa ruta no tiene ventanas).
 ### El módulo Clientes — la ficha y la lista (5-sep-2026)
 
-> Detalle completo: [docs/postmortems/clientes.md](docs/postmortems/clientes.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
+> 📄 Detalle, mediciones y candados: [docs/postmortems/clientes.md](docs/postmortems/clientes.md) › «Lo que decía CLAUDE.md hasta el 22-sep-2026».
 
 - 🔴 Una página del cliente (`/clientes/[codigo]`) y tres listas distintas: CXC y Ventas › Clientes no se tocan.
 - 🔴 Ficha: cuatro tarjetas, «Empresa por empresa» y «Últimos pagos» por FECHA; sin «Cobrado» ni paginación, con el ITBMS; se edita tocando el dato.
@@ -523,8 +523,6 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 «Ver en Ventas ›» (solo admin) manda el CÓDIGO (`?tab=clientes&cliente=D-25`) y resalta esa fila sin esconder las demás.
 - 🩸 «Compró \<año\>» moría a los 200 clientes: tope 1.000 y la lista va por POST; el GET sigue vivo, con el MISMO `comprasDelAnioPorCodigo`.
 - 🔴 Bodega no entra al directorio por la dirección: los guards salen de `ROLES_CLIENTES` (`lib/clientes/roles.ts`); ⚠️ la búsqueda global le sigue dando clientes.
-- Candados: `clientes-ficha-y-lista.test.ts` · `clientes-ficha-datos.test.ts` · `clientes-direccion-no-alimenta-guias.test.ts` · `clientes-enlaces-entre-modulos.test.ts` · `clientes-ficha-pantalla.test.tsx` · `clientes-lista-pantalla.test.tsx` · `clientes-directorio-entero-y-bodega.test.ts`.
-
 ### Multifashion — [docs/postmortems/multifashion.md](docs/postmortems/multifashion.md)
 
 > 📄 Mediciones, citas de Daniel, candados y las reglas de PANTALLA: el postmortem › «Lo que decía CLAUDE.md hasta el 22-sep-2026».
