@@ -25,7 +25,7 @@ import { facturasParaMostrar } from "@/lib/guias/numero-factura";
 import { observacionesVisibles } from "@/lib/guias/observaciones";
 import { partirGuiasParaLaLista, partirGuiasPorVentana } from "@/lib/guias/ventana-lista";
 import { avisosDeLaFila } from "@/lib/guias/avisos-de-la-fila";
-import { textoPieDeLista } from "@/lib/guias/pie-de-la-lista";
+import { sumarBultos, textoPieDeLista } from "@/lib/guias/pie-de-la-lista";
 import { separarPendientes, resumenPendientes } from "@/lib/guias/pendientes-arriba";
 import { cedulaParaMostrar } from "@/lib/guias/cedula";
 import { CHIP_SOLO_PENDIENTES, urlSinPendientes } from "@/lib/guias/filtro-pendientes";
@@ -663,7 +663,22 @@ export default function GuiasList({
                 const visible = verViejas ? [...resto, ...viejas] : resto;
                 const hasMore = !verViejas && viejas.length > 0;
 
-                const totalBultos = filtered.reduce((s, g) => s + (g.total_bultos || 0), 0);
+                // 🔴 LOS DOS NÚMEROS DEL PIE SALEN DE ESTA MISMA LISTA
+                // (22-sep-2026). `mostradas` es, literalmente, lo que se
+                // dibuja: lo pendiente de arriba más los grupos de fecha.
+                // 🩸 Hasta hoy el conteo de guías seguía al filtro y a la
+                // ventana («30 guías de 236») y los BULTOS de al lado se
+                // sumaban sobre `filtered`, o sea sobre las 236: medido contra
+                // producción el 22-sep-2026, la pantalla mostraba 30 guías con
+                // 1.629 bultos y el pie decía 8.433 — **5,2 veces** lo que
+                // había delante. Regla de la casa: *«o el total sigue al
+                // filtro, o no hay buscador»*.
+                // 🔴 Y LA SUMA VIVE EN UN SOLO LUGAR (`sumarBultos`), el mismo
+                // que usa la banda del total del Excel: dos `reduce` iguales en
+                // dos archivos es cómo se llega a que uno siga al filtro y el
+                // otro no.
+                const mostradas = [...pendientes, ...visible];
+                const totalBultos = sumarBultos(mostradas);
 
                 const allFilteredIds = filtered.map(g => g.id);
                 const allSelected = allFilteredIds.length > 0 && allFilteredIds.every(id => selectedIds.has(id));
@@ -1263,13 +1278,15 @@ export default function GuiasList({
                         🩸 Decía «236 GUÍAS» al pie de una pantalla donde había
                         47: el resto espera detrás de «Ver guías más viejas».
                         Con todo a la vista vuelve a ser un número solo.
-                        ⚠️ El total de BULTOS no cambió: sigue contando todas
-                        las filtradas. */}
+                        🔴 Y LOS BULTOS DE AL LADO SIGUEN A LO MISMO
+                        (22-sep-2026): los dos números salen de `mostradas`, la
+                        lista que de verdad se dibujó. Antes el de la izquierda
+                        seguía al filtro y el de la derecha no. */}
                     <div className="flex items-center justify-between px-4 py-3 text-sm border-t border-gray-200 mt-2">
                       <span className="text-gray-400 text-xs uppercase tracking-wide">
-                        {textoPieDeLista(pendientes.length + visible.length, guias.length)}
+                        {textoPieDeLista(mostradas.length, guias.length)}
                       </span>
-                      <span className="tabular-nums font-medium">{totalBultos} bultos</span>
+                      <span data-testid="pie-bultos" className="tabular-nums font-medium">{totalBultos} bultos</span>
                     </div>
                   </>
                 );

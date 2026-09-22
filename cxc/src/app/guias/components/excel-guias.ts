@@ -44,6 +44,7 @@ import {
 import XLSX from "xlsx-js-style";
 import { numeroTranspImpreso } from "@/lib/guias/modo-despacho";
 import { facturasParaMostrar } from "@/lib/guias/numero-factura";
+import { sumarBultos } from "@/lib/guias/pie-de-la-lista";
 import type { Guia, GuiaItem } from "./types";
 
 function fmtGuia(n: number) {
@@ -126,7 +127,12 @@ export function buildGuiasSheet(guias: Guia[]): XLSX.WorkSheet {
   // es la suma de sus renglones, así que sumar por guía o por envío da igual.
   // Se sigue sumando por guía a propósito — una guía sin renglones cargados
   // conserva su total, y contarla por envío la dejaría en cero.
-  const totalBultos = guias.reduce((s, g) => s + (g.total_bultos || 0), 0);
+  //
+  // 🔴 LA SUMA ES LA MISMA FUNCIÓN QUE LA DEL PIE DE LA PANTALLA
+  // (`sumarBultos`, 22-sep-2026). Acá vivía un `reduce` calcado del de
+  // `GuiasList`: dos copias de la misma cuenta es cómo se llega a que una siga
+  // al filtro y la otra no, que es el defecto que se acaba de cerrar.
+  const totalBultos = sumarBultos(guias);
 
   return buildReportSheet({
     columns: COLUMNS,
