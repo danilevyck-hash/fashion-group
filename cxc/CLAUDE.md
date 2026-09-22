@@ -694,15 +694,6 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 ## Hooks (src/lib/hooks/)
 **useAuth** · **useUrlState** (state ↔ URL) · **useLastUsed** · **useDraftAutoSave** (5 s) · **usePersistedState** (sessionStorage) · **useUndoAction** (ventana de 5 s) · **useOnlineStatus**.
 - **useSessionCheck** — ⚠️ **SIN USO**: no tiene importadores desde el 11-abr-2026, así que el chequeo de sesión cada 2 min NO corre. Se conserva rotulado (candado: `ganchos-sin-uso.test.ts`); enchufarlo es una decisión de Daniel que no está tomada.
-## Hooks (src/lib/hooks/)
-- **useAuth** — check role, user info
-- **useSessionCheck** — ⚠️ **SIN USO**: no tiene importadores desde el 11-abr-2026, así que el chequeo de sesión cada 2 min NO corre. Se conserva rotulado (candado: `ganchos-sin-uso.test.ts`); enchufarlo es una decisión de Daniel que no está tomada.
-- **useUrlState** — sync state ↔ URL params
-- **useLastUsed** — remember last form values
-- **useDraftAutoSave** — auto-save formularios cada 5s
-- **usePersistedState** — sessionStorage-backed state
-- **useUndoAction** — delayed execution con 5s undo window
-- **useOnlineStatus** — offline/online detection
 
 ## Testing
 ```bash

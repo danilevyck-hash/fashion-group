@@ -61,3 +61,13 @@ porqué, las mediciones y las citas.
 - **BottomSheet** — half/full screen draggable (mobile)
 - **AccordionContent** — CSS grid expand/collapse animado
 - **AnimatedNumber** — count-up con easing
+
+## Hooks (src/lib/hooks/)
+- **useAuth** — check role, user info
+- **useSessionCheck** — ⚠️ **SIN USO**: no tiene importadores desde el 11-abr-2026, así que el chequeo de sesión cada 2 min NO corre. Se conserva rotulado (candado: `ganchos-sin-uso.test.ts`); enchufarlo es una decisión de Daniel que no está tomada.
+- **useUrlState** — sync state ↔ URL params
+- **useLastUsed** — remember last form values
+- **useDraftAutoSave** — auto-save formularios cada 5s
+- **usePersistedState** — sessionStorage-backed state
+- **useUndoAction** — delayed execution con 5s undo window
+- **useOnlineStatus** — offline/online detection
