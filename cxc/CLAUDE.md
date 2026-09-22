@@ -347,8 +347,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 
 ### Préstamos — [docs/postmortems/prestamos.md](docs/postmortems/prestamos.md)
 
-> Detalle completo (mediciones, citas, candados, mutaciones): [docs/postmortems/prestamos.md](docs/postmortems/prestamos.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
-> ⚠️ Las reglas de PANTALLA de este módulo (qué se dibuja, dónde, rótulos, tamaños) viven SOLO en ese postmortem: léelo antes de tocar una pantalla suya.
+> 📄 Mediciones, citas de Daniel, candados y las reglas de PANTALLA: el postmortem › «Lo que decía CLAUDE.md hasta el 22-sep-2026».
 
 - 🔴 DOS cuentas con su cuota (Préstamo · Daño de mercancía) y el total es la suma; en la base son CINCO conceptos, «Daño de mercancía» es solo ETIQUETA de `Responsabilidad por daño`.
 - Un **Pago baja UNA cuenta**; con las dos debiendo, «Baja de» viene puesto en la **más vieja** y se puede cambiar. Sin fechas el desempate es **estable** (préstamo), nunca el orden del array.
@@ -357,13 +356,11 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 La persona sale de Asistencia y la ficha nace con su `empleado_codigo`, editable. Nada se ata por parecido: lista a mano, y el UPDATE lo EXIGE.
 - 🔴 NADIE APRUEBA UN PRÉSTAMO: nace `aprobado`. El tope de UN SUELDO MENSUAL sobre la deuda TOTAL (sin sueldo, $500) solo AVISA, en pantalla y Telegram privado; el daño nunca pasa por el tope.
 - 🔴 El freno de duplicados mira concepto + origen + fecha, NUNCA la nota (`origen_pago` NULL = Quincena). Soft delete con `logActivity` hasta en «Eliminar Todo el Historial».
-- 🔴 **LAS TRES CUOTAS ENTRAN SOLAS: préstamo, terceros y DAÑO DE MERCANCÍA** (14-sep-2026), cada una capeada a SU saldo y sin aprobar. El daño se registra en «+ Nuevo préstamo» **con su cuota, igual que un préstamo**. Las tres casillas tienen los MISMOS tres estados (`NULL` = va la cuota · `0` = no se descuenta esta quincena · monto = ese monto); la de mercancía por `20261122120000` (**aplicada**). 🔑 Lo ya anotado le gana a la cuota. Se editan en «Editar ficha» (un `0` apaga la cuota y **no borra la deuda**). 🔴 **Boston suma las TRES** en su «descuenta $X por quincena». Detalle y citas en el postmortem.
+- 🔴 **LAS TRES CUOTAS ENTRAN SOLAS: préstamo, terceros y DAÑO DE MERCANCÍA** (14-sep-2026), cada una capeada a SU saldo y sin aprobar. El daño se registra en «+ Nuevo préstamo» **con su cuota, igual que un préstamo**. Las tres casillas tienen los MISMOS tres estados (`NULL` = va la cuota · `0` = no se descuenta esta quincena · monto = ese monto); la de mercancía por `20261122120000` (**aplicada**). 🔑 Lo ya anotado le gana a la cuota. Se editan en «Editar ficha» (un `0` apaga la cuota y **no borra la deuda**). 🔴 **Boston suma las TRES** en su «descuenta $X por quincena».
 - 🔴 «No descontar esta quincena» = un 0 en la FILA: `asistencia_planilla_manual` tiene tres estados (`NULL` = cuota · `0` = no se descuenta · monto) en `lib/asistencia/casilla-sin-descontar.ts`, la MISMA para pantalla y `normalizarManuales`; con 0 el cierre no anota pago.
-- 🔴 **LA CUOTA ES OBLIGATORIA al registrar Préstamo · Daño de mercancía · Descuento a terceros** (14-sep-2026, Daniel: *«a) La cuota es obligatoria: no te deja guardar sin ella»*); **un Pago no la pide**. 🩸 Sin cuota la deuda no se descontaba nunca sola, y desde `/prestamos` (la puerta viva) ni se preguntaba. El botón apagado DICE qué falta («Falta: la cuota», visible). Regla en `lib/prestamos-registrar.ts`. Medido: 31 fichas vivas, las 31 con cuota.
-- 🔴 **EL DESCUENTO NUNCA DEJA EL NETO EN NEGATIVO** (14-sep-2026; red de seguridad). `recortarAlNeto` (`neto-no-negativo.ts`) corre **al FINAL de la ruta**, achica **solo lo AUTOMÁTICO** (lo escrito a mano manda), en el orden **daño → terceros → préstamo**. **El saldo no baja por lo que no se cobró**: el cierre anota solo lo que entró. Se DICE en la celda y en «Antes de cerrar». **El ISR sigue a mano.** Detalle y mediciones en el postmortem.
-- 🔴 **Los movimientos de UNA quincena, en una pantalla y no en 31 fichas** (17-sep): vista «Movimientos» adentro de la pestaña, solo LECTURA, con «Origen» (del cierre o a mano). Postmortem › 10.
-- Candados: `prestamos-dos-cuentas.test.ts` · `planilla-sin-descontar.test.ts` · `prestamos-cuota-obligatoria-y-neto.test.tsx` (26 casos, con los dos controles; `planilla-unida-cierre-prestamo` cambió de dirección con nota fechada).
-
+- 🔴 **LA CUOTA ES OBLIGATORIA al registrar Préstamo · Daño de mercancía · Descuento a terceros** (14-sep-2026); **un Pago no la pide**. 🩸 Sin cuota la deuda no se descontaba nunca sola. El botón apagado DICE qué falta («Falta: la cuota», visible). Regla en `lib/prestamos-registrar.ts`.
+- 🔴 **EL DESCUENTO NUNCA DEJA EL NETO EN NEGATIVO** (14-sep-2026; red de seguridad). `recortarAlNeto` (`neto-no-negativo.ts`) corre **al FINAL de la ruta**, achica **solo lo AUTOMÁTICO** (lo escrito a mano manda), en el orden **daño → terceros → préstamo**. **El saldo no baja por lo que no se cobró**: el cierre anota solo lo que entró. Se DICE en la celda y en «Antes de cerrar». **El ISR sigue a mano.**
+- 🔴 **Los movimientos de UNA quincena, en una pantalla y no en 31 fichas** (17-sep): vista «Movimientos» adentro de la pestaña, solo LECTURA, con «Origen» (del cierre o a mano).
 ### Navegación, 404 y papel — lo que se arregló el 17-sep-2026
 
 > Detalle: [docs/postmortems/navegacion.md](docs/postmortems/navegacion.md).
