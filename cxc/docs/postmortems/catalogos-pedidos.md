@@ -2717,3 +2717,64 @@ borró: el 0,80 / 0,70 **se mudó** de `fobReebok` al módulo del descuento
 (`DESCUENTO_ESTIMADO_CALZADO` / `DESCUENTO_ESTIMADO_RESTO`). La regla que ese
 candado protege no cambió —el multiplicador vive en **un solo lugar** y el pedido
 para cliente no puede volver a tener el suyo—; cambió cuál es ese lugar.
+
+---
+
+## Lo que decía CLAUDE.md hasta el 22-sep-2026 (movido acá, verbatim)
+
+### Catálogos, pedidos y cotización — [docs/postmortems/catalogos-pedidos.md](docs/postmortems/catalogos-pedidos.md)
+
+> Detalle completo (mediciones, citas, candados, mutaciones): [docs/postmortems/catalogos-pedidos.md](docs/postmortems/catalogos-pedidos.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
+> ⚠️ Las reglas de PANTALLA de este módulo (qué se dibuja, dónde, rótulos, tamaños) viven SOLO en ese postmortem: léelo antes de tocar una pantalla suya.
+
+- 4 marcas: Reebok (`active_shoes`) · Joybees (`joystep`) · Tommy (`fashion_shoes`) · Calvin (`vistana`). **Joybees es espejo exacto de Reebok.**
+- Roles (`catalogo/roles.ts`): `CATALOGO_ROLES` = ver · `CATALOGO_ADMIN_ROLES` (admin + secretaria) = administrar · `PEDIDO_ROLES` (admin · secretaria · vendedor) = pedir.
+- 🔴 **VER ≠ PEDIR**: bodega y `gerente_boston` ven en **solo lectura**. De `PEDIDO_ROLES` salen los `createRoles` de las 4 marcas (Reebok suma su `cliente` legacy), el checkout, `send-order` y `COMPROBANTES_EDITAR_ROLES`.
+- 🔴 **El cliente se elige, nunca viene puesto**: el servidor responde **422** si un pedido interno sale sin cliente. El mostrador es `TCKCTA` y hay que tocarlo.
+- **Un solo selector de cliente** (`ClientePicker` · `ClienteSwitchPicker`); barrido que pone el build ROJO si aparece otro.
+- **Pedido** (`/apipedido/terminar`) o **cotización** (`/apicotizacion/terminar`); **una cotización NO aparta mercancía**. `normalizarDocumento` cae a **pedido** ante un valor raro.
+- **At-most-once**: único parcial `(order_id) WHERE estado <> 'error'`. Cotizar consume el envío; para vender se **duplica**. El papel dice cuál fue por el **envío activo**, no por el `status`.
+- El panel «Comprobantes» conserva la key `pedidos` (`role_permissions`). 🔴 **Los pedidos viejos NO se borran, se muestran menos**: **90 días** (`catalogo/comprobantes-ventana.ts`).
+- 🔴 **En el pedido público el precio NO se toca**: el servidor lo reescribe desde la base. ⚠️ La cartera sigue cerrada: el cliente teclea su nombre. ⚠️ Ese pedido **sigue sin salir solo a Switch**.
+- 🔴 **Lo que viaja al navegador se resuelve en el SERVIDOR** (`catalogo/publico-payload.ts`, puro): UN número de disponibilidad. ⚠️ Las columnas se siguen LEYENDO: sin `existencia` no hay respaldo.
+- 🔴 **El catálogo interno de Reebok exige sesión**: `products` e `inventory` salieron de `PUBLIC_PREFIXES`, `authStyle` = `scope-admin`. ⚠️ `/api/catalogo/reebok/public` se queda.
+- 🔴 **LOS OCHO NÚMEROS DEL HUB LOS SUMA LA BASE, Y LA REGLA SIGUE SIENDO UNA (14-sep-2026).** Daniel: *«5. ok va»*. 🩸 `/catalogos/marcas` bajaba el catálogo entero de las 4 marcas —**462,8 KB**, **24.384 ms de p95**— para escribir «N a la venta · N sin foto»; hoy es UNA petición de **181 bytes**. 🔴 **No hay dos definiciones de «a la venta»**: el SQL **se GENERA** desde `catalogo/contadores.ts` y la migración `20261123120000` (aplicada) es su salida impresa, comparada byte a byte. 🔴 **Falla ABIERTA**. Candado: `catalogo-contadores-una-regla`. Detalle en el postmortem.
+- 🔴 **LAS CATEGORÍAS DE REEBOK SE ADMINISTRAN, NO SE PROGRAMAN (17-sep-2026).** Daniel: **«sí»**. El mapa `rubro → categoría` vive en `reebok_rubro_categoria` (`20261205120000`, aplicada), se edita en **Catálogos › Reebok** (**solo admin**) y el Depurador lo **DERIVA**: el ESPEJO murió. 🔴 **Falla ABIERTA** a las SEIS del código; **`CategoriaReebok` CERRADO** (CHECK); **manda la MARCA**. **1.763, 0 cambios.**
+- 🔴 **El logo de Tommy va de COLOR sobre placa blanca** (20-sep): el blanco tiene la bandera invertida. 🔴 Pendiente de Daniel: el master REVERSADO. `tommy-logo-que-se-lee`.
+- Candados: `catalogo-publico-como-el-catalogo` · `catalogo-publico-revisar` · `catalogo-reebok-rubros`.
+
+**Sync, clasificación y puertas.**
+
+- **Las escrituras del sync que no cambian nada no se hacen**; ante la duda, se escribe. **El precio lo manda Switch**: a mano solo `image_url`/`badge` (+`name` en Tommy, que marca `nombre_manual`).
+- 🔴 **CADA MARCA CLASIFICA EL GÉNERO DE OTRA FORMA. Un solo mapa rompe dos marcas.** Tommy y Calvin lo sacan **de la DESCRIPCIÓN** (el guion de `Women-Slippers`), en `tommy-gender.ts` y `calvin-gender.ts`, y el pareo es por **igualdad sobre una tabla de alias, NUNCA por `includes`** — «female» contiene «male» y «women» contiene «men». Reebok no: usa `rubro`/`subrubro` con desempate por nombre. Daniel: *«Pero tommy y calvin es por descripción. No como reebok»*.
+- 🔑 **Lo que entra a Switch en Active Shoes SALE de la plantilla del Depurador.** La cadena es **Depurador → Excel de 25 columnas → se sube a Switch → el cron lo lee → catálogo público**, así que un producto mal clasificado en el catálogo **no se arregla en el catálogo**: se arregla en la plantilla o en Switch.
+- **La clasificación de Reebok la manda Switch** (`reebok-clasificacion.ts`): la MARCA da la categoría, el SUBRUBRO el género, el `rubro` es plan B; `UNISEX` → Hombre y solo ahí desempata el nombre. Lo desconocido cae en `otros`/`sin_clasificar` y **nunca pisa** lo ya clasificado.
+- 🔴 **«Todavía no llegó» NO es «llegó algo que no entiendo»** (`fichaLlego`): sin `ficha_at` no se avisa **ni se clasifica**; con `ficha_at`, un valor desconocido o vacío sí avisa.
+- 🔴 **La existencia de un escondido NO se congela**: entra al conjunto que se le pregunta a Switch (`ocultosManualSkus`). 🔴 **Esconder sigue siendo esconder**: manda `esVisibleEnCatalogo`, donde `oculto_manual` gana SIEMPRE y con ella se recalcula `active`. ⚠️ Sin la columna, todo como antes.
+- 🔴 **La foto a mano queda protegida**: viaja `foto_manual: true` con la foto y el servidor acepta **solo `true` y solo con `image_url`**; el `false` es del sync. ⚠️ La de Calvin (`20261011120000_calvin_foto_manual.sql`) está **aplicada** (verificado contra producción el 14-sep-2026).
+- 🔴 Guard SSR en `/catalogos/admin/[marca]` con la lista derivada de `CATALOGO_ADMIN_ROLES` (`puedeAdministrarCatalogo`); `?tab=pedidos` redirige **antes** del guard; `orders/[id]` exige `COMPROBANTES_ROLES` y `/catalogo/[marca]/pedidos`, `puedeVerComprobantes`.
+- 🔴 **Cinco rutas retiradas**: `joybees/seed`, `joybees/import`, `[marca]/pedidos-unificado`, `reebok/stats`, `reebok/inventory/bulk`. ⚠️ `reebok/inventory` y `pedidos-export` siguen vivos. 🔴 **Las tablas no se tocan** (patrón `mayor_lineas`).
+- 🩸 Borrar de verdad es la excepción (`20260924120000`, aplicada): lista de **ids**, nunca un `LIKE`; el que tenga envío vivo se saca; solo lo ya `deleted`.
+- Candados: `reebok-clasificacion` · `catalogo-reebok-clasifica` · `catalogo-escondidos-existencia-viva` · `catalogo-calvin-foto-manual` · `catalogo-admin-pantalla-cerrada` · `rutas-de-catalogo-retiradas` · `borrar-pedidos-de-prueba` · `catalogo-escondidos-y-solo-lectura` · `catalogo-foto-a-mano-protegida` · `catalogo-comprobantes-guard`.
+
+**Plantilla Switch (era el Depurador).**
+
+- 🔴 **REEBOK ENTRA POR DOS ARCHIVOS, Y LA PANTALLA DICE CUÁL SE SUBIÓ (17-sep-2026):** la **confirmación de compra** (para cotizar — **no cambió**) y el **despacho**, que arregla tres números inventados: el **costo se LEE** (`Precio after Disc`), el **código de barra sale del `EAN` y, sin él, del `UPC`** y la **cantidad es `Quantity`**. 🔴 **Pendiente: el `EAN`**, lo ÚNICO que falta. 🔴 **El MISMO archivo con o sin las columnas nuevas**: el respaldo es un DATO (`COLUMNAS_DESPACHO`), `PO NAME` → **`PO`** → `BP Reference No.` → `Orden`, y **nada de lo que falta es obligatorio**. ⚠️ **Un archivo trae VARIOS PO**: se lee por FILA. No hay un segundo generador de las 25 columnas ni otra cuenta de costo. Candado `reebok-despacho.test.ts`; detalle en el postmortem.
+- 🔴 **EL DESCUENTO DE LA PREFORMA SE ESCRIBE (18-sep-2026):** campo GLOBAL «Descuento del proveedor %» al lado del flete, recordado por persona; vacío = se estima 20/30 % **y se dice en ámbar**. El `WholesalePrice OFF` real y el DESPACHO le ganan siempre. Candado `reebok-descuento-proveedor`.
+- 🔴 **LAS DOS PANTALLAS SE PORTAN COMO UNA (17-sep-2026):** los totales dicen **FOB y CIF** (suma de lo que las filas YA traen; el **sin costo se cuenta aparte**, nunca vale 0), las **facturas solo si el archivo las trae** y **«N nuevos · N ya están en Switch»** por `empresa_key` (**falla ABIERTA**). Los rótulos, en UNA constante. El ámbar de **CATEGORY** de Reebok se separó del de Department/GENDER (que NO cambió); «Ver solo esos N» va por el MISMO desplegable. 🔴 **Ningún número del cálculo se movió.** Candado: `plantilla-switch-mas-util`.
+- 🔴 **TODO EXCEL SALE POR `workbookBytes`/`workbookBuffer`/`workbookBlob` (17-sep-2026)**, y la hoja tabular pone `filtroDesdeA1`: **enciende el panel fijo**. Se habían escapado **once**. 🔴 **Con fotos, el panel PRIMERO.** Candado: `excel-por-el-camino-comun.test.ts`.
+- 🔴 **UNA sola plantilla: la de Switch, 25 columnas** (`OUT_COLS`, `depurador/logic.ts`) para las 4 empresas destino, Facturas Tienda y Reebok; fixture en el repo y candado de igualdad encabezado por encabezado.
+- **Cambia el CONTENIDO, no las columnas:** Fashion Shoes → FOB y CIF separados, **CIF = FOB × 1,10** como Vistana; Multifashion → **FOB = CIF** = precio de la factura. **«Composición» siempre vacía.** **Tasa `07` como TEXTO** (`tasaSwitch`), nunca `7` ni `7.00`. `TEXT_COLS = [0, 1, 2]` es posicional.
+- 🔴 **La key `cargar` y `/productos/cargar` NO cambiaron** (están en `role_permissions` y `fg_users.modulos_override`).
+- 🔴 **El divisor se valida en los TRES caminos** (`validarDivisor`): se apaga **la DESCARGA, nunca el tecleo**. La tasa es un select de dos: 7% → `07`, Exento → `0`, siempre TEXTO.
+- 🔴 **Los precios escritos a mano se conservan** al re-procesar y al cambiar la configuración, pegados por **REFERENCIA de artículo, nunca por índice de fila**. La config se recuerda por usuario (`fg_last_depurador_*`); el archivo no.
+- 🩸 **El short de baño se mide en LETRA** (`TALLA_LETRA`), que le gana a calzado y a pantalón.
+- 🔴 **La secretaria puede QUITAR una descripción** (`PATCH /api/productos/cargar/descripciones/[id]`); es `activa = false`, **nunca un DELETE**.
+- 🔴 **Las dos mitades de una descripción solo valen dentro de la MISMA marca** (`veredictoDescripcion(desc, catalogo, marca)`, índice `porMarca`). ⚠️ «ya-existe», `normalizarEspacios` y la casi-gemela COMPLETA miran todo el catálogo. Interruptor `MITADES_POR_MARCA` en **`true`**.
+- 🔴 **La compañía se RECONOCE de la marca del archivo, no se elige** (`empresaDeMarcaCatalogo`); con marcas de DOS compañías **se dice y no se adivina**. No se recuerda.
+- 🔴 **La «Temporada» es UN campo (AAAA-MM), arranca en el mes actual de Panamá y NO se recuerda**; tasa, factor y modo de precio sí.
+- 🔴 **El Historial guarda el MISMO Excel (bytes idénticos), 90 días**, en el bucket privado `depurador-plantillas` (`20260921120000`, **aplicada**), **SOLO los Excel de Switch**. El cron `cleanup-depurador-archivos` (03:20 UTC) borra el vencido y **la fila con los totales queda para siempre**.
+- Tallas y Fotos a mi Excel se anotan en `activity_logs` y no salen en el Historial. ⚠️ **La marca desconocida se queda EXACTAMENTE como está**.
+- `REEBOK_CATEGORY_ESPERADAS` es **ESPEJO** del mapa del catálogo (candado que compara las dos).
+- ⚠️ **Decisión pendiente de Daniel:** Reebok y Facturas Tienda no validan el divisor en pantalla como CK/TH (el guard de las rutas API sí aplica al guardar).
+- Candados: `depurador-plantilla-switch` · `depurador-validacion-pantalla` · `plantilla-switch` · `plantilla-switch-pantalla`.
