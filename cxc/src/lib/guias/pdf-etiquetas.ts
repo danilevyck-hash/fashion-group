@@ -58,6 +58,12 @@
 // El hueco se repartió entre los campos: no se movió nada de sitio, el rótulo
 // chico y gris sigue arriba de su dato, el orden sigue siendo empresa ·
 // factura · cliente · destino · bulto, y siguen siendo 4 por hoja.
+//
+// 🔴 EL DESTINO LARGO YA NO SE CORTA (22-sep-2026) — Daniel: *«los destino
+// largos que se hagan en dos filas o achicar la letra»*. PRIMERO LAS FILAS,
+// DESPUÉS LA LETRA, en ese orden: el criterio entero vive en el módulo puro
+// `etiqueta-destino.ts` y acá solo se le presta la regla de medir. Los otros
+// tres tamaños —bulto 11 · cliente 5,5 · factura 4— NO se tocaron.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { jsPDF } from "jspdf";
@@ -68,6 +74,7 @@ import {
   partesDelNumeroDeBulto,
   type EtiquetaFila,
 } from "@/lib/guias/etiquetas";
+import { MAY_DESTINO_MINIMO, acomodarDestino } from "@/lib/guias/etiqueta-destino";
 
 // Hoja carta en milímetros.
 const HOJA_W = 215.9;
@@ -233,11 +240,18 @@ function bloqueDeCampo(
      * el mismo cálculo le devuelve las dos líneas de siempre.
      */
     hastaY?: number;
+    /**
+     * 🔴 EL ACHIQUE, Y EN QUÉ ORDEN (22-sep-2026). Daniel: *«los destino largos
+     * que se hagan en dos filas o achicar la letra»*. Con este piso el campo
+     * PRIMERO se parte en cuantas filas quepan a su tamaño de siempre, y SOLO
+     * si ni así entra se le baja la letra —de a un décimo de milímetro— hasta
+     * este mínimo. Sin él, el campo se comporta como siempre: se corta con «…».
+     * Hoy lo usa solo el DESTINO; los otros tres tamaños no se tocan.
+     */
+    achicarHasta?: number;
   },
 ): number {
   const { izq, ancho, mayuscula } = opciones;
-  const tamano = PT_PARA_MAYUSCULA(mayuscula);
-  const salto = bajoElRotulo(mayuscula);
   let y = opciones.y;
 
   // El rótulo: chico, gris, ARRIBA del dato.
@@ -246,11 +260,46 @@ function bloqueDeCampo(
   doc.setTextColor(102);
   doc.text(rotulo, izq, y);
 
-  // El dato: negrita, grande, debajo.
   doc.setTextColor(17);
   doc.setFont("helvetica", "bold");
+
+  if (opciones.achicarHasta != null && opciones.hastaY != null) {
+    // 🔴 FILAS ANTES QUE LETRA CHICA. Todo el criterio vive en un módulo puro,
+    // `etiqueta-destino.ts`, que no sabe nada de jsPDF: acá solo se le prestan
+    // la regla de medir y la de saltar de línea.
+    const anchoDeTexto = (texto: string, mm: number): number => {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(PT_PARA_MAYUSCULA(mm));
+      return doc.getTextWidth(texto);
+    };
+    const acomodo = acomodarDestino(
+      valor,
+      mayuscula,
+      {
+        ancho,
+        desdeY: y,
+        hastaY: opciones.hastaY,
+        bajoElRotulo,
+        interlinea: (mm) => interlinea(PT_PARA_MAYUSCULA(mm)),
+        anchoDeTexto,
+      },
+      opciones.achicarHasta,
+    );
+    const tamanoAcomodado = PT_PARA_MAYUSCULA(acomodo.mayuscula);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(tamanoAcomodado);
+    y += bajoElRotulo(acomodo.mayuscula);
+    acomodo.lineas.forEach((l, i) => {
+      if (i > 0) y += interlinea(tamanoAcomodado);
+      doc.text(l, izq, y);
+    });
+    return y;
+  }
+
+  // El dato: negrita, grande, debajo.
+  const tamano = PT_PARA_MAYUSCULA(mayuscula);
   doc.setFontSize(tamano);
-  y += salto;
+  y += bajoElRotulo(mayuscula);
   const lineas = doc.splitTextToSize(valor, ancho) as string[];
   // Un texto larguísimo no puede empujar lo de abajo fuera del cuarto: se corta
   // con puntos suspensivos en vez de desbordarse.
@@ -329,6 +378,7 @@ function dibujarEtiqueta(doc: jsPDF, d: DatosEtiqueta, caja: number, x0: number,
     mayuscula: MAY_DESTINO,
     maxLineas: 2,
     hastaY: yRaya - AIRE_SOBRE_LA_RAYA,
+    achicarHasta: MAY_DESTINO_MINIMO,
   });
 
   // ── «BULTO» y su número, abajo del todo, centrados y con su raya ──

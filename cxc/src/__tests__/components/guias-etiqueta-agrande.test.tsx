@@ -300,10 +300,22 @@ describe("🔴 3. con lo más largo de producción, nada se sale ni se encima", 
       { ...ETQ, cliente_nombre: "Sistema Nacional De Proteccion Civil (Sinaproc)", destino: "Calle 19 Central, al lado de la joyería Super Oro" },
       [3],
     ).filter((x) => x.cortado);
-    // El cliente más largo y el destino más largo de producción: los dos se
-    // cortan, y los dos cortes tienen que caber.
-    expect(cortadas.length).toBeGreaterThanOrEqual(2);
+    // 📌 22-sep-2026 — ESTE CANDADO CAMBIÓ DE DIRECCIÓN, a propósito. Hasta hoy
+    // pedía DOS cortes acá (el cliente más largo y el destino más largo de
+    // producción). El DESTINO ya no se corta nunca: se parte en más filas y,
+    // si ni así entra, se achica (ver `guias-etiqueta-destino-entero`). El que
+    // sigue cortándose es el CLIENTE, que Daniel no pidió tocar — y su corte
+    // tiene que seguir cabiendo.
+    expect(cortadas.length).toBeGreaterThanOrEqual(1);
     for (const p of cortadas) expect(p.derecha).toBeLessThanOrEqual(derecha + 0.05);
+    // Y ninguna de las líneas del DESTINO está entre las cortadas.
+    const todas = piezas(
+      { ...ETQ, cliente_nombre: "Sistema Nacional De Proteccion Civil (Sinaproc)", destino: "Calle 19 Central, al lado de la joyería Super Oro" },
+      [3],
+    );
+    const desde = todas.findIndex((p) => p.texto === "Destino");
+    const destino = todas.slice(desde + 1).filter((p) => !["BULTO", "3"].includes(p.texto) && !p.texto.startsWith("de "));
+    expect(destino.some((p) => p.cortado)).toBe(false);
     const sinComentarios = PDF.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     expect(sinComentarios).toMatch(/while \(ultima\.length > 1 && doc\.getTextWidth\(`\$\{ultima\}…`\) > ancho\)/);
   });

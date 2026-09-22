@@ -2181,9 +2181,107 @@ partido— y `guias-etiquetas.test.ts`.
   no con una regla contra el papel salido de la impresora.
 - **La pantalla sigue diciendo «cajas»** mientras el papel dice «BULTO» (ver arriba).
 - **La fecha**: «sept» o una segunda forma de escribirla (ver arriba).
-- Los tres destinos que **siguen cortándose** son direcciones largas escritas a mano
-  («Calle 19 Central, al lado de la joyería Super Oro»). Acortarlas en Guías › Configuración las
-  arregla sin tocar el papel.
+- ~~Los tres destinos que **siguen cortándose** son direcciones largas escritas a mano
+  («Calle 19 Central, al lado de la joyería Super Oro»).~~ ✅ **Resuelto el 22-sep-2026** — ver la
+  sección de abajo. No hizo falta acortar ninguna dirección.
+
+---
+
+## 🔴 Etiquetas — EL DESTINO LARGO SALE ENTERO: DOS FILAS ANTES QUE ACHICAR (22-sep-2026)
+
+Daniel, textual: *«los destino largos que se hagan en dos filas o achicar la letra»*.
+
+🔴 **EL ORDEN ES LA REGLA**, y no es intercambiable: primero se parte en cuantas FILAS quepan al
+tamaño de siempre (7,5 mm de altura de mayúscula), y **solo si ni así entra** se le baja la letra.
+Al revés —achicar apenas el destino pasa de una línea— se pierde lo único que este dato tiene que
+dar: que se lea de lejos mientras se ordena el camión.
+
+### 1 · Lo que estaba mal, medido
+
+Contra producción el 22-sep-2026, sobre el universo REAL de destinos: **94 distintos**, juntando
+`guias_destino_lista` (18 filas), `guias_destino_cliente` (36) y la dirección escrita a mano en
+`guia_items` (611 renglones). Cruzados contra los **148 clientes** de `switch_clientes` de las 6 del
+grupo — 93 de ellos entran en UNA línea a 5,5 mm y **55 en dos**, que es lo que le come el hueco al
+destino.
+
+**TRES destinos se imprimían cortados con «…»**, y los tres son direcciones largas escritas a mano:
+
+| destino | dibujaba | necesita | falta |
+|---|---|---|---|
+| «Calle 19 Central, al lado de la joyería Super Oro» | 3 líneas | 5 | **23 mm** |
+| «Calle 19 central al lado de la joyeria super oro» | 3 líneas | 5 | **23 mm** |
+| «Albrook Pasillo del tigre fenre al costo» | 3 líneas | 4 | **11,5 mm** |
+
+🩸 Salía **«CALLE 19 / CENTRAL, AL / LADO DE LA…»**: se perdía *la joyería Super Oro*, que es justo
+la referencia por la que se encuentra el sitio. Las dos primeras son la misma dirección escrita dos
+veces (una con acentos y otra sin ellos): juntarlas es una decisión de Daniel en Guías ›
+Configuración, no del papel.
+
+### 2 · Cómo quedó
+
+El criterio entero vive en un módulo **puro**, `src/lib/guias/etiqueta-destino.ts`, que no sabe nada
+de jsPDF: `pdf-etiquetas.ts` le presta la regla de medir y la de saltar de línea. Así el acomodo se
+prueba sin armar un PDF y el papel no tiene dos criterios.
+
+- 🔴 **Se parte SOLO por espacio, NUNCA a mitad de palabra** (`partirPorEspacio`). Una palabra
+  cortada en dos líneas se lee mal de lejos, que es la única distancia desde la que este dato se
+  usa. Si UNA sola palabra no cabe en el ancho, la función devuelve `null` — es la señal de que ahí
+  **sí** hay que achicar, y no de que haya que partirla.
+- 🔴 **Se baja de a un décimo de milímetro** (`PASO_DEL_ACHIQUE = 0.1`) y se toma **el primero que
+  entra**, que por el orden del recorrido es **el más grande que cabe**. Nada de tres o cuatro
+  escalones gordos: 42 pasos entre 7,5 y el piso.
+- 🔴 **El piso es `MAY_DESTINO_MINIMO = 3,4 mm`**, y tiene porqué: la regla de señalización de la
+  casa —la misma con la que se eligieron los cuatro tamaños el 20-sep-2026— es que **cada milímetro
+  de altura de mayúscula se lee cómodo desde unos 30 cm**, y la etiqueta se lee **parado, a un
+  metro**: 100 ÷ 30 = 3,34 → **3,4**. Por debajo de eso achicar no arregla nada; sería cambiar un
+  dato cortado por un dato ilegible. Ahí —y solo ahí— vuelve el corte con «…», que sigue midiéndose
+  para que no empuje la línea fuera del cuarto.
+- 🔴 **El achique arrastra el bloque entero**: el salto del rótulo a la primera línea
+  (`altura + 2,1 mm`) y la interlínea (`altura × 1,10 ÷ 0,718`) salen del tamaño que **se dibujó**,
+  no del de siempre. Si no, el bloque queda flotando más abajo de donde el acomodo lo calculó y se
+  acerca a la raya del bulto por un hueco que nadie midió. (Dos mutaciones vivían justo ahí.)
+
+Los tres, después:
+
+| destino | cliente en 1 línea | cliente en 2 líneas |
+|---|---|---|
+| «Calle 19 Central, al lado de la joyería Super Oro» | 4 filas a **6,6 mm** | 3 filas a **6,1 mm** |
+| «Calle 19 central al lado de la joyeria super oro» | 4 filas a **6,8 mm** | 3 filas a **6,1 mm** |
+| «Albrook Pasillo del tigre fenre al costo» | 4 filas a **7,1 mm** | 3 filas a **6,8 mm** |
+
+Los tres **enteros**, y los tres **todavía más grandes que el cliente** (5,5 mm): la jerarquía que
+Daniel aprobó el 20-sep-2026 —el destino es el dato más grande después del número del bulto— se
+respeta aun achicando.
+
+⚠️ **Lo que NO se tocó**: los otros tres tamaños (bulto 11 · cliente 5,5 · factura 4), el orden de
+los campos, el rótulo gris arriba del dato, la raya del bulto anclada al borde de abajo, las 4 por
+hoja y las líneas de corte. Y **el CLIENTE sigue cortándose con «…»** cuando es larguísimo: Daniel
+pidió el destino, y solo el destino. Hay candado que cuenta que `achicarHasta` aparezca UNA sola vez.
+
+### 3 · El barrido
+
+Los **94 destinos reales × 14 clientes reales** contra el papel armado de verdad: **0 cortados,
+0 textos fuera del cuarto de hoja, 0 líneas pisando la raya del bulto**.
+
+### 4 · Candados y mutaciones
+
+- `src/__tests__/components/guias-etiqueta-destino-entero.test.tsx` — 36 casos: los tres enteros, el
+  barrido del cuarto, el corte por espacio, el orden «filas antes que letra», el achique fino, el
+  piso con su porqué y lo que no se tocó.
+- `src/__tests__/components/guias-etiqueta-agrande.test.tsx` — 📌 **cambió de dirección**, con nota
+  fechada adentro: pedía DOS cortes con «…» (cliente y destino) y ahora pide que el destino **no**
+  esté entre los cortados.
+- Mutaciones: `scripts/_mutar-candados-etiqueta-destino.sh` — **14 mutaciones, 14 cazadas**, 2
+  controles en verde. 🩸 **Tres sobrevivieron en la primera corrida** y las tres eran agujeros de
+  verdad: el paso del achique se le preguntaba al propio módulo (con `PASO = 1.0` la prueba seguía
+  dando), y ni el salto bajo el rótulo ni la interlínea estaban atados al tamaño dibujado.
+
+### 5 · Lo que queda pendiente de Daniel
+
+- **Las dos «Calle 19» son la misma dirección**, escrita con y sin acentos. Juntarlas en Guías ›
+  Configuración es decisión suya; el papel ya no depende de eso.
+- **Ver la etiqueta achicada impresa de verdad**, sobre una caja: los 6,1 mm están medidos sobre el
+  PDF, no con una regla contra el papel salido de la impresora.
 
 ---
 
