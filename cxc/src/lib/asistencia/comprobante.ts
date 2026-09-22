@@ -313,7 +313,7 @@ export function armarComprobante(
     R("salarioQuincenal", "SALARIO QUINCENAL", v(d?.salarioQuincenal), "dato", false),
     R("extra125", "HORAS EXTRAS 1.25", v(d?.extraDiurno), "dato", false),
     R("extra150", "HORAS EXTRAS 1.50", v(d?.extraNocturno), "dato", false),
-    R("excedente", "EXEDENTE DE HORAS EXTRAS SEMANAL", v(d?.excedente), "dato", false),
+    R("excedente", "EXCEDENTE DE HORAS EXTRAS SEMANAL", v(d?.excedente), "dato", false),
     R("domingo", "DOMINGO", v(d?.domingos), "dato", false),
     R("feriado", "FERIADO", v(d?.feriados), "dato", false),
     R("ausencia", "AUSENCIA", v(d?.ausencias), "dato", false),

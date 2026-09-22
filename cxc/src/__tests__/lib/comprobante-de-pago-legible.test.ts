@@ -181,7 +181,7 @@ describe("A. 🔴 NI UN CENTAVO SE MUEVE — la tanda real de Fashion Wear, 1–
       p.salario.toFixed(2),
       p.extra125.toFixed(2),
       p.extra150.toFixed(2),
-      "0.00", // EXEDENTE DE HORAS EXTRAS SEMANAL
+      "0.00", // EXCEDENTE DE HORAS EXTRAS SEMANAL
       "0.00", // DOMINGO
       "0.00", // FERIADO
       "0.00", // AUSENCIA
@@ -267,7 +267,7 @@ describe("C. 🔴 NINGÚN TEXTO SIN SU ACENTO", () => {
     // La ficha
     "COLABORADOR", "POSICIÓN", "DESEMPEÑADA", "RATA", "POR", "HORA",
     // Los renglones
-    "SALARIO", "HORAS", "EXTRAS", "EXEDENTE", "SEMANAL", "DOMINGO", "FERIADO",
+    "SALARIO", "HORAS", "EXTRAS", "EXCEDENTE", "SEMANAL", "DOMINGO", "FERIADO",
     "AUSENCIA", "TARDANZAS", "SALIDA", "TEMPRANA", "TOTAL", "DEVENGADO",
     "DEDUCCIONES", "SEGURO", "SOCIAL", "EDUCATIVO", "IMPUESTO", "SOBRE", "LA",
     "RENTA", "DESCUENTOS", "PRÉSTAMO", "DESCUENTO", "A", "TERCEROS", "DAÑO",
