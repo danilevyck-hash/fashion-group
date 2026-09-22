@@ -70,3 +70,8 @@
 - **URL state:** filtros persisten en URL (?risk=vencido&empresa=fashion_wear) — deep links y back/forward funcionan
 - **UI persistence:** filas expandidas y scroll position sobreviven navegación (sessionStorage)
 - **Offline:** banner "Sin conexión" (informativo) + botones deshabilitados sin red. NO hay lectura offline: el Modo Viaje (snapshots localStorage + cache de páginas del SW) se eliminó en jul 2026
+
+## Teclado (lo único que corre)
+- **`⌘K` / `Ctrl+K` — abrir la búsqueda global.** Tiene su propio listener dentro de `SearchBar.tsx` y nunca dependió de ningún gancho.
+- 🩸 **Todo lo demás se retiró el 11-sep-2026** (Daniel: *«quita lo que no funciona»*): la `/` para buscar, la ayuda «?», los saltos `G+…`, el `J/K` por filas y la `E` para editar **nunca corrieron** —`useKeyboardShortcuts` estaba sin un solo importador desde el 11-abr-2026—. Candado: `atajos-de-teclado-retirados.test.ts`. Detalle en [el postmortem](docs/postmortems/usuarios-inicio-teclado.md).
+- El **clic derecho** en filas de CXC y Recordatorios se había retirado antes, con el rediseño de esos dos módulos (ver sus bloques).
