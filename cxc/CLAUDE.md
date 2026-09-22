@@ -536,7 +536,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 
 ### Multifashion — [docs/postmortems/multifashion.md](docs/postmortems/multifashion.md)
 
-> Detalle completo: [docs/postmortems/multifashion.md](docs/postmortems/multifashion.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
+> 📄 Mediciones, citas de Daniel, candados y las reglas de PANTALLA: el postmortem › «Lo que decía CLAUDE.md hasta el 22-sep-2026».
 
 - Multifashion ES `american_classic`: constante del servidor, nunca de la URL; mes UTC−5 fijo (`hoyPanama`).
 - `gerente_acs` ve el módulo COMPLETO y es su ÚNICO módulo (403 en el resto); queda la validación de parámetros.
@@ -558,13 +558,11 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 Nombres capitalizados (`nombreVendedorEnPantalla`): solo cambia cómo se MUESTRA, la clave sigue en mayúsculas.
 - 🩸 «Cuándo vende la tienda»: cada línea dice su período — «Día más fuerte» y «Hora pico» de los últimos 3 meses (`patrones.ts`), «Mejor / peor día» del MES. 🔑 El promedio de N meses no es el de sus promedios: se suman `promedio × días` y días.
 - 🔴 «Hoy» es UNA línea y no escribe «$0» si el día no arrancó; «Actualizar ahora» al ☰.
-- 🔴 Las vendedoras con dos códigos se juntan (`20261009120000_multifashion_vendedora_alias.sql`, **aplicada** (verificado contra producción el 14-sep-2026)): identidad = CÓDIGO, tabla firmada, soft delete nunca DELETE, única entre activas, RLS service_role; lo resuelve `multifashion_vendedora_canonica` y las RPC v4 caen a la v3 sin la DDL.
+- 🔴 Las vendedoras con dos códigos se juntan (`20261009120000_multifashion_vendedora_alias.sql`, **aplicada**): identidad = CÓDIGO, tabla firmada, soft delete nunca DELETE, única entre activas, RLS service_role; lo resuelve `multifashion_vendedora_canonica` y las RPC v4 caen a la v3 sin la DDL.
 - ⚠️ Juntar los códigos NO arregla la diferencia entre Vendedoras y el mes: falta `DEFAULT`, excluido a propósito.
 - 🔴 **«REDES Sheynee» (15) ES Sheynee (11)**: columna `canal` del MISMO amarre, NUNCA por nombre; UNA fila (comisión y bono juntos) con «tienda $X · redes $Y» (`canales.ts`, v5); Metas lee el canónico (`meta_ventas_v2`). Migración `20261209120000` **pendiente**.
 - 🩸 La fila «YTD» pasa a «Año» con el total de la tarjeta (`fila-anio.ts`); el Δ va sobre los meses comparables. ⚠️ En el año en curso puede diferir por el día de corte.
 - 🩸 `SyncNowButton` con `roles={ROLES_MULTIFASHION}`; el rol sale de `lib/roles-etiquetas.ts`, derivado de `SYSTEM_ROLES`.
-- Candados: `acs-resumen-meta-ritmo.test.ts` · `multifashion-rediseno.test.ts` · `multifashion-rediseno-pantalla.test.tsx` · `multifashion-anio-una-vez.test.ts` · `roles-etiquetas.test.ts` · `multifashion-cerrado-y-espejo.test.ts`.
-
 ### Marketing › Mobiliario — [docs/postmortems/marketing-mobiliario.md](docs/postmortems/marketing-mobiliario.md)
 
 - 🔴 **El inventario se descuenta en PIEZAS.** Los bultos son solo cómo viajó la mercancía y **no existe conversión fija** entre unos y otros. `piezasParaStock()` es la única función que toca el stock, y hay barrido que pone el build ROJO si `bultos` entra en esa aritmética.

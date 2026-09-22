@@ -462,3 +462,37 @@
 - ⚠️ **Pendiente de Daniel:** correr `supabase/migrations/20261209120000_multifashion_vendedora_canal.sql` (carga el amarre 15 → 11 con canal `redes`; mientras no corra, las rutas caen a las v4/v2/v1 y la pantalla no cambia). ⚠️ La pestaña espejo de Comisiones monta el MISMO componente: también verá el desglose.
 - Candados: `multifashion-redes-canal.test.ts` (29 casos); `multifashion-metas.test.ts` cambió su doble de la base con nota fechada (la lectura pide primero la v2). Mutación: `scripts/_mutar-candados-redes-canal.sh` — **17 mutaciones, 17 cazadas**, 2 controles verdes.
 
+---
+
+## Lo que decía CLAUDE.md hasta el 22-sep-2026 (movido acá, verbatim)
+
+### Multifashion — [docs/postmortems/multifashion.md](docs/postmortems/multifashion.md)
+
+> Detalle completo: [docs/postmortems/multifashion.md](docs/postmortems/multifashion.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
+
+- Multifashion ES `american_classic`: constante del servidor, nunca de la URL; mes UTC−5 fijo (`hoyPanama`).
+- `gerente_acs` ve el módulo COMPLETO y es su ÚNICO módulo (403 en el resto); queda la validación de parámetros.
+- 🔴 Guard SSR y UNA lista de roles (`lib/multifashion/acceso.ts`) derivada de `modules.ts`: `ROLES_MULTIFASHION` = admin + `gerente_acs`, `ROLES_LECTURA_METAS` sin `secretaria`, `ROLES_ADMIN_METAS` solo admin. ⚠️ Excepción: `vendedoras` y `bonos` del espejo de Comisiones.
+- Comisiona con otra base: `SUM(subtotal firmado) × 0,5%`, sin filtro de utilidad; el «0,5%» igual al del grupo es coincidencia.
+- Un mes empezado va contra los MISMOS DÍAS del año pasado, los CARGADOS en `switch_articulo_diario`, no «hasta hoy» (`clientes-corte-comparativo.ts`); Vendedoras, contra el mes anterior.
+- Proyección por TEMPORADA, no por días; bajo el 5% no se proyecta y se dice, con cuántos días está hecha.
+- Metas configurables; la grupal mide TODA la venta de la tienda y los participantes solo definen a quién se le muestra el aporte; nunca se reparte un objetivo solo.
+- Telegram de ACS: UNA línea arriba/abajo del ritmo — `ritmo` = venta del año pasado al mismo corte × (objetivo ÷ venta del rango un año antes), % = vendido ÷ ritmo − 1; sin meta vigente no sale, falla abierto (`meta-ritmo.ts`).
+- `claveVendedora` agrupa por igualdad exacta normalizada, nunca por parecido; la venta de hoy sale de `retail-dia.ts` con frescura; la «marca» de Switch es marca + departamento y lo desconocido cae en «Otros».
+
+**El rediseño del módulo (6-sep-2026).**
+
+- 🔴 Cuatro pestañas (`pestanas.ts`): Metas dentro de Vendedoras y Caja fuera, sin borrar ruta ni componente (`mayor_lineas`); `?subtab=` viejo cae en Resumen.
+- 🔴 Un solo control de tiempo (`periodo.ts`, `?mfPeriodo=`): meses, año y últimos 3 · 6 · 12; cada pestaña ofrece SOLO lo que sabe servir y lo demás cae a SU MES; corte en Panamá.
+- 🔴 «Multifashion» en todos lados; `/multifashion` y `american_classic` intactos.
+- 🔴 El bono es una COLUMNA «al cierre» mientras el mes no termine; ⚠️ monto y regla intactos; el espejo de Comisiones monta el MISMO componente sin `periodo` ni `conMetas`.
+- 🔴 Clientes abre con la cobertura en una línea (`clientes-cobertura.ts`); sin tiquetes se abstiene; abre con 10 filas.
+- 🔴 Nombres capitalizados (`nombreVendedorEnPantalla`): solo cambia cómo se MUESTRA, la clave sigue en mayúsculas.
+- 🩸 «Cuándo vende la tienda»: cada línea dice su período — «Día más fuerte» y «Hora pico» de los últimos 3 meses (`patrones.ts`), «Mejor / peor día» del MES. 🔑 El promedio de N meses no es el de sus promedios: se suman `promedio × días` y días.
+- 🔴 «Hoy» es UNA línea y no escribe «$0» si el día no arrancó; «Actualizar ahora» al ☰.
+- 🔴 Las vendedoras con dos códigos se juntan (`20261009120000_multifashion_vendedora_alias.sql`, **aplicada** (verificado contra producción el 14-sep-2026)): identidad = CÓDIGO, tabla firmada, soft delete nunca DELETE, única entre activas, RLS service_role; lo resuelve `multifashion_vendedora_canonica` y las RPC v4 caen a la v3 sin la DDL.
+- ⚠️ Juntar los códigos NO arregla la diferencia entre Vendedoras y el mes: falta `DEFAULT`, excluido a propósito.
+- 🔴 **«REDES Sheynee» (15) ES Sheynee (11)**: columna `canal` del MISMO amarre, NUNCA por nombre; UNA fila (comisión y bono juntos) con «tienda $X · redes $Y» (`canales.ts`, v5); Metas lee el canónico (`meta_ventas_v2`). Migración `20261209120000` **pendiente**.
+- 🩸 La fila «YTD» pasa a «Año» con el total de la tarjeta (`fila-anio.ts`); el Δ va sobre los meses comparables. ⚠️ En el año en curso puede diferir por el día de corte.
+- 🩸 `SyncNowButton` con `roles={ROLES_MULTIFASHION}`; el rol sale de `lib/roles-etiquetas.ts`, derivado de `SYSTEM_ROLES`.
+- Candados: `acs-resumen-meta-ritmo.test.ts` · `multifashion-rediseno.test.ts` · `multifashion-rediseno-pantalla.test.tsx` · `multifashion-anio-una-vez.test.ts` · `roles-etiquetas.test.ts` · `multifashion-cerrado-y-espejo.test.ts`.
