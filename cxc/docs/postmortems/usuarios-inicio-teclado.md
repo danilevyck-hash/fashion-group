@@ -42,3 +42,16 @@
 ### Búsqueda global — cada resultado lleva a donde dice (11-sep-2026)
 
 - **Búsqueda global:** 8 módulos (CXC, Reclamos, Guías, Directorio, Cheques, Ventas, Préstamos, Caja). 🔴 **Cada resultado LLEVA a donde dice** (11-sep-2026): una **guía** abre `/guias/<id>` —decía `/guias?id=`, que el middleware convierte en la HOJA DE IMPRIMIR—, un **cliente** abre su ficha `/clientes/<codigo>`, un resultado de **Ventas** abre `?tab=clientes&cliente=<CÓDIGO>` —decía `?search=`, que no lee nadie— y un gasto de **Caja** abre su período `/caja/<id>` —decía `?periodo=`, tampoco leído—. 🔴 El código del cliente de Ventas sale del **puente por ID** (`switch_facturas` → `switch_clientes` → `codigo`), **nunca del nombre**; sin código se abre la pestaña Clientes sin preseleccionar. ⚠️ El gasto de Caja no queda **resaltado** dentro de su período: eso pide que la pantalla de Caja lea un parámetro y hoy no lee ninguno — pendiente, no olvido. Candado: `busqueda-global-destinos.test.ts`.
+
+---
+
+## Lo que decía CLAUDE.md hasta el 22-sep-2026 (movido acá, verbatim)
+
+### Usuarios, Inicio y teclado — lo que se regalaba y no servía (11-sep-2026)
+
+> Detalle completo (mediciones, citas, candados, mutaciones): [docs/postmortems/usuarios-inicio-teclado.md](docs/postmortems/usuarios-inicio-teclado.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
+> ⚠️ Las reglas de PANTALLA de este módulo (qué se dibuja, dónde, rótulos, tamaños) viven SOLO en ese postmortem: léelo antes de tocar una pantalla suya.
+
+- 🔴 NO SE PUEDE REGALAR UN MÓDULO QUE LA PANTALLA REBOTA: los ofrecibles de «permisos personalizados» se derivan (`src/lib/modulos-ofrecibles.ts`) —a un rol solo se le ofrece lo que `ALL_MODULES` le da— y el servidor lo rechaza igual (`/api/admin/users`). Candado: `usuarios-modulos-ofrecibles.test.ts`.
+- ⚠️ El override REEMPLAZA la lista del rol en vez de sumarla, y la pantalla no lo dice. Decisión pendiente de Daniel.
+- 🔴 El teclado y el Inicio dejaron de prometer lo que no existe: se retiraron `useKeyboardShortcuts`, `useBadges`, `useSmartSuggestions`, `SuggestionCard` y `/api/home-stats`, sin lectores; queda `useSessionCheck`, desenchufado a propósito. Candados: `atajos-de-teclado-retirados.test.ts` · `inicio-sin-promesas.test.ts`.

@@ -409,13 +409,11 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 **CUATRO tramos, sumas de los OCHO de Switch, y ningún número cambia** (`tramos.ts`). 🔴 **Nunca «vencido», ni dicho ni pintado** —el dato es EDAD, no mora—: un tono (`tono.ts`). 🔴 **Lo A FAVOR se ve**: «Le debes X · Tienes a favor Y · **Por pagar Z = X − Y**».
 ### Usuarios, Inicio y teclado — lo que se regalaba y no servía (11-sep-2026)
 
-> Detalle completo (mediciones, citas, candados, mutaciones): [docs/postmortems/usuarios-inicio-teclado.md](docs/postmortems/usuarios-inicio-teclado.md) › «Lo que decía CLAUDE.md hasta el 14-sep-2026».
-> ⚠️ Las reglas de PANTALLA de este módulo (qué se dibuja, dónde, rótulos, tamaños) viven SOLO en ese postmortem: léelo antes de tocar una pantalla suya.
+> 📄 Mediciones, citas de Daniel, candados y las reglas de PANTALLA: [docs/postmortems/usuarios-inicio-teclado.md](docs/postmortems/usuarios-inicio-teclado.md) › «Lo que decía CLAUDE.md hasta el 22-sep-2026».
 
-- 🔴 NO SE PUEDE REGALAR UN MÓDULO QUE LA PANTALLA REBOTA: los ofrecibles de «permisos personalizados» se derivan (`src/lib/modulos-ofrecibles.ts`) —a un rol solo se le ofrece lo que `ALL_MODULES` le da— y el servidor lo rechaza igual (`/api/admin/users`). Candado: `usuarios-modulos-ofrecibles.test.ts`.
+- 🔴 NO SE PUEDE REGALAR UN MÓDULO QUE LA PANTALLA REBOTA: los ofrecibles de «permisos personalizados» se derivan (`src/lib/modulos-ofrecibles.ts`) —a un rol solo se le ofrece lo que `ALL_MODULES` le da— y el servidor lo rechaza igual (`/api/admin/users`).
 - ⚠️ El override REEMPLAZA la lista del rol en vez de sumarla, y la pantalla no lo dice. Decisión pendiente de Daniel.
-- 🔴 El teclado y el Inicio dejaron de prometer lo que no existe: se retiraron `useKeyboardShortcuts`, `useBadges`, `useSmartSuggestions`, `SuggestionCard` y `/api/home-stats`, sin lectores; queda `useSessionCheck`, desenchufado a propósito. Candados: `atajos-de-teclado-retirados.test.ts` · `inicio-sin-promesas.test.ts`.
-
+- 🔴 El teclado y el Inicio dejaron de prometer lo que no existe: se retiraron `useKeyboardShortcuts`, `useBadges`, `useSmartSuggestions`, `SuggestionCard` y `/api/home-stats`, sin lectores; queda `useSessionCheck`, desenchufado a propósito.
 ### Crons, alertas e infraestructura — [docs/postmortems/crons-alertas.md](docs/postmortems/crons-alertas.md)
 
 > 📄 Mediciones, citas de Daniel, candados y mutaciones: el postmortem › «Lo que decía CLAUDE.md hasta el 22-sep-2026».
