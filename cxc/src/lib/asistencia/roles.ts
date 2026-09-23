@@ -17,10 +17,17 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { ROL_BOSTON } from "@/lib/boston/rol";
+import { rolesQueSumaVentasBoston } from "@/lib/boston/ventas-boston";
 
 import { vePestanaPrestamos } from "@/lib/prestamos-una-puerta";
 
-export const ASISTENCIA_ROLES = ["admin", "secretaria", "contabilidad"] as const;
+// 🔴 DAVID ENTRA AL MÓDULO COMPLETO (23-sep-2026). Daniel, textual:
+// *«Asistencia que pueda ver todo como yo»*. `gerente_boston` se SUMA por el
+// interruptor `VENTAS_BOSTON` (`lib/boston/ventas-boston.ts`): apagado, la lista
+// vuelve a ser exactamente la de antes. Lo que ve lo recorta el SERVIDOR a
+// Confecciones Boston en cada ruta (`lib/asistencia/alcance-boston.ts`), y lo
+// que NO gana lo dice `MIRAN_PERO_NO_CIERRAN`, más abajo.
+export const ASISTENCIA_ROLES: readonly string[] = ["admin", "secretaria", "contabilidad", ...rolesQueSumaVentasBoston()];
 
 export function asistenciaRoles(): string[] {
   return [...ASISTENCIA_ROLES];
@@ -177,8 +184,13 @@ export function vePestana(rol: string, pestana: string): boolean {
 // ningún llamador cambió.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Entra a Asistencia, pero NO cierra la quincena. */
-export const MIRAN_PERO_NO_CIERRAN = ["secretaria"] as const;
+/** Entra a Asistencia, pero NO cierra la quincena.
+ *
+ *  🔴 `gerente_boston` entra acá con el interruptor (23-sep-2026): «cerrar la
+ *  quincena sigue siendo de Contabilidad — ella sigue cerrando las cuatro». Y
+ *  con eso, por derivación, tampoco carga el día libre de la empresa, ni la
+ *  foto de la cédula, ni anota un abono: todo lo que firma un pago. */
+export const MIRAN_PERO_NO_CIERRAN: readonly string[] = ["secretaria", ...rolesQueSumaVentasBoston()];
 
 export function cerrarPlanillaRoles(): string[] {
   const noCierran = new Set<string>(MIRAN_PERO_NO_CIERRAN);

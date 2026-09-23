@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { logActivity } from "@/lib/log-activity";
 import { PRESTAMOS_ADMIN_ROLES, PRESTAMOS_ROLES } from "@/lib/prestamos-roles";
+import { estaAcotado, rechazarFichaPrestamoFueraDeAlcance } from "@/lib/asistencia/alcance-boston-server";
 import {
   CONCEPTOS_OFRECIDOS,
   CONCEPTO_DANO,
@@ -40,6 +41,13 @@ export async function GET(req: NextRequest) {
   const auth = requireRole(req, [...PRESTAMOS_ROLES]);
   if (auth instanceof NextResponse) return auth;
   const empleadoId = req.nextUrl.searchParams.get("empleado_id");
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): los movimientos son de UNA ficha, y
+  // esa ficha tiene que ser de su gente; la lista entera (sin ficha) no se le da.
+  if (estaAcotado(auth.role)) {
+    if (!empleadoId) return NextResponse.json([]);
+    const fuera = await rechazarFichaPrestamoFueraDeAlcance(auth.role, empleadoId);
+    if (fuera) return fuera;
+  }
 
   let query = supabaseServer
     .from("prestamos_movimientos")
@@ -81,6 +89,9 @@ export async function POST(req: NextRequest) {
   if (typeof concepto !== "string" || !(CONCEPTOS_OFRECIDOS as readonly string[]).includes(concepto)) {
     return NextResponse.json({ error: "Concepto inválido" }, { status: 400 });
   }
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): no se anota plata a alguien ajeno.
+  const fuera = await rechazarFichaPrestamoFueraDeAlcance(auth.role, String(empleado_id));
+  if (fuera) return fuera;
   // Panamá es UTC-5 todo el año (sin DST). La fecha no puede ser futura.
   const hoyPanama = hoyPanamaYmd();
   if (typeof fecha !== "string" || fecha > hoyPanama) {

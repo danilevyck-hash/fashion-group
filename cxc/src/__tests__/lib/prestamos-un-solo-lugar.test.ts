@@ -101,8 +101,12 @@ describe("🔴 el saldo se calcula en UN solo lugar", () => {
 });
 
 describe("🔴 PRESTAMOS_ROLES se dice una vez", () => {
-  it("son admin y contabilidad", () => {
-    expect([...PRESTAMOS_ROLES]).toEqual(["admin", "contabilidad"]);
+  // 🔄 CAMBIÓ DE DIRECCIÓN (23-sep-2026): entra `gerente_boston` por el
+  // interruptor `VENTAS_BOSTON` —Daniel: los préstamos de SU gente— y el
+  // servidor lo recorta a Boston en cada ruta. La zona peligrosa sigue siendo
+  // solo de admin.
+  it("son admin, contabilidad y —por Ventas Boston— el gerente de Boston", () => {
+    expect([...PRESTAMOS_ROLES]).toEqual(["admin", "contabilidad", "gerente_boston"]);
     expect([...PRESTAMOS_ADMIN_ROLES]).toEqual(["admin"]);
   });
 

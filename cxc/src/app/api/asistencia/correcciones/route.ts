@@ -37,6 +37,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { requireAsistencia } from "@/lib/asistencia/guard";
+import { rechazarFueraDeAlcance } from "@/lib/asistencia/alcance-boston-server";
+import { supabaseServer } from "@/lib/supabase-server";
+import { TABLA_CORRECCIONES } from "@/lib/asistencia/correcciones";
 import { diaPanama } from "@/lib/asistencia/reporte";
 import {
   avisoMigracionCorrecciones,
@@ -87,6 +90,9 @@ export async function GET(req: NextRequest) {
   if (!codigo || !fechaValida(fecha)) {
     return NextResponse.json({ error: "Falta el colaborador o la fecha." }, { status: 400 });
   }
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): el historial de alguien ajeno, 403.
+  const fuera = await rechazarFueraDeAlcance(auth.role, [codigo]);
+  if (fuera) return fuera;
 
   try {
     const { historial, faltaMigracion } = await leerHistorialDelDia(codigo, fecha);
@@ -176,6 +182,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 🔴 EL ALCANCE DE DAVID (23-sep-2026): con la persona ya resuelta (de la
+    // marcación o del cuerpo), se rechaza si no es de su empresa.
+    const fuera = await rechazarFueraDeAlcance(auth.role, [codigo]);
+    if (fuera) return fuera;
+
     return respuestaEscritura(
       await crearCorreccion({
         marcacionId,
@@ -204,6 +215,9 @@ export async function DELETE(req: NextRequest) {
 
   const id = (req.nextUrl.searchParams.get("id") ?? "").trim();
   if (!id) return NextResponse.json({ error: "Falta cuál corrección." }, { status: 400 });
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): se mira de QUIÉN es antes de anularla.
+  const fuera = await rechazarFueraDeAlcance(auth.role, await codigoDeCorreccion(id));
+  if (fuera) return fuera;
 
   try {
     return respuestaEscritura(await anularCorreccion(id, firma(auth)));
@@ -212,4 +226,15 @@ export async function DELETE(req: NextRequest) {
     console.error("[asistencia/correcciones DELETE]", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
+}
+
+/** El código de la persona de una corrección, para el recorte por alcance. Sin fila, nada que recortar. */
+async function codigoDeCorreccion(id: string): Promise<string[]> {
+  const { data } = await supabaseServer
+    .from(TABLA_CORRECCIONES)
+    .select("empleado_codigo")
+    .eq("id", id)
+    .maybeSingle();
+  const codigo = (data as { empleado_codigo?: string | null } | null)?.empleado_codigo;
+  return codigo ? [String(codigo)] : [];
 }

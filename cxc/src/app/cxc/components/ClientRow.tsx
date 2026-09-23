@@ -23,6 +23,8 @@ interface Props {
   onSeleccionar: (client: ConsolidatedClient) => void;
   /** «no paga hace 298 d» / «nunca ha pagado». 🔴 Se ve SIEMPRE (20-sep-2026). */
   avisoSinPagar?: string | null;
+  /** Sin casilla de selección (la cartera de Boston no manda a varios). */
+  sinSeleccion?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -43,6 +45,7 @@ export default function ClientRow({
   seleccionado,
   onSeleccionar,
   avisoSinPagar,
+  sinSeleccion = false,
 }: Props) {
   const risk = riskInfo(client.total, client.current, client.watch, client.overdue);
   // 🔴 EL NOMBRE QUE SE LEE ES EL QUE ESCRIBE SWITCH (20-sep-2026). 🩸 Acá se
@@ -62,7 +65,7 @@ export default function ClientRow({
           {/* La casilla es para MANDAR A VARIOS, o sea cobrar: al saldo a favor
               tampoco se le dibuja. Se reserva su ancho para que las filas del
               bloque «Saldo a favor» no queden corridas. */}
-          {seLeCobra(client.total) ? (
+          {seLeCobra(client.total) && !sinSeleccion ? (
             <input
               type="checkbox"
               checked={seleccionado}

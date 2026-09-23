@@ -6,6 +6,8 @@ import { filterEmpleadosMovimientos } from "@/lib/prestamos-helpers";
 import { workbookBuffer, XLSX_MIME } from "@/lib/excel-export";
 import { buildPrestamosWorkbook, type EmpleadoRow } from "@/lib/exports/prestamos-excel";
 import { calcularSaldoPrestamo } from "@/lib/prestamos-saldo";
+import { alcanceDelRol } from "@/lib/asistencia/alcance-boston-server";
+import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +32,12 @@ export async function GET(req: NextRequest) {
     : "deben";
 
   const empresaParam = req.nextUrl.searchParams.get("empresa");
-  const empresaFilter = empresaParam && empresaParam !== "all" ? empresaParam : null;
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): el Excel sale de SU empresa, pase lo
+  // que pase en la URL (`prestamos_empleados.empresa` guarda el NOMBRE).
+  const alcance = alcanceDelRol(auth.role);
+  const empresaFilter = alcance
+    ? (EMPRESA_KEY_TO_NAME[alcance[0]] ?? alcance[0])
+    : empresaParam && empresaParam !== "all" ? empresaParam : null;
 
   let query = supabaseServer
     .from("prestamos_empleados")

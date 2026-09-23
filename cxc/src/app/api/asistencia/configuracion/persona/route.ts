@@ -32,6 +32,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { requireAsistencia } from "@/lib/asistencia/guard";
+import { rechazarFueraDeAlcance } from "@/lib/asistencia/alcance-boston-server";
 import { REGLAS_DEFAULT } from "@/lib/asistencia/config";
 import {
   armarPersonaDeConfiguracion,
@@ -51,6 +52,9 @@ export async function GET(req: NextRequest) {
   if (!codigo) {
     return NextResponse.json({ error: "Falta el código del colaborador." }, { status: 400 });
   }
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): una ficha ajena contesta 403.
+  const fuera = await rechazarFueraDeAlcance(auth.role, [codigo]);
+  if (fuera) return fuera;
 
   try {
     // 🔴 «Trabaja afuera» se lee APARTE (14-sep-2026): su columna nace con la

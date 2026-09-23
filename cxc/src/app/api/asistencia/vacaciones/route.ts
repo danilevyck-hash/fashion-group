@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { requireAsistencia } from "@/lib/asistencia/guard";
+import { codigosDelAlcance, rechazarFueraDeAlcance, soloPermitidos } from "@/lib/asistencia/alcance-boston-server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { TABLA_VACACIONES, esTablaFaltante } from "@/lib/asistencia/config";
 import {
@@ -95,12 +96,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: res.error.message }, { status: 500 });
   }
 
-  const vacaciones = res.data ?? [];
-  const { corresponden, avisoSinFecha } = armarCorresponden(vacaciones, personas, filas);
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): solo las vacaciones y las personas de
+  // SU empresa; «le corresponden N días» se calcula sobre ésas. Sin recorte,
+  // `null` y todo como siempre.
+  const permitidos = await codigosDelAlcance(auth.role);
+  const vacaciones = soloPermitidos(res.data ?? [], (f) => String((f as { empleado_codigo?: unknown }).empleado_codigo ?? ""), permitidos);
+  const personasDelAlcance = soloPermitidos(personas, (p) => p.codigo, permitidos);
+  const { corresponden, avisoSinFecha } = armarCorresponden(vacaciones, personasDelAlcance, filas);
 
   return NextResponse.json({
     vacaciones,
-    personas,
+    personas: personasDelAlcance,
     faltaMigracion,
     puedeCargar: true,
     avisoMigracion: null,
@@ -204,6 +210,9 @@ export async function POST(req: NextRequest) {
   const desde = (b.desde ?? "").trim();
   const hasta = (b.hasta ?? desde).trim();
   if (!codigo) return NextResponse.json({ error: "Falta el colaborador" }, { status: 400 });
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): a alguien ajeno no se le cargan vacaciones.
+  const fuera = await rechazarFueraDeAlcance(auth.role, [codigo]);
+  if (fuera) return fuera;
   const mal = revisarFechas(desde, hasta);
   if (mal) return NextResponse.json({ error: mal }, { status: 400 });
 
@@ -254,6 +263,9 @@ export async function PATCH(req: NextRequest) {
 
   const id = (b.id ?? "").trim();
   if (!id) return NextResponse.json({ error: "Falta el id" }, { status: 400 });
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): se mira de QUIÉN es antes de tocarla.
+  const fuera = await rechazarFueraDeAlcance(auth.role, await codigoDeVacacion(id));
+  if (fuera) return fuera;
 
   const cambios: Record<string, unknown> = {};
   if (b.desde !== undefined || b.hasta !== undefined) {
@@ -296,6 +308,9 @@ export async function DELETE(req: NextRequest) {
 
   const id = (req.nextUrl.searchParams.get("id") ?? "").trim();
   if (!id) return NextResponse.json({ error: "Falta el id" }, { status: 400 });
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): se mira de QUIÉN es antes de retirarla.
+  const fuera = await rechazarFueraDeAlcance(auth.role, await codigoDeVacacion(id));
+  if (fuera) return fuera;
 
   const { error } = await supabaseServer
     .from(TABLA_VACACIONES)
@@ -304,4 +319,15 @@ export async function DELETE(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
+}
+
+/** El código de la persona de una vacación, para el recorte por alcance. Sin fila, nada que recortar. */
+async function codigoDeVacacion(id: string): Promise<string[]> {
+  const { data } = await supabaseServer
+    .from(TABLA_VACACIONES)
+    .select("empleado_codigo")
+    .eq("id", id)
+    .maybeSingle();
+  const codigo = (data as { empleado_codigo?: string | null } | null)?.empleado_codigo;
+  return codigo ? [String(codigo)] : [];
 }

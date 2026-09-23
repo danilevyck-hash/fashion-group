@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { requireAsistencia } from "@/lib/asistencia/guard";
+import { rechazarLoDelGrupo } from "@/lib/asistencia/alcance-boston-server";
 import { supabaseServer } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,10 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
+  // 🔴 Los feriados son de TODO el sistema («no hay feriados por empresa»): un
+  // rol acotado a una empresa (David) los ve y no los toca.
+  const delGrupo = rechazarLoDelGrupo(auth.role);
+  if (delGrupo) return delGrupo;
   let b: { fecha?: string; nombre?: string };
   try { b = await req.json(); } catch { return NextResponse.json({ error: "JSON inválido" }, { status: 400 }); }
   const fecha = (b.fecha ?? "").trim();
@@ -39,6 +44,8 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
+  const delGrupo = rechazarLoDelGrupo(auth.role);
+  if (delGrupo) return delGrupo;
   const fecha = (req.nextUrl.searchParams.get("fecha") ?? "").trim();
   if (!fecha) return NextResponse.json({ error: "Falta la fecha" }, { status: 400 });
   const { error } = await supabaseServer.from("asistencia_feriados").delete().eq("fecha", fecha);

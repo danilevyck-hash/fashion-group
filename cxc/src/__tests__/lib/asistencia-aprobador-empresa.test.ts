@@ -182,16 +182,19 @@ describe("una empresa que no existe no entra por la puerta de atrás", () => {
   });
 });
 
-describe("🔑 David gana la puerta, no el módulo", () => {
-  it("está en APROBACIONES_ROLES y NO en ASISTENCIA_ROLES", () => {
+// 🔄 CAMBIÓ DE DIRECCIÓN (23-sep-2026). Decía «David gana la puerta, no el
+// módulo» y «ve UNA sola pestaña». Daniel: *«Asistencia que pueda ver todo como
+// yo»*. Entra al módulo completo por `VENTAS_BOSTON`; el reparto de APROBADORES
+// —lo que este archivo protege— no cambió: sigue aprobando SOLO Boston.
+describe("🔑 David entra al módulo, y aprueba solo lo suyo", () => {
+  it("está en APROBACIONES_ROLES y también en ASISTENCIA_ROLES", () => {
     expect(aprobacionesRoles()).toContain(ROL_BOSTON);
-    expect(asistenciaRoles()).not.toContain(ROL_BOSTON);
+    expect(asistenciaRoles()).toContain(ROL_BOSTON);
   });
 
-  it("ve UNA sola pestaña: Aprobaciones", () => {
-    expect(vePestana(ROL_BOSTON, "aprobaciones")).toBe(true);
-    for (const t of ["planilla", "reporte", "justificaciones", "vacaciones", "configuracion"]) {
-      expect(vePestana(ROL_BOSTON, t), t).toBe(false);
+  it("ve todas las pestañas, como el admin", () => {
+    for (const t of ["aprobaciones", "planilla", "reporte", "justificaciones", "vacaciones", "configuracion"]) {
+      expect(vePestana(ROL_BOSTON, t), t).toBe(true);
     }
   });
 

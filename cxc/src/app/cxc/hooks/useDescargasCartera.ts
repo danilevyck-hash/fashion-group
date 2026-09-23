@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import type { Company } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
+import type { CasaDelPapel } from "@/lib/cxc/casa-del-papel";
 import { hoyPanama } from "@/lib/fecha-panama";
 import {
   bloquesPorCompania,
@@ -42,6 +43,9 @@ export function useDescargasCartera(
   filtered: ConsolidatedClient[],
   cxcCompanies: Company[],
   companyFilter: string,
+  /** 🔴 Quién firma el PDF (23-sep-2026). Sin esto, el grupo: la cartera de
+   *  Boston pasa `CASA_BOSTON` y su papel sale sin el logo del grupo. */
+  casa?: CasaDelPapel,
 ) {
   return useCallback(
     async (clave: ClaveDescarga, formato: FormatoDescarga) => {
@@ -59,6 +63,7 @@ export function useDescargasCartera(
             subtitulo: titulo,
             archivo: nombreArchivoDescarga(clave, "pdf", hoy),
             hoy,
+            casa,
           });
           return;
         }
@@ -81,6 +86,7 @@ export function useDescargasCartera(
           subtitulo: titulo,
           archivo: nombreArchivoDescarga(clave, "pdf", hoy),
           hoy,
+          casa,
         });
         return;
       }
@@ -93,7 +99,7 @@ export function useDescargasCartera(
         nombreArchivoDescarga(clave, "xlsx", hoy),
       );
     },
-    [filtered, cxcCompanies, companyFilter],
+    [filtered, cxcCompanies, companyFilter, casa],
   );
 }
 

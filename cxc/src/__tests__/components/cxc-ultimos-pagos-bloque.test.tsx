@@ -135,7 +135,11 @@ describe("🔄 dónde vive el bloque hoy, y cada cartera con SU hook", () => {
   it("CXC celular: el MISMO bloque por fecha, dentro de la tarjeta abierta", () => {
     const movil = leer("src/app/cxc/components/PanelCxcMobile.tsx");
     expect(movil).toContain("<UltimosPagosPorFecha");
-    expect(movil).toContain("useUltimosPagosGrupo(codigo, true)");
+    // 🔄 23-sep-2026: el panel del celular también dibuja la cartera de Boston
+    // («Ventas Boston»), y ahí el hook del GRUPO no se dispara (`esGrupo`). La
+    // regla es la misma: cada cartera con SU hook, y Boston nunca pide al grupo.
+    expect(movil).toContain("useUltimosPagosGrupo(codigo, esGrupo)");
+    expect(movil).toContain('const esGrupo = cartera === "grupo"');
     expect(movil).not.toContain("useUltimosPagosBoston");
   });
 

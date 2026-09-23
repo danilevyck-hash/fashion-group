@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { PRESTAMOS_ROLES } from "@/lib/prestamos-roles";
+import { codigosDelAlcance, rechazarFueraDeAlcance, soloPermitidos } from "@/lib/asistencia/alcance-boston-server";
 import { leerDatosPrestamos } from "@/lib/prestamos-lista-server";
 import { logActivity } from "@/lib/log-activity";
 
@@ -19,7 +20,15 @@ export async function GET(req: NextRequest) {
   const auth = requireRole(req, [...PRESTAMOS_ROLES]);
   if (auth instanceof NextResponse) return auth;
   try {
-    return NextResponse.json(await leerDatosPrestamos());
+    // 🔴 EL ALCANCE DE DAVID (23-sep-2026): solo las fichas y los colaboradores
+    // de SU empresa; una ficha sin código no tiene empresa y no entra.
+    const permitidos = await codigosDelAlcance(auth.role);
+    const datos = await leerDatosPrestamos();
+    return NextResponse.json({
+      ...datos,
+      filas: soloPermitidos(datos.filas, (f) => f.empleadoCodigo, permitidos),
+      colaboradores: soloPermitidos(datos.colaboradores, (c) => c.codigo, permitidos),
+    });
   } catch (e) {
     console.error("[prestamos/empleados]", e);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
@@ -73,6 +82,9 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): una ficha nueva, solo a su gente.
+  const fuera = await rechazarFueraDeAlcance(auth.role, [codigo]);
+  if (fuera) return fuera;
 
   // Una persona, una ficha. Ramón Miranda llegó a tener dos con el mismo código
   // solo para poder cobrarle un daño de $3,13 — justo lo que las dos cuentas

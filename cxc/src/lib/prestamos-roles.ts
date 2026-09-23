@@ -20,8 +20,14 @@
 // esperando en producción.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Quien ve y escribe el módulo. */
-export const PRESTAMOS_ROLES: readonly string[] = ["admin", "contabilidad"];
+import { rolesQueSumaVentasBoston } from "@/lib/boston/ventas-boston";
+
+/** Quien ve y escribe el módulo.
+ *
+ *  🔴 `gerente_boston` entra por el interruptor `VENTAS_BOSTON` (23-sep-2026):
+ *  los préstamos de SU gente, y el servidor lo acota a Boston en cada ruta
+ *  (`lib/asistencia/alcance-boston.ts`). Apagado, la lista es la de siempre. */
+export const PRESTAMOS_ROLES: readonly string[] = ["admin", "contabilidad", ...rolesQueSumaVentasBoston()];
 
 /** La zona de acciones peligrosas y el «Eliminar» de la lista. */
 export const PRESTAMOS_ADMIN_ROLES: readonly string[] = ["admin"];

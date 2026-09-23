@@ -62,15 +62,21 @@ export const MODULO_ASISTENCIA = "asistencia";
 /**
  * 🔴 LOS MÓDULOS QUE HABILITAN LA PLANILLA, Y POR QUÉ SON DOS.
  *
- * `gerente_boston` (David) abre la planilla de Boston desde `/boston`, y sus
- * módulos son `["boston", "catalogos"]` — **no tiene `asistencia`**, ni puede
+ * `gerente_boston` (David) abría la planilla de Boston desde `/boston` cuando
+ * sus módulos eran `["boston", "catalogos"]`, sin `asistencia`, y no podía
  * heredarlo (`fgModulesIncluye` exige que el módulo declare el rol en su
- * `roles[]`, y el de Asistencia son admin/secretaria/contabilidad/bodega).
- * Exigirle `asistencia` a secas le rompería su pestaña.
+ * `roles[]`). Exigirle `asistencia` a secas le rompía esa pestaña.
  *
- * Su acceso ya está acotado por otras dos vías que NO se tocan: la ruta le
- * fuerza la empresa a Boston (no la lee de la URL) y le contesta sin un solo
- * campo de dinero (`planillaSinDinero`).
+ * ⚠️ NOTA FECHADA (23-sep-2026): medido en `role_permissions`, David SÍ tiene
+ * `asistencia` desde el 31-ago-2026 (aprueba horas extra), y con «Ventas
+ * Boston» entra al módulo completo, acotado a Boston en cada ruta
+ * (`lib/asistencia/alcance-boston.ts`). `MODULOS_PLANILLA` se conserva: sigue
+ * siendo la red para una cookie vieja que no traiga la key, y no le abre nada a
+ * nadie más (el rol manda antes que el módulo).
+ *
+ * Su acceso sigue acotado por otras dos vías que NO se tocan: la ruta le
+ * fuerza la empresa a Boston (no la lee de la URL) y el bloque de dinero cuelga
+ * de `VE_SUELDOS_DE_BOSTON` (`planillaSinDinero`).
  */
 export const MODULOS_PLANILLA = [MODULO_ASISTENCIA, MODULO_BOSTON] as const;
 

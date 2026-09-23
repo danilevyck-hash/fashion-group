@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireAsistencia } from "@/lib/asistencia/guard";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
+import { codigosDelAlcance, rechazarFueraDeAlcance, soloPermitidos } from "@/lib/asistencia/alcance-boston-server";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { quincenaDesdeClave } from "@/lib/asistencia/planilla";
 import { esCerrada } from "@/lib/asistencia/planilla-guardada";
@@ -86,9 +87,11 @@ export async function GET(req: NextRequest) {
       quincena,
       codigo: codigo || undefined,
     });
+    // 🔴 EL ALCANCE DE DAVID (23-sep-2026): solo los renglones de su gente.
+    const permitidos = await codigosDelAlcance(auth.role);
     return NextResponse.json({
       quincena,
-      renglones,
+      renglones: soloPermitidos(renglones, (r) => r.codigo, permitidos),
       // Nada se rompe sin la migración: se DICE, con el nombre del archivo.
       faltaMigracion: faltaTabla ? avisoMigracionOtrosServicios() : null,
     });
@@ -123,6 +126,9 @@ export async function POST(req: NextRequest) {
   if (!codigo) {
     return NextResponse.json({ error: "Falta el colaborador." }, { status: 400 });
   }
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): a alguien ajeno no se le anota nada.
+  const fuera = await rechazarFueraDeAlcance(auth.role, [codigo]);
+  if (fuera) return fuera;
 
   const v = validarOtroServicio(body.monto, body.concepto);
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
@@ -172,6 +178,9 @@ export async function DELETE(req: NextRequest) {
   try {
     const fila = await leerUnOtroServicio(id);
     if (!fila) return NextResponse.json({ error: "Ese renglón ya no está." }, { status: 404 });
+    // 🔴 EL ALCANCE DE DAVID (23-sep-2026): se mira de QUIÉN es antes de quitarlo.
+    const fuera = await rechazarFueraDeAlcance(auth.role, [fila.codigo]);
+    if (fuera) return fuera;
 
     // 🔴 EL FRENO, ANTES DE ESCRIBIR NADA. Con la quincena ya cerrada un
     // renglón no se edita ni se borra: lo que se pagó se tiene que poder leer

@@ -31,7 +31,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
+import { CASA_GRUPO, type CasaDelPapel } from "@/lib/cxc/casa-del-papel";
 import { tramoLabel } from "@/lib/cxc-aging";
 import { fmtDate } from "@/lib/format";
 import type { BloqueCliente, FilaCliente } from "@/lib/cxc/descargas";
@@ -71,18 +71,27 @@ function dinero(n: number) {
  * El `Hoja N de M` NO se dibuja acá: cuántas hojas hay recién se sabe al final
  * (ver `piePorHoja`).
  */
-function cabecera(doc: jsPDF, subtitulo: string, hoy: string) {
+// 🔴 LA CASA DEL PAPEL (23-sep-2026). Hasta hoy el logo, el membrete y el pie
+// eran los de Fashion Group, escritos acá. Desde que la cartera de Boston se
+// baja por la MISMA pantalla, la casa entra como opción (`opts.casa`) y sale de
+// `lib/cxc/casa-del-papel.ts`: Boston firma como Boston, sin el logo del grupo
+// y sin `fashiongr.com` en el pie. Sin `casa`, el grupo, como siempre.
+function cabecera(doc: jsPDF, subtitulo: string, hoy: string, casa: CasaDelPapel) {
   const w = doc.internal.pageSize.getWidth();
 
-  try {
-    doc.addImage(FG_LOGO_BASE64, "JPEG", MARGEN, 10, FG_LOGO_WIDTH, FG_LOGO_HEIGHT);
-  } catch { /* sin logo el papel sale igual: nunca se cae por una imagen */ }
+  let anchoLogo = 0;
+  if (casa.logo) {
+    try {
+      doc.addImage(casa.logo.base64, "JPEG", MARGEN, 10, casa.logo.width, casa.logo.height);
+      anchoLogo = casa.logo.width;
+    } catch { /* sin logo el papel sale igual: nunca se cae por una imagen */ }
+  }
 
-  const x = MARGEN + FG_LOGO_WIDTH + 3;
+  const x = MARGEN + anchoLogo + (anchoLogo ? 3 : 0);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.setTextColor(...TINTA);
-  doc.text("FASHION GROUP", x, 17);
+  doc.text(casa.membrete, x, 17);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
@@ -99,7 +108,7 @@ function cabecera(doc: jsPDF, subtitulo: string, hoy: string) {
 }
 
 /** `Hoja N de M` arriba a la derecha y el pie, en todas las hojas. */
-function piePorHoja(doc: jsPDF) {
+function piePorHoja(doc: jsPDF, casa: CasaDelPapel) {
   const hojas = doc.getNumberOfPages();
   const w = doc.internal.pageSize.getWidth();
   const h = doc.internal.pageSize.getHeight();
@@ -112,8 +121,11 @@ function piePorHoja(doc: jsPDF) {
 
     doc.setFontSize(7);
     doc.setTextColor(...GRIS_CLARO);
-    doc.text("Confidencial", MARGEN, h - 10);
-    doc.text("fashiongr.com", w - MARGEN, h - 10, { align: "right" });
+    // `casa.pie` es «Confidencial · fashiongr.com» para el grupo y solo
+    // «Confidencial» para Boston: a la izquierda lo primero, a la derecha el resto.
+    const [izquierda, ...resto] = casa.pie.split(" · ");
+    doc.text(izquierda, MARGEN, h - 10);
+    if (resto.length) doc.text(resto.join(" · "), w - MARGEN, h - 10, { align: "right" });
   }
 }
 
@@ -203,9 +215,10 @@ function pieDelPapel(
 export function pdfTotalPorCliente(
   filas: FilaCliente[],
   aFavor: FilaCliente[],
-  opts: { subtitulo: string; archivo: string; hoy: string },
+  opts: { subtitulo: string; archivo: string; hoy: string; casa?: CasaDelPapel },
 ): jsPDF {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+  const casa = opts.casa ?? CASA_GRUPO;
 
   const renglon = (f: FilaCliente): Celda[] =>
     [f.codigo, f.nombre, dinero(f.t0), dinero(f.t1), dinero(f.t2), dinero(f.total)];
@@ -232,10 +245,10 @@ export function pdfTotalPorCliente(
       5: { halign: "right", cellWidth: 26, fontStyle: "bold" },
     },
     ...estilosDeTabla(),
-    didDrawPage: () => cabecera(doc, opts.subtitulo, opts.hoy),
+    didDrawPage: () => cabecera(doc, opts.subtitulo, opts.hoy, casa),
   });
 
-  piePorHoja(doc);
+  piePorHoja(doc, casa);
   doc.save(opts.archivo);
   return doc;
 }
@@ -248,9 +261,10 @@ export function pdfTotalPorCliente(
 export function pdfPorCompania(
   bloques: BloqueCliente[],
   aFavor: BloqueCliente[],
-  opts: { subtitulo: string; archivo: string; hoy: string },
+  opts: { subtitulo: string; archivo: string; hoy: string; casa?: CasaDelPapel },
 ): jsPDF {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+  const casa = opts.casa ?? CASA_GRUPO;
 
   const cuerpo: Celda[][] = [];
   const dibujarBloque = (b: BloqueCliente) => {
@@ -288,10 +302,10 @@ export function pdfPorCompania(
       5: { halign: "right", cellWidth: 26 },
     },
     ...estilosDeTabla(),
-    didDrawPage: () => cabecera(doc, opts.subtitulo, opts.hoy),
+    didDrawPage: () => cabecera(doc, opts.subtitulo, opts.hoy, casa),
   });
 
-  piePorHoja(doc);
+  piePorHoja(doc, casa);
   doc.save(opts.archivo);
   return doc;
 }

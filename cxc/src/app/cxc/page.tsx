@@ -12,6 +12,10 @@ import { normalizeName } from "@/lib/normalize";
 import AppHeader from "@/components/AppHeader";
 import { Toast, PullToRefresh } from "@/components/ui";
 import BostonTab from "@/components/cxc/BostonTab";
+import CarteraBoston from "./components/CarteraBoston";
+import { useRouter } from "next/navigation";
+import { casaDelRol } from "@/lib/navegacion/casa-del-rol";
+import { VENTAS_BOSTON, carteraDelRolEnCxc, puedeQuedarseEnCxc } from "@/lib/boston/ventas-boston";
 import TiraTotales from "./components/TiraTotales";
 import ClientTable from "./components/ClientTable";
 import HojaCobrar, { type CorreoProgramado } from "./components/HojaCobrar";
@@ -147,9 +151,27 @@ export default function AdminDashboard() {
 
 function AdminDashboardInner() {
   const { authChecked, role: userRole } = useAuth({ moduleKey: "cxc", allowedRoles: ["admin", "secretaria", "vendedor"] });
+  const router = useRouter();
+  // ── 🔴 QUÉ CARTERA SIRVE ESTA PANTALLA LO DECIDE EL ROL (23-sep-2026) ──────
+  //
+  // Daniel: David (`gerente_boston`) entra a Cuentas por Cobrar y ve ÚNICAMENTE
+  // Boston. La regla vive en `lib/boston/ventas-boston.ts`: para él la cartera
+  // es Boston SIEMPRE —con o sin interruptor—, y con el interruptor apagado ni
+  // siquiera se queda acá (vuelve a su casa). Para todos los demás, el grupo,
+  // exactamente como hasta hoy.
+  //
+  // 🔴 Y NO SE LE PIDE NI UNA LECTURA DEL GRUPO: `useAdminData` no dispara con
+  // la cartera de Boston (clave nula) y el registro de envíos tampoco. El
+  // servidor le contestaría 403 igual —lo prueba `boston-acceso`—, pero pedir
+  // para recibir 403 es pedir.
+  const carteraDelRol = carteraDelRolEnCxc(userRole);
+  const esCarteraBoston = authChecked && carteraDelRol === "boston";
+  useEffect(() => {
+    if (authChecked && !puedeQuedarseEnCxc(userRole)) router.replace(casaDelRol(userRole, null));
+  }, [authChecked, userRole, router]);
   // `uploads` (la lista de cargas de archivo) se dejó de pedir: se desestructuraba
   // acá y no lo leía ninguna línea de la pantalla. Ver `useAdminData`.
-  const { clients, loading, loadError, loadData, avisoMontos, ultimoPago } = useAdminData(authChecked);
+  const { clients, loading, loadError, loadData, avisoMontos, ultimoPago } = useAdminData(authChecked && !esCarteraBoston);
   usePersistedScroll("cxc", !loading && clients.length > 0);
   const searchParams = useSearchParams();
   // Pestaña activa. Las dos carteras NUNCA se ven juntas: son dos consultas a
@@ -245,7 +267,7 @@ function AdminDashboardInner() {
       .then((d) => setEnvios(d?.porCodigo ?? {}))
       .catch(() => { /* la marca es una ayuda, no un número de plata */ });
   }, []);
-  useEffect(() => { if (authChecked) recargarEnvios(); }, [authChecked, recargarEnvios]);
+  useEffect(() => { if (authChecked && !esCarteraBoston) recargarEnvios(); }, [authChecked, esCarteraBoston, recargarEnvios]);
 
   const marcaEnvioDe = useCallback(
     (c: ConsolidatedClient): string | null => {
@@ -458,6 +480,19 @@ function AdminDashboardInner() {
 
   if (!authChecked) return null;
 
+  // 🔴 LA CARTERA DE BOSTON, SOLA. Sin las pestañas del grupo: quien ve Boston
+  // no tiene otra cartera que elegir. Con el interruptor apagado no se dibuja
+  // nada mientras el efecto de arriba lo lleva a su casa.
+  if (esCarteraBoston) {
+    if (!puedeQuedarseEnCxc(userRole)) return null;
+    return (
+      <div>
+        <AppHeader module="Cuentas por Cobrar" />
+        <CarteraBoston />
+      </div>
+    );
+  }
+
   // ── Sorting ──────────────────────────────────────────
 
   function toggleSort(key: SortKey) {
@@ -654,9 +689,14 @@ function AdminDashboardInner() {
       <TabsCartera role={userRole} tab={tab} onTab={setTab} />
 
       {tab === "boston" ? (
-        <div className="max-w-6xl mx-auto px-4 py-4 pb-16">
-          <BostonTab />
-        </div>
+        // 🔴 La pestaña de Boston del ADMIN monta la MISMA cartera que ve David
+        // (23-sep-2026): una sola pantalla de Boston, no dos. Con el
+        // interruptor apagado, la pestaña de siempre.
+        VENTAS_BOSTON ? <CarteraBoston /> : (
+          <div className="max-w-6xl mx-auto px-4 py-4 pb-16">
+            <BostonTab />
+          </div>
+        )
       ) : (
       <>
 

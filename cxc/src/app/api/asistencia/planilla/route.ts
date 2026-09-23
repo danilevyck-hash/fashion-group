@@ -26,6 +26,7 @@ import { asistenciaRoles, aprobacionesRoles, soloAprueba } from "@/lib/asistenci
 import { EMPRESA_BOSTON, ROL_BOSTON, esGerenteBoston, planillaSinDinero } from "@/lib/boston/rol";
 import { lineasSinDinero } from "@/lib/boston/planilla-sin-dinero";
 import { requireAsistencia, MODULOS_PLANILLA } from "@/lib/asistencia/guard";
+import { rechazarFueraDeAlcance } from "@/lib/asistencia/alcance-boston-server";
 import { alcanza } from "@/lib/asistencia/aprobador-empresa";
 import { leerAlcanceAprobador } from "@/lib/asistencia/aprobador-empresa-server";
 import { supabaseServer } from "@/lib/supabase-server";
@@ -1112,6 +1113,9 @@ export async function POST(req: NextRequest) {
     if (!codigo) {
       return NextResponse.json({ error: "Falta el colaborador." }, { status: 400 });
     }
+    // 🔴 EL ALCANCE DE DAVID (23-sep-2026): los montos a mano solo de su gente.
+    const fuera = await rechazarFueraDeAlcance(auth.role, [codigo]);
+    if (fuera) return fuera;
 
     // 🔑 La normalización la hace el módulo puro, no esta ruta: negativos a 0,
     // texto a número, basura a 0. Es la MISMA función que usa el cálculo, así

@@ -384,7 +384,9 @@ describe("11. los roles son los de la pestaña, no una lista nueva", () => {
   });
 
   it("la secretaria mira y nadie más entra de arriba", () => {
-    expect([...PRESTAMOS_PESTANA_ROLES].sort()).toEqual(["admin", "contabilidad", "secretaria"]);
+    // 🔄 23-sep-2026: entra `gerente_boston` por «Ventas Boston» (derivado de
+    // `PRESTAMOS_ROLES`, no tecleado acá), recortado a Boston por el servidor.
+    expect([...PRESTAMOS_PESTANA_ROLES].sort()).toEqual(["admin", "contabilidad", "gerente_boston", "secretaria"]);
   });
 });
 

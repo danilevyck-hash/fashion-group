@@ -332,8 +332,12 @@ describe("🔴 7 · los dos PDF son el MISMO documento", () => {
   const papel = plano(PAPEL);
 
   it("los dos llaman a la misma cabecera y al mismo pie", () => {
-    expect((papel.match(/cabecera\(doc, opts\.subtitulo, opts\.hoy\)/g) ?? [])).toHaveLength(2);
-    expect((papel.match(/piePorHoja\(doc\)/g) ?? [])).toHaveLength(2);
+    // 🔄 23-sep-2026: la cabecera y el pie reciben la CASA del papel
+    // (`lib/cxc/casa-del-papel.ts`): la cartera de Boston se baja por la misma
+    // pantalla y firma como Boston. Sin `casa`, el grupo, como siempre.
+    expect((papel.match(/cabecera\(doc, opts\.subtitulo, opts\.hoy, casa\)/g) ?? [])).toHaveLength(2);
+    expect((papel.match(/piePorHoja\(doc, casa\)/g) ?? [])).toHaveLength(2);
+    expect((papel.match(/const casa = opts\.casa \?\? CASA_GRUPO;/g) ?? [])).toHaveLength(2);
     expect((papel.match(/\.\.\.estilosDeTabla\(\)/g) ?? [])).toHaveLength(2);
   });
 
@@ -346,11 +350,17 @@ describe("🔴 7 · los dos PDF son el MISMO documento", () => {
   });
 
   it("el brandbook: logo, fecha, «Hoja N de M», Confidencial y fashiongr.com", () => {
-    expect(papel).toContain("FG_LOGO_BASE64");
+    // 🔄 23-sep-2026: el logo y el pie del GRUPO viven en `CASA_GRUPO`
+    // (`casa-del-papel.ts`) y el papel los dibuja desde `casa.logo` y `casa.pie`.
+    const casa = plano("src/lib/cxc/casa-del-papel.ts");
+    expect(casa).toContain("FG_LOGO_BASE64");
+    expect(casa).toContain('pie: "Confidencial · fashiongr.com"');
+    expect(papel).toContain("casa.logo.base64");
+    expect(papel).toContain("casa.membrete");
     expect(papel).toContain("doc.text(fmtDate(hoy)");
     expect(papel).toContain("Hoja ${i} de ${hojas}");
-    expect(papel).toContain('doc.text("Confidencial"');
-    expect(papel).toContain('doc.text("fashiongr.com"');
+    expect(papel).toContain('casa.pie.split(" · ")');
+    expect(papel).toContain("doc.text(izquierda, MARGEN, h - 10)");
   });
 
   it("🔴 el detallado pone la suma del cliente ABAJO de sus compañías", () => {

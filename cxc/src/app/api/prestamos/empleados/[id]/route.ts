@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import { requireRole } from "@/lib/requireRole";
 import { PRESTAMOS_ADMIN_ROLES, PRESTAMOS_ROLES } from "@/lib/prestamos-roles";
+import { rechazarFichaPrestamoFueraDeAlcance, rechazarFueraDeAlcance } from "@/lib/asistencia/alcance-boston-server";
 import { filterEmpleadoMovimientos } from "@/lib/prestamos-helpers";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 
@@ -14,6 +15,9 @@ const COLS =
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = requireRole(req, [...PRESTAMOS_ROLES]);
   if (auth instanceof NextResponse) return auth;
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): la ficha de alguien ajeno, 403.
+  const fuera = await rechazarFichaPrestamoFueraDeAlcance(auth.role, params.id);
+  if (fuera) return fuera;
   const { data, error } = await supabaseServer
     .from("prestamos_empleados").select(COLS).eq("id", params.id).single();
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
@@ -59,6 +63,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = requireRole(req, [...PRESTAMOS_ROLES]);
   if (auth instanceof NextResponse) return auth;
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): no se edita la ficha de alguien ajeno.
+  const fuera = await rechazarFichaPrestamoFueraDeAlcance(auth.role, params.id);
+  if (fuera) return fuera;
   const body = await req.json().catch(() => ({}));
   const update: Record<string, unknown> = {};
 
@@ -116,6 +123,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         { status: 409 },
       );
     }
+    // 🔴 …ni se la ata a alguien que no es de su empresa.
+    const fueraNuevo = await rechazarFueraDeAlcance(auth.role, [cod]);
+    if (fueraNuevo) return fueraNuevo;
     update.empleado_codigo = cod;
     // El nombre y la empresa vienen con la persona: son suyos, no de la ficha.
     update.nombre = persona.nombre;

@@ -32,6 +32,7 @@ import { leerTrabajaAfuera } from "@/lib/asistencia/config-server";
 import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { requireAsistencia } from "@/lib/asistencia/guard";
+import { alcanceDelRol, codigosDelAlcance, rechazarFueraDeAlcance, rechazarEmpresaFueraDeAlcance, soloPermitidos, empresaEnAlcance, estaAcotado } from "@/lib/asistencia/alcance-boston-server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerDeudaPorCodigo } from "@/lib/prestamos-lista-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
@@ -196,7 +197,11 @@ export async function GET(req: NextRequest) {
     //
     // ⚠️ La FILA no se borra: se esconde. Ver `codigos-ignorados.ts`.
     const escondidos = await leerIgnorados();
-    const personasVisibles = sinIgnorados(personas, escondidos.codigos);
+    // 🔴 EL ALCANCE DE DAVID (23-sep-2026): solo las fichas de SU empresa; un
+    // código sin ficha no tiene empresa y no entra. Sin recorte, todas.
+    const alcance = alcanceDelRol(auth.role);
+    const personasVisibles = sinIgnorados(personas, escondidos.codigos)
+      .filter((p) => empresaEnAlcance(alcance, p.empresa));
 
     // 🩸 EL RESUMEN CUENTA SOLO A LOS ACTIVOS. El aviso de pendientes dice
     // «X de N todavía no salen en la planilla», y quien ya no trabaja acá no es
@@ -207,7 +212,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       personas: personasVisibles,
       // Los escondidos viajan aparte, para el bloque plegado que los devuelve.
-      ignorados: escondidos.lista,
+      // Un rol acotado no los ve: son códigos sin ficha, o sea sin empresa.
+      ignorados: alcance === null ? escondidos.lista : [],
       reglas,
       reglasDefault: REGLAS_DEFAULT,
       resumen: {
@@ -260,6 +266,19 @@ export async function PUT(req: NextRequest) {
   const r = validarPersona(body);
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
   const p = r.valor;
+
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): la ficha tiene que ser de SU empresa
+  // —la que ya está guardada y la que viene en el cuerpo—, así no puede mover a
+  // nadie hacia Boston ni fuera de Boston. Sin recorte, nada de esto corre.
+  if (estaAcotado(auth.role)) {
+    const fueraEmpresa = rechazarEmpresaFueraDeAlcance(auth.role, p.empresa);
+    if (fueraEmpresa) return fueraEmpresa;
+    const permitidos = await codigosDelAlcance(auth.role);
+    const { filas: existentes } = await leerPersonas(p.codigo);
+    if (existentes.length > 0 && permitidos && !permitidos.has(p.codigo)) {
+      return rechazarEmpresaFueraDeAlcance(auth.role, null)!;
+    }
+  }
 
   // La vigencia se valida APARTE de la ficha, y no dentro de `validarPersona`,
   // porque son dos cosas distintas: una dice QUIÉN es la persona y la otra

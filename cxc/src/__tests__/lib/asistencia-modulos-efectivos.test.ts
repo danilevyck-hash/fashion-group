@@ -86,11 +86,14 @@ describe("🔴 David NO se rompe: la planilla de Boston la habilita el módulo `
     expect(status(requireAsistencia(req(ROL_BOSTON, MODS_DAVID), gate, MODULOS_PLANILLA))).toBe(200);
   });
 
-  it("⚠️ y NO gana el resto del módulo: las otras rutas le siguen dando 403", () => {
-    // 🔑 Acá lo frena el ROL (`gerente_boston` no está en `asistenciaRoles()`),
-    // no el módulo — la conducta es la que importa, pero conviene decirlo: si
-    // algún día se le agregara el rol, el módulo NO sería el segundo freno.
+  it("⚠️ sin la key `asistencia` en la cookie, las otras rutas le siguen dando 403", () => {
+    // 🔄 NOTA FECHADA (23-sep-2026): hasta hoy lo frenaba el ROL (no estaba en
+    // `asistenciaRoles()`). Con «Ventas Boston» el rol SÍ está, y lo que frena
+    // es el MÓDULO: una cookie sin `asistencia` no entra. En producción su fila
+    // de `role_permissions` la trae desde el 31-ago-2026.
+    expect(asistenciaRoles()).toContain(ROL_BOSTON);
     expect(status(requireAsistencia(req(ROL_BOSTON, MODS_DAVID), asistenciaRoles()))).toBe(403);
+    expect(status(requireAsistencia(req(ROL_BOSTON, [...MODS_DAVID, "asistencia"]), asistenciaRoles()))).toBe(200);
   });
 
   it("tener `boston` no le abre la planilla a un rol que no es el suyo", () => {

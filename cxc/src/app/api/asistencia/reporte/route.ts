@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { empresaParaPedir } from "@/lib/asistencia/empresa-para-todo";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { requireAsistencia } from "@/lib/asistencia/guard";
+import { alcanceDelRol, empresaForzada } from "@/lib/asistencia/alcance-boston-server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
@@ -82,7 +83,10 @@ export async function GET(req: NextRequest) {
   // 🔴 Filtro POR EMPRESA (10-sep-2026): lo aplica el servidor para que la
   // tabla, los totales y el Excel/PDF digan lo mismo. Sin ficha no hay empresa:
   // esos códigos solo salen con «Todas».
-  const empresaFiltro = empresaParaPedir(sp.get("empresa"));
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): la empresa se FUERZA a la suya, pase
+  // lo que pase en la URL — los sin ficha (sin empresa) quedan afuera. Sin
+  // recorte, lo pedido tal cual, como siempre.
+  const empresaFiltro = empresaForzada(alcanceDelRol(auth.role), empresaParaPedir(sp.get("empresa")));
 
   try {
     // 🔑 LAS NUEVE LECTURAS VAN EN UN SOLO VIAJE (14-sep-2026). Eran TRES olas

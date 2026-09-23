@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import { requireRole } from "@/lib/requireRole";
 import { PRESTAMOS_ROLES } from "@/lib/prestamos-roles";
+import { rechazarFichaPrestamoFueraDeAlcance } from "@/lib/asistencia/alcance-boston-server";
 import { CONCEPTO_PAGO, ORIGEN_POR_DEFECTO, esOrigenPago } from "@/lib/prestamos-conceptos";
 import {
   CUENTA_DANO,
@@ -34,6 +35,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     .eq("id", params.id)
     .maybeSingle();
   if (!mov) return NextResponse.json({ error: "Movimiento no encontrado" }, { status: 404 });
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): un movimiento de alguien ajeno, 403.
+  const fuera = await rechazarFichaPrestamoFueraDeAlcance(auth.role, String(mov.empleado_id ?? ""));
+  if (fuera) return fuera;
 
   // El concepto es inmutable: cambiarlo cambiaría el signo de una plata ya
   // registrada, y el saldo se movería sin que nadie registrara nada.
@@ -117,6 +121,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     .maybeSingle();
   if (!existing) return NextResponse.json({ error: "Movimiento no encontrado" }, { status: 404 });
   if (existing.deleted) return NextResponse.json({ error: "El movimiento ya fue eliminado" }, { status: 400 });
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): no se borra lo de alguien ajeno.
+  const fuera = await rechazarFichaPrestamoFueraDeAlcance(auth.role, String(existing.empleado_id ?? ""));
+  if (fuera) return fuera;
 
   const { error } = await supabaseServer.from("prestamos_movimientos").update({ deleted: true }).eq("id", params.id);
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });

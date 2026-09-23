@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { empresaParaPedir } from "@/lib/asistencia/empresa-para-todo";
 import { asistenciaRoles, diaLibreRoles } from "@/lib/asistencia/roles";
 import { requireAsistencia } from "@/lib/asistencia/guard";
+import { alcanceDelRol, empresaEnAlcance, empresaForzada, rechazarFueraDeAlcance } from "@/lib/asistencia/alcance-boston-server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { esDiaLibreDeLaEmpresa, MOTIVOS_JUSTIFICACION, motivoSeOfrece } from "@/lib/asistencia/motivos";
 import { avisoMigracionDiaLibre } from "@/lib/asistencia/dia-libre-empresa";
@@ -54,7 +55,10 @@ export async function GET(req: NextRequest) {
   // de columnas hace que PostgREST rechace el select ENTERO, así que sin esto
   // Justificaciones no cargaría NI UNA fila hasta que alguien corra el SQL —y
   // el síntoma sería "Asistencia está rota".
-  const empresaFiltro = empresaParaPedir(sp.get("empresa"));
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): la empresa se FUERZA a la suya, pase
+  // lo que pase en la URL. Sin recorte, lo pedido tal cual.
+  const alcance = alcanceDelRol(auth.role);
+  const empresaFiltro = empresaForzada(alcance, empresaParaPedir(sp.get("empresa")));
   let [{ data, error }, { personas, faltaMigracion, filas }] = await Promise.all([
     armar(`${COLS_BASE}, ${COLS_PERMISO_HORAS.join(", ")}`),
     leerPersonasDelModulo(),
@@ -72,7 +76,9 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     justificaciones: lista,
     motivos: MOTIVOS_JUSTIFICACION,
-    personas,
+    // El desplegable de personas también se recorta: nadie carga una
+    // justificación a alguien que no es de su empresa.
+    personas: personas.filter((p) => empresaEnAlcance(alcance, empresaDe.get(String(p.codigo)) ?? null)),
     faltaMigracion,
     // Sin las columnas, la pantalla no ofrece las horas y lo dice de entrada,
     // no al fallar el guardado.
@@ -95,6 +101,9 @@ export async function POST(req: NextRequest) {
   const hasta = (b.hasta ?? desde).trim();
   const motivo = (b.motivo ?? "").trim();
   if (!codigo) return NextResponse.json({ error: "Falta el colaborador" }, { status: 400 });
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): a alguien ajeno no se le justifica nada.
+  const fuera = await rechazarFueraDeAlcance(auth.role, [codigo]);
+  if (fuera) return fuera;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || !/^\d{4}-\d{2}-\d{2}$/.test(hasta)) {
     return NextResponse.json({ error: "Fechas inválidas" }, { status: 400 });
   }
@@ -202,7 +211,21 @@ export async function DELETE(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const id = (req.nextUrl.searchParams.get("id") ?? "").trim();
   if (!id) return NextResponse.json({ error: "Falta el id" }, { status: 400 });
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): se mira de QUIÉN es antes de borrar.
+  const fuera = await rechazarFueraDeAlcance(auth.role, await codigoDeJustificacion(id));
+  if (fuera) return fuera;
   const { error } = await supabaseServer.from("asistencia_justificaciones").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
+}
+
+/** El código de la persona de una justificación, para el recorte por alcance. Sin fila, nada que recortar. */
+async function codigoDeJustificacion(id: string): Promise<string[]> {
+  const { data } = await supabaseServer
+    .from("asistencia_justificaciones")
+    .select("empleado_codigo")
+    .eq("id", id)
+    .maybeSingle();
+  const codigo = (data as { empleado_codigo?: string | null } | null)?.empleado_codigo;
+  return codigo ? [String(codigo)] : [];
 }

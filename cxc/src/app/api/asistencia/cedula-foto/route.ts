@@ -19,6 +19,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAsistencia } from "@/lib/asistencia/guard";
 import { asistenciaRoles, cerrarPlanillaRoles } from "@/lib/asistencia/roles";
+import { rechazarFueraDeAlcance } from "@/lib/asistencia/alcance-boston-server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { TABLA_PERSONAS } from "@/lib/asistencia/config-server";
 import { COLUMNA_CEDULA_FOTO } from "@/lib/asistencia/datos-del-papel";
@@ -61,6 +62,9 @@ export async function GET(req: NextRequest) {
 
   const codigo = codigoDe(req);
   if (!codigo) return NextResponse.json({ error: "Falta el código." }, { status: 400 });
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): la cédula de alguien ajeno, 403.
+  const fuera = await rechazarFueraDeAlcance(auth.role, [codigo]);
+  if (fuera) return fuera;
 
   try {
     const path = await pathGuardado(codigo);

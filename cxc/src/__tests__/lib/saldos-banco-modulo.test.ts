@@ -358,6 +358,14 @@ export function seConfunden(a: string, b: string): boolean {
   return Math.max(propiasDeA, propiasDeB) < 2;
 }
 
+// 🔴 LA ÚNICA EXCEPCIÓN, CON SU CITA (23-sep-2026). «Ventas» y «Ventas Boston»
+// comparten palabra, y Daniel eligió ese nombre a propósito, textual: *«Llámalo
+// Ventas Boston entonces»*. No es un descuido de nombres: nadie que vea las dos
+// fichas las tiene a la vez —«Ventas» es solo de admin y «Ventas Boston» de
+// David— y la palabra que las distingue es la empresa. Un tercer par NO entra
+// acá sin su propia cita.
+const PARES_DECIDIDOS_POR_DANIEL: ReadonlySet<string> = new Set(["ventas|boston"]);
+
 describe("los nombres de los módulos no se confunden entre sí", () => {
   it("ningún par del catálogo se parece demasiado", () => {
     const choques: string[] = [];
@@ -365,6 +373,7 @@ describe("los nombres de los módulos no se confunden entre sí", () => {
       for (let j = i + 1; j < ALL_MODULES.length; j += 1) {
         const a = ALL_MODULES[i];
         const b = ALL_MODULES[j];
+        if (PARES_DECIDIDOS_POR_DANIEL.has(`${a.key}|${b.key}`)) continue;
         if (seConfunden(a.label, b.label)) choques.push(`"${a.label}" (${a.key}) vs "${b.label}" (${b.key})`);
       }
     }

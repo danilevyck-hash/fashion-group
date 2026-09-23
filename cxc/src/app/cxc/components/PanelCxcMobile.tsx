@@ -42,6 +42,8 @@ import MenuDescargar from "./MenuDescargar";
 import { seLeCobra } from "@/lib/cxc/cobrable";
 import type { ClaveDescarga } from "@/lib/cxc/descargas";
 import type { FormatoDescarga } from "../hooks/useDescargasCartera";
+import type { Cartera } from "@/lib/cxc/cartera";
+import { empresasCarteraAparte } from "@/lib/switch-api/empresas";
 
 // 🩸 Acá vivían `haceCuanto`, `ultimoPagoLabel` y `ultimaCompraLabel`: las tres
 // líneas de texto que llevaba CADA empresa dentro de la tarjeta abierta. Con
@@ -83,6 +85,12 @@ interface PanelCxcMobileProps {
   onSyncedNow?: () => void;
   /** Lo que el guard dejó afuera de estos totales, ya redactado por el servidor. */
   avisoMontos?: string | null;
+  /**
+   * 🔴 QUÉ CARTERA ES (23-sep-2026). Con `"boston"` la frescura pregunta por
+   * Boston, la tarjeta no pide los últimos pagos a la ruta del GRUPO y no
+   * enlaza a una ficha que Boston no tiene. Por defecto, el grupo: nada cambia.
+   */
+  cartera?: Cartera;
 }
 
 export default function PanelCxcMobile({
@@ -107,6 +115,7 @@ export default function PanelCxcMobile({
   empresaRestriction,
   onSyncedNow,
   avisoMontos,
+  cartera = "grupo",
 }: PanelCxcMobileProps) {
   // Totales del resumen de buckets. roleClients aquí ya viene filtrado por
   // empresa (kpiClients en page.tsx): con "Todas" es el universo accesible,
@@ -159,6 +168,7 @@ export default function PanelCxcMobile({
           onDescargar={onDescargar}
           companyFilter={companyFilter}
           onSyncedNow={onSyncedNow}
+          cartera={cartera}
         />
 
         {/* Qué se quedó AFUERA del total. Va ARRIBA del número —Daniel:
@@ -226,6 +236,7 @@ export default function PanelCxcMobile({
                     onCobrar={() => onCobrar(client)}
                     avisoSinPagar={avisoSinPagarDe(client)}
                     marcaEnvio={marcaEnvioDe(client)}
+                    cartera={cartera}
                   />
                 </li>
               );
@@ -246,11 +257,13 @@ function MobileHeader({
   onDescargar,
   companyFilter,
   onSyncedNow,
+  cartera,
 }: {
   canExport: boolean;
   onDescargar: (clave: ClaveDescarga, formato: FormatoDescarga) => void;
   companyFilter: string;
   onSyncedNow?: () => void;
+  cartera: Cartera;
 }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -277,9 +290,11 @@ function MobileHeader({
             celular es lo único que queda en pantalla al hacer scroll. Queda
             sr-only para no dejar la página sin encabezado. */}
         <h1 className="sr-only">Cuentas por Cobrar</h1>
+        {/* 🔴 La frescura pregunta por LA CARTERA que se mira (23-sep-2026):
+            las 6 del grupo, o solo Boston (`empresasCarteraAparte()`). */}
         <SyncStatus
           tabla="estadocuenta"
-          empresasEsperadas={CXC_GRUPO_EMPRESA_KEYS}
+          empresasEsperadas={cartera === "boston" ? empresasCarteraAparte() : CXC_GRUPO_EMPRESA_KEYS}
           empresaLabels={EMPRESA_KEY_TO_NAME}
         />
         {/* "Actualizar ahora" (admin/secretaria) — estadocuenta de la empresa
@@ -530,6 +545,7 @@ function MobileClientCard({
   onCobrar,
   avisoSinPagar,
   marcaEnvio,
+  cartera,
 }: {
   client: ConsolidatedClient;
   cxcCompanies: Company[];
@@ -541,6 +557,7 @@ function MobileClientCard({
   avisoSinPagar: string | null;
   /** «Le enviaste el estado de cuenta hace 3 días», o `null`. */
   marcaEnvio: string | null;
+  cartera: Cartera;
 }) {
   const borderLeft = worstBucketBorder(client);
 
@@ -620,6 +637,7 @@ function MobileClientCard({
           cxcCompanies={cxcCompanies}
           onOpenEstado={onOpenEstado}
           onCobrar={onCobrar}
+          cartera={cartera}
         />
       )}
     </article>
@@ -664,12 +682,19 @@ function MobileClientExpanded({
   cxcCompanies,
   onOpenEstado,
   onCobrar,
+  cartera,
 }: {
   client: ConsolidatedClient;
   cxcCompanies: Company[];
   onOpenEstado: () => void;
   onCobrar: () => void;
+  cartera: Cartera;
 }) {
+  // 🔴 En la cartera de Boston los últimos pagos NO se piden a la ruta del
+  // GRUPO (le contestaría 403 y sería una lectura del grupo desde Boston):
+  // viven en el cajón de documentos, que ya los trae por id de Switch. Y no
+  // hay ficha en `/clientes/…`: Boston no está en `clientes_master`.
+  const esGrupo = cartera === "grupo";
   // `companies[key].nombre` es el nombre del cliente registrado en esa
   // empresa (variante por empresa), NO el nombre de la empresa. El nombre
   // de la empresa se resuelve por key contra el array canónico cxcCompanies
@@ -699,7 +724,7 @@ function MobileClientExpanded({
     () => Object.values(client.companies).find(c => c?.codigo)?.codigo ?? null,
     [client.companies],
   );
-  const pagos = useUltimosPagosGrupo(codigo, true);
+  const pagos = useUltimosPagosGrupo(codigo, esGrupo);
 
   return (
     <div className="border-t border-gray-100 bg-gray-50 px-3 py-3">
@@ -734,9 +759,11 @@ function MobileClientExpanded({
         ))}
       </ul>
 
-      <div className="mt-3">
-        <UltimosPagosPorFecha pagos={pagos} />
-      </div>
+      {esGrupo && (
+        <div className="mt-3">
+          <UltimosPagosPorFecha pagos={pagos} />
+        </div>
+      )}
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {seLeCobra(client.total) && (
@@ -755,7 +782,7 @@ function MobileClientExpanded({
         >
           Documentos
         </button>
-        {codigo && (
+        {codigo && esGrupo && (
           <Link
             href={`/clientes/${encodeURIComponent(codigo)}`}
             className="inline-flex items-center gap-1 min-h-[44px] text-xs font-medium text-blue-600 active:opacity-70"

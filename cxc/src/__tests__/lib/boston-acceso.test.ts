@@ -63,6 +63,7 @@ import { SEARCH_ROLES } from "@/components/SearchBar";
 import {
   aprobacionesRoles,
   asistenciaRoles,
+  cerrarPlanillaRoles,
   soloAprueba,
   soloApruebaRoles,
   vePestana,
@@ -248,17 +249,22 @@ describe("gerente_boston — Boston y Catálogos, y NADA más", () => {
     expect(conElRol).toEqual([...SUS_MODULOS].sort());
   });
 
-  it("🔴 `asistencia` le da la PUERTA, no el módulo: las otras rutas siguen en 403", () => {
-    // Es la mitad que hace que agregar la key sea seguro.
-    expect(asistenciaRoles()).not.toContain(ROL);
+  // 🔄 CAMBIÓ DE DIRECCIÓN (23-sep-2026). Acá decía «`asistencia` le da la
+  // PUERTA, no el módulo» y «solo ve la pestaña Aprobaciones». Daniel, textual:
+  // *«Asistencia que pueda ver todo como yo»*. David entra al módulo COMPLETO
+  // por el interruptor `VENTAS_BOSTON`, y lo que protege ahora este archivo es
+  // lo que de verdad importaba: que el SERVIDOR le recorte todo a Boston y que
+  // NO cierre la quincena. El detalle vive en `boston-ventas-boston.test.tsx`.
+  it("🔴 entra a Asistencia como los demás — y NO cierra la quincena", () => {
+    expect(asistenciaRoles()).toContain(ROL);
     expect(aprobacionesRoles()).toContain(ROL);
+    expect(cerrarPlanillaRoles()).not.toContain(ROL);
   });
 
-  it("🔴 y solo ve la pestaña Aprobaciones — ninguna otra", () => {
-    for (const tab of ["planilla", "reporte", "justificaciones", "vacaciones", "configuracion"]) {
-      expect(vePestana(ROL, tab), `${tab} no debería verla`).toBe(false);
+  it("🔴 y ve las MISMAS pestañas que el admin", () => {
+    for (const tab of ["planilla", "reporte", "justificaciones", "vacaciones", "configuracion", "aprobaciones"]) {
+      expect(vePestana(ROL, tab), `${tab} debería verla`).toBe(vePestana("admin", tab));
     }
-    expect(vePestana(ROL, "aprobaciones")).toBe(true);
   });
 
   it("🔴 NO cae en `soloApruebaRoles()`: su planilla de Boston conserva la plata", () => {
@@ -437,9 +443,11 @@ const RUTAS_AJENAS: Array<[modulo: string, url: string, handler: Handler]> = [
   // que NO exista. El candado de gerente_boston NO se debilitó — las demás rutas ajenas
   // siguen una por una.
   ["multifashion",        "/api/multifashion/overview?year=2026&mes=8",   multifashionOverview as Handler],
-  // 🔴 PRÉSTAMOS: VE la lista por `/api/boston/prestamos`, pero el módulo de
-  // Contabilidad —donde se ESCRIBE— le sigue cerrado. Ver, no editar.
-  ["préstamos (escritura)", "/api/prestamos/empleados",                   prestamosEmpleados as Handler],
+  // 🔄 CAMBIÓ DE DIRECCIÓN (23-sep-2026): acá estaba «préstamos (escritura)»
+  // (`/api/prestamos/empleados`, 403). Daniel: David maneja los préstamos de SU
+  // gente. La ruta le contesta 200 y el servidor le recorta las fichas a Boston
+  // (`lib/asistencia/alcance-boston.ts`); lo prueba `boston-ventas-boston.test.tsx`.
+  // Se conserva abajo como ruta PROPIA, con el recorte medido por conducta.
 ];
 
 describe("gerente_boston — 403 en todo lo que no es Boston", () => {
@@ -469,6 +477,7 @@ describe("gerente_boston — 403 en todo lo que no es Boston", () => {
 // ═════════════════════════════════════════════════════════════════════════════
 
 const RUTAS_PROPIAS: Array<[nombre: string, url: string, handler: Handler]> = [
+  ["préstamos de su gente", "/api/prestamos/empleados", prestamosEmpleados as Handler],
   ["inicio",    "/api/boston/inicio",    bostonInicio as Handler],
   ["ventas",    "/api/boston/ventas",    bostonVentas as Handler],
   ["clientes",  "/api/boston/clientes",  bostonClientes as Handler],
@@ -494,7 +503,7 @@ describe("gerente_boston — su módulo SÍ le abre", () => {
   it("los demás roles NO entran a /api/boston/**", async () => {
     for (const rol of SYSTEM_ROLE_KEYS) {
       if (rol === "admin" || rol === ROL) continue;
-      for (const [nombre, url, handler] of RUTAS_PROPIAS.slice(0, 4)) {
+      for (const [nombre, url, handler] of RUTAS_PROPIAS.slice(1, 5)) {
         const res = await handler(req(url, rol));
         expect(res.status, `${nombre} dejó entrar a ${rol}`).toBe(403);
       }

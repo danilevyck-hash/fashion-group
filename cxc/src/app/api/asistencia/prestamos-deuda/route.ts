@@ -27,6 +27,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAsistencia } from "@/lib/asistencia/guard";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
+import { alcanceDelRol, empresaEnAlcance } from "@/lib/asistencia/alcance-boston-server";
 import { cerrarPlanillaRoles } from "@/lib/asistencia/planilla-guardada";
 import { leerPersonas } from "@/lib/asistencia/config-server";
 import { leerPrestamosDeQuincena } from "@/lib/asistencia/prestamos-planilla-server";
@@ -53,7 +54,11 @@ export async function GET(req: NextRequest) {
     // 🔴 SE MUESTRA A QUIEN DEBE, y también a quien tiene saldo a FAVOR
     // (negativo): esconder un saldo a favor es esconder plata que es de la
     // persona. Quien llegó a cero sale solo de la lista.
-    const conDeuda = fichas.filter((f) => Math.abs(f.saldo) > 0.004);
+    // 🔴 EL ALCANCE DE DAVID (23-sep-2026): solo su gente. Sin recorte, todos.
+    const alcance = alcanceDelRol(auth.role);
+    const conDeuda = fichas
+      .filter((f) => Math.abs(f.saldo) > 0.004)
+      .filter((f) => empresaEnAlcance(alcance, f.codigo ? empresaDe.get(String(f.codigo)) ?? null : null));
     return NextResponse.json({
       fichas: conDeuda.map((f) => ({
         id: f.id,

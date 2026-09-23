@@ -22,6 +22,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAsistencia } from "@/lib/asistencia/guard";
+import { alcanceDelRol, empresaEnAlcance } from "@/lib/asistencia/alcance-boston-server";
 import { PRESTAMOS_PESTANA_ROLES } from "@/lib/prestamos-una-puerta";
 import { leerPersonas } from "@/lib/asistencia/config-server";
 import { supabaseServer } from "@/lib/supabase-server";
@@ -121,11 +122,13 @@ export async function GET(req: NextRequest) {
       }),
     );
 
-    return NextResponse.json({
-      desde,
-      hasta,
-      filas: movimientos.map((m) => filaDeMovimiento(m, fichas, amarrados)),
-    });
+    // 🔴 EL ALCANCE DE DAVID (23-sep-2026): solo los movimientos de gente de
+    // SU empresa (por la ficha de Asistencia). Sin recorte, todos.
+    const alcance = alcanceDelRol(auth.role);
+    const filas = movimientos
+      .map((m) => filaDeMovimiento(m, fichas, amarrados))
+      .filter((f) => empresaEnAlcance(alcance, f.empresa));
+    return NextResponse.json({ desde, hasta, filas });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[asistencia/prestamos-movimientos GET]", msg);

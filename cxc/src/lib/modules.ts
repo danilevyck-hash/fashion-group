@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { asistenciaRoles, aprobacionesRoles } from "@/lib/asistencia/roles";
 import { MODULO_BOSTON, ROL_BOSTON, ROLES_MODULO_BOSTON } from "@/lib/boston/rol";
+import { moduloCxcSePintaA, rotuloModuloBoston } from "@/lib/boston/ventas-boston";
 import { MODULO_MARCACION, ROL_MARCACION, ROLES_MODULO_MARCACION, ROTULO_MARCACION, RUTA_MARCACION } from "@/lib/marcacion/rol";
 import { ROLES_CXC } from "@/lib/cxc/roles";
 import { ROLES_CLIENTES } from "@/lib/clientes/roles";
@@ -166,7 +167,12 @@ export const ALL_MODULES: AppModule[] = [
   // MISMA lista que usan las rutas de `/api/boston/**`. Una copia a mano en el
   // catálogo es exactamente el bug que dejó a los 3 vendedores tocando la
   // pestaña de Boston para recibir siempre un 403 (ver `boston-roles.ts`).
-  { key: MODULO_BOSTON,   label: "Confecciones Boston", href: "/boston",         icon: Factory,          roles: [...ROLES_MODULO_BOSTON],                      group: "ventas-clientes" },
+  // 🔴 «VENTAS BOSTON» (23-sep-2026). Daniel: *«Llámalo Ventas Boston entonces.
+  // Y dale acceso a los otros módulos»*. Cambia el RÓTULO (por el interruptor
+  // `VENTAS_BOSTON`); la `key` y la ruta NO: están en `role_permissions`.
+  // Cuentas por Cobrar le llega por su fila de `role_permissions` (migración
+  // 20261217130000), no por este `roles[]`, y Asistencia ya la tenía.
+  { key: MODULO_BOSTON,   label: rotuloModuloBoston(), href: "/boston",          icon: Factory,          roles: [...ROLES_MODULO_BOSTON],                      group: "ventas-clientes" },
   // 🔑 `roles[]` sale de `ROLES_CLIENTES` — la MISMA lista que los guards SSR
   // de la lista y de la ficha. Las tres copias a mano fue lo que dejó a bodega
   // entrando al directorio completo por la dirección (11-sep-2026).
@@ -453,8 +459,14 @@ export function getVisibleModules(role: string, fgModules?: string[] | null): Ap
   // Se FILTRA acá, no se borra de `ALL_MODULES`: la `key` sigue viva en
   // `role_permissions` y en `fg_users.modulos_override`, y apagar el
   // interruptor la devuelve sola. Ver `lib/prestamos-una-puerta.ts`.
+  // 🔴 Y CUENTAS POR COBRAR PARA DAVID SOLO CON `VENTAS_BOSTON` PRENDIDO
+  // (23-sep-2026): la key le llega por `role_permissions` (la migración puede
+  // correr antes o después del deploy), y con el interruptor apagado se PODA
+  // para que el menú y la pantalla `/cxc` digan lo mismo. No se hardcodea el
+  // rol: la pregunta vive en `lib/boston/ventas-boston.ts`.
   const podar = (ms: AppModule[]): AppModule[] =>
-    moduloPrestamosEnElMenu() ? ms : ms.filter((m) => m.key !== MODULO_PRESTAMOS);
+    (moduloPrestamosEnElMenu() ? ms : ms.filter((m) => m.key !== MODULO_PRESTAMOS))
+      .filter((m) => m.key !== "cxc" || moduloCxcSePintaA(role));
   if (role === "admin") return podar(ALL_MODULES);
   if (fgModules && fgModules.length > 0) {
     return podar(ALL_MODULES.filter(m => fgModulesIncluye(fgModules, m, role)));

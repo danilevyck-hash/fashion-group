@@ -19,6 +19,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAsistencia } from "@/lib/asistencia/guard";
 import { asistenciaRoles, diaLibreRoles } from "@/lib/asistencia/roles";
+import { codigosDelAlcance, soloPermitidos } from "@/lib/asistencia/alcance-boston-server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { MOTIVO_DIA_LIBRE_EMPRESA } from "@/lib/asistencia/motivos";
 import { avisoMigracionDiaLibre } from "@/lib/asistencia/dia-libre-empresa";
@@ -41,9 +42,11 @@ export async function GET(req: NextRequest) {
   const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
   const { saldos, deudas, faltaTabla } = await leerSaldosDiaLibre();
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): solo las deudas de su gente.
+  const permitidos = await codigosDelAlcance(auth.role);
   return NextResponse.json({
-    saldos: [...saldos.values()],
-    deudas,
+    saldos: soloPermitidos([...saldos.values()], (s) => s.codigo, permitidos),
+    deudas: soloPermitidos(deudas, (d) => d.empleado_codigo, permitidos),
     puedeCargar: diaLibreRoles().includes(auth.role),
     faltaMigracion: faltaTabla ? avisoMigracionDiaLibre() : null,
   });

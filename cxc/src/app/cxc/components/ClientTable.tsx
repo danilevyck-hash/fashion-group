@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { Company } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import ClientRow from "./ClientRow";
@@ -25,6 +26,15 @@ interface Props {
   avisoSinPagarDe: (client: ConsolidatedClient) => string | null;
   /** La marca «Le enviaste… hace N días» de un cliente, o `null`. */
   marcaEnvioDe: (client: ConsolidatedClient) => string | null;
+  /**
+   * 🔴 Lo que se despliega bajo la fila, cuando NO es el panel del grupo
+   * (23-sep-2026). La cartera de Boston lo usa: el panel del grupo pide los
+   * últimos pagos a la ruta del GRUPO y enlaza a una ficha que Boston no tiene.
+   * Sin esto, `ContactPanel` como siempre.
+   */
+  renderDetalle?: (client: ConsolidatedClient, abierto: boolean) => ReactNode;
+  /** Sin casillas de «mandar a varios» (Boston no tiene lote). Por defecto, con casillas. */
+  sinSeleccion?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -63,6 +73,8 @@ export default function ClientTable({
   onSeleccionarTodos,
   avisoSinPagarDe,
   marcaEnvioDe,
+  renderDetalle,
+  sinSeleccion = false,
 }: Props) {
   const [expanded, setExpanded] = usePersistedState<string | null>("cxc", "expanded", null);
 
@@ -91,17 +103,20 @@ export default function ClientTable({
           seleccionado={seleccion.has(codigoDe(client))}
           onSeleccionar={onSeleccionar}
           avisoSinPagar={avisoSinPagarDe(client)}
+          sinSeleccion={sinSeleccion}
         />
         <AccordionContent open={isExpanded}>
-          <ContactPanel
-            client={client}
-            companyFilter={companyFilter}
-            roleCompanies={roleCompanies}
-            onOpenEstado={onOpenEstado}
-            onCobrar={onCobrar}
-            marcaEnvio={marcaEnvioDe(client)}
-            abierto={isExpanded}
-          />
+          {renderDetalle ? renderDetalle(client, isExpanded) : (
+            <ContactPanel
+              client={client}
+              companyFilter={companyFilter}
+              roleCompanies={roleCompanies}
+              onOpenEstado={onOpenEstado}
+              onCobrar={onCobrar}
+              marcaEnvio={marcaEnvioDe(client)}
+              abierto={isExpanded}
+            />
+          )}
         </AccordionContent>
       </div>
     );
@@ -114,13 +129,15 @@ export default function ClientTable({
         {/* Desktop header — hidden on mobile since mobile uses card layout */}
         <div className="hidden sm:grid grid-cols-12 gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wide select-none">
           <div className="col-span-4 flex items-center gap-1.5">
-            <input
-              type="checkbox"
-              checked={todosSeleccionados}
-              onChange={onSeleccionarTodos}
-              aria-label="Seleccionar a todos los de la lista"
-              className="shrink-0 h-4 w-4 rounded border-gray-300 accent-black cursor-pointer"
-            />
+            {!sinSeleccion && (
+              <input
+                type="checkbox"
+                checked={todosSeleccionados}
+                onChange={onSeleccionarTodos}
+                aria-label="Seleccionar a todos los de la lista"
+                className="shrink-0 h-4 w-4 rounded border-gray-300 accent-black cursor-pointer"
+              />
+            )}
             <span className="cursor-pointer hover:text-gray-900 transition" onClick={() => toggleSort("name")}>
               Cliente{sortArrow("name")}
             </span>

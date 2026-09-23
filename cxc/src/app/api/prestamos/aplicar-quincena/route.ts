@@ -21,6 +21,7 @@ import { getSession } from "@/lib/require-auth";
 import { logActivity } from "@/lib/log-activity";
 import { getQuincenaRangePanama, quincenaDeFecha, esFechaISO } from "@/lib/prestamos-quincena";
 import { PRESTAMOS_ROLES } from "@/lib/prestamos-roles";
+import { rechazarLoDelGrupo } from "@/lib/asistencia/alcance-boston-server";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,10 @@ export async function POST(req: NextRequest) {
   if (!session || !ROLES.includes(session.role)) {
     return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   }
+  // 🔴 Aplica a TODOS los elegibles de todas las empresas: un rol acotado
+  // (David) no lo corre. Sus cuotas entran solas con el cierre de la contadora.
+  const delGrupo = rechazarLoDelGrupo(session.role);
+  if (delGrupo) return delGrupo;
 
   // Fecha de pago elegida (opcional; sin cuerpo o sin fecha → hoy Panamá).
   let fechaElegida: unknown;

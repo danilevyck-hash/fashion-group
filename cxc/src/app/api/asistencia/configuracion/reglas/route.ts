@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { requireAsistencia } from "@/lib/asistencia/guard";
+import { rechazarLoDelGrupo } from "@/lib/asistencia/alcance-boston-server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { validarReglas, reglasHaciaFila } from "@/lib/asistencia/config";
 import {
@@ -43,6 +44,10 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
+  // 🔴 Las reglas valen para TODAS las empresas: un rol acotado (David) las lee
+  // y no las cambia.
+  const delGrupo = rechazarLoDelGrupo(auth.role);
+  if (delGrupo) return delGrupo;
 
   let body: unknown;
   try {

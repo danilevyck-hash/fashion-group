@@ -21,6 +21,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAsistencia } from "@/lib/asistencia/guard";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
+import { rechazarFueraDeAlcance } from "@/lib/asistencia/alcance-boston-server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { firmarSelfie } from "@/lib/marcacion/selfie-servidor";
 import { DISPOSITIVO_TELEFONO } from "@/lib/marcacion/marcacion";
@@ -37,14 +38,17 @@ export async function GET(req: NextRequest) {
   try {
     const { data, error } = await supabaseServer
       .from("asistencia_marcaciones")
-      .select("foto_path, lat, lng")
+      .select("foto_path, lat, lng, empleado_codigo")
       .eq("id", id)
       .eq("dispositivo", DISPOSITIVO_TELEFONO)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!data) return NextResponse.json({ url: null, lat: null, lng: null });
 
-    const fila = data as { foto_path?: string | null; lat?: number | null; lng?: number | null };
+    const fila = data as { foto_path?: string | null; lat?: number | null; lng?: number | null; empleado_codigo?: string | null };
+    // 🔴 EL ALCANCE DE DAVID (23-sep-2026): la selfie de alguien ajeno, 403.
+    const fuera = await rechazarFueraDeAlcance(auth.role, [fila.empleado_codigo ?? null]);
+    if (fuera) return fuera;
     return NextResponse.json({
       url: await firmarSelfie(fila.foto_path),
       lat: typeof fila.lat === "number" ? fila.lat : null,

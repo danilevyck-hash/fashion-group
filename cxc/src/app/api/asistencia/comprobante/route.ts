@@ -16,6 +16,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAsistencia } from "@/lib/asistencia/guard";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
+import { alcanceDelRol, empresaEnAlcance } from "@/lib/asistencia/alcance-boston-server";
 import { leerPersonas } from "@/lib/asistencia/config-server";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +28,9 @@ export async function GET(req: NextRequest) {
 
   try {
     const { filas } = await leerPersonas();
-    const personas = filas.map((f) => ({
+    // 🔴 EL ALCANCE DE DAVID (23-sep-2026): el cargo y la cédula solo de su gente.
+    const alcance = alcanceDelRol(auth.role);
+    const personas = filas.filter((f) => empresaEnAlcance(alcance, f.empresa)).map((f) => ({
       codigo: String(f.empleado_codigo),
       // `null` y no `""`: el papel lo distingue y escribe un guion.
       posicion: f.posicion ?? null,

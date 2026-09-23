@@ -59,7 +59,7 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 | Contabilidad | `contabilidad` | prestamos, proveedores, ventas, búsqueda global (ventas+prestamos). En API directorio solo lectura (GET), no edición |
 | Vendedor | `vendedor` | catálogos (**solo ver** + armar pedidos), CXC, directorio, guías (solo lectura), búsqueda global (CXC+directorio) |
 | Gerente ACS | `gerente_acs` | SOLO Multifashion (`/multifashion` + `/api/multifashion/*`), y **el módulo COMPLETO** — todo el histórico, igual que admin. Auto-redirect desde home (único módulo). Módulos vía `role_permissions` |
-| Gerente Confecciones Boston | `gerente_boston` | Confecciones Boston (`/boston` + `/api/boston/*`), la cartera `/api/cxc/boston`, la planilla de Boston, y **Catálogos solo para VER**. Aterriza en `/boston` por su CASA (`MODULO_CASA_POR_ROL`), no por el auto-redirect de módulo único. **NO ve la búsqueda global, ni el CXC del grupo, ni Ventas, ni Comisiones, ni Guías, ni la lista de comprobantes, ni administrar catálogos.** Módulos vía `role_permissions` |
+| Gerente Confecciones Boston | `gerente_boston` | **Ventas Boston** (`/boston`, key `boston`: Inicio · Ventas), **Cuentas por Cobrar viendo SOLO Boston** (`/cxc`, con la key `cxc` en `role_permissions`: migración `20261217130000`, pendiente), **Asistencia COMPLETA acotada a Boston por el servidor y sin «Cerrar»**, y **Catálogos solo para VER**. Aterriza en `/boston` por su CASA. **NO ve la búsqueda global, ni una fila del grupo, ni Ventas, ni Comisiones, ni Guías, ni comprobantes, ni administrar catálogos.** Interruptor `VENTAS_BOSTON` |
 | Marcación | `marcacion` | SOLO `/marcacion` — marcar desde el teléfono, con selfie y ubicación. Auto-redirect desde home. ⚠️ **Rodrigo la tiene siendo `bodega`**: es el módulo POR PERSONA de `MODULOS_POR_PERSONA` |
 
 > Roles reales del sistema = los 8 de arriba (`src/lib/modules.ts` → `SYSTEM_ROLES`). No existen roles `director` ni `cliente` (el catálogo Reebok es público, sin login).
@@ -92,7 +92,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 
 - 🔴 **Boston NUNCA se mezcla con el CXC del grupo** (ni fila, total ni export); 🔴 **el del grupo SÍ convive con el resto**: aislarlo de más también es error.
 - **Fashion Group son SEIS empresas** (`B2B_EMPRESA_KEYS` = `empresasConCxc()`); Boston y ACS no. La vista **EXCLUYE, no enumera** (`switch_estadocuenta_aging`, `..._aging_mv` la materializa). Toda lectura acota por `empresa_key`.
-- `gerente_boston` (David): `boston` + `catalogos` **solo VER**, casa `/boston`. No ve búsqueda global, CXC del grupo, Ventas, Comisiones, Guías, comprobantes ni administrar catálogos.
+- 🔴 **«VENTAS BOSTON» (23-sep-2026, `VENTAS_BOSTON` en `lib/boston/ventas-boston.ts`)**: `/boston` queda con Inicio · Ventas; David ve **`/cxc` con la MISMA pantalla del grupo y SOLO la cartera de Boston** (`carteraDelRolEnCxc`, `lib/cxc/boston-como-grupo.ts`, datos por `/api/cxc/boston`, papel `CASA_BOSTON`) y **Asistencia completa acotada a Boston en el SERVIDOR** (`lib/asistencia/alcance-boston*.ts`: listas por empresa de la FICHA, 403 a un código ajeno, `MIRAN_PERO_NO_CIERRAN`). 🔴 Sin la key `cxc` en `role_permissions` (migración **pendiente**) falla ABIERTA: «Por cobrar» sigue en `/boston`. `false` = lo de antes. Candado `boston-ventas-boston`.
 - **Sueldos recortados en el SERVIDOR** (`VE_SUELDOS_DE_BOSTON`, hoy `true`); se ENUMERA lo que viaja (`CAMPOS_SIN_DINERO`).
 - `ccte_id` de Boston lleva el AÑO adentro (`serie × 10.000.000 + (año − 2000) × 100.000 + correlativo`): sin fecha se **rechaza** y la corrida se corta. Sync: **upsert → reconcile**.
 - 🔴 **SU PLATA SUMA; SUS CLIENTES NO SE VEN**: su venta sigue en Ventas › Resumen y Vista General; de las superficies del grupo salen sus CLIENTES, en ambas direcciones. 🩸 **Ni entra a `clientes_master`**.
@@ -100,11 +100,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 **Su DIRECTORIO se refresca SEMANAL sin tocar al grupo**: `sync-clientes-boston` (domingos 07:10 UTC) escribe **SOLO `switch_clientes` de Boston**. Para marcar ausente: lista completa y sin encoger bajo el **70%**; vacía = error. Alerta B, **165 h**.
 - 🔴 **La secretaria cobra y ve el módulo** (`ROLES_CXC`). ⚠️ **Boston sigue afuera**: otra lista.
 
-**La planilla de David = la de Yulissa.**
-
-- 🔴 **Las columnas de dinero salen de UN lugar** (`columnas-dinero-planilla.ts`, 19): `PlanillaTab` y `PlanillaBoston` leen la MISMA lista.
-- 🔴 **Boston pide con el MISMO corte que la contadora**: el de la quincena cerrada, o el sugerido (`corteParaBoston`); `planilla-guardada` le **fuerza Boston** (`?id=` ajeno → 404).
-- 🔴 **Su Préstamos suma las tres cuentas**: saldo = `calcularSaldoPrestamo` (préstamo + daño + terceros), cuota = préstamo + terceros (el daño sin cuota es **pendiente**, no diseño).
+**La planilla de David = la de Yulissa** (hoy abre `PlanillaTab` en Asistencia; `PlanillaBoston` queda para el interruptor apagado): columnas de dinero de UN lugar (`columnas-dinero-planilla.ts`, 19) · mismo corte que la contadora (`corteParaBoston`; `planilla-guardada` le fuerza Boston, `?id=` ajeno → 404) · Préstamos suma las tres cuentas (`calcularSaldoPrestamo`).
 
 **El rediseño.** Vive en **`/cxc`**; `/admin` EXACTO redirige 307 con su query.
 

@@ -35,6 +35,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { requireAsistencia } from "@/lib/asistencia/guard";
+import { rechazarFueraDeAlcance } from "@/lib/asistencia/alcance-boston-server";
 import { diaPanama } from "@/lib/asistencia/reporte";
 import {
   avisoMigracionCorrecciones,
@@ -171,6 +172,11 @@ export async function POST(req: NextRequest) {
 
       listos.push({ clave, tipo, marcacionId, reemplaza, hora, codigo, fecha });
     }
+
+    // 🔴 EL ALCANCE DE DAVID (23-sep-2026): TODO validado y NADA escrito, igual
+    // que el resto: si un solo cambio es de alguien ajeno, se rechaza entero.
+    const fuera = await rechazarFueraDeAlcance(auth.role, listos.map((c) => c.codigo));
+    if (fuera) return fuera;
 
     // ── ESCRIBIR ────────────────────────────────────────────────────────────
     const quien = firma(auth);

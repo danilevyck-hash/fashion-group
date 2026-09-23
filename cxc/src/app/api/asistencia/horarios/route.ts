@@ -19,6 +19,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { requireAsistencia } from "@/lib/asistencia/guard";
+import { alcanceDelRol, empresaEnAlcance, rechazarFueraDeAlcance } from "@/lib/asistencia/alcance-boston-server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { salidaSugerida, minutosDelDia, diaPanama } from "@/lib/asistencia/reporte";
@@ -94,8 +95,10 @@ export async function GET(req: NextRequest) {
     // Universo = quien marcó ∪ quien tiene ficha. La unión importa: el código 47
     // tiene ficha y cero marcaciones, y sin él no se le puede fijar el horario.
     const codigos = new Set<string>([...salidas.keys(), ...directorio.codigos()]);
+    // 🔴 EL ALCANCE DE DAVID (23-sep-2026): solo su empresa. Sin recorte, todos.
+    const alcance = alcanceDelRol(auth.role);
 
-    const personas = [...codigos].map((cod) => {
+    const personas = [...codigos].filter((cod) => empresaEnAlcance(alcance, empresaDe.get(cod) ?? null)).map((cod) => {
       const g = porCodigo.get(cod);
       const sug = salidaSugerida(salidas.get(cod) ?? []);
       const p = directorio.persona(cod);
@@ -209,6 +212,9 @@ export async function PUT(req: NextRequest) {
 
   const codigo = (body.codigo ?? "").trim();
   if (!codigo) return NextResponse.json({ error: "Falta el colaborador" }, { status: 400 });
+  // 🔴 EL ALCANCE DE DAVID (23-sep-2026): un horario ajeno no se escribe.
+  const fuera = await rechazarFueraDeAlcance(auth.role, [codigo]);
+  if (fuera) return fuera;
   const salidaV = validarHora(body.salida, "salida");
   if (!salidaV.ok) return NextResponse.json({ error: salidaV.error }, { status: 400 });
   // 🔴 La entrada AHORA SE PUEDE FIJAR (18-sep-2026). Si el cuerpo no la trae

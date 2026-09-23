@@ -11,6 +11,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAsistencia } from "@/lib/asistencia/guard";
 import { asistenciaRoles, cerrarPlanillaRoles } from "@/lib/asistencia/roles";
+import { estaAcotado } from "@/lib/asistencia/alcance-boston-server";
 import { codigoValido, motivoDeIgnorado } from "@/lib/asistencia/codigos-ignorados";
 import {
   ignorarCodigo,
@@ -27,7 +28,8 @@ export async function GET(req: NextRequest) {
   try {
     const { lista } = await leerIgnorados();
     return NextResponse.json({
-      ignorados: lista,
+      // 🔴 Un rol acotado (David) no los ve: son códigos sin ficha, sin empresa.
+      ignorados: estaAcotado(auth.role) ? [] : lista,
       // Para no dibujar un botón que va a contestar 403.
       puedeIgnorar: cerrarPlanillaRoles().includes(String(auth.role ?? "")),
     });
