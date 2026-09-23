@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { normalizarBultos } from "@/lib/marketing/piezas-bultos";
 import { deleteEntrega, updateEntrega } from "@/lib/marketing/inventario";
+import {
+  columnasQueVinieron,
+  traeAlgoDelGasto,
+} from "@/lib/marketing/editar-gasto";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +19,10 @@ interface MarcaPctBody {
 
 interface UpdateBody {
   notas?: string | null;
+  /** Las tres del rediseño (22-sep-2026). Ausentes = la fila no se toca. */
+  seReporta?: boolean;
+  tiendaCodigo?: string | null;
+  nota?: string | null;
   marcas?: MarcaPctBody[];
   items?: Array<{
     productoId?: string;
@@ -63,10 +71,17 @@ export async function PATCH(
       cantidad: Number(it.cantidad ?? 0),
       bultos: normalizarBultos(it.bultos),
     }));
+    // 🔴 LAS TRES COLUMNAS DEL REDISEÑO PASAN — SOLO SI VINIERON (22-sep-2026).
+    // 🩸 Esta ruta armaba `{ items, marcas, notas }` a mano y las dejaba
+    // afuera: la tienda y el «se reporta» de un mueble no se podían corregir
+    // nunca. Lo que no viaja queda `undefined` y `columnasDelGasto` no lo
+    // escribe — un `null` acá BORRARÍA la tienda.
+    const delGasto = columnasQueVinieron(body);
     const entrega = await updateEntrega(params.id, {
       items,
       marcas: normalizarMarcasBody(body.marcas),
       notas: body.notas,
+      ...(traeAlgoDelGasto(delGasto) ? delGasto : {}),
     });
     return NextResponse.json(entrega);
   } catch (err) {

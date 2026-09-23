@@ -19,6 +19,9 @@ import { useToast } from "@/components/ToastSystem";
 import { PasoInstruccion } from "./PasoInstruccion";
 import { PdfUploader, UploadResult } from "./PdfUploader";
 import { ProveedorInput } from "./ProveedorInput";
+import BloqueDatosDelGasto from "@/app/marketing/components/BloqueDatosDelGasto";
+import { MARKETING_PUERTA_GASTO, type DatosDelGasto } from "@/lib/marketing/puerta-gasto";
+import { cuerpoDeLaEdicion, datosDeLaFila } from "@/lib/marketing/editar-gasto";
 import { MAX_PDF_MB, faltaLaFactura } from "@/lib/marketing/pdf-en-la-puerta";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { formatearMonto } from "@/lib/marketing/normalizar";
@@ -42,6 +45,12 @@ export interface FacturaFormValues {
   // El usuario confirmó que aunque haya duplicado quiere guardar igual.
   // Se loguea en activity_logs para auditoría.
   permitirDuplicado?: boolean;
+  /**
+   * 🔴 LAS TRES DEL REDISEÑO, SOLO CUANDO LA PANTALLA LAS PREGUNTÓ
+   * (22-sep-2026, los remates). Ausente = el caller no manda nada y la fila
+   * guardada conserva su tienda, su «se reporta» y su nota.
+   */
+  gasto?: { tiendaCodigo: string | null; seReporta: boolean; nota: string | null };
 }
 
 // Orden fijo del dropdown de marca (registro de gastos): por código conocido,
@@ -157,6 +166,14 @@ interface FacturaFormProps {
    * Sin la prop, el campo es el de siempre.
    */
   historicoProveedores?: readonly string[];
+  /**
+   * 🔴 EDITAR UN GASTO CONSERVA (Y DEJA CAMBIAR) SU TIENDA, SU «se reporta» Y
+   * SU NOTA (22-sep-2026, los remates). Con esto puesto el formulario dibuja
+   * esos tres campos con el valor que la fila tiene hoy y los manda en el
+   * MISMO guardado (`FacturaFormValues.gasto`). Sin la prop, nada cambia: no
+   * se dibujan y no viajan, así que la fila no se pisa.
+   */
+  editarDatosDelGasto?: boolean;
 }
 
 type ItbmsOption = "0" | "7";
@@ -212,6 +229,7 @@ export function FacturaForm({
   pdfInicial,
   pdfObligatorio = false,
   historicoProveedores,
+  editarDatosDelGasto = false,
 }: FacturaFormProps) {
   const { toast } = useToast();
 
@@ -243,6 +261,11 @@ export function FacturaForm({
   // de impulsadora (que nace "pagado") lo devolvería a "creado" en silencio.
   const estadoPago: EstadoPagoFactura =
     initial?.estado_pago === "pagado" ? "pagado" : "creado";
+  // Tienda · «se reporta» · nota, con el valor que la fila tiene hoy.
+  const [datosGasto, setDatosGasto] = useState<DatosDelGasto>(() =>
+    datosDeLaFila(initial ?? null),
+  );
+  const pideDatosDelGasto = editarDatosDelGasto && MARKETING_PUERTA_GASTO;
   const [pdfFile, setPdfFile] = useState<File | undefined>(undefined);
   const [pdfSubido, setPdfSubido] = useState(false);
   const [leyendoIA, setLeyendoIA] = useState(false);
@@ -471,6 +494,7 @@ export function FacturaForm({
           estadoPago,
           marcasSeleccionadas: marcasPayload,
           permitirDuplicado,
+          ...(pideDatosDelGasto ? { gasto: cuerpoDeLaEdicion(datosGasto) } : {}),
         },
         pdfFile,
       );
@@ -885,6 +909,25 @@ export function FacturaForm({
             )}
           </div>
       </PasoInstruccion>
+      )}
+
+      {/* 🔴 LOS TRES DEL REDISEÑO, AL EDITAR. Sin el renglón de la marca: la
+          marca ya tiene su propio paso arriba. */}
+      {pideDatosDelGasto && (
+        <div
+          className="rounded-lg border border-gray-200 bg-white p-4"
+          data-testid="datos-del-gasto-al-editar"
+        >
+          <div className="text-sm font-semibold text-gray-900 mb-3">
+            Tienda, nota y reporte a la marca
+          </div>
+          <BloqueDatosDelGasto
+            datos={datosGasto}
+            onChange={setDatosGasto}
+            marcas={[]}
+            sinMarca
+          />
+        </div>
       )}
 
       <div className="flex items-center gap-2 justify-end">

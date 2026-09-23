@@ -5,6 +5,10 @@ import {
   getPeriodo,
   renombrarPeriodo,
 } from "@/lib/marketing/periodos-io";
+import { supabaseServer } from "@/lib/supabase-server";
+import { completarPeriodo, esColumnaAusente } from "@/lib/marketing/columnas-opcionales";
+import { zipsDelPeriodo } from "@/lib/marketing/zips-del-periodo";
+import { ZIP_E_IMPULSADORAS_NUEVO } from "@/lib/marketing/zip-e-impulsadoras";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -14,6 +18,52 @@ const uuidRegex =
 
 const MSG_SIN_TABLAS =
   "Todavía no se activaron los períodos. Falta correr la actualización en la base de datos.";
+
+// ────────────────────────────────────────────────────────────────────────────
+// GET /api/marketing/periodos/[id]   → { zips, sinMigracion }
+//
+// 🔴 LO QUE YA SE LE MANDÓ A LA MARCA. `mk_periodos.zips_bajados` se llena
+// desde el 22-sep-2026 con cada ZIP que se baja (`zips-bajados.ts`), y hasta
+// hoy NADIE lo mostraba. Esta puerta solo LEE esa columna — ni un `update`.
+//
+// 🔴 Falla ABIERTA: sin la columna (`columnas-opcionales.ts`) contesta lista
+// vacía y lo dice en `sinMigracion`; la pantalla entonces no dibuja nada.
+// ────────────────────────────────────────────────────────────────────────────
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  const auth = requireRole(req, ["admin", "secretaria"]);
+  if (auth instanceof NextResponse) return auth;
+  if (!uuidRegex.test(params.id)) {
+    return NextResponse.json({ error: "Período inválido" }, { status: 400 });
+  }
+  if (!ZIP_E_IMPULSADORAS_NUEVO) {
+    return NextResponse.json({ zips: [], sinMigracion: false });
+  }
+  try {
+    const { data, error } = await supabaseServer
+      .from("mk_periodos")
+      .select("id, zips_bajados")
+      .eq("id", params.id)
+      .maybeSingle();
+    if (error) {
+      if (esColumnaAusente(error)) {
+        return NextResponse.json({ zips: [], sinMigracion: true });
+      }
+      throw new Error(error.message);
+    }
+    const fila = completarPeriodo((data ?? {}) as Record<string, unknown>);
+    return NextResponse.json({
+      zips: zipsDelPeriodo(fila.zips_bajados),
+      sinMigracion: false,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Error interno";
+    console.error("GET /api/marketing/periodos/[id]:", msg);
+    return NextResponse.json({ zips: [], sinMigracion: false }, { status: 200 });
+  }
+}
 
 // PATCH /api/marketing/periodos/[id]   body: { nombre }
 //

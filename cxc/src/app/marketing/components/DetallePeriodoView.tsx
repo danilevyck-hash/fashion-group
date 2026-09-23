@@ -49,6 +49,8 @@ import CerrarPeriodoModal from "./CerrarPeriodoModal";
 import LoQueFalta from "./LoQueFalta";
 import ProyectosEliminados from "./ProyectosEliminados";
 import { ChipEstado, FilaNivel } from "./FilaNivel";
+import ZipsBajados from "./ZipsBajados";
+import { ZIP_E_IMPULSADORAS_NUEVO } from "@/lib/marketing/zip-e-impulsadoras";
 import type { BloqueResumen } from "./InicioMarketing";
 import type { ProyectoListItem } from "./useMarcaPeriodos";
 
@@ -281,6 +283,13 @@ export default function DetallePeriodoView({
             </span>
           )}
         </div>
+      )}
+
+      {/* 🔴 LO QUE YA SE LE MANDÓ A LA MARCA (22-sep-2026, los remates). Sin
+          ZIPs anotados no dibuja nada; hoy los 6 períodos tienen la lista
+          vacía, así que aparece con la primera descarga. */}
+      {ZIP_E_IMPULSADORAS_NUEVO && !esBucket && (
+        <ZipsBajados periodoId={seccion.id ?? null} />
       )}
 
       {abierto && bloqueResumen && (

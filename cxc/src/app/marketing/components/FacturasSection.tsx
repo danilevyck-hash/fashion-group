@@ -22,6 +22,7 @@ import {
   subirArchivoAStorage,
 } from "./uploadHelpers";
 import { useBulkUploadFacturas } from "@/lib/marketing/useBulkUploadFacturas";
+import { MARKETING_PUERTA_GASTO } from "@/lib/marketing/puerta-gasto";
 import {
   useBackdropDismiss,
   useEscapeClose,
@@ -358,14 +359,18 @@ export default function FacturasSection({
       tieneImportacion: boolean;
       estadoPago: EstadoPagoFactura;
       marcasSeleccionadas: MarcaPorcentajeInput[];
+      /* Tienda · «se reporta» · nota. Ausente = no viajan y no se pisan. */
+      gasto?: { tiendaCodigo: string | null; seReporta: boolean; nota: string | null };
     },
   ) => {
     if (!editando) return;
-    const { marcasSeleccionadas, ...payload } = data;
+    const { marcasSeleccionadas, gasto, ...payload } = data;
     const res = await fetch(`/api/marketing/facturas/${editando.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      // 🔴 Las tres del rediseño SOLO si la pantalla las preguntó: lo que no
+      // viaja no se escribe (`columnasDelGasto`), y la fila queda como está.
+      body: JSON.stringify(gasto ? { ...payload, ...gasto } : payload),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => null);
@@ -704,6 +709,7 @@ export default function FacturasSection({
                     marcasCatalogo={marcasCatalogo}
                     initial={editando}
                     initialMarcas={editandoMarcas}
+                    editarDatosDelGasto={MARKETING_PUERTA_GASTO}
                     onSubmit={handleEditar}
                     onCancel={() => { setEditando(null); setEditandoMarcas(null); }}
                   />

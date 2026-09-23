@@ -26,9 +26,11 @@
 //    escribe en el mismo acto: sin marca, 400 antes de escribir nada.
 // 🔴 EL FRENO DE DUPLICADOS ES DEL SERVIDOR: el 400 llega con su mensaje y la
 //    pantalla lo dice tal cual; nada se guardó.
-// ⚠️ En «Mueble» no hay campo de foto: sin proyecto no hay de dónde colgarla
-//    hasta que las fotos cuelguen de la tienda (pieza B). Factura e
-//    Impulsadora sí la tienen, como siempre.
+// 🔴 EL MUEBLE YA TIENE FOTO (22-sep-2026, los remates). Cuelga de la TIENDA
+//    del gasto (`mk_adjuntos.tienda_codigo`, pieza B) y, en «General», del
+//    cajón `TIENDA_GENERAL`. Se sube DESPUÉS de que la entrega quedó guardada:
+//    si el gasto no se guarda, no queda una foto suelta. Nunca tumba el
+//    guardado — la plata ya está escrita cuando esto corre.
 //
 // Todo cuelga de `MARKETING_PUERTA_GASTO` (`RegistrarGastoModal.tsx` elige).
 // ============================================================================
@@ -42,7 +44,12 @@ import { FacturaForm } from "@/components/marketing";
 import EntregaForm from "@/components/marketing/EntregaForm";
 import RegistrarPagoModal from "./RegistrarPagoModal";
 import BloqueDatosDelGasto, { type TiendaElegida } from "./BloqueDatosDelGasto";
-import { adjuntarPdfDeFactura, pedirUploadUrl, subirArchivoAStorage } from "./uploadHelpers";
+import {
+  adjuntarPdfDeFactura,
+  pedirUploadUrl,
+  subirAdjunto,
+  subirArchivoAStorage,
+} from "./uploadHelpers";
 import {
   MARKETING_PDF_EN_LA_PUERTA,
   aceptaDeLaPuerta,
@@ -51,7 +58,7 @@ import {
   rotuloDeLaPuerta,
 } from "@/lib/marketing/pdf-en-la-puerta";
 import { MARCAS_BLOQUE } from "@/lib/marketing/bloques";
-import { ROTULO_DE_TIPO, type TipoGasto } from "@/lib/marketing/gasto";
+import { ROTULO_DE_TIPO, TIENDA_GENERAL, type TipoGasto } from "@/lib/marketing/gasto";
 import {
   OPCIONES_DE_TIPO,
   datosPorDefecto,
@@ -239,6 +246,24 @@ export default function PuertaGasto({
     [foto, toast],
   );
 
+  /**
+   * 🔴 LA FOTO DE UN MUEBLE CUELGA DE LA TIENDA. No hay factura de dónde
+   * colgarla, y el proyecto se fue. Con «General» va al cajón
+   * `TIENDA_GENERAL`. Nunca tumba el guardado: la entrega ya quedó escrita.
+   */
+  const adjuntarFotoALaTienda = useCallback(async () => {
+    if (!foto) return;
+    const destino = comun.tiendaCodigo ?? TIENDA_GENERAL;
+    try {
+      await subirAdjunto({ file: foto, tiendaCodigo: destino, tipo: "foto_proyecto" });
+    } catch {
+      toast(
+        "El gasto quedó guardado, pero la foto no subió. Vuelve a intentarlo desde la tienda.",
+        "warning",
+      );
+    }
+  }, [foto, comun.tiendaCodigo, toast]);
+
   /** Sube el PDF sin dueño para que la IA lo lea; su `path` se reusa al guardar. */
   const subirPdfParaIA = useCallback(
     async (file: File): Promise<string | null> => {
@@ -322,7 +347,9 @@ export default function PuertaGasto({
         gasto={comun}
         productos={productos}
         onClose={onClose}
-        onSaved={onSaved}
+        onSaved={() => {
+          void adjuntarFotoALaTienda().then(onSaved);
+        }}
       />
     );
   }
@@ -346,6 +373,11 @@ export default function PuertaGasto({
     const cual = clasificarArchivoDeLaPuerta(archivo);
     if (!cual.ok) {
       toast(cual.mensaje, "error");
+      return;
+    }
+    // En un mueble solo entra una FOTO: no hay factura de dónde colgar un PDF.
+    if (tipo === "mueble" && cual.clase === "pdf") {
+      toast("En un mueble sube una foto, no un PDF.", "error");
       return;
     }
     // UNO U OTRO, nunca los dos: el campo es uno solo.
@@ -462,16 +494,17 @@ export default function PuertaGasto({
                 tiendaInicial={tiendaInicial}
               />
 
-              {/* FOTO O FACTURA — opcional; en Mueble no hay de dónde colgarla. */}
-              {tipo !== "mueble" && (
-                <div>
+              {/* FOTO O FACTURA — opcional. En Mueble solo foto: la foto va a
+                  la tienda; un PDF de factura ahí no tendría factura. */}
+              <div>
                   <div className="text-sm font-medium text-gray-700 mb-1">
-                    {rotuloDeLaPuerta()} <span className="font-normal text-gray-400">(opcional)</span>
+                    {tipo === "mueble" ? "Foto del mueble" : rotuloDeLaPuerta()}{" "}
+                    <span className="font-normal text-gray-400">(opcional)</span>
                   </div>
                   <input
                     ref={fotoRef}
                     type="file"
-                    accept={aceptaDeLaPuerta()}
+                    accept={tipo === "mueble" ? "image/*" : aceptaDeLaPuerta()}
                     className="hidden"
                     onChange={(e) => {
                       const archivo = e.target.files?.[0] ?? null;
@@ -499,12 +532,12 @@ export default function PuertaGasto({
                       type="button"
                       onClick={() => fotoRef.current?.click()}
                       className="w-full rounded-md border border-dashed border-gray-300 px-3 min-h-[44px] py-2 text-sm text-gray-600 hover:border-gray-500 hover:text-black transition"
+                      data-testid="subir-archivo-de-la-puerta"
                     >
-                      {rotuloBotonDeLaPuerta()}
+                      {tipo === "mueble" ? "Subir foto" : rotuloBotonDeLaPuerta()}
                     </button>
                   )}
-                </div>
-              )}
+              </div>
             </div>
 
             <div className="border-t border-gray-100 px-5 py-4 flex items-center justify-end gap-3">

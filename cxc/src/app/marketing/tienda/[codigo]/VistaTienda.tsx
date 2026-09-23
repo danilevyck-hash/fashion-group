@@ -133,9 +133,10 @@ export default function VistaTienda({ codigo }: { codigo: string }) {
               datos.grupos.map((g) => <TablaDeMarca key={g.marcaCodigo} grupo={g} />)
             )}
 
-            {!esGeneral && datos.codigo && (
-              <FotosSection tiendaCodigo={datos.codigo} />
-            )}
+            {/* 🔴 «General» también tiene fotos (22-sep-2026, los remates): un
+                mueble que no es de ninguna tienda igual se fotografía. Se
+                guardan bajo el código `GENERAL`. */}
+            <FotosSection tiendaCodigo={datos.codigo ?? TIENDA_GENERAL} />
           </>
         )}
 

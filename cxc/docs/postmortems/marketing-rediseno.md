@@ -402,3 +402,73 @@ Medido sobre el ZIP **real** que recibió Tommy (`05-marketing/zip-gastos-del-pe
 1. 🔑 **El pago de abril 2024 de Ana Trejos** (§ 9.1): o son 15 meses que se deben, o está mal fechado. Nadie lo tocó.
 2. ⚠️ **Nadie MUESTRA todavía los ZIP anotados**: `mk_periodos.zips_bajados` se llena desde ahora, pero no hay pantalla que liste «lo que ya se le mandó a esta marca» ni botón que llame a `firmar-de-nuevo`. Es la pantalla del período, territorio de la pieza (C).
 3. ⚠️ El respaldo del ZIP **por proyecto** (`generar-zip.ts`) lee `se_reporta` si la ruta `datos-zip` lo manda; hoy esa ruta no lo selecciona, así que ahí todo se reporta (falla ABIERTO).
+
+---
+
+## 10. Los tres remates (22-sep-2026) — editar conserva, el mueble tiene foto, el período dice lo que ya se mandó
+
+> Los tres pendientes que dejaron las piezas A, B y D. Ninguno pedía decisión de Daniel. **Nada de lo que se guarda cambió de forma y ningún número cambió.** Interruptores: `MARKETING_PUERTA_GASTO` (1 y 2) y `ZIP_E_IMPULSADORAS_NUEVO` (3) — **no hay uno nuevo**.
+
+### 10.1 Editar un gasto conserva —y deja cambiar— su tienda, su «se reporta» y su nota
+
+🩸 **El defecto.** `updateFactura` y `updateEntrega` ya aceptaban las tres columnas desde la pieza A, pero **ninguna pantalla de edición las preguntaba** y la ruta `PATCH /api/marketing/inventario/entregas/[id]` armaba `{ items, marcas, notas }` a mano, así que ni siquiera las dejaba pasar. Se podía poner la tienda al CREAR el gasto y nunca más corregirla. Peor: `mapEntrega` (`inventario.ts`) **tiraba** las tres columnas al leer, así que la pantalla ni las veía.
+
+🔴 **La regla.** **Lo que no viaja no se pisa.** Una clave ausente queda `undefined` y `columnasDelGasto` no la escribe; la pantalla de antes —que no manda nada— deja la fila exactamente como está. ⚠️ `tiendaCodigo: null` **sí es una decisión** («General»), por eso se mira la PRESENCIA de la clave (`in`) y nunca si el valor es nulo.
+
+**Lo que se tocó.**
+
+- **Puro nuevo:** `lib/marketing/editar-gasto.ts` — `datosDeLaFila` (abre el formulario con el valor de hoy; `esDeTienda` se DERIVA de que haya código; una fila vieja sin columna abre PRENDIDA como el DEFAULT), `cuerpoDeLaEdicion` (lo que la pantalla manda de vuelta), `columnasQueVinieron` / `traeAlgoDelGasto` (solo las claves presentes, ya normalizadas).
+- **Servidor:** `PATCH /inventario/entregas/[id]` deja pasar las tres **solo si vinieron**. `PATCH /facturas/[id]` ya reenviaba el cuerpo entero y `updateFactura` solo lee lo conocido: no cambió. `inventario.ts › mapEntrega` ahora las devuelve por `completarGasto` (falla ABIERTA sin la migración).
+- **Pantalla:** `BloqueDatosDelGasto` gana `sinMarca` (la edición ya tiene su propio control de marca) y dice **«Hoy: D-24»** cuando de la fila solo viene el código — 🔴 **no busca el nombre en el directorio**: no puede haber una segunda puerta al directorio (candado `un-solo-selector-de-cliente`); la única es el `ClientePicker` de abajo. `FacturaForm` gana `editarDatosDelGasto` y manda `gasto` en `FacturaFormValues`; `FacturasSection` lo pasa y lo reenvía en el PATCH. `EntregaForm` dibuja el bloque cuando hay `initial` y manda `cuerpoDeLaEdicion` en su PATCH.
+- **Intacto:** una marca por gasto (`exigirUnaMarca`) y el freno de duplicados, que al editar **se salta la propia fila** (`frenarSiEditarDejaDuplicado` pasa el `id`).
+
+### 10.2 El mueble tiene foto, colgada de la tienda
+
+🩸 **El defecto.** En «＋ Gasto › Mueble entregado» no había campo de foto: sin proyecto, `mk_adjuntos` no tenía de dónde colgarla. La pieza B ya hizo que las fotos cuelguen de la **tienda** (`mk_adjuntos.tienda_codigo`), así que el campo se enchufó.
+
+- La puerta ofrece **«Foto del mueble»** (solo imagen: un PDF ahí no tendría factura y se rechaza con su mensaje). La factura y la impulsadora **no cambiaron**.
+- Se sube por `uploadHelpers › subirAdjunto({ tiendaCodigo })`, que ya existía — **no se inventó otro camino de subida** — y **después** de que la entrega quedó guardada: si el gasto no se guarda, no queda una foto suelta. Nunca tumba el guardado (la plata ya está escrita); si falla, se dice en un aviso.
+- 🔴 **Con «General» cuelga de `TIENDA_GENERAL`.** Para que esa foto se pueda VER, el cajón «General» dejó de ser una excepción en `/api/marketing/tienda/[codigo]/fotos`: el GET lee `tienda_codigo = 'GENERAL'` (antes contestaba lista vacía) y el POST lo acepta (antes lo rechazaba con 400). `GENERAL` no colisiona con ningún cliente del directorio (los suyos son `D-xx`). `VistaTienda` dibuja las fotos también en «General».
+
+### 10.3 La pantalla del período lista lo que ya se le mandó a la marca
+
+🩸 **El hueco.** La pieza D anota cada ZIP bajado en `mk_periodos.zips_bajados` y guarda el archivo en `marketing/periodos/<id>/<fecha>.zip`… y **ninguna pantalla lo leía**.
+
+- **Puro nuevo:** `lib/marketing/zips-del-periodo.ts` — `zipsDelPeriodo` (normaliza, **el más nuevo arriba**, lo que no sea lista se lee como lista vacía), `hayZipsQueMostrar`, `cuandoSeBajo` (**hora de PANAMÁ**, nunca la del navegador; sin fecha dice «Sin fecha», no inventa «hoy»), `quienLoBajo` (`sistema` no se dibuja), `loQueLlevaba`, `sePuedeVolverAFirmar`, `DIAS_DEL_LINK = 30`.
+- **Lectura:** `GET /api/marketing/periodos/[id]` → `{ zips, sinMigracion }`. **Solo lee** esa columna, por `columnas-opcionales.ts`; sin la columna contesta lista vacía.
+- **Pantalla:** `ZipsBajados.tsx`, montado en `DetallePeriodoView` (no en los buckets sin período). Cada renglón: fecha y hora de Panamá · quién lo bajó si se anotó · «N gastos · $X» · **«Volver a firmar»**, que llama a `POST /api/marketing/zip/firmar-de-nuevo` y abre el link nuevo — **no vuelve a armar el ZIP**, que tarda y baja todas las fotos.
+- 🔴 **Sin ZIPs anotados no se dibuja nada.**
+
+### 10.4 Medido contra producción (22-sep-2026, solo lectura por REST)
+
+| Qué | Número |
+|---|---|
+| `mk_periodos` | **6** filas, **`zips_bajados = []` en las 6** → hoy la lista nueva **no aparece en ninguna pantalla** |
+| `mk_facturas` vivas | 94 · **86 con `tienda_codigo`** · `se_reporta = false`: **0** · `nota`: **0** |
+| `mk_entregas_muebles` | 24 · **24 con `tienda_codigo`** · `se_reporta = false`: **0** · `nota`: **0** |
+| `mk_adjuntos` tipo `foto_proyecto` | 60, **60 con `tienda_codigo`** (ninguna en «General» todavía) |
+
+Ninguna fila se tocó: los tres remates cambian PANTALLAS y rutas, no datos.
+
+### 10.5 Candado y mutaciones
+
+`src/__tests__/components/marketing-remates.test.tsx` — **19 casos en 4 bloques**: lo que no viaja no se pisa (y `null` sí es «General») · el duplicado al editar no se cuenta a sí mismo · el mueble ofrece foto y cuelga de la tienda con «General» de respaldo · la lista de ZIPs no se dibuja vacía, ordena el más nuevo arriba, dice la hora de Panamá y «Volver a firmar» llama a la ruta correcta.
+
+`scripts/_mutar-candados-marketing-remates.sh` — **8 mutaciones + 2 controles, 10/10**:
+
+| # | Mutación | Resultado |
+|---|---|---|
+| 1 | `columnasQueVinieron` manda las tres siempre (pisa con `null`) | 🔴 |
+| 2 | la ruta de la entrega vuelve a tirar las tres | 🔴 |
+| 3 | `datosDeLaFila` abre siempre con «se reporta» apagado | 🔴 |
+| 4 | el mueble vuelve a quedarse sin campo de foto | 🔴 |
+| 5 | la foto del mueble deja de caer en `TIENDA_GENERAL` | 🔴 |
+| 6 | `hayZipsQueMostrar` devuelve siempre `true` (dibuja vacío) | 🔴 |
+| 7 | los ZIPs salen del más viejo al más nuevo | 🔴 |
+| 8 | al editar, la factura se acusa a sí misma de duplicada | 🔴 |
+| — | control sin mutar (×2) | 🟢 19/19 |
+
+### 10.6 Lo que queda dicho
+
+- ⚠️ La **edición vive en la pantalla vieja del proyecto** (`FacturasSection` / `EntregasSection`): la vista de tienda de la pieza B lista los gastos pero todavía no los deja editar. Es una pantalla más, no un pendiente de este encargo.
+- ⚠️ El aviso viejo de duplicado **por número** de factura sigue en `FacturaForm` (avisa y deja continuar); el freno del servidor manda igual.

@@ -44,6 +44,13 @@ interface Props {
   marcaDeImpulsadora?: MkMarca | null;
   /** La tienda desde la que se abrió la puerta: viene puesta, no se pregunta. */
   tiendaInicial?: TiendaElegida | null;
+  /**
+   * 🔴 SIN EL RENGLÓN DE LA MARCA (22-sep-2026, los remates). Lo usa el
+   * formulario de EDICIÓN, donde la marca ya tiene su propio control y
+   * preguntarla dos veces en la misma pantalla es peor que no preguntarla.
+   * Sin la prop, el bloque es EXACTAMENTE el de la puerta «＋ Gasto».
+   */
+  sinMarca?: boolean;
 }
 
 const CAMPO =
@@ -56,6 +63,7 @@ export default function BloqueDatosDelGasto({
   marcaInicial = null,
   marcaDeImpulsadora,
   tiendaInicial = null,
+  sinMarca = false,
 }: Props) {
   const [cambiandoMarca, setCambiandoMarca] = useState(false);
   const esImpulsadora = marcaDeImpulsadora !== undefined;
@@ -65,9 +73,21 @@ export default function BloqueDatosDelGasto({
 
   const cambiar = (parte: Partial<DatosDelGasto>) => onChange({ ...datos, ...parte });
 
+  // 🔴 AL EDITAR, LA TIENDA QUE YA TIENE SE DICE. De la fila guardada solo
+  // viene el CÓDIGO (`tienda_codigo`, D-25) — el nombre no está —, así que se
+  // enseña el código tal cual en vez de dejar el campo en blanco, que se
+  // leería como «no tiene tienda». 🔴 No se busca el nombre en el directorio:
+  // acá no puede haber una segunda puerta al directorio; la única es el
+  // `ClientePicker` de abajo (candado `un-solo-selector-de-cliente`).
+  const codigoSinNombre =
+    datos.esDeTienda && datos.tiendaCodigo.trim() !== "" && datos.tiendaNombre.trim() === ""
+      ? datos.tiendaCodigo.trim().toUpperCase()
+      : null;
+
   return (
     <div className="space-y-5">
       {/* ─── MARCA ─────────────────────────────────────────────────────── */}
+      {!sinMarca && (
       <div>
         <label htmlFor="gasto-marca" className="block text-sm font-medium text-gray-700 mb-1">
           Marca<span className="text-red-500 ml-0.5">*</span>
@@ -113,6 +133,7 @@ export default function BloqueDatosDelGasto({
           </select>
         )}
       </div>
+      )}
 
       {/* ─── TIENDA o GENERAL ──────────────────────────────────────────── */}
       <div>
@@ -158,13 +179,18 @@ export default function BloqueDatosDelGasto({
                 {TIENDA_GENERAL}
               </button>
             </div>
+            {codigoSinNombre && (
+              <p className="text-sm text-gray-600 mb-2" data-testid="tienda-de-hoy">
+                Hoy: <span className="tabular-nums text-gray-900">{codigoSinNombre}</span>
+              </p>
+            )}
             {datos.esDeTienda && (
               <ClientePicker
                 value={datos.tiendaNombre}
                 codigo={datos.tiendaCodigo}
                 onChange={(nombre, codigo) => cambiar({ tiendaNombre: nombre, tiendaCodigo: codigo })}
                 permitirOtro={false}
-                placeholder="Busca la tienda…"
+                placeholder={codigoSinNombre ? "Busca otra tienda…" : "Busca la tienda…"}
                 inputClassName={`${CAMPO} pr-16`}
               />
             )}

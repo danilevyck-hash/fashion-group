@@ -37,7 +37,13 @@
 // ============================================================================
 
 import { useEffect, useMemo, useState } from "react";
-import type { DatosDelGastoParaGuardar } from "@/lib/marketing/puerta-gasto";
+import BloqueDatosDelGasto from "@/app/marketing/components/BloqueDatosDelGasto";
+import {
+  MARKETING_PUERTA_GASTO,
+  type DatosDelGasto,
+  type DatosDelGastoParaGuardar,
+} from "@/lib/marketing/puerta-gasto";
+import { cuerpoDeLaEdicion, datosDeLaFila } from "@/lib/marketing/editar-gasto";
 import type {
   EntregaConItems,
   MarcaConPorcentaje,
@@ -215,6 +221,12 @@ export default function EntregaForm({
 
   // ---- Estado del form ----
   const [nombre, setNombre] = useState<string>("");
+  // 🔴 AL EDITAR: tienda · «se reporta» · nota, con el valor de hoy
+  // (22-sep-2026, los remates). Sin editar no se dibuja y no viaja nada.
+  const [datosGasto, setDatosGasto] = useState<DatosDelGasto>(() =>
+    datosDeLaFila(null),
+  );
+  const editandoDatosDelGasto = Boolean(initial) && MARKETING_PUERTA_GASTO;
   const [marcasSel, setMarcasSel] = useState<MarcaSel[]>([]);
   const [panelesStr, setPanelesStr] = useState<string>("");
   const [accesorios, setAccesorios] = useState<Record<Categoria, string>>({
@@ -318,6 +330,7 @@ export default function EntregaForm({
       }
 
       setNombre(initial.notas ?? "");
+      setDatosGasto(datosDeLaFila(initial));
       setMarcasSel(marcasIni);
       setPanelesStr(cantsByCat.paneles > 0 ? String(cantsByCat.paneles) : "");
       setAccesorios({
@@ -340,6 +353,7 @@ export default function EntregaForm({
       setOtrosBultos(otrosB);
     } else {
       setNombre("");
+      setDatosGasto(datosDeLaFila(null));
       // Entrega NUEVA: la marca se HEREDA del caller (viniendo de "Registrar
       // gasto" ya se eligió en la puerta — no se pregunta dos veces).
       setMarcasSel(marcasInicialesDesdeProyecto(marcasProyecto));
@@ -590,7 +604,14 @@ export default function EntregaForm({
         : "/api/marketing/inventario/entregas";
       const method = initial ? "PATCH" : "POST";
       const body = initial
-        ? { items, marcas, notas: nombre.trim() || null }
+        ? {
+            items,
+            marcas,
+            notas: nombre.trim() || null,
+            // 🔴 Lo que la pantalla PREGUNTÓ es lo único que viaja: sin el
+            // bloque (interruptor apagado) la fila no se pisa.
+            ...(editandoDatosDelGasto ? cuerpoDeLaEdicion(datosGasto) : {}),
+          }
         : {
             proyectoId: proyectoId ?? null,
             items,
@@ -775,6 +796,25 @@ export default function EntregaForm({
                   className="w-full rounded-md border border-gray-300 px-3 min-h-[44px] text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
                 />
               </section>
+
+              {/* 🔴 AL EDITAR: tienda, nota y «se reporta a la marca», con el
+                  valor de hoy. La marca tiene su propio bloque abajo. */}
+              {editandoDatosDelGasto && (
+                <section
+                  className="rounded-lg border border-gray-200 bg-white p-4"
+                  data-testid="datos-del-gasto-al-editar"
+                >
+                  <div className="text-sm font-semibold text-gray-900 mb-3">
+                    Tienda, nota y reporte a la marca
+                  </div>
+                  <BloqueDatosDelGasto
+                    datos={datosGasto}
+                    onChange={setDatosGasto}
+                    marcas={[]}
+                    sinMarca
+                  />
+                </section>
+              )}
 
               {/* Paso 1: Marca(s) con %. Con `marcaFija` (la puerta nueva ya
                   la eligió) el bloque entero no se dibuja. */}

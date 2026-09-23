@@ -15,6 +15,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { firmarAdjuntos } from "@/lib/marketing/storage";
 import { esColumnaAusente, sinColumnasDelRediseno } from "@/lib/marketing/columnas-opcionales";
 import { esCodigoGeneral, VISTA_TIENDA } from "@/lib/marketing/vista-tienda";
+import { TIENDA_GENERAL } from "@/lib/marketing/gasto";
 import type { MkAdjunto } from "@/lib/marketing/types";
 
 export const dynamic = "force-dynamic";
@@ -35,16 +36,20 @@ export async function GET(
   if (crudo.length === 0 || crudo.length > 40) {
     return NextResponse.json({ error: "Código inválido" }, { status: 400 });
   }
-  // El cajón «General» no tiene fotos propias: una foto siempre es de una
-  // tienda. Se contesta vacío, no un error.
-  if (esCodigoGeneral(crudo)) return NextResponse.json([]);
+  // 🔴 «General» TAMBIÉN es un cajón con fotos (22-sep-2026, los remates). Un
+  // mueble que no es de ninguna tienda igual tiene su foto, y hasta hoy no
+  // tenía de dónde colgarla: se guarda bajo el código `GENERAL`, que ningún
+  // cliente del directorio puede usar (los suyos son D-xx).
+  const codigo = esCodigoGeneral(crudo)
+    ? TIENDA_GENERAL.toUpperCase()
+    : crudo.toUpperCase();
 
   try {
     const { data, error } = await supabaseServer
       .from("mk_adjuntos")
       .select("*")
       .eq("tipo", "foto_proyecto")
-      .eq("tienda_codigo", crudo.toUpperCase())
+      .eq("tienda_codigo", codigo)
       .order("created_at", { ascending: false });
     if (error) {
       if (esColumnaAusente(error)) return NextResponse.json([]);
@@ -82,9 +87,13 @@ export async function POST(
     return NextResponse.json({ error: "No disponible" }, { status: 404 });
   }
   const crudo = String(params.codigo ?? "").trim();
-  if (crudo.length === 0 || crudo.length > 40 || esCodigoGeneral(crudo)) {
+  if (crudo.length === 0 || crudo.length > 40) {
     return NextResponse.json({ error: "Código inválido" }, { status: 400 });
   }
+  // El cajón «General» guarda bajo `GENERAL`, igual que lo lee el GET.
+  const codigo = esCodigoGeneral(crudo)
+    ? TIENDA_GENERAL.toUpperCase()
+    : crudo.toUpperCase();
   try {
     const body = (await req.json()) as {
       url?: string;
@@ -105,7 +114,7 @@ export async function POST(
     };
     let { data, error } = await supabaseServer
       .from("mk_adjuntos")
-      .insert({ ...base, tienda_codigo: crudo.toUpperCase() })
+      .insert({ ...base, tienda_codigo: codigo })
       .select()
       .single();
     if (error && esColumnaAusente(error)) {

@@ -50,6 +50,7 @@ import {
 import { normalizarBultos, normalizarPiezas, piezasParaStock } from "./piezas-bultos";
 import { exigirUnaMarca } from "./gasto";
 import {
+  completarGasto,
   conRespaldoSinColumnas,
   sinColumnasDelRediseno,
 } from "./columnas-opcionales";
@@ -149,6 +150,14 @@ function mapEntrega(row: Record<string, unknown>): MkEntregaMuebles {
     total_por_empresa_interna:
       (row.total_por_empresa_interna as Record<string, number>) ?? {},
     notas: (row.notas as string | null) ?? null,
+    // 🔴 LAS TRES DEL REDISEÑO VIAJAN A LA PANTALLA (22-sep-2026, los
+    // remates). Sin esto, `mapEntrega` las tiraba y editar una entrega abría
+    // con la tienda vacía aunque la fila la tuviera. `completarGasto` pone el
+    // valor de hoy para lo que no vino: falla ABIERTA sin la migración.
+    ...(() => {
+      const c = completarGasto(row);
+      return { se_reporta: c.se_reporta, tienda_codigo: c.tienda_codigo, nota: c.nota };
+    })(),
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? ""),
   };
