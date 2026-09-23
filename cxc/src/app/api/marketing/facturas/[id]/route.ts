@@ -1,14 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { getFacturaById } from "@/lib/marketing/queries";
-import { getMarcasDeFactura } from "@/lib/marketing/factura-marcas";
-import {
-  updateFactura,
-  eliminarFacturaDefinitiva,
-} from "@/lib/marketing/mutations";
+import { updateFactura } from "@/lib/marketing/mutations";
 import { firmarAdjuntos } from "@/lib/marketing/storage";
-import { logAudit } from "@/lib/marketing/audit";
-import { supabaseServer } from "@/lib/supabase-server";
 import type { UpdateFacturaInput } from "@/lib/marketing/types";
 
 export const dynamic = "force-dynamic";
@@ -63,6 +57,12 @@ export async function PATCH(
   }
 }
 
+// 🩸 «ELIMINAR DEFINITIVAMENTE» SE RETIRÓ (22-sep-2026). Daniel: con «Anular»
+// basta. La puerta se queda para contestar que NO —403, con el porqué— en vez
+// de un 404 que parecería un bug. Los 12 borrados duros de la historia quedan
+// en `activity_logs` (`delete_definitivo`); no se construye nada encima.
+const MSG_BORRADO_RETIRADO =
+  "Eliminar definitivamente ya no existe. Anula el registro: queda plegado y se puede restaurar.";
 export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } },
@@ -72,40 +72,5 @@ export async function DELETE(
   if (!uuidRegex.test(params.id)) {
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
-  try {
-    const factura = await getFacturaById(params.id);
-    if (!factura) {
-      return NextResponse.json(
-        { error: "Factura no encontrada" },
-        { status: 404 },
-      );
-    }
-    const marcasBefore = await getMarcasDeFactura(params.id);
-    const { data: adjBefore } = await supabaseServer
-      .from("mk_adjuntos")
-      .select("*")
-      .eq("factura_id", params.id);
-
-    await eliminarFacturaDefinitiva(params.id);
-
-    await logAudit({
-      action: "delete_definitivo",
-      entityType: "mk_facturas",
-      entityId: params.id,
-      userRole: auth.role,
-      userName: auth.userName,
-      before: {
-        factura,
-        marcas: marcasBefore,
-        adjuntos: adjBefore ?? [],
-      },
-    });
-
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "No se pudo eliminar la factura";
-    console.error("marketing/facturas/[id] DELETE:", message);
-    return NextResponse.json({ error: message }, { status: 400 });
-  }
+  return NextResponse.json({ error: MSG_BORRADO_RETIRADO }, { status: 403 });
 }

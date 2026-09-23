@@ -121,6 +121,16 @@ export interface MkFactura {
   // estar corrida todavía.
   periodo_desde?: string | null;
   periodo_hasta?: string | null;
+  // 🔴 EL REDISEÑO (22-sep-2026), columnas de `20261216120000`. Opcionales en
+  // el tipo porque la migración la aplica Daniel cuando diga que sí; mientras
+  // no exista, se leen con `completarGasto` (columnas-opcionales.ts):
+  // `se_reporta` prendido, tienda y nota vacías. Ver lib/marketing/gasto.ts.
+  se_reporta?: boolean;
+  // Código del directorio (D-25). `null` = cajón «General». Es del GASTO,
+  // no del proyecto: `proyecto_id` se queda en la base pero ya no decide.
+  tienda_codigo?: string | null;
+  // Qué fue («Apertura», «Remodelación»). Libre.
+  nota?: string | null;
   anulado_en: string | null;
   anulado_motivo: string | null;
   created_at: string;
@@ -150,6 +160,9 @@ export interface MkAdjunto {
   id: string;
   proyecto_id: string | null;
   factura_id: string | null;
+  // 🔴 EL REDISEÑO (22-sep-2026): las fotos se pegan a la TIENDA, ya no al
+  // proyecto (`20261216120000` la copia del proyecto). Opcional hasta entonces.
+  tienda_codigo?: string | null;
   tipo: TipoAdjunto;
   url: string;
   nombre_original: string | null;
@@ -409,6 +422,11 @@ export interface MkEntregaMuebles {
   // Joybees no contribuye aquí (su 100% va completo a total_por_marca).
   total_por_empresa_interna: Record<string, number>;
   notas: string | null;
+  // 🔴 EL REDISEÑO (22-sep-2026): las mismas tres columnas que en mk_facturas
+  // (`20261216120000`), opcionales hasta que la migración corra.
+  se_reporta?: boolean;
+  tienda_codigo?: string | null;
+  nota?: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -131,24 +131,11 @@ export async function getProyectoById(id: string): Promise<ProyectoConMarcas | n
   if (!data) return null;
   const proyecto = mapProyecto(data as Record<string, unknown>);
 
-  const { data: pmData, error: pmError } = await supabaseServer
-    .from("mk_proyecto_marcas")
-    .select("*, marca:mk_marcas(*)")
-    .eq("proyecto_id", id);
-  if (pmError) throw new Error(`getProyectoById[marcas]: ${pmError.message}`);
-
-  const marcas: MarcaConPorcentaje[] = (pmData ?? [])
-    .map((row) => {
-      const r = row as Record<string, unknown>;
-      const m = r.marca as Record<string, unknown> | null;
-      if (!m) return null;
-      return {
-        marca: mapMarca(m),
-        porcentaje: Number(r.porcentaje ?? 0),
-      };
-    })
-    .filter((x): x is MarcaConPorcentaje => x !== null);
-
+  // 🩸 `mk_proyecto_marcas` YA NO SE LEE (22-sep-2026): la marca es del GASTO
+  // (`lib/marketing/gasto.ts`) y la ficha del proyecto deriva sus marcas de los
+  // DOCUMENTOS (facturas ∪ entregas), que es lo que ya hacía `ProyectoOverlay`.
+  // La tabla se queda con sus 5 filas, sin lectores ni escritores.
+  const marcas: MarcaConPorcentaje[] = [];
   return { ...proyecto, marcas };
 }
 

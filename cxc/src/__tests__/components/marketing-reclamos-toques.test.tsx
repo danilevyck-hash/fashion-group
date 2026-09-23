@@ -9,8 +9,11 @@
  * y el test se cae por lo que se VE, no por lo que dice un comentario.
  *
  * Lo que protege, defecto por defecto:
- *   1. Anular y Eliminar no pueden volver a estar pegados ni medir 24 px.
- *   2. El borrado DEFINITIVO del proyecto dice que es definitivo.
+ *   1. Editar y Anular se ven en el celular y miden 44 px. ⚠️ CAMBIÓ DE
+ *      DIRECCIÓN el 22-sep-2026: «Eliminar definitivamente» SE RETIRÓ
+ *      (Daniel: con «Anular» basta), así que lo que antes exigía que el
+ *      botón rojo estuviera lejos de «Anular» hoy exige que NO EXISTA.
+ *   2. El proyecto ya no ofrece borrado definitivo (misma decisión).
  *   3. El correo al proveedor no se pierde con un clic en el fondo, y el tacho
  *      de la libreta pregunta antes de borrar.
  *   4. El filtro "Marca" del reporte por proyecto SE LLENA.
@@ -178,9 +181,9 @@ afterEach(() => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// 1. Editar · Anular · Eliminar de una factura
+// 1. Editar · Anular de una factura — y NINGÚN «Eliminar definitivamente»
 // ════════════════════════════════════════════════════════════════════════════
-describe("🔴 el dedo no puede caer en Eliminar cuando iba a Anular", () => {
+describe("🔴 Editar y Anular se ven y se tocan; el borrado definitivo se fue", () => {
   function pintarFacturas() {
     sessionStorage.setItem("cxc_role", "admin");
     return render(
@@ -190,7 +193,7 @@ describe("🔴 el dedo no puede caer en Eliminar cuando iba a Anular", () => {
     );
   }
 
-  it("los tres botones se VEN en el celular (nada escondido tras el hover)", async () => {
+  it("los dos botones se VEN en el celular (nada escondido tras el hover)", async () => {
     pintarFacturas();
     const editar = await screen.findByRole("button", { name: "Editar" });
     const anular = screen.getByRole("button", { name: "Anular" });
@@ -213,54 +216,27 @@ describe("🔴 el dedo no puede caer en Eliminar cuando iba a Anular", () => {
     pintarFacturas();
     const editar = await screen.findByRole("button", { name: "Editar" });
     const anular = screen.getByRole("button", { name: "Anular" });
-    const eliminar = await screen.findByRole("button", {
-      name: /Eliminar definitivamente/,
-    });
-    for (const b of [editar, anular, eliminar]) expect(esTactil(b)).toBe(true);
+    for (const b of [editar, anular]) expect(esTactil(b)).toBe(true);
   });
 
-  it("lo DESTRUCTIVO no queda pegado a lo reversible", async () => {
+  it("🔴 «Eliminar definitivamente» NO existe, ni para admin (22-sep-2026)", async () => {
     pintarFacturas();
-    const anular = screen.getByRole("button", { name: "Anular" });
-    const eliminar = await screen.findByRole("button", {
-      name: /Eliminar definitivamente/,
-    });
-    // Comparten fila, pero Eliminar se va al extremo opuesto (`ml-auto`): en
-    // jsdom no hay layout, así que se mide la regla que LO produce.
-    expect(anular.parentElement).toBe(eliminar.parentElement);
-    expect(eliminar.className).toMatch(/(?:^|\s)ml-auto(?:\s|$)/);
-    expect(anular.className).not.toMatch(/(?:^|\s)ml-auto(?:\s|$)/);
+    await screen.findByRole("button", { name: "Anular" });
+    // 🩸 Hasta el 22-sep-2026 acá se exigía que el botón rojo estuviera al
+    // extremo opuesto de «Anular». Daniel lo retiró: con Anular (reversible,
+    // la factura queda plegada y se restaura) basta. Si vuelve, esto se cae.
+    expect(screen.queryByRole("button", { name: /Eliminar definitivamente/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Eliminar$/ })).toBeNull();
+    expect(document.body.textContent ?? "").not.toMatch(/NO se puede deshacer/i);
   });
 
-  it("y dice que es definitivo, no sólo «Eliminar»", async () => {
-    pintarFacturas();
-    const eliminar = await screen.findByRole("button", {
-      name: /Eliminar definitivamente/,
-    });
-    expect(eliminar.textContent).toMatch(/definitivamente/i);
-  });
-
-  it("tocar Anular abre el motivo (reversible), no el borrado", async () => {
+  it("tocar Anular abre el motivo (reversible), no un borrado", async () => {
     pintarFacturas();
     fireEvent.click(screen.getByRole("button", { name: "Anular" }));
     await waitFor(() =>
       expect(screen.getByRole("heading", { name: /Anular factura 0001/i })).toBeTruthy(),
     );
-    // El borrado definitivo NO se disparó de paso.
-    expect(
-      screen.queryByText(/NO se puede deshacer/i),
-    ).toBeNull();
-  });
-
-  it("tocar Eliminar abre la confirmación que avisa que no hay vuelta atrás", async () => {
-    pintarFacturas();
-    const eliminar = await screen.findByRole("button", {
-      name: /Eliminar definitivamente/,
-    });
-    fireEvent.click(eliminar);
-    await waitFor(() =>
-      expect(screen.getByText(/NO se puede deshacer/i)).toBeTruthy(),
-    );
+    expect(screen.queryByText(/NO se puede deshacer/i)).toBeNull();
   });
 });
 
@@ -668,9 +644,9 @@ describe("🔴 el único campo en inglés del sistema", () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// 2. Las DOS formas de borrar un proyecto no se leen igual
+// 2. El proyecto ya no ofrece borrado definitivo (22-sep-2026)
 // ════════════════════════════════════════════════════════════════════════════
-describe("🔴 el borrado DEFINITIVO del proyecto dice que es definitivo", () => {
+describe("🔴 la ficha del proyecto: «Editar» se toca, «Eliminar definitivamente» no existe", () => {
   function pintarOverlay() {
     sessionStorage.setItem("cxc_role", "admin");
     render(
@@ -684,39 +660,20 @@ describe("🔴 el borrado DEFINITIVO del proyecto dice que es definitivo", () =>
     );
   }
 
-  it("el botón NO dice sólo «Eliminar», y mide 44 px", async () => {
+  it("«Editar» sigue ahí y mide 44 px", async () => {
     pintarOverlay();
-    const btn = await screen.findByRole("button", { name: /Eliminar definitivamente/ });
-    expect(esTactil(btn)).toBe(true);
-    // El de la lista del período ("Registrado por error — eliminar") esconde y
-    // se puede deshacer; ÉSTE borra facturas, fotos y archivos para siempre.
-    // Si los dos volvieran a decir "Eliminar" a secas, esto se cae.
-    expect(screen.queryByRole("button", { name: /^Eliminar$/ })).toBeNull();
-  });
-
-  it("no queda pegado a «Editar» (la fila se partió en dos)", async () => {
-    pintarOverlay();
-    const eliminar = await screen.findByRole("button", { name: /Eliminar definitivamente/ });
-    const editar = screen.getByRole("button", { name: "Editar" });
-    expect(editar.parentElement).toBe(eliminar.parentElement);
-    expect(eliminar.parentElement!.className).toMatch(/flex-col/);
+    const editar = await screen.findByRole("button", { name: "Editar" });
     expect(esTactil(editar)).toBe(true);
   });
 
-  it("y sigue pidiendo ESCRIBIR el nombre del proyecto para borrar", async () => {
+  it("🔴 ningún botón borra el proyecto para siempre, ni para admin", async () => {
     pintarOverlay();
-    fireEvent.click(await screen.findByRole("button", { name: /Eliminar definitivamente/ }));
-    expect(await screen.findByText(/Esta acción NO se puede deshacer/i)).toBeTruthy();
-    // Pide escribir el nombre exacto del proyecto…
-    const campo = screen.getByPlaceholderText(String(PROYECTO.nombre)) as HTMLInputElement;
-    // …y hasta que no coincida, el botón rojo del modal está APAGADO.
-    const rojo = screen
-      .getAllByRole("button")
-      .filter((b) => /Eliminar definitivamente/i.test(b.textContent ?? ""))
-      .find((b) => (b as HTMLButtonElement).disabled) as HTMLButtonElement;
-    expect(rojo).toBeTruthy();
-    fireEvent.change(campo, { target: { value: PROYECTO.nombre } });
-    await waitFor(() => expect(rojo.disabled).toBe(false));
+    await screen.findByRole("button", { name: "Editar" });
+    // 🩸 Hasta el 22-sep-2026 acá se exigía el botón rojo con confirmación por
+    // nombre. Daniel lo retiró (con «Anular» basta); la ruta contesta 403.
+    expect(screen.queryByRole("button", { name: /Eliminar definitivamente/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Eliminar$/ })).toBeNull();
+    expect(document.body.textContent ?? "").not.toMatch(/NO se puede deshacer/i);
   });
 });
 

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
-import { ConfirmDeleteModal } from "@/components/ui";
 import {
   BorradorFacturaCard,
   FacturaCard,
@@ -68,14 +67,9 @@ export default function FacturasSection({
   const [dragActivo, setDragActivo] = useState(false);
   // Confirmación global cuando hay borradores con duplicados sin aprobar
   const [confirmDup, setConfirmDup] = useState(false);
-  // Eliminar definitivamente (solo admin)
-  const [eliminando, setEliminando] = useState<FacturaConAdjuntos | null>(null);
-  const [eliminandoLoading, setEliminandoLoading] = useState(false);
-  const [role, setRole] = useState<string>("");
-  useEffect(() => {
-    setRole(sessionStorage.getItem("cxc_role") ?? "");
-  }, []);
-  const esAdmin = role === "admin";
+  // 🩸 «Eliminar definitivamente» SE RETIRÓ (22-sep-2026, Daniel: con
+  // «Anular» basta). El botón, su confirmación y el DELETE se fueron; la ruta
+  // contesta 403. Los 12 borrados duros de la historia quedan en activity_logs.
 
   // ---- Cierre de modales con clic fuera + Escape ----
   // Anular lleva un motivo escrito: si el usuario ya tipeó algo, el clic fuera
@@ -399,29 +393,6 @@ export default function FacturasSection({
     onChange?.();
   };
 
-  const handleEliminarDefinitivo = async () => {
-    if (!eliminando) return;
-    setEliminandoLoading(true);
-    try {
-      const res = await fetch(`/api/marketing/facturas/${eliminando.id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error ?? "No se pudo eliminar la factura");
-      }
-      toast("Factura eliminada", "success");
-      setEliminando(null);
-      await cargar();
-      onChange?.();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Error al eliminar";
-      toast(msg, "error");
-    } finally {
-      setEliminandoLoading(false);
-    }
-  };
-
   const handleAnular = async () => {
     if (!anulando || !anulandoMotivo.trim()) return;
     setAnulandoLoading(true);
@@ -743,23 +714,13 @@ export default function FacturasSection({
             return (
               <div key={f.id} className="space-y-1">
                 <FacturaCard factura={f} porcentajesMarcas={marcasDeEsta} />
-                {/* 🩸 Las tres acciones vivían FLOTANDO sobre la esquina de la
-                    tarjeta, de ~24 px de alto y a 4 px una de otra. En el
-                    iPhone el dedo caía en "Eliminar" (definitivo, se lleva la
-                    factura para siempre) cuando iba a "Anular" (reversible: la
-                    factura queda plegada abajo y se puede restaurar).
-
-                    Ahora van en su propia FILA debajo de la tarjeta:
-                      · cada botón mide 44 px de alto (mínimo táctil);
-                      · no tapan los badges (Pagado / Zona libre / PDF) que
-                        viven arriba a la derecha de la tarjeta — con 44 px de
-                        alto, flotando, los habrían tapado;
-                      · "Eliminar" se va al EXTREMO OPUESTO de la fila
-                        (`ml-auto`), separado de lo reversible: el dedo no
-                        puede resbalar de "Anular" a "Eliminar".
-                    Se dejan siempre visibles (antes se revelaban por hover en
-                    escritorio): en pantalla táctil el hover no existe y la
-                    fila propia ya no compite con nada. */}
+                {/* 🩸 Las acciones vivían FLOTANDO sobre la esquina de la
+                    tarjeta, de ~24 px de alto y a 4 px una de otra. Ahora van
+                    en su propia FILA debajo de la tarjeta, de 44 px de alto
+                    (mínimo táctil), sin tapar los badges y siempre visibles:
+                    en pantalla táctil el hover no existe.
+                    «Eliminar definitivamente» se retiró el 22-sep-2026 (con
+                    «Anular», que es reversible, basta). */}
                 {!f.anulado_en && !readonly && (
                   <div className="flex flex-wrap items-center gap-2">
                     <button
@@ -783,19 +744,6 @@ export default function FacturasSection({
                     >
                       Anular
                     </button>
-                    {esAdmin && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEliminando(f);
-                        }}
-                        className="ml-auto text-xs text-red-700 hover:text-white hover:bg-red-600 border border-red-300 rounded-md px-3 min-h-[44px] inline-flex items-center font-medium transition"
-                        title="Eliminar definitivamente (irreversible)"
-                      >
-                        Eliminar definitivamente
-                      </button>
-                    )}
                   </div>
                 )}
               </div>
@@ -911,19 +859,6 @@ export default function FacturasSection({
           </div>
         </div>
       )}
-
-      <ConfirmDeleteModal
-        open={eliminando !== null}
-        title={
-          eliminando
-            ? `Eliminar factura ${eliminando.numero_factura}`
-            : "Eliminar factura"
-        }
-        description="Se borrarán la factura, sus marcas asignadas y el PDF en Storage. Esta acción NO se puede deshacer."
-        onConfirm={handleEliminarDefinitivo}
-        onCancel={() => setEliminando(null)}
-        loading={eliminandoLoading}
-      />
 
       {/* Modal de confirmación de duplicados (bulk) */}
       {confirmDup && (

@@ -70,12 +70,6 @@ interface ProyectoMin {
   fecha_inicio: string;
 }
 
-interface ProyMarcaMin {
-  proyecto_id: string;
-  marca_id: string;
-  porcentaje: number;
-}
-
 interface FacturaMin {
   proyecto_id: string;
   total: number;
@@ -105,24 +99,10 @@ async function cargarProyectosVigentes(
   });
 }
 
-async function cargarProyMarcas(
-  proyectoIds: ReadonlyArray<string>
-): Promise<ProyMarcaMin[]> {
-  if (proyectoIds.length === 0) return [];
-  const { data, error } = await supabaseServer
-    .from("mk_proyecto_marcas")
-    .select("proyecto_id, marca_id, porcentaje")
-    .in("proyecto_id", proyectoIds);
-  if (error) throw new Error(`cargarProyMarcas: ${error.message}`);
-  return (data ?? []).map((r) => {
-    const x = r as Record<string, unknown>;
-    return {
-      proyecto_id: String(x.proyecto_id),
-      marca_id: String(x.marca_id),
-      porcentaje: Number(x.porcentaje ?? 0),
-    };
-  });
-}
+// 🩸 `cargarProyMarcas` (leía `mk_proyecto_marcas`) SE RETIRÓ el 22-sep-2026:
+// la marca es del GASTO. Las marcas de un proyecto salen de sus DOCUMENTOS
+// (`cargarGastoCompletoPorMarca`: facturas ∪ entregas), la misma regla de la
+// ficha del proyecto y de las tarjetas del inicio.
 
 async function cargarFacturas(
   proyectoIds: ReadonlyArray<string>
@@ -356,11 +336,16 @@ export async function reportePorProyecto(
   if (proyectos.length === 0) return [];
 
   const proyectoIds = proyectos.map((p) => p.id);
-  const [proyMarcas, facturas, entregaTotalByProy] = await Promise.all([
-    cargarProyMarcas(proyectoIds),
+  const [gastoPorMarca, facturas, entregaTotalByProy] = await Promise.all([
+    cargarGastoCompletoPorMarca(proyectoIds),
     cargarFacturas(proyectoIds),
     getEntregaTotalByProyectoBatch(proyectoIds),
   ]);
+  // Las marcas de cada proyecto, de sus documentos (ya no de mk_proyecto_marcas).
+  const proyMarcas: Array<{ proyecto_id: string; marca_id: string }> = [];
+  for (const [pid, porMarca] of gastoPorMarca) {
+    for (const mid of porMarca.keys()) proyMarcas.push({ proyecto_id: pid, marca_id: mid });
+  }
 
   // Si se filtra por marcaId, solo incluir proyectos que tengan esa marca
   let proyectosFiltrados = proyectos;

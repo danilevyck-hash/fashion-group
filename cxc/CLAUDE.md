@@ -546,6 +546,11 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 **«REDES Sheynee» (15) ES Sheynee (11)**: columna `canal` del MISMO amarre, NUNCA por nombre; UNA fila (comisión y bono juntos) con «tienda $X · redes $Y» (`canales.ts`, v5); Metas lee el canónico (`meta_ventas_v2`). Migración `20261209120000` **pendiente**.
 - 🩸 La fila «YTD» pasa a «Año» con el total de la tarjeta (`fila-anio.ts`); el Δ va sobre los meses comparables. ⚠️ En el año en curso puede diferir por el día de corte.
 - 🩸 `SyncNowButton` con `roles={ROLES_MULTIFASHION}`; el rol sale de `lib/roles-etiquetas.ts`, derivado de `SYSTEM_ROLES`.
+### Marketing › el rediseño (22-sep-2026) — [docs/postmortems/marketing-rediseno.md](docs/postmortems/marketing-rediseno.md)
+
+- 🔴 **El cimiento está puesto y las pantallas NO** (pieza 1 de 5): un gasto es factura · mueble · impulsadora con **UNA marca** (`exigirUnaMarca`, enchufada en las tres puertas), su **tienda** del directorio o «General» (**el proyecto se va**, Daniel: *«a) Basta la tienda»*), y **`se_reporta`** prendido por defecto (apagado no suma ni va al ZIP). Módulos puros en `lib/marketing/{gasto,proveedor,duplicado,periodo-estado,agrupar-por-tienda,columnas-opcionales}.ts`; duplicado = proveedor NORMALIZADO + monto + fecha y **no se guarda**; el período tiene DOS estados y la nota de crédito es TEXTO sin cálculo.
+- 🔴 **Migraciones `20261216120000` y `20261216120100` APLICADAS el 22-sep-2026** (86 facturas · 24 entregas · 60 adjuntos tomaron la tienda de su proyecto; 22 facturas sin tienda: 17 de impulsadoras sin proyecto, 4 muebles Boston sin proyecto, 1 con proyecto sin tienda): aditivas, COPIARON la tienda del proyecto y **el código falla ABIERTO sin ellas**. 🩸 «Eliminar definitivamente» se retiró (rutas 403) y `mk_proyecto_marcas` quedó sin lectores (`congelada`, no se dropea). El reparto para las piezas A–D vive en el postmortem. Candado: `marketing-cimiento`.
+
 ### Marketing › Mobiliario — [docs/postmortems/marketing-mobiliario.md](docs/postmortems/marketing-mobiliario.md)
 
 - 🔴 **El inventario se descuenta en PIEZAS.** Los bultos son solo cómo viajó la mercancía y **no existe conversión fija** entre unos y otros. `piezasParaStock()` es la única función que toca el stock, y hay barrido que pone el build ROJO si `bultos` entra en esa aritmética.

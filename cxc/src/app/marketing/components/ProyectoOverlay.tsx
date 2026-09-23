@@ -15,7 +15,7 @@ import {
 } from "react";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { useToast } from "@/components/ToastSystem";
-import { ConfirmTypeNameModal, ModalOverlay } from "@/components/ui";
+import { ModalOverlay } from "@/components/ui";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { useDescargarZip } from "@/lib/marketing/useDescargarZip";
 import {
@@ -96,19 +96,12 @@ export default function ProyectoOverlay({
   const [tab, setTab] = useUrlState<Tab>("pt", "facturas");
   const [marcasCatalogo, setMarcasCatalogo] = useState<MkMarca[]>([]);
   const [editando, setEditando] = useState(false);
-  const [eliminando, setEliminando] = useState(false);
-  const [eliminandoLoading, setEliminandoLoading] = useState(false);
-  const [role, setRole] = useState<string>("");
   const { estados: zipEstados, descargar: descargarZip } = useDescargarZip();
 
   // Escape cierra el overlay del proyecto, pero NO cuando hay un modal encima
-  // (editar / eliminar): ahí el Escape le toca al de arriba, si no se cerrarían
-  // los dos de un golpe. El clic fuera se pasa como onBackdropClick abajo.
-  useEscapeClose(true, onClose, !editando && !eliminando);
-
-  useEffect(() => {
-    setRole(sessionStorage.getItem("cxc_role") ?? "");
-  }, []);
+  // (editar): ahí el Escape le toca al de arriba, si no se cerrarían los dos
+  // de un golpe. El clic fuera se pasa como onBackdropClick abajo.
+  useEscapeClose(true, onClose, !editando);
 
   useEffect(() => {
     let cancelado = false;
@@ -276,29 +269,10 @@ export default function ProyectoOverlay({
     );
   }
 
-  const esAdmin = role === "admin";
-
-  const handleEliminar = async () => {
-    setEliminandoLoading(true);
-    try {
-      const res = await fetch(`/api/marketing/proyectos/${proyecto.id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error ?? "No se pudo eliminar");
-      }
-      toast("Proyecto eliminado", "success");
-      setEliminando(false);
-      onChange();
-      onClose();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Error al eliminar";
-      toast(msg, "error");
-    } finally {
-      setEliminandoLoading(false);
-    }
-  };
+  // 🩸 «Eliminar definitivamente» SE RETIRÓ (22-sep-2026, Daniel: con
+  // «Anular» basta). Borraba el proyecto, sus facturas, fotos y archivos para
+  // siempre; la ruta ahora contesta 403 y los 12 borrados duros de la historia
+  // quedan en activity_logs.
 
   return (
     <ModalOverlay backdropClassName="bg-black/30" onBackdropClick={onClose}>
@@ -406,16 +380,6 @@ export default function ProyectoOverlay({
                   >
                     Editar
                   </button>
-                  {esAdmin && (
-                    <button
-                      type="button"
-                      onClick={() => setEliminando(true)}
-                      title="Borra el proyecto, sus facturas, sus fotos y sus archivos. No se puede deshacer."
-                      className="text-xs px-3 min-h-[44px] inline-flex items-center rounded-md border border-red-300 text-red-700 font-medium hover:bg-red-600 hover:text-white transition"
-                    >
-                      Eliminar definitivamente
-                    </button>
-                  )}
                 </div>
               </div>
             </div>
@@ -589,15 +553,6 @@ export default function ProyectoOverlay({
         }}
       />
 
-      <ConfirmTypeNameModal
-        open={eliminando}
-        title="Eliminar proyecto definitivamente"
-        description="Se borrarán el proyecto, sus facturas, fotos y archivos en Storage. Esta acción NO se puede deshacer."
-        expectedName={proyecto.nombre || proyecto.tienda}
-        onCancel={() => setEliminando(false)}
-        onConfirm={handleEliminar}
-        loading={eliminandoLoading}
-      />
     </ModalOverlay>
   );
 }

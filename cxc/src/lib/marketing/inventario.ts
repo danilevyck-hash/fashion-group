@@ -48,6 +48,7 @@ import {
   sumaUnidadesPorProducto,
 } from "@/lib/inventario-calc";
 import { normalizarBultos, normalizarPiezas, piezasParaStock } from "./piezas-bultos";
+import { exigirUnaMarca } from "./gasto";
 import {
   borrarSellosDeDocumento,
   sellarDocumentoPorMarcas,
@@ -808,6 +809,9 @@ export async function createEntrega(
 
   // Marcas con % (1 marca = 100%; varias = % entre ellas). Sin empresa interna.
   const marcasPct = normalizarMarcasEntrega(input.marcas, items);
+  // 🔴 UN GASTO TIENE UNA MARCA (22-sep-2026, `lib/marketing/gasto.ts`):
+  // medido 24 de 24 entregas con una sola. Con dos, se frena y se dice.
+  if (marcasPct.length > 1) exigirUnaMarca(marcasPct);
   if (marcasPct.length === 0) {
     throw new Error("La entrega debe tener al menos una marca");
   }
@@ -933,6 +937,9 @@ export async function updateEntrega(
 
   // Marcas con % (sin empresa interna). Cargar precios + validar.
   const marcasPct = normalizarMarcasEntrega(input.marcas, items);
+  // 🔴 UN GASTO TIENE UNA MARCA (22-sep-2026, `lib/marketing/gasto.ts`):
+  // medido 24 de 24 entregas con una sola. Con dos, se frena y se dice.
+  if (marcasPct.length > 1) exigirUnaMarca(marcasPct);
   if (marcasPct.length === 0) {
     throw new Error("La entrega debe tener al menos una marca");
   }

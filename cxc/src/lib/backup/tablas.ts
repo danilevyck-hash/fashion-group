@@ -221,7 +221,6 @@ export const TABLAS_PERSONAS = [
   "mk_facturas",
   "mk_marcas",
   "mk_proyectos",
-  "mk_proyecto_marcas",
   "mk_factura_marcas",
   "mk_entregas_muebles",
   "mk_entrega_items",
@@ -266,6 +265,10 @@ export const TABLAS_PERSONAS = [
 
 // ─── `congelada` — nadie la escribe y su origen ya no existe ────────────────
 export const TABLAS_CONGELADAS = [
+  // 🩸 Marketing › la marca POR PROYECTO del modelo viejo (22-sep-2026): sin
+  // lectores ni escritores en `src/`, 5 filas que no se borran (patrón
+  // `mayor_lineas`). La marca es del GASTO (`lib/marketing/gasto.ts`).
+  "mk_proyecto_marcas",
   // El CSV viejo de ventas y de CXC. No re-derivables de Switch.
   "ventas_raw",
   "cxc_rows",

@@ -14,6 +14,7 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { sellarDocumentoPorMarcas } from "./periodos-io";
+import { exigirUnaMarca } from "./gasto";
 import type { MarcaConPorcentaje, MkMarca, TipoMarca } from "./types";
 
 // Legacy: se mantiene para importaciones antiguas. El valor real se decide
@@ -129,6 +130,9 @@ export async function setMarcasDeFactura(
   if (!Array.isArray(marcas) || marcas.length === 0) {
     throw new Error("Debe especificar al menos una marca");
   }
+  // 🔴 UN GASTO TIENE UNA MARCA (22-sep-2026, `lib/marketing/gasto.ts`). Con
+  // dos, se frena aquí y se dice; medido: 108 de 108 facturas con una sola.
+  exigirUnaMarca(marcas);
 
   // Validación: marcaIds únicas y no vacías
   const ids = new Set<string>();

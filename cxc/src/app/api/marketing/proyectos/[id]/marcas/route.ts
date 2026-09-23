@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
-import { updateProyectoMarcas } from "@/lib/marketing/mutations";
-import type { MarcaPorcentajeInput } from "@/lib/marketing/types";
 
 export const dynamic = "force-dynamic";
 
-const uuidRegex =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// 🩸 RETIRADA (22-sep-2026). Escribía `mk_proyecto_marcas`, la tabla de marcas
+// POR PROYECTO del modelo viejo. En el rediseño la marca es del GASTO (una por
+// gasto, `lib/marketing/gasto.ts`) y el proyecto se va: ningún lector ni
+// escritor queda en `src/`. La tabla NO se dropea (patrón `mayor_lineas`);
+// sus 5 filas quedan en el respaldo como `congelada`. Sin un solo botón que
+// llamara a esta ruta, contesta 410 y lo dice.
+const MSG_MARCAS_POR_PROYECTO_RETIRADAS =
+  "Las marcas ya no se guardan por proyecto: cada gasto lleva la suya.";
 
 export async function PUT(
   req: NextRequest,
@@ -14,23 +18,9 @@ export async function PUT(
 ) {
   const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
-  if (!uuidRegex.test(params.id)) {
-    return NextResponse.json({ error: "ID inválido" }, { status: 400 });
-  }
-  try {
-    const body = (await req.json()) as { marcas: MarcaPorcentajeInput[] };
-    if (!Array.isArray(body?.marcas)) {
-      return NextResponse.json(
-        { error: "Falta arreglo 'marcas'" },
-        { status: 400 },
-      );
-    }
-    await updateProyectoMarcas(params.id, body.marcas);
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "No se pudieron guardar las marcas";
-    console.error("marketing/proyectos/[id]/marcas PUT:", message);
-    return NextResponse.json({ error: message }, { status: 400 });
-  }
+  void params;
+  return NextResponse.json(
+    { error: MSG_MARCAS_POR_PROYECTO_RETIRADAS },
+    { status: 410 },
+  );
 }

@@ -404,29 +404,33 @@ describe("el sello se pone al REGISTRAR, no por la fecha del documento", () => {
     expect(sellos[0].tipo).toBe("factura");
   });
 
-  it("una factura de dos bloques distintos recibe UN sello por bloque", async () => {
-    const facturaId = await registrarFactura({
-      numero: "F-002",
-      fecha: "2026-08-11",
-      total: 500,
-      marcaIds: [MARCA_TH, MARCA_RBK],
-    });
-
-    const sellos = sellosDe(facturaId);
-    expect(sellos.map((s) => s.proveedor_key).sort()).toEqual(["pvh", "reebok"]);
-    expect(
-      sellos.find((s) => s.proveedor_key === "reebok")!.periodo_id,
-    ).toBe(PER_RBK_ABIERTO);
+  // ⚠️ CAMBIÓ DE DIRECCIÓN el 22-sep-2026 (rediseño de Marketing, Daniel:
+  // UNA marca por gasto, nunca se reparte; medido 108/108 con una sola). Los
+  // dos casos de abajo exigían que una factura de DOS marcas recibiera un
+  // sello por bloque; hoy la puerta (`exigirUnaMarca`, lib/marketing/gasto.ts)
+  // la RECHAZA antes de escribir nada, y no queda ni un sello.
+  it("una factura de DOS marcas se rechaza en la puerta y no deja sello", async () => {
+    const antes = estado.tablas.mk_periodo_documentos.length;
+    await expect(
+      registrarFactura({
+        numero: "F-002",
+        fecha: "2026-08-11",
+        total: 500,
+        marcaIds: [MARCA_TH, MARCA_RBK],
+      }),
+    ).rejects.toThrow(/UNA marca/);
+    expect(estado.tablas.mk_periodo_documentos).toHaveLength(antes);
   });
 
-  it("SIN la migración por marca, Tommy y Calvin comparten el sello viejo 'pvh'", async () => {
-    const facturaId = await registrarFactura({
-      numero: "F-003",
-      fecha: "2026-08-11",
-      total: 800,
-      marcaIds: [MARCA_TH, MARCA_CK],
-    });
-    expect(sellosDe(facturaId)).toHaveLength(1);
+  it("SIN la migración por marca, Tommy y Calvin juntas tampoco entran", async () => {
+    await expect(
+      registrarFactura({
+        numero: "F-003",
+        fecha: "2026-08-11",
+        total: 800,
+        marcaIds: [MARCA_TH, MARCA_CK],
+      }),
+    ).rejects.toThrow(/UNA marca/);
   });
 
   it("una marca SIN bloque decidido no se sella con nadie", async () => {
@@ -778,17 +782,19 @@ describe("con la migración por marca corrida, el sello va por CÓDIGO", () => {
     migrarAPeriodosPorMarca();
   });
 
-  it("Tommy y Calvin reciben UN sello CADA UNA, con su propio código", async () => {
-    const facturaId = await registrarFactura({
-      numero: "F-M1",
-      fecha: "2026-08-11",
-      total: 800,
-      marcaIds: [MARCA_TH, MARCA_CK],
-    });
-    const sellos = sellosDe(facturaId);
-    expect(sellos.map((s) => s.proveedor_key).sort()).toEqual(["CK", "TH"]);
-    expect(sellos.find((s) => s.proveedor_key === "TH")!.periodo_id).toBe(PER_TH);
-    expect(sellos.find((s) => s.proveedor_key === "CK")!.periodo_id).toBe(PER_CK);
+  // ⚠️ CAMBIÓ DE DIRECCIÓN el 22-sep-2026: una factura lleva UNA marca. Lo
+  // que antes era «un sello por marca» hoy es «cada marca, su propia factura,
+  // con su propio sello por CÓDIGO».
+  it("Tommy y Calvin: cada una SU factura y SU sello por código; juntas, se rechaza", async () => {
+    const th = await registrarFactura({ numero: "F-M1", fecha: "2026-08-11", total: 500, marcaIds: [MARCA_TH] });
+    const ck = await registrarFactura({ numero: "F-M2", fecha: "2026-08-11", total: 300, marcaIds: [MARCA_CK] });
+    expect(sellosDe(th).map((s) => s.proveedor_key)).toEqual(["TH"]);
+    expect(sellosDe(th)[0].periodo_id).toBe(PER_TH);
+    expect(sellosDe(ck).map((s) => s.proveedor_key)).toEqual(["CK"]);
+    expect(sellosDe(ck)[0].periodo_id).toBe(PER_CK);
+    await expect(
+      registrarFactura({ numero: "F-M3", fecha: "2026-08-11", total: 800, marcaIds: [MARCA_TH, MARCA_CK] }),
+    ).rejects.toThrow(/UNA marca/);
   });
 
   it("cerrar Tommy deja a Calvin intacta, aunque cierren el mismo día", async () => {

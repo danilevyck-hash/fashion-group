@@ -45,40 +45,10 @@ export async function GET(req: NextRequest) {
 
     const ids = proyectos.map((p) => p.id);
 
-    // Marcas de cada proyecto
-    const { data: pmData, error: pmError } = await supabaseServer
-      .from("mk_proyecto_marcas")
-      .select("*, marca:mk_marcas(*)")
-      .in("proyecto_id", ids);
-    if (pmError) throw new Error(pmError.message);
-
+    // 🩸 `mk_proyecto_marcas` YA NO SE LEE (22-sep-2026): la marca es del
+    // GASTO (`lib/marketing/gasto.ts`); la lista deriva lo que muestra de los
+    // documentos. La tabla se queda con sus 5 filas, sin lectores ni escritores.
     const marcasByProyecto = new Map<string, MarcaConPorcentaje[]>();
-    for (const row of pmData ?? []) {
-      const r = row as Record<string, unknown>;
-      const marcaRow = r.marca as Record<string, unknown> | null;
-      if (!marcaRow) continue;
-      const tipoRaw = String(marcaRow.tipo ?? "externa");
-      const tipo: "externa" | "interna" =
-        tipoRaw === "interna" ? "interna" : "externa";
-      const item: MarcaConPorcentaje = {
-        marca: {
-          id: String(marcaRow.id),
-          nombre: String(marcaRow.nombre ?? ""),
-          codigo: String(marcaRow.codigo ?? ""),
-          empresa_codigo: String(
-            marcaRow.empresa_codigo ?? "",
-          ) as MarcaConPorcentaje["marca"]["empresa_codigo"],
-          tipo,
-          activo: Boolean(marcaRow.activo ?? true),
-          created_at: String(marcaRow.created_at ?? ""),
-        },
-        porcentaje: Number(r.porcentaje ?? 0),
-      };
-      const pid = String(r.proyecto_id);
-      const arr = marcasByProyecto.get(pid) ?? [];
-      arr.push(item);
-      marcasByProyecto.set(pid, arr);
-    }
 
     // Totales de facturas por proyecto (fuente única compartida con detalle)
     const totalByProyecto = await resumenFacturasVigentesBatch(ids);

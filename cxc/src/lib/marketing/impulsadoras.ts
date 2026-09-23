@@ -25,6 +25,7 @@ import { getMarcas } from "./queries";
 import { mesActualISO, mesAnteriorISO } from "./meses";
 import { bloquePorMarcaId, sellarDocumento } from "./periodos-io";
 import { esMarcaCodigo } from "./bloques";
+import { exigirUnaMarca } from "./gasto";
 import {
   coberturaDelMes,
   etiquetaPeriodo,
@@ -227,6 +228,9 @@ function validarSplit(
   if (!Array.isArray(marcas) || marcas.length === 0) {
     throw new Error("Debe asignar al menos una marca");
   }
+  // 🔴 UNA impulsadora es de UNA marca (22-sep-2026, Daniel: «persona con
+  // $800/mes a UNA marca»; `lib/marketing/gasto.ts`). Medido: 2 de 2.
+  exigirUnaMarca(marcas);
   const ids = new Set<string>();
   let suma = 0;
   for (const m of marcas) {
