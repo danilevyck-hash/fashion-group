@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
-import { reportePorMarca } from "@/lib/marketing/reportes";
+import { reportePorMarca, reportePorMarcaRediseno } from "@/lib/marketing/reportes";
+import { MARKETING_PORTADA_REDISENO } from "@/lib/marketing/portada-rediseno";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,12 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Rediseño (22-sep-2026): la marca es la del GASTO, solo lo reportado,
+    // sin pie que sume marcas entre sí. Apagado el interruptor, lo de antes.
+    if (MARKETING_PORTADA_REDISENO) {
+      const filas = await reportePorMarcaRediseno(anio);
+      return NextResponse.json({ items: filas, anio: anio ?? null, rediseno: true });
+    }
     const items = await reportePorMarca(anio);
     return NextResponse.json({ items, anio: anio ?? null });
   } catch (err: unknown) {

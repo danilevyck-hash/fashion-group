@@ -1,39 +1,18 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireRole } from "@/lib/requireRole";
-import { reportePorProyecto } from "@/lib/marketing/reportes";
-import type { FiltrosReporteProyecto } from "@/lib/marketing/reportes";
+import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-// El filtro `?estado=` se retiró el 11-ago-2026 junto con "Cerrar proyecto":
-// la pantalla de reportes nunca lo mandaba y el estado dejó de existir como
-// concepto visible del proyecto.
-export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria"]);
-  if (auth instanceof NextResponse) return auth;
-
-  const { searchParams } = new URL(req.url);
-  const anioStr = searchParams.get("anio");
-  const marcaId = searchParams.get("marca_id") ?? undefined;
-  const tienda = searchParams.get("tienda") ?? undefined;
-
-  const filtros: FiltrosReporteProyecto = {};
-  if (anioStr) {
-    const parsed = parseInt(anioStr, 10);
-    if (!Number.isFinite(parsed) || parsed < 2000 || parsed > 2100) {
-      return NextResponse.json({ error: "anio inválido" }, { status: 400 });
-    }
-    filtros.anio = parsed;
-  }
-  if (marcaId) filtros.marcaId = marcaId;
-  if (tienda) filtros.tienda = tienda;
-
-  try {
-    const items = await reportePorProyecto(filtros);
-    return NextResponse.json({ items });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Error interno";
-    console.error("GET /api/marketing/reportes/proyecto:", msg);
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
+// 🩸 GET /api/marketing/reportes/proyecto SE RETIRÓ el 22-sep-2026 (pieza C del
+// rediseño de Marketing). Daniel: *«"Por proyecto" se va»* — el proyecto dejó
+// de ser el contenedor del gasto (*«a) Basta la tienda»*); los reportes son por
+// MARCA y por TIENDA. Contesta 410 con el porqué; ninguna tabla se dropea
+// (patrón `mayor_lineas`). Candado: `marketing-portada-y-cierre`.
+export async function GET() {
+  return NextResponse.json(
+    {
+      error:
+        "El reporte por proyecto se retiró: los gastos se reportan por marca y por tienda.",
+    },
+    { status: 410 },
+  );
 }

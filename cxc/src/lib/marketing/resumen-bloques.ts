@@ -29,9 +29,19 @@
 // $58.365,00 abiertos**. O sea: la plata se movería en pantalla por no haber
 // corrido una migración.
 //
+// 🔴 «¿SE REPORTA A LA MARCA?» (rediseño, 22-sep-2026). Con `excluirNoReportado`
+// en `true`, un gasto con `se_reporta = false` NO entra en `total`, ni en
+// `porMarca`, ni en «Por cliente», ni en el detalle: cae en `noReportado`
+// (conteo + monto), que la pantalla dice en gris y nunca suma. La regla es
+// UNA y viene del cimiento (`sumaEnElPeriodo`). Con la bandera apagada —o sin
+// la columna— todo se cuenta como hoy: medido el 22-sep-2026, 0 de 94
+// facturas vivas y 0 de 24 entregas están apagadas, así que ningún número se
+// movió al prender esto.
+//
 // Módulo PURO. Sin base, sin I/O.
 // ============================================================================
 
+import { sumaEnElPeriodo } from "./periodo-estado";
 import {
   marcasDeEntrega,
   porcionEntregaParaMarca,
@@ -104,6 +114,8 @@ export interface BloqueResumen {
   sinComprobante: number;
   /** Gastos del período ABIERTO CON CLIENTE y sin foto de instalación. */
   sinFoto: number;
+  /** Lo apagado con «¿Se reporta a la marca?»: se dice, no se suma. */
+  noReportado: Monto;
 }
 
 export interface PeriodoCerradoResumen {
@@ -116,6 +128,8 @@ export interface PeriodoCerradoResumen {
   facturas: Monto;
   muebles: Monto;
   total: number;
+  /** Lo apagado que quedó sellado a este período: se dice, no se suma. */
+  noReportado: Monto;
 }
 
 /** Clave de la sección del período ABIERTO en el detalle por período. */
@@ -198,6 +212,11 @@ export interface EntradaBloques {
   sellos?: ReadonlyArray<SelloRow>;
   /** Filas de `mk_adjuntos`. Vacío = los dos avisos salen en cero. */
   adjuntos?: ReadonlyArray<AdjuntoResumen>;
+  /**
+   * 🔴 `true` = un gasto con `se_reporta = false` va a `noReportado` y no
+   * suma. `false`/ausente = todo cuenta, como antes del rediseño.
+   */
+  excluirNoReportado?: boolean;
 }
 
 // ----------------------------------------------------------------------------
@@ -369,6 +388,10 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
   const periodos = inp.periodos ?? [];
   const sellos = inp.sellos ?? [];
   const adjuntos = inp.adjuntos ?? [];
+  const excluir = inp.excluirNoReportado === true;
+  /** ¿Este gasto está apagado Y la bandera pide apartarlo? */
+  const apagado = (g: { se_reporta?: boolean | null }): boolean =>
+    excluir && !sumaEnElPeriodo({ seReporta: g.se_reporta });
   // El clasificador es la FUENTE ÚNICA (ver `crearClasificadorPeriodos`).
   const { conPeriodos, abiertoDeMarca, cerradoPara } =
     crearClasificadorPeriodos(periodos, sellos);
@@ -426,6 +449,7 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
         proyectos: 0,
         sinComprobante: 0,
         sinFoto: 0,
+        noReportado: { count: 0, total: 0 },
       };
       bloques.set(k, b);
     }
@@ -514,6 +538,7 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
     marcaKey: string,
     tipo: "factura" | "entrega",
     monto: number,
+    sinReportar = false,
   ) => {
     // 🔴 La llave lleva la MARCA. Acumular solo por `periodo.id` metería las 59
     // facturas de "mid 2026" en UNA sola entrada y la pantalla no podría decir
@@ -533,8 +558,13 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
         facturas: { count: 0, total: 0 },
         muebles: { count: 0, total: 0 },
         total: 0,
+        noReportado: { count: 0, total: 0 },
       };
       cerradosAcc.set(llave, c);
+    }
+    if (sinReportar) {
+      sumar(c.noReportado, monto);
+      return;
     }
     sumar(tipo === "factura" ? c.facturas : c.muebles, monto);
     c.total += monto;
@@ -569,6 +599,11 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
     // el titular de la pantalla y las dos cifras se contradirían.
     if (esMf(pid)) {
       const b = bloque(MULTIFASHION_KEY);
+      if (apagado(f)) {
+        sumar(b.noReportado, num(f.total));
+        anotarProyecto(MULTIFASHION_KEY, pid);
+        continue;
+      }
       sumar(b.facturas, num(f.total));
       anotarProyecto(MULTIFASHION_KEY, pid);
       anotarCliente(pid, MULTIFASHION_KEY, num(f.total));
@@ -598,6 +633,12 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
       anotarProyecto(k, pid);
 
       const cer = cerradoPara("factura", fid, k, periodoLegacyDeFactura(f, false));
+      // Apagado: se anota aparte (en su período) y no toca ningún total.
+      if (apagado(f)) {
+        if (cer) anotarCerrado(cer, k, "factura", monto, true);
+        else sumar(bloque(k).noReportado, monto);
+        continue;
+      }
       if (cer) {
         anotarCerrado(cer, k, "factura", monto);
         anotarDetalle(k, cer, pid, "factura", monto);
@@ -624,6 +665,11 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
 
     if (esMf(pid)) {
       const b = bloque(MULTIFASHION_KEY);
+      if (apagado(e)) {
+        sumar(b.noReportado, num(e.total));
+        anotarProyecto(MULTIFASHION_KEY, pid);
+        continue;
+      }
       sumar(b.muebles, num(e.total));
       anotarProyecto(MULTIFASHION_KEY, pid);
       anotarCliente(pid, MULTIFASHION_KEY, num(e.total));
@@ -646,6 +692,11 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
       // columna de `mk_facturas` y no existe para las entregas. Sin sello, van
       // al período abierto — que es lo que hace la pantalla de hoy.
       const cer = cerradoPara("entrega", eid, k, false);
+      if (apagado(e)) {
+        if (cer) anotarCerrado(cer, k, "entrega", monto, true);
+        else sumar(bloque(k).noReportado, monto);
+        continue;
+      }
       if (cer) {
         anotarCerrado(cer, k, "entrega", monto);
         anotarDetalle(k, cer, pid, "entrega", monto);
@@ -676,6 +727,7 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
     b.facturas.total = round2(b.facturas.total);
     b.muebles.total = round2(b.muebles.total);
     b.total = round2(b.facturas.total + b.muebles.total);
+    b.noReportado.total = round2(b.noReportado.total);
     b.proyectos = proyectosDeBloque.get(k)?.size ?? 0;
     listaBloques.push(b);
   }
@@ -686,6 +738,7 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
       facturas: { ...c.facturas, total: round2(c.facturas.total) },
       muebles: { ...c.muebles, total: round2(c.muebles.total) },
       total: round2(c.total),
+      noReportado: { ...c.noReportado, total: round2(c.noReportado.total) },
     }))
     .sort(
       (a, b) =>

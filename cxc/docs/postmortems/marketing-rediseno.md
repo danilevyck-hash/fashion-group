@@ -253,3 +253,38 @@ Dos candados ajenos **cambiaron de forma, no de dirección**, con nota fechada:
 - ⚠️ La pantalla vieja del proyecto (`FacturasSection`, `ProyectoOverlay`) no muestra los gastos nuevos: nacen sin `proyecto_id`. Se ven en la vista de tienda (B) y en los reportes por tienda (C).
 - ⚠️ El aviso viejo por **número** de factura (`check-duplicate`, «Continuar de todos modos») sigue en `FacturaForm`: avisa, pero el freno nuevo del servidor manda igual.
 - ⚠️ `updateFactura`/`updateEntrega` aceptan las tres columnas, pero las rutas de edición (`PUT /facturas/[id]`, `PATCH /entregas/[id]`) todavía no las mandan: editar un gasto no cambia su tienda ni su «se reporta». Es otra pantalla.
+
+---
+
+## (C) La portada Abiertos | Cerrados, el cierre con nombre y los reportes (22-sep-2026)
+
+**Lo que Daniel definió y acá se construyó**, detrás de `MARKETING_PORTADA_REDISENO` (`src/lib/marketing/portada-rediseno.ts`, hoy `true`; `false` = la portada, el modal y el cierre de antes, intactos):
+
+- **La portada** (`InicioMarketing.tsx` → `PortadaAbiertosCerrados.tsx`): dos pestañas **Abiertos | Cerrados** (`?estado=`, `replace`). En Abiertos, una fila por marca con su período abierto, **lo reportado como único monto**, lo apagado en gris («No se reporta: $X», nunca sumado) y **desde cuándo está abierto** («42 días abierto», contra el `hoy` de Panamá que manda la ruta). En Cerrados, el **nombre que se le puso al cerrar** (`nombre_al_cerrar`; un cierre viejo como «mid 2026» conserva el suyo), la marca, «Cerrado el …» y la nota de crédito si la hay; tocarla abre el nivel 3 por id (`seccionPorSlug` resuelve slug o id). 🔴 **Sin tarjeta de Multifashion entre las marcas**: va en Herramientas como «Tienda propia · N gastos · no se le reporta a ninguna marca» y lleva a `/marketing/multifashion`. 🔴 **Sin total del grupo** ni «Por cliente»/«Por marca»: *«los gastos de las marcas NUNCA se suman entre sí»*.
+- **El cierre** (`cerrar.ts › cerrarPeriodoRediseno`, `[id]/cerrar/route.ts`, `periodos-io.ts › cerrarPeriodoConNombre/abrirPeriodoSiguiente`, `CerrarPeriodoModal.tsx`): pide **el nombre con el que se cierra ESTE período** (obligatorio, `MSG_FALTA_NOMBRE`, arranca con el nombre que ya tiene) y la **nota de crédito como TEXTO** (opcional, ≤300; ningún `Number()`), sella lo que pertenece al período —**los apagados también**, el sello dice a qué período va el gasto, no si se reporta—, escribe el parche de `armarCierre` **sin `reporte`** y abre el siguiente con `abrirSiguiente` («Desde el 22 sept 2026», `hoyPanama()`). Si abrir el siguiente falla, se reabre. **No baja ningún Excel al cerrar** (`DetallePeriodoView` solo lo hace con el interruptor apagado). El body de la ruta pasa de `{ nombreSiguiente }` a `{ nombreAlCerrar, notaCredito? }`.
+- **Lo apagado no suma** en el agregador único (`resumen-bloques.ts › excluirNoReportado`): `se_reporta = false` cae en `noReportado` (conteo + monto) por bloque y por cerrado, fuera de `total`, `porMarca`, `porCliente` y el detalle. Lo prenden `/api/marketing/inicio`, `proyectos-lista` (niveles 2 y 3) y `periodos-reporte.ts`, todos leyendo `se_reporta` por `conRespaldoSinColumnas`. La ruta de la portada suma `periodosMeta` (`abierto_en` · `nombre_al_cerrar` · `nota_credito`, por `completarPeriodo`) y `hoy`.
+- **Los reportes** (`reportes-rediseno.ts` puro + `reportes.ts › reportePorMarcaRediseno/reportePorTiendaRediseno`): la marca y la tienda son **las del GASTO**, solo lo que `se_reporta`, **una marca = 100 %** (`partesPorMarca`; una fila vieja con dos se reparte a partes iguales y se avisa — medido: ninguna), el año es el del documento (`impulsadora_mes` para las impulsadoras). Por marca salen las cinco de `MARCAS_BLOQUE` **sin pie**; por tienda, `agruparPorTienda` con «General» al final y Multifashion como una tienda más. 🩸 **Se retiraron** `ReportePorProyectoView.tsx`, `reportePorProyecto`, `exportarExcelReporte` (y el import de `excel-export`), «Exportar Excel» de las dos vistas y la ruta `/api/marketing/reportes/proyecto` (contesta **410**). Nada se dropea.
+
+**Medido contra producción (22-sep-2026, solo lectura):** `mk_periodos` 6 filas (5 abiertas «Período 2026» del 12-ago, 1 cerrada «mid 2026» de `pvh`, `cerrado_por = migracion`), `nombre_al_cerrar` y `nota_credito` NULL en las 6, `zips_bajados = []`. 94 facturas vivas ($116.553,16) y 24 entregas ($81.347,00): **0 apagadas** → prender `excluirNoReportado` no movió un centavo. 22 facturas sin tienda (17 impulsadoras). Multifashion: 2 proyectos (D-108 y «Multifashion Holdings» sin código), $8.061,63 en la tarjeta de antes. Tommy abrió el 12-ago 03:21 UTC = 11-ago en Panamá → **42 días** al 22-sep.
+
+**Candado:** `src/__tests__/components/marketing-portada-y-cierre.test.tsx` (21 casos en 7 bloques: dos estados · cerrar exige nombre y no genera reporte · el total excluye lo no reportado · Multifashion no es marca · las marcas no se suman entre sí · proyecto 410 y sin Exportar Excel · el interruptor).
+
+**Mutaciones a mano (6 + control):**
+
+| # | Mutación | Resultado |
+|---|---|---|
+| 1 | `filasAbiertas` deja de saltar `MULTIFASHION_KEY` | 🔴 |
+| 2 | `apagado()` del agregador devuelve siempre `false` (lo apagado vuelve a sumar) | 🔴 (2 casos) |
+| 3 | `cerrarPeriodoRediseno` deja de sellar lo que pertenece al período | 🔴 |
+| 4 | `cerrarPeriodoConNombre` escribe `reporte` en el `update` | 🔴 |
+| 5 | `reportePorMarcaDe` suma lo apagado en `reportado` | 🔴 |
+| 6 | la ruta `/reportes/proyecto` contesta 200 | 🔴 |
+| — | control sin mutar | 🟢 21/21 |
+
+**Candados ajenos que cambiaron de forma, con nota fechada:** `marketing-periodos.test.ts` y `poda-textos-explicaciones.test.tsx` (mockean el interruptor en `false`: prueban el cierre y el modal DE ANTES); `iphone-tocables-y-letra.test.ts` (2 pestañas, sin `ReportePorProyectoView`); `excel-exports-marketing.test.ts` (sin el bloque de `exportarExcelReporte`); `marketing-reclamos-toques.test.tsx` (sin el bloque del filtro «Marca» del reporte por proyecto).
+
+**Pendiente de Daniel:**
+1. 🔴 **Los $8.061,63 de Multifashion**: siguen en su bucket (no se le reportan a nadie). Si sus gastos con marca Tommy/Calvin deben entrar al período de esa marca —y por lo tanto al ZIP que se le manda—, es plata que se mueve y lo decide él.
+2. El agregador de los niveles 2 y 3 (`proyectos-lista`) ya aparta lo apagado, pero `lista-por-periodo.ts` no lo dibuja en gris todavía (hoy 0 apagados: nada que dibujar).
+3. El «Excel» de un período cerrado en el nivel 3 sigue vivo (es el del ZIP, pieza D); solo se retiró el «Exportar Excel» de Reportes.
+

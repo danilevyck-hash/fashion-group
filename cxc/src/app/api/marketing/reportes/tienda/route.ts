@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
-import { reportePorTienda } from "@/lib/marketing/reportes";
+import { reportePorTienda, reportePorTiendaRediseno } from "@/lib/marketing/reportes";
 import { getUniqueFieldValues } from "@/lib/marketing/queries";
+import { MARKETING_PORTADA_REDISENO } from "@/lib/marketing/portada-rediseno";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,14 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Rediseño (22-sep-2026): la tienda es la del GASTO (código del
+    // directorio), «General» al final, solo lo reportado. Las tiendas del
+    // filtro salen de las mismas filas. Apagado el interruptor, lo de antes.
+    if (MARKETING_PORTADA_REDISENO) {
+      const filas = await reportePorTiendaRediseno(anio);
+      const tiendas = filas.map((f) => f.tienda);
+      return NextResponse.json({ items: filas, tiendas, anio: anio ?? null, rediseno: true });
+    }
     const [items, tiendas] = await Promise.all([
       reportePorTienda(anio),
       getUniqueFieldValues("mk_proyectos", "tienda"),

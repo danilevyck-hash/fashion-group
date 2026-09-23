@@ -18,10 +18,21 @@
 // lectura del reporte de "mid 2026" que ya está guardado —y que dice 'pvh'
 // porque ese cierre fue conjunto de verdad—, o sea que el Excel congelado
 // dejaría de salir. Es la misma decisión que la columna `proveedor_key`.
+//
+// 🔴 «¿SE REPORTA A LA MARCA?» (rediseño, 22-sep-2026). Con el interruptor
+// `MARKETING_PORTADA_REDISENO` prendido, `cargarDatosPeriodos` trae
+// `se_reporta` (por `conRespaldoSinColumnas`: sin la columna, todo prendido)
+// y un gasto apagado NO entra en las líneas ni en los totales del reporte —
+// pero SÍ entra en `documentos`, porque el sello dice a qué período pertenece
+// y un gasto apagado también se registró en este período. Sellarlo evita que
+// se arrastre al siguiente para siempre.
 // ============================================================================
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { esMultifashion } from "@/lib/marketing/multifashion";
+import { conRespaldoSinColumnas } from "./columnas-opcionales";
+import { sumaEnElPeriodo } from "./periodo-estado";
+import { MARKETING_PORTADA_REDISENO } from "./portada-rediseno";
 import { marcasDeEntrega, porcionEntregaParaMarca } from "./resumen-inicio";
 import {
   agregarPorBloques,
@@ -127,6 +138,7 @@ interface FacturaFila {
   fecha_factura: string | null;
   proveedor: string | null;
   concepto: string | null;
+  se_reporta?: boolean | null;
 }
 interface EntregaFila {
   id: string;
@@ -136,6 +148,7 @@ interface EntregaFila {
   total_por_empresa_interna: Record<string, number> | null;
   notas: string | null;
   created_at: string | null;
+  se_reporta?: boolean | null;
 }
 interface ProyectoFila {
   id: string;
@@ -173,6 +186,12 @@ export interface DatosPeriodos {
    * lee (`if (!datos.hayTablas) → 409`).
    */
   hayTablas: boolean;
+  /**
+   * 🔴 `true` = un gasto con `se_reporta = false` se aparta (`noReportado`)
+   * y no suma. Lo pone `cargarDatosPeriodos` desde el interruptor; un caso
+   * de prueba lo arma a mano.
+   */
+  excluirNoReportado?: boolean;
 }
 
 /**
@@ -184,26 +203,41 @@ export interface DatosPeriodos {
  * 20260811160000_marketing_periodos_por_proveedor.sql. Un error en esas dos
  * lecturas se propaga como cualquier otro.
  */
+const COLS_FACTURA =
+  "id, proyecto_id, total, grupo_legacy, impulsadora_id, numero_factura, fecha_factura, proveedor, concepto";
+const COLS_ENTREGA =
+  "id, proyecto_id, total, total_por_marca, total_por_empresa_interna, notas, created_at";
+
+const avisarColumna = (m: string) => console.error(`[marketing/periodos-reporte] ${m}`);
+
 export async function cargarDatosPeriodos(): Promise<DatosPeriodos> {
+  const excluir = MARKETING_PORTADA_REDISENO;
   const [factRes, fmRes, proyRes, marcasRes, entRes, adjRes, perRes, selloRes] =
     await Promise.all([
-      supabaseServer
-        .from("mk_facturas")
-        .select(
-          "id, proyecto_id, total, grupo_legacy, impulsadora_id, numero_factura, fecha_factura, proveedor, concepto",
-        )
-        .is("anulado_en", null),
+      // `se_reporta` es del rediseño: se pide, y si la columna no está se
+      // relee sin ella (todo prendido, como hoy). Un timeout o un permiso no
+      // caen al respaldo: `esColumnaAusente` los deja pasar como error.
+      conRespaldoSinColumnas<FacturaFila[]>(
+        () =>
+          supabaseServer
+            .from("mk_facturas")
+            .select(`${COLS_FACTURA}, se_reporta`)
+            .is("anulado_en", null),
+        () => supabaseServer.from("mk_facturas").select(COLS_FACTURA).is("anulado_en", null),
+        avisarColumna,
+      ).then((r) => r.resultado),
       supabaseServer.from("mk_factura_marcas").select("factura_id, marca_id, porcentaje"),
       supabaseServer
         .from("mk_proyectos")
         .select("id, nombre, tienda, tienda_codigo")
         .is("anulado_en", null),
       supabaseServer.from("mk_marcas").select("id, nombre, codigo, empresa_codigo"),
-      supabaseServer
-        .from("mk_entregas_muebles")
-        .select(
-          "id, proyecto_id, total, total_por_marca, total_por_empresa_interna, notas, created_at",
-        ),
+      conRespaldoSinColumnas<EntregaFila[]>(
+        () =>
+          supabaseServer.from("mk_entregas_muebles").select(`${COLS_ENTREGA}, se_reporta`),
+        () => supabaseServer.from("mk_entregas_muebles").select(COLS_ENTREGA),
+        avisarColumna,
+      ).then((r) => r.resultado),
       supabaseServer.from("mk_adjuntos").select("tipo, factura_id, proyecto_id"),
       supabaseServer
         .from("mk_periodos")
@@ -236,6 +270,7 @@ export async function cargarDatosPeriodos(): Promise<DatosPeriodos> {
     periodos: (perRes.data ?? []) as PeriodoRow[],
     sellos: (selloRes.data ?? []) as SelloRow[],
     hayTablas: true,
+    excluirNoReportado: excluir,
   };
 }
 
@@ -254,6 +289,7 @@ export function agregar(datos: DatosPeriodos) {
     periodos: datos.periodos,
     sellos: datos.sellos,
     adjuntos: datos.adjuntos,
+    excluirNoReportado: datos.excluirNoReportado === true,
   });
 }
 
@@ -311,6 +347,10 @@ export function armarReportePeriodo(
   const prov = String(periodo.proveedor_key);
   const soloSellados = opciones?.soloSelladosAEste === true;
   const marcaPedida = opciones?.marca;
+  // 🔴 Un gasto apagado pertenece al período (se sella) pero no se reporta
+  // (no hay línea ni suma). Solo con la bandera del rediseño.
+  const apagado = (g: { se_reporta?: boolean | null }): boolean =>
+    datos.excluirNoReportado === true && !sumaEnElPeriodo({ seReporta: g.se_reporta });
   // Normalmente UNA marca. Un período viejo por proveedor ('pvh') junta tres:
   // sin esto, cerrar un período heredado generaría un reporte VACÍO.
   const marcasDelReporte = new Set(
@@ -460,6 +500,8 @@ export function armarReportePeriodo(
       const k = bloquePorMarca.get(r.marca_id) ?? SIN_BLOQUE;
       if (!marcasDelReporte.has(k)) continue;
       if (!entraEnEstePeriodo("factura", fid, k)) continue;
+      idsFactura.add(fid);
+      if (apagado(f)) continue;
       if (pid) proyectosDelReporte.add(pid);
       const ctx = datosDeProyecto(pid);
       lineasFactura.push({
@@ -473,7 +515,6 @@ export function armarReportePeriodo(
         marca: nombrePorMarca.get(r.marca_id) ?? "",
         monto: round2(num(f.total) * (r.porcentaje / sumPct)),
       });
-      idsFactura.add(fid);
     }
   }
 
@@ -491,6 +532,8 @@ export function armarReportePeriodo(
       if (!entraEnEstePeriodo("entrega", eid, k)) continue;
       const monto = porcionEntregaParaMarca(e as never, mid, empresaPorMarca.get(mid));
       if (monto <= 0) continue;
+      idsEntrega.add(eid);
+      if (apagado(e)) continue;
       proyectosDelReporte.add(pid);
       const ctx = datosDeProyecto(pid);
       lineasEntrega.push({
@@ -502,7 +545,6 @@ export function armarReportePeriodo(
         notas: e.notas ?? null,
         monto: round2(monto),
       });
-      idsEntrega.add(eid);
     }
   }
 
@@ -582,6 +624,20 @@ export function armarReportePeriodo(
       entregas: Array.from(idsEntrega),
     },
   };
+}
+
+/**
+ * 🔴 SOLO los documentos que pertenecen al período ABIERTO de una marca —
+ * para SELLARLOS al cerrar—, sin armar ni guardar ningún reporte. Es lo que
+ * usa el cierre del rediseño (22-sep-2026): Daniel, *«cuando lo cierro es
+ * porque lo cobré»*; cerrar no genera nada. Los apagados también entran:
+ * el sello dice a qué período pertenece el gasto, no si se reporta.
+ */
+export function documentosDelPeriodoAbierto(
+  datos: DatosPeriodos,
+  periodo: { id: string; proveedor_key: string; nombre: string },
+): DocumentosDelReporte {
+  return armarReportePeriodo(datos, periodo).documentos;
 }
 
 // ----------------------------------------------------------------------------

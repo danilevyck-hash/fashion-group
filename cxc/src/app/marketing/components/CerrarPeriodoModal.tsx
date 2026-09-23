@@ -32,12 +32,24 @@
 // dentro de un año.
 //
 // ⚠️ NO SE PUEDE DESHACER, y el modal lo dice antes de que toque el botón.
+//
+// 🔴 EL CIERRE DEL REDISEÑO (22-sep-2026), detrás de `MARKETING_PORTADA_REDISENO`:
+// Daniel, *«no quiero pipeline, cuando lo cierro es porque lo cobré»*. El
+// modal pide el NOMBRE con el que se cierra ESTE período (obligatorio — es lo
+// que la marca reconoce) y la nota de crédito como TEXTO libre (opcional, sin
+// ningún cálculo: *«no enredes ni hagas de más»*). NO baja ningún reporte: el
+// ZIP se baja cuando se quiera desde el período. El siguiente se abre solo,
+// con nombre por defecto («Desde el 22 sept 2026»). El total que se muestra
+// es lo REPORTADO; lo apagado se dice en gris y no suma. Con el interruptor
+// apagado, el modal de antes, intacto (`CerrarPeriodoModalDeAntes`).
 // ============================================================================
 
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useToast } from "@/components/ToastSystem";
 import { formatearMonto } from "@/lib/marketing/normalizar";
+import { MSG_FALTA_NOMBRE } from "@/lib/marketing/periodo-estado";
+import { MARKETING_PORTADA_REDISENO } from "@/lib/marketing/portada-rediseno";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import type { BloqueResumen } from "./InicioMarketing";
 
@@ -54,7 +66,13 @@ function plural(n: number, uno: string, varios: string): string {
   return `${n} ${n === 1 ? uno : varios}`;
 }
 
-export default function CerrarPeriodoModal({
+export default function CerrarPeriodoModal(props: Props) {
+  if (MARKETING_PORTADA_REDISENO) return <CerrarPeriodoModalRediseno {...props} />;
+  return <CerrarPeriodoModalDeAntes {...props} />;
+}
+
+/** El modal de antes del rediseño, intacto. Vive detrás del interruptor. */
+function CerrarPeriodoModalDeAntes({
   bloque,
   periodoId,
   onClose,
@@ -260,6 +278,195 @@ export default function CerrarPeriodoModal({
             className="rounded-md bg-black text-white px-4 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {cerrando ? "Cerrando…" : "Cerrar y bajar reporte"}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// EL MODAL DEL REDISEÑO — nombre al cerrar + nota de crédito, sin reporte.
+// ────────────────────────────────────────────────────────────────────────────
+function CerrarPeriodoModalRediseno({ bloque, periodoId, onClose, onCerrado }: Props) {
+  const { toast } = useToast();
+  // Arranca con el nombre que el período ya tiene: Daniel lo cambia si quiere.
+  const [nombre, setNombre] = useState(bloque.periodoAbierto?.nombre ?? "");
+  const [notaCredito, setNotaCredito] = useState("");
+  const [cerrando, setCerrando] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const cerrar = useCallback(() => onClose(), [onClose]);
+  const { panelRef, backdrop } = useFormModalDismiss(mounted, cerrar, !cerrando);
+
+  // Los pendientes VIENEN ya contados por bloque. Nunca se recuenta acá.
+  const pendientes = {
+    sinComprobante: bloque.sinComprobante ?? 0,
+    sinFoto: bloque.sinFoto ?? 0,
+  };
+  const noReportado = bloque.noReportado ?? { count: 0, total: 0 };
+  const gastos = bloque.facturas.count + bloque.muebles.count;
+  const nombrePeriodo = bloque.periodoAbierto?.nombre ?? "Período actual";
+  const puedeConfirmar = nombre.trim().length > 0 && !cerrando;
+
+  const confirmar = async () => {
+    if (!puedeConfirmar) return;
+    setCerrando(true);
+    try {
+      const res = await fetch(`/api/marketing/periodos/${periodoId}/cerrar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombreAlCerrar: nombre.trim(),
+          notaCredito: notaCredito.trim() || null,
+        }),
+      });
+      const data = (await res.json().catch(() => null)) as {
+        error?: string;
+        siguiente?: { nombre?: string };
+      } | null;
+      if (!res.ok) throw new Error(data?.error ?? "No se pudo cerrar el período");
+      toast(
+        `Cerrado «${nombre.trim()}». ${bloque.nombre} sigue en «${data?.siguiente?.nombre ?? "el período nuevo"}».`,
+        "success",
+      );
+      await onCerrado(periodoId, `${bloque.nombre} · ${nombre.trim()} · ${formatearMonto(bloque.total)}`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "No se pudo cerrar el período", "error");
+      setCerrando(false);
+    }
+  };
+
+  if (!mounted) return null;
+
+  const hayPendientes = pendientes.sinComprobante > 0 || pendientes.sinFoto > 0;
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4" {...backdrop}>
+      <div className="absolute inset-0 bg-black/40" aria-hidden="true" />
+      <div
+        ref={panelRef}
+        className="relative bg-white w-full sm:max-w-md rounded-lg max-h-[90vh] overflow-y-auto border border-gray-200"
+      >
+        <div className="border-b border-gray-100 pl-5 pr-2 py-2.5 flex items-center justify-between gap-3">
+          <h2 className="text-base font-semibold text-gray-900">Cerrar el período de {bloque.nombre}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={cerrando}
+            aria-label="Cerrar"
+            className="shrink-0 w-11 h-11 flex items-center justify-center rounded-md text-gray-500 hover:text-black active:scale-[0.97] transition disabled:opacity-40"
+          >
+            <span aria-hidden="true" className="text-xl leading-none">
+              &times;
+            </span>
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <p className="text-sm text-gray-600">
+            Cerrar quiere decir que ya lo cobraste. El período que sigue se abre solo.
+          </p>
+
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <div className="text-xs text-gray-500">
+              Lo de {bloque.nombre} en <span className="font-medium text-gray-700">{nombrePeriodo}</span>:
+            </div>
+            <ul className="mt-2 space-y-1 text-sm text-gray-800">
+              <li className="flex items-center justify-between gap-3">
+                <span>{plural(gastos, "gasto reportado", "gastos reportados")}</span>
+                <span className="tabular-nums font-semibold">{formatearMonto(bloque.total)}</span>
+              </li>
+              {noReportado.count > 0 && (
+                <li className="flex items-center justify-between gap-3 text-gray-500">
+                  <span>{plural(noReportado.count, "gasto que no se reporta", "gastos que no se reportan")}</span>
+                  <span className="tabular-nums">{formatearMonto(noReportado.total)}</span>
+                </li>
+              )}
+            </ul>
+          </div>
+
+          {hayPendientes && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+              <div className="text-sm font-semibold text-amber-900">Antes de cerrar, fíjate</div>
+              <ul className="space-y-2 text-sm text-amber-900">
+                {pendientes.sinComprobante > 0 && (
+                  <li>
+                    <span className="font-medium">
+                      {plural(pendientes.sinComprobante, "gasto", "gastos")} sin comprobante.
+                    </span>{" "}
+                    <span className="text-amber-800">Es el papel que respalda la plata.</span>
+                  </li>
+                )}
+                {pendientes.sinFoto > 0 && (
+                  <li>
+                    <span className="font-medium">{plural(pendientes.sinFoto, "gasto", "gastos")} sin foto.</span>{" "}
+                    <span className="text-amber-800">La de la instalación. Se puede agregar después.</span>
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+
+          <div>
+            <label htmlFor="mk-nombre-al-cerrar" className="block text-sm font-medium text-gray-700 mb-1">
+              ¿Con qué nombre se cierra este período?
+              <span className="text-red-500 ml-0.5">*</span>
+            </label>
+            <input
+              id="mk-nombre-al-cerrar"
+              type="text"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Ej. Temporada 2026, Enero–junio 2026"
+              disabled={cerrando}
+              maxLength={120}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none disabled:bg-gray-50"
+            />
+            {nombre.trim().length === 0 && (
+              <p className="mt-1 text-xs text-red-700">{MSG_FALTA_NOMBRE}</p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="mk-nota-credito" className="block text-sm font-medium text-gray-700 mb-1">
+              Nota de crédito <span className="text-gray-400 font-normal">(opcional)</span>
+            </label>
+            <input
+              id="mk-nota-credito"
+              type="text"
+              value={notaCredito}
+              onChange={(e) => setNotaCredito(e.target.value)}
+              placeholder="Ej. NC-000123"
+              disabled={cerrando}
+              maxLength={300}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none disabled:bg-gray-50"
+            />
+          </div>
+
+          <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-3">
+            Después de cerrarlo no se puede deshacer: los montos de adentro ya no se pueden editar.
+          </p>
+        </div>
+
+        <div className="border-t border-gray-100 px-5 py-4 flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={cerrando}
+            className="px-3 min-h-[44px] inline-flex items-center justify-center rounded-md text-sm text-gray-600 hover:text-black transition disabled:opacity-40"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={confirmar}
+            disabled={!puedeConfirmar}
+            className="rounded-md bg-black text-white px-4 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {cerrando ? "Cerrando…" : "Cerrar período"}
           </button>
         </div>
       </div>

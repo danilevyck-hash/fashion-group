@@ -271,7 +271,13 @@ export function seccionPorSlug(
   if (s === SLUG_PERIODO_ACTUAL) {
     return secciones.find((x) => x.estado === "abierto") ?? null;
   }
-  return secciones.find((x) => x.slug === s) ?? null;
+  // Por slug (el link lindo) y, si no, por ID (el estable): la portada del
+  // rediseño (22-sep-2026) enlaza un período cerrado por su id.
+  return (
+    secciones.find((x) => x.slug === s) ??
+    secciones.find((x) => x.id !== null && String(x.id).toLowerCase() === s) ??
+    null
+  );
 }
 
 /**

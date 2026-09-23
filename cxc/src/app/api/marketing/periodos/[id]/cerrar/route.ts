@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { esFaltaDeTablas } from "@/lib/marketing/periodos-io";
+import { MARKETING_PORTADA_REDISENO } from "@/lib/marketing/portada-rediseno";
 import {
   ErrorDeCierre,
   MSG_SIN_TABLAS,
   cerrarPeriodoDeMarca,
+  cerrarPeriodoRediseno,
+  validarNombreAlCerrar,
   validarNombreSiguiente,
+  validarNotaCredito,
 } from "../../cerrar";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +30,10 @@ const uuidRegex =
 // La operación entera vive en `../../cerrar.ts`. Cada marca se cierra SOLA con
 // este botón — el cierre en grupo se retiró el 11-ago-2026 (Daniel: *"que sea
 // por separado mejor no?"*).
+//
+// 🔴 Con `MARKETING_PORTADA_REDISENO` prendido el body es
+// `{ nombreAlCerrar, notaCredito? }` y el cierre NO genera reporte
+// (`cerrarPeriodoRediseno`). Con el interruptor en `false`, todo como antes.
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
@@ -34,6 +42,9 @@ export async function POST(
   if (auth instanceof NextResponse) return auth;
   if (!uuidRegex.test(params.id)) {
     return NextResponse.json({ error: "Período inválido" }, { status: 400 });
+  }
+  if (MARKETING_PORTADA_REDISENO) {
+    return cerrarConNombre(req, params.id, auth.userName || auth.role);
   }
 
   let nombreSiguiente = "";
@@ -75,6 +86,40 @@ export async function POST(
         { error: err.message, ...(err.extra ?? {}) },
         { status: err.status },
       );
+    }
+    if (esFaltaDeTablas(err)) {
+      return NextResponse.json({ error: MSG_SIN_TABLAS }, { status: 409 });
+    }
+    const msg = err instanceof Error ? err.message : "Error interno";
+    console.error("POST /api/marketing/periodos/[id]/cerrar:", msg);
+    return NextResponse.json(
+      { error: "No se pudo cerrar el período. Intenta de nuevo." },
+      { status: 500 },
+    );
+  }
+}
+
+/** El cierre del rediseño: nombre obligatorio, nota de crédito como texto. */
+async function cerrarConNombre(req: NextRequest, id: string, cerradoPor: string) {
+  let nombreAlCerrar = "";
+  let notaCredito: string | null = null;
+  try {
+    const body = (await req.json()) as { nombreAlCerrar?: unknown; notaCredito?: unknown };
+    nombreAlCerrar = validarNombreAlCerrar(body?.nombreAlCerrar);
+    notaCredito = validarNotaCredito(body?.notaCredito);
+  } catch (err) {
+    if (err instanceof ErrorDeCierre) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    return NextResponse.json({ error: "No se recibió el nombre del período." }, { status: 400 });
+  }
+
+  try {
+    const r = await cerrarPeriodoRediseno({ periodoId: id, nombreAlCerrar, notaCredito, cerradoPor });
+    return NextResponse.json({ cerrado: r.cerrado, siguiente: r.siguiente });
+  } catch (err) {
+    if (err instanceof ErrorDeCierre) {
+      return NextResponse.json({ error: err.message, ...(err.extra ?? {}) }, { status: err.status });
     }
     if (esFaltaDeTablas(err)) {
       return NextResponse.json({ error: MSG_SIN_TABLAS }, { status: 409 });

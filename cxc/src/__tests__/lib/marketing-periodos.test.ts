@@ -38,6 +38,16 @@ vi.hoisted(() => {
   process.env.SESSION_SECRET ||= "test-secret";
 });
 
+// ⚠️ Nota fechada (22-sep-2026, pieza C del rediseño): este archivo prueba
+// el cierre DE ANTES —`{ nombreSiguiente }`, reporte congelado al cerrar—, que
+// sigue vivo detrás de `MARKETING_PORTADA_REDISENO` en `false`. El cierre
+// nuevo (nombre al cerrar + nota de crédito, SIN reporte, el siguiente con
+// «Desde el …») lo cubre `marketing-portada-y-cierre.test.tsx`.
+vi.mock("@/lib/marketing/portada-rediseno", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/marketing/portada-rediseno")>();
+  return { ...real, MARKETING_PORTADA_REDISENO: false };
+});
+
 // ── Doble de PostgREST ──────────────────────────────────────────────────────
 type Fila = Record<string, unknown>;
 

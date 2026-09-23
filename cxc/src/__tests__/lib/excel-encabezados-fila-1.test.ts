@@ -383,7 +383,11 @@ describe("6 · la `nota` es la EXCEPCIÓN, no la puerta de atrás", () => {
     // que se está viendo. Sube A PROPÓSITO: una hoja que antes no existía.
     // ⚠️ NO usa `nota:` — su pie va en la fila de totales, que ya queda fuera
     // del filtro. La puerta de la `nota` sigue con sus DOS de siempre.
-    expect(total).toBe(31);
+    // 🔁 30 desde el 22-sep-2026: **`exportarExcelReporte` (Marketing ›
+    // Reportes) SE RETIRÓ** con la pieza C del rediseño (Daniel: «"Exportar
+    // Excel" se va»); su `buildReportSheet` se fue con él. Nada se perdió de
+    // camino: el Excel de una marca vive en el ZIP del período.
+    expect(total).toBe(30);
   });
 });
 

@@ -1,7 +1,7 @@
 // ============================================================================
 // I11 — Homogeneización de exports Excel: familia Marketing.
-// Valida que los 4 constructores (zip-export resumen_gastos, generar-zip
-// respaldo, inventario global, reportes) producen workbooks legibles
+// Valida que los 3 constructores (zip-export resumen_gastos, generar-zip
+// respaldo, inventario global) producen workbooks legibles
 // (XLSX.write → XLSX.read) con las mismas hojas/columnas, links intactos,
 // moneda numérica y paleta de la casa (navy 1B3A5C + Calibri).
 // ============================================================================
@@ -21,7 +21,6 @@ import { CASA_PALETTE } from "@/lib/excel-export";
 import { buildResumenGastosWorkbook } from "@/lib/marketing/zip-export";
 import { buildRespaldoWorkbook, type FacturaConMarcas } from "@/lib/marketing/generar-zip";
 import { exportarExcelGlobal } from "@/lib/marketing/inventario-excel";
-import { exportarExcelReporte } from "@/lib/marketing/reportes";
 import type {
   EntregaConItems,
   MkInventarioProducto,
@@ -297,67 +296,8 @@ describe("exportarExcelGlobal (inventario-excel)", () => {
   });
 });
 
-// ── reportes: exportarExcelReporte (buildReportSheet) ────────────────────────
-
-describe("exportarExcelReporte (reportes)", () => {
-  async function readBlob(blob: Blob): Promise<XLSX.WorkBook> {
-    return XLSX.read(new Uint8Array(await blob.arrayBuffer()), { type: "array" });
-  }
-
-  it("por marca: headers en la fila 1 + gasto numérico", async () => {
-    const blob = exportarExcelReporte("marca", [
-      { marca, gasto: 123.45 },
-    ]);
-    const wb = await readBlob(blob);
-    expect(wb.SheetNames).toEqual(["Por marca"]);
-    const ws = wb.Sheets["Por marca"];
-    // buildReportSheet: r0 ENCABEZADOS, r1.. datos. Nada arriba.
-    expect(cell(ws, "A1").v).toBe("Marca");
-    expect(cell(ws, "B1").v).toBe("Código");
-    expect(cell(ws, "C1").v).toBe("Gasto");
-    expect(cell(ws, "A2").v).toBe("Tommy Hilfiger");
-    expect(cell(ws, "C2").t).toBe("n");
-    expect(cell(ws, "C2").v).toBe(123.45);
-  });
-
-  it("por tienda: columnas dinámicas de marca conservadas", async () => {
-    const blob = exportarExcelReporte("tienda", [
-      { tienda: "Tienda Centro", porMarca: { "Tommy Hilfiger": 200 }, total: 200 },
-    ]);
-    const ws = (await readBlob(blob)).Sheets["Por tienda"];
-    expect(cell(ws, "A1").v).toBe("Tienda");
-    expect(cell(ws, "B1").v).toBe("Tommy Hilfiger");
-    expect(cell(ws, "C1").v).toBe("Gasto");
-    expect(cell(ws, "B2").t).toBe("n");
-    expect(cell(ws, "B2").v).toBe(200);
-  });
-
-  it("por proyecto: 5 columnas (sin Estado) y gasto numérico", async () => {
-    // La columna "Estado" se retiró el 11-ago-2026 junto con "Cerrar
-    // proyecto": sin escritor del estado solo podía decir "Abierto".
-    const blob = exportarExcelReporte("proyecto", [
-      {
-        proyecto: {
-          id: "pr1",
-          nombre: "Remodelación",
-          tienda: "Tienda Centro",
-          fecha_inicio: "2026-04-01",
-        },
-        marcas: [{ nombre: "Tommy Hilfiger" }],
-        gastoTotal: 350.5,
-      },
-    ]);
-    const ws = (await readBlob(blob)).Sheets["Por proyecto"];
-    expect(cell(ws, "A1").v).toBe("Proyecto");
-    expect(cell(ws, "E1").v).toBe("Gasto real");
-    expect(cell(ws, "A2").v).toBe("Remodelación");
-    expect(cell(ws, "D2").v).toBe("Tommy Hilfiger");
-    expect(cell(ws, "E2").t).toBe("n");
-    expect(cell(ws, "E2").v).toBe(350.5);
-    // Ninguna celda del encabezado dice "Estado".
-    for (const col of ["A", "B", "C", "D", "E", "F"]) {
-      const c = ws[`${col}1`];
-      if (c) expect(c.v).not.toBe("Estado");
-    }
-  });
-});
+// ── reportes: exportarExcelReporte ───────────────────────────────────────────
+// 22-sep-2026 · NOTA FECHADA — `exportarExcelReporte` SE RETIRÓ con la pieza C
+// del rediseño de Marketing (Daniel: «"Exportar Excel" se va»): el Excel de
+// una marca vive en el ZIP de su período (`zip-marca.ts`, arriba). El candado
+// que impide que vuelva es `marketing-portada-y-cierre.test.tsx`.

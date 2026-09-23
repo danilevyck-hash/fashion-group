@@ -189,8 +189,9 @@ const PERMITIDOS: Record<string, string> = {
   // ── Filtros de reporte: no atan a nadie a ningún registro ──
   "app/marketing/components/ReportePorTiendaView.tsx":
     "Filtro del reporte por tienda: solo acota lo que ya está en pantalla, no guarda nada.",
-  "app/marketing/components/ReportePorProyectoView.tsx":
-    "Filtro del reporte por proyecto: solo acota lo que ya está en pantalla, no guarda nada.",
+  // 22-sep-2026 · NOTA FECHADA — `ReportePorProyectoView.tsx` salió de esta
+  // lista porque el ARCHIVO se retiró (pieza C del rediseño de Marketing:
+  // Daniel, «"Por proyecto" se va»). Candado: `marketing-portada-y-cierre`.
 };
 
 function archivosDelSistema(): string[] {

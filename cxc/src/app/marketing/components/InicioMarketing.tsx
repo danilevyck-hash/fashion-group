@@ -30,9 +30,16 @@
 // ⚠️ DEGRADA LIMPIO. Sin la migración de períodos (`conPeriodos: false`) las
 // filas se dibujan igual; solo el contador de períodos deja de sumar la fila
 // del abierto que todavía no existe en la base.
+//
+// 🔴 EL REDISEÑO (22-sep-2026): con `MARKETING_PORTADA_REDISENO` prendido, la
+// portada es `PortadaAbiertosCerrados` (dos pestañas, sin Multifashion como
+// marca, sin total del grupo). Con el interruptor en `false`, ESTA pantalla,
+// intacta (`InicioDeAntes`). Nada de lo que se guarda cambia entre las dos.
 // ============================================================================
 
 import { useEffect, useMemo, useState } from "react";
+import { MARKETING_PORTADA_REDISENO } from "@/lib/marketing/portada-rediseno";
+import PortadaAbiertosCerrados from "./PortadaAbiertosCerrados";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 import {
   MARCAS_BLOQUE,
@@ -61,6 +68,8 @@ export interface BloqueResumen {
   sinComprobante?: number;
   /** Gastos sin foto de instalación. Solo los que tienen cliente. */
   sinFoto?: number;
+  /** Lo apagado con «¿Se reporta a la marca?» (rediseño). Ausente = cero. */
+  noReportado?: MontoInicio | null;
 }
 
 export interface PeriodoCerradoResumen {
@@ -72,6 +81,7 @@ export interface PeriodoCerradoResumen {
   facturas: MontoInicio;
   muebles: MontoInicio;
   total: number;
+  noReportado?: MontoInicio | null;
 }
 
 export interface FilaClienteInicio {
@@ -102,6 +112,8 @@ export interface DatosInicio {
 interface Props {
   /** Abre la página de la marca (nivel 2: sus períodos). */
   onSelectBloque: (key: string) => void;
+  /** Abre un período CERRADO (nivel 3). Solo lo usa la portada del rediseño. */
+  onSelectCerrado?: (bloqueKey: string, periodoId: string) => void;
   /** La única puerta para meter plata: el modal de "Registrar gasto". */
   onRegistrarGasto: () => void;
   onOpenImpulsadoras: () => void;
@@ -134,7 +146,27 @@ function plural(n: number, uno: string, varios: string): string {
   return `${n} ${n === 1 ? uno : varios}`;
 }
 
-export default function InicioMarketing({
+export default function InicioMarketing(props: Props) {
+  if (MARKETING_PORTADA_REDISENO) {
+    return (
+      <PortadaAbiertosCerrados
+        onSelectBloque={props.onSelectBloque}
+        onSelectCerrado={(bloqueKey, periodoId) =>
+          (props.onSelectCerrado ?? ((k) => props.onSelectBloque(k)))(bloqueKey, periodoId)
+        }
+        onRegistrarGasto={props.onRegistrarGasto}
+        onOpenImpulsadoras={props.onOpenImpulsadoras}
+        onOpenInventario={props.onOpenInventario}
+        onOpenReportes={props.onOpenReportes}
+        refreshKey={props.refreshKey}
+      />
+    );
+  }
+  return <InicioDeAntes {...props} />;
+}
+
+/** La portada de antes del rediseño, intacta. Vive detrás del interruptor. */
+function InicioDeAntes({
   onSelectBloque,
   onRegistrarGasto,
   onOpenImpulsadoras,

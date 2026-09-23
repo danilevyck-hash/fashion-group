@@ -41,6 +41,7 @@ import {
   type SeccionPeriodo,
 } from "@/lib/marketing/lista-por-periodo";
 import { MULTIFASHION_KEY } from "@/lib/marketing/bloques";
+import { MARKETING_PORTADA_REDISENO } from "@/lib/marketing/portada-rediseno";
 import { useDescargarZip } from "@/lib/marketing/useDescargarZip";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { useDescargasPeriodo } from "./useDescargasPeriodo";
@@ -430,9 +431,12 @@ export default function DetallePeriodoView({
           onClose={() => setCerrando(false)}
           onCerrado={async (periodoId, etiquetaCierre) => {
             setCerrando(false);
-            // El recién cerrado se baja con SU marca — el mismo camino que el
-            // botón Excel de un período cerrado.
-            await descargarReporte(periodoId, etiquetaCierre, marca.key);
+            // 🔴 Rediseño (22-sep-2026): cerrar NO genera reporte — Daniel,
+            // *«cuando lo cierro es porque lo cobré»*. Con el interruptor
+            // apagado, el recién cerrado se baja con SU marca, como antes.
+            if (!MARKETING_PORTADA_REDISENO) {
+              await descargarReporte(periodoId, etiquetaCierre, marca.key);
+            }
             recargar();
           }}
         />

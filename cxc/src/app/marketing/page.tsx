@@ -153,6 +153,12 @@ function MarketingPage() {
               // acá (candado navegacion-atras-fluido).
               router.push(`/marketing/${slugDeMarca(key, marcas)}`)
             }
+            onSelectCerrado={(key, periodoId) =>
+              // Un período cerrado abre su nivel 3 directo, por su ID: la
+              // página del período lo resuelve (`seccionPorSlug` acepta el
+              // slug o el id).
+              router.push(`/marketing/${slugDeMarca(key, marcas)}/${periodoId}`)
+            }
             onRegistrarGasto={() => setRegistrandoGasto(true)}
             onOpenImpulsadoras={() => navegar({ vista: "impulsadoras" })}
             onOpenInventario={() => router.push("/marketing/mobiliario")}

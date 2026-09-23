@@ -38,6 +38,8 @@ export interface FacturaResumen {
   total: number | null;
   grupo_legacy?: boolean | null;
   impulsadora_id?: string | null;
+  /** «¿Se reporta a la marca?» (rediseño 22-sep-2026). Solo un `false` apaga. */
+  se_reporta?: boolean | null;
 }
 
 /** Fila de `mk_factura_marcas`. */
@@ -53,6 +55,8 @@ export interface EntregaResumen {
   total: number | null;
   total_por_marca: Record<string, number> | null;
   total_por_empresa_interna?: Record<string, number> | null;
+  /** «¿Se reporta a la marca?» (rediseño 22-sep-2026). Solo un `false` apaga. */
+  se_reporta?: boolean | null;
 }
 
 /** Marca del catálogo (`mk_marcas`), solo lo que hace falta acá. */

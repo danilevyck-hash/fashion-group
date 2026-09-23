@@ -2,12 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { esMultifashion } from "@/lib/marketing/multifashion";
+import { hoyPanama } from "@/lib/fecha-panama";
 import {
   agregarPorBloques,
   type AdjuntoResumen,
   type PeriodoRow,
   type SelloRow,
 } from "@/lib/marketing/resumen-bloques";
+import {
+  completarPeriodo,
+  conRespaldoSinColumnas,
+} from "@/lib/marketing/columnas-opcionales";
+import {
+  MARKETING_PORTADA_REDISENO,
+  type PeriodoMeta,
+} from "@/lib/marketing/portada-rediseno";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -30,6 +39,24 @@ export const fetchCache = "force-no-store";
 //
 // La capa que SÍ sigue viva es la de los sellos históricos: dicen
 // 'pvh'/'reebok'/'joybees' y el agregador los reconoce igual (`clavesDeSello`).
+//
+// 🔴 EL REDISEÑO (22-sep-2026) agrega, detrás de `MARKETING_PORTADA_REDISENO`:
+// `se_reporta` de facturas y entregas (lo apagado va a `noReportado`, no al
+// total), las columnas del cierre de `mk_periodos` (`abierto_en`,
+// `nombre_al_cerrar`, `nota_credito`) en `periodosMeta`, y el `hoy` de Panamá
+// para que la portada diga cuántos días lleva abierto cada período. Todo por
+// `columnas-opcionales`: sin la columna, como antes.
+
+const COLS_FACTURA = "id, proyecto_id, total, grupo_legacy, impulsadora_id";
+const COLS_ENTREGA = "id, proyecto_id, total, total_por_marca, total_por_empresa_interna";
+const COLS_PERIODO = "id, proveedor_key, nombre, estado, cerrado_en";
+const avisarColumna = (m: string) => console.error(`[marketing/inicio] ${m}`);
+
+interface PeriodoLeido extends PeriodoRow {
+  abierto_en?: string | null;
+  nombre_al_cerrar?: string | null;
+  nota_credito?: string | null;
+}
 
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria"]);
@@ -47,26 +74,38 @@ export async function GET(req: NextRequest) {
       perRes,
       selloRes,
     ] = await Promise.all([
-        supabaseServer
-          .from("mk_facturas")
-          .select("id, proyecto_id, total, grupo_legacy, impulsadora_id")
-          .is("anulado_en", null),
+        conRespaldoSinColumnas(
+          () =>
+            supabaseServer
+              .from("mk_facturas")
+              .select(`${COLS_FACTURA}, se_reporta`)
+              .is("anulado_en", null),
+          () => supabaseServer.from("mk_facturas").select(COLS_FACTURA).is("anulado_en", null),
+          avisarColumna,
+        ).then((r) => r.resultado),
         supabaseServer.from("mk_factura_marcas").select("factura_id, marca_id, porcentaje"),
         supabaseServer
           .from("mk_proyectos")
           .select("id, tienda, tienda_codigo")
           .is("anulado_en", null),
         supabaseServer.from("mk_marcas").select("id, nombre, codigo, empresa_codigo"),
-        supabaseServer
-          .from("mk_entregas_muebles")
-          .select("id, proyecto_id, total, total_por_marca, total_por_empresa_interna"),
+        conRespaldoSinColumnas(
+          () => supabaseServer.from("mk_entregas_muebles").select(`${COLS_ENTREGA}, se_reporta`),
+          () => supabaseServer.from("mk_entregas_muebles").select(COLS_ENTREGA),
+          avisarColumna,
+        ).then((r) => r.resultado),
         supabaseServer.from("mk_impulsadoras").select("id, monto_mensual, activa"),
         // Comprobantes y fotos: alimentan los dos AVISOS del bloque. Si esta
         // lectura falla, los avisos salen en cero y la plata se dibuja igual.
         supabaseServer.from("mk_adjuntos").select("tipo, factura_id, proyecto_id"),
-        supabaseServer
-          .from("mk_periodos")
-          .select("id, proveedor_key, nombre, estado, cerrado_en"),
+        conRespaldoSinColumnas(
+          () =>
+            supabaseServer
+              .from("mk_periodos")
+              .select(`${COLS_PERIODO}, abierto_en, nombre_al_cerrar, nota_credito`),
+          () => supabaseServer.from("mk_periodos").select(`${COLS_PERIODO}, abierto_en`),
+          avisarColumna,
+        ).then((r) => r.resultado),
         supabaseServer
           .from("mk_periodo_documentos")
           .select("periodo_id, proveedor_key, tipo, documento_id"),
@@ -103,7 +142,21 @@ export async function GET(req: NextRequest) {
       periodos: (perRes.data ?? []) as PeriodoRow[],
       sellos: (selloRes.data ?? []) as SelloRow[],
       adjuntos: (adjRes.error ? [] : (adjRes.data ?? [])) as AdjuntoResumen[],
+      excluirNoReportado: MARKETING_PORTADA_REDISENO,
     });
+
+    // Las columnas del cierre, por id de período, completadas con su valor
+    // de hoy si no vinieron (`completarPeriodo`). La portada lee de acá el
+    // nombre que Daniel le puso, la nota de crédito y desde cuándo está abierto.
+    const periodosMeta: Record<string, PeriodoMeta> = {};
+    for (const p of (perRes.data ?? []) as PeriodoLeido[]) {
+      const c = completarPeriodo(p as unknown as Record<string, unknown>);
+      periodosMeta[String(p.id)] = {
+        abiertoEn: p.abierto_en ?? null,
+        nombreAlCerrar: c.nombre_al_cerrar,
+        notaCredito: c.nota_credito,
+      };
+    }
 
     const entregas = (entregasRes.data ?? []) as Array<{
       proyecto_id: string | null;
@@ -130,6 +183,8 @@ export async function GET(req: NextRequest) {
 
     const res = NextResponse.json({
       ...resumen,
+      periodosMeta,
+      hoy: hoyPanama(),
       marcas: marcasCatalogo.map((m) => ({ id: m.id, nombre: m.nombre, codigo: m.codigo })),
       mobiliario: { entregas: mobiliario.entregas, total: Number(mobiliario.total.toFixed(2)) },
       impulsadoras: {

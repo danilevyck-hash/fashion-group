@@ -1,21 +1,37 @@
 // ============================================================================
 // Marketing — reportes agregados
-// Lee desde Supabase y agrega por marca / tienda / proyecto.
+// Lee desde Supabase y agrega por marca / tienda.
 // Todos los totales excluyen registros con anulado_en != null.
+//
+// 🩸 «POR PROYECTO» Y «EXPORTAR EXCEL» SE RETIRARON el 22-sep-2026 (pieza C del
+// rediseño). Daniel: *«"Por proyecto" se va; "Exportar Excel" se va»* — el
+// proyecto dejó de existir como contenedor (*«a) Basta la tienda»*) y el Excel
+// de una marca vive en el ZIP del período (pieza D). `reportePorProyecto`,
+// `exportarExcelReporte` y la ruta `/api/marketing/reportes/proyecto` (410)
+// no vuelven; hay candado (`marketing-portada-y-cierre`). Ninguna tabla se
+// dropea (patrón `mayor_lineas`).
+//
+// 🔴 DOS CAMINOS, UN INTERRUPTOR (`MARKETING_PORTADA_REDISENO`):
+//   · prendido → `reportePorMarcaRediseno` / `reportePorTiendaRediseno`: la
+//     marca y la tienda son las del GASTO, solo lo que `se_reporta`, UNA
+//     marca = 100 % (`reportes-rediseno.ts`, puro). El año es el del documento.
+//   · apagado → `reportePorMarca` / `reportePorTienda`, los de antes,
+//     intactos (por proyecto y su reparto `pct / sumPct`).
 // ============================================================================
-import {
-  buildReportSheet,
-  workbookFromSheets,
-  workbookBlob,
-  MONEY_FMT,
-  type ReportCell,
-  type ReportColumn,
-} from "@/lib/excel-export";
 import { supabaseServer } from "@/lib/supabase-server";
-import { formatearFecha } from "./normalizar";
 import { getMarcas } from "./queries";
-import { getEntregaTotalByProyectoBatch } from "./inventario";
 import type { MkMarca } from "./types";
+import { conRespaldoSinColumnas, completarGasto } from "./columnas-opcionales";
+import { marcasDeEntrega, porcionEntregaParaMarca } from "./resumen-inicio";
+import {
+  partesPorMarca,
+  reportePorMarcaDe,
+  reportePorTiendaDe,
+  type GastoParaReporte,
+  type NombresDeMarca,
+  type ReporteMarcaFila,
+  type ReporteTiendaFila,
+} from "./reportes-rediseno";
 
 // ----------------------------------------------------------------------------
 // Tipos de output
@@ -31,23 +47,6 @@ export interface ReporteTiendaItem {
   tienda: string;
   porMarca: Record<string, number>;
   total: number;
-}
-
-export interface ReporteProyectoItem {
-  proyecto: {
-    id: string;
-    nombre: string | null;
-    tienda: string;
-    fecha_inicio: string;
-  };
-  marcas: Array<{ nombre: string }>;
-  gastoTotal: number;
-}
-
-export interface FiltrosReporteProyecto {
-  anio?: number;
-  marcaId?: string;
-  tienda?: string;
 }
 
 // ----------------------------------------------------------------------------
@@ -69,12 +68,6 @@ interface ProyectoMin {
   tienda_codigo: string | null;
   fecha_inicio: string;
 }
-
-interface FacturaMin {
-  proyecto_id: string;
-  total: number;
-}
-
 
 async function cargarProyectosVigentes(
   anio?: number
@@ -103,25 +96,6 @@ async function cargarProyectosVigentes(
 // la marca es del GASTO. Las marcas de un proyecto salen de sus DOCUMENTOS
 // (`cargarGastoCompletoPorMarca`: facturas ∪ entregas), la misma regla de la
 // ficha del proyecto y de las tarjetas del inicio.
-
-async function cargarFacturas(
-  proyectoIds: ReadonlyArray<string>
-): Promise<FacturaMin[]> {
-  if (proyectoIds.length === 0) return [];
-  const { data, error } = await supabaseServer
-    .from("mk_facturas")
-    .select("proyecto_id, total")
-    .in("proyecto_id", proyectoIds)
-    .is("anulado_en", null);
-  if (error) throw new Error(`cargarFacturas: ${error.message}`);
-  return (data ?? []).map((r) => {
-    const x = r as Record<string, unknown>;
-    return {
-      proyecto_id: String(x.proyecto_id),
-      total: Number(x.total ?? 0),
-    };
-  });
-}
 
 // ----------------------------------------------------------------------------
 // Reporte por marca
@@ -318,174 +292,145 @@ export async function reportePorTienda(
 }
 
 // ----------------------------------------------------------------------------
-// Reporte por proyecto
+// EL REDISEÑO (22-sep-2026): la marca y la tienda son las del GASTO
 // ----------------------------------------------------------------------------
-export async function reportePorProyecto(
-  filtros: FiltrosReporteProyecto = {}
-): Promise<ReporteProyectoItem[]> {
-  const [marcas, proyectosRaw] = await Promise.all([
+
+interface FacturaGasto {
+  id: string;
+  proyecto_id: string | null;
+  total: number | null;
+  impulsadora_id: string | null;
+  impulsadora_mes: string | null;
+  fecha_factura: string | null;
+  se_reporta?: boolean | null;
+  tienda_codigo?: string | null;
+}
+interface EntregaGasto {
+  id: string;
+  proyecto_id: string | null;
+  total: number | null;
+  total_por_marca: Record<string, number> | null;
+  total_por_empresa_interna: Record<string, number> | null;
+  created_at: string | null;
+  se_reporta?: boolean | null;
+  tienda_codigo?: string | null;
+}
+
+const COLS_FACTURA_GASTO = "id, proyecto_id, total, impulsadora_id, impulsadora_mes, fecha_factura";
+const COLS_ENTREGA_GASTO =
+  "id, proyecto_id, total, total_por_marca, total_por_empresa_interna, created_at";
+const avisar = (m: string) => console.error(`[marketing/reportes] ${m}`);
+
+/**
+ * Todos los gastos vivos, cada uno con SU marca y SU tienda (las columnas del
+ * rediseño; sin ellas, la tienda del proyecto de siempre). Una factura vieja
+ * con dos marcas se reparte a partes iguales y se avisa (medido: ninguna).
+ */
+async function cargarGastosDelRediseno(): Promise<{
+  gastos: GastoParaReporte[];
+  nombres: NombresDeMarca;
+}> {
+  const [factRes, fmRes, entRes, proyRes, marcas] = await Promise.all([
+    conRespaldoSinColumnas<FacturaGasto[]>(
+      () =>
+        supabaseServer
+          .from("mk_facturas")
+          .select(`${COLS_FACTURA_GASTO}, se_reporta, tienda_codigo`)
+          .is("anulado_en", null),
+      () => supabaseServer.from("mk_facturas").select(COLS_FACTURA_GASTO).is("anulado_en", null),
+      avisar,
+    ).then((r) => r.resultado),
+    supabaseServer.from("mk_factura_marcas").select("factura_id, marca_id"),
+    conRespaldoSinColumnas<EntregaGasto[]>(
+      () =>
+        supabaseServer
+          .from("mk_entregas_muebles")
+          .select(`${COLS_ENTREGA_GASTO}, se_reporta, tienda_codigo`),
+      () => supabaseServer.from("mk_entregas_muebles").select(COLS_ENTREGA_GASTO),
+      avisar,
+    ).then((r) => r.resultado),
+    supabaseServer.from("mk_proyectos").select("id, tienda, tienda_codigo").is("anulado_en", null),
     getMarcas(),
-    cargarProyectosVigentes(filtros.anio),
   ]);
+  if (factRes.error) throw new Error(`reportes[fact]: ${factRes.error.message}`);
+  if (fmRes.error) throw new Error(`reportes[fm]: ${fmRes.error.message}`);
+  if (entRes.error) throw new Error(`reportes[ent]: ${entRes.error.message}`);
+  if (proyRes.error) throw new Error(`reportes[proy]: ${proyRes.error.message}`);
 
-  let proyectos = proyectosRaw;
-  if (filtros.tienda) {
-    const t = filtros.tienda.toLocaleLowerCase("es");
-    proyectos = proyectos.filter((p) => p.tienda.toLocaleLowerCase("es") === t);
-  }
-  if (proyectos.length === 0) return [];
-
-  const proyectoIds = proyectos.map((p) => p.id);
-  const [gastoPorMarca, facturas, entregaTotalByProy] = await Promise.all([
-    cargarGastoCompletoPorMarca(proyectoIds),
-    cargarFacturas(proyectoIds),
-    getEntregaTotalByProyectoBatch(proyectoIds),
-  ]);
-  // Las marcas de cada proyecto, de sus documentos (ya no de mk_proyecto_marcas).
-  const proyMarcas: Array<{ proyecto_id: string; marca_id: string }> = [];
-  for (const [pid, porMarca] of gastoPorMarca) {
-    for (const mid of porMarca.keys()) proyMarcas.push({ proyecto_id: pid, marca_id: mid });
-  }
-
-  // Si se filtra por marcaId, solo incluir proyectos que tengan esa marca
-  let proyectosFiltrados = proyectos;
-  if (filtros.marcaId) {
-    const idsConMarca = new Set(
-      proyMarcas.filter((pm) => pm.marca_id === filtros.marcaId).map((pm) => pm.proyecto_id)
-    );
-    proyectosFiltrados = proyectos.filter((p) => idsConMarca.has(p.id));
-  }
-
-  const marcaById = new Map(marcas.map((m) => [m.id, m]));
-
-  const totalByProy = new Map<string, number>();
-  for (const f of facturas) {
-    totalByProy.set(f.proyecto_id, (totalByProy.get(f.proyecto_id) ?? 0) + f.total);
-  }
-
-  const marcasByProy = new Map<string, Array<{ nombre: string }>>();
-  for (const pm of proyMarcas) {
-    const marca = marcaById.get(pm.marca_id);
-    if (!marca) continue;
-    const arr = marcasByProy.get(pm.proyecto_id) ?? [];
-    arr.push({ nombre: marca.nombre });
-    marcasByProy.set(pm.proyecto_id, arr);
-  }
-
-  return proyectosFiltrados
-    .map((p) => {
-      const gastoFact = totalByProy.get(p.id) ?? 0;
-      const gastoEntregas = entregaTotalByProy.get(p.id) ?? 0;
-      const gasto = Number((gastoFact + gastoEntregas).toFixed(2));
-      return {
-        proyecto: p,
-        marcas: marcasByProy.get(p.id) ?? [],
-        gastoTotal: gasto,
-      };
-    })
-    .sort((a, b) => b.proyecto.fecha_inicio.localeCompare(a.proyecto.fecha_inicio));
-}
-
-// ----------------------------------------------------------------------------
-// Exportar reporte a Excel
-// ----------------------------------------------------------------------------
-type TipoReporte = "marca" | "tienda" | "proyecto";
-
-function esArrayDe<T>(v: unknown, guard: (x: unknown) => x is T): v is T[] {
-  return Array.isArray(v) && v.every(guard);
-}
-
-function esReporteMarcaItem(x: unknown): x is ReporteMarcaItem {
-  return (
-    typeof x === "object" &&
-    x !== null &&
-    "marca" in x &&
-    "gasto" in x
+  const proyectos = new Map(
+    ((proyRes.data ?? []) as Array<{ id: string; tienda: string | null; tienda_codigo: string | null }>).map(
+      (p) => [String(p.id), p],
+    ),
   );
-}
+  const codigoDeMarca = new Map(marcas.map((m) => [m.id, String(m.codigo ?? "").trim().toUpperCase()]));
+  const empresaDeMarca = new Map(marcas.map((m) => [m.id, m.empresa_codigo ?? null]));
+  const nombres: Record<string, string> = {};
+  for (const m of marcas) nombres[String(m.codigo ?? "").trim().toUpperCase()] = m.nombre;
 
-function esReporteTiendaItem(x: unknown): x is ReporteTiendaItem {
-  return (
-    typeof x === "object" &&
-    x !== null &&
-    "tienda" in x &&
-    "porMarca" in x
-  );
-}
+  // La tienda del gasto; sin ella (la migración sin correr), la del proyecto.
+  const tiendaDe = (fila: { tienda_codigo?: string | null; proyecto_id: string | null }) => {
+    const p = fila.proyecto_id ? proyectos.get(String(fila.proyecto_id)) : undefined;
+    const codigo = fila.tienda_codigo ?? p?.tienda_codigo ?? null;
+    return { codigo, nombre: p?.tienda ?? null };
+  };
 
-function esReporteProyectoItem(x: unknown): x is ReporteProyectoItem {
-  return (
-    typeof x === "object" &&
-    x !== null &&
-    "proyecto" in x &&
-    "gastoTotal" in x
-  );
-}
-
-// Tabular puro → buildReportSheet (estilo de la casa I11: banda navy PRI +
-// Calibri + moneda numérica). Mismas columnas y datos que antes.
-export function exportarExcelReporte(tipo: TipoReporte, data: unknown): Blob {
-  let hoja: string;
-  let columns: ReportColumn[];
-  let rows: ReportCell[][];
-
-  if (tipo === "marca") {
-    if (!esArrayDe(data, esReporteMarcaItem)) {
-      throw new Error("data inválida para reporte por marca");
-    }
-    hoja = "Por marca";
-    columns = [
-      { header: "Marca", wch: 20 },
-      { header: "Código", wch: 10 },
-      { header: "Gasto", wch: 14, align: "right", fmt: MONEY_FMT },
-    ];
-    rows = data.map((item) => [item.marca.nombre, item.marca.codigo, item.gasto]);
-  } else if (tipo === "tienda") {
-    if (!esArrayDe(data, esReporteTiendaItem)) {
-      throw new Error("data inválida para reporte por tienda");
-    }
-    hoja = "Por tienda";
-    const marcasUnicas = Array.from(
-      new Set(data.flatMap((d) => Object.keys(d.porMarca)))
-    ).sort((a, b) => a.localeCompare(b, "es"));
-    columns = [
-      { header: "Tienda", wch: 24 },
-      ...marcasUnicas.map(
-        (m): ReportColumn => ({ header: m, wch: 14, align: "right", fmt: MONEY_FMT })
-      ),
-      { header: "Gasto", wch: 14, align: "right", fmt: MONEY_FMT },
-    ];
-    rows = data.map((item) => [
-      item.tienda,
-      ...marcasUnicas.map((m) => item.porMarca[m] ?? 0),
-      item.total,
-    ]);
-  } else {
-    if (!esArrayDe(data, esReporteProyectoItem)) {
-      throw new Error("data inválida para reporte por proyecto");
-    }
-    hoja = "Por proyecto";
-    // La columna "Estado" se retiró el 11-ago-2026 junto con "Cerrar
-    // proyecto": sin escritor, solo podía decir "Abierto" para siempre.
-    columns = [
-      { header: "Proyecto", wch: 28 },
-      { header: "Tienda", wch: 20 },
-      { header: "Fecha inicio", wch: 14 },
-      { header: "Marcas", wch: 30 },
-      { header: "Gasto real", wch: 14, align: "right", fmt: MONEY_FMT },
-    ];
-    rows = data.map((item) => [
-      item.proyecto.nombre ?? item.proyecto.tienda,
-      item.proyecto.tienda,
-      formatearFecha(item.proyecto.fecha_inicio),
-      item.marcas.map((m) => m.nombre).join(", "),
-      item.gastoTotal,
-    ]);
+  const marcasPorFactura = new Map<string, Array<{ marcaId: string }>>();
+  for (const r of (fmRes.data ?? []) as Array<{ factura_id: string; marca_id: string }>) {
+    const arr = marcasPorFactura.get(String(r.factura_id)) ?? [];
+    arr.push({ marcaId: String(r.marca_id) });
+    marcasPorFactura.set(String(r.factura_id), arr);
   }
 
-  const ws = buildReportSheet({ columns, rows });
-  const wb = workbookFromSheets([{ name: hoja, ws }]);
-  // `workbookBlob` y no `XLSX.write` a secas: es el que deja la fila de
-  // encabezados fija (la librería no sabe escribir paneles).
-  return workbookBlob(wb);
+  const gastos: GastoParaReporte[] = [];
+  for (const raw of (factRes.data ?? []) as FacturaGasto[]) {
+    const f = completarGasto(raw as unknown as Record<string, unknown>) as unknown as FacturaGasto;
+    const tienda = tiendaDe(f);
+    const { partes, repartido } = partesPorMarca(Number(f.total ?? 0), marcasPorFactura.get(f.id) ?? []);
+    if (repartido) avisar(`la factura ${f.id} trae más de una marca; se repartió a partes iguales.`);
+    for (const parte of partes) {
+      gastos.push({
+        id: partes.length === 1 ? f.id : `${f.id}:${parte.marcaId}`,
+        tipo: f.impulsadora_id ? "impulsadora" : "factura",
+        marcaCodigo: codigoDeMarca.get(parte.marcaId) ?? null,
+        tiendaCodigo: tienda.codigo,
+        tiendaNombre: tienda.nombre,
+        monto: parte.monto,
+        seReporta: f.se_reporta,
+        fecha: (f.impulsadora_id ? f.impulsadora_mes : f.fecha_factura) ?? f.fecha_factura,
+      });
+    }
+  }
+  for (const raw of (entRes.data ?? []) as EntregaGasto[]) {
+    const e = completarGasto(raw as unknown as Record<string, unknown>) as unknown as EntregaGasto;
+    const tienda = tiendaDe(e);
+    const marcas = marcasDeEntrega(e);
+    if (marcas.length > 1) avisar(`la entrega ${e.id} trae más de una marca.`);
+    for (const mid of marcas) {
+      const monto = porcionEntregaParaMarca(e, mid, empresaDeMarca.get(mid));
+      if (monto <= 0) continue;
+      gastos.push({
+        id: marcas.length === 1 ? e.id : `${e.id}:${mid}`,
+        tipo: "mueble",
+        marcaCodigo: codigoDeMarca.get(mid) ?? null,
+        tiendaCodigo: tienda.codigo,
+        tiendaNombre: tienda.nombre,
+        monto,
+        seReporta: e.se_reporta,
+        fecha: e.created_at ? String(e.created_at).slice(0, 10) : null,
+      });
+    }
+  }
+  return { gastos, nombres };
+}
+
+/** Por marca, el rediseño: UN total (lo reportado) por marca, sin pie. */
+export async function reportePorMarcaRediseno(anio?: number): Promise<ReporteMarcaFila[]> {
+  const { gastos, nombres } = await cargarGastosDelRediseno();
+  return reportePorMarcaDe(gastos, nombres, anio);
+}
+
+/** Por tienda, el rediseño: la tienda del GASTO, «General» al final. */
+export async function reportePorTiendaRediseno(anio?: number): Promise<ReporteTiendaFila[]> {
+  const { gastos, nombres } = await cargarGastosDelRediseno();
+  return reportePorTiendaDe(gastos, nombres, anio);
 }

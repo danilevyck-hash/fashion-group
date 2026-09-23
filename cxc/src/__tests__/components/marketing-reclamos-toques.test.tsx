@@ -37,7 +37,6 @@ import { ToastProvider } from "@/components/ToastSystem";
 import FacturasSection from "@/app/marketing/components/FacturasSection";
 import FotosSection from "@/app/marketing/components/FotosSection";
 import EnviarProveedorModal from "@/app/reclamos/components/EnviarProveedorModal";
-import { ReportePorProyectoView } from "@/app/marketing/components/ReportePorProyectoView";
 import HistorialImpulsadoraModal from "@/app/marketing/components/HistorialImpulsadoraModal";
 import EntregaForm from "@/components/marketing/EntregaForm";
 import ReclamoForm from "@/app/reclamos/components/ReclamoForm";
@@ -345,42 +344,12 @@ describe("🔴 el correo al proveedor no se pierde ni se borra un contacto sin q
 // ════════════════════════════════════════════════════════════════════════════
 // 4. El filtro de marca
 // ════════════════════════════════════════════════════════════════════════════
-describe("🔴 el filtro «Marca» del reporte por proyecto se LLENA", () => {
-  it("ofrece las marcas que devuelve la API, no sólo «Todas»", async () => {
-    render(
-      <ToastProvider>
-        <ReportePorProyectoView />
-      </ToastProvider>,
-    );
-    // La API devuelve el ARRAY pelado: si alguien vuelve a desenvolver un
-    // `{ marcas }` que no existe, esto se cae.
-    expect(await screen.findByRole("option", { name: "Tommy Hilfiger" })).toBeTruthy();
-    expect(screen.getByRole("option", { name: "Calvin Klein" })).toBeTruthy();
-  });
+// 22-sep-2026 · NOTA FECHADA — el bloque «el filtro "Marca" del reporte por
+// proyecto se LLENA» se fue con la PANTALLA: «Por Proyecto» se retiró en la
+// pieza C del rediseño de Marketing (Daniel: «"Por proyecto" se va» — el
+// proyecto dejó de ser el contenedor del gasto). La ruta contesta 410 y el
+// candado que impide que vuelva es `marketing-portada-y-cierre.test.tsx`.
 
-  it("y elegir una marca la manda al endpoint", async () => {
-    render(
-      <ToastProvider>
-        <ReportePorProyectoView />
-      </ToastProvider>,
-    );
-    await screen.findByRole("option", { name: "Tommy Hilfiger" });
-    const select = screen.getByRole("option", { name: "Tommy Hilfiger" })
-      .closest("select") as HTMLSelectElement;
-    fireEvent.change(select, { target: { value: TOMMY.id } });
-    await waitFor(() =>
-      expect(
-        fetchMock.mock.calls.some(([u]) =>
-          String(u).includes(`marca_id=${TOMMY.id}`),
-        ),
-      ).toBe(true),
-    );
-  });
-});
-
-// ════════════════════════════════════════════════════════════════════════════
-// 9. Anular un pago de impulsadora
-// ════════════════════════════════════════════════════════════════════════════
 describe("🔴 anular un pago no abre el cuadro gris del navegador", () => {
   const IMPULSADORA = {
     id: "i1",

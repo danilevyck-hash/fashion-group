@@ -1,18 +1,22 @@
 "use client";
 
+// Reportes de gastos: POR MARCA y POR TIENDA. 🩸 «Por Proyecto» se retiró el
+// 22-sep-2026 (pieza C del rediseño): el proyecto dejó de ser el contenedor
+// del gasto — Daniel, *«a) Basta la tienda»*—. Un enlace viejo con
+// `?rep=proyecto` cae en «Por Marca». «Exportar Excel» también se fue: el
+// Excel de una marca vive en el ZIP de su período.
+
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import ReportePorMarcaView from "./ReportePorMarcaView";
 import ReportePorTiendaView from "./ReportePorTiendaView";
-import ReportePorProyectoView from "./ReportePorProyectoView";
 
-type Tab = "marca" | "tienda" | "proyecto";
+type Tab = "marca" | "tienda";
 
 // El `sub` de cada pestaña se fue (poda de textos, ago-2026): decía lo mismo
 // que la pestaña que ya está encendida arriba.
 const TABS: Array<{ value: Tab; label: string }> = [
   { value: "marca", label: "Por Marca" },
   { value: "tienda", label: "Por Tienda" },
-  { value: "proyecto", label: "Por Proyecto" },
 ];
 
 export function ReportesTabs() {
@@ -34,7 +38,7 @@ export function ReportesTabs() {
             key={t.value}
             onClick={() => setTab(t.value)}
             className={`inline-flex min-h-[44px] items-center px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              tab === t.value
+              active.value === t.value
                 ? "border-fuchsia-500 text-fuchsia-700"
                 : "border-transparent text-gray-500 hover:text-gray-800"
             }`}
@@ -44,10 +48,8 @@ export function ReportesTabs() {
         ))}
       </div>
 
-
-      {tab === "marca" && <ReportePorMarcaView />}
-      {tab === "tienda" && <ReportePorTiendaView />}
-      {tab === "proyecto" && <ReportePorProyectoView />}
+      {active.value === "marca" && <ReportePorMarcaView />}
+      {active.value === "tienda" && <ReportePorTiendaView />}
     </div>
   );
 }

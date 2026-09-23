@@ -39,6 +39,11 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 import {
+  conRespaldoSinColumnas,
+  sinColumnasDelRediseno,
+} from "./columnas-opcionales";
+import type { PatchDeCierre, PeriodoSiguiente } from "./periodo-estado";
+import {
   SIN_BLOQUE,
   bloqueDeCodigo,
   clavesDeSello,
@@ -73,6 +78,10 @@ export interface PeriodoFila {
   cerrado_en?: string | null;
   cerrado_por?: string | null;
   reporte?: unknown;
+  /** Rediseño (22-sep-2026): el nombre que Daniel le puso al cerrar. */
+  nombre_al_cerrar?: string | null;
+  /** Rediseño: la nota de crédito, TEXTO. Nunca se calcula nada con ella. */
+  nota_credito?: string | null;
 }
 
 /**
@@ -111,7 +120,7 @@ export function esFaltaDeTablas(err: unknown): boolean {
 }
 
 /** Error de Supabase conservando el `code`, para poder reconocerlo arriba. */
-function comoError(err: { code?: string | null; message?: string } | null, donde: string): Error {
+function comoError(err: { code?: string | null; message?: string | null } | null, donde: string): Error {
   const e = new Error(err?.message ?? `${donde}: sin datos`);
   if (err?.code) (e as Error & { code?: string }).code = String(err.code);
   return e;
@@ -434,13 +443,76 @@ export async function cerrarPeriodo(
   if (error) throw comoError(error, "cerrarPeriodo");
 }
 
-/** Deshace `cerrarPeriodo`. Solo se usa si abrir el siguiente falló. */
+/**
+ * Deshace `cerrarPeriodo` o `cerrarPeriodoConNombre`. Solo se usa si abrir el
+ * siguiente falló. Borra también el nombre y la nota del rediseño; sin esas
+ * columnas se reescribe sin ellas (`columnas-opcionales`).
+ */
 export async function reabrirPeriodo(id: string): Promise<void> {
-  const { error } = await supabaseServer
+  const base = { estado: "abierto", cerrado_en: null, cerrado_por: null, reporte: null };
+  const { resultado } = await conRespaldoSinColumnas(
+    () =>
+      supabaseServer
+        .from("mk_periodos")
+        .update({ ...base, nombre_al_cerrar: null, nota_credito: null })
+        .eq("id", id),
+    () => supabaseServer.from("mk_periodos").update(base).eq("id", id),
+    (m) => avisar("reabrirPeriodo", m),
+  );
+  if (resultado.error) throw comoError(resultado.error, "reabrirPeriodo");
+}
+
+/**
+ * 🔴 EL CIERRE DEL REDISEÑO (22-sep-2026): marca el período CERRADO con el
+ * nombre que Daniel le puso y la nota de crédito como TEXTO. Recibe el parche
+ * ya armado por `armarCierre` (periodo-estado.ts) y NO escribe `reporte`:
+ * cerrar no genera nada — Daniel, *«cuando lo cierro es porque lo cobré»*.
+ *
+ * Sin las columnas nuevas (la migración sin correr) se cierra igual, sin
+ * nombre ni nota, y queda rastro en el log (`columnas-opcionales`).
+ *
+ * No abre el siguiente: eso lo hace `abrirPeriodoSiguiente`, y el orden
+ * importa (el índice único deja UN solo abierto por marca).
+ */
+export async function cerrarPeriodoConNombre(
+  id: string,
+  patch: PatchDeCierre,
+): Promise<void> {
+  const { resultado } = await conRespaldoSinColumnas(
+    () =>
+      supabaseServer
+        .from("mk_periodos")
+        .update(patch)
+        .eq("id", id)
+        .eq("estado", "abierto"),
+    () =>
+      supabaseServer
+        .from("mk_periodos")
+        .update(sinColumnasDelRediseno(patch as unknown as Record<string, unknown>))
+        .eq("id", id)
+        .eq("estado", "abierto"),
+    (m) => avisar("cerrarPeriodoConNombre", m),
+  );
+  if (resultado.error) throw comoError(resultado.error, "cerrarPeriodoConNombre");
+}
+
+/**
+ * Inserta el período que SIGUE, tal como lo arma `abrirSiguiente` (de la
+ * MISMA marca, con el nombre por defecto que dice desde cuándo).
+ */
+export async function abrirPeriodoSiguiente(fila: PeriodoSiguiente): Promise<PeriodoFila> {
+  const { data, error } = await supabaseServer
     .from("mk_periodos")
-    .update({ estado: "abierto", cerrado_en: null, cerrado_por: null, reporte: null })
-    .eq("id", id);
-  if (error) throw comoError(error, "reabrirPeriodo");
+    .insert({
+      proveedor_key: fila.proveedor_key,
+      nombre: fila.nombre,
+      estado: fila.estado,
+      abierto_en: fila.abierto_en,
+    })
+    .select("id, proveedor_key, nombre, estado, abierto_en, cerrado_en, cerrado_por")
+    .single();
+  if (error || !data) throw comoError(error, "abrirPeriodoSiguiente");
+  return data as PeriodoFila;
 }
 
 export async function abrirPeriodo(
