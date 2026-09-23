@@ -74,8 +74,15 @@ vi.mock("@/lib/supabase-server", () => ({
 
 const { GET } = await import("@/app/api/ventas/productos/route");
 
-/** La única tabla que la ruta lee: el último día cargado, para el corte. */
+/** La tabla del CORTE: el último día cargado. Desde el 23-sep-2026 (UNA SOLA
+ *  VENTA) la ventana actual lee además las notas de débito de `switch_facturas`
+ *  y `switch_factura_utilidad` para cuadrar contra el Resumen; lo que este
+ *  candado vigila es que `depurador_descripciones` NO vuelva. */
 const SOLO_EL_CORTE = "switch_articulo_diario";
+const TABLAS_DEL_CUADRE = ["switch_facturas", "switch_factura_utilidad"];
+const sinCuadre = (tablas: string[]) => tablas.filter(t => !TABLAS_DEL_CUADRE.includes(t));
+const RPCS_DEL_CUADRE = ["ventas_dashboard_summary_v2", "ventas_dashboard_summary"];
+const sinResumen = (fns: string[]) => fns.filter(f => !RPCS_DEL_CUADRE.includes(f));
 
 const SECRET_PREV = process.env.SESSION_SECRET;
 beforeAll(() => { process.env.SESSION_SECRET = "test-secret-reciente"; });
@@ -124,7 +131,7 @@ describe("SIN la migración la pantalla es la de ayer, y no se cae", () => {
     estado.sinMigracion = true;
     const res = await GET(req(URL_BASE));
     expect(res.status).toBe(200);
-    expect(estado.rpc.map(r => r.fn)).toEqual([
+    expect(sinResumen(estado.rpc.map(r => r.fn))).toEqual([
       "switch_top_descripciones_reciente",
       "switch_top_descripciones",
     ]);
@@ -134,7 +141,7 @@ describe("SIN la migración la pantalla es la de ayer, y no se cae", () => {
     estado.sinMigracion = true;
     const body = await (await GET(req(URL_BASE))).json();
     expect(body.productos.every((p: { aviso?: unknown }) => p.aviso === undefined)).toBe(true);
-    expect(estado.tablas).toEqual([SOLO_EL_CORTE]);
+    expect(sinCuadre(estado.tablas)).toEqual([SOLO_EL_CORTE]);
   });
 
   it("los números llegan enteros igual", async () => {
@@ -162,18 +169,19 @@ describe("⚠️ INVERTIDO — el aviso de «mal clasificado» NO vuelve", () =>
 
   it("🔴 y NO se consulta `depurador_descripciones` — una consulta menos", async () => {
     await GET(req(URL_BASE));
-    expect(estado.tablas).toEqual([SOLO_EL_CORTE]);
+    expect(estado.tablas).not.toContain("depurador_descripciones");
+    expect(sinCuadre(estado.tablas)).toEqual([SOLO_EL_CORTE]);
   });
 
-  it("tampoco en el comparativo (previo=1)", async () => {
+  it("tampoco en el comparativo (previo=1) — y ahí no se cuadra nada", async () => {
     await GET(req(`${URL_BASE}&previo=1`));
     expect(estado.tablas).toEqual([SOLO_EL_CORTE]);
   });
 
-  it("la ruta no lee NINGUNA tabla aparte del corte: la RPC y MAX(fecha), nada más", async () => {
+  it("la ruta no lee NINGUNA tabla aparte del corte y el cuadre: la RPC, MAX(fecha) y el Resumen, nada más", async () => {
     await GET(req(URL_BASE));
-    expect(estado.tablas).toEqual([SOLO_EL_CORTE]);
-    expect(estado.rpc.map(r => r.fn)).toEqual(["switch_top_descripciones_reciente"]);
+    expect(sinCuadre(estado.tablas)).toEqual([SOLO_EL_CORTE]);
+    expect(sinResumen(estado.rpc.map(r => r.fn))).toEqual(["switch_top_descripciones_reciente"]);
   });
 });
 

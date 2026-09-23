@@ -25,6 +25,14 @@ import type { Cliente } from "@/components/ventas/types";
 //    previo de centavos produzca un porcentaje absurdo en el archivo.
 import { variacionPct } from "@/lib/variacion";
 import { rotuloCompras, rotuloVs, type PeriodoVentas } from "@/lib/ventas/periodo";
+// 🔴 EL ARCHIVO SE EXPLICA SOLO (23-sep-2026). El Excel del 20-sep tenía 92
+// filas que sumaban $6.045.624,95 y un TOTAL de $5.988.950,48: la diferencia
+// exacta era la fila del mostrador ($56.674,47), que en pantalla va en ámbar
+// «fuera del ranking» y en el archivo no llevaba marca. Daniel: «Sí» baja el
+// Excel. Ahora la fila del mostrador va marcada igual que en pantalla y el
+// TOTAL dice cuántos clientes suma y que el mostrador queda afuera. El número
+// del total NO cambia.
+import { UNA_SOLA_VENTA, nombreMostradorExcel, rotuloTotalClientes } from "@/lib/ventas/una-sola-venta";
 
 export interface ClientesExcelOpts {
   /** Año de la columna «Compras» (el nombre del archivo lo lleva). */
@@ -61,7 +69,7 @@ export async function buildClientesSheet(opts: ClientesExcelOpts): Promise<WorkS
 
   if (opts.mostrador) {
     rows.push([
-      opts.mostrador.nombre || "Mostrador",
+      UNA_SOLA_VENTA ? nombreMostradorExcel(opts.mostrador.nombre) : (opts.mostrador.nombre || "Mostrador"),
       opts.mostrador.id,
       opts.mostrador.empresas_count,
       opts.mostrador.ytd,
@@ -86,8 +94,12 @@ export async function buildClientesSheet(opts: ClientesExcelOpts): Promise<WorkS
     rows,
     // El TOTAL no incluye al mostrador, igual que la pantalla: ahí está fuera
     // del ranking y decirlo de una forma en la tabla y de otra en el archivo
-    // es cómo se descubre un descuadre que no existe.
-    totals: ["TOTAL", null, null, totalYtd, totalDelta, null],
+    // es cómo se descubre un descuadre que no existe. Y LO DICE: «TOTAL · 91
+    // clientes, sin el mostrador».
+    totals: [
+      UNA_SOLA_VENTA ? rotuloTotalClientes(filas.length, !!opts.mostrador) : "TOTAL",
+      null, null, totalYtd, totalDelta, null,
+    ],
     // 🔴 SIN `nota:`. La hoja no lleva una línea al pie explicando qué se bajó,
     // y no es un olvido: `excel-encabezados-fila-1.test.ts` mantiene esa puerta
     // cerrada a propósito — solo DOS exports del sistema la usan, y las dos las

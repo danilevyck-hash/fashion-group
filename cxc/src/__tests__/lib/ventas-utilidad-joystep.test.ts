@@ -36,6 +36,10 @@ const rpcCalls: { fn: string; args: Record<string, unknown> }[] = [];
 /** Cuando true, `utilidad_por_cliente_v2` responde "esa función no existe"
  *  (PGRST202) — o sea, la migración todavía no la corrió Daniel. */
 let v2Ausente = false;
+/** La v3 (UNA SOLA VENTA, 23-sep-2026) se prueba en `ventas-una-sola-venta`;
+ *  acá se la da por ausente para que el camino v2 → v1 siga siendo el que
+ *  este candado mira. */
+const v3Ausente = true;
 
 vi.mock("@/lib/requireRole", () => ({
   requireRole: () => ({ role: "admin", userName: "Daniel" }),
@@ -45,11 +49,21 @@ vi.mock("@/lib/supabase-server", () => ({
   supabaseServer: {
     rpc: async (fn: string, args: Record<string, unknown>) => {
       rpcCalls.push({ fn, args });
+      if (fn === "utilidad_por_cliente_v3" && v3Ausente) {
+        return {
+          data: null,
+          error: { code: "PGRST202", message: "Could not find the function public.utilidad_por_cliente_v3" },
+        };
+      }
       if (fn === "utilidad_por_cliente_v2" && v2Ausente) {
         return {
           data: null,
           error: { code: "PGRST202", message: "Could not find the function public.utilidad_por_cliente_v2" },
         };
+      }
+      // El Resumen (`ventas_dashboard_summary_v2`), que el cuadre lee.
+      if (fn.startsWith("ventas_dashboard_summary")) {
+        return { data: [{ empresa: "joystep", mes: 3, total_subtotal: 1000 }], error: null };
       }
       return {
         data: [{
@@ -58,6 +72,16 @@ vi.mock("@/lib/supabase-server", () => ({
         }],
         error: null,
       };
+    },
+    // Las lecturas de tabla del camino UNA SOLA VENTA (primera fecha del
+    // reporte, contado, códigos): vacías, con COUNT exacto en cero.
+    from: () => {
+      const q = {
+        select: () => q, eq: () => q, in: () => q, gte: () => q, lt: () => q, lte: () => q,
+        order: () => q, limit: async () => ({ data: [], error: null }),
+        range: async () => ({ data: [], error: null, count: 0 }),
+      };
+      return q;
     },
   },
 }));
@@ -139,9 +163,12 @@ describe("la migración es ADITIVA — la app funciona antes y después de corre
     v2Ausente = true;
     const { res, body } = await llamar();
     expect(res.status).toBe(200);
-    expect(rpcCalls.map(c => c.fn)).toEqual(["utilidad_por_cliente_v2", "utilidad_por_cliente"]);
+    // La v3 se pide primero (ausente en este candado), después la v2 y la v1;
+    // lo que sigue es el Resumen, para el cuadre.
+    const cadena = rpcCalls.map(c => c.fn).filter(f => f.startsWith("utilidad_por_cliente"));
+    expect(cadena).toEqual(["utilidad_por_cliente_v3", "utilidad_por_cliente_v2", "utilidad_por_cliente"]);
     // La v1 no recibe lista: la lleva adentro.
-    expect(rpcCalls[1].args).toEqual({ p_anio: 2026 });
+    expect(rpcCalls.find(c => c.fn === "utilidad_por_cliente")!.args).toEqual({ p_anio: 2026 });
     expect(body.rows.length).toBe(1);
   });
 

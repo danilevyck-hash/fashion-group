@@ -44,6 +44,11 @@ export const TIPOS_VENTA_SUMAN = [
 /** El único comprobante de venta que RESTA. Lo que resta, RESTA. */
 export const TIPO_VENTA_RESTA = "Nota de Crédito" as const;
 
+/** La nota de débito, con nombre: es el tipo que el reporte por artículo de
+ *  Switch NO trae (0 filas 'ND' en `switch_articulo_diario`) y que Productos
+ *  suma aparte para dar la misma venta que el Resumen. */
+export const TIPO_VENTA_NOTA_DEBITO = "Nota de Débito" as const;
+
 /** Todo lo que el sistema sabe leer hoy en `switch_facturas.tipo_comprobante`. */
 export const TIPOS_VENTA_CONOCIDOS: readonly string[] = [
   ...TIPOS_VENTA_SUMAN,

@@ -73,6 +73,11 @@ import {
 } from "@/lib/ventas/productos";
 import { rpcConFallbackDeVersion } from "@/lib/ventas/rpc-version";
 import { ultimoDiaArticuloDiario } from "@/lib/ventas/ultimo-dia-cargado";
+// 🔴 UNA SOLA VENTA (23-sep-2026): el total de esta pestaña es el del Resumen,
+// y lo que el reporte por artículo no trae (notas de débito, renglones sueltos)
+// se DICE. Ver `lib/ventas/una-sola-venta.ts`.
+import { UNA_SOLA_VENTA, anioValido, ventanaAntesDeLosDatos } from "@/lib/ventas/una-sola-venta";
+import { cuadreProductos, primeraFecha } from "@/lib/ventas/una-sola-venta-server";
 
 export const dynamic = "force-dynamic";
 
@@ -89,7 +94,11 @@ export async function GET(req: NextRequest) {
   if (!PRODUCTOS_EMPRESA_KEYS.includes(empresa)) {
     return NextResponse.json({ error: "empresa inválida" }, { status: 400 });
   }
-  if (!Number.isInteger(year) || year < 2024 || year > 2100) {
+  // 🔴 2022 y 2023 SE SIRVEN (23-sep-2026; Daniel: «Sí» mira esos años). El
+  // rechazo `year < 2024` dejaba la pantalla en «No se pudieron cargar los
+  // productos» con el dato en la base (Fashion Wear 2023 = $3.318.508,30 en 163
+  // descripciones). Con el interruptor apagado vuelve el piso de antes.
+  if (!anioValido(year)) {
     return NextResponse.json({ error: "year inválido" }, { status: 400 });
   }
   if (mes !== null && (!Number.isInteger(mes) || mes < 1 || mes > 12)) {
@@ -142,10 +151,31 @@ export async function GET(req: NextRequest) {
     margen: p.margen != null ? Number(p.margen) : null,
   }));
 
-  // Totales = suma del nivel 1 (cuadra con la fuente certificada).
-  const ventaTotal = productos.reduce((s, p) => s + p.venta, 0);
-  const costoTotal = productos.reduce((s, p) => s + p.costo, 0);
+  // Totales = suma del nivel 1: lo que el reporte por artículo trae.
+  const ventaListado = productos.reduce((s, p) => s + p.venta, 0);
+  const costoListado = productos.reduce((s, p) => s + p.costo, 0);
+
+  // 🔴 UNA SOLA VENTA: el total de la ventana ACTUAL es el del Resumen (la
+  // MISMA lectura, `leerDashboardSummary`), y la diferencia con el listado se
+  // desglosa: notas de débito (con su costo, de la única fuente que lo tiene)
+  // y renglones que el reporte por artículo no devuelve. La ventana previa
+  // (`previo=1`) alimenta solo el Δ por descripción y no se cuadra. Falla
+  // ABIERTA: sin cuadre, el total es el del listado, como antes.
+  const cuadre = UNA_SOLA_VENTA && !previo
+    ? await cuadreProductos({ empresa, desde, hasta, listado: ventaListado })
+    : null;
+  const ventaTotal = cuadre ? cuadre.ventaResumen : ventaListado;
+  const costoTotal = cuadre ? costoListado + cuadre.notasDebito.costo : costoListado;
   const margenTotal = ventaTotal > 0 ? (ventaTotal - costoTotal) / ventaTotal : null;
+
+  // Sin una sola descripción: ¿es que no hay datos de ese período? Se dice
+  // desde cuándo los hay («Productos de Fashion Wear tiene datos desde febrero
+  // 2023») en vez de dejar «Sin productos» como si la empresa no vendiera.
+  let datosDesde: string | null = null;
+  if (UNA_SOLA_VENTA && productos.length === 0) {
+    const primera = await primeraFecha("switch_articulo_diario", empresa);
+    datosDesde = ventanaAntesDeLosDatos(primera, hasta) ? primera : null;
+  }
 
   const body: ProductosResponse = {
     empresa,
@@ -157,6 +187,8 @@ export async function GET(req: NextRequest) {
     comparativo: { desde: comparativo.desde, hasta: comparativo.hasta, corte: comparativo.corte, parcial: comparativo.parcial },
     totales: { venta: ventaTotal, costo: costoTotal, margen: margenTotal },
     productos,
+    ...(cuadre ? { cuadre } : {}),
+    ...(datosDesde ? { datosDesde } : {}),
   };
   return NextResponse.json(body);
 }

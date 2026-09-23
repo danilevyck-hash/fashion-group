@@ -56,8 +56,10 @@ import { SYNC_NOW_VENTAS_SECUENCIA } from "@/components/shared/syncNowOpciones";
 import { ROTULO_DESCARGAR_EXCEL } from "@/lib/ventas/descarga";
 import {
   buildSlotsMetrica, cellValue, cellDelta, renderCellValue, celdaKey,
-  deltaCelda, isNaComparison, marginRatio, type CeldaBase, type DeltaCelda, type SlotDetalle,
+  isNaComparison, marginRatio, type CeldaBase, type DeltaCelda, type SlotDetalle,
 } from "@/lib/ventas/celda";
+// 🔴 «n/a» se dice con palabras también en el celular (23-sep-2026).
+import { deltaCeldaDe } from "@/lib/ventas/una-sola-venta";
 import {
   buildSlotsProyeccion, explicacionProyeccion,
   explicacionProyeccionGrupo, deltaProyeccionTexto,
@@ -430,7 +432,7 @@ function MobileTarjetas({
     return {
       ...base,
       valor: renderCellValue(cur, viewMode),
-      dc: deltaCelda(cellDelta(cell, viewMode), viewMode, isNaComparison(cell, viewMode)),
+      dc: deltaCeldaDe(cell, viewMode, cellDelta(cell, viewMode), isNaComparison(cell, viewMode)),
       margen: margenChico(cell, viewMode),
       detalle: {
         titulo,
@@ -456,7 +458,7 @@ function MobileTarjetas({
     // descuadre que no existe.
     const display = fmtMoney(cur);
     const delta = variacionPct(cur, prev);
-    const dc = deltaCelda(delta, viewMode, delta == null);
+    const dc = deltaCeldaDe(ytdCell, viewMode, delta, delta == null);
     const margen = viewMode === "utilidad" ? fmtPorcentaje(margenPct) : null;
     return {
       dc,

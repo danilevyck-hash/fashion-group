@@ -140,7 +140,7 @@ describe("3b · 🔴 la píldora de empresa y el alcance viven en Utilidad tambi
     // empresas de plata.
     expect(fuentes.utilidad).toContain("data-alcance-utilidad");
     expect(fuentes.utilidad).toContain("alcanceEmpresas(data.empresas)");
-    expect(fuentes.utilidad).toContain("Boston y Multifashion no llevan utilidad");
+    expect(fuentes.utilidad).toContain("Boston y Multifashion no entran");
     // Y ya no hay ayuda que abrir para enterarse.
     expect(fuentes.utilidad).not.toContain("<Ayuda");
   });

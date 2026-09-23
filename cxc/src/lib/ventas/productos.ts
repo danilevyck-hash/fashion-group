@@ -12,6 +12,7 @@ import { ventanaUnAnioAntes, type VentanaComparativa } from "@/lib/ventas/client
 // de mes de Multifashion y el día de las marcaciones del reloj).
 import { hoyPanama } from "@/lib/fecha-panama";
 import { B2B_EMPRESA_KEYS, nombreCortoEmpresa } from "@/lib/empresa-mapping";
+import { UNA_SOLA_VENTA, filasDeCierreProductos, type CuadreProductos } from "@/lib/ventas/una-sola-venta";
 
 // 🔴 LAS SEIS DE FASHION GROUP, Y NADA MÁS (11-sep-2026). Default Fashion Wear.
 //
@@ -97,6 +98,16 @@ export interface ProductosResponse {
   meses?: number[];
   totales: { venta: number; costo: number; margen: number | null };
   productos: ProductoNivel1[];
+  /**
+   * 🔴 UNA SOLA VENTA (23-sep-2026): con esto puesto, `totales.venta` es la
+   * venta del RESUMEN para la ventana, y acá se desglosa lo que el listado no
+   * trae (notas de débito, renglones que el reporte por artículo no devuelve).
+   * Ausente = el total es la suma del listado, como antes.
+   */
+  cuadre?: CuadreProductos;
+  /** Cuando no hay ni una descripción porque la tabla arranca DESPUÉS de la
+   *  ventana: desde cuándo hay datos de esta empresa (`AAAA-MM-DD`). */
+  datosDesde?: string;
 }
 
 // Período → rango de fechas [desde, hasta] (YYYY-MM-DD).
@@ -335,14 +346,23 @@ export async function buildProductosSheet(
     // Excel es un margen REAL que se suma y se promedia con los demás y baja el
     // promedio sin que nadie lo note. Es la MISMA regla que ya seguía
     // `precioPromedio` en la columna de al lado: `null` = celda VACÍA.
-    rows: resp.productos.map(p => [
-      p.descripcion,
-      p.num_codigos,
-      p.cantidad,
-      p.venta,
-      precioPromedio(p.venta, p.cantidad),
-      ...(cliente ? [] : [p.margen]),
-    ]),
+    rows: [
+      ...resp.productos.map(p => [
+        p.descripcion,
+        p.num_codigos,
+        p.cantidad,
+        p.venta,
+        precioPromedio(p.venta, p.cantidad),
+        ...(cliente ? [] : [p.margen]),
+      ]),
+      // 🔴 UNA SOLA VENTA: las filas de cierre —lo que el listado no trae— van
+      // al final, con su venta y NADA más (ni piezas, ni precio, ni margen: no
+      // son un producto), para que el archivo SUME su TOTAL. Sin cuadre, o con
+      // el interruptor apagado, no se agrega ninguna.
+      ...(UNA_SOLA_VENTA && !cliente
+        ? filasDeCierreProductos(resp.cuadre).map(f => [f.rotulo, null, null, f.venta, null, null])
+        : []),
+    ],
     totals: [
       "TOTAL", null, totalCant, resp.totales.venta, totalPrecio,
       ...(cliente ? [] : [resp.totales.margen]),

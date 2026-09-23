@@ -44,6 +44,9 @@ import {
 } from "@/lib/ventas/productos";
 import { periodoParaProductos, type PeriodoVentas } from "@/lib/ventas/periodo";
 import { ROTULO_DESCARGAR_EXCEL, anotarDescarga } from "@/lib/ventas/descarga";
+// 🔴 UNA SOLA VENTA (23-sep-2026): el total es el del Resumen y la línea de
+// abajo dice qué incluye; un período sin datos dice desde cuándo los hay.
+import { UNA_SOLA_VENTA, textoCuadreProductos, textoDatosDesde } from "@/lib/ventas/una-sola-venta";
 
 // "precio" NO es una columna de la RPC: sale de venta ÷ cantidad. Por eso el
 // orden pasa por `valorOrden` y no por `p[sort.key]` — indexar un campo que no
@@ -499,6 +502,14 @@ export function ProductosView({ periodo: periodoElegido, anioEnCurso }: {
   // notación de matemática.
   const deltaLabel = periodo === "ytd" ? `vs ${selectedYear - 1}` : "vs año ant.";
 
+  // 🔴 «Productos de Fashion Wear tiene datos desde febrero 2023» (23-sep-2026):
+  // un año que la tabla no cubre no es «sin productos para este filtro» —eso
+  // se lee como que no vendió— y tampoco un error. El servidor manda desde
+  // cuándo hay datos cuando la ventana cae antes.
+  const textoVacio = UNA_SOLA_VENTA && data?.datosDesde
+    ? textoDatosDesde("Productos", data.datosDesde, nombreCortoEmpresa(empresa))
+    : "Sin productos para este filtro.";
+
   // ⛔ ACÁ VIVÍA `anioNoAplica` y su párrafo «El año 2026 de arriba no se aplica
   // a este período… Para mirar un año elige "Año en curso" o un mes». Se retiró
   // el 11-sep-2026: con UN solo selector de período ya no hay dos controles de
@@ -618,6 +629,13 @@ export function ProductosView({ periodo: periodoElegido, anioEnCurso }: {
               </>
             )}
           </p>
+          {/* 🔴 UNA SOLA VENTA: el total de arriba es el del RESUMEN. Lo que el
+              reporte por artículo no trae (las notas de débito, y los renglones
+              de factura que ese reporte no devuelve) se DICE acá, con su monto,
+              en vez de dejar que dos pestañas den dos números para lo mismo. */}
+          {UNA_SOLA_VENTA && !conCliente && textoCuadreProductos(data.cuadre) && (
+            <p data-cuadre-productos className="mb-1 text-xs text-gray-500">{textoCuadreProductos(data.cuadre)}</p>
+          )}
           {/* Las piezas y el precio promedio del período, y —clave para los
               períodos relativos— LAS DOS FECHAS. "Últimos 12 meses" sin fechas
               es el rótulo que se malinterpreta. */}
@@ -748,7 +766,7 @@ export function ProductosView({ periodo: periodoElegido, anioEnCurso }: {
             </thead>
             <tbody>
               {visibleRows.length === 0 && (
-                <tr><td colSpan={conCliente ? 6 : 7} className="px-3 py-8 text-center text-gray-400">Sin productos para este filtro.</td></tr>
+                <tr><td colSpan={conCliente ? 6 : 7} className="px-3 py-8 text-center text-gray-400">{textoVacio}</td></tr>
               )}
               {visibleRows.map(p => (
                 <ProductoRow
@@ -805,7 +823,7 @@ export function ProductosView({ periodo: periodoElegido, anioEnCurso }: {
           <ul data-vista="tarjetas" className="space-y-2">
             {visibleRows.length === 0 && (
               <li className="rounded-lg border border-gray-200 bg-white px-3 py-8 text-center text-sm text-gray-400">
-                Sin productos para este filtro.
+                {textoVacio}
               </li>
             )}
             {visibleRows.map(p => (

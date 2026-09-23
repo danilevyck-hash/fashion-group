@@ -699,7 +699,9 @@ describe("Utilidad · el alcance se dice EN PANTALLA (antes en el ⓘ)", () => {
     expect(linea).toContain("6 empresas B2B");
     // Y dice POR QUÉ no es el total del grupo, que es la pregunta que el
     // número dejaba sin contestar.
-    expect(linea).toContain("Boston y Multifashion no llevan utilidad");
+    // Desde el 23-sep-2026 (UNA SOLA VENTA) la línea dice que no entran, y
+    // sigue con el cuadre contra el Resumen.
+    expect(linea).toContain("Boston y Multifashion no entran");
     // El ⓘ se retiró: lo que decía ahora está en pantalla.
     expect(screen.queryByRole("button", { name: "Cómo se calcula" })).toBeNull();
   });

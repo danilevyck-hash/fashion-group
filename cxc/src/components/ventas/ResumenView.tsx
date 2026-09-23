@@ -19,9 +19,12 @@ import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { buildNotaMayoreo } from "@/lib/ventas/mayoreo";
 import {
   cellValue, cellDelta, isNaComparison, marginRatio,
-  renderCellValue, buildSlotsMetrica, celdaKey, deltaCelda,
+  renderCellValue, buildSlotsMetrica, celdaKey,
   type CeldaBase, type DeltaCelda, type ViewMode as ModoCelda,
 } from "@/lib/ventas/celda";
+// 🔴 «n/a» se dice con palabras en las SEIS llamadas de la matriz (23-sep-2026):
+// `deltaCeldaDe` le pasa a `deltaCelda` la base del año anterior.
+import { deltaCeldaDe } from "@/lib/ventas/una-sola-venta";
 import {
   buildSlotsProyeccion, explicacionProyeccion,
   explicacionProyeccionGrupo, deltaProyeccionTexto,
@@ -905,7 +908,7 @@ function HeatCell({
 
   const foco = celdaKey("d", filaId, columna);
   const isNa = cur != null && isNaComparison(cell, mode);
-  const dc = cur == null ? null : deltaCelda(delta, mode, isNa);
+  const dc = cur == null ? null : deltaCeldaDe(cell, mode, delta, isNa);
   const margen = margenChico(cell, mode);
 
   // Monto arriba, % del cambio contra el mismo mes del año anterior abajo. El
@@ -994,7 +997,7 @@ function EmpresaTotalCell({
   const delta = mode === "utilidad"
     ? variacionPct(utilidadTotal, utilidadPrevTotal)
     : variacionPct(ventasTotal, ventasPrevTotal);
-  const dc = deltaCelda(delta, mode, delta == null);
+  const dc = deltaCeldaDe(agg, mode, delta, delta == null);
   const margen = mode === "utilidad" ? fmtPorcentaje(margenPctYtd) : null;
   const foco = celdaKey("d", filaId, "total");
 
@@ -1069,7 +1072,7 @@ function TotalGroupCell({
   }
   const cellLike: Cell = { ...agg, periodLabel };
   const delta = cellDelta(cellLike, mode);
-  const dc = deltaCelda(delta, mode, isNaComparison(agg, mode));
+  const dc = deltaCeldaDe(agg, mode, delta, isNaComparison(agg, mode));
   const margen = margenChico(agg, mode);
   const foco = celdaKey("d", TOTAL_GRUPO_ID, columna);
 
@@ -1119,7 +1122,7 @@ function TotalGroupAnnualCell({
   const cellLike: Cell = { ...agg, periodLabel: `YTD ${selectedYear}` };
   const cur = cellValue(agg, mode);
   const delta = cellDelta(cellLike, mode);
-  const dc = cur == null ? null : deltaCelda(delta, mode, isNaComparison(agg, mode));
+  const dc = cur == null ? null : deltaCeldaDe(agg, mode, delta, isNaComparison(agg, mode));
   const displayValue = cur == null ? "—" : fmtMoney(cur);
   const margen = mode === "utilidad" && cur != null ? fmtPorcentaje(margenYtd) : null;
   const foco = celdaKey("d", TOTAL_GRUPO_ID, "total");

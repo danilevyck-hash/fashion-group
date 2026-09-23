@@ -12,6 +12,7 @@
 
 import { EMPRESA_KEY_TO_NAME, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { fmtPorcentaje } from "@/lib/ventas/format";
+import type { CuadreUtilidad } from "@/lib/ventas/una-sola-venta";
 
 /** Las cinco que `utilidad_por_cliente(p_anio)` (v1) lleva escritas en su WHERE.
  *  Solo se usa para rotular la respuesta cuando la migración de la v2 todavía
@@ -32,10 +33,23 @@ export interface UtilidadClienteRow {
   empresaKey: string;
   empresa: string;
   nDocs: number;
-  ventas: number;       // Σ subtotal_con_descuento (neto: NC restan)
+  /** 🔴 UNA SOLA VENTA (23-sep-2026): la venta ENTERA del cliente, la misma
+   *  definición que el Resumen (el contado incluido). Antes era solo lo que el
+   *  reporte de utilidad traía. */
+  ventas: number;
   costo: number;        // Σ costo (neto)
   utilidad: number;     // Σ utilidad (neto)
-  margen: number | null; // fracción utilidad/ventas; null si ventas <= 0
+  /** fracción utilidad ÷ ventas CON costo; null si no hay base. El contado no
+   *  lo diluye: no se le conoce el costo. */
+  margen: number | null;
+  /** La parte de `ventas` que el reporte de utilidad cubre (con costo). */
+  ventasConCosto?: number;
+  /** La parte sin costo por cliente: el contado. */
+  ventasSinCosto?: number;
+  /** El código del cliente en Switch, si se supo. */
+  codigo?: string | null;
+  /** El mostrador (`TCKCTA`): se marca, y SUMA en el total (el Resumen lo suma). */
+  mostrador?: boolean;
 }
 
 export interface UtilidadClienteResponse {
@@ -46,6 +60,13 @@ export interface UtilidadClienteResponse {
   empresas: string[];
   totales: { ventas: number; costo: number; utilidad: number; margen: number | null };
   rows: UtilidadClienteRow[];
+  /** 🔴 UNA SOLA VENTA: el cuadre contra el Resumen del mismo año y las mismas
+   *  empresas, y cuánto del total es contado sin costo. `null` si el Resumen no
+   *  se pudo leer. Ausente con el interruptor apagado. */
+  cuadre?: CuadreUtilidad | null;
+  /** Cuando el año pedido es anterior a la historia del reporte de utilidad
+   *  (`switch_factura_utilidad` arranca en ene-2026): desde cuándo hay datos. */
+  datosDesde?: string;
 }
 
 export function empresaNombre(key: string): string {

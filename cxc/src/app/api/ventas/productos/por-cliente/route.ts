@@ -38,6 +38,8 @@ import {
 import { matrizPorCliente } from "@/lib/ventas/productos-por-cliente-server";
 import { ultimoDiaArticuloDiario } from "@/lib/ventas/ultimo-dia-cargado";
 
+import { anioValido } from "@/lib/ventas/una-sola-venta";
+
 export const dynamic = "force-dynamic";
 
 /** Las dos ventanas que esta ruta sabe contestar. */
@@ -57,7 +59,8 @@ export async function GET(req: NextRequest) {
   if (!PRODUCTOS_EMPRESA_KEYS.includes(empresa)) {
     return NextResponse.json({ error: "empresa inválida" }, { status: 400 });
   }
-  if (!Number.isInteger(year) || year < 2024 || year > 2100) {
+  // 🔴 2022 y 2023 se sirven (23-sep-2026): el mismo piso que la ruta madre.
+  if (!anioValido(year)) {
     return NextResponse.json({ error: "year inválido" }, { status: 400 });
   }
   if (mes !== null && (!Number.isInteger(mes) || mes < 1 || mes > 12)) {

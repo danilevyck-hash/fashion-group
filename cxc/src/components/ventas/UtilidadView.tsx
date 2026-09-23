@@ -12,6 +12,10 @@ import {
   type UtilidadClienteResponse,
   type UtilidadClienteRow,
 } from "@/lib/ventas/utilidad-cliente";
+// 🔴 UNA SOLA VENTA (23-sep-2026): la venta es la del Resumen (el contado
+// incluido), el cuadre se dice, el mostrador se marca y un año sin reporte de
+// utilidad dice desde cuándo lo hay.
+import { UNA_SOLA_VENTA, textoCuadreUtilidad, textoDatosDesde } from "@/lib/ventas/una-sola-venta";
 
 export type UtilidadSortKey = "ventas" | "utilidad" | "margen";
 type SortKey = UtilidadSortKey;
@@ -126,6 +130,13 @@ export function UtilidadView({
   const visibleRows = rows;
   const negativos = rows.filter((r) => r.utilidad < 0).length;
 
+  // 🔴 «Utilidad tiene datos desde enero 2026» (23-sep-2026): el reporte de
+  // utilidad de Switch arranca ahí; un año anterior no es un error ni «sin
+  // clientes para este filtro».
+  const textoVacio = UNA_SOLA_VENTA && data?.datosDesde
+    ? textoDatosDesde("Utilidad", data.datosDesde)
+    : "Sin clientes para este filtro.";
+
   const toggleSort = (key: SortKey) => {
     setSort((prev) => (prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }));
   };
@@ -168,7 +179,12 @@ export function UtilidadView({
             Margen <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMargenPantalla(data.totales.margen)}</span>
           </span>
           <span data-alcance-utilidad className="text-xs text-gray-500">
-            {alcanceEmpresas(data.empresas)} · Boston y Multifashion no llevan utilidad, así que este total no es el del grupo
+            {alcanceEmpresas(data.empresas)} · Boston y Multifashion no entran a esta pestaña
+            {/* 🔴 UNA SOLA VENTA: el cuadre contra el Resumen, dicho. «El mismo
+                total que el Resumen», o cuánto falta y por qué. */}
+            {UNA_SOLA_VENTA && textoCuadreUtilidad(data.cuadre) && (
+              <span data-cuadre-utilidad> · {textoCuadreUtilidad(data.cuadre)}</span>
+            )}
           </span>
         </p>
       )}
@@ -216,7 +232,7 @@ export function UtilidadView({
         <div className="space-y-2 lg:hidden">
           {visibleRows.length === 0 && (
             <div className="rounded-lg border border-gray-200 bg-white px-4 py-10 text-center text-sm text-gray-400">
-              Sin clientes para este filtro.
+              {textoVacio}
             </div>
           )}
           {visibleRows.map((r) => (
@@ -243,7 +259,7 @@ export function UtilidadView({
             </thead>
             <tbody>
               {visibleRows.length === 0 && (
-                <tr><td colSpan={6} className="px-3 py-8 text-center text-gray-400">Sin clientes para este filtro.</td></tr>
+                <tr><td colSpan={6} className="px-3 py-8 text-center text-gray-400">{textoVacio}</td></tr>
               )}
               {visibleRows.map((r) => (
                 <UtilidadRow key={`${r.empresaKey}|${r.clienteSwitchId ?? r.cliente}`} r={r} />
@@ -290,6 +306,16 @@ function SortableTh({
  *  y el chequeo pasando en falso. */
 const filaKey = (r: UtilidadClienteRow) => `${r.empresaKey}|${r.clienteSwitchId ?? r.cliente}`;
 
+/** El mostrador (`TCKCTA`), marcado como en el modo Ventas. Acá SUMA en el
+ *  total —el Resumen lo suma— así que no dice «fuera del ranking». */
+function MarcaMostrador() {
+  return (
+    <span data-marca-mostrador className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-normal text-amber-700">
+      mostrador · ventas de contado
+    </span>
+  );
+}
+
 function UtilidadRow({ r }: { r: UtilidadClienteRow }) {
   const neg = r.utilidad < 0;
   // Negativo = devolución neta. Se ve claro (rojo) pero NO como error.
@@ -299,6 +325,7 @@ function UtilidadRow({ r }: { r: UtilidadClienteRow }) {
     <tr data-fila-utilidad={filaKey(r)} className="border-b border-gray-100 hover:bg-gray-50">
       <td data-col="cliente" className="px-3 py-2.5">
         <span className="text-gray-800">{r.cliente}</span>
+        {UNA_SOLA_VENTA && r.mostrador && <MarcaMostrador />}
         {neg && (
           <span className="ml-2 rounded bg-rose-50 px-1.5 py-0.5 text-xs font-medium text-rose-600" title="Devoluciones netas: las notas de crédito superan las ventas del período">
             dev. neta
@@ -328,6 +355,7 @@ function UtilidadCard({ r }: { r: UtilidadClienteRow }) {
     <div data-fila-utilidad={filaKey(r)} className="rounded-lg border border-gray-200 bg-white px-4 py-3">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span data-col="cliente" className="text-[15px] font-medium leading-tight text-gray-900">{r.cliente}</span>
+        {UNA_SOLA_VENTA && r.mostrador && <MarcaMostrador />}
         {neg && (
           <span
             className="rounded bg-rose-50 px-1.5 py-0.5 text-xs font-medium text-rose-600"

@@ -53,7 +53,9 @@ describe("las 8 celdas de las dos tablas pintan el %", () => {
 
   it("escritorio: mes, total anual por empresa, total grupo y anual del grupo", () => {
     // 4 celdas clicables + las 2 funciones de color = 6 usos de la pareja.
-    expect(resumen.match(/deltaCelda\(/g) ?? []).toHaveLength(4);
+    // Desde el 23-sep-2026 las llamadas pasan por `deltaCeldaDe` (la MISMA
+    // `deltaCelda`, con la base previa puesta para decir «no vendiste»).
+    expect(resumen.match(/deltaCeldaDe?\(/g) ?? []).toHaveLength(4);
     expect(resumen.match(/dc\.texto/g) ?? []).toHaveLength(4);
   });
 
@@ -68,7 +70,7 @@ describe("las 8 celdas de las dos tablas pintan el %", () => {
     expect(mobile).toContain("tarjeta.resumen.dc.texto");
     expect(mobile).toContain("tarjeta.enCurso.dc.texto");
     // El cálculo sigue siendo el compartido, no una matemática nueva.
-    expect(mobile.match(/deltaCelda\(/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(mobile.match(/deltaCeldaDe?\(/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
   });
 
   it("el monto y el % van apilados en el escritorio, no en la misma línea", () => {
