@@ -14,7 +14,8 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
-import CatalogosPublicosPage, { URL_CATALOGOS_PUBLICOS, metadata } from "@/app/catalogo-publico/todos/page";
+import CatalogosPublicosPage, { metadata } from "@/app/catalogo-publico/todos/page";
+import { URL_CATALOGOS_PUBLICOS } from "@/lib/catalogo/url-catalogos-publicos";
 import { MARCAS_DEL_HUB } from "@/lib/catalogo/contadores";
 import { getMarcaTheme } from "@/lib/catalogo/marcas-ui";
 

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { MARCAS_DEL_HUB } from "@/lib/catalogo/contadores";
 import { getMarcaTheme } from "@/lib/catalogo/marcas-ui";
 import { DOMINIO_PUBLICO } from "@/lib/catalogo/metadata-publica";
+import { URL_CATALOGOS_PUBLICOS } from "@/lib/catalogo/url-catalogos-publicos";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // /catalogo-publico/todos — UN link para el cliente con los CUATRO catálogos
@@ -17,8 +18,6 @@ import { DOMINIO_PUBLICO } from "@/lib/catalogo/metadata-publica";
 //   el link. Lo que Switch cambie (existencia, precio) lo ve el cliente al
 //   volver a abrir.
 // ─────────────────────────────────────────────────────────────────────────────
-
-export const URL_CATALOGOS_PUBLICOS = `${DOMINIO_PUBLICO}/catalogo-publico/todos`;
 
 const TITULO = "Catálogos Fashion Group";
 const DESCRIPCION = "Reebok · Joybees · Tommy Hilfiger · Calvin Klein — Fashion Group Panamá.";
