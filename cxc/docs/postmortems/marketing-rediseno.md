@@ -284,7 +284,7 @@ Dos candados ajenos **cambiaron de forma, no de dirección**, con nota fechada:
 **Candados ajenos que cambiaron de forma, con nota fechada:** `marketing-periodos.test.ts` y `poda-textos-explicaciones.test.tsx` (mockean el interruptor en `false`: prueban el cierre y el modal DE ANTES); `iphone-tocables-y-letra.test.ts` (2 pestañas, sin `ReportePorProyectoView`); `excel-exports-marketing.test.ts` (sin el bloque de `exportarExcelReporte`); `marketing-reclamos-toques.test.tsx` (sin el bloque del filtro «Marca» del reporte por proyecto).
 
 **Pendiente de Daniel:**
-1. 🔴 **Los $8.061,63 de Multifashion**: siguen en su bucket (no se le reportan a nadie). Si sus gastos con marca Tommy/Calvin deben entrar al período de esa marca —y por lo tanto al ZIP que se le manda—, es plata que se mueve y lo decide él.
+1. ✅ **DECIDIDO por Daniel el 22-sep-2026 — los $8.061,63 de Multifashion se quedan APARTE, nunca se le cobran a una marca.** Se le planteó a/b/c (siempre · nunca · gasto por gasto con «se reporta»); eligió textual: *«b) No, nunca → se quedan aparte como hoy. No cambio nada.»* Lo que gasta en su propia tienda para Tommy/Calvin es suyo. La regla por tienda D-108 (`multifashion.ts`, `MULTIFASHION_KEY` en `portada-rediseno.ts`) se queda como está y **no se vuelve a preguntar**.
 2. El agregador de los niveles 2 y 3 (`proyectos-lista`) ya aparta lo apagado, pero `lista-por-periodo.ts` no lo dibuja en gris todavía (hoy 0 apagados: nada que dibujar).
 3. El «Excel» de un período cerrado en el nivel 3 sigue vivo (es el del ZIP, pieza D); solo se retiró el «Exportar Excel» de Reportes.
 
