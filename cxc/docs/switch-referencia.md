@@ -177,7 +177,9 @@ Medido sobre `fashion_wear`: `abrev · ccteId · credito · debito · dias · fe
 
 #### Las dos tablas sin `raw_data`, que es donde no se puede saber qué se está tirando
 
-`switch_recibos` y `switch_ingresos_mercancia` **no guardan el crudo**. En recibos se usan 6 campos (`fechaCreacion, clienteId, clienteCodigo, clienteNombre, vendedor, total`) y **si `/apireporte/recibos` manda algo más —forma de pago, banco, número de recibo— hoy no queda rastro de ello en ninguna parte.** Es el único endpoint en producción del que no se puede auditar el descarte sin volver a llamarlo.
+`switch_recibos` y `switch_ingresos_mercancia` **no guardan el crudo**. En recibos se usan 6 campos (`fechaCreacion, clienteId, clienteCodigo, clienteNombre, vendedor, total`).
+
+🔑 **Medido el 22-sep-2026 llamando al endpoint** (Fashion Wear, `desde=2026-08-01`, 5 recibos): `/apireporte/recibos` manda **14 campos** — `desde, hasta, fechaCreacion, sucursal, sucursalId, codigoSucursal, vendedorId, vendedor, codigoVendedor, clienteId, clienteCodigo, clienteNombre, clienteRazonsocial, total`. **NO manda forma de pago, banco, número de cheque ni número de recibo.** Los 8 que se descartan son sucursal, ids y códigos de vendedor/cliente, y `clienteRazonsocial` (la razón social, que `switch_clientes` ya tiene por otro camino). Consecuencia para Recordatorios: **saber que un pago fue con cheque no se puede sacar de Switch; solo se sabe si alguien lo anota a mano.** Daniel lo preguntó porque de ahí dependía si el módulo de cheques tenía sentido: sí lo tiene, porque no hay otra fuente.
 
 ### 1.8 Lo que la doc NO tiene y el sistema necesita (confirmado por omisión)
 
