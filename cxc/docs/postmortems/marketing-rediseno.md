@@ -147,3 +147,62 @@ Regla para las cuatro: **importar del cimiento, no reescribirlo**; **toda lectur
 - `src/__tests__/components/marketing-reclamos-toques.test.tsx` — bloques 1 y 2 cambiaron de dirección (nota fechada arriba de cada uno).
 - `src/__tests__/lib/marketing-periodos.test.ts` — tres casos que registraban una factura con DOS marcas cambiaron de dirección con nota fechada: hoy la puerta la rechaza (`ErrorMarcaRepartida`) y no queda sello; cada marca lleva su propia factura.
 - `scripts/_mutar-candados-marketing-cimiento.sh` — 44 mutaciones + 2 controles; el resultado de la corrida está en el informe de la pieza.
+
+---
+
+## 8. Pieza (B) — el buscador global y la vista de tienda (22-sep-2026)
+
+> Daniel: *«debería estar organizado: ver por cliente, busco el cliente o proyecto y ver adentro la info (por marca etc.)»*.
+
+**Ahora → después.** Para llegar a un gasto había que ir **Marca → Período → Proyecto**, tres saltos, y el buscador del proyecto comparaba con `includes` sobre el texto crudo. Ahora se busca la tienda en **⌘K** y se cae en `/marketing/tienda/<código>`, con TODO lo suyo agrupado **por marca**.
+
+### Lo medido contra producción (solo lectura, por REST)
+
+| Qué | Número |
+|---|---|
+| Proyectos con los que se midió el buscador | **25** |
+| «nova» con `includes` | **2** — Nova Lux **y** «Renovación» |
+| «nova» por palabra | **1** — solo Nova Lux (D-170) |
+| «d» con `includes` / por palabra | **21 de 25** / **6** |
+| Términos que NO cambian con la regla nueva | **12 de 14** (`remodel · city · frontera · mall · lux · j · plaza · impulsadora · hanna · renovacion · muebles · apertura`) |
+| Facturas con ceros a la izquierda («0000064948») | **79 de 108** — por eso el NÚMERO se queda por subcadena (de 5 números probados, 4 quedaban en cero con la regla por palabra) |
+| Tiendas con gasto hoy | **17** + el cajón «General» (22 gastos, $37.778,12) |
+| Cuadre contra la pantalla que ya existe | **D-24 = $37.460,92** (CK $8.261,80 · TH $29.199,12), **D-25 = $10.509,75**, **D-170 = $12.261,16** — idénticos a «Reportes por tienda» |
+| Fotos con tienda (`mk_adjuntos.tienda_codigo`) | **60 de 60** de las `foto_proyecto` |
+
+### Qué se construyó
+
+- **`src/lib/marketing/vista-tienda.ts`** (puro) — el interruptor **`VISTA_TIENDA`** (hoy `true`), `hrefDeTienda` (la ÚNICA definición de `/marketing/tienda/<código>`), `esCodigoGeneral` / `CODIGO_GENERAL`, `rotuloDeLaTienda`, `agruparPorMarca`, `totalDeLaTienda`, `rotuloDeFila` / `rotuloDelPeriodo`. **Qué suma lo decide `periodo-estado.ts › totalesDelPeriodo`**: acá no hay una segunda definición.
+- **`src/lib/search/texto.ts`** (puro) — `normalizarBusqueda` · `coincidePorPalabra` · `coincideSubcadena` · `algunoCoincidePorPalabra`. 🔴 Una palabra del texto tiene que **EMPEZAR** con lo escrito; nada por parecido (sin distancia de edición ni fonética, con barrido).
+- **`src/lib/search/marketing.ts`** y **`marketing-server.ts`** — la sección de Marketing del ⌘K: las tiendas con gasto, su nombre del directorio **por CÓDIGO**, y lo que suman **solo de lo reportado**. Falla ABIERTA a `[]`.
+- **`GET /api/marketing/tienda/[codigo]`** (+ `datos.ts`) — la lectura. Facturas vivas + entregas + su marca (`mk_factura_marcas` / `total_por_marca`) + el sello de período (`mk_periodo_documentos` → `mk_periodos`) + el nombre de la impulsadora + las fotos. Toda columna del rediseño pasa por `columnas-opcionales.ts › completarGasto` / `esColumnaAusente`: sin la migración, la pantalla lo **dice** y no revienta. La ruta **no escribe nada** (barrido).
+- **`GET`/`POST /api/marketing/tienda/[codigo]/fotos`** — las fotos de la tienda, firmadas. El POST es puerta propia porque `POST /api/marketing/adjuntos` exige un `proyecto_id` para una `foto_proyecto` y el proyecto se fue; falla ABIERTA (guarda sin tienda y lo dice en el log).
+- **La pantalla** `src/app/marketing/tienda/[codigo]/{page,VistaTienda}.tsx` — resumen arriba (**gasto que se reporta**, y aparte **lo que no suma**), una tabla por marca (Tipo · Proveedor · Detalle · Fecha · Período · Monto), lo no reportado **en gris con su rótulo**, las fotos de la tienda al pie, y **«＋ Gasto»**. Con el interruptor apagado: `notFound()`.
+- **`FotosSection.tsx`** — gana `tiendaCodigo`; con él lee y sube por la puerta de la tienda, sin `tiendaCodigo` se porta **exactamente** como hoy.
+- **`/api/marketing/adjuntos/upload-url`** — acepta `tiendaCodigo` y guarda en `tienda/<código>/…`. Aditivo: los cuatro caminos de antes no cambian.
+- **`/api/search/route.ts`** y **`SearchBar.tsx`** — la sección «Marketing», solo para admin y secretaria (los roles del módulo), con la dirección tomada de `hrefDelResultado`, nunca escrita a mano.
+- **`/api/marketing/proyectos-lista`** — el texto (nombre · tienda · concepto) pasa a `coincidePorPalabra`; el **número de factura** se queda en `coincideSubcadena`. Con `VISTA_TIENDA` en `false` vuelve el `includes` de siempre.
+
+### Lo que NO se hizo, y por qué
+
+- **La puerta «＋ Gasto» todavía no abre con la tienda puesta.** `RegistrarGastoModal` (pieza A) aún no acepta `tiendaCodigo`; el punto de montaje está marcado en `VistaTienda.tsx` y es una prop de una línea cuando A lo declare. Hoy el botón abre el formulario preguntando como siempre.
+- **El buscador del proyecto sigue existiendo**: esta pieza lo arregló, no lo retiró. Quitarlo es de la pieza (C), con la portada.
+
+### Candado y mutaciones
+
+`src/__tests__/lib/marketing-vista-tienda.test.ts` — **30 casos en 6 bloques**: agrupa por marca y el total excluye lo no reportado · la tienda por CÓDIGO y nunca por nombre · «nova» no trae «Renovación» (con los 25 proyectos reales adentro) · el resultado de ⌘K apunta a `/marketing/tienda/<código>` y esa dirección se escribe una sola vez · el interruptor en `false` = nada cambia · las fotos cuelgan de la tienda y todo falla ABIERTO.
+
+Mutaciones corridas a mano (romper → ROJO → restaurar), **6 de 6 en rojo** y el control en verde:
+
+| # | Mutación | Resultado |
+|---|---|---|
+| 1 | `totalDeLaTienda` suma también lo NO reportado | 🔴 |
+| 2 | `hrefDeTienda` deja de apuntar a `/marketing/tienda/…` | 🔴 |
+| 3 | la lectura busca `clientes_master` por `nombre` en vez de por `codigo` | 🔴 |
+| 4 | `coincidePorPalabra` vuelve a `includes` | 🔴 |
+| 5 | `page.tsx` pierde el `notFound()` del interruptor | 🔴 |
+| 6 | el número de factura pasa a compararse por palabra | 🔴 |
+
+Dos candados ajenos **cambiaron de forma, no de dirección**, con nota fechada:
+- `src/__tests__/lib/caja-y-marketing-defectos.test.ts` › «la ruta sigue pidiendo un dueño» — el guard de `upload-url` ganó un cuarto permitido (`tiendaCodigo`) y quedó en varias líneas; ahora se comprueban las piezas, no la grafía de una línea. Se sumó un caso: la foto de una tienda va a SU carpeta.
+- `src/__tests__/lib/sesion-semilla-primer-pintado.test.tsx` — la pantalla nueva entró a `ALCANZADAS_POR_EL_GANCHO` (29 → 30).

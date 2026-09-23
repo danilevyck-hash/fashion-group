@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { esMultifashion } from "@/lib/marketing/multifashion";
+import { conRespaldoSinColumnas } from "@/lib/marketing/columnas-opcionales";
+import { MARKETING_PORTADA_REDISENO } from "@/lib/marketing/portada-rediseno";
 import {
   marcasDeEntrega,
   porcionEntregaParaMarca,
@@ -14,6 +16,8 @@ import {
   nombreDeBloque,
 } from "@/lib/marketing/bloques";
 import { bloqueDeSlug, slugDeMarca } from "@/lib/marketing/slugs";
+import { coincidePorPalabra, coincideSubcadena } from "@/lib/search/texto";
+import { VISTA_TIENDA } from "@/lib/marketing/vista-tienda";
 import {
   agregarPorBloques,
   crearClasificadorPeriodos,
@@ -73,6 +77,9 @@ export const fetchCache = "force-no-store";
 // "Cerrar período". La lista devuelve SIEMPRE todos los proyectos vivos (no
 // anulados). `?filtro_estado=` se ignora si un cliente viejo lo manda.
 
+const COLS_FACTURA_LISTA = "id, proyecto_id, total, grupo_legacy, impulsadora_id, concepto, proveedor, numero_factura, fecha_factura, created_at";
+const COLS_ENTREGA_LISTA = "id, proyecto_id, total, total_por_marca, total_por_empresa_interna";
+
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
@@ -120,18 +127,25 @@ export async function GET(req: NextRequest) {
       // TODAS las facturas vivas — las de proyecto y las sueltas (proyecto_id
       // null) en UNA lectura: las dos alimentan al agregador, y las columnas
       // extra son las que la fila General necesita para describir el gasto.
-      supabaseServer
-        .from("mk_facturas")
-        .select(
-          "id, proyecto_id, total, grupo_legacy, impulsadora_id, concepto, proveedor, numero_factura, fecha_factura, created_at",
-        )
-        .is("anulado_en", null),
+      // `se_reporta` es del rediseño (22-sep-2026): si la columna no está, se
+      // relee sin ella y todo cuenta como hoy (`columnas-opcionales`).
+      conRespaldoSinColumnas(
+        () =>
+          supabaseServer
+            .from("mk_facturas")
+            .select(`${COLS_FACTURA_LISTA}, se_reporta`)
+            .is("anulado_en", null),
+        () => supabaseServer.from("mk_facturas").select(COLS_FACTURA_LISTA).is("anulado_en", null),
+        (m) => console.error(`[marketing/proyectos-lista] ${m}`),
+      ).then((r) => r.resultado),
       supabaseServer
         .from("mk_factura_marcas")
         .select("factura_id, marca_id, porcentaje"),
-      supabaseServer
-        .from("mk_entregas_muebles")
-        .select("id, proyecto_id, total, total_por_marca, total_por_empresa_interna"),
+      conRespaldoSinColumnas(
+        () => supabaseServer.from("mk_entregas_muebles").select(`${COLS_ENTREGA_LISTA}, se_reporta`),
+        () => supabaseServer.from("mk_entregas_muebles").select(COLS_ENTREGA_LISTA),
+        (m) => console.error(`[marketing/proyectos-lista] ${m}`),
+      ).then((r) => r.resultado),
       supabaseServer.from("mk_adjuntos").select("tipo, factura_id, proyecto_id"),
       supabaseServer
         .from("mk_periodos")
@@ -239,6 +253,7 @@ export async function GET(req: NextRequest) {
       periodos,
       sellos,
       adjuntos: adjuntos as AdjuntoResumen[],
+      excluirNoReportado: MARKETING_PORTADA_REDISENO,
     });
 
     // El clasificador ÚNICO de períodos (el mismo que usa el agregador): acá
@@ -449,13 +464,34 @@ export async function GET(req: NextRequest) {
       busqueda.length > 0 &&
       busqueda.replace(/,/g, "").trim() !== "" &&
       Number.isFinite(montoNum);
+    // 🔴 EL TEXTO SE COMPARA POR PALABRA, NO CON `includes` (22-sep-2026).
+    //
+    // 🩸 Escribir «nova» traía «Renovación»: la palabra la lleva adentro.
+    // Medido sobre los 25 proyectos reales de producción: de 14 términos, 12
+    // dan EXACTAMENTE lo mismo con las dos reglas, y los 2 que cambian
+    // cambian para bien — «nova» pasa de 2 proyectos a 1 (solo Nova Lux) y
+    // «d» de 21 a 6. La regla vive en `lib/search/texto.ts`.
+    //
+    // ⚠️ EL NÚMERO DE FACTURA SIGUE POR SUBCADENA, y está medido: 79 de las
+    // 108 facturas tienen ceros a la izquierda («0000064948»), así que
+    // buscar «64948» por palabra no encontraría nada (4 de 5 números
+    // probados quedaban en cero). Ahí el tramo del medio ES lo que la gente
+    // teclea, y esa parte no se toca.
+    //
+    // Con `VISTA_TIENDA` apagado vuelve el `includes` de siempre.
     const matchTexto = (s: string | null | undefined) =>
-      !!s && s.toLowerCase().includes(term);
+      VISTA_TIENDA
+        ? coincidePorPalabra(s, busqueda)
+        : !!s && s.toLowerCase().includes(term);
+    const matchNumero = (s: string | null | undefined) =>
+      VISTA_TIENDA
+        ? coincideSubcadena(s, busqueda)
+        : !!s && s.toLowerCase().includes(term);
     const proyConFacturaMatch = new Set<string>();
     if (term) {
       for (const f of facturas) {
         if (
-          matchTexto(f.numero_factura) ||
+          matchNumero(f.numero_factura) ||
           matchTexto(f.concepto) ||
           (buscaMonto && Number(f.total ?? 0) === montoNum)
         ) {

@@ -81,11 +81,27 @@ describe("11 · «Otro gasto» sí le pasa el PDF a la IA", () => {
     expect(RUTA).toContain('parts.push("sin-dueno")');
   });
 
+  // ⚠️ CAMBIÓ DE FORMA el 22-sep-2026, no de dirección. Con el rediseño de
+  // Marketing la foto de una TIENDA tampoco tiene proyecto ni factura —el
+  // proyecto se fue—, así que el guard ganó un cuarto permitido
+  // (`tiendaCodigo`) y quedó escrito en varias líneas. Lo que este caso
+  // cuida es lo mismo de antes: sin NINGUNO de los dueños permitidos, la
+  // ruta corta. Se comprueban las piezas, no la grafía de una sola línea.
   it("⚠️ la ruta sigue pidiendo un dueño para todo lo demás", () => {
-    expect(RUTA).toContain(
-      '!body.proyectoId && !body.facturaId && !body.impulsadoraId && !body.paraLeerConIA',
-    );
+    for (const pieza of [
+      "!body.proyectoId",
+      "!body.facturaId",
+      "!body.impulsadoraId",
+      "!body.paraLeerConIA",
+      "tiendaCodigo.length === 0",
+    ]) {
+      expect(RUTA).toContain(pieza);
+    }
     expect(RUTA).toContain("Se requiere proyectoId, facturaId o impulsadoraId");
+  });
+
+  it("🔴 la foto de una tienda va a SU carpeta, y no se cuela en «sin-dueno»", () => {
+    expect(RUTA).toContain('parts.push("tienda", tiendaCodigo)');
   });
 
   it("🔴 el mismo PDF NO se sube dos veces: al guardar se reusa su `path`", () => {

@@ -4,6 +4,8 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { calcularSaldoPrestamo, type MovimientoParaSaldo } from "@/lib/prestamos-saldo";
 import { transportistaLabel } from "@/lib/transportistaLabel";
 import { EMPRESAS_DEL_GRUPO } from "@/lib/clientes/mundos";
+import { buscarTiendasDeMarketing } from "@/lib/search/marketing-server";
+import { VISTA_TIENDA } from "@/lib/marketing/vista-tienda";
 
 export const dynamic = "force-dynamic";
 
@@ -51,13 +53,20 @@ export const dynamic = "force-dynamic";
 //     bórralo»*. La tabla queda (congelada, respaldada), sin un solo lector.
 //   · guías, reclamos, préstamos y caja no buscan por nombre de cliente
 //     (transportista, nro de reclamo/factura, empleado y proveedor).
+//
+// 🔴 MARKETING (22-sep-2026): una TIENDA con gasto de Marketing. El resultado
+// abre `/marketing/tienda/<código>` — Daniel: *«busco el cliente o proyecto y
+// ver adentro la info (por marca etc.)»*. Se busca por NOMBRE o por CÓDIGO,
+// **por palabra** (`lib/search/texto.ts`): escribir «nova» encuentra «Nova
+// Lux» y ya no «Renovación». Cuelga del interruptor `VISTA_TIENDA`: apagado,
+// la sección no existe y el buscador se porta como siempre.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria", "vendedor", "bodega", "contabilidad"]); if (auth instanceof NextResponse) return auth;
   const q = req.nextUrl.searchParams.get("q")?.trim();
   if (!q || q.length < 2) {
-    return NextResponse.json({ cxc: [], reclamos: [], guias: [], directorio: [], cheques: [], ventas: [], prestamos: [], caja: [] });
+    return NextResponse.json({ cxc: [], reclamos: [], guias: [], directorio: [], cheques: [], ventas: [], prestamos: [], caja: [], marketing: [] });
   }
 
   const pattern = `%${q}%`;
@@ -288,9 +297,15 @@ export async function GET(req: NextRequest) {
     saldo: calcularSaldoPrestamo(emp.prestamos_movimientos).saldo,
   }));
 
+  // Marketing: las tiendas con gasto. Solo para quien ve el módulo (admin y
+  // secretaria), y solo con el interruptor prendido. Falla ABIERTA a [].
+  const puedeMarketing = auth.role === "admin" || auth.role === "secretaria";
+  const marketingTiendas =
+    VISTA_TIENDA && puedeMarketing ? await buscarTiendasDeMarketing(q) : [];
+
   // Module-level permissions per role
   const role = auth.role;
-  const empty = { cxc: [], reclamos: [], guias: [], directorio: [], cheques: [], ventas: [], prestamos: [], caja: [] };
+  const empty = { cxc: [], reclamos: [], guias: [], directorio: [], cheques: [], ventas: [], prestamos: [], caja: [], marketing: [] };
   const allResults = {
     cxc: cxcDeduped,
     reclamos: reclamosRes.data || [],
@@ -305,6 +320,7 @@ export async function GET(req: NextRequest) {
     ventas: ventasDeduped.map(({ switchId: _switchId, ...v }) => v),
     prestamos: prestamosData,
     caja: cajaRes.data || [],
+    marketing: marketingTiendas,
   };
 
   // Vendedor: only CXC and Directorio

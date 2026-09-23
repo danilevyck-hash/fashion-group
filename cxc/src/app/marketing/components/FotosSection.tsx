@@ -11,12 +11,32 @@ import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { subirAdjunto } from "./uploadHelpers";
 import { Ayuda } from "@/components/shared/Ayuda";
 
+// ============================================================================
+// 🔴 LAS FOTOS CUELGAN DE LA TIENDA (22-sep-2026), no del proyecto.
+//
+// Daniel: las fotos se pegan a la TIENDA. La columna es
+// `mk_adjuntos.tienda_codigo`, y la migración `20261216120000` la copió del
+// proyecto (medido: 60 de 60 fotos quedaron con su tienda).
+//
+// Esta sección sirve a las DOS puertas mientras dure la transición:
+//   · con `tiendaCodigo` → lee `/api/marketing/tienda/<código>/fotos`;
+//   · con `proyectoId`   → lo de siempre, sin un solo cambio.
+// Sin la columna, la ruta de la tienda contesta lista vacía: falla ABIERTA.
+// ============================================================================
+
 interface FotosSectionProps {
-  proyectoId: string;
+  /** La puerta vieja: las fotos de un proyecto. */
+  proyectoId?: string;
+  /** La puerta nueva: las fotos de una TIENDA, por su código (D-25). */
+  tiendaCodigo?: string;
   readonly?: boolean;
 }
 
-export default function FotosSection({ proyectoId, readonly = false }: FotosSectionProps) {
+export default function FotosSection({
+  proyectoId,
+  tiendaCodigo,
+  readonly = false,
+}: FotosSectionProps) {
   const { toast } = useToast();
   const [fotos, setFotos] = useState<MkAdjunto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +55,9 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
     setErrorCarga(null);
     try {
       const res = await fetch(
-        `/api/marketing/proyectos/${proyectoId}/fotos`,
+        tiendaCodigo
+          ? `/api/marketing/tienda/${encodeURIComponent(tiendaCodigo)}/fotos`
+          : `/api/marketing/proyectos/${proyectoId}/fotos`,
         { cache: "no-store" },
       );
       if (!res.ok) {
@@ -63,7 +85,7 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
     } finally {
       if (myReqId === reqIdRef.current) setLoading(false);
     }
-  }, [proyectoId, toast]);
+  }, [proyectoId, tiendaCodigo, toast]);
 
   useEffect(() => {
     cargar();
@@ -73,6 +95,7 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
     const adj = await subirAdjunto({
       file,
       proyectoId,
+      tiendaCodigo,
       tipo: "foto_proyecto",
     });
     // Re-fetch del servidor en lugar de optimistic state update.
@@ -140,7 +163,9 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
   return (
     <section className="space-y-3">
       <div className="flex items-center gap-1">
-        <h2 className="text-base font-semibold text-gray-900">Fotos del proyecto</h2>
+        <h2 className="text-base font-semibold text-gray-900">
+          {tiendaCodigo ? "Fotos de la tienda" : "Fotos del proyecto"}
+        </h2>
         {/* Para qué sirven las fotos: se aprende una vez → ⓘ. */}
         <Ayuda titulo="Para qué sirven" className="-my-2">
           <p>Respaldo visual que se adjunta a la cobranza a la marca.</p>
@@ -199,7 +224,7 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
                     src={f.url}
-                    alt={f.nombre_original ?? "Foto del proyecto"}
+                    alt={f.nombre_original ?? (tiendaCodigo ? "Foto de la tienda" : "Foto del proyecto")}
                     className="w-full h-full object-cover cursor-zoom-in"
                     loading="lazy"
                     onClick={() => setLightbox(f.url)}
@@ -255,7 +280,7 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
         </>
       ) : readonly ? (
         <div className="rounded-lg border border-dashed border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
-          Este proyecto no tiene fotos.
+          {tiendaCodigo ? "Esta tienda no tiene fotos." : "Este proyecto no tiene fotos."}
         </div>
       ) : (
         <FotoUploader

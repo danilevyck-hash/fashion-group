@@ -28,6 +28,11 @@ interface UploadUrlRequest {
    * sola vez, como en el camino Factura.
    */
   paraLeerConIA?: boolean;
+  /**
+   * 🔴 EL REDISEÑO (22-sep-2026): la foto de una TIENDA. No tiene proyecto ni
+   * factura —el proyecto se fue— y su archivo vive en `tienda/<código>/…`.
+   */
+  tiendaCodigo?: string;
   filename: string;
   contentType?: string;
 }
@@ -52,7 +57,17 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    if (!body.proyectoId && !body.facturaId && !body.impulsadoraId && !body.paraLeerConIA) {
+    const tiendaCodigo = String(body.tiendaCodigo ?? "").trim().toUpperCase();
+    if (tiendaCodigo.length > 40 || /[^A-Z0-9-]/.test(tiendaCodigo)) {
+      return NextResponse.json({ error: "tiendaCodigo inválido" }, { status: 400 });
+    }
+    if (
+      !body.proyectoId &&
+      !body.facturaId &&
+      !body.impulsadoraId &&
+      !body.paraLeerConIA &&
+      tiendaCodigo.length === 0
+    ) {
       return NextResponse.json(
         { error: "Se requiere proyectoId, facturaId o impulsadoraId" },
         { status: 400 },
@@ -83,8 +98,12 @@ export async function POST(req: NextRequest) {
     // Path interno del bucket "marketing" (sin prefijo "marketing/"):
     //   proyecto/factura → {proyectoId}/{facturaId?}/{ts}_{name}
     //   impulsadora      → impulsadora/{impulsadoraId}/{ts}_{name}
+    //   tienda           → tienda/{tiendaCodigo}/{ts}_{name}
     const parts: string[] = [];
-    if (!body.proyectoId && !body.facturaId && !body.impulsadoraId) {
+    if (!body.proyectoId && !body.facturaId && !body.impulsadoraId && tiendaCodigo) {
+      // La foto de una tienda: `tienda/D-25/…`.
+      parts.push("tienda", tiendaCodigo);
+    } else if (!body.proyectoId && !body.facturaId && !body.impulsadoraId) {
       // Sin dueño todavía: es el PDF que la IA va a leer antes de que la
       // factura exista. Se cuelga de la factura al guardar.
       parts.push("sin-dueno");

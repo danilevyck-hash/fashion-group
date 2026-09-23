@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { getVisibleModules } from "@/lib/modules";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
+import { hrefDelResultado, type TiendaDeMarketing } from "@/lib/search/marketing";
 
 interface CxcResult { id: string; nombre_normalized: string; total: number; company_key: string }
 interface ReclamoResult { id: string; nro_reclamo: string; nro_factura: string; empresa: string; estado: string; fecha_reclamo: string }
@@ -13,6 +14,9 @@ interface ChequeResult { id: string; cliente: string; monto: number; fecha_depos
 interface VentaResult { cliente: string; total: number; last_fecha: string; empresa: string; codigo?: string }
 interface PrestamoResult { id: string; nombre: string; empresa: string | null; saldo: number }
 interface CajaResult { id: string; descripcion: string; proveedor: string; total: number; fecha: string; periodo_id: string }
+// 🔴 Marketing (22-sep-2026): una TIENDA con gasto. El resultado abre su
+// vista — `hrefDelResultado`, que es la ÚNICA definición de esa dirección.
+type MarketingResult = TiendaDeMarketing
 
 interface SearchResults {
   cxc: CxcResult[];
@@ -23,6 +27,7 @@ interface SearchResults {
   ventas: VentaResult[];
   prestamos: PrestamoResult[];
   caja: CajaResult[];
+  marketing?: MarketingResult[];
 }
 
 interface QuickAction {
@@ -229,6 +234,21 @@ function flatten(r: SearchResults): FlatItem[] {
       icon: "📦",
     });
   }
+  // 🔴 MARKETING: la tienda, y adentro TODO lo suyo por marca. La dirección
+  // NO se escribe acá — sale de `lib/marketing/vista-tienda.ts`.
+  for (const t of (r.marketing || [])) {
+    items.push({
+      module: "Marketing",
+      label: t.nombre,
+      sub: [
+        `$${fmtMoney(t.monto)}`,
+        `${t.gastos} ${t.gastos === 1 ? "gasto" : "gastos"}`,
+        t.codigo ?? "",
+      ].filter(Boolean).join(" — "),
+      href: hrefDelResultado(t),
+      icon: "📣",
+    });
+  }
   return items;
 }
 
@@ -244,6 +264,7 @@ const SEARCH_MODULES = [
   { label: "Directorio", href: "/clientes", keywords: ["directorio", "contacto", "correo", "telefono", "whatsapp", "clientes"] },
   { label: "Prestamos", href: "/prestamos", keywords: ["prestamo", "empleado", "descuento", "planilla"] },
   { label: "Caja", href: "/caja", keywords: ["caja", "gasto", "pago", "proveedor", "efectivo"] },
+  { label: "Marketing", href: "/marketing", keywords: ["marketing", "marca", "tienda", "mueble", "impulsadora", "valla"] },
 ];
 
 function getModuleSuggestions(q: string, visibleHrefs: Set<string>) {

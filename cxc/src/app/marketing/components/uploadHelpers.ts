@@ -49,6 +49,13 @@ interface UploadArgs {
   file: File;
   proyectoId?: string;
   facturaId?: string;
+  /**
+   * 🔴 EL REDISEÑO (22-sep-2026): la foto cuelga de la TIENDA. Con este código
+   * puesto, el registro va por la puerta de la tienda —la de `mk_adjuntos`
+   * exige un proyecto para una `foto_proyecto`— y la foto nace con su
+   * `tienda_codigo`. Sin él, todo como siempre.
+   */
+  tiendaCodigo?: string;
   tipo: TipoAdjunto;
 }
 
@@ -70,6 +77,7 @@ export async function subirAdjunto({
   file,
   proyectoId,
   facturaId,
+  tiendaCodigo,
   tipo,
 }: UploadArgs): Promise<AdjuntoCreado> {
   // 1) Pedir signed upload URL
@@ -79,6 +87,7 @@ export async function subirAdjunto({
     body: JSON.stringify({
       proyectoId,
       facturaId,
+      tiendaCodigo,
       filename: file.name,
       contentType: file.type,
     }),
@@ -101,19 +110,30 @@ export async function subirAdjunto({
     throw new Error("No se pudo subir el archivo");
   }
 
-  // 3) Registrar fila en mk_adjuntos
-  const adjRes = await fetch("/api/marketing/adjuntos", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      proyectoId,
-      facturaId,
-      tipo,
-      url: path,
-      nombreOriginal: file.name,
-      sizeBytes: file.size,
-    }),
-  });
+  // 3) Registrar fila en mk_adjuntos — por la puerta de la TIENDA cuando la
+  //    foto es de una tienda, y por la de siempre en cualquier otro caso.
+  const adjRes = tiendaCodigo
+    ? await fetch(`/api/marketing/tienda/${encodeURIComponent(tiendaCodigo)}/fotos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: path,
+          nombreOriginal: file.name,
+          sizeBytes: file.size,
+        }),
+      })
+    : await fetch("/api/marketing/adjuntos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          proyectoId,
+          facturaId,
+          tipo,
+          url: path,
+          nombreOriginal: file.name,
+          sizeBytes: file.size,
+        }),
+      });
   if (!adjRes.ok) {
     const err = await adjRes.json().catch(() => null);
     throw new Error(err?.error ?? "No se pudo registrar el adjunto");

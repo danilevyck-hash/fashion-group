@@ -429,6 +429,8 @@ describe("G · las pantallas alcanzadas, por nombre", () => {
     "src/app/marketing/[marca]/page.tsx",
     "src/app/marketing/mobiliario/page.tsx",
     "src/app/marketing/page.tsx",
+    // La vista de una tienda (22-sep-2026, el rediseño de Marketing).
+    "src/app/marketing/tienda/[codigo]/VistaTienda.tsx",
     "src/app/multifashion/MultifashionShell.tsx",
     "src/app/prestamos/PrestamosClient.tsx",
     "src/app/prestamos/[id]/page.tsx",
@@ -452,10 +454,10 @@ describe("G · las pantallas alcanzadas, por nombre", () => {
     expect(encontrados).toEqual([...ALCANZADAS_POR_EL_GANCHO, ...CON_CHEQUEO_PROPIO_Y_SEMILLA, ...PINTA_EN_EL_NAVEGADOR].sort());
   });
 
-  it("las 29 pasan por `useAuth`, así que el arreglo del gancho les llega", () => {
+  it("las 30 pasan por `useAuth`, así que el arreglo del gancho les llega", () => {
     for (const p of ALCANZADAS_POR_EL_GANCHO) {
       expect(leer(p), p).toContain('from "@/lib/hooks/useAuth"');
     }
-    expect(ALCANZADAS_POR_EL_GANCHO).toHaveLength(29);
+    expect(ALCANZADAS_POR_EL_GANCHO).toHaveLength(30);
   });
 });
