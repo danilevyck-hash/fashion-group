@@ -106,6 +106,16 @@ vi.mock("swr", () => ({
   default: () => ({ data: PAYLOAD, error: undefined, isLoading: false, mutate: vi.fn() }),
 }));
 
+// 🔄 CAMBIÓ DE DIRECCIÓN EL 23-sep-2026. La regla («un toque, no cuatro») no
+// cambió; lo que cambió es que la pantalla mínima (`RETAIL_AL_FRENTE`) pone las
+// marcas en UNA línea y el selector detrás de «detalle». Estas pruebas se
+// montan con el interruptor apagado —la pantalla de siempre, que sigue viva—;
+// la mínima tiene su candado en `multifashion-retail-al-frente.test.tsx`.
+vi.mock("@/lib/multifashion/retail-al-frente", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/multifashion/retail-al-frente")>();
+  return { ...real, RETAIL_AL_FRENTE: false };
+});
+
 // Se importa DESPUÉS del mock (vitest lo iza igual, pero deja la intención clara).
 import { ProductosSubtab } from "@/components/multifashion/ProductosSubtab";
 

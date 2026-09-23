@@ -70,6 +70,16 @@ function chain(result: { data: unknown; error: unknown; count?: number }) {
 // es el ACCESO por rol. Se dobla como lo que realmente pasa en producción: la
 // tabla está y ese día no tiene fila cacheada.
 
+// 🔄 23-sep-2026: con `RETAIL_AL_FRENTE` prendido, `clientes-wholesale`
+// contesta 410 a TODOS los roles (la puerta se retiró, el archivo se queda). Lo
+// que este archivo vigila es el ACCESO por rol, así que se monta con el
+// interruptor apagado y la ruta se comporta como siempre; el 410 tiene su
+// candado en `multifashion-retail-al-frente.test.tsx`.
+vi.mock("@/lib/multifashion/retail-al-frente", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/multifashion/retail-al-frente")>();
+  return { ...real, RETAIL_AL_FRENTE: false };
+});
+
 vi.mock("@/lib/supabase-server", () => ({
   supabaseServer: {
     rpc: async (name: string) => {

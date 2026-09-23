@@ -551,13 +551,21 @@ describe("10 · la proyección dice sobre cuántos días está hecha", () => {
     expect(resumen).toContain("totales.proyeccion_dias");
   });
 
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 23-sep-2026. Con `RETAIL_AL_FRENTE` el «Cierra
+  // en» del mes va por TEMPORADA (la cuenta de la meta, `resumen-minimo.ts`) y
+  // la RPC por días (`proyeccion_mensual_retail_v1`) queda en la rama del
+  // interruptor apagado, INTACTA: sigue diciendo sobre cuántos días está hecha
+  // y sigue siendo la RETAIL. Lo que se vigila aquí es que esa rama no se borre.
   it("🔴 la FÓRMULA no se tocó: el dato sale de la RPC que ya lo traía", () => {
     // `dia_corte` y `dias_mes` ya viajaban en `proyeccion_mensual_retail_v1`.
     expect(rutaDetalle).toContain("dia_corte");
-    expect(rutaDetalle).toContain("proyeccion_dias: proyeccionDias?.dias ?? null");
+    expect(rutaDetalle).toContain("(proyeccionDias?.dias ?? null)");
     expect(rutaDetalle).toContain('supabaseServer.rpc("proyeccion_mensual_retail_v1"');
     // Y la proyección sigue siendo la RETAIL, no la total (que suma mayoreo).
     expect(rutaDetalle).toContain("acProy.proyeccion_retail");
+    // Con el interruptor, la temporada; sin él, los días. Nunca la total.
+    expect(rutaDetalle).toContain("RETAIL_AL_FRENTE ? (temporada?.proyeccion ?? null) : proyeccionRetail");
+    expect(rutaDetalle).not.toContain("acProy.proyeccion_total");
   });
 
   it("sin proyección no se inventa un número de días", () => {

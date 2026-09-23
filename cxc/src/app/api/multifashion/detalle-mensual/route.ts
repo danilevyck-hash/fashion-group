@@ -16,10 +16,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { ROLES_MULTIFASHION } from "@/lib/multifashion/acceso";
 import { supabaseServer } from "@/lib/supabase-server";
+import { hoyPanama } from "@/lib/fecha-panama";
 import {
   MESES_DEL_PATRON, agregarPatrones, mesesDeLaVentana,
   type MesPatron,
 } from "@/lib/multifashion/patrones";
+import { RETAIL_AL_FRENTE } from "@/lib/multifashion/retail-al-frente";
+import { rpcRetail } from "@/lib/multifashion/rpc-retail";
+import { proyeccionMesPorTemporada } from "@/lib/multifashion/resumen-minimo";
 
 export const dynamic = "force-dynamic";
 // Hace 2 llamados al RPC mensual (año actual + año anterior para la comparación
@@ -36,14 +40,16 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const yearParam = sp.get("year");
   const mesParam = sp.get("mes");
-  const yearPedido = yearParam ? parseInt(yearParam, 10) : new Date().getFullYear();
+  // 🔴 «Hoy» es el de PANAMÁ (23-sep-2026): Vercel corre en UTC.
+  const hoy = hoyPanama();
+  const anioHoy = Number(hoy.slice(0, 4));
+  const yearPedido = yearParam ? parseInt(yearParam, 10) : anioHoy;
   if (!Number.isFinite(yearPedido) || yearPedido < 2000 || yearPedido > 2100) {
     return NextResponse.json({ error: "year inválido" }, { status: 400 });
   }
 
-  const now = new Date();
-  const isCurrent = yearPedido === now.getFullYear();
-  const mesFallback = isCurrent ? now.getMonth() + 1 : 12;
+  const isCurrent = yearPedido === anioHoy;
+  const mesFallback = isCurrent ? Number(hoy.slice(5, 7)) : 12;
   const mesPedido = mesParam ? parseInt(mesParam, 10) : mesFallback;
   if (!Number.isFinite(mesPedido) || mesPedido < 1 || mesPedido > 12) {
     return NextResponse.json({ error: "mes inválido (1..12)" }, { status: 400 });
@@ -69,8 +75,18 @@ export async function GET(req: NextRequest) {
   // Detalle + hora pico + margen mensual tienda completa + mayoreo del mes +
   // cliente(s) de mayoreo, en paralelo. Todo lo extra es aditivo: si falla, el
   // detalle igual responde (el titular cae a retail puro y la nota no se muestra).
-  const [detalleRes, horasRes, margenRes, mayoreoRes, mayoreoClienteRes, prevYearRes, retailProyRes, ...patronRes] = await Promise.all([
-    supabaseServer.rpc("multifashion_detalle_mensual_v2", { p_year: year, p_mes: mes }),
+  // 🩸 CUATRO CONSULTAS RETIRADAS CON `RETAIL_AL_FRENTE` (23-sep-2026): el
+  // mayoreo del mes y el nombre de su cliente (la línea chiquita sale del
+  // overview que YA viaja: `wholesale.meses`) y la proyección por días
+  // (`proyeccion_mensual_retail_v1`, reemplazada por la cuenta de la meta: por
+  // TEMPORADA). La cuarta es la ruta `clientes-wholesale`. Patrón
+  // `mayor_lineas`: con el interruptor apagado se piden como siempre.
+  const sinConsulta = Promise.resolve({ data: null, error: null });
+  const retiradas = RETAIL_AL_FRENTE;
+
+  const [detalleRes, horasRes, margenRes, mayoreoRes, mayoreoClienteRes, prevYearRes, retailProyRes, feriadosRes, ...patronRes] = await Promise.all([
+    // 🔴 RETAIL CONTRA RETAIL: la v3 lee el YoY solo de la vista (cae a la v2).
+    rpcRetail("detalleMensual", { p_year: year, p_mes: mes }),
     supabaseServer.rpc("multifashion_horas_pico_v1", { p_year: year, p_mes: mes }),
     // _v2: margen mensual desde ventas_rollup_mensual_mv (híbrido cerrados/mes en
     // curso) — mismo número exacto, sin agregar las vistas en vivo. Fallback a la v1
@@ -83,7 +99,7 @@ export async function GET(req: NextRequest) {
     // Mayoreo del mes: misma vista, is_wholesale=true. subtotal ya trae el signo
     // de NC (la vista lo resuelve). Mayoreo de Multifashion es escaso (≤ unas
     // pocas filas/mes), no requiere paginación.
-    supabaseServer
+    retiradas ? sinConsulta : supabaseServer
       .from("_multifashion_sf_vw")
       .select("subtotal")
       .eq("anio", year)
@@ -91,7 +107,7 @@ export async function GET(req: NextRequest) {
       .eq("is_wholesale", true),
     // Nombre del/los cliente(s) de mayoreo para la nota (solo etiqueta). El monto
     // sale de la vista; el nombre de la tabla base (la vista no expone cliente).
-    supabaseServer
+    retiradas ? sinConsulta : supabaseServer
       .from("switch_facturas")
       .select("cliente_nombre")
       .eq("empresa_key", "american_classic")
@@ -102,10 +118,16 @@ export async function GET(req: NextRequest) {
     // ANTERIOR. Reusa el MISMO RPC con year-1 → metodología idéntica (retail,
     // _multifashion_sf_vw, misma fuente y bucket de día). Aditivo: si falla o no
     // hay datos (año anterior < may 2024), la línea simplemente no se dibuja.
-    supabaseServer.rpc("multifashion_detalle_mensual_v2", { p_year: year - 1, p_mes: mes }),
+    rpcRetail("detalleMensual", { p_year: year - 1, p_mes: mes }),
     // Proyección de cierre MÉTODO-B (pico fuera + run-rate plano + mayoreo). Reemplaza
     // la proyección lineal del titular (que se inflaba con días pico de feriado).
-    supabaseServer.rpc("proyeccion_mensual_retail_v1", { p_anio: year, p_mes: mes }),
+    // 🩸 Retirada con el interruptor: el «Cierra en» va por temporada (abajo).
+    retiradas ? sinConsulta : supabaseServer.rpc("proyeccion_mensual_retail_v1", { p_anio: year, p_mes: mes }),
+    // Los feriados del mes, para «¿la tienda abrió?» (un día hábil en $0 que no
+    // es feriado). Solo con el interruptor; si falla, `null` = no se avisa.
+    RETAIL_AL_FRENTE
+      ? supabaseServer.from("asistencia_feriados").select("fecha").gte("fecha", mesInicio).lt("fecha", mesNext)
+      : sinConsulta,
     // ── «Cuándo vende la tienda» sobre los ÚLTIMOS 3 MESES ──────────────────
     // 🩸 Con la ventana de UN mes, «mejor día de semana» y «mejor día del mes»
     // daban EL MISMO número el 6-sep-2026 ($3.364,19): ese «promedio» del sábado
@@ -116,7 +138,7 @@ export async function GET(req: NextRequest) {
     ...mesesDeLaVentana(year, mes, MESES_DEL_PATRON)
       .filter((m) => !(m.anio === year && m.mes === mes))
       .flatMap((m) => [
-        supabaseServer.rpc("multifashion_detalle_mensual_v2", { p_year: m.anio, p_mes: m.mes }),
+        rpcRetail("detalleMensual", { p_year: m.anio, p_mes: m.mes }),
         supabaseServer.rpc("multifashion_horas_pico_v1", { p_year: m.anio, p_mes: m.mes }),
       ]),
   ]);
@@ -236,6 +258,26 @@ export async function GET(req: NextRequest) {
     ? { dias: Number((acProy as { dia_corte?: number }).dia_corte ?? 0), diasMes: Number((acProy as { dias_mes?: number }).dias_mes ?? 0) }
     : null;
 
+  // 🔴 «CIERRA EN» POR TEMPORADA (23-sep-2026, mockup aprobado): LA MISMA
+  // CUENTA DE LA META — lo vendido hasta el último día completo dividido por
+  // la porción de temporada que ya pasó, con el mismo mes del año pasado como
+  // forma. Bajo el 5 % de temporada no se proyecta y se dice. El mes completo
+  // del año pasado ya se pidió arriba para el gráfico (`prevYearRes`).
+  const temporada = RETAIL_AL_FRENTE && esMesEnCurso
+    ? proyeccionMesPorTemporada({
+        ventasAlCorte: Number(totales.ventas ?? 0),
+        prevMismosDias: Number((detalle?.yoy as { ventas?: number } | undefined)?.ventas ?? 0),
+        prevMesCompleto: Number(prevYearTotales.ventas ?? 0),
+        diaCorte: Number(detalle?.dia_actual ?? 0),
+      })
+    : null;
+  const feriados = RETAIL_AL_FRENTE && !feriadosRes.error && Array.isArray(feriadosRes.data)
+    ? (feriadosRes.data as Array<{ fecha: string }>).map((f) => String(f.fecha).slice(0, 10))
+    : null;
+  if (RETAIL_AL_FRENTE && feriadosRes.error) {
+    console.error("[multifashion/detalle-mensual] feriados", feriadosRes.error);
+  }
+
   // ── Patrones de los últimos 3 meses (día más fuerte + hora pico) ───────────
   // El mes elegido entra con lo que YA se pidió arriba; los otros dos vienen de
   // `patronRes`, en pares (detalle, horas). Aditivo de punta a punta: si alguna
@@ -272,12 +314,18 @@ export async function GET(req: NextRequest) {
     totales: {
       ...totales,
       margen: margenMes,
-      mayoreo: mayoreoMes,
-      ventas_total: retailVentas + mayoreoMes,
-      proyeccion_cierre: proyeccionRetail,
-      proyeccion_dias: proyeccionDias?.dias ?? null,
-      proyeccion_dias_mes: proyeccionDias?.diasMes ?? null,
+      // Con el interruptor, el mayoreo del mes NO se lee aquí (sale del
+      // overview): va en `null`, nunca en un cero que parezca medido.
+      mayoreo: retiradas ? null : mayoreoMes,
+      ventas_total: retiradas ? null : retailVentas + mayoreoMes,
+      proyeccion_cierre: RETAIL_AL_FRENTE ? (temporada?.proyeccion ?? null) : proyeccionRetail,
+      proyeccion_dias: RETAIL_AL_FRENTE ? (temporada?.dias ?? null) : (proyeccionDias?.dias ?? null),
+      proyeccion_dias_mes: RETAIL_AL_FRENTE ? Number(detalle?.dias_en_mes ?? 0) || null : (proyeccionDias?.diasMes ?? null),
+      proyeccion_base: RETAIL_AL_FRENTE ? (temporada ? "temporada" : null) : "dias",
     },
+    // El mismo mes del año pasado, COMPLETO (la base de la temporada).
+    anio_anterior_mes_completo: Number(prevYearTotales.ventas ?? 0) || null,
+    feriados,
     patrones,
     mayoreo_cliente: mayoreoCliente,
     // Lista completa y conteo de facturas: la nota de Multifashion resume

@@ -98,6 +98,12 @@ import { fmtMoney } from "@/lib/ventas/format";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { fmtVariacionPct } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
+import { RETAIL_AL_FRENTE } from "@/lib/multifashion/retail-al-frente";
+import {
+  CeldaPulso, Pill, fmtFecha, fmtMargen, fmtMontoConSigno, fmtPctTotal, fmtUnidades,
+  fmtUnidadesConSigno, flechaVariacion, tonoVariacion,
+} from "./productos-celdas";
+import { LineaMarcas, PulsoSinVenta, TablaTop } from "./ProductosMinimo";
 import {
   ordenarRanking,
   filtrarRanking,
@@ -200,51 +206,9 @@ const ALERTA_MAX = 3;
 /** Cuántos grupos se muestran de cada lado en "qué movió la aguja". */
 const MOVIMIENTOS_N = 3;
 
-/** Unidades: la columna es `numeric(14,4)` pero en la práctica son piezas
- *  enteras. Se muestran sin decimales salvo que realmente los tengan. */
-function fmtUnidades(n: number): string {
-  return Number.isInteger(n) ? n.toLocaleString("en-US") : n.toLocaleString("en-US", { maximumFractionDigits: 2 });
-}
-
-/** Margen: SIN el "+" que le pone `fmtPct` a los deltas — acá no es una
- *  variación contra nada, es una proporción. `null` → "—" (ver punto 3). */
-function fmtMargen(p: number | null): string {
-  return p == null ? "—" : `${(p * 100).toFixed(1)}%`;
-}
-
-function fmtPctTotal(p: number | null): string {
-  return p == null ? "—" : `${(p * 100).toFixed(1)}%`;
-}
-
-/** Monto con signo. El menos es el signo tipográfico (−), no un guion. */
-function fmtMontoConSigno(n: number): string {
-  return `${n >= 0 ? "+" : "−"}${fmtMoney(Math.abs(n))}`;
-}
-
-function fmtUnidadesConSigno(n: number): string {
-  return `${n >= 0 ? "+" : "−"}${fmtUnidades(Math.abs(n))}`;
-}
-
-/** "1 de septiembre de 2025" → "1 sep 2025". Fecha corta y en español simple. */
-const MES_CORTO = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-function fmtFecha(iso: string): string {
-  const [a, m, d] = iso.split("-");
-  return `${Number(d)} ${MES_CORTO[Number(m) - 1]} ${a}`;
-}
-
-/** El tono del cambio. Gris cuando no hay con qué comparar: un "—" en verde
- *  diría que algo mejoró. */
-function tonoVariacion(n: number | null): string {
-  if (n == null) return "text-gray-500";
-  if (n > 0) return "text-emerald-700";
-  if (n < 0) return "text-rose-700";
-  return "text-gray-500";
-}
-
-function flechaVariacion(n: number | null): string {
-  if (n == null || n === 0) return "";
-  return n > 0 ? "▲" : "▼";
-}
+// Los formatos (`fmtUnidades`, `fmtMargen`, …), `CeldaPulso` y `Pill` viven en
+// `productos-celdas.tsx` desde el 23-sep-2026: los comparten esta pantalla y
+// `ProductosMinimo`. Ni una letra cambió al moverlos.
 
 interface ProductosSubtabProps {
   selectedYear: number;
@@ -446,19 +410,222 @@ export function ProductosSubtab({
 
   const sustantivo = vista === "categoria" ? "categorías" : "artículos";
 
-  return (
-    <div className="space-y-4">
-      {errorMsg && (
-        <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-900">
-          No se pudieron cargar los productos: {errorMsg}
-          <button
-            onClick={() => mutate()}
-            className="ml-2 font-medium underline underline-offset-2 hover:text-orange-700"
-          >
-            Reintentar
-          </button>
+  // ── Las piezas que comparten las DOS pantallas (la de siempre y la mínima) ──
+  // El detalle completo, cerrado. Sigue estando todo: buscador, filtro, orden
+  // por columna y paginado.
+  const verTodo = (
+    <Card className="overflow-hidden p-0">
+      <button
+        type="button"
+        onClick={() => setDetalleAbierto(v => !v)}
+        aria-expanded={detalleAbierto}
+        className="flex min-h-[44px] w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-gray-50"
+      >
+        <span className="text-sm font-medium text-gray-950">
+          Ver todo
+          <span className="ml-2 font-normal text-gray-500">
+            {(base?.length ?? 0).toLocaleString("en-US")} {sustantivo}
+          </span>
+        </span>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 shrink-0 text-gray-500 transition-transform",
+            detalleAbierto && "rotate-180",
+          )}
+        />
+      </button>
+
+      {detalleAbierto && (
+        <div className="space-y-3 border-t border-gray-200 bg-gray-50/60 p-3">
+          {/* Buscador + filtro por categoría. Solo en "Por artículo":
+              es la vista que tiene ~3.900 renglones, y es la pregunta
+              que sigue a la de categoría. */}
+          {vista === "articulo" && (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="search"
+                  value={texto}
+                  onChange={e => { setTexto(e.target.value); setVisibles(TANDA); }}
+                  placeholder="Buscar por código o descripción"
+                  aria-label="Buscar por código o descripción"
+                  // 44 px de alto y letra de 16 px en celular: por
+                  // debajo de 16, iOS hace zoom solo al enfocar y deja
+                  // la pantalla corrida.
+                  className="h-11 w-full rounded-md border border-gray-200 bg-white pl-9 pr-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600 sm:text-sm"
+                />
+              </div>
+              <select
+                value={categoria}
+                onChange={e => { setCategoria(e.target.value); setVisibles(TANDA); }}
+                aria-label="Filtrar por categoría"
+                className="h-11 w-full rounded-md border border-gray-200 bg-white px-3 text-base text-gray-900 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600 sm:w-64 sm:text-sm"
+              >
+                <option value="">Todas las categorías</option>
+                {categoriasDisponibles.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <VistaRanking
+            vista={vista}
+            filas={filas}
+            totalSinFiltrar={base?.length ?? 0}
+            visibles={visibles}
+            onVerMas={() => setVisibles(v => v + TANDA)}
+            orden={orden}
+            onOrdenar={clic}
+          />
         </div>
       )}
+    </Card>
+  );
+
+  // Agrupador. 44 px de alto (regla táctil): es el control que más se toca de
+  // la pestaña y en este módulo ya hubo píldoras de 26 px (CLAUDE.md).
+  // `-my-1.5` para que crecer no despegue el filtro del título.
+  const agrupador = (
+  <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Agrupar por">
+    <Pill activo={vista === "categoria"} onClick={() => cambiarVista("categoria")}>
+      <Layers className="h-3.5 w-3.5" /> Por categoría
+    </Pill>
+    <Pill activo={vista === "articulo"} onClick={() => cambiarVista("articulo")}>
+      <Package className="h-3.5 w-3.5" /> Por artículo
+    </Pill>
+    {/* "Por departamento" y ya no "Por marca": lo que Switch guarda en su
+        campo `marca` son 32 valores del tipo `TH MENSWEAR`, o sea marca +
+        departamento pegados. Con el filtro de marca arriba, llamarle "marca"
+        a las dos cosas dejaba un control mintiendo. */}
+    <Pill activo={vista === "marca"} onClick={() => cambiarVista("marca")}>
+      <Tag className="h-3.5 w-3.5" /> Por departamento
+    </Pill>
+  </div>
+  );
+
+  const avisosMarca = (
+    <>
+  {/* El agrupador por marca depende del diccionario del catálogo de Switch.
+      Si todavía no está cargado se DICE — la alternativa sería deducir la
+      marca del código del proveedor, o sea inventarla. */}
+  {vista === "marca" && resp && !resp.marcaDisponible && (
+    <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+      <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <span>
+        Todavía no está cargado el catálogo de marcas de la tienda, así que todo aparece como{" "}
+        <strong>Sin marca</strong>. Se llena solo en la próxima actualización diaria.
+      </span>
+    </div>
+  )}
+  {vista === "marca" && resp && resp.marcaDisponible && resp.sinMarca.articulos > 0 && (
+    <div className="flex items-start gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+      <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <span>
+        <span className="font-mono tabular-nums">{resp.sinMarca.articulos.toLocaleString("en-US")}</span> artículos
+        del período ({fmtMoney(resp.sinMarca.venta)}) todavía no tienen marca en el catálogo de la tienda.
+      </span>
+    </div>
+  )}
+
+    </>
+  );
+
+  const errorBanner = errorMsg && (
+    <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-900">
+      No se pudieron cargar los productos: {errorMsg}
+      <button
+        onClick={() => mutate()}
+        className="ml-2 font-medium underline underline-offset-2 hover:text-orange-700"
+      >
+        Reintentar
+      </button>
+    </div>
+  );
+
+  // ── LA PANTALLA MÍNIMA (23-sep-2026, mockup aprobado): 9 elementos → 5 ────
+  // 1. «Se vende mucho pero deja poco» ARRIBA (es lo accionable) · 2. la banda
+  // UNIDADES · UTILIDAD · MARGEN sin VENTA · 3. las marcas en una línea con el
+  // detalle a un toque · 4. el agrupador con UNA tabla de 5 filas · 5. «Lo que
+  // más cambió» + «Ver todo». 🔴 Ningún número cambia: son los mismos `totales`,
+  // `base` y `baseComparativa` de siempre. Y el mayoreo NO se marca aquí.
+  if (RETAIL_AL_FRENTE) {
+    const sinVentas = resp && base && base.length === 0;
+    return (
+      <div className="space-y-4" data-pestana="productos-minimo">
+        {errorBanner}
+        {/* `sr-only`: la pestaña dice «Productos» y el período está arriba. */}
+        <h3 className="sr-only">Más vendido · {nombreMarca ? `${nombreMarca} · ` : ""}{rotuloPeriodo}</h3>
+
+        <div className={cn("space-y-4", loading && "opacity-60 transition-opacity")}>
+          {vista !== "marca" && !sinVentas && flojos.length > 0 && totales?.margen != null && (
+            <div data-elemento="alerta">
+              <MargenFlojo filas={flojos} margenGeneral={totales.margen} sustantivo={sustantivo} />
+            </div>
+          )}
+
+          {totales && (
+            <PulsoSinVenta
+              totales={totales}
+              comparativo={resp?.comparativo ?? null}
+              totalesAnterior={totalesAnterior}
+            />
+          )}
+
+          {conFiltro && (
+            <LineaMarcas
+              grupos={grupos}
+              totalPeriodo={resp?.ranking.totales.venta ?? 0}
+              seleccion={marcaSel}
+              detalle={
+                <SelectorMarcas
+                  grupos={grupos}
+                  totalPeriodo={resp?.ranking.totales.venta ?? 0}
+                  totalUnidades={resp?.ranking.totales.unidades ?? 0}
+                  margenGeneral={resp?.ranking.totales.margen ?? null}
+                  seleccion={marcaSel}
+                  onSeleccion={cambiarMarca}
+                  loading={loading}
+                />
+              }
+            />
+          )}
+
+          <div data-elemento="agrupador" className="space-y-4">
+            {agrupador}
+            {avisosMarca}
+            {vista === "marca" ? (
+              <VistaMarca
+                renglones={(resp?.marcas ?? []).filter(m => !marcaSel || m.grupo === marcaSel)}
+                loading={loading}
+                periodo={rotuloPeriodo}
+              />
+            ) : sinVentas ? (
+              <Card className="p-8 text-center">
+                <p className="text-sm text-gray-700">No hubo ventas en {rotuloPeriodo}.</p>
+              </Card>
+            ) : (
+              <TablaTop filas={topUnidades} sustantivo={sustantivo} />
+            )}
+          </div>
+
+          {vista !== "marca" && !sinVentas && (
+            <div data-elemento="cambios" className="space-y-4">
+              {cambios && resp?.comparativo && (
+                <Movimientos cambios={cambios} comparativo={resp.comparativo} sustantivo={sustantivo} />
+              )}
+              {verTodo}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {errorBanner}
 
       {/* Las dos píldoras de período («Últimos 12 meses» / «Un mes») se
           retiraron el 6-sep-2026: el período es UNO solo para todo el módulo y
@@ -509,46 +676,9 @@ export function ProductosSubtab({
         </p>
       </div>
 
-      {/* Agrupador. 44 px de alto (regla táctil): es el control que más se toca
-          de la pestaña y en este módulo ya hubo píldoras de 26 px (CLAUDE.md).
-          `-my-1.5` para que crecer no despegue el filtro del título. */}
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Agrupar por">
-        <Pill activo={vista === "categoria"} onClick={() => cambiarVista("categoria")}>
-          <Layers className="h-3.5 w-3.5" /> Por categoría
-        </Pill>
-        <Pill activo={vista === "articulo"} onClick={() => cambiarVista("articulo")}>
-          <Package className="h-3.5 w-3.5" /> Por artículo
-        </Pill>
-        {/* "Por departamento" y ya no "Por marca": lo que Switch guarda en su
-            campo `marca` son 32 valores del tipo `TH MENSWEAR`, o sea marca +
-            departamento pegados. Con el filtro de marca arriba, llamarle "marca"
-            a las dos cosas dejaba un control mintiendo. */}
-        <Pill activo={vista === "marca"} onClick={() => cambiarVista("marca")}>
-          <Tag className="h-3.5 w-3.5" /> Por departamento
-        </Pill>
-      </div>
+      {agrupador}
 
-      {/* El agrupador por marca depende del diccionario del catálogo de Switch.
-          Si todavía no está cargado se DICE — la alternativa sería deducir la
-          marca del código del proveedor, o sea inventarla. */}
-      {vista === "marca" && resp && !resp.marcaDisponible && (
-        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>
-            Todavía no está cargado el catálogo de marcas de la tienda, así que todo aparece como{" "}
-            <strong>Sin marca</strong>. Se llena solo en la próxima actualización diaria.
-          </span>
-        </div>
-      )}
-      {vista === "marca" && resp && resp.marcaDisponible && resp.sinMarca.articulos > 0 && (
-        <div className="flex items-start gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
-          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>
-            <span className="font-mono tabular-nums">{resp.sinMarca.articulos.toLocaleString("en-US")}</span> artículos
-            del período ({fmtMoney(resp.sinMarca.venta)}) todavía no tienen marca en el catálogo de la tienda.
-          </span>
-        </div>
-      )}
+      {avisosMarca}
 
       {vista === "marca" ? (
         <VistaMarca
@@ -589,76 +719,7 @@ export function ProductosSubtab({
                 <Movimientos cambios={cambios} comparativo={resp.comparativo} sustantivo={sustantivo} />
               )}
 
-              {/* El detalle completo, cerrado. Sigue estando todo: buscador,
-                  filtro, orden por columna y paginado. */}
-              <Card className="overflow-hidden p-0">
-                <button
-                  type="button"
-                  onClick={() => setDetalleAbierto(v => !v)}
-                  aria-expanded={detalleAbierto}
-                  className="flex min-h-[44px] w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-gray-50"
-                >
-                  <span className="text-sm font-medium text-gray-950">
-                    Ver todo
-                    <span className="ml-2 font-normal text-gray-500">
-                      {(base?.length ?? 0).toLocaleString("en-US")} {sustantivo}
-                    </span>
-                  </span>
-                  <ChevronDown
-                    className={cn(
-                      "h-4 w-4 shrink-0 text-gray-500 transition-transform",
-                      detalleAbierto && "rotate-180",
-                    )}
-                  />
-                </button>
-
-                {detalleAbierto && (
-                  <div className="space-y-3 border-t border-gray-200 bg-gray-50/60 p-3">
-                    {/* Buscador + filtro por categoría. Solo en "Por artículo":
-                        es la vista que tiene ~3.900 renglones, y es la pregunta
-                        que sigue a la de categoría. */}
-                    {vista === "articulo" && (
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                        <div className="relative flex-1">
-                          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                          <input
-                            type="search"
-                            value={texto}
-                            onChange={e => { setTexto(e.target.value); setVisibles(TANDA); }}
-                            placeholder="Buscar por código o descripción"
-                            aria-label="Buscar por código o descripción"
-                            // 44 px de alto y letra de 16 px en celular: por
-                            // debajo de 16, iOS hace zoom solo al enfocar y deja
-                            // la pantalla corrida.
-                            className="h-11 w-full rounded-md border border-gray-200 bg-white pl-9 pr-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600 sm:text-sm"
-                          />
-                        </div>
-                        <select
-                          value={categoria}
-                          onChange={e => { setCategoria(e.target.value); setVisibles(TANDA); }}
-                          aria-label="Filtrar por categoría"
-                          className="h-11 w-full rounded-md border border-gray-200 bg-white px-3 text-base text-gray-900 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600 sm:w-64 sm:text-sm"
-                        >
-                          <option value="">Todas las categorías</option>
-                          {categoriasDisponibles.map(c => (
-                            <option key={c} value={c}>{c}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
-                    <VistaRanking
-                      vista={vista}
-                      filas={filas}
-                      totalSinFiltrar={base?.length ?? 0}
-                      visibles={visibles}
-                      onVerMas={() => setVisibles(v => v + TANDA)}
-                      orden={orden}
-                      onOrdenar={clic}
-                    />
-                  </div>
-                )}
-              </Card>
+              {verTodo}
             </>
           )}
         </div>
@@ -771,51 +832,6 @@ function Pulso({
         )}
       </div>
     </Card>
-  );
-}
-
-function CeldaPulso({
-  rotulo,
-  valor,
-  tono,
-  delta,
-  anterior,
-  fmtAbs,
-}: {
-  rotulo: string;
-  valor: string;
-  /** "plata" va en el acento de la app; "volumen" en gris. Son unidades
-   *  distintas y verlas iguales es la mitad del problema que se vino a
-   *  arreglar (unidades y dólares compitiendo en la misma fila). */
-  tono: "plata" | "volumen";
-  delta: Variacion | null;
-  anterior: string | null;
-  fmtAbs: (n: number) => string;
-}) {
-  return (
-    <div className="px-4 py-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{rotulo}</p>
-      <p
-        className={cn(
-          "mt-1 font-mono text-2xl font-medium leading-tight tabular-nums",
-          tono === "plata" ? "text-teal-800" : "text-gray-950",
-        )}
-      >
-        {valor}
-      </p>
-      {delta && anterior ? (
-        <p className="mt-1 text-xs text-gray-500">
-          <span className={cn("font-mono font-medium tabular-nums", tonoVariacion(delta.pct ?? delta.abs))}>
-            {flechaVariacion(delta.pct ?? delta.abs)}{" "}
-            {delta.pct != null ? fmtVariacionPct(delta.pct, true, 1) : fmtAbs(delta.abs)}
-          </span>{" "}
-          contra <span className="font-mono tabular-nums">{anterior}</span> el año pasado
-        </p>
-      ) : null}
-      {/* Sin "Sin comparación" en cada celda: el pie de la tarjeta ya dice, UNA
-          vez y con el motivo, por qué no hay contra qué comparar. Tres avisos
-          idénticos sin explicación eran ruido. */}
-    </div>
   );
 }
 
@@ -1503,32 +1519,6 @@ function FilaMarcaFiltro({
           </span>
         </span>
       </div>
-    </button>
-  );
-}
-
-function Pill({
-  activo,
-  onClick,
-  children,
-}: {
-  activo: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={activo}
-      className={cn(
-        "-my-1.5 inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3.5 text-xs font-medium transition",
-        activo
-          ? "border-teal-700 bg-teal-700 text-white"
-          : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-gray-900",
-      )}
-    >
-      {children}
     </button>
   );
 }

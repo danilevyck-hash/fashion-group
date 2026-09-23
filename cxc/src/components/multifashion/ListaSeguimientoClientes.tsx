@@ -62,9 +62,16 @@ interface Props {
   clientes: ClienteUniverso[];
   /** La fecha de PANAMÁ del servidor. Nunca la del navegador. */
   hoy: string;
+  /**
+   * 🔴 RETAIL AL FRENTE (23-sep-2026): la fila dice CUÁNTO COMPRÓ («compró
+   * $295.28 · 842 días sin comprar») y el encabezado «Clientes identificados ·
+   * N con nombre y compras» se va (lo dice la línea de cobertura de arriba).
+   * Sin la prop, la lista es la de siempre.
+   */
+  conMonto?: boolean;
 }
 
-export function ListaSeguimientoClientes({ clientes, hoy }: Props) {
+export function ListaSeguimientoClientes({ clientes, hoy, conMonto = false }: Props) {
   // El chip vive en la URL: un enlace a «los que no vuelven» se puede compartir
   // y el back del navegador no cicla por los chips (van con `replace`).
   const [chipUrl, setChip] = useUrlState<string>("mfCliChip", CHIP_INICIAL);
@@ -130,17 +137,21 @@ export function ListaSeguimientoClientes({ clientes, hoy }: Props) {
 
   return (
     <section className="space-y-3">
-      <div>
-        <h3 className="font-display text-sm font-semibold text-gray-950">Clientes identificados</h3>
-        <p className="text-xs text-gray-500">
-          {conteos.todos.toLocaleString()} con nombre y compras · toca el nombre para ver su ficha
-        </p>
-      </div>
+      {conMonto ? (
+        <h3 className="sr-only">Clientes identificados · {conteos.todos.toLocaleString()} con nombre y compras</h3>
+      ) : (
+        <div>
+          <h3 className="font-display text-sm font-semibold text-gray-950">Clientes identificados</h3>
+          <p className="text-xs text-gray-500">
+            {conteos.todos.toLocaleString()} con nombre y compras · toca el nombre para ver su ficha
+          </p>
+        </div>
+      )}
 
       <Card className="overflow-hidden p-0">
         {/* LOS TRES CHIPS. «Frecuentes» se retiró: el que compra seguido no
             necesita que lo busquen. Las TARJETAS de arriba no se tocaron. */}
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-gray-100 px-3 py-2">
+        <div data-elemento={conMonto ? "chips" : undefined} className="flex flex-wrap items-center gap-1.5 border-b border-gray-100 px-3 py-2">
           {CHIPS.map((c) => (
             <button
               key={c}
@@ -162,28 +173,32 @@ export function ListaSeguimientoClientes({ clientes, hoy }: Props) {
           ))}
         </div>
 
-        {lista.length === 0 ? (
-          <p className="px-3 py-8 text-center text-xs text-gray-500">
-            Ningún cliente cae en &quot;{ROTULO_CHIP[chip]}&quot;.
-          </p>
-        ) : (
-          visibles.map((c) => (
-            <FilaCliente
-              key={c.cliente_switch_id}
-              cliente={c}
-              ultimoContacto={contactos?.porCliente?.[String(c.cliente_switch_id)] ?? null}
-              hoy={hoy}
-              abierta={abierto === c.cliente_switch_id}
-              onAbrir={() => setAbierto((p) => (p === c.cliente_switch_id ? null : c.cliente_switch_id))}
-              onEscribir={() => { void anotarContacto(c.cliente_switch_id); }}
-            />
-          ))
-        )}
+        <div data-elemento={conMonto ? "lista" : undefined}>
+          {lista.length === 0 ? (
+            <p className="px-3 py-8 text-center text-xs text-gray-500">
+              Ningún cliente cae en &quot;{ROTULO_CHIP[chip]}&quot;.
+            </p>
+          ) : (
+            visibles.map((c) => (
+              <FilaCliente
+                key={c.cliente_switch_id}
+                cliente={c}
+                ultimoContacto={contactos?.porCliente?.[String(c.cliente_switch_id)] ?? null}
+                hoy={hoy}
+                abierta={abierto === c.cliente_switch_id}
+                onAbrir={() => setAbierto((p) => (p === c.cliente_switch_id ? null : c.cliente_switch_id))}
+                onEscribir={() => { void anotarContacto(c.cliente_switch_id); }}
+                conMonto={conMonto}
+              />
+            ))
+          )}
+        </div>
       </Card>
 
       {recorta && (
         <button
           type="button"
+          data-elemento={conMonto ? "ver-los-n" : undefined}
           onClick={() => setVerTodos(true)}
           className="inline-flex min-h-[44px] items-center rounded-md border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-950 active:scale-[0.97]"
         >
@@ -197,7 +212,7 @@ export function ListaSeguimientoClientes({ clientes, hoy }: Props) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function FilaCliente({
-  cliente, ultimoContacto, hoy, abierta, onAbrir, onEscribir,
+  cliente, ultimoContacto, hoy, abierta, onAbrir, onEscribir, conMonto = false,
 }: {
   cliente: ClienteUniverso;
   ultimoContacto: UltimoContacto | null;
@@ -205,6 +220,7 @@ function FilaCliente({
   abierta: boolean;
   onAbrir: () => void;
   onEscribir: () => void;
+  conMonto?: boolean;
 }) {
   const linea = lineaDelRenglon(cliente, ultimoContacto, hoy);
 
@@ -223,6 +239,11 @@ function FilaCliente({
               {nombreEnPantalla(cliente.nombre)}
             </span>
             <span className="mt-0.5 block truncate text-xs">
+              {/* La plata primero (23-sep-2026): llamar a alguien sin saber
+                  cuánto gastó era la lista «coja» del inventario. */}
+              {conMonto && (
+                <span data-compro className="font-mono tabular-nums text-gray-700">compró {fmtMoney(cliente.total_comprado)} · </span>
+              )}
               {/* Ámbar = la urgencia. Gris = el aviso para no repetir. */}
               <span className="font-medium text-amber-700">{linea.dias}</span>
               {linea.contacto && <span className="text-gray-400"> · {linea.contacto}</span>}

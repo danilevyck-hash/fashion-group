@@ -45,6 +45,7 @@ import { coberturaDeClientes, FILAS_CLIENTES_AL_ABRIR } from "@/lib/multifashion
 import { etiquetaPeriodo, type Periodo } from "@/lib/multifashion/periodo";
 import { ListaSeguimientoClientes } from "./ListaSeguimientoClientes";
 import type { ClienteUniverso } from "@/lib/multifashion/clientes-universo";
+import { RETAIL_AL_FRENTE, fueraDelRanking } from "@/lib/multifashion/retail-al-frente";
 
 // "Escala compartida entre mayoreo y retail" vivía escrito DOS veces —una en la
 // lista vertical del celular, otra en la tira del escritorio— y por eso podían
@@ -194,11 +195,14 @@ export function ClientesMultifashionSubtab({ selectedYear, mes, periodo }: Clien
   // useSWR cuyo fetcher dispara ambos fetch en paralelo y devuelve {wholesale,
   // retail}, preservando el loading/error combinados del Promise.all original.
   const qs = `fecha_inicio=${range.fecha_inicio}&fecha_fin=${range.fecha_fin}`;
-  const { data, error, isLoading, mutate } = useSWR<{ wholesale: WholesaleResp; retail: RetailResp }>(
+  const { data, error, isLoading, mutate } = useSWR<{ wholesale: WholesaleResp | null; retail: RetailResp }>(
     ["multifashion-clientes", range.fecha_inicio, range.fecha_fin],
     async () => {
       const [ws, rt] = await Promise.all([
-        fetch(`/api/multifashion/clientes-wholesale?${qs}`, { cache: "no-store" }).then(async r => {
+        // 🩸 Con `RETAIL_AL_FRENTE` el bloque «Mayoreo» se fue y su consulta
+        // NO se hace (la ruta contesta 410): la plata del mayoreo se dice en
+        // la línea chiquita del Resumen.
+        RETAIL_AL_FRENTE ? Promise.resolve(null) : fetch(`/api/multifashion/clientes-wholesale?${qs}`, { cache: "no-store" }).then(async r => {
           if (!r.ok) {
             const body = await r.json().catch(() => ({}));
             throw new Error(body?.error ?? `wholesale HTTP ${r.status}`);
@@ -264,6 +268,65 @@ export function ClientesMultifashionSubtab({ selectedYear, mes, periodo }: Clien
   const toggleRow = (id: string) => {
     setExpandedId(prev => prev === id ? null : id);
   };
+
+  // 🔴 LA PESTAÑA MÍNIMA (23-sep-2026, mockup aprobado): 8 elementos → 5.
+  // 1. la cobertura, con el mostrador en la MISMA línea · 2. TRES tarjetas
+  // («Dormidos» era el chip «No vuelven») · 3. los chips · 4. la lista, con
+  // cuánto compró cada uno · 5. «Ver los N». Se fueron: el bloque Mayoreo, el
+  // encabezado repetido y el renglón de anónimos suelto. 🔴 La Frontera queda
+  // fuera de la lista POR CÓDIGO (`fueraDelRanking`), nunca por nombre; las
+  // cuatro cuentas de las tarjetas no se tocan.
+  if (RETAIL_AL_FRENTE) {
+    const clientesLista = fidel ? fidel.clientes.filter((c) => !fueraDelRanking(c.cliente_switch_id)) : [];
+    return (
+      <div data-pestana="clientes-minimo" className={cn("space-y-5", loading && "opacity-60 pointer-events-none transition-opacity")}>
+        {errorMsg ? (
+          <Card className="rounded-md border border-orange-200 bg-orange-50 p-4 text-xs text-orange-900">
+            No se pudo cargar la lista: {errorMsg}
+            <button onClick={() => mutate()} className="ml-2 font-medium underline underline-offset-2 hover:text-orange-700">Reintentar</button>
+          </Card>
+        ) : loading && !retail ? (
+          <Card className="flex min-h-[200px] items-center justify-center p-12 text-sm text-gray-500">
+            Cargando clientes…
+          </Card>
+        ) : (
+          <div className="space-y-6">
+            <div data-elemento="cobertura">
+              <h3 className="sr-only">Clientes · {periodoStr}</h3>
+              {cobertura.texto && (
+                <p className="text-sm text-gray-700">
+                  {cobertura.texto}
+                  {retail && (retail.ventas_anonimas > 0 || retail.tickets_anonimos > 0) && (
+                    <span className="text-gray-500">
+                      {" · "}mostrador <span className="font-mono tabular-nums">{fmtMoney(retail.ventas_anonimas)}</span>
+                      {" · "}<span className="font-mono tabular-nums">{retail.tickets_anonimos.toLocaleString()}</span> tickets, aparte
+                    </span>
+                  )}
+                </p>
+              )}
+            </div>
+
+            {fidel && (
+              <section data-elemento="tarjetas" className="space-y-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <SegCard icon={<Repeat className="h-4 w-4" />} tone="teal" valor={fidel.cards.frecuentes} label="Frecuentes" sub="2+ visitas en 90 días" />
+                  <SegCard icon={<UserPlus className="h-4 w-4" />} tone="teal" valor={fidel.cards.nuevos_mes} label="Nuevos del mes" sub="registrados este mes" />
+                  <SegCard icon={<Percent className="h-4 w-4" />} tone="teal" valor={fidel.cards.cinco_pendiente} label="5% pendiente" sub="sin segunda visita" />
+                </div>
+                {!fidel.detalle_activo && (
+                  <p className="text-xs text-gray-400">
+                    El estado &quot;usado&quot; del 5% se activa cuando corra la migración de detalle.
+                  </p>
+                )}
+              </section>
+            )}
+
+            {fidel && <ListaSeguimientoClientes clientes={clientesLista} hoy={fidel.hoy} conMonto />}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={cn("space-y-5", loading && "opacity-60 pointer-events-none transition-opacity")}>

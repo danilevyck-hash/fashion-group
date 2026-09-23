@@ -387,7 +387,10 @@ describe("6 · la `nota` es la EXCEPCIÓN, no la puerta de atrás", () => {
     // Reportes) SE RETIRÓ** con la pieza C del rediseño (Daniel: «"Exportar
     // Excel" se va»); su `buildReportSheet` se fue con él. Nada se perdió de
     // camino: el Excel de una marca vive en el ZIP del período.
-    expect(total).toBe(30);
+    // 🔁 31 desde el 23-sep-2026: **entró el Excel del ranking de Vendedoras de
+    // Multifashion** (`lib/multifashion/vendedoras-excel.ts`), que sale SOLO en
+    // mes cerrado (mockup «Multifashion mínimo» aprobado por Daniel).
+    expect(total).toBe(31);
   });
 });
 

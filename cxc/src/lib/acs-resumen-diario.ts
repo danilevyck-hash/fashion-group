@@ -46,9 +46,12 @@
 import { supabaseServer } from "@/lib/supabase-server";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { variacionPct } from "@/lib/variacion";
-import { sumRetail } from "@/lib/multifashion/retail-dia";
+import { leerMayoreoRango, sumRetail } from "@/lib/multifashion/retail-dia";
 import { leerRitmoMeta } from "@/lib/multifashion/meta-ritmo-lectura";
 import type { RitmoMeta } from "@/lib/multifashion/meta-ritmo";
+import {
+  RETAIL_AL_FRENTE, lineaMayoreoTelegram, type MayoreoDelPeriodo,
+} from "@/lib/multifashion/retail-al-frente";
 
 export { hoyPanama };
 
@@ -68,6 +71,11 @@ export interface AcsResumenDiario {
    *  cubra el día, sin comparable, o la lectura falló → la línea no sale.
    *  Cuenta en `@/lib/multifashion/meta-ritmo`, lectura en `meta-ritmo-lectura`. */
   meta?: RitmoMeta | null;
+  /** La línea chiquita del mayoreo (23-sep-2026): cuánto entró por mayoreo en
+   *  el MES y en el AÑO hasta el `corte`. NO entra a Mes/Año ni a sus %.
+   *  `null`/ausente = no se leyó (o el interruptor está apagado) → no sale. */
+  mayoreoMes?: MayoreoDelPeriodo | null;
+  mayoreoAnio?: MayoreoDelPeriodo | null;
 }
 
 export function addDays(fecha: string, days: number): string {
@@ -146,7 +154,7 @@ export async function calcularResumenDiario(
   const corte = syncFresco ? fecha : addDays(fecha, -1);
   const v = ventanasResumen(corte);
 
-  const [hoy, hoyPrev, mes, mesPrev, anio, anioPrev, meta] = await Promise.all([
+  const [hoy, hoyPrev, mes, mesPrev, anio, anioPrev, meta, mayMes, mayAnio] = await Promise.all([
     syncFresco ? sumRetail(corte, corte) : Promise.resolve(0),
     syncFresco ? sumRetail(v.fechaComparable, v.fechaComparable) : Promise.resolve(0),
     sumRetail(v.inicioMes, corte),
@@ -156,6 +164,10 @@ export async function calcularResumenDiario(
     // Falla abierto adentro (devuelve null y loguea): el resumen nunca se cae
     // por la meta. Mismo `corte` que Mes/Año, a propósito.
     leerRitmoMeta(corte),
+    // El mayoreo del mes y del año, para la línea chiquita. Solo con el
+    // interruptor prendido; falla abierto adentro (null = la línea no sale).
+    RETAIL_AL_FRENTE ? leerMayoreoRango(v.inicioMes, corte) : Promise.resolve(null),
+    RETAIL_AL_FRENTE ? leerMayoreoRango(v.inicioAnio, corte) : Promise.resolve(null),
   ]);
 
   return {
@@ -164,6 +176,8 @@ export async function calcularResumenDiario(
     mes, mesPrev,
     anio, anioPrev,
     meta,
+    mayoreoMes: mayMes ? { monto: mayMes.ventas, facturas: mayMes.documentos, retail: mes } : null,
+    mayoreoAnio: mayAnio ? { monto: mayAnio.ventas, facturas: mayAnio.documentos, retail: anio } : null,
   };
 }
 
@@ -203,6 +217,13 @@ export async function calcularResumenDiario(
 //   🎯 Meta  ▲ +13% arriba del ritmo        (o "▼ -4% abajo del ritmo")
 //   Sin meta que cubra el día, o sin comparable, la línea y su separador no
 //   salen. Ver fmtLineaMeta y src/lib/multifashion/meta-ritmo.ts.
+//
+//   Con mayoreo en el mes o en el año (23-sep-2026, Daniel: «abajo chiquitito
+//   me pones tanto por el mayoreo»), UNA línea debajo de la fila que le toca,
+//   SOLO si el mayoreo de ese período no es cero; Mes y Año siguen siendo
+//   retail y sus % retail contra retail:
+//   Año    $390,121    ▲ +15.7%
+//     + $28,366 de mayoreo (5 facturas) · entró $418,487
 
 export function fmtMonto(n: number): string {
   return `$${Math.round(n).toLocaleString("en-US")}`;
@@ -325,7 +346,9 @@ export function buildMensaje(r: AcsResumenDiario, prefijo = ""): string {
     }
   }
   actual.push({ label: "Mes", monto: r.mes, resto: fmtVariacion(r.mes, r.mesPrev, 1) });
+  const notaMes = lineaMayoreoTelegram(r.mayoreoMes);
   actual.push({ label: "Año", monto: r.anio, resto: fmtVariacion(r.anio, r.anioPrev, 1) });
+  const notaAnio = lineaMayoreoTelegram(r.mayoreoAnio);
   if (r.mesPrev > 0) {
     pasado.push({ label: "Mes", monto: r.mesPrev, resto: fmtRangoMesPrevLargo(r.corte) });
   }
@@ -344,7 +367,12 @@ export function buildMensaje(r: AcsResumenDiario, prefijo = ""): string {
     // hasta qué día llegan los acumulados cuando el corte se recorta a D-1.
     lineas.push(`⏳ Ventas del día aún sincronizando (al ${fmtDiaCorto(r.corte)})`);
   }
-  lineas.push(...actual.map(fila));
+  for (const f of actual) {
+    lineas.push(fila(f));
+    // La línea chiquita del mayoreo va DEBAJO de su fila, sangrada, y solo si hubo.
+    if (f.label === "Mes" && notaMes) lineas.push(`  ${notaMes}`);
+    if (f.label === "Año" && notaAnio) lineas.push(`  ${notaAnio}`);
+  }
   // Sin ninguna métrica comparable el bloque de abajo sobra, y con él su cierre.
   if (pasado.length > 0) lineas.push(SEPARADOR, "Año pasado", ...pasado.map(fila));
   // La meta va AL FINAL, con su propio separador, y solo si hay algo que decir.

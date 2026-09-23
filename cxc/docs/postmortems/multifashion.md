@@ -406,6 +406,95 @@
 
 ---
 
+## Retail al frente, mayoreo abajo (23-sep-2026)
+
+> Daniel, textual: *«Quiero que se compare sin contar el mayoreo. Y abajo chiquitito me pones tanto por el mayoreo para yo saber cuánta plata entró a la tienda. Pero el número que en verdad me interesa es el real de ventas retail.»* Mockup aprobado pestaña por pestaña («Multifashion mínimo», 23-sep-2026). Verificación previa de Fable y el inventario de las cuatro pantallas: `scratchpad/multifashion-mayoreo-fable.md` y `multifashion-mayoreo-e-inventario.md` (sesión del 23-sep).
+
+### La regla
+
+1. **El número grande es RETAIL** (`is_wholesale = false`): año, mes, día, mes a mes, meta, bono y Telegram. Como siempre.
+2. **Todo % es retail contra retail.** 🩸 Cuatro RPC (`_multifashion_retail_blend_sum`, `multifashion_overview_serie_v1`, `multifashion_detalle_mensual_v2`, `multifashion_bonos_v4`) leían enero–abril de 2025 de `ventas_raw`, donde el mayoreo NO está marcado (0 de 25.727 filas): las cuatro facturas de LA FRONTERA del 30-abr-2025 ($23.917) entraban como venta de tienda del año pasado. `switch_facturas` tiene 2024 y 2025 completos (2025: 12.948 documentos en las dos tablas; $686.044,05 vs $686.043,69). El pegado sobraba.
+3. **La línea chiquita** «+ $X de mayoreo (N facturas) · entró $Y» debajo del número grande, SOLO cuando el mayoreo del período ≠ 0 (marzo 2026 tiene factura + NC de Joystep, neto $0: sin línea). En el año, el mes y el Telegram diario. **En Productos no se marca nada.**
+
+### Lo medido (23-sep-2026, RPC de producción vs la misma fórmula sobre la vista sin `ventas_raw`)
+
+| Qué | HOY (RPC en producción) | DESPUÉS (misma fórmula, solo la vista) | Cambia |
+|---|---|---|---|
+| Año 2026 al 23-sep (retail) | $390,388.26 | $390,388.26 | no |
+| Base 2025 al mismo día | $361,111.88 (abril CON Frontera) | $337,194.72 | −$23.917,16 |
+| Cierre 2025 | $676,337.36 | $652,420.19 | −$23.917,16 |
+| «Cierra en» 2026 | $731,169.97 | $755,341.55 | +$24.171,58 |
+| «vs 2025» | +8,1 % | +15,78 % | **sí** |
+| Mayoreo 2026 (línea chiquita) | nota «no incluye $28,365.90 · 5 facturas» | «+ $28,365.90 de mayoreo (5 facturas) · entró $418,754.16» | forma |
+| Mes 1/2026: ventas · vs año pasado | $33,272.39 · 51,26 % (base $21,996.83) | $33,272.39 · 51,26 % (base $21,996.81) | no |
+| Mes 2/2026: ventas · vs año pasado | $38,381.69 · -8,72 % (base $42,046.32) | $38,381.69 · -8,72 % (base $42,046.28) | no |
+| Mes 3/2026: ventas · vs año pasado | $38,325.58 · 5,80 % (base $36,224.21) | $38,325.58 · 5,80 % (base $36,224.15) | no |
+| Mes 4/2026: ventas · vs año pasado | $47,375.17 · -29,06 % (base $66,778.36) | $47,375.17 · 10,53 % (base $42,861.32) | **sí** · mayoreo $24,807.00 (1) |
+| Mes 5/2026: ventas · vs año pasado | $42,446.03 · 16,92 % (base $36,302.49) | $42,446.03 · 16,92 % (base $36,302.49) | no |
+| Mes 6/2026: ventas · vs año pasado | $64,503.06 · 8,79 % (base $59,292.96) | $64,503.06 · 8,79 % (base $59,292.96) | no · mayoreo $1,350.00 (1) |
+| Mes 7/2026: ventas · vs año pasado | $40,788.67 · 21,60 % (base $33,544.16) | $40,788.67 · 21,60 % (base $33,544.16) | no · mayoreo $2,208.90 (1) |
+| Mes 8/2026: ventas · vs año pasado | $53,193.56 · 34,83 % (base $39,453.49) | $53,193.56 · 34,83 % (base $39,453.49) | no |
+| Mes 9/2026: ventas · vs año pasado | $31,834.45 · 24,97 % (base $25,473.08) | $31,834.45 · 24,97 % (base $25,473.08) | no |
+| Bono Jennifer 1/2026 | $33,272.39 vs $21,996.81 · 51,3 % → $100 | $33,272.39 vs $21,996.81 · 51,26 % → $100 | no |
+| Bono Jennifer 2/2026 | $38,381.69 vs $42,046.28 · -8,7 % → $0 | $38,381.69 vs $42,046.28 · -8,72 % → $0 | no |
+| Bono Jennifer 3/2026 | $38,325.58 vs $36,224.15 · 5,8 % → $50 | $38,325.58 vs $36,224.15 · 5,80 % → $50 | no |
+| Bono Jennifer 4/2026 | $72,182.17 vs $66,778.32 · 8,1 % → $50 | $47,375.17 vs $42,861.32 · 10,53 % → $100 | **sí** |
+| Bono Jennifer 5/2026 | $42,446.03 vs $36,302.49 · 16,9 % → $100 | $42,446.03 vs $36,302.49 · 16,92 % → $100 | no |
+| Bono Jennifer 6/2026 | $65,853.06 vs $59,292.96 · 11,1 % → $100 | $64,503.06 vs $59,292.96 · 8,79 % → $50 | **sí** |
+| Bono Jennifer 7/2026 | $42,997.57 vs $37,172.16 · 15,7 % → $100 | $40,788.67 vs $33,544.16 · 21,60 % → $100 | no |
+| Bono Jennifer 8/2026 | $53,193.56 vs $39,453.49 · 34,8 % → $100 | $53,193.56 vs $39,453.49 · 34,83 % → $100 | no |
+| Vendedoras sep-2026 (comisiones) | Sheynee Batista $11,376.73 · com. $55.82 · Jailine $7,255.32 · com. $34.85 · Milagros Torres $6,750.26 · com. $33.27 · Jennifer Miranda $6,423.38 · com. $30.29 | iguales (la RPC no cambia; el mayoreo va con DEFAULT) | no |
+| Telegram diario (al 22-sep): Año · Mes | $390,120.61 ▲ +15,7 % · $31,834.45 ▲ +25,0 % | iguales + línea «+ $28,366 de mayoreo (5 facturas) · entró $418,487» | forma |
+| Meta «Viaje playa» | sep sin mayoreo: avance $31,834.45 | igual (retail, como siempre) | no |
+
+Los meses de 2025 (12) y los de 2026 sin mayoreo cuadran al centavo en las dos fuentes. Lo ÚNICO que cambia de valor es lo que estaba MAL: el año (+8,1 % → +15,8 %), abril (▼ 29,1 % → +10,5 %) y el bono de abril ($50 → $100) y junio ($100 → $50); enero–agosto sigue sumando $600. Comisiones no se mueven (las 13 facturas de mayoreo de la historia llevan vendedor `DEFAULT`, que la RPC excluye).
+
+### Qué cambió, pantalla por pantalla (35 elementos → 20)
+
+| Pestaña | Hoy | Después |
+|---|---|---|
+| **Resumen** (11 → 6) | 4 tarjetas (Ventas del mes · Tickets · Cierra en por regla de tres · Año con «no incluye $X de mayoreo»), gráfico, tabla «Mes a mes» de 13 filas, «Cuándo vende la tienda» con 4 bloques y 2 minigráficos. El año decía +8 %. | 3 tarjetas: **Ventas del mes** (tiquetes y promedio adentro, «▲ +25.0% vs sep 2025 · ▼ −21.7% vs agosto») · **Cierra en** por TEMPORADA (la cuenta de la meta; «por temporada, con 22 días») · **Año · retail** «▲ +15.8% vs 2025 · cierra en $755,341.55 · margen 33%» + la línea chiquita. Gráfico con «sáb 12 y lun 21 en $0 y no son feriado — ¿la tienda abrió?» (día hábil lunes–sábado, ya pasado, sin tiquetes, no en `asistencia_feriados`; sin la lista no avisa). Hábitos en UNA línea sin «peor día». «Ver mes a mes ▾» plegado. |
+| **Vendedoras** (7 → 4) | «(incluye mayoreo si lo hubo)» (falso), columna Bono «al cierre» ×4, dos tarjetas de meta idénticas. | Sin la frase; sin columna Bono → UNA línea «Bono: se define al cerrar el mes (retail contra retail). En agosto: Jennifer Miranda $100 · Sheynee Batista $50.»; UNA tarjeta de meta (`MetaAvanceCompacta`); botón **Excel** SOLO en mes cerrado (`buildReportSheet` + `filtroDesdeA1` + `workbookBlob`). Un solo corte del mes (el `corte` de Panamá del módulo). |
+| **Productos** (9 → 5) | Marcas en 7 renglones, banda con VENTA repetida, nota fija, dos listas con los mismos nombres. | «Se vende mucho pero deja poco» ARRIBA; banda UNIDADES · UTILIDAD · MARGEN + «Comparado con … · ⓘ» (la nota fija y la fórmula viven en el ⓘ); «Tommy 71% · Calvin 24% · Karl 3% · el resto 1% · detalle ›» (el selector de siempre a un toque); UNA tabla de 5 filas (# · Categoría · Piezas · Venta · Deja · Margen); «Lo que más cambió» + «Ver todo». Ningún número cambia; sin marca de mayoreo. |
+| **Clientes** (8 → 5) | 4 tarjetas (Dormidos = el chip «No vuelven»), encabezado repetido, bloque «Mayoreo», renglón de anónimos, lista sin plata. | Cobertura con el mostrador en la MISMA línea; 3 tarjetas; chips; la lista con «compró $X · N días sin comprar»; «Ver los N». **La Frontera fuera POR CÓDIGO (324)**; el bloque Mayoreo y su consulta se fueron (`/api/multifashion/clientes-wholesale` contesta 410). |
+
+Chico y sin dibujo: `hoyPanama()` en `page.tsx`, `overview`, `detalle-mensual` y `retail-recurrentes` (era `new Date()`, UTC); cambiar/crear/retirar una meta deja rastro en `activity_logs` (`meta_editada` · `meta_creada` · `meta_retirada`); un solo redondeo de % en el Resumen (`fmtDeltaRetail`: un decimal, flecha sobre el % ya redondeado); las cuatro consultas retiradas (mayoreo del mes, cliente del mayoreo, `proyeccion_mensual_retail_v1`, `clientes-wholesale`) siguen en el código detrás del interruptor (patrón `mayor_lineas`).
+
+### Las migraciones (ESCRITAS, NO aplicadas — las corre Daniel con `npm run migrar`)
+
+- `20261217140000_multifashion_retail_contra_retail.sql` — `_multifashion_retail_sum` (helper, solo la vista) · `multifashion_overview_serie_v2` · `multifashion_proyeccion_cierre_v2` · `multifashion_detalle_mensual_v3` · `multifashion_bonos_v5` (la base del bono de la gerente en retail contra retail; el ranking de vendedoras idéntico). Cuerpos = los de las versiones anteriores con la rama `ventas_raw` quitada. `CREATE OR REPLACE`, nunca DROP.
+- `20261217140100_multifashion_clientes_maher_entra_frontera_por_codigo.sql` — la vista `_multifashion_sf_vw` expone `cliente_codigo` AL FINAL; `multifashion_retail_recurrentes_v3` = la v2 sin `cliente NOT ILIKE '%maher%'` y con `cliente_codigo NOT IN (324)` (nunca «FRONTERA» por nombre).
+
+🔴 **Hasta que corran, el código cae a las versiones viejas** (`lib/multifashion/rpc-retail.ts`, por `rpcConFallbackDeVersion`): la pantalla mínima se ve, pero el año sigue diciendo +8 % y abril ▼ 29 %. El bono de abril/junio tampoco cambia hasta la v5.
+
+### El interruptor
+
+`RETAIL_AL_FRENTE` en `src/lib/multifashion/retail-al-frente.ts` (hoy `true`). En `false`: las cuatro pestañas dibujan lo de antes (las ramas viejas siguen enteras en cada archivo), las rutas piden las RPC viejas, `clientes-wholesale` vuelve a contestar, el Telegram no lleva la línea. Nada de lo que se guarda cambia en ningún caso.
+
+### Candados
+
+- **Nuevo:** `src/__tests__/components/multifashion-retail-al-frente.test.tsx` (44 pruebas): ninguna migración nueva nombra `ventas_raw`; las cinco RPC nuevas y sus parejas; un solo redondeo; la línea chiquita con mayoreo ≠ 0 y no con 0 (año, mes, Telegram); Productos sin ella; La Frontera fuera por código (SQL sin «frontera» ni «maher»); tarjeta de meta UNA vez; Excel solo en mes cerrado; conteo por pestaña 6·4·5·5 contra el DOM montando los cuatro componentes; las ramas viejas siguen en el fuente; ninguna escritura nueva.
+- **Cambiaron de dirección, fechados:** `multifashion-rediseno-pantalla.test.tsx` y `multifashion-filtro-marca.test.tsx` se montan con el interruptor apagado (son el candado de «false = como antes»); `multifashion-acceso.test.ts` igual (la ruta `clientes-wholesale` contesta 410 con él prendido); `multifashion-rediseno.test.ts` § 10 vigila que la proyección por días quede intacta en la rama apagada.
+
+### Mutaciones a mano (23-sep-2026)
+
+Cada una rompe el candado `multifashion-retail-al-frente.test.tsx` y se restauró:
+
+1. La RPC `multifashion_bonos_v5` vuelve a sumar el mayoreo en la venta de la tienda (se quita `is_wholesale = false`) → **1 rojo** («suman SOLO is_wholesale = false»).
+2. La línea chiquita sale también con $0 (se afloja `hayMayoreo`) → **5 rojos** (marzo, septiembre, «sin mayoreo en el año», Telegram).
+3. La Frontera vuelve al ranking (se quita `cliente_codigo NOT IN (324)` de la RPC v3) → **1 rojo**.
+4. Vuelve la segunda tarjeta de meta (`<MetasEnVendedoras />` sin el interruptor) → **4 rojos** (cuenta 4 elementos, tarjeta una vez, rama vieja).
+5. El Excel sale también en el mes en curso (se quita `mesCerrado`) → **2 rojos**.
+6. Una RPC nueva vuelve a leer `ventas_raw` → **1 rojo** («ninguna migración nombra ventas_raw»).
+
+### Pendientes y dudas para Daniel
+
+- 🔴 **Correr las dos migraciones.** Sin ellas el +8 % sigue en pantalla.
+- ⚠️ **Maher:** entra al RANKING (la RPC dejó de excluirlo por nombre, como pediste), pero la lista de LLAMAR de Clientes conserva tu decisión del 16-sep («Maher es revendedor», `fuera-de-seguimiento.ts`, por código). Si también lo quieres en la lista de llamar, se saca de esa lista; no lo cambié solo.
+- ⚠️ `ClientesMultifashionSubtab.tsx` quedó en 862 líneas (la rama vieja se conserva entera para el interruptor); `MultifashionResumenView.tsx` (1.078) y `ProductosSubtab.tsx` (1.524) ya pasaban las 800 antes de este encargo.
+- ⚠️ Con el mes en curso, la línea del bono pide UNA vez más a `/api/multifashion/bonos` (el último mes cerrado): es la misma RPC, cacheada 5 min.
+- Las 13 reglas del rediseño del 6-sep se podaron de CLAUDE.md el 23-sep-2026 (tope de 130.000 code points): viven verbatim más abajo, en «Lo que decía CLAUDE.md hasta el 22-sep-2026 › El rediseño del módulo». Copia del bloque podado: `scratchpad/claude-md-bloque-podado-23sep.md` de la sesión.
+
 ## Lo que decía CLAUDE.md hasta el 14-sep-2026 (movido acá, verbatim)
 
 > El 14-sep-2026 CLAUDE.md pasaba de 333 mil caracteres (el tope del harness es 150 mil) y las instrucciones se cortaban a la mitad. Se dejó ahí un resumen de las reglas vigentes y el texto completo —mediciones, citas de Daniel, candados y mutaciones— se movió acá sin cambiar una palabra.

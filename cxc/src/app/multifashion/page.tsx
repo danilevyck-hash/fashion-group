@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { fetchMultifashion, fetchAvailableYears } from "@/lib/ventas/queries";
 import { verifySession } from "@/lib/session-cookie";
 import { puedeAbrirMultifashion } from "@/lib/multifashion/acceso";
+import { hoyPanama } from "@/lib/fecha-panama";
 import { MultifashionShell } from "./MultifashionShell";
 
 export const dynamic = "force-dynamic";
@@ -28,12 +29,15 @@ export default async function MultifashionPage() {
   if (!role) redirect("/");
   if (!puedeAbrirMultifashion(role)) redirect("/home");
 
-  const now = new Date();
-  const year = now.getFullYear();
-  // mes 1-indexed = mes en curso. multifashion_mensual_v6 suma WHERE mes <= p_mes
+  // 🔴 El año y el mes son los de PANAMÁ (23-sep-2026), no los del servidor:
+  // Vercel corre en UTC y de 7 pm a medianoche ya sería «mañana». Es el mismo
+  // corte que usa el shell (`hoyPanama()` en `MultifashionShell`).
+  const hoy = hoyPanama();
+  const year = Number(hoy.slice(0, 4));
+  // mes 1-indexed = mes en curso. multifashion_mensual_v7 suma WHERE mes <= p_mes
   // para los KPIs YTD del overview; el mes en curso garantiza incluir la data
   // parcial del mes y marca es_periodo_parcial en retail.meses[mes].
-  const mes = now.getMonth() + 1;
+  const mes = Number(hoy.slice(5, 7));
 
   const [multi, availableYears] = await Promise.all([
     fetchMultifashion({ year, mes }).catch(err => {

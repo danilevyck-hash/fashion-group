@@ -34,6 +34,7 @@ import {
 } from "@/lib/multifashion/metas-lectura";
 import { claveVendedora, esClaveDeSistema } from "@/lib/multifashion/metas-clave";
 import { hoyPanama } from "@/lib/fecha-panama";
+import { logActivity } from "@/lib/log-activity";
 
 export const dynamic = "force-dynamic";
 
@@ -266,6 +267,10 @@ export async function POST(req: NextRequest) {
     if (error) throw new Error(error.message);
 
     await guardarParticipantes(data.id as string, v.participantes);
+    await logActivity(auth.role, "meta_creada", "multifashion", {
+      id: data.id, nombre: v.nombre, desde: v.desde, hasta: v.hasta, objetivo: v.objetivo,
+      tipo: v.tipo, participantes: v.participantes.length,
+    }, auth.userName);
     return NextResponse.json({ ok: true, id: data.id });
   } catch (e) {
     console.error("[multifashion/metas] POST", e);
@@ -310,6 +315,13 @@ export async function PUT(req: NextRequest) {
     if (error) throw new Error(error.message);
 
     await guardarParticipantes(id, v.participantes);
+    // 🔴 CAMBIAR UNA META DEJA RASTRO (23-sep-2026): quién, cuándo y a qué
+    // quedó. Antes se sobreescribía en silencio y nadie podía saber si los
+    // $420.000 eran los de siempre o los de esta mañana.
+    await logActivity(auth.role, "meta_editada", "multifashion", {
+      id, nombre: v.nombre, desde: v.desde, hasta: v.hasta, objetivo: v.objetivo,
+      tipo: v.tipo, activa: v.activa, participantes: v.participantes.length,
+    }, auth.userName);
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[multifashion/metas] PUT", e);
@@ -340,6 +352,7 @@ export async function DELETE(req: NextRequest) {
       .eq("id", id);
 
     if (error) throw new Error(error.message);
+    await logActivity(auth.role, "meta_retirada", "multifashion", { id }, auth.userName);
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[multifashion/metas] DELETE", e);

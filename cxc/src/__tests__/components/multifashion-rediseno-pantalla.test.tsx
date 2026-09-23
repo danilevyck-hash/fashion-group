@@ -10,6 +10,18 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+// 🔄 CAMBIÓ DE DIRECCIÓN EL 23-sep-2026. Estas pruebas describen la pantalla
+// del rediseño del 6-sep (cuatro tarjetas, «Cuándo vende la tienda» con sus
+// cuatro líneas), que desde el 23-sep vive DETRÁS del interruptor
+// `RETAIL_AL_FRENTE` en `false`. Se montan con el interruptor apagado: son el
+// candado de «false = como antes». La pantalla mínima tiene el suyo en
+// `multifashion-retail-al-frente.test.tsx`.
+vi.mock("@/lib/multifashion/retail-al-frente", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/multifashion/retail-al-frente")>();
+  return { ...real, RETAIL_AL_FRENTE: false };
+});
+
 import { render, screen, cleanup } from "@testing-library/react";
 import { MultifashionResumenView } from "@/components/multifashion/MultifashionResumenView";
 import { PeriodoSelect } from "@/components/multifashion/PeriodoSelect";

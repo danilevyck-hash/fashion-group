@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { ROLES_VENDEDORAS_ESPEJO } from "@/lib/multifashion/acceso";
 import { supabaseServer } from "@/lib/supabase-server";
+import { rpcRetail } from "@/lib/multifashion/rpc-retail";
 import type { BonosMultifashion } from "@/components/ventas/types";
 
 export const dynamic = "force-dynamic";
@@ -45,8 +46,15 @@ export async function GET(req: NextRequest) {
   // bono. Mientras la migración `20261009120000_multifashion_vendedora_alias.sql`
   // no corra, la v4 no existe y se cae a la v3 — el bono se calcula igual que
   // hasta hoy. ⚠️ El MONTO y la REGLA del bono no se tocaron.
+  // 🔴 RETAIL CONTRA RETAIL (23-sep-2026): la v5 mide el bono de la gerente
+  // con la tienda SIN mayoreo en los dos años (abril 2026 pasa de $50 a $100 y
+  // junio de $100 a $50; ene–ago sigue sumando $600). Cae a la v4 mientras la
+  // migración `20261217140000` no corra, y a la v3 si tampoco está la v4.
+  // Con `RETAIL_AL_FRENTE` apagado se pide la v4 como hasta hoy.
   const { data, error } = await (async () => {
     const args = { p_year: year, p_mes: mes };
+    const v5o4 = await rpcRetail("bonos", args);
+    if (!v5o4.error) return v5o4;
     const v4 = await supabaseServer.rpc("multifashion_bonos_v4", args);
     if (!v4.error) return v4;
     return supabaseServer.rpc("multifashion_bonos_v3", args);

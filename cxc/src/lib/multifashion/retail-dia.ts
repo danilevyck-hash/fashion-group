@@ -84,3 +84,35 @@ export async function leerRetailRango(desde: string, hasta: string): Promise<Ret
 export async function sumRetail(desde: string, hasta: string): Promise<number> {
   return (await leerRetailRango(desde, hasta)).ventas;
 }
+
+/**
+ * El MAYOREO en `[desde, hasta]` — la misma vista, `is_wholesale = true`,
+ * paginado igual. Alimenta la línea chiquita del Telegram («+ $X de mayoreo
+ * (N facturas) · entró $Y», 23-sep-2026). NO entra al número grande.
+ *
+ * Falla ABIERTA: si la lectura se cae, devuelve `null` y la línea no sale —
+ * el resumen nunca se pierde por el mayoreo.
+ */
+export async function leerMayoreoRango(desde: string, hasta: string): Promise<RetailRango | null> {
+  try {
+    const filas = await leerTodoPaginado<FilaRetail>(
+      `${VISTA_RETAIL} mayoreo [${desde}..${hasta}]`,
+      (pedirCount, from, to) =>
+        supabaseServer
+          .from(VISTA_RETAIL)
+          .select("subtotal", pedirCount ? { count: "exact" } : {})
+          .eq("is_wholesale", true)
+          .gte("fecha", desde)
+          .lte("fecha", hasta)
+          .order("n_sistema", { ascending: true })
+          .range(from, to),
+    );
+    let suma = 0;
+    for (const f of filas) suma += Number(f.subtotal) || 0;
+    return { ventas: Math.round(suma * 100) / 100, documentos: filas.length };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[retail-dia] no pude leer el mayoreo (${msg}); la línea no sale`);
+    return null;
+  }
+}

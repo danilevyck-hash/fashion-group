@@ -51,6 +51,9 @@ import { fmtMoney, fmtMoneyCompact, fmtPct, MONTHS } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
 import { buildNotaMayoreo } from "@/lib/ventas/mayoreo";
 import { ROTULO_ESTE_MES, ROTULO_VENTANA } from "@/lib/multifashion/patrones";
+import { RETAIL_AL_FRENTE } from "@/lib/multifashion/retail-al-frente";
+import { diasSinVenta } from "@/lib/multifashion/resumen-minimo";
+import { ResumenMinimo } from "./ResumenMinimo";
 
 interface DiaRow {
   dia: number;
@@ -96,6 +99,8 @@ interface Totales {
   /** Sobre CUÁNTOS días está hecha la proyección (`dia_corte` de la RPC). */
   proyeccion_dias?: number | null;
   proyeccion_dias_mes?: number | null;
+  /** «temporada» (la cuenta de la meta, 23-sep-2026) o «dias» (regla de tres). */
+  proyeccion_base?: "temporada" | "dias" | null;
 }
 
 interface ComparativoBlock {
@@ -106,7 +111,7 @@ interface ComparativoBlock {
   tiene_data: boolean;
 }
 
-interface DetalleMensualResp {
+export interface DetalleMensualResp {
   year: number;
   mes: number;
   mes_label: string;
@@ -135,6 +140,10 @@ interface DetalleMensualResp {
   mayoreo_clientes?: string[];
   /** Facturas de mayoreo del mes (resumen "N facturas" de la nota). */
   mayoreo_facturas?: number;
+  /** Los feriados del mes (`YYYY-MM-DD`), para «¿la tienda abrió?». `null` = no se leyeron. */
+  feriados?: string[] | null;
+  /** El mismo mes del año pasado, COMPLETO (la base de la temporada). */
+  anio_anterior_mes_completo?: number | null;
   /** Día más fuerte y hora pico sobre los últimos N meses. Aditivo. */
   patrones?: {
     dow: HeatmapDow[];
@@ -371,8 +380,46 @@ export function MultifashionResumenView({
         </Card>
       )}
 
+      {/* 🔴 RETAIL AL FRENTE (23-sep-2026): la pantalla MÍNIMA del mockup, 11
+          elementos → 6. El gráfico y la tabla «Mes a mes» siguen siendo los de
+          siempre, armados aquí y pasados enteros. Con el interruptor apagado se
+          dibuja lo de abajo, como hasta hoy. */}
+      {data && RETAIL_AL_FRENTE && (
+        <ResumenMinimo
+          data={data}
+          overview={overview}
+          year={year}
+          mes={mes}
+          isClosedYear={isClosedYear}
+          grafico={
+            <ChartMesAnioMount
+              chartView={chartView}
+              setChartView={setChartView}
+              cumChart={cumChart}
+              mesMapAct={mesMapAct}
+              mesMapPrev={mesMapPrev}
+              year={year}
+              prevYear={prevYear}
+              data={data}
+              avisoTiendaAbrio={diasSinVenta({
+                dias: data.dias, isMesActual: data.is_mes_actual, diaActual: data.dia_actual,
+                year, mes, feriados: data.feriados ?? null,
+              }).texto}
+            />
+          }
+          mesAMes={
+            <ComparativoInteranualCard
+              meses={overview.retail.meses}
+              year={year}
+              diaActual={data.dia_actual}
+              totalAnio={overview.retail.ytdVentas}
+            />
+          }
+        />
+      )}
+
       {/* 2-4. Titular del mes → gráfico Mes/Año → banda de 3 cards. */}
-      {data && (
+      {data && !RETAIL_AL_FRENTE && (
         <>
           {/* Las CUATRO tarjetas de arriba. El año ya no está escondido detrás
               de un desplegable: es una de ellas. */}
@@ -841,6 +888,7 @@ function LineaPatron({
 // vivía en Overview). Un solo gráfico con switch.
 function ChartMesAnioMount({
   chartView, setChartView, cumChart, mesMapAct, mesMapPrev, year, prevYear, data,
+  avisoTiendaAbrio = null,
 }: {
   chartView: "mes" | "anio";
   setChartView: (v: "mes" | "anio") => void;
@@ -850,6 +898,9 @@ function ChartMesAnioMount({
   year: number;
   prevYear: number;
   data: DetalleMensualResp | null;
+  /** «sáb 12 y lun 21 en $0 y no son feriado — ¿la tienda abrió?» (23-sep-2026).
+   *  🩸 Antes esos días quedaban callados en el gráfico. Va en la leyenda. */
+  avisoTiendaAbrio?: string | null;
 }) {
   if (!data) return null;
   const { totales, dias, mes_label, is_mes_actual } = data;
@@ -899,6 +950,9 @@ function ChartMesAnioMount({
                   </>
                 ) : (
                   <span className="text-gray-400"> · sin datos de {anioAnterior} para comparar</span>
+                )}
+                {avisoTiendaAbrio && (
+                  <span data-aviso="tienda-abrio" className="font-medium text-amber-700"> · {avisoTiendaAbrio}</span>
                 )}
               </p>
             </>

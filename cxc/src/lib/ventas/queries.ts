@@ -6,6 +6,8 @@
 //     (mes=4 → arr index 3 = Apr).
 //   - Null in a monthly array means "no data yet" (future month).
 
+import { RETAIL_AL_FRENTE } from "@/lib/multifashion/retail-al-frente";
+import { RPC_RETAIL, type RpcRetail } from "@/lib/multifashion/rpc-retail";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { esEmpresaDelGrupo } from "@/lib/clientes/mundos";
@@ -682,6 +684,17 @@ export async function fetchAvailableYears(): Promise<number[]> {
  * Multifashion tab — single retail store snapshot.
  * Llama al RPC multifashion_mensual que retorna jsonb con todo el shape listo.
  */
+/**
+ * La RPC nueva con reintento y, si no existe todavía, la vieja. Un timeout NO
+ * dispara el respaldo (la vieja hace más trabajo: sería otro timeout).
+ */
+async function rpcRetailConReintento(cual: RpcRetail, args: Record<string, unknown>) {
+  const [nueva, vieja] = RPC_RETAIL[cual];
+  const pedir = (fn: string) => withDbRetry(() => supabaseServer.rpc(fn, args), { label: fn });
+  if (!RETAIL_AL_FRENTE) return pedir(vieja);
+  return rpcConFallbackDeVersion(() => pedir(nueva), () => pedir(vieja), { label: nueva });
+}
+
 export async function fetchMultifashion({
   year,
   mes,
@@ -713,9 +726,13 @@ export async function fetchMultifashion({
         { label: "multifashion_mensual_v6" },
       );
     })(),
-    withDbRetry(() => supabaseServer.rpc("multifashion_overview_serie_v1", { p_year: year }), { label: "multifashion_overview_serie_v1" }),
-    withDbRetry(() => supabaseServer.rpc("multifashion_overview_serie_v1", { p_year: year - 1 }), { label: "multifashion_overview_serie_v1(prev)" }),
-    withDbRetry(() => supabaseServer.rpc("multifashion_proyeccion_cierre_v1", { p_year: year }), { label: "multifashion_proyeccion_cierre_v1" }),
+    // 🔴 RETAIL CONTRA RETAIL (23-sep-2026): la serie y la proyección piden la
+    // versión que lee SOLO `_multifashion_sf_vw` (v2) y caen a la v1 mientras la
+    // migración `20261217140000` no corra. Con `RETAIL_AL_FRENTE` apagado van
+    // derecho a la v1. Ver `lib/multifashion/rpc-retail.ts`.
+    rpcRetailConReintento("overviewSerie", { p_year: year }),
+    rpcRetailConReintento("overviewSerie", { p_year: year - 1 }),
+    rpcRetailConReintento("proyeccionCierre", { p_year: year }),
   ]);
   if (mv6.error) throw new Error(`multifashion_mensual_v7/v6: ${mv6.error.message}`);
   if (serieAct.error) throw new Error(`multifashion_overview_serie_v1(${year}): ${serieAct.error.message}`);

@@ -19,9 +19,16 @@ import useSWR from "swr";
 import { Plus, Target } from "lucide-react";
 import { fmtMoney } from "@/lib/ventas/format";
 import { MetaAvanceCard } from "./MetaAvanceCard";
+import { MetaAvanceCompacta } from "./MetaAvanceCompacta";
+import { RETAIL_AL_FRENTE } from "@/lib/multifashion/retail-al-frente";
 import { MetaFormModal, type MetaGuardar } from "./MetaFormModal";
 import type { VendedoraAgrupada } from "@/lib/multifashion/metas-clave";
 import type { MetaConAvance } from "@/lib/multifashion/metas-lectura";
+
+// 🔴 UNA tarjeta de meta, compacta, con `RETAIL_AL_FRENTE` (23-sep-2026): en
+// Vendedoras la meta se dibujaba dos veces. Con el interruptor apagado, la de
+// siempre. Mismos datos, misma cuenta.
+const TarjetaMeta = RETAIL_AL_FRENTE ? MetaAvanceCompacta : MetaAvanceCard;
 
 interface Respuesta {
   instalado: boolean;
@@ -180,6 +187,7 @@ export function MetasSubtab() {
             <div className="mb-4 flex justify-end">
               <button
                 type="button"
+                data-elemento="nueva-meta"
                 onClick={abrirNueva}
                 className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-800 transition active:scale-[0.97] hover:border-gray-400"
               >
@@ -190,7 +198,7 @@ export function MetasSubtab() {
           {/* Las metas VIVAS mandan la pantalla. */}
           <div className="space-y-4">
             {vivas.map((meta) => (
-              <MetaAvanceCard
+              <TarjetaMeta
                 key={meta.id}
                 meta={meta}
                 puedeEditar={puedeEditar}
@@ -241,7 +249,7 @@ export function MetasSubtab() {
                     </button>
                     {abiertaHistoria === m.id && (
                       <div className="border-t border-gray-100 bg-gray-50/70 p-3">
-                        <MetaAvanceCard
+                        <TarjetaMeta
                           meta={m}
                           puedeEditar={puedeEditar}
                           onEditar={abrirEdicion}

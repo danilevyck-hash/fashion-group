@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { ROLES_MULTIFASHION } from "@/lib/multifashion/acceso";
 import { supabaseServer } from "@/lib/supabase-server";
+import { RETAIL_AL_FRENTE } from "@/lib/multifashion/retail-al-frente";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,18 @@ export async function GET(req: NextRequest) {
   // después). overview queda compartido con Ventas, pero los sub-tabs son admin.
   const auth = requireRole(req, ROLES_MULTIFASHION);
   if (auth instanceof NextResponse) return auth;
+
+  // 🩸 RETIRADA EL 23-sep-2026 (patrón `mayor_lineas`: el archivo y la RPC se
+  // quedan, la puerta se cierra). El bloque «Mayoreo» de Clientes se fue: la
+  // plata del mayoreo se dice en la línea chiquita del Resumen y La Frontera
+  // queda fuera del ranking por código. Con `RETAIL_AL_FRENTE` apagado la ruta
+  // contesta como siempre — es lo que la pestaña de antes pide.
+  if (RETAIL_AL_FRENTE) {
+    return NextResponse.json(
+      { error: "Esta consulta se retiró: el mayoreo se ve en el Resumen de Multifashion." },
+      { status: 410 },
+    );
+  }
 
   const sp = req.nextUrl.searchParams;
   const today = new Date().toISOString().slice(0, 10);

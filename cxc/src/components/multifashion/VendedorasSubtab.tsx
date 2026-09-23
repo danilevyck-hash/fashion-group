@@ -57,7 +57,11 @@ import { MetasEnVendedoras } from "./MetasEnVendedoras";
 import { nombreEnPantalla } from "@/lib/multifashion/nombres";
 import { desgloseCanales } from "@/lib/multifashion/canales";
 import { notaComparacionVendedoras, rotuloDeltaVendedoras, type ChipVendedoras } from "@/lib/multifashion/vendedoras-rotulo";
-import type { CortePeriodo, Periodo } from "@/lib/multifashion/periodo";
+import { etiquetaPeriodo, type CortePeriodo, type Periodo } from "@/lib/multifashion/periodo";
+import { RETAIL_AL_FRENTE, mesCerrado } from "@/lib/multifashion/retail-al-frente";
+import { libroVendedoras, nombreArchivoVendedoras } from "@/lib/multifashion/vendedoras-excel";
+import { workbookBlob } from "@/lib/excel-export";
+import { saveAs } from "file-saver";
 
 const MES_FULL = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -108,9 +112,12 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas }: Ven
   const year = selectedYear;
 
   // Meses base relativos a hoy. Para año cerrado, "en curso" = Dic.
+  // 🔴 UN SOLO CORTE DEL MES (23-sep-2026): cuando el módulo manda su `corte`
+  // (el de PANAMÁ, el mismo del Resumen), se usa ése y no el reloj del
+  // navegador. El espejo de Comisiones, sin `corte`, sigue como siempre.
   const now = new Date();
-  const isCurrentYear = year === now.getFullYear();
-  const enCursoMes = isCurrentYear ? now.getMonth() + 1 : 12;
+  const isCurrentYear = RETAIL_AL_FRENTE && corte ? year === corte.anio : year === now.getFullYear();
+  const enCursoMes = isCurrentYear ? (RETAIL_AL_FRENTE && corte ? corte.mes : now.getMonth() + 1) : 12;
   const mesAnteriorMes = Math.max(1, enCursoMes - 1);
 
   // Control PROPIO — solo cuando no llega el período del módulo (el espejo).
@@ -215,6 +222,21 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas }: Ven
 
   // Contra qué compara la Δ en el período activo (ver el encabezado del archivo).
   const rotuloDelta = rotuloDeltaVendedoras(chip, rpcMes, year);
+
+  // 🔴 RETAIL AL FRENTE (23-sep-2026): la columna «Bono» se va (decía «al
+  // cierre» ×4 durante 29 días de cada 30) y pasa a UNA línea debajo de la
+  // tabla (`BonosSection` → `lineaBono`). El Excel del ranking sale SOLO en un
+  // mes CERRADO: un ranking que cambia mañana no se baja.
+  const conBono = !esRango && !RETAIL_AL_FRENTE;
+  const esUnMes = rpcPeriodo === "mes";
+  const excelDisponible = RETAIL_AL_FRENTE && esUnMes && corte != null && mesCerrado(year, rpcMes, corte);
+  const periodoExcel = etiquetaPeriodo({ tipo: "mes", anio: year, mes: rpcMes });
+  const bajarExcel = () => {
+    if (!resp) return;
+    const wb = libroVendedoras({ filas: sortedVendedoras, periodo: periodoExcel, rotuloDelta: rotuloDelta.columna });
+    saveAs(workbookBlob(wb), nombreArchivoVendedoras(periodoExcel));
+  };
+
   const notaComparacion = resp
     ? notaComparacionVendedoras(chip, rpcMes, year, resp.es_periodo_parcial, resp.dia_corte_periodo_anterior)
     : null;
@@ -239,7 +261,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas }: Ven
 
       {/* Contexto del bono del gerente. Ya NO es una barra de color: es una línea
           gris debajo del subtítulo. Sigue elevando la data para la columna Bono. */}
-      {!esRango && (
+      {!esRango && !RETAIL_AL_FRENTE && (
         <BonosSection selectedYear={year} mes={bonoMes} onData={onBonosData} />
       )}
 
@@ -263,18 +285,34 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas }: Ven
         </div>
       )}
 
-      <div className={cn(loading && "opacity-60 transition-opacity")}>
+      <div data-elemento="resumen" className={cn(loading && "opacity-60 transition-opacity")}>
         {/* `sr-only`: la pestaña dice "Vendedoras" y el período está arriba. */}
         <h3 className="sr-only">Vendedoras · {chipLabel[chip]}</h3>
         {resp && (
-          <p className="mt-0.5 text-xs text-gray-500">
-            <span className="font-mono tabular-nums text-gray-700">{resp.total_vendedoras_periodo}</span> vendedoras ·{" "}
-            <span className="font-mono tabular-nums text-gray-700">{fmtMoney(resp.ventas_total)}</span> ventas ·{" "}
-            <span className="font-mono tabular-nums text-gray-700">{resp.tickets_total.toLocaleString()}</span> tickets
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+            <span>
+              <span className="font-mono tabular-nums text-gray-700">{resp.total_vendedoras_periodo}</span> vendedoras ·{" "}
+              <span className="font-mono tabular-nums text-gray-700">{fmtMoney(resp.ventas_total)}</span> ventas ·{" "}
+              <span className="font-mono tabular-nums text-gray-700">{resp.tickets_total.toLocaleString()}</span> tickets
+            </span>
+            {/* 🔴 Excel SOLO en mes cerrado (23-sep-2026). */}
+            {excelDisponible && resp.vendedoras.length > 0 && (
+              <button
+                type="button"
+                data-boton="excel"
+                onClick={bajarExcel}
+                className="inline-flex min-h-[44px] items-center rounded-md border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-950 active:scale-[0.97]"
+              >
+                Excel
+              </button>
+            )}
           </p>
         )}
+        {/* 🩸 «(incluye mayoreo si lo hubo)» era FALSO: las 13 facturas de
+            mayoreo de la historia llevan vendedor DEFAULT y la RPC lo excluye.
+            Con `RETAIL_AL_FRENTE` la frase se va; queda contra qué compara la Δ. */}
         <p className="mt-1 text-xs text-gray-400">
-          Ventas atribuidas a cada vendedor (incluye mayoreo si lo hubo).
+          {!RETAIL_AL_FRENTE && "Ventas atribuidas a cada vendedor (incluye mayoreo si lo hubo)."}
           {notaComparacion && <> {notaComparacion}</>}
         </p>
       </div>
@@ -283,7 +321,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas }: Ven
       {resp && resp.vendedoras.length === 0 ? (
         <EmptyState />
       ) : (
-        <div className={cn(loading && "opacity-60 pointer-events-none transition-opacity")}>
+        <div data-elemento="tabla" className={cn(loading && "opacity-60 pointer-events-none transition-opacity")}>
           {/* Escritorio. El corte es `lg` y no `md` porque lo que decide es el
               ancho ÚTIL: la barra lateral se lleva 224 px. */}
           <Card data-vista="tabla" className="hidden p-0 lg:block">
@@ -298,8 +336,9 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas }: Ven
                     <th className="border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Ticket prom.</th>
                     <SortHeader col="delta_ventas" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>{rotuloDelta.columna}</SortHeader>
                     <SortHeader col="comision"     sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Comisión</SortHeader>
-                    {/* El bono, donde le corresponde: una columna, no una barra. */}
-                    {!esRango && (
+                    {/* El bono, donde le corresponde: una columna, no una barra.
+                        (Con `RETAIL_AL_FRENTE`, una línea debajo de la tabla.) */}
+                    {conBono && (
                       <th className="border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Bono</th>
                     )}
                   </tr>
@@ -311,7 +350,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas }: Ven
                       v={v}
                       rank={i + 1}
                       badge={bonoBadges.get(v.nombre)}
-                      conBono={!esRango}
+                      conBono={conBono}
                       pendiente={bonoPendiente}
                     />
                   ))}
@@ -328,12 +367,21 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas }: Ven
                 v={v}
                 rank={i + 1}
                 badge={bonoBadges.get(v.nombre)}
-                conBono={!esRango}
+                conBono={conBono}
                 pendiente={bonoPendiente}
                 rotuloDelta={rotuloDelta.corto}
               />
             ))}
           </div>
+
+          {/* 🔴 LA LÍNEA DEL BONO (23-sep-2026), debajo de la tabla, solo por
+              mes: «Bono: se define al cerrar el mes (retail contra retail). En
+              agosto: …». Sigue elevando la data para los resaltes de fila. */}
+          {!esRango && RETAIL_AL_FRENTE && (
+            <div className="mt-2">
+              <BonosSection selectedYear={year} mes={bonoMes} onData={onBonosData} />
+            </div>
+          )}
         </div>
       )}
 
@@ -345,7 +393,11 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas }: Ven
         <section className="mt-8 space-y-4">
           <h3 className="text-sm font-semibold text-gray-950">Metas</h3>
           <MetasSubtab />
-          <MetasEnVendedoras />
+          {/* 🩸 Con `RETAIL_AL_FRENTE` la segunda tarjeta se BORRA (23-sep-2026):
+              era la misma meta dibujada dos veces —mismas cuatro filas, mismos
+              montos, misma nota—. La tarjeta de `MetasSubtab` ya trae el aporte
+              de cada una. Apagado, las dos como antes. */}
+          {!RETAIL_AL_FRENTE && <MetasEnVendedoras />}
         </section>
       )}
     </div>

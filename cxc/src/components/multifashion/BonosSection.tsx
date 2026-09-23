@@ -28,6 +28,8 @@ import { fmtMoney } from "@/lib/ventas/format";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { variacionPct, fmtVariacionPct } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
+import { RETAIL_AL_FRENTE } from "@/lib/multifashion/retail-al-frente";
+import { lineaBono } from "@/lib/multifashion/bono-linea";
 
 const MES_FULL = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -36,6 +38,11 @@ const MES_FULL = [
 
 const REGLA_BONO =
   "Crecimiento ≥ 5% y < 10% → $50 · ≥ 10% → $100. Tienda completa (retail + mayoreo) vs el mismo mes del año anterior.";
+
+/** La regla con `RETAIL_AL_FRENTE` (23-sep-2026): retail contra retail. El
+ *  monto y los escalones son los MISMOS; cambió contra qué se mide. */
+const REGLA_BONO_RETAIL =
+  "Crecimiento ≥ 5% y < 10% → $50 · ≥ 10% → $100. Retail contra retail: la tienda sin mayoreo vs el mismo mes del año anterior.";
 
 const TONE_LIGHT: Record<DeltaTone, string> = {
   emerald: "text-emerald-600",
@@ -80,6 +87,23 @@ export function BonosSection({ selectedYear, mes, onData }: BonosSectionProps) {
     onData(error ? null : (resp ?? null));
   }, [resp, error, onData]);
 
+  // Con el mes en curso, la línea dice el ÚLTIMO mes cerrado («En agosto: …»):
+  // se pide UNA vez más, con el mes que la propia RPC dice que es el último
+  // elegible. Solo con el interruptor; en un mes cerrado no hace falta.
+  const ultimoMes = resp && !resp.sin_data && !resp.es_elegible ? resp.ultimo_mes_elegible : null;
+  const ultimoUrl = RETAIL_AL_FRENTE && ultimoMes
+    ? `/api/multifashion/bonos?${new URLSearchParams({ year: String(ultimoMes.year), mes: String(ultimoMes.mes) }).toString()}`
+    : null;
+  const { data: ultimo } = useSWR<BonosMultifashion>(
+    ultimoUrl,
+    async (url: string) => {
+      const r = await fetch(url, { cache: "no-store" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json() as Promise<BonosMultifashion>;
+    },
+    { dedupingInterval: 5 * 60_000, revalidateOnFocus: false },
+  );
+
   if (error) {
     const errorMsg = error instanceof Error ? error.message : "error inesperado";
     return (
@@ -93,6 +117,23 @@ export function BonosSection({ selectedYear, mes, onData }: BonosSectionProps) {
     return resp?.sin_data
       ? <Card className="p-4 text-center text-xs text-gray-500">Sin datos de ventas de Multifashion todavía.</Card>
       : null;
+  }
+
+  // 🔴 RETAIL AL FRENTE (23-sep-2026): la columna «Bono» se fue y esto es la
+  // línea: «Bono: se define al cerrar el mes (retail contra retail). En agosto:
+  // Jennifer Miranda $100 · Sheynee Batista $50.» Las palabras las elige
+  // `lineaBono`; el monto lo sigue decidiendo la RPC.
+  if (RETAIL_AL_FRENTE) {
+    const texto = lineaBono(resp, ultimo ?? null);
+    if (!texto) return null;
+    return (
+      <p data-linea-bono className={cn("flex flex-wrap items-center gap-x-1.5 text-xs text-gray-500", loading && "opacity-60 transition-opacity")}>
+        <span>{texto}</span>
+        <span title={REGLA_BONO_RETAIL} className="inline-flex cursor-help text-gray-400" aria-label="Regla del bono">
+          <Info className="h-3.5 w-3.5" />
+        </span>
+      </p>
+    );
   }
 
   // Mes todavía abierto: no hay nada que contar que la columna «Bono» no diga ya.

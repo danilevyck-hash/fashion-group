@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { ROLES_MULTIFASHION } from "@/lib/multifashion/acceso";
 import { fetchMultifashion } from "@/lib/ventas/queries";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 export const dynamic = "force-dynamic";
 // Overview anual cruza el empalme switch_facturas/ventas_raw (blend pesado); el
@@ -26,16 +27,20 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const yearParam = sp.get("year");
   const mesParam = sp.get("mes");
-  const yearPedido = yearParam ? parseInt(yearParam, 10) : new Date().getFullYear();
+  // 🔴 «Hoy» es el de PANAMÁ (23-sep-2026): Vercel corre en UTC y de 7 pm a
+  // medianoche el año/mes del servidor ya es «mañana».
+  const hoy = hoyPanama();
+  const anioHoy = Number(hoy.slice(0, 4));
+  const mesHoy = Number(hoy.slice(5, 7));
+  const yearPedido = yearParam ? parseInt(yearParam, 10) : anioHoy;
   if (!Number.isFinite(yearPedido) || yearPedido < 2000 || yearPedido > 2100) {
     return NextResponse.json({ error: "year inválido" }, { status: 400 });
   }
 
-  // Default mes: si year es actual → mes en curso (now.getMonth() + 1).
-  // Si year es cerrado → 12 (todo el año).
-  const now = new Date();
-  const isCurrent = yearPedido === now.getFullYear();
-  const mesFallback = isCurrent ? now.getMonth() + 1 : 12;
+  // Default mes: si year es actual → mes en curso (Panamá). Si year es
+  // cerrado → 12 (todo el año).
+  const isCurrent = yearPedido === anioHoy;
+  const mesFallback = isCurrent ? mesHoy : 12;
   const mesPedido = mesParam ? parseInt(mesParam, 10) : mesFallback;
   if (!Number.isFinite(mesPedido) || mesPedido < 1 || mesPedido > 12) {
     return NextResponse.json({ error: "mes inválido (1..12)" }, { status: 400 });

@@ -10,7 +10,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { ROLES_MULTIFASHION } from "@/lib/multifashion/acceso";
-import { supabaseServer } from "@/lib/supabase-server";
+import { hoyPanama } from "@/lib/fecha-panama";
+import { rpcRetail } from "@/lib/multifashion/rpc-retail";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +24,9 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const sp = req.nextUrl.searchParams;
-  const today = new Date().toISOString().slice(0, 10);
-  const ene1 = `${new Date().getFullYear()}-01-01`;
+  // «Hoy» es el de PANAMÁ (23-sep-2026), nunca el reloj UTC de Vercel.
+  const today = hoyPanama();
+  const ene1 = `${today.slice(0, 4)}-01-01`;
   const fecha_inicio = sp.get("fecha_inicio") ?? ene1;
   const fecha_fin = sp.get("fecha_fin") ?? today;
   const limitParam = sp.get("limit");
@@ -43,7 +45,11 @@ export async function GET(req: NextRequest) {
   // El rango viaja tal como lo pidió la pantalla. La ventana acotada de
   // `gerente_acs` se levantó el 13-ago-2026 (ver CLAUDE.md § Roles); lo que
   // sigue vigente es la validación de formato, de orden y el tope de `limit`.
-  const { data, error } = await supabaseServer.rpc("multifashion_retail_recurrentes_v2", {
+  // 🔴 MAHER ENTRA Y LA FRONTERA SALE POR CÓDIGO (23-sep-2026): la v3 quita la
+  // exclusión por nombre de VENTAS MAHER y saca a LA FRONTERA DUTY FREE por su
+  // `cliente_switch_id` (324), nunca por el nombre. Cae a la v2 mientras la
+  // migración `20261217140100` no corra; con `RETAIL_AL_FRENTE` apagado, v2.
+  const { data, error } = await rpcRetail("retailRecurrentes", {
     p_fecha_inicio: fecha_inicio,
     p_fecha_fin: fecha_fin,
     p_limit: limit,
