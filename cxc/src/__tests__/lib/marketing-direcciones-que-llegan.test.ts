@@ -135,6 +135,12 @@ describe("🔴 ninguna dirección que hoy funciona deja de funcionar", () => {
   });
 });
 
+// 23-sep-2026 · NOTA FECHADA — con Tiendas y Marcas (`MARKETING_TIENDAS_Y_
+// MARCAS` prendido) `?vista=reportes` REDIRIGE a la pestaña Tiendas y
+// `?proyecto=<id>` a la ficha de la tienda de ese proyecto (`useRedirigir
+// ProyectoViejo`): las direcciones siguen llegando a algún lado. Lo de abajo
+// vigila la pantalla DE ANTES (`MarketingPageDeAntes`, `InicioDeAntes`), que
+// vive intacta detrás del interruptor.
 describe("🔑 lo que la dirección promete, existe", () => {
   const raiz = readFileSync(
     path.join(RAIZ, "src/app/marketing/page.tsx"),

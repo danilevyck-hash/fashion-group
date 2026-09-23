@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
+import { ROLES_MARKETING } from "@/lib/marketing/roles";
 import { listImpulsadoras, createImpulsadora } from "@/lib/marketing/impulsadoras";
 import { logActivity } from "@/lib/log-activity";
 import type { CreateImpulsadoraInput } from "@/lib/marketing/types";
@@ -10,7 +11,7 @@ export const fetchCache = "force-no-store";
 
 // GET /api/marketing/impulsadoras — catálogo con split + estado de pago del mes.
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria"]);
+  const auth = requireRole(req, [...ROLES_MARKETING]);
   if (auth instanceof NextResponse) return auth;
   try {
     const data = await listImpulsadoras();

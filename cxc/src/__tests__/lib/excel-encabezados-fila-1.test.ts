@@ -390,7 +390,11 @@ describe("6 · la `nota` es la EXCEPCIÓN, no la puerta de atrás", () => {
     // 🔁 31 desde el 23-sep-2026: **entró el Excel del ranking de Vendedoras de
     // Multifashion** (`lib/multifashion/vendedoras-excel.ts`), que sale SOLO en
     // mes cerrado (mockup «Multifashion mínimo» aprobado por Daniel).
-    expect(total).toBe(31);
+    // 🔁 32 desde el 23-sep-2026: **entró el Excel de la ficha de la tienda de
+    // Marketing** (`src/app/marketing/tienda/[codigo]/excel-de-la-tienda.ts`):
+    // baja los gastos vivos de UNA tienda, lo que está en pantalla (Tiendas y
+    // Marcas). Sube A PROPÓSITO; NO usa `nota:`.
+    expect(total).toBe(32);
   });
 });
 

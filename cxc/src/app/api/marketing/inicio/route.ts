@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
-import { esMultifashion } from "@/lib/marketing/multifashion";
+import { esMultifashion, MULTIFASHION_CODIGOS } from "@/lib/marketing/multifashion";
+import { ROLES_MARKETING } from "@/lib/marketing/roles";
+import { MARKETING_TIENDAS_Y_MARCAS } from "@/lib/marketing/tiendas-y-marcas";
 import { hoyPanama } from "@/lib/fecha-panama";
 import {
   agregarPorBloques,
@@ -59,7 +61,8 @@ interface PeriodoLeido extends PeriodoRow {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria"]);
+  // Lectura: contabilidad también entra a mirar (23-sep-2026).
+  const auth = requireRole(req, [...ROLES_MARKETING]);
   if (auth instanceof NextResponse) return auth;
 
   try {
@@ -78,7 +81,7 @@ export async function GET(req: NextRequest) {
           () =>
             supabaseServer
               .from("mk_facturas")
-              .select(`${COLS_FACTURA}, se_reporta`)
+              .select(`${COLS_FACTURA}, se_reporta, tienda_codigo`)
               .is("anulado_en", null),
           () => supabaseServer.from("mk_facturas").select(COLS_FACTURA).is("anulado_en", null),
           avisarColumna,
@@ -90,7 +93,7 @@ export async function GET(req: NextRequest) {
           .is("anulado_en", null),
         supabaseServer.from("mk_marcas").select("id, nombre, codigo, empresa_codigo"),
         conRespaldoSinColumnas(
-          () => supabaseServer.from("mk_entregas_muebles").select(`${COLS_ENTREGA}, se_reporta`),
+          () => supabaseServer.from("mk_entregas_muebles").select(`${COLS_ENTREGA}, se_reporta, tienda_codigo`),
           () => supabaseServer.from("mk_entregas_muebles").select(COLS_ENTREGA),
           avisarColumna,
         ).then((r) => r.resultado),
@@ -143,6 +146,13 @@ export async function GET(req: NextRequest) {
       sellos: (selloRes.data ?? []) as SelloRow[],
       adjuntos: (adjRes.error ? [] : (adjRes.data ?? [])) as AdjuntoResumen[],
       excluirNoReportado: MARKETING_PORTADA_REDISENO,
+      // 🔴 Multifashion también por la TIENDA del gasto, y el mueble sin
+      // proyecto cuenta (Tiendas y Marcas, 23-sep-2026). Sin el interruptor,
+      // como antes: solo por proyecto.
+      tiendasMultifashion: MARKETING_TIENDAS_Y_MARCAS
+        ? new Set(MULTIFASHION_CODIGOS.map((c) => c.toUpperCase()))
+        : undefined,
+      contarEntregasSinProyecto: MARKETING_TIENDAS_Y_MARCAS,
     });
 
     // Las columnas del cierre, por id de período, completadas con su valor

@@ -44,8 +44,12 @@ import {
   claveDeSeccion,
   type BloqueResumen,
   type DetalleProyectoPeriodo,
+  type DetalleTiendaPeriodo,
   type PeriodoCerradoResumen,
 } from "./resumen-bloques";
+import { TIENDA_GENERAL } from "./gasto";
+import { hrefDeTienda } from "./vista-tienda";
+import type { TiendaDeSeccion } from "./tiendas-y-marcas";
 import { SLUG_PERIODO_ACTUAL, asignarSlugsDePeriodo } from "./slugs";
 
 export { SECCION_ABIERTO, claveDeSeccion };
@@ -156,6 +160,14 @@ export interface SeccionPeriodo {
    * suma nada de las demás.
    */
   compartido: { proveedorNombre: string | null; otrasMarcas: string[] } | null;
+  /**
+   * 🔴 UNA LÍNEA POR TIENDA (23-sep-2026, Tiendas y Marcas): las tiendas con
+   * gasto en ESTE período de ESTA marca, del más grande al más chico y
+   * «General» al final; cada una lleva a su ficha. Salen del detalle por
+   * tienda del agregador, así que suman el total de la sección por
+   * construcción. Ausente = la ruta no lo armó (interruptor apagado).
+   */
+  tiendas?: TiendaDeSeccion[];
 }
 
 export interface InsumosSecciones {
@@ -182,6 +194,10 @@ export interface InsumosSecciones {
   >;
   /** `resumen.detalle` ENTERO — acá se filtra por la marca. */
   detalle: ReadonlyArray<DetalleProyectoPeriodo>;
+  /** `resumen.detalleTiendas` ENTERO (23-sep-2026). Ausente = sin líneas por tienda. */
+  detalleTiendas?: ReadonlyArray<DetalleTiendaPeriodo>;
+  /** Nombre del DIRECTORIO por código de tienda; sin él se dibuja el código. */
+  nombresDeTienda?: ReadonlyMap<string, string>;
   /**
    * `mk_periodos.proveedor_key` por id de período. Solo sirve para NOMBRAR la
    * casa de un cierre compartido; sin él, la fila se dibuja como siempre.
@@ -227,6 +243,26 @@ export function armarSecciones(i: InsumosSecciones): SeccionPeriodo[] {
           (orden.get(b.id) ?? Number.MAX_SAFE_INTEGER),
       );
 
+  const tiendasDe = (clave: string): TiendaDeSeccion[] | undefined => {
+    if (!i.detalleTiendas) return undefined;
+    return i.detalleTiendas
+      .filter((d) => d.bloqueKey === i.bloqueKey && d.seccion === clave)
+      .map((d) => ({
+        codigo: d.tiendaCodigo,
+        nombre: d.tiendaCodigo
+          ? (i.nombresDeTienda?.get(d.tiendaCodigo) ?? d.tiendaCodigo)
+          : TIENDA_GENERAL,
+        monto: Number(d.monto.toFixed(2)),
+        gastos: d.gastos,
+        href: hrefDeTienda(d.tiendaCodigo),
+      }))
+      .sort((a, b) => {
+        if (a.codigo === null) return 1;
+        if (b.codigo === null) return -1;
+        return b.monto - a.monto || a.nombre.localeCompare(b.nombre, "es");
+      });
+  };
+
   const out: Array<Omit<SeccionPeriodo, "slug">> = [];
 
   if (i.bloque) {
@@ -253,6 +289,7 @@ export function armarSecciones(i: InsumosSecciones): SeccionPeriodo[] {
       // Los períodos ABIERTOS son uno por marca desde ago-2026: nunca se
       // comparten.
       compartido: null,
+      tiendas: tiendasDe(SECCION_ABIERTO),
     });
   }
 
@@ -283,6 +320,7 @@ export function armarSecciones(i: InsumosSecciones): SeccionPeriodo[] {
               otrasMarcas,
             }
           : null,
+      tiendas: tiendasDe(clave),
     });
   }
 

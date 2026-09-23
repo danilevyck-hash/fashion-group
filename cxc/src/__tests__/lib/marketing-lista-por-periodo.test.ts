@@ -410,12 +410,15 @@ describe("barrido estático — una sola verdad", () => {
     expect(nivel3).toMatch(/: "\/marketing"/);
   });
 
+  // 23-sep-2026 · NOTA FECHADA — `anotarDetalle` ganó un sexto argumento, la
+  // TIENDA del gasto (Tiendas y Marcas): en la MISMA llamada acumula el
+  // detalle por proyecto y el detalle por tienda. Sigue siendo una sola pasada.
   it("🔴 el detalle del agregador se acumula EN LAS MISMAS LÍNEAS que los totales", () => {
     const agg = leer("lib/marketing/resumen-bloques.ts");
     // Cada anotarCerrado de plata va acompañado de su anotarDetalle.
-    expect(agg).toMatch(/anotarCerrado\(cer, k, "factura", monto\);\s*\n\s*anotarDetalle\(k, cer, pid, "factura", monto\);/);
-    expect(agg).toMatch(/anotarCerrado\(cer, k, "entrega", monto\);\s*\n\s*anotarDetalle\(k, cer, pid, "entrega", monto\);/);
-    expect(agg).toMatch(/sumar\(b\.facturas, monto\);\s*\n\s*anotarCliente\(pid, k, monto\);\s*\n\s*anotarDetalle\(k, null, pid, "factura", monto\);/);
-    expect(agg).toMatch(/sumar\(b\.muebles, monto\);\s*\n\s*anotarCliente\(pid, k, monto\);\s*\n\s*anotarDetalle\(k, null, pid, "entrega", monto\);/);
+    expect(agg).toMatch(/anotarCerrado\(cer, k, "factura", monto\);\s*\n\s*anotarDetalle\(k, cer, pid, "factura", monto, tienda\);/);
+    expect(agg).toMatch(/anotarCerrado\(cer, k, "entrega", monto\);\s*\n\s*anotarDetalle\(k, cer, pid, "entrega", monto, tienda\);/);
+    expect(agg).toMatch(/sumar\(b\.facturas, monto\);\s*\n\s*anotarCliente\(pid, k, monto\);\s*\n\s*anotarDetalle\(k, null, pid, "factura", monto, tienda\);/);
+    expect(agg).toMatch(/sumar\(b\.muebles, monto\);\s*\n\s*anotarCliente\(pid, k, monto\);\s*\n\s*anotarDetalle\(k, null, pid, "entrega", monto, tienda\);/);
   });
 });

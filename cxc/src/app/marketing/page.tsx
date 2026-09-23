@@ -1,21 +1,32 @@
 "use client";
 
-// Marketing se organiza por MARCA, en TRES NIVELES con URL propia
-// (12-ago-2026 — mockup aprobado por Daniel):
+// Marketing se organiza en DOS puertas (23-sep-2026, Tiendas y Marcas —
+// mockup aprobado por Daniel):
 //
-//   /marketing                        → nivel 1: las marcas (este archivo)
-//   /marketing/[marca]                → nivel 2: SUS períodos
-//   /marketing/[marca]/[periodo]      → nivel 3: el detalle del período
-//   /marketing?vista=reportes         → reportes (reemplaza el inicio)
-//   /marketing?vista=impulsadoras     → impulsadoras (reemplaza el inicio)
+//   /marketing                        → la portada: Tiendas · Marcas ·
+//                                       Impulsadoras · Mobiliario (`?tab=`)
+//   /marketing/tienda/[codigo]        → la ficha de la tienda (se registra,
+//                                       se edita y se anula ahí)
+//   /marketing/[marca]                → la marca: su período abierto con UNA
+//                                       línea por tienda, y los cerrados
+//   /marketing/[marca]/[periodo]      → el detalle de un período
 //
-// Daniel, textual: *"quiero que dentro de cada marca aparezca 'periodo uno'
-// periodo dos, y dentro de cada periodo la info… que este ordenado"*.
+// Daniel, textual: el gasto *«se registra cuando llega la factura del
+// proveedor»*, a la marca se le pasa *«cada 6 meses»*, y *«no quiero que se
+// enfoque el módulo en [el cobro], sino en registrar bien los gastos para
+// pasárselos a la marca»*.
 //
-// Legacy: `?bloque=` / `?proveedor=` eran la lista de la marca en esta misma
-// página — ahora REDIRIGEN a /marketing/[marca] (conservando ?proyecto=). Y
-// `?vista=papelera` / `?vista=anulados` siguen redirigiendo a /marketing.
-// Un enlace viejo tiene que llegar a algún lado, no a un error.
+// 🩸 Lo que se fue de la pantalla (patrón `mayor_lineas`: el código y las
+// rutas se quedan, sin puerta): «Reportes» (`?vista=reportes`, por tienda ES
+// la pestaña Tiendas y por marca ES la página de la marca) y el overlay del
+// proyecto (`?proyecto=<id>`, que ahora REDIRIGE a la ficha de la tienda de
+// ese proyecto). Todo detrás de `MARKETING_TIENDAS_Y_MARCAS`: en `false`, la
+// pantalla de antes, intacta (`MarketingPageDeAntes`).
+//
+// Legacy que sigue llegando: `?bloque=` / `?proveedor=` REDIRIGEN a
+// /marketing/[marca]; `?vista=papelera` / `?vista=anulados` a /marketing;
+// `?vista=impulsadoras` a la pestaña Impulsadoras. Un enlace viejo tiene que
+// llegar a algún lado, no a un error.
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -24,44 +35,32 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import type { MkMarca } from "@/lib/marketing/types";
 import { esBloqueKey } from "@/lib/marketing/bloques";
 import { slugDeMarca } from "@/lib/marketing/slugs";
+import { ROLES_MARKETING } from "@/lib/marketing/roles";
+import {
+  MARKETING_TIENDAS_Y_MARCAS,
+  destinoDeVistaVieja,
+} from "@/lib/marketing/tiendas-y-marcas";
 import InicioMarketing from "./components/InicioMarketing";
 import ProyectoOverlay from "./components/ProyectoOverlay";
 import ReportesTabs from "./components/ReportesTabs";
 import ImpulsadorasView from "./components/ImpulsadorasView";
 import RegistrarGastoModal from "./components/RegistrarGastoModal";
+import PortadaTiendasYMarcas from "./components/PortadaTiendasYMarcas";
+import { useRedirigirProyectoViejo } from "./components/useProyectoViejo";
 
 type VistaExtra = "reportes" | "impulsadoras" | null;
 
 export default function MarketingPageWrapper() {
   return (
     <Suspense>
-      <MarketingPage />
+      {MARKETING_TIENDAS_Y_MARCAS ? <MarketingPage /> : <MarketingPageDeAntes />}
     </Suspense>
   );
 }
 
-function MarketingPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const { authChecked } = useAuth({
-    moduleKey: "marketing",
-    allowedRoles: ["admin", "secretaria"],
-  });
-
-  const proyectoParam = searchParams.get("proyecto");
-  // `bloque`/`proveedor` son de la URL vieja (la lista vivía acá): redirigen.
-  const bloqueRaw = searchParams.get("bloque") ?? searchParams.get("proveedor");
-  const bloqueParam = esBloqueKey(bloqueRaw) ? bloqueRaw : null;
-  const vistaRaw = searchParams.get("vista");
-  const vistaParam: VistaExtra =
-    vistaRaw === "reportes" || vistaRaw === "impulsadoras"
-      ? (vistaRaw as VistaExtra)
-      : null;
-
+/** El catálogo de marcas, para «＋ Gasto» y los enlaces por slug. */
+function useMarcas(): MkMarca[] {
   const [marcas, setMarcas] = useState<MkMarca[]>([]);
-  const [registrandoGasto, setRegistrandoGasto] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
-
   useEffect(() => {
     let cancelado = false;
     (async () => {
@@ -80,6 +79,120 @@ function MarketingPage() {
       cancelado = true;
     };
   }, []);
+  return marcas;
+}
+
+// ─── LA PORTADA NUEVA: TIENDAS · MARCAS · IMPULSADORAS · MOBILIARIO ──────────
+
+function MarketingPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  // Contabilidad entra a mirar (23-sep-2026); quién escribe lo decide la
+  // portada con `puedeEscribirMarketing`.
+  const { authChecked, role } = useAuth({
+    moduleKey: "marketing",
+    allowedRoles: [...ROLES_MARKETING],
+  });
+  const marcas = useMarcas();
+  const [registrandoGasto, setRegistrandoGasto] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const proyectoParam = searchParams.get("proyecto");
+  const vistaRaw = searchParams.get("vista");
+  // `bloque`/`proveedor` son de la URL vieja (la lista vivía acá): redirigen.
+  const bloqueRaw = searchParams.get("bloque") ?? searchParams.get("proveedor");
+  const bloqueParam = esBloqueKey(bloqueRaw) ? bloqueRaw : null;
+
+  // 🔴 Un `?proyecto=<id>` viejo va a la ficha de la tienda de ese proyecto.
+  // Con `?bloque=` se deja que el redirect de abajo lo lleve a la marca, que
+  // a su vez redirige (la marca también lee `?proyecto=`).
+  const redirigiendoProyecto = useRedirigirProyectoViejo(bloqueParam ? null : proyectoParam);
+
+  // Enlaces viejos, UNA sola puerta de redirect: `?vista=` (Reportes se fue,
+  // Impulsadoras es una pestaña), la papelera, y `?bloque=` (nivel 2).
+  useEffect(() => {
+    const destinoLegacy =
+      vistaRaw !== null
+        ? destinoDeVistaVieja(vistaRaw)
+        : bloqueParam
+          ? `/marketing/${slugDeMarca(bloqueParam, marcas)}${
+              proyectoParam ? `?proyecto=${encodeURIComponent(proyectoParam)}` : ""
+            }`
+          : null;
+    if (destinoLegacy) router.replace(destinoLegacy);
+  }, [vistaRaw, bloqueParam, proyectoParam, marcas, router]);
+
+  if (!authChecked) return null;
+  if (redirigiendoProyecto) return null;
+
+  const refrescar = () => setRefreshKey((k) => k + 1);
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <AppHeader module="Marketing" breadcrumbs={[]} />
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+        <PortadaTiendasYMarcas
+          role={role}
+          marcas={marcas}
+          refreshKey={refreshKey}
+          onRegistrarGasto={() => setRegistrandoGasto(true)}
+          onSelectBloque={(key) =>
+            // Drill-down con push: el nivel 2 es otra página y Atrás vuelve
+            // acá (candado navegacion-atras-fluido).
+            router.push(`/marketing/${slugDeMarca(key, marcas)}`)
+          }
+          onSelectCerrado={(key, periodoId) =>
+            router.push(`/marketing/${slugDeMarca(key, marcas)}/${periodoId}`)
+          }
+        />
+      </main>
+
+      {registrandoGasto && (
+        <RegistrarGastoModal
+          marcas={marcas}
+          onClose={() => setRegistrandoGasto(false)}
+          onSaved={() => {
+            setRegistrandoGasto(false);
+            refrescar();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── LA PANTALLA DE ANTES (interruptor en `false`), INTACTA ──────────────────
+//
+// Marketing se organizaba por MARCA, en TRES NIVELES con URL propia
+// (12-ago-2026 — mockup aprobado por Daniel):
+//
+//   /marketing                        → nivel 1: las marcas
+//   /marketing?vista=reportes         → reportes (reemplaza el inicio)
+//   /marketing?vista=impulsadoras     → impulsadoras (reemplaza el inicio)
+//
+// Daniel, textual: *"quiero que dentro de cada marca aparezca 'periodo uno'
+// periodo dos, y dentro de cada periodo la info… que este ordenado"*.
+
+function MarketingPageDeAntes() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { authChecked } = useAuth({
+    moduleKey: "marketing",
+    allowedRoles: [...ROLES_MARKETING],
+  });
+
+  const proyectoParam = searchParams.get("proyecto");
+  const bloqueRaw = searchParams.get("bloque") ?? searchParams.get("proveedor");
+  const bloqueParam = esBloqueKey(bloqueRaw) ? bloqueRaw : null;
+  const vistaRaw = searchParams.get("vista");
+  const vistaParam: VistaExtra =
+    vistaRaw === "reportes" || vistaRaw === "impulsadoras"
+      ? (vistaRaw as VistaExtra)
+      : null;
+
+  const marcas = useMarcas();
+  const [registrandoGasto, setRegistrandoGasto] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const navegar = useCallback(
     (next: { vista?: VistaExtra }) => {

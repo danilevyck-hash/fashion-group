@@ -13,6 +13,7 @@
 // ============================================================================
 
 import type { KeyboardEvent, ReactNode } from "react";
+import Link from "next/link";
 
 export function ListaCard({
   titulo,
@@ -43,6 +44,7 @@ export function FilaNivel({
   monto,
   acciones,
   onClick,
+  href,
   ariaLabel,
 }: {
   /** Chip de estado (ABIERTO/CERRADO) antes del título. */
@@ -54,9 +56,16 @@ export function FilaNivel({
   /** Botones propios de la fila (ZIP, ···). No disparan el onClick de la fila. */
   acciones?: ReactNode;
   onClick?: () => void;
+  /**
+   * 🔴 UNA FILA QUE LLEVA A OTRA PANTALLA ES UN ENLACE (23-sep-2026, Tiendas
+   * y Marcas): con `href` la fila se dibuja como `<a>` —se abre en otra
+   * pestaña, se copia, la lee un lector de pantalla— en vez de un div con
+   * `onClick`. Sin `href`, la fila de siempre.
+   */
+  href?: string;
   ariaLabel?: string;
 }) {
-  const tocable = !!onClick;
+  const tocable = !!onClick || !!href;
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!tocable) return;
     if (e.key === "Enter" || e.key === " ") {
@@ -64,17 +73,11 @@ export function FilaNivel({
       onClick?.();
     }
   };
-  return (
-    <div
-      role={tocable ? "button" : undefined}
-      tabIndex={tocable ? 0 : undefined}
-      aria-label={ariaLabel}
-      onClick={onClick}
-      onKeyDown={onKeyDown}
-      className={`flex items-center gap-3 px-4 sm:px-5 py-3 min-h-[56px] ${
-        tocable ? "cursor-pointer hover:bg-gray-50 transition-colors" : ""
-      }`}
-    >
+  const clase = `flex items-center gap-3 px-4 sm:px-5 py-3 min-h-[56px] ${
+    tocable ? "cursor-pointer hover:bg-gray-50 transition-colors" : ""
+  }`;
+  const adentro = (
+    <>
       {chip}
       <div className="flex-1 min-w-0">
         <div className="font-semibold text-gray-900 text-[15px] break-words">
@@ -98,6 +101,25 @@ export function FilaNivel({
         </div>
       )}
       {tocable && <span className="text-gray-400 shrink-0">›</span>}
+    </>
+  );
+  if (href) {
+    return (
+      <Link href={href} aria-label={ariaLabel} className={`${clase} text-inherit no-underline`}>
+        {adentro}
+      </Link>
+    );
+  }
+  return (
+    <div
+      role={tocable ? "button" : undefined}
+      tabIndex={tocable ? 0 : undefined}
+      aria-label={ariaLabel}
+      onClick={onClick}
+      onKeyDown={onKeyDown}
+      className={clase}
+    >
+      {adentro}
     </div>
   );
 }

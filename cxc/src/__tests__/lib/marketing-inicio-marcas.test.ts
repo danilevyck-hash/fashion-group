@@ -532,6 +532,11 @@ describe("barrido estático", () => {
     expect(src).toContain("no está duplicado");
   });
 
+  // 23-sep-2026 · NOTA FECHADA — con Tiendas y Marcas (`MARKETING_TIENDAS_Y_
+  // MARCAS`) «Reportes» DESAPARECIÓ de la pantalla: por tienda es la pestaña
+  // Tiendas y por marca es la página de la marca. Las tres puertas de abajo
+  // siguen en la pantalla DE ANTES (`InicioDeAntes` / `MarketingPageDeAntes`),
+  // que vive intacta detrás del interruptor; es eso lo que este caso vigila.
   it("Mobiliario, Impulsadoras y Reportes se abren desde el inicio", () => {
     // 🔴 Reportes: la tarjeta del inicio es su ÚNICA puerta desde la poda del
     // 11-ago-2026 (el enlace de la lista de marca se retiró). Quitarla dejaría

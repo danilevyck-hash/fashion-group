@@ -140,7 +140,12 @@ describe("el permiso prestado se retiró sin cerrarle la puerta a nadie", () => 
     // («catalogo para david si, solo eso») y su fila de `role_permissions` dice
     // ["boston"] hasta que corra la DDL 20260902130000. Entrada DELIBERADA, con
     // su fecha de retiro escrita, igual que las otras dos.
-    expect(Object.keys(MODULO_HEREDA_PERMISO_DE).sort()).toEqual(["catalogos", "comisiones", "referencia"]);
+    // 🔴 `marketing → gastos-contabilidad` entra el 23-sep-2026: contabilidad
+    // gana Marketing solo a MIRAR (Daniel: «contabilidad, admin y secres») y su
+    // fila de `role_permissions` no trae la key hasta que corra la DDL
+    // 20261218120100. Entrada DELIBERADA, con su fecha de retiro escrita.
+    expect(Object.keys(MODULO_HEREDA_PERMISO_DE).sort()).toEqual(["catalogos", "comisiones", "marketing", "referencia"]);
+    expect(MODULO_HEREDA_PERMISO_DE["marketing"]).toBe("gastos-contabilidad");
     expect(MODULO_HEREDA_PERMISO_DE["catalogos"]).toBe("boston");
     expect(MODULO_HEREDA_PERMISO_DE["saldos-banco"]).toBeUndefined();
     expect(MODULO_HEREDA_PERMISO_DE["referencia"]).toBe("catalogos");
@@ -168,8 +173,12 @@ describe("el permiso prestado se retiró sin cerrarle la puerta a nadie", () => 
     // desde `ventas` del 25-ago-2026 (ver comisiones-contabilidad.test.tsx),
     // que es justamente lo que hace que la ficha se encienda ANTES de que
     // Daniel corra la DDL a mano. Deliberado.
+    // 23-sep-2026 · NOTA FECHADA — `marketing` entra por el MISMO mecanismo:
+    // hereda de `gastos-contabilidad` mientras la DDL 20261218120100 no corra
+    // (Daniel: lo ven «contabilidad, admin y secres»; entra a MIRAR). Candado:
+    // `marketing-tiendas-y-marcas`.
     expect(visibles.sort()).toEqual(
-      ["asistencia", "comisiones", "gastos-contabilidad", "prestamos", "proveedores", "ventas"].sort(),
+      ["asistencia", "comisiones", "gastos-contabilidad", "marketing", "prestamos", "proveedores", "ventas"].sort(),
     );
   });
 

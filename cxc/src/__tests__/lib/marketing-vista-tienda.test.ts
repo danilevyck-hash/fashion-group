@@ -68,7 +68,15 @@ const RUTA_DATOS = "src/app/api/marketing/tienda/[codigo]/datos.ts";
 const RUTA_API = "src/app/api/marketing/tienda/[codigo]/route.ts";
 const RUTA_FOTOS = "src/app/api/marketing/tienda/[codigo]/fotos/route.ts";
 const RUTA_PAGINA = "src/app/marketing/tienda/[codigo]/page.tsx";
-const RUTA_VISTA = "src/app/marketing/tienda/[codigo]/VistaTienda.tsx";
+// 23-sep-2026 · NOTA FECHADA — `VistaTienda.tsx` pasó a ser el envoltorio
+// (la sesión y el interruptor `MARKETING_TIENDAS_Y_MARCAS`); las DOS pantallas
+// que dibujan la plata son la de antes (`VistaTiendaAnterior.tsx`, una tabla
+// por marca) y la ficha nueva (`FichaTienda.tsx`, una sola lista). La regla
+// —no sumar por su cuenta— se exige en las dos.
+const RUTAS_VISTA = [
+  "src/app/marketing/tienda/[codigo]/VistaTiendaAnterior.tsx",
+  "src/app/marketing/tienda/[codigo]/FichaTienda.tsx",
+];
 const RUTA_BUSCADOR = "src/app/api/search/route.ts";
 const RUTA_SEARCHBAR = "src/components/SearchBar.tsx";
 const RUTA_PROYECTOS = "src/app/api/marketing/proyectos-lista/route.ts";
@@ -143,9 +151,11 @@ describe("1. la vista agrupa por marca y el total es solo de lo reportado", () =
   });
 
   it("la pantalla no suma por su cuenta: el total sale de `totalDeLaTienda`", () => {
-    const src = codigo(RUTA_VISTA);
-    expect(src).toMatch(/totales\.reportado/);
-    expect(src).not.toMatch(/\.reduce\(/); // ninguna suma a mano en la vista
+    for (const ruta of RUTAS_VISTA) {
+      const src = codigo(ruta);
+      expect(src, ruta).toMatch(/totales\.reportado/);
+      expect(src, ruta).not.toMatch(/\.reduce\(/); // ninguna suma a mano en la vista
+    }
     const datos = codigo(RUTA_DATOS);
     expect(datos).toMatch(/totalDeLaTienda\(/);
     expect(datos).toMatch(/agruparPorMarca\(/);

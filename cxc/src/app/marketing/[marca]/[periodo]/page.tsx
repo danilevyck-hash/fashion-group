@@ -22,9 +22,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { seccionPorSlug } from "@/lib/marketing/lista-por-periodo";
+import { ROLES_MARKETING, puedeEscribirMarketing } from "@/lib/marketing/roles";
+import { MARKETING_TIENDAS_Y_MARCAS } from "@/lib/marketing/tiendas-y-marcas";
 import RegistrarGastoModal from "../../components/RegistrarGastoModal";
 import ProyectoOverlay from "../../components/ProyectoOverlay";
 import DetallePeriodoView from "../../components/DetallePeriodoView";
+import { useRedirigirProyectoViejo } from "../../components/useProyectoViejo";
 import {
   useMarcaPeriodos,
   useMarcasCatalogo,
@@ -51,9 +54,9 @@ function PeriodoPage({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { authChecked } = useAuth({
+  const { authChecked, role } = useAuth({
     moduleKey: "marketing",
-    allowedRoles: ["admin", "secretaria"],
+    allowedRoles: [...ROLES_MARKETING],
   });
 
   const [busqueda, setBusqueda] = useState("");
@@ -68,6 +71,9 @@ function PeriodoPage({
   );
 
   const proyectoParam = searchParams.get("proyecto");
+  // 🔴 Con Tiendas y Marcas (23-sep-2026) el overlay del proyecto se retiró:
+  // un `?proyecto=` viejo redirige a la ficha de la tienda de ese proyecto.
+  const redirigiendoProyecto = useRedirigirProyectoViejo(proyectoParam);
   const rutaPeriodo = `/marketing/${marcaSlug}/${periodoSlug}`;
 
   useEffect(() => {
@@ -76,6 +82,7 @@ function PeriodoPage({
   }, [busqueda]);
 
   if (!authChecked) return null;
+  if (redirigiendoProyecto) return null;
 
   const marca = datos?.marca ?? null;
   const secciones = datos?.secciones ?? null;
@@ -90,8 +97,9 @@ function PeriodoPage({
     ) ?? null;
   const seccion = secciones ? seccionPorSlug(secciones, periodoSlug) : null;
   // Con UN solo período el nivel 2 redirige acá: volver tiene que ir al
-  // inicio, no rebotar contra el redirect.
-  const haySeleccionDePeriodos = (secciones?.length ?? 0) > 1;
+  // inicio, no rebotar contra el redirect. Con Tiendas y Marcas el nivel 2
+  // ya no redirige: siempre se vuelve a la marca.
+  const haySeleccionDePeriodos = MARKETING_TIENDAS_Y_MARCAS || (secciones?.length ?? 0) > 1;
   const volverLabel = haySeleccionDePeriodos && marca ? marca.nombre : "Marketing";
   const volverHref = haySeleccionDePeriodos
     ? `/marketing/${marcaSlug}`
@@ -159,8 +167,9 @@ function PeriodoPage({
               }
               onRegistrarGasto={() => setRegistrandoGasto(true)}
               recargar={recargar}
+              soloLectura={!puedeEscribirMarketing(role)}
             />
-            {proyectoParam && (
+            {proyectoParam && !MARKETING_TIENDAS_Y_MARCAS && (
               <ProyectoOverlay
                 proyectoId={proyectoParam}
                 // El contexto de la marca/período desde el que se abrió: la

@@ -24,6 +24,8 @@ import {
   type GrupoPorMarca,
 } from "@/lib/marketing/vista-tienda";
 import type { TotalesDelPeriodo } from "@/lib/marketing/periodo-estado";
+import { MARKETING_TIENDAS_Y_MARCAS } from "@/lib/marketing/tiendas-y-marcas";
+import { etiquetaMes } from "@/lib/marketing/meses";
 
 export interface DatosDeLaTienda {
   /** El código pedido, ya normalizado. `null` = el cajón «General». */
@@ -37,6 +39,14 @@ export interface DatosDeLaTienda {
   fotos: number;
   /** `true` cuando la base todavía no tiene las columnas del rediseño. */
   sinMigracion: boolean;
+  /**
+   * 🔴 LA FICHA COMO UNA LISTA (23-sep-2026, Tiendas y Marcas): las mismas
+   * filas de `grupos`, planas y con lo que la tabla nueva necesita (N°,
+   * subtotal, ITBMS, si tiene PDF…), y aparte las ANULADAS, que se ven
+   * plegadas y nunca suman. Solo con el interruptor; sin él, listas vacías.
+   */
+  filas: FilaDeTienda[];
+  anuladas: FilaDeTienda[];
 }
 
 type Fila = Record<string, unknown>;
@@ -64,6 +74,8 @@ export async function leerDatosDeLaTienda(codigoCrudo: string): Promise<DatosDeL
     totales: { reportado: 0, noReportado: 0, cantidadReportada: 0, cantidadNoReportada: 0 },
     fotos: 0,
     sinMigracion,
+    filas: [],
+    anuladas: [],
   });
 
   // ── El nombre: del directorio, por CÓDIGO ──────────────────────────────────
@@ -87,15 +99,17 @@ export async function leerDatosDeLaTienda(codigoCrudo: string): Promise<DatosDeL
     : rotuloDeLaTienda({ codigo, nombre: nombreDirectorio });
 
   // ── Las facturas y los pagos de impulsadora ────────────────────────────────
-  const facturasQ = supabaseServer
-    .from("mk_facturas")
-    .select(
-      "id, numero_factura, fecha_factura, proveedor, concepto, total, impulsadora_id, periodo_desde, se_reporta, tienda_codigo, nota",
-    )
-    .is("anulado_en", null);
+  // Con el interruptor de Tiendas y Marcas vienen TAMBIÉN las anuladas (la
+  // ficha las pliega) y las columnas que la lista nueva dibuja. Sin él, las
+  // vivas de siempre y nada más.
+  const columnasFactura: string = MARKETING_TIENDAS_Y_MARCAS
+    ? "id, numero_factura, fecha_factura, proveedor, concepto, total, subtotal, itbms, impulsadora_id, impulsadora_mes, periodo_desde, se_reporta, tienda_codigo, nota, anulado_en, anulado_motivo, proyecto_id"
+    : "id, numero_factura, fecha_factura, proveedor, concepto, total, impulsadora_id, periodo_desde, se_reporta, tienda_codigo, nota";
+  const facturasQ = supabaseServer.from("mk_facturas").select(columnasFactura);
+  const facturasVivasQ = MARKETING_TIENDAS_Y_MARCAS ? facturasQ : facturasQ.is("anulado_en", null);
   const facturasRes = await (codigo
-    ? facturasQ.eq("tienda_codigo", codigo)
-    : facturasQ.is("tienda_codigo", null));
+    ? facturasVivasQ.eq("tienda_codigo", codigo)
+    : facturasVivasQ.is("tienda_codigo", null));
   if (facturasRes.error) {
     if (esColumnaAusente(facturasRes.error)) return vacio(true, nombre, enElDirectorio);
     throw new Error(facturasRes.error.message);
@@ -104,7 +118,7 @@ export async function leerDatosDeLaTienda(codigoCrudo: string): Promise<DatosDeL
   // ── Los muebles entregados ─────────────────────────────────────────────────
   const entregasQ = supabaseServer
     .from("mk_entregas_muebles")
-    .select("id, total, total_por_marca, notas, created_at, se_reporta, tienda_codigo, nota");
+    .select("id, total, total_por_marca, notas, created_at, se_reporta, tienda_codigo, nota, proyecto_id");
   const entregasRes = await (codigo
     ? entregasQ.eq("tienda_codigo", codigo)
     : entregasQ.is("tienda_codigo", null));
@@ -113,17 +127,19 @@ export async function leerDatosDeLaTienda(codigoCrudo: string): Promise<DatosDeL
     throw new Error(entregasRes.error.message);
   }
 
-  const facturas = (facturasRes.data ?? []).map((f) => completarGasto(f as Fila));
+  const todasLasFacturas = ((facturasRes.data ?? []) as unknown as Fila[]).map((f) => completarGasto(f));
+  const facturas = todasLasFacturas.filter((f) => !f.anulado_en);
+  const facturasAnuladas = todasLasFacturas.filter((f) => !!f.anulado_en);
   const entregas = (entregasRes.data ?? []).map((e) => completarGasto(e as Fila));
 
-  const idsFactura = facturas.map((f) => String(f.id));
+  const idsFactura = todasLasFacturas.map((f) => String(f.id));
   const idsEntrega = entregas.map((e) => String(e.id));
 
   // ── Las marcas, el sello del período y los nombres de las impulsadoras ─────
   const idsImpulsadora = [
     ...new Set(facturas.map((f) => String(f.impulsadora_id ?? "")).filter((x) => x.length > 0)),
   ];
-  const [marcasRes, facturaMarcasRes, sellosRes, impulsadorasRes, fotosRes] = await Promise.all([
+  const [marcasRes, facturaMarcasRes, sellosRes, impulsadorasRes, fotosRes, pdfRes] = await Promise.all([
     supabaseServer.from("mk_marcas").select("id, codigo, nombre"),
     idsFactura.length > 0
       ? supabaseServer.from("mk_factura_marcas").select("factura_id, marca_id").in("factura_id", idsFactura)
@@ -144,7 +160,18 @@ export async function leerDatosDeLaTienda(codigoCrudo: string): Promise<DatosDeL
           .eq("tipo", "foto_proyecto")
           .eq("tienda_codigo", codigo)
       : Promise.resolve({ count: 0, error: null } as { count: number | null; error: null }),
+    // Qué facturas tienen su PDF (o foto) adjunto: el botón «PDF» de la fila.
+    MARKETING_TIENDAS_Y_MARCAS && idsFactura.length > 0
+      ? supabaseServer
+          .from("mk_adjuntos")
+          .select("factura_id")
+          .in("factura_id", idsFactura)
+          .in("tipo", ["pdf_factura", "foto_factura"])
+      : Promise.resolve({ data: [], error: null }),
   ]);
+  const facturasConPdf = new Set(
+    ((pdfRes as { data?: Fila[] | null }).data ?? []).map((a) => String(a.factura_id)),
+  );
 
   const marcaPorId = new Map<string, { codigo: string; nombre: string }>();
   for (const m of (marcasRes.data ?? []) as Fila[]) {
@@ -192,7 +219,7 @@ export async function leerDatosDeLaTienda(codigoCrudo: string): Promise<DatosDeL
   // ── Las filas ──────────────────────────────────────────────────────────────
   const filas: FilaDeTienda[] = [];
 
-  for (const f of facturas) {
+  const filaDeFactura = (f: Fila): FilaDeTienda => {
     const id = String(f.id);
     const marca = marcaPorId.get(marcaDeFactura.get(id) ?? "");
     const impulsadoraId = String(f.impulsadora_id ?? "");
@@ -200,7 +227,8 @@ export async function leerDatosDeLaTienda(codigoCrudo: string): Promise<DatosDeL
     const numero = String(f.numero_factura ?? "").trim();
     const concepto = String(f.concepto ?? "").trim();
     const nota = String(f.nota ?? "").trim();
-    filas.push({
+    const mesImpulsadora = soloElDia(f.impulsadora_mes ?? f.periodo_desde ?? "");
+    return {
       id,
       tipo,
       marcaCodigo: marca?.codigo ?? "",
@@ -216,8 +244,29 @@ export async function leerDatosDeLaTienda(codigoCrudo: string): Promise<DatosDeL
       ),
       seReporta: seReportaDe(f.se_reporta),
       ...delPeriodo(id),
-    });
-  }
+      // Lo de más para la ficha como UNA lista (solo con el interruptor).
+      ...(MARKETING_TIENDAS_Y_MARCAS
+        ? {
+            numero,
+            subtotal: num(f.subtotal),
+            itbms: num(f.itbms),
+            concepto,
+            nota,
+            mes:
+              tipo === "impulsadora" && /^\d{4}-\d{2}/.test(mesImpulsadora)
+                ? etiquetaMes(mesImpulsadora)
+                : undefined,
+            tienePdf: facturasConPdf.has(id),
+            anulada: !!f.anulado_en,
+            anuladoMotivo: String(f.anulado_motivo ?? "").trim() || undefined,
+            proyectoId: f.proyecto_id ? String(f.proyecto_id) : null,
+          }
+        : {}),
+    };
+  };
+
+  for (const f of facturas) filas.push(filaDeFactura(f));
+  const anuladas: FilaDeTienda[] = facturasAnuladas.map(filaDeFactura);
 
   for (const e of entregas) {
     const id = String(e.id);
@@ -240,6 +289,9 @@ export async function leerDatosDeLaTienda(codigoCrudo: string): Promise<DatosDeL
       fecha: soloElDia(e.created_at),
       seReporta: seReportaDe(e.se_reporta),
       ...delPeriodo(id),
+      ...(MARKETING_TIENDAS_Y_MARCAS
+        ? { concepto: notas, nota, proyectoId: e.proyecto_id ? String(e.proyecto_id) : null }
+        : {}),
     });
   }
 
@@ -252,5 +304,7 @@ export async function leerDatosDeLaTienda(codigoCrudo: string): Promise<DatosDeL
     totales: totalDeLaTienda(grupos),
     fotos: Number((fotosRes as { count?: number | null }).count ?? 0),
     sinMigracion: false,
+    filas: MARKETING_TIENDAS_Y_MARCAS ? filas : [],
+    anuladas: MARKETING_TIENDAS_Y_MARCAS ? anuladas : [],
   };
 }

@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
+import { ROLES_MARKETING } from "@/lib/marketing/roles";
 import { supabaseServer } from "@/lib/supabase-server";
 import { firmarAdjuntos } from "@/lib/marketing/storage";
 import { esColumnaAusente, sinColumnasDelRediseno } from "@/lib/marketing/columnas-opcionales";
@@ -27,7 +28,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { codigo: string } },
 ) {
-  const auth = requireRole(req, ["admin", "secretaria"]);
+  const auth = requireRole(req, [...ROLES_MARKETING]);
   if (auth instanceof NextResponse) return auth;
   if (!VISTA_TIENDA) {
     return NextResponse.json({ error: "No disponible" }, { status: 404 });

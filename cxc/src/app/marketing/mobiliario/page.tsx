@@ -31,7 +31,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
+import { ROLES_MARKETING } from "@/lib/marketing/roles";
+import { MARKETING_TIENDAS_Y_MARCAS, type FilaTienda } from "@/lib/marketing/tiendas-y-marcas";
+import { hrefDeTienda } from "@/lib/marketing/vista-tienda";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useToast } from "@/components/ToastSystem";
 import { ConfirmDeleteModal, ConfirmModal } from "@/components/ui";
@@ -78,9 +82,43 @@ export default function MobiliarioPage() {
   const router = useRouter();
   const { authChecked, role } = useAuth({
     moduleKey: "marketing",
-    allowedRoles: ["admin", "secretaria"],
+    allowedRoles: [...ROLES_MARKETING],
   });
   const { toast } = useToast();
+  // 🔴 EL NOMBRE DE LA TIENDA SALE DEL DIRECTORIO, por código (23-sep-2026):
+  // la lista de tiendas con gasto ya lo trae; acá solo se mira. Si la lectura
+  // se cae, queda el texto del proyecto de siempre (falla ABIERTA).
+  const [nombrePorCodigo, setNombrePorCodigo] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    if (!MARKETING_TIENDAS_Y_MARCAS) return;
+    let cancelado = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/marketing/tiendas", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { filas?: FilaTienda[] };
+        const m = new Map<string, string>();
+        for (const f of data.filas ?? []) if (f.codigo) m.set(f.codigo.toUpperCase(), f.nombre);
+        if (!cancelado) setNombrePorCodigo(m);
+      } catch {
+        /* se queda el nombre del proyecto */
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+  /** El nombre que se dibuja, y la ficha a la que lleva (si la tienda tiene código). */
+  const tiendaEnPantalla = (f: { tienda: string; tiendaCodigo: string | null }) => {
+    const codigo = f.tiendaCodigo?.toUpperCase() ?? null;
+    const nombre = (codigo && MARKETING_TIENDAS_Y_MARCAS ? nombrePorCodigo.get(codigo) : undefined) ?? f.tienda;
+    if (!codigo || !MARKETING_TIENDAS_Y_MARCAS) return <>{nombre}</>;
+    return (
+      <Link href={hrefDeTienda(codigo)} className="hover:underline underline-offset-2">
+        {nombre}
+      </Link>
+    );
+  };
 
   const [productos, setProductos] = useState<MkInventarioProducto[]>([]);
   const [entregas, setEntregas] = useState<EntregaConItems[]>([]);
@@ -483,7 +521,8 @@ export default function MobiliarioPage() {
               onClick={() => router.push("/marketing")}
               className="text-sm text-gray-600 hover:text-black transition inline-flex items-center gap-1 min-h-[44px] -mt-2"
             >
-              ← Proyectos
+              {/* «← Proyectos» era del modelo viejo (23-sep-2026): se vuelve a Marketing. */}
+              ‹ Marketing
             </button>
             <h1 className="text-xl font-semibold text-gray-900">
               Mobiliario
@@ -795,7 +834,7 @@ export default function MobiliarioPage() {
                       data-fg-campo="cliente"
                       className="text-sm font-medium text-gray-900 break-words"
                     >
-                      {f.tienda}
+                      {tiendaEnPantalla(f)}
                     </div>
                     <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
                       <Dato
@@ -928,7 +967,7 @@ export default function MobiliarioPage() {
                         className="border-t border-gray-100 hover:bg-gray-50 transition-colors"
                       >
                         <td data-fg-campo="cliente" className="px-3 py-2 text-gray-900">
-                          {f.tienda}
+                          {tiendaEnPantalla(f)}
                         </td>
                         <td data-fg-campo="paneles" className="px-3 py-2 text-right font-mono tabular-nums text-gray-700">
                           {f.totalPaneles > 0 ? (

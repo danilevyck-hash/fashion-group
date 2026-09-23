@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
+import { ROLES_MARKETING } from "@/lib/marketing/roles";
 import {
   esFaltaDeTablas,
   getPeriodo,
@@ -33,7 +34,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const auth = requireRole(req, ["admin", "secretaria"]);
+  const auth = requireRole(req, [...ROLES_MARKETING]);
   if (auth instanceof NextResponse) return auth;
   if (!uuidRegex.test(params.id)) {
     return NextResponse.json({ error: "Período inválido" }, { status: 400 });

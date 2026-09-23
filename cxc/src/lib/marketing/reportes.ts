@@ -24,6 +24,11 @@ import type { MkMarca } from "./types";
 import { conRespaldoSinColumnas, completarGasto } from "./columnas-opcionales";
 import { marcasDeEntrega, porcionEntregaParaMarca } from "./resumen-inicio";
 import {
+  MARKETING_TIENDAS_Y_MARCAS,
+  gastoEsDeMultifashion,
+  sinMultifashion,
+} from "./tiendas-y-marcas";
+import {
   partesPorMarca,
   reportePorMarcaDe,
   reportePorTiendaDe,
@@ -368,10 +373,16 @@ async function cargarGastosDelRediseno(): Promise<{
   for (const m of marcas) nombres[String(m.codigo ?? "").trim().toUpperCase()] = m.nombre;
 
   // La tienda del gasto; sin ella (la migración sin correr), la del proyecto.
+  // 🔴 Y si el gasto es de Multifashion (por su tienda o por su proyecto), se
+  // dice: por marca no se le cobra a nadie (23-sep-2026).
   const tiendaDe = (fila: { tienda_codigo?: string | null; proyecto_id: string | null }) => {
     const p = fila.proyecto_id ? proyectos.get(String(fila.proyecto_id)) : undefined;
-    const codigo = fila.tienda_codigo ?? p?.tienda_codigo ?? null;
-    return { codigo, nombre: p?.tienda ?? null };
+    const codigo = (fila.tienda_codigo ?? p?.tienda_codigo ?? null)?.toString().trim().toUpperCase() || null;
+    return {
+      codigo,
+      nombre: p?.tienda ?? null,
+      esMultifashion: gastoEsDeMultifashion({ tiendaCodigo: codigo, proyecto: p ?? null }),
+    };
   };
 
   const marcasPorFactura = new Map<string, Array<{ marcaId: string }>>();
@@ -397,6 +408,7 @@ async function cargarGastosDelRediseno(): Promise<{
         monto: parte.monto,
         seReporta: f.se_reporta,
         fecha: (f.impulsadora_id ? f.impulsadora_mes : f.fecha_factura) ?? f.fecha_factura,
+        esTiendaPropia: tienda.esMultifashion,
       });
     }
   }
@@ -417,16 +429,49 @@ async function cargarGastosDelRediseno(): Promise<{
         monto,
         seReporta: e.se_reporta,
         fecha: e.created_at ? String(e.created_at).slice(0, 10) : null,
+        esTiendaPropia: tienda.esMultifashion,
       });
+    }
+  }
+  // 🔴 EL NOMBRE DE LA TIENDA SALE DEL DIRECTORIO, POR CÓDIGO (23-sep-2026).
+  // 🩸 Salía de `mk_proyectos.tienda` (texto libre): «City Mall Pasocanoa»,
+  // «Nova Lux, S.a.», «La Frontera Dutty Free» — tres grafías para la misma
+  // tienda según la pantalla. Con el interruptor, el nombre es el de
+  // `clientes_master`; si la lectura se cae, queda el de antes (falla ABIERTA).
+  if (MARKETING_TIENDAS_Y_MARCAS) {
+    const codigos = [...new Set(gastos.map((g) => g.tiendaCodigo).filter((c): c is string => !!c))];
+    if (codigos.length > 0) {
+      const { data } = await supabaseServer
+        .from("clientes_master")
+        .select("codigo, nombre")
+        .in("codigo", codigos);
+      const nombrePorCodigo = new Map<string, string>();
+      for (const c of (data ?? []) as Array<{ codigo: string; nombre: string | null }>) {
+        const nombre = String(c.nombre ?? "").trim();
+        if (nombre.length > 0) nombrePorCodigo.set(String(c.codigo).toUpperCase(), nombre);
+      }
+      for (const g of gastos) {
+        const nombre = g.tiendaCodigo ? nombrePorCodigo.get(g.tiendaCodigo) : undefined;
+        if (nombre) g.tiendaNombre = nombre;
+      }
     }
   }
   return { gastos, nombres };
 }
 
-/** Por marca, el rediseño: UN total (lo reportado) por marca, sin pie. */
+/**
+ * Por marca, el rediseño: UN total (lo reportado) por marca, sin pie.
+ *
+ * 🔴 SIN MULTIFASHION (23-sep-2026). 🩸 Por marca sumaba los gastos de la
+ * tienda propia a Tommy ($1.319,25) y a Calvin ($2.477,58): si esos números
+ * salían del sistema, se le reportaba a PVH gasto de la tienda propia. Es la
+ * MISMA regla de la portada de marcas y del ZIP (`MULTIFASHION_KEY` aparte).
+ * Por tienda no cambia: ahí Multifashion es una fila más.
+ */
 export async function reportePorMarcaRediseno(anio?: number): Promise<ReporteMarcaFila[]> {
   const { gastos, nombres } = await cargarGastosDelRediseno();
-  return reportePorMarcaDe(gastos, nombres, anio);
+  const base = MARKETING_TIENDAS_Y_MARCAS ? sinMultifashion(gastos) : gastos;
+  return reportePorMarcaDe(base, nombres, anio);
 }
 
 /** Por tienda, el rediseño: la tienda del GASTO, «General» al final. */

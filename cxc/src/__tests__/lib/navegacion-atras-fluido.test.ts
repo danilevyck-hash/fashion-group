@@ -25,23 +25,33 @@ const leer = (rel: string) => readFileSync(join(process.cwd(), rel), "utf8");
 describe("Marketing: el drill-down APILA historial", () => {
   const fuente = leer("src/app/marketing/page.tsx");
 
+  // 23-sep-2026 · NOTA FECHADA — con Tiendas y Marcas la página raíz tiene DOS
+  // pantallas en el mismo archivo (`MarketingPage`, la nueva, y
+  // `MarketingPageDeAntes`, intacta detrás del interruptor). `navegar()` vive
+  // en la de antes; se recorta desde su `const navegar` hasta el `const
+  // refrescar` que le SIGUE, no el primero del archivo.
   it("navegar() usa router.push (con replace, Atrás desde la marca caía en Inicio)", () => {
     // La función navegar es la única puerta de navegación interna del módulo.
-    const navegar = fuente.slice(
-      fuente.indexOf("const navegar"),
-      fuente.indexOf("const refrescar"),
-    );
+    const desde = fuente.indexOf("const navegar");
+    const navegar = fuente.slice(desde, fuente.indexOf("const refrescar", desde));
     expect(navegar).toContain("router.push(");
     expect(navegar).not.toContain("router.replace(");
   });
 
-  it("el único router.replace que queda es el redirect de enlaces viejos (papelera/anulados)", () => {
+  // 23-sep-2026 · NOTA FECHADA — son DOS `router.replace(`, uno por pantalla,
+  // y los dos son el redirect de enlaces viejos (`destinoLegacy`: `?vista=`,
+  // `?bloque=`, papelera). Ninguno es navegación normal.
+  it("todo router.replace que queda es el redirect de enlaces viejos", () => {
     const usos = fuente.split("router.replace(").length - 1;
-    expect(usos).toBe(1);
-    // Y está en el efecto del redirect legacy, no en la navegación normal.
-    const idx = fuente.indexOf("router.replace(");
-    const contexto = fuente.slice(Math.max(0, idx - 400), idx);
-    expect(contexto).toContain("papelera");
+    expect(usos).toBe(2);
+    let desde = 0;
+    for (let i = 0; i < usos; i += 1) {
+      const idx = fuente.indexOf("router.replace(", desde);
+      const contexto = fuente.slice(Math.max(0, idx - 600), idx);
+      expect(contexto).toContain("destinoLegacy");
+      desde = idx + 1;
+    }
+    expect(fuente).toContain("papelera");
   });
 });
 

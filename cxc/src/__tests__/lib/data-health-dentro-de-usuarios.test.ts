@@ -139,7 +139,10 @@ const NO_ADMIN_ESPERADO: Record<string, string[]> = {
   // comisiones"*. Cambio DELIBERADO, ajeno a esta mudanza: el candado hizo lo
   // suyo y frenó el build hasta acá. El detalle (y las mediciones) están en
   // `comisiones-contabilidad.test.tsx`.
-  contabilidad: ["proveedores", "asistencia", "gastos-contabilidad", "prestamos", "comisiones"],
+  // 23-sep-2026 · NOTA FECHADA — `marketing` entra por pedido de Daniel («lo ven
+  // contabilidad, admin y secres»): entra a MIRAR. Cambio DELIBERADO; candado
+  // `marketing-tiendas-y-marcas`.
+  contabilidad: ["proveedores", "asistencia", "gastos-contabilidad", "prestamos", "comisiones", "marketing"],
   vendedor: ["referencia", "cxc", "directorio", "catalogos", "guias"],
   gerente_acs: ["multifashion"],
 };

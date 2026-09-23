@@ -45,6 +45,7 @@ import { ROLES_CXC } from "@/lib/cxc/roles";
 import { ROLES_CLIENTES } from "@/lib/clientes/roles";
 import { catalogoRoles } from "@/lib/catalogo/roles";
 import { MODULO_PRESTAMOS, moduloPrestamosEnElMenu } from "./prestamos-una-puerta";
+import { ROLES_MARKETING } from "@/lib/marketing/roles";
 
 export type ModuleGroup =
   | "ventas-clientes"
@@ -219,7 +220,11 @@ export const ALL_MODULES: AppModule[] = [
   { key: MODULO_MARCACION, label: ROTULO_MARCACION, href: RUTA_MARCACION,    icon: Fingerprint,   roles: [...ROLES_MODULO_MARCACION],                    group: "operacion" },
   { key: "reclamos",       label: "Reclamos",          href: "/reclamos",         icon: AlertTriangle, roles: ["admin", "secretaria"],                       group: "operacion" },
   { key: "cargar",         label: "Plantilla Switch",  href: "/productos/cargar", icon: PackagePlus,   roles: ["admin", "secretaria"],                       group: "operacion" },
-  { key: "marketing",      label: "Marketing",         href: "/marketing",        icon: Megaphone,     roles: ["admin", "secretaria"],                       group: "operacion" },
+  // 🔴 Marketing lo VEN «contabilidad, admin y secres» (Daniel, 23-sep-2026):
+  // contabilidad entra a MIRAR. Los roles salen de `lib/marketing/roles.ts`
+  // (una lista para leer, otra para escribir); las rutas que escriben siguen
+  // contestando 403 a contabilidad.
+  { key: "marketing",      label: "Marketing",         href: "/marketing",        icon: Megaphone,     roles: [...ROLES_MARKETING],                           group: "operacion" },
   { key: "caja",           label: "Caja Menuda",       href: "/caja",             icon: Wallet,        roles: ["admin", "secretaria"],                       group: "operacion" },
   // "Gastos" a secas: es el ÚNICO módulo de gastos que queda, y desde el
   // 13-ago-2026 tiene DOS pestañas — *Gastos* y *Saldos de banco*. Daniel,
@@ -394,6 +399,23 @@ export const MODULO_HEREDA_PERMISO_DE: Record<string, string> = {
   //
   // Se retira cuando la DDL esté corrida (verificable en `role_permissions`).
   "catalogos": MODULO_BOSTON,
+  // 🔴 Marketing para CONTABILIDAD (23-sep-2026). Daniel: lo ven
+  // «contabilidad, admin y secres». Mientras la DDL 20261218120100 no corra,
+  // la ficha se enciende para quien ya tiene `gastos-contabilidad` —que
+  // contabilidad tiene por derecho propio, medido el 23-sep-2026:
+  //   `role_permissions.contabilidad.modulos` =
+  //   ["asistencia","prestamos","proveedores","gastos-contabilidad","comisiones"]
+  // — sin `marketing`. Mismo caso que `comisiones → ventas`: agregarle el rol
+  // al módulo, SOLO, no le pinta nada en el menú porque `fg_modules` manda.
+  //
+  // ⚠️ El recorte por `roles[]` (`fgModulesIncluye`) la acota a los roles que
+  // `marketing` declara: admin y secretaria ya lo tienen directo, y ningún
+  // otro rol con `gastos-contabilidad` está en esa lista. La página lo acepta
+  // por `allowedRoles` y el servidor solo le abre las lecturas (403 al
+  // escribir): entra a MIRAR.
+  //
+  // Se retira cuando la DDL esté corrida (verificable en `role_permissions`).
+  "marketing": "gastos-contabilidad",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

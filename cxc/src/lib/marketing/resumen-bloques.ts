@@ -170,6 +170,17 @@ export interface DetalleProyectoPeriodo {
   entregas: number;
 }
 
+/** Detalle por TIENDA·período (23-sep-2026): el mismo monto que entra en el total,
+ *  por la tienda del GASTO (`tienda_codigo`; sin ella, la del proyecto). Se acumula
+ *  en las MISMAS líneas que `detalle`. `tiendaCodigo === null` = «General». */
+export interface DetalleTiendaPeriodo {
+  bloqueKey: string;
+  seccion: string;
+  tiendaCodigo: string | null;
+  monto: number;
+  gastos: number;
+}
+
 export interface FilaPorCliente {
   cliente: string;
   clienteCodigo: string | null;
@@ -187,6 +198,8 @@ export interface ResumenBloques {
    * pasada que arma `bloques` y `cerrados` — nunca de una segunda cuenta.
    */
   detalle: DetalleProyectoPeriodo[];
+  /** Detalle por tienda·período (23-sep-2026), de la misma pasada que `detalle`. */
+  detalleTiendas: DetalleTiendaPeriodo[];
   /** Cabecera: lo gastado hoy (períodos abiertos), proyectos y clientes vivos. */
   resumen: { total: number; proyectos: number; clientes: number };
   porCliente: FilaPorCliente[];
@@ -206,6 +219,13 @@ export interface EntradaBloques {
   proyectos: ReadonlyArray<ProyectoResumenBloque>;
   /** Ids de proyectos que son Multifashion. */
   proyectosMultifashion: ReadonlySet<string>;
+  /** 🔴 Códigos de tienda que son Multifashion (D-108), 23-sep-2026: un gasto de la
+   *  puerta nueva nace SIN proyecto y CON `tienda_codigo`; sin esto caería en el bloque
+   *  de su marca. Ausente = solo por proyecto, como antes (medido: ningún número cambia). */
+  tiendasMultifashion?: ReadonlySet<string>;
+  /** 🔴 `true` = una entrega SIN proyecto (puerta nueva) cuenta en su marca, como una
+   *  factura sin proyecto. Antes se saltaba. Medido 23-sep-2026: 0 entregas así. */
+  contarEntregasSinProyecto?: boolean;
   /** Filas de `mk_periodos`. Vacío = la DDL no corrió. */
   periodos?: ReadonlyArray<PeriodoRow>;
   /** Filas de `mk_periodo_documentos`. Vacío = la DDL no corrió. */
@@ -403,8 +423,17 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
 
   const proyById = new Map(inp.proyectos.map((p) => [String(p.id), p]));
   const proyectosVivos = new Set(proyById.keys());
-  const esMf = (pid: string | null | undefined) =>
-    !!pid && inp.proyectosMultifashion.has(String(pid));
+  const tiendasMf = inp.tiendasMultifashion ?? new Set<string>();
+  const codigoTienda = (t: unknown): string | null => {
+    const c = String(t ?? "").trim().toUpperCase();
+    return c.length > 0 ? c : null;
+  };
+  /** La tienda del gasto: la suya, y si no la trae, la de su proyecto. */
+  const tiendaDe = (g: { tienda_codigo?: string | null }, pid: string | null): string | null =>
+    codigoTienda(g.tienda_codigo) ?? codigoTienda(pid ? proyById.get(pid)?.tienda_codigo : null);
+  // Multifashion: del PROYECTO (como siempre) o de la TIENDA del gasto (23-sep-2026).
+  const esMf = (pid: string | null | undefined, tienda: string | null = null) =>
+    (!!pid && inp.proyectosMultifashion.has(String(pid))) || (!!tienda && tiendasMf.has(tienda));
 
   // --- Adjuntos: los dos papeles, cada uno con su set ---
   const facturaConComprobante = new Set<string>();
@@ -513,12 +542,15 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
   // permite que la lista de la marca muestre "cuánto reportó cada proyecto en
   // cada período" cuadrando al centavo con las tarjetas — por construcción.
   const detalleAcc = new Map<string, DetalleProyectoPeriodo>();
+  // Y por TIENDA (23-sep-2026), en la MISMA llamada.
+  const detalleTiendasAcc = new Map<string, DetalleTiendaPeriodo>();
   const anotarDetalle = (
     k: string,
     per: { id: string | null; nombre: string } | null,
     pid: string | null | undefined,
     tipo: "factura" | "entrega",
     monto: number,
+    tienda: string | null = null,
   ) => {
     const proyectoId = pid ? String(pid) : null;
     const seccion = claveDeSeccion(per);
@@ -531,6 +563,15 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
     d.monto += monto;
     if (tipo === "factura") d.facturas += 1;
     else d.entregas += 1;
+
+    const llaveTienda = `${k}::${seccion}::${tienda ?? "(general)"}`;
+    let t = detalleTiendasAcc.get(llaveTienda);
+    if (!t) {
+      t = { bloqueKey: k, seccion, tiendaCodigo: tienda, monto: 0, gastos: 0 };
+      detalleTiendasAcc.set(llaveTienda, t);
+    }
+    t.monto += monto;
+    t.gastos += 1;
   };
 
   const anotarCerrado = (
@@ -590,14 +631,14 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
   for (const f of inp.facturas) {
     const fid = String(f.id);
     const pid = f.proyecto_id ? String(f.proyecto_id) : null;
+    const tienda = tiendaDe(f as { tienda_codigo?: string | null }, pid);
 
     const rows = rowsByFactura.get(fid) ?? [];
 
-    // Multifashion es del PROYECTO, no de la marca: es una tienda propia y su
-    // gasto no se le reporta a nadie, tenga la marca que tenga la factura. La
-    // marca igual se anota en `porMarca` — si no, "Por marca" sumaría menos que
-    // el titular de la pantalla y las dos cifras se contradirían.
-    if (esMf(pid)) {
+    // Multifashion es del PROYECTO (o de la TIENDA del gasto), no de la marca: es
+    // tienda propia y no se le reporta a nadie. La marca igual se anota en
+    // `porMarca` — si no, "Por marca" sumaría menos que el titular de la pantalla.
+    if (esMf(pid, tienda)) {
       const b = bloque(MULTIFASHION_KEY);
       if (apagado(f)) {
         sumar(b.noReportado, num(f.total));
@@ -607,7 +648,7 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
       sumar(b.facturas, num(f.total));
       anotarProyecto(MULTIFASHION_KEY, pid);
       anotarCliente(pid, MULTIFASHION_KEY, num(f.total));
-      anotarDetalle(MULTIFASHION_KEY, null, pid, "factura", num(f.total));
+      anotarDetalle(MULTIFASHION_KEY, null, pid, "factura", num(f.total), tienda);
       anotarPendientes(MULTIFASHION_KEY, f);
       const sumPctMf = rows.reduce((s, x) => s + num(x.porcentaje), 0) || 1;
       for (const r of rows) {
@@ -641,7 +682,7 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
       }
       if (cer) {
         anotarCerrado(cer, k, "factura", monto);
-        anotarDetalle(k, cer, pid, "factura", monto);
+        anotarDetalle(k, cer, pid, "factura", monto, tienda);
         continue;
       }
       // `porMarca` solo cuenta lo ABIERTO, igual que el titular: un desglose
@@ -650,7 +691,7 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
       const b = bloque(k);
       sumar(b.facturas, monto);
       anotarCliente(pid, k, monto);
-      anotarDetalle(k, null, pid, "factura", monto);
+      anotarDetalle(k, null, pid, "factura", monto, tienda);
       anotarPendientes(k, f);
     }
   }
@@ -658,12 +699,13 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
   // ---------------------------------------------------------------- ENTREGAS
   for (const e of inp.entregas) {
     const pid = e.proyecto_id ? String(e.proyecto_id) : null;
-    // Una entrega sin proyecto vivo no se atribuye: no hay a dónde llevar al
-    // usuario si toca el bloque, y contarla inflaría un total inalcanzable.
-    if (!pid || !proyectosVivos.has(pid)) continue;
+    // Una entrega de un proyecto que ya no vive no se atribuye. Una SIN proyecto
+    // (la puerta nueva) cuenta solo con `contarEntregasSinProyecto` (23-sep-2026).
+    if (pid ? !proyectosVivos.has(pid) : !inp.contarEntregasSinProyecto) continue;
     const eid = String(e.id);
+    const tienda = tiendaDe(e as { tienda_codigo?: string | null }, pid);
 
-    if (esMf(pid)) {
+    if (esMf(pid, tienda)) {
       const b = bloque(MULTIFASHION_KEY);
       if (apagado(e)) {
         sumar(b.noReportado, num(e.total));
@@ -673,7 +715,7 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
       sumar(b.muebles, num(e.total));
       anotarProyecto(MULTIFASHION_KEY, pid);
       anotarCliente(pid, MULTIFASHION_KEY, num(e.total));
-      anotarDetalle(MULTIFASHION_KEY, null, pid, "entrega", num(e.total));
+      anotarDetalle(MULTIFASHION_KEY, null, pid, "entrega", num(e.total), tienda);
       for (const mid of marcasDeEntrega(e)) {
         porMarca[mid] =
           (porMarca[mid] ?? 0) + porcionEntregaParaMarca(e, mid, empresaDeMarca.get(mid));
@@ -699,14 +741,14 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
       }
       if (cer) {
         anotarCerrado(cer, k, "entrega", monto);
-        anotarDetalle(k, cer, pid, "entrega", monto);
+        anotarDetalle(k, cer, pid, "entrega", monto, tienda);
         continue;
       }
       porMarca[mid] = (porMarca[mid] ?? 0) + monto;
       const b = bloque(k);
       sumar(b.muebles, monto);
       anotarCliente(pid, k, monto);
-      anotarDetalle(k, null, pid, "entrega", monto);
+      anotarDetalle(k, null, pid, "entrega", monto, tienda);
     }
   }
 
@@ -761,11 +803,16 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
     ...d,
     monto: round2(d.monto),
   }));
+  const detalleTiendas = [...detalleTiendasAcc.values()].map((d) => ({
+    ...d,
+    monto: round2(d.monto),
+  }));
 
   return {
     bloques: listaBloques,
     cerrados,
     detalle,
+    detalleTiendas,
     resumen: {
       total: round2(listaBloques.reduce((s, b) => s + b.total, 0)),
       proyectos: proyectosVivos.size,

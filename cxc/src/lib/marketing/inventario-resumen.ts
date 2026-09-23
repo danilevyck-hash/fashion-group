@@ -25,6 +25,12 @@ import type {
 export interface FilaResumenTienda {
   /** Display name (con capitalización del primer encuentro) */
   tienda: string;
+  /**
+   * Código del directorio de la tienda (23-sep-2026, Tiendas y Marcas): el de
+   * la primera entrega que lo traiga (`tienda_codigo`, o el del proyecto).
+   * `null` = sin código: la fila no enlaza a ninguna ficha.
+   */
+  tiendaCodigo: string | null;
   totalPaneles: number;
   /** marcaId → monto (al 100%) */
   montoPorMarca: Record<string, number>;
@@ -69,6 +75,7 @@ export function resumirPorTienda(
     string,
     {
       tienda: string;
+      tiendaCodigo: string | null;
       totalPaneles: number;
       montoPorMarca: Record<string, number>;
       entregas: EntregaConItems[];
@@ -83,11 +90,21 @@ export function resumirPorTienda(
       acum.get(key) ??
       {
         tienda: display,
+        tiendaCodigo: null as string | null,
         totalPaneles: 0,
         montoPorMarca: {} as Record<string, number>,
         entregas: [] as EntregaConItems[],
       };
     fila.entregas.push(e);
+    if (!fila.tiendaCodigo) {
+      const propio = String(e.tienda_codigo ?? "").trim().toUpperCase();
+      const delProyecto = String(
+        (e.proyecto_id ? proyectoById.get(e.proyecto_id)?.tienda_codigo : null) ?? "",
+      )
+        .trim()
+        .toUpperCase();
+      fila.tiendaCodigo = propio || delProyecto || null;
+    }
 
     // Total de paneles (cualquier marca).
     for (const it of e.items) {
@@ -123,6 +140,7 @@ export function resumirPorTienda(
     }
     filas.push({
       tienda: v.tienda,
+      tiendaCodigo: v.tiendaCodigo,
       totalPaneles: v.totalPaneles,
       montoPorMarca,
       totalMonto: round2(totalMonto),

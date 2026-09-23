@@ -51,6 +51,8 @@ import ProyectosEliminados from "./ProyectosEliminados";
 import { ChipEstado, FilaNivel } from "./FilaNivel";
 import ZipsBajados from "./ZipsBajados";
 import { ZIP_E_IMPULSADORAS_NUEVO } from "@/lib/marketing/zip-e-impulsadoras";
+import { MARKETING_TIENDAS_Y_MARCAS } from "@/lib/marketing/tiendas-y-marcas";
+import { TiendasDelPeriodo } from "./PaginaMarca";
 import type { BloqueResumen } from "./InicioMarketing";
 import type { ProyectoListItem } from "./useMarcaPeriodos";
 
@@ -75,6 +77,8 @@ interface Props {
   onRegistrarGasto: () => void;
   /** Recargar tras cerrar el período / eliminar / deshacer. */
   recargar: () => void;
+  /** Contabilidad mira (23-sep-2026): sin Registrar, Cerrar, ZIP ni «···». */
+  soloLectura?: boolean;
 }
 
 export default function DetallePeriodoView({
@@ -92,6 +96,7 @@ export default function DetallePeriodoView({
   onAbrirProyecto,
   onRegistrarGasto,
   recargar,
+  soloLectura = false,
 }: Props) {
   const { toast } = useToast();
   const { bajando, descargarReporte, bajarZipMarca } = useDescargasPeriodo();
@@ -192,7 +197,12 @@ export default function DetallePeriodoView({
   const zipClave = `${marca.key}:${abierto || !seccion.id ? "abierto" : seccion.id}`;
   // Multifashion también baja su ZIP — Daniel: *"descargas por marca te basta
   // y multifashion es una marca"*. "Sin marca asignada" no: no hay a quién.
-  const conZip = hayGasto && (!esBucket || marca.key === MULTIFASHION_KEY);
+  const conZip = !soloLectura && hayGasto && (!esBucket || marca.key === MULTIFASHION_KEY);
+  // 🔴 UNA LÍNEA POR TIENDA (23-sep-2026, Tiendas y Marcas): con el
+  // interruptor, el período lista sus TIENDAS —cada una lleva a su ficha— en
+  // vez de sus proyectos, y el buscador de proyectos no se dibuja. Sin él,
+  // la lista de proyectos de siempre.
+  const tiendasDelPeriodo = MARKETING_TIENDAS_Y_MARCAS && !esBucket ? seccion.tiendas ?? null : null;
 
   return (
     <div className="space-y-4">
@@ -213,16 +223,16 @@ export default function DetallePeriodoView({
           </h1>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
-          {abierto && (
+          {abierto && !soloLectura && (
             <button
               type="button"
               onClick={onRegistrarGasto}
               className="rounded-md bg-black text-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition"
             >
-              + Registrar gasto
+              {MARKETING_TIENDAS_Y_MARCAS ? "＋ Gasto" : "+ Registrar gasto"}
             </button>
           )}
-          {seccion.puedeCerrar && bloqueResumen && (
+          {seccion.puedeCerrar && bloqueResumen && !soloLectura && (
             <button
               type="button"
               onClick={() => setCerrando(true)}
@@ -251,7 +261,7 @@ export default function DetallePeriodoView({
                   : "ZIP"}
             </button>
           )}
-          {!esBucket && !abierto && seccion.id && (
+          {!esBucket && !abierto && seccion.id && !soloLectura && (
             <button
               type="button"
               onClick={() => descargarReporte(seccion.id as string, etiqueta, marca.key)}
@@ -325,16 +335,23 @@ export default function DetallePeriodoView({
       )}
 
       {/* Búsqueda — filtra DENTRO del período; los totales de arriba no
-          cambian. text-base en mobile: con 14px Safari hace zoom al enfocar. */}
-      <input
-        type="search"
-        value={busqueda}
-        onChange={(e) => onBusqueda(e.target.value)}
-        placeholder="Buscar por proyecto, tienda o N° de factura…"
-        className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none"
-      />
+          cambian. text-base en mobile: con 14px Safari hace zoom al enfocar.
+          Con las líneas por tienda no hay lista de proyectos que filtrar. */}
+      {!tiendasDelPeriodo && (
+        <input
+          type="search"
+          value={busqueda}
+          onChange={(e) => onBusqueda(e.target.value)}
+          placeholder="Buscar por proyecto, tienda o N° de factura…"
+          className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none"
+        />
+      )}
 
-      {loading ? (
+      {tiendasDelPeriodo ? (
+        <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+          <TiendasDelPeriodo tiendas={tiendasDelPeriodo} />
+        </div>
+      ) : loading ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-16 rounded-lg bg-gray-100 animate-pulse" />
@@ -429,7 +446,7 @@ export default function DetallePeriodoView({
           se dibuja. Solo en el período ABIERTO (o en un bucket sin período):
           un proyecto anulado no pertenece a un período cerrado, y repetirlo en
           todos sería decir lo mismo tres veces. */}
-      {(abierto || esBucket) && (
+      {(abierto || esBucket) && !soloLectura && (
         <ProyectosEliminados bloque={marca.key} onRestaurado={recargar} />
       )}
 

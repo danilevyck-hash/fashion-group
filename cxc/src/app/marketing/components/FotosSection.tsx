@@ -285,7 +285,7 @@ export default function FotosSection({
       ) : (
         <FotoUploader
           onUpload={handleUpload}
-          label="Sube fotos del proyecto"
+          label={tiendaCodigo ? "Sube fotos de la tienda" : "Sube fotos del proyecto"}
           accept="image/*"
           maxSizeMb={10}
           multiple

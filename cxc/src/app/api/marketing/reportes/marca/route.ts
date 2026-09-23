@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
+import { ROLES_MARKETING } from "@/lib/marketing/roles";
 import { reportePorMarca, reportePorMarcaRediseno } from "@/lib/marketing/reportes";
 import { MARKETING_PORTADA_REDISENO } from "@/lib/marketing/portada-rediseno";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria"]);
+  const auth = requireRole(req, [...ROLES_MARKETING]);
   if (auth instanceof NextResponse) return auth;
 
   const { searchParams } = new URL(req.url);

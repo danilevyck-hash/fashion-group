@@ -91,6 +91,26 @@ export interface FilaDeTienda {
   estadoPeriodo: "abierto" | "cerrado" | null;
   /** Nombre del período al que quedó sellado, si se sabe. */
   periodoNombre: string | null;
+  // ── Lo que la ficha como UNA lista necesita de más (23-sep-2026). Todo
+  //    OPCIONAL: la vista de antes no lo lee y la ruta lo llena solo con el
+  //    interruptor `MARKETING_TIENDAS_Y_MARCAS` prendido. ──
+  /** N° de la factura, tal como lo escribió el proveedor. */
+  numero?: string;
+  subtotal?: number;
+  itbms?: number;
+  /** El concepto crudo de la factura (o las notas del mueble). */
+  concepto?: string;
+  /** La nota libre del gasto (`nota`). */
+  nota?: string;
+  /** Mes cubierto por un pago de impulsadora, ya escrito para la pantalla. */
+  mes?: string;
+  /** `true` = tiene su PDF (o foto) de factura adjunto. */
+  tienePdf?: boolean;
+  /** Anulada: se ve plegada, nunca suma. */
+  anulada?: boolean;
+  anuladoMotivo?: string;
+  /** Solo un mueble: el proyecto viejo al que quedó atado, si lo hay. */
+  proyectoId?: string | null;
 }
 
 /** El rótulo del tipo, para la columna «Tipo». Una sola fuente: `gasto.ts`. */

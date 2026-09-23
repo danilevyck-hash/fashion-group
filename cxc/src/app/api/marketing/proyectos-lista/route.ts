@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
-import { esMultifashion } from "@/lib/marketing/multifashion";
+import { esMultifashion, MULTIFASHION_CODIGOS } from "@/lib/marketing/multifashion";
+import { ROLES_MARKETING } from "@/lib/marketing/roles";
+import { MARKETING_TIENDAS_Y_MARCAS } from "@/lib/marketing/tiendas-y-marcas";
 import { conRespaldoSinColumnas } from "@/lib/marketing/columnas-opcionales";
 import { MARKETING_PORTADA_REDISENO } from "@/lib/marketing/portada-rediseno";
 import {
@@ -81,7 +83,8 @@ const COLS_FACTURA_LISTA = "id, proyecto_id, total, grupo_legacy, impulsadora_id
 const COLS_ENTREGA_LISTA = "id, proyecto_id, total, total_por_marca, total_por_empresa_interna";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria"]);
+  // Lectura: contabilidad también entra a mirar (23-sep-2026).
+  const auth = requireRole(req, [...ROLES_MARKETING]);
   if (auth instanceof NextResponse) return auth;
 
   const url = new URL(req.url);
@@ -133,7 +136,7 @@ export async function GET(req: NextRequest) {
         () =>
           supabaseServer
             .from("mk_facturas")
-            .select(`${COLS_FACTURA_LISTA}, se_reporta`)
+            .select(`${COLS_FACTURA_LISTA}, se_reporta, tienda_codigo`)
             .is("anulado_en", null),
         () => supabaseServer.from("mk_facturas").select(COLS_FACTURA_LISTA).is("anulado_en", null),
         (m) => console.error(`[marketing/proyectos-lista] ${m}`),
@@ -142,7 +145,7 @@ export async function GET(req: NextRequest) {
         .from("mk_factura_marcas")
         .select("factura_id, marca_id, porcentaje"),
       conRespaldoSinColumnas(
-        () => supabaseServer.from("mk_entregas_muebles").select(`${COLS_ENTREGA_LISTA}, se_reporta`),
+        () => supabaseServer.from("mk_entregas_muebles").select(`${COLS_ENTREGA_LISTA}, se_reporta, tienda_codigo`),
         () => supabaseServer.from("mk_entregas_muebles").select(COLS_ENTREGA_LISTA),
         (m) => console.error(`[marketing/proyectos-lista] ${m}`),
       ).then((r) => r.resultado),
@@ -254,7 +257,39 @@ export async function GET(req: NextRequest) {
       sellos,
       adjuntos: adjuntos as AdjuntoResumen[],
       excluirNoReportado: MARKETING_PORTADA_REDISENO,
+      // Las MISMAS dos banderas que `/api/marketing/inicio` (23-sep-2026):
+      // Multifashion también por la tienda del gasto, y el mueble sin
+      // proyecto cuenta. Con el interruptor apagado, como antes.
+      tiendasMultifashion: MARKETING_TIENDAS_Y_MARCAS
+        ? new Set(MULTIFASHION_CODIGOS.map((c) => c.toUpperCase()))
+        : undefined,
+      contarEntregasSinProyecto: MARKETING_TIENDAS_Y_MARCAS,
     });
+
+    // 🔴 EL NOMBRE DE LA TIENDA SALE DEL DIRECTORIO, POR CÓDIGO (23-sep-2026):
+    // las líneas por tienda de la marca dibujan `clientes_master.nombre`,
+    // nunca el texto libre de `mk_proyectos.tienda`. Solo con el interruptor;
+    // si la lectura se cae, se dibuja el código (falla ABIERTA).
+    const nombresDeTienda = new Map<string, string>();
+    if (MARKETING_TIENDAS_Y_MARCAS && bloqueRaw) {
+      const codigos = [
+        ...new Set(
+          resumen.detalleTiendas
+            .map((d) => d.tiendaCodigo)
+            .filter((c): c is string => typeof c === "string" && c.length > 0),
+        ),
+      ];
+      if (codigos.length > 0) {
+        const { data } = await supabaseServer
+          .from("clientes_master")
+          .select("codigo, nombre")
+          .in("codigo", codigos);
+        for (const c of (data ?? []) as Array<{ codigo: string; nombre: string | null }>) {
+          const nombre = String(c.nombre ?? "").trim();
+          if (nombre.length > 0) nombresDeTienda.set(String(c.codigo).toUpperCase(), nombre);
+        }
+      }
+    }
 
     // El clasificador ÚNICO de períodos (el mismo que usa el agregador): acá
     // solo decide EN QUÉ PERÍODO va cada gasto suelto de la fila General.
@@ -455,6 +490,9 @@ export async function GET(req: NextRequest) {
           generales,
           conPeriodos: resumen.conPeriodos,
           ordenProyectos: proyectos.map((p) => String(p.id)),
+          // Una línea por tienda (23-sep-2026), solo con el interruptor.
+          detalleTiendas: MARKETING_TIENDAS_Y_MARCAS ? resumen.detalleTiendas : undefined,
+          nombresDeTienda,
         })
       : null;
 

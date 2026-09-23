@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
+import { ROLES_MARKETING } from "@/lib/marketing/roles";
 import { VISTA_TIENDA } from "@/lib/marketing/vista-tienda";
 import { leerDatosDeLaTienda } from "./datos";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-/** Los mismos roles del módulo Marketing (`modules.ts`). */
-const ROLES_MARKETING = ["admin", "secretaria"] as const;
 
 export async function GET(
   req: NextRequest,

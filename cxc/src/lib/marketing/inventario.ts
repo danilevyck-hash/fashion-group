@@ -536,6 +536,24 @@ export async function listEntregasPendientes(): Promise<EntregaConItems[]> {
   return attachItems(entregas);
 }
 
+/**
+ * UNA entrega con sus renglones, por id (23-sep-2026): la ficha de la tienda
+ * edita el mueble desde su fila y necesita abrir el formulario con lo
+ * guardado. `null` si no existe.
+ */
+export async function getEntregaById(id: string): Promise<EntregaConItems | null> {
+  if (!id) return null;
+  const { data, error } = await supabaseServer
+    .from("mk_entregas_muebles")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(`getEntregaById: ${error.message}`);
+  if (!data) return null;
+  const [entrega] = await attachItems([mapEntrega(data as Record<string, unknown>)]);
+  return entrega ?? null;
+}
+
 export async function listAllEntregas(): Promise<EntregaConItems[]> {
   const { data: entRows, error: entErr } = await supabaseServer
     .from("mk_entregas_muebles")

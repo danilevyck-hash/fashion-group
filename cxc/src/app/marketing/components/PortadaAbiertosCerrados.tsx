@@ -69,10 +69,20 @@ interface Props {
   /** Abre un período cerrado: la marca y el id del período. */
   onSelectCerrado: (bloqueKey: string, periodoId: string) => void;
   onRegistrarGasto: () => void;
-  onOpenImpulsadoras: () => void;
-  onOpenInventario: () => void;
-  onOpenReportes: () => void;
+  onOpenImpulsadoras?: () => void;
+  onOpenInventario?: () => void;
+  onOpenReportes?: () => void;
   refreshKey: number;
+  /**
+   * 🔴 SIN LA TARJETA «HERRAMIENTAS» (23-sep-2026, Tiendas y Marcas): en la
+   * portada nueva Multifashion es una TIENDA (vive en la pestaña Tiendas),
+   * Mobiliario e Impulsadoras son pestañas y «Reportes» desapareció —por
+   * tienda ES la lista de tiendas, por marca ES la página de la marca—. Con
+   * el interruptor apagado no se pasa y la tarjeta se dibuja como siempre.
+   */
+  sinHerramientas?: boolean;
+  /** La portada nueva ya tiene su «＋ Gasto» arriba: acá no se repite. */
+  sinBotonDeGasto?: boolean;
 }
 
 const ROTULO_PESTANA: Record<PestanaPortada, string> = {
@@ -167,6 +177,8 @@ export default function PortadaAbiertosCerrados({
   onOpenInventario,
   onOpenReportes,
   refreshKey,
+  sinHerramientas = false,
+  sinBotonDeGasto = false,
 }: Props) {
   const [datos, setDatos] = useState<DatosPortada | null>(null);
   const [loading, setLoading] = useState(true);
@@ -222,16 +234,18 @@ export default function PortadaAbiertosCerrados({
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-end gap-4">
-        <h1 className="sr-only">Marketing</h1>
-        <button
-          type="button"
-          onClick={onRegistrarGasto}
-          className="rounded-md bg-black text-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition shrink-0"
-        >
-          + Registrar gasto
-        </button>
-      </div>
+      {!sinBotonDeGasto && (
+        <div className="flex items-center justify-end gap-4">
+          <h1 className="sr-only">Marketing</h1>
+          <button
+            type="button"
+            onClick={onRegistrarGasto}
+            className="rounded-md bg-black text-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition shrink-0"
+          >
+            + Registrar gasto
+          </button>
+        </div>
+      )}
 
       {/* Las DOS pestañas. Lista cerrada: `PESTANAS_PORTADA`. */}
       <div className="flex items-center gap-1 border-b border-gray-200" role="tablist">
@@ -335,7 +349,7 @@ export default function PortadaAbiertosCerrados({
         </ListaCard>
       )}
 
-      {datos && (
+      {datos && !sinHerramientas && (
         <ListaCard titulo="Herramientas">
           {tiendaPropia && (
             <FilaNivel

@@ -38,6 +38,14 @@ export interface GastoParaReporte {
   seReporta?: boolean | null;
   /** "YYYY-MM-DD": la del documento, para el filtro por año. */
   fecha: string | null;
+  /**
+   * 🔴 `true` = es de la TIENDA PROPIA del grupo (D-108, o su proyecto). Por
+   * tienda sale como una fila más; por MARCA no se le cobra a nadie (Daniel,
+   * 22-sep-2026: *«nunca se le cobran a una marca»*). Lo pone la lectura con
+   * la regla única de `tiendas-y-marcas.ts`; ausente = no lo es. Este módulo
+   * no sabe cuál es esa tienda a propósito: solo respeta la marca.
+   */
+  esTiendaPropia?: boolean | null;
 }
 
 /** Nombre visible de cada marca, por código. */

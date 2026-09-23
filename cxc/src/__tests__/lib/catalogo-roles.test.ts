@@ -300,12 +300,16 @@ const MODULOS_POR_ROL_ESPERADOS: Record<string, string[]> = {
   // las 4 rutas de lectura del módulo. Lo que ganó es la PUERTA (ficha + la
   // página, que hasta ese día la rebotaba a `/home`). `POST /descuentos` y
   // `/config` le siguen contestando 403: ve, no edita.
+  // 23-sep-2026 · NOTA FECHADA — `marketing` entra por pedido de Daniel («lo ven
+  // contabilidad, admin y secres»): entra a MIRAR. Cambio DELIBERADO; candado
+  // `marketing-tiendas-y-marcas`.
   contabilidad: [
     "comisiones",
     "proveedores",
     "gastos-contabilidad",
     "prestamos",
     "asistencia",
+    "marketing",
   ],
   // `referencia` — mismo pedido del 12-ago-2026 de arriba (bodega).
   vendedor: ["cxc", "directorio", "catalogos", "guias", "referencia"],

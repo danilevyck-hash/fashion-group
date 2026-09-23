@@ -66,6 +66,7 @@ import {
   type MarcaCodigo,
 } from "./bloques";
 import { esMultifashion, MULTIFASHION_LABEL } from "./multifashion";
+import { MARKETING_TIENDAS_Y_MARCAS, esTiendaMultifashion } from "./tiendas-y-marcas";
 import { formatearFecha } from "./normalizar";
 import { etiquetaPeriodoCorta, periodoEfectivo } from "./periodo";
 import { marcasDeEntrega, porcionEntregaParaMarca } from "./resumen-inicio";
@@ -190,6 +191,8 @@ interface FacturaFila {
   anulado_en: string | null;
   /** 🔴 Columna del rediseño. Ausente = se reporta (falla ABIERTO). */
   se_reporta?: boolean | null;
+  /** La tienda del GASTO (23-sep-2026). Ausente = la del proyecto. */
+  tienda_codigo?: string | null;
 }
 interface EntregaFila {
   id: string;
@@ -197,6 +200,8 @@ interface EntregaFila {
   total: number | null;
   /** 🔴 Columna del rediseño. Ausente = se reporta (falla ABIERTO). */
   se_reporta?: boolean | null;
+  /** La tienda del GASTO (23-sep-2026). Ausente = la del proyecto. */
+  tienda_codigo?: string | null;
   total_por_marca: Record<string, number> | null;
   total_por_empresa_interna: Record<string, number> | null;
   notas: string | null;
@@ -389,7 +394,7 @@ async function leerFacturasConSeReporta(): Promise<ResultadoPg<FacturaFila[]>> {
     () =>
       supabaseServer
         .from("mk_facturas")
-        .select(`${COLUMNAS_FACTURA}, se_reporta`) as unknown as PromiseLike<
+        .select(`${COLUMNAS_FACTURA}, se_reporta, tienda_codigo`) as unknown as PromiseLike<
         ResultadoPg<FacturaFila[]>
       >,
     () =>
@@ -406,7 +411,7 @@ async function leerEntregasConSeReporta(): Promise<ResultadoPg<EntregaFila[]>> {
     () =>
       supabaseServer
         .from("mk_entregas_muebles")
-        .select(`${COLUMNAS_ENTREGA}, se_reporta`) as unknown as PromiseLike<
+        .select(`${COLUMNAS_ENTREGA}, se_reporta, tienda_codigo`) as unknown as PromiseLike<
         ResultadoPg<EntregaFila[]>
       >,
     () =>
@@ -690,6 +695,13 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
     const p = proyectoById.get(String(pid));
     return !!p && esMultifashion(p);
   };
+  // 🔴 LA MISMA REGLA QUE LA PORTADA DE MARCAS (23-sep-2026): Multifashion
+  // también por la TIENDA del gasto (D-108), no solo por su proyecto. Un
+  // gasto de la puerta nueva nace sin proyecto; sin esto entraría al ZIP de
+  // Tommy o de Calvin. Con el interruptor apagado, solo por proyecto.
+  const esGastoMultifashion = (pid: string | null, tienda: string | null | undefined): boolean =>
+    esProyectoMultifashion(pid) ||
+    (MARKETING_TIENDAS_Y_MARCAS && esTiendaMultifashion(tienda));
   const proyectoVivo = (pid: string | null): boolean => {
     if (!pid) return false;
     const p = proyectoById.get(String(pid));
@@ -751,7 +763,7 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
       if (f.anulado_en) continue;
       const pid = f.proyecto_id ? String(f.proyecto_id) : null;
       // 🔴 Multifashion NUNCA entra: es tienda propia, no se le reporta a nadie.
-      if (esProyectoMultifashion(pid)) continue;
+      if (esGastoMultifashion(pid, f.tienda_codigo)) continue;
       if (pid && !proyectoVivo(pid)) continue;
       if (!vaEnElPapel(f)) continue;
       const rows = rowsPorFactura.get(String(f.id)) ?? [];
@@ -770,7 +782,10 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
     for (const e of entregas) {
       if (!vaEnElPapel(e)) continue;
       const pid = e.proyecto_id ? String(e.proyecto_id) : null;
-      if (!pid || !proyectoVivo(pid) || esProyectoMultifashion(pid)) continue;
+      // Un mueble SIN proyecto (la puerta nueva) entra con el interruptor
+      // (23-sep-2026); uno de un proyecto que ya no vive, nunca.
+      if (pid ? !proyectoVivo(pid) : !MARKETING_TIENDAS_Y_MARCAS) continue;
+      if (esGastoMultifashion(pid, e.tienda_codigo)) continue;
       if (!marcasDeEntrega(e).includes(marcaId)) continue;
       if (!entraEnElPeriodo("entrega", String(e.id))) continue;
       const monto = porcionEntregaParaMarca(e, marcaId, empresaPorMarca.get(marcaId));

@@ -37,9 +37,18 @@ import { formatearMonto } from "@/lib/marketing/normalizar";
 import { MARKETING_PORTADA_REDISENO } from "@/lib/marketing/portada-rediseno";
 import { textoParteDeLaMarca } from "@/lib/marketing/cerrados-por-periodo";
 import type { SeccionPeriodo } from "@/lib/marketing/lista-por-periodo";
+import { ROLES_MARKETING } from "@/lib/marketing/roles";
+import { MULTIFASHION_KEY } from "@/lib/marketing/bloques";
+import { hrefDeTienda } from "@/lib/marketing/vista-tienda";
+import {
+  CODIGO_MULTIFASHION,
+  MARKETING_TIENDAS_Y_MARCAS,
+} from "@/lib/marketing/tiendas-y-marcas";
 import RegistrarGastoModal from "../components/RegistrarGastoModal";
 import ProyectoOverlay from "../components/ProyectoOverlay";
 import DetallePeriodoView from "../components/DetallePeriodoView";
+import PaginaMarca from "../components/PaginaMarca";
+import { useRedirigirProyectoViejo } from "../components/useProyectoViejo";
 import { ChipEstado, FilaNivel, ListaCard } from "../components/FilaNivel";
 import { useDescargasPeriodo } from "../components/useDescargasPeriodo";
 import {
@@ -62,9 +71,11 @@ export default function MarcaPageWrapper({
 function MarcaPage({ marcaSlug }: { marcaSlug: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { authChecked } = useAuth({
+  // Contabilidad entra a mirar (23-sep-2026); quién escribe lo decide la
+  // pantalla con `puedeEscribirMarketing(role)`.
+  const { authChecked, role } = useAuth({
     moduleKey: "marketing",
-    allowedRoles: ["admin", "secretaria"],
+    allowedRoles: [...ROLES_MARKETING],
   });
 
   const [busqueda, setBusqueda] = useState("");
@@ -81,7 +92,10 @@ function MarcaPage({ marcaSlug }: { marcaSlug: string }) {
 
   // El overlay del proyecto (solo lo usa el modo detalle de los buckets, y
   // los enlaces viejos /marketing?bloque=…&proyecto=… que redirigen acá).
+  // 🔴 Con Tiendas y Marcas (23-sep-2026) el overlay se retiró: un
+  // `?proyecto=` viejo REDIRIGE a la ficha de la tienda de ese proyecto.
   const proyectoParam = searchParams.get("proyecto");
+  const redirigiendoProyecto = useRedirigirProyectoViejo(proyectoParam);
 
   useEffect(() => {
     const t = setTimeout(() => setBusquedaDebounced(busqueda.trim()), 300);
@@ -90,18 +104,29 @@ function MarcaPage({ marcaSlug }: { marcaSlug: string }) {
 
   // 🔑 UN SOLO PERÍODO → directo al nivel 3, con replace: Atrás vuelve a
   // /marketing en un paso, sin rebotar por esta lista de un renglón.
+  // ⚠️ Solo en la pantalla de ANTES: con Tiendas y Marcas la página de la
+  // marca ES la pantalla (el abierto con sus tiendas + los cerrados).
   const secciones = datos?.secciones ?? null;
   useEffect(() => {
+    if (MARKETING_TIENDAS_Y_MARCAS) return;
     if (!secciones || secciones.length !== 1 || !datos?.marca) return;
     const qs = proyectoParam ? `?proyecto=${encodeURIComponent(proyectoParam)}` : "";
     router.replace(`/marketing/${marcaSlug}/${secciones[0].slug}${qs}`);
   }, [secciones, datos?.marca, marcaSlug, proyectoParam, router]);
 
+  // 🔴 Multifashion es una TIENDA (D-108): `/marketing/multifashion` lleva a
+  // su ficha, no a un bucket de marca.
+  const esMultifashionSlug = datos?.marca?.key === MULTIFASHION_KEY;
+  useEffect(() => {
+    if (MARKETING_TIENDAS_Y_MARCAS && esMultifashionSlug) router.replace(hrefDeTienda(CODIGO_MULTIFASHION));
+  }, [esMultifashionSlug, router]);
+
   if (!authChecked) return null;
+  if (redirigiendoProyecto) return null;
 
   const marca = datos?.marca ?? null;
   const esBucket = !!datos && !datos.particion && !!marca;
-  const saltando = !!secciones && secciones.length === 1;
+  const saltando = !MARKETING_TIENDAS_Y_MARCAS && !!secciones && secciones.length === 1;
 
   // La marca de ESTA página, resuelta contra el catálogo, para que "Registrar
   // gasto" no la vuelva a preguntar (renglón fijo con "Cambiar"). `marca.key`
@@ -145,7 +170,11 @@ function MarcaPage({ marcaSlug }: { marcaSlug: string }) {
         }
       : null;
 
-  const breadcrumbs = marca ? [{ label: marca.nombre }] : [];
+  const breadcrumbs = marca
+    ? MARKETING_TIENDAS_Y_MARCAS
+      ? [{ label: "Marcas", onClick: () => router.push("/marketing?tab=marcas") }, { label: marca.nombre }]
+      : [{ label: marca.nombre }]
+    : [];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -165,6 +194,18 @@ function MarcaPage({ marcaSlug }: { marcaSlug: string }) {
           <AvisoVolver
             texto="Esa marca no existe en Marketing."
             onVolver={() => router.push("/marketing")}
+          />
+        ) : MARKETING_TIENDAS_Y_MARCAS && esMultifashionSlug ? (
+          <div className="h-40 rounded-lg bg-gray-100 animate-pulse" />
+        ) : MARKETING_TIENDAS_Y_MARCAS && !esBucket && secciones ? (
+          <PaginaMarca
+            role={role}
+            marca={marca}
+            marcaCatalogo={marcaInicialModal}
+            secciones={secciones}
+            bloqueResumen={datos.bloque_resumen}
+            onRegistrarGasto={() => setRegistrandoGasto(true)}
+            recargar={recargar}
           />
         ) : esBucket && seccionBucket ? (
           <>
@@ -186,7 +227,7 @@ function MarcaPage({ marcaSlug }: { marcaSlug: string }) {
               onRegistrarGasto={() => setRegistrandoGasto(true)}
               recargar={recargar}
             />
-            {proyectoParam && (
+            {proyectoParam && !MARKETING_TIENDAS_Y_MARCAS && (
               <ProyectoOverlay
                 proyectoId={proyectoParam}
                 onClose={() => router.push(`/marketing/${marcaSlug}`)}

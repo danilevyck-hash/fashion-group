@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { normalizarBultos } from "@/lib/marketing/piezas-bultos";
-import { deleteEntrega, updateEntrega } from "@/lib/marketing/inventario";
+import { deleteEntrega, getEntregaById, updateEntrega } from "@/lib/marketing/inventario";
+import { ROLES_MARKETING } from "@/lib/marketing/roles";
 import {
   columnasQueVinieron,
   traeAlgoDelGasto,
@@ -47,6 +48,29 @@ function normalizarMarcasBody(
       porcentaje: Number(m.porcentaje ?? 0),
     }))
     .filter((m) => m.marcaId);
+}
+
+/** UNA entrega, para editarla desde la ficha de la tienda (23-sep-2026). Solo lee. */
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  const auth = requireRole(req, [...ROLES_MARKETING]);
+  if (auth instanceof NextResponse) return auth;
+  if (!uuidRegex.test(params.id)) {
+    return NextResponse.json({ error: "ID inválido" }, { status: 400 });
+  }
+  try {
+    const entrega = await getEntregaById(params.id);
+    if (!entrega) {
+      return NextResponse.json({ error: "Entrega no encontrada" }, { status: 404 });
+    }
+    return NextResponse.json(entrega);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Error";
+    console.error("inventario/entregas/[id] GET:", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
 
 export async function PATCH(
