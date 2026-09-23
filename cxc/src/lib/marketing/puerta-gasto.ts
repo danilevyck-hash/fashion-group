@@ -229,8 +229,8 @@ export function traeColumnasDelGasto(cols: ColumnasDelGasto): boolean {
 /**
  * El error que frena un gasto igual a otro que ya está. Con nombre para que la
  * ruta lo reconozca y conteste 400 con `duplicado: true`, y la pantalla lo
- * diga tal cual: «Ya existe un gasto de X por $Y del Z (N° …). No se guarda
- * dos veces.»
+ * diga tal cual: «Ya existe un gasto de X por $Y del Z para <tienda> (N° …).
+ * No se guarda dos veces.» — la tienda entró el 23-sep-2026 con la llave.
  */
 export class ErrorGastoDuplicado extends Error {
   readonly existente: HuellaDeGasto & { id?: string; numero?: string | null };

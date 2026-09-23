@@ -472,3 +472,66 @@ Ninguna fila se tocó: los tres remates cambian PANTALLAS y rutas, no datos.
 
 - ⚠️ La **edición vive en la pantalla vieja del proyecto** (`FacturasSection` / `EntregasSection`): la vista de tienda de la pieza B lista los gastos pero todavía no los deja editar. Es una pantalla más, no un pendiente de este encargo.
 - ⚠️ El aviso viejo de duplicado **por número** de factura sigue en `FacturaForm` (avisa y deja continuar); el freno del servidor manda igual.
+
+---
+
+## 11. El freno de duplicados deja subir la misma suma para OTRA tienda (23-sep-2026)
+
+> Daniel, textual: *«me debes dejar subir si las facturas suman igual pero cliente es diferente, como en el caso de Impreco a Nova Lux»*.
+
+Impreco (Impresora Comercial) le hace el mismo trabajo, el mismo día y por el mismo monto a dos tiendas distintas. Con la llave del 22-sep-2026 —proveedor normalizado + monto + fecha— la segunda factura **no se podía guardar**: el servidor contestaba 400 y la secretaria quedaba trabada con plata real en la mano.
+
+### Ahora vs después
+
+| | Antes (22-sep-2026) | Después (23-sep-2026) |
+|---|---|---|
+| Llave del freno | proveedor normalizado + monto + fecha | **+ TIENDA** (`tienda_codigo`; «General» cuenta como una tienda más) |
+| Dos números de factura distintos | No importaban: se frenaba igual | 🔴 **Nunca son la misma factura**: no se frena. Si a alguna le falta el número, decide la llave |
+| El mismo número con un cero de más | Se frenaba (y se sigue frenando) | Igual: el número se compara **sin los ceros de relleno** (`numeroClave`) |
+| El mensaje | «Ya existe un gasto de X por $Y del Z (N° …)» | «Ya existe un gasto de X por $Y del Z **para \<tienda\>** (N° …). No se guarda dos veces.» |
+| Al EDITAR | Se volvía a preguntar si cambiaba proveedor, fecha o monto | También si cambia la **tienda** o el **número** |
+
+### Lo que se tocó
+
+- **Puro:** `lib/marketing/duplicado.ts` — `HuellaDeGasto` gana `tienda` y `numero`; nuevas `tiendaClave` · `numeroClave` · `numerosSeContradicen`; `claveDeDuplicado` termina en `|TIENDA`; `mensajeDuplicado` dice para qué tienda. `TIENDA_GENERAL` se importa de `gasto.ts`, **no se redefine**.
+- **Servidor:** `puerta-gasto-server.ts › frenarFacturaDuplicada` lee `tienda_codigo` con `conRespaldoSinColumnas` (**falla ABIERTA**: sin la columna todo cuenta como «General» y el freno queda más suelto, nunca más apretado). `frenarPagoDuplicado` no cambia de comportamiento: la «tienda» de un pago **es la impulsadora** (la lectura ya se acota a la suya), y el mensaje sale sin ese identificador interno.
+- **`mutations.ts`:** `createFactura` manda `tienda` y `numero`; `frenarSiEditarDejaDuplicado` lee `numero_factura` y `tienda_codigo` (con respaldo) y el disparo del freno suma `payload.tienda_codigo` y `payload.numero_factura`.
+- ⚠️ **El mueble no tiene freno de duplicados y sigue sin tenerlo**: no tiene proveedor, y sin proveedor `claveDeDuplicado` no afirma nada. Las puertas con freno son dos: factura y pago de impulsadora.
+
+### Medido contra producción (solo lectura por REST, 23-sep-2026)
+
+111 facturas · **96 vivas** · **79 vivas que no son pagos de impulsadora**.
+
+| | Grupos repetidos | Facturas |
+|---|---|---|
+| Llave vieja (proveedor + monto + fecha) | **5** | 10 |
+| Llave nueva (+ tienda, + número distinto) | **1** | 2 |
+
+El que **sigue frenado**: Confecciones Boston, $6.163,20 del 10-sep-2026, las dos en «General» y con el mismo número escrito con un cero de más (`11-00007766` / `11-000007766`) — exactamente el caso que el freno nació para atajar.
+
+Los **cuatro que dejan de estar trabados**:
+
+| Proveedor | Monto | Fecha | Tiendas | N° | Por qué entra |
+|---|---|---|---|---|---|
+| Krysthel Yanneth Morales Martínez | $963,00 | 27-jun-2025 | D-80 Jerusalem De Panamá · **D-25 City Mall Paso Canoa** | 40 / 40 | **Tienda distinta** |
+| Krysthel Yanneth Morales Martínez | $214,00 | 27-jun-2025 | D-25 City Mall Paso Canoa · **D-166 Zona Sur Dutty Free** | 39 / 39 | **Tienda distinta** |
+| Krysthel Yanneth Morales Martínez | $1.070,00 | 18-dic-2025 | D-80 (las dos) | 81 / 82 | **Número distinto** |
+| Impresora Comercial | $55,64 | 8-abr-2026 | D-156 (las dos) | 63894 / 63895 | **Número distinto** |
+
+🔑 **La factura de Impreco a Nova Lux (D-170) no está en la base**: el freno la rechazó, por eso Daniel la reclamó. Lo que sí quedó medido son los dos casos de Krysthel, que tienen exactamente esa forma —mismo proveedor, mismo monto, mismo día, dos tiendas— y hoy estaban trabados. ⚠️ **Nada se tocó ni se limpió**: los 5 grupos siguen en la base tal cual.
+
+### Candado y mutaciones
+
+`src/__tests__/lib/marketing-cimiento.test.ts` (bloque 4, ahora con 4 casos nuevos) y `src/__tests__/components/marketing-puerta-gasto.test.tsx` (bloque 5): la llave termina en la tienda, otra tienda entra, «General» es una tienda más, dos números distintos entran, el mismo número con un cero de más se frena, sin número decide la llave, el mensaje dice para qué tienda, y las puertas del servidor mandan tienda y número.
+
+| # | Qué se rompió | Resultado |
+|---|---|---|
+| M1 | `claveDeDuplicado` sin la tienda | 🔴 3 rojos |
+| M2 | `numerosSeContradicen` siempre `false` | 🔴 2 rojos |
+| M3 | `createFactura` deja de mandar `tienda` | 🔴 2 rojos |
+| — | control sin mutar | 🟢 74/74 |
+
+### Lo que queda dicho
+
+- ⚠️ El aviso viejo por **número exacto** en `FacturaForm` (avisa y deja continuar) sigue donde estaba; ahora coincide con el servidor: dos números distintos ya no frenan.
+- ⚠️ El número se compara **sin ceros de relleno**; si algún proveedor usara el cero como parte del número («007» ≠ «7»), los tomaría como el mismo. No pasa en las 111 facturas medidas.

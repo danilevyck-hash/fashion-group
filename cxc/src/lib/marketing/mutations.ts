@@ -316,7 +316,13 @@ export async function createFactura(
   // (proveedor normalizado + monto + fecha) — que lanza y no guarda.
   const cols = columnasDelGasto(input);
   await exigirTiendaDelDirectorio(cols.tienda_codigo);
-  await frenarFacturaDuplicada({ proveedor, monto: total, fecha });
+  await frenarFacturaDuplicada({
+    proveedor,
+    monto: total,
+    fecha,
+    tienda: cols.tienda_codigo ?? null,
+    numero,
+  });
 
   const payload = {
     proyecto_id: input.proyectoId ?? null,
@@ -419,13 +425,16 @@ export async function updateFactura(
   }
 
   // 🔴 Editar tampoco puede dejar dos iguales: si cambió el proveedor, la
-  // fecha o el monto, se mira la huella RESULTANTE contra las demás vivas
+  // fecha, el monto, la TIENDA o el NÚMERO, se mira la huella RESULTANTE
+  // contra las demás vivas
   // (la propia fila se salta por `id`). Un pago de impulsadora no pasa por
   // acá: su freno mira `periodo_desde` y vive en `impulsadoras.ts`.
   if (
     payload.proveedor !== undefined ||
     payload.fecha_factura !== undefined ||
-    payload.total !== undefined
+    payload.total !== undefined ||
+    payload.tienda_codigo !== undefined ||
+    payload.numero_factura !== undefined
   ) {
     await frenarSiEditarDejaDuplicado(id, payload);
   }
@@ -451,17 +460,24 @@ async function frenarSiEditarDejaDuplicado(
   id: string,
   payload: Record<string, unknown>,
 ): Promise<void> {
-  const { data, error } = await supabaseServer
-    .from("mk_facturas")
-    .select("proveedor, total, fecha_factura, impulsadora_id")
-    .eq("id", id)
-    .maybeSingle();
+  // `tienda_codigo` es del rediseño: sin la columna se relee sin ella y la
+  // fila cuenta como «General» — el freno queda más suelto, nunca más
+  // apretado. Falla ABIERTA.
+  const leer = (columnas: string) =>
+    supabaseServer.from("mk_facturas").select(columnas).eq("id", id).maybeSingle();
+  const { resultado } = await conRespaldoSinColumnas<unknown>(
+    () => leer("proveedor, total, fecha_factura, impulsadora_id, numero_factura, tienda_codigo"),
+    () => leer("proveedor, total, fecha_factura, impulsadora_id, numero_factura"),
+  );
+  const { data, error } = resultado;
   if (error || !data) return; // sin fila no hay con qué comparar; el update dirá lo suyo
   const fila = data as {
     proveedor: string | null;
     total: number | null;
     fecha_factura: string | null;
     impulsadora_id: string | null;
+    numero_factura?: string | null;
+    tienda_codigo?: string | null;
   };
   if (fila.impulsadora_id) return;
   await frenarFacturaDuplicada({
@@ -469,6 +485,8 @@ async function frenarSiEditarDejaDuplicado(
     proveedor: (payload.proveedor as string | undefined) ?? fila.proveedor,
     monto: (payload.total as number | undefined) ?? fila.total,
     fecha: (payload.fecha_factura as string | undefined) ?? fila.fecha_factura,
+    tienda: (payload.tienda_codigo as string | undefined) ?? fila.tienda_codigo ?? null,
+    numero: (payload.numero_factura as string | undefined) ?? fila.numero_factura ?? null,
   });
 }
 

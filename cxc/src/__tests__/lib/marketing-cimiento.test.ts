@@ -12,7 +12,12 @@
 //      «S a», «S.A.», puntos, acentos, mayúsculas y espacios dobles no lo
 //      vuelven otro proveedor.
 //   4. EL DUPLICADO NO SE CUELA por un cero de más ni por otra grafía: mismo
-//      proveedor + mismo monto + misma fecha → no se guarda.
+//      proveedor + mismo monto + misma fecha + MISMA TIENDA → no se guarda.
+//      🔴 23-sep-2026, Daniel: *«me debes dejar subir si las facturas suman
+//      igual pero cliente es diferente, como en el caso de Impreco a Nova
+//      Lux»* — la TIENDA entra a la llave («General» es una tienda más) y dos
+//      NÚMEROS de factura distintos nunca son la misma factura; si a alguna le
+//      falta el número, decide la llave.
 //   5. LAS MIGRACIONES SON ADITIVAS: no borran ni modifican un valor que
 //      exista, `se_reporta` nace `NOT NULL DEFAULT true`, la tienda se COPIA
 //      del proyecto solo donde está en NULL, y `proyecto_id` no se toca.
@@ -58,6 +63,9 @@ import {
   esDuplicado,
   mensajeDuplicado,
   montoClave,
+  numeroClave,
+  numerosSeContradicen,
+  tiendaClave,
 } from "@/lib/marketing/duplicado";
 import {
   ESTADOS_PERIODO,
@@ -316,13 +324,93 @@ describe("4 · 🔴 el duplicado no se cuela", () => {
     expect(m).toMatch(/No se guarda dos veces/);
   });
 
-  it("🔴 la clave es proveedor NORMALIZADO + monto a DOS decimales + fecha", () => {
+  it("🔴 la clave es proveedor NORMALIZADO + monto a DOS decimales + fecha + TIENDA", () => {
     expect(claveDeDuplicado({ proveedor: "Impresora Comercial, S.A.", monto: 55.6, fecha: "2026-04-08" })).toBe(
-      "impresora comercial|55.60|2026-04-08",
+      "impresora comercial|55.60|2026-04-08|GENERAL",
     );
+    expect(
+      claveDeDuplicado({ proveedor: "Impresora Comercial", monto: 55.6, fecha: "2026-04-08", tienda: "d-170" }),
+    ).toBe("impresora comercial|55.60|2026-04-08|D-170");
     const src = codigo("src/lib/marketing/duplicado.ts");
     expect(src).toMatch(/normalizarProveedor\(g\.proveedor\)/);
     expect(src).toMatch(/toFixed\(2\)/);
+    expect(src).toMatch(/tiendaClave\(g\.tienda\)/);
+  });
+
+  // ── 23-sep-2026 · «Impreco a Nova Lux» ─────────────────────────────────────
+  const conTienda = [
+    {
+      id: "n1",
+      proveedor: "Impresora Comercial S.A.",
+      monto: 470.13,
+      fecha: "2026-09-18",
+      tienda: "D-170",
+      numero: "0000065457",
+    },
+  ];
+
+  it("🔴 mismo proveedor, monto y fecha para OTRA tienda SÍ se puede subir", () => {
+    // El caso de Daniel: Impreco le hizo el mismo trabajo, el mismo día, por
+    // el mismo monto, a dos tiendas distintas.
+    expect(
+      esDuplicado({ proveedor: "Impresora Comercial", monto: 470.13, fecha: "2026-09-18", tienda: "D-80" }, conTienda),
+    ).toBe(false);
+    // Y «General» es una tienda más: tampoco choca con la de Nova Lux.
+    expect(esDuplicado({ proveedor: "Impresora Comercial", monto: 470.13, fecha: "2026-09-18" }, conTienda)).toBe(false);
+    // La MISMA tienda sigue frenada (sin número, decide la llave).
+    expect(
+      esDuplicado({ proveedor: "Impresora Comercial", monto: 470.13, fecha: "2026-09-18", tienda: "d-170 " }, conTienda),
+    ).toBe(true);
+    expect(tiendaClave(null)).toBe("GENERAL");
+    expect(tiendaClave("  d-170 ")).toBe("D-170");
+  });
+
+  it("🔴 dos NÚMEROS de factura distintos no son la misma factura; el cero de relleno no cuenta", () => {
+    // Misma tienda, mismo monto, misma fecha, otro número → se puede subir.
+    expect(
+      esDuplicado(
+        { proveedor: "Impresora Comercial", monto: 470.13, fecha: "2026-09-18", tienda: "D-170", numero: "0000065458" },
+        conTienda,
+      ),
+    ).toBe(false);
+    // El MISMO número escrito con un cero de más sigue siendo el mismo.
+    expect(
+      esDuplicado(
+        { proveedor: "Impresora Comercial", monto: 470.13, fecha: "2026-09-18", tienda: "D-170", numero: "00000065457" },
+        conTienda,
+      ),
+    ).toBe(true);
+    // Si a una le falta el número, no contradice nada: decide la llave.
+    expect(
+      esDuplicado(
+        { proveedor: "Impresora Comercial", monto: 470.13, fecha: "2026-09-18", tienda: "D-170", numero: "" },
+        conTienda,
+      ),
+    ).toBe(true);
+    expect(numeroClave("11-000007766")).toBe(numeroClave("11-00007766"));
+    expect(numeroClave("0000063894")).toBe("63894");
+    expect(numerosSeContradicen("0000063894", "0000063895")).toBe(true);
+    expect(numerosSeContradicen("0000063894", null)).toBe(false);
+    expect(numerosSeContradicen(null, null)).toBe(false);
+  });
+
+  it("🔴 el mensaje dice PARA QUÉ TIENDA, y sin tienda dice General", () => {
+    expect(mensajeDuplicado(conTienda[0])).toContain("para D-170");
+    expect(mensajeDuplicado(existentes[0])).toContain(`para ${TIENDA_GENERAL}`);
+  });
+
+  it("🔴 las tres puertas del servidor mandan la tienda y el número", () => {
+    const server = codigo("src/lib/marketing/puerta-gasto-server.ts");
+    // La factura lee `tienda_codigo` con respaldo (falla ABIERTA sin la columna).
+    expect(server).toMatch(/conRespaldoSinColumnas[\s\S]*?fecha_factura, tienda_codigo/);
+    expect(server).toMatch(/huellaDeFila\(r, r\.fecha_factura, r\.tienda_codigo \?\? null\)/);
+    // En un pago de impulsadora la «tienda» es LA IMPULSADORA.
+    expect(server).toMatch(/buscarDuplicado\(\{ \.\.\.nuevo, tienda: impulsadoraId \}/);
+    const mut = codigo("src/lib/marketing/mutations.ts");
+    expect(mut).toMatch(/frenarFacturaDuplicada\(\{[\s\S]*?tienda: cols\.tienda_codigo \?\? null,[\s\S]*?numero,/);
+    // Cambiar la tienda o el número al EDITAR también vuelve a preguntar.
+    expect(mut).toMatch(/payload\.tienda_codigo !== undefined/);
+    expect(mut).toMatch(/payload\.numero_factura !== undefined/);
   });
 });
 

@@ -436,11 +436,11 @@ describe("5 · 🔴 el duplicado lo frena el SERVIDOR: 400 y no escribe", () => 
     db.filas.clientes_master = [{ codigo: "D-30" }];
   };
 
-  it("`createFactura` lanza `ErrorGastoDuplicado` con otra grafía y otro número, y no inserta", async () => {
+  it("`createFactura` lanza `ErrorGastoDuplicado` con otra grafía y el mismo número con un cero de más, y no inserta", async () => {
     yaEsta();
     await expect(
       createFactura({
-        numeroFactura: "0000063895",
+        numeroFactura: "00000063894",
         fechaFactura: "2026-06-10",
         proveedor: "IMPRESORA COMERCIAL S A",
         concepto: "Letrero",
@@ -449,6 +449,36 @@ describe("5 · 🔴 el duplicado lo frena el SERVIDOR: 400 y no escribe", () => 
       }),
     ).rejects.toSatisfy((e: unknown) => esErrorDeDuplicado(e) && /No se guarda dos veces/.test(String((e as Error).message)));
     expect(db.escrituras).toEqual([]);
+  });
+
+  it("🔴 23-sep-2026 · otro NÚMERO de factura entra, y la misma factura para OTRA tienda también", async () => {
+    // Daniel: «me debes dejar subir si las facturas suman igual pero cliente
+    // es diferente, como en el caso de Impreco a Nova Lux».
+    yaEsta();
+    const otroNumero = await createFactura({
+      numeroFactura: "0000063895",
+      fechaFactura: "2026-06-10",
+      proveedor: "IMPRESORA COMERCIAL S A",
+      concepto: "Letrero",
+      subtotal: 52,
+      itbms: 3.64,
+    });
+    expect(otroNumero.id).toBeTruthy();
+
+    // La MISMA factura (mismo número) cargada a otra tienda: la de la base no
+    // tiene tienda («General»), la nueva es de D-30.
+    db.escrituras.length = 0;
+    const otraTienda = await createFactura({
+      numeroFactura: "0000063894",
+      fechaFactura: "2026-06-10",
+      proveedor: "IMPRESORA COMERCIAL S A",
+      concepto: "Letrero",
+      subtotal: 52,
+      itbms: 3.64,
+      tiendaCodigo: "D-30",
+    });
+    expect(otraTienda.id).toBeTruthy();
+    expect(db.escrituras.filter((e) => e.op === "insert")).toHaveLength(1);
   });
 
   it("cambia uno de los tres (la fecha) y entra", async () => {
@@ -468,12 +498,22 @@ describe("5 · 🔴 el duplicado lo frena el SERVIDOR: 400 y no escribe", () => 
   it("🔴 la ruta contesta 400 con `duplicado: true` y no escribió nada", async () => {
     yaEsta();
     const res = await postFactura(
-      peticionFactura({ marcaId: "m-th", proveedor: "Impresora Comercial", subtotal: 52, itbms: 3.64, fechaFactura: "2026-06-10" }),
+      peticionFactura({
+        marcaId: "m-th",
+        numeroFactura: "0000063894",
+        proveedor: "Impresora Comercial",
+        subtotal: 52,
+        itbms: 3.64,
+        fechaFactura: "2026-06-10",
+      }),
     );
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: string; duplicado?: boolean };
     expect(body.duplicado).toBe(true);
-    expect(body.error).toMatch(/Ya existe un gasto de Impresora Comercial, S\.A\. por \$55\.64 del 2026-06-10 \(N° 0000063894\)/);
+    // 🔴 El mensaje dice PARA QUÉ TIENDA es el que ya está (sin tienda, «General»).
+    expect(body.error).toMatch(
+      /Ya existe un gasto de Impresora Comercial, S\.A\. por \$55\.64 del 2026-06-10 para General \(N° 0000063894\)/,
+    );
     expect(db.escrituras).toEqual([]);
     expect(marcasEscritas.llamadas).toEqual([]);
   });
