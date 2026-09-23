@@ -44,6 +44,8 @@ import { workbookBlob, filtroDesdeA1 } from "@/lib/excel-export";
 import { ROTULO_DESCARGAR_PLANTILLA, ROTULO_SUBIR_OTRO_ARCHIVO } from "@/lib/depurador/rotulos";
 import { costoDelArchivo, facturasDelArchivo, plural } from "@/lib/depurador/resumen-del-archivo";
 import { FILTRO_AMBAR, filaVisible, rotuloFiltro } from "@/lib/depurador/filtro-ambar";
+import { filasDeAvisos, nombreArchivoAvisos, ROTULO_BAJAR_AVISOS } from "@/lib/depurador/avisos-excel";
+import { TRES_DETALLES } from "@/lib/depurador/tres-detalles";
 import { useNuevosEnSwitch } from "@/lib/hooks/useNuevosEnSwitch";
 import { CostoDelArchivo, FacturasDelArchivo, NuevosEnSwitch } from "./ResumenDelArchivo";
 
@@ -697,6 +699,23 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
     }
   };
 
+  /** Baja los avisos como Excel, para arreglarlos en el archivo del proveedor
+   *  antes de volver a subirlo.
+   *
+   *  🔴 Sale por `workbookBlob` (que escribe con `workbookBytes`) + filtro desde
+   *  A1, el camino común de TODO export de la casa: así la fila de encabezados
+   *  queda fija. No toca ni una fila de las 25 columnas. */
+  const bajarAvisos = async () => {
+    const XLSX = (await import("xlsx-js-style")).default;
+    const aoa = filasDeAvisos(warnings);
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = [{ wch: 6 }, { wch: 110 }];
+    ws["!autofilter"] = { ref: filtroDesdeA1(aoa) };
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Avisos");
+    saveAs(workbookBlob(wb), nombreArchivoAvisos(hoyPanama()));
+  };
+
   const totalUnits = processed?.reduce((s, d) => s + (Number(d.cols["Stock Ideal"]) || 0), 0) ?? 0;
   const marcas = processed ? [...new Set(processed.map((d) => d.cols["Marca *"]).filter(Boolean))] : [];
   const revisar = processed?.filter((d) => d.fallback).length ?? 0;
@@ -894,13 +913,30 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
           {warnings.length > 0 && (
             <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               <span aria-hidden>!</span>
-              <div>
-                <b className="font-semibold">{warnings.length} aviso(s)</b> de datos faltantes
-                (puedes corregirlos en el Excel antes de subir):
-                <ul className="ml-4 mt-1.5 list-disc">
-                  {warnings.slice(0, 8).map((x, i) => <li key={i}>{x}</li>)}
+              <div className="min-w-0 flex-1">
+                <b className="font-semibold" data-avisos-titulo>
+                  {warnings.length} {TRES_DETALLES ? plural(warnings.length, "aviso", "avisos") : "aviso(s)"}
+                </b>{" "}
+                de datos faltantes (puedes corregirlos en el Excel antes de subir):
+                {/* 🔴 COMPLETOS. Antes se dibujaban 8 y el resto se escondía
+                    detrás de un «…y N más» que no llevaba a ningún lado: con 40
+                    artículos sin código de barra se arreglaban ocho. */}
+                <ul
+                  className={`ml-4 mt-1.5 list-disc ${TRES_DETALLES ? "max-h-56 overflow-y-auto pr-2" : ""}`}
+                  data-avisos-lista
+                >
+                  {(TRES_DETALLES ? warnings : warnings.slice(0, 8)).map((x, i) => <li key={i}>{x}</li>)}
                 </ul>
-                {warnings.length > 8 && <div className="mt-1">…y {warnings.length - 8} más.</div>}
+                {!TRES_DETALLES && warnings.length > 8 && <div className="mt-1">…y {warnings.length - 8} más.</div>}
+                {TRES_DETALLES && (
+                  <button
+                    type="button"
+                    onClick={() => { void bajarAvisos(); }}
+                    className="mt-2 rounded-md border border-amber-400 bg-white px-2.5 py-1 text-[12px] font-semibold text-amber-800 transition hover:bg-amber-100 active:scale-[0.97]"
+                  >
+                    {ROTULO_BAJAR_AVISOS}
+                  </button>
+                )}
               </div>
             </div>
           )}

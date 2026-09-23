@@ -630,7 +630,10 @@ describe("🔴 El archivo LLEGA a la pantalla, y la pantalla DICE cuál se subi�
   it("la dropzone única manda el despacho al flujo Reebok", () => {
     // Sin esto el archivo cae en el Depurador CK/TH y muestra un error.
     expect(dispatcher).toContain("findHeaderRowDespacho");
-    expect(dispatcher).toMatch(/findHeaderRow\(rows\) !== -1 \|\| findHeaderRowDespacho\(rows\) !== -1/);
+    // 23-sep-2026: el olfateo pasa por `reconocerArchivo`, que pregunta las dos
+    // formas de Reebok y las manda al MISMO camino. Las preguntas no cambiaron.
+    expect(dispatcher).toMatch(/reebokCompra: \(rows\) => findHeaderRow\(rows\) !== -1/);
+    expect(dispatcher).toMatch(/reebokDespacho: \(rows\) => findHeaderRowDespacho\(rows\) !== -1/);
   });
 
   it("el cliente lo lee con `parseDespacho` y reconoce el formato ANTES que el viejo", () => {

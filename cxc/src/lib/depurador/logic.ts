@@ -413,6 +413,41 @@ export function pickBestSheet(sheets: NamedSheet[]): SheetRow[] | null {
 }
 
 /* ============ PROCESAMIENTO ============ */
+/**
+ * Las columnas que un archivo del proveedor (Calvin / Tommy / Karl) TIENE que
+ * traer para poder procesarse, con el nombre que se le dice a la persona.
+ *
+ * 🔴 UNA SOLA DEFINICIÓN. `processRows` la usa para frenar con un error, y la
+ * caja de soltar el archivo la usa para saber si reconoce el archivo ANTES de
+ * procesarlo (`reconocer-archivo.ts`). Dos listas distintas harían que la caja
+ * dijera «reconocido» de algo que después revienta.
+ */
+export const COLUMNAS_OBLIGATORIAS_CKTH: { clave: string; rotulo: string }[] = [
+  { clave: "ref", rotulo: "REFERENCIA" },
+  { clave: "ean", rotulo: "EAN" },
+  { clave: "cat", rotulo: "P_CATEGORY / DESCRIPCIÓN" },
+  { clave: "talla", rotulo: "TALLA" },
+  { clave: "costo", rotulo: "COSTO" },
+  { clave: "precio", rotulo: "PRECIO" },
+];
+
+/** Las columnas obligatorias que le faltan a esta fila de encabezados. Vacío =
+ *  el archivo es del proveedor (Calvin / Tommy / Karl). PURA. */
+export function columnasQueFaltan(headers: Cell[]): string[] {
+  return COLUMNAS_OBLIGATORIAS_CKTH
+    .filter(({ clave }) => findCol(headers, ALIAS[clave], clave) === -1)
+    .map(({ rotulo }) => rotulo);
+}
+
+/** Los valores de la columna MARCA del archivo crudo, en orden y sin la fila de
+ *  encabezados. Vacío si el archivo no trae columna de marca. PURA. */
+export function marcasDelArchivo(rows: SheetRow[]): Cell[] {
+  if (!rows.length) return [];
+  const c = findCol(rows[0], ALIAS.marca, "marca");
+  if (c === -1) return [];
+  return rows.slice(1).map((r) => (r ? r[c] : null) ?? null);
+}
+
 export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessResult {
   const warnings: string[] = [];
   if (!rows.length) { throw new Error("El archivo no tiene filas de datos."); }
@@ -421,13 +456,7 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
   const col: Record<string, number> = {};
   for (const k in ALIAS) { col[k] = findCol(headers, ALIAS[k], k); }
 
-  const missing: string[] = [];
-  if (col.ref === -1) missing.push("REFERENCIA");
-  if (col.ean === -1) missing.push("EAN");
-  if (col.cat === -1) missing.push("P_CATEGORY / DESCRIPCIÓN");
-  if (col.talla === -1) missing.push("TALLA");
-  if (col.costo === -1) missing.push("COSTO");
-  if (col.precio === -1) missing.push("PRECIO");
+  const missing = columnasQueFaltan(headers);
   if (missing.length) {
     throw new Error("No encontré estas columnas en el archivo: " + missing.join(", ") +
       ". Revisa que sea el Excel correcto del proveedor.");

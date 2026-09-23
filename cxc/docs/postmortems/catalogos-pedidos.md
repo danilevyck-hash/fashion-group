@@ -3093,6 +3093,131 @@ el pie desapareciendo, y Guías separándose de la regla común.
 
 ---
 
+## 🔴 PLANTILLA SWITCH — LOS TRES DETALLES DE PANTALLA (23-sep-2026)
+
+Los tres que Daniel aprobó después de la auditoría del módulo. **Ninguno toca el
+Excel de las 25 columnas**: ni una fórmula, ni una tasa, ni un divisor, ni un
+precio. El fixture y su candado de igualdad encabezado por encabezado no se
+tocaron.
+
+Interruptor único: `src/lib/depurador/tres-detalles.ts` → `TRES_DETALLES` (hoy
+`true`). En `false` la pantalla es **exactamente** la de antes, caída silenciosa
+incluida.
+
+### 1 · La caja de soltar el archivo dice qué reconoció, ANTES de procesar
+
+🩸 **El defecto.** El `DepuradorDispatcher` olfatea entre cuatro caminos —Calvin
+/ Tommy / Karl · Reebok confirmación · Reebok despacho · Facturas Tienda— y
+cuando no entendía el archivo **caía a Calvin/Tommy en silencio**: el `catch`
+ponía `kind = "ckth"` y la persona veía el error recién adentro, después de
+esperar.
+
+🔴 **El olfateo NO cambió.** Las mismas tres preguntas, en el mismo orden, con
+las mismas funciones (`findHeaderRow`, `findHeaderRowDespacho`,
+`detectFactura`). Lo nuevo es que el resultado **se dice** —«Reconocido: Calvin →
+Vistana International»— y que lo que nadie reconoce **no entra a ningún camino**:
+«No reconozco este archivo — no se procesa».
+
+🔴 **Qué es un archivo de Calvin/Tommy/Karl se pregunta UNA sola vez.** La lista
+de columnas obligatorias salió de adentro de `processRows` a
+`COLUMNAS_OBLIGATORIAS_CKTH` + `columnasQueFaltan` (`logic.ts`), y la usan los
+dos: el freno con error y la caja. Dos listas distintas harían que la caja
+dijera «reconocido» de algo que revienta dos segundos después.
+
+La marca y la compañía salen de donde siempre: `marcasDelArchivo` →
+`empresasReconocidas` → `empresaDeMarcaCatalogo`, y la marca de pantalla, de
+`EMPRESAS_DESTINO`. Con marcas de **dos compañías no se adivina**: se dice y se
+elige adentro, como ya hacía la pantalla.
+
+**Medido el 23-sep-2026** contra los **10 Excel guardados** en el bucket privado
+`depurador-plantillas` (los 10 que quedan de las 150 corridas): los 10 son la
+**salida** de 25 columnas, no un archivo de proveedor. Hoy los 10 caen a
+Calvin/Tommy y revientan adentro con «No encontré estas columnas en el archivo:
+EAN, P_CATEGORY / DESCRIPCIÓN, TALLA, PRECIO»; después, los 10 dicen «no
+reconozco» **antes** de procesar. Mismo veredicto, dicho a tiempo. Los **3
+fixtures de despacho de Reebok** del repo siguen yendo al camino de Reebok,
+igual que antes.
+
+Módulo puro: `src/lib/depurador/reconocer-archivo.ts` (los detectores entran por
+parámetro para que el despachador los siga cargando con `import()` y `reebok.ts`
+y `tienda.ts` no entren al paquete inicial).
+
+⚠️ El candado viejo de `reebok-despacho.test.ts` comparaba el texto literal
+`findHeaderRow(rows) !== -1 || findHeaderRowDespacho(rows) !== -1`; ahora esas
+dos preguntas son los dos detectores que el despachador inyecta, y el candado
+las comprueba una por una. La regla que protege —el despacho va al flujo de
+Reebok— no cambió.
+
+### 2 · Los avisos, completos y bajables
+
+🩸 **El defecto.** `{warnings.length} aviso(s)` y `warnings.slice(0, 8)`, con un
+«…y 4 más» que no llevaba a ningún lado. Si 40 artículos vienen sin código de
+barra, se arreglaban ocho. Y el `plural()` de la casa estaba dos líneas más
+abajo, bien usado.
+
+Después: plural de verdad (`plural(n, "aviso", "avisos")`), la lista **completa**
+con su propio deslizamiento (`max-h-56 overflow-y-auto`), y un botón **«Bajar la
+lista»** que baja un Excel de dos columnas (`#` y `Aviso`), uno por renglón, sin
+recortar ni agrupar.
+
+🔴 El Excel sale por el camino común de la casa: `workbookBlob` (que escribe con
+`workbookBytes`) + `filtroDesdeA1`, o sea con la fila de encabezados fija. Las
+filas las arma un módulo puro, `src/lib/depurador/avisos-excel.ts`. **Los textos
+de los avisos no cambian**: los sigue escribiendo `processRows`, uno por uno.
+
+### 3 · El Historial marca la descarga repetida
+
+🩸 **Medido contra producción el 23-sep-2026** (`carga_history`, **150 corridas**
+entre el 25-jun y el 22-sep): **24 repiten marca, estilos y piezas dentro de la
+hora anterior** — una de cada seis, agrupadas en **22 series** (dos de ellas de
+tres corridas: «CK Jeans» el 29-jun a las 19:50, 20:45 y 20:51). La secretaria
+baja el Excel, corrige y lo vuelve a bajar; al día siguiente el Historial muestra
+las filas iguales sin decir cuál se subió a Switch.
+
+Después: la vieja se ve en gris con el chip **«repetida»** y la última de la
+serie lleva **«la última»**. 🔴 **No se borra ni se esconde nada**: las dos filas
+siguen ahí, con su botón de «Descargar», y el cálculo se hace sobre **todas** las
+corridas, no sobre las que el filtro deja ver.
+
+🔴 **Igualdad exacta, nunca por parecido**: misma marca (el texto tal cual lo
+guardó la corrida), mismos estilos, mismas piezas, y `MINUTOS_REPETIDA = 60`. Una
+corrida con una pieza de diferencia es OTRA corrida. Módulo puro y de solo
+lectura: `src/lib/depurador/corridas-repetidas.ts`.
+
+⚠️ El chip va a `text-[12px]`, no menos: el candado `iphone-tocables-y-letra`
+prohíbe letra bajo 12 px en esta pantalla.
+
+### Los candados y las mutaciones
+
+`src/__tests__/lib/plantilla-switch-tres-detalles.test.tsx` — **23 pruebas**.
+
+Cuatro mutaciones corridas a mano, las cuatro cazadas, las cuatro restauradas:
+
+| Mutación | Qué se rompió | Resultado |
+|---|---|---|
+| `caminoAProcesar` prendido vuelve a caer a `"ckth"` | la caída silenciosa | 🔴 rojo |
+| `MINUTOS_REPETIDA = 120` | la ventana de la repetida | 🔴 rojo |
+| los avisos vuelven a `warnings.slice(0, 8)` | la lista completa | 🔴 rojo |
+| la marca se compara con `trim().toLowerCase()` | la igualdad exacta | 🔴 rojo |
+
+### Lo que NO se tocó
+
+Facturas Tienda (el único camino de Multifashion), «Tallas por bulto», «Fotos a
+mi Excel», la fórmula del precio y quién puede cambiarla, el guard del divisor,
+el Historial de archivos y su retención de 90 días, y el aviso por Telegram (que
+Daniel rechazó).
+
+### Pendientes que esta pieza no resolvió
+
+- Los **4 artículos generados que nunca llegaron a Switch** ($5.040 CIF, 430
+  piezas): sigue sin avisar nadie.
+- **El precio del papel que no cuadra con la fórmula guardada** (CK Underwear
+  divisor 0,75 → $23, el Excel dice $24): ni el Excel ni el Historial dicen si
+  fue fórmula, modo global o tecleo.
+- **93% del Historial no tiene archivo** (140 de 150) y el rótulo promete un año.
+
+---
+
 ## Lo que decía CLAUDE.md hasta el 22-sep-2026 (movido acá, verbatim)
 
 ### Catálogos, pedidos y cotización — [docs/postmortems/catalogos-pedidos.md](docs/postmortems/catalogos-pedidos.md)

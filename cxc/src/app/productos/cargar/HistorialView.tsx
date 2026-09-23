@@ -12,6 +12,13 @@ import {
   vistaDeLista,
 } from "@/lib/buscar-en-lista";
 import { useUrlState } from "@/lib/hooks/useUrlState";
+import {
+  CHIP_REPETIDA,
+  CHIP_ULTIMA,
+  marcarRepetidas,
+  type MarcaDeRepeticion,
+} from "@/lib/depurador/corridas-repetidas";
+import { TRES_DETALLES } from "@/lib/depurador/tres-detalles";
 
 interface CargaRow {
   id: string;
@@ -87,6 +94,33 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
     [porCompania, busqueda],
   );
 
+  // ── 🔴 LA DESCARGA REPETIDA SE MARCA (23-sep-2026) ────────────────────────
+  //
+  // Medido contra producción: 24 de las 150 corridas repiten marca, estilos y
+  // piezas dentro de la hora anterior. Nada decía cuál se subió a Switch.
+  //
+  // 🔴 NO SE BORRA NI SE ESCONDE NADA: la fila repetida sigue ahí, con su
+  // botón. Se calcula sobre TODAS las corridas, no sobre las que el filtro deja
+  // ver — si no, esconder una fila cambiaría el chip de la de al lado.
+  const repetidas = useMemo(
+    () => (TRES_DETALLES ? marcarRepetidas(rows ?? []) : new Map<string, MarcaDeRepeticion>()),
+    [rows],
+  );
+
+  const chipDe = (r: CargaRow): MarcaDeRepeticion => repetidas.get(r.id) ?? null;
+
+  const Chip = ({ marca }: { marca: MarcaDeRepeticion }) =>
+    marca === null ? null : (
+      <span
+        data-chip-repeticion={marca}
+        className={`ml-2 inline-block rounded-full px-2 py-0.5 text-[12px] font-medium ${
+          marca === "ultima" ? "bg-emerald-50 text-emerald-800" : "bg-stone-100 text-stone-500"
+        }`}
+      >
+        {marca === "ultima" ? CHIP_ULTIMA : CHIP_REPETIDA}
+      </span>
+    );
+
   const botonDescargar = (r: CargaRow) =>
     r.tiene_archivo ? (
       <a
@@ -144,11 +178,12 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
           {/* Celular e iPad vertical: una tarjeta por carga. */}
           <ul className="lg:hidden max-h-[560px] overflow-y-auto divide-y divide-stone-100" data-vista="tarjetas">
             {visibles.map((r) => (
-              <li key={r.id} className={`px-3 py-3 ${r.tiene_archivo ? "" : "opacity-60"}`}>
+              <li key={r.id} className={`px-3 py-3 ${r.tiene_archivo ? "" : "opacity-60"} ${chipDe(r) === "repetida" ? "text-stone-400" : ""}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-[13px] font-medium text-stone-900 truncate">
+                    <div className={`text-[13px] font-medium truncate ${chipDe(r) === "repetida" ? "text-stone-500" : "text-stone-900"}`}>
                       {r.marca || "—"}
+                      <Chip marca={chipDe(r)} />
                     </div>
                     <div className="text-[12px] text-stone-500 truncate">
                       {empresaCanonica(r.empresa) || "—"} · {r.usuario}
@@ -185,11 +220,18 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
               </thead>
               <tbody>
                 {visibles.map((r) => (
-                  <tr key={r.id} className={r.tiene_archivo ? "hover:bg-teal-50" : "text-stone-400"}>
+                  <tr
+                    key={r.id}
+                    data-repeticion={chipDe(r) ?? ""}
+                    className={`${r.tiene_archivo ? "hover:bg-teal-50" : "text-stone-400"} ${chipDe(r) === "repetida" ? "text-stone-400" : ""}`}
+                  >
                     <td className="border-b border-stone-100 px-1.5 xl:px-3 py-2 text-stone-700">{fmtFecha(r.created_at)}</td>
                     <td className={`border-b border-stone-100 px-1.5 xl:px-3 py-2 ${r.tiene_archivo ? "text-stone-900" : ""}`}>{r.usuario}</td>
                     <td className={`border-b border-stone-100 px-1.5 xl:px-3 py-2 ${r.tiene_archivo ? "text-stone-900" : ""}`}>{empresaCanonica(r.empresa) || "—"}</td>
-                    <td className={`border-b border-stone-100 px-1.5 xl:px-3 py-2 ${r.tiene_archivo ? "text-stone-900" : ""}`}>{r.marca || "—"}</td>
+                    <td className={`border-b border-stone-100 px-1.5 xl:px-3 py-2 ${r.tiene_archivo && chipDe(r) !== "repetida" ? "text-stone-900" : ""}`}>
+                      {r.marca || "—"}
+                      <Chip marca={chipDe(r)} />
+                    </td>
                     <td className="border-b border-stone-100 px-1.5 xl:px-3 py-2 text-right text-stone-700">{r.cantidad_estilos.toLocaleString()}</td>
                     <td className="border-b border-stone-100 px-1.5 xl:px-3 py-2 text-right text-stone-700">{r.total_unidades.toLocaleString()}</td>
                     <td className="border-b border-stone-100 px-1.5 xl:px-3 py-2 text-right">{botonDescargar(r)}</td>

@@ -6,8 +6,16 @@ import DepuradorClient from "./DepuradorClient";
 import ReebokClient from "./ReebokClient";
 import FacturasTiendaClient from "./FacturasTiendaClient";
 import type { SheetRow } from "@/lib/depurador/logic";
+import {
+  caminoAProcesar,
+  reconocerArchivo,
+  TEXTO_NO_RECONOZCO,
+  type Camino,
+  type Reconocimiento,
+} from "@/lib/depurador/reconocer-archivo";
+import { TRES_DETALLES } from "@/lib/depurador/tres-detalles";
 
-type Kind = "ckth" | "reebok" | "tienda";
+type Kind = Camino;
 
 export interface DescargaHistorial {
   empresa: string;
@@ -22,6 +30,13 @@ export interface DescargaHistorial {
 interface DispatcherProps {
   onDownloaded?: (payload: DescargaHistorial) => void;
 }
+
+/** El CSV se reconoce por la extensión: nadie le pregunta nada a las hojas. */
+const SIN_DETECTORES = {
+  reebokCompra: () => false,
+  reebokDespacho: () => false,
+  facturaTienda: () => false,
+};
 
 /** Punto de entrada único de «Plantilla › Nuevo»: una sola dropzone. Al soltar
  *  el archivo, olfatea los headers y despacha al flujo correcto SIN tocar la
@@ -38,37 +53,55 @@ export default function DepuradorDispatcher({ onDownloaded }: DispatcherProps) {
   const [file, setFile] = useState<File | null>(null);
   const [kind, setKind] = useState<Kind>("ckth");
   const [error, setError] = useState("");
+  // 🔴 Lo que la caja DICE antes de procesar: qué archivo reconoció y a qué
+  // compañía va. `null` mientras no hay nada soltado.
+  const [rec, setRec] = useState<Reconocimiento | null>(null);
+  const [nombreSoltado, setNombreSoltado] = useState("");
 
   const detect = useCallback(async (f: File) => {
     setBusy(true);
     setError("");
+    setNombreSoltado(f.name);
     try {
-      // El CSV (';') solo lo come Facturas Tienda: no hace falta abrirlo.
+      // 🔴 El olfateo es el MISMO de siempre; lo nuevo es que el resultado se
+      // DICE y que lo que nadie reconoce no entra a ningún camino.
+      let reconocimiento: Reconocimiento;
       if (/\.csv$/i.test(f.name)) {
-        setKind("tienda");
-        setFile(f);
-        return;
+        // El CSV (';') solo lo come Facturas Tienda: no hace falta abrirlo.
+        reconocimiento = reconocerArchivo(f.name, [], SIN_DETECTORES);
+      } else {
+        const XLSX = (await import("xlsx-js-style")).default;
+        const wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
+        const { findHeaderRow } = await import("@/lib/depurador/reebok");
+        const { findHeaderRowDespacho } = await import("@/lib/depurador/reebok-despacho");
+        const { detectFactura } = await import("@/lib/depurador/tienda");
+        const hojas = wb.SheetNames.map((sn) => ({
+          nombre: sn,
+          filas: XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: null }) as SheetRow[],
+        }));
+        // 🔴 Reebok entra por DOS archivos —confirmación de compra y despacho—
+        // y los dos van al MISMO flujo. Las preguntas son las de siempre.
+        reconocimiento = reconocerArchivo(f.name, hojas, {
+          reebokCompra: (rows) => findHeaderRow(rows) !== -1,
+          reebokDespacho: (rows) => findHeaderRowDespacho(rows) !== -1,
+          facturaTienda: (rows) => detectFactura(rows) !== null,
+        });
       }
-      const XLSX = (await import("xlsx-js-style")).default;
-      const wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
-      const { findHeaderRow } = await import("@/lib/depurador/reebok");
-      const { findHeaderRowDespacho } = await import("@/lib/depurador/reebok-despacho");
-      const { detectFactura } = await import("@/lib/depurador/tienda");
-      let detected: Kind = "ckth";
-      for (const sn of wb.SheetNames) {
-        const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: null }) as SheetRow[];
-        // 🔴 Reebok entra por DOS archivos: la confirmación de compra (lo que va
-        // a llegar) y el despacho (lo que llegó). Los dos van al mismo flujo, y
-        // ReebokClient dice cuál se subió. Se olfatean por CONTENIDO, nunca por
-        // el nombre de la hoja: el despacho llega como `Sheet1` o como `Despacho`.
-        if (findHeaderRow(rows) !== -1 || findHeaderRowDespacho(rows) !== -1) { detected = "reebok"; break; }
-        if (detectFactura(rows)) { detected = "tienda"; break; }
-      }
-      setKind(detected);
+      setRec(reconocimiento);
+      const destino = caminoAProcesar(reconocimiento, TRES_DETALLES);
+      // 🔴 Apagado, lo desconocido cae a Calvin/Tommy como antes. Prendido, no
+      // se procesa: la caja lo dice y el archivo se queda afuera.
+      if (!destino) return;
+      setKind(destino);
       setFile(f);
     } catch {
-      // Si no se puede leer, deja que el flujo CK/TH muestre su propio error.
-      setKind("ckth");
+      // No se pudo abrir el archivo. Apagado: que el flujo Calvin/Tommy muestre
+      // su propio error, como siempre. Prendido: se dice acá y no se procesa.
+      const roto: Reconocimiento = { camino: null, texto: TEXTO_NO_RECONOZCO, empresas: [] };
+      setRec(roto);
+      const destino = caminoAProcesar(roto, TRES_DETALLES);
+      if (!destino) return;
+      setKind(destino);
       setFile(f);
     } finally {
       setBusy(false);
@@ -78,6 +111,8 @@ export default function DepuradorDispatcher({ onDownloaded }: DispatcherProps) {
   const back = () => {
     setFile(null);
     setError("");
+    setRec(null);
+    setNombreSoltado("");
     if (inputRef.current) inputRef.current.value = "";
   };
 
@@ -104,8 +139,30 @@ export default function DepuradorDispatcher({ onDownloaded }: DispatcherProps) {
           >
             <UploadCloud className="mb-2 h-7 w-7 text-teal-800" strokeWidth={1.6} />
             <div className="text-base font-semibold text-stone-900">
-              {busy ? "Leyendo archivo…" : "Suelta el archivo aquí o haz clic para buscar"}
+              {busy
+                ? "Leyendo archivo…"
+                : TRES_DETALLES && nombreSoltado
+                  ? nombreSoltado
+                  : "Suelta el archivo aquí o haz clic para buscar"}
             </div>
+            {/* 🔴 Qué reconoció, ANTES de procesar. Lo que no reconoce no pasa. */}
+            {TRES_DETALLES && !busy && rec && (
+              <span
+                data-reconocimiento={rec.camino ?? "ninguno"}
+                className={`mt-2 inline-block rounded-full px-3 py-1 text-[12px] font-medium ${
+                  rec.camino
+                    ? "bg-emerald-50 text-emerald-800"
+                    : "bg-red-50 text-red-800"
+                }`}
+              >
+                {rec.texto}
+              </span>
+            )}
+            {TRES_DETALLES && !busy && rec && !rec.camino && (
+              <span className="mt-1.5 text-[12px] text-stone-500">
+                Suelta el Excel del proveedor (Calvin, Tommy, Karl o Reebok) o el reporte de tienda.
+              </span>
+            )}
             <input
               ref={inputRef}
               type="file"

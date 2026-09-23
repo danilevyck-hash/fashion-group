@@ -242,6 +242,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 **El Historial guarda el MISMO Excel (bytes idénticos), 90 días**, en el bucket privado `depurador-plantillas` (`20260921120000`, **aplicada**), **SOLO los Excel de Switch**. El cron `cleanup-depurador-archivos` (03:20 UTC) borra el vencido y **la fila con los totales queda para siempre**.
 - Tallas y Fotos a mi Excel se anotan en `activity_logs` y no salen en el Historial. ⚠️ **La marca desconocida se queda EXACTAMENTE como está**.
 - `REEBOK_CATEGORY_ESPERADAS` es **ESPEJO** del mapa del catálogo (candado que compara las dos).
+- 🔴 **LA CAJA DICE QUÉ ARCHIVO RECONOCIÓ, LOS AVISOS SALEN COMPLETOS Y EL HISTORIAL MARCA LA REPETIDA (23-sep-2026):** lo que nadie reconoce **no se procesa** (antes caía a Calvin/Tommy en silencio; `reconocer-archivo.ts`, con la MISMA lista de columnas con la que frena `processRows`); los avisos ya no se cortan en 8 y bajan como Excel por `workbookBlob` + `filtroDesdeA1`; y la descarga repetida (misma marca, estilos y piezas en ≤ 60 min — **24 de 150** medidas) sale en gris con chip, **sin borrar ni esconder nada**. Interruptor `TRES_DETALLES`. 🔴 **El Excel de 25 columnas no cambió un byte.**
 - ⚠️ **Decisión pendiente de Daniel:** Reebok y Facturas Tienda no validan el divisor en pantalla como CK/TH (el guard de las rutas API sí aplica al guardar).
 ### Reclamos — [docs/postmortems/reclamos.md](docs/postmortems/reclamos.md)
 
