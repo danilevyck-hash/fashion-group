@@ -9,6 +9,7 @@ import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import type { ContadoresDelHub, ContadoresMarca } from "@/lib/catalogo/contadores";
 import { textoPulso, type PulsoDelHub, type PulsoMarca } from "@/lib/catalogo/pulso-pedidos";
 import { CATALOGO_ADMIN_ROLES, COMPROBANTES_ROLES, catalogoRoles } from "@/lib/catalogo/roles";
+import { URL_CATALOGOS_PUBLICOS } from "@/lib/catalogo/url-catalogos-publicos";
 
 // Catálogos en UNA pantalla: una tarjeta por marca con sus acciones adentro
 // (Ver catálogo · Comprobantes · Administrar · Copiar enlace) + contadores en
@@ -183,6 +184,15 @@ export default function CatalogosMarcasPage() {
       .catch(() => setToast("No se pudo copiar el link"));
   }
 
+  // UN link con los cuatro catálogos (23-sep-2026). Daniel: *«¿dónde veo el
+  // link para copiar en el módulo Catálogos?»*. Es el mismo link vivo que la
+  // página pública `/catalogo-publico/todos`: nada se congela al copiarlo.
+  function copiarLinkDeTodos() {
+    navigator.clipboard.writeText(URL_CATALOGOS_PUBLICOS)
+      .then(() => setToast("Link de los 4 catálogos copiado"))
+      .catch(() => setToast("No se pudo copiar el link"));
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <AppHeader module="Catálogos" breadcrumbs={[{ label: "Marcas" }]} />
@@ -201,6 +211,20 @@ export default function CatalogosMarcasPage() {
             sr-only para que la página no pierda su encabezado accesible: podar
             ruido visual no es motivo para dejar un documento sin h1. */}
         <h1 className="sr-only">Catálogos</h1>
+
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3">
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-gray-900">Link para clientes · los 4 catálogos</div>
+            <div className="truncate font-mono text-xs text-gray-500" data-testid="link-catalogos-todos">{URL_CATALOGOS_PUBLICOS}</div>
+          </div>
+          <button
+            type="button"
+            onClick={copiarLinkDeTodos}
+            className="min-h-[44px] rounded-md bg-black px-4 text-sm font-semibold text-white active:scale-[0.97]"
+          >
+            Copiar link
+          </button>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
           {BRANDS.map((b) => {

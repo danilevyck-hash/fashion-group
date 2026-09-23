@@ -161,3 +161,22 @@ describe("🩸 los cuatro botones arrancan a la misma altura", () => {
     expect(h2.className).not.toMatch(/(^|\s)min-h-\[4\.5rem\]/);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UN LINK PARA CLIENTES CON LOS CUATRO CATÁLOGOS (23-sep-2026). Daniel: *«¿dónde
+// veo el link para copiar en el módulo Catálogos?»*. El hub lo muestra y lo
+// copia; es el MISMO link vivo de `/catalogo-publico/todos` (nada se congela).
+// ─────────────────────────────────────────────────────────────────────────────
+describe("🔴 el hub ofrece el link de los cuatro catálogos", () => {
+  it("se ve el link público y un botón que lo copia", async () => {
+    await montar();
+    const { URL_CATALOGOS_PUBLICOS } = await import("@/lib/catalogo/url-catalogos-publicos");
+    expect(screen.getByTestId("link-catalogos-todos").textContent).toBe(URL_CATALOGOS_PUBLICOS);
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+    const { fireEvent } = await import("@testing-library/react");
+    fireEvent.click(screen.getByRole("button", { name: "Copiar link" }));
+    expect(writeText).toHaveBeenCalledWith(URL_CATALOGOS_PUBLICOS);
+    expect(await screen.findByText("Link de los 4 catálogos copiado")).toBeTruthy();
+  });
+});
