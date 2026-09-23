@@ -9,9 +9,15 @@
 //   ABIERTOS  — una fila por MARCA: su período abierto, lo REPORTADO como
 //               único monto, lo apagado en gris (sin sumar) y desde cuándo
 //               está abierto. Tocarla abre la marca (nivel 2).
-//   CERRADOS  — una fila por período cerrado: el NOMBRE que se le puso al
-//               cerrar, la marca, la fecha de cierre y la nota de crédito si
-//               la hay. Tocarla abre ese período (nivel 3).
+//   CERRADOS  — una fila por PERÍODO cerrado (no por marca): el NOMBRE que se
+//               le puso al cerrar, las marcas, la fecha de cierre y la nota de
+//               crédito si la hay. Tocarla abre ese período (nivel 3).
+//
+// 🔴 UN PERÍODO COMPARTIDO ES UNA SOLA FILA (22-sep-2026). «mid 2026» es de
+// PVH —la casa de Tommy y Calvin— y se dibujaba DOS veces, con el contador en
+// «Cerrados 2». Daniel: *«doble?»*. Hoy es UNA fila con los DOS montos, cada
+// uno con su marca y su propio botón para entrar, y el contador cuenta
+// PERÍODOS. 🔴 Los dos montos NO se suman: cada marca recibió su ZIP aparte.
 //
 // 🔴 MULTIFASHION NO ES UNA MARCA: es una tienda (D-108). No tiene fila entre
 // las marcas; se enlaza aparte, en Herramientas, con su plata a la vista.
@@ -39,10 +45,16 @@ import {
   filasCerradas,
   textoDiasAbierto,
   type FilaAbierta,
-  type FilaCerrada,
   type PestanaPortada,
   type PeriodoMeta,
 } from "@/lib/marketing/portada-rediseno";
+import {
+  agruparCerradosPorPeriodo,
+  esCompartido,
+  marcasDelGrupo,
+  tituloDelGrupo,
+  type GrupoCerrado,
+} from "@/lib/marketing/cerrados-por-periodo";
 import { FilaNivel, ListaCard } from "./FilaNivel";
 import type { DatosInicio } from "./InicioMarketing";
 
@@ -83,12 +95,50 @@ function subtituloAbierta(f: FilaAbierta): string {
   return partes.join(" · ");
 }
 
-/** El subtítulo de un período cerrado: marca, fecha y nota de crédito. */
-function subtituloCerrada(f: FilaCerrada): string {
-  const partes: string[] = [f.marcaNombre];
-  if (f.cerradoEn) partes.push(`Cerrado el ${formatearFecha(f.cerradoEn)}`);
-  if (f.notaCredito) partes.push(`Nota de crédito: ${f.notaCredito}`);
+/** El subtítulo de un período cerrado: sus marcas, la fecha y la nota. */
+function subtituloCerrada(g: GrupoCerrado): string {
+  const partes: string[] = [marcasDelGrupo(g)];
+  if (g.cerradoEn) partes.push(`Cerrado el ${formatearFecha(g.cerradoEn)}`);
+  if (g.notaCredito) partes.push(`Nota de crédito: ${g.notaCredito}`);
   return partes.join(" · ");
+}
+
+/**
+ * Los montos de un período que comparten DOS marcas o más: uno por marca, con
+ * su nombre, y cada uno es la puerta a SU nivel 3.
+ *
+ * 🔴 ACÁ NO HAY UNA SUMA. No existe el total de la fila: las marcas no se
+ * suman entre sí, y por eso tampoco hay un renglón que las junte.
+ */
+function MontosPorMarca({
+  grupo,
+  onAbrir,
+}: {
+  grupo: GrupoCerrado;
+  onAbrir: (bloqueKey: string, periodoId: string) => void;
+}) {
+  return (
+    <div className="flex flex-col items-end">
+      {grupo.marcas.map((m) => (
+        <button
+          key={m.bloqueKey}
+          type="button"
+          onClick={() => onAbrir(m.bloqueKey, grupo.id)}
+          aria-label={`Abrir ${grupo.nombre} de ${m.marcaNombre}`}
+          className="flex min-h-[44px] min-w-[44px] items-center justify-end gap-2 rounded-md px-2 -mr-2 hover:bg-gray-100 active:scale-[0.97] transition"
+        >
+          <span className="text-xs font-normal text-gray-500">{m.marcaNombre}</span>
+          <span className="tabular-nums">{formatearMonto(m.total)}</span>
+          {m.noReportado > 0 && (
+            <span className="text-xs font-normal text-gray-500 tabular-nums">
+              (no se reporta: {formatearMonto(m.noReportado)})
+            </span>
+          )}
+          <span className="text-gray-400 font-normal">›</span>
+        </button>
+      ))}
+    </div>
+  );
 }
 
 /** El monto de la fila: lo reportado, y debajo en gris lo que no. */
@@ -162,6 +212,9 @@ export default function PortadaAbiertosCerrados({
     [datos, meta, hoy],
   );
   const cerradas = useMemo(() => filasCerradas(datos?.cerrados ?? [], meta), [datos, meta]);
+  // 🔴 UNA fila por PERÍODO, no por marca: el contador de la pestaña y la
+  // lista cuentan y dibujan lo mismo.
+  const grupos = useMemo(() => agruparCerradosPorPeriodo(cerradas), [cerradas]);
   const tiendaPropia = useMemo(() => filaTiendaMultifashion(datos?.bloques ?? []), [datos]);
 
   const mobiliario = datos?.mobiliario;
@@ -196,8 +249,8 @@ export default function PortadaAbiertosCerrados({
             }`}
           >
             {ROTULO_PESTANA[p]}
-            {p === "cerrados" && datos && cerradas.length > 0 && (
-              <span className="ml-1.5 text-xs text-gray-400 tabular-nums">{cerradas.length}</span>
+            {p === "cerrados" && datos && grupos.length > 0 && (
+              <span className="ml-1.5 text-xs text-gray-400 tabular-nums">{grupos.length}</span>
             )}
           </button>
         ))}
@@ -243,28 +296,42 @@ export default function PortadaAbiertosCerrados({
             />
           ))}
         </ListaCard>
-      ) : cerradas.length === 0 ? (
+      ) : grupos.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 bg-white p-10 text-center">
           <p className="text-sm text-gray-600">Todavía no hay períodos cerrados.</p>
         </div>
       ) : (
         <ListaCard titulo="Períodos cerrados">
-          {cerradas.map((f) => (
-            <FilaNivel
-              key={`${f.id}:${f.bloqueKey}`}
-              titulo={f.nombre}
-              subtitulo={subtituloCerrada(f)}
-              monto={
-                <MontoConApagado
-                  reportado={f.total}
-                  noReportado={f.noReportado}
-                  cantidadNoReportada={f.noReportado > 0 ? 1 : 0}
-                />
-              }
-              onClick={() => onSelectCerrado(f.bloqueKey, f.id)}
-              ariaLabel={`Abrir ${f.nombre} de ${f.marcaNombre}`}
-            />
-          ))}
+          {grupos.map((g) => {
+            const compartido = esCompartido(g);
+            const unica = g.marcas[0];
+            return (
+              <FilaNivel
+                key={g.id}
+                titulo={tituloDelGrupo(g)}
+                subtitulo={subtituloCerrada(g)}
+                monto={
+                  compartido ? (
+                    <MontosPorMarca grupo={g} onAbrir={onSelectCerrado} />
+                  ) : (
+                    <MontoConApagado
+                      reportado={unica.total}
+                      noReportado={unica.noReportado}
+                      cantidadNoReportada={unica.noReportado > 0 ? 1 : 0}
+                    />
+                  )
+                }
+                // Con DOS marcas la fila no tiene un solo destino: se entra por
+                // el monto de cada una. Con una, la fila de siempre.
+                onClick={
+                  compartido ? undefined : () => onSelectCerrado(unica.bloqueKey, g.id)
+                }
+                ariaLabel={
+                  compartido ? undefined : `Abrir ${g.nombre} de ${unica.marcaNombre}`
+                }
+              />
+            );
+          })}
         </ListaCard>
       )}
 

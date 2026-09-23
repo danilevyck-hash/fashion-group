@@ -69,6 +69,12 @@ export interface PeriodoMeta {
   abiertoEn: string | null;
   nombreAlCerrar: string | null;
   notaCredito: string | null;
+  /**
+   * `mk_periodos.proveedor_key`: el código de marca en los períodos nuevos, y
+   * la casa (`'pvh'`) en el cierre viejo que comparten Tommy y Calvin.
+   * Opcional: sin él la fila se dibuja como siempre.
+   */
+  proveedorKey?: string | null;
 }
 
 export interface FilaAbierta {
@@ -98,6 +104,8 @@ export interface FilaCerrada {
   notaCredito: string | null;
   total: number;
   noReportado: number;
+  /** La casa del período (`proveedor_key`); la usa `cerrados-por-periodo.ts`. */
+  proveedorKey: string | null;
 }
 
 /** Fecha (YYYY-MM-DD) de Panamá de un instante ISO; `null` si no se puede leer. */
@@ -184,6 +192,7 @@ export function filasCerradas(
       notaCredito: String(m?.notaCredito ?? "").trim() || null,
       total: round2(Number(c.total) || 0),
       noReportado: round2(Number(c.noReportado?.total) || 0),
+      proveedorKey: m?.proveedorKey ?? null,
     });
   }
   filas.sort(

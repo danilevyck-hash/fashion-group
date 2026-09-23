@@ -5,7 +5,13 @@
 //
 //   /marketing/calvin-klein
 //     ABIERTO   Período 2026   $5,840.00   [Bajar ZIP]  ›
-//     CERRADO   mid 2026       $46,462.14  [ZIP]        ›
+//     CERRADO   mid 2026 · PVH              $46,462.14  [ZIP]  ›
+//               parte Calvin Klein · el resto es de Tommy Hilfiger
+//
+// 🔴 UN CIERRE QUE DOS MARCAS COMPARTEN LO DICE (22-sep-2026). «mid 2026» es
+// de PVH —la casa de Tommy y Calvin— y acá se veía como si fuera solo de esta
+// marca. El monto de la fila sigue siendo SOLO el de esta marca: no se suma
+// nada de la otra. Detrás de `MARKETING_PORTADA_REDISENO`.
 //
 // 🔑 Cada fila lleva su descarga AHÍ (pedido explícito de Daniel). El
 // [Cerrar] NO está acá: vive en el nivel 3 — una acción seria merece la
@@ -28,6 +34,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { formatearMonto } from "@/lib/marketing/normalizar";
+import { MARKETING_PORTADA_REDISENO } from "@/lib/marketing/portada-rediseno";
+import { textoParteDeLaMarca } from "@/lib/marketing/cerrados-por-periodo";
 import type { SeccionPeriodo } from "@/lib/marketing/lista-por-periodo";
 import RegistrarGastoModal from "../components/RegistrarGastoModal";
 import ProyectoOverlay from "../components/ProyectoOverlay";
@@ -126,6 +134,7 @@ function MarcaPage({ marcaSlug }: { marcaSlug: string }) {
             muebles: datos.bloque_resumen.muebles.total,
           },
           puedeCerrar: false,
+          compartido: null,
           proyectos: (datos.proyectos ?? []).map((p) => ({
             id: String(p.id),
             monto: p.gasto_real ?? p.por_cobrar_total ?? 0,
@@ -218,13 +227,24 @@ function MarcaPage({ marcaSlug }: { marcaSlug: string }) {
                 const hayGasto = s.docs.facturas > 0 || s.docs.muebles > 0;
                 const abierto = s.estado === "abierto";
                 const etiqueta = `${marca.nombre} · ${s.nombre} · ${formatearMonto(s.total)}`;
+                // El cierre compartido: la casa en el título y, debajo, qué
+                // parte es de esta marca y de quién es el resto.
+                const compartido = MARKETING_PORTADA_REDISENO ? s.compartido : null;
+                const titulo =
+                  compartido?.proveedorNombre
+                    ? `${s.nombre} · ${compartido.proveedorNombre}`
+                    : s.nombre;
+                const subtitulo = compartido
+                  ? textoParteDeLaMarca(marca.nombre, compartido.otrasMarcas)
+                  : "";
                 const zipClave = `${marca.key}:${abierto || !s.id ? "abierto" : s.id}`;
                 const conZip = hayGasto && (abierto || !!s.id);
                 return (
                   <FilaNivel
                     key={s.key}
                     chip={<ChipEstado estado={s.estado} />}
-                    titulo={s.nombre}
+                    titulo={titulo}
+                    subtitulo={subtitulo || undefined}
                     monto={
                       hayGasto ? (
                         formatearMonto(s.total)

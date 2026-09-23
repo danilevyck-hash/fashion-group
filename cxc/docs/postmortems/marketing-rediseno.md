@@ -288,6 +288,44 @@ Dos candados ajenos **cambiaron de forma, no de dirección**, con nota fechada:
 2. El agregador de los niveles 2 y 3 (`proyectos-lista`) ya aparta lo apagado, pero `lista-por-periodo.ts` no lo dibuja en gris todavía (hoy 0 apagados: nada que dibujar).
 3. El «Excel» de un período cerrado en el nivel 3 sigue vivo (es el del ZIP, pieza D); solo se retiró el «Exportar Excel» de Reportes.
 
+### (C) · el cierre compartido: «mid 2026» se veía DOBLE (22-sep-2026)
+
+> Daniel, mirando la pestaña Cerrados: *«doble?»*.
+
+**Medido contra producción (solo lectura, por REST).** `mk_periodos` tiene **6 filas**: los 5 períodos ABIERTOS, uno por marca (`proveedor_key` = TH · CK · KL · RBK · J), y **UN solo cerrado**: «mid 2026», `proveedor_key = 'pvh'` — PVH es la casa que factura Tommy Hilfiger y Calvin Klein. `nombre_al_cerrar` y `nota_credito` en NULL en las 6.
+
+**Ahora → después.**
+
+| | Ahora | Después |
+|---|---|---|
+| Pestaña | «Cerrados **2**» | «Cerrados **1**» (cuenta PERÍODOS) |
+| Filas | `mid 2026 · Calvin Klein · Cerrado el 11 ago 2026 · $46,462.14` **y** `mid 2026 · Tommy Hilfiger · … · $94,104.43` | **UNA**: título `mid 2026 · PVH`, subtítulo `Calvin Klein + Tommy Hilfiger · Cerrado el 11 ago 2026`, y a la derecha los DOS montos, cada uno con su marca |
+| Adentro de Tommy | `CERRADO  mid 2026  $94,104.43` | `CERRADO  mid 2026 · PVH` + `parte Tommy Hilfiger · el resto es de Calvin Klein` (en Calvin, al revés) |
+
+🔴 **LOS DOS MONTOS NO SE SUMAN.** Cada marca recibió su ZIP aparte: un grupo **no tiene campo `total`** y el módulo no tiene una sola operación de suma (barrido sobre el archivo, comentarios aparte). Los $140.566,57 no se escriben en ningún lado. **Ningún número cambia**: los dos montos son exactamente los que ya salían.
+
+**Qué se construyó.**
+
+- **`src/lib/marketing/cerrados-por-periodo.ts`** (puro, nuevo) — `agruparCerradosPorPeriodo` (junta por id de período, marcas alfabéticas), `tituloDelGrupo`, `marcasDelGrupo`, `esCompartido`, `textoParteDeLaMarca`, `unirNombres`, `marcasCompaneras` y la **tabla chica** `NOMBRE_POR_PROVEEDOR` (`'pvh'` → «PVH»; una clave desconocida **no se adivina**: la fila se dibuja como siempre).
+- **Las marcas de un período salen de sus DOCUMENTOS**, no de una lista a mano: son las filas que ya arma `resumen-bloques.ts › cerrados` (una por período·marca).
+- **`portada-rediseno.ts`** (aditivo) — `PeriodoMeta.proveedorKey?` y `FilaCerrada.proveedorKey`; `GET /api/marketing/inicio` lo llena con `mk_periodos.proveedor_key`, que ya leía.
+- **`PortadaAbiertosCerrados.tsx`** — una fila por grupo; con dos marcas, cada monto es **su propia puerta** (44×44, «Abrir mid 2026 de Tommy Hilfiger») y la fila deja de tener un destino único; con una marca, **la fila de siempre**.
+- **`lista-por-periodo.ts`** (aditivo) — `SeccionPeriodo.compartido` (`{ proveedorNombre, otrasMarcas }` o `null`) e `InsumosSecciones.proveedorPorPeriodo`; `proyectos-lista` lo arma de los `periodos` que ya leía. **El total de la sección sigue siendo solo el de esa marca.**
+- **`/marketing/[marca]/page.tsx`** — el título y el subtítulo de la fila del cerrado, **detrás de `MARKETING_PORTADA_REDISENO`** (apagado = la fila de antes, sin subtítulo).
+
+**Candado** `src/__tests__/components/marketing-cerrados-por-periodo.test.tsx` — **16 casos en 7 bloques**, con los montos REALES de producción adentro. Mutaciones a mano (romper → ROJO → restaurar), **5 de 5 en rojo**, control 🟢 16/16:
+
+| # | Mutación | Resultado |
+|---|---|---|
+| 1 | `agruparCerradosPorPeriodo` vuelve a agrupar por período **y marca** | 🔴 4 casos |
+| 2 | el grupo gana un `total` = suma de sus marcas | 🔴 2 casos |
+| 3 | la pestaña cuenta filas (`cerradas.length`) en vez de períodos | 🔴 1 caso |
+| 4 | `textoParteDeLaMarca` devuelve siempre vacío | 🔴 2 casos |
+| 5 | la pantalla de la marca deja de mirar el interruptor | 🔴 1 caso |
+| — | control sin mutar | 🟢 16/16 |
+
+**Pendiente o dudoso.** Con dos marcas la fila **no tiene un destino único**: se entra por el monto de cada marca. Si Daniel prefiere que tocar la fila entera lleve a una de las dos, es una línea — pero elegir cuál sería inventar una preferencia que él no dijo.
+
 
 ---
 

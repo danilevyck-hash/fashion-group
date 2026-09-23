@@ -38,6 +38,7 @@
 // repare esos sellos.
 // ============================================================================
 
+import { marcasCompaneras, nombreDeProveedor } from "./cerrados-por-periodo";
 import {
   SECCION_ABIERTO,
   claveDeSeccion,
@@ -146,6 +147,15 @@ export interface SeccionPeriodo {
   proyectos: SeccionProyecto[];
   /** Impulsadoras y gastos sin cliente DE ESTE período, o null. */
   general: GastoGeneral | null;
+  /**
+   * Cuando el período cerrado lo comparten DOS marcas o más (el caso de «mid
+   * 2026», de PVH): la casa y las OTRAS marcas. `null` = el período es solo de
+   * esta marca, y la fila se dibuja como siempre.
+   *
+   * 🔴 El monto de la sección sigue siendo SOLO el de esta marca: acá no se
+   * suma nada de las demás.
+   */
+  compartido: { proveedorNombre: string | null; otrasMarcas: string[] } | null;
 }
 
 export interface InsumosSecciones {
@@ -160,11 +170,23 @@ export interface InsumosSecciones {
   cerrados: ReadonlyArray<
     Pick<
       PeriodoCerradoResumen,
-      "id" | "nombre" | "cerradoEn" | "total" | "bloqueKey" | "facturas" | "muebles"
+      | "id"
+      | "nombre"
+      | "cerradoEn"
+      | "total"
+      | "bloqueKey"
+      | "bloqueNombre"
+      | "facturas"
+      | "muebles"
     >
   >;
   /** `resumen.detalle` ENTERO — acá se filtra por la marca. */
   detalle: ReadonlyArray<DetalleProyectoPeriodo>;
+  /**
+   * `mk_periodos.proveedor_key` por id de período. Solo sirve para NOMBRAR la
+   * casa de un cierre compartido; sin él, la fila se dibuja como siempre.
+   */
+  proveedorPorPeriodo?: ReadonlyMap<string, string>;
   /** El General de cada sección, por clave (lo arma la ruta con los items). */
   generales: ReadonlyMap<string, GastoGeneral>;
   conPeriodos: boolean;
@@ -228,12 +250,18 @@ export function armarSecciones(i: InsumosSecciones): SeccionPeriodo[] {
       puedeCerrar: i.conPeriodos && !sinGasto && !!i.bloque.periodoAbierto?.id,
       proyectos: proyectosDe(SECCION_ABIERTO),
       general: i.generales.get(SECCION_ABIERTO) ?? null,
+      // Los períodos ABIERTOS son uno por marca desde ago-2026: nunca se
+      // comparten.
+      compartido: null,
     });
   }
 
   for (const c of i.cerrados) {
     if (c.bloqueKey !== i.bloqueKey) continue;
     const clave = claveDeSeccion({ id: c.id, nombre: c.nombre });
+    // ¿Otras marcas tienen plata sellada a ESTE mismo período? Sale de las
+    // mismas filas del agregador, nunca de una lista escrita a mano.
+    const otrasMarcas = marcasCompaneras(i.cerrados, c.id, i.bloqueKey);
     out.push({
       key: clave,
       id: c.id,
@@ -246,6 +274,15 @@ export function armarSecciones(i: InsumosSecciones): SeccionPeriodo[] {
       puedeCerrar: false,
       proyectos: proyectosDe(clave),
       general: i.generales.get(clave) ?? null,
+      compartido:
+        otrasMarcas.length > 0
+          ? {
+              proveedorNombre: nombreDeProveedor(
+                c.id ? i.proveedorPorPeriodo?.get(String(c.id)) : null,
+              ),
+              otrasMarcas,
+            }
+          : null,
     });
   }
 

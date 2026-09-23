@@ -447,6 +447,11 @@ export async function GET(req: NextRequest) {
           bloque: bloqueResumen,
           cerrados: resumen.cerrados,
           detalle: resumen.detalle,
+          // La casa de cada período: solo sirve para NOMBRAR un cierre que dos
+          // marcas comparten («mid 2026 · PVH»). Ningún monto depende de esto.
+          proveedorPorPeriodo: new Map(
+            periodos.map((per) => [String(per.id), String(per.proveedor_key ?? "")]),
+          ),
           generales,
           conPeriodos: resumen.conPeriodos,
           ordenProyectos: proyectos.map((p) => String(p.id)),

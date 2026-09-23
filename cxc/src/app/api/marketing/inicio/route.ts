@@ -155,6 +155,9 @@ export async function GET(req: NextRequest) {
         abiertoEn: p.abierto_en ?? null,
         nombreAlCerrar: c.nombre_al_cerrar,
         notaCredito: c.nota_credito,
+        // La casa del período: 'pvh' en el cierre viejo que comparten Tommy y
+        // Calvin, el código de marca en los que abrieron después.
+        proveedorKey: p.proveedor_key ?? null,
       };
     }
 
