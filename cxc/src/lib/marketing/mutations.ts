@@ -13,6 +13,15 @@ import {
 } from "./normalizar";
 import { esPathStorage } from "./storage";
 import { sellarDocumento, proveedoresDeMarcaIds } from "./periodos-io";
+import {
+  conRespaldoSinColumnas,
+  sinColumnasDelRediseno,
+} from "./columnas-opcionales";
+import { columnasDelGasto, traeColumnasDelGasto } from "./puerta-gasto";
+import {
+  exigirTiendaDelDirectorio,
+  frenarFacturaDuplicada,
+} from "./puerta-gasto-server";
 import type {
   MkProyecto,
   MkFactura,
@@ -247,6 +256,25 @@ export async function restaurarProyecto(id: string): Promise<void> {
 export const MSG_SIN_CLIENTE_SIN_DDL =
   "Para registrar un gasto sin cliente falta correr la actualización de la base de datos. Mientras tanto, elige un cliente.";
 
+/**
+ * El `insert` de la factura CON las columnas del rediseño y, si la base dijera
+ * que no existen, el MISMO insert sin ellas (`columnas-opcionales.ts`, falla
+ * abierta). Sin columnas nuevas en el payload no hay reintento que hacer.
+ */
+async function insertarFacturaConRespaldo(payload: Record<string, unknown>) {
+  const insertar = (p: Record<string, unknown>) =>
+    supabaseServer.from("mk_facturas").insert(p).select("*").single();
+  const traeNuevas = ["se_reporta", "tienda_codigo", "nota"].some((c) => c in payload);
+  if (!traeNuevas) {
+    return { resultado: await insertar(payload), conLasColumnas: true };
+  }
+  return conRespaldoSinColumnas(
+    () => insertar(payload),
+    () => insertar(sinColumnasDelRediseno(payload)),
+    (m) => console.error(m),
+  );
+}
+
 export async function createFactura(
   input: CreateFacturaInput
 ): Promise<MkFactura> {
@@ -282,6 +310,14 @@ export async function createFactura(
 
   const estadoPago = input.estadoPago === "pagado" ? "pagado" : "creado";
 
+  // 🔴 EL REDISEÑO (22-sep-2026, pieza A): las tres columnas nuevas entran
+  // SOLO si la pantalla las mandó (`columnasDelGasto`); la tienda tiene que
+  // estar en el directorio; y ANTES de escribir, el freno de duplicados
+  // (proveedor normalizado + monto + fecha) — que lanza y no guarda.
+  const cols = columnasDelGasto(input);
+  await exigirTiendaDelDirectorio(cols.tienda_codigo);
+  await frenarFacturaDuplicada({ proveedor, monto: total, fecha });
+
   const payload = {
     proyecto_id: input.proyectoId ?? null,
     numero_factura: numero,
@@ -293,13 +329,11 @@ export async function createFactura(
     total,
     tiene_importacion: tieneImportacion,
     estado_pago: estadoPago,
+    ...cols,
   };
 
-  const { data, error } = await supabaseServer
-    .from("mk_facturas")
-    .insert(payload)
-    .select("*")
-    .single();
+  const { resultado } = await insertarFacturaConRespaldo(payload);
+  const { data, error } = resultado;
   if (error || !data) {
     // Pre-DDL: el CHECK viejo rechaza proyecto e impulsadora los dos en NULL.
     // La pantalla tiene que degradar limpio ANTES de que corra la migración.
@@ -341,6 +375,10 @@ export async function updateFactura(
   if (input.estadoPago !== undefined) {
     payload.estado_pago = input.estadoPago === "pagado" ? "pagado" : "creado";
   }
+  // Las tres columnas del rediseño, solo si vinieron (22-sep-2026, pieza A).
+  const cols = columnasDelGasto(input);
+  await exigirTiendaDelDirectorio(cols.tienda_codigo);
+  Object.assign(payload, cols);
 
   // Si cambia subtotal, itbms o tieneImportacion, recalcular total.
   const hasSubtotal = input.subtotal !== undefined;
@@ -380,16 +418,58 @@ export async function updateFactura(
     throw new Error("updateFactura: nada que actualizar");
   }
 
-  const { data, error } = await supabaseServer
-    .from("mk_facturas")
-    .update(payload)
-    .eq("id", id)
-    .select("*")
-    .single();
+  // 🔴 Editar tampoco puede dejar dos iguales: si cambió el proveedor, la
+  // fecha o el monto, se mira la huella RESULTANTE contra las demás vivas
+  // (la propia fila se salta por `id`). Un pago de impulsadora no pasa por
+  // acá: su freno mira `periodo_desde` y vive en `impulsadoras.ts`.
+  if (
+    payload.proveedor !== undefined ||
+    payload.fecha_factura !== undefined ||
+    payload.total !== undefined
+  ) {
+    await frenarSiEditarDejaDuplicado(id, payload);
+  }
+
+  const actualizar = (p: Record<string, unknown>) =>
+    supabaseServer.from("mk_facturas").update(p).eq("id", id).select("*").single();
+  const { resultado } = traeColumnasDelGasto(cols)
+    ? await conRespaldoSinColumnas(
+        () => actualizar(payload),
+        () => actualizar(sinColumnasDelRediseno(payload)),
+        (m) => console.error(m),
+      )
+    : { resultado: await actualizar(payload) };
+  const { data, error } = resultado;
   if (error || !data) {
     throw new Error(`updateFactura: ${error?.message ?? "sin datos"}`);
   }
   return data as MkFactura;
+}
+
+/** La huella que tendría la factura DESPUÉS de la edición, contra las vivas. */
+async function frenarSiEditarDejaDuplicado(
+  id: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const { data, error } = await supabaseServer
+    .from("mk_facturas")
+    .select("proveedor, total, fecha_factura, impulsadora_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (error || !data) return; // sin fila no hay con qué comparar; el update dirá lo suyo
+  const fila = data as {
+    proveedor: string | null;
+    total: number | null;
+    fecha_factura: string | null;
+    impulsadora_id: string | null;
+  };
+  if (fila.impulsadora_id) return;
+  await frenarFacturaDuplicada({
+    id,
+    proveedor: (payload.proveedor as string | undefined) ?? fila.proveedor,
+    monto: (payload.total as number | undefined) ?? fila.total,
+    fecha: (payload.fecha_factura as string | undefined) ?? fila.fecha_factura,
+  });
 }
 
 export async function anularFactura(id: string, motivo: string): Promise<void> {

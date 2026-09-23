@@ -18,6 +18,10 @@ interface MarcaPctBody {
 interface CreateEntregaBody {
   proyectoId?: string | null;
   notas?: string | null;
+  /** Las tres columnas del rediseño (22-sep-2026, pieza A). Ausentes = como hoy. */
+  seReporta?: boolean;
+  tiendaCodigo?: string | null;
+  nota?: string | null;
   // Marcas con % entre ellas (1 marca = 100%). Sin empresa interna.
   marcas?: MarcaPctBody[];
   items?: Array<{
@@ -88,6 +92,9 @@ export async function POST(req: NextRequest) {
       items,
       marcas: normalizarMarcasBody(body.marcas),
       notas: body.notas ?? null,
+      seReporta: body.seReporta,
+      tiendaCodigo: body.tiendaCodigo,
+      nota: body.nota,
     });
     return NextResponse.json(entrega);
   } catch (err) {

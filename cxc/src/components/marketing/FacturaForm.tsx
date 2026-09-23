@@ -18,6 +18,7 @@ import type {
 import { useToast } from "@/components/ToastSystem";
 import { PasoInstruccion } from "./PasoInstruccion";
 import { PdfUploader, UploadResult } from "./PdfUploader";
+import { ProveedorInput } from "./ProveedorInput";
 import { MAX_PDF_MB, faltaLaFactura } from "@/lib/marketing/pdf-en-la-puerta";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { formatearMonto } from "@/lib/marketing/normalizar";
@@ -149,6 +150,13 @@ interface FacturaFormProps {
    * EDICIÓN de una factura vieja siguen guardando sin PDF, como siempre.
    */
   pdfObligatorio?: boolean;
+  /**
+   * 🔴 LOS PROVEEDORES YA USADOS, para sugerirlos mientras se escribe
+   * (22-sep-2026, pieza A). Con esto puesto el campo «Proveedor» es
+   * `ProveedorInput`: texto libre + lista de ayuda, nunca una lista cerrada.
+   * Sin la prop, el campo es el de siempre.
+   */
+  historicoProveedores?: readonly string[];
 }
 
 type ItbmsOption = "0" | "7";
@@ -203,6 +211,7 @@ export function FacturaForm({
   onUploadPdfForIA,
   pdfInicial,
   pdfObligatorio = false,
+  historicoProveedores,
 }: FacturaFormProps) {
   const { toast } = useToast();
 
@@ -572,6 +581,16 @@ export function FacturaForm({
             <label htmlFor="factura-proveedor" className="block text-sm text-gray-600 mb-1">
               Proveedor<span className="text-red-500 ml-0.5">*</span>
             </label>
+            {historicoProveedores ? (
+              <ProveedorInput
+                id="factura-proveedor"
+                value={proveedor}
+                onChange={setProveedor}
+                historico={historicoProveedores}
+                required
+                className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none"
+              />
+            ) : (
             <input
               id="factura-proveedor"
               type="text"
@@ -580,6 +599,7 @@ export function FacturaForm({
               required
               className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none"
             />
+            )}
           </div>
 
           <div>

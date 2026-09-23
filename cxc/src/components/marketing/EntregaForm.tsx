@@ -37,6 +37,7 @@
 // ============================================================================
 
 import { useEffect, useMemo, useState } from "react";
+import type { DatosDelGastoParaGuardar } from "@/lib/marketing/puerta-gasto";
 import type {
   EntregaConItems,
   MarcaConPorcentaje,
@@ -67,6 +68,18 @@ interface Props {
   initial?: EntregaConItems | null;
   onClose: () => void;
   onSaved: () => void;
+  /**
+   * 🔴 LA PUERTA «＋ Gasto» YA ELIGIÓ LA MARCA (22-sep-2026, pieza A): UNA por
+   * gasto. Con esto puesto el selector de marcas no se dibuja — viene
+   * preseleccionada por `marcasProyecto` y enseñar un control que no cambia
+   * nada es peor que no enseñarlo. Sin la prop, el formulario es el de siempre.
+   */
+  marcaFija?: boolean;
+  /**
+   * Las tres columnas del rediseño que la puerta ya preguntó (tienda ·
+   * «se reporta» · nota). Viajan en el POST tal cual; sin la prop no viajan.
+   */
+  gasto?: DatosDelGastoParaGuardar | null;
 }
 
 type Categoria = "paneles" | "tablas" | "conjunto" | "norte" | "barra" | "otros";
@@ -160,6 +173,8 @@ export default function EntregaForm({
   initial,
   onClose,
   onSaved,
+  marcaFija = false,
+  gasto = null,
 }: Props) {
   const { toast } = useToast();
 
@@ -576,7 +591,16 @@ export default function EntregaForm({
       const method = initial ? "PATCH" : "POST";
       const body = initial
         ? { items, marcas, notas: nombre.trim() || null }
-        : { proyectoId: proyectoId ?? null, items, marcas, notas: nombre.trim() || null };
+        : {
+            proyectoId: proyectoId ?? null,
+            items,
+            marcas,
+            notas: nombre.trim() || null,
+            // Lo que la puerta nueva preguntó; sin ella, nada nuevo viaja.
+            ...(gasto
+              ? { tiendaCodigo: gasto.tiendaCodigo, seReporta: gasto.seReporta, nota: gasto.nota }
+              : {}),
+          };
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -752,7 +776,9 @@ export default function EntregaForm({
                 />
               </section>
 
-              {/* Paso 1: Marca(s) con % */}
+              {/* Paso 1: Marca(s) con %. Con `marcaFija` (la puerta nueva ya
+                  la eligió) el bloque entero no se dibuja. */}
+              {!marcaFija && (
               <section className="space-y-2">
                 <label className="block text-sm font-medium text-gray-800">
                   ¿A qué marca(s) pertenece esta entrega?
@@ -828,6 +854,7 @@ export default function EntregaForm({
                   </div>
                 )}
               </section>
+              )}
 
               {/* Paso 2: Paneles destacado. ⛔ Sin curva, sin autorrelleno:
                   el ⓘ "Cómo se llena el kit" se fue CON la funcionalidad que

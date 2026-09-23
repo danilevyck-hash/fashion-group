@@ -6,6 +6,7 @@ import {
   anularPagoImpulsadora,
 } from "@/lib/marketing/impulsadoras";
 import { firmarPath } from "@/lib/marketing/storage";
+import { esErrorDeDuplicado } from "@/lib/marketing/puerta-gasto";
 import { logActivity } from "@/lib/log-activity";
 import type { RegistrarPagoImpulsadoraInput } from "@/lib/marketing/types";
 
@@ -51,6 +52,11 @@ export async function POST(
       // Foto OPCIONAL del pago (evento/activación) — distinta del comprobante.
       // `fotoGuardada` en la respuesta le dice a la pantalla si entró o no.
       foto: body.foto ?? null,
+      // Las tres columnas del rediseño (22-sep-2026, pieza A): si no vienen,
+      // no se escriben.
+      seReporta: body.seReporta,
+      tiendaCodigo: body.tiendaCodigo,
+      nota: body.nota,
     });
     logActivity(
       auth.role,
@@ -68,6 +74,11 @@ export async function POST(
     return NextResponse.json(res);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error";
+    // 🔴 El duplicado (misma impulsadora, mismo monto, mismo inicio de
+    // período) contesta 400 y no escribió nada.
+    if (esErrorDeDuplicado(err)) {
+      return NextResponse.json({ error: message, duplicado: true }, { status: 400 });
+    }
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

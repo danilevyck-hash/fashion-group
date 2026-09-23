@@ -56,6 +56,15 @@ vi.mock("@/lib/marketing/pdf-en-la-puerta", async (importOriginal) => {
   };
 });
 
+// ⚠️ Nota fechada (22-sep-2026): la puerta «＋ Gasto» del rediseño (pieza A)
+// está PRENDIDA (`MARKETING_PUERTA_GASTO`, `lib/marketing/puerta-gasto.ts`).
+// Este archivo prueba la pantalla DE ANTES, que sigue viva detrás del
+// interruptor en `false`; la nueva la cubre `marketing-puerta-gasto.test.tsx`.
+vi.mock("@/lib/marketing/puerta-gasto", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/marketing/puerta-gasto")>();
+  return { ...real, MARKETING_PUERTA_GASTO: false };
+});
+
 vi.mock("@/app/marketing/components/RegistrarPagoModal", () => ({
   default: ({ impulsadora }: { impulsadora: { nombre: string } }) => (
     <div data-testid="registrar-pago-modal">Pago a {impulsadora.nombre}</div>

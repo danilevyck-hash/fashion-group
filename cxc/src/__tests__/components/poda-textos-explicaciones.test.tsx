@@ -286,6 +286,15 @@ vi.mock("@/lib/marketing/pdf-en-la-puerta", async (importOriginal) => {
   };
 });
 
+// ⚠️ Nota fechada (22-sep-2026): la puerta «＋ Gasto» del rediseño (pieza A)
+// está PRENDIDA (`MARKETING_PUERTA_GASTO`, `lib/marketing/puerta-gasto.ts`).
+// Este archivo prueba la pantalla DE ANTES, que sigue viva detrás del
+// interruptor en `false`; la nueva la cubre `marketing-puerta-gasto.test.tsx`.
+vi.mock("@/lib/marketing/puerta-gasto", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/marketing/puerta-gasto")>();
+  return { ...real, MARKETING_PUERTA_GASTO: false };
+});
+
 vi.mock("@/app/marketing/components/RegistrarPagoModal", () => ({
   default: () => <div data-testid="registrar-pago-modal" />,
 }));
@@ -395,6 +404,15 @@ describe("Marketing · 'Por cliente' pierde la definición, NO el aviso de que n
 // Marketing › Cerrar período
 // ───────────────────────────────────────────────────────────────────────────
 import CerrarPeriodoModal from "@/app/marketing/components/CerrarPeriodoModal";
+
+// ⚠️ Nota fechada (22-sep-2026, pieza C del rediseño): este bloque prueba el
+// modal DE ANTES (nombre del período que EMPIEZA), vivo detrás de
+// `MARKETING_PORTADA_REDISENO` en `false`. El modal nuevo (nombre con el que
+// se CIERRA + nota de crédito) lo cubre `marketing-portada-y-cierre.test.tsx`.
+vi.mock("@/lib/marketing/portada-rediseno", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/marketing/portada-rediseno")>();
+  return { ...real, MARKETING_PORTADA_REDISENO: false };
+});
 
 describe("Marketing · cerrar período pierde la bajada del campo, no el campo ni el aviso rojo", () => {
   function pintar() {

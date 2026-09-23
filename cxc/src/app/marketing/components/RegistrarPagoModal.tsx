@@ -15,6 +15,7 @@ import {
   validarPeriodo,
 } from "@/lib/marketing/periodo";
 import type { ImpulsadoraConEstado } from "@/lib/marketing/types";
+import type { DatosDelGastoParaGuardar } from "@/lib/marketing/puerta-gasto";
 
 interface Props {
   impulsadora: ImpulsadoraConEstado;
@@ -34,6 +35,12 @@ interface Props {
    * aviso, no apaga un botón.
    */
   fotoOpcional?: File | null;
+  /**
+   * Las tres columnas del rediseño que la puerta «＋ Gasto» ya preguntó
+   * (tienda · «se reporta» · nota; 22-sep-2026, pieza A). Viajan en el POST
+   * tal cual; sin la prop (Impulsadoras › Registrar pago) no viaja nada nuevo.
+   */
+  gasto?: DatosDelGastoParaGuardar | null;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -51,6 +58,7 @@ export default function RegistrarPagoModal({
   impulsadora,
   mesInicial,
   fotoOpcional,
+  gasto = null,
   onClose,
   onSaved,
 }: Props) {
@@ -155,6 +163,9 @@ export default function RegistrarPagoModal({
           hasta,
           monto: montoNum,
           ...(foto ? { foto } : {}),
+          ...(gasto
+            ? { tiendaCodigo: gasto.tiendaCodigo, seReporta: gasto.seReporta, nota: gasto.nota }
+            : {}),
           comprobante: {
             path: comprobante.path,
             tipo: comprobante.tipo,

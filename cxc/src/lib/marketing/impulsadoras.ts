@@ -27,6 +27,17 @@ import { bloquePorMarcaId, sellarDocumento } from "./periodos-io";
 import { esMarcaCodigo } from "./bloques";
 import { exigirUnaMarca } from "./gasto";
 import {
+  conRespaldoSinColumnas,
+  sinColumnasDelRediseno,
+} from "./columnas-opcionales";
+import { columnasDelGasto, traeColumnasDelGasto } from "./puerta-gasto";
+import {
+  exigirTiendaDelDirectorio,
+  frenarPagoDuplicado,
+} from "./puerta-gasto-server";
+import { mesesSinPagar } from "./meses-sin-pagar";
+import { ZIP_E_IMPULSADORAS_NUEVO } from "./zip-e-impulsadoras";
+import {
   coberturaDelMes,
   etiquetaPeriodo,
   etiquetaPeriodoCorta,
@@ -188,6 +199,9 @@ export async function listImpulsadoras(): Promise<ImpulsadoraConEstado[]> {
 
   const mesAnt = mesAnteriorISO();
   const mesAct = mesActualISO();
+  // El «hoy» de negocio es el de Panamá, nunca el reloj del servidor (Vercel
+  // corre en UTC): es el último mes que se mira para saber qué se debe.
+  const hoy = hoyPanama();
 
   return impulsadoras.map((imp) => {
     const marcasResueltas: ImpulsadoraMarcaResuelta[] = (splits.get(String(imp.id)) ?? [])
@@ -207,6 +221,10 @@ export async function listImpulsadoras(): Promise<ImpulsadoraConEstado[]> {
       marcas: marcasResueltas,
       mesAnterior: { ...cobAnt, pagado: cobAnt.estado === "pagado" },
       mesActual: { ...cobAct, pagado: cobAct.estado === "pagado" },
+      // 🔴 TODOS los meses sin pagar desde el primer pago, el más viejo
+      //    arriba (22-sep-2026). Los dos chips de arriba se quedan: son los
+      //    que ve la pantalla con el interruptor apagado.
+      mesesSinPagar: ZIP_E_IMPULSADORAS_NUEVO ? mesesSinPagar(periodos, hoy) : [],
       // Los 3 más recientes, para que la tarjeta muestre QUÉ se pagó y no solo
       // el estado del mes ("1–15 jul 2026 · 16–31 jul 2026 · jun 2026").
       ultimosPeriodos: periodos.slice(-3).reverse().map(etiquetaPeriodoCorta),
@@ -457,6 +475,18 @@ export async function registrarPagoImpulsadora(
     );
   }
 
+  // 🔴 EL REDISEÑO (22-sep-2026, pieza A): las tres columnas nuevas entran
+  // SOLO si la pantalla las mandó; la tienda tiene que estar en el directorio;
+  // y el freno de duplicados mira `periodo_desde` como fecha — ANTES de
+  // escribir nada.
+  const cols = columnasDelGasto(input);
+  await exigirTiendaDelDirectorio(cols.tienda_codigo);
+  await frenarPagoDuplicado(impulsadoraId, {
+    proveedor: nombreImpulsadora,
+    monto,
+    fecha: desde,
+  });
+
   // Mes completo → "Impulsadora Ana — Julio 2026" (texto idéntico al de los
   // pagos mensuales de antes). Quincena → "… — 1–15 de julio 2026".
   const concepto = `Impulsadora ${nombreImpulsadora} — ${etiquetaPeriodo(periodo)}`;
@@ -483,26 +513,33 @@ export async function registrarPagoImpulsadora(
   const paraSellar: Array<{ facturaId: string; marcaId: string }> = [];
   try {
     for (const p of porciones) {
-      const { data: facData, error: facErr } = await supabaseServer
-        .from("mk_facturas")
-        .insert({
-          proyecto_id: null,
-          impulsadora_id: impulsadoraId,
-          impulsadora_mes: mesISO,
-          ...colsPeriodo,
-          numero_factura: numeroFactura,
-          fecha_factura: fechaFactura,
-          proveedor: tituloCase(nombreImpulsadora),
-          concepto,
-          subtotal: p.monto,
-          itbms: 0,
-          total: p.monto,
-          tiene_importacion: false,
-          estado_pago: "pagado",
-          grupo_legacy: false,
-        })
-        .select("id")
-        .single();
+      const filaPago = {
+        proyecto_id: null,
+        impulsadora_id: impulsadoraId,
+        impulsadora_mes: mesISO,
+        ...colsPeriodo,
+        numero_factura: numeroFactura,
+        fecha_factura: fechaFactura,
+        proveedor: tituloCase(nombreImpulsadora),
+        concepto,
+        subtotal: p.monto,
+        itbms: 0,
+        total: p.monto,
+        tiene_importacion: false,
+        estado_pago: "pagado",
+        grupo_legacy: false,
+        ...cols,
+      };
+      const insertar = (fila: Record<string, unknown>) =>
+        supabaseServer.from("mk_facturas").insert(fila).select("id").single();
+      const { resultado } = traeColumnasDelGasto(cols)
+        ? await conRespaldoSinColumnas(
+            () => insertar(filaPago),
+            () => insertar(sinColumnasDelRediseno(filaPago)),
+            (m) => console.error(m),
+          )
+        : { resultado: await insertar(filaPago) };
+      const { data: facData, error: facErr } = resultado;
       if (facErr || !facData) {
         throw new Error(facErr?.message ?? "no se creó la factura");
       }

@@ -75,6 +75,12 @@
 // es imagen, todo sigue igual; si es PDF, ES la factura — se lee con la IA que
 // ya existía y llega al paso 3 con los campos puestos, sin pedirlo de nuevo ni
 // subirlo dos veces. Todo cuelga de `MARKETING_PDF_EN_LA_PUERTA`, APAGADO.
+//
+// 🔴 EL REDISEÑO (22-sep-2026, pieza A) VIVE EN `PuertaGasto.tsx`, detrás de
+// `MARKETING_PUERTA_GASTO` (`lib/marketing/puerta-gasto.ts`). Con el
+// interruptor PRENDIDO el `default export` de acá monta la puerta nueva (tres
+// tipos, UNA marca, tienda o «General», «Se reporta», nota); APAGADO monta
+// `RegistrarGastoModalAnterior`, que es TODO lo de abajo, sin un cambio.
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -82,6 +88,8 @@ import { createPortal } from "react-dom";
 import { useToast } from "@/components/ToastSystem";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import ClientePicker from "@/components/ClientePicker";
+import { MARKETING_PUERTA_GASTO } from "@/lib/marketing/puerta-gasto";
+import PuertaGasto, { type PuertaGastoProps } from "./PuertaGasto";
 import { FacturaForm } from "@/components/marketing";
 import EntregaForm from "@/components/marketing/EntregaForm";
 import RegistrarPagoModal from "./RegistrarPagoModal";
@@ -170,7 +178,18 @@ function ordenarMarcas(marcas: MkMarca[]): MkMarca[] {
   });
 }
 
-export default function RegistrarGastoModal({
+/**
+ * 🔴 LA ÚNICA PUERTA. Con `MARKETING_PUERTA_GASTO` prendido, la del rediseño;
+ * apagado, la de antes (abajo, intacta). Los tres lugares que la montan
+ * (`/marketing`, `/marketing/[marca]`, `/marketing/[marca]/[periodo]`) no
+ * cambian una línea.
+ */
+export default function RegistrarGastoModal(props: PuertaGastoProps) {
+  if (MARKETING_PUERTA_GASTO) return <PuertaGasto {...props} />;
+  return <RegistrarGastoModalAnterior {...props} />;
+}
+
+function RegistrarGastoModalAnterior({
   marcas,
   marcaInicial = null,
   onClose,

@@ -50,6 +50,12 @@ import {
 import { normalizarBultos, normalizarPiezas, piezasParaStock } from "./piezas-bultos";
 import { exigirUnaMarca } from "./gasto";
 import {
+  conRespaldoSinColumnas,
+  sinColumnasDelRediseno,
+} from "./columnas-opcionales";
+import { columnasDelGasto, traeColumnasDelGasto } from "./puerta-gasto";
+import { exigirTiendaDelDirectorio } from "./puerta-gasto-server";
+import {
   borrarSellosDeDocumento,
   sellarDocumentoPorMarcas,
 } from "./periodos-io";
@@ -846,18 +852,31 @@ export async function createEntrega(
       ? String(input.notas).trim() || null
       : null;
 
+  // 🔴 EL REDISEÑO (22-sep-2026, pieza A): `se_reporta` · `tienda_codigo` ·
+  // `nota` entran SOLO si la pantalla las mandó, y la tienda tiene que estar
+  // en el directorio. Un mueble no tiene proveedor: sin freno de duplicados.
+  const cols = columnasDelGasto(input);
+  await exigirTiendaDelDirectorio(cols.tienda_codigo);
+
   // 1) Insert entrega (total_por_empresa_interna SIEMPRE {} — sin 50/50).
-  const { data: entRow, error: entErr } = await supabaseServer
-    .from("mk_entregas_muebles")
-    .insert({
-      proyecto_id: proyectoId,
-      total,
-      total_por_marca: totalPorMarca,
-      total_por_empresa_interna: {},
-      notas,
-    })
-    .select("*")
-    .single();
+  const payloadEntrega = {
+    proyecto_id: proyectoId,
+    total,
+    total_por_marca: totalPorMarca,
+    total_por_empresa_interna: {},
+    notas,
+    ...cols,
+  };
+  const insertar = (p: Record<string, unknown>) =>
+    supabaseServer.from("mk_entregas_muebles").insert(p).select("*").single();
+  const { resultado: resEntrega } = traeColumnasDelGasto(cols)
+    ? await conRespaldoSinColumnas(
+        () => insertar(payloadEntrega),
+        () => insertar(sinColumnasDelRediseno(payloadEntrega)),
+        (m) => console.error(m),
+      )
+    : { resultado: await insertar(payloadEntrega) };
+  const { data: entRow, error: entErr } = resEntrega;
   if (entErr || !entRow) {
     // Pre-DDL: si la columna sigue NOT NULL (la migración 20260811180000 la
     // relaja), una entrega sin cliente rebota acá. Degradar limpio, no
@@ -978,10 +997,20 @@ export async function updateEntrega(
     updPayload.notas =
       input.notas === null ? null : String(input.notas).trim() || null;
   }
-  const { error: updErr } = await supabaseServer
-    .from("mk_entregas_muebles")
-    .update(updPayload)
-    .eq("id", id);
+  // Las tres columnas del rediseño, solo si vinieron (22-sep-2026, pieza A).
+  const cols = columnasDelGasto(input);
+  await exigirTiendaDelDirectorio(cols.tienda_codigo);
+  Object.assign(updPayload, cols);
+  const actualizar = (p: Record<string, unknown>) =>
+    supabaseServer.from("mk_entregas_muebles").update(p).eq("id", id).select("id").maybeSingle();
+  const { resultado: resUpd } = traeColumnasDelGasto(cols)
+    ? await conRespaldoSinColumnas(
+        () => actualizar(updPayload),
+        () => actualizar(sinColumnasDelRediseno(updPayload)),
+        (m) => console.error(m),
+      )
+    : { resultado: await actualizar(updPayload) };
+  const updErr = resUpd.error;
   if (updErr) throw new Error(`updateEntrega[entrega]: ${updErr.message}`);
 
   // 2) Reemplazar items (reparto = unidades bajo la marca primaria, empresa null).

@@ -243,6 +243,14 @@ export interface CreateFacturaInput {
   itbms?: number;
   tieneImportacion?: boolean;
   estadoPago?: EstadoPagoFactura;
+  /**
+   * Las tres columnas del rediseño (22-sep-2026, pieza A). OPCIONALES: la
+   * pantalla de antes no las manda y entonces no se escriben. Ver
+   * `lib/marketing/puerta-gasto.ts › columnasDelGasto`.
+   */
+  seReporta?: boolean;
+  tiendaCodigo?: string | null;
+  nota?: string | null;
 }
 
 export interface UpdateFacturaInput {
@@ -254,6 +262,14 @@ export interface UpdateFacturaInput {
   itbms?: number;
   tieneImportacion?: boolean;
   estadoPago?: EstadoPagoFactura;
+  /**
+   * Las tres columnas del rediseño (22-sep-2026, pieza A). OPCIONALES: la
+   * pantalla de antes no las manda y entonces no se escriben. Ver
+   * `lib/marketing/puerta-gasto.ts › columnasDelGasto`.
+   */
+  seReporta?: boolean;
+  tiendaCodigo?: string | null;
+  nota?: string | null;
 }
 
 export interface CreateAdjuntoInput {
@@ -304,6 +320,14 @@ export interface RegistrarPagoImpulsadoraInput {
    * — distinta del comprobante, que es obligatorio y va aparte.
    */
   foto?: { path: string; nombreOriginal?: string; sizeBytes?: number } | null;
+  /**
+   * Las tres columnas del rediseño (22-sep-2026, pieza A). OPCIONALES: la
+   * pantalla de antes no las manda y entonces no se escriben. Ver
+   * `lib/marketing/puerta-gasto.ts › columnasDelGasto`.
+   */
+  seReporta?: boolean;
+  tiendaCodigo?: string | null;
+  nota?: string | null;
 }
 
 // Marca del split con nombre/código resueltos, para la UI.
@@ -328,6 +352,17 @@ export interface ImpulsadoraConEstado extends MkImpulsadora {
   marcas: ImpulsadoraMarcaResuelta[];
   mesAnterior: PagoMesEstado;
   mesActual: PagoMesEstado;
+  /**
+   * 🔴 TODOS los meses sin pagar desde el primer pago, el MÁS VIEJO PRIMERO
+   * (22-sep-2026). `mesAnterior`/`mesActual` siguen ahí porque son lo que la
+   * pantalla dibuja con el interruptor `ZIP_E_IMPULSADORAS_NUEVO` apagado.
+   * Lista vacía = no debe nada, o no tiene ningún pago del cual partir.
+   */
+  mesesSinPagar: Array<{
+    mes: string;
+    estado: "parcial" | "pendiente";
+    faltan: string;
+  }>;
   /** Períodos pagados más recientes, ya formateados ("1–15 jul 2026"). */
   ultimosPeriodos: string[];
   /**
@@ -467,12 +502,28 @@ export interface CreateEntregaInput {
   // entrega se reparte por estos %. Sin empresa interna (se retiró el 50/50).
   marcas?: MarcaPorcentajeInput[];
   notas?: string | null;
+  /**
+   * Las tres columnas del rediseño (22-sep-2026, pieza A). OPCIONALES: la
+   * pantalla de antes no las manda y entonces no se escriben. Ver
+   * `lib/marketing/puerta-gasto.ts › columnasDelGasto`.
+   */
+  seReporta?: boolean;
+  tiendaCodigo?: string | null;
+  nota?: string | null;
 }
 
 export interface UpdateEntregaInput {
   items: EntregaItemInput[];
   marcas?: MarcaPorcentajeInput[];
   notas?: string | null;
+  /**
+   * Las tres columnas del rediseño (22-sep-2026, pieza A). OPCIONALES: la
+   * pantalla de antes no las manda y entonces no se escriben. Ver
+   * `lib/marketing/puerta-gasto.ts › columnasDelGasto`.
+   */
+  seReporta?: boolean;
+  tiendaCodigo?: string | null;
+  nota?: string | null;
 }
 
 export interface CreateProductoInput {

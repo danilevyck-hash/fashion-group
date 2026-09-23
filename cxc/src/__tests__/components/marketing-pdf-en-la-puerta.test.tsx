@@ -45,6 +45,15 @@ vi.mock("@/lib/marketing/pdf-en-la-puerta", async (importOriginal) => {
 
 // El formulario de MUEBLES es su propio modal y no se toca en este cambio: se
 // dobla para poder disparar su `onSaved` y mirar CÓMO se cuelga el PDF.
+// ⚠️ Nota fechada (22-sep-2026): la puerta «＋ Gasto» del rediseño (pieza A)
+// está PRENDIDA (`MARKETING_PUERTA_GASTO`, `lib/marketing/puerta-gasto.ts`).
+// Este archivo prueba la pantalla DE ANTES, que sigue viva detrás del
+// interruptor en `false`; la nueva la cubre `marketing-puerta-gasto.test.tsx`.
+vi.mock("@/lib/marketing/puerta-gasto", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/marketing/puerta-gasto")>();
+  return { ...real, MARKETING_PUERTA_GASTO: false };
+});
+
 vi.mock("@/components/marketing/EntregaForm", () => ({
   default: ({ onSaved }: { onSaved: () => void | Promise<void> }) => (
     <button type="button" data-testid="entrega-guardar" onClick={() => void onSaved()}>

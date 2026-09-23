@@ -206,3 +206,50 @@ Mutaciones corridas a mano (romper → ROJO → restaurar), **6 de 6 en rojo** y
 Dos candados ajenos **cambiaron de forma, no de dirección**, con nota fechada:
 - `src/__tests__/lib/caja-y-marketing-defectos.test.ts` › «la ruta sigue pidiendo un dueño» — el guard de `upload-url` ganó un cuarto permitido (`tiendaCodigo`) y quedó en varias líneas; ahora se comprueban las piezas, no la grafía de una línea. Se sumó un caso: la foto de una tienda va a SU carpeta.
 - `src/__tests__/lib/sesion-semilla-primer-pintado.test.tsx` — la pantalla nueva entró a `ALCANZADAS_POR_EL_GANCHO` (29 → 30).
+
+---
+
+## A. La puerta «＋ Gasto» con sus tres formularios (22-sep-2026, pieza A)
+
+> Interruptor: `MARKETING_PUERTA_GASTO` en `src/lib/marketing/puerta-gasto.ts`, **hoy `true`**. En `false`, `RegistrarGastoModal` es la pantalla de antes campo por campo (`RegistrarGastoModalAnterior`, el mismo archivo, intacto) y el servidor no corre el freno nuevo. Candado: `src/__tests__/components/marketing-puerta-gasto.test.tsx` (27 casos en 7 bloques).
+
+### Ahora vs después
+
+| | Antes (interruptor en `false`) | Después (hoy) |
+|---|---|---|
+| Paso 1 | Factura · Mueble · «Gasto de la marca» (con Impulsadora / Otro gasto adentro) | **Factura de un proveedor · Mueble de la bodega · Pago de impulsadora** (`OPCIONES_DE_TIPO`, derivadas de `TIPOS_DE_GASTO`) |
+| Cliente | Obligatorio en Factura y Mueble; busca o **crea un proyecto** | **Tienda del directorio o «General»**; obligatoria solo si «es de una tienda». **Ningún proyecto**: `proyecto_id = null`, `tienda_codigo` del gasto |
+| Marca | Botones; se ponía **aparte** con `PUT /facturas/[id]/marcas` | Desplegable, UNA; viaja **con la factura** (`marcaId`) y el servidor contesta **400 antes de escribir** si falta. En impulsadora es la de ella, fija |
+| Se reporta / nota | No existían | Casilla **prendida** + nota opcional; viajan en el MISMO guardado (`seReporta` · `tiendaCodigo` · `nota`) |
+| Botón apagado | Sin motivo | **«Falta: la marca y la tienda»** (`textoFaltaEnLaPuerta`, patrón de Préstamos) |
+| Proveedor | Texto libre | Texto libre **con sugerencias** del histórico (`ProveedorInput` → `sugerirProveedores`); `GET /api/marketing/facturas/proveedores` |
+| Duplicado | Solo por número, y solo avisaba | **El servidor frena**: proveedor normalizado + monto + fecha → 400 `{ duplicado: true }` y no escribe; la pantalla dice el mensaje tal cual |
+
+### Lo que se tocó
+
+- **Puro:** `lib/marketing/puerta-gasto.ts` (interruptor · `OPCIONES_DE_TIPO` · `datosPorDefecto` · `queFaltaEnLaPuerta`/`textoFaltaEnLaPuerta` · `paraGuardar` · `columnasDelGasto` · `ErrorGastoDuplicado`). No conoce `proyecto_id` (candado).
+- **Servidor:** `lib/marketing/puerta-gasto-server.ts` (`frenarFacturaDuplicada` · `frenarPagoDuplicado` —fecha = `periodo_desde`, falla abierta sin la columna— · `exigirTiendaDelDirectorio`, falla abierta si la lectura se cae). `mutations.ts › createFactura/updateFactura`, `inventario.ts › createEntrega/updateEntrega`, `impulsadoras.ts › registrarPagoImpulsadora`: las tres columnas entran SOLO si vinieron (`columnasDelGasto(input)`), escritas con `conRespaldoSinColumnas` + `sinColumnasDelRediseno`. Rutas `POST /facturas` (marca en el mismo acto, rollback = anular), `/inventario/entregas`, `/impulsadoras/[id]/pagos`. `types.ts` gana los tres campos opcionales en los cinco inputs.
+- **Pantalla:** `PuertaGasto.tsx` (nueva), `BloqueDatosDelGasto.tsx` (nueva), `ProveedorInput.tsx` (nueva); `RegistrarGastoModal.tsx` elige por el interruptor; `FacturaForm` gana `historicoProveedores`; `EntregaForm` gana `marcaFija` (esconde el selector) y `gasto`; `RegistrarPagoModal` gana `gasto`. Los tres lugares que montan la puerta no cambian una línea; `tiendaInicial` queda lista para que la vista de tienda (pieza B) abra la puerta con la tienda puesta.
+- **Tests de la pantalla de antes** (`marketing-registrar-gasto`, `marketing-pdf-en-la-puerta`, `poda-textos-explicaciones`): se les puso el interruptor en `false` con nota fechada; siguen probando lo de antes, que sigue vivo.
+
+### Medido contra producción (solo lectura, 22-sep-2026)
+
+108 facturas (94 vivas) · duplicados con la clave nueva entre vivas sin impulsadoras: **6 grupos, 12 facturas** (igual con `total` que con `subtotal`); **14 grupos** contando las anuladas · 13 proveedores distintos · `se_reporta = false`: **0** · `nota`: **0** · 86 facturas y 24 entregas con `tienda_codigo` (las migraciones ya estaban aplicadas). Los existentes no se tocaron.
+
+### Mutaciones a mano (todas ROJAS; control verde 27/27)
+
+| # | Qué se rompió | Resultado |
+|---|---|---|
+| M1 | `OPCIONES_DE_TIPO` con dos tipos (`slice(0, 2)`) | 3 rojos |
+| M2 | Sin `frenarFacturaDuplicada` en `createFactura` | 2 rojos |
+| M3 | `datosPorDefecto` con `seReporta: false` | 6 rojos |
+| M4 | La ruta deja de exigir la marca (`exigirUnaMarca` fuera) | 1 rojo |
+| M5 | La tienda deja de ser obligatoria en `queFaltaEnLaPuerta` | 3 rojos |
+| M6 | El interruptor apagado sigue montando la puerta nueva | 2 rojos |
+
+### Pendiente o dudoso
+
+- ⚠️ **En Mueble no hay campo de foto**: sin proyecto, `mk_adjuntos` no tiene de dónde colgarla (`createAdjunto` exige proyecto o factura). Cuando las fotos cuelguen de la tienda (pieza B, `mk_adjuntos.tienda_codigo`) se enchufa acá.
+- ⚠️ La pantalla vieja del proyecto (`FacturasSection`, `ProyectoOverlay`) no muestra los gastos nuevos: nacen sin `proyecto_id`. Se ven en la vista de tienda (B) y en los reportes por tienda (C).
+- ⚠️ El aviso viejo por **número** de factura (`check-duplicate`, «Continuar de todos modos») sigue en `FacturaForm`: avisa, pero el freno nuevo del servidor manda igual.
+- ⚠️ `updateFactura`/`updateEntrega` aceptan las tres columnas, pero las rutas de edición (`PUT /facturas/[id]`, `PATCH /entregas/[id]`) todavía no las mandan: editar un gasto no cambia su tienda ni su «se reporta». Es otra pantalla.
