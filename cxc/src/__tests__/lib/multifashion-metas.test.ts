@@ -926,7 +926,10 @@ describe("las cuatro pestañas, y las Metas adentro de Vendedoras", () => {
     // en el shell (`year`), no el del arranque — en enero `inicial.year` abría
     // el ranking sobre el año pasado. Lo que este candado protege sigue igual:
     // el espejo NO monta las Metas.
-    expect(comisiones).toContain("<VendedorasSubtab selectedYear={year} />");
+    // 22-sep-2026: la etiqueta lleva ahora `periodo` y `corte` (el selector de
+    // Comisiones manda también en Multifashion, Daniel: «7. a)»); las Metas
+    // siguen sin montarse en el espejo.
+    expect(comisiones).toMatch(/<VendedorasSubtab\s+selectedYear=\{year\}/);
     expect(comisiones).not.toContain("conMetas");
   });
 

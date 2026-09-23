@@ -20,12 +20,19 @@
 // diferir uno o dos centavos del número que se paga (ver `comisionLinea`).
 // Lo único que se calcula acá es la resta de los descuentos ACTIVOS, que es la
 // misma cuenta que hace la pantalla.
+//
+// 🔴 22-SEP-2026 — LOS RENGLONES SON SOLO LO PAGABLE, COMO EN EL EXCEL. Las
+// facturas con utilidad ≤ 20 % (aporte $0.00) y los recibos en cero ya no se
+// listan: qué va al papel lo decide `renglonesDelPapel` (`papel-pagable.ts`),
+// la MISMA función que lee el Excel. Daniel: *«3. b) no salen»*, *«recibo
+// $0.00: a) se quita del papel»*. Ningún total cambia: son renglones en $0.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { fmtDate } from "@/lib/format";
 import { fmtMoney } from "@/lib/ventas/format";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { etiquetaPeriodo } from "@/lib/comisiones/periodo";
+import { renglonesDelPapel } from "@/lib/comisiones/papel-pagable";
 import {
   tipoDocCorto,
   type ComisionDetalle,
@@ -82,9 +89,9 @@ export interface FilaPapel {
   negativo: boolean;
 }
 
-/** Las ventas comisionables, en el orden que llegan del RPC. */
+/** Las ventas comisionables, en el orden que llegan del RPC (solo lo pagable). */
 export function filasVentas(data: ComisionDetalle): FilaPapel[] {
-  return (data.ventas ?? []).map((v) => ({
+  return renglonesDelPapel(data).ventas.map((v) => ({
     celdas: [
       fmtDate(v.fecha),
       v.cliente,
@@ -97,9 +104,9 @@ export function filasVentas(data: ComisionDetalle): FilaPapel[] {
   }));
 }
 
-/** Los cobros comisionables. */
+/** Los cobros comisionables (solo lo pagable: un recibo en cero no se lista). */
 export function filasCobros(data: ComisionDetalle): FilaPapel[] {
-  return (data.cobros ?? []).map((c) => ({
+  return renglonesDelPapel(data).cobros.map((c) => ({
     celdas: [fmtDate(c.fecha), c.cliente, fmtMoney(c.monto)],
     negativo: c.monto < 0,
   }));

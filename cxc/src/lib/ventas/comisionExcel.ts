@@ -13,6 +13,7 @@ import { ROTULO_NO_SE_PAGA, sumarPagable } from "@/lib/comisiones/sin-pago";
 import { sinRetirados } from "@/lib/comisiones/retirados";
 import { nombreArchivoComision, nombreArchivoComisionTodas } from "@/lib/comisiones/nombre-archivo";
 import { etiquetaPeriodo, sufijoArchivoPeriodo } from "@/lib/comisiones/periodo";
+import { renglonesDelPapel, ventasDelPapel } from "@/lib/comisiones/papel-pagable";
 
 export interface VentaDoc {
   fecha: string;
@@ -79,9 +80,12 @@ export function comisionLinea(monto: number, tasa: number): number {
  * Excel es el papel de lo PAGABLE: ahí no van.
  *
  * Quitar filas de $0 NO altera ningún total: no suman a `ventas_base`.
+ *
+ * 🔴 22-SEP-2026 — LA REGLA VIVE EN `lib/comisiones/papel-pagable.ts`, y la
+ * lee también el PDF (`reporte-comision.ts`). Acá solo se conserva el nombre.
  */
 export function ventasPagables(ventas: VentaDoc[]): VentaDoc[] {
-  return ventas.filter((v) => v.subtotal !== 0);
+  return ventasDelPapel(ventas);
 }
 
 // ── Detalle por vendedor: UNA hoja con secciones apiladas ────────────────────
@@ -156,7 +160,13 @@ export async function buildComisionDetalleSheet(
   // ── FILA 3: los encabezados de VENTAS ── (columna Tipo FA/NC; SIN % utilidad)
   // Solo lo PAGABLE: las facturas con aporte $0 (utilidad ≤20%) se omiten —
   // siguen visibles en el modal, pero no en el Excel que firma el vendedor.
-  const ventasExcel = ventasPagables(d.ventas);
+  // 🔴 Qué renglones van lo decide `renglonesDelPapel`, la MISMA función que
+  // lee el PDF (22-sep-2026): desde entonces los dos papeles listan lo mismo,
+  // y el recibo en $0.00 tampoco sale. Con el interruptor apagado, `ventasPagables`
+  // sigue quitando las facturas en $0 como siempre hizo este Excel.
+  const renglones = renglonesDelPapel(d);
+  const ventasExcel = ventasPagables(renglones.ventas);
+  const cobrosExcel = renglones.cobros;
   const filaEncabezados = r;
   ["Fecha", "Cliente", "Factura", "Tipo", "Subtotal"].forEach((h, i) => {
     ws[addr(r, i)] = hdr(h, i === 4 ? "right" : i === 3 ? "center" : "left");
@@ -190,7 +200,7 @@ export async function buildComisionDetalleSheet(
     ws[addr(r, i)] = hdr(h, i === 2 ? "right" : "left");
   });
   heights[r] = 22; r++;
-  d.cobros.forEach((c, idx) => {
+  cobrosExcel.forEach((c, idx) => {
     const alt = idx % 2 === 0;
     ws[addr(r, 0)] = td(fmtDate(c.fecha), alt);
     ws[addr(r, 1)] = td(c.cliente, alt);

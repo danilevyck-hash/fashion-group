@@ -88,6 +88,7 @@ import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
 import { MenuDescargaComision } from "./comisiones-detalle/MenuDescargaComision";
 import { useDescargaComision } from "./comisiones-detalle/useDescargaComision";
 import { descargarPdfTablaComisiones } from "@/lib/comisiones/pdf-tabla-comisiones";
+import { anotarDescargaComision } from "@/lib/comisiones/rastro";
 import { TITULO_PAPEL_GRUPO } from "@/lib/comisiones/tabla-papel";
 import { ComisionesTarjetasConsolidado } from "./ComisionesTarjetas";
 
@@ -261,8 +262,13 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
 
   const empty = !loading && !error && (rows ?? []).length === 0 && !sinAsignar;
 
+  // 🔴 Queda rastro de cada descarga de la matriz (22-sep-2026); nunca la frena.
+  const anotar = (formato: "pdf" | "excel") =>
+    anotarDescargaComision(formato, { alcance: "matriz-grupo", empresa: EMPRESAS.join(","), year, mes });
+
   const handleExport = () => {
     if (empty || !rows) return;
+    anotar("excel");
     void exportComisionesConsolidado({
       year,
       mes,
@@ -302,6 +308,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
   // nosotros, el MISMO que ya usa el Excel de este período.
   const handlePdf = () => {
     if (empty || !rows) return;
+    anotar("pdf");
     descargarPdfTablaComisiones(
       {
         titulo: TITULO_PAPEL_GRUPO,

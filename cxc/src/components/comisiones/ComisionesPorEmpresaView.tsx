@@ -45,6 +45,7 @@ import { esTodoElAnio, etiquetaPeriodo } from "@/lib/comisiones/periodo";
 import { ROTULO_NO_SE_PAGA as MARCA_NO_SE_PAGA } from "@/lib/comisiones/sin-pago";
 import { nombreArchivoComisionesEmpresa } from "@/lib/comisiones/nombre-archivo";
 import { descargarPdfTablaComisiones } from "@/lib/comisiones/pdf-tabla-comisiones";
+import { anotarDescargaComision } from "@/lib/comisiones/rastro";
 import { tituloPapelEmpresa } from "@/lib/comisiones/tabla-papel";
 import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesResumen } from "@/lib/ventas/comisionExcel";
@@ -164,8 +165,13 @@ export function ComisionesPorEmpresaView({
   const noSePagan = conActividad.filter((v) => v.se_paga === false);
   const visibles = verNoSePagan ? [...activos, ...noSePagan] : activos;
 
+  // 🔴 Queda rastro de cada descarga (22-sep-2026); nunca la frena.
+  const anotar = (formato: "pdf" | "excel") =>
+    anotarDescargaComision(formato, { alcance: "matriz-empresa", empresa, year, mes });
+
   const handleExport = () => {
     if (vendedores.length === 0) return;
+    anotar("excel");
     void exportComisionesResumen({
       empresaKey: empresa,
       empresaNombre: nombreEmpresa,
@@ -198,6 +204,7 @@ export function ComisionesPorEmpresaView({
   // empresa y este período.
   const handlePdf = () => {
     if (vendedores.length === 0) return;
+    anotar("pdf");
     descargarPdfTablaComisiones(
       {
         titulo: tituloPapelEmpresa(nombreEmpresa),

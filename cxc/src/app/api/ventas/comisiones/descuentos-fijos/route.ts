@@ -30,6 +30,8 @@ import { validarVigencia } from "@/lib/comisiones/vigencia";
 import { normalizarVendedor } from "@/lib/comisiones/exclusiones";
 import { aplicarAlias } from "@/lib/comisiones/alias";
 import { estaRetirado, AVISO_VENDEDOR_RETIRADO } from "@/lib/comisiones/retirados";
+import { anotarConfigComision } from "@/lib/comisiones/rastro-server";
+import { ACCION_CONFIG_DESCUENTO } from "@/lib/comisiones/rastro";
 import { sePagaComision } from "@/lib/comisiones/sin-pago";
 import { leerAliasOVacio } from "@/lib/comisiones/exclusiones-server";
 
@@ -182,10 +184,11 @@ export async function POST(req: NextRequest) {
     .eq("activo", false)
     .select("id");
   if (!revivida.error && revivida.data && revivida.data.length > 0) {
-    return NextResponse.json(
-      { ok: true, id: String((revivida.data[0] as { id: string }).id) },
-      { status: 201 },
-    );
+    const id = String((revivida.data[0] as { id: string }).id);
+    // 🔴 Queda rastro (22-sep-2026): quién agregó qué descuento. Después de que
+    // la base confirmó; nunca tira la respuesta.
+    await anotarConfigComision(auth, ACCION_CONFIG_DESCUENTO, { accion: "agregar", id, ...v.valor });
+    return NextResponse.json({ ok: true, id }, { status: 201 });
   }
 
   const { data, error } = await supabaseServer
@@ -208,7 +211,9 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
-  return NextResponse.json({ ok: true, id: String((data as { id: string }).id) }, { status: 201 });
+  const idNuevo = String((data as { id: string }).id);
+  await anotarConfigComision(auth, ACCION_CONFIG_DESCUENTO, { accion: "agregar", id: idNuevo, ...v.valor });
+  return NextResponse.json({ ok: true, id: idNuevo }, { status: 201 });
 }
 
 export async function PATCH(req: NextRequest) {
@@ -246,6 +251,7 @@ export async function PATCH(req: NextRequest) {
   if (!data || data.length === 0) {
     return NextResponse.json({ error: "Ese descuento ya no está en la lista" }, { status: 404 });
   }
+  await anotarConfigComision(auth, ACCION_CONFIG_DESCUENTO, { accion: "editar", id, ...v.valor });
   return NextResponse.json({ ok: true });
 }
 
@@ -274,5 +280,6 @@ export async function DELETE(req: NextRequest) {
   if (!data || data.length === 0) {
     return NextResponse.json({ error: "Ese descuento ya no está en la lista" }, { status: 404 });
   }
+  await anotarConfigComision(auth, ACCION_CONFIG_DESCUENTO, { accion: "quitar", id });
   return NextResponse.json({ ok: true });
 }

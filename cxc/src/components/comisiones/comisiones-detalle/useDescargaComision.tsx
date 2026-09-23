@@ -41,6 +41,7 @@ import {
   nombreArchivoComision,
   nombreArchivoComisionTodas,
 } from "@/lib/comisiones/nombre-archivo";
+import { alcanceDeVendedor, anotarDescargaComision } from "@/lib/comisiones/rastro";
 
 /** Una empresa del alcance: su key y su nombre CORTO (diccionario § 0). */
 export interface EmpresaDelAlcance {
@@ -96,6 +97,20 @@ export function useDescargaComision(year: number, mes: number) {
     [year, mes],
   );
 
+  // 🔴 QUEDA RASTRO de cada descarga (22-sep-2026): quién bajó qué papel, de
+  // quién y de cuándo. Se anota DESPUÉS de armar el archivo y nunca lo frena.
+  const anotar = useCallback(
+    (formato: "pdf" | "excel", empresas: EmpresaDelAlcance[], vendedor: string) =>
+      anotarDescargaComision(formato, {
+        alcance: alcanceDeVendedor(empresas.length),
+        vendedor,
+        empresa: empresas.map((e) => e.key).join(","),
+        year,
+        mes,
+      }),
+    [year, mes],
+  );
+
   const descargarExcel = useCallback(
     async (empresas: EmpresaDelAlcance[], vendedor: string) => {
       const cargados = await cargar(empresas, vendedor);
@@ -106,6 +121,7 @@ export function useDescargaComision(year: number, mes: number) {
           cargados[0].empresa.nombre,
           cargados[0].descuentos.filter((d) => d.activo),
         );
+        anotar("excel", empresas, vendedor);
         return;
       }
       await exportComisionDetalleVarias(
@@ -118,8 +134,9 @@ export function useDescargaComision(year: number, mes: number) {
         year,
         mes,
       );
+      anotar("excel", empresas, vendedor);
     },
-    [cargar, year, mes],
+    [cargar, anotar, year, mes],
   );
 
   const descargarPdf = useCallback(
@@ -136,8 +153,9 @@ export function useDescargaComision(year: number, mes: number) {
         })),
         nombreDe(empresas, vendedor),
       );
+      anotar("pdf", empresas, vendedor);
     },
-    [cargar, nombreDe, year, mes],
+    [cargar, nombreDe, anotar, year, mes],
   );
 
   return { descargarExcel, descargarPdf, MENSAJE_ERROR };

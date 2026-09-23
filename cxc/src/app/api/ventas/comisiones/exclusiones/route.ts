@@ -34,6 +34,8 @@ import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 import { normalizarVendedor, validarCasillas, validarExclusionesNuevas } from "@/lib/comisiones/exclusiones";
 import { aplicarAlias, type AliasVendedor } from "@/lib/comisiones/alias";
 import { estaRetirado, AVISO_VENDEDOR_RETIRADO } from "@/lib/comisiones/retirados";
+import { anotarConfigComision } from "@/lib/comisiones/rastro-server";
+import { ACCION_CONFIG_CLIENTE_SIN_COMISION } from "@/lib/comisiones/rastro";
 import {
   agregarExclusion,
   cambiarCasillasExclusion,
@@ -167,6 +169,14 @@ export async function POST(req: NextRequest) {
       { status: 409 },
     );
   }
+  // 🔴 Queda rastro (22-sep-2026): quién agregó qué cliente, a qué vendedor y en
+  // qué empresas. Después de que la base confirmó; nunca tira la respuesta.
+  await anotarConfigComision(auth, ACCION_CONFIG_CLIENTE_SIN_COMISION, {
+    accion: "agregar",
+    ids,
+    filas: valores,
+    ya_estaban: yaEstaban,
+  });
   return NextResponse.json(
     { ok: true, id: ids[0], ids, creadas: ids.length, ya_estaban: yaEstaban },
     { status: 201 },
@@ -192,6 +202,7 @@ export async function PATCH(req: NextRequest) {
 
   const r = await cambiarCasillasExclusion(id, v.valor);
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+  await anotarConfigComision(auth, ACCION_CONFIG_CLIENTE_SIN_COMISION, { accion: "casillas", id, ...v.valor });
   return NextResponse.json({ ok: true });
 }
 
@@ -205,5 +216,6 @@ export async function DELETE(req: NextRequest) {
   }
   const r = await desactivarExclusion(id, auth.userName ?? auth.userId ?? "admin");
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+  await anotarConfigComision(auth, ACCION_CONFIG_CLIENTE_SIN_COMISION, { accion: "quitar", id });
   return NextResponse.json({ ok: true });
 }

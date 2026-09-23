@@ -257,8 +257,12 @@ describe("🔴 Multifashion en Comisiones: una opción más, nunca una suma", ()
     expect(leer("src/lib/comisiones/vistas.ts")).toContain("separadorAntes: true");
   });
 
-  it("el período y la descarga del shell no aplican a Multifashion (trae sus propios chips)", () => {
-    expect(shell).toContain("!esVistaMultifashion(vista)");
+  it("la DESCARGA del shell no aplica a Multifashion (no tiene papel); el período sí, desde el 22-sep-2026", () => {
+    // 🔄 22-SEP-2026 — Daniel: «7. a)»: Multifashion abre y se mueve con el
+    // período del grupo (`MULTIFASHION_CON_EL_PERIODO_DEL_GRUPO`). Lo que sigue
+    // sin aplicar es la descarga: ni su módulo ni la vista arman un papel.
+    expect(shell).toContain("const enMultifashion = esVistaMultifashion(vista);");
+    expect(shell).toContain("const conDescarga = conPeriodo && !enMultifashion;");
   });
 });
 
@@ -274,7 +278,10 @@ describe("🔴 Multifashion en Comisiones recibe el año elegido en el shell", (
   it("`selectedYear={year}` — y ya no `inicial.year`", () => {
     const src = leer("src/components/comisiones/ComisionesView.tsx");
     const codigo = src.replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-    expect(codigo).toContain("<VendedorasSubtab selectedYear={year} />");
+    // 22-sep-2026: la etiqueta lleva ahora `periodo` y `corte` (el selector de
+    // Comisiones manda también en Multifashion); lo que se vigila acá sigue
+    // siendo que el año sea el ELEGIDO.
+    expect(codigo).toMatch(/<VendedorasSubtab\s+selectedYear=\{year\}/);
     expect(codigo).not.toContain("selectedYear={inicial.year}");
   });
 });

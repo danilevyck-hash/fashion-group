@@ -57,6 +57,7 @@ import { nombreArchivoComision } from "@/lib/comisiones/nombre-archivo";
 // reporte sin abrir esta pantalla, y dos generadores es cómo se llega a que el
 // archivo de un camino y el del otro no se parezcan.
 import { descargarPdfComision } from "@/lib/comisiones/pdf-comision";
+import { anotarDescargaComision } from "@/lib/comisiones/rastro";
 import { etiquetaPeriodo } from "@/lib/comisiones/periodo";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -173,6 +174,9 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
   const pctTasaC = data ? (data.tasa_cobro * 100).toFixed(2) : "";
 
   const nombreArchivo = nombreArchivoComision(vendedor, empresa, year, mes);
+  // 🔴 Queda rastro de cada descarga (22-sep-2026); nunca la frena.
+  const anotar = (formato: "pdf" | "excel") =>
+    anotarDescargaComision(formato, { alcance: "vendedor", vendedor, empresa, year, mes });
 
   // ── Encabezado (título + total arriba + botones) ────────────────────────────
   const encabezado = (
@@ -207,7 +211,11 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
 
       <div className="flex items-center gap-2">
         <button
-          onClick={() => data && exportComisionDetalle(data, empresaNombre, descActivos)}
+          onClick={() => {
+            if (!data) return;
+            void exportComisionDetalle(data, empresaNombre, descActivos);
+            anotar("excel");
+          }}
           disabled={!data}
           className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md bg-black px-3 text-sm text-white transition active:scale-[0.97] disabled:opacity-40"
         >
@@ -215,13 +223,14 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
         </button>
         {/* 🔴 UN SOLO botón, y dice «PDF»: de un PDF ya se imprime. */}
         <button
-          onClick={() =>
-            data &&
+          onClick={() => {
+            if (!data) return;
             descargarPdfComision(
               [{ data, descuentos, empresaNombre, vendedor, year, mes }],
               nombreArchivo,
-            )
-          }
+            );
+            anotar("pdf");
+          }}
           disabled={!data}
           className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 px-3 text-sm text-gray-700 transition hover:border-black active:scale-[0.97] disabled:opacity-40"
         >

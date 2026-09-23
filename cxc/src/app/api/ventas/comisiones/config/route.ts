@@ -34,6 +34,8 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { sePagaComision } from "@/lib/comisiones/sin-pago";
 import { estaRetirado, AVISO_VENDEDOR_RETIRADO } from "@/lib/comisiones/retirados";
+import { anotarConfigComision } from "@/lib/comisiones/rastro-server";
+import { ACCION_CONFIG_TASA } from "@/lib/comisiones/rastro";
 import { aplicarAlias } from "@/lib/comisiones/alias";
 import { leerAliasOVacio } from "@/lib/comisiones/exclusiones-server";
 
@@ -188,6 +190,12 @@ export async function PUT(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  // 🔴 Queda rastro de quién cambió qué tasa (22-sep-2026), después de que la
+  // base confirmó. Un fallo del registro no tira la respuesta.
+  await anotarConfigComision(auth, ACCION_CONFIG_TASA, {
+    tasas: rows.map((r) => ({ vendedor: r.vendedor_nombre, tasa_venta: r.tasa_venta, tasa_cobro: r.tasa_cobro ?? null })),
+  });
 
   return NextResponse.json({ ok: true, updated: payload.length });
 }

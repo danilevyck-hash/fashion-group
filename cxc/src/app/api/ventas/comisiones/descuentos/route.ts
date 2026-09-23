@@ -12,6 +12,8 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
+import { anotarConfigComision } from "@/lib/comisiones/rastro-server";
+import { ACCION_CONFIG_DESCUENTO_MES } from "@/lib/comisiones/rastro";
 import { supabaseServer } from "@/lib/supabase-server";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import {
@@ -104,6 +106,10 @@ export async function POST(req: NextRequest) {
       { onConflict: "descuento_id,mes" },
     );
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // 🔴 Queda rastro (22-sep-2026): es la palanca que más plata mueve del módulo
+  // (apagar un mes = $1.573,08) y no dejaba huella de quién la tocó.
+  await anotarConfigComision(auth, ACCION_CONFIG_DESCUENTO_MES, { descuento_id: descuentoId, year, mes, activo });
 
   return NextResponse.json({ ok: true });
 }

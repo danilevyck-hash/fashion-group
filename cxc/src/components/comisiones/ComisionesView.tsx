@@ -63,6 +63,11 @@ import { hoyPanama } from "@/lib/fecha-panama";
 import { periodoInicial } from "@/lib/comisiones/mes-inicial";
 import { rotuloDescargarExcel, rotuloDescargarPdf } from "@/lib/comisiones/descarga";
 import {
+  MULTIFASHION_CON_EL_PERIODO_DEL_GRUPO,
+  corteParaMultifashion,
+  periodoParaMultifashion,
+} from "@/lib/comisiones/multifashion-periodo";
+import {
   OPCIONES_VISTA,
   VISTA_GRUPO,
   esVistaDeEmpresa,
@@ -224,10 +229,20 @@ export function ComisionesView({
   const opciones = OPCIONES_VISTA.filter(
     (o) => conMultifashion || !esVistaMultifashion(o.valor),
   );
-  // Ni el período ni la descarga aplican a Configuración, y Multifashion trae
-  // sus propios chips de período (los mismos de su módulo: los dos lados dicen
-  // lo mismo porque es la MISMA vista).
-  const conPeriodo = !(enConfig && hayConfig) && !esVistaMultifashion(vista);
+  // Ni el período ni la descarga aplican a Configuración.
+  // 🔴 MULTIFASHION ABRE Y SE MUEVE CON EL MISMO PERÍODO QUE EL GRUPO
+  // (22-sep-2026, Daniel: «7. a)»). Abría en «Septiembre (en curso)» con sus
+  // chips propios mientras el grupo abría en «Agosto» (cerrado), en la misma
+  // pantalla. Ahora el selector de arriba manda también ahí; su CÁLCULO no se
+  // toca ni se mezcla. Con el interruptor apagado, sus chips propios vuelven.
+  const enMultifashion = esVistaMultifashion(vista);
+  const multifashionConPeriodo = enMultifashion && MULTIFASHION_CON_EL_PERIODO_DEL_GRUPO;
+  const conPeriodo = !(enConfig && hayConfig) && (!enMultifashion || multifashionConPeriodo);
+  // ⚠️ Multifashion no tiene papel: ni su módulo ni esta vista arman un PDF o
+  // un Excel, así que los botones de descarga y el «Actualizar ahora» de los
+  // RECIBOS del grupo no se dibujan ahí (un control que no ofrece nada no se
+  // dibuja). Cuando exista una descarga en Multifashion, se monta ESA.
+  const conDescarga = conPeriodo && !enMultifashion;
 
   return (
     <div className="space-y-2">
@@ -299,11 +314,13 @@ export function ComisionesView({
         {/* "Actualizar ahora" de RECIBOS (cobros) — vive acá porque la comisión
             sobre cobro lee switch_recibos. Menú para elegir la empresa (una por
             disparo — sesión única Switch). */}
+        {conDescarga && (
         <SyncNowButton
           opciones={SYNC_NOW_RECIBOS_OPCIONES}
           className="shrink-0"
           onSuccess={() => setRefreshKey((k) => k + 1)}
         />
+        )}
 
         {/* 🔴 DOS BOTONES: EL PERÍODO EN LOS DOS FORMATOS. El botón dice QUÉ
             TRAE y el verbo es «Descargar» (Daniel: «a, pero descargar, no bajar,
@@ -314,6 +331,8 @@ export function ComisionesView({
             todo el módulo se comporte igual»*. La flechita de la celda SÍ sigue
             sin aparecer con «Todo el año»: ese reporte es de UN mes, éste es la
             matriz. */}
+        {conDescarga && (
+        <>
         <button
           type="button"
           onClick={() => pdfRef.current?.()}
@@ -330,6 +349,8 @@ export function ComisionesView({
         >
           <FileSpreadsheet className="h-4 w-4 shrink-0" /> {rotuloDescargarExcel(mes)}
         </button>
+        </>
+        )}
       </div>
       )}
 
@@ -348,8 +369,16 @@ export function ComisionesView({
            🔴 EL AÑO SÍ ES EL ELEGIDO (11-sep-2026). 🩸 Iba `inicial.year`, el del
            arranque del módulo: en enero `periodoInicial` abre en diciembre del
            año anterior, así que el ranking salía sobre el año pasado y sus chips
-           rotulaban «Diciembre (en curso)» sobre un año cerrado. */
-        <VendedorasSubtab selectedYear={year} />
+           rotulaban «Diciembre (en curso)» sobre un año cerrado.
+           🔴 Y DESDE EL 22-SEP-2026 EL PERÍODO TAMBIÉN: el selector de arriba
+           manda (abre en el último mes cerrado, como el grupo), traducido al
+           vocabulario de Multifashion por `periodoParaMultifashion`. Sin el
+           interruptor, `periodo` va en `undefined` y la vista dibuja sus chips. */
+        <VendedorasSubtab
+          selectedYear={year}
+          periodo={multifashionConPeriodo ? periodoParaMultifashion(year, mes) : undefined}
+          corte={multifashionConPeriodo ? corteParaMultifashion(hoyPanama()) : undefined}
+        />
       ) : esVistaGrupo(vista) ? (
         <ComisionesConsolidadoView year={year} mes={mes} onExcel={registrarExcel} onPdf={registrarPdf} refreshKey={refreshKey} />
       ) : (

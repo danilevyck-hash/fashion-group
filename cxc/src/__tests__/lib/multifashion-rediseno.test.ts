@@ -295,7 +295,12 @@ describe("5 · Vendedoras", () => {
     // ⚠️ CAMBIÓ DE DIRECCIÓN EL 11-SEP-2026, NO SE BORRÓ: el año es el ELEGIDO
     // en el shell (`year`), no el del arranque — en enero `inicial.year` abría
     // el ranking sobre el año pasado. Las píldoras propias siguen intactas.
-    expect(comisiones).toContain("<VendedorasSubtab selectedYear={year} />");
+    // 22-sep-2026: el espejo recibe `periodo` y `corte` del selector de
+    // Comisiones detrás de `MULTIFASHION_CON_EL_PERIODO_DEL_GRUPO` (Daniel:
+    // «7. a)»); con el interruptor apagado `periodo` va en `undefined` y las
+    // píldoras propias vuelven. Lo que se vigila: el año es el ELEGIDO y las
+    // Metas siguen sin montarse acá.
+    expect(comisiones).toMatch(/<VendedorasSubtab\s+selectedYear=\{year\}/);
     expect(comisiones).not.toContain("selectedYear={inicial.year}");
     expect(comisiones).not.toContain("conMetas");
     // Sin `periodo` la vista dibuja su control propio.
