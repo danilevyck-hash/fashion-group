@@ -17,6 +17,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
+import { hoyPanama } from "@/lib/fecha-panama";
+import { anotarZipBajado } from "@/lib/marketing/zips-bajados";
 import {
   ErrorZipMarca,
   buildZipDeMarca,
@@ -54,6 +56,21 @@ export async function POST(req: NextRequest) {
       periodoId: body.periodoId ?? null,
     });
 
+    // 🔴 CADA ZIP QUE SE BAJA QUEDA ANOTADO, con su archivo guardado en
+    //    `marketing/periodos/<id>/<fecha>.zip` (Daniel, 22-sep-2026). Se
+    //    espera con `await` —es un registro de lo que se le mandó a una
+    //    marca, no un ping— pero FALLA ABIERTO: `anotarZipBajado` nunca lanza,
+    //    así que la descarga sale igual si Storage o la columna fallan.
+    const anotado = await anotarZipBajado({
+      periodoId: result.periodoId,
+      fechaISO: hoyPanama(),
+      bajadoPor: auth.userName || auth.role,
+      ahoraISO: new Date().toISOString(),
+      gastos: result.gastos,
+      monto: result.total,
+      bytes: result.buffer,
+    });
+
     return new NextResponse(new Uint8Array(result.buffer), {
       headers: {
         "Content-Type": "application/zip",
@@ -67,6 +84,7 @@ export async function POST(req: NextRequest) {
         "X-Fotos-Omitidas": String(result.fotosOmitidas),
         "X-Pdfs-Incluidos": String(result.pdfsIncluidos),
         "X-Pdfs-Omitidos": String(result.pdfsOmitidos),
+        "X-Zip-Guardado": anotado.archivoPath ?? "",
       },
     });
   } catch (err) {

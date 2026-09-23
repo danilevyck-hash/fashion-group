@@ -76,6 +76,16 @@ import {
   nombreArchivoComprobante,
   numeroComprobante,
 } from "./pdf-entrega-mueble";
+import { seReportaDe } from "./gasto";
+import { conRespaldoSinColumnas, type ResultadoPg } from "./columnas-opcionales";
+import { ZIP_E_IMPULSADORAS_NUEVO } from "./zip-e-impulsadoras";
+import {
+  grafiasUnicasDeProveedor,
+  limpiarTextoParaLaMarca,
+  porcionDeLaFactura,
+  proveedorParaLaMarca,
+  subtituloParaLaMarca,
+} from "./papel-de-la-marca";
 import {
   CONCURRENCY,
   buildResumenGastosWorkbook,
@@ -130,7 +140,10 @@ export function contentDisposition(nombre: string): string {
 
 
 const BUCKET = "marketing";
-const LINK_TTL_SECONDS = 60 * 60 * 24 * 365; // 1 año, igual que el ZIP global
+// 🩸 Acá vivía un `LINK_TTL_SECONDS = 1 año` que NADIE leía: los links de este
+// módulo los firma `firmarLote` (zip-export.ts), y desde el 22-sep-2026 duran
+// 30 días (`zip-e-impulsadoras.ts`). Dejarlo habría hecho creer que el TTL se
+// cambia acá.
 const GALERIA_BASE = process.env.NEXT_PUBLIC_SITE_URL || "https://www.fashiongr.com";
 
 /** Textos de "no hay cliente" que el reporte congelado usa como centinela. */
@@ -175,11 +188,15 @@ interface FacturaFila {
   periodo_desde?: string | null;
   periodo_hasta?: string | null;
   anulado_en: string | null;
+  /** 🔴 Columna del rediseño. Ausente = se reporta (falla ABIERTO). */
+  se_reporta?: boolean | null;
 }
 interface EntregaFila {
   id: string;
   proyecto_id: string | null;
   total: number | null;
+  /** 🔴 Columna del rediseño. Ausente = se reporta (falla ABIERTO). */
+  se_reporta?: boolean | null;
   total_por_marca: Record<string, number> | null;
   total_por_empresa_interna: Record<string, number> | null;
   notas: string | null;
@@ -349,6 +366,69 @@ export function codigoDeNombreDeMarca(
 }
 
 // ----------------------------------------------------------------------------
+// Las dos lecturas que piden `se_reporta` — y siguen andando si no existe
+// ----------------------------------------------------------------------------
+//
+// 🔴 QUÉ ENTRA AL ZIP: solo lo que se reporta a la marca (Daniel, 22-sep-2026:
+// *«hay gastos o muebles que son para tienda pero no quiero reportar como
+// gastos pero saber que existen»*). La columna la agrega la migración
+// `20261216120000`; sin ella la lectura se repite SIN pedirla y todo se reporta
+// como hasta hoy — falla ABIERTO, nunca vacío (`columnas-opcionales.ts`).
+
+const COLUMNAS_FACTURA =
+  "id, proyecto_id, numero_factura, fecha_factura, proveedor, concepto, subtotal, total, impulsadora_id, impulsadora_mes, periodo_desde, periodo_hasta, anulado_en";
+const COLUMNAS_ENTREGA =
+  "id, proyecto_id, total, total_por_marca, total_por_empresa_interna, notas, created_at";
+
+function avisarSinColumna(mensaje: string): void {
+  console.warn(`zip-marca: ${mensaje}`);
+}
+
+async function leerFacturasConSeReporta(): Promise<ResultadoPg<FacturaFila[]>> {
+  const { resultado } = await conRespaldoSinColumnas<FacturaFila[]>(
+    () =>
+      supabaseServer
+        .from("mk_facturas")
+        .select(`${COLUMNAS_FACTURA}, se_reporta`) as unknown as PromiseLike<
+        ResultadoPg<FacturaFila[]>
+      >,
+    () =>
+      supabaseServer.from("mk_facturas").select(COLUMNAS_FACTURA) as unknown as PromiseLike<
+        ResultadoPg<FacturaFila[]>
+      >,
+    avisarSinColumna,
+  );
+  return resultado;
+}
+
+async function leerEntregasConSeReporta(): Promise<ResultadoPg<EntregaFila[]>> {
+  const { resultado } = await conRespaldoSinColumnas<EntregaFila[]>(
+    () =>
+      supabaseServer
+        .from("mk_entregas_muebles")
+        .select(`${COLUMNAS_ENTREGA}, se_reporta`) as unknown as PromiseLike<
+        ResultadoPg<EntregaFila[]>
+      >,
+    () =>
+      supabaseServer
+        .from("mk_entregas_muebles")
+        .select(COLUMNAS_ENTREGA) as unknown as PromiseLike<ResultadoPg<EntregaFila[]>>,
+    avisarSinColumna,
+  );
+  return resultado;
+}
+
+/**
+ * ¿Este gasto va en el papel de la marca? Con el interruptor apagado, todos
+ * (como hoy). Con él prendido, solo los que se reportan — y un `se_reporta`
+ * que no vino se lee como que SÍ (`seReportaDe`).
+ */
+function vaEnElPapel(fila: { se_reporta?: boolean | null }): boolean {
+  if (!ZIP_E_IMPULSADORAS_NUEVO) return true;
+  return seReportaDe(fila.se_reporta);
+}
+
+// ----------------------------------------------------------------------------
 // Entrada / salida públicas
 // ----------------------------------------------------------------------------
 
@@ -406,6 +486,28 @@ interface GastoDeMarca {
   /** Código D-XXX del cliente, o null (General / sin código). */
   clienteCodigo: string | null;
   monto: number;
+}
+
+/**
+ * 🔴 EL PAPEL QUE SALE DE LA CASA, LIMPIO (22-sep-2026).
+ *
+ * Se aplica al FINAL de la preparación, sobre los gastos ya armados, para que
+ * lo limpio llegue a TODO lo que el encargado ve: las celdas del Excel y
+ * también el NOMBRE de cada comprobante dentro del ZIP (que lleva el concepto).
+ *
+ *   · el concepto, sin el nombre de las empresas del grupo;
+ *   · el proveedor, en UNA sola grafía (la más usada del propio archivo).
+ *
+ * Devuelve gastos NUEVOS: ni la base ni los montos se tocan.
+ */
+function limpiarParaLaMarca(gastos: ReadonlyArray<GastoDeMarca>): GastoDeMarca[] {
+  if (!ZIP_E_IMPULSADORAS_NUEVO) return [...gastos];
+  const grafias = grafiasUnicasDeProveedor(gastos.map((g) => g.proveedor));
+  return gastos.map((g) => ({
+    ...g,
+    concepto: limpiarTextoParaLaMarca(g.concepto),
+    proveedor: proveedorParaLaMarca(g.proveedor, grafias),
+  }));
 }
 
 /** Carpeta de un gasto: el cliente del directorio, su texto, o General. */
@@ -530,21 +632,13 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
       supabaseServer
         .from("mk_periodo_documentos")
         .select("periodo_id, proveedor_key, tipo, documento_id"),
-      supabaseServer
-        .from("mk_facturas")
-        .select(
-          "id, proyecto_id, numero_factura, fecha_factura, proveedor, concepto, subtotal, total, impulsadora_id, impulsadora_mes, periodo_desde, periodo_hasta, anulado_en",
-        ),
+      leerFacturasConSeReporta(),
       supabaseServer.from("mk_factura_marcas").select("factura_id, marca_id, porcentaje"),
       supabaseServer
         .from("mk_proyectos")
         .select("id, nombre, tienda, tienda_codigo, anulado_en"),
       supabaseServer.from("mk_marcas").select("id, nombre, codigo, empresa_codigo"),
-      supabaseServer
-        .from("mk_entregas_muebles")
-        .select(
-          "id, proyecto_id, total, total_por_marca, total_por_empresa_interna, notas, created_at",
-        ),
+      leerEntregasConSeReporta(),
       supabaseServer
         .from("mk_adjuntos")
         .select("id, tipo, factura_id, proyecto_id, url, nombre_original")
@@ -659,12 +753,12 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
       // 🔴 Multifashion NUNCA entra: es tienda propia, no se le reporta a nadie.
       if (esProyectoMultifashion(pid)) continue;
       if (pid && !proyectoVivo(pid)) continue;
+      if (!vaEnElPapel(f)) continue;
       const rows = rowsPorFactura.get(String(f.id)) ?? [];
-      const mia = rows.find((r) => r.marcaId === marcaId);
-      if (!mia) continue;
+      if (!rows.some((r) => r.marcaId === marcaId)) continue;
       if (!entraEnElPeriodo("factura", String(f.id))) continue;
-      const sumPct = rows.reduce((s, r) => s + r.pct, 0) || 1;
-      facturasDeMarca.push({ f, monto: round2(num(f.total) * (mia.pct / sumPct)) });
+      // 🔴 UNA MARCA = 100 % (`papel-de-la-marca.ts › porcionDeLaFactura`).
+      facturasDeMarca.push({ f, monto: porcionDeLaFactura(num(f.total), rows, marcaId) });
     }
   }
 
@@ -674,6 +768,7 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
   const entregasDeMarca: Array<{ e: EntregaFila; monto: number }> = [];
   if (marcaId) {
     for (const e of entregas) {
+      if (!vaEnElPapel(e)) continue;
       const pid = e.proyecto_id ? String(e.proyecto_id) : null;
       if (!pid || !proyectoVivo(pid) || esProyectoMultifashion(pid)) continue;
       if (!marcasDeEntrega(e).includes(marcaId)) continue;
@@ -738,6 +833,7 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
     ];
   }
   gastos.sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
+  gastos = limpiarParaLaMarca(gastos);
 
   const total = round2(gastos.reduce((s, g) => s + g.monto, 0));
 
@@ -799,19 +895,11 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
  */
 async function prepararDescargaMultifashion(): Promise<PrepDescarga> {
   const [factRes, proyRes, entRes, adjRes] = await Promise.all([
-    supabaseServer
-      .from("mk_facturas")
-      .select(
-        "id, proyecto_id, numero_factura, fecha_factura, proveedor, concepto, subtotal, total, impulsadora_id, impulsadora_mes, periodo_desde, periodo_hasta, anulado_en",
-      ),
+    leerFacturasConSeReporta(),
     supabaseServer
       .from("mk_proyectos")
       .select("id, nombre, tienda, tienda_codigo, anulado_en"),
-    supabaseServer
-      .from("mk_entregas_muebles")
-      .select(
-        "id, proyecto_id, total, total_por_marca, total_por_empresa_interna, notas, created_at",
-      ),
+    leerEntregasConSeReporta(),
     supabaseServer
       .from("mk_adjuntos")
       .select("id, tipo, factura_id, proyecto_id, url, nombre_original")
@@ -834,13 +922,14 @@ async function prepararDescargaMultifashion(): Promise<PrepDescarga> {
   const facturaById = new Map(facturas.map((f) => [String(f.id), f]));
   const nombrePorCodigo = await leerNombresDeCliente(proyectosMf);
 
-  const gastos: GastoDeMarca[] = [];
+  const crudos: GastoDeMarca[] = [];
   for (const f of facturas) {
     if (f.anulado_en) continue;
+    if (!vaEnElPapel(f)) continue;
     const pid = f.proyecto_id ? String(f.proyecto_id) : null;
     const p = pid ? proyectoById.get(pid) : undefined;
     if (!p) continue; // no es Multifashion (o su proyecto está en papelera)
-    gastos.push({
+    crudos.push({
       tipo: "factura",
       documentoId: String(f.id),
       fecha: txt(f.fecha_factura).slice(0, 10),
@@ -854,10 +943,11 @@ async function prepararDescargaMultifashion(): Promise<PrepDescarga> {
     });
   }
   for (const e of entregas) {
+    if (!vaEnElPapel(e)) continue;
     const pid = e.proyecto_id ? String(e.proyecto_id) : null;
     const p = pid ? proyectoById.get(pid) : undefined;
     if (!p) continue;
-    gastos.push({
+    crudos.push({
       tipo: "entrega",
       documentoId: String(e.id),
       fecha: txt(e.created_at).slice(0, 10),
@@ -870,7 +960,8 @@ async function prepararDescargaMultifashion(): Promise<PrepDescarga> {
       monto: round2(num(e.total)),
     });
   }
-  gastos.sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
+  crudos.sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
+  const gastos = limpiarParaLaMarca(crudos);
   const total = round2(gastos.reduce((s, g) => s + g.monto, 0));
 
   if (gastos.length === 0 || total === 0) {
@@ -1071,6 +1162,20 @@ function asignarLinksYNumeros(
  */
 function subtituloDescarga(prep: PrepDescarga): string {
   const hoy = formatearFecha(hoyPanamaISO());
+  if (ZIP_E_IMPULSADORAS_NUEVO) {
+    // 🔴 SIN LA NOTA INTERNA (22-sep-2026). El archivo real que recibió Tommy
+    //    abría con «mid 2026 · calculado el 20 sept 2026 (este período se cerró
+    //    sin reporte guardado)»: eso le habla al sistema, no al encargado. De
+    //    dónde salió cada monto sigue viajando en `fuenteMontos` y en la
+    //    cabecera `X-Fuente-Montos`, que son para adentro.
+    return subtituloParaLaMarca({
+      nombrePeriodo: prep.periodo ? txt(prep.periodo.nombre) : "",
+      estado: prep.periodo ? txt(prep.periodo.estado) : "",
+      cerradoEn: prep.periodo?.cerrado_en ?? null,
+      hoyFormateado: hoy,
+      formatearFecha,
+    });
+  }
   if (!prep.periodo) return `Gastos al ${hoy}`; // Multifashion, sin período
   const nombre = txt(prep.periodo.nombre);
   if (txt(prep.periodo.estado) !== "cerrado") {

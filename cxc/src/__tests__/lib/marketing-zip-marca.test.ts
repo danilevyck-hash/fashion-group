@@ -466,10 +466,19 @@ describe("el Excel de la descarga — formato viejo, sin columnas de marca", () 
     expect(targets).toContain("https://firmado/fact/f1.pdf");
   });
 
-  it("cerrado SIN reporte congelado: el subtítulo LO DECLARA", async () => {
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 22-sep-2026 (pieza D del rediseño).
+  //
+  // Hasta hoy este candado EXIGÍA que el subtítulo dijera «(este período se
+  // cerró sin reporte guardado)». Daniel lo vio en el ZIP real que recibió
+  // Tommy y lo sacó: *«lo interno no sale»*. De dónde salió cada monto sigue
+  // viajando —`fuenteMontos` y la cabecera `X-Fuente-Montos`—, que es para
+  // adentro; el papel del encargado ya no lo dice.
+  it("cerrado sin reporte congelado: el subtítulo NO le cuenta nada interno", async () => {
     const excel = await buildExcelDeMarca({ marcaCodigo: "TH", periodoId: P_CERRADO });
     const filas = hojaResumenDeXlsx(excel.buffer);
-    expect(String(filas[1][0])).toContain("se cerró sin reporte guardado");
+    expect(String(filas[1][0])).not.toContain("sin reporte guardado");
+    expect(String(filas[1][0])).toContain("cerrado");
+    // El dato NO se perdió: sigue del lado de adentro.
     expect(excel.fuenteMontos).toBe("en_vivo");
   });
 

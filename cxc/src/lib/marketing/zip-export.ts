@@ -51,12 +51,15 @@ import {
   numeroComprobante,
 } from "./pdf-entrega-mueble";
 import { signEntregaToken } from "./gallery-token";
+import { ttlDeLinkDelZip } from "./zip-e-impulsadoras";
 
 const BUCKET = "marketing";
 const MAX_DIM = 1600; // px — lado mayor de la foto tras redimensionar
 const JPEG_QUALITY = 70;
 export const CONCURRENCY = 4; // descargas/compresiones simultáneas
-const LINK_TTL_SECONDS = 60 * 60 * 24 * 365; // 1 año
+// 🔴 30 DÍAS desde el 22-sep-2026 (antes: 1 año). El número y el porqué viven
+// en `zip-e-impulsadoras.ts`; con el interruptor apagado vuelve al año.
+const LINK_TTL_SECONDS = ttlDeLinkDelZip();
 // Base para los links de galería del Excel (la galería re-firma fotos al abrir).
 const GALERIA_BASE = process.env.NEXT_PUBLIC_SITE_URL || "https://www.fashiongr.com";
 
@@ -171,8 +174,9 @@ export async function comprimirFoto(input: Buffer): Promise<Buffer | null> {
   }
 }
 
-/** Firma en lote (1 año). Devuelve mapa path→signedUrl. Los paths que ya son
- *  URL absoluta se mapean a sí mismos. */
+/** Firma en lote (30 días). Devuelve mapa path→signedUrl. Los paths que ya son
+ *  URL absoluta se mapean a sí mismos. Vencido, se vuelve a firmar por
+ *  `POST /api/marketing/zip/firmar-de-nuevo`. */
 export async function firmarLote(paths: ReadonlyArray<string>): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   const storagePaths: string[] = [];

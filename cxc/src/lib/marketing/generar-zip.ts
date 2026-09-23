@@ -43,6 +43,9 @@ import {
   type EntregaMueblePdfData,
 } from "./pdf-entrega-mueble";
 import { marcasDeEntrega } from "./resumen-inicio";
+import { seReportaDe } from "./gasto";
+import { grafiasUnicasDeProveedor, proveedorParaLaMarca } from "./papel-de-la-marca";
+import { ZIP_E_IMPULSADORAS_NUEVO } from "./zip-e-impulsadoras";
 import type {
   EntregaConItems,
   MarcaConPorcentaje,
@@ -200,6 +203,19 @@ export function buildRespaldoWorkbook(
     marcasDelProyecto.map((m) => [m.id, m.empresa_codigo]),
   );
 
+  // 🔴 SOLO LO QUE SE REPORTA, Y EL PROVEEDOR EN UNA GRAFÍA (22-sep-2026).
+  // Mismas dos reglas que el ZIP por marca: este respaldo también termina en
+  // manos de la marca. `se_reporta` ausente = se reporta (falla ABIERTO), así
+  // que sin la columna el archivo sale igual que hoy.
+  const visibles = ZIP_E_IMPULSADORAS_NUEVO
+    ? facturas.filter((f) => seReportaDe((f as { se_reporta?: boolean | null }).se_reporta))
+    : facturas;
+  const grafias = ZIP_E_IMPULSADORAS_NUEVO
+    ? grafiasUnicasDeProveedor(visibles.map((f) => f.proveedor))
+    : new Map<string, string>();
+  const proveedorDe = (crudo: string): string =>
+    ZIP_E_IMPULSADORAS_NUEVO ? proveedorParaLaMarca(crudo, grafias) : crudo;
+
   const header: string[] = [
     "Mes ejecución",
     "Cliente",
@@ -211,11 +227,11 @@ export function buildRespaldoWorkbook(
   ];
 
   type Celda = string | number;
-  const rows: Celda[][] = facturas.map((f) => {
+  const rows: Celda[][] = visibles.map((f) => {
     const row: Celda[] = [
       mes,
       proyecto.tienda,
-      f.proveedor,
+      proveedorDe(f.proveedor),
       detalle,
       round2(f.total),
     ];
@@ -239,6 +255,12 @@ export function buildRespaldoWorkbook(
   // Agregar entregas como filas adicionales (1 por entrega) sin desglose
   // factura/entrega — la marca solo ve "Entrega de muebles" y el monto.
   for (const e of entregas) {
+    if (
+      ZIP_E_IMPULSADORAS_NUEVO &&
+      !seReportaDe((e as { se_reporta?: boolean | null }).se_reporta)
+    ) {
+      continue;
+    }
     const row: Celda[] = [
       mes,
       proyecto.tienda,

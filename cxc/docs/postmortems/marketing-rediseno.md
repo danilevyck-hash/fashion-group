@@ -288,3 +288,79 @@ Dos candados ajenos **cambiaron de forma, no de dirección**, con nota fechada:
 2. El agregador de los niveles 2 y 3 (`proyectos-lista`) ya aparta lo apagado, pero `lista-por-periodo.ts` no lo dibuja en gris todavía (hoy 0 apagados: nada que dibujar).
 3. El «Excel» de un período cerrado en el nivel 3 sigue vivo (es el del ZIP, pieza D); solo se retiró el «Exportar Excel» de Reportes.
 
+
+---
+
+## 9. Pieza (D) — impulsadoras, el Excel del ZIP y los links de 30 días (22-sep-2026)
+
+Interruptor único: **`src/lib/marketing/zip-e-impulsadoras.ts › ZIP_E_IMPULSADORAS_NUEVO`** (hoy `true`). En `false`, las tres cosas vuelven exactamente a como estaban. **Nada de lo que se guarda cambió de forma**: la limpieza ocurre al ARMAR el papel, no al escribir en la base (Daniel: *«no elimines ni modifiques nada, deja que secretaria lo haga cuando rediseñemos»*).
+
+### 9.1 Impulsadoras — todos los meses sin pagar
+
+🩸 **El defecto.** `listImpulsadoras` miraba DOS meses (`mesAnteriorISO` / `mesActualISO`): un mes sin pagar más viejo que esos dos desaparecía de la pantalla, y la cabecera decía «Todo al día este mes ✓» con meses debajo sin pagar.
+
+🔴 **La regla.** Todos los meses sin pagar **desde el primer pago** hasta el mes en curso de **Panamá** (`hoyPanama()`, no el reloj del servidor), el **más viejo arriba**. «Sin pagar» incluye el mes a medias. Sin ningún pago registrado la lista va VACÍA: `mk_impulsadoras` no tiene fecha de ingreso y **inventar un arranque sería inventar una deuda**. Módulo puro nuevo: `lib/marketing/meses-sin-pagar.ts` (`mesesSinPagar`, `resumenDeLoQueDebe`), encima de `coberturaDelMes` de `periodo.ts`, que ya existía.
+
+**Medido contra producción (22-sep-2026, solo lectura):**
+
+| | Hoy en pantalla | Con el interruptor |
+|---|---|---|
+| Ana Trejos | 2 chips (ago · sep 2026) | **24 meses sin pagar** (5 a medias), el más viejo **mayo 2024** |
+| Cindy de Gracia | 2 chips (ago · sep 2026) | **4 meses sin pagar**, el más viejo **junio 2026** |
+
+**Pantalla:** una línea «Debe 24 meses (5 a medias) — el más viejo, mayo 2024» y los chips del más viejo al más nuevo; se dibujan **6** y el resto se pliega en «Ver los otros N» (24 chips de corrido tapan el monto y los botones). El botón «Registrar pago» ahora sale mientras quede UN mes sin pagar, y el modal **abre en el más viejo** (`mesInicial`). `RegistrarPagoModal` **no se tocó**: solo la prop que recibe.
+
+🔑 **Para Daniel, y él decide:** Ana tiene un pago de **abril 2024** y el siguiente recién en **agosto 2025**. O son 15 meses de 2024-2025 que nunca se pagaron, o ese pago está mal fechado. El sistema no lo puede saber; **no se tocó nada**.
+⚠️ Cinco de sus «meses a medias» son meses a los que les falta **un día** (el pago se registró hasta el 30 de un mes de 31). Por eso el resumen los cuenta **aparte** y lo dice.
+
+### 9.2 El Excel que lee la marca — las tres reglas
+
+Medido sobre el ZIP **real** que recibió Tommy (`05-marketing/zip-gastos-del-periodo-cerrado-tommy-hilfiger.zip`, «mid 2026», 15 hojas, 40 gastos, $94.104,43, 429 celdas de texto, 93 archivos):
+
+| Regla | ANTES | DESPUÉS |
+|---|---|---|
+| 1. Nota interna en el subtítulo | **1 celda**: «mid 2026 · calculado el 20 sept 2026 (este período se cerró sin reporte guardado)» | **0** — queda «mid 2026 · cerrado» |
+| 2. Nombre de una empresa del grupo en el concepto | **1 de 40**: «Pago de espacio (mueble) en tienda **para Fashion Wear Inc.**» (+ el **nombre del PDF** de esa fila, que también lo llevaba) | **0** — queda «Pago de espacio (mueble) en tienda» |
+| 3. Proveedor en una sola grafía | **10 grafías**, el sufijo de sociedad escrito de **4 formas**: `S a` · `S.a` · `S.a.` · `Corp.` | **10 grafías**, sufijo en **2 formas** (`S.A.` · `Corp.`); **19 de 40 celdas** cambian de escritura |
+| 4. Solo lo que `se_reporta` | no se miraba | se filtra (hoy **0 apagados** en producción: ninguna fila cambia todavía) |
+
+- La limpieza se aplica **al final de la preparación** (`zip-marca.ts › limpiarParaLaMarca`), no al armar el Excel: así llega también al **nombre de cada comprobante dentro del ZIP**, que lleva el concepto.
+- 🔴 **El proveedor NO se censura.** «Confecciones Boston» es empresa del grupo **y** proveedor legítimo cuando fabrica (Daniel: *«Boston cuando fabrica»*). La regla 2 se aplica **solo al concepto**.
+- Los nombres de las ocho empresas se **DERIVAN** de `EMPRESA_KEY_TO_NAME` + `EMPRESA_KEY_TO_NOMBRE_CORTO` + `EMPRESA_FISCAL[*].legal` (de ahí sale el «Inc.»), del más largo al más corto para que «Confecciones Boston» gane antes que «Boston». **Ninguno escrito a mano.**
+- 🔴 **El reparto `pct/sumPct` se simplificó encima de `exigirUnaMarca`**: una marca = el total entero (`papel-de-la-marca.ts › porcionDeLaFactura`). **Ningún monto se movió** — medido: 108 de 108 facturas con UNA marca, 72 al «50 %» (el modelo viejo «marca 50 / Fashion Group 50») y 36 al «100 %»; con una sola fila, `total × (pct/sumPct)` ya daba el total. Queda la red por si llegara una repartida: no se rompe el ZIP de un encargado.
+- Lo mismo (proveedor + `se_reporta`) se aplicó al respaldo del ZIP por proyecto (`generar-zip.ts`).
+
+### 9.3 Los links de 30 días y el registro de cada ZIP
+
+- 🔴 **30 días** (`TTL_LINK_ZIP_SEGUNDOS`), antes **365**. `firmarLote` (`zip-export.ts`) los firma; el `LINK_TTL_SECONDS` de `zip-marca.ts` era un valor **sin lectores** y se retiró con nota. ⚠️ El default de `firmarPath` **sigue en una hora**: eso firma lo que se mira dentro de la app, no lo que sale de la casa.
+- 🔴 **Ruta nueva para volver a firmar**: `POST /api/marketing/zip/firmar-de-nuevo` (`{ paths: [] }` → `{ links, fallaron, vencen_en_dias }`), admin y secretaria. **No es una llave maestra**: se rechaza lo vacío, lo absoluto, lo que trae `..` y lo que trae `://` (`esPathFirmable`).
+- 🔴 **Cada ZIP que se baja queda anotado**: `POST /api/marketing/zip-marca` guarda el archivo en `marketing/periodos/<id>/<fecha>.zip` y agrega un registro a `mk_periodos.zips_bajados` con `anotarZip`, **releyendo la fila antes de escribir** (la lista es un jsonb: escribir la que uno tenía en la mano borraría lo que otra persona anotó). `lib/marketing/zips-bajados.ts`. **Falla ABIERTA y nunca lanza**: si Storage o la columna fallan, el encargado igual recibe su ZIP. Multifashion no tiene período y no se anota (no es un error). Dos descargas del mismo día escriben el mismo archivo (upsert) y se anotan las dos.
+
+### 9.4 Candado y mutaciones
+
+`src/__tests__/lib/marketing-zip-e-impulsadoras.test.ts` — **23 casos** en 4 bloques (meses sin pagar · el papel de la marca en módulo puro · el Excel armado de verdad contra un doble en memoria de PostgREST · TTL y registro de ZIP). El doble **recorta las columnas al `select`**, así que el caso «sin la migración» prueba el falla-abierto de verdad.
+
+`scripts/_mutar-candados-marketing-zip-e-impulsadoras.sh` — **11 mutaciones + 1 control, 12/12**:
+
+| # | Mutación | Resultado |
+|---|---|---|
+| 1 | `mesesSinPagar` vuelve a mirar solo 2 meses | 🔴 |
+| 2 | la lista deja de venir del más viejo al más nuevo | 🔴 |
+| 3 | un mes a medias deja de contar como sin pagar | 🔴 |
+| 4 | vuelve la nota interna al subtítulo | 🔴 |
+| 5 | deja de limpiarse el nombre de la empresa del concepto | 🔴 |
+| 6 | el sufijo de sociedad vuelve a escribirse como venga | 🔴 |
+| 7 | el «50 %» vuelve a partir el monto a la mitad | 🔴 |
+| 8 | lo que no se reporta vuelve a entrar al ZIP | 🔴 |
+| 9 | los gastos dejan de limpiarse | 🔴 |
+| 10 | los links vuelven a durar un año | 🔴 |
+| 11 | el ZIP guardado cambia de lugar | 🔴 |
+| — | control sin mutar | 🟢 23/23 |
+
+**Candado ajeno que cambió de dirección, con nota fechada:** `marketing-zip-marca.test.ts` — el caso «cerrado SIN reporte congelado: el subtítulo LO DECLARA» EXIGÍA la nota interna; hoy exige que **no** esté, y comprueba que el dato sigue del lado de adentro (`fuenteMontos`).
+
+### 9.5 Pendiente de Daniel
+
+1. 🔑 **El pago de abril 2024 de Ana Trejos** (§ 9.1): o son 15 meses que se deben, o está mal fechado. Nadie lo tocó.
+2. ⚠️ **Nadie MUESTRA todavía los ZIP anotados**: `mk_periodos.zips_bajados` se llena desde ahora, pero no hay pantalla que liste «lo que ya se le mandó a esta marca» ni botón que llame a `firmar-de-nuevo`. Es la pantalla del período, territorio de la pieza (C).
+3. ⚠️ El respaldo del ZIP **por proyecto** (`generar-zip.ts`) lee `se_reporta` si la ruta `datos-zip` lo manda; hoy esa ruta no lo selecciona, así que ahí todo se reporta (falla ABIERTO).

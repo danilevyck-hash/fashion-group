@@ -6,6 +6,8 @@ import { useToast } from "@/components/ToastSystem";
 import { ConfirmDeleteModal } from "@/components/ui";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 import { etiquetaMes } from "@/lib/marketing/meses";
+import { resumenDeLoQueDebe, type MesSinPagar } from "@/lib/marketing/meses-sin-pagar";
+import { ZIP_E_IMPULSADORAS_NUEVO } from "@/lib/marketing/zip-e-impulsadoras";
 import type {
   ImpulsadoraConEstado,
   MkMarca,
@@ -56,6 +58,46 @@ function ChipMes({ label, estado, faltan }: { label: string } & Pick<PagoMesEsta
         <span className="font-normal whitespace-nowrap">· falta {faltan}</span>
       )}
     </span>
+  );
+}
+
+// 🔴 TODOS LOS MESES SIN PAGAR, EL MÁS VIEJO ARRIBA (22-sep-2026).
+//
+// 🩸 La tarjeta mostraba DOS chips —mes anterior y mes actual— y un mes sin
+// pagar más viejo que eso no aparecía en ninguna parte. Medido contra
+// producción: Ana Trejos debía julio de 2026 y la pantalla no lo decía.
+//
+// Se dibujan los 6 más viejos y el resto se pliega detrás de un botón que DICE
+// cuántos son: veinticuatro chips de corrido tapan el monto y los botones.
+const MESES_A_LA_VISTA = 6;
+
+function MesesQueDebe({ meses }: { meses: ReadonlyArray<MesSinPagar> }) {
+  const [todos, setTodos] = useState(false);
+  if (meses.length === 0) {
+    return <span className="text-xs text-emerald-700">Sin meses pendientes ✓</span>;
+  }
+  const visibles = todos ? meses : meses.slice(0, MESES_A_LA_VISTA);
+  const ocultos = meses.length - visibles.length;
+  return (
+    <div className="space-y-1.5">
+      <div className="text-[12px] font-medium text-amber-800">
+        {resumenDeLoQueDebe(meses, (m) => etiquetaMes(m).toLowerCase())}
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        {visibles.map((m) => (
+          <ChipMes key={m.mes} label={etiquetaMes(m.mes)} estado={m.estado} faltan={m.faltan} />
+        ))}
+        {ocultos > 0 && (
+          <button
+            type="button"
+            onClick={() => setTodos(true)}
+            className="rounded-full border border-gray-300 px-2 py-0.5 text-xs text-gray-600 hover:border-black hover:text-black transition"
+          >
+            Ver los otros {ocultos}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -153,7 +195,13 @@ export default function ImpulsadorasView({ marcas }: Props) {
     }
   }, [eliminando, toast, cargar]);
 
-  const pendientes = (items ?? []).filter((i) => i.activa && !i.mesActual.pagado).length;
+  // 🩸 Decía «Todo al día este mes ✓» mirando SOLO el mes actual, con meses
+  // viejos sin pagar debajo. Con el interruptor nuevo cuenta a quien debe
+  // CUALQUIER mes, que es lo que hay que ir a pagar.
+  const pendientes = (items ?? []).filter((i) =>
+    i.activa &&
+    (ZIP_E_IMPULSADORAS_NUEVO ? (i.mesesSinPagar ?? []).length > 0 : !i.mesActual.pagado),
+  ).length;
 
   return (
     <div className="space-y-5">
@@ -173,11 +221,15 @@ export default function ImpulsadorasView({ marcas }: Props) {
       {!loading && (items?.length ?? 0) > 0 && (
         <div className="text-sm text-gray-600">
           {pendientes === 0 ? (
-            <span className="text-emerald-700">Todo al día este mes ✓</span>
+            <span className="text-emerald-700">
+              {ZIP_E_IMPULSADORAS_NUEVO ? "Todo al día ✓" : "Todo al día este mes ✓"}
+            </span>
           ) : (
             <span>
-              <span className="font-semibold text-amber-700">{pendientes}</span> pendiente
-              {pendientes === 1 ? "" : "s"} de pago este mes
+              <span className="font-semibold text-amber-700">{pendientes}</span>{" "}
+              {ZIP_E_IMPULSADORAS_NUEVO
+                ? `con meses sin pagar`
+                : `pendiente${pendientes === 1 ? "" : "s"} de pago este mes`}
             </span>
           )}
         </div>
@@ -218,17 +270,23 @@ export default function ImpulsadorasView({ marcas }: Props) {
                     ? imp.marcas.map((m) => `${m.marca.nombre} ${m.porcentaje}%`).join(" · ")
                     : "Sin marcas"}
                 </div>
-                <div className="mt-2 flex items-center gap-2 flex-wrap">
-                  <ChipMes
-                    label={etiquetaMes(imp.mesAnterior.mes)}
-                    estado={imp.mesAnterior.estado}
-                    faltan={imp.mesAnterior.faltan}
-                  />
-                  <ChipMes
-                    label={etiquetaMes(imp.mesActual.mes)}
-                    estado={imp.mesActual.estado}
-                    faltan={imp.mesActual.faltan}
-                  />
+                <div className="mt-2">
+                  {ZIP_E_IMPULSADORAS_NUEVO ? (
+                    <MesesQueDebe meses={imp.mesesSinPagar ?? []} />
+                  ) : (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <ChipMes
+                        label={etiquetaMes(imp.mesAnterior.mes)}
+                        estado={imp.mesAnterior.estado}
+                        faltan={imp.mesAnterior.faltan}
+                      />
+                      <ChipMes
+                        label={etiquetaMes(imp.mesActual.mes)}
+                        estado={imp.mesActual.estado}
+                        faltan={imp.mesActual.faltan}
+                      />
+                    </div>
+                  )}
                 </div>
                 {/* Sin truncate: a 390px cortaba el año ("1–15 jul 202…").
                     Es una línea secundaria, que envuelva no molesta. */}
@@ -250,7 +308,12 @@ export default function ImpulsadorasView({ marcas }: Props) {
                     si falta algo en cualquiera de los dos meses, el botón está.
                     Antes solo miraba el mes actual y dejaba sin forma de cargar
                     la quincena que faltaba del mes pasado. */}
-                {(!imp.mesActual.pagado || !imp.mesAnterior.pagado) && (
+                {/* Con el interruptor nuevo el botón está mientras quede UN
+                    mes sin pagar, por viejo que sea — que es de lo que se
+                    trata: un mes de hace cinco meses también se paga. */}
+                {(ZIP_E_IMPULSADORAS_NUEVO
+                  ? (imp.mesesSinPagar ?? []).length > 0
+                  : !imp.mesActual.pagado || !imp.mesAnterior.pagado) && (
                   <button
                     type="button"
                     onClick={() => setPagando(imp)}
@@ -316,9 +379,12 @@ export default function ImpulsadorasView({ marcas }: Props) {
       {pagando && (
         <RegistrarPagoModal
           impulsadora={pagando}
-          // Arranca en el mes más viejo que todavía debe algo.
+          // Arranca en el mes más viejo que todavía debe algo. Con el
+          // interruptor nuevo ese mes es el primero de la lista completa, no
+          // el más viejo de los dos que se miraban antes.
           mesInicial={
-            pagando.mesAnterior.pagado ? pagando.mesActual.mes : pagando.mesAnterior.mes
+            (ZIP_E_IMPULSADORAS_NUEVO && (pagando.mesesSinPagar ?? [])[0]?.mes) ||
+            (pagando.mesAnterior.pagado ? pagando.mesActual.mes : pagando.mesAnterior.mes)
           }
           onClose={() => setPagando(null)}
           onSaved={() => {
