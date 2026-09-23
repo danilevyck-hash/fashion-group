@@ -309,10 +309,23 @@ describe("4 · los chips", () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 4-bis. EL REVENDEDOR NO ES UN CLIENTE DE TIENDA
+// 4-bis. NO HAY EXCEPCIONES POR UNA SOLA PERSONA (23-sep-2026)
+//
+// 🔴 CAMBIO DE DIRECCIÓN, con fecha. El 16-sep-2026 este bloque exigía que
+// VENTAS MAHER (códigos 47, 48 y 49) quedara FUERA de la lista de llamar
+// —Daniel: «Maher es revendedor»—. El 23-sep-2026 él lo revierte, textual:
+// ***«métel[o] para no hacer excepciones por solo una persona»***. Maher es un
+// cliente como cualquiera en TODO el módulo.
+//
+// Medido contra producción ese día: «No vuelven» 721 → 723, «Nuevos» 52 → 52,
+// «Todos» 983 → 986 (son TRES códigos, no uno) y las cuatro tarjetas quietas.
+//
+// Lo que este bloque sigue vigilando es el MECANISMO: queda vacío, se compara
+// por CÓDIGO y nunca por nombre, y cada código que algún día se agregue tiene
+// que decir por qué.
 // ═════════════════════════════════════════════════════════════════════════════
 
-describe("4-bis · a Maher no se le hace postventa", () => {
+describe("4-bis · nadie queda fuera de la lista de llamar", () => {
   const conMaher = armarUniverso(
     [reg(47, { nombre: "VENTAS MAHER" }), reg(48, { nombre: "VENTAS MAHER" }),
      reg(49, { nombre: "VENTAS MAHER" }), reg(500, { nombre: "JOISY CAMARENA" })],
@@ -320,54 +333,46 @@ describe("4-bis · a Maher no se le hace postventa", () => {
     HOY,
   ).clientes;
 
-  it("🔴 sale de la lista, con los TRES chips", () => {
-    for (const chip of CHIPS) {
-      expect(filtrarPorChip(baseDeSeguimiento(conMaher), chip).map((c) => c.cliente_switch_id))
-        .not.toContain(47);
-    }
-    expect(baseDeSeguimiento(conMaher).map((c) => c.cliente_switch_id)).toEqual([500]);
+  it("🔴 Maher ENTRA a la lista, con sus tres códigos (Daniel, 23-sep-2026)", () => {
+    expect(baseDeSeguimiento(conMaher).map((c) => c.cliente_switch_id))
+      .toEqual([47, 48, 49, 500]);
+    expect(filtrarPorChip(baseDeSeguimiento(conMaher), "todos").map((c) => c.cliente_switch_id))
+      .toContain(47);
   });
 
-  it("🔴 son SUS TRES CÓDIGOS, no uno: 48 y 49 ni siquiera tienen ficha", () => {
-    expect(FUERA_DE_SEGUIMIENTO.map((f) => f.codigo)).toEqual([47, 48, 49]);
-    for (const c of [47, 48, 49]) expect(estaFueraDeSeguimiento(c)).toBe(true);
-    expect(estaFueraDeSeguimiento(500)).toBe(false);
+  it("🔴 la lista de exclusiones quedó VACÍA: ningún código pasa por excepción", () => {
+    expect(FUERA_DE_SEGUIMIENTO).toEqual([]);
+    for (const c of [47, 48, 49, 500]) expect(estaFueraDeSeguimiento(c)).toBe(false);
     expect(estaFueraDeSeguimiento(null)).toBe(false);
   });
 
-  it("🔴 se compara por CÓDIGO, nunca por nombre — una «MAHERLIN» no desaparece", () => {
-    const maherlin = armarUniverso(
-      [reg(501, { nombre: "MAHERLIN PEREZ" })],
-      [fac(501, "2025-12-22")],
-      HOY,
-    ).clientes;
-    expect(baseDeSeguimiento(maherlin).map((c) => c.cliente_switch_id)).toEqual([501]);
-    // Y el módulo no tiene una sola comparación de texto.
+  it("🔴 el mecanismo se conserva y sigue siendo POR CÓDIGO, nunca por nombre", () => {
+    // Si algún día vuelve a haber una exclusión, tiene que ser por código: un
+    // `ILIKE '%maher%'` haría desaparecer a una clienta «MAHERLIN» sin que
+    // nadie se entere.
     const src = plano(leer("src/lib/multifashion/fuera-de-seguimiento.ts"));
     expect(src).not.toMatch(/ILIKE|includes\(|toLowerCase\(|\.test\(/);
+    expect(src).toContain("estaFueraDeSeguimiento");
+    // La llave sigue siendo un número (el código), no un texto.
+    expect(src).toMatch(/codigo:\s*number/);
   });
 
-  it("🔴 cada código dice POR QUÉ está afuera", () => {
+  it("🔴 y el que algún día se agregue tiene que decir POR QUÉ", () => {
     for (const f of FUERA_DE_SEGUIMIENTO) {
       expect(f.porque.length, `${f.codigo} sin motivo`).toBeGreaterThan(20);
       expect(f.nombre.length).toBeGreaterThan(0);
     }
-    expect(FUERA_DE_SEGUIMIENTO[0].porque).toMatch(/[Rr]evendedor/);
   });
 
-  it("⚠️ pero las CUATRO TARJETAS lo siguen contando: son otra pregunta", () => {
-    const { cards } = armarUniverso(
+  it("⚠️ las CUATRO TARJETAS no se movieron: siempre lo contaron", () => {
+    const { cards, clientes } = armarUniverso(
       [reg(47, { nombre: "VENTAS MAHER" })],
       [fac(47, correrDias(HOY, -90))],
       HOY,
     );
-    // Dormido en la tarjeta, afuera de la lista. Es a propósito.
     expect(cards.dormidos).toBe(1);
-    expect(baseDeSeguimiento(armarUniverso(
-      [reg(47, { nombre: "VENTAS MAHER" })],
-      [fac(47, correrDias(HOY, -90))],
-      HOY,
-    ).clientes)).toEqual([]);
+    // Y ahora también está en la lista de abajo.
+    expect(baseDeSeguimiento(clientes).map((c) => c.cliente_switch_id)).toEqual([47]);
   });
 });
 

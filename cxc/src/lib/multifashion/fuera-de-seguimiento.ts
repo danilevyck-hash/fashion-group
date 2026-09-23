@@ -2,35 +2,38 @@
 // QUIÉN NO ES UN CLIENTE DE TIENDA — la lista de a quién NO se le hace
 // postventa, en UN solo lugar y con su motivo escrito.
 //
-// Daniel, 16-sep-2026: ***«Maher es revendedor»***. Le compra a la tienda para
-// volver a vender, así que no es alguien a quien Jennifer llama para que vuelva.
+// 🔴 HOY LA LISTA ESTÁ VACÍA, Y ESO ES LA DECISIÓN (23-sep-2026).
+// Daniel, textual: ***«métel[o] para no hacer excepciones por solo una
+// persona»***. VENTAS MAHER vuelve a ser un cliente como cualquier otro en
+// TODO el módulo: entra al ranking de Clientes (ya entraba desde el rediseño
+// «Retail al frente») y ahora también a la lista de llamar por WhatsApp.
 //
-// 🔴 SE VA DE LA LISTA, NO DE LAS TARJETAS. El encargo dice expresamente que las
-// cuatro tarjetas de arriba no se tocan, y son otra pregunta: la tarjeta cuenta
-// el UNIVERSO de fidelización y la lista es A QUIÉN LLAMAR. Van a quedar
-// diciendo uno más que la lista, igual que ya pasa con «Nuevos», y está bien.
+// ⚠️ CAMBIO DE DIRECCIÓN, no un olvido. El 16-sep-2026 Daniel había dicho
+// *«Maher es revendedor»* y sus tres códigos (47, 48 y 49) estaban acá afuera.
+// El 23-sep-2026 lo revierte: una excepción para una sola persona cuesta más
+// de lo que ahorra. El mecanismo se conserva VACÍO —no se borra— por si algún
+// día hace falta sacar a alguien; mientras la lista esté vacía,
+// `estaFueraDeSeguimiento` contesta `false` para todo el mundo.
 //
-// 🔴 POR CÓDIGO, NUNCA POR NOMBRE — y acá la decisión tiene un costo medido, así
-// que queda escrita. La RPC del ranking lo excluye con `cliente NOT ILIKE
-// '%maher%'`, que es cómodo porque atrapa cualquier código nuevo… y es
-// exactamente la trampa que la casa prohíbe: el día que entre una clienta
-// llamada «MAHERLIN», desaparece de la lista de llamar **sin que nadie se
-// entere**. Un código de más se ve; una clienta que falta, no.
-//   · Lo que esto NO cubre: si Switch le abre un código NUEVO a Maher, vuelve a
-//     aparecer hasta que alguien lo agregue acá. Es un renglón de más en una
-//     lista de 967, y se nota.
+// ── LO MEDIDO CONTRA PRODUCCIÓN AL REVERTIR (23-sep-2026) ───────────────────
+// La lista de Clientes de Multifashion, con los MISMOS datos, antes y después:
+//   · «No vuelven»: 721 → **723**   (+2: los códigos 48 y 49)
+//   · «Nuevos»:      52 →  **52**   (sin cambio)
+//   · «Todos»:      983 → **986**   (+3: los tres códigos de Maher)
+//   · Las CUATRO TARJETAS no se mueven (96 · 47 · 723 · 862): siempre lo
+//     contaron — son el universo de fidelización, no a quién llamar.
+// Son TRES filas de más, no una, porque «VENTAS MAHER» tiene tres códigos:
+//   · 47 — 76 visitas, última compra 17-sep-2026, $10.035,90. No está dormido.
+//   · 48 y 49 — una compra cada uno, las dos del 5-jun-2024, así que caen en
+//     «No vuelven».
+// ⚠️ Ninguno de los tres tiene teléfono en Switch: aparecen en la lista pero
+// SIN botón de WhatsApp, como cualquier otro cliente sin número cargado.
 //
-// ── LO MEDIDO CONTRA PRODUCCIÓN (16-sep-2026) ───────────────────────────────
-// «VENTAS MAHER» tiene TRES códigos, no uno:
-//   · 47 — ficha «VENTAS MAHER», 84 facturas, de jun-2024 al **15-sep-2026**,
-//     $10.818,52. Sin teléfono ni celular cargado.
-//   · 48 y 49 — SIN ficha en el directorio, una factura cada uno, las dos del
-//     5-jun-2024. En la factura el nombre viene con un espacio al final
-//     («VENTAS MAHER »), que es por lo que la RPC tiene que hacerle TRIM.
-//
-// ⚠️ Con su última compra del 15-sep no caía en «No vuelven» de todos modos, y
-// sin teléfono nunca habría tenido botón. Sale igual, porque no es a quien se
-// llama — no porque estorbara.
+// 🔴 SI ALGÚN DÍA VUELVE A HABER UNA EXCLUSIÓN: POR CÓDIGO, NUNCA POR NOMBRE.
+// Un `cliente NOT ILIKE '%maher%'` es cómodo y es la trampa que la casa
+// prohíbe: el día que entre una clienta llamada «MAHERLIN» desaparece de la
+// lista **sin que nadie se entere**. Un código de más se ve; una clienta que
+// falta, no.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Un código que no entra a la lista de seguimiento, con su porqué. */
@@ -43,27 +46,15 @@ export interface FueraDeSeguimiento {
   porque: string;
 }
 
-export const FUERA_DE_SEGUIMIENTO: readonly FueraDeSeguimiento[] = [
-  {
-    codigo: 47,
-    nombre: "VENTAS MAHER",
-    porque: "Revendedor: le compra a la tienda para volver a vender (Daniel, 16-sep-2026).",
-  },
-  {
-    codigo: 48,
-    nombre: "VENTAS MAHER",
-    porque: "El mismo revendedor, con otro código de Switch y sin ficha en el directorio.",
-  },
-  {
-    codigo: 49,
-    nombre: "VENTAS MAHER",
-    porque: "El mismo revendedor, con otro código de Switch y sin ficha en el directorio.",
-  },
-];
+/**
+ * 🔴 VACÍA A PROPÓSITO desde el 23-sep-2026 (ver el encabezado). Agregar a
+ * alguien acá lo saca de la lista de llamar y hay que escribirle el motivo.
+ */
+export const FUERA_DE_SEGUIMIENTO: readonly FueraDeSeguimiento[] = [];
 
 const CODIGOS = new Set(FUERA_DE_SEGUIMIENTO.map((f) => f.codigo));
 
-/** ¿A este código NO se le hace postventa? */
+/** ¿A este código NO se le hace postventa? Con la lista vacía, nunca. */
 export function estaFueraDeSeguimiento(codigo: number | null | undefined): boolean {
   return typeof codigo === "number" && CODIGOS.has(codigo);
 }

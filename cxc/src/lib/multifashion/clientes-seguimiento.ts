@@ -52,12 +52,14 @@ export function esChip(v: unknown): v is Chip {
  * seguimiento de compra. Medido el 16-sep-2026: de 1.060 fichas, **967 tienen
  * compras** y 93 nunca compraron.
  *
- * 🔴 Y los revendedores no entran: a Maher no se le llama para que vuelva
- * (Daniel: *«Maher es revendedor»*). La lista de quiénes y por qué vive en
- * `fuera-de-seguimiento.ts`, POR CÓDIGO y nunca por nombre.
+ * 🔴 Y HOY NO SE EXCLUYE A NADIE MÁS (23-sep-2026). Daniel: *«métel[o] para
+ * no hacer excepciones por solo una persona»* — VENTAS MAHER, que estaba
+ * afuera desde el 16-sep, vuelve a ser un cliente como cualquiera. El
+ * mecanismo se conserva VACÍO en `fuera-de-seguimiento.ts`, POR CÓDIGO y nunca
+ * por nombre. Medido ese día: «Todos» 983 → 986 y «No vuelven» 721 → 723.
  *
- * ⚠️ Esto NO toca las cuatro tarjetas de arriba: ésas cuentan el universo de
- * fidelización y van a decir uno más que la lista. Es a propósito.
+ * ⚠️ Las cuatro tarjetas de arriba no se mueven: cuentan el universo de
+ * fidelización, que a Maher siempre lo contó.
  */
 export function baseDeSeguimiento(
   clientes: readonly ClienteUniverso[],

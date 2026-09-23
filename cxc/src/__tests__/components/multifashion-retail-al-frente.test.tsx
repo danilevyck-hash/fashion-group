@@ -617,11 +617,12 @@ describe("5 · Clientes: 5 elementos", () => {
     fireEvent.click(screen.getByRole("button", { name: /Todos/ }));
     fireEvent.click(await screen.findByRole("button", { name: /Ver los/ }));
     expect(screen.queryByText(/Frontera/i)).toBeNull();
-    // ⚠️ Maher entra al RANKING (la RPC dejó de excluirlo por nombre), pero la
-    // lista de LLAMAR conserva su propia regla por código (`fuera-de-seguimiento.ts`,
-    // Daniel 16-sep-2026: «Maher es revendedor»). Si Daniel quiere que también
-    // entre a la lista, se toca ESA lista; acá se vigila que no cambió sola.
-    expect(screen.queryByText("Ventas Maher")).toBeNull();
+    // 🔴 CAMBIO DE DIRECCIÓN (Daniel, 23-sep-2026): «métel[o] para no hacer
+    // excepciones por solo una persona». Maher ya entraba al RANKING y ahora
+    // también sale en la lista de LLAMAR — `fuera-de-seguimiento.ts` quedó
+    // vacío. La Frontera sigue fuera por código: es mayoreo, no una excepción
+    // por persona.
+    expect(screen.getByText("Ventas Maher")).toBeTruthy();
     expect(screen.getAllByText(/compró \$/).length).toBeGreaterThan(20);
     // La consulta del mayoreo no se hace más.
     const urls = fetchMock.mock.calls.map((c) => String(c[0]));

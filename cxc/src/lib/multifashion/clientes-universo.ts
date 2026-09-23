@@ -72,15 +72,15 @@
 // ⚠️ Un cliente puede quedar en **$0,00** y se muestra igual: el 453 («CARLOS
 // LARA») compró y devolvió todo. Es cierto, no es un dato roto.
 //
-// ⚠️ **DECISIÓN PENDIENTE DE DANIEL (16-sep-2026): VENTAS MAHER.** La RPC del
-// ranking lo excluye por nombre desde jun-2026 («revendedor B2B», decisión de
-// él), pero el universo de fidelización —el de las CUATRO TARJETAS, que este
-// encargo no toca— sí lo cuenta, así que aparece entre los clientes a los que
-// la tienda le puede escribir. Se deja como está: sacarlo de acá movería una
-// tarjeta. Daniel decide si el revendedor entra a la lista de llamar.
+// ✅ **DECIDIDO (23-sep-2026): VENTAS MAHER ES UN CLIENTE COMO CUALQUIERA.**
+// Daniel, textual: *«métel[o] para no hacer excepciones por solo una
+// persona»*. Ya entraba al ranking (la RPC v3 dejó de excluirlo por nombre) y
+// desde hoy también entra a la lista de llamar: `fuera-de-seguimiento.ts`
+// quedó VACÍO. Este universo nunca lo sacó, así que las cuatro tarjetas no se
+// movieron; lo que cambió es la lista de abajo («Todos» 983 → 986).
 //
-// 🔑 Y por eso el monto NO copia las exclusiones por NOMBRE del ranking (las 8
-// empresas del grupo, «maher»): ésas dicen **quién aparece en un ranking**, no
+// 🔑 Y el monto sigue sin copiar las exclusiones por NOMBRE del ranking (las 8
+// empresas del grupo): ésas dicen **quién aparece en un ranking**, no
 // **cuánto compró una persona**. Acá se suman las facturas de ESE código y
 // punto. Para los 500 clientes que el ranking sí muestra da exactamente lo
 // mismo —ninguno cae en esas exclusiones—, y por eso la verificación de 500 de
