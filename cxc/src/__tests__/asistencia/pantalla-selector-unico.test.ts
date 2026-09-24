@@ -88,6 +88,10 @@ describe("🔴 UNA sola clave y UNA sola memoria", () => {
     expect(CLAVES_DE_PANTALLA).not.toContain(PARAM_HASTA);
     const sel = leer("src/components/asistencia/SelectorPeriodo.tsx");
     expect(sel).not.toMatch(/history:\s*"push"/);
+    // El hook escribe la dirección él mismo (las dos fechas JUNTAS): tiene que
+    // ser `replace`, y nunca `push`.
+    expect(sel).toContain("router.replace(");
+    expect(sel).not.toMatch(/router\.push\(/);
   });
 
   it("🩸 Préstamos › Movimientos ya no tiene su lista de 24, y `?quincena=` sigue llegando", () => {
@@ -98,6 +102,19 @@ describe("🔴 UNA sola clave y UNA sola memoria", () => {
     // Un enlace viejo GANA sobre el período compartido: nadie se queda sin ver
     // la quincena que le mandaron.
     expect(mov).toMatch(/if \(q\) return q;/);
+  });
+});
+
+describe("🩸 las dos fechas se escriben JUNTAS, en una sola vuelta", () => {
+  it("🩸 EL DEFECTO: dos `useUrlState` seguidos pierden una — quedaba `desde=16 · hasta=15`", () => {
+    // Cada setter de `useUrlState` arma la dirección nueva a partir de la que
+    // había AL PINTAR, así que el segundo pisa al primero. Por eso el hook arma
+    // UNA dirección con las dos fechas y llama al router una sola vez.
+    const sel = leer("src/components/asistencia/SelectorPeriodo.tsx");
+    expect(sel).toContain("params.set(PARAM_DESDE, d)");
+    expect(sel).toContain("params.set(PARAM_HASTA, h)");
+    // Y NO puede volver a los dos setters sueltos.
+    expect(sel).not.toMatch(/setDesdeUrl|setHastaUrl/);
   });
 });
 
