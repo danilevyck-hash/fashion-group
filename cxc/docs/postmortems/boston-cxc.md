@@ -1429,6 +1429,63 @@ Daniel, textual: *«Llámalo Ventas Boston entonces. Y dale acceso a los otros m
 
 ---
 
+## 🔴 CUENTAS POR COBRAR EN EL CELULAR — «LA LISTA ES LA CARTERA» (24-sep-2026)
+
+Diseño aprobado por Daniel el 24-sep-2026. **Solo cambia la vista de celular (hasta `sm`); la computadora no se tocó.** Interruptor `CXC_CELULAR` (`src/lib/cxc/celular.ts`, hoy `true`; `false` = `PanelCxcMobile`, la pantalla de antes, intacta y con todos sus candados).
+
+### Lo que estorbaba, medido contra producción el 24-sep-2026
+
+Cartera del grupo leída de `switch_estadocuenta_aging_mv` acotada a las 6: **210 filas · 100 clientes con saldo ≠ 0 · $4.194.743,63** (0-90 $1.819.834,35 · 91-120 $455.738,20 · +120 $1.919.171,08).
+
+- **83 de 100 montos salían REDONDEADOS.** La fila usaba `formatCompactCurrency`: decía «$44K» donde el cliente debe $43.806,10. Sumando las 100 tarjetas el redondeo escondía **$20.794,51**, y el peor caso erraba un **29 %** (Chez Moi: «$1K» por $1.407,92). Para leer el número real había que tocar «Ver detalle» — un toque más por cliente.
+- **Abría por el que menos plata tiene.** Con `ORDEN_AL_ABRIR` («más viejo sin pagar»), los **10 primeros sumaban $84.770,18 = 2,0 %** de la cartera, y **City Mall Paso Canoa ($650.276,18, el más grande) caía en la posición 66** — 12.905 px = 15 pantallazos de arrastre. Los 18 clientes que son el 80 % de la plata quedaban repartidos hasta la posición 86.
+- **141 de 300 chips por cliente se dibujaban VACÍOS** (47 %), con un guion: 64 px de los 191 de cada tarjeta. 58 de 100 clientes tienen toda su plata en un solo tramo. Resultado: **4,42 clientes por pantalla**, 24,1 pantallazos para ver los 100.
+- **El primer cliente arrancaba en y=490 de 844 px** (58 % del primer pantallazo) con **14 cosas tocables antes**, y «Actualizar ahora» salía apagado ocupando un renglón entero.
+- **El cajón de documentos era la tabla de 5 columnas del escritorio a 390 px**: en City Mall Paso Canoa (139 renglones) **105 de 695 celdas (15 %) salían cortadas o encimadas** — se leía `1008$10,994.2`. «Días» tenía 21 px y «100» pide 25; «Original» 50 px y `$29,344.75` pide 74.
+- **La ficha del cliente desbordaba a lo ancho**: `$43,806.10` salía como `$43,806.1C`.
+
+### Lo que se construyó
+
+**La portada es una lista.** Título «Por cobrar», subtítulo con la empresa (hoja de iOS con las 6 + «Todas»), el **total EXACTO** (`$4,194,744`, sin «M» ni «K»), la línea «95 clientes en las 6 empresas · el que más debe, arriba», tres chips de tramo, un buscador y la lista. Se fueron de la vista de celular: la tarjeta negra, «Actualizar ahora» (queda en el «···»), el desplegable de empresa, los tres chips por cliente, «Ver detalle» y el «Cobrar» duplicado. Las pestañas Grupo/Boston se van del celular en la cartera del grupo (Boston es un botón arriba a la derecha) y **siguen dibujándose en Boston**, que es la única forma de volver.
+
+**Cada fila son DOS renglones.** Nombre a 17 px —el que escribe Switch, `nombre-cliente.ts`, sin recortar— y debajo **lo que urge**, una sola cosa, con esta prioridad: plata de más de 120 días → el que hace rato no paga (`avisaSinPagar`) → plata de 91 a 120 → cuándo pagó → «al día». A la derecha el **monto exacto sin centavos**. A la izquierda una rayita del **tramo DOMINANTE** (donde está la mayor parte de su plata, no «el peor tramo con algo adentro»): City Mall Paso Canoa tiene $46.376 de más de 120 días sobre $650.276 y se lee VERDE, porque eso es lo que es.
+
+**El orden.** 🔴 **En el celular la lista abre por PLATA** (Daniel: b). `ordenDelCelular(risk)` **es** `ordenParaRiskFilter(risk)`, la regla del 27-jul-2026: sin chip, el que más debe arriba; con un chip, el que más debe **en ese tramo**. No nace un segundo comparador. ⚠️ **La computadora conserva `ORDEN_AL_ABRIR`** y su candado `cxc-abre-por-mas-viejo`.
+
+**Los chips filtran y ordenan.** El chip tocado se pone negro, el número grande pasa a ser el de ese tramo, la lista queda solo con quienes pasan `pasaFiltroRiesgo` (la MISMA definición del escritorio) ordenados por la plata de ese tramo, y el subtítulo dice «40 clientes con más de 120 días · ver todo». La empresa elegida se combina con el chip.
+
+**Tocar el número grande abre «Por empresa»**: una fila por empresa con su total exacto, los tres tramos por color y «47 clientes · pagó \<cliente\> $679 ayer · vendió $20.762 ayer». 🔴 Los tramos se suman **exactamente como la computadora al elegir una empresa en el filtro**; el pulso sale del dato que la pantalla ya tiene (`switch_ultimo_pago_cliente_v2` y `switch_ultima_compra_cliente_v1`, que llegan por empresa desde el 13-ago-2026): **cero peticiones nuevas**. ⚠️ Es el último pago **de los clientes con saldo vivo**, no el último recibo de toda la empresa. Tocar una empresa deja la portada filtrada en ella. Sin Boston: la lista de empresas la manda quien llama.
+
+**Tocar una fila abre la hoja «Cobrar» de siempre.** El MISMO componente `HojaCobrar`, las MISMAS cuatro salidas, el MISMO deshacer de 5 s, las MISMAS 6 empresas decididas por el servidor. Lo único que el celular le agregó son **dos líneas de contexto** («\<cliente\> · $650,276.18» y «Último pago 20 ago · $234,189.21», sacado del dato que ya está: se suman los montos de las empresas cuya `ultimoPagoFecha` es la más reciente) **y un enlace** «Ver los documentos ›». 🔴 Las tres viajan **solo cuando la hoja la abrió el celular** (`cobrarDesdeCelular` en `page.tsx`), así que la computadora queda idéntica. **Cobrar son dos toques.** Al saldo a favor no se le cobra: su fila no abre la hoja.
+
+**La página del cliente** (`/cxc/cliente/[codigo]`): nombre grande, «$650,276.18 · lo que urge», «Cobrar» arriba a la derecha, grupo «Por empresa · 6» (total, los tres tramos por color y «39 documentos · el más viejo 142 días · pagó $37,561 hace 35 d»), grupo «Documentos · N» **como renglones, nunca una tabla de cinco columnas**, y «Últimos pagos» (`pagos-por-fecha.ts`). 🔴 **Los tramos salen del AGING, no de los documentos** — la edad de un documento y el tramo del estado de cuenta se calculan de dos formas, y contarlos ahí daría un segundo juego de tramos para la misma plata; del estado de cuenta se toma **solo** cuántos documentos son y cuál es el más viejo. 🔴 **El orden de los documentos es el del servidor** (`fecha`, `ccte_id`): no se reordena. Usa la MISMA clave SWR que `/cxc` (`useAdminData`), así que llegar desde la lista no dispara una lectura nueva. «Cobrar» monta `CobrarEnFicha`, el adaptador que ya existía: **no hay una segunda hoja de cobro en el sistema**. `gerente_boston` rebota a su casa antes de pedir una sola lectura del grupo.
+
+**La ficha del cliente** (`/clientes/[codigo]`): la tabla «Empresa por empresa» pasa de `w-full` a `w-full min-w-max` con `whitespace-nowrap` en cada celda de dinero. 🩸 `w-full` **dentro** de un `overflow-x-auto` nunca desborda: la tabla se encogía hasta partir el último dígito y el deslizamiento de lado no se activaba jamás. **No cambia una sola cifra.**
+
+### Archivos
+
+- `src/lib/cxc/celular.ts` — el interruptor y el porqué medido.
+- `src/lib/cxc/lista-celular.ts` — módulo PURO: `montoExacto` · `loQueUrge` · `tramoDominante` · `ordenDelCelular` · `totalDeLaPortada` · `subtituloDeLaPortada` · `carteraPorEmpresa` · `ultimoPagoDelCliente` · `empresasDelCliente` · `haceCuanto`. Sin `new Date()`, sin consultas, sin la palabra «boston».
+- `src/app/cxc/components/PanelCxcCelular.tsx` — la portada y la lista.
+- `src/app/cxc/components/HojasCxcCelular.tsx` — las tres hojas (elegir empresa · «Por empresa» · «···» con actualizar y las dos descargas de siempre), todas con `ModalOverlay align="center"`, el patrón de hoja del sistema: ningún panel `absolute` colgado de un ancla.
+- `src/app/cxc/cliente/[codigo]/{page,ClienteCxc}.tsx` — la página de un cliente.
+- Tocados: `src/app/cxc/page.tsx` (el interruptor, el panel, las pestañas ocultas en el celular y las tres props nuevas de la hoja), `src/app/cxc/components/HojaCobrar.tsx` (tres props OPCIONALES: sin ellas se dibuja exactamente como el 5-sep-2026) y `src/app/clientes/[codigo]/ClienteDetail.tsx` (el ancho de la tabla).
+
+### Candado
+
+`src/__tests__/components/cxc-celular.test.tsx` — **39 pruebas**, con un fixture de clientes REALES y sus cifras reales de producción (City Mall Paso Canoa $650.276,18 repartido en las seis · La Frontera Duty Free $380.732,79 con $370.621,79 de más de 120 días, partidos entre 121-180 y más de un año · City Mall David $323.742,73 · Nova Lux $294.760,42 al día · uno con saldo a favor). Prueba: que los tres tramos del celular digan lo MISMO que `TiraTotales` de la computadora sobre el mismo fixture; que abra por plata y que con el orden de la computadora el más grande NO sería el primero; que un chip ordene por su tramo; que «Por empresa» sume el total y cada tramo al centavo; que tocar la fila llame a `onCobrar` y que al saldo a favor no; que el celular no tenga un segundo camino de cobro (`enviar-email`, `waHref`, `mailto:`, `clipboard`, `fetch(`); que no haya `<table>` ni `overflow-x`; que `PanelCxcMobile` siga intacto; y que Boston no aparezca.
+
+**Verificado por mutación, 11 de 11 cazadas:** el monto vuelve a redondearse al millar (1) · el celular vuelve a ordenar por días sin pagar (2) · la rayita vuelve a ser «el peor tramo con algo adentro» (3) · «lo que urge» pone 91-120 antes que +120 (4) · «Por empresa» se come el tramo de más de un año (5) · el último pago toma la fecha más vieja (6) · «ayer» vuelve a decirse «hace 1 d» (7) · al saldo a favor se le vuelve a ofrecer cobrar (8) · el interruptor se apaga (9) · la ficha vuelve a cortar el monto (10) · el nombre vuelve a ser la llave de pareo en mayúsculas (11).
+
+### Lo que quedó fuera, y por qué
+
+- **El «···» conserva las cuatro descargas de escritorio** (`MenuDescargar`): son las MISMAS de la computadora y retirarlas sería quitarle una salida al que cobra desde el teléfono. La auditoría dice que el botón de descarga del celular no deja rastro; medirlo es otra decisión.
+- **`pasaFiltroRiesgo` no se tocó.** Para «0-90» sigue queriendo decir «su deuda entera está dentro del plazo», no «tiene algo ahí»: es la definición del módulo y cambiarla movería también la computadora.
+- **La hoja «Cobrar» sigue ofreciendo WhatsApp y «copiar»** aunque en toda la historia no se haya usado ninguno de los dos (20 correos, 0 WhatsApp, 0 copias): esa es la pregunta 3 de la auditoría y la contesta Daniel, no este encargo.
+- **El aviso «N sin pagar hace +90 d» dejó de tener botón propio en el celular** (era una línea de la tarjeta negra). El filtro `?sinpagar=1` **sigue existiendo y sigue filtrando**: la información pasó a estar en la fila de cada cliente, que es donde se lee sin tocar nada.
+
+---
+
 ## Lo que decía CLAUDE.md hasta el 14-sep-2026 (movido acá, verbatim)
 
 > El 14-sep-2026 CLAUDE.md pasaba de 333 mil caracteres (el tope del harness es 150 mil) y las instrucciones se cortaban a la mitad. Se dejó ahí un resumen de las reglas vigentes y el texto completo —mediciones, citas de Daniel, candados y mutaciones— se movió acá sin cambiar una palabra.

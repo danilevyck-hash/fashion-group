@@ -117,6 +117,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 **«Contacto» en la ficha: el sync NUNCA lo pisa**. Lo usa el saludo del correo y del WhatsApp; sin contacto, el de siempre; en un correo compartido **no se saluda a nadie**.
 - 🔴 **Boston: mismo FORMATO, APARTE.** Ruta propia, **no reusa `fetchEstadoCuentaData`**; sus teléfonos y correos de `switch_clientes` acotado a Boston, **nunca de `clientes_master`**.
 - 🩸 `/api/cxc-rows` se retiró; `contact-log` y `cxc-summary` se quedan. `cxc_rows` y `cxc_contact_log` **no se borran**.
+- 🔴 **EN EL CELULAR, LA LISTA ES LA CARTERA (24-sep-2026)**: `/cxc` hasta `sm` abre en la lista, con el total **EXACTO** y tres chips que **filtran Y ordenan por su plata**; el cliente son DOS renglones (nombre de Switch · lo que urge · monto sin centavos · rayita del tramo **DOMINANTE**) y **tocar la fila abre la MISMA `HojaCobrar`**. 🩸 **83 de 100 montos iban redondeados** y abría por el que menos debe. 🔴 **Abre por PLATA** (`ordenDelCelular` = `ordenParaRiskFilter`); la computadora conserva `ORDEN_AL_ABRIR`. El total abre **«Por empresa»**; `/cxc/cliente/[codigo]` va en **RENGLONES, nunca una tabla**. `lib/cxc/lista-celular.ts`, interruptor `CXC_CELULAR` (`false` = `PanelCxcMobile` intacto). ⚠️ Boston aparte. Candado `cxc-celular`.
 
 **La FORMA DE SWITCH** — solo documentos ABIERTOS.
 
