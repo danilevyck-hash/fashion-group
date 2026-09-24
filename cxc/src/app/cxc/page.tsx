@@ -22,6 +22,8 @@ import HojaCobrar, { type CorreoProgramado } from "./components/HojaCobrar";
 import BarraSeleccion from "./components/BarraSeleccion";
 import { SkeletonRow } from "./components/Skeleton";
 import PanelCxcMobile from "./components/PanelCxcMobile";
+import PanelCxcCelular from "./components/PanelCxcCelular";
+import { CXC_CELULAR } from "@/lib/cxc/celular";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import TabsCartera from "./components/TabsCartera";
 import EstadoCuentaDrawer from "./components/EstadoCuentaDrawer";
@@ -29,7 +31,7 @@ import MenuDescargar from "./components/MenuDescargar";
 import EnviarEmailModal from "./components/EnviarEmailModal";
 import useAdminData from "./hooks/useAdminData";
 import { useDescargasCartera } from "./hooks/useDescargasCartera";
-import { tabCxcPermitida } from "@/lib/cxc/boston-roles";
+import { tabCxcPermitida, pestanasCxc } from "@/lib/cxc/boston-roles";
 import { veCxc } from "@/lib/cxc/roles";
 import { seLeCobra } from "@/lib/cxc/cobrable";
 import SyncStatus from "@/components/shared/SyncStatus";
@@ -44,6 +46,8 @@ import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import UndoToast from "@/components/UndoToast";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
+import { ultimoPagoDelCliente } from "@/lib/cxc/lista-celular";
+import { fechaCortaPago } from "@/lib/cxc/pagos-por-fecha";
 import {
   diasSinPagar,
   avisaSinPagar,
@@ -139,6 +143,16 @@ function buildEmailBody(client: ConsolidatedClient) {
 // `reclamos-csv-retirado.test.ts`.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * «Último pago 20 ago · $234,189.21» — o que nunca pagó. Sale del dato que la
+ * pantalla YA tiene (el último pago por empresa): no pide nada a la red.
+ */
+function textoUltimoPagoDe(client: ConsolidatedClient, hoy: string): string {
+  const pago = ultimoPagoDelCliente(client);
+  if (!pago) return "Nunca ha pagado";
+  return `Último pago ${fechaCortaPago(pago.fecha, hoy)} · $${fmt(pago.monto)}`;
+}
+
 // ── Main Component ───────────────────────────────────────
 
 export default function AdminDashboard() {
@@ -232,7 +246,12 @@ function AdminDashboardInner() {
   const [emailClient, setEmailClient] = useState<ConsolidatedClient | null>(null);
   // La hoja «Cobrar» — el único camino de cobro de una fila.
   const [cobrarClient, setCobrarClient] = useState<ConsolidatedClient | null>(null);
-  const abrirCobrar = useCallback((client: ConsolidatedClient) => setCobrarClient(client), []);
+  const abrirCobrar = useCallback((client: ConsolidatedClient) => { setCobrarClient(client); setCobrarDesdeCelular(false); }, []);
+  // 🔴 La hoja «Cobrar» es UNA sola para las dos pantallas. Lo que el celular le
+  // agrega —el saldo exacto, el último pago y «Ver los documentos ›»— viaja
+  // SOLO cuando la abrió el celular, así que la computadora queda idéntica.
+  const [cobrarDesdeCelular, setCobrarDesdeCelular] = useState(false);
+  const abrirCobrarCelular = useCallback((client: ConsolidatedClient) => { setCobrarClient(client); setCobrarDesdeCelular(true); }, []);
 
   // 🔴 EL AVISO «SIN PAGAR HACE +90 D» ES UN FILTRO MÁS, y vive en la URL como
   // los otros (`?sinpagar=1`), con `replace`: es un filtro del MISMO nivel, así
@@ -686,7 +705,13 @@ function AdminDashboardInner() {
     <div>
       <AppHeader module="Cuentas por Cobrar" />
 
-      <TabsCartera role={userRole} tab={tab} onTab={setTab} />
+      {/* 🔴 EN EL CELULAR LAS PESTAÑAS SE VAN DE LA CARTERA DEL GRUPO
+          (24-sep-2026): Boston es un botón arriba a la derecha de la lista, y
+          el alto que ocupaban vuelve a los clientes. En Boston SÍ se dibujan —
+          es la única forma de volver— y en la computadora no cambia nada. */}
+      <div className={CXC_CELULAR && tab === "grupo" ? "hidden lg:block" : undefined}>
+        <TabsCartera role={userRole} tab={tab} onTab={setTab} />
+      </div>
 
       {tab === "boston" ? (
         // 🔴 La pestaña de Boston del ADMIN monta la MISMA cartera que ve David
@@ -700,6 +725,27 @@ function AdminDashboardInner() {
       ) : (
       <>
 
+      {CXC_CELULAR ? (
+        <PanelCxcCelular
+          filtered={filtered}
+          roleClients={kpiClients}
+          cxcCompanies={cxcCompanies}
+          search={search}
+          setSearch={setSearch}
+          riskFilter={riskFilter}
+          setRiskFilter={handleRiskFilterChange}
+          companyFilter={companyFilter}
+          setCompanyFilter={setCompanyFilter}
+          onCobrar={abrirCobrarCelular}
+          diasSinPagarDe={diasSinPagarDe}
+          canExport={canExport}
+          onDescargar={descargar}
+          empresaRestriction={empresaRestriction}
+          onSyncedNow={() => loadData()}
+          avisoMontos={avisoMontos}
+          onBoston={pestanasCxc(userRole).some((p) => p.key === "boston") ? () => setTab("boston") : null}
+        />
+      ) : (
       <PanelCxcMobile
         filtered={filtered}
         roleClients={kpiClients}
@@ -723,6 +769,7 @@ function AdminDashboardInner() {
         onSyncedNow={() => loadData()}
         avisoMontos={avisoMontos}
       />
+      )}
 
       <div className="hidden lg:block max-w-6xl mx-auto px-6 py-8">
 
@@ -899,6 +946,13 @@ function AdminDashboardInner() {
         onCopiar={copyMessage}
         onEscribirloYo={openEmail}
         marcaEnvio={cobrarClient ? marcaEnvioDe(cobrarClient) : null}
+        totalDeLaFila={cobrarDesdeCelular && cobrarClient ? cobrarClient.total : null}
+        ultimoPagoTexto={cobrarDesdeCelular && cobrarClient ? textoUltimoPagoDe(cobrarClient, hoy) : null}
+        hrefDocumentos={
+          cobrarDesdeCelular && cobrarClient
+            ? `/cxc/cliente/${encodeURIComponent(codigoDe(cobrarClient))}`
+            : null
+        }
       />
 
       {pendingUndo && (

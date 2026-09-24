@@ -29,6 +29,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { ModalOverlay } from "@/components/ui";
 import type { ConsolidatedClient } from "@/lib/types";
 import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
@@ -75,6 +76,19 @@ interface Props {
   onEscribirloYo: (client: ConsolidatedClient) => void;
   /** «Le enviaste el estado de cuenta hace 3 días», o `null`. */
   marcaEnvio: string | null;
+  /**
+   * 🔴 LO QUE AGREGÓ EL CELULAR (24-sep-2026), y SOLO eso: dos líneas de
+   * contexto y una salida de lectura. Nada de lo que se MANDA cambió — las
+   * cuatro salidas, las 6 empresas del servidor y el deshacer de 5 s son los
+   * mismos. Sin estas props la hoja se dibuja EXACTAMENTE como el 5-sep-2026,
+   * que es lo que ve la computadora.
+   */
+  /** El saldo exacto que trae la fila: se lee sin esperar a la red. */
+  totalDeLaFila?: number | null;
+  /** «Último pago 20 ago · $234,189.21», ya redactado por quien abre la hoja. */
+  ultimoPagoTexto?: string | null;
+  /** A dónde lleva «Ver los documentos ›». `null` = no se dibuja. */
+  hrefDocumentos?: string | null;
 }
 
 export default function HojaCobrar({
@@ -85,6 +99,9 @@ export default function HojaCobrar({
   onCopiar,
   onEscribirloYo,
   marcaEnvio,
+  totalDeLaFila = null,
+  ultimoPagoTexto = null,
+  hrefDocumentos = null,
 }: Props) {
   const abierto = !!client;
   const codigo = client ? codigoDe(client) : null;
@@ -179,7 +196,13 @@ export default function HojaCobrar({
   const cuerpo = (
     <div className="space-y-3">
       <div>
-        <p className="text-base font-semibold text-gray-900">{datos?.clienteNombre || nombre}</p>
+        <p className="text-base font-semibold text-gray-900">
+          {datos?.clienteNombre || nombre}
+          {totalDeLaFila != null && (
+            <span className="tabular-nums font-normal text-gray-600"> · ${fmt(totalDeLaFila)}</span>
+          )}
+        </p>
+        {ultimoPagoTexto && <p className="text-xs text-gray-500 mt-0.5">{ultimoPagoTexto}</p>}
         <p className="text-xs text-gray-500 mt-0.5">{encabezado}</p>
         {marcaEnvio && <p className="text-xs text-gray-400 mt-0.5">{marcaEnvio}</p>}
       </div>
@@ -228,6 +251,7 @@ export default function HojaCobrar({
         />
       </ul>
 
+      <div className="flex flex-wrap items-center gap-4">
       <button
         type="button"
         onClick={() => { onEscribirloYo(client); onClose(); }}
@@ -235,6 +259,18 @@ export default function HojaCobrar({
       >
         Escribirlo yo ›
       </button>
+      {/* Los documentos se MIRAN, no se mandan: por eso es un enlace y no una
+          quinta salida de la lista de arriba. */}
+      {hrefDocumentos && (
+        <Link
+          href={hrefDocumentos}
+          onClick={onClose}
+          className="inline-flex items-center min-h-[44px] text-sm font-medium text-blue-600 hover:text-blue-800 transition"
+        >
+          Ver los documentos ›
+        </Link>
+      )}
+      </div>
     </div>
   );
 
