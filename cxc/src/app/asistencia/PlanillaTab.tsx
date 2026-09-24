@@ -120,6 +120,16 @@ import {
 import { enlaceDiasDe, marcasImparesDeLineas } from "@/lib/asistencia/marcas-impares";
 import type { OtroServicio } from "@/lib/asistencia/otros-servicios";
 import AntesDeCerrar from "./AntesDeCerrar";
+// ── 🔴 EL REDISEÑO DEL 24-sep-2026 ────────────────────────────────────────────
+// El selector único (‹ 16 – 30 sep 2026 ›, sin calendario: acá solo se pagan
+// quincenas), el corte como línea gris con una «×», la tabla dentro de su caja
+// con la cabecera pegada, y el nombre de cada fila llevando a su Asistencia.
+import SelectorPeriodo, { usePeriodoAsistencia } from "@/components/asistencia/SelectorPeriodo";
+import { aparatoDeQuienMira } from "@/lib/aparato";
+import {
+  ASISTENCIA_PANTALLA_2026_09, CAMBIAR_EL_CORTE, VACIAR_EL_CORTE,
+  lineaDelCorte, quincenaDelPeriodo, rutaAsistenciaDePersona, VER_SU_ASISTENCIA,
+} from "@/lib/asistencia/pantalla-2026-09";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 // 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
@@ -425,6 +435,13 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
   // «Descargar ⌄»: Excel · PDF · Comprobantes en un solo botón (11-sep-2026).
   const [descargaOpen, setDescargaOpen] = useState(false);
   const descargaRef = useRef<HTMLButtonElement>(null);
+  /** El campo del corte, para que «cambiar» de la línea gris lleve hasta él. */
+  const corteRef = useRef<HTMLInputElement>(null);
+  /** 🔴 El aparato de quien mira, por el DEDO (`pointer: coarse`). */
+  const [celular, setCelular] = useState(false);
+  useEffect(() => {
+    if (ASISTENCIA_PANTALLA_2026_09) setCelular(aparatoDeQuienMira() === "celular");
+  }, []);
   const [data, setData] = useState<Respuesta | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -507,7 +524,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
   // `plQuincena` —o con una que ya no se puede elegir— no se toca nada y la
   // Planilla abre vacía, que es la regla de Daniel del 1-sep-2026.
   useEffect(() => {
-    if (!ASISTENCIA_PESTANAS_VIVAS) return;
+    if (!ASISTENCIA_PESTANAS_VIVAS || ASISTENCIA_PANTALLA_2026_09) return;
     const q = quincenaDeLaUrl(quincenaUrl, quincenasParaElegir);
     if (!q) return;
     setDesde(q.desde);
@@ -516,6 +533,41 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
     if (PLANILLA_UNIDA) setCorte(corteUrl ? corteDeLaUrl(corteUrl) : corteInicial(q));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── 🔴 EL PERÍODO ES EL DEL MÓDULO (24-sep-2026) ──────────────────────────
+  //
+  // La MISMA barra de flechas de Asistencia, Aprobaciones y Movimientos, con la
+  // misma clave de la dirección y la misma memoria. 🔴 **Sin calendario**: acá
+  // solo se pagan quincenas, y el rango libre está retirado de esta pantalla
+  // desde el 15-sep-2026 (Daniel: *«si la quincena es fija, que no haya opción
+  // de rango, solo las opciones»*). Un período que no es una quincena se lleva a
+  // la quincena que lo contiene, así que lo que se paga no cambia nunca.
+  //
+  // 🔴 EL CUADRO SIGUE SIN GENERARSE SOLO: elegir la quincena no pide nada; la
+  // plata aparece cuando alguien toca «Generar», como siempre.
+  const compartido = usePeriodoAsistencia();
+  const quincenaDelSelector = useMemo(
+    () => quincenaDelPeriodo(compartido.desde),
+    [compartido.desde],
+  );
+  useEffect(() => {
+    if (!ASISTENCIA_PANTALLA_2026_09) return;
+    const q = quincenaDelSelector;
+    setDesde(q.desde);
+    setHasta(q.hasta);
+    setElegido(true);
+    // El corte: el de la dirección si lo hay, y si no el PROPUESTO de esa
+    // quincena (13 / 28), exactamente como al tocar un botón de quincena.
+    if (PLANILLA_UNIDA) {
+      setCorte((antes) => {
+        const deLaUrl = corteUrl ? corteDeLaUrl(corteUrl) : "";
+        if (deLaUrl && deLaUrl >= q.desde && deLaUrl <= q.hasta) return deLaUrl;
+        if (antes && antes >= q.desde && antes <= q.hasta) return antes;
+        return corteInicial(q);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quincenaDelSelector.desde]);
   // 🔑 El rol sale de `sessionStorage`, igual que en `AsistenciaClient` y
   // `AppHeader`. Arranca vacío: en el primer render no hay sessionStorage, y
   // dibujar el botón de cerrar para sacarlo un tick después es peor.
@@ -539,7 +591,10 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
   const [sugerido, setSugerido] = useState<{ inicio: string; ultimaHasta: string } | null>(null);
   useEffect(() => {
     // Ya se generó algo, o la persona ya eligió: lo que manda es su elección.
-    if (pedido || elegido || sinEmpresa) return;
+    // 🔴 Con el selector único la quincena viene SIEMPRE elegida, así que la
+    // condición es solo «todavía no se generó nada»: el aviso sigue diciendo
+    // dónde quedó la quincena pasada, que es para lo que existe.
+    if (pedido || (!ASISTENCIA_PANTALLA_2026_09 && elegido) || sinEmpresa) return;
     let vivo = true;
     void (async () => {
       try {
@@ -560,6 +615,10 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
         setSugerido({ inicio, ultimaHasta: ultima.hasta });
         // El calendario abre en ese mes. No queda «elegido»: sigue en vacío
         // hasta que alguien toque los dos días.
+        // 🔴 Con el selector único NO se toca el período: la quincena la manda
+        // la barra de arriba, y pisarla desde una lectura que viaja sería
+        // cambiarle la quincena a alguien mientras la mira.
+        if (ASISTENCIA_PANTALLA_2026_09) return;
         setDesde(inicio);
         setHasta(inicio);
       } catch { /* la sugerencia es una ayuda, no un requisito */ }
@@ -1055,9 +1114,21 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
             de rango, solo las opciones»*). ⚠️ La RUTA sigue aceptando
             `desde`/`hasta` libres: los usa `medirAjusteAnterior`. */}
         <div className="flex flex-col gap-1">
-          <span className="text-xs text-gray-500">Quincena</span>
+          {!ASISTENCIA_PANTALLA_2026_09 && <span className="text-xs text-gray-500">Quincena</span>}
           <div className="flex flex-wrap items-center gap-2">
-            {quincenasParaElegir.map((q) => {
+            {/* 🔴 LA MISMA BARRA DE LAS OTRAS PESTAÑAS (24-sep-2026), sin
+                calendario: acá solo se pagan quincenas. 🩸 Eran cuatro botones
+                con rótulo propio, al lado de otro control con rótulo propio
+                («Cortar el reloj el»), y por eso parecían dos períodos. */}
+            {ASISTENCIA_PANTALLA_2026_09 ? (
+              <SelectorPeriodo
+                desde={desde}
+                hasta={hasta}
+                hoy={compartido.hoy}
+                conCalendario={false}
+                onElegir={compartido.elegir}
+              />
+            ) : quincenasParaElegir.map((q) => {
               const prendido = elegido && esLaQuincena(q, desde, hasta);
               return (
                 <button key={q.clave} type="button" onClick={() => elegirQuincena(q)}
@@ -1084,7 +1155,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
             EL INICIO, al lado de la quincena, con el corte propuesto ya puesto;
             vacío = quincena entera, como siempre. Cambiarlo vuelve viejo el
             cuadro; se aprieta «Regenerar» para verlo cortado. */}
-        {PLANILLA_UNIDA && (
+        {PLANILLA_UNIDA && !ASISTENCIA_PANTALLA_2026_09 && (
           <label className="flex flex-col gap-1">
             <span className="text-xs text-gray-500">Cortar el reloj el</span>
             <div className="flex flex-wrap items-center gap-2">
@@ -1113,6 +1184,37 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
               </span>
             </div>
           </label>
+        )}
+        {/* ══════════════════════════════════════════════════════════════════
+            🔴 EL CORTE DEL RELOJ, EN UNA LÍNEA GRIS (24-sep-2026)
+            🩸 «Quincena» y «Cortar el reloj el» estaban uno al lado del otro,
+            con rótulo propio y el mismo peso: parecían DOS períodos. Y al lado
+            del campo había un botón «Quincena entera» y un chip «Corte 17 sep»
+            que solo repetía el valor del campo — los dos se van.
+            🔑 El corte NO cambia lo que se paga: el período queda entero y solo
+            se recorta hasta dónde se mira el reloj. Eso no se toca.
+            ══════════════════════════════════════════════════════════════════ */}
+        {PLANILLA_UNIDA && ASISTENCIA_PANTALLA_2026_09 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              ref={corteRef}
+              type="date"
+              value={corte}
+              min={elegido ? desde : undefined}
+              max={elegido ? hasta : undefined}
+              onChange={(e) => elegirCorte(e.target.value)}
+              aria-label="Cortar el reloj el"
+              className="min-h-[44px] rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm"
+            />
+            {corte && (
+              <button type="button" onClick={() => elegirCorte("")}
+                aria-label={VACIAR_EL_CORTE}
+                title={VACIAR_EL_CORTE}
+                className="flex h-11 w-11 items-center justify-center rounded-md border border-gray-300 text-sm text-gray-500 transition hover:border-black hover:text-black active:scale-[0.97]">
+                ×
+              </button>
+            )}
+          </div>
         )}
 
         {botonGenerar}
@@ -1162,6 +1264,28 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
         )}
       </div>
 
+      {/* 🔴 LA LÍNEA GRIS DEL CORTE (24-sep-2026, esc 1d). Dice hasta dónde se
+          lee el reloj y, con «cambiar», lleva al campo. Vacío: «hasta el fin de
+          la quincena». */}
+      {PLANILLA_UNIDA && ASISTENCIA_PANTALLA_2026_09 && elegido && (
+        <p className="text-[12px] text-gray-500">
+          {lineaDelCorte(corte)}
+          {" · "}
+          <button
+            type="button"
+            onClick={() => {
+              const el = corteRef.current;
+              el?.focus();
+              (el as unknown as { showPicker?: () => void })?.showPicker?.();
+            }}
+            className="underline decoration-dotted underline-offset-2 hover:text-gray-900"
+          >
+            {CAMBIAR_EL_CORTE}
+          </button>
+          {corte && fraseCorte(corte, hasta) && <> — {fraseCorte(corte, hasta)}</>}
+        </p>
+      )}
+
       {/* 🔴 DÓNDE CONVIENE EMPEZAR. La quincena pasada terminó un día, y la que
           sigue empieza al otro: decirlo evita las dos formas de equivocarse —
           dejar días sin pagar, o pisar una quincena que ya se pagó (que el
@@ -1172,7 +1296,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           elegir. Lo que el aviso sigue haciendo es lo único que importaba:
           decir dónde quedó la quincena pasada, para no dejar días sin pagar ni
           pisar una que ya se pagó. */}
-      {sugerido && !elegido && !pedido && (
+      {sugerido && (ASISTENCIA_PANTALLA_2026_09 ? !pedido : !elegido && !pedido) && (
         <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[13px] text-blue-900">
           La última quincena cerrada de <b>{etiquetaEmpresa(empresa)}</b> terminó el{" "}
           <b>{fechaCorta(sugerido.ultimaHasta)}</b>, así que esta empieza el{" "}
@@ -1398,6 +1522,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           corte={corte}
           elegido={elegido}
           puedeCerrar={puedeCerrarla}
+          soloInforma={ASISTENCIA_PANTALLA_2026_09 && celular}
           onCerrada={() => setDesactualizada(true)}
         />
       )}
@@ -1422,6 +1547,17 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           <p className="text-sm font-medium text-gray-700">Elige el período que vas a pagar</p>
           <p className="mt-1 text-[13px] text-gray-500">
             Toca la quincena arriba y después <b>Generar</b>.
+          </p>
+        </div>
+      )}
+      {/* 🔴 CON EL SELECTOR ÚNICO LA QUINCENA VIENE PUESTA, ASÍ QUE EL VACÍO
+          DICE LO QUE FALTA DE VERDAD: generar. 🔑 **La plata sigue sin
+          dibujarse sola** — la regla de Daniel del 1-sep-2026 no se toca. */}
+      {ASISTENCIA_PANTALLA_2026_09 && elegido && !pedido && !cargando && !sinEmpresa && (
+        <div className="rounded-lg border border-dashed border-gray-200 px-4 py-12 text-center">
+          <p className="text-sm font-medium text-gray-700">Esta quincena todavía no se generó</p>
+          <p className="mt-1 text-[13px] text-gray-500">
+            Toca <b>Generar</b> para armar el cuadro de lo que se va a pagar.
           </p>
         </div>
       )}
@@ -1459,11 +1595,20 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
 
           {/* ── ESCRITORIO: la tabla de 19 columnas ── */}
           <div className="hidden md:block">
-            <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+            {/* 🔴 4b — LAS 14 COLUMNAS DENTRO DE SU PROPIA CAJA (24-sep-2026).
+                🩸 Medido en la captura de Daniel a 1440 px: la tabla se cortaba
+                después de «ISR» y el NETO —el número por el que existe la
+                pantalla— quedaba fuera del borde derecho. Ahora la caja se
+                desliza sola (de lado y hacia abajo), el nombre queda fijo a la
+                izquierda y la cabecera, pegada arriba. **Ninguna columna se
+                pliega**: la contadora las ve todas. */}
+            <div className={ASISTENCIA_PANTALLA_2026_09
+              ? "max-h-[70vh] overflow-auto rounded-lg border border-gray-200 bg-white"
+              : "overflow-x-auto rounded-lg border border-gray-200 bg-white"}>
               <table className="w-max min-w-full text-sm">
-                <thead>
+                <thead className={ASISTENCIA_PANTALLA_2026_09 ? "sticky top-0 z-20 bg-white" : undefined}>
                   <tr className="border-b border-gray-200 text-[10px] uppercase tracking-wide text-gray-400">
-                    <th className="sticky left-0 z-10 bg-white px-3 py-2.5 text-left font-medium">Colaborador</th>
+                    <th className={`sticky left-0 bg-white px-3 py-2.5 text-left font-medium ${ASISTENCIA_PANTALLA_2026_09 ? "z-30" : "z-10"}`}>Colaborador</th>
                     {/* 🔴 UNA sola lista para el grupo y para Boston
                         (`columnas-dinero-planilla.ts`, 11-sep-2026). */}
                     {ROTULOS_DINERO_PLANILLA.map((h) => (
@@ -1475,6 +1620,9 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                   {buenas.map((l) => (
                     <Fila
                       key={l.codigo} l={l} onGuardar={guardar}
+                      verAsistencia={ASISTENCIA_PANTALLA_2026_09
+                        ? rutaAsistenciaDePersona({ codigo: l.codigo, empresa, desde, hasta })
+                        : null}
                       // Apagados, no escondidos: su ausencia es parte de lo que
                       // hay que ver. Y el motivo va escrito, porque son DOS y se
                       // arreglan distinto — con otras fechas, o reabriendo.
@@ -1566,6 +1714,9 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
             {buenas.map((l) => (
               <Tarjeta
                 key={l.codigo} l={l}
+                verAsistencia={ASISTENCIA_PANTALLA_2026_09
+                  ? rutaAsistenciaDePersona({ codigo: l.codigo, empresa, desde, hasta })
+                  : null}
                 abierta={abierta === l.codigo}
                 onToggle={() => setAbierta(abierta === l.codigo ? null : l.codigo)}
                 onGuardar={guardar}
@@ -2010,8 +2161,14 @@ function CeldaManual({
 }
 
 function Fila({
-  l, onGuardar, bloqueo,
-}: { l: LineaPlanilla & { diaLibre?: DiaLibreEnLinea }; onGuardar: OnGuardar; bloqueo?: Bloqueo }) {
+  l, onGuardar, bloqueo, verAsistencia,
+}: {
+  l: LineaPlanilla & { diaLibre?: DiaLibreEnLinea };
+  onGuardar: OnGuardar;
+  bloqueo?: Bloqueo;
+  /** 🔴 7a — la dirección de «ver su asistencia», con la MISMA quincena. */
+  verAsistencia?: string | null;
+}) {
   const d = l.dinero!;
   /** El monto sobre el que se calcularon los seguros, si no fue el bruto. */
   const sobreQueBase = baseSeguros(d.baseSeguros);
@@ -2025,9 +2182,26 @@ function Fila({
   const conAjuste = (campo: Parameters<typeof notaCeldaAjuste>[0]) => notaCeldaAjuste(campo, l.ajusteDetalle);
   return (
     <tr className="border-b border-gray-100 last:border-0 hover:bg-gray-50" data-fila-planilla={l.codigo}>
-      <td className="sticky left-0 z-10 bg-white px-3 py-1.5 text-gray-900 hover:bg-gray-50">
-        {capitalizarNombre(l.etiqueta)}
+      <td className="group sticky left-0 z-10 bg-white px-3 py-1.5 text-gray-900 hover:bg-gray-50">
+        {/* ══════════════════════════════════════════════════════════════════
+            🔴 7a — EL NOMBRE LLEVA A SU ASISTENCIA (24-sep-2026)
+            Daniel: *«al estar en Planilla… me gustaría que al hacer clic al
+            colaborador me lleve de una a su Asistencia con la misma quincena
+            seleccionada»*. 🩸 Hoy son cuatro toques y buscar entre 43 filas.
+            🔑 El camino de vuelta ya existe: las pestañas visitadas quedan
+            armadas, así que el Atrás devuelve la Planilla tal cual.
+            ══════════════════════════════════════════════════════════════════ */}
+        {verAsistencia ? (
+          <Link href={verAsistencia} className="underline decoration-dotted underline-offset-2 hover:decoration-solid">
+            {capitalizarNombre(l.etiqueta)}
+          </Link>
+        ) : capitalizarNombre(l.etiqueta)}
         <span className="ml-1.5 text-xs text-gray-400">{l.codigo}</span>
+        {verAsistencia && (
+          <span aria-hidden className="ml-1.5 hidden text-[11px] text-gray-400 group-hover:inline">
+            {VER_SU_ASISTENCIA}
+          </span>
+        )}
         {/* 🔑 Sin esto, los ceros de ausencias, tardanzas y extras se leen como
             un error de cálculo. El chip dice que están en cero A PROPÓSITO. */}
         {l.noMarcaReloj && (
@@ -2159,10 +2333,12 @@ function Fila({
 }
 
 function Tarjeta({
-  l, abierta, onToggle, onGuardar, bloqueo,
+  l, abierta, onToggle, onGuardar, bloqueo, verAsistencia,
 }: {
   l: LineaPlanilla; abierta: boolean; onToggle: () => void; onGuardar: OnGuardar;
   bloqueo?: Bloqueo;
+  /** 🔴 7a — la dirección de su Asistencia, con la MISMA quincena. */
+  verAsistencia?: string | null;
 }) {
   const d = l.dinero!;
   const h = l.horas;
@@ -2182,6 +2358,9 @@ function Tarjeta({
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white" data-fila-planilla={l.codigo}>
+      {/* 🔴 7a EN EL CELULAR: el enlace va DEBAJO del encabezado tocable, no
+          adentro — un enlace dentro de un botón no es HTML válido y en iOS se
+          pelean los dos toques. */}
       <button
         type="button" onClick={onToggle}
         className="flex min-h-[44px] w-full items-center justify-between gap-3 px-3 py-2.5 text-left"
@@ -2208,6 +2387,13 @@ function Tarjeta({
         </span>
       </button>
 
+      {verAsistencia && (
+        <p className="border-t border-gray-100 px-3 py-2">
+          <Link href={verAsistencia} className="text-[13px] text-gray-600 underline decoration-dotted underline-offset-2">
+            {VER_SU_ASISTENCIA}
+          </Link>
+        </p>
+      )}
       {abierta && (
         <div className="border-t border-gray-100 px-3 py-3 text-[13px]">
           {linea("Salario quincenal", d.salarioQuincenal)}

@@ -41,6 +41,7 @@ import { empresasQueVe, type AlcanceDeEmpresas } from "@/lib/asistencia/empresa-
 import { antesDeCerrarDelCuadro, type CuadroParaAvisos } from "@/lib/asistencia/antes-de-cerrar-del-cuadro";
 import { PESTANA_FICHAS } from "@/lib/asistencia/persona-en-el-centro";
 import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
+import { TABLERO_SOLO_INFORMA } from "@/lib/asistencia/celular-asistencia";
 import {
   POR_QUE_NO_HAY_TOTAL, encabezadoDelTablero, etiquetaCerrar, filaVacia,
   sePuedeCerrar, textoQueFalta, type FilaTablero,
@@ -50,7 +51,7 @@ const money = (n: number) =>
   `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function TableroCierre({
-  rol, desde, hasta, corte, elegido, puedeCerrar, onCerrada,
+  rol, desde, hasta, corte, elegido, puedeCerrar, onCerrada, soloInforma = false,
 }: {
   rol: string;
   desde: string;
@@ -62,6 +63,14 @@ export default function TableroCierre({
   /** ¿Este rol cierra? El freno de verdad lo pone el servidor. */
   puedeCerrar: boolean;
   onCerrada: () => void;
+  /**
+   * 🔴 6b — EN EL CELULAR LA LISTA SOLO INFORMA (24-sep-2026). Daniel: desde el
+   * teléfono la quincena se cierra ENTRANDO a la empresa. Un toque más a cambio
+   * de no cerrar la empresa equivocada con el pulgar.
+   * ⚠️ Lo que NO cambia: nunca un total del grupo, y cada cierre sigue siendo el
+   * de SU empresa por su propia puerta.
+   */
+  soloInforma?: boolean;
 }) {
   const { toast } = useToast();
   /** Las empresas que este rol puede mirar, según el SERVIDOR. */
@@ -221,7 +230,7 @@ export default function TableroCierre({
                   {textoQueFalta(f)}
                 </td>
                 <td className="px-2 py-2.5 text-right">
-                  {sePuedeCerrar(f, puedeCerrar) && (
+                  {!soloInforma && sePuedeCerrar(f, puedeCerrar) && (
                     <button
                       type="button"
                       onClick={() => setConfirmar(f)}
@@ -241,6 +250,9 @@ export default function TableroCierre({
       {/* 🔴 POR QUÉ NO HAY UN TOTAL, dicho antes de que a alguien se le ocurra
           sumar los cuatro netos de la columna. */}
       <p className="text-[12px] text-gray-500">{POR_QUE_NO_HAY_TOTAL}</p>
+      {soloInforma && (
+        <p className="text-[12px] text-gray-500">{TABLERO_SOLO_INFORMA}</p>
+      )}
 
       {confirmar?.totales && (
         <ModalCierre
