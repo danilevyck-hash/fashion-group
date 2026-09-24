@@ -228,18 +228,30 @@ describe("5.3 🔴 lo que solo se descubría con el mouse", () => {
     expect(clasesDeBorde.some((c) => !c.startsWith("hover:")), "la raya solo existe al hover").toBe(true);
   });
 
-  it("🩸 el encabezado de la tabla se queda fijo DE VERDAD", async () => {
+  it("🩸 el encabezado de la tabla se queda fijo DE VERDAD — en la computadora", async () => {
     // El `sticky top-0` estaba puesto y no funcionaba: `overflow-x-auto` hace
     // de la caja un contenedor de desplazamiento y el sticky se pega a ELLA,
     // que no tenía alto. Con alto, el encabezado sí se queda.
+    //
+    // 🔴 24-sep-2026: ESO VALE DE `sm` PARA ARRIBA. En el celular Daniel pidió
+    // lo contrario y eligió entre las dos opciones que le pusimos: *«sin scroll
+    // dentro de scroll: la tabla se desliza con la página, o solo horizontal
+    // dentro de su caja, nunca vertical anidado»*. Medido en TOM-057: la caja
+    // de **591 px** guardaba **1.092** de contenido dentro de una página de
+    // **1.311** — el pulgar tenía que encontrar el deslizamiento de adentro.
+    // ⚠️ EL PRECIO ESTÁ DICHO: sin alto, el encabezado del celular deja de
+    // quedarse fijo. Se eligió a sabiendas; la caja con alto se queda en la
+    // computadora, que es donde se leen los pedidos largos con el mouse.
     const { container } = await pintar();
     const thead = container.querySelector("thead.sticky") as HTMLElement;
     expect(thead, "se perdió el encabezado fijo").toBeTruthy();
     const caja = thead.closest("div") as HTMLElement;
-    expect(caja.className, "la caja no puede quedarse sin alto: el sticky no se pega a nada")
-      .toMatch(/max-h-/);
+    expect(caja.className, "la caja no puede quedarse sin alto en la computadora")
+      .toMatch(/sm:max-h-|(?<!sm:)max-h-/);
     expect(caja.className).toContain("overflow-auto");
-    expect(caja.className, "con overflow-x-auto el sticky no funciona").not.toContain("overflow-x-auto");
+    // Y en el celular, un solo deslizamiento: de costado y nada más.
+    expect(caja.className, "el celular no puede volver a la caja con alto").not.toMatch(/(^| )max-h-/);
+    expect(caja.className).toContain("overflow-x-auto");
   });
 });
 

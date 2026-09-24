@@ -55,6 +55,7 @@ import {
   textoFaltaEnviar,
   tieneClienteElegido,
 } from "@/lib/catalogo/cliente-elegido";
+import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; category?: string;
   /** Precio de lista del catálogo (`<marca>_products.price`, sincronizado de
@@ -1009,7 +1010,18 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
            perdían al bajar y no volvían.
            El arreglo es darle ALTO a la caja: la tabla se desplaza adentro —a
            lo alto y a lo ancho— y ahí el encabezado sí se queda. */
-        <div className="mb-4 overflow-auto max-h-[70vh]">
+        /* 🔴 EN EL CELULAR NO HAY UN DESLIZAMIENTO ADENTRO DEL OTRO (24-sep-2026).
+            Medido en TOM-057: la caja mide **591 px** de alto y guarda **1.092**
+            de contenido —14 renglones de 73 px— dentro de una página de **1.311**,
+            así que el pulgar tenía que encontrar el deslizamiento de adentro para
+            ver los últimos diez renglones. Hasta `sm` la tabla se desliza SOLO de
+            costado y la página crece: se desliza una sola vez. De `sm` para
+            arriba queda la caja con su alto, que es lo que mantiene pegado el
+            encabezado de la tabla (ver el comentario de arriba). Ni un número
+            cambia. */
+        <div className={CATALOGO_ORDEN_CELULAR
+          ? "mb-4 overflow-x-auto sm:overflow-auto sm:max-h-[70vh]"
+          : "mb-4 overflow-auto max-h-[70vh]"}>
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-white z-10">
               <tr className="border-b border-gray-200">
