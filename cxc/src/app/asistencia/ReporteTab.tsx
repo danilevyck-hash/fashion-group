@@ -116,6 +116,17 @@ import {
 import {
   NOTA_SIN_MARCAS, TEXTO_DIA_SIN_MARCAS, TEXTO_SIN_MARCAS, avisoSinMarcas, esSinMarcas,
 } from "@/lib/asistencia/sin-marcas";
+// ── 🔴 EL REDISEÑO DEL 24-sep-2026 ────────────────────────────────────────────
+// Un solo selector de período (‹ 16 – 30 sep 2026 › + 📅), una sola fila de
+// mandos, los avisos plegados en una línea, la columna «Sale» retirada (el
+// código a la IZQUIERDA del nombre y la salida en burbuja) y, en el celular,
+// una tarjeta por colaborador. Las reglas viven en los módulos PUROS.
+import {
+  ASISTENCIA_PANTALLA_2026_09, PARAM_ABRE, anchoDelCodigo, columnasDelReporte, rotuloDeAvisos,
+} from "@/lib/asistencia/pantalla-2026-09";
+import { datosDeLaTarjeta, lineaDeDias, pieDelCelular } from "@/lib/asistencia/celular-asistencia";
+import SelectorPeriodo, { usePeriodoAsistencia } from "@/components/asistencia/SelectorPeriodo";
+import { aparatoDeQuienMira } from "@/lib/aparato";
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 const DOW = ["dom","lun","mar","mié","jue","vie","sáb"];
@@ -191,16 +202,25 @@ export default function ReporteTab({ empresa = "" }: {
     () => periodoInicial({ url: { desde: desdeUrl, hasta: hastaUrl }, hoy, ...respaldo }),
     [desdeUrl, hastaUrl, hoy, respaldo],
   );
-  const { desde, hasta } = inicial;
-  const elegirPeriodo = useCallback((d: string, h: string) => {
+  // 🔴 EL PERÍODO ES EL DEL MÓDULO ENTERO (24-sep-2026): la MISMA clave de la
+  // dirección y la MISMA memoria que Aprobaciones, Planilla y Movimientos.
+  // Apagado, todo queda exactamente como estaba (llave `asistencia_reporte`).
+  const compartido = usePeriodoAsistencia();
+  const viejo = useCallback((d: string, h: string) => {
     setDesdeUrl(d); setHastaUrl(h);
     try { localStorage.setItem("fg_last_asistencia_reporte", `${d}|${h}`); } catch { /* modo privado */ }
   }, [setDesdeUrl, setHastaUrl]);
+  const desde = ASISTENCIA_PANTALLA_2026_09 ? compartido.desde : inicial.desde;
+  const hasta = ASISTENCIA_PANTALLA_2026_09 ? compartido.hasta : inicial.hasta;
+  const elegirPeriodo = ASISTENCIA_PANTALLA_2026_09 ? compartido.elegir : viejo;
 
   // La URL queda escrita UNA vez al montar, para que el rango sobreviva al
   // cambio de pestaña aunque nadie haya tocado el selector. Con la URL ya
   // completa no corre: lo que trae el enlace manda.
   useEffect(() => {
+    // Con el rediseño esto lo escribe `usePeriodoAsistencia`, una sola vez y
+    // para las cuatro pestañas.
+    if (ASISTENCIA_PANTALLA_2026_09) return;
     if (urlTraePeriodo({ desde: desdeUrl, hasta: hastaUrl })) return;
     setDesdeUrl(inicial.desde); setHastaUrl(inicial.hasta);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -230,6 +250,27 @@ export default function ReporteTab({ empresa = "" }: {
   // si dijera "5 de tolerancia" mientras el motor usa 10, el texto sería falso.
   const [reglas, setReglas] = useState<Partial<ReglasReporte> | null>(null);
   const [abierta, setAbierta] = useState<string | null>(null);
+  // ── 🔴 EL APARATO DE QUIEN MIRA (24-sep-2026) ─────────────────────────────
+  // Se pregunta por el DEDO (`pointer: coarse`), como en todo el sistema, y en
+  // un efecto: en el servidor no hay `matchMedia` y pintar la tabla para
+  // después cambiarla sería peor que pintarla un tick tarde.
+  const [celular, setCelular] = useState(false);
+  useEffect(() => {
+    if (ASISTENCIA_PANTALLA_2026_09) setCelular(aparatoDeQuienMira() === "celular");
+  }, []);
+  // 🔴 7a — SE LLEGA DESDE LA PLANILLA CON LA PERSONA PUESTA. `?abre=<código>`
+  // abre su tabla de días; el período ya viaja en `?desde=&hasta=`.
+  const [abreUrl] = useUrlState(PARAM_ABRE, "");
+  useEffect(() => {
+    if (!ASISTENCIA_PANTALLA_2026_09) return;
+    const c = String(abreUrl ?? "").trim();
+    if (c) setAbierta(c);
+  }, [abreUrl]);
+  /** ¿El panel de arriba está desplegado? (relojes · avisos · buscador) */
+  const [avisosAbiertos, setAvisosAbiertos] = useState(false);
+  const [relojesAbiertos, setRelojesAbiertos] = useState(false);
+  const [buscadorAbierto, setBuscadorAbierto] = useState(false);
+  const [descargasAbiertas, setDescargasAbiertas] = useState(false);
   /**
    * 🔴 LA VISTA «JUSTIFICACIONES DEL PERÍODO» (10-sep-2026). Arranca CERRADA:
    * el trabajo de esta pantalla es el reporte, y las justificaciones son la
@@ -422,6 +463,20 @@ export default function ReporteTab({ empresa = "" }: {
     void cargar(true);
   }, [cargar]);
   const conteo = conteoARevisar(visibles?.length ?? 0, personas?.length ?? 0, soloARevisar);
+  /** El ancho del código más largo: el nombre arranca siempre en el mismo punto. */
+  const anchoCodigo = useMemo(
+    () => anchoDelCodigo((visibles ?? []).map((x) => x.codigo)),
+    [visibles],
+  );
+  /** Cuántas cajas de aviso hay abajo. Es lo que dice la línea que las pliega. */
+  const cuantosAvisos =
+    (sinHorario > 0 ? 1 : 0) +
+    (correcciones.correcciones > 0 ? 1 : 0) +
+    (visibles && contarRepetidas(visibles.flatMap((x) => x.dias)) > 0 ? 1 : 0) +
+    (diaEnCurso ? 1 : 0) +
+    (fueraDelRango > 0 ? 1 : 0) +
+    (avisoSinMarcas((visibles ?? []).filter(esSinMarcas).length) ? 1 : 0) +
+    (avisoCorreccion ? 1 : 0);
 
   // 🔴 LA SELECCIÓN SE DERIVA DE LO QUE SE VE. Un código marcado que dejó de
   // estar en la tabla (cambió el período, se prendió el filtro) no se justifica
@@ -505,81 +560,198 @@ export default function ReporteTab({ empresa = "" }: {
       {/* Arriba de todo a propósito: si el reloj no está entrando, cualquier
           número de esta pantalla está incompleto y hay que saberlo ANTES de
           leerlo — no después de descontarle minutos a alguien. */}
-      <EstadoReloj onLlegaron={() => void cargar()} />
+      {/* ══════════════════════════════════════════════════════════════════
+          🔴 EL PANEL DE ARRIBA, EN UNA SOLA FILA (24-sep-2026)
+          Daniel: *«veo todo este panel que me ensucia»*. 🩸 Medido: nueve
+          bloques y 1.085 px antes del primer nombre. Ahora: el selector único,
+          la lupa, «Solo a revisar», compartir y un «···» con los relojes; los
+          avisos, plegados en una línea.
+          ══════════════════════════════════════════════════════════════════ */}
+      {ASISTENCIA_PANTALLA_2026_09 ? (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <SelectorPeriodo desde={desde} hasta={hasta} hoy={hoy} onElegir={elegirPeriodo} />
 
-      <div className="flex flex-wrap items-end gap-3">
-        <RangoFechas desde={desde} hasta={hasta} recordarComo="asistencia_reporte" onChange={elegirPeriodo} />
-        <input
-          type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar colaborador"
-          className="min-h-[44px] flex-1 min-w-[160px] rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm"
-        />
-        {/* ── 🔴 EL BOTÓN «SOLO A REVISAR» (18-sep-2026) ────────────────────
-            Daniel: *«si y nada más el botón de "Solo a revisar"»*. Al lado del
-            buscador y con la misma forma que los atajos del período. Filtra lo
-            YA cargado —no le pide nada al servidor— y se combina con el
-            buscador y con el selector de empresa en vez de pelearlos.
-            🔴 Al apagarlo se suelta también la fila abierta con solo sus días:
-            dejarla recortada bajo un filtro apagado es mentir con la pantalla. */}
-        <button
-          type="button"
-          onClick={() => {
-            const prender = !soloARevisar;
-            setRevisarUrl(prender ? VALOR_PRENDIDO : "");
-            if (!prender) setDiasDeUrl("");
-          }}
-          aria-pressed={soloARevisar}
-          // 🔑 NEGRO, COMO LOS ATAJOS DEL PERÍODO, no ámbar: el ámbar de esta
-          // pantalla significa «esto hay que mirarlo» y vive en el número. Un
-          // botón prendido se ve igual en todo el sistema.
-          className={`min-h-[44px] rounded-md border px-3 text-sm transition active:scale-[0.97] ${
-            soloARevisar
-              ? "border-black bg-black font-medium text-white"
-              : "border-gray-300 text-gray-700 hover:border-black hover:text-black"
-          }`}
-        >
-          {ROTULO_SOLO_A_REVISAR}
-        </button>
-        <div className="flex gap-2">
-          {/* 🔴 EL BOTÓN DICE A CUÁNTOS AFECTA cuando la pantalla está
-              recortada: «Excel · 34». Es la única excepción que admite la regla
-              de que lo que sale de la pantalla nunca se recorta. */}
-          <button type="button" onClick={bajarExcel} disabled={!visibles?.length}
-            className="min-h-[44px] rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:opacity-40">
-            {rotuloDescarga("Excel", visibles?.length ?? 0, soloARevisar)}
-          </button>
-          <button type="button" onClick={bajarPdf} disabled={!visibles?.length}
-            className="min-h-[44px] rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:opacity-40">
-            {rotuloDescarga("PDF", visibles?.length ?? 0, soloARevisar)}
-          </button>
-        </div>
-        {/* «34 de 45 colaboradores»: que el total recortado del pie no se lea
-            como el de todos. Solo con el filtro prendido. */}
-        {conteo && <span className="text-[13px] text-gray-500">{conteo}</span>}
-      </div>
+            {/* El buscador vive detrás de la lupa; con algo escrito se queda
+                abierto para que nadie pierda de vista por qué falta gente. */}
+            <button
+              type="button"
+              onClick={() => setBuscadorAbierto((v) => !v)}
+              aria-pressed={buscadorAbierto || !!q}
+              aria-label="Buscar colaborador"
+              title="Buscar colaborador"
+              className={`flex h-11 w-11 items-center justify-center rounded-md border text-base transition active:scale-[0.97] ${
+                buscadorAbierto || q ? "border-black text-gray-900" : "border-gray-300 text-gray-600 hover:border-black"
+              }`}
+            >
+              <span aria-hidden>🔍</span>
+            </button>
+            {(buscadorAbierto || !!q) && (
+              <input
+                type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar colaborador"
+                autoFocus
+                className="min-h-[44px] min-w-[160px] flex-1 rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm"
+              />
+            )}
 
-      {/* ── 🔴 LOS ATAJOS DEL PERÍODO (16-sep-2026) ───────────────────────────
-          Daniel: *«arregla la manera de seleccionar en el calendario que se ve
-          raro, tiene que ser normal, facil»*. 🩸 Para mirar UN día había que
-          abrir el calendario y tocar DOS veces (es un selector de rango). Los
-          cuatro botones salen de `atajos-periodo.ts`, que arma las quincenas
-          con la MISMA función que la Planilla — no hay un tercer selector—, y
-          el calendario queda para todo lo demás. */}
-      <div className="flex flex-wrap gap-2">
-        {atajos.map((a) => (
+            <button
+              type="button"
+              onClick={() => {
+                const prender = !soloARevisar;
+                setRevisarUrl(prender ? VALOR_PRENDIDO : "");
+                if (!prender) setDiasDeUrl("");
+              }}
+              aria-pressed={soloARevisar}
+              className={`min-h-[44px] rounded-md border px-3 text-sm transition active:scale-[0.97] ${
+                soloARevisar
+                  ? "border-black bg-black font-medium text-white"
+                  : "border-gray-300 text-gray-700 hover:border-black hover:text-black"
+              }`}
+            >
+              {ROTULO_SOLO_A_REVISAR}
+            </button>
+
+            {/* Compartir: Excel y PDF detrás de un ícono. Dicen a cuántos
+                afectan, igual que antes. */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setDescargasAbiertas((v) => !v)}
+                disabled={!visibles?.length}
+                aria-haspopup="menu"
+                aria-expanded={descargasAbiertas}
+                aria-label="Bajar Excel o PDF"
+                title="Bajar Excel o PDF"
+                className="flex h-11 w-11 items-center justify-center rounded-md border border-gray-300 text-base text-gray-600 transition hover:border-black hover:text-black active:scale-[0.97] disabled:opacity-40"
+              >
+                <span aria-hidden>⇧</span>
+              </button>
+              {descargasAbiertas && (
+                <div role="menu" className="absolute right-0 z-20 mt-1 w-52 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                  <button type="button" role="menuitem"
+                    onClick={() => { setDescargasAbiertas(false); void bajarExcel(); }}
+                    className="block w-full px-3 py-2.5 text-left text-sm text-gray-700 transition hover:bg-gray-50">
+                    {rotuloDescarga("Excel", visibles?.length ?? 0, soloARevisar)}
+                  </button>
+                  <button type="button" role="menuitem"
+                    onClick={() => { setDescargasAbiertas(false); void bajarPdf(); }}
+                    className="block w-full px-3 py-2.5 text-left text-sm text-gray-700 transition hover:bg-gray-50">
+                    {rotuloDescarga("PDF", visibles?.length ?? 0, soloARevisar)}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 🔴 Los relojes, en el «···». En el celular la línea se ve
+                siempre (abajo) porque es lo único que dice si los números están
+                completos; acá entra al menú, que es lo que pidió Daniel. */}
+            {!celular && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setRelojesAbiertos((v) => !v)}
+                  aria-haspopup="menu"
+                  aria-expanded={relojesAbiertos}
+                  aria-label="Los relojes"
+                  title="Los relojes"
+                  className="flex h-11 w-11 items-center justify-center rounded-md border border-gray-300 text-base text-gray-600 transition hover:border-black hover:text-black active:scale-[0.97]"
+                >
+                  <span aria-hidden>···</span>
+                </button>
+                {relojesAbiertos && (
+                  <div className="absolute right-0 z-20 mt-1 w-[22rem] max-w-[90vw] rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
+                    <EstadoReloj onLlegaron={() => void cargar()} />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {conteo && <span className="ml-auto text-[13px] text-gray-500">{conteo}</span>}
+          </div>
+
+          {/* En el celular, los relojes en UNA línea: si el reloj no está
+              entrando, cualquier número de abajo está incompleto. */}
+          {celular && <EstadoReloj resumen onLlegaron={() => void cargar()} />}
+        </>
+      ) : (
+        <>
+          <EstadoReloj onLlegaron={() => void cargar()} />
+
+        <div className="flex flex-wrap items-end gap-3">
+          <RangoFechas desde={desde} hasta={hasta} recordarComo="asistencia_reporte" onChange={elegirPeriodo} />
+          <input
+            type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar colaborador"
+            className="min-h-[44px] flex-1 min-w-[160px] rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm"
+          />
+          {/* ── 🔴 EL BOTÓN «SOLO A REVISAR» (18-sep-2026) ────────────────────
+              Daniel: *«si y nada más el botón de "Solo a revisar"»*. Al lado del
+              buscador y con la misma forma que los atajos del período. Filtra lo
+              YA cargado —no le pide nada al servidor— y se combina con el
+              buscador y con el selector de empresa en vez de pelearlos.
+              🔴 Al apagarlo se suelta también la fila abierta con solo sus días:
+              dejarla recortada bajo un filtro apagado es mentir con la pantalla. */}
           <button
-            key={a.clave} type="button"
-            onClick={() => elegirPeriodo(a.desde, a.hasta)}
-            aria-pressed={atajoPrendido === a.clave}
+            type="button"
+            onClick={() => {
+              const prender = !soloARevisar;
+              setRevisarUrl(prender ? VALOR_PRENDIDO : "");
+              if (!prender) setDiasDeUrl("");
+            }}
+            aria-pressed={soloARevisar}
+            // 🔑 NEGRO, COMO LOS ATAJOS DEL PERÍODO, no ámbar: el ámbar de esta
+            // pantalla significa «esto hay que mirarlo» y vive en el número. Un
+            // botón prendido se ve igual en todo el sistema.
             className={`min-h-[44px] rounded-md border px-3 text-sm transition active:scale-[0.97] ${
-              atajoPrendido === a.clave
+              soloARevisar
                 ? "border-black bg-black font-medium text-white"
                 : "border-gray-300 text-gray-700 hover:border-black hover:text-black"
             }`}
           >
-            {a.rotulo}
+            {ROTULO_SOLO_A_REVISAR}
           </button>
-        ))}
-      </div>
+          <div className="flex gap-2">
+            {/* 🔴 EL BOTÓN DICE A CUÁNTOS AFECTA cuando la pantalla está
+                recortada: «Excel · 34». Es la única excepción que admite la regla
+                de que lo que sale de la pantalla nunca se recorta. */}
+            <button type="button" onClick={bajarExcel} disabled={!visibles?.length}
+              className="min-h-[44px] rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:opacity-40">
+              {rotuloDescarga("Excel", visibles?.length ?? 0, soloARevisar)}
+            </button>
+            <button type="button" onClick={bajarPdf} disabled={!visibles?.length}
+              className="min-h-[44px] rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:opacity-40">
+              {rotuloDescarga("PDF", visibles?.length ?? 0, soloARevisar)}
+            </button>
+          </div>
+          {/* «34 de 45 colaboradores»: que el total recortado del pie no se lea
+              como el de todos. Solo con el filtro prendido. */}
+          {conteo && <span className="text-[13px] text-gray-500">{conteo}</span>}
+        </div>
+
+        {/* ── 🔴 LOS ATAJOS DEL PERÍODO (16-sep-2026) ───────────────────────────
+            Daniel: *«arregla la manera de seleccionar en el calendario que se ve
+            raro, tiene que ser normal, facil»*. 🩸 Para mirar UN día había que
+            abrir el calendario y tocar DOS veces (es un selector de rango). Los
+            cuatro botones salen de `atajos-periodo.ts`, que arma las quincenas
+            con la MISMA función que la Planilla — no hay un tercer selector—, y
+            el calendario queda para todo lo demás. */}
+        <div className="flex flex-wrap gap-2">
+          {atajos.map((a) => (
+            <button
+              key={a.clave} type="button"
+              onClick={() => elegirPeriodo(a.desde, a.hasta)}
+              aria-pressed={atajoPrendido === a.clave}
+              className={`min-h-[44px] rounded-md border px-3 text-sm transition active:scale-[0.97] ${
+                atajoPrendido === a.clave
+                  ? "border-black bg-black font-medium text-white"
+                  : "border-gray-300 text-gray-700 hover:border-black hover:text-black"
+              }`}
+            >
+              {a.rotulo}
+            </button>
+          ))}
+        </div>
+        </>
+      )}
 
       {/* 🔴 UN ENLACE AL LADO DE LA TABLA, no un bloque suelto ni filas
           metidas adentro. Daniel: *«Reporte es para otra cosa»* — pero una
@@ -595,111 +767,133 @@ export default function ReporteTab({ empresa = "" }: {
         </div>
       )}
 
-      {/* Sin horario fijado se asume 5:00 p.m., y con eso las extras y la salida
-          temprana pueden estar mal. Vale avisarlo antes de que descuente.
-          🩸 Decía «revísalo en Horarios» (11-sep-2026, Daniel lo vio): esa
-          pestaña ya no existe con el acomodo nuevo; la hora de salida se
-          confirma en la ficha del colaborador. El destino sale del módulo puro. */}
-      {sinHorario > 0 && (
-        <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
-          <b>{sinHorario}</b> {sinHorario === 1 ? "colaborador no tiene" : "colaboradores no tienen"} su hora de salida
-          confirmada. Mientras tanto se asume 5:00 p.m. — se confirma {dondeSeCargaLaFicha()}, en <b>{PESTANA_FICHAS}</b>.
-          {/* 🔴 Y SE DICE QUIÉN, CON EL ENLACE A SU FICHA (16-sep-2026).
-              Daniel: *«debería de haber un link directo para ir al problema»*.
-              🩸 El aviso daba el número y nada más, así que había que ir a
-              buscar a mano a cuál de las 40 personas le falta.
-              ⚠️ El enlace solo existe con el acomodo nuevo; apagado, la ficha
-              no tiene página propia y se nombran igual. */}
-          {sinHorarioLista.length > 0 && (
-            <>
-              {" — "}
-              {sinHorarioLista.map((x, i) => (
-                <span key={x.codigo}>
-                  {i > 0 && ", "}
-                  {PERSONA_EN_EL_CENTRO ? (
-                    <a href={rutaDePersona(x.codigo)}
-                      className="font-medium underline decoration-dotted underline-offset-2 hover:text-amber-900">
-                      {capitalizarNombre(etiquetaPersona(x.codigo, x.nombre))}
-                    </a>
-                  ) : (
-                    <b>{capitalizarNombre(etiquetaPersona(x.codigo, x.nombre))}</b>
-                  )}
-                </span>
-              ))}
-            </>
-          )}
-        </p>
+      {/* ══════════════════════════════════════════════════════════════════
+          🔴 LOS AVISOS, PLEGADOS EN UNA LÍNEA (24-sep-2026)
+          🩸 Eran hasta siete cajas apiladas que ocupaban más alto que las dos
+          primeras filas de la tabla. Ninguno se borró: se dicen en una línea
+          que los abre. El texto sale del módulo puro.
+          ══════════════════════════════════════════════════════════════════ */}
+      {ASISTENCIA_PANTALLA_2026_09 && rotuloDeAvisos(cuantosAvisos) && (
+        <button
+          type="button"
+          onClick={() => setAvisosAbiertos((v) => !v)}
+          aria-expanded={avisosAbiertos}
+          className="flex min-h-[44px] w-full items-center justify-between rounded-md border border-gray-200 bg-gray-50 px-3 text-left text-[13px] text-gray-700 transition hover:border-gray-400"
+        >
+          <span>{rotuloDeAvisos(cuantosAvisos)}</span>
+          <span aria-hidden className="text-gray-400">{avisosAbiertos ? "⌃" : "›"}</span>
+        </button>
       )}
+      <div
+        hidden={ASISTENCIA_PANTALLA_2026_09 && !avisosAbiertos}
+        className={ASISTENCIA_PANTALLA_2026_09 && !avisosAbiertos ? "hidden" : "space-y-4"}
+      >
+        {/* Sin horario fijado se asume 5:00 p.m., y con eso las extras y la salida
+            temprana pueden estar mal. Vale avisarlo antes de que descuente.
+            🩸 Decía «revísalo en Horarios» (11-sep-2026, Daniel lo vio): esa
+            pestaña ya no existe con el acomodo nuevo; la hora de salida se
+            confirma en la ficha del colaborador. El destino sale del módulo puro. */}
+        {sinHorario > 0 && (
+          <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
+            <b>{sinHorario}</b> {sinHorario === 1 ? "colaborador no tiene" : "colaboradores no tienen"} su hora de salida
+            confirmada. Mientras tanto se asume 5:00 p.m. — se confirma {dondeSeCargaLaFicha()}, en <b>{PESTANA_FICHAS}</b>.
+            {/* 🔴 Y SE DICE QUIÉN, CON EL ENLACE A SU FICHA (16-sep-2026).
+                Daniel: *«debería de haber un link directo para ir al problema»*.
+                🩸 El aviso daba el número y nada más, así que había que ir a
+                buscar a mano a cuál de las 40 personas le falta.
+                ⚠️ El enlace solo existe con el acomodo nuevo; apagado, la ficha
+                no tiene página propia y se nombran igual. */}
+            {sinHorarioLista.length > 0 && (
+              <>
+                {" — "}
+                {sinHorarioLista.map((x, i) => (
+                  <span key={x.codigo}>
+                    {i > 0 && ", "}
+                    {PERSONA_EN_EL_CENTRO ? (
+                      <a href={rutaDePersona(x.codigo)}
+                        className="font-medium underline decoration-dotted underline-offset-2 hover:text-amber-900">
+                        {capitalizarNombre(etiquetaPersona(x.codigo, x.nombre))}
+                      </a>
+                    ) : (
+                      <b>{capitalizarNombre(etiquetaPersona(x.codigo, x.nombre))}</b>
+                    )}
+                  </span>
+                ))}
+              </>
+            )}
+          </p>
+        )}
 
-      {/* 🔴 QUE NADIE LEA UN TOTAL SIN ENTERARSE DE QUE HAY HORAS TOCADAS A
-          MANO. Va arriba de la tabla, no escondido en el detalle de una
-          persona: el número de abajo ya viene calculado con estas horas. */}
-      {correcciones.correcciones > 0 && (
-        <p className="rounded-md bg-blue-50 px-3 py-2 text-[13px] text-blue-900">
-          <b>{correcciones.correcciones}</b>{" "}
-          {correcciones.correcciones === 1 ? "hora corregida a mano" : "horas corregidas a mano"} en{" "}
-          <b>{correcciones.dias}</b> {correcciones.dias === 1 ? "día" : "días"}
-          {correcciones.agregadas > 0 && (
-            <> — {correcciones.agregadas} {correcciones.agregadas === 1 ? "es una marcación agregada" : "son marcaciones agregadas"}</>
-          )}
-          {/* 🔴 18-sep-2026: las QUITADAS se dicen aparte. Son las que destraban
-              el cierre, y el aviso tiene que nombrarlas por lo que son. */}
-          {correcciones.quitadas > 0 && (
-            <> — {correcciones.quitadas} {correcciones.quitadas === 1 ? "es una marcación quitada" : "son marcaciones quitadas"}</>
-          )}
-          . Los números de abajo ya cuentan con eso. Abre al colaborador para ver qué se cambió y por qué.
-        </p>
-      )}
+        {/* 🔴 QUE NADIE LEA UN TOTAL SIN ENTERARSE DE QUE HAY HORAS TOCADAS A
+            MANO. Va arriba de la tabla, no escondido en el detalle de una
+            persona: el número de abajo ya viene calculado con estas horas. */}
+        {correcciones.correcciones > 0 && (
+          <p className="rounded-md bg-blue-50 px-3 py-2 text-[13px] text-blue-900">
+            <b>{correcciones.correcciones}</b>{" "}
+            {correcciones.correcciones === 1 ? "hora corregida a mano" : "horas corregidas a mano"} en{" "}
+            <b>{correcciones.dias}</b> {correcciones.dias === 1 ? "día" : "días"}
+            {correcciones.agregadas > 0 && (
+              <> — {correcciones.agregadas} {correcciones.agregadas === 1 ? "es una marcación agregada" : "son marcaciones agregadas"}</>
+            )}
+            {/* 🔴 18-sep-2026: las QUITADAS se dicen aparte. Son las que destraban
+                el cierre, y el aviso tiene que nombrarlas por lo que son. */}
+            {correcciones.quitadas > 0 && (
+              <> — {correcciones.quitadas} {correcciones.quitadas === 1 ? "es una marcación quitada" : "son marcaciones quitadas"}</>
+            )}
+            . Los números de abajo ya cuentan con eso. Abre al colaborador para ver qué se cambió y por qué.
+          </p>
+        )}
 
-      {/* 🔴 LA MARCA REPETIDA SE OLVIDÓ SOLA, Y SE DICE (18-sep-2026). Daniel:
-          *«quiero que el sistema agarre la primera marcación y olvide la
-          próxima si es en x cantidad de tiempo»* — «1 minuto». Un número que
-          cambia sin explicación es peor que el error: arriba se cuenta cuántas
-          y abajo, en su día, cada una va tachada con su porqué. Gris, no azul:
-          nadie tocó nada a mano. */}
-      {visibles && contarRepetidas(visibles.flatMap((p) => p.dias)) > 0 && (
-        <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-700">
-          {avisoRepetidas(contarRepetidas(visibles.flatMap((p) => p.dias)))}
-        </p>
-      )}
+        {/* 🔴 LA MARCA REPETIDA SE OLVIDÓ SOLA, Y SE DICE (18-sep-2026). Daniel:
+            *«quiero que el sistema agarre la primera marcación y olvide la
+            próxima si es en x cantidad de tiempo»* — «1 minuto». Un número que
+            cambia sin explicación es peor que el error: arriba se cuenta cuántas
+            y abajo, en su día, cada una va tachada con su porqué. Gris, no azul:
+            nadie tocó nada a mano. */}
+        {visibles && contarRepetidas(visibles.flatMap((p) => p.dias)) > 0 && (
+          <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-700">
+            {avisoRepetidas(contarRepetidas(visibles.flatMap((p) => p.dias)))}
+          </p>
+        )}
 
-      {/* 🔴 EL DÍA QUE NO TERMINÓ NO ES UN ERROR, Y SE DICE. Sin esta línea,
-          quien mire a las 3 de la tarde vería a media oficina con 3 marcas y
-          "A revisar" en cero, y pensaría que el cuadro se equivoca. El día se
-          ve entero —las marcas están—; lo único que no se hace es juzgarlo. */}
-      {diaEnCurso && (
-        <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
-          Hoy ({fechaCorta(diaEnCurso)}) todavía va corriendo: sus marcas se ven, pero el día
-          <b> no se cuenta como mal marcado ni como ausencia</b> hasta que termine.
-        </p>
-      )}
+        {/* 🔴 EL DÍA QUE NO TERMINÓ NO ES UN ERROR, Y SE DICE. Sin esta línea,
+            quien mire a las 3 de la tarde vería a media oficina con 3 marcas y
+            "A revisar" en cero, y pensaría que el cuadro se equivoca. El día se
+            ve entero —las marcas están—; lo único que no se hace es juzgarlo. */}
+        {diaEnCurso && (
+          <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
+            Hoy ({fechaCorta(diaEnCurso)}) todavía va corriendo: sus marcas se ven, pero el día
+            <b> no se cuenta como mal marcado ni como ausencia</b> hasta que termine.
+          </p>
+        )}
 
-      {/* Quien no estaba trabajando en el rango no sale — y se dice cuántos son,
-          para que nadie busque a una persona que la pantalla decidió no mostrar. */}
-      {fueraDelRango > 0 && (
-        <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
-          <b>{fueraDelRango}</b>{" "}
-          {fueraDelRango === 1 ? "colaborador no aparece" : "colaboradores no aparecen"} porque no
-          estaba trabajando en estas fechas (entró después o ya se había ido). Sus marcaciones
-          siguen guardadas y salen si consultas el rango en que sí trabajaba.
-        </p>
-      )}
+        {/* Quien no estaba trabajando en el rango no sale — y se dice cuántos son,
+            para que nadie busque a una persona que la pantalla decidió no mostrar. */}
+        {fueraDelRango > 0 && (
+          <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
+            <b>{fueraDelRango}</b>{" "}
+            {fueraDelRango === 1 ? "colaborador no aparece" : "colaboradores no aparecen"} porque no
+            estaba trabajando en estas fechas (entró después o ya se había ido). Sus marcaciones
+            siguen guardadas y salen si consultas el rango en que sí trabajaba.
+          </p>
+        )}
 
-      {/* 🔴 QUIEN NO MARCÓ NI UN DÍA SALE IGUAL, EN GRIS (24-sep-2026). 🩸 La
-          lista se armaba solo con quien tiene marcas, así que Yeisibeth Muñoz
-          (306, Multifashion) no existía para la quincena 1–15 de septiembre y
-          no había forma de arreglarle las horas. */}
-      {avisoSinMarcas((visibles ?? []).filter(esSinMarcas).length) && (
-        <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
-          {avisoSinMarcas((visibles ?? []).filter(esSinMarcas).length)}
-        </p>
-      )}
+        {/* 🔴 QUIEN NO MARCÓ NI UN DÍA SALE IGUAL, EN GRIS (24-sep-2026). 🩸 La
+            lista se armaba solo con quien tiene marcas, así que Yeisibeth Muñoz
+            (306, Multifashion) no existía para la quincena 1–15 de septiembre y
+            no había forma de arreglarle las horas. */}
+        {avisoSinMarcas((visibles ?? []).filter(esSinMarcas).length) && (
+          <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
+            {avisoSinMarcas((visibles ?? []).filter(esSinMarcas).length)}
+          </p>
+        )}
 
-      {/* Sin la migración corrida la pantalla NO ofrece corregir, y lo dice: un
-          botón que siempre falla es peor que no tenerlo. */}
-      {avisoCorreccion && (
-        <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">{avisoCorreccion}</p>
-      )}
+        {/* Sin la migración corrida la pantalla NO ofrece corregir, y lo dice: un
+            botón que siempre falla es peor que no tenerlo. */}
+        {avisoCorreccion && (
+          <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">{avisoCorreccion}</p>
+        )}
+      </div>
 
       {cargando && <p className="py-8 text-center text-sm text-gray-400">Cargando…</p>}
       {/* 🔴 FIJA, no en el flujo: una línea que aparece y desaparece arriba de
@@ -753,12 +947,19 @@ export default function ReporteTab({ empresa = "" }: {
       )}
 
       {!cargando && !error && !!visibles?.length && (
-        <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+        /* 🔴 EN EL CELULAR NADA SE DESLIZA DE LADO (24-sep-2026): la tabla mide
+           888 px dentro de una ventana de 356. Sigue siendo la MISMA tabla —el
+           detalle de días de adentro no cambia—, pero la fila de la persona se
+           dibuja como una tarjeta que ocupa el ancho entero. */
+        <div className={celular ? "rounded-lg border border-gray-200 bg-white" : "overflow-x-auto rounded-lg border border-gray-200 bg-white"}>
           <table className="w-full text-sm">
-            <thead>
+            <thead className={celular ? "hidden" : undefined}>
               <tr className="border-b border-gray-200 text-[10.5px] uppercase tracking-wide text-gray-400">
                 <th className="px-3 py-2.5 text-left font-medium">Colaborador</th>
-                <th className="px-2 py-2.5 text-center font-medium">Sale</th>
+                {/* 🔴 LA COLUMNA «SALE» SE RETIRÓ (24-sep-2026). Daniel: *«pone
+                    salida como en una burbuja al lado del nombre, y el código a
+                    la izquierda del nombre»*. Once columnas pasan a diez. */}
+                {!ASISTENCIA_PANTALLA_2026_09 && <th className="px-2 py-2.5 text-center font-medium">Sale</th>}
                 <th className="px-2 py-2.5 text-right font-medium">Días</th>
                 <th className="px-2 py-2.5 text-right font-medium">Ausen.</th>
                 <th className="px-2 py-2.5 text-right font-medium">Veces<br />tarde</th>
@@ -773,6 +974,8 @@ export default function ReporteTab({ empresa = "" }: {
             <tbody>
               {visibles.map((p) => (
                 <FilaPersona key={p.codigo} p={p}
+                  celular={celular}
+                  anchoCodigo={anchoCodigo}
                   // 🔴 Una fila abierta por «Ver solo esos días» está abierta
                   // igual: es la MISMA fila desplegada, con menos días adentro.
                   abierta={abierta === p.codigo || diasDeUrl === p.codigo}
@@ -801,8 +1004,18 @@ export default function ReporteTab({ empresa = "" }: {
               ))}
             </tbody>
             <tfoot>
+              {/* 🔴 EL PIE DEL CELULAR DICE LO MISMO EN UNA LÍNEA: «8
+                  colaboradores · 11 ausencias · 34.17 min tarde». Los mismos
+                  números del pie de la tabla, sin una columna que se deslice. */}
+              {celular ? (
+                <tr className="border-t border-gray-200 bg-gray-50 font-semibold">
+                  <td className="px-3 py-2.5 text-[13px]" colSpan={columnasDelReporte()}>
+                    {pieDelCelular({ colaboradores: visibles.length, ausencias: tot.aus, minutosTarde: tot.tarde })}
+                  </td>
+                </tr>
+              ) : (
               <tr className="border-t border-gray-200 bg-gray-50 font-semibold">
-                <td className="px-3 py-2.5" colSpan={3}>{visibles.length} {visibles.length === 1 ? "colaborador" : "colaboradores"}</td>
+                <td className="px-3 py-2.5" colSpan={ASISTENCIA_PANTALLA_2026_09 ? 2 : 3}>{visibles.length} {visibles.length === 1 ? "colaborador" : "colaboradores"}</td>
                 <td className="px-2 py-2.5 text-right tabular-nums">{tot.aus || "—"}</td>
                 <td className="px-2 py-2.5"></td>
                 {/* 🩸 Los minutos se miden al segundo y sumarlos da 9544.499999999998:
@@ -814,6 +1027,7 @@ export default function ReporteTab({ empresa = "" }: {
                 <td className="px-2 py-2.5 text-right tabular-nums">{tot.extra ? fmtMin(tot.extra) : "—"}</td>
                 <td className="px-2 py-2.5 text-right tabular-nums">{tot.rev || "—"}</td>
               </tr>
+              )}
             </tfoot>
           </table>
         </div>
@@ -894,9 +1108,13 @@ export default function ReporteTab({ empresa = "" }: {
   );
 }
 
-function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, onToggle, puedeCorregir, onCorregir, onJustificar, marcasTelefono, onVerSelfie, decisionesExtra, motivosFrecuentes, onGuardadoElDia, anclada, puedeDecidirExtra, onDecidirExtra, extrasEnVuelo, seleccionada, onSeleccionar }: {
+function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, onToggle, puedeCorregir, onCorregir, onJustificar, marcasTelefono, onVerSelfie, decisionesExtra, motivosFrecuentes, onGuardadoElDia, anclada, puedeDecidirExtra, onDecidirExtra, extrasEnVuelo, seleccionada, onSeleccionar, celular = false, anchoCodigo = 3 }: {
   p: PersonaReporte;
   abierta: boolean;
+  /** 🔴 En el celular la fila es una TARJETA de ancho completo, no once columnas. */
+  celular?: boolean;
+  /** Cuántos dígitos mide el código más largo: el nombre arranca siempre igual. */
+  anchoCodigo?: number;
   /** Abierta por «Ver solo esos días»: adentro van SOLO los días a revisar. */
   soloDiasARevisar: boolean;
   /** El período que se está mirando, para que el enlace lo lleve puesto. */
@@ -933,123 +1151,9 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
   const persona = p.nombre
     ? capitalizarNombre(etiquetaPersona(p.codigo, p.nombre))
     : etiquetaPersona(p.codigo, p.nombre);
-  return (
-    <>
-      {/* 🔴 La fila de quien no marcó va en GRIS: se ve que no es una fila con
-          números, sin sacarla de la lista ni del papel. */}
-      <tr onClick={onToggle}
-        className={`cursor-pointer border-b border-gray-100 transition hover:bg-gray-50${
-          esSinMarcas(p) ? " bg-gray-50/70 text-gray-500" : ""
-        }`}>
-        {/* El NOMBRE manda; el código va chico al lado, y solo si aporta algo.
-            Sin nombre configurado se muestra el código —nunca un blanco— y se
-            dice qué falta, porque un número suelto no se le reclama a nadie. */}
-        <td className="px-3 py-2.5 text-gray-900">
-          {/* 🔴 LA CASILLA VA DENTRO DE «Colaborador», no en una columna nueva:
-              la tabla tiene once y agregar una doceava la aprieta en el iPad.
-              `stopPropagation` porque tocar la fila la despliega — marcar y
-              abrir son dos cosas distintas. */}
-          <input
-            type="checkbox"
-            checked={seleccionada}
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => { e.stopPropagation(); onSeleccionar(p.codigo); }}
-            aria-label={`Seleccionar ${persona}`}
-            className="mr-2 h-4 w-4 cursor-pointer align-middle accent-black"
-          />
-          {persona}
-          {p.nombre ? (
-            <span className="ml-1.5 text-xs text-gray-400">{p.codigo}</span>
-          ) : (
-            <span className="ml-1.5 text-xs text-amber-700">falta configurar</span>
-          )}
-          {/* 🔴 Dice por qué esta fila está vacía: no marcó. Sin esto se lee
-              igual que alguien que trabajó y no tiene nada anotado. */}
-          {esSinMarcas(p) && (
-            <span className="ml-1.5 whitespace-nowrap rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600">
-              {TEXTO_SIN_MARCAS}
-            </span>
-          )}
-          {/* 🔴 Dice por qué esta fila sigue acá con el filtro prendido. */}
-          {anclada && (
-            <span title={TITULO_ANCLADA}
-              className="ml-1.5 whitespace-nowrap rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600">
-              {ROTULO_ANCLADA}
-            </span>
-          )}
-          {/* 🔴 Se ve SIN abrir nada: los minutos de esta fila ya salen de una
-              hora que alguien escribió a mano. */}
-          {r.diasCorregidos > 0 && (
-            <span className="ml-1.5 whitespace-nowrap rounded bg-blue-50 px-1.5 py-0.5 text-xs font-semibold text-blue-700">
-              {r.diasCorregidos} {r.diasCorregidos === 1 ? "día corregido" : "días corregidos"}
-            </span>
-          )}
-          {/* 🔴 Se ve SIN abrir nada. Sin este chip, quien trabajó todo el mes
-              fuera de la oficina aparece con «0 días trabajados» y ninguna
-              explicación: idéntico a alguien que simplemente no vino. */}
-          {r.diasTrabajandoFuera > 0 && (
-            <span className="ml-1.5 whitespace-nowrap rounded bg-gray-100 px-1.5 py-0.5 text-xs font-semibold text-gray-700">
-              {r.diasTrabajandoFuera} {r.diasTrabajandoFuera === 1 ? "día" : "días"} trabajando fuera
-            </span>
-          )}
-        </td>
-        <td className="px-2 py-2.5 text-center tabular-nums text-gray-500">{p.salida}</td>
-        <td className="px-2 py-2.5 text-right tabular-nums text-gray-700">{r.diasTrabajados}</td>
-        <td className="px-2 py-2.5 text-right">{r.ausenciasSinJustificar
-          ? <span className="font-semibold tabular-nums text-red-700">{r.ausenciasSinJustificar}</span>
-          : <span className="text-gray-300">—</span>}</td>
-        <td className="px-2 py-2.5 text-right text-gray-700">{n(r.vecesTarde)}</td>
-        <td className="px-2 py-2.5 text-right">{r.minutosTarde
-          ? <span className="font-medium tabular-nums text-amber-700">{fmtMin(r.minutosTarde)}</span>
-          : <span className="text-gray-300">—</span>}</td>
-        <td className="px-2 py-2.5 text-right text-gray-700">{n(r.excesoAlmuerzoMin)}</td>
-        <td className="px-2 py-2.5 text-right text-gray-700">{n(r.salidaTempranaMin)}</td>
-        <td className="px-2 py-2.5 text-right font-semibold text-gray-900">{n(r.tiempoNoTrabajadoMin)}</td>
-        {/* 🔴 El servicio profesional NO cuenta horas extra (3-sep-2026,
-            Daniel: *«es solo para ver sus tardanzas y ausencias»*): raya, no 0
-            ni el número que midió el reloj. Tardanza y ausencia, intactas. */}
-        {/* 🔴 LOS MINUTOS MEDIDOS ARRIBA Y LO DECIDIDO DEBAJO (16-sep-2026).
-            Daniel, preguntado si tenía que decir las dos cosas: *«Si»*. 🩸 La
-            celda mostraba lo que midió el reloj y se leía como plata que se va
-            a pagar — la planilla paga SOLO lo aprobado. El texto sale del
-            módulo puro `extras-decididas.ts`. */}
-        <td className="px-2 py-2.5 text-right text-gray-700" title={cuentaHorasExtra(p) && r.extraMin > 0 ? tituloExtrasDecididas(extras) : undefined}>
-          {cuentaHorasExtra(p) ? n(r.extraMin) : sinExtra()}
-          {cuentaHorasExtra(p) && textoExtrasDecididas(extras) && (
-            <span className="block text-[11px] font-normal text-gray-500">{textoExtrasDecididas(extras)}</span>
-          )}
-        </td>
-        {/* 🔴 EL NÚMERO LLEVA AL DÍA (18-sep-2026). Daniel: *«opcion a con
-            mockup»*. 🩸 Era un número MUERTO: decía cuántos días había que
-            revisar y para saber CUÁLES había que abrir a la persona y recorrer
-            los once días del período, en 34 fichas.
-            🔴 CON 0 DÍAS NO HAY ENLACE: va el guion de siempre. Un enlace que
-            abre una lista vacía es peor que no tenerlo.
-            ⚠️ Es un `<a>` de verdad —se puede copiar y abrir en otra pestaña—,
-            y el clic normal lo resuelve en el acto, sin recargar la pantalla. */}
-        <td className="px-2 py-2.5 text-right">{r.diasARevisar
-          ? (
-            <a
-              href={enlaceDiasARevisarDe(p.codigo, rango)}
-              title={TITULO_NUMERO}
-              onClick={(e) => {
-                // Con Cmd/Ctrl/medio se deja pasar: abrir en otra pestaña es
-                // una forma legítima de usar el enlace.
-                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-                e.preventDefault();
-                e.stopPropagation();
-                onVerDiasARevisar();
-              }}
-              className="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-700 underline decoration-dotted underline-offset-2 transition hover:bg-amber-100 hover:text-amber-900"
-            >
-              {r.diasARevisar}
-            </a>
-          )
-          : <span className="text-gray-300">—</span>}</td>
-      </tr>
-
-      {abierta && (
-        <tr><td colSpan={11} className="bg-gray-50 px-3 py-3">
+  /** El detalle de días. EL MISMO en la tabla y en la tarjeta del celular. */
+  const detalleDeLosDias = (
+        <tr><td colSpan={columnasDelReporte()} className="bg-gray-50 px-3 py-3">
           {/* 🔴 LA FILA GRIS SOLO INFORMA. Medido en `armarPlanilla`: a quien no
               marcó nada se le da `HORAS_CERO`, o sea que la planilla NO le
               cuenta ausencias. La pantalla no puede decir otra cosa que el pago. */}
@@ -1114,7 +1218,226 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
             </table>
           </div>
         </td></tr>
-      )}
+  );
+  // 🔴 EL CÓDIGO A LA IZQUIERDA, alineado entre sí (24-sep-2026). Los códigos
+  // van de uno a tres dígitos (2 · 3 · 301…), así que se reserva el ancho del
+  // más largo y el nombre arranca siempre en el mismo punto.
+  const codigoIzquierda = ASISTENCIA_PANTALLA_2026_09 && !!p.nombre ? (
+    <span
+      className="mr-2 inline-block text-right align-middle text-xs tabular-nums text-gray-400"
+      style={{ minWidth: `${anchoCodigo}ch` }}
+    >
+      {p.codigo}
+    </span>
+  ) : null;
+  /** La burbuja gris con la hora a la que sale. Solo si la ficha la tiene. */
+  const burbujaSalida = ASISTENCIA_PANTALLA_2026_09 && p.salida ? (
+    <span
+      title="Hora de salida de su ficha"
+      className="ml-1.5 whitespace-nowrap rounded-full bg-gray-100 px-1.5 py-0.5 text-[11px] tabular-nums text-gray-600"
+    >
+      {p.salida}
+    </span>
+  ) : null;
+
+  // ── 🔴 EN EL CELULAR, UNA TARJETA POR COLABORADOR (24-sep-2026) ───────────
+  //
+  // Es la MISMA fila: el mismo `onToggle`, la misma selección, y adentro el
+  // MISMO detalle de días. Lo único que cambia es que ocupa el ancho entero en
+  // vez de once columnas de 888 px.
+  if (celular) {
+    const datos = datosDeLaTarjeta(
+      {
+        ausenciasSinJustificar: r.ausenciasSinJustificar,
+        vecesTarde: r.vecesTarde,
+        minutosTarde: r.minutosTarde,
+        extraMin: r.extraMin,
+        diasARevisar: r.diasARevisar,
+      },
+      { cuentaHorasExtra: cuentaHorasExtra(p) },
+    );
+    const TONO: Record<string, string> = {
+      rojo: "text-red-700 font-semibold",
+      ambar: "text-amber-700",
+      gris: "text-gray-600",
+      verde: "text-emerald-700",
+    };
+    return (
+      <>
+        <tr onClick={onToggle}
+          className={`cursor-pointer border-b border-gray-100 transition active:bg-gray-50${
+            esSinMarcas(p) ? " bg-gray-50/70" : ""
+          }`}>
+          <td className="px-3 py-3" colSpan={columnasDelReporte()}>
+            <div className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                checked={seleccionada}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => { e.stopPropagation(); onSeleccionar(p.codigo); }}
+                aria-label={`Seleccionar ${persona}`}
+                className="mt-1 h-5 w-5 shrink-0 cursor-pointer accent-black"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-[15px] font-medium text-gray-900">
+                  {persona}
+                  {p.nombre
+                    ? <span className="ml-1.5 text-xs font-normal text-gray-400">{p.codigo}</span>
+                    : <span className="ml-1.5 text-xs text-amber-700">falta configurar</span>}
+                  {anclada && (
+                    <span title={TITULO_ANCLADA} className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600">
+                      {ROTULO_ANCLADA}
+                    </span>
+                  )}
+                </p>
+                <p className="mt-0.5 text-[13px] text-gray-500">
+                  {lineaDeDias(r.diasTrabajados, p.salida)}
+                  {esSinMarcas(p) && <> · {TEXTO_SIN_MARCAS}</>}
+                </p>
+                <p className="mt-0.5 text-[13px]">
+                  {datos.map((d, i) => (
+                    <span key={d.clave}>
+                      {i > 0 && <span className="text-gray-300"> · </span>}
+                      <span className={TONO[d.tono]}>{d.texto}</span>
+                    </span>
+                  ))}
+                </p>
+              </div>
+              <span aria-hidden className="mt-1 shrink-0 text-gray-300">{abierta ? "⌃" : "›"}</span>
+            </div>
+          </td>
+        </tr>
+        {abierta && detalleDeLosDias}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {/* 🔴 La fila de quien no marcó va en GRIS: se ve que no es una fila con
+          números, sin sacarla de la lista ni del papel. */}
+      <tr onClick={onToggle}
+        className={`cursor-pointer border-b border-gray-100 transition hover:bg-gray-50${
+          esSinMarcas(p) ? " bg-gray-50/70 text-gray-500" : ""
+        }`}>
+        {/* El NOMBRE manda; el código va chico al lado, y solo si aporta algo.
+            Sin nombre configurado se muestra el código —nunca un blanco— y se
+            dice qué falta, porque un número suelto no se le reclama a nadie. */}
+        <td className="px-3 py-2.5 text-gray-900">
+          {/* 🔴 LA CASILLA VA DENTRO DE «Colaborador», no en una columna nueva:
+              la tabla tiene once y agregar una doceava la aprieta en el iPad.
+              `stopPropagation` porque tocar la fila la despliega — marcar y
+              abrir son dos cosas distintas. */}
+          <input
+            type="checkbox"
+            checked={seleccionada}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => { e.stopPropagation(); onSeleccionar(p.codigo); }}
+            aria-label={`Seleccionar ${persona}`}
+            className="mr-2 h-4 w-4 cursor-pointer align-middle accent-black"
+          />
+          {/* 🔴 El código va DELANTE del nombre (24-sep-2026) y la hora de
+              salida, en burbuja: así el nombre arranca siempre en el mismo
+              punto y la columna «Sale» deja de existir. */}
+          {codigoIzquierda}
+          {persona}
+          {burbujaSalida}
+          {!ASISTENCIA_PANTALLA_2026_09 && (p.nombre ? (
+            <span className="ml-1.5 text-xs text-gray-400">{p.codigo}</span>
+          ) : (
+            <span className="ml-1.5 text-xs text-amber-700">falta configurar</span>
+          ))}
+          {ASISTENCIA_PANTALLA_2026_09 && !p.nombre && (
+            <span className="ml-1.5 text-xs text-amber-700">falta configurar</span>
+          )}
+          {/* 🔴 Dice por qué esta fila está vacía: no marcó. Sin esto se lee
+              igual que alguien que trabajó y no tiene nada anotado. */}
+          {esSinMarcas(p) && (
+            <span className="ml-1.5 whitespace-nowrap rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600">
+              {TEXTO_SIN_MARCAS}
+            </span>
+          )}
+          {/* 🔴 Dice por qué esta fila sigue acá con el filtro prendido. */}
+          {anclada && (
+            <span title={TITULO_ANCLADA}
+              className="ml-1.5 whitespace-nowrap rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600">
+              {ROTULO_ANCLADA}
+            </span>
+          )}
+          {/* 🔴 Se ve SIN abrir nada: los minutos de esta fila ya salen de una
+              hora que alguien escribió a mano. */}
+          {r.diasCorregidos > 0 && (
+            <span className="ml-1.5 whitespace-nowrap rounded bg-blue-50 px-1.5 py-0.5 text-xs font-semibold text-blue-700">
+              {r.diasCorregidos} {r.diasCorregidos === 1 ? "día corregido" : "días corregidos"}
+            </span>
+          )}
+          {/* 🔴 Se ve SIN abrir nada. Sin este chip, quien trabajó todo el mes
+              fuera de la oficina aparece con «0 días trabajados» y ninguna
+              explicación: idéntico a alguien que simplemente no vino. */}
+          {r.diasTrabajandoFuera > 0 && (
+            <span className="ml-1.5 whitespace-nowrap rounded bg-gray-100 px-1.5 py-0.5 text-xs font-semibold text-gray-700">
+              {r.diasTrabajandoFuera} {r.diasTrabajandoFuera === 1 ? "día" : "días"} trabajando fuera
+            </span>
+          )}
+        </td>
+        {!ASISTENCIA_PANTALLA_2026_09 && (
+          <td className="px-2 py-2.5 text-center tabular-nums text-gray-500">{p.salida}</td>
+        )}
+        <td className="px-2 py-2.5 text-right tabular-nums text-gray-700">{r.diasTrabajados}</td>
+        <td className="px-2 py-2.5 text-right">{r.ausenciasSinJustificar
+          ? <span className="font-semibold tabular-nums text-red-700">{r.ausenciasSinJustificar}</span>
+          : <span className="text-gray-300">—</span>}</td>
+        <td className="px-2 py-2.5 text-right text-gray-700">{n(r.vecesTarde)}</td>
+        <td className="px-2 py-2.5 text-right">{r.minutosTarde
+          ? <span className="font-medium tabular-nums text-amber-700">{fmtMin(r.minutosTarde)}</span>
+          : <span className="text-gray-300">—</span>}</td>
+        <td className="px-2 py-2.5 text-right text-gray-700">{n(r.excesoAlmuerzoMin)}</td>
+        <td className="px-2 py-2.5 text-right text-gray-700">{n(r.salidaTempranaMin)}</td>
+        <td className="px-2 py-2.5 text-right font-semibold text-gray-900">{n(r.tiempoNoTrabajadoMin)}</td>
+        {/* 🔴 El servicio profesional NO cuenta horas extra (3-sep-2026,
+            Daniel: *«es solo para ver sus tardanzas y ausencias»*): raya, no 0
+            ni el número que midió el reloj. Tardanza y ausencia, intactas. */}
+        {/* 🔴 LOS MINUTOS MEDIDOS ARRIBA Y LO DECIDIDO DEBAJO (16-sep-2026).
+            Daniel, preguntado si tenía que decir las dos cosas: *«Si»*. 🩸 La
+            celda mostraba lo que midió el reloj y se leía como plata que se va
+            a pagar — la planilla paga SOLO lo aprobado. El texto sale del
+            módulo puro `extras-decididas.ts`. */}
+        <td className="px-2 py-2.5 text-right text-gray-700" title={cuentaHorasExtra(p) && r.extraMin > 0 ? tituloExtrasDecididas(extras) : undefined}>
+          {cuentaHorasExtra(p) ? n(r.extraMin) : sinExtra()}
+          {cuentaHorasExtra(p) && textoExtrasDecididas(extras) && (
+            <span className="block text-[11px] font-normal text-gray-500">{textoExtrasDecididas(extras)}</span>
+          )}
+        </td>
+        {/* 🔴 EL NÚMERO LLEVA AL DÍA (18-sep-2026). Daniel: *«opcion a con
+            mockup»*. 🩸 Era un número MUERTO: decía cuántos días había que
+            revisar y para saber CUÁLES había que abrir a la persona y recorrer
+            los once días del período, en 34 fichas.
+            🔴 CON 0 DÍAS NO HAY ENLACE: va el guion de siempre. Un enlace que
+            abre una lista vacía es peor que no tenerlo.
+            ⚠️ Es un `<a>` de verdad —se puede copiar y abrir en otra pestaña—,
+            y el clic normal lo resuelve en el acto, sin recargar la pantalla. */}
+        <td className="px-2 py-2.5 text-right">{r.diasARevisar
+          ? (
+            <a
+              href={enlaceDiasARevisarDe(p.codigo, rango)}
+              title={TITULO_NUMERO}
+              onClick={(e) => {
+                // Con Cmd/Ctrl/medio se deja pasar: abrir en otra pestaña es
+                // una forma legítima de usar el enlace.
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                e.preventDefault();
+                e.stopPropagation();
+                onVerDiasARevisar();
+              }}
+              className="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-700 underline decoration-dotted underline-offset-2 transition hover:bg-amber-100 hover:text-amber-900"
+            >
+              {r.diasARevisar}
+            </a>
+          )
+          : <span className="text-gray-300">—</span>}</td>
+      </tr>
+
+      {abierta && detalleDeLosDias}
     </>
   );
 }
@@ -1343,10 +1666,17 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
   // 🔴 Ni en un día que no era suyo (15-sep-2026): no hay nada que justificar
   //    en un día anterior al ingreso o posterior a la salida.
   const seJustifica = !d.feriado && !d.vacacion && !d.justificado && !d.fueraDeVigencia;
+  // 🔴 2d — UN DÍA QUE TODAVÍA NO LLEGÓ NO OFRECE NADA QUE ARREGLAR. Es
+  // ESTRICTAMENTE futuro: hoy sí se puede arreglar, que para eso está.
+  const diaFuturo = ASISTENCIA_PANTALLA_2026_09 && d.enCurso && d.fecha > hoyPanama();
+  /** Las acciones del día: se ven al pasar el mouse y con el foco del teclado. */
+  const alPasarElMouse = ASISTENCIA_PANTALLA_2026_09
+    ? "opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+    : "";
   const justificar = () => onJustificar({ codigo, persona, empresa, fecha: d.fecha });
-  const enlaceJustificar = (
+  const enlaceJustificar = diaFuturo ? null : (
     <button type="button" onClick={justificar}
-      className="ml-1.5 min-h-[44px] rounded px-1 text-xs text-gray-500 underline decoration-dotted underline-offset-2 transition hover:text-black">
+      className={`ml-1.5 min-h-[44px] rounded px-1 text-xs text-gray-500 underline decoration-dotted underline-offset-2 hover:text-black ${alPasarElMouse}`}>
       Justificar
     </button>
   );
@@ -1492,7 +1822,12 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
 
   return (
     <>
-      <tr className={`border-b border-gray-100 ${d.revisar ? "bg-amber-50/60" : ""} ${d.correcciones.length ? "bg-blue-50/40" : ""}`}>
+      {/* 🔴 2d — LAS ACCIONES SALEN AL PASAR EL MOUSE (24-sep-2026). 🩸 Un
+          colaborador abierto tenía **32 cosas para tocar**; doce de ellas en
+          días que todavía no llegaron. `group` + `focus-within` para que el
+          teclado las siga alcanzando: esconderlas del tabulador sería sacarlas
+          de verdad. */}
+      <tr className={`group border-b border-gray-100 ${d.revisar ? "bg-amber-50/60" : ""} ${d.correcciones.length ? "bg-blue-50/40" : ""}`}>
         <td className="whitespace-nowrap px-2 py-1.5 text-gray-700">{fechaCorta(d.fecha)}</td>
         {/* 🔴 CON EL EDITOR ABIERTO SIEMPRE VAN LAS CUATRO COLUMNAS, aunque el
             día no tenga ni una marca: el caso más común es justamente ése —quien
@@ -1641,9 +1976,9 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
               )}
               {/* Agregar la marca que falta. Es el caso más común de todos: quien
                   olvidó marcar no tiene nada que corregir. */}
-              {puedeCorregir && !d.fueraDeVigencia && !editando && (
+              {puedeCorregir && !d.fueraDeVigencia && !editando && !diaFuturo && (
                 <button type="button" onClick={() => (seEdita ? abrirEditor() : agregar())}
-                  className="ml-1.5 min-h-[44px] rounded px-1 text-xs text-gray-500 underline decoration-dotted underline-offset-2 transition hover:text-black">
+                  className={`ml-1.5 min-h-[44px] rounded px-1 text-xs text-gray-500 underline decoration-dotted underline-offset-2 hover:text-black ${alPasarElMouse}`}>
                   {seEdita ? "Arreglar el día" : "Agregar hora"}
                 </button>
               )}
@@ -1697,9 +2032,9 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
               // lo que se paga. Ver `sin-marcas.ts`.
               : sinMarcas ? <span className="text-gray-500">{TEXTO_DIA_SIN_MARCAS}</span>
               : <span className="font-medium text-red-700">Ausencia sin justificar</span>}
-            {puedeCorregir && !d.feriado && !d.fueraDeVigencia && !editando && (
+            {puedeCorregir && !d.feriado && !d.fueraDeVigencia && !editando && !diaFuturo && (
               <button type="button" onClick={() => (seEdita ? abrirEditor() : agregar())}
-                className="ml-2 min-h-[44px] rounded px-1 text-xs text-gray-500 underline decoration-dotted underline-offset-2 transition hover:text-black">
+                className={`ml-2 min-h-[44px] rounded px-1 text-xs text-gray-500 underline decoration-dotted underline-offset-2 hover:text-black ${alPasarElMouse}`}>
                 {seEdita ? "Arreglar el día" : "Agregar marcación"}
               </button>
             )}

@@ -120,6 +120,10 @@ import { puedeCerrar } from "@/lib/asistencia/roles";
 import { textoConfirmar, textoIgnorados } from "@/lib/asistencia/codigos-ignorados";
 // 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
+// 🔴 5c — la tabla directa, una fila de mandos y el código a la izquierda.
+// 🔴 7b — en el celular, la lista agrupada por empresa.
+import { ASISTENCIA_PANTALLA_2026_09, anchoDelCodigo } from "@/lib/asistencia/pantalla-2026-09";
+import { aparatoDeQuienMira } from "@/lib/aparato";
 import BuscadorDeLista, { VacioDeBusqueda } from "@/components/BuscadorDeLista";
 import {
   LIMPIAR_BUSQUEDA,
@@ -849,6 +853,29 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
     [porChip, busqueda],
   );
   const buscando = busqueda.trim() !== "";
+  /** 🔴 El aparato de quien mira, por el DEDO. */
+  const [celular, setCelular] = useState(false);
+  useEffect(() => {
+    if (ASISTENCIA_PANTALLA_2026_09) setCelular(aparatoDeQuienMira() === "celular");
+  }, []);
+  /** 🔴 7b — en el celular la lista va agrupada por empresa. */
+  const agrupadaPorEmpresa = ASISTENCIA_PANTALLA_2026_09 && celular;
+  const visiblesEnPantalla = useMemo(() => {
+    if (!agrupadaPorEmpresa) return visibles;
+    // 🔑 Orden ESTABLE: primero la empresa, después el nombre tal como se ve.
+    // No se agrega ni se quita a nadie: es la misma lista, en otro orden.
+    return [...visibles].sort((a, b) => {
+      const ea = a.empresa ? etiquetaEmpresa(a.empresa) : "\uffff";
+      const eb = b.empresa ? etiquetaEmpresa(b.empresa) : "\uffff";
+      if (ea !== eb) return ea.localeCompare(eb, "es");
+      return String(a.nombre ?? a.codigo).localeCompare(String(b.nombre ?? b.codigo), "es");
+    });
+  }, [visibles, agrupadaPorEmpresa]);
+  /** 🔴 5c — el ancho del código más largo, para que el nombre arranque igual. */
+  const anchoCodigo = useMemo(
+    () => (ASISTENCIA_PANTALLA_2026_09 ? anchoDelCodigo(visibles.map((x) => x.codigo)) : 0),
+    [visibles],
+  );
 
   // UN solo aviso, con el desglose adentro. Antes eran dos carteles ámbar
   // apilados que decían casi lo mismo y competían entre ellos.
@@ -896,6 +923,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
             }
             alerta={pendientes > 0}
             abierta={!!seccion.personas}
+            sinTarjeta={ASISTENCIA_PANTALLA_2026_09 && personaEnElCentro}
             onToggle={() => alternar("personas")}
           >
             {/* Cómo se llena la lista se aprende una vez: al ⓘ. Lo que sí pide
@@ -967,7 +995,21 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
               </p>
             )}
 
-            <div className="flex flex-wrap gap-2">
+            {/* 🔴 5c — UNA SOLA FILA DE MANDOS (24-sep-2026): el buscador, los
+                chips y «+ Nuevo colaborador». 🩸 Eran tres bloques apilados y
+                los dos botones NEGROS —«Todos (44)», que es un filtro, y
+                «+ Nuevo colaborador», que es una acción— ocupaban un renglón
+                entero cada uno. */}
+            <div className={ASISTENCIA_PANTALLA_2026_09 ? "flex flex-wrap items-center gap-2" : "flex flex-wrap gap-2"}>
+              {ASISTENCIA_PANTALLA_2026_09 && (
+                <BuscadorDeLista
+                  valor={busqueda}
+                  onCambiar={setBusqueda}
+                  placeholder={PLACEHOLDER_COLABORADOR}
+                  etiqueta="Buscar colaborador por nombre o código"
+                  conteo={textoDeConteo(visibles.length, porChip.length, busqueda)}
+                />
+              )}
               <button type="button" onClick={() => setFiltro("todos")}
                 className={`${PILL_BASE} ${filtro === "todos" ? PILL_ON : PILL_OFF}`}>
                 Todos ({datos.resumen.total})
@@ -988,12 +1030,19 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
               )}
               {/* 🔴 Los chips de empresa SE FUERON (10-sep-2026): la empresa se
                   elige UNA vez arriba de las pestañas, para todo el módulo. */}
-            </div>
 
             {/* 🔴 DAR DE ALTA A ALGUIEN ABRE DIRECTO EN EDITAR. Mostrarle una
                 ficha vacía en modo texto y pedirle además que toque «Editar»
                 es un paso de más para decir lo que la pantalla ya sabe. */}
-            {personaEnElCentro && puedeTocarLaFicha && (
+              {ASISTENCIA_PANTALLA_2026_09 && personaEnElCentro && puedeTocarLaFicha && (
+                <Link href={RUTA_PERSONA_NUEVA}
+                  className="ml-auto inline-flex min-h-[44px] items-center rounded-md bg-black px-3 text-sm text-white transition active:scale-[0.97]">
+                  + Nuevo colaborador
+                </Link>
+              )}
+            </div>
+
+            {!ASISTENCIA_PANTALLA_2026_09 && personaEnElCentro && puedeTocarLaFicha && (
               <div>
                 <Link href={RUTA_PERSONA_NUEVA}
                   className="inline-flex min-h-[44px] items-center rounded-md bg-black px-3 text-sm text-white transition active:scale-[0.97]">
@@ -1005,13 +1054,15 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
             {/* 🔴 EL BUSCADOR, pegado a la lista y debajo de los chips: con 42
                 filas, llegar a alguien era rodar la pantalla. Filtra lo que ya
                 está cargado; no le pregunta nada al servidor. */}
-            <BuscadorDeLista
-              valor={busqueda}
-              onCambiar={setBusqueda}
-              placeholder={PLACEHOLDER_COLABORADOR}
-              etiqueta="Buscar colaborador por nombre o código"
-              conteo={textoDeConteo(visibles.length, porChip.length, busqueda)}
-            />
+            {!ASISTENCIA_PANTALLA_2026_09 && (
+              <BuscadorDeLista
+                valor={busqueda}
+                onCambiar={setBusqueda}
+                placeholder={PLACEHOLDER_COLABORADOR}
+                etiqueta="Buscar colaborador por nombre o código"
+                conteo={textoDeConteo(visibles.length, porChip.length, busqueda)}
+              />
+            )}
 
             {buscando && visibles.length === 0 && (
               <VacioDeBusqueda texto={VACIO_BUSQUEDA} onLimpiar={() => setBusqueda("")} rotulo={LIMPIAR_BUSQUEDA} />
@@ -1032,7 +1083,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                   <span>Qué falta</span>
                 </div>
 
-                {visibles.map((p) => {
+                {visiblesEnPantalla.map((p, iFila) => {
                   const falta = faltaEnPersona(p);
                   // 🔴 LA COLUMNA «Qué falta» (10-sep-2026): lo de pagar en rojo,
                   // lo de completar en gris, vacía cuando no falta nada. Sale
@@ -1051,7 +1102,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                       {/* ── ESCRITORIO: columnas alineadas ── */}
                       <span className={`hidden ${rejilla}`}>
                         <span className="min-w-0">
-                          <NombrePersona p={p} />
+                          <NombrePersona p={p} anchoCodigo={anchoCodigo} />
                           {excepciones.length > 0 && (
                             <span className="mt-1 flex flex-wrap gap-1">
                               {excepciones.map((e) => (
@@ -1094,8 +1145,22 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                     </>
                   );
 
+                  /* 🔴 7b — EN EL CELULAR, AGRUPADA POR EMPRESA (24-sep-2026).
+                     El encabezado aparece cuando cambia la empresa; en la
+                     computadora no se dibuja ninguno y la lista es la de
+                     siempre, con su columna «Empresa». */
+                  const grupo = agrupadaPorEmpresa
+                    && (iFila === 0 || (visiblesEnPantalla[iFila - 1]?.empresa ?? "") !== (p.empresa ?? ""))
+                    ? (p.empresa ? etiquetaEmpresa(p.empresa) : "Sin empresa")
+                    : null;
+
                   return (
                     <div key={p.codigo} className="border-b border-gray-100 last:border-0">
+                      {grupo && (
+                        <p className="bg-gray-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                          {grupo}
+                        </p>
+                      )}
                       {personaEnElCentro ? (
                         /* 🔴 LA FILA LLEVA A SU PÁGINA. Es un enlace de verdad
                            —no un `onClick` con `router.push`— para que se pueda
@@ -1837,7 +1902,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
  * vez que alguien entra a Configuración, aunque venga solo a poner un salario.
  */
 function Seccion({
-  titulo, resumen, alerta, abierta, onToggle, children,
+  titulo, resumen, alerta, abierta, onToggle, children, sinTarjeta = false,
 }: {
   titulo: string;
   resumen: string;
@@ -1845,7 +1910,24 @@ function Seccion({
   abierta: boolean;
   onToggle: () => void;
   children: React.ReactNode;
+  /**
+   * 🔴 5c — LA TABLA, DIRECTA (24-sep-2026). 🩸 La lista de colaboradores vivía
+   * dentro de una tarjeta plegable que repetía el título de la pestaña
+   * («Colaboradores» arriba de «Colaboradores») y se podía cerrar sin querer,
+   * dejando la pestaña en blanco. Las otras tres secciones —Horarios, Feriados
+   * y Reglas— siguen plegadas al pie, exactamente como hoy.
+   */
+  sinTarjeta?: boolean;
 }) {
+  if (sinTarjeta) {
+    return (
+      <section className="space-y-3">
+        <h2 className="sr-only">{titulo}</h2>
+        <p className={`text-[12px] ${alerta ? "text-amber-700" : "text-gray-500"}`}>{resumen}</p>
+        {children}
+      </section>
+    );
+  }
   return (
     <section className="overflow-hidden rounded-lg border border-gray-200 bg-white">
       <button type="button" onClick={onToggle} aria-expanded={abierta}
@@ -1868,12 +1950,30 @@ function Seccion({
 /** El nombre, con el código al lado. Sin nombre se muestra EL CÓDIGO —el dato
  *  que sí existe y el que está pegado al reloj—, nunca «Sin nombre»: dos filas
  *  seguidas se veían idénticas. */
-function NombrePersona({ p }: { p: { nombre: string | null; codigo: string; marcaciones: number; ultimaMarca: string | null } }) {
+function NombrePersona({ p, anchoCodigo = 0 }: {
+  p: { nombre: string | null; codigo: string; marcaciones: number; ultimaMarca: string | null };
+  /**
+   * 🔴 5c — EL CÓDIGO A LA IZQUIERDA (24-sep-2026). Daniel: *«el código a la
+   * izquierda del nombre»*, el MISMO cambio que en la tabla de Asistencia. Los
+   * códigos van de uno a tres dígitos (2 · 3 · 301…): se reserva el ancho del
+   * más largo y así el nombre arranca siempre en el mismo punto.
+   * `0` = como antes, el código detrás del nombre.
+   */
+  anchoCodigo?: number;
+}) {
   return (
     <span className="block min-w-0">
       <span className="block truncate text-sm text-gray-900">
+        {anchoCodigo > 0 && (
+          <span
+            className="mr-2 inline-block text-right align-middle text-xs tabular-nums text-gray-400"
+            style={{ minWidth: `${anchoCodigo}ch` }}
+          >
+            {p.codigo}
+          </span>
+        )}
         {p.nombre ? capitalizarNombre(p.nombre) : `Código ${p.codigo}`}
-        {p.nombre && <span className="ml-1.5 text-xs text-gray-400">código {p.codigo}</span>}
+        {anchoCodigo === 0 && p.nombre && <span className="ml-1.5 text-xs text-gray-400">código {p.codigo}</span>}
       </span>
       <span className="block truncate text-[11px] text-gray-400">
         {p.marcaciones} marcaciones{p.ultimaMarca ? ` · última ${p.ultimaMarca}` : ""}
