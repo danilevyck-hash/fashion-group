@@ -243,17 +243,32 @@ describe("🔴 Editar y Anular se ven y se tocan; el borrado definitivo se fue",
 // 5. La X de la foto en el celular
 // ════════════════════════════════════════════════════════════════════════════
 describe("🔴 desde el celular SÍ se puede borrar una foto subida por error", () => {
-  it("la X no está escondida tras el hover y mide 44 px", async () => {
+  // 🩸 Hasta el 24-sep-2026 acá se exigía que la × estuviera SIEMPRE visible en
+  // el celular: con `opacity-0` era invisible al dedo y el primer toque abría
+  // la foto grande — no había forma de borrar una foto subida por error.
+  //
+  // 🔴 Daniel eligió la opción 13b del mockup del celular: la cuadrícula queda
+  // limpia y la × aparece al tocar **«Editar»**, como en Fotos del iPhone. La
+  // protección no se aflojó —se sigue pudiendo borrar con el dedo, y el área
+  // táctil sigue siendo de 44 px—: se ató al botón «Editar» en vez de al hover.
+  it("la × se prende con «Editar» (13b), no con el hover, y mide 44 px", async () => {
     render(
       <ToastProvider>
         <FotosSection proyectoId="p1" />
       </ToastProvider>,
     );
     const x = await screen.findByRole("button", { name: "Eliminar foto" });
-    // `opacity-0` sólo puede venir con prefijo de breakpoint (`sm:opacity-0`).
-    expect(x.className).not.toMatch(/(?:^|\s)opacity-0(?:\s|$)/);
-    expect(x.className).toMatch(/(?:^|\s)opacity-100(?:\s|$)/);
+    // El hover sigue SIN ser la puerta del celular: el `opacity-0` que queda
+    // lleva prefijo `sm:`, o sea que es de la computadora.
+    expect(x.className).toMatch(/sm:group-hover:opacity-100/);
     expect(/(?:^|\s)(?:w-11|h-11)(?:\s|$)/.test(x.className)).toBe(true);
+
+    // Antes de tocar «Editar» la × no se puede tocar; después, sí.
+    expect(x.className).toMatch(/(?:^|\s)pointer-events-none(?:\s|$)/);
+    fireEvent.click(screen.getByRole("button", { name: "Editar" }));
+    const y = await screen.findByRole("button", { name: "Eliminar foto" });
+    expect(y.className).toMatch(/(?:^|\s)opacity-100(?:\s|$)/);
+    expect(y.className).not.toMatch(/(?:^|\s)pointer-events-none(?:\s|$)/);
   });
 });
 
