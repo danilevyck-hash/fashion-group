@@ -16,6 +16,8 @@ import { usePublicarAlturaEncabezado } from "@/lib/hooks/usePublicarAlturaEncabe
 import { Z_ENCABEZADO } from "@/lib/ui/barra-pegajosa";
 import { etiquetaDeRol } from "@/lib/roles-etiquetas";
 import { BotonCambiarContrasena } from "@/components/CambiarContrasena";
+import { esRolMarcacion } from "@/lib/marcacion/rol";
+import { MARCACION_UN_TOQUE } from "@/lib/marcacion/un-toque";
 
 // Cómo se llama cada rol: UN solo lugar, `lib/roles-etiquetas.ts` (11-sep-2026).
 
@@ -81,6 +83,12 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
   // Roles fuera de /api/search (ej. gerente_acs): ocultar también el botón de
   // lupa móvil — abriría un overlay vacío (SearchBar se auto-oculta).
   const canSearch = !userRole || SEARCH_ROLES.includes(userRole);
+  // 🔴 QUIEN SOLO MARCA NO VE CAMPANA, LUPA NI MENÚ (24-sep-2026). Son tres
+  // botones de 44×44 que no le sirven: la lupa ya se le escondía
+  // (`SEARCH_ROLES`), pero la campana no le avisa de nada y el menú lleva a una
+  // lista de UN ítem — su único módulo. Es por ROL, no por «tener un módulo
+  // solo»: `admin` prueba esta misma pantalla y la ve completa.
+  const soloMarca = MARCACION_UN_TOQUE && esRolMarcacion(userRole);
 
   async function handleLogout() {
     // Se ESPERA la revocación antes de navegar (3-sep-2026): la pantalla de
@@ -128,7 +136,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
           <div className="hidden sm:block">
             <SearchBar compact />
           </div>
-          <div className="hidden sm:block"><NotificationCenter /></div>
+          {!soloMarca && <div className="hidden sm:block"><NotificationCenter /></div>}
           {/* Desktop: user info */}
           {userName && (
             <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
@@ -152,15 +160,17 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
               iPhone): este header sale en las 22 páginas, así que cada píxel
               que falte acá se multiplica por toda la app. La campana decide su
               propio tamaño y ya no admite uno chico — ver NotificationCenter. */}
-          <div className="sm:hidden"><NotificationCenter /></div>
-          {canSearch && (
+          {!soloMarca && <div className="sm:hidden"><NotificationCenter /></div>}
+          {canSearch && !soloMarca && (
             <button onClick={() => setMobileSearchOpen(true)} aria-label="Buscar" className="sm:hidden min-w-[44px] min-h-[44px] flex items-center justify-center">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             </button>
           )}
+          {!soloMarca && (
           <button onClick={() => setDrawerOpen(true)} aria-label="Abrir menú de módulos" className="sm:hidden min-w-[44px] min-h-[44px] flex items-center justify-center -mr-1">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
+          )}
         </div>
         {/* Breadcrumb bar único — desktop only, siempre visible. hideBreadcrumbBar queda como escape hatch.
             Todos los segmentos excepto el último son clicables. El último (página actual) es texto plano. */}
