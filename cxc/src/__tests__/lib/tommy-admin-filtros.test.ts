@@ -127,7 +127,13 @@ describe("🔴 cabe en un iPhone", () => {
   it("la fila de filtros envuelve en vez de arrastrar la página", () => {
     // Verificado en el navegador: 0 px de arrastre en 390 · 834 · 1440.
     expect(shell).toContain('<div className="flex flex-wrap items-center gap-2 mb-4">');
-    expect(shell).toContain('<div className="flex flex-wrap items-center gap-2 mb-3">');
+    // 🔴 24-sep-2026: la fila de CHIPS es la excepción, y es una decisión de
+    // Daniel. Hasta `sm` se desliza de lado en vez de partirse en dos renglones
+    // (medidos en los píxeles 623 y 675: **52 px** de más), y de `sm` para
+    // arriba vuelve a envolver, que es lo que se midió el 6-sep. El literal de
+    // antes se conserva como la rama del interruptor apagado.
+    expect(shell).toContain('"flex flex-wrap items-center gap-2 mb-3"');
+    expect(shell).toContain("sm:flex-wrap sm:overflow-x-visible");
   });
 });
 

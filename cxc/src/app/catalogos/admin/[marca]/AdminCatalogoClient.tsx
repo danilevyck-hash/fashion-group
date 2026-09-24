@@ -45,6 +45,7 @@ import {
 } from "@/lib/catalogos/admin-chips";
 import { colaSinFoto } from "@/lib/catalogos/fotos-faltantes";
 import { coincideBusqueda, ordenarParaTrabajar } from "@/lib/catalogos/admin-lista";
+import { CATALOGO_ORDEN_CELULAR, FILA_QUE_SE_DESLIZA } from "@/lib/catalogo/orden-celular";
 
 /** Respuesta de GET /products/variantes (sin `sku`): el mapa completo de la marca. */
 interface VariantesResp {
@@ -314,7 +315,15 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
             </div>
 
             {/* UNA fila de chips, con el número adentro. */}
-            <div className="flex flex-wrap items-center gap-2 mb-3">
+            {/* 🔴 EN EL CELULAR, UNA FILA QUE SE DESLIZA (24-sep-2026): los
+                cinco chips de Reebok (Todos 220 · Calzado 150 · Ropa 54 ·
+                Accesorios 16 · Escondidos 1) caían en DOS renglones —medidos en
+                los píxeles 623 y 675—; en una fila que se desliza de lado son
+                **52 px menos**. De `sm` para arriba vuelven a envolver, que es
+                lo medido el 6-sep (0 px de arrastre a 834 y 1440). */}
+            <div className={CATALOGO_ORDEN_CELULAR
+              ? `${FILA_QUE_SE_DESLIZA} items-center mb-3 sm:flex-wrap sm:overflow-x-visible`
+              : "flex flex-wrap items-center gap-2 mb-3"}>
               {chips.map((c) => (
                 <button
                   key={c.key}

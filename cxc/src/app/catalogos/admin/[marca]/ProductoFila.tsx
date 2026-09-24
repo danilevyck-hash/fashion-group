@@ -32,6 +32,7 @@ import { getMarcaTheme, type AdminProducto, type MarcaUiKey } from "@/lib/catalo
 import { fmtPrecio } from "@/lib/catalogo/precio";
 import { estaEscondido, tieneFoto } from "@/lib/catalogos/admin-chips";
 import { disponibleDe } from "@/lib/catalogos/admin-lista";
+import { CATALOGO_ORDEN_CELULAR, lineaDeExistencias } from "@/lib/catalogo/orden-celular";
 
 /** Los tipos que acepta el selector de foto de la fila — enumerados y no con el
  *  comodín de imagen, por el mismo motivo que en `SubirFotos.tsx`. */
@@ -107,6 +108,19 @@ export default function ProductoFila({
       }`}
     >
       <div className="flex flex-wrap sm:flex-nowrap items-center gap-3">
+        {/* 🔴 EN EL CELULAR, UNA FILA POR PRODUCTO (24-sep-2026).
+            🩸 Medido: **15 pares de textos encimados** en una sola pantalla.
+            «En bodega: 14» caía encima de «Subir otra» (34 × 37 px) y de
+            «Esconder» (9 × 37 px); «Disponible: 14» tapaba «Subir otra» 42 × 28
+            px. Pasaba en las **220** filas de Reebok y en las **81** de Joybees
+            (en Tommy y Calvin, cero). La causa: la columna de datos es `flex-1`
+            —base 0—, así que NUNCA forzaba el salto de línea: se encogía por
+            debajo de su contenido y el texto se derramaba sobre los botones.
+            El arreglo es de LUGAR: hasta `sm`, la foto y los datos van juntos en
+            una fila de ancho completo y los botones bajan enteros debajo.
+            `sm:contents` hace que este envoltorio DESAPAREZCA de `sm` para
+            arriba: la computadora queda exactamente igual que hoy. */}
+        <div className={CATALOGO_ORDEN_CELULAR ? "flex w-full min-w-0 items-center gap-3 sm:contents" : "contents"}>
         {/* Miniatura */}
         <div className="relative w-[88px] h-[88px] shrink-0 rounded-md overflow-hidden bg-gray-100">
           {tieneFoto(product) ? (
@@ -138,22 +152,43 @@ export default function ProductoFila({
               <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-700 text-white">Escondido</span>
             )}
           </div>
-          <div className="flex items-center gap-3 mt-1 text-xs">
+          {/* 🔴 LOS DOS NÚMEROS, EN UNA LÍNEA (24-sep-2026): «Disponible 14 · En
+              bodega 14», con los mismos valores de siempre. El `flex-wrap` y el
+              `whitespace-nowrap` son la segunda red: aunque el renglón no entre,
+              baja de línea en vez de derramarse sobre los botones. */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-xs">
             {product.price != null && (
-              <span className="font-bold text-gray-900 tabular-nums">{fmtPrecio(product.price)}</span>
+              <span className="font-bold text-gray-900 tabular-nums whitespace-nowrap">{fmtPrecio(product.price)}</span>
             )}
-            <span className={`tabular-nums ${agotado ? "text-gray-400" : "text-gray-700"}`}>
-              {agotado ? "Agotado" : `Disponible: ${disponible}`}
-            </span>
-            {product.existencia != null && (
-              <span className="text-gray-400 tabular-nums">En bodega: {product.existencia}</span>
+            {CATALOGO_ORDEN_CELULAR ? (
+              <span className={`tabular-nums whitespace-nowrap ${agotado ? "text-gray-400" : "text-gray-700"}`}>
+                {agotado
+                  ? ["Agotado", lineaDeExistencias(null, product.existencia)].filter((t) => t !== "").join(" · ")
+                  : lineaDeExistencias(disponible, product.existencia)}
+              </span>
+            ) : (
+              <>
+                <span className={`tabular-nums ${agotado ? "text-gray-400" : "text-gray-700"}`}>
+                  {agotado ? "Agotado" : `Disponible: ${disponible}`}
+                </span>
+                {product.existencia != null && (
+                  <span className="text-gray-400 tabular-nums">En bodega: {product.existencia}</span>
+                )}
+              </>
             )}
           </div>
           {error && <p className="text-[11px] text-red-600 leading-tight mt-1">{error}</p>}
         </div>
+        </div>
 
         {/* Acciones */}
-        <div className="shrink-0 flex flex-wrap items-center gap-2">
+        {/* 🔴 LOS DOS BOTONES, MITAD Y MITAD (24-sep-2026): en el celular la caja
+            se lleva el ancho completo y reparte, así que «Subir otra» y
+            «Esconder» dejan de ser una lotería. De `sm` para arriba, la fila de
+            siempre. */}
+        <div className={CATALOGO_ORDEN_CELULAR
+          ? "shrink-0 grid w-full grid-cols-2 items-center gap-2 sm:flex sm:w-auto sm:flex-wrap"
+          : "shrink-0 flex flex-wrap items-center gap-2"}>
           <input
             ref={inputRef}
             type="file"
@@ -188,7 +223,9 @@ export default function ProductoFila({
           )}
 
           {confirmando ? (
-            <span className="flex items-center gap-1.5 text-xs">
+            <span className={CATALOGO_ORDEN_CELULAR
+              ? "col-span-2 flex items-center gap-1.5 text-xs sm:col-auto"
+              : "flex items-center gap-1.5 text-xs"}>
               <span className="text-gray-500 whitespace-nowrap">
                 {escondido ? "¿Mostrar en el catálogo?" : "¿Esconder del catálogo?"}
               </span>
