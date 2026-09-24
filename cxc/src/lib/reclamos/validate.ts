@@ -94,7 +94,7 @@ export function validateReclamoFull(h: ReclamoHeaderInput, items: unknown): stri
   return validateReclamoHeader(h) ?? validateReclamoItems(items);
 }
 
-export const FALTA_PDF = "Falta el PDF de la factura.";
+export const FALTA_PDF = "Falta la factura: sube el PDF o una foto.";
 
 /**
  * Al CREAR un reclamo el PDF de la factura es OBLIGATORIO (Daniel, 10-sep-2026:

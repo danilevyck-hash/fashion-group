@@ -23,6 +23,7 @@ import ReclamoDetail from "@/app/reclamos/components/ReclamoDetail";
 import { emptyItem } from "@/app/reclamos/components/constants";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { diasDesde } from "@/lib/reclamos/dias";
+import { FALTA_PDF } from "@/lib/reclamos/validate";
 import type { Reclamo } from "@/app/reclamos/components/types";
 
 // jsdom en este Node no trae localStorage: el AppHeader lo lee en un efecto
@@ -211,7 +212,7 @@ describe("nuevo reclamo", () => {
   it("🔴 sin PDF no se guarda, y se dice qué falta; sin «Paso 1 de 4»", () => {
     pintar({ facturaPdfPath: null });
     expect((screen.getByRole("button", { name: "Guardar reclamo" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText("Falta el PDF de la factura.")).toBeTruthy();
+    expect(screen.getByText(FALTA_PDF)).toBeTruthy();
     expect(document.body.textContent).not.toContain("Paso 1 de 4");
     expect(document.body.textContent).not.toContain("Mostrar todos los campos");
   });

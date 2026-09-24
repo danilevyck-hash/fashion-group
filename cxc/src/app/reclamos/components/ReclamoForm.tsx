@@ -124,9 +124,9 @@ export default function ReclamoForm({
           el PDF que no va a tener que teclear proveedor, marca, factura, fecha
           ni pedido. Va bajo el título, en gris, y el ⓘ se retira. */}
       <div className="mb-10">
-        <div className="text-sm font-semibold text-gray-900">Factura del proveedor (PDF) *</div>
+        <div className="text-sm font-semibold text-gray-900">Factura del proveedor *</div>
         <p className="text-sm text-gray-500 mt-1 mb-3 max-w-xl">
-          Sube el PDF y se llenan solos el proveedor, la marca, la factura, la fecha y el pedido, más los renglones para que marques cuáles reclamas. Revisa y corrige.
+          Sube el PDF o una foto y se llenan solos el proveedor, la marca, la factura, la fecha y el pedido, más los renglones para que marques cuáles reclamas. Revisa y corrige.
         </p>
         <div className="max-w-xl">
           <FacturaPdfUploader onUploaded={setFacturaPdfPath} onExtracted={aplicarIA} />

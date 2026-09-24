@@ -10,6 +10,13 @@ interface Body {
   filename?: string;
 }
 
+/**
+ * Las extensiones que el bucket guarda tal cual: el PDF de siempre y las fotos
+ * que el lector sabe leer (`lib/ia/bloque-archivo.ts`). Cualquier otra cosa
+ * termina en `.pdf`, como se comportó este endpoint desde el primer día.
+ */
+const EXTENSIONES = [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".gif"] as const;
+
 // Sanitiza nombre de archivo: deja letras, números, guion, guion-bajo, punto.
 function sanitizarNombre(nombre: string): string {
   const base = nombre.trim().toLowerCase();
@@ -31,10 +38,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Falta filename" }, { status: 400 });
     }
     const safeName = sanitizarNombre(body.filename);
-    const safePdf = safeName.endsWith(".pdf") ? safeName : `${safeName}.pdf`;
+    // 🔴 LA EXTENSIÓN DICE QUÉ ES (24-sep-2026). Antes se forzaba `.pdf` a todo,
+    // así que una FOTO de la factura quedaba guardada como si fuera un PDF y el
+    // lector no sabía con qué bloque mandarla al modelo. Lo que no es una de
+    // estas extensiones sigue cayendo en `.pdf`, como siempre.
+    const conExtension = EXTENSIONES.some((ext) => safeName.endsWith(ext))
+      ? safeName
+      : `${safeName}.pdf`;
     const prefix = randomUUID();
     const timestamp = Date.now();
-    const path = `${prefix}/${timestamp}_${safePdf}`;
+    const path = `${prefix}/${timestamp}_${conExtension}`;
 
     const { data, error } = await supabaseServer.storage
       .from(FACTURA_BUCKET)

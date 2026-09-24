@@ -3,7 +3,7 @@ import { requireAdminOSecretaria } from "@/lib/api-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 import { FACTURA_BUCKET } from "@/lib/reclamos/factura-storage";
 import { MODELO_LECTOR, MAX_TOKENS_LECTOR, PROMPT_LECTOR, parsearRespuestaLector } from "@/lib/reclamos/lector-factura";
-import { leerPdfConAnthropic } from "@/lib/ia/anthropic";
+import { leerPdfConAnthropic, tipoPorNombre } from "@/lib/ia/anthropic";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
   if (!body.path) {
-    return NextResponse.json({ error: "Falta path del PDF" }, { status: 400 });
+    return NextResponse.json({ error: "Falta el archivo de la factura" }, { status: 400 });
   }
 
   try {
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       .from(FACTURA_BUCKET)
       .download(body.path);
     if (dlError || !fileData) {
-      throw new Error(dlError?.message ?? "No se pudo descargar el PDF");
+      throw new Error(dlError?.message ?? "No se pudo descargar la factura");
     }
     const arrayBuffer = await fileData.arrayBuffer();
     const base64 = Buffer.from(arrayBuffer).toString("base64");
@@ -54,6 +54,10 @@ export async function POST(req: NextRequest) {
       modelo: MODELO_LECTOR,
       maxTokens: MAX_TOKENS_LECTOR,
       pdfBase64: base64,
+      // 🔴 El tipo sale de la EXTENSIÓN del archivo guardado: un PDF viaja como
+      // bloque `document` —igual que siempre— y una foto de la factura como
+      // bloque `image`. Sin extensión conocida, PDF.
+      mediaType: tipoPorNombre(body.path),
       prompt: PROMPT_LECTOR,
     });
     const extraido = parsearRespuestaLector(raw);

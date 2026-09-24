@@ -71,7 +71,7 @@ describe("🔴 lo que hace la pantalla se dice bajo el título, no dentro del �
   it("la frase se ve sin tocar nada", () => {
     pintar();
     expect(document.body.textContent).toContain(
-      "Sube el PDF y se llenan solos el proveedor, la marca, la factura, la fecha y el pedido",
+      "Sube el PDF o una foto y se llenan solos el proveedor, la marca, la factura, la fecha y el pedido",
     );
   });
 
