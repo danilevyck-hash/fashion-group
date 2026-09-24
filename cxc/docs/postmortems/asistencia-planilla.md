@@ -7,6 +7,138 @@
 
 ---
 
+## 🔴 Cuatro marcas también en el teléfono (24-sep-2026) — y el almuerzo, de un solo toque
+
+> Interruptor: `MARCACION_CUATRO_MARCAS` en `src/lib/marcacion/cuatro-marcas.ts`, hoy `true`.
+> `false` = las DOS marcas de siempre, byte a byte.
+> Candado: `src/__tests__/marcacion/marcacion-cuatro-marcas.test.tsx`.
+> **Nada en la base. Ninguna migración.**
+
+> 📄 **Lo que se podó de `CLAUDE.md` el 24-sep-2026 para hacerle sitio a esta
+> regla, de la nota «MARCACIÓN «UN TOQUE»»**, verbatim: *«…la **ubicación se
+> pide AL ABRIR** y negada dice «Ajustes › Safari › Ubicación»; se van la nota y
+> «Mis marcas» y queda una línea solo si **ayer** faltó la salida; el encabezado
+> dice **«Marcación»** (decía `marcacion`) y a ese rol no se le dibujan campana,
+> lupa ni menú; sin señal, una línea propia en vez de la franja naranja que
+> tapaba el encabezado»*. Las mediciones de ese rediseño (el botón que saltaba
+> 202 → 344 px, los cuatro toques, el «Deshacer» que se pisaba 15 px con el
+> botón de marcar) siguen enteras en el encabezado de
+> `src/lib/marcacion/un-toque.ts`.
+
+### Qué decidió Daniel (textual)
+
+- *«Cuatro marcas también en el teléfono»*.
+- ¿El botón las va pidiendo en orden, y las cuatro llevan foto?
+  *«sí el botón va solo en orden, y sí va foto en las cuatro»*.
+- Y enseguida, el cambio: **las dos marcas del almuerzo van SIN foto**, de un
+  solo toque; la ubicación se guarda igual que en las otras. La entrada y la
+  salida siguen con foto, con la misma regla de «aceptar la foto ES marcar».
+
+### 🩸 Cómo estaba hasta hoy
+
+El reloj físico de la oficina siempre tomó **cuatro** marcas al día: entrada,
+salida a almuerzo, vuelta de almuerzo y salida. El teléfono nació el 14-sep-2026
+con **dos** (`MARCAS_POR_DIA = 2`, Daniel entonces: *«dos, no cuatro»*), así que
+quien dejó el reloj y pasó al teléfono —las cuatro personas medidas el
+24-sep-2026: Ana, Cindy, Angel y Yeisibeth— **perdía el almuerzo**, y el reporte
+de la contadora le quedaba con dos marcas donde ella espera cuatro.
+
+### Las reglas
+
+1. 🔴 **El botón va SOLO EN ORDEN, como el reloj.** «Marcar entrada» → «Marcar
+   salida a almuerzo» → «Marcar vuelta de almuerzo» → «Marcar salida», y tras la
+   cuarta queda gris en «Listo por hoy». 🔴 **La persona NUNCA elige cuál marca
+   es**: la decide el orden del día. Es la MISMA regla que ya usaba el motor de
+   Asistencia (la primera del día es la entrada, la última la salida, las del
+   medio el almuerzo), así que no hay una segunda definición que pueda diferir.
+   Los cuatro rótulos viven en UNA lista (`ROTULOS_DEL_BOTON`), no en un `if`
+   por estado; el botón sigue en el mismo cajón fijo de abajo y **no se mueve un
+   píxel** entre los cinco estados (candado que mide el borde de arriba).
+2. 🔴 **Foto en la ENTRADA y en la SALIDA; el ALMUERZO, un solo toque.** La 1.ª
+   y la 4.ª abren la cámara y aceptar la foto ES marcar; la 2.ª y la 3.ª marcan
+   al tocar el botón, sin abrirla. 🔴 **La ubicación se guarda en las cuatro**,
+   igual que antes, y el «Deshacer» de 2 minutos también.
+   🔴 **Quién pide foto lo decide el SERVIDOR, no el teléfono** (`pideFoto`, que
+   mira el ORDEN del día leído de la base): la ruta vuelve a validar con esa
+   respuesta, así que un teléfono no puede saltarse la foto de la entrada
+   diciendo que es el almuerzo.
+3. 🔴 **«Deshacer» sigue siendo sobre la ÚLTIMA marca, 2 minutos**, y ahora la
+   NOMBRA: «Deshacer la salida a almuerzo», «Deshacer la vuelta de almuerzo».
+   El número de marca lo calcula el servidor (`queSePuedeDeshacer` devuelve
+   `indice`) y la pantalla usa el mismo para la de la cola.
+4. 🔴 **La pastilla verde dice cada marca con su nombre** —«Entrada 8:00 a. m. ·
+   Almuerzo 12:00 p. m. · Vuelta 1:00 p. m. · Salida 6:00 p. m.»—. 🩸 Antes
+   dibujaba la primera y la última: a mediodía, con la salida a almuerzo recién
+   puesta, decía «Entrada 8:00 · Salida 12:00», que se lee como que ya salió del
+   trabajo.
+5. 🔴 **El tope lo comprueba el SERVIDOR con la MISMA regla del botón**
+   (`estadoDelBotonHoy`), nunca con un número escrito a mano en la ruta. La
+   quinta marca del día se rechaza con 409 y su motivo («Ese día ya tiene sus
+   cuatro marcas. Si algo está mal, avísale a Roxana.»).
+6. **La cola sin señal aguanta las cuatro.** Nunca hubo un tope de dos en el
+   teléfono: `cola-offline.ts` guarda por `eventoId` y no cuenta nada. Lo único
+   que cambia es que una marca del almuerzo va con `selfie: null`.
+7. ⚠️ **Un día que quede en 2 o 3 marcas no se arregla desde el teléfono**: el
+   reporte lo marca «a revisar», igual que con el reloj físico. No se inventó
+   nada para eso. La línea de «ayer faltó la salida» tampoco se tocó.
+
+### 🔴 Lo que se guarda
+
+La marca viaja con el **MISMO payload de siempre** —los ocho campos de
+`marcacion-payload-igual`, por la misma puerta, con el mismo método— y cae en
+`asistencia_marcaciones` por `guardarMarcaciones`, la única puerta de escritura.
+
+- **El `tipo` NO aprendió un valor nuevo.** Sigue siendo `entrada` o `salida`
+  —lo único que `validarPayloadMarca` acepta— y se alterna por el orden del día:
+  1.ª `entrada` · 2.ª `salida` (a almuerzo) · 3.ª `entrada` (la vuelta) · 4.ª
+  `salida`. Es lo que de verdad pasa, y no hace falta más: **el motor del
+  reporte ni siquiera lee esa columna** —selecciona `id, empleado_codigo,
+  empleado_nombre, ocurrio_en, dispositivo`— y asigna por ORDEN. El reloj físico
+  escribe ahí su `attendanceStatus` crudo, así que la columna nunca fue un
+  vocabulario cerrado.
+- ⚠️ **Lo ÚNICO que se ve distinto en la base**: las dos marcas del almuerzo
+  caen con **`foto_path` en NULL**. La columna es `text` NULLABLE desde que
+  nació (`20261127120000_marcacion_telefono.sql`) y ya venía en NULL en **todas**
+  las marcas del reloj físico, que nunca tuvieron foto; el reporte de la
+  contadora ya lo contemplaba (`en-el-reporte.ts` › `tieneFoto` es
+  `Boolean(String(f.foto_path ?? "").trim())`). Sin foto no se sube nada al
+  bucket, así que tampoco queda un archivo suelto.
+- Todo lo demás viaja igual en las cuatro: la ubicación (`lat`, `lng`,
+  `precision_m`), las dos horas (`ocurrio_en` del servidor y `hora_telefono`
+  como testigo), `sin_senal`, `dispositivo`, `evento_id` y `marcada_por`.
+
+### Los archivos
+
+| Archivo | Qué hace |
+|---|---|
+| `src/lib/marcacion/cuatro-marcas.ts` | **Nuevo.** El interruptor y toda la regla, puro: los rótulos, el tipo por orden, quién pide foto, el nombre de cada marca, el resumen de la pastilla y el aviso del día completo. |
+| `src/lib/marcacion/un-toque.ts` | `botonUnToque` llama a `estadoDelBotonHoy` y sigue siendo el único que rebautiza el estado apagado «Listo por hoy». |
+| `src/lib/marcacion/marcacion.ts` | `validarPayloadMarca` toma `exigeFoto = true`; por omisión, la foto sigue siendo obligatoria. |
+| `src/lib/marcacion/deshacer.ts` | `queSePuedeDeshacer` devuelve también el `indice` de la marca. |
+| `src/lib/marcacion/estado-server.ts` | El `boton` del estado sale de `estadoDelBotonHoy`. |
+| `src/lib/marcacion/cola-offline.ts` | `MarcaPendiente.selfie` pasa a `Blob \| null`. |
+| `src/app/api/marcacion/route.ts` | El tope con la regla del botón; la foto la exige el servidor según el orden; sin foto no sube nada. |
+| `src/app/api/marcacion/deshacer/route.ts` | El aviso nombra la marca deshecha. |
+| `src/app/marcacion/MarcacionClient.tsx` | El almuerzo marca de un toque; la foto viaja solo cuando la hay. |
+| `src/app/marcacion/PantallaUnToque.tsx` | La pastilla con cada marca y el rótulo de «Deshacer». |
+
+### Candados
+
+- `src/__tests__/marcacion/marcacion-cuatro-marcas.test.tsx` — **nuevo**, 31
+  pruebas: los cuatro rótulos en orden contra la pantalla real, el botón que no
+  se mueve, gris tras la cuarta, foto solo en la 1.ª y la 4.ª, el almuerzo de un
+  toque con su ubicación, «Deshacer» nombrando la marca, la cola con las cuatro,
+  el `tipo` que no cambió, el `foto_path` nullable, el motor que no lee esa
+  columna, el tope del servidor y el camino apagado escrito.
+- `src/__tests__/components/marcacion-un-toque.test.tsx` — se actualizó para
+  medir **todos** los estados del día (cuatro con el interruptor prendido, dos
+  apagado) en vez de tres fijos. No se le quitó ninguna comprobación.
+- `src/__tests__/lib/marcacion-payload-igual.test.ts` — **verde tal cual**: no se
+  tocó una sola comprobación. Solo se aclaró el texto de dos títulos, porque
+  «la foto viaja SIEMPRE» ahora quiere decir «cuando hay foto, viaja igual».
+
+---
+
 ## 🔴 Las tres reglas de horas del 24-sep-2026 — gracia del almuerzo, entrada autorizada y el aviso
 
 > 🔴 **Mueven plata hacia adelante y NINGUNA hacia atrás.** Solo cambian lo que
@@ -17,7 +149,7 @@
 > `ENTRADA_AUTORIZADA`, hoy los dos en `true`; en `false` —o sin las columnas
 > de la migración— el cálculo es el de antes, byte a byte.
 >
-> ⚠️ **Migración `20261219120000_asistencia_gracia_almuerzo_entrada_autorizada.sql` PENDIENTE de aplicar** (la aplica Daniel). Hasta entonces: gracia 0, sin aviso, y «Hoy entraba a las» contesta 503 con el nombre del archivo.
+> ✅ **Migración `20261219120000_asistencia_gracia_almuerzo_entrada_autorizada.sql` APLICADA el 24-sep-2026** (la aplicó Daniel). Sin ella —o con los interruptores en `false`— la gracia es 0, no sale el aviso y «Hoy entraba a las» contesta 503 con el nombre del archivo: el código sigue fallando ABIERTO.
 
 ### Qué decidió Daniel (textual)
 

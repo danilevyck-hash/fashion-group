@@ -26,9 +26,9 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { hoyPanama } from "@/lib/fecha-panama";
+import { estadoDelBotonHoy } from "./cuatro-marcas";
 import {
   diasDeLaQuincena,
-  estadoDelBoton,
   marcasDelDia,
   notaDespuesDe,
   quincenaDeHoy,
@@ -99,8 +99,9 @@ export async function leerMarcasDeLaQuincena(
 ): Promise<{
   quincena: { desde: string; hasta: string };
   marcas: MarcaDeLaQuincena[];
-  /** Lo que se puede deshacer ahora mismo, o `null`. */
-  deshacer: (Deshacible & { id: string }) | null;
+  /** Lo que se puede deshacer ahora mismo, o `null`. `indice` es qué número de
+   *  marca del día es: de ahí sale su nombre («la vuelta de almuerzo»). */
+  deshacer: (Deshacible & { id: string; indice: number }) | null;
 }> {
   const quincena = quincenaDeHoy(hoy);
   const { data, error } = await supabaseServer
@@ -124,7 +125,7 @@ export async function leerMarcasDeLaQuincena(
       dispositivo: String((m as { dispositivo: string }).dispositivo ?? ""),
     }))
     // 🔴 Una marca deshecha NO cuenta: ni para el botón, ni para «Mis marcas»,
-    // ni para el tope de dos marcas al día. La fila sigue en la base.
+    // ni para el tope de marcas del día. La fila sigue en la base.
     .filter((m) => !quitadas.ids.has(m.id));
   return {
     quincena,
@@ -193,7 +194,7 @@ export async function armarEstadoDeLaPantalla(codigo: string, nombre: string | n
     deshacer: deshacer ? { ocurrioEn: deshacer.ocurrioEn, tipo: deshacer.tipo } : null,
     hoy,
     marcasHoy,
-    boton: estadoDelBoton(marcasHoy),
+    boton: estadoDelBotonHoy(marcasHoy),
     nota: notaDespuesDe(marcasHoy),
     quincena,
     rotuloQuincena: rotuloQuincena(quincena),

@@ -31,13 +31,13 @@ import {
   AVISO_SIN_CODIGO as SIN_CODIGO,
   DISPOSITIVO_TELEFONO,
   diaPanamaDe,
-  estadoDelBoton,
   faltaLaMigracion,
   horaQueCuenta,
   marcasDelDia,
   rutaDeSelfie,
   validarPayloadMarca,
 } from "@/lib/marcacion/marcacion";
+import { avisoDiaCompleto, estadoDelBotonHoy, pideFoto } from "@/lib/marcacion/cuatro-marcas";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -103,14 +103,19 @@ export async function POST(req: NextRequest) {
     return Number.isFinite(n) ? n : null;
   };
 
-  const malo = validarPayloadMarca({
+  const loQueLlego = {
     eventoId,
     tipo,
     lat: num("lat"),
     lng: num("lng"),
     precisionM: num("precisionM"),
     selfie: esArchivo(selfie) ? { tipo: String(selfie.type ?? ""), bytes: selfie.size } : null,
-  });
+  };
+  // 🔑 PRIMERO LO QUE NO DEPENDE DE NADIE —quién es, dónde está, y que la foto,
+  // SI VINO, sea una imagen que no pese de más—. Si la foto es obligatoria se
+  // decide abajo, cuando se sabe QUÉ MARCA del día es ésta: eso lo dice el
+  // orden, y el orden lo tiene la base.
+  const malo = validarPayloadMarca(loQueLlego, false);
   if (malo) return NextResponse.json({ error: malo }, { status: 400 });
 
   const cuando = horaQueCuenta({ sinSenal, horaTelefono, ahoraServidor: new Date().toISOString() });
@@ -132,22 +137,33 @@ export async function POST(req: NextRequest) {
 
     const fecha = diaPanamaDe(cuando.ocurrioEn);
 
-    // 🔴 DOS MARCAS AL DÍA Y NADA MÁS, comprobado en el SERVIDOR. La pantalla
-    // apaga el botón, pero una marca sin señal puede llegar tarde y encontrar
-    // el día ya cerrado: se rechaza con su motivo, la persona lo lee y, si de
-    // verdad hay un error, lo corrige la contadora.
+    // 🔴 LAS MARCAS DEL DÍA Y NI UNA MÁS, comprobado en el SERVIDOR. Desde el
+    // 24-sep-2026 son CUATRO (`cuatro-marcas.ts`); con ese interruptor apagado,
+    // las dos de siempre. La pantalla apaga el botón, pero una marca sin señal
+    // puede llegar tarde y encontrar el día ya completo: se rechaza con su
+    // motivo, la persona lo lee y, si de verdad hay un error, lo corrige la
+    // contadora. 🔑 La regla es LA MISMA del botón, nunca una copia con un
+    // número escrito a mano.
     const { marcas } = await leerMarcasDeLaQuincena(codigo, fecha);
     const yaTiene = marcasDelDia(marcas, fecha);
-    if (!estadoDelBoton(yaTiene).tipo) {
-      return NextResponse.json(
-        { error: "Ese día ya tiene su entrada y su salida. Si algo está mal, avísale a Roxana." },
-        { status: 409 },
-      );
+    if (!estadoDelBotonHoy(yaTiene).tipo) {
+      return NextResponse.json({ error: avisoDiaCompleto() }, { status: 409 });
     }
 
-    const archivo = selfie as Blob;
-    const path = rutaDeSelfie(codigo, fecha, eventoId);
-    subida = (await subirSelfie(path, Buffer.from(await archivo.arrayBuffer()))).path;
+    // 🔴 LA FOTO LA EXIGE EL SERVIDOR, Y SOLO EN LA ENTRADA Y EN LA SALIDA
+    // (24-sep-2026). Las dos del ALMUERZO van sin foto —un solo toque—, pero
+    // quién es cuál lo dice el ORDEN del día, que sale de la base: el teléfono
+    // no puede saltarse la foto de la entrada diciendo que es el almuerzo. Es
+    // la MISMA validación de siempre, contestada con la respuesta de `pideFoto`.
+    const faltaFoto = validarPayloadMarca(loQueLlego, pideFoto(yaTiene));
+    if (faltaFoto) return NextResponse.json({ error: faltaFoto }, { status: 400 });
+
+    // 🔑 Sin foto no se sube nada y `foto_path` queda en NULL — la columna es
+    // nullable desde que nació y así están TODAS las marcas del reloj físico.
+    if (esArchivo(selfie)) {
+      const path = rutaDeSelfie(codigo, fecha, eventoId);
+      subida = (await subirSelfie(path, Buffer.from(await (selfie as Blob).arrayBuffer()))).path;
+    }
 
     const { error } = await guardarMarcaciones([
       {
@@ -175,8 +191,9 @@ export async function POST(req: NextRequest) {
     ]);
 
     if (error) {
-      // La fila no entró: la foto no se queda suelta en el bucket.
-      await borrarSelfies([subida]);
+      // La fila no entró: la foto no se queda suelta en el bucket. Una marca
+      // del almuerzo no subió ninguna: no hay nada que borrar.
+      if (subida) await borrarSelfies([subida]);
       subida = null;
       if (faltaLaMigracion(error)) {
         return NextResponse.json({ error: AVISO_FALTA_MIGRACION }, { status: 503 });

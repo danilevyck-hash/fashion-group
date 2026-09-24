@@ -27,7 +27,8 @@ import {
   nombreDeLaFicha,
 } from "@/lib/marcacion/estado-server";
 import { diaPanamaDe } from "@/lib/marcacion/marcacion";
-import { MOTIVO_DESHACER, avisoDeshecha } from "@/lib/marcacion/deshacer";
+import { MOTIVO_DESHACER } from "@/lib/marcacion/deshacer";
+import { avisoDeshechaDeLaMarca } from "@/lib/marcacion/cuatro-marcas";
 
 export const dynamic = "force-dynamic";
 
@@ -95,7 +96,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      aviso: avisoDeshecha(deshacer.tipo),
+      // 🔴 SE DICE POR SU NOMBRE. Con cuatro marcas, la segunda es «la salida a
+      // almuerzo» y la tercera «la vuelta de almuerzo»; con el interruptor
+      // apagado, «la entrada» o «la salida» como siempre.
+      aviso: avisoDeshechaDeLaMarca(deshacer.indice, deshacer.tipo),
       ...(await armarEstadoDeLaPantalla(codigo, nombre)),
     });
   } catch (e) {

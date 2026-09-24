@@ -36,7 +36,9 @@ export interface MarcaPendiente {
   lat: number;
   lng: number;
   precisionM: number | null;
-  selfie: Blob;
+  /** 🔴 `null` en las dos marcas del ALMUERZO, que van sin foto desde el
+   *  24-sep-2026. La entrada y la salida siguen llevándola. */
+  selfie: Blob | null;
   /** Cuántas veces se intentó mandar. Solo para poder decirlo en pantalla. */
   intentos: number;
 }

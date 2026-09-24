@@ -61,7 +61,11 @@ describe("lo que la pantalla manda no cambió", () => {
     }
   });
 
-  it("🔴 la foto viaja SIEMPRE, y con el mismo nombre de archivo", () => {
+  // 🔴 24-sep-2026: las dos marcas del ALMUERZO van SIN foto (`cuatro-marcas.ts`).
+  // Lo que se mide acá no cambió: cuando hay foto, viaja por el MISMO campo, con
+  // el mismo nombre de archivo y achicada igual. Quién la lleva lo dice el
+  // candado `marcacion-cuatro-marcas`.
+  it("🔴 la foto viaja por el MISMO campo y con el mismo nombre de archivo", () => {
     expect(PANTALLA).toContain('cuerpo.set("selfie", blob, "selfie.jpg")');
     expect(PANTALLA).toContain('cuerpo.set("selfie", m.selfie, "selfie.jpg")');
     // Y se sigue achicando en el teléfono antes de viajar.
@@ -99,7 +103,7 @@ describe("lo que el servidor exige no cambió", () => {
     expect(validarPayloadMarca(base)).toBeNull();
   });
 
-  it("🔴 sin foto NO entra — la foto sigue siendo obligatoria en las dos marcas", () => {
+  it("🔴 sin foto NO entra — por omisión la foto sigue siendo obligatoria", () => {
     expect(validarPayloadMarca({ ...base, selfie: null })).toMatch(/Falta la selfie/);
     expect(validarPayloadMarca({ ...base, tipo: "salida", selfie: null })).toMatch(/Falta la selfie/);
   });

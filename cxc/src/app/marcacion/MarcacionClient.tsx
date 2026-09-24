@@ -10,16 +10,24 @@
 // teléfono»*. Si alguien mueve el reloj del teléfono, esta pantalla sigue
 // diciendo la hora de Panamá — y es la que se va a guardar.
 //
-// 🔴 EL BOTÓN NO PREGUNTA NADA. Dice «Marcar entrada», después «Marcar
-// salida», después se apaga. Qué dice lo decide `estadoDelBoton` del módulo
-// puro, contando las marcas del día — las del teléfono, las del reloj físico y
-// las que todavía esperan señal, todas juntas.
+// 🔴 EL BOTÓN NO PREGUNTA NADA, Y VA SOLO EN ORDEN. Desde el 24-sep-2026 son
+// CUATRO marcas también en el teléfono: «Marcar entrada» → «Marcar salida a
+// almuerzo» → «Marcar vuelta de almuerzo» → «Marcar salida», y después se
+// apaga. Qué dice lo decide `estadoDelBotonHoy` del módulo puro
+// (`cuatro-marcas.ts`), contando las marcas del día — las del teléfono, las del
+// reloj físico y las que todavía esperan señal, todas juntas. La persona NUNCA
+// elige cuál marca es.
 //
 // 🔴 LA HORA SE LEE EN 12 HORAS, Y SOLO ACÁ (14-sep-2026). Daniel: *«quiero
 // que la hora salga en formato 12 h»* · *«para la planilla sí se usa formato 24
 // horas, ¿no? Formato de 12 horas solo para esto»*. Cómo se ve lo decide
 // `enDoceHoras` del módulo puro; esta pantalla NO llama a `horaCorta`, y hay
 // candado que lo exige y que exige lo contrario en el reporte.
+//
+// 🔴 FOTO EN LA ENTRADA Y EN LA SALIDA; EL ALMUERZO, UN SOLO TOQUE
+// (24-sep-2026). Las dos marcas del almuerzo no abren la cámara: se marcan al
+// tocar el botón, con la MISMA ubicación de siempre. Quién pide foto lo decide
+// el SERVIDOR por el orden del día, y la ruta vuelve a validarlo.
 //
 // 🔴 «DESHACER» LA ÚLTIMA MARCA, DOS MINUTOS. Daniel marcó la salida cinco
 // minutos después de la entrada, por error de dedo. Pasados los dos minutos el
@@ -66,6 +74,12 @@ import {
   faltoLaSalidaDeAyer,
   MARCACION_UN_TOQUE,
 } from "@/lib/marcacion/un-toque";
+import {
+  avisoDeshechaDeLaMarca,
+  horasDelDia,
+  MARCACION_CUATRO_MARCAS,
+  pideFoto,
+} from "@/lib/marcacion/cuatro-marcas";
 
 export interface EstadoServidor {
   codigo: string | null;
@@ -194,7 +208,7 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
         cuerpo.set("lat", String(m.lat));
         cuerpo.set("lng", String(m.lng));
         if (m.precisionM !== null) cuerpo.set("precisionM", String(m.precisionM));
-        cuerpo.set("selfie", m.selfie, "selfie.jpg");
+        if (m.selfie) cuerpo.set("selfie", m.selfie, "selfie.jpg");
         let res: Response;
         try {
           res = await fetch("/api/marcacion", { method: "POST", body: cuerpo });
@@ -318,6 +332,10 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
   const nota = notaDespuesDe(marcasHoy);
   const dias = diasDeLaQuincena(todas, hoy);
   const hoyMarcado = dias.find((d) => d.fecha === hoy) ?? null;
+  // 🔴 LAS HORAS DE HOY, UNA POR UNA. Con cuatro marcas la pastilla las nombra
+  // («Entrada · Almuerzo · Vuelta · Salida»); la primera y la última ya no
+  // alcanzan. Sale de la MISMA lista con la que se cuenta el botón.
+  const horasHoy = horasDelDia(todas, hoy);
 
   // 🔴 QUÉ SE PUEDE DESHACER — la última marca, dos minutos. La regla entera
   // vive en el módulo puro; acá solo se le pasan las dos fuentes y los dos
@@ -350,6 +368,16 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
     if (boton.apagado || !boton.tipo) return;
     setAviso(null);
     setTipoEnCurso(boton.tipo);
+    // 🔴 EL ALMUERZO ES UN SOLO TOQUE (24-sep-2026). Daniel: las dos marcas del
+    // almuerzo van SIN foto. La cámara ni se abre: se marca ahí mismo, con la
+    // ubicación de siempre. La entrada y la salida siguen pasando por la foto.
+    // ⚠️ Y solo en la pantalla nueva: la de antes tiene su propio camino de
+    // foto («Enviar» y «Volver a tomarla») y con el interruptor de «un toque»
+    // apagado se queda exactamente como estaba.
+    if (MARCACION_UN_TOQUE && MARCACION_CUATRO_MARCAS && !pideFoto(marcasHoy)) {
+      void enviarMarca(null, boton.tipo);
+      return;
+    }
     archivoRef.current?.click();
   }
 
@@ -426,8 +454,11 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
    * MANDAR LA MARCA. Recibe la foto y el tipo POR PARÁMETRO y no del estado:
    * con «aceptar la foto es marcar» el envío ocurre en el mismo tic en que
    * llega la foto, y un `setState` todavía no se leyó.
+   *
+   * 🔴 `blob` en `null` = una marca del ALMUERZO, que va SIN foto. Todo lo
+   * demás viaja igual: la ubicación, las dos horas, el `eventoId` y el tipo.
    */
-  async function enviarMarca(blob: Blob, tipoDeLaMarca: TipoMarca) {
+  async function enviarMarca(blob: Blob | null, tipoDeLaMarca: TipoMarca) {
     if (enviando) return;
     const coords = ubicacion ?? (await pedirUbicacion());
     if (!coords) {
@@ -480,7 +511,7 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
       cuerpo.set("lat", String(pendiente.lat));
       cuerpo.set("lng", String(pendiente.lng));
       if (pendiente.precisionM !== null) cuerpo.set("precisionM", String(pendiente.precisionM));
-      cuerpo.set("selfie", blob, "selfie.jpg");
+      if (blob) cuerpo.set("selfie", blob, "selfie.jpg");
 
       let res: Response;
       try {
@@ -529,7 +560,10 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
       if (donde === "telefono") {
         await borrarPendiente(sePuedeDeshacer.eventoId);
         await refrescarCola();
-        setAviso({ tono: "listo", texto: `Listo, se deshizo la ${tipo}. Puedes marcar de nuevo.` });
+        // 🔴 SE DICE POR SU NOMBRE: la que se sacó de la cola es la ÚLTIMA del
+        // día, o sea la número `marcasHoy - 1`. Con el interruptor de las
+        // cuatro apagado, «la entrada» o «la salida», como siempre.
+        setAviso({ tono: "listo", texto: avisoDeshechaDeLaMarca(marcasHoy - 1, tipo) });
         return;
       }
       let res: Response;
@@ -548,7 +582,7 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
       }
       if (esEstado(j)) aplicarEstado(j as EstadoServidor);
       else await cargar();
-      setAviso({ tono: "listo", texto: j.aviso ?? `Listo, se deshizo la ${tipo}.` });
+      setAviso({ tono: "listo", texto: j.aviso ?? avisoDeshechaDeLaMarca(marcasHoy - 1, tipo) });
     } finally {
       setDeshaciendo(false);
     }
@@ -634,6 +668,8 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
             fecha={fechaLarga(hoy)}
             enLinea={enLinea}
             hoyMarcado={hoyMarcado}
+            horasHoy={horasHoy}
+            marcasHoy={marcasHoy}
             sePuedeDeshacer={sePuedeDeshacer}
             deshaciendo={deshaciendo}
             onDeshacer={deshacer}

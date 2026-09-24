@@ -28,6 +28,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { DISPOSITIVO_TELEFONO, type TipoMarca } from "./marcacion";
+import { tipoDeLaMarcaHoy } from "./cuatro-marcas";
 
 /** Dos minutos. Daniel, 14-sep-2026. */
 export const VENTANA_DESHACER_MS = 2 * 60_000;
@@ -70,7 +71,7 @@ export interface Deshacible {
 export function queSePuedeDeshacer(
   marcas: readonly MarcaGuardada[],
   ahoraIso: string,
-): (Deshacible & { id: string }) | null {
+): (Deshacible & { id: string; indice: number }) | null {
   const ahora = Date.parse(ahoraIso);
   if (!Number.isFinite(ahora)) return null;
   const ordenadas = marcas
@@ -86,7 +87,15 @@ export function queSePuedeDeshacer(
   const antes = ordenadas.filter(
     (m) => m !== ultima && diaDeMismoCorte(m.ocurrioEn, ultima.ocurrioEn),
   ).length;
-  return { id: ultima.id, ocurrioEn: ultima.ocurrioEn, tipo: antes === 0 ? "entrada" : "salida" };
+  // 🔴 Y CON CUATRO MARCAS, QUÉ ES SALE DEL ORDEN (24-sep-2026): la 2.ª es la
+  // salida a almuerzo y la 3.ª la vuelta. `tipoDeLaMarcaHoy` alterna; con el
+  // interruptor de las cuatro apagado contesta lo de siempre.
+  return {
+    id: ultima.id,
+    indice: antes,
+    ocurrioEn: ultima.ocurrioEn,
+    tipo: tipoDeLaMarcaHoy(antes),
+  };
 }
 
 /** Dos instantes del MISMO día de Panamá. Se compara con el corte de −5 h. */

@@ -206,8 +206,18 @@ export interface PayloadMarca {
   selfie: { tipo: string; bytes: number } | null;
 }
 
-/** `null` = entra. Si no, EL MENSAJE QUE VE LA PERSONA. */
-export function validarPayloadMarca(p: PayloadMarca): string | null {
+/**
+ * `null` = entra. Si no, EL MENSAJE QUE VE LA PERSONA.
+ *
+ * 🔴 `exigeFoto` ARRANCA EN `true` Y NO SE MUEVE PARA NADIE QUE NO LO PIDA: la
+ * foto siguió siendo obligatoria en la entrada y en la salida. Desde el
+ * 24-sep-2026 las marcas del ALMUERZO van sin foto (Daniel: un solo toque), y
+ * quién la pide lo decide el SERVIDOR con el orden del día
+ * (`cuatro-marcas.ts` › `pideFoto`), nunca el teléfono. Lo único que cambia
+ * con `false` es que una marca SIN foto no se rechaza; la que trae foto se
+ * revisa igual —que sea una imagen y que no pese de más—.
+ */
+export function validarPayloadMarca(p: PayloadMarca, exigeFoto = true): string | null {
   if (!/^[A-Za-z0-9-]{8,64}$/.test(String(p.eventoId ?? ""))) {
     return "La marca llegó sin identificador. Vuelve a marcar.";
   }
@@ -215,12 +225,10 @@ export function validarPayloadMarca(p: PayloadMarca): string | null {
     return "No se entendió si es entrada o salida. Vuelve a marcar.";
   }
   if (!p.selfie || !(p.selfie.bytes > 0)) {
-    return "Falta la selfie. Toma la foto para poder marcar.";
-  }
-  if (!/^image\//i.test(String(p.selfie.tipo ?? ""))) {
+    if (exigeFoto) return "Falta la selfie. Toma la foto para poder marcar.";
+  } else if (!/^image\//i.test(String(p.selfie.tipo ?? ""))) {
     return "Lo que llegó no es una foto. Toma la selfie con la cámara.";
-  }
-  if (p.selfie.bytes > MAX_BYTES_SELFIE) {
+  } else if (p.selfie.bytes > MAX_BYTES_SELFIE) {
     return "La foto pesa demasiado. Toma la selfie de nuevo.";
   }
   const lat = Number(p.lat), lng = Number(p.lng);

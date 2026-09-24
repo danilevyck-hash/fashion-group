@@ -6,8 +6,11 @@
  * el botón SALTABA 142 px entre estados (202 → 344), marcar eran CUATRO toques
  * y «Deshacer» caía 15 px encima de donde estaba el botón de marcar.
  *
- *  1. UN BOTÓN, UN LUGAR — el mismo cajón y las mismas clases en los TRES
- *     estados; con las dos marcas hechas queda gris en «Listo por hoy».
+ *  1. UN BOTÓN, UN LUGAR — el mismo cajón y las mismas clases en TODOS los
+ *     estados del día; con el día completo queda gris en «Listo por hoy».
+ *     🔴 «El día completo» son CUATRO marcas desde el 24-sep-2026
+ *     (`cuatro-marcas.ts`), y dos con ese interruptor apagado: acá se mide lo
+ *     que el interruptor diga, nunca un número escrito a mano.
  *  2. ACEPTAR LA FOTO ES MARCAR — no existe «Enviar» ni «Volver a tomarla»:
  *     al volver de la cámara la marca sale sola.
  *  3. CÁMARA NORMAL — `capture="environment"`, no la de selfie.
@@ -86,6 +89,15 @@ import {
   diaAnterior,
   textoAvisarA,
 } from "@/lib/marcacion/un-toque";
+// 🔴 DESDE EL 24-sep-2026 LAS MARCAS DEL DÍA SON CUATRO (`cuatro-marcas.ts`).
+// Este candado sigue midiendo lo mismo —un botón, un lugar, y gris cuando ya no
+// hay nada que marcar—, pero «ya no hay nada que marcar» son las marcas que el
+// interruptor diga: con él prendido, cuatro; apagado, las dos de antes.
+import {
+  MARCACION_CUATRO_MARCAS,
+  ROTULOS_DEL_BOTON,
+  marcasPorDia,
+} from "@/lib/marcacion/cuatro-marcas";
 
 const RAIZ = join(process.cwd(), "src");
 const FUENTE_PANTALLA = readFileSync(join(RAIZ, "app/marcacion/MarcacionClient.tsx"), "utf8");
@@ -94,8 +106,19 @@ const FUENTE_FRANJA = readFileSync(join(RAIZ, "components/OfflineBanner.tsx"), "
 
 /** 8:58 a. m. de Panamá, jueves 24 de septiembre de 2026. */
 const AHORA_SERVIDOR = "2026-09-24T13:58:00.000Z";
+/** 12:00 p. m. y 1:00 p. m. — el almuerzo, cuando las marcas son cuatro. */
+const A_ALMUERZO = "2026-09-24T17:00:00.000Z";
+const DE_ALMUERZO = "2026-09-24T18:00:00.000Z";
 /** 6:00 p. m. del mismo día. */
 const SALIDA = "2026-09-24T23:00:00.000Z";
+/** El día del teléfono, marca por marca, hasta quedar completo. */
+const DIA_COMPLETO = MARCACION_CUATRO_MARCAS
+  ? [AHORA_SERVIDOR, A_ALMUERZO, DE_ALMUERZO, SALIDA]
+  : [AHORA_SERVIDOR, SALIDA];
+/** Lo que dice el botón en cada paso, hasta apagarse. */
+const ROTULOS_EN_ORDEN = MARCACION_CUATRO_MARCAS
+  ? [...ROTULOS_DEL_BOTON]
+  : ["Marcar entrada", "Marcar salida"];
 /** La entrada de AYER, sin salida detrás. */
 const AYER_ENTRADA = "2026-09-23T13:58:00.000Z";
 
@@ -182,8 +205,8 @@ function botonPrincipal(contenedor: HTMLElement): HTMLButtonElement {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("1 · un botón, un lugar", () => {
-  it("🔴 el botón vive en el MISMO cajón y con las MISMAS clases en los tres estados", () => {
-    const estados = [[], [AHORA_SERVIDOR], [AHORA_SERVIDOR, SALIDA]];
+  it("🔴 el botón vive en el MISMO cajón y con las MISMAS clases en TODOS los estados", () => {
+    const estados = DIA_COMPLETO.map((_, i) => DIA_COMPLETO.slice(0, i)).concat([DIA_COMPLETO]);
     const vistos: { cajon: string; geometria: boolean; top: number; texto: string }[] = [];
     for (const marcas of estados) {
       const { container, unmount } = render(<MarcacionClient inicial={semilla(marcas)} />);
@@ -197,23 +220,21 @@ describe("1 · un botón, un lugar", () => {
       });
       unmount();
     }
-    // El cajón es EL MISMO en los tres — y es el fijo de abajo.
+    // Son todos los estados del día, no una muestra.
+    expect(vistos.length).toBe(marcasPorDia() + 1);
+    // El cajón es EL MISMO en todos — y es el fijo de abajo.
     expect(new Set(vistos.map((v) => v.cajon)).size).toBe(1);
     expect(vistos[0].cajon).toBe(CLASES_CAJON_BOTON);
-    // La geometría del botón sale de la constante, en los tres.
+    // La geometría del botón sale de la constante, en todos.
     expect(vistos.every((v) => v.geometria)).toBe(true);
     // Y el borde de arriba es el mismo: el botón no salta (antes 202 → 344 px).
     expect(new Set(vistos.map((v) => v.top)).size).toBe(1);
     // Lo único que cambia es lo que dice.
-    expect(vistos.map((v) => v.texto)).toEqual([
-      "Marcar entrada",
-      "Marcar salida",
-      TEXTO_LISTO_POR_HOY,
-    ]);
+    expect(vistos.map((v) => v.texto)).toEqual([...ROTULOS_EN_ORDEN, TEXTO_LISTO_POR_HOY]);
   });
 
-  it("🔴 con las dos marcas hechas el botón queda GRIS y sin acción", () => {
-    const { container } = render(<MarcacionClient inicial={semilla([AHORA_SERVIDOR, SALIDA])} />);
+  it("🔴 con el día completo el botón queda GRIS y sin acción", () => {
+    const { container } = render(<MarcacionClient inicial={semilla(DIA_COMPLETO)} />);
     const b = botonPrincipal(container);
     expect(b.textContent).toBe(TEXTO_LISTO_POR_HOY);
     expect(b.disabled).toBe(true);
@@ -230,9 +251,20 @@ describe("1 · un botón, un lugar", () => {
   });
 
   it("la regla del texto es la de siempre, con un rótulo distinto al final", () => {
-    expect(botonUnToque(0)).toEqual({ tipo: "entrada", texto: "Marcar entrada", apagado: false });
-    expect(botonUnToque(1)).toEqual({ tipo: "salida", texto: "Marcar salida", apagado: false });
-    expect(botonUnToque(2)).toEqual({ tipo: null, texto: TEXTO_LISTO_POR_HOY, apagado: true });
+    ROTULOS_EN_ORDEN.forEach((texto, i) => {
+      expect(botonUnToque(i)).toEqual({
+        tipo: i % 2 === 0 ? "entrada" : "salida",
+        texto,
+        apagado: false,
+      });
+    });
+    expect(botonUnToque(marcasPorDia())).toEqual({
+      tipo: null,
+      texto: TEXTO_LISTO_POR_HOY,
+      apagado: true,
+    });
+    // Y una marca antes del final, el botón SIGUE vivo.
+    expect(botonUnToque(marcasPorDia() - 1).apagado).toBe(false);
   });
 });
 

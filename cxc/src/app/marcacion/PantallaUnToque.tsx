@@ -27,6 +27,11 @@
 import { cuentaRegresiva, rotuloDeshacer, type QueSeDeshace } from "@/lib/marcacion/deshacer";
 import { enDoceHoras, type DiaMarcado, type EstadoBoton } from "@/lib/marcacion/marcacion";
 import {
+  MARCACION_CUATRO_MARCAS,
+  resumenDelDia,
+  rotuloDeshacerDeLaMarca,
+} from "@/lib/marcacion/cuatro-marcas";
+import {
   CLASES_BOTON_UN_TOQUE,
   CLASES_CAJON_BOTON,
   PADDING_ABAJO_BOTON,
@@ -48,6 +53,12 @@ export interface PantallaUnToqueProps {
   enLinea: boolean;
   /** Lo que ya marcó HOY, o `null`. */
   hoyMarcado: DiaMarcado | null;
+  /** Las horas de HOY, en orden, como «HH:MM». Con cuatro marcas la pastilla
+   *  las nombra una por una; con dos, se sigue leyendo `hoyMarcado`. */
+  horasHoy: readonly string[];
+  /** Cuántas marcas lleva HOY. Lo usa el rótulo de «Deshacer», que nombra la
+   *  ÚLTIMA: su número es `marcasHoy - 1`. */
+  marcasHoy: number;
   sePuedeDeshacer: QueSeDeshace | null;
   deshaciendo: boolean;
   onDeshacer: () => void;
@@ -68,6 +79,8 @@ export default function PantallaUnToque({
   fecha,
   enLinea,
   hoyMarcado,
+  horasHoy,
+  marcasHoy,
   sePuedeDeshacer,
   deshaciendo,
   onDeshacer,
@@ -106,11 +119,16 @@ export default function PantallaUnToque({
           data-pastilla
           className="mt-6 flex items-center justify-between gap-3 rounded-xl bg-green-50 px-4 py-3.5 text-[17px] font-semibold text-green-800"
         >
+          {/* 🔴 CADA MARCA CON SU NOMBRE (24-sep-2026). Con cuatro marcas, la
+              primera y la última ya no alcanzan: a mediodía, «Entrada 8:00 ·
+              Salida 12:00» se lee como que ya salió del trabajo. */}
           <span>
             ✓{" "}
-            {hoyMarcado.salida
-              ? `Entrada ${enDoceHoras(hoyMarcado.entrada)} · Salida ${enDoceHoras(hoyMarcado.salida)}`
-              : `Entrada ${enDoceHoras(hoyMarcado.entrada)}`}
+            {MARCACION_CUATRO_MARCAS
+              ? resumenDelDia(horasHoy)
+              : hoyMarcado.salida
+                ? `Entrada ${enDoceHoras(hoyMarcado.entrada)} · Salida ${enDoceHoras(hoyMarcado.salida)}`
+                : `Entrada ${enDoceHoras(hoyMarcado.entrada)}`}
           </span>
           {sePuedeDeshacer && (
             <button
@@ -121,7 +139,9 @@ export default function PantallaUnToque({
             >
               {deshaciendo
                 ? "Deshaciendo…"
-                : `${rotuloDeshacer(sePuedeDeshacer.tipo)} · ${cuentaRegresiva(sePuedeDeshacer.restanMs)}`}
+                : `${MARCACION_CUATRO_MARCAS
+                    ? rotuloDeshacerDeLaMarca(marcasHoy - 1, sePuedeDeshacer.tipo)
+                    : rotuloDeshacer(sePuedeDeshacer.tipo)} · ${cuentaRegresiva(sePuedeDeshacer.restanMs)}`}
             </button>
           )}
         </div>

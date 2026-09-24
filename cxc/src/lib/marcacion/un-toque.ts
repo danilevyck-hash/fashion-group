@@ -40,7 +40,8 @@
 // `marcacion-payload-igual`).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { estadoDelBoton, QUIEN_CORRIGE, type DiaMarcado, type EstadoBoton } from "./marcacion";
+import { QUIEN_CORRIGE, type DiaMarcado, type EstadoBoton } from "./marcacion";
+import { estadoDelBotonHoy } from "./cuatro-marcas";
 
 /** 🔴 El interruptor. `true` = un botón fijo abajo y aceptar la foto es marcar. */
 export const MARCACION_UN_TOQUE = true;
@@ -91,12 +92,18 @@ export const TEXTO_LISTO_POR_HOY = "Listo por hoy";
 export const TEXTO_MARCANDO = "Marcando…";
 
 /**
- * Qué dice el botón, con la MISMA regla de siempre (`estadoDelBoton`, que
+ * Qué dice el botón, con la MISMA regla de siempre (`estadoDelBotonHoy`, que
  * cuenta las marcas del día vengan del reloj, del teléfono o de la cola).
  * Lo único que cambia acá es el texto del estado apagado.
+ *
+ * 🔴 DESDE EL 24-sep-2026 LAS MARCAS SON CUATRO (`cuatro-marcas.ts`): el botón
+ * las va pidiendo en orden —entrada, salida a almuerzo, vuelta de almuerzo,
+ * salida— y se apaga tras la cuarta. Con ese interruptor apagado, las dos de
+ * siempre. La regla no se escribe dos veces: esta función sigue sin contar
+ * nada, solo rebautiza el estado apagado.
  */
 export function botonUnToque(marcasHoy: number): EstadoBoton {
-  const b = estadoDelBoton(marcasHoy);
+  const b = estadoDelBotonHoy(marcasHoy);
   return b.apagado ? { ...b, texto: TEXTO_LISTO_POR_HOY } : b;
 }
 
