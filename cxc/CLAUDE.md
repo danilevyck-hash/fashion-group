@@ -73,10 +73,7 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 
 > **Nacidos después del 5-jul-2026**: los cuatro módulos navegables `asistencia` · `gastos-contabilidad` · `referencia` · `boston`, más dos PÁGINAS públicas que **no son módulos** y por eso no tienen ficha ni entrada en `role_permissions`: `/pedido-tommy/[id]` y `/pedido-calvin/[id]`.
 
-> 🩸 **«Packing Lists» (key `packing-lists`) se RETIRÓ el 10-sep-2026** (0 filas, nadie lo usó). Las tablas `packing_lists` y `pl_items` **NO se dropean** (patrón `mayor_lineas`), quedan `retirada` fuera del respaldo; `/packing-lists*` redirige a `/home` (307). Detalle en `docs/historico/superado.md`.
 
-> Las fichas del home y del sidebar NO llevan subtítulo: el campo `subtitle` se eliminó de `AppModule`.
-> Páginas de grupo: `/g/[grupo]` con los 3 slugs nuevos. Los slugs viejos redirigen en `next.config.js` (`/g/sistema` → `/g/administracion`; `/g/plata-entra`, `/g/plata-sale`, `/g/productos` → `/home`).
 ## Pendientes vivos
 
 🔴 **Lo que Daniel pidió y sigue sin hacerse vive en [docs/pendientes-vivos.md](docs/pendientes-vivos.md)** (24 puntos, **reauditados uno por uno el 18-sep-2026**: nueve estaban resueltos y el archivo no se había enterado). Ábrelo al empezar una sesión, junto con `docs/estado-actual.md`. Daniel: *«no te olvides de las cosas porque yo me olvido y se pasan cosas»*. 🔴 **Lo que mueve plata y sigue abierto**: Multifashion sin ninguna quincena cerrada (y Fashion Wear 1–15 sep reabierta) · el cuadre del estado de cuenta que llega vacío. 🔑 **Antes de construir lo que ahí falte, compruébalo contra el código y la base.**
@@ -678,6 +675,7 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 - **Regla:** el stack del historial debe ser ESPEJO del breadcrumb (Inicio › Grupo › Módulo › Detalle). El Back del navegador solo deshace la última URL — no conoce la jerarquía, así que la jerarquía debe vivir en el historial.
 - **Drill-down a un nivel más profundo → `push`**; **filtro / tab / sort en el MISMO nivel → `replace`** (Back no debe ciclar por tabs ni filtros). `useUrlState(key, default, { history: "push" })` para params que representan un nivel; default `"replace"` para filtros/tabs.
 - 🔴 **EN EL CELULAR, UNA PESTAÑA ES UNA PANTALLA (24-sep-2026)**: `useUrlState` decide por el dedo (`aparatoDeQuienMira`): `CLAVES_DE_PANTALLA` (`tab · subtab · vista · ver · modo · mfCel`) hacen `push` en el celular y `replace` en la computadora; filtros siguen en `replace`. Candado `url-state-pestana-es-pantalla`.
+- 🔴 **EN EL CELULAR, ☰ ABRE UNA HOJA DE ABAJO CON LOS GRUPOS COMO PESTAÑAS (24-sep-2026)**: los módulos del ROL adentro, el de aquí marcado, abierta en el grupo donde estás; la pestaña dice la PRIMERA palabra DERIVADA (**Ventas · Operación · Administración**) y tocar un módulo navega y cierra. 🩸 Eran cuatro renglones y `/g/<grupo>` de por medio. ⚠️ `/g/<grupo>` no se toca; con UN grupo no hay pestañas. `lib/navegacion/cajon-por-grupos.ts`, interruptor `CAJON_HOJA_ABAJO`. Candado `cajon-hoja-abajo`.
 - **SPAs de un solo route**: el patrón de referencia es **Reclamos** (`src/app/reclamos/ReclamosClient.tsx`), que reconstruye el estado desde la URL. Los módulos con routes reales (Caja, Préstamos, Guías, Clientes detalle) ya son correctos y no requieren tratamiento especial.
 ## Teclado (lo único que corre)
 

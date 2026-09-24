@@ -316,6 +316,81 @@ Es el motivo real por el que `/home` quedó fuera del arreglo de la mañana, y s
 
 ---
 
+# 5 · En el celular, el menú de las tres rayas muestra el menú (24-sep-2026)
+
+## Lo que había
+
+El botón ☰ del teléfono abría un cajón lateral de 288 px con **cuatro renglones
+útiles** —Inicio, Ventas y clientes, Operación, Administración— y el resto de la
+pantalla en blanco. Los tres de abajo no son módulos: son **grupos**, y tocarlos
+cerraba el cajón y cargaba **otra pantalla**, `/g/<grupo>`, cuyo único trabajo es
+listar los módulos de ese grupo.
+
+Medido sobre los 20 módulos que ve admin (10 · 9 · 1): ir de **Asistencia a
+Guías** —dos módulos del MISMO grupo— eran **tres toques con una pantalla de por
+medio** (☰ › Operación › esperar `/g/operacion` › Guías). Equivocarse de grupo
+costaba además un «Atrás».
+
+## Cómo quedó
+
+☰ abre una **hoja desde abajo** —donde está el pulgar— con:
+
+1. «Inicio» (la casa del rol, y nada si ya está parado en ella: la misma regla
+   del cajón viejo y del camino de migas);
+2. los grupos como **pestañas**, con el control segmentado que ya usa el resto
+   del sistema (`components/ventas/ControlSegmentado`), **abierta en el grupo del
+   módulo donde está la persona**;
+3. los módulos de ese grupo, **con el de aquí marcado** (`aria-current="page"`);
+4. al pie, nombre · rol · Contraseña · Salir.
+
+De Asistencia a Guías quedan **dos toques y ninguna pantalla de por medio**, y
+cambiar de grupo ya no cuesta salir de la hoja.
+
+## Las reglas
+
+- 🔴 **Los módulos salen del ROL, nunca de una lista escrita a mano**: todo sale
+  de `getVisibleModules`/`GROUPS` de `modules.ts`, que ya poda Préstamos (Planilla
+  Unida) y el CXC de David según sus interruptores. En
+  `lib/navegacion/cajon-por-grupos.ts` no hay el nombre de un solo módulo ni de un
+  solo rol.
+- 🔴 **El rótulo de la pestaña es la PRIMERA palabra del grupo, DERIVADA**:
+  «Ventas y clientes» no entra en un tercio de 390 px —se leía «Ventas y cl…»—,
+  así que la pestaña dice **Ventas · Operación · Administración**. El nombre
+  completo sigue mandando en el home, en el camino de migas y en `/g/<grupo>`. Un
+  grupo que se renombre arrastra solo su rótulo corto.
+- 🔴 **Un grupo sin módulos no se dibuja, y con UN solo grupo no hay pestañas**:
+  un segmentado de una opción es un botón que no hace nada (la misma regla que la
+  Planilla aplicó al suyo). Le pasa al gerente de Multifashion. Al rol
+  `marcacion` ni siquiera se le dibuja el ☰ — eso no se tocó.
+- ⚠️ **`/g/<grupo>` NO se toca**: sigue viva para la computadora y para el camino
+  de migas. Esto solo cambia por dónde se entra desde el teléfono.
+- **Se reusa el `BottomSheet` de la casa** (`components/ui.tsx`), que ya trae el
+  agarre, el fondo oscuro, el Escape, el bloqueo del scroll del fondo y el
+  `sm:hidden` — o sea que la computadora no ve la hoja nunca. Cerrar con toque
+  afuera, con Escape y al cambiar de ruta sigue funcionando igual que el cajón.
+- 🔑 **Lo que se guarda no cambia**: esto es navegación, no toca ni una fila.
+
+## Dónde quedó «Inicio»
+
+Como en el dibujo 1c que Daniel aprobó: **«Inicio» es un renglón encima de las
+pestañas** y el pie dice «daniel · Administrador · Contraseña · Salir». Es la
+única decisión de lugar que se tomó mirando el mockup y no el texto del encargo,
+que lo ponía al pie.
+
+## Interruptor y candado
+
+- `CAJON_HOJA_ABAJO` en `src/lib/navegacion/cajon-por-grupos.ts`, hoy `true`.
+  En `false` vuelve el cajón lateral de siempre, intacto.
+- `src/__tests__/navegacion/cajon-hoja-abajo.test.tsx` — el módulo puro (el
+  interruptor, el rótulo corto derivado, los tres grupos de admin contra
+  `getModulesInGroup`, el rol de un módulo solo sin pestañas, el grupo del
+  pathname con su respaldo) y el render (☰ abre la hoja con las tres pestañas
+  cortas y el módulo de aquí marcado · la pestaña cambia la lista sin navegar ·
+  tocar un módulo navega y cierra · con el interruptor apagado vuelve el cajón
+  lateral con los nombres largos y sin pestañas).
+
+---
+
 ## Lo que decía CLAUDE.md hasta el 22-sep-2026 (movido acá, verbatim)
 
 ### Navegación, 404 y papel — lo que se arregló el 17-sep-2026

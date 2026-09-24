@@ -18,6 +18,16 @@ import { etiquetaDeRol } from "@/lib/roles-etiquetas";
 import { BotonCambiarContrasena } from "@/components/CambiarContrasena";
 import { esRolMarcacion } from "@/lib/marcacion/rol";
 import { MARCACION_UN_TOQUE } from "@/lib/marcacion/un-toque";
+import { BottomSheet } from "@/components/ui";
+import {
+  CAJON_HOJA_ABAJO,
+  gruposDelCajon,
+  grupoAlAbrir,
+  moduloDeLaRuta,
+  seDibujaElSegmentado,
+} from "@/lib/navegacion/cajon-por-grupos";
+import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
+import type { ModuleGroup } from "@/lib/modules";
 
 // Cómo se llama cada rol: UN solo lugar, `lib/roles-etiquetas.ts` (11-sep-2026).
 
@@ -110,6 +120,20 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
   const cerrarDrawer = useCallback(() => setDrawerOpen(false), []);
   const backdropDrawer = useBackdropDismiss(cerrarDrawer);
   useEscapeClose(drawerOpen, cerrarDrawer);
+
+  // ── El menú del celular: una hoja de abajo con los grupos como pestañas ──
+  // 🔴 24-sep-2026. La regla y el interruptor viven en
+  // `lib/navegacion/cajon-por-grupos.ts`; acá solo se dibuja. Los módulos son
+  // los del ROL, nunca una lista escrita a mano.
+  const gruposHoja = CAJON_HOJA_ABAJO ? gruposDelCajon(userRole, fgModules) : [];
+  const [grupoElegido, setGrupoElegido] = useState<ModuleGroup | null>(null);
+  useEffect(() => {
+    if (!CAJON_HOJA_ABAJO || !drawerOpen) return;
+    setGrupoElegido(grupoAlAbrir(pathname, gruposDelCajon(userRole, fgModules)));
+  }, [drawerOpen, pathname, userRole, fgModules]);
+  const grupoActivo = grupoElegido ?? gruposHoja[0]?.key ?? null;
+  const modulosDelGrupo = gruposHoja.find(g => g.key === grupoActivo)?.modulos ?? [];
+  const moduloAqui = moduloDeLaRuta(pathname);
 
   const moduleColor = getModuleColor(pathname);
   const currentNav = ALL_MODULES.find(m => moduleColor && pathname.startsWith(m.href));
@@ -222,8 +246,9 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
         </div>
       )}
 
-      {/* Mobile drawer */}
-      {drawerOpen && (
+      {/* Mobile drawer — el cajón lateral de siempre. Queda EXACTAMENTE como
+          estaba: con `CAJON_HOJA_ABAJO` apagado vuelve solo. */}
+      {drawerOpen && !CAJON_HOJA_ABAJO && (
         <div className="fixed inset-0 z-50 sm:hidden">
           <div {...backdropDrawer} className="absolute inset-0 bg-black/40" />
           <div className="absolute right-0 top-0 bottom-0 w-72 bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
@@ -278,6 +303,67 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
             </nav>
           </div>
         </div>
+      )}
+
+      {/* ── La hoja de abajo (24-sep-2026) ──
+          Sube desde donde está el pulgar, con los grupos como pestañas y los
+          módulos del grupo debajo. Reusa el `BottomSheet` de la casa, que ya
+          trae el agarre, el fondo oscuro, el Escape, el bloqueo del scroll y el
+          `sm:hidden` — o sea que la computadora no la ve nunca. */}
+      {CAJON_HOJA_ABAJO && (
+        <BottomSheet open={drawerOpen} onClose={cerrarDrawer}>
+          <div className="-mx-5 flex min-h-full flex-col" data-cajon-hoja>
+            {acciones && (
+              <div className="border-b border-gray-100 px-5 pb-3">{acciones}</div>
+            )}
+            {!enSuCasa && (
+              <button onClick={() => { router.push(casa); setDrawerOpen(false); }}
+                className="flex min-h-[44px] w-full items-center gap-3 px-5 py-3 text-sm text-gray-600 active:bg-gray-100 transition-all">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+                Inicio
+              </button>
+            )}
+            {/* Las pestañas: el MISMO control segmentado del resto del sistema.
+                El rótulo corto lo deriva el módulo puro — «Ventas y clientes»
+                no entra en un tercio de 390 px. */}
+            {seDibujaElSegmentado(gruposHoja) && grupoActivo && (
+              <div className="px-3 pb-1 pt-1">
+                <ControlSegmentado
+                  options={gruposHoja.map(g => ({ value: g.key, label: g.rotuloCorto }))}
+                  active={grupoActivo}
+                  onChange={(v) => setGrupoElegido(v)}
+                  ariaLabel="Grupos de módulos"
+                />
+              </div>
+            )}
+            <nav className="py-1">
+              {modulosDelGrupo.map(m => {
+                const Icon = m.icon;
+                const aqui = m.key === moduloAqui;
+                return (
+                  <button key={m.key} onClick={() => { router.push(m.href); setDrawerOpen(false); }}
+                    aria-current={aqui ? "page" : undefined}
+                    className={`flex min-h-[44px] w-full items-center gap-3 px-5 py-3 text-sm transition-all ${aqui ? "bg-gray-50 font-medium text-black" : "text-gray-600 active:bg-gray-100"}`}>
+                    <Icon size={16} strokeWidth={1.5} />
+                    {m.label}
+                  </button>
+                );
+              })}
+            </nav>
+            {userName && (
+              <div className="mt-auto flex items-center gap-3 border-t border-gray-200 px-5 pt-2">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-gray-800">{userName}</div>
+                  <div className="text-xs text-gray-400">{etiquetaDeRol(userRole)}</div>
+                </div>
+                <BotonCambiarContrasena variante="texto" />
+                <button onClick={() => { handleLogout(); setDrawerOpen(false); }} className="-mr-2 flex min-h-[44px] min-w-[44px] items-center justify-center text-xs text-gray-400 transition hover:text-red-600">Salir</button>
+              </div>
+            )}
+          </div>
+        </BottomSheet>
       )}
     </>
   );
