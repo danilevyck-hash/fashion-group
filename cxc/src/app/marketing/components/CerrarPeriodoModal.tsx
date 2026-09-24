@@ -343,12 +343,22 @@ function CerrarPeriodoModalRediseno({ bloque, periodoId, onClose, onCerrado }: P
 
   const hayPendientes = pendientes.sinComprobante > 0 || pendientes.sinFoto > 0;
 
+  // 🔴 10a — LA MISMA PANTALLA, VESTIDA DE HOJA DE iOS (24-sep-2026). Daniel:
+  // *«No hay nada que arreglar»* en el cierre — cabe entera en un iPhone, dice
+  // qué va a pasar, avisa del gasto sin foto, pide el nombre y la nota de
+  // crédito y advierte en rojo. Lo único que cambia en el celular es que SUBE
+  // DESDE ABAJO y que «Cerrar período» es un botón ancho al alcance del pulgar.
+  // 🔴 NINGUNA REGLA DEL CIERRE SE TOCA: mismo endpoint, mismos campos, mismo
+  // aviso, misma validación.
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4" {...backdrop}>
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
+      {...backdrop}
+    >
       <div className="absolute inset-0 bg-black/40" aria-hidden="true" />
       <div
         ref={panelRef}
-        className="relative bg-white w-full sm:max-w-md rounded-lg max-h-[90vh] overflow-y-auto border border-gray-200"
+        className="relative bg-white w-full rounded-t-[20px] sm:rounded-lg sm:max-w-md max-h-[92vh] sm:max-h-[90vh] overflow-y-auto border border-gray-200"
       >
         <div className="border-b border-gray-100 pl-5 pr-2 py-2.5 flex items-center justify-between gap-3">
           <h2 className="text-base font-semibold text-gray-900">Cerrar el período de {bloque.nombre}</h2>
@@ -451,12 +461,14 @@ function CerrarPeriodoModalRediseno({ bloque, periodoId, onClose, onCerrado }: P
           </p>
         </div>
 
-        <div className="border-t border-gray-100 px-5 py-4 flex items-center justify-end gap-3">
+        {/* En el celular «Cerrar período» es ancho y Cancelar baja debajo; en la
+            computadora, los dos botones de siempre a la derecha. */}
+        <div className="border-t border-gray-100 px-4 py-4 pb-8 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end sm:px-5 sm:pb-4">
           <button
             type="button"
             onClick={onClose}
             disabled={cerrando}
-            className="px-3 min-h-[44px] inline-flex items-center justify-center rounded-md text-sm text-gray-600 hover:text-black transition disabled:opacity-40"
+            className="min-h-[44px] w-full sm:w-auto px-3 inline-flex items-center justify-center rounded-md text-[17px] sm:text-sm text-gray-600 hover:text-black transition disabled:opacity-40"
           >
             Cancelar
           </button>
@@ -464,7 +476,7 @@ function CerrarPeriodoModalRediseno({ bloque, periodoId, onClose, onCerrado }: P
             type="button"
             onClick={confirmar}
             disabled={!puedeConfirmar}
-            className="rounded-md bg-black text-white px-4 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto rounded-[14px] sm:rounded-md bg-black text-white px-4 py-4 sm:py-0 min-h-[44px] inline-flex items-center justify-center text-[17px] font-semibold sm:text-sm sm:font-normal active:scale-[0.98] transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {cerrando ? "Cerrando…" : "Cerrar período"}
           </button>
