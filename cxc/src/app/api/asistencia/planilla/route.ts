@@ -574,14 +574,15 @@ export async function GET(req: NextRequest) {
       // los 7 días que sí trabajó. El MISMO mapa que ya se lee arriba para
       // `codigosFueraDeRango`; sin fechas cargadas no cambia un centavo.
       vigencias,
-      // 🔴 Los días laborables de cada quien (18-sep-2026). Vacío = lunes a
-      // viernes para todos, la planilla de siempre.
-      diasLaborables,
       // 🔴 Las entradas autorizadas (24-sep-2026): ACÁ ES DONDE LLEGAN AL PAGO,
       // con la MISMA lectura que el Reporte. Sin la tabla, vacío: la planilla
       // de siempre, hasta el centavo. ⚠️ Solo el cuadro que se GENERA: una
       // quincena ya cerrada es su resultado congelado y no se recalcula.
       entradasAutorizadas: indexarEntradasAutorizadas(entradasRes.entradas),
+      // 🔴 Los días laborables de cada quien (18-sep-2026). Vacío = lunes a
+      // viernes para todos, la planilla de siempre.
+      // ⚠️ Va ÚLTIMO a propósito: el candado `horario-configurable` lo exige.
+      diasLaborables,
     });
 
     // Cuánto dura el día de cada quien. Es lo que vale una ausencia.

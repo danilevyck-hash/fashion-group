@@ -346,13 +346,14 @@ export async function GET(req: NextRequest) {
       // pantalla de Asistencia no puede marcarle una falta a alguien que ese
       // día todavía no trabajaba acá.
       vigencias,
-      // 🔴 Los días laborables de cada quien (18-sep-2026), la MISMA lista que
-      // usa la planilla. Vacío = lunes a viernes para todos.
-      diasLaborables,
       // 🔴 Las entradas autorizadas (24-sep-2026): ese día la extra de la
       // entrada se mide desde la hora autorizada. La MISMA lectura que la
       // planilla; vacío = nadie tiene.
       entradasAutorizadas: indexarEntradasAutorizadas(entradasRes.entradas),
+      // 🔴 Los días laborables de cada quien (18-sep-2026), la MISMA lista que
+      // usa la planilla. Vacío = lunes a viernes para todos.
+      // ⚠️ Va ÚLTIMO a propósito: el candado `horario-configurable` lo exige.
+      diasLaborables,
     });
 
     // 🔴 QUIEN NO COBRA HORAS EXTRA NO LAS CUENTA EN EL REPORTE. Hasta el
