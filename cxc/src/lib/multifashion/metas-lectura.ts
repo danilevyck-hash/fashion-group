@@ -34,10 +34,15 @@
 // sin paginar se leerían 1.000 de 6.610 documentos —el 15% de la venta— sin un
 // solo error. Un avance que se queda corto y no avisa es peor que no tenerlo.
 //
-// 🔑 LOS PESOS DE LA TEMPORADA NO CUESTAN UNA LECTURA EXTRA CARA: salen de
-// `multifashion_overview_serie_v1(anio)`, una RPC que YA ESTÁ EN PRODUCCIÓN
-// desde jun-2026 y devuelve los 12 meses del año en una llamada. O sea que la
-// proyección ponderada —lo que Daniel pidió— funciona ANTES de que corra la DDL.
+// ── 🔴 DE DÓNDE SALE «CUÁNTA TEMPORADA PASÓ» (23-sep-2026) ───────────────────
+// De la MISMA función que el «vendido» y que el ritmo del Telegram: el año
+// pasado LEÍDO DÍA POR DÍA (`leerBaseAnioPasado`), no el mes repartido en
+// partes iguales. El porqué —y el defecto que lo destapó— está en la cabecera
+// de `metas-avance.ts`.
+//
+// El respaldo mensual sigue entero y solo se pide cuando esa lectura falla:
+// sale de `rpcRetail("overviewSerie")` (la v2, que no pega `ventas_raw`; cae
+// sola a la v1), una RPC que devuelve los 12 meses del año en una llamada.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { supabaseServer } from "@/lib/supabase-server";
@@ -49,10 +54,13 @@ import {
   claveVendedora,
   type VendedoraAgrupada,
 } from "./metas-clave";
+import { unAnioAntes } from "@/lib/ventas/clientes-corte-comparativo";
+import { rpcRetail } from "./rpc-retail";
 import {
   avanceMeta,
   mesDelAnioAnterior,
   type Avance,
+  type BaseAnioPasado,
   type PesoMes,
 } from "./metas-avance";
 
@@ -310,11 +318,12 @@ export async function leerPesosTemporada(desde: string, hasta: string): Promise<
 
   const porMes = new Map<string, number>();
   for (const anio of anios) {
-    const { data, error } = await supabaseServer.rpc("multifashion_overview_serie_v1", {
-      p_year: anio,
-    });
+    // 🔴 Por la puerta de la casa (`rpcRetail`): la v2 es la que NO pega
+    // `ventas_raw` para enero–abril de 2025, donde el mayoreo no está marcado.
+    // Sin la migración se cae sola a la v1, como el resto del módulo.
+    const { data, error } = await rpcRetail("overviewSerie", { p_year: anio });
     if (error) {
-      console.error("[metas] no se pudo leer la temporada", anio, error.message);
+      console.error("[metas] no se pudo leer la temporada", anio, (error as { message?: string }).message);
       return [];
     }
     for (const m of (data as SerieAnual | null)?.meses ?? []) {
@@ -323,6 +332,46 @@ export async function leerPesosTemporada(desde: string, hasta: string): Promise<
   }
 
   return mesesRef.map((mes) => ({ mes, ventas: porMes.get(mes) ?? 0 }));
+}
+
+/**
+ * 🔴 EL AÑO PASADO DÍA POR DÍA — la base con la que la pantalla y el Telegram
+ * dicen lo mismo (23-sep-2026).
+ *
+ * Sale de `leerVentasDelPeriodo`, la MISMA función que da el «vendido» de la
+ * meta y la MISMA que usa `leerRitmoMeta` para la línea «🎯 Meta» del resumen
+ * de ACS: `_multifashion_sf_vw`, `is_wholesale = false`, subtotal firmado.
+ * Retail contra retail, mismo corte, misma tabla. Si acá se leyera de otro
+ * lado, la pantalla volvería a contradecir al Telegram.
+ *
+ * FALLA ABIERTO: `null` y la proyección cae al respaldo mensual (`pesos`), que
+ * lo dice en `base`. Una base que no cargó no puede tumbar el avance que sí.
+ */
+export async function leerBaseAnioPasado(
+  desde: string,
+  hasta: string,
+  corte: string,
+): Promise<BaseAnioPasado | null> {
+  try {
+    const [rango, hastaCorte] = await Promise.all([
+      leerVentasDelPeriodo(unAnioAntes(desde), unAnioAntes(hasta)),
+      leerVentasDelPeriodo(unAnioAntes(desde), unAnioAntes(corte)),
+    ]);
+    const base = { rango: totalDe(rango.filas), hastaCorte: totalDe(hastaCorte.filas) };
+    return base.rango > 0 ? base : null;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[metas] no pude leer el año pasado día por día (${msg}); la proyección va por meses`);
+    return null;
+  }
+}
+
+/**
+ * El día hasta el que se mide, acotado al período de la meta. Es el MISMO
+ * corte del «vendido»: con la meta ya cerrada, su último día.
+ */
+export function corteDeLaMeta(desde: string, hasta: string, hoy: string): string {
+  return hoy < desde ? desde : hoy > hasta ? hasta : hoy;
 }
 
 // ── Metas guardadas ──────────────────────────────────────────────────────────
@@ -417,10 +466,15 @@ export async function leerMetas(): Promise<Meta[] | null> {
  * pregunta y dos pantallas dirían números distintos de lo mismo.
  */
 export async function avanceDeMeta(meta: Meta, hoy: string): Promise<MetaConAvance> {
-  const [{ filas, fuente }, pesos] = await Promise.all([
+  // 🔴 La base buena primero (el año pasado día por día, la del Telegram); los
+  // pesos mensuales solo se piden si esa no se pudo leer — así no cuesta una
+  // lectura de más y el respaldo sigue entero.
+  const corte = corteDeLaMeta(meta.desde, meta.hasta, hoy);
+  const [{ filas, fuente }, baseAnioPasado] = await Promise.all([
     leerVentasDelPeriodo(meta.desde, meta.hasta),
-    leerPesosTemporada(meta.desde, meta.hasta),
+    leerBaseAnioPasado(meta.desde, meta.hasta, corte),
   ]);
+  const pesos = baseAnioPasado ? [] : await leerPesosTemporada(meta.desde, meta.hasta);
 
   const claves = meta.participantes.map((p) => p.clave);
   const porClave = totalDeParticipantes(filas, claves);
@@ -461,6 +515,7 @@ export async function avanceDeMeta(meta: Meta, hoy: string): Promise<MetaConAvan
     objetivo: meta.objetivo,
     vendido: vendidoGrupal,
     pesos,
+    baseAnioPasado,
   });
 
   const porVendedora: AvanceParticipante[] = meta.participantes.map((p) => {
@@ -492,6 +547,7 @@ export async function avanceDeMeta(meta: Meta, hoy: string): Promise<MetaConAvan
               objetivo,
               vendido,
               pesos,
+              baseAnioPasado,
             }),
     };
   });
@@ -518,7 +574,9 @@ export async function avanceDeMeta(meta: Meta, hoy: string): Promise<MetaConAvan
     porVendedora,
     aporteNoAsignado,
     fuente,
-    temporadaDisponible: pesos.some((p) => p.ventas > 0),
+    // 🔴 Lo dice el avance, no la fuente: con la base del año pasado día por
+    // día no hay pesos mensuales que mirar y la temporada igual está.
+    temporadaDisponible: avance.base === "temporada",
   };
 }
 

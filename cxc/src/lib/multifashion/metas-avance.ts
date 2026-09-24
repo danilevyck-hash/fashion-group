@@ -47,8 +47,66 @@
 // inventado con cara de dato es peor que no tener número.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ── 🔴 LA TEMPORADA SE MIDE DÍA POR DÍA, NO MES REPARTIDO EN PARTES IGUALES ──
+// (23-sep-2026) El 23 de septiembre la pantalla decía *"cierran en $401.881,60,
+// les faltarían $18.118"* y el mismo día el Telegram decía *"▲ +5% arriba del
+// ritmo"*. Los dos no pueden tener razón, y el que mentía era la pantalla.
+//
+// Las dos cuentas son LA MISMA fórmula —proyección ÷ objetivo − 1 ES el % del
+// ritmo (`meta-ritmo.ts`)— y solo se separaban en de dónde sale «cuánta
+// temporada pasó»:
+//
+//   · El Telegram: lo que el año pasado se había vendido A ESA MISMA FECHA
+//     ($25.473,08 del 1 al 23 de sep de 2025) sobre el rango completo
+//     ($340.698,55) = 7,48 %.
+//   · La pantalla: el MES del año pasado repartido en partes iguales entre sus
+//     días — 23 de 30 días de septiembre = 76,7 % de $36.430,41 = $27.930 sobre
+//     $340.698,55 = 8,20 %.
+//
+// Septiembre de 2025 no vendió parejo (el 23 fue un día en cero), así que el
+// reparto plano daba por transcurrida más temporada de la que pasó y hundía la
+// proyección: $401.881,60 en vez de $440.643,43. Con la base real las dos
+// pantallas dicen lo mismo, +4,9 %.
+//
+// La misma regla ya vive en el «Cierra en» del mes (`resumen-minimo.ts`,
+// `proyeccionMesPorTemporada`: `prevMismosDias ÷ prevMesCompleto`). Eran tres
+// lugares con la misma idea y solo éste la aproximaba.
+//
+// ⚠️ `pesos` NO se retira: es el respaldo cuando no se puede leer el año pasado
+// día por día, y después de él quedan los días pelados. Falla ABIERTO hacia la
+// regla peor, diciéndolo (`base`), nunca hacia ningún número.
+
 /** Debajo de esto no se proyecta: el divisor es tan chico que amplifica ruido. */
 export const FRACCION_MINIMA_PARA_PROYECTAR = 0.05;
+
+/**
+ * Lo que vendió el MISMO período un año antes, medido con la MISMA función que
+ * el ritmo del Telegram (`leerVentasDelPeriodo` sobre `_multifashion_sf_vw`,
+ * `is_wholesale = false`, subtotal firmado): retail contra retail.
+ */
+export interface BaseAnioPasado {
+  /** Del inicio del período (−1 año) hasta el corte (−1 año), inclusive. */
+  hastaCorte: number;
+  /** El período COMPLETO (−1 año). */
+  rango: number;
+}
+
+/**
+ * La porción de temporada transcurrida según el año pasado día por día.
+ *
+ * `null` = no se puede usar y hay que caer al respaldo: sin rango, o un
+ * «hasta el corte» mayor que el rango entero (dato inconsistente, no se
+ * inventa un 100 %). Un neto negativo por devoluciones se trata como 0.
+ */
+export function fraccionDelAnioPasado(base: BaseAnioPasado | null | undefined): number | null {
+  if (!base) return null;
+  const rango = Number(base.rango) || 0;
+  const hastaCorte = Number(base.hastaCorte) || 0;
+  if (rango <= 0) return null;
+  const f = hastaCorte / rango;
+  if (f > 1) return null;
+  return f < 0 ? 0 : f;
+}
 
 /** Cuánto de la temporada tiene que faltar para que un día pese. Ver `pesosPorDia`. */
 export interface PesoMes {
@@ -72,6 +130,12 @@ export interface EntradaAvance {
   vendido: number;
   /** Reparto del MISMO período un año antes. Vacío → se cae a los días. */
   pesos?: readonly PesoMes[];
+  /**
+   * 🔴 LA BASE BUENA: el año pasado día por día. Cuando está, MANDA sobre
+   * `pesos` — es la misma base del ritmo del Telegram, así que las dos
+   * pantallas no se pueden contradecir.
+   */
+  baseAnioPasado?: BaseAnioPasado | null;
 }
 
 export interface Avance {
@@ -197,9 +261,16 @@ export function transcurrido(
   hasta: string,
   hoy: string,
   pesos: readonly PesoMes[] | undefined,
+  baseAnioPasado?: BaseAnioPasado | null,
 ): Transcurrido {
-  if (hoy < desde) return { fraccion: 0, base: pesosPorDia(desde, hasta, pesos) ? "temporada" : "dias" };
-  if (hoy >= hasta) return { fraccion: 1, base: pesosPorDia(desde, hasta, pesos) ? "temporada" : "dias" };
+  // La base buena manda: si el año pasado se puede leer día por día, ni se
+  // miran los pesos mensuales.
+  const real = fraccionDelAnioPasado(baseAnioPasado);
+  const hayTemporada = real != null || pesosPorDia(desde, hasta, pesos) != null;
+
+  if (hoy < desde) return { fraccion: 0, base: hayTemporada ? "temporada" : "dias" };
+  if (hoy >= hasta) return { fraccion: 1, base: hayTemporada ? "temporada" : "dias" };
+  if (real != null) return { fraccion: real, base: "temporada" };
 
   const porDia = pesosPorDia(desde, hasta, pesos);
   if (porDia == null) {
@@ -218,7 +289,7 @@ const centavos = (n: number) => Math.round(n * 100) / 100;
 export function avanceMeta(e: EntradaAvance): Avance {
   const vendido = centavos(e.vendido);
   const objetivo = centavos(e.objetivo);
-  const { fraccion, base } = transcurrido(e.desde, e.hasta, e.hoy, e.pesos);
+  const { fraccion, base } = transcurrido(e.desde, e.hasta, e.hoy, e.pesos, e.baseAnioPasado);
 
   const diasTotales = diasInclusive(e.desde, e.hasta);
   const diasTranscurridos =

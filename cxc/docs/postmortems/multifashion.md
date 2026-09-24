@@ -495,6 +495,81 @@ Cada una rompe el candado `multifashion-retail-al-frente.test.tsx` y se restaur�
 - ⚠️ Con el mes en curso, la línea del bono pide UNA vez más a `/api/multifashion/bonos` (el último mes cerrado): es la misma RPC, cacheada 5 min.
 - Las 13 reglas del rediseño del 6-sep se podaron de CLAUDE.md el 23-sep-2026 (tope de 130.000 code points): viven verbatim más abajo, en «Lo que decía CLAUDE.md hasta el 22-sep-2026 › El rediseño del módulo». Copia del bloque podado: `scratchpad/claude-md-bloque-podado-23sep.md` de la sesión.
 
+---
+
+## La meta decía una cosa y el Telegram otra (23-sep-2026)
+
+> Daniel, esa noche a las 8:50 p.m.: el resumen de ACS decía **«🎯 Meta ▲ +5% arriba del ritmo»** y la tarjeta «Viaje playa» de Multifashion › Vendedoras › Metas decía **«$32,945.68 de $420,000 · Así como van, cierran en $401,881.60 · faltarían $18,118.40»**. Si van 5 % arriba del ritmo tienen que cerrar POR ENCIMA de la meta. Uno de los dos mentía.
+
+### Por qué eran la misma cuenta y aun así se contradecían
+
+```
+ritmo      = prevHastaCorte × (objetivo ÷ prevRango)
+pct        = vendido ÷ ritmo − 1                        ← el Telegram
+proyección = vendido ÷ fracción de temporada            ← la tarjeta
+```
+
+Con `fracción = prevHastaCorte ÷ prevRango`, **proyección ÷ objetivo − 1 = pct**: «ir arriba del ritmo» y «cerrar por encima de la meta» son literalmente la misma afirmación. La única forma de que se separen es que la fracción de temporada salga de dos lados distintos — y era exactamente lo que pasaba:
+
+| | De dónde salía la fracción | Al 23-sep-2026 |
+|---|---|---|
+| Telegram (`meta-ritmo.ts`) | el año pasado **día por día**: $25.473,08 (1–23 sep 2025) ÷ $340.698,55 | **7,4767 %** |
+| Tarjeta (`metas-avance.ts`) | el **mes** del año pasado repartido en partes iguales entre sus días: (23÷30 × $36.430,41) ÷ $340.698,55 | **8,1979 %** |
+
+Septiembre de 2025 no vendió parejo (**el 23 de sep de 2025 vendió $0**), así que el reparto plano daba por transcurrida más temporada de la que pasó y hundía la proyección.
+
+🔴 **El que mentía era la PANTALLA.** La regla buena ya la usaban DOS lugares del mismo módulo: el ritmo del Telegram y el «Cierra en» del mes (`resumen-minimo.ts` › `proyeccionMesPorTemporada`, que divide `prevMismosDias ÷ prevMesCompleto`). Solo la meta la aproximaba.
+
+### Lo medido contra producción (23-sep-2026, REST + las RPC reales)
+
+| Qué | Valor | De dónde |
+|---|---|---|
+| Meta «Viaje playa» | 1-sep → 31-dic-2026, $420.000, grupal, activa | `multifashion_metas` |
+| Vendido al 23-sep-2026 | **$32.945,68** | `multifashion_meta_ventas_v2` |
+| 1–23 sep 2025 (retail) | **$25.473,08** (= 1–22: el 23 vendió $0) | la misma RPC |
+| sep–dic 2025 (retail) | **$340.698,55** | la misma RPC |
+| sep 2025 completo | $36.430,41 | `multifashion_overview_serie_v1` **y** `_v2` (iguales: el pegado de `ventas_raw` es ene–abr) |
+
+| | HOY (antes) | DESPUÉS |
+|---|---|---|
+| Telegram «🎯 Meta» | ritmo $31.402,23 · **+4,92 %** («+5%») | **igual, no se tocó** |
+| Tarjeta «cierran en» | **$401.881,60** · faltarían $18.118,40 | **$440.643,43** · le SOBRAN $20.643,43 |
+| ¿Alcanza? | **no** | **sí** |
+| proyección ÷ objetivo − 1 | −4,31 % (≠ el Telegram) | **+4,92 % = el Telegram, al sexto decimal** |
+
+### La regla, ahora una sola
+
+🔴 **La temporada transcurrida de una meta se mide con el año pasado DÍA POR DÍA, con la MISMA función que el vendido y que el ritmo del Telegram**: `leerVentasDelPeriodo` sobre `_multifashion_sf_vw`, `is_wholesale = false`, subtotal firmado. Retail contra retail, mismo corte (`corteDeLaMeta`, acotado al período), misma tabla.
+
+- `metas-avance.ts`: `EntradaAvance.baseAnioPasado` (`{ hastaCorte, rango }`) y `fraccionDelAnioPasado`. Cuando está, **manda** sobre los pesos mensuales.
+- `metas-lectura.ts`: `leerBaseAnioPasado(desde, hasta, corte)` — las dos lecturas en paralelo con el vendido, así que **no cuesta un viaje de más** (los pesos mensuales solo se piden si la base falla). `temporadaDisponible` lo dice el avance (`base === "temporada"`), no la fuente.
+- ⚠️ **`pesos` NO se retiró**: es el respaldo cuando el año pasado no se puede leer día por día, y después queda el reparto por días pelados. **Falla ABIERTO hacia la regla peor, diciéndolo en `base`**, nunca hacia un número inventado. Los pisos no se movieron: bajo el 5 % de temporada no se proyecta, el día de hoy cuenta completo, un período cerrado vale lo vendido.
+- 🩸 Los pesos mensuales ya no nombran `multifashion_overview_serie_v1` a mano: van por `rpcRetail("overviewSerie")`, o sea **la v2 primero** (la que no pega `ventas_raw` para ene–abr 2025). Una meta que cruzara abril venía contaminada con el mayoreo de La Frontera.
+
+### Migraciones
+
+**Ninguna.** Se verificó contra producción que `multifashion_meta_ventas_v1/v2` —de donde salen los dos números— **no nombran `ventas_raw`** (0 menciones en `20260813170000` y `20261209120000`), así que no hay nada que reemplazar.
+
+🔑 **Y de paso, un dato que la nota de «Retail al frente» tenía viejo: las DOS migraciones del 23-sep YA ESTÁN APLICADAS.** Verificado función por función: `_multifashion_retail_sum`, `multifashion_overview_serie_v2`, `multifashion_proyeccion_cierre_v2`, `multifashion_detalle_mensual_v3`, `multifashion_bonos_v5` y `multifashion_retail_recurrentes_v3` responden. La firma: `overview_serie_v1` da abril-2025 = $66.778,36 y la `_v2` = $42.861,32. O sea que el +15,8 % del año y el ▼29 %→+10,5 % de abril **ya están en pantalla**.
+
+### Candado
+
+`src/__tests__/lib/multifashion-meta-ritmo-y-proyeccion.test.ts` (23 pruebas). Con datos FIJOS: reproduce los dos números del defecto; exige que `alcanza === (pct >= 0)` en siete casos (muy arriba, apenas arriba, apenas abajo, muy abajo, dos a mitad de temporada y uno clavado en la meta); que `proyección ÷ objetivo − 1` sea el `pct` del ritmo al sexto decimal; que la base de la tarjeta se lea con `leerVentasDelPeriodo` + `unAnioAntes`, igual que el ritmo; que la tarjeta no nombre `overview_serie_v1` a mano; que la base viaje a TODAS las cuentas de `avanceMeta` (la grupal y la de cada vendedora); y que ninguna de las dos cuentas toque la base.
+
+### Mutaciones a mano (23-sep-2026)
+
+Cada una se rompió, se vio el rojo y se restauró:
+
+1. Se quita la línea que hace mandar a la base real (vuelve el reparto plano) → **10 rojos**.
+2. Los pesos vuelven a pedir `multifashion_overview_serie_v1` a mano en vez de `rpcRetail` → **1 rojo**.
+3. La base deja de viajar a la cuenta de cada vendedora (solo la grupal la lleva) → **1 rojo**.
+4. Un `hastaCorte` mayor que el rango se acepta como 100 % en vez de caer al respaldo → **2 rojos**.
+
+### Pendientes y dudas para Daniel
+
+- ⚠️ **El corte de la tarjeta es `hoyPanama()`, el del Telegram es el último día sincronizado.** Si el sync del día todavía no corrió, la tarjeta cuenta hoy como transcurrido con $0 vendido: proyecta **por lo bajo**, nunca de más. Es la regla de siempre («el día de hoy cuenta completo») y no se tocó.
+- ⚠️ La tarjeta y el Telegram pueden diferir **un día** por eso mismo; el signo (arriba/abajo de la meta) no cambia salvo que estén clavados en cero.
+
 ## Lo que decía CLAUDE.md hasta el 14-sep-2026 (movido acá, verbatim)
 
 > El 14-sep-2026 CLAUDE.md pasaba de 333 mil caracteres (el tope del harness es 150 mil) y las instrucciones se cortaban a la mitad. Se dejó ahí un resumen de las reglas vigentes y el texto completo —mediciones, citas de Daniel, candados y mutaciones— se movió acá sin cambiar una palabra.
