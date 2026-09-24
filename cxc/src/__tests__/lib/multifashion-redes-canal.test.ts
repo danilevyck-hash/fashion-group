@@ -10,8 +10,9 @@
 //      cerrada; la función que lo resuelve lee la tabla y nada más.
 //   2. 🔴 UNA SOLA FILA EN EL RANKING. La v5 agrupa por persona y el canal es
 //      un desglose ADENTRO de esa fila (`por_canal`); ventas, tickets y
-//      comisión salen juntos. La pantalla dibuja «tienda $X · redes $Y» solo
-//      cuando hay algo que desglosar.
+//      comisión salen juntos. La pantalla dibuja «Sheynee $X · Redes $Y» solo
+//      cuando hay algo que desglosar (el rótulo dice el PRIMER NOMBRE desde el
+//      24-sep-2026; sin nombre cae a «tienda»).
 //   3. 🔴 EL BONO USA EL TOTAL JUNTO. `multifashion_bonos_v4` agrupa por
 //      `vendedor_canonico` y esta migración no lo toca.
 //   4. 🔴 METAS USA EL CANÓNICO. `multifashion_meta_ventas_v2` devuelve la
@@ -48,6 +49,7 @@ import {
   CANALES,
   ROTULO_TIENDA,
   desgloseCanales,
+  primerNombre,
 } from "@/lib/multifashion/canales";
 import { leerVentasDelPeriodo, totalDeParticipantes } from "@/lib/multifashion/metas-lectura";
 
@@ -57,6 +59,7 @@ const sqlCodigo = sinComentariosSql(sql);
 const sqlAlias = leer("supabase/migrations/20261009120000_multifashion_vendedora_alias.sql");
 const canales = leer("src/lib/multifashion/canales.ts");
 const pantalla = leer("src/components/multifashion/VendedorasSubtab.tsx");
+const pantallaCelular = leer("src/components/multifashion/celular/VendedorasCelular.tsx");
 const rutaVendedoras = leer("src/app/api/multifashion/vendedoras/route.ts");
 const rutaBonos = leer("src/app/api/multifashion/bonos/route.ts");
 const bonosSection = leer("src/components/multifashion/BonosSection.tsx");
@@ -93,23 +96,53 @@ describe("1 · el canal NO se deduce del nombre", () => {
     expect(sqlCodigo).not.toMatch(/vendedor_nombre\s*(=|<>|IN)/);
   });
 
-  it("la lista del código es espejo del CHECK: solo «redes», y la tienda se llama tienda", () => {
+  it("la lista del código es espejo del CHECK: solo «redes», y el rótulo va con mayúscula", () => {
+    // 🔑 La CLAVE es el valor de la base (el CHECK); el VALOR es solo el rótulo.
     expect(Object.keys(CANALES)).toEqual(["redes"]);
-    expect(CANALES.redes).toBe("redes");
+    expect(sqlCodigo).toContain("CHECK (canal IS NULL OR canal IN ('redes'))");
+    expect(CANALES.redes).toBe("Redes");
+    // Y el rótulo de respaldo, para cuando no sabemos de quién es la fila.
     expect(ROTULO_TIENDA).toBe("tienda");
   });
 
-  it("🔴 el texto de la pantalla se arma SIN el nombre de nadie", () => {
-    // Dos argumentos: el total y lo que la base dijo por canal. Ni un nombre.
-    expect(desgloseCanales.length).toBe(2);
+  it("🔴 el nombre entra como RÓTULO, nunca como criterio (24-sep-2026)", () => {
+    // Tres argumentos: el total, lo que la base dijo por canal, y el nombre
+    // —que SOLO se escribe—. Qué se desglosa lo sigue decidiendo `por_canal`.
+    expect(desgloseCanales.length).toBe(3);
     const codigo = sinComentarios(canales);
-    expect(codigo).not.toMatch(/nombre/i);
+    // Ni una comparación de texto: nada de buscar «REDES» adentro de un nombre.
     expect(codigo).not.toMatch(/REDES/);
     expect(codigo).not.toMatch(/includes\(|toUpperCase|match\(|test\(/);
+    // Y el nombre no puede entrar a ninguna decisión: estas son TODAS las
+    // líneas donde aparece —el recorte, la firma y el rótulo—. Un `if` que lo
+    // mire, o un `return null` cuando falta, agregan una línea y esto se cae.
+    expect(codigo).not.toMatch(/if\s*\([^)]*nombre/);
+    expect(
+      codigo.split("\n").filter((l) => /\bnombre\b/.test(l)).map((l) => l.trim()),
+    ).toEqual([
+      "export function primerNombre(nombre: string | null | undefined): string {",
+      'return String(nombre ?? "").trim().split(/\\s+/)[0] ?? "";',
+      "nombre?: string | null,",
+      "const rotulo = primerNombre(nombreEnPantalla(nombre)) || ROTULO_TIENDA;",
+    ]);
     // Y la pantalla tampoco mira el nombre para decidir el desglose.
-    const componente = sinComentarios(pantalla);
-    expect(componente).not.toMatch(/REDES/);
-    expect(componente).not.toMatch(/nombre[^\n]*includes/);
+    for (const componente of [sinComentarios(pantalla), sinComentarios(pantallaCelular)]) {
+      expect(componente).not.toMatch(/REDES/);
+      expect(componente).not.toMatch(/nombre[^\n]*includes/);
+    }
+  });
+
+  it("🔴 el rótulo es el PRIMER nombre, y sin nombre cae a «tienda» (falla ABIERTA)", () => {
+    expect(primerNombre("Sheynee Batista")).toBe("Sheynee");
+    expect(primerNombre("  Maria   Del Carmen Aparicio ")).toBe("Maria");
+    expect(primerNombre("Jailine")).toBe("Jailine");
+    expect(primerNombre("")).toBe("");
+    expect(primerNombre(null)).toBe("");
+    expect(primerNombre(undefined)).toBe("");
+    // Sin nombre, la línea NO queda con un hueco: dice «tienda», como siempre.
+    expect(desgloseCanales(12049.87, { redes: 375.3 }, null)).toBe("tienda $11,674.57 · Redes $375.30");
+    expect(desgloseCanales(12049.87, { redes: 375.3 }, "   ")).toBe("tienda $11,674.57 · Redes $375.30");
+    expect(desgloseCanales(12049.87, { redes: 375.3 })).toBe("tienda $11,674.57 · Redes $375.30");
   });
 });
 
@@ -228,8 +261,17 @@ describe("2 · una sola fila en el ranking, con el desglose adentro", () => {
   it("🔴 la pantalla dibuja el desglose desde `por_canal`, en la fila Y en la tarjeta", () => {
     const codigo = sinComentarios(pantalla);
     expect(codigo).toContain('import { desgloseCanales } from "@/lib/multifashion/canales";');
-    const usos = codigo.split("desgloseCanales(v.ventas, v.por_canal)").length - 1;
+    // 🔴 UNA sola función, y los TRES llamadores la usan con la MISMA firma:
+    // la fila y la tarjeta de computadora, y la fila del celular.
+    const usos = codigo.split("desgloseCanales(v.ventas, v.por_canal, v.nombre)").length - 1;
     expect(usos).toBe(2);
+    const celular = sinComentarios(pantallaCelular);
+    expect(celular).toContain('import { desgloseCanales } from "@/lib/multifashion/canales";');
+    expect(celular.split("desgloseCanales(v.ventas, v.por_canal, v.nombre)").length - 1).toBe(1);
+    // Y no quedó ni un llamador con la firma vieja, sin nombre.
+    for (const src of [codigo, celular]) {
+      expect(src).not.toMatch(/desgloseCanales\([^)]*por_canal\s*\)/);
+    }
     expect(codigo.split("{desglose && (").length - 1).toBe(2);
     expect(codigo.split("data-desglose-canal").length - 1).toBe(2);
     // La fila sigue siendo una por nombre canónico.
@@ -238,29 +280,36 @@ describe("2 · una sola fila en el ranking, con el desglose adentro", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("2b · el texto «tienda $X · redes $Y»", () => {
+describe("2b · el texto «Sheynee $X · Redes $Y»", () => {
   it("con lo de redes, dice las dos partes y suman la fila", () => {
-    expect(desgloseCanales(9117.73, { redes: 1717.73 })).toBe("tienda $7,400.00 · redes $1,717.73");
+    expect(desgloseCanales(9117.73, { redes: 1717.73 }, "Sheynee Batista"))
+      .toBe("Sheynee $7,400.00 · Redes $1,717.73");
+  });
+
+  it("el nombre que llega GRITADO de Switch se escribe capitalizado", () => {
+    expect(desgloseCanales(9117.73, { redes: 1717.73 }, "SHEYNEE BATISTA"))
+      .toBe("Sheynee $7,400.00 · Redes $1,717.73");
   });
 
   it("acepta el número como texto (así llega el numeric por JSON)", () => {
-    expect(desgloseCanales(9117.73, { redes: "1717.73" })).toBe("tienda $7,400.00 · redes $1,717.73");
+    expect(desgloseCanales(9117.73, { redes: "1717.73" }, "Sheynee Batista"))
+      .toBe("Sheynee $7,400.00 · Redes $1,717.73");
   });
 
   it("🔴 sin nada que desglosar no dice NADA: ni null, ni {}, ni un canal vacío", () => {
-    expect(desgloseCanales(5651.06, null)).toBeNull();
-    expect(desgloseCanales(5651.06, undefined)).toBeNull();
-    expect(desgloseCanales(5651.06, {})).toBeNull();
-    expect(desgloseCanales(5651.06, { redes: null })).toBeNull();
+    expect(desgloseCanales(5651.06, null, "Jailine")).toBeNull();
+    expect(desgloseCanales(5651.06, undefined, "Jailine")).toBeNull();
+    expect(desgloseCanales(5651.06, {}, "Jailine")).toBeNull();
+    expect(desgloseCanales(5651.06, { redes: null }, "Jailine")).toBeNull();
   });
 
   it("un canal que no está en la lista cerrada no se dibuja", () => {
-    expect(desgloseCanales(100, { whatsapp: 40 } as never)).toBeNull();
+    expect(desgloseCanales(100, { whatsapp: 40 } as never, "Jailine")).toBeNull();
   });
 
-  it("la tienda es lo que queda: total − canales, al centavo", () => {
-    expect(desgloseCanales(100, { redes: 100 })).toBe("tienda $0.00 · redes $100.00");
-    expect(desgloseCanales(50.1, { redes: 0.2 })).toBe("tienda $49.90 · redes $0.20");
+  it("la parte de la vendedora es lo que queda: total − canales, al centavo", () => {
+    expect(desgloseCanales(100, { redes: 100 }, "Sheynee Batista")).toBe("Sheynee $0.00 · Redes $100.00");
+    expect(desgloseCanales(50.1, { redes: 0.2 }, "Sheynee Batista")).toBe("Sheynee $49.90 · Redes $0.20");
   });
 });
 

@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// EL CANAL DE UNA VENTA: tienda o redes (18-sep-2026).
+// EL CANAL DE UNA VENTA: la tienda de la vendedora, o redes (18-sep-2026).
 //
 // Daniel quiere medir lo que Multifashion vende por redes sociales (WhatsApp e
 // Instagram). Creó en Switch un vendedor aparte, «REDES Sheynee», y Sheynee
@@ -13,32 +13,45 @@
 // «el código X es el canal redes de la persona Y». La vista lo expone como
 // `vendedor_canal` y el ranking (`multifashion_vendedoras_v5`) sigue agrupando
 // por persona —UNA fila, comisión y tickets JUNTOS— y en esa fila manda
-// `por_canal`: `{ redes: 1717.73 }` solo cuando un código con canal vendió en
+// `por_canal`: `{ redes: 375.30 }` solo cuando un código con canal vendió en
 // el período. Para las demás vendedoras viene `null` y no se dibuja nada.
 //
-// 🔴 EL CANAL NUNCA SE DEDUCE DEL NOMBRE. Acá no entra el nombre de nadie:
-// buscar «REDES» en un texto sería adivinar por parecido, y esta casa no
-// adivina (CLAUDE.md, «nada por parecido»). Lo que se muestra sale de un dato
-// escrito a mano en la tabla, o no se muestra.
+// ── EL RÓTULO DICE EL NOMBRE (24-sep-2026) ───────────────────────────────────
+// Antes la línea decía «tienda $11,674.57 · redes $375.30». Daniel pidió que
+// la parte de la tienda diga el PRIMER NOMBRE de la vendedora y que «Redes» vaya
+// con mayúscula: «Sheynee $11,674.57 · Redes $375.30». El nombre completo ya
+// está en negrita arriba, en la misma fila, así que repetirlo entero sería
+// ruido. Sin nombre se cae al rótulo de siempre, «tienda»: falla ABIERTA, nunca
+// a un hueco.
+//
+// 🔴 EL CANAL NUNCA SE DEDUCE DEL NOMBRE. El nombre entra solo como RÓTULO —se
+// escribe tal cual, capitalizado— y jamás decide nada: buscar «REDES» en un
+// texto sería adivinar por parecido, y esta casa no adivina (CLAUDE.md, «nada
+// por parecido»). Qué se desglosa sale de un dato escrito a mano en la tabla,
+// o no se desglosa.
 //
 // 🔴 LO QUE SE PAGA NO PASA POR ACÁ. La comisión y el bono los calcula la
 // base sobre el total junto; este módulo solo ARMA UN TEXTO para la pantalla.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { fmtMoney } from "@/lib/ventas/format";
+import { nombreEnPantalla } from "@/lib/multifashion/nombres";
 
 /**
  * Lista CERRADA de canales aparte de la tienda, con su rótulo en pantalla.
- * Es espejo del CHECK de `multifashion_vendedora_alias.canal` (migración
- * `20261209120000`): un canal nuevo entra por migración y por acá, a la vez.
+ *
+ * 🔑 La CLAVE es el valor de la base —espejo del CHECK de
+ * `multifashion_vendedora_alias.canal`, migración `20261209120000`— y el VALOR
+ * es solo cómo se escribe en la pantalla. Un canal nuevo entra por migración y
+ * por acá, a la vez; cambiarle el rótulo no toca la base.
  */
 export const CANALES = {
-  redes: "redes",
+  redes: "Redes",
 } as const;
 
 export type Canal = keyof typeof CANALES;
 
-/** Cómo se llama en pantalla lo que NO tiene canal: el mostrador. */
+/** Cómo se llama la parte sin canal cuando no sabemos de quién es: el mostrador. */
 export const ROTULO_TIENDA = "tienda";
 
 /** Lo que la RPC manda en la fila de una vendedora: canal → ventas. */
@@ -47,7 +60,17 @@ export type VentasPorCanal = Partial<Record<Canal, number | string | null>>;
 const centavos = (n: number) => Math.round(n * 100) / 100;
 
 /**
- * El desglose de una fila del ranking: «tienda $7,400.00 · redes $1,717.73».
+ * La primera palabra de un nombre: «Sheynee Batista» → «Sheynee». Vacío → "".
+ *
+ * Es un recorte, no una búsqueda: parte por espacios y se queda con el primer
+ * pedazo. Nada se compara, nada se adivina.
+ */
+export function primerNombre(nombre: string | null | undefined): string {
+  return String(nombre ?? "").trim().split(/\s+/)[0] ?? "";
+}
+
+/**
+ * El desglose de una fila del ranking: «Sheynee $11,674.57 · Redes $375.30».
  *
  * `null` cuando no hay nada que desglosar —`por_canal` vacío o ausente—, que es
  * el caso de todas las vendedoras menos la que vende por redes. La pantalla no
@@ -55,10 +78,14 @@ const centavos = (n: number) => Math.round(n * 100) / 100;
  *
  * La tienda se DERIVA: es el total menos lo de los canales, así que las partes
  * suman exactamente la fila. No se pide un número más a la base para eso.
+ *
+ * `nombre` es SOLO el rótulo de esa parte derivada —el primer nombre, ya
+ * capitalizado—. Sin él va «tienda», como siempre.
  */
 export function desgloseCanales(
   ventas: number,
   porCanal: VentasPorCanal | null | undefined,
+  nombre?: string | null,
 ): string | null {
   if (porCanal == null) return null;
   const partes: string[] = [];
@@ -73,5 +100,6 @@ export function desgloseCanales(
   }
   if (partes.length === 0) return null;
   const tienda = centavos(ventas - enCanales);
-  return [`${ROTULO_TIENDA} ${fmtMoney(tienda)}`, ...partes].join(" · ");
+  const rotulo = primerNombre(nombreEnPantalla(nombre)) || ROTULO_TIENDA;
+  return [`${rotulo} ${fmtMoney(tienda)}`, ...partes].join(" · ");
 }

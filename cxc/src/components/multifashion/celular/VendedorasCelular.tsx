@@ -75,7 +75,7 @@ export function VendedorasCelular({
       <ul data-celular="vendedoras-lista" className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white">
         {vendedoras.map((v) => {
           const delta = deltaCorto(variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct));
-          const desglose = desgloseCanales(v.ventas, v.por_canal);
+          const desglose = desgloseCanales(v.ventas, v.por_canal, v.nombre);
           const estaAbierta = abierta === v.nombre;
           return (
             <li key={v.nombre} className="border-t border-gray-200 first:border-t-0">

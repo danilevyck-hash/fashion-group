@@ -342,9 +342,9 @@ export function subtituloVendedoras(args: {
   return partes.join(" · ");
 }
 
-/** La segunda línea de una vendedora: «tienda $11,420 · redes $136 · 263 tiquetes». */
+/** La segunda línea de una vendedora: «Sheynee $11,675 · Redes $375 · 275 tiquetes». */
 export function lineaVendedora(args: {
-  /** Ya armado por `canales.ts`, con centavos. `null` = sin canal aparte. */
+  /** Ya armado por `canales.ts`, con centavos y con el nombre adelante. `null` = sin canal aparte. */
   desglose: string | null;
   tiquetes: number;
   ticketPromedio: number;
@@ -353,8 +353,9 @@ export function lineaVendedora(args: {
   const partes: string[] = [];
   if (args.gerente) partes.push("gerente");
   if (args.desglose) {
-    // El desglose viene con centavos («tienda $11,419.55»); en el celular va
-    // corto, con la MISMA plata.
+    // El desglose viene con centavos («Sheynee $11,674.57»); en el celular va
+    // corto, con la MISMA plata. El recorte mira el MONTO, no el rótulo: le da
+    // igual que adelante diga «tienda», un nombre o «Redes».
     partes.push(args.desglose.replace(/\$([\d,]+)\.(\d\d)/g, (_m, entero: string, dec: string) =>
       montoCorto(Number(`${entero.replace(/,/g, "")}.${dec}`)),
     ));

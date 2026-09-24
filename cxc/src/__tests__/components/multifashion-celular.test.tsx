@@ -201,8 +201,10 @@ describe("1 · el interruptor y los números del celular", () => {
       .toBe("$32,649 · 690 tiquetes · contra agosto, mismos días");
     expect(subtituloVendedoras({ ventas: 32649.26, tiquetes: 690, rotuloDelta: "vs agosto 2026", anio: 2026, parcial: false }))
       .toBe("$32,649 · 690 tiquetes · contra agosto");
-    expect(lineaVendedora({ desglose: "tienda $11,419.55 · redes $135.65", tiquetes: 263, ticketPromedio: 43.94, gerente: false }))
-      .toBe("tienda $11,420 · redes $136 · 263 tiquetes");
+    // El desglose ya llega con el nombre adelante y «Redes» en mayúscula
+    // (24-sep-2026); acá solo se recortan los centavos.
+    expect(lineaVendedora({ desglose: "Sheynee $11,419.55 · Redes $135.65", tiquetes: 263, ticketPromedio: 43.94, gerente: false }))
+      .toBe("Sheynee $11,420 · Redes $136 · 263 tiquetes");
     expect(lineaVendedora({ desglose: null, tiquetes: 101, ticketPromedio: 67.21, gerente: true }))
       .toBe("gerente · 101 tiquetes · $67.21 promedio");
     expect(detalleVendedora({ comision: 56.71, ticketPromedio: 43.94 }))
@@ -484,20 +486,22 @@ async function pintarVendedoras() {
 }
 
 describe("4 · Vendedoras en el celular", () => {
-  it("🔴 una fila por vendedora, con «tienda · redes» en Sheynee y el cambio al lado del monto", async () => {
+  it("🔴 una fila por vendedora, con «Sheynee · Redes» en Sheynee y el cambio al lado del monto", async () => {
     const { container } = await pintarVendedoras();
     const lista = container.querySelector('[data-celular="vendedoras-lista"]') as HTMLElement;
     const filas = [...lista.querySelectorAll("[data-vendedora]")];
     expect(filas).toHaveLength(4);
     expect(filas.map((f) => f.getAttribute("data-vendedora")))
       .toEqual(["SHEYNEE BATISTA", "JAILINE", "MILAGROS TORRES", "JENNIFER MIRANDA"]);
-    expect(filas[0].textContent).toContain("tienda $11,420 · redes $136 · 263 tiquetes");
+    // 🔴 El rótulo es el PRIMER nombre de la vendedora, no «tienda» (24-sep-2026).
+    expect(filas[0].textContent).toContain("Sheynee $11,420 · Redes $136 · 263 tiquetes");
     expect(filas[0].textContent).toContain("$11,555");
     expect(filas[0].textContent).toContain("▼ 12 %");
     expect(filas[1].textContent).toContain("165 tiquetes · $45.13 promedio");
     expect(filas[3].textContent).toContain("gerente · 101 tiquetes");
     expect(filas[3].textContent).toContain("▲ 39 %");
     // Las demás NO llevan desglose de canal: no se inventa una línea vacía.
+    expect(filas[1].textContent).not.toContain("Redes ");
     expect(filas[1].textContent).not.toContain("tienda $");
   });
 

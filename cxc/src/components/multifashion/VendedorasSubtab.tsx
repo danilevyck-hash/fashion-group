@@ -464,9 +464,10 @@ function VendedoraRow({
 }) {
   const dv = formatDeltaRatio(variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct));
   const bono = textoBono(v, badge, pendiente);
-  // «tienda $7,400.00 · redes $1,717.73» — solo en la fila de quien vendió por
-  // un canal aparte (lo dice la base, `por_canal`); para las demás, nada.
-  const desglose = desgloseCanales(v.ventas, v.por_canal);
+  // «Sheynee $11,674.57 · Redes $375.30» — solo en la fila de quien vendió por
+  // un canal aparte (lo dice la base, `por_canal`); para las demás, nada. El
+  // primer nombre es el rótulo de lo que NO es canal; el canal lo dice la base.
+  const desglose = desgloseCanales(v.ventas, v.por_canal, v.nombre);
   return (
     <tr className={rowHighlight(v, badge) ? "bg-amber-50/60" : ""}>
       <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{rank}</td>
@@ -507,7 +508,7 @@ function VendedoraCard({
 }) {
   const dv = formatDeltaRatio(variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct));
   const bono = textoBono(v, badge, pendiente);
-  const desglose = desgloseCanales(v.ventas, v.por_canal);
+  const desglose = desgloseCanales(v.ventas, v.por_canal, v.nombre);
   return (
     <div className={cn(
       "rounded-lg border bg-white px-4 py-3.5",
