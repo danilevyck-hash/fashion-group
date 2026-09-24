@@ -34,6 +34,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { useState } from "react";
 import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 import PrintDocument from "@/app/guias/components/PrintDocument";
+// 🔴 PRECARGA A TIEMPO: la pantalla pide el papel de la guía sin esperarlo.
+// El porqué, en `src/__tests__/lib/guias-precarga-papel-a-tiempo.test.ts`.
+import "@/lib/guias/papel-de-la-guia";
 import DespachoForm from "@/app/guias/components/DespachoForm";
 import ListaEnvios from "@/app/guias/components/ListaEnvios";
 import GuiasList from "@/app/guias/components/GuiasList";

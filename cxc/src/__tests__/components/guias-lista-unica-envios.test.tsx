@@ -46,6 +46,9 @@ vi.mock("next/navigation", () => ({
 }));
 
 import GuiaPage from "@/app/guias/[id]/page";
+// 🔴 PRECARGA A TIEMPO: la pantalla pide el papel de la guía sin esperarlo.
+// El porqué, en `src/__tests__/lib/guias-precarga-papel-a-tiempo.test.ts`.
+import "@/lib/guias/papel-de-la-guia";
 
 const GUIA_ID = "11111111-1111-4111-8111-111111111111";
 

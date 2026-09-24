@@ -15,6 +15,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import GuiasList from "@/app/guias/components/GuiasList";
+// 🔴 PRECARGA A TIEMPO: la pantalla pide el papel de la guía sin esperarlo.
+// El porqué, en `src/__tests__/lib/guias-precarga-papel-a-tiempo.test.ts`.
+import "@/lib/guias/papel-de-la-guia";
 import type { Guia } from "@/app/guias/components/types";
 
 beforeEach(() => {

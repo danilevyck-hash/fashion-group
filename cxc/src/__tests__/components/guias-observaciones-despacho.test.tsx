@@ -91,6 +91,9 @@ function montar(over: Partial<Guia> = {}) {
 
 // Se importa DESPUÉS de los mocks.
 import GuiaPage from "@/app/guias/[id]/page";
+// 🔴 PRECARGA A TIEMPO: la pantalla pide el papel de la guía sin esperarlo.
+// El porqué, en `src/__tests__/lib/guias-precarga-papel-a-tiempo.test.ts`.
+import "@/lib/guias/papel-de-la-guia";
 
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({}) })));

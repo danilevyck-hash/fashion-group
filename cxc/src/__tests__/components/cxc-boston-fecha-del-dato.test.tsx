@@ -179,7 +179,11 @@ describe("el aviso es un EXTRA: nunca se lleva puesta la cartera", () => {
     );
     await waitFor(() => expect(textoPintado()).toContain("187,018.00"));
     // La fecha sí se pinta; el ámbar simplemente no, que es lo correcto.
-    expect(textoPintado()).toMatch(/Actualizado:/);
+    // 🔴 SON DOS PETICIONES DISTINTAS (23-sep-2026): el monto sale de la
+    // cartera y la fecha de `/api/sync-status`. Que haya llegado una no quiere
+    // decir que llegó la otra, y afirmarlo de una daba rojo al azar en la
+    // máquina de GitHub. `waitFor` reintenta: si la fecha nunca se pinta, roja.
+    await waitFor(() => expect(textoPintado()).toMatch(/Actualizado:/));
     expect(screen.queryByRole("status")).toBeNull();
   });
 });

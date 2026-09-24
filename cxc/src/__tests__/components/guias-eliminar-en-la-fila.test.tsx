@@ -57,6 +57,9 @@ vi.mock("@/lib/guias/atajos-facturas", async (importOriginal) => {
 });
 
 import GuiasPage from "@/app/guias/page";
+// 🔴 PRECARGA A TIEMPO: la pantalla pide el papel de la guía sin esperarlo.
+// El porqué, en `src/__tests__/lib/guias-precarga-papel-a-tiempo.test.ts`.
+import "@/lib/guias/papel-de-la-guia";
 
 /** Dos guías: la que se va a borrar y una vecina, para que "la fila correcta"
  *  sea una afirmación con contenido. Las dos PENDIENTES y las dos con renglones,

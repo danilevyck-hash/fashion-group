@@ -20,4 +20,9 @@
 
 import { configure } from "@testing-library/react";
 
-configure({ asyncUtilTimeout: 5_000 });
+// ⚠️ 23-sep-2026: eran 5.000 ms, EXACTAMENTE el tope que Vitest le da a una
+// prueba por omisión — así que la prueba se moría en el mismo instante en que
+// `waitFor` iba a rendirse y el margen nunca se usaba. Ahora el tope de Vitest
+// está en 20.000 (`vitest.config.ts`) y esta espera tiene aire de sobra: el
+// PDF del estado de cuenta tardaba más de 5 s en la máquina de GitHub.
+configure({ asyncUtilTimeout: 10_000 });

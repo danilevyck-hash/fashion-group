@@ -60,7 +60,15 @@ async function montar(json: unknown = RESPUESTA) {
   sessionStorage.setItem("cxc_role", "admin");
   sessionStorage.setItem("fg_modules", JSON.stringify(["catalogos"]));
   render(<CatalogosMarcasPage />);
-  await screen.findByRole("heading", { name: NOMBRE.reebok });
+  // 🔴 SE ESPERA EL DATO, NO EL TÍTULO (23-sep-2026). El nombre de la marca se
+  // dibuja de una con la pantalla; los números llegan DESPUÉS de la petición,
+  // y hasta entonces la tarjeta dice «Cargando…». Esperar el título dejaba a
+  // todas las afirmaciones de abajo —`getByText`, que no reintenta— corriendo
+  // una carrera contra el `fetch`: en esta computadora ganaba siempre, en la
+  // máquina de GitHub perdía al azar (5 corridas rojas entre el 19 y el
+  // 23-sep). Las CUATRO líneas pintadas son la señal de que ya terminó.
+  const lineas = await screen.findAllByText(/productos a la venta/);
+  expect(lineas).toHaveLength(4);
 }
 
 function tarjeta(marca: MarcaUiKey): HTMLElement {

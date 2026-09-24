@@ -99,8 +99,13 @@ describe("🔴 1. sin la migración corrida, la pantalla NO se rompe", () => {
   it("«＋ Etiquetar una factura» queda apagado: no se ofrece lo que no se puede guardar", async () => {
     servir({ etiquetas: [], sinTabla: true });
     render(<EtiquetasView />);
+    // 🔴 SE ESPERA EL APAGADO, NO EL BOTÓN (23-sep-2026). El botón existe desde
+    // el primer dibujo; que esté apagado depende de la respuesta que dice que
+    // falta la tabla. Afirmarlo de una era una carrera contra el `fetch`: en
+    // esta computadora ganaba, en la de GitHub no («expected false to be true»,
+    // 20 y 22-sep). `waitFor` reintenta: si nunca se apaga, sigue roja.
     const boton = await screen.findByRole("button", { name: /Etiquetar una factura/ });
-    expect((boton as HTMLButtonElement).disabled).toBe(true);
+    await waitFor(() => expect((boton as HTMLButtonElement).disabled).toBe(true));
   });
 });
 

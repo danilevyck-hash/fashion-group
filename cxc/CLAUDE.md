@@ -704,7 +704,7 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 
 ## Testing
 ```bash
-npm test          # Vitest — 16.111 pruebas. Las corre también GitHub Actions y el gancho antes de subir.
+npm test          # Vitest — 17.500 pruebas. Las corre también GitHub Actions y el gancho antes de subir. 🔴 Una prueba aguanta 20 s (`vitest.config.ts`) y `waitFor` espera 10 s: la máquina de GitHub es LENTA y los dos topes eran iguales, así que la prueba moría justo cuando `waitFor` iba a reintentar.
 npx next build    # El build tiene que pasar antes de subir
 ```
 
