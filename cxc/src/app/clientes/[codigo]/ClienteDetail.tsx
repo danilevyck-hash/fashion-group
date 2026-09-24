@@ -338,23 +338,32 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
           {activas.length === 0 ? (
             <p className="text-sm text-gray-500">Todavía no hay movimientos de este cliente.</p>
           ) : (
+            /* 🔴 EL MONTO NO SE CORTA (24-sep-2026). Medido a 390 px: la
+               columna «Debe» mostraba `$43,806.1C` — el último dígito partido
+               por la mitad. `w-full` dentro de un `overflow-x-auto` NUNCA
+               desborda: la tabla se encoge hasta que las cifras no caben, y el
+               deslizamiento de lado no se activa jamás. Con `min-w-max` la
+               tabla pide su ancho de verdad y el contenedor la desliza (la
+               regla de la casa: una tabla ancha, en su propio deslizamiento),
+               y `whitespace-nowrap` impide que un monto se parta en dos.
+               ⚠️ No cambia una sola cifra. */
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-max text-sm">
                 <thead>
                   <tr className="text-left text-xs uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
                     <th className="py-2 font-normal">Empresa</th>
-                    <th className="py-2 font-normal text-right">{anio}</th>
-                    <th className="py-2 font-normal text-right">{anio - 1}</th>
+                    <th className="py-2 font-normal text-right whitespace-nowrap">{anio}</th>
+                    <th className="py-2 font-normal text-right whitespace-nowrap">{anio - 1}</th>
                     <th className="py-2 font-normal text-right whitespace-nowrap">vs {anio - 1}</th>
-                    <th className="py-2 font-normal text-right">Debe</th>
+                    <th className="py-2 font-normal text-right whitespace-nowrap">Debe</th>
                   </tr>
                 </thead>
                 <tbody>
                   {activas.map((e) => (
                     <tr key={e.empresa} className="border-b border-gray-100">
-                      <td className="py-2 text-gray-700">{nombreCortoEmpresa(e.empresa)}</td>
-                      <td className="py-2 text-right tabular-nums">{dinero(e.compras)}</td>
-                      <td className="py-2 text-right tabular-nums text-gray-500">
+                      <td className="py-2 pr-4 text-gray-700 whitespace-nowrap">{nombreCortoEmpresa(e.empresa)}</td>
+                      <td className="py-2 pl-4 text-right tabular-nums whitespace-nowrap">{dinero(e.compras)}</td>
+                      <td className="py-2 pl-4 text-right tabular-nums whitespace-nowrap text-gray-500">
                         {e.comprasAnterior != null ? dinero(e.comprasAnterior) : "—"}
                       </td>
                       <CeldaVariacion actual={e.compras} anterior={e.comprasAnterior} />
@@ -363,8 +372,8 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
                   ))}
                   <tr className="font-medium">
                     <td className="py-2.5">Total</td>
-                    <td className="py-2.5 text-right tabular-nums">{dinero(total.compras)}</td>
-                    <td className="py-2.5 text-right tabular-nums text-gray-500">
+                    <td className="py-2.5 pl-4 text-right tabular-nums whitespace-nowrap">{dinero(total.compras)}</td>
+                    <td className="py-2.5 pl-4 text-right tabular-nums whitespace-nowrap text-gray-500">
                       {total.comprasAnterior != null ? dinero(total.comprasAnterior) : "—"}
                     </td>
                     <CeldaVariacion actual={total.compras} anterior={total.comprasAnterior} className="py-2.5" />
@@ -540,20 +549,20 @@ function Tarjeta({ titulo, children }: { titulo: string; children: React.ReactNo
  *  pasar de $0 a $50.000 no es crecer «infinito». */
 function CeldaVariacion({ actual, anterior, className = "py-2" }: { actual: number; anterior: number | null; className?: string }) {
   const v = variacionVsAnterior(actual, anterior);
-  if (!v) return <td className={`${className} text-right text-gray-300`}>—</td>;
+  if (!v) return <td className={`${className} pl-4 text-right whitespace-nowrap text-gray-300`}>—</td>;
   const baja = v.startsWith("−");
   return (
-    <td className={`${className} text-right tabular-nums ${baja ? "text-red-600" : "text-emerald-700"}`}>{v}</td>
+    <td className={`${className} pl-4 text-right tabular-nums whitespace-nowrap ${baja ? "text-red-600" : "text-emerald-700"}`}>{v}</td>
   );
 }
 
 /** Saldo a favor del CLIENTE (negativo) en azul: no es deuda, es crédito. */
 function CeldaDebe({ valor, className = "py-2" }: { valor: number; className?: string }) {
   if (valor < 0) {
-    return <td className={`${className} text-right tabular-nums text-blue-600`}>Saldo a favor {dinero(Math.abs(valor))}</td>;
+    return <td className={`${className} pl-4 text-right tabular-nums whitespace-nowrap text-blue-600`}>Saldo a favor {dinero(Math.abs(valor))}</td>;
   }
   return (
-    <td className={`${className} text-right tabular-nums ${valor > 0 ? "text-red-700" : "text-gray-400"}`}>
+    <td className={`${className} pl-4 text-right tabular-nums whitespace-nowrap ${valor > 0 ? "text-red-700" : "text-gray-400"}`}>
       {valor > 0 ? dinero(valor) : "—"}
     </td>
   );
