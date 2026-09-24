@@ -48,6 +48,8 @@ import PreciosProveedorAyuda from "@/components/marketing/PreciosProveedorAyuda"
 // PDF de la nota de entrega, y una foto de 8 MB haría un papel que no se puede
 // mandar por WhatsApp.
 import { compressImage, validateFotoFile } from "@/app/reclamos/components/fotoUpload";
+import MobiliarioCelular from "../components/celular/MobiliarioCelular";
+import { useEsCelular } from "../components/celular/useEsCelular";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import type {
   EntregaConItems,
@@ -508,6 +510,9 @@ export default function MobiliarioPage() {
     }
   };
 
+  // 🔑 UN SOLO ÁRBOL: o el celular o la computadora, nunca los dos.
+  const enCelular = useEsCelular();
+
   if (!authChecked) return null;
 
   const breadcrumbs = [{ label: "Mobiliario" }];
@@ -515,6 +520,33 @@ export default function MobiliarioPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <AppHeader module="Marketing" breadcrumbs={breadcrumbs} />
+      {/* 🔴 EN EL CELULAR, UNA FILA POR PRODUCTO (24-sep-2026, 7b). Recibe los
+          MISMOS productos, las MISMAS métricas y el MISMO resumen por tienda:
+          acá no se calcula un solo número nuevo. 🔑 Un solo árbol: o el celular
+          o la computadora, nunca los dos. */}
+      {enCelular ? (
+        <MobiliarioCelular
+          productos={productos}
+          entregadoPorProducto={entregadoPorProducto}
+          metricas={metricas}
+          resumenFilas={resumenFilas}
+          resumenMarcas={resumenMarcas}
+          totalResumen={totalResumen}
+          cargando={loading}
+          escribe={escribe}
+          esAdmin={role === "admin"}
+          onEditar={abrirEditarProducto}
+          onBorrar={setDeleteProd}
+          onNuevo={abrirNuevoProducto}
+          onExcel={() => descargarExcel()}
+          hrefDeTienda={hrefDeTienda}
+          nombreDeTienda={(f) =>
+            (f.tiendaCodigo && MARKETING_TIENDAS_Y_MARCAS
+              ? nombrePorCodigo.get(f.tiendaCodigo.toUpperCase())
+              : undefined) ?? f.tienda
+          }
+        />
+      ) : (
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
@@ -1057,7 +1089,10 @@ export default function MobiliarioPage() {
             ⚠️ La TABLA `mk_mobiliario_notas_proveedor` sigue existiendo y con
             sus 6 filas — es de donde sale el contenido del "?". */}
       </main>
+      )}
 
+      {/* 🔴 Los modales viven FUERA de la rama que se eligió: son los MISMOS
+          para las dos vistas y tienen que abrirse en las dos. */}
       {/* Modal edit/nuevo producto */}
       {editProd && (
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
