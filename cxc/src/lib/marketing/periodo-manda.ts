@@ -20,9 +20,12 @@
 // períodos REALES de los gastos, nunca de una lista escrita a mano.
 //
 // 🔴 NINGÚN NÚMERO CAMBIA: lo que suma sigue siendo `periodo-estado.ts`
-// (solo lo que se reporta); acá se parte y se rotula. Medido el 23-sep-2026
-// en Outlet Duty Free N3 (D-118): Abierto $6.401,27 (3) · mid 2026 $71,26 (1)
-// · Todos $6.472,53.
+// (solo lo que se reporta); acá se parte y se rotula. Medido contra producción
+// el 24-sep-2026 en Outlet Duty Free N3 (D-118): Abierto $1.771,27 (2) ·
+// mid 2026 · PVH $4.701,26 (2) · Todos $6.472,53. ⚠️ Este comentario decía
+// «Abierto $6.401,27 (3) · mid 2026 $71,26 (1)»: la entrega de muebles de
+// $4.630 está sellada a «mid 2026» en la base, no abierta. El total de
+// «Todos» no se movió y CLAUDE.md siempre dijo lo correcto.
 //
 // 🔴 LOS ANULADOS DESAPARECEN. Daniel: *«se elimina y listo… con seguro de
 // que escriban ELIMINAR»*. Al anular, el gasto se va de TODAS las pantallas

@@ -77,7 +77,8 @@ import {
   nombreArchivoComprobante,
   numeroComprobante,
 } from "./pdf-entrega-mueble";
-import { seReportaDe } from "./gasto";
+import { seReportaDe, TIENDA_GENERAL } from "./gasto";
+import { MARKETING_FOTOS_CON_PERIODO } from "./fotos-periodo";
 import { conRespaldoSinColumnas, type ResultadoPg } from "./columnas-opcionales";
 import { ZIP_E_IMPULSADORAS_NUEVO } from "./zip-e-impulsadoras";
 import {
@@ -227,6 +228,9 @@ interface AdjuntoFila {
   proyecto_id: string | null;
   url: string;
   nombre_original: string | null;
+  /** 🔴 24-sep-2026: la foto de la TIENDA, con su sello de período. */
+  tienda_codigo?: string | null;
+  periodo_id?: string | null;
 }
 export interface PeriodoDeMarca {
   id: string;
@@ -615,6 +619,31 @@ async function prepararDescarga(op: ZipMarcaOpciones): Promise<PrepDescarga> {
   return prepararDescargaDeMarca(op);
 }
 
+/**
+ * Los adjuntos que el ZIP necesita. Pide las columnas de la foto de TIENDA
+ * (`tienda_codigo`, `periodo_id`); si la base todavía no las tiene, relee sin
+ * ellas y el ZIP sale exactamente como antes — falla ABIERTA.
+ */
+async function leerAdjuntosDelZip(): Promise<{ data: AdjuntoFila[] | null; error: { message?: string | null; code?: string | null } | null }> {
+  const tipos = ["pdf_factura", "foto_factura", "foto_proyecto", "foto_instalacion"];
+  // `foto_instalacion` la habilita la migración 20260811180000. Pedirla antes
+  // no rompe nada: si todavía no existe ninguna, no viene ninguna.
+  const { resultado } = await conRespaldoSinColumnas<AdjuntoFila[]>(
+    () =>
+      supabaseServer
+        .from("mk_adjuntos")
+        .select("id, tipo, factura_id, proyecto_id, url, nombre_original, tienda_codigo, periodo_id")
+        .in("tipo", tipos) as unknown as PromiseLike<{ data: AdjuntoFila[] | null; error: { message?: string | null; code?: string | null } | null }>,
+    () =>
+      supabaseServer
+        .from("mk_adjuntos")
+        .select("id, tipo, factura_id, proyecto_id, url, nombre_original")
+        .in("tipo", tipos) as unknown as PromiseLike<{ data: AdjuntoFila[] | null; error: { message?: string | null; code?: string | null } | null }>,
+    (m) => console.warn(`[marketing/zip] ${m}`),
+  );
+  return resultado;
+}
+
 async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescarga> {
   const marcaCodigo = txt(op.marcaCodigo).toUpperCase();
   if (!esMarcaCodigo(marcaCodigo)) {
@@ -644,12 +673,7 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
         .select("id, nombre, tienda, tienda_codigo, anulado_en"),
       supabaseServer.from("mk_marcas").select("id, nombre, codigo, empresa_codigo"),
       leerEntregasConSeReporta(),
-      supabaseServer
-        .from("mk_adjuntos")
-        .select("id, tipo, factura_id, proyecto_id, url, nombre_original")
-        // `foto_instalacion` la habilita la migración 20260811180000. Pedirla
-        // antes no rompe nada: si todavía no existe ninguna, no viene ninguna.
-        .in("tipo", ["pdf_factura", "foto_factura", "foto_proyecto", "foto_instalacion"]),
+      leerAdjuntosDelZip(),
     ]);
 
   if (perRes.error || selloRes.error) {
@@ -872,6 +896,7 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
       const e = entregas.find((x) => String(x.id) === eid);
       return e?.proyecto_id ? String(e.proyecto_id) : null;
     },
+    periodoId: periodo.id,
   });
   const urlFirmada = await firmarLote(
     pathsParaFirmar(gastos, comprobantesPorFactura, fotosPorCarpeta),
@@ -915,10 +940,7 @@ async function prepararDescargaMultifashion(): Promise<PrepDescarga> {
       .from("mk_proyectos")
       .select("id, nombre, tienda, tienda_codigo, anulado_en"),
     leerEntregasConSeReporta(),
-    supabaseServer
-      .from("mk_adjuntos")
-      .select("id, tipo, factura_id, proyecto_id, url, nombre_original")
-      .in("tipo", ["pdf_factura", "foto_factura", "foto_proyecto", "foto_instalacion"]),
+    leerAdjuntosDelZip(),
   ]);
   if (factRes.error) throw new Error(`facturas: ${factRes.error.message}`);
   if (proyRes.error) throw new Error(`proyectos: ${proyRes.error.message}`);
@@ -1065,17 +1087,26 @@ function armarComprobantesPorFactura(
  * de la factura — un evento sin cliente tiene fotos igual y salen en
  * General/fotos/) + las del proyecto (`foto_proyecto`). Dedup por id — dos
  * gastos del mismo proyecto comparten fotos.
+ *
+ * 🔴 Y LAS DE LA TIENDA (24-sep-2026): una foto pegada a la TIENDA (sin
+ * proyecto) entra a la carpeta de esa tienda cuando su sello es el período que
+ * se está bajando (`periodoId`). Sin `periodoId` —Multifashion, que no tiene
+ * período— no se suma ninguna, y el dedup por `carpeta::id` impide que una
+ * foto que ya entró por su proyecto salga dos veces.
  */
-function armarFotosPorCarpeta(
+export function armarFotosPorCarpeta(
   gastos: ReadonlyArray<GastoDeMarca>,
   adjuntos: ReadonlyArray<AdjuntoFila>,
   ctx: {
     proyectoDeFactura: (facturaId: string) => string | null;
     proyectoDeEntrega: (entregaId: string) => string | null;
+    periodoId?: string | null;
   },
 ): Map<string, AdjuntoFila[]> {
   const fotosPorFactura = new Map<string, AdjuntoFila[]>();
   const fotosPorProyecto = new Map<string, AdjuntoFila[]>();
+  const fotosPorTienda = new Map<string, AdjuntoFila[]>();
+  const periodoDelZip = txt(ctx.periodoId);
   for (const a of adjuntos) {
     if (a.tipo === "foto_instalacion" && a.factura_id) {
       const arr = fotosPorFactura.get(String(a.factura_id)) ?? [];
@@ -1085,6 +1116,18 @@ function armarFotosPorCarpeta(
       const arr = fotosPorProyecto.get(String(a.proyecto_id)) ?? [];
       arr.push(a);
       fotosPorProyecto.set(String(a.proyecto_id), arr);
+    }
+    if (
+      MARKETING_FOTOS_CON_PERIODO &&
+      a.tipo === "foto_proyecto" &&
+      periodoDelZip &&
+      txt(a.periodo_id) === periodoDelZip &&
+      txt(a.tienda_codigo)
+    ) {
+      const k = txt(a.tienda_codigo).toUpperCase();
+      const arr = fotosPorTienda.get(k) ?? [];
+      arr.push(a);
+      fotosPorTienda.set(k, arr);
     }
   }
 
@@ -1108,6 +1151,10 @@ function armarFotosPorCarpeta(
       const pid = ctx.proyectoDeEntrega(g.documentoId);
       if (pid) for (const a of fotosPorProyecto.get(pid) ?? []) anotarFoto(g.carpeta, a);
     }
+    // Las de la TIENDA del gasto, selladas al período que se baja. El gasto
+    // sin cliente vive en «General», y ahí guarda sus fotos con ese código.
+    const tienda = (txt(g.clienteCodigo) || TIENDA_GENERAL).toUpperCase();
+    for (const a of fotosPorTienda.get(tienda) ?? []) anotarFoto(g.carpeta, a);
   }
   return out;
 }

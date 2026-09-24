@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { FotoUploader } from "@/components/marketing";
 import type { MkAdjunto } from "@/lib/marketing/types";
@@ -9,6 +9,12 @@ import { FotoLightbox } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { MARKETING_CELULAR } from "@/lib/marketing/celular";
+import {
+  MARKETING_FOTOS_CON_PERIODO,
+  avisoSinFotosDelPeriodo,
+  fotosDelPeriodo,
+} from "@/lib/marketing/fotos-periodo";
+import { PERIODO_ABIERTO, PERIODO_TODOS, ROTULO_ABIERTO } from "@/lib/marketing/periodo-manda";
 import { subirAdjunto } from "./uploadHelpers";
 import { Ayuda } from "@/components/shared/Ayuda";
 
@@ -23,6 +29,13 @@ import { Ayuda } from "@/components/shared/Ayuda";
 //   · con `tiendaCodigo` → lee `/api/marketing/tienda/<código>/fotos`;
 //   · con `proyectoId`   → lo de siempre, sin un solo cambio.
 // Sin la columna, la ruta de la tienda contesta lista vacía: falla ABIERTA.
+//
+// 🔴 Y SIGUEN AL PERÍODO (24-sep-2026). Daniel: *«cuando me meto al período
+// abierto, veo las fotos del período viejo»*. La cuadrícula filtra con el
+// MISMO chip que la lista de gastos (`periodo`, de `periodo-manda.ts`): la
+// foto trae su período del servidor y acá solo se parte (`fotos-periodo.ts`,
+// puro). Sin `periodo` —la puerta del proyecto, o el interruptor apagado— se
+// ven todas, como hoy.
 // ============================================================================
 
 interface FotosSectionProps {
@@ -30,16 +43,19 @@ interface FotosSectionProps {
   proyectoId?: string;
   /** La puerta nueva: las fotos de una TIENDA, por su código (D-25). */
   tiendaCodigo?: string;
+  /** El chip de arriba: `abierto`, el id de un cierre, o `todos`. */
+  periodo?: string;
   readonly?: boolean;
 }
 
 export default function FotosSection({
   proyectoId,
   tiendaCodigo,
+  periodo,
   readonly = false,
 }: FotosSectionProps) {
   const { toast } = useToast();
-  const [fotos, setFotos] = useState<MkAdjunto[]>([]);
+  const [todasLasFotos, setFotos] = useState<MkAdjunto[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [fotosConError, setFotosConError] = useState<Set<string>>(new Set());
@@ -99,6 +115,20 @@ export default function FotosSection({
     cargar();
   }, [cargar]);
 
+  // 🔴 Lo que se VE es lo del chip. El período solo manda en la puerta de la
+  // tienda: la del proyecto no tiene chips y sigue mostrando todo.
+  const clavePeriodo = tiendaCodigo && periodo ? periodo : PERIODO_TODOS;
+  const fotos = useMemo(
+    () => fotosDelPeriodo(todasLasFotos as Array<MkAdjunto & { periodo?: null }>, clavePeriodo),
+    [todasLasFotos, clavePeriodo],
+  );
+  // Subir estando parado en un cierre: la foto nace en «Abierto» y no se vería.
+  const enUnCierre =
+    MARKETING_FOTOS_CON_PERIODO &&
+    !!tiendaCodigo &&
+    clavePeriodo !== PERIODO_TODOS &&
+    clavePeriodo !== PERIODO_ABIERTO;
+
   const handleUpload = async (file: File): Promise<UploadResult> => {
     const adj = await subirAdjunto({
       file,
@@ -110,7 +140,7 @@ export default function FotosSection({
     // La signed URL recién firmada puede no estar propagada en CDN — al
     // recargar lista, el endpoint vuelve a firmar con archivo ya disponible.
     await cargar();
-    toast("Foto subida", "success");
+    toast(enUnCierre ? `Foto subida · está en «${ROTULO_ABIERTO}»` : "Foto subida", "success");
     return {
       url: adj.url,
       nombreOriginal: adj.nombre_original ?? file.name,
@@ -120,7 +150,7 @@ export default function FotosSection({
 
   const solicitarEliminar = (foto: MkAdjunto) => {
     // Snapshot para revertir si el usuario deshace o el DELETE falla.
-    const snapshot = fotos;
+    const snapshot = todasLasFotos;
     scheduleAction({
       id: foto.id,
       message: "Foto eliminada",
@@ -301,7 +331,7 @@ export default function FotosSection({
         </>
       ) : readonly ? (
         <div className="rounded-lg border border-dashed border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
-          {tiendaCodigo ? "Esta tienda no tiene fotos." : "Este proyecto no tiene fotos."}
+          {avisoSinFotosDelPeriodo(clavePeriodo, !!tiendaCodigo)}
         </div>
       ) : (
         <FotoUploader

@@ -246,7 +246,7 @@ export default function FichaTienda({ codigo, role }: { codigo: string; role: st
           onRegistrarGasto={() => setRegistrando(true)}
           accionesDe={menuDe}
           onPdf={abrirPdf}
-          fotos={<FotosSection tiendaCodigo={datos.codigo ?? TIENDA_GENERAL} readonly={!escribe} />}
+          fotos={<FotosSection tiendaCodigo={datos.codigo ?? TIENDA_GENERAL} periodo={periodo} readonly={!escribe} />}
           hrefVolver={hrefDePestana("tiendas")}
         />
       ) : (
@@ -409,7 +409,7 @@ export default function FichaTienda({ codigo, role }: { codigo: string; role: st
             {/* 🔴 «General» también tiene fotos: un mueble que no es de ninguna
                 tienda igual se fotografía. Se guardan bajo `GENERAL`. */}
             <div id={ANCLA_FOTOS}>
-              <FotosSection tiendaCodigo={datos.codigo ?? TIENDA_GENERAL} readonly={!escribe} />
+              <FotosSection tiendaCodigo={datos.codigo ?? TIENDA_GENERAL} periodo={periodo} readonly={!escribe} />
             </div>
           </>
         )}

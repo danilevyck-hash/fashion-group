@@ -5,8 +5,14 @@
 // `mk_adjuntos.tienda_codigo` (la migración `20261216120000` la copió del
 // proyecto — medido: 60 de 60 fotos quedaron con su tienda).
 //
+// 🔴 Y SIGUEN AL PERÍODO (24-sep-2026). Cada foto nace sellada al período
+// ABIERTO de la tienda (`mk_adjuntos.periodo_id`, migración `20261219130000`)
+// y viaja con su `periodo` puesto SOLO si ese sello ya cerró: la cuadrícula de
+// la ficha filtra con el mismo chip que la lista de gastos (`fotos-periodo.ts`).
+//
 // 🔴 Falla ABIERTA: sin la columna contesta 200 con lista vacía y lo dice en
-// `sinMigracion`, igual que el resto del rediseño.
+// `sinMigracion`, igual que el resto del rediseño; sin la regla nueva, el POST
+// avisa en español y BORRA del cajón el archivo que acababa de subir.
 // ============================================================================
 
 import { NextRequest, NextResponse } from "next/server";
@@ -17,6 +23,17 @@ import { firmarAdjuntos } from "@/lib/marketing/storage";
 import { esColumnaAusente, sinColumnasDelRediseno } from "@/lib/marketing/columnas-opcionales";
 import { esCodigoGeneral, VISTA_TIENDA } from "@/lib/marketing/vista-tienda";
 import { TIENDA_GENERAL } from "@/lib/marketing/gasto";
+import {
+  AVISO_FALTA_LA_MIGRACION,
+  MARKETING_FOTOS_CON_PERIODO,
+  esLaReglaDeDestino,
+  periodoDeLaFoto,
+} from "@/lib/marketing/fotos-periodo";
+import {
+  borrarDelCajon,
+  leerPeriodosDeFotos,
+  periodoAbiertoDeLaTienda,
+} from "@/lib/marketing/fotos-periodo-server";
 import type { MkAdjunto } from "@/lib/marketing/types";
 
 export const dynamic = "force-dynamic";
@@ -56,8 +73,14 @@ export async function GET(
       if (esColumnaAusente(error)) return NextResponse.json([]);
       throw new Error(error.message);
     }
-    const firmados = await firmarAdjuntos((data ?? []) as MkAdjunto[]);
-    const res = NextResponse.json(firmados);
+    const filas = (data ?? []) as MkAdjunto[];
+    const firmados = await firmarAdjuntos(filas);
+    // 🔴 El período de cada foto: solo si su sello ya CERRÓ. Sin la columna
+    // `periodo_id` no hay ids que leer y todas salen abiertas, como hoy.
+    const conPeriodo = MARKETING_FOTOS_CON_PERIODO
+      ? await conSuPeriodo(firmados, filas)
+      : firmados;
+    const res = NextResponse.json(conPeriodo);
     res.headers.set("Cache-Control", "no-store");
     return res;
   } catch (err) {
@@ -65,6 +88,29 @@ export async function GET(
     console.error("GET /api/marketing/tienda/[codigo]/fotos:", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
+}
+
+
+/**
+ * Le pega a cada foto el `periodo` de su sello, cuando ese sello ya CERRÓ.
+ * Las filas firmadas no traen `periodo_id` (viene del `select("*")` crudo), así
+ * que se cruzan por id. Falla ABIERTA: sin la columna nadie tiene sello y
+ * todas salen abiertas.
+ */
+async function conSuPeriodo(
+  firmados: MkAdjunto[],
+  crudas: ReadonlyArray<MkAdjunto>,
+): Promise<Array<MkAdjunto & { periodo: ReturnType<typeof periodoDeLaFoto> }>> {
+  const idDePeriodo = new Map<string, string>();
+  for (const f of crudas) {
+    const pid = String((f as unknown as Record<string, unknown>).periodo_id ?? "").trim();
+    if (pid) idDePeriodo.set(String(f.id), pid);
+  }
+  const periodos = await leerPeriodosDeFotos([...idDePeriodo.values()]);
+  return firmados.map((f) => ({
+    ...f,
+    periodo: periodoDeLaFoto(idDePeriodo.get(String(f.id)) ?? null, periodos),
+  }));
 }
 
 /**
@@ -75,8 +121,15 @@ export async function GET(
  * repite `createAdjunto`), y el rediseño quitó el proyecto. Acá la foto nace
  * con su `tienda_codigo` y sin proyecto.
  *
- * 🔴 Falla ABIERTA: sin la columna, se guarda como antes —sin tienda— y se
- * dice en el log; la foto NO se pierde.
+ * 🔴 Nace SELLADA al período abierto de la tienda (`periodo_id`), para que la
+ * cuadrícula la muestre bajo el chip que corresponde y el ZIP de la marca la
+ * lleve cuando ese período cierre.
+ *
+ * 🔴 Falla ABIERTA: sin la columna, se guarda como antes —sin tienda ni
+ * sello— y se dice en el log; la foto NO se pierde. 🩸 Y si la base rechaza
+ * la fila por la regla vieja (`mk_adjuntos_destino_chk` exige proyecto), el
+ * aviso sale EN ESPAÑOL y el archivo recién subido se BORRA del cajón: cada
+ * intento fallido dejaba un huérfano (4 medidos el 24-sep-2026).
  */
 export async function POST(
   req: NextRequest,
@@ -113,11 +166,30 @@ export async function POST(
       nombre_original: String(body?.nombreOriginal ?? "").trim() || null,
       size_bytes: Number.isFinite(Number(body?.sizeBytes)) ? Number(body?.sizeBytes) : null,
     };
+    // El sello: el período ABIERTO del gasto más reciente de esta tienda.
+    // Nunca lanza y nunca frena la subida (`null` = foto sin sello).
+    const periodoId = MARKETING_FOTOS_CON_PERIODO
+      ? await periodoAbiertoDeLaTienda(codigo)
+      : null;
+    const conTienda: Record<string, unknown> = { ...base, tienda_codigo: codigo };
+    if (periodoId) conTienda.periodo_id = periodoId;
     let { data, error } = await supabaseServer
       .from("mk_adjuntos")
-      .insert({ ...base, tienda_codigo: codigo })
+      .insert(conTienda)
       .select()
       .single();
+    // Sin `periodo_id` (la migración todavía no corrió) se reintenta sin el
+    // sello: la foto se guarda igual y se ve bajo «Abierto».
+    if (error && periodoId && esColumnaAusente(error)) {
+      console.warn(
+        "[marketing/fotos-periodo] mk_adjuntos.periodo_id no existe; la foto se guarda sin sello.",
+      );
+      ({ data, error } = await supabaseServer
+        .from("mk_adjuntos")
+        .insert({ ...base, tienda_codigo: codigo })
+        .select()
+        .single());
+    }
     if (error && esColumnaAusente(error)) {
       console.warn(
         "[marketing/rediseño] mk_adjuntos.tienda_codigo no existe; la foto se guarda sin tienda.",
@@ -128,7 +200,20 @@ export async function POST(
         .select()
         .single());
     }
-    if (error) throw new Error(error.message);
+    // 🩸 La regla vieja todavía exige proyecto: el archivo ya está subido, así
+    // que se BORRA y se avisa en español. Nunca el texto crudo de Postgres.
+    if (error && esLaReglaDeDestino(error)) {
+      console.error(
+        "[marketing/fotos-periodo] la base rechazó la foto de tienda por " +
+          `${error.message}; falta la migración 20261219130000.`,
+      );
+      await borrarDelCajon(url);
+      return NextResponse.json({ error: AVISO_FALTA_LA_MIGRACION }, { status: 400 });
+    }
+    if (error) {
+      await borrarDelCajon(url);
+      throw new Error(error.message);
+    }
     const firmado = await firmarAdjuntos([data as MkAdjunto]);
     return NextResponse.json(firmado[0]);
   } catch (err) {
