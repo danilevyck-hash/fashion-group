@@ -27,6 +27,8 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { COMPROBANTE_OBLIGATORIO } from "@/lib/reclamos/rotulos";
+
 const RAIZ = join(__dirname, "..", "..");
 const leer = (rel: string) => readFileSync(join(RAIZ, rel), "utf8");
 
@@ -72,7 +74,7 @@ const EN_UN_AYUDA: Array<[string, string]> = [
   ["app/reclamos/components/ReclamoForm.tsx", "se guardan junto con el reclamo en un solo paso"],
   // 🔄 11-sep-2026: el ⓘ «Cuándo hace falta el comprobante» se fue de la
   // pantalla del reclamo (mockup de Daniel: una sola fila de botones, sin ese
-  // enlace). La regla —comprobante obligatorio para marcar Pagado— NO se
+  // enlace). La regla —comprobante obligatorio para marcar cobrado— NO se
   // perdió: la dice la propia ventana de pago (SettlementModal, más abajo en
   // esta misma lista) en el momento en que frena de verdad.
   // 🔄 11-sep-2026: el correo al proveedor dejó de mandar links adentro del
@@ -224,8 +226,14 @@ describe("🔴 lo que FRENA una acción sigue en pantalla, nunca adentro de un �
     // PANTALLA: el módulo se retiró (Daniel: «packing list no se usa,
     // eliminar»). La regla —lo que FRENA una acción se ve en pantalla, nunca
     // dentro de un ⓘ— no cambió: las demás filas siguen intactas.
-    // Reclamos: el comprobante es obligatorio para marcar Pagado.
-    ["app/reclamos/components/SettlementModal.tsx", "obligatorio para marcar Pagado"],
+    // Reclamos: el comprobante es obligatorio para cobrar.
+    // 🔴 Desde el 24-sep-2026 esa frase NO se escribe a mano en la ventana: sale
+    // de `lib/reclamos/rotulos.ts` (Daniel: *«solo hay creado y cobrado, ¿por qué
+    // veo pagado?»*). Por eso la fila busca el NOMBRE de la constante —que es lo
+    // que la ventana pinta— y el TEXTO se comprueba abajo contra el módulo: así
+    // el candado sigue prohibiendo esconderla en un ⓘ y además deja de romperse
+    // cuando cambia una palabra del rótulo.
+    ["app/reclamos/components/SettlementModal.tsx", "{COMPROBANTE_OBLIGATORIO}"],
     // Depurador: el bloqueo por descripciones nuevas.
     ["app/productos/cargar/DepuradorClient.tsx", "Bloqueado: hay"],
     ["app/productos/cargar/FacturasTiendaClient.tsx", "Bloqueado: hay"],
@@ -251,6 +259,17 @@ describe("🔴 lo que FRENA una acción sigue en pantalla, nunca adentro de un �
         "Esconderlo detrás de un toque es igual que borrarlo: nadie abre un ⓘ " +
         "que no sabe que tiene algo adentro.",
     ).toBe(false);
+  });
+
+  /**
+   * El complemento de la fila de arriba: ahí se comprueba que la ventana PINTA
+   * la constante y que no la esconde en un ⓘ; acá, que la constante sigue
+   * diciendo QUÉ FRENA. Separado a propósito: si mañana alguien la deja en
+   * «Comprobante», el barrido de la fila seguiría verde y este se pone rojo.
+   */
+  it("y el rótulo del comprobante de Reclamos sigue diciendo qué frena", () => {
+    expect(COMPROBANTE_OBLIGATORIO).toMatch(/obligatorio para marcar cobrado/i);
+    expect(COMPROBANTE_OBLIGATORIO).toMatch(/foto o pdf/i);
   });
 });
 
