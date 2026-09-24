@@ -36,11 +36,10 @@
 // adentro (es sólo lectura), así que no hay blancos de 44 px que respetar.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import useSWR from "swr";
 import { Clock, AlertTriangle } from "lucide-react";
 import { fmtMoney } from "@/lib/ventas/format";
 import { SIN_COMPARATIVO } from "@/lib/variacion";
-import type { VentaHoy } from "@/lib/multifashion/venta-hoy";
+import { useVentaHoy } from "@/lib/multifashion/venta-hoy-cliente";
 
 // "domingo 6 sep" — corto, para que la línea entre en el teléfono.
 const FMT_DIA = new Intl.DateTimeFormat("es-PA", {
@@ -92,12 +91,6 @@ function colorPct(pct: number | null): string {
   return "text-gray-600";
 }
 
-const fetcher = async (url: string): Promise<VentaHoy> => {
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return (await res.json()) as VentaHoy;
-};
-
 interface VentaHoyCardProps {
   /** Sube +1 tras un "Actualizar ahora" con éxito → se vuelve a pedir el día. */
   syncTick?: number;
@@ -106,11 +99,9 @@ interface VentaHoyCardProps {
 }
 
 export function VentaHoyCard({ syncTick = 0, habilitado = true }: VentaHoyCardProps) {
-  const { data, error, isLoading } = useSWR<VentaHoy>(
-    habilitado ? ["multifashion-venta-hoy", syncTick] : null,
-    () => fetcher("/api/multifashion/venta-hoy"),
-    { revalidateOnFocus: true, dedupingInterval: 60_000, keepPreviousData: true },
-  );
+  // 🔴 LA MISMA CLAVE QUE LA LÍNEA DEL CELULAR (24-sep-2026): el navegador pide
+  // la venta de hoy UNA vez y las dos pantallas leen de ahí.
+  const { data, error, isLoading } = useVentaHoy(syncTick, habilitado);
 
   if (!habilitado) return null;
 

@@ -53,7 +53,10 @@ import { buildNotaMayoreo } from "@/lib/ventas/mayoreo";
 import { ROTULO_ESTE_MES, ROTULO_VENTANA } from "@/lib/multifashion/patrones";
 import { RETAIL_AL_FRENTE } from "@/lib/multifashion/retail-al-frente";
 import { diasSinVenta } from "@/lib/multifashion/resumen-minimo";
-import { ResumenMinimo } from "./ResumenMinimo";
+import { ResumenMinimo, TarjetaAnio } from "./ResumenMinimo";
+import { MULTIFASHION_CELULAR, type ClaveRenglon, type PantallaCelular } from "@/lib/multifashion/celular";
+import type { CortePeriodo, Periodo } from "@/lib/multifashion/periodo";
+import { AnioCelular, InicioCelular } from "./celular/InicioCelular";
 
 interface DiaRow {
   dia: number;
@@ -170,6 +173,18 @@ interface MultifashionResumenViewProps {
    *  botón vive ahora en el header de la página (junto al nombre de la tienda),
    *  así que la orden de re-pedir el detalle del mes llega por esta señal. */
   syncTick?: number;
+  /**
+   * 🔴 LO DEL CELULAR (24-sep-2026). Sin esta prop la vista se dibuja EXACTO
+   * como siempre — es lo que hace la pestaña espejo y lo que hacen los candados
+   * viejos. Con ella, en `sm:hidden` se dibuja «un número y cuatro renglones» y
+   * el Resumen de siempre pasa a `hidden sm:block`.
+   */
+  celular?: {
+    periodo: Periodo;
+    corte: CortePeriodo;
+    pantalla: PantallaCelular;
+    onAbrir: (clave: ClaveRenglon) => void;
+  };
 }
 
 const MESES_FULL = [
@@ -297,7 +312,7 @@ function buildCumulativeChart(act: MultifashionSerieAnio, prev: MultifashionSeri
 }
 
 export function MultifashionResumenView({
-  overview, selectedYear, isClosedYear, mes, syncTick = 0,
+  overview, selectedYear, isClosedYear, mes, syncTick = 0, celular,
 }: MultifashionResumenViewProps) {
   const year = selectedYear;
   const prevYear = year - 1;
@@ -384,7 +399,38 @@ export function MultifashionResumenView({
           elementos → 6. El gráfico y la tabla «Mes a mes» siguen siendo los de
           siempre, armados aquí y pasados enteros. Con el interruptor apagado se
           dibuja lo de abajo, como hasta hoy. */}
+      {/* 🔴 EL CELULAR: «un número y cuatro renglones» (24-sep-2026). Vive acá
+          adentro a propósito — `data` ya está pedido y así las dos vistas no
+          pueden decir números distintos del mismo mes. */}
+      {data && RETAIL_AL_FRENTE && MULTIFASHION_CELULAR && celular && (
+        <div className="sm:hidden">
+          {celular.pantalla === "anio" ? (
+            <AnioCelular
+              tarjeta={<TarjetaAnio overview={overview} year={year} isClosedYear={isClosedYear} />}
+              acumulado={
+                <CumulativeChartCard
+                  chart={cumChart}
+                  mesMapAct={mesMapAct}
+                  mesMapPrev={mesMapPrev}
+                  year={year}
+                  prevYear={prevYear}
+                />
+              }
+            />
+          ) : (
+            <InicioCelular
+              data={data}
+              overview={overview}
+              periodo={celular.periodo}
+              corte={celular.corte}
+              onAbrir={celular.onAbrir}
+            />
+          )}
+        </div>
+      )}
+
       {data && RETAIL_AL_FRENTE && (
+        <div className={MULTIFASHION_CELULAR && celular ? "hidden sm:block" : undefined}>
         <ResumenMinimo
           data={data}
           overview={overview}
@@ -416,6 +462,7 @@ export function MultifashionResumenView({
             />
           }
         />
+        </div>
       )}
 
       {/* 2-4. Titular del mes → gráfico Mes/Año → banda de 3 cards. */}

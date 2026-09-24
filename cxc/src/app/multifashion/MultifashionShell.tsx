@@ -46,6 +46,11 @@ import {
   ajustarPeriodo, anioDelPeriodo, etiquetaPeriodo, opcionesPeriodo, periodoAUrl,
   periodoDesdeUrl, periodoPorDefecto, type CortePeriodo, type Periodo,
 } from "@/lib/multifashion/periodo";
+import {
+  MULTIFASHION_CELULAR, diasDelMesMirado, encabezadoCelular, esElMesDeHoy,
+  esPantallaCelular, mesAnterior, mesSiguiente, subtituloDelMes, type ClaveRenglon,
+} from "@/lib/multifashion/celular";
+import { useVentaHoy } from "@/lib/multifashion/venta-hoy-cliente";
 import type { Multifashion } from "@/components/ventas/types";
 
 // Fetcher puro del overview por año. SWR lo cachea por año → volver a un año ya
@@ -75,10 +80,11 @@ export function MultifashionShell({
 
   // 🔴 El corte es el mes de PANAMÁ (UTC−5 fijo), no el del navegador: es la
   // misma regla de borde de mes de todo el módulo.
-  const corte: CortePeriodo = useMemo(() => {
-    const hoy = hoyPanama();
-    return { anio: Number(hoy.slice(0, 4)), mes: Number(hoy.slice(5, 7)) };
-  }, []);
+  const hoyIso = useMemo(() => hoyPanama(), []);
+  const corte: CortePeriodo = useMemo(
+    () => ({ anio: Number(hoyIso.slice(0, 4)), mes: Number(hoyIso.slice(5, 7)) }),
+    [hoyIso],
+  );
 
   // Pestaña y período: los dos en la URL, los dos filtros del MISMO nivel
   // (`replace`, no ciclan el back). `?subtab=` viejo redirige y la basura cae en
@@ -142,6 +148,41 @@ export function MultifashionShell({
   const onPeriodo = useCallback((valor: string) => setPeriodoRaw(valor), [setPeriodoRaw]);
   const onTab = useCallback((t: TabMultifashion) => setSubtabRaw(t), [setSubtabRaw]);
 
+  // ── EL CELULAR: «un número y cuatro renglones» (24-sep-2026) ───────────────
+  // Una sola pieza de estado nueva, en la URL como todo lo demás: en qué
+  // pantalla está el Resumen del teléfono. `?mfCel=anio` o nada.
+  const [pantallaRaw, setPantallaRaw] = useUrlState("mfCel", "inicio");
+  const pantallaCel = esPantallaCelular(pantallaRaw);
+  const { data: ventaHoy } = useVentaHoy(syncTick, authChecked);
+
+  const abrirRenglon = useCallback((clave: ClaveRenglon) => {
+    if (clave === "anio") { setPantallaRaw("anio"); return; }
+    setSubtabRaw(clave);
+  }, [setPantallaRaw, setSubtabRaw]);
+
+  const encabezado = encabezadoCelular({ tab, pantalla: pantallaCel, periodo, corte });
+  const irAtras = useCallback(() => {
+    if (tab !== "resumen") { setSubtabRaw("resumen"); return; }
+    if (pantallaCel === "anio") { setPantallaRaw("inicio"); return; }
+    const previo = mesAnterior(periodo);
+    if (previo) setPeriodoRaw(periodoAUrl(previo));
+  }, [tab, pantallaCel, periodo, setSubtabRaw, setPantallaRaw, setPeriodoRaw]);
+  const irAdelante = useCallback(() => {
+    const siguiente = mesSiguiente(periodo, corte);
+    if (siguiente) setPeriodoRaw(periodoAUrl(siguiente));
+  }, [periodo, corte, setPeriodoRaw]);
+
+  // 🔴 Lo de HOY solo en el mes de HOY: la banda vieja hablaba del día de hoy
+  // aunque estuvieras mirando agosto.
+  const subtituloCel = tab === "resumen" && pantallaCel === "inicio"
+    ? subtituloDelMes({
+        dias: diasDelMesMirado(periodo, corte, hoyIso),
+        hoy: esElMesDeHoy(periodo, corte)
+          ? (ventaHoy ? { hayVentas: ventaHoy.hayVentas, ventas: ventaHoy.ventas } : undefined)
+          : null,
+      })
+    : null;
+
   // Las dos acciones de sync: en el teléfono viven en el menú ☰; desde `md`
   // están a la vista en el encabezado. El componente es el MISMO en los dos
   // lados — el gate de rol y el acelerador viven adentro de SyncNowButton.
@@ -180,7 +221,9 @@ export function MultifashionShell({
     <PullToRefresh onRefresh={async () => { await mutate(); }}>
     <main className="mx-auto w-full max-w-[1280px] px-4 py-5 md:px-7 md:py-6">
       {/* Bloque 1 de 3: título + período. */}
-      <header className="relative z-20 mb-4 flex flex-wrap items-center justify-between gap-3">
+      <header className={`relative z-20 mb-4 flex-wrap items-center justify-between gap-3 ${
+        MULTIFASHION_CELULAR ? "hidden sm:flex" : "flex"
+      }`}>
         <div className="flex min-w-0 items-center gap-3">
           {/* El h1 sigue siendo `sr-only` (invariante de la casa: el título
               grande se podó en toda la app y lo dicen la barra sticky y el
@@ -202,8 +245,47 @@ export function MultifashionShell({
         />
       </header>
 
-      {/* Bloque 2 de 3: la venta de hoy, en UNA línea. */}
-      <VentaHoyCard syncTick={syncTick} habilitado={authChecked} />
+      {/* 🔴 EL ENCABEZADO DEL CELULAR (24-sep-2026): el mes es el título, «‹
+          Agosto» cambia de mes y «Octubre ›» solo si el mes no es el actual —
+          NUNCA hacia el futuro. Reemplaza al desplegable de 57 meses. */}
+      {MULTIFASHION_CELULAR && (
+        <header data-celular="encabezado" className="mb-3 sm:hidden">
+          <div className="flex min-h-[44px] items-center justify-between">
+            {encabezado.atras ? (
+              <button
+                type="button"
+                data-celular="atras"
+                onClick={irAtras}
+                className="-ml-1 inline-flex min-h-[44px] items-center rounded-md px-1 text-base text-gray-600 transition active:scale-[0.97]"
+              >
+                ‹ {encabezado.atras}
+              </button>
+            ) : <span />}
+            {encabezado.adelante && (
+              <button
+                type="button"
+                data-celular="adelante"
+                onClick={irAdelante}
+                className="-mr-1 inline-flex min-h-[44px] items-center rounded-md px-1 text-base text-gray-600 transition active:scale-[0.97]"
+              >
+                {encabezado.adelante} ›
+              </button>
+            )}
+          </div>
+          <p data-celular="titulo" className="text-3xl font-bold leading-tight tracking-tight text-gray-950">
+            {encabezado.titulo}
+          </p>
+          {subtituloCel && (
+            <p data-celular="subtitulo" className="mt-0.5 text-sm text-gray-500 tabular-nums">{subtituloCel}</p>
+          )}
+        </header>
+      )}
+
+      {/* Bloque 2 de 3: la venta de hoy, en UNA línea. En el celular esa banda
+          se vuelve la línea gris de arriba (`subtituloCel`). */}
+      <div className={MULTIFASHION_CELULAR ? "hidden sm:block" : undefined}>
+        <VentaHoyCard syncTick={syncTick} habilitado={authChecked} />
+      </div>
 
       {fetchError && (
         <div className="mb-4 rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-900">
@@ -221,6 +303,7 @@ export function MultifashionShell({
           corte={corte}
           isClosedYear={isClosedYear}
           syncTick={syncTick}
+          celular={MULTIFASHION_CELULAR ? { pantalla: pantallaCel, onAbrir: abrirRenglon } : undefined}
         />
       ) : (
         <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">

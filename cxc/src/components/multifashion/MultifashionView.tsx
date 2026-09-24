@@ -24,6 +24,8 @@ import { ClientesMultifashionSubtab } from "./ClientesMultifashionSubtab";
 import { ProductosSubtab } from "./ProductosSubtab";
 import { PESTANAS_MULTIFASHION, type TabMultifashion } from "@/lib/multifashion/pestanas";
 import { mesDelPeriodo, type CortePeriodo, type Periodo } from "@/lib/multifashion/periodo";
+import { MULTIFASHION_CELULAR, type ClaveRenglon, type PantallaCelular } from "@/lib/multifashion/celular";
+import { cn } from "@/lib/utils";
 
 // iPhone: los sub-tabs medían 36px de alto (py-2 + text-xs) — por debajo de los
 // 44 de la regla táctil, y son el control que más se toca del módulo. Con
@@ -56,11 +58,22 @@ interface MultifashionViewProps {
   isClosedYear: boolean;
   /** Sube +1 cada vez que el header corre un "Actualizar ahora" con éxito. */
   syncTick?: number;
+  /**
+   * 🔴 EL CELULAR (24-sep-2026): las cuatro pestañas se van y quedan cuatro
+   * RENGLONES en el Resumen. Sin esta prop, la vista es la de siempre.
+   */
+  celular?: {
+    pantalla: PantallaCelular;
+    onAbrir: (clave: ClaveRenglon) => void;
+  };
 }
 
 export function MultifashionView({
-  data, tab, onTabChange, periodo, corte, isClosedYear, syncTick,
+  data, tab, onTabChange, periodo, corte, isClosedYear, syncTick, celular,
 }: MultifashionViewProps) {
+  // En el celular las pestañas se reemplazan por los cuatro renglones del
+  // Resumen; en computadora la tira no se toca.
+  const enCelular = MULTIFASHION_CELULAR && celular != null;
   // El mes que representa el período — lo que piden las pestañas que trabajan
   // por mes. Para un rango es el mes de corte.
   const { anio: selectedYear, mes } = mesDelPeriodo(periodo, corte);
@@ -68,7 +81,10 @@ export function MultifashionView({
   return (
     <div className="w-full">
       <Tabs value={tab} onValueChange={(v) => onTabChange(v as TabMultifashion)} className="w-full">
-        <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-gray-200 bg-transparent px-4 p-0 md:mx-0 md:px-0">
+        <TabsList className={cn(
+          "-mx-4 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-gray-200 bg-transparent px-4 p-0 md:mx-0 md:px-0",
+          enCelular && "hidden sm:flex",
+        )}>
           {PESTANAS_MULTIFASHION.map((p) => {
             const Icon = ICONO[p.id];
             return (
@@ -79,26 +95,33 @@ export function MultifashionView({
           })}
         </TabsList>
 
-        <TabsContent value="resumen" className="mt-5">
+        <TabsContent value="resumen" className={enCelular ? "mt-0 sm:mt-5" : "mt-5"}>
           <MultifashionResumenView
             overview={data}
             selectedYear={selectedYear}
             isClosedYear={isClosedYear}
             mes={mes}
             syncTick={syncTick}
+            celular={celular ? { ...celular, periodo, corte } : undefined}
           />
         </TabsContent>
-        <TabsContent value="vendedoras" className="mt-5">
+        <TabsContent value="vendedoras" className={enCelular ? "mt-0 sm:mt-5" : "mt-5"}>
           {/* `conMetas`: la pestaña Metas vive ADENTRO de ésta. La pestaña
               espejo de Comisiones monta el MISMO componente sin la prop — no
               tiene el módulo Multifashion y `/api/multifashion/metas` le
               contestaría 403. */}
-          <VendedorasSubtab selectedYear={selectedYear} periodo={periodo} corte={corte} conMetas />
+          <VendedorasSubtab
+            selectedYear={selectedYear}
+            periodo={periodo}
+            corte={corte}
+            conMetas
+            enCelular={enCelular}
+          />
         </TabsContent>
-        <TabsContent value="productos" className="mt-5">
+        <TabsContent value="productos" className={enCelular ? "mt-0 sm:mt-5" : "mt-5"}>
           <ProductosSubtab selectedYear={selectedYear} mes={mes} periodo={periodo} />
         </TabsContent>
-        <TabsContent value="clientes" className="mt-5">
+        <TabsContent value="clientes" className={enCelular ? "mt-0 sm:mt-5" : "mt-5"}>
           <ClientesMultifashionSubtab selectedYear={selectedYear} mes={mes} periodo={periodo} />
         </TabsContent>
       </Tabs>

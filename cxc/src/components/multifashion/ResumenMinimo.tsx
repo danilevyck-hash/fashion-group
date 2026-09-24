@@ -86,14 +86,6 @@ export function ResumenMinimo({ data, overview, year, mes, isClosedYear, grafico
   const dias = totales.proyeccion_dias ?? null;
   const hayMargen = typeof totales.margen === "number" && Number.isFinite(totales.margen);
 
-  // ── Tarjeta 3: el año, retail contra retail ────────────────────────────────
-  const proy = overview.proyeccionCierre;
-  const deltaAnio = proy.tiene_proyeccion ? variacionPct(proy.proyeccion ?? 0, proy.cierre_prev) : null;
-  const notaAnio = lineaMayoreo(mayoreoDelAnio(overview.wholesale, overview.retail.ytdVentas));
-  const acumulado = overview.serieActual.dias.length
-    ? overview.serieActual.dias[overview.serieActual.dias.length - 1].acumulado
-    : 0;
-
   // ── Los hábitos, en una línea ─────────────────────────────────────────────
   const patrones = data.patrones;
   const hayVentana = patrones != null && patrones.mesesUsados > 0;
@@ -146,28 +138,7 @@ export function ResumenMinimo({ data, overview, year, mes, isClosedYear, grafico
         </Card>
 
         {/* 3 · El año, retail contra retail */}
-        <Card data-elemento="anio" className="p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Año {year} · retail</p>
-          <p className="mt-1 flex flex-wrap items-baseline gap-x-2">
-            <span className="font-mono text-2xl font-semibold leading-tight tabular-nums text-gray-950">
-              {fmtMoney(overview.retail.ytdVentas)}
-            </span>
-            {deltaAnio != null && (
-              <span className={cn("font-mono text-sm font-medium tabular-nums", TONO[tonoDeltaRetail(deltaAnio)])}>
-                {fmtDeltaRetail(deltaAnio)} vs {year - 1}
-              </span>
-            )}
-          </p>
-          <p className="mt-0.5 text-xs text-gray-500">
-            {proy.tiene_proyeccion ? (
-              <>cierra en <span className="font-mono tabular-nums text-gray-700">{fmtMoney(proy.proyeccion ?? 0)}</span></>
-            ) : (
-              <>acumulado <span className="font-mono tabular-nums text-gray-700">{fmtMoney(acumulado)}</span>{isClosedYear ? ` de ${year}` : ""}</>
-            )}
-            {" · "}margen <span className="font-mono tabular-nums text-gray-700">{fmtMargen(overview.total.margen)}</span>
-          </p>
-          {notaAnio && <p data-linea-mayoreo className="mt-1.5 text-xs text-gray-400">{notaAnio}</p>}
-        </Card>
+        <TarjetaAnio overview={overview} year={year} isClosedYear={isClosedYear} />
       </div>
 
       {/* 4 · El gráfico */}
@@ -188,5 +159,52 @@ export function ResumenMinimo({ data, overview, year, mes, isClosedYear, grafico
       </div>
       {mesAMesAbierto && <div data-plegado="mes-a-mes">{mesAMes}</div>}
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LA TARJETA DEL AÑO — retail contra retail.
+//
+// Se extrajo el 24-sep-2026 para que el celular pueda dibujar LA MISMA tarjeta
+// en la pantalla del renglón «Año» (`AnioCelular`). Ni una clase ni un número
+// cambiaron: es el mismo JSX que estaba acá adentro.
+// ─────────────────────────────────────────────────────────────────────────────
+export function TarjetaAnio({
+  overview, year, isClosedYear,
+}: {
+  overview: Multifashion;
+  year: number;
+  isClosedYear: boolean;
+}) {
+  const proy = overview.proyeccionCierre;
+  const deltaAnio = proy.tiene_proyeccion ? variacionPct(proy.proyeccion ?? 0, proy.cierre_prev) : null;
+  const notaAnio = lineaMayoreo(mayoreoDelAnio(overview.wholesale, overview.retail.ytdVentas));
+  const acumulado = overview.serieActual.dias.length
+    ? overview.serieActual.dias[overview.serieActual.dias.length - 1].acumulado
+    : 0;
+
+  return (
+      <Card data-elemento="anio" className="p-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Año {year} · retail</p>
+        <p className="mt-1 flex flex-wrap items-baseline gap-x-2">
+          <span className="font-mono text-2xl font-semibold leading-tight tabular-nums text-gray-950">
+            {fmtMoney(overview.retail.ytdVentas)}
+          </span>
+          {deltaAnio != null && (
+            <span className={cn("font-mono text-sm font-medium tabular-nums", TONO[tonoDeltaRetail(deltaAnio)])}>
+              {fmtDeltaRetail(deltaAnio)} vs {year - 1}
+            </span>
+          )}
+        </p>
+        <p className="mt-0.5 text-xs text-gray-500">
+          {proy.tiene_proyeccion ? (
+            <>cierra en <span className="font-mono tabular-nums text-gray-700">{fmtMoney(proy.proyeccion ?? 0)}</span></>
+          ) : (
+            <>acumulado <span className="font-mono tabular-nums text-gray-700">{fmtMoney(acumulado)}</span>{isClosedYear ? ` de ${year}` : ""}</>
+          )}
+          {" · "}margen <span className="font-mono tabular-nums text-gray-700">{fmtMargen(overview.total.margen)}</span>
+        </p>
+        {notaAnio && <p data-linea-mayoreo className="mt-1.5 text-xs text-gray-400">{notaAnio}</p>}
+      </Card>
   );
 }

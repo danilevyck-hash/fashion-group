@@ -60,6 +60,8 @@ import { notaComparacionVendedoras, rotuloDeltaVendedoras, type ChipVendedoras }
 import { etiquetaPeriodo, type CortePeriodo, type Periodo } from "@/lib/multifashion/periodo";
 import { RETAIL_AL_FRENTE, mesCerrado } from "@/lib/multifashion/retail-al-frente";
 import { libroVendedoras, nombreArchivoVendedoras } from "@/lib/multifashion/vendedoras-excel";
+import { MULTIFASHION_CELULAR } from "@/lib/multifashion/celular";
+import { VendedorasCelular } from "./celular/VendedorasCelular";
 import { workbookBlob } from "@/lib/excel-export";
 import { saveAs } from "file-saver";
 
@@ -99,6 +101,12 @@ interface VendedorasSubtabProps {
   /** Dibuja las Metas debajo. Solo el módulo Multifashion las pide (el espejo
    *  de Comisiones recibiría un 403 de `/api/multifashion/metas`). */
   conMetas?: boolean;
+  /**
+   * 🔴 EL CELULAR (24-sep-2026): hasta `sm` se dibuja UNA fila por vendedora y
+   * la meta como UN renglón. De `sm` para arriba, todo como siempre. La pestaña
+   * espejo de Comisiones NO manda esta prop y no cambia en nada.
+   */
+  enCelular?: boolean;
 }
 
 /**
@@ -108,8 +116,11 @@ interface VendedorasSubtabProps {
  * hay que cambiarla, se cambia UNA vez y las dos puertas dicen lo mismo.
  * 🔴 Multifashion comisiona con OTRA base que el grupo: no se fusiona nada.
  */
-export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas }: VendedorasSubtabProps) {
+export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCelular }: VendedorasSubtabProps) {
   const year = selectedYear;
+  // La meta del celular abre la tarjeta de metas de siempre — no una nueva.
+  const [metaAbiertaCel, setMetaAbiertaCel] = useState(false);
+  const celular = MULTIFASHION_CELULAR && enCelular === true;
 
   // Meses base relativos a hoy. Para año cerrado, "en curso" = Dic.
   // 🔴 UN SOLO CORTE DEL MES (23-sep-2026): cuando el módulo manda su `corte`
@@ -285,7 +296,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas }: Ven
         </div>
       )}
 
-      <div data-elemento="resumen" className={cn(loading && "opacity-60 transition-opacity")}>
+      <div data-elemento="resumen" className={cn(loading && "opacity-60 transition-opacity", celular && "hidden sm:block")}>
         {/* `sr-only`: la pestaña dice "Vendedoras" y el período está arriba. */}
         <h3 className="sr-only">Vendedoras · {chipLabel[chip]}</h3>
         {resp && (
@@ -359,8 +370,25 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas }: Ven
             </div>
           </Card>
 
+          {/* 🔴 CELULAR: una fila por vendedora (24-sep-2026). */}
+          {celular && resp && (
+            <div className="sm:hidden">
+              <VendedorasCelular
+                vendedoras={sortedVendedoras}
+                ventasTotal={resp.ventas_total}
+                tiquetesTotal={resp.tickets_total}
+                rotuloDelta={rotuloDelta.corto}
+                anio={year}
+                parcial={resp.es_periodo_parcial}
+                metaAbierta={metaAbiertaCel}
+                onAbrirMeta={() => setMetaAbiertaCel((v) => !v)}
+                conMetas={conMetas === true}
+              />
+            </div>
+          )}
+
           {/* Celular e iPad */}
-          <div data-vista="tarjetas" className="space-y-2 lg:hidden">
+          <div data-vista="tarjetas" className={cn("space-y-2 lg:hidden", celular && "hidden sm:block")}>
             {sortedVendedoras.map((v, i) => (
               <VendedoraCard
                 key={v.nombre}
@@ -378,7 +406,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas }: Ven
               mes: «Bono: se define al cerrar el mes (retail contra retail). En
               agosto: …». Sigue elevando la data para los resaltes de fila. */}
           {!esRango && RETAIL_AL_FRENTE && (
-            <div className="mt-2">
+            <div className={cn("mt-2", celular && "hidden sm:block")}>
               <BonosSection selectedYear={year} mes={bonoMes} onData={onBonosData} />
             </div>
           )}
@@ -390,9 +418,11 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas }: Ven
           premio, las fechas y la historia) y después cuánto aportó cada una.
           Las dos leen la MISMA clave de SWR: se pide una sola vez. */}
       {conMetas && (
-        <section className="mt-8 space-y-4">
-          <h3 className="text-sm font-semibold text-gray-950">Metas</h3>
-          <MetasSubtab />
+        <section className={cn("space-y-4", celular ? "mt-4 sm:mt-8" : "mt-8")}>
+          <h3 className={cn("text-sm font-semibold text-gray-950", celular && "hidden sm:block")}>Metas</h3>
+          <div data-celular={celular ? "metas" : undefined} className={celular && !metaAbiertaCel ? "hidden sm:block" : undefined}>
+            <MetasSubtab />
+          </div>
           {/* 🩸 Con `RETAIL_AL_FRENTE` la segunda tarjeta se BORRA (23-sep-2026):
               era la misma meta dibujada dos veces —mismas cuatro filas, mismos
               montos, misma nota—. La tarjeta de `MetasSubtab` ya trae el aporte
