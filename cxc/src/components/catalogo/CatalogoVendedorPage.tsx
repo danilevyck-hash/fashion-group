@@ -29,6 +29,7 @@ import type { CatalogoCartItem, CatalogoProducto } from "./types";
 import { Toast } from "@/components/ui";
 import CatalogoHeader from "./CatalogoHeader";
 import CatalogoSyncNow from "@/components/shared/CatalogoSyncNow";
+import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
 import CatalogoFilters from "./CatalogoFilters";
 import CatalogoProductCard from "./CatalogoProductCard";
 import CatalogoGroupedCard from "./CatalogoGroupedCard";
@@ -679,7 +680,14 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
         Compartir
       </button>
       {showShareMenu && (
-        <div className={theme.vendorShare.panel}>
+        /* 🔴 EN EL CELULAR EL MENÚ NO TAPA LA LISTA (24-sep-2026). Medido sobre
+           la captura de Daniel: el panel mide **190 × 104 px**, arranca en el
+           píxel **411** y cae encima del rótulo «CALZADO — HOMBRE · 42» (429) y
+           de los primeros **54 px** de las dos fotos (que empiezan en el 461).
+           Con `static` hasta `sm` deja de flotar: se abre debajo del botón,
+           empuja la lista 104 px y no tapa nada. Es el MISMO panel, con las
+           mismas dos opciones — de `sm` para arriba flota como siempre. */
+        <div className={`${theme.vendorShare.panel}${CATALOGO_ORDEN_CELULAR ? " max-sm:static" : ""}`}>
           <button onClick={handleCopyLink} className={theme.vendorShare.item}>
             <svg xmlns="http://www.w3.org/2000/svg" width={theme.vendorShare.iconSize} height={theme.vendorShare.iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             {theme.vendorShare.copyLabel}
