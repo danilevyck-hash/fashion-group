@@ -1,9 +1,22 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useOnlineContext } from "@/lib/OnlineContext";
+import { RUTA_MARCACION } from "@/lib/marcacion/rol";
+import { MARCACION_UN_TOQUE } from "@/lib/marcacion/un-toque";
 
 export default function OfflineBanner() {
   const { isOnline, wasOffline } = useOnlineContext();
+  const pathname = usePathname();
+
+  // 🔴 EN LA PANTALLA DE MARCAR, ESTA FRANJA NO VA (24-sep-2026). Es `fixed
+  // top-0` y TAPA el encabezado entero —logo y nombre del módulo desaparecen—,
+  // y encima dice lo contrario de lo que pasa: «los datos mostrados pueden no
+  // estar actualizados» cuando ahí, sin señal, se marca igual y la marca se
+  // manda sola. Esa pantalla lo dice a su manera, en una línea bajo el título
+  // (`TEXTO_SIN_SENAL`). En el resto del sistema la franja no se toca.
+  const enMarcacion = MARCACION_UN_TOQUE && (pathname ?? "").startsWith(RUTA_MARCACION);
+  if (enMarcacion) return null;
 
   // Nothing to show
   if (isOnline && !wasOffline) return null;
