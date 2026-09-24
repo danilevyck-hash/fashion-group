@@ -383,6 +383,26 @@ describe("6. las fotos cuelgan de la tienda y la lectura falla abierta", () => {
     expect(src).toMatch(/\.eq\("tipo", "foto_proyecto"\)/);
   });
 
+  // 🩸 24-sep-2026: esta prueba leía el TEXTO del archivo y por eso NO cazó que
+  // la base rechazaba cada foto de tienda (`mk_adjuntos_destino_chk` exigía
+  // proyecto: 23514 → 400, con el archivo ya subido y 4 huérfanos medidos).
+  // Ahora la FORMA de la fila que la puerta inserta se valida contra el CHECK
+  // que la migración escribe. El candado completo vive en
+  // `src/__tests__/marketing/marketing-fotos-de-tienda.test.ts`.
+  it("la fila que la puerta inserta pasa la regla de destino de la base", () => {
+    const src = codigo(RUTA_FOTOS);
+    // La forma, afirmada campo por campo sobre el `insert` de la puerta.
+    expect(src).toMatch(/tipo: "foto_proyecto" as const/);
+    expect(src).toMatch(/proyecto_id: null/);
+    expect(src).toMatch(/factura_id: null/);
+    expect(src).toMatch(/tienda_codigo: codigo/);
+    // Y la regla de la base, leída del SQL, tiene que aceptarla.
+    const sql = leer("supabase/migrations/20261219130000_marketing_fotos_de_tienda.sql");
+    expect(sql).toMatch(
+      /\(tipo = 'foto_proyecto'\s+AND tienda_codigo IS NOT NULL AND factura_id IS NULL\)/,
+    );
+  });
+
   it("toda lectura del rediseño pasa por `columnas-opcionales` y falla ABIERTA", () => {
     for (const r of [RUTA_DATOS, RUTA_FOTOS, "src/lib/search/marketing-server.ts"]) {
       expect(codigo(r)).toMatch(/esColumnaAusente/);
