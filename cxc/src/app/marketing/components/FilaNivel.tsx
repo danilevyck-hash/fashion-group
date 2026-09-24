@@ -73,13 +73,18 @@ export function FilaNivel({
       onClick?.();
     }
   };
-  const clase = `flex items-center gap-3 px-4 sm:px-5 py-3 min-h-[56px] ${
+  // 🔴 EN 390 PX EL TÍTULO NO SE PARTE LETRA POR LETRA (24-sep-2026): el chip,
+  // el monto, ZIP y Cerrar son `shrink-0` y al título le quedaban 5 px («Período
+  // 2026» salía en 248 px de alto). En el celular la fila ENVUELVE: el título
+  // se reserva al menos el 45 % del ancho y las acciones bajan a su propia
+  // línea, a la derecha. En `sm` y arriba, la fila de siempre, en una línea.
+  const clase = `flex flex-wrap sm:flex-nowrap items-center gap-3 px-4 sm:px-5 py-3 min-h-[56px] ${
     tocable ? "cursor-pointer hover:bg-gray-50 transition-colors" : ""
   }`;
   const adentro = (
     <>
       {chip}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-[45%] sm:min-w-0">
         <div className="font-semibold text-gray-900 text-[15px] break-words">
           {titulo}
         </div>
@@ -94,7 +99,7 @@ export function FilaNivel({
       )}
       {acciones && (
         <div
-          className="flex items-center gap-1.5 shrink-0"
+          className="flex items-center gap-1.5 shrink-0 basis-full justify-end sm:basis-auto"
           onClick={(e) => e.stopPropagation()}
         >
           {acciones}
