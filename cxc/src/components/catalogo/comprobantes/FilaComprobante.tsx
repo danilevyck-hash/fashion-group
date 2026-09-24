@@ -33,6 +33,7 @@ import {
 } from "@/lib/catalogo/numeros-pedido";
 import type { FilaComprobante } from "@/lib/catalogo/fila-comprobante";
 import AccionesComprobante from "./AccionesComprobante";
+import { BLANCO_CASILLA, CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
 
 /** La etiqueta de origen. Los DOS nombres viven en `origen-comprobante.ts`. */
 export function OrigenBadge({
@@ -247,14 +248,25 @@ export function FichaFila(p: PropsFila) {
     >
       <div className="flex items-start gap-2">
         {p.puedeAdministrar && (
-          <input
-            type="checkbox"
-            checked={p.seleccionado}
-            onChange={p.onSeleccionar}
+          /* 🔴 EL BLANCO QUE SE TOCA MIDE 44 (24-sep-2026). Medido: la casilla
+             es de **16 × 16 px** y era uno de los **27 controles** de esta
+             pantalla por debajo del mínimo de la casa. El cuadradito se ve
+             igual —no se agranda un checkbox hasta los 44—: lo que mide 44 es
+             el blanco de alrededor. Solo hasta `sm`; la tabla de escritorio,
+             que es otra fila, no se toca. */
+          <span
+            className={CATALOGO_ORDEN_CELULAR ? `${BLANCO_CASILLA} -my-2 shrink-0 sm:contents` : "contents"}
             onClick={(e) => e.stopPropagation()}
-            className="w-4 h-4 accent-black cursor-pointer mt-1 shrink-0"
-            aria-label={`Seleccionar pedido de ${p.clienteLabel(p.pedido)}`}
-          />
+          >
+            <input
+              type="checkbox"
+              checked={p.seleccionado}
+              onChange={p.onSeleccionar}
+              onClick={(e) => e.stopPropagation()}
+              className="w-4 h-4 accent-black cursor-pointer mt-1 shrink-0"
+              aria-label={`Seleccionar pedido de ${p.clienteLabel(p.pedido)}`}
+            />
+          </span>
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">

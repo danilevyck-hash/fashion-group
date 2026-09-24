@@ -72,6 +72,7 @@ import {
   VACIO_NINGUNO_COINCIDE,
   VACIO_SIN_COMPROBANTES,
 } from "@/lib/catalogo/numeros-pedido";
+import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
 
 // La fila que se pinta. Su forma vive en `lib/catalogo/fila-comprobante.ts`.
 export type { FilaComprobante, FilaDeOrders };
@@ -569,7 +570,12 @@ export default function ComprobantesPanel({
               admin/secretaria — `bulk-delete` responde 403 al vendedor. */}
           {puedeAdministrar && (
             <div className="flex items-center justify-between gap-3 mb-3 min-h-[38px]">
-              <label className="inline-flex items-center gap-2 px-1 text-sm text-gray-600 cursor-pointer select-none">
+              {/* 🔴 EL BLANCO QUE SE TOCA MIDE 44 (24-sep-2026): la casilla es
+                  de 16 px y el rótulo entero es lo que se toca, así que el
+                  mínimo se le pide a la etiqueta, no al cuadradito. */}
+              <label className={`inline-flex items-center gap-2 px-1 text-sm text-gray-600 cursor-pointer select-none${
+                CATALOGO_ORDEN_CELULAR ? " min-h-[44px]" : ""
+              }`}>
                 <input
                   type="checkbox"
                   checked={allSelected}
