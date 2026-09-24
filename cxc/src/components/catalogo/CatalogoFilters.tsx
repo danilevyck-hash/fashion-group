@@ -117,6 +117,7 @@ import {
 } from "@/lib/catalogo/filtros-extra";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import { grupoTieneOpciones, type OpcionFiltro } from "@/lib/catalogo/filtros-derivados";
+import { CATALOGO_ORDEN_CELULAR, cuantosFiltrosPuestos, textoBotonFiltros } from "@/lib/catalogo/orden-celular";
 
 interface FiltroDesplegableProps {
   /** Nombre del grupo, tal cual se lee en el botón: "Género", "Categoría"… */
@@ -381,6 +382,27 @@ export default function CatalogoFilters({
   const conBultos = theme.features.filtroBultos && !!onBultosFilterChange;
   const conPrecio = theme.features.filtroPrecio && !!onPrecioChange;
 
+  // ── 🔴 EN EL CELULAR LOS FILTROS SE RECOGEN EN UNA FILA (24-sep-2026) ──
+  // Medido a 390 px: del píxel 185 al 409 hay **224 px** de filtros —Género,
+  // Categoría, PRECIO desde/hasta y Ordenar— antes de la primera foto, que
+  // arrancaba en el **461**. Recogidos en «Filtros ›» (más la fila de orden)
+  // son **76 px** y la primera foto sube al **313**: el primer «Agregar» entra
+  // en la pantalla de 844 sin deslizar.
+  //
+  // ⚠️ No se va ningún filtro: Género, Categoría, el precio y el chip de bultos
+  // viven DENTRO de «Filtros ›», que dice cuántos hay puestos. El buscador se
+  // queda arriba y «Ordenar» al lado, como en el mockup. De `sm` para arriba la
+  // pantalla es EXACTAMENTE la de hoy.
+  const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
+  const enCelular = CATALOGO_ORDEN_CELULAR;
+  const filtrosPuestos = cuantosFiltrosPuestos({
+    genero: gender,
+    categoria: category,
+    precioMin: conPrecio ? precio.desde.trim() : "",
+    precioMax: conPrecio ? precio.hasta.trim() : "",
+    soloVariosBultos: conBultos && bultosFilter,
+  });
+
   const hasActiveFilters = !!(
     searchInput || gender || category ||
     (conBultos && bultosFilter) ||
@@ -388,9 +410,9 @@ export default function CatalogoFilters({
   );
 
   return (
-    <div className="space-y-3 mb-6">
+    <div className={enCelular ? "flex flex-col space-y-3 mb-6 sm:block" : "space-y-3 mb-6"}>
       {/* Search bar */}
-      <div className="relative">
+      <div className={enCelular ? "relative order-1" : "relative"}>
         <svg className={f.searchIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
@@ -416,7 +438,9 @@ export default function CatalogoFilters({
           arrastre horizontal: `flex-wrap` la baja de renglón en vez de esconder
           lo que no entra. Medido: 813 px de arrastre a 390 → 0, y 559 px a
           834 (iPad vertical) → 0. */}
-      <div className="flex lg:hidden flex-wrap items-center gap-2">
+      <div className={enCelular
+        ? `${filtrosAbiertos ? "flex" : "hidden"} sm:flex lg:hidden flex-wrap items-center gap-2 order-3`
+        : "flex lg:hidden flex-wrap items-center gap-2"}>
         {conBultos && (
           <button
             onClick={() => onBultosFilterChange!(!bultosFilter)}
@@ -537,13 +561,17 @@ export default function CatalogoFilters({
           más una lista de precios reales, y apretados contra el select de orden
           la fila no entraba en un iPhone. */}
       {conPrecio && (
-        <FiltroPrecioExacto
-          precio={precio}
-          onChange={onPrecioChange!}
-          precios={preciosDisponibles}
-          chipLabel={f.chipLabel}
-          chipInactive={f.chipInactive}
-        />
+        <div className={enCelular
+          ? `${filtrosAbiertos ? "" : "hidden"} sm:block order-4`
+          : undefined}>
+          <FiltroPrecioExacto
+            precio={precio}
+            onChange={onPrecioChange!}
+            precios={preciosDisponibles}
+            chipLabel={f.chipLabel}
+            chipInactive={f.chipInactive}
+          />
+        </div>
       )}
 
       {/* Sort + count + clear.
@@ -552,8 +580,28 @@ export default function CatalogoFilters({
           la fila medía 404px contra 358 de ancho útil a 390px y la PÁGINA entera
           se iba en scroll horizontal; sacarlo ahora sería confiar en que
           "Limpiar filtros" + orden + conteo siempre entren, y no cuesta nada. */}
+      {/* El `order-2` va en un envoltorio para no tocar la clase de la fila:
+          el `flex-wrap` de aquí abajo es un candado medido (404 px contra 358)
+          y se queda LITERAL. */}
+      <div className={enCelular ? "order-2" : undefined}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
+          {/* «Filtros ›» — SOLO hasta `sm`. Abre y cierra los mismos controles
+              de siempre, que siguen viviendo donde vivían: no se duplicó ni un
+              desplegable. El número dice cuántos hay puestos. */}
+          {enCelular && (conGenero || conCategorias || conBultos || conPrecio) && (
+            <button
+              type="button"
+              onClick={() => setFiltrosAbiertos((v) => !v)}
+              aria-expanded={filtrosAbiertos}
+              className={`sm:hidden inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-full text-xs font-medium transition whitespace-nowrap ${
+                filtrosPuestos > 0 || filtrosAbiertos ? f.chipActive : f.chipInactive
+              }`}
+            >
+              {textoBotonFiltros(filtrosPuestos)}
+              <span aria-hidden="true">{filtrosAbiertos ? "⌄" : "›"}</span>
+            </button>
+          )}
           {hasActiveFilters && (
             <button onClick={onClearAll} className={f.clearAll}>
               Limpiar filtros
@@ -579,6 +627,7 @@ export default function CatalogoFilters({
             {filteredCount} {filteredCount === 1 ? "producto" : "productos"}
           </span>
         </div>
+      </div>
       </div>
     </div>
   );

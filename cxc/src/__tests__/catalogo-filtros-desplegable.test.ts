@@ -109,7 +109,14 @@ describe("la fila que se arrastraba sale de la pantalla del celular y del iPad",
     // Daniel: *"si, hazlo en ipad tambien"*. Con `lg`, 1023 es el último ancho
     // con desplegables y 1024 el primero con píldoras.
     expect(FUENTE).toContain("flex lg:hidden flex-wrap");
-    expect(FUENTE).not.toMatch(/\b(sm|md|xl):hidden\b/);
+    expect(FUENTE).not.toMatch(/\b(md|xl):hidden\b/);
+    // 🔴 EL ÚNICO `sm:hidden` DEL ARCHIVO ES «FILTROS ›» (24-sep-2026). El corte
+    // de las DOS filas de filtros sigue siendo `lg` y no se movió: lo que
+    // estrena `sm` es el pliegue del celular —el botón «Filtros ›» que recoge
+    // esos mismos controles— y vive detrás de `CATALOGO_ORDEN_CELULAR`. Si
+    // aparece un segundo `sm:hidden`, alguien volvió a partir la pantalla por
+    // otro lado y hay que mirarlo.
+    expect((FUENTE.match(/\bsm:hidden\b/g) ?? []).length).toBe(1);
   });
 
   it("y de `lg` para arriba las PÍLDORAS también envuelven — nada se arrastra", () => {
