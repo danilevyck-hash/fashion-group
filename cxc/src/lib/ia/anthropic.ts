@@ -20,6 +20,10 @@ import Anthropic from "@anthropic-ai/sdk";
 
 import { clasificarFalloAnthropic, type OrigenLector } from "@/lib/alertas/lector-facturas";
 import { avisarLectorCaido } from "@/lib/alertas/lector-facturas-io";
+import { TIPO_PDF, bloqueDeArchivo } from "@/lib/ia/bloque-archivo";
+
+export { TIPO_PDF, TIPOS_IMAGEN, bloqueDeArchivo, esTipoQueLee, tipoPorNombre } from "@/lib/ia/bloque-archivo";
+export type { TipoQueLee } from "@/lib/ia/bloque-archivo";
 
 /**
  * Reintentos del SDK, declarados a propósito y no heredados del default.
@@ -39,8 +43,16 @@ export interface LecturaDePdf {
   /** El modelo lo decide cada lector. Acá no se elige ninguno. */
   modelo: string;
   maxTokens: number;
-  /** El PDF ya en base64. */
+  /** El archivo ya en base64 (un PDF, o una foto de la factura). */
   pdfBase64: string;
+  /**
+   * El tipo del archivo. Sin él, PDF — que es como se comportó siempre.
+   *
+   * 🔴 Un PDF viaja como bloque `document` y una foto como bloque `image`; el
+   * modelo y el prompt son los MISMOS. Lo decide `bloqueDeArchivo`, que además
+   * rechaza en español lo que no sabe leer.
+   */
+  mediaType?: string;
   /** El prompt ya armado por el lector. */
   prompt: string;
 }
@@ -67,6 +79,11 @@ export async function leerPdfConAnthropic(p: LecturaDePdf): Promise<string> {
 
   const client = new Anthropic({ apiKey, maxRetries: MAX_REINTENTOS });
 
+  // 🔴 El bloque se arma ANTES del try: un tipo que no se puede leer es un
+  // error de quien sube el archivo, no un fallo del proveedor — no avisa por
+  // Telegram ni gasta un reintento.
+  const archivo = bloqueDeArchivo(p.mediaType ?? TIPO_PDF, p.pdfBase64);
+
   let msg: Anthropic.Message;
   try {
     msg = await client.messages.create({
@@ -75,13 +92,7 @@ export async function leerPdfConAnthropic(p: LecturaDePdf): Promise<string> {
       messages: [
         {
           role: "user",
-          content: [
-            {
-              type: "document",
-              source: { type: "base64", media_type: "application/pdf", data: p.pdfBase64 },
-            },
-            { type: "text", text: p.prompt },
-          ],
+          content: [archivo, { type: "text", text: p.prompt }],
         },
       ],
     });
