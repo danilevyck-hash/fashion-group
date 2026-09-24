@@ -658,11 +658,19 @@ export default function ReporteTab({ empresa = "" }: {
                 >
                   <span aria-hidden>···</span>
                 </button>
-                {relojesAbiertos && (
-                  <div className="absolute right-0 z-20 mt-1 w-[22rem] max-w-[90vw] rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
-                    <EstadoReloj onLlegaron={() => void cargar()} />
-                  </div>
-                )}
+                {/* 🔴 EL LECTOR DEL RELOJ QUEDA MONTADO, ESCONDIDO. Desarmarlo
+                    al cerrar el menú se llevaría el pedido en el aire: el
+                    «Traer ahora» deja un encargo que la PC recoge en un par de
+                    minutos, y es ESTE componente el que se entera y refresca la
+                    tabla. Se esconde, no se desarma. */}
+                <div
+                  hidden={!relojesAbiertos}
+                  className={relojesAbiertos
+                    ? "absolute right-0 z-20 mt-1 w-[22rem] max-w-[90vw] rounded-lg border border-gray-200 bg-white p-2 shadow-lg"
+                    : "hidden"}
+                >
+                  <EstadoReloj onLlegaron={() => void cargar()} />
+                </div>
               </div>
             )}
 
