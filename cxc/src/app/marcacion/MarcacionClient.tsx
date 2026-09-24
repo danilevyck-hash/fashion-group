@@ -65,6 +65,15 @@ import {
   type MarcaPendiente,
 } from "@/lib/marcacion/cola-offline";
 import { achicarEnElTelefono } from "@/lib/marcacion/selfie-telefono";
+import PantallaUnToque from "./PantallaUnToque";
+import {
+  AVISO_UBICACION_NEGADA,
+  botonUnToque,
+  CAPTURE_CAMARA,
+  CLASES_AIRE_PARA_EL_BOTON,
+  faltoLaSalidaDeAyer,
+  MARCACION_UN_TOQUE,
+} from "@/lib/marcacion/un-toque";
 
 export interface EstadoServidor {
   codigo: string | null;
@@ -278,6 +287,21 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
     };
   }, [cargar, refrescarCola, semilla, vaciarCola]);
 
+  // 🔴 LA UBICACIÓN SE PIDE AL ABRIR (24-sep-2026), no después de la foto.
+  // Antes se pedía recién con la foto ya tomada: si el permiso estaba negado,
+  // la caja roja aparecía DESPUÉS de gastar la foto y sin decir dónde se
+  // arregla. Ahora, si falta, se sabe antes de abrir la cámara — y el botón
+  // sigue funcionando: se vuelve a pedir al marcar, por si ya lo aceptó.
+  const ubicacionPedida = useRef(false);
+  useEffect(() => {
+    if (!MARCACION_UN_TOQUE) return;
+    if (ubicacionPedida.current) return;
+    if (!estado?.codigo) return;
+    ubicacionPedida.current = true;
+    void pedirUbicacion();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estado?.codigo]);
+
   // ── Qué se dibuja ──────────────────────────────────────────────────────────
   //
   // 🔑 LAS MISMAS FUNCIONES QUE EL SERVIDOR, sobre las marcas del servidor MÁS
@@ -295,7 +319,10 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
     ...pendientes.map((p) => ({ ocurrioEn: p.horaTelefono })),
   ];
   const marcasHoy = marcasDelDia(todas, hoy);
-  const boton = estadoDelBoton(marcasHoy);
+  // 🔴 LA MISMA REGLA, UN TEXTO DISTINTO. `botonUnToque` no vuelve a contar
+  // nada: llama a `estadoDelBoton` y solo cambia «Ya marcaste hoy» por «Listo
+  // por hoy». Con el interruptor apagado, el botón de siempre.
+  const boton = MARCACION_UN_TOQUE ? botonUnToque(marcasHoy) : estadoDelBoton(marcasHoy);
   const nota = notaDespuesDe(marcasHoy);
   const dias = diasDeLaQuincena(todas, hoy);
   const hoyMarcado = dias.find((d) => d.fecha === hoy) ?? null;
@@ -342,6 +369,15 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
       return;
     }
     const chica = await achicarEnElTelefono(archivo);
+    // 🔴 ACEPTAR LA FOTO ES MARCAR (24-sep-2026). La cámara de iOS ya preguntó
+    // «¿Usar foto?»: volver a pedir «Enviar» era el cuarto toque, el que sobra.
+    // La red es «Deshacer», los 2 minutos de siempre.
+    if (MARCACION_UN_TOQUE) {
+      const tipo = tipoEnCurso ?? boton.tipo;
+      if (!tipo) return;
+      await enviarMarca(chica, tipo);
+      return;
+    }
     setFoto({ blob: chica, url: URL.createObjectURL(chica) });
     void pedirUbicacion();
   }
@@ -364,9 +400,14 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
         () => {
           setBuscandoUbicacion(false);
           setUbicacion(null);
+          // 🔴 CON EL INTERRUPTOR NUEVO SE DICE DÓNDE SE ARREGLA. En iPhone un
+          // permiso negado no se vuelve a preguntar: el texto de antes se
+          // repetía para siempre sin salida.
           setAviso({
             tono: "error",
-            texto: "Falta la ubicación. Acepta el permiso de ubicación para poder marcar.",
+            texto: MARCACION_UN_TOQUE
+              ? AVISO_UBICACION_NEGADA
+              : "Falta la ubicación. Acepta el permiso de ubicación para poder marcar.",
           });
           resolve(null);
         },
@@ -382,11 +423,27 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
     setAviso(null);
   }
 
+  /** El botón «Enviar» de la pantalla de antes. Con el interruptor nuevo esa
+   *  pantalla no existe: la foto aceptada llama directo a `enviarMarca`. */
   async function enviar() {
-    if (!foto || !tipoEnCurso || enviando) return;
-    const coords = ubicacion ?? (await pedirUbicacion());
-    if (!coords) return;
+    if (!foto || !tipoEnCurso) return;
+    await enviarMarca(foto.blob, tipoEnCurso);
+  }
 
+  /**
+   * MANDAR LA MARCA. Recibe la foto y el tipo POR PARÁMETRO y no del estado:
+   * con «aceptar la foto es marcar» el envío ocurre en el mismo tic en que
+   * llega la foto, y un `setState` todavía no se leyó.
+   */
+  async function enviarMarca(blob: Blob, tipoDeLaMarca: TipoMarca) {
+    if (enviando) return;
+    const coords = ubicacion ?? (await pedirUbicacion());
+    if (!coords) {
+      // Sin ubicación no se puede marcar (el servidor la exige). Se dijo qué
+      // falta; el botón vuelve a quedar disponible.
+      if (MARCACION_UN_TOQUE) setTipoEnCurso(null);
+      return;
+    }
     setEnviando(true);
     setAviso(null);
     // La hora de la FOTO es la de este teléfono. Con señal no se usa —manda la
@@ -395,12 +452,12 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
     const eventoId = nuevoId();
     const pendiente: MarcaPendiente = {
       eventoId,
-      tipo: tipoEnCurso,
+      tipo: tipoDeLaMarca,
       horaTelefono,
       lat: coords.latitude,
       lng: coords.longitude,
       precisionM: Number.isFinite(coords.accuracy) ? Math.round(coords.accuracy) : null,
-      selfie: foto.blob,
+      selfie: blob,
       intentos: 0,
     };
 
@@ -425,13 +482,13 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
       }
       const cuerpo = new FormData();
       cuerpo.set("eventoId", eventoId);
-      cuerpo.set("tipo", tipoEnCurso);
+      cuerpo.set("tipo", tipoDeLaMarca);
       cuerpo.set("sinSenal", "0");
       cuerpo.set("horaTelefono", horaTelefono);
       cuerpo.set("lat", String(pendiente.lat));
       cuerpo.set("lng", String(pendiente.lng));
       if (pendiente.precisionM !== null) cuerpo.set("precisionM", String(pendiente.precisionM));
-      cuerpo.set("selfie", foto.blob, "selfie.jpg");
+      cuerpo.set("selfie", blob, "selfie.jpg");
 
       let res: Response;
       try {
@@ -455,6 +512,10 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
       else await cargar();
     } finally {
       setEnviando(false);
+      // 🔑 Con «un toque» no hay pantalla de foto que cerrar, pero el tipo en
+      // curso sí tiene que soltarse: si no, un envío fallido dejaría el botón
+      // creyendo que todavía está marcando.
+      if (MARCACION_UN_TOQUE) setTipoEnCurso(null);
     }
   }
 
@@ -517,19 +578,31 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
       {/* 🔴 El breadcrumb lleva el RÓTULO, no la key. Sin esto el encabezado
           escribía «marcacion» en minúscula y sin tilde, que es el nombre
           interno del módulo y no el que nadie debería leer (14-sep-2026). */}
-      <AppHeader module="marcacion" breadcrumbs={[{ label: ROTULO_MARCACION }]} />
+      {/* 🩸 EL ENCABEZADO DECÍA «marcacion», EN MINÚSCULA Y SIN TILDE
+          (24-sep-2026). En el celular la barra pinta la prop `module` CRUDA
+          (`AppHeader`, `<span className="truncate sm:hidden">`) y el rótulo
+          bonito viajaba en `breadcrumbs`, que solo se dibuja en escritorio.
+          Era el único módulo del sistema que pasaba la KEY; los otros 20 pasan
+          el nombre. Se le pasa el RÓTULO y el breadcrumb queda «Inicio ›
+          Marcación», sin repetirlo. */}
+      <AppHeader module={MARCACION_UN_TOQUE ? ROTULO_MARCACION : "marcacion"} breadcrumbs={MARCACION_UN_TOQUE ? undefined : [{ label: ROTULO_MARCACION }]} />
       <input
         ref={archivoRef}
         type="file"
         accept="image/*"
-        capture="user"
+        // 🔴 LA CÁMARA NORMAL, NO LA DE SELFIE. Daniel: «sus fotos son del
+        // lugar, no de su cara». La foto sigue siendo obligatoria y se guarda
+        // igual: lo único que cambia es hacia dónde mira la cámara.
+        capture={MARCACION_UN_TOQUE ? CAPTURE_CAMARA : "user"}
         onChange={llegoLaFoto}
         className="hidden"
         aria-hidden="true"
         tabIndex={-1}
       />
 
-      <main className="mx-auto w-full max-w-md px-4 pb-16 pt-6">
+      <main
+        className={`mx-auto w-full max-w-md px-4 pt-6 ${MARCACION_UN_TOQUE ? CLASES_AIRE_PARA_EL_BOTON : "pb-16"}`}
+      >
         {/* 🔴 MIENTRAS NO HAY DATO SE DIBUJA EL ESQUELETO, NUNCA UN BLANCO.
             Esto solo se ve cuando el servidor no pudo armar el estado (ver
             `page.tsx`) y el dato tiene que venir del navegador: ocupa el MISMO
@@ -558,7 +631,30 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
           </p>
         )}
 
-        {estado?.codigo && !foto && (
+        {/* ── «UN TOQUE» (24-sep-2026) ───────────────────────────────────────
+            Un botón fijo abajo que no se mueve nunca, la foto aceptada ES la
+            marca, y una sola confirmación. Con el interruptor apagado, lo de
+            abajo — la pantalla de antes, intacta. */}
+        {MARCACION_UN_TOQUE && estado?.codigo && (
+          <PantallaUnToque
+            nombre={capitalizarNombre(estado.nombre) || `Código ${estado.codigo}`}
+            hora={horaAmPm(isoQueCuenta)}
+            fecha={fechaLarga(hoy)}
+            enLinea={enLinea}
+            hoyMarcado={hoyMarcado}
+            sePuedeDeshacer={sePuedeDeshacer}
+            deshaciendo={deshaciendo}
+            onDeshacer={deshacer}
+            aviso={avisoVisible}
+            pendientes={pendientes.length}
+            faltoAyer={faltoLaSalidaDeAyer(dias, hoy)}
+            boton={boton}
+            marcando={enviando || tipoEnCurso !== null}
+            onTocarBoton={tocarBoton}
+          />
+        )}
+
+        {!MARCACION_UN_TOQUE && estado?.codigo && !foto && (
           <>
             <p className="text-sm text-gray-600">
               Hola, <b className="font-semibold text-black">{capitalizarNombre(estado.nombre) || `Código ${estado.codigo}`}</b>
@@ -641,8 +737,11 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
           </>
         )}
 
-        {/* ── La selfie ──────────────────────────────────────────────────── */}
-        {foto && (
+        {/* ── La selfie — la pantalla intermedia de antes ─────────────────
+            🩸 Es el cuarto toque que se retiró: la cámara de iOS ya preguntó
+            «¿Usar foto?» y esto volvía a pedir «Enviar». Vive solo con el
+            interruptor apagado. */}
+        {!MARCACION_UN_TOQUE && foto && (
           <>
             <p className="text-sm text-gray-600">
               {tipoEnCurso === "entrada" ? "Entrada" : "Salida"} ·{" "}

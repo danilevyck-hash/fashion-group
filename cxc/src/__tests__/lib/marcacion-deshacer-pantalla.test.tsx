@@ -16,6 +16,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup, act } from "@testing-library/react";
 import React from "react";
 
+// 🔴 ESTE CANDADO ES EL DE LA PANTALLA DE ANTES (24-sep-2026). Con el
+// rediseño «un toque» (`lib/marcacion/un-toque.ts`) la pantalla cambió de
+// acomodo, pero el interruptor en `false` tiene que dejarla EXACTAMENTE como
+// estaba — y eso es lo que se prueba acá, tal cual estaba escrito.
+vi.mock("@/lib/marcacion/un-toque", async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  MARCACION_UN_TOQUE: false,
+}));
+
 vi.mock("@/components/AppHeader", () => ({ default: () => <div data-testid="encabezado" /> }));
 vi.mock("@/lib/marcacion/selfie-telefono", () => ({
   achicarEnElTelefono: async (b: Blob) => b,
