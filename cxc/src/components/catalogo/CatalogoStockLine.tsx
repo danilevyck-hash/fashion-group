@@ -23,6 +23,7 @@
 
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { MOSTRAR_EXISTENCIA } from "@/lib/catalogo/stock-en-la-tarjeta";
+import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
 
 interface CatalogoStockLineProps {
   marca: MarcaUiKey;
@@ -41,11 +42,29 @@ interface CatalogoStockLineProps {
    * Reebok, Tommy y los modelos de una sola talla: no cambia nada.
    */
   talla?: string;
+  /**
+   * «Bulto de N» — SOLO en el celular y solo cuando la card lo cede (24-sep-2026).
+   *
+   * 🔴 EN EL CELULAR LOS TRES DATOS VAN EN UNA LÍNEA: «Bulto de 12 ·
+   * Disponibilidad 1 · Existencia 1». Medido en la tarjeta de CLASSIC LEATHER a
+   * 390 px, los tres renglones ocupaban **41 px** (727→734, 745→755, 760→768) y
+   * en uno solo son **8**: la tarjeta baja de 368 a 335 px y el catálogo entero
+   * de Reebok, de 30.386 px a unos 27.900 — casi tres pantallas menos.
+   *
+   * ⚠️ No se quita ningún dato ni se toca un número. La card sigue dibujando su
+   * propio «Bulto de N» para `sm` en adelante (ahí nada cambia), y este de aquí
+   * solo existe hasta `sm`. Sin `bulto` —catálogo público, o el interruptor
+   * apagado— la línea no lo menciona y la card lo dibuja como siempre.
+   */
+  bulto?: string;
 }
 
-export default function CatalogoStockLine({ marca, disponibilidad, existencia, talla }: CatalogoStockLineProps) {
+export default function CatalogoStockLine({ marca, disponibilidad, existencia, talla, bulto }: CatalogoStockLineProps) {
   const s = getMarcaTheme(marca)!.card.stock;
   const agotado = disponibilidad == null || disponibilidad <= 0;
+  // La línea única es del CELULAR y del bloque de la derecha (sin talla): con
+  // talla el bloque ya vive a lo ancho debajo de los botones y no se toca.
+  const enUnaLinea = CATALOGO_ORDEN_CELULAR && !talla;
   return (
     /* Sin border-t ni separador: el stock ya no es una franja aparte, es la
        columna derecha del renglón del precio (Daniel, 25-jul-2026).
@@ -55,8 +74,21 @@ export default function CatalogoStockLine({ marca, disponibilidad, existencia, t
        izquierda, porque ahí NINGÚN tamaño legible cabe al lado. */
     <div className={talla
       ? "text-[11px] leading-[15px] tabular-nums"
-      : "shrink-0 text-[11px] leading-[15px] tabular-nums xl:text-right"}>
-      <div className={`font-semibold whitespace-nowrap ${agotado ? s.agotado : s.strong}`}>
+      : enUnaLinea
+        ? "shrink-0 flex flex-wrap items-center gap-x-1.5 text-[11px] leading-[15px] tabular-nums sm:block xl:text-right"
+        : "shrink-0 text-[11px] leading-[15px] tabular-nums xl:text-right"}>
+      {/* 🔴 El «Bulto de N» del celular. Va PRIMERO, como en la pantalla de
+          hoy, y desaparece de `sm` para arriba: ahí lo sigue dibujando la card
+          bajo el precio, donde siempre estuvo. */}
+      {enUnaLinea && bulto && (
+        <div className={`whitespace-nowrap sm:hidden ${s.soft}`}>Bulto de {bulto}</div>
+      )}
+      {/* 🔑 El punto medio que separa los datos en el celular es CSS (`before:`),
+          nunca un nodo de texto: así lo que se lee de la tarjeta sigue diciendo
+          «Disponibilidad 1» y «Existencia 1», sin un «·» pegado a la palabra. */}
+      <div className={`font-semibold whitespace-nowrap ${
+        enUnaLinea && bulto ? "before:mr-1.5 before:content-['·'] sm:before:content-none " : ""
+      }${agotado ? s.agotado : s.strong}`}>
         Disponibilidad {disponibilidad ?? "—"}
         {talla && <span className={`font-normal ${s.soft}`}> · {talla}</span>}
       </div>
@@ -66,7 +98,9 @@ export default function CatalogoStockLine({ marca, disponibilidad, existencia, t
           PRENDIDO —la pantalla no cambió— porque cuál de los dos se queda lo
           decide Daniel, no el código. Ver `stock-en-la-tarjeta.ts`. */}
       {MOSTRAR_EXISTENCIA && (
-        <div className={`whitespace-nowrap ${s.soft}`}>
+        <div className={`whitespace-nowrap ${
+          enUnaLinea ? "before:mr-1.5 before:content-['·'] sm:before:content-none " : ""
+        }${s.soft}`}>
           Existencia {existencia ?? "—"}
         </div>
       )}

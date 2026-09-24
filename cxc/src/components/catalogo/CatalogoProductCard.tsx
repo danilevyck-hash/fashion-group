@@ -12,6 +12,7 @@ import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import type { CatalogoProducto } from "./types";
 import CatalogoProductName from "./CatalogoProductName";
 import CatalogoStockLine from "./CatalogoStockLine";
+import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
 import { supabaseThumb } from "@/lib/image-thumb";
 import { fmtPrecio } from "@/lib/catalogo/precio";
 import VisorFoto from "./VisorFoto";
@@ -243,6 +244,11 @@ export default function CatalogoProductCard({
                     quedan: son los que informan. */}
               </div>
               {product.price != null && (
+                /* 🔴 EN EL CELULAR ESTE RENGLÓN SE CEDE (24-sep-2026): cuando la
+                   tarjeta muestra stock, «Bulto de N» viaja a la línea única de
+                   `CatalogoStockLine` («Bulto de 12 · Disponibilidad 1 ·
+                   Existencia 1»). De `sm` para arriba se dibuja aquí, como
+                   siempre; en el catálogo público (sin stock) tampoco cambia. */
                 /* Solo "Bulto de N": el precio del bulto se quitó (Daniel,
                    25-jul-2026) — competía con el precio unitario, que es el que
                    el vendedor cotiza. El indicador "● N" (bultos en stock) también
@@ -250,8 +256,10 @@ export default function CatalogoProductCard({
                    DISCRETA (Daniel, 25-jul-2026): 10px gris — es un dato de apoyo,
                    no puede competir con el precio. Clase LITERAL e idéntica en las
                    dos cards (no sale del tema: aquí no hay color de marca). */
-                <div className="flex items-baseline gap-1.5 mt-0.5">
-                  <span className="text-[10px] leading-[14px] text-gray-500">Bulto de {bultoSize}</span>
+                <div className={CATALOGO_ORDEN_CELULAR && showStock ? "hidden sm:block" : undefined}>
+                  <div className="flex items-baseline gap-1.5 mt-0.5">
+                    <span className="text-[10px] leading-[14px] text-gray-500">Bulto de {bultoSize}</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -264,6 +272,7 @@ export default function CatalogoProductCard({
                 marca={marca}
                 disponibilidad={product.disponibilidad}
                 existencia={product.existencia}
+                bulto={product.price != null ? String(bultoSize) : undefined}
               />
             )}
           </div>

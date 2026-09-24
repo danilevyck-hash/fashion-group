@@ -10,6 +10,7 @@ import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { type JoybeesProduct, type GroupedProduct, tienePreciosDistintos } from "./groupByModel";
 import CatalogoProductName from "./CatalogoProductName";
 import CatalogoStockLine from "./CatalogoStockLine";
+import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
 import { supabaseThumb } from "@/lib/image-thumb";
 import { disponibleVendible } from "@/lib/catalogos/disponible";
 import { fmtPrecio } from "@/lib/catalogo/precio";
@@ -259,8 +260,14 @@ export default function CatalogoGroupedCard({
               {/* Solo "Bulto de N" — el precio del bulto y el indicador "● N" se
                   quitaron en las 3 marcas (Daniel, 25-jul-2026). Espejo exacto de
                   CatalogoProductCard, incluida la línea DISCRETA de 10px gris. */}
-              <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-[10px] leading-[14px] text-gray-500">Bulto de {BULTO_SIZE}</span>
+              {/* 🔴 EN EL CELULAR ESTE RENGLÓN SE CEDE (24-sep-2026): con una
+                  sola talla, «Bulto de N» viaja a la línea única del stock. Con
+                  varias tallas el bloque de stock baja al pie del selector y
+                  aquí no cambia nada. */}
+              <div className={CATALOGO_ORDEN_CELULAR && showStock && isSingleVariant ? "hidden sm:block" : undefined}>
+                <div className="flex items-baseline gap-1.5 mt-0.5">
+                  <span className="text-[10px] leading-[14px] text-gray-500">Bulto de {BULTO_SIZE}</span>
+                </div>
               </div>
             </div>
 
@@ -274,6 +281,7 @@ export default function CatalogoGroupedCard({
                 marca={marca}
                 disponibilidad={sel.product.disponibilidad}
                 existencia={sel.product.existencia}
+                bulto={String(BULTO_SIZE)}
               />
             )}
           </div>
