@@ -329,7 +329,14 @@ describe("3. 🔴 «Justificar» en la fila abre el MISMO formulario de la ficha
     // Reporte), para que el formulario no le ofrezca a Multifashion el día
     // libre de la empresa. Mismo modal, mismo formulario.
     expect(rep).toMatch(/onJustificar\(\{ codigo, persona, empresa, fecha: d\.fecha \}\)/);
-    expect(rep).not.toMatch(/OverflowMenu|···/);
+    expect(rep).not.toMatch(/OverflowMenu/);
+    // 🔴 24-sep-2026 · EL «···» SIGUE PROHIBIDO EN LA FILA DEL DÍA, y ahora se
+    // dice con más precisión: el rediseño del panel de arriba puso UN «···» —el
+    // de los relojes— y la forma de que ese permiso no se convierta en una
+    // puerta abierta es exigir que sea exactamente uno y que sea ÉSE. Un «···»
+    // nuevo en cualquier parte del archivo vuelve a poner el build en rojo.
+    expect((rep.match(/···/g) ?? []).length).toBe(1);
+    expect(rep).toContain('aria-label="Los relojes"');
   });
 
   it("al guardar, la pestaña se refresca (cargar) y la lista del período se vuelve a leer (refresco)", () => {

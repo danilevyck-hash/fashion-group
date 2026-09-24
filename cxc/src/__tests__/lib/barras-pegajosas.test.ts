@@ -85,6 +85,10 @@ const NO_SON_BARRAS_DE_PAGINA: { archivo: string; motivo: string }[] = [
   { archivo: "app/productos/cargar/DepuradorClient.tsx", motivo: "thead de la vista previa" },
   { archivo: "app/productos/cargar/FacturasTiendaClient.tsx", motivo: "thead de la vista previa" },
   { archivo: "app/prestamos/components/MovimientoTable.tsx", motivo: "thead de movimientos" },
+  // 24-sep-2026 · El rediseño de la Planilla mete las 14 columnas en una caja
+  // con scroll propio (`max-h-[70vh] overflow-auto`) para que el NETO se vea:
+  // ese `sticky top-0` del `<thead>` se pega a ESA caja, no a la página.
+  { archivo: "app/asistencia/PlanillaTab.tsx", motivo: "thead de la tabla de la planilla, dentro de su caja" },
   { archivo: "components/ventas/ResumenView.tsx", motivo: "thead del heatmap (sticky en los dos ejes)" },
   // (`components/ventas/ResumenAnual.tsx` salió de la lista el 11-sep-2026: la
   // vista Anual se retiró con la pestaña.)
