@@ -353,3 +353,52 @@ describe("D · lo que dice la tarjeta", () => {
     expect(lineaDeDias(1, "18:30")).toBe("1 día · sale 18:30");
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// E · EL RELOJ: LIMPIO CUANDO TODO ESTÁ BIEN, A LA VISTA CUANDO NO
+// ─────────────────────────────────────────────────────────────────────────────
+
+function servirRelojes(relojes: unknown[]) {
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    const u = String(url);
+    if (u.includes("/api/asistencia/reporte")) return { ok: true, status: 200, json: async () => RESPUESTA } as Response;
+    if (u.includes("/api/asistencia/reloj")) return { ok: true, status: 200, json: async () => ({ relojes }) } as Response;
+    return { ok: true, status: 200, json: async () => ({ motivos: [], justificaciones: [], personas: [] }) } as Response;
+  }));
+}
+
+const RELOJ = (salud: string, titulo: string) => ({
+  dispositivo: `reloj ${salud}`, salud, titulo, detalle: null,
+  pedidoPendiente: false, pedidoSinRespuesta: false, leidoHasta: null,
+});
+
+describe("E · el reloj en la computadora", () => {
+  it("🔴 con TODOS al día no se dibuja: está a un toque, en el «···»", async () => {
+    aparato(false);
+    servirRelojes([RELOJ("al_dia", "Las marcaciones están entrando solas")]);
+    montarReporte();
+    await screen.findByText("Ana Trejos");
+    expect(screen.queryByText("Las marcaciones están entrando solas")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Traer ahora/ })).toBeNull();
+  });
+
+  it("🔴 y se ve SIN tocar nada en cuanto uno no está entrando — los números de abajo están incompletos", async () => {
+    aparato(false);
+    servirRelojes([
+      RELOJ("al_dia", "Las marcaciones están entrando solas"),
+      RELOJ("callado", "Hace 3 horas que no entra una marcación"),
+    ]);
+    montarReporte();
+    expect(await screen.findByText("Hace 3 horas que no entra una marcación")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /Traer ahora/ }).length).toBeGreaterThan(0);
+  });
+
+  it("🔴 el «···» lo abre igual cuando todo está bien", async () => {
+    aparato(false);
+    servirRelojes([RELOJ("al_dia", "Las marcaciones están entrando solas")]);
+    montarReporte();
+    await screen.findByText("Ana Trejos");
+    fireEvent.click(screen.getByRole("button", { name: "Los relojes" }));
+    expect(await screen.findByText("Las marcaciones están entrando solas")).toBeTruthy();
+  });
+});

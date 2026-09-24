@@ -123,9 +123,23 @@ function montar(ui: React.ReactElement) {
  * 🔑 Se toca el TERCERO, que es la primera quincena del MES EN CURSO. Por
  * posición y no por rótulo: así el caso no depende de en qué mes se corra.
  */
+/*
+ * 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026. Los CUATRO botones de quincena se
+ * retiraron: la quincena la pone el SELECTOR ÚNICO del módulo
+ * («‹ 16 – 30 sep 2026 ›», `ASISTENCIA_PANTALLA_2026_09`), que vive en
+ * `?desde=&hasta=` y abre en la quincena en curso de Panamá. O sea que ya no hay
+ * nada que tocar para elegirla: llega puesta, igual que llega cuando alguien
+ * viene de otra pestaña.
+ *
+ * 🔴 LO QUE NO CAMBIÓ, y es lo que estos casos sostienen: **el cuadro no se
+ * dibuja solo**. Hay que tocar «Generar», y lo que se le pide al servidor es el
+ * MISMO `desde`/`hasta`/`corte` de siempre.
+ */
 function elegirQuincenaEnCurso() {
-  const botones = screen.getAllByRole("button", { name: /^\d{1,2} – \d{1,2} \w{3}$/ });
-  fireEvent.click(botones[2]);
+  // La barra dice en qué quincena está parada la pantalla, sin tocar nada.
+  expect(screen.getByRole("button", { name: "Quincena anterior" })).toBeTruthy();
+  // 🩸 Y los cuatro botones viejos ya no se dibujan.
+  expect(screen.queryAllByRole("button", { name: /^\d{1,2} – \d{1,2} \w{3}$/ })).toHaveLength(0);
 }
 
 // 🔴 LA PLANILLA ABRE VACÍA (1-sep-2026): no pide nada hasta que alguien elige
@@ -327,12 +341,31 @@ describe("Reporte — la metodología al ⓘ, el estado del reloj en pantalla", 
     expect(await screen.findByText(/Mientras tanto se asume 5:00 p\.m\./)).toBeTruthy();
   });
 
-  it("🔴 el reloj que no recogió el pedido se ve sin tocar nada", async () => {
+  /*
+   * 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026, Y VOLVIÓ A SU SITIO EL MISMO DÍA.
+   *
+   * Las tarjetas de reloj iban ARRIBA DE TODO a propósito: si el reloj no está
+   * entrando, cualquier número de la pantalla está incompleto y hay que saberlo
+   * ANTES de leerlo, no después de descontarle minutos a alguien.
+   *
+   * Con el rediseño del panel (Daniel: *«veo todo este panel que me ensucia»*)
+   * los relojes pasaron al «···» de la fila de mandos. Eso escondía el aviso, así
+   * que la regla quedó partida en dos y las dos se prueban acá:
+   *
+   *   · **Con todo al día no se dibuja nada** — el panel limpio que Daniel pidió;
+   *     el estado sigue a un toque, en el «···».
+   *   · 🔴 **Con cualquier cosa que mirar se ve SIN tocar nada** — un reloj
+   *     callado, un error, o un pedido que la PC no recogió.
+   */
+  it("🔴 el reloj que no recogió el pedido se ve SIN tocar nada, y lo dice completo", async () => {
     servir(base);
     montar(<ReporteTab />);
-    expect(
-      await screen.findByText(/La PC de la oficina no ha recogido el pedido/),
-    ).toBeTruthy();
+    await screen.findByText(/Ángela García/);
+    const aviso = await screen.findByText(/La PC de la oficina no ha recogido el pedido/);
+    // 🔴 A la vista: ni escondido por el «···», ni detrás de un toque.
+    expect(aviso.closest("[hidden]")).toBeNull();
+    // Y «Traer ahora» sigue al lado, que es lo que se hace con ese aviso.
+    expect(screen.getAllByRole("button", { name: /Traer ahora/ }).length).toBeGreaterThan(0);
   });
 
   it("🔴 «de los N tarde, M vienen de días sin las 4 marcas» se queda al abrir la fila", async () => {

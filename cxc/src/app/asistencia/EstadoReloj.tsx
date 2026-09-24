@@ -79,8 +79,24 @@ const PUNTO: Record<RelojEnPantalla["salud"], string> = {
   nunca: "bg-gray-300",
 };
 
-export default function EstadoReloj({ onLlegaron, resumen = false }: {
+export default function EstadoReloj({ onLlegaron, resumen = false, escondidoSiTodoBien = false }: {
   onLlegaron?: () => void;
+  /**
+   * 🔴 SE ESCONDE SOLO SI TODO ESTÁ BIEN (24-sep-2026). Lo pide la fila única de
+   * mandos de Asistencia: Daniel quiere el panel limpio, pero **si el reloj no
+   * está entrando, cualquier número de esa pantalla está incompleto y hay que
+   * saberlo ANTES de descontarle minutos a alguien** — por eso este cartel vivía
+   * arriba de todo.
+   *
+   * 🔴 LA REGLA: con todos los relojes al día y sin nada en el aire, no se
+   * dibuja nada (está a un toque, en el «···»). **Con cualquier cosa que mirar
+   * —un reloj callado, un error, un pedido esperando a la PC, la migración sin
+   * correr— se dibuja SIEMPRE**, esté el menú abierto o cerrado.
+   *
+   * ⚠️ Esconder no es desarmar: el componente sigue montado y siguiendo el
+   * pedido de «Traer ahora».
+   */
+  escondidoSiTodoBien?: boolean;
   /**
    * 🔴 UNA SOLA LÍNEA PARA TODOS LOS RELOJES (24-sep-2026). Lo pide el celular:
    * dos tarjetas que dicen lo mismo («al día, hace 3 min») eran dos de los nueve
@@ -172,6 +188,12 @@ export default function EstadoReloj({ onLlegaron, resumen = false }: {
   if (relojes.length === 0) return null;
 
   const faltaMigracion = !!datos?.faltaMigracion;
+
+  // 🔴 Nada que mirar = nada que dibujar. Cualquier otra cosa se ve igual.
+  const todoBien = !faltaMigracion
+    && relojes.every((r) => r.salud === "al_dia" && !r.pedidoPendiente && !r.pedidoSinRespuesta)
+    && pidiendo.length === 0;
+  if (escondidoSiTodoBien && todoBien) return null;
 
   if (resumen) {
     // 🔴 EL PEOR DE TODOS MANDA EL COLOR: con uno callado, la línea no puede

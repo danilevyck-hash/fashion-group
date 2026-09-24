@@ -676,28 +676,28 @@ export default function ReporteTab({ empresa = "" }: {
                 >
                   <span aria-hidden>···</span>
                 </button>
-                {/* 🔴 EL LECTOR DEL RELOJ QUEDA MONTADO, ESCONDIDO. Desarmarlo
-                    al cerrar el menú se llevaría el pedido en el aire: el
-                    «Traer ahora» deja un encargo que la PC recoge en un par de
-                    minutos, y es ESTE componente el que se entera y refresca la
-                    tabla. Se esconde, no se desarma. */}
-                <div
-                  hidden={!relojesAbiertos}
-                  className={relojesAbiertos
-                    ? "absolute right-0 z-20 mt-1 w-[22rem] max-w-[90vw] rounded-lg border border-gray-200 bg-white p-2 shadow-lg"
-                    : "hidden"}
-                >
-                  <EstadoReloj onLlegaron={() => void cargar()} />
-                </div>
+
               </div>
             )}
 
             {conteo && <span className="ml-auto text-[13px] text-gray-500">{conteo}</span>}
           </div>
 
-          {/* En el celular, los relojes en UNA línea: si el reloj no está
-              entrando, cualquier número de abajo está incompleto. */}
-          {celular && <EstadoReloj resumen onLlegaron={() => void cargar()} />}
+          {/* ══════════════════════════════════════════════════════════════
+              🔴 EL RELOJ: LIMPIO CUANDO TODO ESTÁ BIEN, A LA VISTA CUANDO NO
+              Daniel quiso el panel recogido y los relojes dentro del «···». 🔴
+              Pero si el reloj no está entrando, **cualquier número de esta
+              pantalla está incompleto** y hay que saberlo ANTES de descontarle
+              minutos a alguien — por eso este cartel vivía arriba de todo. La
+              regla que concilia las dos cosas: **con todo al día no se dibuja
+              nada** (está a un toque, en el «···»); **con cualquier cosa que
+              mirar se dibuja igual**, con el menú abierto o cerrado.
+              🔑 UNA sola instancia, siempre montada: adentro vive el pedido en
+              el aire de «Traer ahora».
+              ══════════════════════════════════════════════════════════════ */}
+          {celular
+            ? <EstadoReloj resumen onLlegaron={() => void cargar()} />
+            : <EstadoReloj escondidoSiTodoBien={!relojesAbiertos} onLlegaron={() => void cargar()} />}
         </>
       ) : (
         <>
