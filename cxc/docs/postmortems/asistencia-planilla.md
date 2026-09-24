@@ -7,6 +7,205 @@
 
 ---
 
+## 🔴 Los tres arreglos del 24-sep-2026 — las pestañas vivas, guardar sin salto, y quien no marcó
+
+> 🔴 **Ningún número de plata cambia y nada de lo que se guarda se toca.** El
+> `POST /api/asistencia/correcciones/dia` es el mismo, la ruta de la Planilla no
+> recibe ningún parámetro nuevo, y el cuadro de la planilla sale byte a byte
+> igual. Los tres arreglos van bajo interruptor en
+> `src/lib/asistencia/pestanas-vivas.ts`, hoy los tres en `true`.
+
+### El mapa
+
+| Interruptor | Qué prende | `false` = |
+|---|---|---|
+| `ASISTENCIA_PESTANAS_VIVAS` | Las pestañas visitadas quedan montadas y escondidas; la quincena y el corte de la Planilla viajan en la dirección | Una pestaña dibujada con un `if`, como antes |
+| `ASISTENCIA_GUARDAR_SIN_SALTO` | La recarga de después de guardar es silenciosa y la fila corregida se queda anclada | El «Cargando…» que reemplaza la tabla, y la fila se va |
+| `ASISTENCIA_SIN_MARCAS_VISIBLE` | Quien no marcó ni un día sale en gris en la lista | La lista solo con quien marcó |
+
+---
+
+### A · Las pestañas visitadas se quedan armadas
+
+**🩸 El defecto, medido el 24-sep-2026.** `AsistenciaClient.tsx` dibujaba la
+pestaña activa con un `if` (`{tab === "planilla" && <PlanillaTab …>}`), así que
+la pestaña que se dejaba **se desarmaba entera**.
+
+Yendo de **Planilla a Asistencia** y volviendo se perdía todo:
+
+| Lo que tenía en Planilla | Al volver |
+|---|---|
+| La quincena elegida | ❌ Sin elegir — la pantalla abría vacía |
+| **El corte del reloj** | ❌ Volvía al propuesto (13 / 28) |
+| El cuadro generado (personas, sueldos, descuentos, neto) | ❌ Se perdía |
+| «Antes de cerrar» y el estado del cierre | ❌ Se perdían (salen del cuadro) |
+| Línea de colaborador abierta | ❌ Cerrada |
+
+Y de **Asistencia a Planilla**: el colaborador desplegado, lo escrito en el
+buscador, las horas a medio corregir, los marcados para justificar a varios y el
+lugar donde estaba la página.
+
+**El punto que cuesta plata, no tiempo:** el **corte** volvía al propuesto. Si la
+contadora lo había movido (por ejemplo al 10 en vez del 13) y volvía a generar
+sin darse cuenta, la planilla que veía era **de otro corte** —o sea, se leyó el
+reloj hasta otro día— y nada lo avisaba.
+
+**Medido:** volver costaba 2 toques (la quincena + «Generar»), 3 si tocó el
+corte, y **3 llamadas al servidor**; las lecturas de la planilla son las 1.641
+marcaciones de la quincena más otras diez tablas, **≈3,1 s solo de lectura**.
+
+**Lo que se hizo.**
+
+- Las pestañas **ya visitadas** quedan montadas y se esconden (`hidden` +
+  `hidden` de Tailwind). La que nadie tocó **no se monta**: entrar al módulo no
+  puede disparar las cinco lecturas de golpe.
+- 🔑 El envoltorio se escribe a mano en cada renglón y **no** como un componente
+  definido adentro del render: un componente nuevo en cada render tiene un tipo
+  nuevo, React lo desarma y lo vuelve a armar, y se perdería justo lo que esto
+  viene a conservar. Hay candado que lo prohíbe.
+- Con la ayuda («?») abierta las pestañas **se esconden**, no se desarman.
+- La quincena y el corte viajan además en la dirección, con claves **propias**:
+  `plQuincena` (el primer día de la quincena) y `plCorte`. `quincena` ya es de
+  Préstamos › Movimientos y `desde`/`hasta` de Asistencia y Aprobaciones;
+  reusarlas haría que dos pantallas se pisaran el período.
+- 🔴 **`CORTE_ENTERA = "0"`**: «la quincena entera» es un VALOR, no la ausencia
+  del parámetro. Escrito vacío, la dirección lo borraría y al volver reaparecería
+  el corte propuesto — el defecto que esto viene a cerrar.
+- 🔴 **Son filtros, no pantallas**: van con `replace` y **no** entran a
+  `CLAVES_DE_PANTALLA`. En el celular la que empuja historial sigue siendo `tab`.
+- La dirección se lee **una sola vez, al montar**. Una quincena que ya no está
+  entre las elegibles (un enlace del mes pasado) se ignora y la Planilla abre
+  vacía — la regla de Daniel del 1-sep-2026 no se toca.
+
+**🔴 Lo que NO se hizo, a propósito:** el cuadro generado **no se guarda en
+ningún storage**. Plata dibujada desde una copia es un número viejo con cara de
+nuevo, y ésa es la clase de error que este módulo lleva años evitando. Al
+recargar la página se vuelve a generar, como hoy. Hay candado.
+
+**Candado:** `src/__tests__/components/asistencia-pestanas-vivas.test.tsx`.
+
+---
+
+### B · Guardar una hora no borra la tabla ni salta arriba
+
+Daniel: *«guardo una hora y se me sale de la pantalla»*.
+
+**🩸 La causa A (pasa siempre).** Al guardar se llamaba `onGuardadoElDia()` →
+`cargar()` → `setCargando(true)`, y la tabla estaba condicionada a `!cargando`:
+**se desmontaba entera** y en su lugar quedaba una sola línea, «Cargando…». La
+página pasaba de medir varias pantallas de alto a medir una línea, así que el
+navegador dejaba al teléfono arriba de todo. Medido contra producción, las
+lecturas de esa misma recarga: **2.031 ms** la primera página de marcaciones
+(1.000 filas) **+ 1.108 ms** la segunda (641) **+ 996 ms** de las otras lecturas.
+Segundos, no décimas.
+
+**🩸 La causa B (con «Solo a revisar» prendido).** Si la corrección dejaba al
+colaborador **sin días por revisar**, al recargar la persona **salía de la
+tabla**. Ahí no es una sensación: la fila ya no está.
+
+**Lo que se hizo.**
+
+- `cargar(silenciosa)`: la recarga de después de guardar prende `refrescando`, no
+  `cargando`. La tabla se queda dibujada con los datos viejos hasta que llegan
+  los nuevos.
+- El aviso es una pastilla **FIJA** abajo (`position: fixed`), fuera del flujo:
+  una línea que aparece y desaparece arriba de la tabla empujaría la página y
+  movería el lugar donde se estaba mirando.
+- **La fila recién corregida se ancla**: a lo filtrado se le devuelven los
+  anclados **en su lugar** de la lista (`conAnclados`), con un chip «listo» que
+  dice por qué sigue ahí. Se van al cambiar el filtro, el período o la empresa.
+- 🔴 La regla de qué es «a revisar» **no se toca**: la sigue poniendo el motor.
+  Lo único que se agrega es que los anclados vuelven.
+
+**🔴 El guardado no cambia**: el mismo `POST /api/asistencia/correcciones/dia`,
+con motivo obligatorio, la corrección por encima y `asistencia_marcaciones`
+intacta.
+
+**Candado:** `src/__tests__/components/asistencia-guardar-sin-salto.test.tsx`.
+
+---
+
+### C · Quien no marcó en el período aparece igual
+
+**🩸 El defecto, medido contra producción.** La lista se armaba **solo con quien
+tiene marcas en el período** (`reporte.ts`, `porPersona` se llena únicamente con
+marcaciones). Sin una marca, la persona no existía para esa pantalla —aunque su
+ficha estuviera activa y vigente— y **no había forma de arreglarle las horas**.
+
+Lo que eso escondía, barriendo las 49 fichas contra las marcas de cada quincena
+(descontando los 6 códigos escondidos):
+
+- **1–15 sep:** **Yeisibeth Muñoz (306, Multifashion)**, activa, `fecha_ingreso`
+  16-ene-2026, `fecha_salida` NULL, **0 marcas** en esa quincena (5 en toda su
+  historia, todas del teléfono: 22, 23 y 24 de septiembre). Las otras 7 fichas de
+  Multifashion sí tenían marcas, por eso la lista se veía llena.
+- **16–30 sep:** **María V. Bethancourth (49, Confecciones Boston)**, activa, sin
+  la casilla «no marca el reloj» y **sin una sola marca** en la quincena en
+  curso.
+- (V-EG Edwin Gómez, Vistana, sale en las dos: tiene «no marca el reloj»
+  encendido, o sea que es normal.)
+
+**🔴 Qué hace HOY la planilla con alguien sin marcas — medido, no supuesto.**
+En `armarPlanilla` los códigos del cuadro salen de las **FICHAS** de la empresa ∪
+quien marcó, así que la persona **sí** entra al cuadro. Sin reporte se le asigna
+`HORAS_CERO`: **cero ausencias, cero tardanzas, cero descuentos**. Y con la ficha
+completa y sin explicación, la línea sale con `FALTA.sinMarcaciones` («no marcó
+ni un día en esta quincena») y **`dinero: null`** → va a «Tú decides», sin pago
+calculado.
+
+**O sea: la planilla NO le cobra una sola ausencia.** Por eso la fila gris del
+Reporte **solo informa** y no cuenta ausencias — contarlas haría que la pantalla
+y el pago dijeran cosas distintas del mismo período. Esto es lo que Daniel pidió:
+*«no inventes un descuento nuevo»*.
+
+**Lo que se hizo.**
+
+- `armarReporte` acepta `sinMarcas?: ReadonlySet<string>`. Esos códigos se
+  siembran en `porPersona` **después** de recorrer las marcaciones, así que un
+  código que sí marcó nunca pasa por ahí.
+- Sus días existen —para poder TOCARLOS— pero con el **veredicto suspendido**,
+  igual que el día en curso y el día fuera de vigencia: todo en cero,
+  `ausente: false`, `revisar: false`. Su resumen queda en cero y **no mueve
+  ningún total**.
+- La persona viaja con `sinMarcas: true`. La pantalla la dibuja en gris, con el
+  chip «sin marcas en el período», el aviso de arriba («N colaboradores no
+  marcaron ni un día…») y, al abrirla, la nota que dice que la planilla no le
+  descuenta ausencias.
+- 🔴 Su día dice **«Sin marcas — no se cuenta como ausencia»**, nunca «Ausencia
+  sin justificar»: un rojo ahí diría lo contrario de lo que se paga.
+- Se corrige por **la puerta de siempre**: `POST …/correcciones/dia` ya aceptaba
+  un día con cero marcas (`tipo: "agregar"` con `marcacionId: null` y el
+  `codigo`/`fecha` del cuerpo), así que **la ruta no se tocó** y el formato de lo
+  que se guarda no cambió.
+- Quedan afuera: el que sí marcó, el que no estaba trabajando en el rango
+  (`codigosFueraDeRango`, la MISMA regla que ya saca a los demás), el código
+  escondido, y el que el buscador o la página de una persona no pidieron.
+- **Excel y PDF la llevan igual que la pantalla** (regla: lo que sale de la
+  pantalla nunca se recorta).
+
+**⚠️ Lo que su día NO dice:** si tenía vacaciones o una justificación. Su
+veredicto está suspendido entero; lo que explica el período sigue estando en la
+Planilla («Tú decides») y en Justificaciones. Antes esa persona no aparecía en
+absoluto, así que es estrictamente más información.
+
+**🔴 La PLANILLA no pasa esta lista**: su ruta no manda `sinMarcas` y su cuadro
+es el de siempre. Hay candado que lo mide.
+
+**Candado:** `src/__tests__/components/asistencia-sin-marcas-visible.test.tsx`.
+
+---
+
+### Dato para Daniel, no una afirmación
+
+La ficha de **Yeisibeth Muñoz (306)** dice que entró el **16-ene-2026**, pero su
+primera marca de la historia es del **22-sep-2026** y la ficha se editó el
+20-sep. La misma `fecha_ingreso` (16-ene-2026) y el mismo salario ($550) los
+tiene Cindy De Gracia (código 3). No se puede saber si es un error de tecleo; si
+lo fuera, mueve los días de vacaciones que le corresponden y el prorrateo de su
+primera quincena. **No está medido, no se afirma.**
+
+---
+
 ## 🔴 Los seis cambios del 19-sep-2026 — el día se arregla en la fila, y el cierre se ve de una
 
 ### Qué decidió Daniel
