@@ -234,3 +234,171 @@ Y lo que **sigue siendo cierto**, escrito donde se lee:
 - 🩸 **Dos puertas sin un solo botón, retiradas**: `[id]/en-proceso` (0 reclamos en ese estado en la historia; el VALOR sigue válido en la base) y `/api/reclamos/motivos` (`reclamo_custom_motivos`, 0 filas). **La tabla no se dropea**: queda `retirada`, fuera del respaldo. 🔴 **La cabecera no dice la misma fecha dos veces** (`seDiceCreadoEl`; pasaba en 14 de 33).
 - 🔑 **LA FECHA DE LA FACTURA ES LA QUE HAY, SIN ASTERISCOS.** `ANTHROPIC_API_KEY` **se verificó el 20-sep-2026 y SIRVE**; el backfill **ya no tiene trabajo** (`20261114120000` llenó todas las `fecha_factura` en NULL). Los **33 vivos tienen `fecha_factura` = `fecha_reclamo`** y **solo 4 tienen PDF**: no hay de dónde sacar la real. Daniel: *«sino usa la fecha de creación como la de la factura y ya, una sola fecha menos enredo»*. ⚠️ **Hacia adelante no se arrastra**: al crear, el PDF y la fecha son obligatorios.
 - Candados (todos `reclamos-*`): `portada-al-frente` · `cobrar-al-frente` · `cobro-monto-puesto` · `renglones-legibles` · `aviso-semanal` · `formulario-dice-que-pasa` · `puertas-sin-boton`.
+
+---
+
+## El celular, la foto de la factura y la palabra «cobrado» (24-sep-2026)
+
+Daniel aprobó el mockup `cel-reclamos.html` **letra por letra**: **1b · 2c · 2e ·
+3b · 3e · 4b · 5b · 6b · 7b · 8b · 9 · 10c · 11c**. Lo que sigue es lo que se
+construyó, qué reemplaza —con la medición— y qué quedó distinto del dibujo.
+
+### 1 · «Cobrado», nunca «pagado»
+
+> Daniel, textual: *«solo hay creado y cobrado, ¿por qué veo pagado?»*
+
+Tenía razón, y el sistema ya se la daba a medias: la portada dice «Cobrado
+2026», la lista de una empresa dice «Cobrados» y el papel que sale al proveedor
+**dejó de imprimir la palabra el 20-sep-2026** —justo porque «Pagado» se le lee
+al revés a un proveedor extranjero—. Lo único que seguía diciendo «pagado» era
+**el botón que más se toca** (14 cobros, 9 en septiembre) y el chip de arriba
+del reclamo.
+
+Los rótulos viven ahora en **`src/lib/reclamos/rotulos.ts`**: `MARCAR_COBRADO`
+(«Marcar como cobrado»), `CHIP_COBRADO` («Cobrado»), `COMPROBANTE_OBLIGATORIO`,
+`FALTA_COMPROBANTE`, `NO_SE_PUDO_COBRAR`, `LISTO_COBRADO` y `cobradoEl(fecha)`
+—que **sin fecha no inventa ninguna**, devuelve solo «cobrado»—.
+
+🔴 **Es SOLO el rótulo.** El estado en la base sigue siendo `"Pagado"`
+(`ESTADO_PAGADO`), el PATCH manda ese valor exacto, `esPendiente` compara contra
+él y el papel no cambia ni una celda.
+
+**Candado `reclamos-cobrado-no-pagado.test.ts`**: barre `src/app/reclamos/**` y
+`src/lib/reclamos/**`, borra los comentarios (la historia del módulo SÍ puede
+nombrar «pagado») y junta todas las cadenas y el texto suelto de JSX. La única
+que se permite es la cadena EXACTA `"Pagado"` —el valor de la base—; cualquier
+frase que la contenga pone el build rojo. Los candados viejos que afirmaban
+«Marcar como pagado» se actualizaron al rótulo nuevo leyéndolo del módulo, sin
+debilitarse.
+
+### 2 · La factura entra como PDF o como foto (4b)
+
+🩸 **El defecto, medido:** `FacturaPdfUploader` pedía `accept="application/pdf"`,
+así que en el iPhone «Elegir archivo» abría **Archivos y nada más** —ni la
+cámara ni la fototeca— y la factura es obligatoria para guardar: **desde el
+teléfono no había forma de empezar un reclamo**. A Andrea la factura le llega
+por CORREO; a Daniel, muchas veces en papel o por WhatsApp.
+
+El veredicto de la auditoría era de cuatro líneas y se cumplió:
+
+1. `accept="image/*,application/pdf"` en la caja.
+2. `validar()` acepta una foto con las MISMAS reglas que las fotos del daño
+   (`validateFotoFile`); el PDF conserva su tope de 10 MB.
+3. El `Content-Type` del PUT sale del archivo (`tipoDeArchivo`), no fijo.
+4. El bloque de contenido del modelo lo decide el tipo.
+
+Ese cuarto punto vive en **`src/lib/ia/bloque-archivo.ts`** (puro, sin el SDK
+adentro, para que el candado lo lea sin levantar una conexión): `application/pdf`
+→ bloque `document` **byte por byte como siempre**; `image/jpeg|png|webp|gif` →
+bloque `image` con SU tipo; **cualquier otra cosa LANZA** en español («Ese
+archivo no se puede leer: manda un PDF o una foto») **antes** de salir a la red
+—así un `.docx` no gasta un reintento ni dispara el aviso de 🔧 SISTEMA—.
+`leerPdfConAnthropic` recibe un `mediaType` opcional que por omisión es PDF: el
+lector de Marketing no cambia en nada.
+
+Dos piezas más, para que funcione de punta a punta:
+
+- **El bucket guarda la extensión real.** `factura-pdf/upload-url` forzaba `.pdf`
+  a todo; ahora conserva `.pdf/.jpg/.jpeg/.png/.webp/.gif` y **lo desconocido
+  sigue cayendo en `.pdf`**, como siempre.
+- **El lector deduce el tipo de la ruta** (`tipoPorNombre`), porque lo único que
+  le llega es el `path` del bucket. Sin extensión conocida, PDF.
+
+La foto **se achica en el navegador antes de viajar** con el MISMO compresor del
+comprobante de pago (1600 px · JPEG 0,8) — el formato que la IA acepta y que no
+revienta el límite de body de Vercel.
+
+⚠️ **Lo que NO se hizo, y se dice en pantalla:** una factura de **varias hojas
+son varias fotos**, y la caja manda un solo archivo. Cuando entra una foto
+aparece una línea gris: *«Si la factura tiene varias hojas, mándala en PDF: la
+foto es de una sola hoja»*. Tampoco se probó HEIC en un teléfono real: `ALLOWED`
+de `fotoUpload.ts` no lo incluye; desde la fototeca iOS convierte solo a JPEG,
+pero un `.heic` elegido desde Archivos se rechazaría con el mensaje de foto.
+
+🔴 **No cambian**: el prompt (`PROMPT_LECTOR`), el modelo (`claude-sonnet-4-6`),
+el parser (`parsearRespuestaLector`), la ruta `/api/reclamos/ia/leer-factura`, el
+bucket `reclamo-facturas`, el formulario, la validación de guardado ni una
+columna de la base. Candado `lector-factura-imagen.test.ts`.
+
+### 3 · El celular (`RECLAMOS_CELULAR`, hoy `true`, solo hasta `sm`)
+
+🩸 **Lo que reemplaza, medido el 24-sep-2026 a 390 px y sobre las fotos del
+iPhone de Daniel:**
+
+| Pantalla | Cómo estaba |
+|---|---|
+| Portada | **1.055 px** (1,25 pantallas); «Nuevo Reclamo» se llevaba una fila entera con el lado izquierdo en blanco; el buscador se cortaba («…estilo o empre») |
+| Lista de una empresa | **45 cosas tocables**; 12 botones antes del primer reclamo, que empezaba en y=423 de 844; tarjetas de 174 px → **2,5 reclamos por pantalla** |
+| Reclamo abierto | cabecera de **cinco renglones** (en la computadora es una línea), cuatro botones en dos filas y **dos menús que no se conocían** |
+| Fotos y seguimiento | dos cajas siempre abiertas: **28 de los 33 reclamos vivos no tienen una sola foto** y las notas a mano son **14 en toda la historia** |
+| «Cobrados» | **los días seguían corriendo**: «350 días» en uno ya cobrado, y la fecha salía pelada sin decir de qué era |
+| Un cobrado | el MISMO hecho en **tres cajas** distintas: **2,7 pantallas** |
+| Buscar | una **tabla de 560 px dentro de 358**: «Estado» y «Total» —la plata— quedaban fuera |
+| El «···» de la fila | abría hacia abajo y **«Eliminar» en rojo caía sobre el reclamo de abajo** (14 reclamos ya borrados en la historia) |
+
+**Lo que se construyó**, archivo por archivo:
+
+- `src/lib/reclamos/celular.ts` — el interruptor y las palabras puras
+  (`subtituloPortada`, `lineaEmpresa`, `lineaReclamo`, `lineaCobrado`,
+  `tituloSeleccion`, `botonMandar`, `montoCel`). **No calcula un solo total**:
+  los números salen de `portada.ts` y de `reclamoTaxes`, como en la computadora.
+- `components/celular/piezas.tsx` — `FilaCel` (la ÚNICA fila del módulo: nombre a
+  la izquierda, **plata siempre a la derecha**), el visto verde, la casilla de
+  elegir, el «···» y `CtaFija`, el botón negro pegado abajo con
+  `env(safe-area-inset-bottom)`.
+- `components/celular/PortadaCelular.tsx` — **1b** y **9**.
+- `components/celular/ListaEmpresaCelular.tsx` — **2c**, **2e**, **5b**, **10c**.
+- `components/celular/DetalleCelular.tsx` — **3b**, **3e**, **6b**, **11c**.
+- `components/celular/HojasReclamosCelular.tsx` — **7b** (cobrar), **8b**
+  (mandar), la hoja de opciones y las pantallas de Fotos y Seguimiento.
+
+🔴 **Nada de lo que se guarda cambia**, y es lo que sostiene el candado:
+
+- El correo y las descargas salen de **`components/descargas.ts`**, un módulo
+  nuevo que tiene la ruta y el cuerpo **una sola vez** y que leen la ventana de
+  la computadora *y* la hoja del teléfono. El asunto y el mensaje salen de
+  `lib/reclamos/correo-proveedor.ts` (movidos del modal, **sin cambiar una
+  coma**): el candado compara el objeto que manda la hoja contra el que arma la
+  ventana.
+- El cobro llama al **mismo `submitSettlement`** del contenedor —la ruta de
+  settlements con `markPaid: true`, con el comprobante subido antes—.
+- Ninguna pantalla del celular arma una ruta `/api/reclamos` a mano (barrido).
+
+🔴 **`AppHeader` se dibuja UNA sola vez.** Con el interruptor prendido lo pone
+`ReclamosClient` y las tres pantallas de la computadora lo callan con
+`sinEncabezado`: dos encabezados montados a la vez serían dos buscadores, dos
+campanas y **dos oyentes de ⌘K**. Con el interruptor apagado, cada pantalla
+dibuja el suyo como siempre.
+
+**Deshacer de 5 s** en el cobro y en el correo, con el `UndoToast` de la casa: el
+POST es el MISMO, solo que sale cinco segundos después.
+
+#### Lo que quedó distinto del mockup, y por qué
+
+1. **No hay una barra «‹ Fashion Wear» propia.** El mockup dibuja un top bar de
+   iOS porque el teléfono de su dibujo no tiene el encabezado de la casa. En la
+   app esa vuelta ya existe: es la **barra de migas** de `AppHeader`
+   (`Inicio › Reclamos › Fashion Wear`). Dibujarla dos veces era un renglón de
+   más para hacer lo mismo.
+2. **En un reclamo cobrado las fotos son un renglón, no una tira de miniaturas.**
+   El mockup 6b las dibuja en grilla y el 3e como renglón. Se eligió **una sola
+   regla para los dos casos**: el renglón, que además dice cuántas hay y abre a
+   pantalla completa con los botones de dedo.
+3. **La lista de una empresa no lleva buscador.** El mockup 2c/2e no lo dibuja y
+   la portada ya busca en todo el módulo. En la computadora el buscador de la
+   empresa **no se tocó**.
+4. **El número grande es más chico que el del mockup** (34 px contra 44): Daniel,
+   24-sep-2026, *«kpi más chico, que no consuma tanto»*.
+5. **Editar sigue siendo la pantalla de siempre**, también en el teléfono: es el
+   formulario más largo del sistema y no estaba en el mockup.
+
+**Candado `reclamos-celular.test.tsx`** (39 pruebas): las palabras puras; la
+portada (número exacto, una fila por empresa, el chip rojo, lo cobrado en un
+renglón, el botón fijo); buscar en filas y **ni una `<table>` ni un
+`overflow-x-auto`** en ninguna de las tres pantallas; la fila sin botones y que
+abre el reclamo; el «···»; «Cobrados» con visto y sin días; el título de la
+selección con su plata; el detalle con UN botón negro fijo y los dos renglones;
+el cobrado con la línea verde y sus dos filas; la hoja de cobro (monto puesto,
+editable, un solo botón que dice cuánto, «Se deshace por 5 segundos», el
+comprobante obligatorio) y que manda **las mismas filas**; el correo con el
+**mismo cuerpo y la misma ruta**; y que todo cuelga del interruptor.
