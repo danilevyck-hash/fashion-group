@@ -129,11 +129,18 @@ interface Props {
    * y el calendario queda para lo que no es una quincena (10-sep-2026).
    */
   textoVacio?: string;
+  /**
+   * 🔴 SOLO EL ÍCONO 📅, sin el rango escrito al lado (24-sep-2026). Lo pide el
+   * selector único de Asistencia: ahí el período ya se lee en la barra
+   * «‹ 16 – 30 sep 2026 ›» y repetirlo en el botón sería decir la misma fecha
+   * dos veces. El calendario que abre es EXACTAMENTE el mismo.
+   */
+  iconoSolo?: boolean;
 }
 
 export default function RangoFechas({
   desde, hasta, onChange, recordarComo, label = "Período", vacio = false, textoVacio = "Elige el período",
-  inline = false, accion, sugerido = null,
+  inline = false, accion, sugerido = null, iconoSolo = false,
 }: Props) {
   const [abierto, setAbierto] = useState(false);
   const [ancla, setAncla] = useState<string | null>(null);
@@ -199,7 +206,17 @@ export default function RangoFechas({
     />
   );
 
-  const boton = (
+  const boton = iconoSolo ? (
+    <button
+      type="button"
+      onClick={() => setAbierto((v) => !v)}
+      aria-label="Elegir un día o un rango"
+      title="Elegir un día o un rango"
+      className="flex h-11 w-11 items-center justify-center rounded-md border border-gray-300 text-base transition hover:border-black active:scale-[0.97]"
+    >
+      <span aria-hidden className="leading-none">📅</span>
+    </button>
+  ) : (
     <button
       type="button"
       onClick={() => setAbierto((v) => !v)}
@@ -246,8 +263,8 @@ export default function RangoFechas({
   }
 
   return (
-    <div className="min-w-[240px]">
-      {label && (
+    <div className={iconoSolo ? "shrink-0" : "min-w-[240px]"}>
+      {label && !iconoSolo && (
         <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">{label}</label>
       )}
 

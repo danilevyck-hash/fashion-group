@@ -31,6 +31,13 @@ import { fmt } from "@/lib/format";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { quincenaDesdeClave, quincenasHasta, type Quincena } from "@/lib/asistencia/planilla";
 import { rotuloQuincena } from "@/lib/asistencia/elegir-quincena";
+// 🔴 EL SELECTOR ÚNICO DEL MÓDULO (24-sep-2026). 🩸 Acá vivía una lista
+// desplegable de 24 quincenas, la CUARTA forma de elegir período del módulo.
+// Ahora es la misma barra de flechas de las otras tres pestañas, con la misma
+// clave de la dirección. ⚠️ `?quincena=` sigue entrando: un enlace viejo abre
+// donde decía.
+import SelectorPeriodo, { usePeriodoAsistencia } from "@/components/asistencia/SelectorPeriodo";
+import { ASISTENCIA_PANTALLA_2026_09, quincenaDelPeriodo } from "@/lib/asistencia/pantalla-2026-09";
 import {
   etiquetaDeFiltro, filtrarPorEmpresa, nombreArchivoPorEmpresa,
 } from "@/lib/asistencia/empresa-para-todo";
@@ -60,11 +67,18 @@ export default function MovimientosQuincenaTab(props: { empresa?: string }) {
   const opciones = useMemo(() => quincenasHasta(hoyPanama(), CUANTAS_QUINCENAS), []);
   // Mismo nivel → `replace`: el Atrás del navegador no cicla por quincenas.
   const [claveUrl, setClave] = useUrlState(PARAM_QUINCENA, "");
+  const compartido = usePeriodoAsistencia();
   const quincena: Quincena = useMemo(() => {
     const q = quincenaDesdeClave(claveUrl);
+    // 🔴 Manda `?quincena=` cuando viene en el enlace (compatibilidad); si no,
+    // la quincena del período compartido. 🔑 Con un período que no es una
+    // quincena se mira la que lo CONTIENE: Movimientos es por quincena, y un
+    // rango libre no tiene movimientos propios.
+    if (q) return q;
+    if (ASISTENCIA_PANTALLA_2026_09) return quincenaDelPeriodo(compartido.desde);
     // Una clave rara (o vacía) cae en la quincena en curso, nunca en blanco.
-    return q ?? opciones[0];
-  }, [claveUrl, opciones]);
+    return opciones[0];
+  }, [claveUrl, opciones, compartido.desde]);
 
   const [filas, setFilas] = useState<FilaMovimiento[] | null>(null);
   const [error, setError] = useState(false);
@@ -123,6 +137,16 @@ export default function MovimientosQuincenaTab(props: { empresa?: string }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
+        {ASISTENCIA_PANTALLA_2026_09 ? (
+          /* 🔴 Sin calendario: acá solo hay movimientos de una QUINCENA. */
+          <SelectorPeriodo
+            desde={quincena.desde}
+            hasta={quincena.hasta}
+            hoy={compartido.hoy}
+            conCalendario={false}
+            onElegir={(d, h) => { setClave(""); compartido.elegir(d, h); }}
+          />
+        ) : (
         <label className="flex items-center gap-2 text-sm">
           <span className="text-gray-600">Quincena</span>
           <select
@@ -138,6 +162,7 @@ export default function MovimientosQuincenaTab(props: { empresa?: string }) {
             ))}
           </select>
         </label>
+        )}
         <button
           type="button"
           onClick={() => void bajarExcel()}

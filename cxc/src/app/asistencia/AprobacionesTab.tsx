@@ -38,6 +38,12 @@ import { empresaParaPedir } from "@/lib/asistencia/empresa-para-todo";
 import { useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ToastSystem";
 import RangoFechas, { ultimoRango } from "@/components/ui/RangoFechas";
+// 🔴 EL SELECTOR ÚNICO DEL MÓDULO (24-sep-2026). 🩸 Esta pestaña recordaba su
+// período con una llave PROPIA (`asistencia_aprobaciones`): cambiarlo en
+// Asistencia no lo cambiaba acá, y al revés. Ahora es la misma clave de la
+// dirección y la misma memoria que las otras tres pestañas.
+import SelectorPeriodo, { usePeriodoAsistencia } from "@/components/asistencia/SelectorPeriodo";
+import { ASISTENCIA_PANTALLA_2026_09 } from "@/lib/asistencia/pantalla-2026-09";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { esFechaDeCalendario, quincenasHasta } from "@/lib/asistencia/planilla";
@@ -124,14 +130,18 @@ export default function AprobacionesTab({ empresa = "" }: {
   const cambiarVista = (v: Vista) => { setVistaUrl(v); recordarVista(v); };
 
   const quincenaEnCurso = useMemo(() => quincenasHasta(hoy, 1)[0], [hoy]);
-  const [desde, setDesde] = useState(rangoUrl?.desde ?? quincenaEnCurso.desde);
-  const [hasta, setHasta] = useState(rangoUrl?.hasta ?? quincenaEnCurso.hasta);
+  const [desdeViejo, setDesde] = useState(rangoUrl?.desde ?? quincenaEnCurso.desde);
+  const [hastaViejo, setHasta] = useState(rangoUrl?.hasta ?? quincenaEnCurso.hasta);
   useEffect(() => {
+    if (ASISTENCIA_PANTALLA_2026_09) return;
     if (rangoUrl) return;
     const r = ultimoRango("asistencia_aprobaciones");
     if (r) { setDesde(r.desde); setHasta(r.hasta); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const compartido = usePeriodoAsistencia();
+  const desde = ASISTENCIA_PANTALLA_2026_09 ? compartido.desde : desdeViejo;
+  const hasta = ASISTENCIA_PANTALLA_2026_09 ? compartido.hasta : hastaViejo;
 
   const [dias, setDias] = useState<DiaAprobacion[] | null>(null);
   const [puedeAprobar, setPuedeAprobar] = useState(true);
@@ -298,8 +308,49 @@ export default function AprobacionesTab({ empresa = "" }: {
 
   return (
     <div className="py-4">
+      {/* ══════════════════════════════════════════════════════════════════
+          🔴 3a — UNA SOLA FILA DE MANDOS (24-sep-2026): selector ·
+          Colaborador / Día · lupa · Excel · «Sí a todo». 🩸 Eran dos filas, y
+          el número grande («5 por decidir · 10:36 h») quedaba metido ENTRE los
+          botones en vez de encabezar la lista.
+          ══════════════════════════════════════════════════════════════════ */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <RangoFechas desde={desde} hasta={hasta} recordarComo="asistencia_aprobaciones" onChange={(d, h) => { setDesde(d); setHasta(h); }} />
+        {ASISTENCIA_PANTALLA_2026_09 ? (
+          <SelectorPeriodo desde={desde} hasta={hasta} hoy={compartido.hoy} onElegir={compartido.elegir} />
+        ) : (
+          <RangoFechas desde={desde} hasta={hasta} recordarComo="asistencia_aprobaciones" onChange={(d, h) => { setDesde(d); setHasta(h); }} />
+        )}
+        {ASISTENCIA_PANTALLA_2026_09 && (
+          <>
+            <div role="radiogroup" aria-label="Ver por" className="inline-flex rounded-md border border-gray-200 p-0.5">
+              {VISTAS.map((v) => (
+                <button
+                  key={v.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={vista === v.key}
+                  onClick={() => cambiarVista(v.key)}
+                  className={`min-h-[40px] rounded px-4 text-sm font-medium transition ${
+                    vista === v.key ? "bg-black text-white" : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  {v.etiqueta}
+                </button>
+              ))}
+            </div>
+            {/* 🔴 El buscador SOLO en «Colaborador»: en «Día» los renglones son
+                fechas y un campo que dice «Buscar colaborador» no busca nada. */}
+            {vista === "colaborador" && (
+              <BuscadorDeLista
+                valor={busqueda}
+                onCambiar={setBusqueda}
+                placeholder={PLACEHOLDER_COLABORADOR}
+                etiqueta="Buscar colaborador por nombre o código"
+                conteo={conteo}
+              />
+            )}
+          </>
+        )}
         <div className="flex-1" />
         {/* 🔴 EXPORTAR NO ES APROBAR: se puede bajar aunque no se pueda decidir. */}
         <button
@@ -359,7 +410,9 @@ export default function AprobacionesTab({ empresa = "" }: {
       {/* ── El control de dos opciones y el contador, en una línea ──────────── */}
       {!cargando && dias !== null && (
         <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <div role="radiogroup" aria-label="Ver por" className="inline-flex rounded-md border border-gray-200 p-0.5">
+          <div role="radiogroup" aria-label="Ver por"
+            className={`inline-flex rounded-md border border-gray-200 p-0.5 ${ASISTENCIA_PANTALLA_2026_09 ? "hidden" : ""}`}
+            hidden={ASISTENCIA_PANTALLA_2026_09}>
             {VISTAS.map((v) => (
               <button
                 key={v.key}
@@ -378,7 +431,7 @@ export default function AprobacionesTab({ empresa = "" }: {
           {/* 🔴 El buscador SOLO en «Colaborador»: en «Día» los renglones son
               fechas, no personas, y un campo que dice «Buscar colaborador»
               encima de una lista de días no busca nada. */}
-          {vista === "colaborador" && (
+          {vista === "colaborador" && !ASISTENCIA_PANTALLA_2026_09 && (
             <BuscadorDeLista
               valor={busqueda}
               onCambiar={setBusqueda}
