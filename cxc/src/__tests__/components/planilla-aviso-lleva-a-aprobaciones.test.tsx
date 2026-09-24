@@ -39,6 +39,8 @@ import {
   HORAS_CERO, TOTALES_CERO, MANUALES_CERO, quincena, periodoDeQuincena, type LineaPlanilla,
 } from "@/lib/asistencia/planilla";
 import { enlaceAprobaciones, type DiaAprobacion } from "@/lib/asistencia/aprobaciones";
+// 🔴 24-sep-2026: el período de las cuatro pestañas sale de una sola función.
+import { periodoCompartidoInicial } from "@/lib/asistencia/pantalla-2026-09";
 import PlanillaTab from "@/app/asistencia/PlanillaTab";
 import AprobacionesTab from "@/app/asistencia/AprobacionesTab";
 
@@ -151,9 +153,23 @@ function servirPlanilla(conFreno = false) {
  * 🔑 Se toca el TERCERO, que es la primera quincena del MES EN CURSO. Por
  * posición y no por rótulo: así el caso no depende de en qué mes se corra.
  */
+/*
+ * 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026. Los CUATRO botones de quincena se
+ * retiraron: la quincena la pone el SELECTOR ÚNICO del módulo
+ * («‹ 16 – 30 sep 2026 ›», `ASISTENCIA_PANTALLA_2026_09`), que vive en
+ * `?desde=&hasta=` y abre en la quincena en curso de Panamá. O sea que ya no hay
+ * nada que tocar para elegirla: llega puesta, igual que llega cuando alguien
+ * viene de otra pestaña.
+ *
+ * 🔴 LO QUE NO CAMBIÓ, y es lo que estos casos sostienen: **el cuadro no se
+ * dibuja solo**. Hay que tocar «Generar», y lo que se le pide al servidor es el
+ * MISMO `desde`/`hasta`/`corte` de siempre.
+ */
 function elegirQuincenaEnCurso() {
-  const botones = screen.getAllByRole("button", { name: /^\d{1,2} – \d{1,2} \w{3}$/ });
-  fireEvent.click(botones[2]);
+  // La barra dice en qué quincena está parada la pantalla, sin tocar nada.
+  expect(screen.getByRole("button", { name: "Quincena anterior" })).toBeTruthy();
+  // 🩸 Y los cuatro botones viejos ya no se dibujan.
+  expect(screen.queryAllByRole("button", { name: /^\d{1,2} – \d{1,2} \w{3}$/ })).toHaveLength(0);
 }
 
 function generar() {
@@ -332,9 +348,8 @@ describe("🔴 APROBACIONES con ?persona= en la URL", () => {
 });
 
 describe("CONTROL: sin ?persona= nada cambia", () => {
-  it("renglones cerrados, sin chip, sin fila resaltada, y el rango recordado manda", async () => {
+  it("renglones cerrados, sin chip, sin fila resaltada, y el período es el del módulo", async () => {
     URL_ACTUAL = "tab=aprobaciones";
-    globalThis.localStorage?.clear();
     await montarAprobaciones();
     expect(screen.queryByTestId("chip-persona")).toBeNull();
     expect(document.querySelectorAll('[aria-current="true"]')).toHaveLength(0);
@@ -342,7 +357,36 @@ describe("CONTROL: sin ?persona= nada cambia", () => {
       expect(screen.getByRole("button", { name: new RegExp(`^${n}$`) }).getAttribute("aria-expanded")).toBe("false");
     }
     expect(screen.queryByTestId("dias-de-6")).toBeNull();
-    // El último rango recordado, como siempre.
-    await waitFor(() => expect(pedidas.some((u) => u.includes("desde=2026-07-01"))).toBe(true));
+    // 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026: Aprobaciones recordaba su período
+    // con una llave PROPIA (`fg_last_asistencia_aprobaciones`), así que cambiar
+    // el período en Asistencia NO lo cambiaba acá — eran dos memorias para la
+    // misma pregunta. Con el selector único la memoria es UNA sola para las
+    // cuatro pestañas (`fg_last_asistencia_periodo`).
+    //
+    // 🔴 LA REGLA NO CAMBIÓ y sigue probada abajo, sobre la función pura que la
+    // pantalla usa: manda la dirección, después lo recordado, y al final la
+    // quincena en curso. ⚠️ Acá se prueba el ÚLTIMO escalón porque en este
+    // entorno no hay `localStorage` (`jsdom` sin almacenamiento): sin memoria,
+    // el 10 de agosto se pide la quincena 1 – 15 ago.
+    await waitFor(() => expect(pedidas.some((u) => u.includes("desde=2026-08-01"))).toBe(true));
+    expect(pedidas.some((u) => u.includes("hasta=2026-08-15"))).toBe(true);
+  });
+
+  it("🔴 la precedencia del período compartido: dirección → recordado → quincena en curso", () => {
+    const hoy = "2026-08-10";
+    const recordado = { desde: "2026-07-01", hasta: "2026-07-15" };
+    // 1. Lo que trae el enlace manda.
+    expect(periodoCompartidoInicial({ url: { desde: "2026-06-16", hasta: "2026-06-30" }, recordado, hoy }))
+      .toEqual({ desde: "2026-06-16", hasta: "2026-06-30" });
+    // 2. Sin dirección, lo recordado en este dispositivo — la MISMA memoria de
+    //    las cuatro pestañas.
+    expect(periodoCompartidoInicial({ url: {}, recordado, hoy }))
+      .toEqual({ desde: "2026-07-01", hasta: "2026-07-15" });
+    // 3. Y sin nada, la quincena en curso de Panamá.
+    expect(periodoCompartidoInicial({ url: {}, recordado: null, hoy }))
+      .toEqual({ desde: "2026-08-01", hasta: "2026-08-15" });
+    // 🩸 Media dirección o un rango al revés no se creen.
+    expect(periodoCompartidoInicial({ url: { desde: "2026-06-16" }, recordado: null, hoy }))
+      .toEqual({ desde: "2026-08-01", hasta: "2026-08-15" });
   });
 });

@@ -33,6 +33,8 @@ import {
 import {
   corteInicial, esLaQuincena, fraseCorte, quincenasDelMes, quincenasElegibles, rotuloQuincena,
 } from "@/lib/asistencia/elegir-quincena";
+// 🔴 24-sep-2026: el rótulo de la barra sale del módulo puro del rediseño.
+import { rotuloDelPeriodo } from "@/lib/asistencia/pantalla-2026-09";
 
 vi.mock("@/lib/asistencia/planilla-unida", () => ({ planillaUnidaPrendida: () => true, PLANILLA_UNIDA: true }));
 
@@ -99,6 +101,26 @@ function servir() {
   return llamadas;
 }
 const montar = () => render(<ToastProvider><PlanillaTab /></ToastProvider>);
+/**
+ * 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026: la quincena se elegía con CUATRO
+ * botones y ahora la pone el SELECTOR ÚNICO del módulo
+ * («‹ 16 – 30 sep 2026 ›», `ASISTENCIA_PANTALLA_2026_09`), que vive en
+ * `?desde=&hasta=` y comparte clave y memoria con Asistencia, Aprobaciones y
+ * Préstamos › Movimientos.
+ *
+ * 🔴 LA REGLA NO CAMBIÓ: solo se pagan QUINCENAS —el selector de la Planilla no
+ * lleva calendario— y lo que se pide al servidor es exactamente el mismo
+ * `desde`/`hasta`/`corte` de siempre.
+ *
+ * Acá se abre directo en una quincena, que es como llega la pantalla de verdad
+ * cuando alguien viene de otra pestaña o del enlace de un aviso.
+ */
+function abrirEn(desde: string, hasta: string) {
+  URL_PLANILLA = `desde=${desde}&hasta=${hasta}`;
+  return montar();
+}
+/** «‹» y «›» de la barra. */
+const atras = () => fireEvent.click(screen.getByRole("button", { name: "Quincena anterior" }));
 const boton = (nombre: RegExp | string) => screen.getAllByRole("button", { name: nombre })[0] as HTMLButtonElement;
 const generar = () => fireEvent.click(boton(/^Generar$/));
 const urlDelCuadro = (ll: Llamada[]) => ll.find((c) => c.url.includes("/api/asistencia/planilla?"))?.url ?? null;
@@ -109,6 +131,11 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.setSystemTime(new Date("2026-09-10T15:00:00Z")); // 10 sep 2026, 10:00 a.m. Panamá
   sessionStorage.setItem("cxc_role", "admin");
+  // 🔴 24-sep-2026: la dirección y la memoria del período son COMPARTIDAS por
+  // las cuatro pestañas, así que un caso que las deja escritas le cambiaría la
+  // quincena al siguiente. Se limpian las dos.
+  URL_PLANILLA = "";
+  try { localStorage.clear(); } catch { /* jsdom sin localStorage */ }
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); sessionStorage.clear(); });
 
@@ -128,8 +155,8 @@ describe("el módulo puro: las dos quincenas del mes, con el último día real",
   it("⚠️ CONTROL: en septiembre (30 días) la pantalla NO dice nada del 31 (15-sep-2026)", () => {
     // Un aviso que sale siempre deja de avisar. El caso al revés —agosto, donde
     // SÍ sale— está en `asistencia-planilla-cerrar-quincena.test.tsx`.
-    montar();
-    fireEvent.click(screen.getByRole("button", { name: "16 – 30 sep" }));
+    servir();
+    abrirEn("2026-09-16", "2026-09-30");
     expect(screen.queryByText(/El 31 no paga sueldo/)).toBeNull();
   });
   it("el corte propuesto es el 13 o el 28, y la frase dice qué pasa con los días de después", () => {
@@ -145,53 +172,69 @@ describe("el módulo puro: las dos quincenas del mes, con el último día real",
   });
 });
 
-describe("🔴 la pantalla: dos botones, el corte a la vista, Generar negro", () => {
-  it("abre con los CUATRO botones —agosto y septiembre— y sin ningún calendario", async () => {
+describe("🔴 la pantalla: la barra de quincena, el corte a la vista, Generar negro", () => {
+  it("🩸 24-sep-2026: abre en la quincena en curso, con la barra, y sin ningún calendario", async () => {
     servir(); montar();
-    expect(boton("1 – 15 ago")).toBeTruthy();
-    expect(boton("16 – 30 ago")).toBeTruthy();
-    expect(boton("1 – 15 sep")).toBeTruthy();
-    expect(boton("16 – 30 sep")).toBeTruthy();
-    // 🔴 Y ni rastro del rango libre.
+    // 🔴 Lo primero que se lee es QUÉ quincena se va a pagar, escrito entero.
+    expect(screen.getByText(rotuloDelPeriodo("2026-09-01", "2026-09-15"))).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Quincena anterior" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Quincena siguiente" })).toBeTruthy();
+    // 🩸 Los cuatro botones de quincena se retiraron.
+    expect(screen.queryByRole("button", { name: "1 – 15 ago" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "16 – 30 ago" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "1 – 15 sep" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "16 – 30 sep" })).toBeNull();
+    // 🔴 Y ni rastro del rango libre: en la Planilla el selector NO lleva
+    // calendario, porque acá solo se pagan quincenas.
     expect(screen.queryByText("Otro rango")).toBeNull();
     expect(screen.queryByTestId("rango")).toBeNull();
     expect(screen.queryByText(/Elige el período$/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Elegir un día o un rango" })).toBeNull();
   });
 
   // ⚠️ 11-sep-2026: Excel, PDF y Comprobantes viven en UN botón «Descargar ⌄»
   // (mockup «Antes de cerrar»). Cambió dónde están, no cuándo aparecen.
-  it("🔴 «Cortar el reloj el» se ve DESDE EL INICIO, vacío, y «Descargar» NO está", async () => {
-    servir(); montar();
-    expect(corteInput().value).toBe("");
-    expect(screen.getByText("Vacío: se lee la quincena entera.")).toBeTruthy();
+  it("🔴 el corte se ve DESDE EL INICIO, y «Descargar» NO está hasta generar", async () => {
+    const ll = servir(); montar();
+    // 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026: el campo abría VACÍO porque la
+    // quincena arrancaba sin elegir. Ahora la quincena viene puesta, así que el
+    // corte viene con el PROPUESTO de esa quincena (13 / 28), que es
+    // exactamente lo que pasaba al tocar uno de los cuatro botones.
+    expect(corteInput().value).toBe("2026-09-13");
+    // La línea gris dice hasta dónde se lee el reloj, y lleva al campo.
+    expect(screen.getByText(/El reloj se lee hasta el 13 sep/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "cambiar" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /^Descargar/ })).toBeNull();
     expect(screen.queryByRole("menuitem", { name: /^Excel$/ })).toBeNull();
-    expect(boton(/^Generar$/).disabled).toBe(true);
+    // 🔴 LO QUE NO CAMBIÓ, Y ES LO QUE IMPORTA: la plata NO se dibuja sola.
+    // Elegir la quincena no le pide el cuadro a nadie.
+    expect(urlDelCuadro(ll)).toBeNull();
+    expect(screen.getByText("Esta quincena todavía no se generó")).toBeTruthy();
   });
 
-  it("tocar «1 – 15 sep» lo prende, propone el corte del 13 con su frase, y Generar se pone NEGRO", async () => {
+  it("la quincena 1 – 15 sep trae el corte del 13 con su frase, y Generar es NEGRO", async () => {
     servir(); montar();
-    fireEvent.click(boton("1 – 15 sep"));
-    expect(boton("1 – 15 sep").getAttribute("aria-pressed")).toBe("true");
-    expect(boton("16 – 30 sep").getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByText(rotuloDelPeriodo("2026-09-01", "2026-09-15"))).toBeTruthy();
     expect(corteInput().value).toBe("2026-09-13");
-    expect(screen.getByText("Del 14 al 15 se paga normal y se ajusta en la siguiente.")).toBeTruthy();
-    // Y el chip dice el corte corto (11-sep-2026, mockup): «Corte 13 sep».
-    expect(screen.getByText("Corte 13 sep")).toBeTruthy();
+    expect(screen.getByText(/Del 14 al 15 se paga normal y se ajusta en la siguiente\./)).toBeTruthy();
+    // 🩸 El chip gris «Corte 13 sep» se retiró: repetía el valor que el campo ya
+    // dice. Lo que queda —y lo que este caso exige— es que el corte propuesto se
+    // LEA en palabras, en la línea gris.
+    expect(screen.queryByText("Corte 13 sep")).toBeNull();
+    expect(screen.getByText(/El reloj se lee hasta el 13 sep/)).toBeTruthy();
     expect(boton(/^Generar$/).disabled).toBe(false);
     expect(boton(/^Generar$/).className).toContain("bg-black");
   });
 
-  it("«16 – 30 sep» propone el 28", async () => {
-    servir(); montar();
-    fireEvent.click(boton("16 – 30 sep"));
+  it("la quincena 16 – 30 sep propone el 28", async () => {
+    servir();
+    abrirEn("2026-09-16", "2026-09-30");
     expect(corteInput().value).toBe("2026-09-28");
-    expect(screen.getByText("Del 29 al 30 se paga normal y se ajusta en la siguiente.")).toBeTruthy();
+    expect(screen.getByText(/Del 29 al 30 se paga normal y se ajusta en la siguiente\./)).toBeTruthy();
   });
 
-  it("🔴 Generar pide EL MISMO rango y corte que los botones muestran, y recién ahí sale «Descargar» con Excel/PDF/Comprobantes", async () => {
+  it("🔴 Generar pide EL MISMO rango y corte que la barra muestra, y recién ahí sale «Descargar» con Excel/PDF/Comprobantes", async () => {
     const ll = servir(); montar();
-    fireEvent.click(boton("1 – 15 sep"));
     generar();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
     expect(urlDelCuadro(ll)).toBe("/api/asistencia/planilla?desde=2026-09-01&hasta=2026-09-15&empresa=confecciones_boston&corte=2026-09-13");
@@ -206,11 +249,12 @@ describe("🔴 la pantalla: dos botones, el corte a la vista, Generar negro", ()
    * calendario se pide TAL CUAL». Los dos probaban una puerta que Daniel mandó
    * cerrar: *«si la quincena es fija, que no haya opción de rango, solo las
    * opciones»*. Quedan estos dos en su lugar. */
-  it("🔴 la quincena del MES ANTERIOR se pide de verdad — es para lo que están esos dos botones", async () => {
+  it("🔴 la quincena del MES ANTERIOR se pide de verdad — para eso está la flecha «‹»", async () => {
     // Sin ella, estando en octubre no habría forma de abrir ni cerrar la
     // quincena 1–15 de septiembre, que es cuando la contadora la cierra.
     const ll = servir(); montar();
-    fireEvent.click(boton("16 – 30 ago"));
+    atras(); // 1 – 15 sep → 16 – 30 ago
+    expect(screen.getByText(rotuloDelPeriodo("2026-08-16", "2026-08-30"))).toBeTruthy();
     expect(corteInput().value).toBe("2026-08-28");
     generar();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
@@ -230,11 +274,16 @@ describe("🔴 la pantalla: dos botones, el corte a la vista, Generar negro", ()
     expect(ruta).toMatch(/sp\.get\("hasta"\)/);
   });
 
-  it("«Quincena entera» vacía el corte y el pedido va sin `corte`", async () => {
+  it("🩸 la «×» vacía el corte y el pedido va sin `corte`", async () => {
+    // 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026: era un botón «Quincena entera» al
+    // lado del campo. Se retiró junto con el chip «Corte 13 sep» —los dos
+    // hablaban del mismo valor que el campo ya decía— y quedó una «×» pegada al
+    // campo. 🔴 LO QUE NO CAMBIÓ: vacío = se lee la quincena ENTERA, y el pedido
+    // viaja SIN `corte`, exactamente igual que antes.
     const ll = servir(); montar();
-    fireEvent.click(boton("1 – 15 sep"));
-    fireEvent.click(boton(/^Quincena entera$/));
+    fireEvent.click(boton(/^Quitar el corte$/));
     expect(corteInput().value).toBe("");
+    expect(screen.getByText(/El reloj se lee hasta el fin de la quincena/)).toBeTruthy();
     generar();
     await waitFor(() => expect(urlDelCuadro(ll)).toBe("/api/asistencia/planilla?desde=2026-09-01&hasta=2026-09-15&empresa=confecciones_boston"));
   });

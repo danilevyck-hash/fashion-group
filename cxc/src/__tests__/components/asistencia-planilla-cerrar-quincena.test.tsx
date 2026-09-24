@@ -47,6 +47,8 @@ import {
 } from "@/lib/asistencia/planilla";
 import { MIGRACION_PLANILLA_GUARDADA } from "@/lib/asistencia/planilla-guardada";
 import PlanillaTab from "@/app/asistencia/PlanillaTab";
+// 🔴 24-sep-2026: el rótulo de la barra sale del módulo puro del rediseño.
+import { rotuloDelPeriodo } from "@/lib/asistencia/pantalla-2026-09";
 
 // ── 🔴 EL DOBLE DEL ROUTER (24-sep-2026) ────────────────────────────────────
 // Desde que la quincena y el corte viajan en la dirección (`plQuincena`,
@@ -161,15 +163,34 @@ const guionBase = (cierre: unknown = BORRADOR) =>
 
 const montar = () => render(<ToastProvider><PlanillaTab /></ToastProvider>);
 
-/** El botón de una quincena, por su rótulo. */
-const botonQuincena = (rotulo: string) =>
-  screen.getByRole("button", { name: rotulo }) as HTMLButtonElement;
+/* ── 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026 ──────────────────────────────────
+ *
+ * La quincena se elegía con CUATRO botones («1 – 15 ago», «16 – 30 jul»…). Con
+ * el rediseño (`ASISTENCIA_PANTALLA_2026_09`) la pone el SELECTOR ÚNICO del
+ * módulo —«‹ 16 – 30 sep 2026 ›»—, que vive en `?desde=&hasta=` y comparte clave
+ * y memoria con Asistencia, Aprobaciones y Préstamos › Movimientos.
+ *
+ * 🔴 LO QUE NO CAMBIÓ: solo se pagan QUINCENAS (el selector de la Planilla no
+ * lleva calendario), el cuadro NO se dibuja solo —hay que tocar «Generar»— y lo
+ * que se le pide al servidor es el MISMO `desde`/`hasta`/`corte` de siempre.
+ */
 
-/** Lo que hace la persona: tocar la quincena y después Generar.
- *  ⚠️ El reloj está fijo en el 10-ago-2026, así que «1 – 15 ago» es la primera
- *  quincena del mes en curso — el mismo rango que pedía el doble del calendario. */
+/** Abre la Planilla ya parada en una quincena, que es como llega de verdad. */
+function montarEn(desde: string, hasta: string) {
+  URL_PLANILLA = `desde=${desde}&hasta=${hasta}`;
+  return montar();
+}
+/** Lo que dice la barra ahora mismo. */
+const enLaBarra = (desde: string, hasta: string) =>
+  screen.getByText(rotuloDelPeriodo(desde, hasta));
+/** La flecha «‹»: una quincena para atrás. */
+const quincenaAtras = () =>
+  fireEvent.click(screen.getByRole("button", { name: "Quincena anterior" }));
+
+/** Lo que hace la persona: tocar Generar.
+ *  ⚠️ El reloj está fijo en el 10-ago-2026, así que la pantalla abre en
+ *  «1 – 15 ago» — el mismo rango que antes se elegía tocando su botón. */
 function generar() {
-  fireEvent.click(botonQuincena("1 – 15 ago"));
   fireEvent.click(screen.getAllByRole("button", { name: /^Generar$/ })[0]);
 }
 
@@ -194,6 +215,9 @@ beforeEach(() => {
   // 🔴 Cerrar es de admin y contabilidad. El rol sale de `sessionStorage`, igual
   // que en el resto del sistema.
   sessionStorage.setItem("cxc_role", "admin");
+  // 🔴 24-sep-2026: la dirección del período es COMPARTIDA, así que un caso que
+  // la deja escrita le cambiaría la quincena al siguiente.
+  URL_PLANILLA = "";
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); sessionStorage.clear(); });
 
@@ -205,26 +229,37 @@ describe("🔴 el calendario a la vista, y el cuadro solo cuando se pide", () =>
    * prorratean el sueldo, apagan los montos a mano y dejan cabeceras que no son
    * quincenas. Ahora se prueba lo contrario: que no hay calendario, y que las
    * opciones son CUATRO. */
-  it("la quincena se elige con CUATRO botones, y NO hay calendario", async () => {
+  it("🩸 la quincena se elige con la BARRA, y NO hay calendario", async () => {
     servir(guionBase());
     montar();
-    // El mes en curso (agosto) y el anterior (julio). 🔄 15-sep-2026: el
-    // segundo botón decía «16 – 31»; el 31 no se paga nunca.
-    expect(botonQuincena("1 – 15 jul")).toBeTruthy();
-    expect(botonQuincena("16 – 30 jul")).toBeTruthy();
-    expect(botonQuincena("1 – 15 ago")).toBeTruthy();
-    expect(botonQuincena("16 – 30 ago")).toBeTruthy();
-    // 🔴 Y ni rastro del rango libre.
+    // Abre en la quincena en curso (el reloj está en el 10-ago-2026) y lo dice
+    // entero, sin tocar nada. 🔄 15-sep-2026: el rótulo nunca dice «31».
+    expect(enLaBarra("2026-08-01", "2026-08-15")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Quincena anterior" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Quincena siguiente" })).toBeTruthy();
+    // 🩸 Los cuatro botones se retiraron.
+    for (const r of ["1 – 15 jul", "16 – 30 jul", "1 – 15 ago", "16 – 30 ago"]) {
+      expect(screen.queryByRole("button", { name: r })).toBeNull();
+    }
+    // 🔴 Y ni rastro del rango libre: acá solo se pagan quincenas.
     expect(screen.queryByText("Otro rango")).toBeNull();
     expect(screen.queryByTestId("rango")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Elegir un día o un rango" })).toBeNull();
+  });
+
+  it("🔴 «›» no lleva al futuro: la quincena que todavía no empezó no se ofrece", () => {
+    servir(guionBase());
+    montar();
+    // El 10 de agosto, «16 – 30 ago» todavía no empezó.
+    expect((screen.getByRole("button", { name: "Quincena siguiente" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Quincena anterior" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   /* CONTROL: la quincena del mes ANTERIOR no es decorativa — se puede elegir y
    * pide su propio cuadro. Sin esto, en octubre nadie podría cerrar septiembre. */
   it("🔴 la quincena del mes anterior se puede pedir de verdad", async () => {
     const llamadas = servir(guionBase());
-    montar();
-    fireEvent.click(botonQuincena("16 – 30 jul"));
+    montarEn("2026-07-16", "2026-07-30");
     fireEvent.click(screen.getAllByRole("button", { name: /^Generar$/ })[0]);
     await waitFor(() => {
       const c = llamadas.find((x) => x.url.includes("/api/asistencia/planilla?"));
@@ -241,19 +276,26 @@ describe("🔴 el calendario a la vista, y el cuadro solo cuando se pide", () =>
     // `planilla-elegir-quincena.test.tsx`, que monta la misma pantalla en
     // septiembre. Ver `dia-31.ts`.
     servir(guionBase());
+    // En la primera quincena de agosto no hay ningún 31 de por medio: no se dice.
     montar();
-    // Antes de elegir el período no se dice nada; al tocar «16 – 30 ago», sí.
+    expect(enLaBarra("2026-08-01", "2026-08-15")).toBeTruthy();
     expect(screen.queryByText(/El 31 no paga sueldo/)).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "16 – 30 ago" }));
+    cleanup();
+    // En la SEGUNDA, sí.
+    servir(guionBase());
+    montarEn("2026-08-16", "2026-08-30");
     expect(
       screen.getByText("El 31 no paga sueldo, pero sus ausencias, tardanzas, salidas tempranas y horas extra sí entran."),
     ).toBeTruthy();
   });
 
-  it("🔴 elegir el período NO pide el cuadro: hay que tocar Generar", async () => {
+  it("🔴 abrir la pantalla NO pide el cuadro: hay que tocar Generar", async () => {
     const llamadas = servir(guionBase());
     montar();
-    fireEvent.click(botonQuincena("1 – 15 ago"));
+    // 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026: antes había que tocar la quincena
+    // y este caso probaba que ese toque no pedía nada. Hoy la quincena viene
+    // PUESTA, así que la regla se prueba en su forma más fuerte: **montar la
+    // pantalla tampoco pide el cuadro**. La plata no se dibuja sola.
     // Se vacía la cola de microtareas —por ahí saldría el pedido del cuadro—
     // en vez de contar 20 ms.
     await act(async () => { await Promise.resolve(); });
@@ -615,13 +657,17 @@ describe("🔴 el inicio sugerido después de cerrar", () => {
     expect(screen.queryByTestId("rango")).toBeNull();
   });
 
-  it("🔴 es una SUGERENCIA: no queda elegido y no se pide ningún cuadro", async () => {
+  it("🔴 es una SUGERENCIA: no mueve el período y no se pide ningún cuadro", async () => {
     const llamadas = servir(conHistorial([CERRADA]));
     montar();
     await screen.findByText(/última quincena cerrada/);
-    // Nadie eligió todavía: sigue el cartel del vacío y Generar apagado.
-    expect(screen.getByText(/Elige el período que vas a pagar/)).toBeTruthy();
-    expect((screen.getAllByRole("button", { name: /^Generar$/ })[0] as HTMLButtonElement).disabled).toBe(true);
+    // 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026: decía «Elige el período que vas a
+    // pagar» porque la quincena arrancaba sin elegir. Hoy viene puesta por el
+    // selector del módulo, y el vacío dice lo único que falta de verdad.
+    // 🔴 LA REGLA NO CAMBIÓ, y son las dos que importan: la sugerencia **no le
+    // mueve el período a nadie** y **no pide ningún cuadro**.
+    expect(enLaBarra("2026-08-01", "2026-08-15")).toBeTruthy();
+    expect(screen.getByText("Esta quincena todavía no se generó")).toBeTruthy();
     expect(llamadas.filter((c) => c.url.includes("/api/asistencia/planilla?"))).toEqual([]);
   });
 
@@ -650,12 +696,21 @@ describe("🔴 el inicio sugerido después de cerrar", () => {
     expect(aviso.textContent).toContain("1 sep 2026");
   });
 
-  it("elegida la quincena, la sugerencia deja de decirse (ya decidió la persona)", async () => {
+  it("🩸 mover la quincena no borra la sugerencia, pero tampoco se la deja pisar", async () => {
+    // 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026: la sugerencia se iba en cuanto la
+    // persona tocaba un botón de quincena, porque «tocar un botón» era la señal
+    // de que ya había decidido. Con el selector único la quincena viene puesta
+    // desde que se entra, así que esa señal dejó de existir: la sugerencia se va
+    // cuando se GENERA el cuadro (el caso de abajo lo sostiene).
+    //
+    // 🔴 LO QUE ESTE CASO PROTEGE, y no cambió: la sugerencia **no le pisa el
+    // período a quien ya se movió**.
     servir(conHistorial([CERRADA]));
     montar();
     await screen.findByText(/última quincena cerrada/);
-    fireEvent.click(botonQuincena("16 – 30 ago"));
-    await waitFor(() => expect(screen.queryByText(/última quincena cerrada/)).toBeNull());
+    quincenaAtras();
+    await waitFor(() => expect(enLaBarra("2026-07-16", "2026-07-30")).toBeTruthy());
+    expect(enLaBarra("2026-07-16", "2026-07-30")).toBeTruthy();
   });
 
   it("generado el cuadro, la recomendación ya no está", async () => {
@@ -671,14 +726,15 @@ describe("🔴 el inicio sugerido después de cerrar", () => {
     servir(conHistorial([CERRADA]));
     montar();
     await screen.findByText(/última quincena cerrada/);
-    // La persona elige julio a mano, contra la recomendación.
-    fireEvent.click(botonQuincena("1 – 15 jul"));
+    // La persona se va a julio a mano, contra la recomendación.
+    quincenaAtras();
+    quincenaAtras();
     // La recomendación ya llegó (se esperó su cartel arriba): se espera a que
     // la pantalla reaccione al toque, no a que pasen 40 ms.
-    await waitFor(() => expect(botonQuincena("1 – 15 jul").getAttribute("aria-pressed")).toBe("true"));
-    // La recomendación no vuelve a moverle nada: el botón de julio sigue prendido.
-    expect(botonQuincena("1 – 15 jul").getAttribute("aria-pressed")).toBe("true");
-    expect(botonQuincena("16 – 30 ago").getAttribute("aria-pressed")).toBe("false");
+    await waitFor(() => expect(enLaBarra("2026-07-01", "2026-07-15")).toBeTruthy());
+    // La recomendación no vuelve a moverle nada: la barra sigue en julio.
+    expect(enLaBarra("2026-07-01", "2026-07-15")).toBeTruthy();
+    expect(screen.queryByText(rotuloDelPeriodo("2026-08-01", "2026-08-15"))).toBeNull();
   });
 });
 

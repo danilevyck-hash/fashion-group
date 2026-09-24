@@ -393,35 +393,53 @@ describe("🔴 el número de «A revisar» lleva a los días", () => {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("🔴 el Excel y el PDF bajan lo que se ve, y el botón lo DICE", () => {
+  /*
+   * 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026: «Excel» y «PDF» eran dos botones
+   * sueltos en el panel de arriba. Con el rediseño del panel (Daniel: *«veo todo
+   * este panel que me ensucia»* — nueve bloques y 1.085 px antes del primer
+   * nombre) los dos pasaron detrás del ícono de compartir «⇧».
+   *
+   * 🔴 LO QUE NO CAMBIÓ, y es toda la regla de este bloque: el rótulo **sigue
+   * diciendo a cuántos afecta** cuando la pantalla está recortada, y lo que baja
+   * es EXACTAMENTE lo que se ve.
+   */
+  const abrirDescargas = () =>
+    fireEvent.click(screen.getByRole("button", { name: "Bajar Excel o PDF" }));
+
   it("con el filtro apagado los botones se llaman «Excel» y «PDF»", async () => {
     await abrirReporte();
-    expect(screen.getByRole("button", { name: "Excel" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "PDF" })).toBeTruthy();
+    abrirDescargas();
+    expect(screen.getByRole("menuitem", { name: "Excel" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "PDF" })).toBeTruthy();
   });
 
   it("con el filtro prendido dicen a cuántos afectan", async () => {
     await abrirReporte();
     fireEvent.click(boton());
-    await screen.findByRole("button", { name: "Excel · 2" });
-    expect(screen.getByRole("button", { name: "PDF · 2" })).toBeTruthy();
+    abrirDescargas();
+    await screen.findByRole("menuitem", { name: "Excel · 2" });
+    expect(screen.getByRole("menuitem", { name: "PDF · 2" })).toBeTruthy();
   });
 
   it("🔴 y bajan EXACTAMENTE esas 2 personas, no las 3 de la lista entera", async () => {
     await abrirReporte();
     fireEvent.click(boton());
-    await screen.findByRole("button", { name: "Excel · 2" });
-    fireEvent.click(screen.getByRole("button", { name: "Excel · 2" }));
+    abrirDescargas();
+    await screen.findByRole("menuitem", { name: "Excel · 2" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Excel · 2" }));
     await waitFor(() => expect(excelRecibio).toHaveBeenCalled());
     expect(excelRecibio.mock.calls[0][0].personas.map((p: { codigo: string }) => p.codigo))
       .toEqual(["16", "43"]);
-    fireEvent.click(screen.getByRole("button", { name: "PDF · 2" }));
+    abrirDescargas();
+    fireEvent.click(screen.getByRole("menuitem", { name: "PDF · 2" }));
     await waitFor(() => expect(pdfRecibio).toHaveBeenCalled());
     expect(pdfRecibio.mock.calls[0][0].personas).toHaveLength(2);
   });
 
   it("sin filtro bajan las 3, como siempre", async () => {
     await abrirReporte();
-    fireEvent.click(screen.getByRole("button", { name: "Excel" }));
+    abrirDescargas();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Excel" }));
     await waitFor(() => expect(excelRecibio).toHaveBeenCalled());
     expect(excelRecibio.mock.calls[0][0].personas).toHaveLength(3);
   });

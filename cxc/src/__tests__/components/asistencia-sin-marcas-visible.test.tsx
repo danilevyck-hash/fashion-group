@@ -315,15 +315,22 @@ describe("D · en la pantalla sale, lo dice y se puede corregir", () => {
   });
 
   it("🔴 el Excel y el PDF la llevan igual que la pantalla", async () => {
+    // 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026: «Excel» y «PDF» eran dos botones
+    // sueltos del panel de arriba; con el rediseño viven detrás del ícono de
+    // compartir «⇧». 🔴 Lo que se baja no cambió: es lo que está en pantalla.
+    const abrirDescargas = () =>
+      fireEvent.click(screen.getByRole("button", { name: "Bajar Excel o PDF" }));
     servir();
     montar();
     await screen.findByText("Yeisibeth Muñoz");
-    fireEvent.click(screen.getByRole("button", { name: /Excel/ }));
+    abrirDescargas();
+    fireEvent.click(screen.getByRole("menuitem", { name: /Excel/ }));
     await waitFor(() => expect(excelRecibio).toHaveBeenCalled());
     const aExcel = excelRecibio.mock.calls[0][0] as { personas: Array<{ codigo: string }> };
     expect(aExcel.personas.map((p) => p.codigo)).toContain(COD);
 
-    fireEvent.click(screen.getByRole("button", { name: /PDF/ }));
+    abrirDescargas();
+    fireEvent.click(screen.getByRole("menuitem", { name: /PDF/ }));
     await waitFor(() => expect(pdfRecibio).toHaveBeenCalled());
     const aPdf = pdfRecibio.mock.calls[0][0] as { personas: Array<{ codigo: string }> };
     expect(aPdf.personas.map((p) => p.codigo)).toContain(COD);

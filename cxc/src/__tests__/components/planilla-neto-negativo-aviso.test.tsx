@@ -389,15 +389,22 @@ function respuesta(lineas: LineaPlanilla[]) {
 /**
  * 🩸 15-sep-2026: acá se tocaba «Elige el período» del doble del calendario.
  * La Planilla ya no monta el calendario (Daniel: *«si la quincena es fija, que
- * no haya opción de rango, solo las opciones»*): se elige con CUATRO botones —
+ * no haya opción de rango, solo las opciones»*): se elegía con CUATRO botones —
  * las dos quincenas del mes anterior y las dos del mes en curso—.
  *
- * 🔑 Se toca el TERCERO, que es la primera quincena del MES EN CURSO. Por
- * posición y no por rótulo: así el caso no depende de en qué mes se corra.
+ * 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026: los cuatro botones se retiraron y la
+ * quincena la pone el SELECTOR ÚNICO del módulo («‹ 16 – 30 sep 2026 ›»), que
+ * abre en la quincena en curso de Panamá. O sea que ya no hay nada que tocar
+ * para elegirla: llega puesta.
+ *
+ * 🔴 LO QUE ESTE ARCHIVO SIGUE EXIGIENDO NO CAMBIA: el cuadro **no se dibuja
+ * solo**. Hay que tocar «Generar», y hasta entonces no hay ni una fila de plata.
  */
 function elegirQuincenaEnCurso() {
-  const botones = screen.getAllByRole("button", { name: /^\d{1,2} – \d{1,2} \w{3}$/ });
-  fireEvent.click(botones[2]);
+  // La barra dice en qué quincena está parada la pantalla, sin tocar nada.
+  expect(screen.getByRole("button", { name: "Quincena anterior" })).toBeTruthy();
+  // 🩸 Y los cuatro botones viejos ya no existen.
+  expect(screen.queryAllByRole("button", { name: /^\d{1,2} – \d{1,2} \w{3}$/ })).toHaveLength(0);
 }
 
 /** La respuesta para todo lo que la pantalla pida; anota cada llamada. */

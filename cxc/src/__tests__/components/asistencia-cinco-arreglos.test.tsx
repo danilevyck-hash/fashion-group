@@ -27,6 +27,11 @@ import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/re
 import { ToastProvider } from "@/components/ToastSystem";
 import { REGLAS_DEFAULT } from "@/lib/asistencia/config";
 import { atajosDePeriodo, atajoActivo } from "@/lib/asistencia/atajos-periodo";
+// 🔴 24-sep-2026: el selector único reemplazó a los cuatro atajos EN LA
+// PANTALLA. Los módulos puros de los dos siguen vivos y los dos se prueban acá.
+import {
+  haySiguienteQuincena, pasoDeQuincena, rotuloDelPeriodo,
+} from "@/lib/asistencia/pantalla-2026-09";
 import { periodoInicial, urlTraePeriodo } from "@/lib/asistencia/periodo-en-la-url";
 import {
   salidaSospechosa, SALIDA_SOSPECHOSA_MIN, TEXTO_SALIDA_SOSPECHOSA,
@@ -146,22 +151,63 @@ describe("1. 🔴 LOS ATAJOS DEL PERÍODO — un toque, no dos en un calendario"
     expect(atajoActivo(a, "2026-09-16", "2026-09-20")).toBeNull();
   });
 
-  it("🔴 EN LA PANTALLA: los cuatro botones están, y tocar uno pide ESE período", async () => {
+  // ── 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026 ────────────────────────────────
+  //
+  // Los CUATRO botones «Hoy · Ayer · Esta quincena · Quincena pasada» se
+  // RETIRARON de la pantalla con el rediseño (`ASISTENCIA_PANTALLA_2026_09`).
+  // 🩸 El motivo medido: eran cuatro de los NUEVE bloques que había antes del
+  // primer nombre en el celular, y convivían con otros tres selectores de
+  // período distintos —Aprobaciones con memoria propia, la Planilla con sus
+  // cuatro botones de quincena y Movimientos con una lista de 24—. Daniel:
+  // *«veo todo este panel que me ensucia»*.
+  //
+  // 🔴 LA REGLA QUE ESTE CASO PROTEGE NO CAMBIÓ, solo el control que la cumple:
+  // **elegir un período tiene que costar UN toque y pedirle ESE período al
+  // servidor**. Hoy eso lo hace la barra «‹ 16 – 30 sep 2026 ›»: dice en qué
+  // quincena estás parado y cada flecha salta a la de al lado.
+  //
+  // ⚠️ `atajosDePeriodo` NO se retiró: los cuatro casos de arriba lo siguen
+  // sosteniendo, y la Planilla lo sigue usando para armar sus quincenas.
+  it("🔴 EN LA PANTALLA: la barra dice la quincena, y la flecha pide ESE período", async () => {
+    // La quincena 16 – 30 sep, puesta en la dirección como la deja el selector.
+    URL_ACTUAL = "tab=asistencia&desde=2026-09-16&hasta=2026-09-30";
     servir(respuesta());
     montar(<ReporteTab />);
-    await waitFor(() => expect(ultimoPedido()).toContain("/api/asistencia/reporte"));
+    await waitFor(() => expect(ultimoPedido()).toContain("desde=2026-09-16"));
 
-    const hoy = screen.getByRole("button", { name: "Hoy" });
-    const ayer = screen.getByRole("button", { name: "Ayer" });
-    expect(screen.getByRole("button", { name: /^Esta quincena · / })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /^Quincena pasada · / })).toBeTruthy();
+    // Lo primero que se lee es el período, escrito entero.
+    expect(screen.getByText(rotuloDelPeriodo("2026-09-16", "2026-09-30"))).toBeTruthy();
+    expect(rotuloDelPeriodo("2026-09-16", "2026-09-30")).toContain("16 – 30 sep");
 
-    fireEvent.click(ayer);
-    const a = atajosDePeriodo(new Date().toISOString().slice(0, 10));
-    await waitFor(() => expect(REEMPLAZOS.join(" ")).toContain("desde="));
-    // 🔑 El calendario NO se fue: sigue estando para lo que no es un atajo.
-    expect(hoy).toBeTruthy();
-    expect(a).toHaveLength(4);
+    const atras = screen.getByRole("button", { name: "Quincena anterior" });
+    const adelante = screen.getByRole("button", { name: "Quincena siguiente" });
+
+    // 🔴 UN TOQUE: la flecha pide la quincena anterior ENTERA, no un día suelto.
+    fireEvent.click(atras);
+    const anterior = pasoDeQuincena("2026-09-16", -1);
+    expect(anterior).toEqual({ desde: "2026-09-01", hasta: "2026-09-15" });
+    await waitFor(() => expect(REEMPLAZOS.join(" ")).toContain("desde=2026-09-01"));
+    expect(REEMPLAZOS.join(" ")).toContain("hasta=2026-09-15");
+
+    // 🔑 El calendario NO se fue: sigue estando para lo que no es una quincena.
+    // ⚠️ `getAllBy…`: `RangoFechas` monta su botón dos veces —uno para
+    // escritorio y otro para el teléfono, uno escondido por CSS—, y eso es de
+    // siempre.
+    expect(screen.getAllByRole("button", { name: "Elegir un día o un rango" }).length).toBeGreaterThan(0);
+    expect(adelante).toBeTruthy();
+    // 🩸 Y los cuatro atajos viejos ya no se dibujan, en ninguna de sus formas.
+    expect(screen.queryByRole("button", { name: "Hoy" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Ayer" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Esta quincena · / })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Quincena pasada · / })).toBeNull();
+  });
+
+  it("🔴 «›» NUNCA lleva al futuro: se apaga cuando la quincena que sigue no empezó", () => {
+    // 16 – 30 sep mirado el 24 de septiembre: la que sigue (1 – 15 oct) no empezó.
+    expect(haySiguienteQuincena("2026-09-16", "2026-09-24")).toBe(false);
+    // Ya en octubre, sí.
+    expect(haySiguienteQuincena("2026-09-16", "2026-10-02")).toBe(true);
+    expect(haySiguienteQuincena("2026-09-01", "2026-09-24")).toBe(true);
   });
 });
 

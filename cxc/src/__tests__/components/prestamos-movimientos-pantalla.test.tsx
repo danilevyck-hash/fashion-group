@@ -96,6 +96,26 @@ function servir(porVentana: Record<string, FilaMovimiento[]>) {
 const montar = () => render(<ToastProvider><PrestamosTab /></ToastProvider>);
 const irAMovimientos = () => fireEvent.click(screen.getByRole("button", { name: "Movimientos" }));
 
+// ── 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026 ────────────────────────────────────
+//
+// La quincena se elegía con un `<select aria-label="Quincena">` de 24 opciones
+// —la CUARTA forma de elegir período que tenía el módulo—. Con el rediseño
+// (`ASISTENCIA_PANTALLA_2026_09`) Movimientos usa la MISMA barra de flechas que
+// Asistencia, Aprobaciones y la Planilla, y comparte con ellas la clave de la
+// dirección (`?desde=&hasta=`) y la memoria.
+//
+// 🔴 LA REGLA NO CAMBIÓ: elegir otra quincena vuelve a preguntar, con la
+// ventana que INCLUYE el 31. Lo único que cambia es el control que lo hace.
+// ⚠️ `?quincena=` sigue entrando y GANA: un enlace viejo abre donde decía.
+/** Retrocede `n` quincenas con la flecha «‹» de la barra. */
+const atras = (n = 1) => {
+  for (let i = 0; i < n; i += 1) {
+    fireEvent.click(screen.getByRole("button", { name: "Quincena anterior" }));
+  }
+};
+/** De la quincena en curso (16 – 30 sep) a la de agosto: dos pasos atrás. */
+const irA16_30Agosto = () => atras(2);
+
 beforeEach(() => { RUTAS.length = 0; URL_ACTUAL = ""; pedidos.length = 0; metodos.length = 0; id = 0; });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
@@ -118,7 +138,7 @@ describe("Movimientos — los números del 16 al 30 de agosto de 2026", () => {
     irAMovimientos();
     // Abre en la quincena en curso (16–30 sep, ventana hasta el 30).
     await waitFor(() => expect(pedidos.some((u) => u.includes("desde=2026-09-16"))).toBe(true));
-    fireEvent.change(screen.getByLabelText("Quincena"), { target: { value: "2026-08-2" } });
+    irA16_30Agosto();
     await waitFor(() =>
       expect(pedidos.some((u) => u.includes("desde=2026-08-16") && u.includes("hasta=2026-08-31"))).toBe(true));
   });
@@ -127,7 +147,7 @@ describe("Movimientos — los números del 16 al 30 de agosto de 2026", () => {
     servir(VENTANA);
     montar();
     irAMovimientos();
-    fireEvent.change(screen.getByLabelText("Quincena"), { target: { value: "2026-08-2" } });
+    irA16_30Agosto();
     const descuentos = await screen.findByRole("heading", { name: /Descuentos/ });
     expect(descuentos.textContent).toContain("13");
     const deudas = screen.getByRole("heading", { name: /Deudas nuevas/ });
@@ -141,7 +161,7 @@ describe("Movimientos — los números del 16 al 30 de agosto de 2026", () => {
     servir(VENTANA);
     montar();
     irAMovimientos();
-    fireEvent.change(screen.getByLabelText("Quincena"), { target: { value: "2026-08-2" } });
+    irA16_30Agosto();
     await screen.findByRole("heading", { name: /Descuentos/ });
     // 13 en la tabla + 13 en las tarjetas del celular (las dos se montan).
     expect(screen.getAllByText("del cierre")).toHaveLength(26);
@@ -152,7 +172,7 @@ describe("Movimientos — los números del 16 al 30 de agosto de 2026", () => {
     servir(VENTANA);
     montar();
     irAMovimientos();
-    fireEvent.change(screen.getByLabelText("Quincena"), { target: { value: "2026-08-2" } });
+    irA16_30Agosto();
     await screen.findByText("La deuda creció");
     expect(screen.getByText("Se prestó")).toBeTruthy();
     expect(screen.getByText("Se descontó")).toBeTruthy();
@@ -163,7 +183,7 @@ describe("Movimientos — los números del 16 al 30 de agosto de 2026", () => {
     servir(VENTANA);
     render(<ToastProvider><PrestamosTab empresa="vistana_international" /></ToastProvider>);
     irAMovimientos();
-    fireEvent.change(screen.getByLabelText("Quincena"), { target: { value: "2026-08-2" } });
+    irA16_30Agosto();
     const deudas = await screen.findByRole("heading", { name: /Deudas nuevas/ });
     expect(deudas.textContent).toContain("3");
     expect(screen.getByText("No se le descontó nada a nadie en esta quincena.")).toBeTruthy();
@@ -182,7 +202,7 @@ describe("Movimientos — los números del 16 al 30 de agosto de 2026", () => {
     servir(VENTANA);
     montar();
     irAMovimientos();
-    fireEvent.change(screen.getByLabelText("Quincena"), { target: { value: "2026-08-2" } });
+    irA16_30Agosto();
     await screen.findByRole("heading", { name: /Descuentos/ });
     expect(metodos.filter(Boolean)).toEqual([]);
   });

@@ -179,7 +179,12 @@ function servir(json: unknown) {
 }
 const montar = () => render(<ToastProvider><PlanillaTab /></ToastProvider>);
 
-beforeEach(() => vi.unstubAllGlobals());
+beforeEach(() => {
+  vi.unstubAllGlobals();
+  // 🔴 24-sep-2026: la dirección del período es COMPARTIDA por las cuatro
+  // pestañas; un caso que la deja escrita le cambiaría la quincena al siguiente.
+  URL_PLANILLA = "";
+});
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 // 🔴 CAMBIÓ DE DIRECCIÓN (1-sep-2026). Eran DOS `<input type="date">` sueltos y
@@ -217,9 +222,23 @@ async function elegirPeriodo(_d?: string, _h?: string) {
  * los dos primeros son el mes anterior). Por posición y no por rótulo, para que
  * el caso no dependa de en qué mes se corra.
  */
+/*
+ * 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026. Los CUATRO botones de quincena se
+ * retiraron: la quincena la pone el SELECTOR ÚNICO del módulo
+ * («‹ 16 – 30 sep 2026 ›», `ASISTENCIA_PANTALLA_2026_09`), que vive en
+ * `?desde=&hasta=` y abre en la quincena en curso de Panamá. O sea que ya no hay
+ * nada que tocar para elegirla: llega puesta, igual que llega cuando alguien
+ * viene de otra pestaña.
+ *
+ * 🔴 LO QUE NO CAMBIÓ, y es lo que estos casos sostienen: **el cuadro no se
+ * dibuja solo**. Hay que tocar «Generar», y lo que se le pide al servidor es el
+ * MISMO `desde`/`hasta`/`corte` de siempre.
+ */
 function elegirQuincenaEnCurso() {
-  const botones = screen.getAllByRole("button", { name: /^\d{1,2} – \d{1,2} \w{3}$/ });
-  fireEvent.click(botones[2]);
+  // La barra dice en qué quincena está parada la pantalla, sin tocar nada.
+  expect(screen.getByRole("button", { name: "Quincena anterior" })).toBeTruthy();
+  // 🩸 Y los cuatro botones viejos ya no se dibujan.
+  expect(screen.queryAllByRole("button", { name: /^\d{1,2} – \d{1,2} \w{3}$/ })).toHaveLength(0);
 }
 
 /** El botón que de verdad pide el cuadro. */
@@ -234,8 +253,17 @@ function generar() {
  * calendario («1 ago – 15 ago 2026 · 15 días»); se fue con el calendario. Lo
  * que este candado protege no cambió: se elige un período y lo elegido se ve.
  */
-const quincenaPrendida = () => screen.queryAllByRole("button", { pressed: true })[0] ?? null;
-const loElegidoSeVe = () => quincenaPrendida() !== null;
+/*
+ * 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026: lo elegido se veía en el botón de
+ * quincena PRENDIDO (`aria-pressed`). Los cuatro botones se retiraron y hoy lo
+ * elegido se lee en la BARRA, escrito entero («1 – 15 ago 2026»). Lo que este
+ * candado protege no cambió: se elige un período y **lo elegido se ve**.
+ */
+const loQueDiceLaBarra = () => {
+  const bar = screen.getByRole("button", { name: "Quincena anterior" }).parentElement;
+  return (bar?.textContent ?? "").replace(/[‹›]/g, "").trim();
+};
+const loElegidoSeVe = () => /\d{1,2} – \d{1,2} \w{3} \d{4}/.test(loQueDiceLaBarra());
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", () => {
@@ -256,22 +284,29 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
   // mostrando la quincena en curso. Daniel: *«la quincena se paga según el
   // rango de fecha seleccionado»* — un rango puesto solo AFIRMA un período de
   // pago que nadie pidió. Ahora abre invitando a elegirlo.
-  it("🔴 abre SIN período puesto: dice «Elige el período que vas a pagar»", async () => {
-    servir(respuestaQuincena());
+  // 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026. Decía «abre SIN período puesto» —la
+  // regla del 1-sep era que la pantalla no AFIRMARA un período de pago que nadie
+  // pidió—. Con el selector único el período del módulo ya viene puesto y es el
+  // MISMO en las cuatro pestañas, así que la afirmación se mudó: lo que no puede
+  // pasar es que **se dibuje plata** sin que nadie la pida.
+  it("🔴 abre con la quincena puesta, pero SIN un solo número de plata", async () => {
+    const llamadas = servir(respuestaQuincena());
     montar();
-    await waitFor(() => expect(screen.getByText(/Elige el período que vas a pagar/)).toBeTruthy());
-    // Ningún botón prendido: nadie eligió nada todavía.
-    expect(quincenaPrendida()).toBeNull();
+    await waitFor(() => expect(screen.getByText("Esta quincena todavía no se generó")).toBeTruthy());
+    // La quincena se lee entera en la barra…
+    expect(loElegidoSeVe()).toBe(true);
+    // …y no se pidió ni un cuadro.
+    expect(llamadas.filter((c) => c.url.includes("/api/asistencia/planilla?"))).toEqual([]);
+    expect(screen.queryAllByText(/ALEJANDRA CAMAÑO/i)).toHaveLength(0);
   });
 
-  it("y después de elegirlo, dice el rango y cuántos días son", async () => {
+  it("y después de generar, la barra sigue diciendo el rango", async () => {
     servir(respuestaQuincena());
     montar();
     await elegirPeriodo();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
-    // El FORMATO de la etiqueta («1 ago – 15 ago 2026 · 15 días») se prueba
-    // sobre el control real en `rango-fechas-calendario.test.tsx`. Acá alcanza
-    // con que el control DEJE de decir «Elige el período» al haber elegido.
+    // El FORMATO de la etiqueta se prueba en `pantalla-2026-09`; acá alcanza con
+    // que la barra diga un período de verdad.
     expect(loElegidoSeVe()).toBe(true);
   });
 
@@ -288,16 +323,16 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
   // y mirar». Daniel: *«la quincena se paga según el rango de fecha
   // seleccionado»* — abrir mostrando plata de un período que nadie eligió es
   // justamente lo que no puede pasar, porque el corte real es variable.
-  it("🔴 NO pide el cuadro hasta que alguien elige el período", async () => {
+  it("🔴 NO pide el cuadro hasta que alguien toca Generar", async () => {
     vi.setSystemTime(new Date("2026-08-10T15:00:00Z"));
     const llamadas = servir(respuestaQuincena());
     montar();
-    await waitFor(() => expect(screen.getByText(/Elige el período que vas a pagar/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Esta quincena todavía no se generó")).toBeTruthy());
     // Ni una llamada al CUADRO. (La pantalla pregunta qué hay cerrado para
     // recomendar por dónde empezar: esa URL también empieza con
     // `/api/asistencia/planilla`, de ahí el `?`.)
     expect(llamadas.filter((c) => c.url.includes("/api/asistencia/planilla?"))).toEqual([]);
-    expect(screen.getByText(/Elige el período que vas a pagar/)).toBeTruthy();
+    expect(screen.getByText("Esta quincena todavía no se generó")).toBeTruthy();
     vi.useRealTimers();
   });
 

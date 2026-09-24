@@ -200,8 +200,13 @@ describe("C · ir y volver no desarma nada", () => {
     await waitFor(() => expect(cuantos("/api/asistencia/reporte")).toBeGreaterThan(0));
 
     await tocar("Planilla");
-    // La Planilla está a la vista: dice qué hay que elegir.
-    const dice = await screen.findByText("Elige el período que vas a pagar");
+    // La Planilla está a la vista: dice qué falta para ver la plata.
+    // 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026: decía «Elige el período que vas a
+    // pagar» porque la quincena arrancaba SIN elegir. Con el selector único la
+    // quincena viene puesta desde el período del módulo, así que lo único que
+    // falta —y lo que el vacío dice— es generar. 🔴 Lo que NO cambió y este
+    // archivo sigue sosteniendo: la plata no se dibuja sola.
+    const dice = await screen.findByRole("button", { name: "Generar" });
 
     await tocar("Asistencia");
     // 🔴 Sigue en el DOM —no se desarmó—, dentro de un contenedor escondido.
@@ -215,7 +220,7 @@ describe("C · ir y volver no desarma nada", () => {
     const antes = cuantos("/api/asistencia/reporte");
 
     await tocar("Planilla");
-    await screen.findByText("Elige el período que vas a pagar");
+    await screen.findByRole("button", { name: "Generar" });
     await tocar("Asistencia");
     await act(async () => { await Promise.resolve(); });
 
@@ -226,7 +231,7 @@ describe("C · ir y volver no desarma nada", () => {
     montar("tab=asistencia");
     await waitFor(() => expect(cuantos("/api/asistencia/reporte")).toBeGreaterThan(0));
     await tocar("Planilla");
-    await screen.findByText("Elige el período que vas a pagar");
+    await screen.findByRole("button", { name: "Generar" });
     await act(async () => { await Promise.resolve(); });
 
     expect(cuantos("/api/prestamos/empleados")).toBe(0);

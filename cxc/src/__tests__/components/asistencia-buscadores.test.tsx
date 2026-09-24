@@ -296,9 +296,23 @@ const RESPUESTA_PLANILLA = {
  * 🔑 Se toca el TERCERO, que es la primera quincena del MES EN CURSO. Por
  * posición y no por rótulo: así el caso no depende de en qué mes se corra.
  */
+/*
+ * 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026. Los CUATRO botones de quincena se
+ * retiraron: la quincena la pone el SELECTOR ÚNICO del módulo
+ * («‹ 16 – 30 sep 2026 ›», `ASISTENCIA_PANTALLA_2026_09`), que vive en
+ * `?desde=&hasta=` y abre en la quincena en curso de Panamá. O sea que ya no hay
+ * nada que tocar para elegirla: llega puesta, igual que llega cuando alguien
+ * viene de otra pestaña.
+ *
+ * 🔴 LO QUE NO CAMBIÓ, y es lo que estos casos sostienen: **el cuadro no se
+ * dibuja solo**. Hay que tocar «Generar», y lo que se le pide al servidor es el
+ * MISMO `desde`/`hasta`/`corte` de siempre.
+ */
 function elegirQuincenaEnCurso() {
-  const botones = screen.getAllByRole("button", { name: /^\d{1,2} – \d{1,2} \w{3}$/ });
-  fireEvent.click(botones[2]);
+  // La barra dice en qué quincena está parada la pantalla, sin tocar nada.
+  expect(screen.getByRole("button", { name: "Quincena anterior" })).toBeTruthy();
+  // 🩸 Y los cuatro botones viejos ya no se dibujan.
+  expect(screen.queryAllByRole("button", { name: /^\d{1,2} – \d{1,2} \w{3}$/ })).toHaveLength(0);
 }
 
 async function abrirPlanilla() {
