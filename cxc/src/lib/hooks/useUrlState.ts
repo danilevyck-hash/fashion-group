@@ -1,6 +1,7 @@
 "use client";
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { aparatoDeQuienMira, type Aparato } from "@/lib/aparato";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 /**
@@ -22,7 +23,37 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
  *   const [step, setStep] = useUrlState("step", "list", { history: "push" }); // drill-down
  */
 
-type UrlStateOptions = { history?: "push" | "replace" };
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 EN EL CELULAR, UNA PESTAÑA ES UNA PANTALLA (24-sep-2026).
+//
+// Daniel: «si entro a Multifashion, después a Clientes, y hago slide hacia
+// atrás, debería estar en el home de Multifashion. Pero me manda al Inicio.
+// Eso pasa en todos lados». La causa: las pestañas cambian la URL con
+// `replace` (para que en la computadora Atrás no cicle entre pestañas), pero
+// con el dedo la pestaña se abre como una pantalla, y el gesto de volver se
+// salta la entrada que nunca se escribió.
+//
+// Regla: `history: "pantalla"` = `push` cuando quien mira tiene el aparato en
+// la mano (`aparatoDeQuienMira() === "celular"`, por el dedo, nunca por el
+// nombre) y `replace` en la computadora. Las claves de `CLAVES_DE_PANTALLA`
+// lo tienen por defecto; un filtro o una búsqueda siguen en `replace`.
+// Candado: `url-state-pestana-es-pantalla.test.tsx`.
+// ─────────────────────────────────────────────────────────────────────────────
+type UrlStateOptions = { history?: "push" | "replace" | "pantalla" };
+
+/** Claves que en el celular se abren como pantalla: al cambiar, se puede volver. */
+export const CLAVES_DE_PANTALLA: readonly string[] = ["tab", "subtab", "vista", "ver", "modo", "mfCel"];
+
+/** Qué hace el historial con esta clave, según el aparato de quien mira. */
+export function modoDeHistorial(
+  key: string,
+  history: UrlStateOptions["history"] | undefined,
+  aparato: Aparato,
+): "push" | "replace" {
+  const pedido = history ?? (CLAVES_DE_PANTALLA.includes(key) ? "pantalla" : "replace");
+  if (pedido === "pantalla") return aparato === "celular" ? "push" : "replace";
+  return pedido;
+}
 
 // String overload (including string union types)
 export function useUrlState<T extends string = string>(
@@ -117,7 +148,7 @@ export function useUrlState(
 
       const qs = params.toString();
       const url = qs ? `${pathname}?${qs}` : pathname;
-      if (options?.history === "push") {
+      if (modoDeHistorial(key, options?.history, aparatoDeQuienMira()) === "push") {
         router.push(url, { scroll: false });
       } else {
         router.replace(url, { scroll: false });
