@@ -45,6 +45,17 @@ interface Props {
   deshabilitado?: boolean;
   /** Por qué está apagado, con todas las letras. Se dibuja debajo. */
   faltaTexto?: string | null;
+  /**
+   * 🔴 EL AVISO SUBE A LA CAJA DEL CLIENTE, EN EL CELULAR (24-sep-2026). Medido
+   * en el pedido de tres productos: la caja del CLIENTE termina en el píxel
+   * **709** y «Falta: elegir el cliente» estaba en el **1.010** — **301 px**
+   * abajo, con la caja del VENDEDOR y todo el total en medio. Cuando lo ÚNICO
+   * que falta es el cliente, el checkout lo dice pegado a esa caja y prende
+   * esto para no decirlo dos veces; aquí el aviso se queda para `sm` en
+   * adelante, donde la pantalla no cambió. Con cualquier otra cosa faltando,
+   * este aviso sale como siempre: es el que las enumera todas.
+   */
+  soloEnComputadora?: boolean;
   /** Color del botón sólido: el negro del checkout/confirmación o el verde del detalle. */
   tono?: "negro" | "verde";
 }
@@ -60,6 +71,7 @@ export default function EnviarDocumentoSwitch({
   textoEnviando = "Enviando…",
   deshabilitado = false,
   faltaTexto = null,
+  soloEnComputadora = false,
   tono = "negro",
 }: Props) {
   return (
@@ -102,7 +114,7 @@ export default function EnviarDocumentoSwitch({
       {/* Apagado Y explicado, acá mismo: un botón que se deja tocar y contesta
           con un toast obliga a tocarlo una vez por cada cosa que falta. */}
       {!enviando && faltaTexto && (
-        <p data-medir="falta-enviar" className="mt-2 text-center text-xs text-amber-800">
+        <p data-medir="falta-enviar" className={`mt-2 text-center text-xs text-amber-800${soloEnComputadora ? " hidden sm:block" : ""}`}>
           {faltaTexto}
         </p>
       )}

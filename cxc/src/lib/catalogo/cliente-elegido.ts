@@ -115,10 +115,17 @@ export interface EstadoCheckout {
  * dice qué falta. Un botón que se puede tocar y contesta con un toast obliga a
  * tocarlo una vez por cada cosa que falta.
  */
+/**
+ * Lo que falta cuando lo único que falta es el cliente. Se nombra para que el
+ * aviso que va PEGADO a la caja del cliente (24-sep-2026) diga exactamente lo
+ * mismo que el de abajo del total, sin una segunda redacción.
+ */
+export const FALTA_EL_CLIENTE = "elegir el cliente";
+
 export function faltaParaEnviar(e: EstadoCheckout): string[] {
   const falta: string[] = [];
   if (!e.hayItems) falta.push("agregar productos");
-  if (!e.clienteElegido) falta.push("elegir el cliente");
+  if (!e.clienteElegido) falta.push(FALTA_EL_CLIENTE);
   if (!e.vendedorElegido) falta.push("elegir el vendedor");
   if (e.preordersEnCarrito > 0) falta.push("quitar los productos en preventa");
   return falta;

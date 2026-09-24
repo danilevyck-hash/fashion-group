@@ -47,12 +47,14 @@ import ClienteSwitchPicker, {
 import EnviarDocumentoSwitch from "@/components/catalogo/EnviarDocumentoSwitch";
 import { type DocumentoSwitch } from "@/lib/catalogo/documento-switch";
 import {
+  FALTA_EL_CLIENTE,
   SIN_CLIENTE_ELEGIDO,
   clienteParaCheckout,
   esClienteDeMostrador,
   faltaParaEnviar,
   textoFaltaEnviar,
 } from "@/lib/catalogo/cliente-elegido";
+import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
 
 export interface CheckoutCartItem {
   product_id: string;
@@ -346,6 +348,16 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
                 {clientePickerOpen ? "Cerrar" : cliente === undefined ? "Elegir" : "Cambiar"}
               </button>
             </div>
+            {/* 🔴 EL AVISO, PEGADO A LA CAJA DEL QUE HABLA (24-sep-2026). Medido:
+                estaba **301 px** más abajo, debajo del total y con la caja del
+                VENDEDOR en medio. Es el MISMO texto de siempre —sale de
+                `textoFaltaEnviar`, no de una frase nueva— y solo hasta `sm`:
+                en la computadora sigue saliendo donde salía. */}
+            {CATALOGO_ORDEN_CELULAR && cliente === undefined && !clientePickerOpen && (
+              <p data-medir="falta-cliente-en-la-caja" className="mt-2 text-xs font-medium text-amber-800 sm:hidden">
+                {textoFaltaEnviar([FALTA_EL_CLIENTE])}
+              </p>
+            )}
             {clientePickerOpen && (
               <div className="mt-3 border-t border-gray-100 pt-3">
                 {/* 🔴 EL SELECTOR ÚNICO. Contado SIGUE EXISTIENDO y sigue
@@ -449,6 +461,7 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
                 enviando={sending}
                 deshabilitado={!puedeConfirmar}
                 faltaTexto={falta.length > 0 ? textoFaltaEnviar(falta) : null}
+                soloEnComputadora={CATALOGO_ORDEN_CELULAR && falta.length === 1 && falta[0] === FALTA_EL_CLIENTE}
               />
             </div>
           </section>
