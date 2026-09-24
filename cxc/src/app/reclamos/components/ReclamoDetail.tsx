@@ -64,6 +64,8 @@ interface Props {
   /** Recarga la lista (después de una descarga, para que diga «Reclamado»). */
   onReload?: () => void;
   showToast: (msg: string) => void;
+  /** El celular dibuja su propio encabezado: el contenedor lo pone UNA vez. */
+  sinEncabezado?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -90,6 +92,7 @@ export default function ReclamoDetail({
   onAddSettlement, onRemoveSettlement, onReload,
   showToast,
   contacto,
+  sinEncabezado,
 }: Props) {
   const fotoRef = useRef<HTMLInputElement>(null);
   const [deleteFotoTarget, setDeleteFotoTarget] = useState<{ id: string; path: string } | null>(null);
@@ -229,13 +232,15 @@ export default function ReclamoDetail({
 
   return (
     <div>
-      <AppHeader
-        module="Reclamos"
-        breadcrumbs={[
-          { label: current.empresa, onClick: onBackToEmpresa ?? onBack },
-          { label: current.nro_reclamo || "Reclamo" },
-        ]}
-      />
+      {!sinEncabezado && (
+        <AppHeader
+          module="Reclamos"
+          breadcrumbs={[
+            { label: current.empresa, onClick: onBackToEmpresa ?? onBack },
+            { label: current.nro_reclamo || "Reclamo" },
+          ]}
+        />
+      )}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-12">
       <div className="-mt-2 mb-2 flex items-center flex-wrap">
         <button onClick={onBackToEmpresa ?? onBack} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -ml-2">← {current.empresa}</button>

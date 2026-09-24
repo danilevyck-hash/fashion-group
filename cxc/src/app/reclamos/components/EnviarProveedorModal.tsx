@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { Ayuda } from "@/components/shared/Ayuda";
+import { asuntoPorDefecto, mensajePorDefecto } from "@/lib/reclamos/correo-proveedor";
+import { mandarAlProveedor, textoDelEnvio } from "./descargas";
 
 interface EnviarProveedorModalProps {
   open: boolean;
@@ -103,17 +105,12 @@ export default function EnviarProveedorModal({
   if (open !== prevOpen) {
     setPrevOpen(open);
     if (open) {
-      const nombre = (contactoNombre || "").trim() || "equipo";
-      const plural = count === 1 ? "" : "s";
       setTo(defaultTo || "");
       setCc("");
-      setSubject(
-        defaultSubject ||
-          (count === 1 ? `Reclamo pendiente — ${empresa}` : `Reclamos pendientes — ${empresa} (${count})`),
-      );
-      setMessage(
-        `Estimado/a ${nombre},\n\nAdjuntamos ${count} reclamo${plural} pendiente${plural} de ${empresa} con su evidencia fotográfica y el detalle en Excel. Quedamos en espera de la nota de crédito correspondiente.`,
-      );
+      // 🔴 El asunto y el mensaje salen de `lib/reclamos/correo-proveedor.ts`,
+      // el MISMO módulo que lee la hoja del celular: un solo correo.
+      setSubject(asuntoPorDefecto(count, empresa, defaultSubject));
+      setMessage(mensajePorDefecto(count, empresa, contactoNombre));
       setError(null);
       setLibretaOpen(false);
       setEditId(null);
@@ -213,36 +210,19 @@ export default function EnviarProveedorModal({
     setSending(true);
     setError(null);
     try {
-      const res = await fetch(`/api/reclamos/proveedor/${encodeURIComponent(empresa)}/send-zip`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reclamo_ids: reclamoIds,
-          to: cleanTo,
-          cc: cleanCc,
-          subject: subject.trim(),
-          message: message.trim(),
-        }),
+      // 🔴 La ruta y el cuerpo viven en `descargas.ts`, el MISMO módulo que usa
+      // la hoja del celular: un solo correo, un solo payload.
+      const data = await mandarAlProveedor(empresa, reclamoIds, {
+        to: cleanTo,
+        cc: cleanCc,
+        subject: subject.trim(),
+        message: message.trim(),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error || "No se pudo enviar el correo.");
-      }
-      const data = await res.json().catch(() => ({}));
       // Lo que viajó se dice con números: el Excel siempre, y cuántas facturas
       // y fotos entraron. Lo que no entró también se dice — un adjunto que
       // falta en silencio es el proveedor pidiéndolo por WhatsApp dos días
       // después.
-      const facturas = Number(data?.facturasAdjuntas || 0);
-      const fotos = Number(data?.fotosAdjuntas || 0);
-      const piezas: string[] = [];
-      if (facturas > 0) piezas.push(`${facturas} factura${facturas === 1 ? "" : "s"}`);
-      if (fotos > 0) piezas.push(`${fotos} foto${fotos === 1 ? "" : "s"}`);
-      const adjuntos = piezas.length ? ` · con ${piezas.join(" y ")}` : "";
-      const omitidas = Number(data?.fotosOmitidas || 0);
-      const aviso = omitidas > 0 ? ` · ${omitidas} foto${omitidas === 1 ? "" : "s"} no se pudo incluir` : "";
-      const ccAviso = cleanCc ? " (con copia)" : "";
-      onSent(`Correo enviado a ${cleanTo}${ccAviso}${adjuntos}${aviso}`);
+      onSent(textoDelEnvio(data, cleanTo, cleanCc));
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo enviar el correo.");

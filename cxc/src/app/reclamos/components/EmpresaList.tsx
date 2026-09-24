@@ -15,6 +15,7 @@ import OverflowMenu from "@/components/ui/OverflowMenu";
 import FotoBadge from "./FotoBadge";
 import EnviarProveedorModal from "./EnviarProveedorModal";
 import { facturasEnPantalla } from "@/lib/reclamos/facturas";
+import { bajar as descargar, pedirLote, type Descarga } from "./descargas";
 import { diasDesde } from "@/lib/reclamos/dias";
 import { fechaDeCobro } from "@/lib/reclamos/portada";
 import { textoReclamado, estaReclamado } from "@/lib/reclamos/reclamado";
@@ -51,22 +52,13 @@ interface Props {
   onDeleteSelected: (ids: string[]) => void;
   /** Recarga los reclamos tras mandar el correo o descargar (para ver «Reclamado»). */
   onReload: () => void;
+  /** El celular dibuja su propio encabezado: el contenedor lo pone UNA vez. */
+  sinEncabezado?: boolean;
 }
-
-type Descarga = "excel" | "pdf";
 
 const IconTrash = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
 );
-
-function descargar(blob: Blob, nombre: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = nombre;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 /**
  * UN ENCABEZADO QUE ORDENA.
@@ -137,7 +129,7 @@ function Encabezado({
 export default function EmpresaList({
   role, activeEmpresa, reclamos, contactos,
   selectionMode, setSelectionMode, selectedIds, setSelectedIds,
-  onBack, onNewReclamo, onLoadDetail, onEditReclamo, onDeleteReclamo, onDeleteSelected, onReload,
+  onBack, onNewReclamo, onLoadDetail, onEditReclamo, onDeleteReclamo, onDeleteSelected, onReload, sinEncabezado,
 }: Props) {
   const isAdmin = role === "admin";
   const hoy = hoyPanama();
@@ -171,7 +163,6 @@ export default function EmpresaList({
   const c = contactos.find((ct) => ct.empresa === activeEmpresa) || null;
   const key = empresaKeyDeReclamo(activeEmpresa);
   const nombreCorto = key ? nombreCortoEmpresa(key) : activeEmpresa;
-  const empresaPath = encodeURIComponent(activeEmpresa);
 
   const allSelected = visibles.length > 0 && visibles.every((r) => selectedIds.includes(r.id));
   const toggleSelect = (id: string) => setSelectedIds((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
@@ -185,11 +176,8 @@ export default function EmpresaList({
     if (busy || idsObjetivo.length === 0) return;
     setBusy(tipo);
     try {
-      const res = await fetch(`/api/reclamos/proveedor/${empresaPath}/${tipo === "excel" ? "export-zip" : "export-pdf"}`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reclamo_ids: idsObjetivo }),
-      });
-      if (!res.ok) { const err = await res.json().catch(() => null); throw new Error(err?.error || "No se pudo armar el archivo. Intenta de nuevo."); }
-      descargar(await res.blob(), `Reclamos-${sufijo}-${nombreCorto}-${hoy}.${tipo === "excel" ? "xlsx" : "pdf"}`);
+      const blob = await pedirLote(activeEmpresa, tipo, idsObjetivo);
+      descargar(blob, `Reclamos-${sufijo}-${nombreCorto}-${hoy}.${tipo === "excel" ? "xlsx" : "pdf"}`);
       showToast(`${tipo === "excel" ? "Excel" : "PDF"} descargado — ${idsObjetivo.length} reclamo${idsObjetivo.length === 1 ? "" : "s"}`);
       onReload();
     } catch (err) {
@@ -203,12 +191,16 @@ export default function EmpresaList({
     if (filaBusy) return;
     setFilaBusy(r.id);
     try {
-      const res = tipo === "excel"
-        ? await fetch(`/api/reclamos/${r.id}/excel`)
-        : await fetch(`/api/reclamos/proveedor/${empresaPath}/export-pdf`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reclamo_ids: [r.id] }) });
-      if (!res.ok) { const err = await res.json().catch(() => null); throw new Error(err?.error || "No se pudo armar el archivo. Intenta de nuevo."); }
+      let blob: Blob;
+      if (tipo === "excel") {
+        const res = await fetch(`/api/reclamos/${r.id}/excel`);
+        if (!res.ok) { const err = await res.json().catch(() => null); throw new Error(err?.error || "No se pudo armar el archivo. Intenta de nuevo."); }
+        blob = await res.blob();
+      } else {
+        blob = await pedirLote(activeEmpresa, "pdf", [r.id]);
+      }
       const safe = (r.nro_reclamo || "reclamo").replace(/[^A-Za-z0-9_-]+/g, "_");
-      descargar(await res.blob(), `Reclamo-${safe}.${tipo === "excel" ? "xlsx" : "pdf"}`);
+      descargar(blob, `Reclamo-${safe}.${tipo === "excel" ? "xlsx" : "pdf"}`);
       showToast(`${tipo === "excel" ? "Excel" : "PDF"} de ${r.nro_reclamo} descargado`);
       onReload();
     } catch (err) {
@@ -271,7 +263,7 @@ export default function EmpresaList({
 
   return (
     <div>
-      <AppHeader module="Reclamos" breadcrumbs={[{ label: nombreCorto }]} />
+      {!sinEncabezado && <AppHeader module="Reclamos" breadcrumbs={[{ label: nombreCorto }]} />}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-12">
       <div className="mb-4">
         <button onClick={onBack} className="inline-flex min-h-[44px] items-center text-sm text-gray-400 hover:text-black transition">← Reclamos</button>

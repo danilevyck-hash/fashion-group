@@ -23,6 +23,8 @@ interface Props {
   onNewReclamo: () => void;
   onSelectEmpresa: (empresa: string) => void;
   onLoadDetail: (id: string, empresa: string) => void;
+  /** El celular dibuja su propio encabezado: el contenedor lo pone UNA vez. */
+  sinEncabezado?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -44,7 +46,7 @@ interface Props {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function EmpresaSelector({
   role, reclamos, loading, contactos, globalSearch, setGlobalSearch,
-  onNewReclamo, onSelectEmpresa, onLoadDetail,
+  onNewReclamo, onSelectEmpresa, onLoadDetail, sinEncabezado,
 }: Props) {
   const hoy = hoyPanama();
   const resumen = resumenPortada(reclamos, hoy);
@@ -61,7 +63,7 @@ export default function EmpresaSelector({
 
   return (
     <div>
-      <AppHeader module="Reclamos" />
+      {!sinEncabezado && <AppHeader module="Reclamos" />}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <div className="flex items-center justify-end mb-5">
           <h1 className="sr-only">Reclamos</h1>

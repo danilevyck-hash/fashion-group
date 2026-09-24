@@ -4,6 +4,7 @@ import { useRef, useState, type DragEvent } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { FotoLightbox, PdfLightbox } from "@/components/ui";
 import { compressImage, validateFotoFile } from "./fotoUpload";
+import { AVISO_VARIAS_HOJAS, RECLAMOS_CELULAR } from "@/lib/reclamos/celular";
 
 import type { FacturaExtraida } from "@/lib/reclamos/lector-factura";
 
@@ -49,7 +50,10 @@ export default function FacturaPdfUploader({ pdfUrl, onUploaded, onExtracted }: 
   const [fotoLightbox, setFotoLightbox] = useState<string | null>(null);
   const [subiendo, setSubiendo] = useState(false);
   const [dragging, setDragging] = useState(false);
+  /** Se prende cuando entró una FOTO: ahí se dice lo de las varias hojas. */
+  const [entroUnaFoto, setEntroUnaFoto] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const camaraRef = useRef<HTMLInputElement>(null);
 
   const handleUpload = async (original: File): Promise<void> => {
     // 🔴 Una foto se achica ANTES de viajar, con el MISMO compresor del
@@ -121,6 +125,7 @@ export default function FacturaPdfUploader({ pdfUrl, onUploaded, onExtracted }: 
   async function procesar(file: File) {
     const err = validar(file);
     if (err) { toast(err, "error"); return; }
+    setEntroUnaFoto(!esPdf(tipoDeArchivo(file)));
     setSubiendo(true);
     try {
       await handleUpload(file);
@@ -163,9 +168,54 @@ export default function FacturaPdfUploader({ pdfUrl, onUploaded, onExtracted }: 
           </button>
         </div>
       )}
+      {/* ── 4b · DOS PUERTAS, SOLO EN EL TELÉFONO (24-sep-2026) ──────────────
+          🩸 En el iPhone «Elegir archivo» abría Archivos y nada más, y la
+          factura es obligatoria para guardar: desde el teléfono no se podía ni
+          empezar. La PRINCIPAL es elegir —a Andrea la factura le llega por
+          CORREO—; la cámara va debajo, para el papel. Las dos terminan en el
+          MISMO `procesar`: misma subida, misma lectura, mismo formulario. */}
+      {RECLAMOS_CELULAR && (
+        <div className="space-y-2 sm:hidden">
+          <input
+            ref={camaraRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) procesar(f); e.target.value = ""; }}
+          />
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={subiendo}
+            className="block w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-left active:bg-gray-50 disabled:opacity-50"
+          >
+            <span className="block text-[17px] font-medium text-gray-900">
+              {subiendo ? "Subiendo…" : "Elegir PDF o foto"}
+            </span>
+            <span className="mt-0.5 block text-[14px] text-gray-500">de Archivos o de la fototeca</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => camaraRef.current?.click()}
+            disabled={subiendo}
+            className="block w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-left active:bg-gray-50 disabled:opacity-50"
+          >
+            <span className="block text-[17px] font-medium text-gray-900">Tomar foto de la factura</span>
+            <span className="mt-0.5 block text-[14px] text-gray-500">la cámara, derecho sobre el papel</span>
+          </button>
+          {entroUnaFoto && (
+            <p className="text-[13px] text-gray-500">{AVISO_VARIAS_HOJAS}</p>
+          )}
+        </div>
+      )}
+
       {/* Franja compacta: drag-and-drop + click. Reemplaza el dropzone alto del
           PdfUploader de Marketing para que el detalle en edición quepa en un
           pantallazo. Misma lógica de subida + IA (handleUpload). */}
+      <div
+        className={RECLAMOS_CELULAR ? "hidden sm:block" : undefined}
+      >
       <div
         onDrop={onDrop}
         onDragOver={onDragOver}
@@ -202,6 +252,7 @@ export default function FacturaPdfUploader({ pdfUrl, onUploaded, onExtracted }: 
         >
           {pdfUrl ? "Reemplazar" : "Elegir archivo"}
         </button>
+      </div>
       </div>
       {leyendoIA && (
         <div className="flex items-center gap-2 text-xs text-gray-500">

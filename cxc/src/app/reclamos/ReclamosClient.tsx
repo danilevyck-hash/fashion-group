@@ -28,6 +28,11 @@ import { validateReclamoFull, validateReclamoNuevo } from "@/lib/reclamos/valida
 import { facturasATexto, facturasDe } from "@/lib/reclamos/facturas";
 import { itemsAGuardar, type LineaFactura } from "@/lib/reclamos/lineas-factura";
 import { LISTO_COBRADO, NO_SE_PUDO_COBRAR } from "@/lib/reclamos/rotulos";
+import { RECLAMOS_CELULAR } from "@/lib/reclamos/celular";
+import AppHeader from "@/components/AppHeader";
+import PortadaCelular from "./components/celular/PortadaCelular";
+import ListaEmpresaCelular from "./components/celular/ListaEmpresaCelular";
+import DetalleCelular from "./components/celular/DetalleCelular";
 
 // Clave de caché SWR del listado de Reclamos (Fase 3, mismo patrón que el piloto
 // CXC #115). La caché vive a nivel de la app (SWRProvider) y persiste entre
@@ -519,22 +524,52 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
     ? <UndoToast message={pendingUndoReclamo.message} startedAt={pendingUndoReclamo.startedAt} onUndo={undoActionReclamo} />
     : null;
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // 🔴 EL CELULAR ES OTRA PANTALLA, Y EL ENCABEZADO ES UNO SOLO (24-sep-2026).
+  //
+  // Con `RECLAMOS_CELULAR` prendido, `AppHeader` se dibuja ACÁ una sola vez y
+  // las pantallas de la computadora lo dejan de dibujar (`sinEncabezado`): dos
+  // encabezados montados a la vez serían dos buscadores, dos campanas y dos
+  // oyentes de ⌘K. Con el interruptor apagado, cada pantalla dibuja el suyo
+  // como siempre y no hay celular nuevo.
+  // ─────────────────────────────────────────────────────────────────────────
+  const soloCompu = RECLAMOS_CELULAR ? "hidden sm:block" : undefined;
+
   // ── LIST VIEW ──
   if (view === "list") {
     if (!activeEmpresa) {
       return (
         <PullToRefresh onRefresh={loadReclamos}>
-          <EmpresaSelector
-            role={role}
-            reclamos={reclamos}
-            loading={loading}
-            contactos={contactos}
-            globalSearch={globalSearch}
-            setGlobalSearch={setGlobalSearch}
-            onNewReclamo={() => { resetForm(); setView("form"); }}
-            onSelectEmpresa={(empresa) => { changeEmpresa(empresa); }}
-            onLoadDetail={(id, empresa) => { setEditMode(false); changeEmpresa(empresa, { view: "detail", id }); loadDetail(id); }}
-          />
+          {RECLAMOS_CELULAR && <AppHeader module="Reclamos" />}
+          {RECLAMOS_CELULAR && (
+            <div className="sm:hidden">
+              <PortadaCelular
+                role={role}
+                reclamos={reclamos}
+                loading={loading}
+                contactos={contactos}
+                globalSearch={globalSearch}
+                setGlobalSearch={setGlobalSearch}
+                onNewReclamo={() => { resetForm(); setView("form"); }}
+                onSelectEmpresa={(empresa) => { changeEmpresa(empresa); }}
+                onLoadDetail={(id, empresa) => { setEditMode(false); changeEmpresa(empresa, { view: "detail", id }); loadDetail(id); }}
+              />
+            </div>
+          )}
+          <div className={soloCompu}>
+            <EmpresaSelector
+              role={role}
+              reclamos={reclamos}
+              loading={loading}
+              contactos={contactos}
+              globalSearch={globalSearch}
+              setGlobalSearch={setGlobalSearch}
+              onNewReclamo={() => { resetForm(); setView("form"); }}
+              onSelectEmpresa={(empresa) => { changeEmpresa(empresa); }}
+              onLoadDetail={(id, empresa) => { setEditMode(false); changeEmpresa(empresa, { view: "detail", id }); loadDetail(id); }}
+              sinEncabezado={RECLAMOS_CELULAR}
+            />
+          </div>
           {deleteModal}
           {undoToast}
         </PullToRefresh>
@@ -543,23 +578,47 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
 
     return (
       <PullToRefresh onRefresh={loadReclamos}>
-        <EmpresaList
-          role={role}
-          activeEmpresa={activeEmpresa}
-          reclamos={reclamos}
-          contactos={contactos}
-          selectionMode={selectionMode}
-          setSelectionMode={setSelectionMode}
-          selectedIds={selectedIds}
-          setSelectedIds={setSelectedIds}
-          onBack={() => changeEmpresa(null)}
-          onNewReclamo={() => { resetForm(); setFEmpresa(activeEmpresa); setView("form"); }}
-          onLoadDetail={(id) => { setEditMode(false); setView("detail", id); loadDetail(id); }}
-          onEditReclamo={(id) => { setView("detail", id); loadDetail(id).then((r) => { if (r) enterEdit(r); }); }}
-          onDeleteReclamo={(id) => requestDeleteReclamo(id)}
-          onDeleteSelected={requestDeleteSelected}
-          onReload={loadReclamos}
-        />
+        {RECLAMOS_CELULAR && (
+          <AppHeader module="Reclamos" breadcrumbs={[{ label: activeEmpresa }]} />
+        )}
+        {RECLAMOS_CELULAR && (
+          <div className="sm:hidden">
+            <ListaEmpresaCelular
+              role={role}
+              activeEmpresa={activeEmpresa}
+              reclamos={reclamos}
+              contactos={contactos}
+              selectionMode={selectionMode}
+              setSelectionMode={setSelectionMode}
+              selectedIds={selectedIds}
+              setSelectedIds={setSelectedIds}
+              onNewReclamo={() => { resetForm(); setFEmpresa(activeEmpresa); setView("form"); }}
+              onLoadDetail={(id) => { setEditMode(false); setView("detail", id); loadDetail(id); }}
+              onDeleteSelected={requestDeleteSelected}
+              onReload={loadReclamos}
+            />
+          </div>
+        )}
+        <div className={soloCompu}>
+          <EmpresaList
+            role={role}
+            activeEmpresa={activeEmpresa}
+            reclamos={reclamos}
+            contactos={contactos}
+            selectionMode={selectionMode}
+            setSelectionMode={setSelectionMode}
+            selectedIds={selectedIds}
+            setSelectedIds={setSelectedIds}
+            onBack={() => changeEmpresa(null)}
+            onNewReclamo={() => { resetForm(); setFEmpresa(activeEmpresa); setView("form"); }}
+            onLoadDetail={(id) => { setEditMode(false); setView("detail", id); loadDetail(id); }}
+            onEditReclamo={(id) => { setView("detail", id); loadDetail(id).then((r) => { if (r) enterEdit(r); }); }}
+            onDeleteReclamo={(id) => requestDeleteReclamo(id)}
+            onDeleteSelected={requestDeleteSelected}
+            onReload={loadReclamos}
+            sinEncabezado={RECLAMOS_CELULAR}
+          />
+        </div>
         {deleteModal}
         {undoToast}
       </PullToRefresh>
@@ -608,8 +667,45 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   // ── DETAIL VIEW ──
   if (!current) return null;
 
+  // 🔴 En el celular el reclamo se dibuja con `DetalleCelular`… salvo EDITANDO:
+  // editar es el formulario largo del sistema y se sigue usando el de siempre.
+  const detalleCelular = RECLAMOS_CELULAR && !editMode;
+
   return (
     <>
+      {RECLAMOS_CELULAR && (
+        <AppHeader
+          module="Reclamos"
+          breadcrumbs={[
+            { label: current.empresa, onClick: () => { setCurrent(null); changeEmpresa(activeEmpresa, { view: "list", id: null }); } },
+            { label: current.nro_reclamo || "Reclamo" },
+          ]}
+        />
+      )}
+      {detalleCelular && (
+        <div className="sm:hidden">
+          <DetalleCelular
+            current={current}
+            role={role}
+            contacto={contactos.find((ct) => ct.empresa === current.empresa) || null}
+            nota={nota}
+            setNota={setNota}
+            onStartEdit={() => enterEdit(current)}
+            onDeleteReclamo={requestDeleteReclamo}
+            onAddNota={addNota}
+            onVolverAPorCobrar={() => changeEstado("Creado")}
+            onCobrar={(filas, comprobante) => { void submitSettlement(filas, comprobante); }}
+            cobrando={settling}
+            onUploadFoto={uploadFoto}
+            uploadingFoto={uploadingDetailFoto}
+            onDeleteFoto={deleteFoto}
+            onReload={loadReclamos}
+            toast={toast}
+            showToast={(msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); }}
+          />
+        </div>
+      )}
+      <div className={detalleCelular ? "hidden sm:block" : undefined}>
       <ReclamoDetail
         current={current}
         role={role}
@@ -640,7 +736,9 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
         onRemoveSettlement={removeSettlement}
         onReload={loadReclamos}
         showToast={(msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); }}
+        sinEncabezado={RECLAMOS_CELULAR}
       />
+      </div>
       <SettlementModal
         open={settleOpen}
         reclamado={current.monto_reclamado_snapshot ?? reclamoTaxes(current.empresa, calcSub(current.reclamo_items ?? [])).total}
