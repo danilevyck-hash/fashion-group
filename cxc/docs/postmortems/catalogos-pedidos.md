@@ -7,6 +7,125 @@
 
 ---
 
+## 🔴 CATÁLOGOS EN EL CELULAR — «LO MISMO, ORDENADO»: LOS NUEVE CAMBIOS CHICOS (24-sep-2026)
+
+**Daniel, textual, sobre el mockup `cel-catalogos-orden.html`: «todo sí».** Y antes de eso, lo
+que NO es: **no es un rediseño**. Catálogos se queda como está —mismo estilo, mismos colores,
+mismos rótulos, las mismas tarjetas de producto— y **el precio del pedido se queda como hoy**.
+
+Interruptor único: `CATALOGO_ORDEN_CELULAR` en `src/lib/catalogo/orden-celular.ts`, hoy `true`.
+`false` = Catálogos entero como estaba, sin tener que acordarse de nueve lugares.
+Candado: `src/__tests__/catalogo/catalogo-orden-celular.test.tsx` (218 pruebas en ese archivo y
+sus vecinos), y **el que importa es el 11**: se renderiza el checkout de verdad, se elige un
+cliente de verdad, se toca «Pedido» y se compara el payload **prendido contra apagado**; sale
+idéntico salvo el `idempotency_key`, que es un UUID nuevo por envío a propósito.
+
+### De dónde salen los números
+
+Capturas de Daniel del 24-sep 9:10-9:12 (`cel-daniel-2/IMG_3142…3149`, iPhone de 402 px) y
+auditoría propia a 390 × 844 (`cel-catalogos/*.png`, `geo.json`, `geo2.json`, `geo3.json`).
+Las medidas en píxeles salen de leer los PNG de página completa a escala 2× → CSS px a 390.
+
+### Los nueve, uno por uno
+
+| # | Pantalla | El cambio | Medido |
+|---|---|---|---|
+| 1 | Hub de marcas | Los 4 botones en rejilla de 2×2, del mismo ancho | anchos **133 · 140 · 127 · 105 px**; la fila de abajo terminaba en el píxel **292** contra el **332** de la de arriba — **40 px** de borde mocho. ⚠️ La tarjeta NO queda más corta (287 → 285 px): los cuatro botones ya caían en dos filas |
+| 2 | Link para clientes | Una línea con «Copiar link» al lado | caja de **119 px** (píxel 86 al 205) → **68**: **51 px** |
+| 3 | Catálogo del cliente | Género · Categoría · precio · (Tommy: bultos) recogidos en «Filtros ›» | bloque de filtros del píxel **185 al 409** = **224 px** → **76**: **148 px**. La primera foto sube del **461 al 313** y el primer «Agregar» del **778 al 630** |
+| 4 | Tarjeta del producto | «Bulto de 12 · Disponibilidad 1 · Existencia 1» en una línea | tres renglones de **41 px** (727→734, 745→755, 760→768) → **8**. Tarjeta **368 → 335 px**; Reebok entero de **30.386** a ~**27.900** px |
+| 5 | Carrito / pedido | «Falta: elegir el cliente» pegado a la caja del CLIENTE | el aviso estaba **301 px** abajo (caja termina en el 709, aviso en el 1.010) |
+| 6 | Comprobantes | Rótulo a la izquierda de su fila de chips; casilla con blanco de 44 | de «Descargar Excel» (230) al buscador (410) = **180 px** → **100**. Casillas de **16 × 16**; **27 controles** por debajo del mínimo |
+| 7 | Administrar | Una fila por producto: foto/código/precio, números en línea, botones abajo | **15 pares de textos encimados** por pantalla, en las **220** filas de Reebok y las **81** de Joybees (Tommy y Calvin, **cero**). Chips de dos filas (píxeles 623 y 675) a una: **52 px** |
+| 8 | Comprobante abierto | Se va el deslizamiento adentro del deslizamiento | caja de **591 px** con **1.092** de contenido (14 renglones de 73) dentro de una página de **1.311** |
+| 9 | Compartir | El menú se abre debajo del botón y empuja | el panel mide **190 × 104 px**, arranca en el **411** y tapa el rótulo «CALZADO — HOMBRE · 42» (429) y **54 px** de las dos fotos (461) |
+
+### Cómo se hizo cada uno, y qué NO se tocó
+
+**1 · Hub.** `clasesBotonesDeLaMarca()`: `grid grid-cols-2` hasta `sm`, `sm:flex sm:flex-wrap`
+de ahí para arriba. Con dos o tres botones (roles sin «Comprobantes» o sin «Administrar») la
+rejilla los reparte igual. El candado viejo de `hub-marcas-pedidos.test.tsx` («la fila de
+acciones PUEDE bajar de línea», `toContain("flex-wrap")`) **sigue verde sin tocarlo**.
+
+**2 · Link.** Se va el renglón del título («Link para clientes · los 4 catálogos») **solo hasta
+`sm`**; la dirección y el botón quedan en línea. ⚠️ **El rótulo del botón no se tocó**: sigue
+diciendo «Copiar link» en las dos, aunque el mockup dibujaba «Copiar» — «mismos rótulos» le
+gana al mockup, y además `catalogo-hub-tarjeta-completa.test.tsx` lo busca por ese nombre.
+
+**3 · Filtros.** No se duplicó NINGÚN control: los mismos `<FiltroDesplegable>` y el mismo
+`<FiltroPrecioExacto>` se pliegan con `hidden`/`flex`, y la fila de orden sube al segundo lugar
+con `order-2` en un **envoltorio** (la clase `flex flex-wrap items-center justify-between gap-2`
+es un candado medido —404 px contra 358— y se conserva LITERAL). El botón dice «Filtros» y, con
+filtros puestos, «Filtros · 2» (`cuantosFiltrosPuestos`, que NO cuenta un «Todos»).
+⚠️ **El corte de las dos filas de filtros sigue siendo `lg`**, como el 6-sep; lo que estrena
+`sm` es el pliegue. `catalogo-filtros-desplegable.test.ts` se actualizó para decirlo y ahora
+exige que **el único `sm:hidden` del archivo sea el de «Filtros ›»**.
+
+**4 · Tarjeta.** El punto medio es **CSS** (`before:content-['·']`), nunca un nodo de texto: la
+tarjeta se sigue leyendo «Disponibilidad 1» y «Existencia 1», sin un «·» pegado a la palabra.
+«Bulto de N» viaja a `CatalogoStockLine` **solo cuando la card muestra stock** (catálogo
+interno); en el público, donde no hay stock, la card lo sigue dibujando como siempre y nada
+cambia. Con TALLA (Joybees agrupado) no se toca nada: ahí el bloque ya vive a lo ancho.
+Los siete candados de `catalogo-cards-paridad.test.ts` **siguen verdes sin tocarlos**, incluido
+el que congela literal la clase de la fila del precio.
+
+**5 · Carrito.** El aviso es el MISMO texto (`textoFaltaEnviar([FALTA_EL_CLIENTE])`), no una
+frase nueva. Y **no se dice dos veces**: cuando lo ÚNICO que falta es el cliente, el de abajo
+del total se calla en el celular (`soloEnComputadora`). Con más de una cosa faltando, el de
+abajo sale como siempre: es el que las enumera todas. **El precio editable del renglón no se
+tocó** — `LineasPedidoEditables.tsx` ni siquiera importa el interruptor, y hay candado.
+
+**6 · Comprobantes.** 🔑 **Los dos grupos NO se juntan en una sola fila: no caben.** Los cinco
+chips de Reebok (Todos 14 · Del cliente 1 · Del vendedor 13 · Pedidos 13 · Borradores 1) piden
+**404 px** y hay **358**. Queda una fila por grupo, que se desliza de lado si sobra. La casilla
+que se ve sigue siendo de 16 px: **lo que mide 44 es el blanco que la envuelve** (`BLANCO_CASILLA`),
+y en «Seleccionar todos» es la etiqueta entera la que se lleva el mínimo. La tabla de
+escritorio (≥ `lg`) es otra fila y no se tocó.
+
+**7 · Administrar.** 🩸 La causa del encimado era de LUGAR: la columna de datos es `flex-1`, o
+sea **base 0**, así que NUNCA forzaba el salto de línea — se encogía por debajo de su contenido
+y el texto se derramaba sobre «Subir otra» y «Esconder». El arreglo es un envoltorio con
+**`sm:contents`**: hasta `sm` la foto y los datos van juntos en una fila de ancho completo y los
+botones bajan enteros debajo, repartidos mitad y mitad; de `sm` para arriba el envoltorio
+**desaparece** y la computadora queda idéntica. La clase literal de la fila
+(`flex flex-wrap sm:flex-nowrap items-center gap-3`, candado de `tommy-bulto-por-estilo`)
+**no se tocó**. Segunda red: el renglón de los números lleva `flex-wrap` y cada número
+`whitespace-nowrap`. `tommy-admin-filtros.test.ts` se actualizó por los chips.
+
+**8 · Comprobante abierto.** Daniel dio las dos opciones y la elegida fue «solo horizontal
+dentro de su caja, nunca vertical anidado»: hasta `sm`, `overflow-x-auto` sin alto; de `sm` para
+arriba, la caja de siempre. ⚠️ **EL PRECIO ESTÁ DICHO Y SE ELIGIÓ A SABIENDAS**: sin alto, el
+encabezado de la tabla **deja de quedarse fijo en el celular** (era el arreglo del 6-sep, que
+necesita una caja con alto para que el `sticky` tenga a qué pegarse). Se conserva en la
+computadora, que es donde se leen los pedidos largos. `pedido-detalle-rediseno.test.tsx` lo dice.
+
+**9 · Compartir.** `max-sm:static` sobre el MISMO panel del tema: deja de flotar, se vuelve un
+hijo de la caja del botón y empuja la lista. No se duplicó el menú ni se cambió una opción.
+
+### Lo que NO salió como el mockup, y por qué
+
+1. **Los tres botones chicos («⟳ hace N h» · «Comprobantes» · «Compartir») NO quedaron en una
+   línea gris de 20 px.** El mockup los dibujaba como texto chico; como controles reales tienen
+   que conservar el blanco de **44 px** de la casa (`iphone-tocables-y-letra`,
+   `catalogo-admin-una-lista`), así que achicarlos habría roto la regla que el punto 6 de este
+   mismo trabajo vino a CUMPLIR. En Reebok ya van en una sola fila; en Joybees, Tommy y Calvin
+   siguen en sus dos lugares (el sync en su fila, los otros dos en el encabezado).
+2. **La tarjeta del hub no queda más corta** (287 → 285 px). Está medido y dicho: lo que se
+   arregla es el borde mocho de 40 px, no la altura.
+3. **El punto 8 tiene un costo** (el encabezado fijo del celular), arriba.
+
+### Candados
+
+`catalogo-orden-celular` (nuevo) · `catalogo-cards-paridad` · `catalogo-la-foto-manda` ·
+`catalogo-tarjeta-nombre-por-marca` · `catalogo-tarjeta-podada` · `catalogo-hub-pulso` ·
+`catalogo-hub-tarjeta-completa` · `hub-marcas-pedidos` · `comprobantes-*` ·
+`catalogo-admin-una-lista` · `iphone-tocables-y-letra` · `iphone-targets-operacion`.
+Tres se actualizaron a propósito, con el porqué escrito dentro: `catalogo-filtros-desplegable`
+(el único `sm:hidden`), `tommy-admin-filtros` (los chips que se deslizan) y
+`pedido-detalle-rediseno` (el encabezado fijo pasa a ser de la computadora).
+
+---
+
 ## 🔴 EL DESPACHO DE REEBOK ENTRA AL DEPURADOR — TRES NÚMEROS QUE SE INVENTABAN (17-sep-2026)
 
 Daniel, textual: *«te paso un nuevo excel… puede reemplazar al viejo que se subía a
