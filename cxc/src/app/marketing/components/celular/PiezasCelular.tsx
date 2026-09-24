@@ -173,7 +173,9 @@ export function FilaCelular({
           >
             {monto}
           </span>
-          {pie && <span className="block text-[11px] font-medium text-gray-500">{pie}</span>}
+          {/* 🔴 `text-xs` (13 px) y no menos: la letra nunca baja de ahí en
+              todo el sistema — candado `iphone-targets-operacion`. */}
+          {pie && <span className="block text-xs font-medium text-gray-500">{pie}</span>}
         </span>
       )}
       {tocable && !accion && <span className="shrink-0 text-gray-400">›</span>}
