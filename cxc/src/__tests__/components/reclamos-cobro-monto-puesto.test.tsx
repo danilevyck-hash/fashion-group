@@ -22,6 +22,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 
 import SettlementModal from "@/app/reclamos/components/SettlementModal";
+import { MARCAR_COBRADO } from "@/lib/reclamos/rotulos";
 
 const almacen = () => {
   const datos = new Map<string, string>();
@@ -60,7 +61,7 @@ describe("🔴 el monto del cobro viene puesto", () => {
   it("🔴 es EDITABLE: un cobro parcial se escribe encima y es lo que se guarda", () => {
     const { onSubmit } = pintar();
     fireEvent.change(campoMonto(), { target: { value: "200" } });
-    fireEvent.click(screen.getByRole("button", { name: /Marcar como Pagado/i }));
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(MARCAR_COBRADO, "i") }));
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(onSubmit.mock.calls[0][0][0].monto).toBe(200);
   });
@@ -95,13 +96,13 @@ describe("🔴 el N° de nota de crédito se pliega, pero no se fue", () => {
     const { onSubmit } = pintar();
     fireEvent.click(screen.getByRole("button", { name: "Agregar el N° de nota de crédito" }));
     fireEvent.change(screen.getByLabelText(/N° nota de crédito/), { target: { value: "4020000422" } });
-    fireEvent.click(screen.getByRole("button", { name: /Marcar como Pagado/i }));
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(MARCAR_COBRADO, "i") }));
     expect(onSubmit.mock.calls[0][0][0].nota_credito).toBe("4020000422");
   });
 
   it("sin abrirlo, el cobro se guarda con el número vacío (no se rompe nada)", () => {
     const { onSubmit } = pintar();
-    fireEvent.click(screen.getByRole("button", { name: /Marcar como Pagado/i }));
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(MARCAR_COBRADO, "i") }));
     expect(onSubmit.mock.calls[0][0][0]).toEqual({ monto: RECLAMADO, nota_credito: "", fecha: expect.any(String) });
   });
 });
@@ -115,15 +116,15 @@ describe("⚠️ CONTROL: lo demás de la ventana no se tocó", () => {
 
   it("el comprobante sigue siendo obligatorio cuando el reclamo no lo tiene", () => {
     const { onSubmit } = pintar({ requireComprobante: true });
-    fireEvent.click(screen.getByRole("button", { name: /Marcar como Pagado/i }));
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(MARCAR_COBRADO, "i") }));
     expect(onSubmit).not.toHaveBeenCalled();
-    expect(document.body.textContent).toContain("obligatorio para marcar Pagado");
+    expect(document.body.textContent).toContain("obligatorio para marcar cobrado");
   });
 
   it("un monto borrado a mano se sigue rechazando", () => {
     const { onSubmit } = pintar();
     fireEvent.change(campoMonto(), { target: { value: "" } });
-    fireEvent.click(screen.getByRole("button", { name: /Marcar como Pagado/i }));
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(MARCAR_COBRADO, "i") }));
     expect(onSubmit).not.toHaveBeenCalled();
     expect(document.body.textContent).toContain("monto recuperado mayor a 0");
   });

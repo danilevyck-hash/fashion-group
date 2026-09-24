@@ -388,7 +388,7 @@ describe("🔴 barridos: lo que no puede volver", () => {
     expect(DETALLE).toContain('data-medir="reclamo-cabecera"');
     expect(DETALLE).toContain('data-medir="reclamo-totales"');
     expect(DETALLE.indexOf('data-medir="reclamo-totales"')).toBeGreaterThan(DETALLE.indexOf('data-vista="tabla"'));
-    expect(DETALLE).toContain("Marcar como pagado");
+    expect(DETALLE).toContain("MARCAR_COBRADO");
     expect(DETALLE).not.toContain("<StatusBadge");
     expect(DETALLE).toContain("conGenero &&");
     expect(DETALLE).toContain("motivoEnPantalla(");

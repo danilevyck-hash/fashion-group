@@ -27,6 +27,7 @@ import SettlementModal, { SettlementInput } from "./components/SettlementModal";
 import { validateReclamoFull, validateReclamoNuevo } from "@/lib/reclamos/validate";
 import { facturasATexto, facturasDe } from "@/lib/reclamos/facturas";
 import { itemsAGuardar, type LineaFactura } from "@/lib/reclamos/lineas-factura";
+import { LISTO_COBRADO, NO_SE_PUDO_COBRAR } from "@/lib/reclamos/rotulos";
 
 // Clave de caché SWR del listado de Reclamos (Fase 3, mismo patrón que el piloto
 // CXC #115). La caché vive a nivel de la app (SWRProvider) y persiste entre
@@ -380,10 +381,10 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
         body: JSON.stringify({ settlements: rows, markPaid: true }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setToast(data?.error || "No se pudo marcar como Pagado."); setTimeout(() => setToast(null), 5000); return; }
+      if (!res.ok) { setToast(data?.error || NO_SE_PUDO_COBRAR); setTimeout(() => setToast(null), 5000); return; }
       setSettleOpen(false);
       await loadDetail(current.id); loadReclamos();
-      setToast("Listo, cobrado — reclamo Pagado"); setTimeout(() => setToast(null), 3000);
+      setToast(LISTO_COBRADO); setTimeout(() => setToast(null), 3000);
     } catch { setToast("Sin conexión. Verifica tu internet e intenta de nuevo."); setTimeout(() => setToast(null), 5000); }
     finally { setSettling(false); }
   }

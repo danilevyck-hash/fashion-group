@@ -18,6 +18,7 @@ import { FALTA_FECHA_FACTURA } from "@/lib/reclamos/orden";
 import { filaRepetida } from "@/lib/reclamos/lineas-factura";
 import { AIRE_ENTRE_COLUMNAS } from "@/lib/reclamos/tabla-renglones";
 import { motivoEnPantalla, notaEnPantalla, seDiceCreadoEl } from "@/lib/reclamos/texto";
+import { CHIP_COBRADO, MARCAR_COBRADO } from "@/lib/reclamos/rotulos";
 import EnviarProveedorModal from "./EnviarProveedorModal";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
@@ -315,7 +316,7 @@ export default function ReclamoDetail({
           <span className="text-xs text-gray-400 whitespace-nowrap shrink-0">Editando</span>
         ) : (
           <span className={`shrink-0 text-xs px-2.5 py-1 rounded-full border ${!pendiente ? "bg-green-50 text-green-700 border-green-200" : estaReclamado(current) ? "bg-gray-100 text-gray-600 border-gray-200" : "bg-red-50 text-red-600 border-red-100 font-medium"}`}>
-            {!pendiente ? "Pagado" : textoReclamado(current)}
+            {!pendiente ? CHIP_COBRADO : textoReclamado(current)}
           </span>
         )}
       </div>
@@ -345,7 +346,7 @@ export default function ReclamoDetail({
           {pendiente && (
             <button onClick={() => onChangeEstado("Pagado")} className="bg-black text-white px-5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all inline-flex items-center justify-center gap-2 min-h-[44px]">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-              Marcar como pagado
+              {MARCAR_COBRADO}
             </button>
           )}
           {pendiente && (

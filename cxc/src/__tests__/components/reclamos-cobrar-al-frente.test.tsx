@@ -9,7 +9,7 @@
  *    · correos al proveedor en TODA la historia ..... 9  (el último, hace 2 meses)
  *
  * O sea que el botón negro era el que casi nadie toca y lo de todos los días
- * estaba en la esquina. Se invierte: negro «Marcar como pagado», al lado
+ * estaba en la esquina. Se invierte: negro «Marcar como cobrado», al lado
  * «Correo» con borde. Ninguno se va, ninguno cambia lo que hace.
  *
  * ⚠️ LO QUE NO CAMBIA, Y ESTE CANDADO LO REPITE: en un reclamo COBRADO
@@ -32,6 +32,7 @@ import { ToastProvider } from "@/components/ToastSystem";
 import ReclamoDetail from "@/app/reclamos/components/ReclamoDetail";
 import { emptyItem } from "@/app/reclamos/components/constants";
 import type { Reclamo } from "@/app/reclamos/components/types";
+import { MARCAR_COBRADO } from "@/lib/reclamos/rotulos";
 
 const RAIZ = process.cwd();
 const almacen = () => {
@@ -71,10 +72,10 @@ function pintar(r: Reclamo = rec()) {
   return { onChangeEstado };
 }
 
-describe("🔴 en un reclamo POR COBRAR, el botón negro es «Marcar como pagado»", () => {
-  it("«Marcar como pagado» es el principal, y ya no está apartado a la derecha", () => {
+describe("🔴 en un reclamo POR COBRAR, el botón negro es «Marcar como cobrado»", () => {
+  it("«Marcar como cobrado» es el principal, y ya no está apartado a la derecha", () => {
     pintar();
-    const pagar = screen.getByRole("button", { name: /Marcar como pagado/ });
+    const pagar = screen.getByRole("button", { name: new RegExp(MARCAR_COBRADO) });
     expect(pagar.className).toContain("bg-black");
     expect(pagar.className).toContain("text-white");
     expect(pagar.className).not.toContain("ml-auto");
@@ -87,9 +88,9 @@ describe("🔴 en un reclamo POR COBRAR, el botón negro es «Marcar como pagado
     expect(correo.className).not.toContain("bg-black");
   });
 
-  it("los dos están en la MISMA fila, y el pagado va primero", () => {
+  it("los dos están en la MISMA fila, y el cobrado va primero", () => {
     pintar();
-    const pagar = screen.getByRole("button", { name: /Marcar como pagado/ });
+    const pagar = screen.getByRole("button", { name: new RegExp(MARCAR_COBRADO) });
     const correo = screen.getByRole("button", { name: "Correo" });
     expect(pagar.parentElement).toBe(correo.parentElement);
     // `compareDocumentPosition` = 4 → `correo` viene DESPUÉS de `pagar`.
@@ -98,7 +99,7 @@ describe("🔴 en un reclamo POR COBRAR, el botón negro es «Marcar como pagado
 
   it("y sigue haciendo lo mismo: abre el cobro, no cambia el estado a la brava", () => {
     const { onChangeEstado } = pintar();
-    fireEvent.click(screen.getByRole("button", { name: /Marcar como pagado/ }));
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(MARCAR_COBRADO) }));
     expect(onChangeEstado).toHaveBeenCalledWith("Pagado");
     expect(onChangeEstado).toHaveBeenCalledTimes(1);
   });
@@ -118,9 +119,9 @@ describe("⚠️ en un reclamo COBRADO no cambió NADA", () => {
     expect(screen.queryByRole("button", { name: "Correo" })).toBeNull();
   });
 
-  it("tampoco «Marcar como pagado»: ya está pagado", () => {
+  it("tampoco «Marcar como cobrado»: ya está cobrado", () => {
     pintar(cobrado);
-    expect(screen.queryByRole("button", { name: /Marcar como pagado/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: new RegExp(MARCAR_COBRADO) })).toBeNull();
   });
 
   it("y «Volver a por cobrar» sigue en su esquina, por si fue un error", () => {

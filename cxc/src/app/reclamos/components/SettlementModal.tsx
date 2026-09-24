@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { validateComprobanteFile } from "./fotoUpload";
+import { COMPROBANTE_OBLIGATORIO, FALTA_COMPROBANTE, MARCAR_COBRADO } from "@/lib/reclamos/rotulos";
 
 export interface SettlementInput {
   monto: number;
@@ -65,7 +66,7 @@ export default function SettlementModal({
   reclamado,
   submitting,
   title = "Registrar recuperación",
-  confirmLabel = "Marcar como Pagado",
+  confirmLabel = MARCAR_COBRADO,
   requireComprobante = false,
   onClose,
   onSubmit,
@@ -121,7 +122,7 @@ export default function SettlementModal({
 
   const confirm = () => {
     if (requireComprobante && !file) {
-      setError("Adjunta el comprobante (foto o PDF) — es obligatorio para marcar Pagado.");
+      setError(FALTA_COMPROBANTE);
       return;
     }
     for (const r of rows) {
@@ -163,7 +164,7 @@ export default function SettlementModal({
             <div className="text-xs uppercase tracking-[0.05em] text-amber-700 font-medium">
               Comprobante de pago *
             </div>
-            <p className="mt-0.5 text-xs text-amber-800">Foto o PDF — obligatorio para marcar Pagado.</p>
+            <p className="mt-0.5 text-xs text-amber-800">{COMPROBANTE_OBLIGATORIO}</p>
             <input
               ref={fileRef}
               type="file"

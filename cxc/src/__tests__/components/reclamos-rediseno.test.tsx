@@ -25,6 +25,7 @@ import { hoyPanama } from "@/lib/fecha-panama";
 import { diasDesde } from "@/lib/reclamos/dias";
 import { FALTA_PDF } from "@/lib/reclamos/validate";
 import type { Reclamo } from "@/app/reclamos/components/types";
+import { CHIP_COBRADO, MARCAR_COBRADO } from "@/lib/reclamos/rotulos";
 
 // jsdom en este Node no trae localStorage: el AppHeader lo lee en un efecto
 // (barra lateral plegada). Un almacén de mentira, como en comisiones-flecha.
@@ -286,17 +287,17 @@ describe("la pantalla del reclamo (REC-2026-0026)", () => {
     expect(screen.queryByText("Creado")).toBeNull();
   });
   // 🔄 CAMBIÓ DE DIRECCIÓN EL 20-sep-2026, con nota: el botón negro pasó a ser
-  // «Marcar como pagado» y «Correo» quedó al lado con borde (9 cobros en 30
+  // «Marcar como cobrado» y «Correo» quedó al lado con borde (9 cobros en 30
   // días contra 9 correos en toda la historia). Lo que este caso sigue
   // vigilando —que la fila sea UNA, que estén los tres botones y que «En
   // proceso» no vuelva— no cambió. El porqué está en
   // `reclamos-cobrar-al-frente.test.tsx`.
-  it("UNA fila: Marcar como pagado (principal) · Correo · Descargar · ···", () => {
+  it("UNA fila: Marcar como cobrado (principal) · Correo · Descargar · ···", () => {
     const { onChangeEstado } = pintar();
     expect(screen.getByRole("button", { name: "Correo" })).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Descargar/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Más opciones del reclamo/ })).toBeTruthy();
-    const pagar = screen.getByRole("button", { name: /Marcar como pagado/ });
+    const pagar = screen.getByRole("button", { name: new RegExp(MARCAR_COBRADO) });
     expect(pagar.className).toContain("bg-black");
     fireEvent.click(pagar);
     expect(onChangeEstado).toHaveBeenCalledWith("Pagado");
@@ -336,10 +337,10 @@ describe("la pantalla del reclamo (REC-2026-0026)", () => {
     expect(onRemoveSettlement).not.toHaveBeenCalled();
     expect(screen.getByText("¿Quitar esta nota de crédito?")).toBeTruthy();
   });
-  it("cuando está pagado, el chip dice «Pagado» y queda «Volver a por cobrar»", () => {
+  it("cuando está cobrado, el chip dice «Cobrado» y queda «Volver a por cobrar»", () => {
     pintar({ current: { ...rec, estado: "Pagado" } });
-    expect(screen.getByText("Pagado")).toBeTruthy();
+    expect(screen.getByText(CHIP_COBRADO)).toBeTruthy();
     expect(screen.getByRole("button", { name: /Volver a por cobrar/ })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /Marcar como pagado/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: new RegExp(MARCAR_COBRADO) })).toBeNull();
   });
 });
