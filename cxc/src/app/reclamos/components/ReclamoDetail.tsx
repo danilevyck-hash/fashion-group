@@ -9,7 +9,7 @@ import { Reclamo, RItem, Contacto } from "./types";
 import { GENEROS, generoLabel, DEFAULT_MOTIVOS, emptyItem, calcSub, empresaDesdeIA, reclamoTaxes, esActiveShoes, impLabel, itbmsLabel, esPendiente } from "./constants";
 import { empresasParaElegir } from "@/lib/reclamos/empresas-con-reclamos";
 import FotoBadge from "./FotoBadge";
-import FacturaPdfUploader, { type FacturaIAData } from "./FacturaPdfUploader";
+import FacturaPdfUploader, { esPdf, type FacturaIAData } from "./FacturaPdfUploader";
 import FacturasChips from "./FacturasChips";
 import { facturasEnPantalla } from "@/lib/reclamos/facturas";
 import { diasDesde } from "@/lib/reclamos/dias";
@@ -129,7 +129,11 @@ export default function ReclamoDetail({
       const href = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = href;
-      a.download = `${current.nro_reclamo}-factura.pdf`;
+      // La factura puede ser un PDF o una FOTO (24-sep-2026): el archivo se
+      // baja con la extensión que de verdad tiene, no con «.pdf» siempre.
+      const ruta = current.factura_pdf_path || url;
+      const ext = esPdf(ruta) ? "pdf" : (ruta.toLowerCase().split("?")[0].split(".").pop() || "jpg");
+      a.download = `${current.nro_reclamo}-factura.${ext}`;
       a.click();
       URL.revokeObjectURL(href);
       showToast("Factura descargada");
