@@ -420,6 +420,9 @@ describe("G · las pantallas alcanzadas, por nombre", () => {
     "src/app/clientes/[codigo]/ClienteDetail.tsx",
     "src/app/comisiones/ComisionesPageClient.tsx",
     "src/app/cxc/page.tsx",
+    // La página de un cliente dentro de Cuentas por Cobrar (24-sep-2026, el
+    // celular: «Ver los documentos ›» de la hoja «Cobrar» lleva acá).
+    "src/app/cxc/cliente/[codigo]/ClienteCxc.tsx",
     "src/app/gastos-contabilidad/GastosContabilidadClient.tsx",
     "src/app/guias/[id]/imprimir/page.tsx",
     "src/app/guias/[id]/page.tsx",
@@ -454,10 +457,10 @@ describe("G · las pantallas alcanzadas, por nombre", () => {
     expect(encontrados).toEqual([...ALCANZADAS_POR_EL_GANCHO, ...CON_CHEQUEO_PROPIO_Y_SEMILLA, ...PINTA_EN_EL_NAVEGADOR].sort());
   });
 
-  it("las 30 pasan por `useAuth`, así que el arreglo del gancho les llega", () => {
+  it("las 31 pasan por `useAuth`, así que el arreglo del gancho les llega", () => {
     for (const p of ALCANZADAS_POR_EL_GANCHO) {
       expect(leer(p), p).toContain('from "@/lib/hooks/useAuth"');
     }
-    expect(ALCANZADAS_POR_EL_GANCHO).toHaveLength(30);
+    expect(ALCANZADAS_POR_EL_GANCHO).toHaveLength(31);
   });
 });
