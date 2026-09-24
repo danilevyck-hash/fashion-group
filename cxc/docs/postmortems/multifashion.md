@@ -570,6 +570,62 @@ Cada una se rompió, se vio el rojo y se restauró:
 - ⚠️ **El corte de la tarjeta es `hoyPanama()`, el del Telegram es el último día sincronizado.** Si el sync del día todavía no corrió, la tarjeta cuenta hoy como transcurrido con $0 vendido: proyecta **por lo bajo**, nunca de más. Es la regla de siempre («el día de hoy cuenta completo») y no se tocó.
 - ⚠️ La tarjeta y el Telegram pueden diferir **un día** por eso mismo; el signo (arriba/abajo de la meta) no cambia salvo que estén clavados en cero.
 
+## El celular — «un número y cuatro renglones» (24-sep-2026)
+
+> Mockup aprobado por Daniel: `cel-multifashion.html`, secciones **1 (Al abrir)** y **2 (Vendedoras)**.
+> Auditoría con medidas: iPhone 390×844, sesión de admin, solo lectura, 1:30 a. m. de Panamá del 24-sep-2026.
+
+### Lo que estorbaba, medido
+
+| # | Qué | Medida |
+|---|-----|--------|
+| 1 | Título, desplegable de período, banda «HOY» y cuatro pestañas **antes del primer número** | **308 px de 844 = 36 % de la pantalla** |
+| 2 | La banda «HOY» decía «jueves, 24 sept · sin ventas todavía» **también mirando agosto** | 94 px, en las cuatro pestañas |
+| 3 | El desplegable de período era una lista de cinco años de meses | **57 · 65 · 58 · 65 opciones** en una ventana de 506 px |
+| 4 | Vendedoras, la pestaña más cargada | **48 bloques de texto** en la primera pantalla, montos en 16 px |
+| 5 | Ninguna pestaña abría con un número grande | Clientes: **0 montos ≥ 20 px** |
+
+Lo que **no** estorbaba y por eso no se tocó: arrastre horizontal de la página = **0 px en las cuatro pestañas**; blancos tocables por debajo de 44 px = **0**.
+
+### La regla
+
+1. **Al abrir, el mes es el número.** Título «Septiembre» (mes en curso de Panamá), subtítulo «23 días · hoy sin ventas todavía» — 🔴 **lo de hoy SOLO en el mes de hoy**, que es el defecto 2 —, el número grande `$32,946` con «▲ 29 % contra septiembre 2025 · cierra en $47,117», el día por día en barras chicas sin ejes y la línea de hábitos que ya existía.
+2. **«‹ Agosto» cambia de mes; «Octubre ›» solo si el mes elegido no es el actual.** 🔴 **Nunca hacia el futuro** (`mesSiguiente` devuelve `null` en el mes de corte). El desplegable de 57 meses se va del celular y se queda en la computadora. `?mfPeriodo=` y el corte de Panamá no cambian.
+3. **Cuatro renglones** — Año · Vendedoras · Productos · Clientes —, cada uno con su número y su pantalla. Productos y Clientes abren **las pestañas actuales TAL CUAL** (Daniel las dejó para después). El renglón «Año» abre la tarjeta de año y el acumulado que ya existían.
+4. **Vendedoras**: una fila por vendedora (nombre · «tienda $11,420 · redes $136 · 263 tiquetes» · monto y cambio a la derecha); la comisión y el tiquete promedio salen **al tocar el nombre**; la meta es **un renglón** que abre la tarjeta de metas de siempre.
+5. **Nada se desliza de lado** y nada queda bajo 14 px.
+6. 🔴 **Ningún número se mueve**: el redondeo es `fmtMoneyCompact` (el que ya usaba el módulo) y el umbral de color el ±5 % de `formatDeltaRatio`. El candado compara, con el MISMO fixture, el total del mes, el % contra el año pasado, «cierra en», el año y cada vendedora entre la vista de antes y la nueva — **las dos se dibujan en el mismo árbol**, la de computadora en `hidden sm:block` y la del celular en `sm:hidden`.
+
+### Dónde vive
+
+- **`src/lib/multifashion/celular.ts`** — módulo PURO: el interruptor `MULTIFASHION_CELULAR`, los montos, el cambio corto, la navegación de mes, el encabezado, los cuatro renglones y las piezas de Vendedoras.
+- **`src/lib/multifashion/venta-hoy-cliente.ts`** — `useVentaHoy`: 🔴 **UNA sola petición** de `/api/multifashion/venta-hoy` para la banda de computadora y la línea del celular (misma clave de SWR).
+- **`src/components/multifashion/celular/InicioCelular.tsx`** y **`…/VendedorasCelular.tsx`** — las dos pantallas nuevas.
+- Enganchadas **adentro de los componentes que ya tienen los datos** (`MultifashionResumenView`, `VendedorasSubtab`): así no hay una segunda petición del mismo mes y las dos vistas no se pueden contradecir.
+- `TarjetaAnio` se **extrajo** de `ResumenMinimo.tsx` sin cambiar una clase: la dibujan el Resumen de computadora y la pantalla «Año» del celular.
+
+### Candado y mutaciones
+
+`src/__tests__/components/multifashion-celular.test.tsx` — 30 pruebas con el fixture real de septiembre ($32.945,68 · ▲+29,3 % · cierra en $47.117,38 · año $391.231,84 ▲+16,0 % · cuatro vendedoras por $32.649,26 · 1.237 piezas · 99 frecuentes · 723 no vuelven).
+
+Nueve mutaciones probadas a mano, **nueve cazadas**:
+
+1. `MULTIFASHION_CELULAR = false` → 🔴
+2. `mesSiguiente` deja navegar al futuro → 🔴
+3. Lo de HOY también en un mes cerrado → 🔴
+4. Los cuatro renglones en otro orden → 🔴
+5. El monto del celular con centavos → 🔴
+6. El umbral de color deja de ser ±5 % → 🔴
+7. La fila de la vendedora pierde «tienda · redes» → 🔴
+8. Las pestañas siguen dibujándose en el celular → 🔴
+9. La tarjeta de metas ya no se pliega en el celular → 🔴
+
+### Pendientes y dudas para Daniel
+
+- ⚠️ **Productos y Clientes quedan como están hoy** en el celular: se abren desde su renglón con un «‹ Septiembre» arriba, pero adentro no cambió nada (la tabla que se desliza y «Ver los 723» siguen igual). Daniel las dejó para después.
+- ⚠️ **El renglón de Vendedoras, el de Productos y el de Clientes piden su dato al abrir** (tres peticiones más, en paralelo y con la MISMA clave de SWR que su pestaña, así que tocar el renglón abre una pantalla ya cargada). Mientras no llegan, el renglón se dibuja con su nombre y **sin número** — nunca un `$0` inventado.
+- ⚠️ El corte `sm` (640 px) es el de la casa; un iPad sigue viendo la pantalla de computadora.
+
 ## Lo que decía CLAUDE.md hasta el 14-sep-2026 (movido acá, verbatim)
 
 > El 14-sep-2026 CLAUDE.md pasaba de 333 mil caracteres (el tope del harness es 150 mil) y las instrucciones se cortaban a la mitad. Se dejó ahí un resumen de las reglas vigentes y el texto completo —mediciones, citas de Daniel, candados y mutaciones— se movió acá sin cambiar una palabra.
