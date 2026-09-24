@@ -10,6 +10,7 @@ import type { ContadoresDelHub, ContadoresMarca } from "@/lib/catalogo/contadore
 import { textoPulso, type PulsoDelHub, type PulsoMarca } from "@/lib/catalogo/pulso-pedidos";
 import { CATALOGO_ADMIN_ROLES, COMPROBANTES_ROLES, catalogoRoles } from "@/lib/catalogo/roles";
 import { URL_CATALOGOS_PUBLICOS } from "@/lib/catalogo/url-catalogos-publicos";
+import { CATALOGO_ORDEN_CELULAR, clasesBotonesDeLaMarca } from "@/lib/catalogo/orden-celular";
 
 // Catálogos en UNA pantalla: una tarjeta por marca con sus acciones adentro
 // (Ver catálogo · Comprobantes · Administrar · Copiar enlace) + contadores en
@@ -212,9 +213,18 @@ export default function CatalogosMarcasPage() {
             ruido visual no es motivo para dejar un documento sin h1. */}
         <h1 className="sr-only">Catálogos</h1>
 
+        {/* 🔴 EN EL CELULAR ES UNA LÍNEA (24-sep-2026). La caja medía **119 px**
+            (del píxel 86 al 205) para un título, una dirección cortada y un
+            botón debajo; en una sola línea son **68 px** y REEBOK empieza a
+            verse sin deslizar. El título «Link para clientes · los 4 catálogos»
+            se va del celular porque la dirección ya lo dice — en la computadora
+            se queda tal cual. ⚠️ El botón sigue diciendo «Copiar link» en las
+            dos: el rótulo no se toca, lo que se va es el renglón del título. */}
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3">
           <div className="min-w-0">
-            <div className="text-sm font-semibold text-gray-900">Link para clientes · los 4 catálogos</div>
+            <div className={`text-sm font-semibold text-gray-900 ${CATALOGO_ORDEN_CELULAR ? "hidden sm:block" : ""}`}>
+              Link para clientes · los 4 catálogos
+            </div>
             <div className="truncate font-mono text-xs text-gray-500" data-testid="link-catalogos-todos">{URL_CATALOGOS_PUBLICOS}</div>
           </div>
           <button
@@ -283,8 +293,17 @@ export default function CatalogosMarcasPage() {
                       El `flex-wrap` que ya estaba los baja de renglón en vez de
                       comprimir a los otros, y la tarjeta CRECE HACIA ABAJO. Vale
                       igual con el cuarto botón («Copiar enlace») y con la
-                      grilla de 4 columnas de `xl`. */}
-                  <div className="mt-5 flex flex-wrap gap-2.5">
+                      grilla de 4 columnas de `xl`.
+
+                      🔴 EN EL CELULAR SON DOS FILAS PAREJAS DE DOS (24-sep-2026).
+                      Medido a 390 px: los cuatro anchos eran **133 · 140 · 127
+                      · 105 px** y la fila de abajo terminaba en el píxel 292
+                      contra el 332 de la de arriba — **40 px** de borde mocho.
+                      Hasta `sm` van en rejilla de dos columnas iguales; de `sm`
+                      para arriba manda el `flex-wrap` de siempre. La tarjeta
+                      mide lo mismo (287 → 285 px): los cuatro botones YA caían
+                      en dos filas, lo que se arregla es el borde. */}
+                  <div className={clasesBotonesDeLaMarca()}>
                     <Link
                       href={b.catalogoHref}
                       className={`inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold transition active:scale-[0.97] ${hub.primaryBtn}`}
