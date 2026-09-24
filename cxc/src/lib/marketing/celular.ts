@@ -366,6 +366,54 @@ export const ACCEPT_DE_LA_CAMARA = "image/*";
 export const LADO_MAYOR_DE_LA_FOTO = 1600;
 export const CALIDAD_DE_LA_FOTO = 0.8;
 
+/** Los seis campos que el lector devuelve. Es la forma de la ruta, no una nueva. */
+export interface LecturaDeLaFactura {
+  numero_factura: string | null;
+  fecha_factura: string | null;
+  proveedor: string | null;
+  concepto: string | null;
+  subtotal: number | null;
+  itbms_pct: 0 | 7 | null;
+}
+
+/**
+ * 🔴 LO QUE LEYÓ LA FOTO ENTRA POR LA PUERTA QUE YA EXISTÍA: el `initial` del
+ * formulario de la factura. No hay un segundo camino ni un campo nuevo — los
+ * seis valores se revisan y se corrigen como siempre antes de guardar.
+ *
+ * 🔑 El ITBMS se guarda en DÓLARES, que es como lo pide el formulario; el
+ * lector devuelve el PORCENTAJE (0 o 7). La cuenta es la misma que hace hoy la
+ * pantalla al elegir el porcentaje: `subtotal × pct ÷ 100`.
+ */
+export function initialDeLaLectura(l: LecturaDeLaFactura | null): {
+  numero_factura?: string;
+  fecha_factura?: string;
+  proveedor?: string;
+  concepto?: string;
+  subtotal?: number;
+  itbms?: number;
+} | undefined {
+  if (!l) return undefined;
+  const out: {
+    numero_factura?: string;
+    fecha_factura?: string;
+    proveedor?: string;
+    concepto?: string;
+    subtotal?: number;
+    itbms?: number;
+  } = {};
+  if (l.numero_factura) out.numero_factura = l.numero_factura;
+  if (l.fecha_factura) out.fecha_factura = l.fecha_factura;
+  if (l.proveedor) out.proveedor = l.proveedor;
+  if (l.concepto) out.concepto = l.concepto;
+  if (typeof l.subtotal === "number" && Number.isFinite(l.subtotal)) {
+    out.subtotal = l.subtotal;
+    if (l.itbms_pct === 7) out.itbms = Math.round(l.subtotal * 7) / 100;
+    else if (l.itbms_pct === 0) out.itbms = 0;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 /** Lo que dice el botón apagado cuando todavía falta algo (11a · 12a). */
 export function textoDelBotonCelular(falta: string | null, siListo: string): string {
   return falta ? falta : siListo;

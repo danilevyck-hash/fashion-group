@@ -92,9 +92,26 @@ export function RotuloDeGrupo({ children }: { children: ReactNode }) {
   );
 }
 
-/** La tarjeta blanca que agrupa filas. */
-export function GrupoCelular({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <ul className={`mx-4 mt-3 overflow-hidden rounded-2xl bg-white ${className}`}>{children}</ul>;
+/**
+ * La tarjeta blanca que agrupa filas.
+ *
+ * `sinMargen` la deja pegada a los bordes de su contenedor: se usa cuando ya
+ * vive dentro de un modal con su propio aire (la puerta «＋ Gasto»).
+ */
+export function GrupoCelular({
+  children,
+  className = "",
+  sinMargen = false,
+}: {
+  children: ReactNode;
+  className?: string;
+  sinMargen?: boolean;
+}) {
+  return (
+    <ul className={`${sinMargen ? "" : "mx-4"} mt-3 overflow-hidden rounded-2xl bg-white ${className}`}>
+      {children}
+    </ul>
+  );
 }
 
 /**

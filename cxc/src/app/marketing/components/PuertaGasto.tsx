@@ -44,6 +44,18 @@ import { FacturaForm } from "@/components/marketing";
 import EntregaForm from "@/components/marketing/EntregaForm";
 import RegistrarPagoModal from "./RegistrarPagoModal";
 import BloqueDatosDelGasto, { type TiendaElegida } from "./BloqueDatosDelGasto";
+import PuertasDeLaFacturaCelular from "./celular/PuertasDeLaFacturaCelular";
+import { BotonAncho } from "./celular/PiezasCelular";
+import { useEsCelular } from "./celular/useEsCelular";
+import {
+  ACCEPT_DE_LA_CAMARA,
+  CALIDAD_DE_LA_FOTO,
+  CAPTURE_DE_LA_CAMARA,
+  LADO_MAYOR_DE_LA_FOTO,
+  initialDeLaLectura,
+  type LecturaDeLaFactura,
+} from "@/lib/marketing/celular";
+import { compressImage, validateFotoFile } from "@/app/reclamos/components/fotoUpload";
 import {
   adjuntarPdfDeFactura,
   pedirUploadUrl,
@@ -147,6 +159,16 @@ export default function PuertaGasto({
   const [pdfPuerta, setPdfPuerta] = useState<File | null>(null);
   const [pdfPathPreSubido, setPdfPathPreSubido] = useState<string | null>(null);
   const fotoRef = useRef<HTMLInputElement>(null);
+  // ── 🔴 4c · EL ESCANEO DESDE EL TELÉFONO (24-sep-2026) ────────────────────
+  // Daniel: *«que se pueda meter un gasto por el teléfono así se escanea»*.
+  // El lector YA EXISTÍA (`/api/marketing/ia/leer-factura`, seis campos): lo
+  // único que faltaba era abrirle la cámara y enseñarle a leer fotos.
+  // 🔴 Lo que se guarda NO CAMBIA: la foto se cuelga por el MISMO camino de
+  // siempre (`adjuntarFoto` → `foto_factura`) y el POST de la factura es el de
+  // siempre. Lo leído entra por el `initial` del formulario.
+  const camaraRef = useRef<HTMLInputElement>(null);
+  const [lectura, setLectura] = useState<LecturaDeLaFactura | null>(null);
+  const [leyendo, setLeyendo] = useState(false);
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -154,6 +176,9 @@ export default function PuertaGasto({
   const cerrar = useCallback(() => onClose(), [onClose]);
   const tocado = tipo !== null || !!foto || !!pdfPuerta;
   const { panelRef, backdrop } = useFormModalDismiss(mounted, cerrar, !tocado);
+
+  // 🔑 El celular cambia CÓMO se pregunta, nunca QUÉ se guarda.
+  const enCelular = useEsCelular();
 
   const marcasOrdenadas = useMemo(() => ordenarMarcas(marcas), [marcas]);
   const marcaDeImpulsadora = impulsadoraSel?.marcas[0]?.marca ?? null;
@@ -279,6 +304,53 @@ export default function PuertaGasto({
           "warning",
         );
         return null;
+      }
+    },
+    [toast],
+  );
+
+  /**
+   * 🔴 LA FOTO SE ACHICA EN EL NAVEGADOR ANTES DE VIAJAR: 1600 px de lado
+   * mayor, JPEG 0,8 — los MISMOS números de Reclamos y Mobiliario
+   * (`compressImage`). El cuerpo de una función de Vercel se topa en ~4,5 MB y
+   * una foto de iPhone pesa 3-12 MB.
+   *
+   * 🔴 Después se sube «sin dueño» para que la IA la lea (el MISMO camino del
+   * PDF) y lo leído se aplica al formulario por su `initial`. La foto queda en
+   * `foto`, así que al guardar se cuelga como `foto_factura` por el camino de
+   * siempre: NADA de lo que se guarda cambia.
+   */
+  const escanearFactura = useCallback(
+    async (original: File) => {
+      const malo = validateFotoFile(original);
+      if (malo) {
+        toast(malo, "error");
+        return;
+      }
+      setLeyendo(true);
+      try {
+        const chica = await compressImage(original, {
+          maxDimension: LADO_MAYOR_DE_LA_FOTO,
+          quality: CALIDAD_DE_LA_FOTO,
+        });
+        setFoto(chica);
+        setPdfPuerta(null);
+        setPdfPathPreSubido(null);
+        const { uploadUrl, path } = await pedirUploadUrl({ file: chica, paraLeerConIA: true });
+        await subirArchivoAStorage(uploadUrl, chica);
+        const res = await fetch("/api/marketing/ia/leer-factura", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path }),
+        });
+        if (!res.ok) throw new Error();
+        setLectura((await res.json()) as LecturaDeLaFactura);
+        toast("Datos leídos de la foto. Revísalos.", "success");
+      } catch {
+        // Falla ABIERTA: la foto queda adjunta igual y los campos se teclean.
+        toast("No se pudo leer la foto. Llena los campos a mano — la foto se sube al guardar.", "warning");
+      } finally {
+        setLeyendo(false);
       }
     },
     [toast],
@@ -494,9 +566,46 @@ export default function PuertaGasto({
                 tiendaInicial={tiendaInicial}
               />
 
+              {/* 🔴 4c — EN EL CELULAR, TRES PUERTAS PARA LA FACTURA
+                  (24-sep-2026): escanear con la cámara, elegir el PDF o
+                  escribirlo a mano. En la computadora, el campo de siempre. */}
+              {enCelular && tipo === "factura" ? (
+                <div>
+                  <div className="text-sm font-medium text-gray-700">La factura</div>
+                  <input
+                    ref={camaraRef}
+                    type="file"
+                    accept={ACCEPT_DE_LA_CAMARA}
+                    capture={CAPTURE_DE_LA_CAMARA}
+                    data-testid="escanear-la-factura"
+                    className="hidden"
+                    onChange={(e) => {
+                      const archivo = e.target.files?.[0] ?? null;
+                      e.target.value = "";
+                      if (archivo) void escanearFactura(archivo);
+                    }}
+                  />
+                  <PuertasDeLaFacturaCelular
+                    leyendo={leyendo}
+                    archivo={(foto ?? pdfPuerta)?.name ?? null}
+                    onQuitar={() => {
+                      setFoto(null);
+                      setPdfPuerta(null);
+                      setPdfPathPreSubido(null);
+                      setLectura(null);
+                    }}
+                    onElegir={(puerta) => {
+                      if (puerta === "escanear") camaraRef.current?.click();
+                      else if (puerta === "pdf") fotoRef.current?.click();
+                      else if (puedeContinuar) setPaso("form");
+                    }}
+                  />
+                </div>
+              ) : null}
+
               {/* FOTO O FACTURA — opcional. En Mueble solo foto: la foto va a
                   la tienda; un PDF de factura ahí no tendría factura. */}
-              <div>
+              <div className={enCelular && tipo === "factura" ? "hidden" : undefined}>
                   <div className="text-sm font-medium text-gray-700 mb-1">
                     {tipo === "mueble" ? "Foto del mueble" : rotuloDeLaPuerta()}{" "}
                     <span className="font-normal text-gray-400">(opcional)</span>
@@ -540,6 +649,30 @@ export default function PuertaGasto({
               </div>
             </div>
 
+            {/* 🔴 11a · 12a — EN EL CELULAR, UN BOTÓN ANCHO QUE DICE QUÉ FALTA
+                EN SU PROPIO TEXTO, al alcance del pulgar. 🩸 En la pantalla de
+                hoy el aviso queda abajo a la izquierda, lejos del campo que lo
+                causa. La regla de qué falta NO cambió: es la misma
+                `queFaltaEnLaPuerta`. */}
+            {enCelular ? (
+              <div className="border-t border-gray-100 px-4 py-4 space-y-3">
+                {textoFalta && (
+                  <span className="sr-only" data-testid="falta-para-continuar">
+                    {textoFalta}
+                  </span>
+                )}
+                <BotonAncho onClick={() => puedeContinuar && setPaso("form")} disabled={!puedeContinuar}>
+                  {textoFalta || "Continuar"}
+                </BotonAncho>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-full min-h-[44px] text-center text-[17px] text-gray-600"
+                >
+                  Cancelar
+                </button>
+              </div>
+            ) : (
             <div className="border-t border-gray-100 px-5 py-4 flex items-center justify-end gap-3">
               {textoFalta && (
                 <span className="text-xs text-amber-700 mr-auto" data-testid="falta-para-continuar">
@@ -562,6 +695,7 @@ export default function PuertaGasto({
                 Continuar
               </button>
             </div>
+            )}
           </>
         )}
 
@@ -579,6 +713,7 @@ export default function PuertaGasto({
             <FacturaForm
               proyecto={{ id: "", marcas: [] }}
               marcasCatalogo={marcasOrdenadas}
+              {...(initialDeLaLectura(lectura) ? { initial: initialDeLaLectura(lectura) } : {})}
               initialMarcas={marcaEfectiva ? [{ marcaId: marcaEfectiva.id, porcentaje: 100 }] : undefined}
               marcaFija={marcaEfectiva}
               onSubmit={guardarFactura}

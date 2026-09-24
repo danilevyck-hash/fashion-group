@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
-import { leerPdfConAnthropic } from "@/lib/ia/anthropic";
+import { leerPdfConAnthropic, esTipoQueLee, tipoPorNombre } from "@/lib/ia/anthropic";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -16,6 +16,13 @@ const MAX_TOKENS = 1024;
 // llamada del sistema: es el que avisa por 🔧 SISTEMA cuando la llave no sirve,
 // se acabó el crédito o la cuenta está topada (11-sep-2026). El prompt, el
 // modelo y el parser de esta ruta NO cambiaron.
+//
+// 🔴 TAMBIÉN LEE UNA FOTO (24-sep-2026, el escaneo del celular). Daniel: *«que
+// se pueda meter un gasto por el teléfono así se escanea»*. El lector ya
+// existía y devolvía los seis campos; lo único que le faltaba era aceptar un
+// JPEG. El tipo sale del NOMBRE del archivo guardado (`tipoPorNombre`) y, si el
+// bucket lo dice, de su `Content-Type`; sin extensión conocida, PDF — que es
+// como se comportó siempre. 🔴 El prompt no cambió ni una coma.
 
 interface Body {
   path?: string;
@@ -104,12 +111,17 @@ export async function POST(req: NextRequest) {
     }
     const arrayBuffer = await fileData.arrayBuffer();
     const base64 = Buffer.from(arrayBuffer).toString("base64");
+    // El tipo del bucket manda si es uno de los que el modelo lee; si no, el
+    // del nombre. Falla ABIERTA a PDF, el comportamiento de siempre.
+    const delBucket = (fileData as Blob).type ?? "";
+    const mediaType = esTipoQueLee(delBucket) ? delBucket : tipoPorNombre(body.path);
 
     const raw = await leerPdfConAnthropic({
       origen: "marketing",
       modelo: MODEL,
       maxTokens: MAX_TOKENS,
       pdfBase64: base64,
+      mediaType,
       prompt: PROMPT,
     });
     const extraido = parsearRespuesta(raw);
