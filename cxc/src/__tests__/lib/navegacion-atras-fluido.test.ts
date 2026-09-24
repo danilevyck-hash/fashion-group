@@ -134,7 +134,10 @@ describe("useUrlState conserva la convención push/replace", () => {
   const hook = leer("src/lib/hooks/useUrlState.ts");
 
   it("default replace (filtros/tabs no ensucian el historial) + push opcional (drill-down)", () => {
-    expect(hook).toContain('options?.history === "push"');
+    // 🔁 24-sep-2026: el modo lo decide `modoDeHistorial` por el aparato —en el
+    // celular una pestaña es una pantalla (push); en la computadora, replace—.
+    // Candado propio: `url-state-pestana-es-pantalla.test.tsx`.
+    expect(hook).toContain('modoDeHistorial(key, options?.history, aparatoDeQuienMira()) === "push"');
     expect(hook).toContain("router.push(url, { scroll: false })");
     expect(hook).toContain("router.replace(url, { scroll: false })");
   });

@@ -677,6 +677,7 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 
 - **Regla:** el stack del historial debe ser ESPEJO del breadcrumb (Inicio › Grupo › Módulo › Detalle). El Back del navegador solo deshace la última URL — no conoce la jerarquía, así que la jerarquía debe vivir en el historial.
 - **Drill-down a un nivel más profundo → `push`**; **filtro / tab / sort en el MISMO nivel → `replace`** (Back no debe ciclar por tabs ni filtros). `useUrlState(key, default, { history: "push" })` para params que representan un nivel; default `"replace"` para filtros/tabs.
+- 🔴 **EN EL CELULAR, UNA PESTAÑA ES UNA PANTALLA (24-sep-2026)**: `useUrlState` decide por el aparato (`aparatoDeQuienMira`, por el dedo): las claves `tab · subtab · vista · ver · modo · mfCel` (`CLAVES_DE_PANTALLA`) hacen `push` con el dedo y `replace` con el mouse (`history: "pantalla"`); filtros y búsquedas siguen en `replace`. Daniel: *«slide hacia atrás me mandaba al Inicio; pasa en todos lados»*. Candado `url-state-pestana-es-pantalla`.
 - **SPAs de un solo route**: el patrón de referencia es **Reclamos** (`src/app/reclamos/ReclamosClient.tsx`), que reconstruye el estado desde la URL. Los módulos con routes reales (Caja, Préstamos, Guías, Clientes detalle) ya son correctos y no requieren tratamiento especial.
 ## Teclado (lo único que corre)
 
