@@ -8,17 +8,19 @@
 // cuenta, y por eso «Reportes › Por tienda» pudo irse de la pantalla — esta
 // lista ES ese reporte.
 //
+// 🔴 EL PERÍODO MANDA (23-sep-2026): además de `filas` («Todos», la lista de
+// siempre) viajan `periodos` (los chips, salidos de los gastos) y
+// `filasPorPeriodo` (la misma lista, por chip). La pantalla elige; acá no se
+// suma nada nuevo (`periodo-manda.ts`).
+//
 // 🔴 Solo lee. Contabilidad entra (`ROLES_MARKETING`).
 // ============================================================================
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
-import { reportePorTiendaRediseno } from "@/lib/marketing/reportes";
+import { tiendasPorPeriodoRediseno } from "@/lib/marketing/reportes";
 import { ROLES_MARKETING } from "@/lib/marketing/roles";
-import {
-  MARKETING_TIENDAS_Y_MARCAS,
-  filasDeTiendas,
-} from "@/lib/marketing/tiendas-y-marcas";
+import { MARKETING_TIENDAS_Y_MARCAS } from "@/lib/marketing/tiendas-y-marcas";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -30,8 +32,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "No disponible" }, { status: 404 });
   }
   try {
-    const reporte = await reportePorTiendaRediseno();
-    const res = NextResponse.json({ filas: filasDeTiendas(reporte) });
+    const datos = await tiendasPorPeriodoRediseno();
+    const res = NextResponse.json(datos);
     res.headers.set("Cache-Control", "no-store");
     return res;
   } catch (err) {

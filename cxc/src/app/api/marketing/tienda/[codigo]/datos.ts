@@ -13,7 +13,13 @@
 // ============================================================================
 
 import { supabaseServer } from "@/lib/supabase-server";
-import { completarGasto, esColumnaAusente } from "@/lib/marketing/columnas-opcionales";
+import {
+  completarGasto,
+  completarPeriodo,
+  conRespaldoSinColumnas,
+  esColumnaAusente,
+} from "@/lib/marketing/columnas-opcionales";
+import type { PeriodoDelGasto } from "@/lib/marketing/periodo-manda";
 import { seReportaDe, tipoDeFila, TIENDA_GENERAL } from "@/lib/marketing/gasto";
 import {
   agruparPorMarca,
@@ -42,8 +48,11 @@ export interface DatosDeLaTienda {
   /**
    * 🔴 LA FICHA COMO UNA LISTA (23-sep-2026, Tiendas y Marcas): las mismas
    * filas de `grupos`, planas y con lo que la tabla nueva necesita (N°,
-   * subtotal, ITBMS, si tiene PDF…), y aparte las ANULADAS, que se ven
-   * plegadas y nunca suman. Solo con el interruptor; sin él, listas vacías.
+   * subtotal, ITBMS, si tiene PDF…). Solo con el interruptor; sin él, vacía.
+   *
+   * 🩸 `anuladas` SIEMPRE viaja vacía desde el 23-sep-2026 (el período manda):
+   * un gasto anulado no sale del servidor hacia ninguna pantalla. El campo se
+   * queda para no romper a quien lo lea.
    */
   filas: FilaDeTienda[];
   anuladas: FilaDeTienda[];
@@ -99,14 +108,13 @@ export async function leerDatosDeLaTienda(codigoCrudo: string): Promise<DatosDeL
     : rotuloDeLaTienda({ codigo, nombre: nombreDirectorio });
 
   // ── Las facturas y los pagos de impulsadora ────────────────────────────────
-  // Con el interruptor de Tiendas y Marcas vienen TAMBIÉN las anuladas (la
-  // ficha las pliega) y las columnas que la lista nueva dibuja. Sin él, las
-  // vivas de siempre y nada más.
+  // Con el interruptor de Tiendas y Marcas vienen las columnas que la lista
+  // nueva dibuja. 🔴 SOLO LAS VIVAS, con o sin interruptor (23-sep-2026, el
+  // período manda): lo anulado no sale del servidor hacia ninguna pantalla.
   const columnasFactura: string = MARKETING_TIENDAS_Y_MARCAS
     ? "id, numero_factura, fecha_factura, proveedor, concepto, total, subtotal, itbms, impulsadora_id, impulsadora_mes, periodo_desde, se_reporta, tienda_codigo, nota, anulado_en, anulado_motivo, proyecto_id"
     : "id, numero_factura, fecha_factura, proveedor, concepto, total, impulsadora_id, periodo_desde, se_reporta, tienda_codigo, nota";
-  const facturasQ = supabaseServer.from("mk_facturas").select(columnasFactura);
-  const facturasVivasQ = MARKETING_TIENDAS_Y_MARCAS ? facturasQ : facturasQ.is("anulado_en", null);
+  const facturasVivasQ = supabaseServer.from("mk_facturas").select(columnasFactura).is("anulado_en", null);
   const facturasRes = await (codigo
     ? facturasVivasQ.eq("tienda_codigo", codigo)
     : facturasVivasQ.is("tienda_codigo", null));
@@ -127,12 +135,10 @@ export async function leerDatosDeLaTienda(codigoCrudo: string): Promise<DatosDeL
     throw new Error(entregasRes.error.message);
   }
 
-  const todasLasFacturas = ((facturasRes.data ?? []) as unknown as Fila[]).map((f) => completarGasto(f));
-  const facturas = todasLasFacturas.filter((f) => !f.anulado_en);
-  const facturasAnuladas = todasLasFacturas.filter((f) => !!f.anulado_en);
+  const facturas = ((facturasRes.data ?? []) as unknown as Fila[]).map((f) => completarGasto(f));
   const entregas = (entregasRes.data ?? []).map((e) => completarGasto(e as Fila));
 
-  const idsFactura = todasLasFacturas.map((f) => String(f.id));
+  const idsFactura = facturas.map((f) => String(f.id));
   const idsEntrega = entregas.map((e) => String(e.id));
 
   // ── Las marcas, el sello del período y los nombres de las impulsadoras ─────
@@ -185,35 +191,77 @@ export async function leerDatosDeLaTienda(codigoCrudo: string): Promise<DatosDeL
     const fid = String(fm.factura_id);
     if (!marcaDeFactura.has(fid)) marcaDeFactura.set(fid, String(fm.marca_id));
   }
-  const periodoDeDoc = new Map<string, string>();
+  // Un documento puede llevar más de un sello (medido: la factura de Impreco
+  // de D-118 está sellada DOS veces a «mid 2026»). Se guardan todos.
+  const sellosDeDoc = new Map<string, string[]>();
   for (const s of (sellosRes.data ?? []) as Fila[]) {
-    periodoDeDoc.set(String(s.documento_id), String(s.periodo_id));
+    const doc = String(s.documento_id);
+    sellosDeDoc.set(doc, [...(sellosDeDoc.get(doc) ?? []), String(s.periodo_id)]);
   }
   const nombreImpulsadora = new Map<string, string>();
   for (const i of (impulsadorasRes.data ?? []) as Fila[]) {
     nombreImpulsadora.set(String(i.id), String(i.nombre ?? "").trim());
   }
 
-  const idsPeriodo = [...new Set([...periodoDeDoc.values()])];
-  const periodoPorId = new Map<string, { estado: "abierto" | "cerrado" | null; nombre: string | null }>();
+  const idsPeriodo = [...new Set([...sellosDeDoc.values()].flat())];
+  type PeriodoLeido = {
+    estado: "abierto" | "cerrado" | null;
+    nombre: string | null;
+    nombreAlCerrar: string | null;
+    proveedorKey: string;
+    cerradoEn: string | null;
+  };
+  const periodoPorId = new Map<string, PeriodoLeido>();
   if (idsPeriodo.length > 0) {
-    const { data } = await supabaseServer
-      .from("mk_periodos")
-      .select("id, nombre, estado")
-      .in("id", idsPeriodo);
-    for (const p of (data ?? []) as Fila[]) {
+    // `nombre_al_cerrar` es columna del rediseño: se lee con respaldo.
+    const { resultado } = await conRespaldoSinColumnas<Fila[]>(
+      () =>
+        supabaseServer
+          .from("mk_periodos")
+          .select("id, nombre, estado, proveedor_key, cerrado_en, nombre_al_cerrar")
+          .in("id", idsPeriodo),
+      () => supabaseServer.from("mk_periodos").select("id, nombre, estado, proveedor_key, cerrado_en").in("id", idsPeriodo),
+    );
+    for (const cruda of (resultado.data ?? []) as Fila[]) {
+      const p = completarPeriodo(cruda);
       const estado = String(p.estado ?? "");
       periodoPorId.set(String(p.id), {
         estado: estado === "abierto" || estado === "cerrado" ? estado : null,
         nombre: String(p.nombre ?? "").trim() || null,
+        nombreAlCerrar: String(p.nombre_al_cerrar ?? "").trim() || null,
+        proveedorKey: String(p.proveedor_key ?? "").trim(),
+        cerradoEn: p.cerrado_en ? String(p.cerrado_en) : null,
       });
     }
   }
 
+  /**
+   * 🔴 EL PERÍODO MANDA (23-sep-2026): con el interruptor, un sello a un
+   * período CERRADO gana sobre uno abierto — el gasto ya se le pasó a la marca
+   * y a ese cierre pertenece. Sin sello a un cerrado, está abierto. Sin el
+   * interruptor, como antes: el último sello leído.
+   */
   const delPeriodo = (docId: string) => {
-    const pid = periodoDeDoc.get(docId);
-    const p = pid ? periodoPorId.get(pid) : undefined;
-    return { estadoPeriodo: p?.estado ?? null, periodoNombre: p?.nombre ?? null };
+    const pids = sellosDeDoc.get(docId) ?? [];
+    const leidos = pids.map((pid) => ({ pid, p: periodoPorId.get(pid) })).filter((x) => !!x.p);
+    const elegido = MARKETING_TIENDAS_Y_MARCAS
+      ? (leidos.find((x) => x.p?.estado === "cerrado") ?? leidos[0])
+      : leidos[leidos.length - 1];
+    const p = elegido?.p;
+    const periodo: PeriodoDelGasto | null =
+      MARKETING_TIENDAS_Y_MARCAS && p?.estado === "cerrado" && elegido
+        ? {
+            id: elegido.pid,
+            nombre: p.nombreAlCerrar ?? p.nombre ?? "",
+            proveedorKey: p.proveedorKey,
+            cerradoEn: p.cerradoEn,
+          }
+        : null;
+    return {
+      estadoPeriodo: p?.estado ?? null,
+      periodoNombre: p?.nombre ?? null,
+      ...(MARKETING_TIENDAS_Y_MARCAS ? { periodo } : {}),
+    };
   };
 
   // ── Las filas ──────────────────────────────────────────────────────────────
@@ -266,7 +314,6 @@ export async function leerDatosDeLaTienda(codigoCrudo: string): Promise<DatosDeL
   };
 
   for (const f of facturas) filas.push(filaDeFactura(f));
-  const anuladas: FilaDeTienda[] = facturasAnuladas.map(filaDeFactura);
 
   for (const e of entregas) {
     const id = String(e.id);
@@ -305,6 +352,6 @@ export async function leerDatosDeLaTienda(codigoCrudo: string): Promise<DatosDeL
     fotos: Number((fotosRes as { count?: number | null }).count ?? 0),
     sinMigracion: false,
     filas: MARKETING_TIENDAS_Y_MARCAS ? filas : [],
-    anuladas: MARKETING_TIENDAS_Y_MARCAS ? anuladas : [],
+    anuladas: [],
   };
 }

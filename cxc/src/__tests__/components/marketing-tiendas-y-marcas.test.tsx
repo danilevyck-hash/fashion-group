@@ -422,19 +422,23 @@ describe("3 · la ficha es UNA tabla con facturas + muebles + impulsadora, y el 
     expect(pie.total).toBe(9699.94);
     expect(pie.montoFacturas + pie.montoMuebles + pie.montoImpulsadora).toBeCloseTo(9699.94, 2);
     expect(within(tablas[0].querySelector("tfoot")!).getByText("$9,699.94")).toBeTruthy();
-    expect(screen.getByText("6 gastos · 3 facturas $747.94 · 2 muebles $8,152.00 · 1 pago de impulsadora $800.00")).toBeTruthy();
+    // 23-sep-2026 · NOTA FECHADA — con «el período manda» el pie dice a dónde
+    // va lo abierto (mockup aprobado), no el desglose por tipo (que sigue en
+    // `pieDeLaFicha` y en el Excel).
+    expect(pie.facturas + pie.muebles + pie.impulsadora).toBe(6);
+    expect(screen.getByText(/6 gastos · irán al próximo ZIP de Calvin Klein y de Tommy Hilfiger/)).toBeTruthy();
     // Lo apagado se ve en gris y no suma; la cabecera lo dice.
     expect(screen.getByText("No se reporta")).toBeTruthy();
     // La línea gris de la factura: N° · subtotal + ITBMS.
     expect(screen.getByText("factura N° 0000065407 · $623.01 + ITBMS $43.61")).toBeTruthy();
     expect(screen.getAllByText("mueble · precio reportado").length).toBe(2);
-    // Lo anulado, plegado en su chip y fuera de la tabla.
+    // 23-sep-2026 · NOTA FECHADA — lo anulado YA NO SE VE: ni chip «Anulados»
+    // ni fila (el período manda, Daniel: «se elimina y listo»). Candado propio:
+    // `marketing-el-periodo-manda.test.tsx`.
     expect(screen.queryByText("Krysthel · repetida")).toBeNull();
-    const chips = chipsDeLaFicha(VIVAS, ANULADAS);
-    expect(chips.map((c) => c.rotulo)).toEqual(["Todos", "Tommy Hilfiger", "Calvin Klein", "Anulados"]);
-    fireEvent.click(screen.getByRole("tab", { name: /Anulados/ }));
-    expect(screen.getByText("Krysthel · repetida")).toBeTruthy();
-    expect(tablas[0].querySelectorAll("tbody tr[data-fg-gasto]").length).toBe(1);
+    const chips = chipsDeLaFicha(VIVAS);
+    expect(chips.map((c) => c.rotulo)).toEqual(["Todas las marcas", "Tommy Hilfiger", "Calvin Klein"]);
+    expect(screen.queryByRole("tab", { name: /Anulados/ })).toBeNull();
   });
 
   it("«＋ Gasto» abre la puerta con ESTA tienda puesta", async () => {
@@ -447,14 +451,17 @@ describe("3 · la ficha es UNA tabla con facturas + muebles + impulsadora, y el 
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("4 · editar y anular se hacen desde la ficha", () => {
-  it("«···» ofrece Editar y Anular; anular pide motivo y llama a la ruta de siempre", async () => {
+  // 23-sep-2026 · NOTA FECHADA — «Anular» pasó a decir «Eliminar» y pide
+  // escribir ELIMINAR (el período manda); la RUTA es la misma (`…/anular`).
+  it("«···» ofrece Editar y Eliminar; eliminar pide escribir ELIMINAR y llama a la ruta de siempre", async () => {
     render(<ToastProvider><VistaTienda codigo="D-170" /></ToastProvider>);
     await waitFor(() => expect(screen.getByText(/Nova Lux, S.A./)).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: /Más opciones de Impresora Comercial · letrero Calvin Klein/ }));
     expect(await screen.findByText("Editar")).toBeTruthy();
-    fireEvent.click(screen.getByText("Anular"));
-    fireEvent.change(await screen.findByLabelText(/Motivo/), { target: { value: "se cargó dos veces" } });
-    fireEvent.click(screen.getByRole("button", { name: "Anular" }));
+    fireEvent.click(screen.getByText("Eliminar"));
+    fireEvent.change(await screen.findByLabelText(/Por qué/), { target: { value: "se cargó dos veces" } });
+    fireEvent.change(screen.getByLabelText(/Escribe/), { target: { value: "ELIMINAR" } });
+    fireEvent.click(screen.getByRole("button", { name: "Eliminar" }));
     await waitFor(() =>
       expect(llamadas.fetch.find((l) => l.url.endsWith("/api/marketing/facturas/f1/anular") && l.method === "POST")).toBeTruthy(),
     );
@@ -530,7 +537,11 @@ describe("6 · contabilidad entra solo lectura, con y sin la migración", () => 
   });
 
   it("las rutas: GET contesta, POST anular contesta 403", async () => {
-    vi.doMock("@/lib/marketing/reportes", () => ({ reportePorTiendaRediseno: async () => REPORTE_TIENDAS }));
+    vi.doMock("@/lib/marketing/reportes", () => ({
+      reportePorTiendaRediseno: async () => REPORTE_TIENDAS,
+      // 23-sep-2026: la ruta sirve la lista por período (el período manda).
+      tiendasPorPeriodoRediseno: async () => ({ filas: FILAS_TIENDAS, periodos: [], filasPorPeriodo: {} }),
+    }));
     vi.doMock("@/lib/marketing/mutations", () => ({ anularFactura: vi.fn(async () => {}) }));
     const { GET } = await import("@/app/api/marketing/tiendas/route");
     const { POST } = await import("@/app/api/marketing/facturas/[id]/anular/route");

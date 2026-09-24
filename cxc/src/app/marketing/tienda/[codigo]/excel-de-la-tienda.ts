@@ -25,7 +25,17 @@ function fechaDe(f: FilaDeTienda): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-export function descargarExcelDeLaTienda(nombre: string, codigo: string, vivas: ReadonlyArray<FilaDeTienda>): void {
+/**
+ * Baja lo que se MIRA: los gastos del período elegido (23-sep-2026, el
+ * período manda). `periodo` va al nombre del archivo («Abierto», «mid 2026 ·
+ * PVH», «Todos»); sin él, el nombre de antes.
+ */
+export function descargarExcelDeLaTienda(
+  nombre: string,
+  codigo: string,
+  vivas: ReadonlyArray<FilaDeTienda>,
+  periodo?: string,
+): void {
   const filas = ordenarPorFecha(vivas);
   const pie = pieDeLaFicha(vivas);
   const ws = buildReportSheet({
@@ -52,6 +62,9 @@ export function descargarExcelDeLaTienda(nombre: string, codigo: string, vivas: 
     }),
     totals: ["Total reportado", null, null, null, null, null, pie.total],
   });
-  const base = ["marketing", codigo || "general", nombre].filter(Boolean).join("-").replace(/[\\/:*?"<>|]+/g, "-");
+  const base = ["marketing", codigo || "general", nombre, periodo ?? ""]
+    .filter(Boolean)
+    .join("-")
+    .replace(/[\\/:*?"<>|]+/g, "-");
   downloadWorkbook(workbookFromSheets([{ name: "Gastos", ws }]), exportFilename(base));
 }

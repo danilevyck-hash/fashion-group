@@ -537,6 +537,13 @@ export const SEED_TOLERANT_CRONS = [
   // fila con los totales. Desplegado el 4-sep-2026: seed-tolerante hasta que
   // siembre su fila; promover a CRONS_FAIL_CLOSED cuando lleve días corriendo.
   "cleanup-depurador-archivos",
+  // Limpieza de los gastos de Marketing ANULADOS hace más de 90 días (03:40
+  // UTC; solo DB + Storage, no toca Switch). 🔴 Borra la fila, sus adjuntos y
+  // sus sellos — hasta ese día el anulado queda con `anulado_en`, fuera de
+  // todas las pantallas. Nacido el 23-sep-2026 (Daniel: «se elimina y
+  // listo»): seed-tolerante hasta que siembre su fila; promover a
+  // CRONS_FAIL_CLOSED cuando lleve días corriendo.
+  "cleanup-marketing-anulados",
   // Snapshot de catálogo del tab Ventas › Referencia (3 entradas de 2 empresas,
   // 04:30/04:40/04:50 UTC — ver SWITCH_CRON_ENTRADAS). Desplegado el
   // 10-ago-2026: seed-tolerante hasta que siembre su fila. Las 3 entradas

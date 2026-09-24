@@ -156,6 +156,9 @@ export default function HistorialImpulsadoraModal({ impulsadora, onClose, onChan
     }
   }
 
+  // 🔴 EL PERÍODO MANDA (23-sep-2026): un pago anulado desaparece de TODAS
+  // las pantallas, también de este historial (se listaba tachado). La ruta
+  // sigue trayéndolo 90 días, hasta que el cron lo borra; acá no se dibuja.
   const vigentes = (pagos ?? []).filter((p) => !p.anulado);
   const totalPagado = vigentes.reduce((s, p) => s + p.total, 0);
 
@@ -269,14 +272,14 @@ export default function HistorialImpulsadoraModal({ impulsadora, onClose, onChan
 
           {pagos === null && <p className="text-sm text-gray-400 py-6 text-center">Cargando…</p>}
           {error && <p className="text-sm text-red-600 py-4">{error}</p>}
-          {pagos !== null && pagos.length === 0 && !error && (
+          {pagos !== null && vigentes.length === 0 && !error && (
             <p className="text-sm text-gray-500 py-6 text-center">
               Todavía no tiene pagos registrados.
             </p>
           )}
 
           <div className="space-y-2">
-            {(pagos ?? []).map((p) => (
+            {vigentes.map((p) => (
               <div
                 key={p.ref}
                 className={`rounded-lg border p-3 ${

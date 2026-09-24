@@ -151,9 +151,13 @@ describe("1. la vista agrupa por marca y el total es solo de lo reportado", () =
   });
 
   it("la pantalla no suma por su cuenta: el total sale de `totalDeLaTienda`", () => {
+    // 23-sep-2026 · NOTA FECHADA — con «el período manda», la ficha nueva
+    // (`FichaTienda.tsx`) dibuja `pie.total`, que sale de `pieDeLaFicha`
+    // (puro, sobre `totalesDelPeriodo`) para el PERÍODO elegido. La regla es
+    // la misma: la pantalla no suma; solo cambió de dónde lee el número.
     for (const ruta of RUTAS_VISTA) {
       const src = codigo(ruta);
-      expect(src, ruta).toMatch(/totales\.reportado/);
+      expect(src, ruta).toMatch(/totales\.reportado|pie\.total/);
       expect(src, ruta).not.toMatch(/\.reduce\(/); // ninguna suma a mano en la vista
     }
     const datos = codigo(RUTA_DATOS);

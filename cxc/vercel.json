@@ -49,6 +49,10 @@
       "schedule": "20 3 * * *"
     },
     {
+      "path": "/api/cron/cleanup-marketing-anulados",
+      "schedule": "40 3 * * *"
+    },
+    {
       "path": "/api/cron/refresh-clientes-views",
       "schedule": "35 7 * * *"
     },

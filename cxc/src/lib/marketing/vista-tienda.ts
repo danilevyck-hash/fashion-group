@@ -29,6 +29,7 @@ import {
   type TipoGasto,
 } from "./gasto";
 import { totalesDelPeriodo, type TotalesDelPeriodo } from "./periodo-estado";
+import type { PeriodoDelGasto } from "./periodo-manda";
 
 /**
  * 🔴 EL INTERRUPTOR. En `true` se dibuja la vista de tienda, el resultado de
@@ -111,6 +112,13 @@ export interface FilaDeTienda {
   anuladoMotivo?: string;
   /** Solo un mueble: el proyecto viejo al que quedó atado, si lo hay. */
   proyectoId?: string | null;
+  /**
+   * 🔴 EL PERÍODO MANDA (23-sep-2026): el período CERRADO al que quedó sellado
+   * el gasto, o `null` si sigue abierto (ningún sello suyo apunta a un
+   * cerrado). Lo pone la ruta solo con `MARKETING_TIENDAS_Y_MARCAS`; la ficha
+   * lo usa para partir por período (`periodo-manda.ts`).
+   */
+  periodo?: PeriodoDelGasto | null;
 }
 
 /** El rótulo del tipo, para la columna «Tipo». Una sola fuente: `gasto.ts`. */

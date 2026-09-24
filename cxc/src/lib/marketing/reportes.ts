@@ -21,7 +21,9 @@
 import { supabaseServer } from "@/lib/supabase-server";
 import { getMarcas } from "./queries";
 import type { MkMarca } from "./types";
-import { conRespaldoSinColumnas, completarGasto } from "./columnas-opcionales";
+import { conRespaldoSinColumnas, completarGasto, completarPeriodo } from "./columnas-opcionales";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
+import { tiendasPorPeriodo, type PeriodoDelGasto, type TiendasPorPeriodo } from "./periodo-manda";
 import { marcasDeEntrega, porcionEntregaParaMarca } from "./resumen-inicio";
 import {
   MARKETING_TIENDAS_Y_MARCAS,
@@ -433,6 +435,37 @@ async function cargarGastosDelRediseno(): Promise<{
       });
     }
   }
+  // 🔴 EL PERÍODO MANDA (23-sep-2026): con el interruptor, cada gasto sabe a
+  // qué período CERRADO quedó sellado (o `null` = abierto). Solo se leen los
+  // sellos de los cerrados, paginado: `db-max-rows` corta en silencio.
+  if (MARKETING_TIENDAS_Y_MARCAS) {
+    const cerrados = await cargarPeriodosCerrados();
+    if (cerrados.size > 0) {
+      const sellos = await leerTodoPaginado<{ tipo: string; documento_id: string; periodo_id: string }>(
+        "reportes[sellos]",
+        (pedirCount, desde, hasta) =>
+          supabaseServer
+            .from("mk_periodo_documentos")
+            .select("tipo, documento_id, periodo_id", pedirCount ? { count: "exact" } : undefined)
+            .in("periodo_id", [...cerrados.keys()])
+            .order("id", { ascending: true })
+            .range(desde, hasta),
+      );
+      const periodoDe = new Map<string, PeriodoDelGasto>();
+      for (const s of sellos) {
+        const clave = `${s.tipo}::${String(s.documento_id)}`;
+        const p = cerrados.get(String(s.periodo_id));
+        if (p && !periodoDe.has(clave)) periodoDe.set(clave, p);
+      }
+      for (const g of gastos) {
+        const tipo = g.tipo === "mueble" ? "entrega" : "factura";
+        const docId = g.id.split(":")[0];
+        g.periodo = periodoDe.get(`${tipo}::${docId}`) ?? null;
+      }
+    } else {
+      for (const g of gastos) g.periodo = null;
+    }
+  }
   // 🔴 EL NOMBRE DE LA TIENDA SALE DEL DIRECTORIO, POR CÓDIGO (23-sep-2026).
   // 🩸 Salía de `mk_proyectos.tienda` (texto libre): «City Mall Pasocanoa»,
   // «Nova Lux, S.a.», «La Frontera Dutty Free» — tres grafías para la misma
@@ -457,6 +490,41 @@ async function cargarGastosDelRediseno(): Promise<{
     }
   }
   return { gastos, nombres };
+}
+
+/** Los períodos CERRADOS, por id, con el nombre del cierre y su casa. */
+async function cargarPeriodosCerrados(): Promise<Map<string, PeriodoDelGasto>> {
+  const { resultado } = await conRespaldoSinColumnas<Array<Record<string, unknown>>>(
+    () =>
+      supabaseServer
+        .from("mk_periodos")
+        .select("id, nombre, proveedor_key, cerrado_en, nombre_al_cerrar")
+        .eq("estado", "cerrado"),
+    () => supabaseServer.from("mk_periodos").select("id, nombre, proveedor_key, cerrado_en").eq("estado", "cerrado"),
+    avisar,
+  );
+  if (resultado.error) throw new Error(`reportes[periodos]: ${resultado.error.message}`);
+  const out = new Map<string, PeriodoDelGasto>();
+  for (const cruda of resultado.data ?? []) {
+    const p = completarPeriodo(cruda);
+    out.set(String(p.id), {
+      id: String(p.id),
+      nombre: String(p.nombre_al_cerrar ?? "").trim() || String(p.nombre ?? "").trim(),
+      proveedorKey: String(p.proveedor_key ?? "").trim(),
+      cerradoEn: p.cerrado_en ? String(p.cerrado_en) : null,
+    });
+  }
+  return out;
+}
+
+/**
+ * 🔴 EL PERÍODO MANDA (23-sep-2026): la portada de Tiendas partida por
+ * período. «Todos» es EXACTAMENTE `reportePorTiendaRediseno()`; cada chip es
+ * el mismo reporte sobre los gastos de ese período (`periodo-manda.ts`).
+ */
+export async function tiendasPorPeriodoRediseno(): Promise<TiendasPorPeriodo> {
+  const { gastos, nombres } = await cargarGastosDelRediseno();
+  return tiendasPorPeriodo(gastos, nombres);
 }
 
 /**

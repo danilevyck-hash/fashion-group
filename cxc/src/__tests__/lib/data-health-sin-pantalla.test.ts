@@ -129,7 +129,7 @@ describe("🔴 la medición no se tocó", () => {
     expect(entradas[0].schedule).toBe("0 12 * * *");
   });
 
-  it("🔴 el total de entradas de cron NO cambia por retirar una pantalla: son 81", () => {
+  it("🔴 el total de entradas de cron NO cambia por retirar una pantalla: son 82", () => {
     // Retirar una PANTALLA no puede mover el cronograma. Si este número baja,
     // se llevó por delante una tarea; si sube, entró una sin registrar.
     // ⚠️ Eran 81 hasta el 11-sep-2026 (cuando se retiró Data Health de la
@@ -140,10 +140,14 @@ describe("🔴 la medición no se tocó", () => {
     // semanal de los reclamos de más de 120 días), por OTRO encargo y con su
     // entrada registrada en `cron-telemetry.ts` y en `docs/crons.md`. Ver
     // `reclamos-aviso-semanal.test.ts`.
+    // ⚠️ 23-sep-2026: son 82 — entró `cleanup-marketing-anulados` (borra de
+    // verdad los gastos de Marketing anulados hace más de 90 días), por OTRO
+    // encargo y con su entrada registrada en `cron-telemetry.ts` y en
+    // `docs/crons.md`. Ver `marketing-el-periodo-manda.test.tsx`.
     // Este candado cambió de número con nota, no de regla: la medición
     // (`integrity-check`) sigue intacta, y el caso de arriba lo comprueba.
     const vercel = JSON.parse(leer("vercel.json")) as { crons: unknown[] };
-    expect(vercel.crons).toHaveLength(81);
+    expect(vercel.crons).toHaveLength(82);
   });
 
   // Mismo motivo que la allowlist de checks: `cron-telemetry.ts` construye el

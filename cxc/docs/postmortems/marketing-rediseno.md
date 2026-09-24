@@ -633,3 +633,74 @@ Candados ajenos que cambiaron de forma por la key nueva de contabilidad, con not
 - 🔴 **UN PERÍODO CERRADO ES UNA FILA, AUNQUE LO COMPARTAN DOS MARCAS** (22-sep): «mid 2026» es de **PVH** (la casa de Tommy y Calvin) y se veía DOBLE, con «Cerrados 2». Hoy va UNA fila —«mid 2026 · PVH», con los DOS montos, cada uno con su marca y su propia puerta— y la pestaña cuenta PERÍODOS; adentro de la marca dice «parte Tommy Hilfiger · el resto es de Calvin Klein», con SU monto. 🔴 **Nunca se suman** (el grupo no tiene `total`); las marcas salen de los DOCUMENTOS y el nombre de la casa de una tabla chica (`cerrados-por-periodo.ts`). Candado: `marketing-cerrados-por-periodo`.
 - 🔴 **NINGÚN MES SIN PAGAR SE ESCONDE, Y EL PAPEL DE LA MARCA SALE LIMPIO** (pieza D): la tarjeta de una impulsadora lista **TODOS los meses sin pagar desde el primer pago**, el más viejo arriba (miraba DOS y desaparecía lo viejo; medido: Ana Trejos **24 meses**, Cindy **4**), y «Registrar pago» abre en el más viejo. El Excel del ZIP pierde la **nota interna** («este período se cerró sin reporte guardado», 1 celda del archivo real de Tommy), el **nombre de las empresas del grupo en el concepto** —derivado de `EMPRESA_KEY_TO_NAME` + `EMPRESA_FISCAL`, **nunca el proveedor**: Boston fabrica— y deja **UNA grafía por proveedor** (el sufijo de sociedad iba de 4 formas a 2, 19 de 40 celdas); entra **solo lo que `se_reporta`** y **una marca = 100 %** (ningún monto se movió). Los links firmados duran **30 días**, no un año, con `POST /api/marketing/zip/firmar-de-nuevo`, y **cada ZIP que se baja se guarda** en `marketing/periodos/<id>/<fecha>.zip` y se anota en `mk_periodos.zips_bajados` releyendo la fila (falla ABIERTA: la descarga sale igual). Interruptor `ZIP_E_IMPULSADORAS_NUEVO` (`lib/marketing/zip-e-impulsadoras.ts`, hoy `true`). Candado: `marketing-zip-e-impulsadoras`.
 - 🔴 **EDITAR UN GASTO CAMBIA SU TIENDA, EL MUEBLE TIENE FOTO Y EL PERÍODO DICE LO QUE YA SE MANDÓ** (los tres remates, 22-sep): al editar salen **tienda · «se reporta» · nota** con su valor de hoy y **lo que no viaja no se pisa** (un `null` SÍ es «General»); el duplicado al editar **no se cuenta a sí mismo**; la foto del mueble cuelga de la **tienda** (`TIENDA_GENERAL` si es «General») y se sube **después** de guardar; y la pantalla del período lista los ZIPs de `mk_periodos.zips_bajados` con **«Volver a firmar»** (30 días) — 🔴 **sin ZIPs anotados no se dibuja nada** (hoy los 6 están en `[]`). Candado: `marketing-remates`.
+
+---
+
+## 13. El período manda — Abierto · cada cierre · Todos, y los anulados desaparecen (23-sep-2026)
+
+> Daniel, con el mockup aprobado (`marketing-periodos.html`): *«arriba eliges el período, abajo ves lo de ese período»*; sobre los anulados: *«se elimina y listo… con seguro de que escriban ELIMINAR»*.
+
+**Interruptor:** el existente, `MARKETING_TIENDAS_Y_MARCAS` (`lib/marketing/tiendas-y-marcas.ts`, hoy `true`). Sin uno nuevo. En `false`: la vista de tienda por marca de antes, sin barra; `/api/marketing/tiendas` contesta 404; el cron no borra nada. Nada de lo que se guarda cambia de forma, salvo el borrado a los 90 días.
+
+### La regla
+
+Los períodos son de cada MARCA (`mk_periodos.proveedor_key`: Tommy cierra el suyo, Calvin el suyo) y una tienda mezcla marcas. Por eso el primer chip no es «Período 2026» a secas: es **«Abierto»** —todo gasto que no tiene un sello a un período CERRADO, de cualquier marca— y después cada cierre con su nombre y su casa («mid 2026 · PVH», como en `cerrados-por-periodo.ts`), y **«Todos»** al final. Un gasto con un sello a un cerrado pertenece a ESE cerrado, aunque además lleve un sello a un abierto (medido: la factura de Impreco de D-118 lleva DOS sellos a «mid 2026», y hay entregas con sello a un abierto y a un cerrado). Lo decide quien lee la base (`datos.ts` para la ficha, `reportes.ts › cargarGastosDelRediseno` para la portada); el módulo puro `lib/marketing/periodo-manda.ts` solo parte, agrupa y rotula. **Lo que suma sigue siendo `periodo-estado.ts`.**
+
+### Ahora → después
+
+| Pantalla | Antes | Después |
+|---|---|---|
+| **Ficha de la tienda** `/marketing/tienda/[codigo]` | Una lista con TODO lo de la tienda mezclado: lo ya pasado a la marca en «mid 2026» junto a lo que Daniela está trabajando, sin que nada lo dijera. Chips Todos · por marca · **Anulados** (plegados, con «Restaurar»). Pie «N gastos · N facturas $X · N muebles $Y». | Barra **Abierto · N** · **mid 2026 · PVH · N** · **Todos · N** arriba de los KPIs; abre en **Abierto**. Los KPIs (total · por marca · gastos), los chips de marca («Todas las marcas» · por marca) y la tabla son SOLO del período elegido; el pie dice **«N gastos · irán al próximo ZIP de Calvin Klein y de Tommy Hilfiger»** (Abierto), **«ya pasados a la marca en «mid 2026 · PVH»»** (un cerrado) o **«N gastos en M períodos»** (Todos). En **Todos**, la tabla se agrupa por período —el más nuevo arriba— con cabecera y subtotal por bloque («Abierto · aún no pasado a la marca · 2 gastos», «mid 2026 · PVH · cerrado el 11 ago 2026 · 2 gastos»), lo cerrado en gris. El Excel baja el período que se mira. El período vive en la URL (`?periodo=`, `replace`). **Sin chip «Anulados», sin «Restaurar».** |
+| **Lista de Tiendas** (portada) | «Todos» siempre, sin pie. | La MISMA barra; con Abierto cada tienda muestra su total abierto y su desglose por marca; con un cerrado, lo de ese período; Todos, la suma. Pie: **«Abierto · lo que irá al próximo ZIP · N tiendas»** y el total de las tiendas que se ven. Una tienda sin nada en el período no aparece. |
+| **Anular** («···» › Eliminar) | Modal con motivo obligatorio; quedaba plegada en «Anulados» con «Restaurar». | `ConfirmarEliminar`: el botón rojo se prende solo al escribir **ELIMINAR** (exacto; `confirmaEliminar`), porqué OPCIONAL (sin él viaja «Eliminado desde la ficha de la tienda»: la ruta lo exige). **Misma ruta** (`POST …/anular`). El gasto **desaparece de todas las pantallas** (el servidor de la ficha solo manda vivas; el historial de la impulsadora dibuja solo vigentes); la fila queda con `anulado_en`, recuperable solo por la base. Eliminar un mueble (DELETE que devuelve el stock, como siempre) también pide la palabra. |
+| **Cron `cleanup-marketing-anulados`** | No existía: un anulado vivía para siempre. | Diario **03:40 UTC** (UNA entrada en `vercel.json`, `SEED_TOLERANT_CRONS`, `docs/crons.md`), patrón de `cleanup-depurador-archivos`: `anulado_en < medianoche de Panamá de hace 90 días` (`corteDeAnulados(hoyPanama())`), ≤500 por corrida, **por lista de ids**: quita los archivos de sus adjuntos del bucket `marketing`, sus sellos en `mk_periodo_documentos` (no cascadean: es polimórfica) y la fila (`mk_adjuntos` y `mk_factura_marcas` cascadean). ⚠️ **`mk_entregas_muebles` NO tiene `anulado_en`** (medido): los muebles se eliminan directo desde la ficha; el cron lo intenta, lo dice y sigue (falla ABIERTA por `esColumnaAusente`). Sin Telegram inmediato: rastro en `cron_email_errors` y el vigía de heartbeats. |
+
+### Medido contra producción (solo lectura por REST, 23-sep-2026) — ANTES y DESPUÉS
+
+96 facturas vivas · 24 entregas · 200 sellos · UN período cerrado («mid 2026», `pvh`, cerrado el 12-ago-2026 01:20 UTC = 11 ago en Panamá) · 15 facturas anuladas.
+
+| Tienda | Antes (ficha, Todos) | Después: Abierto | Después: mid 2026 · PVH | Después: Todos | Cambia |
+|---|---|---|---|---|---|
+| Outlet Duty Free N3 (D-118) | $6.472,53 (4) | **$1.771,27 (2)** | **$4.701,26 (2)** | **$6.472,53 (4)** | no |
+| Nova Lux (D-170) | $12.649,97 (7) | $12.649,97 (7) | — (no aparece) | $12.649,97 (7) | no |
+| City Mall David (D-24) | $37.460,92 (9) | — (nada abierto) | $37.460,92 (9) | $37.460,92 (9) | no |
+| Multifashion (D-108) | $8.061,63 (9) | $8.061,63 (9) | — | $8.061,63 (9) | no |
+| **Portada (suma de tiendas)** | $200.060,24 (17 tiendas) | $59.493,67 (5 tiendas) | $140.566,57 (14 tiendas) | **$200.060,24 (17)** | no |
+
+🔴 **El mockup y el encargo decían Abierto $6.401,27 (3) · mid 2026 $71,26 (1) para D-118, y NO es así.** El mueble de $4.630 (entrega ME-0014, 22 jun 2026) lleva sello a «mid 2026» (`proveedor_key = TH`, sellado el 12-ago-2026 03:21 UTC) **y está en el ZIP real de ese cierre** (`zip-gastos-del-periodo-cerrado-tommy-hilfiger.zip › Outlet Duty Free N3, S.A./facturas/2026-06-22 · Entrega de mobiliario ME-0014 · Tommy Hilfiger.pdf`, y `resumen_gastos.xlsx` trae el 4630): ya se le pasó a Tommy. Ponerlo en «Abierto» lo mandaría en el PRÓXIMO ZIP por segunda vez. Se siguió la definición del encargo («sellado en un período cerrado») y los datos; el total de la tienda no cambia.
+
+Anuladas: **15**; con el corte de hoy (`2026-06-25T05:00:00Z`) **14 se borrarían en la primera corrida** (las de abril, mayo y junio) y la de Nova Lux del 23-sep se queda hasta el 22-dic-2026. Doce de las 14 tienen sello a «mid 2026»: el cron los borra con la fila. El cron **no se ejecutó a mano**.
+
+### Lo que se tocó
+
+- **Puro nuevo:** `lib/marketing/periodo-manda.ts` (`chipsDePeriodos` · `periodoElegido` · `gastosDelPeriodo` · `bloquesPorPeriodo` · `cabeceraDelBloque` · `rotuloDelKpi` · `textoDelPieDelPeriodo` · `textoDelPieDeTiendas` · `tiendasPorPeriodo` · `filasDeTiendasDelPeriodo` · `totalDeTiendas` · `DIAS_PARA_BORRAR_ANULADOS` · `PALABRA_PARA_ANULAR` · `confirmaEliminar` · `corteDeAnulados` · `anuladoCaduco`).
+- **Servidor:** `datos.ts` (solo vivas SIEMPRE; `periodo` por fila con el cerrado ganando; `nombre_al_cerrar` por `conRespaldoSinColumnas`), `reportes.ts` (`periodo` por gasto leyendo los sellos de los cerrados con `leerTodoPaginado`; `tiendasPorPeriodoRediseno`), `GET /api/marketing/tiendas` (devuelve `filas` + `periodos` + `filasPorPeriodo`), `lib/marketing/anulados-caducos.ts` + `GET /api/cron/cleanup-marketing-anulados`.
+- **Pantallas:** `BarraDePeriodos.tsx` (nueva), `PortadaTiendas.tsx`, `FichaTienda.tsx`, `FichaTiendaAcciones.tsx` + `ConfirmarEliminar.tsx` (nuevo), `excel-de-la-tienda.ts` (el período en el nombre del archivo), `HistorialImpulsadoraModal.tsx` (solo vigentes). `tiendas-y-marcas.ts`: `chipsDeLaFicha(vivas)` sin «Anulados» y con «Todas las marcas»; `FILTRO_ANULADOS` → `FILTRO_ANULADOS_RETIRADO`. `FilaDeTienda.periodo` y `GastoParaReporte.periodo` (opcionales).
+- **Registro del cron:** `vercel.json` (+1, `40 3 * * *`), `cron-telemetry.ts › SEED_TOLERANT_CRONS`, `docs/crons.md` (82 entradas).
+- **Se conserva:** la ruta `papelera/restaurar` (sin puerta en la ficha), `restaurarFactura`, la pantalla de antes (`VistaTiendaAnterior`), el cierre, el ZIP, Impulsadoras y Mobiliario.
+
+### Candado y mutaciones
+
+`src/__tests__/components/marketing-el-periodo-manda.test.tsx` — **19 casos en 7 bloques**, DOM + puro + barridos, con los números reales de D-118, Nova Lux y City Mall David: abre en Abierto · los chips salen de los gastos (un cerrado sin gastos no existe; `?periodo=basura` cae en Abierto) · en un período solo sus gastos y el KPI cuadra · «Todos» con dos bloques cuyos subtotales suman · la lista de Tiendas por período con su pie · un anulado en ninguna superficie (barridos sobre `datos.ts`, `FichaTienda.tsx`, `FichaTiendaAcciones.tsx`, `tiendas-y-marcas.ts`, `HistorialImpulsadoraModal.tsx`) · ELIMINAR exacto, con la ruta de siempre, también para el mueble · el cron con un Supabase de mentira (`lt("anulado_en", corte)`, archivos, sellos, filas, nada más; 14 de 15 caducan) y su registro (una entrada, un minuto, `SEED_TOLERANT_CRONS`, 401 sin secreto) · interruptor `false`.
+
+Candados ajenos que **cambiaron de forma, no de dirección**, con nota fechada: `marketing-tiendas-y-marcas` (el pie dice a dónde va lo abierto; sin chip «Anulados»; «Anular» pasó a «Eliminar» con la palabra; el doble de `reportes` gana `tiendasPorPeriodoRediseno`), `marketing-vista-tienda` (la ficha lee `pie.total`, que sale de `pieDeLaFicha`), `data-health-sin-pantalla` (el total de entradas de cron pasa de 81 a 82 por la entrada nueva, con nota).
+
+Mutaciones a mano (romper → ROJO → restaurar):
+
+| # | Mutación | Resultado |
+|---|---|---|
+| 1 | `periodoElegido` cae en «Todos» en vez de «Abierto» | 🔴 2 casos |
+| 2 | `chipsDePeriodos` agrega un chip escrito a mano («Período 2026») | 🔴 2 casos |
+| 3 | `gastosDelPeriodo` devuelve todos los gastos sin mirar la clave | 🔴 9 casos |
+| 4 | `confirmaEliminar` acepta «eliminar» en minúsculas | 🔴 2 casos |
+| 5 | el cron corta con «ahora» en vez de hace 90 días | 🔴 1 caso |
+| 6 | `datos.ts` vuelve a mandar las anuladas (sin `.is("anulado_en", null)`) | 🔴 1 caso |
+| 7 | el subtotal del bloque suma lo apagado | 🟢 pasó → se agregó un gasto apagado a la prueba → 🔴 1 caso |
+| — | control sin mutar | 🟢 19/19 |
+
+### Pendiente o dudoso
+
+- 🔴 **El mockup tenía el mueble de D-118 en «Abierto» y la base y el ZIP lo tienen en «mid 2026»**: la pantalla sigue a la base. Si Daniel quiere el mueble en el próximo ZIP, es una decisión suya (se quitaría el sello a mano, por la base).
+- ⚠️ Los muebles no tienen `anulado_en`: se eliminan directo (con ELIMINAR), sin los 90 días de gracia. Darles anulación es otra pieza.
+- ⚠️ El pie de la lista de Tiendas SUMA las tiendas que se ven (es lo aprobado en el mockup: «$···» al pie); es la misma suma de tiendas que ya se medía ($200.060,24), no un total por marca.
+- ⚠️ Un `?filtro=anulados` viejo no existe como URL (el filtro de marca no vive en la URL); `FILTRO_ANULADOS_RETIRADO` queda rotulado por si algún enlace lo trae.

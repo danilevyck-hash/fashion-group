@@ -204,20 +204,27 @@ export interface TiendaDeSeccion {
 // ─── LA FICHA DE LA TIENDA: UNA SOLA LISTA ───────────────────────────────────
 
 export const FILTRO_TODOS = "todos";
-export const FILTRO_ANULADOS = "anulados";
+/**
+ * 🩸 El chip «Anulados» SE RETIRÓ el 23-sep-2026 (el período manda, Daniel:
+ * *«se elimina y listo»*): un gasto anulado desaparece de todas las pantallas
+ * y a los 90 días se borra de verdad (`periodo-manda.ts`). La constante se
+ * queda rotulada para que ningún `?filtro=anulados` viejo reviente: cae en
+ * «Todas las marcas».
+ */
+export const FILTRO_ANULADOS_RETIRADO = "anulados";
+
+/** El rótulo del primer chip de marcas: hay otra barra arriba con «Todos». */
+export const ROTULO_TODAS_LAS_MARCAS = "Todas las marcas";
 
 export interface ChipDeLaFicha {
-  /** `todos` · el código de una marca · `anulados`. */
+  /** `todos` · el código de una marca. */
   clave: string;
   rotulo: string;
   cantidad: number;
 }
 
-/** Los chips: Todos · una por marca (con gasto vivo) · Anulados (si hay). */
-export function chipsDeLaFicha(
-  vivas: ReadonlyArray<FilaDeTienda>,
-  anuladas: ReadonlyArray<FilaDeTienda>,
-): ChipDeLaFicha[] {
+/** Los chips: Todas las marcas · una por marca (con gasto vivo). Sin «Anulados». */
+export function chipsDeLaFicha(vivas: ReadonlyArray<FilaDeTienda>): ChipDeLaFicha[] {
   const porMarca = new Map<string, { rotulo: string; cantidad: number }>();
   for (const f of vivas) {
     const clave = String(f.marcaCodigo ?? "").trim().toUpperCase() || "—";
@@ -225,11 +232,10 @@ export function chipsDeLaFicha(
     m.cantidad += 1;
     porMarca.set(clave, m);
   }
-  const chips: ChipDeLaFicha[] = [{ clave: FILTRO_TODOS, rotulo: "Todos", cantidad: vivas.length }];
+  const chips: ChipDeLaFicha[] = [{ clave: FILTRO_TODOS, rotulo: ROTULO_TODAS_LAS_MARCAS, cantidad: vivas.length }];
   for (const [clave, m] of [...porMarca.entries()].sort((a, b) => b[1].cantidad - a[1].cantidad)) {
     chips.push({ clave, rotulo: m.rotulo, cantidad: m.cantidad });
   }
-  if (anuladas.length > 0) chips.push({ clave: FILTRO_ANULADOS, rotulo: "Anulados", cantidad: anuladas.length });
   return chips;
 }
 
@@ -238,14 +244,9 @@ export function ordenarPorFecha<T extends { fecha: string; id: string }>(filas: 
   return [...filas].sort((a, b) => (b.fecha ?? "").localeCompare(a.fecha ?? "") || a.id.localeCompare(b.id));
 }
 
-/** Las filas que se ven con un chip puesto. */
-export function filasVisibles(
-  vivas: ReadonlyArray<FilaDeTienda>,
-  anuladas: ReadonlyArray<FilaDeTienda>,
-  filtro: string,
-): FilaDeTienda[] {
-  if (filtro === FILTRO_ANULADOS) return ordenarPorFecha(anuladas);
-  if (filtro === FILTRO_TODOS || !filtro) return ordenarPorFecha(vivas);
+/** Las filas que se ven con un chip de marca puesto. Un filtro desconocido = todas. */
+export function filasVisibles(vivas: ReadonlyArray<FilaDeTienda>, filtro: string): FilaDeTienda[] {
+  if (filtro === FILTRO_TODOS || !filtro || filtro === FILTRO_ANULADOS_RETIRADO) return ordenarPorFecha(vivas);
   const f = filtro.trim().toUpperCase();
   return ordenarPorFecha(vivas.filter((x) => String(x.marcaCodigo ?? "").trim().toUpperCase() === f));
 }

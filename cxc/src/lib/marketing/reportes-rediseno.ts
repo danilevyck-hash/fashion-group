@@ -24,6 +24,7 @@ import { agruparPorTienda, type GastoAgrupable } from "./agrupar-por-tienda";
 import { MARCAS_BLOQUE, SIN_BLOQUE, bloqueDeCodigo } from "./bloques";
 import { ErrorMarcaRepartida, exigirUnaMarca, type TipoGasto } from "./gasto";
 import { sumaEnElPeriodo } from "./periodo-estado";
+import type { PeriodoDelGasto } from "./periodo-manda";
 
 /** Un gasto tal como lo necesita el reporte: ya con su marca y su tienda. */
 export interface GastoParaReporte {
@@ -46,6 +47,13 @@ export interface GastoParaReporte {
    * no sabe cuál es esa tienda a propósito: solo respeta la marca.
    */
   esTiendaPropia?: boolean | null;
+  /**
+   * 🔴 EL PERÍODO MANDA (23-sep-2026): el período CERRADO al que quedó sellado
+   * el gasto, o `null` si sigue abierto. Lo pone la lectura solo con
+   * `MARKETING_TIENDAS_Y_MARCAS`; el reporte por tienda no lo mira — la
+   * portada lo parte por período ANTES de llamarlo (`periodo-manda.ts`).
+   */
+  periodo?: PeriodoDelGasto | null;
 }
 
 /** Nombre visible de cada marca, por código. */
