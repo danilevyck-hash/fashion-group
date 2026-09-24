@@ -34,6 +34,9 @@ import {
   leerVacaciones, leerTrabajaAfuera,
 } from "@/lib/asistencia/config-server";
 import { codigosFueraDeRango } from "@/lib/asistencia/vigencia";
+// 🔴 QUIEN NO MARCÓ EN EL PERÍODO APARECE IGUAL (24-sep-2026). La regla de a
+// quién se agrega vive en el módulo PURO; acá solo se le pasan las fichas.
+import { codigosSinMarcas } from "@/lib/asistencia/sin-marcas";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { leerMarcasDelTelefono } from "@/lib/marcacion/reporte-server";
 import { senalarQuitadas } from "@/lib/marcacion/en-el-reporte";
@@ -273,6 +276,36 @@ export async function GET(req: NextRequest) {
     const visiblesEnPantalla = ignorados.size
       ? enRango.filter((m) => !ignorados.has(String(m.empleado_codigo ?? "").trim()))
       : enRango;
+
+    // ── 🔴 QUIEN NO MARCÓ EN EL PERÍODO APARECE IGUAL (24-sep-2026) ──────────
+    //
+    // 🩸 La lista se armaba SOLO con quien tiene marcas, así que Yeisibeth
+    // Muñoz (306, Multifashion), activa y vigente, no existía para la quincena
+    // del 1 al 15 de septiembre y no había forma de arreglarle las horas. Lo
+    // mismo con María V. Bethancourth (49, Boston) en la quincena en curso.
+    //
+    // 🔴 SU FILA SOLO INFORMA: todos sus días salen en cero y ninguno es
+    // ausencia, que es EXACTAMENTE lo que la planilla ya hace con ella
+    // (`armarPlanilla` le da `HORAS_CERO`). Ver `sin-marcas.ts`.
+    //
+    // 🔑 Se le pasan las fichas VIGENTES y no escondidas; el filtro por empresa
+    // va más abajo, sobre la lista final, como el de todo el mundo.
+    const conMarcas = new Set(
+      visiblesEnPantalla.map((m) => String(m.empleado_codigo ?? "").trim()).filter(Boolean),
+    );
+    const sinMarcas = new Set(
+      codigosSinMarcas({
+        fichas: personasDb.filas.map((f) => ({
+          codigo: String(f.empleado_codigo),
+          nombre: f.nombre ?? nombres.get(String(f.empleado_codigo)) ?? null,
+        })),
+        conMarcas,
+        fueraDeVigencia: fuera,
+        ignorados,
+        soloCodigo,
+        q,
+      }),
+    );
 
     const personas = armarReporte({
       marcaciones: visiblesEnPantalla,

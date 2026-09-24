@@ -96,6 +96,17 @@ import { MOTIVO_MAX } from "@/lib/asistencia/correcciones";
 import SelfieMarcacionModal, { type SelfieParaVer } from "./SelfieMarcacionModal";
 import { llaveDelDia, type MarcaTelefonoUI } from "@/lib/marcacion/en-el-reporte";
 import { rotuloDeLaMarca } from "@/lib/marcacion/marcacion";
+// 🔴 GUARDAR UNA HORA NO BORRA LA TABLA NI SALTA ARRIBA (24-sep-2026), y la
+// fila recién corregida no se va sola. Las reglas viven en el módulo PURO.
+import {
+  ASISTENCIA_GUARDAR_SIN_SALTO, ROTULO_ANCLADA, TEXTO_ACTUALIZANDO, TITULO_ANCLADA,
+  ancladosQueSeQuedan, conAnclados,
+} from "@/lib/asistencia/pestanas-vivas";
+// 🔴 QUIEN NO MARCÓ EN EL PERÍODO APARECE IGUAL (24-sep-2026). La fila gris
+// solo informa: la planilla no le cuenta ausencias. Ver `sin-marcas.ts`.
+import {
+  NOTA_SIN_MARCAS, TEXTO_DIA_SIN_MARCAS, TEXTO_SIN_MARCAS, avisoSinMarcas, esSinMarcas,
+} from "@/lib/asistencia/sin-marcas";
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 const DOW = ["dom","lun","mar","mié","jue","vie","sáb"];
@@ -216,6 +227,20 @@ export default function ReporteTab({ empresa = "" }: {
    * explicación que se va a buscar cuando algo no cuadra.
    */
   const [cargando, setCargando] = useState(false);
+  // ── 🔴 GUARDAR UNA HORA NO BORRA LA TABLA (24-sep-2026) ──────────────────
+  //
+  // 🩸 Guardar llamaba a `cargar()`, que prende `cargando`, y la tabla estaba
+  // condicionada a `!cargando`: **desaparecía varios segundos** y la página
+  // pasaba de medir varias pantallas de alto a una línea, así que el teléfono
+  // quedaba arriba de todo. Medido: las lecturas de esa recarga tardan
+  // 2.031 ms + 1.108 ms + 996 ms. Es el «se me sale de la pantalla» de Daniel.
+  //
+  // Ahora la recarga de después de guardar es SILENCIOSA: la tabla se queda
+  // con lo viejo hasta que llega lo nuevo, y el aviso es una pastilla FIJA
+  // abajo —fuera del flujo— para que ni un píxel de la página se mueva.
+  const [refrescando, setRefrescando] = useState(false);
+  /** 🔴 Los códigos recién corregidos: su fila no se va aunque el filtro la saque. */
+  const [anclados, setAnclados] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   // Correcciones: cuántas hay en el rango, si se pueden hacer (la migración
   // puede no haber corrido) y cuál se está tocando.
@@ -258,8 +283,11 @@ export default function ReporteTab({ empresa = "" }: {
   const [marcasTelefono, setMarcasTelefono] = useState<Record<string, MarcaTelefonoUI[]>>({});
   const [verSelfie, setVerSelfie] = useState<SelfieParaVer | null>(null);
 
-  const cargar = useCallback(async () => {
-    setCargando(true); setError(null);
+  const cargar = useCallback(async (silenciosa = false) => {
+    // 🔑 Con el interruptor apagado, TODA recarga vuelve a ser la de antes.
+    if (silenciosa && ASISTENCIA_GUARDAR_SIN_SALTO) setRefrescando(true);
+    else setCargando(true);
+    setError(null);
     try {
       const p = new URLSearchParams({ desde, hasta });
       if (q.trim()) p.set("q", q.trim());
@@ -284,7 +312,7 @@ export default function ReporteTab({ empresa = "" }: {
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar");
       setPersonas(null);
-    } finally { setCargando(false); }
+    } finally { setCargando(false); setRefrescando(false); }
   }, [desde, hasta, q, empresa]);
 
   useEffect(() => { void cargar(); }, [cargar]);
@@ -358,10 +386,32 @@ export default function ReporteTab({ empresa = "" }: {
   // revisar — filtrando lo YA cargado, sin pedirle nada al servidor. Todo lo
   // que está debajo de los botones se calcula sobre esto: el pie, los avisos,
   // el Excel y el PDF. **O el total sigue al filtro, o no hay filtro.**
-  const visibles = useMemo(
+  // 🔴 LA FILA QUE SE ACABA DE CORREGIR NO DESAPARECE. 🩸 Con «Solo a revisar»
+  // prendido, guardar una hora que dejaba a la persona sin días por revisar la
+  // sacaba de la tabla: se corregía y la fila que se estaba mirando ya no
+  // estaba. La regla del filtro no se toca —la sigue poniendo el motor—: lo
+  // único que se agrega es que a lo filtrado se le devuelven los anclados, EN
+  // SU LUGAR. Se van al cambiar el filtro, el período o la empresa.
+  const filtradas = useMemo(
     () => (personas === null ? null : soloConDiasARevisar(personas, soloARevisar)),
     [personas, soloARevisar],
   );
+  const visibles = useMemo(
+    () => (filtradas === null ? null : conAnclados(filtradas, personas ?? [], anclados)),
+    [filtradas, personas, anclados],
+  );
+  /** Los que se quedan SOLO porque se los ancló: llevan el chip «listo». */
+  const seQuedanAncladas = useMemo(
+    () => ancladosQueSeQuedan(filtradas, anclados),
+    [filtradas, anclados],
+  );
+  // Cambiar lo que se mira limpia los anclajes: son de esta vuelta, no del día.
+  useEffect(() => { setAnclados(new Set()); }, [soloARevisar, desde, hasta, empresa]);
+  /** Se guardó el día de alguien: se lo ancla y se recarga sin borrar la tabla. */
+  const guardadoElDia = useCallback((codigo: string) => {
+    setAnclados((s) => (s.has(codigo) ? s : new Set([...s, codigo])));
+    void cargar(true);
+  }, [cargar]);
   const conteo = conteoARevisar(visibles?.length ?? 0, personas?.length ?? 0, soloARevisar);
 
   // 🔴 LA SELECCIÓN SE DERIVA DE LO QUE SE VE. Un código marcado que dejó de
@@ -626,6 +676,16 @@ export default function ReporteTab({ empresa = "" }: {
         </p>
       )}
 
+      {/* 🔴 QUIEN NO MARCÓ NI UN DÍA SALE IGUAL, EN GRIS (24-sep-2026). 🩸 La
+          lista se armaba solo con quien tiene marcas, así que Yeisibeth Muñoz
+          (306, Multifashion) no existía para la quincena 1–15 de septiembre y
+          no había forma de arreglarle las horas. */}
+      {avisoSinMarcas((visibles ?? []).filter(esSinMarcas).length) && (
+        <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
+          {avisoSinMarcas((visibles ?? []).filter(esSinMarcas).length)}
+        </p>
+      )}
+
       {/* Sin la migración corrida la pantalla NO ofrece corregir, y lo dice: un
           botón que siempre falla es peor que no tenerlo. */}
       {avisoCorreccion && (
@@ -633,6 +693,13 @@ export default function ReporteTab({ empresa = "" }: {
       )}
 
       {cargando && <p className="py-8 text-center text-sm text-gray-400">Cargando…</p>}
+      {/* 🔴 FIJA, no en el flujo: una línea que aparece y desaparece arriba de
+          la tabla empuja la página y mueve el lugar donde se estaba mirando. */}
+      {refrescando && (
+        <p className="fixed bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full bg-gray-900 px-3 py-1.5 text-xs text-white shadow-lg">
+          {TEXTO_ACTUALIZANDO}
+        </p>
+      )}
       {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {!cargando && !error && personas?.length === 0 && (
         <p className="py-10 text-center text-sm text-gray-500">
@@ -714,7 +781,8 @@ export default function ReporteTab({ empresa = "" }: {
                   onCorregir={setCorrigiendo}
                   onJustificar={setJustificando}
                   motivosFrecuentes={motivosFrecuentes}
-                  onGuardadoElDia={() => void cargar()}
+                  onGuardadoElDia={() => guardadoElDia(p.codigo)}
+                  anclada={seQuedanAncladas.has(p.codigo)}
                   seleccionada={seleccion.has(p.codigo)}
                   onSeleccionar={alternarSeleccion}
                   puedeDecidirExtra={puedeDecidirExtra}
@@ -817,7 +885,7 @@ export default function ReporteTab({ empresa = "" }: {
   );
 }
 
-function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, onToggle, puedeCorregir, onCorregir, onJustificar, marcasTelefono, onVerSelfie, decisionesExtra, motivosFrecuentes, onGuardadoElDia, puedeDecidirExtra, onDecidirExtra, extrasEnVuelo, seleccionada, onSeleccionar }: {
+function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, onToggle, puedeCorregir, onCorregir, onJustificar, marcasTelefono, onVerSelfie, decisionesExtra, motivosFrecuentes, onGuardadoElDia, anclada, puedeDecidirExtra, onDecidirExtra, extrasEnVuelo, seleccionada, onSeleccionar }: {
   p: PersonaReporte;
   abierta: boolean;
   /** Abierta por «Ver solo esos días»: adentro van SOLO los días a revisar. */
@@ -837,6 +905,8 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
   motivosFrecuentes: readonly string[];
   /** Se guardó un día: hay que volver a leer el reporte. */
   onGuardadoElDia: () => void;
+  /** 🔴 Está en la tabla SOLO porque se la acaba de corregir. Lleva «listo». */
+  anclada: boolean;
   /** ¿Este rol puede decidir las horas extra? El freno de verdad es del servidor. */
   puedeDecidirExtra: boolean;
   onDecidirExtra: (codigo: string, fecha: string, minutos: number, decision: Decision) => void;
@@ -856,7 +926,12 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
     : etiquetaPersona(p.codigo, p.nombre);
   return (
     <>
-      <tr onClick={onToggle} className="cursor-pointer border-b border-gray-100 transition hover:bg-gray-50">
+      {/* 🔴 La fila de quien no marcó va en GRIS: se ve que no es una fila con
+          números, sin sacarla de la lista ni del papel. */}
+      <tr onClick={onToggle}
+        className={`cursor-pointer border-b border-gray-100 transition hover:bg-gray-50${
+          esSinMarcas(p) ? " bg-gray-50/70 text-gray-500" : ""
+        }`}>
         {/* El NOMBRE manda; el código va chico al lado, y solo si aporta algo.
             Sin nombre configurado se muestra el código —nunca un blanco— y se
             dice qué falta, porque un número suelto no se le reclama a nadie. */}
@@ -878,6 +953,20 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
             <span className="ml-1.5 text-xs text-gray-400">{p.codigo}</span>
           ) : (
             <span className="ml-1.5 text-xs text-amber-700">falta configurar</span>
+          )}
+          {/* 🔴 Dice por qué esta fila está vacía: no marcó. Sin esto se lee
+              igual que alguien que trabajó y no tiene nada anotado. */}
+          {esSinMarcas(p) && (
+            <span className="ml-1.5 whitespace-nowrap rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600">
+              {TEXTO_SIN_MARCAS}
+            </span>
+          )}
+          {/* 🔴 Dice por qué esta fila sigue acá con el filtro prendido. */}
+          {anclada && (
+            <span title={TITULO_ANCLADA}
+              className="ml-1.5 whitespace-nowrap rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600">
+              {ROTULO_ANCLADA}
+            </span>
           )}
           {/* 🔴 Se ve SIN abrir nada: los minutos de esta fila ya salen de una
               hora que alguien escribió a mano. */}
@@ -952,6 +1041,12 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
 
       {abierta && (
         <tr><td colSpan={11} className="bg-gray-50 px-3 py-3">
+          {/* 🔴 LA FILA GRIS SOLO INFORMA. Medido en `armarPlanilla`: a quien no
+              marcó nada se le da `HORAS_CERO`, o sea que la planilla NO le
+              cuenta ausencias. La pantalla no puede decir otra cosa que el pago. */}
+          {esSinMarcas(p) && (
+            <p className="mb-2 text-[13px] text-gray-600">{NOTA_SIN_MARCAS}</p>
+          )}
           {/* 🔴 SE DICE QUE ESTÁ RECORTADO, Y CÓMO SE SUELTA (18-sep-2026). Un
               detalle con 3 de 11 días y sin una línea que lo diga se lee como
               si la persona hubiera trabajado tres días. El texto sale del
@@ -994,6 +1089,7 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
                   <FilaDia key={d.fecha} d={d} codigo={p.codigo} persona={persona}
                     empresa={(p as PersonaReporte & { empresa?: string | null }).empresa ?? null}
                     conExtra={cuentaHorasExtra(p)}
+                    sinMarcas={esSinMarcas(p)}
                     puedeCorregir={puedeCorregir} onCorregir={onCorregir}
                     onJustificar={onJustificar}
                     motivosFrecuentes={motivosFrecuentes}
@@ -1040,7 +1136,7 @@ function perdonDelDia(d: DiaReporte): PerdonDelDia {
  * corrección debajo. Debajo de la fila, una línea por corrección dice qué se
  * cambió, por qué, quién y cuándo — sin abrir nada más.
  */
-function FilaDia({ d, codigo, persona, empresa, conExtra, puedeCorregir, onCorregir, onJustificar, delTelefono, onVerSelfie, motivosFrecuentes, onGuardadoElDia, decisionExtra, puedeDecidirExtra, onDecidirExtra, extraEnVuelo }: {
+function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorregir, onCorregir, onJustificar, delTelefono, onVerSelfie, motivosFrecuentes, onGuardadoElDia, decisionExtra, puedeDecidirExtra, onDecidirExtra, extraEnVuelo }: {
   d: DiaReporte;
   codigo: string;
   persona: string;
@@ -1048,6 +1144,8 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, puedeCorregir, onCorre
   empresa: string | null;
   /** `false` = servicio profesional: la columna Extra va con raya. */
   conExtra: boolean;
+  /** 🔴 Esta persona no marcó NI UNA VEZ en el período: su día no es ausencia. */
+  sinMarcas: boolean;
   puedeCorregir: boolean;
   onCorregir: (m: MarcaParaCorregir) => void;
   onJustificar: (d: DiaParaJustificar) => void;
@@ -1524,6 +1622,11 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, puedeCorregir, onCorre
               // el día en curso: la planilla ya no lo cobra, y un rojo acá
               // diría lo contrario de lo que se paga.
               : d.fueraDeVigencia ? <span className="text-gray-500">{TEXTO_DIA_FUERA_DE_VIGENCIA}</span>
+              // 🔴 NO MARCÓ NI UNA VEZ EN EL PERÍODO (24-sep-2026): gris y no
+              // rojo, por lo mismo que el día en curso — la planilla no se la
+              // cobra, y un «Ausencia sin justificar» acá diría lo contrario de
+              // lo que se paga. Ver `sin-marcas.ts`.
+              : sinMarcas ? <span className="text-gray-500">{TEXTO_DIA_SIN_MARCAS}</span>
               : <span className="font-medium text-red-700">Ausencia sin justificar</span>}
             {puedeCorregir && !d.feriado && !d.fueraDeVigencia && !editando && (
               <button type="button" onClick={() => (seEdita ? abrirEditor() : agregar())}

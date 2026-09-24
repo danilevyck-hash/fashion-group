@@ -385,6 +385,13 @@ export interface PersonaReporte {
    * casilla. Es lo ÚNICO que mira `cuentaHorasExtra`.
    */
   cobraHorasExtra?: boolean;
+  /**
+   * 🔴 NO MARCÓ NI UNA VEZ EN EL PERÍODO (24-sep-2026). La fila existe para que
+   * se la pueda ver y corregir, pero **todos sus días van en cero y ninguno es
+   * ausencia**: es lo que la planilla ya hace con esta persona. La pantalla la
+   * dibuja en gris y lo dice. Ausente o `false` = la persona de siempre.
+   */
+  sinMarcas?: boolean;
   dias: DiaReporte[];
   resumen: {
     diasTrabajados: number;
@@ -714,6 +721,24 @@ export function armarReporte(opts: {
    * la lectura devuelve vacío. Lunes a viernes para todo el mundo, como hoy.
    */
   diasLaborables?: ReadonlyMap<string, readonly number[]>;
+  /**
+   * 🔴 QUIÉN SALE AUNQUE NO HAYA MARCADO NI UNA VEZ (24-sep-2026).
+   *
+   * 🩸 Hasta hoy la lista se armaba SOLO con quien tiene marcas en el período,
+   * así que Yeisibeth Muñoz (306, Multifashion) no existía para la pantalla de
+   * la quincena 1–15 de septiembre y no había forma de arreglarle las horas.
+   *
+   * 🔴 SU VEREDICTO QUEDA SUSPENDIDO, COMO EL DÍA EN CURSO Y EL DÍA FUERA DE
+   * VIGENCIA: todos sus días salen en cero y **ninguno es ausencia**. Es lo que
+   * la planilla ya hace con esta persona (`armarPlanilla` le da `HORAS_CERO`
+   * porque no tiene reporte), y la pantalla no puede decir otra cosa que el
+   * pago. Los días existen para poder TOCARLOS y agregarles una hora.
+   *
+   * 🔑 SIN ESTO NADA CAMBIA: vacío por defecto. La PLANILLA no lo pasa, así que
+   * su cuadro es exactamente el de siempre. Un código que sí marcó se ignora
+   * acá: ése sale por el camino de siempre, con sus números.
+   */
+  sinMarcas?: ReadonlySet<string>;
 }): PersonaReporte[] {
   const { marcaciones, horarios, justificaciones, feriados, desde, hasta, nombres } = opts;
   const vacaciones = opts.vacaciones ?? [];
@@ -780,8 +805,22 @@ export function armarReporte(opts: {
     }
   }
 
+  // 🔴 LOS QUE NO MARCARON NI UNA VEZ ENTRAN AL FINAL DE LA LISTA (24-sep-2026).
+  // Se agregan DESPUÉS de recorrer las marcaciones, así que un código que sí
+  // marcó nunca pasa por acá: `porPersona.has(cod)` ya es verdadero y se lo
+  // deja como está, con sus números de siempre. Ver `sin-marcas.ts`.
+  const sinMarcasDeVerdad = new Set<string>();
+  for (const cod of opts.sinMarcas ?? []) {
+    const c = String(cod ?? "").trim();
+    if (!c || porPersona.has(c)) continue;
+    porPersona.set(c, { nombre: nombres?.get(c) ?? null, dias: new Map(), ids: new Map(), primera: new Map() });
+    sinMarcasDeVerdad.add(c);
+  }
+
   const out: PersonaReporte[] = [];
   for (const [codigo, p] of porPersona) {
+    /** 🔴 Esta persona no marcó NADA en el período: su veredicto se suspende. */
+    const noMarcoNada = sinMarcasDeVerdad.has(codigo);
     const h = horarioDe.get(codigo);
     // 🔑 TODO EL DÍA SE MIDE EN SEGUNDOS. Los umbrales de negocio siguen siendo
     // en minutos (la tolerancia, el mínimo de extra, el almuerzo) y se escalan
@@ -873,6 +912,32 @@ export function armarReporte(opts: {
       // Informativo: qué horas de este día se tocaron a mano. No entra en
       // ninguna cuenta — ver la nota de `correccionesPorDia`.
       const correcciones = [...(opts.correccionesPorDia?.get(`${codigo}|${fecha}`) ?? [])];
+
+      // ── 🔴 NO MARCÓ NI UNA VEZ EN TODO EL PERÍODO (24-sep-2026) ────────────
+      //
+      // El día existe para poder TOCARLO y agregarle una hora, y nada más: en
+      // cero, sin ausencia y sin nada que revisar. Es lo MISMO que la planilla
+      // ya hace con esta persona (`HORAS_CERO`), y la pantalla no puede decir
+      // otra cosa que el pago. Va antes que la vigencia y que las vacaciones
+      // por la misma razón de siempre: lo que se calcule antes hay que
+      // acordarse de anularlo después. Ver `sin-marcas.ts`.
+      if (noMarcoNada) {
+        dias.push({
+          fecha,
+          marcas: [], marcasIds: [], repetidas: [],
+          entrada: null, salida: null,
+          tardeMin: 0, excesoAlmuerzoMin: 0, salidaTempranaMin: 0, extraMin: 0, trabajadoMin: 0,
+          revisar: false, salidaSospechosa: false,
+          enCurso, fueraDeVigencia: false,
+          // 🔴 NUNCA una ausencia: la planilla no se la cobra.
+          ausente: false,
+          vacacion: null, justificado: null, permiso: null, permisoRango: null,
+          permisoPerdonaMin: 0, permisoPerdonaSalidaMin: 0, permisoPerdonaAlmuerzoMin: 0,
+          feriado, habil,
+          correcciones,
+        });
+        continue;
+      }
 
       // ── 🔴 ESE DÍA NO ERA SUYO: VA ANTES QUE TODO, HASTA DE LAS VACACIONES ──
       //
@@ -1173,6 +1238,8 @@ export function armarReporte(opts: {
       nombre: nombres?.get(codigo) ?? p.nombre ?? null,
       salida: h?.salida ?? SALIDA_DEFAULT,
       almuerzoMin: almuerzoProg,
+      // 🔴 Solo cuando de verdad no marcó: la bandera no se pone sola.
+      ...(noMarcoNada ? { sinMarcas: true as const } : {}),
       dias,
       resumen,
     });
