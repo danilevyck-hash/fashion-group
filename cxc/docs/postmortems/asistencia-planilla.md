@@ -7,6 +7,183 @@
 
 ---
 
+## 🔴 Las tres reglas de horas del 24-sep-2026 — gracia del almuerzo, entrada autorizada y el aviso
+
+> 🔴 **Mueven plata hacia adelante y NINGUNA hacia atrás.** Solo cambian lo que
+> el motor GENERA desde ahora; una quincena cerrada es su resultado congelado
+> (`asistencia_planilla_guardada`) y nadie la recalcula (candado
+> `quincena-cerrada-no-cambia`). Interruptores en
+> `src/lib/asistencia/reglas-nuevas.ts`: `GRACIA_ALMUERZO` y
+> `ENTRADA_AUTORIZADA`, hoy los dos en `true`; en `false` —o sin las columnas
+> de la migración— el cálculo es el de antes, byte a byte.
+>
+> ⚠️ **Migración `20261219120000_asistencia_gracia_almuerzo_entrada_autorizada.sql` PENDIENTE de aplicar** (la aplica Daniel). Hasta entonces: gracia 0, sin aviso, y «Hoy entraba a las» contesta 503 con el nombre del archivo.
+
+### Qué decidió Daniel (textual)
+
+1. **Gracia del almuerzo, 5 minutos sobre la duración.** *«Almuerzo de 60 que
+   dura 65 no descuenta nada; si dura 66, se descuentan los 6, igual que la
+   tardanza se cuenta desde la hora y no desde el minuto 11. En Multifashion 60
+   más 5, en las otras 30 más 5.»* ¿Una sola regla para las cuatro? *«sí»*.
+2. **Entrada autorizada por día.** En «Arreglar el día» se marca «Hoy entraba a
+   las __:__» con motivo; ese día la extra se mide desde esa hora autorizada
+   hasta la hora de entrada del horario (*«horario 10:00, autorizada 06:00,
+   marcó 05:58 → 4 h de extra de entrada, medidas desde las 06:00, no desde
+   las 05:58»*), va a Aprobaciones como cualquier extra y se paga al recargo
+   que corresponda por la hora del día. **No cambia nada para quien no la tiene.**
+3. **Aviso de entrada temprana** *«solo desde 30 minutos»*, configurable. Solo
+   aviso: no cuenta, no frena, no entra a «Antes de cerrar».
+4. **Salida temprana: como hoy**, desde el minuto uno. No se tocó.
+
+### 🩸 Cómo contaba hasta hoy (informe del 24-sep-2026, medido contra producción)
+
+- El exceso de almuerzo se descontaba **desde el primer minuto**:
+  `max(0, tomado − programado)`. Sheynee Batista (304), 19-sep: 47,9 min de 60
+  → 0 (y los 12 que no usó no valían nada). 0,77 min de exceso en su quincena.
+- **Llegar antes valía cero, siempre.** Ángel Pizza (305, Multifashion,
+  horario 10:00) entró 08:59 los días 22 y 23 de septiembre: 61 minutos de
+  adelanto a $0 y 29,6 min de salida temprana descontados ($2,33 en dos días).
+  Del 16 al 23 de septiembre: **1.885 minutos** de adelanto en las cuatro
+  empresas (768 en Multifashion, promedio 20,2 por día).
+- El encabezado del motor mentía en dos puntos («ENTRADA 8:00» y «ALMUERZO 30
+  MINUTOS, IGUAL PARA TODOS»): hoy son 53 horarios, 8 con 60 de almuerzo y 8
+  con entrada a las 09:00 o 10:00. Se reescribió con la verdad de hoy.
+
+### La regla, entera
+
+**1 · Gracia del almuerzo** (`reglas-nuevas.ts` › `excesoAlmuerzoBrutoMin`).
+Una PUERTA como la tolerancia: hasta `programado + gracia` no hay exceso; un
+segundo más y se cuenta **todo** desde el minuto programado.
+
+| Almuerzo | Duró | Antes | Ahora (gracia 5) |
+|---|---|---|---|
+| 60 (Multifashion) | 65:00 | 5 | **0** |
+| 60 | 66:00 | 6 | **6** |
+| 30 (las otras tres) | 35:00 | 5 | **0** |
+| 30 | 36:00 | 6 | **6** |
+| 60 | 47:54 (Sheynee) | 0 | 0 |
+
+- Vive en `asistencia_reglas.gracia_almuerzo_min` (**DEFAULT 5**, 0–60), UNA
+  fila para las cuatro empresas, editable en Configuración › Reglas del cálculo
+  › «Gracia del almuerzo», al lado de «Tolerancia de tardanza».
+- 🔴 **Falla ABIERTA**: con `GRACIA_ALMUERZO = false`, o si la fila de la base
+  NO trae la columna (`select *` sin la migración), la gracia es **0** —el
+  cálculo de hoy—, no el DEFAULT (`VALOR_SIN_COLUMNA`). El permiso de horas
+  sigue perdonando sobre el exceso ya con gracia. Guardar las reglas sin las
+  columnas reintenta sin ellas y lo dice (`avisoReglasNuevas`).
+- El Excel y el PDF del Reporte dicen la gracia con la que se calculó; sin
+  dato, no la afirman.
+
+**2 · Entrada autorizada** (`entrada-autorizada.ts` › `extraDeEntrada`;
+I/O en `entrada-autorizada-server.ts`; tabla **`asistencia_entradas_autorizadas`**).
+
+- 🔴 **Es una TABLA NUEVA, no un tipo de corrección.** Una corrección cambia
+  QUÉ HORA VALE (pisa, agrega o quita una marca); la autorización no toca una
+  marca: cambia DESDE DÓNDE SE MIDE la extra de la entrada. En la misma tabla
+  habría pedido un `tipo`, que `aplicarCorrecciones` y cada lector la filtren,
+  y chocaría con el único parcial `(empleado_codigo, fecha, hora) WHERE
+  marcacion_id IS NULL` al agregar una marca a la misma hora. Misma forma que
+  las correcciones: `motivo` y `creada_por` obligatorios con CHECK, UNA viva
+  por persona y día (único parcial), `anulada_en`/`anulada_por` (se anula,
+  nunca se borra), RLS sin políticas.
+- La cuenta: `desde = max(marca, autorizada)`; extra = `entrada del horario −
+  desde`, si la autorizada es ANTERIOR a la entrada; pasa por la **misma
+  puerta del mínimo** (`extraMinimoMin`, hoy 10) que la extra de salida.
+  `DiaReporte.extraMin` es la extra COMPLETA (salida + entrada) y
+  `extraEntradaMin` dice cuánto vino de la entrada (subconjunto).
+
+  | Horario | Autorizada | Marcó | Extra de entrada |
+  |---|---|---|---|
+  | 10:00 | 06:00 | 05:58 | **240 min**, medidos de 06:00 a 10:00 |
+  | 10:00 | 06:00 | 06:30 | 210 (desde que marcó) |
+  | 10:00 | 06:00 | 10:15 | 0 — y **15 de tardanza**, como siempre |
+  | 10:00 | — | 05:58 | 0 — como hoy |
+  | 10:00 | 06:00 (anulada) | 05:58 | 0 |
+
+- **La planilla** (`clasificarDia`): la extra de entrada se reparte con SU
+  ventana (`desde` → entrada del horario) contra el MISMO corte de la tarde:
+  6–10 a.m. cae entera de día (1,25) con el corte en 18:00 y en 18:01. La de
+  salida se reparte como siempre. `HorasPersona` **no ganó columnas** (25, las
+  mismas que se congelan): el desglose `extraEntradaDiurnoMin/NocturnoMin`
+  viaja solo dentro de `clasificarDia` → `medirHoras`.
+- **Aprobaciones**: sale del mismo `diasConExtra` (`clasificarDia`), con los
+  minutos y «entró 06:00 (autorizado)» al lado. Sin aprobar → `extraNoAprobada`
+  (aviso ámbar y freno del cierre); «No» → decidido; **los 30 min sin aprobar
+  de Multifashion son de la SALIDA** (el horario de la tienda) y no se comen la
+  extra de la entrada.
+- **Pantalla**: en «Arreglar el día» (editor de la fila, `EDITAR_EL_DIA`) va el
+  campo «Hoy entraba a las» con «Quitar»; se guarda con el MISMO porqué y el
+  mismo botón por `POST /api/asistencia/correcciones/dia`
+  (`entradaAutorizada: { hora } | { quitar: true }`); sin motivo, **400 y cero
+  escrituras**. Bajo el día queda la línea azul «Entrada autorizada a las 06:00
+  · yulissa: motivo · 240 min de extra medidos de 06:00:00 a 10:00:00» con
+  «Deshacer» (`DELETE /api/asistencia/correcciones?entrada=<id>`, anula con
+  firma). Editar es editar: otra hora anula la viva y escribe la nueva.
+- Lecturas: el Reporte y la Planilla leen la tabla con la MISMA
+  `leerEntradasAutorizadas(desde, hasta)` (paginada, solo vivas); sin la
+  tabla, vacío.
+
+**3 · El aviso** (`entrada-autorizada.ts` › `avisoEntradaTemprana`). Se dibuja
+«llegó N min antes · ¿entrada autorizada?» (chip gris, tocarlo abre «Arreglar
+el día») solo si la primera marca cae **N ≥ umbral** minutos antes de su
+entrada (`asistencia_reglas.aviso_entrada_temprana_min`, **DEFAULT 30**, 0 =
+apagado, editable en Reglas del cálculo) y el día no tiene autorización. 29 →
+no · 30 → sí. Viaja en `DiaReporte.entradaTempranaMin` y NADA lo lee salvo la
+fila: ni `revisar`, ni `planilla.ts`, ni `antes-de-cerrar*.ts`, ni
+`planilla-guardada.ts` (barrido).
+
+### La migración, en palabras simples
+
+`supabase/migrations/20261219120000_asistencia_gracia_almuerzo_entrada_autorizada.sql`
+— aditiva, idempotente, **sin aplicar**:
+
+1. `asistencia_reglas` gana dos columnas con valor puesto: `gracia_almuerzo_min`
+   (5) y `aviso_entrada_temprana_min` (30). **Toca 1 fila** (la única, id = 1).
+2. Nace `asistencia_entradas_autorizadas`, vacía, con sus dos índices y RLS.
+
+No borra, no reescribe, no toca la planilla guardada (candado que lee el SQL).
+La tabla nueva entró al respaldo (`backup/tablas.ts` › `TABLAS_PERSONAS` y
+`DATASETS` del cron).
+
+### Candados (`src/__tests__/asistencia/`, 68 pruebas)
+
+- `gracia-almuerzo.test.ts` — 65 → 0, 66 → 6 (30+5 y 60+5), el borde `>`, el
+  DEFAULT 5, apagado = antes, sin columna = 0, validación, la migración y la
+  pantalla.
+- `entrada-autorizada.test.ts` — el caso 06:00/10:00/05:58 → 240, 06:30 → 210,
+  sin autorización 0, anulada 0, tardanza intacta, 240 al 1,25 con el corte en
+  18:00 y 18:01, Aprobaciones y los 30 de ACS, la ruta (400 sin motivo, cero
+  escrituras; anular+escribir; quitar), y que nada toque el reloj.
+- `aviso-entrada-temprana.test.ts` — 29 no / 30 sí / con autorización no,
+  DEFAULT 30, sin columna apagado, no mueve ni un número, barrido del cierre.
+- `quincena-cerrada-no-cambia.test.ts` — el I/O de la planilla guardada no
+  importa el motor ni las reglas nuevas; la migración no toca lo cerrado;
+  `HorasPersona` sigue con 25 cifras; con los interruptores apagados el motor
+  da lo de antes.
+
+**Verificado por mutación** (las cinco cazadas, medido): DEFAULT 5 → 0 (7
+pruebas caen) · gracia `>` → `>=` (5) · aviso `>=` → `>` (2) · la extra desde
+la marca en vez de la autorizada (10) · DEFAULT 30 → 0 (4).
+
+**Candados viejos que se ajustaron, y por qué**: `asistencia-segundos` y
+`permiso-tres-columnas` pasan `graciaAlmuerzoMin: 0` (prueban medir al segundo
+y el perdón sobre un exceso de 2 min, que con gracia no existiría);
+`asistencia-config` documenta que una fila sin la columna vale 0; el candado de
+la ruta del día mockea el I/O nuevo; el de la pantalla cuenta solo las cuatro
+casillas de hora (`aria-label="Hora …"`).
+
+### Lo que NO se hizo, y lo que queda de Daniel
+
+- ⚠️ **La extra de entrada pasa por el mínimo de 10 minutos** («como cualquier
+  extra»). Si Daniel quiere que una autorización de 5 minutos cuente, es un
+  `if` en `extraDeEntrada`.
+- ⚠️ El aviso no sale en el Excel ni en el PDF del Reporte: es de pantalla.
+- ⚠️ El Excel y el PDF del Reporte llevan en «Extras» la extra COMPLETA (con la
+  de entrada), sin desglose; el desglose está en la línea azul del día.
+- La salida temprana no se tocó. La marcación del reloj sigue sin editarse.
+
+---
+
 ## 🔴 Los tres arreglos del 24-sep-2026 — las pestañas vivas, guardar sin salto, y quien no marcó
 
 > 🔴 **Ningún número de plata cambia y nada de lo que se guarda se toca.** El
