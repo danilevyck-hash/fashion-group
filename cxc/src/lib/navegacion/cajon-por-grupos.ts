@@ -27,8 +27,23 @@
 // y para el camino de migas. Esto solo cambia por dónde se entra desde el
 // teléfono.
 //
-// Interruptor `CAJON_HOJA_ABAJO`: en `false` vuelve el cajón lateral de
-// siempre, sin tocar una línea de lo que se guarda.
+// ── SEGUNDA VUELTA: LA HOJA PASÓ A SER UNA PANTALLA (24-sep-2026) ────────────
+// Daniel vio la hoja y no le gustó: arrancaba a la MITAD de la pantalla y
+// dejaba ver 6 de los 20 módulos, con las pestañas obligando a un tercer toque
+// para salir del grupo. Ahora ☰ abre el **menú a pantalla completa**: los tres
+// grupos como encabezados de sección, sus módulos en filas agrupadas al estilo
+// de Ajustes del iPhone, cada uno con su ícono a color, el de aquí marcado, y
+// un buscador arriba que llega a cualquiera. Caben 12 sin desplazar y los 20 en
+// un rollo corto, así que cualquier módulo son DOS toques, se venga de donde se
+// venga.
+//
+// 🔑 LA HOJA NO SE BORRÓ: es el otro `MODO_DEL_CAJON`. Volver a ella es cambiar
+// una palabra, sin desenterrar código.
+//
+// Interruptores: `CAJON_HOJA_ABAJO` en `false` vuelve el cajón lateral de
+// siempre; con él prendido, `MODO_DEL_CAJON` elige entre la hoja de abajo
+// (`"hoja"`) y el menú a pantalla completa (`"pantalla"`, hoy). Ninguno de los
+// dos toca una línea de lo que se guarda.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
@@ -39,9 +54,26 @@ import {
   type ModuleGroup,
 } from "@/lib/modules";
 import { moduloDeRuta } from "@/lib/novedades/seleccion";
+import { coincideBusqueda } from "@/lib/buscar-normalizado";
 
 /** 🔴 Hoy PRENDIDO. `false` = el cajón lateral de antes, igual que siempre. */
 export const CAJON_HOJA_ABAJO = true;
+
+/** Las dos formas del menú del celular. La hoja se conserva entera. */
+export type ModoDelCajon = "hoja" | "pantalla";
+
+/** 🔴 Hoy `pantalla`. `"hoja"` devuelve la hoja de abajo, tal cual estaba. */
+export const MODO_DEL_CAJON: ModoDelCajon = "pantalla";
+
+/** ¿Se dibuja el menú a pantalla completa? */
+export function esMenuDePantalla(): boolean {
+  return CAJON_HOJA_ABAJO && MODO_DEL_CAJON === "pantalla";
+}
+
+/** ¿Se dibuja la hoja de abajo? */
+export function esHojaDeAbajo(): boolean {
+  return CAJON_HOJA_ABAJO && MODO_DEL_CAJON === "hoja";
+}
 
 /** Un grupo tal como se dibuja en la hoja: su nombre largo, el corto y sus módulos. */
 export interface GrupoDelCajon {
@@ -123,4 +155,36 @@ export function grupoAlAbrir(
  */
 export function seDibujaElSegmentado(grupos: readonly GrupoDelCajon[]): boolean {
   return grupos.length > 1;
+}
+
+/**
+ * Los grupos, con sus módulos filtrados por lo que se escribió en el buscador.
+ *
+ * 🔴 SE BUSCA CON LA MISMA REGLA QUE TODO EL SISTEMA (`coincideBusqueda`):
+ * subcadena exacta normalizada —sin acentos, sin mayúsculas, sin signos—,
+ * **nunca por parecido**. Con una o dos letras se pide que estén al PRINCIPIO
+ * del nombre, que es lo que ya hace el directorio; de tres para arriba, en
+ * cualquier parte. Un texto vacío devuelve los grupos tal cual.
+ *
+ * Un grupo que se queda sin módulos NO se devuelve: nadie mira un encabezado de
+ * sección vacío.
+ *
+ * ⚠️ Esto NO es la búsqueda global (la del ⌘K y la lupa): esa busca clientes,
+ * guías y facturas contra el servidor. Este buscador solo acorta la lista de
+ * módulos que ya está en la pantalla.
+ */
+export function filtrarGruposPorTexto(
+  grupos: readonly GrupoDelCajon[],
+  texto: string | null | undefined,
+): GrupoDelCajon[] {
+  const q = (texto ?? "").trim();
+  if (!q) return [...grupos];
+  return grupos
+    .map((g) => ({ ...g, modulos: g.modulos.filter((m) => coincideBusqueda(q, [m.label])) }))
+    .filter((g) => g.modulos.length > 0);
+}
+
+/** Cuántos módulos quedaron a la vista — para decir cuando no quedó ninguno. */
+export function cuantosModulos(grupos: readonly GrupoDelCajon[]): number {
+  return grupos.reduce((n, g) => n + g.modulos.length, 0);
 }

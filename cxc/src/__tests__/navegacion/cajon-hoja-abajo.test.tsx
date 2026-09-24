@@ -13,6 +13,16 @@
 // (3) se dibuja el segmentado con UN solo grupo (un botón que no hace nada) ·
 // (4) los módulos dejan de salir del rol · (5) tocar un módulo no cierra la
 // hoja · (6) el interruptor apagado ya no devuelve el cajón lateral de antes.
+//
+// ⚠️ 24-sep-2026 — LA HOJA YA NO ES LO QUE SE VE. Daniel la miró y no le gustó
+// (arrancaba a la mitad de la pantalla y mostraba 6 de 20 módulos), así que hoy
+// `MODO_DEL_CAJON` es `"pantalla"` y ☰ abre el menú a pantalla completa —su
+// candado es `menu-pantalla-completa.test.tsx`—. Este archivo se queda entero:
+// la hoja sigue viva detrás del modo `"hoja"`, y lo que protege —que los
+// módulos salen del ROL, el rótulo corto derivado, el grupo de la ruta, el
+// segmentado que no se dibuja solo, y el cajón lateral con el interruptor
+// apagado— no cambió ni una coma. Los bloques que la dibujan piden el modo
+// `"hoja"` a propósito.
 // ============================================================================
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -27,10 +37,16 @@ vi.mock("next/navigation", () => ({
 
 // El interruptor se lee en cada render, así que un getter alcanza para probar
 // las dos caras sin duplicar el componente.
-const interruptor = vi.hoisted(() => ({ prendido: true }));
+const interruptor = vi.hoisted(() => ({ prendido: true, modo: "hoja" as "hoja" | "pantalla" }));
 vi.mock("@/lib/navegacion/cajon-por-grupos", async (original) => {
   const real = await original<typeof import("@/lib/navegacion/cajon-por-grupos")>();
-  return { ...real, get CAJON_HOJA_ABAJO() { return interruptor.prendido; } };
+  return {
+    ...real,
+    get CAJON_HOJA_ABAJO() { return interruptor.prendido; },
+    get MODO_DEL_CAJON() { return interruptor.modo; },
+    esHojaDeAbajo: () => interruptor.prendido && interruptor.modo === "hoja",
+    esMenuDePantalla: () => interruptor.prendido && interruptor.modo === "pantalla",
+  };
 });
 
 // Piezas pesadas del encabezado que no son lo que se está probando.
@@ -52,11 +68,16 @@ import {
 import { getModulesInGroup } from "@/lib/modules";
 
 describe("cajon-por-grupos · el módulo puro", () => {
-  it("el interruptor está PRENDIDO", async () => {
+  it("el interruptor está PRENDIDO y hoy el modo es PANTALLA", async () => {
     const real = await vi.importActual<typeof import("@/lib/navegacion/cajon-por-grupos")>(
       "@/lib/navegacion/cajon-por-grupos",
     );
     expect(real.CAJON_HOJA_ABAJO).toBe(true);
+    // 🔴 Lo que Daniel ve hoy es el menú a pantalla completa. La hoja sigue
+    // entera detrás del otro modo: volver a ella es cambiar esta palabra.
+    expect(real.MODO_DEL_CAJON).toBe("pantalla");
+    expect(real.esMenuDePantalla()).toBe(true);
+    expect(real.esHojaDeAbajo()).toBe(false);
   });
 
   it("el rótulo corto es la PRIMERA palabra, derivada, no una lista a mano", () => {
@@ -111,7 +132,12 @@ function montarComoAdmin(ruta = "/asistencia") {
 }
 
 describe("AppHeader · la hoja de abajo en el celular", () => {
-  beforeEach(() => { nav.push.mockClear(); interruptor.prendido = true; sessionStorage.clear(); });
+  beforeEach(() => {
+    nav.push.mockClear();
+    interruptor.prendido = true;
+    interruptor.modo = "hoja";
+    sessionStorage.clear();
+  });
   afterEach(() => cleanup());
 
   it("☰ abre la hoja: pestañas cortas, los módulos del grupo y el de aquí marcado", async () => {

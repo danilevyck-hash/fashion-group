@@ -54,6 +54,29 @@ const MODULE_COLORS: Record<string, ModuleColor> = {
   // parientes: el acento existe justamente para saber en cuál de los dos se
   // está parado.
   marcacion:   { border: "border-yellow-500",  text: "text-yellow-500",  hex: "#eab308" },
+  // ───────────────────────────────────────────────────────────────────────────
+  // Los CUATRO que faltaban — 24-sep-2026, con el menú a pantalla completa.
+  //
+  // 🩸 El menú nuevo dibuja cada módulo con su ícono a COLOR, y estos cuatro
+  // salían en gris: Vista General, Referencia, Catálogos y Usuarios eran los
+  // únicos sin acento propio de los 20 que ve admin. Daniel eligió el menú a
+  // color, así que había que pintarlos.
+  //
+  // 🔑 LAS 22 FAMILIAS DE LA PALETA YA ESTABAN TOMADAS. Los 18 acentos de
+  // arriba cubren todo el círculo de color en su tono medio, así que estos
+  // cuatro se eligieron por lo que la paleta NO tenía: un neutro frío, un
+  // marrón, un morado tinta y un azul marino. Ninguno se confunde con un
+  // vecino a 16 px, que es el tamaño real del ícono en la fila del menú, y los
+  // cuatro son oscuros: contraste de sobra sobre la tarjeta blanca.
+  //
+  // ⚠️ NO ENTRAN A `getModuleKeyFromPath`. Eso cambiaría el acento de 2 px del
+  // encabezado de esas cuatro pantallas —y el ícono que aparece al lado del
+  // nombre—, que es otra pantalla y otra decisión. Hoy el tono se usa en el
+  // menú y en los cuadritos de «qué cambió».
+  "vista-general": { border: "border-slate-600",  text: "text-slate-600",  hex: "#475569" },
+  referencia:      { border: "border-amber-800",  text: "text-amber-800",  hex: "#92400e" },
+  catalogos:       { border: "border-violet-800", text: "text-violet-800", hex: "#5b21b6" },
+  usuarios:        { border: "border-blue-900",   text: "text-blue-900",   hex: "#1e3a8a" },
 };
 
 /** El acento de un módulo por su KEY (la de `src/lib/modules.ts`).

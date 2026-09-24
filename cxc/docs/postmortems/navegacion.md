@@ -389,6 +389,182 @@ que lo ponía al pie.
   tocar un módulo navega y cierra · con el interruptor apagado vuelve el cajón
   lateral con los nombres largos y sin pestañas).
 
+> ⚠️ **La hoja duró una mañana.** Daniel la miró y no le gustó: ver §7. La hoja
+> NO se borró —es el modo `"hoja"` de `MODO_DEL_CAJON`— y este candado la sigue
+> probando entera.
+
+---
+
+# 6 · En el celular, la barra de arriba se esconde al bajar (24-sep-2026)
+
+## Lo que había
+
+Medido en píxeles sobre las fotos de Daniel del 24-sep
+(`cel-daniel-3/comisiones-vendedoras.png` y `cel-daniel-2/IMG_3120.PNG`,
+buscando la raya de color de cada módulo), en un iPhone de 844 px de alto:
+
+| | px reales |
+|---|---|
+| Franja del reloj y la isla (safe area, **no se puede tocar**) | 62 |
+| La barra: fila `h-11` (44) + la raya de color (2) | **46** |
+| Total blanco arriba | **108** |
+| Lo que queda para mirar, de 844 | **736** |
+
+Coincide con el código (`AppHeader.tsx`: `h-11` + `borderBottomWidth: 2px`). El
+encargo original hablaba de «72 px fijos»: **no son 72**, y todo el mockup se
+rehízo con 46 para no prometer el doble de lo que se gana.
+
+Esos 46 px estaban ahí **siempre**, en las 22 pantallas. Y de los tres botones
+de esa barra, Daniel usa uno. Textual: *«no uso ni notificaciones ni buscar»*.
+
+## Cómo quedó
+
+- **Hasta `sm` la barra es FG · el nombre del módulo · ☰.** La campana y la
+  lupa se van del teléfono **para todos los roles**. En la computadora no
+  cambia nada, y `⌘K` sigue abriendo la búsqueda global igual que siempre.
+- **Se esconde al deslizar hacia abajo y vuelve al deslizar hacia arriba**, como
+  Safari y Fotos: **782 px para mirar en vez de 736** (+46, un 6 %).
+
+## Las reglas
+
+- 🔴 **Manda el SENTIDO del dedo, no la posición**: bajar esconde, subir
+  muestra, se esté a 300 px del tope o a 3.000. Un movimiento de menos de 8 px
+  no decide nada **y no mueve el punto de medición**, así que un deslizamiento
+  lento igual suma y la barra responde; sin ese umbral la barra parpadea con
+  cada temblor del dedo.
+- 🔴 **Arriba del todo la barra está SIEMPRE.** Si no, una pantalla corta —o el
+  rebote de iOS, que deja llegar a `scrollY` negativos— podía dejarla escondida
+  sin forma de traerla de vuelta.
+- 🔴 **`--fg-altura-encabezado` SIGUE A LA BARRA.** Las barras pegajosas de
+  contenido se cuelgan de esa medida (`lib/ui/barra-pegajosa.ts`): con el
+  encabezado escondido pasa a **0** y suben con él. Dejarla en 46 habría puesto
+  una franja blanca encima de la barra de filtros de cada módulo. ⚠️ La medida
+  salta, no se anima: el encabezado va en z-index 10 y la barra de contenido en
+  9, así que mientras dura el movimiento (160 ms) el encabezado la tapa, nunca
+  al revés. Animar también el `top` de `.fg-barra-pegajosa` es un renglón de
+  `globals.css` que se dejó **sin tocar a propósito** — con dos agentes más
+  trabajando en el repo ese archivo es de todos.
+- 🔴 **Con «reducir movimiento» no se anima nada**: la barra aparece y
+  desaparece de golpe.
+- **Solo hasta `sm`**: el oyente se prende con `(max-width: 639px)`, el mismo
+  corte de Tailwind. Al pasar a la computadora la barra vuelve y la medida
+  vuelve a su alto real: girar el teléfono no puede dejarla escondida.
+- **El `scroll` va `passive` y agrupado en un `requestAnimationFrame`**: este
+  encabezado sale en las 22 páginas.
+- ⚠️ **Al rol `marcacion` no se le toca nada**: ya no veía campana, lupa ni menú
+  desde el 24-sep por la mañana.
+- 🔑 **Lo que se guarda no cambia.** Esto es navegación: no toca ni una fila.
+
+## Interruptor y candado
+
+- `BARRA_QUE_SE_ESCONDE` en `src/lib/navegacion/barra-celular.ts`, hoy `true`.
+  En `false` vuelve la barra de hoy —quieta, con campana y lupa—. 🔑 Los dos
+  botones **no se apagan con un `false` escrito a mano**: salen de
+  `campanaYLupaEnElCelular()`, derivado del interruptor, así que apagarlo los
+  devuelve sin acordarse de un segundo lugar.
+- La regla vive en un módulo PURO (`barra-celular.ts`) y el navegador en
+  `useBarraCelular.ts`: el oyente, las dos consultas de medio y la variable CSS.
+- `src/__tests__/navegacion/barra-celular.test.tsx` — 12 casos. Mutaciones que
+  caza: esconder mirando la posición en vez del sentido del dedo · dejar la
+  variable de altura quieta al esconderse · esconder también arriba del todo ·
+  animar con «reducir movimiento» prendido · escribir el `false` de la campana a
+  mano · que el interruptor apagado no devuelva los dos botones.
+
+---
+
+# 7 · El menú de las tres rayas es una pantalla completa (24-sep-2026)
+
+## Lo que había, y qué falla
+
+La hoja de abajo de §5, la misma mañana. Medido sobre la foto de Daniel
+(`cel-daniel-3/menu-hoja-abajo-catalogos.png`): la hoja **arranca a 413 px** —la
+mitad justa de la pantalla— y deja ver **6 de los 20 módulos**; los 20 nombres
+seguidos miden ~860 px, así que siempre hay que desplazar. Encima: el segmentado
+gris con la pastilla blanca flota en vez de asentarse, los íconos son grises
+finos y todos iguales, hay 43 px por renglón (mucho aire para 20 nombres),
+«Inicio» queda suelto arriba fuera de las pestañas y de todo grupo, y **no se ve
+dónde estás parado** — Catálogos aparece en esa lista sin marca.
+
+Y la pestaña cobra un **tercer toque** para llegar a un módulo de otro grupo.
+
+## Cómo quedó
+
+☰ abre el **menú entero**, con la forma de Ajustes del iPhone:
+
+1. título grande **«Menú»** y una **✕** de 44×44;
+2. un **buscador** arriba que solo acorta esta lista;
+3. «**Inicio**» (la casa del rol, y nada si ya está parado en ella);
+4. los **tres grupos como encabezados de sección**, con su nombre **completo**
+   —acá hay ancho de sobra: el rótulo corto era de la pestaña—;
+5. sus módulos en **tarjetas blancas sobre el gris del sistema** (`#f2f2f7`),
+   filas de 44 px, cada uno con **su ícono en su color** y el de aquí marcado
+   (`aria-current="page"` y la palabra «aquí» donde los demás llevan «›»);
+6. al pie, **nombre · rol · Contraseña · Salir**.
+
+Caben **12 módulos sin desplazar** y los 20 en un rollo corto: cualquier módulo
+son **dos toques**, se venga de donde se venga.
+
+## Las reglas
+
+- 🔴 **Los módulos salen del ROL, nunca de una lista escrita a mano**: el mismo
+  `gruposDelCajon` de §5, o sea `getVisibleModules`/`GROUPS` de `modules.ts`. El
+  candado compara la lista dibujada contra esa función, por igualdad: si sobra o
+  falta uno, cae.
+- 🔴 **El buscador usa la MISMA regla de búsqueda de la casa**
+  (`coincideBusqueda`, `lib/buscar-normalizado.ts`): subcadena exacta
+  normalizada —sin acentos, sin mayúsculas, sin signos—, **nunca por parecido**.
+  Con una o dos letras se pide que estén al principio; de tres para arriba, en
+  cualquier parte. Un grupo que se queda sin módulos no se dibuja, y cuando no
+  queda ninguno se dice con palabras. ⚠️ **No es la búsqueda global**: la del
+  ⌘K busca clientes, guías y facturas contra el servidor; ésta solo acorta la
+  lista que ya está en la pantalla.
+- 🔴 **El menú abre en limpio**: lo que se escribió antes no se hereda.
+- **Cierra con la ✕, con Escape y al navegar**, igual que el cajón de siempre
+  (los tres ganchos ya estaban: `useEscapeClose`, el efecto que mira el
+  `pathname` y el bloqueo de scroll del fondo).
+- **`sm:hidden`**: la computadora no lo ve nunca.
+- 🔑 **Lo que se guarda no cambia.**
+
+## Los cuatro tonos que faltaban
+
+De los 20 módulos que ve admin, **16 tenían color propio** y cuatro no —Vista
+General, Referencia, Catálogos y Usuarios—, así que en un menú a color salían en
+gris. Daniel eligió el menú a color, así que había que pintarlos.
+
+🔑 **Las 22 familias de la paleta ya estaban tomadas**: los 18 acentos de
+`moduleColors.ts` cubren el círculo de color entero en su tono medio. Los cuatro
+se eligieron por lo que la paleta **no** tenía:
+
+| Módulo | Tono | Por qué |
+|---|---|---|
+| Vista General | `slate-600` · `#475569` | El único neutro frío. Es la vista sobre todo el grupo: el acento más sobrio de los 20 |
+| Referencia | `amber-800` · `#92400e` | El único marrón. `stone-500` (Boston) es un gris cálido y `amber-500` (Recordatorios) un amarillo brillante |
+| Catálogos | `violet-800` · `#5b21b6` | El único morado tinta. `violet-500` (Caja) y `purple-600` (Proveedores) son claros |
+| Usuarios | `blue-900` · `#1e3a8a` | El único azul marino. Los cuatro azules existentes son medios |
+
+Los cuatro son oscuros: contraste de sobra sobre la tarjeta blanca, y ninguno se
+confunde con un vecino a 16 px, que es el tamaño real del ícono en la fila.
+
+⚠️ **NO entran a `getModuleKeyFromPath`.** Eso cambiaría el acento de 2 px del
+encabezado de esas cuatro pantallas y les pondría un ícono al lado del nombre:
+es otra pantalla y otra decisión, que no está tomada. Hoy el tono se usa en el
+menú y en los cuadritos de «qué cambió».
+
+## Interruptores y candado
+
+- `MODO_DEL_CAJON` en `src/lib/navegacion/cajon-por-grupos.ts`, hoy
+  `"pantalla"`. En `"hoja"` vuelve la hoja de abajo de §5, **entera**; con
+  `CAJON_HOJA_ABAJO` en `false` vuelve el cajón lateral de siempre. Tres caras,
+  ninguna borrada.
+- `src/__tests__/navegacion/menu-pantalla-completa.test.tsx` — 12 casos (el
+  modo, el buscador normalizado, los cuatro tonos y que ningún módulo de admin
+  quede en gris; y el render: los tres grupos con todos sus módulos comparados
+  contra el rol, el de aquí marcado, los íconos con su clase de color, el
+  buscador que acorta sin navegar, «Inicio» y el pie, tocar un módulo navega y
+  cierra, la ✕ y Escape, el menú que abre en limpio, y un rol de un módulo solo).
+- `cajon-hoja-abajo.test.tsx` se quedó **entero**: pide el modo `"hoja"` para
+  los bloques que la dibujan y sigue protegiendo lo mismo que protegía.
+
 ---
 
 ## Lo que decía CLAUDE.md hasta el 22-sep-2026 (movido acá, verbatim)

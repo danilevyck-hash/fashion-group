@@ -6,7 +6,7 @@ import { useBackdropDismiss, useEscapeClose } from "@/lib/hooks/useModalDismiss"
 import FGLogo from "@/components/FGLogo";
 import SearchBar, { SEARCH_ROLES } from "@/components/SearchBar";
 import NotificationCenter from "@/components/NotificationCenter";
-import { getModuleColor } from "@/lib/moduleColors";
+import { getModuleColor, getModuleColorByKey } from "@/lib/moduleColors";
 import { ALL_MODULES, getVisibleGroups, type AppGroup } from "@/lib/modules";
 import { casaDelRol, yaEstaEnSuCasa } from "@/lib/navegacion/casa-del-rol";
 import { hrefDelModulo } from "@/lib/navegacion/href-del-modulo";
@@ -21,11 +21,21 @@ import { MARCACION_UN_TOQUE } from "@/lib/marcacion/un-toque";
 import { BottomSheet } from "@/components/ui";
 import {
   CAJON_HOJA_ABAJO,
+  cuantosModulos,
+  esHojaDeAbajo,
+  esMenuDePantalla,
+  filtrarGruposPorTexto,
   gruposDelCajon,
   grupoAlAbrir,
   moduloDeLaRuta,
   seDibujaElSegmentado,
 } from "@/lib/navegacion/cajon-por-grupos";
+import {
+  campanaYLupaEnElCelular,
+  corrimientoDeLaBarra,
+  transicionDeLaBarra,
+} from "@/lib/navegacion/barra-celular";
+import { useBarraCelular } from "@/lib/navegacion/useBarraCelular";
 import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
 import type { ModuleGroup } from "@/lib/modules";
 
@@ -73,6 +83,11 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
   // celular, y envuelve en dos líneas cuando la ruta es larga.
   const encabezadoRef = useRef<HTMLDivElement | null>(null);
   usePublicarAlturaEncabezado(encabezadoRef);
+  // 🔴 Y en el celular se ESCONDE al deslizar hacia abajo (24-sep-2026). La
+  // regla vive en `lib/navegacion/barra-celular.ts`; el gancho mira el
+  // deslizamiento y, cuando la barra se va, deja `--fg-altura-encabezado` en 0
+  // para que las barras pegajosas de contenido suban con ella.
+  const barra = useBarraCelular(encabezadoRef);
 
   useEffect(() => {
     setUserName(sessionStorage.getItem("fg_user_name") || "");
@@ -135,12 +150,37 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
   const modulosDelGrupo = gruposHoja.find(g => g.key === grupoActivo)?.modulos ?? [];
   const moduloAqui = moduloDeLaRuta(pathname);
 
+  // ── El menú a pantalla completa (24-sep-2026) ──
+  // Lo que se escribe en su buscador solo acorta ESTA lista; la búsqueda
+  // global (⌘K) es otra cosa y no se toca. Se vacía cada vez que se abre: el
+  // menú nunca se abre a medio filtrar.
+  const [busqueda, setBusqueda] = useState("");
+  useEffect(() => { if (drawerOpen) setBusqueda(""); }, [drawerOpen]);
+  const gruposFiltrados = filtrarGruposPorTexto(gruposHoja, busqueda);
+  const irAlModulo = useCallback((href: string) => {
+    router.push(href);
+    setDrawerOpen(false);
+  }, [router]);
+
   const moduleColor = getModuleColor(pathname);
   const currentNav = ALL_MODULES.find(m => moduleColor && pathname.startsWith(m.href));
 
   return (
     <>
-      <div ref={encabezadoRef} className={`w-full border-b bg-white sticky top-0 ${moduleColor ? moduleColor.border : "border-gray-200"}`} style={{ zIndex: Z_ENCABEZADO, ...(moduleColor ? { borderBottomWidth: "2px" } : {}) }}>
+      <div
+        ref={encabezadoRef}
+        data-encabezado
+        data-barra-visible={barra.visible ? "si" : "no"}
+        className={`w-full border-b bg-white sticky top-0 ${moduleColor ? moduleColor.border : "border-gray-200"}`}
+        style={{
+          zIndex: Z_ENCABEZADO,
+          // Se corre justo lo que mide, nunca un `-100%`: el mismo bloque lleva
+          // la tira del camino de migas en la computadora.
+          transform: `translateY(${corrimientoDeLaBarra(barra.visible, barra.altura)}px)`,
+          transition: transicionDeLaBarra(barra.sinMovimiento),
+          ...(moduleColor ? { borderBottomWidth: "2px" } : {}),
+        }}
+      >
         <div className="h-11 flex items-center px-4 sm:px-6 gap-3">
           <FGLogo variant="icon" theme="light" size={22} />
           <div className="w-px h-4 bg-gray-200" />
@@ -183,9 +223,17 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
               Los tres son 44×44 reales (regla de la casa para el tacto en
               iPhone): este header sale en las 22 páginas, así que cada píxel
               que falte acá se multiplica por toda la app. La campana decide su
-              propio tamaño y ya no admite uno chico — ver NotificationCenter. */}
-          {!soloMarca && <div className="sm:hidden"><NotificationCenter /></div>}
-          {canSearch && !soloMarca && (
+              propio tamaño y ya no admite uno chico — ver NotificationCenter.
+
+              🔴 24-sep-2026: LA CAMPANA Y LA LUPA SE FUERON DEL CELULAR, para
+              TODOS los roles. Daniel, textual: *«no uso ni notificaciones ni
+              buscar»*. En el teléfono la barra queda con FG · el nombre del
+              módulo · ☰, y nada más. En la computadora las dos siguen igual, y
+              `⌘K` sigue abriendo la búsqueda. Lo decide
+              `campanaYLupaEnElCelular()`, derivado del interruptor: apagarlo
+              las devuelve sin tocar esta línea. */}
+          {!soloMarca && campanaYLupaEnElCelular() && <div className="sm:hidden"><NotificationCenter /></div>}
+          {canSearch && !soloMarca && campanaYLupaEnElCelular() && (
             <button onClick={() => setMobileSearchOpen(true)} aria-label="Buscar" className="sm:hidden min-w-[44px] min-h-[44px] flex items-center justify-center">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             </button>
@@ -310,7 +358,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
           módulos del grupo debajo. Reusa el `BottomSheet` de la casa, que ya
           trae el agarre, el fondo oscuro, el Escape, el bloqueo del scroll y el
           `sm:hidden` — o sea que la computadora no la ve nunca. */}
-      {CAJON_HOJA_ABAJO && (
+      {esHojaDeAbajo() && (
         <BottomSheet open={drawerOpen} onClose={cerrarDrawer}>
           <div className="-mx-5 flex min-h-full flex-col" data-cajon-hoja>
             {acciones && (
@@ -364,6 +412,117 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
             )}
           </div>
         </BottomSheet>
+      )}
+
+      {/* ── El menú a PANTALLA COMPLETA (24-sep-2026) ──
+          Daniel vio la hoja de abajo y no le gustó: arrancaba a la mitad de la
+          pantalla y mostraba 6 de sus 20 módulos. Esto es la pantalla de
+          Ajustes del iPhone: título grande, un buscador que solo acorta esta
+          lista, los tres grupos como encabezados de sección y sus módulos en
+          tarjetas blancas sobre el gris del sistema, cada uno con su ícono a
+          color y el de aquí marcado.
+
+          🔑 Los módulos salen del ROL (`gruposDelCajon`), nunca de una lista
+          escrita acá. Cierra con ✕, con Escape (`useEscapeClose`, arriba) y al
+          navegar (el efecto que mira `pathname`). `sm:hidden`: la computadora
+          no lo ve nunca. */}
+      {esMenuDePantalla() && drawerOpen && (
+        <div
+          data-menu-pantalla
+          role="dialog"
+          aria-modal="true"
+          aria-label="Menú"
+          className="fixed inset-0 z-50 flex flex-col bg-[#f2f2f7] sm:hidden"
+          style={{ paddingTop: "env(safe-area-inset-top)" }}
+        >
+          <div className="flex items-center justify-between px-4 pt-2">
+            <h2 className="text-[28px] font-bold leading-tight tracking-tight text-gray-950">Menú</h2>
+            <button
+              onClick={cerrarDrawer}
+              aria-label="Cerrar menú"
+              className="-mr-2 flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-gray-500 transition active:bg-black/5"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+
+          <div className="px-4 pb-1 pt-2">
+            <input
+              type="search"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar un módulo"
+              aria-label="Buscar un módulo"
+              autoCapitalize="none"
+              autoCorrect="off"
+              className="h-11 w-full rounded-xl border border-transparent bg-white px-3.5 text-base text-gray-900 placeholder:text-gray-400 focus:border-gray-300 focus:outline-none"
+            />
+          </div>
+
+          {acciones && <div className="px-4 py-2">{acciones}</div>}
+
+          <nav className="flex-1 overflow-y-auto px-4 pb-4">
+            {/* Misma regla que el camino de migas: la casa del ROL, y nada si
+                ya está parado en ella. */}
+            {!enSuCasa && (
+              <div className="mt-3 overflow-hidden rounded-xl bg-white">
+                <button
+                  onClick={() => irAlModulo(casa)}
+                  className="flex min-h-[44px] w-full items-center gap-3 px-3.5 py-2.5 text-left text-[15px] text-gray-800 transition active:bg-gray-100"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-gray-500">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                  <span className="min-w-0 flex-1 truncate">Inicio</span>
+                  <span className="flex-shrink-0 text-sm text-gray-300">›</span>
+                </button>
+              </div>
+            )}
+
+            {gruposFiltrados.map(g => (
+              <section key={g.key}>
+                <h3 className="px-3.5 pb-1.5 pt-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500">{g.label}</h3>
+                <div className="overflow-hidden rounded-xl bg-white">
+                  {g.modulos.map(m => {
+                    const Icon = m.icon;
+                    const aqui = m.key === moduloAqui;
+                    const tono = getModuleColorByKey(m.key);
+                    return (
+                      <button
+                        key={m.key}
+                        onClick={() => irAlModulo(m.href)}
+                        aria-current={aqui ? "page" : undefined}
+                        className={`flex min-h-[44px] w-full items-center gap-3 border-t border-gray-100 px-3.5 py-2.5 text-left text-[15px] transition first:border-t-0 active:bg-gray-100 ${aqui ? "bg-gray-50 font-semibold text-gray-950" : "text-gray-800"}`}
+                      >
+                        <Icon size={18} strokeWidth={1.75} className={`flex-shrink-0 ${tono ? tono.text : "text-gray-400"}`} />
+                        <span className="min-w-0 flex-1 truncate">{m.label}</span>
+                        <span className={`flex-shrink-0 text-xs ${aqui ? "text-gray-500" : "text-gray-300"}`}>{aqui ? "aquí" : "›"}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+
+            {cuantosModulos(gruposFiltrados) === 0 && (
+              <p className="px-3.5 py-8 text-center text-sm text-gray-500">Ningún módulo se llama así.</p>
+            )}
+          </nav>
+
+          {userName && (
+            <div
+              className="flex items-center gap-3 border-t border-gray-200 bg-white px-4 pt-2"
+              style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
+            >
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium text-gray-800">{userName}</div>
+                <div className="text-xs text-gray-400">{etiquetaDeRol(userRole)}</div>
+              </div>
+              <BotonCambiarContrasena variante="texto" />
+              <button onClick={() => { handleLogout(); setDrawerOpen(false); }} className="-mr-2 flex min-h-[44px] min-w-[44px] items-center justify-center text-xs text-gray-400 transition hover:text-red-600">Salir</button>
+            </div>
+          )}
+        </div>
       )}
     </>
   );
