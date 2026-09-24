@@ -279,7 +279,8 @@ describe("1 · los chips salen de los períodos reales de los gastos, y se abre 
     await abrirFicha();
     const barra = screen.getByRole("tablist", { name: "Elegir el período" });
     const chips = within(barra).getAllByRole("tab");
-    expect(chips.map((c) => c.textContent)).toEqual(["Abierto2", "mid 2026 · PVH2", "Todos4"]);
+    // 🔴 Sin conteo: Daniel (24-sep-2026) «números de facturas no me hace sentido, es mejor nada».
+    expect(chips.map((c) => c.textContent)).toEqual(["Abierto", "mid 2026 · PVH", "Todos"]);
     expect(chips[0].getAttribute("aria-selected")).toBe("true");
   });
 });
@@ -416,7 +417,7 @@ describe("4 · un anulado no aparece en ninguna superficie", () => {
     await abrirFicha();
     expect(screen.queryByRole("tab", { name: /Anulados/ })).toBeNull();
     const marcas = within(screen.getByRole("tablist", { name: "Filtrar por marca" })).getAllByRole("tab");
-    expect(marcas.map((t) => t.textContent)).toEqual(["Todas las marcas2", "Calvin Klein1", "Tommy Hilfiger1"]);
+    expect(marcas.map((t) => t.textContent)).toEqual(["Todas las marcas", "Calvin Klein", "Tommy Hilfiger"]);
   });
 });
 

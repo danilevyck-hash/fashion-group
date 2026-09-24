@@ -48,7 +48,6 @@ export default function BarraDePeriodos({ chips, elegido, onElegir, etiqueta }: 
             }`}
           >
             {c.rotulo}
-            <span className={`tabular-nums ${activo ? "opacity-80" : "opacity-70"}`}>{c.cantidad}</span>
           </button>
         );
       })}

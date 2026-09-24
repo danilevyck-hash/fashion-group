@@ -315,7 +315,6 @@ export default function FichaTienda({ codigo, role }: { codigo: string; role: st
                   }`}
                 >
                   {c.rotulo}
-                  <span className="tabular-nums opacity-70">{c.cantidad}</span>
                 </button>
               ))}
             </div>
