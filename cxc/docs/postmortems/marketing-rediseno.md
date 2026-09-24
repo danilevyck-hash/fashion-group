@@ -780,3 +780,94 @@ El camino completo, en el navegador: la foto se valida (`validateFotoFile`), se 
 - ⚠️ **No se probó una lectura real contra Anthropic** (habría gastado crédito). Lo que el candado prueba es el camino: el `capture`, el achique, la subida sin dueño, la llamada al lector y que el payload de guardar no cambió.
 - ⚠️ El **buscador de tiendas** no se dibuja en el celular: con 5 tiendas abiertas no aporta y se lleva una franja. Vuelve solo con el interruptor apagado (o en la computadora). Si Daniel lo quiere, es una línea.
 - ⚠️ La **barra de períodos sigue siendo un chip por cierre**: con muchos cierres se desliza de lado. Hoy hay uno.
+
+---
+
+## 15. Las fotos de la tienda — no se podían guardar, y no seguían al período (24-sep-2026)
+
+Daniel, hoy, desde el iPhone: subió cuatro fotos a **Outlet Duty Free N3 (D-118)**, salió el
+cuadro rojo «Error · Reintentar» y ninguna quedó. Y aparte: *«cuando me meto al período abierto,
+veo las fotos del período viejo»*.
+
+### 15.1 Lo medido (24-sep-2026, solo lectura contra producción)
+
+| Qué | Medido |
+|---|---|
+| Fotos de tienda anotadas en la base | **0 de 160** filas de `mk_adjuntos` tienen tienda **sin** proyecto |
+| Archivos huérfanos del intento de hoy | **4**, en `tienda/D-118/`, 24-sep 21:50:59–21:51:00 UTC, los cuatro `image/jpeg` (73 · 99 · 99 · 104 KB) |
+| Fotos de proyecto en total | **60**, las 60 con `tienda_codigo` |
+| Fotos cuyo proyecto tiene un gasto sellado a un período **cerrado** | **52**, en **14 tiendas**, las 52 al MISMO período |
+| Períodos cerrados en toda la base | **1**: «mid 2026», `pvh`, `8e2ee894-2b68-47f2-b342-b6c0bc9f5a0a`, cerrado el 12-ago-2026 |
+| Períodos abiertos | **5** (TH · CK · KL · RBK · J), los cinco «Período 2026», abiertos el 12-ago-2026 |
+| Las dos fotos de D-118 | `013d9316…` (16-jun) y `9ec37900…` (30-jul), proyecto «Remodelacion» → **mid 2026** |
+| D-118, gastos abiertos | 2, del 21-sep: Calvin $731,02 y Tommy $1.040,25 |
+
+🩸 **La causa del defecto 1, comprobada en `pg_constraint`:** `mk_adjuntos_destino_chk`
+(11-ago-2026) dice `(tipo = 'foto_proyecto' AND proyecto_id IS NOT NULL AND factura_id IS NULL)`.
+La puerta del rediseño manda `tipo = 'foto_proyecto'` con `proyecto_id = null` —el rediseño del
+22-sep quitó los proyectos—, así que la base contesta **23514** y la ruta devolvía el texto crudo
+de Postgres con 400. El archivo ya estaba subido: cada «Reintentar» dejaba otro huérfano.
+
+### 15.2 Las decisiones
+
+- 🔴 **El sello de una foto es UNA COLUMNA, no una fila de `mk_periodo_documentos`.** Un gasto se
+  sella por MARCA (una fila por marca, con su `proveedor_key`); una foto de tienda **no tiene
+  marca** —lo que se ve en la foto es la tienda—, así que lleva un período y nada más:
+  `mk_adjuntos.periodo_id`, nullable.
+- 🔴 **«Abierto» es lo mismo que en `periodo-manda.ts`:** sin sello a un período **cerrado**. Una
+  foto sellada a un período abierto y una foto sin sello se ven las dos bajo «Abierto», y cuando
+  ese período cierra la sellada se va con él sola. Ninguna regla nueva de «abierto».
+- 🔴 **Una foto nace en el período abierto del gasto MÁS RECIENTE de su tienda**
+  (`periodoAbiertoParaFotoNueva`, puro). Tiene su porqué: la foto se sube justo después de
+  registrar el gasto que documenta, así que acompaña a ese gasto y se le pasa a la marca que lo
+  pagó. ⚠️ **Decisión pendiente de Daniel:** una tienda puede tener dos marcas abiertas a la vez
+  (D-118 tiene Calvin y Tommy del mismo día) — hoy la foto va a UNA, la del gasto más reciente
+  (medido: Tommy). La alternativa sería que la misma foto viaje en el ZIP de **las dos** marcas.
+  No se construyó: es «dónde vive un dato» y lo decide él.
+- 🔴 **Si la fila no se pudo escribir, el archivo no se queda.** `borrarDelCajon` corre en el
+  camino de error de la ruta.
+- 🔴 **Todo falla ABIERTO.** Sin la migración: la lectura no trae período (se ven todas, como
+  hoy), el `insert` se reintenta sin `periodo_id`, el ZIP relee sin las columnas nuevas y la
+  pantalla avisa en español («Todavía no se pueden guardar fotos de tienda: falta aplicar la
+  actualización de la base. Avísale a Daniel.»).
+
+### 15.3 Qué se tocó
+
+| Archivo | Qué |
+|---|---|
+| `src/lib/marketing/fotos-periodo.ts` | **Nuevo, puro.** El interruptor `MARKETING_FOTOS_CON_PERIODO`, `fotosDelPeriodo`, `periodoDeLaFoto`, `periodoAbiertoParaFotoNueva`, `esLaReglaDeDestino`, el aviso en español |
+| `src/lib/marketing/fotos-periodo-server.ts` | **Nuevo.** `periodoAbiertoDeLaTienda`, `leerPeriodosDeFotos`, `borrarDelCajon`. Nunca lanza |
+| `src/app/api/marketing/tienda/[codigo]/fotos/route.ts` | GET: le pega el `periodo` a cada foto. POST: sella, reintenta sin sello, avisa en español y borra el huérfano |
+| `src/app/marketing/components/FotosSection.tsx` | Prop `periodo`; la cuadrícula filtra con el chip; subiendo en un cierre el toast dice «está en «Abierto»» |
+| `src/app/marketing/tienda/[codigo]/FichaTienda.tsx` | Le pasa `periodo` a las dos vistas (celular y computadora). `VistaTiendaAnterior` NO: sigue mostrando todo |
+| `src/lib/marketing/zip-marca.ts` | `leerAdjuntosDelZip` (con respaldo sin columnas) y `armarFotosPorCarpeta` suma las fotos de la TIENDA selladas al período que se baja, sin duplicar |
+| `src/lib/marketing/periodo-manda.ts` | Comentario corregido: decía Abierto $6.401,27 (3) · mid 2026 $71,26 (1); es **$1.771,27 (2)** · **$4.701,26 (2)** — el mueble de $4.630 está sellado a «mid 2026». «Todos» $6.472,53 no se movió |
+| `supabase/migrations/20261219130000_marketing_fotos_de_tienda.sql` | **NO aplicada.** La aplica Daniel |
+| `scripts/marketing-rescatar-fotos-huerfanas.ts` | **Solo lectura por defecto.** `--aplicar` inserta las filas de los archivos huérfanos |
+
+### 15.4 La migración (no aplicada)
+
+Aditiva, cero filas de datos creadas o borradas:
+
+1. **Columna** `mk_adjuntos.periodo_id uuid NULL REFERENCES mk_periodos(id) ON DELETE SET NULL`,
+   con índice parcial `(tienda_codigo, periodo_id) WHERE tipo = 'foto_proyecto'`.
+2. **Regla** `mk_adjuntos_destino_chk` reemplazada: se conserva letra por letra lo que exigía y se
+   agrega un renglón, `(tipo = 'foto_proyecto' AND tienda_codigo IS NOT NULL AND factura_id IS NULL)`.
+   🩸 El DROP busca por `foto_proyecto` **y** `proyecto_id`, nunca por el texto `IN (...)`:
+   Postgres normaliza `IN` a `= ANY (ARRAY[...])` al guardar la definición y buscar por `IN` deja
+   el paso en un no-op silencioso (la lección de `20260811180000`).
+3. **Las 52 fotos viejas** se sellan a «mid 2026» **por lista de ids**, nunca con un UPDATE
+   abierto, con guarda que aborta si toca más filas que la lista. Las 8 restantes tienen gastos
+   abiertos y quedan sin sello: se siguen viendo en «Abierto», que es donde van.
+
+### 15.5 Candados
+
+- `src/__tests__/marketing/marketing-fotos-de-tienda.test.ts` (21 pruebas). El CHECK se **lee del
+  archivo SQL y se evalúa** contra la fila que la puerta inserta —nada de buscar una frase—, y la
+  misma prueba comprueba que la regla **vieja** la rechazaba: ése era el defecto.
+- `src/__tests__/lib/marketing-vista-tienda.test.ts` § 6 — la prueba que **no cazó** este defecto
+  (leía el texto del archivo) ahora afirma la FORMA de la fila campo por campo y que la regla de
+  la migración la acepta.
+- **Mutaciones a mano, 3 de 3 cazadas:** quitar el renglón nuevo del CHECK · no borrar el archivo
+  huérfano en el camino de error · que el ZIP ignore el período y se lleve todas las fotos de la
+  tienda.
