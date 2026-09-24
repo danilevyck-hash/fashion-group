@@ -43,6 +43,9 @@
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { completarSegundos, normalizarHora, type CorreccionVisible } from "./correcciones";
+// 🔴 LA ENTRADA AUTORIZADA DEL DÍA (24-sep-2026) viaja en el MISMO plan y se
+// guarda en el mismo golpe, con el mismo porqué. Su regla vive en su módulo.
+import { resumenCambioEntrada, type CambioEntradaAutorizada } from "./entrada-autorizada";
 
 /**
  * 🔴 EL INTERRUPTOR. En `false` el Reporte es EXACTAMENTE el de antes: cada
@@ -151,6 +154,24 @@ export interface PlanDelDia {
    * nadie sabe que no se hizo.
    */
   invalidas: string[];
+  /**
+   * 🔴 El cambio de la ENTRADA AUTORIZADA del día (24-sep-2026): ponerla o
+   * quitarla. Ausente o `null` = no se tocó. Cuenta como cambio para poder
+   * guardar, y va en el mismo cuerpo que las horas.
+   */
+  entradaAutorizada?: CambioEntradaAutorizada | null;
+}
+
+/** El plan de las horas, con el cambio de la entrada autorizada encima. */
+export function conEntradaAutorizada(
+  plan: PlanDelDia,
+  entrada: { cambio: CambioEntradaAutorizada | null; invalida: boolean },
+): PlanDelDia {
+  return {
+    ...plan,
+    invalidas: entrada.invalida ? [...plan.invalidas, "entrada"].sort() : plan.invalidas,
+    entradaAutorizada: entrada.cambio,
+  };
 }
 
 /**
@@ -261,7 +282,7 @@ export function faltaParaGuardarElDia(plan: PlanDelDia, motivo: unknown): string
       ? "Hay una hora que no sirve"
       : `Hay ${plan.invalidas.length} horas que no sirven`;
   }
-  if (plan.cambios.length === 0) return "Todavía no cambiaste nada";
+  if (plan.cambios.length === 0 && !plan.entradaAutorizada) return "Todavía no cambiaste nada";
   if (!(typeof motivo === "string" && motivo.trim().length > 0)) return "Falta: el porqué";
   return null;
 }
@@ -280,6 +301,8 @@ export function resumenDelPlan(plan: PlanDelDia): string | null {
   if (cuenta.quitar > 0) {
     partes.push(`${cuenta.quitar} ${cuenta.quitar === 1 ? "quitada" : "quitadas"}`);
   }
+  const entrada = resumenCambioEntrada(plan.entradaAutorizada ?? null);
+  if (entrada) partes.push(entrada);
   return partes.length ? partes.join(" · ") : null;
 }
 

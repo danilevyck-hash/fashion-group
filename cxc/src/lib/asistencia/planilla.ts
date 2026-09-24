@@ -737,7 +737,15 @@ export function clasificarDia(
   | "extraDiurnoMin" | "extraNocturnoMin" | "excedenteMin"
   | "domingoMin" | "feriadoMin" | "tardanzaMin" | "ausenciaMin" | "sabadoMin"
   | "vacacionesYaPagadasMin" | "salidaTempranaMin"
-> {
+> & {
+  /**
+   * 🔴 De `extraDiurnoMin`/`extraNocturnoMin`, lo que vino de la ENTRADA
+   * AUTORIZADA (24-sep-2026). Un DESGLOSE, no una columna: no entra a
+   * `HorasPersona` ni se congela. Ausente = 0 = el día de siempre.
+   */
+  extraEntradaDiurnoMin?: number;
+  extraEntradaNocturnoMin?: number;
+} {
   const cero = {
     extraDiurnoMin: 0, extraNocturnoMin: 0, excedenteMin: 0,
     domingoMin: 0, feriadoMin: 0, tardanzaMin: 0, ausenciaMin: 0, sabadoMin: 0,
@@ -801,16 +809,35 @@ export function clasificarDia(
   const extra = d.extraMin;
   if (extra <= 0) return { ...cero, tardanzaMin, salidaTempranaMin };
 
-  // La ventana efectiva termina en la última marca del día.
-  const fin = d.salida ? hhmmAMin(d.salida) : 0;
-  const ini = fin - extra;
   const corte = hhmmAMin(reglas.horaCorteNocturno);
+
+  // ── 🔴 LA EXTRA DE LA ENTRADA AUTORIZADA (24-sep-2026) ─────────────────────
+  //
+  // `extraMin` trae la extra COMPLETA y `extraEntradaMin` dice cuánto de eso
+  // vino de la entrada (un subconjunto, nunca se suma). Ésa se reparte con SU
+  // propia ventana —desde donde se midió hasta la entrada del horario— contra
+  // el MISMO corte de la tarde: 6–10 a.m. cae entera de día (1,25); un turno
+  // que entre de noche caería de noche. Sin autorización es 0 y este bloque
+  // no toca nada: el reparto de abajo es el de siempre.
+  const extraEntrada = Math.min(extra, Math.max(0, d.extraEntradaMin ?? 0));
+  const extraSalida = extra - extraEntrada;
+  let entradaDiurno = 0;
+  if (extraEntrada > 0) {
+    const finEnt = d.entradaAutorizada?.hasta ? hhmmAMin(d.entradaAutorizada.hasta) : 0;
+    const iniEnt = finEnt - extraEntrada;
+    entradaDiurno = Math.max(0, Math.min(extraEntrada, Math.min(finEnt, corte) - iniEnt));
+  }
+  const entradaNocturno = extraEntrada - entradaDiurno;
+
+  // La ventana efectiva de la SALIDA termina en la última marca del día.
+  const fin = d.salida ? hhmmAMin(d.salida) : 0;
+  const ini = fin - extraSalida;
 
   // 🔑 Se acota a [0, extra] en los dos lados: sin eso, un día raro (salida
   // antes del corte, o una marca cruzando la medianoche) mandaría minutos
   // negativos a una columna y el total cuadraría por casualidad.
-  const diurno = Math.max(0, Math.min(extra, Math.min(fin, corte) - ini));
-  const nocturno = extra - diurno;
+  const diurno = Math.max(0, Math.min(extraSalida, Math.min(fin, corte) - ini));
+  const nocturno = extraSalida - diurno;
 
   // 🔴 TODO LO NOCTURNO VA AL 1,50, sin apartar nada. `excedenteMin` queda en
   // cero a propósito y por eso se escribe: la columna existe y vale $0,00,
@@ -819,9 +846,13 @@ export function clasificarDia(
     ...cero,
     tardanzaMin,
     salidaTempranaMin,
-    extraDiurnoMin: diurno,
-    extraNocturnoMin: nocturno,
+    extraDiurnoMin: diurno + entradaDiurno,
+    extraNocturnoMin: nocturno + entradaNocturno,
     excedenteMin: 0,
+    // Solo para que `medirHoras` sepa qué parte NO es de la salida: los 30 min
+    // sin aprobar de ACS son el horario de la TIENDA, o sea de la salida.
+    extraEntradaDiurnoMin: entradaDiurno,
+    extraEntradaNocturnoMin: entradaNocturno,
   };
 }
 
@@ -920,8 +951,15 @@ export function medirHoras(
       // exactamente el `else` de siempre: `Math.min(x, 0)` es 0 y todo cae en
       // «no aprobado», que es lo que hacía ayer.
       const auto = Math.max(0, aprob?.autoMin ?? 0);
-      const pagaDiurno = Math.min(c.extraDiurnoMin, auto);
-      const pagaNocturno = Math.min(c.extraNocturnoMin, Math.max(0, auto - pagaDiurno));
+      // 🔴 Y SOLO SOBRE LA SALIDA (24-sep-2026): los 30 minutos son el horario
+      // de la tienda, que cierra a las 7 p.m. La extra de una ENTRADA
+      // AUTORIZADA no sale de ese horario y espera su aprobación como
+      // cualquier otra. Sin entrada autorizada los dos restos son 0 y esto es
+      // el cálculo de siempre.
+      const entDiurno = Math.max(0, c.extraEntradaDiurnoMin ?? 0);
+      const entNocturno = Math.max(0, c.extraEntradaNocturnoMin ?? 0);
+      const pagaDiurno = Math.min(c.extraDiurnoMin - entDiurno, auto);
+      const pagaNocturno = Math.min(c.extraNocturnoMin - entNocturno, Math.max(0, auto - pagaDiurno));
 
       h.extraDiurnoMin += pagaDiurno;
       h.extraNocturnoMin += pagaNocturno;

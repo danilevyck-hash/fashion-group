@@ -105,7 +105,10 @@ const filaDe = (fecha: string) =>
     && el.getAttribute("colspan") === null)
     .closest("tr") as HTMLTableRowElement;
 const camposHora = () =>
-  Array.from(document.querySelectorAll('input[type="time"]')) as HTMLInputElement[];
+  // 🔑 SOLO las cuatro casillas de HORA (`aria-label="Hora m0"`…): desde el
+  // 24-sep-2026 el editor trae además el campo «Hoy entraba a las», que es otra
+  // cosa y tiene su propio candado (`entrada-autorizada.test.ts`).
+  Array.from(document.querySelectorAll('input[type="time"][aria-label^="Hora "]')) as HTMLInputElement[];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // A. TOCAR UNA HORA ABRE EL EDITOR EN LA MISMA FILA — sin ventana

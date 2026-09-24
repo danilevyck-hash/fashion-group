@@ -45,6 +45,10 @@ import { senalarQuitadas } from "@/lib/marcacion/en-el-reporte";
 // sobre los MISMOS días que la columna ya suma. No cambia qué se paga.
 import { leerAprobaciones } from "@/lib/asistencia/aprobaciones-server";
 import { claveDia, decisionDe } from "@/lib/asistencia/aprobaciones";
+// 🔴 LAS ENTRADAS AUTORIZADAS (24-sep-2026): la MISMA lectura que la planilla.
+// Sin la tabla viene vacío y el reporte es el de siempre.
+import { indexarEntradasAutorizadas } from "@/lib/asistencia/entrada-autorizada";
+import { leerEntradasAutorizadas } from "@/lib/asistencia/entrada-autorizada-server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -110,7 +114,7 @@ export async function GET(req: NextRequest) {
     // Paginado con verificación contra el COUNT: un mes de dos relojes con 4
     // marcas diarias pasa de 1.000 filas, y PostgREST corta ahí EN SILENCIO.
     // Un reporte de horas recortado sin avisar es peor que uno que falla.
-    const [marcaciones, { reglas }, { directorio }, correcciones, personasDb, afuera, horariosLeidos, jRes, vRes, fRes, telefono, aprRes] = await Promise.all([
+    const [marcaciones, { reglas }, { directorio }, correcciones, personasDb, afuera, horariosLeidos, jRes, vRes, fRes, telefono, aprRes, entradasRes] = await Promise.all([
       leerTodoPaginado<MarcacionConId>(
         "asistencia_marcaciones (reporte)",
         (pedirCount, from, to) => {
@@ -167,6 +171,9 @@ export async function GET(req: NextRequest) {
       // lectura que usa Aprobaciones y la planilla: la columna «Extras» del
       // Reporte no puede decir que se paga algo que la planilla no paga.
       leerAprobaciones(desde, hasta),
+      // 🔴 Las entradas autorizadas del rango (24-sep-2026). Sin la tabla,
+      // vacío: nadie tiene, como siempre.
+      leerEntradasAutorizadas(desde, hasta),
     ]);
     const nombres = new Map<string, string>(
       directorio.codigos().map((c) => [c, directorio.etiqueta(c)]),
@@ -342,6 +349,10 @@ export async function GET(req: NextRequest) {
       // 🔴 Los días laborables de cada quien (18-sep-2026), la MISMA lista que
       // usa la planilla. Vacío = lunes a viernes para todos.
       diasLaborables,
+      // 🔴 Las entradas autorizadas (24-sep-2026): ese día la extra de la
+      // entrada se mide desde la hora autorizada. La MISMA lectura que la
+      // planilla; vacío = nadie tiene.
+      entradasAutorizadas: indexarEntradasAutorizadas(entradasRes.entradas),
     });
 
     // 🔴 QUIEN NO COBRA HORAS EXTRA NO LAS CUENTA EN EL REPORTE. Hasta el

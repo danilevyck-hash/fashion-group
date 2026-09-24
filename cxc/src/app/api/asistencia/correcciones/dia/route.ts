@@ -1,5 +1,10 @@
 // POST /api/asistencia/correcciones/dia
-//   { codigo, fecha, motivo, cambios: [{ tipo, marcacionId, reemplaza, hora }] }
+//   { codigo, fecha, motivo, cambios: [{ tipo, marcacionId, reemplaza, hora }],
+//     entradaAutorizada?: { hora } | { quitar: true } }
+//
+// 🔴 24-sep-2026: el mismo golpe puede traer la ENTRADA AUTORIZADA del día
+// («hoy entraba a las __:__»), con el MISMO motivo obligatorio. Va a su propia
+// tabla (`asistencia_entradas_autorizadas`); ver `entrada-autorizada.ts`.
 //
 // ── 🔴 EL DÍA COMPLETO, DE UN SOLO GOLPE (19-sep-2026) ──────────────────────
 //
@@ -50,6 +55,14 @@ import {
   crearCorreccion,
   leerMarcacion,
 } from "@/lib/asistencia/correcciones-server";
+// 🔴 LA ENTRADA AUTORIZADA (24-sep-2026): su propia tabla, su propio I/O. No
+// toca ninguna marca ni ninguna corrección.
+import { ENTRADA_AUTORIZADA, avisoMigracionEntradaAutorizada, normalizarHoraEntrada } from "@/lib/asistencia/entrada-autorizada";
+import {
+  anularEntradaAutorizada,
+  crearEntradaAutorizada,
+  leerEntradaVivaDelDia,
+} from "@/lib/asistencia/entrada-autorizada-server";
 
 export const dynamic = "force-dynamic";
 
@@ -97,15 +110,45 @@ export async function POST(req: NextRequest) {
     const motivo = normalizarMotivo(body?.motivo);
 
     const crudos = Array.isArray(body?.cambios) ? (body!.cambios as unknown[]) : [];
-    if (crudos.length === 0) {
+    const codigoCuerpo = String(body?.codigo ?? "").trim();
+    const fechaCuerpo = String(body?.fecha ?? "").trim();
+
+    // ── 🔴 LA ENTRADA AUTORIZADA DEL DÍA (24-sep-2026) ─────────────────────
+    //
+    // Viaja en el MISMO golpe, con el MISMO motivo: `entradaAutorizada:
+    // { hora: "06:00" }` la pone (anulando la que hubiera), `{ quitar: true }`
+    // la quita. No toca ninguna marca ni ninguna corrección: es su propia
+    // tabla. Con el interruptor apagado se rechaza: nada se escribe a ciegas.
+    const entradaCruda = (body?.entradaAutorizada ?? null) as Record<string, unknown> | null;
+    let entrada: { tipo: "poner"; hora: string } | { tipo: "quitar" } | null = null;
+    if (entradaCruda && typeof entradaCruda === "object") {
+      if (!ENTRADA_AUTORIZADA) {
+        return NextResponse.json({ error: "La entrada autorizada no está activa." }, { status: 400 });
+      }
+      if (entradaCruda.quitar === true) {
+        entrada = { tipo: "quitar" };
+      } else {
+        const hora = normalizarHoraEntrada(entradaCruda.hora);
+        if (!hora) {
+          return NextResponse.json(
+            { error: "La hora de la entrada autorizada no sirve. Se espera algo como 6:00." },
+            { status: 400 },
+          );
+        }
+        entrada = { tipo: "poner", hora };
+      }
+      if (!codigoCuerpo) return NextResponse.json({ error: "Falta el colaborador." }, { status: 400 });
+      if (!fechaValida(fechaCuerpo)) {
+        return NextResponse.json({ error: "La fecha no sirve." }, { status: 400 });
+      }
+    }
+
+    if (crudos.length === 0 && !entrada) {
       return NextResponse.json({ error: "No cambiaste nada en este día." }, { status: 400 });
     }
     if (crudos.length > MAX_CAMBIOS) {
       return NextResponse.json({ error: "Son demasiados cambios para un día." }, { status: 400 });
     }
-
-    const codigoCuerpo = String(body?.codigo ?? "").trim();
-    const fechaCuerpo = String(body?.fecha ?? "").trim();
 
     // ── VALIDAR TODO, SIN ESCRIBIR ──────────────────────────────────────────
     const listos: CambioListo[] = [];
@@ -175,13 +218,52 @@ export async function POST(req: NextRequest) {
 
     // 🔴 EL ALCANCE DE DAVID (23-sep-2026): TODO validado y NADA escrito, igual
     // que el resto: si un solo cambio es de alguien ajeno, se rechaza entero.
-    const fuera = await rechazarFueraDeAlcance(auth.role, listos.map((c) => c.codigo));
+    const fuera = await rechazarFueraDeAlcance(auth.role, [
+      ...listos.map((c) => c.codigo),
+      ...(entrada ? [codigoCuerpo] : []),
+    ]);
     if (fuera) return fuera;
 
     // ── ESCRIBIR ────────────────────────────────────────────────────────────
     const quien = firma(auth);
     const errores: Array<{ clave: string; error: string }> = [];
     let aplicados = 0;
+
+    // 🔴 LA ENTRADA AUTORIZADA, PRIMERO: es una sola escritura (o dos: anular +
+    // poner) sobre su propia tabla. Si falta la migración se dice y no se
+    // escribe nada más.
+    if (entrada) {
+      const viva = await leerEntradaVivaDelDia(codigoCuerpo, fechaCuerpo);
+      if (viva.faltaMigracion) {
+        return NextResponse.json({ error: avisoMigracionEntradaAutorizada() }, { status: 503 });
+      }
+      if (entrada.tipo === "quitar") {
+        if (viva.entrada) {
+          const a = await anularEntradaAutorizada(viva.entrada.id, quien);
+          if (!a.ok) {
+            if (a.faltaMigracion) return NextResponse.json({ error: avisoMigracionEntradaAutorizada() }, { status: 503 });
+            errores.push({ clave: "entrada", error: a.error });
+          } else aplicados += 1;
+        }
+      } else if (!viva.entrada || viva.entrada.hora !== entrada.hora) {
+        // Editar es editar: se anula la anterior y se escribe la nueva.
+        if (viva.entrada) {
+          const a = await anularEntradaAutorizada(viva.entrada.id, quien);
+          if (!a.ok) {
+            if (a.faltaMigracion) return NextResponse.json({ error: avisoMigracionEntradaAutorizada() }, { status: 503 });
+            errores.push({ clave: "entrada", error: a.error });
+          }
+        }
+        if (errores.length === 0) {
+          const r = await crearEntradaAutorizada({
+            empleadoCodigo: codigoCuerpo, fecha: fechaCuerpo, hora: entrada.hora, motivo, creadaPor: quien,
+          });
+          if (r.ok) aplicados += 1;
+          else if (r.faltaMigracion) return NextResponse.json({ error: avisoMigracionEntradaAutorizada() }, { status: 503 });
+          else errores.push({ clave: "entrada", error: r.error });
+        }
+      }
+    }
 
     for (const c of listos) {
       // 🔴 Primero se ANULA la corrección vieja: el único parcial de la base no

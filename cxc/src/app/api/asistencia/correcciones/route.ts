@@ -1,6 +1,8 @@
 // GET    /api/asistencia/correcciones?codigo=&fecha=   → el historial de ese día
 // POST   /api/asistencia/correcciones                  → corregir / agregar / QUITAR
 // DELETE /api/asistencia/correcciones?id=               → deshacer
+// DELETE /api/asistencia/correcciones?entrada=          → deshacer una ENTRADA
+//                                                        AUTORIZADA (24-sep-2026)
 //
 // ── 🔴 LA TERCERA FORMA ENTRA POR ACÁ DESDE EL 18-sep-2026 ──────────────────
 //
@@ -55,6 +57,10 @@ import {
   leerMarcacion,
   type ResultadoEscritura,
 } from "@/lib/asistencia/correcciones-server";
+// 🔴 La entrada autorizada se deshace por la MISMA puerta que una corrección:
+// se anula con firma, la fila queda (24-sep-2026).
+import { avisoMigracionEntradaAutorizada } from "@/lib/asistencia/entrada-autorizada";
+import { anularEntradaAutorizada, codigoDeEntradaAutorizada } from "@/lib/asistencia/entrada-autorizada-server";
 
 export const dynamic = "force-dynamic";
 
@@ -212,6 +218,24 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
+
+  // 🔴 DESHACER UNA ENTRADA AUTORIZADA (24-sep-2026): misma firma, misma
+  // anulación, su propia tabla. El alcance se mira igual que en una corrección.
+  const entradaId = (req.nextUrl.searchParams.get("entrada") ?? "").trim();
+  if (entradaId) {
+    const fueraEntrada = await rechazarFueraDeAlcance(auth.role, await codigoDeEntradaAutorizada(entradaId));
+    if (fueraEntrada) return fueraEntrada;
+    try {
+      const r = await anularEntradaAutorizada(entradaId, firma(auth));
+      if (r.ok) return NextResponse.json({ ok: true, id: r.id });
+      if (r.faltaMigracion) return NextResponse.json({ error: avisoMigracionEntradaAutorizada() }, { status: 503 });
+      return NextResponse.json({ error: r.error }, { status: 400 });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[asistencia/correcciones DELETE entrada]", msg);
+      return NextResponse.json({ error: msg }, { status: 500 });
+    }
+  }
 
   const id = (req.nextUrl.searchParams.get("id") ?? "").trim();
   if (!id) return NextResponse.json({ error: "Falta cuál corrección." }, { status: 400 });

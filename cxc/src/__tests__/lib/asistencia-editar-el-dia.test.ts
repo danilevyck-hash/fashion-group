@@ -294,6 +294,20 @@ vi.mock("@/lib/asistencia/guard", async () => {
   return { ...real, requireAsistencia: () => ({ role: "admin", userName: "yulissa" }) };
 });
 
+// 🔴 24-sep-2026: la ruta también sabe de la ENTRADA AUTORIZADA, por su propio
+// I/O. Aquí no hay ninguna: se contesta «no hay» y las escrituras se anotan.
+vi.mock("@/lib/asistencia/entrada-autorizada-server", () => ({
+  leerEntradaVivaDelDia: async () => ({ entrada: null, faltaMigracion: false }),
+  crearEntradaAutorizada: async (e: unknown) => {
+    escrituras.push({ op: "crear-entrada", payload: e });
+    return { ok: true as const, id: `entrada-${escrituras.length}` };
+  },
+  anularEntradaAutorizada: async (id: string, quien: string) => {
+    escrituras.push({ op: "anular-entrada", payload: { id, quien } });
+    return { ok: true as const, id };
+  },
+}));
+
 vi.mock("@/lib/asistencia/correcciones-server", () => ({
   leerMarcacion: async (id: string) => marcaciones[id] ?? null,
   crearCorreccion: async (c: unknown) => {

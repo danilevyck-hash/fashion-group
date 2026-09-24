@@ -57,6 +57,8 @@ export function DiasDePersona({
         >
           <span className="text-sm text-gray-800">{d.etiqueta}</span>
           <ChipTipo tipo={d.tipo} />
+          {/* 🔴 Entrada autorizada (24-sep-2026): de ahí sale parte de esta extra. */}
+          {d.entradaAutorizada && <span className="text-xs text-gray-500">entró {d.entradaAutorizada} (autorizado)</span>}
           {d.salida && <span className="text-xs text-gray-500">{d.salida}</span>}
           <span className="ml-auto text-sm font-semibold">{hm(d.minutos)} h</span>
           <BotonesSiNo

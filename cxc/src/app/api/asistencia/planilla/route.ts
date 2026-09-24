@@ -47,6 +47,9 @@ import {
   type MarcacionConId,
 } from "@/lib/asistencia/correcciones";
 import { leerCorrecciones } from "@/lib/asistencia/correcciones-server";
+// 🔴 LAS ENTRADAS AUTORIZADAS (24-sep-2026): la MISMA lectura que el Reporte.
+import { indexarEntradasAutorizadas } from "@/lib/asistencia/entrada-autorizada";
+import { leerEntradasAutorizadas } from "@/lib/asistencia/entrada-autorizada-server";
 import {
   leerReglas,
   leerPersonas,
@@ -374,7 +377,7 @@ export async function GET(req: NextRequest) {
           .range(from, to),
     );
 
-    const [{ reglas }, personasDb, afuera, correcciones, manualesLeidos, aprRes, repRes, horariosLeidos, jRes, vRes, fRes] = await Promise.all([
+    const [{ reglas }, personasDb, afuera, correcciones, manualesLeidos, aprRes, repRes, horariosLeidos, jRes, vRes, fRes, entradasRes] = await Promise.all([
       leerReglas(),
       leerPersonas(),
       // 🔴 QUIÉN TRABAJA AFUERA (14-sep-2026). Lectura APARTE y tolerante: con
@@ -411,6 +414,9 @@ export async function GET(req: NextRequest) {
         .select("fecha, nombre")
         .gte("fecha", q.desde)
         .lte("fecha", hastaReloj),
+      // 🔴 Las entradas autorizadas (24-sep-2026), la MISMA lectura que el
+      // Reporte. Sin la tabla, vacío: nadie tiene, la planilla de siempre.
+      leerEntradasAutorizadas(q.desde, hastaReloj),
     ]);
     if (fRes.error) throw new Error(fRes.error.message);
 
@@ -571,6 +577,11 @@ export async function GET(req: NextRequest) {
       // 🔴 Los días laborables de cada quien (18-sep-2026). Vacío = lunes a
       // viernes para todos, la planilla de siempre.
       diasLaborables,
+      // 🔴 Las entradas autorizadas (24-sep-2026): ACÁ ES DONDE LLEGAN AL PAGO,
+      // con la MISMA lectura que el Reporte. Sin la tabla, vacío: la planilla
+      // de siempre, hasta el centavo. ⚠️ Solo el cuadro que se GENERA: una
+      // quincena ya cerrada es su resultado congelado y no se recalcula.
+      entradasAutorizadas: indexarEntradasAutorizadas(entradasRes.entradas),
     });
 
     // Cuánto dura el día de cada quien. Es lo que vale una ausencia.

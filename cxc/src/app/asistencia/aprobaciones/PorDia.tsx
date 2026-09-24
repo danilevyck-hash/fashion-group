@@ -73,6 +73,9 @@ export default function PorDia({
                       <span className="min-w-0 flex-1 truncate text-sm">{g.etiqueta}</span>
                       <span className="hidden shrink-0 text-xs text-gray-500 sm:block">{g.empresaEtiqueta ?? ""}</span>
                       <ChipTipo tipo={g.tipo} />
+                      {/* 🔴 Entrada autorizada (24-sep-2026): parte de esta extra vino de la
+                          ENTRADA, y la hora de salida sola no lo explica. */}
+                      {g.entradaAutorizada && <span className="shrink-0 text-xs text-gray-500">entró {g.entradaAutorizada} (autorizado)</span>}
                       {g.salida && <span className="shrink-0 text-xs text-gray-500">{g.salida}</span>}
                       <span className="shrink-0 text-sm font-semibold">{hm(g.minutos)} h</span>
                       <BotonesSiNo

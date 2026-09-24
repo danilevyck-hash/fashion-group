@@ -15,6 +15,9 @@ import { requireAsistencia } from "@/lib/asistencia/guard";
 import { rechazarLoDelGrupo } from "@/lib/asistencia/alcance-boston-server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { validarReglas, reglasHaciaFila } from "@/lib/asistencia/config";
+// 🔴 Las dos reglas del 24-sep-2026 FALLAN ABIERTAS: si la base todavía no
+// tiene sus columnas, se guardan las de siempre y se dice.
+import { avisoReglasNuevas, esColumnaReglaNuevaFaltante, sinColumnasNuevas } from "@/lib/asistencia/reglas-nuevas";
 import {
   leerReglas,
   esTablaFaltante,
@@ -62,9 +65,17 @@ export async function PUT(req: NextRequest) {
   const r = validarReglas(body);
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
 
-  const { error } = await supabaseServer
-    .from(TABLA_REGLAS)
-    .upsert({ ...reglasHaciaFila(r.valor), updated_at: new Date().toISOString() }, { onConflict: "id" });
+  const fila = { ...reglasHaciaFila(r.valor), updated_at: new Date().toISOString() };
+  let { error } = await supabaseServer.from(TABLA_REGLAS).upsert(fila, { onConflict: "id" });
+
+  // 🔴 SIN LAS COLUMNAS NUEVAS (la migración del 24-sep-2026 no corrió) se
+  // guardan las reglas de siempre y se avisa: guardar la tolerancia no puede
+  // quedar trabado por dos campos que la base todavía no conoce.
+  let avisoNuevas: string | null = null;
+  if (error && esColumnaReglaNuevaFaltante(error)) {
+    ({ error } = await supabaseServer.from(TABLA_REGLAS).upsert(sinColumnasNuevas(fila), { onConflict: "id" }));
+    avisoNuevas = avisoReglasNuevas();
+  }
 
   if (error) {
     if (esTablaFaltante(error, TABLA_REGLAS)) {
@@ -74,5 +85,5 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "No se pudo guardar. Intenta de nuevo." }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, reglas: r.valor });
+  return NextResponse.json({ ok: true, reglas: r.valor, avisoNuevas });
 }

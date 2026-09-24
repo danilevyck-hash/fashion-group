@@ -240,6 +240,9 @@ const DATASETS: Dataset[] = [
   // se pierde, no se puede volver a conseguir de ninguna parte.
   { table: "asistencia_marcaciones" },
   { table: "asistencia_correcciones" },
+  // 🔴 La entrada autorizada por día (24-sep-2026): la escribe una persona y
+  // de ella sale hora extra que se paga. No se puede volver a conseguir.
+  { table: "asistencia_entradas_autorizadas" },
   { table: "asistencia_personas" },
   { table: "asistencia_horarios" },
   { table: "asistencia_horas_extra_aprobadas" },

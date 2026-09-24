@@ -85,11 +85,20 @@ import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
 // La regla de qué se va a escribir vive en un módulo PURO; acá solo se dibuja.
 import {
   EDITAR_EL_DIA, GUARDAR_EL_DIA, PORQUE, TITULO_EDITAR_EL_DIA,
-  casillasDelDia, claveMarca, claveVacia,
+  casillasDelDia, claveMarca, claveVacia, conEntradaAutorizada,
   faltaParaGuardarElDia, planDelDia, resumenDelPlan, textoGuardado,
   type CasillaDelDia, type EscritoEnCasilla,
 } from "@/lib/asistencia/editar-el-dia";
 import { MOTIVO_MAX } from "@/lib/asistencia/correcciones";
+// 🔴 LA ENTRADA AUTORIZADA Y SU AVISO (24-sep-2026). Daniel: «hoy entraba a
+// las __:__» desde «Arreglar el día», con motivo; y el aviso «llegó N min antes
+// · ¿entrada autorizada?» solo desde 30 minutos. La regla vive en el módulo
+// PURO; acá solo se dibuja y se manda por la misma ruta del día.
+import {
+  ENTRADA_AUTORIZADA, QUITAR_ENTRADA_AUTORIZADA, ROTULO_ENTRADA_AUTORIZADA,
+  TITULO_AVISO_ENTRADA_TEMPRANA, cambioEntradaAutorizada, textoAvisoEntradaTemprana,
+  textoEntradaAutorizada, type EscritoEntradaAutorizada,
+} from "@/lib/asistencia/entrada-autorizada";
 // 🔴 EL RELOJ DEL TELÉFONO EN EL REPORTE (14-sep-2026). Lo que Daniel pidió que
 // viera la contadora: la selfie y el mapa, y de dónde salió cada marca. Es una
 // capa de ARRIBA: el motor no sabe nada de esto y sus minutos no cambian.
@@ -1211,12 +1220,21 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
   const [escrito, setEscrito] = useState<Map<string, EscritoEnCasilla>>(new Map());
   const [motivoDia, setMotivoDia] = useState("");
   const [guardandoDia, setGuardandoDia] = useState(false);
+  // 🔴 Lo tecleado en «Hoy entraba a las» (24-sep-2026). `null` = no se tocó.
+  const [escritoEntrada, setEscritoEntrada] = useState<EscritoEntradaAutorizada | null>(null);
   const casillas = useMemo(() => casillasDelDia(d), [d]);
   const porClave = useMemo(
     () => new Map(casillas.map((c) => [c.clave, c])),
     [casillas],
   );
-  const plan = useMemo(() => planDelDia(casillas, escrito), [casillas, escrito]);
+  const entradaActual = d.entradaAutorizada ?? null;
+  const plan = useMemo(
+    () => conEntradaAutorizada(
+      planDelDia(casillas, escrito),
+      cambioEntradaAutorizada(entradaActual, escritoEntrada),
+    ),
+    [casillas, escrito, entradaActual, escritoEntrada],
+  );
   const faltaDia = faltaParaGuardarElDia(plan, motivoDia);
   /** Editar es lo mismo que corregir: mismos roles, misma migración. */
   const seEdita = EDITAR_EL_DIA && puedeCorregir && !d.fueraDeVigencia;
@@ -1224,12 +1242,14 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
   function abrirEditor() {
     if (!seEdita) return;
     setEscrito(new Map());
+    setEscritoEntrada(null);
     setMotivoDia("");
     setEditando(true);
   }
   function cerrarEditor() {
     setEditando(false);
     setEscrito(new Map());
+    setEscritoEntrada(null);
     setMotivoDia("");
   }
   function escribir(clave: string, cambio: EscritoEnCasilla) {
@@ -1257,6 +1277,14 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
           fecha: d.fecha,
           motivo: motivoDia,
           cambios: plan.cambios,
+          // 🔴 La entrada autorizada viaja en el MISMO golpe (24-sep-2026).
+          ...(plan.entradaAutorizada
+            ? {
+                entradaAutorizada: plan.entradaAutorizada.tipo === "poner"
+                  ? { hora: plan.entradaAutorizada.hora }
+                  : { quitar: true },
+              }
+            : {}),
         }),
       });
       const j = await res.json().catch(() => ({}));
@@ -1288,6 +1316,22 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
       onGuardadoElDia();
     } catch (e) {
       toast(e instanceof Error ? e.message : "No se pudo deshacer.", "error");
+    } finally {
+      setDeshaciendo(null);
+    }
+  }
+  /** 🔴 Deshacer una ENTRADA AUTORIZADA (24-sep-2026): se anula con firma por
+   *  la misma puerta; la extra de entrada de ese día vuelve a cero. */
+  async function deshacerEntradaAutorizada(id: string) {
+    setDeshaciendo(id);
+    try {
+      const res = await fetch(`/api/asistencia/correcciones?entrada=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error ?? "No se pudo quitar");
+      toast("Listo, se quitó la entrada autorizada. Ese día vuelve a medirse como siempre.", "success");
+      onGuardadoElDia();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "No se pudo quitar.", "error");
     } finally {
       setDeshaciendo(null);
     }
@@ -1530,6 +1574,31 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
                   {TEXTO_SALIDA_SOSPECHOSA}
                 </span>
               )}
+              {/* 🔴 «LLEGÓ N MIN ANTES · ¿ENTRADA AUTORIZADA?» (24-sep-2026). Un
+                  AVISO, nunca un cálculo: llegar antes sigue valiendo cero
+                  hasta que alguien escriba desde qué hora entraba. Solo desde
+                  el umbral de las reglas (hoy 30 min) y nunca si el día ya tiene
+                  entrada autorizada. Tocarlo abre «Arreglar el día», que es
+                  donde se decide. En gris: es una pregunta, no un problema. */}
+              {ENTRADA_AUTORIZADA && typeof d.entradaTempranaMin === "number" && (
+                seEdita && !editando ? (
+                  <button
+                    type="button"
+                    onClick={abrirEditor}
+                    title={TITULO_AVISO_ENTRADA_TEMPRANA}
+                    className="ml-1.5 min-h-[44px] rounded bg-gray-100 px-1.5 text-xs font-medium text-gray-700 underline decoration-dotted underline-offset-2 transition hover:text-black"
+                  >
+                    {textoAvisoEntradaTemprana(d.entradaTempranaMin)}
+                  </button>
+                ) : (
+                  <span
+                    className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-700"
+                    title={TITULO_AVISO_ENTRADA_TEMPRANA}
+                  >
+                    {textoAvisoEntradaTemprana(d.entradaTempranaMin)}
+                  </span>
+                )
+              )}
               {/* 🔴 GRIS, NUNCA ÁMBAR. El color es la mitad del mensaje: ámbar
                   dice "hay algo que corregir" y acá no lo hay — el día sigue
                   corriendo. Se dice igual, para que un día sin las 4 marcas y
@@ -1667,6 +1736,41 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
         <tr className="border-b border-gray-100 bg-blue-50/40">
           <td></td>
           <td colSpan={8} className="px-2 pb-3 pt-1">
+            {/* 🔴 «HOY ENTRABA A LAS __:__» (24-sep-2026). Con hora, ese día la
+                extra de la entrada se mide desde ahí hasta su hora de entrada y
+                va a Aprobaciones; sin hora, nada cambia. Se guarda con el MISMO
+                porqué y el mismo botón. */}
+            {ENTRADA_AUTORIZADA && (
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <label htmlFor={`entrada-${codigo}-${d.fecha}`} className="text-[12px] font-medium text-gray-700">
+                  {ROTULO_ENTRADA_AUTORIZADA}
+                </label>
+                <input
+                  id={`entrada-${codigo}-${d.fecha}`}
+                  type="time"
+                  value={escritoEntrada?.quitar ? "" : (escritoEntrada?.hora ?? entradaActual?.hora.slice(0, 5) ?? "")}
+                  disabled={guardandoDia || escritoEntrada?.quitar === true}
+                  onChange={(ev) => setEscritoEntrada({ hora: ev.target.value, quitar: false })}
+                  className="min-h-[44px] w-[7.5rem] rounded-md border border-gray-300 px-1.5 text-[13px] tabular-nums outline-none transition focus:border-black disabled:bg-gray-100 disabled:text-gray-400"
+                />
+                {entradaActual && (
+                  <button
+                    type="button"
+                    onClick={() => setEscritoEntrada((e) => (e?.quitar ? null : { hora: "", quitar: true }))}
+                    aria-pressed={escritoEntrada?.quitar === true}
+                    disabled={guardandoDia}
+                    className={`min-h-[44px] rounded px-1.5 text-[12px] transition ${
+                      escritoEntrada?.quitar ? "bg-amber-100 font-semibold text-amber-900" : "text-gray-500 hover:text-black"
+                    }`}
+                  >
+                    {escritoEntrada?.quitar ? "Se quita ✕" : QUITAR_ENTRADA_AUTORIZADA}
+                  </button>
+                )}
+                <span className="text-[12px] text-gray-500">
+                  Solo si ese día entraba antes de su hora: lo de antes de su entrada pasa a hora extra para aprobar.
+                </span>
+              </div>
+            )}
             <div>
               {/* 🩸 El rótulo NO envuelve los botones en un <label>: un botón es
                   «labelable», así que el label se ataría al PRIMER botón y no al
@@ -1787,6 +1891,28 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
               </span>
             ))}
             {notaMarcasSueltas(d.marcas.length)}
+          </td>
+        </tr>
+      )}
+
+      {/* 🔴 LA ENTRADA AUTORIZADA DEL DÍA, DICHA (24-sep-2026): desde qué hora,
+          quién y por qué, y cuánto de la extra salió de ahí. En azul, como una
+          decisión tomada. «Deshacer» la anula con firma; la fila queda. */}
+      {ENTRADA_AUTORIZADA && d.entradaAutorizada && (
+        <tr className="border-b border-gray-100 bg-blue-50/40">
+          <td></td>
+          <td colSpan={8} className="px-2 pb-1.5 text-[12px] text-blue-900">
+            {textoEntradaAutorizada(d.entradaAutorizada)}
+            {(d.extraEntradaMin ?? 0) > 0 && d.entradaAutorizada.desde
+              ? ` · ${fmtMin(d.extraEntradaMin ?? 0)} min de extra medidos de ${d.entradaAutorizada.desde} a ${d.entradaAutorizada.hasta}`
+              : " · sin extra de entrada ese día"}
+            {puedeCorregir && (
+              <button type="button" onClick={() => void deshacerEntradaAutorizada(d.entradaAutorizada!.id)}
+                disabled={deshaciendo === d.entradaAutorizada.id}
+                className="ml-1.5 min-h-[44px] rounded px-1 text-[12px] text-blue-700 underline decoration-dotted underline-offset-2 transition hover:text-black disabled:opacity-40">
+                {deshaciendo === d.entradaAutorizada.id ? "Quitando…" : "Deshacer"}
+              </button>
+            )}
           </td>
         </tr>
       )}

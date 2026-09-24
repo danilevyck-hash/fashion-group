@@ -54,6 +54,9 @@ export const TABLAS_PERSONAS = [
   // append-only y el reloj NO reenvía el pasado.
   "asistencia_marcaciones",
   "asistencia_correcciones",
+  // 🔴 La entrada autorizada por día (24-sep-2026): la escribe una persona,
+  // con motivo y firma, y de ella sale hora extra que se paga.
+  "asistencia_entradas_autorizadas",
   "asistencia_personas",
   "asistencia_horarios",
   "asistencia_horas_extra_aprobadas",

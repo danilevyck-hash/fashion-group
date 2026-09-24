@@ -600,7 +600,11 @@ describe("validarReglas — se guardan TODAS juntas", () => {
   });
 
   it("una fila incompleta cae a los valores por defecto, no a NaN", () => {
-    expect(reglasDesdeFila({})).toEqual(REGLAS_DEFAULT);
+    // 🔴 24-sep-2026: las DOS columnas nuevas (gracia del almuerzo · aviso de
+    // entrada temprana) son la excepción A PROPÓSITO. Una fila que EXISTE y no
+    // las trae es «la migración no corrió», y ahí valen 0: el sistema de hoy,
+    // no el DEFAULT (ver `VALOR_SIN_COLUMNA`). Sin fila, sí los DEFAULT.
+    expect(reglasDesdeFila({})).toEqual({ ...REGLAS_DEFAULT, graciaAlmuerzoMin: 0, avisoEntradaTempranaMin: 0 });
     expect(reglasDesdeFila(null)).toEqual(REGLAS_DEFAULT);
     const parcial = reglasDesdeFila({ tolerancia_tardanza_min: 5 });
     expect(parcial.toleranciaTardanzaMin).toBe(5);

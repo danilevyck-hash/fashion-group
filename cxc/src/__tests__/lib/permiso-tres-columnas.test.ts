@@ -88,7 +88,11 @@ function diaDe(opts: {
     marcaciones: marcas(opts.fecha ?? DIA, opts.horas),
     horarios: hor,
     justificaciones: opts.justificaciones ?? [],
-    feriados: new Map(), desde: DIA, hasta: DIA2, reglas: REGLAS_DEFAULT,
+    // 🔴 24-sep-2026: sin gracia del almuerzo A PROPÓSITO. Este archivo prueba
+    // el PERDÓN del permiso sobre un exceso de 2 min 37 s; con la gracia de 5
+    // minutos ese exceso no existiría y no habría nada que perdonar. La gracia
+    // tiene su propio candado (`gracia-almuerzo.test.ts`).
+    feriados: new Map(), desde: DIA, hasta: DIA2, reglas: { ...REGLAS_DEFAULT, graciaAlmuerzoMin: 0 },
     nombres: new Map([[CODIGO, "ANDREA PEREZ"]]), incluirNoHabiles: true,
   });
   return { persona: p, dia: p.dias.find((d) => d.fecha === (opts.fecha ?? DIA))!, horario: hor };

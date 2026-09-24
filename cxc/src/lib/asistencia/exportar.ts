@@ -134,6 +134,10 @@ function conDefaults(r: Partial<ReglasReporte> | undefined): ReglasReporte {
   return {
     toleranciaTardanzaMin: n(r?.toleranciaTardanzaMin, TOLERANCIA_MIN),
     extraMinimoMin: n(r?.extraMinimoMin, EXTRA_MINIMO_MIN),
+    // 🔴 24-sep-2026: sin el dato del servidor, 0 —el cálculo de siempre—; el
+    // papel nunca afirma una gracia que el motor no usó.
+    graciaAlmuerzoMin: n(r?.graciaAlmuerzoMin, 0),
+    avisoEntradaTempranaMin: n(r?.avisoEntradaTempranaMin, 0),
   };
 }
 
@@ -314,7 +318,7 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
     ["Cómo se calcula"],
     ["Entrada", `8:00 a.m. con ${g.toleranciaTardanzaMin} minutos de tolerancia. Pasados los ${g.toleranciaTardanzaMin}, se cuenta desde las 8:00.`],
     // El almuerzo NO sale de `reglas`: es fijo y lo decide la empresa (ver ALMUERZO_POR_EMPRESA).
-    ["Almuerzo", `${textoAlmuerzo()}. Se mide entre la 2ª y la 3ª marca del día.`],
+    ["Almuerzo", `${textoAlmuerzo()}. Se mide entre la 2ª y la 3ª marca del día.${g.graciaAlmuerzoMin > 0 ? ` Con ${g.graciaAlmuerzoMin} minutos de gracia: pasados, el exceso se descuenta entero desde el minuto programado.` : ""}`],
     // 🔴 1-sep-2026: acá decía "y se le resta el atraso del mismo día". Ya no:
     // *"No, van separadas"*. El mínimo es una PUERTA, no un descuento —pasada,
     // se paga TODO desde el primer minuto— y el atraso se cobra por su lado.
@@ -375,7 +379,7 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
   const PIE_PT = 7;
   const PIE_MARGEN = 14;
   const pie = armarPie(doc, [
-    `Entrada 8:00 (${g.toleranciaTardanzaMin} min de tolerancia) · almuerzo ${textoAlmuerzo()} · `
+    `Entrada 8:00 (${g.toleranciaTardanzaMin} min de tolerancia) · almuerzo ${textoAlmuerzo()}${g.graciaAlmuerzoMin > 0 ? ` (${g.graciaAlmuerzoMin} min de gracia)` : ""} · `
     // 🔴 Misma corrección que la hoja «Cómo se calcula»: la extra se paga
     // completa y el atraso va aparte (1-sep-2026). El pie del papel firmado
     // no puede decir una regla distinta de la que hizo los números.

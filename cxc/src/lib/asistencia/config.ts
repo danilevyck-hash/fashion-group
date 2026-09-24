@@ -33,6 +33,13 @@
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+// 🔴 Las dos reglas del 24-sep-2026 (gracia del almuerzo · aviso de entrada
+// temprana): sus columnas y lo que valen cuando la base no las trae.
+import {
+  COLUMNA_AVISO_ENTRADA_TEMPRANA,
+  COLUMNA_GRACIA_ALMUERZO,
+  VALOR_SIN_COLUMNA,
+} from "./reglas-nuevas";
 
 // ── Empresas que comparten el reloj ──────────────────────────────────────────
 // Solo estas tres. ACS/Multifashion usa OTRO reloj y no entra acá; si algún día
@@ -135,6 +142,21 @@ export interface ReglasAsistencia {
    * cálculo de la planilla no está construido. Ver el aviso de la pantalla.
    */
   recargoExcedenteNocturnaMixta: number;
+  /**
+   * 🔴 GRACIA DEL ALMUERZO (24-sep-2026), en minutos sobre la DURACIÓN. Daniel:
+   * *«Almuerzo de 60 que dura 65 no descuenta nada; si dura 66, se descuentan
+   * los 6»*. Es una PUERTA como la tolerancia: pasada, el exceso se cuenta
+   * entero desde el minuto programado. Una sola para las cuatro empresas. La
+   * regla vive en `reglas-nuevas.ts`; sin la columna en la base vale 0 (hoy).
+   */
+  graciaAlmuerzoMin: number;
+  /**
+   * 🔴 AVISO DE ENTRADA TEMPRANA (24-sep-2026): desde cuántos minutos antes de
+   * su entrada la fila del día avisa «llegó N min antes · ¿entrada
+   * autorizada?». Daniel: *«solo desde 30 minutos»*. SOLO avisa: no cuenta ni
+   * frena. 0 = sin aviso. Sin la columna en la base vale 0 (hoy).
+   */
+  avisoEntradaTempranaMin: number;
 }
 
 /**
@@ -167,6 +189,11 @@ export const REGLAS_DEFAULT: ReglasAsistencia = {
   seguroEducativoPct: 1.25,
   excedenteHorasDia: 3,
   recargoExcedenteNocturnaMixta: 2.625,
+  // 🔴 Los DOS del 24-sep-2026, con el DEFAULT de su columna: 5 y 30 (Daniel).
+  // ⚠️ Una fila de la base que NO TRAE la columna vale 0 en los dos —el
+  // sistema de hoy—: ver `VALOR_SIN_COLUMNA` en `reglas-nuevas.ts`.
+  graciaAlmuerzoMin: 5,
+  avisoEntradaTempranaMin: 30,
 };
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -478,6 +505,15 @@ export function validarTolerancia(v: unknown): Resultado<number> {
   });
 }
 
+/** La gracia del almuerzo: mismo techo que la tolerancia de tardanza. */
+export function validarGraciaAlmuerzo(v: unknown): Resultado<number> {
+  return numero(v, {
+    min: 0, max: TOLERANCIA_MAX_MIN, entero: true,
+    que: "La gracia del almuerzo",
+    ayuda: "Va en minutos enteros, por ejemplo 5.",
+  });
+}
+
 export function validarMinutos(v: unknown, que: string, ejemplo: string): Resultado<number> {
   return numero(v, {
     min: 0, max: MINUTOS_MAX, entero: true,
@@ -572,6 +608,14 @@ export function validarReglas(body: unknown): Resultado<ReglasAsistencia> {
     ["seguroEducativoPct", validarPorcentaje(b.seguroEducativoPct, "El seguro educativo", "1.25")],
     ["excedenteHorasDia", validarExcedenteHoras(b.excedenteHorasDia)],
     ["recargoExcedenteNocturnaMixta", validarRecargoExcedente(b.recargoExcedenteNocturnaMixta)],
+    // 🔴 Los dos del 24-sep-2026. Si el cuerpo NO los trae (un formulario
+    // viejo), valen su DEFAULT: un cuerpo de antes se sigue guardando igual.
+    ["graciaAlmuerzoMin", b.graciaAlmuerzoMin === undefined
+      ? { ok: true, valor: REGLAS_DEFAULT.graciaAlmuerzoMin }
+      : validarGraciaAlmuerzo(b.graciaAlmuerzoMin)],
+    ["avisoEntradaTempranaMin", b.avisoEntradaTempranaMin === undefined
+      ? { ok: true, valor: REGLAS_DEFAULT.avisoEntradaTempranaMin }
+      : validarMinutos(b.avisoEntradaTempranaMin, "El aviso de entrada temprana", "30")],
   ];
 
   const out = {} as Record<string, unknown>;
@@ -614,6 +658,16 @@ export function reglasDesdeFila(fila: Record<string, unknown> | null | undefined
       "recargo_excedente_nocturna_mixta",
       REGLAS_DEFAULT.recargoExcedenteNocturnaMixta,
     ),
+    // 🔴 LOS DOS DEL 24-sep-2026 FALLAN ABIERTOS AL SISTEMA DE HOY: una fila
+    // que existe y NO TRAE la columna (la migración no corrió; el `select *`
+    // no la devuelve) vale 0 —gracia 0, aviso apagado—, no el DEFAULT. Sin
+    // fila (`null`) sí valen los DEFAULT: es lo que la base escribe sola.
+    graciaAlmuerzoMin: fila && !(COLUMNA_GRACIA_ALMUERZO in f)
+      ? VALOR_SIN_COLUMNA.graciaAlmuerzoMin
+      : num(COLUMNA_GRACIA_ALMUERZO, REGLAS_DEFAULT.graciaAlmuerzoMin),
+    avisoEntradaTempranaMin: fila && !(COLUMNA_AVISO_ENTRADA_TEMPRANA in f)
+      ? VALOR_SIN_COLUMNA.avisoEntradaTempranaMin
+      : num(COLUMNA_AVISO_ENTRADA_TEMPRANA, REGLAS_DEFAULT.avisoEntradaTempranaMin),
   };
 }
 
@@ -635,6 +689,10 @@ export function reglasHaciaFila(r: ReglasAsistencia): Record<string, unknown> {
     seguro_educativo_pct: r.seguroEducativoPct,
     excedente_horas_dia: r.excedenteHorasDia,
     recargo_excedente_nocturna_mixta: r.recargoExcedenteNocturnaMixta,
+    // Los dos del 24-sep-2026. Si la base todavía no tiene las columnas, la
+    // ruta reintenta sin ellas (`sinColumnasNuevas`) y lo dice.
+    [COLUMNA_GRACIA_ALMUERZO]: r.graciaAlmuerzoMin,
+    [COLUMNA_AVISO_ENTRADA_TEMPRANA]: r.avisoEntradaTempranaMin,
   };
 }
 

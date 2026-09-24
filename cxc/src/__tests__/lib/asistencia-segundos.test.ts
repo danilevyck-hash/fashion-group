@@ -50,7 +50,10 @@ const dia = (marcas: string[], h: HorarioPersona | null = horario) =>
     feriados: new Map(),
     desde: "2026-07-13",
     hasta: "2026-07-13",
-    reglas: REGLAS_DEFAULT,
+    // 🔴 24-sep-2026: sin gracia del almuerzo A PROPÓSITO. Este archivo prueba
+    // que se MIDE al segundo (29 s de exceso son 29 s); la gracia de 5 minutos
+    // es otra regla, con su propio candado (`gracia-almuerzo.test.ts`).
+    reglas: { ...REGLAS_DEFAULT, graciaAlmuerzoMin: 0 },
   })[0].dias[0];
 
 // ─────────────────────────────────────────────────────────────────────────────

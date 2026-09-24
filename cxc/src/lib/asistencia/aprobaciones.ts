@@ -193,6 +193,12 @@ export interface DiaExtra {
   /** 🔴 Lo trabajado en domingo o feriado (10-sep-2026): se aprueba igual que la extra, con SU recargo. */
   domFerMin: number;
   tipo: "extra" | "domingo" | "feriado";
+  /**
+   * 🔴 «Entró 06:00 (autorizado)» (24-sep-2026): la hora autorizada del día,
+   * "HH:MM", cuando parte de estos minutos viene de la ENTRADA. Ausente = el
+   * día de siempre. Solo para decirlo: los minutos ya están en `minutos`.
+   */
+  entradaAutorizada?: string;
 }
 
 /**
@@ -227,6 +233,11 @@ export function diasConExtra(
       nocturnoMin: c.extraNocturnoMin,
       domFerMin,
       tipo: c.feriadoMin > 0 ? "feriado" : c.domingoMin > 0 ? "domingo" : "extra",
+      // Solo cuando la entrada autorizada aportó minutos: así la pantalla
+      // dice de dónde sale una extra que no se ve en la hora de salida.
+      ...((d.extraEntradaMin ?? 0) > 0 && d.entradaAutorizada
+        ? { entradaAutorizada: d.entradaAutorizada.hora.slice(0, 5) }
+        : {}),
     });
   }
   return out;
@@ -295,6 +306,8 @@ export interface PersonaEnDia {
   empresaEtiqueta: string | null;
   /** Hora de salida marcada, «HH:MM». Es lo que Julio reconoce. */
   salida: string | null;
+  /** «Entró 06:00 (autorizado)» (24-sep-2026), "HH:MM". Ausente = el día de siempre. */
+  entradaAutorizada?: string;
   minutos: number;
   diurnoMin: number;
   nocturnoMin: number;
@@ -396,6 +409,7 @@ export function armarDiasAprobacion(opts: OpcionesDias): DiaAprobacion[] {
         empresa: l.empresa,
         empresaEtiqueta: l.empresaEtiqueta,
         salida: d.salida,
+        ...(d.entradaAutorizada ? { entradaAutorizada: d.entradaAutorizada } : {}),
         minutos: d.minutos,
         diurnoMin: d.diurnoMin,
         nocturnoMin: d.nocturnoMin,

@@ -12,23 +12,29 @@
 // VALOR POR DEFECTO —el confirmado por la contable— para que el motor siga
 // siendo puro y testeable sin base.
 //
-// ⚠️ EL ALMUERZO ES LA EXCEPCIÓN, y por pedido del propio Daniel (13-ago-2026):
-// es FIJO en 30 minutos para todo el mundo, así que no entra por `reglas`. Ver
-// `ALMUERZO_FIJO_MIN` en `config.ts`.
+// ⚠️ EL ALMUERZO NO ENTRA POR `reglas`: lo decide la EMPRESA (30 min en las tres
+// de siempre, 60 en Multifashion — `ALMUERZO_POR_EMPRESA`, `config.ts`) y se
+// lee de `asistencia_horarios.almuerzo_minutos`. Lo único configurable del
+// almuerzo es su GRACIA (24-sep-2026), que sí viene por `reglas`.
 //
-// ── LAS REGLAS, acordadas con Daniel el 5-ago-2026 ───────────────────────────
+// ── LAS REGLAS, acordadas con Daniel el 5-ago-2026 (al día al 24-sep-2026) ──
 //
-// 1. ENTRADA 8:00 CON TOLERANCIA (hoy 10 MINUTOS), y pasada la tolerancia se
-//    cuenta DESDE LAS 8:00, no desde el fin de la gracia.
-//    🩸 El "desde las 8:00" no es un detalle: si al que llega 8:11 le contaras
-//    1 minuto, le acabás de enseñar que la entrada es 8:10.
-//    🩸 La tolerancia arrancó en 5 y la contable la subió a 10 (6-ago-2026). Se
-//    cambia en UN lugar: el default de `config.ts` o la fila de la base.
+// 1. ENTRADA A LA HORA DEL HORARIO DE CADA QUIEN (08:00 en las tres del grupo;
+//    09:00 o 10:00 en Multifashion), con tolerancia (hoy 10 minutos) y, pasada,
+//    se cuenta DESDE LA HORA DE ENTRADA, no desde el fin de la gracia.
+//    🩸 Si al que llega 8:11 le contaras 1 minuto, le enseñas que la entrada es
+//    8:10. La tolerancia arrancó en 5 y la contable la subió a 10 (6-ago-2026).
+//    🔴 24-sep-2026: llegar ANTES sigue valiendo cero, salvo el día con ENTRADA
+//    AUTORIZADA («hoy entraba a las __:__»): ahí la extra se mide desde esa
+//    hora hasta la entrada del horario. Ver `entrada-autorizada.ts`.
 //
-// 2. ALMUERZO 30 MINUTOS, IGUAL PARA TODOS. Se sigue leyendo de
-//    `asistencia_horarios.almuerzo_minutos` (medido: las 33 personas con
-//    horario tienen 30), y quien todavía no tenga fila cae en el mismo 30.
-//    Ya no se puede elegir otro valor desde ninguna pantalla.
+// 2. ALMUERZO POR EMPRESA: 30 MINUTOS en Boston, Vistana y Fashion Wear, 60 en
+//    Multifashion (medido el 24-sep-2026: 53 horarios, 8 con 60), leído de
+//    `asistencia_horarios.almuerzo_minutos`; sin fila, 30. Se mide entre la 2.ª
+//    y la 3.ª marca SOLO con 4 marcas o más.
+//    🔴 24-sep-2026: con GRACIA de 5 minutos sobre la duración («60 que dura 65
+//    no descuenta; 66 descuenta los 6»), una para las cuatro empresas
+//    (`asistencia_reglas.gracia_almuerzo_min`, `reglas-nuevas.ts`).
 //
 // 3. HORAS EXTRA: mínimo 10 minutos, y SE PAGAN BRUTAS (1-sep-2026).
 //    🔴 El mínimo es una PUERTA, no un descuento: pasado el umbral se paga
@@ -118,6 +124,14 @@ import { esDiaLaborable, horarioDelDia } from "./horario-configurable";
 // que un import normal armaría un ciclo en tiempo de ejecución; `import type`
 // se borra al compilar y no queda ninguno.
 import type { CorreccionVisible } from "./correcciones";
+// 🔴 LAS TRES REGLAS DE HORAS DEL 24-sep-2026. La gracia del almuerzo y la
+// entrada autorizada (con su aviso) viven en sus módulos puros; acá solo se les
+// pregunta. Con los interruptores apagados, este motor es el de antes.
+import { GRACIA_ALMUERZO, excesoAlmuerzoBrutoMin, graciaAlmuerzoEfectiva } from "./reglas-nuevas";
+import {
+  avisoEntradaTemprana, extraDeEntrada, horaASeg, llaveEntrada,
+  type EntradaAutorizada, type EntradaAutorizadaVisible,
+} from "./entrada-autorizada";
 
 /** Panamá es UTC−5 fijo, sin horario de verano. */
 const PANAMA_OFFSET_MS = 5 * 60 * 60 * 1000;
@@ -141,7 +155,7 @@ export const SALIDA_DEFAULT = "17:00";
 /** Lo único de `asistencia_reglas` que el reporte de minutos usa hoy. */
 export type ReglasReporte = Pick<
   ReglasAsistencia,
-  "toleranciaTardanzaMin" | "extraMinimoMin"
+  "toleranciaTardanzaMin" | "extraMinimoMin" | "graciaAlmuerzoMin" | "avisoEntradaTempranaMin"
 >;
 
 export interface Marcacion {
@@ -229,7 +243,29 @@ export interface DiaReporte {
   tardeMin: number;
   excesoAlmuerzoMin: number;
   salidaTempranaMin: number;
+  /**
+   * La hora extra del día, COMPLETA: la de la salida y, desde el 24-sep-2026,
+   * la de la ENTRADA AUTORIZADA (`extraEntradaMin`, que ya está adentro). Sin
+   * autorización es exactamente la de siempre: la de la salida.
+   */
   extraMin: number;
+  /**
+   * 🔴 De `extraMin`, lo que viene de la ENTRADA AUTORIZADA (24-sep-2026): se
+   * midió desde la hora autorizada (o desde la marca, si marcó después) hasta
+   * la entrada del horario. Es un SUBCONJUNTO de `extraMin`, no se suma. Ausente
+   * o 0 = el día de siempre. La planilla lo usa para ponerle el recargo por la
+   * hora del día (`clasificarDia`).
+   */
+  extraEntradaMin?: number;
+  /** La entrada autorizada de ese día, para decirla y deshacerla. `null` = no hay. */
+  entradaAutorizada?: EntradaAutorizadaVisible | null;
+  /**
+   * 🔴 EL AVISO DE ENTRADA TEMPRANA (24-sep-2026): cuántos minutos antes de su
+   * hora marcó, SOLO cuando pasa el umbral de las reglas y el día no tiene
+   * entrada autorizada. `null` o ausente = no se avisa. Es un aviso y nada
+   * más: no entra a `revisar`, al cierre ni a ninguna cuenta.
+   */
+  entradaTempranaMin?: number | null;
   trabajadoMin: number;
   /** El día no tiene 4 marcas: los números salen igual, pero hay que revisarlo. */
   revisar: boolean;
@@ -739,6 +775,16 @@ export function armarReporte(opts: {
    * acá: ése sale por el camino de siempre, con sus números.
    */
   sinMarcas?: ReadonlySet<string>;
+  /**
+   * 🔴 LAS ENTRADAS AUTORIZADAS del rango (24-sep-2026), por `codigo|fecha`
+   * (`indexarEntradasAutorizadas`). Ese día la extra de la ENTRADA se mide
+   * desde la hora autorizada hasta la entrada del horario. Ver
+   * `entrada-autorizada.ts`.
+   *
+   * 🔑 SIN ESTO NADA CAMBIA: vacío por defecto, y sin la tabla la lectura
+   * devuelve vacío. Quien no tiene autorización se mide como siempre.
+   */
+  entradasAutorizadas?: ReadonlyMap<string, EntradaAutorizada>;
 }): PersonaReporte[] {
   const { marcaciones, horarios, justificaciones, feriados, desde, hasta, nombres } = opts;
   const vacaciones = opts.vacaciones ?? [];
@@ -750,7 +796,14 @@ export function armarReporte(opts: {
     typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : def;
   const toleranciaMin = num(opts.reglas?.toleranciaTardanzaMin, TOLERANCIA_MIN);
   const extraMinimoMin = num(opts.reglas?.extraMinimoMin, EXTRA_MINIMO_MIN);
-  // ⛔ El almuerzo NO entra por `reglas`: es fijo (ver `ALMUERZO_FIJO_MIN`).
+  // ⛔ El almuerzo NO entra por `reglas`: lo decide la empresa (`ALMUERZO_POR_EMPRESA`).
+  // 🔴 Su GRACIA sí (24-sep-2026). Con el interruptor apagado, 0: lo de siempre.
+  const graciaAlmuerzoMin = graciaAlmuerzoEfectiva(
+    opts.reglas?.graciaAlmuerzoMin, REGLAS_DEFAULT.graciaAlmuerzoMin, GRACIA_ALMUERZO,
+  );
+  // 🔴 El umbral del aviso de entrada temprana (24-sep-2026). 0 = sin aviso.
+  const avisoTempranaMin = num(opts.reglas?.avisoEntradaTempranaMin, REGLAS_DEFAULT.avisoEntradaTempranaMin);
+  const entradasAutorizadas = opts.entradasAutorizadas ?? new Map<string, EntradaAutorizada>();
 
   const horarioDe = new Map(horarios.map((h) => [h.empleado_codigo, h]));
   // 🔴 Los días se recorren POR PERSONA desde el 18-sep-2026: sin
@@ -1108,13 +1161,18 @@ export function armarReporte(opts: {
       let almuerzoTomado = 0;
       if (buenas.length >= 4) {
         almuerzoTomado = buenas[2] - buenas[1]; // segundos
-        const excesoAlmuerzoBrutoMin = Math.max(0, (almuerzoTomado - almuerzoProgSeg) / 60);
-        permisoPerdonaAlmuerzoMin = Math.min(excesoAlmuerzoBrutoMin, minutosPerdonadosDe(ventana, {
+        // 🔴 CON GRACIA (24-sep-2026): una PUERTA como la tolerancia. Hasta
+        // `programado + gracia` no hay exceso; un segundo más y se cuenta TODO
+        // desde el minuto programado (60 que dura 65 → 0 · 66 → 6). Con gracia
+        // 0 —interruptor apagado o columna ausente— es `max(0, tomado −
+        // programado)`, el cálculo de siempre. Vive en `reglas-nuevas.ts`.
+        const excesoBrutoMin = excesoAlmuerzoBrutoMin(almuerzoTomado, almuerzoProgSeg, graciaAlmuerzoMin);
+        permisoPerdonaAlmuerzoMin = Math.min(excesoBrutoMin, minutosPerdonadosDe(ventana, {
           // El exceso empieza cuando se acabó el almuerzo permitido y termina
           // cuando la persona volvió a marcar: esa marca lo CIERRA.
           desdeSeg: buenas[1] + almuerzoProgSeg, hastaSeg: buenas[2], bordeDelReloj: "fin",
         }));
-        excesoAlmuerzoMin = Math.max(0, excesoAlmuerzoBrutoMin - permisoPerdonaAlmuerzoMin);
+        excesoAlmuerzoMin = Math.max(0, excesoBrutoMin - permisoPerdonaAlmuerzoMin);
       }
 
       const salidaTempranaBrutaMin = soloUna ? 0 : Math.max(0, (salidaProgSeg - sal) / 60);
@@ -1149,6 +1207,42 @@ export function armarReporte(opts: {
       const brutoSeg = soloUna ? 0 : Math.max(0, sal - salidaProgSeg);
       const extraMin = brutoSeg < extraMinimoSeg ? 0 : brutoSeg / 60;
 
+      // ── 🔴 LA ENTRADA AUTORIZADA (24-sep-2026) ───────────────────────────
+      //
+      // Daniel: «hoy entraba a las __:__». Ese día la extra de la ENTRADA se
+      // mide desde esa hora (o desde la marca, si marcó después) hasta la
+      // entrada del horario, y pasa por la MISMA puerta del mínimo. Sin
+      // autorización —o con `ENTRADA_AUTORIZADA` apagado— es 0 y `extraMin`
+      // es la de la salida, como siempre. La regla vive en
+      // `entrada-autorizada.ts`; acá solo se le pregunta y se suma.
+      const autorizada = entradasAutorizadas.get(llaveEntrada(codigo, fecha)) ?? null;
+      const deEntrada = extraDeEntrada({
+        entSeg: ent,
+        entradaProgSeg,
+        autorizadaSeg: autorizada ? horaASeg(autorizada.hora) : null,
+        extraMinimoSeg,
+      });
+      const extraEntradaMin = deEntrada.min;
+      /** La extra COMPLETA del día: la de la salida más la de la entrada. */
+      const extraTotalMin = extraMin + extraEntradaMin;
+      const entradaAutorizada: EntradaAutorizadaVisible | null = autorizada
+        ? {
+            id: autorizada.id,
+            hora: autorizada.hora,
+            desde: extraEntradaMin > 0 ? fmt(deEntrada.desdeSeg) : null,
+            hasta: fmt(entradaProgSeg),
+            motivo: autorizada.motivo,
+            creadaPor: autorizada.creadaPor,
+            creadaEn: autorizada.creadaEn,
+          }
+        : null;
+      // 🔴 EL AVISO: llegó N minutos antes y nadie dijo que entraba antes. Solo
+      // desde el umbral de las reglas (hoy 30) y nunca con autorización. No
+      // cuenta, no frena, no entra a `revisar`.
+      const entradaTempranaMin = avisoEntradaTemprana({
+        entSeg: ent, entradaProgSeg, umbralMin: avisoTempranaMin, tieneAutorizacion: autorizada !== null,
+      });
+
       const trabajadoMin = soloUna ? 0 : Math.max(0, (sal - ent - almuerzoTomado) / 60);
       // Regla 5. 4 marcas es lo normal; cualquier otra cosa se revisa —pero
       // los números se calculan igual.
@@ -1175,7 +1269,12 @@ export function armarReporte(opts: {
         entrada: fmt(ent),
         // `null` y no la hora de entrada: no sabemos cuándo se fue.
         salida: soloUna ? null : fmt(sal),
-        tardeMin, excesoAlmuerzoMin, salidaTempranaMin, extraMin, trabajadoMin,
+        tardeMin, excesoAlmuerzoMin, salidaTempranaMin, extraMin: extraTotalMin, trabajadoMin,
+        // 🔴 Los tres de la entrada autorizada (24-sep-2026). Solo viajan
+        // cuando hay algo que decir: un día de siempre sale como siempre.
+        ...(extraEntradaMin > 0 ? { extraEntradaMin } : {}),
+        ...(entradaAutorizada ? { entradaAutorizada } : {}),
+        ...(entradaTempranaMin !== null ? { entradaTempranaMin } : {}),
         revisar, salidaSospechosa: sospechosa,
         enCurso, fueraDeVigencia: false, ausente: false, vacacion: null, justificado, permiso, permisoRango,
         permisoPerdonaMin, permisoPerdonaSalidaMin, permisoPerdonaAlmuerzoMin, feriado, habil,

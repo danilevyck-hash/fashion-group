@@ -41,6 +41,11 @@ import {
   etiquetaEmpresa,
   type ReglasAsistencia,
 } from "@/lib/asistencia/config";
+// 🔴 Los rótulos de las dos reglas del 24-sep-2026, de su módulo puro.
+import {
+  AYUDA_AVISO_ENTRADA_TEMPRANA, AYUDA_GRACIA_ALMUERZO,
+  ROTULO_AVISO_ENTRADA_TEMPRANA, ROTULO_GRACIA_ALMUERZO,
+} from "@/lib/asistencia/reglas-nuevas";
 import { rataPorHoraCalculo } from "@/lib/asistencia/rata";
 import {
   comoFilas,
@@ -316,6 +321,10 @@ function reglasAForm(r: ReglasAsistencia): FormReglas {
     seguroEducativoPct: String(r.seguroEducativoPct),
     excedenteHorasDia: String(r.excedenteHorasDia),
     recargoExcedenteNocturnaMixta: String(r.recargoExcedenteNocturnaMixta),
+    // 🔴 Los dos del 24-sep-2026: la gracia del almuerzo y el aviso de entrada
+    // temprana. Ver `reglas-nuevas.ts`.
+    graciaAlmuerzoMin: String(r.graciaAlmuerzoMin),
+    avisoEntradaTempranaMin: String(r.avisoEntradaTempranaMin),
   };
 }
 
@@ -782,7 +791,9 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "No se pudo guardar");
-      toast("Listo, las reglas quedaron guardadas", "success");
+      // 🔴 Sin las columnas del 24-sep-2026 se guardaron las de siempre: se DICE.
+      if (typeof d.avisoNuevas === "string" && d.avisoNuevas) toast(d.avisoNuevas, "error");
+      else toast("Listo, las reglas quedaron guardadas", "success");
       await cargar();
     } catch (e) {
       toast(e instanceof Error ? e.message : "No se pudo guardar", "error");
@@ -1712,6 +1723,16 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                   <Campo label="Mínimo para contar hora extra" ayuda="Quedarse menos de esto no cuenta como extra."
                     sufijo="minutos" valor={form.extraMinimoMin}
                     onChange={(v) => set("extraMinimoMin", v)} />
+                  {/* 🔴 LAS DOS DEL 24-sep-2026, al lado de la tolerancia. Daniel:
+                      «60 que dura 65 no descuenta nada; si dura 66, se descuentan
+                      los 6» y, sobre el aviso, «solo desde 30 minutos». Los rótulos
+                      salen de `reglas-nuevas.ts`. */}
+                  <Campo label={ROTULO_GRACIA_ALMUERZO} ayuda={AYUDA_GRACIA_ALMUERZO}
+                    sufijo="minutos" valor={form.graciaAlmuerzoMin}
+                    onChange={(v) => set("graciaAlmuerzoMin", v)} />
+                  <Campo label={ROTULO_AVISO_ENTRADA_TEMPRANA} ayuda={AYUDA_AVISO_ENTRADA_TEMPRANA}
+                    sufijo="minutos" valor={form.avisoEntradaTempranaMin}
+                    onChange={(v) => set("avisoEntradaTempranaMin", v)} />
                 </Bloque>
 
                 <Bloque titulo="Recargos">

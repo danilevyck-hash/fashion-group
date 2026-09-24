@@ -95,6 +95,8 @@ export interface DiaDePersona {
   minutos: number;
   tipo: PersonaEnDia["tipo"];
   salida: string | null;
+  /** «entró 06:00 (autorizado)» (24-sep-2026). Ausente = el día de siempre. */
+  entradaAutorizada?: string;
   decision: Decision;
   por: string | null;
   cuando: string | null;
@@ -124,6 +126,7 @@ function diaDePersona(d: DiaAprobacion, g: PersonaEnDia): DiaDePersona {
     minutos: g.minutos,
     tipo: g.tipo,
     salida: g.salida,
+    ...(g.entradaAutorizada ? { entradaAutorizada: g.entradaAutorizada } : {}),
     decision: decisionDe(g),
     por: g.por,
     cuando: g.cuando,
