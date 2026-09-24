@@ -7,6 +7,215 @@
 
 ---
 
+## 🔴 El rediseño de la pantalla (24-sep-2026) — celular y computadora
+
+> Interruptor: `ASISTENCIA_PANTALLA_2026_09` en `src/lib/asistencia/pantalla-2026-09.ts`, hoy `true`.
+> `false` = las pantallas de antes, intactas.
+> Mockups aprobados letra por letra por Daniel: `cel-asistencia.html` (11 secciones, 18 letras) y
+> `esc-asistencia.html` (8 secciones, 25 letras), con sus dos informes de opciones.
+
+**Lo que eligió Daniel, letra por letra:** `1b` (portada del celular) · `2b` (tarjeta por
+colaborador) · `2d` (el colaborador abierto, acciones al pasar el mouse) · `2e` (2b con su cambio:
+sin la columna «Sale», el código a la izquierda, la salida en burbuja) · `3a` (el panel recogido; y
+en la computadora, una sola fila de mandos con el número encabezando Aprobaciones) · `4a` sin «Hoy»
+ni «Ayer» / `1f` (el selector único) · `1d` (el corte como línea gris) · `4b` (las 14 columnas en su
+caja) · `5` (Aprobaciones se queda con Colaborador · Día) · `5c` (Colaboradores, tabla directa con el
+código a la izquierda) · `6b` (el tablero de cierre del celular solo informa) · `7a` (de la Planilla
+a la Asistencia de esa persona) · `7b` (Colaboradores agrupado por empresa en el celular) · `9a`
+(Préstamos como hoy). `6a` (las tres reglas nuevas) ya estaba construido y no se tocó.
+
+### 🩸 Lo que se midió antes de tocar nada
+
+| Qué | Medida | Dónde |
+|---|---|---|
+| Selectores de período del módulo | **4**, con **3** memorias y **2** listas de quincenas que no coinciden | el código, 24-sep |
+| Asistencia en el teléfono: ancho de la tabla | **888 px** dentro de una ventana de **356** | `IMG_3118`/`IMG_3119` |
+| Bloques antes del primer nombre (celular) | **9** · **1.085 px** · **22 controles** con «Todas» | `IMG_3117` + `IMG_3118` |
+| Casillas de «justificar a varios» | **16 × 16 px**; iOS pide 44 | medido |
+| Planilla en la computadora (1440 px) | la tabla se corta después de «ISR»: **el NETO queda fuera del borde** | `d12` |
+| Un colaborador abierto | **32 cosas para tocar**, **12 de ellas en días que no llegaron** | `d04`, `d05` |
+| De la Planilla a la Asistencia de una persona | **4 toques** y buscar entre **43 filas** | medido |
+| Colaboradores con «Todas» | página de **4.206 px**; dos botones negros apilados | `d01`, `e09` |
+
+### 1 · Un solo selector de período (`4a` sin chips / `1f`)
+
+**La barra:** `‹  16 – 30 sep 2026  ›` y, al lado, un 📅 que abre el calendario de siempre para un
+día o un rango. **Sin «Hoy» ni «Ayer»** — Daniel los pidió fuera: la quincena es lo que se mira.
+
+- **Las flechas saltan de QUINCENA, siempre.** Mirando un día suelto o un rango elegido en el
+  calendario, «‹» y «›» llevan a la quincena anterior o siguiente a la que CONTIENE el primer día de
+  lo que se mira. Un paso que a veces es «un día» y a veces «una quincena» es un control que no se
+  puede predecir.
+- **«›» se apaga cuando la quincena que sigue todavía no empezó** — la misma regla del mes del
+  celular de Multifashion: nunca al futuro.
+- **El rótulo no miente:** «16 – 30 sep 2026» cuando es una quincena, «18 sep 2026» cuando es UN día,
+  «18 sep – 22 sep 2026» cuando es cualquier otro rango, y **vacío** con una fecha rota.
+- **Una clave y una memoria.** `?desde=&hasta=` con `replace` (es un filtro del mismo nivel: el Atrás
+  del navegador no cicla por fechas) y `fg_last_asistencia_periodo`. 🩸 Antes Asistencia recordaba con
+  `asistencia_reporte` y Aprobaciones con `asistencia_aprobaciones` — **cambiar el período en una
+  pestaña no cambiaba el de la otra**.
+- **Con qué período abre:** manda la dirección, después la memoria, y al final **la quincena en
+  curso**. 🩸 Asistencia abría en «hace 14 días → hoy», que no es ninguna quincena: las flechas
+  habrían estado mintiendo desde el primer segundo.
+- ⚠️ **En la Planilla y en Movimientos el selector va SIN calendario.** En la Planilla solo se pagan
+  quincenas (Daniel, 15-sep-2026: *«si la quincena es fija, que no haya opción de rango, solo las
+  opciones»*) y en Movimientos no hay movimientos de un rango libre. Es una desviación deliberada del
+  mockup, que dibujaba el 📅 en las cinco.
+- ⚠️ **`?quincena=` sigue entrando en Movimientos y GANA**: un enlace viejo abre donde decía.
+
+#### 🩸 El defecto que encontró el candado: las dos fechas se pisaban
+
+Escribirlas con dos `useUrlState` seguidos **pierde una**. Cada setter arma la dirección nueva a
+partir de la que había AL PINTAR, así que el segundo pisa al primero: pedir la quincena anterior
+dejaba `desde=2026-09-16&hasta=2026-09-15` — **un rango al revés**. Por eso `usePeriodoAsistencia`
+arma UNA dirección con las dos fechas y llama al router una sola vez, con su propio valor optimista
+para que la barra no se sienta con un toque de retraso.
+
+⚠️ El defecto ya existía en el `elegirPeriodo` de Asistencia (16-sep-2026); lo tapaba el valor
+optimista de `useUrlState`. Lo destapó el candado nuevo.
+
+### 2 · El corte del reloj, en una línea gris (`1d`)
+
+🩸 «Quincena» y «Cortar el reloj el» estaban uno al lado del otro, con rótulo propio y el mismo peso:
+**por eso parecían dos períodos**. Y al lado del campo había un botón **«Quincena entera»** y un chip
+gris **«Corte 17 sep»** que solo repetía el valor que el campo ya decía.
+
+Hoy: el campo, una **«×»** que lo vacía, y debajo **una línea gris** — «El reloj se lee hasta el
+28 sep · cambiar», o «El reloj se lee hasta el fin de la quincena» cuando está vacío. «cambiar»
+lleva al campo (`showPicker` donde el navegador lo tiene).
+
+🔑 **El corte no cambia lo que se paga**: el período queda entero y solo se recorta hasta dónde se
+mira el reloj. Eso ya era así y no se tocó. El corte propuesto sigue siendo `CORTE_SUGERIDO`
+(13 / 28) y se pone solo al cambiar de quincena.
+
+### 3 · La Planilla cabe en la pantalla (`4b`) y el nombre lleva a su Asistencia (`7a`)
+
+- **Las 14 columnas dentro de SU caja**: `max-h-[70vh] overflow-auto`, la cabecera pegada arriba y la
+  columna del nombre fija a la izquierda. **Ninguna columna se pliega**: la contadora las ve todas.
+  🩸 A 1440 px la tabla se cortaba después de «ISR» y el NETO —el número por el que existe la
+  pantalla— quedaba fuera del borde derecho.
+- **`7a`**: el nombre de cada fila es un enlace a
+  `/asistencia?tab=asistencia&empresa=…&desde=…&hasta=…&abre=<código>`. De **cuatro toques a uno**.
+  El camino de vuelta ya estaba resuelto por `pestanas-vivas.ts`: el Atrás devuelve la Planilla
+  armada, sin regenerarla. En el celular el enlace va **debajo** del encabezado tocable de la
+  tarjeta: un `<a>` dentro de un `<button>` no es HTML válido y en iOS se pelean los dos toques.
+- 🔴 **La plata sigue sin dibujarse sola.** La regla de Daniel del 1-sep-2026 no se toca: al montar no
+  se pide nada, y el cuadro aparece cuando alguien aprieta «Generar». Lo que cambió es el VACÍO: con
+  la quincena ya puesta por el selector, decía «Elige el período que vas a pagar» y ahora dice
+  «Esta quincena todavía no se generó · Toca **Generar**».
+
+### 4 · Asistencia: una fila de mandos y diez columnas (`3a` · `2e` · `2d`)
+
+- **Una sola fila:** el selector · la lupa (el buscador aparece al tocarla, y se queda si hay texto) ·
+  «Solo a revisar» · el ícono de compartir con Excel y PDF adentro · un «···» con los relojes y
+  «Traer ahora».
+- **Los avisos se pliegan** tras «N avisos del período». **Ninguno se borró**: se abren tocando la
+  línea.
+- **La columna «Sale» se retiró** (11 → 10). Daniel, textual: *«pone salida como en una burbuja al
+  lado del nombre, y el código a la izquierda del nombre»*. Los códigos van alineados entre sí
+  (`anchoDelCodigo`), así que el nombre arranca siempre en el mismo punto. **El dato no se perdió**:
+  la salida se lee en la burbuja gris.
+- **`2d` — las acciones al pasar el mouse.** «Arreglar el día» y «Justificar» viven en
+  `opacity-0 group-hover:opacity-100 group-focus-within:opacity-100`: siguen en el DOM y **el teclado
+  las sigue alcanzando**. Esconderlas del tabulador sería sacarlas de verdad.
+- **Los días que todavía no llegaron no ofrecen nada que arreglar** — `d.enCurso && d.fecha > hoy`,
+  o sea ESTRICTAMENTE futuros. **Hoy sí se puede arreglar**: para eso está.
+
+### 5 · El celular (`1b` · `2b` · `3a` · `6b` · `7b`)
+
+- **`1b` — la portada.** Al entrar al módulo sin `?tab=`, las cinco pestañas como filas de una lista
+  iOS, con el selector de empresa arriba y su conteo REAL al lado. Tocar una fila escribe `?tab=`,
+  que es una clave de PANTALLA (`useUrlState`): en el celular empuja historial, así que **el Atrás
+  devuelve la portada**.
+  - Los conteos salen de las MISMAS rutas que usa cada pestaña: `configuracion` (colaboradores y
+    cuántos no tienen ficha), `planilla?aprobaciones=1` (por decidir y sus horas), `prestamos-deuda`
+    (quién debe y cuánto) y `planilla-guardada` (si la quincena está cerrada, solo con UNA empresa
+    elegida). **Mientras viaja, la fila no dice nada: nunca un cero inventado.**
+  - ⚠️ **Lo que esto cuesta, dicho:** son hasta cuatro lecturas al abrir el módulo, y la pestaña que
+    se toque después vuelve a pedir lo suyo. Son lecturas: no escriben nada y no cambian un centavo.
+  - ⚠️ La fila de Asistencia queda **sin detalle**: su número («8 colaboradores · 11 ausencias») sale
+    del motor del reporte, que es la lectura más cara del módulo, y no valía una quinta petición al
+    abrir. El mockup lo dibujaba.
+- **`2b` — una tarjeta por colaborador.** Nombre y código, «6 días · sale 18:30», y lo que le falló
+  (ausencias en rojo, tardanzas en ámbar, extras en gris, «a revisar» en ámbar) o
+  **«sin nada que revisar»** en verde. Es la MISMA fila de la tabla: el mismo `onToggle`, la misma
+  selección, y adentro **el MISMO detalle de días**. El pie dice lo mismo que el de la tabla.
+- **`3a` — los relojes en una línea** (`resumenDeRelojes`: «Los relojes están al día», «1 de 2
+  relojes no están entrando», «Ningún reloj está entrando»). ⚠️ **«Traer ahora» quedó en esa misma
+  línea y no dentro del «···»**, como pedía el mockup: separarlos obligaba a montar el lector del
+  reloj DOS veces, con dos pollers para el mismo dato.
+- **`6b` — el tablero de cierre solo informa.** Desde el teléfono la quincena se cierra entrando a la
+  empresa: un toque más a cambio de no cerrar la empresa equivocada con el pulgar. 🔴 **Sigue sin
+  haber un total del grupo** y cada cierre sigue siendo el de SU empresa por su propia puerta.
+- **`7b` — Colaboradores agrupado por empresa.** Es la MISMA lista, en otro orden, con un encabezado
+  cuando cambia la empresa. No se agrega ni se quita a nadie.
+
+### 6 · Colaboradores en la computadora (`5c`)
+
+🩸 La lista vivía dentro de una tarjeta plegable que **repetía el título de la pestaña**
+(«Colaboradores» arriba de «Colaboradores») y se podía cerrar sin querer, dejando la pestaña en
+blanco. Y los dos botones NEGROS —«Todos (44)», que es un filtro, y «+ Nuevo colaborador», que es una
+acción— ocupaban un renglón entero cada uno.
+
+Hoy: la tabla, directa; el buscador y «+ Nuevo colaborador» en la fila de los chips; y el código
+delante del nombre, igual que en Asistencia. **Horarios, Feriados y Reglas siguen plegados al pie**,
+exactamente como estaban.
+
+### 7 · Aprobaciones (`3a`)
+
+Una sola fila de mandos —selector · Colaborador / Día · buscador · Excel · «Sí a todo»— y el número
+grande («5 por decidir · 10:36 h») **encabezando la lista** en vez de metido entre los botones. Las
+dos vistas se quedan y abre en Colaborador, como hoy.
+
+### 🔴 Ningún número cambia
+
+Dos pruebas, porque una sola no alcanza (`pantalla-no-mueve-un-numero.test.ts`):
+
+1. **Barrido** — ni el motor del reporte, ni el de la planilla, ni sus ayudantes puros, ni **una sola
+   ruta de `/api/asistencia/**`** importan `pantalla-2026-09` o `celular-asistencia`. Si nadie que
+   calcula o escribe lo conoce, no lo puede consultar. Y los dos módulos del rediseño no importan el
+   motor, ni usan `fetch`, ni `supabase`, ni `new Date()`.
+2. **Datos fijos** — un día con todo (entra 35 min antes, almuerza 66, sale 25 después) pasa por
+   `armarReporte` → `medirHoras` → `calcularDinero` y se compara contra números escritos a mano:
+   rata **$4,81**, quincenal **$500**, extra **$2,51**, bruto **$502,51**, seguros **$48,99** y
+   **$6,28**, neto **$447,24**.
+
+### Los archivos
+
+| Archivo | Qué es |
+|---|---|
+| `src/lib/asistencia/pantalla-2026-09.ts` | **Puro.** El interruptor, el período compartido, el salto de quincena, los rótulos, el corte y la ruta de `7a`. |
+| `src/lib/asistencia/celular-asistencia.ts` | **Puro.** La tarjeta, el pie y las filas de la portada. |
+| `src/components/asistencia/SelectorPeriodo.tsx` | La barra `‹ … ›` + 📅 y el hook `usePeriodoAsistencia`. |
+| `src/app/asistencia/PortadaCelular.tsx` | La lista iOS de las cinco pestañas, con sus conteos. |
+| `src/components/ui/RangoFechas.tsx` | `iconoSolo`: el MISMO calendario detrás de un 📅 de 44 px. |
+| `src/app/asistencia/EstadoReloj.tsx` | `resumen`: los relojes en una línea, con «Traer ahora» para todos. |
+
+### Candados (`src/__tests__/asistencia/`)
+
+- `pantalla-selector-unico` (40) — una clave, una memoria, las cuatro pestañas con el mismo hook, el
+  salto de quincena y el freno al futuro, los rótulos, el corte sin botón ni chip, `7a`, las diez
+  columnas, el tablero sin total del grupo, la caja de la tabla y el barrido de voseo.
+- `pantalla-no-mueve-un-numero` (8) — el barrido del motor y de las rutas, y el día con datos fijos.
+- `pantalla-2026-09-pantallas` (22) — lo que se dibuja de verdad, en computadora y en celular.
+
+Dos candados de antes, ajustados sin perder lo que protegen: `barras-pegajosas` (la Planilla entra a
+«no son barras de página» con su motivo: su `<thead>` se pega a la caja de la tabla) y
+`asistencia-corregir-hora` (el «···» sigue prohibido en la fila del día, y ahora se exige que haya
+**exactamente uno** en el archivo y que sea el de los relojes).
+
+### Lo que NO se hizo
+
+- **La fila «Asistencia» de la portada no lleva número** (ver arriba: costaba una quinta lectura).
+- **El 📅 no se dibuja en la Planilla ni en Movimientos**, aunque el mockup lo ponía en las cinco: en
+  la Planilla un rango libre está retirado desde el 15-sep-2026 y reponerlo por la puerta del
+  selector habría revivido justo lo que se sacó.
+- **`8a`/`8b` (la entrada autorizada de un día o de un rango)** no entra acá: `8a` ya se construyó
+  esta misma mañana — ver «Las tres reglas de horas del 24-sep-2026».
+- **«Antes de cerrar» no se tocó**: ya era una lista de renglones, que es lo que pedía el encargo.
+
+---
+
 ## 🔴 Cuatro marcas también en el teléfono (24-sep-2026) — y el almuerzo, de un solo toque
 
 > Interruptor: `MARCACION_CUATRO_MARCAS` en `src/lib/marcacion/cuatro-marcas.ts`, hoy `true`.
