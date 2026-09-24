@@ -287,7 +287,12 @@ describe("5 · Vendedoras", () => {
     expect(vendedoras).toContain("<MetasEnVendedoras />");
     expect(vendedoras).toContain("conMetas &&");
     // Y el módulo se lo PASA — sin esto la pestaña queda sin metas y nadie avisa.
-    expect(view).toContain("<VendedorasSubtab selectedYear={selectedYear} periodo={periodo} corte={corte} conMetas />");
+    // ⚠️ 24-sep-2026: el montaje pasó a varias líneas (suma `enCelular`), así
+    // que se comprueban las PROPS, no la línea. La regla no cambió.
+    const montaje = view.slice(view.indexOf("<VendedorasSubtab"), view.indexOf("</TabsContent>", view.indexOf("<VendedorasSubtab")));
+    for (const prop of ["selectedYear={selectedYear}", "periodo={periodo}", "corte={corte}", "conMetas"]) {
+      expect(montaje, prop).toContain(prop);
+    }
   });
 
   it("🔴 el ESPEJO de Comisiones conserva sus seis píldoras (no se toca)", () => {

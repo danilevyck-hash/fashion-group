@@ -111,7 +111,11 @@ describe("🔴 la frescura que SÍ depende del foco no se toca", () => {
   it("la venta de HOY de Multifashion sigue revalidando al foco", () => {
     // Es el número que cambia con cada sync de Switch; su tarjeta tiene su
     // propio hook y no entra en este cambio.
-    expect(codigoDe("src/components/multifashion/VentaHoyCard.tsx")).toContain("revalidateOnFocus: true");
+    // ⚠️ 24-sep-2026: ese hook se mudó a `venta-hoy-cliente.ts` para que la
+    // banda de computadora y la línea del celular compartan UNA sola petición.
+    // La opción es la MISMA y sigue viviendo en un solo lugar.
+    expect(codigoDe("src/lib/multifashion/venta-hoy-cliente.ts")).toContain("revalidateOnFocus: true");
+    expect(codigoDe("src/components/multifashion/VentaHoyCard.tsx")).toContain("useVentaHoy(");
   });
 });
 
