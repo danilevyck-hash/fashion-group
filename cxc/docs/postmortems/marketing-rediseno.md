@@ -704,3 +704,79 @@ Mutaciones a mano (romper → ROJO → restaurar):
 - ⚠️ Los muebles no tienen `anulado_en`: se eliminan directo (con ELIMINAR), sin los 90 días de gracia. Darles anulación es otra pieza.
 - ⚠️ El pie de la lista de Tiendas SUMA las tiendas que se ven (es lo aprobado en el mockup: «$···» al pie); es la misma suma de tiendas que ya se medía ($200.060,24), no un total por marca.
 - ⚠️ Un `?filtro=anulados` viejo no existe como URL (el filtro de marca no vive en la URL); `FILTRO_ANULADOS_RETIRADO` queda rotulado por si algún enlace lo trae.
+
+---
+
+## 14. Marketing en el celular — «nombre y UN monto; el desglose adentro» (24-sep-2026)
+
+> Daniel, contestando el mockup `cel-marketing.html` letra por letra: **1a · 2a · 3a · 4c · 5b · 6b · 7b · 8a · 9a · 10a · 11a · 12a · 13b**.
+>
+> Y la frase que vale para todo el sistema, textual, sobre la segunda línea de las filas de la portada («Tommy $8,913.22 · Calvin $3,736.75»): *«ya son datos que veré adentro, eso me ensucia la pantalla, no solo aquí sino en todo el sistema»*.
+>
+> Sobre el número grande: *«el número grande más chico, que no consuma tanto»*.
+
+**Interruptor:** `MARKETING_CELULAR` (`lib/marketing/celular.ts`, hoy `true`). En `false`, el celular de antes: la portada con sus cuatro pestañas, la ficha como tabla con deslizamiento, Mobiliario en tarjetas de doce renglones e Impulsadoras en tarjetas de 1,2 iPhones. **Nada de lo que se guarda cambia** con ninguno de los dos valores.
+
+### El envoltorio: UN SOLO ÁRBOL, no dos escondidos con CSS
+
+Los otros celulares de la casa (CXC, Multifashion) dibujan las dos vistas y esconden una con `hidden sm:block`. **Acá no se podía**: Marketing tiene seis pantallas con vista de celular, y con las dos montadas cada nombre de tienda salía DOS veces en el documento, cada `FotosSection` pedía sus fotos dos veces, y los cuatro candados que ya existían (`marketing-tiendas-y-marcas`, `marketing-el-periodo-manda`, …) se pusieron rojos con «Found multiple elements».
+
+Se usó el patrón del rediseño de Asistencia: se pregunta el aparato en un EFECTO y se monta **una sola** de las dos ramas.
+
+- `esPantallaDeCelular()` (puro, `lib/marketing/celular.ts`): `window.matchMedia("(max-width: 639px)")` — el escalón `sm` de Tailwind menos uno, escrito UNA vez (`HASTA_SM`). En el servidor y sin `matchMedia`, **computadora**.
+- `useEsCelular()` (`app/marketing/components/celular/useEsCelular.ts`): arranca en `false`, lo mide en un efecto y se vuelve a medir si la ventana cambia de tamaño.
+- 🔴 **Los modales viven FUERA de la rama elegida** (la puerta «＋ Gasto», el cierre, el borrado, el historial de una impulsadora, el editar de un producto): son los MISMOS para las dos vistas y tienen que abrirse en las dos.
+
+### Las trece pantallas, una por una
+
+| # | Lo que eligió Daniel | Qué se construyó | Dónde vive |
+|---|---|---|---|
+| **1a** | Tiendas primero con su total arriba, el número grande **más chico** | `TiendasCelular`: título «Marketing», número grande (34 px, no 44), la barra de períodos en píldoras, y una fila por tienda: **nombre + UN monto**. 🔴 Sin el desglose por marca. Al final, «También»: Marcas · Impulsadoras · Mobiliario | `celular/TiendasCelular.tsx`, montado por `PortadaTiendas` |
+| **2a** | Dos renglones por gasto con el monto a la vista | `FichaTiendaCelular`: proveedor · concepto arriba; fecha · marca · factura abajo; el monto a la derecha. Tocar el gasto abre la hoja de acciones (el PDF y lo que ofrecía el «···») | `celular/FichaTiendaCelular.tsx` |
+| **3a** | Número grande **más chico**, ZIP y Cerrar anchos, las tiendas debajo | `PaginaMarcaCelular`: el total del período abierto, dos botones anchos y una fila por tienda; los cerrados en su grupo | `celular/PaginaMarcaCelular.tsx`, montado por `PaginaMarca` |
+| **4c** | Tres puertas: escanear · elegir el PDF · escribirlo a mano | `PuertasDeLaFacturaCelular` dentro de `PuertaGasto` | ver «El escaneo», abajo |
+| **5b** | Marcas **sin** total de las tres marcas | `MarcasCelular`: la lista y nada más; las que no tienen gasto bajan al final, en gris, con «—» | `celular/MarcasCelular.tsx` |
+| **6b** | Una fila por persona con «Pagar» en la fila; el detalle adentro | `ImpulsadorasCelular`: nombre · marca · cuánto debe · desde cuándo, y «Pagar». Los meses sin pagar, el historial y «Eliminar» al tocar el nombre | `celular/ImpulsadorasCelular.tsx` |
+| **7b** | Una fila por producto **con su foto** (tocarla la abre grande); Editar y Borrar al deslizar; **sin** «entregadas 543 de 561» | `MobiliarioCelular`: miniatura de 44 px, precio y las piezas en bodega. Comprado/entregado/valor viven adentro. `SwipeableRow`: izquierda Editar, derecha Borrar (solo admin). El resumen por tienda pasa de 13 tarjetas de 12 renglones a 13 renglones | `celular/MobiliarioCelular.tsx` |
+| **8a** | Las facturas sueltas y los pagos de impulsadora en un renglón; **sin** el número de factura en la fila | `fichaGeneralCelular` (puro) parte las filas y agrupa los pagos; el renglón se abre y muestra los N | `lib/marketing/celular.ts` |
+| **9a** | El período como título de grupo con su subtotal | Los MISMOS `bloquesPorPeriodo` y `cabeceraDelBloque` de la computadora, dibujados como rótulo de grupo | `FichaTiendaCelular` |
+| **10a** | El cierre como hoja de iOS, mismo envío | El modal sube desde abajo (`items-end`, esquinas redondeadas arriba) y «Cerrar período» es ancho. **Ninguna regla del cierre se toca** | `CerrarPeriodoModal.tsx` |
+| **11a** | Lo obligatorio arriba y el botón apagado dice qué falta | En el celular el pie de la puerta es un botón ancho cuyo TEXTO es `textoFaltaEnLaPuerta(...)`. La regla de qué falta no cambió | `PuertaGasto.tsx` |
+| **12a** | Eliges a la persona y ya | La lista de impulsadoras de la puerta ya era lo primero; el botón ancho dice «Falta: a quién le pagas» hasta que se elige | `PuertaGasto.tsx` |
+| **13b** | La × solo al tocar «Editar» | `FotosSection` gana un «Editar» (solo `sm:hidden`, solo con fotos y con permiso de escritura) que prende las ×. En la computadora hay hover y nada cambió | `FotosSection.tsx` |
+
+### El escaneo (4c) — no se construyó un lector, se le abrió la cámara al que ya existía
+
+Lo que **ya estaba** el 24-sep-2026: `POST /api/marketing/ia/leer-factura` con su prompt de seis campos (`numero_factura`, `fecha_factura`, `proveedor`, `concepto`, `subtotal`, `itbms_pct`), su modelo (`claude-sonnet-4-6`) y su parser; `FacturaForm` con `pdfInicial` → `onUploadPdfForIA` → la ruta; y `MARKETING_PDF_EN_LA_PUERTA` en `true`, o sea el PDF ya se leía solo desde la puerta.
+
+Lo que **faltaba**, y es exactamente lo que se hizo:
+
+1. **`capture="environment"`** en el input de escanear (`CAPTURE_DE_LA_CAMARA`): la cámara de atrás, la que mira al papel. Era el único `capture=` que no existía en Marketing; el otro del sistema está en Marcación.
+2. **Que el lector acepte una foto.** El transporte lo resolvió `lib/ia/bloque-archivo.ts` (bloque `image` cuando el `media_type` es imagen) y acá solo se le pasa el `mediaType`: el del bucket si el modelo sabe leerlo, si no el deducido del NOMBRE del archivo (`tipoPorNombre`), **con PDF por defecto**. 🔴 El prompt no cambió ni una coma.
+
+El camino completo, en el navegador: la foto se valida (`validateFotoFile`), se achica a **1600 px de lado mayor y JPEG 0,8** (`compressImage`, los MISMOS números de Reclamos y Mobiliario: el cuerpo de una función de Vercel se topa en ~4,5 MB y una foto de iPhone pesa 3-12 MB), se sube **sin dueño** (`paraLeerConIA`, el mismo camino del PDF), se le pide al lector, y lo leído entra al formulario por su **`initial`** — la puerta que ya existía, sin un campo nuevo (`initialDeLaLectura`, puro; el ITBMS se convierte de porcentaje a dólares con la misma cuenta que hace la pantalla al elegir el 7 %).
+
+🔴 **Nada de lo que se guarda cambia:** la foto queda en el estado `foto` y se cuelga como **`foto_factura`** por `adjuntarFoto`, el camino de siempre; el `POST /api/marketing/facturas` no ganó ni perdió un campo. **Falla ABIERTA**: si el lector no contesta, la foto queda adjunta igual y los seis campos se teclean.
+
+### Candados y mutaciones
+
+`src/__tests__/marketing/marketing-celular.test.tsx` (10 casos) y `src/__tests__/marketing/marketing-escanear.test.tsx` (5 casos).
+
+| # | Mutación | Resultado |
+|---|---|---|
+| 1 | `subtituloTiendaCelular` vuelve a poner el desglose por marca | 🔴 2 casos |
+| 2 | `renglonDeGastoCelular` ignora `sinNumeroDeFactura` | 🔴 1 caso |
+| 3 | `fichaGeneralCelular` no agrupa los pagos de impulsadora | 🔴 1 caso |
+| 4 | `MarcasCelular` agrega un `NumeroGrande` con la suma de las marcas | 🔴 1 caso |
+| 5 | `MobiliarioCelular` vuelve a escribir «entregadas N de N» en la fila | 🔴 1 caso |
+| 6 | se le quita el `capture` al input de escanear | 🔴 1 caso |
+| 7 | la foto se sube sin `compressImage` | 🔴 1 caso |
+| 8 | `useEsCelular` devuelve `true` siempre | 🔴 1 caso (la prueba de «apagado = lo de antes») |
+| — | control sin mutar | 🟢 15/15 |
+
+### Pendiente o dudoso
+
+- ⚠️ **El total del pie de Mobiliario suma las tres marcas entre sí**, que es lo contrario de la regla del módulo. Queda ANOTADO, no cambiado: Daniel ya dijo que Mobiliario por dentro no se toca. Es el mismo número del pie de la computadora.
+- ⚠️ **No se probó una lectura real contra Anthropic** (habría gastado crédito). Lo que el candado prueba es el camino: el `capture`, el achique, la subida sin dueño, la llamada al lector y que el payload de guardar no cambió.
+- ⚠️ El **buscador de tiendas** no se dibuja en el celular: con 5 tiendas abiertas no aporta y se lleva una franja. Vuelve solo con el interruptor apagado (o en la computadora). Si Daniel lo quiere, es una línea.
+- ⚠️ La **barra de períodos sigue siendo un chip por cierre**: con muchos cierres se desliza de lado. Hoy hay uno.
