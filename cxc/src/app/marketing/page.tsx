@@ -32,6 +32,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { puedeEscribirMarketing } from "@/lib/marketing/roles";
 import type { MkMarca } from "@/lib/marketing/types";
 import { esBloqueKey } from "@/lib/marketing/bloques";
 import { slugDeMarca } from "@/lib/marketing/slugs";
@@ -176,7 +177,7 @@ function MarketingPage() {
 function MarketingPageDeAntes() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { authChecked } = useAuth({
+  const { authChecked, role } = useAuth({
     moduleKey: "marketing",
     allowedRoles: [...ROLES_MARKETING],
   });
@@ -254,7 +255,7 @@ function MarketingPageDeAntes() {
               ← Marketing
             </button>
             {vistaParam === "impulsadoras" ? (
-              <ImpulsadorasView marcas={marcas} />
+              <ImpulsadorasView marcas={marcas} escribe={puedeEscribirMarketing(role)} />
             ) : (
               <ReportesTabs />
             )}

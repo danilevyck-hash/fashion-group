@@ -33,7 +33,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
-import { ROLES_MARKETING } from "@/lib/marketing/roles";
+import { ROLES_MARKETING, puedeEscribirMarketing } from "@/lib/marketing/roles";
 import { MARKETING_TIENDAS_Y_MARCAS, type FilaTienda } from "@/lib/marketing/tiendas-y-marcas";
 import { hrefDeTienda } from "@/lib/marketing/vista-tienda";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -84,6 +84,8 @@ export default function MobiliarioPage() {
     moduleKey: "marketing",
     allowedRoles: [...ROLES_MARKETING],
   });
+  // Contabilidad entra a mirar (24-sep-2026): sin «+ Agregar producto» ni «Editar».
+  const escribe = puedeEscribirMarketing(role);
   const { toast } = useToast();
   // 🔴 EL NOMBRE DE LA TIENDA SALE DEL DIRECTORIO, por código (23-sep-2026):
   // la lista de tiendas con gasto ya lo trae; acá solo se mira. Si la lectura
@@ -559,13 +561,15 @@ export default function MobiliarioPage() {
                 "Notas del proveedor", y el candado real está en el servidor. */}
             <div className="flex items-center gap-2">
               {role === "admin" && <PreciosProveedorAyuda />}
-              <button
-                type="button"
-                onClick={abrirNuevoProducto}
-                className="text-xs text-gray-500 hover:text-black underline min-h-[44px] px-1"
-              >
-                + Agregar producto
-              </button>
+              {escribe && (
+                <button
+                  type="button"
+                  onClick={abrirNuevoProducto}
+                  className="text-xs text-gray-500 hover:text-black underline min-h-[44px] px-1"
+                >
+                  + Agregar producto
+                </button>
+              )}
             </div>
           </div>
           {/* TARJETAS — hasta lg. Mismos datos y mismas etiquetas que la tabla. */}
@@ -608,6 +612,7 @@ export default function MobiliarioPage() {
                         <Dato campo="valor" label="Valor" valor={formatearMonto(valor)} />
                       </dl>
                       <div className="mt-3 flex gap-2">
+                        {escribe && (
                         <button
                           type="button"
                           onClick={() => abrirEditarProducto(p)}
@@ -615,6 +620,7 @@ export default function MobiliarioPage() {
                         >
                           Editar
                         </button>
+                        )}
                         {role === "admin" && (
                           <button
                             type="button"
@@ -737,6 +743,7 @@ export default function MobiliarioPage() {
                             {formatearMonto(valor)}
                           </td>
                           <td className="px-3 py-2 text-right space-x-2">
+                            {escribe && (
                             <button
                               type="button"
                               onClick={() => abrirEditarProducto(p)}
@@ -744,6 +751,7 @@ export default function MobiliarioPage() {
                             >
                               Editar
                             </button>
+                            )}
                             {role === "admin" && (
                               <button
                                 type="button"

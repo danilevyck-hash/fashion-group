@@ -118,7 +118,7 @@ export default function PortadaTiendasYMarcas({
           sinBotonDeGasto
         />
       )}
-      {tab === "impulsadoras" && <ImpulsadorasView marcas={marcas} />}
+      {tab === "impulsadoras" && <ImpulsadorasView marcas={marcas} escribe={escribe} />}
     </div>
   );
 }

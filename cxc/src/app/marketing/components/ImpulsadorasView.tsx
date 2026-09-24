@@ -19,6 +19,9 @@ import RegistrarPagoModal from "./RegistrarPagoModal";
 
 interface Props {
   marcas: MkMarca[];
+  /** false = contabilidad: solo mira. Sin «+ Nueva», «Registrar pago» ni «Eliminar»
+   *  (24-sep-2026; el servidor ya los rechazaba con 403, la pantalla los mostraba igual). */
+  escribe?: boolean;
 }
 
 // Iniciales del nombre (hasta 2 palabras).
@@ -126,7 +129,7 @@ function textoEliminar(imp: ImpulsadoraConEstado): {
   };
 }
 
-export default function ImpulsadorasView({ marcas }: Props) {
+export default function ImpulsadorasView({ marcas, escribe = true }: Props) {
   const { toast } = useToast();
   const [items, setItems] = useState<ImpulsadoraConEstado[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -209,13 +212,15 @@ export default function ImpulsadorasView({ marcas }: Props) {
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Impulsadoras</h1>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowNueva(true)}
-          className="rounded-md bg-black text-white px-3 py-2 text-sm active:scale-[0.97] transition"
-        >
-          + Nueva impulsadora
-        </button>
+        {escribe && (
+          <button
+            type="button"
+            onClick={() => setShowNueva(true)}
+            className="rounded-md bg-black text-white px-3 py-2 text-sm active:scale-[0.97] transition"
+          >
+            + Nueva impulsadora
+          </button>
+        )}
       </div>
 
       {!loading && (items?.length ?? 0) > 0 && (
@@ -311,7 +316,7 @@ export default function ImpulsadorasView({ marcas }: Props) {
                 {/* Con el interruptor nuevo el botón está mientras quede UN
                     mes sin pagar, por viejo que sea — que es de lo que se
                     trata: un mes de hace cinco meses también se paga. */}
-                {(ZIP_E_IMPULSADORAS_NUEVO
+                {escribe && (ZIP_E_IMPULSADORAS_NUEVO
                   ? (imp.mesesSinPagar ?? []).length > 0
                   : !imp.mesActual.pagado || !imp.mesAnterior.pagado) && (
                   <button
@@ -334,6 +339,7 @@ export default function ImpulsadorasView({ marcas }: Props) {
                 >
                   Ver historial
                 </button>
+                {escribe && (
                 <button
                   type="button"
                   onClick={() => setEliminando(imp)}
@@ -342,6 +348,7 @@ export default function ImpulsadorasView({ marcas }: Props) {
                 >
                   Eliminar
                 </button>
+                )}
               </div>
             </div>
           ))}
