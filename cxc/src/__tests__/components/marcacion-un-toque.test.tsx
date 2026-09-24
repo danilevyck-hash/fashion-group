@@ -72,6 +72,7 @@ vi.mock("@/lib/marcacion/cola-offline", () => ({
 }));
 
 import MarcacionClient from "@/app/marcacion/MarcacionClient";
+import { BloquesDelEsqueleto } from "@/app/marcacion/EsqueletoMarcacion";
 import OfflineBanner from "@/components/OfflineBanner";
 import {
   CLASES_BOTON_UN_TOQUE,
@@ -430,8 +431,25 @@ describe("8 · el interruptor guarda cada pieza", () => {
     expect(FUENTE_PANTALLA).toContain("MARCACION_UN_TOQUE ? ROTULO_MARCACION : \"marcacion\"");
     expect(FUENTE_PANTALLA).toContain("MARCACION_UN_TOQUE && estado?.codigo");
     // Y la pantalla de antes sigue entera, detrás del interruptor apagado.
-    expect(FUENTE_PANTALLA).toContain("!MARCACION_UN_TOQUE && estado?.codigo && !foto");
-    expect(FUENTE_PANTALLA).toContain("!MARCACION_UN_TOQUE && foto");
+    expect(FUENTE_PANTALLA).toContain("!MARCACION_UN_TOQUE && estado?.codigo");
+    expect(FUENTE_PANTALLA).toContain("<PantallaDeAntes");
     expect(FUENTE_ENCABEZADO).toContain("MARCACION_UN_TOQUE && esRolMarcacion(userRole)");
+  });
+});
+
+describe("9 · el esqueleto mide lo que va a reemplazar", () => {
+  it("🔴 son TRES bloques y el botón está en el cajón fijo, no en medio del texto", () => {
+    const { container } = render(<BloquesDelEsqueleto />);
+    const raiz = container.querySelector('[data-esqueleto="marcacion"]') as HTMLElement;
+    expect(raiz).not.toBeNull();
+    const hijos = Array.from(raiz.children);
+    // saludo · reloj · fecha · el cajón fijo del botón
+    expect(hijos.length).toBe(4);
+    expect(hijos[1].className).toContain("h-[56px]"); // el reloj nuevo
+    expect(raiz.textContent ?? "").not.toMatch(/Cargando/i);
+    const cajon = raiz.querySelector("[data-boton-fijo]") as HTMLElement;
+    expect(cajon).not.toBeNull();
+    expect(cajon.className).toBe(CLASES_CAJON_BOTON);
+    expect((cajon.lastElementChild!.firstElementChild as HTMLElement).className).toContain("min-h-[52px]");
   });
 });

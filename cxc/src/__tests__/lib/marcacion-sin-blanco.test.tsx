@@ -57,6 +57,10 @@ const RAIZ = path.resolve(__dirname, "../../..");
 const leer = (p: string) => readFileSync(path.join(RAIZ, p), "utf8");
 
 const FUENTE_PANTALLA = leer("src/app/marcacion/MarcacionClient.tsx");
+// ⚠️ Con el rediseño «un toque» (24-sep-2026) la pantalla que este candado
+// mide —la de ANTES, con el interruptor apagado— se mudó a su propio archivo.
+// El esqueleto la sigue midiendo a ella, así que las medidas se leen de ahí.
+const FUENTE_PANTALLA_DE_ANTES = leer("src/app/marcacion/PantallaDeAntes.tsx");
 const FUENTE_ESQUELETO = leer("src/app/marcacion/EsqueletoMarcacion.tsx");
 const FUENTE_LOADING = leer("src/app/marcacion/loading.tsx");
 const FUENTE_PAGINA = leer("src/app/marcacion/page.tsx");
@@ -186,12 +190,12 @@ function clasesDeLosBloques(): string[][] {
 describe("D · el esqueleto mide lo mismo que lo que reemplaza", () => {
   it("el bloque del reloj mide lo que mide el reloj", () => {
     // La pantalla dibuja la hora con `text-[46px] leading-none`.
-    expect(FUENTE_PANTALLA).toContain("text-[46px]");
+    expect(FUENTE_PANTALLA_DE_ANTES).toContain("text-[46px]");
     expect(clasesDeLosBloques()[1]).toContain("h-[46px]");
   });
 
   it("el bloque del botón usa el MISMO alto mínimo que el botón", () => {
-    expect(FUENTE_PANTALLA).toContain("min-h-[56px]");
+    expect(FUENTE_PANTALLA_DE_ANTES).toContain("min-h-[56px]");
     expect(clasesDeLosBloques()[3]).toContain("min-h-[56px]");
   });
 

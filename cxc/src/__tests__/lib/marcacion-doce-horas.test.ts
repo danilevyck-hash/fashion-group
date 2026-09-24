@@ -68,7 +68,14 @@ describe("A. cómo se ve una hora de 12 horas — UN solo lugar", () => {
 });
 
 describe("A. la pantalla de marcar no dibuja una hora de 24 horas", () => {
-  const pantalla = leer("app/marcacion/MarcacionClient.tsx");
+  // 🔑 Son TRES archivos desde el 24-sep-2026: el cliente, la pantalla nueva
+  // («un toque») y la de antes. El barrido las mira a las tres juntas — si
+  // mirara una sola, un `horaCorta` en otra se escaparía.
+  const pantalla = [
+    leer("app/marcacion/MarcacionClient.tsx"),
+    leer("app/marcacion/PantallaUnToque.tsx"),
+    leer("app/marcacion/PantallaDeAntes.tsx"),
+  ].join("\n");
 
   it("el barrido mira el archivo de verdad (si no, no miró nada)", () => {
     expect(pantalla.length).toBeGreaterThan(5000);

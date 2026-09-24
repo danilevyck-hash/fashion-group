@@ -39,25 +39,16 @@ import { BloquesDelEsqueleto } from "./EsqueletoMarcacion";
 import { ROTULO_MARCACION } from "@/lib/marcacion/rol";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import {
-  diaCorto,
   diasDeLaQuincena,
-  enDoceHoras,
   estadoDelBoton,
   fechaLarga,
   horaAmPm,
   marcasDelDia,
   notaDespuesDe,
-  QUIEN_CORRIGE,
-  type DiaMarcado,
   type MarcaSimple,
   type TipoMarca,
 } from "@/lib/marcacion/marcacion";
-import {
-  cuentaRegresiva,
-  queSeDeshace,
-  rotuloDeshacer,
-  type Deshacible,
-} from "@/lib/marcacion/deshacer";
+import { queSeDeshace, type Deshacible } from "@/lib/marcacion/deshacer";
 import {
   borrarPendiente,
   guardarPendiente,
@@ -66,6 +57,7 @@ import {
 } from "@/lib/marcacion/cola-offline";
 import { achicarEnElTelefono } from "@/lib/marcacion/selfie-telefono";
 import PantallaUnToque from "./PantallaUnToque";
+import PantallaDeAntes from "./PantallaDeAntes";
 import {
   AVISO_UBICACION_NEGADA,
   botonUnToque,
@@ -654,174 +646,41 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
           />
         )}
 
-        {!MARCACION_UN_TOQUE && estado?.codigo && !foto && (
-          <>
-            <p className="text-sm text-gray-600">
-              Hola, <b className="font-semibold text-black">{capitalizarNombre(estado.nombre) || `Código ${estado.codigo}`}</b>
-            </p>
-
-            {/* 🔴 12 HORAS, y es la hora que se va a GUARDAR (ver el encabezado). */}
-            <p className="mt-3 text-[46px] font-semibold leading-none tracking-tight tabular-nums">
-              {horaAmPm(isoQueCuenta)}
-            </p>
-            <p className="mt-2 text-sm text-gray-500">
-              {enLinea
-                ? `${fechaLarga(hoy)} · hora de Panamá`
-                : "Hora de tu teléfono · sin señal"}
-            </p>
-
-            {/* Lo que ya marcó hoy. Nunca «0 marcas»: si no marcó, no se dice. */}
-            {hoyMarcado && (
-              <p className="mt-4 rounded-md bg-green-50 px-3 py-2.5 text-sm font-medium text-green-800">
-                ✓ {hoyMarcado.salida
-                  ? `Entrada ${enDoceHoras(hoyMarcado.entrada)} · Salida ${enDoceHoras(hoyMarcado.salida)}`
-                  : `Entrada de hoy: ${enDoceHoras(hoyMarcado.entrada)}`}
-              </p>
-            )}
-
-            {/* 🔴 DESHACER LA ÚLTIMA MARCA — dos minutos, y después no está.
-                Va pegado a lo que deshace. No pregunta «¿estás seguro?»: la
-                ventana de dos minutos ES el freno, y si se toca por error se
-                vuelve a marcar. */}
-            {sePuedeDeshacer && (
-              <button
-                type="button"
-                onClick={deshacer}
-                disabled={deshaciendo}
-                className="mt-2 min-h-[44px] w-full rounded-md px-3 py-2 text-sm text-gray-600 underline decoration-dotted underline-offset-2 transition active:scale-[0.97] disabled:text-gray-400"
-              >
-                {deshaciendo
-                  ? "Deshaciendo…"
-                  : `${rotuloDeshacer(sePuedeDeshacer.tipo)} · ${cuentaRegresiva(sePuedeDeshacer.restanMs)}`}
-              </button>
-            )}
-
-            {avisoVisible && (
-              <p
-                className={`mt-3 rounded-md px-3 py-2.5 text-sm font-medium ${
-                  avisoVisible.tono === "error"
-                    ? "bg-red-50 text-red-800"
-                    : avisoVisible.tono === "listo"
-                      ? "bg-green-50 text-green-800"
-                      : "bg-amber-50 text-amber-900"
-                }`}
-              >
-                {avisoVisible.texto}
-              </p>
-            )}
-
-            {pendientes.length > 0 && (
-              <p className="mt-3 rounded-md bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-900">
-                {pendientes.length === 1
-                  ? "Una marca está esperando señal. Se va a enviar sola."
-                  : `${pendientes.length} marcas están esperando señal. Se van a enviar solas.`}
-              </p>
-            )}
-
-            {nota && <p className="mt-3 text-sm text-gray-600">{nota}</p>}
-
-            <button
-              type="button"
-              onClick={tocarBoton}
-              disabled={boton.apagado}
-              className={`mt-6 min-h-[56px] w-full rounded-md px-4 py-4 text-base font-semibold transition active:scale-[0.97] ${
-                boton.apagado
-                  ? "cursor-default border border-gray-200 bg-gray-100 text-gray-500"
-                  : "bg-black text-white"
-              }`}
-            >
-              {boton.texto}
-            </button>
-
-            <MisMarcas dias={dias} rotulo={estado.rotuloQuincena ?? ""} hoy={hoy} />
-          </>
-        )}
-
-        {/* ── La selfie — la pantalla intermedia de antes ─────────────────
-            🩸 Es el cuarto toque que se retiró: la cámara de iOS ya preguntó
-            «¿Usar foto?» y esto volvía a pedir «Enviar». Vive solo con el
-            interruptor apagado. */}
-        {!MARCACION_UN_TOQUE && foto && (
-          <>
-            <p className="text-sm text-gray-600">
-              {tipoEnCurso === "entrada" ? "Entrada" : "Salida"} ·{" "}
-              <span className="tabular-nums">{horaAmPm(isoQueCuenta)}</span>
-            </p>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={foto.url}
-              alt="Tu selfie"
-              className="mt-3 w-full rounded-lg border border-gray-200 object-cover"
-            />
-            {buscandoUbicacion && (
-              <p className="mt-3 text-sm text-gray-500">Buscando tu ubicación…</p>
-            )}
-            {aviso && (
-              <p
-                className={`mt-3 rounded-md px-3 py-2.5 text-sm font-medium ${
-                  aviso.tono === "error" ? "bg-red-50 text-red-800" : "bg-amber-50 text-amber-900"
-                }`}
-              >
-                {aviso.texto}
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={enviar}
-              disabled={enviando || buscandoUbicacion}
-              className="mt-4 min-h-[56px] w-full rounded-md bg-black px-4 py-4 text-base font-semibold text-white transition active:scale-[0.97] disabled:bg-gray-300"
-            >
-              {enviando ? "Enviando…" : "Enviar"}
-            </button>
-            <button
-              type="button"
-              onClick={cancelarFoto}
-              className="mt-2 min-h-[44px] w-full rounded-md px-4 py-2 text-sm text-gray-600 underline decoration-dotted underline-offset-2"
-            >
-              Volver a tomarla
-            </button>
-          </>
+        {/* ── LA PANTALLA DE ANTES, entera, con el interruptor apagado ────
+            Vive en su propio archivo (`PantallaDeAntes.tsx`) y no se toca: es
+            el «volver atrás» de Daniel. */}
+        {!MARCACION_UN_TOQUE && estado?.codigo && (
+          <PantallaDeAntes
+            nombre={capitalizarNombre(estado.nombre) || `Código ${estado.codigo}`}
+            hora={horaAmPm(isoQueCuenta)}
+            fecha={fechaLarga(hoy)}
+            enLinea={enLinea}
+            hoyMarcado={hoyMarcado}
+            sePuedeDeshacer={sePuedeDeshacer}
+            deshaciendo={deshaciendo}
+            onDeshacer={deshacer}
+            avisoVisible={avisoVisible}
+            aviso={aviso}
+            pendientes={pendientes.length}
+            nota={nota}
+            boton={boton}
+            onTocarBoton={tocarBoton}
+            dias={dias}
+            rotuloQuincena={estado.rotuloQuincena ?? ""}
+            hoy={hoy}
+            foto={foto}
+            tipoEnCurso={tipoEnCurso}
+            buscandoUbicacion={buscandoUbicacion}
+            enviando={enviando}
+            onEnviar={enviar}
+            onCancelarFoto={cancelarFoto}
+          />
         )}
       </main>
     </div>
   );
 }
 
-/** «Mis marcas» de la quincena. Ella ve sus horas y nada más. */
-function MisMarcas({ dias, rotulo, hoy }: { dias: DiaMarcado[]; rotulo: string; hoy: string }) {
-  if (dias.length === 0) {
-    return (
-      <p className="mt-8 text-sm text-gray-500">
-        Todavía no tienes marcas en esta quincena.
-      </p>
-    );
-  }
-  return (
-    <section className="mt-8">
-      <h2 className="flex items-baseline justify-between text-sm font-semibold text-black">
-        Mis marcas
-        <span className="text-sm font-normal text-gray-500">{rotulo}</span>
-      </h2>
-      <ul className="mt-2 divide-y divide-gray-100">
-        {dias.map((d) => (
-          <li key={d.fecha} className="flex items-center justify-between py-2.5 text-sm tabular-nums">
-            <span className="text-gray-600">{diaCorto(d.fecha)}</span>
-            {d.salida ? (
-              <span className="font-semibold">{enDoceHoras(d.entrada)} – {enDoceHoras(d.salida)}</span>
-            ) : d.faltaSalida ? (
-              <span className="font-semibold text-amber-700">falta la salida</span>
-            ) : (
-              <span className="font-semibold">
-                {enDoceHoras(d.entrada)}{d.fecha === hoy ? " –" : ""}
-              </span>
-            )}
-          </li>
-        ))}
-      </ul>
-      <p className="mt-3 text-sm text-gray-500">Si algo está mal, avísale a {QUIEN_CORRIGE}.</p>
-    </section>
-  );
-}
 
 /** El día de Panamá de un instante, sin importar el módulo entero. */
 function horaISOaDia(iso: string): string {
