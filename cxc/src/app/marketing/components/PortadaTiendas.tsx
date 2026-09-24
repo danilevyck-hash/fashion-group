@@ -39,18 +39,18 @@ import {
   type TiendasPorPeriodo,
 } from "@/lib/marketing/periodo-manda";
 import { filtrarTiendas, subtituloDeTienda, type FilaTienda } from "@/lib/marketing/tiendas-y-marcas";
-import { MARKETING_CELULAR } from "@/lib/marketing/celular";
 import BarraDePeriodos from "./BarraDePeriodos";
 import { FilaNivel, ListaCard } from "./FilaNivel";
 import TiendasCelular from "./celular/TiendasCelular";
+import { useEsCelular } from "./celular/useEsCelular";
 
 interface Props {
   refreshKey: number;
   /**
    * 🔴 EN EL CELULAR, TIENDAS ES LA PORTADA (24-sep-2026, 1a). Con esto puesto
-   * la vista de celular se dibuja arriba y la de computadora queda en
-   * `hidden sm:block`: las DOS leen las MISMAS filas y el MISMO total, así que
-   * ningún número puede diferir entre una y otra.
+   * —y solo en una pantalla de hasta 639 px— se monta la vista de celular EN
+   * LUGAR de la de computadora. Las DOS reciben las MISMAS filas y el MISMO
+   * total, calculados una sola vez arriba: ningún número puede diferir.
    */
   celular?: { escribe: boolean; onRegistrarGasto: () => void } | null;
 }
@@ -98,24 +98,28 @@ export default function PortadaTiendas({ refreshKey, celular = null }: Props) {
   const visibles = useMemo(() => filtrarTiendas(filas ?? [], texto), [filas, texto]);
   const total = useMemo(() => totalDeTiendas(visibles), [visibles]);
 
-  const enCelular = MARKETING_CELULAR && celular !== null;
+  const enCelular = useEsCelular() && celular !== null;
+
+  // 🔑 UN SOLO ÁRBOL: o el celular o la computadora, nunca los dos. Ver
+  // `useEsCelular`.
+  if (enCelular) {
+    return (
+      <TiendasCelular
+        filas={visibles}
+        chips={chips}
+        periodo={periodo}
+        onPeriodo={setPeriodo}
+        total={total}
+        cargando={loading && datos === null}
+        hayDatos={datos !== null && filas !== null}
+        escribe={celular!.escribe}
+        onRegistrarGasto={celular!.onRegistrarGasto}
+      />
+    );
+  }
 
   return (
-    <>
-      {enCelular && (
-        <TiendasCelular
-          filas={visibles}
-          chips={chips}
-          periodo={periodo}
-          onPeriodo={setPeriodo}
-          total={total}
-          cargando={loading && datos === null}
-          hayDatos={datos !== null && filas !== null}
-          escribe={celular!.escribe}
-          onRegistrarGasto={celular!.onRegistrarGasto}
-        />
-      )}
-      <div className={enCelular ? "hidden sm:block space-y-4" : "space-y-4"}>
+    <div className="space-y-4">
       {chips.length > 0 && (
         <BarraDePeriodos chips={chips} elegido={periodo} onElegir={setPeriodo} etiqueta="Elegir el período" />
       )}
@@ -186,8 +190,7 @@ export default function PortadaTiendas({ refreshKey, celular = null }: Props) {
       <p className="text-[12px] text-gray-500">
         Una tienda nueva se elige del directorio al registrar su primer gasto, con «＋ Gasto».
       </p>
-      </div>
-    </>
+    </div>
   );
 }
 

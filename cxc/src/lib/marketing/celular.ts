@@ -46,6 +46,37 @@ import type { FilaDeTienda } from "./vista-tienda";
  */
 export const MARKETING_CELULAR = true;
 
+/**
+ * 🔴 EL ANCHO EN EL QUE EMPIEZA EL CELULAR: hasta 639 px, el escalón `sm` de
+ * Tailwind menos uno. Es la MISMA raya que usan las clases `sm:` del resto del
+ * módulo, escrita una sola vez.
+ */
+export const HASTA_SM = "(max-width: 639px)";
+
+/**
+ * ¿Quien mira está en un celular?
+ *
+ * 🔑 SE MONTA UN SOLO ÁRBOL, NO DOS ESCONDIDOS CON CSS. Marketing tiene seis
+ * pantallas con vista de celular, y dibujar las dos a la vez duplicaría cada
+ * lectura de fotos y dejaría dos veces el mismo nombre en el documento —que es
+ * exactamente lo que rompe los candados que ya existen—. Es el mismo patrón
+ * del rediseño de Asistencia: se pregunta en un efecto y el valor de arranque
+ * es `false`.
+ *
+ * ⚠️ En el servidor no hay `matchMedia`: ante la duda, COMPUTADORA. Un
+ * navegador sin `matchMedia` cae al plan B de siempre (el dedo).
+ */
+export function esPantallaDeCelular(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const mq = window.matchMedia?.(HASTA_SM);
+    if (mq) return mq.matches;
+  } catch {
+    /* un navegador sin matchMedia cae al plan B */
+  }
+  return false;
+}
+
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
 
 /** El monto del celular: el MISMO de siempre, con centavos. No hay redondeo. */

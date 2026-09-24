@@ -68,6 +68,9 @@ import {
   pieDeLaFicha,
   totalPorMarca,
 } from "@/lib/marketing/tiendas-y-marcas";
+import { montoCelular } from "@/lib/marketing/celular";
+import FichaTiendaCelular from "../../components/celular/FichaTiendaCelular";
+import { useEsCelular } from "../../components/celular/useEsCelular";
 import RegistrarGastoModal from "../../components/RegistrarGastoModal";
 import FotosSection from "../../components/FotosSection";
 import BarraDePeriodos from "../../components/BarraDePeriodos";
@@ -151,6 +154,9 @@ export default function FichaTienda({ codigo, role }: { codigo: string; role: st
     [periodo, delPeriodo, porMarca, tiendaPropia, chipsPeriodo],
   );
 
+  // 🔑 UN SOLO ÁRBOL: o el celular o la computadora, nunca los dos.
+  const enCelular = useEsCelular();
+
   const elegirPeriodo = (clave: string) => {
     setPeriodo(clave);
     setFiltro(FILTRO_TODOS);
@@ -210,6 +216,40 @@ export default function FichaTienda({ codigo, role }: { codigo: string; role: st
         module="Marketing"
         breadcrumbs={[{ label: "Tiendas", onClick: () => router.push(hrefDePestana("tiendas")) }, { label: titulo }]}
       />
+      {/* 🔴 EN EL CELULAR, LA FICHA SON RENGLONES (24-sep-2026, 2a · 8a · 9a).
+          Recibe las MISMAS filas, los MISMOS bloques y el MISMO total que la
+          tabla de abajo: acá no se calcula un solo número. */}
+      {enCelular && datos && !datos.sinMigracion ? (
+        <FichaTiendaCelular
+          titulo={titulo}
+          subtitulo={subtituloDeLaFicha({
+            codigo: codigoVisible,
+            rotulo: rotuloDelKpi(periodo, chipsPeriodo),
+            porMarca,
+          })}
+          total={pie.total}
+          textoPie={textoPie}
+          chips={chipsPeriodo}
+          periodo={periodo}
+          onPeriodo={elegirPeriodo}
+          visibles={visibles}
+          bloques={bloques}
+          cargando={cargando}
+          aviso={
+            vivas.length === 0
+              ? "Todavía no hay gastos cargados a esta tienda."
+              : delPeriodo.length === 0
+                ? "Nada abierto: todo lo de esta tienda ya se le pasó a la marca. Mira «Todos» para ver la historia."
+                : null
+          }
+          escribe={escribe}
+          onRegistrarGasto={() => setRegistrando(true)}
+          accionesDe={menuDe}
+          onPdf={abrirPdf}
+          fotos={<FotosSection tiendaCodigo={datos.codigo ?? TIENDA_GENERAL} readonly={!escribe} />}
+          hrefVolver={hrefDePestana("tiendas")}
+        />
+      ) : (
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-4">
         <button
           type="button"
@@ -374,31 +414,53 @@ export default function FichaTienda({ codigo, role }: { codigo: string; role: st
           </>
         )}
 
-        {registrando && datos && (
-          // 🔴 La puerta «＋ Gasto» abre con ESTA tienda puesta (`tiendaCodigo`):
-          // estando parado en Nova Lux no se vuelve a preguntar cuál es.
-          <RegistrarGastoModal
-            marcas={marcas}
-            tiendaCodigo={datos.codigo}
-            tiendaNombre={datos.nombre}
-            onClose={() => setRegistrando(false)}
-            onSaved={() => {
-              setRegistrando(false);
-              cargar();
-            }}
-          />
-        )}
-
-        <FichaTiendaAcciones
-          accion={accion}
-          marcas={marcas}
-          tiendaNombre={titulo}
-          onCerrar={() => setAccion(null)}
-          onCambio={cargar}
-        />
       </main>
+      )}
+
+      {/* 🔴 Los modales viven FUERA de la rama que se eligió: son los MISMOS
+          para las dos vistas y tienen que abrirse en las dos. */}
+      {registrando && datos && (
+        // 🔴 La puerta «＋ Gasto» abre con ESTA tienda puesta (`tiendaCodigo`):
+        // estando parado en Nova Lux no se vuelve a preguntar cuál es.
+        <RegistrarGastoModal
+          marcas={marcas}
+          tiendaCodigo={datos.codigo}
+          tiendaNombre={datos.nombre}
+          onClose={() => setRegistrando(false)}
+          onSaved={() => {
+            setRegistrando(false);
+            cargar();
+          }}
+        />
+      )}
+
+      <FichaTiendaAcciones
+        accion={accion}
+        marcas={marcas}
+        tiendaNombre={titulo}
+        onCerrar={() => setAccion(null)}
+        onCambio={cargar}
+      />
     </div>
   );
+}
+
+/**
+ * La línea gris de arriba en el celular: el código, qué período se mira y
+ * cuánto va por marca. 🔴 El desglose por marca vive ACÁ ADENTRO, que es
+ * exactamente lo que Daniel pidió: fuera de la fila de la portada, dentro de
+ * la ficha.
+ */
+function subtituloDeLaFicha(args: {
+  codigo: string;
+  rotulo: string;
+  porMarca: ReadonlyArray<{ codigo: string; nombre: string; monto: number }>;
+}): string {
+  const partes: string[] = [];
+  if (args.codigo) partes.push(args.codigo);
+  partes.push(args.rotulo);
+  for (const m of args.porMarca) partes.push(`${m.nombre} ${montoCelular(m.monto)}`);
+  return partes.join(" · ");
 }
 
 function Aviso({ texto }: { texto: string }) {

@@ -32,8 +32,8 @@ import {
   esPestanaTiendasYMarcas,
   type PestanaTiendasYMarcas,
 } from "@/lib/marketing/tiendas-y-marcas";
-import { MARKETING_CELULAR } from "@/lib/marketing/celular";
 import PortadaTiendas from "./PortadaTiendas";
+import { useEsCelular } from "./celular/useEsCelular";
 import PortadaAbiertosCerrados from "./PortadaAbiertosCerrados";
 import ImpulsadorasView from "./ImpulsadorasView";
 
@@ -73,12 +73,13 @@ export default function PortadaTiendasYMarcas({
   // 🔴 EN EL CELULAR LA PORTADA ES TIENDAS, Y LAS OTRAS TRES SON RENGLONES AL
   // FINAL (24-sep-2026, 1a): ni barra de pestañas ni botón suelto arriba. La
   // pestaña sigue viviendo en `?tab=`, así que Atrás se porta igual que hoy.
-  const cel = MARKETING_CELULAR;
+  const cel = useEsCelular();
   const hrefVolverACelular = "/marketing";
 
   return (
     <div className="space-y-5">
-      <div className={`flex items-center justify-end gap-4${cel ? " hidden sm:flex" : ""}`}>
+      {!cel && (
+      <div className="flex items-center justify-end gap-4">
         <h1 className="sr-only">Marketing</h1>
         {escribe ? (
           <button
@@ -94,11 +95,10 @@ export default function PortadaTiendasYMarcas({
           </span>
         )}
       </div>
+      )}
 
-      <div
-        className={`flex items-center gap-1 border-b border-gray-200 overflow-x-auto${cel ? " hidden sm:flex" : ""}`}
-        role="tablist"
-      >
+      {!cel && (
+      <div className="flex items-center gap-1 border-b border-gray-200 overflow-x-auto" role="tablist">
         {PESTANAS_TIENDAS_Y_MARCAS.map((p) => (
           <button
             key={p}
@@ -116,6 +116,7 @@ export default function PortadaTiendasYMarcas({
           </button>
         ))}
       </div>
+      )}
 
       {tab === "tiendas" && (
         <PortadaTiendas

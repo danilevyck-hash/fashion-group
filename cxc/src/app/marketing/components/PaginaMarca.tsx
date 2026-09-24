@@ -40,6 +40,8 @@ import CerrarPeriodoModal from "./CerrarPeriodoModal";
 import LoQueFalta from "./LoQueFalta";
 import ZipsBajados from "./ZipsBajados";
 import { ChipEstado, FilaNivel, ListaCard } from "./FilaNivel";
+import PaginaMarcaCelular from "./celular/PaginaMarcaCelular";
+import { useEsCelular } from "./celular/useEsCelular";
 import { useDescargasPeriodo } from "./useDescargasPeriodo";
 
 interface Props {
@@ -122,8 +124,36 @@ export default function PaginaMarca({
     );
   };
 
+  // 🔑 UN SOLO ÁRBOL: o el celular o la computadora, nunca los dos.
+  const enCelular = useEsCelular();
+
   return (
-    <div className="space-y-4">
+    <>
+      {/* 🔴 EN EL CELULAR, LA MARCA ES UN NÚMERO Y DOS BOTONES ANCHOS
+          (24-sep-2026, 3a). Recibe las MISMAS secciones y llama a las MISMAS
+          descargas y al MISMO cierre: acá no se calcula ni se cierra nada
+          distinto. */}
+      {enCelular ? (
+        <PaginaMarcaCelular
+          marca={marca}
+          secciones={secciones}
+          escribe={escribe}
+          sinFoto={bloqueResumen?.sinFoto ?? 0}
+          bajando={bajando}
+          onZip={(periodoId) =>
+            bajarZipMarca(
+              marca.key,
+              `${marca.nombre} · ${abierta?.nombre ?? ""} · ${formatearMonto(abierta?.total ?? 0)}`,
+              periodoId,
+            )
+          }
+          onCerrar={() => setCerrando(true)}
+          puedeCerrar={!!(abierta?.puedeCerrar && bloqueResumen && abierta.id)}
+          onRegistrarGasto={onRegistrarGasto}
+          onAbrirCerrado={(slug) => router.push(`/marketing/${marca.slug}/${slug}`)}
+        />
+      ) : (
+      <div className="space-y-4">
       <button
         type="button"
         onClick={() => router.push(hrefDePestana("marcas"))}
@@ -180,7 +210,11 @@ export default function PaginaMarca({
       <p className="text-[12px] text-gray-500">
         Multifashion no aparece en ninguna marca: sus gastos no se le pasan a nadie.
       </p>
+      </div>
+      )}
 
+      {/* 🔴 El modal de cierre vive FUERA de la rama que se eligió: es el MISMO
+          para las dos vistas y tiene que abrirse en las dos. */}
       {cerrando && bloqueResumen && abierta?.id && (
         <CerrarPeriodoModal
           bloque={bloqueResumen}
@@ -192,7 +226,7 @@ export default function PaginaMarca({
           }}
         />
       )}
-    </div>
+    </>
   );
 }
 

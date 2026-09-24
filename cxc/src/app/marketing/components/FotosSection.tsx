@@ -8,6 +8,7 @@ import type { UploadResult } from "@/components/marketing";
 import { FotoLightbox } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
+import { MARKETING_CELULAR } from "@/lib/marketing/celular";
 import { subirAdjunto } from "./uploadHelpers";
 import { Ayuda } from "@/components/shared/Ayuda";
 
@@ -43,6 +44,13 @@ export default function FotosSection({
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [fotosConError, setFotosConError] = useState<Set<string>>(new Set());
   const [lightbox, setLightbox] = useState<string | null>(null);
+  // 🔴 13b — LA × SOLO AL TOCAR «EDITAR» (24-sep-2026). Daniel eligió la
+  // opción b: la cuadrícula queda limpia y la × de borrar aparece al tocar
+  // «Editar» arriba, como en Fotos del iPhone. 🩸 Hoy la × mide 44×44 encima
+  // de una miniatura de 112×112 —el 15 % del área— y con el dedo la diferencia
+  // entre abrir la foto y pedir borrarla son milímetros.
+  // ⚠️ Solo en el celular: en la computadora hay hover y la × sigue igual.
+  const [editandoFotos, setEditandoFotos] = useState(false);
   // Borrar foto usa el patrón universal de "deshacer 5s": se quita de la UI al
   // instante y el DELETE real (foto + Storage) corre tras la ventana de undo.
   const { pendingUndo, scheduleAction, undoAction } = useUndoAction();
@@ -170,6 +178,15 @@ export default function FotosSection({
         <Ayuda titulo="Para qué sirven" className="-my-2">
           <p>Respaldo visual que se adjunta a la cobranza a la marca.</p>
         </Ayuda>
+        {MARKETING_CELULAR && !readonly && fotos.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setEditandoFotos((v) => !v)}
+            className="sm:hidden ml-auto min-h-[44px] px-2 text-[17px] text-blue-600 active:opacity-60"
+          >
+            {editandoFotos ? "Listo" : "Editar"}
+          </button>
+        )}
       </div>
 
       {errorCarga && (
@@ -248,7 +265,11 @@ export default function FotosSection({
                        por error desde el celular. Se muestra siempre en móvil y
                        se conserva el revelado por hover en escritorio, igual
                        que Editar/Anular/Eliminar en FacturasSection. */
-                    className="absolute top-1 right-1 bg-white/90 rounded-full w-11 h-11 flex items-center justify-center text-red-600 shadow-sm opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 focus-visible:opacity-100 transition"
+                    className={`absolute top-1 right-1 bg-white/90 rounded-full w-11 h-11 flex items-center justify-center text-red-600 shadow-sm transition sm:opacity-0 sm:pointer-events-auto sm:group-hover:opacity-100 sm:focus-within:opacity-100 focus-visible:opacity-100 ${
+                      MARKETING_CELULAR && !editandoFotos
+                        ? "opacity-0 pointer-events-none"
+                        : "opacity-100"
+                    }`}
                   >
                     <svg
                       width="14"
