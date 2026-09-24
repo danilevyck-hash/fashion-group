@@ -6,7 +6,7 @@
 // Todo en MINUTOS, nunca horas decimales: "295 minutos" se le discute a una
 // persona, "4,92 horas" no le dice nada a nadie.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ToastSystem";
 import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, fmtMin, cuentaHorasExtra, extraQueCuenta, type DiaReporte, type PersonaReporte, type ReglasReporte } from "@/lib/asistencia/reporte";
@@ -271,6 +271,24 @@ export default function ReporteTab({ empresa = "" }: {
   const [relojesAbiertos, setRelojesAbiertos] = useState(false);
   const [buscadorAbierto, setBuscadorAbierto] = useState(false);
   const [descargasAbiertas, setDescargasAbiertas] = useState(false);
+  /** Los dos menús de la fila de mandos se cierran con Escape o tocando afuera,
+   *  como todo desplegable de la casa. 🔑 El de los relojes se ESCONDE, nunca se
+   *  desarma: adentro vive el pedido en el aire de «Traer ahora». */
+  const mandosRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!relojesAbiertos && !descargasAbiertas) return;
+    const cerrar = () => { setRelojesAbiertos(false); setDescargasAbiertas(false); };
+    const afuera = (e: MouseEvent) => {
+      if (!mandosRef.current?.contains(e.target as Node)) cerrar();
+    };
+    const escape = (e: KeyboardEvent) => { if (e.key === "Escape") cerrar(); };
+    document.addEventListener("mousedown", afuera);
+    window.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("mousedown", afuera);
+      window.removeEventListener("keydown", escape);
+    };
+  }, [relojesAbiertos, descargasAbiertas]);
   /**
    * 🔴 LA VISTA «JUSTIFICACIONES DEL PERÍODO» (10-sep-2026). Arranca CERRADA:
    * el trabajo de esta pantalla es el reporte, y las justificaciones son la
@@ -569,7 +587,7 @@ export default function ReporteTab({ empresa = "" }: {
           ══════════════════════════════════════════════════════════════════ */}
       {ASISTENCIA_PANTALLA_2026_09 ? (
         <>
-          <div className="flex flex-wrap items-center gap-2">
+          <div ref={mandosRef} className="flex flex-wrap items-center gap-2">
             <SelectorPeriodo desde={desde} hasta={hasta} hoy={hoy} onElegir={elegirPeriodo} />
 
             {/* El buscador vive detrás de la lupa; con algo escrito se queda
