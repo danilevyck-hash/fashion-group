@@ -37,6 +37,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { useToast } from "@/components/ToastSystem";
 import { nombreRelojEnPantalla } from "@/lib/asistencia/agente";
+// 🔴 La línea de una sola fila sale del módulo puro del rediseño.
+import { resumenDeRelojes } from "@/lib/asistencia/pantalla-2026-09";
+
+/** ⚠️ «Traer ahora» de Asistencia es OTRA cosa que «Actualizar ahora»: le pide a
+ *  una PC que empuje las marcas de su reloj. El rótulo no se toca. */
+const ACTUALIZAR_AHORA_RELOJ = "Traer ahora";
 
 interface RelojEnPantalla {
   dispositivo: string;
@@ -73,7 +79,19 @@ const PUNTO: Record<RelojEnPantalla["salud"], string> = {
   nunca: "bg-gray-300",
 };
 
-export default function EstadoReloj({ onLlegaron }: { onLlegaron?: () => void }) {
+export default function EstadoReloj({ onLlegaron, resumen = false }: {
+  onLlegaron?: () => void;
+  /**
+   * 🔴 UNA SOLA LÍNEA PARA TODOS LOS RELOJES (24-sep-2026). Lo pide el celular:
+   * dos tarjetas que dicen lo mismo («al día, hace 3 min») eran dos de los nueve
+   * bloques que había antes del primer nombre. El texto sale del módulo puro y
+   * «Traer ahora» le deja el pedido a TODOS los relojes que lo aceptan.
+   *
+   * ⚠️ Nada de la lógica cambia: es la misma lectura, el mismo POST y el mismo
+   * aviso cuando el agente recoge.
+   */
+  resumen?: boolean;
+}) {
   const { toast } = useToast();
   const [datos, setDatos] = useState<Respuesta | null>(null);
   // Arranca el spinner al instante, sin esperar el GET de vuelta. Se apaga
@@ -154,6 +172,35 @@ export default function EstadoReloj({ onLlegaron }: { onLlegaron?: () => void })
   if (relojes.length === 0) return null;
 
   const faltaMigracion = !!datos?.faltaMigracion;
+
+  if (resumen) {
+    // 🔴 EL PEOR DE TODOS MANDA EL COLOR: con uno callado, la línea no puede
+    // decir que está todo al día. Se ordena por gravedad —nunca se toma «el
+    // primero de la lista», que es el defecto que este archivo ya tuvo—.
+    const GRAVEDAD: Record<RelojEnPantalla["salud"], number> = {
+      con_error: 0, callado: 1, nunca: 2, al_dia: 3,
+    };
+    const peor = [...relojes].sort((a, b) => GRAVEDAD[a.salud] - GRAVEDAD[b.salud])[0];
+    const puedenPedir = relojes.filter(
+      (r) => !faltaMigracion && (!(pidiendo.includes(r.dispositivo) || r.pedidoPendiente) || r.pedidoSinRespuesta),
+    );
+    const esperando = relojes.some((r) => pidiendo.includes(r.dispositivo) || r.pedidoPendiente);
+    return (
+      <div className={`flex min-h-[44px] flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-3 py-1.5 ${COLOR[peor.salud]}`}>
+        <span className={`h-2 w-2 shrink-0 rounded-full ${PUNTO[peor.salud]}`} />
+        <span className="min-w-0 flex-1 text-[13px] text-gray-900">{resumenDeRelojes(relojes)}</span>
+        <button
+          type="button"
+          onClick={() => { for (const r of puedenPedir) void pedir(r.dispositivo); }}
+          disabled={puedenPedir.length === 0}
+          className="inline-flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-md border border-gray-300 bg-white px-2.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 active:scale-[0.97] disabled:opacity-50"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${esperando ? "animate-spin" : ""}`} />
+          {ACTUALIZAR_AHORA_RELOJ}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2">

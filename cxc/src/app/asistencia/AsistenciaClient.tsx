@@ -65,6 +65,7 @@
 // El candado de todo esto es `src/__tests__/lib/asistencia-pestanas.test.ts`.
 
 import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import ReporteTab from "./ReporteTab";
@@ -92,6 +93,13 @@ import {
 // el módulo PURO; acá solo se aplica.
 import { pestanasMontadas, recordarVisitada, seEsconde } from "@/lib/asistencia/pestanas-vivas";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
+// 🔴 1b — EN EL CELULAR, EL MÓDULO ABRE EN UNA PORTADA (24-sep-2026): las cinco
+// pestañas como filas de una lista iOS, con su número al lado. La regla vive en
+// el módulo puro; acá solo se elige qué se dibuja.
+import { ASISTENCIA_PANTALLA_2026_09 } from "@/lib/asistencia/pantalla-2026-09";
+import { usePeriodoAsistencia } from "@/components/asistencia/SelectorPeriodo";
+import { aparatoDeQuienMira } from "@/lib/aparato";
+import PortadaCelular from "./PortadaCelular";
 
 // 🩸 ESTA LISTA SE MUDÓ A UN MÓDULO PURO (10-sep-2026). Vivía acá abajo, con
 // todas sus notas, y `asistencia-pestanas.test.ts` la leía como TEXTO de este
@@ -170,6 +178,21 @@ function AsistenciaInner() {
   const empresa = empresaElegida(empresaUrl || empresaRecordada, rol, alcance);
   const elegirEmpresa = (e: string) => { setEmpresaUrl(e); recordarEmpresa(e); };
 
+  // ── 🔴 LA PORTADA DEL CELULAR ────────────────────────────────────────────
+  //
+  // Sin `?tab=` en la dirección y con el dedo en la pantalla, el módulo abre en
+  // la portada. 🔑 Se mira el parámetro CRUDO, no `useUrlState`, que devuelve la
+  // pestaña por defecto cuando falta: la diferencia entre «no eligió nada» y
+  // «eligió la primera» es justamente lo que decide esta pantalla.
+  const sp = useSearchParams();
+  const hayTab = String(sp?.get("tab") ?? "").trim() !== "";
+  const [celular, setCelular] = useState(false);
+  useEffect(() => {
+    if (ASISTENCIA_PANTALLA_2026_09) setCelular(aparatoDeQuienMira() === "celular");
+  }, []);
+  // El período del módulo, para que la portada diga de qué quincena habla.
+  const periodo = usePeriodoAsistencia();
+
   const visibles = pestanasDeAsistencia({
     personaEnElCentro: PERSONA_EN_EL_CENTRO,
     planillaUnida: PLANILLA_UNIDA,
@@ -236,6 +259,11 @@ function AsistenciaInner() {
   // que este arreglo viene a conservar.
   const escondida = (k: Tab) => (seEsconde(k, tab) ? "hidden" : undefined);
 
+  // 🔴 La portada es una PANTALLA, no un estado escondido: tocar una fila
+  // escribe `?tab=`, que en el celular empuja historial, así que el Atrás
+  // devuelve esta lista. Nada se monta hasta que se toca algo.
+  const enLaPortada = ASISTENCIA_PANTALLA_2026_09 && celular && !hayTab && visibles.length > 1;
+
   return (
     <>
       {/* El módulo iba en minúscula ("asistencia") y eso se veía: la barra
@@ -249,6 +277,18 @@ function AsistenciaInner() {
             para que no quede un hueco suelto bajo el `py-6`. */}
         <h1 className="sr-only">Asistencia</h1>
 
+        {enLaPortada ? (
+          <PortadaCelular
+            pestanas={visibles}
+            empresa={empresa}
+            opciones={opciones}
+            onEmpresa={elegirEmpresa}
+            desde={periodo.desde}
+            hasta={periodo.hasta}
+            onAbrir={(k) => setTab(k as Tab)}
+          />
+        ) : (
+        <>
         <div className="flex items-end gap-2 border-b border-gray-200">
           {/* El arrastre lateral vive SOLO en las pestañas: si el «?» quedara
               adentro, en el iPhone habría que arrastrar para encontrar la ayuda. */}
@@ -373,6 +413,8 @@ function AsistenciaInner() {
             )}
           </div>
         </div>
+        </>
+        )}
       </div>
     </>
   );
