@@ -55,7 +55,9 @@ import {
   tituloDelGrupo,
   type GrupoCerrado,
 } from "@/lib/marketing/cerrados-por-periodo";
+import { MARKETING_CELULAR } from "@/lib/marketing/celular";
 import { FilaNivel, ListaCard } from "./FilaNivel";
+import MarcasCelular from "./celular/MarcasCelular";
 import type { DatosInicio } from "./InicioMarketing";
 
 /** Lo que la ruta manda de más para esta portada. */
@@ -83,6 +85,13 @@ interface Props {
   sinHerramientas?: boolean;
   /** La portada nueva ya tiene su «＋ Gasto» arriba: acá no se repite. */
   sinBotonDeGasto?: boolean;
+  /**
+   * 🔴 EN EL CELULAR, MARCAS ES UNA LISTA Y NADA MÁS (24-sep-2026, 5b). Con
+   * esto puesto la vista de celular se dibuja arriba y la de computadora queda
+   * en `hidden sm:block`. Las DOS derivan de las MISMAS `filasAbiertas` y
+   * `agruparCerradosPorPeriodo`: ningún número puede diferir.
+   */
+  celular?: { escribe: boolean; hrefVolver: string } | null;
 }
 
 const ROTULO_PESTANA: Record<PestanaPortada, string> = {
@@ -179,6 +188,7 @@ export default function PortadaAbiertosCerrados({
   refreshKey,
   sinHerramientas = false,
   sinBotonDeGasto = false,
+  celular = null,
 }: Props) {
   const [datos, setDatos] = useState<DatosPortada | null>(null);
   const [loading, setLoading] = useState(true);
@@ -232,8 +242,23 @@ export default function PortadaAbiertosCerrados({
   const mobiliario = datos?.mobiliario;
   const impulsadoras = datos?.impulsadoras;
 
+  const enCelular = MARKETING_CELULAR && celular !== null;
+
   return (
-    <div className="space-y-5">
+    <>
+      {enCelular && (
+        <MarcasCelular
+          abiertas={abiertas}
+          grupos={grupos}
+          cargando={loading && datos === null}
+          escribe={celular!.escribe}
+          onRegistrarGasto={onRegistrarGasto}
+          onSelectBloque={onSelectBloque}
+          onSelectCerrado={onSelectCerrado}
+          hrefVolver={celular!.hrefVolver}
+        />
+      )}
+    <div className={enCelular ? "hidden sm:block space-y-5" : "space-y-5"}>
       {!sinBotonDeGasto && (
         <div className="flex items-center justify-end gap-4">
           <h1 className="sr-only">Marketing</h1>
@@ -386,5 +411,6 @@ export default function PortadaAbiertosCerrados({
         </ListaCard>
       )}
     </div>
+    </>
   );
 }

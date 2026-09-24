@@ -32,6 +32,7 @@ import {
   esPestanaTiendasYMarcas,
   type PestanaTiendasYMarcas,
 } from "@/lib/marketing/tiendas-y-marcas";
+import { MARKETING_CELULAR } from "@/lib/marketing/celular";
 import PortadaTiendas from "./PortadaTiendas";
 import PortadaAbiertosCerrados from "./PortadaAbiertosCerrados";
 import ImpulsadorasView from "./ImpulsadorasView";
@@ -69,9 +70,15 @@ export default function PortadaTiendasYMarcas({
     setTab(p);
   };
 
+  // 🔴 EN EL CELULAR LA PORTADA ES TIENDAS, Y LAS OTRAS TRES SON RENGLONES AL
+  // FINAL (24-sep-2026, 1a): ni barra de pestañas ni botón suelto arriba. La
+  // pestaña sigue viviendo en `?tab=`, así que Atrás se porta igual que hoy.
+  const cel = MARKETING_CELULAR;
+  const hrefVolverACelular = "/marketing";
+
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-end gap-4">
+      <div className={`flex items-center justify-end gap-4${cel ? " hidden sm:flex" : ""}`}>
         <h1 className="sr-only">Marketing</h1>
         {escribe ? (
           <button
@@ -88,7 +95,10 @@ export default function PortadaTiendasYMarcas({
         )}
       </div>
 
-      <div className="flex items-center gap-1 border-b border-gray-200 overflow-x-auto" role="tablist">
+      <div
+        className={`flex items-center gap-1 border-b border-gray-200 overflow-x-auto${cel ? " hidden sm:flex" : ""}`}
+        role="tablist"
+      >
         {PESTANAS_TIENDAS_Y_MARCAS.map((p) => (
           <button
             key={p}
@@ -107,7 +117,12 @@ export default function PortadaTiendasYMarcas({
         ))}
       </div>
 
-      {tab === "tiendas" && <PortadaTiendas refreshKey={refreshKey} />}
+      {tab === "tiendas" && (
+        <PortadaTiendas
+          refreshKey={refreshKey}
+          celular={cel ? { escribe, onRegistrarGasto } : null}
+        />
+      )}
       {tab === "marcas" && (
         <PortadaAbiertosCerrados
           onSelectBloque={onSelectBloque}
@@ -116,9 +131,16 @@ export default function PortadaTiendasYMarcas({
           refreshKey={refreshKey}
           sinHerramientas
           sinBotonDeGasto
+          celular={cel ? { escribe, hrefVolver: hrefVolverACelular } : null}
         />
       )}
-      {tab === "impulsadoras" && <ImpulsadorasView marcas={marcas} escribe={escribe} />}
+      {tab === "impulsadoras" && (
+        <ImpulsadorasView
+          marcas={marcas}
+          escribe={escribe}
+          celular={cel ? { hrefVolver: hrefVolverACelular } : null}
+        />
+      )}
     </div>
   );
 }

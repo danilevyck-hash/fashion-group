@@ -14,14 +14,22 @@ import type {
   PagoMesEstado,
   ResultadoEliminarImpulsadora,
 } from "@/lib/marketing/types";
+import { MARKETING_CELULAR } from "@/lib/marketing/celular";
 import NuevaImpulsadoraModal from "./NuevaImpulsadoraModal";
 import RegistrarPagoModal from "./RegistrarPagoModal";
+import ImpulsadorasCelular from "./celular/ImpulsadorasCelular";
 
 interface Props {
   marcas: MkMarca[];
   /** false = contabilidad: solo mira. Sin «+ Nueva», «Registrar pago» ni «Eliminar»
    *  (24-sep-2026; el servidor ya los rechazaba con 403, la pantalla los mostraba igual). */
   escribe?: boolean;
+  /**
+   * 🔴 EN EL CELULAR, UNA FILA POR PERSONA (24-sep-2026, 6b). Con esto puesto
+   * la vista de celular se dibuja arriba y la de computadora queda en
+   * `hidden sm:block`. Las DOS leen la MISMA lista y abren los MISMOS modales.
+   */
+  celular?: { hrefVolver: string } | null;
 }
 
 // Iniciales del nombre (hasta 2 palabras).
@@ -129,7 +137,7 @@ function textoEliminar(imp: ImpulsadoraConEstado): {
   };
 }
 
-export default function ImpulsadorasView({ marcas, escribe = true }: Props) {
+export default function ImpulsadorasView({ marcas, escribe = true, celular = null }: Props) {
   const { toast } = useToast();
   const [items, setItems] = useState<ImpulsadoraConEstado[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -206,8 +214,23 @@ export default function ImpulsadorasView({ marcas, escribe = true }: Props) {
     (ZIP_E_IMPULSADORAS_NUEVO ? (i.mesesSinPagar ?? []).length > 0 : !i.mesActual.pagado),
   ).length;
 
+  const enCelular = MARKETING_CELULAR && celular !== null;
+
   return (
-    <div className="space-y-5">
+    <>
+      {enCelular && (
+        <ImpulsadorasCelular
+          items={items}
+          cargando={loading}
+          escribe={escribe}
+          onPagar={setPagando}
+          onHistorial={setViendo}
+          onEliminar={setEliminando}
+          onNueva={() => setShowNueva(true)}
+          hrefVolver={celular!.hrefVolver}
+        />
+      )}
+    <div className={enCelular ? "hidden sm:block space-y-5" : "space-y-5"}>
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Impulsadoras</h1>
@@ -354,7 +377,10 @@ export default function ImpulsadorasView({ marcas, escribe = true }: Props) {
           ))}
         </div>
       )}
+      </div>
 
+      {/* 🔴 Los modales viven FUERA del envoltorio `hidden sm:block`: son los
+          MISMOS para las dos vistas, y adentro no se abrirían en el celular. */}
       {showNueva && (
         <NuevaImpulsadoraModal
           marcas={marcas}
@@ -410,6 +436,6 @@ export default function ImpulsadorasView({ marcas, escribe = true }: Props) {
           onChanged={() => cargar()}
         />
       )}
-    </div>
+    </>
   );
 }
