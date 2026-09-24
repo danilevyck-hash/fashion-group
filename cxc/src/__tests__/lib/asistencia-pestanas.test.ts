@@ -197,7 +197,12 @@ describe("las 6 pestañas y su orden", () => {
     // la pantalla haría otra — que es exactamente el enredo que este cambio
     // vino a deshacer.
     expect(src).toMatch(/from "\.\/VacacionesTab"/);
-    expect(src).toMatch(/tab === "vacaciones" && <VacacionesTab \/>/);
+    // 🔴 24-sep-2026: la pestaña ya no se dibuja con un `if` — las visitadas
+    // quedan MONTADAS y se esconden (`monta(...)`, `pestanas-vivas.ts`). Lo que
+    // este caso protege sigue siendo lo mismo: que esa clave monte ESE
+    // componente, y no otro.
+    expect(src).toMatch(/monta\("vacaciones"\) &&/);
+    expect(src).toMatch(/<VacacionesTab \/>/);
   });
 
   it("abre en Reporte — primero se ordena la asistencia, después se paga", () => {
@@ -291,7 +296,12 @@ describe("🔴 la pestaña Vacaciones se ve, y sin permiso propio", () => {
 
   it("está declarada, importada y montada — y su ruta viva", () => {
     expect(src).toMatch(/import VacacionesTab from "\.\/VacacionesTab"/);
-    expect(src).toMatch(/tab === "vacaciones" && <VacacionesTab \/>/);
+    // 🔴 24-sep-2026: la pestaña ya no se dibuja con un `if` — las visitadas
+    // quedan MONTADAS y se esconden (`monta(...)`, `pestanas-vivas.ts`). Lo que
+    // este caso protege sigue siendo lo mismo: que esa clave monte ESE
+    // componente, y no otro.
+    expect(src).toMatch(/monta\("vacaciones"\) &&/);
+    expect(src).toMatch(/<VacacionesTab \/>/);
     // 🩸 Con el acomodo nuevo Vacaciones deja de ser PESTAÑA —su saldo se mudó
     // a la lista de Personas y cargarlas se hace desde la persona— pero la
     // pantalla sigue montada y su ruta viva, que es lo que este caso protege.

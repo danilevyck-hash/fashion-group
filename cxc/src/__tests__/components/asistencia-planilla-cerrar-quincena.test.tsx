@@ -48,6 +48,23 @@ import {
 import { MIGRACION_PLANILLA_GUARDADA } from "@/lib/asistencia/planilla-guardada";
 import PlanillaTab from "@/app/asistencia/PlanillaTab";
 
+// ── 🔴 EL DOBLE DEL ROUTER (24-sep-2026) ────────────────────────────────────
+// Desde que la quincena y el corte viajan en la dirección (`plQuincena`,
+// `plCorte`, ver `pestanas-vivas.ts`), `PlanillaTab` usa `useUrlState`. Acá se
+// renderiza el componente suelto, sin el router de la app: este doble es el
+// mismo que ya usan los otros tests de Asistencia.
+let URL_PLANILLA = "";
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: vi.fn((u: string) => { URL_PLANILLA = String(u).split("?")[1] ?? ""; }),
+    replace: vi.fn((u: string) => { URL_PLANILLA = String(u).split("?")[1] ?? ""; }),
+    refresh: vi.fn(), prefetch: vi.fn(),
+  }),
+  usePathname: () => "/asistencia",
+  useSearchParams: () => new URLSearchParams(URL_PLANILLA),
+}));
+
+
 /* ─────────────────────────────────────────────────────────────────────────────
  * 🩸 ACÁ VIVÍA EL DOBLE DE `RangoFechas`, y se fue el 15-sep-2026.
  *

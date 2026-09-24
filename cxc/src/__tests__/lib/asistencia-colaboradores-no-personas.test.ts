@@ -78,7 +78,12 @@ describe("A. 🔴 la pestaña se llama «Colaboradores»", () => {
     const src = puro("src/app/asistencia/AsistenciaClient.tsx");
     // 🔴 10-sep-2026 (noche): la pestaña recibe la empresa del selector de todo
     // el módulo (`empresa={empresa}`). Ver `asistencia-empresa-para-todo.test.ts`.
-    expect(src).toMatch(/tab === "colaboradores" && <ConfiguracionTab personaEnElCentro empresa=\{empresa\} \/>/);
+    // 🔴 24-sep-2026: la pestaña ya no se dibuja con un `if` — las visitadas
+    // quedan MONTADAS y se esconden (`monta(...)`, `pestanas-vivas.ts`). Lo que
+    // este caso protege sigue siendo lo mismo: que esa clave monte ESE
+    // componente, y no otro.
+    expect(src).toMatch(/monta\("colaboradores"\) &&/);
+    expect(src).toMatch(/<ConfiguracionTab personaEnElCentro empresa=\{empresa\} \/>/);
     expect(src).not.toMatch(/tab === "personas"/);
   });
 });

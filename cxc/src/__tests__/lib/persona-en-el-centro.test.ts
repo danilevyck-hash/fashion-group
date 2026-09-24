@@ -192,8 +192,13 @@ describe("B. 🔴 DE 6 A 4 PESTAÑAS, Y PERSONAS ES LA PRIMERA", () => {
     const src = puro(CLIENTE);
     // 🔴 10-sep-2026 (noche): la pestaña recibe la empresa del selector de todo
     // el módulo (`empresa={empresa}`). Ver `asistencia-empresa-para-todo.test.ts`.
-    expect(src).toMatch(/tab === "colaboradores" && <ConfiguracionTab personaEnElCentro empresa=\{empresa\} \/>/);
-    expect(src).toMatch(/tab === "configuracion" && <ConfiguracionTab \/>/);
+    // 🔴 24-sep-2026: la pestaña ya no se dibuja con un `if` — las visitadas
+    // quedan MONTADAS y se esconden (`monta(...)`, `pestanas-vivas.ts`). Lo que
+    // este caso protege sigue siendo lo mismo: el MISMO componente, no uno nuevo.
+    expect(src).toMatch(/monta\("colaboradores"\) &&/);
+    expect(src).toMatch(/<ConfiguracionTab personaEnElCentro empresa=\{empresa\} \/>/);
+    expect(src).toMatch(/monta\("configuracion"\) &&/);
+    expect(src).toMatch(/<ConfiguracionTab \/>/);
     // Y la decisión de qué pestañas hay NO vive en el JSX.
     expect(src).toMatch(/pestanasDeAsistencia\(/);
     expect(src).toMatch(/pestanaQueSeAbre\(tabRaw, visibles\)/);

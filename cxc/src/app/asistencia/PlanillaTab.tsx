@@ -155,6 +155,13 @@ import { aIso, deIso } from "@/components/ui/rango-fechas-iso";
 // 🩸 Acá había un `import RangoFechas from "@/components/ui/RangoFechas"`. Se
 // fue con «Otro rango ⌄»: el componente sigue vivo y lo usan otras pantallas
 // (Asistencia, Aprobaciones), pero la Planilla ya no elige rangos libres.
+import { useUrlState } from "@/lib/hooks/useUrlState";
+// 🔴 LA QUINCENA Y EL CORTE VIAJAN EN LA DIRECCIÓN (24-sep-2026), para que
+// sobrevivan al Atrás y a recargar. La regla vive en el módulo PURO.
+import {
+  ASISTENCIA_PESTANAS_VIVAS, PARAM_PLANILLA_CORTE, PARAM_PLANILLA_QUINCENA,
+  corteALaUrl, corteDeLaUrl, quincenaALaUrl, quincenaDeLaUrl,
+} from "@/lib/asistencia/pestanas-vivas";
 import {
   corteInicial, esLaQuincena, fechaCortaCorte, fraseCorte, quincenasElegibles, rotuloQuincena,
   textoDelDia31,
@@ -408,6 +415,10 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
   const [hasta, setHasta] = useState(quincenaEnCurso.hasta);
   /** `false` hasta que alguien elige un período. Sin esto no se pide nada. */
   const [elegido, setElegido] = useState(false);
+  // 🔑 El mismo dato, leíble desde un callback sin volver a crearlo en cada
+  // cambio: `elegirCorte` no puede depender de `elegido` o se rearmaría entero.
+  const elegidoRef = useRef(false);
+  useEffect(() => { elegidoRef.current = elegido; }, [elegido]);
   // 🔴 EL CORTE (día 13/28). "" = la quincena entera, el comportamiento de
   // siempre. Solo se usa con el interruptor. Cambiarlo vuelve viejo el cuadro.
   const [corte, setCorte] = useState("");
@@ -455,12 +466,55 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
    * `corte` de siempre, y `generar` arma el MISMO pedido.
    */
   const quincenasParaElegir = useMemo(() => quincenasElegibles(hoy), [hoy]);
+  // ── 🔴 LA QUINCENA Y EL CORTE, EN LA DIRECCIÓN (24-sep-2026) ───────────────
+  //
+  // 🩸 Vivían SOLO en memoria: al cambiar de pestaña y volver, la quincena
+  // quedaba sin elegir y **el corte volvía al propuesto (13/28)**. Si la
+  // contadora lo había movido y regeneraba sin darse cuenta, estaba mirando
+  // una quincena leída hasta OTRO día, y nada lo avisaba.
+  //
+  // 🔴 EL CUADRO GENERADO NO SE GUARDA EN NINGÚN LADO, a propósito: plata
+  // dibujada desde una copia es un número viejo con cara de nuevo. Al recargar
+  // se vuelve a generar, como hoy.
+  //
+  // 🔑 Son filtros del MISMO nivel → `replace`, y claves propias (`plQuincena`,
+  // `plCorte`): `quincena` ya es de Préstamos › Movimientos y `desde`/`hasta`
+  // de Asistencia. Una quincena que ya no está entre las elegibles (un enlace
+  // viejo) se ignora y la pantalla abre vacía, como al entrar de cero.
+  const [quincenaUrl, setQuincenaUrl] = useUrlState(PARAM_PLANILLA_QUINCENA, "");
+  const [corteUrl, setCorteUrl] = useUrlState(PARAM_PLANILLA_CORTE, "");
   const elegirQuincena = useCallback((q: (typeof quincenasParaElegir)[number]) => {
     setDesde(q.desde);
     setHasta(q.hasta);
     setElegido(true);
     // El corte viene PROPUESTO (13 o 28) y se cambia o se vacía si hace falta.
-    if (PLANILLA_UNIDA) setCorte(corteInicial(q));
+    const c = PLANILLA_UNIDA ? corteInicial(q) : "";
+    if (PLANILLA_UNIDA) setCorte(c);
+    if (ASISTENCIA_PESTANAS_VIVAS) {
+      setQuincenaUrl(quincenaALaUrl(q.desde));
+      setCorteUrl(corteALaUrl(c));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setQuincenaUrl, setCorteUrl]);
+  /** El corte lo elige una persona: se guarda en la dirección al instante. */
+  const elegirCorte = useCallback((c: string) => {
+    setCorte(c);
+    if (ASISTENCIA_PESTANAS_VIVAS && elegidoRef.current) setCorteUrl(corteALaUrl(c));
+  }, [setCorteUrl]);
+
+  // 🔴 LA DIRECCIÓN SE LEE UNA SOLA VEZ, AL MONTAR. Después manda la pantalla:
+  // releerla en cada render pelearía con el toque de la contadora. Sin
+  // `plQuincena` —o con una que ya no se puede elegir— no se toca nada y la
+  // Planilla abre vacía, que es la regla de Daniel del 1-sep-2026.
+  useEffect(() => {
+    if (!ASISTENCIA_PESTANAS_VIVAS) return;
+    const q = quincenaDeLaUrl(quincenaUrl, quincenasParaElegir);
+    if (!q) return;
+    setDesde(q.desde);
+    setHasta(q.hasta);
+    setElegido(true);
+    if (PLANILLA_UNIDA) setCorte(corteUrl ? corteDeLaUrl(corteUrl) : corteInicial(q));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // 🔑 El rol sale de `sessionStorage`, igual que en `AsistenciaClient` y
   // `AppHeader`. Arranca vacío: en el primer render no hay sessionStorage, y
@@ -1039,12 +1093,12 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                 value={corte}
                 min={elegido ? desde : undefined}
                 max={elegido ? hasta : undefined}
-                onChange={(e) => setCorte(e.target.value)}
+                onChange={(e) => elegirCorte(e.target.value)}
                 aria-label="Cortar el reloj el"
                 className="min-h-[44px] rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm"
               />
               {corte && (
-                <button type="button" onClick={() => setCorte("")}
+                <button type="button" onClick={() => elegirCorte("")}
                   className="min-h-[44px] rounded-md border border-gray-300 px-2 text-xs text-gray-600 transition hover:border-black hover:text-black">
                   Quincena entera
                 </button>

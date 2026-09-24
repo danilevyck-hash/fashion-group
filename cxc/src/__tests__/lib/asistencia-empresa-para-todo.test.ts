@@ -73,7 +73,12 @@ describe("A. 🔴 «Reporte» se llama «Asistencia», y el orden es el del trab
     expect(pestanaQueSeAbre("reporte", visibles)).toBe("asistencia");
     expect(pestanaQueSeAbre(null, visibles)).toBe("colaboradores");
     expect(puro("src/app/asistencia/colaboradores/SeccionAsistencia.tsx")).toMatch(/tab=asistencia&/);
-    expect(puro("src/app/asistencia/AsistenciaClient.tsx")).toMatch(/\(tab === "reporte" \|\| tab === "asistencia"\) && <ReporteTab empresa=\{empresa\} \/>/);
+    // 🔴 24-sep-2026: la pestaña ya no se dibuja con un `if` — las visitadas
+    // quedan MONTADAS y se esconden (`monta(...)`, `pestanas-vivas.ts`). Lo que
+    // este caso protege sigue siendo lo mismo: que esa clave monte ESE
+    // componente, y no otro.
+    expect(puro("src/app/asistencia/AsistenciaClient.tsx")).toMatch(/\(monta\("reporte"\) \|\| monta\("asistencia"\)\) &&/);
+    expect(puro("src/app/asistencia/AsistenciaClient.tsx")).toMatch(/<ReporteTab empresa=\{empresa\} \/>/);
   });
 });
 

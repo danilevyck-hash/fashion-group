@@ -88,6 +88,9 @@ import {
 import {
   PARAM_EMPRESA, RECORDAR_EMPRESA, empresaElegida, opcionesDeEmpresa, type AlcanceDeEmpresas,
 } from "@/lib/asistencia/empresa-para-todo";
+// 🔴 LAS PESTAÑAS YA VISITADAS NO SE DESARMAN (24-sep-2026). La regla vive en
+// el módulo PURO; acá solo se aplica.
+import { pestanasMontadas, recordarVisitada, seEsconde } from "@/lib/asistencia/pestanas-vivas";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
 
 // 🩸 ESTA LISTA SE MUDÓ A UN MÓDULO PURO (10-sep-2026). Vivía acá abajo, con
@@ -207,6 +210,32 @@ function AsistenciaInner() {
     if (aEscribir) setTab(aEscribir);
   }, [tabRaw, tab, setTab, visibles]);
 
+  // ── 🔴 LA PESTAÑA QUE SE DEJA NO SE DESARMA (24-sep-2026) ────────────────
+  //
+  // 🩸 Se dibujaba con un `if`, así que al ir de Planilla a Asistencia y volver
+  // se perdían la quincena elegida, el cuadro generado, «Antes de cerrar», el
+  // estado del cierre y —el que cuesta plata— **el corte del reloj volvía al
+  // propuesto (13/28)**; en la otra dirección se perdían el colaborador
+  // abierto, el buscador y las horas a medio corregir.
+  //
+  // 🔴 SOLO LAS YA VISITADAS. Montar las cinco al entrar sería disparar las
+  // cinco lecturas de golpe: la que nadie tocó no existe hasta que se toque.
+  // 🔑 Y solo las que esta persona PUEDE ver: hasta que llega el rol, `visibles`
+  // está vacío y no se monta nada, igual que antes.
+  const [visitadas, setVisitadas] = useState<ReadonlySet<string>>(() => new Set<string>());
+  useEffect(() => {
+    if (!visibles.some(([k]) => k === tab)) return;
+    setVisitadas((s) => recordarVisitada(s, tab));
+  }, [tab, visibles]);
+  const montadas = pestanasMontadas(visitadas, visibles.some(([k]) => k === tab) ? tab : "");
+  /** ¿Se monta esta pestaña? Solo si se visitó y su rol la ve. */
+  const monta = (k: Tab) => montadas.has(k) && visibles.some(([v]) => v === k);
+  // 🔑 El envoltorio se escribe A MANO en cada renglón y NO como un componente
+  // definido acá adentro: un componente nuevo en cada render tiene un tipo
+  // nuevo, React lo desarma y lo vuelve a armar, y se perdería exactamente lo
+  // que este arreglo viene a conservar.
+  const escondida = (k: Tab) => (seEsconde(k, tab) ? "hidden" : undefined);
+
   return (
     <>
       {/* El módulo iba en minúscula ("asistencia") y eso se veía: la barra
@@ -271,7 +300,7 @@ function AsistenciaInner() {
         </div>
 
         <div className="mt-5">
-          {ayuda ? (
+          {ayuda && (
             <div className="space-y-4">
               {/* El "Cómo funciona" DEL MEDIO se fue: el botón "?" que abre
                   esto ya lo dice, y el contenido arranca con "Cómo funciona la
@@ -284,27 +313,65 @@ function AsistenciaInner() {
               </div>
               <ComoFuncionaTab />
             </div>
-          ) : (
-            <>
-              {tab === "planilla" && <PlanillaTab empresa={empresa} />}
-              {tab === "prestamos" && <PrestamosTab empresa={empresa} />}
-              {/* «Reporte» se llama «Asistencia» desde el 10-sep-2026; la clave
-                  vieja sigue montando la misma pantalla con el interruptor apagado. */}
-              {(tab === "reporte" || tab === "asistencia") && <ReporteTab empresa={empresa} />}
-              {tab === "justificaciones" && <JustificacionesTab />}
-              {tab === "vacaciones" && <VacacionesTab />}
-              {tab === "aprobaciones" && <AprobacionesTab empresa={empresa} />}
-              {/* 🔴 «COLABORADORES» ES LA MISMA PANTALLA, EN MODO LISTA. Daniel:
-                  *«te acepto la queja»* — «Configuración» se llama Personas; y
-                  desde el 10-sep-2026, *«no lo llames personas, sino colaboradores»*. No
-                  es un componente nuevo: es `ConfiguracionTab` con las filas
-                  llevando a la página de cada quien en vez de desplegarse, y
-                  con Horarios, Feriados y Reglas exactamente donde estaban. Un
-                  segundo componente sería una segunda lista de personas. */}
-              {tab === "colaboradores" && <ConfiguracionTab personaEnElCentro empresa={empresa} />}
-              {tab === "configuracion" && <ConfiguracionTab />}
-            </>
           )}
+          {/* 🔴 Con la ayuda abierta las pestañas se ESCONDEN, no se desarman:
+              cerrar el «?» tiene que devolver la pantalla donde estaba. */}
+          <div hidden={ayuda} className={ayuda ? "hidden" : undefined}>
+            {monta("planilla") && (
+              <div hidden={seEsconde("planilla", tab)} className={escondida("planilla")}>
+                <PlanillaTab empresa={empresa} />
+              </div>
+            )}
+            {monta("prestamos") && (
+              <div hidden={seEsconde("prestamos", tab)} className={escondida("prestamos")}>
+                <PrestamosTab empresa={empresa} />
+              </div>
+            )}
+            {/* «Reporte» se llama «Asistencia» desde el 10-sep-2026; la clave
+                vieja sigue montando la misma pantalla con el interruptor apagado.
+                🔑 Las dos claves son UNA sola pestaña montada: nunca están las
+                dos en `visibles`, así que no hay dos ReporteTab a la vez. */}
+            {(monta("reporte") || monta("asistencia")) && (
+              <div
+                hidden={seEsconde("reporte", tab) && seEsconde("asistencia", tab)}
+                className={seEsconde("reporte", tab) && seEsconde("asistencia", tab) ? "hidden" : undefined}
+              >
+                <ReporteTab empresa={empresa} />
+              </div>
+            )}
+            {monta("justificaciones") && (
+              <div hidden={seEsconde("justificaciones", tab)} className={escondida("justificaciones")}>
+                <JustificacionesTab />
+              </div>
+            )}
+            {monta("vacaciones") && (
+              <div hidden={seEsconde("vacaciones", tab)} className={escondida("vacaciones")}>
+                <VacacionesTab />
+              </div>
+            )}
+            {monta("aprobaciones") && (
+              <div hidden={seEsconde("aprobaciones", tab)} className={escondida("aprobaciones")}>
+                <AprobacionesTab empresa={empresa} />
+              </div>
+            )}
+            {/* 🔴 «COLABORADORES» ES LA MISMA PANTALLA, EN MODO LISTA. Daniel:
+                *«te acepto la queja»* — «Configuración» se llama Personas; y
+                desde el 10-sep-2026, *«no lo llames personas, sino colaboradores»*. No
+                es un componente nuevo: es `ConfiguracionTab` con las filas
+                llevando a la página de cada quien en vez de desplegarse, y
+                con Horarios, Feriados y Reglas exactamente donde estaban. Un
+                segundo componente sería una segunda lista de personas. */}
+            {monta("colaboradores") && (
+              <div hidden={seEsconde("colaboradores", tab)} className={escondida("colaboradores")}>
+                <ConfiguracionTab personaEnElCentro empresa={empresa} />
+              </div>
+            )}
+            {monta("configuracion") && (
+              <div hidden={seEsconde("configuracion", tab)} className={escondida("configuracion")}>
+                <ConfiguracionTab />
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </>
