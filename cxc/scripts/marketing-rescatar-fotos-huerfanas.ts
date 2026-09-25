@@ -14,7 +14,14 @@
 //   npx tsx scripts/marketing-rescatar-fotos-huerfanas.ts --tienda D-118
 //   npx tsx scripts/marketing-rescatar-fotos-huerfanas.ts --marca=TH
 //   npx tsx scripts/marketing-rescatar-fotos-huerfanas.ts --periodo=<uuid>
+//   npx tsx scripts/marketing-rescatar-fotos-huerfanas.ts --archivo=<nombre>:TH
 //   npx tsx scripts/marketing-rescatar-fotos-huerfanas.ts --aplicar    (escribe)
+//
+// 🔴 UNA MARCA POR ARCHIVO (24-sep-2026). `--archivo=<nombre>:<marca>` se
+// repite una vez por archivo y le gana al valor global; el valor puede ser la
+// clave de la marca (`TH`) o el id del período. El archivo que no está en el
+// mapa y no tiene valor global se SALTA y se dice, uno por uno: los cuatro
+// huérfanos de D-118 no son de la misma marca (dos Tommy, dos Calvin).
 //
 // 🔴 LA MARCA SE ELIGE, NO SE ADIVINA (24-sep-2026). Los períodos son POR
 // MARCA y una tienda puede tener DOS abiertos a la vez (medido: D-118 tiene
@@ -79,6 +86,11 @@ async function main() {
     return i >= 0 ? String(args[i + 1] ?? "").trim() : "";
   };
   const elegido = valorDe("--periodo") || valorDe("--marca");
+  // 🔴 El mapa `archivo → marca`, que le gana al valor global.
+  const { mapaDeArchivosElegidos, elegidoParaArchivo, nombreEnElCajon, AVISO_ARCHIVO_SIN_ELEGIR } = await import(
+    "../src/lib/marketing/fotos-rescate"
+  );
+  const porArchivo = mapaDeArchivosElegidos(args);
 
   const sb = createClient(url, key, { auth: { persistSession: false } });
 
@@ -187,34 +199,38 @@ async function main() {
     );
   }
 
-  // 4. El destino de cada tienda, con la regla pura. Sin `--marca` y con dos
-  //    o más abiertas: se muestran las opciones y NO se aplica nada.
-  const destinoPorTienda = new Map<string, ReturnType<typeof destinoDeFotoNueva>>();
-  let faltaElegirEnAlguna = false;
   console.log("\nLas marcas con período ABIERTO de cada tienda:\n");
   for (const [t, marcas] of marcasPorTienda) {
-    const destino = destinoDeFotoNueva(marcas, elegido);
-    destinoPorTienda.set(t, destino);
     const lista = marcas.length
       ? marcas.map((m) => `${m.nombre} (${m.proveedorKey} · ${m.periodoId})`).join("  |  ")
       : "ninguna — la foto queda sin sello y se ve en «Abierto»";
     console.log(`  ${t}: ${lista}`);
-    if (!destino.ok) {
-      faltaElegirEnAlguna = true;
-      console.log(`     ⚠️  ${destino.error}`);
-      if (destino.faltaElegir) {
-        console.log(
-          `     → elige una: ${marcas.map((m) => `--marca=${m.proveedorKey}`).join("  o  ")}`,
-        );
-      }
-    }
+  }
+
+  // 4. 🔴 EL DESTINO ES POR ARCHIVO: primero el mapa `--archivo=<nombre>:<marca>`,
+  //    después el valor global, y siempre la MISMA regla pura de la puerta.
+  //    El archivo que queda sin elegir se SALTA y se dice, uno por uno.
+  const destinoPorArchivo = new Map<string, ReturnType<typeof destinoDeFotoNueva>>();
+  for (const h of huerfanas) {
+    const marcas = marcasPorTienda.get(h.tienda) ?? [];
+    destinoPorArchivo.set(h.path, destinoDeFotoNueva(marcas, elegidoParaArchivo(porArchivo, h.path, elegido)));
   }
 
   console.log("\nLo que se insertaría (una fila por archivo):\n");
+  const saltadas: Huerfana[] = [];
   for (const h of huerfanas) {
-    const destino = destinoPorTienda.get(h.tienda);
+    const destino = destinoPorArchivo.get(h.path);
     if (!destino?.ok) {
-      console.log(`  (${h.path}) — sin marca elegida, no se insertaría nada.`);
+      saltadas.push(h);
+      console.log(`  ⚠️  ${h.path} — ${destino?.faltaElegir ? AVISO_ARCHIVO_SIN_ELEGIR : destino?.error}`);
+      const marcas = marcasPorTienda.get(h.tienda) ?? [];
+      if (destino?.faltaElegir && marcas.length) {
+        console.log(
+          `     → elige una: ${marcas
+            .map((m) => `--archivo=${nombreEnElCajon(h.path)}:${m.proveedorKey}`)
+            .join("  o  ")}`,
+        );
+      }
       continue;
     }
     console.log(
@@ -230,22 +246,29 @@ async function main() {
       }),
     );
   }
+  if (saltadas.length) {
+    console.log(`\n🛑 ${saltadas.length} archivo(s) se saltan: nadie eligió su marca.`);
+  }
 
   if (!aplicar) {
     console.log("\n👀 Solo lectura. Nada se escribió. Con `--aplicar` se insertan esas filas.");
     return;
   }
 
-  // 🔴 Con dos o más marcas abiertas y sin elegir, NO se escribe nada.
-  if (faltaElegirEnAlguna) {
-    console.log("\n🛑 Falta elegir la marca. Nada se escribió. Vuelve a correrlo con `--marca=<clave>`.");
+  // 🔴 Sin un solo archivo con marca resuelta no se escribe nada.
+  if (saltadas.length === huerfanas.length) {
+    console.log("\n🛑 Falta elegir la marca. Nada se escribió. Vuelve a correrlo con `--archivo=<nombre>:<marca>`.");
     process.exitCode = 1;
     return;
   }
 
   console.log("\n✍️  Insertando…");
   let ok = 0;
+  let intentadas = 0;
   for (const h of huerfanas) {
+    const destino = destinoPorArchivo.get(h.path);
+    if (!destino?.ok) continue;
+    intentadas += 1;
     const fila: Record<string, unknown> = {
       tipo: "foto_proyecto",
       proyecto_id: null,
@@ -255,8 +278,7 @@ async function main() {
       nombre_original: h.nombreOriginal,
       size_bytes: h.sizeBytes,
     };
-    const pid = destinoPorTienda.get(h.tienda)?.periodoId ?? null;
-    if (pid) fila.periodo_id = pid;
+    if (destino.periodoId) fila.periodo_id = destino.periodoId;
     const { error } = await sb.from("mk_adjuntos").insert(fila);
     if (error) {
       console.log(`  ❌ ${h.path}: ${error.message}`);
@@ -267,9 +289,9 @@ async function main() {
       continue;
     }
     ok += 1;
-    console.log(`  ✅ ${h.path}`);
+    console.log(`  ✅ ${h.path}  →  ${destino.periodoId ?? "sin sello"}`);
   }
-  console.log(`\n${ok} de ${huerfanas.length} fila(s) insertada(s).`);
+  console.log(`\n${ok} de ${intentadas} fila(s) insertada(s); ${saltadas.length} saltada(s).`);
 }
 
 main().catch((e) => {

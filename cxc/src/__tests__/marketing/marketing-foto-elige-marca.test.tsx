@@ -146,6 +146,12 @@ import {
   type MarcaAbiertaDeLaTienda,
 } from "@/lib/marketing/fotos-periodo";
 import { armarFotosPorCarpeta } from "@/lib/marketing/zip-marca";
+import {
+  AVISO_ARCHIVO_SIN_ELEGIR,
+  elegidoParaArchivo,
+  mapaDeArchivosElegidos,
+  nombreEnElCajon,
+} from "@/lib/marketing/fotos-rescate";
 
 const RAIZ = path.resolve(__dirname, "..", "..", "..");
 const leer = (rel: string) => fs.readFileSync(path.join(RAIZ, rel), "utf8");
@@ -441,6 +447,83 @@ describe("3. a un período CERRADO no entra ni sale nada", () => {
     barrer(path.join(RAIZ, "src/lib/marketing"));
     barrer(path.join(RAIZ, "src/app/api/marketing"));
     expect(sellan).toEqual([RUTA]);
+  });
+});
+
+// ─── 3b. UNA MARCA POR ARCHIVO, EN EL RESCATE ───────────────────────────────
+
+// Los cuatro huérfanos de D-118, medidos el 24-sep-2026: dos son de Tommy y
+// dos de Calvin. Con un solo valor global se sellaban los cuatro con la misma
+// marca; el mapa `--archivo=<nombre>:<marca>` le da a cada uno la suya.
+const TH_1 = "1790286658923_pm.jpeg";
+const TH_2 = "1790286658944_pm_3_.jpeg";
+const CK_1 = "1790286659056_pm_1_.jpeg";
+const CK_2 = "1790286659914_pm_2_.jpeg";
+const EN_EL_CAJON = (n: string) => `tienda/D-118/${n}`;
+
+describe("3b. el rescate acepta una marca POR ARCHIVO", () => {
+  it("el mapa se llena con las dos grafías, y el valor puede ser la clave o el id", () => {
+    const mapa = mapaDeArchivosElegidos([
+      "--tienda",
+      "D-118",
+      `--archivo=${TH_1}:TH`,
+      "--archivo",
+      `${CK_1}:${CK_ABIERTO}`,
+      "--aplicar",
+    ]);
+    expect(mapa.get(TH_1)).toBe("TH");
+    expect(mapa.get(CK_1)).toBe(CK_ABIERTO);
+    expect(mapa.size).toBe(2);
+    // El path entero también sirve de llave: se parea por el nombre del cajón.
+    expect(nombreEnElCajon(EN_EL_CAJON(TH_1))).toBe(TH_1);
+    expect(mapaDeArchivosElegidos([`--archivo=${EN_EL_CAJON(CK_2)}:CK`]).get(CK_2)).toBe("CK");
+  });
+
+  it("el mapa le GANA al valor global, y el que no está cae al global", () => {
+    const mapa = mapaDeArchivosElegidos([`--archivo=${TH_1}:TH`]);
+    expect(elegidoParaArchivo(mapa, EN_EL_CAJON(TH_1), "CK")).toBe("TH");
+    expect(elegidoParaArchivo(mapa, EN_EL_CAJON(CK_1), "CK")).toBe("CK");
+  });
+
+  it("los CUATRO de D-118 se sellan cada uno con SU marca", () => {
+    const mapa = mapaDeArchivosElegidos([
+      `--archivo=${TH_1}:TH`,
+      `--archivo=${TH_2}:TH`,
+      `--archivo=${CK_1}:CK`,
+      `--archivo=${CK_2}:CK`,
+    ]);
+    const sello = (n: string) =>
+      destinoDeFotoNueva([TOMMY, CALVIN], elegidoParaArchivo(mapa, EN_EL_CAJON(n), "")).periodoId;
+    expect([sello(TH_1), sello(TH_2), sello(CK_1), sello(CK_2)]).toEqual([
+      TH_ABIERTO,
+      TH_ABIERTO,
+      CK_ABIERTO,
+      CK_ABIERTO,
+    ]);
+  });
+
+  it("sin mapa y sin global, con DOS marcas abiertas el archivo se SALTA y se dice", () => {
+    const mapa = mapaDeArchivosElegidos(["--tienda", "D-118"]);
+    const d = destinoDeFotoNueva([TOMMY, CALVIN], elegidoParaArchivo(mapa, EN_EL_CAJON(CK_1), ""));
+    expect(d.ok).toBe(false);
+    expect(d.faltaElegir).toBe(true);
+    expect(d.periodoId).toBeNull();
+    expect(AVISO_ARCHIVO_SIN_ELEGIR).toMatch(/--archivo=/);
+  });
+
+  it("una entrada rota no ensucia el mapa, y la repetida manda la ÚLTIMA", () => {
+    expect(mapaDeArchivosElegidos(["--archivo=sinvalor:", "--archivo=:TH", "--archivo"]).size).toBe(0);
+    expect(mapaDeArchivosElegidos([`--archivo=${TH_1}:TH`, `--archivo=${TH_1}:CK`]).get(TH_1)).toBe("CK");
+  });
+
+  it("BARRIDO: el script pregunta al MAPA antes que al global, y sella por ARCHIVO", () => {
+    const s = leer(SCRIPT);
+    expect(s).toMatch(/mapaDeArchivosElegidos\(args\)/);
+    expect(s).toMatch(/elegidoParaArchivo\(porArchivo, h\.path, elegido\)/);
+    expect(s).toMatch(/--archivo=/);
+    // 🔴 El destino es por ARCHIVO: ya no hay un destino por tienda.
+    expect(s).not.toMatch(/destinoPorTienda/);
+    expect(s).toMatch(/destinoPorArchivo/);
   });
 });
 
