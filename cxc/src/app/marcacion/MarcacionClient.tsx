@@ -64,6 +64,9 @@ import {
   type MarcaPendiente,
 } from "@/lib/marcacion/cola-offline";
 import { achicarEnElTelefono } from "@/lib/marcacion/selfie-telefono";
+// 🔴 EL SELLO DE ESTE TELÉFONO (25-sep-2026): un campo OPCIONAL más en el
+// formulario, ni uno menos ni uno renombrado. Ver `sello-del-aparato.ts`.
+import { CAMPO_APARATO, selloDeEsteAparato } from "@/lib/marcacion/sello-del-aparato";
 import PantallaUnToque from "./PantallaUnToque";
 import PantallaDeAntes from "./PantallaDeAntes";
 import {
@@ -209,6 +212,11 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
         cuerpo.set("lng", String(m.lng));
         if (m.precisionM !== null) cuerpo.set("precisionM", String(m.precisionM));
         if (m.selfie) cuerpo.set("selfie", m.selfie, "selfie.jpg");
+        // 🔴 EL SELLO DE ESTE TELÉFONO — un campo opcional, y nada más
+        // (25-sep-2026). Sin `localStorage` viaja sin él y no pasa nada: de esa
+        // marca no se dice nada. Ver `lib/marcacion/sello-del-aparato.ts`.
+        const selloCola = selloDeEsteAparato();
+        if (selloCola) cuerpo.set(CAMPO_APARATO, selloCola);
         let res: Response;
         try {
           res = await fetch("/api/marcacion", { method: "POST", body: cuerpo });
@@ -512,6 +520,9 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
       cuerpo.set("lng", String(pendiente.lng));
       if (pendiente.precisionM !== null) cuerpo.set("precisionM", String(pendiente.precisionM));
       if (blob) cuerpo.set("selfie", blob, "selfie.jpg");
+      // 🔴 El mismo sello por los DOS caminos: con señal y desde la cola.
+      const sello = selloDeEsteAparato();
+      if (sello) cuerpo.set(CAMPO_APARATO, sello);
 
       let res: Response;
       try {

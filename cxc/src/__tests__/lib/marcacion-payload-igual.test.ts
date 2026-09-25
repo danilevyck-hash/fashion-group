@@ -15,6 +15,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { CAMPO_APARATO } from "@/lib/marcacion/sello-del-aparato";
 import {
   COLUMNAS_DE_LA_MARCA,
   DISPOSITIVO_TELEFONO,
@@ -43,12 +44,29 @@ const CAMPOS_QUE_VIAJAN = [
   "selfie",
 ] as const;
 
-/** Cada `cuerpo.set("…")` de la pantalla, en el orden en que aparece. */
+/**
+ * 🔴 EL ÚNICO CAMPO QUE SE SUMÓ, Y SE DECIDIÓ A PROPÓSITO (25-sep-2026): el
+ * sello del teléfono (`aparatoId`), OPCIONAL. Daniel quiere enterarse cuando
+ * dos personas marcan desde el mismo aparato; no bloquea nada y no cambia
+ * ninguno de los ocho de arriba. Cualquier OTRO campo nuevo pone esto ROJO.
+ */
+const CAMPO_EXTRA_PERMITIDO = CAMPO_APARATO;
+
+/**
+ * Cada `cuerpo.set(…)` de la pantalla, en el orden en que aparece.
+ *
+ * 🔑 SE MIRAN LAS DOS FORMAS DE ESCRIBIRLO: con el nombre entre comillas
+ * (`cuerpo.set("lat", …)`) y con una constante (`cuerpo.set(CAMPO_APARATO, …)`).
+ * Sin la segunda, meter un campo nuevo detrás de una constante pasaría este
+ * candado sin que nadie se entere — que es exactamente lo que vino a evitar.
+ */
 function camposQueArmaLaPantalla(): string[][] {
   // Dos bloques arman un FormData: `vaciarCola` (el reenvío) y `enviarMarca`.
   const bloques = PANTALLA.split("new FormData()").slice(1);
   return bloques.map((b) =>
-    [...b.matchAll(/cuerpo\.set\(\s*"([^"]+)"/g)].map((m) => m[1]),
+    [...b.matchAll(/cuerpo\.set\(\s*(?:"([^"]+)"|([A-Za-z_$][\w$]*))/g)].map(
+      (m) => m[1] ?? (m[2] === "CAMPO_APARATO" ? CAMPO_APARATO : `¿${m[2]}?`),
+    ),
   );
 }
 
@@ -57,8 +75,25 @@ describe("lo que la pantalla manda no cambió", () => {
     const bloques = camposQueArmaLaPantalla();
     expect(bloques.length).toBe(2);
     for (const campos of bloques) {
-      expect(new Set(campos)).toEqual(new Set(CAMPOS_QUE_VIAJAN));
+      expect(new Set(campos)).toEqual(
+        new Set([...CAMPOS_QUE_VIAJAN, CAMPO_EXTRA_PERMITIDO]),
+      );
     }
+  });
+
+  it("🔴 el campo de más es UNO SOLO, y es el sello del teléfono", () => {
+    for (const campos of camposQueArmaLaPantalla()) {
+      const extras = campos.filter(
+        (c) => !(CAMPOS_QUE_VIAJAN as readonly string[]).includes(c),
+      );
+      expect(extras).toEqual([CAMPO_EXTRA_PERMITIDO]);
+    }
+  });
+
+  it("🔴 el sello es OPCIONAL: sin él la marca viaja igual", () => {
+    // Las dos puertas lo mandan solo si el teléfono lo tiene.
+    expect(PANTALLA).toMatch(/if \(selloCola\) cuerpo\.set\(CAMPO_APARATO, selloCola\)/);
+    expect(PANTALLA).toMatch(/if \(sello\) cuerpo\.set\(CAMPO_APARATO, sello\)/);
   });
 
   // 🔴 24-sep-2026: las dos marcas del ALMUERZO van SIN foto (`cuatro-marcas.ts`).
@@ -131,5 +166,16 @@ describe("lo que el servidor exige no cambió", () => {
     for (const campo of CAMPOS_QUE_VIAJAN) {
       expect(RUTA).toContain(`"${campo}"`);
     }
+  });
+
+  it("🔴 el sello no puede frenar una marca: se valida la FORMA y se descarta si no sirve", () => {
+    expect(RUTA).toContain("selloValido(selloCrudo) ? selloCrudo : null");
+    // Y ninguna respuesta de error nace de él.
+    expect(RUTA).not.toMatch(/aparato[^\n]*status:\s*4\d\d/i);
+  });
+
+  it("🔴 sin la migración la marca entra igual — falla ABIERTA", () => {
+    expect(RUTA).toContain("faltaUnaColumnaNueva(error)");
+    expect(RUTA).toContain("sinLasColumnasNuevas(fila)");
   });
 });

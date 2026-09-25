@@ -38,9 +38,18 @@ import {
   validarPayloadMarca,
 } from "@/lib/marcacion/marcacion";
 import { avisoDiaCompleto, estadoDelBotonHoy, pideFoto } from "@/lib/marcacion/cuatro-marcas";
+// 🔴 LO QUE NACIÓ EL 25-sep-2026, y las dos cosas fallan ABIERTAS: sin la
+// migración `20261220120000` la marca entra igual, sin calle y sin sello.
+import { CAMPO_APARATO, selloValido } from "@/lib/marcacion/sello-del-aparato";
+import { faltaUnaColumnaNueva, sinLasColumnasNuevas } from "@/lib/marcacion/columnas-nuevas";
+import { lugarTextoDeLaMarca } from "@/lib/marcacion/lugar-al-marcar";
+import { revisarMismoAparato } from "@/lib/asistencia/mismo-aparato-io";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+/** Panamá es UTC−5 fijo, como en todo el sistema. */
+const PANAMA = "-05:00";
 
 // Sin código atado no hay a quién marcarle. Se DICE, no se inventa uno. El
 // texto vive en el módulo puro (`AVISO_SIN_CODIGO`) porque la PÁGINA dice lo
@@ -87,6 +96,10 @@ export async function POST(req: NextRequest) {
   const sinSenal = String(form.get("sinSenal") ?? "") === "1";
   const horaTelefono = String(form.get("horaTelefono") ?? "").trim() || null;
   const selfie = form.get("selfie");
+  // 🔴 EL SELLO DEL TELÉFONO — opcional, y no se le cree nada más que la forma.
+  // Un sello raro se descarta y la marca entra igual: acá nada se bloquea.
+  const selloCrudo = String(form.get(CAMPO_APARATO) ?? "").trim();
+  const aparatoId = selloValido(selloCrudo) ? selloCrudo : null;
   // 🔑 NO SE PREGUNTA `instanceof File`. El `File` que arma el runtime al
   // parsear el formulario no siempre es el MISMO `File` global del entorno
   // (undici contra el del navegador o el de jsdom): con `instanceof`, una
@@ -165,8 +178,13 @@ export async function POST(req: NextRequest) {
       subida = (await subirSelfie(path, Buffer.from(await (selfie as Blob).arrayBuffer()))).path;
     }
 
-    const { error } = await guardarMarcaciones([
-      {
+    // 🔴 EL LUGAR EN PALABRAS SE RESUELVE ACÁ Y VIAJA EN EL MISMO INSERT.
+    // `asistencia_marcaciones` es append-only —hay barrido que prohíbe el
+    // `update`—, así que rellenarlo después no era una opción. Sin la llave de
+    // Google esto contesta `null` sin tocar la red. Ver `lugar-al-marcar.ts`.
+    const lugarTexto = await lugarTextoDeLaMarca(num("lat"), num("lng"));
+
+    const fila = {
         dispositivo: DISPOSITIVO_TELEFONO,
         evento_id: eventoId,
         empleado_codigo: codigo,
@@ -187,8 +205,16 @@ export async function POST(req: NextRequest) {
         lng: num("lng"),
         precision_m: num("precisionM"),
         marcada_por: auth.userName ?? null,
-      },
-    ]);
+        lugar_texto: lugarTexto,
+        aparato_id: aparatoId,
+    };
+
+    let { error } = await guardarMarcaciones([fila]);
+    // 🔴 FALLA ABIERTA: sin las columnas nuevas, la marca de siempre entra tal
+    // cual. Lo único que se pierde es la calle y el sello.
+    if (faltaUnaColumnaNueva(error)) {
+      ({ error } = await guardarMarcaciones([sinLasColumnasNuevas(fila)]));
+    }
 
     if (error) {
       // La fila no entró: la foto no se queda suelta en el bucket. Una marca
@@ -200,6 +226,15 @@ export async function POST(req: NextRequest) {
       }
       throw new Error(error.message);
     }
+
+    // 🔴 DOS PERSONAS, UN SOLO TELÉFONO: se mira DESPUÉS de que la fila entró y
+    // nunca frena nada. Manda un mensaje al chat privado de Daniel, uno por
+    // (aparato, día), y no bloquea ninguna marca. Ver `mismo-aparato.ts`.
+    await revisarMismoAparato(
+      aparatoId,
+      new Date(Date.parse(`${fecha}T00:00:00.000${PANAMA}`)).toISOString(),
+      new Date(Date.parse(`${fecha}T23:59:59.999${PANAMA}`)).toISOString(),
+    );
 
     return NextResponse.json({
       ok: true,
