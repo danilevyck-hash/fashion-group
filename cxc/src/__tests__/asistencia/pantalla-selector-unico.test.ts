@@ -52,7 +52,19 @@ describe("🔴 el interruptor existe y se puede apagar", () => {
   });
 
   it("cada pantalla que cambió lo consulta, nunca decide por su cuenta", () => {
-    for (const f of [...PESTANAS, "src/app/asistencia/AsistenciaClient.tsx", "src/app/asistencia/ConfiguracionTab.tsx"]) {
+    // ⚠️ Movimientos salió de esta lista el 25-sep-2026: ya no tiene camino
+    // apagado que consultar. Su lista de 24 quincenas se FUE del archivo («3a»
+    // del mockup), así que le queda un solo camino — el selector de arriba— y
+    // preguntar por el interruptor no decidiría nada. Lo cubre, más fuerte, el
+    // caso «Préstamos › Movimientos ya no tiene su lista de 24».
+    const CONSULTAN = [
+      "src/app/asistencia/ReporteTab.tsx",
+      "src/app/asistencia/AprobacionesTab.tsx",
+      "src/app/asistencia/PlanillaTab.tsx",
+      "src/app/asistencia/AsistenciaClient.tsx",
+      "src/app/asistencia/ConfiguracionTab.tsx",
+    ];
+    for (const f of CONSULTAN) {
       expect(leer(f), f).toContain("ASISTENCIA_PANTALLA_2026_09");
     }
   });
@@ -97,8 +109,12 @@ describe("🔴 UNA sola clave y UNA sola memoria", () => {
   it("🩸 Préstamos › Movimientos ya no tiene su lista de 24, y `?quincena=` sigue llegando", () => {
     const mov = leer("src/app/asistencia/MovimientosQuincenaTab.tsx");
     expect(mov).toContain("SelectorPeriodo");
-    // El `<select>` solo puede existir en el camino apagado.
-    expect(mov).toContain("ASISTENCIA_PANTALLA_2026_09 ?");
+    // 🔴 25-sep-2026 («3a»): el `<select>` de 24 quincenas ya no existe NI
+    // apagado. Antes este caso admitía que viviera en el camino de atrás; hoy
+    // exige que no esté en el archivo, que es más fuerte.
+    expect(mov).not.toContain("<select");
+    expect(mov).not.toContain("CUANTAS_QUINCENAS");
+    expect(mov).not.toContain("quincenasHasta");
     // Un enlace viejo GANA sobre el período compartido: nadie se queda sin ver
     // la quincena que le mandaron.
     expect(mov).toMatch(/if \(q\) return q;/);

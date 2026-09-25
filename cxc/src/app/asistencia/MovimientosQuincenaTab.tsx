@@ -26,11 +26,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { useUrlState } from "@/lib/hooks/useUrlState";
-import { hoyPanama } from "@/lib/fecha-panama";
 import { fmt } from "@/lib/format";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
-import { quincenaDesdeClave, quincenasHasta, type Quincena } from "@/lib/asistencia/planilla";
-import { rotuloQuincena } from "@/lib/asistencia/elegir-quincena";
+import { quincenaDesdeClave, type Quincena } from "@/lib/asistencia/planilla";
 // 🔴 EL SELECTOR ÚNICO DEL MÓDULO (24-sep-2026). 🩸 Acá vivía una lista
 // desplegable de 24 quincenas, la CUARTA forma de elegir período del módulo.
 // Ahora es la misma barra de flechas de las otras tres pestañas, con la misma
@@ -52,11 +50,11 @@ import {
 /** El parámetro de la URL: la quincena que se mira se puede compartir. */
 export const PARAM_QUINCENA = "quincena";
 
-/**
- * Cuántas quincenas se ofrecen hacia atrás. Un año: la pregunta de Daniel es
- * «¿qué pasó en tal quincena?», y esa quincena puede ser la de hace ocho meses.
- */
-export const CUANTAS_QUINCENAS = 24;
+// 🩸 LA LISTA DE 24 QUINCENAS SE FUE (25-sep-2026, «3a» del mockup). Vivía acá
+// una constante `CUANTAS_QUINCENAS = 24` y un `<select>` con un año de
+// quincenas: la CUARTA forma de elegir período del módulo. Desde el 24-sep
+// manda el selector único de arriba, y hoy la lista ya no existe ni apagada.
+// El porqué, en `lib/asistencia/sobra-3a.ts`.
 
 function money(n: number): string {
   return n < 0 ? `−$${fmt(-n)}` : `$${fmt(n)}`;
@@ -64,7 +62,6 @@ function money(n: number): string {
 
 export default function MovimientosQuincenaTab(props: { empresa?: string }) {
   const { toast } = useToast();
-  const opciones = useMemo(() => quincenasHasta(hoyPanama(), CUANTAS_QUINCENAS), []);
   // Mismo nivel → `replace`: el Atrás del navegador no cicla por quincenas.
   const [claveUrl, setClave] = useUrlState(PARAM_QUINCENA, "");
   const compartido = usePeriodoAsistencia();
@@ -75,10 +72,10 @@ export default function MovimientosQuincenaTab(props: { empresa?: string }) {
     // quincena se mira la que lo CONTIENE: Movimientos es por quincena, y un
     // rango libre no tiene movimientos propios.
     if (q) return q;
-    if (ASISTENCIA_PANTALLA_2026_09) return quincenaDelPeriodo(compartido.desde);
-    // Una clave rara (o vacía) cae en la quincena en curso, nunca en blanco.
-    return opciones[0];
-  }, [claveUrl, opciones, compartido.desde]);
+    // 🔑 Una clave rara (o vacía) cae en la quincena que contiene el período de
+    // arriba, nunca en blanco.
+    return quincenaDelPeriodo(compartido.desde);
+  }, [claveUrl, compartido.desde]);
 
   const [filas, setFilas] = useState<FilaMovimiento[] | null>(null);
   const [error, setError] = useState(false);
@@ -137,32 +134,15 @@ export default function MovimientosQuincenaTab(props: { empresa?: string }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        {ASISTENCIA_PANTALLA_2026_09 ? (
-          /* 🔴 Sin calendario: acá solo hay movimientos de una QUINCENA. */
-          <SelectorPeriodo
-            desde={quincena.desde}
-            hasta={quincena.hasta}
-            hoy={compartido.hoy}
-            conCalendario={false}
-            onElegir={(d, h) => { setClave(""); compartido.elegir(d, h); }}
-          />
-        ) : (
-        <label className="flex items-center gap-2 text-sm">
-          <span className="text-gray-600">Quincena</span>
-          <select
-            aria-label="Quincena"
-            value={quincena.clave}
-            onChange={(e) => setClave(e.target.value)}
-            className="min-h-[44px] rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm"
-          >
-            {opciones.map((q) => (
-              <option key={q.clave} value={q.clave}>
-                {rotuloQuincena(q)} {q.anio}
-              </option>
-            ))}
-          </select>
-        </label>
-        )}
+        {/* 🔴 Sin calendario: acá solo hay movimientos de una QUINCENA.
+            🩸 Al lado vivía un `<select>` de 24 quincenas; se fue el 25-sep-2026. */}
+        <SelectorPeriodo
+          desde={quincena.desde}
+          hasta={quincena.hasta}
+          hoy={compartido.hoy}
+          conCalendario={false}
+          onElegir={(d, h) => { setClave(""); compartido.elegir(d, h); }}
+        />
         <button
           type="button"
           onClick={() => void bajarExcel()}

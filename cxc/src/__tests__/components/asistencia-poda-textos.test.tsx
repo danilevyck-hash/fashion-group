@@ -514,11 +514,24 @@ describe("Configuración — metodología al ⓘ, pendientes y bajas en pantalla
     esperaDetrasDelInfo("Cómo se llena esta lista", /El reloj solo manda un número por colaborador/);
   });
 
-  it("🔴 el aviso de pendientes y el ROJO de «se dio de baja y sigue marcando» NO se esconden", async () => {
+  // 🔄 CAMBIÓ DE DIRECCIÓN el 25-sep-2026 («3a», aprobado por Daniel sobre el
+  // mockup): la franja AMARILLA de pendientes se dejó de dibujar acá, porque el
+  // mismo dato ya sale en «Antes de cerrar», en la Planilla, como «código del
+  // reloj sin ficha» — que es donde de verdad frena el cierre. 🔑 El dato NO se
+  // perdió: `avisoPendientes` sigue vivo y probado (`sobra-3a.test.tsx`).
+  // Lo que este candado protege NO cambió: el aviso ROJO —dada de baja y sigue
+  // marcando— y el de la migración piden que alguien haga algo HOY, y siguen
+  // sin esconderse detrás de un ⓘ.
+  it("🔴 el ROJO de «se dio de baja y sigue marcando» NO se esconde", async () => {
     await abrirConfiguracion();
-    expect(screen.getByText(/todavía no salen en la planilla/)).toBeTruthy();
     expect(screen.getByText(/1 persona dada de baja siguió marcando/)).toBeTruthy();
     expect(screen.getByText(/Falta correr el archivo de la base de datos de las bajas/)).toBeTruthy();
+  });
+
+  it("🩸 y la franja amarilla de pendientes se fue de esta pantalla", async () => {
+    await abrirConfiguracion();
+    expect(screen.queryByText(/todavía no salen en la planilla/)).toBeNull();
+    expect(screen.queryByText(/todavía no sale en la planilla/)).toBeNull();
   });
 
   it("«el sueldo de la quincena no se reparte por días» sigue alcanzable en la ficha", async () => {

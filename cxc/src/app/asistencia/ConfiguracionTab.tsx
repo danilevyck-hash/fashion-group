@@ -123,6 +123,7 @@ import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 // 🔴 5c — la tabla directa, una fila de mandos y el código a la izquierda.
 // 🔴 7b — en el celular, la lista agrupada por empresa.
 import { ASISTENCIA_PANTALLA_2026_09, anchoDelCodigo } from "@/lib/asistencia/pantalla-2026-09";
+import { ASISTENCIA_SOBRA_3A } from "@/lib/asistencia/sobra-3a";
 import { aparatoDeQuienMira } from "@/lib/aparato";
 import BuscadorDeLista, { VacioDeBusqueda } from "@/components/BuscadorDeLista";
 import {
@@ -879,8 +880,14 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
 
   // UN solo aviso, con el desglose adentro. Antes eran dos carteles ámbar
   // apilados que decían casi lo mismo y competían entre ellos.
+  //
+  // 🩸 Y DESDE EL 25-sep-2026 NO SE DIBUJA («3a» del mockup). El mismo dato sale
+  // en «Antes de cerrar», en la Planilla, como «código del reloj sin ficha» —que
+  // es donde de verdad frena el cierre—, y un cartel permanente arriba de una
+  // lista se deja de leer. 🔑 `avisoPendientes` NO se borra: el dato no se
+  // pierde, cambia de lugar. `ASISTENCIA_SOBRA_3A = false` lo devuelve acá.
   const aviso = useMemo(
-    () => (datos ? avisoPendientes(datos.resumen) : null),
+    () => (ASISTENCIA_SOBRA_3A || !datos ? null : avisoPendientes(datos.resumen)),
     [datos],
   );
 
