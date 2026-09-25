@@ -559,12 +559,12 @@ Los **cuatro que dejan de estar trabados**:
 |---|---|---|
 | a | Ninguna fila de tienda llevaba a la ficha | Portada Tiendas, líneas por tienda de la marca (niveles 2 y 3) y Mobiliario enlazan a `hrefDeTienda` (`FilaNivel` ganó `href` y se dibuja como `<a>`). |
 | b | Reportes le cobraba Multifashion a PVH | **UNA regla** (`gastoEsDeMultifashion`: por `tienda_codigo` D-108 o por el proyecto) en el reporte por marca (`sinMultifashion`), el agregador (`tiendasMultifashion`), la marca y el ZIP (`esGastoMultifashion`). Medido: Tommy **$116.675,66** y Calvin **$73.782,95** en portada, marca y reporte. |
-| c | La factura de $2.307,32 (Impresora Comercial, proyecto «Multifashion Holdings» sin código) caía en «General» | Migración `20261218120000_marketing_huerfana_multifashion_toma_su_tienda.sql`, **ESCRITA y NO aplicada**: UPDATE por id, 1 fila, `tienda_codigo = 'D-108'` solo si sigue NULL. |
+| c | La factura de $2.307,32 (Impresora Comercial, proyecto «Multifashion Holdings» sin código) caía en «General» | Migración `20261218120000_marketing_huerfana_multifashion_toma_su_tienda.sql`, **APLICADA el 23-sep-2026** (verificado por lectura el 24-sep: esa factura tiene `tienda_codigo = 'D-108'`): UPDATE por id, 1 fila. |
 | d | Reportes abría en 2026 y escondía City Mall David | Reportes se fue; la portada Tiendas es «Todos» siempre (`reportePorTiendaRediseno()` sin año). |
 | e | «+ Agregar factura» del overlay viejo mandaba el proyecto y no la tienda | Se fue con el overlay; el único camino es «＋ Gasto». |
 | f | Textos de «proyecto» en pantalla | «← Proyectos» → «‹ Marketing»; «Sube fotos del proyecto» → «Sube fotos de la tienda»; el buscador «Buscar por proyecto…» no se dibuja con las líneas por tienda; «Este proyecto también tiene…» se fue con el overlay. |
 | g | Tres nombres para la misma tienda | El nombre sale SIEMPRE de `clientes_master` por código: portada Tiendas y reportes (`cargarGastosDelRediseno`), líneas por tienda (`nombresDeTienda` en `proyectos-lista`), Mobiliario (`/api/marketing/tiendas`). Falla ABIERTA al texto de antes si la lectura se cae. |
-| h | Contabilidad no entraba | `lib/marketing/roles.ts`: `ROLES_MARKETING` (admin · secretaria · contabilidad) para LEER, `ROLES_MARKETING_ESCRITURA` (admin · secretaria) para escribir; `puedeEscribirMarketing` esconde «＋ Gasto», «···», Cerrar, ZIP, Excel. 16 rutas GET aceptan contabilidad; las que escriben contestan **403**. `modules.ts`: `marketing.roles` gana contabilidad y `MODULO_HEREDA_PERMISO_DE.marketing = "gastos-contabilidad"` enciende la ficha ANTES de la migración. Migración `20261218120100_marketing_para_contabilidad.sql`, **ESCRITA y NO aplicada**: `role_permissions.contabilidad` gana `marketing`, 1 fila, idempotente. |
+| h | Contabilidad no entraba | `lib/marketing/roles.ts`: `ROLES_MARKETING` (admin · secretaria · contabilidad) para LEER, `ROLES_MARKETING_ESCRITURA` (admin · secretaria) para escribir; `puedeEscribirMarketing` esconde «＋ Gasto», «···», Cerrar, ZIP, Excel. 16 rutas GET aceptan contabilidad; las que escriben contestan **403**. `modules.ts`: `marketing.roles` gana contabilidad y `MODULO_HEREDA_PERMISO_DE.marketing = "gastos-contabilidad"` enciende la ficha ANTES de la migración. Migración `20261218120100_marketing_para_contabilidad.sql`, **APLICADA el 23-sep-2026** (verificado por lectura el 24-sep: `role_permissions.contabilidad` ya trae `marketing`): 1 fila, idempotente. |
 
 ### Medido contra producción (solo lectura por REST, 23-sep-2026) — ANTES y DESPUÉS
 
@@ -820,10 +820,9 @@ de Postgres con 400. El archivo ya estaba subido: cada «Reintentar» dejaba otr
 - 🔴 **Una foto nace en el período abierto del gasto MÁS RECIENTE de su tienda**
   (`periodoAbiertoParaFotoNueva`, puro). Tiene su porqué: la foto se sube justo después de
   registrar el gasto que documenta, así que acompaña a ese gasto y se le pasa a la marca que lo
-  pagó. ⚠️ **Decisión pendiente de Daniel:** una tienda puede tener dos marcas abiertas a la vez
-  (D-118 tiene Calvin y Tommy del mismo día) — hoy la foto va a UNA, la del gasto más reciente
-  (medido: Tommy). La alternativa sería que la misma foto viaje en el ZIP de **las dos** marcas.
-  No se construyó: es «dónde vive un dato» y lo decide él.
+  pagó. 🔴 **Superado el mismo día por § 16**: Daniel decidió que con dos marcas abiertas la
+  marca se ELIGE, y el «gasto más reciente» quedó solo como el ORDEN en que se dibujan las
+  opciones.
 - 🔴 **Si la fila no se pudo escribir, el archivo no se queda.** `borrarDelCajon` corre en el
   camino de error de la ruta.
 - 🔴 **Todo falla ABIERTO.** Sin la migración: la lectura no trae período (se ven todas, como
@@ -842,10 +841,10 @@ de Postgres con 400. El archivo ya estaba subido: cada «Reintentar» dejaba otr
 | `src/app/marketing/tienda/[codigo]/FichaTienda.tsx` | Le pasa `periodo` a las dos vistas (celular y computadora). `VistaTiendaAnterior` NO: sigue mostrando todo |
 | `src/lib/marketing/zip-marca.ts` | `leerAdjuntosDelZip` (con respaldo sin columnas) y `armarFotosPorCarpeta` suma las fotos de la TIENDA selladas al período que se baja, sin duplicar |
 | `src/lib/marketing/periodo-manda.ts` | Comentario corregido: decía Abierto $6.401,27 (3) · mid 2026 $71,26 (1); es **$1.771,27 (2)** · **$4.701,26 (2)** — el mueble de $4.630 está sellado a «mid 2026». «Todos» $6.472,53 no se movió |
-| `supabase/migrations/20261219130000_marketing_fotos_de_tienda.sql` | **NO aplicada.** La aplica Daniel |
+| `supabase/migrations/20261219130000_marketing_fotos_de_tienda.sql` | **APLICADA el 24-sep-2026.** Verificado por lectura: `mk_adjuntos.periodo_id` existe y 52 de las 60 fotos quedaron selladas a «mid 2026» |
 | `scripts/marketing-rescatar-fotos-huerfanas.ts` | **Solo lectura por defecto.** `--aplicar` inserta las filas de los archivos huérfanos |
 
-### 15.4 La migración (no aplicada)
+### 15.4 La migración (aplicada el 24-sep-2026)
 
 Aditiva, cero filas de datos creadas o borradas:
 
@@ -871,3 +870,96 @@ Aditiva, cero filas de datos creadas o borradas:
 - **Mutaciones a mano, 3 de 3 cazadas:** quitar el renglón nuevo del CHECK · no borrar el archivo
   huérfano en el camino de error · que el ZIP ignore el período y se lleve todas las fotos de la
   tienda.
+
+---
+
+## 16. La foto va a la tienda del período ABIERTO, y la marca se elige (24-sep-2026)
+
+Daniel, textual, el mismo día que se construyó § 15:
+
+> «las fotos deben ir a la tienda del período abierto; un período cerrado, nada debe entrar ni
+> salir»
+
+§ 15 dejó la foto sellándose SOLA al período abierto de la marca del **gasto más reciente** de la
+tienda. Eso es una adivinanza cuando la tienda tiene dos marcas abiertas: en Outlet Duty Free N3
+las cuatro fotos de Daniel se hubieran ido enteras a Tommy, y la factura de Calvin del mismo día
+habría quedado sin un solo respaldo visual. La decisión que § 15 dejaba abierta («⚠️ pendiente de
+Daniel») la cerró él: **se elige**.
+
+### 16.1 Lo medido (24-sep-2026, solo lectura contra producción)
+
+| Qué | Medido |
+|---|---|
+| Migración `20261219130000` | **APLICADA.** `mk_adjuntos.periodo_id` existe; 60 fotos de tienda, **52 con sello**, las 52 a «mid 2026» |
+| Tiendas con gastos vivos sellados a un período **abierto** | **4** |
+| …de ellas, con **DOS marcas abiertas** | **3**: D-118 (Tommy `f1ac9b37…` + Calvin `cefdd262…`), D-170 (Tommy + Calvin) y el cajón «General» |
+| …con UNA sola | **1**: D-87, Joybees (`1eaecba0…`) |
+| Períodos abiertos en toda la base | **5**: TH · CK · KL · RBK · J |
+| Períodos cerrados | **1**: «mid 2026» · PVH, `8e2ee894…`, cerrado el 12-ago-2026 |
+| D-118, sus tres facturas | Calvin $731,02 (21-sep) → `cefdd262…` abierto · Tommy $1.040,25 (21-sep) → `f1ac9b37…` abierto · Impreco $71,26 (18-jun) → `8e2ee894…` cerrado |
+| Archivos huérfanos del intento de Daniel | siguen los **4** en `tienda/D-118/`, sin fila |
+
+O sea: **3 de las 4 tiendas con gastos abiertos hoy necesitan la pregunta**. No es un caso raro.
+
+### 16.2 La regla
+
+- 🔴 **UNA marca abierta → la foto va ahí, sin preguntar.** Es lo que ya pasaba en la práctica y
+  no cambia ni un toque.
+- 🔴 **DOS o más → se elige con un toque.** En el celular, un botón por marca (44 px, el tamaño
+  de todo lo que se toca acá); en la computadora, un desplegable. **Ninguna viene puesta**, y
+  mientras no se toque una **el selector de archivo ni se dibuja**: elegir pasa ANTES de abrir la
+  cámara o el carrete.
+- 🔴 **NINGUNA marca abierta → la foto queda sin sello** y se ve en «Abierto», exactamente como
+  hoy.
+- 🔴 **LO DECIDE EL SERVIDOR, NO LA PANTALLA.** El POST recibe `periodoId` (o `marca`, su clave) y
+  `destinoDeFotoNueva` —pura— valida que ese período esté ABIERTO y sea de una marca con gasto en
+  **esa** tienda. Lo que no cuadra es **400 en español** y el archivo recién subido se borra del
+  cajón, igual que en § 15.
+- 🔴 **A UN PERÍODO CERRADO NO ENTRA NI SALE NADA.** La lista de opciones son solo los ABIERTOS
+  (`.eq("estado", "abierto")`), así que un cerrado nunca llega a ser opción; y cuando lo que llega
+  es el id de un cerrado, se dice **con su propio aviso** («Ese período ya está cerrado: a un
+  período cerrado no entra ni sale nada»), no con el genérico. **Y el ZIP de un período cerrado no
+  cambia por fotos nuevas**: `armarFotosPorCarpeta` solo suma las fotos cuyo `periodo_id` es
+  exactamente el del ZIP que se baja, y una foto nueva nace con un período ABIERTO.
+- 🔴 **El «gasto más reciente» dejó de decidir y pasó a ORDENAR.** `periodosAbiertosOrdenados`
+  sigue existiendo y pone primero la marca del gasto más nuevo, pero eso solo cambia en qué orden
+  se dibujan los botones: no preselecciona nada.
+- 🔑 **Nada de lo que se guarda cambia.** Misma columna, misma fila, misma migración. El
+  interruptor sigue siendo `MARKETING_FOTOS_CON_PERIODO`; apagado, la pantalla de antes.
+
+### 16.3 Qué se tocó
+
+| Archivo | Qué |
+|---|---|
+| `src/lib/marketing/fotos-periodo.ts` | **La regla, pura**: `MarcaAbiertaDeLaTienda`, `marcasAbiertasOrdenadas`, `necesitaElegirMarca`, `marcaElegidaEntre`, `destinoDeFotoNueva`, `periodosAbiertosOrdenados`, `nombreDeMarcaAbierta` y los tres avisos en español |
+| `src/lib/marketing/fotos-periodo-server.ts` | `periodoAbiertoDeLaTienda` → **`marcasAbiertasDeLaTienda`** (devuelve la lista, no un id) y `estadoDelPeriodo`. Ninguna lanza |
+| `src/app/api/marketing/tienda/[codigo]/fotos/route.ts` | El POST recibe `periodoId`/`marca`, valida con la función pura y contesta 400 con `marcas` y `faltaElegir` |
+| `src/app/api/marketing/tienda/[codigo]/fotos/marcas/route.ts` | **Nueva.** Solo LEE: las marcas abiertas de la tienda y si hay que elegir |
+| `src/app/marketing/components/FotosSection.tsx` | La pregunta con los nombres: botones de 44 px en el celular, `<select>` en la computadora, nada preseleccionado, y el uploader aparece al elegir |
+| `src/app/marketing/components/uploadHelpers.ts` | `subirAdjunto` lleva el `periodoId` elegido. Es el mensajero, no la regla |
+| `scripts/marketing-rescatar-fotos-huerfanas.ts` | `--marca=<clave>` y `--periodo=<uuid>`, con la MISMA función pura; en seco muestra las dos opciones de D-118 y **no aplica nada** sin el parámetro |
+
+### 16.4 Candados
+
+- `src/__tests__/marketing/marketing-foto-elige-marca.test.tsx` — **25 pruebas**: la regla pura
+  (0/1/2+ marcas, elegir por id o por clave, marca ajena, período cerrado), la puerta (sella sin
+  preguntar con una · 400 y borra el huérfano sin elegir con dos · sella la ELEGIDA · el aviso
+  propio del cerrado), el ZIP cerrado que no cambia, la pantalla que pregunta y no preselecciona,
+  y el **barrido**: ningún otro archivo de `src/lib/marketing` ni de `src/app/api/marketing`
+  escribe `periodo_id` en `mk_adjuntos` — la única puerta es ésa.
+- `src/__tests__/marketing/marketing-fotos-de-tienda.test.ts` (§ 15) se ajustó a la regla nueva:
+  su `postFoto` manda la marca elegida, porque D-118 tiene dos.
+- **Mutaciones a mano, 4 de 4 cazadas** (`scripts/_mutar-candados-marketing-foto-marca.sh`):
+  sellar la primera sin preguntar · el cerrado con el aviso genérico · ofrecer también los
+  períodos cerrados · preseleccionar la primera marca en la pantalla.
+- 🩸 **Lección de la corrida:** la primera versión de ese script restauraba con `git checkout --`
+  y se llevó por delante el trabajo sin commitear de los cuatro archivos. Ahora copia los
+  archivos a un temporal antes de mutar y restaura desde ahí. Ningún script de mutación de este
+  repo debe volver a usar `git checkout`.
+
+### 16.5 Lo que NO se hizo
+
+- **La misma foto en el ZIP de las dos marcas.** Sigue siendo una sola foto, un solo período. Si
+  Daniel quiere que una foto viaje en los dos ZIP, es otra conversación y otro grano.
+- **No se corrió el rescate con `--aplicar`.** Las 4 huérfanas de D-118 siguen en el cajón,
+  esperando que Daniel diga a qué marca van: `npx tsx scripts/marketing-rescatar-fotos-huerfanas.ts --tienda D-118 --marca=TH --aplicar`.
