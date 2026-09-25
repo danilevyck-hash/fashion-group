@@ -48,6 +48,7 @@ import type {
   BonosMultifashion,
 } from "@/components/ventas/types";
 import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
+import { ROTULO_TOTAL_MULTIFASHION } from "@/lib/comisiones/celular";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { variacionPctDesdeRatio } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
@@ -107,6 +108,19 @@ interface VendedorasSubtabProps {
    * espejo de Comisiones NO manda esta prop y no cambia en nada.
    */
   enCelular?: boolean;
+  /**
+   * 🔴 EL TOTAL DE MULTIFASHION, EN SU PROPIA BARRA (25-sep-2026, la «7p»).
+   *
+   * 🩸 Fashion Group cerraba con «TOTAL A PAGAR $5.978,55» y Multifashion
+   * **nunca decía su total** —$255,27 en agosto—: la misma pantalla terminaba
+   * de dos maneras distintas. Daniel: que se vea, *«separada y sin mezclarse
+   * nunca con la del grupo»*.
+   *
+   * 🔴 NUNCA SE SUMA CON LA DEL GRUPO: el rótulo lleva el nombre adentro
+   * (`ROTULO_TOTAL_MULTIFASHION`) para que no exista una pantalla donde dos
+   * barras negras digan lo mismo y parezcan sumables. Hay barrido.
+   */
+  conTotalAPagar?: boolean;
 }
 
 /**
@@ -116,7 +130,7 @@ interface VendedorasSubtabProps {
  * hay que cambiarla, se cambia UNA vez y las dos puertas dicen lo mismo.
  * 🔴 Multifashion comisiona con OTRA base que el grupo: no se fusiona nada.
  */
-export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCelular }: VendedorasSubtabProps) {
+export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCelular, conTotalAPagar }: VendedorasSubtabProps) {
   const year = selectedYear;
   // La meta del celular abre la tarjeta de metas de siempre — no una nueva.
   const [metaAbiertaCel, setMetaAbiertaCel] = useState(false);
@@ -304,7 +318,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
             <span>
               <span className="font-mono tabular-nums text-gray-700">{resp.total_vendedoras_periodo}</span> vendedoras ·{" "}
               <span className="font-mono tabular-nums text-gray-700">{fmtMoney(resp.ventas_total)}</span> ventas ·{" "}
-              <span className="font-mono tabular-nums text-gray-700">{resp.tickets_total.toLocaleString()}</span> tickets
+              <span className="font-mono tabular-nums text-gray-700">{resp.tickets_total.toLocaleString()}</span> {resp.tickets_total === 1 ? "ticket" : "tickets"}
             </span>
             {/* 🔴 Excel SOLO en mes cerrado (23-sep-2026). */}
             {excelDisponible && resp.vendedoras.length > 0 && (
@@ -402,9 +416,28 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
             ))}
           </div>
 
+          {/* 🔴 EL TOTAL DE MULTIFASHION, EN SU PROPIA BARRA (la «7p»).
+              🩸 Fashion Group cerraba con su total y ésta no cerraba con nada:
+              $255,27 en agosto que nunca se decían. Es la SUMA de las comisiones
+              que ya están dibujadas —lo mismo que se ve—, y el rótulo lleva el
+              nombre adentro para que NUNCA se lea como sumable con la del
+              grupo. */}
+          {conTotalAPagar && sortedVendedoras.length > 0 && (
+            <div
+              data-total-multifashion
+              className="mt-2 flex items-center justify-between gap-2 rounded-xl bg-gray-900 px-3 py-3"
+            >
+              <span className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                {ROTULO_TOTAL_MULTIFASHION}
+              </span>
+              <span className="font-mono text-base font-semibold tabular-nums text-white">
+                {fmtMoney(sortedVendedoras.reduce((s, v) => s + (v.comision ?? 0), 0))}
+              </span>
+            </div>
+          )}
+
           {/* 🔴 LA LÍNEA DEL BONO (23-sep-2026), debajo de la tabla, solo por
-              mes: «Bono: se define al cerrar el mes (retail contra retail). En
-              agosto: …». Sigue elevando la data para los resaltes de fila. */}
+              mes. Sigue elevando la data para los resaltes de fila. */}
           {!esRango && RETAIL_AL_FRENTE && (
             <div className={cn("mt-2", celular && "hidden sm:block")}>
               <BonosSection selectedYear={year} mes={bonoMes} onData={onBonosData} />
@@ -532,7 +565,7 @@ function VendedoraCard({
         <p data-desglose-canal className="mt-0.5 font-mono text-xs text-gray-500 tabular-nums">{desglose}</p>
       )}
       <div className="mt-1 text-xs text-gray-500">
-        <span className="font-mono tabular-nums">{v.tickets.toLocaleString()}</span> tickets ·{" "}
+        <span className="font-mono tabular-nums">{v.tickets.toLocaleString()}</span> {v.tickets === 1 ? "ticket" : "tickets"} ·{" "}
         <span className="font-mono tabular-nums">${v.ticket_promedio.toFixed(2)}</span> tkt prom ·{" "}
         <span className="font-mono tabular-nums">${v.comision.toFixed(2)}</span> comisión
         {conBono && <> · bono <span className={cn(bono === BONO_AL_CIERRE || bono === "—" ? "text-gray-400" : "font-mono font-semibold text-amber-700")}>{bono}</span></>}

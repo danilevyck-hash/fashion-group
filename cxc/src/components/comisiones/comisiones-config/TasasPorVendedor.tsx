@@ -64,6 +64,8 @@ export function TasasPorVendedor({ onSaved }: { onSaved: (msg: string) => void }
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** La fila abierta en el celular: sus empresas. Solo una a la vez. */
+  const [abierta, setAbierta] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -170,7 +172,15 @@ export function TasasPorVendedor({ onSaved }: { onSaved: (msg: string) => void }
                 <th className="py-2 pr-3.5 font-medium">Vendedor</th>
                 <th className="px-3.5 py-2 text-right font-medium">Venta</th>
                 <th className="px-3.5 py-2 text-right font-medium">Cobro</th>
-                <th className="px-3.5 py-2 font-medium">Empresas</th>
+                {/* 🔴 EN EL CELULAR NO HAY COLUMNA «EMPRESAS» (25-sep-2026, la
+                    «4j»). 🩸 Medido a 390 px: la tabla pedía 413 px en un cajón
+                    de 324 y la columna que se salía era justamente ésa —104 px
+                    de ancho, 56 fuera de la pantalla—. Y por su culpa **la fila
+                    de Reynaldo Espinosa medía 165 px contra los 57 de Edwin y
+                    Rodrigo**: 108 px de hueco blanco cuya razón no se veía. En
+                    el celular las empresas salen al ABRIR la fila; en la
+                    computadora se quedan, pero como pastillas. */}
+                <th className="hidden px-3.5 py-2 font-medium sm:table-cell">Empresas</th>
               </tr>
             </thead>
             <tbody>
@@ -182,7 +192,30 @@ export function TasasPorVendedor({ onSaved }: { onSaved: (msg: string) => void }
                     data-vendedor={r.vendedor_nombre}
                     className="border-b border-gray-100 last:border-0"
                   >
-                    <td className="py-2.5 pr-3.5 text-gray-900">{nombre}</td>
+                    <td className="py-2.5 pr-3.5 text-gray-900">
+                      {nombre}
+                      {/* En el celular, un toque abre las empresas de esa
+                          persona. En la computadora el botón no existe: la
+                          columna está a la vista. */}
+                      {r.origen.length > 0 && (
+                        <button
+                          type="button"
+                          aria-expanded={abierta === r.vendedor_nombre}
+                          aria-label={`Empresas de ${nombre}`}
+                          onClick={() => setAbierta((v) => (v === r.vendedor_nombre ? null : r.vendedor_nombre))}
+                          className="ml-1 align-middle text-xs text-teal-700 sm:hidden"
+                        >
+                          {abierta === r.vendedor_nombre ? "▾" : "›"}
+                        </button>
+                      )}
+                      {abierta === r.vendedor_nombre && (
+                        <span data-empresas-de={r.vendedor_nombre} className="mt-1 flex flex-wrap gap-1 sm:hidden">
+                          {r.origen.map((e) => (
+                            <span key={e} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700">{e}</span>
+                          ))}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-3.5 py-2.5 text-right">
                       <span className="inline-flex items-center gap-1">
                         <input
@@ -219,8 +252,14 @@ export function TasasPorVendedor({ onSaved }: { onSaved: (msg: string) => void }
                         <span className="text-gray-400">%</span>
                       </span>
                     </td>
-                    <td className="px-3.5 py-2.5 text-xs text-gray-500">
-                      {r.origen.length > 0 ? r.origen.join(", ") : "—"}
+                    <td className="hidden px-3.5 py-2.5 text-xs text-gray-500 sm:table-cell">
+                      {r.origen.length > 0 ? (
+                        <span className="flex flex-wrap gap-1">
+                          {r.origen.map((e) => (
+                            <span key={e} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700">{e}</span>
+                          ))}
+                        </span>
+                      ) : "—"}
                     </td>
                   </tr>
                 );

@@ -29,6 +29,13 @@ export const ACCION_DESCARGA_PDF = "descarga_pdf";
 export const ACCION_DESCARGA_EXCEL = "descarga_excel";
 
 /** Las acciones de configuración, anotadas por el servidor. */
+/**
+ * 🔴 «MANDAR» DEJA RASTRO IGUAL QUE UNA DESCARGA (25-sep-2026, la «9r»). Se
+ * anota DESPUÉS de que el correo salió o el enlace quedó firmado, nunca antes.
+ */
+export const ACCION_MANDAR_CORREO = "mandar_correo";
+export const ACCION_MANDAR_LINK = "mandar_link";
+
 export const ACCION_CONFIG_TASA = "config_tasa";
 export const ACCION_CONFIG_CLIENTE_SIN_COMISION = "config_cliente_sin_comision";
 export const ACCION_CONFIG_DESCUENTO = "config_descuento";

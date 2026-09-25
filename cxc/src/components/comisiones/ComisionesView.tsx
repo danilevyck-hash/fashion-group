@@ -60,6 +60,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ComisionesCriterios } from "./ComisionesCriterios";
 import { ComisionesPeriodo } from "./ComisionesPeriodo";
 import { hoyPanama } from "@/lib/fecha-panama";
+import { COMISIONES_CELULAR } from "@/lib/comisiones/celular";
+import { useEsCelularComisiones } from "./celular/useEsCelularComisiones";
+import { PortadaComisionesCelular } from "./celular/PortadaComisionesCelular";
 import { periodoInicial } from "@/lib/comisiones/mes-inicial";
 import { rotuloDescargarExcel, rotuloDescargarPdf } from "@/lib/comisiones/descarga";
 import {
@@ -174,6 +177,13 @@ export function ComisionesView({
   const [year, setYear] = useState<number>(inicial.year);
   const [mes, setMes] = useState<number>(inicial.mes);
   const [syncStale, setSyncStale] = useState(false);
+  /**
+   * 🔴 EL TOTAL DEL MES, ARRIBA Y CHICO (la «1b»). Lo REPORTA la vista del
+   * grupo —que es la dueña del número— y acá solo se dibuja: este archivo no
+   * suma nada. `null` mientras carga o cuando la vista no tiene total.
+   */
+  const [total, setTotal] = useState<number | null>(null);
+  const enCelular = useEsCelularComisiones();
 
   // La descarga: la vista hija registra su función; acá solo se dispara. La
   // función se guarda en un ref (cambia en cada render de la hija) y en el
@@ -243,6 +253,81 @@ export function ComisionesView({
   // RECIBOS del grupo no se dibujan ahí (un control que no ofrece nada no se
   // dibuja). Cuando exista una descarga en Multifashion, se monta ESA.
   const conDescarga = conPeriodo && !enMultifashion;
+
+  /** El cuerpo, uno solo: lo dibujan igual la computadora y el celular. */
+  const cuerpo = enConfig && hayConfig ? (
+    <ComisionesConfiguracionView />
+  ) : esVistaMultifashion(vista) ? (
+    /* Multifashion, con SU año y SUS chips de período: la MISMA vista del
+       módulo Multifashion, no una copia.
+       🔴 EL AÑO ES EL ELEGIDO (11-sep-2026) y desde el 22-sep-2026 el PERÍODO
+       también: el selector de arriba manda, traducido al vocabulario de
+       Multifashion por `periodoParaMultifashion`.
+       🔴 Y SU TOTAL VA EN SU PROPIA BARRA (25-sep-2026, la «7p»): «TOTAL A
+       PAGAR · Multifashion», que NUNCA se suma con la del grupo. */
+    <VendedorasSubtab
+      selectedYear={year}
+      periodo={multifashionConPeriodo ? periodoParaMultifashion(year, mes) : undefined}
+      corte={multifashionConPeriodo ? corteParaMultifashion(hoyPanama()) : undefined}
+      conTotalAPagar={COMISIONES_CELULAR}
+    />
+  ) : esVistaGrupo(vista) ? (
+    <ComisionesConsolidadoView
+      year={year}
+      mes={mes}
+      onExcel={registrarExcel}
+      onPdf={registrarPdf}
+      refreshKey={refreshKey}
+      onTotal={setTotal}
+      totalArriba={enCelular}
+    />
+  ) : (
+    <ComisionesPorEmpresaView
+      empresa={vista}
+      empresaNombre={nombreCortoEmpresa(vista)}
+      year={year}
+      mes={mes}
+      onExcel={registrarExcel}
+      onPdf={registrarPdf}
+      refreshKey={refreshKey}
+    />
+  );
+
+  // ── 🔴 EL CELULAR (25-sep-2026): la «1b» y la «8» ─────────────────────────
+  //
+  // 🩸 Medido a 390 px: la portada gastaba **265 px (el 31 % del teléfono) en
+  // 7 controles repartidos en 4 renglones** antes del primer vendedor, y los
+  // dos botones de descarga se llevaban **100 px en dos renglones sueltos y en
+  // zig-zag** —PDF pegado a la derecha, Excel a la izquierda—.
+  //
+  // Ahora: el título con el total del mes en chico, UNA fila con la empresa y
+  // «‹ Ago 2026 ›», y el «···» con ⚙, ⓘ, Descargar y Actualizar.
+  if (enCelular) {
+    return (
+      <PortadaComisionesCelular
+        vista={vista}
+        opciones={opciones}
+        onVista={elegirVista}
+        year={year}
+        mes={mes}
+        onPeriodo={handlePeriodo}
+        conPeriodo={conPeriodo}
+        conDescarga={conDescarga}
+        hayConfig={hayConfig}
+        enConfig={enConfig}
+        onConfig={() => setEnConfig((v) => !v)}
+        total={total}
+        onPdf={() => pdfRef.current?.()}
+        onExcel={() => excelRef.current?.()}
+        pdfDisabled={pdfDisabled}
+        excelDisabled={excelDisabled}
+        onActualizado={() => setRefreshKey((k) => k + 1)}
+        avisoMontos={avisoMontos}
+      >
+        {cuerpo}
+      </PortadaComisionesCelular>
+    );
+  }
 
   return (
     <div className="space-y-2">
@@ -359,39 +444,7 @@ export function ComisionesView({
           corrupto afecta a todas. Sin rechazos no se dibuja nada. */}
       <AvisoRechazosSwitch texto={avisoMontos} />
 
-      {enConfig && hayConfig ? (
-        <ComisionesConfiguracionView />
-      ) : esVistaMultifashion(vista) ? (
-        /* Multifashion, con SU año y SUS chips de período: la MISMA vista del
-           módulo Multifashion, no una copia. No se le pasa el MES del shell
-           porque la de allá tampoco lo usa — sus chips mandan, y así los dos
-           lados dicen lo mismo.
-           🔴 EL AÑO SÍ ES EL ELEGIDO (11-sep-2026). 🩸 Iba `inicial.year`, el del
-           arranque del módulo: en enero `periodoInicial` abre en diciembre del
-           año anterior, así que el ranking salía sobre el año pasado y sus chips
-           rotulaban «Diciembre (en curso)» sobre un año cerrado.
-           🔴 Y DESDE EL 22-SEP-2026 EL PERÍODO TAMBIÉN: el selector de arriba
-           manda (abre en el último mes cerrado, como el grupo), traducido al
-           vocabulario de Multifashion por `periodoParaMultifashion`. Sin el
-           interruptor, `periodo` va en `undefined` y la vista dibuja sus chips. */
-        <VendedorasSubtab
-          selectedYear={year}
-          periodo={multifashionConPeriodo ? periodoParaMultifashion(year, mes) : undefined}
-          corte={multifashionConPeriodo ? corteParaMultifashion(hoyPanama()) : undefined}
-        />
-      ) : esVistaGrupo(vista) ? (
-        <ComisionesConsolidadoView year={year} mes={mes} onExcel={registrarExcel} onPdf={registrarPdf} refreshKey={refreshKey} />
-      ) : (
-        <ComisionesPorEmpresaView
-          empresa={vista}
-          empresaNombre={nombreCortoEmpresa(vista)}
-          year={year}
-          mes={mes}
-          onExcel={registrarExcel}
-          onPdf={registrarPdf}
-          refreshKey={refreshKey}
-        />
-      )}
+      {cuerpo}
     </div>
   );
 }

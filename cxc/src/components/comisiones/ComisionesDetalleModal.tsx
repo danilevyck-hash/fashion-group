@@ -43,7 +43,7 @@
 // pasan, no con lo que haya montado en `<body>`.
 
 import { useEffect, useState } from "react";
-import { X, Download, FileText } from "lucide-react";
+import { X, Download, FileText, Send } from "lucide-react";
 import { fmtMoney } from "@/lib/ventas/format";
 import { fmtDate } from "@/lib/format";
 import { exportComisionDetalle, comisionLinea, type ComisionDetalle, type ComisionDescuento } from "@/lib/ventas/comisionExcel";
@@ -56,9 +56,17 @@ import { nombreArchivoComision } from "@/lib/comisiones/nombre-archivo";
 // 🔴 EL PDF SE ARMA EN UN SOLO LUGAR: la flechita de la celda baja el MISMO
 // reporte sin abrir esta pantalla, y dos generadores es cómo se llega a que el
 // archivo de un camino y el del otro no se parezcan.
-import { descargarPdfComision } from "@/lib/comisiones/pdf-comision";
+import { construirPdfComision, descargarPdfComision } from "@/lib/comisiones/pdf-comision";
 import { anotarDescargaComision } from "@/lib/comisiones/rastro";
 import { etiquetaPeriodo } from "@/lib/comisiones/periodo";
+import {
+  AVISO_DESLIZA,
+  COLUMNAS_DETALLE_COBRO,
+  COLUMNAS_DETALLE_VENTA,
+  ROTULO_MANDAR,
+} from "@/lib/comisiones/celular";
+import { useEsCelularComisiones } from "./celular/useEsCelularComisiones";
+import { HojaMandarComision } from "./celular/HojaMandarComision";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -76,6 +84,36 @@ const NOTA_COMISION_LINEA =
  *  `requireRole` de `POST /api/ventas/comisiones/descuentos`. Si esa lista se
  *  mueve, esta se mueve con ella — un botón que el server rechaza es peor que
  *  ningún botón. */
+/**
+ * 🔴 EL ORDEN DE LAS COLUMNAS DEL DETALLE. En el celular la plata va primero
+ * (la «3h»); en la computadora, el orden de siempre. Los NOMBRES y el
+ * contenido de cada columna salen de `lib/comisiones/celular.ts`, en un solo
+ * lugar, para que el candado compare contra la regla y no contra el JSX.
+ */
+function COLUMNAS_VENTA_EN_ORDEN(enCelular: boolean) {
+  return enCelular
+    ? COLUMNAS_DETALLE_VENTA
+    : ([
+        { clave: "fecha", rotulo: "Fecha", alineado: "izq" },
+        { clave: "cliente", rotulo: "Cliente", alineado: "izq" },
+        { clave: "factura", rotulo: "Factura", alineado: "izq" },
+        { clave: "subtotal", rotulo: "Subtotal", alineado: "der" },
+        { clave: "utilidad", rotulo: "% Util.", alineado: "der" },
+        { clave: "comision", rotulo: "Comisión", alineado: "der" },
+      ] as const);
+}
+
+function COLUMNAS_COBRO_EN_ORDEN(enCelular: boolean) {
+  return enCelular
+    ? COLUMNAS_DETALLE_COBRO
+    : ([
+        { clave: "fecha", rotulo: "Fecha", alineado: "izq" },
+        { clave: "cliente", rotulo: "Cliente", alineado: "izq" },
+        { clave: "monto", rotulo: "Monto", alineado: "der" },
+        { clave: "comision", rotulo: "Comisión", alineado: "der" },
+      ] as const);
+}
+
 export const ROLES_EDITAR_DESCUENTOS = ["admin", "secretaria"];
 
 interface Props {
@@ -109,6 +147,10 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
     setPuedeEditarDescuentos(ROLES_EDITAR_DESCUENTOS.includes(r));
   }, []);
   const [loading, setLoading] = useState(true);
+  /** 🔴 La hoja de «Mandar» (la «9r»). */
+  const [mandando, setMandando] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const enCelular = useEsCelularComisiones();
   const [error, setError] = useState<string | null>(null);
   // 🔄 9-SEP-2026 — se fue el `mounted`: existía porque la hoja impresa iba en un
   // portal y `document` no existe en SSR. Sin portal, el detalle se dibuja en el
@@ -210,6 +252,17 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
       )}
 
       <div className="flex items-center gap-2">
+        {/* 🔴 «MANDAR» VIVE EN EL DETALLE DEL VENDEDOR (25-sep-2026, la «9r»):
+            es donde se está mirando lo que se va a mandar. Abre la MISMA hoja
+            de tres salidas del estado de cuenta de Cuentas por Cobrar. */}
+        <button
+          onClick={() => setMandando(true)}
+          disabled={!data}
+          data-boton-mandar
+          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md bg-gray-900 px-3 text-sm text-white transition active:scale-[0.97] disabled:opacity-40"
+        >
+          <Send className="h-3.5 w-3.5" /> {ROTULO_MANDAR}
+        </button>
         <button
           onClick={() => {
             if (!data) return;
@@ -269,16 +322,30 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
               </Ayuda>
             </h3>
 
+            {enCelular && (
+              <p data-aviso-desliza className="mb-1 text-[11px] text-gray-500">{AVISO_DESLIZA}</p>
+            )}
             <div className="overflow-x-auto rounded-lg border border-gray-200">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                    <th className="px-3 py-2 font-medium">Fecha</th>
-                    <th className="px-3 py-2 font-medium">Cliente</th>
-                    <th className="px-3 py-2 font-medium">Factura</th>
-                    <th className="px-3 py-2 text-right font-medium">Subtotal</th>
-                    <th className="px-3 py-2 text-right font-medium">% Util.</th>
-                    <th className="px-3 py-2 text-right font-medium">Comisión</th>
+                    {/* 🔴 EN EL CELULAR LA PLATA VA PRIMERO (25-sep-2026, la
+                        «3h»). Daniel eligió las seis columnas deslizando, y en
+                        la misma frase pidió que Subtotal y Comisión se vean.
+                        🩸 Medido a 390 px: la tabla mide 557 px en un cajón de
+                        324, así que «% UTIL.» y «COMISIÓN» se veían **0 px** de
+                        69 y de 93, y «SUBTOTAL» 31 de 104: el detalle se abría
+                        en dos toques y no enseñaba ni un monto. Las dos formas
+                        de resolverlo eran fijar columnas o poner la plata
+                        primero; ésta no depende de que el navegador soporte
+                        `position: sticky` en una celda. **No se quita ninguna
+                        columna y no se recalcula ni un número**: es el MISMO
+                        renglón, en otro orden, y solo hasta `sm`. */}
+                    {COLUMNAS_VENTA_EN_ORDEN(enCelular).map((c) => (
+                      <th key={c.clave} className={`px-3 py-2 font-medium ${c.alineado === "der" ? "text-right" : ""}`}>
+                        {c.rotulo}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -290,14 +357,29 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                     // La NOTA DE CRÉDITO se reconoce por el rojo y el negativo:
                     // la columna «Tipo» (FA/NC) era decir dos veces lo mismo.
                     <tr key={i} className={`border-b border-gray-100 last:border-0 ${v.subtotal < 0 ? "text-rose-600" : v.subtotal === 0 && v.tipo === "Factura" ? "text-gray-400" : "text-gray-800"}`}>
-                      <td className="px-3 py-1.5 whitespace-nowrap">{fmtDate(v.fecha)}</td>
-                      <td className="px-3 py-1.5">{v.cliente}</td>
-                      {/* Los últimos 4 dígitos: el largo de Switch partía la
-                          fila en dos líneas. En el Excel va completo. */}
-                      <td className="px-3 py-1.5 tabular-nums text-gray-500">{facturaParaMostrar(v.secuencial)}</td>
-                      <td className="px-3 py-1.5 text-right tabular-nums">{fmtMoney(v.subtotal)}</td>
-                      <td className="px-3 py-1.5 text-right tabular-nums text-gray-500">{v.tipo === "Nota de Crédito" || v.pct_utilidad == null || !Number.isFinite(v.pct_utilidad) ? "—" : `${v.pct_utilidad.toFixed(1)}%`}</td>
-                      <td className="px-3 py-1.5 text-right tabular-nums">{fmtMoney(comisionLinea(v.subtotal, data.tasa_venta))}</td>
+                      {COLUMNAS_VENTA_EN_ORDEN(enCelular).map((c) => {
+                        // Los últimos 4 dígitos de la factura: el largo de
+                        // Switch partía la fila en dos líneas. En el Excel va
+                        // completo.
+                        const contenido =
+                          c.clave === "fecha" ? fmtDate(v.fecha)
+                          : c.clave === "cliente" ? v.cliente
+                          : c.clave === "factura" ? facturaParaMostrar(v.secuencial)
+                          : c.clave === "subtotal" ? fmtMoney(v.subtotal)
+                          : c.clave === "utilidad"
+                            ? (v.tipo === "Nota de Crédito" || v.pct_utilidad == null || !Number.isFinite(v.pct_utilidad) ? "—" : `${v.pct_utilidad.toFixed(1)}%`)
+                            : fmtMoney(comisionLinea(v.subtotal, data.tasa_venta));
+                        const gris = c.clave === "factura" || c.clave === "utilidad";
+                        return (
+                          <td
+                            key={c.clave}
+                            data-col-detalle={c.clave}
+                            className={`px-3 py-1.5 ${c.alineado === "der" ? "text-right tabular-nums" : c.clave === "fecha" ? "whitespace-nowrap" : ""} ${gris ? "tabular-nums text-gray-500" : ""}`}
+                          >
+                            {contenido}
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                 </tbody>
@@ -305,10 +387,17 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                   {/* El pie de "Comisión" muestra el número del RPC (el mismo
                       del cierre), NO la suma de las líneas: un solo total. */}
                   <tr className="border-t border-gray-200 bg-gray-50 font-semibold text-gray-900">
-                    <td className="px-3 py-2" colSpan={3}>TOTAL VENTAS</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(data.ventas_base)}</td>
-                    <td></td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(data.comision_venta)}</td>
+                    {COLUMNAS_VENTA_EN_ORDEN(enCelular).map((c, idx) => (
+                      <td
+                        key={c.clave}
+                        className={`px-3 py-2 ${c.alineado === "der" ? "text-right tabular-nums" : ""}`}
+                      >
+                        {c.clave === "comision" ? fmtMoney(data.comision_venta)
+                          : c.clave === "subtotal" ? fmtMoney(data.ventas_base)
+                          : idx === (enCelular ? 2 : 0) ? "TOTAL VENTAS"
+                          : ""}
+                      </td>
+                    ))}
                   </tr>
                 </tfoot>
               </table>
@@ -329,10 +418,13 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                    <th className="px-3 py-2 font-medium">Fecha</th>
-                    <th className="px-3 py-2 font-medium">Cliente</th>
-                    <th className="px-3 py-2 text-right font-medium">Monto</th>
-                    <th className="px-3 py-2 text-right font-medium">Comisión</th>
+                    {/* 🔴 La MISMA regla de la «3h»: en el celular la plata va
+                        primero. Medido: la columna COMISIÓN se veía 32 px de 93. */}
+                    {COLUMNAS_COBRO_EN_ORDEN(enCelular).map((c) => (
+                      <th key={c.clave} className={`px-3 py-2 font-medium ${c.alineado === "der" ? "text-right" : ""}`}>
+                        {c.rotulo}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -340,19 +432,35 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                     <tr><td colSpan={4} className="px-3 py-4 text-center text-gray-400">Sin cobros comisionables.</td></tr>
                   ) : data.cobros.map((c, i) => (
                     <tr key={i} className="border-b border-gray-100 last:border-0 text-gray-800">
-                      <td className="px-3 py-1.5 whitespace-nowrap">{fmtDate(c.fecha)}</td>
-                      <td className="px-3 py-1.5">{c.cliente}</td>
-                      <td className="px-3 py-1.5 text-right tabular-nums">{fmtMoney(c.monto)}</td>
-                      <td className="px-3 py-1.5 text-right tabular-nums">{fmtMoney(comisionLinea(c.monto, data.tasa_cobro))}</td>
+                      {COLUMNAS_COBRO_EN_ORDEN(enCelular).map((col) => (
+                        <td
+                          key={col.clave}
+                          data-col-detalle={col.clave}
+                          className={`px-3 py-1.5 ${col.alineado === "der" ? "text-right tabular-nums" : col.clave === "fecha" ? "whitespace-nowrap" : ""}`}
+                        >
+                          {col.clave === "fecha" ? fmtDate(c.fecha)
+                            : col.clave === "cliente" ? c.cliente
+                            : col.clave === "monto" ? fmtMoney(c.monto)
+                            : fmtMoney(comisionLinea(c.monto, data.tasa_cobro))}
+                        </td>
+                      ))}
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   {/* Igual que en VENTAS: el pie es el número del RPC. */}
                   <tr className="border-t border-gray-200 bg-gray-50 font-semibold text-gray-900">
-                    <td className="px-3 py-2" colSpan={2}>TOTAL COBROS</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(data.cobros_base)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(data.comision_cobro)}</td>
+                    {COLUMNAS_COBRO_EN_ORDEN(enCelular).map((col, idx) => (
+                      <td
+                        key={col.clave}
+                        className={`px-3 py-2 ${col.alineado === "der" ? "text-right tabular-nums" : ""}`}
+                      >
+                        {col.clave === "comision" ? fmtMoney(data.comision_cobro)
+                          : col.clave === "monto" ? fmtMoney(data.cobros_base)
+                          : idx === (enCelular ? 2 : 0) ? "TOTAL COBROS"
+                          : ""}
+                      </td>
+                    ))}
                   </tr>
                 </tfoot>
               </table>
@@ -433,6 +541,41 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
   // otra forma. Con el PDF armado en código, el modal y el detalle de abajo bajan
   // el MISMO archivo sin montar nada.
 
+  /**
+   * El papel para «Mandar»: el MISMO que baja «Descargar», armado con
+   * `construirPdfComision`. De acá salen sus bytes y nada más.
+   */
+  const armarPdf = async () => {
+    if (!data) throw new Error("Todavía no cargó el detalle.");
+    const doc = construirPdfComision([
+      { data, descuentos, empresaNombre, vendedor, year, mes },
+    ]);
+    const base64 = doc.output("datauristring").split(",")[1] ?? "";
+    return { base64, nombre: nombreArchivo };
+  };
+
+  const laHojaDeMandar = (
+    <>
+      <HojaMandarComision
+        abierta={mandando}
+        onCerrar={() => setMandando(false)}
+        vendedor={nombreVendedorEnPantalla(vendedor)}
+        empresa={empresaNombre}
+        mes={`${year}-${String(mes).padStart(2, "0")}`}
+        year={year}
+        mesNumero={mes}
+        periodo={etiquetaPeriodo(year, mes)}
+        armarPdf={armarPdf}
+        onAviso={setAviso}
+      />
+      {aviso && (
+        <div role="status" className="fixed inset-x-0 bottom-4 z-[80] mx-auto w-fit rounded-full bg-gray-900 px-4 py-2 text-sm text-white">
+          {aviso}
+        </div>
+      )}
+    </>
+  );
+
   if (inline) {
     return (
       <>
@@ -444,6 +587,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
           {encabezado}
           {cuerpo}
         </section>
+        {laHojaDeMandar}
       </>
     );
   }
@@ -459,6 +603,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
           {cuerpo}
         </div>
       </ModalOverlay>
+      {laHojaDeMandar}
     </>
   );
 }

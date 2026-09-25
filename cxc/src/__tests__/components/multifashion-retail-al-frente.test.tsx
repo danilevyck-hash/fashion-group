@@ -299,7 +299,11 @@ describe("4 · Vendedoras: meta una vez, Excel al cerrar, bono en una línea", (
     expect(leer("src/lib/multifashion/vendedoras-excel.ts")).toContain("filtroDesdeA1");
   });
 
-  it("la línea del bono dice quién cobró, retail contra retail", () => {
+  // 🔁 25-sep-2026 — «POR LA VENTA DE LA TIENDA», NO «RETAIL CONTRA RETAIL».
+  // «Retail» es jerga del sistema, no del negocio, y esta línea la lee Daniel.
+  // 🔴 LA CUENTA NO CAMBIÓ: sigue siendo la misma RPC, retail contra retail; lo
+  // único que cambió son las palabras.
+  it("la línea del bono dice quién cobró, por la venta de la tienda", () => {
     const agosto = {
       mes_evaluado: { year: 2026, mes: 8 }, es_elegible: true, fecha_max_data: "2026-09-22",
       ultimo_mes_elegible: { year: 2026, mes: 8 },
@@ -307,9 +311,9 @@ describe("4 · Vendedoras: meta una vez, Excel al cerrar, bono en una línea", (
       vendedoras: [{ nombre: "SHEYNEE BATISTA", tickets: 1, ventas: 1, ticket_promedio: 1, manager: false, delta_ventas_pct: null, tiene_comparacion: false, bono_vendedora: true }],
     };
     const septiembre = { ...agosto, mes_evaluado: { year: 2026, mes: 9 }, es_elegible: false, gerente: { ...agosto.gerente, bono: 0 } };
-    expect(lineaBono(agosto, null)).toBe("Bono de agosto 2026 (retail contra retail): Jennifer Miranda $100 · Sheynee Batista $50.");
-    expect(lineaBono(septiembre, agosto)).toBe("Bono: se define al cerrar el mes (retail contra retail). En agosto: Jennifer Miranda $100 · Sheynee Batista $50.");
-    expect(lineaBono(septiembre, null)).toBe("Bono: se define al cerrar el mes (retail contra retail).");
+    expect(lineaBono(agosto, null)).toBe("Bono de agosto 2026, por la venta de la tienda: Jennifer Miranda $100 · Sheynee Batista $50.");
+    expect(lineaBono(septiembre, agosto)).toBe("Bono: se define al cerrar el mes, por la venta de la tienda. En agosto: Jennifer Miranda $100 · Sheynee Batista $50.");
+    expect(lineaBono(septiembre, null)).toBe("Bono: se define al cerrar el mes, por la venta de la tienda.");
     expect(lineaBono(null, null)).toBeNull();
   });
 
@@ -548,7 +552,7 @@ describe("5 · Vendedoras: 4 elementos", () => {
     expect(screen.queryByText(/incluye mayoreo si lo hubo/)).toBeNull();
     expect(screen.queryByText("Bono")).toBeNull();
     expect(screen.queryByText("al cierre")).toBeNull();
-    expect(await screen.findByText("Bono: se define al cerrar el mes (retail contra retail). En agosto: Jennifer Miranda $100 · Sheynee Batista $50.")).toBeTruthy();
+    expect(await screen.findByText("Bono: se define al cerrar el mes, por la venta de la tienda. En agosto: Jennifer Miranda $100 · Sheynee Batista $50.")).toBeTruthy();
   });
 
   it("🔴 el Excel SOLO en mes cerrado", async () => {
@@ -557,7 +561,7 @@ describe("5 · Vendedoras: 4 elementos", () => {
     cleanup();
     await pintarVendedoras(8);
     expect(screen.getByRole("button", { name: "Excel" })).toBeTruthy();
-    expect(await screen.findByText("Bono de agosto 2026 (retail contra retail): Jennifer Miranda $100 · Sheynee Batista $50.")).toBeTruthy();
+    expect(await screen.findByText("Bono de agosto 2026, por la venta de la tienda: Jennifer Miranda $100 · Sheynee Batista $50.")).toBeTruthy();
   });
 });
 

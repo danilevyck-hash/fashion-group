@@ -171,6 +171,15 @@ interface PropsConsolidado {
    */
   menuEmpresa?: (empresaKey: string, fila: FilaConsolidado) => ReactNode;
   menuTotal?: (fila: FilaConsolidado) => ReactNode;
+  /**
+   * 🔴 `true` = EL TOTAL YA SE DICE ARRIBA (25-sep-2026, la «1b»), así que acá
+   * no va la barra negra del pie.
+   *
+   * 🩸 Medido: con una fila abierta la barra quedaba en y≈760 y el botón
+   * flotante empezaba en y=772 — se leía **«TOTAL A PAGAR $5,97…»**, al número
+   * más importante de la pantalla le faltaban los últimos tres caracteres.
+   */
+  totalArriba?: boolean;
 }
 
 export function ComisionesTarjetasConsolidado({
@@ -184,6 +193,7 @@ export function ComisionesTarjetasConsolidado({
   onDetalle,
   menuEmpresa,
   menuTotal,
+  totalArriba = false,
 }: PropsConsolidado) {
   return (
     <ListaTarjetas>
@@ -220,7 +230,7 @@ export function ComisionesTarjetasConsolidado({
           />
         ))}
 
-      <TarjetaTotal total={granTotal} aPagar={noSePagan.length > 0} />
+      {!totalArriba && <TarjetaTotal total={granTotal} aPagar={noSePagan.length > 0} />}
     </ListaTarjetas>
   );
 }

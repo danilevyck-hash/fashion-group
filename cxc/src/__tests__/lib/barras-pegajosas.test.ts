@@ -94,7 +94,7 @@ const NO_SON_BARRAS_DE_PAGINA: { archivo: string; motivo: string }[] = [
   // `fixed inset-0 overflow-y-auto` con su PROPIO deslizamiento: su «‹ volver»
   // se pega a esa caja, no a la página, y el encabezado del sistema no existe
   // en el celular (`SIN_BARRA_ARRIBA`).
-  { archivo: "components/ventas/celular/PiezasVentas.tsx", motivo: "el «‹ volver» de la pantalla que sube, dentro de su propia caja" },
+  { archivo: "components/celular/Piezas.tsx", motivo: "el «‹ volver» de la pantalla que sube, dentro de su propia caja" },
   // (`components/ventas/ResumenAnual.tsx` salió de la lista el 11-sep-2026: la
   // vista Anual se retiró con la pestaña.)
   { archivo: "components/catalogo/PedidoDetalleClient.tsx", motivo: "thead del detalle del pedido" },

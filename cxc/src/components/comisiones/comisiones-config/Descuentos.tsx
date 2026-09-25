@@ -107,6 +107,8 @@ export function Descuentos({ onSaved }: { onSaved: (msg: string) => void }) {
   const [errorAlta, setErrorAlta] = useState<string | null>(null);
   const [aQuitar, setAQuitar] = useState<DescuentoFila | null>(null);
   const [quitando, setQuitando] = useState(false);
+  /** La fila abierta en el celular: empresa y fechas. Solo una a la vez. */
+  const [abierto, setAbierto] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -377,20 +379,44 @@ export function Descuentos({ onSaved }: { onSaved: (msg: string) => void }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
+                {/* 🔴 TRES COLUMNAS EN EL CELULAR (25-sep-2026, la «6o»).
+                    🩸 Medido a 390 px: ésta era **la tabla más ancha del
+                    módulo** —589 px en un cajón de 324, con **265 px afuera, el
+                    45 %**: «Desde» se salía 100 px, «Hasta» 173 y **QUITAR
+                    entera**. Empresa, Desde y Hasta salen al ABRIR la fila; en
+                    la computadora las siete columnas no se tocan. */}
                 <th className="py-2 pr-3.5 font-medium">Vendedor</th>
-                <th className="px-3.5 py-2 font-medium">Empresa</th>
+                <th className="hidden px-3.5 py-2 font-medium sm:table-cell">Empresa</th>
                 <th className="px-3.5 py-2 font-medium">Concepto</th>
                 <th className="px-3.5 py-2 text-right font-medium">Monto</th>
-                <th className="px-3.5 py-2 font-medium">Desde</th>
-                <th className="px-3.5 py-2 font-medium">Hasta</th>
+                <th className="hidden px-3.5 py-2 font-medium sm:table-cell">Desde</th>
+                <th className="hidden px-3.5 py-2 font-medium sm:table-cell">Hasta</th>
                 <th className="py-2 pl-3.5"><span className="sr-only">Quitar</span></th>
               </tr>
             </thead>
             <tbody>
               {filas.map((f) => (
                 <tr key={f.id} className="border-b border-gray-100 last:border-0" data-descuento-id={f.id}>
-                  <td className="py-2.5 pr-3.5 text-gray-900">{nombreVendedorEnPantalla(f.vendedor_nombre)}</td>
-                  <td className="px-3.5 py-2.5 text-gray-700">{nombreEmpresa(f.empresa_key)}</td>
+                  <td className="py-2.5 pr-3.5 text-gray-900">
+                    {nombreVendedorEnPantalla(f.vendedor_nombre)}
+                    {/* En el celular, un toque abre empresa y fechas — que es
+                        lo que decide si el descuento sigue vivo. */}
+                    <button
+                      type="button"
+                      aria-expanded={abierto === f.id}
+                      aria-label={`Detalle de ${f.concepto}`}
+                      onClick={() => setAbierto((v) => (v === f.id ? null : f.id))}
+                      className="ml-1 align-middle text-xs text-teal-700 sm:hidden"
+                    >
+                      {abierto === f.id ? "▾" : "›"}
+                    </button>
+                    {abierto === f.id && (
+                      <span data-detalle-descuento={f.id} className="mt-1 block text-xs text-gray-500 sm:hidden">
+                        {nombreEmpresa(f.empresa_key)} · desde {mesEnPalabras(f.desde)} · hasta {hastaEnPalabras(f.hasta)}
+                      </span>
+                    )}
+                  </td>
+                  <td className="hidden px-3.5 py-2.5 text-gray-700 sm:table-cell">{nombreEmpresa(f.empresa_key)}</td>
                   <td className="px-3.5 py-2.5 text-gray-700">
                     <button
                       type="button"
@@ -402,8 +428,8 @@ export function Descuentos({ onSaved }: { onSaved: (msg: string) => void }) {
                     </button>
                   </td>
                   <td className="px-3.5 py-2.5 text-right tabular-nums text-gray-900">{fmtMoney(f.monto)}</td>
-                  <td className="px-3.5 py-2.5 text-xs text-gray-500">{mesEnPalabras(f.desde)}</td>
-                  <td className="px-3.5 py-2.5 text-xs text-gray-500">{hastaEnPalabras(f.hasta)}</td>
+                  <td className="hidden px-3.5 py-2.5 text-xs text-gray-500 sm:table-cell">{mesEnPalabras(f.desde)}</td>
+                  <td className="hidden px-3.5 py-2.5 text-xs text-gray-500 sm:table-cell">{hastaEnPalabras(f.hasta)}</td>
                   <td className="py-2.5 pl-3.5 text-right">
                     <button
                       type="button"

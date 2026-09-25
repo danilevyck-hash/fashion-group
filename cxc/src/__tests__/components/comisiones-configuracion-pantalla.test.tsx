@@ -238,70 +238,87 @@ describe("🔴 la pestaña Configuración", () => {
     expect(upd.some((u) => u.vendedor_nombre === "DANIEL LEVY")).toBe(false);
   });
 
-  it("🔴 la lista va AGRUPADA POR EMPRESA (encabezado + contador) y cada tabla es Cliente · Vendedor · Venta · Cobro · Desde · × — sin Empresa ni Motivo", async () => {
+  // 🩸 SE REHIZO EL 25-sep-2026 (la «5t/5u»). Daniel: *«¿la casilla llena
+  // significa que comisiona o no?»* — la casilla marcada quería decir EXCLUIDO,
+  // o sea que NO comisiona, y por eso se leía al revés. Y la lista iba agrupada
+  // por empresa: 18 filas activas en SEIS tablas para 12 reglas, con el
+  // encabezado de cinco columnas repetido seis veces. Ahora: UNA lista, un solo
+  // encabezado, CERO casillas, y cada renglón dice en palabras lo que hace.
+  it("🔴 UNA sola lista, en palabras, sin casillas y sin agrupar por empresa", async () => {
     render(<ComisionesConfiguracionView />);
     const seccion = (await screen.findByText("Clientes que no comisionan")).closest("section")!;
-    const grupos = [...seccion.querySelectorAll("[data-grupo-empresa]")].map((g) => g.getAttribute("data-grupo-empresa"));
-    expect(grupos).toEqual(["active_shoes", "active_wear"]);
-    const activeShoes = seccion.querySelector('[data-grupo-empresa="active_shoes"]') as HTMLElement;
-    expect(within(activeShoes).getByRole("heading", { name: "Active Shoes" })).toBeTruthy();
-    expect(within(activeShoes).getByLabelText("2 en Active Shoes").textContent).toBe("2");
-    const activeWear = seccion.querySelector('[data-grupo-empresa="active_wear"]') as HTMLElement;
-    expect(within(activeWear).getByLabelText("1 en Active Wear").textContent).toBe("1");
-    // Encabezados de la tabla del grupo: sin columna Empresa, sin Motivo.
-    const encabezados = within(activeShoes).getAllByRole("columnheader").map((h) => h.textContent?.trim());
-    // 🔄 6-sep-2026: se fue «Desde». Decía «3 sept 2026» en TODAS las filas —el
-    // día en que se cargaron, no una fecha de vigencia—, así que no distinguía
-    // nada. `creado_en` sigue en la base como firma de quién y cuándo.
-    expect(encabezados).toEqual(["Cliente", "Vendedor", "Venta", "Cobro", "Quitar"]);
-    expect(encabezados).not.toContain("Empresa");
-    expect(encabezados).not.toContain("Motivo");
-    const fila = within(activeShoes).getByText("Kheriddine").closest("tr")!;
-    expect(within(fila).getByText("D-84")).toBeTruthy();
-    expect(within(fila).getByText("Reynaldo Espinosa")).toBeTruthy();
-    expect(within(fila).queryByText("Active Shoes")).toBeNull();
-    // 🔄 6-sep-2026: la fecha ya no se dibuja — decía lo mismo en todas las filas.
-    expect(within(fila).queryByText(fmtDate("2026-09-03"))).toBeNull();
-    // Las casillas dicen lo que trae cada fila: Kheriddine las dos; Metro Shoes solo venta.
-    expect((within(fila).getByLabelText("Venta de Kheriddine para Reynaldo Espinosa") as HTMLInputElement).checked).toBe(true);
-    expect((within(fila).getByLabelText("Cobro de Kheriddine para Reynaldo Espinosa") as HTMLInputElement).checked).toBe(true);
-    const metro = within(activeShoes).getByText("Metro Shoes").closest("tr")!;
-    expect((within(metro).getByLabelText("Venta de Metro Shoes para Reynaldo Espinosa") as HTMLInputElement).checked).toBe(true);
-    expect((within(metro).getByLabelText("Cobro de Metro Shoes para Reynaldo Espinosa") as HTMLInputElement).checked).toBe(false);
+    // 🩸 No hay grupos por empresa, y no hay ni una casilla.
+    expect(seccion.querySelectorAll("[data-grupo-empresa]").length).toBe(0);
+    expect(seccion.querySelectorAll('input[type="checkbox"]').length).toBe(0);
+    // Un solo encabezado, con la columna en palabras.
+    const encabezados = within(seccion).getAllByRole("columnheader").map((h) => h.textContent?.trim());
+    expect(encabezados).toEqual(["Cliente", "Vendedor", "Empresas", "Qué no comisiona", "Quitar"]);
+    // Las tres filas de la base son TRES reglas (clientes distintos).
+    const filas = [...seccion.querySelectorAll("[data-regla]")];
+    expect(filas).toHaveLength(3);
+    const kher = within(seccion).getByText("Kheriddine").closest("tr")!;
+    expect(within(kher).getByText("D-84")).toBeTruthy();
+    expect(within(kher).getByText("Reynaldo Espinosa")).toBeTruthy();
+    expect(within(kher).getByText("Active Shoes")).toBeTruthy();
+    expect((kher.textContent ?? "")).toContain("No comisiona venta ni cobro");
+    // 🔴 Metro Shoes es la única de «solo la venta»: se lee sin descifrar casillas.
+    const metro = within(seccion).getByText("Metro Shoes").closest("tr")!;
+    expect((metro.textContent ?? "")).toContain("No comisiona solo la venta");
   });
 
-  it("🔴 cambiar una casilla manda PATCH ?id= al momento; dejar las dos apagadas NO manda nada y avisa", async () => {
+  it("🔴 los dos desplegables filtran, y el comodín «todos los vendedores» NUNCA se esconde", async () => {
     render(<ComisionesConfiguracionView />);
     const seccion = (await screen.findByText("Clientes que no comisionan")).closest("section")!;
-    // Kheriddine: apagar Cobro → PATCH con venta=true, cobro=false.
-    const cobroKher = within(seccion).getByLabelText("Cobro de Kheriddine para Reynaldo Espinosa");
-    await act(async () => { fireEvent.click(cobroKher); });
+    fireEvent.change(within(seccion).getByLabelText("Filtrar por empresa"), { target: { value: "active_wear" } });
+    await waitFor(() => expect([...seccion.querySelectorAll("[data-regla]")]).toHaveLength(1));
+    expect(within(seccion).getByText("El Remate")).toBeTruthy();
+    expect(within(seccion).queryByText("Kheriddine")).toBeNull();
+    fireEvent.change(within(seccion).getByLabelText("Filtrar por empresa"), { target: { value: "todas" } });
+    await waitFor(() => expect([...seccion.querySelectorAll("[data-regla]")]).toHaveLength(3));
+  });
+
+  it("🔴 cambiar qué no comisiona manda PATCH ?id= por cada fila de la regla; las dos apagadas no mandan nada", async () => {
+    render(<ComisionesConfiguracionView />);
+    const seccion = (await screen.findByText("Clientes que no comisionan")).closest("section")!;
+    const kher = within(seccion).getByText("Kheriddine").closest("tr")!;
+    fireEvent.click(within(kher).getByRole("button", { name: /Opciones de Kheriddine/ }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Cambiar qué no comisiona" }));
+    const hoja = await screen.findByLabelText("¿Qué no comisiona?");
+    // Arranca diciendo lo que la regla dice hoy: las dos.
+    const venta = within(hoja).getByRole("switch", { name: /La venta/ });
+    const cobro = within(hoja).getByRole("switch", { name: /El cobro/ });
+    expect(venta.getAttribute("aria-checked")).toBe("true");
+    expect(cobro.getAttribute("aria-checked")).toBe("true");
+    // Apagar las dos: Guardar se apaga y nada viaja.
+    fireEvent.click(venta);
+    fireEvent.click(cobro);
+    const guardar = within(hoja).getByRole("button", { name: /Guardar/ }) as HTMLButtonElement;
+    expect(guardar.disabled).toBe(true);
+    expect(llamadas.some((c) => c.method === "PATCH")).toBe(false);
+    // Solo el cobro → un PATCH con el payload de siempre.
+    fireEvent.click(cobro);
+    await act(async () => { fireEvent.click(within(hoja).getByRole("button", { name: /Guardar/ })); });
     await waitFor(() => expect(llamadas.some((c) => c.method === "PATCH")).toBe(true));
     const patch = llamadas.find((c) => c.method === "PATCH")!;
     expect(patch.url).toContain("/api/ventas/comisiones/exclusiones?id=1");
-    expect(patch.body).toEqual({ excluye_venta: true, excluye_cobro: false });
-    // Metro Shoes ya tiene Cobro apagado: apagar Venta dejaría las dos apagadas → nada viaja, se avisa.
-    llamadas.length = 0;
-    const ventaMetro = within(seccion).getByLabelText("Venta de Metro Shoes para Reynaldo Espinosa");
-    await act(async () => { fireEvent.click(ventaMetro); });
-    expect((await screen.findByRole("alert")).textContent).toBe(AVISO_NINGUNA_CASILLA);
-    expect(llamadas.some((c) => c.method === "PATCH")).toBe(false);
-    expect((ventaMetro as HTMLInputElement).checked).toBe(true);
+    expect(patch.body).toEqual({ excluye_venta: false, excluye_cobro: true });
   });
 
   it("quitar pide confirmación (diciendo qué vuelve) y manda DELETE ?id= (soft delete en el servidor)", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     render(<ComisionesConfiguracionView />);
     const seccion = (await screen.findByText("Clientes que no comisionan")).closest("section")!;
-    fireEvent.click(within(seccion).getByRole("button", { name: /Quitar a Kheriddine/ }));
+    const kher = within(seccion).getByText("Kheriddine").closest("tr")!;
+    fireEvent.click(within(kher).getByRole("button", { name: /Opciones de Kheriddine/ }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Quitar" }));
     await screen.findByText("¿Quitar de la lista?");
-    // Tocar × NO manda nada: sin confirmar no hay DELETE.
+    // Sin confirmar no hay DELETE.
     await act(async () => { vi.advanceTimersByTime(50); });
     expect(llamadas.some((c) => c.method === "DELETE")).toBe(false);
-    expect(screen.getByText(/Reynaldo Espinosa vuelve a cobrar comisión por Kheriddine en Active Shoes, en venta y en cobro/)).toBeTruthy();
+    expect(screen.getByText(/Reynaldo Espinosa vuelve a cobrar comisión por Kheriddine en Active Shoes/)).toBeTruthy();
     // El botón rojo se habilita después de 1 s (ConfirmDeleteModal).
     await act(async () => { vi.advanceTimersByTime(1100); });
-    const quitar = screen.getByRole("button", { name: "Quitar", exact: true });
+    const quitar = screen.getAllByRole("button", { name: "Quitar" }).at(-1)!;
     await waitFor(() => expect((quitar as HTMLButtonElement).disabled).toBe(false));
     await act(async () => { fireEvent.click(quitar); });
     await waitFor(() => expect(llamadas.some((c) => c.method === "DELETE" && c.url.endsWith("/exclusiones?id=1"))).toBe(true));
@@ -317,10 +334,13 @@ describe("🔴 la pestaña Configuración", () => {
     expect(guardar.disabled).toBe(true);
     expect(within(alta).getByText("Falta elegir el cliente")).toBeTruthy();
     // «arranca con las dos marcadas pero yo deselecciono».
-    const venta = within(alta).getByLabelText("Venta") as HTMLInputElement;
-    const cobro = within(alta).getByLabelText("Cobro") as HTMLInputElement;
-    expect(venta.checked).toBe(true);
-    expect(cobro.checked).toBe(true);
+    // 🔁 Desde el 25-sep-2026 son INTERRUPTORES bajo la pregunta «¿Qué no
+    // comisiona?», no casillas bajo un encabezado que decía «VENTA».
+    const venta = within(alta).getByRole("switch", { name: "La venta" });
+    const cobro = within(alta).getByRole("switch", { name: "El cobro" });
+    expect(venta.getAttribute("aria-checked")).toBe("true");
+    expect(cobro.getAttribute("aria-checked")).toBe("true");
+    expect(within(alta).getByText("¿Qué no comisiona?")).toBeTruthy();
     // El selector compartido pide el directorio de la empresa elegida (la primera de las 6).
     await waitFor(() => expect(llamadas.some((c) => /\/exclusiones\/vistana\/clientes-switch\?q=/.test(c.url))).toBe(true));
     const kher = await within(alta).findByRole("button", { name: /Kheriddine/ });
@@ -346,8 +366,8 @@ describe("🔴 la pestaña Configuración", () => {
     const guardar = within(alta).getByRole("button", { name: "Guardar" }) as HTMLButtonElement;
     fireEvent.click(await within(alta).findByRole("button", { name: /Kheriddine/ }));
     fireEvent.change(within(alta).getByLabelText("Vendedor"), { target: { value: "EDWIN" } });
-    const venta = within(alta).getByLabelText("Venta") as HTMLInputElement;
-    const cobro = within(alta).getByLabelText("Cobro") as HTMLInputElement;
+    const venta = within(alta).getByRole("switch", { name: "La venta" });
+    const cobro = within(alta).getByRole("switch", { name: "El cobro" });
 
     // Solo Venta.
     fireEvent.click(cobro);
@@ -361,9 +381,10 @@ describe("🔴 la pestaña Configuración", () => {
     agregarEnClientes();
     const alta2 = await screen.findByTestId("alta-sin-comision");
     const guardar2 = within(alta2).getByRole("button", { name: "Guardar" }) as HTMLButtonElement;
-    const venta2 = within(alta2).getByLabelText("Venta") as HTMLInputElement;
-    const cobro2 = within(alta2).getByLabelText("Cobro") as HTMLInputElement;
-    expect(venta2.checked && cobro2.checked).toBe(true);
+    const venta2 = within(alta2).getByRole("switch", { name: "La venta" });
+    const cobro2 = within(alta2).getByRole("switch", { name: "El cobro" });
+    expect(venta2.getAttribute("aria-checked")).toBe("true");
+    expect(cobro2.getAttribute("aria-checked")).toBe("true");
     fireEvent.click(await within(alta2).findByRole("button", { name: /Metro Shoes/ }));
     fireEvent.change(within(alta2).getByLabelText("Vendedor"), { target: { value: "EDWIN" } });
 

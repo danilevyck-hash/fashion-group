@@ -136,6 +136,14 @@ interface Row extends ComisionConsolidadoRow {
 }
 
 interface Props {
+  /**
+   * 🔴 EL TOTAL, HACIA ARRIBA (25-sep-2026, la «1b»). Esta vista es la DUEÑA
+   * del número y lo REPORTA; el encabezado del celular solo lo dibuja. `null`
+   * mientras carga o si no hay nada.
+   */
+  onTotal?: (t: number | null) => void;
+  /** `true` = el total ya se dice arriba: acá no va la barra negra del pie. */
+  totalArriba?: boolean;
   year: number;
   mes: number;
   /** El botón de descarga vive en la barra del shell (ver ComisionesView): esta
@@ -158,7 +166,7 @@ export function MarcaNoSePaga() {
   );
 }
 
-export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKey = 0 }: Props) {
+export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKey = 0, onTotal, totalArriba = false }: Props) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [sinAsignar, setSinAsignar] = useState<Row | null>(null);
   const [loading, setLoading] = useState(false);
@@ -261,6 +269,12 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
   const haySinPago = noSePagan.length > 0;
 
   const empty = !loading && !error && (rows ?? []).length === 0 && !sinAsignar;
+
+  // 🔴 EL TOTAL SUBE AL ENCABEZADO (la «1b»), pero el número es ÉSTE: el mismo
+  // `grandTotal` que dibuja el pie de la tabla. No se recalcula arriba.
+  useEffect(() => {
+    onTotal?.(loading || error || empty ? null : grandTotal);
+  }, [onTotal, loading, error, empty, grandTotal]);
 
   // 🔴 Queda rastro de cada descarga de la matriz (22-sep-2026); nunca la frena.
   const anotar = (formato: "pdf" | "excel") =>
@@ -479,6 +493,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
             empresas={EMPRESAS}
             nombreEmpresa={nombreCortoEmpresa}
             granTotal={grandTotal}
+            totalArriba={totalArriba}
             onDetalle={conDetalle ? detalleDe : () => {}}
             menuEmpresa={(k, fila) =>
               conDescarga && hayQueDescargar(fila.porEmpresa[k], fila.descuentoPorEmpresa?.[k] ?? 0) ? (

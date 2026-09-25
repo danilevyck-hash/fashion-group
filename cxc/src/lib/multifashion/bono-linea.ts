@@ -22,7 +22,14 @@ const MES_LARGO = [
   "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
 ];
 
-export const BONO_SE_DEFINE = "Bono: se define al cerrar el mes (retail contra retail).";
+/**
+ * 🔴 «POR LA VENTA DE LA TIENDA», NO «RETAIL CONTRA RETAIL» (25-sep-2026).
+ *
+ * «Retail» es jerga del sistema, no del negocio: esta línea la lee Daniel, no
+ * el código. **La cuenta no cambia** —sigue siendo la misma RPC, retail contra
+ * retail— y su explicación larga vive en el ⓘ de al lado.
+ */
+export const BONO_SE_DEFINE = "Bono: se define al cerrar el mes, por la venta de la tienda.";
 
 /** «Jennifer Miranda $100 · Sheynee Batista $50» — quién cobró qué en un mes cerrado. */
 export function quienesCobraron(resp: BonosMultifashion): string {
@@ -48,7 +55,7 @@ export function lineaBono(
   if (!visto || visto.sin_data) return null;
   if (visto.es_elegible) {
     const { mes, year } = visto.mes_evaluado;
-    return `Bono de ${MES_LARGO[mes - 1]} ${year} (retail contra retail): ${quienesCobraron(visto)}.`;
+    return `Bono de ${MES_LARGO[mes - 1]} ${year}, por la venta de la tienda: ${quienesCobraron(visto)}.`;
   }
   if (ultimo && !ultimo.sin_data && ultimo.es_elegible) {
     return `${BONO_SE_DEFINE} En ${MES_LARGO[ultimo.mes_evaluado.mes - 1]}: ${quienesCobraron(ultimo)}.`;
