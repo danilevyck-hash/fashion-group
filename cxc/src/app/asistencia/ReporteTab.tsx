@@ -54,6 +54,8 @@ import {
 // y aquí se DICE —tachada en su día, con su porqué, y contada arriba—. El texto
 // sale del módulo puro para que la pantalla y el Excel digan lo mismo.
 import { avisoRepetidas, contarRepetidas, explicacionRepetida } from "@/lib/asistencia/marca-repetida";
+// 🔴 UNA SOLA LÍNEA DEBAJO DEL DÍA (25-sep-2026). La regla es pura y vive ahí.
+import { VER_FOTOS, lineaDelDia } from "@/lib/asistencia/linea-del-dia";
 // 🔴 ENCONTRAR RÁPIDO LOS DÍAS A REVISAR (18-sep-2026). Daniel: *«opcion a con
 // mockup»* y *«si y nada más el botón de "Solo a revisar"»*. Dos cosas: el
 // número es un enlace a esos días, y un botón deja solo a quien tiene algo.
@@ -100,9 +102,9 @@ import {
   textoEntradaAutorizada, type EscritoEntradaAutorizada,
 } from "@/lib/asistencia/entrada-autorizada";
 // 🔴 EL RELOJ DEL TELÉFONO EN EL REPORTE (14-sep-2026). Lo que Daniel pidió que
-// viera la contadora: la selfie y el mapa, y de dónde salió cada marca. Es una
+// viera la contadora: las fotos del lugar y el mapa, y de dónde salió cada marca. Es una
 // capa de ARRIBA: el motor no sabe nada de esto y sus minutos no cambian.
-import SelfieMarcacionModal, { type SelfieParaVer } from "./SelfieMarcacionModal";
+import FotosDeLaMarcaModal, { type FotoParaVer } from "./FotosDeLaMarcaModal";
 import { llaveDelDia, type MarcaTelefonoUI } from "@/lib/marcacion/en-el-reporte";
 import { rotuloDeLaMarca } from "@/lib/marcacion/marcacion";
 // 🔴 GUARDAR UNA HORA NO BORRA LA TABLA NI SALTA ARRIBA (24-sep-2026), y la
@@ -122,7 +124,7 @@ import {
 // código a la IZQUIERDA del nombre y la salida en burbuja) y, en el celular,
 // una tarjeta por colaborador. Las reglas viven en los módulos PUROS.
 import {
-  ASISTENCIA_PANTALLA_2026_09, PARAM_ABRE, anchoDelCodigo, columnasDelReporte, rotuloDeAvisos,
+  ASISTENCIA_PANTALLA_2026_09, DESCARGAR, PARAM_ABRE, anchoDelCodigo, columnasDelReporte, rotuloDeAvisos,
 } from "@/lib/asistencia/pantalla-2026-09";
 import { datosDeLaTarjeta, lineaDeDias, pieDelCelular } from "@/lib/asistencia/celular-asistencia";
 import SelectorPeriodo, { usePeriodoAsistencia } from "@/components/asistencia/SelectorPeriodo";
@@ -266,18 +268,20 @@ export default function ReporteTab({ empresa = "" }: {
     const c = String(abreUrl ?? "").trim();
     if (c) setAbierta(c);
   }, [abreUrl]);
-  /** ¿El panel de arriba está desplegado? (relojes · avisos · buscador) */
+  /** ¿El panel de arriba está desplegado? (avisos · buscador) */
   const [avisosAbiertos, setAvisosAbiertos] = useState(false);
-  const [relojesAbiertos, setRelojesAbiertos] = useState(false);
   const [buscadorAbierto, setBuscadorAbierto] = useState(false);
   const [descargasAbiertas, setDescargasAbiertas] = useState(false);
-  /** Los dos menús de la fila de mandos se cierran con Escape o tocando afuera,
-   *  como todo desplegable de la casa. 🔑 El de los relojes se ESCONDE, nunca se
-   *  desarma: adentro vive el pedido en el aire de «Traer ahora». */
+  /** 🩸 EL «···» SE FUE EL 25-sep-2026 y con él su estado. Daniel, textual:
+   *  *«los 3 puntitos no hacen nada»* — y tenía razón: adentro no se dibujaba
+   *  NADA (el panel quedó vacío), y lo único que el botón movía era esconder los
+   *  relojes «si todo estaba bien». Como la PC de la oficina se apaga de noche,
+   *  nunca estaba todo bien, así que tocarlo no cambiaba un píxel. Los relojes
+   *  pasaron a la pastilla de la fila y el botón se quitó. */
   const mandosRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!relojesAbiertos && !descargasAbiertas) return;
-    const cerrar = () => { setRelojesAbiertos(false); setDescargasAbiertas(false); };
+    if (!descargasAbiertas) return;
+    const cerrar = () => setDescargasAbiertas(false);
     const afuera = (e: MouseEvent) => {
       if (!mandosRef.current?.contains(e.target as Node)) cerrar();
     };
@@ -288,7 +292,7 @@ export default function ReporteTab({ empresa = "" }: {
       document.removeEventListener("mousedown", afuera);
       window.removeEventListener("keydown", escape);
     };
-  }, [relojesAbiertos, descargasAbiertas]);
+  }, [descargasAbiertas]);
   /**
    * 🔴 LA VISTA «JUSTIFICACIONES DEL PERÍODO» (10-sep-2026). Arranca CERRADA:
    * el trabajo de esta pantalla es el reporte, y las justificaciones son la
@@ -349,7 +353,7 @@ export default function ReporteTab({ empresa = "" }: {
   // Las marcas del teléfono del período, por `codigo|fecha`. Vacío cuando no
   // hay ninguna (o la migración todavía no corrió).
   const [marcasTelefono, setMarcasTelefono] = useState<Record<string, MarcaTelefonoUI[]>>({});
-  const [verSelfie, setVerSelfie] = useState<SelfieParaVer | null>(null);
+  const [verFotos, setVerFotos] = useState<FotoParaVer[] | null>(null);
 
   const cargar = useCallback(async (silenciosa = false) => {
     // 🔑 Con el interruptor apagado, TODA recarga vuelve a ser la de antes.
@@ -573,6 +577,33 @@ export default function ReporteTab({ empresa = "" }: {
     rev: a.rev + p.resumen.diasARevisar,
   }), { aus: 0, tarde: 0, noTrab: 0, extra: 0, rev: 0 });
 
+  /**
+   * 🔴 EL FILTRO «SOLO A REVISAR», COMO CHIP DE SU COLUMNA (25-sep-2026). El
+   * mismo estado, la misma URL (`?revisar=1`) y el mismo nombre accesible que
+   * tenía en la fila de mandos: lo único que cambió es dónde se toca.
+   */
+  const chipSoloARevisar = (
+    <button
+      type="button"
+      onClick={() => {
+        const prender = !soloARevisar;
+        setRevisarUrl(prender ? VALOR_PRENDIDO : "");
+        if (!prender) setDiasDeUrl("");
+      }}
+      aria-pressed={soloARevisar}
+      aria-label={ROTULO_SOLO_A_REVISAR}
+      title={ROTULO_SOLO_A_REVISAR}
+      className={`inline-flex min-h-[32px] items-center gap-1 rounded-full border px-2 text-[10.5px] uppercase tracking-wide transition active:scale-[0.97] ${
+        soloARevisar
+          ? "border-black bg-black font-medium text-white"
+          : "border-gray-200 text-gray-400 hover:border-black hover:text-black"
+      }`}
+    >
+      A revisar
+      <span aria-hidden className="leading-none">⌵</span>
+    </button>
+  );
+
   return (
     <div className="space-y-4">
       {/* Arriba de todo a propósito: si el reloj no está entrando, cualquier
@@ -612,25 +643,11 @@ export default function ReporteTab({ empresa = "" }: {
               />
             )}
 
-            <button
-              type="button"
-              onClick={() => {
-                const prender = !soloARevisar;
-                setRevisarUrl(prender ? VALOR_PRENDIDO : "");
-                if (!prender) setDiasDeUrl("");
-              }}
-              aria-pressed={soloARevisar}
-              className={`min-h-[44px] rounded-md border px-3 text-sm transition active:scale-[0.97] ${
-                soloARevisar
-                  ? "border-black bg-black font-medium text-white"
-                  : "border-gray-300 text-gray-700 hover:border-black hover:text-black"
-              }`}
-            >
-              {ROTULO_SOLO_A_REVISAR}
-            </button>
-
-            {/* Compartir: Excel y PDF detrás de un ícono. Dicen a cuántos
-                afectan, igual que antes. */}
+            {/* 🔴 «DESCARGAR», CON SU NOMBRE (25-sep-2026). Daniel, textual:
+                *«la flecha cámbiala a descargar o flecha para abajo»*. 🩸 Era un
+                «⇧» de solo ícono: una flecha hacia ARRIBA para bajar dos
+                archivos. Ahora dice lo que hace y abre el mismo menú de siempre
+                con Excel y PDF, que siguen diciendo a cuántos afectan. */}
             <div className="relative">
               <button
                 type="button"
@@ -638,66 +655,48 @@ export default function ReporteTab({ empresa = "" }: {
                 disabled={!visibles?.length}
                 aria-haspopup="menu"
                 aria-expanded={descargasAbiertas}
-                aria-label="Bajar Excel o PDF"
-                title="Bajar Excel o PDF"
-                className="flex h-11 w-11 items-center justify-center rounded-md border border-gray-300 text-base text-gray-600 transition hover:border-black hover:text-black active:scale-[0.97] disabled:opacity-40"
+                title={DESCARGAR}
+                className="flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:opacity-40"
               >
-                <span aria-hidden>⇧</span>
+                <span aria-hidden className="leading-none">↓</span>
+                {DESCARGAR}
               </button>
               {descargasAbiertas && (
                 <div role="menu" className="absolute right-0 z-20 mt-1 w-52 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
                   <button type="button" role="menuitem"
                     onClick={() => { setDescargasAbiertas(false); void bajarExcel(); }}
-                    className="block w-full px-3 py-2.5 text-left text-sm text-gray-700 transition hover:bg-gray-50">
+                    className="block min-h-[44px] w-full px-3 py-2.5 text-left text-sm text-gray-700 transition hover:bg-gray-50">
                     {rotuloDescarga("Excel", visibles?.length ?? 0, soloARevisar)}
                   </button>
                   <button type="button" role="menuitem"
                     onClick={() => { setDescargasAbiertas(false); void bajarPdf(); }}
-                    className="block w-full px-3 py-2.5 text-left text-sm text-gray-700 transition hover:bg-gray-50">
+                    className="block min-h-[44px] w-full px-3 py-2.5 text-left text-sm text-gray-700 transition hover:bg-gray-50">
                     {rotuloDescarga("PDF", visibles?.length ?? 0, soloARevisar)}
                   </button>
                 </div>
               )}
             </div>
 
-            {/* 🔴 Los relojes, en el «···». En el celular la línea se ve
-                siempre (abajo) porque es lo único que dice si los números están
-                completos; acá entra al menú, que es lo que pidió Daniel. */}
-            {!celular && (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setRelojesAbiertos((v) => !v)}
-                  aria-haspopup="menu"
-                  aria-expanded={relojesAbiertos}
-                  aria-label="Los relojes"
-                  title="Los relojes"
-                  className="flex h-11 w-11 items-center justify-center rounded-md border border-gray-300 text-base text-gray-600 transition hover:border-black hover:text-black active:scale-[0.97]"
-                >
-                  <span aria-hidden>···</span>
-                </button>
-
-              </div>
-            )}
+            {/* ══════════════════════════════════════════════════════════════
+                🔴 LOS DOS RELOJES, EN UNA PASTILLA DE ESTA MISMA FILA
+                (25-sep-2026). Daniel: *«Reloj Multifashion y Boston ¿puedes
+                merge en una y que Traer ahora al tocar sea a los dos? y que esté
+                en el mismo panel de arriba junto a las otras para no ocupar
+                mucho espacio sucio»*. 🩸 Eran DOS cajas amarillas de ancho
+                completo debajo de la fila, con dos botones que hacen lo mismo.
+                🔴 UN «Traer ahora» que le deja el pedido a los DOS — las MISMAS
+                dos llamadas de antes— y, con una empresa filtrada, solo su
+                reloj. El «···» se fue: ya no queda nada adentro.
+                ══════════════════════════════════════════════════════════════ */}
+            <EstadoReloj
+              resumen
+              empresa={empresaParaPedir(empresa)}
+              onLlegaron={() => void cargar()}
+            />
 
             {conteo && <span className="ml-auto text-[13px] text-gray-500">{conteo}</span>}
           </div>
 
-          {/* ══════════════════════════════════════════════════════════════
-              🔴 EL RELOJ: LIMPIO CUANDO TODO ESTÁ BIEN, A LA VISTA CUANDO NO
-              Daniel quiso el panel recogido y los relojes dentro del «···». 🔴
-              Pero si el reloj no está entrando, **cualquier número de esta
-              pantalla está incompleto** y hay que saberlo ANTES de descontarle
-              minutos a alguien — por eso este cartel vivía arriba de todo. La
-              regla que concilia las dos cosas: **con todo al día no se dibuja
-              nada** (está a un toque, en el «···»); **con cualquier cosa que
-              mirar se dibuja igual**, con el menú abierto o cerrado.
-              🔑 UNA sola instancia, siempre montada: adentro vive el pedido en
-              el aire de «Traer ahora».
-              ══════════════════════════════════════════════════════════════ */}
-          {celular
-            ? <EstadoReloj resumen onLlegaron={() => void cargar()} />
-            : <EstadoReloj escondidoSiTodoBien={!relojesAbiertos} onLlegaron={() => void cargar()} />}
         </>
       ) : (
         <>
@@ -994,7 +993,18 @@ export default function ReporteTab({ empresa = "" }: {
                 <th className="px-2 py-2.5 text-right font-medium">Salida<br />temprana</th>
                 <th className="px-2 py-2.5 text-right font-medium">No trabajado</th>
                 <th className="px-2 py-2.5 text-right font-medium">Extras</th>
-                <th className="px-2 py-2.5 text-right font-medium">A revisar</th>
+                {/* ══════════════════════════════════════════════════════════
+                    🔴 «SOLO A REVISAR» VIVE EN SU COLUMNA (25-sep-2026)
+                    Daniel, textual, sobre la fila de mandos: *«quita el Solo a
+                    revisar»*. 🔴 La FUNCIÓN no se fue —filtra a quien tiene algo
+                    que revisar, y `?revisar=1` sigue abriendo la pantalla
+                    filtrada—: se mudó al encabezado de la columna que cuenta
+                    esos días, que es donde se está mirando cuando hace falta.
+                    El nombre accesible sigue siendo «Solo a revisar».
+                    ══════════════════════════════════════════════════════════ */}
+                <th className="px-2 py-2.5 text-right font-medium">
+                  {ASISTENCIA_PANTALLA_2026_09 && !celular ? chipSoloARevisar : "A revisar"}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -1008,7 +1018,7 @@ export default function ReporteTab({ empresa = "" }: {
                   soloDiasARevisar={diasDeUrl === p.codigo}
                   rango={{ desde, hasta }}
                   onVerDiasARevisar={() => { setDiasDeUrl(p.codigo); setAbierta(null); }}
-                  marcasTelefono={marcasTelefono} onVerSelfie={setVerSelfie}
+                  marcasTelefono={marcasTelefono} onVerFotos={setVerFotos}
                   // 🔴 Tocar la fila abierta en «solo esos días» la abre ENTERA:
                   // es la salida, y no hace falta un control nuevo para tenerla.
                   onToggle={() => {
@@ -1036,7 +1046,12 @@ export default function ReporteTab({ empresa = "" }: {
               {celular ? (
                 <tr className="border-t border-gray-200 bg-gray-50 font-semibold">
                   <td className="px-3 py-2.5 text-[13px]" colSpan={columnasDelReporte()}>
-                    {pieDelCelular({ colaboradores: visibles.length, ausencias: tot.aus, minutosTarde: tot.tarde })}
+                    <span className="mr-2">
+                      {pieDelCelular({ colaboradores: visibles.length, ausencias: tot.aus, minutosTarde: tot.tarde })}
+                    </span>
+                    {/* 🔴 En el celular el encabezado no se dibuja, así que el
+                        filtro vive acá, al lado del pie que él mismo recorta. */}
+                    {chipSoloARevisar}
                   </td>
                 </tr>
               ) : (
@@ -1105,7 +1120,7 @@ export default function ReporteTab({ empresa = "" }: {
           onGuardado={() => void cargar()}
         />
       )}
-      <SelfieMarcacionModal marca={verSelfie} onClose={() => setVerSelfie(null)} />
+      <FotosDeLaMarcaModal marcas={verFotos} onClose={() => setVerFotos(null)} />
       {justificandoVarios && (
         <JustificarVariosModal
           personas={seleccionados}
@@ -1134,7 +1149,7 @@ export default function ReporteTab({ empresa = "" }: {
   );
 }
 
-function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, onToggle, puedeCorregir, onCorregir, onJustificar, marcasTelefono, onVerSelfie, decisionesExtra, motivosFrecuentes, onGuardadoElDia, anclada, puedeDecidirExtra, onDecidirExtra, extrasEnVuelo, seleccionada, onSeleccionar, celular = false, anchoCodigo = 3 }: {
+function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, onToggle, puedeCorregir, onCorregir, onJustificar, marcasTelefono, onVerFotos, decisionesExtra, motivosFrecuentes, onGuardadoElDia, anclada, puedeDecidirExtra, onDecidirExtra, extrasEnVuelo, seleccionada, onSeleccionar, celular = false, anchoCodigo = 3 }: {
   p: PersonaReporte;
   abierta: boolean;
   /** 🔴 En el celular la fila es una TARJETA de ancho completo, no once columnas. */
@@ -1151,7 +1166,7 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
   onCorregir: (m: MarcaParaCorregir) => void;
   onJustificar: (d: DiaParaJustificar) => void;
   marcasTelefono: Record<string, MarcaTelefonoUI[]>;
-  onVerSelfie: (m: SelfieParaVer) => void;
+  onVerFotos: (m: FotoParaVer[]) => void;
   /** `codigo|fecha → si|no`. Lo que no está es PENDIENTE. */
   decisionesExtra: ReadonlyMap<string, Decision>;
   /** Los motivos más escritos en 90 días, para los botones del porqué. */
@@ -1238,7 +1253,7 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
                     onDecidirExtra={onDecidirExtra}
                     extraEnVuelo={extrasEnVuelo.has(claveDia(p.codigo, d.fecha))}
                     delTelefono={marcasTelefono[llaveDelDia(p.codigo, d.fecha)] ?? []}
-                    onVerSelfie={onVerSelfie} />
+                    onVerFotos={onVerFotos} />
                 ))}
               </tbody>
             </table>
@@ -1494,7 +1509,7 @@ function perdonDelDia(d: DiaReporte): PerdonDelDia {
  * corrección debajo. Debajo de la fila, una línea por corrección dice qué se
  * cambió, por qué, quién y cuándo — sin abrir nada más.
  */
-function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorregir, onCorregir, onJustificar, delTelefono, onVerSelfie, motivosFrecuentes, onGuardadoElDia, decisionExtra, puedeDecidirExtra, onDecidirExtra, extraEnVuelo }: {
+function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorregir, onCorregir, onJustificar, delTelefono, onVerFotos, motivosFrecuentes, onGuardadoElDia, decisionExtra, puedeDecidirExtra, onDecidirExtra, extraEnVuelo }: {
   d: DiaReporte;
   codigo: string;
   persona: string;
@@ -1509,7 +1524,7 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
   onJustificar: (d: DiaParaJustificar) => void;
   /** Las marcas que ese día salieron del teléfono. Vacío = ninguna. */
   delTelefono: MarcaTelefonoUI[];
-  onVerSelfie: (m: SelfieParaVer) => void;
+  onVerFotos: (m: FotoParaVer[]) => void;
   /** Los motivos más escritos en 90 días, para los botones del porqué. */
   motivosFrecuentes: readonly string[];
   /** Se guardó este día: el reporte se vuelve a leer. */
@@ -1522,6 +1537,41 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
   extraEnVuelo: boolean;
 }) {
   const { toast } = useToast();
+
+  // ── 🔴 LA LÍNEA RESUMEN DEL DÍA (25-sep-2026) ────────────────────────────
+  //
+  // Una sola, y solo si hay algo que decir. Las horas ya están en las cuatro
+  // columnas de la fila; acá va lo que NO está: que fue del teléfono, que se
+  // mandó sin señal, cuánto tardó en llegar, cuántas repetidas se olvidaron y
+  // «ver fotos». 🔑 El cálculo no se hace acá: la regla es pura.
+  const resumenDelDia = lineaDelDia({
+    marcas: delTelefono.map((m) => ({
+      sinSenal: m.sinSenal,
+      atrasoMin: m.atrasoMin,
+      quitada: m.quitada,
+      relojCorrido: m.relojCorrido,
+      conFoto: m.tieneFoto || m.lat !== null,
+    })),
+    repetidas: (d.repetidas ?? []).length,
+  });
+  /** El porqué entero de cada repetida, al pasar el cursor. No se pierde nada. */
+  const tituloDelResumen =
+    (d.repetidas ?? []).length > 0
+      ? (d.repetidas ?? []).map((r) => `${r.hora} — ${explicacionRepetida(r)}`).join("\n")
+      : undefined;
+  /** Las marcas del día que tienen algo que abrir, en orden de hora. */
+  const fotosDelDia: FotoParaVer[] = delTelefono
+    .filter((m) => m.tieneFoto || m.lat !== null)
+    .map((m) => {
+      const idx = d.marcas.findIndex((h) => h.startsWith(m.hora));
+      return {
+        ...m,
+        persona,
+        fecha: d.fecha,
+        rotulo: m.quitada ? "Marca" : rotuloDeLaMarca(idx < 0 ? 0 : idx, d.marcas.length),
+      };
+    });
+
   /** La corrección que produjo la marca de esa posición, si la hay. */
   const correccionDe = (idx: number) =>
     d.correcciones.find((c) => c.hora === d.marcas[idx]) ?? null;
@@ -2193,33 +2243,68 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
         </tr>
       )}
 
-      {delTelefono.map((m) => {
-        const idx = d.marcas.findIndex((h) => h.startsWith(m.hora));
-        const rotulo = m.quitada ? "Marca" : rotuloDeLaMarca(idx < 0 ? 0 : idx, d.marcas.length);
-        return (
-          <tr key={m.id} className="border-b border-gray-100">
+      {/* ══════════════════════════════════════════════════════════════════
+          🔴 UNA SOLA LÍNEA DEBAJO DEL DÍA (25-sep-2026)
+          Daniel, textual: *«¿estas informaciones se pueden resumir? quitar lo
+          obvio, para no ensuciar tanto la pantalla»*. 🩸 Salía una línea POR
+          MARCA repitiendo horas que la fila ya muestra en sus cuatro columnas
+          («Entrada 8:58 a. m. · Marcada sin señal · el teléfono la envió
+          09:01 · Ver la selfie y el mapa»), más una línea por cada repetida.
+          🔴 Ahora: las horas no se repiten, las repetidas se CUENTAN y «ver
+          fotos» sale UNA vez por día. La regla vive en `linea-del-dia.ts`; sin
+          nada que decir no se dibuja NADA.
+          ══════════════════════════════════════════════════════════════════ */}
+      {ASISTENCIA_PANTALLA_2026_09 ? (
+        resumenDelDia && (
+          <tr className="border-b border-gray-100">
             <td></td>
-            <td colSpan={8} className="px-2 pb-1.5 text-[12px] text-gray-500">
-              <b className={`font-semibold ${m.quitada ? "text-gray-400 line-through" : "text-gray-800"}`}>
-                {rotulo} {m.horaLarga}
-              </b>
-              {" · "}{m.detalle}
-              {m.relojCorrido && (
-                <span className="ml-1.5 text-amber-800">· {m.relojCorrido}</span>
-              )}
-              {(m.tieneFoto || m.lat !== null) && (
+            <td
+              colSpan={8}
+              className={`px-2 pb-1.5 text-[12px] ${resumenDelDia.llamaLaAtencion ? "text-amber-800" : "text-gray-500"}`}
+              title={tituloDelResumen}
+            >
+              {resumenDelDia.texto}
+              {resumenDelDia.verFotos && (
                 <button
                   type="button"
-                  onClick={() => onVerSelfie({ ...m, persona, fecha: d.fecha, rotulo })}
+                  onClick={() => onVerFotos(fotosDelDia)}
                   className="ml-1.5 min-h-[44px] rounded px-1 underline decoration-dotted underline-offset-2 transition hover:text-black"
                 >
-                  Ver la selfie y el mapa
+                  {VER_FOTOS}
                 </button>
               )}
             </td>
           </tr>
-        );
-      })}
+        )
+      ) : (
+        delTelefono.map((m) => {
+          const idx = d.marcas.findIndex((h) => h.startsWith(m.hora));
+          const rotulo = m.quitada ? "Marca" : rotuloDeLaMarca(idx < 0 ? 0 : idx, d.marcas.length);
+          return (
+            <tr key={m.id} className="border-b border-gray-100">
+              <td></td>
+              <td colSpan={8} className="px-2 pb-1.5 text-[12px] text-gray-500">
+                <b className={`font-semibold ${m.quitada ? "text-gray-400 line-through" : "text-gray-800"}`}>
+                  {rotulo} {m.horaLarga}
+                </b>
+                {" · "}{m.detalle}
+                {m.relojCorrido && (
+                  <span className="ml-1.5 text-amber-800">· {m.relojCorrido}</span>
+                )}
+                {(m.tieneFoto || m.lat !== null) && (
+                  <button
+                    type="button"
+                    onClick={() => onVerFotos([{ ...m, persona, fecha: d.fecha, rotulo }])}
+                    className="ml-1.5 min-h-[44px] rounded px-1 underline decoration-dotted underline-offset-2 transition hover:text-black"
+                  >
+                    Ver la selfie y el mapa
+                  </button>
+                )}
+              </td>
+            </tr>
+          );
+        })
+      )}
 
       {/* 🔴 LO QUE NO ENTRA EN LAS CUATRO COLUMNAS, EN SU PROPIA LÍNEA. Con 4
           marcas —el 82 % de los días— esto no se dibuja y la fila es la de
@@ -2317,7 +2402,11 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
           va en azul como una corrección. */}
       {/* ⚠️ `?? []`: falla ABIERTA. Un día que llegue sin el campo (una
           respuesta vieja, un test que arma el día a mano) se dibuja igual. */}
-      {(d.repetidas ?? []).map((r, i) => (
+      {/* 🔴 LAS REPETIDAS SE CUENTAN, NO SE LISTAN (25-sep-2026): van en la línea
+          de arriba («· 2 repetidas») y su porqué entero se lee al pasar el
+          cursor. ⚠️ El Excel NO cambió: sigue llevando cada una con su
+          explicación en la columna «Todas las marcas». */}
+      {!ASISTENCIA_PANTALLA_2026_09 && (d.repetidas ?? []).map((r, i) => (
         <tr key={`repetida-${i}`} className="border-b border-gray-100 bg-gray-50/60">
           <td></td>
           <td colSpan={8} className="px-2 pb-1.5 text-[12px] text-gray-600">

@@ -59,6 +59,27 @@ export interface MarcaTelefonoUI {
   tieneFoto: boolean;
   lat: number | null;
   lng: number | null;
+  /**
+   * 🔴 LOS TRES CAMPOS DE ABAJO SON PARA LA LÍNEA RESUMEN DEL DÍA (25-sep-2026,
+   * `lib/asistencia/linea-del-dia.ts`). Son ADITIVOS: el `detalle` de siempre no
+   * se tocó y sigue siendo el texto que se lee al abrir las fotos.
+   */
+  sinSenal: boolean;
+  /** Minutos entre la marca y el momento en que el teléfono la mandó. `null`
+   *  cuando no se sabe (sin `created_at` no se inventa un instante). */
+  atrasoMin: number | null;
+}
+
+/**
+ * Cuántos minutos tardó el teléfono en mandarla. `null` sin `created_at`: no se
+ * inventa un instante. Nunca negativo — un reloj raro es otro problema.
+ */
+function atrasoEnMinutos(ocurrioEn: string, creadoEn: string | null | undefined): number | null {
+  if (!creadoEn) return null;
+  const a = Date.parse(ocurrioEn);
+  const b = Date.parse(creadoEn);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  return Math.max(0, (b - a) / 60_000);
 }
 
 /** La llave del día de una persona. Código y NO nombre, como todo el sistema. */
@@ -100,6 +121,8 @@ export function marcasPorDia(
       tieneFoto: Boolean(String(f.foto_path ?? "").trim()),
       lat: typeof f.lat === "number" ? f.lat : null,
       lng: typeof f.lng === "number" ? f.lng : null,
+      sinSenal: Boolean(f.sin_senal),
+      atrasoMin: atrasoEnMinutos(f.ocurrio_en, f.created_at),
     });
   }
   for (const k of Object.keys(salida)) {

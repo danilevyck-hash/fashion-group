@@ -68,13 +68,45 @@ const CalendarioRango = dynamic(() => import("./CalendarioRango"), {
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
 /**
- * 7 columnas × 44 px = 308, más el padding del panel.
+ * 🔴 EL ANCHO DEL PANEL SE ARMA CON SUS PARTES, NO CON UN NÚMERO (25-sep-2026).
+ *
+ * 🩸 MEDIDO en Chromium (390, 768, 1024 y 1440 de ancho): el panel pedía
+ * `308 + 24 = 332` px, pero Tailwind pone `box-sizing: border-box`, así que de
+ * esos 332 el borde se come 2 y el `p-3` otros 24 — **quedaban 306 px de
+ * contenido para una grilla que mide 308**. Y las celdas del calendario NO se
+ * encogen (son `<td>` de 44 px fijos dentro de una tabla), así que la columna
+ * del DOMINGO se sale del panel. Con la barra de scroll clásica —la de Windows,
+ * que es lo que hay en la oficina, y la de macOS con «mostrar siempre»— se van
+ * otros ~15 px: **17 px de los 44 de la última columna**, que es exactamente lo
+ * que Daniel fotografió («DO» y los días 6, 13, 20, 27 y 4 medio tapados).
+ *
+ * 🔴 Por eso ahora se suma cada parte por su nombre y hay candado que lo mide
+ * (`asistencia/fila-de-mandos.test.tsx`): 7 columnas + el padding + el borde +
+ * el lugar de la barra de scroll. Un número suelto se vuelve a quedar corto en
+ * cuanto alguien cambie un padding.
  *
  * 🔴 UN SOLO MES (4-sep-2026). Eran dos, y el panel medía 660: pedido de
  * Daniel. Con uno entra en cualquier pantalla y no hay que decidir en cuál de
  * los dos meses tocar.
  */
-const ANCHO_CALENDARIO = 308 + 24;
+/** Blanco táctil de cada día (`calendar.tsx` › `day: h-11 w-11`). */
+export const ANCHO_DIA_CALENDARIO = 44;
+/** Lunes a domingo. */
+export const COLUMNAS_CALENDARIO = 7;
+/** El `p-3` del panel, a los dos lados. */
+const PADDING_PANEL = 12 * 2;
+/** El `border` del panel, a los dos lados. */
+const BORDE_PANEL = 1 * 2;
+/**
+ * El lugar de la barra de scroll vertical. El panel es `overflow-y-auto` (y por
+ * la regla de CSS eso vuelve `auto` también el horizontal), así que en cuanto el
+ * mes no entra a lo alto la barra aparece y se come ancho. Con barras
+ * superpuestas —macOS por omisión— sobran estos píxeles; con las clásicas, son
+ * los que salvan la columna del domingo.
+ */
+const BARRA_DE_SCROLL = 16;
+export const ANCHO_CALENDARIO =
+  ANCHO_DIA_CALENDARIO * COLUMNAS_CALENDARIO + PADDING_PANEL + BORDE_PANEL + BARRA_DE_SCROLL;
 /** 6 semanas + encabezado + el título: alcanza sin scroll para cualquier mes. */
 const ALTO_CALENDARIO = 420;
 
@@ -288,7 +320,11 @@ export default function RangoFechas({
           {/* El título solo mientras se está eligiendo: cerrado, el botón ya lo
               dice y repetirlo era ruido (se veía duplicado en la captura). */}
           {ancla && <p className="px-1 pb-2 text-sm font-medium text-gray-900">{titulo}</p>}
-          {cuerpo()}
+          {/* 🔴 CENTRADO Y CON SU PROPIO DESLIZAMIENTO (25-sep-2026): con el
+              ancho ya calculado el mes entra entero, y si algún día una pantalla
+              angosta lo apretara, se desliza ESTA caja y no se recorta una
+              columna en silencio. Es lo mismo que ya hacía el modo en línea. */}
+          <div className="flex justify-center overflow-x-auto">{cuerpo()}</div>
         </DesplegableFlotante>
       </div>
 

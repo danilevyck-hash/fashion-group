@@ -132,16 +132,18 @@ describe("A · Asistencia en la computadora", () => {
     });
   });
 
-  it("🔴 la lupa, «Solo a revisar», compartir y los relojes: una sola fila de mandos", async () => {
+  it("🔴 la lupa, «Descargar» y los relojes: una sola fila de mandos", async () => {
     aparato(false); servir(); montarReporte();
     await screen.findByText("Ana Trejos");
     expect(screen.getByRole("button", { name: "Buscar colaborador" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Solo a revisar" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Bajar Excel o PDF" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Los relojes" })).toBeTruthy();
-    // 🔴 Excel y PDF no se perdieron: viven detrás del ícono de compartir.
+    // 🩸 25-sep-2026: «Solo a revisar» salió de la fila (se mudó al encabezado de
+    // su columna) y el «⇧» pasó a decir «Descargar». El «···» se fue entero.
+    expect(screen.queryByRole("button", { name: "Bajar Excel o PDF" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Los relojes" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Descargar" })).toBeTruthy();
+    // 🔴 Excel y PDF no se perdieron: viven detrás de «Descargar».
     expect(screen.queryByRole("button", { name: /^Excel/ })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Bajar Excel o PDF" }));
+    fireEvent.click(screen.getByRole("button", { name: "Descargar" }));
     expect(screen.getByRole("menuitem", { name: /Excel/ })).toBeTruthy();
     expect(screen.getByRole("menuitem", { name: /PDF/ })).toBeTruthy();
   });
@@ -241,7 +243,11 @@ describe("B · Asistencia en el celular", () => {
       return { ok: true, status: 200, json: async () => ({ motivos: [], justificaciones: [], personas: [] }) } as Response;
     }));
     montarReporte();
-    expect(await screen.findByText("Los relojes están al día")).toBeTruthy();
+    // 🔴 25-sep-2026: CON LA EMPRESA FILTRADA, SOLO SU RELOJ. Esta pantalla se
+    // monta con `empresa="american_classic"`, así que de los dos relojes que
+    // sirve el servidor la pastilla nombra el de Multifashion y nada más.
+    expect(await screen.findByText("Reloj de Multifashion al día")).toBeTruthy();
+    expect(screen.queryByText(/Reloj de Boston/)).toBeNull();
     expect(screen.getByRole("button", { name: /Traer ahora/ })).toBeTruthy();
   });
 });
@@ -373,32 +379,56 @@ const RELOJ = (salud: string, titulo: string) => ({
 });
 
 describe("E · el reloj en la computadora", () => {
-  it("🔴 con TODOS al día no se dibuja: está a un toque, en el «···»", async () => {
+  // 🩸 ACÁ VIVÍAN LOS TRES CANDADOS DEL «···» (24-sep-2026). Se retiraron el
+  // 25-sep-2026 con el botón: escondía la caja del reloj «si todo estaba bien» y
+  // el «···» la traía de vuelta. Daniel, textual: *«los 3 puntitos no hacen
+  // nada»* — y no hacían nada porque la PC de la oficina se apaga de noche, así
+  // que nunca estaba «todo bien». Lo que queda vale MÁS, no menos: la pastilla
+  // está SIEMPRE en la fila, esté el reloj como esté.
+  it("🔴 con TODOS al día la pastilla se ve igual, en verde y en la fila", async () => {
     aparato(false);
     servirRelojes([RELOJ("al_dia", "Las marcaciones están entrando solas")]);
     montarReporte();
     await screen.findByText("Ana Trejos");
-    expect(screen.queryByText("Las marcaciones están entrando solas")).toBeNull();
-    expect(screen.queryByRole("button", { name: /Traer ahora/ })).toBeNull();
+    expect(await screen.findByText(/al día/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Traer ahora/ })).toBeTruthy();
   });
 
-  it("🔴 y se ve SIN tocar nada en cuanto uno no está entrando — los números de abajo están incompletos", async () => {
+  it("🔴 y con uno callado NOMBRA al que falla — los números de abajo están incompletos", async () => {
     aparato(false);
     servirRelojes([
-      RELOJ("al_dia", "Las marcaciones están entrando solas"),
-      RELOJ("callado", "Hace 3 horas que no entra una marcación"),
+      { ...RELOJ("al_dia", "Las marcaciones están entrando solas"), dispositivo: "reloj cboston" },
+      { ...RELOJ("callado", "Hace 3 horas que no entra una marcación"), dispositivo: "reloj acs" },
     ]);
     montarReporte();
-    expect(await screen.findByText("Hace 3 horas que no entra una marcación")).toBeTruthy();
+    // 🔴 Nombra SOLO al que falla: «2 de 2 relojes» obligaba a abrir algo para
+    // saber cuál.
+    expect(await screen.findByText(/Reloj de Multifashion sin señal/)).toBeTruthy();
     expect(screen.getAllByRole("button", { name: /Traer ahora/ }).length).toBeGreaterThan(0);
   });
 
-  it("🔴 el «···» lo abre igual cuando todo está bien", async () => {
+  it("🔴 con «Todas», UN «Traer ahora» le deja el pedido a LOS DOS", async () => {
     aparato(false);
-    servirRelojes([RELOJ("al_dia", "Las marcaciones están entrando solas")]);
-    montarReporte();
-    await screen.findByText("Ana Trejos");
-    fireEvent.click(screen.getByRole("button", { name: "Los relojes" }));
-    expect(await screen.findByText("Las marcaciones están entrando solas")).toBeTruthy();
+    const pedidos: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      const u = String(url);
+      if (u.includes("/api/asistencia/reporte")) return { ok: true, status: 200, json: async () => RESPUESTA } as Response;
+      if (u.includes("/api/asistencia/reloj")) {
+        if (init?.method === "POST") {
+          pedidos.push(JSON.parse(String(init.body)).dispositivo);
+          return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+        }
+        return { ok: true, status: 200, json: async () => ({ relojes: [
+          { ...RELOJ("callado", "x"), dispositivo: "reloj cboston" },
+          { ...RELOJ("callado", "y"), dispositivo: "reloj acs" },
+        ] }) } as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({ motivos: [], justificaciones: [], personas: [] }) } as Response;
+    }));
+    // Con «Todas» se ven los dos relojes y el botón le pide a los dos.
+    render(<ToastProvider><ReporteTab empresa="todas" /></ToastProvider>);
+    fireEvent.click(await screen.findByRole("button", { name: /Traer ahora/ }));
+    await waitFor(() => expect(pedidos.length).toBe(2));
+    expect(new Set(pedidos)).toEqual(new Set(["reloj cboston", "reloj acs"]));
   });
 });

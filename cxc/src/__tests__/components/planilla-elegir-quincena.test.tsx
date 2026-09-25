@@ -201,9 +201,14 @@ describe("🔴 la pantalla: la barra de quincena, el corte a la vista, Generar n
     // corte viene con el PROPUESTO de esa quincena (13 / 28), que es
     // exactamente lo que pasaba al tocar uno de los cuatro botones.
     expect(corteInput().value).toBe("2026-09-13");
-    // La línea gris dice hasta dónde se lee el reloj, y lleva al campo.
-    expect(screen.getByText(/El reloj se lee hasta el 13 sep/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "cambiar" })).toBeTruthy();
+    // 🩸 CAMBIÓ EL 25-sep-2026. Decía «El reloj se lee hasta el 28 sep · cambiar
+    // — Del 29 al 30 se paga normal…»: repetía el día que el campo de al lado ya
+    // dice y no decía DESDE cuándo. Daniel: *«debería decir desde cuándo lee (la
+    // última apertura, día después); y algo minimalista que se sepa que es el
+    // cierre del reloj»*. Sin cierre anterior (este historial va vacío), el
+    // desde es el inicio de la quincena.
+    expect(screen.getByText(/Corte del reloj · lee del 1 al 13 sep/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "cambiar" })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Descargar/ })).toBeNull();
     expect(screen.queryByRole("menuitem", { name: /^Excel$/ })).toBeNull();
     // 🔴 LO QUE NO CAMBIÓ, Y ES LO QUE IMPORTA: la plata NO se dibuja sola.
@@ -216,12 +221,16 @@ describe("🔴 la pantalla: la barra de quincena, el corte a la vista, Generar n
     servir(); montar();
     expect(screen.getByText(rotuloDelPeriodo("2026-09-01", "2026-09-15"))).toBeTruthy();
     expect(corteInput().value).toBe("2026-09-13");
+    // 🩸 La cola «Del 14 al 15 se paga normal y se ajusta en la siguiente» se fue
+    // al ⓘ el 25-sep-2026: es la explicación, no el dato. La frase NO cambió.
+    expect(screen.queryByText(/Del 14 al 15 se paga normal/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Los días que quedan/ }));
     expect(screen.getByText(/Del 14 al 15 se paga normal y se ajusta en la siguiente\./)).toBeTruthy();
     // 🩸 El chip gris «Corte 13 sep» se retiró: repetía el valor que el campo ya
     // dice. Lo que queda —y lo que este caso exige— es que el corte propuesto se
     // LEA en palabras, en la línea gris.
     expect(screen.queryByText("Corte 13 sep")).toBeNull();
-    expect(screen.getByText(/El reloj se lee hasta el 13 sep/)).toBeTruthy();
+    expect(screen.getByText(/Corte del reloj · lee del 1 al 13 sep/)).toBeTruthy();
     expect(boton(/^Generar$/).disabled).toBe(false);
     expect(boton(/^Generar$/).className).toContain("bg-black");
   });
@@ -230,6 +239,8 @@ describe("🔴 la pantalla: la barra de quincena, el corte a la vista, Generar n
     servir();
     abrirEn("2026-09-16", "2026-09-30");
     expect(corteInput().value).toBe("2026-09-28");
+    expect(screen.getByText(/Corte del reloj · lee del 16 al 28 sep/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Los días que quedan/ }));
     expect(screen.getByText(/Del 29 al 30 se paga normal y se ajusta en la siguiente\./)).toBeTruthy();
   });
 
@@ -283,7 +294,8 @@ describe("🔴 la pantalla: la barra de quincena, el corte a la vista, Generar n
     const ll = servir(); montar();
     fireEvent.click(boton(/^Quitar el corte$/));
     expect(corteInput().value).toBe("");
-    expect(screen.getByText(/El reloj se lee hasta el fin de la quincena/)).toBeTruthy();
+    // Sin corte, el reloj se lee hasta el fin de la medición de la quincena.
+    expect(screen.getByText(/Corte del reloj · lee del 1 al 15 sep/)).toBeTruthy();
     generar();
     await waitFor(() => expect(urlDelCuadro(ll)).toBe("/api/asistencia/planilla?desde=2026-09-01&hasta=2026-09-15&empresa=confecciones_boston"));
   });

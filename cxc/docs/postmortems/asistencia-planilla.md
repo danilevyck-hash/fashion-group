@@ -7,6 +7,220 @@
 
 ---
 
+## 🔴 La fila de mandos, arreglada (25-sep-2026) — los siete detalles que Daniel vio en producción
+
+> Interruptor: el MISMO `ASISTENCIA_PANTALLA_2026_09` (hoy `true`). Con él apagado, todo lo de abajo
+> vuelve a ser lo de antes, sin excepción.
+> Candado: `src/__tests__/asistencia/fila-de-mandos.test.tsx` (33 casos).
+
+**Daniel, textual**, mirando Asistencia › Asistencia en la computadora:
+
+> «otra vez calendario chueco. Estos botones no me gusta cómo los hiciste en Asistencia: quita el
+> Solo a revisar, la flecha cámbiala a descargar o flecha para abajo, los 3 puntitos no hacen nada.
+> Reloj Multifashion y Boston ¿puedes merge en una y que Traer ahora al tocar sea a los dos? y que
+> esté en el mismo panel de arriba junto a las otras para no ocupar mucho espacio sucio»
+
+Y, en la misma tanda, sobre la Planilla y sobre el día abierto de un colaborador:
+
+> «ese mensaje no tiene que decir desde el 28 si ya está en el calendario; debería decir desde
+> cuándo lee (la última apertura, día después); y algo minimalista que se sepa que es el cierre del
+> reloj»
+
+> «¿estas informaciones se pueden resumir? quitar lo obvio, para no ensuciar tanto la pantalla»
+
+### 1 · El calendario chueco — 🩸 la causa, medida
+
+El popover del 📅 se cortaba a la derecha: «DO» y los días 6, 13, 20, 27 y 4 quedaban medio tapados.
+
+Medido en Chromium (390, 768, 1024 y 1440 de ancho, con el DOM y las clases reales del panel):
+
+| Qué | Medida |
+|---|---|
+| Ancho que pedía el panel (`ANCHO_CALENDARIO = 308 + 24`) | **332 px** |
+| Menos el borde (`border`, 2) y el `p-3` (24) | **306 px de contenido** |
+| Lo que mide la grilla: 7 columnas × 44 px | **308 px** |
+| Sobrante | **−2 px**, y las celdas **no se encogen** (son `<td>` de 44 px fijos en una tabla) |
+| Con barra de scroll clásica (Windows, o macOS con «mostrar siempre») | **−17 px**: 17 de los 44 de la última columna |
+
+Dos cosas se juntaban: el `332` estaba escrito como un número suelto que **no contaba el borde**
+(Tailwind pone `box-sizing: border-box`), y el panel es `overflow-y-auto` — que por la regla de CSS
+vuelve `auto` también el horizontal, así que cuando el mes no entra a lo alto aparece la barra y se
+come ancho. Con barras superpuestas (macOS por omisión) el recorte era de 2 px y casi no se veía;
+con las clásicas —las PC de la oficina— era de 17.
+
+🔴 **El arreglo es de aritmética, no de maquillaje**: `ANCHO_CALENDARIO` se suma por partes en
+`src/components/ui/RangoFechas.tsx` —`ANCHO_DIA_CALENDARIO × COLUMNAS_CALENDARIO + padding + borde +
+barra de scroll` = **350 px**— y el cuerpo del desplegable va dentro de un
+`flex justify-center overflow-x-auto`, igual que el modo en línea, para que si algún día una pantalla
+lo aprieta se deslice ESA caja y no se recorte una columna en silencio. El candado recalcula la
+posición con `calcularPosicionDesplegable` a los cuatro anchos y exige dos cosas: que el panel **no
+se salga de la pantalla** y que le queden **≥ 308 px** de grilla.
+
+### 2 · «Solo a revisar» sale de la fila — y la función no se borra
+
+Daniel: *«quita el Solo a revisar»*. **Dónde quedó: como chip en el encabezado de la columna
+«A revisar»**, que es la columna que cuenta esos días y donde se está mirando cuando hace falta. En
+el celular el encabezado no se dibuja, así que ahí el chip va al lado del pie de la tabla.
+
+🔴 **Nada de la función cambió**: el mismo estado, el mismo filtro (`soloConDiasARevisar`), el mismo
+`?revisar=1` en la dirección —con `replace`, como siempre—, el mismo «34 de 45 colaboradores» y los
+mismos «Excel · 34» / «PDF · 34». El nombre accesible del chip sigue siendo `Solo a revisar`, que es
+lo que leen los candados de `asistencia-solo-a-revisar`, `asistencia-guardar-sin-salto` y
+`asistencia-justificar-a-varios`.
+
+### 3 · La flecha pasa a ser «Descargar»
+
+🩸 Era un **«⇧» de solo ícono**: una flecha hacia ARRIBA para BAJAR dos archivos. Ahora es un botón
+con texto —`DESCARGAR` en `pantalla-2026-09.ts`— con una flecha **hacia abajo** al lado, y abre el
+MISMO menú de siempre: Excel y PDF, con los mismos generadores y el «· 34» cuando la pantalla está
+recortada. En el celular es el mismo botón.
+
+### 4 · Los tres puntitos — 🩸 por qué no hacían nada
+
+Daniel: *«los 3 puntitos no hacen nada»*. Tenía razón, y la causa son dos cosas a la vez:
+
+1. **Su panel estaba VACÍO.** En `ReporteTab.tsx` el `<div className="relative">` del «···» tenía el
+   botón y, donde debía ir el desplegable, una línea en blanco. Nunca se dibujó nada adentro.
+2. **Lo único que el botón movía era `escondidoSiTodoBien`**, que escondía la caja de los relojes
+   cuando TODOS estaban al día. Como la PC de la oficina se apaga de noche, los dos relojes están
+   «callados» casi siempre: la caja salía igual, y tocar el «···» no cambiaba un píxel.
+
+Después del arreglo 5 no quedaba nada que poner adentro, así que **el botón se quitó** junto con su
+estado (`relojesAbiertos`) y con la prop `escondidoSiTodoBien` de `EstadoReloj`. El candado de
+`asistencia-corregir-hora` que exigía «exactamente UN ··· y que sea el de los relojes» ahora exige
+**cero**: es más estricto, no menos.
+
+### 5 · Los dos relojes, una pastilla y un «Traer ahora»
+
+🩸 Eran **dos cajas amarillas de ancho completo** debajo de la fila («RELOJ DE MULTIFASHION · La PC
+de la oficina no responde · Traer ahora» y la de Boston), con dos botones que hacen lo mismo.
+
+Ahora es **una pastilla dentro de la misma fila de mandos** (`EstadoReloj` en modo `resumen`, el que
+ya usaba el celular), con la regla en el módulo puro `src/lib/asistencia/relojes-en-la-fila.ts`:
+
+| Estado | Lo que dice |
+|---|---|
+| Todos al día, dos relojes | «Relojes al día · hace 3 minutos» (el más viejo manda) |
+| Todos al día, uno solo | «Reloj de Boston al día · hace 3 minutos» |
+| Uno callado | «Reloj de Multifashion sin señal hace 2 horas» |
+| Los dos mal | «Reloj de Multifashion y Reloj de Boston no se pudo leer» (el peor manda) |
+
+🔴 **Nombra solo al que falla.** La línea vieja (`resumenDeRelojes`, retirada) decía «1 de 2 relojes
+no están entrando»: un conteo que obliga a abrir algo para saber cuál.
+
+🔴 **Un «Traer ahora» para los dos.** Son las MISMAS llamadas de antes —un `POST /api/asistencia/reloj`
+por dispositivo, uno detrás del otro—; nada nuevo viaja al servidor. El acuse dice a quiénes salió
+(«Pedido enviado a los 2 relojes: la PC lo recoge en unos minutos»). ⚠️ **No dice cuántas marcas
+trajo**, y no es un olvido: el POST solo deja el pedido en el buzón y las marcaciones aparecen
+recién cuando el agente de la PC da su vuelta, minutos después. Inventar un «12 marcas» sería
+inventarle un dato a Daniel.
+
+🔴 **Lo que NO se perdió de las cajas viejas**: el aviso accionable «La PC de la oficina no ha
+recogido el pedido: revisa que esté prendida» sigue saliendo, con las mismas palabras
+(`avisoDeLaPastilla`), y el lector del reloj sigue montado y siguiendo el pedido en el aire.
+
+**Con la empresa filtrada, solo su reloj.** Hasta hoy `/api/asistencia/reloj` devolvía los dos
+siempre y nadie los filtraba. La lista es ESCRITA A MANO (`RELOJ_DE_EMPRESAS`) y salió de medir
+producción el 25-sep-2026, sobre las marcaciones de septiembre:
+
+| Reloj | Empresas | Marcaciones (sep-2026) |
+|---|---|---|
+| `reloj cboston` | confecciones_boston · vistana · fashion_wear | 1.190 · 479 · 456 |
+| `reloj acs` | american_classic | 347 |
+
+🔴 **Falla ABIERTA**: un reloj que no esté en la lista se muestra siempre, y si el filtro no deja
+ninguno se muestran todos. Esconder el estado del reloj es peor que mostrar uno de más — si el reloj
+no está entrando, **cualquier número de esa pantalla está incompleto**.
+
+### 6 · La línea del corte, en la Planilla
+
+🩸 Decía: «El reloj se lee hasta el 28 sep · cambiar — Del 29 al 30 se paga normal y se ajusta en la
+siguiente.» Tres problemas en un renglón: repetía el 28 que el campo de al lado ya dice; **no decía
+DESDE cuándo** se está leyendo el reloj, que es el único dato que no está en ninguna otra parte de la
+pantalla; y «cambiar» mandaba a un campo que está a dos centímetros.
+
+Ahora: **«Corte del reloj · lee del 14 al 28 sep»**, con la cola en un ⓘ al final. Regla pura en
+`src/lib/asistencia/corte-del-reloj.ts`:
+
+- el **desde** es el día SIGUIENTE al `corte` de la última planilla **CERRADA** de esa empresa
+  (`asistencia_planilla_guardada.corte`; sin corte, su `hasta`) — el primer día que todavía no se
+  leyó. Sale del MISMO historial que ya devuelve la ruta del cierre, sin endpoint nuevo;
+- **sin cierre anterior**, el desde es el inicio de la quincena: no se inventa una fecha;
+- **con el corte vacío** (la ×), se lee hasta `finDeLaMedicion(hasta)` — la misma función de la frase
+  del ajuste, así que en un mes de 31 días dice 31 y no 30;
+- un cierre más nuevo que el corte de hoy (una quincena vieja que se regenera) **no produce «del 29
+  al 28»**: ahí la línea dice solo «lee hasta el 13 sep»;
+- el mes se dice UNA vez si es el mismo («del 14 al 28 sep») y las dos si cambia («del 26 ago al 28
+  sep»).
+
+🔑 **Ningún número se mueve y el corte que se manda a generar tampoco**: este módulo redacta una
+línea, no decide un período. La cola del ⓘ es la MISMA `fraseCorte` de siempre.
+
+### 7 · El día abierto, resumido en una línea
+
+🩸 Debajo de cada día salía una línea POR MARCA, repitiendo horas que la fila ya muestra en sus
+cuatro columnas (Entrada · Sale almz. · Vuelve · Salida), y otra línea por cada repetida:
+
+```
+Entrada 8:58 a. m. · Marcada sin señal · el teléfono la envió 09:01 · Ver la selfie y el mapa
+Salida 6:00 p. m.  · Marcada sin señal · el teléfono la envió 09:01 · Ver la selfie y el mapa
+Marca repetida: 18:01:25 — repetida, 12 s después de 18:01:13 — no cuenta
+```
+
+Ahora, regla pura en `src/lib/asistencia/linea-del-dia.ts`:
+
+```
+Teléfono · sin señal, enviada 3 h después · 2 repetidas · ver fotos
+```
+
+- **las horas no se repiten**: están en la fila;
+- **UNA línea por día, y solo si hay algo que decir** — un día marcado entero desde el reloj, sin
+  repetidas, **no dibuja nada**;
+- el atraso que se dice es **el MAYOR del día**, y por debajo de **5 minutos** no se dice (mismo
+  umbral con el que ya se avisa que el reloj del teléfono está corrido);
+- **las repetidas se CUENTAN, no se listan** («· 2 repetidas»); su porqué entero —con el MISMO texto
+  del Excel, `explicacionRepetida`— se lee al pasar el cursor por la línea, y ⚠️ **el Excel no
+  cambió**: sigue llevando cada una en «Todas las marcas»;
+- una marca deshecha desde el teléfono se dice («· 1 deshecha»), no se esconde;
+- **«ver fotos» sale UNA vez por día** y abre las fotos de todas las marcas de ese día, una debajo de
+  la otra.
+
+🔴 **«llegó» sigue prohibido.** Se dice **«enviada 3 h después»** y no «llegó con 3 h de atraso»: la
+contadora leería lo segundo como que la persona llegó tarde a trabajar, y a esa hora lo que pasó es
+que el teléfono encontró señal. Es la misma regla de `lib/marcacion/en-el-reporte.ts`, y el barrido
+que la sostiene ahora también mira `linea-del-dia.ts`.
+
+🔴 **«Selfie» se fue del módulo.** Daniel, 24-sep-2026: *«sus fotos son del lugar, no de su cara»*.
+`SelfieMarcacionModal.tsx` → **`FotosDeLaMarcaModal.tsx`**, `SelfieParaVer` → `FotoParaVer`, «Ver la
+selfie y el mapa» → «ver fotos», «Abriendo la selfie…» → «Abriendo la foto…», «las selfies se borran
+solas» → «las fotos del lugar se borran solas». ⚠️ La constante `RETENCION_SELFIE_DIAS` (90) vive en
+`lib/marcacion/marcacion.ts` y **no se tocó**: es un identificador, no un rótulo.
+
+### Lo que NO cambió, y hay candado que lo exige
+
+- **Ningún número**: ni un minuto, ni un centavo, ni un pedido al servidor
+  (`pantalla-no-mueve-un-numero.test.ts` sigue verde).
+- **`?revisar=` sigue funcionando** desde la dirección.
+- **El lector del reloj sigue montado** (`9525a544`): `EstadoReloj` no se desmonta, y adentro sigue
+  viviendo el pedido en el aire de «Traer ahora».
+- **El camino APAGADO del interruptor está intacto**: las dos cajas amarillas, la línea por marca, la
+  fila por repetida y la línea «El reloj se lee hasta el …» siguen ahí para `false`.
+
+### Candados
+
+`src/__tests__/asistencia/fila-de-mandos.test.tsx` — 33 casos en siete bloques, uno por arreglo.
+Actualizados sin debilitarlos: `pantalla-2026-09-pantallas` (la fila de mandos y los tres casos del
+«···», que pasan a exigir la pastilla siempre visible), `pantalla-selector-unico` (se fueron
+`lineaDelCorte`, `resumenDeRelojes` y `CAMBIAR_EL_CORTE`), `asistencia-corregir-hora` (de «exactamente
+un ···» a **cero**), `asistencia-solo-a-revisar` y `asistencia-sin-marcas-visible` («Descargar» en vez
+de «Bajar Excel o PDF»), `asistencia-marca-repetida` (la repetida se cuenta y su porqué va en el
+`title`), `asistencia-poda-textos` (el aviso de la PC sigue a la vista),
+`planilla-elegir-quincena` (la línea nueva del corte y la cola en el ⓘ),
+`marcacion-reloj-del-telefono` (el barrido de «llegó» suma `linea-del-dia.ts`),
+`asistencia-siete-pantallas` y `marcaciones-pestana` (el modal renombrado).
+
+---
+
 ## 🔴 El rediseño de la pantalla (24-sep-2026) — celular y computadora
 
 > Interruptor: `ASISTENCIA_PANTALLA_2026_09` en `src/lib/asistencia/pantalla-2026-09.ts`, hoy `true`.

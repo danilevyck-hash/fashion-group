@@ -123,7 +123,10 @@ describe("5. 🔴 los avisos del reloj son UNA línea por reloj", () => {
   it("los tres estados del pedido siguen diciendo lo mismo, más corto, y el botón se queda", () => {
     expect(e).toMatch(/La PC de la oficina no ha recogido el pedido: revisa que esté prendida\./);
     expect(e).toMatch(/Pedido enviado, la PC lo recoge en unos minutos\./);
-    expect(e).toMatch(/"Esperando a la PC…" : "Traer ahora"/);
+    // 🩸 Los dos rótulos salieron a la constante del módulo puro el 25-sep-2026
+    // (`relojes-en-la-fila.ts`), para que la pastilla de la fila de mandos y la
+    // tarjeta larga digan LO MISMO. El texto no cambió una letra.
+    expect(e).toMatch(/\? ESPERANDO_A_LA_PC : TRAER_AHORA/);
     expect(e).toMatch(/px-3 py-1\.5/);
   });
 });

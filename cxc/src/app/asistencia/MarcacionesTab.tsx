@@ -4,7 +4,7 @@
  * LA PESTAÑA «MARCACIONES» — LO QUE MANDÓ EL TELÉFONO, TAL CUAL (25-sep-2026).
  *
  * 🔴 SOLO LA VE `admin`, Y NO ES UNA DECISIÓN DE PANTALLA. Cada marca trae una
- * selfie y una ubicación: dónde estuvo una persona y qué cara tenía. La lista
+ * foto del LUGAR y una ubicación: dónde estuvo una persona. La lista
  * de roles es UNA (`MARCACIONES_ROLES`) y la leen esta pantalla y la ruta;
  * esconder una pestaña nunca cerró nada.
  *
@@ -38,7 +38,7 @@ import { aparatoDeQuienMira } from "@/lib/aparato";
 import { empresaParaPedir } from "@/lib/asistencia/empresa-para-todo";
 import { textoDelPie } from "@/lib/ui/pie-de-lista";
 import { diaPanamaDe, horaAmPm } from "@/lib/marcacion/marcacion";
-import SelfieMarcacionModal, { type SelfieParaVer } from "./SelfieMarcacionModal";
+import FotosDeLaMarcaModal, { type FotoParaVer } from "./FotosDeLaMarcaModal";
 import {
   CHIP_MISMO_APARATO,
   CHIP_TODOS,
@@ -131,7 +131,7 @@ export default function MarcacionesTab({ empresa }: { empresa: string }) {
   const [celular, setCelular] = useState(false);
   useEffect(() => { setCelular(aparatoDeQuienMira() === "celular"); }, []);
 
-  const [abierta, setAbierta] = useState<SelfieParaVer | null>(null);
+  const [abierta, setAbierta] = useState<FotoParaVer | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -187,6 +187,9 @@ export default function MarcacionesTab({ empresa }: { empresa: string }) {
       detalle: detalleDeLaHoja(m),
       relojCorrido: null,
       quitada: false,
+      sinSenal: Boolean(m.sinSenal),
+      // La demora ya se dice en `lineasDeLaHoja`: acá no hace falta medirla otra vez.
+      atrasoMin: null,
       tieneFoto: m.tieneFoto,
       lat: m.lat,
       lng: m.lng,
@@ -316,7 +319,7 @@ export default function MarcacionesTab({ empresa }: { empresa: string }) {
             </ScrollableTable>
           )}
 
-      <SelfieMarcacionModal marca={abierta} onClose={() => setAbierta(null)} />
+      <FotosDeLaMarcaModal marcas={abierta ? [abierta] : null} onClose={() => setAbierta(null)} />
 
       {/* Lo que esta pantalla NO hace, dicho donde se lee. */}
       <p className="text-xs text-gray-400">

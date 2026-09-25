@@ -41,6 +41,8 @@ import { esTodas } from "@/lib/asistencia/empresa-para-todo";
 import { createPortal } from "react-dom";
 import { useToast } from "@/components/ToastSystem";
 import { Ayuda } from "@/components/shared/Ayuda";
+// 🔴 «Corte del reloj · lee del 14 al 28 sep» — la regla es PURA y vive ahí.
+import { lineaCorteDelReloj } from "@/lib/asistencia/corte-del-reloj";
 import {
   EMPRESAS_ASISTENCIA,
   etiquetaEmpresa,
@@ -127,8 +129,8 @@ import AntesDeCerrar from "./AntesDeCerrar";
 import SelectorPeriodo, { usePeriodoAsistencia } from "@/components/asistencia/SelectorPeriodo";
 import { aparatoDeQuienMira } from "@/lib/aparato";
 import {
-  ASISTENCIA_PANTALLA_2026_09, CAMBIAR_EL_CORTE, VACIAR_EL_CORTE,
-  lineaDelCorte, quincenaDelPeriodo, rutaAsistenciaDePersona, VER_SU_ASISTENCIA,
+  ASISTENCIA_PANTALLA_2026_09, VACIAR_EL_CORTE,
+  quincenaDelPeriodo, rutaAsistenciaDePersona, VER_SU_ASISTENCIA,
 } from "@/lib/asistencia/pantalla-2026-09";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 // 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
@@ -435,7 +437,8 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
   // «Descargar ⌄»: Excel · PDF · Comprobantes en un solo botón (11-sep-2026).
   const [descargaOpen, setDescargaOpen] = useState(false);
   const descargaRef = useRef<HTMLButtonElement>(null);
-  /** El campo del corte, para que «cambiar» de la línea gris lleve hasta él. */
+  /** El campo del corte. El «cambiar» de la línea gris se retiró el 25-sep-2026
+   *  —el calendario está al lado—, pero la referencia se conserva: es el campo. */
   const corteRef = useRef<HTMLInputElement>(null);
   /** 🔴 El aparato de quien mira, por el DEDO (`pointer: coarse`). */
   const [celular, setCelular] = useState(false);
@@ -589,6 +592,43 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
   // 🔑 Sale del `historial` que ya devuelve la ruta del cierre — sin endpoint
   // nuevo. Se pide SIN fechas: así contesta el historial de la empresa entera.
   const [sugerido, setSugerido] = useState<{ inicio: string; ultimaHasta: string } | null>(null);
+  /**
+   * 🔴 HASTA DÓNDE SE LEYÓ EL RELOJ LA ÚLTIMA VEZ QUE SE CERRÓ (25-sep-2026).
+   * Es el `corte` de la última planilla CERRADA de esta empresa —y sin corte, su
+   * `hasta`—, o sea el último día que ya está leído. El día siguiente es desde
+   * dónde se está leyendo ahora, que es lo que Daniel pidió que dijera la línea:
+   * *«debería decir desde cuándo lee (la última apertura, día después)»*.
+   *
+   * 🔑 Sale del MISMO historial que ya devuelve la ruta del cierre, sin endpoint
+   * nuevo. `null` = esta empresa nunca cerró una quincena.
+   */
+  const [ultimoCorteCerrado, setUltimoCorteCerrado] = useState<string | null>(null);
+  useEffect(() => {
+    if (!PLANILLA_UNIDA || !ASISTENCIA_PANTALLA_2026_09 || sinEmpresa) return;
+    let vivo = true;
+    void (async () => {
+      try {
+        const r = await fetch(
+          `/api/asistencia/planilla-guardada?empresa=${encodeURIComponent(empresa)}`,
+          { cache: "no-store" },
+        );
+        const j = await r.json();
+        if (!r.ok || !vivo) return;
+        const historial = Array.isArray(j.historial) ? (j.historial as CabeceraGuardada[]) : [];
+        // Solo las CERRADAS: una reabierta no pagó nada, así que su reloj no
+        // quedó leído.
+        const cerradas = historial.filter((c) => c.estado === "cerrada");
+        if (cerradas.length === 0) { setUltimoCorteCerrado(null); return; }
+        const ultima = cerradas.reduce((a, b) => (b.hasta > a.hasta ? b : a));
+        setUltimoCorteCerrado(ultima.corte ?? ultima.hasta ?? null);
+      } catch {
+        // 🔴 FALLA ABIERTA: sin esta lectura la línea dice «lee del <inicio de la
+        // quincena> al …», que es lo que se puede sostener sin inventar nada.
+        if (vivo) setUltimoCorteCerrado(null);
+      }
+    })();
+    return () => { vivo = false; };
+  }, [empresa, sinEmpresa]);
   useEffect(() => {
     // Ya se generó algo, o la persona ya eligió: lo que manda es su elección.
     // 🔴 Con el selector único la quincena viene SIEMPRE elegida, así que la
@@ -687,6 +727,8 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
   // ── LO QUE SE DERIVA DEL ESTADO ────────────────────────────────────────────
   /** ¿El cuadro en pantalla es de lo que está elegido arriba? */
   const coincide = !!pedido && pedido.desde === desde && pedido.hasta === hasta && pedido.empresa === empresa && (pedido.corte ?? "") === corte;
+  /** La línea del corte, del módulo puro. `null` si el período todavía no sirve. */
+  const lineaCorte = lineaCorteDelReloj({ desde, hasta, corte, ultimoCorteCerrado });
   /** 🔴 Hay números en pantalla que ya no son los de lo que está elegido. */
   const vieja = !!data && (!coincide || desactualizada);
   const cerrada = cierre?.cerrada ?? null;
@@ -1267,22 +1309,25 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
       {/* 🔴 LA LÍNEA GRIS DEL CORTE (24-sep-2026, esc 1d). Dice hasta dónde se
           lee el reloj y, con «cambiar», lleva al campo. Vacío: «hasta el fin de
           la quincena». */}
-      {PLANILLA_UNIDA && ASISTENCIA_PANTALLA_2026_09 && elegido && (
-        <p className="text-[12px] text-gray-500">
-          {lineaDelCorte(corte)}
-          {" · "}
-          <button
-            type="button"
-            onClick={() => {
-              const el = corteRef.current;
-              el?.focus();
-              (el as unknown as { showPicker?: () => void })?.showPicker?.();
-            }}
-            className="underline decoration-dotted underline-offset-2 hover:text-gray-900"
-          >
-            {CAMBIAR_EL_CORTE}
-          </button>
-          {corte && fraseCorte(corte, hasta) && <> — {fraseCorte(corte, hasta)}</>}
+      {/* ══════════════════════════════════════════════════════════════════
+          🔴 «Corte del reloj · lee del 14 al 28 sep» (25-sep-2026)
+          Daniel, textual: *«ese mensaje no tiene que decir desde el 28 si ya
+          está en el calendario; debería decir desde cuándo lee (la última
+          apertura, día después); y algo minimalista que se sepa que es el cierre
+          del reloj»*. 🩸 Decía «El reloj se lee hasta el 28 sep · cambiar — Del
+          29 al 30 se paga normal y se ajusta en la siguiente»: repetía el 28 que
+          el campo de al lado ya dice, no decía DESDE cuándo —el único dato que
+          no está en ninguna otra parte— y mandaba a «cambiar» un campo que está
+          a dos centímetros. La cola es la MISMA frase de siempre y se fue al ⓘ.
+          ══════════════════════════════════════════════════════════════════ */}
+      {PLANILLA_UNIDA && ASISTENCIA_PANTALLA_2026_09 && elegido && lineaCorte && (
+        <p className="flex flex-wrap items-center gap-x-1 text-[12px] text-gray-500">
+          {lineaCorte.texto}
+          {lineaCorte.nota && (
+            <Ayuda titulo="Los días que quedan" etiqueta="">
+              <p>{lineaCorte.nota}</p>
+            </Ayuda>
+          )}
         </p>
       )}
 

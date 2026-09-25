@@ -86,16 +86,20 @@ async function abrirElDetalle() {
 }
 
 describe("🔴 la repetida se ve tachada, con su porqué, y se cuenta arriba", () => {
-  it("🩸 Ramón, 3-ago: las cuatro buenas en sus columnas, la 07:58:37 tachada y explicada", async () => {
+  it("🩸 Ramón, 3-ago: las cuatro buenas en sus columnas y la repetida CONTADA en la línea del día", async () => {
     servir(respuesta([REPETIDA]));
     montar(<ReporteTab />);
     await abrirElDetalle();
     for (const h of BUENAS) expect(screen.getByText(h)).toBeTruthy();
-    // La repetida está —no se esconde— y va TACHADA.
-    const tachada = screen.getByText("07:58:37");
-    expect(tachada.className).toContain("line-through");
-    // Y dice POR QUÉ, con el mismo texto que el Excel.
-    expect(screen.getByText(/repetida, 1 s después de 07:58:36 — no cuenta/)).toBeTruthy();
+    // 🩸 CAMBIÓ EL 25-sep-2026. Antes cada repetida era su propia fila tachada
+    // («Marca repetida: 07:58:37 — repetida, 1 s después de 07:58:36 — no
+    // cuenta»). Daniel, textual: *«¿estas informaciones se pueden resumir?
+    // quitar lo obvio, para no ensuciar tanto la pantalla»*.
+    // 🔴 LO QUE NO SE PERDIÓ: la repetida se CUENTA en la línea del día y su
+    // porqué —con el MISMO texto del Excel— se lee al pasar el cursor.
+    const linea = screen.getByText("1 repetida");
+    expect(linea).toBeTruthy();
+    expect(linea.getAttribute("title")).toContain("repetida, 1 s después de 07:58:36 — no cuenta");
     // Sin «5 marcas» ni «Revisar»: el día quedó en 4.
     expect(screen.queryByText("5 marcas")).toBeNull();
     expect(screen.queryByText("Revisar")).toBeNull();

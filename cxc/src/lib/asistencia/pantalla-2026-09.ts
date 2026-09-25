@@ -268,6 +268,14 @@ export function anchoDelCodigo(codigos: readonly string[]): number {
 // LOS AVISOS PLEGADOS EN UNA LÍNEA
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * 🔴 EL BOTÓN DICE LO QUE HACE (25-sep-2026). Daniel, textual: *«la flecha
+ * cámbiala a descargar o flecha para abajo»*. 🩸 Era un «⇧» de solo ícono —una
+ * flecha hacia ARRIBA para BAJAR dos archivos— y nadie sabía qué era. El menú
+ * que abre no cambió: Excel y PDF, con «· 34» cuando la pantalla está recortada.
+ */
+export const DESCARGAR = "Descargar";
+
 /** «3 avisos del período» · «1 aviso del período». `null` sin ninguno. */
 export function rotuloDeAvisos(cuantos: number): string | null {
   const n = Math.max(0, Math.trunc(cuantos || 0));
@@ -275,14 +283,11 @@ export function rotuloDeAvisos(cuantos: number): string | null {
   return n === 1 ? "1 aviso del período" : `${n} avisos del período`;
 }
 
-/** La línea de una sola fila que resume los relojes. */
-export function resumenDeRelojes(
-  relojes: readonly { salud: string; titulo: string }[],
-): string {
-  if (relojes.length === 0) return "";
-  if (relojes.length === 1) return relojes[0].titulo;
-  const malos = relojes.filter((r) => r.salud !== "al_dia");
-  if (malos.length === 0) return "Los relojes están al día";
-  if (malos.length === relojes.length) return "Ningún reloj está entrando";
-  return `${malos.length} de ${relojes.length} relojes no están entrando`;
-}
+/* 🩸 ACÁ VIVÍA `resumenDeRelojes`. SE RETIRÓ EL 25-sep-2026.
+ *
+ * Decía «2 de 2 relojes no están entrando» — un conteo que obliga a abrir algo
+ * para saber CUÁL. Daniel pidió una sola pastilla en la fila de mandos, y esa
+ * pastilla nombra al que falla: la regla se mudó entera a
+ * `lib/asistencia/relojes-en-la-fila.ts` › `textoDeLaPastilla`, que además sabe
+ * decir hace cuánto y qué relojes le tocan a la empresa que se está mirando.
+ * No quedó ningún lector de la vieja. */

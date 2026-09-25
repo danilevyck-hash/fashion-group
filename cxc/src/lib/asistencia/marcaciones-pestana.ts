@@ -5,7 +5,7 @@
 // computadora, y sexta pestaña de Asistencia, SOLO para él**.
 //
 // 🔴 POR QUÉ SOLO `admin`, Y NO «los que ven Asistencia». Cada marca del
-// teléfono trae **una selfie y una ubicación**. Eso no es un dato de planilla:
+// teléfono trae **una foto del lugar y una ubicación**. Eso no es un dato de planilla:
 // es dónde estuvo una persona y qué cara tenía. La contadora no necesita verlo
 // para pagar, y la secretaria tampoco. Hasta que Daniel diga otra cosa, la
 // pestaña es de una sola persona, y el SERVIDOR lo comprueba igual que la

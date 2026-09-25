@@ -316,10 +316,11 @@ describe("D · en la pantalla sale, lo dice y se puede corregir", () => {
 
   it("🔴 el Excel y el PDF la llevan igual que la pantalla", async () => {
     // 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026: «Excel» y «PDF» eran dos botones
-    // sueltos del panel de arriba; con el rediseño viven detrás del ícono de
-    // compartir «⇧». 🔴 Lo que se baja no cambió: es lo que está en pantalla.
+    // sueltos del panel de arriba; con el rediseño viven detrás de un botón, que
+    // desde el 25-sep-2026 dice «Descargar». 🔴 Lo que se baja no cambió: es lo
+    // que está en pantalla.
     const abrirDescargas = () =>
-      fireEvent.click(screen.getByRole("button", { name: "Bajar Excel o PDF" }));
+      fireEvent.click(screen.getByRole("button", { name: "Descargar" }));
     servir();
     montar();
     await screen.findByText("Yeisibeth Muñoz");

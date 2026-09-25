@@ -163,7 +163,7 @@ export function vePestana(rol: string, pestana: string): boolean {
   if (pestana === "prestamos") return vePestanaPrestamos(rol);
   // 🔴 «MARCACIONES» SE AUTORIZA POR SU PROPIA LISTA (25-sep-2026), y es la
   // MISMA que mira la ruta (`MARCACIONES_ROLES`, hoy solo `admin`). No cuelga
-  // de `ASISTENCIA_ROLES`: cada marca trae una selfie y una ubicación, y eso no
+  // de `ASISTENCIA_ROLES`: cada marca trae una foto del lugar y una ubicación, y eso no
   // es un dato de planilla. Con el interruptor apagado contesta `false` a todo
   // el mundo, así que la pestaña no existe ni por la URL.
   if (pestana === CLAVE_MARCACIONES) return vePestanaMarcaciones(rol);

@@ -37,12 +37,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { useToast } from "@/components/ToastSystem";
 import { nombreRelojEnPantalla } from "@/lib/asistencia/agente";
-// 🔴 La línea de una sola fila sale del módulo puro del rediseño.
-import { resumenDeRelojes } from "@/lib/asistencia/pantalla-2026-09";
-
-/** ⚠️ «Traer ahora» de Asistencia es OTRA cosa que «Actualizar ahora»: le pide a
- *  una PC que empuje las marcas de su reloj. El rótulo no se toca. */
-const ACTUALIZAR_AHORA_RELOJ = "Traer ahora";
+// 🔴 La pastilla de una sola fila sale del módulo puro: qué dice, a qué relojes
+// les toca la empresa que se mira y qué se anuncia al dejar el pedido.
+import {
+  ESPERANDO_A_LA_PC, TRAER_AHORA, avisoDeLaPastilla, relojesDeLaEmpresa, textoDeLaPastilla,
+  textoPedidoEnviado,
+} from "@/lib/asistencia/relojes-en-la-fila";
 
 interface RelojEnPantalla {
   dispositivo: string;
@@ -52,6 +52,8 @@ interface RelojEnPantalla {
   pedidoPendiente: boolean;
   pedidoSinRespuesta: boolean;
   leidoHasta: string | null;
+  /** Minutos desde el último contacto de la PC. La ruta ya lo mandaba. */
+  minutosSinNoticias?: number | null;
 }
 
 interface Respuesta {
@@ -79,34 +81,25 @@ const PUNTO: Record<RelojEnPantalla["salud"], string> = {
   nunca: "bg-gray-300",
 };
 
-export default function EstadoReloj({ onLlegaron, resumen = false, escondidoSiTodoBien = false }: {
+export default function EstadoReloj({ onLlegaron, resumen = false, empresa = null }: {
   onLlegaron?: () => void;
   /**
-   * 🔴 SE ESCONDE SOLO SI TODO ESTÁ BIEN (24-sep-2026). Lo pide la fila única de
-   * mandos de Asistencia: Daniel quiere el panel limpio, pero **si el reloj no
-   * está entrando, cualquier número de esa pantalla está incompleto y hay que
-   * saberlo ANTES de descontarle minutos a alguien** — por eso este cartel vivía
-   * arriba de todo.
-   *
-   * 🔴 LA REGLA: con todos los relojes al día y sin nada en el aire, no se
-   * dibuja nada (está a un toque, en el «···»). **Con cualquier cosa que mirar
-   * —un reloj callado, un error, un pedido esperando a la PC, la migración sin
-   * correr— se dibuja SIEMPRE**, esté el menú abierto o cerrado.
-   *
-   * ⚠️ Esconder no es desarmar: el componente sigue montado y siguiendo el
-   * pedido de «Traer ahora».
-   */
-  escondidoSiTodoBien?: boolean;
-  /**
-   * 🔴 UNA SOLA LÍNEA PARA TODOS LOS RELOJES (24-sep-2026). Lo pide el celular:
-   * dos tarjetas que dicen lo mismo («al día, hace 3 min») eran dos de los nueve
-   * bloques que había antes del primer nombre. El texto sale del módulo puro y
-   * «Traer ahora» le deja el pedido a TODOS los relojes que lo aceptan.
+   * 🔴 UNA SOLA PASTILLA PARA TODOS LOS RELOJES (24-sep-2026, y desde el
+   * 25-sep-2026 también en la computadora). 🩸 Eran DOS cajas amarillas de ancho
+   * completo que decían lo mismo, con dos botones que hacen lo mismo. El texto
+   * sale del módulo puro y «Traer ahora» le deja el pedido a TODOS los relojes
+   * que lo aceptan — las MISMAS dos llamadas de antes, una por dispositivo.
    *
    * ⚠️ Nada de la lógica cambia: es la misma lectura, el mismo POST y el mismo
    * aviso cuando el agente recoge.
    */
   resumen?: boolean;
+  /**
+   * 🔴 CON UNA EMPRESA FILTRADA, SOLO SU RELOJ (25-sep-2026). `null` = «Todas» y
+   * se ven los dos. Qué reloj lee cada empresa vive en `relojes-en-la-fila.ts`,
+   * y falla ABIERTA: si el filtro no deja ninguno, se muestran todos.
+   */
+  empresa?: string | null;
 }) {
   const { toast } = useToast();
   const [datos, setDatos] = useState<Respuesta | null>(null);
@@ -129,7 +122,13 @@ export default function EstadoReloj({ onLlegaron, resumen = false, escondidoSiTo
     void cargar();
   }, [cargar]);
 
-  const relojes = useMemo(() => datos?.relojes ?? [], [datos]);
+  // 🔴 TODOS los relojes se siguen LEYENDO y siguiendo (el pedido en el aire es
+  // por dispositivo): la empresa solo decide cuáles se DIBUJAN.
+  const todosLosRelojes = useMemo(() => datos?.relojes ?? [], [datos]);
+  const relojes = useMemo(
+    () => relojesDeLaEmpresa(todosLosRelojes, empresa),
+    [todosLosRelojes, empresa],
+  );
 
   // Huella de "quién tiene un pedido en el aire". Se compara como texto para
   // que el efecto no se dispare en cada render por un arreglo nuevo.
@@ -166,7 +165,7 @@ export default function EstadoReloj({ onLlegaron, resumen = false, escondidoSiTo
   }, [esperandoAlguno, cargar]);
 
   const pedir = useCallback(
-    async (dispositivo: string) => {
+    async (dispositivo: string): Promise<boolean> => {
       setPidiendo((p) => (p.includes(dispositivo) ? p : [...p, dispositivo]));
       try {
         const r = await fetch("/api/asistencia/reloj", {
@@ -177,23 +176,46 @@ export default function EstadoReloj({ onLlegaron, resumen = false, escondidoSiTo
         const d = await r.json();
         if (!r.ok) throw new Error(d?.error ?? "No se pudo enviar el pedido");
         await cargar();
+        return true;
       } catch (e) {
         setPidiendo((p) => p.filter((x) => x !== dispositivo));
         toast(e instanceof Error ? e.message : "No se pudo enviar el pedido", "error");
+        return false;
       }
     },
     [cargar, toast],
+  );
+
+  /**
+   * 🔴 UN TOQUE, UN PEDIDO POR RELOJ. Se manda a los dos y se anuncia UNA vez,
+   * con los nombres. ⚠️ No dice cuántas marcas trajo, y no es un olvido: el POST
+   * solo deja el pedido en el buzón y las marcaciones aparecen recién cuando el
+   * agente de la PC da su vuelta, minutos después.
+   */
+  const pedirATodos = useCallback(
+    async (dispositivos: readonly string[]) => {
+      if (dispositivos.length === 0) return;
+      const salieron: string[] = [];
+      for (const d of dispositivos) {
+        if (await pedir(d)) salieron.push(d);
+      }
+      if (salieron.length > 0) toast(textoPedidoEnviado(salieron), "success");
+    },
+    [pedir, toast],
   );
 
   if (relojes.length === 0) return null;
 
   const faltaMigracion = !!datos?.faltaMigracion;
 
-  // 🔴 Nada que mirar = nada que dibujar. Cualquier otra cosa se ve igual.
-  const todoBien = !faltaMigracion
-    && relojes.every((r) => r.salud === "al_dia" && !r.pedidoPendiente && !r.pedidoSinRespuesta)
-    && pidiendo.length === 0;
-  if (escondidoSiTodoBien && todoBien) return null;
+  /* 🩸 ACÁ VIVÍA `escondidoSiTodoBien`. SE FUE EL 25-sep-2026 con el «···».
+   * Escondía la pastilla cuando todo estaba al día, para que el panel se viera
+   * limpio, y el «···» la traía de vuelta. Daniel, textual: *«los 3 puntitos no
+   * hacen nada»* — y no hacían nada porque la PC de la oficina se apaga de
+   * noche, así que nunca estaba «todo bien» y la caja salía igual. Ahora la
+   * pastilla vive SIEMPRE en la fila de mandos: ocupa un renglón compartido, y
+   * si el reloj no está entrando **cualquier número de esa pantalla está
+   * incompleto** y hay que verlo sin tocar nada. */
 
   if (resumen) {
     // 🔴 EL PEOR DE TODOS MANDA EL COLOR: con uno callado, la línea no puede
@@ -208,17 +230,28 @@ export default function EstadoReloj({ onLlegaron, resumen = false, escondidoSiTo
     );
     const esperando = relojes.some((r) => pidiendo.includes(r.dispositivo) || r.pedidoPendiente);
     return (
-      <div className={`flex min-h-[44px] flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-3 py-1.5 ${COLOR[peor.salud]}`}>
+      <div className={`flex min-h-[44px] max-w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-3 py-1.5 ${COLOR[peor.salud]}`}>
         <span className={`h-2 w-2 shrink-0 rounded-full ${PUNTO[peor.salud]}`} />
-        <span className="min-w-0 flex-1 text-[13px] text-gray-900">{resumenDeRelojes(relojes)}</span>
+        <span className="min-w-0 text-[13px] text-gray-900">{textoDeLaPastilla(relojes)}</span>
+        {avisoDeLaPastilla(relojes) && (
+          <span className="text-[12px] font-medium text-amber-800">{avisoDeLaPastilla(relojes)}</span>
+        )}
+        {faltaMigracion && datos?.avisoMigracion && (
+          <span className="text-[12px] text-amber-800">{datos.avisoMigracion}</span>
+        )}
+        {/* 🔴 UN SOLO «Traer ahora» PARA LOS DOS (25-sep-2026). Daniel: *«¿que
+            Traer ahora al tocar sea a los dos?»*. Son las MISMAS llamadas que
+            hacía cada caja por su lado: un POST por dispositivo, uno detrás del
+            otro. Nada nuevo viaja al servidor. */}
         <button
           type="button"
-          onClick={() => { for (const r of puedenPedir) void pedir(r.dispositivo); }}
+          onClick={() => void pedirATodos(puedenPedir.map((r) => r.dispositivo))}
           disabled={puedenPedir.length === 0}
+          title={faltaMigracion ? (datos?.avisoMigracion ?? undefined) : undefined}
           className="inline-flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-md border border-gray-300 bg-white px-2.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 active:scale-[0.97] disabled:opacity-50"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${esperando ? "animate-spin" : ""}`} />
-          {ACTUALIZAR_AHORA_RELOJ}
+          {esperando ? ESPERANDO_A_LA_PC : TRAER_AHORA}
         </button>
       </div>
     );
@@ -316,7 +349,7 @@ function TarjetaReloj({
           className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${esperando && !rendido ? "animate-spin" : ""}`} />
-          {esperando && !rendido ? "Esperando a la PC…" : "Traer ahora"}
+          {esperando && !rendido ? ESPERANDO_A_LA_PC : TRAER_AHORA}
         </button>
       </div>
     </div>

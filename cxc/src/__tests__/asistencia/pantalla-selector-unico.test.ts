@@ -22,11 +22,11 @@ import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
 import {
-  ASISTENCIA_PANTALLA_2026_09, CAMBIAR_EL_CORTE, PARAM_ABRE, PARAM_DESDE, PARAM_HASTA,
+  ASISTENCIA_PANTALLA_2026_09, PARAM_ABRE, PARAM_DESDE, PARAM_HASTA,
   RECORDAR_PERIODO, VACIAR_EL_CORTE, anchoDelCodigo, columnasDelReporte, cortoDelCorte,
-  esQuincenaExacta, haySiguienteQuincena, lineaDelCorte, pasoDeQuincena,
+  esQuincenaExacta, haySiguienteQuincena, pasoDeQuincena,
   periodoCompartidoInicial, quincenaDeHoy, quincenaDelPeriodo, quincenaSiguiente,
-  resumenDeRelojes, rotuloDeAvisos, rotuloDelPeriodo, rutaAsistenciaDePersona,
+  rotuloDeAvisos, rotuloDelPeriodo, rutaAsistenciaDePersona,
 } from "@/lib/asistencia/pantalla-2026-09";
 import { CLAVES_DE_PANTALLA } from "@/lib/hooks/useUrlState";
 
@@ -194,9 +194,7 @@ describe("🔴 con qué período abre el módulo", () => {
 });
 
 describe("🔴 el corte del reloj: la «×» y la línea gris, sin el botón ni el chip", () => {
-  it("la línea dice hasta dónde se lee, y vacío lo dice con palabras", () => {
-    expect(lineaDelCorte("2026-09-28")).toBe("El reloj se lee hasta el 28 sep");
-    expect(lineaDelCorte("")).toBe("El reloj se lee hasta el fin de la quincena");
+  it("la línea de antes sigue siendo la de antes (el camino APAGADO no se tocó)", () => {
     expect(cortoDelCorte("2026-09-13")).toBe("13 sep");
   });
 
@@ -206,11 +204,14 @@ describe("🔴 el corte del reloj: la «×» y la línea gris, sin el botón ni 
     const prendido = pl.split("PLANILLA_UNIDA && ASISTENCIA_PANTALLA_2026_09")[1] ?? "";
     expect(prendido.slice(0, 1600)).not.toContain("Quincena entera");
     expect(prendido.slice(0, 1600)).not.toContain("Corte {fechaCortaCorte");
-    // Y lo que SÍ está: la «×» y el enlace de la línea gris.
+    // Y lo que SÍ está: la «×» del campo.
     expect(pl).toContain("VACIAR_EL_CORTE");
-    expect(pl).toContain("CAMBIAR_EL_CORTE");
     expect(VACIAR_EL_CORTE).toBe("Quitar el corte");
-    expect(CAMBIAR_EL_CORTE).toBe("cambiar");
+    // 🩸 «· cambiar» se retiró el 25-sep-2026: el calendario está al lado, y el
+    // enlace mandaba a un campo que se ve. Daniel: *«ese mensaje no tiene que
+    // decir desde el 28 si ya está en el calendario»*. La línea nueva vive en
+    // `corte-del-reloj.ts` y tiene su propio candado.
+    expect(pl).not.toContain("CAMBIAR_EL_CORTE");
   });
 
   it("🔑 el corte NO cambia lo que se paga: sigue viajando igual al servidor", () => {
@@ -266,20 +267,10 @@ describe("🔴 el panel de arriba: los avisos y los relojes, en una línea", () 
     expect(rotuloDeAvisos(1)).toBe("1 aviso del período");
     expect(rotuloDeAvisos(3)).toBe("3 avisos del período");
   });
-  it("la línea de los relojes resume TODOS, y el peor manda", () => {
-    expect(resumenDeRelojes([])).toBe("");
-    expect(resumenDeRelojes([{ salud: "al_dia", titulo: "Las marcaciones están entrando solas" }]))
-      .toBe("Las marcaciones están entrando solas");
-    expect(resumenDeRelojes([
-      { salud: "al_dia", titulo: "a" }, { salud: "al_dia", titulo: "b" },
-    ])).toBe("Los relojes están al día");
-    expect(resumenDeRelojes([
-      { salud: "al_dia", titulo: "a" }, { salud: "callado", titulo: "b" },
-    ])).toBe("1 de 2 relojes no están entrando");
-    expect(resumenDeRelojes([
-      { salud: "callado", titulo: "a" }, { salud: "con_error", titulo: "b" },
-    ])).toBe("Ningún reloj está entrando");
-  });
+  // 🩸 ACÁ SE PROBABA `resumenDeRelojes`, RETIRADA EL 25-sep-2026: decía «1 de 2
+  // relojes no están entrando», un conteo que obliga a abrir algo para saber
+  // CUÁL. La pastilla nueva nombra al que falla y vive en
+  // `relojes-en-la-fila.ts`, con su candado en `fila-de-mandos.test.tsx`.
   it("🩸 los cuatro atajos «Hoy · Ayer · Esta quincena · Quincena pasada» solo quedan APAGADOS", () => {
     const rep = leer("src/app/asistencia/ReporteTab.tsx");
     // El bloque de los atajos vive dentro del `else` del interruptor.

@@ -397,14 +397,16 @@ describe("🔴 el Excel y el PDF bajan lo que se ve, y el botón lo DICE", () =>
    * 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026: «Excel» y «PDF» eran dos botones
    * sueltos en el panel de arriba. Con el rediseño del panel (Daniel: *«veo todo
    * este panel que me ensucia»* — nueve bloques y 1.085 px antes del primer
-   * nombre) los dos pasaron detrás del ícono de compartir «⇧».
+   * nombre) los dos pasaron detrás del ícono de compartir «⇧», y el 25-sep-2026
+   * ese ícono pasó a decir «Descargar» — Daniel: *«la flecha cámbiala a
+   * descargar o flecha para abajo»*.
    *
    * 🔴 LO QUE NO CAMBIÓ, y es toda la regla de este bloque: el rótulo **sigue
    * diciendo a cuántos afecta** cuando la pantalla está recortada, y lo que baja
    * es EXACTAMENTE lo que se ve.
    */
   const abrirDescargas = () =>
-    fireEvent.click(screen.getByRole("button", { name: "Bajar Excel o PDF" }));
+    fireEvent.click(screen.getByRole("button", { name: "Descargar" }));
 
   it("con el filtro apagado los botones se llaman «Excel» y «PDF»", async () => {
     await abrirReporte();

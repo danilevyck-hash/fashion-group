@@ -421,7 +421,9 @@ describe("E. Lo que lee la contadora nunca dice «llegó»", () => {
     // sería un candado que grita por algo que no es el defecto.
     const archivos = [
       "src/lib/marcacion/en-el-reporte.ts",
-      "src/app/asistencia/SelfieMarcacionModal.tsx",
+      // 🩸 Se llamaba `SelfieMarcacionModal.tsx` hasta el 25-sep-2026: son fotos
+      // DEL LUGAR, no selfies.
+      "src/app/asistencia/FotosDeLaMarcaModal.tsx",
     ];
     for (const rel of archivos) {
       expect(sinComentarios(leer(rel)).toLowerCase(), rel).not.toMatch(/lleg[oó]/);
@@ -430,10 +432,14 @@ describe("E. Lo que lee la contadora nunca dice «llegó»", () => {
     const puro = leer("src/lib/marcacion/marcacion.ts");
     const fn = puro.slice(puro.indexOf("export function textoParaLaContadora"));
     expect(sinComentarios(fn).toLowerCase()).not.toMatch(/lleg[oó]/);
-    // Y la sub-fila del reporte, que es donde el mockup lo decía.
+    // Y la sub-fila del reporte, que es donde el mockup lo decía. Desde el
+    // 25-sep-2026 es UNA línea por día (`lineaDelDia`), que dice «enviada 3 h
+    // después» por el MISMO motivo: «llegó con 3 h de atraso» se leería como que
+    // la persona llegó tarde a trabajar.
     const reporte = leer("src/app/asistencia/ReporteTab.tsx");
     const sub = reporte.slice(reporte.indexOf("delTelefono.map"), reporte.indexOf("d.correcciones.map"));
     expect(sinComentarios(sub).toLowerCase()).not.toMatch(/lleg[oó]/);
+    expect(sinComentarios(leer("src/lib/asistencia/linea-del-dia.ts")).toLowerCase()).not.toMatch(/lleg[oó]/);
   });
 
   it("la primera del día es Entrada y la última Salida, venga de donde venga", () => {

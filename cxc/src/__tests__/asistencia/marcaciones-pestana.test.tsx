@@ -431,6 +431,11 @@ describe("🔴 la pestaña Marcaciones SOLO mira", () => {
   });
 
   it("reusa la MISMA hoja del reporte, no escribe otra", () => {
-    expect(leer(TAB)).toContain('from "./SelfieMarcacionModal"');
+    // 🩸 El archivo se llamaba `SelfieMarcacionModal.tsx` y se renombró el
+    // 25-sep-2026: son fotos DEL LUGAR, no selfies (Daniel, 24-sep-2026: *«sus
+    // fotos son del lugar, no de su cara»*). Sigue siendo UNA sola hoja para las
+    // dos pantallas, que es lo que este candado sostiene.
+    expect(leer(TAB)).toContain('from "./FotosDeLaMarcaModal"');
+    expect(leer(TAB)).not.toContain("SelfieMarcacionModal");
   });
 });
