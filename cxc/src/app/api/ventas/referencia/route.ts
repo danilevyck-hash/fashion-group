@@ -59,6 +59,7 @@ import {
   parsearListaCodigos,
   pedidosNoEncontrados,
 } from "@/lib/ventas/referencia";
+import { REFERENCIA_2026_09 } from "@/lib/ventas/referencia-pantalla";
 import {
   armarArticulo,
   type ArticuloCompras,
@@ -222,6 +223,10 @@ function fusionar(
   ingresos: FilaIngreso[],
   info: FilaInfo[],
   hoy: string,
+  // 🔴 El detalle (llegadas por día + venta día a día) SOLO viaja cuando se
+  // buscó UN código: es lo que arma la tarjeta del modelo y la medición del
+  // 80 %. Con 50 códigos pegados sería payload que nadie mira.
+  conDetalle = false,
 ): ArticuloCompras[] {
   const claves = new Set<string>();
   const k = (e: string, c: string) => `${e} ${c}`;
@@ -253,6 +258,7 @@ function fusionar(
           catalogoSyncedAt: inf?.synced_at ?? null,
         },
         hoy,
+        conDetalle,
       ),
     );
   }
@@ -310,7 +316,13 @@ export async function GET(req: NextRequest) {
         leerInfo(filtro),
       ]);
 
-      const articulos = fusionar(ventas, ingresos.filas, info.filas, hoy);
+      const articulos = fusionar(
+        ventas,
+        ingresos.filas,
+        info.filas,
+        hoy,
+        REFERENCIA_2026_09 && codigos.length === 1,
+      );
 
       // Un código pedido que no trajo NI UN artículo por prefijo, en NINGUNA
       // fuente: ese sí no existe. Los que trajeron colores no se reportan —

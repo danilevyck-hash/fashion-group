@@ -37,6 +37,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { signoTipo, mesDeFecha } from "./referencia";
+import { agruparLlegadasPorDia, type DiaVenta, type Llegada } from "./referencia-llegadas";
 
 /** % de importación para estimar el FOB donde Switch no lo desglosa. */
 export const PCT_IMPORTACION = 0.1;
@@ -467,6 +468,19 @@ export interface ArticuloCompras {
   precioEtiqueta: number | null;
   /** Frescura del dato de catálogo (existencia/precio). */
   catalogoSyncedAt: string | null;
+  /**
+   * 🔴 TODAS las llegadas agrupadas POR DÍA, la más vieja primero, SIN la
+   * ventana de 3 años de `compras`. Solo viaja con `REFERENCIA_2026_09` y en la
+   * búsqueda de UN código — es lo que necesitan la tarjeta del modelo («27
+   * llegadas desde oct 2022») y la medición del 80 %, que no pueden cortar la
+   * historia sin correr la fila de la bodega.
+   * `undefined` = no se pidió el detalle (o es una respuesta vieja cacheada).
+   */
+  llegadas?: Llegada[];
+  /** La venta NETA día por día, toda la historia. Misma puerta y mismo motivo
+   *  que `llegadas`: la medición del 80 % se cuenta en SEMANAS, y un mes no
+   *  alcanza para eso. */
+  ventasDia?: DiaVenta[];
 }
 
 export interface EntradaArticulo {
@@ -493,7 +507,13 @@ export function desdeDeVentana(hoy: string): string {
  * 🔴 NO mide ninguna compra por separado. La única aritmética que sobrevive es
  * de ARTÍCULO, y `hoy` solo se usa para saber dónde cortar los 3 años.
  */
-export function armarArticulo(e: EntradaArticulo, hoy: string): ArticuloCompras {
+export function armarArticulo(
+  e: EntradaArticulo,
+  hoy: string,
+  /** `true` = además viajan `llegadas` y `ventasDia` (ver sus notas). Cuesta
+   *  payload, así que lo pide SOLO la búsqueda de un código. */
+  conDetalle = false,
+): ArticuloCompras {
   const todasLasCompras = agruparCompras(e.ingresos);
   const dias = ventasNetasPorDia(e.ventas);
   const cotejo = cotejarVentasConCompras(todasLasCompras, dias);
@@ -527,6 +547,16 @@ export function armarArticulo(e: EntradaArticulo, hoy: string): ArticuloCompras 
     existencia: e.existencia,
     precioEtiqueta: e.precioEtiqueta,
     catalogoSyncedAt: e.catalogoSyncedAt,
+    // Las llegadas van POR DÍA y SIN recortar por la ventana de 3 años: la
+    // medición del 80 % necesita la fila entera de la bodega.
+    ...(conDetalle
+      ? {
+          llegadas: agruparLlegadasPorDia(
+            todasLasCompras.map((c) => ({ fecha: c.fecha, unidades: c.unidades })),
+          ),
+          ventasDia: dias.map((d) => ({ fecha: d.fecha, unidades: d.unidades })),
+        }
+      : {}),
   };
 }
 

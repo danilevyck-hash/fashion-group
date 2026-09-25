@@ -251,7 +251,19 @@ describe("UNA sola resolución para un código y para cincuenta", () => {
   it("🔴 el MISMO artículo sale idéntico buscado solo o dentro de la lista — la prueba de la resolución única", async () => {
     const solo = (await buscar("4D5029G")).body.articulos.find((a) => a.codigo === "4D5029G002");
     const enLista = (await buscar(LISTA_REAL_DANIEL)).body.articulos.find((a) => a.codigo === "4D5029G002");
-    expect(enLista).toEqual(solo);
+    // ⚠️ Desde el 25-sep-2026 la búsqueda de UN código lleva ADEMÁS el detalle
+    // (`llegadas` y `ventasDia`) que arma la tarjeta del modelo y la medición
+    // del 80 %. Es carga de más, no otra resolución: con 50 códigos pegados
+    // sería payload que nadie mira. Todo lo demás tiene que salir IDÉNTICO, que
+    // es lo que este candado protege.
+    const sinDetalle = (a: typeof solo) => {
+      if (!a) return a;
+      const { llegadas: _l, ventasDia: _v, ...resto } = a;
+      return resto;
+    };
+    expect(sinDetalle(enLista)).toEqual(sinDetalle(solo));
+    expect(solo?.llegadas).toBeDefined();
+    expect(enLista?.llegadas).toBeUndefined();
   });
 
   it("un código CON color pegado tal cual también se encuentra (es prefijo de sí mismo)", async () => {
