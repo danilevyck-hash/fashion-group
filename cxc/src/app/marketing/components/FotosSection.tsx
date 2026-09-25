@@ -11,8 +11,11 @@ import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { MARKETING_CELULAR } from "@/lib/marketing/celular";
 import {
   MARKETING_FOTOS_CON_PERIODO,
+  PREGUNTA_DE_LA_MARCA,
   avisoSinFotosDelPeriodo,
   fotosDelPeriodo,
+  necesitaElegirMarca,
+  type MarcaAbiertaDeLaTienda,
 } from "@/lib/marketing/fotos-periodo";
 import { PERIODO_ABIERTO, PERIODO_TODOS, ROTULO_ABIERTO } from "@/lib/marketing/periodo-manda";
 import { subirAdjunto } from "./uploadHelpers";
@@ -36,6 +39,16 @@ import { Ayuda } from "@/components/shared/Ayuda";
 // foto trae su período del servidor y acá solo se parte (`fotos-periodo.ts`,
 // puro). Sin `periodo` —la puerta del proyecto, o el interruptor apagado— se
 // ven todas, como hoy.
+//
+// 🔴 Y LA MARCA SE ELIGE CON UN TOQUE CUANDO HAY MÁS DE UNA (24-sep-2026).
+// Daniel: *«las fotos deben ir a la tienda del período abierto; un período
+// cerrado, nada debe entrar ni salir»*. Los períodos son POR MARCA y una
+// tienda puede tener DOS abiertos a la vez (medido: Outlet Duty Free N3 tiene
+// Calvin y Tommy). Con UNA sola no se pregunta nada; con dos o más salen los
+// nombres —botones de 44 px en el celular, un desplegable en la computadora—
+// y 🔴 NINGUNO viene puesto: hasta que se toque uno, el selector de archivo no
+// se abre. El SERVIDOR lo vuelve a validar, así que esto es comodidad, no la
+// regla.
 // ============================================================================
 
 interface FotosSectionProps {
@@ -67,6 +80,10 @@ export default function FotosSection({
   // entre abrir la foto y pedir borrarla son milímetros.
   // ⚠️ Solo en el celular: en la computadora hay hover y la × sigue igual.
   const [editandoFotos, setEditandoFotos] = useState(false);
+  // Las marcas con período ABIERTO de esta tienda, y la que se eligió. Nada
+  // viene puesto: elegir es un acto, nunca un default.
+  const [marcas, setMarcas] = useState<MarcaAbiertaDeLaTienda[]>([]);
+  const [marcaElegida, setMarcaElegida] = useState<string>("");
   // Borrar foto usa el patrón universal de "deshacer 5s": se quita de la UI al
   // instante y el DELETE real (foto + Storage) corre tras la ventana de undo.
   const { pendingUndo, scheduleAction, undoAction } = useUndoAction();
@@ -115,6 +132,30 @@ export default function FotosSection({
     cargar();
   }, [cargar]);
 
+  // 🔴 Falla ABIERTA: si esto no contesta, la lista queda vacía, no se pregunta
+  // nada y el servidor sella con lo que corresponda (o con nada).
+  useEffect(() => {
+    if (!MARKETING_FOTOS_CON_PERIODO || !tiendaCodigo || readonly) return;
+    let vivo = true;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/marketing/tienda/${encodeURIComponent(tiendaCodigo)}/fotos/marcas`,
+          { cache: "no-store" },
+        );
+        if (!res.ok) return;
+        const body = (await res.json()) as { marcas?: MarcaAbiertaDeLaTienda[] };
+        if (!vivo || !Array.isArray(body?.marcas)) return;
+        setMarcas(body.marcas);
+      } catch {
+        // Silencio a propósito: sin marcas no se pregunta y todo sigue igual.
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [tiendaCodigo, readonly]);
+
   // 🔴 Lo que se VE es lo del chip. El período solo manda en la puerta de la
   // tienda: la del proyecto no tiene chips y sigue mostrando todo.
   const clavePeriodo = tiendaCodigo && periodo ? periodo : PERIODO_TODOS;
@@ -129,18 +170,27 @@ export default function FotosSection({
     clavePeriodo !== PERIODO_TODOS &&
     clavePeriodo !== PERIODO_ABIERTO;
 
+  const hayQueElegirMarca = necesitaElegirMarca(marcas);
+  const marcaDelToque = marcas.find((m) => m.periodoId === marcaElegida) ?? null;
+
   const handleUpload = async (file: File): Promise<UploadResult> => {
     const adj = await subirAdjunto({
       file,
       proyectoId,
       tiendaCodigo,
+      periodoId: hayQueElegirMarca ? marcaElegida : undefined,
       tipo: "foto_proyecto",
     });
     // Re-fetch del servidor en lugar de optimistic state update.
     // La signed URL recién firmada puede no estar propagada en CDN — al
     // recargar lista, el endpoint vuelve a firmar con archivo ya disponible.
     await cargar();
-    toast(enUnCierre ? `Foto subida · está en «${ROTULO_ABIERTO}»` : "Foto subida", "success");
+    const aDonde = marcaDelToque
+      ? `Foto subida · va a ${marcaDelToque.nombre}`
+      : enUnCierre
+        ? `Foto subida · está en «${ROTULO_ABIERTO}»`
+        : "Foto subida";
+    toast(aDonde, "success");
     return {
       url: adj.url,
       nombreOriginal: adj.nombre_original ?? file.name,
@@ -175,6 +225,51 @@ export default function FotosSection({
   };
 
   const hayFotos = fotos.length > 0;
+  // 🔴 Con dos o más marcas abiertas, primero se elige y después se abre el
+  // selector de archivo. Ninguna viene puesta.
+  const faltaElegirLaMarca = hayQueElegirMarca && !marcaDelToque;
+  const preguntaDeLaMarca = hayQueElegirMarca ? (
+    <div className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
+      <p className="text-sm font-medium text-gray-900">{PREGUNTA_DE_LA_MARCA}</p>
+      {/* Celular: botones de 44 px, uno por marca. */}
+      <div className="flex flex-wrap gap-2 sm:hidden">
+        {marcas.map((m) => (
+          <button
+            key={m.periodoId}
+            type="button"
+            onClick={() => setMarcaElegida(m.periodoId)}
+            aria-pressed={marcaElegida === m.periodoId}
+            className={`min-h-[44px] rounded-md border px-3 text-sm active:scale-[0.97] ${
+              marcaElegida === m.periodoId
+                ? "border-black bg-black text-white"
+                : "border-gray-300 bg-white text-gray-800"
+            }`}
+          >
+            {m.nombre}
+          </button>
+        ))}
+      </div>
+      {/* Computadora: un desplegable, sin nada preseleccionado. */}
+      <select
+        value={marcaElegida}
+        onChange={(e) => setMarcaElegida(e.target.value)}
+        aria-label={PREGUNTA_DE_LA_MARCA}
+        className="hidden sm:block w-full max-w-xs rounded-md border border-gray-300 px-2 py-2 text-sm"
+      >
+        <option value="">Elige la marca…</option>
+        {marcas.map((m) => (
+          <option key={m.periodoId} value={m.periodoId}>
+            {m.nombre}
+          </option>
+        ))}
+      </select>
+      {faltaElegirLaMarca && (
+        <p className="text-xs text-gray-500">
+          Elige la marca y aparece el botón para subir la foto.
+        </p>
+      )}
+    </div>
+  ) : null;
 
   // Navegación del lightbox con flechas ‹ › y teclas ← → (igual que la galería
   // pública). Solo se navega entre fotos visualizables (no HEIC ni con error).
@@ -319,7 +414,8 @@ export default function FotosSection({
               );
             })}
           </div>
-          {!readonly && (
+          {!readonly && preguntaDeLaMarca}
+          {!readonly && !faltaElegirLaMarca && (
             <FotoUploader
               onUpload={handleUpload}
               accept="image/*"
@@ -334,13 +430,18 @@ export default function FotosSection({
           {avisoSinFotosDelPeriodo(clavePeriodo, !!tiendaCodigo)}
         </div>
       ) : (
-        <FotoUploader
-          onUpload={handleUpload}
-          label={tiendaCodigo ? "Sube fotos de la tienda" : "Sube fotos del proyecto"}
-          accept="image/*"
-          maxSizeMb={10}
-          multiple
-        />
+        <>
+          {preguntaDeLaMarca}
+          {!faltaElegirLaMarca && (
+            <FotoUploader
+              onUpload={handleUpload}
+              label={tiendaCodigo ? "Sube fotos de la tienda" : "Sube fotos del proyecto"}
+              accept="image/*"
+              maxSizeMb={10}
+              multiple
+            />
+          )}
+        </>
       )}
 
       {pendingUndo && (

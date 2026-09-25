@@ -34,6 +34,8 @@
 // el ZIP como antes. Ningún monto cambia ni con `true` ni con `false`.
 // ============================================================================
 
+import { MARCAS_BLOQUE, marcaBloquePorKey } from "./bloques";
+import { nombreDeProveedor } from "./cerrados-por-periodo";
 import { claveDelPeriodo, PERIODO_ABIERTO, PERIODO_TODOS, type PeriodoDelGasto } from "./periodo-manda";
 
 /** 🔴 El interruptor. `false` = las fotos como hoy y el ZIP como antes. */
@@ -113,7 +115,7 @@ export function periodoDeLaFoto(
 // ─── CON QUÉ PERÍODO NACE UNA FOTO ───────────────────────────────────────────
 
 /**
- * Un gasto de la tienda, para elegir a qué período abierto va la foto nueva.
+ * Un gasto de la tienda, para saber qué marcas tiene abiertas.
  * `cuando` es la fecha con la que se ordena (ISO o AAAA-MM-DD).
  */
 export interface GastoParaSellarFoto {
@@ -124,31 +126,181 @@ export interface GastoParaSellarFoto {
 }
 
 /**
- * 🔴 UNA FOTO DE TIENDA NACE EN EL PERÍODO ABIERTO DEL GASTO MÁS RECIENTE DE
- * ESA TIENDA. Es la regla y tiene su porqué: la foto se sube justo después de
- * registrar el gasto que documenta, así que acompaña a ese gasto y se le pasa
- * a la marca que lo pagó.
- *
- * ⚠️ Una tienda puede tener gastos de DOS marcas abiertos a la vez (medido:
- * D-118 tiene uno de Calvin y uno de Tommy del 21-sep). Ahí manda el más
- * reciente; empatados, el id de período más chico, para que la cuenta sea
- * siempre la misma.
- *
- * Sin gastos abiertos devuelve `null`: la foto queda sin sello, se ve en
- * «Abierto» y no viaja en ningún ZIP — exactamente lo de hoy.
+ * Los períodos ABIERTOS de una tienda, sin repetir, el del gasto MÁS RECIENTE
+ * primero. Empatados, el id más chico: la cuenta es siempre la misma.
+ */
+export function periodosAbiertosOrdenados(
+  gastos: ReadonlyArray<GastoParaSellarFoto>,
+): string[] {
+  const ordenados = [...gastos]
+    .filter((g) => g.periodosAbiertos.length > 0)
+    .sort((a, b) => {
+      const c = String(b.cuando ?? "").localeCompare(String(a.cuando ?? ""));
+      if (c !== 0) return c;
+      return String(a.documentoId).localeCompare(String(b.documentoId));
+    });
+  const vistos: string[] = [];
+  for (const g of ordenados) {
+    for (const pid of [...g.periodosAbiertos].map(String).sort()) {
+      if (pid && !vistos.includes(pid)) vistos.push(pid);
+    }
+  }
+  return vistos;
+}
+
+/**
+ * El período abierto del gasto MÁS RECIENTE de la tienda. Con UNA sola marca
+ * abierta es la respuesta entera; con dos o más es solo el primero de la
+ * lista, y quien sube la foto ELIGE (`destinoDeFotoNueva`).
  */
 export function periodoAbiertoParaFotoNueva(
   gastos: ReadonlyArray<GastoParaSellarFoto>,
 ): string | null {
-  const conPeriodo = gastos.filter((g) => g.periodosAbiertos.length > 0);
-  if (conPeriodo.length === 0) return null;
-  const ordenados = [...conPeriodo].sort((a, b) => {
-    const c = String(b.cuando ?? "").localeCompare(String(a.cuando ?? ""));
-    if (c !== 0) return c;
-    return String(a.documentoId).localeCompare(String(b.documentoId));
+  return periodosAbiertosOrdenados(gastos)[0] ?? null;
+}
+
+// ─── 🔴 LA FOTO VA A LA TIENDA DEL PERÍODO ABIERTO, Y LA MARCA SE ELIGE ──────
+//
+// Daniel, 24-sep-2026: *«las fotos deben ir a la tienda del período abierto;
+// un período cerrado, nada debe entrar ni salir»*. Los períodos son POR MARCA,
+// así que una tienda puede tener DOS abiertos a la vez — medido hoy: D-118
+// (Calvin + Tommy), D-170 (Tommy + Calvin) y el cajón «General»; D-87 tiene
+// una sola (Joybees).
+//
+//   · UNA marca abierta  → la foto va ahí, sin preguntar.
+//   · DOS o más          → se elige con un toque, y el SERVIDOR lo valida.
+//   · NINGUNA            → la foto queda sin sello y se ve en «Abierto».
+//   · un período CERRADO → no entra: 400 en español.
+
+/** Una marca con período ABIERTO en esta tienda: lo que se elige con un toque. */
+export interface MarcaAbiertaDeLaTienda {
+  /** `mk_periodos.id` — lo que se guarda en `mk_adjuntos.periodo_id`. */
+  periodoId: string;
+  /** `mk_periodos.proveedor_key`: la clave de la marca, o la de su casa. */
+  proveedorKey: string;
+  /** El nombre que se lee en el botón: «Tommy Hilfiger». */
+  nombre: string;
+}
+
+/** La pregunta, cuando hay más de una marca abierta. */
+export const PREGUNTA_DE_LA_MARCA = "¿De qué marca es la foto?";
+
+/** Falta elegir: la pantalla no la abrió, o el servidor no recibió nada. */
+export const AVISO_ELIGE_LA_MARCA =
+  "Esta tienda tiene más de una marca abierta. Elige a cuál va la foto antes de subirla.";
+
+/** La marca que llegó no tiene gastos abiertos en esta tienda. */
+export const AVISO_MARCA_AJENA =
+  "Esa marca no tiene gastos abiertos en esta tienda. Elige una de las que salen.";
+
+/** 🔴 A un período cerrado no entra ni sale nada. */
+export const AVISO_PERIODO_CERRADO =
+  "Ese período ya está cerrado: a un período cerrado no entra ni sale nada.";
+
+/** Cómo se lee una marca en pantalla; sin nombre conocido, su propia clave. */
+export function nombreDeMarcaAbierta(proveedorKey: string | null | undefined): string {
+  const k = String(proveedorKey ?? "").trim();
+  if (!k) return "";
+  return marcaBloquePorKey(k)?.nombreFallback ?? nombreDeProveedor(k) ?? k;
+}
+
+const ORDEN_DE_MARCA: ReadonlyMap<string, number> = new Map(
+  MARCAS_BLOQUE.map((m, i) => [String(m.key), i] as const),
+);
+
+/**
+ * Las marcas abiertas, sin repetir y en el orden de siempre (el de
+ * `MARCAS_BLOQUE`); lo que no es una marca conocida va al final, por nombre.
+ * 🔴 Nada se preselecciona: esto solo decide cómo se DIBUJAN los botones.
+ */
+export function marcasAbiertasOrdenadas(
+  crudas: ReadonlyArray<{ periodoId: string; proveedorKey: string }>,
+): MarcaAbiertaDeLaTienda[] {
+  const porPeriodo = new Map<string, MarcaAbiertaDeLaTienda>();
+  for (const c of crudas) {
+    const periodoId = String(c.periodoId ?? "").trim();
+    if (!periodoId || porPeriodo.has(periodoId)) continue;
+    const proveedorKey = String(c.proveedorKey ?? "").trim();
+    porPeriodo.set(periodoId, {
+      periodoId,
+      proveedorKey,
+      nombre: nombreDeMarcaAbierta(proveedorKey) || periodoId,
+    });
+  }
+  const lugar = (m: MarcaAbiertaDeLaTienda) =>
+    ORDEN_DE_MARCA.get(m.proveedorKey.toUpperCase()) ?? ORDEN_DE_MARCA.size;
+  return [...porPeriodo.values()].sort((a, b) => {
+    const d = lugar(a) - lugar(b);
+    if (d !== 0) return d;
+    return a.nombre.localeCompare(b.nombre, "es");
   });
-  const del = [...ordenados[0].periodosAbiertos].map(String).sort();
-  return del[0] ?? null;
+}
+
+/** ¿Hay que preguntar? Solo con DOS o más marcas abiertas. */
+export function necesitaElegirMarca(
+  opciones: ReadonlyArray<MarcaAbiertaDeLaTienda>,
+): boolean {
+  return MARKETING_FOTOS_CON_PERIODO && opciones.length >= 2;
+}
+
+/** La marca elegida, buscada por id de período O por su clave. Nunca por parecido. */
+export function marcaElegidaEntre(
+  opciones: ReadonlyArray<MarcaAbiertaDeLaTienda>,
+  elegido: string | null | undefined,
+): MarcaAbiertaDeLaTienda | null {
+  const e = String(elegido ?? "").trim();
+  if (!e) return null;
+  const porId = opciones.find((o) => o.periodoId === e);
+  if (porId) return porId;
+  const k = e.toUpperCase();
+  return opciones.find((o) => o.proveedorKey.toUpperCase() === k) ?? null;
+}
+
+/** Lo que el servidor decide con lo que llegó. */
+export interface DestinoDeFotoNueva {
+  /** `true` = se puede guardar. `false` = 400 con `error`. */
+  ok: boolean;
+  /** El sello que va en `mk_adjuntos.periodo_id`. `null` = sin sello. */
+  periodoId: string | null;
+  /** El aviso en español, cuando no se puede. */
+  error: string | null;
+  /** Había que preguntar y no llegó nada elegido. */
+  faltaElegir: boolean;
+}
+
+/**
+ * 🔴 A QUÉ PERÍODO VA UNA FOTO NUEVA. Una sola regla, la misma para la puerta,
+ * la pantalla y el script de rescate:
+ *
+ *   · sin marcas abiertas → sin sello (se ve en «Abierto», como hoy);
+ *   · una sola            → esa, sin preguntar;
+ *   · dos o más           → la elegida, y sin elección es 400;
+ *   · una marca que no está entre las abiertas → 400, nunca se adivina.
+ *
+ * Con el interruptor apagado no se sella nada: la pantalla de antes.
+ */
+export function destinoDeFotoNueva(
+  opciones: ReadonlyArray<MarcaAbiertaDeLaTienda>,
+  elegido: string | null | undefined,
+): DestinoDeFotoNueva {
+  if (!MARKETING_FOTOS_CON_PERIODO) {
+    return { ok: true, periodoId: null, error: null, faltaElegir: false };
+  }
+  const e = String(elegido ?? "").trim();
+  const match = marcaElegidaEntre(opciones, e);
+  if (e && !match) {
+    return { ok: false, periodoId: null, error: AVISO_MARCA_AJENA, faltaElegir: false };
+  }
+  if (opciones.length === 0) {
+    return { ok: true, periodoId: null, error: null, faltaElegir: false };
+  }
+  if (match) {
+    return { ok: true, periodoId: match.periodoId, error: null, faltaElegir: false };
+  }
+  if (opciones.length === 1) {
+    return { ok: true, periodoId: opciones[0].periodoId, error: null, faltaElegir: false };
+  }
+  return { ok: false, periodoId: null, error: AVISO_ELIGE_LA_MARCA, faltaElegir: true };
 }
 
 // ─── CUANDO LA BASE TODAVÍA NO TIENE LA REGLA NUEVA ──────────────────────────

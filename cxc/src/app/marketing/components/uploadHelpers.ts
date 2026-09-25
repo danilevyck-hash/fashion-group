@@ -56,6 +56,13 @@ interface UploadArgs {
    * `tienda_codigo`. Sin él, todo como siempre.
    */
   tiendaCodigo?: string;
+  /**
+   * 🔴 LA MARCA ELEGIDA (24-sep-2026). Los períodos son POR MARCA y una tienda
+   * puede tener DOS abiertos a la vez: cuando hay más de uno, la pantalla lo
+   * pregunta y manda acá el `mk_periodos.id` elegido. El SERVIDOR lo vuelve a
+   * validar; esto es solo el mensajero.
+   */
+  periodoId?: string | null;
   tipo: TipoAdjunto;
 }
 
@@ -78,6 +85,7 @@ export async function subirAdjunto({
   proyectoId,
   facturaId,
   tiendaCodigo,
+  periodoId,
   tipo,
 }: UploadArgs): Promise<AdjuntoCreado> {
   // 1) Pedir signed upload URL
@@ -120,6 +128,7 @@ export async function subirAdjunto({
           url: path,
           nombreOriginal: file.name,
           sizeBytes: file.size,
+          periodoId: periodoId ?? undefined,
         }),
       })
     : await fetch("/api/marketing/adjuntos", {

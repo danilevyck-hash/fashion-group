@@ -25,14 +25,17 @@ import { esCodigoGeneral, VISTA_TIENDA } from "@/lib/marketing/vista-tienda";
 import { TIENDA_GENERAL } from "@/lib/marketing/gasto";
 import {
   AVISO_FALTA_LA_MIGRACION,
+  AVISO_PERIODO_CERRADO,
   MARKETING_FOTOS_CON_PERIODO,
+  destinoDeFotoNueva,
   esLaReglaDeDestino,
   periodoDeLaFoto,
 } from "@/lib/marketing/fotos-periodo";
 import {
   borrarDelCajon,
+  estadoDelPeriodo,
   leerPeriodosDeFotos,
-  periodoAbiertoDeLaTienda,
+  marcasAbiertasDeLaTienda,
 } from "@/lib/marketing/fotos-periodo-server";
 import type { MkAdjunto } from "@/lib/marketing/types";
 
@@ -125,6 +128,13 @@ async function conSuPeriodo(
  * cuadrícula la muestre bajo el chip que corresponde y el ZIP de la marca la
  * lleve cuando ese período cierre.
  *
+ * 🔴 Y LA MARCA SE ELIGE CUANDO HAY MÁS DE UNA (24-sep-2026). Daniel: *«las
+ * fotos deben ir a la tienda del período abierto; un período cerrado, nada
+ * debe entrar ni salir»*. Los períodos son POR MARCA: con UNA abierta la foto
+ * va ahí sin preguntar; con DOS o más llega `periodoId` (o `marca`) y el
+ * SERVIDOR valida que sea de una marca con gasto ABIERTO en ESTA tienda. Lo
+ * que no cuadra es 400 en español y el archivo se borra del cajón.
+ *
  * 🔴 Falla ABIERTA: sin la columna, se guarda como antes —sin tienda ni
  * sello— y se dice en el log; la foto NO se pierde. 🩸 Y si la base rechaza
  * la fila por la regla vieja (`mk_adjuntos_destino_chk` exige proyecto), el
@@ -153,6 +163,9 @@ export async function POST(
       url?: string;
       nombreOriginal?: string;
       sizeBytes?: number;
+      /** El período ABIERTO elegido, o la clave de la marca a la que pertenece. */
+      periodoId?: string;
+      marca?: string;
     };
     const url = String(body?.url ?? "").trim();
     if (url.length === 0) {
@@ -166,11 +179,30 @@ export async function POST(
       nombre_original: String(body?.nombreOriginal ?? "").trim() || null,
       size_bytes: Number.isFinite(Number(body?.sizeBytes)) ? Number(body?.sizeBytes) : null,
     };
-    // El sello: el período ABIERTO del gasto más reciente de esta tienda.
-    // Nunca lanza y nunca frena la subida (`null` = foto sin sello).
-    const periodoId = MARKETING_FOTOS_CON_PERIODO
-      ? await periodoAbiertoDeLaTienda(codigo)
-      : null;
+    // 🔴 El sello lo decide UNA sola función (`destinoDeFotoNueva`, pura) sobre
+    // las marcas ABIERTAS de esta tienda. Leerlas nunca lanza y una lista vacía
+    // deja la foto sin sello, como hoy.
+    const elegido = String(body?.periodoId ?? body?.marca ?? "").trim();
+    const marcas = MARKETING_FOTOS_CON_PERIODO
+      ? await marcasAbiertasDeLaTienda(codigo)
+      : [];
+    const destino = destinoDeFotoNueva(marcas, elegido);
+    if (!destino.ok) {
+      // Lo que llegó no es una marca abierta de esta tienda: si el período
+      // existe y ya cerró, se dice con su nombre — a un cerrado no entra nada.
+      const cerrado =
+        !destino.faltaElegir && elegido ? (await estadoDelPeriodo(elegido)) === "cerrado" : false;
+      await borrarDelCajon(url);
+      return NextResponse.json(
+        {
+          error: cerrado ? AVISO_PERIODO_CERRADO : destino.error,
+          faltaElegir: destino.faltaElegir,
+          marcas,
+        },
+        { status: 400 },
+      );
+    }
+    const periodoId = destino.periodoId;
     const conTienda: Record<string, unknown> = { ...base, tienda_codigo: codigo };
     if (periodoId) conTienda.periodo_id = periodoId;
     let { data, error } = await supabaseServer

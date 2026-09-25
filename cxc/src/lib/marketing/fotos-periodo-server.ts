@@ -12,8 +12,10 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { esColumnaAusente } from "./columnas-opcionales";
 import { esPathStorage } from "./storage";
 import {
-  periodoAbiertoParaFotoNueva,
+  marcasAbiertasOrdenadas,
+  periodosAbiertosOrdenados,
   type GastoParaSellarFoto,
+  type MarcaAbiertaDeLaTienda,
   type PeriodoLeidoParaFoto,
 } from "./fotos-periodo";
 
@@ -29,16 +31,21 @@ function avisar(donde: string, detalle: unknown) {
 }
 
 /**
- * Con qué período nace una foto de esta tienda: el ABIERTO del gasto más
- * reciente de la tienda (`periodoAbiertoParaFotoNueva`). `null` = sin sello.
+ * 🔴 LAS MARCAS CON PERÍODO ABIERTO EN ESTA TIENDA — lo que se elige con un
+ * toque cuando hay más de una.
  *
  * Son tres lecturas: los gastos vivos de la tienda, sus sellos y los períodos
- * de esos sellos. Corre UNA vez por foto subida.
+ * de esos sellos. Corre UNA vez al abrir la ficha y UNA por foto subida.
+ *
+ * Falla ABIERTA: cualquier tropiezo devuelve la lista VACÍA, y con lista vacía
+ * la foto se guarda sin sello — exactamente lo de hoy.
  */
-export async function periodoAbiertoDeLaTienda(codigo: string): Promise<string | null> {
+export async function marcasAbiertasDeLaTienda(
+  codigo: string,
+): Promise<MarcaAbiertaDeLaTienda[]> {
   try {
     const tienda = txt(codigo).toUpperCase();
-    if (!tienda) return null;
+    if (!tienda) return [];
 
     const [facRes, entRes] = await Promise.all([
       supabaseServer
@@ -53,11 +60,11 @@ export async function periodoAbiertoDeLaTienda(codigo: string): Promise<string |
     ]);
     if (facRes.error && !esColumnaAusente(facRes.error)) {
       avisar("facturas", facRes.error.message);
-      return null;
+      return [];
     }
     if (entRes.error && !esColumnaAusente(entRes.error)) {
       avisar("entregas", entRes.error.message);
-      return null;
+      return [];
     }
 
     const cuandoDe = (f: Fila) => txt(f.created_at) || txt(f.fecha_factura);
@@ -65,7 +72,7 @@ export async function periodoAbiertoDeLaTienda(codigo: string): Promise<string |
       ...((facRes.data ?? []) as Fila[]).map((f) => ({ id: txt(f.id), cuando: cuandoDe(f) })),
       ...((entRes.data ?? []) as Fila[]).map((e) => ({ id: txt(e.id), cuando: cuandoDe(e) })),
     ].filter((g) => g.id.length > 0);
-    if (gastos.length === 0) return null;
+    if (gastos.length === 0) return [];
 
     const selRes = await supabaseServer
       .from("mk_periodo_documentos")
@@ -73,28 +80,31 @@ export async function periodoAbiertoDeLaTienda(codigo: string): Promise<string |
       .in("documento_id", gastos.map((g) => g.id));
     if (selRes.error) {
       avisar("sellos", selRes.error.message);
-      return null;
+      return [];
     }
     const sellos = (selRes.data ?? []) as Fila[];
     const idsPeriodo = [...new Set(sellos.map((s) => txt(s.periodo_id)).filter(Boolean))];
-    if (idsPeriodo.length === 0) return null;
+    if (idsPeriodo.length === 0) return [];
 
+    // 🔴 SOLO LOS ABIERTOS. A un período cerrado no entra ni sale nada, así
+    // que ninguno cerrado llega siquiera a ser una opción.
     const perRes = await supabaseServer
       .from("mk_periodos")
-      .select("id, estado")
+      .select("id, proveedor_key, estado")
       .in("id", idsPeriodo)
       .eq("estado", "abierto");
     if (perRes.error) {
       avisar("periodos", perRes.error.message);
-      return null;
+      return [];
     }
-    const abiertos = new Set(((perRes.data ?? []) as Fila[]).map((p) => txt(p.id)));
-    if (abiertos.size === 0) return null;
+    const marcaDe = new Map<string, string>();
+    for (const p of (perRes.data ?? []) as Fila[]) marcaDe.set(txt(p.id), txt(p.proveedor_key));
+    if (marcaDe.size === 0) return [];
 
     const porDoc = new Map<string, string[]>();
     for (const s of sellos) {
       const pid = txt(s.periodo_id);
-      if (!abiertos.has(pid)) continue;
+      if (!marcaDe.has(pid)) continue;
       const doc = txt(s.documento_id);
       porDoc.set(doc, [...(porDoc.get(doc) ?? []), pid]);
     }
@@ -104,9 +114,42 @@ export async function periodoAbiertoDeLaTienda(codigo: string): Promise<string |
       cuando: g.cuando,
       periodosAbiertos: porDoc.get(g.id) ?? [],
     }));
-    return periodoAbiertoParaFotoNueva(entrada);
+    return marcasAbiertasOrdenadas(
+      periodosAbiertosOrdenados(entrada).map((periodoId) => ({
+        periodoId,
+        proveedorKey: marcaDe.get(periodoId) ?? "",
+      })),
+    );
   } catch (err) {
-    avisar("periodoAbiertoDeLaTienda", err);
+    avisar("marcasAbiertasDeLaTienda", err);
+    return [];
+  }
+}
+
+/**
+ * 🔴 EL ESTADO DE UN PERÍODO, PARA DECIRLO CON SU NOMBRE. Solo se pregunta
+ * cuando lo que llegó no está entre las marcas abiertas: sirve para separar
+ * «ese período ya está cerrado» de «esa marca no es de esta tienda».
+ *
+ * `null` = no se sabe (no existe, o la lectura falló): el aviso general.
+ */
+export async function estadoDelPeriodo(periodoId: string): Promise<string | null> {
+  try {
+    const id = txt(periodoId);
+    if (!id) return null;
+    const { data, error } = await supabaseServer
+      .from("mk_periodos")
+      .select("id, estado")
+      .eq("id", id)
+      .limit(1);
+    if (error) {
+      avisar("estadoDelPeriodo", error.message);
+      return null;
+    }
+    const fila = ((data ?? []) as Fila[])[0];
+    return fila ? txt(fila.estado) || null : null;
+  } catch (err) {
+    avisar("estadoDelPeriodo", err);
     return null;
   }
 }
