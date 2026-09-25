@@ -185,23 +185,21 @@ export const ROTULO_DESCARGAR_COMISIONES = "Descargar";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 9r · «Mandar» desde el detalle del vendedor
+//
+// 🩸 ACÁ VIVÍAN `OPCIONES_MANDAR`, `ComoSeManda` y `tituloDeLaHojaMandar`: las
+// tres salidas de una hoja NUESTRA —Correo · WhatsApp · Copiar el link— con su
+// título. Se fueron el 25-sep-2026, el mismo día que nacieron. Daniel, textual:
+// *«¿Copiar link y WhatsApp es necesario? Si se me abre el PDF como en Guías,
+// se manda a su chat y ya; así quitas esos botones extra»*.
+//
+// 🔴 Ahora «Mandar» abre la HOJA DE COMPARTIR DEL TELÉFONO con el PDF, igual que
+// «Compartir» de Guías: WhatsApp y el correo están ahí, en la lista del propio
+// aparato, y en la computadora el papel se descarga. La regla vive en
+// `lib/comisiones/mandar.ts`. Queda el rótulo, que no cambió.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Las tres salidas, las MISMAS del estado de cuenta de Cuentas por Cobrar. */
-export type ComoSeManda = "correo" | "whatsapp" | "link";
-
-export const OPCIONES_MANDAR: { clave: ComoSeManda; rotulo: string }[] = [
-  { clave: "correo", rotulo: "Correo" },
-  { clave: "whatsapp", rotulo: "WhatsApp" },
-  { clave: "link", rotulo: "Copiar el link" },
-];
-
+/** El rótulo del botón. Sigue diciendo lo mismo. */
 export const ROTULO_MANDAR = "Mandar";
-
-/** «Mandar la comisión de agosto a Reynaldo Espinosa» — el título de la hoja. */
-export function tituloDeLaHojaMandar(mes: string, vendedor: string): string {
-  return `Mandar la comisión de ${mesEnPalabras(mes)} a ${vendedor}`;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Cosas de orden · van sin preguntar y no cambian ningún número

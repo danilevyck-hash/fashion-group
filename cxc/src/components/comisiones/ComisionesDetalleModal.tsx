@@ -56,8 +56,11 @@ import { nombreArchivoComision } from "@/lib/comisiones/nombre-archivo";
 // 🔴 EL PDF SE ARMA EN UN SOLO LUGAR: la flechita de la celda baja el MISMO
 // reporte sin abrir esta pantalla, y dos generadores es cómo se llega a que el
 // archivo de un camino y el del otro no se parezcan.
-import { construirPdfComision, descargarPdfComision } from "@/lib/comisiones/pdf-comision";
-import { anotarDescargaComision } from "@/lib/comisiones/rastro";
+import { descargarPdfComision } from "@/lib/comisiones/pdf-comision";
+// 🔴 «Mandar» = la hoja de compartir del teléfono con el PDF, igual que
+// «Compartir» de Guías. El papel es el MISMO que baja «Descargar».
+import { PAPEL_DESCARGADO, compartirComision } from "@/lib/comisiones/mandar";
+import { anotarDescargaComision, anotarMandarComision } from "@/lib/comisiones/rastro";
 import { etiquetaPeriodo } from "@/lib/comisiones/periodo";
 import {
   AVISO_DESLIZA,
@@ -66,7 +69,6 @@ import {
   ROTULO_MANDAR,
 } from "@/lib/comisiones/celular";
 import { useEsCelularComisiones } from "./celular/useEsCelularComisiones";
-import { HojaMandarComision } from "./celular/HojaMandarComision";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -147,7 +149,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
     setPuedeEditarDescuentos(ROLES_EDITAR_DESCUENTOS.includes(r));
   }, []);
   const [loading, setLoading] = useState(true);
-  /** 🔴 La hoja de «Mandar» (la «9r»). */
+  /** 🔴 «Mandar» (la «9r»): mientras el aparato tiene la hoja abierta. */
   const [mandando, setMandando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const enCelular = useEsCelularComisiones();
@@ -220,6 +222,38 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
   const anotar = (formato: "pdf" | "excel") =>
     anotarDescargaComision(formato, { alcance: "vendedor", vendedor, empresa, year, mes });
 
+  /**
+   * 🔴 «MANDAR» — el PDF a la hoja de compartir del teléfono (25-sep-2026).
+   *
+   * 🩸 EL PAPEL SE ARMA DENTRO DEL TOQUE, sin un solo `await` antes: Safari en
+   * iOS solo abre la hoja de compartir como parte del gesto, y un `await` de red
+   * en el medio la bloquea (la misma regla de la nota de entrega de Mobiliario).
+   * Por eso el detalle ya está cargado —el botón se apaga sin él— y
+   * `compartirComision` construye el archivo de forma SÍNCRONA.
+   *
+   * 🔴 EL PDF ES EL MISMO QUE BAJA «DESCARGAR»: `construirPdfComision`, adentro
+   * de `lib/comisiones/mandar.ts`. No hay un segundo generador.
+   */
+  async function mandar() {
+    if (!data || mandando) return;
+    setMandando(true);
+    try {
+      const como = await compartirComision(
+        [{ data, descuentos, empresaNombre, vendedor, year, mes }],
+        nombreArchivo,
+        nombreVendedorEnPantalla(vendedor),
+        etiquetaPeriodo(year, mes),
+      );
+      // 🔴 Se anota DESPUÉS de que el papel salió, nunca antes.
+      anotarMandarComision(como, { alcance: "vendedor", vendedor, empresa, year, mes });
+      // Cancelar no es un error y no se dice nada; la descarga sí se avisa,
+      // porque en la computadora el archivo se fue a la carpeta de siempre.
+      if (como === "descargado") setAviso(PAPEL_DESCARGADO);
+    } finally {
+      setMandando(false);
+    }
+  }
+
   // ── Encabezado (título + total arriba + botones) ────────────────────────────
   const encabezado = (
     <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-200 p-4">
@@ -253,15 +287,20 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
 
       <div className="flex items-center gap-2">
         {/* 🔴 «MANDAR» VIVE EN EL DETALLE DEL VENDEDOR (25-sep-2026, la «9r»):
-            es donde se está mirando lo que se va a mandar. Abre la MISMA hoja
-            de tres salidas del estado de cuenta de Cuentas por Cobrar. */}
+            es donde se está mirando lo que se va a mandar.
+
+            🔴 ABRE LA HOJA DE COMPARTIR DEL TELÉFONO CON EL PDF, igual que
+            «Compartir» de Guías — WhatsApp y el correo salen ahí, en la lista
+            del propio aparato. En la computadora, el papel se descarga.
+            🩸 El PDF se arma DENTRO del toque, sin un `await` en el medio: iOS
+            no abre la hoja si el gesto se pierde. */}
         <button
-          onClick={() => setMandando(true)}
-          disabled={!data}
+          onClick={() => void mandar()}
+          disabled={!data || mandando}
           data-boton-mandar
           className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md bg-gray-900 px-3 text-sm text-white transition active:scale-[0.97] disabled:opacity-40"
         >
-          <Send className="h-3.5 w-3.5" /> {ROTULO_MANDAR}
+          <Send className="h-3.5 w-3.5" /> {mandando ? "Preparando…" : ROTULO_MANDAR}
         </button>
         <button
           onClick={() => {
@@ -541,40 +580,15 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
   // otra forma. Con el PDF armado en código, el modal y el detalle de abajo bajan
   // el MISMO archivo sin montar nada.
 
-  /**
-   * El papel para «Mandar»: el MISMO que baja «Descargar», armado con
-   * `construirPdfComision`. De acá salen sus bytes y nada más.
-   */
-  const armarPdf = async () => {
-    if (!data) throw new Error("Todavía no cargó el detalle.");
-    const doc = construirPdfComision([
-      { data, descuentos, empresaNombre, vendedor, year, mes },
-    ]);
-    const base64 = doc.output("datauristring").split(",")[1] ?? "";
-    return { base64, nombre: nombreArchivo };
-  };
-
-  const laHojaDeMandar = (
-    <>
-      <HojaMandarComision
-        abierta={mandando}
-        onCerrar={() => setMandando(false)}
-        vendedor={nombreVendedorEnPantalla(vendedor)}
-        empresa={empresaNombre}
-        mes={`${year}-${String(mes).padStart(2, "0")}`}
-        year={year}
-        mesNumero={mes}
-        periodo={etiquetaPeriodo(year, mes)}
-        armarPdf={armarPdf}
-        onAviso={setAviso}
-      />
-      {aviso && (
-        <div role="status" className="fixed inset-x-0 bottom-4 z-[80] mx-auto w-fit rounded-full bg-gray-900 px-4 py-2 text-sm text-white">
-          {aviso}
-        </div>
-      )}
-    </>
-  );
+  /** El acuse de «Mandar», cuando hay algo que decir. */
+  const laHojaDeMandar = aviso ? (
+    <div
+      role="status"
+      className="fixed inset-x-0 bottom-4 z-[80] mx-auto w-fit rounded-full bg-gray-900 px-4 py-2 text-sm text-white"
+    >
+      {aviso}
+    </div>
+  ) : null;
 
   if (inline) {
     return (

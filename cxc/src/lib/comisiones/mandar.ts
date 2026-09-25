@@ -1,81 +1,90 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// 🔴 MANDARLE LA COMISIÓN AL VENDEDOR — la «9r» (25-sep-2026).
+// 🔴 MANDARLE LA COMISIÓN AL VENDEDOR — LA HOJA DE COMPARTIR DEL TELÉFONO,
+//    COMO EN GUÍAS (25-sep-2026, la «9r», corregida el mismo día).
 //
-// 🩸 QUÉ VINO A ARREGLAR: el papel de un vendedor se BAJABA al teléfono y de
-// ahí había que buscarlo en la carpeta de descargas y adjuntarlo a mano. Ahora
-// «Mandar» vive en el detalle del vendedor —que es donde se está mirando lo que
-// se va a mandar— y abre la MISMA hoja de tres salidas del estado de cuenta de
-// Cuentas por Cobrar: **Correo · WhatsApp · Copiar el link**.
+// Daniel, textual, mirando la hoja de tres botones: *«¿Copiar link y WhatsApp
+// es necesario? Si se me abre el PDF como en Guías, se manda a su chat y ya;
+// así quitas esos botones extra»*.
 //
-// 🔴 EL PDF ES EL MISMO QUE BAJA «DESCARGAR». No hay un segundo generador: la
-// pantalla arma el papel con `construirPdfComision` —el de siempre— y manda sus
-// BYTES. Si el papel cambia, cambia el que se manda, sin tocar este archivo.
+// 🩸 QUÉ SE FUE, Y POR QUÉ. La primera versión abría una hoja NUESTRA con tres
+// salidas —Correo · WhatsApp · Copiar el link—. Eran tres caminos para lo mismo,
+// y dos de ellos pedían un cajón de Storage (`comisiones-papeles`) que **nunca
+// existió**: el link se firmaba contra un cajón inexistente. El teléfono ya
+// tiene esa lista, es la suya, está en español y la persona la conoce — WhatsApp
+// y el correo salen ahí, sin que nosotros los dibujemos.
 //
-// 🔑 EL CORREO PIDE LA DIRECCIÓN. El sistema no guarda el correo de ningún
-// vendedor: `comision_vendedor_tasa` y `comision_vendedor_alias` solo tienen el
-// nombre. Inventar una dirección sería peor que preguntarla.
+// 🔴 ES EXACTAMENTE LO QUE HACE «COMPARTIR» DE GUÍAS (`lib/guias/papel-de-la-
+// guia.ts`): se arma el PDF y se le entrega al sistema. En el celular sale la
+// hoja de compartir; en la computadora —donde esa hoja no existe— se DESCARGA,
+// que ahí es lo correcto y no un plan B pobre.
 //
-// ⚠️ EL LINK NECESITA UN CAJÓN EN STORAGE. Cuentas por Cobrar **no tiene** link
-// firmado —copia el texto del mensaje y adjunta el PDF al correo—, así que este
-// mecanismo es nuevo y sigue el patrón de los ZIP de Marketing: subir el
-// archivo a un cajón PRIVADO y firmar la dirección por **30 días**
-// (`firmarPath` + `createSignedUrl`). El cajón es `comisiones-papeles` y se
-// crea UNA vez; mientras no exista, la ruta contesta que no se pudo y las dos
-// salidas que dependen del link se apagan **diciendo por qué** — nunca se manda
-// un link roto.
+// 🔴 EL PDF ES EL MISMO QUE BAJA «DESCARGAR». No hay un segundo generador: lo
+// arma `construirPdfComision`, el de siempre. Si el papel cambia, cambia el que
+// se manda, sin tocar este archivo.
+//
+// 🩸 EL ARCHIVO SE ARMA SIN UN SOLO `await` EN EL MEDIO, a propósito: Safari en
+// iOS solo abre la hoja de compartir DENTRO del gesto del toque, y un `await` de
+// red hace que deje de contarlo como tal (la misma regla de la nota de entrega
+// de Mobiliario). Por eso `archivoDeLaComision` es SÍNCRONA y quien la llama
+// tiene el detalle ya cargado.
+//
+// 🔑 NO HAY CORREO PROPIO, y no es un olvido. Guías tampoco lo ofrece: el correo
+// es una de las opciones de la hoja del teléfono. Y el sistema no guarda el
+// correo de ningún vendedor (`comision_vendedor_tasa` y `comision_vendedor_alias`
+// solo tienen el nombre), así que pedirlo a mano era un formulario de más.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** El cajón privado donde vive el papel de una comisión mientras dura el link. */
-export const CAJON_PAPELES = "comisiones-papeles";
+import { compartirArchivo, type ResultadoCompartir } from "@/lib/compartir-archivo";
+import { construirPdfComision } from "./pdf-comision";
+import type { HojaReporte } from "./reporte-comision";
 
-/** 30 días, el mismo plazo que los ZIP de Marketing. */
-export const DIAS_DEL_LINK = 30;
-export const TTL_LINK_SEGUNDOS = 60 * 60 * 24 * DIAS_DEL_LINK;
+/**
+ * 🩸 EL CAJÓN QUE NO SE CREÓ. `comisiones-papeles` era el bucket privado donde
+ * iba a vivir el papel mientras durara el link firmado de 30 días. **No existe
+ * en Storage y ya no hace falta**: con la hoja de compartir el archivo va del
+ * teléfono al chat sin pasar por ningún cajón. Se deja escrito acá —sin un solo
+ * lector— para que nadie lo vuelva a inventar creyendo que falta.
+ */
+export const CAJON_QUE_NO_SE_CREO = "comisiones-papeles";
 
-/** El remitente. El mismo de las alertas y los reportes del sistema. */
-export const REMITENTE_COMISIONES = "Fashion Group <notificaciones@fashiongr.com>";
+/** El título que ve la hoja de compartir. Corto: es lo que se lee arriba. */
+export function tituloDeLoQueSeComparte(vendedor: string, periodo: string): string {
+  return `Comisión de ${periodo} — ${vendedor}`;
+}
 
-/** Dónde se guarda el papel: por año, mes y vendedor, con la marca de tiempo. */
-export function pathDelPapel(
-  year: number,
-  mes: number,
+/** El texto que acompaña al archivo en el chat o en el correo. */
+export function textoDeLoQueSeComparte(vendedor: string, periodo: string): string {
+  return `${vendedor} — comisión de ${periodo}. Fashion Group`;
+}
+
+/**
+ * El archivo que sale por «Mandar»: **el PDF, siempre**, el mismo de
+ * «Descargar». Síncrona a propósito (ver arriba).
+ */
+export function archivoDeLaComision(hojas: HojaReporte[], nombreSinExtension: string): File {
+  const blob = construirPdfComision(hojas).output("blob");
+  return new File([blob], `${nombreSinExtension}.pdf`, { type: "application/pdf" });
+}
+
+/**
+ * Abre la hoja de compartir del celular con el papel de la comisión (WhatsApp,
+ * correo, AirDrop). En la computadora lo descarga.
+ *
+ * Devuelve `"cancelado"` cuando la persona cierra la hoja sin elegir nada: no es
+ * un error y no se muestra como tal.
+ */
+export async function compartirComision(
+  hojas: HojaReporte[],
+  nombreSinExtension: string,
   vendedor: string,
-  empresa: string,
-  ahoraIso: string,
-): string {
-  const limpio = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "x";
-  const sello = ahoraIso.replace(/[^0-9]/g, "").slice(0, 14);
-  return `${year}/${String(mes).padStart(2, "0")}/${limpio(empresa)}-${limpio(vendedor)}-${sello}.pdf`;
+  periodo: string,
+): Promise<ResultadoCompartir> {
+  const archivo = archivoDeLaComision(hojas, nombreSinExtension);
+  return compartirArchivo(archivo, {
+    title: tituloDeLoQueSeComparte(vendedor, periodo),
+    text: textoDeLoQueSeComparte(vendedor, periodo),
+  });
 }
 
-/** El asunto del correo. Sin jerga: dice el mes y de quién es. */
-export function asuntoDelCorreo(vendedor: string, periodo: string): string {
-  return `Tu comisión de ${periodo} — ${vendedor}`;
-}
-
-/** El cuerpo del correo, en texto simple. */
-export function cuerpoDelCorreo(vendedor: string, periodo: string): string {
-  return [
-    `Hola ${vendedor},`,
-    "",
-    `Te va el detalle de tu comisión de ${periodo}, en el archivo adjunto.`,
-    "",
-    "Cualquier cosa, respóndele a este correo.",
-    "",
-    "Fashion Group",
-  ].join("\n");
-}
-
-/** El mensaje de WhatsApp. Lleva el link, que caduca a los 30 días. */
-export function mensajeDeWhatsApp(vendedor: string, periodo: string, link: string): string {
-  return `Hola ${vendedor}, aquí está tu comisión de ${periodo}: ${link}\n\nEl enlace vence en ${DIAS_DEL_LINK} días.`;
-}
-
-/** Lo que se dice cuando el cajón todavía no existe. Sin códigos ni jerga. */
-export const SIN_CAJON =
-  "Todavía no se puede armar el enlace. Manda el papel por correo, que va adjunto.";
-
-/** Lo que se dice cuando el correo salió. */
-export const CORREO_ENVIADO = "Listo, el correo salió";
-/** Y cuando el link quedó copiado. */
-export const LINK_COPIADO = `Listo, enlace copiado — vence en ${DIAS_DEL_LINK} días`;
+/** Lo que se dice cuando el papel quedó bajado (computadora, o sin hoja). */
+export const PAPEL_DESCARGADO = "Listo, el papel se bajó";

@@ -34,14 +34,12 @@ import {
   COLUMNAS_DETALLE_VENTA,
   COMISIONES_CELULAR,
   OPCIONES_DESCARGA,
-  OPCIONES_MANDAR,
   ROTULO_TOTAL_A_PAGAR,
   ROTULO_TOTAL_GRUPO,
   ROTULO_TOTAL_MULTIFASHION,
   mesEnPalabras,
   mesesAlrededor,
   tickets,
-  tituloDeLaHojaMandar,
 } from "@/lib/comisiones/celular";
 import { fmtMoney } from "@/lib/ventas/format";
 import { sumarPagable } from "@/lib/comisiones/sin-pago";
@@ -251,11 +249,10 @@ describe("8 y 9r · el papel", () => {
       .toContain("data-abrir-descargar");
   });
 
-  it("«Mandar» tiene las MISMAS tres salidas del estado de cuenta", () => {
-    expect(OPCIONES_MANDAR.map((o) => o.rotulo)).toEqual(["Correo", "WhatsApp", "Copiar el link"]);
-    expect(tituloDeLaHojaMandar("2026-08", "Reynaldo Espinosa"))
-      .toBe("Mandar la comisión de Ago 2026 a Reynaldo Espinosa");
-  });
+  // 🩸 Acá se probaban las TRES salidas de una hoja nuestra (Correo · WhatsApp ·
+  // Copiar el link) y su título. Se fueron el 25-sep-2026, el mismo día: Daniel,
+  // *«si se me abre el PDF como en Guías, se manda a su chat y ya»*. Lo que
+  // «Mandar» hace ahora lo sostiene `mandar-comision.test.ts`.
 
   it("🔴 y vive en el DETALLE del vendedor", () => {
     expect(leer("src/components/comisiones/ComisionesDetalleModal.tsx")).toContain("data-boton-mandar");

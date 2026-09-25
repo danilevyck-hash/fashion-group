@@ -28,14 +28,19 @@ export const MODULO_ACTIVIDAD_COMISIONES = "comisiones";
 export const ACCION_DESCARGA_PDF = "descarga_pdf";
 export const ACCION_DESCARGA_EXCEL = "descarga_excel";
 
-/** Las acciones de configuración, anotadas por el servidor. */
 /**
- * 🔴 «MANDAR» DEJA RASTRO IGUAL QUE UNA DESCARGA (25-sep-2026, la «9r»). Se
- * anota DESPUÉS de que el correo salió o el enlace quedó firmado, nunca antes.
+ * 🔴 «MANDAR» DEJA RASTRO IGUAL QUE UNA DESCARGA (25-sep-2026, la «9r»).
+ *
+ * 🩸 Hasta ese mismo día eran DOS acciones (`mandar_correo` · `mandar_link`) y
+ * las anotaba el SERVIDOR, porque el papel salía por una ruta nuestra. Desde que
+ * «Mandar» abre la hoja de compartir del teléfono —como «Compartir» de Guías—
+ * no hay ruta que anotar: el archivo va del navegador al chat. Queda UNA acción,
+ * anotada desde el navegador igual que una descarga, y se anota DESPUÉS de que
+ * la hoja se cerró — nunca antes de que el papel saliera.
  */
-export const ACCION_MANDAR_CORREO = "mandar_correo";
-export const ACCION_MANDAR_LINK = "mandar_link";
+export const ACCION_MANDAR = "mandar";
 
+/** Las acciones de configuración, anotadas por el servidor. */
 export const ACCION_CONFIG_TASA = "config_tasa";
 export const ACCION_CONFIG_CLIENTE_SIN_COMISION = "config_cliente_sin_comision";
 export const ACCION_CONFIG_DESCUENTO = "config_descuento";
@@ -86,5 +91,25 @@ export function anotarDescargaComision(formato: FormatoDescarga, d: DetalleDesca
     action: formato === "pdf" ? ACCION_DESCARGA_PDF : ACCION_DESCARGA_EXCEL,
     module: MODULO_ACTIVIDAD_COMISIONES,
     details: detalleDeDescarga(formato, d),
+  });
+}
+
+/**
+ * Anota que el papel de un vendedor salió por «Mandar» (la hoja de compartir
+ * del teléfono, o la descarga en la computadora). Nunca frena nada.
+ *
+ * 🔑 `como` dice qué hizo el aparato: `compartido` (se eligió una app),
+ * `descargado` (computadora o navegador sin hoja) o `cancelado` (se cerró la
+ * hoja sin elegir). Se anota igual: lo que interesa es quién pidió mandar el
+ * papel de quién.
+ */
+export function anotarMandarComision(
+  como: "compartido" | "descargado" | "cancelado",
+  d: DetalleDescarga,
+): void {
+  logActivityClient({
+    action: ACCION_MANDAR,
+    module: MODULO_ACTIVIDAD_COMISIONES,
+    details: { ...detalleDeDescarga("pdf", d), como },
   });
 }
