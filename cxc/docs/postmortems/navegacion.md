@@ -567,6 +567,129 @@ menú y en los cuadritos de «qué cambió».
 
 ---
 
+# 8 · En el celular no hay barra de arriba (24-sep-2026)
+
+## Lo que había, y qué falla
+
+La barra de §5, la misma tarde. Se escondía al deslizar hacia abajo, sí, pero
+**volvía al subir el dedo** — y subir el dedo es lo que se hace todo el tiempo
+mientras se lee una lista. Las cuentas, sobre los mismos 844 px del iPhone de
+Daniel (47 px de arriba y 34 de abajo son del sistema y no se tocan):
+
+| | Al abrir | Al deslizar |
+|---|---|---|
+| §5 · la franja de 46 px que se esconde | 717 px | 763 px |
+| **sin barra** | **763 px** | **763 px** |
+
+O sea: la franja costaba 46 px al abrir **cada una de las 22 pantallas**, y los
+devolvía a medias.
+
+## Lo que eligió Daniel
+
+Se le dibujaron tres formas de quitarla (`scratchpad/cel-barra-sin-barra.html`),
+cada una sobre dos pantallas reales —Comisiones con los números de su foto y la
+portada de Asistencia—, y eligió la **a**:
+
+- **b** (las rayas al lado del título, con una línea que se pega arriba al
+  deslizar) gana 46 px al abrir y pierde 44 mientras se lee, que es donde se
+  pasa el rato; y deja el ☰ en la esquina más lejos del pulgar.
+- **c** (una barra fina abajo) es la única que deja **menos** espacio que hoy
+  —714 contra 763— y obliga a subir 49 px **todos** los botones negros fijos.
+- **a** da los mismos 763 px al abrir y al deslizar, y deja las tres rayas en la
+  zona del pulgar.
+
+## Cómo quedó
+
+1. **No hay franja.** El bloque del encabezado es `hidden sm:block`: hasta `sm`
+   no se dibuja, y en la computadora queda exactamente como estaba —buscador,
+   campana, usuario y la tira del camino de migas—. Al estar en `display:none`,
+   `usePublicarAlturaEncabezado` lo mide en **0** y las barras pegajosas de
+   contenido se pegan arriba del todo solas, sin una regla nueva.
+2. **El nombre del módulo es el título grande de la página**: 34 px semibold,
+   arriba del contenido, con el punto del acento del módulo al lado. No es
+   pegajoso: al deslizar **desaparece con el contenido**, no se encoge a una
+   línea pegada arriba —encoger cuesta 44 de los 46 px que se están
+   recuperando—.
+3. **Las tres rayas son un botón redondo de 56 px** abajo a la derecha, fijo,
+   que abre el **mismo** menú a pantalla completa de §7. Las listas dejan
+   **76 px** de colchón abajo (56 + 16 + 4) para que la última fila no nazca
+   debajo del botón.
+4. **A quien solo marca no se le dibuja ni título ni botón.** Su pantalla tiene
+   un trabajo y ya empieza con su nombre y el reloj de 56 px; meterle
+   «Marcación» arriba es volver a bajar el botón, que es justo lo que el arreglo
+   de «un toque» vino a evitar. Gana los 46 px enteros y no pierde nada.
+
+## Una sola fuente del título por pantalla
+
+Las portadas del celular que ya dibujan su título grande lo **avisan**
+(`tituloEnLaPantalla`) y el layout se calla. Medido archivo por archivo:
+
+| Pantalla | Qué dibuja hoy | Quién pone el título |
+|---|---|---|
+| Reclamos | `<h1>Reclamos</h1>` (`celular/PortadaCelular.tsx`), y la empresa / el nº en sus dos sub-pantallas | la pantalla |
+| Cuentas por Cobrar | `<h1>Por cobrar</h1>` (`PanelCxcCelular.tsx`) | la pantalla, salvo en Boston |
+| Asistencia | `<h2>Asistencia</h2>` (`PortadaCelular.tsx`), solo en la portada | la pantalla en la portada; el layout adentro de una pestaña |
+| Multifashion | el **mes** (`data-celular="titulo"`) | la pantalla |
+| Marketing | `TituloCelular` en las seis vistas | la pantalla |
+| Catálogos y los otros 16 | solo un `<h1 className="sr-only">` | **el layout** |
+
+⚠️ **El título del layout es un `<p>`, no un `<h1>`.** Trece pantallas ya tienen
+su `<h1 className="sr-only">` con el nombre del módulo: un segundo encabezado
+con la misma palabra se lee dos veces en voz alta, y hay dos candados de la casa
+(Recordatorios y Asistencia) que exigen **un solo `h1`**. Es el mismo patrón que
+ya usaba el título del celular de Multifashion.
+
+## Que el flotante y los botones negros convivan
+
+Cinco portadas del celular rematan con una barra fija de **ancho completo** —
+«Nuevo reclamo», «Marcar cobrado», el botón de Marcación, el aviso de instalar
+la app—. No hay esquina que cederle al flotante, y recortarle 72 px a la derecha
+a cada barra sería tocar cinco módulos para arreglar uno **y dejar el botón
+negro descentrado en los cinco**.
+
+🔴 **Entonces sube el flotante, y el botón negro no se mueve ni un píxel.** La
+barra publica su alto **medido** (`usePublicarAltoBarraFija` →
+`--fg-alto-barra-fija`) y el botón se sienta a `16 px + ese alto`, con un
+`max()` de CSS que el navegador resuelve solo:
+
+```
+bottom: max(calc(16px + env(safe-area-inset-bottom)),
+            calc(16px + var(--fg-alto-barra-fija, 0px)))
+```
+
+⚠️ **Con barra no se suma la franja de iOS**: la barra ya la lleva dentro de su
+propio relleno, y sumarla otra vez dejaría el botón flotando 34 px en el aire.
+Por eso es un `max()` de dos pisos y no una suma de tres números.
+
+🔴 **Falla ABIERTA**: una barra que se olvide de publicar su alto deja la
+variable en 0 y el flotante vuelve al piso —tapado, sí, pero nunca
+desaparecido—. Y hay barrido: cualquier `.tsx` con una barra fija de ancho
+completo abajo tiene que publicar su alto o estar en la lista de las que **no
+montan `AppHeader`** (las tres pantallas del carrito del catálogo, que usan
+`CatalogoNavbar`).
+
+El z-index del flotante es **30**: por encima de todo el contenido (las barras
+pegajosas son 9 y el encabezado 10) y por debajo del menú, de las hojas y de los
+modales (50+), que tienen que taparlo. Si quedara escondido, la persona se
+queda **sin ninguna forma de navegar**.
+
+## Interruptor y candado
+
+- `SIN_BARRA_ARRIBA` en `src/lib/navegacion/barra-celular.ts`, hoy `true`. En
+  `false` vuelve la barra de §5 **entera** —con su regla de deslizamiento, su
+  hamburguesa y su `--fg-altura-encabezado`—, y el título del layout no se
+  dibuja nunca. Nada de lo que se guarda cambia.
+- `src/__tests__/navegacion/sin-barra-arriba.test.tsx` — 18 casos. Mutaciones
+  que caza: sumar la franja de iOS **además** del alto de la barra · escribir el
+  `false` de la franja a mano en vez de derivarlo del interruptor · poner el
+  título también cuando la pantalla ya lo dibuja · ponerle título a quien solo
+  marca · dibujar el flotante en la computadora · que una barra fija deje de
+  publicar su alto (verificadas tres a mano, las tres caen).
+- `barra-celular.test.tsx` se quedó **entero**: remeda `SIN_BARRA_ARRIBA` en
+  `false` porque lo que protege es justamente la cara apagada.
+
+---
+
 ## Lo que decía CLAUDE.md hasta el 22-sep-2026 (movido acá, verbatim)
 
 ### Navegación, 404 y papel — lo que se arregló el 17-sep-2026
