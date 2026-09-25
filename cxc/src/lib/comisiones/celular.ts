@@ -152,12 +152,16 @@ export const COLUMNAS_DETALLE_VENTA = [
   { clave: "utilidad", rotulo: "% Util.", alineado: "der" },
 ] as const;
 
+/**
+ * ⚠️ COBROS tiene CUATRO columnas y no cinco: **el API de Switch no expone el
+ * número de recibo**, y por eso esa columna nunca existió. Acá tampoco se
+ * inventa.
+ */
 export const COLUMNAS_DETALLE_COBRO = [
   { clave: "comision", rotulo: "Comisión", alineado: "der" },
   { clave: "monto", rotulo: "Monto", alineado: "der" },
   { clave: "fecha", rotulo: "Fecha", alineado: "izq" },
   { clave: "cliente", rotulo: "Cliente", alineado: "izq" },
-  { clave: "recibo", rotulo: "Recibo", alineado: "izq" },
 ] as const;
 
 /** El aviso de que la tabla se desliza. Se dice una vez por tabla. */
