@@ -233,10 +233,18 @@ describe("1. la regla de la base acepta la fila que la puerta inserta", () => {
 
 // ─── 2 Y 3. LA PUERTA ────────────────────────────────────────────────────────
 
-async function postFoto(url = "tienda/D-118/foto.jpeg") {
+// 🔴 D-118 tiene DOS marcas abiertas (Calvin y Tommy), así que desde el
+// 24-sep-2026 la marca se ELIGE: la puerta recibe el período elegido. Lo que
+// pasa sin elegir vive en `marketing-foto-elige-marca.test.tsx`.
+async function postFoto(url = "tienda/D-118/foto.jpeg", periodoId: string | null = TH_ABIERTO) {
   const { POST } = await import("@/app/api/marketing/tienda/[codigo]/fotos/route");
   const req = {
-    json: async () => ({ url, nombreOriginal: "foto.jpeg", sizeBytes: 123 }),
+    json: async () => ({
+      url,
+      nombreOriginal: "foto.jpeg",
+      sizeBytes: 123,
+      ...(periodoId ? { periodoId } : {}),
+    }),
   } as unknown as Parameters<typeof POST>[0];
   return POST(req, { params: { codigo: "D-118" } });
 }
@@ -270,7 +278,7 @@ describe("2 y 3. la puerta guarda la foto de la tienda, o avisa sin dejar basura
     expect(fila.proyecto_id).toBeNull();
     expect(fila.factura_id).toBeNull();
     expect(fila.tienda_codigo).toBe("D-118");
-    // El gasto más reciente de la tienda es el de Tommy: ése manda.
+    // La marca elegida es la que se sella. Nunca una adivinada.
     expect(fila.periodo_id).toBe(TH_ABIERTO);
     expect(fake.removidos).toEqual([]);
   });
@@ -297,7 +305,8 @@ describe("2 y 3. la puerta guarda la foto de la tienda, o avisa sin dejar basura
 
   it("la puerta no arma el sello con una lista de marcas escrita a mano", () => {
     const src = leer(RUTA);
-    expect(src).toMatch(/periodoAbiertoDeLaTienda\(codigo\)/);
+    expect(src).toMatch(/marcasAbiertasDeLaTienda\(codigo\)/);
+    expect(src).toMatch(/destinoDeFotoNueva\(marcas, elegido\)/);
     expect(src).not.toMatch(/\bTH\b.*\bCK\b/);
   });
 });
@@ -426,7 +435,7 @@ describe("6. apagado = como antes", () => {
     expect(leer("src/lib/marketing/fotos-periodo.ts")).toMatch(
       /if \(!MARKETING_FOTOS_CON_PERIODO\) return \[\.\.\.fotos\];/,
     );
-    expect(leer(RUTA)).toMatch(/MARKETING_FOTOS_CON_PERIODO\s*\n?\s*\?\s*await periodoAbiertoDeLaTienda/);
+    expect(leer(RUTA)).toMatch(/MARKETING_FOTOS_CON_PERIODO\s*\n?\s*\?\s*await marcasAbiertasDeLaTienda/);
     expect(leer("src/lib/marketing/zip-marca.ts")).toMatch(/MARKETING_FOTOS_CON_PERIODO &&/);
   });
 
