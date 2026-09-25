@@ -274,18 +274,46 @@ export function ClientesView({
   // y cachea internamente en ClienteHoverCard (cache module-level allá).
   const [historialCache, setHistorialCache] = useState<Record<string, HistorialState>>({});
   const histInFlight = useRef<Set<string>>(new Set());
+  /** Lo que ya llegó bien: no se vuelve a pedir aunque se toque otra vez. */
+  const yaCargado = useRef<Set<string>>(new Set());
 
+  // 🔴 QUIÉN DECIDE SI SE PIDE: EL `ref`, NUNCA EL RESULTADO DE UN `setState`
+  // (25-sep-2026).
+  //
+  // 🩸 EL DEFECTO, medido el 25-sep-2026 en el teléfono: tocando la tarjeta de
+  // un cliente tres veces seguidas quedaban **3 barras grises y CERO peticiones**
+  // a `historial-mensual`, a los 30 segundos. En la computadora los mismos tres
+  // clientes cargaban bien. Lo que faltaba en el teléfono eran «Últimos 12
+  // meses», «12 meses anteriores» y «Recurrencia».
+  //
+  // 🔑 POR QUÉ. La versión de antes decidía con una variable (`trigger`) que
+  // llenaba el actualizador de `setHistorialCache`, y ese actualizador **solo
+  // corre en el acto** cuando React puede calcular el estado por adelantado —y
+  // solo puede si la fibra de esta pantalla no tiene ya un cambio pendiente—.
+  // En el teléfono SIEMPRE lo tiene: tocar la tarjeta llama antes a
+  // `setSheetCliente`, que es un cambio de estado de ESTA misma pantalla. El
+  // actualizador quedaba para después, `trigger` seguía en `false` y la función
+  // se iba antes del `fetch`. Y la vez siguiente era peor: el estado ya decía
+  // «cargando», así que tampoco entraba. En la computadora el globo de Radix no
+  // toca el estado de esta pantalla primero, y por eso ahí sí pedía.
+  //
+  // La regla nueva no depende de cuándo corre React: el `ref` se marca ANTES de
+  // pedir y se limpia al terminar, y es lo único que decide. El estado se sigue
+  // escribiendo igual —para dibujar—, pero ya no manda.
+  //
+  // ⚠️ Un pedido que terminó mal deja la marca `error` en el estado y el `ref`
+  // limpio: el toque siguiente vuelve a intentar, que es lo que hace falta
+  // cuando la red se cayó un momento.
   const loadHistorial = useCallback((codigo: string, empresaKey: string) => {
     const histKey = `${codigo}|${empresaKey}`;
     if (histInFlight.current.has(histKey)) return;
-    let trigger = false;
-    setHistorialCache(prev => {
-      if (prev[histKey] && prev[histKey].status !== "idle") return prev;
-      trigger = true;
-      return { ...prev, [histKey]: { status: "loading" } };
-    });
-    if (!trigger) return;
+    if (yaCargado.current.has(histKey)) return;
     histInFlight.current.add(histKey);
+    setHistorialCache(prev =>
+      prev[histKey] && prev[histKey].status === "ready"
+        ? prev
+        : { ...prev, [histKey]: { status: "loading" } },
+    );
     fetch(`/api/clientes/${encodeURIComponent(codigo)}/historial-mensual?empresa=${encodeURIComponent(empresaKey)}`)
       .then(async r => {
         if (!r.ok) {
@@ -294,7 +322,10 @@ export function ClientesView({
         }
         return r.json();
       })
-      .then(data => setHistorialCache(prev => ({ ...prev, [histKey]: { status: "ready", data } })))
+      .then(data => {
+        yaCargado.current.add(histKey);
+        setHistorialCache(prev => ({ ...prev, [histKey]: { status: "ready", data } }));
+      })
       .catch(err => setHistorialCache(prev => ({
         ...prev,
         [histKey]: { status: "error", message: err?.message ?? "Error al cargar" },
