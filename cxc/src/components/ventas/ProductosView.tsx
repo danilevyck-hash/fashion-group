@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,7 @@ import {
   PRODUCTOS_EMPRESAS,
   PRODUCTOS_EMPRESA_KEYS,
   DEFAULT_PRODUCTOS_EMPRESA,
+  MEMORIA_EMPRESA_PRODUCTOS,
   fmtMargen,
   fmtPrecioProm,
   precioPromedio,
@@ -44,6 +45,16 @@ import {
 } from "@/lib/ventas/productos";
 import { periodoParaProductos, type PeriodoVentas } from "@/lib/ventas/periodo";
 import { ROTULO_DESCARGAR_EXCEL, anotarDescarga } from "@/lib/ventas/descarga";
+import { useLastUsed } from "@/lib/hooks/useLastUsed";
+import { subtituloDelProducto } from "@/lib/ventas/celular";
+import { useEsCelularVentas } from "./celular/useEsCelularVentas";
+import { MenuVentasCelular } from "./celular/MenuVentasCelular";
+import {
+  ESTILO_COLCHON_DERECHA,
+  GrupoVentas,
+  PantallaVentas,
+  TituloVentas,
+} from "./celular/PiezasVentas";
 // 🔴 UNA SOLA VENTA (23-sep-2026): el total es el del Resumen y la línea de
 // abajo dice qué incluye; un período sin datos dice desde cuándo los hay.
 import { UNA_SOLA_VENTA, textoCuadreProductos, textoDatosDesde } from "@/lib/ventas/una-sola-venta";
@@ -87,16 +98,23 @@ const TODOS = "todos";
 /** Cuántos renglones muestra «Dejó de comprar» antes de decir cuántos faltan. */
 const DEJADOS_VISIBLES = 5;
 
-/** Los criterios de la tira de orden del celular. Mismas etiquetas que los
- *  encabezados de la tabla — no se abrevió ni se renombró nada. */
+/**
+ * Los criterios de la tira de orden. Mismas etiquetas que los encabezados de la
+ * tabla.
+ *
+ * 🔴 «CANTIDAD» Y «TOTAL» (25-sep-2026, la «4d»). Daniel pidió cinco columnas
+ * —Descripción · Precio prom. · Margen · Cantidad · Total— y ésos son los
+ * nombres. **Ningún número cambia**: «Cantidad» son las mismas piezas y «Total»
+ * la misma venta. Es el rótulo, no el dato.
+ */
 const ORDEN_TARJETAS_SIN_MARGEN: { key: SortKey; label: string }[] = [
-  { key: "cantidad", label: "Piezas" },
-  { key: "venta", label: "Venta" },
+  { key: "cantidad", label: "Cantidad" },
+  { key: "venta", label: "Total" },
   { key: "precio", label: "Precio prom." },
 ];
 const ORDEN_TARJETAS: { key: SortKey; label: string }[] = [
   ...ORDEN_TARJETAS_SIN_MARGEN,
-  { key: "margen", label: "Margen %" },
+  { key: "margen", label: "Margen" },
 ];
 
 /** Valor por el que se ordena cada columna. El precio se calcula al vuelo. */
@@ -120,12 +138,15 @@ function fmtDia(iso: string): string {
   return `${Number(d)} ${MONTHS[Number(m) - 1].toLowerCase()} ${y}`;
 }
 
-export function ProductosView({ periodo: periodoElegido, anioEnCurso }: {
+export function ProductosView({ periodo: periodoElegido, anioEnCurso, onDescargarLasTres }: {
   /** El período del selector único de arriba (11-sep-2026). */
   periodo: PeriodoVentas;
   /** El año en curso de PANAMÁ, para las ventanas «Últimos N meses». */
   anioEnCurso: number;
+  /** 🔴 La «6a»: las tres pestañas en un solo Excel. Lo arma el shell. */
+  onDescargarLasTres?: () => void | Promise<void>;
 }) {
+  const enCelular = useEsCelularVentas();
   // Lo que se le pide a la ruta, DERIVADO del período: un año → `ytd` de ese
   // año; una ventana → `6m`/`12m` desde hoy. Nunca dos controles de tiempo.
   const { periodo, year: selectedYear } = periodoParaProductos(periodoElegido, anioEnCurso);
@@ -139,7 +160,23 @@ export function ProductosView({ periodo: periodoElegido, anioEnCurso }: {
     const e = searchParams.get("empresa");
     return e && PRODUCTOS_EMPRESA_KEYS.includes(e) ? e : DEFAULT_PRODUCTOS_EMPRESA;
   })();
+  // 🔴 LA ÚLTIMA EMPRESA ELEGIDA SE RECUERDA (la «3c»). Manda la dirección
+  // (`?empresa=`), después la memoria del navegador, después Fashion Wear.
+  const [empresaMemoria, setEmpresaMemoria] = useLastUsed(
+    MEMORIA_EMPRESA_PRODUCTOS,
+    DEFAULT_PRODUCTOS_EMPRESA,
+  );
   const [empresa, setEmpresa] = useState(initialEmpresa);
+  const semillaPuesta = useRef(searchParams.get("empresa") != null);
+  useEffect(() => {
+    // La memoria llega en el segundo pintado (`useLastUsed` hidrata en un
+    // efecto): se aplica UNA vez, y solo si la dirección no trajo empresa.
+    if (semillaPuesta.current) return;
+    semillaPuesta.current = true;
+    if (empresaMemoria && PRODUCTOS_EMPRESA_KEYS.includes(empresaMemoria) && empresaMemoria !== empresa) {
+      setEmpresa(empresaMemoria);
+    }
+  }, [empresaMemoria, empresa]);
   const [data, setData] = useState<ProductosResponse | null>(null);
   // Venta del MISMO período del año anterior por descripción → columna Δ.
   const [prevVenta, setPrevVenta] = useState<Record<string, number>>({});
@@ -379,13 +416,19 @@ export function ProductosView({ periodo: periodoElegido, anioEnCurso }: {
   // nueva podía no tener el MES elegido — y desde que los meses sueltos ya no
   // están en el selector, ese motivo no existe. (Lo mismo al cambiar el año:
   // `VentasShell` ya no remonta la vista.)
-  const onEmpresaChange = (key: string) => {
+  const onEmpresaChangeBase = (key: string) => {
     setEmpresa(key);
     // 🔴 EL CLIENTE SÍ SE LIMPIA, y es la excepción que confirma la regla de
     // arriba: `cliente_switch_id` es de UNA empresa. El id 412 de Vistana es
     // otro negocio —o ninguno— en Fashion Wear, así que arrastrarlo mostraría
     // la tabla de otro cliente con el nombre del anterior.
     setFiltroCliente(TODOS);
+  };
+
+  /** 🔴 Cambiar la empresa la DEJA RECORDADA (la «3c»). */
+  const onEmpresaChange = (key: string) => {
+    onEmpresaChangeBase(key);
+    setEmpresaMemoria(key);
   };
 
   // ⛔ ACÁ ABAJO VIVÍA EL GUARD QUE RESETEABA EL MES cuando la empresa nueva no
@@ -500,7 +543,6 @@ export function ProductosView({ periodo: periodoElegido, anioEnCurso }: {
   // El rótulo de la columna de cambio: para un año dice el año contra el que
   // compara; para las ventanas no hay un año que nombrar. Sin la "Δ", que es
   // notación de matemática.
-  const deltaLabel = periodo === "ytd" ? `vs ${selectedYear - 1}` : "vs año ant.";
 
   // 🔴 «Productos de Fashion Wear tiene datos desde febrero 2023» (23-sep-2026):
   // un año que la tabla no cubre no es «sin productos para este filtro» —eso
@@ -584,11 +626,12 @@ export function ProductosView({ periodo: periodoElegido, anioEnCurso }: {
           </SelectContent>
         </Select>
 
-        <div className="relative min-w-[160px] flex-1">
+        <div className="relative min-w-[120px] flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
           <Input
             value={search}
             onChange={e => setSearch(e.target.value)}
+            aria-label="Buscar descripción"
             placeholder="Buscar descripción…"
             /* text-base en móvil: Safari hace zoom al enfocar un input con
                letra < 16px (text-xs = 12px). Desde sm vuelve al text-xs. */
@@ -602,11 +645,29 @@ export function ProductosView({ periodo: periodoElegido, anioEnCurso }: {
             MISMA secuencia (las 8 empresas en orden + el refresco de vistas al
             final), no una variante: dos formas de actualizar son dos estados
             posibles de los mismos datos. */}
-        <SyncNowButton opciones={SYNC_NOW_VENTAS_SECUENCIA} secuencial onSuccess={load} />
+        {/* 🔴 EN EL CELULAR LOS DOS SE VAN AL «···» (25-sep-2026, la «6a»).
+            «Descargar en Excel» se llevaba un renglón entero él solo —166 × 44
+            px, a y=307— para un botón medido en 3 usos en 7 días. En la
+            computadora no cambia nada. */}
+        {!enCelular && (
+          <>
+            <SyncNowButton opciones={SYNC_NOW_VENTAS_SECUENCIA} secuencial onSuccess={load} />
 
-        <Button variant="outline" size="sm" onClick={onExcel} disabled={!data || loading} className="min-h-[44px]">
-          <Download className="mr-1.5 h-3.5 w-3.5" /> {ROTULO_DESCARGAR_EXCEL}
-        </Button>
+            <Button variant="outline" size="sm" onClick={onExcel} disabled={!data || loading} className="min-h-[44px]">
+              <Download className="mr-1.5 h-3.5 w-3.5" /> {ROTULO_DESCARGAR_EXCEL}
+            </Button>
+          </>
+        )}
+        {enCelular && (
+          <MenuVentasCelular
+            pestana="productos"
+            periodoRotulo={nombreCortoEmpresa(empresa)}
+            apagada={!data || loading}
+            onEstaPestana={onExcel}
+            onLasTres={() => onDescargarLasTres?.()}
+            onActualizado={load}
+          />
+        )}
       </div>
 
       {/* Totales — texto simple, sin cards.
@@ -633,8 +694,15 @@ export function ProductosView({ periodo: periodoElegido, anioEnCurso }: {
               reporte por artículo no trae (las notas de débito, y los renglones
               de factura que ese reporte no devuelve) se DICE acá, con su monto,
               en vez de dejar que dos pestañas den dos números para lo mismo. */}
+          {/* 🔴 EL PÁRRAFO DE LAS NOTAS DE DÉBITO PASA A UN ⓘ (25-sep-2026, la
+              «4d»). 🩸 Ocupaba **3 líneas / 54 px** y decía lo mismo en las seis
+              empresas, pero vale **21,6 % en Active Wear** ($73.818,89 de
+              $341.523,02) y **0,005 % en Active Shoes** ($22,76 de medio
+              millón): el mismo lugar para algo que a veces cambia lo que estás
+              leyendo y casi siempre es ruido. El TEXTO no cambió ni una palabra
+              —lo sigue escribiendo `textoCuadreProductos`— y se lee tocando. */}
           {UNA_SOLA_VENTA && !conCliente && textoCuadreProductos(data.cuadre) && (
-            <p data-cuadre-productos className="mb-1 text-xs text-gray-500">{textoCuadreProductos(data.cuadre)}</p>
+            <NotaDelCuadre texto={textoCuadreProductos(data.cuadre)!} />
           )}
           {/* Las piezas y el precio promedio del período, y —clave para los
               períodos relativos— LAS DOS FECHAS. "Últimos 12 meses" sin fechas
@@ -687,19 +755,13 @@ export function ProductosView({ periodo: periodoElegido, anioEnCurso }: {
         </>
       )}
 
-      {!conCliente && !loading && data && (
-        <DejoDeVenderse filas={dejadosDeVender} comparativo={data.comparativo} />
-      )}
-
-      {conCliente && !loading && data && (
-        <DejoDeComprar
-          filas={dejados}
-          cargando={previoCargando}
-          fallo={previoFallo}
-          desde={data.comparativo?.desde}
-          hasta={data.comparativo?.hasta}
-        />
-      )}
+      {/* ⛔ ACÁ ARRIBA VIVÍAN «Dejó de venderse» y «Dejó de comprar», ENCIMA de
+          lo principal. Bajaron al final de la lista el 25-sep-2026 (la «4d»):
+          medido a 390 px empujaban la lista de lo que SÍ se vende entre 123 y
+          385 px según la empresa —Joystep, 37 descripciones, 385 px— y
+          desplegados eran 1.194 px, 1,4 pantallazos de lo que ya no se vende
+          delante de lo que se vende. El primer producto empezaba a y=825 de
+          844. El bloque no cambió por dentro: cambió de lugar. */}
 
       {error && (
         <div className="rounded-lg border border-gray-200 bg-white p-8 text-center text-sm text-gray-700">
@@ -743,30 +805,30 @@ export function ProductosView({ periodo: periodoElegido, anioEnCurso }: {
         <div data-vista="tabla" className="hidden overflow-x-auto rounded-lg border border-gray-200 sm:block">
           <table className="w-full border-collapse text-sm">
             <thead>
+              {/* 🔴 CINCO COLUMNAS, EN ESTE ORDEN (25-sep-2026, la «4d»):
+                  Descripción · Precio prom. · Margen · Cantidad · Total.
+                  🩸 Salieron «Códigos» (un conteo que ya se ve al abrir la
+                  fila) y la columna Δ: siete columnas para 148 descripciones
+                  era la tabla más ancha de la pestaña. **Ningún número cambia**:
+                  «Cantidad» son las mismas piezas y «Total» la misma venta. */}
               <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-[0.04em] text-gray-400">
                 <th className="px-2 py-2.5 font-normal lg:px-3">Descripción</th>
-                <th className="hidden px-1.5 py-2.5 text-right font-normal sm:table-cell lg:px-3">Códigos</th>
-                <SortableTh label="Cant" active={sort} sortKey="cantidad" onClick={toggleSort} className="hidden sm:table-cell" />
-                <SortableTh label="Venta" active={sort} sortKey="venta" onClick={toggleSort} />
-                <th className="hidden px-1.5 py-2.5 text-right font-normal sm:table-cell lg:px-3">{deltaLabel}</th>
-                {/* Precio prom. entra ESCONDIDA bajo `sm`, igual que Cant y Δ.
-                    A 390 px solo caben Descripción, Venta y Margen (medido:
-                    scripts/_medir-productos-precio-anchos.mjs) y la regla es que
-                    una columna más no puede agregar arrastre nuevo en iPhone. */}
-                <SortableTh label="Precio prom." active={sort} sortKey="precio" onClick={toggleSort} className="hidden sm:table-cell" />
-                {/* 🔴 Margen % SÓLO SIN FILTRO. Es el margen del PRODUCTO (sale
+                <SortableTh label="Precio prom." active={sort} sortKey="precio" onClick={toggleSort} />
+                {/* 🔴 Margen SÓLO SIN FILTRO. Es el margen del PRODUCTO (sale
                     de `switch_articulo_diario`, que sí tiene costo); la venta de
                     al lado sería la del cliente, y `switch_factura_lineas` no
                     trae costo, así que un margen por cliente no existe. Pegar
                     los dos números invita a leer uno como el otro. */}
                 {!conCliente && (
-                  <SortableTh label="Margen %" active={sort} sortKey="margen" onClick={toggleSort} />
+                  <SortableTh label="Margen" active={sort} sortKey="margen" onClick={toggleSort} />
                 )}
+                <SortableTh label="Cantidad" active={sort} sortKey="cantidad" onClick={toggleSort} />
+                <SortableTh label="Total" active={sort} sortKey="venta" onClick={toggleSort} />
               </tr>
             </thead>
             <tbody>
               {visibleRows.length === 0 && (
-                <tr><td colSpan={conCliente ? 6 : 7} className="px-3 py-8 text-center text-gray-400">{textoVacio}</td></tr>
+                <tr><td colSpan={conCliente ? 4 : 5} className="px-3 py-8 text-center text-gray-400">{textoVacio}</td></tr>
               )}
               {visibleRows.map(p => (
                 <ProductoRow
@@ -777,11 +839,6 @@ export function ProductosView({ periodo: periodoElegido, anioEnCurso }: {
                   codigos={codigos[p.descripcion]}
                   clientes={clientes[p.descripcion]}
                   codigosLoading={codigosLoading === p.descripcion}
-                  /* Con un cliente puesto la columna de cambio compara contra
-                     lo que compraba ÉL, no contra la empresa entera: si no, el
-                     Δ diría "creció" porque creció otro. */
-                  prevVenta={conCliente ? comprasPrevias?.get(p.descripcion)?.venta : prevVenta[p.descripcion]}
-                  comparativoMedido={conCliente ? comprasPrevias != null : comparativo !== "fallo"}
                   mostrarMargen={!conCliente}
                   tab={drillTab}
                   onTab={setDrillTab}
@@ -813,11 +870,14 @@ export function ProductosView({ periodo: periodoElegido, anioEnCurso }: {
               pestaña de distancia. Ahora hay un solo componente.
               Mismo criterio que la tabla: con un cliente puesto no hay margen
               por cliente, así que tampoco se puede ordenar por él. */}
+          {/* 🔴 LOS CUATRO EN UNA FILA (25-sep-2026, la «4d»): sin el rótulo
+              «Ordenar por» delante, que los partía en DOS filas de 94 px. */}
           <TiraOrden
             criterios={conCliente ? ORDEN_TARJETAS_SIN_MARGEN : ORDEN_TARJETAS}
             active={sort}
             onClick={toggleSort}
             className="mb-2"
+            sinRotulo
           />
 
           <ul data-vista="tarjetas" className="space-y-2">
@@ -842,6 +902,21 @@ export function ProductosView({ periodo: periodoElegido, anioEnCurso }: {
             ))}
           </ul>
         </div>
+      )}
+
+      {/* ── 🔴 «DEJÓ DE VENDERSE», DEBAJO DE LA LISTA Y PLEGADO (la «4d») ──── */}
+      {!conCliente && !loading && data && (
+        <DejoDeVenderse filas={dejadosDeVender} comparativo={data.comparativo} />
+      )}
+
+      {conCliente && !loading && data && (
+        <DejoDeComprar
+          filas={dejados}
+          cargando={previoCargando}
+          fallo={previoFallo}
+          desde={data.comparativo?.desde}
+          hasta={data.comparativo?.hasta}
+        />
       )}
 
       {/* ⛔ ACÁ VIVÍA «Mostrar más (120 restantes)». Ver el comentario de la
@@ -884,29 +959,14 @@ function SortableTh({
 // "Nuevo". Antes bastaba con `prev > 0` y un producto que el año pasado vendió
 // $2 salía con +50000%; ahora la regla es la única de la app (`variacionPct`).
 //
-// 🔴 `medido` DICE SI HUBO VENTANA DE COMPARACIÓN. Cuando la consulta del año
-// anterior falló, no se midió nada: "Nuevo" sería afirmar que ese producto no
-// existía, y con el catálogo entero en verde el error de red se lee como un
-// dato. Sin medición, la celda va vacía ("—").
-function DeltaCell({ curr, prev, medido }: { curr: number; prev: number | undefined; medido: boolean }) {
-  if (!medido) {
-    return <td data-col="delta" className="hidden px-1.5 py-2.5 text-right font-mono text-xs text-gray-300 sm:table-cell lg:px-3">—</td>;
-  }
-  const ratio = variacionPct(curr, prev);
-  if (ratio == null) {
-    return <td data-col="delta" className="hidden px-1.5 py-2.5 text-right font-mono text-xs text-teal-700 sm:table-cell lg:px-3">Nuevo</td>;
-  }
-  const pct = ratio * 100;
-  const up = pct >= 0;
-  return (
-    <td data-col="delta" className={`hidden px-1.5 py-2.5 text-right font-mono tabular-nums sm:table-cell lg:px-3 ${up ? "text-emerald-700" : "text-rose-600"}`}>
-      {up ? "+" : ""}{pct.toFixed(0)}%
-    </td>
-  );
-}
+// ⛔ ACÁ VIVÍA `DeltaCell`, LA COLUMNA Δ DE LA TABLA. Se retiró el 25-sep-2026
+// con la «4d»: Daniel pidió CINCO columnas —Descripción · Precio prom. ·
+// Margen · Cantidad · Total— y el cambio contra el año anterior no es una de
+// ellas. 🔑 La medición del período anterior NO se retiró: `prevVenta` sigue
+// alimentando «Dejó de venderse», que es donde ese dato decide algo.
 
 function ProductoRow({
-  p, isOpen, onToggle, codigos, clientes, codigosLoading, prevVenta, comparativoMedido, mostrarMargen, tab, onTab,
+  p, isOpen, onToggle, codigos, clientes, codigosLoading, mostrarMargen, tab, onTab,
 }: {
   p: ProductoNivel1;
   isOpen: boolean;
@@ -914,10 +974,6 @@ function ProductoRow({
   codigos: ProductoCodigo[] | undefined;
   clientes: ClienteDeProducto[] | null | undefined;
   codigosLoading: boolean;
-  prevVenta: number | undefined;
-  /** false cuando la consulta del período anterior falló: sin ventana medida,
-   *  la columna de cambio no puede afirmar "Nuevo". */
-  comparativoMedido: boolean;
   /** false con un cliente puesto: no hay margen por cliente (ver la cabecera). */
   mostrarMargen: boolean;
   tab: DrillTab;
@@ -947,18 +1003,18 @@ function ProductoRow({
             </div>
           </div>
         </td>
-        <td data-col="codigos" className="hidden px-1.5 py-2.5 text-right font-mono tabular-nums text-gray-500 sm:table-cell lg:px-3">{p.num_codigos}</td>
-        <td data-col="cantidad" className="hidden px-1.5 py-2.5 text-right font-mono tabular-nums text-gray-600 sm:table-cell lg:px-3">{Math.round(p.cantidad).toLocaleString("en-US")}</td>
-        <td data-col="venta" className="px-2 py-2.5 text-right font-mono tabular-nums text-gray-900 sm:px-1.5 lg:px-3">{fmtMoney(p.venta)}</td>
-        <DeltaCell curr={p.venta} prev={prevVenta} medido={comparativoMedido} />
-        <td data-col="precio" className="hidden px-1.5 py-2.5 text-right font-mono tabular-nums text-gray-700 sm:table-cell lg:px-3">{fmtPrecioProm(precioPromedio(p.venta, p.cantidad))}</td>
+        {/* 🔴 LAS CINCO, EN EL ORDEN DE LA «4d». Ninguna se esconde bajo un
+            corte: la tabla vive de `sm` para arriba y son cinco columnas. */}
+        <td data-col="precio" className="px-1.5 py-2.5 text-right font-mono tabular-nums text-gray-700 lg:px-3">{fmtPrecioProm(precioPromedio(p.venta, p.cantidad))}</td>
         {mostrarMargen && (
-          <td data-col="margen" className="px-2 py-2.5 text-right font-mono tabular-nums text-gray-700 sm:px-1.5 lg:px-3">{fmtMargen(p.margen)}</td>
+          <td data-col="margen" className="px-1.5 py-2.5 text-right font-mono tabular-nums text-gray-700 lg:px-3">{fmtMargen(p.margen)}</td>
         )}
+        <td data-col="cantidad" className="px-1.5 py-2.5 text-right font-mono tabular-nums text-gray-600 lg:px-3">{Math.round(p.cantidad).toLocaleString("en-US")}</td>
+        <td data-col="venta" className="px-2 py-2.5 text-right font-mono tabular-nums text-gray-900 sm:px-1.5 lg:px-3">{fmtMoney(p.venta)}</td>
       </tr>
       {isOpen && (
         <tr className="bg-gray-50/60">
-          <td colSpan={mostrarMargen ? 7 : 6} className="px-2 py-0 lg:px-3">
+          <td colSpan={mostrarMargen ? 5 : 4} className="px-2 py-0 lg:px-3">
             <div className="py-2 pl-5">
               {codigosLoading && <div className="py-2 text-xs text-gray-400">Cargando…</div>}
               {!codigosLoading && (
@@ -1041,16 +1097,24 @@ function ProductoCard({
         className="flex w-full items-start gap-2 px-3 py-2.5 text-left"
       >
         <ChevronRight className={`mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+        {/* 🔴 DOS LÍNEAS, NO CUATRO NÚMEROS CON RÓTULO (25-sep-2026, la «4d»).
+            🩸 La tarjeta medía 94 px con NUEVE textos —el nombre más cuatro
+            rótulos y cuatro valores— para 148 descripciones. Ahora: arriba la
+            descripción (recortada) y el TOTAL entero a la derecha; abajo, en
+            gris, cantidad · precio prom. · margen. **Ningún número cambia**:
+            son las MISMAS funciones (`fmtMoney`, `fmtMargen`, `precioPromedio`)
+            y el texto gris lo arma `subtituloDelProducto`, que es puro. */}
         <div className="min-w-0 flex-1">
-          <div data-tarjeta-descripcion className="text-sm text-gray-800">{p.descripcion}</div>
-          {/* Dos líneas, dos por dos. `grid-cols-2` y no `flex`: con nombres de
-              largo distinto los valores quedan alineados en columna y se
-              comparan de un vistazo entre tarjetas. */}
-          <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1">
-            <Dato rotulo="Piezas" col="cantidad">{Math.round(p.cantidad).toLocaleString("en-US")}</Dato>
-            <Dato rotulo="Venta" col="venta">{fmtMoney(p.venta)}</Dato>
-            <Dato rotulo="Precio prom." col="precio">{fmtPrecioProm(precioPromedio(p.venta, p.cantidad))}</Dato>
-            {mostrarMargen && <Dato rotulo="Margen %" col="margen">{fmtMargen(p.margen)}</Dato>}
+          <div className="flex items-baseline gap-2">
+            <div data-tarjeta-descripcion className="min-w-0 flex-1 truncate text-sm text-gray-800">
+              {p.descripcion}
+            </div>
+            <div data-tarjeta-col="venta" className="shrink-0 font-mono text-sm tabular-nums text-gray-900">
+              {fmtMoney(p.venta)}
+            </div>
+          </div>
+          <div data-tarjeta-sub className="mt-0.5 truncate text-xs text-gray-500">
+            {subtituloDelProducto(p.cantidad, precioPromedio(p.venta, p.cantidad), mostrarMargen ? p.margen : null)}
           </div>
         </div>
       </button>
@@ -1078,6 +1142,31 @@ function ProductoCard({
 }
 
 /** Un número de la tarjeta con su rótulo encima. `data-col` = el de la tabla. */
+/**
+ * El ⓘ de las notas de débito. Cerrado es un botón de 44 px; abierto, el MISMO
+ * párrafo de siempre, con su mismo `data-cuadre-productos` para que el
+ * verificador de «ningún número cambió» lo siga encontrando.
+ */
+function NotaDelCuadre({ texto }: { texto: string }) {
+  const [abierto, setAbierto] = useState(false);
+  return (
+    <div className="mb-1">
+      <button
+        type="button"
+        data-cuadre-info
+        aria-expanded={abierto}
+        onClick={() => setAbierto((v) => !v)}
+        className="inline-flex min-h-[44px] items-center gap-1 text-xs text-gray-500 underline decoration-dotted"
+      >
+        ⓘ Qué incluye este total
+      </button>
+      {abierto && (
+        <p data-cuadre-productos className="text-xs text-gray-500">{texto}</p>
+      )}
+    </div>
+  );
+}
+
 function Dato({ rotulo, col, children }: { rotulo: string; col: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">

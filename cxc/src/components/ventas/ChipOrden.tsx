@@ -64,20 +64,33 @@ export function TiraOrden<K extends string>({
   active,
   onClick,
   className,
+  sinRotulo = false,
 }: {
   criterios: readonly { key: K; label: string }[];
   active: OrdenActivo<K>;
   onClick: (k: K) => void;
   className?: string;
+  /**
+   * 🔴 SIN EL RÓTULO «Ordenar por» LOS CUATRO CHIPS CABEN EN UNA FILA
+   * (25-sep-2026). Medido en Productos a 390 px: con el rótulo delante los
+   * cuatro pedían 412 px contra 358 disponibles y bajaban a **dos filas,
+   * 94 px de alto para cuatro palabras**. Sin él caben en una.
+   *
+   * ⚠️ El grupo conserva su `aria-label`: se va el texto dibujado, no lo que
+   * oye quien usa un lector de pantalla.
+   */
+  sinRotulo?: boolean;
 }) {
   return (
     <div
       data-orden-tarjetas
-      className={cn("flex flex-wrap items-center gap-1.5", className)}
+      className={cn("flex items-center gap-1.5", sinRotulo ? "flex-nowrap overflow-x-auto" : "flex-wrap", className)}
       role="group"
       aria-label="Ordenar por"
     >
-      <span className="flex min-h-[44px] items-center pr-0.5 text-xs text-gray-500">Ordenar por</span>
+      {!sinRotulo && (
+        <span className="flex min-h-[44px] items-center pr-0.5 text-xs text-gray-500">Ordenar por</span>
+      )}
       {criterios.map((c) => (
         <ChipOrden key={c.key} label={c.label} sortKey={c.key} active={active} onClick={onClick} />
       ))}

@@ -218,7 +218,10 @@ describe("1 · la columna Precio prom. dice venta ÷ unidades", () => {
     // 🔁 Sin decimal desde el 5-sep-2026 (diccionario § 0, #5). El VALOR no se
     // movió: 0,4 sigue siendo 0,4.
     expect(celda("CAMISA POLO", "margen")).toBe("40%");
-    expect(celda("CAMISA POLO", "codigos")).toBe("3");
+    // 🩸 «Códigos» dejó de ser columna el 25-sep-2026 (la «4d»): son CINCO
+    // —Descripción · Precio prom. · Margen · Cantidad · Total— y el conteo de
+    // códigos ya se ve al abrir la fila. El dato NO se perdió.
+    expect(celda("CAMISA POLO", "codigos")).toBe("");
   });
 
   it("el desplegable de códigos también trae el precio de cada código", async () => {
@@ -268,7 +271,7 @@ describe("2 · tocar el encabezado REORDENA de verdad", () => {
     await pintada();
     fireEvent.click(enTabla().getByRole("button", { name: /^Cant/ }));
     await waitFor(() => expect(ordenEnPantalla()).toEqual(["CAMISA POLO", "SANDALIA", "DEVUELTO"]));
-    fireEvent.click(enTabla().getByRole("button", { name: /^Venta/ }));
+    fireEvent.click(enTabla().getByRole("button", { name: /^Total/ }));
     await waitFor(() => expect(ordenEnPantalla()).toEqual(["CAMISA POLO", "SANDALIA", "DEVUELTO"]));
     fireEvent.click(enTabla().getByRole("button", { name: /Margen/ }));
     await waitFor(() => expect(ordenEnPantalla()[0]).toBe("DEVUELTO")); // margen 66,7%
@@ -340,15 +343,28 @@ describe("3 · el período cambia LO QUE SE PIDE", () => {
     }
   });
 
-  // La "Δ" se fue del rótulo: es notación de matemática en una tabla que mira
-  // gente que no la conoce. Lo que NO cambió es que el año deje de mentir.
-  it("el rótulo de la columna de cambio deja de mentir un año cuando la ventana es relativa", async () => {
+  // 🩸 LA COLUMNA DE CAMBIO SE RETIRÓ EL 25-sep-2026 (la «4d»): Daniel pidió
+  // CINCO columnas y ésa no es una. Lo que este candado sostiene ahora es que
+  // NO VOLVIÓ, ni con el rótulo viejo ni con la «Δ» que ya se había ido. La
+  // medición del período anterior sigue viva: alimenta «Dejó de venderse».
+  it("la columna de cambio ya no está, y no vuelve por la puerta de atrás", async () => {
     const { rerender } = render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
-    expect(screen.getByText("vs 2025")).toBeTruthy();
-    rerender(<ProductosView periodo={ULTIMOS_6} anioEnCurso={2026} />);
-    await waitFor(() => expect(screen.getByText("vs año ant.")).toBeTruthy());
+    expect(screen.queryByText("vs 2025")).toBeNull();
+    expect(screen.queryByText("vs año ant.")).toBeNull();
     expect(screen.queryByText(/^Δ/)).toBeNull();
+    expect(document.querySelector('[data-col="delta"]')).toBeNull();
+    rerender(<ProductosView periodo={ULTIMOS_6} anioEnCurso={2026} />);
+    await waitFor(() => expect(document.querySelector('[data-col="delta"]')).toBeNull());
+  });
+
+  // 🔴 Y LAS CINCO COLUMNAS SON LAS CINCO, EN SU ORDEN.
+  it("la tabla tiene exactamente las cinco columnas de la «4d», en orden", async () => {
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
+    await pintada();
+    const ths = [...(document.querySelector('[data-vista="tabla"] thead tr')?.children ?? [])]
+      .map((th) => (th.textContent ?? "").replace(/[▼▲]/g, "").trim());
+    expect(ths).toEqual(["Descripción", "Precio prom.", "Margen", "Cantidad", "Total"]);
   });
 
   it("las DOS fechas del período están en pantalla (un rótulo relativo solo, no)", async () => {
@@ -430,8 +446,8 @@ describe("4 · un período sin comparativo lo DICE, no inventa un porcentaje", (
     ];
     render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
-    await waitFor(() => expect(celda("CAMISA POLO", "delta")).toBe("+13%"));
-    expect(document.querySelector("[data-sin-comparativo]")).toBeNull();
+    await waitFor(() => expect(document.querySelector("[data-sin-comparativo]")).toBeNull());
+    expect(document.querySelector("[data-comparativo-fallo]")).toBeNull();
   });
 });
 
@@ -525,7 +541,6 @@ describe("6 · la pantalla distingue «falló» de «no había nada»", () => {
     await pintada();
     await waitFor(() => expect(document.querySelector("[data-sin-comparativo]")).toBeTruthy());
     expect(document.querySelector("[data-comparativo-fallo]")).toBeNull();
-    expect(celda("CAMISA POLO", "delta")).toBe("Nuevo");
   });
 
   it("🔴 si el comparativo FALLÓ, la pantalla lo DICE y no hay ni un «Nuevo»", async () => {
@@ -537,9 +552,7 @@ describe("6 · la pantalla distingue «falló» de «no había nada»", () => {
     expect(aviso.textContent).toContain("No se pudo cargar");
     // El aviso del OTRO caso no aparece: son dos cosas distintas.
     expect(document.querySelector("[data-sin-comparativo]")).toBeNull();
-    for (const d of ["CAMISA POLO", "SANDALIA", "DEVUELTO"]) {
-      expect(celda(d, "delta"), `${d} sigue diciendo "Nuevo" con la consulta caída`).toBe("—");
-    }
+    // 🔴 Sin ventana medida, la pantalla no afirma nada: no hay ni un «Nuevo».
     expect(document.body.textContent).not.toContain("Nuevo");
   });
 
@@ -554,7 +567,6 @@ describe("6 · la pantalla distingue «falló» de «no había nada»", () => {
     urlsPedidas = [];
     fireEvent.click(boton);
     await waitFor(() => expect(document.querySelector("[data-comparativo-fallo]")).toBeNull());
-    expect(celda("CAMISA POLO", "delta")).not.toBe("—");
   });
 
   it("⚠️ los números de la tabla NO cambian por que el comparativo falle", async () => {
@@ -834,26 +846,42 @@ function tarjeta(descripcion: string, col: string): string {
   return (li!.querySelector(`[data-tarjeta-col="${col}"]`)?.textContent ?? "").trim();
 }
 
+/** La segunda línea gris de la tarjeta: «1,000 u · $9.00 prom. · margen 40 %». */
+function subtitulo(descripcion: string): string {
+  const li = document.querySelector(`li[data-tarjeta-producto="${descripcion}"]`);
+  expect(li, `no está la tarjeta de ${descripcion}`).toBeTruthy();
+  return (li!.querySelector("[data-tarjeta-sub]")?.textContent ?? "").trim();
+}
+
+// 🔁 DESDE EL 25-sep-2026 LA TARJETA ES DE DOS LÍNEAS (la «4d»): arriba la
+// descripción y el TOTAL, abajo en gris cantidad · precio prom. · margen. Los
+// cuatro números siguen estando —eso es lo que estas dos pruebas sostienen—,
+// pero tres de ellos viven en una sola línea de texto y no en cuatro celdas.
 describe("10 · las tarjetas de celular", () => {
   it("🔴 la tarjeta trae los CUATRO números, PIEZAS y PRECIO PROM. incluidos", async () => {
     render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
-    expect(tarjeta("CAMISA POLO", "cantidad")).toBe("1,000");
     expect(tarjeta("CAMISA POLO", "venta")).toBe("$9,000.00");
-    expect(tarjeta("CAMISA POLO", "precio")).toBe("$9.00");
+    const sub = subtitulo("CAMISA POLO");
+    expect(sub).toContain("1,000 u");
+    expect(sub).toContain("$9.00 prom.");
     // 🔁 Sin decimal desde el 5-sep-2026 (diccionario § 0, #5).
-    expect(tarjeta("CAMISA POLO", "margen")).toBe("40%");
+    expect(sub).toContain("margen 40 %");
   });
 
   it("🔴 y dice EXACTAMENTE lo mismo que la tabla, celda por celda", async () => {
     render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
-    // Las tres filas x los cuatro números. Si la tarjeta tuviera su propio
-    // formateador o su propio redondeo, esto cae.
+    // Si la tarjeta tuviera su propio formateador o su propio redondeo, esto cae.
     for (const d of ["CAMISA POLO", "SANDALIA", "DEVUELTO"]) {
-      for (const col of ["cantidad", "venta", "precio", "margen"]) {
-        expect(tarjeta(d, col), `${d}/${col}`).toBe(celda(d, col));
-      }
+      expect(tarjeta(d, "venta"), `${d}/venta`).toBe(celda(d, "venta"));
+      const sub = subtitulo(d);
+      // La cantidad y el precio, con el MISMO texto que la celda de la tabla.
+      expect(sub, `${d}/cantidad`).toContain(`${celda(d, "cantidad")} u`);
+      const precio = celda(d, "precio");
+      if (precio !== "—") expect(sub, `${d}/precio`).toContain(`${precio} prom.`);
+      const margen = celda(d, "margen");
+      if (margen !== "—") expect(sub, `${d}/margen`).toContain(`margen ${margen.replace("%", " %")}`);
     }
   });
 

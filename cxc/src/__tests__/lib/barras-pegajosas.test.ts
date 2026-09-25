@@ -90,6 +90,11 @@ const NO_SON_BARRAS_DE_PAGINA: { archivo: string; motivo: string }[] = [
   // ese `sticky top-0` del `<thead>` se pega a ESA caja, no a la página.
   { archivo: "app/asistencia/PlanillaTab.tsx", motivo: "thead de la tabla de la planilla, dentro de su caja" },
   { archivo: "components/ventas/ResumenView.tsx", motivo: "thead del heatmap (sticky en los dos ejes)" },
+  // 25-sep-2026 · La pantalla del cliente del celular (la «3g») es un
+  // `fixed inset-0 overflow-y-auto` con su PROPIO deslizamiento: su «‹ volver»
+  // se pega a esa caja, no a la página, y el encabezado del sistema no existe
+  // en el celular (`SIN_BARRA_ARRIBA`).
+  { archivo: "components/ventas/celular/PiezasVentas.tsx", motivo: "el «‹ volver» de la pantalla que sube, dentro de su propia caja" },
   // (`components/ventas/ResumenAnual.tsx` salió de la lista el 11-sep-2026: la
   // vista Anual se retiró con la pestaña.)
   { archivo: "components/catalogo/PedidoDetalleClient.tsx", motivo: "thead del detalle del pedido" },

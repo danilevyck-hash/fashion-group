@@ -330,24 +330,21 @@ describe("3 · 🔴 con un cliente puesto NO hay Margen %", () => {
     fireEvent.click(enTabla().getByRole("button", { name: /Margen/ }));
     await elegirCliente(CITY.nombre);
     expect(filas()).toEqual(["CAMISA POLO", "SANDALIA"]);
-    expect(enTabla().getByRole("button", { name: /^Venta/ }).textContent).toContain("▼");
+    expect(enTabla().getByRole("button", { name: /^Total/ }).textContent).toContain("▼");
   });
 });
 
-describe("4 · la columna de cambio compara contra lo que compraba ÉL", () => {
-  it("usa la venta anterior DEL CLIENTE, no la de la empresa", async () => {
+// 🩸 LA COLUMNA DE CAMBIO SE RETIRÓ EL 25-sep-2026 (la «4d»: cinco columnas,
+// y ésa no es una). Lo que NO se retiró es la MEDICIÓN de lo que ese cliente
+// compraba antes: sigue alimentando «Dejó de comprar», que es el bloque de
+// abajo y el que este candado ya cuidaba. Acá solo queda que la columna no
+// vuelva por la puerta de atrás.
+describe("4 · la columna de cambio ya no está", () => {
+  it("no hay celda de cambio, ni con un cliente puesto", async () => {
     render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await elegirCliente(CITY.nombre);
-    // 2000 contra 1500 = +33%. Con la base de la empresa (7200) sería −72%.
-    expect(celda("CAMISA POLO", "delta")).toBe("+33%");
-  });
-
-  it("lo que no compraba antes sale «Nuevo»", async () => {
-    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
-    await pintada();
-    await elegirCliente(CITY.nombre);
-    expect(celda("SANDALIA", "delta")).toBe("Nuevo");
+    expect(document.querySelector('[data-col="delta"]')).toBeNull();
   });
 });
 

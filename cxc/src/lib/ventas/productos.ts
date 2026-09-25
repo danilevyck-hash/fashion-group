@@ -38,6 +38,20 @@ export const PRODUCTOS_EMPRESAS: { key: string; nombre: string }[] = B2B_EMPRESA
 export const PRODUCTOS_EMPRESA_KEYS = PRODUCTOS_EMPRESAS.map(e => e.key);
 export const DEFAULT_PRODUCTOS_EMPRESA = "fashion_wear";
 
+/**
+ * 🔴 PRODUCTOS RECUERDA LA ÚLTIMA EMPRESA ELEGIDA (25-sep-2026, la «3c»).
+ *
+ * Daniel: *«dejarlo por empresa, pero que recuerde la última que elegiste»*.
+ * La pestaña abría SIEMPRE en Fashion Wear y el número grande que se leía al
+ * entrar —$2.440.739,46— era solo de esa empresa, el 35 % de los $7.069.116
+ * del Resumen. Recordarla cuesta poco y quita un toque en cada visita.
+ *
+ * ⚠️ Es la llave de `useLastUsed`, que guarda en `fg_last_<llave>`: por
+ * NAVEGADOR, no por usuario ni en la base. Un `?empresa=` en la dirección le
+ * gana a la memoria: un enlace compartido tiene que abrir donde dice.
+ */
+export const MEMORIA_EMPRESA_PRODUCTOS = "productos_empresa";
+
 export function empresaNombre(key: string): string {
   return PRODUCTOS_EMPRESAS.find(e => e.key === key)?.nombre ?? key;
 }

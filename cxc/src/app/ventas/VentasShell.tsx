@@ -22,6 +22,9 @@ import {
   tabHeredado,
   type ModoClientes,
 } from "@/lib/ventas/pestanas";
+import { descargarLasTresPestanas } from "@/lib/ventas/excel-tres-pestanas";
+import { anotarDescarga } from "@/lib/ventas/descarga";
+import { DEFAULT_PRODUCTOS_EMPRESA, MEMORIA_EMPRESA_PRODUCTOS, type ProductosResponse } from "@/lib/ventas/productos";
 import {
   MEMORIA_PERIODO_VENTAS,
   PARAM_PERIODO_VENTAS,
@@ -29,6 +32,8 @@ import {
   opcionesPeriodo,
   periodoAUrl,
   periodoDesdeUrl,
+  periodoParaProductos,
+  rotuloCompras,
   resolverPeriodo,
   ventanaParaClientes,
   type CapacidadesPeriodo,
@@ -272,6 +277,48 @@ export function VentasShell({
     [tab, availableYears, anioEnCurso, cap],
   );
 
+  // ── 🔴 «LAS TRES PESTAÑAS EN UN SOLO EXCEL» — la «6a» ─────────────────────
+  //
+  // Vive en el SHELL porque es el único que tiene las tres cosas a la vez. Las
+  // hojas las siguen armando los TRES generadores de siempre
+  // (`buildResumenSheet`, `buildClientesSheet`, `buildProductosSheet`): acá no
+  // se escribe una sola columna.
+  //
+  // ⚠️ Productos no vive en este bundle —se pide por empresa— así que se pide
+  // acá, con la ÚLTIMA empresa elegida, que es la que la pestaña abre.
+  const [empresaProductos] = useLastUsed(MEMORIA_EMPRESA_PRODUCTOS, DEFAULT_PRODUCTOS_EMPRESA);
+  const descargarLasTres = useCallback(async () => {
+    if (!resumen) return;
+    const { periodo: periodoProd, year: yearProd } = periodoParaProductos(periodo, anioEnCurso);
+    let productos: ProductosResponse | null = null;
+    try {
+      const qs = new URLSearchParams({
+        empresa: empresaProductos || DEFAULT_PRODUCTOS_EMPRESA,
+        year: String(yearProd),
+        periodo: periodoProd,
+      });
+      const r = await fetch(`/api/ventas/productos?${qs.toString()}`, { cache: "no-store" });
+      if (r.ok) productos = (await r.json()) as ProductosResponse;
+    } catch {
+      // 🔴 FALLA ABIERTA: si Productos no contesta, el archivo sale con las dos
+      // hojas que sí están. Un Excel de menos es mejor que ninguno.
+    }
+    await descargarLasTresPestanas({
+      resumen: { data: resumen, modo: "ventas" },
+      clientes: clientes
+        ? {
+            year: selectedYear,
+            periodo,
+            anioComparativo: clientes.anioComparativo ?? selectedYear - 1,
+            filas: clientes.rows,
+            empresa: "todas",
+          }
+        : null,
+      productos: productos ? { resp: productos } : null,
+    });
+    anotarDescarga("resumen", { alcance: "las-tres", anio: selectedYear });
+  }, [resumen, clientes, periodo, selectedYear, anioEnCurso, empresaProductos]);
+
   // Pull-to-refresh (mobile): revalida el período actual sin cambiarlo.
   const onRefresh = useCallback(async () => {
     await mutate();
@@ -347,6 +394,8 @@ export function VentasShell({
               loading={loading}
               error={fetchError}
               onReloadData={() => mutate()}
+              onDescargarLasTres={descargarLasTres}
+              periodoRotulo={rotuloCompras(periodo)}
             />
           ) : <ErrorState scope="resumen" detail={data?.resumenError ?? null} onRetry={() => mutate()} />}
         </TabsContent>
@@ -366,6 +415,8 @@ export function VentasShell({
               periodo={periodo}
               modo={modo}
               onModo={setModo}
+              onDescargarLasTres={descargarLasTres}
+              onReloadData={() => mutate()}
             />
           ) : <ErrorState scope="clientes" detail={data?.clientesError ?? null} onRetry={() => mutate()} />}
         </TabsContent>

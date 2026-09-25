@@ -15,6 +15,9 @@ import { Download } from "lucide-react";
 import { exportResumenToExcel } from "@/lib/ventas/excel";
 import { ROTULO_DESCARGAR_EXCEL, anotarDescarga } from "@/lib/ventas/descarga";
 import { ControlSegmentado } from "./ControlSegmentado";
+import { useEsCelularVentas } from "./celular/useEsCelularVentas";
+import { ResumenCelular } from "./celular/ResumenCelular";
+import { MenuVentasCelular } from "./celular/MenuVentasCelular";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { buildNotaMayoreo } from "@/lib/ventas/mayoreo";
 import {
@@ -135,11 +138,19 @@ interface ResumenViewProps {
   error: string | null;
   /** Reload del bundle tras un "Actualizar ahora" exitoso (mutate del SWR del shell). */
   onReloadData?: () => void;
+  /** 🔴 La «6a»: las tres pestañas en un solo Excel. Lo arma el shell. */
+  onDescargarLasTres?: () => void | Promise<void>;
+  /** «año 2026» — para el subtítulo de la hoja de descarga. */
+  periodoRotulo?: string;
 }
 
 export function ResumenView({
   data, multi, selectedYear, isClosedYear, loading, error, onReloadData,
+  onDescargarLasTres, periodoRotulo = "",
 }: ResumenViewProps) {
+  // 🔴 EN EL CELULAR SE MONTA OTRA PANTALLA, NO LA MISMA ESCONDIDA: dibujar las
+  // dos a la vez dejaría cada nombre de empresa DOS veces en el documento.
+  const enCelular = useEsCelularVentas();
   const [viewMode, setViewMode] = useState<ViewMode>("ventas");
   // El panel mes × año tiene su propio control de TRES métricas (Ventas ·
   // Utilidad · Margen %): es una matriz de años, y ahí el margen sí es una
@@ -349,6 +360,28 @@ export function ResumenView({
         </div>
       )}
 
+      {/* ── 🔴 EL CELULAR (25-sep-2026): la «1b» y la «2a» ────────────────── */}
+      {enCelular ? (
+        <ResumenCelular
+          data={data}
+          selectedYear={selectedYear}
+          isClosedYear={isClosedYear}
+          viewMode={viewMode}
+          setViewMode={onToggleMode}
+          onOpenEmpresa={setPanelEmpresaId}
+          multiMayoreoNota={multiMayoreoNota?.texto ?? null}
+          accion={
+            <MenuVentasCelular
+              pestana="resumen"
+              periodoRotulo={periodoRotulo}
+              apagada={bajando}
+              onEstaPestana={onExcel}
+              onLasTres={() => onDescargarLasTres?.()}
+              onActualizado={() => onReloadData?.()}
+            />
+          }
+        />
+      ) : (
       <ResumenViewMobile
         data={data}
         selectedYear={selectedYear}
@@ -364,6 +397,7 @@ export function ResumenView({
         bajando={bajando}
         multiMayoreoNota={multiMayoreoNota?.texto ?? null}
       />
+      )}
 
       {/* 🩸 EL CORTE NO ES `md` NI `lg` NI `xl`, Y EL MOTIVO ES UN NÚMERO.
           La matriz son 15 columnas (Empresa + 12 meses + Total + Proyección) y

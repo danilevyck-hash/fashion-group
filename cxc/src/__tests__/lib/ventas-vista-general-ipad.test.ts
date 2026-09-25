@@ -212,23 +212,24 @@ describe("Ventas › Productos — la tabla ENTRA, así que se queda tabla", () 
     expect(productos).toContain("<tbody>");
   });
 
-  it("las columnas siguen existiendo con sus mismos textos, más Precio prom.", () => {
-    for (const th of ["Descripción", "Códigos", "Cant", "Venta", "Precio prom.", "Margen %"]) {
+  // 🔁 DESDE EL 25-sep-2026 SON CINCO COLUMNAS (la «4d» que Daniel aprobó):
+  // Descripción · Precio prom. · Margen · Cantidad · Total. Salieron «Códigos»
+  // —un conteo que ya se ve al abrir la fila— y la columna de cambio. **Ningún
+  // número cambia**: «Cantidad» son las mismas piezas y «Total» la misma venta.
+  it("las cinco columnas de la «4d» siguen existiendo, con sus textos", () => {
+    for (const th of ["Descripción", "Precio prom.", "Margen", "Cantidad", "Total"]) {
       expect(productos).toContain(th);
     }
-    // El rótulo de la columna de cambio se calcula (`vs 2025` con año/mes;
-    // `vs año ant.` con las ventanas relativas, donde nombrar un año sería
-    // mentira). La "Δ" se retiró: es notación de matemática en una tabla que
-    // mira gente que no la conoce. Que DIGA lo correcto en cada caso se prueba
-    // tocando el selector, no leyendo el archivo:
-    // src/__tests__/components/ventas-productos-precio-periodos.tsx.
-    expect(productos).toContain("{deltaLabel}");
-    expect(productos).toContain('`vs ${selectedYear - 1}`');
   });
 
-  it("Precio prom. se esconde bajo `sm`, como Cant y Δ — a 390 px no cabe una 4a", () => {
+  it("🩸 la columna de cambio no vuelve, ni con su rótulo calculado", () => {
+    expect(productos).not.toContain("{deltaLabel}");
+    expect(productos).not.toContain('data-col="delta"');
+  });
+
+  it("🔴 y ninguna de las cinco se esconde bajo un corte: la tabla vive desde `sm`", () => {
     const th = productos.slice(productos.indexOf('label="Precio prom."'));
-    expect(th.slice(0, 200)).toContain('className="hidden sm:table-cell"');
+    expect(th.slice(0, 200)).not.toContain('className="hidden sm:table-cell"');
   });
 });
 

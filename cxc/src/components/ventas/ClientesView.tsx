@@ -17,6 +17,13 @@ import { ClienteHoverCard, type HistorialState } from "./ClienteHoverCard";
 import { ClienteSheet } from "./ClienteSheet";
 import { SortSheet } from "./SortSheet";
 import { ControlSegmentado } from "./ControlSegmentado";
+import { useEsCelularVentas } from "./celular/useEsCelularVentas";
+import { ClientesCelular } from "./celular/ClientesCelular";
+import { HojaClienteCelular } from "./celular/HojaClienteCelular";
+import { MenuVentasCelular } from "./celular/MenuVentasCelular";
+import { HojaCel } from "./celular/PiezasVentas";
+import { esPantallaDeCelularVentas, ultimaCompraEnPalabras } from "@/lib/ventas/celular";
+import { hoyPanama } from "@/lib/fecha-panama";
 import { UtilidadView } from "./UtilidadView";
 import { type ModoClientes } from "@/lib/ventas/pestanas";
 import { exportClientesToExcel } from "@/lib/ventas/clientes-excel";
@@ -159,12 +166,20 @@ interface ClientesViewProps {
    *  lo que se sirvió lo dice `data.ventana`, y la columna rotula ESO. Sin él,
    *  el año de `selectedYear`. */
   periodo?: PeriodoVentas;
+  /** 🔴 La «6a»: las tres pestañas en un solo Excel. Lo arma el shell. */
+  onDescargarLasTres?: () => void | Promise<void>;
+  /** Reload del bundle tras un «Actualizar ahora» bueno. */
+  onReloadData?: () => void;
 }
 
 export function ClientesView({
   data: initialData, selectedYear, isClosedYear, modo, onModo,
   periodo = { tipo: "anio", anio: selectedYear },
+  onDescargarLasTres, onReloadData,
 }: ClientesViewProps) {
+  // 🔴 EN EL CELULAR SE MONTA OTRA PANTALLA, NO LA MISMA ESCONDIDA: dibujar las
+  // dos a la vez dejaría cada nombre de cliente DOS veces en el documento.
+  const enCelular = useEsCelularVentas();
   // 🔴 `?cliente=D-25` — LO ÚNICO QUE SE LE AGREGÓ A ESTA PANTALLA (5-sep-2026).
   //
   // El pie de la ficha del cliente tiene «Ver en Ventas ›» (solo admin, que es
@@ -184,9 +199,19 @@ export function ClientesView({
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
-  // Sort default: año cerrado → ordenar por compras YTD (vista anual);
-  // año en curso → última compra (vista rolling 12m).
-  const [sortBy, setSortBy] = useState<SortKey>(isClosedYear ? "ytd" : "ultima");
+  // 🔴 EN EL CELULAR ABRE POR PLATA DEL AÑO: el que más te compró, arriba
+  // (la «3f», decidida por Daniel el 25-sep-2026).
+  //
+  // 🩸 Abría por «última compra», así que los 10 primeros eran los 10 que
+  // compraron ayer, en orden alfabético, y el más grande del año ($1.431.353)
+  // quedaba CUARTO de casualidad: mañana podía estar en cualquier lugar. Con
+  // tres tarjetas por pantalla, las tres primeras no valían nada.
+  //
+  // ⚠️ En la computadora no cambia: un año cerrado sigue abriendo por compras y
+  // el año en curso por última compra, con su columna «ÚLTIMA COMPRA ↓».
+  const [sortBy, setSortBy] = useState<SortKey>(
+    isClosedYear || esPantallaDeCelularVentas() ? "ytd" : "ultima",
+  );
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   // ⛔ ACÁ VIVÍA `vista` («Clientes: últimos 12 meses / con compras en 2026»),
   // el desplegable que decidía el UNIVERSO. Se retiró el 11-sep-2026: en los
@@ -200,6 +225,8 @@ export function ClientesView({
   // encuentra nada, y que además hacían parecer que la lista se había roto. No
   // se ESCONDEN —siguen contados y a un toque—: se pliegan.
   const [ceroAbierto, setCeroAbierto] = useState(false);
+  /** El chip «Todas las empresas» del celular, cuando está abierto. */
+  const [empresaAbierta, setEmpresaAbierta] = useState(false);
   // Lo que devolvió la consulta de utilidad, para que el Excel de esta pantalla
   // pueda bajar lo que se está viendo en los modos Utilidad y Margen %.
   const [utilidadData, setUtilidadData] = useState<UtilidadClienteResponse | null>(null);
@@ -512,6 +539,80 @@ export function ClientesView({
   // En modo empresa específica, la empresa está implícita en el filtro,
   // así que se omite del subtítulo para reducir ruido visual.
   const showEmpresaInCard = empresa === "todas";
+
+  // ── 🔴 EL CELULAR (25-sep-2026): la «3f» y la «3g» ────────────────────────
+  //
+  // ⚠️ El modo Utilidad NO tiene pantalla de celular propia: es otra lista
+  // (una fila por cliente Y EMPRESA) y Daniel no la miró. Ahí se sigue
+  // dibujando lo de siempre.
+  if (enCelular && !enUtilidad) {
+    const hoy = hoyPanama();
+    const rotuloEmpresa =
+      EMPRESA_OPCIONES.find((o) => o.valor === empresa)?.etiqueta ?? "Todas las empresas";
+    const sinCompras = bloques.enCero.length;
+    return (
+      <>
+        <ClientesCelular
+          filas={enPantalla}
+          total={cuantosClientes}
+          selectedYear={selectedYear}
+          hoy={hoy}
+          busqueda={search}
+          onBusqueda={setSearch}
+          empresaRotulo={rotuloEmpresa}
+          onEmpresa={() => setEmpresaAbierta(true)}
+          onTocarCliente={setSheetCliente}
+          accion={
+            <MenuVentasCelular
+              pestana="clientes"
+              periodoRotulo={rotuloCompras(periodoServido)}
+              apagada={bajando || enPantalla.length === 0}
+              onEstaPestana={onExcel}
+              onLasTres={() => onDescargarLasTres?.()}
+              onActualizado={() => { void reloadData(); onReloadData?.(); }}
+            />
+          }
+          pie={
+            sinCompras > 0 ? (
+              <button
+                type="button"
+                data-clientes-en-cero
+                aria-expanded={ceroAbierto}
+                onClick={() => setCeroAbierto((v) => !v)}
+                className="min-h-[44px] text-[13px] font-medium text-teal-700"
+              >
+                {ceroAbierto ? "Ocultar" : "Ver"} los {sinCompras} {textoSinCompras(selectedYear, periodoServido)}
+              </button>
+            ) : null
+          }
+        />
+
+        {/* El chip de empresa abre la MISMA lista de siempre, en una hoja. */}
+        <HojaCel
+          abierta={empresaAbierta}
+          titulo="Empresa"
+          onCerrar={() => setEmpresaAbierta(false)}
+          opciones={EMPRESA_OPCIONES.map((o) => ({
+            clave: o.valor,
+            rotulo: o.etiqueta,
+            onClick: () => { void onEmpresaChange(o.valor); },
+          }))}
+        />
+
+        {/* 3g · la hoja del cliente */}
+        <HojaClienteCelular
+          abierta={sheetCliente !== null}
+          onCerrar={() => setSheetCliente(null)}
+          codigo={sheetCliente?.id ?? ""}
+          nombre={sheetCliente?.nombre ?? ""}
+          cuandoCompro={
+            sheetCliente ? (ultimaCompraEnPalabras(sheetCliente.ultimaIso, hoy)?.texto ?? null) : null
+          }
+          year={selectedYear}
+        />
+      </>
+    );
+  }
 
   return (
     <div className={cn("space-y-3", loading && "opacity-60 pointer-events-none transition-opacity")}>
