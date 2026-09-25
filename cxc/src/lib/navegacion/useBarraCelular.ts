@@ -22,6 +22,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { VAR_ALTURA_ENCABEZADO } from "@/lib/ui/barra-pegajosa";
 import {
   BARRA_QUE_SE_ESCONDE,
+  SIN_BARRA_ARRIBA,
   CONSULTA_CELULAR,
   CONSULTA_SIN_MOVIMIENTO,
   ESTADO_BARRA_INICIAL,
@@ -79,7 +80,11 @@ export function useBarraCelular(ref: RefObject<HTMLElement | null>): BarraCelula
   }, []);
 
   // ── El deslizamiento, solo hasta `sm` ──
+  // 🔴 Con la franja de arriba retirada (`SIN_BARRA_ARRIBA`) no hay nada que
+  // esconder en el celular: el oyente de `scroll` ni se prende. Apagar ese
+  // interruptor devuelve la barra que se esconde, entera.
   useEffect(() => {
+    if (SIN_BARRA_ARRIBA) return;
     if (!BARRA_QUE_SE_ESCONDE) return;
     if (typeof window === "undefined") return;
 
@@ -148,6 +153,7 @@ export function useBarraCelular(ref: RefObject<HTMLElement | null>): BarraCelula
   // sube con ella. Se escribe DESPUÉS de `usePublicarAlturaEncabezado`, que es
   // quien la publica cuando el encabezado cambia de tamaño.
   useEffect(() => {
+    if (SIN_BARRA_ARRIBA) return;
     if (!BARRA_QUE_SE_ESCONDE) return;
     if (typeof document === "undefined") return;
     const el = ref.current;

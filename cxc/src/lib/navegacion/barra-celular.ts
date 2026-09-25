@@ -146,3 +146,135 @@ export function corrimientoDeLaBarra(visible: boolean, alturaBarra: number): num
 export function transicionDeLaBarra(sinMovimiento: boolean): string {
   return sinMovimiento ? "none" : `transform ${MS_TRANSICION_BARRA}ms ease-out`;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 SEGUNDA VUELTA: EN EL CELULAR NO HAY BARRA DE ARRIBA (24-sep-2026).
+//
+// Daniel miró la barra que se esconde y eligió la opción **a** del mockup: que
+// la franja no exista. El nombre del módulo pasa a ser el **título grande de la
+// página** —el que se lee una vez, arriba del contenido, y se va con el dedo—,
+// y las tres rayas se mudan a un **botón redondo flotante** abajo a la derecha,
+// donde ya descansa el pulgar.
+//
+// 🩸 LAS CUENTAS, sobre los mismos 844 px del iPhone de Daniel:
+//
+//     hoy · franja de 46 px ......... 717 px al abrir · 763 al deslizar
+//     sin barra ..................... 763 px al abrir · 763 al deslizar
+//
+// O sea: **los 46 px se recuperan enteros y no se devuelven nunca**, ni
+// siquiera el instante en que la barra volvía al subir el dedo.
+//
+// 🔴 UNA SOLA FUENTE DEL TÍTULO POR PANTALLA. Las portadas nuevas del celular
+// —Asistencia, Cuentas por Cobrar, Multifashion, Reclamos, Marketing,
+// Catálogos— ya dibujan su propio título grande. Ésas lo dicen (`AppHeader`
+// recibe `tituloEnLaPantalla`) y el layout **no lo agrega**: el nombre del
+// módulo se lee UNA vez o el arreglo se convierte en un defecto nuevo.
+//
+// ⚠️ EN LA COMPUTADORA NO CAMBIA NADA. Todo esto vive hasta `sm`
+// (`CONSULTA_CELULAR`): el encabezado de escritorio, con su buscador, su
+// campana, el usuario y la tira del camino de migas, queda igual.
+//
+// Interruptor `SIN_BARRA_ARRIBA`: en `false` vuelve la barra que se esconde de
+// §5 —entera, con su regla de deslizamiento—, sin tocar una línea de lo que se
+// guarda.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 🔴 Hoy PRENDIDO. `false` = la barra que se esconde, tal como quedó en §5. */
+export const SIN_BARRA_ARRIBA = true;
+
+/**
+ * ¿Se dibuja la franja de arriba en el celular?
+ *
+ * Se DERIVA del interruptor, igual que la campana: apagarlo devuelve la barra
+ * sin tener que acordarse de un segundo lugar.
+ */
+export function hayFranjaEnElCelular(): boolean {
+  return !SIN_BARRA_ARRIBA;
+}
+
+/** Lo que hace falta saber para decidir quién dice el nombre del módulo. */
+export interface QuienDiceElTitulo {
+  /** La pantalla ya dibuja el nombre del módulo en grande, ella sola. */
+  tituloEnLaPantalla: boolean;
+  /** Quien SOLO marca: una pantalla, sin menú y sin nombre de módulo. */
+  soloMarca: boolean;
+}
+
+/**
+ * ¿Lo pone el layout, el título grande del módulo?
+ *
+ * Sí cuando la franja se fue **y** la pantalla no lo dibuja por su cuenta. Con
+ * el interruptor apagado no lo pone nunca: ahí el nombre del módulo vive en la
+ * franja, como toda la vida.
+ *
+ * 🔴 A QUIEN SOLO MARCA NO SE LE PONE NINGUNO. Su pantalla tiene UN trabajo y
+ * ya empieza con su nombre y la hora de 56 px; meterle «Marcación» arriba es
+ * volver a bajar el botón, que es justo lo que el arreglo de «un toque» vino a
+ * evitar. Sin la franja gana los 46 px enteros y no pierde nada: no tiene otro
+ * módulo del que confundirse.
+ */
+export function elLayoutPoneElTitulo(quien: QuienDiceElTitulo): boolean {
+  if (!SIN_BARRA_ARRIBA) return false;
+  return !quien.tituloEnLaPantalla && !quien.soloMarca;
+}
+
+/** El botón redondo: 56 px de lado a lado, como manda el mockup. */
+export const DIAMETRO_FLOTANTE = 56;
+
+/** Cuánto lo separa del borde de la pantalla, y de la barra fija si la hay. */
+export const MARGEN_FLOTANTE = 16;
+
+/**
+ * El colchón que dejan las listas abajo, para que la última fila no quede
+ * debajo del botón. 56 del botón + 16 del margen + 4 de aire = 76.
+ */
+export const COLCHON_DE_LA_LISTA = 76;
+
+/**
+ * Nombre de la variable CSS con el alto de la barra fija de abajo.
+ *
+ * La publica la propia barra (`usePublicarAltoBarraFija`), MEDIDA, nunca
+ * escrita a mano: «Cobrar» y «Nuevo reclamo» no miden lo mismo, y la de
+ * Reclamos crece cuando dice cuántos hay seleccionados.
+ */
+export const VAR_ALTO_BARRA_FIJA = "--fg-alto-barra-fija";
+
+/** El atributo con el que una barra fija de abajo se deja reconocer. */
+export const ATRIBUTO_BARRA_FIJA = "data-barra-fija-abajo";
+
+/**
+ * A qué altura del piso queda el botón flotante, en píxeles.
+ *
+ * 🔴 EL FLOTANTE SUBE; LOS BOTONES NEGROS FIJOS NO SE MUEVEN. Las portadas del
+ * celular rematan con una barra fija de ANCHO COMPLETO —«Cobrar», «Nuevo
+ * reclamo», «Decidir las 5», «Pedido»—, así que correr el flotante a la
+ * izquierda no alcanzaría: no queda esquina libre. Y recortarle 72 px a la
+ * derecha a cada barra sería tocar cinco módulos para arreglar uno, y dejar el
+ * botón negro descentrado en las cinco.
+ *
+ * Entonces el flotante se apoya ENCIMA de la barra: la barra publica su alto y
+ * el botón se sienta a `margen + ese alto`. Sin barra fija el valor es 0 y el
+ * botón vuelve al piso, respetando la franja de iOS.
+ *
+ * ⚠️ Con barra NO se suma la franja de iOS: la barra ya la lleva adentro de su
+ * propio relleno, y sumarla otra vez dejaría el botón flotando en el aire. Por
+ * eso es un `max()` de los dos pisos y no una suma de los tres números.
+ */
+export function abajoDelFlotante(altoBarraFija: number, franjaIos = 0): number {
+  const alto = Math.max(0, Number.isFinite(altoBarraFija) ? altoBarraFija : 0);
+  const franja = Math.max(0, Number.isFinite(franjaIos) ? franjaIos : 0);
+  return Math.round(Math.max(MARGEN_FLOTANTE + franja, MARGEN_FLOTANTE + alto));
+}
+
+/**
+ * La MISMA regla, ya escrita en CSS, para que el botón no tenga que medir nada
+ * ni volver a pintarse cuando la barra aparece.
+ *
+ * 🔑 Es la única forma en que el flotante conoce la barra: un `max()` que el
+ * navegador resuelve solo. Sin barra, `var(...)` cae a `0px` y manda el piso de
+ * siempre — o sea que **falla ABIERTA**: una pantalla que se olvide de publicar
+ * su alto deja el botón donde estaba, nunca lo esconde.
+ */
+export const ABAJO_DEL_FLOTANTE_CSS =
+  `max(calc(${MARGEN_FLOTANTE}px + env(safe-area-inset-bottom)), ` +
+  `calc(${MARGEN_FLOTANTE}px + var(${VAR_ALTO_BARRA_FIJA}, 0px)))`;

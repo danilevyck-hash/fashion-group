@@ -31,10 +31,16 @@ import {
   seDibujaElSegmentado,
 } from "@/lib/navegacion/cajon-por-grupos";
 import {
+  ABAJO_DEL_FLOTANTE_CSS,
+  DIAMETRO_FLOTANTE,
+  SIN_BARRA_ARRIBA,
   campanaYLupaEnElCelular,
   corrimientoDeLaBarra,
+  elLayoutPoneElTitulo,
+  hayFranjaEnElCelular,
   transicionDeLaBarra,
 } from "@/lib/navegacion/barra-celular";
+import { useColchonDelFlotante } from "@/lib/navegacion/useColchonDelFlotante";
 import { useBarraCelular } from "@/lib/navegacion/useBarraCelular";
 import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
 import type { ModuleGroup } from "@/lib/modules";
@@ -66,9 +72,21 @@ interface AppHeaderProps {
    * quiera — este cajón es SOLO móvil (`sm:hidden`, como todo el drawer).
    */
   acciones?: ReactNode;
+  /**
+   * 🔴 ESTA PANTALLA YA DIBUJA EL NOMBRE DEL MÓDULO EN GRANDE (24-sep-2026).
+   *
+   * Sin la franja de arriba, el nombre del módulo pasa a ser el título grande
+   * de la página, y lo pone este layout. Pero las portadas nuevas del celular
+   * —Asistencia, Cuentas por Cobrar, Multifashion, Reclamos, Marketing,
+   * Catálogos— ya traen el suyo: si el layout agregara otro, el nombre se
+   * leería DOS veces. Ésas pasan `tituloEnLaPantalla` y el layout se calla.
+   *
+   * Es OPCIONAL y aditivo: quien no lo pasa recibe el título del layout.
+   */
+  tituloEnLaPantalla?: boolean;
 }
 
-export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acciones, grupo }: AppHeaderProps) {
+export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acciones, grupo, tituloEnLaPantalla }: AppHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -162,6 +180,12 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
     setDrawerOpen(false);
   }, [router]);
 
+  // 🔴 El botón redondo flotante: solo cuando la franja se fue y el rol TIENE
+  // menú. Quien solo marca no lo ve —no tiene a dónde ir— y en la computadora
+  // no existe (`sm:hidden`).
+  const hayFlotante = SIN_BARRA_ARRIBA && !soloMarca;
+  useColchonDelFlotante(hayFlotante);
+
   const moduleColor = getModuleColor(pathname);
   const currentNav = ALL_MODULES.find(m => moduleColor && pathname.startsWith(m.href));
 
@@ -171,7 +195,11 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
         ref={encabezadoRef}
         data-encabezado
         data-barra-visible={barra.visible ? "si" : "no"}
-        className={`w-full border-b bg-white sticky top-0 ${moduleColor ? moduleColor.border : "border-gray-200"}`}
+        // 🔴 SIN FRANJA EN EL CELULAR (24-sep-2026): `hidden sm:block` la saca
+        // hasta `sm` y la deja intacta en la computadora. Al estar en
+        // `display:none`, `usePublicarAlturaEncabezado` la mide en 0 y las
+        // barras pegajosas de contenido se pegan arriba del todo solas.
+        className={`w-full border-b bg-white sticky top-0 ${hayFranjaEnElCelular() ? "" : "hidden sm:block"} ${moduleColor ? moduleColor.border : "border-gray-200"}`}
         style={{
           zIndex: Z_ENCABEZADO,
           // Se corre justo lo que mide, nunca un `-100%`: el mismo bloque lleva
@@ -238,7 +266,10 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             </button>
           )}
-          {!soloMarca && (
+          {/* 🔴 Con la franja retirada, las tres rayas viven en el botón
+              redondo flotante de abajo. Esta hamburguesa se queda para cuando
+              `SIN_BARRA_ARRIBA` esté en `false`: la barra vuelve entera. */}
+          {!soloMarca && hayFranjaEnElCelular() && (
           <button onClick={() => setDrawerOpen(true)} aria-label="Abrir menú de módulos" className="sm:hidden min-w-[44px] min-h-[44px] flex items-center justify-center -mr-1">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
@@ -277,6 +308,38 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
           );
         })()}
       </div>
+
+      {/* ── EL NOMBRE DEL MÓDULO ES EL TÍTULO DE LA PÁGINA (24-sep-2026) ──
+          Sin la franja de arriba, el nombre se dice acá una vez, en grande, al
+          estilo de iOS: se lee al abrir y se va con el dedo al deslizar —no se
+          encoge ni se pega arriba, que costaría 44 de los 46 px recuperados—.
+          Queda FUERA del bloque pegajoso a propósito: es contenido, no barra.
+
+          🔴 UNA SOLA FUENTE POR PANTALLA: si la portada ya dibuja su título,
+          el layout no pone ninguno (`tituloEnLaPantalla`).
+
+          El acento de 2 px del módulo no se pierde: se conserva como el punto
+          de color al lado del título, que es la identidad del módulo en el
+          celular ahora que el borde del encabezado no está. */}
+      {elLayoutPoneElTitulo({ tituloEnLaPantalla: !!tituloEnLaPantalla, soloMarca }) && (
+        <div data-titulo-modulo className="px-4 pb-1 pt-3 sm:hidden">
+          {/* 🔑 Es un `<p>`, no un `<h1>`: cada pantalla del sistema ya tiene
+              su `<h1 className="sr-only">` con el nombre del módulo, y dos
+              encabezados con la MISMA palabra se leen dos veces en voz alta.
+              Es el mismo patrón que ya usaba el título del celular de
+              Multifashion (`data-celular="titulo"`). */}
+          <p className="flex items-start gap-2.5 text-[34px] font-semibold leading-[1.08] tracking-tight text-gray-950">
+            {moduleColor && (
+              <span
+                aria-hidden="true"
+                className="mt-[15px] inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full"
+                style={{ backgroundColor: moduleColor.hex }}
+              />
+            )}
+            <span className="min-w-0 break-words">{module}</span>
+          </p>
+        </div>
+      )}
 
       {/* «Qué cambió» — la tira de novedades del módulo (9-sep-2026).
           Va acá y no en 22 pantallas: este encabezado es lo único que todas
@@ -426,6 +489,36 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
           escrita acá. Cierra con ✕, con Escape (`useEscapeClose`, arriba) y al
           navegar (el efecto que mira `pathname`). `sm:hidden`: la computadora
           no lo ve nunca. */}
+      {/* ── LAS TRES RAYAS, EN UN BOTÓN REDONDO ABAJO A LA DERECHA (24-sep-2026) ──
+          Donde ya descansa el pulgar, no en la esquina más lejana. 56 px, fijo,
+          y abre el MISMO menú a pantalla completa de siempre.
+
+          🔴 NO TAPA LOS BOTONES NEGROS FIJOS DE LAS PORTADAS. «Nuevo reclamo»,
+          «Marcar cobrado» y el botón de Marcación son barras de ANCHO COMPLETO
+          pegadas abajo: no hay esquina que ceder. Entonces el flotante SUBE —la
+          barra publica su alto medido y el botón se apoya encima
+          (`ABAJO_DEL_FLOTANTE_CSS`)—, y el botón negro, que es la acción
+          principal de su pantalla, no se mueve ni un píxel.
+
+          z-30: por encima de todo el contenido (las barras pegajosas son 9 y el
+          encabezado 10), por debajo del menú, de las hojas y de los modales
+          (50+), que tienen que taparlo. */}
+      {hayFlotante && (
+        <button
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Abrir menú"
+          data-boton-flotante
+          className="fixed right-4 z-30 flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-gray-900 text-white shadow-lg shadow-black/25 transition active:scale-[0.97] sm:hidden"
+          style={{
+            width: DIAMETRO_FLOTANTE,
+            height: DIAMETRO_FLOTANTE,
+            bottom: ABAJO_DEL_FLOTANTE_CSS,
+          }}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+      )}
+
       {esMenuDePantalla() && drawerOpen && (
         <div
           data-menu-pantalla

@@ -25,6 +25,15 @@
 /* 🔴 LA ÚNICA FORMA DE PEGAR UNA BARRA DE CONTENIDO ARRIBA (11-sep-2026).
    Se pega DEBAJO del encabezado —nunca encima— y con z-index por debajo de él.
    El porqué, la medición y lo que queda afuera: src/lib/ui/barra-pegajosa.ts. */
+/* El colchón del botón redondo flotante del celular (24-sep-2026).
+   56 px del botón + 16 del margen + 4 de aire = 76. La clase la prende y la
+   apaga `useColchonDelFlotante`; en la computadora no hay botón ni colchón. */
+@media (max-width: 639px) {
+  body.fg-con-flotante {
+    padding-bottom: 76px;
+  }
+}
+
 .fg-barra-pegajosa {
   position: sticky;
   top: var(--fg-altura-encabezado);
