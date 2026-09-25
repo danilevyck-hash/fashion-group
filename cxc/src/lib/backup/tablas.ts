@@ -347,6 +347,12 @@ export const TABLAS_BITACORA = [
   // a los 30 días la novedad caduca sola, así que la fila deja de significar
   // nada por su cuenta. Ver `src/lib/novedades/lista.ts`.
   "novedades_vistas",
+  // 🔴 Quién abrió cada módulo, por día y aparato (25-sep-2026). Es `bitacora`
+  // de manual: la escribe la propia app al navegar, se regenera sola en cuanto
+  // la gente vuelve a usar el sistema y envejece a propósito —el cron
+  // `cleanup-sessions` borra lo de más de 180 días—. Respaldarla sería guardar
+  // lo que ya decidimos tirar. Ver `src/lib/visitas/registro.ts`.
+  "visitas_modulo",
 ] as const;
 
 // ─── `retirada` — tabla muerta ──────────────────────────────────────────────
