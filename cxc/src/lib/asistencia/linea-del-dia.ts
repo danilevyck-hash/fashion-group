@@ -81,8 +81,9 @@ export function textoRepetidas(cuantas: number): string {
   return n === 1 ? "1 repetida" : `${n} repetidas`;
 }
 
-/** «1 deshecha» · «2 deshechas». */
-function textoDeshechas(cuantas: number): string {
+/** «1 deshecha» · «2 deshechas». ⚠️ Exportada desde el 25-sep-2026: la línea
+ *  del REPORTE (`panel-del-dia.ts`) la reusa sin volver a escribirla. */
+export function textoDeshechas(cuantas: number): string {
   return cuantas === 1 ? "1 deshecha" : `${cuantas} deshechas`;
 }
 

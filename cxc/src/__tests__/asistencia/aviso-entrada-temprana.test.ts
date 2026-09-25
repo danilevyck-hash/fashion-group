@@ -114,8 +114,10 @@ describe("🔴 en el motor: un aviso y nada más", () => {
     const tsx = fs.readFileSync(path.join(RAIZ, "src/app/asistencia/ReporteTab.tsx"), "utf8");
     expect(tsx).toContain("textoAvisoEntradaTemprana(d.entradaTempranaMin)");
     expect(tsx).toContain("ROTULO_ENTRADA_AUTORIZADA");
-    // El chip abre el editor del día, que es donde se decide.
+    // 🔄 25-sep-2026: el chip sigue abriendo donde se decide, y ahora abre
+    // exactamente la casilla de la ENTRADA (`panel-del-dia.ts`), no el día
+    // entero. Es MÁS preciso, no menos: antes abría las cuatro casillas.
     const i = tsx.indexOf("textoAvisoEntradaTemprana(d.entradaTempranaMin)");
-    expect(tsx.slice(i - 900, i)).toContain("onClick={abrirEditor}");
+    expect(tsx.slice(i - 900, i)).toContain("abrirEditor(claveDeColumna(0), 0)");
   });
 });

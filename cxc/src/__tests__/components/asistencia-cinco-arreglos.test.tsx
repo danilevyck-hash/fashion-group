@@ -58,6 +58,7 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(URL_ACTUAL),
 }));
 
+import { TEXTO_REVISAR } from "@/lib/asistencia/panel-del-dia";
 import ReporteTab from "@/app/asistencia/ReporteTab";
 
 // ── El arnés ─────────────────────────────────────────────────────────────────
@@ -329,7 +330,13 @@ describe("4. 🔴 DOS MARCAS Y LA SEGUNDA A MEDIODÍA", () => {
     }));
     montar(<ReporteTab />);
     fireEvent.click(await screen.findByText(/Andrea Perez/i));
-    expect(await screen.findByText(TEXTO_SALIDA_SOSPECHOSA)).toBeTruthy();
+    // 🔄 25-sep-2026: «Revisar» y «Revisar salida» son UN solo chip
+    // (`panel-del-dia.ts`). El aviso no desapareció: el chip está y su porqué
+    // —el texto entero de `tituloSalidaSospechosa`— se lee al pasar el cursor.
+    const chip = await screen.findByText(TEXTO_REVISAR);
+    expect(chip).toBeTruthy();
+    expect(chip.getAttribute("title")).toContain("2 marcas");
+    expect(chip.getAttribute("title")).toContain("antes de su hora de salida");
   });
 
   it("⚠️ CONTROL: sin la bandera, el chip no está", async () => {
@@ -340,7 +347,9 @@ describe("4. 🔴 DOS MARCAS Y LA SEGUNDA A MEDIODÍA", () => {
     }));
     montar(<ReporteTab />);
     fireEvent.click(await screen.findByText(/Andrea Perez/i));
+    // Sin la bandera y sin «Revisar», no hay chip de ninguna clase.
     expect(screen.queryByText(TEXTO_SALIDA_SOSPECHOSA)).toBeNull();
+    expect(screen.queryByText(TEXTO_REVISAR)).toBeNull();
   });
 });
 

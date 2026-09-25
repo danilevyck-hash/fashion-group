@@ -25,6 +25,7 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(""),
 }));
 
+import { ARREGLAR_EL_DIA } from "@/lib/asistencia/panel-del-dia";
 import ReporteTab from "@/app/asistencia/ReporteTab";
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
@@ -185,12 +186,17 @@ describe("«Justificar» en la fila del día", () => {
   // enlace, en el MISMO lugar, y ahora abre el editor de la fila en vez de una
   // ventana por marca. Lo que este candado cuida —que «Justificar» esté al lado
   // y no aparezca en el feriado ni en el día ya justificado— no cambió.
-  it("🔴 está en la fila del día, al lado de «Arreglar el día», y no en el feriado ni en el día ya justificado", async () => {
+  // 🔄 25-sep-2026: en un día CON marcas «Arreglar el día» se retiró —era una
+  // segunda puerta a lo mismo (`panel-del-dia.ts`)— y la puerta es la hora. El
+  // candado sigue exigiendo que haya por dónde arreglar el día, y ahora además
+  // que no haya DOS.
+  it("🔴 está en la fila del día, al lado de la hora que se toca, y no en el feriado ni en el día ya justificado", async () => {
     servir(base);
     montar(<ReporteTab />);
     await abrirPersona();
     const filaDia = screen.getByText("lun 31 ago").closest("tr") as HTMLTableRowElement;
-    expect(within(filaDia).getByRole("button", { name: "Arreglar el día" })).toBeTruthy();
+    expect(within(filaDia).getByRole("button", { name: "13:22:02" })).toBeTruthy();
+    expect(within(filaDia).queryByRole("button", { name: ARREGLAR_EL_DIA })).toBeNull();
     expect(within(filaDia).getByRole("button", { name: "Justificar" })).toBeTruthy();
     const feriado = screen.getByText("mar 1 sep").closest("tr") as HTMLTableRowElement;
     expect(within(feriado).queryByRole("button", { name: "Justificar" })).toBeNull();

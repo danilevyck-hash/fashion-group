@@ -92,6 +92,15 @@ import {
   type CasillaDelDia, type EscritoEnCasilla,
 } from "@/lib/asistencia/editar-el-dia";
 import { MOTIVO_MAX } from "@/lib/asistencia/correcciones";
+// 🔴 EL PANEL DEL DÍA ABRE SOLO LA CASILLA QUE SE TOCÓ (25-sep-2026). Daniel:
+// *«al hacer clic en una hora, que solo se abra el panel de esa casilla y no
+// toda»*. Qué motivo aplica a cada casilla, cuándo sale «Hoy entraba a las», el
+// chip único y qué se dice debajo del día: todo vive en el módulo PURO.
+import {
+  ARREGLAR_EL_DIA, NOTA_NO_SE_BORRA_NADA, OTRO_MOTIVO, PANEL_DEL_DIA_2026_09, ROTULO_NOTA,
+  chipRevisar, lineaDelReporte, motivoDeLaCasilla, motivosLibres, rotuloGuardar,
+  seMuestraEntradaAutorizada, seOfreceArreglarElDia,
+} from "@/lib/asistencia/panel-del-dia";
 // 🔴 LA ENTRADA AUTORIZADA Y SU AVISO (24-sep-2026). Daniel: «hoy entraba a
 // las __:__» desde «Arreglar el día», con motivo; y el aviso «llegó N min antes
 // · ¿entrada autorizada?» solo desde 30 minutos. La regla vive en el módulo
@@ -1544,7 +1553,12 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
   // columnas de la fila; acá va lo que NO está: que fue del teléfono, que se
   // mandó sin señal, cuánto tardó en llegar, cuántas repetidas se olvidaron y
   // «ver fotos». 🔑 El cálculo no se hace acá: la regla es pura.
-  const resumenDelDia = lineaDelDia({
+  // 🔴 25-sep-2026: en el REPORTE esta línea ya no habla del teléfono. Daniel:
+  // *«¿es necesario saber ahí Teléfono · sin señal…? ¿y ver fotos si ya está en
+  // Marcaciones?»*. `lineaDelReporte` deja solo lo que no vive en ninguna otra
+  // pantalla (repetidas y deshechas); con el interruptor apagado devuelve la
+  // línea entera de `lineaDelDia`, igual que hoy.
+  const resumenDelDia = lineaDelReporte({
     marcas: delTelefono.map((m) => ({
       sinSenal: m.sinSenal,
       atrasoMin: m.atrasoMin,
@@ -1615,13 +1629,37 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
   //
   // 🔴 Lo que se escribe lo decide `planDelDia` (módulo PURO): una casilla que
   // nadie tocó no produce nada, y una hora igual a la que ya valía, tampoco.
-  const [editando, setEditando] = useState(false);
+  // 🔴 25-sep-2026: se abre UNA casilla, no el día entero. `abierta.clave` es la
+  // casilla escribible; `abierta.clave === null` es el panel de antes (las
+  // cuatro a la vez), que es lo que queda con el interruptor apagado.
+  const [abierta, setAbierta] = useState<{ clave: string | null; columna: number | null } | null>(null);
+  const editando = abierta !== null;
+  const esLaCasillaAbierta = (clave: string) =>
+    abierta !== null && (abierta.clave === null || abierta.clave === clave);
   const [escrito, setEscrito] = useState<Map<string, EscritoEnCasilla>>(new Map());
   const [motivoDia, setMotivoDia] = useState("");
+  // 🔴 «Otro…» abre el campo libre con los motivos más usados de 90 días. Sin
+  // motivo propio (una marca suelta, fuera de las cuatro columnas) arranca abierto.
+  const [motivoLibre, setMotivoLibre] = useState(false);
+  /** El ⓘ de «No se borra nada…»: cerrado salvo que alguien lo toque. */
+  const [notaAbierta, setNotaAbierta] = useState(false);
   const [guardandoDia, setGuardandoDia] = useState(false);
   // 🔴 Lo tecleado en «Hoy entraba a las» (24-sep-2026). `null` = no se tocó.
   const [escritoEntrada, setEscritoEntrada] = useState<EscritoEntradaAutorizada | null>(null);
   const casillas = useMemo(() => casillasDelDia(d), [d]);
+  // 🔴 LAS CUATRO COLUMNAS DE SIEMPRE, Y CUÁLES ESCONDEN (18-sep-2026). La
+  // cuenta salió de la pantalla a `marcas-del-dia.ts`: acá solo se pregunta.
+  // 🔑 Con 4 marcas —381 de 466 días medidos, el 81,8 %— esto devuelve
+  // [0,1,2,3] y la fila se dibuja EXACTAMENTE igual que antes.
+  // ⚠️ Se calcula ACÁ ARRIBA desde el 25-sep-2026: `abrirEditor` necesita saber
+  // qué casilla vive en cada columna para abrir SOLO esa.
+  const columnas = columnasClasicas(d.marcas.length);
+  const cabenLasCuatro = cabenEnLasCuatroColumnas(d.marcas.length);
+  /** La clave de la casilla que ocupa la columna `c`: su marca, o el hueco. */
+  const claveDeColumna = (c: number) => {
+    const idx = columnas[c];
+    return idx === null || idx === undefined ? claveVacia(c) : claveMarca(idx);
+  };
   const porClave = useMemo(
     () => new Map(casillas.map((c) => [c.clave, c])),
     [casillas],
@@ -1638,18 +1676,34 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
   /** Editar es lo mismo que corregir: mismos roles, misma migración. */
   const seEdita = EDITAR_EL_DIA && puedeCorregir && !d.fueraDeVigencia;
 
-  function abrirEditor() {
+  /**
+   * 🔴 ABRIR UNA CASILLA (25-sep-2026). `clave`/`columna` dicen cuál: la que se
+   * tocó. Sin argumentos —«Arreglar el día» en la fila gris de quien no marcó—
+   * abre la ENTRADA, que es la primera del día.
+   *
+   * 🔑 Cambiar de casilla LIMPIA lo tecleado, como «Cancelar» y volver a abrir:
+   * una casilla escondida con un cambio pendiente sería un cambio que nadie ve
+   * y que igual se guardaría. Nada callado.
+   */
+  function abrirEditor(clave?: string | null, columna?: number | null) {
     if (!seEdita) return;
     setEscrito(new Map());
     setEscritoEntrada(null);
     setMotivoDia("");
-    setEditando(true);
+    const col = columna ?? null;
+    setMotivoLibre(motivoDeLaCasilla(col) === null);
+    setAbierta(
+      PANEL_DEL_DIA_2026_09
+        ? { clave: clave ?? claveDeColumna(0), columna: clave ? col : 0 }
+        : { clave: null, columna: null },
+    );
   }
   function cerrarEditor() {
-    setEditando(false);
+    setAbierta(null);
     setEscrito(new Map());
     setEscritoEntrada(null);
     setMotivoDia("");
+    setMotivoLibre(false);
   }
   function escribir(clave: string, cambio: EscritoEnCasilla) {
     setEscrito((m) => {
@@ -1785,7 +1839,7 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
   }
 
   /** Una hora tocable. Tocarla abre el editor del día (o la ventana de antes). */
-  function HoraBoton({ idx, tenue }: { idx: number; tenue?: boolean }) {
+  function HoraBoton({ idx, col, tenue }: { idx: number; col?: number | null; tenue?: boolean }) {
     const { clase, titulo, corregida } = textoHora(idx, tenue);
     if (!puedeCorregir) {
       return <span className={clase} title={titulo}>{d.marcas[idx]}</span>;
@@ -1793,7 +1847,7 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
     return (
       <button
         type="button"
-        onClick={() => (seEdita ? abrirEditor() : abrir(idx))}
+        onClick={() => (seEdita ? abrirEditor(claveMarca(idx), col ?? null) : abrir(idx))}
         // 🔴 El título DICE que también se puede quitar: hasta el 18-sep-2026
         // decía solo «Corregir esta hora» y quitar no existía por esta puerta.
         title={titulo ?? (seEdita ? TITULO_EDITAR_EL_DIA : "Corregir o quitar esta marcación")}
@@ -1861,8 +1915,11 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
 
   /** Una celda de hora de las CUATRO columnas de siempre. */
   function Hora({ idx, col }: { idx: number | null; col: number }) {
-    if (editando) {
-      const clave = idx === null ? claveVacia(col) : claveMarca(idx);
+    const clave = idx === null ? claveVacia(col) : claveMarca(idx);
+    // 🔴 SOLO LA CASILLA QUE SE TOCÓ SE ABRE (25-sep-2026). Las otras tres
+    // siguen tocables: tocar otra cambia de casilla. Con el interruptor apagado
+    // `esLaCasillaAbierta` dice que sí a las cuatro, que es el panel de antes.
+    if (editando && esLaCasillaAbierta(clave)) {
       return celdaEscribible(clave, idx === null ? null : (porClave.get(clave) ?? null), col === 1 || col === 2);
     }
     if (idx === null) {
@@ -1873,7 +1930,7 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
         <td className="px-2 py-1.5 text-right">
           <button
             type="button"
-            onClick={abrirEditor}
+            onClick={() => abrirEditor(clave, col)}
             title={TITULO_EDITAR_EL_DIA}
             className="min-h-[44px] rounded px-1 tabular-nums text-gray-400 underline decoration-dotted decoration-gray-300 underline-offset-2 transition hover:text-black hover:decoration-black"
           >
@@ -1884,17 +1941,23 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
     }
     return (
       <td className="px-2 py-1.5 text-right">
-        <HoraBoton idx={idx} tenue={idx === 1 || idx === 2} />
+        <HoraBoton idx={idx} col={col} tenue={idx === 1 || idx === 2} />
       </td>
     );
   }
 
-  // 🔴 LAS CUATRO COLUMNAS DE SIEMPRE, Y CUÁLES ESCONDEN (18-sep-2026). La
-  // cuenta salió de la pantalla a `marcas-del-dia.ts`: acá solo se pregunta.
-  // 🔑 Con 4 marcas —381 de 466 días medidos, el 81,8 %— esto devuelve
-  // [0,1,2,3] y la fila se dibuja EXACTAMENTE igual que antes.
-  const columnas = columnasClasicas(d.marcas.length);
-  const cabenLasCuatro = cabenEnLasCuatroColumnas(d.marcas.length);
+  /** 🔴 «Revisar» y «Revisar salida» son UN solo chip (25-sep-2026). */
+  const chipUnicoRevisar = chipRevisar({
+    revisar: d.revisar,
+    salidaSospechosa: d.salidaSospechosa,
+    tituloSalida: d.salidaSospechosa ? tituloSalidaSospechosa(d.salidaTempranaMin) : null,
+  });
+
+  /** El motivo que aplica a la casilla abierta, y los libres de «Otro…». */
+  const motivoPropio = motivoDeLaCasilla(abierta?.columna ?? null);
+  const motivosDeOtro = motivosLibres(motivosFrecuentes, motivoPropio);
+  /** Con el panel apagado el campo libre y sus chips salen siempre, como hoy. */
+  const seEscribeElMotivo = !PANEL_DEL_DIA_2026_09 || motivoLibre || motivoPropio === null;
 
   return (
     <>
@@ -1967,7 +2030,23 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
                   />
                 </span>
               )}
-              {d.revisar && (
+              {/* ══════════════════════════════════════════════════════════
+                  🔴 UN SOLO CHIP «REVISAR» (25-sep-2026). Daniel vio «Revisar»
+                  y «Revisar salida» pegados en la misma fila: dos chips ámbar
+                  que se leen como dos problemas y son el mismo —ese día hay que
+                  mirarlo—. Ahora es UNO y el porqué entero (los dos, si son
+                  dos) se lee al pasar el cursor o al tocarlo. La regla vive en
+                  `panel-del-dia.ts`; ni un minuto cambia.
+                  ══════════════════════════════════════════════════════════ */}
+              {chipUnicoRevisar && (
+                <span
+                  className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800"
+                  title={chipUnicoRevisar.titulo}
+                >
+                  {chipUnicoRevisar.texto}
+                </span>
+              )}
+              {!PANEL_DEL_DIA_2026_09 && d.revisar && (
                 <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800">Revisar</span>
               )}
               {/* 🔴 DOS MARCAS Y LA SEGUNDA MUY ANTES DE SU SALIDA (16-sep-2026).
@@ -1977,7 +2056,7 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
                   día pasaba sin que nadie avisara. Se ve como un «Revisar» más,
                   y NO cambia un solo minuto: la regla y el umbral (con su
                   medición) viven en `salida-sospechosa.ts`. */}
-              {d.salidaSospechosa && (
+              {!PANEL_DEL_DIA_2026_09 && d.salidaSospechosa && (
                 <span
                   className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800"
                   title={tituloSalidaSospechosa(d.salidaTempranaMin)}
@@ -1995,7 +2074,8 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
                 seEdita && !editando ? (
                   <button
                     type="button"
-                    onClick={abrirEditor}
+                    // 🔴 Abre la casilla de la ENTRADA, que es donde se decide.
+                    onClick={() => abrirEditor(claveDeColumna(0), 0)}
                     title={TITULO_AVISO_ENTRADA_TEMPRANA}
                     className="ml-1.5 min-h-[44px] rounded bg-gray-100 px-1.5 text-xs font-medium text-gray-700 underline decoration-dotted underline-offset-2 transition hover:text-black"
                   >
@@ -2052,10 +2132,18 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
               )}
               {/* Agregar la marca que falta. Es el caso más común de todos: quien
                   olvidó marcar no tiene nada que corregir. */}
-              {puedeCorregir && !d.fueraDeVigencia && !editando && !diaFuturo && (
+              {/* 🔴 «ARREGLAR EL DÍA» ERA UNA SEGUNDA PUERTA (25-sep-2026).
+                  Daniel: *«también hay botón de Arreglar día, ¿doble
+                  entrada?»* — sí: este botón y tocar una hora llamaban a la
+                  MISMA función. Donde el día dibuja sus cuatro columnas, cada
+                  hora y cada hueco ya es la puerta; el botón se retira y queda
+                  SOLO en la fila gris de quien no marcó nada (abajo), que es
+                  donde no hay ninguna hora que tocar. */}
+              {puedeCorregir && !d.fueraDeVigencia && !editando && !diaFuturo
+                && (!seEdita || seOfreceArreglarElDia({ marcas: d.marcas.length })) && (
                 <button type="button" onClick={() => (seEdita ? abrirEditor() : agregar())}
                   className={`ml-1.5 min-h-[44px] rounded px-1 text-xs text-gray-500 underline decoration-dotted underline-offset-2 hover:text-black ${alPasarElMouse}`}>
-                  {seEdita ? "Arreglar el día" : "Agregar hora"}
+                  {seEdita ? ARREGLAR_EL_DIA : "Agregar hora"}
                 </button>
               )}
               {/* «Justificar» desde el día (11-sep-2026): el mismo permiso de la
@@ -2111,7 +2199,7 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
             {puedeCorregir && !d.feriado && !d.fueraDeVigencia && !editando && !diaFuturo && (
               <button type="button" onClick={() => (seEdita ? abrirEditor() : agregar())}
                 className={`ml-2 min-h-[44px] rounded px-1 text-xs text-gray-500 underline decoration-dotted underline-offset-2 hover:text-black ${alPasarElMouse}`}>
-                {seEdita ? "Arreglar el día" : "Agregar marcación"}
+                {seEdita ? ARREGLAR_EL_DIA : "Agregar marcación"}
               </button>
             )}
             {seJustifica && enlaceJustificar}
@@ -2151,7 +2239,15 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
                 extra de la entrada se mide desde ahí hasta su hora de entrada y
                 va a Aprobaciones; sin hora, nada cambia. Se guarda con el MISMO
                 porqué y el mismo botón. */}
-            {ENTRADA_AUTORIZADA && (
+            {ENTRADA_AUTORIZADA && seMuestraEntradaAutorizada({
+              // 🔴 25-sep-2026: SOLO al tocar la Entrada, y solo si ese día hay
+              // algo que decidir —el aviso de entrada temprana (≥ 30 min, el
+              // umbral de las reglas) o una autorización ya puesta—. En
+              // cualquier otra casilla no se dibuja.
+              columna: abierta?.columna ?? null,
+              entradaTempranaMin: d.entradaTempranaMin,
+              tieneEntradaAutorizada: Boolean(entradaActual),
+            }) && (
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <label htmlFor={`entrada-${codigo}-${d.fecha}`} className="text-[12px] font-medium text-gray-700">
                   {ROTULO_ENTRADA_AUTORIZADA}
@@ -2189,35 +2285,99 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
               <span id={`porque-${codigo}-${d.fecha}`} className="block text-[12px] font-medium text-gray-700">
                 {PORQUE} <span className="text-red-600">*</span>
               </span>
-              {/* Los más usados, si los hay. Tocar uno ESCRIBE en el campo. */}
-              {motivosFrecuentes.length > 0 && (
+              {/* ══════════════════════════════════════════════════════════
+                  🔴 EL MOTIVO QUE APLICA A ESTA CASILLA (25-sep-2026).
+                  🩸 Salían los CUATRO juntos —«no marco salida · no marco
+                  salida almuerzo · no marco Entrada · no marco salida de
+                  almuerzo»—, que eran los motivos más usados de 90 días, mal
+                  escritos y sin orden, se hubiera tocado la hora que se
+                  hubiera tocado. Ahora sale UNO, el de la casilla abierta, con
+                  el rótulo parejo; y «Otro…» abre el campo libre con los más
+                  usados, que NO se retiran.
+                  ══════════════════════════════════════════════════════════ */}
+              {PANEL_DEL_DIA_2026_09 ? (
                 <div className="mt-1 flex flex-wrap gap-1.5">
-                  {motivosFrecuentes.map((m) => (
-                    <button key={m} type="button" onClick={() => setMotivoDia(m)}
-                      aria-pressed={motivoDia === m}
+                  {motivoPropio && (
+                    <button type="button"
+                      onClick={() => { setMotivoDia(motivoPropio); setMotivoLibre(false); }}
+                      aria-pressed={!motivoLibre && motivoDia === motivoPropio}
+                      disabled={guardandoDia}
                       className={`min-h-[44px] rounded-full border px-3 text-[12px] transition active:scale-[0.97] ${
-                        motivoDia === m
+                        !motivoLibre && motivoDia === motivoPropio
                           ? "border-black bg-black text-white"
                           : "border-gray-200 bg-white text-gray-600 hover:border-black hover:text-black"
                       }`}>
-                      {m}
+                      {motivoPropio}
                     </button>
-                  ))}
+                  )}
+                  {motivoPropio && (
+                    <button type="button"
+                      onClick={() => { setMotivoLibre(true); if (motivoDia === motivoPropio) setMotivoDia(""); }}
+                      aria-pressed={motivoLibre}
+                      disabled={guardandoDia}
+                      className={`min-h-[44px] rounded-full border px-3 text-[12px] transition active:scale-[0.97] ${
+                        motivoLibre
+                          ? "border-black bg-white font-medium text-black"
+                          : "border-gray-200 bg-white text-gray-600 hover:border-black hover:text-black"
+                      }`}>
+                      {OTRO_MOTIVO}
+                    </button>
+                  )}
                 </div>
+              ) : (
+                /* Los más usados, si los hay. Tocar uno ESCRIBE en el campo. */
+                motivosFrecuentes.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {motivosFrecuentes.map((m) => (
+                      <button key={m} type="button" onClick={() => setMotivoDia(m)}
+                        aria-pressed={motivoDia === m}
+                        className={`min-h-[44px] rounded-full border px-3 text-[12px] transition active:scale-[0.97] ${
+                          motivoDia === m
+                            ? "border-black bg-black text-white"
+                            : "border-gray-200 bg-white text-gray-600 hover:border-black hover:text-black"
+                        }`}>
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                )
               )}
-              <input
-                aria-labelledby={`porque-${codigo}-${d.fecha}`}
-                value={motivoDia}
-                onChange={(e) => setMotivoDia(e.target.value.slice(0, MOTIVO_MAX))}
-                placeholder="Escribe el motivo…"
-                disabled={guardandoDia}
-                className="mt-1.5 min-h-[44px] w-full rounded-lg border border-gray-200 bg-white px-3 text-base outline-none transition focus:border-black sm:text-sm"
-              />
+              {/* El campo libre. Con el panel prendido sale al tocar «Otro…»
+                  (o de entrada, cuando la casilla no tiene motivo propio), con
+                  los más usados de 90 días al lado. */}
+              {seEscribeElMotivo && (
+                <>
+                  {PANEL_DEL_DIA_2026_09 && motivosDeOtro.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {motivosDeOtro.map((m) => (
+                        <button key={m} type="button" onClick={() => setMotivoDia(m)}
+                          aria-pressed={motivoDia === m}
+                          disabled={guardandoDia}
+                          className={`min-h-[44px] rounded-full border px-3 text-[12px] transition active:scale-[0.97] ${
+                            motivoDia === m
+                              ? "border-black bg-black text-white"
+                              : "border-gray-200 bg-white text-gray-600 hover:border-black hover:text-black"
+                          }`}>
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <input
+                    aria-labelledby={`porque-${codigo}-${d.fecha}`}
+                    value={motivoDia}
+                    onChange={(e) => setMotivoDia(e.target.value.slice(0, MOTIVO_MAX))}
+                    placeholder="Escribe el motivo…"
+                    disabled={guardandoDia}
+                    className="mt-1.5 min-h-[44px] w-full rounded-lg border border-gray-200 bg-white px-3 text-base outline-none transition focus:border-black sm:text-sm"
+                  />
+                </>
+              )}
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <button type="button" onClick={() => void guardarElDia()}
                   disabled={Boolean(faltaDia) || guardandoDia}
                   className="min-h-[44px] rounded-md bg-black px-4 text-sm font-medium text-white transition active:scale-[0.97] disabled:opacity-40">
-                  {guardandoDia ? "Guardando…" : GUARDAR_EL_DIA}
+                  {guardandoDia ? "Guardando…" : rotuloGuardar()}
                 </button>
                 <button type="button" onClick={cerrarEditor} disabled={guardandoDia}
                   className="min-h-[44px] rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:opacity-40">
@@ -2233,11 +2393,36 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
                 {!faltaDia && resumenDelPlan(plan) && (
                   <span className="text-[12px] text-gray-600">{resumenDelPlan(plan)}</span>
                 )}
+                {/* ════════════════════════════════════════════════════════
+                    🔴 LA NOTA «NO SE BORRA NADA…» ES UN ⓘ (25-sep-2026).
+                    El texto no cambia una letra: cambia dónde vive. Eran tres
+                    renglones grises debajo de los botones, siempre; ahora se
+                    lee al tocar el ⓘ (y al pasar el cursor), que es cuando
+                    hace falta. El texto vive en `panel-del-dia.ts`.
+                    ════════════════════════════════════════════════════════ */}
+                {PANEL_DEL_DIA_2026_09 && (
+                  <button
+                    type="button"
+                    onClick={() => setNotaAbierta((v) => !v)}
+                    aria-expanded={notaAbierta}
+                    aria-label={ROTULO_NOTA}
+                    title={NOTA_NO_SE_BORRA_NADA}
+                    className="min-h-[44px] rounded px-1 text-[13px] text-gray-400 transition hover:text-black"
+                  >
+                    ⓘ
+                  </button>
+                )}
               </div>
-              <p className="mt-1.5 text-[12px] text-gray-500">
-                No se borra nada: lo que marcó el reloj queda guardado y la corrección va encima,
-                con tu nombre y este motivo.
-              </p>
+              {PANEL_DEL_DIA_2026_09 ? (
+                notaAbierta && (
+                  <p className="mt-1.5 text-[12px] text-gray-500">{NOTA_NO_SE_BORRA_NADA}</p>
+                )
+              ) : (
+                <p className="mt-1.5 text-[12px] text-gray-500">
+                  No se borra nada: lo que marcó el reloj queda guardado y la corrección va encima,
+                  con tu nombre y este motivo.
+                </p>
+              )}
             </div>
           </td>
         </tr>
@@ -2327,11 +2512,12 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
                     Con el editor abierto se escribe y se quita acá mismo —es
                     el caso que más importa, porque la que sobra casi nunca es
                     una de las cuatro columnas—. */}
-                {editando ? (
+                {editando && esLaCasillaAbierta(claveMarca(i)) ? (
                   <span className="inline-block w-[7.5rem] align-top">
                     {campoEscribible(claveMarca(i), porClave.get(claveMarca(i)) ?? null, true)}
                   </span>
                 ) : (
+                  // 🔴 Se toca y abre SU casilla; sin columna, sin motivo propio.
                   <HoraBoton idx={i} tenue />
                 )}
               </span>

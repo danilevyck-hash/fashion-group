@@ -35,7 +35,7 @@ import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/re
 
 import { ToastProvider } from "@/components/ToastSystem";
 import { REGLAS_DEFAULT } from "@/lib/asistencia/config";
-import { GUARDAR_EL_DIA } from "@/lib/asistencia/editar-el-dia";
+import { OTRO_MOTIVO, rotuloGuardar } from "@/lib/asistencia/panel-del-dia";
 import { ROTULO_SOLO_A_REVISAR } from "@/lib/asistencia/solo-a-revisar";
 import {
   ASISTENCIA_GUARDAR_SIN_SALTO, ROTULO_ANCLADA, TEXTO_ACTUALIZANDO,
@@ -191,14 +191,18 @@ const camposHora = () => Array.from(document.querySelectorAll('input[type="time"
 async function corregirYGuardar() {
   fireEvent.click(await screen.findByRole("button", { name: ROTULO_SOLO_A_REVISAR }));
   fireEvent.click(await screen.findByText("Yulissa Juarez"));
+  // 🔄 25-sep-2026: tocar una hora abre SOLO esa casilla (`panel-del-dia.ts`),
+  // y el porqué a mano se pide por «Otro…». Lo que este candado cuida —que
+  // guardar no borre la tabla ni salte arriba, y que sea UN POST— no cambió.
   fireEvent.click(await screen.findByText("08:00:00"));
   await waitFor(() => expect(camposHora().length).toBeGreaterThan(0));
-  fireEvent.change(camposHora()[1], { target: { value: "12:00" } });
+  fireEvent.change(camposHora()[0], { target: { value: "08:10" } });
+  fireEvent.click(screen.getByRole("button", { name: OTRO_MOTIVO }));
   fireEvent.change(
-    document.querySelector('input[placeholder="Escribe el motivo…"]') as HTMLInputElement,
+    await screen.findByPlaceholderText("Escribe el motivo…"),
     { target: { value: "se le olvidó marcar" } },
   );
-  fireEvent.click(screen.getByRole("button", { name: GUARDAR_EL_DIA }));
+  fireEvent.click(screen.getByRole("button", { name: rotuloGuardar() }));
 }
 
 describe("B · la tabla se queda dibujada mientras llegan los datos nuevos", () => {

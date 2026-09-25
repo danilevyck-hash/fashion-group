@@ -218,6 +218,7 @@ vi.mock("@/lib/asistencia/exportar", () => ({
 }));
 vi.mock("@/lib/excel-export", () => ({ downloadWorkbook: vi.fn() }));
 
+import { ARREGLAR_EL_DIA, OTRO_MOTIVO, rotuloGuardar } from "@/lib/asistencia/panel-del-dia";
 import ReporteTab from "@/app/asistencia/ReporteTab";
 
 afterEach(() => {
@@ -294,14 +295,18 @@ describe("D · en la pantalla sale, lo dice y se puede corregir", () => {
     fireEvent.click(await screen.findByText("Yeisibeth Muñoz"));
     // Un día sin una sola marca se abre por «Arreglar el día», que es la
     // MISMA puerta de siempre: el editor en la fila, con motivo obligatorio.
-    fireEvent.click(screen.getAllByRole("button", { name: "Arreglar el día" })[0]);
+    // 🔴 25-sep-2026: «Arreglar el día» SE QUEDA justo acá —es el único día que
+    // no dibuja ni una hora ni un hueco que tocar— y abre la casilla de la
+    // ENTRADA. El porqué a mano se pide por «Otro…» (`panel-del-dia.ts`).
+    fireEvent.click(screen.getAllByRole("button", { name: ARREGLAR_EL_DIA })[0]);
     await waitFor(() => expect(camposHora().length).toBeGreaterThan(0));
     fireEvent.change(camposHora()[0], { target: { value: "08:00" } });
+    fireEvent.click(screen.getByRole("button", { name: OTRO_MOTIVO }));
     fireEvent.change(
-      document.querySelector('input[placeholder="Escribe el motivo…"]') as HTMLInputElement,
+      await screen.findByPlaceholderText("Escribe el motivo…"),
       { target: { value: "se le olvidó marcar" } },
     );
-    fireEvent.click(screen.getByRole("button", { name: "Guardar el día" }));
+    fireEvent.click(screen.getByRole("button", { name: rotuloGuardar() }));
 
     await waitFor(() => {
       expect(llamadas.filter((l) => l.url.includes("/correcciones/dia"))).toHaveLength(1);
