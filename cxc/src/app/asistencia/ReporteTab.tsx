@@ -7,6 +7,7 @@
 // persona, "4,92 horas" no le dice nada a nadie.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { DragEvent as EventoArrastre } from "react";
 import { useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ToastSystem";
 import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, fmtMin, cuentaHorasExtra, extraQueCuenta, type DiaReporte, type PersonaReporte, type ReglasReporte } from "@/lib/asistencia/reporte";
@@ -92,6 +93,14 @@ import {
   type CasillaDelDia, type EscritoEnCasilla,
 } from "@/lib/asistencia/editar-el-dia";
 import { MOTIVO_MAX } from "@/lib/asistencia/correcciones";
+// 🔴 ARRASTRAR UNA HORA DE COLUMNA (25-sep-2026). Se agarra la hora y se suelta
+// donde va, en vez de abrir la casilla y teclearla. Lo que se guarda es la
+// MISMA corrección: el módulo PURO solo dice qué movimiento vale y arma las dos
+// entradas del mapa `escrito` que ya llenaba el teclado.
+import {
+  ARRASTRAR_HORA, MOTIVO_ARRASTRE, mapaDelArrastre, puedeSoltar, rotuloMoverAqui,
+  type HoraArrastrada,
+} from "@/lib/asistencia/arrastrar-hora";
 // 🔴 EL PANEL DEL DÍA ABRE SOLO LA CASILLA QUE SE TOCÓ (25-sep-2026). Daniel:
 // *«al hacer clic en una hora, que solo se abra el panel de esa casilla y no
 // toda»*. Qué motivo aplica a cada casilla, cuándo sale «Hoy entraba a las», el
@@ -1676,6 +1685,96 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
   /** Editar es lo mismo que corregir: mismos roles, misma migración. */
   const seEdita = EDITAR_EL_DIA && puedeCorregir && !d.fueraDeVigencia;
 
+  // ════════════════════════════════════════════════════════════════════════
+  // 🔴 ARRASTRAR UNA HORA DE COLUMNA (25-sep-2026)
+  // ════════════════════════════════════════════════════════════════════════
+  //
+  // La hora se agarra y se suelta en su columna. Soltar NO guarda: abre la
+  // casilla de destino con la hora puesta y el porqué escrito, y «Guardar»
+  // sigue siendo un toque aparte. Qué movimiento vale lo decide el módulo
+  // PURO (`arrastrar-hora.ts`); acá solo se dibuja y se suelta.
+  const [arrastrando, setArrastrando] = useState<HoraArrastrada | null>(null);
+  const seArrastra = seEdita && ARRASTRAR_HORA;
+  /** Lo que hay HOY en cada una de las cuatro columnas. `null` = vacía. */
+  const horasPorColumna: (string | null)[] = columnas.map(
+    (i) => (i === null || i === undefined ? null : (d.marcas[i] ?? null)),
+  );
+  /** Las marcas que no entran en las cuatro columnas: las de la línea de abajo. */
+  const sueltas = marcasEscondidas(d.marcas.length);
+  /** La hora número `idx`, lista para arrastrar. `col` = null si es suelta. */
+  function horaParaArrastrar(idx: number, col: number | null): HoraArrastrada {
+    return {
+      clave: claveMarca(idx),
+      hora: d.marcas[idx] ?? "",
+      columna: col,
+      esDelReloj: Boolean(porClave.get(claveMarca(idx))?.marcacionId),
+    };
+  }
+  /** ¿Se puede soltar lo que se está arrastrando en esta columna? */
+  const sePuedeSoltarEn = (columna: number) =>
+    arrastrando !== null
+    && puedeSoltar({ origen: arrastrando, destino: columna, horasPorColumna }).ok;
+  /**
+   * 🔴 SOLTAR. Abre la casilla de destino con la hora puesta, vacía la de
+   * origen y escribe el porqué solo. Lo que viaja al servidor sale del MISMO
+   * `planDelDia` que si se hubiera tecleado a mano.
+   */
+  function soltarAqui(origen: HoraArrastrada, destino: number) {
+    setArrastrando(null);
+    const v = puedeSoltar({ origen, destino, horasPorColumna });
+    if (!v.ok) { toast(v.aviso, "error"); return; }
+    setEscrito(mapaDelArrastre(origen, destino));
+    setEscritoEntrada(null);
+    setMotivoDia(MOTIVO_ARRASTRE);
+    // El motivo escrito no es el propio de la casilla: se muestra en el campo
+    // libre, donde se puede cambiar antes de guardar.
+    setMotivoLibre(true);
+    setNotaAbierta(false);
+    setAbierta({ clave: claveVacia(destino), columna: destino });
+  }
+  /** Lo que una celda de columna necesita para recibir una hora. */
+  function recibirEn(columna: number) {
+    if (!seArrastra) return {};
+    return {
+      // 🔴 TODA columna recibe el soltar, aunque el movimiento no valga: así la
+      // persona escucha POR QUÉ no se puede. Un destino que no admite la hora
+      // simplemente no se prende, y al soltar ahí se lo dice.
+      onDragOver: (ev: EventoArrastre) => {
+        if (arrastrando === null) return;
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = (sePuedeSoltarEn(columna) ? "move" : "none") as "move" | "none";
+      },
+      onDrop: (ev: EventoArrastre) => {
+        ev.preventDefault();
+        if (arrastrando) soltarAqui(arrastrando, columna);
+      },
+    };
+  }
+  /** El resalte de la columna que va a recibir la hora. */
+  const claseDestino = (columna: number) =>
+    arrastrando === null
+      ? ""
+      : sePuedeSoltarEn(columna)
+        ? "bg-blue-50 outline outline-2 outline-blue-300"
+        : "";
+  /** Lo que una hora necesita para poder agarrarse. */
+  function agarrarse(idx: number, col: number | null) {
+    if (!seArrastra) return {};
+    return {
+      draggable: true,
+      onDragStart: (ev: EventoArrastre) => {
+        const o = horaParaArrastrar(idx, col);
+        ev.dataTransfer.effectAllowed = "move" as const;
+        // Algún navegador no arranca el arrastre sin datos adentro.
+        ev.dataTransfer.setData("text/plain", o.hora);
+        setArrastrando(o);
+      },
+      onDragEnd: () => setArrastrando(null),
+    };
+  }
+  /** ¿Esta casilla quedó vacía porque su hora se está moviendo a otra columna? */
+  const seMueveDeAqui = (clave: string) => editando && escrito.get(clave)?.quitar === true;
+
   /**
    * 🔴 ABRIR UNA CASILLA (25-sep-2026). `clave`/`columna` dicen cuál: la que se
    * tocó. Sin argumentos —«Arreglar el día» en la fila gris de quien no marcó—
@@ -1844,14 +1943,27 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
     if (!puedeCorregir) {
       return <span className={clase} title={titulo}>{d.marcas[idx]}</span>;
     }
+    // 🔴 LA HORA SE AGARRA Y SE SUELTA EN SU COLUMNA (25-sep-2026). Sigue
+    // siendo un botón: tocarla abre su casilla, como siempre. Arrastrarla es
+    // un atajo para no teclear la hora, y no guarda nada por sí solo.
+    const seLaLlevan = seMueveDeAqui(claveMarca(idx));
     return (
       <button
         type="button"
+        {...agarrarse(idx, col ?? null)}
         onClick={() => (seEdita ? abrirEditor(claveMarca(idx), col ?? null) : abrir(idx))}
         // 🔴 El título DICE que también se puede quitar: hasta el 18-sep-2026
         // decía solo «Corregir esta hora» y quitar no existía por esta puerta.
+        // ⚠️ El título NO cambia por poder arrastrar: lo que la hora hace al
+        // TOCARLA es lo mismo de siempre, y decir dos cosas en el mismo lugar
+        // sería la segunda puerta que este panel acaba de quitar. Que se pueda
+        // agarrar se ve en el cursor.
         title={titulo ?? (seEdita ? TITULO_EDITAR_EL_DIA : "Corregir o quitar esta marcación")}
-        className={`min-h-[44px] rounded px-1 ${clase} ${corregida ? "underline decoration-blue-300 underline-offset-2" : "underline decoration-dotted decoration-gray-300 underline-offset-2 hover:decoration-black"}`}
+        className={`min-h-[44px] rounded px-1 ${clase} ${
+          seLaLlevan
+            ? "border border-dashed border-gray-300 text-gray-400 line-through"
+            : corregida ? "underline decoration-blue-300 underline-offset-2" : "underline decoration-dotted decoration-gray-300 underline-offset-2 hover:decoration-black"
+        } ${seArrastra ? "cursor-grab active:cursor-grabbing" : ""} ${arrastrando?.clave === claveMarca(idx) ? "opacity-40" : ""}`}
       >
         {d.marcas[idx]}
       </button>
@@ -1927,7 +2039,8 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
       // antes había que buscar el enlace «Agregar hora» al final de la fila.
       if (!seEdita) return <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">—</td>;
       return (
-        <td className="px-2 py-1.5 text-right">
+        // 🔴 Y TAMBIÉN RECIBE: es la columna vacía donde se suelta la hora.
+        <td className={`px-2 py-1.5 text-right transition ${claseDestino(col)}`} {...recibirEn(col)}>
           <button
             type="button"
             onClick={() => abrirEditor(clave, col)}
@@ -1940,7 +2053,7 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
       );
     }
     return (
-      <td className="px-2 py-1.5 text-right">
+      <td className={`px-2 py-1.5 text-right transition ${claseDestino(col)}`} {...recibirEn(col)}>
         <HoraBoton idx={idx} col={col} tenue={idx === 1 || idx === 2} />
       </td>
     );
@@ -2276,6 +2389,37 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
                 <span className="text-[12px] text-gray-500">
                   Solo si ese día entraba antes de su hora: lo de antes de su entrada pasa a hora extra para aprobar.
                 </span>
+              </div>
+            )}
+            {/* ══════════════════════════════════════════════════════════
+                🔴 LO MISMO SIN RATÓN (25-sep-2026). Arrastrar es cómodo con el
+                mouse y no existe con el teclado ni en un teléfono. Por eso la
+                casilla abierta ofrece el MISMO movimiento como un botón: la
+                marca suelta se trae aquí, con el mismo porqué automático y el
+                mismo «Guardar». La regla que decide si vale es la MISMA
+                (`puedeSoltar`), nunca una segunda.
+                ══════════════════════════════════════════════════════════ */}
+            {seArrastra && abierta?.columna !== null && abierta?.columna !== undefined
+              && (horasPorColumna[abierta.columna] ?? null) === null
+              && sueltas
+                .map((i) => horaParaArrastrar(i, null))
+                .filter((o) => puedeSoltar({ origen: o, destino: abierta.columna as number, horasPorColumna }).ok)
+                .length > 0 && (
+              <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                {sueltas
+                  .map((i) => horaParaArrastrar(i, null))
+                  .filter((o) => puedeSoltar({ origen: o, destino: abierta.columna as number, horasPorColumna }).ok)
+                  .map((o) => (
+                    <button
+                      key={o.clave}
+                      type="button"
+                      onClick={() => soltarAqui(o, abierta.columna as number)}
+                      disabled={guardandoDia}
+                      className="min-h-[44px] rounded-full border border-gray-200 bg-white px-3 text-[12px] text-gray-600 transition hover:border-black hover:text-black active:scale-[0.97]"
+                    >
+                      {rotuloMoverAqui(o.hora, sueltas.length)}
+                    </button>
+                  ))}
               </div>
             )}
             <div>

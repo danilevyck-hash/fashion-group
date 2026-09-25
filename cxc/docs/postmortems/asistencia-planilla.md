@@ -7,6 +7,70 @@
 
 ---
 
+## 🔴 Las horas del día se arrastran de columna (25-sep-2026)
+
+**Qué aprobó Daniel.** Del mockup `asistencia-marcas-propuestas.html`, **solo la segunda idea**:
+«Arrastrar la hora». La primera —la «propuesta de marcas», que rellenaba el día solo y pedía
+«Así fue ✓»— **la rechazó**, y no se construyó nada de eso. El aviso de entrada temprana tampoco
+se tocó.
+
+**Qué hace.** En el detalle del colaborador, dentro de la fila del día:
+
+1. una **marca suelta** —la de la línea «Otra marca del día: 13:14:49»— se agarra y se suelta en
+   una columna VACÍA (Entrada · Sale almz. · Vuelve · Salida);
+2. una hora que **ya está en una columna** se lleva a otra (la 13:48:07 de «Salida» a «Vuelve»);
+3. mientras se arrastra, la columna que puede recibirla se prende en azul y la hora de origen
+   queda tenue; **soltar fuera de una columna no hace nada**;
+4. al soltar, se abre la casilla de destino con la hora puesta, el porqué escrito solo —«Marca
+   movida de columna», que se puede cambiar— y «Guardar · Cancelar». 🔴 **Soltar NO guarda.**
+
+**Sin ratón.** La misma acción está como botón dentro de la casilla abierta: se toca el hueco de
+la columna y sale **«Mover aquí la marca suelta»**. Es la MISMA regla (`puedeSoltar`), nunca una
+segunda. Con eso el teclado y el teléfono no quedan afuera: **el arrastre en sí es de computadora**
+—el arrastrar y soltar de HTML5 no existe en un navegador táctil— y no se inventó un toque largo.
+
+**🔴 Lo que se guarda es lo de siempre.** Arrastrar no es una forma nueva de escribir: es una forma
+nueva de CAPTURAR lo mismo. `escritoDelArrastre` produce las DOS entradas del MISMO mapa `escrito`
+que ya llenaba el teclado —la hora en la casilla de destino y «Quitar» en la de origen—, y de ahí
+salen el MISMO `planDelDia` y el MISMO cuerpo del `POST /api/asistencia/correcciones/dia`. Medido
+por el candado sobre el día real: el cuerpo trae exactamente `codigo · fecha · motivo · cambios`,
+y los cambios son, uno por uno, los de teclear la hora y tocar «Quitar» a mano. Ni una columna
+nueva en la base, ni un campo nuevo. La marcación del reloj sigue sin editarse ni borrarse.
+
+**Los cuatro frenos** (`lib/asistencia/arrastrar-hora.ts`, puro):
+
+| Freno | Por qué |
+|---|---|
+| **Una hora por columna** | No se suelta donde ya hay una: ««Salida» ya tiene una hora…» |
+| **No a la misma columna** | Mover algo a donde ya está no es mover |
+| **El día queda en orden** | entrada ≤ sale a almorzar ≤ vuelve ≤ salida; si no, se rechaza y se dice |
+| **Solo horas del RELOJ** | Una agregada a mano no se puede vaciar («Quitar» solo existe sobre el reloj): se deshace su corrección |
+
+**⚠️ LO QUE HAY QUE SABER ANTES DE LEER UN NÚMERO, y es la parte incómoda.** Las cuatro columnas
+de la pantalla son **POSICIONALES**: `columnasClasicas` reparte las marcas del día por su ORDEN
+—la 1.ª es la entrada, la última la salida— y las marcas vienen ordenadas por hora
+(`reporte.ts`: `crudas = (…).slice().sort((a, b) => a - b)`). El sistema **no guarda a qué columna
+pertenece cada marca: la deduce**.
+
+Consecuencia, dicha sin adornos: **mover una hora de una columna a otra no cambia lo que el motor
+lee.** Se anula la marca del reloj y se escribe una a mano con la misma hora, con su firma y su
+motivo; el día sigue leyéndose igual, porque el conjunto de horas es el mismo. Lo que cambia el
+día sigue siendo la HORA, no la columna.
+
+Se construyó igual porque es lo que Daniel aprobó, porque el gesto ahorra teclear la hora y porque
+deja rastro firmado de quién decidió qué; pero **queda dicho acá**: si él quiere que la columna
+sea un dato guardado —«esta 13:14:49 es la salida a almorzar, y la que falta es la vuelta»—, eso
+es otra decisión, otra columna y otra migración. **Es una pregunta para Daniel, no un olvido.**
+
+**Interruptor y candado.** `ARRASTRAR_HORA` en `lib/asistencia/arrastrar-hora.ts`, hoy `true`;
+en `false` las horas no se pueden agarrar y la pantalla es exactamente la de hoy.
+Candado: `src/__tests__/asistencia/arrastrar-hora.test.tsx` (18 casos: la regla pura, la pantalla
+con arrastre real, el rechazo dicho, el camino sin ratón, el apagado, y la comparación del cuerpo
+del POST contra el de teclearlo a mano). Dos mutaciones probadas, las dos cazadas: quitarle al
+movimiento la mitad que vacía el origen (3 fallos) y apagar el freno del orden (1 fallo).
+
+---
+
 ## 🔴 Marcaciones, agrupadas por día (25-sep-2026) — «scroll down en vez de chips»
 
 > Interruptor: `MARCACIONES_POR_DIA` (`lib/asistencia/marcaciones-por-dia.ts`, hoy `true`).
@@ -130,7 +194,7 @@ alguien haga algo hoy y siguen arriba de la lista.
 
 ## Lo que decía CLAUDE.md hasta el 25-sep-2026 (podado ese día para hacer sitio)
 
-Cuatro reglas que vivían en «Invariantes por módulo» y estaban **verbatim** más abajo en este
+Cinco reglas que vivían en «Invariantes por módulo» y estaban **verbatim** más abajo en este
 mismo archivo. Se podaron para que CLAUDE.md siguiera bajo el tope del harness; siguen
 VIGENTES, y aquí quedan tal como estaban escritas:
 
@@ -138,6 +202,7 @@ VIGENTES, y aquí quedan tal como estaban escritas:
 - 🔴 **UN PERMISO DE HORAS PERDONA LAS TRES COLUMNAS, CON LA MISMA REGLA (16-sep-2026).** `minutosPerdonadosDe` cruza la ventana del permiso con la del INCUMPLIMIENTO —tardanza · salida temprana · exceso de almuerzo— y perdona la **intersección**, capeada a SU propio bruto. 🔴 **Nada callado**: el día lleva los tres perdones por separado y el chip dice cuál y cuánto. Un permiso de horas **no justifica el día entero**.
 - 🔴 Una vacación **no es una justificación** (tabla propia; «Vacaciones» no está entre los motivos ni los retirados); **el motor las honra pase lo que pase** y un día de vacaciones **no genera horas, tardanza ni ausencia**. Sin marcar no cuesta nada; **«ya se le pagó» es lo ÚNICO que mueve plata**: ausencia de día completo (**8 h × rata**) en hábiles no feriados.
 - 🔴 Dar de baja a alguien con deuda **avisa** (`salida-con-deuda.ts`), y la deuda son las **tres cuentas** (`calcularSaldoPrestamo`). 🔴 Las columnas de dinero salen de **un solo lugar**: `columnas-dinero-planilla.ts` (**19**), leído por `PlanillaTab` y `PlanillaBoston`.
+- Corregir una hora: el porqué es obligatorio; los motivos frecuentes se derivan de lo guardado en **90 días** por clave normalizada (**igualdad exacta, nada por parecido**), **4** con **2+** usos (`motivos-frecuentes.ts`, solo lectura). *(Podada el 25-sep-2026 para hacer sitio a «las horas se arrastran de columna»; la mitad que importa —«Otro…» abre el campo libre con los más usados de 90 días— sigue dicha en la línea del panel del día.)*
 
 ---
 
