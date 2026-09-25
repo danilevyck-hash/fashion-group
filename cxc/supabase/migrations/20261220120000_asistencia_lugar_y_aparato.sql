@@ -28,7 +28,9 @@
 --    Local 11 y 12, David»), **sin latitud ni longitud adentro**. Así que el
 --    punto sembrado es la MEDIANA de las marcas reales de las cuatro personas
 --    de Multifashion (medido el 25-sep-2026 contra producción: 32 marcas de
---    teléfono de los códigos 2, 3, 305 y 306; mediana 8.535117 / -82.838671,
+--    teléfono de los códigos 2, 3, 305 y 306 cae en 8.535117 / -82.838671 (eso es
+--    Paso Canoas, NO la tienda). La tienda real la dio Daniel el 25-sep-2026 con la
+--    coordenada de Google Maps 8°25'50.3"N 82°25'48.8"W = 8.430639 / -82.430222,
 --    con la mitad de ellas a menos de 3,6 m de ese punto y precisión declarada
 --    de 16 a 31 m). El radio de 200 m es holgado a propósito.
 --
@@ -82,7 +84,7 @@ CREATE POLICY asistencia_lugares_referencia_service_role
 
 -- La semilla: el punto de Multifashion. 1 fila. Si ya existe, no se pisa.
 INSERT INTO public.asistencia_lugares_referencia (empresa_key, nombre, lat, lng, radio_m)
-VALUES ('american_classic', 'City Mall David', 8.535117, -82.838671, 200)
+VALUES ('american_classic', 'American Classics Store · David', 8.430639, -82.430222, 200)
 ON CONFLICT (empresa_key) DO NOTHING;
 
 -- ── 3 · El sello del teléfono ───────────────────────────────────────────────
