@@ -24,7 +24,10 @@
 // tal cual; lo único que varía es el color. Hay candado.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { useRef } from "react";
 import { cuentaRegresiva, rotuloDeshacer, type QueSeDeshace } from "@/lib/marcacion/deshacer";
+import { ATRIBUTO_BARRA_FIJA } from "@/lib/navegacion/barra-celular";
+import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
 import { enDoceHoras, type DiaMarcado, type EstadoBoton } from "@/lib/marcacion/marcacion";
 import {
   MARCACION_CUATRO_MARCAS,
@@ -92,6 +95,11 @@ export default function PantallaUnToque({
   onTocarBoton,
 }: PantallaUnToqueProps) {
   const apagado = marcando || boton.apagado;
+  // 🔴 El cajón del botón dice cuánto mide. A quien SOLO marca no se le dibuja
+  // el botón redondo del menú —no tiene a dónde ir—, pero un admin probando
+  // esta pantalla sí lo ve, y ahí el flotante se sube encima en vez de taparlo.
+  const cajon = useRef<HTMLDivElement | null>(null);
+  usePublicarAltoBarraFija(cajon);
   return (
     <>
       {nombre && <p className="text-[15px] text-gray-500">{nombre}</p>}
@@ -177,7 +185,7 @@ export default function PantallaUnToque({
       )}
 
       {/* 🔴 EL BOTÓN, SIEMPRE EN EL MISMO PÍXEL. */}
-      <div data-boton-fijo className={CLASES_CAJON_BOTON} style={{ paddingBottom: PADDING_ABAJO_BOTON }}>
+      <div ref={cajon} data-boton-fijo {...{ [ATRIBUTO_BARRA_FIJA]: "" }} className={CLASES_CAJON_BOTON} style={{ paddingBottom: PADDING_ABAJO_BOTON }}>
         <div className="mx-auto w-full max-w-md">
           <button
             type="button"

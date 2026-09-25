@@ -19,9 +19,11 @@
 // ⚠️ Lo que se fue es SOLO el camino de iOS. Donde SÍ hay botón de instalar
 // —Android y escritorio— la barra sigue viva y con su botón; hay candado.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { esRutaDelCliente } from "@/lib/catalogo/rutas-publicas";
+import { ATRIBUTO_BARRA_FIJA } from "@/lib/navegacion/barra-celular";
+import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -69,6 +71,7 @@ export default function InstallPrompt() {
   const [standalone, setStandalone] = useState(false);
   const [ready, setReady] = useState(false); // ya evaluamos el entorno
   const [dismissed, setDismissed] = useState(false);
+  const cajon = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     try {
@@ -115,18 +118,23 @@ export default function InstallPrompt() {
     dismiss();
   }
 
-  // Gating
-  if (dismissed || !ready) return null;
-  if (pathname === "/" || esRutaDelCliente(pathname)) return null;
-
+  // Gating — se calcula ANTES de cualquier `return`: abajo hay un gancho, y un
+  // gancho después de un `return` condicional es un defecto de React.
+  const enRuta = pathname !== "/" && !esRutaDelCliente(pathname);
   // Qué mostrar: SOLO si el navegador ofreció instalar de verdad
   // (`beforeinstallprompt`) y la app no está ya instalada. Sin eso, no se
   // dibuja nada — ni una barra que solo explique.
   const installable = !standalone && !!deferred;
-  if (!installable) return null;
+  const seVe = !dismissed && ready && enRuta && installable;
+
+  // 🔴 Esta tarjeta también es una barra fija de abajo: cuando está, el botón
+  // redondo del menú se le sube encima en vez de quedar tapado (24-sep-2026).
+  usePublicarAltoBarraFija(cajon, seVe);
+
+  if (!seVe) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pointer-events-none">
+    <div ref={cajon} {...{ [ATRIBUTO_BARRA_FIJA]: "" }} className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pointer-events-none">
       <div className="pointer-events-auto mx-auto max-w-md rounded-xl border border-gray-200 bg-white shadow-lg p-3.5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">

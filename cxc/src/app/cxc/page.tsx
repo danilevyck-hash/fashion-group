@@ -679,7 +679,10 @@ function AdminDashboardInner() {
   if (loading) {
     return (
       <div>
-        <AppHeader module="Cuentas por Cobrar" />
+        {/* Mientras carga se dice lo mismo que se va a decir después: con
+            `CXC_CELULAR` el título grande lo pone `PanelCxcCelular`, así que
+            el layout no lo agrega ni por un instante. */}
+        <AppHeader module="Cuentas por Cobrar" tituloEnLaPantalla={CXC_CELULAR} />
         {/* El mismo alto y el mismo borde que `TabsCartera`: sus botones son
             `min-h-[44px]` dentro de un contenedor con `pt-2`. No se dibujan las
             pestañas de verdad porque cuáles van depende del rol. */}
@@ -703,7 +706,10 @@ function AdminDashboardInner() {
   return (
     <PullToRefresh onRefresh={loadData}>
     <div>
-      <AppHeader module="Cuentas por Cobrar" />
+      {/* 🔴 EN EL CELULAR LA CARTERA DEL GRUPO YA DICE «Por cobrar» en grande
+          (`PanelCxcCelular`): el layout no pone otro título. En Boston no —esa
+          pantalla no trae título propio— y ahí sí lo pone el layout. */}
+      <AppHeader module="Cuentas por Cobrar" tituloEnLaPantalla={CXC_CELULAR && tab === "grupo"} />
 
       {/* 🔴 EN EL CELULAR LAS PESTAÑAS SE VAN DE LA CARTERA DEL GRUPO
           (24-sep-2026): Boston es un botón arriba a la derecha de la lista, y

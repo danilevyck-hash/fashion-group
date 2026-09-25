@@ -8,7 +8,9 @@
 // dibujan con `FilaCel`. Nombre a la izquierda, plata SIEMPRE a la derecha.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
+import { ATRIBUTO_BARRA_FIJA } from "@/lib/navegacion/barra-celular";
+import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
 
 export function Visto() {
   return (
@@ -93,9 +95,17 @@ export function CtaFija({
   disabled?: boolean;
   marca?: string;
 }) {
+  // 🔴 DICE CUÁNTO MIDE PARA QUE EL BOTÓN REDONDO DEL MENÚ SE LE SUBA ENCIMA
+  // (24-sep-2026). Sin la franja de arriba, las tres rayas viven en un botón
+  // flotante abajo a la derecha; esta barra ocupa TODO el ancho, así que uno
+  // taparía al otro. El que se mueve es el flotante, nunca este botón negro.
+  const cajon = useRef<HTMLDivElement | null>(null);
+  usePublicarAltoBarraFija(cajon);
   return (
     <div
+      ref={cajon}
       data-cta={marca ?? "principal"}
+      {...{ [ATRIBUTO_BARRA_FIJA]: "" }}
       className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white/95 px-4 pt-3 backdrop-blur"
       style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
     >

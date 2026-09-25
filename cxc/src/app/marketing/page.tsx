@@ -48,6 +48,7 @@ import ImpulsadorasView from "./components/ImpulsadorasView";
 import RegistrarGastoModal from "./components/RegistrarGastoModal";
 import PortadaTiendasYMarcas from "./components/PortadaTiendasYMarcas";
 import { useRedirigirProyectoViejo } from "./components/useProyectoViejo";
+import { useEsCelular } from "./components/celular/useEsCelular";
 
 type VistaExtra = "reportes" | "impulsadoras" | null;
 
@@ -97,6 +98,10 @@ function MarketingPage() {
   const marcas = useMarcas();
   const [registrandoGasto, setRegistrandoGasto] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  // 🔴 En el celular, cada pantalla de Marketing ya trae su título grande
+  // (`TituloCelular`): «Marketing», «Marcas», la tienda, la marca… El layout no
+  // agrega otro (24-sep-2026).
+  const celular = useEsCelular();
 
   const proyectoParam = searchParams.get("proyecto");
   const vistaRaw = searchParams.get("vista");
@@ -130,7 +135,7 @@ function MarketingPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <AppHeader module="Marketing" breadcrumbs={[]} />
+      <AppHeader module="Marketing" breadcrumbs={[]} tituloEnLaPantalla={celular} />
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <PortadaTiendasYMarcas
           role={role}
@@ -194,6 +199,8 @@ function MarketingPageDeAntes() {
   const marcas = useMarcas();
   const [registrandoGasto, setRegistrandoGasto] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  // Mismo motivo que arriba: la pantalla del celular pone el título.
+  const celular = useEsCelular();
 
   const navegar = useCallback(
     (next: { vista?: VistaExtra }) => {
@@ -241,7 +248,7 @@ function MarketingPageDeAntes() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <AppHeader module="Marketing" breadcrumbs={breadcrumbs} />
+      <AppHeader module="Marketing" breadcrumbs={breadcrumbs} tituloEnLaPantalla={celular} />
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         {mostrandoVistaExtra ? (
           <div className="space-y-4">

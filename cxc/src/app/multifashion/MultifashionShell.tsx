@@ -217,7 +217,10 @@ export function MultifashionShell({
     <>
     {/* Único chrome en móvil (drawer/búsqueda/logout/notifs) — el Sidebar es
         desktop-only. Para gerente_acs (módulo único, PWA) es su ÚNICA salida. */}
-    <AppHeader module="Multifashion" acciones={accionesSync} />
+    {/* 🔴 En el celular el título grande es EL MES (`data-celular="titulo"`),
+        que es lo que Daniel mira; el nombre del módulo sigue `sr-only`. El
+        layout no agrega otro título arriba: volvería a empujar el número. */}
+    <AppHeader module="Multifashion" acciones={accionesSync} tituloEnLaPantalla={MULTIFASHION_CELULAR} />
     <PullToRefresh onRefresh={async () => { await mutate(); }}>
     <main className="mx-auto w-full max-w-[1280px] px-4 py-5 md:px-7 md:py-6">
       {/* Bloque 1 de 3: título + período. */}

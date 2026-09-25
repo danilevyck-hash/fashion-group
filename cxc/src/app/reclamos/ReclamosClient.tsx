@@ -540,7 +540,9 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
     if (!activeEmpresa) {
       return (
         <PullToRefresh onRefresh={loadReclamos}>
-          {RECLAMOS_CELULAR && <AppHeader module="Reclamos" />}
+          {/* 🔴 `tituloEnLaPantalla`: la portada del celular ya dibuja
+              «Reclamos» en grande. Sin esto el nombre se leería DOS veces. */}
+          {RECLAMOS_CELULAR && <AppHeader module="Reclamos" tituloEnLaPantalla />}
           {RECLAMOS_CELULAR && (
             <div className="sm:hidden">
               <PortadaCelular
@@ -579,7 +581,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
     return (
       <PullToRefresh onRefresh={loadReclamos}>
         {RECLAMOS_CELULAR && (
-          <AppHeader module="Reclamos" breadcrumbs={[{ label: activeEmpresa }]} />
+          <AppHeader module="Reclamos" breadcrumbs={[{ label: activeEmpresa }]} tituloEnLaPantalla />
         )}
         {RECLAMOS_CELULAR && (
           <div className="sm:hidden">
@@ -676,6 +678,9 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
       {RECLAMOS_CELULAR && (
         <AppHeader
           module="Reclamos"
+          // Editando se dibuja el formulario largo de siempre, que NO trae
+          // título grande: ahí lo pone el layout.
+          tituloEnLaPantalla={detalleCelular}
           breadcrumbs={[
             { label: current.empresa, onClick: () => { setCurrent(null); changeEmpresa(activeEmpresa, { view: "list", id: null }); } },
             { label: current.nro_reclamo || "Reclamo" },

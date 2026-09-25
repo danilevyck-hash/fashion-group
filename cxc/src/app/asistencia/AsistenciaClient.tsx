@@ -269,7 +269,10 @@ function AsistenciaInner() {
       {/* El módulo iba en minúscula ("asistencia") y eso se veía: la barra
           sticky y el breadcrumb son ahora lo ÚNICO que nombra la pantalla, así
           que dicen el label real del módulo (`lib/modules.ts`: "Asistencia"). */}
-      <AppHeader module="Asistencia" />
+      {/* 🔴 En la portada del celular el título grande «Asistencia» lo dibuja
+          `PortadaCelular`; adentro de una pestaña no hay ninguno y lo pone el
+          layout (24-sep-2026). */}
+      <AppHeader module="Asistencia" tituloEnLaPantalla={enLaPortada} />
       <div className="mx-auto max-w-6xl px-4 py-6">
         {/* Sin título grande: "Asistencia" ya lo dicen la barra sticky
             (celular) y el breadcrumb (escritorio). Queda sr-only para no dejar
