@@ -7,6 +7,140 @@
 
 ---
 
+## 🔴 Marcaciones, agrupadas por día (25-sep-2026) — «scroll down en vez de chips»
+
+> Interruptor: `MARCACIONES_POR_DIA` (`lib/asistencia/marcaciones-por-dia.ts`, hoy `true`).
+> En `false` vuelve ENTERA la pantalla de chips y seis columnas, que se conservó sin tocar
+> una línea en `src/app/asistencia/marcaciones/PantallaDeAntes.tsx`.
+> Candado: `src/__tests__/asistencia/marcaciones-por-dia.test.tsx` (28 casos).
+
+Daniel, textual, sobre el mockup: *«hazlo minimalista, user friendly; ya sabes que tienes que
+usar scroll down en vez de chips con cada persona»*.
+
+### 🩸 Lo que había, medido el 25-sep-2026 contra producción
+
+- **37 marcas de teléfono en toda la base**, de cinco personas y cuatro días.
+- La tabla de la computadora las ponía en **37 renglones sueltos y SIN columna de fecha**:
+  para saber de qué día era cada uno había que tocar uno de los **cinco chips de día**,
+  arriba de los **seis chips de colaborador**.
+- **32 de las 37 llegaron al instante** y aun así cada una gastaba una celda entera diciéndolo
+  en la columna «Llegó».
+- En el celular, **cuatro filas de botones** —empresa (5) · período · colaboradores (6) ·
+  días (5)— antes de la primera hora, y **el día repetido en la esquina de cada tarjeta**.
+- El lugar salía con el código de mapa del servicio: **«G5P6+2GH, Paso Canoas · a 46,4 km»**.
+- La columna «Aparato» mostraba seis letras del sello del teléfono. Medido: en esos cuatro
+  días **no hubo un solo teléfono compartido** — las cuatro marcas con sello del vie 25 son
+  cuatro teléfonos distintos y las otras 33 vienen sin sello.
+
+### Las reglas
+
+1. **El día es el encabezado**, y dentro va **UNA fila por colaborador** con sus marcas en
+   orden. De **37 renglones sueltos a 17 bajo cuatro días**. El día se baja con la rueda.
+2. **Arriba quedan dos cosas**: el período y **UN** desplegable, «Colaborador: todos ▾».
+   🔴 **Sin filtro de día y sin filtro de empresa**: la empresa se elige una sola vez en el
+   selector del módulo y vale para todo Asistencia.
+3. **Las cuatro marcas se leen como tres tramos**: `Entrada 08:59 · Almuerzo 18:01 – 18:01 ·
+   Salida 18:01`. El almuerzo junta la salida y la vuelta en un solo rango.
+4. **«Sin señal» es un PUNTO gris** delante de la marca (con su `title`), no una pastilla
+   naranja que empuja el renglón.
+5. **El lugar se dice UNA vez por fila y en palabras**: «Paso Canoas · 46 km de la tienda».
+   🔴 El código de mapa se va (`sinCodigoDeMapa`); sin punto de referencia, solo el nombre;
+   sin nombre, «—». ⚠️ **El número exacto no se pierde**: «a 46,4 km» sigue entero en la hoja
+   que abre la fila (`lineasDeLaHoja`).
+6. **El atraso se dice SOLO cuando lo hubo**, en gris bajo la fila:
+   `sin señal: la entrada se envió 9 h después · la salida, 6 min después`.
+   🔴 **Nunca la palabra «llegó»** — la contadora la leería como que la persona llegó tarde a
+   trabajar, y a esa hora lo que llegó fue el dato. Misma regla que `linea-del-dia.ts` y
+   `lib/marcacion/en-el-reporte.ts`, con **barrido** sobre la pantalla y sobre su regla.
+7. **La columna «Aparato» se va.** En su lugar, un **aviso ROJO en la fila** y solo cuando dos
+   colaboradores marcaron con el **mismo teléfono ese día** (`marcasDeAparatoCompartido`, la
+   MISMA regla del aviso de Telegram). 🔑 Dos marcas **sin sello nunca** son «el mismo
+   teléfono»: `null` no es igual a `null`.
+8. **La nota del pie pasa a un ⓘ** al lado del conteo de marcas.
+9. **Tocar la fila abre las fotos y el mapa** de ese día, en la MISMA hoja del reporte
+   (`FotosDeLaMarcaModal`), con las marcas del día una debajo de la otra.
+10. **En el celular, la misma agrupación**: encabezado de día y una tarjeta por colaborador,
+    sin las cuatro filas de botones y sin el día repetido en cada tarjeta. No hay tabla: en
+    390 px una `ScrollableTable minWidth={880}` se arrastra de lado.
+
+### 🔴 Ningún número cambia
+
+- Las horas son las mismas (`horaCorta`, Panamá UTC−5 fijo) y el día es el mismo (`diaPanamaDe`).
+- El atraso sale de **UNA sola cuenta con dos redacciones**: `cuantoDespues()` en
+  `marcaciones-pestana.ts`, de la que hoy se deriva `demoraEnPalabras()` —la de la pantalla de
+  antes—. El candado lo compara caso por caso.
+- La única cifra que se redondea es la **distancia de la pantalla** (46,4 km → «46 km de la
+  tienda»), tal como el mockup que Daniel aprobó; la exacta sigue en la hoja de la marca.
+- La ruta `GET /api/asistencia/marcaciones` solo **agregó** `lugar.nombre` (el nombre crudo,
+  sin la distancia pegada): `lugar.texto` no cambió un carácter, y **no se escribe nada**.
+
+### Los archivos
+
+- `src/lib/asistencia/marcaciones-por-dia.ts` — la regla, pura: interruptor, tramos, lugar en
+  palabras, la frase del envío y la agrupación por día.
+- `src/lib/asistencia/marcaciones-pestana.ts` — `cuantoDespues()`, del que ahora sale
+  `demoraEnPalabras()`.
+- `src/app/asistencia/MarcacionesTab.tsx` — la pantalla nueva; elige la de antes con el
+  interruptor apagado.
+- `src/app/asistencia/marcaciones/PantallaDeAntes.tsx` — la de chips, entera.
+- `src/app/api/asistencia/marcaciones/route.ts` — manda `lugar.nombre`, aditivo.
+
+### Lo que NO cambió
+
+Quién la ve (`MARCACIONES_ROLES` = `admin`, y lo decide el servidor), que **solo se mira** —ni
+un POST, PUT, PATCH o DELETE, con barrido—, la hoja de fotos y mapa, y el pie común de la casa
+(«9 marcas de 37»). La pestaña sigue al final de la barra: el aterrizaje de nadie se movió.
+
+---
+
+## 🩸 «3a · Lo que sobra» (25-sep-2026) — dos cosas que se dejan de dibujar
+
+> Interruptor propio: `ASISTENCIA_SOBRA_3A` (`lib/asistencia/sobra-3a.ts`, hoy `true`).
+> Candado: `src/__tests__/asistencia/sobra-3a.test.tsx`.
+> 🔴 **Nada se borra de la base y ningún número se mueve.**
+
+### 1 · Préstamos › Movimientos: la lista de 24 quincenas
+
+Vivía en `MovimientosQuincenaTab.tsx` una constante `CUANTAS_QUINCENAS = 24` y un `<select>`
+con un año entero de quincenas: **la CUARTA forma de elegir período del módulo**.
+
+⚠️ **Precisión medida el 25-sep-2026**: desde el **24-sep** (`ed64ad7f`, el selector único) esa
+lista ya no se dibujaba — quedaba en el camino apagado de `ASISTENCIA_PANTALLA_2026_09`. El
+informe del mockup la daba por VIVA porque midió la constante, no la rama que se pinta. Lo que
+se hizo hoy es sacarla del archivo para que no pueda volver sola.
+
+Queda: el selector único de arriba (`SelectorPeriodo` + `usePeriodoAsistencia`), y la quincena
+que se mira es la que **contiene** ese período (`quincenaDelPeriodo`). ⚠️ Un enlace viejo con
+`?quincena=` sigue abriendo donde decía. 🔑 `quincenasHasta()` **no se borró**: la Planilla y
+Aprobaciones la siguen usando para la quincena en curso.
+
+### 2 · Colaboradores: la franja amarilla
+
+La pestaña abría con «**1 colaborador de 44 todavía no sale en la planilla** · 1 marca en el
+reloj y todavía no tiene ficha…». El **mismo dato** ya sale en **«Antes de cerrar»**, en la
+Planilla, como «código del reloj sin ficha» (`antes-de-cerrar.ts`) — que es donde de verdad
+**frena el cierre**. Un cartel permanente arriba de una lista se deja de leer; el mismo aviso
+pegado al botón que frena, no.
+
+🔑 **`avisoPendientes()` NO se borra** y sigue probada: el dato no se pierde, cambia de lugar.
+⚠️ **El aviso ROJO no se tocó**: «dada de baja y sigue marcando» y el de la migración piden que
+alguien haga algo hoy y siguen arriba de la lista.
+
+---
+
+## Lo que decía CLAUDE.md hasta el 25-sep-2026 (podado ese día para hacer sitio)
+
+Cuatro reglas que vivían en «Invariantes por módulo» y estaban **verbatim** más abajo en este
+mismo archivo. Se podaron para que CLAUDE.md siguiera bajo el tope del harness; siguen
+VIGENTES, y aquí quedan tal como estaban escritas:
+
+- 🔴 **LOS DÍAS DE VACACIONES SE CALCULAN SOLOS, Y NO SON UN SALDO (17-sep-2026).** **30 días corridos por cada 11 MESES** desde `fecha_ingreso`, menos las registradas (`vacaciones-corresponden.ts`). 🔴 Se lee **«Le corresponden N días», NUNCA «le quedan»**, con la línea gris de lo que no incluye. 🔴 **NO entra a ningún cálculo de plata**, con barrido. 🔴 **Sin `fecha_ingreso` no sale un número, ni cero.** 🩸 El saldo a mano se RETIRÓ.
+- 🔴 **UN PERMISO DE HORAS PERDONA LAS TRES COLUMNAS, CON LA MISMA REGLA (16-sep-2026).** `minutosPerdonadosDe` cruza la ventana del permiso con la del INCUMPLIMIENTO —tardanza · salida temprana · exceso de almuerzo— y perdona la **intersección**, capeada a SU propio bruto. 🔴 **Nada callado**: el día lleva los tres perdones por separado y el chip dice cuál y cuánto. Un permiso de horas **no justifica el día entero**.
+- 🔴 Una vacación **no es una justificación** (tabla propia; «Vacaciones» no está entre los motivos ni los retirados); **el motor las honra pase lo que pase** y un día de vacaciones **no genera horas, tardanza ni ausencia**. Sin marcar no cuesta nada; **«ya se le pagó» es lo ÚNICO que mueve plata**: ausencia de día completo (**8 h × rata**) en hábiles no feriados.
+- 🔴 Dar de baja a alguien con deuda **avisa** (`salida-con-deuda.ts`), y la deuda son las **tres cuentas** (`calcularSaldoPrestamo`). 🔴 Las columnas de dinero salen de **un solo lugar**: `columnas-dinero-planilla.ts` (**19**), leído por `PlanillaTab` y `PlanillaBoston`.
+
+---
+
 ## 🔴 La fila de mandos, arreglada (25-sep-2026) — los siete detalles que Daniel vio en producción
 
 > Interruptor: el MISMO `ASISTENCIA_PANTALLA_2026_09` (hoy `true`). Con él apagado, todo lo de abajo
