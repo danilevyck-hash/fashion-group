@@ -79,6 +79,11 @@ export const TABLAS_PERSONAS = [
   "asistencia_dia_libre_deuda",
   "asistencia_dia_libre_pago",
   "asistencia_prestamo_aprobado",
+  // 🔴 LOS PUNTOS DE REFERENCIA DE LA MARCACIÓN (25-sep-2026). Son pocas filas,
+  // pero ninguna se puede volver a conseguir sola: el NOMBRE («City Mall
+  // David») y la coordenada los puso una persona, y no están en ningún otro
+  // lado. Sin ella se pierde el «a N km» de las marcas lejanas.
+  "asistencia_lugares_referencia",
   "asistencia_reparto_empresa",
   "asistencia_aprobador_empresa",
   "asistencia_planilla_guardada",
@@ -446,6 +451,7 @@ export const PK_QUE_NO_ES_ID: Readonly<Record<string, readonly string[]>> = Obje
   asistencia_feriados: ["fecha"],
   asistencia_horarios: ["empleado_codigo"],
   asistencia_horas_extra_aprobadas: ["empleado_codigo", "fecha"],
+  asistencia_lugares_referencia: ["empresa_key"],
   asistencia_personas: ["empleado_codigo"],
   asistencia_planilla_manual: ["quincena", "empleado_codigo"],
   asistencia_prestamo_aprobado: ["quincena", "empleado_codigo"],
