@@ -12,10 +12,24 @@
 //
 //   npx tsx scripts/marketing-rescatar-fotos-huerfanas.ts              (mira)
 //   npx tsx scripts/marketing-rescatar-fotos-huerfanas.ts --tienda D-118
+//   npx tsx scripts/marketing-rescatar-fotos-huerfanas.ts --marca=TH
+//   npx tsx scripts/marketing-rescatar-fotos-huerfanas.ts --periodo=<uuid>
 //   npx tsx scripts/marketing-rescatar-fotos-huerfanas.ts --aplicar    (escribe)
 //
-// ⚠️ `--aplicar` necesita la migración `20261219130000` YA corrida: sin ella la
-// base vuelve a rechazar la fila y el script lo dice sin tocar nada más.
+// 🔴 LA MARCA SE ELIGE, NO SE ADIVINA (24-sep-2026). Los períodos son POR
+// MARCA y una tienda puede tener DOS abiertos a la vez (medido: D-118 tiene
+// Calvin y Tommy). Con una sola marca abierta la foto va ahí sin preguntar;
+// con dos o más hace falta `--marca=<clave>` o `--periodo=<uuid>`, y sin el
+// parámetro el script MUESTRA las dos opciones y **no aplica nada**. Es la
+// misma función pura que usa la puerta (`destinoDeFotoNueva`): no hay una
+// segunda regla escrita acá.
+//
+// 🔴 A UN PERÍODO CERRADO NO ENTRA NADA: la lista de opciones son SOLO los
+// abiertos, así que un `--periodo` cerrado no está entre ellas y se rechaza.
+//
+// ⚠️ `--aplicar` necesita la migración `20261219130000` YA corrida (se aplicó
+// el 24-sep-2026): sin ella la base vuelve a rechazar la fila y el script lo
+// dice sin tocar nada más.
 // ============================================================================
 
 import { createClient } from "@supabase/supabase-js";
@@ -56,6 +70,15 @@ async function main() {
   const aplicar = args.includes("--aplicar");
   const iTienda = args.indexOf("--tienda");
   const soloTienda = iTienda >= 0 ? String(args[iTienda + 1] ?? "").toUpperCase() : null;
+  // La marca elegida a mano: `--marca=TH` o `--periodo=<uuid>`. Es lo mismo
+  // para la regla pura — busca por clave de marca o por id de período.
+  const valorDe = (bandera: string): string => {
+    const conIgual = args.find((a) => a.startsWith(`${bandera}=`));
+    if (conIgual) return conIgual.slice(bandera.length + 1).trim();
+    const i = args.indexOf(bandera);
+    return i >= 0 ? String(args[i + 1] ?? "").trim() : "";
+  };
+  const elegido = valorDe("--periodo") || valorDe("--marca");
 
   const sb = createClient(url, key, { auth: { persistSession: false } });
 
@@ -109,10 +132,13 @@ async function main() {
     );
   }
 
-  // 3. El período con el que nacería cada una: el ABIERTO de su tienda, con la
-  //    MISMA regla que la puerta (`periodoAbiertoParaFotoNueva`, puro).
-  const { periodoAbiertoParaFotoNueva } = await import("../src/lib/marketing/fotos-periodo");
-  const periodoPorTienda = new Map<string, string | null>();
+  // 3. El período con el que nacería cada una: las marcas ABIERTAS de su
+  //    tienda y la MISMA regla pura de la puerta (`destinoDeFotoNueva`).
+  const { destinoDeFotoNueva, marcasAbiertasOrdenadas, periodosAbiertosOrdenados } = await import(
+    "../src/lib/marketing/fotos-periodo"
+  );
+  type Marca = { periodoId: string; proveedorKey: string; nombre: string };
+  const marcasPorTienda = new Map<string, Marca[]>();
   for (const t of new Set(huerfanas.map((h) => h.tienda))) {
     const [fac, ent] = await Promise.all([
       sb.from("mk_facturas").select("id, fecha_factura, created_at").eq("tienda_codigo", t).is("anulado_en", null),
@@ -129,7 +155,7 @@ async function main() {
       })),
     ];
     if (gastos.length === 0) {
-      periodoPorTienda.set(t, null);
+      marcasPorTienda.set(t, []);
       continue;
     }
     const sel = await sb
@@ -137,34 +163,67 @@ async function main() {
       .select("documento_id, periodo_id")
       .in("documento_id", gastos.map((g) => g.id));
     const ids = [...new Set(((sel.data ?? []) as Array<Record<string, unknown>>).map((x) => String(x.periodo_id)))];
+    // 🔴 SOLO LOS ABIERTOS: un período cerrado nunca entra a la lista.
     const per = ids.length
-      ? await sb.from("mk_periodos").select("id").in("id", ids).eq("estado", "abierto")
+      ? await sb.from("mk_periodos").select("id, proveedor_key").in("id", ids).eq("estado", "abierto")
       : { data: [] as Array<Record<string, unknown>> };
-    const abiertos = new Set(((per.data ?? []) as Array<Record<string, unknown>>).map((x) => String(x.id)));
+    const marcaDe = new Map<string, string>();
+    for (const x of (per.data ?? []) as Array<Record<string, unknown>>) {
+      marcaDe.set(String(x.id), String(x.proveedor_key ?? ""));
+    }
     const porDoc = new Map<string, string[]>();
     for (const x of (sel.data ?? []) as Array<Record<string, unknown>>) {
       const pid = String(x.periodo_id);
-      if (!abiertos.has(pid)) continue;
+      if (!marcaDe.has(pid)) continue;
       const doc = String(x.documento_id);
       porDoc.set(doc, [...(porDoc.get(doc) ?? []), pid]);
     }
-    periodoPorTienda.set(
-      t,
-      periodoAbiertoParaFotoNueva(
-        gastos.map((g) => ({ documentoId: g.id, cuando: g.cuando, periodosAbiertos: porDoc.get(g.id) ?? [] })),
-      ),
+    const orden = periodosAbiertosOrdenados(
+      gastos.map((g) => ({ documentoId: g.id, cuando: g.cuando, periodosAbiertos: porDoc.get(g.id) ?? [] })),
     );
+    marcasPorTienda.set(
+      t,
+      marcasAbiertasOrdenadas(orden.map((periodoId) => ({ periodoId, proveedorKey: marcaDe.get(periodoId) ?? "" }))),
+    );
+  }
+
+  // 4. El destino de cada tienda, con la regla pura. Sin `--marca` y con dos
+  //    o más abiertas: se muestran las opciones y NO se aplica nada.
+  const destinoPorTienda = new Map<string, ReturnType<typeof destinoDeFotoNueva>>();
+  let faltaElegirEnAlguna = false;
+  console.log("\nLas marcas con período ABIERTO de cada tienda:\n");
+  for (const [t, marcas] of marcasPorTienda) {
+    const destino = destinoDeFotoNueva(marcas, elegido);
+    destinoPorTienda.set(t, destino);
+    const lista = marcas.length
+      ? marcas.map((m) => `${m.nombre} (${m.proveedorKey} · ${m.periodoId})`).join("  |  ")
+      : "ninguna — la foto queda sin sello y se ve en «Abierto»";
+    console.log(`  ${t}: ${lista}`);
+    if (!destino.ok) {
+      faltaElegirEnAlguna = true;
+      console.log(`     ⚠️  ${destino.error}`);
+      if (destino.faltaElegir) {
+        console.log(
+          `     → elige una: ${marcas.map((m) => `--marca=${m.proveedorKey}`).join("  o  ")}`,
+        );
+      }
+    }
   }
 
   console.log("\nLo que se insertaría (una fila por archivo):\n");
   for (const h of huerfanas) {
+    const destino = destinoPorTienda.get(h.tienda);
+    if (!destino?.ok) {
+      console.log(`  (${h.path}) — sin marca elegida, no se insertaría nada.`);
+      continue;
+    }
     console.log(
       JSON.stringify({
         tipo: "foto_proyecto",
         proyecto_id: null,
         factura_id: null,
         tienda_codigo: h.tienda,
-        periodo_id: periodoPorTienda.get(h.tienda) ?? null,
+        periodo_id: destino.periodoId,
         url: h.path,
         nombre_original: h.nombreOriginal,
         size_bytes: h.sizeBytes,
@@ -174,6 +233,13 @@ async function main() {
 
   if (!aplicar) {
     console.log("\n👀 Solo lectura. Nada se escribió. Con `--aplicar` se insertan esas filas.");
+    return;
+  }
+
+  // 🔴 Con dos o más marcas abiertas y sin elegir, NO se escribe nada.
+  if (faltaElegirEnAlguna) {
+    console.log("\n🛑 Falta elegir la marca. Nada se escribió. Vuelve a correrlo con `--marca=<clave>`.");
+    process.exitCode = 1;
     return;
   }
 
@@ -189,7 +255,7 @@ async function main() {
       nombre_original: h.nombreOriginal,
       size_bytes: h.sizeBytes,
     };
-    const pid = periodoPorTienda.get(h.tienda) ?? null;
+    const pid = destinoPorTienda.get(h.tienda)?.periodoId ?? null;
     if (pid) fila.periodo_id = pid;
     const { error } = await sb.from("mk_adjuntos").insert(fila);
     if (error) {
