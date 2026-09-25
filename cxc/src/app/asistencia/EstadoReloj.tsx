@@ -43,6 +43,9 @@ import {
   ESPERANDO_A_LA_PC, TRAER_AHORA, avisoDeLaPastilla, relojesDeLaEmpresa, textoDeLaPastilla,
   textoPedidoEnviado,
 } from "@/lib/asistencia/relojes-en-la-fila";
+// 🔴 De noche y el fin de semana, el reloj apagado NO es una avería: la pastilla
+// lo dice en gris en vez de en ámbar. La regla, entera, en el módulo puro.
+import { textoRelojApagado } from "@/lib/asistencia/reloj-fuera-de-horario";
 
 interface RelojEnPantalla {
   dispositivo: string;
@@ -54,6 +57,8 @@ interface RelojEnPantalla {
   leidoHasta: string | null;
   /** Minutos desde el último contacto de la PC. La ruta ya lo mandaba. */
   minutosSinNoticias?: number | null;
+  /** El último contacto de la PC, en ISO — para decir «última lectura ayer 18:32». */
+  vistoEn?: string | null;
 }
 
 interface Respuesta {
@@ -225,14 +230,22 @@ export default function EstadoReloj({ onLlegaron, resumen = false, empresa = nul
       con_error: 0, callado: 1, nunca: 2, al_dia: 3,
     };
     const peor = [...relojes].sort((a, b) => GRAVEDAD[a.salud] - GRAVEDAD[b.salud])[0];
+    /* 🔴 ¿ESTÁ APAGADO PORQUE LA OFICINA ESTÁ CERRADA? (25-sep-2026). Daniel:
+     * *«es normal que se apaguen de noche y fines de semana»*. Fuera de horario,
+     * y con la última lectura de hoy o del último día hábil, la línea va en GRIS
+     * y dice desde cuándo; en horario hábil no cambia nada y sigue en ámbar.
+     * ⚠️ «Traer ahora» tampoco cambia: se puede pedir igual. */
+    const apagado = textoRelojApagado(relojes, Date.now());
     const puedenPedir = relojes.filter(
       (r) => !faltaMigracion && (!(pidiendo.includes(r.dispositivo) || r.pedidoPendiente) || r.pedidoSinRespuesta),
     );
     const esperando = relojes.some((r) => pidiendo.includes(r.dispositivo) || r.pedidoPendiente);
     return (
-      <div className={`flex min-h-[44px] max-w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-3 py-1.5 ${COLOR[peor.salud]}`}>
-        <span className={`h-2 w-2 shrink-0 rounded-full ${PUNTO[peor.salud]}`} />
-        <span className="min-w-0 text-[13px] text-gray-900">{textoDeLaPastilla(relojes)}</span>
+      <div className={`flex min-h-[44px] max-w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-3 py-1.5 ${apagado ? COLOR.al_dia : COLOR[peor.salud]}`}>
+        <span className={`h-2 w-2 shrink-0 rounded-full ${apagado ? "bg-gray-300" : PUNTO[peor.salud]}`} />
+        <span className={`min-w-0 text-[13px] ${apagado ? "text-gray-500" : "text-gray-900"}`}>
+          {apagado ?? textoDeLaPastilla(relojes)}
+        </span>
         {avisoDeLaPastilla(relojes) && (
           <span className="text-[12px] font-medium text-amber-800">{avisoDeLaPastilla(relojes)}</span>
         )}

@@ -65,6 +65,11 @@ export async function GET(req: NextRequest) {
     relojes: base.map((f) => ({
       dispositivo: f.dispositivo,
       leidoHasta: f.leido_hasta ?? null,
+      // 🔴 El último contacto de la PC, tal cual (25-sep-2026). Lo usa la
+      // pastilla para decir «última lectura ayer 18:32» cuando el reloj está
+      // apagado por horario. ⚠️ Es un DATO que ya estaba en la fila: no se
+      // calcula nada nuevo y ningún número se mueve.
+      vistoEn: f.visto_en ?? null,
       agenteVersion: f.agente_version ?? null,
       ...estadoAgente(f, ahora),
     })),
