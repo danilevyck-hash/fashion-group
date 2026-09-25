@@ -122,7 +122,19 @@ describe("las 6 pestañas y su orden", () => {
   // ⚠️ VA PEGADA A PLANILLA y no al final: es la misma plata y el mismo día de
   // trabajo. Y el ORDEN sigue sin ser cosmético — `porDefecto` toma la PRIMERA
   // visible, así que Reporte tiene que seguir siendo el primero.
-  it("son exactamente 7, en el orden Reporte · Planilla · Préstamos · Justificaciones · Vacaciones · Aprobaciones · Configuración", () => {
+  // 🩸 SON OCHO DESDE EL 25-SEP-2026, Y LA OCTAVA ES MARCACIONES.
+  //
+  // Este candado exigía SIETE. No se afloja ni se borra: se amplía con esta
+  // nota, porque la regla que protege no cambió —cuántas pestañas hay, en qué
+  // orden y dónde aterriza cada rol— y «Marcaciones» la cumple: se gana el
+  // lugar por lo que se hace ahí (mirar lo que mandó el teléfono, con su selfie
+  // y su ubicación), no por la tabla que guarda.
+  //
+  // 🔴 VA AL FINAL, Y ESO ES LO QUE ESTE CASO PROTEGE. `pestanaQueSeAbre` toma
+  // la PRIMERA visible: ponerla adelante cambiaría dónde aterriza todo el
+  // mundo. Y solo la ve `admin` (`MARCACIONES_ROLES`), así que para los demás
+  // roles la lista vuelve a tener exactamente las siete de antes.
+  it("son exactamente 8, en el orden Reporte · Planilla · Préstamos · Justificaciones · Vacaciones · Aprobaciones · Configuración · Marcaciones", () => {
     expect(tabs).toEqual([
       ["reporte", "Reporte"],
       ["planilla", "Planilla"],
@@ -131,6 +143,7 @@ describe("las 6 pestañas y su orden", () => {
       ["vacaciones", "Vacaciones"],
       ["aprobaciones", "Aprobaciones"],
       ["configuracion", "Configuración"],
+      ["marcaciones", "Marcaciones"],
     ]);
   });
 

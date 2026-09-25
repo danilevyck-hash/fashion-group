@@ -36,6 +36,12 @@
 // la regla de la casa para lo que cambia una pantalla que se usa a diario.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import {
+  CLAVE_MARCACIONES,
+  MARCACIONES_PESTANA,
+  ROTULO_MARCACIONES,
+} from "@/lib/asistencia/marcaciones-pestana";
+
 /**
  * ¿Está prendido el acomodo nuevo?
  *
@@ -63,7 +69,8 @@ export const PERSONA_EN_EL_CENTRO = personaEnElCentroPrendida();
 
 export type ClavePestana =
   | "colaboradores" | "asistencia" | "reporte" | "planilla" | "prestamos"
-  | "justificaciones" | "vacaciones" | "aprobaciones" | "configuracion";
+  | "justificaciones" | "vacaciones" | "aprobaciones" | "configuracion"
+  | "marcaciones";
 
 export type Pestana = readonly [ClavePestana, string];
 
@@ -80,6 +87,11 @@ export const PESTANAS_HOY: readonly Pestana[] = [
   ["vacaciones", "Vacaciones"],
   ["aprobaciones", "Aprobaciones"],
   ["configuracion", "Configuración"],
+  // 🔴 «MARCACIONES» VA AL FINAL, Y NO ES COSMÉTICO (25-sep-2026): `pestanaQueSeAbre`
+  // toma la PRIMERA visible, así que una pestaña nueva adelante cambiaría dónde
+  // aterriza todo el mundo. Además la ve UNA sola persona (`MARCACIONES_ROLES`),
+  // y la filtra `MARCACIONES_PESTANA`, como Préstamos con `PLANILLA_UNIDA`.
+  [CLAVE_MARCACIONES, ROTULO_MARCACIONES],
 ] as const;
 
 /**
@@ -110,6 +122,8 @@ export const PESTANAS_PERSONA_EN_EL_CENTRO: readonly Pestana[] = [
   ["aprobaciones", "Aprobaciones"],
   ["planilla", "Planilla"],
   ["prestamos", "Préstamos"],
+  // 🔴 Última, por lo mismo de arriba: el aterrizaje no se mueve.
+  [CLAVE_MARCACIONES, ROTULO_MARCACIONES],
 ] as const;
 
 /**
@@ -123,7 +137,13 @@ export function pestanasDeAsistencia(opts: {
   planillaUnida: boolean;
 }): readonly Pestana[] {
   const base = opts.personaEnElCentro ? PESTANAS_PERSONA_EN_EL_CENTRO : PESTANAS_HOY;
-  return base.filter(([k]) => (k === "prestamos" ? opts.planillaUnida : true));
+  return base.filter(([k]) => {
+    if (k === "prestamos") return opts.planillaUnida;
+    // 🔴 Con `MARCACIONES_PESTANA` apagado la pestaña NO EXISTE: ni en la barra
+    // ni por la URL, igual que Préstamos con la Planilla Unida apagada.
+    if (k === CLAVE_MARCACIONES) return MARCACIONES_PESTANA;
+    return true;
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -20,6 +20,7 @@ import { ROL_BOSTON } from "@/lib/boston/rol";
 import { rolesQueSumaVentasBoston } from "@/lib/boston/ventas-boston";
 
 import { vePestanaPrestamos } from "@/lib/prestamos-una-puerta";
+import { CLAVE_MARCACIONES, vePestanaMarcaciones } from "@/lib/asistencia/marcaciones-pestana";
 
 // 🔴 DAVID ENTRA AL MÓDULO COMPLETO (23-sep-2026). Daniel, textual:
 // *«Asistencia que pueda ver todo como yo»*. `gerente_boston` se SUMA por el
@@ -160,6 +161,12 @@ export function vePestana(rol: string, pestana: string): boolean {
   // el módulo en silencio a quien tiene Préstamos y no tiene Asistencia. Ver
   // `lib/prestamos-una-puerta.ts`.
   if (pestana === "prestamos") return vePestanaPrestamos(rol);
+  // 🔴 «MARCACIONES» SE AUTORIZA POR SU PROPIA LISTA (25-sep-2026), y es la
+  // MISMA que mira la ruta (`MARCACIONES_ROLES`, hoy solo `admin`). No cuelga
+  // de `ASISTENCIA_ROLES`: cada marca trae una selfie y una ubicación, y eso no
+  // es un dato de planilla. Con el interruptor apagado contesta `false` a todo
+  // el mundo, así que la pestaña no existe ni por la URL.
+  if (pestana === CLAVE_MARCACIONES) return vePestanaMarcaciones(rol);
   const esDeAprobacion = (PESTANAS_DE_APROBACION as readonly string[]).includes(pestana);
   return esDeAprobacion
     ? aprobacionesRoles().includes(rol)

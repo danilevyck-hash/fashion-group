@@ -423,8 +423,14 @@ describe("🔴 3 · Asistencia para David", () => {
     for (const opts of [{ personaEnElCentro: true, planillaUnida: true }, { personaEnElCentro: false, planillaUnida: true }]) {
       const claves = pestanasDeAsistencia(opts).map(([k]) => k);
       const david = claves.filter((k) => vePestana(ROL_BOSTON, k));
-      const admin = claves.filter((k) => vePestana("admin", k));
+      // 🔴 CON UNA EXCEPCIÓN, DESDE EL 25-SEP-2026: «Marcaciones» es de `admin`
+      // y de nadie más. Cada marca del teléfono trae una selfie y una ubicación
+      // —dónde estuvo una persona y qué cara tenía—, y eso no es un dato de
+      // planilla. Lo que Daniel le abrió a David es el módulo de Asistencia
+      // («Asistencia que pueda ver todo como yo»), no las fotos de su gente.
+      const admin = claves.filter((k) => vePestana("admin", k) && k !== "marcaciones");
       expect(david).toEqual(admin);
+      expect(david).not.toContain("marcaciones");
       expect(david).toContain("prestamos");
     }
     expect(vePestanaPrestamos(ROL_BOSTON)).toBe(true);

@@ -111,11 +111,16 @@ describe("A. 🔴 EL INTERRUPTOR ARRANCA APAGADO", () => {
     }
   });
 
-  it("🔴 APAGADO, EL MÓDULO ES EXACTAMENTE EL DE HOY: 7 pestañas, en su orden", () => {
+  // 🩸 SON OCHO DESDE EL 25-SEP-2026: entró «Marcaciones», que la ve UNA sola
+  // persona (`MARCACIONES_ROLES` = admin) y cuelga de su propio interruptor. El
+  // control no se afloja —las siete de siempre siguen en su orden, adelante— y
+  // la nueva va al FINAL, que es lo que garantiza que el aterrizaje no se mueva.
+  it("🔴 APAGADO, EL MÓDULO ES EXACTAMENTE EL DE HOY: las 7 de siempre, en su orden", () => {
     // Es el CONTROL de todo este archivo. Si esto se rompe, apagar el
     // interruptor ya no devuelve la pantalla de siempre — que es lo único que
     // un interruptor tiene que garantizar.
-    expect(pestanasDeAsistencia({ personaEnElCentro: false, planillaUnida: true }))
+    expect(pestanasDeAsistencia({ personaEnElCentro: false, planillaUnida: true })
+      .filter(([k]) => k !== "marcaciones"))
       .toEqual([
         ["reporte", "Reporte"],
         ["planilla", "Planilla"],
@@ -151,7 +156,11 @@ describe("B. 🔴 DE 6 A 4 PESTAÑAS, Y PERSONAS ES LA PRIMERA", () => {
     // 🔴 10-sep-2026 (noche): «Reporte pasa a llamarse Asistencia. Tu orden»
     // (Daniel). El orden es el del trabajo: la gente, lo que marcó el reloj, lo
     // que se aprueba, lo que se paga. Ver `asistencia-empresa-para-todo.test.ts`.
-    expect(pestanasDeAsistencia({ personaEnElCentro: true, planillaUnida: true }))
+    // ⚠️ «Marcaciones» se saca acá a propósito: entró el 25-sep-2026 al final de
+    // la lista y la ve solo `admin`. Lo que este caso protege es el ORDEN DEL
+    // TRABAJO que aprobó Daniel, y ese no se movió.
+    expect(pestanasDeAsistencia({ personaEnElCentro: true, planillaUnida: true })
+      .filter(([k]) => k !== "marcaciones"))
       .toEqual([
         ["colaboradores", "Colaboradores"],
         ["asistencia", "Asistencia"],
@@ -163,7 +172,10 @@ describe("B. 🔴 DE 6 A 4 PESTAÑAS, Y PERSONAS ES LA PRIMERA", () => {
 
   it("🔴 son CUATRO sin Préstamos — las que Daniel aprobó", () => {
     const claves = pestanasDeAsistencia({ personaEnElCentro: true, planillaUnida: false })
-      .map(([k]) => k);
+      .map(([k]) => k)
+      // ⚠️ «Marcaciones» (25-sep-2026) es de `admin` y va al final: no cambia
+      // cuáles son las cuatro que Daniel aprobó ni en qué orden van.
+      .filter((k) => k !== "marcaciones");
     expect(claves).toEqual(["colaboradores", "asistencia", "aprobaciones", "planilla"]);
   });
 

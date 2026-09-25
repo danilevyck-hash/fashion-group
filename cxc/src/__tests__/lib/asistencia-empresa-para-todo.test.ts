@@ -62,7 +62,11 @@ beforeEach(() => { escrito.length = 0; });
 
 describe("A. 🔴 «Reporte» se llama «Asistencia», y el orden es el del trabajo", () => {
   it("Colaboradores · Asistencia · Aprobaciones · Planilla · Préstamos", () => {
-    expect(PESTANAS_PERSONA_EN_EL_CENTRO.map(([k, r]) => `${k}:${r}`)).toEqual([
+    // ⚠️ «Marcaciones» entró el 25-sep-2026 al FINAL y la ve solo `admin`: lo
+    // que este caso protege —el orden del trabajo— no se movió.
+    expect(PESTANAS_PERSONA_EN_EL_CENTRO
+      .filter(([k]) => k !== "marcaciones")
+      .map(([k, r]) => `${k}:${r}`)).toEqual([
       "colaboradores:Colaboradores", "asistencia:Asistencia", "aprobaciones:Aprobaciones", "planilla:Planilla", "prestamos:Préstamos",
     ]);
     expect(PESTANAS_PERSONA_EN_EL_CENTRO.some(([, r]) => /reporte/i.test(r))).toBe(false);

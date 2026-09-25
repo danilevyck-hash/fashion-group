@@ -27,6 +27,14 @@ export interface SelfieParaVer extends MarcaTelefonoUI {
   persona: string;
   fecha: string;
   rotulo: string;
+  /**
+   * Renglones sueltos bajo el detalle: dónde estaba, con cuánta precisión, si la
+   * mandó sin señal, cuánto tardó en llegar. Los usa la pestaña «Marcaciones»
+   * (25-sep-2026), que muestra la MISMA hoja que el reporte y necesita decir
+   * tres cosas más. 🔑 Lo que no se sabe no llega acá: quien la arma no manda
+   * una raya.
+   */
+  lineas?: readonly string[];
 }
 
 export default function SelfieMarcacionModal({
@@ -83,6 +91,13 @@ export default function SelfieMarcacionModal({
           {marca.rotulo} {marca.horaLarga}
         </p>
         <p className="mt-0.5 text-sm text-gray-500">{marca.detalle}</p>
+        {(marca.lineas ?? []).length > 0 && (
+          <ul className="mt-1.5 space-y-0.5">
+            {(marca.lineas ?? []).map((l) => (
+              <li key={l} className="text-sm text-gray-600">{l}</li>
+            ))}
+          </ul>
+        )}
 
         <div className="mt-3">
           {estado === "cargando" && <p className="text-sm text-gray-500">Abriendo la selfie…</p>}

@@ -77,6 +77,9 @@ import AprobacionesTab from "./AprobacionesTab";
 import { APROBACIONES_ROLES, vePestana } from "@/lib/asistencia/roles";
 import ComoFuncionaTab from "./ComoFuncionaTab";
 import PrestamosTab from "./PrestamosTab";
+// 🔴 «Marcaciones» (25-sep-2026): lo que mandó el TELÉFONO, tal cual. La ve una
+// sola persona (`MARCACIONES_ROLES`, hoy `admin`) y solo se MIRA.
+import MarcacionesTab from "./MarcacionesTab";
 import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
 import {
   PERSONA_EN_EL_CENTRO,
@@ -412,6 +415,14 @@ function AsistenciaInner() {
             {monta("configuracion") && (
               <div hidden={seEsconde("configuracion", tab)} className={escondida("configuracion")}>
                 <ConfiguracionTab />
+              </div>
+            )}
+            {/* 🔴 SOLO SE MIRA: la pestaña no tiene un botón que corrija, borre
+                ni justifique. Y solo la ve `admin` — lo decide `vePestana`, que
+                lee la MISMA lista que la ruta. */}
+            {monta("marcaciones") && (
+              <div hidden={seEsconde("marcaciones", tab)} className={escondida("marcaciones")}>
+                <MarcacionesTab empresa={empresa} />
               </div>
             )}
           </div>
