@@ -19,6 +19,7 @@ import {
   type FilaDiario,
   type MesSerie,
 } from "@/lib/ventas/referencia";
+import { REFERENCIA_2026_09 } from "@/lib/ventas/referencia-pantalla";
 
 // La lista REAL que pegó Daniel (12-ago-2026), tal cual: 48 tokens, duplicados
 // y guiones finales incluidos. Es EL caso del bug — el modo pedido contestaba
@@ -113,15 +114,31 @@ describe("aritmética de meses", () => {
   });
 });
 
-describe("modelo y color — los últimos 3 dígitos", () => {
-  it("31KAE22003001 → modelo 31KAE22003, color 001", () => {
+describe("modelo y color — los últimos 3 CARACTERES", () => {
+  it("31KAE22003001 → modelo 31KAE22003, color 001 (con las dos reglas)", () => {
     expect(modeloDe("31KAE22003001")).toBe("31KAE22003");
     expect(colorDe("31KAE22003001")).toBe("001");
   });
 
-  it("un código sin sufijo numérico de 3 dígitos es su propio modelo", () => {
-    expect(modeloDe("KACKS26-A")).toBe("KACKS26-A");
-    expect(colorDe("KACKS26-A")).toBeNull();
+  it("🔴 con el interruptor prendido el color puede llevar LETRAS", () => {
+    // Daniel, 25-sep-2026: *«los últimos 3 dígitos, letra o número, es el
+    // color, pasa igual con las otras marcas»*. Con la regla vieja (3 DÍGITOS)
+    // el color de Tommy `MW0MW32346C1R` quedaba como modelo suelto, y Fashion
+    // Wear agrupaba el 6 % de sus 5.130 códigos en vez del 50 %.
+    if (REFERENCIA_2026_09) {
+      expect(modeloDe("MW0MW32346C1R")).toBe("MW0MW32346");
+      expect(colorDe("MW0MW32346C1R")).toBe("C1R");
+      expect(modeloDe("KACKS26-A")).toBe("KACKS2");
+    } else {
+      expect(modeloDe("MW0MW32346C1R")).toBe("MW0MW32346C1R");
+      expect(colorDe("MW0MW32346C1R")).toBeNull();
+      expect(modeloDe("KACKS26-A")).toBe("KACKS26-A");
+    }
+  });
+
+  it("un código de 3 caracteres o menos es SIEMPRE su propio modelo", () => {
+    expect(modeloDe("001")).toBe("001");
+    expect(colorDe("001")).toBeNull();
   });
 });
 

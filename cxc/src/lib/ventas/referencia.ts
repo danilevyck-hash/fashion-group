@@ -26,6 +26,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
+import { LARGO_COLOR as LARGO_COLOR_PANTALLA, REFERENCIA_2026_09 } from "./referencia-pantalla";
 
 /** Las 6 empresas del grupo cuyo `switch_articulo_diario` alimenta este tab. */
 export const REFERENCIA_EMPRESA_KEYS: readonly string[] = B2B_EMPRESA_KEYS;
@@ -61,8 +62,9 @@ export const MAX_CODIGOS_MULTI = 50;
 /** El gráfico mes a mes muestra hasta esta cantidad de meses (los últimos). */
 export const SERIE_GRAFICO_MESES = 18;
 
-/** Largo del sufijo de color: los últimos 3 dígitos del código. */
-export const LARGO_COLOR = 3;
+/** Largo del sufijo de color. La fuente única es `referencia-pantalla.ts`;
+ *  acá se reexporta para no romper a quien ya lo importa desde este módulo. */
+export const LARGO_COLOR = LARGO_COLOR_PANTALLA;
 
 // ─── Signo por tipo de comprobante ───────────────────────────────────────────
 
@@ -217,13 +219,27 @@ export function sumarSeries(series: MesSerie[][]): MesSerie[] {
 
 // ─── Modelo y color ──────────────────────────────────────────────────────────
 
-/** Los últimos 3 dígitos del código son el color. `31KAE22003001` → modelo
- *  `31KAE22003`, color `001`. Si el sufijo no son 3 dígitos, el código es su
- *  propio modelo (no se adivina). */
+/**
+ * El MODELO de un código: el código sin su color.
+ *
+ * 🔴 CON `REFERENCIA_2026_09` PRENDIDO, EL COLOR SON LOS ÚLTIMOS 3 CARACTERES,
+ * SEAN LETRA O NÚMERO. Daniel, 25-sep-2026, textual: *«los últimos 3 dígitos,
+ * letra o número, es el color, pasa igual con las otras marcas»*.
+ *
+ * 🩸 La regla vieja pedía 3 DÍGITOS, y el color de Tommy lleva letras
+ * (`MW0MW32346C1R`): en Fashion Wear agrupaba **el 6 %** — 5.130 códigos caían
+ * en 4.820 «modelos» — cuando los modelos de verdad son **2.573**. Medido
+ * contra producción el 25-sep-2026; la tabla entera, empresa por empresa, está
+ * en `referencia-pantalla.ts`. Reebok no se mueve (sus códigos ya terminan en
+ * 3 dígitos) y Joybees agrupa de MENOS, nunca de más.
+ *
+ * Apagado el interruptor vuelve la regla de los 3 dígitos, tal cual.
+ * `31KAE22003001` → modelo `31KAE22003`, color `001` con las dos reglas.
+ */
 export function modeloDe(codigo: string): string {
-  if (codigo.length > LARGO_COLOR && /^\d{3}$/.test(codigo.slice(-LARGO_COLOR))) {
-    return codigo.slice(0, -LARGO_COLOR);
-  }
+  if (codigo.length <= LARGO_COLOR) return codigo;
+  if (REFERENCIA_2026_09) return codigo.slice(0, -LARGO_COLOR);
+  if (/^\d{3}$/.test(codigo.slice(-LARGO_COLOR))) return codigo.slice(0, -LARGO_COLOR);
   return codigo;
 }
 
