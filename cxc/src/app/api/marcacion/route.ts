@@ -185,28 +185,28 @@ export async function POST(req: NextRequest) {
     const lugarTexto = await lugarTextoDeLaMarca(num("lat"), num("lng"));
 
     const fila = {
-        dispositivo: DISPOSITIVO_TELEFONO,
-        evento_id: eventoId,
-        empleado_codigo: codigo,
-        empleado_nombre: await nombreDeLaFicha(codigo),
-        ocurrio_en: cuando.ocurrioEn,
-        tipo,
-        // El crudo de esta fuente: de dónde salió y con qué venía. Las columnas
-        // de arriba son lo que se lee; esto es para poder auditar después.
-        raw: {
-          fuente: DISPOSITIVO_TELEFONO,
-          enviado_en: new Date().toISOString(),
-          user_agent: req.headers.get("user-agent") ?? null,
-        },
-        sin_senal: sinSenal,
-        hora_telefono: horaTelefono,
-        foto_path: subida,
-        lat: num("lat"),
-        lng: num("lng"),
-        precision_m: num("precisionM"),
-        marcada_por: auth.userName ?? null,
-        lugar_texto: lugarTexto,
-        aparato_id: aparatoId,
+      dispositivo: DISPOSITIVO_TELEFONO,
+      evento_id: eventoId,
+      empleado_codigo: codigo,
+      empleado_nombre: await nombreDeLaFicha(codigo),
+      ocurrio_en: cuando.ocurrioEn,
+      tipo,
+      // El crudo de esta fuente: de dónde salió y con qué venía. Las columnas
+      // de arriba son lo que se lee; esto es para poder auditar después.
+      raw: {
+        fuente: DISPOSITIVO_TELEFONO,
+        enviado_en: new Date().toISOString(),
+        user_agent: req.headers.get("user-agent") ?? null,
+      },
+      sin_senal: sinSenal,
+      hora_telefono: horaTelefono,
+      foto_path: subida,
+      lat: num("lat"),
+      lng: num("lng"),
+      precision_m: num("precisionM"),
+      marcada_por: auth.userName ?? null,
+      lugar_texto: lugarTexto,
+      aparato_id: aparatoId,
     };
 
     let { error } = await guardarMarcaciones([fila]);
