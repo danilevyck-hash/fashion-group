@@ -122,12 +122,16 @@ describe("🔴 el botón existe en /referencia", () => {
     expect(src).toContain("Busca un código primero");
   });
 
-  it("CONTROL: el Excel sigue apareciendo SOLO con resultados", () => {
+  it("CONTROL: el Excel sigue apagado mientras no haya resultados", () => {
+    // ⚠️ CAMBIÓ DE FORMA EL 25-sep-2026 (`REFERENCIA_2026_09`): las dos
+    // acciones se mudaron al «···» y ahí no se esconden, se APAGAN. Lo que se
+    // protege es lo mismo de siempre — sin búsqueda no hay Excel que bajar —,
+    // pero se lee en el `disabled` de la acción y no en un bloque de render.
     const src = sinComentarios(VISTA);
     const iExcel = src.indexOf("Descargar Excel");
-    const iCondicion = src.indexOf("{hayResultados && (");
-    expect(iCondicion).toBeGreaterThan(-1);
-    expect(iExcel).toBeGreaterThan(iCondicion);
+    expect(iExcel).toBeGreaterThan(-1);
+    const bloque = src.slice(iExcel, iExcel + 320);
+    expect(bloque).toContain("disabled: !hayResultados");
   });
 
   it("CONTROL: el resto de la pantalla sigue (buscador y Excel)", () => {

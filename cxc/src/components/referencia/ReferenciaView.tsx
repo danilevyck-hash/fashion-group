@@ -29,6 +29,15 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Download, RefreshCw, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import OverflowMenu from "@/components/ui/OverflowMenu";
+import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
+import {
+  AYUDA_BUSCADOR,
+  PLACEHOLDER_BUSCADOR,
+  REFERENCIA_2026_09,
+  modoDeBusqueda,
+} from "@/lib/ventas/referencia-pantalla";
+import { ReferenciaModelo } from "./ReferenciaModelo";
 import { fetchJsonWithRetry, describeFetchError } from "@/lib/fetch-retry";
 import {
   modeloDe,
@@ -95,6 +104,12 @@ export function ReferenciaView() {
 
   const hayResultados = (resp?.articulos.length ?? 0) > 0;
 
+  // 🔴 La pantalla decide sola por lo que se buscó (`modoDeBusqueda`, puro).
+  const modo = useMemo(
+    () => modoDeBusqueda(codigosPegados, (resp?.articulos ?? []).map((a) => a.codigo)),
+    [codigosPegados, resp],
+  );
+
   // ── «Actualizar datos de Switch» ───────────────────────────────────────────
   // 🔴 VOLVIÓ EL 4-sep-2026. La ruta (`POST /api/ventas/referencia/actualizar`)
   // nunca se fue, pero su botón desapareció con la franja de catálogo en el
@@ -137,6 +152,129 @@ export function ReferenciaView() {
   };
   // Daniel: *"quita margen, lo demas dejalo"* — el servidor dice quién lo ve.
   const mostrarMargen = resp?.margenVisible !== false;
+
+  const acciones = [
+    {
+      label: actualizando ? "Actualizando…" : "Actualizar datos de Switch",
+      onClick: () => void actualizar(),
+      disabled: !hayResultados || actualizando || cargando,
+    },
+    {
+      label: "Descargar Excel",
+      onClick: () =>
+        void exportComprasToExcel(articulosOrdenados, resp!.hoyMes, { margen: mostrarMargen }),
+      disabled: !hayResultados,
+    },
+  ];
+
+  // El bloque de resultados es el MISMO con el interruptor prendido o
+  // apagado: se escribe UNA vez y se monta en las dos formas del buscador.
+  // Va como JSX (no como componente anidado): un componente declarado dentro
+  // de otro se REMONTA en cada render y le borraría a las tarjetas lo que
+  // tengan abierto.
+  const resultados = (
+    <>
+      {error && (
+        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
+      )}
+
+      {resp?.comprasDisponibles === false && (
+        <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Todavía no están cargados los ingresos de mercancía, así que no se puede decir qué llegó ni cuándo.
+          Las ventas de abajo sí son reales.
+        </p>
+      )}
+
+      {resp?.coincidencias && resp.coincidencias.length > 0 && (
+        <Coincidencias
+          items={resp.coincidencias}
+          onElegir={(modelo) => {
+            setTexto(modelo);
+            void buscar(modelo);
+          }}
+        />
+      )}
+
+      {resp && resp.noEncontrados.length > 0 && (
+        <p className="mt-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+          No encontré {resp.noEncontrados.length === 1 ? "el código" : "los códigos"}{" "}
+          <span className="font-medium">{resp.noEncontrados.join(", ")}</span> — ni en ventas ni en compras.
+        </p>
+      )}
+
+      {modoPedido ? (
+        <ReferenciaTablaPedido articulos={articulosOrdenados} hoyMes={resp!.hoyMes} mostrarMargen={mostrarMargen} />
+      ) : (
+        porModelo.map(([modelo, arts]) => (
+          <ReferenciaModelo
+            key={modelo}
+            modelo={modelo}
+            arts={arts}
+            hoyMes={resp!.hoyMes}
+            mostrarMargen={mostrarMargen}
+            soloColor={arts.length === 1 || modo === "color"}
+          />
+        ))
+      )}
+
+      {resp && !hayResultados && !resp.coincidencias?.length && resp.noEncontrados.length === 0 && (
+        <p className="mt-4 text-sm text-gray-600">No hay nada con eso.</p>
+      )}
+    </>
+  );
+
+  // ── El buscador del rediseño (25-sep-2026) ────────────────────────────────
+  // 🔴 Placeholder corto, la lupa ADENTRO de la caja, UNA línea de ayuda, y las
+  // dos acciones (Actualizar datos de Switch · Descargar Excel) dentro del
+  // «···». Se pega debajo del encabezado con `CLASE_BARRA_PEGAJOSA`, que es la
+  // ÚNICA forma de pegar una barra de contenido en este repo.
+  if (REFERENCIA_2026_09) {
+    return (
+      <div>
+        <div className={cn(CLASE_BARRA_PEGAJOSA, "-mx-4 bg-gray-50 px-4 pb-2 pt-1")}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void buscar(texto);
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                <input
+                  value={texto}
+                  onChange={(e) => setTexto(e.target.value)}
+                  placeholder={PLACEHOLDER_BUSCADOR}
+                  aria-label="Buscar referencia"
+                  className="min-h-[44px] w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 text-sm outline-none focus:border-gray-900"
+                />
+              </div>
+              <Button type="submit" disabled={cargando} className="min-h-[44px] shrink-0">
+                {cargando ? "Buscando…" : "Buscar"}
+              </Button>
+              <OverflowMenu items={acciones} ariaLabel="Más opciones" />
+            </div>
+          </form>
+          <p className="mt-1.5 text-xs text-gray-600">{AYUDA_BUSCADOR}</p>
+        </div>
+
+        {hayResultados && (
+          <p className="mt-3 text-xs text-gray-600">
+            {modo === "color"
+              ? "1 artículo"
+              : modo === "varios"
+                ? `${resp!.articulos.length} artículos`
+                : `1 modelo · ${porModelo[0]?.[1].length ?? 0} ${
+                    (porModelo[0]?.[1].length ?? 0) === 1 ? "color" : "colores"
+                  }`}
+          </p>
+        )}
+
+        {resultados}
+      </div>
+    );
+  }
+
 
   return (
     <div>

@@ -26,6 +26,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 
 import { ReferenciaView } from "@/components/referencia/ReferenciaView";
+import { TarjetaArticulo } from "@/components/referencia/ReferenciaTarjeta";
 import { UtilidadView } from "@/components/ventas/UtilidadView";
 import { ComisionesConfiguracionView } from "@/components/comisiones/ComisionesConfiguracionView";
 import { ComisionesConsolidadoView } from "@/components/comisiones/ComisionesConsolidadoView";
@@ -220,11 +221,20 @@ const PROHIBIDOS = [
   "tandas anteriores",
 ];
 
+/**
+ * ⚠️ 25-sep-2026 — SE MONTA LA TARJETA, NO EL BUSCADOR.
+ *
+ * Con `REFERENCIA_2026_09` prendido, buscar UN código dibuja la tarjeta NUEVA
+ * (la del modelo). La tarjeta de estos candados —`TarjetaArticulo`— NO se
+ * borró: es la que sigue abriéndose al tocar una fila del MODO PEDIDO
+ * (`CuerpoArticulo`) y la que vuelve entera si el interruptor se apaga. Así que
+ * lo que cambia acá es POR DÓNDE se llega a ella, no lo que se le exige: cada
+ * texto, cada rótulo y cada número que este archivo protege siguen igual.
+ */
 async function buscar(resp: ComprasApiResp, codigo: string) {
   rutas.push((u) => (u.includes("/api/ventas/referencia?q=") ? resp : undefined));
-  render(<ReferenciaView />);
-  fireEvent.change(screen.getByRole("textbox"), { target: { value: codigo } });
-  fireEvent.click(screen.getAllByRole("button", { name: /Buscar/ })[0]);
+  const art = resp.articulos.find((a) => a.codigo === codigo) ?? resp.articulos[0];
+  render(<TarjetaArticulo art={art} hoyMes={resp.hoyMes} />);
   await screen.findAllByText(codigo);
 }
 
@@ -483,8 +493,9 @@ describe("Referencia · los cuatro grandes y la línea de ritmo", () => {
     render(<ReferenciaView />);
     expect(screen.queryByRole("button", { name: /Varias · pegar lista/ })).toBeNull();
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
-    // 1-sep-2026: el texto de pantalla pasó a tuteo neutro (sin voseo) — candado en `nada-de-voseo.test.ts`.
-    expect(screen.getByText(/Puedes pegar hasta \d+ códigos juntos/)).toBeTruthy();
+    // ⚠️ 25-sep-2026: la ayuda se acortó a UNA línea con el rediseño, y sigue
+    // diciendo lo mismo — que el mismo campo acepta varios códigos pegados.
+    expect(screen.getByText(/pegar varios códigos juntos/)).toBeTruthy();
   });
 
   it("el aviso del ajuste QUEDA en pantalla — es plata que se fue, no metodología", async () => {

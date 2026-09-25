@@ -109,6 +109,13 @@ async function buscarPegado(texto = PEGADO, resp = RESP) {
   await screen.findAllByText("CVM253CR02001");
 }
 
+/** 🔴 Desde el rediseño (`REFERENCIA_2026_09`) las dos acciones viven dentro
+ *  del «···»: hay que abrirlo antes de tocarlas. */
+function tocarAccion(nombre: RegExp) {
+  fireEvent.click(screen.getByRole("button", { name: "Más opciones" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: nombre }));
+}
+
 beforeEach(() => {
   exportSpy.mockClear();
   vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => RESP }) as unknown as Response));
@@ -217,22 +224,26 @@ describe("modo pedido — la tabla", () => {
 
   it("🔴 el Excel baja LA MISMA lista, en el orden pegado", async () => {
     await buscarPegado();
-    fireEvent.click(screen.getAllByRole("button", { name: /Descargar Excel/ })[0]);
+    tocarAccion(/Descargar Excel/);
     expect(exportSpy).toHaveBeenCalledTimes(1);
     const lista = exportSpy.mock.calls[0][0] as ArticuloCompras[];
     expect(lista.map((a) => a.codigo)).toEqual(["ZZZ999001", "AAA111001", "CVM253CR02001"]);
   });
 
-  it("🔴 UN solo código sigue mostrando la tarjeta completa, no la tabla", async () => {
+  it("🔴 UN solo código sigue mostrando la tarjeta completa, no el modo pedido", async () => {
     const resp: ComprasApiResp = { ...RESP, articulos: [articulo("CVM253CR02001")] };
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => resp }) as unknown as Response));
     render(<ReferenciaView />);
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "CVM253CR02001" } });
     fireEvent.click(screen.getAllByRole("button", { name: /Buscar/ })[0]);
     await screen.findAllByText("CVM253CR02001");
-    // Tarjeta: los grandes montados de una; tabla: ni una celda th.
-    expect(screen.getAllByText("en bodega").length).toBeGreaterThan(0);
-    expect(document.querySelector("thead")).toBeNull();
+    // 🔴 Desde el rediseño la tarjeta es la del MODELO (los rótulos del oficio)
+    // y NO sale la tabla de colores: un código completo es UN color.
+    expect(screen.getAllByText("Compré").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("% vendido").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Sus colores/)).toBeNull();
+    // Y sigue sin ser el modo pedido: ninguna columna de esa tabla.
+    expect(screen.queryByText("Últ. compra")).toBeNull();
   });
 
   it("🔴 COMPRÉ · VENDÍ de la fila son de la ÚLTIMA LLEGADA, y dicen lo MISMO que la ficha que se abre debajo", async () => {
@@ -500,7 +511,7 @@ describe("modo pedido — ordenar por columna", () => {
   it("⚠️ el Excel sigue bajando el ORDEN PEGADO aunque la tabla esté ordenada", async () => {
     await buscarPegado();
     fireEvent.click(encabezado("Código"));
-    fireEvent.click(screen.getAllByRole("button", { name: /Excel/ })[0]);
+    tocarAccion(/Descargar Excel/);
     const lista = exportSpy.mock.calls[0][0] as { codigo: string }[];
     expect(lista.map((a) => a.codigo)).toEqual(["ZZZ999001", "AAA111001", "CVM253CR02001"]);
   });

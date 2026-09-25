@@ -66,6 +66,8 @@ import {
   textoMesesCelda,
   textoVendidoCelda,
 } from "@/lib/ventas/resumen-articulo";
+import { REFERENCIA_2026_09, ROTULOS } from "@/lib/ventas/referencia-pantalla";
+import { useEsCelularReferencia } from "./useEsCelularReferencia";
 import { CuerpoArticulo, etiquetaEmpresa, fmtInt, fmtPct } from "./ReferenciaTarjeta";
 
 /** Anchos FIJOS por columna: los segmentos de tabla alrededor del detalle
@@ -155,6 +157,7 @@ export function ReferenciaTablaPedido({
   // Una sola fila abierta a la vez (acordeón): el detalle es la tarjeta entera
   // y dos abiertas a la vez vuelven la tabla una pila de tarjetas otra vez.
   const [abierta, setAbierta] = useState<string | null>(null);
+  const enCelular = useEsCelularReferencia();
   // 🔴 `null` = el ORDEN PEGADO, el default de siempre. El sort es un override.
   const [orden, setOrden] = useState<OrdenPedido>(null);
   const filasSinOrdenar = useMemo(() => articulos.map((a) => armarFila(a, hoyMes)), [articulos, hoyMes]);
@@ -179,6 +182,56 @@ export function ReferenciaTablaPedido({
   segmentos.push({ filas: actual, detalle: null });
 
   return (
+    <>
+      {/* 🔴 EN EL CELULAR, UNA TARJETA POR CÓDIGO (25-sep-2026). Daniel pidió
+          «lo mismo para los dos», y lo mismo es la INFORMACIÓN, no el ancho: a
+          390 px una tabla de 8 columnas hay que arrastrarla de lado para leer
+          el Stock. La tarjeta dice las cuatro cifras que deciden —Compré ·
+          Vendí · Stock · % vendido— y tocarla abre el MISMO detalle. La tabla
+          completa se queda desde `sm`. */}
+      {enCelular && (
+        <section className="mt-4 space-y-2">
+          {filas.map((f) => (
+            <div key={f.clave} className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+              <button
+                type="button"
+                onClick={() => setAbierta(f.clave === abierta ? null : f.clave)}
+                aria-expanded={f.clave === abierta}
+                className="flex min-h-[44px] w-full flex-col gap-1 px-3.5 py-2.5 text-left"
+              >
+                <span className="font-mono text-[13px] font-semibold text-gray-900">{f.art.codigo}</span>
+                <span className="truncate text-xs text-gray-600">
+                  {f.art.descripcion || "—"} · {etiquetaEmpresa(f.art.empresa)}
+                </span>
+                <span className="mt-0.5 flex w-full flex-wrap gap-x-3 gap-y-0.5 text-sm tabular-nums text-gray-900">
+                  <span className="text-gray-600">
+                    {ROTULOS.comprado} <b className="font-semibold text-gray-900">{f.compre}</b>
+                  </span>
+                  <span className="text-gray-600">
+                    {ROTULOS.vendido} <b className="font-semibold text-gray-900">{f.vendi}</b>
+                  </span>
+                  <span className="text-gray-600">
+                    {ROTULOS.stock}{" "}
+                    <b className={`font-semibold ${f.stock === 0 ? "text-red-700" : "text-gray-900"}`}>
+                      {f.stock != null ? fmtInt(f.stock) : "—"}
+                    </b>
+                  </span>
+                  <span className="text-gray-600">
+                    {ROTULOS.pctVendido} <b className="font-semibold text-gray-900">{f.vendido}</b>
+                  </span>
+                </span>
+              </button>
+              {f.clave === abierta && (
+                <div className="border-t border-gray-200 bg-emerald-50/40">
+                  <CuerpoArticulo art={f.art} hoyMes={hoyMes} mostrarMargen={mostrarMargen} />
+                </div>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
+
+    {!enCelular && (
     <section className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white">
       {segmentos.map((seg, si) => (
         <Fragment key={si}>
@@ -262,6 +315,8 @@ export function ReferenciaTablaPedido({
         </Fragment>
       ))}
     </section>
+    )}
+    </>
   );
 }
 
