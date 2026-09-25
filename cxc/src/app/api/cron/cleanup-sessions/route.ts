@@ -66,6 +66,16 @@
 //   La regla de retención (90 días, conservando siempre las 10 últimas de cada
 //   par empresa+tipo y nunca las filas 'running') vive en la función SQL
 //   podar_switch_sync_log, no acá — está explicada en su migración.
+//
+// ── PASO 5 (25-sep-2026): poda de visitas_modulo ───────────────────────────
+//   El registro de visitas por módulo («quién usa qué») guarda 180 días. Se
+//   engancha acá por la MISMA razón que el paso 4: este ya es el cron de
+//   limpieza de base, y agregar una entrada nueva a vercel.json por un DELETE
+//   de dos líneas gastaría uno de los 100 cron jobs del plan por nada.
+//
+//   También es NO FATAL y va SEPARADO de los tres pasos de sesiones: mientras
+//   la migración 20261221120000 no corra, la tabla no existe y el paso se
+//   registra en el log sin tocar `errores` ni el heartbeat.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -74,6 +84,8 @@ import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 import { verifySession } from "@/lib/session-cookie";
 import { cortesDeLimpieza } from "@/lib/session-retention";
 import { barrerRunningAtascados } from "@/lib/switch-api/sync-log";
+import { hoyPanama } from "@/lib/fecha-panama";
+import { DIAS_QUE_SE_GUARDAN, TABLA_VISITAS, diaHaceNDias } from "@/lib/visitas/registro";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -181,6 +193,24 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ── Paso 5: poda del registro de visitas por módulo. NO FATAL (ver cabecera):
+  //    no entra en `errores` ni afecta el heartbeat. Sin la migración
+  //    20261221120000 la tabla no existe y esto no hace nada.
+  let visitasPodadas: number | null = null;
+  {
+    const corte = diaHaceNDias(hoyPanama(new Date(startedAt)), DIAS_QUE_SE_GUARDAN);
+    const { data, error } = await supabaseServer
+      .from(TABLA_VISITAS)
+      .delete()
+      .lt("dia", corte)
+      .select("dia");
+    if (error) {
+      console.error(`[cron/cleanup-sessions] poda ${TABLA_VISITAS} falló (no fatal): ${error.message}`);
+    } else {
+      visitasPodadas = data?.length ?? 0;
+    }
+  }
+
   const durationMs = Date.now() - startedAt;
 
   if (errores.length > 0) {
@@ -200,6 +230,7 @@ export async function GET(req: NextRequest) {
         revocadasPorAntiguedad,
         borradas,
         syncLogPodadas,
+        visitasPodadas,
         candadosSoltados,
         durationMs,
       },
@@ -208,7 +239,7 @@ export async function GET(req: NextRequest) {
   }
 
   console.log(
-    `[cron/cleanup-sessions] ok in ${durationMs}ms — inactividad:${revocadasPorInactividad} antiguedad:${revocadasPorAntiguedad} borradas:${borradas} syncLogPodadas:${syncLogPodadas ?? "n/a"} candadosSoltados:${candadosSoltados ?? "n/a"}`,
+    `[cron/cleanup-sessions] ok in ${durationMs}ms — inactividad:${revocadasPorInactividad} antiguedad:${revocadasPorAntiguedad} borradas:${borradas} syncLogPodadas:${syncLogPodadas ?? "n/a"} visitasPodadas:${visitasPodadas ?? "n/a"} candadosSoltados:${candadosSoltados ?? "n/a"}`,
   );
   await recordCronHeartbeat(CRON_NAME);
   return NextResponse.json({
@@ -217,6 +248,7 @@ export async function GET(req: NextRequest) {
     revocadasPorAntiguedad,
     borradas,
     syncLogPodadas,
+    visitasPodadas,
     candadosSoltados,
     cortes,
     durationMs,
