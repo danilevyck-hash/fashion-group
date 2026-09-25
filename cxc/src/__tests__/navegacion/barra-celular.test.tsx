@@ -38,6 +38,13 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(""),
 }));
 
+// ⚠️ 24-sep-2026, SEGUNDA VUELTA: hoy la franja de arriba NO EXISTE en el
+// celular (`SIN_BARRA_ARRIBA`, §7 del postmortem). Este candado sigue vivo
+// porque esa barra es el RESPALDO: apagar el interruptor nuevo devuelve todo lo
+// que se prueba acá abajo. Por eso el módulo se remeda con
+// `SIN_BARRA_ARRIBA = false` — se está probando la cara apagada, a propósito.
+// Lo de la barra retirada lo protege `sin-barra-arriba.test.tsx`.
+//
 // El interruptor se lee en cada render y en cada corrida del gancho, así que un
 // getter alcanza para probar las dos caras sin duplicar el componente.
 const interruptor = vi.hoisted(() => ({ prendido: true }));
@@ -46,6 +53,9 @@ vi.mock("@/lib/navegacion/barra-celular", async (original) => {
   return {
     ...real,
     get BARRA_QUE_SE_ESCONDE() { return interruptor.prendido; },
+    get SIN_BARRA_ARRIBA() { return false; },
+    hayFranjaEnElCelular: () => true,
+    elLayoutPoneElTitulo: () => false,
     campanaYLupaEnElCelular: () => !interruptor.prendido,
   };
 });

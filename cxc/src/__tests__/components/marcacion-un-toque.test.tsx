@@ -421,13 +421,13 @@ describe("6 · el encabezado dice «Marcación»", () => {
     await waitFor(() => expect(screen.getAllByText("Marcación").length).toBeGreaterThan(0));
     expect(screen.queryAllByLabelText("Notificaciones")).toHaveLength(0);
     expect(screen.queryByLabelText("Buscar")).toBeNull();
-    expect(screen.queryByLabelText("Abrir menú de módulos")).toBeNull();
+    expect(screen.queryByLabelText(/^Abrir menú/)).toBeNull();
   });
 
   it("y a un admin no se le quita nada: la regla es por ROL", async () => {
     sessionStorage.setItem("cxc_role", "admin");
     render(<MarcacionClient inicial={semilla()} />);
-    expect(await screen.findByLabelText("Abrir menú de módulos")).toBeTruthy();
+    expect(await screen.findByLabelText(/^Abrir menú/)).toBeTruthy();
     // La campana sale dos veces (escritorio y celular): las dos se quedan.
     expect(screen.getAllByLabelText("Notificaciones").length).toBeGreaterThan(0);
   });

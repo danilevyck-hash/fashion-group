@@ -584,7 +584,10 @@ describe("10 · la proyección dice sobre cuántos días está hecha", () => {
 
 describe("11 · el encabezado del teléfono, de seis bloques a tres", () => {
   it("«Sincronizado …» y «Actualizar ahora» se van al menú ☰ en el celular", () => {
-    expect(shell).toContain("<AppHeader module=\"Multifashion\" acciones={accionesSync} />");
+    // 24-sep-2026: el encabezado puede llevar además `tituloEnLaPantalla`
+    // (el celular sin barra de arriba). Lo que importa acá es que las acciones
+    // viajen al menú ☰.
+    expect(shell).toMatch(/<AppHeader module="Multifashion" acciones=\{accionesSync\}/);
     // Y en el escritorio se quedan a la vista.
     expect(shell).toContain('<div className="hidden md:block">{accionesSync}</div>');
     const header = leer("src/components/AppHeader.tsx");

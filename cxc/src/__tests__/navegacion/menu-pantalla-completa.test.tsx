@@ -77,7 +77,7 @@ function filasDelMenu(menu: HTMLElement): string[] {
 }
 
 async function abrirElMenu(): Promise<HTMLElement> {
-  fireEvent.click(await screen.findByLabelText("Abrir menú de módulos"));
+  fireEvent.click(await screen.findByLabelText(/^Abrir menú/));
   return (await waitFor(() => {
     const el = document.querySelector("[data-menu-pantalla]");
     if (!el) throw new Error("el menú no se abrió");

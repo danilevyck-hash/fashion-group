@@ -142,7 +142,7 @@ describe("AppHeader · la hoja de abajo en el celular", () => {
 
   it("☰ abre la hoja: pestañas cortas, los módulos del grupo y el de aquí marcado", async () => {
     montarComoAdmin("/asistencia");
-    fireEvent.click(await screen.findByLabelText("Abrir menú de módulos"));
+    fireEvent.click(await screen.findByLabelText(/^Abrir menú/));
 
     const pestanas = await screen.findByRole("tablist", { name: "Grupos de módulos" });
     expect([...pestanas.querySelectorAll("button")].map((b) => b.textContent)).toEqual([
@@ -159,7 +159,7 @@ describe("AppHeader · la hoja de abajo en el celular", () => {
 
   it("la pestaña cambia la lista sin salir de la hoja, y tocar un módulo navega", async () => {
     montarComoAdmin("/asistencia");
-    fireEvent.click(await screen.findByLabelText("Abrir menú de módulos"));
+    fireEvent.click(await screen.findByLabelText(/^Abrir menú/));
     await screen.findByRole("button", { name: "Guías de Despacho" });
 
     fireEvent.click(screen.getByRole("tab", { name: "Ventas" }));
@@ -177,7 +177,7 @@ describe("AppHeader · la hoja de abajo en el celular", () => {
   it("con el interruptor apagado vuelve el cajón lateral de antes", async () => {
     interruptor.prendido = false;
     montarComoAdmin("/asistencia");
-    fireEvent.click(await screen.findByLabelText("Abrir menú de módulos"));
+    fireEvent.click(await screen.findByLabelText(/^Abrir menú/));
 
     await screen.findByLabelText("Cerrar menú");
     // Los TRES grupos como renglones, con su nombre completo, y ninguna pestaña.
