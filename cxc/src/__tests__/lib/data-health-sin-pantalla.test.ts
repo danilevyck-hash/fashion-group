@@ -75,8 +75,11 @@ describe("no queda pantalla de Data Health en ninguna parte", () => {
     expect(src).not.toContain("DataHealthTab");
     expect(src).not.toContain('value="data-health"');
     expect(src).not.toContain("Data Health");
-    // CONTROL: la pantalla de Usuarios sigue entera, con sus dos pestañas.
-    expect(src).toContain('const TABS = ["usuarios", "novedades"] as const');
+    // CONTROL: la pantalla de Usuarios sigue entera y con sus pestañas — hoy
+    // tres, desde que nació «Quién usa qué» el 25-sep-2026. Lo que el candado
+    // exige es que `data-health` NO esté, no cuántas hay.
+    expect(src).toMatch(/const TABS = \["usuarios", "novedades"(, "visitas")?\] as const/);
+    expect(src).not.toContain('"data-health"');
     expect(src).toContain("<NovedadesTab />");
   });
 

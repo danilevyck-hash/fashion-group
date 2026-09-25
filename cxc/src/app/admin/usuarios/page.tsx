@@ -5,10 +5,11 @@ import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, SkeletonTable, EmptyState, ConfirmModal, Avatar, Chip } from "@/components/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users as UsersIcon, Megaphone } from "lucide-react";
+import { Users as UsersIcon, Megaphone, Activity } from "lucide-react";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import VendedorSwitchSection from "./VendedorSwitchSection";
 import NovedadesTab from "./NovedadesTab";
+import VisitasTab from "./VisitasTab";
 import IconButton from "@/components/IconButton";
 import { getDefaultModulesForRole, grupoDeModulo } from "@/lib/modules";
 import { modulosOfrecibles, moduloOfrecible } from "@/lib/modulos-ofrecibles";
@@ -49,7 +50,11 @@ function relativeTime(iso: string): string {
 // sigue llenándose y los críticos siguen avisando por 🔧 SISTEMA. Un
 // `?tab=data-health` guardado cae en Usuarios (no en blanco), y
 // `/admin/data-health` redirige al Inicio en next.config.js.
-const TABS = ["usuarios", "novedades"] as const;
+// «Quién usa qué» (25-sep-2026) es la tercera, también SOLO de admin: quién
+// abrió cada módulo en los últimos 30 días. Daniel, textual: «quién entra a
+// cada módulo lo debes saber tú». Va acá por lo mismo que Novedades — ésta ya
+// es la pantalla admin-only de quién es quién.
+const TABS = ["usuarios", "novedades", "visitas"] as const;
 
 // Misma clase que las pestañas de Ventas y Multifashion. No se inventa un
 // patrón nuevo: subrayado teal, sin píldora, 44px de alto al tacto.
@@ -85,7 +90,7 @@ function UsuariosPageInner() {
   // Un `?tab=` desconocido —o uno que este rol no puede ver— cae en la pestaña
   // por defecto, NUNCA en blanco: Radix no dibuja nada si el `value` no tiene
   // trigger (misma convención que /ventas, /admin y el Depurador).
-  const SOLO_ADMIN: readonly string[] = ["novedades"];
+  const SOLO_ADMIN: readonly string[] = ["novedades", "visitas"];
   const tab = TABS.some((t) => t === tabRaw) && (!SOLO_ADMIN.includes(tabRaw) || esAdmin)
     ? tabRaw
     : "usuarios";
@@ -270,6 +275,12 @@ function UsuariosPageInner() {
             {esAdmin && (
               <TabsTrigger value="novedades" className={TAB_TRIGGER_CLASS}>
                 <Megaphone className="hidden h-3.5 w-3.5 sm:block" /> Novedades
+              </TabsTrigger>
+            )}
+            {/* Quién abre cada módulo — también SOLO de admin. */}
+            {esAdmin && (
+              <TabsTrigger value="visitas" className={TAB_TRIGGER_CLASS}>
+                <Activity className="hidden h-3.5 w-3.5 sm:block" /> Quién usa qué
               </TabsTrigger>
             )}
           </TabsList>
@@ -681,6 +692,12 @@ function UsuariosPageInner() {
           {esAdmin && (
             <TabsContent value="novedades" className="mt-0">
               <NovedadesTab />
+            </TabsContent>
+          )}
+
+          {esAdmin && (
+            <TabsContent value="visitas" className="mt-0">
+              <VisitasTab />
             </TabsContent>
           )}
         </Tabs>

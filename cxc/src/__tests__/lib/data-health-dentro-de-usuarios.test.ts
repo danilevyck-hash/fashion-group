@@ -268,7 +268,8 @@ describe("la pantalla sigue siendo solo de admin", () => {
     expect(src).toContain("!SOLO_ADMIN.includes(tabRaw) || esAdmin");
     expect(src).toContain(': "usuarios"');
     // `data-health` no está en TABS: un marcador viejo cae en Usuarios.
-    expect(src).toMatch(/const TABS = \["usuarios", "novedades"\] as const/);
+    expect(src).toMatch(/const TABS = \["usuarios", "novedades"(, "visitas")?\] as const/);
+    expect(src).not.toContain('"data-health"');
   });
 
   // 🔄 CAMBIO DE DIRECCIÓN (11-sep-2026). Exigía que
