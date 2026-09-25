@@ -218,17 +218,63 @@ export function elLayoutPoneElTitulo(quien: QuienDiceElTitulo): boolean {
   return !quien.tituloEnLaPantalla && !quien.soloMarca;
 }
 
-/** El botón redondo: 56 px de lado a lado, como manda el mockup. */
-export const DIAMETRO_FLOTANTE = 56;
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 TERCERA VUELTA: EL BOTÓN SE HACE MÁS CHICO Y SE METE EN LA ESQUINA
+// (25-sep-2026, la **5b** del mockup de Ventas, y vale para TODO el sistema).
+//
+// 🩸 QUÉ VINO A ARREGLAR, medido el 25-sep-2026 a 390 px y sobre las fotos del
+// iPhone de Daniel:
+//
+//     el botón, de 56 px a 16 del borde ....... ocupa x 318 – 374
+//     los montos de Ventas › Resumen .......... terminan en x 337
+//     la flechita de abrir la fila ............ está en x 345
+//
+// O sea: **19 px del final de TODO monto** y **la flechita entera**. Barriendo
+// la pestaña de 40 en 40 px, en **10 de 16 posiciones** el botón estaba encima
+// de un monto de verdad, incluido **$7.069.116,31, el total del grupo** (su
+// foto IMG_3176: «$1,405,657.9…»). En Clientes tapaba la fecha en **13 de 31**
+// posiciones —39 px de los 79 que mide «24 sept 2026»—, y en Comisiones se
+// sentaba ENTERO sobre la columna COBRO de Configuración (x 298–386) y se
+// comía el total: «TOTAL A PAGAR $5,97…».
+//
+// 🔴 LA CUENTA NUEVA. 44 px de botón a 8 px del borde ocupa **x 338 – 382** en
+// un teléfono de 390: **un píxel después** de donde terminan los montos. Y 44
+// es el piso de lo tocable de la casa (`toque-44`), no un número elegido de
+// gusto: más chico que eso sería un defecto nuevo.
+//
+// 🔑 Y EL COLCHÓN SE VUELVE DOS. Abajo (la última fila) y **a la derecha** (la
+// última fila de la pantalla, y toda barra de total que termine pegada al
+// borde). Son la MISMA cuenta —botón + margen + 4 de aire— escrita una vez.
+//
+// ⚠️ LO QUE CUESTA, DICHO: el botón es 12 px más chico. Sigue pasando el piso
+// de 44 y gana 12 px de monto en las 22 pantallas.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** El botón redondo: 44 px de lado a lado — el piso de lo tocable de la casa. */
+export const DIAMETRO_FLOTANTE = 44;
 
 /** Cuánto lo separa del borde de la pantalla, y de la barra fija si la hay. */
-export const MARGEN_FLOTANTE = 16;
+export const MARGEN_FLOTANTE = 8;
 
 /**
  * El colchón que dejan las listas abajo, para que la última fila no quede
- * debajo del botón. 56 del botón + 16 del margen + 4 de aire = 76.
+ * debajo del botón. 44 del botón + 8 del margen + 4 de aire = 56.
  */
-export const COLCHON_DE_LA_LISTA = 76;
+export const COLCHON_DE_LA_LISTA = DIAMETRO_FLOTANTE + MARGEN_FLOTANTE + 4;
+
+/**
+ * 🔴 EL MISMO COLCHÓN, PERO A LA DERECHA.
+ *
+ * Lo usa toda fila o barra cuyo dato viva pegado al borde derecho —los montos
+ * de una lista, el «Total grupo» de Ventas, la barra negra de «TOTAL A PAGAR»—
+ * y que caiga a la altura del botón. Es el MISMO número que el de abajo: el
+ * botón es redondo y tapa lo mismo en los dos sentidos.
+ *
+ * ⚠️ No se pone en todas las filas del sistema: una lista larga se desliza y
+ * solo la que queda a la altura del botón está en riesgo. Se pone donde el
+ * dato NO se puede mover — un total al pie, una barra fija — y ahí se mide.
+ */
+export const COLCHON_LATERAL_FLOTANTE = COLCHON_DE_LA_LISTA;
 
 /**
  * Nombre de la variable CSS con el alto de la barra fija de abajo.

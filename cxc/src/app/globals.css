@@ -25,12 +25,15 @@
 /* 🔴 LA ÚNICA FORMA DE PEGAR UNA BARRA DE CONTENIDO ARRIBA (11-sep-2026).
    Se pega DEBAJO del encabezado —nunca encima— y con z-index por debajo de él.
    El porqué, la medición y lo que queda afuera: src/lib/ui/barra-pegajosa.ts. */
-/* El colchón del botón redondo flotante del celular (24-sep-2026).
-   56 px del botón + 16 del margen + 4 de aire = 76. La clase la prende y la
-   apaga `useColchonDelFlotante`; en la computadora no hay botón ni colchón. */
+/* El colchón del botón redondo flotante del celular (24-sep-2026; medidas
+   nuevas el 25-sep-2026, la «5b»).
+   44 px del botón + 8 del margen + 4 de aire = 56. La clase la prende y la
+   apaga `useColchonDelFlotante`; en la computadora no hay botón ni colchón.
+   🔑 El número vive en `lib/navegacion/barra-celular.ts`
+   (`COLCHON_DE_LA_LISTA`) y su candado compara los dos. */
 @media (max-width: 639px) {
   body.fg-con-flotante {
-    padding-bottom: 76px;
+    padding-bottom: 56px;
   }
 }
 

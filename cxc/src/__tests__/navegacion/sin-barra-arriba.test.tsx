@@ -167,11 +167,21 @@ describe("la regla, sin montar nada", () => {
     );
   });
 
+  // 🔴 MEDIDAS NUEVAS DEL 25-sep-2026 (la «5b» del mockup de Ventas). Eran
+  // 56 · 16 · 76: el botón ocupaba x 318–374 en un teléfono de 390 y se comía
+  // 19 px del final de TODO monto de Ventas › Resumen (que terminan en x 337)
+  // y la flechita de abrir la fila entera (x 345). Con 44 · 8 · 56 ocupa
+  // x 338–382: un píxel después de donde terminan los montos. 44 sigue siendo
+  // el piso de lo tocable de la casa (`toque-44`).
   it("el colchón de la lista sale de las medidas del botón, no de un número suelto", async () => {
     const r = await regla();
-    expect(r.DIAMETRO_FLOTANTE).toBe(56);
-    expect(r.MARGEN_FLOTANTE).toBe(16);
-    expect(r.COLCHON_DE_LA_LISTA).toBe(76);
+    expect(r.DIAMETRO_FLOTANTE).toBe(44);
+    expect(r.MARGEN_FLOTANTE).toBe(8);
+    expect(r.COLCHON_DE_LA_LISTA).toBe(56);
+    // 🔴 El botón nunca baja del piso de lo tocable.
+    expect(r.DIAMETRO_FLOTANTE).toBeGreaterThanOrEqual(44);
+    // 🔴 El colchón de al lado es el MISMO número: el botón es redondo.
+    expect(r.COLCHON_LATERAL_FLOTANTE).toBe(r.COLCHON_DE_LA_LISTA);
     expect(r.COLCHON_DE_LA_LISTA).toBeGreaterThanOrEqual(
       r.DIAMETRO_FLOTANTE + r.MARGEN_FLOTANTE,
     );
@@ -244,14 +254,18 @@ describe("AppHeader · el celular sin la franja", () => {
     expect(elTitulo()).toBeNull();
   });
 
-  it("el botón redondo está, mide 56 px, y abre el menú entero", async () => {
+  it("el botón redondo está, mide 44 px, y abre el menú entero", async () => {
     montar();
     const boton = await screen.findByLabelText("Abrir menú");
+    const { DIAMETRO_FLOTANTE, MARGEN_FLOTANTE } = await regla();
     expect(boton.getAttribute("data-boton-flotante")).not.toBeNull();
-    expect(boton.style.width).toBe("56px");
-    expect(boton.style.height).toBe("56px");
+    expect(boton.style.width).toBe(`${DIAMETRO_FLOTANTE}px`);
+    expect(boton.style.height).toBe(`${DIAMETRO_FLOTANTE}px`);
     expect(boton.className).toContain("fixed");
-    expect(boton.className).toContain("right-4");
+    // 🔴 La separación del borde SALE DE LA REGLA, no de una clase escrita a
+    // mano: era `right-4` (16 px) y el número vivía en dos lugares.
+    expect(boton.style.right).toBe(`${MARGEN_FLOTANTE}px`);
+    expect(boton.className).not.toContain("right-4");
     expect(boton.className).toContain("rounded-full");
     // Mutación (e): en la computadora no existe.
     expect(boton.className).toContain("sm:hidden");
