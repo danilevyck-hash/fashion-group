@@ -1444,3 +1444,162 @@ Medido en `switch_sync_log` (solo lectura): las 87 tandas «manual» de 6 empres
 - 🔴 **La puerta de atrás se cerró**: las 6 rutas de datos de Ventas son **solo `admin`**; `/api/ventas/v2`, `/v2/status`, `/años`, `/ventas/reporte` y `/api/ventas/resumen-anual` se retiraron; la búsqueda global no le ofrece «Ventas» a contabilidad.
 - ⚠️ **Pendiente de Daniel**: en Clientes › Utilidad el período sigue siendo el año (las dos migraciones, `20261120120000` y `20261121120000`, ya están **aplicada** (verificado contra producción el 14-sep-2026)) (esa ruta no tiene ventanas).
 - Candados: `mes-de-panama-vista-general-y-ventas` · `ventas-selector-periodo-unico` · `ventas-resumen-13-cambios` · `ventas-clientes-desplegable-y-nuevo` · `ventas-clientes-periodo-y-frescura` · `ventas-productos-selector-unico` · `ventas-puerta-cerrada`.
+
+---
+
+## 🔴 Referencia — LA TARJETA DEL MODELO, LOS 3 CARACTERES Y «EL 80 % EN N SEMANAS» (25-sep-2026)
+
+Interruptor único: **`REFERENCIA_2026_09`** (`src/lib/ventas/referencia-pantalla.ts`, hoy `true`).
+`false` = la pantalla de hoy, entera, incluida la regla vieja de agrupado.
+**Nada se escribió en la base**: no hay migración ni una sola fila tocada.
+
+### 1 · 🩸 EL MÓDULO NO TENÍA TARJETA DEL MODELO, Y ES LO QUE DANIEL COMPRA
+
+Buscar `NB2570` dibujaba **26 tarjetas de color** y ninguna del modelo. Para saber cuánto
+llevaba comprado del modelo había que sumar 26 tarjetas a mano. La tarjeta nueva
+(`lib/ventas/referencia-modelo.ts`, puro) es la **suma de sus colores**, con los rótulos del
+oficio que pidió Daniel — **Compré · Vendí · Stock · % vendido**, y «Queda» no vuelve a
+nombrar al stock:
+
+| | Compré | Vendí | Stock | % vendido |
+|---|---:|---:|---:|---:|
+| **NB2570** · Men-Boxer Brief · Vistana · 26 colores | 5.856 | 4.580 | 888 | 84 % |
+
+Debajo, en la misma tarjeta: **Llegadas 27 desde oct 2022** · las **dos últimas llegadas**
+(ago 2026 · 360 · el 80 % en «—» · queda 100 %; nov 2025 · 360 · **21 sem** · vendida) ·
+**FOB $15.05 · Precio prom $26.60 · Margen 38 %** en UNA línea · y el renglón **plano** por
+trimestre (**Ene–Mar 245 · Abr–Jun 112 · Jul–Sep 211 · Oct–Dic 431**, los cuatro últimos
+trimestres COMPLETOS). Todo lo demás —las 27 llegadas con su día, el mes a mes, el precio de
+lista, el CIF y el renglón por trimestre del año anterior— queda detrás de **«Más info ›»**,
+cerrado al abrir.
+
+🔴 **Fuera, porque Daniel los sacó:** cliente principal, hermanos, semáforo, «piezas/mes» y
+«te dura».
+
+Debajo de la tarjeta, **un renglón por COLOR ordenado por STOCK de mayor a menor**
+(001 · 345 → 902 · 343 → 400 · 199 → 923 · 1) y los **22 sin mercancía plegados**. Tocar un
+color abre **la misma tarjeta**, con un solo renglón. Buscar un código COMPLETO
+(`NB2570001`) muestra esa tarjeta sola, titulada con el CÓDIGO y no con el modelo recortado.
+
+⚠️ **El precio promedio del MODELO es $26.60, no $26.71.** El mockup lo había medido contra
+`switch_factura_lineas` sobre otra ventana; el módulo lo calcula como siempre —los 12 meses
+completos de `switch_articulo_diario`, `promedioMensual` + `margenReal`— y ahí da
+**932 u por $24.794,55 = $26.60**. No son dos verdades: es la cuenta que el módulo ya tenía,
+y no se cambió para que coincidiera con el papel.
+
+### 2 · 🔴 AGRUPAR POR MODELO SON LOS ÚLTIMOS 3 CARACTERES, LETRA O NÚMERO
+
+Daniel, textual: *«los últimos 3 dígitos, letra o número, es el color, pasa igual con las
+otras marcas»*. La regla vieja (`modeloDe`) exigía **3 DÍGITOS**, y el color de Tommy lleva
+letras (`MW0MW32346C1R`).
+
+**Medido contra producción el 25-sep-2026** (`switch_articulo_info`, códigos distintos):
+
+| empresa | códigos | modelos HOY (3 dígitos) | modelos NUEVOS (3 caracteres) |
+|---|---:|---:|---:|
+| vistana | 8.309 | 5.335 · agrupa 36 % | **3.490 · agrupa 58 %** |
+| fashion_wear | 5.130 | 4.820 · agrupa 6 % | **2.573 · agrupa 50 %** |
+| fashion_shoes | 731 | 680 · agrupa 7 % | **455 · agrupa 38 %** |
+| active_shoes | 1.763 | 153 · agrupa 91 % | **153 · agrupa 91 %** |
+| active_wear | 597 | 251 · agrupa 58 % | **179 · agrupa 70 %** |
+| joystep | 207 | 207 · agrupa 0 % | **62 · agrupa 70 %** |
+
+🔑 **Reebok no se mueve ni un modelo**: sus códigos ya terminan en 3 dígitos.
+
+⚠️ **Joybees se midió aparte, porque sus códigos son `PZ3PK.JOY.COOL` / `UKVCG.FPE-KIDS`.**
+Con la regla nueva pasa de 0 % a 70 % de agrupado y **no junta dos modelos distintos**: los
+26 grupos con más de una descripción son colecciones del MISMO empaque (`POPINZ 3 PACK HAZY
+MAGIC` con `POPINZ 3 PACK HALLOWEEN COLLECTION`). O sea que **agrupa de menos, nunca de más**
+— y por eso **NO se le escribió una regla propia por empresa**: una excepción por marca sería
+una segunda definición de «modelo» que después habría que mantener en dos lados.
+
+Un código de **3 caracteres o menos no se parte** (sería un modelo vacío), igual que antes.
+
+### 3 · 🔴 «EL 80 % SE VENDIÓ EN N SEMANAS» ES UNA LECTURA APARTE, Y SE DICE «APROX.»
+
+`lib/ventas/referencia-llegadas.ts`, puro. **No cambia ni un número del módulo**: Compré,
+Vendí, Stock, el cuadre y los avisos de descuadre salen de `compras.ts` y no se tocan.
+
+🔑 **Convive con «Nada de FIFO»** (la regla del módulo desde el 11-ago-2026). Lo prohibido es
+atribuirle a UNA venta la compra de la que salió — eso exigiría que alguien marcara las
+cajas, y nadie las marca. Acá no se atribuye ninguna venta a ninguna llegada: se mira la
+bodega como una **FILA** (lo que llegó primero sale primero) y se pregunta cuándo el consumo
+acumulado pasó por el 80 % del tramo que esa llegada ocupa. Es una aproximación **declarada**:
+la pantalla escribe *«El 80 % es aprox.: se vende primero lo que llegó primero, y las cajas
+no vienen marcadas.»*
+
+La regla, entera:
+
+1. `stockPrevio = max(0, comprado − stock − vendido)` — lo que había en bodega antes de la
+   primera llegada registrada (los ingresos arrancan en oct-2022). Sin él, la fila arranca
+   corrida y **ninguna** llegada cuadra.
+2. Consumo acumulado al día D = `stockPrevio` + ventas netas hasta D.
+3. La llegada *i* ocupa el tramo `[antes, antes + piezas)`; su 80 % está en
+   `antes + 0,8 × piezas`.
+4. `semanas` = semanas entre la fecha de la llegada y el PRIMER día (≥ esa fecha) en que el
+   consumo pasó ese punto. Si nunca lo pasó → `null`, y la pantalla escribe **«—»**.
+5. `quedaPct` = cuánto del tramo sigue sin consumirse con el consumo de hoy. 0 % = **vendida**.
+
+🔴 **La «anterior» que se muestra al lado no es la de antes a secas: es la última que SÍ
+completó su 80 %.** Un «—» al lado de otro «—» no dice nada; la que sirve de vara es la que
+se vendió.
+
+🩸 **Las llegadas del MODELO se vuelven a juntar POR DÍA.** El 4-ago-2026 llegaron 120 del
+color 400 y 240 del 902: para el modelo eso es **UNA** llegada de 360, no dos. Sin volver a
+juntarlas, NB2570 pasaba de 27 llegadas a **52** y la de nov-2025 medía **26 semanas en vez
+de 21** — los tramos de la fila quedaban partidos.
+
+**Medido (vistana, `NB2570`, 25-sep-2026):**
+
+| | comprado | vendido | stock | stockPrevio | última llegada | la que sirve de vara |
+|---|---:|---:|---:|---:|---|---|
+| MODELO NB2570 | 5.856 | 4.580 | 888 | 388 | ago 2026 · 360 · **«—» · queda 100 %** | nov 2025 · 360 · **21 sem** |
+| COLOR NB2570001 | 935 | 552 | 345 | 38 | feb 2026 · 180 · **«—» · queda 100 %** | abr 2025 · 240 · **52 sem** |
+
+Y en la tabla de colores: 902 → ant. **18 sem**, 400 → ant. **41 sem**. El color **923** va
+con guion en «Compré»: no tiene ninguna llegada en la base (entró antes de oct-2022).
+
+### 4 · La pantalla vacía, el buscador y el celular
+
+El buscador se acortó (placeholder **«Código o modelo»**, lupa DENTRO de la caja, UNA línea
+de ayuda) y se pega debajo del encabezado con `CLASE_BARRA_PEGAJOSA` — la única forma de
+pegar una barra de contenido en este repo. **«Actualizar datos de Switch» y «Descargar
+Excel» se mudaron al «···»**: ahí no se esconden, se **apagan** mientras no haya resultados.
+
+🔴 **La misma vista en el celular y en la computadora** (Daniel: *«lo mismo para los dos»*).
+La única diferencia es el **modo pedido** (varios códigos pegados): hasta `sm` sale una
+**tarjeta por código** con Compré · Vendí · Stock · % vendido y el mismo detalle al tocarla;
+desde `sm`, la tabla completa de siempre. Se monta **un solo árbol**
+(`useEsCelularReferencia`, el mismo patrón de Ventas): con los dos dibujados a la vez cada
+código saldría dos veces en el documento.
+
+### 5 · 🔴 NINGÚN NÚMERO CAMBIA DE CUENTA
+
+`NB2570001` da **935 · 552 · 345 · 62 % · FOB $15.05 · margen 39 %** por el camino VIEJO
+(`armarFicha`, el que dibuja la pantalla con el interruptor apagado) **y** por el nuevo
+(`armarTarjetaModelo`) — el candado compara los dos, campo por campo, incluido el precio
+promedio y el CIF. El **Excel de Referencia no cambió de forma** (`referencia-excel.ts`, sin
+tocar). El payload creció en DOS campos (`llegadas` y `ventasDia`) y **solo en la búsqueda de
+UN código**: con 50 códigos pegados sería carga que nadie mira.
+
+### Los candados
+
+- `src/__tests__/ventas/referencia-2026-09.test.tsx` — 19 pruebas: la tarjeta del modelo con
+  datos REALES de NB2570, los rótulos, los colores por stock, los 22 plegados, «Más info»
+  cerrado, el buscador y las acciones en el «···», y la igualdad prendido/apagado.
+- `src/__tests__/ventas/referencia-modelo-3-caracteres.test.ts` — Tommy agrupa, Reebok no se
+  mueve, Joybees no junta dos empaques distintos, y la medición queda escrita en el módulo.
+- `src/__tests__/ventas/referencia-llegadas-80.test.ts` — los cuatro números de arriba, más
+  `stockPrevio` y las semanas sin husos.
+- Fixture de producción: `src/__tests__/fixtures/referencia-nb2570.json` (54 líneas de
+  ingreso, 363 renglones de venta, 26 colores).
+
+### Lo que se movió de CLAUDE.md el mismo día
+
+Para que las tres reglas nuevas cupieran bajo el tope de 130.000 caracteres, **doce reglas de
+Comisiones se podaron de `CLAUDE.md`** y siguen **VIGENTES**: viven verbatim en este mismo
+archivo, en «Lo que decía CLAUDE.md hasta el 22-sep-2026» — el canónico de vendedor (una
+persona, una fila, una tasa), los retirados, la columna «activo», `nombreVendedorEnPantalla`,
+las fechas del descuento y su administración, el mes con el que abre, el mes negativo, las
+exclusiones por cliente (VENTA vs COBRO, D-108 con comodín `*`) y «Todo el año» como suma de
+sus meses.
