@@ -105,8 +105,18 @@ describe("🔴 esto es para MIRAR, no para FIRMAR", () => {
     expect(papel).toContain("<img src={g.firma_base64}");
     expect(papel).toContain("<img src={g.firma_entregador_base64}");
     const pdf = leer("src/lib/guias/pdf-guia.ts");
-    expect(pdf).toContain("firma: g.firma_base64,");
-    expect(pdf).toContain("firma: g.firma_entregador_base64,");
+    // 🔄 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026, NO SE AFLOJÓ. Pedía ver
+    // `firma: g.firma_base64,` y `firma: g.firma_entregador_base64,` pegados a
+    // su caja — o sea, fijaba justo el CRUCE que Daniel pidió arreglar: en
+    // transportista externo la firma del transportista salía bajo «Despachado
+    // por» y la de quien despacha bajo «Recibido Conforme — Transportista».
+    // Ahora quién va en qué caja lo decide `firmasDelPapel` (módulo puro
+    // `papel-2026-09.ts`, con su medición), y lo que este candado sigue
+    // vigilando es lo de siempre: que el PDF dibuje LAS DOS, enteras, y que la
+    // expresión que las dibuja no se pueda apagar sin que se note.
+    expect(pdf).toContain("firmasDelPapel(g)");
+    expect(pdf).toContain("firma: firmas.izquierda,");
+    expect(pdf).toContain("firma: firmas.derecha,");
     const png = leer("src/lib/guias/png-guia.ts");
     expect(png).toContain("g.firma_base64,");
     expect(png).toContain("g.firma_entregador_base64,");

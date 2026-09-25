@@ -49,6 +49,26 @@ import {
   sinCeroPelado,
   tipoDespachoEfectivo,
 } from "@/lib/guias/modo-despacho";
+// 🔴 EL PAPEL NUEVO (24-sep-2026) VIVE EN UN MÓDULO PURO, y este archivo solo
+// lo APLICA: el título, los rótulos, el orden de los renglones por cliente, qué
+// firma va en qué caja y dónde cae el pie legal se deciden allá, detrás del
+// interruptor `GUIA_PAPEL_2026_09`. Escribir esas reglas acá adentro sería
+// dejarlas donde no se pueden probar solas ni apagar de un lugar.
+import {
+  AIRE_ANTES_DE_FIRMAS_MM,
+  GUIA_PAPEL_2026_09,
+  PIE_LEGAL_Y,
+  TOPE_HOJA_NUEVA_MM,
+  cabenLasFirmas,
+  firmasDelPapel,
+  renglonesDelPapel,
+  rotuloColumnaNumeroTransp,
+  rotuloDestino,
+  rotuloNumeroGuia,
+  rotuloNumeroTransp,
+  seDibujaLaFilaTipo,
+  tituloDelPapel,
+} from "@/lib/guias/papel-2026-09";
 
 const PAGE_W = 216; // Letter
 const MARGIN = 15;
@@ -187,11 +207,14 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
   }
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
-  doc.text("GUÍA DE TRANSPORTE INTERIOR", PAGE_W / 2, 19, { align: "center" });
+  // 🔴 EL TÍTULO DICE DE QUÉ GUÍA SE TRATA: «GUÍA DE TRANSPORTE EXTERNO» o
+  // «GUÍA DE ENTREGA DIRECTA». Decía «INTERIOR» en las dos, que no distinguía
+  // nada y por eso hacía falta además la fila «TIPO».
+  doc.text(tituloDelPapel(g), PAGE_W / 2, 19, { align: "center" });
 
   // ── Datos de la guía ──────────────────────────────────────────────────────
   const campos: Array<[string, string]> = [
-    ["N GUÍA:", fmtGuia(g.numero)],
+    [rotuloNumeroGuia(), fmtGuia(g.numero)],
     ["FECHA:", fmtDate(g.fecha)],
     ["TRANSPORTISTA:", g.transportista ?? ""],
   ];
@@ -199,11 +222,14 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
   // "0" no es una placa: es lo que alguien tecleó para pasar la validación.
   if (!esDirecta) campos.push(["PLACA / VEHÍCULO:", sinCeroPelado(g.placa)]);
   campos.push(["DESPACHADO POR:", nombreDespachadoPor(g.entregado_por)]);
-  campos.push(["TIPO:", ETIQUETA_TIPO_DESPACHO[tipoDespachoEfectivo(g)]]);
+  // La fila «TIPO» se retira con el papel nuevo: lo dice el título.
+  if (seDibujaLaFilaTipo()) {
+    campos.push(["TIPO:", ETIQUETA_TIPO_DESPACHO[tipoDespachoEfectivo(g)]]);
+  }
   // ⚠️ Solo se anuncia arriba cuando hay UN número en toda la guía; con varios
   // por línea, un encabezado con uno de ellos mentiría. Ver `PrintDocument`.
   const transpUnico = numeroTranspUnicoImpreso(items, g.numero_guia_transp);
-  if (!esDirecta && transpUnico) campos.push(["N GUÍA TRANSP.:", transpUnico]);
+  if (!esDirecta && transpUnico) campos.push([rotuloNumeroTransp(), transpUnico]);
   if (esDirecta && g.nombre_chofer) campos.push(["CHOFER:", g.nombre_chofer]);
 
   let y = bloqueCampos(doc, campos, 32);
@@ -212,16 +238,22 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
   doc.line(MARGIN, y - 2, PAGE_W - MARGIN, y - 2);
 
   // ── Detalle ───────────────────────────────────────────────────────────────
+  // 🔴 LOS RENGLONES DEL MISMO CLIENTE VAN JUNTOS, y el nombre se repite en
+  // TODOS (Daniel: *«que se repita para que no haya confusión»*). El orden y la
+  // marca de "primero de su cliente" las decide `renglonesDelPapel`; acá solo
+  // se dibujan. La numeración `#` es 1..N sobre el orden NUEVO, y el total de
+  // bultos no se toca: se suma sobre los mismos renglones.
+  const renglones = renglonesDelPapel(items);
   autoTable(doc, {
     startY: y + 2,
     margin: { left: MARGIN, right: MARGIN },
     head: [
       esDirecta
-        ? ["#", "CLIENTE", "DIRECCIÓN", "EMPRESA", "FACTURA(S)", "BULTOS"]
-        : ["#", "CLIENTE", "DIRECCIÓN", "EMPRESA", "FACTURA(S)", "BULTOS", "N GUÍA TRANSP."],
+        ? ["#", "CLIENTE", rotuloDestino(), "EMPRESA", "FACTURA(S)", "BULTOS"]
+        : ["#", "CLIENTE", rotuloDestino(), "EMPRESA", "FACTURA(S)", "BULTOS", rotuloColumnaNumeroTransp()],
     ],
     body: [
-      ...items.map((it, i) => {
+      ...renglones.map(({ item: it }, i) => {
         const fila = [
           String(i + 1),
           it.cliente ?? "",
@@ -250,6 +282,20 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
           5: { cellWidth: 13, halign: "center" },
           6: { cellWidth: 24 },
         },
+    // 🔴 UNA RAYA GRIS FINA ENTRE CLIENTES. No es una fila vacía inventada —eso
+    // le sumaría un renglón a un documento que se cuenta— sino un trazo sobre
+    // el borde superior de la primera fila de cada grupo, salvo la primera de
+    // toda la tabla, que ya la separa el encabezado.
+    didDrawCell: (data) => {
+      if (!GUIA_PAPEL_2026_09) return;
+      if (data.section !== "body" || data.column.index !== 0) return;
+      if (data.row.index === 0) return;
+      if (!renglones[data.row.index]?.primeroDeSuGrupo) return;
+      doc.setDrawColor(140);
+      doc.setLineWidth(0.4);
+      doc.line(MARGIN, data.cell.y, PAGE_W - MARGIN, data.cell.y);
+      doc.setLineWidth(0.1);
+    },
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -268,14 +314,31 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
   doc.setDrawColor(180);
   doc.rect(MARGIN, y + 2, ANCHO, altoObs);
   if (textoObs) doc.text(obs, MARGIN + 2, y + 7);
-  y += altoObs + 14;
+  // 🔴 LAS FIRMAS QUEDAN PEGADAS DEBAJO DE OBSERVACIONES, y el pie legal al pie
+  // de la hoja. Antes las firmas caían donde terminara la tabla y el pie estaba
+  // clavado en `y = 250`: en una guía corta quedaba un hueco enorme entre las
+  // dos cosas, y en una larga la tabla se les venía encima.
+  y += altoObs + (GUIA_PAPEL_2026_09 ? AIRE_ANTES_DE_FIRMAS_MM : 14);
+
+  // 🔴 CON VARIAS HOJAS, LAS FIRMAS Y EL PIE LEGAL VAN EN LA ÚLTIMA. `autoTable`
+  // pagina solo y deja el documento en la última hoja que dibujó; si lo que
+  // queda de esa hoja no alcanza para el bloque de firmas, se abre una.
+  if (GUIA_PAPEL_2026_09 && !cabenLasFirmas(y)) {
+    doc.addPage();
+    y = TOPE_HOJA_NUEVA_MM;
+  }
 
   // ── Firmas ────────────────────────────────────────────────────────────────
+  // 🔴 CADA FIRMA BAJO SU RÓTULO. En transportista externo salían cruzadas —la
+  // del transportista bajo «Despachado por» y la de quien despacha bajo
+  // «Recibido Conforme — Transportista»—; en entrega directa estaban bien y no
+  // se mueven. La regla y su medición viven en `papel-2026-09.ts`.
+  const firmas = firmasDelPapel(g);
   const colW = ANCHO / 2 - 6;
   bloqueFirma(doc, MARGIN, y, colW, {
     titulo: esDirecta ? "Chofer" : "Despachado por",
     nombre: esDirecta ? (g.nombre_chofer ?? "") : nombreDespachadoPor(g.entregado_por),
-    firma: g.firma_base64,
+    firma: firmas.izquierda,
     pie: "Nombre y firma",
   });
   bloqueFirma(doc, MARGIN + ANCHO / 2 + 6, y, colW, {
@@ -283,12 +346,12 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
     nombre: g.receptor_nombre ?? "",
     // Con guiones al imprimirla; lo guardado no se toca.
     cedula: cedulaParaMostrar(g.cedula),
-    firma: g.firma_entregador_base64,
+    firma: firmas.derecha,
     pie: "Nombre, cédula y firma",
   });
 
   // ── Pie legal ─────────────────────────────────────────────────────────────
-  const pieY = 250;
+  const pieY = GUIA_PAPEL_2026_09 ? PIE_LEGAL_Y : 250;
   doc.setDrawColor(220);
   doc.line(MARGIN, pieY, PAGE_W - MARGIN, pieY);
   doc.setFontSize(6.5);

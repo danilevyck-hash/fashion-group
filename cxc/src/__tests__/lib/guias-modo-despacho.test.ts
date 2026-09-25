@@ -36,6 +36,13 @@ import {
   tipoDespachoDeModo,
   tipoDespachoEfectivo,
 } from "@/lib/guias/modo-despacho";
+// 🔄 24-sep-2026: con el papel nuevo el TÍTULO es el que dice de qué guía se
+// trata («GUÍA DE TRANSPORTE EXTERNO» · «GUÍA DE ENTREGA DIRECTA») y la fila
+// «TIPO:» se retiró de la hoja. El candado sigue exigiendo lo MISMO —que una
+// guía con transportista externo no se comparta como entrega directa ni al
+// revés—; lo que cambia es dónde lo dice el papel. Se lee del módulo, nunca de
+// un texto escrito a mano acá.
+import { TITULO_DIRECTA, TITULO_EXTERNO, tituloDelPapel } from "@/lib/guias/papel-2026-09";
 
 const leer = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 const sinComentarios = (s: string) =>
@@ -224,6 +231,10 @@ describe("🔴 EL PDF QUE SE COMPARTE, generado de verdad", () => {
     const t = texto(BASE);
     expect(t).toContain("Entrega directa");
     expect(t).not.toContain("Transportista externo");
+    // Y el título del papel la nombra por lo que es.
+    expect(tituloDelPapel(BASE)).toBe(TITULO_DIRECTA);
+    expect(t).toContain(TITULO_DIRECTA);
+    expect(t).not.toContain(TITULO_EXTERNO);
   });
 
   it("…ni con la placa en cero: no lleva placa", () => {
@@ -242,15 +253,18 @@ describe("🔴 EL PDF QUE SE COMPARTE, generado de verdad", () => {
       numero_guia_transp: "TR-900",
       guia_items: [{ ...BASE.guia_items[0], numero_guia_transp: "TR-900" }],
     });
-    expect(t).toContain("Transportista externo");
+    expect(t).toContain(TITULO_EXTERNO);
+    expect(t).not.toContain(TITULO_DIRECTA);
     expect(t).toContain("PLACA");
     expect(t).toContain("EK0700");
     expect(t).toContain("TR-900");
   });
 
   it("⚠️ una guía YA despachada con transportista externo no se reinterpreta", () => {
-    const t = texto({ ...BASE, estado: "Completada", placa: "DG7115", numero_guia_transp: "TR-4471" });
-    expect(t).toContain("Transportista externo");
+    const g = { ...BASE, estado: "Completada", placa: "DG7115", numero_guia_transp: "TR-4471" };
+    const t = texto(g);
+    expect(tituloDelPapel(g)).toBe(TITULO_EXTERNO);
+    expect(t).toContain(TITULO_EXTERNO);
     expect(t).toContain("DG7115");
   });
 });

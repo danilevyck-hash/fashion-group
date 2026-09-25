@@ -31,6 +31,11 @@ import { render, screen, cleanup } from "@testing-library/react";
 import { readFileSync } from "fs";
 import path from "path";
 import PrintDocument from "@/app/guias/components/PrintDocument";
+// 🔄 24-sep-2026 — el papel nuevo (`GUIA_PAPEL_2026_09`) cambió el título, el
+// rótulo de la columna de destino y los «N°». Los rótulos se leen del módulo,
+// nunca escritos a mano acá: si mañana se apaga el interruptor, este candado
+// sigue midiendo lo que el papel realmente dice.
+import { rotuloDestino, tituloDelPapel } from "@/lib/guias/papel-2026-09";
 import { construirPdfGuia } from "@/lib/guias/pdf-guia";
 import {
   casillaEnBlanco,
@@ -196,25 +201,47 @@ describe("🔴 los DOS papeles de la guía están escritos con acentos", () => {
     const cadenas = cadenasDelPdf(construirPdfGuia(GUIA).output("arraybuffer"));
     expect(cadenas.length).toBeGreaterThan(10);
     expect(cadenas.filter((c) => c.includes(NUL))).toEqual([]);
-    expect(cadenas.join("\n")).toContain("GUÍA DE TRANSPORTE INTERIOR");
+    expect(cadenas.join("\n")).toContain(tituloDelPapel(GUIA));
   });
 
-  it("los dos papeles dicen LO MISMO, palabra por palabra, en sus rótulos", () => {
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026, NO SE AFLOJÓ.
+  //
+  // El PDF estrenó el papel nuevo (`GUIA_PAPEL_2026_09`): el título dice de qué
+  // guía se trata, la columna se llama «DESTINO» y los números llevan «N°». La
+  // hoja HTML (`PrintDocument.tsx`) NO se tocó —no comparte el dibujo con el
+  // PDF, y cambiarla rompía candados de otro encargo—, así que hoy los dos
+  // papeles se separan EN ESOS TRES RÓTULOS y en ningún otro.
+  //
+  // ⚠️ Esa separación es una DECISIÓN PENDIENTE de Daniel, no un olvido: lo que
+  // se imprime y lo que se comparte salen los dos del PDF, y la hoja HTML es la
+  // vista previa en pantalla. Este candado la deja ESCRITA para que no crezca.
+  it("los dos papeles dicen LO MISMO en todo lo que NO cambió el papel nuevo", () => {
     const hoja = textoDeLaHoja();
     const pdf = textoDelPdf();
     for (const rotulo of [
-      "DIRECCIÓN", "FACTURA(S)", "BULTOS", "CLIENTE", "EMPRESA",
-      "PLACA / VEHÍCULO:", "N GUÍA:", "N GUÍA TRANSP.", "CÉDULA:",
+      "FACTURA(S)", "BULTOS", "CLIENTE", "EMPRESA", "PLACA / VEHÍCULO:", "CÉDULA:",
     ]) {
       expect(hoja, `la hoja no dice «${rotulo}»`).toContain(rotulo);
       expect(pdf, `el PDF no dice «${rotulo}»`).toContain(rotulo);
     }
-    // El título y las observaciones cambian de caja entre los dos papeles
-    // (la hoja lo pone en mayúsculas con CSS), así que se comparan en minúscula.
-    expect(hoja.toLowerCase()).toContain("guía de transporte interior");
-    expect(pdf.toLowerCase()).toContain("guía de transporte interior");
     expect(hoja.toLowerCase()).toContain("observaciones generales del envío");
     expect(pdf.toLowerCase()).toContain("observaciones generales del envío");
+  });
+
+  it("⚠️ lo que el papel nuevo SÍ separó, y nada más que eso", () => {
+    const hoja = textoDeLaHoja();
+    const pdf = textoDelPdf();
+    // La columna del destino.
+    expect(hoja).toContain("DIRECCIÓN");
+    expect(pdf).toContain(rotuloDestino());
+    // El título.
+    expect(hoja.toLowerCase()).toContain("guía de transporte interior");
+    expect(pdf).toContain(tituloDelPapel(GUIA));
+    // Los números: la hoja sigue con «N GUÍA», el PDF con «N° GUÍA».
+    expect(hoja).toContain("N GUÍA:");
+    expect(hoja).toContain("N GUÍA TRANSP.");
+    expect(pdf).toContain("GUÍA:");
+    expect(pdf).toContain("GUÍA TRANSP.");
   });
 });
 

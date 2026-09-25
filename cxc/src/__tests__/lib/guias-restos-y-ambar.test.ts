@@ -205,10 +205,18 @@ describe("🔴 8 · los restos muertos: sin lectores, y la columna NO se dropea"
   it("⚠️ CONTROL — las DOS firmas que SÍ se usan no se tocaron", () => {
     // Están llenas en el 70% de las guías y son lo que el papel imprime. El
     // parecido de los nombres con `firma_transportista` es la trampa.
+    //
+    // 🔄 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026, NO SE AFLOJÓ. El PDF ya no nombra
+    // las dos columnas: desde el papel nuevo pregunta `firmasDelPapel(g)`, el
+    // módulo puro que decide en qué caja va cada firma (en transportista
+    // externo salían cruzadas). Las columnas siguen VIVAS y siguen dibujándose
+    // enteras — solo se mira el archivo donde hoy se nombran.
+    const papelDeLasFirmas = leer("src/lib/guias/papel-2026-09.ts");
     for (const viva of ["firma_base64", "firma_entregador_base64"]) {
       expect(leer("src/app/api/guias/[id]/route.ts")).toContain(viva);
-      expect(leer("src/lib/guias/pdf-guia.ts")).toContain(viva);
+      expect(papelDeLasFirmas).toContain(viva);
     }
+    expect(leer("src/lib/guias/pdf-guia.ts")).toContain("firmasDelPapel(g)");
   });
 });
 

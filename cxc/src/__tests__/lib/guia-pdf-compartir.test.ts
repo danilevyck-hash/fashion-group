@@ -36,6 +36,15 @@ const hoja = sinComentarios(
   readFileSync(path.join(raiz, "src/app/guias/components/PrintDocument.tsx"), "utf8"),
 );
 const pdf = sinComentarios(readFileSync(path.join(raiz, "src/lib/guias/pdf-guia.ts"), "utf8"));
+// 🔄 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026, NO SE AFLOJÓ. Desde el papel nuevo
+// (`GUIA_PAPEL_2026_09`) hay campos de la guía que el PDF sigue dibujando pero
+// a través del módulo puro que decide DÓNDE va cada uno —las dos firmas, que en
+// transportista externo salían cruzadas de caja—. El barrido mira los DOS
+// archivos: lo que vigila es que al PDF no se le pierda un campo que la hoja
+// pinta, no por cuál de los dos archivos pasa.
+const papelNuevo = sinComentarios(
+  readFileSync(path.join(raiz, "src/lib/guias/papel-2026-09.ts"), "utf8"),
+);
 const detalle = readFileSync(path.join(raiz, "src/app/guias/components/GuiaDetail.tsx"), "utf8");
 const compartir = readFileSync(path.join(raiz, "src/lib/compartir-archivo.ts"), "utf8");
 
@@ -75,14 +84,18 @@ describe("🔴 el PDF no se puede separar del papel", () => {
     const campos = [...new Set([...hoja.matchAll(/\bg\.([a-z_][a-z0-9_]*)/gi)].map((m) => m[1]))]
       .filter((c) => !IGNORAR.has(c));
     expect(campos.length).toBeGreaterThan(8); // que el regex no se haya quedado mudo
-    const faltantes = campos.filter((c) => !pdf.includes(`.${c}`));
+    const faltantes = campos.filter(
+      (c) => !pdf.includes(`.${c}`) && !papelNuevo.includes(`.${c}`),
+    );
     expect(faltantes, `campos en la hoja que el PDF no dibuja: ${faltantes.join(", ")}`).toEqual([]);
   });
 
   it("toda columna de la tabla está también en el PDF", () => {
     const cols = [...new Set([...hoja.matchAll(/\bitem\.([a-z_][a-z0-9_]*)/gi)].map((m) => m[1]))];
     expect(cols).toContain("bultos");
-    expect(cols.filter((c) => !pdf.includes(`.${c}`))).toEqual([]);
+    expect(
+      cols.filter((c) => !pdf.includes(`.${c}`) && !papelNuevo.includes(`.${c}`)),
+    ).toEqual([]);
   });
 
   it("el texto legal es EL MISMO, palabra por palabra", () => {
