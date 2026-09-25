@@ -1,12 +1,28 @@
 "use client";
 
 /* ─────────────────────────────────────────────────────────────────────────────
- * LA PESTAÑA «MARCACIONES» — LO QUE MANDÓ EL TELÉFONO, TAL CUAL (25-sep-2026).
+ * LA PESTAÑA «MARCACIONES» — AGRUPADA POR DÍA (25-sep-2026).
+ *
+ * Daniel, sobre el mockup: *«hazlo minimalista, user friendly; ya sabes que
+ * tienes que usar scroll down en vez de chips con cada persona»*.
+ *
+ * 🩸 LO QUE HABÍA: dos filas de chips —uno por colaborador y otro por día— y
+ * una tabla de seis columnas SIN columna de fecha. **37 renglones sueltos** de
+ * cinco personas y cuatro días, mezclados; para saber de qué día era cada uno
+ * había que tocar un chip. En el celular, cuatro filas de botones antes de la
+ * primera hora.
+ *
+ * 🔴 HOY: el DÍA es el encabezado y dentro va UNA fila por colaborador con sus
+ * marcas en orden —«Entrada 08:59 · Almuerzo 18:01 – 18:01 · Salida 18:01»—.
+ * De 37 renglones sueltos a 17 bajo cuatro días. Arriba quedan dos cosas: el
+ * período y «Colaborador: todos ▾». **No hay filtro de empresa** —eso lo manda
+ * el selector del módulo, arriba a la derecha— **ni de día**: el día se baja
+ * con la rueda.
  *
  * 🔴 SOLO LA VE `admin`, Y NO ES UNA DECISIÓN DE PANTALLA. Cada marca trae una
- * foto del LUGAR y una ubicación: dónde estuvo una persona. La lista
- * de roles es UNA (`MARCACIONES_ROLES`) y la leen esta pantalla y la ruta;
- * esconder una pestaña nunca cerró nada.
+ * foto del LUGAR y una ubicación: dónde estuvo una persona. La lista de roles
+ * es UNA (`MARCACIONES_ROLES`) y la leen esta pantalla y la ruta; esconder una
+ * pestaña nunca cerró nada.
  *
  * 🔴 SOLO SE MIRA. Ni un botón que edite, corrija, borre o justifique. La
  * marcación no se edita ni se borra —ni la del reloj ni la del teléfono—: la
@@ -14,20 +30,10 @@
  * Hay barrido que pone el build ROJO si aquí aparece un POST, PUT, PATCH o
  * DELETE.
  *
- * ── LAS DOS PANTALLAS ───────────────────────────────────────────────────────
+ * ⚠️ El interruptor `MARCACIONES_POR_DIA` en `false` devuelve la pantalla de
+ * chips ENTERA (`marcaciones/PantallaDeAntes.tsx`), sin tocar una línea.
  *
- * 🔴 CELULAR (opción 2b, la que eligió Daniel): una TARJETA por colaborador y
- * por día, con sus marcas en orden. El lugar se escribe UNA sola vez cuando
- * todas cayeron en el mismo sitio; con una distinta, cada marca lleva el suyo —
- * que es justamente el día que hay que mirar.
- *
- * 🔴 COMPUTADORA: una tabla de seis columnas —Hora · Colaborador · Marca ·
- * Lugar · Llegó · Aparato—, filtrable por colaborador y por día, con el pie
- * común de la casa («13 marcas de 20»): o el total sigue al filtro, o no hay
- * filtro.
- *
- * El aparato se reconoce POR EL DEDO (`aparatoDeQuienMira`), nunca por el
- * nombre; y toda la regla vive en `marcaciones/logica.ts`, que es puro.
+ * Toda la regla vive en `lib/asistencia/marcaciones-por-dia.ts`, que es puro.
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -37,85 +43,78 @@ import { useUrlState } from "@/lib/hooks/useUrlState";
 import { aparatoDeQuienMira } from "@/lib/aparato";
 import { empresaParaPedir } from "@/lib/asistencia/empresa-para-todo";
 import { textoDelPie } from "@/lib/ui/pie-de-lista";
-import { diaPanamaDe, horaAmPm } from "@/lib/marcacion/marcacion";
-import FotosDeLaMarcaModal, { type FotoParaVer } from "./FotosDeLaMarcaModal";
+import { horaAmPm, horaCorta } from "@/lib/marcacion/marcacion";
 import {
-  CHIP_MISMO_APARATO,
-  CHIP_TODOS,
-  CHIP_TODOS_LOS_DIAS,
-  COLUMNAS_MARCACIONES,
+  AVISO_MISMO_TELEFONO,
+  COLUMNAS_POR_DIA,
+  ETIQUETA_COLABORADOR,
+  MARCACIONES_POR_DIA,
+  NOTA_SOLO_SE_MIRA,
+  ROTULO_TODOS,
+  diasDeMarcaciones,
+  type FilaPorDia,
+} from "@/lib/asistencia/marcaciones-por-dia";
+import FotosDeLaMarcaModal, { type FotoParaVer } from "./FotosDeLaMarcaModal";
+import MarcacionesDeAntes from "./marcaciones/PantallaDeAntes";
+import {
   PALABRAS_MARCAS,
-  SIN_APARATO,
   SIN_COLUMNAS_NUEVAS,
   SIN_MARCAS,
-  TEXTO_SIN_SENAL,
-  TITULO_MISMO_APARATO,
   colaboradoresDeLasMarcas,
   detalleDeLaHoja,
-  diasDeLasMarcas,
   fechaDelDia,
-  filasDeMarcaciones,
   filtrarMarcas,
   lineasDeLaHoja,
-  selloCorto,
-  subtituloDeLaMarca,
-  tarjetasDeMarcaciones,
+  marcasDeAparatoCompartido,
+  rotuloDeLaMarca,
   type MarcaDeTelefono,
-  type MarcaDibujada,
 } from "./marcaciones/logica";
 
-/** Los dos filtros viven en la dirección, con `replace`: son del MISMO nivel. */
+/** El único filtro que queda. Mismo nivel → `replace`. */
 const PARAM_QUIEN = "mcQuien";
-const PARAM_DIA = "mcDia";
 
-/** El chip de un filtro. 44 px de alto, como todo lo que se toca aquí. */
-function Chip({
-  activo, onClick, children, titulo,
-}: {
-  activo: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-  titulo?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={activo}
-      title={titulo}
-      className={`min-h-[44px] whitespace-nowrap rounded-md border px-3 text-sm transition active:scale-[0.97] ${
-        activo
-          ? "border-black bg-black font-medium text-white"
-          : "border-gray-300 text-gray-700 hover:border-black"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-/** El chip gris de la demora. Solo sale cuando la marca llegó tarde. */
-function ChipDemora({ texto }: { texto: string }) {
-  return (
-    <span className="ml-1.5 whitespace-nowrap rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600">
-      {texto}
-    </span>
-  );
-}
-
-/** El chip del teléfono compartido: es justo lo que Daniel quiere ver. */
-function ChipMismoAparato() {
+/** El punto gris de «sin señal»: delante de la marca, sin empujar el renglón. */
+function PuntoSinSenal() {
   return (
     <span
-      title={TITULO_MISMO_APARATO}
-      className="ml-1.5 whitespace-nowrap rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700"
-    >
-      {CHIP_MISMO_APARATO}
+      title="Se marcó sin señal: la hora la puso el teléfono."
+      aria-label="sin señal"
+      className="mr-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-gray-400 align-middle"
+    />
+  );
+}
+
+/** Las marcas del día de una persona, en una línea. */
+function Marcas({ fila }: { fila: FilaPorDia<MarcaDeTelefono> }) {
+  return (
+    <>
+      {fila.tramos.map((t, i) => (
+        <span key={t.clave} className="whitespace-nowrap">
+          {i > 0 && <span className="text-gray-300"> · </span>}
+          {t.sinSenal && <PuntoSinSenal />}
+          <span className="text-gray-700">{t.rotulo} </span>
+          <b className="font-medium tabular-nums text-gray-900">{t.horas}</b>
+        </span>
+      ))}
+    </>
+  );
+}
+
+/** El aviso ROJO: dos colaboradores, un solo teléfono ese día. */
+function AvisoMismoTelefono() {
+  return (
+    <span className="ml-2 whitespace-nowrap rounded bg-red-50 px-1.5 py-0.5 text-[11px] text-red-700">
+      {AVISO_MISMO_TELEFONO}
     </span>
   );
 }
 
 export default function MarcacionesTab({ empresa }: { empresa: string }) {
+  if (!MARCACIONES_POR_DIA) return <MarcacionesDeAntes empresa={empresa} />;
+  return <PorDia empresa={empresa} />;
+}
+
+function PorDia({ empresa }: { empresa: string }) {
   const { desde, hasta, hoy, elegir } = usePeriodoAsistencia();
 
   const [marcas, setMarcas] = useState<MarcaDeTelefono[]>([]);
@@ -124,14 +123,13 @@ export default function MarcacionesTab({ empresa }: { empresa: string }) {
   const [hayColumnasNuevas, setHayColumnasNuevas] = useState(true);
 
   const [quien, setQuien] = useUrlState<string>(PARAM_QUIEN, "");
-  const [dia, setDia] = useUrlState<string>(PARAM_DIA, "");
 
   // El aparato se pregunta POR EL DEDO y en un efecto: en el servidor no hay
-  // `matchMedia`, y pintar la tabla para después cambiarla sería peor.
+  // `matchMedia`, y pintar una cosa para después cambiarla sería peor.
   const [celular, setCelular] = useState(false);
   useEffect(() => { setCelular(aparatoDeQuienMira() === "celular"); }, []);
 
-  const [abierta, setAbierta] = useState<FotoParaVer | null>(null);
+  const [abierta, setAbierta] = useState<FotoParaVer[] | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -169,164 +167,157 @@ export default function MarcacionesTab({ empresa }: { empresa: string }) {
   }, [desde, hasta, empresa]);
 
   const gente = useMemo(() => colaboradoresDeLasMarcas(marcas), [marcas]);
-  const dias = useMemo(() => diasDeLasMarcas(marcas), [marcas]);
   const filtradas = useMemo(
-    () => filtrarMarcas(marcas, { codigo: quien, dia }),
-    [marcas, quien, dia],
+    () => filtrarMarcas(marcas, { codigo: quien, dia: "" }),
+    [marcas, quien],
   );
-  const filas = useMemo(() => filasDeMarcaciones(filtradas), [filtradas]);
-  const tarjetas = useMemo(() => tarjetasDeMarcaciones(filtradas), [filtradas]);
+  const dias = useMemo(
+    // 🔑 El aviso del teléfono compartido se mide sobre TODO lo del período, no
+    // sobre lo filtrado: con el chip de una persona puesta, la otra no está.
+    () => diasDeMarcaciones(filtradas, marcasDeAparatoCompartido(marcas)),
+    [filtradas, marcas],
+  );
 
-  /** 🔴 La MISMA hoja que abre el reporte, con tres renglones más. */
-  const abrir = useCallback((d: MarcaDibujada) => {
-    const m = d.marca;
-    setAbierta({
-      id: m.id,
-      hora: d.hora,
-      horaLarga: horaAmPm(m.ocurrioEn),
-      detalle: detalleDeLaHoja(m),
-      relojCorrido: null,
-      quitada: false,
-      sinSenal: Boolean(m.sinSenal),
-      // La demora ya se dice en `lineasDeLaHoja`: acá no hace falta medirla otra vez.
-      atrasoMin: null,
-      tieneFoto: m.tieneFoto,
-      lat: m.lat,
-      lng: m.lng,
-      persona: m.nombre,
-      fecha: fechaDelDia(diaPanamaDe(m.ocurrioEn)),
-      rotulo: d.rotulo,
-      lineas: lineasDeLaHoja(m),
-    });
+  /** 🔴 Tocar la fila abre la MISMA hoja del reporte, con las marcas del día. */
+  const abrir = useCallback((fila: FilaPorDia<MarcaDeTelefono>) => {
+    setAbierta(
+      fila.marcas.map((m, i) => ({
+        id: m.id,
+        hora: horaCorta(m.ocurrioEn),
+        horaLarga: horaAmPm(m.ocurrioEn),
+        detalle: detalleDeLaHoja(m),
+        relojCorrido: null,
+        quitada: false,
+        sinSenal: Boolean(m.sinSenal),
+        // La demora ya se dice en `lineasDeLaHoja`: no se mide otra vez.
+        atrasoMin: null,
+        tieneFoto: m.tieneFoto,
+        lat: m.lat,
+        lng: m.lng,
+        persona: fila.nombre,
+        fecha: fechaDelDia(fila.dia),
+        rotulo: rotuloDeLaMarca(i, m.tipo),
+        lineas: lineasDeLaHoja(m),
+      })),
+    );
   }, []);
+
+  const vacio = !cargando && !error && filtradas.length === 0;
 
   return (
     <div className="space-y-4">
+      {/* ── ARRIBA: el período, UN desplegable, el conteo y el ⓘ ─────────── */}
       <div className="flex flex-wrap items-center gap-2">
         <SelectorPeriodo desde={desde} hasta={hasta} hoy={hoy} onElegir={elegir} />
+        {gente.length > 0 && (
+          <label className="flex items-center gap-2 text-sm">
+            <span className="sr-only">{ETIQUETA_COLABORADOR}</span>
+            <select
+              aria-label={ETIQUETA_COLABORADOR}
+              value={quien}
+              onChange={(e) => setQuien(e.target.value)}
+              className="min-h-[44px] rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm"
+            >
+              <option value="">{ROTULO_TODOS}</option>
+              {gente.map((g) => (
+                <option key={g.codigo} value={g.codigo}>{g.nombre}</option>
+              ))}
+            </select>
+          </label>
+        )}
         <p className="text-sm text-gray-500">
           {textoDelPie(filtradas.length, marcas.length, PALABRAS_MARCAS)}
         </p>
+        {/* 🔴 La nota del pie pasó a un ⓘ: la misma frase, sin gastar un renglón. */}
+        <span
+          title={NOTA_SOLO_SE_MIRA}
+          aria-label={NOTA_SOLO_SE_MIRA}
+          className="cursor-help text-sm text-gray-400"
+        >
+          ⓘ
+        </span>
       </div>
 
       {!hayColumnasNuevas && (
         <p className="rounded-md bg-amber-50 px-3 py-2.5 text-sm text-amber-800">{SIN_COLUMNAS_NUEVAS}</p>
       )}
 
-      {gente.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          <Chip activo={quien === ""} onClick={() => setQuien("")}>{CHIP_TODOS}</Chip>
-          {gente.map((g) => (
-            <Chip key={g.codigo} activo={quien === g.codigo} onClick={() => setQuien(g.codigo)}>
-              {g.nombre}
-            </Chip>
-          ))}
-        </div>
-      )}
-
-      {dias.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          <Chip activo={dia === ""} onClick={() => setDia("")}>{CHIP_TODOS_LOS_DIAS}</Chip>
-          {dias.map((d) => (
-            <Chip key={d} activo={dia === d} onClick={() => setDia(d)}>{fechaDelDia(d)}</Chip>
-          ))}
-        </div>
-      )}
-
       {error && <p className="rounded-md bg-gray-50 px-3 py-2.5 text-sm text-gray-700">{error}</p>}
       {cargando && !error && <p className="text-sm text-gray-500">Cargando…</p>}
-      {!cargando && !error && filtradas.length === 0 && (
+      {vacio && (
         <p className="rounded-md bg-gray-50 px-3 py-2.5 text-sm text-gray-600">{SIN_MARCAS}</p>
       )}
 
-      {/* ── EL CELULAR: una tarjeta por colaborador y por día ─────────────── */}
-      {celular
-        ? filtradas.length > 0 && (
-            <div className="space-y-3">
-              {tarjetas.map((t) => (
-                <article key={t.llave} className="rounded-lg border border-gray-200 bg-white p-3">
-                  <header className="flex items-baseline justify-between gap-2">
-                    <h3 className="truncate text-[15px] font-medium text-gray-900">{t.nombre}</h3>
-                    <span className="shrink-0 text-[13px] text-gray-500">{fechaDelDia(t.dia)}</span>
-                  </header>
-                  {t.lugarComun && (
-                    <p className="mt-0.5 text-[13px] text-gray-500">{t.lugarComun}</p>
+      {/* ── EL DÍA MANDA, en la computadora y en el celular ──────────────── */}
+      {dias.map((d) => (
+        <section key={d.dia} className="space-y-2">
+          <h3 className="text-[13px] font-medium uppercase tracking-wide text-gray-500">
+            {d.rotulo}
+          </h3>
+
+          {celular ? (
+            <div className="space-y-2">
+              {d.filas.map((f) => (
+                <button
+                  key={f.llave}
+                  type="button"
+                  onClick={() => abrir(f)}
+                  className="block w-full rounded-lg border border-gray-200 bg-white p-3 text-left transition active:bg-gray-50"
+                >
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="truncate text-[15px] font-medium text-gray-900">
+                      {f.nombre}
+                      {f.mismoTelefono && <AvisoMismoTelefono />}
+                    </span>
+                    <span className="shrink-0 text-[13px] text-gray-500">{f.lugar}</span>
+                  </span>
+                  <span className="mt-1 block text-[15px] leading-relaxed">
+                    <Marcas fila={f} />
+                  </span>
+                  {f.detalle && (
+                    <span className="mt-0.5 block text-[13px] text-gray-500">{f.detalle}</span>
                   )}
-                  <ul className="mt-2 divide-y divide-gray-100">
-                    {t.marcas.map((d) => (
-                      <li key={d.marca.id}>
-                        <button
-                          type="button"
-                          onClick={() => abrir(d)}
-                          className="flex min-h-[44px] w-full items-center gap-3 py-2 text-left transition active:bg-gray-50"
-                        >
-                          <span className="w-12 shrink-0 text-[15px] tabular-nums text-gray-900">{d.hora}</span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block text-[15px] text-gray-900">
-                              {d.rotulo}
-                              {d.tarde && <ChipDemora texto={d.llego} />}
-                              {d.mismoAparato && <ChipMismoAparato />}
-                            </span>
-                            {subtituloDeLaMarca(d, t.lugarComun) && (
-                              <span className="block text-[13px] text-gray-500">
-                                {subtituloDeLaMarca(d, t.lugarComun)}
-                              </span>
-                            )}
-                          </span>
-                          <span aria-hidden className="shrink-0 text-gray-300">›</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </article>
+                </button>
               ))}
             </div>
-          )
-        : filtradas.length > 0 && (
-            /* ── LA COMPUTADORA: seis columnas ───────────────────────────── */
-            <ScrollableTable minWidth={880}>
+          ) : (
+            <ScrollableTable minWidth={760}>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
-                    {COLUMNAS_MARCACIONES.map((c) => (
+                    {COLUMNAS_POR_DIA.map((c) => (
                       <th key={c} className="py-2 pr-3 font-medium">{c}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {filas.map((d) => (
+                  {d.filas.map((f) => (
                     <tr
-                      key={d.marca.id}
-                      onClick={() => abrir(d)}
+                      key={f.llave}
+                      onClick={() => abrir(f)}
                       className="cursor-pointer border-b border-gray-100 transition hover:bg-gray-50"
                     >
-                      <td className="py-2 pr-3 tabular-nums text-gray-900">{d.hora}</td>
-                      <td className="py-2 pr-3 text-gray-900">{d.marca.nombre}</td>
-                      <td className="py-2 pr-3 text-gray-700">
-                        {d.rotulo}
-                        {d.marca.sinSenal && <ChipDemora texto={TEXTO_SIN_SENAL} />}
+                      <td className="w-[180px] py-2 pr-3 align-top text-gray-900">
+                        {f.nombre}
+                        {f.mismoTelefono && <AvisoMismoTelefono />}
                       </td>
-                      <td className="py-2 pr-3 text-gray-700">{d.marca.lugar.texto}</td>
-                      <td className="py-2 pr-3 text-gray-600">{d.llego}</td>
-                      <td className="py-2 pr-3 tabular-nums text-gray-600">
-                        {selloCorto(d.marca.aparatoId)}
-                        {d.mismoAparato && <ChipMismoAparato />}
+                      <td className="py-2 pr-3 align-top">
+                        <Marcas fila={f} />
+                        {f.detalle && (
+                          <div className="mt-0.5 text-[12px] text-gray-500">{f.detalle}</div>
+                        )}
                       </td>
+                      <td className="w-[260px] py-2 pr-3 align-top text-gray-700">{f.lugar}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </ScrollableTable>
           )}
+        </section>
+      ))}
 
-      <FotosDeLaMarcaModal marcas={abierta ? [abierta] : null} onClose={() => setAbierta(null)} />
-
-      {/* Lo que esta pantalla NO hace, dicho donde se lee. */}
-      <p className="text-xs text-gray-400">
-        Aquí solo se mira. Para corregir una hora, entra a Asistencia: la marca del teléfono no se
-        edita ni se borra, la corrección va encima y pide el porqué. Sin aparato, la celda dice «
-        {SIN_APARATO}».
-      </p>
+      <FotosDeLaMarcaModal marcas={abierta} onClose={() => setAbierta(null)} />
     </div>
   );
 }

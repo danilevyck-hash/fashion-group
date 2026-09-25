@@ -29,6 +29,7 @@ import { selloValido } from "@/lib/marcacion/sello-del-aparato";
 import { aparatosCompartidos } from "@/lib/asistencia/mismo-aparato";
 import { SIN_LUGAR } from "@/lib/asistencia/lugar-de-marca";
 import { demoraEnPalabras, llegoTarde } from "@/lib/asistencia/marcaciones-pestana";
+import { fechaDelDia } from "@/lib/asistencia/marcaciones-por-dia";
 import type { PalabrasDeLaLista } from "@/lib/ui/pie-de-lista";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -38,6 +39,9 @@ import type { PalabrasDeLaLista } from "@/lib/ui/pie-de-lista";
 /** El lugar, tal como lo arma `lugarDeMarca` del lado del servidor. */
 export interface LugarDeLaMarca {
   texto: string;
+  /** El nombre crudo del lugar, sin la distancia pegada. Lo manda la ruta desde
+   *  el 25-sep-2026 y lo usa la pantalla agrupada por día. */
+  nombre?: string | null;
   metros?: number | null;
   /** Cayó cerca del punto de referencia de su empresa. La pantalla no decide
    *  nada con esto; se conserva porque la ruta lo manda. */
@@ -128,17 +132,14 @@ export function rotuloDeLaMarca(indice: number, tipo: string | null | undefined)
   return nombre.charAt(0).toUpperCase() + nombre.slice(1);
 }
 
-const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-const DIAS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
-
-/** «jue 25 sep» — la fecha de un día de Panamá (`YYYY-MM-DD`), como se lee aquí. */
-export function fechaDelDia(dia: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dia ?? "").trim());
-  if (!m) return String(dia ?? "");
-  const [a, mes, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
-  const dow = new Date(Date.UTC(a, mes - 1, d)).getUTCDay();
-  return `${DIAS[dow]} ${d} ${MESES[mes - 1]}`;
-}
+/**
+ * «jue 25 sep» — la fecha de un día de Panamá (`YYYY-MM-DD`), como se lee aquí.
+ *
+ * 🔑 Vive en `lib/asistencia/marcaciones-por-dia.ts` desde el 25-sep-2026 y se
+ * re-exporta: las DOS pantallas —la de chips y la agrupada por día— escriben la
+ * fecha igual, y una segunda copia sería la forma de que un día no lo hagan.
+ */
+export { fechaDelDia };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LAS TARJETAS DEL CELULAR: UNA POR COLABORADOR Y POR DÍA

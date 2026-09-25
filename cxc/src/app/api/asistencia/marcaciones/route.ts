@@ -159,6 +159,11 @@ export async function GET(req: NextRequest) {
           empresaKey,
           lugar: {
             texto: lugar.texto,
+            // 🔑 EL NOMBRE CRUDO, SIN LA DISTANCIA PEGADA (25-sep-2026). La
+            // pantalla agrupada por día lo redacta a su manera —«Paso Canoas ·
+            // 46 km de la tienda»— y parsear `texto` para separarlo sería
+            // frágil. Es aditivo: `texto` no cambió un carácter.
+            nombre: f.lugar_texto ?? null,
             // Se conserva el nombre del campo para la pantalla: «cerca del
             // punto de referencia de su empresa».
             enLaTienda: lugar.cercaDeLaReferencia,

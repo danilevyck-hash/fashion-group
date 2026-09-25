@@ -68,14 +68,33 @@ export function demoraEnPalabras(
   ocurrioEn: string | null | undefined,
   creadoEn: string | null | undefined,
 ): string {
+  const cuanto = cuantoDespues(ocurrioEn, creadoEn);
+  return cuanto ? `llegó ${cuanto}` : TEXTO_AL_INSTANTE;
+}
+
+/**
+ * 🔴 EL MISMO NÚMERO, SIN EL VERBO: «9 h después» · «6 min después», o `null`
+ * cuando la marca entró al instante.
+ *
+ * Existe porque la pantalla nueva —agrupada por día, 25-sep-2026— dice **«la
+ * entrada se envió 9 h después»**: la palabra «llegó» está prohibida ahí, y la
+ * contadora la leería como que la persona llegó tarde a trabajar. A esa hora lo
+ * que llegó fue el dato.
+ *
+ * 🔑 De aquí sale también `demoraEnPalabras`, para que las dos pantallas no
+ * puedan decir números distintos: es UNA sola cuenta con dos redacciones.
+ */
+export function cuantoDespues(
+  ocurrioEn: string | null | undefined,
+  creadoEn: string | null | undefined,
+): string | null {
   const a = Date.parse(String(ocurrioEn ?? ""));
   const b = Date.parse(String(creadoEn ?? ""));
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return TEXTO_AL_INSTANTE;
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
   const minutos = Math.round((b - a) / 60_000);
-  if (minutos < MINUTOS_AL_INSTANTE) return TEXTO_AL_INSTANTE;
-  if (minutos < 60) return `llegó ${minutos} min después`;
-  const horas = Math.round(minutos / 60);
-  return `llegó ${horas} h después`;
+  if (minutos < MINUTOS_AL_INSTANTE) return null;
+  if (minutos < 60) return `${minutos} min después`;
+  return `${Math.round(minutos / 60)} h después`;
 }
 
 /** ¿Esta marca llegó tarde? Lo usa el chip gris de la fila. */

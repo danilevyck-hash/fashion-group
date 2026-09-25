@@ -17,6 +17,13 @@
  *      Asistencia vuelve a tener exactamente las pestañas de antes.
  *   5. DESDE AQUÍ NO SALE UNA SOLA ESCRITURA: barrido sobre los archivos de la
  *      pestaña que prohíbe POST, PUT, PATCH y DELETE.
+ *
+ * ⚠️ 25-sep-2026, por la tarde: la pantalla que se ve HOY es la agrupada por día
+ * (`MARCACIONES_POR_DIA`, candado `marcaciones-por-dia.test.tsx`). Los puntos 2
+ * y 3 de arriba —los chips y las seis columnas— se conservan ENTEROS y se
+ * prueban contra `marcaciones/PantallaDeAntes.tsx`, que es lo que vuelve a
+ * salir con el interruptor apagado. No se relajó una sola afirmación: cambió
+ * contra qué componente corren.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
@@ -50,12 +57,14 @@ vi.mock("next/navigation", () => ({
 }));
 
 import MarcacionesTab from "@/app/asistencia/MarcacionesTab";
+import MarcacionesDeAntes from "@/app/asistencia/marcaciones/PantallaDeAntes";
 import AsistenciaClient from "@/app/asistencia/AsistenciaClient";
 
 const RAIZ = process.cwd();
 const leer = (p: string) => readFileSync(resolve(RAIZ, p), "utf8");
 
 const TAB = "src/app/asistencia/MarcacionesTab.tsx";
+const DE_ANTES = "src/app/asistencia/marcaciones/PantallaDeAntes.tsx";
 const LOGICA = "src/app/asistencia/marcaciones/logica.ts";
 
 const DESDE = "2026-09-16";
@@ -221,7 +230,7 @@ describe("🔴 en el celular, una tarjeta por colaborador y por día", () => {
   it("🔴 el LUGAR se escribe UNA sola vez cuando todas coinciden", async () => {
     aparato(true);
     servir(MISMO_LUGAR);
-    render(<MarcacionesTab empresa="todas" />);
+    render(<MarcacionesDeAntes empresa="todas" />);
     await waitFor(() => expect(screen.getAllByText("Entrada").length).toBeGreaterThan(0));
     expect(lugarComunDelDia(MISMO_LUGAR)).toBe("City Mall David");
     expect(screen.getAllByText("City Mall David")).toHaveLength(1);
@@ -230,7 +239,7 @@ describe("🔴 en el celular, una tarjeta por colaborador y por día", () => {
   it("🔴 y se REPITE cuando una marca cayó en otro lado", async () => {
     aparato(true);
     servir(LUGARES_DISTINTOS);
-    render(<MarcacionesTab empresa="todas" />);
+    render(<MarcacionesDeAntes empresa="todas" />);
     await waitFor(() => expect(screen.getAllByText("Entrada").length).toBeGreaterThan(0));
     expect(lugarComunDelDia(LUGARES_DISTINTOS)).toBeNull();
     // Cada marca dice el suyo: dos lugares distintos, uno por renglón.
@@ -241,7 +250,7 @@ describe("🔴 en el celular, una tarjeta por colaborador y por día", () => {
   it("el chip gris de demora sale SOLO en la marca que llegó tarde", async () => {
     aparato(true);
     servir(LUGARES_DISTINTOS);
-    render(<MarcacionesTab empresa="todas" />);
+    render(<MarcacionesDeAntes empresa="todas" />);
     await waitFor(() => expect(screen.getAllByText("Entrada").length).toBeGreaterThan(0));
     expect(screen.getAllByText("llegó 9 h después")).toHaveLength(1);
     // La otra llegó al instante, y de eso no se dice nada en la tarjeta.
@@ -262,7 +271,7 @@ describe("🔴 en la computadora, las seis columnas", () => {
 
   it("se dibujan las seis, con la hora de PANAMÁ", async () => {
     servir(MISMO_LUGAR);
-    render(<MarcacionesTab empresa="todas" />);
+    render(<MarcacionesDeAntes empresa="todas" />);
     await waitFor(() => expect(screen.getByRole("table")).toBeTruthy());
     for (const c of COLUMNAS_MARCACIONES) {
       expect(screen.getByRole("columnheader", { name: c })).toBeTruthy();
@@ -283,7 +292,7 @@ describe("🔴 en la computadora, las seis columnas", () => {
 
   it("🔴 «—» en Aparato cuando la marca no trae sello", async () => {
     servir([marca({ id: "99", codigo: "2", ocurrioEn: "2026-09-24T13:17:00.000Z", aparatoId: null })]);
-    render(<MarcacionesTab empresa="todas" />);
+    render(<MarcacionesDeAntes empresa="todas" />);
     await waitFor(() => expect(screen.getByRole("table")).toBeTruthy());
     expect(selloCorto(null)).toBe(SIN_APARATO);
     expect(screen.getAllByText(SIN_APARATO).length).toBeGreaterThan(0);
@@ -292,7 +301,7 @@ describe("🔴 en la computadora, las seis columnas", () => {
   it("🔴 «al instante» cuando la demora es menor a 2 minutos", async () => {
     expect(demoraEnPalabras("2026-09-24T13:17:00.000Z", "2026-09-24T13:18:00.000Z")).toBe("al instante");
     servir(MISMO_LUGAR);
-    render(<MarcacionesTab empresa="todas" />);
+    render(<MarcacionesDeAntes empresa="todas" />);
     await waitFor(() => expect(screen.getByRole("table")).toBeTruthy());
     expect(screen.getAllByText("al instante")).toHaveLength(MISMO_LUGAR.length);
   });
@@ -304,7 +313,7 @@ describe("🔴 en la computadora, las seis columnas", () => {
       marca({ id: "21", codigo: "7", nombre: "CINDY DE GRACIA", ocurrioEn: "2026-09-24T14:00:00.000Z", aparatoId: "zzzzzz99yyyy" }),
     ];
     servir(compartido);
-    render(<MarcacionesTab empresa="todas" />);
+    render(<MarcacionesDeAntes empresa="todas" />);
     await waitFor(() => expect(screen.getByRole("table")).toBeTruthy());
     expect(screen.getAllByText(CHIP_MISMO_APARATO)).toHaveLength(2);
   });
@@ -315,7 +324,7 @@ describe("🔴 en la computadora, las seis columnas", () => {
       marca({ id: "31", codigo: "7", nombre: "CINDY DE GRACIA", ocurrioEn: "2026-09-24T14:00:00.000Z", aparatoId: "cccccc22dddd" }),
     ];
     servir(propios);
-    render(<MarcacionesTab empresa="todas" />);
+    render(<MarcacionesDeAntes empresa="todas" />);
     await waitFor(() => expect(screen.getByRole("table")).toBeTruthy());
     expect(screen.queryByText(CHIP_MISMO_APARATO)).toBeNull();
   });
@@ -329,7 +338,7 @@ describe("🔴 en la computadora, las seis columnas", () => {
     ];
     expect(marcasDeAparatoCompartido(sinSello).size).toBe(0);
     servir(sinSello);
-    render(<MarcacionesTab empresa="todas" />);
+    render(<MarcacionesDeAntes empresa="todas" />);
     await waitFor(() => expect(screen.getByRole("table")).toBeTruthy());
     expect(screen.queryByText(CHIP_MISMO_APARATO)).toBeNull();
   });
@@ -341,10 +350,11 @@ describe("🔴 en la computadora, las seis columnas", () => {
 
   it("el pie sigue al filtro, con la regla común de la casa", async () => {
     servir([...MISMO_LUGAR, ...LUGARES_DISTINTOS]);
-    render(<MarcacionesTab empresa="todas" />);
+    render(<MarcacionesDeAntes empresa="todas" />);
     await waitFor(() => expect(screen.getByRole("table")).toBeTruthy());
     expect(screen.getByText("6 marcas")).toBeTruthy();
     // 🔑 El pie se importa, no se vuelve a escribir.
+    expect(leer(DE_ANTES)).toContain('from "@/lib/ui/pie-de-lista"');
     expect(leer(TAB)).toContain('from "@/lib/ui/pie-de-lista"');
   });
 });
@@ -396,7 +406,7 @@ describe("🔴 con MARCACIONES_PESTANA apagado, la pestaña no existe", () => {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("🔴 la pestaña Marcaciones SOLO mira", () => {
-  const ARCHIVOS = [TAB, LOGICA];
+  const ARCHIVOS = [TAB, LOGICA, DE_ANTES, "src/lib/asistencia/marcaciones-por-dia.ts"];
 
   it("el barrido mira los archivos de verdad (si no, no miró nada)", () => {
     for (const a of ARCHIVOS) expect(leer(a).length).toBeGreaterThan(1000);
@@ -413,7 +423,7 @@ describe("🔴 la pestaña Marcaciones SOLO mira", () => {
   });
 
   it("no hay un botón que corrija, borre o justifique", () => {
-    const src = leer(TAB);
+    const src = leer(TAB) + leer(DE_ANTES);
     for (const palabra of ["Corregir", "Eliminar", "Borrar", "Justificar", "Guardar"]) {
       expect(`${palabra}:${src.includes(`>${palabra}`)}`).toBe(`${palabra}:false`);
     }
@@ -436,6 +446,7 @@ describe("🔴 la pestaña Marcaciones SOLO mira", () => {
     // fotos son del lugar, no de su cara»*). Sigue siendo UNA sola hoja para las
     // dos pantallas, que es lo que este candado sostiene.
     expect(leer(TAB)).toContain('from "./FotosDeLaMarcaModal"');
-    expect(leer(TAB)).not.toContain("SelfieMarcacionModal");
+    expect(leer(DE_ANTES)).toContain('from "../FotosDeLaMarcaModal"');
+    expect(leer(TAB) + leer(DE_ANTES)).not.toContain("SelfieMarcacionModal");
   });
 });
