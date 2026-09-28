@@ -38,7 +38,7 @@ import {
   type SheetRow,
   type MarcaCatalogo,
 } from "./logic";
-import { veredictoDescripcion } from "./veredicto";
+import { gemelaEnCatalogo, veredictoDescripcion } from "./veredicto";
 
 export { OUT_COLS };
 
@@ -333,6 +333,9 @@ export interface FacturaProcessResult {
    *  el catálogo, en cualquier marca) y por eso NO bloquean. Se dice en
    *  pantalla: nada se descarta en silencio. */
   pasaronSolas: number;
+  /** Descripciones reemplazadas por su casi-gemela del catálogo («Women-Polo
+   *  S/S Core» → «Women-Polos S/S Core»). Se dicen en pantalla. */
+  corregidas: { de: string; a: string; productos: number }[];
 }
 
 export interface FacturaConfig {
@@ -411,6 +414,7 @@ export function processFactura(rows: SheetRow[], cfg: FacturaConfig): FacturaPro
   const bloqueosSet = new Map<string, { marca: string; desc: string; empresaKey?: string; motivo?: string; gemela?: string }>();
   // Descripciones nuevas que NO bloquean porque las dos mitades ya existen.
   const pasaronSolasSet = new Set<string>();
+  const corregidas = new Map<string, { de: string; a: string; productos: number }>();
 
   /** Registra una descripción nueva: bloquea SOLO si el veredicto es "alerta"
    *  (casi-gemela, mitad nueva, formato raro). Si pasa sola, se cuenta. */
@@ -517,6 +521,15 @@ export function processFactura(rows: SheetRow[], cfg: FacturaConfig): FacturaPro
     } else {
       // CK / TH / KL: misma normalización del Depurador.
       descOut = normalizeDescripcion(descRaw);
+      // Casi-gemela (solo una "s" final) de cualquier marca → la del catálogo
+      // (Daniel, 28-sep-2026).
+      const g = gemelaEnCatalogo(descOut, cfg.catalogo);
+      if (g) {
+        const e = corregidas.get(marcaKey(descOut)) ?? { de: descOut, a: g, productos: 0 };
+        e.productos++;
+        corregidas.set(marcaKey(descOut), e);
+        descOut = g;
+      }
       rubro = buildRubro(descOut);
       sub = buildSubrubro(descOut);
       if (!esGenero(rubro)) {
@@ -612,6 +625,7 @@ export function processFactura(rows: SheetRow[], cfg: FacturaConfig): FacturaPro
     sinFecha: formato === "A",
     bloqueos: [...bloqueosSet.values()],
     pasaronSolas: [...pasaronSolasSet].filter((k) => !bloqueosSet.has(k)).length,
+    corregidas: [...corregidas.values()],
   };
 }
 

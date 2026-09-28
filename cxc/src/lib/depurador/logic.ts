@@ -14,6 +14,7 @@ import { NORMALIZACION } from "./marca-descripciones";
 import type { Cell } from "./celda";
 import { norm } from "./celda";
 import { tallasAProbar } from "./talla";
+import { gemelaEnCatalogo } from "./veredicto";
 
 // Re-exportados: todo el sistema los importa desde `logic.ts` y así sigue.
 export type { Cell } from "./celda";
@@ -39,6 +40,10 @@ export interface DepuradorConfig {
   mesIdx: number;
   /** Año de la temporada */
   anio: string | number;
+  /** Catálogo de descripciones. Si viene, una descripción que difiere de una
+   *  del catálogo (de cualquier marca) solo por una "s" final se reemplaza por ella
+   *  (ver `corregidas`). */
+  catalogo?: CatalogoDescripciones | null;
 }
 
 /** Una fila procesada = un estilo (tallas colapsadas a 1 fila). */
@@ -79,6 +84,9 @@ export interface ProcessResult {
    *  que buscar en el archivo o darle de alta en MARCAS_CATALOGO.
    *  Ordenadas de más productos a menos. */
   marcasDesconocidas: { marca: string; productos: number }[];
+  /** Descripciones reemplazadas por su gemela del catálogo («Women-Polo S/S
+   *  Core» → «Women-Polos S/S Core»). Se dicen en pantalla: nada en silencio. */
+  corregidas: { marca: string; de: string; a: string; productos: number }[];
 }
 
 /* ============ CONFIG / CONSTANTES ============ */
@@ -519,6 +527,7 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
   // Marcas que el catálogo no conoce → el producto sale sin precio. Se cuentan
   // DESPUÉS del filtro de "sin cantidad": lo que no entra al Excel no se avisa.
   const desconocidas = new Map<string, { marca: string; productos: number }>();
+  const corregidas = new Map<string, { marca: string; de: string; a: string; productos: number }>();
 
   const out: ProcessedRow[] = [];
   for (const [ref, items] of groups) {
@@ -579,6 +588,22 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
       desconocidas.set(k, e);
     }
 
+    // Casi-gemela (solo una "s" final) de cualquier marca → se usa la del
+    // catálogo, con su rubro/subrubro (Daniel, 28-sep-2026).
+    const cat = config.catalogo;
+    if (cat && !servicio && marcaOut !== "Otros") {
+      const g = gemelaEnCatalogo(descOut, cat);
+      if (g) {
+        const k = `${marcaKey(marcaOut)}|||${marcaKey(descOut)}`;
+        const e = corregidas.get(k) ?? { marca: marcaOut, de: descOut, a: g, productos: 0 };
+        e.productos++;
+        corregidas.set(k, e);
+        descOut = g;
+        rubro = buildRubro(g);
+        sub = buildSubrubro(g);
+      }
+    }
+
     // Código de barra obligatorio: si no hay, usar el código del producto (Tarea 3.8).
     const barcode = ean || ref;
 
@@ -635,6 +660,7 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
     marcasDesconocidas: [...desconocidas.values()].sort(
       (a, b) => b.productos - a.productos || a.marca.localeCompare(b.marca)
     ),
+    corregidas: [...corregidas.values()],
   };
 }
 

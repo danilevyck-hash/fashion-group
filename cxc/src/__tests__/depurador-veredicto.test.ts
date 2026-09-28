@@ -3,6 +3,7 @@ import {
   normalizarEspacios,
   veredictoDescripcion,
   esCasiIgual,
+  gemelaEnCatalogo,
 } from "../lib/depurador/veredicto";
 import type { CatalogoDescripciones } from "../lib/depurador/logic";
 
@@ -460,5 +461,27 @@ describe("cierre: lo que sobrevive es de Switch, no del catálogo", () => {
       expect(v3(d).veredicto).toBe("alerta");
       expect(v3(d).motivo).toBe("casi-igual-mitad");
     }
+  });
+});
+
+// 28-sep-2026 · Daniel: «el punto es que el sistema me lo cambie a
+// Women-Polos S/S Core automático» y «las descripciones las quiero igual en
+// cualquier marca». La gemela de CUALQUIER marca reemplaza.
+describe("gemelaEnCatalogo", () => {
+  const cat = {
+    "TH Womenswear": ["Women-Polos S/S Core", "Women-Dresses"],
+    "TH Menswear": ["Men-Polos S/S Core", "Men-Shirts", "Women-Polo S/S"],
+  };
+  it("singular → plural de la misma marca", () => {
+    expect(gemelaEnCatalogo("Women-Polo S/S Core", cat)).toBe("Women-Polos S/S Core");
+  });
+  it("gemela de OTRA marca también reemplaza", () => {
+    expect(gemelaEnCatalogo("Women-Polos S/S", cat)).toBe("Women-Polo S/S");
+  });
+  it("si ya existe tal cual en alguna marca, no se toca", () => {
+    expect(gemelaEnCatalogo("women-dresses", cat)).toBeNull();
+  });
+  it("una prenda distinta (Shirts vs T-Shirts) no reemplaza", () => {
+    expect(gemelaEnCatalogo("Men-T-Shirts", cat)).toBeNull();
   });
 });

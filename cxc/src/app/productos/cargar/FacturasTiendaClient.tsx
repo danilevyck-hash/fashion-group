@@ -444,6 +444,7 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
 
   const bloqueos = result?.bloqueos ?? [];
   const pasaronSolas = result?.pasaronSolas ?? 0;
+  const corregidas = result?.corregidas ?? [];
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
@@ -630,6 +631,16 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
               </button>
             </p>
           )}
+
+          {corregidas.map((c) => (
+            <p
+              key={c.de}
+              className="mb-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-[13px] text-sky-900"
+            >
+              Corregida: «{c.de}» → <b className="font-semibold">«{c.a}»</b> — {c.productos.toLocaleString()}{" "}
+              producto{c.productos === 1 ? "" : "s"}
+            </p>
+          ))}
 
           {/* Nada se descarta en silencio: las que no alertaron se dicen igual. */}
           {pasaronSolas > 0 && (

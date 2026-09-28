@@ -108,6 +108,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
   // Marcas del archivo que el catálogo NO conoce: caen a "Otros" y por eso el
   // producto sale SIN PRECIO. Antes se perdían en silencio. No frenan la carga.
   const [marcasDesconocidas, setMarcasDesconocidas] = useState<{ marca: string; productos: number }[]>([]);
+  const [corregidas, setCorregidas] = useState<{ marca: string; de: string; a: string; productos: number }[]>([]);
   const [error, setError] = useState("");
   const [downloading, setDownloading] = useState(false);
   const [orphanSeen, setOrphanSeen] = useState(false); // alarma de descripción nueva (Tarea 8)
@@ -160,6 +161,10 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
     reintentar: reintentarCatalogo,
     agregarDescripcion,
   } = useCatalogoDescripciones();
+  // runFile no depende del catálogo (se reprocesa por otros motivos): lo lee
+  // de acá para corregir casi-gemelas de su marca al procesar.
+  const catalogoRef = useRef(catalogo);
+  useEffect(() => { catalogoRef.current = catalogo; }, [catalogo]);
 
   // ── Precio (Tarea 2) ───────────────────────────────────────────────────────
   // Default: cada marca toma su fórmula guardada. "global" sigue disponible.
@@ -236,11 +241,13 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
         }));
         const best = pickBestSheet(sheets);
         if (!best) throw new Error("No encontré ninguna hoja con datos de productos.");
-        const { rows, warnings: w, omitidosSinCantidad, marcasDesconocidas } = processRows(best, cfg);
+        const { rows, warnings: w, omitidosSinCantidad, marcasDesconocidas, corregidas } =
+          processRows(best, { ...cfg, catalogo: catalogoRef.current });
         setProcessed(rows);
         setWarnings(w);
         setOmitidosSinCantidad(omitidosSinCantidad);
         setMarcasDesconocidas(marcasDesconocidas);
+        setCorregidas(corregidas);
         setOrphanSeen(false); // re-evaluar alarma de descripción nueva con el archivo nuevo
         // 🔴 Los precios escritos a mano NO se borran al re-procesar. Están
         // guardados por referencia de artículo, así que se re-pegan solos a su
@@ -1020,6 +1027,16 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
             >
               Marca desconocida: <b className="font-semibold">«{m.marca}»</b> — {m.productos.toLocaleString()}{" "}
               producto{m.productos === 1 ? "" : "s"} {m.productos === 1 ? "va" : "van"} a salir sin precio
+            </p>
+          ))}
+
+          {corregidas.map((c) => (
+            <p
+              key={`${c.marca}|||${c.de}`}
+              className="mb-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-[13px] text-sky-900"
+            >
+              Corregida: {c.marca} · «{c.de}» → <b className="font-semibold">«{c.a}»</b> — {c.productos.toLocaleString()}{" "}
+              producto{c.productos === 1 ? "" : "s"}
             </p>
           ))}
 

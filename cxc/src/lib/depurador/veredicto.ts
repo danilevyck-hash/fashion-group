@@ -139,6 +139,24 @@ export function esCasiIgual(a: string, b: string): boolean {
   return difiereSoloPorSFinal(a, b);
 }
 
+/** La casi-gemela (solo "s" final) de `desc` en el catálogo, en CUALQUIER
+ *  marca, tal cual está guardada. null si `desc` ya existe tal cual (en alguna
+ *  marca), si no hay gemela, o si hay más de una grafía (ambigua: que lo
+ *  decida una persona). Daniel, 28-sep-2026: «el punto es que el sistema me lo
+ *  cambie a Women-Polos S/S Core automático» y «las descripciones las quiero
+ *  igual en cualquier marca» → el Depurador y Facturas tienda la usan para
+ *  REEMPLAZAR la descripción en vez de alertar. */
+export function gemelaEnCatalogo(desc: Cell, catalogo: CatalogoDescripciones): string | null {
+  const idx = indexarCatalogo(catalogo);
+  const k = clave(desc);
+  if (!k || idx.completas.has(k)) return null;
+  const halladas: string[] = [];
+  for (const [ck, original] of idx.completas) {
+    if (esCasiIgual(k, ck)) halladas.push(original);
+  }
+  return halladas.length === 1 ? halladas[0] : null;
+}
+
 /* ── Índice del catálogo ──────────────────────────────────────────────────── */
 
 /** Las dos mitades conocidas de un conjunto de descripciones. */
