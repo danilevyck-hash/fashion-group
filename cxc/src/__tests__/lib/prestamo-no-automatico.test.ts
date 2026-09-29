@@ -76,8 +76,12 @@ const deuda = (o: Partial<DeudaDePersona> & { codigo: string }): DeudaDePersona 
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("A. 🔴 el interruptor, en UN solo lugar", () => {
-  it("hoy está APAGADO", () => {
-    expect(PRESTAMO_AUTOMATICO).toBe(false);
+  // 🔴 PRENDIDO el 29-sep-2026. Contabilidad, con la planilla lista para
+  // cerrar: «debería salir ya el descuento … ya descontando el préstamo».
+  // Daniel: «Dale si». Las pruebas de abajo siguen probando el APAGADO
+  // pasando `false` a mano: volver atrás es cambiar UNA constante.
+  it("hoy está PRENDIDO", () => {
+    expect(PRESTAMO_AUTOMATICO).toBe(true);
   });
 
   it("vive SOLO en `prestamos-planilla.ts`: ningún otro archivo de la app lo mira", () => {
@@ -113,14 +117,14 @@ describe("A. 🔴 el interruptor, en UN solo lugar", () => {
 // ═════════════════════════════════════════════════════════════════════════════
 describe("B. 🔴 apagado: las casillas arrancan VACÍAS", () => {
   it("`casillaAutomatica` devuelve 0 aunque el módulo proponga $70", () => {
-    expect(casillaAutomatica(null, 70)).toBe(0);
-    expect(casillaAutomatica(undefined, 70)).toBe(0);
+    expect(casillaAutomatica(null, 70, false)).toBe(0);
+    expect(casillaAutomatica(undefined, 70, false)).toBe(0);
   });
 
   it("🔴 no entra nada a `dinero`: ni préstamo, ni deducciones, ni neto", () => {
     const con = aplicarPrestamoEnLinea(
       linea(MANUAL()),
-      SUG({ sugeridoTerceros: 30, cuotaTerceros: 30, saldoTerceros: 200, sugeridoDano: 10, cuotaDano: 10, saldoDano: 50 }),
+      SUG({ sugeridoTerceros: 30, cuotaTerceros: 30, saldoTerceros: 200, sugeridoDano: 10, cuotaDano: 10, saldoDano: 50 }), false
     );
     expect(con.dinero!.prestamo).toBe(0);
     expect(con.dinero!.terceros).toBe(0);
@@ -133,7 +137,7 @@ describe("B. 🔴 apagado: las casillas arrancan VACÍAS", () => {
   });
 
   it("un 0 en la casilla ya no dice «me salté una cuota»: no había ninguna", () => {
-    const con = aplicarPrestamoEnLinea(linea(MANUAL({ prestamo: 0 })), SUG());
+    const con = aplicarPrestamoEnLinea(linea(MANUAL({ prestamo: 0 })), SUG(), false);
     expect(con.prestamoAutomatico?.sinDescontar).toBeUndefined();
   });
 
@@ -142,7 +146,7 @@ describe("B. 🔴 apagado: las casillas arrancan VACÍAS", () => {
     // que importa es que no se le SUME nada encima.
     const con = aplicarPrestamoEnLinea(
       linea(MANUAL({ prestamo: 35 }), { prestamo: 35, totalDeducciones: 35, netoPagar: 225 }),
-      SUG(),
+      SUG(), false
     );
     expect(con.dinero!.prestamo).toBe(35);
     expect(con.dinero!.netoPagar).toBe(225);
@@ -156,7 +160,7 @@ describe("C. 🔴 el cierre anota EXACTAMENTE lo tecleado", () => {
   it("🩸 el caso de Eloyn: sin nada tecleado, el cierre NO anota ningún pago", () => {
     // Es el defecto que esto viene a cerrar: el automático escribió $25 de pago
     // sobre una planilla que no le descontó nada.
-    const l = aplicarPrestamoEnLinea(linea(MANUAL()), SUG()) as LineaPlanilla;
+    const l = aplicarPrestamoEnLinea(linea(MANUAL()), SUG(), false) as LineaPlanilla;
     const plan = planDeCierre({ lineas: [l], deudas, fecha: "2026-09-15" });
     expect(plan.pagos).toEqual([]);
   });
@@ -164,7 +168,7 @@ describe("C. 🔴 el cierre anota EXACTAMENTE lo tecleado", () => {
   it("con $45 tecleados, el pago anotado es $45 — ni la cuota de $70 ni otra cosa", () => {
     const l = aplicarPrestamoEnLinea(
       linea(MANUAL({ prestamo: 45 }), { prestamo: 45, totalDeducciones: 45, netoPagar: 215 }),
-      SUG(),
+      SUG(), false
     ) as LineaPlanilla;
     const plan = planDeCierre({ lineas: [l], deudas, fecha: "2026-09-15" });
     expect(plan.pagos).toHaveLength(1);
@@ -175,7 +179,7 @@ describe("C. 🔴 el cierre anota EXACTAMENTE lo tecleado", () => {
 // ═════════════════════════════════════════════════════════════════════════════
 describe("D. 🔴 la fila sigue MOSTRANDO cuánto debe y cuál sería su cuota", () => {
   it("«Debe $500.00 · cuota $70.00» debajo de la casilla", () => {
-    const con = aplicarPrestamoEnLinea(linea(MANUAL()), SUG());
+    const con = aplicarPrestamoEnLinea(linea(MANUAL()), SUG(), false);
     expect(textoDeudaCasilla(con, "prestamo")).toBe("Debe $500.00 · cuota $70.00");
   });
 
@@ -184,7 +188,7 @@ describe("D. 🔴 la fila sigue MOSTRANDO cuánto debe y cuál sería su cuota",
     // saldo del préstamo, esta persona no tendría ninguna pista en pantalla.
     const con = aplicarPrestamoEnLinea(
       linea(MANUAL()),
-      SUG({ saldo: 0, cuota: 0, sugerido: 0, saldoDano: 254.5, cuotaDano: 0, sugeridoDano: 0 }),
+      SUG({ saldo: 0, cuota: 0, sugerido: 0, saldoDano: 254.5, cuotaDano: 0, sugeridoDano: 0 }), false
     );
     expect(textoDeudaCasilla(con, "mercancia")).toBe("Debe $254.50 · sin cuota");
   });
@@ -192,7 +196,7 @@ describe("D. 🔴 la fila sigue MOSTRANDO cuánto debe y cuál sería su cuota",
   it("lo mismo con una deuda SOLO de terceros: las tres cuentas se miran igual", () => {
     const con = aplicarPrestamoEnLinea(
       linea(MANUAL()),
-      SUG({ saldo: 0, cuota: 0, sugerido: 0, saldoTerceros: 80, cuotaTerceros: 20, sugeridoTerceros: 20 }),
+      SUG({ saldo: 0, cuota: 0, sugerido: 0, saldoTerceros: 80, cuotaTerceros: 20, sugeridoTerceros: 20 }), false
     );
     expect(textoDeudaCasilla(con, "terceros")).toBe("Debe $80.00 · cuota $20.00");
   });
@@ -200,14 +204,14 @@ describe("D. 🔴 la fila sigue MOSTRANDO cuánto debe y cuál sería su cuota",
   it("🔴 la cuenta que NO debe nada queda callada, aunque otra sí deba", () => {
     // Un «Debe $0.00» debajo de dos de las tres casillas es exactamente el
     // ruido que tapa el dato que sí importa.
-    const con = aplicarPrestamoEnLinea(linea(MANUAL()), SUG());
+    const con = aplicarPrestamoEnLinea(linea(MANUAL()), SUG(), false);
     expect(textoDeudaCasilla(con, "prestamo")).toBe("Debe $500.00 · cuota $70.00");
     expect(textoDeudaCasilla(con, "terceros")).toBeNull();
     expect(textoDeudaCasilla(con, "mercancia")).toBeNull();
   });
 
   it("sin deuda en ninguna cuenta, la línea ni siquiera trae el dato", () => {
-    const con = aplicarPrestamoEnLinea(linea(MANUAL()), SUG({ saldo: 0, cuota: 0, sugerido: 0 }));
+    const con = aplicarPrestamoEnLinea(linea(MANUAL()), SUG({ saldo: 0, cuota: 0, sugerido: 0 }), false);
     expect(con.prestamoAutomatico).toBeUndefined();
     expect(textoDeudaCasilla(con, "prestamo")).toBeNull();
   });
@@ -227,7 +231,7 @@ describe("D. 🔴 la fila sigue MOSTRANDO cuánto debe y cuál sería su cuota",
 // ═════════════════════════════════════════════════════════════════════════════
 describe("E. lo que se DICE cambia con el interruptor, y lo que no depende de él se queda", () => {
   it("🔴 el aviso de la «última cuota» no sale: no entra ninguna cuota", () => {
-    expect(avisosDeUltimaCuota([SUG({ cuota: 70, saldo: 40, sugerido: 40 })])).toEqual([]);
+    expect(avisosDeUltimaCuota([SUG({ cuota: 70, saldo: 40, sugerido: 40 })], false)).toEqual([]);
   });
 
   it("⚠️ quien debe y NO cobra acá se sigue avisando: eso es cierto pase lo que pase", () => {

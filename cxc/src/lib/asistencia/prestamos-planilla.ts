@@ -141,7 +141,12 @@ import { CASILLAS_AUTOMATICAS, estadoCasilla, type CasillaAutomatica } from "./c
  * y al volver a poner esto en `true` todo vuelve a como estaba: el automático
  * entero está detrás de UNA sola función (`cuotaPropuesta`).
  * ────────────────────────────────────────────────────────────────────────── */
-export const PRESTAMO_AUTOMATICO = false;
+// 🔴 PRENDIDO OTRA VEZ el 29-sep-2026. Contabilidad, con la planilla de la
+// 2.ª de septiembre lista: «debería salir ya el descuento que se le hace y ya
+// salga cuánto se le va a pagar en total». Daniel: «Dale si». Medido ese día:
+// las 15 personas que deben tienen cuota, código atado y ficha activa. La
+// casilla se sigue pudiendo escribir a mano y el 0 sigue saltando la quincena.
+export const PRESTAMO_AUTOMATICO = true;
 
 /** Los archivos que Daniel tiene que correr. Se le muestran tal cual. */
 export const MIGRACION_AMARRE_PRESTAMOS =
