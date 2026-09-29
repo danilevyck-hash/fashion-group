@@ -166,6 +166,10 @@ export interface SaldoPrestamo {
   cuentas: Record<CuentaPrestamo, SaldoCuenta>;
 }
 
+function aCentavos(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
 function cuentaVacia(): SaldoCuenta {
   return { prestado: 0, pagado: 0, saldo: 0, desde: null };
 }
@@ -201,11 +205,17 @@ export function calcularSaldoPrestamo(
   }
   // 🔑 EL TOTAL SALE DE LAS CUENTAS, y las cuentas de `CUENTAS`: agregar una
   // cuarta no puede dejar plata afuera del total por olvidar una línea acá.
-  for (const k of CUENTAS) cuentas[k].saldo = cuentas[k].prestado - cuentas[k].pagado;
+  // 🩸 Todo a CENTAVOS (29-sep-2026): sumar decimales en coma flotante dejaba
+  // el saldo en 142.66999… y el pago exacto de 142.67 «excedía lo que debe».
+  for (const k of CUENTAS) {
+    cuentas[k].prestado = aCentavos(cuentas[k].prestado);
+    cuentas[k].pagado = aCentavos(cuentas[k].pagado);
+    cuentas[k].saldo = aCentavos(cuentas[k].prestado - cuentas[k].pagado);
+  }
 
-  const prestado = CUENTAS.reduce((a, k) => a + cuentas[k].prestado, 0);
-  const pagado = CUENTAS.reduce((a, k) => a + cuentas[k].pagado, 0);
-  const saldo = prestado - pagado;
+  const prestado = aCentavos(CUENTAS.reduce((a, k) => a + cuentas[k].prestado, 0));
+  const pagado = aCentavos(CUENTAS.reduce((a, k) => a + cuentas[k].pagado, 0));
+  const saldo = aCentavos(prestado - pagado);
   return {
     prestado,
     pagado,
