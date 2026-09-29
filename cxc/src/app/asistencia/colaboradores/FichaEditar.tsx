@@ -1,7 +1,7 @@
 "use client";
 
 /* ─────────────────────────────────────────────────────────────────────────────
- * EL FORMULARIO CORTO — Datos · Pago · Excepciones (plegado) · Guardar.
+ * EL FORMULARIO CORTO — Datos · Pago · Excepciones (plegado) · Salida · Guardar.
  *
  * 🔴 Daniel: *«para editar una info como seguros, que sea con Editar»*. Se abre
  * con un botón y se cierra con Guardar o Cancelar: no se guarda solo.
@@ -128,7 +128,7 @@ export default function FichaEditar({
   deudaPrestamo?: number | null;
 }) {
   const [verExcepciones, setVerExcepciones] = useState(() => tieneExcepciones(b));
-  const [verBaja, setVerBaja] = useState(false);
+  const [verBaja, setVerBaja] = useState(() => !!b.fechaSalida);
   const set = (cambio: Partial<BorradorFicha>) => onCambio({ ...b, ...cambio });
 
   // 🔑 Se dice QUÉ FALTA en vez de apagar el botón sin explicación. El servidor
@@ -288,32 +288,26 @@ export default function FichaEditar({
         )}
       </div>
 
-      {/* ── GUARDAR / CANCELAR ──────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 px-4 py-3">
-        <button type="button" disabled={!puedeGuardar} onClick={onGuardar}
-          className="min-h-[44px] rounded-md bg-black px-4 text-sm text-white transition active:scale-[0.97] disabled:opacity-40">
-          {guardando ? "Guardando…" : "Guardar"}
-        </button>
-        <button type="button" onClick={onCancelar}
-          className="min-h-[44px] rounded-md border border-gray-300 px-4 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]">
-          Cancelar
-        </button>
-        {faltan.length > 0 && (
-          <span className="text-[13px] text-amber-800">
-            Falta {faltan.length === 1 ? faltan[0] : `${faltan.slice(0, -1).join(", ")} y ${faltan.at(-1)}`}.
-          </span>
-        )}
-      </div>
-
-      {/* ── DAR DE BAJA (plegado, y chico) ──────────────────────────────── */}
+      {/* ── SALIDA (29-sep-2026) ─────────────────────────────────────────
+          Era un «Dar de baja…» gris DEBAJO de Guardar y contabilidad no lo
+          encontró. Daniel eligió la opción B del mockup: una sección con su
+          título, como «Pago», ARRIBA de Guardar — se guarda con ese botón. */}
       {!nueva && (
-        <div className="border-t border-gray-100 px-4 py-2.5">
-          <button type="button" onClick={() => setVerBaja((v) => !v)} aria-expanded={verBaja}
-            className="min-h-[44px] text-[13px] text-gray-400 underline-offset-2 transition hover:text-gray-700 hover:underline">
-            Dar de baja…
-          </button>
+        <>
+          <p className="border-t border-gray-100 px-4 pt-3 text-[11px] font-medium uppercase tracking-wide text-gray-400">
+            Salida
+          </p>
+          {!verBaja && (
+            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+              <span className="text-sm text-gray-700">Trabaja aquí</span>
+              <button type="button" onClick={() => setVerBaja(true)}
+                className="min-h-[44px] rounded-md border border-gray-300 px-4 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]">
+                Dar de baja
+              </button>
+            </div>
+          )}
           {verBaja && (
-            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 px-4 py-3 sm:grid-cols-2">
               {/* 🔴 QUIEN SE VA DEBIENDO, SE DICE ACÁ (Daniel, 5-sep-2026): es
                   cuando se decide la liquidación. Sin Telegram. La regla y el
                   texto viven en `lib/asistencia/salida-con-deuda.ts`. */}
@@ -343,14 +337,32 @@ export default function FichaEditar({
                     ficha se lleva el nombre, el salario y la empresa, o sea
                     todo lo que hace falta para volver a armar una quincena
                     vieja. Se da de baja con fecha y motivo, y se guarda con el
-                    mismo botón Guardar de arriba. */}
+                    mismo botón Guardar de abajo. */}
                 Los dos juntos, o ninguno. Sus quincenas viejas no se tocan: deja
                 de salir en las que vienen.
               </p>
             </div>
           )}
-        </div>
+        </>
       )}
+
+      {/* ── GUARDAR / CANCELAR ──────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 px-4 py-3">
+        <button type="button" disabled={!puedeGuardar} onClick={onGuardar}
+          className="min-h-[44px] rounded-md bg-black px-4 text-sm text-white transition active:scale-[0.97] disabled:opacity-40">
+          {guardando ? "Guardando…" : "Guardar"}
+        </button>
+        <button type="button" onClick={onCancelar}
+          className="min-h-[44px] rounded-md border border-gray-300 px-4 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]">
+          Cancelar
+        </button>
+        {faltan.length > 0 && (
+          <span className="text-[13px] text-amber-800">
+            Falta {faltan.length === 1 ? faltan[0] : `${faltan.slice(0, -1).join(", ")} y ${faltan.at(-1)}`}.
+          </span>
+        )}
+      </div>
+
     </div>
   );
 }
