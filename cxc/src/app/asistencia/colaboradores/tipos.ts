@@ -54,3 +54,20 @@ export interface PermisosDeLaPagina {
   puedeCargarBaseSeguros: boolean;
   puedeMarcarSueldoFijo: boolean;
 }
+
+/**
+ * El horario de UNA persona, tal cual lo devuelve `GET /api/asistencia/horarios`
+ * (29-sep-2026: la ficha lo muestra y lo guarda con su botón Guardar; la
+ * sección «Horarios» de la lista sigue guardando sola). Mismo horario, dos
+ * lugares: se escribe siempre por el mismo `PUT /api/asistencia/horarios`.
+ */
+export interface HorarioDeLaPagina {
+  codigo: string;
+  nombre: string | null;
+  entrada: string;
+  salida: string;
+  almuerzoMinutos: number;
+  diasLaborables: number[];
+  entradaAfuera: string | null;
+  salidaAfuera: string | null;
+}

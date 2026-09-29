@@ -33,6 +33,14 @@ import {
   ETIQUETA_NO_TRABAJA_AFUERA, ETIQUETA_TRABAJA_AFUERA, EXPLICACION_TRABAJA_AFUERA, PREGUNTA_TRABAJA_AFUERA,
 } from "@/lib/asistencia/trabaja-afuera";
 import { useState } from "react";
+import {
+  DIAS_ELEGIBLES,
+  DIAS_SEMANA_CORTO,
+  NOTA_TELEFONO_VACIO,
+  ROTULO_DIAS,
+  ROTULO_RELOJ,
+  ROTULO_TELEFONO,
+} from "@/lib/asistencia/horario-configurable";
 
 import { EMPRESAS_ASISTENCIA, etiquetaEmpresa, JORNADAS } from "@/lib/asistencia/config";
 import {
@@ -57,7 +65,7 @@ import {
 } from "@/lib/asistencia/sueldo-fijo";
 import { MOTIVOS_SALIDA, OPCION_MOTIVO } from "@/lib/asistencia/vigencia";
 import CedulaFoto from "./CedulaFoto";
-import type { PermisosDeLaPagina, PersonaDeLaPagina } from "./tipos";
+import type { HorarioDeLaPagina, PermisosDeLaPagina, PersonaDeLaPagina } from "./tipos";
 
 export interface BorradorFicha {
   codigo: string;
@@ -114,6 +122,7 @@ const CAMPO =
 
 export default function FichaEditar({
   borrador: b, onCambio, onGuardar, onCancelar, guardando, nueva, permisos, puedeEditar, onCambioFoto, deudaPrestamo,
+  horario, onCambioHorario,
 }: {
   borrador: BorradorFicha;
   onCambio: (b: BorradorFicha) => void;
@@ -126,6 +135,9 @@ export default function FichaEditar({
   onCambioFoto: () => void;
   /** Lo que debe en Préstamos (las tres cuentas). Se dice al dar de baja. */
   deudaPrestamo?: number | null;
+  /** Su horario. `null` = todavía no marcó en el reloj: no hay fila que editar. */
+  horario?: HorarioDeLaPagina | null;
+  onCambioHorario?: (h: HorarioDeLaPagina) => void;
 }) {
   const [verExcepciones, setVerExcepciones] = useState(() => tieneExcepciones(b));
   const [verBaja, setVerBaja] = useState(() => !!b.fechaSalida);
@@ -215,6 +227,68 @@ export default function FichaEditar({
             CALCULAN desde «Empezó» (30 por cada 11 meses) y se ven en la
             sección Vacaciones de esta misma página. No se teclean. */}
       </div>
+
+      {/* ── HORARIO (29-sep-2026) ───────────────────────────────────────
+          Daniel, desde esta ficha: «¿dónde?» — el horario solo estaba en la
+          sección plegada al final de la lista. Acá se guarda con Guardar,
+          como el resto de la ficha; la lista sigue guardando sola. */}
+      {!nueva && horario && onCambioHorario && (
+        <>
+          <p className="border-t border-gray-100 px-4 pt-3 text-[11px] font-medium uppercase tracking-wide text-gray-400">
+            Horario
+          </p>
+          <div className="grid gap-3 px-4 py-3 sm:grid-cols-3">
+            <Grupo etiqueta={ROTULO_DIAS}>
+              <div className="flex flex-wrap gap-1">
+                {DIAS_ELEGIBLES.map((d) => {
+                  const on = horario.diasLaborables.includes(d);
+                  return (
+                    <button key={d} type="button" aria-pressed={on}
+                      onClick={() => {
+                        // Nunca se queda sin ningún día: el último no se apaga.
+                        if (on && horario.diasLaborables.length === 1) return;
+                        const dias = on
+                          ? horario.diasLaborables.filter((x: number) => x !== d)
+                          : [...horario.diasLaborables, d].sort((a, b) => a - b);
+                        onCambioHorario({ ...horario, diasLaborables: dias });
+                      }}
+                      className={`min-h-[44px] min-w-[40px] rounded-md border px-2 text-[13px] transition active:scale-[0.97] ${
+                        on ? "border-black bg-black text-white" : "border-gray-200 text-gray-500 hover:border-gray-400"
+                      }`}>
+                      {DIAS_SEMANA_CORTO[d]}
+                    </button>
+                  );
+                })}
+              </div>
+            </Grupo>
+            <Grupo etiqueta={ROTULO_RELOJ}>
+              <div className="flex items-center gap-1.5">
+                <input type="time" aria-label="Entrada en el reloj" className={`${CAMPO} tabular-nums`}
+                  value={horario.entrada}
+                  onChange={(e) => e.target.value && onCambioHorario({ ...horario, entrada: e.target.value })} />
+                <span className="text-gray-400">→</span>
+                <input type="time" aria-label="Salida en el reloj" className={`${CAMPO} tabular-nums`}
+                  value={horario.salida}
+                  onChange={(e) => e.target.value && onCambioHorario({ ...horario, salida: e.target.value })} />
+              </div>
+            </Grupo>
+            <Grupo etiqueta={ROTULO_TELEFONO} ayuda={NOTA_TELEFONO_VACIO}>
+              <div className="flex items-center gap-1.5">
+                <input type="time" aria-label="Entrada por el teléfono" className={`${CAMPO} tabular-nums`}
+                  value={horario.entradaAfuera ?? ""}
+                  onChange={(e) => onCambioHorario({ ...horario, entradaAfuera: e.target.value || null })} />
+                <span className="text-gray-400">→</span>
+                <input type="time" aria-label="Salida por el teléfono" className={`${CAMPO} tabular-nums`}
+                  value={horario.salidaAfuera ?? ""}
+                  onChange={(e) => onCambioHorario({ ...horario, salidaAfuera: e.target.value || null })} />
+              </div>
+            </Grupo>
+            <p className="text-[12px] text-gray-500 sm:col-span-3">
+              Almuerzo: {horario.almuerzoMinutos} minutos · fijo, no se elige.
+            </p>
+          </div>
+        </>
+      )}
 
       {/* ── EXCEPCIONES (plegadas) ──────────────────────────────────────── */}
       <div className="border-t border-gray-100">
@@ -378,5 +452,21 @@ function Campo({ etiqueta, ayuda, children }: {
       {children}
       {ayuda && <span className="mt-1 block text-[11.5px] text-gray-400">{ayuda}</span>}
     </label>
+  );
+}
+
+/** Como `Campo`, pero SIN `<label>`: con varios botones o dos horas adentro,
+ *  un label haría que tocar el título prenda el primer día. */
+function Grupo({ etiqueta, ayuda, children }: {
+  etiqueta: string; ayuda?: string; children: React.ReactNode;
+}) {
+  return (
+    <div role="group" aria-label={etiqueta}>
+      <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-500">
+        {etiqueta}
+      </span>
+      {children}
+      {ayuda && <span className="mt-1 block text-[11.5px] text-gray-400">{ayuda}</span>}
+    </div>
   );
 }

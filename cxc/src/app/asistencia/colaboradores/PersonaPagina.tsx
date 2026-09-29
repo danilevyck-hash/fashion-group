@@ -42,7 +42,7 @@ import SeccionOtrosServicios from "./SeccionOtrosServicios";
 import SeccionJustificaciones from "./SeccionJustificaciones";
 import SeccionVacaciones from "./SeccionVacaciones";
 import SeccionAsistencia from "./SeccionAsistencia";
-import type { PersonaDeLaPagina, PermisosDeLaPagina } from "./tipos";
+import type { HorarioDeLaPagina, PersonaDeLaPagina, PermisosDeLaPagina } from "./tipos";
 
 export default function PersonaPagina({ codigo }: { codigo: string }) {
   const { toast } = useToast();
@@ -63,6 +63,10 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
   const [editando, setEditando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [borrador, setBorrador] = useState<BorradorFicha | null>(null);
+  /** Su horario guardado y el que se está editando (se guarda con Guardar). */
+  const [horario, setHorario] = useState<HorarioDeLaPagina | null>(null);
+  const [horarioBorrador, setHorarioBorrador] = useState<HorarioDeLaPagina | null>(null);
+  const [horarioCompleto, setHorarioCompleto] = useState(true);
   /** Sube de a uno para que las secciones vuelvan a leer después de guardar. */
   const [refresco, setRefresco] = useState(0);
 
@@ -132,8 +136,33 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
     [nueva, persona, codigo],
   );
 
+  // 🔴 EL HORARIO, EN LA FICHA (29-sep-2026). La misma lectura que la sección
+  // «Horarios» de la lista: el horario es uno solo, visible en dos lugares.
+  const cargarHorario = useCallback(async () => {
+    if (nueva) return;
+    try {
+      const r = await fetch("/api/asistencia/horarios", { cache: "no-store" });
+      const d = await r.json();
+      if (!r.ok) return;
+      const f = (d.personas ?? []).find((p: { codigo: string }) => String(p.codigo) === codigo);
+      setHorarioCompleto(!d.faltaMigracion);
+      setHorario(f ? {
+        ...f,
+        diasLaborables: Array.isArray(f.diasLaborables) ? f.diasLaborables : [1, 2, 3, 4, 5],
+        entradaAfuera: f.entradaAfuera ?? null,
+        salidaAfuera: f.salidaAfuera ?? null,
+      } : null);
+    } catch { /* sin horario la ficha se edita igual; la lista lo sigue mostrando */ }
+  }, [codigo, nueva]);
+  useEffect(() => { void cargarHorario(); }, [cargarHorario]);
+  // Si se abrió Editar antes de que llegara el horario, entra en cuanto llega.
+  useEffect(() => {
+    if (editando) setHorarioBorrador((h) => h ?? horario);
+  }, [editando, horario]);
+
   function abrirEditar() {
     setBorrador(borradorDe(persona, nueva ? "" : codigo));
+    setHorarioBorrador(horario);
     setEditando(true);
   }
 
@@ -167,6 +196,21 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error ?? "No se pudo guardar");
+      // El horario, solo si cambió, por la MISMA puerta que usa la lista.
+      if (horarioBorrador && JSON.stringify(horarioBorrador) !== JSON.stringify(horario)) {
+        const h = horarioBorrador;
+        const rh = await fetch("/api/asistencia/horarios", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(horarioCompleto
+            ? { codigo: h.codigo, nombre: h.nombre, entrada: h.entrada, salida: h.salida,
+                diasLaborables: h.diasLaborables, entradaAfuera: h.entradaAfuera, salidaAfuera: h.salidaAfuera }
+            : { codigo: h.codigo, nombre: h.nombre, entrada: h.entrada, salida: h.salida }),
+        });
+        const dh = await rh.json().catch(() => ({}));
+        if (!rh.ok) throw new Error(dh.error ?? "Se guardó la ficha, pero no el horario");
+        await cargarHorario();
+      }
       // 🔴 Con fecha de salida, el aviso dice desde cuándo y —si debe— cuánto
       // hay que descontarle de la liquidación: la ficha se cierra al guardar y
       // el cartel del formulario se va con ella. Ámbar y 8 s cuando hay deuda.
@@ -246,6 +290,8 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
                 nueva={nueva}
                 permisos={permisos}
                 deudaPrestamo={persona?.deudaPrestamo ?? 0}
+                horario={horarioBorrador}
+                onCambioHorario={setHorarioBorrador}
                 puedeEditar={puedeEditar}
                 onCambioFoto={() => setRefresco((n) => n + 1)}
               />
