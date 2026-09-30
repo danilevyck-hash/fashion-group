@@ -10,6 +10,7 @@ import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { requireAsistencia } from "@/lib/asistencia/guard";
 import { alcanceDelRol, empresaForzada } from "@/lib/asistencia/alcance-boston-server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { leerFeriados } from "@/lib/asistencia/feriados-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
   armarReporte,
@@ -157,7 +158,9 @@ export async function GET(req: NextRequest) {
       // un día de vacaciones se leería como ausencia acá y como vacación allá.
       // Sin la tabla corrida devuelve CERO filas y el reporte es el de siempre.
       leerVacaciones(desde, hasta),
-      supabaseServer.from("asistencia_feriados").select("fecha, nombre").gte("fecha", desde).lte("fecha", hasta),
+      // 🔴 Feriados y días libres por la MISMA lectura (30-sep-2026). Sin la
+      // columna `tipo`, todo es feriado: lo de siempre.
+      leerFeriados(desde, hasta),
       // 🔴 LAS MARCAS DEL RELOJ DEL TELÉFONO (14-sep-2026), para que la
       // contadora vea la selfie, el mapa y si se marcó sin señal. Lectura
       // APARTE y tolerante a propósito: las columnas nuevas NO se le agregan al
@@ -178,7 +181,6 @@ export async function GET(req: NextRequest) {
     const nombres = new Map<string, string>(
       directorio.codigos().map((c) => [c, directorio.etiqueta(c)]),
     );
-    if (fRes.error) throw new Error(fRes.error.message);
 
     // 🔴 LAS CORRECCIONES SE APLICAN ANTES DE CALCULAR NADA. Lo que se le pasa
     // al motor es la lista EFECTIVA: la del reloj con las horas corregidas
@@ -319,7 +321,8 @@ export async function GET(req: NextRequest) {
       horarios: horariosLeidos.horarios,
       justificaciones: jRes.filas,
       vacaciones: vRes.filas,
-      feriados: new Map((fRes.data ?? []).map((f) => [String(f.fecha), String(f.nombre)])),
+      feriados: fRes.feriados,
+      diasLibres: fRes.diasLibres,
       desde,
       hasta,
       reglas,

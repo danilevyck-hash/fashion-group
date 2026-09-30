@@ -30,6 +30,7 @@ import { rechazarFueraDeAlcance } from "@/lib/asistencia/alcance-boston-server";
 import { alcanza } from "@/lib/asistencia/aprobador-empresa";
 import { leerAlcanceAprobador } from "@/lib/asistencia/aprobador-empresa-server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { leerFeriados } from "@/lib/asistencia/feriados-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
   armarReporte,
@@ -153,7 +154,7 @@ import {
   diasLibresDelCuadro,
   textoDiasLibres,
 } from "@/lib/asistencia/dia-libre-empresa";
-import { leerSaldosDiaLibre } from "@/lib/asistencia/dia-libre-empresa-server";
+import { asegurarDeudasDeDiasLibres, leerSaldosDiaLibre } from "@/lib/asistencia/dia-libre-empresa-server";
 import {
   aplicarOtrosServiciosEnLinea,
   totalPorCodigo,
@@ -355,6 +356,19 @@ export async function GET(req: NextRequest) {
       : null;
 
   try {
+    // 🔴 LA DEUDA DEL DÍA LIBRE NACE SOLA (30-sep-2026): los días libres de
+    // Configuración › Feriados que YA PASARON, desde un mes antes de la
+    // quincena (el corte deja los últimos días de la anterior para ésta).
+    // Idempotente: lo ya cargado —a mano o en otra generación— no se repite.
+    // VA ANTES de leer los saldos, para que esta misma planilla ya los cobre.
+    // Sin la migración de feriados no hay días libres y no hace nada.
+    await asegurarDeudasDeDiasLibres({
+      desde: new Date(Date.parse(`${q.desde}T00:00:00Z`) - 31 * 86_400_000).toISOString().slice(0, 10),
+      hasta: q.hasta,
+      hoy: hoyPanama(),
+      empresa,
+    });
+
     // Paginado y verificado contra el COUNT: PostgREST corta en 1.000 filas EN
     // SILENCIO y una quincena de 37 personas con 4 marcas diarias pasa de ahí.
     // Una planilla con las marcaciones recortadas sin avisar se paga igual.
@@ -409,16 +423,13 @@ export async function GET(req: NextRequest) {
       // 🔴 LAS VACACIONES, por la MISMA puerta que el reporte. El motor las
       // honra pase lo que pase: si no se pueden leer, la planilla no sale.
       leerVacaciones(q.desde, hastaReloj),
-      supabaseServer
-        .from("asistencia_feriados")
-        .select("fecha, nombre")
-        .gte("fecha", q.desde)
-        .lte("fecha", hastaReloj),
+      // 🔴 Feriados y días libres por la MISMA lectura (30-sep-2026). Sin la
+      // columna `tipo`, todo es feriado: lo de siempre.
+      leerFeriados(q.desde, hastaReloj),
       // 🔴 Las entradas autorizadas (24-sep-2026), la MISMA lectura que el
       // Reporte. Sin la tabla, vacío: nadie tiene, la planilla de siempre.
       leerEntradasAutorizadas(q.desde, hastaReloj),
     ]);
-    if (fRes.error) throw new Error(fRes.error.message);
 
     const horarios = horariosLeidos.horarios;
 
@@ -554,7 +565,8 @@ export async function GET(req: NextRequest) {
       horarios,
       justificaciones: jRes.filas,
       vacaciones: vRes.filas,
-      feriados: new Map((fRes.data ?? []).map((f) => [String(f.fecha), String(f.nombre)])),
+      feriados: fRes.feriados,
+      diasLibres: fRes.diasLibres,
       desde: q.desde,
       // 🔴 EL RELOJ SE MIDE HASTA EL CORTE, no hasta el fin de la quincena. Sin
       // corte, `hastaReloj` ES `q.hasta` y esto no cambia nada.

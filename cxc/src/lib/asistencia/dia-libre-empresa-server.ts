@@ -24,14 +24,19 @@ import {
 import {
   deudaDelDiaLibre, diasHabilesDelRango, MAX_DIAS_DE_UNA_CARGA, porQueNoLlevaDeuda,
 } from "./dia-libre-empresa";
-import { leerPersonas, leerReglas } from "./config-server";
+import { leerJustificaciones, leerPersonas, leerReglas, leerVacaciones } from "./config-server";
+import { diasSinDeudaPorAusenciaJustificada } from "./dia-libre-empresa";
 import { trabajaEseDia } from "./vigencia";
 import { vigenciasDeFilas } from "./config-server";
 import { rataPorHoraCalculo } from "./rata";
 import { leerHorarios } from "./horarios-server";
+import { leerQuienMarco } from "./quien-marco-server";
+import { leerFeriados } from "./feriados-server";
+import { EMPRESAS_ASISTENCIA } from "./config";
 import { DIAS_ELEGIBLES, resolverDiasLaborables } from "./horario-configurable";
 
 export const TABLA_DEUDA = "asistencia_dia_libre_deuda";
+
 export const TABLA_PAGO = "asistencia_dia_libre_pago";
 
 export interface SaldosLeidos {
@@ -116,6 +121,8 @@ export async function registrarDeudasDiaLibre(
   deudas: readonly DeudaACrear[],
   usuario: string,
   nota: string | null = null,
+  /** `true` = solo cuenta lo que crearía, sin escribir (30-sep-2026). */
+  soloPlan = false,
 ): Promise<ResultadoCarga> {
   if (deudas.length === 0) return { creadas: 0, repetidas: 0, faltaTabla: false };
   // 🔴 MULTIFASHION NUNCA LLEVA DEUDA (18-sep-2026). `planearCargaDiaLibre` ya
@@ -137,6 +144,7 @@ export async function registrarDeudasDiaLibre(
   if (faltan.length === 0) {
     return { creadas: 0, repetidas: deudas.length, faltaTabla: false };
   }
+  if (soloPlan) return { creadas: faltan.length, repetidas: deudas.length - faltan.length, faltaTabla: false };
 
   const { error } = await supabaseServer.from(TABLA_DEUDA).insert(
     faltan.map((d) => ({
@@ -319,9 +327,19 @@ export async function planearCargaDiaLibre(opts: {
     return { ...vacio, dias, error: porQueNoLlevaDeuda(empresa) };
   }
 
-  const [{ reglas }, personasDb, horariosLeidos] = await Promise.all([
+  const [{ reglas }, personasDb, horariosLeidos, marco, vac, just] = await Promise.all([
     leerReglas(), leerPersonas(), leerHorarios(),
+    // 🔴 REGLA 8 (30-sep-2026): quién marcó en esos días. Un día que no pasó
+    // todavía no tiene marcas y no saca a nadie.
+    leerQuienMarco(opts.desde, opts.hasta),
+    leerVacaciones(opts.desde, opts.hasta),
+    leerJustificaciones(opts.desde, opts.hasta),
   ]);
+  // 🔴 DE VACACIONES O INCAPACITADO NO DEBE (30-sep-2026). Daniel: *«si está de
+  // vacaciones no debería de deber, ni incapacitado»*. Ese día no se le regaló
+  // nada: ya no iba a trabajar. Solo la incapacidad de DÍA ENTERO (sin horas):
+  // un permiso de dos horas no le quita el día libre.
+  const noDebe = diasSinDeudaPorAusenciaJustificada(vac.filas, just.filas);
   const vigencias = vigenciasDeFilas(personasDb.filas);
   const elegidas = personasDb.filas.filter((f) => {
     const cod = String(f.empleado_codigo);
@@ -363,6 +381,10 @@ export async function planearCargaDiaLibre(opts: {
       // Quien todavía no había entrado —o ya se había ido— no recibió ningún día
       // libre: no se le justifica ni se le cobra nada.
       if (!trabajaEseDia(vigencias.get(cod), fecha)) continue;
+      // 🔴 REGLA 8 (30-sep-2026): quien SÍ trabajó ese día cobra normal y no
+      // debe nada — a él no se le dio el día libre.
+      if (marco.has(`${cod}|${fecha}`)) continue;
+      if (noDebe.has(`${cod}|${fecha}`)) continue;
       tuvoAlgunDia = true;
       if (monto === null || rata === null) continue;
       deudas.push({ codigo: cod, empresaKey: f.empresa ?? null, fecha, monto, rataHora: rata });
@@ -373,7 +395,7 @@ export async function planearCargaDiaLibre(opts: {
   }
 
   if (codigos.length === 0) {
-    return { ...vacio, dias, error: "Nadie estaba trabajando en esos días." };
+    return { ...vacio, dias, error: "Nadie tiene ese día libre: no estaban trabajando o marcaron ese día." };
   }
   return { deudas, codigos, sinRata, dias, error: null };
 }
@@ -412,4 +434,73 @@ export async function cargarDeudasDiaLibre(opts: {
     dias: plan.dias.length,
     error: null,
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 LA DEUDA SOLA: LOS DÍAS LIBRES DE CONFIGURACIÓN › FERIADOS (30-sep-2026)
+//
+// Daniel: al poner la fecha en Feriados como «Día libre», que la deuda nazca
+// sola. CUÁNDO nace:
+//   · al GENERAR la planilla (ruta de planilla), para los días libres del rango
+//     que YA PASARON (`fecha < hoy` de Panamá — el día en curso todavía no se
+//     juzga, regla 6: quien marque a las 3 p.m. no puede quedar debiendo);
+//   · al GUARDAR en Feriados una fecha que ya pasó (ruta de feriados).
+// 🔑 Nunca antes: la deuda congela `8 × rata` y usa la vigencia, los días
+// laborables y las marcas de ESE día. Una deuda de 2027 creada hoy saldría con
+// la rata de hoy, a gente que quizá ya no esté, y sin saber quién trabajó.
+//
+// 🔴 POR LA MISMA PUERTA que la carga a mano (`planearCargaDiaLibre` +
+// `registrarDeudasDiaLibre`): Multifashion afuera, quien marcó ese día afuera
+// (regla 8), y el índice `(empleado_codigo, fecha)` hace que repetir no cree
+// nada — el 21-sep cargado a mano no se duplica.
+//
+// ⚠️ NO escribe justificaciones: el día ya se paga porque el MOTOR lo lee de
+// Feriados (`diasLibres` en `armarReporte`), para todos y también Multifashion.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const USUARIO_DEUDA_AUTOMATICA = "sistema · Feriados";
+
+export interface DeudasAseguradas {
+  /** Los días libres que ya pasaron y se revisaron. */
+  fechas: string[];
+  /** Las que se crearon (con `soloPlan`, las que se crearían). */
+  creadas: number;
+  /** Las que ya estaban (cargadas a mano o en otra generación). */
+  repetidas: number;
+  /** A quién no se le pudo calcular la deuda, por nombre. */
+  sinRata: string[];
+  faltaTabla: boolean;
+}
+
+export async function asegurarDeudasDeDiasLibres(opts: {
+  desde: string;
+  hasta: string;
+  /** Hoy en Panamá (`hoyPanama()`): solo se miran los días ANTERIORES. */
+  hoy: string;
+  /** Una empresa, o todas las que llevan deuda. */
+  empresa?: string | null;
+  soloPlan?: boolean;
+}): Promise<DeudasAseguradas> {
+  const out: DeudasAseguradas = { fechas: [], creadas: 0, repetidas: 0, sinRata: [], faltaTabla: false };
+  if (opts.hasta < opts.desde) return out;
+  const { diasLibres } = await leerFeriados(opts.desde, opts.hasta);
+  const empresas = (opts.empresa ? [opts.empresa] : [...EMPRESAS_ASISTENCIA])
+    .filter((e) => !porQueNoLlevaDeuda(e));
+  for (const [fecha, nombre] of [...diasLibres].sort(([a], [b]) => a.localeCompare(b))) {
+    if (fecha >= opts.hoy) continue;
+    out.fechas.push(fecha);
+    const deudas: DeudaACrear[] = [];
+    for (const empresa of empresas) {
+      const plan = await planearCargaDiaLibre({ empresa, desde: fecha, hasta: fecha });
+      // Un sábado para quien no trabaja sábados, o nadie vigente: nada que deber.
+      if (plan.error) continue;
+      deudas.push(...plan.deudas);
+      out.sinRata.push(...plan.sinRata);
+    }
+    const r = await registrarDeudasDiaLibre(deudas, USUARIO_DEUDA_AUTOMATICA, nombre, opts.soloPlan === true);
+    if (r.faltaTabla) return { ...out, faltaTabla: true };
+    out.creadas += r.creadas;
+    out.repetidas += r.repetidas;
+  }
+  return out;
 }

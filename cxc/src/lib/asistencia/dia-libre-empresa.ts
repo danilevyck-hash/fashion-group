@@ -464,3 +464,22 @@ export function avisoMigracionDiaLibre(): string {
     + "Mientras tanto todo lo demás funciona igual."
   );
 }
+
+/** `codigo|fecha` de los días cubiertos por vacaciones o por una incapacidad
+ *  de día entero: esos días no generan deuda de día libre (30-sep-2026). */
+export function diasSinDeudaPorAusenciaJustificada(
+  vacaciones: readonly { empleado_codigo: string; desde: string; hasta: string }[],
+  justificaciones: readonly { empleado_codigo: string; desde: string; hasta: string; motivo?: string | null; hora_desde?: string | null }[],
+): Set<string> {
+  const out = new Set<string>();
+  const cubrir = (cod: string, desde: string, hasta: string) => {
+    for (let d = new Date(`${desde}T12:00:00Z`); d <= new Date(`${hasta}T12:00:00Z`); d = new Date(d.getTime() + 86_400_000)) {
+      out.add(`${String(cod).trim()}|${d.toISOString().slice(0, 10)}`);
+    }
+  };
+  for (const v of vacaciones) cubrir(v.empleado_codigo, v.desde, v.hasta);
+  for (const j of justificaciones) {
+    if (j.motivo === "Incapacidad" && !j.hora_desde) cubrir(j.empleado_codigo, j.desde, j.hasta);
+  }
+  return out;
+}

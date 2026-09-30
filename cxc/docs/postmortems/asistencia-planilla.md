@@ -3290,3 +3290,14 @@ Las únicas **4 marcas de teléfono** de toda la historia son las pruebas de Dan
 - 🔴 En ACS aprueba `daniel`, no la contadora; **cerrar no sale de esa tabla**: ella sigue cerrando las cuatro.
 - Los nombres se capitalizan con `nombre-en-pantalla.ts` y **no se inventan acentos**. La cédula vive en el bucket **privado `asistencia-cedulas`**: se guarda la RUTA y la URL se **firma al leer**, una hora.
 - Candados: `planilla-unida-comprobante` · `planilla-unida-cierre-prestamo` · `planilla-unida-corte-y-cableado` · `planilla-tres-descuentos` · `persona-en-el-centro` · `prestamos-una-puerta` · `prestamos-pestana-completa`.
+
+
+## Feriado o día libre (30-sep-2026)
+
+Daniel y la contable: las fiestas judías estaban cargadas en ⚙ › Feriados como feriado y el sistema las pagaba sin deuda. Daniel: *«es día libre pero los colaboradores deben»* las horas.
+
+- Cada fecha de Feriados es «Feriado · se paga» o «Día libre · el colaborador debe las horas» (`asistencia_feriados.tipo`, `lib/asistencia/feriados.ts`; lectura única `feriados-server.ts › leerFeriados`). La lista marca los días libres con la etiqueta gris «debe las horas» y el tipo se cambia con el MISMO upsert.
+- 🔴 **El motor**: un día libre NO es feriado. Quien marcó ese día cobra normal, sin el recargo 1.50 (regla 8); quien no marcó lo tiene como feriado —se paga, no es ausencia—, Multifashion incluida y sin deuda (`diasLibres` en `armarReporte`).
+- 🔴 **La deuda nace sola** (`asegurarDeudasDeDiasLibres`): al GENERAR la planilla, para los días libres ya pasados (`fecha < hoy` de Panamá; el día en curso no se juzga) desde un mes antes de la quincena —el corte deja los últimos días de la anterior—, y al GUARDAR en Feriados una fecha que ya pasó. Nunca antes: la deuda congela `8 × rata` y usa la vigencia, los días laborables y las marcas de ESE día. Pasa por la MISMA puerta que la carga a mano (`planearCargaDiaLibre` + `registrarDeudasDiaLibre`): Multifashion afuera, **quien marcó ese día afuera** (regla 8, `quien-marco-server.ts`, que también vale ahora para la carga a mano) e idempotente por `(empleado_codigo, fecha)`. No escribe justificaciones: el día ya se paga por el motor.
+- Medido el 30-sep-2026 en modo plan contra producción: 21-sep (Yom Kipur) → 0 deudas nuevas, 33 repetidas (las cargadas a mano), nadie marcó ese día; 12-sep (Rosh Hashaná, sábado) → nadie lo debe (nadie fuera de Multifashion trabaja sábado). Las 2 justificaciones del 21-sep sin deuda son las de sin salario (Yulissa Juárez, Daniel Levy).
+- ⚠️ Migración `20261222120000_asistencia_feriados_tipo.sql` escrita y SIN aplicar (marca 26 fiestas judías por lista de fechas y nombre). Sin ella todo es feriado, como antes, y la ruta rechaza (503) guardar un día libre. Candado `feriados-dia-libre`.

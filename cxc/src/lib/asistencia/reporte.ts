@@ -677,6 +677,11 @@ export function armarReporte(opts: {
    */
   vacaciones?: readonly Vacacion[];
   feriados: ReadonlyMap<string, string>;
+  /**
+   * 🔴 Los días libres de Configuración › Feriados (`tipo = 'dia_libre'`,
+   * 30-sep-2026). Sin esto nada cambia: vacío = todo lo de siempre.
+   */
+  diasLibres?: ReadonlyMap<string, string>;
   desde: string;
   hasta: string;
   /** Lo configurado en `asistencia_reglas`. Sin esto, los valores por defecto. */
@@ -906,7 +911,6 @@ export function armarReporte(opts: {
       );
       const entradaProgSeg = hhmmASeg(horarioHoy.entrada);
       const salidaProgSeg = hhmmASeg(horarioHoy.salida);
-      const feriado = feriados.get(fecha) ?? null;
       const just = justificacionDe(justificaciones, codigo, fecha);
       const ventana = just ? ventanaDe(just.hora_desde, just.hora_hasta) : null;
       // 🔴 UN PERMISO DE HORAS NO JUSTIFICA EL DÍA ENTERO. `justificado` es lo
@@ -929,6 +933,13 @@ export function armarReporte(opts: {
       const enCurso = !!opts.diaEnCurso && fecha >= opts.diaEnCurso;
       // Segundos desde medianoche, en orden.
       const crudas = (p.dias.get(fecha) ?? []).slice().sort((a, b) => a - b);
+      // 🔴 EL DÍA LIBRE DE CONFIGURACIÓN › FERIADOS (30-sep-2026, Daniel: «es
+      // día libre pero los colaboradores deben»). A quien NO marcó se le lee
+      // como feriado —se paga, no es ausencia, Multifashion incluida—; a quien
+      // SÍ marcó, como un día normal: sin el recargo 1.50 (regla 8). La deuda
+      // no nace acá: la anota `asegurarDeudasDeDiasLibres`.
+      const feriado = feriados.get(fecha)
+        ?? (crudas.length === 0 ? opts.diasLibres?.get(fecha) ?? null : null);
       // 🔴 LAS MARCAS SE MUESTRAN CON SEGUNDOS. Son el dato crudo del que salen
       // todos los números de abajo: si el papel dijera 08:00 y 17:04, nadie
       // podría reproducir a mano las horas que la planilla paga.

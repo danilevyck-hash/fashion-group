@@ -242,6 +242,9 @@ describe("3. 🔴 EL SERVIDOR RECHAZA la deuda de Multifashion, y a Boston le co
     leerReglas: async () => ({ reglas: REGLAS_DEFAULT, faltaMigracion: false }),
     leerPersonas: async () => { lecturas += 1; return { filas: personas, faltaMigracion: false }; },
     leerPersonasDelModulo: async () => ({ filas: personas, faltaMigracion: false }),
+    // 30-sep-2026: el plan también lee vacaciones e incapacidades (no deben). Acá nadie.
+    leerVacaciones: async () => ({ filas: [] }),
+    leerJustificaciones: async () => ({ filas: [] }),
   }));
   vi.doMock("@/lib/asistencia/horarios-server", () => ({
     leerHorarios: async () => ({
@@ -249,6 +252,8 @@ describe("3. 🔴 EL SERVIDOR RECHAZA la deuda de Multifashion, y a Boston le co
       faltaMigracion: false,
     }),
   }));
+  // 30-sep-2026: el plan lee quién marcó (regla 8). Acá nadie marcó: lo de siempre.
+  vi.doMock("@/lib/asistencia/quien-marco-server", () => ({ leerQuienMarco: async () => new Set<string>() }));
   beforeEach(() => { insertados.length = 0; lecturas = 0; });
   const rango = { desde: "2026-09-11", hasta: "2026-09-14" }; // vie · SÁB · dom · lun
 
