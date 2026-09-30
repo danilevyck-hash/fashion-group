@@ -17,6 +17,7 @@ import type { Colaborador, DatosPrestamos, FilaPrestamo } from "@/lib/prestamos-
 import AplicarQuincenaModal from "./components/AplicarQuincenaModal";
 import NuevoMovimientoModal from "./components/NuevoMovimientoModal";
 import ElegirPersonaModal from "./components/ElegirPersonaModal";
+import { descargarHistorialPrestamos, type AmbitoHistorial } from "@/lib/prestamos-descargar-historial";
 
 export type PrestamosInitialData = DatosPrestamos;
 
@@ -180,26 +181,13 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
   // 🔴 «¿Solo los que deben o todos?» — Daniel: «que esté la opción después de
   // apretar descargar». La pregunta va DESPUÉS del clic, no antes: elegir un
   // alcance que no se va a usar es un paso de más en la tarea habitual.
-  async function descargarHistorial(ambito: "deben" | "todos") {
+  async function descargarHistorial(ambito: AmbitoHistorial) {
     setPreguntaExcel(false);
     setExportando(true);
-    try {
-      const emp = filterEmpresa && filterEmpresa !== "all" ? `&empresa=${encodeURIComponent(filterEmpresa)}` : "";
-      const res = await fetch(`/api/prestamos/export-excel?ambito=${ambito}${emp}`);
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        const ymd = hoy.replace(/-/g, "");
-        const slug = filterEmpresa && filterEmpresa !== "all"
-          ? filterEmpresa.toLowerCase().replace(/\s+/g, "_")
-          : "todas_las_empresas";
-        link.download = `historial_prestamos_${ambito}_${slug}_${ymd}.xlsx`;
-        link.click();
-        URL.revokeObjectURL(url);
-      } else { showToast("Error al descargar"); }
-    } catch { showToast("Error al descargar"); }
+    // 29-sep-2026: la descarga vive en `lib/prestamos-descargar-historial.ts`,
+    // la MISMA que usa Asistencia › Préstamos.
+    const empresa = filterEmpresa && filterEmpresa !== "all" ? filterEmpresa : null;
+    if (!(await descargarHistorialPrestamos(ambito, empresa, hoy))) showToast("Error al descargar");
     setExportando(false);
   }
 

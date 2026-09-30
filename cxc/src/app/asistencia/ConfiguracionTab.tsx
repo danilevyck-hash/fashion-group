@@ -71,7 +71,7 @@ import {
   faltaEnPersona,
   fraseFalta,
 } from "@/lib/asistencia/configuracion-avisos";
-import { hoyPanama } from "@/lib/fecha-panama";
+import { fechaCortaRelativa, hoyPanama } from "@/lib/fecha-panama";
 import {
   CUENTAS_CONTABLES,
   ETIQUETA_EN_PLANILLA,
@@ -2049,9 +2049,15 @@ function NombrePersona({ p, anchoCodigo = 0 }: {
         {p.nombre ? capitalizarNombre(p.nombre) : `Código ${p.codigo}`}
         {anchoCodigo === 0 && p.nombre && <span className="ml-1.5 text-xs text-gray-400">código {p.codigo}</span>}
       </span>
-      <span className="block truncate text-[11px] text-gray-400">
-        {p.marcaciones} marcaciones{p.ultimaMarca ? ` · última ${p.ultimaMarca}` : ""}
-      </span>
+      {/* 🔴 8a (29-sep-2026, audit visual aprobado por Daniel): decía «248
+          marcaciones · última 2026-09-29». El conteo no ayuda a decidir nada y
+          queda en el `title`; la fecha se dice como la gente: «hoy», «ayer»,
+          «19 sep» (con el año solo si no es el de hoy), contra el hoy de Panamá. */}
+      {p.ultimaMarca && (
+        <span className="block truncate text-[11px] text-gray-400" title={`${p.marcaciones} marcaciones`}>
+          última marca {fechaCortaRelativa(p.ultimaMarca)}
+        </span>
+      )}
     </span>
   );
 }
@@ -2205,13 +2211,15 @@ function Dato({ etiqueta, valor, numero, ojo }: {
  * componente: acá solo se pinta. Ámbar cuando es plata que no se le paga por
  * asistencia; gris cuando es una forma de trabajar distinta.
  */
-function Excepcion({ e }: { e: { texto: string; ayuda: string; ojo?: boolean } }) {
+function Excepcion({ e }: { e: { texto: string; ayuda: string } }) {
+  // 🔴 8a (29-sep-2026, audit visual aprobado por Daniel): «Sin seguros»,
+  // «Servicio profesional» y «No cobra horas extra» son CONFIGURACIÓN normal,
+  // no una alerta: en la lista van en gris neutro. El ámbar queda para lo que
+  // pide acción. ⚠️ `ojo` sigue en `excepcionesDeLaFicha`: la ficha lo lee.
   return (
     <span
       title={e.ayuda}
-      className={`inline-block whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] ${
-        e.ojo ? "bg-amber-50 text-amber-800" : "bg-gray-100 text-gray-600"
-      }`}
+      className="inline-block whitespace-nowrap rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600"
     >
       {e.texto}
     </span>

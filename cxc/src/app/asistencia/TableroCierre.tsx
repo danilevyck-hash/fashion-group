@@ -52,7 +52,7 @@ const money = (n: number) =>
   `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function TableroCierre({
-  rol, desde, hasta, corte, elegido, puedeCerrar, onCerrada, soloInforma = false,
+  rol, desde, hasta, corte, elegido, puedeCerrar, onCerrada, soloInforma = false, onRevisar,
 }: {
   rol: string;
   desde: string;
@@ -72,6 +72,12 @@ export default function TableroCierre({
    * de SU empresa por su propia puerta.
    */
   soloInforma?: boolean;
+  /**
+   * 🔴 23a (29-sep-2026, aprobado por Daniel): «Revisar» cambia la empresa de
+   * arriba Y le avisa a la Planilla, que genera ESA empresa sola y baja a
+   * «Antes de cerrar». Sin la prop, solo cambia la empresa (como antes).
+   */
+  onRevisar?: (empresa: string) => void;
 }) {
   const { toast } = useToast();
   /** Las empresas que este rol puede mirar, según el SERVIDOR. */
@@ -246,7 +252,7 @@ export default function TableroCierre({
                     f.estado === "con-pendientes" ? (
                       <button
                         type="button"
-                        onClick={() => elegirEmpresa(f.empresa)}
+                        onClick={() => { onRevisar?.(f.empresa); elegirEmpresa(f.empresa); }}
                         aria-label={`Revisar lo que falta en ${f.etiqueta}`}
                         className="min-h-[44px] rounded-md border border-gray-300 px-3 text-sm font-medium text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
                       >

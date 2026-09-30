@@ -23,7 +23,9 @@
 //   4. **El lugar se dice UNA vez por fila y en palabras**: «Paso Canoas ·
 //      46 km de la tienda». El código de mapa —«G5P6+2GH»— no le dice nada a
 //      nadie y se va.
-//   5. **El atraso se dice SOLO cuando lo hubo**, en gris bajo la fila.
+//   5. **El atraso se dice SOLO cuando lo hubo**. Desde el 29-sep-2026 (27a)
+//      ya no es una línea gris bajo la fila: va en el `title` del punto gris
+//      de la marca y entero en la hoja que abre la fila.
 //      🔴 Y NUNCA con la palabra «llegó»: se dice **«se envió»**. La contadora
 //      leería «llegó 9 h después» como que la persona llegó tarde a trabajar, y
 //      no — a esa hora el teléfono recién encontró señal. Misma regla y mismo
@@ -47,6 +49,10 @@ import { SIN_LUGAR } from "@/lib/asistencia/lugar-de-marca";
 import { cuantoDespues } from "@/lib/asistencia/marcaciones-pestana";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { SALIDA_SOSPECHOSA_MIN } from "@/lib/asistencia/salida-sospechosa";
+// 🔴 25a (29-sep-2026): las marcas repetidas se juntan con la MISMA regla y el
+// MISMO número de la planilla —«1 minuto», ≤ 60 s de la última que cuenta—.
+// No hay un segundo umbral aquí.
+import { explicacionRepetida, olvidarRepetidas, type MarcaOlvidada } from "@/lib/asistencia/marca-repetida";
 
 /** Hoy prendido. `false` = la pestaña de chips y seis columnas del 25-sep. */
 export const MARCACIONES_POR_DIA = true;
@@ -63,8 +69,10 @@ export const ROTULO_TODOS = "Colaborador: todos";
 export const ETIQUETA_COLABORADOR = "Colaborador";
 
 /**
- * La nota del pie pasó a un ⓘ al lado del conteo: es la misma frase, en el
- * lugar donde no gasta un renglón.
+ * La nota de «solo se mira». 🔴 28a (29-sep-2026): arriba quedan SOLO período ·
+ * calendario · «Colaborador: todos»; se fueron «84 marcas» y su ⓘ. La frase no
+ * se pierde: va al pie de la hoja que abre la fila, que es donde a uno se le
+ * ocurre corregir una hora.
  */
 export const NOTA_SOLO_SE_MIRA =
   "Aquí solo se mira. Para corregir una hora, entra a Asistencia: la marca del teléfono no se edita " +
@@ -72,9 +80,6 @@ export const NOTA_SOLO_SE_MIRA =
 
 /** El aviso ROJO de la fila. Dos personas, un teléfono: eso sí se mira. */
 export const AVISO_MISMO_TELEFONO = "mismo teléfono que otro colaborador";
-
-/** Lo que se dice de una marca mandada sin señal. */
-export const TEXTO_SIN_SENAL = "sin señal";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EL LUGAR, EN PALABRAS
@@ -157,15 +162,8 @@ export const ROTULO_TRAMO: Record<string, string> = {
   salida: "Salida",
 };
 
-/**
- * Cómo se nombra el tramo dentro de la frase del atraso: «la entrada se envió
- * 9 h después». Sin artículo la frase quedaría en telegrama.
- */
-export const ARTICULO_TRAMO: Record<string, string> = {
-  entrada: "la entrada",
-  almuerzo: "el almuerzo",
-  salida: "la salida",
-};
+// 🩸 `ARTICULO_TRAMO` («la entrada», «la salida») se fue el 29-sep-2026 con la
+// línea gris del atraso (27a): el punto dice el atraso de SU marca.
 
 /** A qué tramo pertenece la marca número `indice` del día de esa persona. */
 export function tramoDeLaMarca(indice: number): ClaveTramo {
@@ -199,9 +197,10 @@ export function tramoDeLaMarca(indice: number): ClaveTramo {
 /** Cuántos minutos antes de su salida todavía se lee «Salida». */
 export const MINUTOS_ANTES_DE_LA_SALIDA = SALIDA_SOSPECHOSA_MIN;
 
-/** Los dos avisos ámbar de la fila. */
+/** El aviso ámbar de la fila. */
 export const AVISO_SIN_ALMUERZO = "sin almuerzo marcado";
-export const avisoMismoMinuto = (n: number): string => `${n} marcas en el mismo minuto`;
+// 🩸 «N marcas en el mismo minuto» se fue el 29-sep-2026 (25a): lo dice el ×N
+// de la marca, con la regla de la planilla. Dos avisos para lo mismo sobraban.
 
 const aMinutos = (hhmm: string | null | undefined): number | null => {
   const m = /^(\d{1,2}):(\d{2})/.exec(String(hhmm ?? "").trim());
@@ -223,21 +222,89 @@ function clavesDelDia(marcas: readonly MarcaParaElDia[]): ClaveTramo[] {
   return marcas.map((_, i) => (salida && i === 1 ? "salida" : tramoDeLaMarca(i)));
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 25a — LAS MARCAS REPETIDAS SE JUNTAN COMO LAS CUENTA LA PLANILLA
+// (29-sep-2026, aprobado por Daniel sobre su mockup)
+//
+// 🩸 Se leía «Entrada 09:00 · Almuerzo 18:00 – 18:00 · Salida 18:00»: el dedo
+// tocó tres veces al irse y la pantalla inventaba un almuerzo de cero minutos.
+// La planilla (`reporte.ts`) nunca lo vio así: olvida toda marca que llega a
+// 60 s o menos de la última que cuenta (`marca-repetida.ts`). Ahora la pantalla
+// dice lo mismo: «Entrada 09:00 · Salida 18:00 ×3», con el ×N en gris.
+//
+// 🔑 La regla NO se copia: se le pregunta a `olvidarRepetidas`, con su umbral
+// de siempre (`SEGUNDOS_MARCA_REPETIDA`). Los tramos se arman con las que
+// CUENTAN; las olvidadas suman al ×N de la que las hizo repetidas.
+// 🔑 Nada se esconde: la hoja que abre la fila trae TODAS las marcas crudas, y
+// la repetida dice su porqué con la MISMA frase del reporte.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const segundoDe = (m: MarcaParaElDia): number => Math.floor(Date.parse(m.ocurrioEn) / 1000);
+
+/** «HH:MM:SS» de Panamá (UTC−5 fijo), como la escribe el reporte. */
+const horaConSegundos = (seg: number): string =>
+  new Date((seg - 5 * 3600) * 1000).toISOString().slice(11, 19);
+
+export interface MarcasJuntas<T> {
+  /** Las que CUENTAN, en orden: con ellas se leen los tramos. */
+  buenas: T[];
+  /** Cuántas marcas crudas representa cada buena (ella + sus repetidas). */
+  veces: number[];
+  /** Por cada marca cruda: a qué buena pertenece y, si no cuenta, por qué. */
+  deCada: { buena: number; repetida: MarcaOlvidada | null }[];
+}
+
 /**
- * Los avisos ámbar del día: «sin almuerzo marcado» y «N marcas en el mismo
- * minuto» (varias marcas con la MISMA hora en pantalla: el dedo tocó de más).
- * Solo se dicen; no se esconde ni se junta ninguna marca.
+ * Parte las marcas de UN día (ya ordenadas) en las que cuentan y las repetidas,
+ * con la regla de la planilla.
+ *
+ * 🔑 El reparto de vuelta a cada marca es seguro: una olvidada está a ≤ 60 s de
+ * su buena y la buena siguiente a más de 60 s, así que recorrerlas en orden y
+ * tomar como buena la primera que coincide con la próxima buena no se equivoca
+ * (ni con dos marcas del mismo segundo: la primera es la que cuenta).
  */
-export function avisosDelDia(marcas: readonly MarcaParaElDia[]): string[] {
-  const avisos: string[] = [];
-  if (segundaEsSalida(marcas)) avisos.push(AVISO_SIN_ALMUERZO);
-  const porMinuto = new Map<string, number>();
-  for (const m of marcas) {
-    const h = horaCorta(m.ocurrioEn);
-    porMinuto.set(h, (porMinuto.get(h) ?? 0) + 1);
+export function juntarRepetidas<T extends MarcaParaElDia>(ordenadas: readonly T[]): MarcasJuntas<T> {
+  const { buenas: segBuenas, olvidadas } = olvidarRepetidas(ordenadas.map(segundoDe));
+  const out: MarcasJuntas<T> = { buenas: [], veces: [], deCada: [] };
+  let b = 0;
+  let o = 0;
+  for (const m of ordenadas) {
+    if (b < segBuenas.length && segundoDe(m) === segBuenas[b]) {
+      out.buenas.push(m);
+      out.veces.push(1);
+      out.deCada.push({ buena: out.buenas.length - 1, repetida: null });
+      b++;
+    } else {
+      const i = out.buenas.length - 1;
+      out.veces[i]++;
+      out.deCada.push({ buena: i, repetida: olvidadas[o++] ?? null });
+    }
   }
-  for (const n of porMinuto.values()) if (n > 1) avisos.push(avisoMismoMinuto(n));
-  return avisos;
+  return out;
+}
+
+/**
+ * Por cada marca CRUDA del día: con qué número de marca se nombra en la hoja
+ * (0 entrada … 3 salida, el mismo de `rotuloDeLaMarca`) y, si es repetida, la
+ * frase del reporte: «repetida, 15 s después de 18:00:05 — no cuenta».
+ */
+export function marcasDeLaHoja(ordenadas: readonly MarcaParaElDia[]): { indice: number; repetida: string | null }[] {
+  const j = juntarRepetidas(ordenadas);
+  const salida = segundaEsSalida(j.buenas);
+  return j.deCada.map((x) => ({
+    indice: salida && x.buena === 1 ? 3 : x.buena,
+    repetida: x.repetida
+      ? explicacionRepetida({
+          despuesDe: horaConSegundos(x.repetida.despuesDeSeg),
+          segundosDespues: x.repetida.segundosDespues,
+        })
+      : null,
+  }));
+}
+
+/** Los avisos ámbar del día (hoy solo «sin almuerzo marcado»). */
+export function avisosDelDia(marcas: readonly MarcaParaElDia[]): string[] {
+  return segundaEsSalida(juntarRepetidas(marcas).buenas) ? [AVISO_SIN_ALMUERZO] : [];
 }
 
 /** El rótulo de un tramo que no es uno de los tres. Sale del `tipo` de la base. */
@@ -250,24 +317,43 @@ function rotuloSuelto(indice: number, tipo: string | null | undefined): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LA FRASE DEL ATRASO — «se envió», nunca «llegó»
+// EL ATRASO — «se envió», nunca «llegó»
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** El verbo, en UN solo lugar. 🔴 «llegó» está prohibida en esta pantalla. */
 export const VERBO_ENVIO = "se envió";
 
 /**
- * «la entrada se envió 9 h después · la salida, 6 min después».
+ * 🔴 27a (29-sep-2026): el punto gris y lo que dice. 🩸 La línea gris «sin
+ * señal: la entrada se envió 9 h después · la salida, 6 min después» partía la
+ * fila en dos renglones; Daniel aprobó que salga de la fila. Queda el punto
+ * junto a la marca, y esto es su `title`: «Sin señal: se envió 9 h después».
+ * `null` = nada que decir, y no hay punto. El detalle entero sigue en la hoja.
  *
- * 🔴 El verbo se escribe UNA vez: repetirlo en cada tramo convierte la línea
- * gris en un párrafo.
+ * Con varias marcas en el tramo (almuerzo, o repetidas) cada atraso lleva su
+ * hora: «Sin señal: 18:01 se envió 6 min después».
  */
-export function frasesDeEnvio(
-  items: readonly { articulo: string; cuanto: string }[],
-): string {
-  return items
-    .map((x, i) => (i === 0 ? `${x.articulo} ${VERBO_ENVIO} ${x.cuanto}` : `${x.articulo}, ${x.cuanto}`))
+export function avisoDelTramo(marcas: readonly MarcaParaElDia[]): string | null {
+  const sinSenal = marcas.some((m) => m.sinSenal);
+  const envios = marcas
+    .map((m) => ({ hora: horaCorta(m.ocurrioEn), cuanto: cuantoDespues(m.ocurrioEn, m.creadoEn) }))
+    .filter((x): x is { hora: string; cuanto: string } => Boolean(x.cuanto));
+  const frase = envios
+    .map((x) => (marcas.length > 1 ? `${x.hora} ${VERBO_ENVIO} ${x.cuanto}` : `${VERBO_ENVIO} ${x.cuanto}`))
     .join(" · ");
+  if (sinSenal) return frase ? `Sin señal: ${frase}` : "Sin señal";
+  return frase ? frase.charAt(0).toUpperCase() + frase.slice(1) : null;
+}
+
+/**
+ * La línea bajo la hora en la hoja que abre la fila (27a: el atraso vive aquí,
+ * entero). 🔴 Con «se envió», como la pantalla: «Marcada sin señal · se envió
+ * 9 h después». La cuenta es la MISMA (`cuantoDespues`).
+ */
+export function detalleEnLaHoja(m: MarcaParaElDia): string {
+  const base = m.sinSenal ? "Marcada sin señal" : "Marcada con señal";
+  const cuanto = cuantoDespues(m.ocurrioEn, m.creadoEn);
+  return cuanto ? `${base} · ${VERBO_ENVIO} ${cuanto}` : `${base} · al instante`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -297,10 +383,22 @@ export interface MarcaParaElDia {
 export interface TramoDibujado {
   clave: ClaveTramo;
   rotulo: string;
-  /** «08:59» o «18:01 – 18:01». */
+  /** «08:59» o «18:01 – 18:01», sin el ×N. */
   horas: string;
-  /** Alguna de sus marcas se mandó sin señal: va con el punto gris. */
+  /** Cada hora del tramo con cuántas marcas crudas junta (25a: «18:00 ×3»). */
+  partes: { hora: string; veces: number }[];
+  /** Alguna de sus marcas se mandó sin señal. */
   sinSenal: boolean;
+  /** El `title` del punto gris (ver `avisoDelTramo`); `null` = sin punto. */
+  aviso: string | null;
+}
+
+/** Un lugar ya en palabras, en sus dos partes y entero. */
+export interface LugarDibujado {
+  nombre: string;
+  distancia: string | null;
+  /** «Paso Canoas · 46 km de la tienda». Es el `title`. */
+  texto: string;
 }
 
 export interface FilaPorDia<T> {
@@ -315,15 +413,15 @@ export interface FilaPorDia<T> {
   /** Las dos partes del lugar, para dibujarlas por separado. */
   lugarNombre: string;
   lugarDistancia: string | null;
+  /** 26a: la fila escribe su lugar porque NO es el del día (ver `lugarDelDia`). */
+  lugarEnLaFila: boolean;
   /** Los avisos ámbar del día (ver `avisosDelDia`). */
   avisos: string[];
-  /** La 2.ª marca se lee como SALIDA (ver `segundaEsSalida`). */
-  segundaEsSalida: boolean;
-  /** La línea gris de abajo, o `null` cuando no hay nada que decir. */
-  detalle: string | null;
+  /** Por cada marca cruda: su número en la hoja y, si es repetida, su porqué. */
+  hoja: { indice: number; repetida: string | null }[];
   /** Ese día, otro colaborador marcó desde este mismo teléfono. */
   mismoTelefono: boolean;
-  /** Las marcas del día, en orden: es lo que abre la hoja de fotos y mapa. */
+  /** TODAS las marcas crudas del día, en orden: es lo que abre la hoja. */
   marcas: T[];
 }
 
@@ -332,6 +430,8 @@ export interface DiaDeMarcaciones<T> {
   dia: string;
   /** «vie 25 sep». */
   rotulo: string;
+  /** 26a: el lugar de TODO el día, al lado de la fecha; `null` = no hay uno. */
+  lugar: LugarDibujado | null;
   filas: FilaPorDia<T>[];
 }
 
@@ -373,69 +473,88 @@ export function partesDelLugarDeLaFila(
   return { nombre: "", distancia: null };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 26a — EL LUGAR SOLO CUANDO CAMBIA (29-sep-2026, aprobado por Daniel)
+//
+// 🩸 «Paso Canoas · 46 km de la tienda» se repetía en cada fila del día, igual
+// en todas. Ahora el lugar del día va UNA vez, al lado de la fecha —«jue 24 sep
+// · Paso Canoas · 46 km de la tienda»— y la fila solo escribe el suyo cuando es
+// OTRO.
+//
+// 🔑 «MISMO LUGAR» = lo mismo que se LEE en pantalla: el nombre sin el código de
+// mapa y la distancia YA REDONDEADA («46 km de la tienda»), comparados sin
+// mayúsculas ni espacios de más. Dos marcas a 46,2 y 46,4 km del mismo pueblo
+// son el mismo lugar; «Paso Canoas» a 46 km y a 12 km, no. Sin nombre ni
+// distancia, la fila no tiene lugar (clave vacía).
+//
+// 🔑 EL LUGAR DEL DÍA: el que más filas comparten, si es UNO solo (sin empate) y
+// lo comparten al menos dos filas —o el día tiene una sola fila—. Si no, el día
+// no tiene lugar y cada fila escribe el suyo. Una fila SIN lugar en un día que
+// sí tiene uno escribe «—»: callarse diría que estuvo ahí.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** La clave con que se compara «mismo lugar». Vacía = sin lugar. */
+export function claveDelLugar(p: { nombre: string; distancia: string | null }): string {
+  if (!p.nombre && !p.distancia) return "";
+  return lugarUnido(p).toLocaleLowerCase("es").replace(/\s+/g, " ").trim();
+}
+
+/** La clave del lugar del día (ver arriba), o `""` si el día no tiene uno. */
+export function lugarDelDia(claves: readonly string[]): string {
+  const cuenta = new Map<string, number>();
+  for (const c of claves) if (c) cuenta.set(c, (cuenta.get(c) ?? 0) + 1);
+  let mejor = "";
+  let n = 0;
+  let empate = false;
+  for (const [c, k] of cuenta) {
+    if (k > n) { mejor = c; n = k; empate = false; } else if (k === n) empate = true;
+  }
+  if (!mejor || empate) return "";
+  return n >= 2 || claves.length === 1 ? mejor : "";
+}
+
+/** ¿Alguna fila del período escribe su lugar? Si no, la columna «Lugar» no va. */
+export function hayColumnaLugar(dias: readonly DiaDeMarcaciones<unknown>[]): boolean {
+  return dias.some((d) => d.filas.some((f) => f.lugarEnLaFila));
+}
+
 const porHora = (a: MarcaParaElDia, b: MarcaParaElDia): number =>
   a.ocurrioEn.localeCompare(b.ocurrioEn) || a.id.localeCompare(b.id);
 
-/** Los tramos de un día, ya ordenado por hora. */
+/** Los tramos de un día, ya ordenado por hora, con las repetidas juntas (25a). */
 export function tramosDelDia(marcas: readonly MarcaParaElDia[]): TramoDibujado[] {
+  const j = juntarRepetidas(marcas);
+  const claves = clavesDelDia(j.buenas);
   const orden: ClaveTramo[] = [];
-  const juntas = new Map<ClaveTramo, { horas: string[]; sinSenal: boolean; rotulo: string }>();
-  const claves = clavesDelDia(marcas);
+  const juntas = new Map<ClaveTramo, { partes: { hora: string; veces: number }[]; crudas: MarcaParaElDia[]; rotulo: string }>();
 
-  marcas.forEach((m, i) => {
+  j.buenas.forEach((m, i) => {
     const clave = claves[i];
-    const rotulo = ROTULO_TRAMO[clave] ?? rotuloSuelto(i, m.tipo);
+    const crudas = marcas.filter((_, k) => j.deCada[k].buena === i);
+    const parte = { hora: horaCorta(m.ocurrioEn), veces: j.veces[i] };
     const g = juntas.get(clave);
     if (!g) {
       orden.push(clave);
-      juntas.set(clave, { horas: [horaCorta(m.ocurrioEn)], sinSenal: Boolean(m.sinSenal), rotulo });
+      juntas.set(clave, { partes: [parte], crudas, rotulo: ROTULO_TRAMO[clave] ?? rotuloSuelto(i, m.tipo) });
     } else {
-      g.horas.push(horaCorta(m.ocurrioEn));
-      g.sinSenal = g.sinSenal || Boolean(m.sinSenal);
+      g.partes.push(parte);
+      g.crudas.push(...crudas);
     }
   });
 
   return orden.map((clave) => {
     const g = juntas.get(clave)!;
+    const horas = g.partes.map((p) => p.hora);
     return {
       clave,
       rotulo: g.rotulo,
       // 🔑 El almuerzo se lee de corrido: «18:01 – 18:01», nunca dos renglones.
-      horas: g.horas.length > 1 ? `${g.horas[0]} – ${g.horas[g.horas.length - 1]}` : g.horas[0],
-      sinSenal: g.sinSenal,
+      horas: horas.length > 1 ? `${horas[0]} – ${horas[horas.length - 1]}` : horas[0],
+      partes: g.partes.length > 1 ? [g.partes[0], g.partes[g.partes.length - 1]] : g.partes,
+      sinSenal: g.crudas.some((m) => m.sinSenal),
+      aviso: avisoDelTramo(g.crudas),
     };
   });
-}
-
-/**
- * La línea gris bajo la fila, o `null` cuando el día no tiene nada que decir.
- *
- * 🔴 **32 de las 37 marcas medidas llegaron al instante y no escriben nada.**
- * Una línea que sale siempre se deja de leer.
- */
-export function detalleDelDia(marcas: readonly MarcaParaElDia[]): string | null {
-  const haySinSenal = marcas.some((m) => m.sinSenal);
-
-  const envios: { articulo: string; cuanto: string }[] = [];
-  const yaDicho = new Set<ClaveTramo>();
-  const claves = clavesDelDia(marcas);
-  marcas.forEach((m, i) => {
-    const cuanto = cuantoDespues(m.ocurrioEn, m.creadoEn);
-    if (!cuanto) return;
-    const clave = claves[i];
-    // Un tramo habla UNA vez: si la salida a almuerzo y la vuelta se atrasaron,
-    // se dice «el almuerzo», no dos veces lo mismo.
-    if (yaDicho.has(clave)) return;
-    yaDicho.add(clave);
-    envios.push({
-      articulo: ARTICULO_TRAMO[clave] ?? `la marca de ${ROTULO_TRAMO[clave] ?? rotuloSuelto(i, m.tipo)}`,
-      cuanto,
-    });
-  });
-
-  if (envios.length === 0) return haySinSenal ? TEXTO_SIN_SENAL : null;
-  const frase = frasesDeEnvio(envios);
-  return haySinSenal ? `${TEXTO_SIN_SENAL}: ${frase}` : frase;
 }
 
 /**
@@ -474,9 +593,9 @@ export function diasDeMarcaciones<T extends MarcaParaElDia>(
       lugar: lugarUnido(lugar),
       lugarNombre: lugar.nombre,
       lugarDistancia: lugar.distancia,
+      lugarEnLaFila: true,
       avisos: avisosDelDia(ordenadas),
-      segundaEsSalida: segundaEsSalida(ordenadas),
-      detalle: detalleDelDia(ordenadas),
+      hoja: marcasDeLaHoja(ordenadas),
       mismoTelefono: ordenadas.some((m) => compartidas?.has(m.id) === true),
       marcas: ordenadas,
     };
@@ -487,9 +606,16 @@ export function diasDeMarcaciones<T extends MarcaParaElDia>(
 
   return [...porDia.entries()]
     .sort((a, b) => b[0].localeCompare(a[0]))
-    .map(([dia, filas]) => ({
-      dia,
-      rotulo: fechaDelDia(dia),
-      filas: filas.sort((a, b) => a.nombre.localeCompare(b.nombre)),
-    }));
+    .map(([dia, filas]) => {
+      const claves = filas.map((f) => claveDelLugar({ nombre: f.lugarNombre, distancia: f.lugarDistancia }));
+      const delDia = lugarDelDia(claves);
+      const comun = delDia ? filas[claves.indexOf(delDia)] : null;
+      filas.forEach((f, i) => { f.lugarEnLaFila = claves[i] !== delDia; });
+      return {
+        dia,
+        rotulo: fechaDelDia(dia),
+        lugar: comun ? { nombre: comun.lugarNombre, distancia: comun.lugarDistancia, texto: comun.lugar } : null,
+        filas: filas.sort((a, b) => a.nombre.localeCompare(b.nombre)),
+      };
+    });
 }

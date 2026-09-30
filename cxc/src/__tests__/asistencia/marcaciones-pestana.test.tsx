@@ -355,7 +355,10 @@ describe("🔴 en la computadora, las seis columnas", () => {
     expect(screen.getByText("6 marcas")).toBeTruthy();
     // 🔑 El pie se importa, no se vuelve a escribir.
     expect(leer(DE_ANTES)).toContain('from "@/lib/ui/pie-de-lista"');
-    expect(leer(TAB)).toContain('from "@/lib/ui/pie-de-lista"');
+    // ⚠️ 29-sep-2026 (28a, aprobado por Daniel): la pestaña por día ya no dice
+    // «N marcas» arriba —quedan solo período · calendario · «Colaborador:
+    // todos»—, así que no importa el pie. La de antes lo sigue usando.
+    expect(leer(TAB)).not.toContain('from "@/lib/ui/pie-de-lista"');
   });
 });
 

@@ -101,6 +101,7 @@ import { antesDeCerrarDelCuadro } from "@/lib/asistencia/antes-de-cerrar-del-cua
 // 🔴 CON «TODAS», EL TABLERO DE CIERRE (19-sep-2026): una línea por empresa,
 // con personas · neto · qué falta · Cerrar. Nunca un total del grupo.
 import TableroCierre from "./TableroCierre";
+import { queHacerConRevisar, type PedidoDeRevisar } from "@/lib/asistencia/tablero-cierre";
 import {
   TEXTO_SIN_DESCONTAR,
   TITULO_SIN_DESCONTAR,
@@ -724,6 +725,39 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
     if (!elegido || sinEmpresa) return;
     setPedido({ desde, hasta, empresa, corte });
   }, [desde, elegido, empresa, hasta, corte, sinEmpresa]);
+
+  // ── 🔴 23a — «REVISAR» DEL TABLERO GENERA SOLO (29-sep-2026) ──────────────
+  // Daniel aprobó: con «Todas», «Revisar» cambia a ESA empresa, genera su
+  // planilla con el MISMO `generar` y baja a «Antes de cerrar». 🩸 Antes solo
+  // cambiaba el selector y había que tocar «Generar» a mano. La regla de
+  // cuándo generar vive en `queHacerConRevisar` (pura): UNA vez, y solo si lo
+  // de arriba es exactamente la empresa y la quincena que se pidió.
+  const revisarPendiente = useRef<PedidoDeRevisar | null>(null);
+  /** Se baja a «Antes de cerrar» cuando llega un cuadro NUEVO (no el que había). */
+  const irAAntesDeCerrar = useRef<{ antes: Respuesta | null } | null>(null);
+  const antesDeCerrarRef = useRef<HTMLDivElement>(null);
+  const revisarEmpresa = useCallback((e: string) => {
+    revisarPendiente.current = { empresa: e, desde, hasta, corte };
+  }, [desde, hasta, corte]);
+  useEffect(() => {
+    const p = revisarPendiente.current;
+    if (!p) return;
+    const que = queHacerConRevisar(p, { empresa, desde, hasta, corte, sinEmpresa, elegido });
+    if (que === "esperar") return;
+    revisarPendiente.current = null;
+    if (que !== "generar") return;
+    // «generar» ya exige empresa elegida y quincena: el MISMO `generar` pide.
+    irAAntesDeCerrar.current = { antes: data };
+    generar();
+  }, [empresa, desde, hasta, corte, sinEmpresa, elegido, generar, data]);
+  useEffect(() => {
+    const ir = irAAntesDeCerrar.current;
+    if (!ir || cargando) return;
+    if (error) { irAAntesDeCerrar.current = null; return; }
+    if (!data || data === ir.antes) return;
+    irAAntesDeCerrar.current = null;
+    antesDeCerrarRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  }, [cargando, data, error]);
 
   // ── LO QUE SE DERIVA DEL ESTADO ────────────────────────────────────────────
   /** ¿El cuadro en pantalla es de lo que está elegido arriba? */
@@ -1605,6 +1639,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           puedeCerrar={puedeCerrarla}
           soloInforma={ASISTENCIA_PANTALLA_2026_09 && celular}
           onCerrada={() => setDesactualizada(true)}
+          onRevisar={revisarEmpresa}
         />
       )}
 
@@ -1612,7 +1647,11 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           TABLERO de cierre de «Todas» necesita lo mismo, y dos copias de quince
           campos son dos verdades sobre qué frena un cierre. La regla sigue
           siendo `armarAntesDeCerrar`. */}
-      {antesDeCerrar && <AntesDeCerrar datos={antesDeCerrar} />}
+      {antesDeCerrar && (
+        <div ref={antesDeCerrarRef} className="scroll-mt-24">
+          <AntesDeCerrar datos={antesDeCerrar} />
+        </div>
+      )}
 
       {/* 🔴 EL VACÍO ES EL ESTADO INICIAL, y dice qué hacer. No es un error ni
           un «no hay datos»: es que nadie eligió todavía qué quincena pagar. */}

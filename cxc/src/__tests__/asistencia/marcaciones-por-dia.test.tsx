@@ -37,13 +37,15 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
-  ARTICULO_TRAMO, AVISO_MISMO_TELEFONO, COLUMNAS_POR_DIA, MARCACIONES_POR_DIA,
-  NOTA_SOLO_SE_MIRA, ROTULO_TODOS, VERBO_ENVIO, detalleDelDia, diasDeMarcaciones,
-  distanciaDeLaTienda, fechaDelDia, frasesDeEnvio, lugarDeLaFila, lugarEnPalabras,
+  AVISO_MISMO_TELEFONO, COLUMNAS_POR_DIA, MARCACIONES_POR_DIA,
+  NOTA_SOLO_SE_MIRA, ROTULO_TODOS, VERBO_ENVIO, avisoDelTramo, detalleEnLaHoja, diasDeMarcaciones,
+  distanciaDeLaTienda, fechaDelDia, lugarDeLaFila, lugarEnPalabras,
   sinCodigoDeMapa, tramoDeLaMarca, tramosDelDia,
-  AVISO_SIN_ALMUERZO, MINUTOS_ANTES_DE_LA_SALIDA, avisoMismoMinuto, avisosDelDia,
+  AVISO_SIN_ALMUERZO, MINUTOS_ANTES_DE_LA_SALIDA, avisosDelDia,
   partesDelLugarDeLaFila, segundaEsSalida,
+  claveDelLugar, hayColumnaLugar, juntarRepetidas, lugarDelDia, marcasDeLaHoja,
 } from "@/lib/asistencia/marcaciones-por-dia";
+import { SEGUNDOS_MARCA_REPETIDA } from "@/lib/asistencia/marca-repetida";
 import { SALIDA_SOSPECHOSA_MIN } from "@/lib/asistencia/salida-sospechosa";
 import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
 import { SIN_LUGAR } from "@/lib/asistencia/lugar-de-marca";
@@ -212,14 +214,19 @@ describe("🔴 1 · sin chips: arriba quedan el período y UN desplegable", () =
     }
   });
 
-  it("el desplegable filtra, y el pie sigue a lo que se ve", async () => {
+  // ⚠️ 29-sep-2026 (28a, aprobado por Daniel): el conteo «5 marcas» / «1 marca
+  // de 5» se fue de arriba. El desplegable sigue filtrando; se prueba por lo que
+  // se DIBUJA, no por el pie.
+  it("el desplegable filtra (y arriba ya no hay conteo)", async () => {
     servir([...DIA_DE_ANA, ...DIA_DE_ANGEL]);
     render(<MarcacionesTab empresa="todas" />);
     await yaSalio();
-    expect(screen.getByText("5 marcas")).toBeTruthy();
+    expect(screen.queryByText(/\d+ marcas?( de \d+)?$/)).toBeNull();
+    expect(screen.getByText("jue 24 sep")).toBeTruthy();
 
     fireEvent.change(screen.getByRole("combobox", { name: "Colaborador" }), { target: { value: "9" } });
-    await waitFor(() => expect(screen.getByText("1 marca de 5")).toBeTruthy());
+    await waitFor(() => expect(screen.queryByText("jue 24 sep")).toBeNull());
+    expect(screen.getByText("vie 25 sep")).toBeTruthy();
     // El día de Ana deja de dibujarse entero: encabezado y fila.
     expect(screen.queryByText("jue 24 sep")).toBeNull();
     expect(screen.queryByRole("cell", { name: /Ana Trejos/ })).toBeNull();
@@ -233,10 +240,21 @@ describe("🔴 1 · sin chips: arriba quedan el período y UN desplegable", () =
 describe("🔴 2 · agrupado por día, una fila por colaborador", () => {
   it("las cuatro marcas se leen como TRES tramos, con el almuerzo junto", () => {
     expect([0, 1, 2, 3].map(tramoDeLaMarca)).toEqual(["entrada", "almuerzo", "almuerzo", "salida"]);
-    const t = tramosDelDia(DIA_DE_ANA);
-    expect(t.map((x) => `${x.rotulo} ${x.horas}`)).toEqual([
-      "Entrada 08:59", "Almuerzo 18:01 – 18:01", "Salida 18:01",
+    const cuatro = [
+      marca({ id: "a", codigo: "2", ocurrioEn: "2026-09-24T13:59:00.000Z" }),
+      marca({ id: "b", codigo: "2", ocurrioEn: "2026-09-24T17:00:00.000Z" }),
+      marca({ id: "c", codigo: "2", ocurrioEn: "2026-09-24T18:00:00.000Z" }),
+      marca({ id: "d", codigo: "2", ocurrioEn: "2026-09-24T23:01:00.000Z" }),
+    ];
+    expect(tramosDelDia(cuatro).map((x) => `${x.rotulo} ${x.horas}`)).toEqual([
+      "Entrada 08:59", "Almuerzo 12:00 – 13:00", "Salida 18:01",
     ]);
+    // ⚠️ 29-sep-2026 (25a, aprobado por Daniel): el día de Ana se leía
+    // «Almuerzo 18:01 – 18:01 · Salida 18:01». Sus tres últimas están a 30 y 40 s
+    // de la de 18:01:00, y la planilla las olvida: ahora es UNA marca ×3.
+    const t = tramosDelDia(DIA_DE_ANA);
+    expect(t.map((x) => `${x.rotulo} ${x.horas}`)).toEqual(["Entrada 08:59", "Almuerzo 18:01"]);
+    expect(t[1].partes).toEqual([{ hora: "18:01", veces: 3 }]);
   });
 
   it("🔴 el día más reciente arriba, y dentro por nombre", () => {
@@ -248,7 +266,7 @@ describe("🔴 2 · agrupado por día, una fila por colaborador", () => {
     expect(d[1].filas[0].nombre).toBe("Ana Trejos");
   });
 
-  it("se dibuja el encabezado del día y la fila entera, con TRES columnas", async () => {
+  it("se dibuja el encabezado del día y la fila entera", async () => {
     servir([...DIA_DE_ANA, ...DIA_DE_ANGEL]);
     render(<MarcacionesTab empresa="todas" />);
     await yaSalio();
@@ -256,12 +274,16 @@ describe("🔴 2 · agrupado por día, una fila por colaborador", () => {
     expect(screen.getByText("vie 25 sep")).toBeTruthy();
     expect(screen.getByText("jue 24 sep")).toBeTruthy();
     expect([...COLUMNAS_POR_DIA]).toEqual(["Colaborador", "Sus marcas del día", "Lugar"]);
-    for (const c of COLUMNAS_POR_DIA) {
+    // ⚠️ 29-sep-2026 (26a): cada día tiene UNA fila, su lugar sube a la fecha y
+    // la columna «Lugar» no se dibuja. Las otras dos, sí.
+    for (const c of COLUMNAS_POR_DIA.slice(0, 2)) {
       expect(screen.getAllByRole("columnheader", { name: c }).length).toBeGreaterThan(0);
     }
-    // 🔴 Las horas son las de PANAMÁ (UTC−5 fijo) y el almuerzo va de corrido.
+    expect(screen.queryByRole("columnheader", { name: "Lugar" })).toBeNull();
+    // 🔴 Las horas son las de PANAMÁ (UTC−5 fijo). (25a: las repetidas de las
+    // 18:01 se juntan en «18:01 ×3».)
     expect(screen.getByText("08:59")).toBeTruthy();
-    expect(screen.getByText("18:01 – 18:01")).toBeTruthy();
+    expect(screen.getByText("18:01")).toBeTruthy();
     // 🩸 Y la fecha ya NO se busca tocando un chip: sale de encabezado.
     expect(fechaDelDia("2026-09-25")).toBe("vie 25 sep");
   });
@@ -325,33 +347,30 @@ describe("🔴 3 · el lugar, en palabras y sin el código de mapa", () => {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("🔴 4 · «se envió», nunca «llegó»", () => {
-  it("la frase del mockup, letra por letra", () => {
-    expect(detalleDelDia(DIA_DE_ANA)).toBe(
-      "sin señal: la entrada se envió 9 h después · la salida, 6 min después",
-    );
+  // ⚠️ 29-sep-2026 (27a, aprobado por Daniel): la línea gris «sin señal: la
+  // entrada se envió 9 h después · la salida, 6 min después» salió de la fila.
+  // Lo mismo lo dice el punto gris (su `title`) y la hoja. «se envió» sigue.
+  it("el punto dice el atraso de SU marca, con «se envió»", () => {
+    const t = tramosDelDia(DIA_DE_ANA);
+    expect(t[0].aviso).toBe("Sin señal: se envió 9 h después");
+    // Varias marcas en el tramo: cada atraso lleva su hora.
+    expect(t[1].aviso).toBe("Sin señal: 18:01 se envió 6 min después");
     expect(VERBO_ENVIO).toBe("se envió");
-    expect(ARTICULO_TRAMO.entrada).toBe("la entrada");
-  });
-
-  it("🔴 el verbo se escribe UNA vez; el resto va con coma", () => {
-    expect(frasesDeEnvio([
-      { articulo: "la entrada", cuanto: "9 h después" },
-      { articulo: "la salida", cuanto: "6 min después" },
-    ])).toBe("la entrada se envió 9 h después · la salida, 6 min después");
   });
 
   it("🩸 sin atraso NO se escribe nada — 32 de las 37 medidas llegaron al instante", async () => {
-    expect(detalleDelDia(DIA_DE_ANGEL)).toBeNull();
+    expect(avisoDelTramo(DIA_DE_ANGEL)).toBeNull();
     servir(DIA_DE_ANGEL);
     render(<MarcacionesTab empresa="todas" />);
     await yaSalio();
     expect(screen.queryByText("al instante")).toBeNull();
     expect(screen.queryByText(/se envió/)).toBeNull();
+    expect(document.querySelectorAll("[title^='Sin señal']")).toHaveLength(0);
   });
 
-  it("sin señal y sin atraso, la línea dice solo «sin señal»", () => {
+  it("sin señal y sin atraso, el punto dice solo «Sin señal»", () => {
     const uno = [marca({ id: "77", codigo: "2", ocurrioEn: "2026-09-24T13:59:00.000Z", sinSenal: true })];
-    expect(detalleDelDia(uno)).toBe("sin señal");
+    expect(avisoDelTramo(uno)).toBe("Sin señal");
   });
 
   it("🔴 BARRIDO: la palabra «llegó» no está en la pantalla nueva ni en su regla", () => {
@@ -369,9 +388,10 @@ describe("🔴 4 · «se envió», nunca «llegó»", () => {
     servir(DIA_DE_ANA);
     render(<MarcacionesTab empresa="todas" />);
     await yaSalio();
-    expect(screen.getAllByLabelText("sin señal").length).toBe(2);
-    // El texto «sin señal» solo vive en la línea gris de abajo, no en un chip.
-    expect(screen.getAllByText(/^sin señal:/)).toHaveLength(1);
+    expect(screen.getAllByLabelText(/^Sin señal/).length).toBe(2);
+    // ⚠️ 29-sep-2026 (27a): «sin señal» ya no es texto en la fila — solo el
+    // `title` del punto.
+    expect(screen.queryByText(/sin señal/i)).toBeNull();
   });
 });
 
@@ -425,13 +445,18 @@ describe("🔴 5 · la columna «Aparato» se va, el aviso rojo se queda", () =>
 // 6 · LA NOTA EN UN ⓘ, Y LA FILA ABRE LAS FOTOS
 // ═════════════════════════════════════════════════════════════════════════════
 
-describe("🔴 6 · la nota pasa a un ⓘ y la fila abre la hoja del día", () => {
-  it("la nota del pie no gasta un renglón: va en el título del ⓘ", async () => {
+describe("🔴 6 · la nota va a la hoja y la fila abre la hoja del día", () => {
+  // ⚠️ 29-sep-2026 (28a, aprobado por Daniel): arriba quedan solo período ·
+  // calendario · «Colaborador: todos». El ⓘ se fue; su frase NO se pierde: va
+  // al pie de la hoja que abre la fila.
+  it("arriba no hay ⓘ; la nota cierra la hoja", async () => {
     servir(DIA_DE_ANA);
     render(<MarcacionesTab empresa="todas" />);
     await yaSalio();
-    const info = screen.getByLabelText(NOTA_SOLO_SE_MIRA);
-    expect(info.textContent).toBe("ⓘ");
+    expect(screen.queryByText("ⓘ")).toBeNull();
+    expect(screen.queryByLabelText(NOTA_SOLO_SE_MIRA)).toBeNull();
+    fireEvent.click(screen.getByRole("cell", { name: /Ana Trejos/ }));
+    await waitFor(() => expect(screen.getByText(NOTA_SOLO_SE_MIRA)).toBeTruthy());
     expect(NOTA_SOLO_SE_MIRA).toContain("Aquí solo se mira");
   });
 
@@ -540,8 +565,14 @@ describe("🔴 9 · con MARCACIONES_POR_DIA apagado vuelve la pantalla de chips"
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("🔴 10 · 16a — el encabezado UNA vez, pegado bajo el de la app", () => {
-  it("con dos días, «Colaborador · Sus marcas del día · Lugar» sale UNA vez y cada día solo con su fecha", async () => {
-    servir([...DIA_DE_ANA, ...DIA_DE_ANGEL]);
+  it("con dos días, el encabezado sale UNA vez y cada día solo con su fecha", async () => {
+    // ⚠️ 29-sep-2026 (26a): con la columna «Lugar» presente (Ángel el jue en
+    // otro sitio que Ana), las tres salen una vez.
+    const otroLugar = marca({
+      id: "11", codigo: "9", nombre: "ANGEL PIZZA", ocurrioEn: "2026-09-24T13:50:00.000Z",
+      lugar: { texto: "x", nombre: "San Pablo Viejo", metros: 4_200, enLaTienda: false },
+    });
+    servir([...DIA_DE_ANA, ...DIA_DE_ANGEL, otroLugar]);
     render(<MarcacionesTab empresa="todas" />);
     await yaSalio();
     for (const c of COLUMNAS_POR_DIA) {
@@ -644,20 +675,9 @@ describe("🔴 12 · 4a — dos marcas y la 2.ª a su hora de salida se lee SALI
     expect(segundaEsSalida(DIA_DE_ANA.map((m) => ({ ...m, salidaHorario: "18:00" })))).toBe(false);
   });
 
-  it("🩸 «Almuerzo 18:00 – 18:00 · Salida 18:00»: avisa «3 marcas en el mismo minuto»", () => {
-    const d = [
-      marca({ id: "80", codigo: "2", ocurrioEn: "2026-09-24T14:00:00.000Z" }),
-      marca({ id: "81", codigo: "2", ocurrioEn: "2026-09-24T23:00:05.000Z" }),
-      marca({ id: "82", codigo: "2", ocurrioEn: "2026-09-24T23:00:20.000Z" }),
-      marca({ id: "83", codigo: "2", ocurrioEn: "2026-09-24T23:00:40.000Z" }),
-    ];
-    expect(avisoMismoMinuto(3)).toBe("3 marcas en el mismo minuto");
-    expect(avisosDelDia(d)).toEqual(["3 marcas en el mismo minuto"]);
-    // Solo se AVISA: ninguna marca se esconde ni se junta.
-    expect(tramosDelDia(d).map((t) => `${t.rotulo} ${t.horas}`)).toEqual([
-      "Entrada 09:00", "Almuerzo 18:00 – 18:00", "Salida 18:00",
-    ]);
-  });
+  // ⚠️ 29-sep-2026 (25a, aprobado por Daniel): «N marcas en el mismo minuto»
+  // se fue: esas marcas ahora se JUNTAN como las cuenta la planilla y lo dice el
+  // ×N. Ver el bloque 13.
 
   it("en pantalla: el aviso ámbar sale en la fila y la hoja dice «Salida»", async () => {
     servir(dos("2026-09-24T23:00:00.000Z"));
@@ -669,5 +689,192 @@ describe("🔴 12 · 4a — dos marcas y la 2.ª a su hora de salida se lee SALI
     fireEvent.click(screen.getByRole("cell", { name: /Ana Trejos/ }));
     await waitFor(() => expect(screen.getByText("Ana Trejos · jue 24 sep")).toBeTruthy());
     expect(screen.queryByText(/Salida a almuerzo/)).toBeNull();
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 13 · 25a (29-sep-2026, aprobado por Daniel): las repetidas se juntan COMO LAS
+// CUENTA LA PLANILLA — «Entrada 09:00 · Salida 18:00 ×3»
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("🔴 13 · 25a — las marcas repetidas se juntan con la regla de la planilla", () => {
+  // El caso del mockup: el dedo tocó tres veces al irse.
+  const triple = [
+    marca({ id: "80", codigo: "2", ocurrioEn: "2026-09-24T14:00:00.000Z", salidaHorario: "18:00" }),
+    marca({ id: "81", codigo: "2", ocurrioEn: "2026-09-24T23:00:05.000Z", salidaHorario: "18:00" }),
+    marca({ id: "82", codigo: "2", ocurrioEn: "2026-09-24T23:00:20.000Z", salidaHorario: "18:00" }),
+    marca({ id: "83", codigo: "2", ocurrioEn: "2026-09-24T23:00:40.000Z", salidaHorario: "18:00" }),
+  ];
+
+  it("🩸 «Almuerzo 18:00 – 18:00 · Salida 18:00» pasa a «Salida 18:00 ×3»", () => {
+    const t = tramosDelDia(triple);
+    expect(t.map((x) => `${x.rotulo} ${x.partes.map((p) => p.hora + (p.veces > 1 ? ` ×${p.veces}` : "")).join(" – ")}`))
+      .toEqual(["Entrada 09:00", "Salida 18:00 ×3"]);
+    // Dos marcas que cuentan y la 2.ª a su hora de salida: la regla 4a sigue.
+    expect(avisosDelDia(triple)).toEqual([AVISO_SIN_ALMUERZO]);
+  });
+
+  it("🔑 el umbral es el de la planilla: 60 s EXACTOS se juntan, 61 no", () => {
+    expect(SEGUNDOS_MARCA_REPETIDA).toBe(60);
+    const par = (seg: number) => [
+      marca({ id: "p1", codigo: "2", ocurrioEn: "2026-09-24T23:00:00.000Z" }),
+      marca({ id: "p2", codigo: "2", ocurrioEn: new Date(Date.parse("2026-09-24T23:00:00.000Z") + seg * 1000).toISOString() }),
+    ];
+    expect(juntarRepetidas(par(60)).veces).toEqual([2]);
+    expect(juntarRepetidas(par(61)).veces).toEqual([1, 1]);
+    // Contra la última que CUENTA: 0 · 50 · 100 s deja dos, no una.
+    const tres = [0, 50, 100].map((s, i) => marca({
+      id: `t${i}`, codigo: "2", ocurrioEn: new Date(Date.parse("2026-09-24T23:00:00.000Z") + s * 1000).toISOString(),
+    }));
+    expect(juntarRepetidas(tres).veces).toEqual([2, 1]);
+  });
+
+  it("🔴 la regla NO se copia: la regla de la pantalla le pregunta a `marca-repetida.ts`", () => {
+    const src = leer(REGLA);
+    expect(src).toMatch(/import \{[^}]*olvidarRepetidas[^}]*\} from "@\/lib\/asistencia\/marca-repetida"/);
+    // Y se le pregunta con SU umbral: sin un segundo número pasado a mano.
+    expect(src).toMatch(/olvidarRepetidas\([^,)]*\)/);
+    expect(src).not.toMatch(/olvidarRepetidas\([^)]*,/);
+  });
+
+  it("en pantalla: «×3» en gris y ya no hay aviso «mismo minuto»", async () => {
+    servir(triple);
+    render(<MarcacionesTab empresa="todas" />);
+    await yaSalio();
+    const x3 = screen.getByText("×3");
+    expect(x3.className).toContain("text-gray-400");
+    expect(screen.queryByText(/mismo minuto/)).toBeNull();
+    expect(screen.queryByText(/Almuerzo/)).toBeNull();
+  });
+
+  it("🔴 la hoja trae las CUATRO marcas crudas; la repetida dice su porqué como el reporte", async () => {
+    expect(marcasDeLaHoja(triple)).toEqual([
+      { indice: 0, repetida: null },
+      { indice: 3, repetida: null },
+      { indice: 3, repetida: "repetida, 15 s después de 18:00:05 — no cuenta" },
+      { indice: 3, repetida: "repetida, 35 s después de 18:00:05 — no cuenta" },
+    ]);
+    servir(triple);
+    render(<MarcacionesTab empresa="todas" />);
+    await yaSalio();
+    fireEvent.click(screen.getByRole("cell", { name: /Ana Trejos/ }));
+    await waitFor(() => expect(screen.getByText("Ana Trejos · jue 24 sep")).toBeTruthy());
+    expect(screen.getAllByText(/^Salida /)).toHaveLength(3);
+    expect(screen.getByText("repetida, 35 s después de 18:00:05 — no cuenta")).toBeTruthy();
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 14 · 26a (29-sep-2026, aprobado por Daniel): el lugar solo cuando cambia
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("🔴 14 · 26a — el lugar va UNA vez al lado de la fecha y la fila solo si difiere", () => {
+  const en = (id: string, codigo: string, nombre: string | null, metros: number | null, quien = "ANA TREJOS") =>
+    marca({
+      id, codigo, nombre: quien, ocurrioEn: "2026-09-24T13:59:00.000Z",
+      lugar: { texto: "x", nombre, metros, enLaTienda: false },
+    });
+
+  it("🔑 «mismo lugar» = lo que se LEE: nombre sin código de mapa y distancia redondeada", () => {
+    const k = (n: string | null, m: number | null) => claveDelLugar({
+      nombre: sinCodigoDeMapa(n), distancia: distanciaDeLaTienda(m),
+    });
+    expect(k("G5P6+2GH, Paso Canoas", 46_200)).toBe(k("paso  canoas", 46_400));
+    expect(k("Paso Canoas", 46_400)).not.toBe(k("Paso Canoas", 12_000));
+    expect(k(null, null)).toBe("");
+  });
+
+  it("el lugar del día: el que más filas comparten (≥ 2, sin empate), o el de la única fila", () => {
+    expect(lugarDelDia(["a"])).toBe("a");
+    expect(lugarDelDia(["a", "a", "b"])).toBe("a");
+    expect(lugarDelDia(["a", "b"])).toBe(""); // empate
+    expect(lugarDelDia(["a", ""])).toBe(""); // una sola fila con lugar de dos
+    expect(lugarDelDia(["", ""])).toBe("");
+  });
+
+  it("todas desde el mismo lugar: va en la fecha y la columna «Lugar» desaparece", async () => {
+    const dia = [en("1", "2", "Paso Canoas", 46_400), en("2", "7", "Paso Canoas", 46_200, "CINDY DE GRACIA")];
+    const d = diasDeMarcaciones(dia);
+    expect(d[0].lugar?.texto).toBe("Paso Canoas · 46 km de la tienda");
+    expect(d[0].filas.every((f) => !f.lugarEnLaFila)).toBe(true);
+    expect(hayColumnaLugar(d)).toBe(false);
+
+    servir(dia);
+    render(<MarcacionesTab empresa="todas" />);
+    await yaSalio();
+    expect(screen.getAllByText("Paso Canoas")).toHaveLength(1);
+    expect(screen.queryByRole("columnheader", { name: "Lugar" })).toBeNull();
+  });
+
+  it("🔴 una fila que difiere escribe SU lugar; las demás no lo repiten", async () => {
+    const dia = [
+      en("1", "2", "Paso Canoas", 46_400),
+      en("2", "7", "Paso Canoas", 46_400, "CINDY DE GRACIA"),
+      en("3", "9", "San Pablo Viejo", 4_200, "ANGEL PIZZA"),
+    ];
+    const d = diasDeMarcaciones(dia);
+    expect(d[0].lugar?.nombre).toBe("Paso Canoas");
+    expect(d[0].filas.map((f) => `${f.nombre}:${f.lugarEnLaFila}`)).toEqual([
+      "Ana Trejos:false", "Angel Pizza:true", "Cindy de Gracia:false",
+    ]);
+
+    servir(dia);
+    render(<MarcacionesTab empresa="todas" />);
+    await yaSalio();
+    expect(screen.getByRole("columnheader", { name: "Lugar" })).toBeTruthy();
+    expect(screen.getAllByText("Paso Canoas")).toHaveLength(1);
+    expect(screen.getAllByText("San Pablo Viejo")).toHaveLength(1);
+  });
+
+  it("⚠️ una fila SIN lugar en un día que sí tiene uno dice «—» (callarse diría que estuvo ahí)", () => {
+    const d = diasDeMarcaciones([
+      en("1", "2", "Paso Canoas", 46_400),
+      en("2", "7", "Paso Canoas", 46_400, "CINDY DE GRACIA"),
+      en("3", "9", null, null, "ANGEL PIZZA"),
+    ]);
+    const angel = d[0].filas.find((f) => f.codigo === "9")!;
+    expect(angel.lugarEnLaFila).toBe(true);
+    expect(angel.lugar).toBe(SIN_LUGAR);
+  });
+
+  it("🔴 ninguna fila del período con lugar (el reloj): no hay columna ni nada al lado de la fecha", async () => {
+    const reloj = [en("1", "2", null, null), en("2", "7", null, null, "CINDY DE GRACIA")];
+    const d = diasDeMarcaciones(reloj);
+    expect(d[0].lugar).toBeNull();
+    expect(hayColumnaLugar(d)).toBe(false);
+    servir(reloj);
+    render(<MarcacionesTab empresa="todas" />);
+    await yaSalio();
+    expect(screen.queryByRole("columnheader", { name: "Lugar" })).toBeNull();
+    expect(screen.queryByText(SIN_LUGAR)).toBeNull();
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 15 · 27a (29-sep-2026, aprobado por Daniel): cada fila = un renglón
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("🔴 15 · 27a — la línea gris sale de la fila; queda el punto y la hoja", () => {
+  it("la fila no lleva línea de atraso; el punto lo dice en su `title`", async () => {
+    servir(DIA_DE_ANA);
+    render(<MarcacionesTab empresa="todas" />);
+    await yaSalio();
+    expect(screen.queryByText(/se envió/)).toBeNull();
+    const punto = document.querySelector("[title='Sin señal: se envió 9 h después']");
+    expect(punto).toBeTruthy();
+    // Un renglón: la celda de marcas no tiene un bloque debajo.
+    const celda = screen.getAllByRole("cell").find((c) => c.textContent?.includes("Entrada"))!;
+    expect(celda.querySelectorAll("div")).toHaveLength(0);
+  });
+
+  it("🔴 el detalle vive en la hoja, con «se envió» y nunca «llegó»", async () => {
+    expect(detalleEnLaHoja(DIA_DE_ANA[0])).toBe("Marcada sin señal · se envió 9 h después");
+    expect(detalleEnLaHoja(DIA_DE_ANGEL[0])).toBe("Marcada con señal · al instante");
+    servir(DIA_DE_ANA);
+    render(<MarcacionesTab empresa="todas" />);
+    await yaSalio();
+    fireEvent.click(screen.getByRole("cell", { name: /Ana Trejos/ }));
+    await waitFor(() => expect(screen.getByText("Marcada sin señal · se envió 9 h después")).toBeTruthy());
+    expect(screen.queryByText(/lleg[oó]/)).toBeNull();
   });
 });

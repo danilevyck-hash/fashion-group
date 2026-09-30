@@ -129,3 +129,27 @@ export function filaVacia(empresa: string, etiqueta: string): FilaTablero {
     personas: 0, neto: 0, totales: null, arreglar: 0, primeroQueFalta: null, error: null,
   };
 }
+
+/**
+ * 🔴 23a — «REVISAR» GENERA SOLO (29-sep-2026, aprobado por Daniel). 🩸
+ * «Revisar» solo cambiaba la empresa de arriba y había que tocar «Generar» a
+ * mano. Ahora la Planilla recuerda a qué empresa y quincena se fue, y cuando
+ * lo de arriba llega a eso, genera UNA vez. Qué hacer con ese pendiente:
+ *   · `generar`   — lo de arriba ya es exactamente lo que se pidió.
+ *   · `esperar`   — la empresa todavía no cambió (la URL viaja aparte).
+ *   · `descartar` — cambió el período, el corte u otra empresa: no se genera
+ *                   nada que nadie pidió.
+ */
+export interface PedidoDeRevisar { empresa: string; desde: string; hasta: string; corte: string }
+
+export function queHacerConRevisar(
+  pendiente: PedidoDeRevisar,
+  ahora: PedidoDeRevisar & { sinEmpresa: boolean; elegido: boolean },
+): "generar" | "esperar" | "descartar" {
+  if (!ahora.elegido) return "descartar";
+  if (pendiente.desde !== ahora.desde || pendiente.hasta !== ahora.hasta || pendiente.corte !== ahora.corte) {
+    return "descartar";
+  }
+  if (ahora.sinEmpresa) return "esperar";
+  return ahora.empresa === pendiente.empresa ? "generar" : "descartar";
+}

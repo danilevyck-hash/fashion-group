@@ -349,7 +349,7 @@ export function filtrarMarcas(
  * mandó sin señal y cuánto tardó en llegar. **Lo que no se sabe no se escribe**:
  * una raya nunca sube a esta lista.
  */
-export function lineasDeLaHoja(m: MarcaDeTelefono): string[] {
+export function lineasDeLaHoja(m: MarcaDeTelefono, conDemora = true): string[] {
   const out: string[] = [];
   const lugar = String(m.lugar?.texto ?? "").trim();
   if (lugar && lugar !== SIN_LUGAR) out.push(lugar);
@@ -363,7 +363,9 @@ export function lineasDeLaHoja(m: MarcaDeTelefono): string[] {
         : `Se marcó ${TEXTO_SIN_SENAL}.`,
     );
   }
-  if (llegoTarde(m.ocurrioEn, m.creadoEn)) {
+  // 29-sep-2026: la pestaña por día dice la demora en el `detalle`, con «se
+  // envió» (`detalleEnLaHoja`); ahí no se repite.
+  if (conDemora && llegoTarde(m.ocurrioEn, m.creadoEn)) {
     out.push(`Esta marca ${demoraEnPalabras(m.ocurrioEn, m.creadoEn)}.`);
   }
   return out;

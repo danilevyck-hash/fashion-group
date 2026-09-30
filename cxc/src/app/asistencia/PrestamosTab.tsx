@@ -40,7 +40,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { filtrarPorEmpresa } from "@/lib/asistencia/empresa-para-todo";
+import { empresaParaPedir, filtrarPorEmpresa } from "@/lib/asistencia/empresa-para-todo";
+import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+import { descargarHistorialPrestamos, type AmbitoHistorial } from "@/lib/prestamos-descargar-historial";
 import { useToast } from "@/components/ToastSystem";
 import { NOMBRE_CUENTA, type CuentaPrestamo } from "@/lib/prestamos-saldo";
 import { ORIGENES_ABONO } from "@/lib/asistencia/abono-extra";
@@ -50,7 +52,7 @@ import { quincenasHasta } from "@/lib/asistencia/planilla";
 import { PARAM_NUEVO_PRESTAMO, enlaceAPrestamos } from "@/lib/prestamos-una-puerta";
 import type { Colaborador, DatosPrestamos } from "@/lib/prestamos-lista-server";
 import { VacioDeBusqueda } from "@/components/BuscadorDeLista";
-import { Search } from "lucide-react";
+import { Download, Search } from "lucide-react";
 import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
 import {
   LIMPIAR_BUSQUEDA,
@@ -166,6 +168,8 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
   const [datosModulo, setDatosModulo] = useState<DatosPrestamos | null>(null);
   const [eligiendo, setEligiendo] = useState(false);
   const [personaElegida, setPersonaElegida] = useState<Colaborador | null>(null);
+  const [descargaAbierta, setDescargaAbierta] = useState(false);
+  const [descargando, setDescargando] = useState(false);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -276,11 +280,50 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
   // que la de terceros: una columna de guiones no dice nada.
   const hayEstaQuincena = fichas.some((f) => f.yaDescontado > 0);
 
+  // 🔴 24 — «DESCARGAR» (29-sep-2026). Daniel: *«solo quiero descargar»*. El
+  // MISMO Excel del historial que bajaba el módulo viejo («Descargar historial»),
+  // con sus dos opciones y la MISMA función (`descargarHistorialPrestamos`).
+  // Sigue a la empresa de arriba: la ruta filtra por el NOMBRE de la empresa de
+  // la ficha de préstamos. Se ofrece a quien escribe aquí: la ruta es de
+  // `PRESTAMOS_ROLES` y a la secretaria le contestaría 403.
+  async function descargar(ambito: AmbitoHistorial) {
+    setDescargaAbierta(false);
+    setDescargando(true);
+    const clave = empresaParaPedir(props.empresa);
+    const empresa = clave ? EMPRESA_KEY_TO_NAME[clave] ?? clave : null;
+    if (!(await descargarHistorialPrestamos(ambito, empresa, hoyPanama()))) {
+      toast("No se pudo descargar. Intenta de nuevo.", "error");
+    }
+    setDescargando(false);
+  }
+
   const botonNuevo = puedeAnotar && (
-    <button type="button" onClick={() => void abrirNuevoPrestamo()}
-      className="min-h-[44px] rounded-md bg-black px-4 text-sm text-white transition active:scale-[0.97]">
-      + Nuevo préstamo
-    </button>
+    <div className="flex items-center gap-2">
+      <div className="relative">
+        <button type="button" onClick={() => setDescargaAbierta((v) => !v)} disabled={descargando}
+          aria-haspopup="menu" aria-expanded={descargaAbierta}
+          className="flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:opacity-40">
+          <Download aria-hidden className="h-4 w-4" />
+          {descargando ? "Descargando…" : "Descargar"}
+        </button>
+        {descargaAbierta && (
+          <div role="menu" className="absolute right-0 z-20 mt-1 w-52 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+            <button type="button" role="menuitem" onClick={() => void descargar("deben")}
+              className="block min-h-[44px] w-full px-3 py-2.5 text-left text-sm text-gray-700 transition hover:bg-gray-50">
+              Solo los que deben
+            </button>
+            <button type="button" role="menuitem" onClick={() => void descargar("todos")}
+              className="block min-h-[44px] w-full px-3 py-2.5 text-left text-sm text-gray-700 transition hover:bg-gray-50">
+              Todos
+            </button>
+          </div>
+        )}
+      </div>
+      <button type="button" onClick={() => void abrirNuevoPrestamo()}
+        className="min-h-[44px] rounded-md bg-black px-4 text-sm text-white transition active:scale-[0.97]">
+        + Nuevo préstamo
+      </button>
+    </div>
   );
 
   const filaDelModulo = personaElegida?.fichaId

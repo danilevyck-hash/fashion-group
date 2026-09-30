@@ -37,3 +37,21 @@ export function colateralDayStartIso(earlyUtcRun: boolean, now: Date = new Date(
   if (earlyUtcRun) return `${now.toISOString().slice(0, 10)}T00:00:00.000Z`;
   return new Date(`${hoyPanama(now)}T00:00:00-05:00`).toISOString();
 }
+
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/**
+ * 🔴 «hoy» · «ayer» · «19 sep» · «19 sep 2025» (29-sep-2026, 8a del audit
+ * visual, aprobado por Daniel): una fecha ISO (YYYY-MM-DD) dicha como la dice
+ * la gente, contra el «hoy» de PANAMÁ. El año solo sale si no es el de hoy.
+ * Una fecha que no se entiende se devuelve tal cual: nunca se inventa otra.
+ */
+export function fechaCortaRelativa(ymd: string, hoy: string = hoyPanama()): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  if (!m) return ymd;
+  if (ymd === hoy) return "hoy";
+  const ayer = new Date(Date.parse(`${hoy}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  if (ymd === ayer) return "ayer";
+  const dia = `${Number(m[3])} ${MESES_CORTOS[Number(m[2]) - 1]}`;
+  return m[1] === hoy.slice(0, 4) ? dia : `${dia} ${m[1]}`;
+}

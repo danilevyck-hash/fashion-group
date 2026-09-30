@@ -15,7 +15,8 @@
  * 🔴 HOY: el DÍA es el encabezado y dentro va UNA fila por colaborador con sus
  * marcas en orden —«Entrada 08:59 · Almuerzo 18:01 – 18:01 · Salida 18:01»—.
  * De 37 renglones sueltos a 17 bajo cuatro días. Arriba quedan dos cosas: el
- * período y «Colaborador: todos ▾». **No hay filtro de empresa** —eso lo manda
+ * período y «Colaborador: todos ▾» (28a, 29-sep-2026: se fueron «84 marcas» y
+ * su ⓘ; la nota de «solo se mira» va al pie de la hoja). **No hay filtro de empresa** —eso lo manda
  * el selector del módulo, arriba a la derecha— **ni de día**: el día se baja
  * con la rueda.
  *
@@ -44,12 +45,15 @@ import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { aparatoDeQuienMira } from "@/lib/aparato";
 import { empresaParaPedir } from "@/lib/asistencia/empresa-para-todo";
-import { textoDelPie } from "@/lib/ui/pie-de-lista";
 import { horaAmPm, horaCorta } from "@/lib/marcacion/marcacion";
 import {
   AVISO_MISMO_TELEFONO,
   COLUMNAS_POR_DIA,
   ETIQUETA_COLABORADOR,
+  detalleEnLaHoja,
+  hayColumnaLugar,
+  type LugarDibujado,
+  type TramoDibujado,
   MARCACIONES_POR_DIA,
   NOTA_SOLO_SE_MIRA,
   ROTULO_TODOS,
@@ -59,11 +63,9 @@ import {
 import FotosDeLaMarcaModal, { type FotoParaVer } from "./FotosDeLaMarcaModal";
 import MarcacionesDeAntes from "./marcaciones/PantallaDeAntes";
 import {
-  PALABRAS_MARCAS,
   SIN_COLUMNAS_NUEVAS,
   SIN_MARCAS,
   colaboradoresDeLasMarcas,
-  detalleDeLaHoja,
   fechaDelDia,
   filtrarMarcas,
   lineasDeLaHoja,
@@ -75,14 +77,33 @@ import {
 /** El único filtro que queda. Mismo nivel → `replace`. */
 const PARAM_QUIEN = "mcQuien";
 
-/** El punto gris de «sin señal»: delante de la marca, sin empujar el renglón. */
-function PuntoSinSenal() {
+/**
+ * El punto gris: delante de la marca, sin empujar el renglón. 🔴 27a
+ * (29-sep-2026): lo que decía la línea gris bajo la fila —«sin señal: la
+ * entrada se envió 9 h después»— va en su `title`; entero, en la hoja.
+ */
+function PuntoSinSenal({ aviso }: { aviso: string }) {
   return (
     <span
-      title="Se marcó sin señal: la hora la puso el teléfono."
-      aria-label="sin señal"
+      title={aviso}
+      aria-label={aviso}
       className="mr-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-gray-400 align-middle"
     />
+  );
+}
+
+/** «18:00 ×3»: la hora y, en gris, cuántas marcas junta (25a). */
+function Horas({ t }: { t: TramoDibujado }) {
+  return (
+    <>
+      {t.partes.map((p, i) => (
+        <span key={i}>
+          {i > 0 && <b className="font-medium text-gray-900"> – </b>}
+          <b className="font-medium tabular-nums text-gray-900">{p.hora}</b>
+          {p.veces > 1 && <span className="tabular-nums text-gray-400"> ×{p.veces}</span>}
+        </span>
+      ))}
+    </>
   );
 }
 
@@ -93,9 +114,9 @@ function Marcas({ fila }: { fila: FilaPorDia<MarcaDeTelefono> }) {
       {fila.tramos.map((t, i) => (
         <span key={t.clave} className="whitespace-nowrap">
           {i > 0 && <span className="text-gray-300"> · </span>}
-          {t.sinSenal && <PuntoSinSenal />}
+          {t.aviso && <PuntoSinSenal aviso={t.aviso} />}
           <span className="text-gray-700">{t.rotulo} </span>
-          <b className="font-medium tabular-nums text-gray-900">{t.horas}</b>
+          <Horas t={t} />
         </span>
       ))}
     </>
@@ -104,7 +125,8 @@ function Marcas({ fila }: { fila: FilaPorDia<MarcaDeTelefono> }) {
 
 /**
  * Los avisos ÁMBAR del día (29-sep-2026, aprobados por Daniel en el audit):
- * «sin almuerzo marcado» y «N marcas en el mismo minuto». Solo se dicen.
+ * «sin almuerzo marcado». Solo se dicen. («N marcas en el mismo minuto» se fue
+ * el mismo día: lo dice el ×N de la marca, 25a.)
  */
 function AvisosAmbar({ avisos }: { avisos: readonly string[] }) {
   return (
@@ -124,15 +146,39 @@ function AvisosAmbar({ avisos }: { avisos: readonly string[] }) {
  * dirección se corta con «…» (el texto entero queda en el `title`) y la
  * distancia va en gris al lado, sin partirse nunca.
  */
-function Lugar({ fila }: { fila: FilaPorDia<MarcaDeTelefono> }) {
-  if (!fila.lugarNombre) return <span className="whitespace-nowrap">{fila.lugar}</span>;
+function Lugar({ lugar }: { lugar: LugarDibujado }) {
+  if (!lugar.nombre) return <span className="whitespace-nowrap">{lugar.texto}</span>;
   return (
-    <span className="flex min-w-0 items-baseline gap-1.5" title={fila.lugar}>
-      <span className="min-w-0 truncate">{fila.lugarNombre}</span>
-      {fila.lugarDistancia && (
-        <span className="shrink-0 whitespace-nowrap text-gray-400">{fila.lugarDistancia}</span>
+    <span className="flex min-w-0 items-baseline gap-1.5" title={lugar.texto}>
+      <span className="min-w-0 truncate">{lugar.nombre}</span>
+      {lugar.distancia && (
+        <span className="shrink-0 whitespace-nowrap text-gray-400">{lugar.distancia}</span>
       )}
     </span>
+  );
+}
+
+const lugarDeLaFilaDibujado = (f: FilaPorDia<MarcaDeTelefono>): LugarDibujado => ({
+  nombre: f.lugarNombre,
+  distancia: f.lugarDistancia,
+  texto: f.lugar,
+});
+
+/**
+ * La fecha del día y, si todo el día marcó desde el mismo lugar, ese lugar UNA
+ * vez al lado: «jue 24 sep · Paso Canoas · 46 km de la tienda» (26a).
+ */
+function FechaDelDia({ rotulo, lugar, celular = false }: { rotulo: string; lugar: LugarDibujado | null; celular?: boolean }) {
+  return (
+    <div className="flex min-w-0 items-baseline gap-1.5 text-[13px] text-gray-500">
+      <h3 className={`shrink-0 font-medium ${celular ? "uppercase tracking-wide" : ""}`}>{rotulo}</h3>
+      {lugar && (
+        <>
+          <span className="text-gray-300">·</span>
+          <Lugar lugar={lugar} />
+        </>
+      )}
+    </div>
   );
 }
 
@@ -213,15 +259,19 @@ function PorDia({ empresa }: { empresa: string }) {
     () => diasDeMarcaciones(filtradas, marcasDeAparatoCompartido(marcas)),
     [filtradas, marcas],
   );
+  // 26a: sin ninguna fila que escriba su lugar (el reloj, o todo el día en el
+  // mismo sitio), la columna «Lugar» no se dibuja.
+  const columnas = hayColumnaLugar(dias) ? COLUMNAS_POR_DIA : COLUMNAS_POR_DIA.slice(0, 2);
 
   /** 🔴 Tocar la fila abre la MISMA hoja del reporte, con las marcas del día. */
   const abrir = useCallback((fila: FilaPorDia<MarcaDeTelefono>) => {
+    const ultima = fila.marcas.length - 1;
     setAbierta(
       fila.marcas.map((m, i) => ({
         id: m.id,
         hora: horaCorta(m.ocurrioEn),
         horaLarga: horaAmPm(m.ocurrioEn),
-        detalle: detalleDeLaHoja(m),
+        detalle: detalleEnLaHoja(m),
         relojCorrido: null,
         quitada: false,
         sinSenal: Boolean(m.sinSenal),
@@ -232,10 +282,17 @@ function PorDia({ empresa }: { empresa: string }) {
         lng: m.lng,
         persona: fila.nombre,
         fecha: fechaDelDia(fila.dia),
-        // Con DOS marcas y la 2.ª a su hora de salida, la hoja también dice
+        // La hoja nombra cada marca como la fila: la repetida lleva el nombre
+        // de la que cuenta, y con DOS marcas y la 2.ª a su hora de salida,
         // «Salida» (el 3 es su lugar en las cuatro marcas).
-        rotulo: rotuloDeLaMarca(fila.segundaEsSalida && i === 1 ? 3 : i, m.tipo),
-        lineas: lineasDeLaHoja(m),
+        rotulo: rotuloDeLaMarca(fila.hoja[i].indice, m.tipo),
+        // 25a: la repetida se ve y dice su porqué con la frase del reporte.
+        // 28a: la nota de «solo se mira» cierra la hoja.
+        lineas: [
+          ...(fila.hoja[i].repetida ? [fila.hoja[i].repetida!] : []),
+          ...lineasDeLaHoja(m, false),
+          ...(i === ultima ? [NOTA_SOLO_SE_MIRA] : []),
+        ],
       })),
     );
   }, []);
@@ -244,7 +301,7 @@ function PorDia({ empresa }: { empresa: string }) {
 
   return (
     <div className="space-y-4">
-      {/* ── ARRIBA: el período, UN desplegable, el conteo y el ⓘ ─────────── */}
+      {/* ── ARRIBA: el período (con su 📅) y UN desplegable. Nada más (28a) ── */}
       <div className="flex flex-wrap items-center gap-2">
         <SelectorPeriodo desde={desde} hasta={hasta} hoy={hoy} onElegir={elegir} />
         {gente.length > 0 && (
@@ -263,17 +320,6 @@ function PorDia({ empresa }: { empresa: string }) {
             </select>
           </label>
         )}
-        <p className="text-sm text-gray-500">
-          {textoDelPie(filtradas.length, marcas.length, PALABRAS_MARCAS)}
-        </p>
-        {/* 🔴 La nota del pie pasó a un ⓘ: la misma frase, sin gastar un renglón. */}
-        <span
-          title={NOTA_SOLO_SE_MIRA}
-          aria-label={NOTA_SOLO_SE_MIRA}
-          className="cursor-help text-sm text-gray-400"
-        >
-          ⓘ
-        </span>
       </div>
 
       {!hayColumnasNuevas && (
@@ -290,9 +336,7 @@ function PorDia({ empresa }: { empresa: string }) {
       {celular ? (
         dias.map((d) => (
           <section key={d.dia} className="space-y-2">
-            <h3 className="text-[13px] font-medium uppercase tracking-wide text-gray-500">
-              {d.rotulo}
-            </h3>
+            <FechaDelDia rotulo={d.rotulo} lugar={d.lugar} celular />
             <div className="space-y-2">
               {d.filas.map((f) => (
                 <button
@@ -306,17 +350,16 @@ function PorDia({ empresa }: { empresa: string }) {
                         {f.nombre}
                         {f.mismoTelefono && <AvisoMismoTelefono />}
                       </span>
-                      <span className="min-w-0 text-[13px] text-gray-500">
-                        <Lugar fila={f} />
-                      </span>
+                      {f.lugarEnLaFila && (
+                        <span className="min-w-0 text-[13px] text-gray-500">
+                          <Lugar lugar={lugarDeLaFilaDibujado(f)} />
+                        </span>
+                      )}
                     </span>
                     <span className="mt-1 block text-[15px] leading-relaxed">
                       <Marcas fila={f} />
                       <AvisosAmbar avisos={f.avisos} />
                     </span>
-                    {f.detalle && (
-                      <span className="mt-0.5 block text-[13px] text-gray-500">{f.detalle}</span>
-                    )}
                 </button>
               ))}
             </div>
@@ -334,11 +377,11 @@ function PorDia({ empresa }: { empresa: string }) {
             <colgroup>
               <col className="w-[200px]" />
               <col />
-              <col className="w-[300px]" />
+              {columnas.length > 2 && <col className="w-[300px]" />}
             </colgroup>
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
-                {COLUMNAS_POR_DIA.map((c) => (
+                {columnas.map((c) => (
                   <th key={c} className={`border-b border-gray-200 bg-white py-2 pr-3 font-medium ${CLASE_BARRA_PEGAJOSA}`}>
                     {c}
                   </th>
@@ -348,8 +391,8 @@ function PorDia({ empresa }: { empresa: string }) {
             {dias.map((d) => (
               <tbody key={d.dia}>
                 <tr>
-                  <td colSpan={COLUMNAS_POR_DIA.length} className="pb-1 pt-5">
-                    <h3 className="text-[13px] font-medium text-gray-500">{d.rotulo}</h3>
+                  <td colSpan={columnas.length} className="pb-1 pt-5">
+                    <FechaDelDia rotulo={d.rotulo} lugar={d.lugar} />
                   </td>
                 </tr>
                 {d.filas.map((f) => (
@@ -365,13 +408,12 @@ function PorDia({ empresa }: { empresa: string }) {
                     <td className="py-2 pr-3 align-top">
                       <Marcas fila={f} />
                       <AvisosAmbar avisos={f.avisos} />
-                      {f.detalle && (
-                        <div className="mt-0.5 text-[12px] text-gray-500">{f.detalle}</div>
-                      )}
                     </td>
-                    <td className="py-2 pr-3 align-top text-gray-700">
-                      <Lugar fila={f} />
-                    </td>
+                    {columnas.length > 2 && (
+                      <td className="py-2 pr-3 align-top text-gray-700">
+                        {f.lugarEnLaFila && <Lugar lugar={lugarDeLaFilaDibujado(f)} />}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
