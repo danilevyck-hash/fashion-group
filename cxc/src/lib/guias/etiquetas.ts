@@ -305,10 +305,32 @@ export function numeroDeCaja(n: number, total: number): string {
   return `${p.numero} ${p.total}`;
 }
 
-/** Lo que dice el botón: «Imprimir 14 etiquetas · 4 hojas». */
-export function textoImprimir(cantidad: number): string {
-  const hojas = cuantasHojas(cantidad);
+// ─── El papel: hoja carta o etiqueta 4×6 (30-sep-2026) ───────────────────────
+// 🔴 La oficina tiene una impresora de ETIQUETAS de 4×6 pulgadas y el PDF carta
+// no sirve ahí. Oficina, textual: *«Hay que configurar para tamaño 4x6
+// pulgadas»* — pedido aprobado por Daniel el 30-sep-2026. Es la MISMA etiqueta
+// (mismos milímetros de mayúscula), una por página y sin líneas de corte.
+export type FormatoEtiquetas = "carta" | "4x6";
+
+export const OPCIONES_FORMATO: ReadonlyArray<{ value: FormatoEtiquetas; label: string }> = [
+  { value: "carta", label: "Hoja carta · 4 por hoja" },
+  { value: "4x6", label: "Etiqueta 4×6" },
+];
+
+/** La ayuda del paso «Imprimir», según el papel elegido. */
+export const AYUDA_FORMATO: Record<FormatoEtiquetas, string> = {
+  carta: "Hoja carta, 4 etiquetas por hoja, con líneas de corte.",
+  "4x6": "Una etiqueta por página de 4×6 pulgadas, para la impresora de etiquetas.",
+};
+
+/**
+ * Lo que dice el botón: «Imprimir 14 etiquetas · 4 hojas» en carta, y en 4×6
+ * «Imprimir 14 etiquetas · 14 páginas» (una por página).
+ */
+export function textoImprimir(cantidad: number, formato: FormatoEtiquetas = "carta"): string {
   const etq = `${cantidad} ${cantidad === 1 ? "etiqueta" : "etiquetas"}`;
+  if (formato === "4x6") return `Imprimir ${etq} · ${cantidad} ${cantidad === 1 ? "página" : "páginas"}`;
+  const hojas = cuantasHojas(cantidad);
   const hj = `${hojas} ${hojas === 1 ? "hoja" : "hojas"}`;
   return `Imprimir ${etq} · ${hj}`;
 }
@@ -332,11 +354,16 @@ export function fechaDeLaEtiqueta(fechaCalendario: string): string {
 }
 
 /** Cómo se llama el archivo: se ve en la carpeta de descargas, así que dice qué es. */
-export function nombreArchivoEtiquetas(e: Pick<EtiquetaFila, "secuencial">, caja?: number | null): string {
+export function nombreArchivoEtiquetas(
+  e: Pick<EtiquetaFila, "secuencial">,
+  caja?: number | null,
+  formato: FormatoEtiquetas = "carta",
+): string {
   const sec = String(e.secuencial ?? "").replace(/[^\w.-]+/g, "");
+  const papel = formato === "4x6" ? "-4x6" : "";
   return caja != null
-    ? `Etiquetas-${sec}-bulto-${caja}.pdf`
-    : `Etiquetas-${sec}.pdf`;
+    ? `Etiquetas-${sec}-bulto-${caja}${papel}.pdf`
+    : `Etiquetas-${sec}${papel}.pdf`;
 }
 
 // ─── Juntar para los renglones de la guía ────────────────────────────────────

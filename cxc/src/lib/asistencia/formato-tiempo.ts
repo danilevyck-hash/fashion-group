@@ -35,3 +35,25 @@ export function formatoTiempo(minutos: number, modo: ModoTiempo): string {
 export function modoTiempoValido(v: unknown): ModoTiempo {
   return v === "min" || v === "hmm" ? v : MODO_TIEMPO_POR_DEFECTO;
 }
+
+/**
+ * 🔴 EL TIEMPO DE UN DÍA, COMO SE LEE EN LA MARCACIÓN (30-sep-2026). Daniel:
+ * *«¿por qué los 14 y 32 segundos el sistema lo toma como 14.53?»* — entró a
+ * las 8:14:32 y la celda decía «14.53» (minutos con decimales: 32 s = 0,53 min),
+ * que se lee como 14 min 53 s. Ahora dice «14m 32s». Solo se MUESTRA así: el
+ * cálculo sigue al segundo, igual.
+ *
+ *   14.5333 → «14m 32s» · 190.18 → «3h 10m 11s» · 30 → «30m» · 0.5 → «30s»
+ */
+export function tiempoDelDia(minutos: number): string {
+  if (!Number.isFinite(minutos) || minutos <= 0) return "0s";
+  const seg = Math.round(minutos * 60);
+  const h = Math.floor(seg / 3600);
+  const m = Math.floor((seg % 3600) / 60);
+  const s = seg % 60;
+  const partes: string[] = [];
+  if (h) partes.push(`${h}h`);
+  if (m) partes.push(`${m}m`);
+  if (s) partes.push(`${s}s`);
+  return partes.join(" ") || "0s";
+}

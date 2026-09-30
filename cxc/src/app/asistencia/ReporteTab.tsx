@@ -151,7 +151,7 @@ import { aparatoDeQuienMira } from "@/lib/aparato";
 // aprobado por Daniel). El formato es una preferencia de pantalla: el Excel, el
 // PDF y todo cálculo siguen en minutos (`formato-tiempo.ts`).
 import { Download, Search } from "lucide-react";
-import { formatoTiempo, type ModoTiempo } from "@/lib/asistencia/formato-tiempo";
+import { formatoTiempo, tiempoDelDia, type ModoTiempo } from "@/lib/asistencia/formato-tiempo";
 import { useFormatoTiempo } from "@/components/asistencia/FormatoTiempoSelector";
 import { PLACEHOLDER_COLABORADOR } from "@/lib/buscar-en-lista";
 
@@ -171,6 +171,9 @@ function fechaCorta(iso: string): string {
  */
 const n = (v: number) =>
   v ? <span className="tabular-nums">{fmtMin(v)}</span> : <span className="text-gray-300">—</span>;
+/** Una celda de UN DÍA: «14m 32s», como en la marcación (30-sep-2026). */
+const dia = (v: number) =>
+  v ? <span className="tabular-nums">{tiempoDelDia(v)}</span> : <span className="text-gray-300">—</span>;
 /** Lo mismo que `n`, pero para una columna de TIEMPO: h:mm o minutos, según la preferencia. */
 const t = (v: number, modo: ModoTiempo) =>
   v ? <span className="tabular-nums">{formatoTiempo(v, modo)}</span> : <span className="text-gray-300">—</span>;
@@ -2137,12 +2140,12 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
                     ? `Más de ${MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos: en la planilla estos minutos se muestran en «Ausencias». Se descuentan igual que una tardanza.`
                     : undefined}
                 >
-                  {fmtMin(d.tardeMin)}
+                  {tiempoDelDia(d.tardeMin)}
                 </span>
               )
               : <span className="text-gray-300">—</span>}</td>
-            <td className="px-2 py-1.5 text-right text-gray-600">{n(d.excesoAlmuerzoMin)}</td>
-            <td className="px-2 py-1.5 text-right text-gray-600">{conExtra ? n(d.extraMin) : sinExtra()}</td>
+            <td className="px-2 py-1.5 text-right text-gray-600">{dia(d.excesoAlmuerzoMin)}</td>
+            <td className="px-2 py-1.5 text-right text-gray-600">{conExtra ? dia(d.extraMin) : sinExtra()}</td>
             <td className="whitespace-nowrap px-2 py-1.5">
               {/* ══════════════════════════════════════════════════════════
                   🔴 LAS HORAS EXTRA SE DECIDEN ACÁ (19-sep-2026).

@@ -52,7 +52,9 @@ import {
   type DefinidosPorCliente,
 } from "@/lib/guias/destinos-clientes";
 import {
+  AYUDA_FORMATO,
   MAX_CAJAS,
+  OPCIONES_FORMATO,
   TEXTO_TRAER_DE_SWITCH,
   avisoDeReimpresion,
   cajasDelJuego,
@@ -71,8 +73,10 @@ import {
   validarCajas,
   type EtiquetaFila,
   type FiltroEtiquetas,
+  type FormatoEtiquetas,
 } from "@/lib/guias/etiquetas";
 import { abrirPdfEnPestana } from "@/lib/guias/pdf-en-pestana";
+import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
 
 const BOTON_NEGRO =
   "inline-flex items-center justify-center gap-2 bg-black text-white rounded-md px-4 text-sm font-medium " +
@@ -113,19 +117,63 @@ function fechaCorta(iso: string): string {
  * hace `abrirPdfEnPestana`—: Safari bloquea una ventana que nace después de un
  * `await`. Sin pestaña, el archivo se baja como antes.
  */
-function pdfDeLaEtiqueta(e: EtiquetaFila, cajas: readonly number[], caja?: number | null) {
+function pdfDeLaEtiqueta(
+  e: EtiquetaFila,
+  cajas: readonly number[],
+  formato: FormatoEtiquetas,
+  caja?: number | null,
+) {
   return async () => {
     const { construirPdfEtiquetas, datosDeEtiqueta } = await import("@/lib/guias/pdf-etiquetas");
-    const doc = construirPdfEtiquetas(datosDeEtiqueta(e), cajas);
+    const doc = construirPdfEtiquetas(datosDeEtiqueta(e), cajas, formato);
     return {
       url: doc.output("bloburl") as unknown as string,
-      descargar: () => doc.save(nombreArchivoEtiquetas(e, caja ?? null)),
+      descargar: () => doc.save(nombreArchivoEtiquetas(e, caja ?? null, formato)),
     };
   };
 }
 
-function imprimir(e: EtiquetaFila, cajas: readonly number[], caja?: number | null) {
-  return abrirPdfEnPestana(pdfDeLaEtiqueta(e, cajas, caja));
+function imprimir(e: EtiquetaFila, cajas: readonly number[], formato: FormatoEtiquetas, caja?: number | null) {
+  return abrirPdfEnPestana(pdfDeLaEtiqueta(e, cajas, formato, caja));
+}
+
+/**
+ * 🔴 EL PAPEL SE RECUERDA POR NAVEGADOR (30-sep-2026): la computadora que está
+ * al lado de la impresora de etiquetas queda en 4×6 y la de la oficina en
+ * carta, sin elegir cada vez. Sin memoria (privado, bloqueado) = hoja carta.
+ */
+const CLAVE_FORMATO = "fg_guias_etiquetas_formato";
+
+function formatoRecordado(): FormatoEtiquetas {
+  try {
+    return localStorage.getItem(CLAVE_FORMATO) === "4x6" ? "4x6" : "carta";
+  } catch {
+    return "carta";
+  }
+}
+
+function useFormatoEtiquetas(): [FormatoEtiquetas, (f: FormatoEtiquetas) => void] {
+  // ⚠️ El panel y el modal nacen con un toque, nunca en el HTML del servidor:
+  // leer la memoria al arrancar no descuadra la hidratación.
+  const [formato, setFormato] = useState<FormatoEtiquetas>(formatoRecordado);
+  const elegir = useCallback((f: FormatoEtiquetas) => {
+    setFormato(f);
+    try { localStorage.setItem(CLAVE_FORMATO, f); } catch { /* sin memoria: solo esta vez */ }
+  }, []);
+  return [formato, elegir];
+}
+
+function ElegirPapel({ formato, onElegir }: { formato: FormatoEtiquetas; onElegir: (f: FormatoEtiquetas) => void }) {
+  return (
+    <ControlSegmentado
+      options={OPCIONES_FORMATO}
+      active={formato}
+      onChange={onElegir}
+      ariaLabel="Papel de las etiquetas"
+      ancho="contenido"
+      className="mb-3"
+    />
+  );
 }
 
 export default function EtiquetasView() {
@@ -401,6 +449,7 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
   const [destino, setDestino] = useState("");
   const [destinoTocado, setDestinoTocado] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const [formato, setFormato] = useFormatoEtiquetas();
   const [error, setError] = useState<string | null>(null);
 
   // Los destinos del cliente: los definidos en la tabla y los del histórico —
@@ -552,7 +601,7 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
         }
         if (!r.ok || !d.etiqueta) { setError(d.error || "No se pudo guardar"); return null; }
         creada = d.etiqueta;
-        return pdfDeLaEtiqueta(d.etiqueta, cajasDelJuego(d.etiqueta.cajas))();
+        return pdfDeLaEtiqueta(d.etiqueta, cajasDelJuego(d.etiqueta.cajas), formato)();
       });
       const guardada = creada as EtiquetaFila | null;
       if (guardada) {
@@ -759,7 +808,8 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
 
           {/* ── 3 · Imprimir ── */}
           <div className="mt-3 rounded-lg border border-gray-200 p-4">
-            <Paso n={3} titulo="Imprimir" ayuda="Hoja carta, 4 etiquetas por hoja, con líneas de corte." />
+            <Paso n={3} titulo="Imprimir" ayuda={AYUDA_FORMATO[formato]} />
+            <ElegirPapel formato={formato} onElegir={setFormato} />
             {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
             <div className="flex flex-wrap gap-2">
               <button
@@ -768,7 +818,7 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
                 disabled={guardando || deshabilitado || !elegida || !cantidad.ok}
                 className={BOTON_NEGRO}
               >
-                {guardando ? "Guardando…" : cantidad.ok ? textoImprimir(cantidad.valor) : "Imprimir"}
+                {guardando ? "Guardando…" : cantidad.ok ? textoImprimir(cantidad.valor, formato) : "Imprimir"}
               </button>
               <button type="button" onClick={onCerrar} className={BOTON_BLANCO}>Cancelar</button>
             </div>
@@ -813,13 +863,14 @@ function ModalReimprimir({
   // corregir los bultos, y lo que se pide nueve de cada diez veces.
   const [modo, setModo] = useState<"juego" | "una">("juego");
   const [caja, setCaja] = useState("1");
+  const [formato, setFormato] = useFormatoEtiquetas();
 
   const n = Number(caja);
   const cajaValida = Number.isInteger(n) && n >= 1 && n <= etiqueta.cajas;
 
   async function dale() {
-    if (modo === "juego") await imprimir(etiqueta, cajasDelJuego(etiqueta.cajas));
-    else if (cajaValida) await imprimir(etiqueta, [n], n);
+    if (modo === "juego") await imprimir(etiqueta, cajasDelJuego(etiqueta.cajas), formato);
+    else if (cajaValida) await imprimir(etiqueta, [n], formato, n);
     onCerrar();
   }
 
@@ -847,7 +898,11 @@ function ModalReimprimir({
           elegida={modo === "una"}
           onElegir={() => setModo("una")}
           titulo="Un solo bulto"
-          detalle="Una hoja, la etiqueta arriba a la izquierda y el resto en blanco."
+          detalle={
+            formato === "4x6"
+              ? "Una sola etiqueta de 4×6."
+              : "Una hoja, la etiqueta arriba a la izquierda y el resto en blanco."
+          }
         >
           <div className="mt-2 flex items-center gap-2.5">
             <span className="text-sm text-gray-600">Bulto</span>
@@ -865,6 +920,11 @@ function ModalReimprimir({
             <span className="text-sm text-gray-600">de {etiqueta.cajas}</span>
           </div>
         </Opcion>
+
+        <div className="mt-3">
+          <ElegirPapel formato={formato} onElegir={setFormato} />
+          <p className="text-[12.5px] text-gray-600">{AYUDA_FORMATO[formato]}</p>
+        </div>
 
         <div className="mt-4 flex gap-3">
           <button

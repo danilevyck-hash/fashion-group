@@ -64,6 +64,15 @@
 // DESPUÉS LA LETRA, en ese orden: el criterio entero vive en el módulo puro
 // `etiqueta-destino.ts` y acá solo se le presta la regla de medir. Los otros
 // tres tamaños —bulto 11 · cliente 5,5 · factura 4— NO se tocaron.
+//
+// 🔴 TAMBIÉN EN ETIQUETA 4×6 PULGADAS (30-sep-2026) — la oficina tiene una
+// impresora de etiquetas y el PDF carta no sirve ahí: *«Hay que configurar para
+// tamaño 4x6 pulgadas»*, aprobado por Daniel. Es LA MISMA etiqueta —los mismos
+// milímetros de mayúscula, que son requisito de Daniel— dibujada en una página
+// de 101,6 × 152,4 mm, UNA por página y SIN líneas de corte. Lo único que cambió
+// en el dibujo es que ahora recibe el tamaño de su celda en vez de suponer el
+// cuarto de carta: el ancho baja 6,35 mm (el destino se parte antes) y el alto
+// sube 12,7 mm, que se queda el destino porque el bulto sigue anclado abajo.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { jsPDF } from "jspdf";
@@ -75,6 +84,7 @@ import {
   type EtiquetaFila,
 } from "@/lib/guias/etiquetas";
 import { MAY_DESTINO_MINIMO, acomodarDestino } from "@/lib/guias/etiqueta-destino";
+import type { FormatoEtiquetas } from "@/lib/guias/etiquetas";
 
 // Hoja carta en milímetros.
 const HOJA_W = 215.9;
@@ -82,6 +92,17 @@ const HOJA_H = 279.4;
 /** Los cuartos: dos columnas por dos filas. */
 const CUARTO_W = HOJA_W / 2;
 const CUARTO_H = HOJA_H / 2;
+/** La etiqueta 4×6 pulgadas de la impresora de etiquetas, parada. */
+const ETIQUETA_4X6_W = 101.6;
+const ETIQUETA_4X6_H = 152.4;
+
+/** El tamaño de la celda donde se dibuja UNA etiqueta. */
+interface Celda {
+  w: number;
+  h: number;
+}
+const CELDA_CARTA: Celda = { w: CUARTO_W, h: CUARTO_H };
+const CELDA_4X6: Celda = { w: ETIQUETA_4X6_W, h: ETIQUETA_4X6_H };
 
 const PAD_X = 8.6;
 const PAD_Y = 9.1;
@@ -323,8 +344,19 @@ function bloqueDeCampo(
   return y;
 }
 
-/** Dibuja UNA etiqueta dentro del cuarto que arranca en (x0, y0). */
-function dibujarEtiqueta(doc: jsPDF, d: DatosEtiqueta, caja: number, x0: number, y0: number): void {
+/**
+ * Dibuja UNA etiqueta dentro de la celda que arranca en (x0, y0): el cuarto de
+ * carta o la página 4×6. ⚠️ La celda se desarma con los nombres de siempre,
+ * `CUARTO_W`/`CUARTO_H`, a propósito: así el dibujo no cambió ni una línea.
+ */
+function dibujarEtiqueta(
+  doc: jsPDF,
+  d: DatosEtiqueta,
+  caja: number,
+  x0: number,
+  y0: number,
+  { w: CUARTO_W, h: CUARTO_H }: Celda = CELDA_CARTA,
+): void {
   const izq = x0 + PAD_X;
   const der = x0 + CUARTO_W - PAD_X;
   const ancho = der - izq;
@@ -340,16 +372,27 @@ function dibujarEtiqueta(doc: jsPDF, d: DatosEtiqueta, caja: number, x0: number,
 
   // ── EMPRESA, grande y en mayúsculas, con la fecha chica a la derecha ──
   // (Esto NO cambió con el rediseño, salvo el formato de la fecha.)
+  // 🩸 30-sep-2026: «VISTANA INTERNATIONAL» y «CONFECCIONES BOSTON» medían ~84 mm
+  // y se montaban ENCIMA de la fecha (en carta y en 4×6). Si el nombre no cabe
+  // al lado de la fecha, se achica SOLO el nombre hasta que quepa; las empresas
+  // cortas siguen saliendo exactamente igual que antes.
+  const fecha = fechaDeLaEtiqueta(d.fecha_factura);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(F_FECHA);
+  const anchoFecha = doc.getTextWidth(fecha);
+  const empresa = String(d.empresa ?? "").toUpperCase();
   doc.setFont("helvetica", "bold");
   doc.setFontSize(F_EMPRESA);
-  const empresa = String(d.empresa ?? "").toUpperCase();
+  const cabeEmpresa = der - izq - anchoFecha - 3;
+  const anchoEmpresa = doc.getTextWidth(empresa);
+  if (anchoEmpresa > cabeEmpresa) doc.setFontSize(F_EMPRESA * (cabeEmpresa / anchoEmpresa));
   let y = y0 + PAD_Y + 6.7;
   doc.text(empresa, izq, y);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(F_FECHA);
   doc.setTextColor(68);
-  doc.text(fechaDeLaEtiqueta(d.fecha_factura), der, y, { align: "right" });
+  doc.text(fecha, der, y, { align: "right" });
   doc.setTextColor(17);
 
   // La línea debajo del encabezado.
@@ -423,7 +466,22 @@ function dibujarEtiqueta(doc: jsPDF, d: DatosEtiqueta, caja: number, x0: number,
  * ⚠️ Sin cajas devuelve el documento vacío y quien llama decide qué hacer:
  * inventar una hoja en blanco sería peor.
  */
-export function construirPdfEtiquetas(d: DatosEtiqueta, cajas: readonly number[]): jsPDF {
+export function construirPdfEtiquetas(
+  d: DatosEtiqueta,
+  cajas: readonly number[],
+  formato: FormatoEtiquetas = "carta",
+): jsPDF {
+  if (formato === "4x6") {
+    // 🔴 UNA etiqueta por página, sin líneas de corte: la impresora de etiquetas
+    // ya trae el rollo partido.
+    const tam: [number, number] = [ETIQUETA_4X6_W, ETIQUETA_4X6_H];
+    const doc = new jsPDF({ unit: "mm", format: tam, orientation: "portrait" });
+    cajas.forEach((caja, i) => {
+      if (i > 0) doc.addPage(tam, "portrait");
+      dibujarEtiqueta(doc, d, caja, 0, 0, CELDA_4X6);
+    });
+    return doc;
+  }
   const doc = nuevoDocumento();
   const hojas = hojasDeEtiquetas(cajas);
   hojas.forEach((hoja, i) => {
