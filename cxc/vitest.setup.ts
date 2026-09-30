@@ -26,3 +26,21 @@ import { configure } from "@testing-library/react";
 // está en 20.000 (`vitest.config.ts`) y esta espera tiene aire de sobra: el
 // PDF del estado de cuenta tardaba más de 5 s en la máquina de GitHub.
 configure({ asyncUtilTimeout: 10_000 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 CADA PRUEBA ARRANCA CON `localStorage` VACÍO (30-sep-2026)
+//
+// 🩸 El CI («pruebas») estuvo ROJO del 25 al 30-sep: 96 correos, siempre los
+// mismos 6 casos (`prestamos-movimientos-pantalla`, `asistencia-planilla-
+// cerrar-quincena`). La barra de período RECUERDA la quincena en
+// `localStorage`, y un caso le dejaba escrita la suya al siguiente: arrancaba
+// una quincena corrida y no encontraba agosto/julio.
+//
+// 🔑 En esta Mac pasaba porque Node 26 trae su propio `localStorage` (que tapa
+// el de jsdom y no guarda nada); en Node 20/24 —el CI y Vercel— sí guarda.
+// Mismo código, dos resultados: el aislamiento no puede depender de la versión.
+// ─────────────────────────────────────────────────────────────────────────────
+import { beforeEach } from "vitest";
+beforeEach(() => {
+  try { globalThis.localStorage?.clear(); } catch { /* entorno sin storage */ }
+});
