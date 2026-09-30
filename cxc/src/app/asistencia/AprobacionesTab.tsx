@@ -82,6 +82,7 @@ import {
   rotuloDeLote,
   vistaDeLista,
 } from "@/lib/buscar-en-lista";
+import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
 import PorColaborador from "./aprobaciones/PorColaborador";
 import PorDia from "./aprobaciones/PorDia";
 import YaDecididas from "./aprobaciones/YaDecididas";
@@ -322,22 +323,17 @@ export default function AprobacionesTab({ empresa = "" }: {
         )}
         {ASISTENCIA_PANTALLA_2026_09 && (
           <>
-            <div role="radiogroup" aria-label="Ver por" className="inline-flex rounded-md border border-gray-200 p-0.5">
-              {VISTAS.map((v) => (
-                <button
-                  key={v.key}
-                  type="button"
-                  role="radio"
-                  aria-checked={vista === v.key}
-                  onClick={() => cambiarVista(v.key)}
-                  className={`min-h-[40px] rounded px-4 text-sm font-medium transition ${
-                    vista === v.key ? "bg-black text-white" : "text-gray-600 hover:text-gray-900"
-                  }`}
-                >
-                  {v.etiqueta}
-                </button>
-              ))}
-            </div>
+            {/* 🔴 6a (29-sep-2026, audit visual aprobado por Daniel): «Colaborador |
+                Día» era dos botones negro/blanco y competía con «Sí a todo lo
+                pendiente». Ahora es el control segmentado gris de la casa; el
+                negro relleno queda SOLO para la acción principal. */}
+            <ControlSegmentado
+              ancho="contenido"
+              ariaLabel="Ver por"
+              options={VISTAS.map((v) => ({ value: v.key, label: v.etiqueta }))}
+              active={vista}
+              onChange={cambiarVista}
+            />
             {/* 🔴 El buscador SOLO en «Colaborador»: en «Día» los renglones son
                 fechas y un campo que dice «Buscar colaborador» no busca nada. */}
             {vista === "colaborador" && (

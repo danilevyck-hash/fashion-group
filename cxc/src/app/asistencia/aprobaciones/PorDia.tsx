@@ -46,7 +46,11 @@ export default function PorDia({
                 <Flecha abierta={abierta} />
               </button>
               <span className="text-sm text-gray-600">
-                {d.gente.length} · {hm(d.minutos)} h
+                {/* 12a (29-sep-2026, audit aprobado por Daniel): decía «3 · 1:47 h» y
+                    el 3 no se entendía. `gente` trae UNA entrada por colaborador
+                    en ese día (`armarDiasAprobacion`). Dice «colaboradores», no
+                    «personas»: es la palabra del módulo (10-sep-2026). */}
+                {d.gente.length} {d.gente.length === 1 ? "colaborador" : "colaboradores"} · {hm(d.minutos)} h
               </span>
               <BotonesSiNo
                 decision={null}

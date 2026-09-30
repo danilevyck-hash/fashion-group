@@ -28,6 +28,8 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { DISPOSITIVO_TELEFONO } from "@/lib/marcacion/marcacion";
 import { lugarDeMarca, referenciaDeLaEmpresa } from "@/lib/asistencia/lugar-de-marca";
 import { leerLugaresReferencia } from "@/lib/asistencia/lugares-referencia-server";
+import { leerHorarios } from "@/lib/asistencia/horarios-server";
+import { horarioDelDia } from "@/lib/asistencia/horario-configurable";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -130,6 +132,20 @@ export async function GET(req: NextRequest) {
 
     const referencias = await leerLugaresReferencia();
 
+    // 🔑 SU HORA DE SALIDA (29-sep-2026), la MISMA fuente del Reporte y con el
+    // horario «de afuera» si lo tiene: estas marcas son todas del teléfono. La
+    // pantalla la usa para leer un día de DOS marcas («Entrada 08:59 · Salida
+    // 18:00»). Falla ABIERTA: sin horarios, la pantalla lee como antes.
+    const salidaDe = new Map<string, string>();
+    try {
+      for (const h of (await leerHorarios()).horarios) {
+        const salida = horarioDelDia(h, DISPOSITIVO_TELEFONO).salida;
+        if (h.empleado_codigo && salida) salidaDe.set(h.empleado_codigo, salida);
+      }
+    } catch (e) {
+      console.error("[asistencia/marcaciones] horarios", e instanceof Error ? e.message : e);
+    }
+
     const marcas = filas
       .filter((f) => {
         if (!empresaFiltro) return true;
@@ -157,6 +173,7 @@ export async function GET(req: NextRequest) {
           precisionM: typeof f.precision_m === "number" ? f.precision_m : null,
           aparatoId: f.aparato_id ?? null,
           empresaKey,
+          salidaHorario: salidaDe.get(codigo) ?? null,
           lugar: {
             texto: lugar.texto,
             // 🔑 EL NOMBRE CRUDO, SIN LA DISTANCIA PEGADA (25-sep-2026). La

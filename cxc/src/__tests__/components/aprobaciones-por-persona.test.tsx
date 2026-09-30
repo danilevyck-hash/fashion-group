@@ -78,9 +78,11 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 describe("🔴 el control «Colaborador · Día»", () => {
   it("abre en Colaborador; tocar «Día» cambia la vista, la escribe en la URL y la recuerda", async () => {
     await montar();
-    expect(screen.getByRole("radio", { name: "Colaborador" }).getAttribute("aria-checked")).toBe("true");
+    // 29-sep-2026 (6a, audit aprobado por Daniel): el selector pasó a ser el
+    // `ControlSegmentado` de la casa: sus opciones son `tab`/`aria-selected`.
+    expect(screen.getByRole("tab", { name: "Colaborador" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.getByTestId("vista-colaborador")).toBeTruthy();
-    await toca(screen.getByRole("radio", { name: "Día" }));
+    await toca(screen.getByRole("tab", { name: "Día" }));
     expect(screen.getByTestId("vista-dia")).toBeTruthy();
     const url = String(replace.mock.calls[replace.mock.calls.length - 1][0]);
     expect(url).toContain("vista=dia");
@@ -91,7 +93,7 @@ describe("🔴 el control «Colaborador · Día»", () => {
     URL_ACTUAL = "tab=aprobaciones&vista=dia";
     await montar();
     expect(screen.getByTestId("vista-dia")).toBeTruthy();
-    expect(screen.getByRole("radio", { name: "Día" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("tab", { name: "Día" }).getAttribute("aria-selected")).toBe("true");
   });
 
   it("la vista recordada abre por día sin nada en la URL", async () => {
@@ -103,7 +105,7 @@ describe("🔴 el control «Colaborador · Día»", () => {
   it("🔴 las dos vistas cuentan lo MISMO arriba: 1 por decidir · 1:32 h", async () => {
     await montar();
     expect(screen.getByTestId("por-decidir").textContent).toBe("1por decidir · 1:32 h");
-    await toca(screen.getByRole("radio", { name: "Día" }));
+    await toca(screen.getByRole("tab", { name: "Día" }));
     expect(screen.getByTestId("por-decidir").textContent).toBe("1por decidir · 1:32 h");
   });
 });

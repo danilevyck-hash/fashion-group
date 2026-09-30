@@ -146,7 +146,10 @@ describe("C. 🔴 uno puede estar en los dos, y la fila lo dice con lo de pagar 
       expect(r).not.toMatch(/^(el|la) /);
     }
     expect(CHIP_PARA_PAGAR).toBe("Falta para pagar");
-    expect(CHIP_COMPLETAR).toBe("Falta completar");
+    // 🔴 29-sep-2026 (audit visual «6a», aprobado por Daniel): «Falta completar»
+    // pasó a «Por completar», la misma palabra que la frase de arriba de la
+    // lista («43 colaboradores · 5 por completar»). La regla no cambió.
+    expect(CHIP_COMPLETAR).toBe("Por completar");
   });
 });
 
@@ -154,14 +157,17 @@ describe("D. 🔴 la pantalla usa el módulo puro, y los chips viejos no vuelven
   const src = puro(TAB);
 
   it("los dos chips filtran DE VERDAD, y solo se dibujan con alguien adentro", () => {
-    expect(src).toMatch(/conteo\.paraPagar > 0 && \(/);
-    expect(src).toMatch(/conteo\.completar > 0 && \(/);
-    expect(src).toMatch(/setFiltro\("para-pagar"\)/);
-    expect(src).toMatch(/setFiltro\("completar"\)/);
+    // 🔴 29-sep-2026 (audit visual «6a», aprobado por Daniel): los chips negros
+    // pasaron a UN control segmentado («Todos 43 · Por completar 5»). Cada
+    // opción sigue saliendo solo con alguien adentro y sigue filtrando.
+    expect(src).toMatch(/<ControlSegmentado/);
+    expect(src).toMatch(/conteo\.paraPagar > 0\s*\?\s*\[\{ value: "para-pagar"/);
+    expect(src).toMatch(/conteo\.completar > 0\s*\?\s*\[\{ value: "completar"/);
+    expect(src).toMatch(/onChange=\{\(v\) => setFiltro\(v\)\}/);
     expect(src).toMatch(/if \(filtro === "para-pagar"\) return activos\.filter\(\(p\) => queLeFalta\(p\)\.paraPagar\.length > 0\)/);
     expect(src).toMatch(/if \(filtro === "completar"\) return activos\.filter\(\(p\) => queLeFalta\(p\)\.completar\.length > 0\)/);
-    expect(src).toMatch(/\{CHIP_PARA_PAGAR\} \(\{conteo\.paraPagar\}\)/);
-    expect(src).toMatch(/\{CHIP_COMPLETAR\} \(\{conteo\.completar\}\)/);
+    expect(src).toMatch(/`\$\{CHIP_PARA_PAGAR\} \$\{conteo\.paraPagar\}`/);
+    expect(src).toMatch(/`\$\{CHIP_COMPLETAR\} \$\{conteo\.completar\}`/);
   });
 
   it("🔴 «Falta configurar» y «Sin saldo» se retiraron como chips", () => {

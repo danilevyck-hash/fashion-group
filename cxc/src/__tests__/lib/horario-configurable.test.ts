@@ -417,7 +417,11 @@ describe("7. 🔴 las rutas y la pantalla van por la fuente ÚNICA", () => {
     // 44 px para lo que se toca; el domingo no se ofrece.
     expect(tab).toMatch(/min-h-\[44px\] min-w-\[44px\]/);
     expect(tab).not.toMatch(/DIAS_SEMANA_CORTO\[0\]/);
-    expect(tab).toMatch(/type="time"/);
+    // 🔴 29-sep-2026 (audit visual «21a», aprobado por Daniel): `type="time"`
+    // dibujaba «04:30 p» con el reloj de 12 h del sistema. Ahora es texto en
+    // 24 h leído por `leerHora24`; lo que viaja al PUT sigue siendo "HH:MM".
+    expect(tab).not.toMatch(/type="time"/);
+    expect(tab).toMatch(/leerHora24\(texto\)/);
   });
 });
 

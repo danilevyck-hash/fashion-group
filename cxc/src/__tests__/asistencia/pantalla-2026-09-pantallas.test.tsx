@@ -135,7 +135,9 @@ describe("A · Asistencia en la computadora", () => {
   it("🔴 la lupa, «Descargar» y los relojes: una sola fila de mandos", async () => {
     aparato(false); servir(); montarReporte();
     await screen.findByText("Ana Trejos");
-    expect(screen.getByRole("button", { name: "Buscar colaborador" })).toBeTruthy();
+    // 🔴 29-sep-2026 (audit visual aprobado por Daniel): la lupa dejó de ser un
+    // botón que abre el campo: el campo va SIEMPRE abierto, con la lupa adentro.
+    expect(screen.getByRole("searchbox", { name: "Buscar colaborador" })).toBeTruthy();
     // 🩸 25-sep-2026: «Solo a revisar» salió de la fila (se mudó al encabezado de
     // su columna) y el «⇧» pasó a decir «Descargar». El «···» se fue entero.
     expect(screen.queryByRole("button", { name: "Bajar Excel o PDF" })).toBeNull();
@@ -148,12 +150,13 @@ describe("A · Asistencia en la computadora", () => {
     expect(screen.getByRole("menuitem", { name: /PDF/ })).toBeTruthy();
   });
 
-  it("🔴 el buscador aparece al tocar la lupa, y sigue filtrando contra el servidor", async () => {
+  // 🔴 29-sep-2026: Daniel, *«buscar con la barra abierta si hay espacio, como
+  // en los otros módulos»* — ya no hay que tocar la lupa para que aparezca.
+  it("🔴 el buscador está abierto sin tocar nada, y sigue filtrando contra el servidor", async () => {
     aparato(false); const llamadas = servir(); montarReporte();
     await screen.findByText("Ana Trejos");
-    expect(screen.queryByPlaceholderText("Buscar colaborador")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Buscar colaborador" }));
-    const campo = screen.getByPlaceholderText("Buscar colaborador");
+    expect(screen.queryByRole("button", { name: "Buscar colaborador" })).toBeNull();
+    const campo = screen.getByPlaceholderText("Buscar colaborador…");
     fireEvent.change(campo, { target: { value: "jailine" } });
     await waitFor(() => expect(llamadas.some((u) => u.includes("q=jailine"))).toBe(true));
   });

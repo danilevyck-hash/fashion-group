@@ -21,6 +21,15 @@
 // ahí, no por la tabla que guarda. **No se quitó ni una función**: son las
 // MISMAS pantallas (`HorariosTab`, `FeriadosTab`), montadas acá adentro.
 //
+// 🔴 5a — HORARIOS, FERIADOS Y REGLAS SE FUERON DEL PIE DE COLABORADORES
+// (29-sep-2026, audit visual aprobado por Daniel). Vivían plegadas al FINAL de
+// la lista de gente, donde nadie las buscaba. Ahora las abre el botón ⚙ de la
+// barra de pestañas (`AsistenciaClient`, `?config=horarios|feriados|reglas`),
+// que monta ESTE MISMO componente con `ajuste`: una sola copia de cada pantalla
+// y del formulario de reglas. Colaboradores queda solo con personas (+ «Ya no
+// trabajan aquí» e «Ignorados»). ⚠️ Con el acomodo viejo (`personaEnElCentro`
+// apagado) la pestaña Configuración sigue con sus cuatro secciones, como antes.
+//
 // 🔑 Las secciones cargan sus datos RECIÉN al abrirse (no están montadas
 // mientras están cerradas): abrir Configuración no dispara tres consultas.
 //
@@ -30,7 +39,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { avisoGuardadoConSalida, avisoSalidaConDeuda } from "@/lib/asistencia/salida-con-deuda";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { filtrarPorEmpresa } from "@/lib/asistencia/empresa-para-todo";
 import { useToast } from "@/components/ToastSystem";
 import { Ayuda } from "@/components/shared/Ayuda";
@@ -136,7 +145,12 @@ import {
 } from "@/lib/buscar-en-lista";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import HorariosTab from "./HorariosTab";
+import { FormatoTiempoSelector } from "@/components/asistencia/FormatoTiempoSelector";
 import FeriadosTab from "./FeriadosTab";
+import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
+
+/** 🔴 5a (29-sep-2026): las tres vistas de ⚙ Configuración. */
+export type AjusteDeAsistencia = "horarios" | "feriados" | "reglas";
 
 interface Persona {
   codigo: string;
@@ -312,6 +326,22 @@ const money = (n: number | null, dec = 2) =>
     ? "—"
     : `$${n.toLocaleString("es-PA", { minimumFractionDigits: dec, maximumFractionDigits: dec })}`;
 
+/**
+ * 🔴 3a — UNA SOLA FRASE VERDADERA ARRIBA DE LA LISTA (29-sep-2026, audit
+ * visual aprobado por Daniel). 🩸 Decía «43 en la lista · todos listos para
+ * pagar» mientras el filtro de al lado decía «Falta completar (5)»: parecían
+ * contradecirse. Las dos cosas eran ciertas —cargo y cédula NO frenan el pago—,
+ * así que ahora la frase cuenta lo MISMO que el filtro, con sus palabras:
+ * «43 colaboradores · 5 por completar», o «43 colaboradores» sin nada que
+ * completar. Lo que SÍ frena el pago se sigue diciendo, antes.
+ */
+function fraseDeLaLista(total: number, paraPagar: number, porCompletar: number): string {
+  const partes = [`${total} ${total === 1 ? "colaborador" : "colaboradores"}`];
+  if (paraPagar > 0) partes.push(`${paraPagar} ${paraPagar === 1 ? "falta" : "faltan"} para pagar`);
+  if (porCompletar > 0) partes.push(`${porCompletar} por completar`);
+  return partes.join(" · ");
+}
+
 function reglasAForm(r: ReglasAsistencia): FormReglas {
   return {
     toleranciaTardanzaMin: String(r.toleranciaTardanzaMin),
@@ -351,7 +381,10 @@ const firma = (b: Borrador) =>
 const bajaCompleta = (b: Borrador) =>
   (b.fechaSalida.trim() === "") === (b.motivoSalida.trim() === "");
 
-export default function ConfiguracionTab({ personaEnElCentro = false, empresa = "" }: {
+export default function ConfiguracionTab({ personaEnElCentro = false, empresa = "", ajuste }: {
+  /** 🔴 5a — ⚙ Configuración: dibuja SOLO esa sección, sin la lista de gente.
+   *  Horarios y Feriados leen lo suyo; solo Reglas pide la configuración. */
+  ajuste?: AjusteDeAsistencia;
   /** 🔴 El selector de empresa de arriba de las pestañas (10-sep-2026): reemplaza
    *  a los chips de empresa que vivían acá. «todas» o vacío = todas. */
   empresa?: string;
@@ -449,9 +482,11 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
       setDatos(null);
     }
   }, []);
+  // Horarios y Feriados leen su propia ruta: no hace falta la lista de gente.
+  const necesitaDatos = ajuste !== "horarios" && ajuste !== "feriados";
   useEffect(() => {
-    void cargar();
-  }, [cargar]);
+    if (necesitaDatos) void cargar();
+  }, [cargar, necesitaDatos]);
 
   function abrir(p: Persona) {
     if (abierta === p.codigo) {
@@ -900,6 +935,148 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
   // La rejilla del escritorio: con el acomodo nuevo lleva una columna más.
   const rejilla = COLUMNAS;
 
+  // ── REGLAS DEL CÁLCULO ──────────────────────────────────────────────────
+  //
+  // 🔴 18a — UNA FILA POR REGLA (29-sep-2026, audit visual aprobado por Daniel).
+  // 🩸 Cada número de 2 a 4 cifras ocupaba media pantalla y la unidad quedaba
+  // lejos. Ahora: la etiqueta con su ⓘ a la izquierda y un campo angosto con la
+  // unidad PEGADA a la derecha («10 min», «1.25 ×», «173.33 h/mes», «9.75 %»).
+  // Lo que se guarda no cambió: el mismo formulario de texto y el mismo PUT.
+  //
+  // 🔴 Vive en UNA variable porque se dibuja en dos lugares: en ⚙ Configuración
+  // (`ajuste="reglas"`) y, con el acomodo viejo, en su sección plegada.
+  const reglasDelCalculo = form && (
+    <>
+      {/* 🔴 CÓMO SE MUESTRAN LOS TIEMPOS (29-sep-2026, audit «9»). Daniel:
+          «aplícalo y en configuración que se pueda configurar cómo mostrarlo».
+          Es de quien mira (se recuerda en este navegador) y se aplica al
+          momento: no pasa por «Guardar las reglas» ni mueve un número. */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 px-3 py-2">
+        <span className="text-sm text-gray-700">Mostrar los tiempos en</span>
+        <FormatoTiempoSelector />
+      </div>
+      <div className="-ml-2 -mt-1">
+        <Ayuda titulo="Para qué sirven estos números" etiqueta="Para qué sirven">
+          <p>
+            Todos los números con los que se calcula. Si la ley o un acuerdo cambia,
+            se cambia aquí y el reporte lo usa de inmediato — no hay que tocar el sistema.
+          </p>
+          {/* ⛔ 19 — «Esto no se cambia desde aquí» era un recuadro fijo al pie;
+              desde el 29-sep-2026 vive en este ⓘ: se aprende una vez. Se dice
+              para que nadie lo pida como campo: son la FORMA del cálculo, no
+              números sueltos. Ver `config.ts`. */}
+          <p className="mt-2 font-medium text-gray-900">Esto no se cambia desde aquí</p>
+          <p>
+            No son números: es la forma del cálculo. Si alguna vez cambia, se cambia
+            en el sistema — así nadie rompe la planilla sin querer.
+          </p>
+          <ul className="mt-1 space-y-0.5">
+            <li>· El almuerzo es de {textoAlmuerzo()}.</li>
+            <li>· La ausencia se descuenta como horas × valor de la hora.</li>
+            <li>· La quincena va del 1 al 15 y del 16 al 30.</li>
+            <li>· El día 31 no se paga, pero sí se descuenta si se falta.</li>
+          </ul>
+        </Ayuda>
+      </div>
+
+      {/* 🔴 «Almuerzo por defecto» SE FUE de acá (13-ago-2026). Era la
+          SEGUNDA perilla del mismo dato —la otra estaba en Horarios,
+          persona por persona— y dos perillas para un solo número es la
+          forma de que terminen diciendo cosas distintas. */}
+      <Bloque titulo="Tardanzas y horas extra">
+        <Campo label="Tolerancia de tardanza" ayuda="Minutos de gracia a la entrada. Pasados, la tardanza se cuenta desde las 8:00."
+          sufijo="min" valor={form.toleranciaTardanzaMin}
+          onChange={(v) => set("toleranciaTardanzaMin", v)} />
+        <Campo label="Mínimo para contar hora extra" ayuda="Quedarse menos de esto no cuenta como extra."
+          sufijo="min" valor={form.extraMinimoMin}
+          onChange={(v) => set("extraMinimoMin", v)} />
+        {/* 🔴 LAS DOS DEL 24-sep-2026, al lado de la tolerancia. Daniel:
+            «60 que dura 65 no descuenta nada; si dura 66, se descuentan
+            los 6» y, sobre el aviso, «solo desde 30 minutos». Los rótulos
+            salen de `reglas-nuevas.ts`. */}
+        <Campo label={ROTULO_GRACIA_ALMUERZO} ayuda={AYUDA_GRACIA_ALMUERZO}
+          sufijo="min" valor={form.graciaAlmuerzoMin}
+          onChange={(v) => set("graciaAlmuerzoMin", v)} />
+        <Campo label={ROTULO_AVISO_ENTRADA_TEMPRANA} ayuda={AYUDA_AVISO_ENTRADA_TEMPRANA}
+          sufijo="min" valor={form.avisoEntradaTempranaMin}
+          onChange={(v) => set("avisoEntradaTempranaMin", v)} />
+      </Bloque>
+
+      <Bloque titulo="Recargos">
+        <Campo label="Hora extra de día" ayuda="Se escribe como factor: 1.25 es la hora y cuarto."
+          sufijo="×" valor={form.recargoExtraDiurno} onChange={(v) => set("recargoExtraDiurno", v)} />
+        <Campo label="Hora extra de noche" ayuda="Aplica pasada la hora de corte de abajo."
+          sufijo="×" valor={form.recargoExtraNocturno} onChange={(v) => set("recargoExtraNocturno", v)} />
+        <Campo label="Hora de corte de la tarde"
+          ayuda="Hasta esta hora la extra va al recargo de día; desde el minuto siguiente al de noche. Es la misma frontera que marca la jornada nocturna."
+          valor={form.horaCorteNocturno} onChange={(v) => set("horaCorteNocturno", v)} />
+        {/* 🔴 ⓘ consistente (29-sep-2026): era la única de los recargos sin
+            él. La línea dice lo que hace el motor: `planilla.ts` valúa las
+            horas de domingo y feriado × este factor × la rata, y solo si se
+            aprueban (`diasConExtra`). */}
+        <Campo label="Domingos y feriados"
+          ayuda="Cada hora trabajada en domingo o feriado se paga por este factor sobre la rata por hora, y solo si se aprueba."
+          sufijo="×" valor={form.recargoDomingoFeriado} onChange={(v) => set("recargoDomingoFeriado", v)} />
+      </Bloque>
+
+      {/* 🩸 ANTES DECÍA "Divisores" Y LA CONTABLE NO LO ENTENDIÓ: *"no sé a qué
+          se refiere eso de divisores"*. La etiqueta estaba mal, no ella.
+          ⚠️ El nombre TÉCNICO sigue siendo `divisor40` / `divisor48`, en el
+          código y en las columnas `divisor_40` / `divisor_48` de la base. */}
+      <Bloque
+        titulo="Horas que se trabajan al mes"
+        ayuda="El salario mensual se divide entre estas horas para sacar la rata por hora."
+      >
+        <Campo label="40 horas por semana" ayuda="Total de horas al mes de quien trabaja 40 horas por semana."
+          sufijo="h/mes" valor={form.divisor40} onChange={(v) => set("divisor40", v)} />
+        <Campo label="48 horas por semana" ayuda="Total de horas al mes de quien trabaja 48 horas por semana."
+          sufijo="h/mes" valor={form.divisor48} onChange={(v) => set("divisor48", v)} />
+      </Bloque>
+
+      <Bloque titulo="Descuentos de ley">
+        {/* Sin ayuda: el «%» pegado al campo ya lo dice. */}
+        <Campo label="Seguro social" sufijo="%"
+          valor={form.seguroSocialPct} onChange={(v) => set("seguroSocialPct", v)} />
+        <Campo label="Seguro educativo" sufijo="%"
+          valor={form.seguroEducativoPct} onChange={(v) => set("seguroEducativoPct", v)} />
+      </Bloque>
+
+      {/* 🔴 19 — EL EXCEDENTE SE QUEDA, PLEGADO Y EN GRIS (29-sep-2026).
+          Daniel: *«no lo saques»*. Era un bloque abierto con un párrafo de
+          alarma; hoy cambiarlo no mueve un centavo, así que no es una alerta:
+          es un dato guardado. Plegado por defecto y en tono neutro. */}
+      <details className="rounded-lg border border-gray-200 bg-white">
+        <summary className="flex min-h-[44px] cursor-pointer items-center px-4 text-sm text-gray-700">
+          Excedente nocturno (no se usa hoy)
+        </summary>
+        <div className="border-t border-gray-100 px-4 pb-2 pt-3">
+          <p className="text-[12px] text-gray-500">
+            Se guarda, pero NO SE USA para calcular: la contadora paga esos minutos × 1.50, junto
+            con el resto de la hora extra de noche, y deja su columna en $0.00. Los dos campos
+            quedan aquí por si algún día se vuelve a usar; hoy cambiarlos no mueve un centavo.
+          </p>
+          <div className="mt-1 divide-y divide-gray-100">
+            <Campo label="Desde cuántas horas extra al día" ayuda="3 quiere decir que aplica desde la cuarta hora extra."
+              sufijo="h" valor={form.excedenteHorasDia}
+              onChange={(v) => set("excedenteHorasDia", v)} />
+            <Campo label="Recargo del excedente" ayuda="Factor confirmado por la contable: 2.625, que es 1.5 × 1.75."
+              sufijo="×" valor={form.recargoExcedenteNocturnaMixta}
+              onChange={(v) => set("recargoExcedenteNocturnaMixta", v)} />
+          </div>
+        </div>
+      </details>
+
+      <button type="button" onClick={() => void guardarReglas()} disabled={guardandoReglas}
+        className="min-h-[44px] rounded-md bg-black px-4 text-sm text-white transition active:scale-[0.97] disabled:opacity-50">
+        {guardandoReglas ? "Guardando…" : "Guardar las reglas"}
+      </button>
+    </>
+  );
+
+  // 🔴 5a — ⚙ Configuración › Horarios / Feriados: la MISMA pantalla, sola.
+  if (ajuste === "horarios") return <HorariosTab />;
+  if (ajuste === "feriados") return <FeriadosTab />;
+
   return (
     <div className="space-y-3">
       {datos?.faltaMigracion && (
@@ -918,16 +1095,15 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
         <p className="py-8 text-center text-sm text-gray-400">Cargando…</p>
       )}
 
-      {datos && (
+      {/* 🔴 5a — ⚙ Configuración › Reglas: solo el formulario. */}
+      {datos && ajuste === "reglas" && reglasDelCalculo}
+
+      {datos && !ajuste && (
         <>
           {/* ── 1. COLABORADORES (era «Personas» hasta el 10-sep-2026) ──────────────────────────────────────────────── */}
           <Seccion
             titulo="Colaboradores"
-            resumen={
-              pendientes > 0
-                ? `${datos.resumen.total} en la lista · ${pendientes} ${pendientes === 1 ? "falta" : "faltan"} para pagar`
-                : `${datos.resumen.total} en la lista · todos listos para pagar`
-            }
+            resumen={fraseDeLaLista(activos.length, pendientes, conteo.completar)}
             alerta={pendientes > 0}
             abierta={!!seccion.personas}
             sinTarjeta={ASISTENCIA_PANTALLA_2026_09 && personaEnElCentro}
@@ -1017,24 +1193,28 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                   conteo={textoDeConteo(visibles.length, porChip.length, busqueda)}
                 />
               )}
-              <button type="button" onClick={() => setFiltro("todos")}
-                className={`${PILL_BASE} ${filtro === "todos" ? PILL_ON : PILL_OFF}`}>
-                Todos ({datos.resumen.total})
-              </button>
-              {/* 🔴 LOS DOS CHIPS. Con nadie adentro NO SE DIBUJAN: un chip en
-                  cero es un control que no ofrece nada. Lo de PAGAR va primero. */}
-              {conteo.paraPagar > 0 && (
-                <button type="button" onClick={() => setFiltro("para-pagar")}
-                  className={`${PILL_BASE} ${filtro === "para-pagar" ? PILL_ON : PILL_OFF}`}>
-                  {CHIP_PARA_PAGAR} ({conteo.paraPagar})
-                </button>
-              )}
-              {conteo.completar > 0 && (
-                <button type="button" onClick={() => setFiltro("completar")}
-                  className={`${PILL_BASE} ${filtro === "completar" ? PILL_ON : PILL_OFF}`}>
-                  {CHIP_COMPLETAR} ({conteo.completar})
-                </button>
-              )}
+              {/* 🔴 6a — EL FILTRO ES UN CONTROL SEGMENTADO (29-sep-2026, audit
+                  visual aprobado por Daniel). 🩸 Eran botones NEGROS, el mismo
+                  peso que «+ Nuevo colaborador», que sí es una acción. Gris y
+                  blanco, como todo filtro de la casa; el negro queda para la
+                  acción. «Todos 43» cuenta lo MISMO que la frase de arriba.
+                  Con nadie adentro una opción NO SE DIBUJA: un filtro en cero
+                  no ofrece nada. Lo de PAGAR va primero. */}
+              <ControlSegmentado
+                ancho="contenido"
+                ariaLabel="Filtrar la lista"
+                active={filtro === "para-pagar" || filtro === "completar" ? filtro : "todos"}
+                onChange={(v) => setFiltro(v)}
+                options={[
+                  { value: "todos", label: `Todos ${activos.length}` },
+                  ...(conteo.paraPagar > 0
+                    ? [{ value: "para-pagar", label: `${CHIP_PARA_PAGAR} ${conteo.paraPagar}` }]
+                    : []),
+                  ...(conteo.completar > 0
+                    ? [{ value: "completar", label: `${CHIP_COMPLETAR} ${conteo.completar}` }]
+                    : []),
+                ]}
+              />
               {/* 🔴 Los chips de empresa SE FUERON (10-sep-2026): la empresa se
                   elige UNA vez arriba de las pestañas, para todo el módulo. */}
 
@@ -1744,10 +1924,15 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
             )}
           </Seccion>
 
+          {/* 🔴 5a (29-sep-2026): con el acomodo nuevo, Horarios, Feriados y
+              Reglas viven en ⚙ Configuración y NO se dibujan aquí. Con el
+              viejo (`personaEnElCentro` apagado) siguen plegadas al pie. */}
+          {!personaEnElCentro && (
+          <>
           {/* ── 2. HORARIOS ──────────────────────────────────────────────── */}
           <Seccion
             titulo="Horarios"
-            resumen="Hora de salida, colaborador por colaborador"
+            resumen="Días y horario de cada colaborador"
             abierta={!!seccion.horarios}
             onToggle={() => alternar("horarios")}
           >
@@ -1771,129 +1956,10 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
             abierta={!!seccion.reglas}
             onToggle={() => alternar("reglas")}
           >
-            {form && (
-              <>
-                <div className="-ml-2 -mt-1">
-                  <Ayuda titulo="Para qué sirven estos números" etiqueta="Para qué sirven">
-                    <p>
-                      Todos los números con los que se calcula. Si la ley o un acuerdo cambia,
-                      se cambia aquí y el reporte lo usa de inmediato — no hay que tocar el sistema.
-                    </p>
-                  </Ayuda>
-                </div>
-
-                {/* 🔴 «Almuerzo por defecto» SE FUE de acá (13-ago-2026). Era la
-                    SEGUNDA perilla del mismo dato —la otra estaba en Horarios,
-                    persona por persona— y dos perillas para un solo número es la
-                    forma de que terminen diciendo cosas distintas. Ahora el
-                    almuerzo es fijo en 30 minutos y se declara abajo, en «Esto no
-                    se cambia desde acá». */}
-                <Bloque titulo="Tardanzas y horas extra">
-                  <Campo label="Tolerancia de tardanza" ayuda="Minutos de gracia a la entrada. Pasados, la tardanza se cuenta desde las 8:00."
-                    sufijo="minutos" valor={form.toleranciaTardanzaMin}
-                    onChange={(v) => set("toleranciaTardanzaMin", v)} />
-                  <Campo label="Mínimo para contar hora extra" ayuda="Quedarse menos de esto no cuenta como extra."
-                    sufijo="minutos" valor={form.extraMinimoMin}
-                    onChange={(v) => set("extraMinimoMin", v)} />
-                  {/* 🔴 LAS DOS DEL 24-sep-2026, al lado de la tolerancia. Daniel:
-                      «60 que dura 65 no descuenta nada; si dura 66, se descuentan
-                      los 6» y, sobre el aviso, «solo desde 30 minutos». Los rótulos
-                      salen de `reglas-nuevas.ts`. */}
-                  <Campo label={ROTULO_GRACIA_ALMUERZO} ayuda={AYUDA_GRACIA_ALMUERZO}
-                    sufijo="minutos" valor={form.graciaAlmuerzoMin}
-                    onChange={(v) => set("graciaAlmuerzoMin", v)} />
-                  <Campo label={ROTULO_AVISO_ENTRADA_TEMPRANA} ayuda={AYUDA_AVISO_ENTRADA_TEMPRANA}
-                    sufijo="minutos" valor={form.avisoEntradaTempranaMin}
-                    onChange={(v) => set("avisoEntradaTempranaMin", v)} />
-                </Bloque>
-
-                <Bloque titulo="Recargos">
-                  <Campo label="Hora extra de día" ayuda="Se escribe como factor: 1.25 es la hora y cuarto."
-                    valor={form.recargoExtraDiurno} onChange={(v) => set("recargoExtraDiurno", v)} />
-                  <Campo label="Hora extra de noche" ayuda="Aplica pasada la hora de corte de abajo."
-                    valor={form.recargoExtraNocturno} onChange={(v) => set("recargoExtraNocturno", v)} />
-                  <Campo label="Hora de corte de la tarde"
-                    ayuda="Hasta esta hora la extra va al recargo de día; desde el minuto siguiente al de noche. Es la misma frontera que marca la jornada nocturna."
-                    valor={form.horaCorteNocturno} onChange={(v) => set("horaCorteNocturno", v)} />
-                  {/* Sin ayuda propia: el ⓘ de «Hora extra de día», dos campos
-                      arriba, ya explica qué es un factor. Repetirlo no agrega. */}
-                  <Campo label="Domingos y feriados"
-                    valor={form.recargoDomingoFeriado} onChange={(v) => set("recargoDomingoFeriado", v)} />
-                </Bloque>
-
-                {/* 🩸 ANTES DECÍA "Divisores" Y LA CONTABLE NO LO ENTENDIÓ. Revisó el
-                    cuadro entero, validó todo y se trabó justo acá: *"no sé a qué se
-                    refiere eso de divisores"*. Ella es una de las tres personas que
-                    usa esta pantalla (contabilidad tiene el módulo), así que la
-                    etiqueta estaba mal, no ella. Y la lógica ya la tiene —dijo *"la
-                    rata de hora depende de la cantidad de horas laborables a la
-                    semana"*—, solo faltaba decirlo en su idioma.
-
-                    ⚠️ El nombre TÉCNICO sigue siendo `divisor40` / `divisor48`, en el
-                    código y en las columnas `divisor_40` / `divisor_48` de la base.
-                    Se deja a propósito: renombrar la columna pediría otra migración a
-                    mano y no cambiaría nada de lo que la contable lee. Lo que importa
-                    es la etiqueta. */}
-                <Bloque
-                  titulo="Horas que se trabajan al mes"
-                  ayuda="El salario mensual se divide entre estas horas para sacar la rata por hora."
-                >
-                  <Campo label="40 horas por semana" ayuda="Total de horas al mes de quien trabaja 40 horas por semana."
-                    sufijo="al mes" valor={form.divisor40} onChange={(v) => set("divisor40", v)} />
-                  <Campo label="48 horas por semana" ayuda="Total de horas al mes de quien trabaja 48 horas por semana."
-                    sufijo="al mes" valor={form.divisor48} onChange={(v) => set("divisor48", v)} />
-                </Bloque>
-
-                <Bloque titulo="Descuentos de ley">
-                  {/* Sin ayuda: el sufijo «%» del campo ya dice lo mismo. */}
-                  <Campo label="Seguro social" sufijo="%"
-                    valor={form.seguroSocialPct} onChange={(v) => set("seguroSocialPct", v)} />
-                  <Campo label="Seguro educativo" sufijo="%"
-                    valor={form.seguroEducativoPct} onChange={(v) => set("seguroEducativoPct", v)} />
-                </Bloque>
-
-                <Bloque
-                  titulo="Excedente en jornada nocturna o mixta"
-                  nota="Se guarda, pero NO SE USA para calcular: la contadora paga esos minutos × 1.50, junto con el resto de la hora extra de noche, y deja su columna en $0.00. Los dos campos quedan aquí por si algún día se vuelve a usar; hoy cambiarlos no mueve un centavo."
-                >
-                  <Campo label="Desde cuántas horas extra al día" ayuda="3 quiere decir que aplica desde la cuarta hora extra."
-                    sufijo="horas" valor={form.excedenteHorasDia}
-                    onChange={(v) => set("excedenteHorasDia", v)} />
-                  <Campo label="Recargo del excedente" ayuda="Factor confirmado por la contable: 2.625, que es 1.5 × 1.75."
-                    valor={form.recargoExcedenteNocturnaMixta}
-                    onChange={(v) => set("recargoExcedenteNocturnaMixta", v)} />
-                </Bloque>
-
-                {/* ⛔ Se dice en la pantalla para que nadie lo pida como campo: son
-                    la FORMA del cálculo, no números sueltos. Ver `config.ts`. */}
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                  <div className="flex flex-wrap items-center gap-1">
-                    <h3 className="text-sm font-medium text-gray-900">Esto no se cambia desde aquí</h3>
-                    {/* El POR QUÉ no son campos se lee una vez. Las tres reglas
-                        siguen a la vista: son las que hay que conocer para
-                        cuadrar contra el Excel de la contable. */}
-                    <Ayuda titulo="Por qué no se pueden cambiar" className="-my-3">
-                      <p>
-                        No son números: es la forma del cálculo. Si alguna vez cambia, se cambia
-                        en el sistema — así nadie rompe la planilla sin querer.
-                      </p>
-                    </Ayuda>
-                  </div>
-                  <ul className="mt-1 space-y-1 text-[12px] leading-relaxed text-gray-600">
-                    <li>· El almuerzo es de {textoAlmuerzo()}.</li>
-                    <li>· La ausencia se descuenta como horas × valor de la hora.</li>
-                    <li>· La quincena va del 1 al 15 y del 16 al 30.</li>
-                    <li>· El día 31 no se paga, pero sí se descuenta si se falta.</li>
-                  </ul>
-                </div>
-
-                <button type="button" onClick={() => void guardarReglas()} disabled={guardandoReglas}
-                  className="min-h-[44px] rounded-md bg-black px-4 text-sm text-white transition active:scale-[0.97] disabled:opacity-50">
-                  {guardandoReglas ? "Guardando…" : "Guardar las reglas"}
-                </button>
-              </>
-            )}
+            {reglasDelCalculo}
           </Seccion>
+          </>
+          )}
         </>
       )}
     </div>
@@ -1922,7 +1988,8 @@ function Seccion({
    * dentro de una tarjeta plegable que repetía el título de la pestaña
    * («Colaboradores» arriba de «Colaboradores») y se podía cerrar sin querer,
    * dejando la pestaña en blanco. Las otras tres secciones —Horarios, Feriados
-   * y Reglas— siguen plegadas al pie, exactamente como hoy.
+   * y Reglas— se mudaron a ⚙ Configuración el 29-sep-2026 (5a); solo el acomodo
+   * viejo las sigue plegando al pie.
    */
   sinTarjeta?: boolean;
 }) {
@@ -2195,46 +2262,61 @@ function Etiqueta({ texto, ayuda }: { texto: string; ayuda?: string }) {
   );
 }
 
+/**
+ * 🔴 18a — Un grupo de reglas: el título y una FILA por regla (29-sep-2026).
+ * `ayuda` EXPLICA → va al ⓘ, que se aprende una vez.
+ */
 function Bloque({
-  titulo, ayuda, nota, children,
-}: { titulo: string; ayuda?: string; nota?: string; children: React.ReactNode }) {
+  titulo, ayuda, children,
+}: { titulo: string; ayuda?: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
+    <div className="rounded-lg border border-gray-200 bg-white px-4 pb-1 pt-3">
       <div className="flex flex-wrap items-center gap-1">
         <h3 className="text-sm font-medium text-gray-900">{titulo}</h3>
-        {/* `ayuda` EXPLICA → va al ⓘ, que se aprende una vez. `nota` ADVIERTE
-            → se queda en pantalla y en ámbar: esconder un aviso detrás de un
-            toque es exactamente igual que borrarlo. */}
         {ayuda && (
           <Ayuda titulo={titulo} className="-my-3">
             <p>{ayuda}</p>
           </Ayuda>
         )}
       </div>
-      {nota && <p className="mt-1 text-[12px] text-amber-800">{nota}</p>}
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">{children}</div>
+      <div className="mt-1 divide-y divide-gray-100">{children}</div>
     </div>
   );
 }
 
+/**
+ * 🔴 18a — Una regla en UNA fila: la etiqueta (con su ⓘ) a la izquierda y un
+ * campo angosto con la unidad pegada a la derecha. La unidad tiene ancho fijo
+ * para que todos los campos del bloque caigan en la misma columna.
+ */
 function Campo({
   label, ayuda, sufijo, valor, onChange,
 }: {
   label: string;
-  /** Cómo se usa el número. Opcional: si el sufijo del campo ya lo dice («%»),
-   *  repetirlo abajo es texto que nadie vuelve a leer. */
+  /** Cómo se usa el número. Opcional: si la unidad ya lo dice («%»),
+   *  repetirlo es texto que nadie vuelve a leer. */
   ayuda?: string;
   sufijo?: string;
   valor: string;
   onChange: (v: string) => void;
 }) {
+  const id = useId();
   return (
-    <div>
-      <Etiqueta texto={label} ayuda={ayuda} />
-      <div className="flex items-center gap-2">
-        <input type="text" inputMode="decimal" value={valor}
-          onChange={(e) => onChange(e.target.value)} className={`${CAMPO} tabular-nums`} />
-        {sufijo && <span className="shrink-0 text-[12px] text-gray-400">{sufijo}</span>}
+    <div className="flex min-h-[52px] items-center justify-between gap-3 py-1">
+      <div className="flex min-w-0 flex-wrap items-center">
+        <label htmlFor={id} className="text-sm text-gray-700">{label}</label>
+        {ayuda && (
+          // -my-3: el botón sigue midiendo 44 px, solo deja de empujar la fila.
+          <Ayuda titulo={label} className="-my-3">
+            <p>{ayuda}</p>
+          </Ayuda>
+        )}
+      </div>
+      <div className="flex shrink-0 items-center gap-1.5">
+        <input id={id} type="text" inputMode="decimal" value={valor}
+          onChange={(e) => onChange(e.target.value)}
+          className="min-h-[44px] w-20 rounded-lg border border-gray-200 px-2 text-right text-base tabular-nums outline-none transition focus:border-black sm:text-sm" />
+        <span className="w-10 text-[13px] text-gray-500">{sufijo ?? ""}</span>
       </div>
     </div>
   );

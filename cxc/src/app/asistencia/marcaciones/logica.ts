@@ -68,6 +68,9 @@ export interface MarcaDeTelefono {
   aparatoId: string | null;
   empresaKey: string | null;
   lugar: LugarDeLaMarca;
+  /** Su hora de salida configurada ese día («HH:MM»), o `null` sin horario.
+   *  La manda la ruta desde el 29-sep-2026 para leer bien un día de DOS marcas. */
+  salidaHorario?: string | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

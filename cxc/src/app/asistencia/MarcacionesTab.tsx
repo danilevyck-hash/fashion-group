@@ -38,7 +38,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import SelectorPeriodo, { usePeriodoAsistencia } from "@/components/asistencia/SelectorPeriodo";
-import { ScrollableTable } from "@/components/ui";
+// 🔴 El encabezado de la tabla se pega DEBAJO del de la app (29-sep-2026): la
+// única forma de hacerlo es esta clase (`lib/ui/barra-pegajosa.ts`).
+import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { aparatoDeQuienMira } from "@/lib/aparato";
 import { empresaParaPedir } from "@/lib/asistencia/empresa-para-todo";
@@ -97,6 +99,40 @@ function Marcas({ fila }: { fila: FilaPorDia<MarcaDeTelefono> }) {
         </span>
       ))}
     </>
+  );
+}
+
+/**
+ * Los avisos ÁMBAR del día (29-sep-2026, aprobados por Daniel en el audit):
+ * «sin almuerzo marcado» y «N marcas en el mismo minuto». Solo se dicen.
+ */
+function AvisosAmbar({ avisos }: { avisos: readonly string[] }) {
+  return (
+    <>
+      {avisos.map((a) => (
+        <span key={a} className="ml-2 whitespace-nowrap rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-800">
+          {a}
+        </span>
+      ))}
+    </>
+  );
+}
+
+/**
+ * EL LUGAR (29-sep-2026). Daniel aprobó el audit donde se leía «Calle del
+ * Cerro 453-43, David · 780 / m de la tienda» partido en dos renglones: la
+ * dirección se corta con «…» (el texto entero queda en el `title`) y la
+ * distancia va en gris al lado, sin partirse nunca.
+ */
+function Lugar({ fila }: { fila: FilaPorDia<MarcaDeTelefono> }) {
+  if (!fila.lugarNombre) return <span className="whitespace-nowrap">{fila.lugar}</span>;
+  return (
+    <span className="flex min-w-0 items-baseline gap-1.5" title={fila.lugar}>
+      <span className="min-w-0 truncate">{fila.lugarNombre}</span>
+      {fila.lugarDistancia && (
+        <span className="shrink-0 whitespace-nowrap text-gray-400">{fila.lugarDistancia}</span>
+      )}
+    </span>
   );
 }
 
@@ -196,7 +232,9 @@ function PorDia({ empresa }: { empresa: string }) {
         lng: m.lng,
         persona: fila.nombre,
         fecha: fechaDelDia(fila.dia),
-        rotulo: rotuloDeLaMarca(i, m.tipo),
+        // Con DOS marcas y la 2.ª a su hora de salida, la hoja también dice
+        // «Salida» (el 3 es su lugar en las cuatro marcas).
+        rotulo: rotuloDeLaMarca(fila.segundaEsSalida && i === 1 ? 3 : i, m.tipo),
         lineas: lineasDeLaHoja(m),
       })),
     );
@@ -249,13 +287,12 @@ function PorDia({ empresa }: { empresa: string }) {
       )}
 
       {/* ── EL DÍA MANDA, en la computadora y en el celular ──────────────── */}
-      {dias.map((d) => (
-        <section key={d.dia} className="space-y-2">
-          <h3 className="text-[13px] font-medium uppercase tracking-wide text-gray-500">
-            {d.rotulo}
-          </h3>
-
-          {celular ? (
+      {celular ? (
+        dias.map((d) => (
+          <section key={d.dia} className="space-y-2">
+            <h3 className="text-[13px] font-medium uppercase tracking-wide text-gray-500">
+              {d.rotulo}
+            </h3>
             <div className="space-y-2">
               {d.filas.map((f) => (
                 <button
@@ -265,57 +302,83 @@ function PorDia({ empresa }: { empresa: string }) {
                   className="block w-full rounded-lg border border-gray-200 bg-white p-3 text-left transition active:bg-gray-50"
                 >
                   <span className="flex items-baseline justify-between gap-2">
-                    <span className="truncate text-[15px] font-medium text-gray-900">
-                      {f.nombre}
-                      {f.mismoTelefono && <AvisoMismoTelefono />}
+                      <span className="shrink-0 truncate text-[15px] font-medium text-gray-900">
+                        {f.nombre}
+                        {f.mismoTelefono && <AvisoMismoTelefono />}
+                      </span>
+                      <span className="min-w-0 text-[13px] text-gray-500">
+                        <Lugar fila={f} />
+                      </span>
                     </span>
-                    <span className="shrink-0 text-[13px] text-gray-500">{f.lugar}</span>
-                  </span>
-                  <span className="mt-1 block text-[15px] leading-relaxed">
-                    <Marcas fila={f} />
-                  </span>
-                  {f.detalle && (
-                    <span className="mt-0.5 block text-[13px] text-gray-500">{f.detalle}</span>
-                  )}
+                    <span className="mt-1 block text-[15px] leading-relaxed">
+                      <Marcas fila={f} />
+                      <AvisosAmbar avisos={f.avisos} />
+                    </span>
+                    {f.detalle && (
+                      <span className="mt-0.5 block text-[13px] text-gray-500">{f.detalle}</span>
+                    )}
                 </button>
               ))}
             </div>
-          ) : (
-            <ScrollableTable minWidth={760}>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
-                    {COLUMNAS_POR_DIA.map((c) => (
-                      <th key={c} className="py-2 pr-3 font-medium">{c}</th>
-                    ))}
+          </section>
+        ))
+      ) : (
+        dias.length > 0 && (
+          /* 🔴 UNA tabla y el encabezado UNA vez (29-sep-2026). 🩸 «Colaborador ·
+             Sus marcas del día · Lugar» se repetía debajo de CADA día —cinco
+             veces por pantalla—. Ahora va una sola vez, pegado bajo el encabezado
+             de la app al bajar (`--fg-altura-encabezado`, medido), y cada día
+             queda solo con su fecha. Sin `ScrollableTable`: su scroll de lado
+             haría que el encabezado se pegue a la caja y no a la página. */
+          <table className="w-full table-fixed text-sm">
+            <colgroup>
+              <col className="w-[200px]" />
+              <col />
+              <col className="w-[300px]" />
+            </colgroup>
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
+                {COLUMNAS_POR_DIA.map((c) => (
+                  <th key={c} className={`border-b border-gray-200 bg-white py-2 pr-3 font-medium ${CLASE_BARRA_PEGAJOSA}`}>
+                    {c}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            {dias.map((d) => (
+              <tbody key={d.dia}>
+                <tr>
+                  <td colSpan={COLUMNAS_POR_DIA.length} className="pb-1 pt-5">
+                    <h3 className="text-[13px] font-medium text-gray-500">{d.rotulo}</h3>
+                  </td>
+                </tr>
+                {d.filas.map((f) => (
+                  <tr
+                    key={f.llave}
+                    onClick={() => abrir(f)}
+                    className="cursor-pointer border-b border-gray-100 transition hover:bg-gray-50"
+                  >
+                    <td className="py-2 pr-3 align-top text-gray-900">
+                      {f.nombre}
+                      {f.mismoTelefono && <AvisoMismoTelefono />}
+                    </td>
+                    <td className="py-2 pr-3 align-top">
+                      <Marcas fila={f} />
+                      <AvisosAmbar avisos={f.avisos} />
+                      {f.detalle && (
+                        <div className="mt-0.5 text-[12px] text-gray-500">{f.detalle}</div>
+                      )}
+                    </td>
+                    <td className="py-2 pr-3 align-top text-gray-700">
+                      <Lugar fila={f} />
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {d.filas.map((f) => (
-                    <tr
-                      key={f.llave}
-                      onClick={() => abrir(f)}
-                      className="cursor-pointer border-b border-gray-100 transition hover:bg-gray-50"
-                    >
-                      <td className="w-[180px] py-2 pr-3 align-top text-gray-900">
-                        {f.nombre}
-                        {f.mismoTelefono && <AvisoMismoTelefono />}
-                      </td>
-                      <td className="py-2 pr-3 align-top">
-                        <Marcas fila={f} />
-                        {f.detalle && (
-                          <div className="mt-0.5 text-[12px] text-gray-500">{f.detalle}</div>
-                        )}
-                      </td>
-                      <td className="w-[260px] py-2 pr-3 align-top text-gray-700">{f.lugar}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </ScrollableTable>
-          )}
-        </section>
-      ))}
+                ))}
+              </tbody>
+            ))}
+          </table>
+        )
+      )}
 
       <FotosDeLaMarcaModal marcas={abierta} onClose={() => setAbierta(null)} />
     </div>

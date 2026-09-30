@@ -32,7 +32,8 @@ import {
 import {
   ETIQUETA_NO_TRABAJA_AFUERA, ETIQUETA_TRABAJA_AFUERA, EXPLICACION_TRABAJA_AFUERA, PREGUNTA_TRABAJA_AFUERA,
 } from "@/lib/asistencia/trabaja-afuera";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { leerHora24 } from "@/lib/asistencia/hora-24";
 import {
   DIAS_ELEGIBLES,
   DIAS_SEMANA_CORTO,
@@ -263,24 +264,20 @@ export default function FichaEditar({
             </Grupo>
             <Grupo etiqueta={ROTULO_RELOJ}>
               <div className="flex items-center gap-1.5">
-                <input type="time" aria-label="Entrada en el reloj" className={`${CAMPO} tabular-nums`}
-                  value={horario.entrada}
-                  onChange={(e) => e.target.value && onCambioHorario({ ...horario, entrada: e.target.value })} />
+                <HoraCampo etiqueta="Entrada en el reloj" valor={horario.entrada}
+                  onValor={(v) => v && onCambioHorario({ ...horario, entrada: v })} />
                 <span className="text-gray-400">→</span>
-                <input type="time" aria-label="Salida en el reloj" className={`${CAMPO} tabular-nums`}
-                  value={horario.salida}
-                  onChange={(e) => e.target.value && onCambioHorario({ ...horario, salida: e.target.value })} />
+                <HoraCampo etiqueta="Salida en el reloj" valor={horario.salida}
+                  onValor={(v) => v && onCambioHorario({ ...horario, salida: v })} />
               </div>
             </Grupo>
             <Grupo etiqueta={ROTULO_TELEFONO} ayuda={NOTA_TELEFONO_VACIO}>
               <div className="flex items-center gap-1.5">
-                <input type="time" aria-label="Entrada por el teléfono" className={`${CAMPO} tabular-nums`}
-                  value={horario.entradaAfuera ?? ""}
-                  onChange={(e) => onCambioHorario({ ...horario, entradaAfuera: e.target.value || null })} />
+                <HoraCampo etiqueta="Entrada por el teléfono" valor={horario.entradaAfuera} puedeVaciar
+                  onValor={(v) => onCambioHorario({ ...horario, entradaAfuera: v })} />
                 <span className="text-gray-400">→</span>
-                <input type="time" aria-label="Salida por el teléfono" className={`${CAMPO} tabular-nums`}
-                  value={horario.salidaAfuera ?? ""}
-                  onChange={(e) => onCambioHorario({ ...horario, salidaAfuera: e.target.value || null })} />
+                <HoraCampo etiqueta="Salida por el teléfono" valor={horario.salidaAfuera} puedeVaciar
+                  onValor={(v) => onCambioHorario({ ...horario, salidaAfuera: v })} />
               </div>
             </Grupo>
             <p className="text-[12px] text-gray-500 sm:col-span-3">
@@ -468,5 +465,30 @@ function Grupo({ etiqueta, ayuda, children }: {
       {children}
       {ayuda && <span className="mt-1 block text-[11.5px] text-gray-400">{ayuda}</span>}
     </div>
+  );
+}
+
+/** Una hora en 24 h (audit «21a», 29-sep-2026): el `type="time"` se dibujaba
+ *  «04:30 p» en una Mac en 12 h. Se escribe libre («1630», «9:05») y al salir
+ *  del campo queda «16:30»; lo que no es una hora vuelve al valor anterior. */
+function HoraCampo({ etiqueta, valor, onValor, puedeVaciar = false }: {
+  etiqueta: string;
+  valor: string | null;
+  onValor: (v: string | null) => void;
+  puedeVaciar?: boolean;
+}) {
+  const [texto, setTexto] = useState(valor ?? "");
+  useEffect(() => { setTexto(valor ?? ""); }, [valor]);
+  return (
+    <input type="text" inputMode="numeric" aria-label={etiqueta} placeholder="--:--"
+      className={`${CAMPO} w-[5.5rem] text-center tabular-nums`}
+      value={texto}
+      onChange={(e) => setTexto(e.target.value)}
+      onBlur={() => {
+        const h = leerHora24(texto);
+        if (h === null || (h === "" && !puedeVaciar)) { setTexto(valor ?? ""); return; }
+        setTexto(h);
+        if ((h || null) !== valor) onValor(h || null);
+      }} />
   );
 }

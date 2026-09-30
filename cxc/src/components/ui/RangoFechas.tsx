@@ -56,6 +56,7 @@ import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 // usan otros seis. Meter una segunda forma habría costado peso y una
 // inconsistencia a la vez.
 import DesplegableFlotante from "./DesplegableFlotante";
+import { CalendarDays } from "lucide-react";
 // 🔴 DEL MÓDULO PURO, NUNCA de `./CalendarioRango`: un import estático a ese
 // archivo trae `react-day-picker` al bundle inicial y anula el `dynamic()`.
 import { aIso, deIso } from "./rango-fechas-iso";
@@ -246,7 +247,7 @@ export default function RangoFechas({
       title="Elegir un día o un rango"
       className="flex h-11 w-11 items-center justify-center rounded-md border border-gray-300 text-base transition hover:border-black active:scale-[0.97]"
     >
-      <span aria-hidden className="leading-none">📅</span>
+      <CalendarDays aria-hidden className="h-4 w-4 text-gray-600" />
     </button>
   ) : (
     <button
@@ -254,7 +255,7 @@ export default function RangoFechas({
       onClick={() => setAbierto((v) => !v)}
       className="flex min-h-[44px] w-full items-center gap-2 rounded-lg border border-gray-200 px-3 text-left text-sm transition hover:border-gray-400"
     >
-      <span aria-hidden className="text-base leading-none">📅</span>
+      <CalendarDays aria-hidden className="h-4 w-4 shrink-0 text-gray-500" />
       <span className={vacio ? "text-gray-500" : "text-gray-900"}>
         {vacio ? textoVacio : etiquetaRango(desde, hasta)}
       </span>

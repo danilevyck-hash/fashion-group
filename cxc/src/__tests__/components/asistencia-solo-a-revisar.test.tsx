@@ -243,19 +243,22 @@ describe("🔴 el botón «Solo a revisar»", () => {
   it("🔴 EL TOTAL SIGUE AL FILTRO: el pie se suma sobre lo que se VE", async () => {
     await abrirReporte();
     // Con los tres: 1+2+4 = 7 ausencias, 10+5+100 = 115 min tarde, 750 no trabajado, 3 a revisar.
+    // 🔴 29-sep-2026 (audit visual aprobado por Daniel): el tiempo se DIBUJA en
+    // h:mm por defecto (`formato-tiempo.ts`): 115 → «1:55», 750 → «12:30». Los
+    // números son los mismos; solo cambia cómo se escriben.
     expect(within(pie()).getByText("3 colaboradores")).toBeTruthy();
     expect(within(pie()).getByText("7")).toBeTruthy();
-    expect(within(pie()).getByText("115")).toBeTruthy();
-    expect(within(pie()).getByText("750")).toBeTruthy();
+    expect(within(pie()).getByText("1:55")).toBeTruthy();
+    expect(within(pie()).getByText("12:30")).toBeTruthy();
 
     fireEvent.click(boton());
     // Con los dos: 1+2 = 3 ausencias, 15 min tarde, 50 no trabajado, 3 a revisar.
     await waitFor(() => expect(within(pie()).queryByText("2 colaboradores")).toBeTruthy());
-    expect(within(pie()).getByText("15")).toBeTruthy();
-    expect(within(pie()).getByText("50")).toBeTruthy();
+    expect(within(pie()).getByText("0:15")).toBeTruthy();
+    expect(within(pie()).getByText("0:50")).toBeTruthy();
     // 🩸 El defecto que esto impide: un pie de 3 personas arriba de una tabla de 2.
-    expect(within(pie()).queryByText("115")).toBeNull();
-    expect(within(pie()).queryByText("750")).toBeNull();
+    expect(within(pie()).queryByText("1:55")).toBeNull();
+    expect(within(pie()).queryByText("12:30")).toBeNull();
   });
 
   it("dice «2 de 3 colaboradores» para que el total recortado no se lea como el de todos", async () => {

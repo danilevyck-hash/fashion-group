@@ -247,7 +247,14 @@ describe("🔴 3 · el atajo de Préstamos dice lo que hace", () => {
     expect(PARAM_BUSCAR).toBe("buscar");
     const pestana = plano("src/app/asistencia/PrestamosTab.tsx");
     expect(pestana).toContain("PARAM_BUSCAR");
-    expect(pestana, "Préstamos empezó a leer `search`").not.toContain('"search"');
+    // 29-sep-2026 (audit visual aprobado por Daniel): el buscador de la pestaña
+    // pasó a ser un `<input type="search">` propio, con borde y lupa. Ese
+    // `type` es el TIPO del campo, no una llave de la dirección: se quita antes
+    // de buscar el literal.
+    expect(
+      pestana.replace('type="search"', ""),
+      "Préstamos empezó a leer `search`",
+    ).not.toContain('"search"');
   });
 
   it("nadie en Préstamos lee `search` — ni la pestaña, ni la página de movimientos", () => {

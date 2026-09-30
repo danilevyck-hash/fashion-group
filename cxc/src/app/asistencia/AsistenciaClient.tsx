@@ -65,12 +65,14 @@
 // El candado de todo esto es `src/__tests__/lib/asistencia-pestanas.test.ts`.
 
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Settings } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
-import { useUrlState } from "@/lib/hooks/useUrlState";
+import { modoDeHistorial, useUrlState } from "@/lib/hooks/useUrlState";
 import ReporteTab from "./ReporteTab";
 import PlanillaTab from "./PlanillaTab";
-import ConfiguracionTab from "./ConfiguracionTab";
+import ConfiguracionTab, { type AjusteDeAsistencia } from "./ConfiguracionTab";
+import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
 import JustificacionesTab from "./JustificacionesTab";
 import VacacionesTab from "./VacacionesTab";
 import AprobacionesTab from "./AprobacionesTab";
@@ -117,6 +119,31 @@ import PortadaCelular from "./PortadaCelular";
 
 type Tab = ClavePestana;
 
+// ── 🔴 5a — ⚙ CONFIGURACIÓN (29-sep-2026, audit visual aprobado por Daniel) ──
+//
+// 🩸 Horarios, Feriados y Reglas del cálculo vivían plegadas al FINAL de
+// Colaboradores, debajo de 43 filas de gente: quien las buscaba no las
+// encontraba y quien buscaba a alguien las tenía de estorbo. Ahora las abre un
+// ⚙ al lado del «?», con un control segmentado Horarios · Feriados · Reglas.
+//
+// 🔑 No es una pestaña más: se toca poco y pesaría lo mismo que la Planilla en
+// la barra (la regla de «POR QUÉ SON 6 Y NO 7», arriba). Vive en la URL —
+// `?config=horarios|feriados|reglas`— así que se puede mandar el enlace, igual
+// que `?tab=`. Un valor desconocido = cerrado, nunca una pantalla en blanco.
+// 🔴 La ven los MISMOS que ven Colaboradores: eran secciones de esa pestaña y
+// el permiso no cambia (`vePestana`); las rutas siguen frenando lo suyo.
+const AJUSTES: readonly { value: AjusteDeAsistencia; label: string }[] = [
+  { value: "horarios", label: "Horarios" },
+  { value: "feriados", label: "Feriados" },
+  { value: "reglas", label: "Reglas" },
+];
+
+// 🔴 6a — LA PESTAÑA ACTIVA SE VE POR SU SUBRAYADO, NO POR UN RECUADRO AZUL
+// (29-sep-2026). 🩸 Tras el clic el foco se quedaba en el botón y el navegador
+// le pintaba su anillo azul: parecía otra marca de «activa». El anillo sale
+// solo con el TECLADO (`focus-visible`), gris como la casa.
+const FOCO_TECLADO = "outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-1";
+
 // Qué pestañas ve cada rol vive en `lib/asistencia/roles.ts` (`vePestana`).
 
 export default function AsistenciaClient() {
@@ -139,6 +166,13 @@ function AsistenciaInner() {
   // vive en el módulo puro, no en este renglón.
   const [tabRaw, setTab] = useUrlState<Tab>("tab", pestanaPorDefecto(PERSONA_EN_EL_CENTRO));
   const [ayuda, setAyuda] = useState(false);
+  // 🔑 DOS lectores de la MISMA llave: abrir ⚙ es una pantalla (en el celular
+  // empuja historial y el Atrás la cierra); cambiar Horarios ↔ Feriados adentro
+  // es del mismo nivel y reemplaza. Ver `useUrlState` › CLAVES_DE_PANTALLA.
+  const [configRaw, abrirConfig] = useUrlState<string>("config", "", { history: "pantalla" });
+  const [, cambiarConfig] = useUrlState<string>("config", "");
+  const router = useRouter();
+  const pathname = usePathname();
 
   // 🔑 El rol sale de `sessionStorage`, igual que en `AppHeader` y `useAuth`.
   // Arranca vacío y se llena en el efecto: en el primer render del servidor no
@@ -188,7 +222,8 @@ function AsistenciaInner() {
   // pestaña por defecto cuando falta: la diferencia entre «no eligió nada» y
   // «eligió la primera» es justamente lo que decide esta pantalla.
   const sp = useSearchParams();
-  const hayTab = String(sp?.get("tab") ?? "").trim() !== "";
+  // `?config=` sin `?tab=` también es una pantalla elegida: no cae en la portada.
+  const hayTab = String(sp?.get("tab") ?? "").trim() !== "" || String(sp?.get("config") ?? "").trim() !== "";
   const [celular, setCelular] = useState(false);
   useEffect(() => {
     if (ASISTENCIA_PANTALLA_2026_09) setCelular(aparatoDeQuienMira() === "celular");
@@ -210,6 +245,27 @@ function AsistenciaInner() {
   // `?tab=justificaciones` en Reporte. La regla vive en `pestanaQueSeAbre`;
   // nadie se queda mirando una pantalla en blanco por un enlace viejo.
   const tab: Tab = pestanaQueSeAbre(tabRaw, visibles);
+
+  // 🔴 5a — ⚙ solo para quien ve Colaboradores (o la Configuración vieja).
+  const veConfig = PERSONA_EN_EL_CENTRO && visibles.some(([k]) => k === "colaboradores" || k === "configuracion");
+  const config: AjusteDeAsistencia | null =
+    veConfig ? AJUSTES.find((a) => a.value === configRaw)?.value ?? null : null;
+
+  /**
+   * Tocar una pestaña con ⚙ abierto cierra ⚙ Y cambia la pestaña en UNA sola
+   * escritura. 🩸 Dos `useUrlState` seguidos se pisan: cada uno arma la URL con
+   * la que había antes, y el segundo borra lo que escribió el primero.
+   */
+  const irAPestana = (k: Tab) => {
+    setAyuda(false);
+    if (!configRaw) { setTab(k); return; }
+    const params = new URLSearchParams(sp?.toString() ?? "");
+    params.delete("config");
+    params.set("tab", k);
+    const url = `${pathname}?${params.toString()}`;
+    if (modoDeHistorial("tab", undefined, aparatoDeQuienMira()) === "push") router.push(url, { scroll: false });
+    else router.replace(url, { scroll: false });
+  };
 
   // ── 🔴 LAS DIRECCIONES VIEJAS DEJAN DE EXISTIR (19-sep-2026) ──────────────
   //
@@ -300,11 +356,12 @@ function AsistenciaInner() {
               adentro, en el iPhone habría que arrastrar para encontrar la ayuda. */}
           <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
             {visibles.map(([k, label]) => (
-              <button key={k} type="button" onClick={() => { setTab(k); setAyuda(false); }}
-                className={`min-h-[44px] whitespace-nowrap px-3 text-sm transition ${
-                  tab === k && !ayuda
+              <button key={k} type="button" onClick={() => irAPestana(k)}
+                aria-current={tab === k && !ayuda && !config ? "page" : undefined}
+                className={`min-h-[44px] whitespace-nowrap px-3 text-sm transition ${FOCO_TECLADO} ${
+                  tab === k && !ayuda && !config
                     ? "border-b-2 border-black font-medium text-gray-900"
-                    : "text-gray-500 hover:text-gray-900"
+                    : "border-b-2 border-transparent text-gray-500 hover:text-gray-900"
                 }`}>
                 {label}
               </button>
@@ -329,13 +386,32 @@ function AsistenciaInner() {
 
           {/* Ayuda, no pestaña: discreto, redondo y con el nombre completo para
               quien navegue con lector de pantalla o se quede encima con el mouse. */}
+          {/* 🔴 5a — ⚙ Configuración, al lado del «?» y con su misma forma.
+              Ícono de línea (lucide, el de todo el repo). */}
+          {veConfig && (
+            <button
+              type="button"
+              onClick={() => { setAyuda(false); if (config) cambiarConfig(""); else abrirConfig("horarios"); }}
+              aria-pressed={!!config}
+              aria-label="Configuración"
+              title="Configuración"
+              className={`mb-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition active:scale-[0.97] ${FOCO_TECLADO} ${
+                config
+                  ? "border-black bg-black text-white"
+                  : "border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-900"
+              }`}
+            >
+              <Settings className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
+            </button>
+          )}
+
           <button
             type="button"
-            onClick={() => setAyuda((v) => !v)}
+            onClick={() => { if (config) cambiarConfig(""); setAyuda((v) => !v); }}
             aria-pressed={ayuda}
             aria-label="Cómo funciona"
             title="Cómo funciona"
-            className={`mb-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-base transition active:scale-[0.97] ${
+            className={`mb-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-base transition active:scale-[0.97] ${FOCO_TECLADO} ${
               ayuda
                 ? "border-black bg-black text-white"
                 : "border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-900"
@@ -360,9 +436,31 @@ function AsistenciaInner() {
               <ComoFuncionaTab />
             </div>
           )}
-          {/* 🔴 Con la ayuda abierta las pestañas se ESCONDEN, no se desarman:
-              cerrar el «?» tiene que devolver la pantalla donde estaba. */}
-          <div hidden={ayuda} className={ayuda ? "hidden" : undefined}>
+          {/* 🔴 5a — ⚙ Configuración. Encima de las pestañas, igual que la
+              ayuda: cerrar devuelve la pestaña donde estaba. Monta el MISMO
+              `ConfiguracionTab`, solo con la sección elegida. */}
+          {config && !ayuda && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-base font-semibold text-gray-900">Configuración</h2>
+                <button type="button" onClick={() => cambiarConfig("")}
+                  className={`min-h-[44px] rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] ${FOCO_TECLADO}`}>
+                  Cerrar
+                </button>
+              </div>
+              <ControlSegmentado
+                ancho="contenido"
+                ariaLabel="Qué configurar"
+                options={AJUSTES}
+                active={config}
+                onChange={(v) => cambiarConfig(v)}
+              />
+              <ConfiguracionTab ajuste={config} />
+            </div>
+          )}
+          {/* 🔴 Con la ayuda (o ⚙) abierta las pestañas se ESCONDEN, no se
+              desarman: cerrar tiene que devolver la pantalla donde estaba. */}
+          <div hidden={ayuda || !!config} className={ayuda || config ? "hidden" : undefined}>
             {monta("planilla") && (
               <div hidden={seEsconde("planilla", tab)} className={escondida("planilla")}>
                 <PlanillaTab empresa={empresa} />
@@ -404,9 +502,9 @@ function AsistenciaInner() {
                 *«te acepto la queja»* — «Configuración» se llama Personas; y
                 desde el 10-sep-2026, *«no lo llames personas, sino colaboradores»*. No
                 es un componente nuevo: es `ConfiguracionTab` con las filas
-                llevando a la página de cada quien en vez de desplegarse, y
-                con Horarios, Feriados y Reglas exactamente donde estaban. Un
-                segundo componente sería una segunda lista de personas. */}
+                llevando a la página de cada quien en vez de desplegarse. Un
+                segundo componente sería una segunda lista de personas.
+                🔴 Horarios, Feriados y Reglas se mudaron a ⚙ el 29-sep-2026. */}
             {monta("colaboradores") && (
               <div hidden={seEsconde("colaboradores", tab)} className={escondida("colaboradores")}>
                 <ConfiguracionTab personaEnElCentro empresa={empresa} />

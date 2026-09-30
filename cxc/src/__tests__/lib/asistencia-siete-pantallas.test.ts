@@ -63,9 +63,12 @@ beforeEach(() => { upserts.length = 0; fichaEmpresa = null; entradaPrevia = null
 describe("1. 🔴 los totales del Reporte se ven con dos decimales, y la plata ya se suma a centavos", () => {
   const rep = puro("src/app/asistencia/ReporteTab.tsx");
   it("la fila de totales usa el MISMO formato que las celdas (fmtMin)", () => {
-    expect(rep).toMatch(/\{tot\.tarde \? fmtMin\(tot\.tarde\) : "—"\}/);
-    expect(rep).toMatch(/\{tot\.noTrab \? fmtMin\(tot\.noTrab\) : "—"\}/);
-    expect(rep).toMatch(/\{tot\.extra \? fmtMin\(tot\.extra\) : "—"\}/);
+    // 🔴 29-sep-2026 (audit visual aprobado por Daniel): el formato de las
+    // celdas y del total es ahora `formatoTiempo` (h:mm o minutos, según la
+    // preferencia); en «minutos» es idéntico a `fmtMin` (`formato-tiempo.test.ts`).
+    expect(rep).toMatch(/\{tot\.tarde \? formatoTiempo\(tot\.tarde, modoTiempo\) : "—"\}/);
+    expect(rep).toMatch(/\{tot\.noTrab \? formatoTiempo\(tot\.noTrab, modoTiempo\) : "—"\}/);
+    expect(rep).toMatch(/\{tot\.extra \? formatoTiempo\(tot\.extra, modoTiempo\) : "—"\}/);
     expect(rep).not.toMatch(/\{tot\.tarde \|\| "—"\}/);
   });
   it("EVIDENCIA: el total de la planilla se suma a centavos en cada paso, y el cierre redondea", () => {
@@ -93,7 +96,9 @@ describe("3. 🔴 «Justificaciones del período» no se dibuja sin justificacio
   it("el componente devuelve null vacío o cargando, y el enlace vive adentro", () => {
     const j = puro("src/app/asistencia/JustificacionesDelPeriodo.tsx");
     expect(j).toMatch(/if \(lista === null \|\| lista\.length === 0\) return null;/);
-    expect(j).toMatch(/Justificaciones del período \(\$\{lista\.length\}\)/);
+    // 🔴 29-sep-2026 (audit visual aprobado por Daniel): el enlace pasó a decir
+    // «Justificaciones (8) ›» y a verse como enlace, no como título.
+    expect(j).toMatch(/Justificaciones \(\$\{lista\.length\}\) ›/);
     expect(j).toMatch(/const \[abierta, setAbierta\] = useState\(false\);/);
     const rep = puro("src/app/asistencia/ReporteTab.tsx");
     expect(rep).not.toMatch(/verJustificaciones/);
@@ -135,7 +140,9 @@ describe("7. Préstamos: «Descuento a terceros» solo cuando alguien lo tiene",
   it("la columna se dibuja solo si alguna fila tiene saldo de terceros, y la tarjeta lo dice", () => {
     const p = puro("src/app/asistencia/PrestamosTab.tsx");
     expect(p).toMatch(/const hayTerceros = fichas\.some\(\(f\) => \(f\.saldoTerceros \?\? 0\) > 0\);/);
-    expect(p).toMatch(/\{hayTerceros && <th[^>]*>\{NOMBRE_CUENTA\.terceros\}<\/th>\}/);
+    // 29-sep-2026 (audit visual aprobado por Daniel): el encabezado dice
+    // «Terceros» en una palabra; el nombre largo queda en el `title`.
+    expect(p).toMatch(/\{hayTerceros && <th[^>]*title=\{NOMBRE_CUENTA\.terceros\}>Terceros<\/th>\}/);
     expect(p).toMatch(/\{hayTerceros && \(\s*<td/);
     expect(p).toMatch(/\(f\.saldoTerceros \?\? 0\) > 0 && ` · \$\{NOMBRE_CUENTA\.terceros\} \$\{money\(f\.saldoTerceros \?\? 0\)\}`/);
     // Y la página del colaborador ya desglosaba solo las cuentas con saldo.

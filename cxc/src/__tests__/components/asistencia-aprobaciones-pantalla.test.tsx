@@ -74,7 +74,8 @@ async function toca(el: Element | null | undefined) {
 }
 
 const boton = (nombre: RegExp) => screen.getAllByRole("button").find((b) => nombre.test(b.getAttribute("aria-label") ?? ""));
-const aDia = async () => toca(screen.getByRole("radio", { name: "Día" }));
+// 29-sep-2026 (6a): «Colaborador | Día» es el `ControlSegmentado` (role tab).
+const aDia = async () => toca(screen.getByRole("tab", { name: "Día" }));
 
 beforeEach(() => { enviados = []; globalThis.localStorage?.clear(); vi.stubGlobal("fetch", servidor()); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
@@ -151,8 +152,10 @@ describe("🔴 la vista «Día» — CONTROL de lo que pidió el 27-ago: por dí
     await aDia();
     expect(screen.getByTestId("vista-dia")).toBeTruthy();
     expect(screen.getByText(/lun 24/)).toBeTruthy();
-    expect(screen.getByText("2 · 2:58 h")).toBeTruthy();
-    expect(screen.getByText("1 · 0:55 h")).toBeTruthy();
+    // 29-sep-2026 (12a, audit aprobado por Daniel): decía «2 · 2:58 h» y el
+    // número solo no se entendía; ahora dice qué cuenta.
+    expect(screen.getByText("2 colaboradores · 2:58 h")).toBeTruthy();
+    expect(screen.getByText("1 colaborador · 0:55 h")).toBeTruthy();
     expect(screen.getByText(/lun 24/).closest("button")!.getAttribute("aria-expanded")).toBe("false");
     expect(screen.queryByText("KEVIN LUBO")).toBeNull();
   });

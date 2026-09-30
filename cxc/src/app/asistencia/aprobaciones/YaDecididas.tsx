@@ -1,7 +1,7 @@
 "use client";
 
 /* ─────────────────────────────────────────────────────────────────────────────
- * «YA DECIDIDAS (N) ▸» — abajo y plegado (10-sep-2026).
+ * «YA DECIDIDAS (N) ⌄» — abajo y plegado (10-sep-2026).
  *
  * Los renglones que ya no tienen ningún día pendiente. Cada uno: nombre ·
  * Sí / No / «Sí y No» · horas · «cambiar», que abre sus días con los mismos
@@ -12,6 +12,7 @@
 import { useState } from "react";
 import { hm, resumenDecision, type PersonaAprobacion } from "@/lib/asistencia/aprobaciones-vistas";
 import { DiasDePersona, type PropsVista } from "./PorColaborador";
+import { Flecha } from "./BotonesSiNo";
 
 export default function YaDecididas({
   personas, onDecidir, enVuelo, bloqueado,
@@ -27,8 +28,10 @@ export default function YaDecididas({
         aria-expanded={abierto}
         className="flex min-h-[44px] items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
       >
-        <span aria-hidden="true" className={`inline-block transition-transform ${abierto ? "rotate-90" : ""}`}>▸</span>
+        {/* 12a (29-sep-2026, audit aprobado por Daniel): era «▸» y los días usan
+            el ⌄: una sola flecha para todo lo que se abre. */}
         Ya decididas ({personas.length})
+        <Flecha abierta={abierto} />
       </button>
       {abierto && (
         <div className="mt-2">

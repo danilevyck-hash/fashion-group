@@ -125,6 +125,12 @@ const boton = (nombre: RegExp | string) => screen.getAllByRole("button", { name:
 const generar = () => fireEvent.click(boton(/^Generar$/));
 const urlDelCuadro = (ll: Llamada[]) => ll.find((c) => c.url.includes("/api/asistencia/planilla?"))?.url ?? null;
 const corteInput = () => screen.getByLabelText("Cortar el reloj el") as HTMLInputElement;
+/**
+ * 🩸 29-sep-2026 (7a, audit aprobado por Daniel): la línea gris «Corte del reloj
+ * · lee del …» se juntó con el control («Reloj hasta 13 sep» · × · ⓘ) y su texto
+ * pasó al ⓘ. La frase es la MISMA; ahora se lee abriendo el ⓘ.
+ */
+const abrirCorte = () => fireEvent.click(screen.getByRole("button", { name: /Los días que quedan/ }));
 
 beforeEach(() => {
   vi.unstubAllGlobals();
@@ -207,6 +213,8 @@ describe("🔴 la pantalla: la barra de quincena, el corte a la vista, Generar n
     // última apertura, día después); y algo minimalista que se sepa que es el
     // cierre del reloj»*. Sin cierre anterior (este historial va vacío), el
     // desde es el inicio de la quincena.
+    expect(screen.getByRole("button", { name: /Reloj hasta 13 sep/ })).toBeTruthy();
+    abrirCorte();
     expect(screen.getByText(/Corte del reloj · lee del 1 al 13 sep/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "cambiar" })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Descargar/ })).toBeNull();
@@ -239,8 +247,9 @@ describe("🔴 la pantalla: la barra de quincena, el corte a la vista, Generar n
     servir();
     abrirEn("2026-09-16", "2026-09-30");
     expect(corteInput().value).toBe("2026-09-28");
+    expect(screen.getByRole("button", { name: /Reloj hasta 28 sep/ })).toBeTruthy();
+    abrirCorte();
     expect(screen.getByText(/Corte del reloj · lee del 16 al 28 sep/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /Los días que quedan/ }));
     expect(screen.getByText(/Del 29 al 30 se paga normal y se ajusta en la siguiente\./)).toBeTruthy();
   });
 
@@ -295,6 +304,8 @@ describe("🔴 la pantalla: la barra de quincena, el corte a la vista, Generar n
     fireEvent.click(boton(/^Quitar el corte$/));
     expect(corteInput().value).toBe("");
     // Sin corte, el reloj se lee hasta el fin de la medición de la quincena.
+    expect(screen.getByRole("button", { name: /Reloj hasta 15 sep/ })).toBeTruthy();
+    abrirCorte();
     expect(screen.getByText(/Corte del reloj · lee del 1 al 15 sep/)).toBeTruthy();
     generar();
     await waitFor(() => expect(urlDelCuadro(ll)).toBe("/api/asistencia/planilla?desde=2026-09-01&hasta=2026-09-15&empresa=confecciones_boston"));

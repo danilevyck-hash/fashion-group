@@ -590,20 +590,31 @@ describe("Configuración — metodología al ⓘ, pendientes y bajas en pantalla
     for (const [titulo, texto] of casos) esperaDetrasDelInfo(titulo, texto);
   });
 
-  it("🔴 «se guarda pero NO SE USA» sigue en pantalla y en ámbar — es una advertencia, no metodología", async () => {
+  it("🔴 «se guarda pero NO SE USA» se queda, plegado y en gris (19, 29-sep-2026)", async () => {
     await abrirConfiguracion();
     fireEvent.click(screen.getByText("Reglas del cálculo"));
+    // 🔴 29-sep-2026 (audit visual «19»): Daniel, *«no lo saques»*. El bloque
+    // se queda, pero PLEGADO por defecto y en tono NEUTRO: hoy cambiarlo no
+    // mueve un centavo, así que no es una alerta. Antes era ámbar y abierto.
+    const resumen = screen.getByText("Excedente nocturno (no se usa hoy)");
+    const plegable = resumen.closest("details")!;
+    expect(plegable.open).toBe(false);
     // 🔑 Desde el 25-ago-2026 el aviso además dice A DÓNDE van esos minutos:
     // la contadora los paga × 1.50 y deja la columna del excedente en $0,00.
-    const nota = screen.getByText(/NO SE USA para calcular/);
-    expect(nota.className).toContain("text-amber-800");
+    const nota = within(plegable).getByText(/NO SE USA para calcular/);
+    expect(nota.className).toContain("text-gray-500");
+    expect(nota.className).not.toMatch(/amber|red/);
     expect(nota.textContent).toMatch(/1\.50/);
   });
 
-  it("las reglas que no se pueden cambiar siguen a la vista; solo el porqué pasó al ⓘ", async () => {
+  it("las reglas que no se pueden cambiar viven en el ⓘ «Para qué sirven» (19, 29-sep-2026)", async () => {
     await abrirConfiguracion();
     fireEvent.click(screen.getByText("Reglas del cálculo"));
-    expect(screen.getByText(/La quincena va del 1 al 15 y del 16 al 30/)).toBeTruthy();
+    // 🔴 29-sep-2026 (audit visual «19», aprobado por Daniel): el recuadro
+    // «Esto no se cambia desde aquí» pasó al ⓘ «Para qué sirven». Se aprende
+    // una vez; siguen alcanzables de un toque.
+    esperaDetrasDelInfo("Para qué sirven estos números", /La quincena va del 1 al 15 y del 16 al 30/);
+    expect(screen.getByText("Esto no se cambia desde aquí")).toBeTruthy();
     // 🔴 El almuerzo pasó de ser una CASILLA a ser una regla declarada: es lo
     // que impide que vuelva a haber dos lugares diciendo cuánto dura.
     // 🔴 10-sep-2026: el almuerzo es por EMPRESA (60 en Multifashion, Daniel:
@@ -611,7 +622,7 @@ describe("Configuración — metodología al ⓘ, pendientes y bajas en pantalla
     // regla se DECLARA. Ver `asistencia-siete-pantallas.test.ts`.
     expect(screen.getByText(/El almuerzo es de 30 minutos \(60 en Multifashion\)/)).toBeTruthy();
     expect(screen.queryByText("Almuerzo por defecto")).toBeNull();
-    esperaDetrasDelInfo("Por qué no se pueden cambiar", /es la forma del cálculo/);
+    expect(screen.getByText(/es la forma del cálculo/)).toBeTruthy();
   });
 
   it("el empty state genérico del filtro se fue", async () => {
@@ -621,8 +632,10 @@ describe("Configuración — metodología al ⓘ, pendientes y bajas en pantalla
     // fixture le faltan cargo y cédula, así que el chip que se dibuja es el
     // segundo; el primero, en cero, no se dibuja. La regla de este candado no
     // cambió: el filtro no muestra un empty state genérico.
-    fireEvent.click(screen.getByText(/^Falta completar \(/));
-    expect(screen.queryByText(/^Falta para pagar \(/)).toBeNull();
+    // 🔴 29-sep-2026 (audit visual «6a»): el filtro es un control segmentado y
+    // la opción dice «Por completar N», sin paréntesis.
+    fireEvent.click(screen.getByRole("tab", { name: /^Por completar \d+$/ }));
+    expect(screen.queryByRole("tab", { name: /^Falta para pagar/ })).toBeNull();
     expect(screen.queryByText(/^Falta configurar \(/)).toBeNull();
     expect(screen.queryByText(/No hay nadie en este filtro/)).toBeNull();
   });

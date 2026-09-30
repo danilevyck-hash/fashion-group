@@ -34,7 +34,7 @@ import { TEXTO_SALIDA_SOSPECHOSA, tituloSalidaSospechosa } from "@/lib/asistenci
 // 🔴 La columna «Extras» dice cuánto está aprobado.
 import {
   TITULO_DECIDIR_EXTRA, etiquetaDecidirExtra, repartirExtras, seDecideEnElReporte,
-  textoExtrasDecididas, tituloExtrasDecididas,
+  tituloExtrasDecididas,
 } from "@/lib/asistencia/extras-decididas";
 // 🔴 LOS DOS BOTONES SON LOS MISMOS DE APROBACIONES, no unos nuevos: mismo
 // componente, mismo endpoint, mismas reglas del servidor (19-sep-2026).
@@ -147,6 +147,13 @@ import {
 import { datosDeLaTarjeta, lineaDeDias, pieDelCelular } from "@/lib/asistencia/celular-asistencia";
 import SelectorPeriodo, { usePeriodoAsistencia } from "@/components/asistencia/SelectorPeriodo";
 import { aparatoDeQuienMira } from "@/lib/aparato";
+// 🔴 ÍCONOS DE LÍNEA, NO EMOJIS, Y EL TIEMPO EN h:mm (29-sep-2026, audit visual
+// aprobado por Daniel). El formato es una preferencia de pantalla: el Excel, el
+// PDF y todo cálculo siguen en minutos (`formato-tiempo.ts`).
+import { Download, Search } from "lucide-react";
+import { formatoTiempo, type ModoTiempo } from "@/lib/asistencia/formato-tiempo";
+import { useFormatoTiempo } from "@/components/asistencia/FormatoTiempoSelector";
+import { PLACEHOLDER_COLABORADOR } from "@/lib/buscar-en-lista";
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 const DOW = ["dom","lun","mar","mié","jue","vie","sáb"];
@@ -164,6 +171,9 @@ function fechaCorta(iso: string): string {
  */
 const n = (v: number) =>
   v ? <span className="tabular-nums">{fmtMin(v)}</span> : <span className="text-gray-300">—</span>;
+/** Lo mismo que `n`, pero para una columna de TIEMPO: h:mm o minutos, según la preferencia. */
+const t = (v: number, modo: ModoTiempo) =>
+  v ? <span className="tabular-nums">{formatoTiempo(v, modo)}</span> : <span className="text-gray-300">—</span>;
 
 /** La raya de «acá no se cuenta», con el motivo al pasar el cursor. */
 // 🔴 14-sep-2026: lo que apaga la columna es la casilla «¿Cobra horas extra?»
@@ -288,7 +298,8 @@ export default function ReporteTab({ empresa = "" }: {
   }, [abreUrl]);
   /** ¿El panel de arriba está desplegado? (avisos · buscador) */
   const [avisosAbiertos, setAvisosAbiertos] = useState(false);
-  const [buscadorAbierto, setBuscadorAbierto] = useState(false);
+  /** h:mm o minutos (29-sep-2026): se elige en Configuración, vale en este aparato. */
+  const [modoTiempo] = useFormatoTiempo();
   const [descargasAbiertas, setDescargasAbiertas] = useState(false);
   /** 🩸 EL «···» SE FUE EL 25-sep-2026 y con él su estado. Daniel, textual:
    *  *«los 3 puntitos no hacen nada»* — y tenía razón: adentro no se dibujaba
@@ -611,14 +622,14 @@ export default function ReporteTab({ empresa = "" }: {
       aria-pressed={soloARevisar}
       aria-label={ROTULO_SOLO_A_REVISAR}
       title={ROTULO_SOLO_A_REVISAR}
-      className={`inline-flex min-h-[32px] items-center gap-1 rounded-full border px-2 text-[10.5px] uppercase tracking-wide transition active:scale-[0.97] ${
-        soloARevisar
-          ? "border-black bg-black font-medium text-white"
-          : "border-gray-200 text-gray-400 hover:border-black hover:text-black"
+      // 🔴 29-sep-2026 (audit visual aprobado por Daniel): se ve IGUAL que los
+      // otros encabezados —sin pastilla ni «⌵»—. Se sigue tocando en el mismo
+      // lugar; prendido va en negro y subrayado para que se note el filtro.
+      className={`-my-2 inline-flex min-h-[44px] items-center text-[10.5px] font-medium uppercase tracking-wide underline-offset-4 transition hover:text-black ${
+        soloARevisar ? "text-black underline" : "text-gray-400"
       }`}
     >
       A revisar
-      <span aria-hidden className="leading-none">⌵</span>
     </button>
   );
 
@@ -639,27 +650,21 @@ export default function ReporteTab({ empresa = "" }: {
           <div ref={mandosRef} className="flex flex-wrap items-center gap-2">
             <SelectorPeriodo desde={desde} hasta={hasta} hoy={hoy} onElegir={elegirPeriodo} />
 
-            {/* El buscador vive detrás de la lupa; con algo escrito se queda
-                abierto para que nadie pierda de vista por qué falta gente. */}
-            <button
-              type="button"
-              onClick={() => setBuscadorAbierto((v) => !v)}
-              aria-pressed={buscadorAbierto || !!q}
-              aria-label="Buscar colaborador"
-              title="Buscar colaborador"
-              className={`flex h-11 w-11 items-center justify-center rounded-md border text-base transition active:scale-[0.97] ${
-                buscadorAbierto || q ? "border-black text-gray-900" : "border-gray-300 text-gray-600 hover:border-black"
-              }`}
-            >
-              <span aria-hidden>🔍</span>
-            </button>
-            {(buscadorAbierto || !!q) && (
+            {/* 🔴 EL BUSCADOR, ABIERTO (29-sep-2026). Daniel: *«buscar con la
+                barra abierta si hay espacio, como en los otros módulos»*. 🩸 Era
+                un botón 🔍 que había que tocar para que apareciera el campo.
+                Ahora es el campo con borde y la lupa adentro, igual que en
+                Préstamos y Cuentas por Cobrar; en el celular baja a su propio
+                renglón. Sigue filtrando contra el SERVIDOR, como siempre. */}
+            <div className="relative min-w-[180px] flex-1 sm:max-w-xs">
+              <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
-                type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar colaborador"
-                autoFocus
-                className="min-h-[44px] min-w-[160px] flex-1 rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm"
+                type="search" value={q} onChange={(e) => setQ(e.target.value)}
+                placeholder={PLACEHOLDER_COLABORADOR}
+                aria-label="Buscar colaborador"
+                className="min-h-[44px] w-full rounded-md border border-gray-300 pl-9 pr-3 text-base outline-none transition focus:border-black sm:text-sm"
               />
-            )}
+            </div>
 
             {/* 🔴 «DESCARGAR», CON SU NOMBRE (25-sep-2026). Daniel, textual:
                 *«la flecha cámbiala a descargar o flecha para abajo»*. 🩸 Era un
@@ -676,7 +681,7 @@ export default function ReporteTab({ empresa = "" }: {
                 title={DESCARGAR}
                 className="flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:opacity-40"
               >
-                <span aria-hidden className="leading-none">↓</span>
+                <Download aria-hidden className="h-4 w-4" />
                 {DESCARGAR}
               </button>
               {descargasAbiertas && (
@@ -1006,7 +1011,8 @@ export default function ReporteTab({ empresa = "" }: {
                 <th className="px-2 py-2.5 text-right font-medium">Días</th>
                 <th className="px-2 py-2.5 text-right font-medium">Ausen.</th>
                 <th className="px-2 py-2.5 text-right font-medium">Veces<br />tarde</th>
-                <th className="px-2 py-2.5 text-right font-medium">Min<br />tarde</th>
+                {/* 🔴 29-sep-2026: sin «Min»; la unidad la dice el número (h:mm o minutos). */}
+                <th className="px-2 py-2.5 text-right font-medium">Tarde</th>
                 <th className="px-2 py-2.5 text-right font-medium">Exceso<br />almuerzo</th>
                 <th className="px-2 py-2.5 text-right font-medium">Salida<br />temprana</th>
                 <th className="px-2 py-2.5 text-right font-medium">No trabajado</th>
@@ -1054,7 +1060,8 @@ export default function ReporteTab({ empresa = "" }: {
                   puedeDecidirExtra={puedeDecidirExtra}
                   onDecidirExtra={decidirExtra}
                   extrasEnVuelo={extrasEnVuelo}
-                  decisionesExtra={decisionesExtra} />
+                  decisionesExtra={decisionesExtra}
+                  modoTiempo={modoTiempo} />
               ))}
             </tbody>
             <tfoot>
@@ -1080,10 +1087,10 @@ export default function ReporteTab({ empresa = "" }: {
                 {/* 🩸 Los minutos se miden al segundo y sumarlos da 9544.499999999998:
                     el total se escribe con el MISMO formato que cada celda
                     (`fmtMin`, dos decimales). Solo cambia cómo se muestra. */}
-                <td className="px-2 py-2.5 text-right tabular-nums">{tot.tarde ? fmtMin(tot.tarde) : "—"}</td>
+                <td className="px-2 py-2.5 text-right tabular-nums">{tot.tarde ? formatoTiempo(tot.tarde, modoTiempo) : "—"}</td>
                 <td className="px-2 py-2.5"></td><td className="px-2 py-2.5"></td>
-                <td className="px-2 py-2.5 text-right tabular-nums">{tot.noTrab ? fmtMin(tot.noTrab) : "—"}</td>
-                <td className="px-2 py-2.5 text-right tabular-nums">{tot.extra ? fmtMin(tot.extra) : "—"}</td>
+                <td className="px-2 py-2.5 text-right tabular-nums">{tot.noTrab ? formatoTiempo(tot.noTrab, modoTiempo) : "—"}</td>
+                <td className="px-2 py-2.5 text-right tabular-nums">{tot.extra ? formatoTiempo(tot.extra, modoTiempo) : "—"}</td>
                 <td className="px-2 py-2.5 text-right tabular-nums">{tot.rev || "—"}</td>
               </tr>
               )}
@@ -1167,8 +1174,10 @@ export default function ReporteTab({ empresa = "" }: {
   );
 }
 
-function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, onToggle, puedeCorregir, onCorregir, onJustificar, marcasTelefono, onVerFotos, decisionesExtra, motivosFrecuentes, onGuardadoElDia, anclada, puedeDecidirExtra, onDecidirExtra, extrasEnVuelo, seleccionada, onSeleccionar, celular = false, anchoCodigo = 3 }: {
+function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, onToggle, puedeCorregir, onCorregir, onJustificar, marcasTelefono, onVerFotos, decisionesExtra, motivosFrecuentes, onGuardadoElDia, anclada, puedeDecidirExtra, onDecidirExtra, extrasEnVuelo, seleccionada, onSeleccionar, celular = false, anchoCodigo = 3, modoTiempo = "hmm" }: {
   p: PersonaReporte;
+  /** h:mm o minutos: solo cómo se dibujan las columnas de tiempo. */
+  modoTiempo?: ModoTiempo;
   abierta: boolean;
   /** 🔴 En el celular la fila es una TARJETA de ancho completo, no once columnas. */
   celular?: boolean;
@@ -1393,6 +1402,9 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
             onClick={(e) => e.stopPropagation()}
             onChange={(e) => { e.stopPropagation(); onSeleccionar(p.codigo); }}
             aria-label={`Seleccionar ${persona}`}
+            // 🔴 29-sep-2026: la casilla dice para qué es al pasar el mouse; al
+            // marcarla aparece arriba la barra «N seleccionados · Justificar a varios».
+            title={JUSTIFICAR_A_VARIOS}
             className="mr-2 h-4 w-4 cursor-pointer align-middle accent-black"
           />
           {/* 🔴 El código va DELANTE del nombre (24-sep-2026) y la hora de
@@ -1448,11 +1460,11 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
           : <span className="text-gray-300">—</span>}</td>
         <td className="px-2 py-2.5 text-right text-gray-700">{n(r.vecesTarde)}</td>
         <td className="px-2 py-2.5 text-right">{r.minutosTarde
-          ? <span className="font-medium tabular-nums text-amber-700">{fmtMin(r.minutosTarde)}</span>
+          ? <span className="font-medium tabular-nums text-amber-700">{formatoTiempo(r.minutosTarde, modoTiempo)}</span>
           : <span className="text-gray-300">—</span>}</td>
-        <td className="px-2 py-2.5 text-right text-gray-700">{n(r.excesoAlmuerzoMin)}</td>
-        <td className="px-2 py-2.5 text-right text-gray-700">{n(r.salidaTempranaMin)}</td>
-        <td className="px-2 py-2.5 text-right font-semibold text-gray-900">{n(r.tiempoNoTrabajadoMin)}</td>
+        <td className="px-2 py-2.5 text-right text-gray-700">{t(r.excesoAlmuerzoMin, modoTiempo)}</td>
+        <td className="px-2 py-2.5 text-right text-gray-700">{t(r.salidaTempranaMin, modoTiempo)}</td>
+        <td className="px-2 py-2.5 text-right font-semibold text-gray-900">{t(r.tiempoNoTrabajadoMin, modoTiempo)}</td>
         {/* 🔴 El servicio profesional NO cuenta horas extra (3-sep-2026,
             Daniel: *«es solo para ver sus tardanzas y ausencias»*): raya, no 0
             ni el número que midió el reloj. Tardanza y ausencia, intactas. */}
@@ -1462,9 +1474,16 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
             a pagar — la planilla paga SOLO lo aprobado. El texto sale del
             módulo puro `extras-decididas.ts`. */}
         <td className="px-2 py-2.5 text-right text-gray-700" title={cuentaHorasExtra(p) && r.extraMin > 0 ? tituloExtrasDecididas(extras) : undefined}>
-          {cuentaHorasExtra(p) ? n(r.extraMin) : sinExtra()}
-          {cuentaHorasExtra(p) && textoExtrasDecididas(extras) && (
-            <span className="block text-[11px] font-normal text-gray-500">{textoExtrasDecididas(extras)}</span>
+          {cuentaHorasExtra(p) ? t(r.extraMin, modoTiempo) : sinExtra()}
+          {/* 🔴 29-sep-2026 (audit visual aprobado por Daniel): debajo va SOLO
+              lo que pide acción —«1:44 sin decidir», en ámbar—. 🩸 Eran hasta
+              tres renglones («104 sin decidir · 32 aprobados · 39 rechazados»);
+              lo aprobado y lo rechazado siguen en el título de la celda y en
+              Aprobaciones. `pendienteMin` son MINUTOS (`extras-decididas.ts`). */}
+          {cuentaHorasExtra(p) && extras.pendienteMin > 0 && (
+            <span className="block whitespace-nowrap text-[11px] font-normal text-amber-700">
+              {formatoTiempo(extras.pendienteMin, modoTiempo)} sin decidir
+            </span>
           )}
         </td>
         {/* 🔴 EL NÚMERO LLEVA AL DÍA (18-sep-2026). Daniel: *«opcion a con

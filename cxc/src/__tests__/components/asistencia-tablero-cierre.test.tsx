@@ -240,7 +240,14 @@ describe("C · una línea por empresa, cada una por su puerta", () => {
     servir([], { pendiente: "vistana" });
     montar();
     // Es exactamente la línea que `armarAntesDeCerrar` arma para ese aviso.
-    expect(await screen.findByText("1 cosa · 1 con horas extra sin decidir · 6:26 h")).toBeTruthy();
+    // 🩸 29-sep-2026 (13a, audit aprobado por Daniel): se fue el «1 cosa ·» del
+    // frente —repetía lo que la frase ya dice—. La frase es la MISMA.
+    expect(await screen.findByText("1 con horas extra sin decidir · 6:26 h")).toBeTruthy();
+    // 🔴 Y con algo pendiente la fila NO ofrece «Cerrar» negro: ofrece
+    // «Revisar», con borde, que abre la Planilla de esa empresa.
+    const revisar = screen.getByRole("button", { name: "Revisar lo que falta en Vistana" });
+    expect(revisar.className).not.toContain("bg-black");
+    expect(screen.queryByRole("button", { name: "Cerrar la quincena de Vistana" })).toBeNull();
     // Y la que no tiene nada pendiente dice que está lista.
     expect(screen.getAllByText(TODO_LISTO_TABLERO).length).toBe(EMPRESAS_ASISTENCIA.length - 1);
   });

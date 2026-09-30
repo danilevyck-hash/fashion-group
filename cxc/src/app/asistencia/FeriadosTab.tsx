@@ -7,15 +7,19 @@
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { Ayuda } from "@/components/shared/Ayuda";
+import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 interface Feriado { fecha: string; nombre: string }
 
-const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
-const DOW = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
-function bonito(iso: string): string {
+// 🔴 20a — FECHA CORTA (29-sep-2026, audit visual aprobado por Daniel): «jue 1
+// ene», no «jueves 1 de enero». El año ya lo dice el selector de arriba.
+const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const DOW = ["dom","lun","mar","mié","jue","vie","sáb"];
+function corta(iso: string): string {
   const [a, m, d] = iso.split("-").map(Number);
   const dow = new Date(Date.UTC(a, m - 1, d)).getUTCDay();
-  return `${DOW[dow]} ${d} de ${MESES[m - 1]}`;
+  return `${DOW[dow]} ${d} ${MESES[m - 1]}`;
 }
 
 export default function FeriadosTab() {
@@ -26,6 +30,7 @@ export default function FeriadosTab() {
   const [fecha, setFecha] = useState("");
   const [nombre, setNombre] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const hoy = hoyPanama();
 
   const cargar = useCallback(async () => {
     const res = await fetch(`/api/asistencia/feriados?anio=${anio}`, { cache: "no-store" });
@@ -94,34 +99,43 @@ export default function FeriadosTab() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        {[anioActual, anioActual + 1].map((a) => (
-          // 44 px, como todo lo táctil de la casa. Medían 38 y pasaron
-          // inadvertidos mientras Feriados era su propia pestaña.
-          <button key={a} type="button" onClick={() => setAnio(String(a))}
-            className={`min-h-[44px] rounded-md border px-3 text-sm transition ${
-              anio === String(a) ? "border-black bg-black text-white" : "border-gray-200 text-gray-600 hover:border-gray-400"
-            }`}>{a}</button>
-        ))}
-      </div>
+      {/* El año es un FILTRO, no una acción: control segmentado gris, sin
+          negro relleno (29-sep-2026). Sigue midiendo 44 px. */}
+      <ControlSegmentado
+        ancho="contenido"
+        ariaLabel="Año"
+        options={[anioActual, anioActual + 1].map((a) => ({ value: String(a), label: String(a) }))}
+        active={anio}
+        onChange={setAnio}
+      />
 
       {lista === null && <p className="py-8 text-center text-sm text-gray-400">Cargando…</p>}
       {!!lista?.length && (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-          {lista.map((f) => (
-            <div key={f.fecha} className="flex items-center justify-between gap-3 border-b border-gray-100 px-3 py-2 last:border-0">
-              <div className="min-w-0">
-                <span className="text-sm text-gray-900">{f.nombre}</span>
-                <span className="ml-2 text-[13px] text-gray-500">{bonito(f.fecha)}</span>
+          {/* 🔴 20a — LO QUE YA PASÓ VA EN GRIS Y SIN «Quitar» (29-sep-2026).
+              Quitar un feriado viejo cambiaría cómo se lee una quincena que ya
+              se midió; los que vienen se siguen quitando. «Hoy» es el de
+              Panamá. Filas de 44 px: la fecha a la izquierda, en su columna. */}
+          {lista.map((f) => {
+            const paso = f.fecha < hoy;
+            return (
+              <div key={f.fecha} className="flex min-h-[44px] items-center justify-between gap-3 border-b border-gray-100 px-3 last:border-0">
+                <div className={`flex min-w-0 items-baseline gap-3 text-sm ${paso ? "text-gray-400" : "text-gray-900"}`}>
+                  <span className={`w-[5.5rem] shrink-0 tabular-nums ${paso ? "" : "text-gray-500"}`}>{corta(f.fecha)}</span>
+                  <span className="truncate">{f.nombre}</span>
+                </div>
+                {paso ? (
+                  <span className="shrink-0 px-2 text-[13px] text-gray-400">pasó</span>
+                ) : (
+                  // 44 px: el dedo tiene que caer en el «Quitar» que se apuntó.
+                  <button type="button" onClick={() => void borrar(f.fecha)}
+                    className="min-h-[44px] shrink-0 rounded-md px-2 text-[13px] text-gray-500 transition hover:bg-red-50 hover:text-red-600">
+                    Quitar
+                  </button>
+                )}
               </div>
-              {/* 44 px: son 22 feriados en la lista y el dedo tiene que caer en
-                  el «Quitar» que se apuntó, no en el del renglón de al lado. */}
-              <button type="button" onClick={() => void borrar(f.fecha)}
-                className="-my-1 min-h-[44px] shrink-0 rounded-md px-2 text-[13px] text-gray-500 transition hover:bg-red-50 hover:text-red-600">
-                Quitar
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

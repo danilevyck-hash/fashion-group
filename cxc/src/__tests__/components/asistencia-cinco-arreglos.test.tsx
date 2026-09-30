@@ -395,7 +395,11 @@ describe("5. 🔴 LA COLUMNA «EXTRAS» DICE CUÁNTO ESTÁ APROBADO", () => {
     expect(repartirExtras("17", [{ fecha: "2026-09-01", extraMin: 0 }], new Map())).toEqual(EXTRAS_SIN_DECIDIR);
   });
 
-  it("🔴 EN LA PANTALLA: la celda dice los minutos medidos Y lo decidido", async () => {
+  // 🔴 29-sep-2026 (audit visual aprobado por Daniel): debajo del número va
+  // SOLO lo que pide acción —«h:mm sin decidir», en ámbar—. Lo aprobado y lo
+  // rechazado siguen en el título de la celda (`tituloExtrasDecididas`) y en
+  // Aprobaciones. `textoExtrasDecididas` sigue vivo como módulo puro.
+  it("🔴 EN LA PANTALLA: la celda dice los minutos medidos y lo que falta decidir", async () => {
     servir(respuesta({
       personas: [persona({
         codigo: "17", nombre: "KENNER HERNANDEZ",
@@ -405,11 +409,15 @@ describe("5. 🔴 LA COLUMNA «EXTRAS» DICE CUÁNTO ESTÁ APROBADO", () => {
         ],
         resumen: resumen({ extraMin: 326.5 }),
       })],
-      decisionesExtra: { "17|2026-08-26": "si", "17|2026-08-27": "no" },
+      decisionesExtra: { "17|2026-08-26": "si" },
     }));
     montar(<ReporteTab />);
     await screen.findByText(/Kenner Hernandez/i);
-    expect(await screen.findByText("254 aprobados · 72 rechazados")).toBeTruthy();
+    // 72.45 min pendientes → «1:12 sin decidir»; lo aprobado ya no ocupa renglón.
+    expect(await screen.findByText("1:12 sin decidir")).toBeTruthy();
+    expect(screen.queryByText(/aprobados/)).toBeNull();
+    const celda = screen.getByText("1:12 sin decidir").closest("td");
+    expect(celda?.getAttribute("title")).toContain("paga solo lo aprobado: 254 min");
   });
 
   it("⚠️ CONTROL: sin decisiones la celda muestra el número solo, como siempre", async () => {
@@ -439,7 +447,9 @@ describe("lo que la pantalla NO puede escribir a mano", () => {
     expect(tsx).toMatch(/atajosDePeriodo\(/);
     expect(tsx).toMatch(/periodoInicial\(/);
     expect(tsx).toMatch(/TEXTO_SALIDA_SOSPECHOSA/);
-    expect(tsx).toMatch(/textoExtrasDecididas\(/);
+    // 🔴 29-sep-2026: la celda ya no dibuja «N aprobados · N rechazados»; lo
+    // decidido sale del título, que sigue siendo del módulo puro.
+    expect(tsx).toMatch(/tituloExtrasDecididas\(/);
     // 🔑 El enlace a la ficha sale del módulo, no de una ruta escrita a mano
     // (la vieja `/asistencia/personas/…` solo vive en el redirect).
     expect(tsx).toMatch(/rutaDePersona\(x\.codigo\)/);

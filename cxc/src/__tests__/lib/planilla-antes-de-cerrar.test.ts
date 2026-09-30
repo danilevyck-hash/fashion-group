@@ -206,10 +206,13 @@ describe("7. la pantalla", () => {
     // TABLERO de cierre de «Todas» necesita exactamente lo mismo, y dos
     // copias de quince campos serían dos verdades sobre qué frena un cierre.
     // Sale de las MISMAS líneas que dibuja la tabla, que es lo que se cuida.
-    expect(tab).toMatch(/<AntesDeCerrar datos=\{antesDeCerrarDelCuadro\(/);
+    // 29-sep-2026 (13a): se calcula UNA vez en `antesDeCerrar` porque también
+    // decide si el botón de arriba es «Cerrar quincena» o «Revisar».
+    expect(tab).toMatch(/const antesDeCerrar = [^\n]*\n\s*\? antesDeCerrarDelCuadro\(/);
+    expect(tab).toMatch(/<AntesDeCerrar datos=\{antesDeCerrar\} \/>/);
     expect(puro("src/lib/asistencia/antes-de-cerrar-del-cuadro.ts")).toMatch(/armarAntesDeCerrar\(\{/);
     // El nombre de la pestaña de las fichas lo sigue poniendo la pantalla.
-    expect(tab).toMatch(/PESTANA_FICHAS,\n\s*\)\} \/>/);
+    expect(tab).toMatch(/PESTANA_FICHAS,\n\s*\)\n\s*: null;/);
     for (const viejo of [
       "Todavía no está cerrada",
       "Esto es un borrador",

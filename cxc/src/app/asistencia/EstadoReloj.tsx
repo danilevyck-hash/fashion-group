@@ -45,7 +45,10 @@ import {
 } from "@/lib/asistencia/relojes-en-la-fila";
 // 🔴 De noche y el fin de semana, el reloj apagado NO es una avería: la pastilla
 // lo dice en gris en vez de en ámbar. La regla, entera, en el módulo puro.
-import { textoRelojApagado } from "@/lib/asistencia/reloj-fuera-de-horario";
+// 🔴 29-sep-2026: y se juzga también con el horario de la PC de la oficina, que
+// es la que se calla (audit de Daniel: el ámbar salía a las 6:20 p.m. porque
+// Multifashion abre hasta las 18:30). Ver `reloj-horario-de-la-pc.ts`.
+import { textoRelojApagadoConLaPc } from "@/lib/asistencia/reloj-horario-de-la-pc";
 
 interface RelojEnPantalla {
   dispositivo: string;
@@ -235,7 +238,7 @@ export default function EstadoReloj({ onLlegaron, resumen = false, empresa = nul
      * y con la última lectura de hoy o del último día hábil, la línea va en GRIS
      * y dice desde cuándo; en horario hábil no cambia nada y sigue en ámbar.
      * ⚠️ «Traer ahora» tampoco cambia: se puede pedir igual. */
-    const apagado = textoRelojApagado(relojes, Date.now());
+    const apagado = textoRelojApagadoConLaPc(relojes, Date.now());
     const puedenPedir = relojes.filter(
       (r) => !faltaMigracion && (!(pidiendo.includes(r.dispositivo) || r.pedidoPendiente) || r.pedidoSinRespuesta),
     );

@@ -39,6 +39,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { esTodas } from "@/lib/asistencia/empresa-para-todo";
 import { createPortal } from "react-dom";
+import { CalendarDays } from "lucide-react";
 import { useToast } from "@/components/ToastSystem";
 import { Ayuda } from "@/components/shared/Ayuda";
 // 🔴 «Corte del reloj · lee del 14 al 28 sep» — la regla es PURA y vive ahí.
@@ -742,6 +743,19 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
   const sePuedeCerrar =
     !!data && !vieja && !cerrada && solapadas.length === 0 && !faltaMigracionCierre && !!data.lineas.length;
   /**
+   * «Antes de cerrar», calculado UNA vez: lo dibuja la lista de abajo y decide
+   * si el botón de arriba es «Cerrar quincena» (negro) o «Revisar» (13a,
+   * 29-sep-2026). Es la MISMA regla (`antesDeCerrarDelCuadro`), no otra.
+   */
+  const antesDeCerrar = !!data && !vieja && !cerrada && !!data.lineas.length
+    ? antesDeCerrarDelCuadro(
+      data,
+      pedido ? { desde: pedido.desde, hasta: pedido.hasta } : null,
+      PLANILLA_UNIDA,
+      PESTANA_FICHAS,
+    )
+    : null;
+  /**
    * 🔴 POR QUÉ NO SE PUEDE ESCRIBIR UN MONTO A MANO. Son dos motivos y gana el
    * de la quincena cerrada: escribir un ISR sobre un cuadro congelado no cambia
    * un centavo de lo que se pagó, y quien lo escribe se va creyendo que corrigió
@@ -1236,8 +1250,17 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
             🔑 El corte NO cambia lo que se paga: el período queda entero y solo
             se recorta hasta dónde se mira el reloj. Eso no se toca.
             ══════════════════════════════════════════════════════════════════ */}
+        {/* ══════════════════════════════════════════════════════════════════
+            🔴 7a — EL CORTE, EN UN SOLO CONTROL (29-sep-2026, audit visual
+            aprobado por Daniel). 🩸 Se veía «28/09/2026 📅» suelto, una «×» sin
+            rótulo al lado y lo que significaba («Corte del reloj · lee del 16
+            al 28 sep ⓘ») una línea más abajo. Ahora el control dice «Reloj
+            hasta 28 sep» con su × y el ⓘ pegados; el «lee del 16…» y la cola
+            viven en el ⓘ. El campo de fecha es el MISMO (escondido): el botón
+            solo abre su calendario, así que la lógica del corte no cambia.
+            ══════════════════════════════════════════════════════════════════ */}
         {PLANILLA_UNIDA && ASISTENCIA_PANTALLA_2026_09 && (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex flex-wrap items-center gap-1">
             <input
               ref={corteRef}
               type="date"
@@ -1246,8 +1269,22 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
               max={elegido ? hasta : undefined}
               onChange={(e) => elegirCorte(e.target.value)}
               aria-label="Cortar el reloj el"
-              className="min-h-[44px] rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm"
+              tabIndex={-1}
+              className="pointer-events-none absolute bottom-0 left-0 h-px w-px opacity-0"
             />
+            <button
+              type="button"
+              onClick={() => {
+                const el = corteRef.current;
+                if (!el) return;
+                // showPicker no existe en Safari viejo: ahí basta el foco.
+                try { el.showPicker(); } catch { el.focus(); }
+              }}
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
+            >
+              <CalendarDays className="h-4 w-4 shrink-0 text-gray-500" aria-hidden />
+              {lineaCorte ? `Reloj hasta ${fechaCortaCorte(lineaCorte.hastaQueLee)}` : "Cortar el reloj"}
+            </button>
             {corte && (
               <button type="button" onClick={() => elegirCorte("")}
                 aria-label={VACIAR_EL_CORTE}
@@ -1255,6 +1292,12 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                 className="flex h-11 w-11 items-center justify-center rounded-md border border-gray-300 text-sm text-gray-500 transition hover:border-black hover:text-black active:scale-[0.97]">
                 ×
               </button>
+            )}
+            {elegido && lineaCorte && (
+              <Ayuda titulo="Los días que quedan" etiqueta="">
+                <p>{lineaCorte.texto}.</p>
+                {lineaCorte.nota && <p className="mt-1">{lineaCorte.nota}</p>}
+              </Ayuda>
             )}
           </div>
         )}
@@ -1294,42 +1337,35 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
         {/* 🔴 Y NUNCA sobre un período que no es una quincena (18-sep-2026,
             Daniel: «si frenalo»). El servidor lo rechaza igual
             (`frenoSoloQuincenas`); acá simplemente no se ofrece. */}
+        {/* 🔴 13a (29-sep-2026, audit aprobado por Daniel): el negro relleno es
+            SOLO para cuando no falta nada. Con frenos en «Antes de cerrar», el
+            botón dice «Revisar», va con borde y baja a esa lista, que lleva a
+            cada cosa. */}
         {!!data && !vieja && !cerrada && !!data.lineas.length && puedeCerrarla && !data.avisos.rangoLibre && (
-          <button
-            type="button"
-            onClick={() => setModal("cerrar")}
-            disabled={!sePuedeCerrar}
-            className="ml-auto min-h-[44px] shrink-0 rounded-md bg-black px-4 text-sm font-medium text-white transition active:scale-[0.97] disabled:opacity-40"
-          >
-            Cerrar quincena
-          </button>
+          antesDeCerrar && !antesDeCerrar.todoListo ? (
+            <button
+              type="button"
+              onClick={() => document.querySelector('[data-testid="antes-de-cerrar"]')?.scrollIntoView?.({ block: "center", behavior: "smooth" })}
+              className="ml-auto min-h-[44px] shrink-0 rounded-md border border-gray-300 px-4 text-sm font-medium text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
+            >
+              Revisar
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setModal("cerrar")}
+              disabled={!sePuedeCerrar}
+              className="ml-auto min-h-[44px] shrink-0 rounded-md bg-black px-4 text-sm font-medium text-white transition active:scale-[0.97] disabled:opacity-40"
+            >
+              Cerrar quincena
+            </button>
+          )
         )}
       </div>
 
-      {/* 🔴 LA LÍNEA GRIS DEL CORTE (24-sep-2026, esc 1d). Dice hasta dónde se
-          lee el reloj y, con «cambiar», lleva al campo. Vacío: «hasta el fin de
-          la quincena». */}
-      {/* ══════════════════════════════════════════════════════════════════
-          🔴 «Corte del reloj · lee del 14 al 28 sep» (25-sep-2026)
-          Daniel, textual: *«ese mensaje no tiene que decir desde el 28 si ya
-          está en el calendario; debería decir desde cuándo lee (la última
-          apertura, día después); y algo minimalista que se sepa que es el cierre
-          del reloj»*. 🩸 Decía «El reloj se lee hasta el 28 sep · cambiar — Del
-          29 al 30 se paga normal y se ajusta en la siguiente»: repetía el 28 que
-          el campo de al lado ya dice, no decía DESDE cuándo —el único dato que
-          no está en ninguna otra parte— y mandaba a «cambiar» un campo que está
-          a dos centímetros. La cola es la MISMA frase de siempre y se fue al ⓘ.
-          ══════════════════════════════════════════════════════════════════ */}
-      {PLANILLA_UNIDA && ASISTENCIA_PANTALLA_2026_09 && elegido && lineaCorte && (
-        <p className="flex flex-wrap items-center gap-x-1 text-[12px] text-gray-500">
-          {lineaCorte.texto}
-          {lineaCorte.nota && (
-            <Ayuda titulo="Los días que quedan" etiqueta="">
-              <p>{lineaCorte.nota}</p>
-            </Ayuda>
-          )}
-        </p>
-      )}
+      {/* 🩸 Acá vivía la línea gris «Corte del reloj · lee del 14 al 28 sep ⓘ»
+          (25-sep-2026). Se mudó al control del corte, arriba (7a, 29-sep-2026):
+          el texto es el MISMO (`lineaCorteDelReloj`) y ahora vive en su ⓘ. */}
 
       {/* 🔴 DÓNDE CONVIENE EMPEZAR. La quincena pasada terminó un día, y la que
           sigue empieza al otro: decirlo evita las dos formas de equivocarse —
@@ -1576,14 +1612,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           TABLERO de cierre de «Todas» necesita lo mismo, y dos copias de quince
           campos son dos verdades sobre qué frena un cierre. La regla sigue
           siendo `armarAntesDeCerrar`. */}
-      {!!data && !vieja && !cerrada && !!data.lineas.length && (
-        <AntesDeCerrar datos={antesDeCerrarDelCuadro(
-          data,
-          pedido ? { desde: pedido.desde, hasta: pedido.hasta } : null,
-          PLANILLA_UNIDA,
-          PESTANA_FICHAS,
-        )} />
-      )}
+      {antesDeCerrar && <AntesDeCerrar datos={antesDeCerrar} />}
 
       {/* 🔴 EL VACÍO ES EL ESTADO INICIAL, y dice qué hacer. No es un error ni
           un «no hay datos»: es que nadie eligió todavía qué quincena pagar. */}

@@ -41,7 +41,11 @@ import {
   NOTA_SOLO_SE_MIRA, ROTULO_TODOS, VERBO_ENVIO, detalleDelDia, diasDeMarcaciones,
   distanciaDeLaTienda, fechaDelDia, frasesDeEnvio, lugarDeLaFila, lugarEnPalabras,
   sinCodigoDeMapa, tramoDeLaMarca, tramosDelDia,
+  AVISO_SIN_ALMUERZO, MINUTOS_ANTES_DE_LA_SALIDA, avisoMismoMinuto, avisosDelDia,
+  partesDelLugarDeLaFila, segundaEsSalida,
 } from "@/lib/asistencia/marcaciones-por-dia";
+import { SALIDA_SOSPECHOSA_MIN } from "@/lib/asistencia/salida-sospechosa";
+import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
 import { SIN_LUGAR } from "@/lib/asistencia/lugar-de-marca";
 import { cuantoDespues, demoraEnPalabras } from "@/lib/asistencia/marcaciones-pestana";
 import { marcasDeAparatoCompartido, type MarcaDeTelefono } from "@/app/asistencia/marcaciones/logica";
@@ -306,7 +310,11 @@ describe("🔴 3 · el lugar, en palabras y sin el código de mapa", () => {
     render(<MarcacionesTab empresa="todas" />);
     await yaSalio();
     // Cuatro marcas, UN lugar dibujado.
-    expect(screen.getAllByText("Paso Canoas · 46 km de la tienda")).toHaveLength(1);
+    // ⚠️ 29-sep-2026 (audit aprobado por Daniel, 17a): el lugar se dibuja en DOS
+    // partes —dirección truncable y distancia en gris— y el texto entero queda
+    // en el `title`. Se cuenta por el `title`, no por un texto de corrido.
+    expect(document.querySelectorAll('[title="Paso Canoas · 46 km de la tienda"]')).toHaveLength(1);
+    expect(screen.getAllByText("Paso Canoas")).toHaveLength(1);
     // 🩸 Y el código de mapa no aparece por ningún lado de la lista.
     expect(screen.queryByText(/G5P6\+2GH/)).toBeNull();
   });
@@ -524,5 +532,142 @@ describe("🔴 9 · con MARCACIONES_POR_DIA apagado vuelve la pantalla de chips"
 
     vi.doUnmock("@/lib/asistencia/marcaciones-por-dia");
     vi.resetModules();
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 10 · AUDIT DEL 29-sep-2026 (aprobado por Daniel): 16a · 17a · 4a
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("🔴 10 · 16a — el encabezado UNA vez, pegado bajo el de la app", () => {
+  it("con dos días, «Colaborador · Sus marcas del día · Lugar» sale UNA vez y cada día solo con su fecha", async () => {
+    servir([...DIA_DE_ANA, ...DIA_DE_ANGEL]);
+    render(<MarcacionesTab empresa="todas" />);
+    await yaSalio();
+    for (const c of COLUMNAS_POR_DIA) {
+      expect(`${c}:${screen.getAllByRole("columnheader", { name: c }).length}`).toBe(`${c}:1`);
+    }
+    // Una sola tabla y UN encabezado.
+    expect(screen.getAllByRole("table")).toHaveLength(1);
+    expect(document.querySelectorAll("thead")).toHaveLength(1);
+    expect(screen.getByText("vie 25 sep")).toBeTruthy();
+    expect(screen.getByText("jue 24 sep")).toBeTruthy();
+  });
+
+  it("🔑 se pega con la clase de la casa (debajo del encabezado medido), nunca con `sticky top-0`", async () => {
+    servir(DIA_DE_ANA);
+    render(<MarcacionesTab empresa="todas" />);
+    await yaSalio();
+    for (const th of screen.getAllByRole("columnheader")) {
+      expect(th.className).toContain(CLASE_BARRA_PEGAJOSA);
+    }
+    const src = leer(TAB);
+    expect(src).not.toMatch(/sticky top-0/);
+    // Sin la caja de scroll lateral: con ella el encabezado se pega a la caja.
+    expect(src).not.toMatch(/<ScrollableTable/);
+  });
+});
+
+describe("🔴 11 · 17a — el lugar no repite la distancia y no se parte", () => {
+  const sinNombre = (metros: number | null) => [
+    marca({
+      id: "50", codigo: "2", ocurrioEn: "2026-09-24T13:59:00.000Z",
+      // 🩸 El caso real: sin dirección guardada, `texto` ES la distancia.
+      lugar: { texto: "a 46,4 km", nombre: null, metros, enLaTienda: false },
+    }),
+  ];
+
+  it("🩸 sin dirección: «46 km de la tienda», no «a 46,4 km · 46 km de la tienda»", () => {
+    expect(lugarDeLaFila(sinNombre(46_400))).toBe("46 km de la tienda");
+    expect(partesDelLugarDeLaFila(sinNombre(46_400))).toEqual({ nombre: "", distancia: "46 km de la tienda" });
+    // Sin nombre ni referencia, «—»: `texto` no se usa de nombre.
+    expect(lugarDeLaFila(sinNombre(null))).toBe(SIN_LUGAR);
+  });
+
+  it("con dirección: la dirección truncable con su `title` y la distancia aparte, sin partirse", async () => {
+    const conCalle = [
+      marca({
+        id: "60", codigo: "2", ocurrioEn: "2026-09-24T13:59:00.000Z",
+        lugar: { texto: "x", nombre: "Calle del Cerro 453-43, David", metros: 780, enLaTienda: false },
+      }),
+    ];
+    expect(partesDelLugarDeLaFila(conCalle)).toEqual({
+      nombre: "Calle del Cerro 453-43, David", distancia: "780 m de la tienda",
+    });
+    servir(conCalle);
+    render(<MarcacionesTab empresa="todas" />);
+    await yaSalio();
+    const calle = screen.getByText("Calle del Cerro 453-43, David");
+    expect(calle.className).toContain("truncate");
+    expect(calle.parentElement?.getAttribute("title")).toBe("Calle del Cerro 453-43, David · 780 m de la tienda");
+    const lejos = screen.getByText("780 m de la tienda");
+    expect(lejos.className).toContain("whitespace-nowrap");
+    expect(lejos.className).toContain("text-gray-400");
+  });
+});
+
+describe("🔴 12 · 4a — dos marcas y la 2.ª a su hora de salida se lee SALIDA", () => {
+  // Paso Canoas: entrada 08:59, y 18:00 (su salida) como segunda marca.
+  const dos = (segunda: string, salidaHorario: string | null = "18:00") => [
+    marca({ id: "70", codigo: "2", ocurrioEn: "2026-09-24T13:59:00.000Z", salidaHorario }),
+    marca({ id: "71", codigo: "2", ocurrioEn: segunda, tipo: "salida", salidaHorario }),
+  ];
+
+  it("🔑 X es el MISMO umbral de «Revisar salida» (120 min), no un número nuevo", () => {
+    expect(MINUTOS_ANTES_DE_LA_SALIDA).toBe(SALIDA_SOSPECHOSA_MIN);
+    expect(MINUTOS_ANTES_DE_LA_SALIDA).toBe(120);
+  });
+
+  it("🩸 «Entrada 08:59 · Almuerzo 18:00» pasa a «Entrada 08:59 · Salida 18:00» + «sin almuerzo marcado»", () => {
+    const d = dos("2026-09-24T23:00:00.000Z");
+    expect(segundaEsSalida(d)).toBe(true);
+    expect(tramosDelDia(d).map((t) => `${t.rotulo} ${t.horas}`)).toEqual(["Entrada 08:59", "Salida 18:00"]);
+    expect(avisosDelDia(d)).toEqual([AVISO_SIN_ALMUERZO]);
+  });
+
+  it("los bordes: 120 min antes SÍ es salida; 121 min antes, se lee como antes", () => {
+    expect(segundaEsSalida(dos("2026-09-24T21:00:00.000Z"))).toBe(true); // 16:00
+    expect(segundaEsSalida(dos("2026-09-24T20:59:00.000Z"))).toBe(false); // 15:59
+    // Andrea Pérez: 12:07 con salida 17:00 → sigue siendo lo de antes.
+    const andrea = dos("2026-09-24T17:07:00.000Z", "17:00");
+    expect(tramosDelDia(andrea).map((t) => t.rotulo)).toEqual(["Entrada", "Almuerzo"]);
+    expect(avisosDelDia(andrea)).toEqual([]);
+  });
+
+  it("⚠️ sin hora de salida configurada NO se adivina: se lee como antes", () => {
+    const d = dos("2026-09-24T23:00:00.000Z", null);
+    expect(segundaEsSalida(d)).toBe(false);
+    expect(tramosDelDia(d).map((t) => t.rotulo)).toEqual(["Entrada", "Almuerzo"]);
+  });
+
+  it("con 3 o 4 marcas la regla no aplica", () => {
+    expect(segundaEsSalida(DIA_DE_ANA.map((m) => ({ ...m, salidaHorario: "18:00" })))).toBe(false);
+  });
+
+  it("🩸 «Almuerzo 18:00 – 18:00 · Salida 18:00»: avisa «3 marcas en el mismo minuto»", () => {
+    const d = [
+      marca({ id: "80", codigo: "2", ocurrioEn: "2026-09-24T14:00:00.000Z" }),
+      marca({ id: "81", codigo: "2", ocurrioEn: "2026-09-24T23:00:05.000Z" }),
+      marca({ id: "82", codigo: "2", ocurrioEn: "2026-09-24T23:00:20.000Z" }),
+      marca({ id: "83", codigo: "2", ocurrioEn: "2026-09-24T23:00:40.000Z" }),
+    ];
+    expect(avisoMismoMinuto(3)).toBe("3 marcas en el mismo minuto");
+    expect(avisosDelDia(d)).toEqual(["3 marcas en el mismo minuto"]);
+    // Solo se AVISA: ninguna marca se esconde ni se junta.
+    expect(tramosDelDia(d).map((t) => `${t.rotulo} ${t.horas}`)).toEqual([
+      "Entrada 09:00", "Almuerzo 18:00 – 18:00", "Salida 18:00",
+    ]);
+  });
+
+  it("en pantalla: el aviso ámbar sale en la fila y la hoja dice «Salida»", async () => {
+    servir(dos("2026-09-24T23:00:00.000Z"));
+    render(<MarcacionesTab empresa="todas" />);
+    await yaSalio();
+    const aviso = screen.getByText(AVISO_SIN_ALMUERZO);
+    expect(aviso.className).toContain("amber");
+    expect(screen.queryByText(/Almuerzo/)).toBeNull();
+    fireEvent.click(screen.getByRole("cell", { name: /Ana Trejos/ }));
+    await waitFor(() => expect(screen.getByText("Ana Trejos · jue 24 sep")).toBeTruthy());
+    expect(screen.queryByText(/Salida a almuerzo/)).toBeNull();
   });
 });

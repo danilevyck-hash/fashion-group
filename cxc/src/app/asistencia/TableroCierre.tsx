@@ -37,7 +37,8 @@ import { useToast } from "@/components/ToastSystem";
 import { ModalCierre } from "./PlanillaTab";
 import { etiquetaRango } from "@/lib/asistencia/planilla-guardada";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
-import { empresasQueVe, type AlcanceDeEmpresas } from "@/lib/asistencia/empresa-para-todo";
+import { PARAM_EMPRESA, empresasQueVe, type AlcanceDeEmpresas } from "@/lib/asistencia/empresa-para-todo";
+import { useUrlState } from "@/lib/hooks/useUrlState";
 import { antesDeCerrarDelCuadro, type CuadroParaAvisos } from "@/lib/asistencia/antes-de-cerrar-del-cuadro";
 import { PESTANA_FICHAS } from "@/lib/asistencia/persona-en-el-centro";
 import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
@@ -78,6 +79,8 @@ export default function TableroCierre({
   const [filas, setFilas] = useState<FilaTablero[]>([]);
   const [cerrando, setCerrando] = useState<string | null>(null);
   const [confirmar, setConfirmar] = useState<FilaTablero | null>(null);
+  /** El selector de empresa de arriba (vive en la URL): «Revisar» lo cambia. */
+  const [, elegirEmpresa] = useUrlState<string>(PARAM_EMPRESA, "");
 
   useEffect(() => {
     let vivo = true;
@@ -227,19 +230,39 @@ export default function TableroCierre({
                     : f.estado === "con-pendientes" ? "text-amber-800"
                       : "text-gray-600"
                 }`}>
-                  {textoQueFalta(f)}
+                  {/* 13a (29-sep-2026, audit aprobado por Daniel): decía «1 cosa · 4
+                      con horas extra sin decidir · 1:19 h»; el «N cosa(s) ·»
+                      repetía lo que ya dice la frase. Queda solo la frase. */}
+                  {f.estado === "con-pendientes" && f.primeroQueFalta ? f.primeroQueFalta : textoQueFalta(f)}
                 </td>
                 <td className="px-2 py-2.5 text-right">
+                  {/* 🔴 13a (29-sep-2026, audit aprobado por Daniel): el «Cerrar»
+                      NEGRO salía aunque faltaran cosas, y al tocarlo el servidor
+                      lo frenaba (409). Ahora: con pendientes, «Revisar» con borde,
+                      que abre la Planilla de ESA empresa, donde «Antes de cerrar»
+                      dice qué falta y lleva a cada cosa. «Cerrar» negro SOLO
+                      cuando no falta nada. */}
                   {!soloInforma && sePuedeCerrar(f, puedeCerrar) && (
-                    <button
-                      type="button"
-                      onClick={() => setConfirmar(f)}
-                      disabled={cerrando !== null}
-                      aria-label={etiquetaCerrar(f)}
-                      className="min-h-[44px] rounded-md bg-black px-3 text-sm font-medium text-white transition active:scale-[0.97] disabled:opacity-40"
-                    >
-                      {cerrando === f.empresa ? "Cerrando…" : "Cerrar"}
-                    </button>
+                    f.estado === "con-pendientes" ? (
+                      <button
+                        type="button"
+                        onClick={() => elegirEmpresa(f.empresa)}
+                        aria-label={`Revisar lo que falta en ${f.etiqueta}`}
+                        className="min-h-[44px] rounded-md border border-gray-300 px-3 text-sm font-medium text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
+                      >
+                        Revisar
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmar(f)}
+                        disabled={cerrando !== null}
+                        aria-label={etiquetaCerrar(f)}
+                        className="min-h-[44px] rounded-md bg-black px-3 text-sm font-medium text-white transition active:scale-[0.97] disabled:opacity-40"
+                      >
+                        {cerrando === f.empresa ? "Cerrando…" : "Cerrar"}
+                      </button>
+                    )
                   )}
                 </td>
               </tr>

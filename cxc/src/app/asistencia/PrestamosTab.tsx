@@ -49,7 +49,9 @@ import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { quincenasHasta } from "@/lib/asistencia/planilla";
 import { PARAM_NUEVO_PRESTAMO, enlaceAPrestamos } from "@/lib/prestamos-una-puerta";
 import type { Colaborador, DatosPrestamos } from "@/lib/prestamos-lista-server";
-import BuscadorDeLista, { VacioDeBusqueda } from "@/components/BuscadorDeLista";
+import { VacioDeBusqueda } from "@/components/BuscadorDeLista";
+import { Search } from "lucide-react";
+import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
 import {
   LIMPIAR_BUSQUEDA,
   PARAM_BUSCAR,
@@ -121,18 +123,17 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-1">
-        {VISTAS_PRESTAMOS.map(([k, label]) => (
-          <button key={k} type="button" onClick={() => setSub(k)}
-            className={`min-h-[44px] whitespace-nowrap rounded-md border px-3 text-sm transition active:scale-[0.97] ${
-              vista === k
-                ? "border-black bg-black font-medium text-white"
-                : "border-gray-300 text-gray-600 hover:border-black hover:text-black"
-            }`}>
-            {label}
-          </button>
-        ))}
-      </div>
+      {/* 🔴 ELEGIR UNA VISTA NO ES UNA ACCIÓN (29-sep-2026, audit visual que
+          aprobó Daniel): eran dos botones, uno negro relleno, y el negro se
+          reserva para lo que HACE algo («+ Nuevo préstamo»). Ahora es el mismo
+          segmentado gris de Ventas, a lo ancho de su contenido. */}
+      <ControlSegmentado
+        ancho="contenido"
+        ariaLabel="Vista de Préstamos"
+        options={VISTAS_PRESTAMOS.map(([value, label]) => ({ value, label }))}
+        active={vista}
+        onChange={setSub}
+      />
 
       {vista === VISTA_MOVIMIENTOS
         ? <MovimientosQuincenaTab empresa={props.empresa} />
@@ -270,6 +271,10 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
   // Daniel: *«que aparezca solo cuando alguien lo tenga»*). Una columna de ceros
   // es una columna que no dice nada.
   const hayTerceros = fichas.some((f) => (f.saldoTerceros ?? 0) > 0);
+  // 🔴 «ESTA QUINCENA» SOLO SI ALGUIEN TIENE ALGO ESTA QUINCENA (29-sep-2026,
+  // audit visual aprobado por Daniel): 🩸 salía «—» en las 15 filas. Misma regla
+  // que la de terceros: una columna de guiones no dice nada.
+  const hayEstaQuincena = fichas.some((f) => f.yaDescontado > 0);
 
   const botonNuevo = puedeAnotar && (
     <button type="button" onClick={() => void abrirNuevoPrestamo()}
@@ -348,13 +353,26 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
         {botonNuevo}
       </div>
 
-      <BuscadorDeLista
-        valor={busqueda}
-        onCambiar={setBusqueda}
-        placeholder={PLACEHOLDER_COLABORADOR}
-        etiqueta="Buscar colaborador por nombre o código"
-        conteo={conteo}
-      />
+      {/* 🔴 EL BUSCADOR CON BORDE Y LUPA, DEL ALTO DE LOS DEMÁS (29-sep-2026,
+          audit visual aprobado por Daniel): 🩸 era una línea subrayada al lado
+          de campos con caja. Mismo filtro y mismo conteo de `buscar-en-lista`;
+          solo cambia el dibujo, y solo en esta pestaña. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <div className="relative w-full max-w-xs sm:w-64">
+          <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            type="search"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder={PLACEHOLDER_COLABORADOR}
+            aria-label="Buscar colaborador por nombre o código"
+            className="min-h-[44px] w-full rounded-md border border-gray-300 pl-9 pr-3 text-base outline-none transition focus:border-black sm:text-sm"
+          />
+        </div>
+        {conteo !== "" && (
+          <span data-testid="conteo-busqueda" className="text-sm tabular-nums text-gray-500">{conteo}</span>
+        )}
+      </div>
 
       {sinResultados && (
         <VacioDeBusqueda texto={VACIO_BUSQUEDA} onLimpiar={() => setBusqueda("")} rotulo={LIMPIAR_BUSQUEDA} />
@@ -369,11 +387,14 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
             <tr>
               <th className="px-3 py-2 font-medium">Colaborador</th>
               <th className="px-3 py-2 text-right font-medium">Préstamo</th>
-              <th className="px-3 py-2 text-right font-medium">Daño de mercancía</th>
-              {hayTerceros && <th className="px-3 py-2 text-right font-medium">{NOMBRE_CUENTA.terceros}</th>}
+              {/* 🔴 ENCABEZADOS DE UNA PALABRA (29-sep-2026, audit visual aprobado
+                  por Daniel): «Daño de mercancía» y «Descuento a terceros» se
+                  partían en dos renglones. El nombre largo queda en el `title`. */}
+              <th className="whitespace-nowrap px-3 py-2 text-right font-medium" title={NOMBRE_CUENTA.dano}>Mercancía</th>
+              {hayTerceros && <th className="whitespace-nowrap px-3 py-2 text-right font-medium" title={NOMBRE_CUENTA.terceros}>Terceros</th>}
               <th className="px-3 py-2 text-right font-medium">Debe</th>
               <th className="px-3 py-2 text-right font-medium">Cuota</th>
-              <th className="px-3 py-2 text-right font-medium">Esta quincena</th>
+              {hayEstaQuincena && <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Esta quincena</th>}
               {puedeAnotar && <th className="px-3 py-2" />}
             </tr>
           </thead>
@@ -399,14 +420,19 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
                 )}
                 <td className="px-3 py-2 text-right tabular-nums font-medium text-gray-900">{money(f.saldo)}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-gray-600">{plataOGuion(cuotaPorQuincena(f))}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-gray-600">
-                  {f.yaDescontado > 0 ? money(f.yaDescontado) : <span className="text-gray-400">—</span>}
-                </td>
+                {hayEstaQuincena && (
+                  <td className="px-3 py-2 text-right tabular-nums text-gray-600">
+                    {f.yaDescontado > 0 ? money(f.yaDescontado) : <span className="text-gray-400">—</span>}
+                  </td>
+                )}
                 {puedeAnotar && (
                   <td className="px-3 py-2 text-right">
+                    {/* 🔴 «Abono», en UN renglón (29-sep-2026, audit visual aprobado
+                        por Daniel): «Anotar abono» se partía en dos en cada fila. */}
                     <button type="button" onClick={() => setAbonando(f)}
-                      className="min-h-[44px] rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]">
-                      Anotar abono
+                      aria-label={`Anotar abono de ${capitalizarNombre(f.nombre)}`}
+                      className="min-h-[44px] whitespace-nowrap rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]">
+                      Abono
                     </button>
                   </td>
                 )}

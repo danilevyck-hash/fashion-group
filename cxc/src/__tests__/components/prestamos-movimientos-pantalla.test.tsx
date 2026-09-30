@@ -94,7 +94,10 @@ function servir(porVentana: Record<string, FilaMovimiento[]>) {
 }
 
 const montar = () => render(<ToastProvider><PrestamosTab /></ToastProvider>);
-const irAMovimientos = () => fireEvent.click(screen.getByRole("button", { name: "Movimientos" }));
+// 29-sep-2026 (audit visual aprobado por Daniel): «Quiénes deben / Movimientos»
+// dejaron de ser dos botones (uno negro) y son el `ControlSegmentado` de la
+// casa, que dibuja PESTAÑAS (`role="tab"`). La vista que se elige no cambió.
+const irAMovimientos = () => fireEvent.click(screen.getByRole("tab", { name: "Movimientos" }));
 
 // ── 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026 ────────────────────────────────────
 //
@@ -124,8 +127,8 @@ describe("la pestaña Préstamos abre donde siempre", () => {
     servir({});
     montar();
     await waitFor(() => expect(screen.getByText("Nadie debe nada en este momento.")).toBeTruthy());
-    expect(screen.getByRole("button", { name: "Quiénes deben" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Movimientos" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Quiénes deben" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tab", { name: "Movimientos" })).toBeTruthy();
   });
 });
 

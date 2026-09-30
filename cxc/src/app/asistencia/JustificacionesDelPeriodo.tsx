@@ -101,10 +101,14 @@ export default function JustificacionesDelPeriodo({ desde, hasta, empresa = "", 
 
   return (
     <>
+      {/* 🔴 SE VE COMO ENLACE, NO COMO TÍTULO (29-sep-2026, audit visual
+          aprobado por Daniel). 🩸 «Justificaciones del período (8)» en gris
+          plano se leía como el título de algo; ahora es «Justificaciones (8) ›»
+          subrayado, que es lo que es: algo que se toca y abre la lista. */}
       <button type="button" onClick={() => setAbierta((v) => !v)}
         aria-expanded={abierta}
-        className="min-h-[44px] text-sm text-gray-500 underline-offset-2 transition hover:text-gray-900 hover:underline">
-        {abierta ? "Ocultar las justificaciones" : `Justificaciones del período (${lista.length})`}
+        className="min-h-[44px] text-sm font-medium text-gray-700 underline decoration-gray-300 underline-offset-4 transition hover:text-black hover:decoration-black">
+        {abierta ? "Ocultar las justificaciones" : `Justificaciones (${lista.length}) ›`}
       </button>
       {abierta && (
     <ul className="mt-2 divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">

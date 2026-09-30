@@ -447,7 +447,9 @@ describe("🔴 3 · Asistencia para David", () => {
     // Y la Planilla dibuja el botón solo para quien puede cerrar.
     const tab = sinComentarios(leer("src/app/asistencia/PlanillaTab.tsx"));
     expect(tab).toMatch(/const puedeCerrarla = puedeCerrar\(rol\)/);
-    expect(tab).toMatch(/puedeCerrarla && [^\n]*\n[\s\S]{0,400}Cerrar quincena/);
+    // 29-sep-2026 (13a): entre la condición y el rótulo ahora va la rama
+    // «Revisar» (cuando falta algo), por eso la ventana es más ancha.
+    expect(tab).toMatch(/puedeCerrarla && [^\n]*\n[\s\S]{0,1400}Cerrar quincena/);
   });
 
   it("el alcance, puro: solo Boston; sin ficha no entra; la empresa se fuerza", () => {

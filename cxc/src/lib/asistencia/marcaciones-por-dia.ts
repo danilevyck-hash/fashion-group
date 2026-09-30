@@ -46,6 +46,7 @@ import { NOMBRES_DE_LA_MARCA } from "@/lib/marcacion/cuatro-marcas";
 import { SIN_LUGAR } from "@/lib/asistencia/lugar-de-marca";
 import { cuantoDespues } from "@/lib/asistencia/marcaciones-pestana";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
+import { SALIDA_SOSPECHOSA_MIN } from "@/lib/asistencia/salida-sospechosa";
 
 /** Hoy prendido. `false` = la pestaña de chips y seis columnas del 25-sep. */
 export const MARCACIONES_POR_DIA = true;
@@ -120,10 +121,26 @@ export function lugarEnPalabras(opts: {
   nombre?: string | null;
   metros?: number | null;
 }): string {
-  const nombre = sinCodigoDeMapa(opts.nombre);
-  const lejos = distanciaDeLaTienda(opts.metros);
-  if (nombre && lejos) return `${nombre} · ${lejos}`;
-  return nombre || lejos || SIN_LUGAR;
+  return lugarUnido(partesDelLugar(opts));
+}
+
+/** Las dos partes, en una línea: «Paso Canoas · 46 km de la tienda». */
+function lugarUnido({ nombre, distancia }: { nombre: string; distancia: string | null }): string {
+  if (nombre && distancia) return `${nombre} · ${distancia}`;
+  return nombre || distancia || SIN_LUGAR;
+}
+
+/**
+ * El lugar en sus DOS partes, para dibujarlas por separado (29-sep-2026): la
+ * dirección —que se corta con «…» si no entra— y la distancia en gris al lado,
+ * que nunca se parte en dos renglones. Daniel aprobó el audit donde se veía
+ * «Calle del Cerro 453-43, David · 780 / m de la tienda» partido en dos.
+ */
+export function partesDelLugar(opts: {
+  nombre?: string | null;
+  metros?: number | null;
+}): { nombre: string; distancia: string | null } {
+  return { nombre: sinCodigoDeMapa(opts.nombre), distancia: distanciaDeLaTienda(opts.metros) };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -157,6 +174,70 @@ export function tramoDeLaMarca(indice: number): ClaveTramo {
   if (i === 1 || i === 2) return "almuerzo";
   if (i === 3) return "salida";
   return `marca-${i}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DOS MARCAS Y LA SEGUNDA A SU HORA DE SALIDA (29-sep-2026)
+//
+// 🩸 En Paso Canoas se leía «Entrada 08:59 · Almuerzo 18:00»: dos marcas, y la
+// segunda —que es a las 18:00, su hora de irse— salía como almuerzo y la
+// salida parecía faltar. Daniel aprobó en el audit: si hay DOS marcas y la
+// segunda cae a su hora de salida (o hasta X min antes), se lee SALIDA y se
+// avisa en ámbar «sin almuerzo marcado».
+//
+// 🔑 ESTO ES SOLO LO QUE SE LEE AQUÍ. El motor de la planilla (`reporte.ts`)
+// SIEMPRE tomó la última marca del día como la salida; esta pantalla se pone
+// de acuerdo con él. Ni un minuto de planilla se mueve.
+//
+// 🔑 X = `SALIDA_SOSPECHOSA_MIN` (120), el umbral ya medido y decidido para
+// «Revisar salida» (`salida-sospechosa.ts`): más de dos horas antes de su
+// salida es un día raro y sigue leyéndose como antes. Un solo número, no dos.
+//
+// ⚠️ Sin hora de salida configurada no se adivina: se lee como antes.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Cuántos minutos antes de su salida todavía se lee «Salida». */
+export const MINUTOS_ANTES_DE_LA_SALIDA = SALIDA_SOSPECHOSA_MIN;
+
+/** Los dos avisos ámbar de la fila. */
+export const AVISO_SIN_ALMUERZO = "sin almuerzo marcado";
+export const avisoMismoMinuto = (n: number): string => `${n} marcas en el mismo minuto`;
+
+const aMinutos = (hhmm: string | null | undefined): number | null => {
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(hhmm ?? "").trim());
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+};
+
+/** ¿La 2.ª de exactamente dos marcas (ya ordenadas) es la salida? */
+export function segundaEsSalida(marcas: readonly MarcaParaElDia[]): boolean {
+  if (marcas.length !== 2) return false;
+  const salida = aMinutos(marcas[1].salidaHorario ?? marcas[0].salidaHorario);
+  if (salida === null) return false;
+  const segunda = aMinutos(horaCorta(marcas[1].ocurrioEn))!;
+  return segunda >= salida - MINUTOS_ANTES_DE_LA_SALIDA;
+}
+
+/** El tramo de cada marca del día (ya ordenado), con la regla de arriba. */
+function clavesDelDia(marcas: readonly MarcaParaElDia[]): ClaveTramo[] {
+  const salida = segundaEsSalida(marcas);
+  return marcas.map((_, i) => (salida && i === 1 ? "salida" : tramoDeLaMarca(i)));
+}
+
+/**
+ * Los avisos ámbar del día: «sin almuerzo marcado» y «N marcas en el mismo
+ * minuto» (varias marcas con la MISMA hora en pantalla: el dedo tocó de más).
+ * Solo se dicen; no se esconde ni se junta ninguna marca.
+ */
+export function avisosDelDia(marcas: readonly MarcaParaElDia[]): string[] {
+  const avisos: string[] = [];
+  if (segundaEsSalida(marcas)) avisos.push(AVISO_SIN_ALMUERZO);
+  const porMinuto = new Map<string, number>();
+  for (const m of marcas) {
+    const h = horaCorta(m.ocurrioEn);
+    porMinuto.set(h, (porMinuto.get(h) ?? 0) + 1);
+  }
+  for (const n of porMinuto.values()) if (n > 1) avisos.push(avisoMismoMinuto(n));
+  return avisos;
 }
 
 /** El rótulo de un tramo que no es uno de los tres. Sale del `tipo` de la base. */
@@ -209,6 +290,8 @@ export interface MarcaParaElDia {
     nombre?: string | null;
     metros?: number | null;
   };
+  /** Su hora de salida configurada ese día («HH:MM»), o `null` si no tiene. */
+  salidaHorario?: string | null;
 }
 
 export interface TramoDibujado {
@@ -227,8 +310,15 @@ export interface FilaPorDia<T> {
   nombre: string;
   dia: string;
   tramos: TramoDibujado[];
-  /** «Paso Canoas · 46 km de la tienda». */
+  /** «Paso Canoas · 46 km de la tienda». Es el `title` de la celda. */
   lugar: string;
+  /** Las dos partes del lugar, para dibujarlas por separado. */
+  lugarNombre: string;
+  lugarDistancia: string | null;
+  /** Los avisos ámbar del día (ver `avisosDelDia`). */
+  avisos: string[];
+  /** La 2.ª marca se lee como SALIDA (ver `segundaEsSalida`). */
+  segundaEsSalida: boolean;
   /** La línea gris de abajo, o `null` cuando no hay nada que decir. */
   detalle: string | null;
   /** Ese día, otro colaborador marcó desde este mismo teléfono. */
@@ -264,14 +354,23 @@ export function fechaDelDia(dia: string): string {
  * resume, y resumir es el punto de toda la pantalla.
  */
 export function lugarDeLaFila(marcas: readonly MarcaParaElDia[]): string {
+  return lugarUnido(partesDelLugarDeLaFila(marcas));
+}
+
+/**
+ * 🩸 29-sep-2026: se leía «a 46,4 km · 46 km de la tienda». Sin dirección
+ * guardada, el nombre caía a `lugar.texto`, que ES la distancia («a 46,4 km»)
+ * y se pegaba delante de la misma distancia redondeada. El nombre sale SOLO de
+ * `lugar.nombre`: sin él, se dice la distancia una vez.
+ */
+export function partesDelLugarDeLaFila(
+  marcas: readonly MarcaParaElDia[],
+): { nombre: string; distancia: string | null } {
   for (const m of marcas) {
-    const texto = lugarEnPalabras({
-      nombre: m.lugar?.nombre ?? m.lugar?.texto ?? null,
-      metros: m.lugar?.metros ?? null,
-    });
-    if (texto !== SIN_LUGAR) return texto;
+    const p = partesDelLugar({ nombre: m.lugar?.nombre ?? null, metros: m.lugar?.metros ?? null });
+    if (p.nombre || p.distancia) return p;
   }
-  return SIN_LUGAR;
+  return { nombre: "", distancia: null };
 }
 
 const porHora = (a: MarcaParaElDia, b: MarcaParaElDia): number =>
@@ -281,9 +380,10 @@ const porHora = (a: MarcaParaElDia, b: MarcaParaElDia): number =>
 export function tramosDelDia(marcas: readonly MarcaParaElDia[]): TramoDibujado[] {
   const orden: ClaveTramo[] = [];
   const juntas = new Map<ClaveTramo, { horas: string[]; sinSenal: boolean; rotulo: string }>();
+  const claves = clavesDelDia(marcas);
 
   marcas.forEach((m, i) => {
-    const clave = tramoDeLaMarca(i);
+    const clave = claves[i];
     const rotulo = ROTULO_TRAMO[clave] ?? rotuloSuelto(i, m.tipo);
     const g = juntas.get(clave);
     if (!g) {
@@ -318,10 +418,11 @@ export function detalleDelDia(marcas: readonly MarcaParaElDia[]): string | null 
 
   const envios: { articulo: string; cuanto: string }[] = [];
   const yaDicho = new Set<ClaveTramo>();
+  const claves = clavesDelDia(marcas);
   marcas.forEach((m, i) => {
     const cuanto = cuantoDespues(m.ocurrioEn, m.creadoEn);
     if (!cuanto) return;
-    const clave = tramoDeLaMarca(i);
+    const clave = claves[i];
     // Un tramo habla UNA vez: si la salida a almuerzo y la vuelta se atrasaron,
     // se dice «el almuerzo», no dos veces lo mismo.
     if (yaDicho.has(clave)) return;
@@ -363,13 +464,18 @@ export function diasDeMarcaciones<T extends MarcaParaElDia>(
   const porDia = new Map<string, FilaPorDia<T>[]>();
   for (const [llave, g] of grupos) {
     const ordenadas = [...g.marcas].sort(porHora);
+    const lugar = partesDelLugarDeLaFila(ordenadas);
     const fila: FilaPorDia<T> = {
       llave,
       codigo: g.codigo,
       nombre: capitalizarNombre(g.nombre) || g.codigo,
       dia: g.dia,
       tramos: tramosDelDia(ordenadas),
-      lugar: lugarDeLaFila(ordenadas),
+      lugar: lugarUnido(lugar),
+      lugarNombre: lugar.nombre,
+      lugarDistancia: lugar.distancia,
+      avisos: avisosDelDia(ordenadas),
+      segundaEsSalida: segundaEsSalida(ordenadas),
       detalle: detalleDelDia(ordenadas),
       mismoTelefono: ordenadas.some((m) => compartidas?.has(m.id) === true),
       marcas: ordenadas,

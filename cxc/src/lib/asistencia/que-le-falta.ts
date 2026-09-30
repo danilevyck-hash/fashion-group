@@ -118,7 +118,10 @@ export function lineasQueFalta(f: Faltantes): { paraPagar: string | null; comple
 }
 
 export const CHIP_PARA_PAGAR = "Falta para pagar";
-export const CHIP_COMPLETAR = "Falta completar";
+// 🔴 «Por completar» desde el 29-sep-2026 (audit visual «6a», aprobado por
+// Daniel): la opción del filtro dice «Por completar 5», igual que la frase de
+// arriba de la lista («43 colaboradores · 5 por completar»).
+export const CHIP_COMPLETAR = "Por completar";
 
 /** Cuántos entran a cada chip. Uno puede estar en los dos. */
 export function contarFaltantes(lista: readonly FichaParaFaltantes[]): { paraPagar: number; completar: number } {

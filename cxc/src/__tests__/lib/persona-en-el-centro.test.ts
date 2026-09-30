@@ -669,13 +669,15 @@ describe("I. 🔴 EL SALDO EN PERSONAS, LAS JUSTIFICACIONES EN REPORTE", () => {
     // La REGLA de este candado no cambió: sigue siendo un chip que filtra de
     // verdad y que no se dibuja en cero. Ver `asistencia-falta-configurar.test.ts`.
     const src = puro(CONFIG);
-    expect(src).toMatch(/setFiltro\("completar"\)/);
+    // 🔴 29-sep-2026 (audit visual «6a», aprobado por Daniel): el chip es una
+    // opción de UN control segmentado, «Por completar N». Misma regla.
+    expect(src).toMatch(/\{ value: "completar"/);
     // 🩸 QUE FILTRE DE VERDAD, no que el chip se pinte: borrar la rama que arma
     // la lista dejaba un chip que se prende y no hace nada.
     expect(src).toMatch(/if \(filtro === "completar"\) return activos\.filter\(\(p\) => queLeFalta\(p\)\.completar\.length > 0\)/);
-    expect(leer(CONFIG)).toMatch(/\{CHIP_COMPLETAR\} \(\{conteo\.completar\}\)/);
+    expect(leer(CONFIG)).toMatch(/`\$\{CHIP_COMPLETAR\} \$\{conteo\.completar\}`/);
     // 🔑 Y con nadie adentro NO se dibuja: un chip en cero no ofrece nada.
-    expect(src).toMatch(/conteo\.completar > 0 && \(/);
+    expect(src).toMatch(/conteo\.completar > 0\s*\?/);
     // CONTROL: el nombre viejo no vuelve.
     expect(leer(CONFIG)).not.toMatch(/Sin saldo \(/);
   });

@@ -132,10 +132,10 @@ const FRENO = {
   texto: "2 colaboradores tienen horas extra sin aprobar (KEVIN LUBO · 150.00 min, JULIO GARAY · 76.50 min). Ve a la pestaña «Aprobaciones», aprueba o deja sin aprobar esas horas, y vuelve a cerrar.",
 };
 
-function servirPlanilla(conFreno = false) {
+function servirPlanilla(conFreno = false, cuadro: unknown = CUADRO) {
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const u = String(url);
-    let status = 200; let body: unknown = CUADRO;
+    let status = 200; let body: unknown = cuadro;
     if (u.includes("planilla-guardada")) {
       if (init?.method === "POST" && conFreno) { status = 409; body = { ok: false, error: "No se puede cerrar", frenos: [FRENO] }; }
       else body = BORRADOR;
@@ -217,12 +217,27 @@ describe("🔴 PLANILLA: cada persona del aviso es un enlace a Aprobaciones", ()
       .toBe(enlaceAprobaciones("6", { desde: "2026-08-01", hasta: "2026-08-15" }));
   });
 
-  it("🔴 el freno del cierre también: cada nombre lleva a su persona", async () => {
+  it("🔴 con horas extra sin decidir, el botón de arriba es «Revisar», no «Cerrar quincena»", async () => {
+    // 13a (29-sep-2026, audit aprobado por Daniel): negro relleno SOLO cuando
+    // no falta nada.
     servirPlanilla(true);
     render(<ToastProvider><PlanillaTab /></ToastProvider>);
     generar();
     await screen.findByTestId("aviso-extra-sin-aprobar");
-    fireEvent.click(screen.getByRole("button", { name: "Cerrar quincena" }));
+    expect(screen.getByRole("button", { name: "Revisar" }).className).not.toContain("bg-black");
+    expect(screen.queryByRole("button", { name: "Cerrar quincena" })).toBeNull();
+  });
+
+  it("🔴 el freno del cierre también: cada nombre lleva a su persona", async () => {
+    // 🩸 CAMBIÓ EL 29-sep-2026 (13a, audit aprobado por Daniel): con horas
+    // extra sin decidir en «Antes de cerrar», el botón de arriba ya no es
+    // «Cerrar quincena» negro sino «Revisar». El 409 del servidor sigue
+    // existiendo para lo que cambió DESPUÉS de generar (alguien deshizo un Sí):
+    // eso es lo que se simula acá — el cuadro llega limpio y el cierre choca.
+    servirPlanilla(true, { ...CUADRO, avisos: { ...AVISOS, extraSinAprobar: [] } });
+    render(<ToastProvider><PlanillaTab /></ToastProvider>);
+    generar();
+    fireEvent.click(await screen.findByRole("button", { name: "Cerrar quincena" }));
     fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Cerrar quincena" }));
     const cartel = (await screen.findByText(/No se puede cerrar la quincena todavía/)).parentElement!;
     const enlaces = within(cartel).getAllByRole("link");

@@ -41,6 +41,7 @@ import {
   ROTULO_TELEFONO,
 } from "@/lib/asistencia/horario-configurable";
 import { Ayuda } from "@/components/shared/Ayuda";
+import { leerHora24 } from "@/lib/asistencia/hora-24";
 
 interface Fila {
   codigo: string;
@@ -72,7 +73,21 @@ function cuerpoDe(f: Fila, configurable: boolean) {
     : { codigo: f.codigo, nombre: f.nombre, entrada: f.entrada, salida: f.salida };
 }
 
-const HORA = "min-h-[44px] w-[6.5rem] rounded-md border border-gray-200 px-2 text-[14px] tabular-nums text-gray-800 focus:border-black focus:outline-none";
+const HORA = "min-h-[44px] w-[4.5rem] rounded-md border border-gray-200 px-2 text-center text-[14px] tabular-nums text-gray-800 placeholder:text-gray-300 focus:border-black focus:outline-none";
+
+// 🔴 2a — LA REJILLA DEL ESCRITORIO (29-sep-2026, audit visual aprobado por
+// Daniel). 🩸 Era `minmax(0,1fr)_auto_auto_auto_auto_auto`: las columnas `auto`
+// de los días y las horas se comían todo el ancho, la del nombre quedaba en 0 y
+// los botones de los días TAPABAN el nombre (en producción solo se leía la fila
+// que tenía el teléfono cargado). Ahora el nombre tiene ANCHO FIJO que no se
+// achica —en dos líneas si hace falta— y lo que sobra se lo lleva la última.
+// ⚠️ Cadena COMPLETA por rejilla: Tailwind purga leyendo el texto del archivo.
+// 🔑 Anchos FIJOS y no `auto`: el encabezado y cada fila son rejillas SEPARADAS,
+// y con `auto` cada una medía sus columnas por su cuenta (el título largo del
+// teléfono corría su columna y dejaba de caer sobre las horas). Días = 6 × 44 px.
+// Sin la migración no hay días ni teléfono, así que son cuatro columnas.
+const REJILLA_COMPLETA = "lg:grid lg:grid-cols-[11.5rem_18rem_11rem_11rem_5rem_minmax(0,1fr)] lg:gap-x-4";
+const REJILLA_SIN_MIGRACION = "lg:grid lg:grid-cols-[11.5rem_11rem_5rem_minmax(0,1fr)] lg:gap-x-4";
 
 export default function HorariosTab() {
   const { toast } = useToast();
@@ -83,6 +98,7 @@ export default function HorariosTab() {
   const [guardando, setGuardando] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const configurable = !faltaMigracion;
+  const rejilla = configurable ? REJILLA_COMPLETA : REJILLA_SIN_MIGRACION;
 
   const cargar = useCallback(async () => {
     setError(null);
@@ -144,23 +160,13 @@ export default function HorariosTab() {
   /** Una hora tecleada; se guarda al salir del campo si cambió. */
   function hora(f: Fila, campo: "entrada" | "salida" | "entradaAfuera" | "salidaAfuera", opcional = false) {
     return (
-      <input
-        type="time"
-        aria-label={`${campo} de ${etiquetaPersona(f.codigo, f.nombre)}`}
-        className={HORA}
-        value={f[campo] ?? ""}
-        placeholder={opcional ? (campo === "entradaAfuera" ? f.entrada : f.salida) : undefined}
-        onChange={(e) => {
-          const v = e.target.value;
-          setFilas((prev) => prev?.map((x) => (x.codigo === f.codigo ? { ...x, [campo]: opcional && !v ? null : v } : x)) ?? null);
-        }}
-        onBlur={(e) => {
-          const v = e.target.value;
-          const valor = opcional && !v ? null : v;
-          if (valor === f[campo]) return;
-          if (!opcional && !v) return; // la entrada y la salida no se borran
-          void guardar(f, { [campo]: valor } as Partial<Fila>);
-        }}
+      <CampoHora
+        etiqueta={`${campo} de ${etiquetaPersona(f.codigo, f.nombre)}`}
+        valor={f[campo]}
+        opcional={opcional}
+        // Vacío en el teléfono = el horario del reloj: se ve en gris adentro.
+        sugerencia={opcional ? (campo === "entradaAfuera" ? f.entrada : f.salida) : undefined}
+        onGuardar={(v) => void guardar(f, { [campo]: v } as Partial<Fila>)}
       />
     );
   }
@@ -209,23 +215,30 @@ export default function HorariosTab() {
       {!!filas?.length && (
         <div className="rounded-lg border border-gray-200 bg-white">
           {/* Encabezados solo en escritorio; en celular cada dato lleva su rótulo. */}
-          <div className="hidden border-b border-gray-200 text-[10.5px] uppercase tracking-wide text-gray-400 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto_auto] lg:gap-x-4 lg:px-3 lg:py-2.5">
+          <div className={`hidden border-b border-gray-200 text-[10.5px] uppercase tracking-wide text-gray-400 lg:items-end lg:px-3 lg:py-2.5 ${rejilla}`}>
             <div>Colaborador</div>
             {configurable && <div>{ROTULO_DIAS}</div>}
             <div>{ROTULO_RELOJ}</div>
-            {configurable && <div>{ROTULO_TELEFONO}</div>}
+            {/* 🔴 2a: «vacío = el mismo de arriba» se dice UNA vez, aquí, y no
+                en cada una de las 43 filas. */}
+            {configurable && (
+              <div>
+                {ROTULO_TELEFONO}
+                <span className="block normal-case tracking-normal text-gray-400">{NOTA_TELEFONO_VACIO}</span>
+              </div>
+            )}
             <div>Almuerzo</div>
             <div></div>
           </div>
           {filas.map((f) => (
             <div
               key={f.codigo}
-              className="border-b border-gray-100 px-3 py-3 last:border-0 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto_auto] lg:items-center lg:gap-x-4 lg:py-2"
+              className={`border-b border-gray-100 px-3 py-3 last:border-0 lg:items-center lg:py-2 ${rejilla}`}
             >
               {/* El nombre primero, el código chico al lado. Sin ficha se
                   muestra el código y se dice qué falta: una celda en blanco
                   es una persona a la que nadie le va a fijar el horario. */}
-              <div className="text-sm">
+              <div className="min-w-0 break-words text-sm">
                 {etiquetaPersona(f.codigo, f.nombre)}
                 {f.nombre ? (
                   <span className="ml-1.5 text-xs text-gray-400">{f.codigo}</span>
@@ -274,9 +287,6 @@ export default function HorariosTab() {
                     {hora(f, "entradaAfuera", true)}
                     <span className="text-gray-400">→</span>
                     {hora(f, "salidaAfuera", true)}
-                    {f.entradaAfuera === null && f.salidaAfuera === null && (
-                      <span className="text-[12px] text-gray-400">{NOTA_TELEFONO_VACIO}</span>
-                    )}
                   </div>
                 </div>
               )}
@@ -286,18 +296,68 @@ export default function HorariosTab() {
                 <span className="lg:hidden">Almuerzo: </span>{f.almuerzoMinutos} minutos
               </div>
 
+              {/* 🔴 2a: «Confirmado» en cada fila se fue —es lo normal y no pide
+                  nada—. Solo queda lo que SÍ pide acción: la sugerencia ámbar. */}
               <div className="mt-1 text-[12px] lg:mt-0">
                 {guardando === f.codigo ? <span className="text-gray-400">Guardando…</span>
                   : !f.guardado ? (
                     <span className="text-amber-700">
                       Sugerido · sale {f.sugerida} en {f.diasMedidos} días
                     </span>
-                  ) : <span className="text-gray-300">Confirmado</span>}
+                  ) : null}
               </div>
             </div>
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * 🔴 21a — UNA HORA EN 24 H (29-sep-2026). Campo de TEXTO, no el selector de hora del navegador: ése
+ * dibuja con el reloj del sistema de quien mira y en una Mac en 12 h la salida
+ * de las 16:30 se leía «04:30 p». Se escribe como salga —«1630», «9:05», «17»—
+ * y al salir del campo queda «16:30»; lo que no es una hora se DICE y vuelve a
+ * lo guardado (`leerHora24`). 🔑 Lo que viaja al PUT es el mismo "HH:MM".
+ *
+ * 🩸 De paso: el campo viejo copiaba cada tecla a la fila y al salir comparaba
+ * contra esa MISMA fila, así que una hora tecleada nunca llegaba al servidor.
+ * Aquí el borrador vive en el campo y se compara contra lo guardado.
+ */
+function CampoHora({ etiqueta, valor, opcional, sugerencia, onGuardar }: {
+  etiqueta: string;
+  valor: string | null;
+  opcional: boolean;
+  sugerencia?: string;
+  onGuardar: (v: string | null) => void;
+}) {
+  const { toast } = useToast();
+  const [texto, setTexto] = useState(valor ?? "");
+  useEffect(() => { setTexto(valor ?? ""); }, [valor]);
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      autoComplete="off"
+      maxLength={5}
+      aria-label={etiqueta}
+      className={HORA}
+      value={texto}
+      placeholder={sugerencia ?? "HH:MM"}
+      onChange={(e) => setTexto(e.target.value.replace(/[^\d:]/g, ""))}
+      onBlur={() => {
+        const h = leerHora24(texto);
+        // La entrada y la salida del reloj no se borran.
+        if (h === null || (h === "" && !opcional)) {
+          if (h === null) toast("Escribe la hora en 24 h, por ejemplo 16:30.", "error");
+          setTexto(valor ?? "");
+          return;
+        }
+        setTexto(h);
+        const nuevo = h === "" ? null : h;
+        if (nuevo !== valor) onGuardar(nuevo);
+      }}
+    />
   );
 }
