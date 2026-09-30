@@ -973,11 +973,19 @@ export async function GET(req: NextRequest) {
     //
     // ⚠️ Falla ABIERTA: sin la migración `20261203120000` no hay deudas, no se
     // cobra nada y el cuadro es EXACTAMENTE el de ayer. Se dice en el aviso.
+    //
+    // 🩸 SOLO EN LA QUINCENA (30-sep-2026). Corría también en el rango corto que
+    // `medirAjusteAnterior` pide para los días del corte (11–15 sep): ahí ya se
+    // comía la deuda, al cuadro llegaban las sobras (Alejandra: $1.65 de $25.81)
+    // y acá se volvía a cobrar la deuda entera — el día libre se cobraba DOS
+    // veces. La contable: «no está sumando las horas extras».
     const diaLibreLeido = await leerSaldosDiaLibre();
-    lineasFinal = lineasFinal.map((l) => aplicarDiaLibreEnLinea(
-      l, diaLibreLeido.saldos.get(l.codigo),
-      { seguroSocialPct: reglas.seguroSocialPct, seguroEducativoPct: reglas.seguroEducativoPct },
-    ));
+    if (q.esQuincena) {
+      lineasFinal = lineasFinal.map((l) => aplicarDiaLibreEnLinea(
+        l, diaLibreLeido.saldos.get(l.codigo),
+        { seguroSocialPct: reglas.seguroSocialPct, seguroEducativoPct: reglas.seguroEducativoPct },
+      ));
+    }
     const diasLibres = diasLibresDelCuadro(lineasFinal);
 
     // ── 🔴 EL NETO NUNCA QUEDA EN NEGATIVO (14-sep-2026) ─────────────────────
