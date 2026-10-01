@@ -52,7 +52,8 @@ import { ROTULO_TOTAL_MULTIFASHION } from "@/lib/comisiones/celular";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { variacionPctDesdeRatio } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
-import { BonosSection } from "./BonosSection";
+import { BonosSection, ChipBono } from "./BonosSection";
+import { chipDeBono, type ChipDeBono } from "@/lib/multifashion/bono-linea";
 import { MetasSubtab } from "./MetasSubtab";
 import { MetasEnVendedoras } from "./MetasEnVendedoras";
 import { nombreEnPantalla } from "@/lib/multifashion/nombres";
@@ -253,6 +254,10 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
   // tabla (`BonosSection` → `lineaBono`). El Excel del ranking sale SOLO en un
   // mes CERRADO: un ranking que cambia mañana no se baja.
   const conBono = !esRango && !RETAIL_AL_FRENTE;
+  // 🔁 1-oct-2026 (Daniel: «Badge de bono sí, como antes»): con el interruptor,
+  // el bono del mes CERRADO es un chip junto al nombre (tabla, tarjetas y
+  // celular). En un rango no hay bono: la respuesta vieja no se usa.
+  const bonosDelChip = esRango || conBono ? null : bonos;
   const esUnMes = rpcPeriodo === "mes";
   const excelDisponible = RETAIL_AL_FRENTE && esUnMes && corte != null && mesCerrado(year, rpcMes, corte);
   const periodoExcel = etiquetaPeriodo({ tipo: "mes", anio: year, mes: rpcMes });
@@ -342,6 +347,14 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
         </p>
       </div>
 
+      {/* 🔴 EL BONO (1-oct-2026): con el mes EN CURSO, UNA línea ARRIBA de la
+          tabla con la regla; con el mes CERRADO no dibuja nada —lo dicen los
+          chips de las filas— pero sigue pidiendo los bonos y elevándolos. En
+          un rango, ni se monta. También en el celular. */}
+      {!esRango && RETAIL_AL_FRENTE && (
+        <BonosSection selectedYear={year} mes={bonoMes} onData={onBonosData} />
+      )}
+
       {/* Tabla única */}
       {resp && resp.vendedoras.length === 0 ? (
         <EmptyState />
@@ -377,6 +390,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
                       badge={bonoBadges.get(v.nombre)}
                       conBono={conBono}
                       pendiente={bonoPendiente}
+                      chip={chipDeBono(v, bonosDelChip)}
                     />
                   ))}
                 </tbody>
@@ -397,6 +411,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
                 metaAbierta={metaAbiertaCel}
                 onAbrirMeta={() => setMetaAbiertaCel((v) => !v)}
                 conMetas={conMetas === true}
+                bonos={bonosDelChip}
               />
             </div>
           )}
@@ -411,6 +426,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
                 badge={bonoBadges.get(v.nombre)}
                 conBono={conBono}
                 pendiente={bonoPendiente}
+                chip={chipDeBono(v, bonosDelChip)}
                 rotuloDelta={rotuloDelta.corto}
               />
             ))}
@@ -436,13 +452,6 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
             </div>
           )}
 
-          {/* 🔴 LA LÍNEA DEL BONO (23-sep-2026), debajo de la tabla, solo por
-              mes. Sigue elevando la data para los resaltes de fila. */}
-          {!esRango && RETAIL_AL_FRENTE && (
-            <div className={cn("mt-2", celular && "hidden sm:block")}>
-              <BonosSection selectedYear={year} mes={bonoMes} onData={onBonosData} />
-            </div>
-          )}
         </div>
       )}
 
@@ -491,9 +500,9 @@ function rowHighlight(v: VendedoraDetalle, badge?: BonoBadge): boolean {
 // del propio ratio (prev = ventas / (1 + pct)) y se le aplica la MISMA regla.
 // Una vendedora que el año pasado vendió $8 en el mes no genera un +40000%.
 function VendedoraRow({
-  v, rank, badge, conBono, pendiente,
+  v, rank, badge, conBono, pendiente, chip,
 }: {
-  v: VendedoraDetalle; rank: number; badge?: BonoBadge; conBono: boolean; pendiente: boolean;
+  v: VendedoraDetalle; rank: number; badge?: BonoBadge; conBono: boolean; pendiente: boolean; chip: ChipDeBono | null;
 }) {
   const dv = formatDeltaRatio(variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct));
   const bono = textoBono(v, badge, pendiente);
@@ -502,7 +511,9 @@ function VendedoraRow({
   // primer nombre es el rótulo de lo que NO es canal; el canal lo dice la base.
   const desglose = desgloseCanales(v.ventas, v.por_canal, v.nombre);
   return (
-    <tr className={rowHighlight(v, badge) ? "bg-amber-50/60" : ""}>
+    // 🔁 1-oct-2026: el fondo ámbar tenue se fue con el interruptor —el chip ya
+    // dice quién ganó—; queda solo en la pantalla de antes (con columna).
+    <tr className={conBono && rowHighlight(v, badge) ? "bg-amber-50/60" : ""}>
       <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{rank}</td>
       <td className="border-b border-gray-200 px-3.5 py-3 text-sm text-gray-950">
         <div className="flex flex-wrap items-center gap-1.5">
@@ -510,6 +521,7 @@ function VendedoraRow({
           {v.manager && (
             <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-xs font-medium text-teal-700">Gerente</span>
           )}
+          <ChipBono chip={chip} />
         </div>
         {desglose && (
           <p data-desglose-canal className="mt-0.5 font-mono text-xs text-gray-500 tabular-nums">{desglose}</p>
@@ -535,9 +547,9 @@ function VendedoraRow({
 }
 
 function VendedoraCard({
-  v, rank, badge, conBono, pendiente, rotuloDelta,
+  v, rank, badge, conBono, pendiente, chip, rotuloDelta,
 }: {
-  v: VendedoraDetalle; rank: number; badge?: BonoBadge; conBono: boolean; pendiente: boolean; rotuloDelta: string;
+  v: VendedoraDetalle; rank: number; badge?: BonoBadge; conBono: boolean; pendiente: boolean; chip: ChipDeBono | null; rotuloDelta: string;
 }) {
   const dv = formatDeltaRatio(variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct));
   const bono = textoBono(v, badge, pendiente);
@@ -545,7 +557,7 @@ function VendedoraCard({
   return (
     <div className={cn(
       "rounded-lg border bg-white px-4 py-3.5",
-      rowHighlight(v, badge) ? "border-amber-200 bg-amber-50/40" : "border-gray-200"
+      conBono && rowHighlight(v, badge) ? "border-amber-200 bg-amber-50/40" : "border-gray-200"
     )}>
       <div className="flex flex-wrap items-baseline gap-1.5">
         <span className="font-mono text-xs text-gray-500 tabular-nums">{rank}.</span>
@@ -553,6 +565,7 @@ function VendedoraCard({
         {v.manager && (
           <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-xs font-medium text-teal-700">Gerente</span>
         )}
+        <ChipBono chip={chip} />
       </div>
       <div className="mt-2 flex items-baseline gap-3">
         <span className="font-mono text-base font-medium tabular-nums text-gray-950">{fmtMoneyCompact(v.ventas)}</span>

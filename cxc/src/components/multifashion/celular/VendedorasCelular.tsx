@@ -19,7 +19,9 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { cn } from "@/lib/utils";
-import type { VendedoraDetalle } from "@/components/ventas/types";
+import type { BonosMultifashion, VendedoraDetalle } from "@/components/ventas/types";
+import { chipDeBono } from "@/lib/multifashion/bono-linea";
+import { ChipBono } from "../BonosSection";
 import { variacionPctDesdeRatio } from "@/lib/variacion";
 import { nombreEnPantalla } from "@/lib/multifashion/nombres";
 import { desgloseCanales } from "@/lib/multifashion/canales";
@@ -46,10 +48,13 @@ interface Props {
   onAbrirMeta: () => void;
   /** `false` en la pestaña espejo de Comisiones: ahí no hay metas. */
   conMetas: boolean;
+  /** 🔁 1-oct-2026: los bonos del mes; con el mes CERRADO la ganadora y la
+   *  gerente llevan su chip junto al nombre. `null` = sin chips. */
+  bonos?: BonosMultifashion | null;
 }
 
 export function VendedorasCelular({
-  vendedoras, ventasTotal, tiquetesTotal, rotuloDelta, anio, parcial, metaAbierta, onAbrirMeta, conMetas,
+  vendedoras, ventasTotal, tiquetesTotal, rotuloDelta, anio, parcial, metaAbierta, onAbrirMeta, conMetas, bonos = null,
 }: Props) {
   const [abierta, setAbierta] = useState<string | null>(null);
 
@@ -87,8 +92,11 @@ export function VendedorasCelular({
                 className="flex min-h-[60px] w-full items-center gap-3 px-4 py-3 text-left transition active:bg-gray-50"
               >
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-base font-medium text-gray-950">
-                    {nombreEnPantalla(v.nombre)}
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate text-base font-medium text-gray-950">
+                      {nombreEnPantalla(v.nombre)}
+                    </span>
+                    <ChipBono chip={chipDeBono(v, bonos)} />
                   </span>
                   <span className="mt-0.5 block text-sm text-gray-500 tabular-nums">
                     {lineaVendedora({

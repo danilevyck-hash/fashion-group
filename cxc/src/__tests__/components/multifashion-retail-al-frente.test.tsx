@@ -49,7 +49,7 @@ import {
   proyeccionMesPorTemporada,
 } from "@/lib/multifashion/resumen-minimo";
 import { RPC_RETAIL, nombreRpc } from "@/lib/multifashion/rpc-retail";
-import { lineaBono } from "@/lib/multifashion/bono-linea";
+import { chipDeBono, lineaBono } from "@/lib/multifashion/bono-linea";
 import { filasExcelVendedoras, nombreArchivoVendedoras } from "@/lib/multifashion/vendedoras-excel";
 import { textoLineaMarcas } from "@/components/multifashion/ProductosMinimo";
 import { buildMensaje } from "@/lib/acs-resumen-diario";
@@ -58,6 +58,7 @@ import { avanceMeta } from "@/lib/multifashion/metas-avance";
 import type { MetaConAvance } from "@/lib/multifashion/metas-lectura";
 import { MultifashionResumenView } from "@/components/multifashion/MultifashionResumenView";
 import { VendedorasSubtab } from "@/components/multifashion/VendedorasSubtab";
+import { VendedorasCelular } from "@/components/multifashion/celular/VendedorasCelular";
 import { ClientesMultifashionSubtab } from "@/components/multifashion/ClientesMultifashionSubtab";
 import { ProductosSubtab } from "@/components/multifashion/ProductosSubtab";
 import { agregarRanking, type FilaArticuloDiario } from "@/lib/multifashion/productos-ranking";
@@ -311,10 +312,33 @@ describe("4 · Vendedoras: meta una vez, Excel al cerrar, bono en una línea", (
       vendedoras: [{ nombre: "SHEYNEE BATISTA", tickets: 1, ventas: 1, ticket_promedio: 1, manager: false, delta_ventas_pct: null, tiene_comparacion: false, bono_vendedora: true }],
     };
     const septiembre = { ...agosto, mes_evaluado: { year: 2026, mes: 9 }, es_elegible: false, gerente: { ...agosto.gerente, bono: 0 } };
-    expect(lineaBono(agosto, null)).toBe("Bono de agosto 2026, por la venta de la tienda: Jennifer Miranda $100 · Sheynee Batista $50.");
-    expect(lineaBono(septiembre, agosto)).toBe("Bono: se define al cerrar el mes, por la venta de la tienda. En agosto: Jennifer Miranda $100 · Sheynee Batista $50.");
-    expect(lineaBono(septiembre, null)).toBe("Bono: se define al cerrar el mes, por la venta de la tienda.");
-    expect(lineaBono(null, null)).toBeNull();
+    // 🔁 1-oct-2026 — Daniel: «Badge de bono sí, como antes». Con el mes
+    // CERRADO la frase se fue (lo dicen los chips de la fila: `chipDeBono`);
+    // con el mes EN CURSO la línea dice la regla REAL de `multifashion_bonos_v5`
+    // y va ARRIBA de la tabla.
+    expect(lineaBono(agosto)).toBeNull();
+    expect(lineaBono(septiembre)).toBe("Bono de septiembre: se define al cerrar el mes · $50 a la que más venda y $50/$100 a la gerente si la tienda crece ≥5 %/≥10 %");
+    expect(lineaBono(null)).toBeNull();
+    expect(lineaBono({ ...septiembre, sin_data: true })).toBeNull();
+  });
+
+  // 🆕 1-oct-2026 — el chip de cada fila, solo con el mes cerrado.
+  it("el chip del bono: la ganadora $50 ámbar, la gerente con el monto de la RPC; en curso, nada", () => {
+    const agosto = {
+      mes_evaluado: { year: 2026, mes: 8 }, es_elegible: true, fecha_max_data: "2026-09-22",
+      ultimo_mes_elegible: { year: 2026, mes: 8 },
+      gerente: { nombre: "JENNIFER MIRANDA", ventas_mes: 1, ventas_mes_prev: 1, delta_pct: 0.218, tiene_comparacion: true, bono: 100 },
+      vendedoras: [
+        { nombre: "SHEYNEE BATISTA", tickets: 1, ventas: 2, ticket_promedio: 1, manager: false, delta_ventas_pct: null, tiene_comparacion: false, bono_vendedora: true },
+        { nombre: "ANA PEREZ", tickets: 1, ventas: 1, ticket_promedio: 1, manager: false, delta_ventas_pct: null, tiene_comparacion: false, bono_vendedora: false },
+      ],
+    };
+    expect(chipDeBono({ nombre: "SHEYNEE BATISTA", manager: false }, agosto)).toEqual({ tipo: "vendedora", texto: "Bono $50" });
+    expect(chipDeBono({ nombre: "JENNIFER MIRANDA", manager: true }, agosto)).toEqual({ tipo: "gerente", texto: "Bono gerente $100" });
+    expect(chipDeBono({ nombre: "ANA PEREZ", manager: false }, agosto)).toBeNull();
+    expect(chipDeBono({ nombre: "JENNIFER MIRANDA", manager: true }, { ...agosto, gerente: { ...agosto.gerente, bono: 0 } })).toBeNull();
+    expect(chipDeBono({ nombre: "SHEYNEE BATISTA", manager: false }, { ...agosto, es_elegible: false })).toBeNull();
+    expect(chipDeBono({ nombre: "SHEYNEE BATISTA", manager: false }, null)).toBeNull();
   });
 
   it("los hábitos en UNA línea, sin «peor día»", () => {
@@ -547,12 +571,63 @@ describe("5 · Vendedoras: 4 elementos", () => {
     expect(screen.queryByText(/cuánto aportó cada una/)).toBeNull();
   });
 
-  it("sin la frase falsa, sin columna Bono, con la línea del bono del mes cerrado", async () => {
-    await pintarVendedoras(9);
+  // 🔁 1-oct-2026 — Daniel: «Badge de bono sí, como antes». En curso: UNA
+  // línea ARRIBA de la tabla con la regla, y ningún chip ni «al cierre».
+  it("sin la frase falsa, sin columna Bono; en curso, la línea de la regla ARRIBA de la tabla y sin chips", async () => {
+    const { container } = await pintarVendedoras(9);
     expect(screen.queryByText(/incluye mayoreo si lo hubo/)).toBeNull();
     expect(screen.queryByText("Bono")).toBeNull();
     expect(screen.queryByText("al cierre")).toBeNull();
-    expect(await screen.findByText("Bono: se define al cerrar el mes, por la venta de la tienda. En agosto: Jennifer Miranda $100 · Sheynee Batista $50.")).toBeTruthy();
+    const linea = await screen.findByText("Bono de septiembre: se define al cerrar el mes · $50 a la que más venda y $50/$100 a la gerente si la tienda crece ≥5 %/≥10 %");
+    const p = linea.closest("[data-linea-bono]") as HTMLElement;
+    expect(p.className).toContain("text-sm");
+    expect(p.className).not.toContain("text-xs");
+    const tabla = container.querySelector('[data-elemento="tabla"]')!;
+    expect(p.compareDocumentPosition(tabla) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.querySelector("[data-chip-bono]")).toBeNull();
+  });
+
+  // 🆕 1-oct-2026 — cerrado: el chip junto al nombre, sin frase abajo ni fondo ámbar.
+  it("🔴 mes cerrado: «Bono $50» ámbar a la ganadora y «Bono gerente $100» verde a la gerente, en tabla y tarjeta", async () => {
+    const { container } = await pintarVendedoras(8);
+    await screen.findAllByText("Bono $50");
+    const tabla = container.querySelector('[data-vista="tabla"]') as HTMLElement;
+    const tarjetas = container.querySelector('[data-vista="tarjetas"]') as HTMLElement;
+    for (const vista of [tabla, tarjetas]) {
+      const vend = vista.querySelector('[data-chip-bono="vendedora"]') as HTMLElement;
+      const ger = vista.querySelector('[data-chip-bono="gerente"]') as HTMLElement;
+      expect(vend.textContent).toContain("Bono $50");
+      expect(vend.className).toContain("bg-amber-100");
+      expect(vend.className).toContain("text-amber-800");
+      expect(vend.className).toContain("font-semibold");
+      expect(ger.textContent).toContain("Bono gerente $100");
+      expect(ger.className).toContain("bg-emerald-100");
+      // Cada chip en la fila de SU vendedora.
+      expect(vend.parentElement!.textContent).toContain("Sheynee Batista");
+      expect(ger.parentElement!.textContent).toContain("Jennifer Miranda");
+    }
+    // Sin la frase de abajo ni el fondo ámbar tenue.
+    expect(container.querySelector("[data-linea-bono]")).toBeNull();
+    expect(screen.queryByText(/por la venta de la tienda:/)).toBeNull();
+    expect(tabla.innerHTML).not.toContain("bg-amber-50");
+    expect(tarjetas.innerHTML).not.toContain("bg-amber-50");
+  });
+
+  // 🆕 1-oct-2026 — el celular del módulo: el bono no se veía en ningún lado.
+  it("🔴 el celular del módulo también lleva el chip con el mes cerrado, y ninguno en curso", async () => {
+    vi.stubGlobal("fetch", fetchPorUrl({}));
+    const props = {
+      vendedoras: VENDEDORAS.vendedoras as never, ventasTotal: 1, tiquetesTotal: 1, rotuloDelta: null,
+      anio: 2026, parcial: false, metaAbierta: false, onAbrirMeta: () => {}, conMetas: false,
+    };
+    const { container } = montar(<VendedorasCelular {...props} bonos={BONOS_AGO as never} />);
+    const vend = container.querySelector('[data-vendedora="SHEYNEE BATISTA"] [data-chip-bono="vendedora"]');
+    const ger = container.querySelector('[data-vendedora="JENNIFER MIRANDA"] [data-chip-bono="gerente"]');
+    expect(vend?.textContent).toContain("Bono $50");
+    expect(ger?.textContent).toContain("Bono gerente $100");
+    cleanup();
+    const enCurso = montar(<VendedorasCelular {...props} bonos={BONOS_SEP as never} />);
+    expect(enCurso.container.querySelector("[data-chip-bono]")).toBeNull();
   });
 
   it("🔴 el Excel SOLO en mes cerrado", async () => {
@@ -561,7 +636,8 @@ describe("5 · Vendedoras: 4 elementos", () => {
     cleanup();
     await pintarVendedoras(8);
     expect(screen.getByRole("button", { name: "Excel" })).toBeTruthy();
-    expect(await screen.findByText("Bono de agosto 2026, por la venta de la tienda: Jennifer Miranda $100 · Sheynee Batista $50.")).toBeTruthy();
+    // 🔁 1-oct-2026: el bono del mes cerrado ya no es una frase, es el chip.
+    expect((await screen.findAllByText("Bono $50")).length).toBeGreaterThan(0);
   });
 });
 

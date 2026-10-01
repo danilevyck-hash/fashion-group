@@ -22,14 +22,14 @@
 import { useEffect } from "react";
 import useSWR from "swr";
 import { Card } from "@/components/ui/card";
-import { Info } from "lucide-react";
+import { Award, Check, Info } from "lucide-react";
 import type { BonosMultifashion } from "@/components/ventas/types";
 import { fmtMoney } from "@/lib/ventas/format";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { variacionPct, fmtVariacionPct } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
 import { RETAIL_AL_FRENTE } from "@/lib/multifashion/retail-al-frente";
-import { lineaBono } from "@/lib/multifashion/bono-linea";
+import { lineaBono, type ChipDeBono } from "@/lib/multifashion/bono-linea";
 
 const MES_FULL = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -87,23 +87,6 @@ export function BonosSection({ selectedYear, mes, onData }: BonosSectionProps) {
     onData(error ? null : (resp ?? null));
   }, [resp, error, onData]);
 
-  // Con el mes en curso, la línea dice el ÚLTIMO mes cerrado («En agosto: …»):
-  // se pide UNA vez más, con el mes que la propia RPC dice que es el último
-  // elegible. Solo con el interruptor; en un mes cerrado no hace falta.
-  const ultimoMes = resp && !resp.sin_data && !resp.es_elegible ? resp.ultimo_mes_elegible : null;
-  const ultimoUrl = RETAIL_AL_FRENTE && ultimoMes
-    ? `/api/multifashion/bonos?${new URLSearchParams({ year: String(ultimoMes.year), mes: String(ultimoMes.mes) }).toString()}`
-    : null;
-  const { data: ultimo } = useSWR<BonosMultifashion>(
-    ultimoUrl,
-    async (url: string) => {
-      const r = await fetch(url, { cache: "no-store" });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.json() as Promise<BonosMultifashion>;
-    },
-    { dedupingInterval: 5 * 60_000, revalidateOnFocus: false },
-  );
-
   if (error) {
     const errorMsg = error instanceof Error ? error.message : "error inesperado";
     return (
@@ -119,15 +102,16 @@ export function BonosSection({ selectedYear, mes, onData }: BonosSectionProps) {
       : null;
   }
 
-  // 🔴 RETAIL AL FRENTE (23-sep-2026): la columna «Bono» se fue y esto es la
-  // línea: «Bono: se define al cerrar el mes (retail contra retail). En agosto:
-  // Jennifer Miranda $100 · Sheynee Batista $50.» Las palabras las elige
-  // `lineaBono`; el monto lo sigue decidiendo la RPC.
+  // 🔴 RETAIL AL FRENTE (23-sep-2026): la columna «Bono» se fue.
+  // 🔁 1-oct-2026 (Daniel: «Badge de bono sí, como antes»): con el mes CERRADO
+  // aquí ya no se dibuja nada —quién ganó lo dice el CHIP de su fila
+  // (`ChipBono`)—; con el mes EN CURSO, UNA línea con la regla, ARRIBA de la
+  // tabla y del tamaño normal. La segunda lectura («En agosto: …») se fue.
   if (RETAIL_AL_FRENTE) {
-    const texto = lineaBono(resp, ultimo ?? null);
+    const texto = lineaBono(resp);
     if (!texto) return null;
     return (
-      <p data-linea-bono className={cn("flex flex-wrap items-center gap-x-1.5 text-xs text-gray-500", loading && "opacity-60 transition-opacity")}>
+      <p data-linea-bono className={cn("flex flex-wrap items-center gap-x-1.5 text-sm text-gray-500", loading && "opacity-60 transition-opacity")}>
         <span>{texto}</span>
         <span title={REGLA_BONO_RETAIL} className="inline-flex cursor-help text-gray-400" aria-label="Regla del bono">
           <Info className="h-3.5 w-3.5" />
@@ -183,5 +167,27 @@ function GerenteLinea({ resp }: { resp: BonosMultifashion }) {
         <Info className="h-3.5 w-3.5" />
       </span>
     </div>
+  );
+}
+
+/**
+ * 🔴 EL CHIP DEL BONO, JUNTO AL NOMBRE (1-oct-2026, «como antes»): ámbar con
+ * el trofeo para la vendedora que ganó, verde con el visto para la gerente. Lo
+ * usan la tabla, las tarjetas y el celular del módulo.
+ */
+export function ChipBono({ chip }: { chip: ChipDeBono | null }) {
+  if (!chip) return null;
+  const gerente = chip.tipo === "gerente";
+  const Icono = gerente ? Check : Award;
+  return (
+    <span
+      data-chip-bono={chip.tipo}
+      className={cn(
+        "inline-flex shrink-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-semibold",
+        gerente ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800",
+      )}
+    >
+      <Icono className="h-3 w-3" aria-hidden /> {chip.texto}
+    </span>
   );
 }

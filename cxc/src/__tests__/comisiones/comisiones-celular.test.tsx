@@ -231,7 +231,11 @@ describe("7p · Multifashion", () => {
   it("🔴 «por la venta de la tienda», no «retail contra retail»", () => {
     const bono = leer("src/lib/multifashion/bono-linea.ts");
     // Lo que ve Daniel no lleva la jerga; la cuenta no cambió.
-    expect(bono).toContain("por la venta de la tienda");
+    // 🔁 1-oct-2026 (Daniel: «Badge de bono sí, como antes»): la frase «…por la
+    // venta de la tienda: …» se fue —el mes cerrado lo dicen los chips— y la
+    // línea del mes en curso dice «si la tienda crece». Sin «retail».
+    expect(bono).toContain("a la gerente si la tienda crece");
+    expect(bono.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "")).not.toMatch(/`[^`]*retail[^`]*`/i);
     expect(bono).not.toContain('"Bono: se define al cerrar el mes (retail contra retail)."');
   });
 });
