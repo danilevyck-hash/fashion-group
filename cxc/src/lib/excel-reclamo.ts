@@ -94,7 +94,7 @@ export function buildReclamoSheet(
   // Cabecera: FASHION GROUP y, debajo, la empresa (mockup 11-sep-2026 — antes
   // decía «Reclamo a Proveedor», que es lo que dice el título del archivo).
   band(ws, r, CMAX, merges, "FASHION GROUP", palette.pri, 18); h[r] = 32; r++;
-  band(ws, r, CMAX, merges, empresa || "Reclamo a Proveedor", palette.mid, 12); h[r] = 22; r++;
+  band(ws, r, CMAX, merges, empresa || "Reclamo a proveedor", palette.mid, 12); h[r] = 22; r++;
   fillRow(ws, r, CMAX, palette.sep); merges.push({ s: { r, c: 0 }, e: { r, c: CMAX } }); h[r] = 6; r++;
 
   // Metadata helpers (layout de ficha: label LBL_BG / valor VAL_BG)
@@ -106,7 +106,7 @@ export function buildReclamoSheet(
   // Factura · PO · Contacto), sin los renglones que están vacíos.
   const fechaCabecera = fechaDeLaCabecera(rec as ReclamoDePapel);
   const meta: [string, string, boolean][] = [
-    ["N° Reclamo", nroReclamo, true],
+    ["N° de reclamo", nroReclamo, true],
     ...(fechaCabecera ? [["Fecha de factura", fmtDate(fechaCabecera), false] as [string, string, boolean]] : []),
     ...datosDelPapel(rec as ReclamoDePapel, opts.contacto ?? null).map(
       (d) => [d.rotulo, d.valor, d.rotulo.startsWith("Factura")] as [string, string, boolean],

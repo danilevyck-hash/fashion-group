@@ -73,7 +73,8 @@ describe("🔴 un pedido que no fue a Switch DICE lo que es", () => {
   it("no dice «—» ni un blanco", () => {
     const t = textoEnSwitch({ switchNumero: null });
     expect(t).toBe(TEXTO_NO_ENVIADO);
-    expect(t).toMatch(/no se ha mandado/i);
+    // 1-oct-2026, Daniel: nombres normales de ERP («No se ha mandado a Switch» → «Pendiente de envío»).
+    expect(t).toMatch(/pendiente de envío/i);
     expect(t).not.toBe("—");
     expect(t).not.toBe("-");
     expect(t.trim()).not.toBe("");

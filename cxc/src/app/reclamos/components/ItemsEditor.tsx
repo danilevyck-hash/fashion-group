@@ -26,7 +26,7 @@ interface Props {
 //     siempre iguales.
 // La talla y el género se guardan igual que siempre.
 // ─────────────────────────────────────────────────────────────────────────────
-export default function ItemsEditor({ items, setItems, titulo = "Renglones del reclamo" }: Props) {
+export default function ItemsEditor({ items, setItems, titulo = "Líneas del reclamo" }: Props) {
   function updateItem(idx: number, field: string, val: string | number) {
     setItems((prev) => prev.map((item, i) => {
       if (i !== idx) return item;
@@ -51,7 +51,7 @@ export default function ItemsEditor({ items, setItems, titulo = "Renglones del r
               <th className="pb-2 font-medium text-left" style={{ minWidth: 70 }}>Talla *</th>
               <th className="pb-2 font-medium text-left" style={{ minWidth: 90 }}>Género *</th>
               <th className="pb-2 font-medium text-right" style={{ minWidth: 60 }}>Cant. *</th>
-              <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Precio U. *</th>
+              <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Precio unitario *</th>
               <th className="pb-2 font-medium text-left">Motivo *</th>
               <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Subtotal</th>
               <th className="pb-2 w-6"></th>
@@ -91,7 +91,7 @@ export default function ItemsEditor({ items, setItems, titulo = "Renglones del r
                   </select>
                 </td>
                 <td className="py-2 text-right tabular-nums text-gray-500 text-xs">${fmt((item.cantidad || 0) * (item.precio_unitario || 0))}</td>
-                <td className="py-2 text-center">{items.length > 1 && <button type="button" aria-label="Quitar renglón" onClick={() => quitar(idx)} className="text-gray-300 hover:text-black text-sm py-1.5 px-2 min-h-[44px]">×</button>}</td>
+                <td className="py-2 text-center">{items.length > 1 && <button type="button" aria-label="Quitar línea" onClick={() => quitar(idx)} className="text-gray-300 hover:text-black text-sm py-1.5 px-2 min-h-[44px]">×</button>}</td>
               </tr>
             ))}
           </tbody>
@@ -146,7 +146,7 @@ export default function ItemsEditor({ items, setItems, titulo = "Renglones del r
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
-                <span className="text-xs text-gray-500">Precio U. *</span>
+                <span className="text-xs text-gray-500">Precio unitario *</span>
                 <input type="number" inputMode="decimal" step="0.50" min={0} value={item.precio_unitario} onChange={(e) => updateItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-2.5 text-base outline-none focus:border-black min-h-[44px]" />
               </label>
               <div className="block">
@@ -166,7 +166,7 @@ export default function ItemsEditor({ items, setItems, titulo = "Renglones del r
       </div>
 
       <div className="mt-1 flex flex-wrap items-center gap-x-4">
-        <button type="button" onClick={agregar} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2">+ Agregar renglón</button>
+        <button type="button" onClick={agregar} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2">+ Agregar línea</button>
         <button type="button" onClick={repetir} className="text-sm text-gray-700 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2 font-medium">Repetir el anterior</button>
       </div>
     </div>

@@ -52,7 +52,7 @@ export default function CajaPage() {
 
   return (
     <div>
-      <AppHeader module="Caja Menuda" />
+      <AppHeader module="Caja menuda" />
       <div className="skin-caja min-h-screen">
         <PeriodoList
           periodos={periodos}

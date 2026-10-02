@@ -130,7 +130,7 @@ function VistaGeneralInner() {
 
   return (
     <div className="min-h-screen bg-stone-50">
-      <AppHeader module="Vista General" />
+      <AppHeader module="Vista general" />
       <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Encabezado + navegación de mes */}
         <div className="mb-8">
@@ -138,7 +138,7 @@ function VistaGeneralInner() {
               (celular) y el breadcrumb (escritorio). Queda sr-only para no
               dejar la página sin encabezado. El `mt-3` de la fila de mes se fue
               con él: sin título arriba, era un hueco suelto bajo el `py-8`. */}
-          <h1 className="sr-only">Vista General</h1>
+          <h1 className="sr-only">Vista general</h1>
           <div className="flex items-center gap-1 -ml-3">
             <button
               type="button"
@@ -259,7 +259,7 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
       <KpiCard
         href="/saldos-banco"
         label="Disponibilidad"
-        hoverLabel="Ir a Saldos de Banco"
+        hoverLabel="Ir a Saldos de banco"
         value={disponibilidad ? moneyK(disponibilidad.total) : "—"}
         sub={disponibilidad
           ? <span className="text-stone-400">al {fechaCorta(disponibilidad.fechaMasVieja)}</span>
@@ -273,7 +273,7 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
       <KpiCard
         href="/referencia"
         label="Inventario"
-        hoverLabel="Ir a Referencia"
+        hoverLabel="Ir a Consulta de artículos"
         value={InventarioKpiValue({ inv: inventario })}
         tags={inventario?.disponible ? ["al costo"] : []}
         sub={
@@ -292,8 +292,8 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
       {/* CXC */}
       <KpiCard
         href="/cxc"
-        label="Por cobrar (CXC)"
-        hoverLabel="Ir a CXC"
+        label="Cuentas por cobrar"
+        hoverLabel="Ir a Cuentas por cobrar"
         value={moneyK(cxc.total)}
         sub={
           <span className={cxc.vencido > 0 ? "text-red-600 font-medium" : "text-stone-400"}>
@@ -305,7 +305,7 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
       {/* CXP */}
       <KpiCard
         href="/proveedores"
-        label="Por pagar (CXP)"
+        label="Cuentas por pagar"
         hoverLabel="Ir a Proveedores"
         value={moneyK(cxp.total)}
         sub={
@@ -365,7 +365,7 @@ const NOMBRE_ALERTA = "text-xs text-stone-700";
 function Atencion({ data }: { data: VistaGeneral }) {
   return (
     <div>
-      <h2 className="text-sm font-semibold text-stone-900 mb-3">Requiere tu atención</h2>
+      <h2 className="text-sm font-semibold text-stone-900 mb-3">Alertas</h2>
       {/* 🩸 A 1024 px las 3 columnas apretaban la tarjeta a 159 px y el nombre
           del cliente perdía 125 px con puntos suspensivos — 18 de las 21 filas.
           Es el ancho PEOR de todos, y no por casualidad: `lg` entra justo a
@@ -381,7 +381,7 @@ function Atencion({ data }: { data: VistaGeneral }) {
           escritorio no cambia. */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
         {/* CXC +90d */}
-        <AlertCard title="Clientes con saldo +90 días" href="/cxc" linkLabel="Ir a CXC" count={data.cxc.topClientes.length}>
+        <AlertCard title="Clientes vencidos +90 días" href="/cxc" linkLabel="Ir a Cuentas por cobrar" count={data.cxc.topClientes.length}>
           {data.cxc.topClientes.length === 0 ? (
             <Empty>Nada vencido a +90 días.</Empty>
           ) : (
@@ -395,7 +395,7 @@ function Atencion({ data }: { data: VistaGeneral }) {
         </AlertCard>
 
         {/* Proveedores vencidos +90d */}
-        <AlertCard title="Proveedores con saldo vencido +90d" href="/proveedores" linkLabel="Ir a Proveedores" count={data.cxp.topProveedores.length}>
+        <AlertCard title="Proveedores vencidos +90 días" href="/proveedores" linkLabel="Ir a Proveedores" count={data.cxp.topProveedores.length}>
           {data.cxp.topProveedores.length === 0 ? (
             <Empty>Nada vencido a +90 días.</Empty>
           ) : (
@@ -409,7 +409,7 @@ function Atencion({ data }: { data: VistaGeneral }) {
         </AlertCard>
 
         {/* Reclamos antiguos sin pagar */}
-        <AlertCard title="Reclamos sin pagar (+30 días)" href="/reclamos" linkLabel="Ir a Reclamos" count={data.reclamos.antiguos.length}>
+        <AlertCard title="Reclamos sin cobrar (+30 días)" href="/reclamos" linkLabel="Ir a Reclamos" count={data.reclamos.antiguos.length}>
           {data.reclamos.antiguos.length === 0 ? (
             <Empty>Sin reclamos antiguos pendientes.</Empty>
           ) : (

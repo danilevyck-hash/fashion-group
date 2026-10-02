@@ -261,7 +261,7 @@ describe("8 · 🔴 las DOS vistas del Resumen muestran los mismos bloques", () 
     { nombre: "tarjeta de Ventas netas",  escritorio: /ventasNetasYTD/,            celular: /ventasNetasYTD/ },
     { nombre: "tarjeta de Utilidad",      escritorio: /utilidadYTD/,               celular: /utilidadYTD/ },
     { nombre: "tarjeta de Margen",        escritorio: /margenYTD/,                 celular: /margenYTD/ },
-    { nombre: "tarjeta Cierre del año",   escritorio: /CIERRE DEL AÑO/,            celular: /Cierre del año/ },
+    { nombre: "tarjeta Cierre del año",   escritorio: /PROYECCIÓN DE CIERRE/,      celular: /Proyección de cierre/ }, // 1-oct-2026, Daniel: nombres normales de ERP
     { nombre: "explicación del cierre",   escritorio: /explicacionProyeccionGrupo/, celular: /explicacionProyeccionGrupo/ },
     { nombre: "control Ventas/Utilidad",  escritorio: /MODO_OPCIONES/,             celular: /MODO_OPCIONES/ },
     // 🔁 11-sep-2026: «control Mensual/Trim/Anual» y «vista Anual» salieron de

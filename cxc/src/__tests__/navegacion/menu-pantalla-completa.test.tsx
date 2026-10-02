@@ -60,7 +60,8 @@ function montarComoAdmin(ruta = "/asistencia") {
   nav.ruta = ruta;
   sessionStorage.setItem("cxc_role", "admin");
   sessionStorage.setItem("fg_user_name", "daniel");
-  return render(<AppHeader module="Asistencia y Planilla" />);
+  // 1-oct-2026, Daniel: nombres normales de ERP (mayúscula solo en la primera palabra).
+  return render(<AppHeader module="Asistencia y planilla" />);
 }
 
 /**
@@ -101,7 +102,7 @@ describe("el modo del cajón", () => {
     // Sin acentos y sin mayúsculas: «guias», «GUÍAS» y «Guías» son lo mismo.
     for (const texto of ["guias", "GUÍAS", "Guías"]) {
       const r = filtrarGruposPorTexto(grupos, texto);
-      expect(r.flatMap((g) => g.modulos.map((m) => m.label))).toEqual(["Guías de Despacho"]);
+      expect(r.flatMap((g) => g.modulos.map((m) => m.label))).toEqual(["Guías de despacho"]);
       // 🔴 Un grupo que se queda sin módulos NO se dibuja.
       expect(r.map((g) => g.key)).toEqual(["operacion"]);
     }
@@ -160,11 +161,11 @@ describe("AppHeader · el menú a pantalla completa", () => {
     montarComoAdmin("/asistencia");
     const menu = await abrirElMenu();
 
-    const aqui = within(menu).getByRole("button", { name: /^Asistencia y Planilla/ });
+    const aqui = within(menu).getByRole("button", { name: /^Asistencia y planilla/ });
     expect(aqui.getAttribute("aria-current")).toBe("page");
     expect(aqui.textContent).toContain("aquí");
 
-    const otro = within(menu).getByRole("button", { name: /^Guías de Despacho/ });
+    const otro = within(menu).getByRole("button", { name: /^Guías de despacho/ });
     expect(otro.getAttribute("aria-current")).toBeNull();
   });
 
@@ -177,10 +178,11 @@ describe("AppHeader · el menú a pantalla completa", () => {
         .querySelector("svg")?.getAttribute("class") ?? "";
 
     // Uno de los de siempre…
-    expect(claseDelIcono("Guías de Despacho")).toContain(getModuleColorByKey("guias")!.text);
+    expect(claseDelIcono("Guías de despacho")).toContain(getModuleColorByKey("guias")!.text);
     // …y los cuatro que hasta hoy salían en gris.
-    expect(claseDelIcono("Vista General")).toContain(getModuleColorByKey("vista-general")!.text);
-    expect(claseDelIcono("Referencia")).toContain(getModuleColorByKey("referencia")!.text);
+    expect(claseDelIcono("Vista general")).toContain(getModuleColorByKey("vista-general")!.text);
+    // 1-oct-2026, Daniel: nombres normales de ERP — «Referencia» se llama «Consulta de artículos».
+    expect(claseDelIcono("Consulta de artículos")).toContain(getModuleColorByKey("referencia")!.text);
     expect(claseDelIcono("Catálogos")).toContain(getModuleColorByKey("catalogos")!.text);
     expect(claseDelIcono("Usuarios")).toContain(getModuleColorByKey("usuarios")!.text);
     // 🔴 Nadie se queda con el gris de respaldo.
@@ -195,7 +197,7 @@ describe("AppHeader · el menú a pantalla completa", () => {
     await waitFor(() => {
       expect(within(menu).queryByRole("button", { name: /^Proveedores/ })).toBeNull();
     });
-    within(menu).getByRole("button", { name: /^Guías de Despacho/ });
+    within(menu).getByRole("button", { name: /^Guías de despacho/ });
     expect([...menu.querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["Operación"]);
     expect(nav.push).not.toHaveBeenCalled();
 
@@ -262,6 +264,6 @@ describe("AppHeader · el menú a pantalla completa", () => {
     expect([...menu.querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["Ventas y clientes"]);
     const suyo = within(menu).getByRole("button", { name: /^Multifashion/ });
     expect(suyo.getAttribute("aria-current")).toBe("page");
-    expect(within(menu).queryByRole("button", { name: /^Guías de Despacho/ })).toBeNull();
+    expect(within(menu).queryByRole("button", { name: /^Guías de despacho/ })).toBeNull();
   });
 });

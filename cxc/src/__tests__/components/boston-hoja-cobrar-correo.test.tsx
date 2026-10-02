@@ -133,8 +133,9 @@ describe("🔴 sin correo cargado", () => {
   it("las otras tres salidas siguen ahí", async () => {
     montar({ destinatario: "" });
     expect(screen.getByRole("button", { name: /WhatsApp/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Copiar el mensaje/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Ver los documentos/ })).toBeTruthy();
+    // 1-oct-2026, Daniel: nombres normales de ERP.
+    expect(screen.getByRole("button", { name: /Copiar mensaje/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Estado de cuenta/ })).toBeTruthy();
   });
 });
 

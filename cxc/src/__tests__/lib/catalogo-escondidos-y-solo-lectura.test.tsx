@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 // ─────────────────────────────────────────────────────────────────────────────
 // CATÁLOGOS — LOS DEFECTOS DEL 11-sep-2026, aprobados por Daniel
 //
@@ -61,7 +62,7 @@ describe("1 · lo escondido a mano entra a la pantalla de administrar", () => {
     // fila, con la misma regla del catálogo público (`opcionesConDatos`). Lo
     // que este candado mide no cambió: el chip «Escondidos» aparece.
     expect(chips.map((c) => `${c.label} ${c.count}`)).toEqual([
-      "Todos 1", "Calzado 1", "Escondidos 1",
+      "Todos 1", "Calzado 1", "Ocultos 1",
     ]);
   });
 
@@ -85,7 +86,7 @@ describe("1 · lo escondido a mano entra a la pantalla de administrar", () => {
 
   it("la fila ofrece «Mostrar» al escondido y manda el toggle sin tocar `active`", () => {
     const fila = leer("src/app/catalogos/admin/[marca]/ProductoFila.tsx");
-    expect(fila).toContain('{escondido ? "Mostrar" : "Esconder"}');
+    expect(fila).toContain('{escondido ? "Mostrar" : "Ocultar"}');
     expect(fila).toContain("toggleProductOculto(marca, { id: product.id, sku: product.sku || \"\" }, !escondido)");
   });
 
@@ -198,7 +199,7 @@ describe("2 · el catálogo interno en SOLO LECTURA para quien no arma pedidos",
     const bloque = src.slice(src.indexOf("Compartir pedido"));
     expect(bloque.indexOf("{isEditorRole && (<>")).toBeGreaterThan(0);
     expect(bloque.indexOf("{isEditorRole && (<>")).toBeLessThan(bloque.indexOf("Avisar por correo a Fashion Group"));
-    expect(bloque.indexOf("{isEditorRole && (<>")).toBeLessThan(bloque.indexOf("Enviar por email al cliente"));
+    expect(bloque.indexOf("{isEditorRole && (<>")).toBeLessThan(bloque.indexOf("Enviar por correo al cliente"));
     expect(bloque.indexOf("Descargar PDF")).toBeLessThan(bloque.indexOf("{isEditorRole && (<>"));
   });
 });

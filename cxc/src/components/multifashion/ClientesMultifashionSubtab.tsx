@@ -311,7 +311,7 @@ export function ClientesMultifashionSubtab({ selectedYear, mes, periodo }: Clien
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <SegCard icon={<Repeat className="h-4 w-4" />} tone="teal" valor={fidel.cards.frecuentes} label="Frecuentes" sub="2+ visitas en 90 días" />
                   <SegCard icon={<UserPlus className="h-4 w-4" />} tone="teal" valor={fidel.cards.nuevos_mes} label="Nuevos del mes" sub="registrados este mes" />
-                  <SegCard icon={<Percent className="h-4 w-4" />} tone="teal" valor={fidel.cards.cinco_pendiente} label="5% pendiente" sub="sin segunda visita" />
+                  <SegCard icon={<Percent className="h-4 w-4" />} tone="teal" valor={fidel.cards.cinco_pendiente} label="Descuento 5% pendiente" sub="sin segunda visita" />
                 </div>
                 {!fidel.detalle_activo && (
                   <p className="text-xs text-gray-400">
@@ -376,14 +376,14 @@ export function ClientesMultifashionSubtab({ selectedYear, mes, periodo }: Clien
                   icon={<Moon className="h-4 w-4" />}
                   tone="amber"
                   valor={fidel.cards.dormidos}
-                  label="Dormidos"
+                  label="Inactivos"
                   sub="60+ días sin comprar"
                 />
                 <SegCard
                   icon={<Percent className="h-4 w-4" />}
                   tone="teal"
                   valor={fidel.cards.cinco_pendiente}
-                  label="5% pendiente"
+                  label="Descuento 5% pendiente"
                   sub="sin segunda visita"
                 />
               </div>
@@ -435,7 +435,7 @@ export function ClientesMultifashionSubtab({ selectedYear, mes, periodo }: Clien
                 <Store className="h-4 w-4" />
               </div>
               <div className="flex min-w-0 flex-1 items-center gap-1">
-                <p className="text-sm font-medium text-gray-900">Anónimos (mostrador)</p>
+                <p className="text-sm font-medium text-gray-900">Consumidor final</p>
                 {/* Qué códigos de Switch caen en este bucket es composición: se
                     aprende una vez y no cambia con el período. */}
                 <Ayuda titulo="Qué entra aquí">
@@ -569,8 +569,8 @@ function ClientesSection({
             <span>Cliente</span>
             <span className="text-right">Total</span>
             <span className="text-right">Tickets</span>
-            <span className="text-right">T. prom</span>
-            <span className="text-right">Última</span>
+            <span className="text-right">Ticket promedio</span>
+            <span className="text-right">Última compra</span>
             <span />
           </div>
 
@@ -671,8 +671,8 @@ function ClienteTarjeta({
           <span className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs text-gray-500">
             <span className="font-mono tabular-nums text-gray-950">{fmtMoney(cliente.total_ytd)}</span>
             <span className="font-mono tabular-nums">{cliente.tickets_ytd.toLocaleString()} tickets</span>
-            <span className="font-mono tabular-nums">prom ${ticketProm.toFixed(2)}</span>
-            <span className="font-mono tabular-nums">últ. {formatFechaShort(cliente.ultima_compra)}</span>
+            <span className="font-mono tabular-nums">Ticket promedio ${ticketProm.toFixed(2)}</span>
+            <span className="font-mono tabular-nums">Última compra {formatFechaShort(cliente.ultima_compra)}</span>
           </span>
         </span>
         <ChevronDown className={cn(

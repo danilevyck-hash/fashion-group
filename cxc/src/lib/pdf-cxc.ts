@@ -290,7 +290,7 @@ export function pdfPorCompania(
   autoTable(doc, {
     startY: ALTO_CABECERA,
     margin: { top: ALTO_CABECERA, left: MARGEN, right: MARGEN, bottom: 18 },
-    head: [["Código", "Cliente / Compañía", tramo("current"), tramo("watch"), tramo("overdue"), "Total"]],
+    head: [["Código", "Cliente / Empresa", tramo("current"), tramo("watch"), tramo("overdue"), "Total"]],
     body: cuerpo,
     foot: pieDelPapel(bloques, aFavor),
     columnStyles: {

@@ -1013,7 +1013,7 @@ export default function ReporteTab({ empresa = "" }: {
                 {!ASISTENCIA_PANTALLA_2026_09 && <th className="px-2 py-2.5 text-center font-medium">Sale</th>}
                 <th className="px-2 py-2.5 text-right font-medium">Días</th>
                 <th className="px-2 py-2.5 text-right font-medium">Ausen.</th>
-                <th className="px-2 py-2.5 text-right font-medium">Veces<br />tarde</th>
+                <th className="px-2 py-2.5 text-right font-medium">Tardanzas</th>
                 {/* 🔴 29-sep-2026: sin «Min»; la unidad la dice el número (h:mm o minutos). */}
                 <th className="px-2 py-2.5 text-right font-medium">Tarde</th>
                 <th className="px-2 py-2.5 text-right font-medium">Exceso<br />almuerzo</th>
@@ -1260,8 +1260,8 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
               <thead><tr className="border-b border-gray-200 text-[10px] uppercase tracking-wide text-gray-400">
                 <th className="px-2 py-2 text-left font-medium">Día</th>
                 <th className="px-2 py-2 text-right font-medium">Entrada</th>
-                <th className="px-2 py-2 text-right font-medium">Sale almz.</th>
-                <th className="px-2 py-2 text-right font-medium">Vuelve</th>
+                <th className="px-2 py-2 text-right font-medium">Salida almuerzo</th>
+                <th className="px-2 py-2 text-right font-medium">Regreso almuerzo</th>
                 <th className="px-2 py-2 text-right font-medium">Salida</th>
                 <th className="px-2 py-2 text-right font-medium">Tarde</th>
                 <th className="px-2 py-2 text-right font-medium">Almz.</th>

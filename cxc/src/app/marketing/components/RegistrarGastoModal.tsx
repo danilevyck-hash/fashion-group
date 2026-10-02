@@ -697,7 +697,7 @@ function RegistrarGastoModalAnterior({
         {/* ---------------------------------------------------------------- */}
         {paso === "tipo" && (
           <div className="p-5 space-y-3">
-            <p className="text-sm text-gray-600">¿Qué es el gasto?</p>
+            <p className="text-sm text-gray-600">Tipo de gasto</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {CAMINOS.map((c) => (
                 <button
@@ -727,7 +727,7 @@ function RegistrarGastoModalAnterior({
           <>
             <div className="p-5 space-y-5">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-gray-500">Qué es</span>
+                <span className="text-xs text-gray-500">Tipo</span>
                 <span className="text-sm font-medium text-gray-900">
                   {CAMINOS.find((c) => c.key === camino)?.titulo}
                 </span>

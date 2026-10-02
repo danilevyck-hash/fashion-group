@@ -126,12 +126,12 @@ export default function DetalleCelular({
   }
 
   const opciones: OpcionDeHoja[] = [
-    ...(pendiente ? [{ label: "Mandar al proveedor", onClick: () => setHoja("correo") }] : []),
+    ...(pendiente ? [{ label: "Enviar al proveedor", onClick: () => setHoja("correo") }] : []),
     { label: "Descargar en PDF", onClick: () => { void descargar("pdf"); } },
     { label: "Descargar en Excel", onClick: () => { void descargar("excel"); } },
     ...(current.factura_pdf_url ? [{ label: "Ver la factura del proveedor", onClick: () => { void verFactura(); } }] : []),
     { label: "Editar", onClick: onStartEdit },
-    ...(!pendiente ? [{ label: "Volver a por cobrar", onClick: onVolverAPorCobrar }] : []),
+    ...(!pendiente ? [{ label: "Marcar como pendiente", onClick: onVolverAPorCobrar }] : []),
     ...(role === "admin" ? [{ label: "Eliminar", onClick: () => onDeleteReclamo(current.id), destructive: true }] : []),
   ];
 
@@ -178,7 +178,7 @@ export default function DetalleCelular({
       {/* 6b · el comprobante y la nota de crédito, dos filas que se tocan. */}
       {!pendiente && (
         <>
-          <p className="px-4 pb-1 pt-4 text-[13px] uppercase tracking-wide text-gray-500">El cobro</p>
+          <p className="px-4 pb-1 pt-4 text-[13px] uppercase tracking-wide text-gray-500">Cobro</p>
           <ul className="mx-4 overflow-hidden rounded-2xl bg-white">
             <FilaCel
               titulo="Comprobante de pago"
@@ -205,7 +205,7 @@ export default function DetalleCelular({
       )}
 
       <p className="px-4 pb-1 pt-4 text-[13px] uppercase tracking-wide text-gray-500">
-        Renglones · {items.length} · total {montoCel(tax.total)}
+        Líneas · {items.length} · total {montoCel(tax.total)}
       </p>
       <ul data-lista="reclamo-renglones" className="mx-4 overflow-hidden rounded-2xl bg-white">
         {aLaVista.map((item, i) => {
@@ -228,7 +228,7 @@ export default function DetalleCelular({
         })}
         {ocultos > 0 && (
           <FilaCel
-            titulo={`y ${ocultos} renglón${ocultos === 1 ? "" : "es"} más`}
+            titulo={`y ${ocultos} línea${ocultos === 1 ? "" : "s"} más`}
             chevron
             onClick={() => setVerTodos(true)}
           />
@@ -244,12 +244,12 @@ export default function DetalleCelular({
       <ul className="mx-4 mt-4 overflow-hidden rounded-2xl bg-white">
         <FilaCel
           titulo="Fotos"
-          sub={fotos.length === 0 ? "todavía ninguna · tomar o elegir" : `${fotos.length} de 5`}
+          sub={fotos.length === 0 ? "Sin fotos · tomar o seleccionar" : `${fotos.length} de 5`}
           chevron
           onClick={() => setHoja("fotos")}
         />
         <FilaCel
-          titulo="Lo que ha pasado"
+          titulo="Seguimiento"
           sub={seg.length === 0 ? "nada todavía" : `${seg.length} nota${seg.length === 1 ? "" : "s"}`}
           chevron
           onClick={() => setHoja("seguimiento")}
@@ -302,7 +302,7 @@ export default function DetalleCelular({
             setHoja(null);
             scheduleAction({
               id: `correo-${current.id}`,
-              message: `Se manda a ${envio.to}`,
+              message: `Se envía a ${envio.to}`,
               execute: async () => {
                 try {
                   const data = await mandarAlProveedor(current.empresa, [current.id], envio);

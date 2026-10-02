@@ -971,7 +971,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
               mano — nunca se adivina (Daniel confirmó que no debería pasar). */}
           {empresasArchivo.length > 1 && (
             <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
-              El archivo trae marcas de {empresasArchivo.length} compañías
+              El archivo trae marcas de {empresasArchivo.length} empresas
               ({empresasArchivo.map((k) => companiaLabel(k)).join(" y ")}). Toca «cambiar» y elige una.
             </p>
           )}
@@ -1182,7 +1182,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                   <table className="w-full border-collapse text-[13px]">
                     <thead>
                       <tr>
-                        {["Marca en este Excel", "Estado", "Divisor", "Extra $", "Redondeo", ""].map((h, i) => (
+                        {["Marca", "Estado", "Divisor", "Extra $", "Redondeo", ""].map((h, i) => (
                           <th key={i} className="border-b-[1.5px] border-stone-300 px-2.5 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-stone-500">{h}</th>
                         ))}
                       </tr>
@@ -1444,7 +1444,7 @@ function CompaniaReconocida({ empresa, marca, fileName, onCambiar }: {
     <div className="min-w-0 flex-1">
       <div className="flex items-center gap-2">
         <span className={`truncate text-sm font-semibold ${empresa ? "text-stone-900" : "text-amber-700"}`}>
-          {empresa ? companiaLabel(empresa) : "Elige la compañía"}
+          {empresa ? companiaLabel(empresa) : "Seleccionar empresa"}
           {marca && <span className="font-normal text-stone-500"> · {marca}</span>}
         </span>
         <button
@@ -1453,7 +1453,7 @@ function CompaniaReconocida({ empresa, marca, fileName, onCambiar }: {
           onClick={() => setAbierto((a) => !a)}
           aria-haspopup="listbox"
           aria-expanded={abierto}
-          aria-label="Cambiar compañía"
+          aria-label="Cambiar empresa"
           className="shrink-0 text-[12px] font-semibold text-teal-700 underline decoration-teal-300 underline-offset-2 transition hover:text-teal-900"
         >
           cambiar
@@ -1466,7 +1466,7 @@ function CompaniaReconocida({ empresa, marca, fileName, onCambiar }: {
         onCerrar={() => setAbierto(false)}
         marca="depurador-compania"
         role="listbox"
-        aria-label="Compañía"
+        aria-label="Empresa"
         anchoMinimo={220}
         className="bg-white rounded-xl border border-black/10 shadow-lg py-1"
       >

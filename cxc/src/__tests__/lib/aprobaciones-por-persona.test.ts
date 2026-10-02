@@ -281,8 +281,10 @@ describe("c. 🔴 las dos vistas, de la MISMA fuente", () => {
 
   it("«N por decidir · H:MM h» cuenta RENGLONES", () => {
     expect(resumenPorDecidir(DIAS)).toEqual({ renglones: 2, minutos: 162 });
-    expect(textoPorDecidir(2, 162)).toBe("2 por decidir · 2:42 h");
-    expect(textoPorDecidir(0, 0)).toBe("Todo decidido");
+    // 1-oct-2026, Daniel: nombres normales de ERP («toBe("2 por decidir · 2:42 h")» → «toBe("2 pendientes · 2:42 h")»).
+    expect(textoPorDecidir(2, 162)).toBe("2 pendientes · 2:42 h");
+    // 1-oct-2026, Daniel: nombres normales de ERP («toBe("Todo decidido")» → «toBe("Sin pendientes")»).
+    expect(textoPorDecidir(0, 0)).toBe("Sin pendientes");
     expect(textoDiasYHoras(1, 15)).toBe("1 día · 0:15 h");
     expect(textoDiasYHoras(4, 145)).toBe("4 días · 2:25 h");
     expect(hm(0)).toBe("0:00");

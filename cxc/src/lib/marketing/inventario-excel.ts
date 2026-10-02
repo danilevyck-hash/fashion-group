@@ -111,8 +111,8 @@ function hojaResumen(
   marcas: ReadonlyArray<MkMarca>,
 ): XLSX.WorkSheet {
   const header = [
-    "Cliente",
-    "Total Paneles",
+    "Tienda",
+    "Total paneles",
     ...marcas.map((m) => `$ ${m.nombre}`),
     "Total $",
   ];

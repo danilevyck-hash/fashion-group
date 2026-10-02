@@ -98,7 +98,7 @@ describe("1 · el encabezado: el nombre y UNA sola línea con lo fiscal", () => 
 
   it("a la derecha hay UN botón: «Cobrar»", () => {
     pintar();
-    expect(screen.getByRole("button", { name: "Cobrar" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Enviar estado de cuenta" })).toBeTruthy(); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 });
 
@@ -107,7 +107,8 @@ describe("2 · las cuatro tarjetas, lo primero que se ve", () => {
   it("las cuatro, en orden", () => {
     pintar();
     const titulos = [...document.querySelectorAll('[data-bloque="tarjetas"] > div > p:first-child')].map((p) => p.textContent);
-    expect(titulos).toEqual(["Compró 2026", "Debe", "Último pago", "Última compra"]);
+    // 1-oct-2026, Daniel: nombres normales de ERP («Compró · Debe»).
+    expect(titulos).toEqual(["Compras 2026", "Saldo pendiente", "Último pago", "Última compra"]);
   });
 
   it("«Compró 2026» con su delta debajo", () => {
@@ -140,8 +141,8 @@ describe("2 · las cuatro tarjetas, lo primero que se ve", () => {
       pagos_por_fecha: [],
     });
     expect(texto()).toContain("Sin comprar en 2026");
-    expect(texto()).toContain("No debe nada");
-    expect(texto()).toContain("Nunca ha pagado");
+    expect(texto()).toContain("Sin saldo"); // 1-oct-2026, Daniel: nombres normales de ERP
+    expect(texto()).toContain("Sin pagos");
     expect(texto()).toContain("Sin compras registradas");
   });
 
@@ -164,7 +165,8 @@ describe("3 · «Empresa por empresa»", () => {
   it("las columnas son Empresa · año · año-1 · vs · Debe, y hay Total", () => {
     pintar();
     const enc = [...document.querySelectorAll("thead th")].map((t) => t.textContent);
-    expect(enc).toEqual(["Empresa", "2026", "2025", "vs 2025", "Debe"]);
+    // 1-oct-2026, Daniel: nombres normales de ERP («vs 2025 · Debe»).
+    expect(enc).toEqual(["Empresa", "2026", "2025", "Variación %", "Saldo"]);
     expect(screen.getByText("Total")).toBeTruthy();
   });
 
@@ -270,7 +272,7 @@ describe("5 · el contacto se edita TOCANDO el dato", () => {
 describe("6 · el pie: enlaces, no botones", () => {
   it("«Ver los N documentos» con el número real", () => {
     pintar();
-    expect(screen.getByRole("button", { name: /Ver los 353 documentos/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Estado de cuenta \(353\)/ })).toBeTruthy(); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   it("«Últimas guías» viene PLEGADO", () => {
@@ -283,7 +285,7 @@ describe("6 · el pie: enlaces, no botones", () => {
 
   it("«Ver en Cuentas por Cobrar» lleva al módulo con el cliente buscado", () => {
     pintar();
-    const a = screen.getByText(/Ver en Cuentas por Cobrar/).closest("a")!;
+    const a = screen.getByText(/Ver en Cuentas por cobrar/).closest("a")!; // 1-oct-2026, Daniel: nombres normales de ERP
     expect(a.getAttribute("href")).toBe("/cxc?search=City%20Mall%20Paso%20Canoa");
   });
 
@@ -296,9 +298,10 @@ describe("6 · el pie: enlaces, no botones", () => {
   it("🔴 bodega NO ve Cobrar, ni los documentos, ni los dos enlaces", () => {
     ROL = "bodega";
     pintar();
-    expect(screen.queryByRole("button", { name: "Cobrar" })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Ver los 353 documentos/ })).toBeNull();
-    expect(screen.queryByText(/Ver en Cuentas por Cobrar/)).toBeNull();
+    // 1-oct-2026, Daniel: nombres normales de ERP
+    expect(screen.queryByRole("button", { name: "Enviar estado de cuenta" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Estado de cuenta \(353\)/ })).toBeNull();
+    expect(screen.queryByText(/Ver en Cuentas por cobrar/)).toBeNull();
     expect(screen.queryByText(/Ver en Ventas/)).toBeNull();
     // Pero la ficha se ve entera: es su gracia.
     expect(screen.getByText("City Mall Paso Canoa")).toBeTruthy();
@@ -308,7 +311,7 @@ describe("6 · el pie: enlaces, no botones", () => {
   it("🔴 el vendedor ve Cobrar pero NO «Ver en Ventas»", () => {
     ROL = "vendedor";
     pintar();
-    expect(screen.getByRole("button", { name: "Cobrar" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Enviar estado de cuenta" })).toBeTruthy();
     expect(screen.queryByText(/Ver en Ventas/)).toBeNull();
   });
 });
@@ -317,14 +320,15 @@ describe("6 · el pie: enlaces, no botones", () => {
 describe("7 · «Cobrar» abre la MISMA hoja del CXC, sin salir de la ficha", () => {
   it("al tocarlo aparece la hoja «Cobrar» con sus cuatro salidas", async () => {
     pintar();
-    fireEvent.click(screen.getByRole("button", { name: "Cobrar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Enviar estado de cuenta" }));
+    // 1-oct-2026, Daniel: nombres normales de ERP: la hoja se titula «Enviar estado de cuenta».
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Cobrar" })).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Enviar estado de cuenta" })).toBeTruthy();
     });
     // ⚠️ Se busca DENTRO de la hoja: «Correo» también es el rótulo del bloque
     // de contacto de la ficha, que sigue debajo.
-    const hoja = screen.getByRole("heading", { name: "Cobrar" }).closest("div")!.parentElement!;
-    for (const salida of ["Correo", "WhatsApp", "Copiar el mensaje", "Ver o bajar el PDF"]) {
+    const hoja = screen.getByRole("heading", { name: "Enviar estado de cuenta" }).closest("div")!.parentElement!;
+    for (const salida of ["Correo", "WhatsApp", "Copiar mensaje", "Descargar PDF"]) {
       expect(hoja.textContent, salida).toContain(salida);
     }
     // Y NO se navegó a otra pantalla.

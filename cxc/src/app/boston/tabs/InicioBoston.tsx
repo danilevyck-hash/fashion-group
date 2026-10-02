@@ -90,27 +90,27 @@ export default function InicioBoston({ onIr }: { onIr: (t: TabBoston) => void })
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
         <Tarjeta
-          titulo="Por cobrar"
+          titulo="Cuentas por cobrar"
           valor={isLoading ? "—" : `$${fmt(c?.total ?? 0)}`}
           pie={isLoading ? "cargando…" : `${c?.clientes ?? 0} clientes`}
           onIr={() => onIr("cxc")}
         />
         <Tarjeta
-          titulo={`Vendido en ${mesNombre || "el mes"}`}
+          titulo={`Ventas de ${mesNombre || "el mes"}`}
           valor={isLoading ? "—" : `$${fmt(data?.ventas.mes ?? 0)}`}
           pie={isLoading ? "cargando…" : `$${fmt(data?.ventas.anio ?? 0)} en ${data?.anio ?? ""}`}
           onIr={() => onIr("ventas")}
         />
         <Tarjeta
-          titulo="En planilla"
+          titulo="Colaboradores activos"
           valor={isLoading ? "—" : String(data?.planilla.personas ?? 0)}
-          pie="personas activas"
+          pie="en planilla"
           onIr={() => onIr("planilla")}
         />
         <Tarjeta
-          titulo="Con préstamo"
+          titulo="Colaboradores con préstamo"
           valor={isLoading ? "—" : String(data?.prestamos.personas ?? 0)}
-          pie="personas de Boston"
+          pie="de Confecciones Boston"
           onIr={() => onIr("prestamos")}
         />
       </div>
@@ -119,7 +119,7 @@ export default function InicioBoston({ onIr }: { onIr: (t: TabBoston) => void })
           Los mismos tres tramos y los mismos cortes que la pestaña CXC. */}
       {c && (
         <div className="mt-3 rounded-xl border border-gray-200 bg-white p-4">
-          <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Cómo está la cartera</p>
+          <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Antigüedad de saldos</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
             <p className="flex items-baseline justify-between gap-2">
               <span className="text-emerald-600">Al día (0-90)</span>

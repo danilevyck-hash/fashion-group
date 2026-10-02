@@ -426,7 +426,7 @@ function Coincidencias({
 }) {
   return (
     <div className="mt-4 rounded-xl border border-gray-200 bg-white p-3.5">
-      <p className="mb-2 text-sm text-gray-700">Elige el modelo:</p>
+      <p className="mb-2 text-sm text-gray-700">Selecciona el modelo:</p>
       <div className="flex flex-col gap-1.5">
         {items.map((c) => (
           <button

@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «N° de factura», «Subtotal».
 /**
  * ─────────────────────────────────────────────────────────────────────────────
  * CAJA — EL PAPEL QUE SE FIRMA PASA DE OCHO COLUMNAS A CINCO (20-sep-2026).
@@ -48,7 +49,7 @@ const encabezados = (doc: HTMLElement) =>
 describe("🔴 CINCO COLUMNAS CUANDO NO HAY NOTAS NI ITBMS", () => {
   it("el papel del período Nº3 sale con Fecha · Proveedor · Categoría · N° Factura · Total", () => {
     const doc = montar(P3);
-    expect(encabezados(doc)).toEqual(["Fecha", "Proveedor", "Categoría", "N° Factura", "Total"]);
+    expect(encabezados(doc)).toEqual(["Fecha", "Proveedor", "Categoría", "N° de factura", "Total"]);
   });
 
   it("🩸 no se dibuja la columna de la NOTA…", () => {
@@ -58,7 +59,7 @@ describe("🔴 CINCO COLUMNAS CUANDO NO HAY NOTAS NI ITBMS", () => {
 
   it("🩸 …ni Sub-total ni ITBMS, que repetían el Total en las 26 filas", () => {
     const doc = montar(P3);
-    expect(within(doc).queryByText("Sub-total")).toBeNull();
+    expect(within(doc).queryByText("Subtotal")).toBeNull();
     expect(within(doc).queryByText("ITBMS")).toBeNull();
     // El total sigue estando, una sola vez y con el número de siempre.
     expect(doc.textContent).toContain("$15.59");
@@ -82,7 +83,7 @@ describe("🔴 CONTROL: la columna vuelve sola cuando hay dato", () => {
       caja_gastos: [{ ...GASTOS_P3[0], itbms: 0.74, total: 11.33 }, GASTOS_P3[1]],
     };
     const doc = montar(conItbms);
-    expect(encabezados(doc)).toEqual(["Fecha", "Proveedor", "Categoría", "N° Factura", "Sub-total", "ITBMS", "Total"]);
+    expect(encabezados(doc)).toEqual(["Fecha", "Proveedor", "Categoría", "N° de factura", "Subtotal", "ITBMS", "Total"]);
   });
 
   it("la regla, en el módulo puro", () => {

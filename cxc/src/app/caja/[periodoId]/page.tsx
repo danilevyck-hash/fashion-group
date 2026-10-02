@@ -68,7 +68,7 @@ export default function PeriodoDetailPage() {
   if (!current) {
     return (
       <div>
-        <AppHeader module="Caja Menuda" breadcrumbs={[{ label: "Cargando..." }]} />
+        <AppHeader module="Caja menuda" breadcrumbs={[{ label: "Cargando..." }]} />
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
           <div className="h-48 bg-gray-100 rounded-lg animate-pulse" />
         </div>
@@ -88,7 +88,7 @@ export default function PeriodoDetailPage() {
   return (
     <div>
       <AppHeader
-        module="Caja Menuda"
+        module="Caja menuda"
         breadcrumbs={[{ label: `Período N°${current.numero}` }]}
       />
       <div className="skin-caja min-h-screen">

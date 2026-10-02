@@ -55,15 +55,17 @@ describe("🔴 UN CERO GRANDE SE LEE COMO DATO ROTO", () => {
     expect(t.frase).toBe("Sin comprar en 2026");
   });
 
-  it("sin deber, la tarjeta dice «No debe nada»", () => {
+  // 1-oct-2026, Daniel: nombres normales de ERP («No debe nada» → «Sin saldo»).
+  it("sin deber, la tarjeta dice «Sin saldo»", () => {
     const t = tarjetaDebe(0, 500_000);
     expect(t.monto).toBeNull();
-    expect(t.frase).toBe("No debe nada");
+    expect(t.frase).toBe("Sin saldo");
     expect(t.proporcion).toBeNull();
   });
 
-  it("sin pagos, «Nunca ha pagado»; sin compras, «Sin compras registradas»", () => {
-    expect(tarjetaDeFecha(null, "2026-09-05", "", SIN_PAGOS_NUNCA, null).frase).toBe("Nunca ha pagado");
+  // 1-oct-2026, Daniel: nombres normales de ERP («Nunca ha pagado» → «Sin pagos»).
+  it("sin pagos, «Sin pagos»; sin compras, «Sin compras registradas»", () => {
+    expect(tarjetaDeFecha(null, "2026-09-05", "", SIN_PAGOS_NUNCA, null).frase).toBe("Sin pagos");
     expect(tarjetaDeFecha(null, "2026-09-05", "", SIN_COMPRAS_NUNCA).frase).toBe("Sin compras registradas");
   });
 
@@ -294,7 +296,7 @@ describe("🔴 LOS CONTEOS DE LOS CHIPS SE CALCULAN, NUNCA SE ESCRIBEN A MANO", 
 
   it("las etiquetas son las que decidió Daniel", () => {
     expect(contarChips([]).map((c) => c.etiqueta)).toEqual([
-      "Todos", "Sin cómo contactarlos", "Sin correo", "Sin teléfono", "Deben",
+      "Todos", "Sin cómo contactarlos", "Sin correo", "Sin teléfono", "Con saldo", /* 1-oct-2026, Daniel: nombres normales de ERP */
     ]);
   });
 

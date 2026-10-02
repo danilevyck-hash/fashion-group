@@ -78,12 +78,17 @@ describe("🔴 la lista ya no vive en el navegador", () => {
   });
 
   it("el formulario pide la lista al servidor", () => {
-    expect(form).toContain('fetch("/api/guias/despachadores"');
-    expect(form).toContain("listaParaElDesplegable");
+    // 🔄 1-oct-2026: la lectura se mudó a `useDespachadores`, que comparten el
+    // formulario (interruptor apagado) y el DESPACHO, donde hoy se elige.
+    const hook = leer("src/app/guias/components/useDespachadores.ts");
+    expect(hook).toContain('fetch("/api/guias/despachadores"');
+    expect(hook).toContain("listaParaElDesplegable");
+    expect(form).toContain("useDespachadores(");
+    expect(leer("src/app/guias/components/DespachoForm.tsx")).toContain("useDespachadores(");
   });
 
   it("⚠️ y FALLA ABIERTA: sin la tabla, los cuatro de siempre", () => {
-    expect(form).toContain("DESPACHADORES_BASE");
+    expect(leer("src/app/guias/components/useDespachadores.ts")).toContain("DESPACHADORES_BASE");
     expect(server).toContain("return [...DESPACHADORES_BASE];");
     expect([...DESPACHADORES_BASE]).toEqual(["Julio", "Rodrigo", "Eloyn", "Jorman"]);
     // La semilla de la migración son ESOS CUATRO y ninguno más.
@@ -110,11 +115,17 @@ describe("🔴 en la guía quedó SOLO el desplegable", () => {
     expect(form).toContain("nombreDespachadoPor");
   });
 
-  it("el campo sigue siendo OBLIGATORIO", () => {
+  it("el campo sigue siendo OBLIGATORIO — ahora AL DESPACHAR", () => {
+    // 🔄 1-oct-2026: Daniel aprobó (sobre el mockup) sacar «Despachado por» de la
+    // creación de la guía y pedirlo al DESPACHAR. Este candado fijaba lo viejo
+    // y se reescribe a propósito: guardar la guía YA NO lo exige; el despacho
+    // sí (`faltaParaDespachar` y el PUT que completa, ver
+    // `guias-nueva-guia-2026-10.test.ts`).
     expect(form).toContain('label="Despachado por" requerido');
     expect(leer("src/app/guias/components/guia-form-logic.ts")).toContain(
-      "if (!entregadoPorElegido(estado.entregadoPor)) errores.add(\"entregadoPor\");",
+      "if (!GUIA_NUEVA_2026_10 && !entregadoPorElegido(estado.entregadoPor)) errores.add(\"entregadoPor\");",
     );
+    expect(leer("src/lib/guias/falta-para-despachar.ts")).toContain('falta.push("despachado por")');
   });
 });
 

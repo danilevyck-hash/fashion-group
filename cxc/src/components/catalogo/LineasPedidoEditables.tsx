@@ -92,7 +92,7 @@ export default function LineasPedidoEditables({
               </div>
               <div className="text-right text-xs tabular-nums">
                 <span className="text-gray-400">{l.piezas} pzas</span>
-                {l.is_preorder && <span className="ml-2 text-amber-700 font-medium">preventa</span>}
+                {l.is_preorder && <span className="ml-2 text-amber-700 font-medium">Preventa</span>}
               </div>
             </div>
           </div>

@@ -74,7 +74,7 @@ import { CHIP_SIN_MANDAR, esSinMandar } from "./sin-mandar";
 export type VistaComprobante = FiltroComprobante | "sin_mandar";
 
 /** El rótulo chico del segundo grupo. */
-export const ROTULO_GRUPO_VISTA = "Qué es";
+export const ROTULO_GRUPO_VISTA = "Tipo";
 
 /** La llave del chip que filtra los que se quedaron trabados. */
 export const VISTA_SIN_MANDAR: VistaComprobante = "sin_mandar";

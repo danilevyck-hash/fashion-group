@@ -282,7 +282,7 @@ describe("🔴 1b · la pantalla /boston dibuja dos pestañas y el rótulo nuevo
     render(<BostonShell />);
     await waitFor(() => {
       const barra = document.querySelector('[data-pestanas="boston"]');
-      expect([...barra!.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Inicio", "Por cobrar", "Ventas"]);
+      expect([...barra!.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Inicio", "CxC", "Ventas"]); // 1-oct-2026, Daniel: nombres normales de ERP
     });
   });
 });
@@ -405,8 +405,9 @@ describe("🔴 2c · el DOM de la cartera de Boston: saldo a favor y sin pagar +
     expect(texto).toContain("Cliente A Favor");
     // 2 sin pagar hace +90 d: Aladdin (2024) y Panda Store (nunca pagó).
     expect(texto).toContain("2 sin pagar hace +90 d");
-    expect(texto).toContain("nunca ha pagado");
-    expect(texto).toMatch(/no paga hace \d+ d/);
+    // 1-oct-2026, Daniel: nombres normales de ERP («nunca ha pagado» → «Sin pagos»).
+    expect(texto).toContain("Sin pagos");
+    expect(texto).toMatch(/Último pago: hace \d+ d/);
     // Cero lecturas del grupo.
     const urls = fetchMock.mock.calls.map((c) => String(c[0]));
     expect(urls.some((u) => u.startsWith("/api/cxc/boston"))).toBe(true);

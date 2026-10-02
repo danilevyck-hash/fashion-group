@@ -21,6 +21,7 @@
 
 import { useEffect, useState } from "react";
 import { SkeletonTable } from "@/components/ui";
+import { etiquetaDeRol } from "@/lib/roles-etiquetas";
 import type { VisitaDeModulo, VisitaDePersona } from "@/lib/visitas/resumen";
 
 interface Respuesta {
@@ -128,17 +129,17 @@ export default function VisitasTab() {
 
       {datos.personas.length > 0 && (
         <section>
-          <h2 className="mb-2 text-sm font-medium text-gray-900">Persona por persona</h2>
+          <h2 className="mb-2 text-sm font-medium text-gray-900">Por usuario</h2>
           <div className="overflow-x-auto rounded-lg border border-gray-200">
             <table className="w-full min-w-[34rem] text-sm">
               <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs text-gray-500">
                 <tr>
                   <th className="px-3 py-2 font-medium">Módulo</th>
-                  <th className="px-3 py-2 font-medium">Persona</th>
+                  <th className="px-3 py-2 font-medium">Usuario</th>
                   <th className="px-3 py-2 font-medium">Rol</th>
                   <th className="px-3 py-2 text-right font-medium">Visitas</th>
-                  <th className="px-3 py-2 font-medium">Desde</th>
-                  <th className="px-3 py-2 font-medium">Última vez</th>
+                  <th className="px-3 py-2 font-medium">Dispositivo</th>
+                  <th className="px-3 py-2 font-medium">Último acceso</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -146,7 +147,7 @@ export default function VisitasTab() {
                   <tr key={`${p.modulo}-${p.userId}`}>
                     <td className="px-3 py-2 text-gray-900">{p.moduloLabel}</td>
                     <td className="px-3 py-2 text-gray-900">{p.nombre}</td>
-                    <td className="px-3 py-2 text-gray-600">{p.rol}</td>
+                    <td className="px-3 py-2 text-gray-600">{etiquetaDeRol(p.rol)}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-gray-900">{p.visitas}</td>
                     <td className="px-3 py-2 text-gray-600">{dondeEntra(p.celular, p.computadora)}</td>
                     <td className="px-3 py-2 text-gray-600">{cuandoFue(p.ultimaEn)}</td>

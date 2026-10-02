@@ -70,6 +70,7 @@ import {
   textoUltimoContacto,
   ultimoContactoPorCliente,
 } from "@/lib/multifashion/contacto-registro";
+// 1-oct-2026, Daniel: nombres normales de ERP («tiquetes» → «tickets», «Cierra en» → «Proyección de cierre», «Cuándo vende la tienda» → «Ventas por día y hora», «Lo que más…» → «Más vendidos / Mayor utilidad / Mayores variaciones», «Dormidos» → «Inactivos», «Compró/Veces» → «Total compras/Visitas»).
 
 const raiz = path.resolve(__dirname, "../../..");
 const leer = (rel: string) => readFileSync(path.join(raiz, rel), "utf8");
@@ -515,8 +516,8 @@ describe("7 · el renglón", () => {
 
   it("tocar el nombre abre su ficha: cuánto compró, cuántas veces y la fecha", () => {
     const src = plano(lista);
-    expect(src).toContain('rotulo="Compró"');
-    expect(src).toContain('rotulo="Veces"');
+    expect(src).toContain('rotulo="Total compras"');
+    expect(src).toContain('rotulo="Visitas"');
     expect(src).toContain('rotulo="Última compra"');
   });
 });
@@ -644,7 +645,7 @@ describe("9 · `multifashion_contactos`", () => {
 
 describe("10 · lo que el encargo dice NO tocar", () => {
   it("🔴 las CUATRO tarjetas siguen ahí, con sus mismos rótulos", () => {
-    for (const r of ["Frecuentes", "Nuevos del mes", "Dormidos", "5% pendiente"]) {
+    for (const r of ["Frecuentes", "Nuevos del mes", "Inactivos", "Descuento 5% pendiente"]) {
       expect(pestana).toContain(`label="${r}"`);
     }
   });
@@ -667,7 +668,7 @@ describe("10 · lo que el encargo dice NO tocar", () => {
 
   it("🔴 la línea de cobertura y el bucket anónimo siguen en la pestaña", () => {
     expect(pestana).toContain("Mostrador anónimo va aparte");
-    expect(pestana).toContain("Anónimos (mostrador)");
+    expect(pestana).toContain("Consumidor final");
   });
 
   it("🔴 Mayoreo conserva su tabla ancha y sus tarjetas", () => {

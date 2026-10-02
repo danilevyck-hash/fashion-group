@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «PO» → «N° de pedido» en pantalla.
 // ─────────────────────────────────────────────────────────────────────────────
 // Depurador, Reclamos y Data Health entran en iPhone y en iPad (30-jul-2026).
 //
@@ -167,7 +168,7 @@ describe("Reclamos › Detalle — PRECIO y SUBTOTAL dejan de quedar fuera", () 
   it("la tarjeta muestra las 10 columnas de la tabla, incluidas las que se perdían", () => {
     const src = leer(RECLAMO_DETALLE);
     const tarjetas = src.slice(src.indexOf('data-vista="tarjetas"'), src.indexOf('data-vista="tabla"'));
-    for (const campo of ["Subtotal", "Cant.", "Precio", "Talla", "Género", "Motivo", "Factura", "PO"]) {
+    for (const campo of ["Subtotal", "Cant.", "Precio", "Talla", "Género", "Motivo", "Factura", "N° de pedido"]) {
       expect(tarjetas).toContain(campo);
     }
     expect(tarjetas).toContain("item.referencia");

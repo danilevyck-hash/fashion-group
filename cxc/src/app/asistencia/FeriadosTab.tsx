@@ -71,9 +71,9 @@ export default function FeriadosTab() {
   async function borrar(f: string) {
     try {
       const res = await fetch(`/api/asistencia/feriados?fecha=${f}`, { method: "DELETE" });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo borrar");
+      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo eliminar");
       await cargar();
-    } catch (e) { toast(e instanceof Error ? e.message : "No se pudo borrar", "error"); }
+    } catch (e) { toast(e instanceof Error ? e.message : "No se pudo eliminar", "error"); }
   }
 
   const campo = "min-h-[44px] w-full rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm";
@@ -104,7 +104,7 @@ export default function FeriadosTab() {
             <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className={campo} />
           </div>
           <div className="min-w-[200px] flex-1">
-            <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">Qué es</label>
+            <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">Descripción</label>
             <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)}
               placeholder="Cierre por inventario" className={campo} />
           </div>
@@ -148,11 +148,11 @@ export default function FeriadosTab() {
                   <span className={`w-[5.5rem] shrink-0 tabular-nums ${paso ? "" : "text-gray-500"}`}>{corta(f.fecha)}</span>
                   <span className="truncate">{f.nombre}</span>
                   {libre && (
-                    <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[12px] text-gray-500">debe las horas</span>
+                    <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[12px] text-gray-500">Horas por reponer</span>
                   )}
                 </div>
                 {paso ? (
-                  <span className="shrink-0 px-2 text-[13px] text-gray-400">pasó</span>
+                  <span className="shrink-0 px-2 text-[13px] text-gray-400">Pasado</span>
                 ) : (
                   <div className="flex shrink-0">
                     {/* 🔴 Cambiar el tipo es el MISMO upsert (30-sep-2026). */}

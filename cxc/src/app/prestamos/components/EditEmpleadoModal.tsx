@@ -54,19 +54,19 @@ export default function EditEmpleadoModal({
         <h2 className="font-medium mb-4">Editar ficha</h2>
         <div className="space-y-4">
           <div>
-            <label className="text-xs text-gray-400 uppercase">Persona (de Asistencia)</label>
+            <label className="text-xs text-gray-400 uppercase">Colaborador</label>
             <select
               value={fCodigo}
               onChange={e => onChangeCodigo(e.target.value)}
               className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent"
             >
-              <option value="">Sin atar</option>
+              <option value="">Sin vincular</option>
               {colaboradores.map(c => (
                 <option key={c.codigo} value={c.codigo}>{c.nombre} — {c.empresaNombre ?? "Sin empresa"}</option>
               ))}
             </select>
             <p className="mt-1 text-xs text-gray-400">
-              El nombre y la empresa salen de aquí. Sin persona atada, la planilla no le descuenta la cuota.
+              El nombre y la empresa salen de aquí. Sin colaborador vinculado, la planilla no le descuenta la cuota.
             </p>
           </div>
           <div>
@@ -98,7 +98,7 @@ export default function EditEmpleadoModal({
         <div className="flex gap-3 mt-6">
           <button onClick={onClose} className="flex-1 inline-flex min-h-[44px] items-center justify-center border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
           <button onClick={onSave} disabled={saving} className="flex-1 inline-flex min-h-[44px] items-center justify-center bg-black text-white rounded-md text-sm hover:bg-gray-800 transition disabled:opacity-50">
-            {saving ? "Guardando..." : "Guardar Cambios"}
+            {saving ? "Guardando..." : "Guardar cambios"}
           </button>
         </div>
       </div>

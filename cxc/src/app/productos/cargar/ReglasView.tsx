@@ -132,18 +132,18 @@ export default function ReglasView() {
     <div className="mx-auto max-w-4xl px-4 py-6">
       {/* ── 1 · Cómo se elige la talla ─────────────────────────────────────── */}
       <section className="mb-8">
-        <h3 className="mb-2 text-[13px] font-bold uppercase tracking-wide text-teal-800">Cómo se elige la talla</h3>
+        <h3 className="mb-2 text-[13px] font-bold uppercase tracking-wide text-teal-800">Reglas de talla</h3>
         <p className="mb-3 text-[13px] text-stone-500">
           Cada estilo colapsa a una fila y el código de barra que se sube a Switch es el de esta talla.
           Si la talla esperada no existe, se usa la más chica y la fila queda marcada en ámbar para revisar.
         </p>
         <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-          <table className="w-full border-collapse text-[13px]" aria-label="Cómo se elige la talla">
+          <table className="w-full border-collapse text-[13px]" aria-label="Reglas de talla">
             <thead>
               <tr>
                 <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Caso</th>
-                <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Cómo se detecta</th>
-                <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Talla elegida</th>
+                <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Criterio</th>
+                <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Talla asignada</th>
               </tr>
             </thead>
             <tbody>
@@ -288,14 +288,14 @@ export default function ReglasView() {
         {correccionesFiltradas.length > 0 && (
           <div className="mt-6">
             <div className="mb-2 text-[12px] font-bold uppercase tracking-wide text-teal-800">
-              Nombres que se corrigen solos ({correcciones.length})
+              Correcciones automáticas ({correcciones.length})
             </div>
             <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-              <table className="w-full border-collapse text-[13px]" aria-label="Nombres que se corrigen solos">
+              <table className="w-full border-collapse text-[13px]" aria-label="Correcciones automáticas">
                 <thead>
                   <tr>
-                    <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Como lo manda el proveedor</th>
-                    <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Como sale al Excel</th>
+                    <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Nombre del proveedor</th>
+                    <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Nombre en plantilla</th>
                   </tr>
                 </thead>
                 <tbody>

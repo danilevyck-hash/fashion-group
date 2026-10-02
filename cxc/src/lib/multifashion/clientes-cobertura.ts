@@ -3,7 +3,7 @@
 //
 // Daniel pidió medirlo y ponerlo arriba, en UNA línea:
 //
-//     19% de los tiquetes con nombre — el 27% de la venta
+//     19% de los tickets con nombre — el 27% de la venta
 //
 // (medido para agosto 2026: 224 de 1.152 tiquetes y $14.287,83 de $53.148,61).
 // Es la primera cosa que hay que saber antes de leer el ranking: el mostrador
@@ -57,7 +57,7 @@ export function coberturaDeClientes(r: CoberturaEntrada | null | undefined): Cob
   const texto =
     pctTickets == null || pctVentas == null
       ? null
-      : `${pctTickets}% de los tiquetes con nombre — el ${pctVentas}% de la venta`;
+      : `${pctTickets}% de los tickets con nombre — el ${pctVentas}% de la venta`;
 
   return { pctTickets, pctVentas, ticketsConNombre: tIdent, ticketsTotal, texto };
 }

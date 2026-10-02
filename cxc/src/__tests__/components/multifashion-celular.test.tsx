@@ -51,6 +51,7 @@ import { MultifashionView } from "@/components/multifashion/MultifashionView";
 import { VendedorasSubtab } from "@/components/multifashion/VendedorasSubtab";
 import type { MetaConAvance } from "@/lib/multifashion/metas-lectura";
 import type { Periodo } from "@/lib/multifashion/periodo";
+// 1-oct-2026, Daniel: nombres normales de ERP («tiquetes» → «tickets», «Cierra en» → «Proyección de cierre», «Cuándo vende la tienda» → «Ventas por día y hora», «Lo que más…» → «Más vendidos / Mayor utilidad / Mayores variaciones», «Dormidos» → «Inactivos», «Compró/Veces» → «Total compras/Visitas»).
 
 const raiz = process.cwd();
 const leer = (rel: string) => readFileSync(path.join(raiz, rel), "utf8");
@@ -169,8 +170,8 @@ describe("1 · el interruptor y los números del celular", () => {
       clave: "anio", titulo: "Año 2026", detalle: "retail · cierra en $756,974",
       monto: "$391,232", delta: { texto: "▲ 16 %", tono: "sube" },
     });
-    expect(r[1]).toMatchObject({ titulo: "Vendedoras", detalle: "4 · 690 tiquetes", monto: "$32,649" });
-    expect(r[2]).toMatchObject({ titulo: "Productos", detalle: "1,237 piezas · deja $10,492", monto: "margen 32 %" });
+    expect(r[1]).toMatchObject({ titulo: "Vendedoras", detalle: "4 · 690 tickets", monto: "$32,649" });
+    expect(r[2]).toMatchObject({ titulo: "Productos", detalle: "1,237 unidades · utilidad $10,492", monto: "margen 32 %" });
     expect(r[3]).toMatchObject({ titulo: "Clientes", detalle: "99 frecuentes · 723 no vuelven", monto: null });
   });
 
@@ -198,15 +199,15 @@ describe("1 · el interruptor y los números del celular", () => {
     expect(contraDeVendedoras("vs agosto 2025", 2026)).toBe("agosto 2025");
     expect(contraDeVendedoras(null, 2026)).toBeNull();
     expect(subtituloVendedoras({ ventas: 32649.26, tiquetes: 690, rotuloDelta: "vs agosto 2026", anio: 2026, parcial: true }))
-      .toBe("$32,649 · 690 tiquetes · contra agosto, mismos días");
+      .toBe("$32,649 · 690 tickets · contra agosto, mismos días");
     expect(subtituloVendedoras({ ventas: 32649.26, tiquetes: 690, rotuloDelta: "vs agosto 2026", anio: 2026, parcial: false }))
-      .toBe("$32,649 · 690 tiquetes · contra agosto");
+      .toBe("$32,649 · 690 tickets · contra agosto");
     // El desglose ya llega con el nombre adelante y «Redes» en mayúscula
     // (24-sep-2026); acá solo se recortan los centavos.
     expect(lineaVendedora({ desglose: "Sheynee $11,419.55 · Redes $135.65", tiquetes: 263, ticketPromedio: 43.94, gerente: false }))
-      .toBe("Sheynee $11,420 · Redes $136 · 263 tiquetes");
+      .toBe("Sheynee $11,420 · Redes $136 · 263 tickets");
     expect(lineaVendedora({ desglose: null, tiquetes: 101, ticketPromedio: 67.21, gerente: true }))
-      .toBe("gerente · 101 tiquetes · $67.21 promedio");
+      .toBe("gerente · 101 tickets · $67.21 promedio");
     expect(detalleVendedora({ comision: 56.71, ticketPromedio: 43.94 }))
       .toBe("Comisión $56.71 · tiquete promedio $43.94");
   });
@@ -397,9 +398,9 @@ describe("2 · al abrir: el mes es el número", () => {
     expect(filas[0].textContent).toContain("retail · cierra en $756,974");
     expect(filas[0].textContent).toContain("$391,232");
     expect(filas[0].textContent).toContain("▲ 16 %");
-    expect(await screen.findByText("4 · 690 tiquetes")).toBeTruthy();
+    expect(await screen.findByText("4 · 690 tickets")).toBeTruthy();
     expect(filas[1].textContent).toContain("$32,649");
-    expect(await screen.findByText("1,237 piezas · deja $10,492")).toBeTruthy();
+    expect(await screen.findByText("1,237 unidades · utilidad $10,492")).toBeTruthy();
     expect(filas[2].textContent).toContain("margen 32 %");
     expect(await screen.findByText("99 frecuentes · 723 no vuelven")).toBeTruthy();
   });
@@ -494,11 +495,11 @@ describe("4 · Vendedoras en el celular", () => {
     expect(filas.map((f) => f.getAttribute("data-vendedora")))
       .toEqual(["SHEYNEE BATISTA", "JAILINE", "MILAGROS TORRES", "JENNIFER MIRANDA"]);
     // 🔴 El rótulo es el PRIMER nombre de la vendedora, no «tienda» (24-sep-2026).
-    expect(filas[0].textContent).toContain("Sheynee $11,420 · Redes $136 · 263 tiquetes");
+    expect(filas[0].textContent).toContain("Sheynee $11,420 · Redes $136 · 263 tickets");
     expect(filas[0].textContent).toContain("$11,555");
     expect(filas[0].textContent).toContain("▼ 12 %");
-    expect(filas[1].textContent).toContain("165 tiquetes · $45.13 promedio");
-    expect(filas[3].textContent).toContain("gerente · 101 tiquetes");
+    expect(filas[1].textContent).toContain("165 tickets · $45.13 promedio");
+    expect(filas[3].textContent).toContain("gerente · 101 tickets");
     expect(filas[3].textContent).toContain("▲ 39 %");
     // Las demás NO llevan desglose de canal: no se inventa una línea vacía.
     expect(filas[1].textContent).not.toContain("Redes ");
@@ -508,7 +509,7 @@ describe("4 · Vendedoras en el celular", () => {
   it("el subtítulo y la comisión a un toque", async () => {
     const { container } = await pintarVendedoras();
     expect(container.querySelector('[data-celular="vendedoras-subtitulo"]')!.textContent)
-      .toBe("$32,649 · 690 tiquetes · contra agosto, mismos días");
+      .toBe("$32,649 · 690 tickets · contra agosto, mismos días");
     expect(container.querySelector('[data-celular="vendedora-detalle"]')).toBeNull();
     fireEvent.click(container.querySelector('[data-vendedora="SHEYNEE BATISTA"]')!);
     expect(container.querySelector('[data-celular="vendedora-detalle"]')!.textContent)

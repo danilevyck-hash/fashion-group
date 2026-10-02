@@ -217,7 +217,7 @@ describe("«Dejó de venderse» — lo que el año pasado vendía y este año no
     await screen.findAllByText("Women-Flip Flops");
     const bloque = document.querySelector("[data-dejo-de-venderse]")!;
     expect(bloque, "el bloque no se dibujó").toBeTruthy();
-    expect(bloque.textContent).toContain("Dejó de venderse");
+    expect(bloque.textContent).toContain("Sin ventas en el período"); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(bloque.textContent).toContain("2 descripciones");
     // 22.400 + 3.100 — la plata que este período no entró por esos productos.
     expect(bloque.textContent).toContain("$25,500.00");

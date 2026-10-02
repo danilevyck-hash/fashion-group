@@ -365,7 +365,8 @@ describe("Reporte — la metodología al ⓘ, el estado del reloj en pantalla", 
     // 🔴 A la vista: ni escondido por el «···», ni detrás de un toque.
     expect(aviso.closest("[hidden]")).toBeNull();
     // Y «Traer ahora» sigue al lado, que es lo que se hace con ese aviso.
-    expect(screen.getAllByRole("button", { name: /Traer ahora/ }).length).toBeGreaterThan(0);
+    // 1-oct-2026, Daniel: nombres normales de ERP («name: /Traer ahora/» → «name: /Sincronizar/»).
+    expect(screen.getAllByRole("button", { name: /Sincronizar/ }).length).toBeGreaterThan(0);
   });
 
   it("🔴 «de los N tarde, M vienen de días sin las 4 marcas» se queda al abrir la fila", async () => {
@@ -538,7 +539,8 @@ describe("Configuración — metodología al ⓘ, pendientes y bajas en pantalla
     await abrirConfiguracion();
     abrirFicha();
     esperaDetrasDelInfo(
-      "Empezó a trabajar",
+      // 1-oct-2026, Daniel: nombres normales de ERP («      "Empezó a trabajar",» → «      "Fecha de ingreso",»).
+      "Fecha de ingreso",
       /El sueldo de la quincena no se reparte por días/,
     );
   });
@@ -557,7 +559,8 @@ describe("Configuración — metodología al ⓘ, pendientes y bajas en pantalla
       /Sigue apareciendo entera en las quincenas en que trabajó/,
     );
     esperaDetrasDelInfo(
-      "¿Por qué salió?",
+      // 1-oct-2026, Daniel: nombres normales de ERP («      "¿Por qué salió?",» → «      "Motivo de salida",»).
+      "Motivo de salida",
       /La planilla se calcula igual en los tres casos/,
     );
   });
@@ -566,9 +569,10 @@ describe("Configuración — metodología al ⓘ, pendientes y bajas en pantalla
     await abrirConfiguracion();
     fireEvent.click(screen.getByText("Reglas del cálculo"));
     // La ETIQUETA que reemplazó a «Divisores» sigue a la vista, sin tocar nada.
-    expect(screen.getByText("Horas que se trabajan al mes")).toBeTruthy();
+    // 1-oct-2026, Daniel: nombres normales de ERP («"Horas que se trabajan al mes"» → «"Horas mensuales"»).
+    expect(screen.getByText("Horas mensuales")).toBeTruthy();
     esperaDetrasDelInfo(
-      "Horas que se trabajan al mes",
+      "Horas mensuales",
       /El salario mensual se divide entre estas horas/,
     );
   });
@@ -642,9 +646,11 @@ describe("Configuración — metodología al ⓘ, pendientes y bajas en pantalla
 
   it("🔴 la lista de «ya no trabajan aquí» conserva el nombre, el motivo y el botón de reactivar", async () => {
     await abrirConfiguracion();
-    const detalle = screen.getByText(/Ya no trabajan aquí/).closest("details")!;
+    // 1-oct-2026, Daniel: nombres normales de ERP («getByText(/Ya no trabajan aquí/)» → «getByText(/Inactivos (/)»).
+    const detalle = screen.getByText(/Inactivos \(/).closest("details")!;
     expect(within(detalle).getByText(/Renunció el 31 de julio de 2026/)).toBeTruthy();
-    expect(within(detalle).getByRole("button", { name: "Volvió a trabajar aquí" })).toBeTruthy();
+    // 1-oct-2026, Daniel: nombres normales de ERP («{ name: "Volvió a trabajar aquí" }» → «{ name: "Reactivar" }»).
+    expect(within(detalle).getByRole("button", { name: "Reactivar" })).toBeTruthy();
     esperaDetrasDelInfo(
       "Qué pasa con quien ya no trabaja aquí",
       /Sigue apareciendo entera en las quincenas en que trabajó/,

@@ -117,7 +117,7 @@ export default function PeriodoList({
           y el breadcrumb (escritorio). Queda sr-only para no dejar la página sin
           encabezado. Sin bajada NO queda un hueco: el bloque de arriba se fue
           entero y el botón se acomoda solo a la derecha. */}
-      <h1 className="sr-only">Caja Menuda</h1>
+      <h1 className="sr-only">Caja menuda</h1>
       {!hasOpenPeriod && (
         <div className="flex justify-end mb-5">
           <button

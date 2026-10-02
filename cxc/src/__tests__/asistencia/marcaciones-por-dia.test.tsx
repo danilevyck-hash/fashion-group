@@ -273,7 +273,8 @@ describe("🔴 2 · agrupado por día, una fila por colaborador", () => {
 
     expect(screen.getByText("vie 25 sep")).toBeTruthy();
     expect(screen.getByText("jue 24 sep")).toBeTruthy();
-    expect([...COLUMNAS_POR_DIA]).toEqual(["Colaborador", "Sus marcas del día", "Lugar"]);
+    // 1-oct-2026, Daniel: nombres normales de ERP («["Colaborador", "Sus marcas del día", "Lugar"]» → «["Colaborador", "Marcaciones", "Lugar"]»).
+    expect([...COLUMNAS_POR_DIA]).toEqual(["Colaborador", "Marcaciones", "Lugar"]);
     // ⚠️ 29-sep-2026 (26a): cada día tiene UNA fila, su lugar sube a la fecha y
     // la columna «Lugar» no se dibuja. Las otras dos, sí.
     for (const c of COLUMNAS_POR_DIA.slice(0, 2)) {

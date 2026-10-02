@@ -503,3 +503,41 @@ export const TEXTO_TRASLADO = "Traslado";
 export function esTraslado(v: string | null | undefined): boolean {
   return (v ?? "").trim().toLowerCase() === TEXTO_TRASLADO.toLowerCase();
 }
+
+// ─── «+ Agregar sin etiquetas» (1-oct-2026) ──────────────────────────────────
+
+/**
+ * 🔴 «AGREGAR A LA GUÍA» — los renglones SIN ETIQUETA que nacen del panel de
+ * Nueva guía (Daniel aprobó el mockup el 1-oct-2026): se eligió el cliente, se
+ * marcaron facturas, se escribieron los bultos y el destino (prellenado con el
+ * de siempre). Sale UN renglón por EMPRESA —el formato de siempre, «A, B» en
+ * `facturas`— con sus bultos. Llena primero las filas vacías y después agrega
+ * al final. Nunca toca un renglón que ya existe. Devuelve un arreglo NUEVO.
+ */
+export function agregarFacturasSueltas<R extends RenglonDeGuia>(
+  items: readonly R[],
+  cliente: ClienteElegido,
+  facturas: readonly Pick<FacturaDelCliente, "empresa" | "secuencial">[],
+  bultosPorEmpresa: Readonly<Record<string, number>>,
+  destino: string,
+): R[] {
+  const porEmpresa = new Map<string, string[]>();
+  for (const f of facturas) {
+    porEmpresa.set(f.empresa, [...(porEmpresa.get(f.empresa) ?? []), (f.secuencial ?? "").trim()]);
+  }
+  const salida = [...items];
+  for (const [empresa, secs] of porEmpresa) {
+    const datos = {
+      cliente: cliente.nombre,
+      cliente_codigo: cliente.codigo,
+      empresa,
+      direccion: destino.trim(),
+      facturas: secs.join(", "),
+      bultos: Math.max(0, Math.floor(bultosPorEmpresa[empresa] ?? 0)),
+    };
+    const idxVacia = salida.findIndex(filaVacia);
+    if (idxVacia >= 0) salida[idxVacia] = { ...salida[idxVacia], ...datos };
+    else salida.push({ ...(renglonNuevo(salida.length + 1) as R), ...datos });
+  }
+  return salida;
+}

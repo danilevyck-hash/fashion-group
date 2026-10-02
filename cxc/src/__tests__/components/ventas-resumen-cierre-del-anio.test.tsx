@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP («Cierre del año» → «Proyección de cierre», «Quién lo compra» → «Clientes», «Total Grupo» → «Total grupo»).
 // ─────────────────────────────────────────────────────────────────────────────
 // VENTAS › RESUMEN — «Cierre del año» sube a tarjeta, y NUNCA se dibuja una
 // meta (5-sep-2026).
@@ -138,11 +139,11 @@ describe("1 · «Cierre del año» es la cuarta tarjeta, arriba", () => {
     // CSS, que en jsdom no corre), así que las dos tarjetas existen a la vez.
     // Que las dos digan el MISMO número es justo lo que hay que sostener.
     pintarEscritorio();
-    expect(screen.getByText("CIERRE DEL AÑO")).toBeTruthy();
+    expect(screen.getByText("PROYECCIÓN DE CIERRE")).toBeTruthy();
     expect(screen.getAllByText("$11,627,069").length).toBeGreaterThanOrEqual(1);
     // El delta va en el subtítulo, en plata y no en porcentaje: es lo que se
     // compara contra el cierre real del año pasado.
-    const tarjeta = screen.getByText("CIERRE DEL AÑO").closest("div")!;
+    const tarjeta = screen.getByText("PROYECCIÓN DE CIERRE").closest("div")!;
     expect(tarjeta.textContent).toContain("+$211,855");
     // 🔁 11-sep-2026: el «vs 2025» salió del texto de la tarjeta (el período
     // se dice una vez, en el selector) y vive en el `title` del delta.
@@ -151,7 +152,7 @@ describe("1 · «Cierre del año» es la cuarta tarjeta, arriba", () => {
 
   it("celular: la misma tarjeta, con el mismo número", () => {
     pintarCelular();
-    expect(screen.getByText("Cierre del año")).toBeTruthy();
+    expect(screen.getByText("Proyección de cierre")).toBeTruthy();
     expect(screen.getAllByText("$11,627,069").length).toBeGreaterThanOrEqual(1);
   });
 
@@ -169,7 +170,7 @@ describe("1 · «Cierre del año» es la cuarta tarjeta, arriba", () => {
         selectedYear={2025} isClosedYear loading={false} error={null}
       />,
     );
-    expect(screen.queryByText("CIERRE DEL AÑO")).toBeNull();
+    expect(screen.queryByText("PROYECCIÓN DE CIERRE")).toBeNull();
   });
 });
 

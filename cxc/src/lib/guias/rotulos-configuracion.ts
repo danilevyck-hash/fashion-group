@@ -26,11 +26,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Tarjeta 1: los destinos DE CADA CLIENTE (`guias_destino_cliente`). */
-export const ROTULO_DONDE_ENTREGA_CADA_CLIENTE = "Dónde entrega cada cliente";
+// 1-oct-2026: nombres de ERP (Daniel). Eran «Dónde entrega cada cliente»,
+// «Direcciones que sugiere el sistema» y «Poner siempre».
+export const ROTULO_DONDE_ENTREGA_CADA_CLIENTE = "Destinos por cliente";
 export const AYUDA_DONDE_ENTREGA_CADA_CLIENTE = "Lo marcado se escribe solo al armar la guía.";
 
 /** Tarjeta 2: la lista general de lugares (`guias_destino_lista`). */
-export const ROTULO_DIRECCIONES_QUE_SUGIERE = "Direcciones que sugiere el sistema";
+export const ROTULO_DIRECCIONES_QUE_SUGIERE = "Direcciones sugeridas";
 export const AYUDA_DIRECCIONES_QUE_SUGIERE =
   "Los botones que salen debajo del campo dirección. No están atados a ningún cliente.";
 
@@ -38,7 +40,7 @@ export const AYUDA_DIRECCIONES_QUE_SUGIERE =
 export const MARCA_SIEMPRE = "Siempre";
 
 /** 🔴 El que NO lo es: se lee como ACCIÓN. La misma palabra en los dos casos. */
-export const ACCION_PONER_SIEMPRE = "Poner siempre";
+export const ACCION_PONER_SIEMPRE = "Predeterminar";
 
 /**
  * La palabra de la marca de un destino, según ya lo sea o no.

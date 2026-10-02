@@ -17,7 +17,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { numerosTranspDeLaGuia } from "@/lib/guias/modo-despacho";
 import { coincideGuiaConBusqueda } from "@/lib/guias/buscar-guia";
-import { numeroCabeceraAlDespachar, numeroGuiaDeCabecera } from "@/lib/guias/falta-para-despachar";
+import { faltaParaDespachar, numeroCabeceraAlDespachar, numeroGuiaDeCabecera } from "@/lib/guias/falta-para-despachar";
 import {
   ENTREGADO_POR_OTRO,
   entregadoPorElegido,
@@ -252,14 +252,26 @@ describe("4 · `__other__` no es un nombre y no llega al papel", () => {
     expect(entregadoPorElegido("Julio")).toBe(true);
   });
 
-  it("el formulario no deja guardar con el centinela puesto", () => {
+  it("el DESPACHO no deja completar con el centinela puesto", () => {
+    // 🔄 1-oct-2026: Daniel aprobó (sobre el mockup) sacar «Despachado por» de la
+    // creación de la guía y pedirlo al DESPACHAR. Este candado fijaba lo viejo
+    // y se reescribe a propósito: guardar la guía YA NO lo exige; el despacho
+    // sí (`faltaParaDespachar` y el PUT que completa, ver
+    // `guias-nueva-guia-2026-10.test.ts`).
     const base = {
-      fecha: "2026-08-25", modoEntrega: "transportista" as const, transportistaId: "t-1",
-      items: [{ ...envio(), uid: "u1" }],
+      tipoDespacho: "externo" as const, placa: "AB-1", receptor: "Juan", cedula: "8-8-8", chofer: "",
+      tieneFirma1: true, tieneFirma2: true,
     };
-    expect(validarGuia({ ...base, entregadoPor: ENTREGADO_POR_OTRO }).has("entregadoPor")).toBe(true);
-    expect(validarGuia({ ...base, entregadoPor: "" }).has("entregadoPor")).toBe(true);
-    expect(validarGuia({ ...base, entregadoPor: "Julio" }).has("entregadoPor")).toBe(false);
+    expect(faltaParaDespachar({ ...base, despachadoPor: ENTREGADO_POR_OTRO })).toContain("despachado por");
+    expect(faltaParaDespachar({ ...base, despachadoPor: "" })).toContain("despachado por");
+    expect(faltaParaDespachar({ ...base, despachadoPor: "Julio" })).toEqual([]);
+    // Y guardar la guía ya no lo mira.
+    expect(
+      validarGuia({
+        fecha: "2026-08-25", modoEntrega: "transportista", transportistaId: "t-1",
+        items: [{ ...envio(), uid: "u1" }], entregadoPor: ENTREGADO_POR_OTRO,
+      }).has("entregadoPor"),
+    ).toBe(false);
   });
 
   it("el papel deja la línea en blanco en vez de afirmar `__other__`", () => {

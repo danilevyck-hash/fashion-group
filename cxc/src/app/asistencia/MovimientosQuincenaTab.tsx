@@ -196,7 +196,7 @@ export default function MovimientosQuincenaTab(props: { empresa?: string }) {
       )}
 
       <p className="text-sm text-gray-500">
-        «Del cierre» quiere decir que lo anotó el cierre de la planilla de esa
+        «Del cierre» quiere decir que lo registró el cierre de la planilla de esa
         quincena. «A mano» quiere decir que alguien lo escribió en Préstamos.
       </p>
     </div>
@@ -241,7 +241,7 @@ function Bloque(props: { titulo: string; filas: readonly FilaMovimiento[]; total
                   <th className="px-3 py-2 font-medium">Colaborador</th>
                   <th className="px-3 py-2 font-medium">Concepto</th>
                   <th className="px-3 py-2 text-right font-medium">Monto</th>
-                  <th className="px-3 py-2 text-right font-medium">Día</th>
+                  <th className="px-3 py-2 text-right font-medium">Fecha</th>
                   <th className="px-3 py-2 font-medium">Origen</th>
                 </tr>
               </thead>

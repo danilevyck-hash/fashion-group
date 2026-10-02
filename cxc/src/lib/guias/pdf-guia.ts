@@ -304,7 +304,8 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
   // ── Observaciones ─────────────────────────────────────────────────────────
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
-  doc.text("OBSERVACIONES GENERALES DEL ENVÍO", MARGIN, y);
+  // 1-oct-2026: nombres de ERP (Daniel): era «OBSERVACIONES GENERALES DEL ENVÍO».
+  doc.text("OBSERVACIONES", MARGIN, y);
   doc.setFont("helvetica", "normal");
   // Sin la línea del cierre en bloque del 3-ago-2026 (54 guías): el papel dice
   // lo que la persona escribió, no el rastro de una operación técnica.

@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 /**
  * ─────────────────────────────────────────────────────────────────────────────
  * 🔴 EL EXCEL DE COMPROBANTES SE PUEDE FILTRAR (22-sep-2026)
@@ -205,7 +206,7 @@ describe("🔴 3. el que no salió a Switch se ve a la primera", () => {
   });
 
   it("y la frase completa NO se fue: sigue en su columna", () => {
-    expect(ws[A(D0 + 3, COL.switch)].v).toBe("No se ha mandado a Switch");
+    expect(ws[A(D0 + 3, COL.switch)].v).toBe("Pendiente de envío");
   });
 });
 

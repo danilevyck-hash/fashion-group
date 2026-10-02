@@ -79,7 +79,7 @@ const NOMBRE_FALTANTE: Readonly<Record<FaltanteRegistro, string>> = {
   fecha: "la fecha",
   monto: "el monto",
   cuota: "la cuota",
-  origen: "de dónde salió el pago",
+  origen: "el origen del pago",
 };
 
 /**

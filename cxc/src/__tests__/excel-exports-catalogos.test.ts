@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 // Tests del export Excel de catálogos (I11): workbook compartido de pedidos
 // (las 3 marcas) + sheet "sin foto" del admin Reebok, ambos con la estructura
 // estándar del helper. La ESTRUCTURA es compartida; la PALETA es de cada marca
@@ -133,7 +134,7 @@ describe("buildPedidosWorkbook — Reebok (con Origen)", () => {
     expect(noSalio.s.font.bold).toBe(true);
     expect(ws[A(DATA_ROW + 1, 9)].v).toBe("Sí");
     // Y la frase completa NO se fue: sigue en su columna, para el que lea.
-    expect(ws[A(DATA_ROW, 7)].v).toBe("No se ha mandado a Switch");
+    expect(ws[A(DATA_ROW, 7)].v).toBe("Pendiente de envío");
   });
 
   it("🔴 el vendedor de un pedido del link NO es una celda en blanco", () => {
@@ -171,7 +172,7 @@ describe("buildPedidosWorkbook — Reebok (con Origen)", () => {
   it("🔴 el que no salió DICE que no salió — no un guion", () => {
     // Un guion en la columna de un número se lee como un cero o como un dato
     // que no cargó. Criterio EXACTO de la pantalla (#593).
-    expect(ws[A(DATA_ROW, 7)].v).toBe("No se ha mandado a Switch");
+    expect(ws[A(DATA_ROW, 7)].v).toBe("Pendiente de envío");
     expect(ws[A(DATA_ROW, 7)].v).not.toBe("—");
     expect(ws[A(DATA_ROW, 7)].v).not.toBe("-");
     // Y el del link sin convertir tampoco miente con un blanco.

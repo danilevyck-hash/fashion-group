@@ -180,7 +180,8 @@ describe("C. 🔴 el cierre anota EXACTAMENTE lo tecleado", () => {
 describe("D. 🔴 la fila sigue MOSTRANDO cuánto debe y cuál sería su cuota", () => {
   it("«Debe $500.00 · cuota $70.00» debajo de la casilla", () => {
     const con = aplicarPrestamoEnLinea(linea(MANUAL()), SUG(), false);
-    expect(textoDeudaCasilla(con, "prestamo")).toBe("Debe $500.00 · cuota $70.00");
+    // 1-oct-2026, Daniel: nombres normales de ERP («.toBe("Debe $» → «toBe("Saldo $»).
+    expect(textoDeudaCasilla(con, "prestamo")).toBe("Saldo $500.00 · cuota $70.00");
   });
 
   it("🔑 una deuda SIN cuota cargada también se dice — no se descontaría sola ni prendido", () => {
@@ -190,7 +191,7 @@ describe("D. 🔴 la fila sigue MOSTRANDO cuánto debe y cuál sería su cuota",
       linea(MANUAL()),
       SUG({ saldo: 0, cuota: 0, sugerido: 0, saldoDano: 254.5, cuotaDano: 0, sugeridoDano: 0 }), false
     );
-    expect(textoDeudaCasilla(con, "mercancia")).toBe("Debe $254.50 · sin cuota");
+    expect(textoDeudaCasilla(con, "mercancia")).toBe("Saldo $254.50 · sin cuota");
   });
 
   it("lo mismo con una deuda SOLO de terceros: las tres cuentas se miran igual", () => {
@@ -198,14 +199,14 @@ describe("D. 🔴 la fila sigue MOSTRANDO cuánto debe y cuál sería su cuota",
       linea(MANUAL()),
       SUG({ saldo: 0, cuota: 0, sugerido: 0, saldoTerceros: 80, cuotaTerceros: 20, sugeridoTerceros: 20 }), false
     );
-    expect(textoDeudaCasilla(con, "terceros")).toBe("Debe $80.00 · cuota $20.00");
+    expect(textoDeudaCasilla(con, "terceros")).toBe("Saldo $80.00 · cuota $20.00");
   });
 
   it("🔴 la cuenta que NO debe nada queda callada, aunque otra sí deba", () => {
     // Un «Debe $0.00» debajo de dos de las tres casillas es exactamente el
     // ruido que tapa el dato que sí importa.
     const con = aplicarPrestamoEnLinea(linea(MANUAL()), SUG(), false);
-    expect(textoDeudaCasilla(con, "prestamo")).toBe("Debe $500.00 · cuota $70.00");
+    expect(textoDeudaCasilla(con, "prestamo")).toBe("Saldo $500.00 · cuota $70.00");
     expect(textoDeudaCasilla(con, "terceros")).toBeNull();
     expect(textoDeudaCasilla(con, "mercancia")).toBeNull();
   });

@@ -53,7 +53,7 @@ export default function ElegirPersonaModal({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between mb-4 -mt-2 -mr-2">
-          <h2 className="font-medium mt-2">¿A quién?</h2>
+          <h2 className="font-medium mt-2">Seleccionar colaborador</h2>
           <button
             type="button"
             onClick={onClose}
@@ -88,7 +88,7 @@ export default function ElegirPersonaModal({
                     >
                       <span className="min-w-0 truncate text-sm font-medium">{c.nombre}</span>
                       <span className="shrink-0 text-xs tabular-nums text-gray-500">
-                        {c.saldo > 0 ? `Debe $${fmt(c.saldo)}` : "No debe nada"}
+                        {c.saldo > 0 ? `Saldo $${fmt(c.saldo)}` : "Sin saldo"}
                       </span>
                     </button>
                   ))}

@@ -69,7 +69,7 @@ export default function FichaTexto({
     <div className="rounded-lg border border-gray-200 bg-white">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">
         <p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
-          Su información
+          Datos generales
         </p>
         <div className="flex flex-wrap gap-2">
           {puedeEditar && (

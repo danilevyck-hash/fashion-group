@@ -35,6 +35,7 @@ import {
   type VentaDia,
 } from "@/lib/ventas/compras";
 import { signoTipo } from "@/lib/ventas/referencia";
+// 1-oct-2026, Daniel: nombres normales de ERP (aprobó «Comprado · Vendido · Stock · % vendido»; el % se rotula «% vendido»; «Llegada» → «Recepción»; «Más info» → «Detalle»).
 
 const HOY = "2026-08-11";
 
@@ -783,10 +784,10 @@ describe("el Excel de Referencia", () => {
   const TRECE = [
     "Referencia",
     "Descripción",
-    "Compré",
-    "Vendí",
-    "Stock",
+    "Comprado",
     "Vendido",
+    "Stock",
+    "% vendido",
     "Meses",
     "Última compra",
     "Precio prom",
@@ -804,8 +805,8 @@ describe("el Excel de Referencia", () => {
     // 🔴 Compré = TODAS las compras (240 + 180) y Vendí = el neto histórico.
     // Stock es la existencia de Switch — y NO se fuerza el cuadre: acá
     // 420 − 216 = 204 sí cierra, pero la columna no sale de esa resta.
-    expect(cuerpo[0]["Compré"]).toBe(420);
-    expect(cuerpo[0]["Vendí"]).toBe(216);
+    expect(cuerpo[0]["Comprado"]).toBe(420);
+    expect(cuerpo[0]["Vendido"]).toBe(216);
     expect(cuerpo[0]["Stock"]).toBe(204);
     // La ÚLTIMA compra es la del 19-feb-2026, no la más vieja.
     expect(cuerpo[0]["Última compra"]).toBe("2026-02-19");
@@ -908,7 +909,7 @@ describe("el Excel de Referencia", () => {
       "Descripción",
       "Empresa",
       "Llegó",
-      "Cuánto",
+      "Cantidad",
       "CIF",
       "FOB",
       "FOB de dónde",
@@ -918,10 +919,10 @@ describe("el Excel de Referencia", () => {
     ]);
     expect(cuerpo).toHaveLength(2);
     const vieja = cuerpo.find((f) => f["Llegó"] === "2025-04-01")!;
-    expect(vieja["Cuánto"]).toBe(240);
+    expect(vieja["Cantidad"]).toBe(240);
     expect(vieja["CIF"]).toBe(5);
     const nueva = cuerpo.find((f) => f["Llegó"] === "2026-02-19")!;
-    expect(nueva["Cuánto"]).toBe(180);
+    expect(nueva["Cantidad"]).toBe(180);
   });
 
   it("🩸 NINGUNA hoja atribuye ventas a una compra — con stock encima eso no se sabe", async () => {
@@ -961,12 +962,12 @@ describe("el Excel de Referencia", () => {
   // tiempo lleva). Las dos columnas nuevas salen de `medirVendidoMeses`, LA
   // MISMA función que pinta la tabla del modo pedido.
 
-  it('🔴 la hoja 1 cambió "90% en" por "Vendido" · "Meses", una al lado de la otra', async () => {
+  it('🔴 la hoja 1 cambió "90% en" por "% vendido" · "Meses", una al lado de la otra', async () => {
     const { encabezado } = await leerHoja("Referencia");
     expect(encabezado).not.toContain("90% en");
-    expect(encabezado).toContain("Vendido");
+    expect(encabezado).toContain("% vendido");
     expect(encabezado).toContain("Meses");
-    expect(encabezado.indexOf("Meses")).toBe(encabezado.indexOf("Vendido") + 1);
+    expect(encabezado.indexOf("Meses")).toBe(encabezado.indexOf("% vendido") + 1);
   });
 
   it("🔴 Vendido/Meses del Excel = las celdas de la tabla: vivo trae el % actual (Vendí÷Compré) y los meses del ancla", async () => {
@@ -974,7 +975,7 @@ describe("el Excel de Referencia", () => {
     // 216/420; Meses = ancla del agregado (feb-2026 → ago-2026 = 6) — la misma
     // ancla de la ficha, no una segunda cuenta.
     const { cuerpo } = await leerHoja("Referencia");
-    expect(cuerpo[0]["Vendido"]).toBeCloseTo(216 / 420, 10);
+    expect(cuerpo[0]["% vendido"]).toBeCloseTo(216 / 420, 10);
     expect(cuerpo[0]["Meses"]).toBe(6);
   });
 
@@ -1012,12 +1013,12 @@ describe("el Excel de Referencia", () => {
     const filas = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false }) as unknown[][];
     const enc = filas.find((f) => f.includes("Referencia")) as string[];
     const fila = filas[filas.indexOf(enc) + 1];
-    expect(fila[enc.indexOf("Compré")]).toBe(36); // no 72
-    expect(fila[enc.indexOf("Vendí")]).toBe(25); // no 61
+    expect(fila[enc.indexOf("Comprado")]).toBe(36); // no 72
+    expect(fila[enc.indexOf("Vendido")]).toBe(25); // no 61
     expect(fila[enc.indexOf("Stock")]).toBe(12); // la existencia, sin recortar
     // 🩸 25 ÷ 37 (lo vendido + lo que queda), no 25 ÷ 36: el % del Excel es el
     // MISMO que el de la pantalla y sale de las dos celdas de al lado.
-    expect(fila[enc.indexOf("Vendido")]).toBeCloseTo(25 / 37, 10);
+    expect(fila[enc.indexOf("% vendido")]).toBeCloseTo(25 / 37, 10);
     expect(fila[enc.indexOf("Meses")]).toBe(5);
     // ⚠️ LA LEYENDA QUE LO EXPLICABA SE FUE con el subtítulo (27-ago-2026):
     // eran ~900 caracteres de manual de uso arriba de los encabezados, y
@@ -1059,7 +1060,7 @@ describe("el Excel de Referencia", () => {
     const fila = filas[filas.indexOf(enc) + 1];
     // Stock 0: se vendió todo lo que hubo. Las 4 que faltan contra lo comprado
     // las explica la Nota (ajuste de inventario), no el porcentaje.
-    expect(fila[enc.indexOf("Vendido")]).toBe(1);
+    expect(fila[enc.indexOf("% vendido")]).toBe(1);
     expect(fila[enc.indexOf("Meses")]).toBe(6);
   });
 
@@ -1106,10 +1107,10 @@ describe("el Excel de Referencia", () => {
     const filaSin = filas[filas.indexOf(enc) + 1];
     const filaTermo = filas[filas.indexOf(enc) + 2];
     // La celda vacía ES el dato (misma convención que "CIF anterior").
-    expect(filaSin[enc.indexOf("Vendido")] || null).toBeNull();
+    expect(filaSin[enc.indexOf("% vendido")] || null).toBeNull();
     expect(filaSin[enc.indexOf("Meses")] || null).toBeNull();
     // Vendió 150 de 100 y quedó en 0: lo que hubo son las 150 que salieron.
-    expect(filaTermo[enc.indexOf("Vendido")]).toBe(1);
+    expect(filaTermo[enc.indexOf("% vendido")]).toBe(1);
     // Ancla extendida jul-2024 → última venta nov-2025, inclusive = 17. El
     // reloj NO sigue corriendo hasta hoy (eso daría 25).
     expect(filaTermo[enc.indexOf("Meses")]).toBe(17);

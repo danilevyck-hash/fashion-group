@@ -193,7 +193,7 @@ export function MultifashionShell({
         empresasEsperadas={["american_classic"]}
         empresaLabels={EMPRESA_KEY_TO_NAME}
         variant="pill"
-        prefix="Sincronizado"
+        prefix="Última sincronización"
       />
       {/* 🩸 Sin `roles` el botón usaba su default (admin + secretaria) y
           Jennifer —cuyo ÚNICO módulo es este— no tenía «Actualizar ahora»

@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP («Sin mandar» → «No enviado»; «No se ha mandado a Switch» → «Pendiente de envío»)
 /**
  * ─────────────────────────────────────────────────────────────────────────────
  * CANDADO — «SIN MANDAR» DICE DESDE CUÁNDO (22-sep-2026)
@@ -150,8 +151,8 @@ describe("3. 🔴 el texto del borrador lleva la antigüedad", () => {
   });
 
   it("y el del TERMINADO no cambió de forma", () => {
-    expect(textoSinMandar("2026-07-04T12:00:00Z", "2026-09-07")).toBe("Sin mandar a Switch · hace 65 días");
-    expect(textoSinMandar("2026-09-07T12:00:00Z", "2026-09-07")).toBe("Sin mandar a Switch · hoy");
+    expect(textoSinMandar("2026-07-04T12:00:00Z", "2026-09-07")).toBe("No enviado a Switch · hace 65 días");
+    expect(textoSinMandar("2026-09-07T12:00:00Z", "2026-09-07")).toBe("No enviado a Switch · hoy");
   });
 });
 

@@ -267,7 +267,7 @@ describe("2 · elegir un cliente FILTRA la tabla de verdad", () => {
     const totales = document.querySelector("[data-totales-productos]")!.textContent ?? "";
     expect(totales).toContain("$2,700.00");
     const resumen = document.querySelector("[data-resumen-productos]")!.textContent ?? "";
-    expect(resumen).toContain("150 piezas");
+    expect(resumen).toContain("150 unidades"); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   it("volver a «Cliente: todos» devuelve la tabla entera, sin pedir nada nuevo", async () => {

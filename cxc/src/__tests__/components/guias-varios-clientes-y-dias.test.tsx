@@ -17,6 +17,9 @@
  * `lib/guias-varios-clientes-y-dias.test.ts`, con `instantaneaRenglones`).
  * ─────────────────────────────────────────────────────────────────────────────
  */
+// 🔄 1-oct-2026: nombres de ERP en Guías (Daniel aprobó el audit): rótulos en tipo oración
+// («Guardar guía», «Nueva guía de despacho», «Tipo de despacho», «Vincular cliente»…).
+// Este candado leía los textos viejos y se actualiza a propósito.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { useState } from "react";
 import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
@@ -27,6 +30,13 @@ import type { GuiaItem } from "@/app/guias/components/types";
 
 // El interruptor de reversión, controlable por test; el resto del módulo es el REAL.
 let atajosEncendidos = true;
+// 🔄 1-oct-2026: Daniel aprobó Nueva guía en UNA tabla (`GUIA_NUEVA_2026_10`):
+// el panel «Facturas del cliente» de arriba ya no se dibuja y su buscador vive
+// dentro de «+ Agregar sin etiquetas» (candado nuevo:
+// `guias-nueva-guia-2026-10.test.tsx`). Este archivo sigue fijando la pantalla
+// de ANTES, que es la que vuelve con el interruptor apagado: por eso lo apaga.
+vi.mock("@/lib/guias/guias-2026-10", () => ({ GUIA_NUEVA_2026_10: false, ETIQUETAS_2026_10: true }));
+
 vi.mock("@/lib/guias/atajos-facturas", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/guias/atajos-facturas")>();
   return {
@@ -277,7 +287,7 @@ describe("🔴 «+ Otro cliente»: un cliente a la vez, y los de antes SE QUEDAN
     fireEvent.focus(campo);
     fireEvent.change(campo, { target: { value: "Tienda que no existe" } });
     expect(screen.getByText(/Solo clientes de la lista/)).toBeTruthy();
-    expect(screen.queryByText(/No está en la lista — escribir a mano/)).toBeNull();
+    expect(screen.queryByText(/Ingresar manualmente/)).toBeNull(); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   it("🔴 REUSA el buscador de siempre: no nace un segundo selector de cliente", async () => {
@@ -526,6 +536,6 @@ describe("🔴 CONTROL — con GUIAS_ATAJOS_NUEVOS en false no existe nada de es
     expect(screen.queryByText("Actualizar ahora")).toBeNull();
     expect(screen.queryByText(/facturas$/)).toBeNull();
     // Y la pantalla de siempre sigue entera.
-    expect(screen.getByText("Detalle de Envío")).toBeTruthy();
+    expect(screen.getByText("Detalle de envío")).toBeTruthy();
   });
 });

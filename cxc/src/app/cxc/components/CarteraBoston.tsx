@@ -127,7 +127,7 @@ function DetalleBoston({
           onClick={(e) => { e.stopPropagation(); onDocumentos(client); }}
           className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition active:scale-[0.97]"
         >
-          Ver los documentos
+          Estado de cuenta
         </button>
       </div>
     </div>

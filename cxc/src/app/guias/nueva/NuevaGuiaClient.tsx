@@ -57,7 +57,7 @@ export default function NuevaGuiaClient() {
   return (
     <div>
       <AppHeader
-        module="Guías de Despacho"
+        module="Guías de despacho"
         breadcrumbs={[{ label: "Nueva guía" }]}
       />
       {s.hasGuiaDraft && (

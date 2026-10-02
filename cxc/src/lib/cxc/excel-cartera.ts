@@ -93,7 +93,7 @@ export function libroPorCompania(bloques: BloqueCliente[], aFavor: BloqueCliente
   const columns: ReportColumn[] = [
     { header: "Código", wch: 10 },
     { header: "Cliente", wch: 38 },
-    { header: "Compañía", wch: 22 },
+    { header: "Empresa", wch: 22 },
     ...COLS_TRAMO,
   ];
   const rows: ReportCell[][] = [];
@@ -117,5 +117,5 @@ export function libroPorCompania(bloques: BloqueCliente[], aFavor: BloqueCliente
     rows,
     totals: ["", "", aFavor.length > 0 ? ROTULO_TOTAL_GENERAL : "Total", t.t0, t.t1, t.t2, t.total],
   });
-  return workbookFromSheets([{ name: "Cartera por compañía", ws }]);
+  return workbookFromSheets([{ name: "Cartera por empresa", ws }]);
 }

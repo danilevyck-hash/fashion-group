@@ -50,6 +50,7 @@ import { MENOS_EN_PDF, textoDePdf } from "@/lib/comisiones/pdf-chrome";
 import { construirPdfComision } from "@/lib/comisiones/pdf-comision";
 import { fmtMoney } from "@/lib/ventas/format";
 import type { ComisionDetalle } from "@/lib/ventas/comisionExcel";
+// 1-oct-2026, Daniel: nombres normales de ERP («Oficina (DEFAULT)» → «Oficina (sin vendedor)», «no se paga» → «No pagable», «Cierre» → «Resumen», «Clientes que no comisionan» → «Exclusiones de comisión»).
 
 const raiz = process.cwd();
 const leer = (rel: string) => readFileSync(path.join(raiz, rel), "utf8");
@@ -91,7 +92,7 @@ const PAPEL_GRUPO: TablaPapel = {
   filas: [
     { celdas: ["Reynaldo Espinosa", "$41.77", "−$1,513.08", "−$1,471.31"] },
     { celdas: ["Edwin", "$70.69", "$0.00", "$70.69"] },
-    { celdas: [`Oficina (DEFAULT) (${ROTULO_NO_SE_PAGA})`, "$12.00", "$0.00", "$12.00"], apagada: true },
+    { celdas: [`Oficina (sin vendedor) (${ROTULO_NO_SE_PAGA})`, "$12.00", "$0.00", "$12.00"], apagada: true },
   ],
   totales: ["Total a pagar", "$112.46", "−$1,513.08", "−$1,400.62"],
 };
@@ -210,7 +211,7 @@ describe("🩸 4. el PDF del período no se lleva el reporte de un vendedor pega
     expect(texto).toContain("Fashion Group");
     expect(texto).toContain("Reynaldo Espinosa");
     // Lo que llevaría el reporte de un vendedor y acá no tiene nada que hacer.
-    expect(texto, "se coló el reporte de un vendedor").not.toContain("CIERRE");
+    expect(texto, "se coló el reporte de un vendedor").not.toContain("RESUMEN");
     expect(texto).not.toContain("11-000003022");
   });
 });
@@ -278,7 +279,7 @@ describe("🔴 5. el papel dice lo MISMO que la pantalla: mismas filas, mismo pi
 describe("🔴 6. Oficina y Daniel Levy: escondidos en pantalla, presentes en el papel", () => {
   it("salen con su marca «no se paga»", async () => {
     const texto = await textoDelPdf(construirPdfTablaComisiones(PAPEL_GRUPO));
-    expect(texto).toContain("Oficina (DEFAULT)");
+    expect(texto).toContain("Oficina (sin vendedor)");
     expect(texto).toContain(ROTULO_NO_SE_PAGA);
   });
 

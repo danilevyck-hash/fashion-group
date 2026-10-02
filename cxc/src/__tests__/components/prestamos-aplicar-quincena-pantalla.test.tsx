@@ -81,9 +81,11 @@ describe("AplicarQuincenaModal", () => {
   it("dice quién ya tiene el descuento y el botón cuenta solo a los demás", () => {
     pintar();
     // MARIA ya tiene (30-ago ∈ quincena 16–31): se dice y no se le vuelve a aplicar.
-    expect(screen.getByText(/1 persona ya tiene el descuento de esta quincena/)).toBeTruthy();
+    // 1-oct-2026, Daniel: nombres normales de ERP («/1 persona ya tiene el descuento de esta quincena/» → «/1 colaborador ya tiene el descuento de esta quincena/»).
+    expect(screen.getByText(/1 colaborador ya tiene el descuento de esta quincena/)).toBeTruthy();
     // KEVIN (pagó el 15, quincena anterior) y LUZ entran: 2 personas.
-    expect(screen.getByText(/2 personas/)).toBeTruthy();
+    // 1-oct-2026, Daniel: nombres normales de ERP («getByText(/2 personas/)» → «getByText(/2 colaboradores/)»).
+    expect(screen.getByText(/2 colaboradores/)).toBeTruthy();
     // Total = 50 (KEVIN) + 20 (LUZ, capeada al saldo) = 70.
     expect(screen.getByText(/\$70\.00/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Aplicar a las 2" })).toBeTruthy();

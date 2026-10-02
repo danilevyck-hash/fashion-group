@@ -101,7 +101,7 @@ export function useAccionesCheque(e: Entorno): AccionesCheque {
     cerrarRebote();
     scheduleAction({
       id: `rebotado-${id}`,
-      message: `Cheque N° ${cheque.numero_cheque} marcado como rebotado`,
+      message: `Cheque N° ${cheque.numero_cheque} marcado como devuelto`,
       execute: async () => {
         try {
           const res = await fetch(`${ruta}/${id}`, {
@@ -111,13 +111,13 @@ export function useAccionesCheque(e: Entorno): AccionesCheque {
           });
           if (!res.ok) {
             setCheques(snapshot);
-            showToast("No se pudo marcar como rebotado. Intenta de nuevo.");
+            showToast("No se pudo marcar como devuelto. Intenta de nuevo.");
             return;
           }
           // La nota a CXC es SECUNDARIA: el cheque ya quedó rebotado. Si falla,
           // se avisa pero NO se revierte el rebotado.
           const nombre = cheque.cliente.toUpperCase().trim();
-          const linea = `⚠ Cheque rebotado ${hoy}: N° ${cheque.numero_cheque} por $${fmt(cheque.monto)} — ${motivo || "Sin motivo"}`;
+          const linea = `⚠ Cheque devuelto ${hoy}: N° ${cheque.numero_cheque} por $${fmt(cheque.monto)} — ${motivo || "Sin motivo"}`;
           let previo = "";
           try {
             const existingRes = await fetch(`/api/overrides?cartera=${CARTERA_GRUPO}`, {
@@ -141,9 +141,9 @@ export function useAccionesCheque(e: Entorno): AccionesCheque {
                 cartera: CARTERA_GRUPO,
               }),
             });
-            if (!ovRes.ok) showToast("Cheque rebotado, pero no se pudo registrar la nota en CXC.");
+            if (!ovRes.ok) showToast("Cheque devuelto, pero no se pudo registrar la nota en Cuentas por cobrar.");
           } catch {
-            showToast("Cheque rebotado, pero no se pudo registrar la nota en CXC.");
+            showToast("Cheque devuelto, pero no se pudo registrar la nota en Cuentas por cobrar.");
           }
           loadCheques();
         } catch {
@@ -159,7 +159,7 @@ export function useAccionesCheque(e: Entorno): AccionesCheque {
     const cheque = cheques.find((c) => c.id === id);
     if (!cheque) return;
     const snapshot = [...cheques];
-    const notaExtra = `Re-depósito desde rebote (${hoy})`;
+    const notaExtra = `Redepósito tras devolución (${hoy})`;
     const notas = cheque.notas ? `${cheque.notas}\n${notaExtra}` : notaExtra;
     setCheques((prev) =>
       prev.map((c) =>
@@ -168,7 +168,7 @@ export function useAccionesCheque(e: Entorno): AccionesCheque {
     );
     scheduleAction({
       id: `redepositar-${id}`,
-      message: `Cheque N° ${cheque.numero_cheque} re-depositado`,
+      message: `Cheque N° ${cheque.numero_cheque} redepositado`,
       execute: async () => {
         try {
           const res = await fetch(`${ruta}/${id}`, {
@@ -178,7 +178,7 @@ export function useAccionesCheque(e: Entorno): AccionesCheque {
           });
           if (!res.ok) {
             setCheques(snapshot);
-            showToast("No se pudo re-depositar. Intenta de nuevo.");
+            showToast("No se pudo redepositar. Intenta de nuevo.");
           }
         } catch {
           setCheques(snapshot);

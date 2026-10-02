@@ -208,7 +208,8 @@ describe("B. CONTROL: un Pago no pide cuota", () => {
     fireEvent.change(m.monto(), { target: { value: "50" } });
     expect(m.cuota()).toBeNull();
     expect(m.boton().disabled).toBe(true);
-    expect(m.falta()?.textContent).toBe("Falta: de dónde salió el pago");
+    // 1-oct-2026, Daniel: nombres normales de ERP («"Falta: de dónde salió el pago"» → «"Falta: el origen del pago"»).
+    expect(m.falta()?.textContent).toBe("Falta: el origen del pago");
     fireEvent.click(screen.getByRole("button", { name: "Liquidación" }));
     expect(m.boton().disabled).toBe(false);
     expect(m.falta()).toBeNull();
@@ -218,7 +219,7 @@ describe("B. CONTROL: un Pago no pide cuota", () => {
     const pago = { fecha: "2026-09-14", monto: "50", cuota: "", pideCuota: true, esPago: true, origen: "" };
     expect(queFaltaParaRegistrar(pago)).toEqual(["origen"]);
     expect(queFaltaParaRegistrar({ ...pago, origen: "Efectivo" })).toEqual([]);
-    expect(textoFaltaRegistrar(["origen"])).toBe("Falta: de dónde salió el pago");
+    expect(textoFaltaRegistrar(["origen"])).toBe("Falta: el origen del pago");
   });
 
   it("y sin `cuotaActual` (nadie preguntó la cuota) no se exige: el formulario no puede pedir lo que no muestra", () => {

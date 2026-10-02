@@ -147,10 +147,10 @@ export default function PrestamoDetallePage() {
             <button
               onClick={() => actions.pagoQuincenal(cuota, cuentaMasVieja(s))}
               disabled={s.saldo <= 0 || cuota <= 0}
-              title={s.saldo <= 0 ? "No debe nada — no hay saldo por deducir" : cuota <= 0 ? "Esta persona no tiene cuota quincenal" : undefined}
+              title={s.saldo <= 0 ? "Sin saldo por deducir" : cuota <= 0 ? "Este colaborador no tiene cuota quincenal" : undefined}
               className="inline-flex min-h-[44px] items-center justify-center bg-emerald-600 text-white px-5 rounded-md text-sm hover:bg-emerald-700 transition font-medium disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Pago Quincenal · ${fmt(cuota)}
+              Pago quincenal · ${fmt(cuota)}
             </button>
           )}
           {/* 🔴 Los dos caminos del mockup (11-sep-2026): «Anotar abono» abre el
@@ -160,7 +160,7 @@ export default function PrestamoDetallePage() {
             onClick={() => { setConceptoInicial(CONCEPTO_PAGO); setShowNuevoMov(true); }}
             className="inline-flex min-h-[44px] items-center justify-center border border-gray-300 text-gray-700 px-5 rounded-md text-sm hover:border-black hover:text-black transition"
           >
-            Anotar abono
+            Registrar abono
           </button>
           <button
             onClick={() => { setConceptoInicial(CONCEPTO_PRESTAMO); setShowNuevoMov(true); }}

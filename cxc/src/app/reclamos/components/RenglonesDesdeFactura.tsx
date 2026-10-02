@@ -65,7 +65,7 @@ export default function RenglonesDesdeFactura({ lineas, seleccion, setSeleccion 
           className="flex-1 border border-gray-300 rounded-md px-3 min-h-[44px] text-base xl:text-sm outline-none focus:border-black"
         />
         <span className="text-xs text-gray-500 whitespace-nowrap tabular-nums">
-          {q.trim() ? `${visibles.length} de ${lineas.length}` : `${lineas.length} renglones`}
+          {q.trim() ? `${visibles.length} de ${lineas.length}` : `${lineas.length} líneas`}
           {nMarcados > 0 && ` · ${nMarcados} marcado${nMarcados === 1 ? "" : "s"}`}
         </span>
       </div>
@@ -124,7 +124,7 @@ export default function RenglonesDesdeFactura({ lineas, seleccion, setSeleccion 
             })}
           </tbody>
         </table>
-        {visibles.length === 0 && <p className="text-sm text-gray-400 py-4">Ningún renglón dice «{q}». Borra la búsqueda para ver los {lineas.length}.</p>}
+        {visibles.length === 0 && <p className="text-sm text-gray-400 py-4">Ninguna línea coincide con «{q}». Limpia la búsqueda para ver las {lineas.length}.</p>}
       </div>
 
       {/* Celular: una tarjeta por línea; lo editable solo aparece al marcar. */}
@@ -152,7 +152,7 @@ export default function RenglonesDesdeFactura({ lineas, seleccion, setSeleccion 
             </div>
           );
         })}
-        {visibles.length === 0 && <p className="text-sm text-gray-400 py-4">Ningún renglón dice «{q}». Borra la búsqueda para ver los {lineas.length}.</p>}
+        {visibles.length === 0 && <p className="text-sm text-gray-400 py-4">Ninguna línea coincide con «{q}». Limpia la búsqueda para ver las {lineas.length}.</p>}
       </div>
     </div>
   );

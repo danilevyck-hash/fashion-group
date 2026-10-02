@@ -20,7 +20,8 @@ export const DEFAULT_VENDEDOR = "DEFAULT";
  * Switch («Daniel o DEFAULT cobrar esa plata»), así que el nombre va entre
  * paréntesis para que se reconozca. La plata NO se esconde ni se reparte.
  */
-export const ETIQUETA_DEFAULT = "Oficina (DEFAULT)";
+// 1-oct-2026, Daniel: nombres normales de ERP («Oficina (DEFAULT)» → «Oficina (sin vendedor)»).
+export const ETIQUETA_DEFAULT = "Oficina (sin vendedor)";
 
 /** Nombre para pantalla: DEFAULT se dice «Oficina (DEFAULT)», el resto tal cual. */
 export const etiquetaVendedor = (vendedor: string): string =>

@@ -77,7 +77,8 @@ describe("Modales · en iPhone no hay Escape, así que necesitan ✕", () => {
   // archivo: elige a la persona de ASISTENCIA (37 activas) en vez de listar las
   // 15 fichas que ya existían. La regla del ✕ de 44×44 no cambió.
   it('Préstamos · el modal de elegir persona tiene un cerrar de 44×44', () => {
-    const i = prestamos.indexOf("¿A quién?");
+    // 1-oct-2026, Daniel: nombres normales de ERP («prestamos.indexOf("¿A quién?")» → «prestamos.indexOf("Seleccionar colaborador")»).
+    const i = prestamos.indexOf("Seleccionar colaborador");
     expect(i).toBeGreaterThan(-1);
     const bloque = prestamos.slice(i - 400, i + 700);
     expect(bloque).toMatch(/aria-label="Cerrar"/);

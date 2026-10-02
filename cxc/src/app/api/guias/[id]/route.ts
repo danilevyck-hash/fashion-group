@@ -18,6 +18,11 @@ import {
   totalesPorRenglon,
 } from "@/lib/guias/etiquetas-server";
 import { ETIQUETAS_POR_ENVIO, type RenglonParaAtar } from "@/lib/guias/etiquetas-por-envio";
+import { GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
+import { entregadoPorElegido } from "@/lib/guias/despachado-por";
+
+/** 🔴 1-oct-2026: lo que contesta el servidor si se completa sin «Despachado por». */
+const FALTA_DESPACHADO_POR = "Despachado por requerido";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const GUIAS_ROLES = ["admin", "secretaria", "bodega", "vendedor"]; // lectura (GET)
@@ -186,6 +191,25 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     // el botón se pondría verde y el PUT rechazaría igual — peor que el botón
     // apagado. Lo que SÍ bloquea (placa, receptor, cédula) no se tocó.
     if (tipo_despacho === "directo" && !nombre_chofer) return NextResponse.json({ error: "Nombre del chofer requerido para entrega directa" }, { status: 400 });
+    // 🔴 «DESPACHADO POR» SE PIDE AL COMPLETAR (1-oct-2026, Daniel aprobó el
+    // mockup). Salió de la creación de la guía —`POST /api/guias` nunca lo
+    // exigió— y la validación se MUDA aquí, no desaparece: sin quien despacha
+    // (el que viene en el cuerpo o, si no viene, el que la guía ya tenía), la
+    // guía no se completa. El centinela «Otro…» no cuenta.
+    if (GUIA_NUEVA_2026_10) {
+      let quien: unknown = entregado_por;
+      if (quien === undefined) {
+        const { data: actual } = await supabaseServer
+          .from("guia_transporte")
+          .select("entregado_por")
+          .eq("id", id)
+          .single();
+        quien = (actual as { entregado_por?: string | null } | null)?.entregado_por;
+      }
+      if (!entregadoPorElegido(typeof quien === "string" ? quien : "")) {
+        return NextResponse.json({ error: FALTA_DESPACHADO_POR }, { status: 400 });
+      }
+    }
   }
 
   const { data: previous } = await supabaseServer.from("guia_transporte").select("estado, placa, modo_entrega, transportista_id").eq("id", id).single();
@@ -228,7 +252,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     // borrar (`reatarEtiquetas`): cuando el DELETE llega, ya no apuntan ahí.
     const { data: viejosLeidos } = await supabaseServer
       .from("guia_items")
-      .select("id, cliente_codigo, empresa, direccion")
+      .select("id, cliente_codigo, empresa, direccion, facturas")
       .eq("guia_id", id)
       .gte("orden", 0);
     const renglonesViejos = (viejosLeidos ?? []) as RenglonParaAtar[];
@@ -245,7 +269,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       const { data: insertados, error: itemsErr } = await supabaseServer
         .from("guia_items")
         .insert(rows)
-        .select("id, cliente_codigo, empresa, direccion");
+        .select("id, cliente_codigo, empresa, direccion, facturas");
       if (itemsErr) {
         // Cleanup: remove any partially inserted new items
         await supabaseServer.from("guia_items").delete().eq("guia_id", id).lt("orden", 0);
@@ -454,7 +478,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   // Block double-dispatch: if guia is already Completada, reject state changes
   if (body.estado) {
-    const { data: current } = await supabaseServer.from("guia_transporte").select("estado, placa, tipo_despacho").eq("id", params.id).single();
+    const { data: current } = await supabaseServer.from("guia_transporte").select("estado, placa, tipo_despacho, entregado_por").eq("id", params.id).single();
     if (current?.estado === "Completada" && body.estado === "Completada") {
       return NextResponse.json({ error: "Esta guía ya fue despachada" }, { status: 400 });
     }
@@ -466,6 +490,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const tipoEfectivo = body.tipo_despacho ?? current?.tipo_despacho;
     if (body.estado === "Completada" && tipoEfectivo !== "directo" && !(body.placa || current?.placa)) {
       return NextResponse.json({ error: "Placa del vehículo requerida" }, { status: 400 });
+    }
+    // 🔴 1-oct-2026: la MISMA regla que el PUT — completar pide «Despachado por».
+    if (
+      GUIA_NUEVA_2026_10 &&
+      body.estado === "Completada" &&
+      !entregadoPorElegido(body.entregado_por ?? current?.entregado_por)
+    ) {
+      return NextResponse.json({ error: FALTA_DESPACHADO_POR }, { status: 400 });
     }
   }
 

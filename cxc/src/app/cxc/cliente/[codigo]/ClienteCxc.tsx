@@ -161,13 +161,13 @@ export default function ClienteCxc({ codigo }: { codigo: string }) {
 
   return (
     <div className="min-h-screen bg-[#F2F2F7]">
-      <AppHeader module="Cuentas por Cobrar" />
+      <AppHeader module="Cuentas por cobrar" />
 
       <div className="mx-auto max-w-2xl pb-12">
         {/* ── Volver y «Cobrar» ──────────────────────────────────────────── */}
         <div className="flex items-center justify-between px-2 pt-1">
           <Link href="/cxc" className="min-h-[44px] px-3 text-[17px] leading-[44px] text-blue-600 active:opacity-60">
-            ‹ Por cobrar
+            ‹ Cuentas por cobrar
           </Link>
           {client && seLeCobra(client.total) && (
             <button
@@ -224,9 +224,9 @@ export default function ClienteCxc({ codigo }: { codigo: string }) {
                     </p>
                     <p className="mt-0.5 text-[13px] text-gray-500">
                       {f.documentos} {f.documentos === 1 ? "documento" : "documentos"}
-                      {f.masViejo != null && <> · el más viejo {f.masViejo} días</>}
+                      {f.masViejo != null && <> · Antigüedad máx.: {f.masViejo} días</>}
                       {f.ultimoPago && (
-                        <> · pagó {montoExacto(f.ultimoPago.monto)} {haceCuanto(f.ultimoPago.fecha, hoy)}</>
+                        <> · Último pago: {montoExacto(f.ultimoPago.monto)} {haceCuanto(f.ultimoPago.fecha, hoy)}</>
                       )}
                     </p>
                   </div>

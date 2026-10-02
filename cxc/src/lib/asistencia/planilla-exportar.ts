@@ -468,7 +468,7 @@ function hojaOtrosServicios(d: DatosPlanillaExport): XLSX.WorkSheet | null {
     { header: "Concepto", wch: 34 },
     { header: "Se aplica a", wch: 16, align: "center" },
     { header: "Monto", wch: 12, align: "right", fmt: MONEY_FMT },
-    { header: "Lo anotó", wch: 16 },
+    { header: "Registrado por", wch: 16 },
   ];
   const rows = renglones.map((r) => [
     nombreDe.get(r.codigo) ?? r.codigo,

@@ -201,7 +201,7 @@ export default function CatalogoStickyCartBar({
             {regular.map(renderItem)}
             {hasPreorders && (
               <>
-                <div className="px-1 pt-3 pb-0.5 text-xs font-bold uppercase tracking-wide text-amber-600">Pre-orden</div>
+                <div className="px-1 pt-3 pb-0.5 text-xs font-bold uppercase tracking-wide text-amber-600">Preventa</div>
                 {preorders.map(renderItem)}
               </>
             )}

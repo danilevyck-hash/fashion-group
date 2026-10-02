@@ -186,13 +186,13 @@ export default function FichaEditar({
         </Campo>
         <Campo etiqueta="Empresa">
           <select className={CAMPO} value={b.empresa} onChange={(e) => set({ empresa: e.target.value })}>
-            <option value="">Elige la empresa</option>
+            <option value="">Seleccionar empresa</option>
             {EMPRESAS_ASISTENCIA.map((e) => (
               <option key={e} value={e}>{etiquetaEmpresa(e)}</option>
             ))}
           </select>
         </Campo>
-        <Campo etiqueta="Empezó" ayuda="Su primer día. De aquí salen sus días de vacaciones.">
+        <Campo etiqueta="Fecha de ingreso" ayuda="Su primer día. De aquí salen sus días de vacaciones.">
           <input type="date" className={CAMPO} value={b.fechaIngreso}
             onChange={(e) => set({ fechaIngreso: e.target.value })} />
         </Campo>
@@ -370,7 +370,7 @@ export default function FichaEditar({
           </p>
           {!verBaja && (
             <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-              <span className="text-sm text-gray-700">Trabaja aquí</span>
+              <span className="text-sm text-gray-700">Activo</span>
               <button type="button" onClick={() => setVerBaja(true)}
                 className="min-h-[44px] rounded-md border border-gray-300 px-4 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]">
                 Dar de baja
@@ -388,16 +388,16 @@ export default function FichaEditar({
                   {avisoSalidaConDeuda(deudaPrestamo)}
                 </p>
               )}
-              <Campo etiqueta="Su último día">
+              <Campo etiqueta="Fecha de salida">
                 <input type="date" className={CAMPO} value={b.fechaSalida}
                   disabled={!!permisos && !permisos.puedeDarDeBaja}
                   onChange={(e) => set({ fechaSalida: e.target.value })} />
               </Campo>
-              <Campo etiqueta="Qué pasó">
+              <Campo etiqueta="Motivo de salida">
                 <select className={CAMPO} value={b.motivoSalida}
                   disabled={!!permisos && !permisos.puedeDarDeBaja}
                   onChange={(e) => set({ motivoSalida: e.target.value })}>
-                  <option value="">Elige el motivo</option>
+                  <option value="">Seleccionar motivo</option>
                   {MOTIVOS_SALIDA.map((m) => (
                     <option key={m} value={m}>{OPCION_MOTIVO[m]}</option>
                   ))}

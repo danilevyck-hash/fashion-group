@@ -229,15 +229,15 @@ function MasInfo({ t, hoyMes }: { t: TarjetaModelo; hoyMes: string }) {
         className="flex min-h-[44px] w-full items-center gap-1.5 text-left text-sm font-medium text-gray-900"
       >
         {abierto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        Más info
+        Detalle
         {!abierto && (
-          <span className="font-normal text-gray-600">· llegadas, mes a mes, precio de lista y CIF</span>
+          <span className="font-normal text-gray-600">· recepciones, mes a mes, precio de lista y CIF</span>
         )}
       </button>
       {abierto && (
         <div className="pb-1">
           {t.llegadas.length > 0 && (
-            <Seccion titulo={`Todas las llegadas · ${textoLlegadas(t) ?? ""}`}>
+            <Seccion titulo={`Todas las recepciones · ${textoLlegadas(t) ?? ""}`}>
               <ul className="grid grid-cols-2 gap-x-4 text-sm tabular-nums sm:grid-cols-3">
                 {t.llegadas.map((l) => (
                   <li key={l.fecha} className="flex justify-between border-b border-gray-100 py-0.5 text-gray-700">
@@ -262,7 +262,7 @@ function MasInfo({ t, hoyMes }: { t: TarjetaModelo; hoyMes: string }) {
             </p>
           </Seccion>
           {t.trimestresAnterior.length > 0 && (
-            <Seccion titulo="Por trimestre · el año anterior">
+            <Seccion titulo="Trimestral (año anterior)">
               <RenglonTrimestres trimestres={t.trimestresAnterior} />
             </Seccion>
           )}
@@ -286,7 +286,7 @@ export function CuerpoTarjetaModelo({
   const llegadas = textoLlegadas(t);
   return (
     <div className="px-3.5 py-3">
-      <Seccion titulo="La mercancía">
+      <Seccion titulo="Existencias">
         <TablaMercancia
           comprado={t.comprado}
           vendido={t.vendido}
@@ -295,12 +295,12 @@ export function CuerpoTarjetaModelo({
         />
       </Seccion>
       {llegadas && (
-        <Seccion titulo="Llegadas">
+        <Seccion titulo="Recepciones">
           <p className="text-sm tabular-nums text-gray-900">{llegadas}</p>
         </Seccion>
       )}
       {t.ultima && (
-        <Seccion titulo="Las dos últimas llegadas">
+        <Seccion titulo="Últimas recepciones">
           <TablaLlegadas ultima={t.ultima} vara={t.vara} />
         </Seccion>
       )}

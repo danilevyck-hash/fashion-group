@@ -150,7 +150,7 @@ export function chipsDelCatalogo<T extends ProductoDeChip>(
   };
   if (sale(sinFoto)) chips.push(sinFoto);
   if (escondidos > 0) {
-    chips.push({ key: CHIP_ESCONDIDOS, label: "Escondidos", count: escondidos });
+    chips.push({ key: CHIP_ESCONDIDOS, label: "Ocultos", count: escondidos });
   }
   return chips;
 }

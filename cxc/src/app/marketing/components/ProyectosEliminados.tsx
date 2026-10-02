@@ -78,14 +78,14 @@ export default function ProyectosEliminados({ bloque, onRestaurado }: Props) {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
-        throw new Error(err?.error ?? "No se pudo devolver el proyecto");
+        throw new Error(err?.error ?? "No se pudo restaurar el proyecto");
       }
-      toast("Listo, el proyecto volvió", "success");
+      toast("Proyecto restaurado", "success");
       await cargar();
       onRestaurado();
     } catch (err) {
       toast(
-        err instanceof Error ? err.message : "No se pudo devolver el proyecto",
+        err instanceof Error ? err.message : "No se pudo restaurar el proyecto",
         "error",
       );
     } finally {

@@ -247,7 +247,7 @@ export default function EmpresaList({
           «Cobrados» cualquier fila abría el modal con «Adjuntamos 1 reclamo
           pendiente…» y lo mandaba. El servidor ahora también lo rechaza. */}
       {esPendiente(r) && (
-        <button type="button" onClick={() => setMailRec(r)} className={accion} aria-label={`Mandar por correo el reclamo ${r.nro_reclamo}`}>Correo</button>
+        <button type="button" onClick={() => setMailRec(r)} className={accion} aria-label={`Enviar por correo el reclamo ${r.nro_reclamo}`}>Correo</button>
       )}
       <button type="button" onClick={() => descargarUno(r, "excel")} disabled={filaBusy !== null} className={accion} aria-label={`Descargar el Excel del reclamo ${r.nro_reclamo}`}>{filaBusy === r.id ? "…" : "Descargar"}</button>
       <OverflowMenu
@@ -278,7 +278,7 @@ export default function EmpresaList({
           {selectionMode && <span className="text-sm text-gray-500">{selCount > 0 ? `${selCount} seleccionado${selCount === 1 ? "" : "s"}` : "Selecciona reclamos…"}</span>}
           {/* Correo y descargas: sobre la selección, o sobre lo que se está mirando. */}
           {filtro === "por-cobrar" && idsObjetivo.length > 0 && (
-            <button onClick={() => setSendOpen(true)} disabled={busy !== null} className={accion} aria-label="Mandar por correo al proveedor">Correo</button>
+            <button onClick={() => setSendOpen(true)} disabled={busy !== null} className={accion} aria-label="Enviar por correo al proveedor">Correo</button>
           )}
           {idsObjetivo.length > 0 && (
             <>
@@ -296,7 +296,7 @@ export default function EmpresaList({
             {selectionMode ? "Cancelar" : "Seleccionar"}
           </button>
           {!selectionMode && (
-            <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">Nuevo Reclamo</button>
+            <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">Nuevo reclamo</button>
           )}
         </div>
       </div>
@@ -360,7 +360,7 @@ export default function EmpresaList({
                 <thead className="sticky top-0 bg-white z-10">
                   <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
                     {selectionMode && <th className="pb-3 w-8"><input type="checkbox" checked={allSelected} onChange={() => (allSelected ? setSelectedIds([]) : setSelectedIds(visibles.map((r) => r.id)))} className="accent-black" title="Seleccionar todos los visibles" /></th>}
-                    <Encabezado columna="numero" orden={orden} onOrdenar={ordenarPor}>N° Reclamo</Encabezado>
+                    <Encabezado columna="numero" orden={orden} onOrdenar={ordenarPor}>N° de reclamo</Encabezado>
                     <Encabezado columna="factura" orden={orden} onOrdenar={ordenarPor}>Factura(s)</Encabezado>
                     <Encabezado columna="dias" alineacion="right" orden={orden} onOrdenar={ordenarPor}>Días</Encabezado>
                     <Encabezado columna="reclamado" className="pl-4" orden={orden} onOrdenar={ordenarPor}>Reclamado</Encabezado>

@@ -92,7 +92,7 @@ export const TEXTO_SIN_NUMERO_DEL_LINK = "Se numera al abrirlo";
 export const TEXTO_SIN_NUMERO = "Sin número";
 
 /** 🔴 La frase que reemplaza al guion. Dice lo que pasa, no un vacío. */
-export const TEXTO_NO_ENVIADO = "No se ha mandado a Switch";
+export const TEXTO_NO_ENVIADO = "Pendiente de envío";
 
 /** El número de la casa, o la razón por la que no hay. */
 export function textoNumeroPedido(p: NumerosDePedido): string {

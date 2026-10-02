@@ -94,7 +94,7 @@ function dibujarCierre(doc: jsPDF, y: number, hoja: HojaReporte): number {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
   doc.setTextColor(...GRIS);
-  doc.text("CIERRE", MARGEN + 3, yy);
+  doc.text("RESUMEN", MARGEN + 3, yy); // 1-oct-2026, Daniel: nombres normales de ERP
   yy += 5;
 
   for (const l of lineas) {

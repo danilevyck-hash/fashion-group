@@ -212,7 +212,7 @@ export function EmpresaMesAnioPanel({
   if (!render) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-8" role="dialog" aria-modal="true" aria-label={`Histórico mes × año de ${nombre}`}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-8" role="dialog" aria-modal="true" aria-label={`Histórico mensual de ${nombre}`}>
       {/* Backdrop oscuro + blur sutil. */}
       <div
         onClick={onClose}
@@ -238,7 +238,7 @@ export function EmpresaMesAnioPanel({
         {/* Header: eyebrow + nombre (izq) · toggle métrica + X (der). */}
         <header className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-9 sm:pt-7">
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Histórico mes × año</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Histórico mensual</p>
             <h2 className="mt-0.5 truncate text-[22px] font-medium leading-tight tracking-tight text-gray-950">{nombre}</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">

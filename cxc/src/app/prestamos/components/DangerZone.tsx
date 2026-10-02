@@ -67,7 +67,7 @@ export default function DangerZone({ isAdmin, hasMovs, onDeleteEmployee, onClear
               <button
                 onClick={onDeleteEmployee}
                 disabled={hasMovs}
-                title={hasMovs ? "Primero hay que borrar los movimientos" : ""}
+                title={hasMovs ? "Primero hay que eliminar los movimientos" : ""}
                 className="px-4 min-h-[44px] bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
               >
                 <TrashIcon />
@@ -79,7 +79,7 @@ export default function DangerZone({ isAdmin, hasMovs, onDeleteEmployee, onClear
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm font-medium text-red-700">Eliminar todo el historial</div>
-                <div className="text-xs text-red-400">Borra todos los movimientos y deja la ficha. Queda registrado quién y cuándo.</div>
+                <div className="text-xs text-red-400">Elimina todos los movimientos y deja la ficha. Queda registrado quién y cuándo.</div>
               </div>
               <button
                 onClick={onClearHistory}

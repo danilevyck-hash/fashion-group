@@ -156,7 +156,8 @@ describe("Los textos hablan de negocio, no de código", () => {
   });
 
   it("la consecuencia de cada sync está en castellano de negocio", () => {
-    expect(consecuenciaDeSyncType("estadocuenta")).toContain("Cuentas por Cobrar");
+    // 1-oct-2026, Daniel: nombres normales de ERP (mayúscula solo en la primera palabra).
+    expect(consecuenciaDeSyncType("estadocuenta")).toContain("Cuentas por cobrar");
     expect(consecuenciaDeSyncType("facturas")).toContain("ventas");
     expect(consecuenciaDeSyncType("proveedores")).toContain("proveedores");
     // 🩸 `egresos_varios` NO estaba en el switch y caía al default («puede haber

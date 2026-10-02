@@ -30,7 +30,7 @@ export default function YaDecididas({
       >
         {/* 12a (29-sep-2026, audit aprobado por Daniel): era «▸» y los días usan
             el ⌄: una sola flecha para todo lo que se abre. */}
-        Ya decididas ({personas.length})
+        Procesadas ({personas.length})
         <Flecha abierta={abierto} />
       </button>
       {abierto && (

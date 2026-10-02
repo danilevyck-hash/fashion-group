@@ -244,7 +244,7 @@ export function MetaFormModal({
       >
         <header className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
           <h2 className="text-sm font-semibold text-gray-950">
-            {meta ? "Cambiar la meta" : "Nueva meta"}
+            {meta ? "Editar meta" : "Nueva meta"}
           </h2>
           <button
             type="button"
@@ -305,7 +305,7 @@ export function MetaFormModal({
           {tipo === "grupal" ? (
             <div>
               <label htmlFor="meta-objetivo" className="mb-1 block text-xs font-medium text-gray-700">
-                Monto a alcanzar entre todas
+                Monto de la meta
               </label>
               <input
                 id="meta-objetivo"
@@ -349,8 +349,8 @@ export function MetaFormModal({
                   // hacía creer que marcar participantes recorta lo que cuenta.
                   // No lo recorta: marcar solo elige a quién se le muestra su
                   // aporte. Que quede claro al elegir, no después.
-                  ["grupal", "Entre todas", "Cuenta toda la venta de la tienda."],
-                  ["vendedora", "Cada una la suya", "Cada vendedora tiene su propio monto."],
+                  ["grupal", "Grupal", "Cuenta toda la venta de la tienda."],
+                  ["vendedora", "Individual", "Cada vendedora tiene su propio monto."],
                 ] as const
               ).map(([valor, rotulo, ayuda]) => (
                 <button
@@ -385,7 +385,7 @@ export function MetaFormModal({
             </div>
             <div>
               <label htmlFor="meta-premio-monto" className="mb-1 block text-xs font-medium text-gray-700">
-                Cuánto vale <span className="font-normal text-gray-400">(opcional)</span>
+                Valor del premio <span className="font-normal text-gray-400">(opcional)</span>
               </label>
               <input
                 id="meta-premio-monto"
@@ -404,7 +404,7 @@ export function MetaFormModal({
           {/* ── Participantes: SIEMPRE de la lista ────────────────────── */}
           <div>
             <p className="mb-1 text-xs font-medium text-gray-700">
-              Quiénes participan{" "}
+              Participantes{" "}
               <span className="font-normal text-gray-500">
                 ({elegidas.size} {elegidas.size === 1 ? "elegida" : "elegidas"})
               </span>
@@ -478,7 +478,7 @@ export function MetaFormModal({
                     {marcada && tipo === "vendedora" && (
                       <div className="flex items-center gap-2 border-t border-gray-100 bg-gray-50 px-3 py-2">
                         <label htmlFor={`obj-${v.clave}`} className="text-xs text-gray-600">
-                          Su monto
+                          Monto
                         </label>
                         <input
                           id={`obj-${v.clave}`}
@@ -515,7 +515,7 @@ export function MetaFormModal({
               onChange={(e) => setActiva(e.target.checked)}
               className="h-4 w-4 rounded border-gray-300"
             />
-            La meta está andando
+            En curso
           </label>
         </div>
 

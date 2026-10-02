@@ -600,9 +600,11 @@ describe("H. 🔴 LAS CUATRO SECCIONES, CON LOS ENDPOINTS DE SIEMPRE", () => {
   });
 
   it("la deuda se desglosa solo con lo que tiene algo, y el cero se dice con palabras", () => {
-    expect(textoDeuda(0)).toBe("No debe nada");
-    expect(textoDeuda(null)).toBe("No debe nada");
-    expect(textoDeuda(120.5)).toBe("Debe $120.50");
+    // 1-oct-2026, Daniel: nombres normales de ERP («toBe("No debe nada")» → «toBe("Sin saldo")»).
+    expect(textoDeuda(0)).toBe("Sin saldo");
+    expect(textoDeuda(null)).toBe("Sin saldo");
+    // 1-oct-2026, Daniel: nombres normales de ERP («toBe("Debe $120.50")» → «toBe("Saldo $120.50")»).
+    expect(textoDeuda(120.5)).toBe("Saldo $120.50");
     expect(desgloseDeuda({ prestamo: 0, dano: 0, terceros: 0 })).toEqual([]);
     expect(desgloseDeuda({ prestamo: 100, dano: 0, terceros: 20 }).map((f) => f.clave))
       .toEqual(["prestamo", "terceros"]);

@@ -181,8 +181,8 @@ export default function CatalogosMarcasPage() {
     // sienta como si fuese el mismo catálogo»*.
     const url = getMarcaTheme(marca)!.publicoShareUrl;
     navigator.clipboard.writeText(url)
-      .then(() => setToast("Link copiado"))
-      .catch(() => setToast("No se pudo copiar el link"));
+      .then(() => setToast("Enlace copiado"))
+      .catch(() => setToast("No se pudo copiar el enlace"));
   }
 
   // UN link con los cuatro catálogos (23-sep-2026). Daniel: *«¿dónde veo el
@@ -190,8 +190,8 @@ export default function CatalogosMarcasPage() {
   // página pública `/catalogo-publico/todos`: nada se congela al copiarlo.
   function copiarLinkDeTodos() {
     navigator.clipboard.writeText(URL_CATALOGOS_PUBLICOS)
-      .then(() => setToast("Link de los 4 catálogos copiado"))
-      .catch(() => setToast("No se pudo copiar el link"));
+      .then(() => setToast("Enlace de los 4 catálogos copiado"))
+      .catch(() => setToast("No se pudo copiar el enlace"));
   }
 
   return (
@@ -223,16 +223,17 @@ export default function CatalogosMarcasPage() {
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3">
           <div className="min-w-0">
             <div className={`text-sm font-semibold text-gray-900 ${CATALOGO_ORDEN_CELULAR ? "hidden sm:block" : ""}`}>
-              Link para clientes · los 4 catálogos
+              Enlace público
             </div>
             <div className="truncate font-mono text-xs text-gray-500" data-testid="link-catalogos-todos">{URL_CATALOGOS_PUBLICOS}</div>
           </div>
           <button
             type="button"
             onClick={copiarLinkDeTodos}
+            aria-label="Copiar enlace de los 4 catálogos"
             className="min-h-[44px] rounded-md bg-black px-4 text-sm font-semibold text-white active:scale-[0.97]"
           >
-            Copiar link
+            Copiar enlace
           </button>
         </div>
 

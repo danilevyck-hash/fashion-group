@@ -848,7 +848,7 @@ export function ClientesView({
               {/* Los clientes sin ficha en el maestro, EN LA LISTA. */}
               {bloques.huerfanos.length > 0 && (
                 <SeparadorFila colSpan={colSpanTabla}>
-                  Otros clientes ({totalOtros}) · todavía no están en el directorio
+                  Clientes no registrados ({totalOtros})
                 </SeparadorFila>
               )}
               {bloques.huerfanos.map((c, idx) => (
@@ -941,7 +941,7 @@ export function ClientesView({
         ))}
         {bloques.huerfanos.length > 0 && (
           <p className="px-1 pt-2 text-xs font-medium text-gray-500">
-            Otros clientes ({totalOtros}) · todavía no están en el directorio
+            Clientes no registrados ({totalOtros})
           </p>
         )}
         {bloques.huerfanos.map(c => (
@@ -1046,7 +1046,7 @@ function DelGrupoBadge() {
       className="ml-1.5 inline-flex shrink-0 items-center rounded-full border border-violet-200 bg-violet-50 px-1.5 py-px align-middle text-[10px] font-medium leading-4 text-violet-700"
       title="Empresa del grupo. Es una venta real y cuenta en los totales igual que cualquier cliente; la marca es sólo para reconocerla."
     >
-      Del grupo
+      Intercompañía
     </span>
   );
 }

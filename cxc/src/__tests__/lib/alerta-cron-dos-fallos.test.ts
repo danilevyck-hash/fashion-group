@@ -146,7 +146,8 @@ describe("dos fallos seguidos SÍ avisan, y el mensaje dice que van 2", () => {
     expect(t).toMatch(/desde .*jul/); // fecha en hora Panamá
     expect(t).toContain("no se está recuperando sola");
     // Y sigue diciendo qué significa para el negocio y qué hacer.
-    expect(t).toContain("Cuentas por Cobrar");
+    // 1-oct-2026, Daniel: nombres normales de ERP (mayúscula solo en la primera palabra).
+    expect(t).toContain("Cuentas por cobrar");
     expect(t).toContain("Qué hacer:");
   });
 

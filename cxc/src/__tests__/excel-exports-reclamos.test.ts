@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «N° de reclamo».
 // Tests del export Excel de Reclamos tras la homogeneización I11:
 // - buildReclamoSheet (ficha por reclamo) — src/lib/excel-reclamo.ts
 // - buildBulkReclamosExcel (Resumen + 1 hoja por reclamo) — src/lib/reclamos/excel-bulk.ts
@@ -139,7 +140,7 @@ describe("buildBulkReclamosExcel (Resumen + hojas por reclamo)", () => {
     // la última columna es «# Fotos» —un DATO— porque las dos de links,
     // «Factura PDF» y «Fotos», se retiraron. 🔄 20-sep-2026: se fue «Estado»,
     // así que «# Fotos» pasó de la I a la H.
-    expect(resumen.A1?.v).toBe("N° Reclamo");
+    expect(resumen.A1?.v).toBe("N° de reclamo");
     expect(resumen.H1?.v).toBe("# Fotos");
     expect(resumen.I1?.v).toBeUndefined();
 

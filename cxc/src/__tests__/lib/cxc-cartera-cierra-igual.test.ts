@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — hoja «Cartera por empresa».
 // ─────────────────────────────────────────────────────────────────────────────
 // 🔴 EL PAPEL Y EL EXCEL DE LA CARTERA CIERRAN CON EL MISMO TOTAL QUE LA
 // PANTALLA (20-sep-2026, pedido de Daniel).
@@ -237,7 +238,7 @@ describe("🔴 3 · la hoja lleva su bloque y cierra con el total de la pantalla
 
   it("«Detallado por compañía»: el bloque cae en su columna y el total cuadra", () => {
     const ws = libroPorCompania(bloquesPorCompania(CARTERA, DOS), bloquesSaldoAFavor(CARTERA, DOS), "x")
-      .Sheets["Cartera por compañía"];
+      .Sheets["Cartera por empresa"];
     expect(celda(ws, "C6")).toBe(ROTULO_TOTAL_POR_COBRAR);
     expect(celda(ws, "C7")).toBe(rotuloSaldoAFavor(2));
     expect(celda(ws, "A8")).toBe("D-139");

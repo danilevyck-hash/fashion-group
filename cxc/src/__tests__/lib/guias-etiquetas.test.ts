@@ -438,8 +438,13 @@ describe("🔴 9. se juntan por CLIENTE y EMPRESA, con los bultos sumados", () =
     etq({ id: 3, cliente_codigo: "D-108", cliente_nombre: "American Classics Store", empresa_key: "fashion_wear", empresa: "Fashion Wear", secuencial: "11-000003255", cajas: 3, destino: "David" }),
   ];
 
+  // 🔄 1-oct-2026: Daniel aprobó UN RENGLÓN POR ENVÍO (dos envíos del mismo
+  // cliente + empresa ya no se juntan: la numeración se repetiría). Con el
+  // interruptor prendido la clave es el envío; este bloque fija la regla de
+  // ANTES pasando `porEnvio = false` (la de hoy vive en
+  // `guias-nueva-guia-2026-10.test.ts`).
   it("tres facturas del mismo par → UN renglón, 6 bultos, las tres facturas", () => {
-    const r = agruparEtiquetasEnRenglones(tres);
+    const r = agruparEtiquetasEnRenglones(tres, false);
     expect(r).toHaveLength(1);
     expect(r[0].bultos).toBe(6);
     expect(r[0].facturas).toBe("11-000003260, 11-000003257, 11-000003255");
@@ -452,13 +457,13 @@ describe("🔴 9. se juntan por CLIENTE y EMPRESA, con los bultos sumados", () =
       etq({ id: 1, empresa_key: "fashion_shoes", empresa: "Fashion Shoes", cajas: 14 }),
       etq({ id: 2, empresa_key: "fashion_wear", empresa: "Fashion Wear", secuencial: "11-000003258", cajas: 5 }),
     ];
-    const r = agruparEtiquetasEnRenglones(dos);
+    const r = agruparEtiquetasEnRenglones(dos, false);
     expect(r).toHaveLength(2);
     expect(totalBultos(r)).toBe(19);
   });
 
   it("⚠️ una etiqueta que YA salió en una guía no se mete en otra", () => {
-    const r = agruparEtiquetasEnRenglones([...tres, etq({ id: 9, guia_numero: 256 })]);
+    const r = agruparEtiquetasEnRenglones([...tres, etq({ id: 9, guia_numero: 256 })], false);
     expect(r).toHaveLength(1);
   });
 
@@ -537,7 +542,11 @@ describe("🔴 11. la pestaña «Etiquetas» tiene su propia puerta", () => {
 
   it("⚠️ la sección de Nueva guía SÍ cuelga de ese interruptor", () => {
     const form = leer("src/app/guias/components/GuiaForm.tsx");
-    expect(form).toMatch(/GUIAS_ATAJOS_NUEVOS && !editingId && !soloCorregible && onReemplazarItems && \(\s*<EtiquetasPendientes/);
+    // 🔄 1-oct-2026: con `GUIA_NUEVA_2026_10` la sección vieja se apaga y los
+    // envíos viven en la tabla única (`DetalleDeEnvio`), que cuelga del MISMO
+    // `GUIAS_ATAJOS_NUEVOS` por `atajosDeLaGuiaNueva`.
+    expect(form).toMatch(/GUIAS_ATAJOS_NUEVOS && !editingId && !soloCorregible && onReemplazarItems && !tablaUnica && \(\s*<EtiquetasPendientes/);
+    expect(form).toMatch(/const tablaUnica = GUIA_NUEVA_2026_10 && atajosDeLaGuiaNueva;/);
   });
 
   // 🔄 18-sep-2026 — el botón decía «Traer de Switch ahora». Daniel: *«¿no

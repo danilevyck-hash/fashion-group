@@ -17,6 +17,9 @@
  * este repo ya pasó cuatro veces.
  * ─────────────────────────────────────────────────────────────────────────────
  */
+// 🔄 1-oct-2026: nombres de ERP en Guías (Daniel aprobó el audit): rótulos en tipo oración
+// («Guardar guía», «Nueva guía de despacho», «Tipo de despacho», «Vincular cliente»…).
+// Este candado leía los textos viejos y se actualiza a propósito.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor, act } from "@testing-library/react";
 import GuiasList from "@/app/guias/components/GuiasList";
@@ -193,24 +196,24 @@ describe("🔴 13 · la guía que salió incompleta queda MARCADA", () => {
     // mutación que borraba el chip de escritorio: el de celular la tapaba.
     // Medido: la mutación SOBREVIVIÓ hasta que este test exigió los dos.
     lista({ placa: "" });
-    expect(screen.getAllByText("Salió incompleta")).toHaveLength(2);
+    expect(screen.getAllByText("Despacho incompleto")).toHaveLength(2);
     expect(screen.getByText(/Salió sin la placa/)).toBeTruthy();
   });
 
   it("sin «Recibido por» → también, y en los dos layouts", () => {
     lista({ receptor_nombre: "" });
-    expect(screen.getAllByText("Salió incompleta")).toHaveLength(2);
+    expect(screen.getAllByText("Despacho incompleto")).toHaveLength(2);
     expect(screen.getByText(/Salió sin quién recibió/)).toBeTruthy();
   });
 
   it("una guía completa NO se marca", () => {
     lista();
-    expect(screen.queryByText("Salió incompleta")).toBeNull();
+    expect(screen.queryByText("Despacho incompleto")).toBeNull();
   });
 
   it("🔴 una guía PENDIENTE no se marca: todavía se está llenando el dato", () => {
     lista({ estado: "Pendiente Bodega", placa: "", receptor_nombre: "", cedula: "" });
-    expect(screen.queryByText("Salió incompleta")).toBeNull();
+    expect(screen.queryByText("Despacho incompleto")).toBeNull();
   });
 
   it("🔴 MARCA, NO ABRE: no aparece ningún campo para escribir la placa", () => {
@@ -266,13 +269,24 @@ describe("🔴 12 · al guardar una guía nueva, te quedás EN la guía", () => 
   /** Llena lo mínimo que `validarGuia` exige y aprieta «Guardar Guía». */
   async function crearYGuardar(opts: { numeroTransp?: string } = {}) {
     render(<GuiaNuevaPage />);
-    await screen.findByText(/Nueva Guía de Transporte/i);
+    await screen.findByText(/Nueva guía de despacho/i);
     const campo = (prefijo: string) =>
       document.querySelector<HTMLInputElement | HTMLSelectElement>(`[id^="${prefijo}-"][id$="-m"]`)!;
+    // 🔄 1-oct-2026: Nueva guía es UNA tabla (Daniel aprobó el mockup).
+    // «Despachado por» se elige al despachar, y un renglón sin etiqueta se
+    // escribe desde «+ Agregar sin etiquetas» › «Escribir a mano», que abre
+    // los MISMOS campos de siempre.
     await act(async () => {
       fireEvent.change(document.getElementById("guia-fecha") as HTMLInputElement, { target: { value: "2026-08-25" } });
-      fireEvent.change(document.querySelector("select")!, { target: { value: "t1" } });
-      fireEvent.change(document.getElementById("guia-entregado-por") as HTMLSelectElement, { target: { value: "Julio" } });
+      fireEvent.change(document.getElementById("guia-transportista") as HTMLSelectElement, { target: { value: "t1" } });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "+ Agregar sin etiquetas" }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Escribir a mano" }));
+    });
+    await act(async () => {
       // 🩸 EL CLIENTE ES UN `ClientePicker`, NO UN `<input>` PELADO: teclear
       // ahí NO le mueve el estado al formulario — hay que ELEGIR. La salida a
       // mano se llama con todas las letras y hay que tocarla a propósito
@@ -282,7 +296,7 @@ describe("🔴 12 · al guardar una guía nueva, te quedás EN la guía", () => 
     await act(async () => {
       // ⚠️ `onMouseDown`, no `onClick`: la opción se elige antes del `onBlur`
       // del campo (si esperara al click, el desplegable ya se cerró).
-      fireEvent.mouseDown(screen.getAllByText(/No está en la lista — escribir a mano/)[0]);
+      fireEvent.mouseDown(screen.getAllByText(/Ingresar manualmente/ /* 1-oct-2026, Daniel: nombres normales de ERP */)[0]);
     });
     await act(async () => {
       fireEvent.change(campo("direccion"), { target: { value: "Paso Canoas" } });
@@ -295,7 +309,7 @@ describe("🔴 12 · al guardar una guía nueva, te quedás EN la guía", () => 
       }
     });
     await act(async () => {
-      fireEvent.click(screen.getAllByRole("button", { name: /Guardar Guía/i })[0]);
+      fireEvent.click(screen.getAllByRole("button", { name: /Guardar guía/i })[0]);
     });
     // 🔴 Se espera a que la pantalla NAVEGUE —que es lo que hace al terminar de
     // guardar—, no a que pasen 200 ms.

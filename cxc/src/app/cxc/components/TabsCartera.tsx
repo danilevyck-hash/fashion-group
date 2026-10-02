@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Las pestañas del CXC: "Grupo · 6 empresas" y "Confecciones Boston".
+ * Las pestañas del CXC: "Fashion Group" y "Confecciones Boston".
  *
  * 🔴 QUÉ PESTAÑAS SE DIBUJAN LO DECIDE EL ROL, y la lista sale del MISMO lugar
  * que el permiso del endpoint (`lib/cxc/boston-roles.ts`). No hay una segunda
@@ -43,14 +43,8 @@ export default function TabsCartera({ role, tab, onTab }: Props) {
             {label}
           </button>
         ))}
-        {/* Solo la coletilla de Boston, que dice algo que la pestaña no dice.
-            La del grupo era "6 empresas" al lado de la pestaña activa
-            "Grupo · 6 empresas": el mismo texto dos veces en la misma línea. */}
-        {tab === "boston" && (
-          <span className="ml-auto hidden md:block text-xs text-gray-400 pr-1">
-            Confecciones Boston · se lleva aparte
-          </span>
-        )}
+        {/* 1-oct-2026, Daniel: nombres normales de ERP — sin coletilla
+            («Confecciones Boston · se lleva aparte» era coloquial). */}
       </div>
     </div>
   );

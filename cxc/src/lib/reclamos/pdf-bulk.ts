@@ -382,7 +382,7 @@ export async function buildBulkReclamosPdf(
       // —«Creado», «Pagado»— y al proveedor extranjero la segunda se le lee al
       // revés. Adentro del sistema el estado no cambia; lo que cambia es el
       // papel que SALE.
-      head: [["N° Reclamo", "Fecha", "Factura", "Ítems", "Total"]],
+      head: [["N° de reclamo", "Fecha", "Factura", "Ítems", "Total"]],
       body: summaryRows,
       styles: { fontSize: 9, cellPadding: 2.5 },
       headStyles: { fillColor: [27, 58, 92], textColor: [255, 255, 255], fontStyle: "bold" },

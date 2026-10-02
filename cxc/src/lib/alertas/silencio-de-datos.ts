@@ -135,7 +135,7 @@ import { mapEmpresaName } from "@/lib/empresa-mapping";
 export const SYNCS_DE_UNIVERSO_COMPLETO: Readonly<Record<string, string>> = {
   // Todos los saldos vivos de la empresa, uno por documento. 0 ceros en 1.302
   // corridas.
-  estadocuenta: "Cuentas por Cobrar",
+  estadocuenta: "Cuentas por cobrar",
   // La foto de costo de la ventana completa: 31 filas en TODAS las corridas.
   costo: "Ventas",
   // El catálogo entero de la empresa (existencia, precio de etiqueta, CIF).

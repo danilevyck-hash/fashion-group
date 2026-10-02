@@ -142,7 +142,7 @@ function ChequeCalendarioPill({
                 title="Cheque devuelto por el banco"
                 className="text-xs text-red-500 hover:underline min-h-[44px] inline-flex items-center"
               >
-                Rebotado
+                Devuelto
               </button>
             </div>
           )}
@@ -413,7 +413,7 @@ export default function CalendarioMes({
                               title="Cheque devuelto por el banco"
                               className="text-xs text-red-500 hover:underline min-h-[44px] inline-flex items-center"
                             >
-                              Rebotado
+                              Devuelto
                             </button>
                           </div>
                         )}
@@ -433,7 +433,7 @@ export default function CalendarioMes({
           <span className="w-2 h-2 rounded-full bg-emerald-500" /> Pendiente
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-red-500" /> Vencido / Rebotado
+          <span className="w-2 h-2 rounded-full bg-red-500" /> Vencido / Devuelto
         </span>
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-gray-300" /> Depositado

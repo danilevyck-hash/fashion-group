@@ -54,6 +54,7 @@ import {
   rotuloEstado,
   rotuloGuia,
   textoEscondidasPorEtiqueta,
+  textoEscondidasPorGuia,
   textoImprimir,
   validarCajas,
   type EtiquetaFila,
@@ -64,6 +65,7 @@ import {
   agruparEnEnvios,
   facturaDelBulto,
   filtrarEnvios,
+  moverEnElEnvio,
   normalizarNota,
   notasMasUsadas,
   rangosDelEnvio,
@@ -71,6 +73,7 @@ import {
   type Envio,
 } from "@/lib/guias/etiquetas-por-envio";
 import { abrirPdfEnPestana } from "@/lib/guias/pdf-en-pestana";
+import { ETIQUETAS_2026_10 } from "@/lib/guias/guias-2026-10";
 import {
   BOTON_BLANCO,
   BOTON_NEGRO,
@@ -390,8 +393,10 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
     }
   }
 
-  // Lo ya etiquetado no se ofrece, y se DICE cuánto se escondió.
-  const { visibles, escondidas } = facturasParaEtiquetar(facturas ?? [], etiquetas);
+  // Lo ya etiquetado no se ofrece, y se DICE cuánto se escondió. 🔴 1-oct-2026:
+  // tampoco lo que ya salió en una guía (la MISMA regla del chip «Ya salió en
+  // GT-xxx» de Nueva guía), y también se dice.
+  const { visibles, escondidas, yaSalieron } = facturasParaEtiquetar(facturas ?? [], etiquetas);
 
   // 🔴 EL ENVÍO ES DE UNA EMPRESA: si el cliente tiene facturas en varias, se
   // elige cuál; con una sola, ya viene elegida.
@@ -444,6 +449,20 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
   function alternarFactura(clave: string) {
     setError(null);
     setMarcadas((m) => (m.some((x) => x.clave === clave) ? m.filter((x) => x.clave !== clave) : [...m, { clave, bultos: "", nota: "" }]));
+  }
+
+  /**
+   * 🔴 EL ORDEN DE LOS BULTOS SE CAMBIA CON ↑ ↓ (1-oct-2026). El orden de la
+   * lista ES el `orden_en_envio` que se guarda y la numeración que se imprime.
+   */
+  function mover(clave: string, paso: -1 | 1) {
+    setError(null);
+    setMarcadas((m) => {
+      // Se mueve entre las del envío (las de la empresa elegida), no entre las ocultas.
+      const delEnvio = m.filter((x) => porClave.has(x.clave));
+      const otras = m.filter((x) => !porClave.has(x.clave));
+      return [...moverEnElEnvio(delEnvio, delEnvio.findIndex((x) => x.clave === clave), paso), ...otras];
+    });
   }
 
   function cambiar(clave: string, campo: "bultos" | "nota", valor: string) {
@@ -562,7 +581,11 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
               <p className="text-sm text-gray-500">Este cliente no tiene facturas registradas.</p>
             )}
             {!cargando && facturas && facturas.length > 0 && visibles.length === 0 && (
-              <p className="text-sm text-gray-500">Todas las facturas de este cliente ya están etiquetadas — míralas en la lista.</p>
+              <p className="text-sm text-gray-500">
+                {yaSalieron > 0
+                  ? "Este cliente no tiene facturas por etiquetar."
+                  : "Todas las facturas de este cliente ya están etiquetadas — míralas en la lista."}
+              </p>
             )}
 
             {!cargando && empresas.length > 1 && (
@@ -609,6 +632,8 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
                             const clave = claveFactura(f);
                             const m = marcadas.find((x) => x.clave === clave);
                             const rango = previa.rangos.find((r) => r.fila.clave === clave);
+                            // 🔴 1-oct-2026: el NÚMERO DE ORDEN de la factura (1, 2, 3…), que es el orden de los bultos.
+                            const orden = enElEnvio.findIndex((x) => x.clave === clave) + 1;
                             return (
                               <li key={clave} className="border-t border-gray-100 first:border-t-0">
                                 <label className="flex min-h-[44px] cursor-pointer flex-wrap items-center gap-3 py-1.5 text-sm">
@@ -618,6 +643,15 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
                                     onChange={() => alternarFactura(clave)}
                                     className="h-4 w-4 shrink-0 accent-black"
                                   />
+                                  {ETIQUETAS_2026_10 && orden > 0 && (
+                                    <span
+                                      data-orden={orden}
+                                      aria-label={`Orden ${orden}`}
+                                      className="inline-flex h-6 min-w-[24px] shrink-0 items-center justify-center rounded-full bg-gray-900 px-1.5 text-xs font-semibold tabular-nums text-white"
+                                    >
+                                      {orden}
+                                    </span>
+                                  )}
                                   <span className="shrink-0 font-mono tabular-nums">{f.secuencial}</span>
                                   <span className="ml-auto shrink-0 tabular-nums text-gray-600">{fmtMonto(f.total)}</span>
                                 </label>
@@ -698,6 +732,9 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
             {!cargando && escondidas > 0 && (
               <p className="mt-2 text-xs text-gray-500">{textoEscondidasPorEtiqueta(escondidas)}</p>
             )}
+            {!cargando && yaSalieron > 0 && (
+              <p className="mt-1 text-xs text-gray-500">{textoEscondidasPorGuia(yaSalieron)}</p>
+            )}
 
             {!cargando && (
               <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
@@ -757,11 +794,34 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
         <ElegirPapel formato={formato} onElegir={setFormato} />
         {enElEnvio.length > 0 && (
           <ul data-testid="resumen-envio" className="mb-3 text-sm">
-            {previa.rangos.map((r) => {
+            {previa.rangos.map((r, i) => {
               const f = porClave.get(r.fila.clave) as Factura;
               const nota = r.fila.nota;
               return (
                 <li key={r.fila.clave} className="flex flex-wrap items-center gap-2 py-0.5">
+                  {ETIQUETAS_2026_10 && (
+                    <>
+                      <span className="w-5 shrink-0 text-right text-xs font-semibold tabular-nums text-gray-500">{i + 1}</span>
+                      <button
+                        type="button"
+                        aria-label={`Subir ${f.secuencial}`}
+                        disabled={i === 0}
+                        onClick={() => mover(r.fila.clave, -1)}
+                        className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-gray-200 text-gray-600 transition hover:text-black disabled:opacity-30 md:[@media(pointer:fine)]:min-h-[32px] md:[@media(pointer:fine)]:min-w-[32px]"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Bajar ${f.secuencial}`}
+                        disabled={i === previa.rangos.length - 1}
+                        onClick={() => mover(r.fila.clave, 1)}
+                        className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-gray-200 text-gray-600 transition hover:text-black disabled:opacity-30 md:[@media(pointer:fine)]:min-h-[32px] md:[@media(pointer:fine)]:min-w-[32px]"
+                      >
+                        ↓
+                      </button>
+                    </>
+                  )}
                   <span className="font-mono tabular-nums">{f.secuencial}</span>
                   <span className="tabular-nums text-gray-500">
                     {r.fila.cajas > 0 ? `bultos ${textoRango(r)} de ${previa.total}` : "faltan los bultos"}
@@ -819,7 +879,7 @@ function ModalReimprimirEnvio({ envio, onCerrar }: { envio: Envio; onCerrar: () 
         <Opcion
           elegida={modo === "envio"}
           onElegir={() => setModo("envio")}
-          titulo="El envío completo"
+          titulo="Envío completo"
           detalle={`Las ${envio.total} etiquetas, iguales a las impresas.`}
         />
         <Opcion
@@ -837,7 +897,7 @@ function ModalReimprimirEnvio({ envio, onCerrar }: { envio: Envio; onCerrar: () 
               max={envio.total}
               value={bulto}
               onChange={(e) => setBulto(e.target.value)}
-              aria-label="Cuál bulto"
+              aria-label="Bulto"
               onClick={(e) => e.stopPropagation()}
               className="w-[86px] rounded-md border border-gray-200 px-2 text-center font-mono outline-none transition focus:border-black min-h-[44px]"
             />

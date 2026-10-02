@@ -51,6 +51,7 @@ import {
 } from "@/lib/multifashion/patrones";
 import { FILAS_CLIENTES_AL_ABRIR, coberturaDeClientes } from "@/lib/multifashion/clientes-cobertura";
 import { nombreEnPantalla } from "@/lib/multifashion/nombres";
+// 1-oct-2026, Daniel: nombres normales de ERP («tiquetes» → «tickets», «Cierra en» → «Proyección de cierre», «Cuándo vende la tienda» → «Ventas por día y hora», «Lo que más…» → «Más vendidos / Mayor utilidad / Mayores variaciones», «Dormidos» → «Inactivos», «Compró/Veces» → «Total compras/Visitas»).
 
 const shell = leer("src/app/multifashion/MultifashionShell.tsx");
 const view = leer("src/components/multifashion/MultifashionView.tsx");
@@ -334,11 +335,11 @@ describe("6 · Clientes", () => {
     });
     expect(c.pctTickets).toBe(19);
     expect(c.pctVentas).toBe(27);
-    expect(c.texto).toBe("19% de los tiquetes con nombre — el 27% de la venta");
+    expect(c.texto).toBe("19% de los tickets con nombre — el 27% de la venta");
     expect(c.texto).not.toMatch(/\d+\.\d/);
   });
 
-  it("🔴 sin tiquetes SE ABSTIENE — nunca «0% — 0%»", () => {
+  it("🔴 sin tickets SE ABSTIENE — nunca «0% — 0%»", () => {
     const c = coberturaDeClientes({ tickets_identificados: 0, tickets_anonimos: 0 });
     expect(c.pctTickets).toBeNull();
     expect(c.texto).toBeNull();
@@ -431,7 +432,7 @@ describe("8 · el año sube a las tarjetas", () => {
     expect(resumen).toContain("function TarjetasDelMes");
     expect(resumen).toMatch(/>\s*Ventas del mes/);
     expect(resumen).toContain(">Tickets<");
-    expect(resumen).toContain('"Cierra en"');
+    expect(resumen).toContain('"Proyección de cierre"');
     expect(resumen).toContain("Año {year}");
     expect(resumen).toContain("xl:grid-cols-4");
   });
@@ -454,7 +455,7 @@ describe("8 · el año sube a las tarjetas", () => {
 describe("9 · «Cuándo vende la tienda»: una sección, con su período dicho", () => {
   it("es UNA sección, no tres tarjetas", () => {
     expect(resumen).toContain("function CuandoVendeLaTienda");
-    expect(resumen).toContain(">Cuándo vende la tienda<");
+    expect(resumen).toContain(">Ventas por día y hora<");
     const src = sinComentarios(resumen);
     expect(src).not.toContain("function BandCards");
     expect(src).not.toContain("function BestWorstDayCard");

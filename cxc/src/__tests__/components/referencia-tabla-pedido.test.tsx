@@ -16,6 +16,7 @@ import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { ReferenciaView } from "@/components/referencia/ReferenciaView";
 import { ordenarComoPegado } from "@/lib/ventas/referencia";
 import type { ArticuloCompras, ComprasApiResp } from "@/lib/ventas/compras";
+// 1-oct-2026, Daniel: nombres normales de ERP (aprobó «Comprado · Vendido · Stock · % vendido»; el % se rotula «% vendido»; «Llegada» → «Recepción»; «Más info» → «Detalle»).
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/ventas",
@@ -131,7 +132,7 @@ describe("modo pedido — la tabla", () => {
     await buscarPegado();
     // Las columnas del mockup aprobado (12-ago-2026): VENDIDO · MESES en vez
     // de "90% en" — Daniel: "va el 29%" no decía cuánto tiempo llevaba.
-    for (const col of ["Código", "Compré", "Vendí", "Stock", "Vendido", "Meses", "Margen", "Últ. compra"]) {
+    for (const col of ["Código", "Comprado", "Vendido", "Stock", "% vendido", "Meses", "Margen", "Últ. compra"]) {
       expect(screen.getAllByText(col).length, `falta la columna "${col}"`).toBeGreaterThan(0);
     }
     expect(screen.queryByText("90% en")).toBeNull();
@@ -199,7 +200,7 @@ describe("modo pedido — la tabla", () => {
     await buscarPegado();
     fireEvent.click(screen.getAllByText("AAA111001")[0].closest("tr")!);
     // El detalle es CuerpoArticulo: los cuatro grandes + la línea del ritmo + la plata.
-    expect(screen.getAllByText("Compré").length).toBeGreaterThan(1); // th + dt
+    expect(screen.getAllByText("Comprado").length).toBeGreaterThan(1); // th + dt
     expect(screen.getAllByText("en bodega").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Vendo 9.6 u por mes · En 10 meses va el 80%").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Precio prom").length).toBeGreaterThan(0);
@@ -239,7 +240,7 @@ describe("modo pedido — la tabla", () => {
     await screen.findAllByText("CVM253CR02001");
     // 🔴 Desde el rediseño la tarjeta es la del MODELO (los rótulos del oficio)
     // y NO sale la tabla de colores: un código completo es UN color.
-    expect(screen.getAllByText("Compré").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Comprado").length).toBeGreaterThan(0);
     expect(screen.getAllByText("% vendido").length).toBeGreaterThan(0);
     expect(screen.queryByText(/Sus colores/)).toBeNull();
     // Y sigue sin ser el modo pedido: ninguna columna de esa tabla.
@@ -376,7 +377,7 @@ describe("modo pedido — la tabla", () => {
 
     expect(screen.queryByText("Margen")).toBeNull();
     // Las demás columnas siguen enteras.
-    for (const col of ["Código", "Compré", "Vendí", "Stock", "Vendido", "Meses", "Últ. compra"]) {
+    for (const col of ["Código", "Comprado", "Vendido", "Stock", "% vendido", "Meses", "Últ. compra"]) {
       expect(screen.getAllByText(col).length, `falta la columna "${col}"`).toBeGreaterThan(0);
     }
     // Abrir el detalle: la fila de plata trae precios y costos, pero NO margen.
@@ -461,7 +462,7 @@ describe("modo pedido — ordenar por columna", () => {
     const leer = (codigo: string) =>
       [...screen.getAllByText(codigo)[0].closest("tr")!.querySelectorAll("td")].map((td) => td.textContent);
     const antes = leer("ZZZ999001");
-    fireEvent.click(encabezado("Vendido"));
+    fireEvent.click(encabezado("% vendido"));
     expect(leer("ZZZ999001")).toEqual(antes);
     fireEvent.click(encabezado("Margen"));
     expect(leer("ZZZ999001")).toEqual(antes);
@@ -548,7 +549,7 @@ describe("modo pedido — ordenar NO puede estrenar una segunda cuenta", () => {
     expect(celdaVendido("DESC001")).toBe("63%");
     expect(celdaVendido("OTRO002")).toBe("55%");
     // Y el orden respeta ESO.
-    fireEvent.click(screen.getAllByRole("button", { name: /^Vendido$/ })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: /^% vendido$/ })[0]);
     const codigos = [...document.querySelectorAll("tbody td:first-child")].map(
       (td) => td.querySelector("span")?.textContent ?? "",
     );

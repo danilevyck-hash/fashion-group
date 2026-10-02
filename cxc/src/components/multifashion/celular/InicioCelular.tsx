@@ -162,7 +162,7 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir }: Props
       <div
         data-celular="barras"
         role="img"
-        aria-label="Ventas día por día del mes"
+        aria-label="Ventas diarias del mes"
         className="mt-5 flex h-[74px] items-end gap-[2px]"
       >
         {barras.map((b) => (

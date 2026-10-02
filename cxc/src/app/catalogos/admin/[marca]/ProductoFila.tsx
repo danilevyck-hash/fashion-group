@@ -83,7 +83,7 @@ export default function ProductoFila({
     setGuardandoEscondido(true);
     try {
       await toggleProductOculto(marca, { id: product.id, sku: product.sku || "" }, !escondido);
-      showToast(escondido ? "Listo — el producto vuelve a verse en el catálogo" : "Listo — el producto quedó escondido");
+      showToast(escondido ? "Listo — el producto vuelve a verse en el catálogo" : "Listo — el producto quedó oculto");
       await onCambio();
     } catch (e) {
       showToast(e instanceof Error ? e.message : "No se pudo actualizar el producto.");
@@ -149,7 +149,7 @@ export default function ProductoFila({
             )}
             <h3 className="text-sm font-semibold text-gray-900 truncate">{product.name}</h3>
             {escondido && (
-              <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-700 text-white">Escondido</span>
+              <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-700 text-white">Oculto</span>
             )}
           </div>
           {/* 🔴 LOS DOS NÚMEROS, EN UNA LÍNEA (24-sep-2026): «Disponible 14 · En
@@ -227,7 +227,7 @@ export default function ProductoFila({
               ? "col-span-2 flex items-center gap-1.5 text-xs sm:col-auto"
               : "flex items-center gap-1.5 text-xs"}>
               <span className="text-gray-500 whitespace-nowrap">
-                {escondido ? "¿Mostrar en el catálogo?" : "¿Esconder del catálogo?"}
+                {escondido ? "¿Mostrar en el catálogo?" : "¿Ocultar del catálogo?"}
               </span>
               <button
                 onClick={alternarEscondido}
@@ -253,7 +253,7 @@ export default function ProductoFila({
                   : "border-gray-200 text-gray-500 hover:bg-gray-50"
               }`}
             >
-              {escondido ? "Mostrar" : "Esconder"}
+              {escondido ? "Mostrar" : "Ocultar"}
             </button>
           )}
         </div>

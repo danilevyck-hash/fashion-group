@@ -107,7 +107,7 @@ export function ResumenMinimo({ data, overview, year, mes, isClosedYear, grafico
             {fmtMoney(totales.ventas)}
           </p>
           <p className="mt-0.5 text-xs text-gray-500">
-            <span className="font-mono tabular-nums">{totales.n_tickets.toLocaleString()}</span> tiquetes ·{" "}
+            <span className="font-mono tabular-nums">{totales.n_tickets.toLocaleString()}</span> tickets ·{" "}
             <span className="font-mono tabular-nums">${totales.ticket_promedio.toFixed(2)}</span> promedio
           </p>
           <p className="mt-2 border-t border-gray-100 pt-2 text-xs">
@@ -121,7 +121,7 @@ export function ResumenMinimo({ data, overview, year, mes, isClosedYear, grafico
         {/* 2 · Cierra en (por temporada) / Margen tienda del mes cerrado */}
         <Card data-elemento="cierra-en" className="p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-            {hayProyeccion ? "Cierra en" : "Margen tienda"}
+            {hayProyeccion ? "Proyección de cierre" : "Margen tienda"}
           </p>
           <p className="mt-1 font-mono text-2xl font-semibold leading-tight tabular-nums text-gray-950">
             {hayProyeccion

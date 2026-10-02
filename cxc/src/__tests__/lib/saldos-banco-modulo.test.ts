@@ -477,7 +477,7 @@ describe("los nombres de los módulos no se confunden entre sí", () => {
     // lista escrita a mano: un módulo nuevo llamado "Planilla" a secas —o
     // "Asistencia del reloj"— tiene que poner el build rojo.
     const asistencia = ALL_MODULES.find((m) => m.key === "asistencia")!;
-    expect(asistencia.label).toBe("Asistencia y Planilla");
+    expect(asistencia.label).toBe("Asistencia y planilla"); // 1-oct-2026, Daniel: nombres normales de ERP (mayúscula solo en la primera palabra)
     // 🔴 La KEY no cambia: está en `role_permissions` y en
     // `fg_users.modulos_override`, y renombrarla rompería los permisos.
     expect(asistencia.href).toBe("/asistencia");

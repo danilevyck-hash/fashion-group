@@ -31,6 +31,9 @@
  * que el bug se dispara siempre: React monta el árbol dos veces y el contador
  * de renders llegaba a 2 sin que nadie tocara una tecla.
  */
+// 🔄 1-oct-2026: nombres de ERP en Guías (Daniel aprobó el audit): rótulos en tipo oración
+// («Guardar guía», «Nueva guía de despacho», «Tipo de despacho», «Vincular cliente»…).
+// Este candado leía los textos viejos y se actualiza a propósito.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { StrictMode, type ReactNode } from "react";
 import { render, screen, cleanup, act, fireEvent, waitFor } from "@testing-library/react";
@@ -154,11 +157,11 @@ async function abrirPantallaDeEditar(envoltorio?: (hijo: ReactNode) => ReactNode
   await act(async () => { fireEvent.click(editar); });
   // El formulario es `dynamic()`: hasta que no resuelve hay esqueleto.
   await waitFor(() => {
-    expect(screen.getAllByText(/Guardar Cambios/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Guardar cambios/i).length).toBeGreaterThan(0);
     expect(document.querySelector(".animate-pulse")).toBeNull();
   });
   // Si la pantalla no cargó, cualquier "0 escrituras" sería verde por nada.
-  expect(screen.getAllByText(/Guardar Cambios/i).length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/Guardar cambios/i).length).toBeGreaterThan(0);
 }
 
 const puts = () => escrituras.filter((e) => e.metodo === "PUT");

@@ -131,7 +131,7 @@ export function ResumenCelular({
     if (proy) {
       const delta = proy.totales_grupo.delta_vs_anio_anterior_total ?? null;
       salida.push({
-        rotulo: "Cierra",
+        rotulo: "Proyección",
         // 🔴 El cierre va REDONDEADO a propósito: es una estimación, y darle
         // centavos a un número estimado lo hace parecer medido.
         valor: cifraDeLaTira(proy.totales_grupo.proyeccion_cierre),

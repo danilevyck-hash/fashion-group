@@ -532,7 +532,7 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
                 title={!isOnline ? "Sin conexión" : undefined}
                 className="text-sm bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                ＋ Recordar
+                ＋ Nuevo
               </button>
             </div>
           </div>

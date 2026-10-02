@@ -68,9 +68,10 @@ beforeEach(() => {
 const buscador = () => screen.getByLabelText("Buscar marca o descripción");
 
 describe("🔴 quedan DOS secciones y nada más", () => {
-  it("están «Cómo se elige la talla» y «Descripciones por marca»", () => {
+  // 1-oct-2026, Daniel: nombres normales de ERP
+  it("están «Reglas de talla» y «Descripciones por marca»", () => {
     render(<ReglasView />);
-    expect(screen.getByText("Cómo se elige la talla")).toBeTruthy();
+    expect(screen.getByText("Reglas de talla")).toBeTruthy();
     expect(screen.getByText("Descripciones por marca")).toBeTruthy();
   });
 
@@ -82,7 +83,7 @@ describe("🔴 quedan DOS secciones y nada más", () => {
 
   it("la tabla de talla dibuja TODOS los casos del código, uno por uno", () => {
     render(<ReglasView />);
-    const tabla = screen.getByRole("table", { name: "Cómo se elige la talla" });
+    const tabla = screen.getByRole("table", { name: "Reglas de talla" });
     // Encabezado + un renglón por caso + el «resto».
     expect(within(tabla).getAllByRole("row")).toHaveLength(CASOS_TALLA.length + 2);
     for (const c of [...CASOS_TALLA, CASO_TALLA_RESTO]) {
@@ -103,8 +104,8 @@ describe("🔴 quedan DOS secciones y nada más", () => {
 
   it("las correcciones de nombre son 10 y dicen lo que sale al Excel", () => {
     render(<ReglasView />);
-    expect(screen.getByText("Nombres que se corrigen solos (10)")).toBeTruthy();
-    const tabla = screen.getByRole("table", { name: "Nombres que se corrigen solos" });
+    expect(screen.getByText("Correcciones automáticas (10)")).toBeTruthy();
+    const tabla = screen.getByRole("table", { name: "Correcciones automáticas" });
     expect(within(tabla).getAllByRole("row")).toHaveLength(11); // encabezado + 10
     // La fila dice lo que sale al EXCEL, no el valor crudo del mapa.
     expect(within(tabla).getByText("Men-Polo S/S")).toBeTruthy();   // como lo manda el proveedor

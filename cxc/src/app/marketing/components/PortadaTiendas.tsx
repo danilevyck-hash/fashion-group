@@ -121,7 +121,7 @@ export default function PortadaTiendas({ refreshKey, celular = null }: Props) {
   return (
     <div className="space-y-4">
       {chips.length > 0 && (
-        <BarraDePeriodos chips={chips} elegido={periodo} onElegir={setPeriodo} etiqueta="Elegir el período" />
+        <BarraDePeriodos chips={chips} elegido={periodo} onElegir={setPeriodo} etiqueta="Seleccionar período" />
       )}
 
       {/* Solo filtra lo que ya está en pantalla. text-base en mobile: con

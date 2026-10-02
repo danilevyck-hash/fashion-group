@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 /**
  * CANDADO — MARKETING › EL PERÍODO MANDA (23-sep-2026).
  *
@@ -249,7 +250,7 @@ const leer = (rel: string) => fs.readFileSync(path.resolve(process.cwd(), rel), 
 const sinComentarios = (s: string) =>
   s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\{\/\*[\s\S]*?\*\/\}/g, " ").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
 
-const tabPeriodo = (nombre: RegExp) => within(screen.getByRole("tablist", { name: "Elegir el período" })).getByRole("tab", { name: nombre });
+const tabPeriodo = (nombre: RegExp) => within(screen.getByRole("tablist", { name: "Seleccionar período" })).getByRole("tab", { name: nombre });
 const filasDeGasto = () => screen.getAllByRole("table")[0].querySelectorAll("tbody tr[data-fg-gasto]");
 const kpi = () => screen.getByRole("main").querySelector("[data-fg-kpi-total]")!.textContent;
 
@@ -277,7 +278,7 @@ describe("1 · los chips salen de los períodos reales de los gastos, y se abre 
 
   it("la ficha abre con «Abierto» elegido y la barra dibuja esos tres chips", async () => {
     await abrirFicha();
-    const barra = screen.getByRole("tablist", { name: "Elegir el período" });
+    const barra = screen.getByRole("tablist", { name: "Seleccionar período" });
     const chips = within(barra).getAllByRole("tab");
     // 🔴 Sin conteo: Daniel (24-sep-2026) «números de facturas no me hace sentido, es mejor nada».
     expect(chips.map((c) => c.textContent)).toEqual(["Abierto", "mid 2026 · PVH", "Todos"]);
@@ -551,7 +552,7 @@ describe("7 · el interruptor en false = como antes", () => {
     perilla.encendido = false;
     render(<ToastProvider><VistaTienda codigo="D-118" /></ToastProvider>);
     await waitFor(() => expect(screen.getByText("Gasto que se reporta")).toBeTruthy());
-    expect(screen.queryByRole("tablist", { name: "Elegir el período" })).toBeNull();
+    expect(screen.queryByRole("tablist", { name: "Seleccionar período" })).toBeNull();
     expect(screen.queryByText(/ELIMINAR/)).toBeNull();
     const { GET } = await import("@/app/api/marketing/tiendas/route");
     const { signSession } = await import("@/lib/session-cookie");

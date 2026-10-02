@@ -65,7 +65,7 @@ export function nombreRelojEnPantalla(clave: string): string {
 export const MIGRACION_AGENTE = "20260806200000_asistencia_agente_pedido.sql";
 
 export function avisoMigracionAgente(): string {
-  return `Falta correr la migración ${MIGRACION_AGENTE} en Supabase. Mientras tanto las marcaciones siguen entrando solas; lo único que no funciona es el botón "Traer ahora".`;
+  return `Falta correr la migración ${MIGRACION_AGENTE} en Supabase. Mientras tanto las marcaciones siguen entrando solas; lo único que no funciona es el botón "Sincronizar".`;
 }
 
 /* ── Detección de "falta la columna" ────────────────────────────────────────

@@ -103,7 +103,7 @@ export default function ReclamoForm({
   }
 
   const leidaTexto = leida
-    ? [leida.proveedor, leida.nro_factura ? `factura ${leida.nro_factura}` : null, leida.fecha_factura ? fmtDate(leida.fecha_factura) : null, leida.nro_orden_compra ? `OC ${leida.nro_orden_compra}` : null, `${leida.lineas.length} renglón${leida.lineas.length === 1 ? "" : "es"}`].filter(Boolean).join(" · ")
+    ? [leida.proveedor, leida.nro_factura ? `factura ${leida.nro_factura}` : null, leida.fecha_factura ? fmtDate(leida.fecha_factura) : null, leida.nro_orden_compra ? `OC ${leida.nro_orden_compra}` : null, `${leida.lineas.length} línea${leida.lineas.length === 1 ? "" : "s"}`].filter(Boolean).join(" · ")
     : null;
 
   return (
@@ -111,10 +111,10 @@ export default function ReclamoForm({
       <nav className="flex items-center gap-1.5 text-xs text-gray-400 -mt-2 mb-2">
         <button onClick={onCancel} className="hover:text-black transition inline-flex items-center min-h-[44px] px-2 -ml-2">Reclamos</button>
         <span className="text-gray-300">/</span>
-        <span className="text-gray-600 font-medium">Nuevo Reclamo</span>
+        <span className="text-gray-600 font-medium">Nuevo reclamo</span>
       </nav>
       {draftBanner}
-      <h1 className="sr-only">Nuevo Reclamo</h1>
+      <h1 className="sr-only">Nuevo reclamo</h1>
 
       {/* ── 1. La factura (PDF), obligatoria y primero ──
           🔴 LO QUE VA A PASAR SE DICE ANTES, NO DETRÁS DE UN ⓘ (20-sep-2026).
@@ -126,7 +126,7 @@ export default function ReclamoForm({
       <div className="mb-10">
         <div className="text-sm font-semibold text-gray-900">Factura del proveedor *</div>
         <p className="text-sm text-gray-500 mt-1 mb-3 max-w-xl">
-          Sube el PDF o una foto y se llenan solos el proveedor, la marca, la factura, la fecha y el pedido, más los renglones para que marques cuáles reclamas. Revisa y corrige.
+          Sube el PDF o una foto y se llenan solos el proveedor, la marca, la factura, la fecha y el pedido, más las líneas para que marques cuáles reclamas. Revisa y corrige.
         </p>
         <div className="max-w-xl">
           <FacturaPdfUploader onUploaded={setFacturaPdfPath} onExtracted={aplicarIA} />
@@ -160,7 +160,7 @@ export default function ReclamoForm({
             </div>
             {!esActiveShoes(fEmpresa) && (
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-500">N° Pedido *</label>
+                <label className="text-xs text-gray-500">N° de pedido *</label>
                 <input type="text" value={fPedido} onChange={(e) => setFPedido(e.target.value)} placeholder="Ej. 10059874" className="border-b border-gray-200 py-3 xl:py-1.5 text-base xl:text-sm text-black outline-none" />
               </div>
             )}
@@ -177,9 +177,9 @@ export default function ReclamoForm({
               <RenglonesDesdeFactura lineas={fLineas} seleccion={fSeleccion} setSeleccion={setFSeleccion} />
               <div className="mt-4">
                 {aMano ? (
-                  <ItemsEditor items={fItems} setItems={setFItems} titulo="Renglones que no están en la factura" />
+                  <ItemsEditor items={fItems} setItems={setFItems} titulo="Líneas adicionales" />
                 ) : (
-                  <button type="button" onClick={() => setAMano(true)} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2">¿No está en la factura? Agregar un renglón a mano</button>
+                  <button type="button" onClick={() => setAMano(true)} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2">¿No está en la factura? Agregar línea manual</button>
                 )}
               </div>
             </>
@@ -187,7 +187,7 @@ export default function ReclamoForm({
             <ItemsEditor items={fItems} setItems={setFItems} />
           )}
           <div className="mt-6 text-right text-sm space-y-1">
-            <div className="text-gray-500">{resumen.renglones} renglón{resumen.renglones === 1 ? "" : "es"} · {resumen.piezas} pieza{resumen.piezas === 1 ? "" : "s"}</div>
+            <div className="text-gray-500">{resumen.renglones} línea{resumen.renglones === 1 ? "" : "s"} · {resumen.piezas} pieza{resumen.piezas === 1 ? "" : "s"}</div>
             <div>Subtotal: <span className="tabular-nums font-medium">${fmt(resumen.subtotal)}</span></div>
             <div className="text-gray-400">Importación ({impLabel(fEmpresa)}): ${fmt(fTax.importacion)}</div>
             {fTax.hasItbms && <div className="text-gray-400">ITBMS ({itbmsLabel(fEmpresa)} s/imp.): ${fmt(fTax.itbms)}</div>}
@@ -270,7 +270,7 @@ export default function ReclamoForm({
 
         {/* ── Notas ── */}
         <div className="mb-10">
-          <div className="text-sm font-semibold text-gray-900 mb-3">Notas <span className="font-normal text-gray-400">(opcional)</span></div>
+          <div className="text-sm font-semibold text-gray-900 mb-3">Observaciones <span className="font-normal text-gray-400">(opcional)</span></div>
           <div className="max-w-2xl">
             <textarea value={fNotas} onChange={(e) => setFNotas(e.target.value)} rows={2} placeholder="Algo más que el proveedor deba saber…" className="w-full border-b border-gray-200 py-3 xl:py-1.5 text-base xl:text-sm text-black outline-none resize-none" />
           </div>

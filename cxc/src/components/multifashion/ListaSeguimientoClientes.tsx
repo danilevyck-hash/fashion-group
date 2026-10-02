@@ -283,14 +283,14 @@ function FilaCliente({
 function FichaDelCliente({ cliente }: { cliente: ClienteUniverso }) {
   return (
     <dl className="flex flex-wrap gap-x-6 gap-y-2 border-t border-gray-100 bg-gray-50/50 px-3 py-2.5">
-      <Dato rotulo="Compró" valor={fmtMoney(cliente.total_comprado)} />
+      <Dato rotulo="Total compras" valor={fmtMoney(cliente.total_comprado)} />
       <Dato
-        rotulo="Veces"
+        rotulo="Visitas"
         valor={`${cliente.visitas.toLocaleString()} ${cliente.visitas === 1 ? "visita" : "visitas"}`}
       />
       <Dato rotulo="Última compra" valor={fechaLarga(cliente.ultima_compra)} />
       {cliente.estado5 === "disponible" && <Dato rotulo="5%" valor="Disponible" />}
-      {cliente.estado5 === "usado" && <Dato rotulo="5%" valor="Ya lo usó" />}
+      {cliente.estado5 === "usado" && <Dato rotulo="5%" valor="Utilizado" />}
     </dl>
   );
 }

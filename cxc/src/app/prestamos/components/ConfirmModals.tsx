@@ -27,12 +27,12 @@ export function DeleteEmpleadoConfirm({ show, nombreEmpleado, deleteInput, onCha
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
       <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
-        <h2 className="font-medium mb-2 text-red-700">Eliminar Empleado</h2>
+        <h2 className="font-medium mb-2 text-red-700">Eliminar colaborador</h2>
         {/* El AVISO se queda; la instrucción de qué escribir se mudó al
             casillero, que es donde se va a escribir. */}
         <p className="text-sm text-gray-500 mb-4">Esta acción es irreversible.</p>
         <p className="text-sm font-medium mb-2">{nombreEmpleado}</p>
-        <input value={deleteInput} onChange={e => onChangeInput(e.target.value)} placeholder="Escribe el nombre del empleado" className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-red-500 transition" />
+        <input value={deleteInput} onChange={e => onChangeInput(e.target.value)} placeholder="Escribe el nombre del colaborador" className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-red-500 transition" />
         <div className="flex gap-3 mt-6">
           <button onClick={onClose} className="flex-1 inline-flex min-h-[44px] items-center justify-center border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
           <button onClick={onConfirm} disabled={deleteInput !== nombreEmpleado} className="flex-1 inline-flex min-h-[44px] items-center justify-center bg-red-600 text-white rounded-md text-sm hover:bg-red-700 transition disabled:opacity-50">
@@ -61,7 +61,7 @@ export function ClearHistoryConfirm({ show, movCount, clearInput, clearProgress,
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
       <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
-        <h2 className="font-medium mb-2 text-red-700">Eliminar Todo el Historial</h2>
+        <h2 className="font-medium mb-2 text-red-700">Eliminar todo el historial</h2>
         {clearProgress ? (
           <p className="text-sm text-amber-600 font-medium py-4">{clearProgress}</p>
         ) : (
@@ -73,7 +73,7 @@ export function ClearHistoryConfirm({ show, movCount, clearInput, clearProgress,
             <div className="flex gap-3 mt-6">
               <button onClick={onClose} className="flex-1 inline-flex min-h-[44px] items-center justify-center border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
               <button onClick={onConfirm} disabled={clearInput !== "CONFIRMAR"} className="flex-1 inline-flex min-h-[44px] items-center justify-center bg-red-600 text-white rounded-md text-sm hover:bg-red-700 transition disabled:opacity-50">
-                Eliminar Todo
+                Eliminar todo
               </button>
             </div>
           </>

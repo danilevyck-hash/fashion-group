@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 // ─────────────────────────────────────────────────────────────────────────────
 // 🔴 NINGÚN PEDIDO SALE A SWITCH SIN UN CLIENTE ELEGIDO A PROPÓSITO.
 //
@@ -189,7 +190,7 @@ describe("Checkout del catálogo — el cliente arranca vacío", () => {
   it("elegir un cliente REAL enciende el botón y ese cliente es el que viaja", async () => {
     const llamadas = stubCheckout();
     await pintarCheckout();
-    fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
+    fireEvent.click(screen.getByRole("button", { name: "Seleccionar" }));
     fireEvent.click(await screen.findByRole("button", { name: /Sporting Shoes/ }));
     await waitFor(() => expect(botonEnviar().disabled).toBe(false));
     expect(document.querySelector('[data-medir="falta-enviar"]')).toBeNull();
@@ -202,7 +203,7 @@ describe("Checkout del catálogo — el cliente arranca vacío", () => {
   it("🔴 Contado SIGUE existiendo, pero hay que TOCARLO", async () => {
     const llamadas = stubCheckout();
     await pintarCheckout();
-    fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
+    fireEvent.click(screen.getByRole("button", { name: "Seleccionar" }));
     // Se espera al directorio: la opción de mostrador se dibuja ANTES de que
     // llegue, con el id de respaldo. Tocarla apurado mediría el respaldo.
     await screen.findByRole("button", { name: /Sporting Shoes/ });
@@ -221,7 +222,7 @@ describe("Checkout del catálogo — el cliente arranca vacío", () => {
     // Empresa cuyo TCKCTA no es el id 1: el pedido tiene que salir con el suyo.
     const llamadas = stubCheckout({ contado: { cliente_switch_id: 908, codigo: "TCKCTA", nombre: "VENTAS" } });
     await pintarCheckout();
-    fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
+    fireEvent.click(screen.getByRole("button", { name: "Seleccionar" }));
     await screen.findByRole("button", { name: /Sporting Shoes/ });
     fireEvent.click(screen.getByRole("button", { name: LABEL_CONTADO }));
     await tocarEnviarCheckout();
@@ -234,7 +235,7 @@ describe("Checkout del catálogo — el cliente arranca vacío", () => {
     // elegido en pantalla — la peor forma de fallar.
     const llamadas = stubCheckout({ contado: null });
     await pintarCheckout();
-    fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
+    fireEvent.click(screen.getByRole("button", { name: "Seleccionar" }));
     await screen.findByRole("button", { name: /Sporting Shoes/ });
     fireEvent.click(screen.getByRole("button", { name: LABEL_CONTADO }));
     await tocarEnviarCheckout();
@@ -247,7 +248,7 @@ describe("Checkout del catálogo — el cliente arranca vacío", () => {
     // de los pedidos nuevos, y eso no es parte de unificar el selector.
     const llamadas = stubCheckout();
     await pintarCheckout();
-    fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
+    fireEvent.click(screen.getByRole("button", { name: "Seleccionar" }));
     await screen.findByRole("button", { name: /Sporting Shoes/ });
     fireEvent.click(screen.getByRole("button", { name: LABEL_CONTADO }));
     await tocarEnviarCheckout();
@@ -261,7 +262,7 @@ describe("Checkout del catálogo — el cliente arranca vacío", () => {
   it("el mostrador NO aparece dos veces (una opción, no dos formas de lo mismo)", async () => {
     stubCheckout({ clientes: [CONTADO_FILA, ...DIRECTORIO] });
     await pintarCheckout();
-    fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
+    fireEvent.click(screen.getByRole("button", { name: "Seleccionar" }));
     await screen.findByRole("button", { name: /Sporting Shoes/ });
     // "VENTAS LOCA" es el nombre del TCKCTA en fashion_shoes: aunque el
     // directorio lo devuelva en la lista, no puede salir como un cliente más.
@@ -275,7 +276,7 @@ describe("Checkout del catálogo — el cliente arranca vacío", () => {
     // importarla y no dibujarla; esto lo mira en el DOM.
     stubCheckout();
     await pintarCheckout();
-    fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
+    fireEvent.click(screen.getByRole("button", { name: "Seleccionar" }));
     await screen.findByRole("button", { name: /Sporting Shoes/ });
     expect(screen.getByPlaceholderText("Buscar por nombre o código...")).toBeTruthy();
     expect(screen.getByRole("button", { name: LABEL_CONTADO }).getAttribute("aria-pressed")).toBe("false");
@@ -376,7 +377,7 @@ const cajaCliente = () => within(document.querySelector('[data-medir="cliente-de
  * probado lo que dice probar.
  */
 async function abrirSelectorCliente() {
-  fireEvent.click(cajaCliente().getByRole("button", { name: /Elegir|Cambiar/ }));
+  fireEvent.click(cajaCliente().getByRole("button", { name: /Seleccionar|Cambiar/ }));
   await screen.findByRole("button", { name: /Sporting Shoes/ });
 }
 
@@ -524,7 +525,7 @@ describe("🔴 Pedido o cotización — la elección, y el candado que no se afl
     // es donde el dedo está mirando cuando decide.
     const llamadas = stubCheckout();
     await pintarCheckout();
-    fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
+    fireEvent.click(screen.getByRole("button", { name: "Seleccionar" }));
     fireEvent.click(await screen.findByRole("button", { name: /Sporting Shoes/ }));
     await waitFor(() => expect(botonEnviar().disabled).toBe(false));
 
@@ -541,7 +542,7 @@ describe("🔴 Pedido o cotización — la elección, y el candado que no se afl
     // intermedio, este toque deja de mandar y el test se pone rojo.
     const llamadas = stubCheckout();
     await pintarCheckout();
-    fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
+    fireEvent.click(screen.getByRole("button", { name: "Seleccionar" }));
     fireEvent.click(await screen.findByRole("button", { name: /Sporting Shoes/ }));
     await waitFor(() => expect(botonEnviar().disabled).toBe(false));
 
@@ -553,7 +554,7 @@ describe("🔴 Pedido o cotización — la elección, y el candado que no se afl
   it("elegir COTIZACIÓN manda documento:'cotizacion' — con el mismo cliente elegido", async () => {
     const llamadas = stubCheckout();
     await pintarCheckout();
-    fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
+    fireEvent.click(screen.getByRole("button", { name: "Seleccionar" }));
     fireEvent.click(await screen.findByRole("button", { name: /Sporting Shoes/ }));
     await waitFor(() => expect(botonEnviar().disabled).toBe(false));
 
@@ -567,7 +568,7 @@ describe("🔴 Pedido o cotización — la elección, y el candado que no se afl
   it("elegir PEDIDO manda documento:'pedido' — el camino de siempre, explícito", async () => {
     const llamadas = stubCheckout();
     await pintarCheckout();
-    fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
+    fireEvent.click(screen.getByRole("button", { name: "Seleccionar" }));
     fireEvent.click(await screen.findByRole("button", { name: /Sporting Shoes/ }));
     await waitFor(() => expect(botonEnviar().disabled).toBe(false));
 
@@ -580,7 +581,7 @@ describe("🔴 Pedido o cotización — la elección, y el candado que no se afl
     // opciones desaparezcan mientras se manda — y el `enviandoRef` del detalle.
     const llamadas = stubCheckout();
     await pintarCheckout();
-    fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
+    fireEvent.click(screen.getByRole("button", { name: "Seleccionar" }));
     fireEvent.click(await screen.findByRole("button", { name: /Sporting Shoes/ }));
     await waitFor(() => expect(botonEnviar().disabled).toBe(false));
 

@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «Sin pagos» / «Último pago: hace N d».
 // ─────────────────────────────────────────────────────────────────────────────
 // 🔴 CUENTAS POR COBRAR ABRE POR «MÁS VIEJO SIN PAGAR» (20-sep-2026).
 //
@@ -182,8 +183,8 @@ describe("🔴 3 · los días sin pagar se ven siempre, no solo con el filtro", 
   });
 
   it("el texto es el de siempre — la regla no se copió", () => {
-    expect(textoSinPagar(313)).toBe("no paga hace 313 d");
-    expect(textoSinPagar(null)).toBe("nunca ha pagado");
+    expect(textoSinPagar(313)).toBe("Último pago: hace 313 d");
+    expect(textoSinPagar(null)).toBe("Sin pagos");
     expect(diasSinPagar("2025-11-11", HOY)).toBe(313);
   });
 

@@ -278,7 +278,7 @@ export function renglonesDelInicio(d: DatosRenglones): RenglonCelular[] {
     clave: "vendedoras",
     titulo: "Vendedoras",
     detalle: d.vendedoras
-      ? `${d.vendedoras.cuantas} · ${miles(d.vendedoras.tiquetes)} ${d.vendedoras.tiquetes === 1 ? "tiquete" : "tiquetes"}`
+      ? `${d.vendedoras.cuantas} · ${miles(d.vendedoras.tiquetes)} ${d.vendedoras.tiquetes === 1 ? "ticket" : "tickets"}`
       : null,
     monto: d.vendedoras ? montoCorto(d.vendedoras.ventas) : null,
     delta: null,
@@ -288,7 +288,7 @@ export function renglonesDelInicio(d: DatosRenglones): RenglonCelular[] {
     clave: "productos",
     titulo: "Productos",
     detalle: d.productos
-      ? `${miles(d.productos.piezas)} piezas · deja ${montoCorto(d.productos.deja)}`
+      ? `${miles(d.productos.piezas)} unidades · utilidad ${montoCorto(d.productos.deja)}`
       : null,
     monto:
       d.productos && d.productos.margen != null && Number.isFinite(d.productos.margen)
@@ -335,7 +335,7 @@ export function subtituloVendedoras(args: {
 }): string {
   const partes = [
     montoCorto(args.ventas),
-    `${miles(args.tiquetes)} ${args.tiquetes === 1 ? "tiquete" : "tiquetes"}`,
+    `${miles(args.tiquetes)} ${args.tiquetes === 1 ? "ticket" : "tickets"}`,
   ];
   const contra = contraDeVendedoras(args.rotuloDelta, args.anio);
   if (contra) partes.push(args.parcial ? `contra ${contra}, mismos días` : `contra ${contra}`);
@@ -360,7 +360,7 @@ export function lineaVendedora(args: {
       montoCorto(Number(`${entero.replace(/,/g, "")}.${dec}`)),
     ));
   }
-  partes.push(`${miles(args.tiquetes)} ${args.tiquetes === 1 ? "tiquete" : "tiquetes"}`);
+  partes.push(`${miles(args.tiquetes)} ${args.tiquetes === 1 ? "ticket" : "tickets"}`);
   if (!args.desglose) partes.push(`${montoLargo(args.ticketPromedio)} promedio`);
   return partes.join(" · ");
 }

@@ -219,7 +219,7 @@ export async function buildComisionDetalleSheet(
   // que explica de dónde sale la comisión era la única que Excel no podía usar
   // para recalcular. Ahora la base es número (ya lo era) y la tasa es un número
   // con formato de porcentaje (PCT_FMT): se ve igual y se puede multiplicar.
-  section("CIERRE");
+  section("RESUMEN"); // 1-oct-2026, Daniel: nombres normales de ERP (era «CIERRE»)
   const cierre: [string, number, number, number][] = [
     ["Ventas", d.ventas_base, d.tasa_venta, d.comision_venta],
     ["Cobros", d.cobros_base, d.tasa_cobro, d.comision_cobro],
@@ -371,10 +371,10 @@ export async function buildComisionesResumenSheet(r: ComisionResumen): Promise<W
     columns: [
       { header: "Vendedor", wch: 26 },
       { header: "Ventas", wch: 14, align: "right", fmt: MONEY_FMT },
-      { header: "Com. Venta", wch: 13, align: "right", fmt: MONEY_FMT },
+      { header: "Com. venta", wch: 13, align: "right", fmt: MONEY_FMT },
       { header: "Cobros", wch: 14, align: "right", fmt: MONEY_FMT },
-      { header: "Com. Cobro", wch: 13, align: "right", fmt: MONEY_FMT },
-      { header: "Com. Total", wch: 13, align: "right", fmt: MONEY_FMT },
+      { header: "Com. cobro", wch: 13, align: "right", fmt: MONEY_FMT },
+      { header: "Com. total", wch: 13, align: "right", fmt: MONEY_FMT },
     ],
     rows: vendedores.map(v => [
       nombreEnExcel(v), v.base, v.comision, v.base_cobro, v.comision_cobro, v.comision_total,

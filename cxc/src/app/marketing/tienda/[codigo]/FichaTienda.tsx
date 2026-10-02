@@ -328,7 +328,7 @@ export default function FichaTienda({ codigo, role }: { codigo: string; role: st
               chips={chipsPeriodo}
               elegido={periodo}
               onElegir={elegirPeriodo}
-              etiqueta="Elegir el período"
+              etiqueta="Seleccionar período"
             />
 
             <Cabecera

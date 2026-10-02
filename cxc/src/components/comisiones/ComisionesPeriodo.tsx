@@ -108,7 +108,7 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
           <div
             ref={panelRef}
             role="dialog"
-            aria-label="Elegir período"
+            aria-label="Seleccionar período"
             className="absolute left-0 top-full z-20 mt-1 w-[276px] max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white p-2 shadow-lg"
           >
             {/* Año — stepper, como el selector de mes del calendario de iOS. */}

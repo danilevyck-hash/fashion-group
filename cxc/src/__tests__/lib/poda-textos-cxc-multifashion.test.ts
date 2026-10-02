@@ -328,7 +328,8 @@ const SE_FUE_DE_LA_VISTA: { archivo: string; que: string; texto: string }[] = [
   { archivo: "app/caja/components/GastoTable.tsx", que: "Caja · 'Gastos' sobre la única tabla de la pantalla", texto: "Gastos" },
   { archivo: "app/reclamos/components/ReclamoDetail.tsx", que: "Reclamos · 'Totales' sobre las tarjetas Subtotal/ITBMS/Total", texto: "Totales" },
   { archivo: "app/proveedores/[key]/ProveedorDetail.tsx", que: "Proveedores · 'Por empresa' sobre una tabla cuya 1ª columna es Empresa", texto: "Por empresa" },
-  { archivo: "app/prestamos/components/MovimientoTable.tsx", que: "Préstamos · 'Estado de Cuenta' sobre la única tabla", texto: "Estado de Cuenta" },
+  // 1-oct-2026, Daniel: nombres normales de ERP («Estado de Cuenta» → «Estado de cuenta»).
+  { archivo: "app/prestamos/components/MovimientoTable.tsx", que: "Préstamos · 'Estado de cuenta' sobre la única tabla", texto: "Estado de cuenta" },
   { archivo: "app/marketing/components/InicioMarketing.tsx", que: "Marketing · el rótulo 'Resumen' sobre cifras que ya traen su pie", texto: "Resumen" },
   { archivo: "components/AppHeader.tsx", que: "Toda la app · 'Módulos' en el cajón del celular, que enseña los módulos", texto: "Módulos" },
   { archivo: "components/NotificationCenter.tsx", que: "Toda la app · 'Notificaciones' en el panel de la campanita", texto: "Notificaciones" },
@@ -376,31 +377,35 @@ describe("lo que se fue DE LA VISTA sigue teniendo nombre para un lector", () =>
 const ENCABEZADO_SR_ONLY: { archivo: string; nombre: string }[] = [
   { archivo: "components/GroupPage.tsx", nombre: "{meta.title}" },
   { archivo: "app/ventas/VentasShell.tsx", nombre: "Ventas" },
-  { archivo: "app/vista-general/page.tsx", nombre: "Vista General" },
-  { archivo: "app/referencia/ReferenciaClient.tsx", nombre: "Referencia" },
+  // 1-oct-2026, Daniel: nombres normales de ERP: «Vista General» → «Vista general».
+  { archivo: "app/vista-general/page.tsx", nombre: "Vista general" },
+  // 1-oct-2026, Daniel: nombres normales de ERP (el módulo «Referencia» pasa a «Consulta de artículos»).
+  { archivo: "app/referencia/ReferenciaClient.tsx", nombre: "Consulta de artículos" },
   { archivo: "app/multifashion/MultifashionShell.tsx", nombre: "Multifashion" },
-  { archivo: "app/cxc/components/PanelCxcMobile.tsx", nombre: "Cuentas por Cobrar" },
+  // 1-oct-2026, Daniel: nombres normales de ERP: «Cuentas por Cobrar» → «Cuentas por cobrar».
+  { archivo: "app/cxc/components/PanelCxcMobile.tsx", nombre: "Cuentas por cobrar" },
   { archivo: "app/clientes/ClientesListClient.tsx", nombre: "Clientes" },
   { archivo: "app/proveedores/ProveedoresListClient.tsx", nombre: "Proveedores" },
   // Data Health dejó de ser una PÁGINA el 13-ago-2026 (pasó a 2ª pestaña de
   // Usuarios) y el 11-sep-2026 la pantalla se retiró entera. El encabezado que
   // queda es el de Usuarios, y sigue siendo UNO solo y `sr-only`.
   { archivo: "app/admin/usuarios/page.tsx", nombre: "Usuarios" },
-  { archivo: "app/guias/components/GuiasList.tsx", nombre: "Guías de Despacho" },
+  { archivo: "app/guias/components/GuiasList.tsx", nombre: "Guías de despacho" }, // 1-oct-2026, Daniel: nombres normales de ERP
   { archivo: "app/reclamos/components/EmpresaSelector.tsx", nombre: "Reclamos" },
-  { archivo: "app/reclamos/components/ReclamoForm.tsx", nombre: "Nuevo Reclamo" },
+  { archivo: "app/reclamos/components/ReclamoForm.tsx", nombre: "Nuevo reclamo" }, // 1-oct-2026, Daniel: nombres normales de ERP
   // El módulo pasó a llamarse "Plantilla Switch" el 8-sep-2026 (Daniel: «se
   // cambia a Plantilla Switch»; la key interna sigue siendo `cargar`). El
   // invariante NO se aflojó: sigue habiendo UN solo h1 y sigue siendo
   // `sr-only`; lo único que cambió es la palabra.
   { archivo: "app/productos/cargar/DepuradorClient.tsx", nombre: "Plantilla Switch" },
   { archivo: "app/productos/cargar/FacturasTiendaClient.tsx", nombre: "Facturas Tienda" },
-  { archivo: "app/asistencia/AsistenciaClient.tsx", nombre: "Asistencia" },
+  // 1-oct-2026, Daniel: nombres normales de ERP (el h1 dice lo mismo que el menú).
+  { archivo: "app/asistencia/AsistenciaClient.tsx", nombre: "Asistencia y planilla" },
   // El módulo pasó a llamarse "Recordatorios" el 24-ago-2026 (la key interna
   // sigue siendo `cheques`). El invariante NO se aflojó: sigue habiendo UN solo
   // h1 y sigue siendo `sr-only`; lo único que cambió es la palabra.
   { archivo: "app/recordatorios/RecordatoriosClient.tsx", nombre: "Recordatorios" },
-  { archivo: "app/caja/components/PeriodoList.tsx", nombre: "Caja Menuda" },
+  { archivo: "app/caja/components/PeriodoList.tsx", nombre: "Caja menuda" }, // 1-oct-2026, Daniel: nombres normales de ERP
   { archivo: "app/prestamos/PrestamosClient.tsx", nombre: "Préstamos" },
   { archivo: "app/marketing/components/InicioMarketing.tsx", nombre: "Marketing" },
   { archivo: "app/gastos-contabilidad/GastosContabilidadClient.tsx", nombre: "Gastos" },
@@ -567,7 +572,9 @@ const EN_PANTALLA: { archivo: string; por_que: string; texto: string }[] = [
     // decidido por Daniel) sacó la palabra «sincronizar» de la pantalla:
     // «Actualizar ahora» en el botón y «Actualizado …» en el rótulo. El aviso
     // sigue A LA VISTA, nunca detrás del ⓘ, que es lo que este candado protege.
-    texto: "Actualizado desde Switch el",
+    // 1-oct-2026, Daniel: nombres normales de ERP — un término por concepto
+    // (docs/nombres-erp.md): «Última sincronización», igual que Proveedores.
+    texto: "Última sincronización",
   },
   {
     archivo: "app/proveedores/[key]/ProveedorDetail.tsx",

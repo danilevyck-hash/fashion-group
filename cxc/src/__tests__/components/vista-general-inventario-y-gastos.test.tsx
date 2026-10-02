@@ -109,8 +109,8 @@ describe("🔴 el COSTO es el número que manda; el precio de etiqueta va rotula
     expect(precio.textContent).toBe("$4,061,849");
     // La etiqueta viaja en el MISMO renglón, no en otro lado de la pantalla.
     const renglon = precio.parentElement!;
-    expect(renglon.textContent).toContain("potencial");
-    expect(renglon.textContent).toContain("no plata que tengas");
+    // 1-oct-2026, Daniel: nombres normales de ERP («A precio de etiqueta — potencial, no plata que tengas»).
+    expect(renglon.textContent).toContain("Valor a precio de venta");
   });
 
   it("y el renglón del total dice 'al costo' pegado al número", () => {
@@ -227,7 +227,8 @@ describe("🩸 a la empresa sin gasto NO se le pinta $0: se le pinta el MOTIVO",
     expect(shoes.textContent).not.toContain("$0");
 
     const boston = document.querySelector('[data-fila-gasto="confecciones_boston"]')!;
-    expect(boston.querySelector('[data-col="sin-gasto"]')!.textContent).toBe("No se baja sola");
+    // 1-oct-2026, Daniel: nombres normales de ERP («No se baja sola» → «Carga manual»).
+    expect(boston.querySelector('[data-col="sin-gasto"]')!.textContent).toBe("Carga manual");
     expect(boston.textContent).toContain("no se traen solos de Switch");
     expect(boston.textContent).not.toContain("$0");
   });

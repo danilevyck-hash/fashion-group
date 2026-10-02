@@ -27,6 +27,7 @@ import { SWRConfig } from "swr";
 import { ListaSeguimientoClientes } from "@/components/multifashion/ListaSeguimientoClientes";
 import { armarUniverso, type FilaFactura, type FilaRegistrado } from "@/lib/multifashion/clientes-universo";
 import { FILAS_SEGUIMIENTO_AL_ABRIR } from "@/lib/multifashion/clientes-seguimiento";
+// 1-oct-2026, Daniel: nombres normales de ERP («tiquetes» → «tickets», «Cierra en» → «Proyección de cierre», «Cuándo vende la tienda» → «Ventas por día y hora», «Lo que más…» → «Más vendidos / Mayor utilidad / Mayores variaciones», «Dormidos» → «Inactivos», «Compró/Veces» → «Total compras/Visitas»).
 
 const HOY = "2026-09-16";
 
@@ -121,9 +122,9 @@ describe("la lista de seguimiento se dibuja", () => {
 
   it("🔴 tocar el nombre abre su ficha: cuánto compró, cuántas veces y la fecha", async () => {
     dibujar();
-    expect(screen.queryByText("Compró")).toBeNull();
+    expect(screen.queryByText("Total compras")).toBeNull();
     fireEvent.click(screen.getByText("Luis Carlos Avila"));
-    expect(screen.getByText("Compró")).toBeTruthy();
+    expect(screen.getByText("Total compras")).toBeTruthy();
     expect(screen.getByText("$929.54")).toBeTruthy();
     expect(screen.getByText("1 visita")).toBeTruthy();
     expect(screen.getByText("7 jul 2026")).toBeTruthy();

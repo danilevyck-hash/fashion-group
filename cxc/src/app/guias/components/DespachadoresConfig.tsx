@@ -183,7 +183,7 @@ export default function DespachadoresConfig({ onAviso }: { onAviso: (m: string) 
       data-testid="despachadores-config"
     >
       <h2 id="despachadores-titulo" className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-900">
-        Quién despacha
+        Despachadores
         <Ayuda titulo="Qué hace esta lista">
           <p>Son los nombres que ofrece el desplegable «Despachado por» al armar una guía.</p>
           <p>La ve todo el equipo, y solo se agrega aquí: en la guía quedó únicamente el desplegable.</p>

@@ -57,7 +57,7 @@ export default function BarraSeleccion({ clientes, onQuitarSeleccion, onCobrarAT
             disabled={enviando || lote.envios.length === 0}
             className="inline-flex min-h-[44px] items-center rounded-md bg-black px-4 text-sm font-medium text-white transition active:scale-[0.97] disabled:opacity-50"
           >
-            {enviando ? "Enviando…" : `Cobrar a los ${clientes.length}`}
+            {enviando ? "Enviando…" : `Enviar estado de cuenta (${clientes.length})`}
           </button>
         </div>
       </div>

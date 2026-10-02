@@ -150,7 +150,7 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
   // Hoja 1 — Detalle. Solo días CON marcas o con ausencia: los feriados y los
   // días justificados sin marca llenarían la hoja de renglones vacíos.
   const detalle: unknown[][] = [[
-    "Colaborador","Código","Día","Entrada","Sale almuerzo","Vuelve","Salida",
+    "Colaborador","Código","Día","Entrada","Salida almuerzo","Regreso almuerzo","Salida",
     // 🔴 LAS DOS COLUMNAS DEL 18-sep-2026, Y VAN JUSTO AL LADO DE LAS HORAS.
     // La contadora, textual: *«y como veo quien marco de mas? en el excel solo
     // salen max 4 marcaciones el excel que descargo»*. 🩸 Tenía razón: las
@@ -244,7 +244,7 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
     "Colaborador","Código","Sale","Días trabajados","Ausencias sin justificar",
     // 🔑 Columna propia, no sumada a las ausencias justificadas: son días
     // TRABAJADOS y meterlos en la misma cifra es lo que este motivo eliminó.
-    "Ausencias justificadas","Días trabajando fuera","Veces tarde","Minutos tarde","…de días a revisar",
+    "Ausencias justificadas","Días trabajando fuera","Tardanzas","Minutos tarde","…de días a revisar",
     "Exceso almuerzo (min)","Salida temprana (min)","Tiempo no trabajado (min)",
     "Extras (min)","Días a revisar","Días corregidos a mano",
     // 🔴 AL FINAL, no intercaladas: la columna «…de días a revisar» se pinta
@@ -401,7 +401,7 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
     // 🔴 «Corregidos» va en el papel QUE SE FIRMA. Este PDF es el que llega a
     // planilla: un total que se lee sin saber que hay horas escritas a mano es
     // exactamente lo que no puede pasar.
-    head: [["Colaborador", "Sale", "Días", "Ausen.", "Veces\ntarde", "Min\ntarde",
+    head: [["Colaborador", "Sale", "Días", "Ausen.", "Tardan-\nzas", "Min\ntarde",
             "Exceso\nalmuerzo", "Salida\ntemprana", "No trabajado\n(min)", "Extras\n(min)", "A\nrevisar", "Días\ncorreg."]],
     body: personas.map((p) => {
       const r = p.resumen;

@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — mayúscula solo en la primera palabra.
 // ─────────────────────────────────────────────────────────────────────────────
 // DOS LIMPIEZAS DEL REDISEÑO (5-sep-2026).
 //
@@ -47,10 +48,11 @@ describe("🔴 Cuentas por Cobrar vive en /cxc", () => {
     expect(fs.existsSync(path.join(RAIZ, "src/app/admin/usuarios/page.tsx"))).toBe(true);
   });
 
-  it("el módulo apunta a /cxc y sigue rotulado «Cuentas por Cobrar»", () => {
+  // 1-oct-2026, Daniel: nombres normales de ERP — mayúscula solo en la primera palabra.
+  it("el módulo apunta a /cxc y sigue rotulado «Cuentas por cobrar»", () => {
     const src = leer("src/lib/modules.ts");
     expect(src).toMatch(/key: "cxc",[\s\S]{0,120}href: "\/cxc"/);
-    expect(src).toContain('label: "Cuentas por Cobrar"');
+    expect(src).toContain('label: "Cuentas por cobrar"');
   });
 
   it("hay redirección de /admin en next.config.js, y SOLO de esa ruta exacta", () => {
@@ -110,7 +112,7 @@ describe("🔴 la pantalla de error no filtra detalles internos", () => {
   });
 
   it("dice qué pasó, qué significa y qué hacer", () => {
-    expect(src).toContain("No se pudo mostrar Cuentas por Cobrar");
+    expect(src).toContain("No se pudo mostrar Cuentas por cobrar");
     expect(src).toContain("No se perdió nada");
     expect(src).toContain("Intentar de nuevo");
     expect(src).toContain("Ir al inicio");

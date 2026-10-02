@@ -179,7 +179,8 @@ describe("🔴 con los sueldos abiertos", () => {
     elegirPeriodo();
     await waitFor(() => expect(screen.getAllByRole("columnheader").length).toBeGreaterThan(5));
     const th = screen.getAllByRole("columnheader").map((e) => e.textContent);
-    expect(th[0]).toBe("Persona");
+    // 1-oct-2026, Daniel: nombres normales de ERP (Persona → Colaborador).
+    expect(th[0]).toBe("Colaborador");
     expect(th.slice(1)).toEqual(COLUMNAS);
   });
 
@@ -245,7 +246,7 @@ describe("🔴 y si el flag vuelve a `false`, la pantalla NO se rompe", () => {
     elegirPeriodo();
     await waitFor(() => expect(screen.getAllByRole("columnheader").length).toBe(5));
     expect(screen.getAllByRole("columnheader").map((e) => e.textContent))
-      .toEqual(["Persona", "Extra 1,25", "Extra 1,50", "Tarde", "Ausencia"]);
+      .toEqual(["Colaborador", "Extra 1,25", "Extra 1,50", "Tarde", "Ausencia"]);
   });
 
   it("⛔ y NI UN símbolo de dinero llega a la pantalla", async () => {

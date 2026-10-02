@@ -71,7 +71,7 @@ export default function SeccionDiaLibre({ codigo, refresco }: { codigo: string; 
           ))}
           {saldo && saldo.pagado > 0 && (
             <div className="flex items-baseline justify-between gap-3 border-t border-gray-100 pt-1">
-              <dt className="text-[13px] text-gray-600">Ya pagado con horas extra</dt>
+              <dt className="text-[13px] text-gray-600">Compensado con horas extra</dt>
               <dd className="text-[13px] tabular-nums text-gray-900">−{plata(saldo.pagado)}</dd>
             </div>
           )}

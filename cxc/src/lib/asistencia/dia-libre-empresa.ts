@@ -348,7 +348,7 @@ export const ROTULO_SALDO = "Días libres de la empresa";
 export function textoSaldoDiaLibre(s: SaldoDiaLibre | null | undefined): string | null {
   const queda = centavos(Math.max(0, num(s?.queda)));
   if (queda <= 0) return null;
-  return `Debe ${plata(queda)} por días libres de la empresa. Se paga solo con horas extra.`;
+  return `Saldo de ${plata(queda)} por días libres de la empresa. Se paga solo con horas extra.`;
 }
 
 /**

@@ -294,7 +294,7 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
     cursor += 6;
   }
   if (preorderItems.length > 0) {
-    cursor = drawSectionTable("Pre-orden", cursor, preorderItems);
+    cursor = drawSectionTable("Preventa", cursor, preorderItems);
   }
   // Total al pie — con guard de salto: si la tabla terminó pegada al borde,
   // el total pasa a una página nueva en vez de desaparecer fuera de la hoja.

@@ -202,7 +202,7 @@ describe("3 · 🔴 en Utilidad, el margen va debajo de cada cifra — con el co
 describe("4 · las tarjetas: cifra y delta, sin repetir el período", () => {
   it("las cuatro se llaman VENTAS · UTILIDAD · MARGEN · CIERRE DEL AÑO y no dicen «Ene–Sep 2026» ni «vs 2025»", () => {
     pintar();
-    for (const l of ["VENTAS", "UTILIDAD", "MARGEN", "CIERRE DEL AÑO"]) expect(screen.getByText(l)).toBeTruthy();
+    for (const l of ["VENTAS", "UTILIDAD", "MARGEN", "PROYECCIÓN DE CIERRE"]) /* 1-oct-2026, Daniel: nombres normales de ERP */ expect(screen.getByText(l)).toBeTruthy();
     const texto = matriz().textContent ?? "";
     expect(texto).not.toMatch(/Ene–Sep 2026/);
     expect(texto).not.toContain("vs 2025");

@@ -140,7 +140,7 @@ describe("cada regla dice lo que hace, en palabras", () => {
     expect(soloCobro).toHaveLength(1);
     expect(soloCobro[0].clienteCodigo).toBe("D-81");
     expect(soloCobro[0].vendedor).toBe("Edwin");
-    expect(fraseDeLaRegla(soloCobro[0].que)).toBe("No comisiona solo el cobro");
+    expect(fraseDeLaRegla(soloCobro[0].que)).toBe("Excluido: solo el cobro"); // 1-oct-2026, Daniel: nombres normales de ERP
     // Las otras once son «venta ni cobro».
     expect(reglas.filter((r) => r.que === "venta-ni-cobro")).toHaveLength(11);
   });
@@ -149,8 +149,9 @@ describe("cada regla dice lo que hace, en palabras", () => {
     expect(queNoComisiona({ excluye_venta: true, excluye_cobro: true })).toBe("venta-ni-cobro");
     expect(queNoComisiona({ excluye_venta: true, excluye_cobro: false })).toBe("solo-la-venta");
     expect(queNoComisiona({ excluye_venta: false, excluye_cobro: true })).toBe("solo-el-cobro");
-    expect(fraseDeLaRegla("venta-ni-cobro")).toBe("No comisiona venta ni cobro");
-    expect(loQueNoComisiona("venta-ni-cobro")).toBe("venta ni cobro");
+    // 1-oct-2026, Daniel: nombres normales de ERP («No comisiona …» → «Excluido: …»).
+    expect(fraseDeLaRegla("venta-ni-cobro")).toBe("Excluido: venta y cobro");
+    expect(loQueNoComisiona("venta-ni-cobro")).toBe("venta y cobro");
     expect(loQueNoComisiona("solo-la-venta")).toBe("solo la venta");
     expect(loQueNoComisiona("solo el cobro" as never)).toBe("solo el cobro");
   });
@@ -200,7 +201,7 @@ describe("la base no cambia; la pantalla sí", () => {
 
   it("🔴 CERO casillas en la lista, y la pregunta del alta va al derecho", () => {
     expect(pantalla).not.toContain('type="checkbox"');
-    expect(PREGUNTA_DEL_ALTA).toBe("¿Qué no comisiona?");
+    expect(PREGUNTA_DEL_ALTA).toBe("Excluir de"); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(ROTULO_LA_VENTA).toBe("La venta");
     expect(ROTULO_EL_COBRO).toBe("El cobro");
     expect(pantalla).toContain('role="switch"');
@@ -222,15 +223,12 @@ describe("la base no cambia; la pantalla sí", () => {
     expect(fuente).not.toContain("supabase");
   });
 
-  it("en pantalla no se dice «exclusión» por ningún lado", () => {
-    // El texto que ve la gente: los literales y el JSX, sin los comentarios.
-    const sinComentarios = pantalla
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .split("\n")
-      .filter((l) => !l.trim().startsWith("//"))
-      .join("\n")
-      // Los nombres de ruta, de tipo y de variable no son texto de pantalla.
-      .replace(/exclusiones|ExclusionActiva|excluye_venta|excluye_cobro|Exclusiones/g, "");
-    expect(sinComentarios).not.toMatch(/exclusi[oó]n/i);
+  // 1-oct-2026, Daniel: nombres normales de ERP. Antes este candado prohibía
+  // la palabra «exclusión»; desde hoy la sección se llama «Exclusiones de
+  // comisión» y el menú de la fila dice «Editar exclusión».
+  it("en pantalla se usa el término de ERP: «Editar exclusión» y «Excluye»", () => {
+    expect(pantalla).toContain('label: "Editar exclusión"');
+    expect(pantalla).toContain(">Excluye</th>");
+    expect(pantalla).not.toContain('label: "Cambiar qué no comisiona"');
   });
 });

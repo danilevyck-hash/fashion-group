@@ -166,14 +166,14 @@ export default function DetallePeriodoView({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
-        throw new Error(err?.error ?? "No se pudo devolver el proyecto");
+        throw new Error(err?.error ?? "No se pudo restaurar el proyecto");
       }
-      toast("Listo, el proyecto volvió", "success");
+      toast("Proyecto restaurado", "success");
       setDeshacerAnular(null);
       recargar();
     } catch (err) {
       toast(
-        err instanceof Error ? err.message : "No se pudo devolver el proyecto",
+        err instanceof Error ? err.message : "No se pudo restaurar el proyecto",
         "error",
       );
     } finally {
@@ -265,7 +265,7 @@ export default function DetallePeriodoView({
             <button
               type="button"
               onClick={() => descargarReporte(seccion.id as string, etiqueta, marca.key)}
-              title="Bajar el Excel de este período"
+              title="Descargar Excel del período"
               className="rounded-md border border-gray-300 bg-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm text-gray-800 hover:border-gray-500 active:scale-[0.97] transition"
             >
               Excel
@@ -424,7 +424,7 @@ export default function DetallePeriodoView({
                             zipEstados[sp.id]?.tipo === "exito",
                         },
                         {
-                          label: "Registrado por error — eliminar",
+                          label: "Eliminar",
                           onClick: () => {
                             setAnularPendiente({ id: sp.id, nombre: titulo });
                             setAnularMotivo("");
@@ -477,7 +477,7 @@ export default function DetallePeriodoView({
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-base font-semibold mb-1">
-              Registrado por error — eliminar
+              Eliminar
             </h3>
             <p className="text-sm text-gray-500 mb-4">
               Vas a eliminar &ldquo;{anularPendiente.nombre}&rdquo;. Deja de

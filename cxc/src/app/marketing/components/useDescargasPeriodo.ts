@@ -49,7 +49,7 @@ export function useDescargasPeriodo() {
           { cache: "no-store" },
         );
         if (!res.ok) {
-          toast("No se pudo bajar el reporte. Intenta de nuevo en unos segundos.", "error");
+          toast("No se pudo descargar el reporte. Intenta de nuevo en unos segundos.", "error");
           return;
         }
         const blob = await res.blob();
@@ -58,7 +58,7 @@ export function useDescargasPeriodo() {
         saveAs(blob, m?.[1] ? decodeURIComponent(m[1]) : nombreArchivo(etiqueta, "xlsx"));
         toast("Reporte listo — revisa tu carpeta de descargas.", "success");
       } catch {
-        toast("No se pudo bajar el reporte. Verifica tu conexión.", "error");
+        toast("No se pudo descargar el reporte. Verifica tu conexión.", "error");
       }
     },
     [toast],

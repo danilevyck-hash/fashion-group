@@ -236,7 +236,7 @@ export default function CorregirMarcacionModal({
           {marca.correccionId ? (
             <div className="space-y-3">
               <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2.5">
-                <p className="text-xs uppercase tracking-wide text-blue-500">Corrección puesta</p>
+                <p className="text-xs uppercase tracking-wide text-blue-500">Corregida</p>
                 <p className="mt-0.5 text-[13px] text-blue-900">
                   <b>{marca.correccionMotivo}</b>
                 </p>
@@ -313,7 +313,7 @@ export default function CorregirMarcacionModal({
                   al campo. El campo se rotula por `aria-labelledby`. */}
               <div>
                 <span id="corregir-porque" className="block text-[13px] font-medium text-gray-700">
-                  Por qué <span className="text-red-600">*</span>
+                  Motivo <span className="text-red-600">*</span>
                 </span>
                 {/* Los más usados, si los hay. Tocar uno ESCRIBE en el campo;
                     se puede seguir editando. Sin historia no se dibuja nada. */}

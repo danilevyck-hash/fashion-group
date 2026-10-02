@@ -252,6 +252,6 @@ export function cuadrarConSwitch(totalSistema: number, saldoSwitch: number | nul
     aviso:
       `Switch dice $${monto(saldoSwitch)} y aquí sale $${monto(totalSistema)} ` +
       `(${diferencia > 0 ? "+" : "−"}$${monto(Math.abs(diferencia))}). ` +
-      `Los documentos todavía no terminaron de sincronizarse — revisa antes de mandarlo.`,
+      `Los documentos todavía no terminaron de sincronizarse — revisa antes de enviarlo.`,
   };
 }

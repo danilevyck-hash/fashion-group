@@ -422,14 +422,17 @@ describe("🔴 5. en la guía el envío es UN renglón, con los bultos bloqueado
     expect(JSON.stringify(r)).not.toMatch(/1–10|11–20|de 30/);
   });
 
-  it("otro envío del MISMO cliente + empresa + destino se suma al mismo renglón; con otro destino, renglón aparte", () => {
+  // 🔄 1-oct-2026: Daniel aprobó UN RENGLÓN POR ENVÍO. Este candado fijaba que
+  // dos envíos iguales se SUMABAN; ahora fija la regla de antes con
+  // `unoPorEnvio = false` (la nueva: `guias-nueva-guia-2026-10.test.ts`).
+  it("(interruptor apagado) otro envío del MISMO cliente + empresa + destino se suma al mismo renglón; con otro destino, renglón aparte", () => {
     const otro = agruparEnEnvios([etq({ id: 30, envio_id: "e2", secuencial: "11-000000009", cajas: 4 })])[0];
     const lejos = agruparEnEnvios([etq({ id: 31, envio_id: "e3", secuencial: "11-000000010", cajas: 2, destino: "David" })])[0];
-    let r = marcarEnvio([vacio()], envio);
-    r = marcarEnvio(r, otro);
+    let r = marcarEnvio([vacio()], envio, false);
+    r = marcarEnvio(r, otro, false);
     expect(r).toHaveLength(1);
     expect(r[0].bultos).toBe(34);
-    r = marcarEnvio(r, lejos);
+    r = marcarEnvio(r, lejos, false);
     expect(r).toHaveLength(2);
     expect(r[1]).toMatchObject({ direccion: "David", bultos: 2, con_etiquetas: true });
   });

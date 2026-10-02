@@ -38,6 +38,9 @@
 // cédula debería de bloquear no?"* — sí.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { entregadoPorElegido } from "@/lib/guias/despachado-por";
+import { GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
+
 export type TipoDespacho = "externo" | "directo";
 
 export interface EstadoDespacho {
@@ -52,6 +55,13 @@ export interface EstadoDespacho {
   // `pendienteNumeroTransp`, que es otra pregunta y otra función.
   tieneFirma1: boolean;
   tieneFirma2: boolean;
+  /**
+   * 🔴 «DESPACHADO POR» SE ELIGE AL DESPACHAR (1-oct-2026, Daniel aprobó el
+   * mockup): salió de la creación de la guía y aquí es OBLIGATORIO. El servidor
+   * pide lo mismo al completar (`PUT /api/guias/[id]`). El centinela «Otro…»
+   * no cuenta (`entregadoPorElegido`).
+   */
+  despachadoPor: string;
 }
 
 const vacio = (s: string | undefined | null) => !String(s ?? "").trim();
@@ -73,6 +83,7 @@ export function faltaParaDespachar(e: EstadoDespacho): string[] {
 
   if (vacio(e.receptor)) falta.push("recibido por");
   if (vacio(e.cedula)) falta.push("cédula");
+  if (GUIA_NUEVA_2026_10 && !entregadoPorElegido(e.despachadoPor)) falta.push("despachado por");
 
   if (!e.tieneFirma1) falta.push(externo ? "la firma del transportista" : "la firma del chofer");
   if (!e.tieneFirma2) falta.push(externo ? "la firma del entregador" : "la firma del cliente");

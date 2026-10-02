@@ -140,7 +140,7 @@ export function planillaSinDinero(rol: string | null | undefined): boolean {
 // ruta, está en el encabezado de `roles.ts`.
 export const PESTANAS_BOSTON = [
   { key: "inicio", label: "Inicio" },
-  { key: "cxc", label: "Por cobrar" },
+  { key: "cxc", label: "CxC" }, // 1-oct-2026: «Cuentas por cobrar» no cabe en la tira (tope 10 letras): va la sigla,
   { key: "ventas", label: "Ventas" },
   { key: "clientes", label: "Clientes" },
   { key: "planilla", label: "Planilla" },

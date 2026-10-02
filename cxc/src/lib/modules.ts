@@ -79,7 +79,7 @@ export const GROUPS: AppGroup[] = [
 
 export const ALL_MODULES: AppModule[] = [
   // Ventas y clientes
-  { key: "vista-general", label: "Vista General",      href: "/vista-general",    icon: LayoutDashboard,  roles: ["admin"],                                     group: "ventas-clientes" },
+  { key: "vista-general", label: "Vista general",      href: "/vista-general",    icon: LayoutDashboard,  roles: ["admin"],                                     group: "ventas-clientes" },
   { key: "ventas",        label: "Ventas",             href: "/ventas",           icon: TrendingUp,       roles: ["admin"],                                     group: "ventas-clientes" },
   // 🔴 COMISIONES VIVE EN «VENTAS Y CLIENTES» (25-ago-2026).
   //
@@ -135,7 +135,7 @@ export const ALL_MODULES: AppModule[] = [
   // del menú y quitar la pestaña de Ventas"*) y `/ventas?tab=referencia`
   // redirige acá. Vendedor/bodega NO ven el margen (*"quita margen, lo demas
   // dejalo"* — gate en /api/ventas/referencia, no en la vista).
-  { key: "referencia",    label: "Referencia",         href: "/referencia",       icon: ScanSearch,       roles: ["admin", "vendedor", "bodega"],               group: "ventas-clientes" },
+  { key: "referencia",    label: "Consulta de artículos", href: "/referencia",       icon: ScanSearch,       roles: ["admin", "vendedor", "bodega"],               group: "ventas-clientes" },
   // 🔑 `roles[]` sale de `ROLES_CXC` en vez de escribirse acá — la MISMA lista
   // que usan la pantalla `/cxc` y las 12 rutas de `/api/cxc/*`.
   //
@@ -147,7 +147,7 @@ export const ALL_MODULES: AppModule[] = [
   // saberse la dirección. Daniel, textual: *«a) sí, le doy CXC completo»*.
   // ⚠️ Boston sigue afuera: esa cartera tiene su propia lista
   // (`ROLES_MODULO_BOSTON`) y la secretaria no está en ella.
-  { key: "cxc",           label: "Cuentas por Cobrar", href: "/cxc",            icon: CircleDollarSign, roles: [...ROLES_CXC],                                group: "ventas-clientes" },
+  { key: "cxc",           label: "Cuentas por cobrar", href: "/cxc",            icon: CircleDollarSign, roles: [...ROLES_CXC],                                group: "ventas-clientes" },
   { key: "multifashion",  label: "Multifashion",       href: "/multifashion",     icon: ShoppingBag,      roles: ["admin", "gerente_acs"],                      group: "ventas-clientes" },
   // 🔴 CONFECCIONES BOSTON — el módulo de David (27-ago-2026).
   //
@@ -187,7 +187,7 @@ export const ALL_MODULES: AppModule[] = [
   { key: "catalogos",     label: "Catálogos",          href: "/catalogos/marcas", icon: BookOpen,         roles: catalogoRoles(),                               group: "ventas-clientes" },
 
   // Operación
-  { key: "guias",          label: "Guías de Despacho", href: "/guias",            icon: Truck,         roles: ["admin", "secretaria", "bodega", "vendedor"], group: "operacion" },
+  { key: "guias",          label: "Guías de despacho", href: "/guias",            icon: Truck,         roles: ["admin", "secretaria", "bodega", "vendedor"], group: "operacion" },
   // 🩸 "Packing Lists" (key `packing-lists`) se RETIRÓ el 10-sep-2026. Daniel,
   // textual: *«packing list no se usa, eliminar»*. Medido contra producción ese
   // día: `packing_lists` y `pl_items` con **0 filas** (vacías desde el
@@ -205,7 +205,7 @@ export const ALL_MODULES: AppModule[] = [
   // el nombre solo hablaba de las marcaciones. 🔴 La `key` NO cambia: está en
   // `role_permissions` y en `fg_users.modulos_override`, y renombrarla rompería
   // los permisos sin comprar nada.
-  { key: "asistencia",     label: "Asistencia y Planilla", href: "/asistencia",   icon: Clock,         roles: [...new Set([...asistenciaRoles(), ...aprobacionesRoles()])],                       group: "operacion" },
+  { key: "asistencia",     label: "Asistencia y planilla", href: "/asistencia",   icon: Clock,         roles: [...new Set([...asistenciaRoles(), ...aprobacionesRoles()])],                       group: "operacion" },
   // 🔴 MARCACIÓN — el reloj del teléfono (14-sep-2026). Daniel: *«ponle
   // marcación al módulo»*. Para quien trabaja afuera y no pasa por ningún reloj
   // físico: Ana (2), Cindy (3), Yeisibeth (306) —rol `marcacion`, que NO ve
@@ -225,7 +225,7 @@ export const ALL_MODULES: AppModule[] = [
   // (una lista para leer, otra para escribir); las rutas que escriben siguen
   // contestando 403 a contabilidad.
   { key: "marketing",      label: "Marketing",         href: "/marketing",        icon: Megaphone,     roles: [...ROLES_MARKETING],                           group: "operacion" },
-  { key: "caja",           label: "Caja Menuda",       href: "/caja",             icon: Wallet,        roles: ["admin", "secretaria"],                       group: "operacion" },
+  { key: "caja",           label: "Caja menuda",       href: "/caja",             icon: Wallet,        roles: ["admin", "secretaria"],                       group: "operacion" },
   // "Gastos" a secas: es el ÚNICO módulo de gastos que queda, y desde el
   // 13-ago-2026 tiene DOS pestañas — *Gastos* y *Saldos de banco*. Daniel,
   // textual: *"y debeeria estar en un solo modulo"*. La `key` sigue siendo

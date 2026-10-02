@@ -196,7 +196,7 @@ export function useCajaState(opts?: UseCajaOptions) {
       // no está en pantalla y el número quedó guardado con el período.
       const dif = payload && typeof payload.diferencia_cierre === "number" ? payload.diferencia_cierre : null;
       const descuadre = dif !== null && hayDescuadre(dif)
-        ? `Al cerrar: ${mensajeDeDiferencia(dif)} respecto de la cuenta del sistema. Quedó anotado.`
+        ? `Al cerrar: ${mensajeDeDiferencia(dif)} respecto de la cuenta del sistema. Quedó registrado.`
         : null;
       const texto = [descuadre, motivo].filter(Boolean).join(" ");
       if (texto) setAviso(texto);

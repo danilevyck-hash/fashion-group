@@ -59,6 +59,7 @@ import { Fragment, useMemo } from "react";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { colorDe } from "@/lib/ventas/referencia";
 import type { ArticuloCompras } from "@/lib/ventas/compras";
+import { ROTULOS } from "@/lib/ventas/referencia-pantalla";
 import {
   armarFicha,
   fmtFechaCorta,
@@ -201,10 +202,10 @@ function CuatroGrandes({ art, ficha }: { art: ArticuloCompras; ficha: FichaArtic
   const r = ficha.ritmo;
   return (
     <dl className="grid grid-cols-2 gap-x-3 gap-y-4 px-3.5 py-4 xl:grid-cols-4">
-      <Grande rotulo="Compré" valor={g.comprado != null ? fmtInt(g.comprado) : "—"} unidad={g.comprado != null}>
+      <Grande rotulo={ROTULOS.comprado} valor={g.comprado != null ? fmtInt(g.comprado) : "—"} unidad={g.comprado != null}>
         <PieCompras art={art} lista={ficha.compras} historico={g.historico} />
       </Grande>
-      <Grande rotulo="Vendí" valor={fmtInt(g.vendido)} unidad>
+      <Grande rotulo={ROTULOS.vendido} valor={fmtInt(g.vendido)} unidad>
         <p className="text-xs text-gray-600">{pieDeVendido(g)}</p>
       </Grande>
       <Grande rotulo="Stock" valor={g.quedan != null ? fmtInt(g.quedan) : "—"} unidad={g.quedan != null}>

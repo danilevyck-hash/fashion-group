@@ -41,6 +41,8 @@ import {
 } from "@/lib/guias/atajos-facturas";
 import { claveDeFactura } from "@/lib/guias/numero-factura";
 import { fmtDate } from "@/lib/format";
+import { hoyPanama } from "@/lib/fecha-panama";
+import { ETIQUETAS_2026_10, GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
 
 /**
  * 🔴 QUIÉN ENTRA A ETIQUETAS — los MISMOS tres que escriben una guía, y la
@@ -370,6 +372,29 @@ export function fechaDeLaEtiqueta(fechaCalendario: string): string {
   return fmtDate(v);
 }
 
+/**
+ * 🔴 LA FECHA QUE VA IMPRESA ES LA DEL DÍA EN QUE SE IMPRIME (1-oct-2026,
+ * Daniel aprobó el mockup), hora de PANAMÁ — no la de la factura.
+ *
+ * 🔑 Lo más simple que deja la reimpresión como COPIA IDÉNTICA: el envío se
+ * guarda en el MISMO toque de «Imprimir» (la pestaña nace dentro del clic y el
+ * POST corre adentro), así que `creado_en` ES el momento de la primera
+ * impresión. Imprimir y reimprimir leen ese mismo dato: una reimpresión de
+ * mañana sigue diciendo el día de hoy. Sin `creado_en` legible, el día de hoy.
+ * No hace falta guardar nada nuevo.
+ *
+ * Con `ETIQUETAS_2026_10` en `false`, la fecha de la factura, como antes.
+ */
+export function fechaImpresa(
+  e: Pick<EtiquetaFila, "fecha_factura" | "creado_en">,
+  ahora: Date = new Date(),
+  deImpresion: boolean = ETIQUETAS_2026_10,
+): string {
+  if (!deImpresion) return e.fecha_factura;
+  const t = new Date(String(e.creado_en ?? ""));
+  return hoyPanama(Number.isNaN(t.getTime()) ? ahora : t);
+}
+
 /** Cómo se llama el archivo: se ve en la carpeta de descargas, así que dice qué es. */
 export function nombreArchivoEtiquetas(
   e: Pick<EtiquetaFila, "secuencial">,
@@ -411,15 +436,25 @@ export interface RenglonDeEtiquetas {
  *
  * ⚠️ Solo entran las PENDIENTES: una etiqueta que ya salió en una guía no se
  * vuelve a meter en otra.
+ *
+ * 🔴 UN RENGLÓN POR ENVÍO (1-oct-2026, Daniel aprobó el mockup). Con
+ * `porEnvio` (el interruptor `GUIA_NUEVA_2026_10`) la clave deja de ser
+ * cliente + empresa y pasa a ser el ENVÍO (`envio_id`, o el id de la fila sin
+ * la migración): dos envíos del mismo cliente + empresa + destino son DOS
+ * renglones. 🩸 Juntos, la guía decía «Nova Lux · 20 bultos» en una línea con
+ * dos juegos de etiquetas «1 de 10» adentro.
  */
 export function agruparEtiquetasEnRenglones(
   etiquetas: readonly EtiquetaFila[],
+  porEnvio: boolean = GUIA_NUEVA_2026_10,
 ): RenglonDeEtiquetas[] {
   const grupos = new Map<string, RenglonDeEtiquetas>();
   for (const e of etiquetas) {
     if (estaImportada(e)) continue;
     const codigo = (e.cliente_codigo ?? "").trim();
-    const clave = `${codigo}|${(e.empresa_key ?? "").trim()}`;
+    const clave = porEnvio
+      ? `envio|${e.envio_id || String(e.id)}`
+      : `${codigo}|${(e.empresa_key ?? "").trim()}`;
     const previo = grupos.get(clave);
     if (previo) {
       grupos.set(clave, {
@@ -523,13 +558,31 @@ export function textoYaEtiquetada(e: Pick<EtiquetaFila, "cajas">): string {
 export function facturasParaEtiquetar(
   facturas: readonly FacturaDelCliente[],
   etiquetas: readonly EtiquetaFila[],
-): { visibles: FacturaDelCliente[]; escondidas: number } {
-  const visibles = facturas.filter(
-    (f) =>
-      f.switch_factura_id == null ||
-      etiquetaDeLaFactura(etiquetas, f.empresa_key, f.switch_factura_id) === null,
-  );
-  return { visibles, escondidas: facturas.length - visibles.length };
+  sinLasYaDespachadas: boolean = ETIQUETAS_2026_10,
+): { visibles: FacturaDelCliente[]; escondidas: number; yaSalieron: number } {
+  // 🔴 1-oct-2026: TAMPOCO SE OFRECE LA FACTURA QUE YA SALIÓ EN UNA GUÍA. 🩸 Se
+  // etiquetaron la 3097 y la 3096, que ya iban en una guía hecha a mano. La
+  // regla NO se reescribe acá: es `yaSalioEn`, el MISMO dato que pinta el chip
+  // «Ya salió en GT-xxx» en Nueva guía (lo calcula el servidor con
+  // `indiceYaSalio` sobre `guia_items.facturas` de guías vivas).
+  const yaSalio = (f: FacturaDelCliente) => sinLasYaDespachadas && f.yaSalioEn != null;
+  const etiquetada = (f: FacturaDelCliente) =>
+    f.switch_factura_id != null &&
+    etiquetaDeLaFactura(etiquetas, f.empresa_key, f.switch_factura_id) !== null;
+  const visibles = facturas.filter((f) => !etiquetada(f) && !yaSalio(f));
+  return {
+    visibles,
+    escondidas: facturas.filter(etiquetada).length,
+    yaSalieron: facturas.filter((f) => !etiquetada(f) && yaSalio(f)).length,
+  };
+}
+
+/** Lo que se dice de las que ya salieron en una guía. `null` = ninguna. */
+export function textoEscondidasPorGuia(n: number): string | null {
+  if (n <= 0) return null;
+  return n === 1
+    ? "1 factura de este cliente ya salió en una guía"
+    : `${n} facturas de este cliente ya salieron en una guía`;
 }
 
 /** Lo que se dice de las escondidas. `null` = no se escondió ninguna. */

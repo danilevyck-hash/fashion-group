@@ -365,7 +365,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
     try {
       const res = await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: e }) });
       if (!res.ok) { setCurrent(prev => prev ? { ...prev, estado: prevEstado } : prev); setToast("No se pudo cambiar el estado. Intenta de nuevo."); setTimeout(() => setToast(null), 3000); return; }
-      setToast("Listo, vuelve a estar por cobrar"); setTimeout(() => setToast(null), 3000);
+      setToast("Reclamo marcado como pendiente"); setTimeout(() => setToast(null), 3000);
       loadReclamos();
     } catch { setCurrent(prev => prev ? { ...prev, estado: prevEstado } : prev); setToast("Sin conexión. Verifica tu internet e intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
   }
@@ -494,7 +494,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
       const itemsRes = await fetch(`/api/reclamos/${current.id}/items`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: editItems }) });
       if (!itemsRes.ok) {
         const err = await itemsRes.json().catch(() => null);
-        setToast(err?.error || "Se guardaron los datos pero no los renglones. Revisa e intenta de nuevo."); setTimeout(() => setToast(null), 5000);
+        setToast(err?.error || "Se guardaron los datos pero no las líneas. Revisa e intenta de nuevo."); setTimeout(() => setToast(null), 5000);
         await loadDetail(current.id); loadReclamos();
         setEditSaving(false); return;
       }

@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «líneas».
 /* ─────────────────────────────────────────────────────────────────────────────
  * 🔴 CANDADO — EL FORMULARIO NUEVO DICE QUÉ VA A PASAR, Y LO QUE FALTA SE DICE
  * DONDE FALTA (20-sep-2026, aprobado por Daniel).
@@ -77,7 +78,7 @@ describe("🔴 lo que hace la pantalla se dice bajo el título, no dentro del �
 
   it("y nombra lo demás que hace: los renglones para marcar", () => {
     pintar();
-    expect(document.body.textContent).toContain("los renglones para que marques cuáles reclamas");
+    expect(document.body.textContent).toContain("las líneas para que marques cuáles reclamas");
     expect(document.body.textContent).toContain("Revisa y corrige");
   });
 

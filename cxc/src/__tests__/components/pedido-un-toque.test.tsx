@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 // ─────────────────────────────────────────────────────────────────────────────
 // ENVIAR A SWITCH EN UN SOLO TOQUE — la pantalla REAL, tocada de verdad.
 //
@@ -257,7 +258,7 @@ describe("se detiene y muestra el problema", () => {
     await tocarEnviar(btn);
     const titulo = await screen.findByText("No se puede enviar a Switch");
     const modal = titulo.closest("div") as HTMLElement;
-    expect(screen.getByText("Lo que sí cruzó con Switch")).toBeTruthy();
+    expect(screen.getByText("Líneas validadas")).toBeTruthy();
     // El SKU también está en la tabla del pedido, detrás del modal: se busca
     // DENTRO del modal para no confundirlos.
     expect(modal.querySelector("table")?.textContent).toContain("SKU-1");

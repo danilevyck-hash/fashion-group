@@ -138,7 +138,7 @@ export function buildOrderEmailHtml(opts: OrderEmailOpts): string {
   // marcas sin pre-orden, así que además dejan de existir dos correos distintos
   // para el mismo pedido.
   const sectionsHtml = hasPreorders
-    ? `${renderSection("Pedido", regularItems, tableHeadBg)}${renderSection("Pre-orden", preorderItems, "#d97706")}`
+    ? `${renderSection("Pedido", regularItems, tableHeadBg)}${renderSection("Preventa", preorderItems, "#d97706")}`
     : tabla(items.map(renderRow).join(""));
 
   // ── Textos por audiencia ──────────────────────────────────────────────────
@@ -161,8 +161,8 @@ export function buildOrderEmailHtml(opts: OrderEmailOpts): string {
   const preordenHtml = !hasPreorders
     ? ""
     : esCliente
-      ? `<p style="background:#fef3c7;border-left:3px solid #d97706;padding:10px 14px;color:#92400e;font-size:12px;margin:8px 0 16px">Los artículos marcados como <strong>Pre-orden</strong> todavía no están en stock. Te avisamos apenas lleguen.</p>`
-      : `<p style="background:#fef3c7;border-left:3px solid #d97706;padding:10px 14px;color:#92400e;font-size:12px;margin:8px 0 16px">Los artículos en <strong>Pre-orden</strong> aún no tienen stock disponible. No deben mezclarse con el pedido regular en bodega.</p>`;
+      ? `<p style="background:#fef3c7;border-left:3px solid #d97706;padding:10px 14px;color:#92400e;font-size:12px;margin:8px 0 16px">Los artículos marcados como <strong>Preventa</strong> todavía no están en stock. Te avisamos apenas lleguen.</p>`
+      : `<p style="background:#fef3c7;border-left:3px solid #d97706;padding:10px 14px;color:#92400e;font-size:12px;margin:8px 0 16px">Los artículos en <strong>Preventa</strong> aún no tienen stock disponible. No deben mezclarse con el pedido regular en bodega.</p>`;
 
   const queSigueHtml = esCliente
     ? `<p style="color:#333;font-size:13px;line-height:1.6;margin:16px 0 0">

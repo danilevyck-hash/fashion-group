@@ -38,6 +38,7 @@
 import { describe, it, expect } from "vitest";
 import { desgloseCanales, primerNombre, CANALES, ROTULO_TIENDA } from "@/lib/multifashion/canales";
 import { lineaVendedora } from "@/lib/multifashion/celular";
+// 1-oct-2026, Daniel: nombres normales de ERP («tiquetes» → «tickets», «Cierra en» → «Proyección de cierre», «Cuándo vende la tienda» → «Ventas por día y hora», «Lo que más…» → «Más vendidos / Mayor utilidad / Mayores variaciones», «Dormidos» → «Inactivos», «Compró/Veces» → «Total compras/Visitas»).
 
 // Sheynee Batista, septiembre 2026 — medido contra producción el 24-sep-2026.
 const SHEYNEE = {
@@ -86,7 +87,7 @@ describe("1 · la línea de la computadora", () => {
 });
 
 describe("2 · la línea del celular", () => {
-  it("🔴 «Sheynee $11,675 · Redes $375 · 275 tiquetes»", () => {
+  it("🔴 «Sheynee $11,675 · Redes $375 · 275 tickets»", () => {
     expect(
       lineaVendedora({
         desglose: desgloseDe(SHEYNEE),
@@ -94,7 +95,7 @@ describe("2 · la línea del celular", () => {
         ticketPromedio: SHEYNEE.ticket_promedio,
         gerente: false,
       }),
-    ).toBe("Sheynee $11,675 · Redes $375 · 275 tiquetes");
+    ).toBe("Sheynee $11,675 · Redes $375 · 275 tickets");
   });
 
   it("la de siempre, sin canal, no cambió", () => {
@@ -105,7 +106,7 @@ describe("2 · la línea del celular", () => {
         ticketPromedio: JAILINE.ticket_promedio,
         gerente: false,
       }),
-    ).toBe("165 tiquetes · $34.25 promedio");
+    ).toBe("165 tickets · $34.25 promedio");
   });
 });
 
@@ -139,6 +140,6 @@ describe("4 · 🔴 la plata no se movió", () => {
   it("el celular recorta los CENTAVOS, no la plata: los mismos números, cortos", () => {
     expect(
       lineaVendedora({ desglose: "Sheynee $11,674.57 · Redes $375.30", tiquetes: 275, ticketPromedio: 43.82, gerente: false }),
-    ).toBe("Sheynee $11,675 · Redes $375 · 275 tiquetes");
+    ).toBe("Sheynee $11,675 · Redes $375 · 275 tickets");
   });
 });

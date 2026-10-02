@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «qué hay que recordar» → «la descripción».
 // ─────────────────────────────────────────────────────────────────────────────
 // RECORDATORIOS — cuándo toca uno, y qué dice el aviso.
 //
@@ -341,8 +342,8 @@ describe("🔴 QUÉ ES OBLIGATORIO — y qué NO, que es lo que decidió Daniel"
   });
 
   it("sin texto (o con puros espacios) no se puede guardar", () => {
-    expect(faltaParaGuardar({ fecha: "2026-08-24", texto: "" })).toEqual(["qué hay que recordar"]);
-    expect(faltaParaGuardar({ fecha: "2026-08-24", texto: "   " })).toEqual(["qué hay que recordar"]);
+    expect(faltaParaGuardar({ fecha: "2026-08-24", texto: "" })).toEqual(["la descripción"]);
+    expect(faltaParaGuardar({ fecha: "2026-08-24", texto: "   " })).toEqual(["la descripción"]);
   });
 
   it("sin fecha, o con una que no existe, tampoco", () => {
@@ -351,7 +352,7 @@ describe("🔴 QUÉ ES OBLIGATORIO — y qué NO, que es lo que decidió Daniel"
   });
 
   it("faltando las dos, las dice las dos (el botón dice qué falta, no un toast por vez)", () => {
-    expect(faltaParaGuardar({ fecha: "", texto: "" })).toEqual(["la fecha", "qué hay que recordar"]);
+    expect(faltaParaGuardar({ fecha: "", texto: "" })).toEqual(["la fecha", "la descripción"]);
   });
 
   it("🔴 EL CLIENTE NO ES OBLIGATORIO — Daniel: «no debería de ser obligatorio»", () => {

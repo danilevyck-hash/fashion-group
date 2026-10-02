@@ -38,7 +38,7 @@ export type OrigenComprobante = "mio" | "link";
 export type FiltroOrigen = "todos" | OrigenComprobante;
 
 /** El rótulo chico del grupo de chips. */
-export const ROTULO_GRUPO_ORIGEN = "Quién lo armó";
+export const ROTULO_GRUPO_ORIGEN = "Origen";
 
 /** 🔴 Los nombres aprobados. `link` = lo armó el cliente; `mio` = la casa. */
 export const ORIGEN_LABEL: Record<OrigenComprobante, string> = {

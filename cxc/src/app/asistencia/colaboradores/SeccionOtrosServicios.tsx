@@ -153,7 +153,7 @@ export default function SeccionOtrosServicios({ codigo, refresco }: {
           )}
           {/* 🔑 Y se dice a qué quincena va, porque no se elige. */}
           <p className="mt-1.5 text-[12px] text-gray-500">
-            Se anota con la fecha de hoy y entra en la quincena que está abierta.
+            Se registra con la fecha de hoy y entra en la quincena que está abierta.
           </p>
         </div>
       )}
@@ -169,7 +169,7 @@ export default function SeccionOtrosServicios({ codigo, refresco }: {
                   <span className="tabular-nums">${s.monto.toFixed(2)}</span> · {s.concepto}
                 </span>
                 <span className="block text-[12px] text-gray-500">
-                  {fmtDate(s.fecha)}{s.anotadoPor ? ` · lo anotó ${s.anotadoPor}` : ""}
+                  {fmtDate(s.fecha)}{s.anotadoPor ? ` · registrado por ${s.anotadoPor}` : ""}
                 </span>
               </span>
               <button type="button" onClick={() => void quitar(s.id)}

@@ -118,6 +118,7 @@ vi.mock("@/lib/multifashion/retail-al-frente", async (importOriginal) => {
 
 // Se importa DESPUÉS del mock (vitest lo iza igual, pero deja la intención clara).
 import { ProductosSubtab } from "@/components/multifashion/ProductosSubtab";
+// 1-oct-2026, Daniel: nombres normales de ERP («tiquetes» → «tickets», «Cierra en» → «Proyección de cierre», «Cuándo vende la tienda» → «Ventas por día y hora», «Lo que más…» → «Más vendidos / Mayor utilidad / Mayores variaciones», «Dormidos» → «Inactivos», «Compró/Veces» → «Total compras/Visitas»).
 
 afterEach(cleanup);
 
@@ -196,7 +197,7 @@ describe("un toque y TODO lo de abajo queda en esa marca", () => {
     // Se agarra la tarjeta por su `data-bloque`, no contando <div> hacia arriba:
     // lo que este candado tiene que vigilar es QUÉ filas muestra el bloque, no
     // cuántos contenedores tiene el encabezado.
-    const bloque = screen.getByText("Lo que más cambió").closest("[data-bloque='movimientos']") as HTMLElement;
+    const bloque = screen.getByText("Mayores variaciones").closest("[data-bloque='movimientos']") as HTMLElement;
     expect(bloque.textContent).toContain("Karl-Botas");
     expect(bloque.textContent).not.toContain("Tommy-Camisas");
   });

@@ -19,6 +19,9 @@
  *   5. El copy de Switch, verbatim.
  * ─────────────────────────────────────────────────────────────────────────────
  */
+// 🔄 1-oct-2026: nombres de ERP en Guías (Daniel aprobó el audit): rótulos en tipo oración
+// («Guardar guía», «Nueva guía de despacho», «Tipo de despacho», «Vincular cliente»…).
+// Este candado leía los textos viejos y se actualiza a propósito.
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { useState } from "react";
 import { render, screen, fireEvent, cleanup, act, waitFor } from "@testing-library/react";
@@ -279,7 +282,7 @@ describe("🔴 3. corregir los bultos lleva directo a reimprimir el juego comple
     fireEvent.click(items[1]); // Corregir bultos
     expect(await screen.findByText("Corregir bultos")).toBeTruthy();
 
-    fireEvent.change(screen.getByLabelText("Cuántos bultos"), { target: { value: "16" } });
+    fireEvent.change(screen.getByLabelText("Bultos"), { target: { value: "16" } });
     fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
 
     expect(await screen.findByText(/Reimprimir · 11-000002558/)).toBeTruthy();

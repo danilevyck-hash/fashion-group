@@ -76,7 +76,7 @@ export type EstadoEgresos = "con_movimientos" | "sin_movimientos" | "sin_datos";
 export const ETIQUETA_ESTADO_EGRESOS: Record<EstadoEgresos, string> = {
   con_movimientos: "Al día",
   sin_movimientos: "Sin movimientos",
-  sin_datos: "No traído",
+  sin_datos: "Sin datos",
 };
 
 /** Una cuenta con lo que salió por ella en el mes. */

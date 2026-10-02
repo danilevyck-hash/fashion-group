@@ -121,7 +121,8 @@ describe("🔴 el campo del saldo se fue de la ficha", () => {
   // 🔑 CONTROL — lo que NO se podía perder al sacar el campo de al lado.
   it("🔑 CONTROL — «Empezó a trabajar» sigue en la ficha y sigue viajando", async () => {
     await abrirFicha();
-    expect(screen.getAllByText(/Empezó a trabajar/).length).toBeGreaterThan(0);
+    // 1-oct-2026, Daniel: nombres normales de ERP («getAllByText(/Empezó a trabajar/)» → «getAllByText(/Fecha de ingreso/)»).
+    expect(screen.getAllByText(/Fecha de ingreso/).length).toBeGreaterThan(0);
     const ingreso = screen.getAllByDisplayValue("2019-02-16")[0] as HTMLInputElement;
     expect(ingreso).toBeTruthy();
     fireEvent.change(ingreso, { target: { value: "2019-03-16" } });

@@ -157,7 +157,8 @@ describe("a. 🔴 EL TIPO: la ruta de Feriados y la pantalla", () => {
   it("la pantalla: el tipo se elige con ControlSegmentado, la lista dice «debe las horas» y cambiar es el mismo POST", () => {
     const s = puro("src/app/asistencia/FeriadosTab.tsx");
     expect(s).toMatch(/<ControlSegmentado[\s\S]*?options=\{TIPOS_FERIADO\.map/);
-    expect(s).toMatch(/debe las horas/);
+    // 1-oct-2026, Daniel: nombres normales de ERP («expect(s).toMatch(/debe las horas/);» → «expect(s).toMatch(/Horas por reponer/);»).
+    expect(s).toMatch(/Horas por reponer/);
     expect(s).toMatch(/guardar\(\{ \.\.\.f, tipo: libre \? "feriado" : "dia_libre" \}\)/);
     expect((s.match(/fetch\("\/api\/asistencia\/feriados", \{/g) ?? []).length).toBe(1);
   });

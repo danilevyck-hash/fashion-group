@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 // ─────────────────────────────────────────────────────────────────────────────
 // Paridad y contratos del FLUJO PÚBLICO de catálogos en las 3 marcas
 // (revisión de punta a punta, jul-2026).
@@ -239,7 +240,7 @@ describe("textos del catálogo público", () => {
   it("el menú Compartir dice lo MISMO en las 3 marcas", () => {
     const labels = MARCAS.map((m) => MARCA_THEME[m].vendorShare.copyLabel);
     expect(new Set(labels).size).toBe(1);
-    expect(labels[0]).toBe("Copiar link público");
+    expect(labels[0]).toBe("Copiar enlace público");
   });
 
   it("las etiquetas de los filtros están acentuadas", () => {

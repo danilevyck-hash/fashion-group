@@ -158,7 +158,7 @@ export async function registrarDeudasDiaLibre(
     })),
   );
   if (esTablaDiaLibreFaltante(error)) return { creadas: 0, repetidas: 0, faltaTabla: true };
-  if (error) throw new Error(`No se pudo anotar el día libre: ${error.message}`);
+  if (error) throw new Error(`No se pudo registrar el día libre: ${error.message}`);
   return { creadas: faltan.length, repetidas: deudas.length - faltan.length, faltaTabla: false };
 }
 
@@ -229,7 +229,7 @@ export async function escribirPagosDiaLibre(opts: {
     })),
   );
   if (esTablaDiaLibreFaltante(error)) return { escritos: 0, total: 0, faltaTabla: true };
-  if (error) throw new Error(`No se pudo anotar el pago del día libre: ${error.message}`);
+  if (error) throw new Error(`No se pudo registrar el pago del día libre: ${error.message}`);
   const total = Math.round(faltan.reduce((s, p) => s + p.monto, 0) * 100) / 100;
   return { escritos: faltan.length, total, faltaTabla: false };
 }

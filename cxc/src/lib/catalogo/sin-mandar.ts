@@ -34,7 +34,7 @@ import { fechaPanamaDe } from "@/lib/fecha-panama";
 import { TEXTO_NO_ENVIADO, esBorrador, type NumerosDePedido } from "./numeros-pedido";
 
 /** El rótulo del chip. Dice el estado, no el mecanismo. */
-export const CHIP_SIN_MANDAR = "Sin mandar";
+export const CHIP_SIN_MANDAR = "No enviado";
 
 /** Lo mínimo que hace falta para saber si una fila está trabada. */
 export interface FilaSinMandar extends NumerosDePedido {
@@ -101,7 +101,7 @@ function conAntiguedad(base: string, dias: number | null, desdeUnDia: boolean): 
  * pedido TERMINADO no llegó al ERP.
  */
 export function textoSinMandar(createdAt: string | null | undefined, hoyPanamaYmd: string): string {
-  return conAntiguedad("Sin mandar a Switch", diasSinLlegarASwitch(createdAt, hoyPanamaYmd), false);
+  return conAntiguedad("No enviado a Switch", diasSinLlegarASwitch(createdAt, hoyPanamaYmd), false);
 }
 
 /**

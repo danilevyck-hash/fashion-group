@@ -50,7 +50,7 @@ describe("la hoja de «Descargar»", () => {
   it("tiene DOS opciones y nada más", () => {
     expect(TITULO_HOJA_DESCARGA).toBe("Descargar");
     expect(OPCION_ESTA_PESTANA).toBe("Esta pestaña en Excel");
-    expect(OPCION_LAS_TRES).toBe("Las tres pestañas en un solo Excel");
+    expect(OPCION_LAS_TRES).toBe("Todas las pestañas (Excel)"); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(DETALLE_LAS_TRES).toBe("Resumen · Clientes · Productos, una hoja cada una");
   });
 

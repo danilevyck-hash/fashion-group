@@ -180,7 +180,7 @@ export default function VacacionesTab() {
                 agrupados abajo. Siguen siendo ELEGIBLES: son gente que marca y
                 a la que hay que poder darle vacaciones. */}
             <select value={codigo} onChange={(e) => setCodigo(e.target.value)} className={campo}>
-              <option value="">Elegir…</option>
+              <option value="">Seleccionar…</option>
               {conNombre.length > 0 && (
                 <optgroup label="Colaboradores">
                   {conNombre.map((p) => (

@@ -91,8 +91,8 @@ export function MetasEnVendedoras() {
             <h4 className="text-sm font-semibold text-gray-950">{meta.nombre}</h4>
             <span className="text-xs text-gray-500">
               {meta.tipo === "vendedora"
-                ? "· la meta de cada una"
-                : "· cuánto aportó cada una"}
+                ? "· meta por vendedora"
+                : "· aporte por vendedora"}
               {" · "}
               {fecha(meta.desde)} a {fecha(meta.hasta)}
             </span>

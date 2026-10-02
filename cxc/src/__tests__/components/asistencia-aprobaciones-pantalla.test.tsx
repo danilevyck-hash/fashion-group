@@ -103,7 +103,8 @@ describe("🔴 abre POR COLABORADOR: un renglón por persona con sus extras suma
   it("el contador cuenta RENGLONES por decidir y suma sus horas", async () => {
     await montar();
     // 4 personas · 337 min = 5:37 h
-    expect(screen.getByTestId("por-decidir").textContent).toBe("4por decidir · 5:37 h");
+    // 1-oct-2026, Daniel: nombres normales de ERP («por decidir · » → «pendientes · »).
+    expect(screen.getByTestId("por-decidir").textContent).toBe("4pendientes · 5:37 h");
   });
 });
 
@@ -121,8 +122,9 @@ describe("🔴 lo que mandan los botones", () => {
     await toca(boton(/^No a KEVIN LUBO$/));
     expect(enviados[0].decision).toBe("no");
     expect(within(screen.getByTestId("vista-colaborador")).queryByText("KEVIN LUBO")).toBeNull();
-    expect(screen.getByRole("button", { name: /Ya decididas \(1\)/ })).toBeTruthy();
-    expect(screen.getByTestId("por-decidir").textContent).toBe("3por decidir · 4:26 h");
+    // 1-oct-2026, Daniel: nombres normales de ERP («name: /Ya decididas (1)/» → «name: /Procesadas (1)/»).
+    expect(screen.getByRole("button", { name: /Procesadas \(1\)/ })).toBeTruthy();
+    expect(screen.getByTestId("por-decidir").textContent).toBe("3pendientes · 4:26 h");
   });
 
   it("UN DÍA de una persona (abriendo el ⌄): solo ese día", async () => {
@@ -196,7 +198,7 @@ describe("🔴 un toque de más no es irreversible: «cambiar» en Ya decididas"
     vi.stubGlobal("fetch", servidor(CON_UNO_APROBADO));
     await montar();
     expect(within(screen.getByTestId("vista-colaborador")).queryByText("JULIO GARAY")).toBeNull();
-    await toca(screen.getByRole("button", { name: /Ya decididas \(1\)/ }));
+    await toca(screen.getByRole("button", { name: /Procesadas \(1\)/ }));
     expect(screen.getByText("JULIO GARAY")).toBeTruthy();
     await toca(screen.getByRole("button", { name: "cambiar" }));
     const si = boton(/^Sí a JULIO GARAY el lun 24 ago$/)!;
@@ -210,7 +212,7 @@ describe("🔴 un toque de más no es irreversible: «cambiar» en Ya decididas"
   it("tocar el otro botón cambia la decisión: Sí → No", async () => {
     vi.stubGlobal("fetch", servidor(CON_UNO_APROBADO));
     await montar();
-    await toca(screen.getByRole("button", { name: /Ya decididas \(1\)/ }));
+    await toca(screen.getByRole("button", { name: /Procesadas \(1\)/ }));
     await toca(screen.getByRole("button", { name: "cambiar" }));
     await toca(boton(/^No a JULIO GARAY el lun 24 ago$/));
     expect(enviados[0].decision).toBe("no");

@@ -371,7 +371,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
                     <th className="border-b border-gray-200 px-3.5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Vendedora</th>
                     <SortHeader col="tickets"      sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Tickets</SortHeader>
                     <SortHeader col="ventas"       sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Ventas</SortHeader>
-                    <th className="border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Ticket prom.</th>
+                    <th className="border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Ticket promedio</th>
                     <SortHeader col="delta_ventas" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>{rotuloDelta.columna}</SortHeader>
                     <SortHeader col="comision"     sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Comisión</SortHeader>
                     {/* El bono, donde le corresponde: una columna, no una barra.
@@ -579,7 +579,7 @@ function VendedoraCard({
       )}
       <div className="mt-1 text-xs text-gray-500">
         <span className="font-mono tabular-nums">{v.tickets.toLocaleString()}</span> {v.tickets === 1 ? "ticket" : "tickets"} ·{" "}
-        <span className="font-mono tabular-nums">${v.ticket_promedio.toFixed(2)}</span> tkt prom ·{" "}
+        <span className="font-mono tabular-nums">${v.ticket_promedio.toFixed(2)}</span> ticket promedio ·{" "}
         <span className="font-mono tabular-nums">${v.comision.toFixed(2)}</span> comisión
         {conBono && <> · bono <span className={cn(bono === BONO_AL_CIERRE || bono === "—" ? "text-gray-400" : "font-mono font-semibold text-amber-700")}>{bono}</span></>}
       </div>

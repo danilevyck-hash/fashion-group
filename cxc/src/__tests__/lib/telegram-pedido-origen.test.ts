@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (Mandar → Enviar)
 // ─────────────────────────────────────────────────────────────────────────────
 // Avisos de Telegram de pedidos de catálogo — LOS TRES EVENTOS, UN SOLO
 // FORMATO, DOS LÍNEAS.
@@ -91,7 +92,7 @@ describe("el formato de DOS LÍNEAS, en los 3 eventos y las 4 marcas", () => {
         // 🔴 NO ES EXPLICACIÓN, ES UNA ACCIÓN PENDIENTE. Desde el 14-ago-2026
         // el pedido del link espera a una persona: es lo único que hay entre el
         // pedido y el ERP, y sin decirlo se queda quieto y nadie se entera.
-        "Falta ponerle el cliente y mandarlo a Switch — está en Borradores.",
+        "Falta asignar el cliente y enviarlo a Switch — está en Borradores.",
       ]);
       sinLoPodado(t);
     });

@@ -499,7 +499,8 @@ describe("🔴 divisor de la rata — el 0 es el que revienta el cálculo", () =
 
   it("la pantalla dice 'Horas que se trabajan al mes' con la jornada al lado", () => {
     const src = leer("src/app/asistencia/ConfiguracionTab.tsx");
-    expect(src).toContain('titulo="Horas que se trabajan al mes"');
+    // 1-oct-2026, Daniel: nombres normales de ERP («expect(src).toContain('titulo="Horas que se trabajan al mes"» → «expect(src).toContain('titulo="Horas mensuales"');»).
+    expect(src).toContain('titulo="Horas mensuales"');
     expect(src).toContain('ayuda="El salario mensual se divide entre estas horas para sacar la rata por hora."');
     expect(src).toContain('label="40 horas por semana"');
     expect(src).toContain('label="48 horas por semana"');

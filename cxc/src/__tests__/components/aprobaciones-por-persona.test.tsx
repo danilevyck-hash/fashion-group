@@ -104,9 +104,10 @@ describe("🔴 el control «Colaborador · Día»", () => {
 
   it("🔴 las dos vistas cuentan lo MISMO arriba: 1 por decidir · 1:32 h", async () => {
     await montar();
-    expect(screen.getByTestId("por-decidir").textContent).toBe("1por decidir · 1:32 h");
+    // 1-oct-2026, Daniel: nombres normales de ERP («toBe("1por decidir · 1:32 h")» → «toBe("1pendientes · 1:32 h")»).
+    expect(screen.getByTestId("por-decidir").textContent).toBe("1pendientes · 1:32 h");
     await toca(screen.getByRole("tab", { name: "Día" }));
-    expect(screen.getByTestId("por-decidir").textContent).toBe("1por decidir · 1:32 h");
+    expect(screen.getByTestId("por-decidir").textContent).toBe("1pendientes · 1:32 h");
   });
 });
 
@@ -147,7 +148,8 @@ describe("🔴 «Ya decididas»: plegado, con Sí / No / «Sí y No» y «cambia
     await montar();
     const ya = screen.getByTestId("ya-decididas");
     expect(within(ya).queryByText("KENNY VARGAS")).toBeNull(); // plegado
-    await toca(within(ya).getByRole("button", { name: /Ya decididas \(1\)/ }));
+    // 1-oct-2026, Daniel: nombres normales de ERP («name: /Ya decididas (1)/» → «name: /Procesadas (1)/»).
+    await toca(within(ya).getByRole("button", { name: /Procesadas \(1\)/ }));
     expect(within(ya).getByText("KENNY VARGAS")).toBeTruthy();
     expect(within(ya).getByText("Sí y No")).toBeTruthy();
     expect(within(ya).getByText("1:01 h")).toBeTruthy();

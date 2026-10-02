@@ -562,7 +562,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
           setSwitchEnvio({ estado: "error", pedido_switch_id: null, numero_interno: null, error_detalle: d.error || null, documento });
         }
         setSwitchProblema({
-          errores: (d.errores as string[] | undefined) ?? [String(d.error || "Switch rechazo el pedido.")],
+          errores: (d.errores as string[] | undefined) ?? [String(d.error || "Switch rechazó el pedido.")],
           avisos: (d.avisos as AvisoEnvio[] | undefined) ?? [],
           lineas: (d.lineas as SwitchPreviewLinea[] | undefined) ?? [],
           puedeSeguir: false,
@@ -808,7 +808,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
    */
   async function sendToClient() {
     if (!clientEmail.trim() || !clientEmail.includes("@")) {
-      showToast("Ingresa un email válido"); return;
+      showToast("Ingresa un correo válido"); return;
     }
     const correo = clientEmail.trim();
     setSendingToClient(true);
@@ -1040,7 +1040,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                     390 px: con w-14 la página arrastraba 1 px, con w-12 arrastra
                     0. La columna solo muestra un número corto (456 en el caso
                     más grande de hoy), así que 48 px le sobran. */}
-                <th className="py-2 text-center text-xs uppercase text-gray-400 font-normal w-12">Pzas</th>
+                <th className="py-2 text-center text-xs uppercase text-gray-400 font-normal w-12">Piezas</th>
                 <th className="py-2 text-right text-xs uppercase text-gray-400 font-normal w-14">Precio</th>
                 <th className="py-2 text-right text-xs uppercase text-gray-400 font-normal w-20">Subtotal</th>
                 {canEdit && <th className="w-8"></th>}
@@ -1164,7 +1164,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                     ? "border-gray-200 text-gray-700 hover:border-gray-400"
                     : "border-amber-400 bg-white text-amber-900 hover:border-amber-500"
                 }`}>
-                {clienteElegido ? "Cambiar" : "Elegir"}
+                {clienteElegido ? "Cambiar" : "Seleccionar"}
               </button>
             ) : (
               <span className="flex-shrink-0 text-xs text-gray-400">ya está en Switch</span>
@@ -1333,12 +1333,12 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
               {!showEmailInput ? (
                 <button onClick={() => setShowEmailInput(true)} className="text-xs text-gray-500 hover:text-black transition text-left flex items-center gap-2 min-h-[44px]">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                  Enviar por email al cliente
+                  Enviar por correo al cliente
                 </button>
               ) : (
                 <div className="flex items-center gap-2">
                   <input type="email" value={clientEmail} onChange={e => setClientEmail(e.target.value)}
-                    placeholder="cliente@email.com" autoFocus
+                    placeholder="cliente@correo.com" autoFocus
                     onKeyDown={e => e.key === "Enter" && sendToClient()}
                     className="flex-1 border border-gray-200 rounded-md px-2.5 min-h-[44px] text-xs outline-none focus:border-black transition" />
                   <button onClick={sendToClient} disabled={sendingToClient}
@@ -1424,7 +1424,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
             {/* Las líneas que SÍ cruzaron con Switch, debajo del problema. */}
             {switchProblema.lineas.length > 0 && (
               <>
-                <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Lo que sí cruzó con Switch</p>
+                <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Líneas validadas</p>
                 <table className="w-full text-xs mb-4">
                   <thead>
                     <tr className="border-b border-gray-200 text-gray-400">

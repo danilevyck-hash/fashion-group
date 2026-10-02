@@ -28,6 +28,7 @@ import { armarTarjetaModelo } from "@/lib/ventas/referencia-modelo";
 import { REFERENCIA_2026_09, ROTULOS } from "@/lib/ventas/referencia-pantalla";
 import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
 import fixture from "../fixtures/referencia-nb2570.json";
+// 1-oct-2026, Daniel: nombres normales de ERP (aprobó «Comprado · Vendido · Stock · % vendido»; el % se rotula «% vendido»; «Llegada» → «Recepción»; «Más info» → «Detalle»).
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/referencia",
@@ -232,19 +233,19 @@ describe("🔴 al buscar un MODELO sale su tarjeta y debajo sus colores", () => 
 describe("🔴 «Más info ›» arranca cerrado", () => {
   it("las 27 llegadas, el mes a mes, el precio de lista y el CIF viven adentro", async () => {
     await buscar("NB2570", TODOS);
-    expect(screen.queryByText(/Todas las llegadas/)).toBeNull();
+    expect(screen.queryByText(/Todas las recepciones/)).toBeNull();
     expect(screen.queryByText(/Precio de lista/)).toBeNull();
     expect(screen.queryByText(/Mes a mes/)).toBeNull();
 
-    const boton = screen.getAllByRole("button", { name: /Más info/ })[0];
+    const boton = screen.getAllByRole("button", { name: /^Detalle/ })[0];
     expect(boton.getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(boton);
 
-    expect(screen.getAllByText(/Todas las llegadas · 27 desde oct 2022/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Todas las recepciones · 27 desde oct 2022/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Mes a mes/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Precio de lista \$27\.00 · Costo CIF \$16\.56/).length).toBeGreaterThan(0);
     // Y el renglón por trimestre del AÑO ANTERIOR (oct–dic 2024 = 1.172 u).
-    expect(screen.getAllByText(/Por trimestre · el año anterior/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Trimestral \(año anterior\)/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("1,172").length).toBeGreaterThan(0);
     // Las 27 fechas, con su día.
     expect(screen.getAllByText("25 oct 2022").length).toBeGreaterThan(0);

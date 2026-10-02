@@ -65,7 +65,7 @@ export type TabCxc = Cartera;
 
 /** Las dos pestañas del panel, en su orden. Fuente única de la UI. */
 export const PESTANAS_CXC: readonly { key: TabCxc; label: string }[] = [
-  { key: "grupo", label: "Grupo · 6 empresas" },
+  { key: "grupo", label: "Fashion Group" },
   { key: "boston", label: "Confecciones Boston" },
 ] as const;
 

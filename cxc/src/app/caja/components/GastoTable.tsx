@@ -360,7 +360,7 @@ export default function GastoTable({
                 <th className="text-left py-2.5 px-4 font-medium">Categoría</th>
                 {showFiscal && (
                   <>
-                    <th className="text-right py-2.5 px-4 font-medium">Sub-total</th>
+                    <th className="text-right py-2.5 px-4 font-medium">Subtotal</th>
                     <th className="text-right py-2.5 px-4 font-medium">ITBMS</th>
                   </>
                 )}
@@ -617,7 +617,7 @@ export default function GastoTable({
               onChange={(e) => setShowFiscal(e.target.checked)}
               style={{ accentColor: "var(--caja-accent)" }}
             />
-            Ver desglose fiscal (Sub-total + ITBMS)
+            Ver desglose fiscal (Subtotal + ITBMS)
           </label>
         </div>
       )}

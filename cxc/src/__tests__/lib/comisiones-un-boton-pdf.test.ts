@@ -40,6 +40,7 @@ import {
 import { construirPdfComision } from "@/lib/comisiones/pdf-comision";
 import { nombreArchivoComision } from "@/lib/comisiones/nombre-archivo";
 import type { ComisionDetalle } from "@/lib/ventas/comisionExcel";
+// 1-oct-2026, Daniel: nombres normales de ERP («Oficina (DEFAULT)» → «Oficina (sin vendedor)», «no se paga» → «No pagable», «Cierre» → «Resumen», «Clientes que no comisionan» → «Exclusiones de comisión»).
 
 const raiz = process.cwd();
 const leer = (rel: string) => readFileSync(path.join(raiz, rel), "utf8");
@@ -248,7 +249,7 @@ describe("⚠️ 5. lo que el papel dice no cambió", () => {
     const texto = await textoDelPdf(construirPdfComision([hoja(EDWIN, "Vistana")]));
     expect(texto).toContain("TOTAL VENTAS");
     expect(texto).toContain("TOTAL COBROS");
-    expect(texto).toContain("CIERRE");
+    expect(texto).toContain("RESUMEN");
     // 750 + 800, el número del RPC — no la suma de las líneas redondeadas.
     expect(texto).toContain("$1,550.00");
   });

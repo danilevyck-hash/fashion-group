@@ -25,6 +25,9 @@
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { mapEmpresaName } from "@/lib/empresa-mapping";
+import { yaSalioEn } from "@/lib/guias/atajos-facturas";
+import { leerIndiceYaSalio } from "@/lib/guias/ya-salio-server";
+import { ETIQUETAS_2026_10 } from "@/lib/guias/guias-2026-10";
 import {
   guiaQueSeLlevo,
   rotuloGuia,
@@ -34,7 +37,7 @@ import {
 import {
   ETIQUETAS_POR_ENVIO,
   envioDe,
-  renglonNuevoDe,
+  renglonDelEnvio,
   type EnvioNuevo,
   type RenglonParaAtar,
 } from "@/lib/guias/etiquetas-por-envio";
@@ -400,9 +403,9 @@ export type ResultadoImportar =
  *
  * Se llama DESPUÉS de que `/api/guias` creó la guía, y por eso la guía se sigue
  * creando exactamente igual que hoy: este paso escribe solo del lado de
- * `guias_etiquetas`. El renglón se busca por (`cliente_codigo`, `empresa`) —el
- * mismo par por el que se agruparon— con igualdad normalizada, jamás por
- * parecido. Una etiqueta que ya salió en otra guía se salta en silencio: no se
+ * `guias_etiquetas`. 🔴 Desde el 1-oct-2026 se ata POR ENVÍO: cada envío va al
+ * renglón que lleva sus facturas (`renglonDelEnvio`), con igualdad exacta,
+ * jamás por parecido. Una etiqueta que ya salió en otra guía se salta en silencio: no se
  * mueve de guía sola.
  */
 export async function importarEtiquetas(
@@ -413,7 +416,7 @@ export async function importarEtiquetas(
 
   const { data: renglones, error: rErr } = await supabaseServer
     .from("guia_items")
-    .select("id, cliente_codigo, empresa, direccion")
+    .select("id, cliente_codigo, empresa, direccion, facturas")
     .eq("guia_id", guiaId)
     .eq("deleted", false);
   if (rErr) return { ok: false, status: 500, error: "No se pudo enlazar con la guía" };
@@ -430,27 +433,42 @@ export async function importarEtiquetas(
     return { ok: false, status: 500, error: "No se pudo enlazar con la guía" };
   }
 
+  // 🔴 1-oct-2026: SE ATA POR ENVÍO. Las pedidas, pendientes, juntas por su
+  // envío; cada envío va al renglón que lleva SUS facturas (`renglonDelEnvio`).
+  // 🩸 Antes cada etiqueta buscaba «el renglón de su cliente + empresa +
+  // destino», y dos envíos iguales en dos renglones terminaban los dos en el
+  // primero. Una etiqueta que ya salió en una guía no se mueve de guía sola.
   const pedidas = new Set(ids.map((n) => Number(n)));
-  let atadas = 0;
+  const porEnvio = new Map<string, EtiquetaFila[]>();
   for (const e of etiquetas) {
-    if (!pedidas.has(e.id)) continue;
-    // Ya salió en una guía: no se mueve de guía sola.
-    if (e.guia_numero !== null) continue;
-    // 🔴 1-oct-2026: el envío es empresa + cliente + DESTINO. Se ata al renglón
-    // de los tres; si el destino se escribió distinto, al último del mismo
-    // cliente + empresa — que es lo que se hacía hasta hoy.
-    const renglonId = renglonNuevoDe(
-      { cliente_codigo: e.cliente_codigo, empresa: e.empresa, direccion: e.destino },
+    if (!pedidas.has(e.id) || e.guia_numero !== null) continue;
+    porEnvio.set(envioDe(e), [...(porEnvio.get(envioDe(e)) ?? []), e]);
+  }
+  const usados = new Set<string>();
+  let atadas = 0;
+  for (const filas of porEnvio.values()) {
+    const primera = filas[0];
+    const renglon = renglonDelEnvio(
+      {
+        cliente_codigo: primera.cliente_codigo,
+        empresa: primera.empresa,
+        direccion: primera.destino,
+        secuenciales: filas.map((f) => f.secuencial),
+      },
       nuevos,
-    )?.id;
-    if (!renglonId) continue;
-    const { error } = await supabaseServer
-      .from(TABLA_ETIQUETAS)
-      .update({ guia_item_id: renglonId })
-      .eq("id", e.id)
-      .eq("deleted", false)
-      .is("guia_item_id", null);
-    if (!error) atadas++;
+      usados,
+    );
+    if (!renglon) continue;
+    usados.add(renglon.id);
+    for (const e of filas) {
+      const { error } = await supabaseServer
+        .from(TABLA_ETIQUETAS)
+        .update({ guia_item_id: renglon.id })
+        .eq("id", e.id)
+        .eq("deleted", false)
+        .is("guia_item_id", null);
+      if (!error) atadas++;
+    }
   }
   return { ok: true, atadas };
 }
@@ -484,7 +502,38 @@ function textoYaEtiquetadas(ya: readonly EtiquetaFila[]): string {
  * de varias facturas o con nota contesta 503 y lo dice. Uno de UNA factura sin
  * nota se guarda como siempre (falla ABIERTA).
  */
-export async function crearEnvio(envio: EnvioNuevo, creadoPor: string): Promise<ResultadoEnvio> {
+export async function crearEnvio(
+  envio: EnvioNuevo,
+  creadoPor: string,
+  sinLasYaDespachadas: boolean = ETIQUETAS_2026_10,
+): Promise<ResultadoEnvio> {
+  // 🔴 1-oct-2026: UNA FACTURA QUE YA SALIÓ EN UNA GUÍA NO SE ETIQUETA, y lo
+  // decide el SERVIDOR (409), no solo la lista. 🩸 Se etiquetaron la 3097 y la
+  // 3096, que ya iban en una guía hecha a mano. La regla es la MISMA del chip
+  // «Ya salió en GT-xxx» (`yaSalioEn` sobre `leerIndiceYaSalio`). Falla
+  // ABIERTA: si el índice no se puede leer, se etiqueta como antes.
+  if (sinLasYaDespachadas) {
+    let indice: Map<string, number> | null = null;
+    try {
+      indice = await leerIndiceYaSalio();
+    } catch {
+      indice = null;
+    }
+    if (indice) {
+      const empresa = mapEmpresaName(envio.empresa_key);
+      for (const f of envio.facturas) {
+        const gt = yaSalioEn(indice, empresa, f.secuencial);
+        if (gt !== null) {
+          return {
+            ok: false,
+            status: 409,
+            error: `La factura ${f.secuencial} ya salió en ${rotuloGuia(gt)}: no se guardó nada`,
+            yaEtiquetadas: [],
+          };
+        }
+      }
+    }
+  }
   let vivas: EtiquetaFila[];
   try {
     vivas = await leerEtiquetas();
@@ -618,7 +667,7 @@ export async function marcarRenglonesConEtiquetas<T extends { id?: string | null
 
 /**
  * 🔴 EL ARREGLO DEL PUT (1-oct-2026). Antes de borrar los renglones viejos de
- * una guía, sus etiquetas se mudan a los renglones NUEVOS (`renglonNuevoDe`):
+ * una guía, sus etiquetas se mudan a los renglones NUEVOS (`renglonDelEnvio`, por envío):
  * así el `ON DELETE SET NULL` ya no las encuentra y no se desatan en silencio.
  * Con el interruptor prendido, devuelve además el total de etiquetas de cada
  * renglón nuevo: la ruta se lo pone como bultos (lo impreso manda).
@@ -637,26 +686,52 @@ export async function reatarEtiquetas(
   const bultosPorRenglon = new Map<string, number>();
   if (viejos.length === 0 || nuevos.length === 0) return { reatadas, bultosPorRenglon };
   try {
-    const { data, error } = await supabaseServer
-      .from(TABLA_ETIQUETAS)
-      .select(COLUMNAS_ATADAS)
-      .in("guia_item_id", viejos.map((v) => v.id))
-      .eq("deleted", false);
+    // 🔴 1-oct-2026: con el envío y la factura de cada etiqueta, para atar POR
+    // ENVÍO. Sin la migración de envíos, cada etiqueta es su propio envío.
+    const leer = (columnas: string) =>
+      supabaseServer
+        .from(TABLA_ETIQUETAS)
+        .select(columnas)
+        .in("guia_item_id", viejos.map((v) => v.id))
+        .eq("deleted", false);
+    let { data, error } = await leer(COLUMNAS_ATADAS + ", secuencial, envio_id");
+    if (error && esColumnaAusente(error.code, error.message)) {
+      ({ data, error } = await leer(COLUMNAS_ATADAS + ", secuencial"));
+    }
     if (error || !Array.isArray(data) || data.length === 0) return { reatadas, bultosPorRenglon };
-    const atadas = data as Array<{ id: number; guia_item_id: string; cajas: number }>;
+    const atadas = data as unknown as Array<{
+      id: number;
+      guia_item_id: string;
+      cajas: number;
+      secuencial?: string | null;
+      envio_id?: string | null;
+    }>;
 
-    // Renglón nuevo → las etiquetas que le tocan.
+    // Renglón nuevo → las etiquetas que le tocan. Cada ENVÍO de cada renglón
+    // viejo busca el renglón nuevo que lleva SUS facturas (`renglonDelEnvio`).
     const destino = new Map<string, { ids: number[]; total: number }>();
+    const usados = new Set<string>();
     for (const v of viejos) {
       const suyas = atadas.filter((a) => a.guia_item_id === v.id);
-      if (suyas.length === 0) continue;
-      const nuevo = renglonNuevoDe(v, nuevos);
-      if (!nuevo) continue; // el renglón se quitó de la guía: vuelve a «Pendiente»
-      const previo = destino.get(nuevo.id) ?? { ids: [], total: 0 };
-      destino.set(nuevo.id, {
-        ids: [...previo.ids, ...suyas.map((a) => Number(a.id))],
-        total: previo.total + suyas.reduce((s, a) => s + (Number(a.cajas) || 0), 0),
-      });
+      const porEnvio = new Map<string, typeof suyas>();
+      for (const a of suyas) {
+        const k = a.envio_id ? String(a.envio_id) : String(a.id);
+        porEnvio.set(k, [...(porEnvio.get(k) ?? []), a]);
+      }
+      for (const delEnvio of porEnvio.values()) {
+        const nuevo = renglonDelEnvio(
+          { ...v, secuenciales: delEnvio.map((a) => String(a.secuencial ?? "")) },
+          nuevos,
+          usados,
+        );
+        if (!nuevo) continue; // el renglón se quitó de la guía: vuelve a «Pendiente»
+        usados.add(nuevo.id);
+        const previo = destino.get(nuevo.id) ?? { ids: [], total: 0 };
+        destino.set(nuevo.id, {
+          ids: [...previo.ids, ...delEnvio.map((a) => Number(a.id))],
+          total: previo.total + delEnvio.reduce((s, a) => s + (Number(a.cajas) || 0), 0),
+        });
+      }
     }
     for (const [renglonId, { ids, total }] of destino) {
       const { error: e1 } = await supabaseServer

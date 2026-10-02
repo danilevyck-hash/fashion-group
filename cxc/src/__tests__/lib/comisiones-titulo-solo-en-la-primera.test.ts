@@ -46,6 +46,7 @@ import {
 } from "@/lib/comisiones/reporte-comision";
 import type { ComisionDetalle } from "@/lib/ventas/comisionExcel";
 import type { TablaPapel } from "@/lib/comisiones/tabla-papel";
+// 1-oct-2026, Daniel: nombres normales de ERP («Oficina (DEFAULT)» → «Oficina (sin vendedor)», «no se paga» → «No pagable», «Cierre» → «Resumen», «Clientes que no comisionan» → «Exclusiones de comisión»).
 
 const RAIZ = process.cwd();
 const leer = (rel: string) => readFileSync(path.join(RAIZ, rel), "utf8");
@@ -144,7 +145,7 @@ describe("🔴 el reporte de un vendedor: el título, una sola vez", () => {
     for (let i = 0; i < hojas.length; i++) {
       const deVentas = COLUMNAS_VENTAS.every((c) => hojas[i].includes(c));
       const deCobros = COLUMNAS_COBROS.every((c) => hojas[i].includes(c));
-      const soloCierre = hojas[i].includes("CIERRE") && !hojas[i].includes("Cliente");
+      const soloCierre = hojas[i].includes("RESUMEN") && !hojas[i].includes("Cliente");
       expect(deVentas || deCobros || soloCierre, `la hoja ${i + 1} quedó sin nombres de columna`).toBe(true);
       if (deVentas || deCobros) conColumnas++;
     }

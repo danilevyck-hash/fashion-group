@@ -76,7 +76,7 @@ export function HojaElegirEmpresa({
 }) {
   const opciones = [{ key: "all", name: "Todas mis empresas" }, ...empresas];
   return (
-    <Hoja titulo="Ver la cartera de" onCerrar={onCerrar}>
+    <Hoja titulo="Seleccionar empresa" onCerrar={onCerrar}>
       <ul className="divide-y divide-gray-100">
         {opciones.map((o) => (
           <li key={o.key}>
@@ -146,10 +146,10 @@ export function HojaPorEmpresa({
                 <span className="mt-0.5 block text-[13px] text-gray-500">
                   {f.clientes} {f.clientes === 1 ? "cliente" : "clientes"}
                   {f.ultimoPago && (
-                    <> · pagó {f.ultimoPago.cliente} {montoExacto(f.ultimoPago.monto)} {haceCuanto(f.ultimoPago.fecha, hoy)}</>
+                    <> · Último pago: {f.ultimoPago.cliente} {montoExacto(f.ultimoPago.monto)} {haceCuanto(f.ultimoPago.fecha, hoy)}</>
                   )}
                   {f.ultimaCompra && (
-                    <> · vendió {montoExacto(f.ultimaCompra.monto)} {haceCuanto(f.ultimaCompra.fecha, hoy)}</>
+                    <> · Última venta: {montoExacto(f.ultimaCompra.monto)} {haceCuanto(f.ultimaCompra.fecha, hoy)}</>
                   )}
                 </span>
               </span>

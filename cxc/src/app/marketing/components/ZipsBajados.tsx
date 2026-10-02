@@ -81,7 +81,7 @@ export default function ZipsBajados({ periodoId }: Props) {
           throw new Error(data?.error ?? "No se pudo volver a firmar el archivo.");
         }
         window.open(data.links[0].url as string, "_blank", "noopener,noreferrer");
-        toast(`Link nuevo, sirve ${DIAS_DEL_LINK} días.`, "success");
+        toast(`Enlace nuevo, sirve ${DIAS_DEL_LINK} días.`, "success");
       } catch (err) {
         toast(err instanceof Error ? err.message : "No se pudo volver a firmar", "error");
       } finally {
@@ -99,7 +99,7 @@ export default function ZipsBajados({ periodoId }: Props) {
       className="rounded-lg border border-gray-200 bg-white p-4"
       data-testid="zips-bajados"
     >
-      <h2 className="text-sm font-semibold text-gray-900 mb-2">Lo que ya se mandó</h2>
+      <h2 className="text-sm font-semibold text-gray-900 mb-2">Historial de envíos</h2>
       <ul className="divide-y divide-gray-100">
         {zips.map((z, i) => {
           const quien = quienLoBajo(z);

@@ -171,3 +171,16 @@ export function capturaDelEnvio(
   if (estados.length > 0 && estados.every((x) => x === "marcada")) return "marcada";
   return "libre";
 }
+
+/**
+ * 🔴 1-oct-2026 — NUEVA GUÍA EN UNA SOLA TABLA. ¿Alguna factura de este envío
+ * ya la lleva un renglón SIN etiqueta? Entonces el envío no se puede sumar:
+ * sus bultos caerían encima de un renglón que ya la tiene. Es la MISMA regla
+ * (`capturaDelEnvio`), mirada solo contra los renglones escritos a mano.
+ */
+export function envioTomadoPorUnRenglon(
+  renglonesSinEtiqueta: readonly RenglonDeGuia[],
+  filas: readonly EtiquetaFila[],
+): boolean {
+  return capturaDelEnvio(renglonesSinEtiqueta, filas, new Set()) === "tomada-por-el-selector";
+}

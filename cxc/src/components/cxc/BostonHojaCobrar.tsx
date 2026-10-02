@@ -77,7 +77,7 @@ export function mensajeBoston(c: ClienteCobrarBoston): string {
     "",
     "Le escribimos de Confecciones Boston para informarle sobre su estado de cuenta actualizado.",
     "",
-    `Estado de Cuenta - ${c.nombre}`,
+    `Estado de cuenta - ${c.nombre}`,
     "",
   ];
   if (c.d0_90 > 0) lineas.push(`Hasta 90 días: $${fmt(c.d0_90)}`);
@@ -85,7 +85,7 @@ export function mensajeBoston(c: ClienteCobrarBoston): string {
   if (c.d121_plus > 0) lineas.push(`Más de 120 días: $${fmt(c.d121_plus)}`);
   lineas.push(`Total: $${fmt(c.total)}`);
   lineas.push("");
-  lineas.push("Agradecemos su pronta atencion a este saldo. Quedamos a su disposicion para cualquier consulta.");
+  lineas.push("Agradecemos su pronta atención a este saldo. Quedamos a su disposición para cualquier consulta.");
   lineas.push("");
   lineas.push("Atentamente,");
   lineas.push("Confecciones Boston - Departamento de Cobros");
@@ -162,7 +162,7 @@ export default function BostonHojaCobrar({
     <ModalOverlay onBackdropClick={onClose} align="start">
       <div className="bg-white rounded-lg w-full sm:max-w-md mx-0 sm:mx-4 my-0 sm:my-16 border border-gray-200">
         <div className="flex items-start justify-between px-5 pt-5 pb-3 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-900">Cobrar</h2>
+          <h2 className="text-base font-semibold text-gray-900">Enviar estado de cuenta</h2>
           <button
             type="button"
             onClick={onClose}
@@ -222,7 +222,7 @@ export default function BostonHojaCobrar({
                 onClick={copiar}
                 className="w-full text-left px-4 py-3 min-h-[44px] transition hover:bg-gray-50"
               >
-                <span className="block text-sm font-medium text-gray-900">Copiar el mensaje</span>
+                <span className="block text-sm font-medium text-gray-900">Copiar mensaje</span>
                 <span className="block text-xs text-gray-500 mt-0.5">Para pegarlo donde quieras</span>
               </button>
             </li>
@@ -232,7 +232,7 @@ export default function BostonHojaCobrar({
                 onClick={() => onVerDocumentos(cliente)}
                 className="w-full text-left px-4 py-3 min-h-[44px] transition hover:bg-gray-50"
               >
-                <span className="block text-sm font-medium text-gray-900">Ver los documentos</span>
+                <span className="block text-sm font-medium text-gray-900">Estado de cuenta</span>
                 <span className="block text-xs text-gray-500 mt-0.5">
                   {preview
                     ? `Su estado de cuenta — ${preview.totalDocs} ${preview.totalDocs === 1 ? "documento" : "documentos"} con saldo`

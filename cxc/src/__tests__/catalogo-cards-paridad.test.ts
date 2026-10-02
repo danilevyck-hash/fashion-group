@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 // ─────────────────────────────────────────────────────────────────────────────
 // Paridad de las CARDS y del menú Compartir en las 3 marcas (25-jul-2026).
 //
@@ -386,7 +387,7 @@ describe("menú Compartir — Copiar link + Descargar PDF en las 3 marcas", () =
   it("cada marca declara su label de copiar y el dropdown completo", () => {
     for (const m of MARCAS) {
       const vs = MARCA_THEME[m].vendorShare;
-      expect(vs.copyLabel, m).toMatch(/Copiar link/);
+      expect(vs.copyLabel, m).toMatch(/Copiar enlace/);
       expect(vs.panel, m).toBeTruthy();
       expect(vs.item, m).toBeTruthy();
       expect(vs.iconSize, m).toBeGreaterThan(0);

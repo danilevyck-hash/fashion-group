@@ -265,7 +265,7 @@ export default function GuiaPage() {
           Lo que se puede tocar ya no hace falta explicarlo: se ve, porque es lo
           único que el formulario dibuja como campo. */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <Dato etiqueta="Cómo salió" valor={ETIQUETA_TIPO_DESPACHO[tipoDespachoEfectivo(g)]} />
+        <Dato etiqueta="Tipo de despacho" valor={ETIQUETA_TIPO_DESPACHO[tipoDespachoEfectivo(g)]} />
         {/* En entrega directa no hay placa, y un "0" no es una placa. */}
         {!esEntregaDirecta(g) && <Dato etiqueta="Placa" valor={sinCeroPelado(g.placa)} />}
         {g.nombre_chofer && <Dato etiqueta="Chofer" valor={g.nombre_chofer} />}
@@ -300,6 +300,8 @@ export default function GuiaPage() {
       setBCedula={s.setBCedula}
       bChofer={s.bChofer}
       setBChofer={s.setBChofer}
+      despachadoPor={s.despachadoPor}
+      setDespachadoPor={s.setDespachadoPor}
       juegos={s.juegos}
       onUsarJuego={s.usarJuego}
       bSaving={s.bSaving}
@@ -319,7 +321,7 @@ export default function GuiaPage() {
   return (
     <div>
       <AppHeader
-        module="Guías de Despacho"
+        module="Guías de despacho"
         breadcrumbs={[{ label: g ? fmtGuia(g.numero) : "Guía" }]}
       />
 

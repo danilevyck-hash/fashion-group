@@ -46,7 +46,7 @@ describe("🔴 «Todo el año» + una empresa", () => {
     expect(screen.queryByText(/Reporte detallado|Descargar el detalle/)).toBeNull();
     // ni una sola lectura del detalle
     expect(llamadas.some((u) => u.includes("/api/ventas/comisiones/detalle"))).toBe(false);
-    expect(screen.getByText("Elige un mes para ver el detalle")).toBeTruthy();
+    expect(screen.getByText("Selecciona un mes para ver el detalle") /* 1-oct-2026, Daniel: nombres normales de ERP */).toBeTruthy();
     expect(screen.queryByText("Toca para ver el detalle")).toBeNull();
   });
 

@@ -58,7 +58,7 @@ export default function CerrarPeriodoModal({ open, onClose, onConfirm, fondo, ga
   const filas: Array<{ label: string; value: number; negativo?: boolean }> = [
     { label: "Fondo", value: fondo },
     { label: `Gastado (${recibos} ${recibos === 1 ? "recibo" : "recibos"})`, value: gastado },
-    { label: "Queda en caja", value: queda, negativo: saldoEsNegativo(queda) },
+    { label: "Saldo final", value: queda, negativo: saldoEsNegativo(queda) },
     { label: `Reposición para volver a $${fmt(fondo)}`, value: reposicion },
   ];
 
@@ -144,7 +144,7 @@ export default function CerrarPeriodoModal({ open, onClose, onConfirm, fondo, ga
               {mensajeDeDiferencia(diferencia)}
               {descuadra && (
                 <span className="block text-xs font-normal mt-0.5" style={{ color: "var(--caja-fg-muted)" }}>
-                  Se cierra igual y la diferencia queda anotada.
+                  Se cierra igual y la diferencia queda registrada.
                 </span>
               )}
             </p>

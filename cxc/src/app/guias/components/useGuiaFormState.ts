@@ -25,6 +25,8 @@ import {
 import { numeroCabeceraAlDespachar } from "@/lib/guias/falta-para-despachar";
 import { guiaYaDespachada } from "@/lib/guias/modo-despacho";
 import { cabeceraEditable, cambiosDeRenglon } from "@/lib/guias/campos-editables";
+import { hoyPanama } from "@/lib/fecha-panama";
+import { GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
 
 interface Options {
   editingId?: string | null; // null = creación
@@ -167,6 +169,9 @@ export function useGuiaFormState({ editingId = null, alGuardar, despuesDeCrear, 
   // de noche devolvía el día siguiente; construimos la fecha local a mano.
   const [fecha, setFecha] = useState(() => {
     if (inicial) return inicial.fecha;
+    // 🔴 1-oct-2026: hoy de PANAMÁ (`hoyPanama`), el mismo «hoy» del resto del
+    // sistema. Sigue siendo editable.
+    if (GUIA_NUEVA_2026_10) return hoyPanama();
     const d = new Date();
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -179,6 +184,10 @@ export function useGuiaFormState({ editingId = null, alGuardar, despuesDeCrear, 
   });
   const [transportistaId, setTransportistaId] = useState<string | null>(() => {
     if (inicial) return inicial.transportistaId;
+    // 🔴 1-oct-2026 (Daniel aprobó el mockup): el desplegable nace VACÍO,
+    // «Seleccionar transportista…». Preseleccionar el último usado es elegir
+    // por la persona — el mismo error que se le quitó a «Despachado por».
+    if (GUIA_NUEVA_2026_10) return null;
     try { return localStorage.getItem("fg_last_transportista_id") || null; } catch { return null; }
   });
   // 🔴 «DESPACHADO POR» NACE VACÍO, SIEMPRE (19-sep-2026). Daniel, textual:

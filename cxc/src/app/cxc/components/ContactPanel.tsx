@@ -172,7 +172,7 @@ export default function ContactPanel({
                 cada cliente en pantalla —100 en la primera carga— para adornar
                 un botón. El conteo real se lee dentro, en el encabezado del
                 cajón: «N documentos en M empresas». */}
-            Ver los documentos
+            Estado de cuenta
           </button>
         )}
         {codigo && (

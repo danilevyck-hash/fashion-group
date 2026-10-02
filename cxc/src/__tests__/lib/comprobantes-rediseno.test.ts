@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 /**
  * ─────────────────────────────────────────────────────────────────────────────
  * CANDADO — EL REDISEÑO DE LA LISTA DE COMPROBANTES (6-sep-2026)
@@ -110,8 +111,8 @@ describe("1-2. 🔴 «Del cliente» y «Del vendedor» — y por qué esos dos n
   });
 
   it("los dos grupos tienen rótulo chico, y son distintos", () => {
-    expect(ROTULO_GRUPO_ORIGEN).toBe("Quién lo armó");
-    expect(ROTULO_GRUPO_VISTA).toBe("Qué es");
+    expect(ROTULO_GRUPO_ORIGEN).toBe("Origen");
+    expect(ROTULO_GRUPO_VISTA).toBe("Tipo");
     expect(ROTULO_GRUPO_ORIGEN).not.toBe(ROTULO_GRUPO_VISTA);
   });
 });
@@ -191,7 +192,7 @@ describe("3. 🔴 los conteos cuentan lo que se está MIRANDO", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe("4. 🔴 «Sin mandar» son los CONFIRMADOS que no llegaron a Switch", () => {
   it("el chip existe, se llama así, y va al final", () => {
-    expect(CHIP_SIN_MANDAR).toBe("Sin mandar");
+    expect(CHIP_SIN_MANDAR).toBe("No enviado");
     expect(VISTAS_COMPROBANTE[VISTAS_COMPROBANTE.length - 1].clave).toBe("sin_mandar");
   });
 
@@ -246,19 +247,19 @@ describe("4. 🔴 «Sin mandar» son los CONFIRMADOS que no llegaron a Switch", 
 
   it("🔴 la frase lleva los DÍAS, contados con el día de PANAMÁ", () => {
     // PED-004 nació el 4-jul-2026; al 7-sep-2026 son 65 días.
-    expect(textoSinMandar("2026-07-04T12:00:00Z", HOY_PANAMA)).toBe("Sin mandar a Switch · hace 65 días");
+    expect(textoSinMandar("2026-07-04T12:00:00Z", HOY_PANAMA)).toBe("No enviado a Switch · hace 65 días");
     // CKP-020, del 15-ago: 23 días.
-    expect(textoSinMandar("2026-08-15T12:00:00Z", HOY_PANAMA)).toBe("Sin mandar a Switch · hace 23 días");
+    expect(textoSinMandar("2026-08-15T12:00:00Z", HOY_PANAMA)).toBe("No enviado a Switch · hace 23 días");
   });
 
   it("hoy y ayer se dicen con palabras, no con «hace 0 días»", () => {
-    expect(textoSinMandar("2026-09-07T12:00:00Z", HOY_PANAMA)).toBe("Sin mandar a Switch · hoy");
-    expect(textoSinMandar("2026-09-06T12:00:00Z", HOY_PANAMA)).toBe("Sin mandar a Switch · ayer");
+    expect(textoSinMandar("2026-09-07T12:00:00Z", HOY_PANAMA)).toBe("No enviado a Switch · hoy");
+    expect(textoSinMandar("2026-09-06T12:00:00Z", HOY_PANAMA)).toBe("No enviado a Switch · ayer");
   });
 
   it("una fecha ilegible no inventa un número ni revienta", () => {
-    expect(textoSinMandar("no-es-fecha", HOY_PANAMA)).toBe("Sin mandar a Switch");
-    expect(textoSinMandar(null, HOY_PANAMA)).toBe("Sin mandar a Switch");
+    expect(textoSinMandar("no-es-fecha", HOY_PANAMA)).toBe("No enviado a Switch");
+    expect(textoSinMandar(null, HOY_PANAMA)).toBe("No enviado a Switch");
   });
 
   it("🔴 el módulo es PURO: no lee el reloj por su cuenta", () => {

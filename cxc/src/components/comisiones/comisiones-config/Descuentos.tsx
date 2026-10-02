@@ -236,7 +236,7 @@ export function Descuentos({ onSaved }: { onSaved: (msg: string) => void }) {
             aria-label="Vendedor"
             className={CAJA}
           >
-            <option value="">Elige el vendedor</option>
+            <option value="">Selecciona el vendedor</option>
             {vendedores.map((v) => (
               <option key={v} value={v}>{nombreVendedorEnPantalla(v)}</option>
             ))}
@@ -326,7 +326,7 @@ export function Descuentos({ onSaved }: { onSaved: (msg: string) => void }) {
         {!puedeGuardar && !guardando && (
           <span className="text-xs text-gray-400">
             {!borrador.vendedor_nombre
-              ? "Falta elegir el vendedor"
+              ? "Falta seleccionar el vendedor"
               : !borrador.concepto.trim()
                 ? "Falta el concepto"
                 : "Falta el monto"}

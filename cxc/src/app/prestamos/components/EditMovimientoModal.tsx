@@ -61,7 +61,7 @@ export default function EditMovimientoModal({
           </div>
           {emConcepto === CONCEPTO_PAGO && (
             <div>
-              <label className="text-xs text-gray-400 uppercase">De dónde salió</label>
+              <label className="text-xs text-gray-400 uppercase">Origen del pago</label>
               <div className="mt-1 flex flex-wrap gap-2">
                 {ORIGENES_PAGO.map((o) => (
                   <button
@@ -86,7 +86,7 @@ export default function EditMovimientoModal({
         <div className="flex gap-3 mt-6">
           <button onClick={onClose} className="flex-1 inline-flex min-h-[44px] items-center justify-center border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
           <button onClick={onSave} disabled={saving} className="flex-1 inline-flex min-h-[44px] items-center justify-center bg-black text-white rounded-md text-sm hover:bg-gray-800 transition disabled:opacity-50">
-            {saving ? "Guardando..." : "Guardar Cambios"}
+            {saving ? "Guardando..." : "Guardar cambios"}
           </button>
         </div>
       </div>

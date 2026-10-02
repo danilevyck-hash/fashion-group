@@ -44,7 +44,7 @@ export function SkeletonKPI({ count = 3 }: { count?: number }) {
 // ── ESTÉTICA 2: Empty States ──
 export function EmptyState({
   icon,
-  title = "Nada por aquí aún",
+  title = "Sin registros",
   subtitle,
   actionLabel,
   onAction,
@@ -573,7 +573,15 @@ const STATUS_COLORS: Record<string, string> = {
   "Preparando": "orange", "En camino": "orange", "Pendiente Bodega": "orange",
 };
 
-const STATUS_LABELS: Record<string, string> = {};
+// 1-oct-2026, Daniel: nombres normales de ERP — el chip muestra el estado con
+// mayúscula inicial, nunca la clave cruda; «rebotado» se dice «Devuelto».
+// Solo cambia el TEXTO: la clave (y el color) siguen siendo los guardados.
+const STATUS_LABELS: Record<string, string> = {
+  pendiente: "Pendiente", borrador: "Borrador", pendiente_aprobacion: "Pendiente de aprobación",
+  activo: "Activo", abierto: "Abierto", depositado: "Depositado", aprobado: "Aprobado",
+  cerrado: "Cerrado", despachada: "Despachada", rechazado: "Rechazado", rechazada: "Rechazada",
+  vencido: "Vencido", rebotado: "Devuelto", archivado: "Archivado",
+};
 
 export function StatusBadge({ estado }: { estado: string }) {
   const color = STATUS_COLORS[estado] || "gray";

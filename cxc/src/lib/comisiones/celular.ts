@@ -199,7 +199,8 @@ export const ROTULO_DESCARGAR_COMISIONES = "Descargar";
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** El rótulo del botón. Sigue diciendo lo mismo. */
-export const ROTULO_MANDAR = "Mandar";
+// 1-oct-2026, Daniel: nombres normales de ERP («Mandar» → «Enviar»).
+export const ROTULO_MANDAR = "Enviar";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Cosas de orden · van sin preguntar y no cambian ningún número

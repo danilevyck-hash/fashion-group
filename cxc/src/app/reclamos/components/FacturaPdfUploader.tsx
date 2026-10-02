@@ -191,7 +191,7 @@ export default function FacturaPdfUploader({ pdfUrl, onUploaded, onExtracted }: 
             className="block w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-left active:bg-gray-50 disabled:opacity-50"
           >
             <span className="block text-[17px] font-medium text-gray-900">
-              {subiendo ? "Subiendo…" : "Elegir PDF o foto"}
+              {subiendo ? "Subiendo…" : "Seleccionar PDF o foto"}
             </span>
             <span className="mt-0.5 block text-[14px] text-gray-500">de Archivos o de la fototeca</span>
           </button>
@@ -250,7 +250,7 @@ export default function FacturaPdfUploader({ pdfUrl, onUploaded, onExtracted }: 
              botón (no hay drag-and-drop), así que tiene que ser tocable. */
           className="text-xs font-medium border border-gray-200 rounded px-3 text-gray-600 hover:text-black active:scale-[0.97] transition shrink-0 disabled:opacity-50 inline-flex items-center justify-center min-h-[44px]"
         >
-          {pdfUrl ? "Reemplazar" : "Elegir archivo"}
+          {pdfUrl ? "Reemplazar" : "Seleccionar archivo"}
         </button>
       </div>
       </div>

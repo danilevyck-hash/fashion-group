@@ -116,14 +116,14 @@ export function tituloSeleccion(elegidos: number, deCuantos: number, monto: numb
   sub: string;
 } {
   return {
-    titulo: elegidos === 0 ? "Elige reclamos" : `${elegidos} elegido${elegidos === 1 ? "" : "s"}`,
+    titulo: elegidos === 0 ? "Seleccionar reclamos" : `${elegidos} seleccionado${elegidos === 1 ? "" : "s"}`,
     sub: `de ${deCuantos} ${cobrados ? "cobrados" : "por cobrar"} · ${montoCel(monto)}`,
   };
 }
 
 /** «Mandar los 2 al proveedor» — el botón dice qué hace y a cuántos. */
 export function botonMandar(n: number): string {
-  return `Mandar ${n === 1 ? "el reclamo" : `los ${n}`} al proveedor`;
+  return `Enviar ${n === 1 ? "el reclamo" : `los ${n}`} al proveedor`;
 }
 
 /**
@@ -132,7 +132,7 @@ export function botonMandar(n: number): string {
  * vez de dejar que alguien mande la primera hoja y crea que mandó todo.
  */
 export const AVISO_VARIAS_HOJAS =
-  "Si la factura tiene varias hojas, mándala en PDF: la foto es de una sola hoja.";
+  "Si la factura tiene varias hojas, envíala en PDF: la foto es de una sola hoja.";
 
 /** La línea del pie de las hojas con deshacer, igual que en Cuentas por Cobrar. */
 export const SE_DESHACE = "Se deshace por 5 segundos.";

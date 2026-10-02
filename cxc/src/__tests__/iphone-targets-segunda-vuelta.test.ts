@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «Nuevo reclamo».
 /**
  * Candados de la SEGUNDA vuelta de la auditoría iPhone (390×844, dsf 3, isMobile
  * y hasTouch por CDP `Emulation.setDeviceMetricsOverride` — achicar la ventana no
@@ -163,10 +164,10 @@ describe("TimeGroupHeader · la cabecera que colapsa el grupo (Guías + Cheques)
 });
 
 describe("Reclamos · los dos botones que abren el módulo", () => {
-  it('"Nuevo Reclamo" mide 44 en los dos lugares que lo pintan (medía 41)', () => {
+  it('"Nuevo reclamo" mide 44 en los dos lugares que lo pintan (medía 41)', () => {
     for (const f of ["EmpresaList.tsx", "EmpresaSelector.tsx"]) {
       const code = read("app", "reclamos", "components", f);
-      const i = code.indexOf("Nuevo Reclamo");
+      const i = code.indexOf("Nuevo reclamo");
       expect(i, f).toBeGreaterThan(0);
       expect(code.slice(code.lastIndexOf("<button", i), i), f).toContain("min-h-[44px]");
     }

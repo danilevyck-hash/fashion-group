@@ -40,6 +40,11 @@ export interface GuiaItem {
    * API lo ignora al guardar.
    */
   con_etiquetas?: boolean;
+  /**
+   * 🔴 UN RENGLÓN POR ENVÍO (1-oct-2026): el envío etiquetado que llenó este
+   * renglón en Nueva guía. Solo vive en la pantalla; la API lo ignora.
+   */
+  envio_id?: string;
 }
 
 export type ModoEntrega = "transportista" | "entrega_directa";

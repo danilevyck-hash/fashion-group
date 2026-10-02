@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «Copiar mensaje», «Descargar PDF», «Editar mensaje».
 // ─────────────────────────────────────────────────────────────────────────────
 // «COBRAR» — UNA HOJA, CUATRO SALIDAS (5-sep-2026).
 //
@@ -83,7 +84,7 @@ describe("🔴 la hoja «Cobrar» ofrece las cuatro salidas", () => {
   const src = leer("src/app/cxc/components/HojaCobrar.tsx");
 
   it("Correo · WhatsApp · Copiar el mensaje · Ver o bajar el PDF", () => {
-    for (const titulo of ["Correo", "WhatsApp", "Copiar el mensaje", "Ver o bajar el PDF"]) {
+    for (const titulo of ["Correo", "WhatsApp", "Copiar mensaje", "Descargar PDF"]) {
       expect(src, `falta la salida «${titulo}»`).toContain(`titulo="${titulo}"`);
     }
   });
@@ -95,7 +96,7 @@ describe("🔴 la hoja «Cobrar» ofrece las cuatro salidas", () => {
 
   it("se conserva «Escribirlo yo» — el formulario completo NO se borró", () => {
     // El TEXTO del botón, no una mención en un comentario.
-    expect(src).toContain("        Escribirlo yo ›\n      </button>");
+    expect(src).toContain("        Editar mensaje ›\n      </button>");
     expect(fs.existsSync(path.join(process.cwd(), "src/app/cxc/components/EnviarEmailModal.tsx"))).toBe(true);
   });
 

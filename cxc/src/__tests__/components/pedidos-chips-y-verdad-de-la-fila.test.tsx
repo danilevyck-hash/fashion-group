@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 /**
  * ─────────────────────────────────────────────────────────────────────────────
  * LA PANTALLA ÚNICA DE COMPROBANTES — LOS CHIPS, Y LA VERDAD EN CADA FILA
@@ -170,7 +171,7 @@ describe("🔴 los TRES chips particionan (y el cuarto es un subconjunto)", () =
     const c = chips(container);
     expect(c[0]).toMatch(/^Pedidos\d+$/);
     expect(c[1]).toMatch(/^Borradores\d+$/);   // no hay cotizaciones en el fixture
-    expect(c[2]).toMatch(/^Sin mandar\d+$/);
+    expect(c[2]).toMatch(/^No enviado\d+$/);
     expect(c).toHaveLength(3);
   });
 
@@ -194,7 +195,7 @@ describe("🔴 los TRES chips particionan (y el cuarto es un subconjunto)", () =
     expect(conteo("Borradores")).toBe(2);
     expect(conteo("Cotizaciones")).toBe(0);
     // Y los 4 «confirmado» que nunca salieron son exactamente el chip nuevo.
-    expect(conteo("Sin mandar")).toBe(4);
+    expect(conteo("No enviado")).toBe(4);
   });
 });
 
@@ -219,7 +220,7 @@ describe("🔴 LA FILA DICE LA VERDAD, aunque el chip organice por otra cosa", (
       // ⚠️ 6-sep-2026: el mismo hecho, dicho más fuerte. Un pedido TERMINADO
       // que no salió pasó de «No se ha mandado a Switch» en gris a «Sin mandar
       // a Switch · hace N días» en rojo. La verdad sigue en la fila.
-      expect(filaDe(container, n).textContent, n).toMatch(/Sin mandar a Switch/);
+      expect(filaDe(container, n).textContent, n).toMatch(/No enviado a Switch/);
     }
   });
 

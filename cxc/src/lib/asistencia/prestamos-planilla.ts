@@ -729,8 +729,8 @@ export function textoDeudaCasilla(
   const d = linea.prestamoAutomatico?.deuda?.[cuenta];
   if (!d || d.saldo <= 0.004) return null;
   return d.cuota > 0.004
-    ? `Debe ${plata(d.saldo)} · cuota ${plata(d.cuota)}`
-    : `Debe ${plata(d.saldo)} · sin cuota`;
+    ? `Saldo ${plata(d.saldo)} · cuota ${plata(d.cuota)}`
+    : `Saldo ${plata(d.saldo)} · sin cuota`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -852,10 +852,10 @@ export function textoPrestamoSinAtar(
   const detalle = items.map((s) => `${s.nombre} · ${plata(s.saldo)}`).join(" — ");
   const cabeza =
     items.length === 1
-      ? "1 préstamo con saldo no está atado a nadie de la planilla, así que no se le descuenta a ningún colaborador."
-      : `${items.length} préstamos con saldo no están atados a nadie de la planilla, así que no se le descuentan a ningún colaborador.`;
+      ? "1 préstamo con saldo no está vinculado a ningún colaborador de la planilla, así que no se descuenta."
+      : `${items.length} préstamos con saldo no están vinculados a ningún colaborador de la planilla, así que no se descuentan.`;
   // ⚠️ Esta frase decía lo mismo desde el 2-sep-2026 y la acción NO EXISTÍA: no
   // había forma de poner el código desde ninguna pantalla. Desde el 5-sep-2026
   // sí la hay — se elige a la persona de Asistencia en la ficha del préstamo.
-  return `${cabeza} Se atan en Préstamos, eligiendo al colaborador en su ficha. ${detalle}`;
+  return `${cabeza} Se vinculan en Préstamos, seleccionando el colaborador en su ficha. ${detalle}`;
 }

@@ -214,7 +214,11 @@ describe("🔴 el autocompletado de «Recibido por»", () => {
       target: { value: texto },
     });
   /** Las opciones del desplegable, en el orden en que se pintaron. */
-  const opciones = () => screen.queryAllByRole("option");
+  // 1-oct-2026: el despacho trae ahora el desplegable «Despachado por» (se
+  // eligió moverlo de la guía al despacho), y sus <option> también son
+  // «option». Se cuentan SOLO las del autocompletado (el listbox flotante).
+  const opciones = () =>
+    screen.queryAllByRole("option").filter((o) => o.closest('[role="listbox"]') !== null);
 
   it("🔴 CON LA PANTALLA RECIÉN ABIERTA NO SE OFRECE NADA — no quita espacio", () => {
     render(<Despacho tipo="externo" juegos={JUEGOS} />);

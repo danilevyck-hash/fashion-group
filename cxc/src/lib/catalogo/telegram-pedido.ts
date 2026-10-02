@@ -199,7 +199,7 @@ export function avisoPedidoDelLink(a: AvisoPedidoLink): string {
     cliente: a.cliente,
     total: a.total,
     piezas: a.piezas,
-    extras: ["Falta ponerle el cliente y mandarlo a Switch — está en Borradores."],
+    extras: ["Falta asignar el cliente y enviarlo a Switch — está en Borradores."],
   });
 }
 

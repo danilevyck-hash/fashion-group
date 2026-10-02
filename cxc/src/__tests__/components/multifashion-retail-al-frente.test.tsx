@@ -66,6 +66,7 @@ import { agregarProductos } from "@/lib/multifashion/productos";
 import {
   armarPorMarca, armarPorMarcaComparativo, departamentoCanonico, grupoDeDepartamento, mapaArticuloGrupo,
 } from "@/lib/multifashion/productos-marca";
+// 1-oct-2026, Daniel: nombres normales de ERP («tiquetes» → «tickets», «Cierra en» → «Proyección de cierre», «Cuándo vende la tienda» → «Ventas por día y hora», «Lo que más…» → «Más vendidos / Mayor utilidad / Mayores variaciones», «Dormidos» → «Inactivos», «Compró/Veces» → «Total compras/Visitas»).
 
 const raiz = process.cwd();
 const leer = (rel: string) => readFileSync(path.join(raiz, rel), "utf8");
@@ -349,7 +350,7 @@ describe("4 · Vendedoras: meta una vez, Excel al cerrar, bono en una línea", (
     })).toBe("Sáb es el día fuerte ($2,770) · hora pico 5–6 pm · mejor día del mes: 19 sep, $4,064");
   });
 
-  it("«¿la tienda abrió?»: día hábil pasado en $0 sin tiquetes y que no es feriado", () => {
+  it("«¿la tienda abrió?»: día hábil pasado en $0 sin tickets y que no es feriado", () => {
     const dias = Array.from({ length: 30 }, (_, i) => ({ dia: i + 1, ventas: 1000, n_tickets: 20 }));
     for (const d of [12, 13, 21, 25]) dias[d - 1] = { dia: d, ventas: 0, n_tickets: 0 }; // sáb, DOM, lun, vie
     dias[4] = { dia: 5, ventas: 0, n_tickets: 3 }; // compró y devolvió: no es «cerrada»
@@ -460,7 +461,7 @@ describe("5 · Resumen: 6 elementos", () => {
     expect(anio.textContent).not.toContain("$418,486.51 ▲"); // el total NO es el número grande
     const mesCard = screen.getByText("Ventas del mes").parentElement as HTMLElement;
     expect(mesCard.textContent).toContain("$31,834.45");
-    expect(mesCard.textContent).toContain("658 tiquetes · $48.38 promedio");
+    expect(mesCard.textContent).toContain("658 tickets · $48.38 promedio");
     expect(mesCard.textContent).toContain("▲ +25.0% vs sep 2025 · ▼ −21.7% vs agosto");
   });
 
@@ -493,7 +494,7 @@ describe("5 · Resumen: 6 elementos", () => {
 
   it("«Cierra en» va por temporada y dice con cuántos días", async () => {
     await pintarResumen(28365.9);
-    const card = screen.getByText("Cierra en").parentElement as HTMLElement;
+    const card = screen.getByText("Proyección de cierre").parentElement as HTMLElement;
     expect(card.textContent).toContain("$45,527.63");
     expect(card.textContent).toContain("por temporada, con 22 días");
   });
@@ -683,12 +684,12 @@ describe("5 · Clientes: 5 elementos", () => {
 
   it("tres tarjetas (sin «Dormidos»), el mostrador en la línea de cobertura, sin bloque Mayoreo ni anónimos suelto", async () => {
     await pintarClientes();
-    expect(screen.queryByText("Dormidos")).toBeNull();
+    expect(screen.queryByText("Inactivos")).toBeNull();
     expect(screen.getByText("Frecuentes")).toBeTruthy();
-    expect(screen.getByText("5% pendiente")).toBeTruthy();
+    expect(screen.getByText("Descuento 5% pendiente")).toBeTruthy();
     expect(screen.getByText(/mostrador/).textContent).toContain("$22,475.39");
     expect(screen.queryByText("Mayoreo")).toBeNull();
-    expect(screen.queryByText("Anónimos (mostrador)")).toBeNull();
+    expect(screen.queryByText("Consumidor final")).toBeNull();
     expect(screen.queryByText("Clientes identificados")).toBeNull();
   });
 
@@ -752,7 +753,7 @@ describe("5 · Productos: 5 elementos", () => {
   async function pintarProductos() {
     vi.stubGlobal("fetch", fetchPorUrl({ "/api/multifashion/productos": payload() }));
     const r = montar(<ProductosSubtab selectedYear={2026} mes={9} periodo={{ tipo: "mes", anio: 2026, mes: 9 }} />);
-    await screen.findByText("Lo que más cambió");
+    await screen.findByText("Mayores variaciones");
     return r;
   }
 
@@ -763,7 +764,7 @@ describe("5 · Productos: 5 elementos", () => {
     expect(elementos).toEqual(["alerta", "banda", "marcas", "agrupador", "cambios"]);
     expect(elementos).toHaveLength(ELEMENTOS_POR_PESTANA.productos);
     // La alerta va ARRIBA de la banda.
-    expect(pestana.textContent!.indexOf("Se vende mucho pero deja poco")).toBeLessThan(pestana.textContent!.indexOf("Unidades"));
+    expect(pestana.textContent!.indexOf("Alta venta, bajo margen")).toBeLessThan(pestana.textContent!.indexOf("Unidades"));
   });
 
   it("la banda no repite la VENTA; las marcas en una línea con el detalle a un toque; una sola tabla", async () => {
@@ -772,14 +773,14 @@ describe("5 · Productos: 5 elementos", () => {
     expect(banda.textContent).toContain("Utilidad");
     expect(banda.textContent).toContain("Margen");
     expect(banda.querySelector("p")?.textContent).not.toBe("Venta");
-    expect(screen.queryByText("Lo que más se vende")).toBeNull();
-    expect(screen.queryByText("Lo que más plata deja")).toBeNull();
+    expect(screen.queryByText("Más vendidos")).toBeNull();
+    expect(screen.queryByText("Mayor utilidad")).toBeNull();
     expect(screen.getByText(/Tommy 61% · Calvin 17% · Karl 15% · el resto 8%/)).toBeTruthy();
     expect(screen.queryByRole("group", { name: "Filtrar por marca" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /detalle/ }));
     expect(screen.getByRole("group", { name: "Filtrar por marca" })).toBeTruthy();
     // La tabla única: # · Categoría · Piezas · Venta · Deja · Margen.
-    expect(screen.getByRole("columnheader", { name: "Deja" })).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: "Utilidad" })).toBeTruthy();
     expect(screen.queryByText(/Ventas netas: las devoluciones/)).toBeNull(); // pasó al ⓘ
   });
 });
@@ -801,11 +802,11 @@ describe("6 · `RETAIL_AL_FRENTE = false` = las pantallas y RPC de antes", () =>
     expect(vendedoras).toMatch(/>Bono<\/th>/);
     const productos = sinComentarios(leer("src/components/multifashion/ProductosSubtab.tsx"));
     expect(productos).toContain("if (RETAIL_AL_FRENTE) {");
-    expect(productos).toContain('titulo="Lo que más se vende"');
+    expect(productos).toContain('titulo="Más vendidos"');
     const clientes = sinComentarios(leer("src/components/multifashion/ClientesMultifashionSubtab.tsx"));
     expect(clientes).toContain("if (RETAIL_AL_FRENTE) {");
     expect(clientes).toContain('title="Mayoreo"');
-    expect(clientes).toContain('label="Dormidos"');
+    expect(clientes).toContain('label="Inactivos"');
     const metas = sinComentarios(leer("src/components/multifashion/MetasSubtab.tsx"));
     expect(metas).toContain("RETAIL_AL_FRENTE ? MetaAvanceCompacta : MetaAvanceCard");
   });

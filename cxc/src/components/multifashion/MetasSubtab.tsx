@@ -220,7 +220,7 @@ export function MetasSubtab() {
           {terminadas.length > 0 && (
             <section className="mt-8">
               <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">
-                Metas que ya terminaron
+                Metas finalizadas
               </h4>
               <ul className="divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-200 bg-white">
                 {terminadas.map((m) => (

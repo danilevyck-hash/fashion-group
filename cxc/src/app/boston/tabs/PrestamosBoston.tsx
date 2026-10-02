@@ -103,7 +103,7 @@ export default function PrestamosBoston() {
     <div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
         <div className="rounded-xl border border-gray-200 bg-white px-3 py-2">
-          <span className="block text-xs uppercase tracking-wide text-gray-500">Por cobrar</span>
+          <span className="block text-xs uppercase tracking-wide text-gray-500">Saldo</span>
           <span className="block text-base sm:text-lg font-semibold tabular-nums text-gray-900">
             ${fmt(tarjetas.saldo)}
           </span>
@@ -115,7 +115,7 @@ export default function PrestamosBoston() {
           </span>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white px-3 py-2">
-          <span className="block text-xs uppercase tracking-wide text-gray-500">Personas</span>
+          <span className="block text-xs uppercase tracking-wide text-gray-500">Colaboradores</span>
           <span className="block text-base sm:text-lg font-semibold tabular-nums text-gray-900">
             {tarjetas.personas}
           </span>

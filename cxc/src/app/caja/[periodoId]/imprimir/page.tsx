@@ -49,7 +49,7 @@ export default function PeriodoImprimirPage() {
     return (
       <div>
         <div className="print:hidden">
-          <AppHeader module="Caja Menuda" breadcrumbs={[{ label: "Cargando..." }]} />
+          <AppHeader module="Caja menuda" breadcrumbs={[{ label: "Cargando..." }]} />
         </div>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
           <div className="h-48 bg-gray-100 rounded-lg animate-pulse" />
@@ -62,7 +62,7 @@ export default function PeriodoImprimirPage() {
     return (
       <div>
         <div className="print:hidden">
-          <AppHeader module="Caja Menuda" breadcrumbs={[{ label: "Error" }]} />
+          <AppHeader module="Caja menuda" breadcrumbs={[{ label: "Error" }]} />
         </div>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 text-center">
           <p className="text-sm text-red-500">{error || "No encontrado"}</p>
@@ -75,7 +75,7 @@ export default function PeriodoImprimirPage() {
     <div>
       <div className="print:hidden">
         <AppHeader
-          module="Caja Menuda"
+          module="Caja menuda"
           breadcrumbs={[
             { label: `Período N°${periodo.numero}`, onClick: () => router.push(`/caja/${periodo.id}`) },
             { label: "Imprimir" },

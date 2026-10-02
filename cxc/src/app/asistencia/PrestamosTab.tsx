@@ -228,7 +228,7 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
       const d = await leerColaboradores();
       const c = d?.colaboradores.find((x) => String(x.codigo) === nuevoDeUrl);
       if (c) void elegirPersona(c);
-      else toast("No encontré a esa persona entre los colaboradores activos.", "error");
+      else toast("No se encontró ese colaborador entre los activos.", "error");
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nuevoDeUrl, puedeAnotar]);
@@ -310,7 +310,7 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
           <div role="menu" className="absolute right-0 z-20 mt-1 w-52 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
             <button type="button" role="menuitem" onClick={() => void descargar("deben")}
               className="block min-h-[44px] w-full px-3 py-2.5 text-left text-sm text-gray-700 transition hover:bg-gray-50">
-              Solo los que deben
+              Solo con saldo
             </button>
             <button type="button" role="menuitem" onClick={() => void descargar("todos")}
               className="block min-h-[44px] w-full px-3 py-2.5 text-left text-sm text-gray-700 transition hover:bg-gray-50">
@@ -367,7 +367,7 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
       <div className="space-y-4">
         {botonNuevo && <div className="flex justify-end">{botonNuevo}</div>}
         <p className="rounded-lg border border-gray-200 px-4 py-6 text-center text-sm text-gray-600">
-          Nadie debe nada en este momento.
+          Sin saldos pendientes.
         </p>
         {modales}
       </div>
@@ -435,7 +435,7 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
                   partían en dos renglones. El nombre largo queda en el `title`. */}
               <th className="whitespace-nowrap px-3 py-2 text-right font-medium" title={NOMBRE_CUENTA.dano}>Mercancía</th>
               {hayTerceros && <th className="whitespace-nowrap px-3 py-2 text-right font-medium" title={NOMBRE_CUENTA.terceros}>Terceros</th>}
-              <th className="px-3 py-2 text-right font-medium">Debe</th>
+              <th className="px-3 py-2 text-right font-medium">Saldo</th>
               <th className="px-3 py-2 text-right font-medium">Cuota</th>
               {hayEstaQuincena && <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Esta quincena</th>}
               {puedeAnotar && <th className="px-3 py-2" />}
@@ -450,7 +450,7 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
                       amarre es por código y nunca por parecido de nombre. */}
                   {!f.codigo && (
                     <span className="ml-2 rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-sm text-amber-800">
-                      sin atar a nadie
+                      Sin colaborador asignado
                     </span>
                   )}
                 </td>
@@ -473,7 +473,7 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
                     {/* 🔴 «Abono», en UN renglón (29-sep-2026, audit visual aprobado
                         por Daniel): «Anotar abono» se partía en dos en cada fila. */}
                     <button type="button" onClick={() => setAbonando(f)}
-                      aria-label={`Anotar abono de ${capitalizarNombre(f.nombre)}`}
+                      aria-label={`Registrar abono de ${capitalizarNombre(f.nombre)}`}
                       className="min-h-[44px] whitespace-nowrap rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]">
                       Abono
                     </button>
@@ -505,12 +505,12 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
               {f.yaDescontado > 0 && ` · esta quincena ${money(f.yaDescontado)}`}
             </p>
             {!f.codigo && (
-              <p className="mt-1 text-sm text-amber-800">No está atado a nadie del reloj: la planilla no le puede descontar.</p>
+              <p className="mt-1 text-sm text-amber-800">No está vinculado a ningún colaborador: la planilla no le puede descontar.</p>
             )}
             {puedeAnotar && (
               <button type="button" onClick={() => setAbonando(f)}
                 className="mt-2 min-h-[44px] w-full rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]">
-                Anotar abono
+                Registrar abono
               </button>
             )}
           </div>
@@ -519,7 +519,7 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
       )}
 
       <p className="text-sm text-gray-500">
-        El descuento de la quincena lo anota el cierre de la planilla. Aquí van los
+        El descuento de la quincena lo registra el cierre de la planilla. Aquí van los
         abonos que no salieron del sueldo y los préstamos nuevos; tocando el nombre
         se ven todos los movimientos.
       </p>
@@ -579,11 +579,11 @@ function AbonoModal(props: {
         }),
       });
       const j = (await r.json()) as { ok?: boolean; error?: string };
-      if (!r.ok || j.ok === false) throw new Error(j.error ?? "No se pudo anotar el abono");
-      toast("Listo, anotado", "success");
+      if (!r.ok || j.ok === false) throw new Error(j.error ?? "No se pudo registrar el abono");
+      toast("Abono registrado", "success");
       props.onListo();
     } catch (e) {
-      toast(e instanceof Error ? e.message : "No se pudo anotar el abono", "error");
+      toast(e instanceof Error ? e.message : "No se pudo registrar el abono", "error");
     } finally {
       setGuardando(false);
     }
@@ -594,25 +594,25 @@ function AbonoModal(props: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
-      role="dialog" aria-modal="true" aria-label={`Anotar abono de ${capitalizarNombre(ficha.nombre)}`}>
+      role="dialog" aria-modal="true" aria-label={`Registrar abono de ${capitalizarNombre(ficha.nombre)}`}>
       <div className="w-full max-w-md rounded-t-lg border border-gray-200 bg-white p-4 sm:rounded-lg">
-        <h2 className="text-base font-medium text-gray-900">Anotar un abono</h2>
+        <h2 className="text-base font-medium text-gray-900">Registrar abono</h2>
         <p className="mt-0.5 text-sm text-gray-500">{capitalizarNombre(ficha.nombre)}</p>
 
         <div className="mt-4 space-y-3">
           {debeLasDos && (
             <label className="block text-sm">
-              <span className="text-gray-600">¿De qué cuenta baja?</span>
+              <span className="text-gray-600">Cuenta</span>
               <select value={cuenta} onChange={(e) => setCuenta(e.target.value as CuentaPrestamo)}
                 className="mt-1 min-h-[44px] w-full rounded-md border border-gray-300 px-3 text-sm">
-                <option value="prestamo">{NOMBRE_CUENTA.prestamo} — debe {money(ficha.saldoPrestamo)}</option>
-                <option value="dano">{NOMBRE_CUENTA.dano} — debe {money(ficha.saldoDano)}</option>
+                <option value="prestamo">{NOMBRE_CUENTA.prestamo} — saldo {money(ficha.saldoPrestamo)}</option>
+                <option value="dano">{NOMBRE_CUENTA.dano} — saldo {money(ficha.saldoDano)}</option>
               </select>
             </label>
           )}
 
           <label className="block text-sm">
-            <span className="text-gray-600">¿Cuánto abonó?</span>
+            <span className="text-gray-600">Monto</span>
             <input type="number" inputMode="decimal" step="0.01" min="0" value={monto}
               onChange={(e) => setMonto(e.target.value)}
               className="mt-1 min-h-[44px] w-full rounded-md border border-gray-300 px-3 text-sm tabular-nums" />
@@ -626,13 +626,13 @@ function AbonoModal(props: {
           </label>
 
           <label className="block text-sm">
-            <span className="text-gray-600">¿Cuándo?</span>
+            <span className="text-gray-600">Fecha</span>
             <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)}
               className="mt-1 min-h-[44px] w-full rounded-md border border-gray-300 px-3 text-sm" />
           </label>
 
           <label className="block text-sm">
-            <span className="text-gray-600">¿De dónde salió?</span>
+            <span className="text-gray-600">Origen del pago</span>
             <select value={origen} onChange={(e) => setOrigen(e.target.value)}
               className="mt-1 min-h-[44px] w-full rounded-md border border-gray-300 px-3 text-sm">
               {ORIGENES_ABONO.map((o) => <option key={o} value={o}>{o}</option>)}

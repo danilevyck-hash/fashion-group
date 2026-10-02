@@ -140,7 +140,7 @@ function armarFilas(empresas: EmpresaEgresosResumen[]): Fila[] {
     const etiquetaEstado =
       empresa.descargaAutomatica || hayMonto
         ? ETIQUETA_ESTADO_EGRESOS[estado]
-        : "No se baja sola";
+        : "Carga manual";
     return {
       empresa,
       estado,
@@ -230,13 +230,13 @@ function Tarjeta({ fila, onAbrir }: { fila: Fila; onAbrir: (key: string) => void
 
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
         <div className="min-w-0">
-          <div className="text-sm text-gray-500">Salió de caja y banco</div>
+          <div className="text-sm text-gray-500">Total egresos</div>
           <div className="mt-0.5">
             <Monto texto={fila.salidaTexto} hayMonto={fila.hayMonto} fuerte />
           </div>
         </div>
         <div className="min-w-0">
-          <div className="text-sm text-gray-500">De eso, gastos</div>
+          <div className="text-sm text-gray-500">Gastos</div>
           <div className="mt-0.5">
             <Monto texto={fila.gastoTexto} hayMonto={fila.hayMonto} />
           </div>
@@ -253,7 +253,7 @@ function Tarjeta({ fila, onAbrir }: { fila: Fila; onAbrir: (key: string) => void
 
       {fila.hayMonto && (
         <span className="mt-3 inline-flex min-h-[44px] items-center text-sm font-medium text-gray-900">
-          Ver en qué salió
+          Ver detalle
           <svg viewBox="0 0 20 20" fill="none" className="ml-1 h-4 w-4" aria-hidden="true">
             <path d="M7.5 4L13 10l-5.5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -329,8 +329,8 @@ export default function ResumenEgresos({ empresas, onAbrir }: Props) {
           <thead>
             <tr className="bg-gray-50 text-sm text-gray-600">
               <th className="px-3 py-2 text-left font-medium">Empresa</th>
-              <th className="px-3 py-2 text-right font-medium">Salió de caja y banco</th>
-              <th className="px-3 py-2 text-right font-medium">De eso, gastos</th>
+              <th className="px-3 py-2 text-right font-medium">Total egresos</th>
+              <th className="px-3 py-2 text-right font-medium">Gastos</th>
               <th className="px-3 py-2 text-right font-medium">Pagos</th>
               <th className="px-3 py-2" />
             </tr>

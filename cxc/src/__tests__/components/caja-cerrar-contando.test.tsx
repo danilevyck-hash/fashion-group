@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «Saldo final», «registrada».
 /**
  * ─────────────────────────────────────────────────────────────────────────────
  * CAJA — LA VENTANA DE CERRAR PREGUNTA CUÁNTA PLATA HAY (20-sep-2026).
@@ -87,7 +88,7 @@ describe("🔴 EL DESCUADRE SE DICE CON CLARIDAD, Y NO FRENA EL CIERRE", () => {
     const onConfirm = montar();
     fireEvent.change(casilla(), { target: { value: "34.72" } });
     expect(screen.getByText(/Faltan \$2\.00/)).toBeTruthy();
-    expect(screen.getByText(/queda anotada/)).toBeTruthy();
+    expect(screen.getByText(/queda registrada/)).toBeTruthy();
     expect(botonCerrar().disabled).toBe(false);
     fireEvent.click(botonCerrar());
     expect(onConfirm).toHaveBeenCalledWith(34.72);
@@ -114,7 +115,7 @@ describe("CONTROL: la cuenta de siempre no se movió", () => {
     const texto = document.body.textContent || "";
     expect(texto).toContain("Fondo");
     expect(texto).toContain("Gastado (26 recibos)");
-    expect(texto).toContain("Queda en caja");
+    expect(texto).toContain("Saldo final");
     expect(texto).toContain("Reposición para volver a $200.00");
     expect(texto).toContain("$36.72");
     expect(texto).toContain("$163.28");

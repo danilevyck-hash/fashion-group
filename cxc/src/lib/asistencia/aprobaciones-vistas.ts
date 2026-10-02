@@ -71,8 +71,8 @@ export function textoDiasYHoras(dias: number, minutos: number): string {
 
 /** «N por decidir · H:MM h», o «Todo decidido». */
 export function textoPorDecidir(renglones: number, minutos: number): string {
-  if (renglones === 0) return "Todo decidido";
-  return `${renglones} por decidir · ${hm(minutos)} h`;
+  if (renglones === 0) return "Sin pendientes";
+  return `${renglones} pendientes · ${hm(minutos)} h`;
 }
 
 /** Lo que dice un renglón ya decidido: «Sí», «No» o, con días de los dos, «Sí y No». */

@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 // ─────────────────────────────────────────────────────────────────────────────
 // CONDUCTA — «COMPROBANTES»: EL PANEL, SU FILTRO Y EL BOTÓN DE UN TOQUE
 // (25-ago-2026)
@@ -210,7 +211,7 @@ describe("🔴 TRES chips, sin «Todos» — las 4 marcas", () => {
       // producción, PED-004 y CKP-020). Por eso vive fuera de
       // `FILTROS_COMPROBANTE` y la partición de los TRES sigue exigida abajo,
       // intacta.
-      expect(textos).toEqual(["Pedidos4", "Cotizaciones1", "Borradores2", "Sin mandar1"]);
+      expect(textos).toEqual(["Pedidos4", "Cotizaciones1", "Borradores2", "No enviado1"]);
       // 🔴 «Todos» se fue de este filtro, y no vuelve.
       expect(textos.join(" ")).not.toContain("Todos");
     });
@@ -287,7 +288,7 @@ describe("🔴 TRES chips, sin «Todos» — las 4 marcas", () => {
       expect(texto).not.toContain("PED-018");
       expect(texto).not.toContain("A-Amani");
       // 🩸 La FILA sigue diciendo la verdad aunque el chip la agrupe.
-      expect(texto).toContain("No se ha mandado a Switch");
+      expect(texto).toContain("Pendiente de envío");
     });
   }
 

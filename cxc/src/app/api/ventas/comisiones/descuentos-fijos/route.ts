@@ -113,14 +113,14 @@ async function validar(body: unknown): Promise<Validacion> {
 
   const empresa = typeof b.empresa_key === "string" ? b.empresa_key.trim() : "";
   if (!(EMPRESAS_COMISIONAN as readonly string[]).includes(empresa)) {
-    return { ok: false, error: "Elige una de las seis empresas que comisionan" };
+    return { ok: false, error: "Selecciona una de las seis empresas que comisionan" };
   }
 
   const alias = await leerAliasOVacio();
   const vendedor = typeof b.vendedor_nombre === "string"
     ? normalizarVendedor(aplicarAlias(b.vendedor_nombre, alias))
     : "";
-  if (!vendedor) return { ok: false, error: "Elige el vendedor" };
+  if (!vendedor) return { ok: false, error: "Selecciona el vendedor" };
   if (vendedor.length > 120) return { ok: false, error: "El nombre del vendedor no es válido" };
   // Un retirado no existe en Comisiones; y a quien no se le paga no se le
   // descuenta nada (su fila ni siquiera entra al total).

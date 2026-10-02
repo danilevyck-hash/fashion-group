@@ -411,7 +411,7 @@ export function ImpresionComision({ data, descuentos, empresaNombre, vendedor, y
                       <span className="tabular-nums">{fmtMoney(round2(data.ventas_base + data.cobros_base))}</span>
                     </div>
                     <div className="cds-cierre mt-2 border border-gray-300 p-2">
-                      <p className="cds-seccion-titulo">Cierre</p>
+                      <p className="cds-seccion-titulo">Resumen</p>
                       <dl className="text-[10px]">
                         <div className="flex justify-between">
                           <dt>Ventas {fmtMoney(data.ventas_base)} × {pctTasaV}%</dt>

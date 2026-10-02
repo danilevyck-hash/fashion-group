@@ -331,13 +331,13 @@ function AsistenciaInner() {
       {/* 🔴 En la portada del celular el título grande «Asistencia» lo dibuja
           `PortadaCelular`; adentro de una pestaña no hay ninguno y lo pone el
           layout (24-sep-2026). */}
-      <AppHeader module="Asistencia" tituloEnLaPantalla={enLaPortada} />
+      <AppHeader module="Asistencia y planilla" tituloEnLaPantalla={enLaPortada} />
       <div className="mx-auto max-w-6xl px-4 py-6">
         {/* Sin título grande: "Asistencia" ya lo dicen la barra sticky
             (celular) y el breadcrumb (escritorio). Queda sr-only para no dejar
             la página sin encabezado; el `mt-4` de las pestañas se fue con él
             para que no quede un hueco suelto bajo el `py-6`. */}
-        <h1 className="sr-only">Asistencia</h1>
+        <h1 className="sr-only">Asistencia y planilla</h1>
 
         {enLaPortada ? (
           <PortadaCelular

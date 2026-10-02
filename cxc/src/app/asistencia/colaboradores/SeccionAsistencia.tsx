@@ -90,7 +90,7 @@ export default function SeccionAsistencia({ codigo, refresco }: {
             href={`/asistencia?tab=asistencia&desde=${desde}&hasta=${hasta}&q=${encodeURIComponent(codigo)}`}
             className="mt-3 inline-flex min-h-[44px] items-center text-sm text-gray-500 transition hover:text-gray-900"
           >
-            Ver sus días ›
+            Ver detalle ›
           </Link>
         </>
       )}

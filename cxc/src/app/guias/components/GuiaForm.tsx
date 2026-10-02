@@ -65,9 +65,11 @@ import { CODIGOS_RETIRADOS_DE_GUIAS } from "@/lib/guias/american-classics";
 import ClientePicker from "@/components/ClientePicker";
 import { GUIAS_ATAJOS_NUEVOS } from "@/lib/guias/atajos-facturas";
 import { ScrollableTable } from "@/components/ui";
-import { EMPRESAS_CANONICAS, claveCampo, faltaParaGuardar, opcionesEmpresa } from "./guia-form-logic";
+import { EMPRESAS_CANONICAS, claveCampo, faltaParaGuardar, opcionesEmpresa, textoFaltaAlGuardar } from "./guia-form-logic";
+import DetalleDeEnvio from "./DetalleDeEnvio";
 import { entregadoPorElegido, nombreDespachadoPor } from "@/lib/guias/despachado-por";
-import { DESPACHADORES_BASE, listaParaElDesplegable } from "@/lib/guias/despachadores";
+import { useDespachadores } from "./useDespachadores";
+import { GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
 import { ETIQUETA_TIPO_DESPACHO } from "@/lib/guias/modo-despacho";
 import { textoFalta } from "@/lib/guias/falta-para-despachar";
 import { textoYaSeDespacho } from "@/lib/guias/campos-editables";
@@ -356,6 +358,15 @@ export default function GuiaForm({
     GUIAS_ATAJOS_NUEVOS && !editingId && !soloCorregible && onReemplazarItems,
   );
   const etiquetasVivas = useEtiquetasVivas(atajosDeLaGuiaNueva);
+  /**
+   * 🔴 1-oct-2026 (Daniel aprobó el mockup): al CREAR, el detalle es UNA sola
+   * tabla (`DetalleDeEnvio`) con los envíos etiquetados y los renglones sin
+   * etiqueta, y el buscador de cliente vive dentro de «+ Agregar sin
+   * etiquetas». Editar una guía sigue con la tabla de siempre.
+   */
+  const tablaUnica = GUIA_NUEVA_2026_10 && atajosDeLaGuiaNueva;
+  /** ¿Ya se tocó «Guardar guía»? Recién entonces se dice lo que falta. */
+  const [intentoGuardar, setIntentoGuardar] = useState(false);
 
   // ── "Tocado" = el usuario CAMBIÓ el campo ──────────────────────────────────
   // Antes se marcaba en el onBlur, así que mirar un desplegable y cerrarlo
@@ -387,19 +398,9 @@ export default function GuiaForm({
   // 🔴 EL CAMPO SIGUE ARRANCANDO VACÍO Y SIGUE SIENDO OBLIGATORIO. Daniel dijo
   // que NO a preseleccionar a nadie: *«porque puede que alguien deje ese por
   // error»*.
-  const [entregadores, setEntregadores] = useState<string[]>([...DESPACHADORES_BASE]);
-  useEffect(() => {
-    let cancel = false;
-    fetch("/api/guias/despachadores", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (cancel) return;
-        const nombres = Array.isArray(d?.nombres) ? (d.nombres as string[]) : [];
-        if (nombres.length > 0) setEntregadores(listaParaElDesplegable(nombres));
-      })
-      .catch(() => { /* el desplegable se queda con la lista de siempre */ });
-    return () => { cancel = true; };
-  }, []);
+  // 🔴 1-oct-2026: con `GUIA_NUEVA_2026_10` el campo no se dibuja (se elige al
+  // DESPACHAR), así que la lista ni se pide.
+  const entregadores = useDespachadores(!GUIA_NUEVA_2026_10);
 
   // "Más usados arriba": clientes (por cliente_codigo) y orden de las 8 empresas
   // canónicas, ambos por frecuencia de uso en guías. Aditivo y best-effort.
@@ -511,7 +512,8 @@ export default function GuiaForm({
     const timer = setTimeout(() => {
       const hasItems = items.some(i => i.cliente && i.direccion && i.empresa && i.facturas && i.bultos > 0);
       const hasModo = modoEntrega === "entrega_directa" || (modoEntrega === "transportista" && !!transportistaId);
-      const hasHeader = fecha.trim() && hasModo && entregadoPor.trim();
+      // 1-oct-2026: «Despachado por» ya no es de la guía, se elige al despachar.
+      const hasHeader = fecha.trim() && hasModo && (GUIA_NUEVA_2026_10 || entregadoPor.trim());
       if (!hasItems || !hasHeader) return;
       ultimoIntento.current = instantanea;
       void handleSave({ silent: true });
@@ -562,7 +564,11 @@ export default function GuiaForm({
   // `<p>` sin una sola palabra adentro. Ahora dice qué pasó y qué SÍ se puede
   // tocar, DERIVADO de `campos-editables.ts` — la misma lista que aplican el
   // formulario, el endpoint que escribe y el candado.
-  const avisoFalta = soloCorregible ? textoYaSeDespacho() : textoFalta(faltantes);
+  const avisoFalta = soloCorregible
+    ? textoYaSeDespacho()
+    : tablaUnica
+      ? textoFaltaAlGuardar(faltantes)
+      : textoFalta(faltantes);
 
   /** El ÚNICO botón de guardar del formulario. Ver la nota de la barra pegajosa. */
   function SaveButton() {
@@ -571,12 +577,20 @@ export default function GuiaForm({
     return (
       <button
         type="button"
-        onClick={() => handleSave()}
-        disabled={saving || !puedeGuardar}
-        title={puedeGuardar ? undefined : avisoFalta}
+        onClick={() => {
+          // 🔴 1-oct-2026: al crear, el botón NO se apaga. Se toca y, si falta
+          // algo, sale UNA línea con TODO lo que falta; no se manda nada.
+          if (tablaUnica && !puedeGuardar) {
+            setIntentoGuardar(true);
+            return;
+          }
+          void handleSave();
+        }}
+        disabled={saving || (!tablaUnica && !puedeGuardar)}
+        title={puedeGuardar || tablaUnica ? undefined : avisoFalta}
         className={cls}
       >
-        {saving ? "Guardando..." : editingId ? "Guardar Cambios" : "Guardar Guía"}
+        {saving ? "Guardando..." : editingId ? "Guardar cambios" : "Guardar guía"}
       </button>
     );
   }
@@ -597,6 +611,9 @@ export default function GuiaForm({
    */
   function AvisoFalta({ className = "" }: { className?: string }) {
     if (puedeGuardar || saving) return null;
+    // 🔴 1-oct-2026: al crear, el aviso NO está a la vista todo el tiempo: sale
+    // recién después de tocar «Guardar guía».
+    if (tablaUnica && !intentoGuardar) return null;
     return <p className={`text-amber-700 ${className}`}>{avisoFalta}</p>;
   }
 
@@ -774,7 +791,7 @@ export default function GuiaForm({
           onChange={(e) => { onUpdateItem(idx, "empresa", e.target.value); marcarTocado(clave); }}
           className={ctrl(err, "appearance-none")}
         >
-          <option value="">Elegir empresa…</option>
+          <option value="">Seleccionar empresa…</option>
           {opciones.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
@@ -885,6 +902,66 @@ export default function GuiaForm({
     );
   }
 
+  /** El desplegable de transportista con su «＋». UNO solo, lo dibuje quien lo dibuje. */
+  function campoTransportista() {
+    return (
+      <>
+                {/* 🔴 EL ＋ PARA AGREGAR UN TRANSPORTISTA NUEVO (9-sep-2026).
+                    Daniel: *«Ponme opción en configuración de guía para poder
+                    agregar un transportista nuevo.»* — y quién puede: *«Todos»*
+                    (admin, secretaria y bodega). 🩸 Los seis de la lista se
+                    sembraron el 26-may-2026 y desde entonces nadie pudo agregar
+                    uno: por eso se escribieron a mano en el campo de texto,
+                    saltándose la lista («NUÑEZ GLOBAL SOLUTIONS», «CITY MODA»,
+                    «SPORTING SHOES», «LUTY LUI» y uno que dice «no»).
+                    🔴 Lo que se agrega queda PARA TODO EL EQUIPO, y se puede
+                    quitar en Guías › Configuración. Con rótulo VISIBLE: el
+                    `title` solo aparece pasando el mouse por encima, y en el
+                    iPad —donde se arman las guías— no hay mouse. */}
+                <div className="flex items-center gap-1">
+                  <select
+                    id="guia-transportista"
+                    value={transportistaId || ""}
+                    onChange={e => { setTransportistaId(e.target.value || null); marcarTocado("transportista"); }}
+                    className={ctrl(Boolean(transportistaError), "appearance-none")}
+                  >
+                    <option value="">Seleccionar transportista…</option>
+                    {transportistas.map(t => (
+                      <option key={t.id} value={t.id}>{t.nombre}</option>
+                    ))}
+                  </select>
+                  <AddNewInline
+                    placeholder="Nombre"
+                    onAdd={onAddTransportista}
+                    etiqueta="Agregar transportista a la lista que ve todo el equipo"
+                    textoBoton="Agregar transportista"
+                  />
+                </div>
+      </>
+    );
+  }
+
+  /**
+   * 🔴 1-oct-2026: los campos de UN renglón sin etiqueta, para escribirlo desde
+   * la tabla única (✎). Son los MISMOS campos de la tarjeta de siempre.
+   */
+  function editorDeRenglon(item: GuiaItem, idx: number) {
+    return (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Campo label="Cliente" requerido htmlFor={idCampo(item, "cliente", "m")}>{campoCliente(item, idx, "m")}</Campo>
+        <Campo label="Dirección" requerido htmlFor={idCampo(item, "direccion", "m")}>{campoDireccion(item, idx, "m")}</Campo>
+        <Campo label="Empresa" requerido htmlFor={idCampo(item, "empresa", "m")}>{campoEmpresa(item, idx, "m")}</Campo>
+        <Campo label="Factura(s)" requerido nota="ej: 10234, 10235" htmlFor={idCampo(item, "facturas", "m")}>{campoFacturas(item, idx, "m")}</Campo>
+        <Campo label="Bultos" requerido htmlFor={idCampo(item, "bultos", "m")}>{campoBultos(item, idx, "m")}</Campo>
+        {pideNumeroTransp && (
+          <Campo label="N° guía del transportista" htmlFor={idCampo(item, "numtransp", "m")}>
+            {campoNumeroTransp(item, idx, "m")}
+          </Campo>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
       {/* Barra pegajosa de arriba. Se pega DEBAJO del encabezado de la app
@@ -931,12 +1008,12 @@ export default function GuiaForm({
           respetar: si la pantalla no lo dice en la barra ni en la miga, su
           título NO se quita. */}
       <h1 className="text-xl font-light tracking-tight mb-6">
-        {editingId ? "Editar" : "Nueva"} Guía de Transporte
+        {editingId ? "Editar" : "Nueva"} guía de despacho
       </h1>
 
       {/* Header fields */}
       <div className="mb-8">
-        <div className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-4">Información General</div>
+        <div className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-4">Información general</div>
         {/* 🔴 EN UNA GUÍA QUE YA SALIÓ, ESTO SE LEE. La fecha, el modo, el
             transportista y quién despachó son lo que el chofer firmó: no están
             en la lista de tres que Daniel abrió (N° del transportista · cliente
@@ -954,7 +1031,7 @@ export default function GuiaForm({
              la guía despachada no se parecía a la guía que se acababa de crear. */
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-6">
             <Campo label="Fecha" bloqueado>{valorBloqueado(fecha)}</Campo>
-            <Campo label="Modo de entrega" bloqueado>
+            <Campo label="Tipo de despacho" bloqueado>
               {valorBloqueado(ETIQUETA_TIPO_DESPACHO[modoEntrega === "transportista" ? "externo" : "directo"])}
             </Campo>
             <Campo label="Transportista" bloqueado>
@@ -977,7 +1054,7 @@ export default function GuiaForm({
             {hayError("fecha", fecha) && <ErrorCampo />}
           </Campo>
 
-          <Campo label="Modo de entrega" requerido>
+          <Campo label="Tipo de despacho" requerido>
             {/* Segmented control modo_entrega — py-2 dejaba 36 px de alto. */}
             <div className="flex rounded-lg bg-gray-100 p-0.5 mb-3">
               <button
@@ -996,53 +1073,38 @@ export default function GuiaForm({
                 {ETIQUETA_TIPO_DESPACHO.directo}
               </button>
             </div>
-            {modoEntrega === "transportista" ? (
+            {modoEntrega === "transportista" && !GUIA_NUEVA_2026_10 ? (
               <>
-                {/* 🔴 EL ＋ PARA AGREGAR UN TRANSPORTISTA NUEVO (9-sep-2026).
-                    Daniel: *«Ponme opción en configuración de guía para poder
-                    agregar un transportista nuevo.»* — y quién puede: *«Todos»*
-                    (admin, secretaria y bodega). 🩸 Los seis de la lista se
-                    sembraron el 26-may-2026 y desde entonces nadie pudo agregar
-                    uno: por eso se escribieron a mano en el campo de texto,
-                    saltándose la lista («NUÑEZ GLOBAL SOLUTIONS», «CITY MODA»,
-                    «SPORTING SHOES», «LUTY LUI» y uno que dice «no»).
-                    🔴 Lo que se agrega queda PARA TODO EL EQUIPO, y se puede
-                    quitar en Guías › Configuración. Con rótulo VISIBLE: el
-                    `title` solo aparece pasando el mouse por encima, y en el
-                    iPad —donde se arman las guías— no hay mouse. */}
-                <div className="flex items-center gap-1">
-                  <select
-                    value={transportistaId || ""}
-                    onChange={e => { setTransportistaId(e.target.value || null); marcarTocado("transportista"); }}
-                    className={ctrl(Boolean(transportistaError), "appearance-none")}
-                  >
-                    <option value="">Seleccionar transportista...</option>
-                    {transportistas.map(t => (
-                      <option key={t.id} value={t.id}>{t.nombre}</option>
-                    ))}
-                  </select>
-                  <AddNewInline
-                    placeholder="Nombre"
-                    onAdd={onAddTransportista}
-                    etiqueta="Agregar transportista a la lista que ve todo el equipo"
-                    textoBoton="Agregar transportista"
-                  />
-                </div>
+                {campoTransportista()}
                 {transportistaError && <ErrorCampo>Selecciona un transportista</ErrorCampo>}
               </>
-            ) : (
+            ) : modoEntrega === "entrega_directa" ? (
               <p className="text-xs text-gray-500 italic">
                 Sale en nuestro propio camión: no lleva placa ni N° de guía de
                 transportista.
               </p>
-            )}
+            ) : null}
           </Campo>
+
+          {/* 🔴 1-oct-2026 (Daniel aprobó el mockup): «Transportista» es un
+              campo PROPIO de «Información general», con el desplegable VACÍO
+              («Seleccionar transportista…»): no se preselecciona el último. */}
+          {GUIA_NUEVA_2026_10 && modoEntrega === "transportista" && (
+            <Campo label="Transportista" requerido htmlFor="guia-transportista">
+              {campoTransportista()}
+              {transportistaError && <ErrorCampo>Selecciona un transportista</ErrorCampo>}
+            </Campo>
+          )}
 
           {/* 🔴 SOLO EL DESPLEGABLE (19-sep-2026). El «＋» para agregar un
               nombre —y la opción «Otro…», que era la otra forma de agregarlo—
               salieron de acá: la lista se administra en Guías › Configuración
               y la ve todo el equipo. Daniel: *«ponlo en configuraciones nada
               más y quita la opción de que sea en la creación de la guía»*. */}
+          {/* 🔴 1-oct-2026: «Despachado por» SALIÓ de la guía y se elige al
+              DESPACHAR (obligatorio allí y en el servidor). Con el interruptor
+              apagado vuelve aquí, como antes. */}
+          {!GUIA_NUEVA_2026_10 && (
           <Campo label="Despachado por" requerido htmlFor="guia-entregado-por">
             <select
               id="guia-entregado-por"
@@ -1054,6 +1116,7 @@ export default function GuiaForm({
               {entregadores.map(e => <option key={e} value={e}>{e}</option>)}
             </select>
           </Campo>
+          )}
 
           {/* 🔴 EL N° DEL TRANSPORTISTA SALIÓ DE ACÁ: AHORA VA POR LÍNEA, al
               lado de los bultos (Daniel, punto 7). Acá se preguntaba UNA vez
@@ -1078,7 +1141,7 @@ export default function GuiaForm({
           la pantalla es EXACTAMENTE la de hoy. Solo al CREAR — en edición y en
           una guía Completada no aparece — y siempre es atajo, jamás candado:
           los renglones de abajo se siguen escribiendo a mano igual que hoy. */}
-      {GUIAS_ATAJOS_NUEVOS && !editingId && !soloCorregible && onReemplazarItems && (
+      {GUIAS_ATAJOS_NUEVOS && !editingId && !soloCorregible && onReemplazarItems && !tablaUnica && (
         <FacturasDelCliente
           items={items}
           onReemplazarItems={onReemplazarItems}
@@ -1100,7 +1163,7 @@ export default function GuiaForm({
           renglones de siempre, juntando por cliente + empresa con los bultos
           sumados. La guía se sigue armando igual; si no se toca, no cambia
           nada. Solo al CREAR, y sin ninguna etiqueta pendiente no se dibuja. */}
-      {GUIAS_ATAJOS_NUEVOS && !editingId && !soloCorregible && onReemplazarItems && (
+      {GUIAS_ATAJOS_NUEVOS && !editingId && !soloCorregible && onReemplazarItems && !tablaUnica && (
         <EtiquetasPendientes
           items={items}
           etiquetas={etiquetasVivas}
@@ -1118,7 +1181,7 @@ export default function GuiaForm({
                 sección, un "＋" pelado se lee como si fuera a renombrar la
                 sección. Textual: *«Sobre dirección. Muévelo»*. Hoy vive PEGADO
                 AL CAMPO de Dirección de cada fila — ver `campoDireccion`. */}
-            Detalle de Envío
+            Detalle de envío
           </div>
           <StatusBadge />
         </div>
@@ -1134,6 +1197,21 @@ export default function GuiaForm({
           </datalist>
         ))}
 
+        {tablaUnica ? (
+          <DetalleDeEnvio
+            items={items}
+            etiquetas={etiquetasVivas}
+            onReemplazarItems={onReemplazarItems as (items: GuiaItem[]) => void}
+            onSeleccion={onEtiquetasSeleccionadas}
+            onQuitar={handleRemoveRow}
+            editor={editorDeRenglon}
+            clientesTop={clientesTop}
+            destinoAutollenadoDe={(codigo) =>
+              destinoParaAutollenar(codigo, destinosPorCliente[(codigo || "").trim()] ?? [], definidosPorCliente)
+            }
+          />
+        ) : (
+        <>
         {validationErrors.has("items-empty") && (
           <p className="text-red-500 text-xs mb-3">Agrega al menos un envío con todos los campos completos.</p>
         )}
@@ -1237,6 +1315,8 @@ export default function GuiaForm({
             <span className="text-lg font-semibold tabular-nums">{totalBultos}</span>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       {/* Observaciones — se escriben donde se carga el camión. En una guía ya

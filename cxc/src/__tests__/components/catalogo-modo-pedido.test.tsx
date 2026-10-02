@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 // EL CATÁLOGO, AGREGANDO A UN PEDIDO — se renderiza la pantalla REAL.
 //
 // El riesgo de verdad no es la matemática: es que un "Agregar" del catálogo
@@ -187,7 +188,7 @@ describe("agregar escribe en ESE pedido, nunca en el carrito", () => {
     stubRed({ itemsField: "reebok_order_items", items: [] });
     render(<CatalogoVendedorPage marca="reebok" />);
     await waitFor(() => expect(screen.getByText("TH-002")).toBeTruthy());
-    fireEvent.click(botonDe("TH-002", "Pre-ordenar"));
+    fireEvent.click(botonDe("TH-002", "Agregar a preventa"));
     await waitFor(() => expect(patches().length).toBe(1));
     expect(patches()[0].url).toBe("/api/catalogo/reebok/orders/ORD-1/item");
     expect(cuerpo()).toMatchObject({ product_id: "p2", is_preorder: true });

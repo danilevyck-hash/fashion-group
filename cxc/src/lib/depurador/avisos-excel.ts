@@ -35,4 +35,4 @@ export function nombreArchivoAvisos(hoy: string): string {
 }
 
 /** El rótulo del botón. Una constante para que no se escriba a mano dos veces. */
-export const ROTULO_BAJAR_AVISOS = "Bajar la lista";
+export const ROTULO_BAJAR_AVISOS = "Descargar avisos";

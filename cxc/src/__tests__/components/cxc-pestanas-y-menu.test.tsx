@@ -78,6 +78,7 @@ const SIN_BOSTON = ["vendedor", "bodega", "contabilidad", "gerente_acs"] as cons
 
 // ─────────────────────────── 1. LAS PESTAÑAS ───────────────────────────
 
+// 1-oct-2026, Daniel: nombres normales de ERP («Grupo · 6 empresas» → «Fashion Group»).
 describe("TabsCartera — la pestaña de Boston solo para quien la puede leer", () => {
   const pintar = (role: string) =>
     render(<TabsCartera role={role} tab="grupo" onTab={() => {}} />);
@@ -85,7 +86,7 @@ describe("TabsCartera — la pestaña de Boston solo para quien la puede leer", 
   it("admin y secretaria ven las DOS pestañas", () => {
     for (const rol of ROLES_BOSTON) {
       const { unmount } = pintar(rol);
-      expect(screen.getByRole("button", { name: "Grupo · 6 empresas" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Fashion Group" })).toBeTruthy();
       expect(screen.getByRole("button", { name: "Confecciones Boston" })).toBeTruthy();
       unmount();
     }
@@ -95,7 +96,7 @@ describe("TabsCartera — la pestaña de Boston solo para quien la puede leer", 
     for (const rol of SIN_BOSTON) {
       const { container, unmount } = pintar(rol);
       const botones = within(container).getAllByRole("button").map((b) => b.textContent);
-      expect(botones, rol).toEqual(["Grupo · 6 empresas"]);
+      expect(botones, rol).toEqual(["Fashion Group"]);
       // Ni escondida, ni gris, ni deshabilitada: no está.
       expect(container.textContent, rol).not.toContain("Boston");
       unmount();
@@ -105,14 +106,16 @@ describe("TabsCartera — la pestaña de Boston solo para quien la puede leer", 
   it("la pestaña del grupo sigue ahí para todos (no se le quitó nada a nadie)", () => {
     for (const rol of [...ROLES_BOSTON, ...SIN_BOSTON]) {
       const { unmount } = pintar(rol);
-      expect(screen.getByRole("button", { name: "Grupo · 6 empresas" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Fashion Group" })).toBeTruthy();
       unmount();
     }
   });
 
-  it("la coletilla de Boston solo aparece con la pestaña de Boston activa", () => {
+  // 1-oct-2026, Daniel: nombres normales de ERP — la coletilla
+  // «Confecciones Boston · se lleva aparte» se quitó; la pestaña ya lo dice.
+  it("la pestaña de Boston no lleva coletilla", () => {
     const { container } = render(<TabsCartera role="admin" tab="boston" onTab={() => {}} />);
-    expect(container.textContent).toContain("se lleva aparte");
+    expect(container.textContent).not.toContain("se lleva aparte");
   });
 });
 

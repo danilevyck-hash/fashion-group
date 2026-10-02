@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «Enviar al proveedor», «Marcar como pendiente», «líneas».
 // ─────────────────────────────────────────────────────────────────────────────
 // RECLAMOS — EL REDISEÑO, MONTADO (10/11-sep-2026). Lo que solo se ve pintando:
 // la portada con sus tres números y las tarjetas por plata; la página de la
@@ -164,11 +165,11 @@ describe("la página de una empresa", () => {
     fireEvent.click(screen.getByRole("button", { name: /Cobrados/ }));
     const filas = filasTabla();
     expect(filas.map((tr) => tr.querySelector("td")!.textContent)).toEqual(["PAGADO"]);
-    expect(within(filas[0] as HTMLElement).queryByRole("button", { name: /Mandar por correo/ })).toBeNull();
+    expect(within(filas[0] as HTMLElement).queryByRole("button", { name: /Enviar por correo/ })).toBeNull();
     // Lo demás de la fila sigue: descargar y el «···».
     expect(within(filas[0] as HTMLElement).getByRole("button", { name: /Descargar el Excel/ })).toBeTruthy();
     // Y el botón de LOTE tampoco aparece sobre los cobrados.
-    expect(screen.queryByRole("button", { name: /Mandar por correo al proveedor/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Enviar por correo al proveedor/ })).toBeNull();
   });
 
   it("tocar la fila abre el reclamo; en la fila viven «Correo», «Descargar» y el «···»", () => {
@@ -176,7 +177,7 @@ describe("la página de una empresa", () => {
     const fila = filasTabla()[1];
     fireEvent.click(fila.querySelector("td")!);
     expect(onLoadDetail).toHaveBeenCalledWith("FW-0001");
-    expect(within(fila as HTMLElement).getByRole("button", { name: /Mandar por correo el reclamo FW-0001/ })).toBeTruthy();
+    expect(within(fila as HTMLElement).getByRole("button", { name: /Enviar por correo el reclamo FW-0001/ })).toBeTruthy();
     expect(within(fila as HTMLElement).getByRole("button", { name: /Descargar el Excel del reclamo FW-0001/ })).toBeTruthy();
     expect(within(fila as HTMLElement).getByRole("button", { name: /Más opciones del reclamo FW-0001/ })).toBeTruthy();
     // Sin íconos mudos: los cinco de antes se fueron.
@@ -229,17 +230,17 @@ describe("nuevo reclamo", () => {
     const tabla = document.querySelector(".hidden.lg\\:block table")!;
     const ths = Array.from(tabla.querySelectorAll("th")).map((t) => t.textContent);
     expect(ths).toEqual(["", "Estilo", "Descripción", "Cantidad", "Precio", "Talla", "Cant. reclamada", "Motivo", "Género"]);
-    expect(document.body.textContent).toContain("2 renglones");
+    expect(document.body.textContent).toContain("2 líneas");
     fireEvent.change(screen.getByLabelText("Buscar en la factura"), { target: { value: "78JB" } });
     expect(document.body.textContent).toContain("1 de 2");
     expect(document.body.textContent).not.toContain("CAMISETA PARA CABALLERO");
     fireEvent.click(screen.getAllByLabelText("Reclamar 78JB258YCI")[0]);
     expect(setFSeleccion).toHaveBeenCalled();
-    expect(document.body.textContent).toContain("Agregar un renglón a mano");
+    expect(document.body.textContent).toContain("Agregar línea manual");
   });
   it("con una línea marcada, el pie dice N renglones · N piezas · $ y los campos son los de siempre", () => {
     pintar({ fLineas: LINEAS, fSeleccion: { 0: { ...emptyItem(), referencia: "78JB258YCI", descripcion: "Playera niño manga corta", cantidad: 23, precio_unitario: 14.4, subtotal: 331.2, motivo: "Mercancía manchada" } } });
-    expect(document.body.textContent).toContain("1 renglón · 23 piezas");
+    expect(document.body.textContent).toContain("1 línea · 23 piezas");
     expect(document.body.textContent).toContain("$331.20");
     expect(screen.getAllByLabelText("Cantidad reclamada")[0]).toBeTruthy();
     expect(screen.getAllByLabelText("Talla")[0]).toBeTruthy();
@@ -294,7 +295,7 @@ describe("la pantalla del reclamo (REC-2026-0026)", () => {
   // `reclamos-cobrar-al-frente.test.tsx`.
   it("UNA fila: Marcar como cobrado (principal) · Correo · Descargar · ···", () => {
     const { onChangeEstado } = pintar();
-    expect(screen.getByRole("button", { name: "Correo" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Enviar al proveedor" })).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Descargar/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Más opciones del reclamo/ })).toBeTruthy();
     const pagar = screen.getByRole("button", { name: new RegExp(MARCAR_COBRADO) });
@@ -340,7 +341,7 @@ describe("la pantalla del reclamo (REC-2026-0026)", () => {
   it("cuando está cobrado, el chip dice «Cobrado» y queda «Volver a por cobrar»", () => {
     pintar({ current: { ...rec, estado: "Pagado" } });
     expect(screen.getByText(CHIP_COBRADO)).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Volver a por cobrar/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Marcar como pendiente/ })).toBeTruthy();
     expect(screen.queryByRole("button", { name: new RegExp(MARCAR_COBRADO) })).toBeNull();
   });
 });

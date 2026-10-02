@@ -92,7 +92,7 @@ export function buildSlotsProyeccion(
 
   const cierra: SlotDetalle = {
     key: "cierre",
-    label: "Cierra en",
+    label: "Proyección de cierre",
     valor: formatCompactCurrency(p.proyeccion_cierre),
     prev: null,
     delta: "",
@@ -210,7 +210,7 @@ export function buildSlotsProyeccionGrupo(
     },
     {
       key: "cierre",
-      label: "Cierra en",
+      label: "Proyección de cierre",
       valor: fmtMoneyCompact(g.proyeccion_cierre),
       prev: null,
       delta: "",

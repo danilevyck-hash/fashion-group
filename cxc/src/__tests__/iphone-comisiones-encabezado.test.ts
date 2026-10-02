@@ -338,7 +338,8 @@ describe("Comisiones — Criterios y la fecha de sincronizado NO se borraron", (
 
   it("la frescura del dato sigue en pantalla, adentro del mismo ⓘ", () => {
     expect(shell).toContain("<SyncStatus");
-    expect(shell).toContain('prefix="Sincronizado"');
+    // 1-oct-2026, Daniel: nombres normales de ERP («Sincronizado» → «Última sincronización»).
+    expect(shell).toContain('prefix="Última sincronización"');
     // Y si alguna empresa quedó sin actualizar, el ⓘ lo avisa sin abrirlo.
     expect(shell).toContain("onStale={setSyncStale}");
     expect(criterios).toContain("bg-amber-500");

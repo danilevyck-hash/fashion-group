@@ -289,7 +289,7 @@ function MobileHeader({
             Daniel): "Cuentas por Cobrar" ya lo dice la barra sticky, que en
             celular es lo único que queda en pantalla al hacer scroll. Queda
             sr-only para no dejar la página sin encabezado. */}
-        <h1 className="sr-only">Cuentas por Cobrar</h1>
+        <h1 className="sr-only">Cuentas por cobrar</h1>
         {/* 🔴 La frescura pregunta por LA CARTERA que se mira (23-sep-2026):
             las 6 del grupo, o solo Boston (`empresasCarteraAparte()`). */}
         <SyncStatus
@@ -484,7 +484,7 @@ function MobileSearch({ value, onChange }: { value: string; onChange: (v: string
         inputMode="search"
         value={value}
         onChange={e => onChange(e.target.value)}
-        placeholder="Buscar cliente, teléfono, email…"
+        placeholder="Buscar cliente, teléfono o correo…"
         className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-400"
       />
     </div>
@@ -780,7 +780,7 @@ function MobileClientExpanded({
           onClick={onOpenEstado}
           className="inline-flex min-h-[44px] items-center rounded-md border border-gray-300 bg-white px-3 text-xs font-medium text-gray-700 active:scale-[0.97]"
         >
-          Documentos
+          Estado de cuenta
         </button>
         {codigo && esGrupo && (
           <Link

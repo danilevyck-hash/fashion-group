@@ -37,6 +37,7 @@
 import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from "vitest";
 import { readFileSync, existsSync } from "fs";
 import path from "path";
+// 1-oct-2026, Daniel: nombres normales de ERP («Oficina (DEFAULT)» → «Oficina (sin vendedor)», «no se paga» → «No pagable», «Cierre» → «Resumen», «Clientes que no comisionan» → «Exclusiones de comisión»).
 
 const RAIZ = process.cwd();
 const MIG_V8 = "supabase/migrations/20260913120000_comision_vendedor_alias_v8.sql";
@@ -532,7 +533,7 @@ describe("🔴 aplicarAlias y nombreVendedorEnPantalla", () => {
     expect(nombreVendedorEnPantalla("EDWIN")).toBe("Edwin");
     expect(nombreVendedorEnPantalla("Rodrigo")).toBe("Rodrigo");
     expect(nombreVendedorEnPantalla("O'NEIL JEAN-PAUL")).toBe("O'Neil Jean-Paul");
-    expect(nombreVendedorEnPantalla("DEFAULT")).toBe("Oficina (DEFAULT)");
+    expect(nombreVendedorEnPantalla("DEFAULT")).toBe("Oficina (sin vendedor)");
     expect(nombreVendedorEnPantalla("")).toBe("");
   });
 });

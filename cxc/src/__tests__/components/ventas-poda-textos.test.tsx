@@ -34,6 +34,7 @@ import { ComisionesDetalleModal } from "@/components/comisiones/ComisionesDetall
 import type { Compra, ComprasApiResp } from "@/lib/ventas/compras";
 import type { UtilidadClienteResponse } from "@/lib/ventas/utilidad-cliente";
 import type { ComisionDetalle } from "@/lib/ventas/comisionExcel";
+// 1-oct-2026, Daniel: nombres normales de ERP (aprobó «Comprado · Vendido · Stock · % vendido»; el % se rotula «% vendido»; «Llegada» → «Recepción»; «Más info» → «Detalle»).
 
 // ModalOverlay (ComisionesDetalleModal) lee la ruta para saber si hay sidebar.
 vi.mock("next/navigation", () => ({
@@ -295,7 +296,7 @@ describe("Referencia · la caja de COMPRAS, cruda", () => {
   it("🔴 dice FECHA y CANTIDAD, la más reciente arriba — y nada más", async () => {
     await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
     // La lista vive ahora BAJO el número grande de "Compré".
-    expect(screen.getAllByText("Compré").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Comprado").length).toBeGreaterThan(0);
     for (const linea of [
       "19 feb 2026 · 180 u",
       "11 feb 2026 · 120 u",
@@ -355,7 +356,7 @@ describe("Referencia · la caja de COMPRAS, cruda", () => {
 describe("Referencia · los cuatro grandes y la línea de ritmo", () => {
   it("🔴 Compré · Vendí · Stock · Meses están en grande, con sus subtítulos", async () => {
     await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
-    for (const rotulo of ["Compré", "Vendí", "Stock", "Meses"]) {
+    for (const rotulo of ["Comprado", "Vendido", "Stock", "Meses"]) {
       expect(screen.getAllByText(rotulo).length, `falta el rótulo "${rotulo}"`).toBeGreaterThan(0);
     }
     // Los números del fixture: comprado 960 · vendido 615 · existencia 345.
@@ -573,7 +574,7 @@ describe("Referencia · la frase de la última llegada (la bodega tocó 0)", () 
     await buscar(RESP_TANDAS, "4G5004G001");
     const grandes = grandesDeLaFicha();
     // Daniel: *"mira que sigue diciendo compre 72 cuando enverdad son 36"*.
-    expect(grandes).toEqual({ Compré: "36u", Vendí: "25u", Stock: "12u", Meses: "5" });
+    expect(grandes).toEqual({ Comprado: "36u", Vendido: "25u", Stock: "12u", Meses: "5" });
     // 25 vendidas de las 37 que hubo (25 + 12 en bodega).
     expect(screen.getAllByText("el 68% de lo que hubo").length).toBeGreaterThan(0);
     // El histórico NO se pierde: queda en chico, bajo la lista de compras.
@@ -595,7 +596,7 @@ describe("Referencia · la frase de la última llegada (la bodega tocó 0)", () 
 /** Los cuatro grandes tal como se leen: rótulo → valor. */
 function grandesDeLaFicha(): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const rotulo of ["Compré", "Vendí", "Stock", "Meses"]) {
+  for (const rotulo of ["Comprado", "Vendido", "Stock", "Meses"]) {
     const dt = screen.getAllByText(rotulo)[0];
     const dd = dt.parentElement?.querySelector("dd");
     out[rotulo] = (dd?.textContent ?? "").replace(/\s+/g, "");

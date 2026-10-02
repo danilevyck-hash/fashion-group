@@ -212,10 +212,10 @@ export function ComisionesPorEmpresaView({
         columnas: [
           { header: "Vendedor" },
           { header: "Ventas", numerica: true },
-          { header: "Com. Venta", numerica: true },
+          { header: "Com. venta", numerica: true },
           { header: "Cobros", numerica: true },
-          { header: "Com. Cobro", numerica: true },
-          { header: "Com. Total", numerica: true },
+          { header: "Com. cobro", numerica: true },
+          { header: "Com. total", numerica: true },
         ],
         filas: filasImpresas(),
         totales: [
@@ -368,7 +368,7 @@ export function ComisionesPorEmpresaView({
           muestran el MISMO neto, así que tienen que explicarlo igual. */}
       <p className="flex items-center gap-1.5 text-xs text-gray-400">
         <Coins className="h-3.5 w-3.5" />
-        {conDetalle ? "Toca para ver el detalle" : "Elige un mes para ver el detalle"}
+        {conDetalle ? "Toca para ver el detalle" : "Selecciona un mes para ver el detalle"}
         <Ayuda titulo="Cómo se calcula">
           <p>Ya están descontados lo devuelto y los descuentos.</p>
         </Ayuda>

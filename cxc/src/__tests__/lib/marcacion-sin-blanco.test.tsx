@@ -285,7 +285,8 @@ describe("G · el CXC y las dos pantallas de pedido tampoco dejan un blanco", ()
     // 24-sep-2026: el encabezado sigue siendo el MISMO, pero ahora puede
     // llevar `tituloEnLaPantalla` (el celular sin barra de arriba). Lo que este
     // candado protege es que esté ANTES de la lista, no su lista de props.
-    expect(rama).toMatch(/<AppHeader module="Cuentas por Cobrar"/);
+    // 1-oct-2026, Daniel: nombres normales de ERP (mayúscula solo en la primera palabra).
+    expect(rama).toMatch(/<AppHeader module="Cuentas por cobrar"/);
     // El alto de la tira de pestañas, reservado (`TabsCartera` son botones
     // `min-h-[44px]`): sin él la lista igual baja de un salto.
     expect(rama).toContain('<div className="min-h-[44px] border-b border-gray-200" />');

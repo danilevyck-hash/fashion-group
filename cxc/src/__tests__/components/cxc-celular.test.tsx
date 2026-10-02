@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «Ordenado por saldo», «Sin pagos», «Copiar mensaje», «Descargar PDF», «Estado de cuenta».
 // ─────────────────────────────────────────────────────────────────────────────
 // CUENTAS POR COBRAR EN EL CELULAR — «LA LISTA ES LA CARTERA» (24-sep-2026).
 //
@@ -341,7 +342,7 @@ describe("🔴 3 · el celular abre por plata", () => {
     expect(container.textContent).toContain("con más de 120 días");
     expect(screen.getByRole("button", { name: "ver todo" })).toBeTruthy();
     expect(subtituloDeLaPortada({ cuantos: 95, risk: "all", empresas: 6, unaEmpresa: null }))
-      .toBe("95 clientes en las 6 empresas · el que más debe, arriba");
+      .toBe("95 clientes en las 6 empresas · ordenado por saldo");
     expect(subtituloDeLaPortada({ cuantos: 40, risk: "overdue", empresas: 6, unaEmpresa: null }))
       .toBe("40 clientes con más de 120 días");
   });
@@ -385,9 +386,9 @@ describe("🔴 4 · cada fila son dos renglones y el monto va exacto", () => {
     // es el que se reclama, aunque sea el más chico de los tres.
     expect(PASO_CANOA.watch).toBeGreaterThan(PASO_CANOA.overdue);
     expect(loQueUrge(PASO_CANOA, 35)).toBe("$46,376 con más de 120 días");
-    expect(loQueUrge(NOVA, 1)).toBe("no paga hace 1 día");
+    expect(loQueUrge(NOVA, 1)).toBe("Último pago: hace 1 día");
     expect(loQueUrge(NOVA, 0)).toBe("al día");
-    expect(loQueUrge({ ...NOVA, watch: 0, overdue: 0 } as ConsolidatedClient, null)).toBe("nunca ha pagado");
+    expect(loQueUrge({ ...NOVA, watch: 0, overdue: 0 } as ConsolidatedClient, null)).toBe("Sin pagos");
     expect(loQueUrge(A_FAVOR, null)).toBe("tiene saldo a favor");
   });
 
@@ -435,11 +436,11 @@ describe("🔴 5 · cobrar son dos toques, por la hoja de siempre", () => {
 
   it("la hoja sigue siendo UNA sola, y sus cuatro salidas no cambiaron", () => {
     const hoja = leer("src/app/cxc/components/HojaCobrar.tsx");
-    for (const titulo of ["Correo", "WhatsApp", "Copiar el mensaje", "Ver o bajar el PDF"]) {
+    for (const titulo of ["Correo", "WhatsApp", "Copiar mensaje", "Descargar PDF"]) {
       expect(hoja).toContain(`titulo="${titulo}"`);
     }
     // Lo que el celular le agregó son DOS líneas y un enlace — nada que se mande.
-    expect(hoja).toContain("Ver los documentos ›");
+    expect(hoja).toContain("Estado de cuenta ›");
     expect(hoja).toContain("hrefDocumentos");
     const pagina = sinComentarios(leer("src/app/cxc/page.tsx"));
     expect(pagina, "la computadora recibiría el enlace del celular")
@@ -494,8 +495,8 @@ describe("🔴 6 · «Por empresa» cuadra con la portada", () => {
         onCerrar={vi.fn()}
       />,
     );
-    expect(container.textContent).toContain("pagó City Mall Paso Canoa");
-    expect(container.textContent).toContain("vendió");
+    expect(container.textContent).toContain("Último pago: City Mall Paso Canoa");
+    expect(container.textContent).toContain("Última venta:");
   });
 
   it("tocar una empresa deja la portada filtrada en ella", () => {

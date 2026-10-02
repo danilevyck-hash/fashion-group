@@ -86,7 +86,7 @@ export function MetaAvanceCard({ meta, puedeEditar, onEditar }: Props) {
             onClick={() => onEditar(meta)}
             className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition active:scale-[0.97] hover:border-gray-300 hover:text-gray-900"
           >
-            <Pencil className="h-3.5 w-3.5" /> Cambiar
+            <Pencil className="h-3.5 w-3.5" /> Editar
           </button>
         )}
       </div>
@@ -226,7 +226,7 @@ export function MetaAvanceCard({ meta, puedeEditar, onEditar }: Props) {
       {meta.porVendedora.length > 0 && (
         <div className="mt-3 border-t border-gray-200/80 pt-3">
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
-            {meta.tipo === "vendedora" ? "La meta de cada una" : "Cuánto aportó cada una"}
+            {meta.tipo === "vendedora" ? "Meta por vendedora" : "Aporte por vendedora"}
           </p>
           {meta.tipo === "grupal" && (
             <p className="mb-2 text-xs leading-relaxed text-gray-500">

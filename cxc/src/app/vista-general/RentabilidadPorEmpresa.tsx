@@ -75,12 +75,12 @@ const DOT: Record<RentabilidadEmpresaRow["estado"], string> = {
 };
 
 const PILL: Record<RentabilidadEmpresaRow["estado"], { label: string; cls: string }> = {
-  verde: { label: "Sana", cls: "bg-green-50 text-green-700" },
-  ambar: { label: "Al límite", cls: "bg-amber-50 text-amber-700" },
-  rojo: { label: "Pierde plata", cls: "bg-red-50 text-red-700" },
+  verde: { label: "Rentable", cls: "bg-green-50 text-green-700" },
+  ambar: { label: "En equilibrio", cls: "bg-amber-50 text-amber-700" },
+  rojo: { label: "Pérdida", cls: "bg-red-50 text-red-700" },
   // Sin gasto utilizable la píldora DICE POR QUÉ (ver `pillDe`); esto es sólo el
   // caso en que ni siquiera hay gastos conectados.
-  sin_gastos: { label: "Sin conectar", cls: "bg-stone-100 text-stone-500" },
+  sin_gastos: { label: "Sin datos", cls: "bg-stone-100 text-stone-500" },
 };
 
 /**

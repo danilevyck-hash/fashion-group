@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP («Cierre del año» → «Proyección de cierre», «Quién lo compra» → «Clientes», «Total Grupo» → «Total grupo»).
 // ─────────────────────────────────────────────────────────────────────────────
 // CANDADO DE CONDUCTA de Ventas › Productos: precio promedio + los 4 períodos.
 //
@@ -379,7 +380,7 @@ describe("3 · el período cambia LO QUE SE PIDE", () => {
     render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     const resumen = document.querySelector("[data-resumen-productos]")!;
-    expect(resumen.textContent).toContain("1,100 piezas");    // 1000 + 100 + 0
+    expect(resumen.textContent).toContain("1,100 unidades"); // 1-oct-2026, Daniel: nombres normales de ERP    // 1000 + 100 + 0
     expect(resumen.textContent).toContain("$13.00");           // 14.300 / 1.100
   });
 
@@ -709,7 +710,7 @@ describe("8 · el desplegable dice QUIÉN lo compra", () => {
     fireEvent.click(enTabla().getByRole("tab", { name: /Códigos/ }));
     await waitFor(() => expect(document.querySelector("[data-drill-codigos]")).toBeTruthy());
     // Si el clic se propagara a la fila, el toggle la cerraría al instante.
-    expect(enTabla().queryByRole("tab", { name: /Quién lo compra/ })).toBeTruthy();
+    expect(enTabla().queryByRole("tab", { name: /^Clientes/ })).toBeTruthy();
   });
 });
 
@@ -943,7 +944,7 @@ describe("10 · las tarjetas de celular", () => {
     await pintada();
     const li = document.querySelector('li[data-tarjeta-producto="CAMISA POLO"]') as HTMLElement;
     fireEvent.click(li.querySelector("button")!);
-    await waitFor(() => expect(within(li).queryByRole("tab", { name: /Quién lo compra/ })).toBeTruthy());
+    await waitFor(() => expect(within(li).queryByRole("tab", { name: /^Clientes/ })).toBeTruthy());
     expect(within(li).queryByRole("tab", { name: /Códigos/ })).toBeTruthy();
     await waitFor(() => expect(li.querySelector("[data-drill-clientes]")).toBeTruthy());
     expect(li.textContent).toContain("City Mall Paso Canoa");

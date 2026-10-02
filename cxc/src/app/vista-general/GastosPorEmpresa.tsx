@@ -66,7 +66,7 @@ export function pillGasto(g: GastoEmpresaRow): { label: string; cls: string } | 
   if (g.motivo) {
     return { label: ETIQUETA_SIN_GASTO_EGRESOS[g.motivo], cls: "bg-stone-100 text-stone-500" };
   }
-  return { label: "Sin conectar", cls: "bg-stone-100 text-stone-500" };
+  return { label: "Sin datos", cls: "bg-stone-100 text-stone-500" };
 }
 
 export default function GastosPorEmpresa({ gastos, mes }: { gastos: GastosData; mes: string }) {

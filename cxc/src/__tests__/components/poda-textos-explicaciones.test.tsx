@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «Caja menuda», «Frecuencia».
 /**
  * PODA DE EXPLICACIONES (23-ago-2026) — CANDADOS DE CONDUCTA.
  *
@@ -156,7 +157,7 @@ describe("Caja Menuda · sin la bajada del fondo fijo, y sin hueco donde estaba"
     // El `max-w-xl` que sostenía la bajada ya no existe en ningún lado.
     expect(container.querySelector(".max-w-xl")).toBeNull();
     // Y el h1 sigue, para no dejar la página sin encabezado.
-    expect(screen.getByText("Caja Menuda")).toBeTruthy();
+    expect(screen.getByText("Caja menuda")).toBeTruthy();
   });
 });
 
@@ -196,7 +197,8 @@ describe("Asistencia · el motivo sigue siendo OBLIGATORIO sin la frase que lo d
     // 🔴 11-sep-2026: el rótulo pasó de «Por qué se corrige» a «Por qué» (mockup
     // aprobado por Daniel); la REGLA de este candado —obligatorio, con
     // asterisco, con freno— no cambió. Ver `asistencia-corregir-hora.test.tsx`.
-    expect(screen.getByText(/^Por qué/i).textContent).toContain("*");
+    // 1-oct-2026, Daniel: nombres normales de ERP («screen.getByText(/^Por qué/i).textContent» → «screen.getByText(/^Motivo/i).textContent»).
+    expect(screen.getByText(/^Motivo/i).textContent).toContain("*");
     const motivo = document.querySelector("textarea") as HTMLTextAreaElement;
     expect(motivo).toBeTruthy();
     // Sin motivo, Guardar sigue apagado: la REGLA no se fue con el texto.
@@ -258,8 +260,8 @@ describe("Cheques · el recordatorio pierde el pie de '¿Se repite?', no las opc
 
   it("el rótulo y las opciones de repetición SIGUEN", () => {
     pintar();
-    expect(screen.getByText(/¿Se repite\?/)).toBeTruthy();
-    expect(screen.getByRole("group", { name: "Se repite" })).toBeTruthy();
+    expect(screen.getByText(/Frecuencia/)).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Frecuencia" })).toBeTruthy();
   });
 });
 
@@ -330,7 +332,7 @@ describe("Marketing · los tres caminos quedan con su nombre y sin su bajada", (
 
   it("🔴 los TRES botones siguen, con su gancho de medición y su nombre", () => {
     abrir();
-    expect(screen.getByText("¿Qué es el gasto?")).toBeTruthy();
+    expect(screen.getByText("Tipo de gasto")).toBeTruthy(); // 1-oct-2026, Daniel: nombres normales de ERP
     for (const [key, titulo] of [
       ["factura", "Factura"],
       ["mueble", "Mueble"],
@@ -594,7 +596,7 @@ describe("Plantilla Switch · Reglas: sin bajadas y sin la lista de principios",
 
   it("CONTROL: la pantalla NO quedó vacía — sigue diciendo cómo se elige la talla", () => {
     render(<ReglasView />);
-    expect(screen.getByText("Cómo se elige la talla")).toBeTruthy();
+    expect(screen.getByText("Reglas de talla")).toBeTruthy(); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(screen.getByText("Descripciones por marca")).toBeTruthy();
   });
 });
@@ -624,13 +626,15 @@ describe("las pantallas grandes: el texto se fue del CÓDIGO y lo de al lado sig
       archivo: "app/productos/cargar/FacturasTiendaClient.tsx",
       fuera: ["separadas del Depurador", "TECHO(Costo"],
       // La tabla de fórmulas por marca y el freno por descripciones nuevas.
-      sigue: ["Marca en esta factura", "Bloqueado: hay", "Jerarquía: precio fijo"],
+      // 1-oct-2026, Daniel: nombres normales de ERP («Marca en esta factura» → «Marca»)
+      sigue: ['"Marca", "Estado", "Divisor"', "Bloqueado: hay", "Jerarquía: precio fijo"],
     },
     {
       archivo: "app/productos/cargar/ReebokClient.tsx",
       fuera: ["plantilla por artículo", "corrige si hace falta"],
       sigue: [
-        'label="¿Qué quieres generar?"',
+        // 1-oct-2026, Daniel: nombres normales de ERP
+        'label="Tipo de salida"',
         'label="Columna de piezas (mes)"',
         "Vacío = hereda la fórmula de marca",
       ],
@@ -659,7 +663,8 @@ describe("las pantallas grandes: el texto se fue del CÓDIGO y lo de al lado sig
       // dato (`CampoEnLinea rotulo="…"`), y «Última sincronización» pasó a
       // «Actualizado desde Switch el» por el diccionario. Los TRES siguen
       // estando: cambió cómo se escriben, no que estén.
-      sigue: [">Contacto</h2>", 'rotulo="Teléfono"', "Actualizado desde Switch el"],
+      // 1-oct-2026, Daniel: nombres normales de ERP («Actualizado desde Switch el» → «Última sincronización»).
+      sigue: [">Contacto</h2>", 'rotulo="Teléfono"', "Última sincronización"],
     },
   ];
 

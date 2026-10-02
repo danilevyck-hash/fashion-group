@@ -210,8 +210,10 @@ describe("🔴 C. el Excel dice quién marcó de más", () => {
     expect(COL_ENTRADA).toBe(3);
     expect(COL_SALIDA).toBe(6);
     expect(celda(0, 3)).toBe("Entrada");
-    expect(celda(0, 4)).toBe("Sale almuerzo");
-    expect(celda(0, 5)).toBe("Vuelve");
+    // 1-oct-2026, Daniel: nombres normales de ERP («toBe("Sale almuerzo")» → «toBe("Salida almuerzo")»).
+    expect(celda(0, 4)).toBe("Salida almuerzo");
+    // 1-oct-2026, Daniel: nombres normales de ERP («expect(celda(0, 5)).toBe("Vuelve");» → «expect(celda(0, 5)).toBe("Regreso almuerzo");»).
+    expect(celda(0, 5)).toBe("Regreso almuerzo");
     expect(celda(0, 6)).toBe("Salida");
     // Y su contenido es el de siempre: 1.ª, 2.ª, 3.ª y ÚLTIMA.
     expect(celda(1, 3)).toBe("08:10:21");

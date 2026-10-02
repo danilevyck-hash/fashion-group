@@ -68,7 +68,7 @@ function parseQuickAction(query: string): QuickAction | null {
   const debeMatch = q.match(/cu[aá]nto\s+debe\s+(.+)/i);
   if (debeMatch) {
     const client = debeMatch[1].trim();
-    return { label: `Buscar deuda de "${client}" en CxC`, href: `/cxc?search=${encodeURIComponent(client)}` };
+    return { label: `Buscar saldo de "${client}" en Cuentas por cobrar`, href: `/cxc?search=${encodeURIComponent(client)}` };
   }
 
   // reclamos de/para [empresa]
@@ -85,7 +85,7 @@ function parseQuickAction(query: string): QuickAction | null {
 
   // últimos gastos / caja
   if (/gastos|caja|[uú]ltimos?\s+gastos/i.test(q)) {
-    return { label: "Ir a Caja", href: "/caja" };
+    return { label: "Ir a Caja menuda", href: "/caja" };
   }
 
   // préstamos de [persona]
@@ -136,7 +136,7 @@ function flatten(r: SearchResults): FlatItem[] {
   const items: FlatItem[] = [];
   for (const c of r.cxc) {
     items.push({
-      module: "CxC",
+      module: "Cuentas por cobrar",
       label: c.nombre_normalized,
       sub: `$${fmtMoney(c.total)} — ${c.company_key}`,
       href: `/cxc?search=${encodeURIComponent(c.nombre_normalized)}`,
@@ -154,7 +154,7 @@ function flatten(r: SearchResults): FlatItem[] {
   }
   for (const g of r.guias) {
     items.push({
-      module: "Guías",
+      module: "Guías de despacho",
       label: `Guía #${g.numero}`,
       sub: `${fmtDate(g.fecha)} — ${g.estado}`,
       // 🩸 11-sep-2026: decía `/guias?id=<id>`, y esa dirección tiene un
@@ -173,7 +173,7 @@ function flatten(r: SearchResults): FlatItem[] {
     // día); sin código —no debería pasar— se cae a la lista, como antes.
     const codigo = (d.empresa || "").trim();
     items.push({
-      module: "Directorio",
+      module: "Clientes",
       label: d.nombre,
       sub: [d.empresa, d.correo, d.celular].filter(Boolean).join(" · "),
       href: codigo ? `/clientes/${encodeURIComponent(codigo)}` : "/clientes",
@@ -182,7 +182,7 @@ function flatten(r: SearchResults): FlatItem[] {
   }
   for (const ch of r.cheques) {
     items.push({
-      module: "Cheques",
+      module: "Recordatorios",
       label: ch.cliente,
       sub: `$${fmtMoney(ch.monto)} — ${fmtDate(ch.fecha_deposito)}`,
       href: "/recordatorios",
@@ -222,7 +222,7 @@ function flatten(r: SearchResults): FlatItem[] {
       fmtDate(cj.fecha),
     ].filter(Boolean).join(" — ");
     items.push({
-      module: "Caja",
+      module: "Caja menuda",
       label,
       sub,
       // 🩸 `?periodo=` tampoco lo leía nadie: el gasto encontrado dejaba en la
@@ -253,17 +253,17 @@ function flatten(r: SearchResults): FlatItem[] {
 }
 
 const SEARCH_MODULES = [
-  { label: "Cuentas por Cobrar", href: "/cxc", keywords: ["cxc", "cartera", "cobrar", "deuda", "saldo", "cliente", "vencido"] },
+  { label: "Cuentas por cobrar", href: "/cxc", keywords: ["cxc", "cartera", "cobrar", "deuda", "saldo", "cliente", "vencido"] },
   { label: "Reclamos", href: "/reclamos", keywords: ["reclamo", "nota credito", "devolucion", "queja"] },
   // El módulo se llama "Recordatorios" desde ago-2026 (la key interna sigue
   // siendo `cheques`). Las palabras viejas se CONSERVAN: quien teclea "cheque"
   // tiene que seguir llegando acá.
   { label: "Recordatorios", href: "/recordatorios", keywords: ["recordatorio", "recordar", "agenda", "cheque", "deposito", "posfechado", "banco"] },
-  { label: "Guias", href: "/guias", keywords: ["guia", "despacho", "envio", "transporte"] },
+  { label: "Guías de despacho", href: "/guias", keywords: ["guia", "despacho", "envio", "transporte"] },
   { label: "Ventas", href: "/ventas", keywords: ["venta", "factura", "ingreso", "vendedor"] },
-  { label: "Directorio", href: "/clientes", keywords: ["directorio", "contacto", "correo", "telefono", "whatsapp", "clientes"] },
-  { label: "Prestamos", href: "/prestamos", keywords: ["prestamo", "empleado", "descuento", "planilla"] },
-  { label: "Caja", href: "/caja", keywords: ["caja", "gasto", "pago", "proveedor", "efectivo"] },
+  { label: "Clientes", href: "/clientes", keywords: ["directorio", "contacto", "correo", "telefono", "whatsapp", "clientes"] },
+  { label: "Préstamos", href: "/prestamos", keywords: ["prestamo", "empleado", "descuento", "planilla"] },
+  { label: "Caja menuda", href: "/caja", keywords: ["caja", "gasto", "pago", "proveedor", "efectivo"] },
   { label: "Marketing", href: "/marketing", keywords: ["marketing", "marca", "tienda", "mueble", "impulsadora", "valla"] },
 ];
 
@@ -433,7 +433,7 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
         <div className="flex items-center gap-3 px-4 sm:px-6 py-3 border-b border-gray-200">
           <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
           <input ref={inputRef} type="text" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={onKeyDown}
-            placeholder="Busca clientes, reclamos, guías, cheques..."
+            placeholder="Buscar clientes, reclamos, guías, recordatorios…"
             /* El buscador de pantalla completa es SOLO móvil: 32px de alto medidos
                en 390×844. text-base ya evitaba el zoom de Safari; faltaba el alto. */
             className="flex-1 text-base py-1 min-h-[44px] outline-none bg-transparent" autoFocus />

@@ -24,7 +24,8 @@ import { CODIGO_CLIENTE_CONTADO } from "@/lib/catalogo/publico-switch-actor";
 import { esVendedorTodos } from "./vendedor-todos";
 
 /** Rótulo único de la sección y de la marca en la tabla. */
-export const ROTULO_CLIENTES_SIN_COMISION = "Clientes que no comisionan";
+// 1-oct-2026, Daniel: nombres normales de ERP.
+export const ROTULO_CLIENTES_SIN_COMISION = "Exclusiones de comisión";
 
 export {
   VENDEDOR_TODOS,
@@ -86,16 +87,16 @@ export function validarExclusionNueva(body: unknown): Validacion {
   const b = (body ?? {}) as Record<string, unknown>;
   const empresa = typeof b.empresa_key === "string" ? b.empresa_key.trim() : "";
   if (!(EMPRESAS_COMISIONAN as readonly string[]).includes(empresa)) {
-    return { ok: false, error: "Elige una de las seis empresas que comisionan" };
+    return { ok: false, error: "Selecciona una de las seis empresas que comisionan" };
   }
   const codigo = typeof b.cliente_codigo === "string" ? normalizarCodigoCliente(b.cliente_codigo) : "";
-  if (!codigo) return { ok: false, error: "Elige el cliente" };
+  if (!codigo) return { ok: false, error: "Selecciona el cliente" };
   if (codigo === CODIGO_CLIENTE_CONTADO) {
     return { ok: false, error: "La venta de mostrador ya no comisiona; no hace falta agregarla" };
   }
   if (codigo.length > 40) return { ok: false, error: "El código del cliente no es válido" };
   const vendedor = typeof b.vendedor === "string" ? normalizarVendedor(b.vendedor) : "";
-  if (!vendedor) return { ok: false, error: "Elige el vendedor" };
+  if (!vendedor) return { ok: false, error: "Selecciona el vendedor" };
   // El comodín es un valor legítimo: «todos los vendedores» de esa empresa.
   if (esVendedorTodos(vendedor)) {
     const casillasTodos = leerCasillas(b);
@@ -138,7 +139,7 @@ export function validarExclusionesNuevas(body: unknown): ValidacionMulti {
       ? [b.empresa_key]
       : [];
   const empresas = [...new Set(crudas.map((k) => (typeof k === "string" ? k.trim() : "")))];
-  if (empresas.length === 0) return { ok: false, error: "Elige al menos una empresa" };
+  if (empresas.length === 0) return { ok: false, error: "Selecciona al menos una empresa" };
 
   const valores: ExclusionNueva[] = [];
   for (const empresa of empresas) {

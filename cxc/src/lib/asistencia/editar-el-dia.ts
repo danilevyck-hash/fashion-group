@@ -267,7 +267,7 @@ export const GUARDAR_EL_DIA = "Guardar el día";
 export const TITULO_EDITAR_EL_DIA = "Arreglar las marcas de este día";
 
 /** El rótulo del campo del porqué, el mismo de siempre. */
-export const PORQUE = "Por qué";
+export const PORQUE = "Motivo";
 
 /**
  * Qué falta para poder guardar. `null` = se puede.

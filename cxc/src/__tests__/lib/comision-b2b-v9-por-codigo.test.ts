@@ -29,6 +29,7 @@ import path from "node:path";
 import { VENDEDOR_TODOS, ROTULO_VENDEDOR_TODOS, esVendedorTodos } from "@/lib/comisiones/vendedor-todos";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { validarExclusionNueva } from "@/lib/comisiones/exclusiones";
+// 1-oct-2026, Daniel: nombres normales de ERP («Oficina (DEFAULT)» → «Oficina (sin vendedor)», «no se paga» → «No pagable», «Cierre» → «Resumen», «Clientes que no comisionan» → «Exclusiones de comisión»).
 
 // La cadena de RPC se lee del archivo y de la constante: no hace falta un
 // cliente de Supabase de verdad.
@@ -96,7 +97,7 @@ describe("🔴 el comodín de vendedor: qué es y cómo se dice", () => {
     expect(nombreVendedorEnPantalla("*")).toBe("Todos los vendedores");
     // Y lo de siempre no cambia.
     expect(nombreVendedorEnPantalla("REYNALDO ESPINOSA")).toBe("Reynaldo Espinosa");
-    expect(nombreVendedorEnPantalla("DEFAULT")).toBe("Oficina (DEFAULT)");
+    expect(nombreVendedorEnPantalla("DEFAULT")).toBe("Oficina (sin vendedor)");
   });
 
   it("la API acepta el comodín como un vendedor válido, con sus casillas", () => {

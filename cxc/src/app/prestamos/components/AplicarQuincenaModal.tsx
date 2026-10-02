@@ -93,13 +93,13 @@ export default function AplicarQuincenaModal({
           {resumen && resumen.yaTienen.length > 0 && (
             <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
               {resumen.yaTienen.length === 1
-                ? "1 persona ya tiene el descuento de esta quincena; no se le vuelve a aplicar."
+                ? "1 colaborador ya tiene el descuento de esta quincena; no se le vuelve a aplicar."
                 : `${resumen.yaTienen.length} ya tienen el descuento de esta quincena; no se les vuelve a aplicar.`}
             </p>
           )}
           {resumen && n > 0 && (
             <p className="text-gray-600">
-              Se aplicará a <span className="font-medium text-gray-900">{n} persona{n !== 1 ? "s" : ""}</span> por
+              Se aplicará a <span className="font-medium text-gray-900">{n} colaborador{n !== 1 ? "es" : ""}</span> por
               un total de <span className="font-medium text-gray-900 tabular-nums">${fmt(resumen.total)}</span>.
               {" "}La última cuota se ajusta al saldo automáticamente.
             </p>

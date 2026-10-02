@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «Ver o bajar el PDF» → «Descargar PDF».
 /**
  * ─────────────────────────────────────────────────────────────────────────────
  * 🔴 ENTREGAR EL PDF DEL ESTADO DE CUENTA — UN SOLO CAMINO, Y EL ERROR SE VE.
@@ -143,21 +144,21 @@ async function abrirHoja() {
       marcaEnvio={null}
     />,
   );
-  await waitFor(() => expect(screen.getByText("Ver o bajar el PDF")).toBeTruthy());
+  await waitFor(() => expect(screen.getByText("Descargar PDF")).toBeTruthy());
 }
 
-const filaPdf = () => screen.getByText("Ver o bajar el PDF").closest("button")!;
+const filaPdf = () => screen.getByText("Descargar PDF").closest("button")!;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. UN SOLO CAMINO PARA EL PDF, Y UN RÓTULO QUE VALE PARA LOS DOS CASOS
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("🔴 hay UNA sola salida para el PDF", () => {
-  it("se llama «Ver o bajar el PDF» — no hay un «Compartir» ni un «PDF» aparte", async () => {
+  it("se llama «Descargar PDF» — no hay un «Compartir» ni un «PDF» aparte", async () => {
     await abrirHoja();
     expect(screen.queryByText("Compartir")).toBeNull();
-    expect(screen.queryByText("Descargar PDF")).toBeNull();
-    expect(screen.getAllByText("Ver o bajar el PDF")).toHaveLength(1);
+    expect(screen.queryByText("PDF")).toBeNull();
+    expect(screen.getAllByText("Descargar PDF")).toHaveLength(1);
   });
 
   it("en la computadora BAJA el archivo", async () => {
@@ -211,7 +212,7 @@ describe("🔴 si el PDF no se puede armar, la pantalla LO DICE", () => {
     Object.defineProperty(navigator, "canShare", { configurable: true, value: () => true });
     await abrirHoja();
     fireEvent.click(filaPdf());
-    await waitFor(() => expect(screen.getByText("Ver o bajar el PDF")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Descargar PDF")).toBeTruthy());
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });

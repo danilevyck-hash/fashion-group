@@ -159,7 +159,7 @@ export function HojaCobrar({
 
   function cobrar() {
     if (requiereComprobante && !file) { setError(FALTA_COMPROBANTE); return; }
-    if (!listo) { setError("Escribe cuánto entró."); return; }
+    if (!listo) { setError("Escribe el monto recuperado."); return; }
     if (!fecha) { setError("Falta la fecha."); return; }
     setError(null);
     onCobrar([{ monto: valor, nota_credito: nc.trim(), fecha }], file);
@@ -171,7 +171,7 @@ export function HojaCobrar({
           parcial sigue siendo posible, solo deja de ser el caso por el que se
           diseña (14 de 14 cobros fueron el total exacto, al centavo). */}
       <label className="block px-5 pt-4">
-        <span className="sr-only">Cuánto entró</span>
+        <span className="sr-only">Monto recuperado</span>
         <input
           type="number"
           inputMode="decimal"
@@ -179,7 +179,7 @@ export function HojaCobrar({
           step="0.01"
           value={monto}
           onChange={(e) => setMonto(e.target.value)}
-          aria-label="Cuánto entró"
+          aria-label="Monto recuperado"
           className="w-full border-none bg-transparent p-0 text-center text-[40px] font-light leading-none tracking-tight tabular-nums text-gray-900 outline-none"
         />
       </label>
@@ -302,7 +302,7 @@ export function HojaCorreo({
   }
 
   return (
-    <Hoja titulo={`Mandar a ${(contactoNombre || "").trim() || empresa}`} onCerrar={onCerrar} marca="correo">
+    <Hoja titulo={`Enviar a ${(contactoNombre || "").trim() || empresa}`} onCerrar={onCerrar} marca="correo">
       <ul className="mt-1 divide-y divide-gray-100 border-y border-gray-100">
         <li>
           <label className={`${FILA} text-[17px] text-gray-900`}>
@@ -340,7 +340,7 @@ export function HojaCorreo({
         </li>
         <li>
           <button type="button" onClick={() => setVerTexto((v) => !v)} className={`${FILA} text-[17px] active:bg-gray-50`}>
-            <span className="text-gray-500">Ver el texto</span>
+            <span className="text-gray-500">Vista previa</span>
             <span className="text-gray-400">{verTexto ? "⌄" : "›"}</span>
           </button>
           {verTexto && (
@@ -363,7 +363,7 @@ export function HojaCorreo({
           )}
         </li>
         <li className={`${FILA} text-[17px]`}>
-          <span className="text-gray-500">Van adjuntos</span>
+          <span className="text-gray-500">Adjuntos</span>
           <span className="truncate text-gray-900">{loQueVaAdjunto({ facturas, fotos })}</span>
         </li>
       </ul>
@@ -371,7 +371,7 @@ export function HojaCorreo({
       {error && <p className="px-5 pt-3 text-[13px] text-red-600">{error}</p>}
 
       <button type="button" onClick={mandar} disabled={enviando} className={NEGRO}>
-        {enviando ? "Mandando…" : "Mandar"}
+        {enviando ? "Enviando…" : "Enviar"}
       </button>
       <p className="px-5 pb-5 text-center text-[13px] text-gray-400">{SE_DESHACE}</p>
     </Hoja>
@@ -465,10 +465,10 @@ export function HojaSeguimiento({
   onCerrar: () => void;
 }) {
   return (
-    <Hoja titulo="Lo que ha pasado" onCerrar={onCerrar} marca="seguimiento">
+    <Hoja titulo="Seguimiento" onCerrar={onCerrar} marca="seguimiento">
       <div className="px-5 py-4">
         {seguimiento.length === 0 ? (
-          <p className="py-4 text-center text-[15px] text-gray-500">Todavía no ha pasado nada</p>
+          <p className="py-4 text-center text-[15px] text-gray-500">Sin seguimiento</p>
         ) : (
           <ul className="divide-y divide-gray-100">
             {seguimiento.map((s) => {

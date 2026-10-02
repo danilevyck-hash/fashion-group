@@ -33,8 +33,8 @@ export const ROTULO_COLUMNA: Record<ColumnaPapel, string> = {
   nota: "Nota",
   proveedor: "Proveedor",
   categoria: "Categoría",
-  factura: "N° Factura",
-  subtotal: "Sub-total",
+  factura: "N° de factura",
+  subtotal: "Subtotal",
   itbms: "ITBMS",
   total: "Total",
 };

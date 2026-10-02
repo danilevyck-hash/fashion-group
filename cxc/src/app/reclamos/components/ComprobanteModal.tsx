@@ -124,7 +124,7 @@ export default function ComprobanteModal({ open, submitting, requireFile, title,
         )}
 
         <label className="mt-4 block">
-          <span className="text-xs text-gray-500">Nota (opcional)</span>
+          <span className="text-xs text-gray-500">Observaciones (opcional)</span>
           <textarea
             value={nota}
             onChange={(e) => setNota(e.target.value)}

@@ -49,6 +49,7 @@ import { rotuloVerNoSePagan, ROTULO_VER_MENOS } from "@/lib/comisiones/sin-pago"
 import { validarExclusionesNuevas } from "@/lib/comisiones/exclusiones";
 import { buildComisionDetalleSheet, type ComisionDetalle } from "@/lib/ventas/comisionExcel";
 import { PCT_FMT } from "@/lib/excel-export";
+// 1-oct-2026, Daniel: nombres normales de ERP («Oficina (DEFAULT)» → «Oficina (sin vendedor)», «no se paga» → «No pagable», «Cierre» → «Resumen», «Clientes que no comisionan» → «Exclusiones de comisión»).
 
 const raiz = path.resolve(__dirname, "../../..");
 const leer = (rel: string) => readFileSync(path.join(raiz, rel), "utf8");
@@ -439,7 +440,7 @@ describe("🔴 16 · «Clientes que no comisionan» acepta VARIAS empresas", () 
   it("sin empresas es un error con texto, nunca una lista vacía que no hace nada", () => {
     const r = validarExclusionesNuevas(base);
     expect(r.ok).toBe(false);
-    expect(r.ok === false && r.error).toBe("Elige al menos una empresa");
+    expect(r.ok === false && r.error).toBe("Selecciona al menos una empresa"); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   it("una empresa que no comisiona tira TODO el alta (fail-closed)", () => {
@@ -521,7 +522,7 @@ describe("🔴 19 · los botones dicen QUÉ traen, y el verbo es «Descargar»",
 
 describe("🔴 20 · los que no se pagan, detrás de «Ver los que no se pagan»", () => {
   it("el rótulo dice cuántos hay: no se abre a ciegas", () => {
-    expect(rotuloVerNoSePagan(2)).toBe("Ver los que no se pagan (2)");
+    expect(rotuloVerNoSePagan(2)).toBe("Mostrar no pagables (2)");
     expect(ROTULO_VER_MENOS).toBe("Ver menos");
   });
 

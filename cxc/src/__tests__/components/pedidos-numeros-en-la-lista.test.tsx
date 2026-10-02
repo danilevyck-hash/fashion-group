@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP («Sin mandar» → «No enviado»; «No se ha mandado a Switch» → «Pendiente de envío»)
 // ─────────────────────────────────────────────────────────────────────────────
 // LA LISTA DE PEDIDOS DEL ADMIN MUESTRA LOS DOS NÚMEROS (24-ago-2026)
 //
@@ -135,7 +136,7 @@ describe("1-2. los dos números están en la fila, y el que falta se dice con pa
     const { container } = pintar([SIN_ENVIAR]);
     const tr = fila(container, "Zapatería Nueva");
     expect(tr.textContent).toContain("PED-019");
-    expect(tr.textContent).toMatch(/sin mandar a switch/i);
+    expect(tr.textContent).toMatch(/no enviado a switch/i);
     // Ni un guion suelto donde iría el número (se leería como un cero).
     const celdaCliente = [...tr.querySelectorAll("td")][2];
     expect(celdaCliente.textContent).not.toMatch(/—/);
@@ -144,7 +145,7 @@ describe("1-2. los dos números están en la fila, y el que falta se dice con pa
   it("los dos casos conviven en la MISMA lista sin confundirse", () => {
     const { container } = pintar([EN_SWITCH, SIN_ENVIAR]);
     expect(fila(container, "Sporting Shoes").textContent).toContain("16-000000503");
-    expect(fila(container, "Zapatería Nueva").textContent).toMatch(/sin mandar a switch/i);
+    expect(fila(container, "Zapatería Nueva").textContent).toMatch(/no enviado a switch/i);
     expect(fila(container, "Zapatería Nueva").textContent).not.toContain("16-000000503");
   });
 });
@@ -176,7 +177,7 @@ describe("4. el pedido del link sin convertir no tiene número — y lo dice", (
     const { container } = pintar([DEL_LINK]);
     const tr = fila(container, "Nathalie");
     expect(tr.textContent).toMatch(/se numera al abrirlo/i);
-    expect(tr.textContent).toMatch(/no se ha mandado a switch/i);
+    expect(tr.textContent).toMatch(/pendiente de envío/i);
   });
 });
 
@@ -250,7 +251,7 @@ describe("7. las 4 marcas se comportan igual (Joybees es espejo EXACTO de Reebok
     for (const marca of MARCAS_UI) {
       const { container, unmount } = pintar([EN_SWITCH, SIN_ENVIAR, COTIZADO, DEL_LINK], marca);
       expect(fila(container, "Sporting Shoes").textContent).toContain("16-000000503");
-      expect(fila(container, "Zapatería Nueva").textContent).toMatch(/sin mandar a switch/i);
+      expect(fila(container, "Zapatería Nueva").textContent).toMatch(/no enviado a switch/i);
       expect(fila(container, "A-Amani").textContent).toMatch(/cotizaci/i);
       expect(fila(container, "Nathalie").textContent).toMatch(/se numera al abrirlo/i);
       unmount();

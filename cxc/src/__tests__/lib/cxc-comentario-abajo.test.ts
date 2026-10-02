@@ -177,8 +177,10 @@ describe("🔴 3 · el comentario baja al pie de la hoja, en blanco", () => {
   it("🔑 sigue la forma que ya tenía la guía de despacho", () => {
     // No se inventó un bloque nuevo: rótulo en negrita + recuadro vacío, igual
     // que «OBSERVACIONES GENERALES DEL ENVÍO».
+    // 🔄 1-oct-2026: nombres de ERP (Daniel) — el rótulo de la guía pasó a
+    // «OBSERVACIONES»; la FORMA (rótulo + recuadro vacío) es la misma.
     const guia = plano("src/lib/guias/pdf-guia.ts");
-    expect(guia).toContain("OBSERVACIONES GENERALES DEL ENVÍO");
+    expect(guia).toContain('doc.text("OBSERVACIONES", MARGIN, y)');
     expect(guia).toContain("doc.rect(");
   });
 

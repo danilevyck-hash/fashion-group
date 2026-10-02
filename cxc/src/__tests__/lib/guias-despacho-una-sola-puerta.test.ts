@@ -240,6 +240,9 @@ describe("🔴 el botón se apaga y DICE qué falta", () => {
     tipoDespacho: "externo" as const,
     placa: "AB-1234", receptor: "Juan", cedula: "8-8-8", chofer: "",
     tieneFirma1: true, tieneFirma2: true,
+    // 1-oct-2026: «Despachado por» se eligió mover de la guía al DESPACHO, donde es
+    // obligatorio (Daniel aprobó el mockup). «Lleno» ahora lo incluye.
+    despachadoPor: "Jorman",
   };
 
   it("todo lleno → no falta nada", () => {
@@ -278,7 +281,7 @@ describe("🔴 el botón se apaga y DICE qué falta", () => {
   it("el texto de lo que falta va en español simple, sin jerga ni nombres de columna", () => {
     const todo = faltaParaDespachar({
       tipoDespacho: "externo", placa: "", receptor: "", cedula: "", chofer: "",
-      tieneFirma1: false, tieneFirma2: false,
+      tieneFirma1: false, tieneFirma2: false, despachadoPor: "",
     });
     for (const t of todo) {
       expect(t, t).not.toMatch(/_/); // nada de `receptor_nombre` ni `firma_base64`

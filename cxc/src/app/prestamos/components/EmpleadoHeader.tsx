@@ -33,12 +33,12 @@ export default function EmpleadoHeader({ empleado, onEdit, onBack, volverA = "â†
           {empleado.empresa && <span className="text-sm text-gray-500">{empleado.empresa}</span>}
           {!empleado.trabaja && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-              Ya no trabaja Â· no se descuenta
+              Inactivo
             </span>
           )}
           {!empleado.empleado_codigo && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
-              Sin persona atada
+              Sin colaborador vinculado
             </span>
           )}
         </div>

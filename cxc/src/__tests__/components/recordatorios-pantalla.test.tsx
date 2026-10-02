@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «＋ Recordar» → «＋ Nuevo», «¿Qué te recuerdo?» → «Nuevo recordatorio», «rebotó» → «devuelto».
 // ─────────────────────────────────────────────────────────────────────────────
 // RECORDATORIOS EN PANTALLA — candado de CONDUCTA.
 //
@@ -169,7 +170,7 @@ function pintar(over: {
  * reposo es una sola fila: las opciones se despliegan al enfocar el campo.
  */
 function abrirLinea() {
-  fireEvent.focus(screen.getByLabelText("¿Qué te recuerdo?"));
+  fireEvent.focus(screen.getByLabelText("Nuevo recordatorio"));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -182,7 +183,7 @@ describe("🔴 LOS CHEQUES NO SE PERDIERON — el rediseño no se llevó nada", 
 
   it("los botones que quedan siguen ahí: Recordar, Lista y Calendario", () => {
     pintar();
-    expect(screen.getByRole("button", { name: /Recordar/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /＋ Nuevo/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Lista$/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Calendario$/ })).toBeTruthy();
   });
@@ -215,7 +216,7 @@ describe("🔴 UNA SOLA LISTA — ninguna pestaña, agrupada por CUÁNDO", () =>
       n.getAttribute("data-agenda-grupo"),
     );
     expect(grupos[0]).toBe("vencido");
-    expect(screen.getByText("Vencido")).toBeTruthy();
+    expect(screen.getAllByText("Vencido").length).toBeGreaterThan(0); // el grupo y el chip (StatusBadge ya dice «Vencido»)
   });
 
   it("cheques y recordatorios conviven en la MISMA lista", () => {
@@ -253,7 +254,7 @@ describe("🔴 UNA SOLA LISTA — ninguna pestaña, agrupada por CUÁNDO", () =>
     });
     const fila = container.querySelector('[data-cheque-fila="c1"]') as HTMLElement;
     expect(fila, "el rebotado desapareció de la lista").toBeTruthy();
-    expect(fila.textContent).toContain("Este cheque rebotó");
+    expect(fila.textContent).toContain("Cheque devuelto");
     expect(fila.textContent).toContain("Fondos insuficientes");
   });
 });
@@ -313,7 +314,7 @@ describe("🔴 EL RENGLÓN DE ESCRIBIR — una línea, siempre visible", () => {
   it("está a la vista sin abrir nada", () => {
     const { container } = pintar();
     expect(container.querySelector("[data-linea-nueva]")).toBeTruthy();
-    expect(screen.getByLabelText("¿Qué te recuerdo?")).toBeTruthy();
+    expect(screen.getByLabelText("Nuevo recordatorio")).toBeTruthy();
   });
 
   it("🔴 «Hoy» NO es una opción — el aviso sale a las 9:00 y ya pasó", () => {
@@ -322,7 +323,7 @@ describe("🔴 EL RENGLÓN DE ESCRIBIR — una línea, siempre visible", () => {
     const grupo = screen.getByRole("group", { name: "Cuándo" });
     const opciones = within(grupo).getAllByRole("button").map((b) => b.textContent);
     expect(opciones).toEqual([
-      "Mañana", "Lunes", "Elegir fecha", "Cada día", "Cada semana", "Cada mes",
+      "Mañana", "Lunes", "Seleccionar fecha", "Cada día", "Cada semana", "Cada mes",
     ]);
     expect(opciones).not.toContain("Hoy");
   });
@@ -334,7 +335,7 @@ describe("🔴 EL RENGLÓN DE ESCRIBIR — una línea, siempre visible", () => {
 
   it("escribir y guardar manda MAÑANA por defecto, y nada más", async () => {
     pintar();
-    fireEvent.change(screen.getByLabelText("¿Qué te recuerdo?"), {
+    fireEvent.change(screen.getByLabelText("Nuevo recordatorio"), {
       target: { value: "Llamar al banco" },
     });
     salidas.length = 0;
@@ -356,7 +357,7 @@ describe("🔴 EL RENGLÓN DE ESCRIBIR — una línea, siempre visible", () => {
 
   it("«Lunes» es el PRÓXIMO lunes, nunca hoy (hoy ES lunes en el fixture)", async () => {
     pintar();
-    fireEvent.change(screen.getByLabelText("¿Qué te recuerdo?"), { target: { value: "x" } });
+    fireEvent.change(screen.getByLabelText("Nuevo recordatorio"), { target: { value: "x" } });
     fireEvent.click(screen.getByRole("button", { name: "Lunes" }));
     salidas.length = 0;
     await act(async () => {
@@ -370,7 +371,7 @@ describe("🔴 EL RENGLÓN DE ESCRIBIR — una línea, siempre visible", () => {
 
   it("«Cada semana» abre el «Hasta…», y viaja cuando se llena", async () => {
     pintar();
-    fireEvent.change(screen.getByLabelText("¿Qué te recuerdo?"), { target: { value: "x" } });
+    fireEvent.change(screen.getByLabelText("Nuevo recordatorio"), { target: { value: "x" } });
     expect(screen.queryByLabelText("Hasta")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Cada semana" }));
     fireEvent.change(screen.getByLabelText("Hasta"), { target: { value: "2026-12-31" } });
@@ -387,8 +388,8 @@ describe("🔴 EL RENGLÓN DE ESCRIBIR — una línea, siempre visible", () => {
 
   it("🔴 elegir un día que ya pasó APAGA el botón y dice POR QUÉ", () => {
     pintar();
-    fireEvent.change(screen.getByLabelText("¿Qué te recuerdo?"), { target: { value: "x" } });
-    fireEvent.click(screen.getByRole("button", { name: "Elegir fecha" }));
+    fireEvent.change(screen.getByLabelText("Nuevo recordatorio"), { target: { value: "x" } });
+    fireEvent.click(screen.getByRole("button", { name: "Seleccionar fecha" }));
     fireEvent.change(screen.getByLabelText("Fecha"), { target: { value: "2026-08-20" } });
 
     const guardar = screen.getByRole("button", { name: /^Guardar$/ }) as HTMLButtonElement;
@@ -407,7 +408,7 @@ describe("🔴 EL RENGLÓN DE ESCRIBIR — una línea, siempre visible", () => {
   it("escribir NO guarda solo: hasta tocar Guardar no sale ninguna escritura", async () => {
     pintar();
     salidas.length = 0;
-    fireEvent.change(screen.getByLabelText("¿Qué te recuerdo?"), { target: { value: "algo" } });
+    fireEvent.change(screen.getByLabelText("Nuevo recordatorio"), { target: { value: "algo" } });
     fireEvent.click(screen.getByRole("button", { name: "Cada mes" }));
     await act(async () => { await Promise.resolve(); });
     expect(salidas.filter((s) => s.metodo !== "GET")).toEqual([]);
@@ -437,7 +438,7 @@ describe("🔴 «A QUIÉN» — solo lo ven los admin", () => {
   it("marcar «Solo a mí» viaja en el POST", async () => {
     pintar({ puedeElegirDestino: true });
     abrirLinea();
-    fireEvent.change(screen.getByLabelText("¿Qué te recuerdo?"), { target: { value: "x" } });
+    fireEvent.change(screen.getByLabelText("Nuevo recordatorio"), { target: { value: "x" } });
     fireEvent.click(screen.getByRole("button", { name: "Solo a mí" }));
     salidas.length = 0;
     await act(async () => {
@@ -460,7 +461,7 @@ describe("🔴 EL CLIENTE es opcional y NO se muestra por defecto", () => {
 
   it("sin abrirlo, el POST manda cliente vacío (no null a medias, no basura)", async () => {
     pintar();
-    fireEvent.change(screen.getByLabelText("¿Qué te recuerdo?"), { target: { value: "x" } });
+    fireEvent.change(screen.getByLabelText("Nuevo recordatorio"), { target: { value: "x" } });
     salidas.length = 0;
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /^Guardar$/ }));
@@ -485,7 +486,7 @@ describe("editar y borrar un recordatorio siguen existiendo", () => {
 
     const dialogo = screen.getByRole("dialog", { name: /Editar recordatorio/ });
     expect(
-      (within(dialogo).getByLabelText("Qué hay que recordar") as HTMLTextAreaElement).value,
+      (within(dialogo).getByLabelText("Descripción") as HTMLTextAreaElement).value,
     ).toBe("Pagar el alquiler");
     expect(
       within(dialogo).getByRole("button", { name: /Cada mes/ }).getAttribute("aria-pressed"),
@@ -546,15 +547,15 @@ describe("🔴 UNA SOLA PUERTA — «＋ Recordar» (22-sep-2026)", () => {
     expect(container.querySelectorAll("[data-puerta-boton]")).toHaveLength(1);
     expect(
       (container.querySelector("[data-puerta-boton]") as HTMLElement).textContent,
-    ).toContain("Recordar");
+    ).toContain("＋ Nuevo");
   });
 
   it("🔴 tocarlo pregunta el MOTIVO, y ofrece los DOS que existen hoy", () => {
     const { container } = pintar();
     // Antes de tocar, no hay ninguna ventana.
     expect(container.querySelector("[data-puerta-recordar]")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /Recordar/ }));
-    const puerta = screen.getByRole("dialog", { name: "Recordar" });
+    fireEvent.click(screen.getByRole("button", { name: /＋ Nuevo/ }));
+    const puerta = screen.getByRole("dialog", { name: "Nuevo recordatorio" });
     expect([...puerta.querySelectorAll("[data-motivo]")].map((n) => n.getAttribute("data-motivo")))
       .toEqual(["cheque", "nota"]);
     // Y cada uno dice qué va a pasar ANTES de elegirlo.
@@ -564,25 +565,25 @@ describe("🔴 UNA SOLA PUERTA — «＋ Recordar» (22-sep-2026)", () => {
   it("🔴 abrir la puerta NO guarda nada", async () => {
     pintar();
     salidas.length = 0;
-    fireEvent.click(screen.getByRole("button", { name: /Recordar/ }));
+    fireEvent.click(screen.getByRole("button", { name: /＋ Nuevo/ }));
     await act(async () => { await Promise.resolve(); });
     expect(salidas.filter((s) => s.metodo !== "GET")).toEqual([]);
   });
 
   it("🔴 el motivo «Cheque» abre el formulario de CHEQUE", async () => {
     const { container } = pintar();
-    fireEvent.click(screen.getByRole("button", { name: /Recordar/ }));
+    fireEvent.click(screen.getByRole("button", { name: /＋ Nuevo/ }));
     fireEvent.click(container.querySelector('[data-motivo="cheque"]') as HTMLElement);
     await act(async () => { await Promise.resolve(); });
     expect(screen.getByRole("dialog", { name: /Nuevo cheque/i })).toBeTruthy();
     // Y pide lo del cheque, no lo de una nota.
-    expect(screen.getByLabelText("N° Cheque")).toBeTruthy();
+    expect(screen.getByLabelText("N° de cheque")).toBeTruthy();
     expect(screen.getByLabelText("Monto")).toBeTruthy();
   });
 
   it("🔴 el motivo «Nota» abre el formulario de NOTA, y guarda en su tabla", async () => {
     const { container } = pintar();
-    fireEvent.click(screen.getByRole("button", { name: /Recordar/ }));
+    fireEvent.click(screen.getByRole("button", { name: /＋ Nuevo/ }));
     fireEvent.click(container.querySelector('[data-motivo="nota"]') as HTMLElement);
     await act(async () => { await Promise.resolve(); });
 
@@ -591,7 +592,7 @@ describe("🔴 UNA SOLA PUERTA — «＋ Recordar» (22-sep-2026)", () => {
     // sería abrirlo frenado.
     expect((within(dialogo).getByLabelText("Fecha") as HTMLInputElement).value).toBe("2026-08-25");
 
-    fireEvent.change(within(dialogo).getByLabelText("Qué hay que recordar"), {
+    fireEvent.change(within(dialogo).getByLabelText("Descripción"), {
       target: { value: "Llamar al banco" },
     });
     salidas.length = 0;

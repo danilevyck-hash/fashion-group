@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «N° de cheque», «Guardar cheque».
 // El bug que reportó Daniel, congelado como test.
 //
 //   > "al poner clic en n chequees, me deja poner un digito cada clic"
@@ -89,7 +90,7 @@ function DrawerConOnCloseInline() {
       title="Nuevo Cheque"
       footer={<button>Guardar</button>}
     >
-      <input aria-label="N° Cheque" value={texto} onChange={(e) => setTexto(e.target.value)} />
+      <input aria-label="N° de cheque" value={texto} onChange={(e) => setTexto(e.target.value)} />
     </Drawer>
   );
 }
@@ -98,14 +99,14 @@ describe("Drawer — el foco no se roba (causa raíz del dígito por clic)", () 
   it("el autofocus cae en el primer CAMPO, nunca en el botón Cerrar", () => {
     render(<DrawerConOnCloseInline />);
     pasarElTiempo();
-    expect(document.activeElement).toBe(screen.getByLabelText("N° Cheque"));
+    expect(document.activeElement).toBe(screen.getByLabelText("N° de cheque"));
     expect(document.activeElement).not.toBe(screen.getByLabelText("Cerrar"));
   });
 
   it("escribir seis dígitos seguidos deja los seis, con re-render de por medio", () => {
     render(<DrawerConOnCloseInline />);
     pasarElTiempo();
-    const input = screen.getByLabelText("N° Cheque") as HTMLInputElement;
+    const input = screen.getByLabelText("N° de cheque") as HTMLInputElement;
     input.focus();
 
     // Tecla por tecla, dejando correr el reloj entre una y otra: es justo la
@@ -122,7 +123,7 @@ describe("Drawer — el foco no se roba (causa raíz del dígito por clic)", () 
   it("cerrado, sus campos salen del recorrido del Tab", () => {
     const { container } = render(
       <Drawer open={false} onClose={() => {}} title="Nuevo Cheque">
-        <input aria-label="N° Cheque" />
+        <input aria-label="N° de cheque" />
       </Drawer>,
     );
     const panel = container.querySelector('[role="dialog"]') as HTMLElement;
@@ -220,7 +221,7 @@ describe("Formulario de cheques — ventana centrada", () => {
 
   it("seis dígitos de N° de cheque quedan los seis (el reporte de Daniel)", async () => {
     await montarFormulario();
-    const numero = screen.getByLabelText("N° Cheque") as HTMLInputElement;
+    const numero = screen.getByLabelText("N° de cheque") as HTMLInputElement;
     numero.focus();
     for (const d of "246001") {
       fireEvent.change(numero, { target: { value: numero.value + d } });
@@ -232,24 +233,24 @@ describe("Formulario de cheques — ventana centrada", () => {
 
   it("Enter en un campo no cierra la ventana ni borra lo escrito", async () => {
     const { onClose, onSave } = await montarFormulario();
-    const numero = screen.getByLabelText("N° Cheque") as HTMLInputElement;
+    const numero = screen.getByLabelText("N° de cheque") as HTMLInputElement;
     fireEvent.change(numero, { target: { value: "246001" } });
     fireEvent.keyDown(numero, { key: "Enter", code: "Enter" });
     pasarElTiempo();
     expect(onClose).not.toHaveBeenCalled();
     expect(onSave).not.toHaveBeenCalled();
-    expect((screen.getByLabelText("N° Cheque") as HTMLInputElement).value).toBe("246001");
+    expect((screen.getByLabelText("N° de cheque") as HTMLInputElement).value).toBe("246001");
   });
 
   it("Escape con el formulario ya escrito tampoco lo borra", async () => {
     const { onClose } = await montarFormulario();
-    const numero = screen.getByLabelText("N° Cheque") as HTMLInputElement;
+    const numero = screen.getByLabelText("N° de cheque") as HTMLInputElement;
     fireEvent.change(numero, { target: { value: "246001" } });
     pasarElTiempo();
     fireEvent.keyDown(document, { key: "Escape" });
     pasarElTiempo();
     expect(onClose).not.toHaveBeenCalled();
-    expect((screen.getByLabelText("N° Cheque") as HTMLInputElement).value).toBe("246001");
+    expect((screen.getByLabelText("N° de cheque") as HTMLInputElement).value).toBe("246001");
   });
 
   it("el formulario NO es un <form>: no hay submit implícito que guarde solo", async () => {
@@ -267,10 +268,10 @@ describe("Formulario de cheques — editar uno viejo", () => {
     const cliente = document.querySelector("#cheque-cliente") as HTMLInputElement;
     expect(document.activeElement).not.toBe(cliente);
     expect(cliente.value).toBe("PLAZA LOS ANGELES");
-    expect((screen.getByLabelText("N° Cheque") as HTMLInputElement).value).toBe("18835");
+    expect((screen.getByLabelText("N° de cheque") as HTMLInputElement).value).toBe("18835");
     expect((screen.getByLabelText("Vendedor") as HTMLInputElement).value).toBe("Rey");
 
-    fireEvent.click(screen.getByText("Guardar Cheque"));
+    fireEvent.click(screen.getByText("Guardar cheque"));
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(onSave.mock.calls[0][0]).toMatchObject({
       cliente: "PLAZA LOS ANGELES",

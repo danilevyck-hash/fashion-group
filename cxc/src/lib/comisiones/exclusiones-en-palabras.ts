@@ -51,16 +51,14 @@ export function queNoComisiona(fila: {
   return "solo-el-cobro";
 }
 
-/** «No comisiona venta ni cobro» · «No comisiona solo el cobro». */
+/** «Excluido: venta y cobro» · «Excluido: solo el cobro». 1-oct-2026, Daniel: nombres normales de ERP. */
 export function fraseDeLaRegla(que: QueNoComisiona): string {
-  if (que === "venta-ni-cobro") return "No comisiona venta ni cobro";
-  if (que === "solo-la-venta") return "No comisiona solo la venta";
-  return "No comisiona solo el cobro";
+  return `Excluido: ${loQueNoComisiona(que)}`;
 }
 
 /** Solo la parte que cambia, para dibujarla en negrita. */
 export function loQueNoComisiona(que: QueNoComisiona): string {
-  if (que === "venta-ni-cobro") return "venta ni cobro";
+  if (que === "venta-ni-cobro") return "venta y cobro";
   if (que === "solo-la-venta") return "solo la venta";
   return "solo el cobro";
 }
@@ -185,7 +183,8 @@ export const ROTULO_FILTRO_EMPRESA = "Empresa: todas";
 export const ROTULO_FILTRO_VENDEDOR = "Vendedor: todos";
 
 /** El título de la hoja de alta. Va al derecho: lo que se prende es lo que NO comisiona. */
-export const PREGUNTA_DEL_ALTA = "¿Qué no comisiona?";
+// 1-oct-2026, Daniel: nombres normales de ERP («¿Qué no comisiona?» → «Excluir de»).
+export const PREGUNTA_DEL_ALTA = "Excluir de";
 export const ROTULO_LA_VENTA = "La venta";
 export const ROTULO_EL_COBRO = "El cobro";
 export const AVISO_AL_MENOS_UNO = "Tiene que quedar prendido al menos uno.";

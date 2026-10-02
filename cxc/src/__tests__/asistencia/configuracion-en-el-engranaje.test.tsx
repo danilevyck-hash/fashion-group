@@ -162,7 +162,8 @@ describe("20a · Feriados", () => {
     render(<ToastProvider><FeriadosTab /></ToastProvider>);
     const viejo = (await screen.findByText("Año Nuevo")).parentElement!.parentElement!;
     expect(within(viejo).getByText("jue 1 ene")).toBeTruthy();
-    expect(within(viejo).getByText("pasó")).toBeTruthy();
+    // 1-oct-2026, Daniel: nombres normales de ERP («getByText("pasó")» → «getByText("Pasado")»).
+    expect(within(viejo).getByText("Pasado")).toBeTruthy();
     expect(within(viejo).queryByRole("button", { name: "Quitar" })).toBeNull();
     const nuevo = screen.getByText("Separación de Colombia").parentElement!.parentElement!;
     expect(within(nuevo).getByText("mar 3 nov")).toBeTruthy();

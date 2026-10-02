@@ -244,7 +244,7 @@ export default function ComprobantesPanel({
       showToast("Pedido duplicado");
       router.push(`/catalogo/${marca}/pedido/${nuevo.id}`);
     } catch {
-      setDupError("Error de conexion. Intenta de nuevo.");
+      setDupError("Error de conexión. Intenta de nuevo.");
     }
     setDuplicating(false);
   }

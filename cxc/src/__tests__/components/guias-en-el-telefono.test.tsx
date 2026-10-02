@@ -21,6 +21,9 @@
  * explica el cambio contiene lo que el barrido busca.
  * ─────────────────────────────────────────────────────────────────────────────
  */
+// 🔄 1-oct-2026: nombres de ERP en Guías (Daniel aprobó el audit): rótulos en tipo oración
+// («Guardar guía», «Nueva guía de despacho», «Tipo de despacho», «Vincular cliente»…).
+// Este candado leía los textos viejos y se actualiza a propósito.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import GuiasList from "@/app/guias/components/GuiasList";
@@ -150,7 +153,7 @@ describe("1 · en el teléfono los renglones son fichas, no una tabla que se arr
     const { container } = pintar();
     const ficha = container.querySelectorAll("ul.lg\\:hidden > li")[1];
     expect(ficha.querySelector("button")).not.toBeNull();
-    expect(ficha.textContent).toContain("Atar cliente");
+    expect(ficha.textContent).toContain("Vincular cliente");
   });
 
   it("🔴 el nombre de la ficha NO baja de 14 px — un destino es un dato", () => {

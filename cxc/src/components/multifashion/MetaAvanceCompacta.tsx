@@ -67,7 +67,7 @@ export function MetaAvanceCompacta({ meta, puedeEditar, onEditar }: Props) {
             onClick={() => onEditar(meta)}
             className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition active:scale-[0.97] hover:border-gray-300 hover:text-gray-900"
           >
-            <Pencil className="h-3.5 w-3.5" /> Cambiar
+            <Pencil className="h-3.5 w-3.5" /> Editar
           </button>
         )}
       </div>

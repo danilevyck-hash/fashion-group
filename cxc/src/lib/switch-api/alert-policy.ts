@@ -210,7 +210,7 @@ export function consecuenciaDeSyncType(syncType: string): string {
     case "facturas":
       return "las ventas que ves en la app pueden estar viejas.";
     case "estadocuenta":
-      return "los saldos de Cuentas por Cobrar pueden estar viejos.";
+      return "los saldos de Cuentas por cobrar pueden estar viejos.";
     case "recibos":
       return "los pagos de clientes pueden no estar reflejados todavía.";
     case "costo":

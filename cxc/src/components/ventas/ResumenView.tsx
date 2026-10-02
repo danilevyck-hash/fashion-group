@@ -438,7 +438,7 @@ export function ResumenView({
             Daniel: *«quita meta, no lo uso, prefiero proyeccion»*. */}
         {showProyeccionCol && (
           <KpiCard
-            label="CIERRE DEL AÑO"
+            label="PROYECCIÓN DE CIERRE"
             value={fmtMoneyCompact(data.proyeccion!.totales_grupo.proyeccion_cierre)}
             sub={deltaProyeccionTexto(data.proyeccion!.totales_grupo.delta_vs_anio_anterior_total)}
             subTone={data.proyeccion!.totales_grupo.delta_vs_anio_anterior_total}
@@ -638,7 +638,7 @@ export function ResumenView({
                 />
               ) : (
               <tr className="bg-gray-950 text-white">
-                <td className="sticky left-0 z-10 bg-gray-950 px-2.5 py-3.5 text-xs font-medium uppercase tracking-wide">Total Grupo</td>
+                <td className="sticky left-0 z-10 bg-gray-950 px-2.5 py-3.5 text-xs font-medium uppercase tracking-wide">Total grupo</td>
                 {totalColAggs.map((agg, ci) => (
                   <TotalGroupCell
                     key={ci}
@@ -1118,7 +1118,7 @@ function TotalGroupCell({
         onClick={(e) => onAbrir({
           filaId: TOTAL_GRUPO_ID,
           focoCelda: foco,
-          titulo: "Total Grupo",
+          titulo: "Total grupo",
           subtitulo: cortoLabel,
           slots: buildSlotsMetrica(agg, mode),
           ...medirFila(e),
@@ -1173,7 +1173,7 @@ function TotalGroupAnnualCell({
         onClick={(e) => onAbrir({
           filaId: TOTAL_GRUPO_ID,
           focoCelda: foco,
-          titulo: "Total Grupo",
+          titulo: "Total grupo",
           subtitulo: `TOTAL ${String(selectedYear).slice(-2)} vs ${String(prevYear).slice(-2)}`,
           slots: buildSlotsMetrica(agg, mode),
           ...medirFila(e),

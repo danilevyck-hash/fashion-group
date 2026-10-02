@@ -45,7 +45,7 @@ export type OpcionCuando = (typeof OPCIONES_CUANDO)[number];
 export const ETIQUETA_CUANDO: Record<OpcionCuando, string> = {
   manana: "Mañana",
   lunes: "Lunes",
-  elegir: "Elegir fecha",
+  elegir: "Seleccionar fecha",
   cada_dia: "Cada día",
   cada_semana: "Cada semana",
   cada_mes: "Cada mes",

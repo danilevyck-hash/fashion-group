@@ -54,7 +54,7 @@ export function validarArchivoFoto(archivo: ArchivoDeRecibo): string | null {
     return `«${archivo.nombre}» no es una foto ni un PDF. Adjunta la foto del recibo o el PDF escaneado.`;
   }
   if (archivo.bytes > MAX_BYTES_FOTO) {
-    return `«${archivo.nombre}» pesa más de ${Math.round(MAX_BYTES_FOTO / (1024 * 1024))} MB. Sácale la foto de nuevo con menos calidad o mándala como PDF.`;
+    return `«${archivo.nombre}» pesa más de ${Math.round(MAX_BYTES_FOTO / (1024 * 1024))} MB. Sácale la foto de nuevo con menos calidad o envíala como PDF.`;
   }
   if (archivo.bytes <= 0) {
     return `«${archivo.nombre}» llegó vacío. Vuelve a elegirlo.`;

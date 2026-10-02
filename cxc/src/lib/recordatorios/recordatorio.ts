@@ -224,7 +224,7 @@ export function faltaParaGuardar(
   const falta: string[] = [];
   if (!fechaValida(v.fecha)) falta.push("la fecha");
   else if (fechaYaPaso(v.fecha, hoy)) falta.push(FALTA_FECHA_PASADA);
-  if (!v.texto.trim()) falta.push("qué hay que recordar");
+  if (!v.texto.trim()) falta.push("la descripción");
   if (v.hasta && (!fechaValida(v.hasta) || v.hasta < v.fecha)) falta.push(FALTA_HASTA);
   return falta;
 }

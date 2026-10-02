@@ -250,7 +250,7 @@ export default function PlanillaBoston() {
             <table className={`text-sm ${hayDinero ? "w-max min-w-full" : "w-full"}`}>
               <thead>
                 <tr className="text-xs uppercase tracking-wide text-gray-500 border-b border-gray-100">
-                  <th className="sticky left-0 z-10 bg-white text-left font-normal px-4 py-3">Persona</th>
+                  <th className="sticky left-0 z-10 bg-white text-left font-normal px-4 py-3">Colaborador</th>
                   {hayDinero ? (
                     COLUMNAS_DINERO.map((c) => (
                       <th key={c.campo} className="whitespace-pre px-2 py-3 text-right font-normal">{c.rotulo}</th>

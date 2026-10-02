@@ -170,7 +170,8 @@ describe("24 · «Descargar» en Asistencia › Préstamos baja el historial de 
     const llamadas = servir();
     await montar("todas");
     fireEvent.click(await screen.findByRole("button", { name: /Descargar/ }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Solo los que deben" }));
+    // 1-oct-2026, Daniel: nombres normales de ERP («{ name: "Solo los que deben" }» → «{ name: "Solo con saldo" }»).
+    fireEvent.click(screen.getByRole("menuitem", { name: "Solo con saldo" }));
     await waitFor(() => expect(llamadas.some((l) => l.url.startsWith("/api/prestamos/export-excel"))).toBe(true));
     expect(llamadas.find((l) => l.url.startsWith("/api/prestamos/export-excel"))!.url)
       .toBe("/api/prestamos/export-excel?ambito=deben");

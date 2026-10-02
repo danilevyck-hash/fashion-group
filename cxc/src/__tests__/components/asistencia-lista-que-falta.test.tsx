@@ -90,7 +90,8 @@ const filaDe = (nombre: RegExp) =>
 describe("9. 🔴 «Qué falta» reemplaza a «Estado»", () => {
   it("el encabezado dice «Qué falta» y ya no dice «Estado» ni «Rata / hora»", async () => {
     await abrir();
-    expect(screen.getByText("Qué falta")).toBeTruthy();
+    // 1-oct-2026, Daniel: nombres normales de ERP («getByText("Qué falta")» → «getByText("Datos pendientes")»).
+    expect(screen.getByText("Datos pendientes")).toBeTruthy();
     expect(screen.queryByText("Estado")).toBeNull();
     expect(screen.queryByText("Rata / hora")).toBeNull();
   });
@@ -150,7 +151,7 @@ describe("7. los días de vacaciones se fueron de la lista", () => {
     expect(screen.queryByText("Vacaciones")).toBeNull();
     expect(llamadas.some((u) => u.includes("/api/asistencia/vacaciones"))).toBe(false);
     // 🔑 CONTROL: la lista sigue mostrando lo suyo.
-    expect(screen.getByText("Qué falta")).toBeTruthy();
+    expect(screen.getByText("Datos pendientes")).toBeTruthy();
     expect(screen.getAllByText(/\$700[.,]00/).length).toBeGreaterThan(0);
   });
 });

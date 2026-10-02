@@ -363,7 +363,7 @@ export type VistaPrestamos = typeof VISTA_DEUDA | typeof VISTA_MOVIMIENTOS;
 
 /** Las dos, en el orden en que se dibujan. */
 export const VISTAS_PRESTAMOS: readonly (readonly [VistaPrestamos, string])[] = [
-  [VISTA_DEUDA, "Quiénes deben"],
+  [VISTA_DEUDA, "Saldos"],
   [VISTA_MOVIMIENTOS, "Movimientos"],
 ] as const;
 

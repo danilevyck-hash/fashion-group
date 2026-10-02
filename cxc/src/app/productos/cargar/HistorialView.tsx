@@ -143,7 +143,7 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <select
           value={empresaFiltro}
-          aria-label="Compañía"
+          aria-label="Empresa"
           onChange={(e) => setEmpresaFiltro(e.target.value)}
           className="min-h-[44px] rounded-md border border-stone-300 bg-white px-2.5 text-sm text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
         >
@@ -156,11 +156,11 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
           valor={busqueda}
           onCambiar={setBusqueda}
           placeholder={PLACEHOLDER_DESCARGA}
-          etiqueta="Buscar descarga por marca, compañía, quién la hizo o fecha"
+          etiqueta="Buscar descarga por marca, empresa, usuario o fecha"
           conteo={conteo}
         />
         {/* El plazo se DERIVA de la constante, nunca se escribe a mano: la fila con los totales queda igual. */}
-        <span className="text-[12px] text-stone-500">El Excel se puede volver a bajar por {textoRetencion()}.</span>
+        <span className="text-[12px] text-stone-500">El Excel se puede volver a descargar por {textoRetencion()}.</span>
       </div>
 
       {rows === null ? (
@@ -195,7 +195,7 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
                 </div>
                 <div className="mt-1.5 flex items-center gap-4 text-[12px] text-stone-500">
                   <span>Estilos <span className="tabular-nums text-stone-700">{r.cantidad_estilos.toLocaleString()}</span></span>
-                  <span>Unidades <span className="tabular-nums text-stone-700">{r.total_unidades.toLocaleString()}</span></span>
+                  <span>Cantidad <span className="tabular-nums text-stone-700">{r.total_unidades.toLocaleString()}</span></span>
                   <span className="ml-auto">{botonDescargar(r)}</span>
                 </div>
               </li>
@@ -206,7 +206,7 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
             <table className="w-full border-collapse whitespace-nowrap text-[13px] tabular-nums">
               <thead>
                 <tr>
-                  {["Fecha", "Quién", "Compañía", "Marca", "Estilos", "Unidades", ""].map((h, i) => (
+                  {["Fecha", "Usuario", "Empresa", "Marca", "Estilos", "Cantidad", ""].map((h, i) => (
                     <th
                       key={i}
                       className={`sticky top-0 border-b-[1.5px] border-stone-300 bg-stone-100 px-1.5 xl:px-3 py-2.5 text-[12px] font-semibold uppercase tracking-wide text-stone-600 ${

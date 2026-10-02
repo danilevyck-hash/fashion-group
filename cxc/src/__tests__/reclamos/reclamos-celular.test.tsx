@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — Mandar → Enviar, Elegir → Seleccionar, «Seguimiento», «Monto recuperado», «Vista previa».
 // ─────────────────────────────────────────────────────────────────────────────
 // RECLAMOS EN EL CELULAR (24-sep-2026) — el mockup que Daniel aprobó letra por
 // letra: 1b · 2c · 2e · 3b · 3e · 5b · 6b · 7b · 8b · 9 · 10c · 11c.
@@ -185,7 +186,7 @@ describe("Las palabras del celular", () => {
 
   it("🔴 10c · el título de la selección dice cuántos van Y cuánto suman", () => {
     expect(tituloSeleccion(2, 11, 2872.35, false)).toEqual({
-      titulo: "2 elegidos",
+      titulo: "2 seleccionados",
       sub: "de 11 por cobrar · $2,872.35",
     });
   });
@@ -312,7 +313,7 @@ describe("🔴 2c · La lista de una empresa no tiene botones en la fila", () =>
     expect(texto).toContain("al proveedor");
     expect(texto).toContain("Descargar en Excel");
     expect(texto).toContain("Descargar en PDF");
-    expect(texto).toContain("Elegir algunos");
+    expect(texto).toContain("Seleccionar");
   });
 
   it("🔴 5b · en «Cobrados» sale el visto verde y la fecha del cobro, sin días", () => {
@@ -327,9 +328,9 @@ describe("🔴 2c · La lista de una empresa no tiene botones en la fila", () =>
 
   it("🔴 10c · elegir se pide UNA vez desde arriba, y el título dice cuántos y cuánto", () => {
     pintar({ selectionMode: true, selectedIds: ["a"] });
-    expect(screen.getByText("1 elegido")).toBeTruthy();
+    expect(screen.getByText("1 seleccionado")).toBeTruthy();
     expect(document.body.textContent).toContain("de 2 por cobrar · $2,711.81");
-    expect(screen.getByRole("button", { name: /Mandar el reclamo al proveedor/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Enviar el reclamo al proveedor/ })).toBeTruthy();
   });
 
   it("⚠️ ni una tabla en toda la pantalla", () => {
@@ -378,7 +379,7 @@ describe("🔴 3b · 3e · El reclamo abierto en el celular", () => {
     fireEvent.click(screen.getByLabelText("Más opciones del reclamo"));
     const hoja = document.querySelector('[data-hoja="opciones"]')!;
     const texto = hoja.textContent || "";
-    expect(texto).toContain("Mandar al proveedor");
+    expect(texto).toContain("Enviar al proveedor");
     expect(texto).toContain("Descargar en PDF");
     expect(texto).toContain("Descargar en Excel");
     expect(texto).toContain("Editar");
@@ -388,7 +389,7 @@ describe("🔴 3b · 3e · El reclamo abierto en el celular", () => {
   it("🔴 3e · Fotos y «Lo que ha pasado» son DOS renglones que se abren", () => {
     pintar();
     expect(screen.getByText("Fotos")).toBeTruthy();
-    expect(screen.getByText("Lo que ha pasado")).toBeTruthy();
+    expect(screen.getByText("Seguimiento")).toBeTruthy();
     fireEvent.click(screen.getByText("Fotos"));
     expect(document.querySelector('[data-hoja="fotos"]')).toBeTruthy();
   });
@@ -439,7 +440,7 @@ describe("🔴 7b · Cobrar es una hoja que sube", () => {
 
   it("el monto viene PUESTO y es el número grande", () => {
     pintar();
-    const input = screen.getByLabelText("Cuánto entró") as HTMLInputElement;
+    const input = screen.getByLabelText("Monto recuperado") as HTMLInputElement;
     expect(input.value).toBe("153.01");
     expect(input.className).toContain("text-[40px]");
   });
@@ -471,7 +472,7 @@ describe("🔴 7b · Cobrar es una hoja que sube", () => {
   it("🔴 ES EDITABLE: un cobro parcial se escribe encima y es lo que viaja", () => {
     const onCobrar = vi.fn();
     pintar({ onCobrar });
-    fireEvent.change(screen.getByLabelText("Cuánto entró"), { target: { value: "100" } });
+    fireEvent.change(screen.getByLabelText("Monto recuperado"), { target: { value: "100" } });
     fireEvent.click(screen.getByRole("button", { name: "Cobrar $100.00" }));
     expect(onCobrar.mock.calls[0][0][0].monto).toBe(100);
   });
@@ -508,7 +509,7 @@ describe("🔴 8b · El correo desde el teléfono manda lo MISMO", () => {
     expect(screen.queryByLabelText("Asunto")).toBeNull();
     expect(document.body.textContent).toContain(loQueVaAdjunto({ facturas: 1, fotos: 3 }));
     expect(document.body.textContent).toContain("Se deshace por 5 segundos.");
-    fireEvent.click(screen.getByText("Ver el texto"));
+    fireEvent.click(screen.getByText("Vista previa"));
     expect((screen.getByLabelText("Asunto") as HTMLInputElement).value).toBe(
       asuntoPorDefecto(1, "Fashion Wear"),
     );
@@ -529,7 +530,7 @@ describe("🔴 8b · El correo desde el teléfono manda lo MISMO", () => {
         onMandar={onMandar}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Mandar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
     expect(onMandar).toHaveBeenCalledWith({
       to: "iamar@aswgr.com",
       cc: "",

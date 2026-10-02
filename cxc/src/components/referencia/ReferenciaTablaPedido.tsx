@@ -80,10 +80,10 @@ function colsPedido(
 ): { titulo: string; px: number; derecha?: boolean; col?: ColumnaPedido }[] {
   return [
     { titulo: "Código", px: 210, col: "codigo" },
-    { titulo: "Compré", px: 72, derecha: true, col: "compre" },
-    { titulo: "Vendí", px: 72, derecha: true, col: "vendi" },
+    { titulo: "Comprado", px: 80, derecha: true, col: "compre" },
+    { titulo: "Vendido", px: 72, derecha: true, col: "vendi" },
     { titulo: "Stock", px: 72, derecha: true, col: "stock" },
-    { titulo: "Vendido", px: 84, derecha: true, col: "vendido" },
+    { titulo: "% vendido", px: 84, derecha: true, col: "vendido" },
     { titulo: "Meses", px: 64, derecha: true, col: "meses" },
     ...(mostrarMargen ? [{ titulo: "Margen", px: 66, derecha: true, col: "margen" as ColumnaPedido }] : []),
     { titulo: "Últ. compra", px: 92, derecha: true, col: "ultima" },

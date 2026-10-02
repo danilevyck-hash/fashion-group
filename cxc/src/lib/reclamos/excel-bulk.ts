@@ -115,7 +115,7 @@ function buildResumenSheet(reclamos: ReclamoFull[]): XLSX.WorkSheet {
 
   const ws = buildReportSheet({
     columns: [
-      { header: "N° Reclamo", wch: 16 },
+      { header: "N° de reclamo", wch: 16 },
       { header: "Factura", wch: 18 },
       { header: "Fecha", wch: 14, align: "center" },
       { header: "Subtotal", wch: 14, align: "right", fmt: MONEY_FMT },

@@ -146,7 +146,7 @@ export function VentaHoyCard({ syncTick = 0, habilitado = true }: VentaHoyCardPr
             {fmtMoney(data.ventas)}
           </span>
           <span className="font-mono text-xs tabular-nums text-gray-600">
-            {data.documentos} {data.documentos === 1 ? "tiquete" : "tiquetes"}
+            {data.documentos} {data.documentos === 1 ? "ticket" : "tickets"}
           </span>
           {data.semanaPasada && (
             <span className={`text-xs font-medium ${colorPct(data.semanaPasada.pct)}`}>

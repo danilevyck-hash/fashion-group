@@ -45,9 +45,10 @@ export function montoExacto(n: number): string {
 
 /** El texto largo de los días sin pagar: en la fila hay sitio para la palabra. */
 export function textoSinPagarLargo(dias: number | null): string {
-  if (dias === null) return "nunca ha pagado";
-  if (dias === 0) return "pagó hoy";
-  return `no paga hace ${dias} ${dias === 1 ? "día" : "días"}`;
+  // 1-oct-2026, Daniel: nombres normales de ERP.
+  if (dias === null) return "Sin pagos";
+  if (dias === 0) return "Último pago: hoy";
+  return `Último pago: hace ${dias} ${dias === 1 ? "día" : "días"}`;
 }
 
 /**
@@ -152,8 +153,8 @@ export function subtituloDeLaPortada(opts: {
   const { cuantos, risk, empresas, unaEmpresa } = opts;
   const clientes = `${cuantos} ${cuantos === 1 ? "cliente" : "clientes"}`;
   if (risk !== "all") return `${clientes} con ${rangoEnPalabras(risk)}`;
-  if (unaEmpresa) return `${clientes} en ${unaEmpresa} · el que más debe, arriba`;
-  return `${clientes} en las ${empresas} empresas · el que más debe, arriba`;
+  if (unaEmpresa) return `${clientes} en ${unaEmpresa} · ordenado por saldo`;
+  return `${clientes} en las ${empresas} empresas · ordenado por saldo`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

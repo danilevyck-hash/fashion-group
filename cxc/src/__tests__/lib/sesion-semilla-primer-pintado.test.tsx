@@ -282,8 +282,9 @@ describe("D · el primer pintado trae contenido", () => {
 
   it("la página de grupo dibuja sus fichas en el servidor (real, con `modules.ts`)", () => {
     const html = htmlDelServidor(semilla({ role: "secretaria" }), <GroupPage group="operacion" />);
-    expect(html).toContain("Guías de Despacho");
-    expect(html).toContain("Caja Menuda");
+    // 1-oct-2026, Daniel: nombres normales de ERP — mayúscula solo en la primera palabra.
+    expect(html).toContain("Guías de despacho");
+    expect(html).toContain("Caja menuda");
     // Y solo las de ese rol: Gastos es de admin y contabilidad.
     expect(html).not.toContain("Gastos");
     expect(htmlDelServidor(null, <GroupPage group="operacion" />)).toBe("");
@@ -317,7 +318,8 @@ describe("D · el primer pintado trae contenido", () => {
 describe("E · 🔴 nadie ve lo que no le toca, ni un instante", () => {
   const PANTALLAS_DE_ADMIN: Array<[string, React.ReactNode, string]> = [
     ["Usuarios", <UsuariosPage key="u" />, "Usuarios"],
-    ["Vista General", <VistaGeneralPage key="v" />, "Vista General"],
+    // 1-oct-2026, Daniel: nombres normales de ERP («Vista General» → «Vista general»).
+    ["Vista general", <VistaGeneralPage key="v" />, "Vista general"],
   ];
 
   describe.each(PANTALLAS_DE_ADMIN)("%s", (_nombre, pantalla, texto) => {

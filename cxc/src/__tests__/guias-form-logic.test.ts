@@ -79,8 +79,13 @@ describe("validarGuia · cabecera", () => {
     expect(e.has("transportista")).toBe(false);
   });
 
-  it("sin quien despacha", () => {
-    expect(validarGuia(estado({ entregadoPor: "" })).has("entregadoPor")).toBe(true);
+  it("sin quien despacha, la guía SE GUARDA igual (se elige al despachar)", () => {
+    // 🔄 1-oct-2026: Daniel aprobó (sobre el mockup) sacar «Despachado por» de la
+    // creación de la guía y pedirlo al DESPACHAR. Este candado fijaba lo viejo
+    // y se reescribe a propósito: guardar la guía YA NO lo exige; el despacho
+    // sí (`faltaParaDespachar` y el PUT que completa, ver
+    // `guias-nueva-guia-2026-10.test.ts`).
+    expect(validarGuia(estado({ entregadoPor: "" })).has("entregadoPor")).toBe(false);
   });
 });
 

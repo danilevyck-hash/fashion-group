@@ -226,7 +226,7 @@ function MobileKpis({ data, prevYear, isClosedYear }: { data: VentasResumen; pre
             un número estimado lo hace parecer medido. */}
         {proy && (
           <KpiTile
-            label="Cierre del año"
+            label="Proyección de cierre"
             value={fmtMoneyCompact(proy.totales_grupo.proyeccion_cierre)}
             sub={{
               text: deltaProyeccionTexto(proy.totales_grupo.delta_vs_anio_anterior_total),
@@ -780,7 +780,7 @@ function TarjetaEmpresa({
               onClick={tarjeta.abrirPanel}
               className="flex min-h-[44px] w-full items-center justify-between gap-2 border-t border-gray-100 px-3 text-left text-xs font-medium text-blue-600 active:bg-gray-50"
             >
-              Ver mes por mes de otros años
+              Histórico mensual
               <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
             </button>
           )}

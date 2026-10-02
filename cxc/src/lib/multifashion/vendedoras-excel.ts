@@ -30,7 +30,7 @@ const COLUMNAS = (rotuloDelta: string) => [
   { header: "Vendedora", wch: 28 },
   { header: "Tickets", wch: 10, align: "right" as const },
   { header: "Ventas", wch: 14, align: "right" as const, fmt: MONEY_FMT },
-  { header: "Ticket prom.", wch: 13, align: "right" as const, fmt: MONEY_FMT },
+  { header: "Ticket promedio", wch: 13, align: "right" as const, fmt: MONEY_FMT },
   { header: rotuloDelta, wch: 16, align: "right" as const, fmt: PCT_FMT },
   { header: "Comisión", wch: 12, align: "right" as const, fmt: MONEY_FMT },
 ];

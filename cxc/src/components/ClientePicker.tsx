@@ -402,7 +402,7 @@ export default function ClientePicker({
             ) : q ? (
               <Opcion destacada onElegir={() => elegir(q, "")}>
                 <span className="min-w-0">
-                  <span className="block">➕ No está en la lista — escribir a mano</span>
+                  <span className="block">➕ Ingresar manualmente</span>
                   <span className="block text-xs opacity-80 truncate">
                     Se guarda &ldquo;{q}&rdquo;
                   </span>
@@ -410,8 +410,8 @@ export default function ClientePicker({
               </Opcion>
             ) : (
               <div className="px-3 py-2 text-xs text-gray-400">
-                ¿No está en la lista? Escribe el nombre y elige &ldquo;escribir a
-                mano&rdquo;.
+                ¿No está en la lista? Escribe el nombre y elige &ldquo;Ingresar
+                manualmente&rdquo;.
               </div>
             )}
           </div>
@@ -443,7 +443,7 @@ export default function ClientePicker({
           : vinculado
             ? `Vinculado a ${codigo}`
             : escritoAMano
-              ? "Cliente escrito a mano"
+              ? "Cliente manual"
               : "Sin cliente"}
       </span>
       {hasError ? <span className="sr-only">Campo obligatorio</span> : null}

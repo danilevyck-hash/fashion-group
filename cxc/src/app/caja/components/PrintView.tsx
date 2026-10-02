@@ -88,7 +88,7 @@ export default function PrintView({ current, onBack }: Props) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={FG_LOGO_BASE64} alt="FG" className="w-9 h-9 rounded" />
           <h1 className="text-lg font-bold uppercase tracking-wide">
-            Reporte de Caja Menuda
+            Reporte de caja menuda
           </h1>
         </div>
         {/* 🔴 EL RANGO REAL DE LOS RECIBOS, NO LA APERTURA (20-sep-2026).

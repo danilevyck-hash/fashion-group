@@ -123,8 +123,8 @@ export default function ListaEmpresaCelular({
         ]
       : []),
     ...(selectionMode
-      ? [{ label: "Dejar de elegir", onClick: () => { setSelectionMode(false); setSelectedIds([]); } }]
-      : [{ label: "Elegir algunos", onClick: () => { setSelectionMode(true); setSelectedIds([]); } }]),
+      ? [{ label: "Cancelar selección", onClick: () => { setSelectionMode(false); setSelectedIds([]); } }]
+      : [{ label: "Seleccionar", onClick: () => { setSelectionMode(true); setSelectedIds([]); } }]),
     ...(hayEleccion && esAdmin
       ? [{ label: `Eliminar ${elegidos.length === 1 ? "el reclamo" : `los ${elegidos.length}`}`, onClick: () => onDeleteSelected(elegidos), destructive: true }]
       : []),
@@ -260,7 +260,7 @@ export default function ListaEmpresaCelular({
             setSelectedIds([]);
             scheduleAction({
               id: `correo-${ids.join(",")}`,
-              message: `Se manda a ${envio.to}`,
+              message: `Se envía a ${envio.to}`,
               execute: async () => {
                 try {
                   const data = await mandarAlProveedor(activeEmpresa, ids, envio);

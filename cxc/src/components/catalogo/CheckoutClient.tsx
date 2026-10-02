@@ -345,7 +345,7 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
                     ? "border-amber-400 bg-white text-amber-900 hover:border-amber-500"
                     : "border-gray-200 text-gray-700 hover:border-gray-300"
                 }`}>
-                {clientePickerOpen ? "Cerrar" : cliente === undefined ? "Elegir" : "Cambiar"}
+                {clientePickerOpen ? "Cerrar" : cliente === undefined ? "Seleccionar" : "Cambiar"}
               </button>
             </div>
             {/* 🔴 EL AVISO, PEGADO A LA CAJA DEL QUE HABLA (24-sep-2026). Medido:

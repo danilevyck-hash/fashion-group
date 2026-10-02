@@ -74,6 +74,7 @@ import { nombreVendedorEnPantalla, type AliasVendedor } from "@/lib/comisiones/a
 import { encabezadoReporte } from "@/lib/comisiones/reporte-comision";
 import { ETIQUETA_DEFAULT } from "@/lib/comisiones/vendedor-default";
 import type { ExcelApi } from "@/components/comisiones/ComisionesView";
+// 1-oct-2026, Daniel: nombres normales de ERP («Oficina (DEFAULT)» → «Oficina (sin vendedor)», «no se paga» → «No pagable», «Cierre» → «Resumen», «Clientes que no comisionan» → «Exclusiones de comisión»).
 
 const CANONICO = "REYNALDO ESPINOSA";
 const BONITO = "Reynaldo Espinosa";
@@ -257,7 +258,7 @@ describe("🔴 (a) Por empresa: ni Aguas ni COLABORADOR existen en la tabla, ni 
     const { container } = render(<ComisionesPorEmpresaView year={2026} mes={8} />);
     const tabla = await screen.findByRole("table");
     expect([...container.querySelectorAll("[data-comision-card]")]).toHaveLength(2);
-    fireEvent.click(within(tabla).getByRole("button", { name: /Ver los que no se pagan/ }));
+    fireEvent.click(within(tabla).getByRole("button", { name: /Mostrar no pagables/ }));
     const tarjetas = [...container.querySelectorAll("[data-comision-card]")].map((c) => c.textContent ?? "");
     expect(tarjetas).toHaveLength(3);
     expect(tarjetas.some((t) => /Aguas/i.test(t))).toBe(false);
@@ -292,7 +293,7 @@ describe("🔴 (a) Todas las empresas: ni el canónico ni la grafía vieja entra
     // 🔄 6-sep-2026: la oficina arranca escondida (no se paga), así que a la
     // vista hay 2 filas; con «Ver los que no se pagan» abierto, 3.
     expect(within(tabla).getAllByRole("row").filter((r) => r.hasAttribute("data-se-paga"))).toHaveLength(2);
-    fireEvent.click(within(tabla).getByRole("button", { name: /Ver los que no se pagan/ }));
+    fireEvent.click(within(tabla).getByRole("button", { name: /Mostrar no pagables/ }));
     const filas = within(tabla).getAllByRole("row").filter((r) => r.hasAttribute("data-se-paga"));
     expect(filas).toHaveLength(3);
     const pie = textoPie(tabla);
@@ -365,7 +366,7 @@ describe("🔴 (a) Configuración: ni Aguas ni COLABORADOR existen en «Tasas po
 
   it("al agregar un cliente que no comisiona, el desplegable no ofrece a Aguas", async () => {
     render(<ComisionesConfiguracionView />);
-    await screen.findByText("Clientes que no comisionan");
+    await screen.findByText("Exclusiones de comisión");
     // Desde el 6-sep-2026 hay DOS «+ Agregar» en la pestaña (Clientes que no
     // comisionan y Descuentos): se acota a la sección que este caso mira.
     const seccion = document.querySelector('[aria-labelledby="sin-comision-titulo"]') as HTMLElement;
@@ -392,7 +393,7 @@ describe("🔴 (b) cada superficie muestra «Reynaldo Espinosa», nunca «REYNAL
     expect(within(tabla).queryByText("EDWIN")).toBeNull();
     // La oficina sigue diciendo «Oficina (DEFAULT)», no «Oficina (default)»
     // — detrás de «Ver los que no se pagan» desde el 6-sep-2026.
-    fireEvent.click(within(tabla).getByRole("button", { name: /Ver los que no se pagan/ }));
+    fireEvent.click(within(tabla).getByRole("button", { name: /Mostrar no pagables/ }));
     expect(within(tabla).getByText(ETIQUETA_DEFAULT)).toBeTruthy();
     // Tarjetas del celular: mismo nombre bonito.
     const tarjetas = [...container.querySelectorAll("[data-comision-card]")].map((c) => c.textContent ?? "");
@@ -408,7 +409,7 @@ describe("🔴 (b) cada superficie muestra «Reynaldo Espinosa», nunca «REYNAL
     const tabla = await screen.findByRole("table");
     expect(within(tabla).getAllByText(BONITO)).toHaveLength(1);
     expect(within(tabla).queryByText(CANONICO)).toBeNull();
-    fireEvent.click(within(tabla).getByRole("button", { name: /Ver los que no se pagan/ }));
+    fireEvent.click(within(tabla).getByRole("button", { name: /Mostrar no pagables/ }));
     expect(within(tabla).getByText(ETIQUETA_DEFAULT)).toBeTruthy();
     const filaRey = within(tabla).getByText(BONITO).closest("tr")!;
     const celdas = within(filaRey).getAllByRole("cell").map((c) => c.textContent);
@@ -469,7 +470,7 @@ describe("🔴 (c) el Excel lleva el nombre capitalizado y nada más cambia", ()
     const celdas = celdasDe(ws);
     expect(celdas).toContain(BONITO);
     expect(celdas).toContain("Edwin");
-    expect(celdas).toContain("Daniel Levy (no se paga)");
+    expect(celdas).toContain("Daniel Levy (No pagable)");
     expect(celdas).not.toContain(CANONICO);
     expect(celdas).not.toContain("EDWIN");
     // Fila 1 = encabezados, como todo Excel del sistema.
@@ -488,7 +489,7 @@ describe("🔴 (c) el Excel lleva el nombre capitalizado y nada más cambia", ()
     });
     const celdas = celdasDe(ws);
     expect(celdas).toContain(BONITO);
-    expect(celdas).toContain(`${ETIQUETA_DEFAULT} (no se paga)`);
+    expect(celdas).toContain(`${ETIQUETA_DEFAULT} (No pagable)`);
     expect(celdas).not.toContain(CANONICO);
     expect(celdas.some((c) => typeof c === "string" && /Oficina \(default\)/.test(c))).toBe(false);
     expect((ws[`C${filaTotalDe(ws)}`] as { v: number }).v).toBe(300);

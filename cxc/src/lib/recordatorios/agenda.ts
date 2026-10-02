@@ -91,8 +91,8 @@ export const ETIQUETA_GRUPO: Record<GrupoAgenda, string> = {
   vencido: "Vencido",
   hoy: "Hoy",
   esta_semana: "Esta semana",
-  despues: "Después",
-  se_repiten: "Se repiten",
+  despues: "Próximos",
+  se_repiten: "Recurrentes",
 };
 
 /** El color del encabezado. Solo «Vencido» va en rojo — el resto es neutro. */

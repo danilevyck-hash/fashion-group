@@ -44,6 +44,9 @@ const form = sinComentarios(leer("src/app/guias/components/DespachoForm.tsx"));
 const base = {
   placa: "", receptor: "Juan", cedula: "8-888-8888", chofer: "Pedro",
   tieneFirma1: true, tieneFirma2: true,
+  // 1-oct-2026: «Despachado por» se eligió mover de la guía al DESPACHO, donde es
+  // obligatorio (Daniel aprobó el mockup). «Lleno» ahora lo incluye.
+  despachadoPor: "Jorman",
 } as const;
 
 describe("🔴 la placa ya no traba la entrega directa", () => {
@@ -59,7 +62,9 @@ describe("🔴 la placa ya no traba la entrega directa", () => {
   });
 
   it("el PATCH lee tipo_despacho de la base (si no, no podría decidir)", () => {
-    expect(api).toContain('select("estado, placa, tipo_despacho")');
+    // 1-oct-2026: la misma lectura trae además `entregado_por`, que el PATCH
+    // exige al completar desde que «Despachado por» se elige al despachar.
+    expect(api).toContain('select("estado, placa, tipo_despacho, entregado_por")');
   });
 
   it("en entrega directa, sin placa NO falta nada — se puede despachar", () => {

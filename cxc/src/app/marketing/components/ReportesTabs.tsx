@@ -15,8 +15,8 @@ type Tab = "marca" | "tienda";
 // El `sub` de cada pestaña se fue (poda de textos, ago-2026): decía lo mismo
 // que la pestaña que ya está encendida arriba.
 const TABS: Array<{ value: Tab; label: string }> = [
-  { value: "marca", label: "Por Marca" },
-  { value: "tienda", label: "Por Tienda" },
+  { value: "marca", label: "Por marca" },
+  { value: "tienda", label: "Por tienda" },
 ];
 
 export function ReportesTabs() {

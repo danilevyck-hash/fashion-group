@@ -105,7 +105,7 @@ export function datosDeLaFicha(
     { clave: "codigo", etiqueta: "Código", valor: String(p.codigo) },
     { clave: "posicion", etiqueta: "Cargo", valor: texto(p.posicion) },
     { clave: "empresa", etiqueta: "Empresa", valor: p.empresa ? etiquetaEmpresa(p.empresa) : SIN_DATO },
-    { clave: "ingreso", etiqueta: "Empezó", valor: fecha(p.fechaIngreso) },
+    { clave: "ingreso", etiqueta: "Fecha de ingreso", valor: fecha(p.fechaIngreso) },
     { clave: "cedula", etiqueta: "Cédula", valor: texto(p.cedula) },
     { clave: "salario", etiqueta: "Salario", valor: money(p.salarioMensual), numero: true },
     // 🔴 La rata por hora SALIÓ de la lista (10-sep-2026, Daniel) y queda acá,
@@ -236,8 +236,8 @@ export const SECCIONES_DE_PERSONA: readonly SeccionDePersona[] = [
  */
 export function textoDeuda(total: number | null | undefined): string {
   const n = Number(total ?? 0);
-  if (!Number.isFinite(n) || n <= 0) return "No debe nada";
-  return `Debe ${money(n)}`;
+  if (!Number.isFinite(n) || n <= 0) return "Sin saldo";
+  return `Saldo ${money(n)}`;
 }
 
 /**

@@ -90,7 +90,7 @@ const ETIQUETA: Record<ChipId, string> = {
   "sin-contacto": "Sin cómo contactarlos",
   "sin-correo": "Sin correo",
   "sin-telefono": "Sin teléfono",
-  deben: "Deben",
+  deben: "Con saldo",
 };
 
 export const CHIPS_EN_ORDEN: ChipId[] = ["todos", "sin-contacto", "sin-correo", "sin-telefono", "deben"];

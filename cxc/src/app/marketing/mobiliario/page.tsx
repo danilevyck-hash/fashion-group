@@ -879,7 +879,7 @@ export default function MobiliarioPage() {
                     <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
                       <Dato
                         campo="paneles"
-                        label="Total Paneles"
+                        label="Total paneles"
                         valor={f.totalPaneles > 0 ? String(f.totalPaneles) : "—"}
                         atenuado={f.totalPaneles <= 0}
                       />
@@ -918,7 +918,7 @@ export default function MobiliarioPage() {
                   <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
                     <Dato
                       campo="paneles"
-                      label="Total Paneles"
+                      label="Total paneles"
                       valor={
                         totalResumen.totalPaneles
                           ? String(totalResumen.totalPaneles)
@@ -962,9 +962,9 @@ export default function MobiliarioPage() {
             <table className="w-full text-sm border-collapse">
               <thead className="bg-gray-50">
                 <tr className="text-xs uppercase tracking-wide text-gray-500">
-                  <th className="text-left font-medium px-3 py-2">Cliente</th>
+                  <th className="text-left font-medium px-3 py-2">Tienda</th>
                   <th className="text-right font-medium px-3 py-2 w-28">
-                    Total Paneles
+                    Total paneles
                   </th>
                   {resumenMarcas.map((m) => (
                     <th

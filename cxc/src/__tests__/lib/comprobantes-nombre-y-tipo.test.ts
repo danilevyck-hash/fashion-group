@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 // ─────────────────────────────────────────────────────────────────────────────
 // EL PANEL SE LLAMA «COMPROBANTES» — Y LA LLAVE SIGUE SIENDO `pedidos`
 // (25-ago-2026)
@@ -201,7 +202,7 @@ describe("🔴 el orden de decisión: borrador → cotización → pedido", () =
     expect(tipoComprobante({ fuente: "publicos" })).toBe("pedido");
     expect(tipoComprobante({ numeroPedido: "PED-019", switchNumero: null })).toBe("pedido");
     // Y la FILA sigue diciendo la verdad, que es otra cosa que el chip.
-    expect(textoEnSwitch({ fuente: "publicos" })).toBe("No se ha mandado a Switch");
+    expect(textoEnSwitch({ fuente: "publicos" })).toBe("Pendiente de envío");
   });
 });
 

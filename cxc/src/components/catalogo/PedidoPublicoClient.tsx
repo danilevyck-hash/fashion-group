@@ -351,7 +351,7 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
             {regular.map(renderItem)}
             {hasPreorders && (
               <>
-                {sectionHeader("Pre-orden", "bg-amber-500")}
+                {sectionHeader("Preventa", "bg-amber-500")}
                 {preorders.map(renderItem)}
               </>
             )}

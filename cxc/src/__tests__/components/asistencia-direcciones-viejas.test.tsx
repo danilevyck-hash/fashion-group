@@ -193,7 +193,8 @@ describe("C · la URL se corrige sola", () => {
 
   it("🔴 una pestaña buena NO se reescribe: nadie le cambia el `tab`", async () => {
     montar("tab=planilla");
-    await screen.findByRole("heading", { name: "Asistencia" });
+    // 1-oct-2026, Daniel: nombres normales de ERP («findByRole("heading", { name: "Asistencia" })» → «findByRole("heading", { name: "Asistencia y planilla" })»).
+    await screen.findByRole("heading", { name: "Asistencia y planilla" });
     // Se vacía la cola de microtareas —por ahí saldría un `replace` tardío—
     // en vez de contar 60 ms.
     await act(async () => { await Promise.resolve(); });
@@ -203,7 +204,7 @@ describe("C · la URL se corrige sola", () => {
 
   it("🔴 sin `?tab=` no se escribe ninguna pestaña en la URL", async () => {
     montar("");
-    await screen.findByRole("heading", { name: "Asistencia" });
+    await screen.findByRole("heading", { name: "Asistencia y planilla" });
     await act(async () => { await Promise.resolve(); });
     // Ni uno de los `replace` lleva `tab`: la entrada normal al módulo no
     // escribe una pestaña en el historial de nadie.

@@ -47,7 +47,7 @@ export default function MovimientoTable({ sortedMovs, saldoByMov, canEdit, canDe
       {/* `sr-only`: es la única tabla de la ficha del empleado y sus columnas
           ya dicen qué es. El encabezado queda para quien usa lector. */}
       <div className="flex items-baseline justify-end mb-3">
-        <h2 className="sr-only">Estado de Cuenta</h2>
+        <h2 className="sr-only">Estado de cuenta</h2>
         {total > 0 && (
           <span className="text-xs text-gray-400 tabular-nums">{total} movimiento{total !== 1 ? "s" : ""}</span>
         )}

@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 /**
  * ─────────────────────────────────────────────────────────────────────────────
  * CANDADO DE CONDUCTA — EL DETALLE DEL PEDIDO (6-sep-2026)
@@ -110,9 +111,9 @@ async function pintar(o: Opciones = {}) {
 /** Abre la caja de «Enviar por email al cliente» y devuelve su input. */
 async function abrirCajaCorreo(): Promise<HTMLInputElement> {
   await act(async () => {
-    fireEvent.click(screen.getByRole("button", { name: /Enviar por email al cliente/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Enviar por correo al cliente/i }));
   });
-  return (await screen.findByPlaceholderText("cliente@email.com")) as HTMLInputElement;
+  return (await screen.findByPlaceholderText("cliente@correo.com")) as HTMLInputElement;
 }
 
 afterEach(() => {
@@ -166,9 +167,9 @@ describe("5.1 🔴 el correo viene YA ESCRITO del cliente elegido", () => {
     await act(async () => { fireEvent.click(screen.getAllByRole("button", { name: /^Enviar$/i })[0]); });
     await waitFor(() => expect(llamadas.some((l) => l.url.includes("/send-order"))).toBe(true));
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Enviar por email al cliente/i }));
+      fireEvent.click(screen.getByRole("button", { name: /Enviar por correo al cliente/i }));
     });
-    const otraVez = (await screen.findByPlaceholderText("cliente@email.com")) as HTMLInputElement;
+    const otraVez = (await screen.findByPlaceholderText("cliente@correo.com")) as HTMLInputElement;
     expect(otraVez.value).toBe("compras@sportingshoes.com");
     expect(campo).toBeTruthy();
   });

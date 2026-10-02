@@ -200,19 +200,19 @@ describe("Elegir de la lista deja el cliente VINCULADO", () => {
     await escribir("Cliente nuevo");
     // 🔑 Se toca el RÓTULO NUEVO. Decía "Otro", y "Otro" se lee como un cliente
     // más de la lista: alguien la tocaba sin buscar primero.
-    fireEvent.mouseDown(screen.getByText(/No está en la lista — escribir a mano/));
+    fireEvent.mouseDown(screen.getByText(/Ingresar manualmente/)); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(campo().value).toBe("Cliente nuevo");
     expect(screen.queryByText("A mano")).toBeNull();
     expect(screen.queryByTitle("Escrito a mano — no está en el directorio")).toBeNull();
     // Y quien no ve la pantalla lo sigue sabiendo.
-    expect(document.body.textContent).toContain("Cliente escrito a mano");
+    expect(document.body.textContent).toContain("Cliente manual"); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   it("🔴 la salida a mano NO puede volver a llamarse solo \"Otro\"", async () => {
     render(<EnLaTabla />);
     await escribir("Cliente nuevo");
     const lista = document.querySelector('[data-desplegable="cliente"]')!;
-    expect(lista.textContent).toContain("No está en la lista — escribir a mano");
+    expect(lista.textContent).toContain("Ingresar manualmente"); // 1-oct-2026, Daniel: nombres normales de ERP
     // El texto tecleado se sigue viendo: es lo que se va a guardar.
     expect(lista.textContent).toContain("Cliente nuevo");
     // Y en ningún lado queda un "Otro" pelado que se lea como un cliente.

@@ -77,7 +77,7 @@ import {
 // los LEE EL CLIENTE. Decían `nombre_normalized`, la llave de pareo en
 // mayúsculas — el cliente recibía su propio nombre a los gritos.
 function buildEmailSubject(client: ConsolidatedClient) {
-  return `Estado de Cuenta - ${nombreDeCliente(client)} - Fashion Group`;
+  return `Estado de cuenta - ${nombreDeCliente(client)} - Fashion Group`;
 }
 
 function buildEmailBody(client: ConsolidatedClient) {
@@ -93,7 +93,7 @@ function buildEmailBody(client: ConsolidatedClient) {
     ``,
     `Le escribimos de Fashion Group para informarle sobre su estado de cuenta actualizado.`,
     ``,
-    `Estado de Cuenta - ${nombreDeCliente(client)}`,
+    `Estado de cuenta - ${nombreDeCliente(client)}`,
     ``,
   ];
   for (const co of COMPANIES) {
@@ -121,7 +121,7 @@ function buildEmailBody(client: ConsolidatedClient) {
   if (client.overdue > 0) lines.push(`Más de 120 días: $${fmt(client.overdue)}`);
   lines.push(`Total: $${fmt(client.total)}`);
   lines.push(``);
-  lines.push(`Agradecemos su pronta atencion a este saldo. Quedamos a su disposicion para cualquier consulta.`);
+  lines.push(`Agradecemos su pronta atención a este saldo. Quedamos a su disposición para cualquier consulta.`);
   lines.push(``);
   lines.push(`Atentamente,`);
   lines.push(`Fashion Group - Departamento de Cobros`);
@@ -506,7 +506,7 @@ function AdminDashboardInner() {
     if (!puedeQuedarseEnCxc(userRole)) return null;
     return (
       <div>
-        <AppHeader module="Cuentas por Cobrar" />
+        <AppHeader module="Cuentas por cobrar" />
         <CarteraBoston />
       </div>
     );
@@ -617,7 +617,7 @@ function AdminDashboardInner() {
         }),
       });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok) { showToast(d?.error || "No se pudo mandar el lote. Intenta de nuevo."); return; }
+      if (!res.ok) { showToast(d?.error || "No se pudo enviar el lote. Intenta de nuevo."); return; }
       // 🔴 Los que quedaron fuera se dicen POR NOMBRE, no como un número.
       const fuera = Array.isArray(d?.sinCorreo) && d.sinCorreo.length > 0
         ? ` · sin correo: ${d.sinCorreo.join(", ")}`
@@ -627,7 +627,7 @@ function AdminDashboardInner() {
       setSeleccion(new Set());
       recargarEnvios();
     } catch {
-      showToast("No se pudo mandar el lote. Intenta de nuevo.");
+      showToast("No se pudo enviar el lote. Intenta de nuevo.");
     } finally {
       setEnviandoLote(false);
     }
@@ -682,7 +682,7 @@ function AdminDashboardInner() {
         {/* Mientras carga se dice lo mismo que se va a decir después: con
             `CXC_CELULAR` el título grande lo pone `PanelCxcCelular`, así que
             el layout no lo agrega ni por un instante. */}
-        <AppHeader module="Cuentas por Cobrar" tituloEnLaPantalla={CXC_CELULAR} />
+        <AppHeader module="Cuentas por cobrar" tituloEnLaPantalla={CXC_CELULAR} />
         {/* El mismo alto y el mismo borde que `TabsCartera`: sus botones son
             `min-h-[44px]` dentro de un contenedor con `pt-2`. No se dibujan las
             pestañas de verdad porque cuáles van depende del rol. */}
@@ -709,7 +709,7 @@ function AdminDashboardInner() {
       {/* 🔴 EN EL CELULAR LA CARTERA DEL GRUPO YA DICE «Por cobrar» en grande
           (`PanelCxcCelular`): el layout no pone otro título. En Boston no —esa
           pantalla no trae título propio— y ahí sí lo pone el layout. */}
-      <AppHeader module="Cuentas por Cobrar" tituloEnLaPantalla={CXC_CELULAR && tab === "grupo"} />
+      <AppHeader module="Cuentas por cobrar" tituloEnLaPantalla={CXC_CELULAR && tab === "grupo"} />
 
       {/* 🔴 EN EL CELULAR LAS PESTAÑAS SE VAN DE LA CARTERA DEL GRUPO
           (24-sep-2026): Boston es un botón arriba a la derecha de la lista, y

@@ -327,7 +327,7 @@ describe("2 · 🔴 cerrar exige el nombre y NO genera reporte", () => {
     expect(screen.getByText(/ya lo cobraste/i)).toBeTruthy();
     expect(screen.getByText("$45.00")).toBeTruthy(); // lo apagado, dicho aparte
     expect(screen.getByText("Cerrar período")).toBeTruthy();
-    expect(screen.queryByText(/bajar reporte/i)).toBeNull();
+    expect(screen.queryByText(/descargar reporte/i)).toBeNull(); // 1-oct-2026, Daniel: nombres normales de ERP (bajar → descargar)
     expect(screen.queryByLabelText(/período que empieza/)).toBeNull();
     // Y con el interruptor prendido, el detalle NO baja el Excel al cerrar.
     const detalle = codigo("src/app/marketing/components/DetallePeriodoView.tsx");

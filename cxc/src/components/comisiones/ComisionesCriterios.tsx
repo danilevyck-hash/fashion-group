@@ -80,7 +80,7 @@ export function ComisionesCriterios({ children, aviso, className }: Props) {
           se paga al vendedor de la factura.{" "}
           <b>Cobro:</b> recibos del mes, excluyendo retenciones de ITBMS, y se
           paga a quien registró el recibo en Switch (si lo registró la oficina,
-          queda en «Oficina (DEFAULT)»). Ambas excluyen intercompañía y clientes
+          queda en «Oficina (sin vendedor)»). Ambas excluyen intercompañía y clientes
           internos. Fuente: reportes de Switch.
         </p>
         {children && <div className="mt-2.5 border-t border-gray-100 pt-2.5">{children}</div>}

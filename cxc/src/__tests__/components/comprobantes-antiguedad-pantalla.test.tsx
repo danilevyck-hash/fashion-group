@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 /**
  * ─────────────────────────────────────────────────────────────────────────────
  * CANDADO DE CONDUCTA — EL BORRADOR QUE SE QUEDÓ SE VE DE LEJOS (22-sep-2026)
@@ -129,7 +130,7 @@ describe("🔴 el comprobante que no llegó a Switch dice DESDE CUÁNDO", () => 
     ver(container, "Borradores");
     const m = marcaDe(container, "TOM-005");
     expect(m, "la fila no marca que no llegó a Switch").toBeTruthy();
-    expect(m!.textContent).toContain("No se ha mandado a Switch");
+    expect(m!.textContent).toContain("Pendiente de envío");
     expect(m!.textContent).toContain("hace 41 días");
   });
 
@@ -143,7 +144,7 @@ describe("🔴 el comprobante que no llegó a Switch dice DESDE CUÁNDO", () => 
     const { container } = pintar([RECIEN]);
     ver(container, "Borradores");
     const m = marcaDe(container, "TOM-099")!;
-    expect(m.textContent).toBe("No se ha mandado a Switch");
+    expect(m.textContent).toBe("Pendiente de envío");
     expect(m.getAttribute("data-tono")).toBe("calma");
   });
 });
@@ -201,7 +202,7 @@ describe("🔴 el pedido del LINK sin convertir queda AFUERA de esta cuenta", ()
     expect(fila, "no se dibujó el pedido del link").toBeTruthy();
     expect(fila.querySelector('[data-medir="sin-llegar"]'), "se le puso la marca del borrador").toBeNull();
     expect(fila.querySelector('[data-medir="sin-mandar"]')).toBeNull();
-    expect(fila.textContent).toContain("No se ha mandado a Switch");
+    expect(fila.textContent).toContain("Pendiente de envío");
     expect(fila.textContent).not.toContain("hace 20 días");
   });
 });

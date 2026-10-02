@@ -64,17 +64,17 @@ export function validarAbono(body: unknown): Validacion {
   const b = (body ?? {}) as Record<string, unknown>;
 
   const fichaId = typeof b.fichaId === "string" ? b.fichaId.trim() : "";
-  if (!fichaId) return { ok: false, error: "Elige a quién se le anota el abono." };
+  if (!fichaId) return { ok: false, error: "Selecciona el colaborador del abono." };
 
   const cuentaRaw = String(b.cuenta ?? "").trim();
   if (!(CUENTAS as readonly string[]).includes(cuentaRaw)) {
-    return { ok: false, error: "Elige de qué cuenta baja: préstamo, daño de mercancía o descuento a terceros." };
+    return { ok: false, error: "Selecciona la cuenta: préstamo, daño de mercancía o descuento a terceros." };
   }
   const cuenta = cuentaRaw as CuentaPrestamo;
 
   const monto = Number(b.monto);
   if (!Number.isFinite(monto) || monto <= 0) {
-    return { ok: false, error: "Escribe cuánto abonó. Tiene que ser mayor que cero." };
+    return { ok: false, error: "Escribe el monto del abono. Tiene que ser mayor que cero." };
   }
   if (monto > MONTO_MAX) {
     return { ok: false, error: `Ese monto es demasiado grande. El tope es $${MONTO_MAX.toLocaleString("en-US")}.` };
@@ -90,11 +90,11 @@ export function validarAbono(body: unknown): Validacion {
   if (origenRaw === ORIGEN_DE_LA_QUINCENA) {
     return {
       ok: false,
-      error: "El descuento de la quincena lo anota el cierre de la planilla, no este formulario.",
+      error: "El descuento de la quincena lo registra el cierre de la planilla, no este formulario.",
     };
   }
   if (!(ORIGENES_ABONO as readonly string[]).includes(origenRaw)) {
-    return { ok: false, error: "Elige de dónde salió el abono." };
+    return { ok: false, error: "Selecciona el origen del pago." };
   }
 
   const notasRaw = typeof b.notas === "string" ? b.notas.trim().replace(/\s+/g, " ") : "";

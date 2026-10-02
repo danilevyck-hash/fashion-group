@@ -285,7 +285,7 @@ export default function ChequeFormModal({
         className="bg-white sm:rounded-lg rounded-t-2xl w-full max-w-xl lg:max-w-2xl mx-0 sm:mx-4 border border-gray-200 max-h-[92vh] sm:max-h-[85vh] flex flex-col"
       >
         <header className="flex items-center justify-between px-5 py-4 border-b border-gray-200 flex-shrink-0">
-          <h2 className="text-base font-medium">{editingId ? "Editar Cheque" : "Nuevo Cheque"}</h2>
+          <h2 className="text-base font-medium">{editingId ? "Editar cheque" : "Nuevo cheque"}</h2>
           <button
             type="button"
             onClick={cerrar}
@@ -338,11 +338,11 @@ export default function ChequeFormModal({
               />
             </Campo>
 
-            <Campo label="N° Cheque" requerido error={err("numero", v.numero_cheque)}>
+            <Campo label="N° de cheque" requerido error={err("numero", v.numero_cheque)}>
               <input
                 type="text"
                 inputMode="numeric"
-                aria-label="N° Cheque"
+                aria-label="N° de cheque"
                 value={v.numero_cheque}
                 onChange={(e) => set("numero_cheque", e.target.value)}
                 onBlur={() => marcar("numero")}
@@ -362,10 +362,10 @@ export default function ChequeFormModal({
               />
             </Campo>
 
-            <Campo label="Fecha Depósito" requerido error={err("fecha", v.fecha_deposito)}>
+            <Campo label="Fecha de depósito" requerido error={err("fecha", v.fecha_deposito)}>
               <input
                 type="date"
-                aria-label="Fecha Depósito"
+                aria-label="Fecha de depósito"
                 value={v.fecha_deposito}
                 onChange={(e) => set("fecha_deposito", e.target.value)}
                 onBlur={() => marcar("fecha")}
@@ -414,9 +414,9 @@ export default function ChequeFormModal({
               )}
             </Campo>
 
-            <Campo label="Notas" anchoCompleto>
+            <Campo label="Observaciones" anchoCompleto>
               <textarea
-                aria-label="Notas"
+                aria-label="Observaciones"
                 value={v.notas}
                 onChange={(e) => set("notas", e.target.value)}
                 rows={2}
@@ -441,7 +441,7 @@ export default function ChequeFormModal({
             title={!isOnline ? "Sin conexión" : undefined}
             className="bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {!isOnline ? "Sin conexión" : saving ? "Guardando..." : "Guardar Cheque"}
+            {!isOnline ? "Sin conexión" : saving ? "Guardando..." : "Guardar cheque"}
           </button>
           <button
             type="button"

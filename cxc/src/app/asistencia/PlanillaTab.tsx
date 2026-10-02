@@ -963,12 +963,12 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
         body: JSON.stringify({ id: reabierta.id }),
       });
       const j = await res.json();
-      if (!res.ok || j.ok === false) throw new Error(j.error ?? "No se pudo borrar");
+      if (!res.ok || j.ok === false) throw new Error(j.error ?? "No se pudo eliminar");
       setBorrando(false);
       toast("Listo — esa planilla se borró. El período queda libre.", "success");
       await pedirCierre(pedido);
     } catch (e) {
-      toast(e instanceof Error ? e.message : "No se pudo borrar", "error");
+      toast(e instanceof Error ? e.message : "No se pudo eliminar", "error");
     } finally {
       setTrabajandoCierre(false);
     }
@@ -1940,7 +1940,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           fila y sus renglones se van de la base. Por eso el freno es ANTES. */}
       <ConfirmDeleteModal
         open={borrando && !!reabierta}
-        title="¿Borrar esta planilla?"
+        title="¿Eliminar esta planilla?"
         description={
           reabierta
             ? `Se va el cuadro del ${reabierta.etiqueta || etiquetaRangoGuardado(reabierta)}`
@@ -1950,8 +1950,8 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
             : ""
         }
         loading={trabajandoCierre}
-        confirmLabel="Borrar la planilla"
-        loadingLabel="Borrando..."
+        confirmLabel="Eliminar planilla"
+        loadingLabel="Eliminando…"
         onConfirm={() => { void eliminar(); }}
         onCancel={() => { if (!trabajandoCierre) setBorrando(false); }}
       />
@@ -2053,7 +2053,7 @@ export function ModalCierre({
                 firma, y si se vuelve a cerrar nace una versión nueva.
               </p>
               <label className="block">
-                <span className="text-[13px] font-medium text-gray-700">¿Por qué se reabre?</span>
+                <span className="text-[13px] font-medium text-gray-700">Motivo de reapertura</span>
                 <textarea
                   value={motivo}
                   onChange={(e) => setMotivo(e.target.value)}
@@ -2091,7 +2091,7 @@ export function ModalCierre({
             type="button" onClick={onCerrar} disabled={trabajando}
             className="min-h-[44px] rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:opacity-40"
           >
-            Mejor no
+            Cancelar
           </button>
           <button
             type="button"

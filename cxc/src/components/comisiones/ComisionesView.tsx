@@ -375,7 +375,7 @@ export function ComisionesView({
             tabla="facturas"
             empresasEsperadas={EMPRESAS}
             empresaLabels={EMPRESA_KEY_TO_NOMBRE_CORTO}
-            prefix="Sincronizado"
+            prefix="Última sincronización"
             onStale={setSyncStale}
           />
         </ComisionesCriterios>

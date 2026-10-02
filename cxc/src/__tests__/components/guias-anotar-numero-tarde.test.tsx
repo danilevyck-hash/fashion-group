@@ -22,6 +22,9 @@
  * —que borra los renglones y les cambia el id— no aparezca nunca.
  * ─────────────────────────────────────────────────────────────────────────────
  */
+// 🔄 1-oct-2026: nombres de ERP en Guías (Daniel aprobó el audit): rótulos en tipo oración
+// («Guardar guía», «Nueva guía de despacho», «Tipo de despacho», «Vincular cliente»…).
+// Este candado leía los textos viejos y se actualiza a propósito.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor, act } from "@testing-library/react";
 
@@ -216,7 +219,7 @@ describe("🔴 lo que se corrige se escribe POR COLUMNA — nunca por el PUT", (
   it("el N° del transportista sale por su endpoint de UNA columna, con su itemId", async () => {
     await editar();
     fireEvent.change(campos("numtransp")[0], { target: { value: "TR-4471" } });
-    fireEvent.click(screen.getAllByRole("button", { name: "Guardar Cambios" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Guardar cambios" })[0]);
     await waitFor(() => expect(llamadas.some((l) => l.url.includes("/numero-transp"))).toBe(true));
     const patch = llamadas.find((l) => l.url.includes("/numero-transp"))!;
     expect(patch.method).toBe("PATCH");
@@ -227,7 +230,7 @@ describe("🔴 lo que se corrige se escribe POR COLUMNA — nunca por el PUT", (
   it("las facturas salen por `PATCH …/item`, con su itemId y SOLO ese campo", async () => {
     await editar();
     fireEvent.change(campos("facturas")[1], { target: { value: "F-2002" } });
-    fireEvent.click(screen.getAllByRole("button", { name: "Guardar Cambios" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Guardar cambios" })[0]);
     await waitFor(() => expect(llamadas.some((l) => l.url.endsWith("/item"))).toBe(true));
     const patch = llamadas.find((l) => l.url.endsWith("/item"))!;
     expect(patch.method).toBe("PATCH");
@@ -240,7 +243,7 @@ describe("🔴 lo que se corrige se escribe POR COLUMNA — nunca por el PUT", (
     await editar();
     fireEvent.change(campos("facturas")[0], { target: { value: "F-9999" } });
     fireEvent.change(campos("numtransp")[0], { target: { value: "TR-1" } });
-    fireEvent.click(screen.getAllByRole("button", { name: "Guardar Cambios" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Guardar cambios" })[0]);
     await waitFor(() => expect(llamadas.some((l) => l.method === "PATCH")).toBe(true));
     for (const l of llamadas) {
       expect(l.method, l.url).not.toBe("PUT");
@@ -251,7 +254,7 @@ describe("🔴 lo que se corrige se escribe POR COLUMNA — nunca por el PUT", (
   it("🔴 SOLO se escribe el renglón que cambió — los otros no se tocan", async () => {
     await editar();
     fireEvent.change(campos("facturas")[0], { target: { value: "F-9999" } });
-    fireEvent.click(screen.getAllByRole("button", { name: "Guardar Cambios" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Guardar cambios" })[0]);
     await waitFor(() => expect(llamadas.some((l) => l.method === "PATCH")).toBe(true));
     const escrituras = llamadas.filter((l) => l.method === "PATCH");
     expect(escrituras).toHaveLength(1);
@@ -260,7 +263,7 @@ describe("🔴 lo que se corrige se escribe POR COLUMNA — nunca por el PUT", (
 
   it("🔴 mirar la guía y guardar sin cambiar nada NO escribe — el botón ni se enciende", async () => {
     await editar();
-    const boton = screen.getAllByRole("button", { name: "Guardar Cambios" })[0] as HTMLButtonElement;
+    const boton = screen.getAllByRole("button", { name: "Guardar cambios" })[0] as HTMLButtonElement;
     expect(boton.disabled).toBe(true);
     fireEvent.click(boton);
     // Se vacía la cola de microtareas —por ahí saldría cualquier escritura—
@@ -285,7 +288,7 @@ describe("🔴 lo que se corrige se escribe POR COLUMNA — nunca por el PUT", (
   it("el error del servidor se ve en la pantalla, no en un toast que se va", async () => {
     await editar();
     fireEvent.change(campos("numtransp")[0], { target: { value: "0" } });
-    fireEvent.click(screen.getAllByRole("button", { name: "Guardar Cambios" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Guardar cambios" })[0]);
     await screen.findByText(/Un 0 no es un N° de guía/);
   });
 });
@@ -327,7 +330,7 @@ describe("🔴 la guía que salió sin el N° queda MARCADA", () => {
       ],
     });
     expect(document.body.textContent).not.toMatch(/Sin guardar/);
-    const boton = screen.getAllByRole("button", { name: "Guardar Cambios" })[0] as HTMLButtonElement;
+    const boton = screen.getAllByRole("button", { name: "Guardar cambios" })[0] as HTMLButtonElement;
     expect(boton.disabled).toBe(true);
   });
 

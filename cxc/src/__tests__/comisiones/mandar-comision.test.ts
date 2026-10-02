@@ -74,7 +74,7 @@ describe("🔴 se manda por la hoja del teléfono, como en Guías", () => {
       .toContain("Reynaldo Espinosa");
     expect(textoDeLoQueSeComparte("Reynaldo Espinosa", "Agosto 2026"))
       .toContain("Agosto 2026");
-    expect(ROTULO_MANDAR).toBe("Mandar");
+    expect(ROTULO_MANDAR).toBe("Enviar"); // 1-oct-2026, Daniel: nombres normales de ERP («Mandar» → «Enviar»)
   });
 });
 

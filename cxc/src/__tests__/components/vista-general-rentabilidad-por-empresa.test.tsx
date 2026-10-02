@@ -167,8 +167,9 @@ describe("🩸 la empresa SIN gasto cargado no muestra un número lindo", () => 
 
   it("y en su lugar la pantalla DICE POR QUÉ", () => {
     pintar();
-    // La píldora trae el motivo exacto: "No se baja sola" no es "Sin cargar".
-    expect(screen.getAllByText("No se baja sola").length).toBeGreaterThan(0);
+    // La píldora trae el motivo exacto: "Carga manual" no es "Sin cargar".
+    // 1-oct-2026, Daniel: nombres normales de ERP («No se baja sola» → «Carga manual»).
+    expect(screen.getAllByText("Carga manual").length).toBeGreaterThan(0);
   });
 
   it("al abrirla, el desglose explica en palabras en vez de restar", () => {

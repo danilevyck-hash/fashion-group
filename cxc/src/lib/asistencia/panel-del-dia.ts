@@ -76,7 +76,7 @@ export const PANEL_DEL_DIA_2026_09 = true;
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Los rótulos de las cuatro columnas del día, en su orden. */
-export const COLUMNAS_DEL_DIA = ["Entrada", "Sale almz.", "Vuelve", "Salida"] as const;
+export const COLUMNAS_DEL_DIA = ["Entrada", "Salida almuerzo", "Regreso almuerzo", "Salida"] as const;
 
 /**
  * 🔴 EL MOTIVO DE CADA CASILLA. Rótulos parejos —todos «No marcó …»— y en el

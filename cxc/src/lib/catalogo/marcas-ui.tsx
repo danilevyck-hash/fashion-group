@@ -880,7 +880,7 @@ const REEBOK: MarcaTheme = {
     iconSize: 12,
     panel: "absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg py-1.5 w-48 z-50",
     item: "w-full text-left px-3 py-2 min-h-[44px] text-xs hover:bg-gray-50 transition flex items-center gap-2",
-    copyLabel: "Copiar link público",
+    copyLabel: "Copiar enlace público",
     stickyActionColor: "bg-[#E4002B] hover:bg-[#c90025]",
   },
   publico: { confirmingLabel: "Confirmando..." },
@@ -906,7 +906,7 @@ const REEBOK: MarcaTheme = {
     titulo: "Administrar",
     subtituloSync: (lastSync) => {
       const rel = relativo(lastSync);
-      return `Sincronizado con Switch ${rel} · 1×/día`;
+      return `Última sincronización: ${rel} · 1×/día`;
     },
     productsUrl: "/api/catalogo/reebok/products?scope=admin",
     excelSinFoto: async (sin) => {
@@ -1181,7 +1181,7 @@ const JOYBEES: MarcaTheme = {
     iconSize: 14,
     panel: "absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-100 py-1 w-48 z-50",
     item: "w-full text-left px-4 py-2.5 min-h-[44px] text-sm text-[#404041] hover:bg-gray-50 transition flex items-center gap-2",
-    copyLabel: "Copiar link público",
+    copyLabel: "Copiar enlace público",
     stickyActionColor: null,
   },
   publico: { confirmingLabel: "Confirmando..." },
@@ -1208,7 +1208,7 @@ const JOYBEES: MarcaTheme = {
     subtituloSync: (lastSync) =>
       `Se llena solo desde Switch por existencia · tú solo subes fotos${
         lastSync
-          ? ` · sincronizado ${new Date(lastSync).toLocaleString("es-PA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
+          ? ` · última sincronización: ${new Date(lastSync).toLocaleString("es-PA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
           : ""
       }`,
     productsUrl: "/api/catalogo/joybees/products",
@@ -1515,7 +1515,7 @@ const TOMMY: MarcaTheme = {
     iconSize: 14,
     panel: "absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-100 py-1 w-48 z-50",
     item: "w-full text-left px-4 py-2.5 min-h-[44px] text-sm text-[#152342] hover:bg-gray-50 transition flex items-center gap-2",
-    copyLabel: "Copiar link público",
+    copyLabel: "Copiar enlace público",
     stickyActionColor: "bg-[#AE0029] hover:bg-[#8c0021]",
   },
   publico: { confirmingLabel: "Confirmando..." },
@@ -1542,7 +1542,7 @@ const TOMMY: MarcaTheme = {
     subtituloSync: (lastSync) =>
       `Se llena solo desde Switch por existencia · tú solo subes fotos${
         lastSync
-          ? ` · sincronizado ${new Date(lastSync).toLocaleString("es-PA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
+          ? ` · última sincronización: ${new Date(lastSync).toLocaleString("es-PA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
           : ""
       }`,
     productsUrl: "/api/catalogo/tommy/products",
@@ -1847,7 +1847,7 @@ const CALVIN: MarcaTheme = {
     iconSize: 14,
     panel: "absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-100 py-1 w-48 z-50",
     item: "w-full text-left px-4 py-2.5 min-h-[44px] text-sm text-[#1A1A1A] hover:bg-gray-50 transition flex items-center gap-2",
-    copyLabel: "Copiar link público",
+    copyLabel: "Copiar enlace público",
     stickyActionColor: "bg-[#1A1A1A] hover:bg-black",
   },
   publico: { confirmingLabel: "Confirmando..." },
@@ -1874,7 +1874,7 @@ const CALVIN: MarcaTheme = {
     subtituloSync: (lastSync) =>
       `Se llena solo desde Switch por existencia · tú solo subes fotos${
         lastSync
-          ? ` · sincronizado ${new Date(lastSync).toLocaleString("es-PA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
+          ? ` · última sincronización: ${new Date(lastSync).toLocaleString("es-PA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
           : ""
       }`,
     productsUrl: "/api/catalogo/calvin/products",

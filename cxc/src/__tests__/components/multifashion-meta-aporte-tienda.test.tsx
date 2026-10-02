@@ -20,6 +20,7 @@ import { MetaAvanceCard } from "@/components/multifashion/MetaAvanceCard";
 import { MetasEnVendedoras } from "@/components/multifashion/MetasEnVendedoras";
 import { avanceMeta } from "@/lib/multifashion/metas-avance";
 import type { MetaConAvance } from "@/lib/multifashion/metas-lectura";
+// 1-oct-2026, Daniel: nombres normales de ERP («tiquetes» → «tickets», «Cierra en» → «Proyección de cierre», «Cuándo vende la tienda» → «Ventas por día y hora», «Lo que más…» → «Más vendidos / Mayor utilidad / Mayores variaciones», «Dormidos» → «Inactivos», «Compró/Veces» → «Total compras/Visitas»).
 
 // `MetasEnVendedoras` lee por SWR. Acá se le sirve el payload directo: lo que
 // se está probando es lo que DIBUJA, no cómo lo pide.
@@ -149,7 +150,7 @@ describe("la tarjeta de la meta muestra la venta de la TIENDA", () => {
     );
     expect(screen.queryByText(/La meta cuenta toda la venta de la tienda/i)).toBeNull();
     expect(screen.queryByText(/que falta son ventas hechas con el código/i)).toBeNull();
-    expect(screen.getByText(/La meta de cada una/i)).toBeTruthy();
+    expect(screen.getByText(/Meta por vendedora/i)).toBeTruthy();
   });
 });
 

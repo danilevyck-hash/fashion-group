@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 /**
  * CANDADO — «Administrar» el catálogo: UNA lista, UN cuadro para subir fotos,
  * y las columnas que quedaron sin lectores NO se borran (6-sep-2026).
@@ -142,7 +143,7 @@ describe("🔴 una sola fila de chips, con el número adentro", () => {
   it("los números se calculan sobre lo VISIBLE, nunca se escriben a mano", () => {
     const chips = chipsDelCatalogo(CATALOGO, CATS, catDe);
     expect(chips.map((c) => `${c.label} ${c.count}`)).toEqual([
-      "Todos 4", "Calzado 2", "Ropa 1", "Accesorios 1", "Sin foto 1", "Escondidos 1",
+      "Todos 4", "Calzado 2", "Ropa 1", "Accesorios 1", "Sin foto 1", "Ocultos 1",
     ]);
   });
 
@@ -487,8 +488,8 @@ describe("🔴 44 px y textos que se leen", () => {
   });
 
   it("«Esconder» se dice igual en el chip y en la fila", () => {
-    expect(fila).toContain('"Mostrar" : "Esconder"');
-    expect(codigo("lib/catalogos/admin-chips.ts")).toContain('label: "Escondidos"');
+    expect(fila).toContain('"Mostrar" : "Ocultar"');
+    expect(codigo("lib/catalogos/admin-chips.ts")).toContain('label: "Ocultos"');
   });
 
   it("nada de voseo en lo nuevo (lo cubre además el candado global)", () => {

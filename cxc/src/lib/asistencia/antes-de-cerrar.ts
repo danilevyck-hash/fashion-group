@@ -246,7 +246,7 @@ export function armarAntesDeCerrar(e: EntradaAntesDeCerrar): AntesDeCerrar {
     arreglar.push({
       clave: "prestamo-sin-atar",
       numero: e.prestamoSinAtar.length,
-      texto: `${e.prestamoSinAtar.length === 1 ? "préstamo con saldo sin atar a nadie: no se descuenta" : "préstamos con saldo sin atar a nadie: no se descuentan"} (${detalle})`,
+      texto: `${e.prestamoSinAtar.length === 1 ? "préstamo con saldo sin colaborador vinculado: no se descuenta" : "préstamos con saldo sin colaborador vinculado: no se descuentan"} (${detalle})`,
       enlace: { rotulo: "Préstamos ›", href: PESTANA_PRESTAMOS },
       tono: "arreglar",
     });

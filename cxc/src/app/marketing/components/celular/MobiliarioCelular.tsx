@@ -142,7 +142,7 @@ export default function MobiliarioCelular({
         <GrupoCelular className="mt-5">
           <FilaCelular titulo="Comprado" monto={String(comprado)} />
           <FilaCelular titulo="Entregado" monto={String(entregado)} />
-          <FilaCelular titulo="En bodega" monto={String(abierto.stock_total)} />
+          <FilaCelular titulo="Disponible" monto={String(abierto.stock_total)} />
           <FilaCelular titulo="Valor" monto={formatearMonto(Number(abierto.precio) * Number(abierto.stock_total))} />
         </GrupoCelular>
         {escribe && (
@@ -155,7 +155,7 @@ export default function MobiliarioCelular({
                   onClick={() => onBorrar(abierto)}
                   className="w-full px-4 py-4 text-left text-[17px] font-medium text-red-600 active:bg-gray-50"
                 >
-                  Borrar el producto
+                  Eliminar producto
                 </button>
               </li>
             )}
@@ -240,7 +240,7 @@ export default function MobiliarioCelular({
                 key={p.id}
                 rightAction={{ label: "Editar", color: "bg-blue-600", onAction: () => onEditar(p) }}
                 leftAction={
-                  esAdmin ? { label: "Borrar", color: "bg-red-600", onAction: () => onBorrar(p) } : undefined
+                  esAdmin ? { label: "Eliminar", color: "bg-red-600", onAction: () => onBorrar(p) } : undefined
                 }
               >
                 {fila}

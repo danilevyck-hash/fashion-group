@@ -126,8 +126,10 @@ describe("la pestaña Préstamos abre donde siempre", () => {
   it("«Quiénes deben» es la vista de entrada", async () => {
     servir({});
     montar();
-    await waitFor(() => expect(screen.getByText("Nadie debe nada en este momento.")).toBeTruthy());
-    expect(screen.getByRole("tab", { name: "Quiénes deben" }).getAttribute("aria-selected")).toBe("true");
+    // 1-oct-2026, Daniel: nombres normales de ERP («getByText("Nadie debe nada en este momento.")» → «getByText("Sin saldos pendientes.")»).
+    await waitFor(() => expect(screen.getByText("Sin saldos pendientes.")).toBeTruthy());
+    // 1-oct-2026, Daniel: nombres normales de ERP («{ name: "Quiénes deben" }» → «{ name: "Saldos" }»).
+    expect(screen.getByRole("tab", { name: "Saldos" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("tab", { name: "Movimientos" })).toBeTruthy();
   });
 });

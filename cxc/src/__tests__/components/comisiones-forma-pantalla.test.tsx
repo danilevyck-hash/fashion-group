@@ -22,6 +22,7 @@ import { ComisionesConsolidadoView } from "@/components/comisiones/ComisionesCon
 import { ComisionesDetalleModal } from "@/components/comisiones/ComisionesDetalleModal";
 // El papel dejó de ser HTML: lo que lleva sale del módulo puro del reporte.
 import { COLUMNAS_VENTAS, filasVentas } from "@/lib/comisiones/reporte-comision";
+// 1-oct-2026, Daniel: nombres normales de ERP («Oficina (DEFAULT)» → «Oficina (sin vendedor)», «no se paga» → «No pagable», «Cierre» → «Resumen», «Clientes que no comisionan» → «Exclusiones de comisión»).
 
 const REYNALDO = "REYNALDO ESPINOSA";
 
@@ -122,7 +123,7 @@ describe("🔴 los que no se pagan, detrás de «Ver los que no se pagan»", () 
   it("arrancan escondidos y lo VISIBLE suma exactamente el «Total a pagar»", async () => {
     render(<ComisionesConsolidadoView year={2026} mes={9} />);
     const tabla = await screen.findByRole("table");
-    expect(within(tabla).queryByText("Oficina (DEFAULT)")).toBeNull();
+    expect(within(tabla).queryByText("Oficina (sin vendedor)")).toBeNull();
     expect(within(tabla).queryByText("Daniel Levy")).toBeNull();
 
     // Lo que se ve: Reynaldo (−1.513,08) + Edwin (41,77) = −1.471,31, que es
@@ -130,8 +131,8 @@ describe("🔴 los que no se pagan, detrás de «Ver los que no se pagan»", () 
     const pie = within(tabla).getByText("Total a pagar").closest("tr")!;
     expect(pie.textContent).toContain("−$1,471.31");
 
-    fireEvent.click(within(tabla).getByRole("button", { name: "Ver los que no se pagan (2)" }));
-    expect(within(tabla).getByText("Oficina (DEFAULT)")).toBeTruthy();
+    fireEvent.click(within(tabla).getByRole("button", { name: "Mostrar no pagables (2)" }));
+    expect(within(tabla).getByText("Oficina (sin vendedor)")).toBeTruthy();
     expect(within(tabla).getByText("Daniel Levy")).toBeTruthy();
     // Y el total NO se movió al mostrarlos: se calcula igual que siempre.
     expect(within(tabla).getByText("Total a pagar").closest("tr")!.textContent).toContain("−$1,471.31");
@@ -269,7 +270,7 @@ describe("🔴 con «Todo el año» la celda no promete un detalle que no existe
   it("el pie dice qué hacer en vez de ofrecer un botón que no lleva a nada", async () => {
     render(<ComisionesConsolidadoView year={2026} mes={0} />);
     await screen.findByRole("table");
-    expect(screen.getByText("Elige un mes para ver el detalle")).toBeTruthy();
+    expect(screen.getByText("Selecciona un mes para ver el detalle") /* 1-oct-2026, Daniel: nombres normales de ERP */).toBeTruthy();
     expect(screen.queryByText("Toca para ver el detalle")).toBeNull();
   });
 

@@ -213,11 +213,11 @@ export default function DetalleEgresos({ empresa, onVolver }: Props) {
           )}
 
           <div className="mb-4 rounded-lg border border-gray-200 bg-white p-3">
-            <LineaTotal label="Salió de caja y banco" cent={totalSalidaCent} fuerte />
+            <LineaTotal label="Total egresos" cent={totalSalidaCent} fuerte />
             <div className="mt-1 border-t border-gray-100 pt-1">
-              <LineaTotal label="De eso, gastos" cent={totalGastoCent} />
+              <LineaTotal label="Gastos" cent={totalGastoCent} />
               {totalNoGastoCent !== 0 && (
-                <LineaTotal label="De eso, no es gasto" cent={totalNoGastoCent} />
+                <LineaTotal label="Otros egresos" cent={totalNoGastoCent} />
               )}
             </div>
             <p className="mt-2 border-t border-gray-100 pt-2 text-sm text-gray-600">
@@ -235,7 +235,7 @@ export default function DetalleEgresos({ empresa, onVolver }: Props) {
               fue un gasto» sería decir algo que no es cierto del mes. */}
           {!sinResultados && (gastoVistas.length > 0 || !buscando) && (
             <>
-              <h2 className="mb-2 text-sm font-semibold text-gray-900">En qué se gastó</h2>
+              <h2 className="mb-2 text-sm font-semibold text-gray-900">Gastos por cuenta</h2>
               <div className="rounded-lg border border-gray-200 bg-white px-3 py-1">
                 {gastoVistas.length === 0 ? (
                   <p className="py-2.5 text-sm text-gray-600">
@@ -251,7 +251,7 @@ export default function DetalleEgresos({ empresa, onVolver }: Props) {
           {noGastoVistas.length > 0 && (
             <>
               <h2 className="mb-1 mt-4 text-sm font-semibold text-gray-900">
-                Salió, pero no es gasto
+                Otros egresos
               </h2>
               {/* Sin esta frase, alguien lee "salió plata" y anota gasto. */}
               <p className="mb-2 text-sm text-gray-600">
@@ -268,7 +268,7 @@ export default function DetalleEgresos({ empresa, onVolver }: Props) {
 
           {!sinResultados && (
             <div className="mt-4 rounded-lg border border-gray-200 bg-white px-3 py-1">
-              <LineaTotal label="Total que salió" cent={totalSalidaCent} fuerte />
+              <LineaTotal label="Total egresos" cent={totalSalidaCent} fuerte />
             </div>
           )}
         </>

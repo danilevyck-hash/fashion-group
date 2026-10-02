@@ -34,7 +34,7 @@ export default function CxcError({
     <div className="flex flex-col items-center justify-center min-h-screen gap-4 px-6 text-center">
       <div className="text-amber-500 text-4xl" aria-hidden>⚠</div>
       <h2 className="text-lg font-semibold text-gray-800">
-        No se pudo mostrar Cuentas por Cobrar
+        No se pudo mostrar Cuentas por cobrar
       </h2>
       <p className="text-sm text-gray-600 max-w-sm">
         Fue un problema al leer los datos. No se perdió nada: esta pantalla solo

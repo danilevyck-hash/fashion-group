@@ -158,7 +158,7 @@ export function HojaClienteCelular({ abierta, onCerrar, codigo, nombre, cuandoCo
             </div>
           </div>
 
-          <RotuloVentas>Empresa por empresa</RotuloVentas>
+          <RotuloVentas>Por empresa</RotuloVentas>
           <GrupoVentas className="mt-0">
             {datos.empresas.length === 0 && (
               <p className="px-4 py-6 text-center text-[14px] text-gray-500">

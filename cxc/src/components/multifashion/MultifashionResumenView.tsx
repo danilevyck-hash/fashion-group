@@ -596,7 +596,7 @@ function TarjetasDelMes({
       {/* 3 · Cierra en (mes en curso) / Margen tienda (mes cerrado). */}
       <Card className="p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-          {hayProyeccion ? "Cierra en" : "Margen tienda"}
+          {hayProyeccion ? "Proyección de cierre" : "Margen tienda"}
         </p>
         <p className="mt-1 font-mono text-2xl font-semibold leading-tight tabular-nums text-gray-950">
           {hayProyeccion
@@ -844,7 +844,7 @@ function CuandoVendeLaTienda({ data }: { data: DetalleMensualResp }) {
 
   return (
     <Card className="p-4">
-      <h4 className="font-display text-sm font-semibold text-gray-950">Cuándo vende la tienda</h4>
+      <h4 className="font-display text-sm font-semibold text-gray-950">Ventas por día y hora</h4>
       <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* Las dos del MES. */}
         <div className="space-y-2.5">
@@ -966,7 +966,7 @@ function ChartMesAnioMount({
     <section>
       <div className="mb-2 flex items-center justify-between gap-3">
         <h4 className="font-display text-sm font-semibold text-gray-950">
-          {chartView === "mes" ? "Ventas día por día" : "Ventas acumuladas"}
+          {chartView === "mes" ? "Ventas diarias" : "Ventas acumuladas"}
         </h4>
         <SegmentedToggle
           value={chartView}

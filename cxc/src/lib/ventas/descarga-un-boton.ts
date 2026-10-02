@@ -37,7 +37,8 @@ export interface RegistroDeDescarga {
 /** Lo que dice la hoja que pregunta qué bajar. */
 export const TITULO_HOJA_DESCARGA = "Descargar";
 export const OPCION_ESTA_PESTANA = "Esta pestaña en Excel";
-export const OPCION_LAS_TRES = "Las tres pestañas en un solo Excel";
+// 1-oct-2026, Daniel: nombres normales de ERP.
+export const OPCION_LAS_TRES = "Todas las pestañas (Excel)";
 export const DETALLE_LAS_TRES = "Resumen · Clientes · Productos, una hoja cada una";
 
 /** El rótulo de las tres pestañas, para el subtítulo de la primera opción. */

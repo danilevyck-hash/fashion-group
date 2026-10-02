@@ -177,7 +177,7 @@ export interface TarjetaDebe {
  * Un saldo A FAVOR (negativo) tampoco lleva proporción: no es deuda.
  */
 export function tarjetaDebe(saldo: number, comprasDelAnio: number): TarjetaDebe {
-  if (saldo === 0) return { monto: null, frase: "No debe nada", proporcion: null };
+  if (saldo === 0) return { monto: null, frase: "Sin saldo", proporcion: null };
   if (saldo < 0) {
     return { monto: null, frase: `Saldo a favor ${dinero(Math.abs(saldo))}`, proporcion: null };
   }
@@ -223,7 +223,7 @@ export function tarjetaDeFecha(
 }
 
 /** Los textos de «no hay dato» de las tarjetas 3 y 4. Uno solo por concepto. */
-export const SIN_PAGOS_NUNCA = "Nunca ha pagado";
+export const SIN_PAGOS_NUNCA = "Sin pagos";
 export const SIN_COMPRAS_NUNCA = "Sin compras registradas";
 
 // ─────────────────────────────────────────────────────────────────────────────

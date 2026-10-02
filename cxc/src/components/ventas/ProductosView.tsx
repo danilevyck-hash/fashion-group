@@ -708,7 +708,7 @@ export function ProductosView({ periodo: periodoElegido, anioEnCurso, onDescarga
               períodos relativos— LAS DOS FECHAS. "Últimos 12 meses" sin fechas
               es el rótulo que se malinterpreta. */}
           <p data-resumen-productos className="mb-3 text-xs text-gray-500">
-            <span className="font-mono tabular-nums text-gray-700">{Math.round(unidadesEnPantalla).toLocaleString("en-US")}</span> piezas
+            <span className="font-mono tabular-nums text-gray-700">{Math.round(unidadesEnPantalla).toLocaleString("en-US")}</span> unidades
             <span className="mx-1.5 text-gray-300">·</span>
             Precio prom. <span className="font-mono tabular-nums text-gray-700">{fmtPrecioProm(precioEnPantalla)}</span>
             <span className="mx-1.5 text-gray-300">·</span>
@@ -1031,7 +1031,7 @@ function ProductoRow({
                       códigos siguen ahí, con su rótulo, sin perder nada. */}
                   <div className="mb-1 flex gap-1" role="tablist" aria-label="Detalle de la descripción">
                     <DrillTabBtn activa={tab === "clientes"} onClick={() => onTab("clientes")}>
-                      Quién lo compra
+                      Clientes
                     </DrillTabBtn>
                     <DrillTabBtn activa={tab === "codigos"} onClick={() => onTab("codigos")}>
                       Códigos{codigos ? ` (${codigos.length})` : ""}
@@ -1125,7 +1125,7 @@ function ProductoCard({
             <>
               <div className="mb-1 flex gap-1" role="tablist" aria-label="Detalle de la descripción">
                 <DrillTabBtn activa={tab === "clientes"} onClick={() => onTab("clientes")}>
-                  Quién lo compra
+                  Clientes
                 </DrillTabBtn>
                 <DrillTabBtn activa={tab === "codigos"} onClick={() => onTab("codigos")}>
                   Códigos{codigos ? ` (${codigos.length})` : ""}
@@ -1260,7 +1260,7 @@ function BloqueClientes({ clientes, conDescargo = true }: {
         <thead>
           <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-[0.04em] text-gray-400">
             <th className="py-1.5 pr-3 font-normal">Cliente</th>
-            <th className="hidden py-1.5 pr-3 text-right font-normal sm:table-cell">Piezas</th>
+            <th className="hidden py-1.5 pr-3 text-right font-normal sm:table-cell">Cantidad</th>
             <th className="py-1.5 pr-3 text-right font-normal">Venta</th>
             <th data-col-participacion className="py-1.5 text-right font-normal">% del total</th>
           </tr>
@@ -1289,7 +1289,7 @@ function BloqueClientes({ clientes, conDescargo = true }: {
         <span className="font-mono tabular-nums text-gray-700">{clientes.length}</span>
         {clientes.length === 1 ? " cliente" : " clientes"}
         <span className="mx-1.5 text-gray-300">·</span>
-        <span className="font-mono tabular-nums text-gray-700">{Math.round(total.cantidad).toLocaleString("en-US")}</span> piezas
+        <span className="font-mono tabular-nums text-gray-700">{Math.round(total.cantidad).toLocaleString("en-US")}</span> unidades
         <span className="mx-1.5 text-gray-300">·</span>
         <span className="font-mono tabular-nums text-gray-700">{fmtMoney(total.venta)}</span>
         {conDescargo && (
@@ -1315,7 +1315,7 @@ function BloqueCodigos({ codigos }: { codigos: ProductoCodigo[] | undefined }) {
       <thead>
         <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-[0.04em] text-gray-400">
           <th className="py-1.5 pr-3 font-normal">Código</th>
-          <th className="hidden py-1.5 pr-3 text-right font-normal sm:table-cell">Piezas</th>
+          <th className="hidden py-1.5 pr-3 text-right font-normal sm:table-cell">Cantidad</th>
           <th className="py-1.5 pr-3 text-right font-normal">Venta</th>
           <th className="hidden py-1.5 pr-3 text-right font-normal sm:table-cell">Precio prom.</th>
           <th className="py-1.5 text-right font-normal">Margen %</th>
@@ -1405,7 +1405,7 @@ function DejoDeComprar({
   return (
     <div data-dejo-de-comprar className="mb-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
       <p className="mb-1.5 text-xs font-medium text-gray-700">
-        Dejó de comprar
+        Sin compras en el período
         {desde && hasta && (
           <span className="ml-1.5 font-normal text-gray-400">
             ({fmtDia(desde)} – {fmtDia(hasta)})
@@ -1476,10 +1476,10 @@ function DejoDeVenderse({
   return (
     <div data-dejo-de-venderse className="mb-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
       <p className="mb-1.5 text-xs font-medium text-gray-700">
-        Dejó de venderse
+        Sin ventas en el período
         <span className="ml-1.5 font-normal text-gray-500">
           <span className="font-mono tabular-nums">{filas.length}</span>
-          {filas.length === 1 ? " descripción que vendía " : " descripciones que vendían "}
+          {filas.length === 1 ? " descripción · " : " descripciones · "}
           <span className="font-mono tabular-nums">{fmtMoney(total)}</span>
         </span>
         {comparativo && (
@@ -1492,7 +1492,7 @@ function DejoDeVenderse({
         <thead>
           <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-[0.04em] text-gray-400">
             <th className="py-1.5 pr-3 font-normal">Descripción</th>
-            <th className="py-1.5 text-right font-normal">Vendía</th>
+            <th className="py-1.5 text-right font-normal">Venta anterior</th>
           </tr>
         </thead>
         <tbody>

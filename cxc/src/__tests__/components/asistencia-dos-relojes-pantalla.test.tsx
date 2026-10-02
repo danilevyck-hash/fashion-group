@@ -80,7 +80,8 @@ describe("🔴 los DOS relojes se ven, cada uno con su botón", () => {
     await screen.findByText(/entrando solas/);
     // 🩸 Este es el defecto: con `relojes[0]` este texto no existía en pantalla.
     expect(screen.getByText(/no pudo leer el reloj/)).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: /Traer ahora/ })).toHaveLength(2);
+    // 1-oct-2026, Daniel: nombres normales de ERP («name: /Traer ahora/» → «name: /Sincronizar/»).
+    expect(screen.getAllByRole("button", { name: /Sincronizar/ })).toHaveLength(2);
   });
 
   it("con dos relojes cada tarjeta dice CUÁL es", async () => {
@@ -101,7 +102,7 @@ describe("🔴 los DOS relojes se ven, cada uno con su botón", () => {
     servir([BOSTON, ACS]);
     montar();
     await screen.findByText(/entrando solas/);
-    const botones = screen.getAllByRole("button", { name: /Traer ahora/ });
+    const botones = screen.getAllByRole("button", { name: /Sincronizar/ });
     fireEvent.click(botones[1]);
     await waitFor(() => expect(pedidos).toHaveLength(1));
     expect(pedidos[0].dispositivo).toBe("reloj acs");
@@ -113,7 +114,7 @@ describe("⚠️ con un solo reloj la pantalla es la de siempre", () => {
     servir([BOSTON]);
     montar();
     await screen.findByText(/entrando solas/);
-    expect(screen.getAllByRole("button", { name: /Traer ahora/ })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /Sincronizar/ })).toHaveLength(1);
   });
 
   it("y NO se dibuja el nombre del reloj: no hay de qué distinguirlo", async () => {
@@ -127,7 +128,7 @@ describe("⚠️ con un solo reloj la pantalla es la de siempre", () => {
     servir([BOSTON]);
     montar();
     await screen.findByText(/entrando solas/);
-    fireEvent.click(screen.getByRole("button", { name: /Traer ahora/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Sincronizar/ }));
     await waitFor(() => expect(pedidos).toHaveLength(1));
     expect(pedidos[0].dispositivo).toBe("reloj cboston");
   });
@@ -139,7 +140,7 @@ describe("el pedido en el aire es de un reloj, no de la pantalla entera", () => 
     montar();
     await screen.findByText(/Pedido enviado/);
     // El de Boston gira; el de Multifashion se tiene que poder apretar igual.
-    const otro = screen.getByRole("button", { name: /Traer ahora/ });
+    const otro = screen.getByRole("button", { name: /Sincronizar/ });
     expect((otro as HTMLButtonElement).disabled).toBe(false);
   });
 

@@ -67,7 +67,7 @@ export default function EmpresaSelector({
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <div className="flex items-center justify-end mb-5">
           <h1 className="sr-only">Reclamos</h1>
-          <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">Nuevo Reclamo</button>
+          <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">Nuevo reclamo</button>
         </div>
 
         {(role === "admin" || role === "secretaria") && (
@@ -118,7 +118,7 @@ export default function EmpresaSelector({
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm min-w-[560px]">
                     <thead><tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-400">
-                      <th className="text-left pb-3 font-medium">N° Reclamo</th>
+                      <th className="text-left pb-3 font-medium">N° de reclamo</th>
                       <th className="text-left pb-3 font-medium">Empresa</th>
                       <th className="text-left pb-3 font-medium">Reclamado</th>
                       <th className="text-left pb-3 font-medium">Estado</th>

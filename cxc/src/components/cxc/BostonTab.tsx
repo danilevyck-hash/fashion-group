@@ -356,7 +356,7 @@ export default function BostonTab() {
               </div>
               {c.tambien_en_grupo && (
                 <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-gray-100 text-[11px] text-gray-600">
-                  también en el grupo
+                  También en Fashion Group
                 </span>
               )}
               <div className="mt-1 flex gap-3 text-sm tabular-nums">
@@ -385,7 +385,7 @@ export default function BostonTab() {
                   onClick={() => setDocumentosDe(c)}
                   className="flex-1 inline-flex min-h-[44px] items-center justify-center rounded-md border border-gray-300 px-3 text-xs font-medium text-gray-700 active:scale-[0.97]"
                 >
-                  Documentos
+                  Estado de cuenta
                 </button>
               </div>
             </div>
@@ -439,7 +439,7 @@ export default function BostonTab() {
                   <span className="truncate text-gray-900 group-hover:underline" title={c.nombre}>{c.nombre}</span>
                   {c.tambien_en_grupo && (
                     <span className="shrink-0 px-2 py-0.5 rounded-full bg-gray-100 text-[11px] text-gray-600 whitespace-nowrap">
-                      también en el grupo
+                      También en Fashion Group
                     </span>
                   )}
                 </span>

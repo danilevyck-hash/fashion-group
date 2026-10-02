@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 // ─────────────────────────────────────────────────────────────────────────────
 // CONTRATO — el Excel de Pedidos lleva los DOS números (25-ago-2026)
 //
@@ -8,12 +9,12 @@
 //
 // Lo que fija:
 //   1. Las dos columnas existen, AL FINAL, y las 6 de siempre no se movieron.
-//   2. El que no salió DICE que no salió ("No se ha mandado a Switch"), no "—".
+//   2. El que no salió DICE que no salió ("Pendiente de envío"), no "—".
 //   3. La columna de Switch nombra si fue pedido o COTIZACIÓN.
 //   4. 🔴 TOLERANCIA a la DDL 20260824160000: sin la columna `documento` el
 //      Excel sale igual y todo se lee como PEDIDO.
 //   5. Si la vista no diera `id_natural`/`fuente`, el libro sale como salía
-//      antes — SIN las dos columnas. Escribir "No se ha mandado a Switch" en
+//      antes — SIN las dos columnas. Escribir "Pendiente de envío" en
 //      todas las filas sin haberlo mirado sería una mentira en una planilla.
 //   6. Las 4 marcas hacen lo mismo (Joybees es espejo exacto de Reebok).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -132,7 +133,7 @@ describe("1-3. las dos columnas nuevas, al final, con las palabras de la pantall
 
     // El que NO salió lo dice con palabras, no con un guion.
     expect(ws[A(DATA_ROW, 6)].v).toBe("PED-017");
-    expect(ws[A(DATA_ROW, 7)].v).toBe("No se ha mandado a Switch");
+    expect(ws[A(DATA_ROW, 7)].v).toBe("Pendiente de envío");
     // 🔴 Y se ve sin leer esa frase: una columna de una palabra.
     expect(ws[A(DATA_ROW, 9)].v).toBe("No");
     // El que salió dice CUÁL de las dos fue.
@@ -146,7 +147,7 @@ describe("1-3. las dos columnas nuevas, al final, con las palabras de la pantall
     mainDb.queue("reebok_pedidos_unificado_vw", { data: [filaVista(OID, "Nathalie", "publicos")] });
     const ws = await hojaDeLaRespuesta(await post("reebok")(makeReq("/x", { role: "admin" })));
     expect(ws[A(DATA_ROW, 6)].v).toBe("Se numera al abrirlo");
-    expect(ws[A(DATA_ROW, 7)].v).toBe("No se ha mandado a Switch");
+    expect(ws[A(DATA_ROW, 7)].v).toBe("Pendiente de envío");
     // Y no se le pidió envío a nadie: una fila del link no puede tener uno.
     expect(reebokDb.chainsFor("reebok_switch_envios")).toHaveLength(0);
   });

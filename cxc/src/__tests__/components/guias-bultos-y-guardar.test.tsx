@@ -16,6 +16,9 @@
  *   · puntos 11 y 12 — un solo «Guardar Guía», y BULTOS empieza vacío.
  * ─────────────────────────────────────────────────────────────────────────────
  */
+// 🔄 1-oct-2026: nombres de ERP en Guías (Daniel aprobó el audit): rótulos en tipo oración
+// («Guardar guía», «Nueva guía de despacho», «Tipo de despacho», «Vincular cliente»…).
+// Este candado leía los textos viejos y se actualiza a propósito.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, act, fireEvent, waitFor } from "@testing-library/react";
 import { useEffect } from "react";
@@ -203,28 +206,28 @@ describe("🔴 5 · guardar manda solo lo que cambió", () => {
     const editar = screen.getByRole("button", { name: /^Editar$/i });
     await act(async () => { fireEvent.click(editar); });
     // El formulario es `dynamic()`: se espera a que esté, no a 300 ms.
-    await screen.findByRole("button", { name: /Guardar Cambios/i });
+    await screen.findByRole("button", { name: /Guardar cambios/i });
   }
 
-  it("🩸 abrir, mirar y apretar «Guardar Cambios» NO escribe nada", async () => {
+  it("🩸 abrir, mirar y apretar «Guardar cambios» NO escribe nada", async () => {
     // Medido: de 549 guardados, 407 (74%) borraron y recrearon los renglones
     // sin que nada hubiera cambiado. La guía 85 pasó por eso 45 veces en 3h38.
     await abrirEdicion();
     escrituras = [];
-    const guardar = screen.getByRole("button", { name: /Guardar Cambios/i });
+    const guardar = screen.getByRole("button", { name: /Guardar cambios/i });
     await act(async () => { fireEvent.click(guardar); });
     // El botón CUMPLE igual: cierra la edición. Eso es lo que se espera —y sin
     // esperarlo, «cero escrituras» sería verde por no haber pasado nada aún.
-    await waitFor(() => expect(screen.queryByRole("button", { name: /Guardar Cambios/i })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Guardar cambios/i })).toBeNull());
     expect(escrituras.filter((e) => e.metodo === "PUT")).toHaveLength(0);
   });
 
   it("⚠️ pero el botón CUMPLE: sale de la pantalla igual que siempre", async () => {
     await abrirEdicion();
     push.mockClear();
-    const guardar = screen.getByRole("button", { name: /Guardar Cambios/i });
+    const guardar = screen.getByRole("button", { name: /Guardar cambios/i });
     await act(async () => { fireEvent.click(guardar); });
-    await waitFor(() => expect(screen.queryByRole("button", { name: /Guardar Cambios/i })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Guardar cambios/i })).toBeNull());
     // No se queda quieto sin decir nada.
     expect(document.body.textContent).not.toMatch(/Guardando/);
   });
@@ -236,7 +239,7 @@ describe("🔴 5 · guardar manda solo lo que cambió", () => {
     escrituras = [];
     const obs = [...document.querySelectorAll<HTMLTextAreaElement>("textarea")].find((e) => !e.closest(".hidden"))!;
     await act(async () => { fireEvent.change(obs, { target: { value: "salió a último segundo" } }); });
-    const guardar = screen.getByRole("button", { name: /Guardar Cambios/i });
+    const guardar = screen.getByRole("button", { name: /Guardar cambios/i });
     await act(async () => { fireEvent.click(guardar); });
     // Se espera al PUT, no a que pasen 300 ms.
     await waitFor(() => expect(escrituras.some((e) => e.metodo === "PUT")).toBe(true));
@@ -255,7 +258,7 @@ describe("🔴 11 y 12 · un solo Guardar, y BULTOS empieza vacío", () => {
     const editar = screen.getByRole("button", { name: /^Editar$/i });
     await act(async () => { fireEvent.click(editar); });
     // El formulario es `dynamic()`: se espera a que esté, no a 300 ms.
-    await screen.findByRole("button", { name: /Guardar Cambios/i });
+    await screen.findByRole("button", { name: /Guardar cambios/i });
   }
 
   it("🔴 hay UN solo botón de guardar en toda la pantalla", async () => {

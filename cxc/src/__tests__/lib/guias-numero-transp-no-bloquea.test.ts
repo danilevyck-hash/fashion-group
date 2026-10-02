@@ -53,6 +53,9 @@ const lleno: EstadoDespacho = {
   chofer: "",
   tieneFirma1: true,
   tieneFirma2: true,
+  // 1-oct-2026: «Despachado por» se eligió mover de la guía al DESPACHO, donde es
+  // obligatorio (Daniel aprobó el mockup). «Lleno» ahora lo incluye.
+  despachadoPor: "Jorman",
 };
 
 describe("🔴 el N° del transportista NO bloquea", () => {
@@ -83,6 +86,7 @@ describe("🔴 el N° del transportista NO bloquea", () => {
       chofer: "",
       tieneFirma1: false,
       tieneFirma2: false,
+      despachadoPor: "",
     });
     // ⚠️ "la firma del transportista" SÍ está y tiene que estar: es una firma,
     // no el número. Lo que no puede aparecer es el N° de su guía.

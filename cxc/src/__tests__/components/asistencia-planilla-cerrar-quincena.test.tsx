@@ -244,7 +244,7 @@ describe("🔴 el calendario a la vista, y el cuadro solo cuando se pide", () =>
     // 🔴 Y ni rastro del rango libre: acá solo se pagan quincenas.
     expect(screen.queryByText("Otro rango")).toBeNull();
     expect(screen.queryByTestId("rango")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Elegir un día o un rango" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Seleccionar un día o un rango" })).toBeNull(); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   it("🔴 «›» no lleva al futuro: la quincena que todavía no empezó no se ofrece", () => {

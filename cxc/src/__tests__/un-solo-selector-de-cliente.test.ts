@@ -345,7 +345,8 @@ const sugerencias = () =>
 describe("🔴 la salida a mano no puede volver a llamarse solo \"Otro\"", () => {
   it("el rótulo dice que es LA SALIDA, no un cliente más", () => {
     const codigo = sinComentarios(picker());
-    expect(codigo).toContain("No está en la lista — escribir a mano");
+    // 1-oct-2026, Daniel: nombres normales de ERP («No está en la lista — escribir a mano» → «Ingresar manualmente»).
+    expect(codigo).toContain("Ingresar manualmente");
     expect(codigo).not.toMatch(/>\s*Otro\s*</);
   });
 
@@ -362,7 +363,8 @@ describe("🔴 la salida a mano no puede volver a llamarse solo \"Otro\"", () =>
     // El chip del código es la prueba de que la línea está amarrada a Switch.
     expect(codigo).toContain("Vinculado al directorio (${codigo})");
     // Y quien no ve la pantalla sigue sabiendo cómo quedó.
-    expect(codigo).toContain("Cliente escrito a mano");
+    // 1-oct-2026, Daniel: nombres normales de ERP («Cliente escrito a mano» → «Cliente manual»).
+    expect(codigo).toContain("Cliente manual");
   });
 });
 

@@ -199,7 +199,7 @@ describe("2 · el mismo renglón dice la misma frase en las dos pantallas", () =
     render(<ClientesView data={conHuerfano} selectedYear={2026} isClosedYear={false} modo="ventas" onModo={() => {}} />);
     // Los dos layouts se montan a la vez en jsdom (uno se esconde con CSS), así
     // que si hubiera dos frases distintas aparecerían las dos.
-    const dichos = screen.getAllByText(/Otros clientes \(1\) · todavía no están en el directorio/);
+    const dichos = screen.getAllByText(/Clientes no registrados \(1\)/) /* 1-oct-2026, Daniel: nombres normales de ERP */;
     expect(dichos.length).toBeGreaterThanOrEqual(2);
     expect(document.body.textContent).not.toContain("click para ver detalle");
     expect(document.body.textContent).not.toContain("Tocar para ver el detalle");
@@ -294,7 +294,7 @@ describe("5 · la ficha del cliente deja de usar la sigla y la jerga", () => {
     expect(screen.queryByText("CXC actual")).toBeNull();
     expect(screen.queryByText(/Ver en CXC/)).toBeNull();
     expect(document.body.textContent).not.toMatch(/\bCXC\b/);
-    expect(screen.getByText(/Ver en Cuentas por Cobrar/)).toBeTruthy();
+    expect(screen.getByText(/Ver en Cuentas por cobrar/)).toBeTruthy(); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   it("«YTD» no aparece en ningún rótulo de la ficha", () => {
@@ -304,11 +304,11 @@ describe("5 · la ficha del cliente deja de usar la sigla y la jerga", () => {
 
   it("las columnas dicen el año con todas sus cifras", () => {
     pintar();
-    expect(screen.getByText("Compró 2026")).toBeTruthy();
+    expect(screen.getByText("Compras 2026")).toBeTruthy(); // 1-oct-2026, Daniel: nombres normales de ERP
     // Los encabezados de la tabla: el año y el año pasado, enteros.
     expect(screen.getAllByText("2026").length).toBeGreaterThan(0);
     expect(screen.getAllByText("2025").length).toBeGreaterThan(0);
-    expect(screen.getByText("vs 2025")).toBeTruthy();
+    expect(screen.getByText("Variación %")).toBeTruthy(); // 1-oct-2026, Daniel: nombres normales de ERP («vs 2025»)
   });
 
   it("⚠️ la explicación de por qué las cifras NO cuadran sigue ahí, con las columnas de HOY", () => {
@@ -318,8 +318,9 @@ describe("5 · la ficha del cliente deja de usar la sigla y la jerga", () => {
     // la otra («el 38% de lo que te compró»).
     fireEvent.click(screen.getByRole("button", { name: /Por qué las cifras no cuadran/i }));
     const ayuda = screen.getByText(/va sin ITBMS/).closest("div")!;
-    expect(ayuda.textContent).toContain("Compró");
-    expect(ayuda.textContent).toContain("Debe");
+    // 1-oct-2026, Daniel: nombres normales de ERP («Compró · Debe» → «Compras · Saldo»).
+    expect(ayuda.textContent).toContain("Compras");
+    expect(ayuda.textContent).toContain("Saldo");
     expect(ayuda.textContent).not.toMatch(/\bCXC\b/);
     // La columna que se retiró no puede volver por la puerta de atrás.
     expect(ayuda.textContent).not.toContain("Cobrado");
@@ -416,7 +417,7 @@ describe("7 · 🔁 el diálogo de «Otros clientes» se retiró: van en la list
     // El cliente está EN LA LISTA (dos renders: tabla y tarjeta).
     expect(screen.getAllByText("SIN CÓDIGO").length).toBeGreaterThanOrEqual(1);
     // Y el renglón que los separa dice cuántos son.
-    expect(screen.getAllByText(/Otros clientes \(1\)/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Clientes no registrados \(1\)/).length).toBeGreaterThanOrEqual(1);
     // El año comparativo lo sigue diciendo el encabezado de la columna.
     expect(screen.getByText("vs 2024")).toBeTruthy();
   });

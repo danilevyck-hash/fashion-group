@@ -239,7 +239,8 @@ describe("🔴 «Descuentos»: la tercera tarjeta, minimalista", () => {
     fireEvent.click(within(s).getByRole("button", { name: "+ Agregar" }));
     await within(s).findByTestId("alta-descuento");
     expect((within(s).getByRole("button", { name: "Guardar" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(within(s).getByText("Falta elegir el vendedor")).toBeTruthy();
+    // 1-oct-2026, Daniel: nombres normales de ERP («elegir» → «seleccionar»).
+    expect(within(s).getByText("Falta seleccionar el vendedor")).toBeTruthy();
     fireEvent.change(within(s).getByLabelText("Vendedor"), { target: { value: "EDWIN" } });
     expect(within(s).getByText("Falta el concepto")).toBeTruthy();
   });
@@ -253,7 +254,7 @@ describe("🔴 «Descuentos»: la tercera tarjeta, minimalista", () => {
     const opciones = within(s).getAllByRole("option").map((o) => o.textContent);
     expect(opciones).not.toContain("Rey Stoute Aguas");
     expect(opciones).not.toContain("Daniel Levy");
-    expect(opciones).not.toContain("Oficina (DEFAULT)");
+    expect(opciones).not.toContain("Oficina (sin vendedor)"); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   it("🔴 quitar es SOFT DELETE con confirmación: DELETE a la ruta, y la ruta apaga `activo`", async () => {

@@ -162,7 +162,7 @@ export default function FichaTiendaCelular({
       <NumeroGrande valor={montoCelular(total)} detalle={textoPie} />
 
       {chips.length > 0 && (
-        <ChipsDePeriodoCelular chips={chips} elegido={periodo} onElegir={onPeriodo} etiqueta="Elegir el período" />
+        <ChipsDePeriodoCelular chips={chips} elegido={periodo} onElegir={onPeriodo} etiqueta="Seleccionar período" />
       )}
 
       {cargando ? (

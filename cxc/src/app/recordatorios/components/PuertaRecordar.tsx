@@ -49,12 +49,12 @@ export default function PuertaRecordar({ open, onCerrar, onElegir }: Props) {
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Recordar"
+        aria-label="Nuevo recordatorio"
         data-puerta-recordar
         className="bg-white sm:rounded-lg rounded-t-2xl w-full max-w-sm mx-0 sm:mx-4 border border-gray-200"
       >
         <header className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-          <h2 className="text-base font-medium">¿Qué te recuerdo?</h2>
+          <h2 className="text-base font-medium">Nuevo recordatorio</h2>
           <button
             type="button"
             onClick={onCerrar}

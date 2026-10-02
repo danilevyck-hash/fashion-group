@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «N° de factura».
 /**
  * ─────────────────────────────────────────────────────────────────────────────
  * CAJA — LA LISTA DE PERÍODOS Y EL PAPEL QUE SE FIRMA (7-sep-2026).
@@ -137,7 +138,7 @@ describe("🔴 EL PAPEL QUE SE FIRMA", () => {
   it("lleva el N° de factura en cada línea, y «—» donde no hay", () => {
     render(<PrintView current={periodo} onBack={vi.fn()} />);
     const doc = document.getElementById("print-document")!;
-    expect(within(doc).getByText("N° Factura")).toBeTruthy();
+    expect(within(doc).getByText("N° de factura")).toBeTruthy();
     expect(within(doc).getByText("196854200")).toBeTruthy();
     // El recibo sin factura no inventa un número.
     expect(doc.querySelectorAll("td")).toBeTruthy();

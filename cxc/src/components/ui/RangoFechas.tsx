@@ -243,8 +243,8 @@ export default function RangoFechas({
     <button
       type="button"
       onClick={() => setAbierto((v) => !v)}
-      aria-label="Elegir un día o un rango"
-      title="Elegir un día o un rango"
+      aria-label="Seleccionar un día o un rango"
+      title="Seleccionar un día o un rango"
       className="flex h-11 w-11 items-center justify-center rounded-md border border-gray-300 text-base transition hover:border-black active:scale-[0.97]"
     >
       <CalendarDays aria-hidden className="h-4 w-4 text-gray-600" />

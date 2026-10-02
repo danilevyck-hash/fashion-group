@@ -139,7 +139,7 @@ describe("🔴 el ⚙ «Configuración»: solo admin, solo en el módulo /comisi
     // Es un interruptor: queda marcado mientras la configuración está abierta.
     expect(engranaje.getAttribute("aria-pressed")).toBe("true");
     await screen.findByText("Tasas por vendedor");
-    await screen.findByText("Clientes que no comisionan");
+    await screen.findByText("Exclusiones de comisión");
     expect(screen.queryByRole("button", { name: /Descargar el mes/i })).toBeNull();
     // Y el selector de empresa NO se va: elegir una es la forma de salir.
     expect(screen.getByLabelText("Empresa")).toBeTruthy();
@@ -195,13 +195,15 @@ function agregarEnClientes() {
 describe("🔴 la pestaña Configuración", () => {
   beforeEach(() => { sessionStorage.setItem("cxc_role", "admin"); });
 
-  it("no dice «exclusión» por ningún lado: se llama «Clientes que no comisionan»", async () => {
+  // 1-oct-2026, Daniel: nombres normales de ERP. Antes este caso prohibía
+  // «exclusión»; desde hoy la sección se llama «Exclusiones de comisión».
+  it("la sección se llama «Exclusiones de comisión» y no quedan rótulos coloquiales", async () => {
     render(<ComisionesConfiguracionView />);
-    await screen.findByText("Clientes que no comisionan");
+    await screen.findByText("Exclusiones de comisión");
     await screen.findByText("Kheriddine");
     agregarEnClientes();
     await screen.findByTestId("alta-sin-comision");
-    expect(document.body.textContent ?? "").not.toMatch(/exclu/i);
+    expect(document.body.textContent ?? "").not.toMatch(/no comisiona/i);
   });
 
   it("🔴 Tasas por vendedor: «Reynaldo Espinosa» con Y y capitalizado, UNA fila, 1.00 / 1.00, sin nota de «N nombres»; Daniel Levy NO está", async () => {
@@ -221,7 +223,7 @@ describe("🔴 la pestaña Configuración", () => {
     expect(within(tabla).queryByText(/Rey Stoute Aguas|REY STOUTE AGUAS|Aguas/)).toBeNull();
     // Daniel: «quítalo».
     expect(within(tabla).queryByText(/DANIEL LEVY|Daniel Levy/)).toBeNull();
-    expect(within(tabla).queryByText("no se paga")).toBeNull();
+    expect(within(tabla).queryByText("No pagable")).toBeNull();
     // Se manda con el nombre CANÓNICO (el que agrupa la RPC) y con las DOS tasas.
     // 🔄 6-sep-2026: se fue el botón «Guardar tasas» (era un segundo botón NEGRO
     // compitiendo con «+ Agregar», y las tasas pedían guardar mientras las
@@ -246,13 +248,13 @@ describe("🔴 la pestaña Configuración", () => {
   // encabezado, CERO casillas, y cada renglón dice en palabras lo que hace.
   it("🔴 UNA sola lista, en palabras, sin casillas y sin agrupar por empresa", async () => {
     render(<ComisionesConfiguracionView />);
-    const seccion = (await screen.findByText("Clientes que no comisionan")).closest("section")!;
+    const seccion = (await screen.findByText("Exclusiones de comisión")).closest("section")!;
     // 🩸 No hay grupos por empresa, y no hay ni una casilla.
     expect(seccion.querySelectorAll("[data-grupo-empresa]").length).toBe(0);
     expect(seccion.querySelectorAll('input[type="checkbox"]').length).toBe(0);
     // Un solo encabezado, con la columna en palabras.
     const encabezados = within(seccion).getAllByRole("columnheader").map((h) => h.textContent?.trim());
-    expect(encabezados).toEqual(["Cliente", "Vendedor", "Empresas", "Qué no comisiona", "Quitar"]);
+    expect(encabezados).toEqual(["Cliente", "Vendedor", "Empresas", "Excluye", "Quitar"] /* 1-oct-2026, Daniel: nombres normales de ERP */);
     // Las tres filas de la base son TRES reglas (clientes distintos).
     const filas = [...seccion.querySelectorAll("[data-regla]")];
     expect(filas).toHaveLength(3);
@@ -260,15 +262,15 @@ describe("🔴 la pestaña Configuración", () => {
     expect(within(kher).getByText("D-84")).toBeTruthy();
     expect(within(kher).getByText("Reynaldo Espinosa")).toBeTruthy();
     expect(within(kher).getByText("Active Shoes")).toBeTruthy();
-    expect((kher.textContent ?? "")).toContain("No comisiona venta ni cobro");
+    expect((kher.textContent ?? "")).toContain("Excluido: venta y cobro");
     // 🔴 Metro Shoes es la única de «solo la venta»: se lee sin descifrar casillas.
     const metro = within(seccion).getByText("Metro Shoes").closest("tr")!;
-    expect((metro.textContent ?? "")).toContain("No comisiona solo la venta");
+    expect((metro.textContent ?? "")).toContain("Excluido: solo la venta");
   });
 
   it("🔴 los dos desplegables filtran, y el comodín «todos los vendedores» NUNCA se esconde", async () => {
     render(<ComisionesConfiguracionView />);
-    const seccion = (await screen.findByText("Clientes que no comisionan")).closest("section")!;
+    const seccion = (await screen.findByText("Exclusiones de comisión")).closest("section")!;
     fireEvent.change(within(seccion).getByLabelText("Filtrar por empresa"), { target: { value: "active_wear" } });
     await waitFor(() => expect([...seccion.querySelectorAll("[data-regla]")]).toHaveLength(1));
     expect(within(seccion).getByText("El Remate")).toBeTruthy();
@@ -279,11 +281,11 @@ describe("🔴 la pestaña Configuración", () => {
 
   it("🔴 cambiar qué no comisiona manda PATCH ?id= por cada fila de la regla; las dos apagadas no mandan nada", async () => {
     render(<ComisionesConfiguracionView />);
-    const seccion = (await screen.findByText("Clientes que no comisionan")).closest("section")!;
+    const seccion = (await screen.findByText("Exclusiones de comisión")).closest("section")!;
     const kher = within(seccion).getByText("Kheriddine").closest("tr")!;
     fireEvent.click(within(kher).getByRole("button", { name: /Opciones de Kheriddine/ }));
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Cambiar qué no comisiona" }));
-    const hoja = await screen.findByLabelText("¿Qué no comisiona?");
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Editar exclusión" }));
+    const hoja = await screen.findByLabelText("Excluir de");
     // Arranca diciendo lo que la regla dice hoy: las dos.
     const venta = within(hoja).getByRole("switch", { name: /La venta/ });
     const cobro = within(hoja).getByRole("switch", { name: /El cobro/ });
@@ -307,7 +309,7 @@ describe("🔴 la pestaña Configuración", () => {
   it("quitar pide confirmación (diciendo qué vuelve) y manda DELETE ?id= (soft delete en el servidor)", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     render(<ComisionesConfiguracionView />);
-    const seccion = (await screen.findByText("Clientes que no comisionan")).closest("section")!;
+    const seccion = (await screen.findByText("Exclusiones de comisión")).closest("section")!;
     const kher = within(seccion).getByText("Kheriddine").closest("tr")!;
     fireEvent.click(within(kher).getByRole("button", { name: /Opciones de Kheriddine/ }));
     fireEvent.click(await screen.findByRole("menuitem", { name: "Quitar" }));
@@ -327,12 +329,12 @@ describe("🔴 la pestaña Configuración", () => {
 
   it("🔴 «+ Agregar»: Empresa → Cliente (el selector compartido) → Vendedor → Venta ☑ Cobro ☑ → Guardar; arranca con las DOS marcadas", async () => {
     render(<ComisionesConfiguracionView />);
-    await screen.findByText("Clientes que no comisionan");
+    await screen.findByText("Exclusiones de comisión");
     agregarEnClientes();
     const alta = await screen.findByTestId("alta-sin-comision");
     const guardar = within(alta).getByRole("button", { name: "Guardar" }) as HTMLButtonElement;
     expect(guardar.disabled).toBe(true);
-    expect(within(alta).getByText("Falta elegir el cliente")).toBeTruthy();
+    expect(within(alta).getByText("Falta seleccionar el cliente")).toBeTruthy();
     // «arranca con las dos marcadas pero yo deselecciono».
     // 🔁 Desde el 25-sep-2026 son INTERRUPTORES bajo la pregunta «¿Qué no
     // comisiona?», no casillas bajo un encabezado que decía «VENTA».
@@ -340,12 +342,12 @@ describe("🔴 la pestaña Configuración", () => {
     const cobro = within(alta).getByRole("switch", { name: "El cobro" });
     expect(venta.getAttribute("aria-checked")).toBe("true");
     expect(cobro.getAttribute("aria-checked")).toBe("true");
-    expect(within(alta).getByText("¿Qué no comisiona?")).toBeTruthy();
+    expect(within(alta).getByText("Excluir de")).toBeTruthy();
     // El selector compartido pide el directorio de la empresa elegida (la primera de las 6).
     await waitFor(() => expect(llamadas.some((c) => /\/exclusiones\/vistana\/clientes-switch\?q=/.test(c.url))).toBe(true));
     const kher = await within(alta).findByRole("button", { name: /Kheriddine/ });
     fireEvent.click(kher);
-    expect(within(alta).getByText("Falta elegir el vendedor")).toBeTruthy();
+    expect(within(alta).getByText("Falta seleccionar el vendedor")).toBeTruthy();
     // El desplegable muestra el nombre bonito y manda el canónico.
     const select = within(alta).getByLabelText("Vendedor") as HTMLSelectElement;
     expect([...select.options].map((o) => o.textContent)).toContain("Edwin");
@@ -360,7 +362,7 @@ describe("🔴 la pestaña Configuración", () => {
 
   it("🔴 las 4 combinaciones: solo Venta y solo Cobro viajan al POST; las dos apagadas no se guardan y se avisa", async () => {
     render(<ComisionesConfiguracionView />);
-    await screen.findByText("Clientes que no comisionan");
+    await screen.findByText("Exclusiones de comisión");
     agregarEnClientes();
     const alta = await screen.findByTestId("alta-sin-comision");
     const guardar = within(alta).getByRole("button", { name: "Guardar" }) as HTMLButtonElement;
@@ -425,9 +427,9 @@ describe("🔴 el chip «N clientes sin comisión» NO va en las tablas", () => 
     expect(within(tabla).getByText("Reynaldo Espinosa")).toBeTruthy();
     // 🔄 6-sep-2026: la oficina arranca detrás de «Ver los que no se pagan».
     await act(async () => {
-      fireEvent.click(within(tabla).getByRole("button", { name: /Ver los que no se pagan/ }));
+      fireEvent.click(within(tabla).getByRole("button", { name: /Mostrar no pagables/ }));
     });
-    const def = within(tabla).getByText("Oficina (DEFAULT)").closest("tr")!;
+    const def = within(tabla).getByText("Oficina (sin vendedor)").closest("tr")!;
     expect(within(def).queryByText(/sin comisión/)).toBeNull();
   });
 });

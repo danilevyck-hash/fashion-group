@@ -170,7 +170,7 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
         </table>
 
         <div className="print-obs mb-8 text-xs">
-          <div className="font-medium uppercase mb-1">Observaciones Generales del Envío</div>
+          <div className="font-medium uppercase mb-1">Observaciones</div>
           <div className="border border-gray-300 rounded p-2 min-h-[40px] whitespace-pre-wrap">
             {observacionesVisibles(g.observaciones)}
           </div>

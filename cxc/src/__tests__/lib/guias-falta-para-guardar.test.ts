@@ -58,13 +58,18 @@ describe("la cabecera", () => {
   it("sin transportista, estando en modo transportista", () => {
     expect(faltaParaGuardar(estado({ transportistaId: null }))).toEqual(["el transportista"]);
   });
-  it("sin quién despacha", () => {
-    expect(faltaParaGuardar(estado({ entregadoPor: "" }))).toEqual(["quién despacha"]);
+  it("sin quién despacha NO falta nada: se elige al despachar", () => {
+    // 🔄 1-oct-2026: Daniel aprobó (sobre el mockup) sacar «Despachado por» de la
+    // creación de la guía y pedirlo al DESPACHAR. Este candado fijaba lo viejo
+    // y se reescribe a propósito: guardar la guía YA NO lo exige; el despacho
+    // sí (`faltaParaDespachar` y el PUT que completa, ver
+    // `guias-nueva-guia-2026-10.test.ts`).
+    expect(faltaParaGuardar(estado({ entregadoPor: "" }))).toEqual([]);
   });
   it("se dicen TODOS juntos, en el orden en que se leen", () => {
     const falta = faltaParaGuardar(estado({ fecha: "", transportistaId: null, entregadoPor: "" }));
-    expect(falta).toEqual(["la fecha", "el transportista", "quién despacha"]);
-    expect(textoFalta(falta)).toBe("Falta: la fecha, el transportista y quién despacha");
+    expect(falta).toEqual(["la fecha", "el transportista"]);
+    expect(textoFalta(falta)).toBe("Falta: la fecha y el transportista");
   });
 });
 
@@ -73,7 +78,8 @@ describe("los envíos", () => {
     // Pedir "el cliente, la dirección, la empresa…" de una fila en blanco sería
     // gritarle cinco cosas a quien todavía no escribió ninguna.
     const falta = faltaParaGuardar(estado({ items: [envio({ cliente: "", direccion: "", empresa: "", facturas: "", bultos: 0 })] }));
-    expect(falta).toEqual(["por lo menos un envío"]);
+    // 🔄 1-oct-2026: el texto del mockup aprobado, «al menos un envío».
+    expect(falta).toEqual(["al menos un envío"]);
   });
 
   it("con UN solo envío no se lo numera", () => {
@@ -111,7 +117,7 @@ describe("🔴 la lista NO es una segunda lista de reglas", () => {
     const casos: EstadoGuia[] = [
       estado({ fecha: "" }),
       estado({ transportistaId: null }),
-      estado({ entregadoPor: "" }),
+      // 🔄 1-oct-2026: `entregadoPor: ""` salió de esta lista: ya no se rechaza al guardar.
       estado({ items: [envio({ cliente: "" })] }),
       estado({ items: [envio({ direccion: "" })] }),
       estado({ items: [envio({ empresa: "" })] }),

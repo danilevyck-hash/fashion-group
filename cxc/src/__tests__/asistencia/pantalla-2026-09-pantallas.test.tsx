@@ -110,7 +110,7 @@ describe("A · Asistencia en la computadora", () => {
     expect(screen.getByRole("button", { name: "Quincena siguiente" })).toBeTruthy();
     // ⚠️ `RangoFechas` dibuja su botón DOS veces —uno para el escritorio y otro
     // para el teléfono, uno escondido por CSS— desde antes de este rediseño.
-    expect(screen.getAllByRole("button", { name: "Elegir un día o un rango" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "Seleccionar un día o un rango" }).length).toBeGreaterThan(0); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   it("🩸 los cuatro atajos «Hoy · Ayer · Esta quincena · Quincena pasada» ya no se dibujan", async () => {
@@ -251,7 +251,8 @@ describe("B · Asistencia en el celular", () => {
     // sirve el servidor la pastilla nombra el de Multifashion y nada más.
     expect(await screen.findByText("Reloj de Multifashion al día")).toBeTruthy();
     expect(screen.queryByText(/Reloj de Boston/)).toBeNull();
-    expect(screen.getByRole("button", { name: /Traer ahora/ })).toBeTruthy();
+    // 1-oct-2026, Daniel: nombres normales de ERP («name: /Traer ahora/» → «name: /Sincronizar/»).
+    expect(screen.getByRole("button", { name: /Sincronizar/ })).toBeTruthy();
   });
 });
 
@@ -394,7 +395,7 @@ describe("E · el reloj en la computadora", () => {
     montarReporte();
     await screen.findByText("Ana Trejos");
     expect(await screen.findByText(/al día/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Traer ahora/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Sincronizar/ })).toBeTruthy();
   });
 
   it("🔴 y con uno callado NOMBRA al que falla — los números de abajo están incompletos", async () => {
@@ -407,7 +408,7 @@ describe("E · el reloj en la computadora", () => {
     // 🔴 Nombra SOLO al que falla: «2 de 2 relojes» obligaba a abrir algo para
     // saber cuál.
     expect(await screen.findByText(/Reloj de Multifashion sin señal/)).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: /Traer ahora/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: /Sincronizar/ }).length).toBeGreaterThan(0);
   });
 
   it("🔴 con «Todas», UN «Traer ahora» le deja el pedido a LOS DOS", async () => {
@@ -430,7 +431,7 @@ describe("E · el reloj en la computadora", () => {
     }));
     // Con «Todas» se ven los dos relojes y el botón le pide a los dos.
     render(<ToastProvider><ReporteTab empresa="todas" /></ToastProvider>);
-    fireEvent.click(await screen.findByRole("button", { name: /Traer ahora/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Sincronizar/ }));
     await waitFor(() => expect(pedidos.length).toBe(2));
     expect(new Set(pedidos)).toEqual(new Set(["reloj cboston", "reloj acs"]));
   });

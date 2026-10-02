@@ -236,7 +236,7 @@ export type ClaveDescarga = "total-por-cliente" | "por-compania";
 
 export const ROTULO_DESCARGA: Record<ClaveDescarga, string> = {
   "total-por-cliente": "Total por cliente",
-  "por-compania": "Detallado por compañía",
+  "por-compania": "Detalle por empresa",
 };
 
 /** El encabezado del menú, arriba de las dos líneas. */

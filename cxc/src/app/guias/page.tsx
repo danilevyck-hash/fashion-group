@@ -212,7 +212,7 @@ export default function GuiasPage() {
   return (
     <PullToRefresh onRefresh={s.loadGuias}>
       <div>
-        <AppHeader module="Guías de Despacho" />
+        <AppHeader module="Guías de despacho" />
         {/* La fila de pestañas solo existe para quien puede configurar
             (admin y secretaria): para bodega y vendedor la pantalla es
             exactamente la de siempre, sin una fila extra. */}

@@ -153,7 +153,7 @@ export function avisoDeLaPastilla(relojes: readonly RelojParaLaFila[]): string |
 
 /** ⚠️ «Traer ahora» de Asistencia es OTRA cosa que «Actualizar ahora»: le pide a
  *  una PC que empuje las marcas de su reloj. El rótulo no se toca. */
-export const TRAER_AHORA = "Traer ahora";
+export const TRAER_AHORA = "Sincronizar";
 
 /** Lo que dice el botón mientras la PC no ha recogido el pedido. */
 export const ESPERANDO_A_LA_PC = "Esperando a la PC…";

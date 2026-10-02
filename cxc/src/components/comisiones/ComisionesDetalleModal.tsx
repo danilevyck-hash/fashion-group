@@ -516,7 +516,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
 
             {/* CIERRE */}
             <section className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">Cierre</h3>
+              <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">Resumen</h3>
               <dl className="space-y-1 text-sm">
                 <div className="flex justify-between">
                   <dt className="text-gray-600">Ventas {fmtMoney(data.ventas_base)} × {pctTasaV}%</dt>

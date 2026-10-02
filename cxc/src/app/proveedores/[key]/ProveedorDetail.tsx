@@ -131,7 +131,7 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
             <section className="border border-gray-200 rounded-lg p-4 mb-4">
               <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
                 <div>
-                  <div className="text-xs uppercase tracking-[0.05em] text-gray-400">Por pagar · grupo</div>
+                  <div className="text-xs uppercase tracking-[0.05em] text-gray-400">Saldo por pagar (total)</div>
                   <div className={`text-2xl font-semibold tabular-nums mt-1 ${data.total_grupo.por_pagar < 0 ? "text-blue-600" : "text-purple-700"}`}>
                     {data.total_grupo.por_pagar < 0
                       ? `Saldo a favor $${fmt(Math.abs(data.total_grupo.por_pagar))}`
@@ -218,7 +218,7 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
                     </tr>
                   ))}
                   <tr className="font-medium">
-                    <td className="py-2.5">Total grupo</td>
+                    <td className="py-2.5">Total</td>
                     <PorPagarCell value={data.total_grupo.por_pagar} className="py-2.5" />
                     <td className="py-2.5" />
                   </tr>

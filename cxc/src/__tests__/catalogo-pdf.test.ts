@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 // Tests de la lib única de PDFs de catálogo (order-pdf-core + catalog-pdf).
 //
 // Bug histórico cubierto: el TOTAL del pedido salía repetido en CADA página
@@ -120,7 +121,7 @@ describe("order-pdf-core — PDF de pedido único Reebok/Joybees", () => {
     });
     const text = (await extractPagesText(docBytes(doc))).join(" ");
     expect(text).toContain("Pedido");
-    expect(text).toContain("Pre-orden");
+    expect(text).toContain("Preventa");
     // El total sigue sumando TODO (regulares + pre-orden)
     expect(text).toContain("20 bultos · 240 piezas");
   });
@@ -141,7 +142,7 @@ describe("order-pdf-core — PDF de pedido único Reebok/Joybees", () => {
     });
     const text = (await extractPagesText(docBytes(doc))).join(" ");
     expect(text).not.toContain("Detalle");
-    expect(text).not.toContain("Pre-orden");
+    expect(text).not.toContain("Preventa");
     // Y la tabla SÍ está: que no haya rótulo no puede significar que se perdió.
     expect(text).toContain("Producto");
     expect(text).toContain("Subtotal");

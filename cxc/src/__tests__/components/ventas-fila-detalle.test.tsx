@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP («Cierre del año» → «Proyección de cierre», «Quién lo compra» → «Clientes», «Total Grupo» → «Total grupo»).
 // La fila transformada: qué muestra y cómo se cierra.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
@@ -116,13 +117,13 @@ describe("cierre y foco", () => {
 describe("fila oscura de totales", () => {
   it("usa el borde indigo claro para que se lea sobre el fondo negro", () => {
     renderFila({
-      detalle: detalle({ filaId: TOTAL_GRUPO_ID, titulo: "Total Grupo" }),
+      detalle: detalle({ filaId: TOTAL_GRUPO_ID, titulo: "Total grupo" }),
       colSpan: 10,
       onClose: () => {},
       oscura: true,
     });
     const td = screen.getByTestId("fila-detalle").querySelector("td")!;
     expect(td.className).toContain("ring-indigo-300");
-    expect(screen.getByText("Total Grupo")).toBeTruthy();
+    expect(screen.getByText("Total grupo")).toBeTruthy();
   });
 });

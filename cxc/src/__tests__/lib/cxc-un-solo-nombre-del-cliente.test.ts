@@ -122,8 +122,9 @@ describe("🔴 2 · todas las superficies del grupo la usan", () => {
   it("la barra de «mandar a varios» y los textos que LEE EL CLIENTE", () => {
     const src = plano(PAGINA);
     // WhatsApp y «copiar mensaje» son textos que recibe el cliente.
-    expect(src).toContain("`Estado de Cuenta - ${nombreDeCliente(client)} - Fashion Group`");
-    expect(src).toContain("`Estado de Cuenta - ${nombreDeCliente(client)}`");
+    // 1-oct-2026, Daniel: nombres normales de ERP («Estado de Cuenta» → «Estado de cuenta»).
+    expect(src).toContain("`Estado de cuenta - ${nombreDeCliente(client)} - Fashion Group`");
+    expect(src).toContain("`Estado de cuenta - ${nombreDeCliente(client)}`");
     expect(src).toContain("nombre: nombreDeCliente(c)");
   });
 

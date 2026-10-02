@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (Mandar → Enviar)
 // ─────────────────────────────────────────────────────────────────────────────
 // PARIDAD 3 MARCAS — el pedido del LINK PÚBLICO **NO** sale solo a Switch.
 //
@@ -212,7 +213,7 @@ describe("confirmar del link — NO sale solo a Switch (las 3 marcas)", () => {
       seed(m);
       await confirmar(m.marca);
       const avisos = mockTelegram.mock.calls.map((c) => String(c[0]));
-      expect(avisos.some((a) => a.includes("Falta ponerle el cliente y mandarlo a Switch"))).toBe(true);
+      expect(avisos.some((a) => a.includes("Falta asignar el cliente y enviarlo a Switch"))).toBe(true);
       expect(avisos.some((a) => a.includes("Entra a Switch como Contado"))).toBe(false);
     });
 

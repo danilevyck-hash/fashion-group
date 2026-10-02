@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «Detalle por empresa», columna «Empresa».
 /**
  * ─────────────────────────────────────────────────────────────────────────────
  * 🔴 CUENTAS POR COBRAR — «DESCARGAR» SON DOS COSAS, Y LAS DOS EN PDF Y EXCEL
@@ -113,7 +114,7 @@ const DOS: Company[] = B2B_COMPANIES.filter((c) => c.key === "vistana" || c.key 
 describe("🔴 1 · «Descargar» ofrece DOS cosas, no tres", () => {
   it("las dos líneas y su encabezado", () => {
     expect(ENCABEZADO_DESCARGAS).toBe("Todos los clientes");
-    expect(Object.values(ROTULO_DESCARGA)).toEqual(["Total por cliente", "Detallado por compañía"]);
+    expect(Object.values(ROTULO_DESCARGA)).toEqual(["Total por cliente", "Detalle por empresa"]);
   });
 
   it("el botón dice «Descargar», no «Exportar»", () => {
@@ -180,10 +181,10 @@ describe("🔴 3 · qué columnas trae cada archivo", () => {
   });
 
   it("«Detallado por compañía»: la Compañía entra en el medio y nada más", () => {
-    const ws = libroPorCompania(bloquesPorCompania(CARTERA, DOS), bloquesSaldoAFavor(CARTERA, DOS), "x").Sheets["Cartera por compañía"];
+    const ws = libroPorCompania(bloquesPorCompania(CARTERA, DOS), bloquesSaldoAFavor(CARTERA, DOS), "x").Sheets["Cartera por empresa"];
     const cabecera = ["A3", "B3", "C3", "D3", "E3", "F3", "G3"].map((c) => ws[c]?.v);
     expect(cabecera).toEqual([
-      "Código", "Cliente", "Compañía",
+      "Código", "Cliente", "Empresa",
       tramoLabel("current"), tramoLabel("watch"), tramoLabel("overdue"), "Total",
     ]);
   });
@@ -417,7 +418,7 @@ describe("🔴 8 · el Excel sale por el estándar de la casa", () => {
   it("🔴 en el Excel el código y el cliente se REPITEN en cada renglón", () => {
     // En el papel las compañías van adentro del cliente; en la hoja no: sin el
     // nombre en cada fila no se puede filtrar ni armar una tabla dinámica.
-    const ws = libroPorCompania(bloquesPorCompania(CARTERA, DOS), bloquesSaldoAFavor(CARTERA, DOS), "x").Sheets["Cartera por compañía"];
+    const ws = libroPorCompania(bloquesPorCompania(CARTERA, DOS), bloquesSaldoAFavor(CARTERA, DOS), "x").Sheets["Cartera por empresa"];
     expect([ws["A4"]?.v, ws["B4"]?.v, ws["C4"]?.v]).toEqual(["D-25", "City Mall Paso Canoa", "Vistana International"]);
     expect([ws["A5"]?.v, ws["B5"]?.v, ws["C5"]?.v]).toEqual(["D-25", "City Mall Paso Canoa", "Fashion Wear"]);
   });
@@ -453,7 +454,7 @@ describe("🔴 9 · el archivo dice qué es, de quién y de cuándo", () => {
     expect(subtituloDelPapel("total-por-cliente", "Vistana International"))
       .toBe("Total por cliente — Vistana International");
     expect(subtituloDelPapel("por-compania", null))
-      .toBe("Detallado por compañía — Fashion Group · 6 empresas");
+      .toBe("Detalle por empresa — Fashion Group · 6 empresas");
   });
 });
 

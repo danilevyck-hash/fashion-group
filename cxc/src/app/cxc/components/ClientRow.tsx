@@ -6,10 +6,10 @@ import { seLeCobra } from "@/lib/cxc/cobrable";
 import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
 
 function riskInfo(total: number, current: number, watch: number, overdue: number): { border: string; tooltip: string } {
-  if (total < 0) return { border: "border-l-blue-400", tooltip: "Saldo a favor: saldo negativo (nota de credito o sobrepago)" };
-  if (overdue > 0) return { border: "border-l-red-500", tooltip: "Vencido critico: deuda con mas de 120 dias" };
-  if (watch > 0) return { border: "border-l-amber-400", tooltip: "Vencido reciente: deuda con 91 a 120 dias" };
-  return { border: "border-l-emerald-500", tooltip: "Por vencer: deuda dentro del plazo (0 a 90 dias)" };
+  if (total < 0) return { border: "border-l-blue-400", tooltip: "Saldo a favor: saldo negativo (nota de crédito o sobrepago)" };
+  if (overdue > 0) return { border: "border-l-red-500", tooltip: "Vencido crítico: deuda con más de 120 días" };
+  if (watch > 0) return { border: "border-l-amber-400", tooltip: "Vencido reciente: deuda con 91 a 120 días" };
+  return { border: "border-l-emerald-500", tooltip: "Por vencer: deuda dentro del plazo (0 a 90 días)" };
 }
 
 interface Props {

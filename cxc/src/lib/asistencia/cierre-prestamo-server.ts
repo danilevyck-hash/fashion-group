@@ -233,7 +233,7 @@ async function escribirUnPago(planillaId: string, p: PagoAEscribir): Promise<voi
     })
     .select("id")
     .single();
-  if (error) throw new Error(`No se pudo anotar el pago de ${p.nombrePrestamos}: ${error.message}`);
+  if (error) throw new Error(`No se pudo registrar el pago de ${p.nombrePrestamos}: ${error.message}`);
 
   const movimientoId = String((data as { id: string }).id);
   const { error: errAmarre } = await supabaseServer.from(TABLA_AMARRE).insert({

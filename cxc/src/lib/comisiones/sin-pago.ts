@@ -53,7 +53,8 @@ export function sumarPagable<T extends { se_paga?: boolean }>(
 }
 
 /** Texto único de la marca en pantalla y en el Excel. */
-export const ROTULO_NO_SE_PAGA = "no se paga";
+// 1-oct-2026, Daniel: nombres normales de ERP («no se paga» → «No pagable»).
+export const ROTULO_NO_SE_PAGA = "No pagable";
 
 /**
  * 🔴 LOS QUE NO SE PAGAN, DETRÁS DE «VER TODOS» (6-sep-2026).
@@ -71,7 +72,7 @@ export const ROTULO_NO_SE_PAGA = "no se paga";
  * `sumarPagable` y el Excel los sigue llevando con su «(no se paga)»: lo único
  * que cambia es que la pantalla no los dibuja hasta que se los pide.
  */
-export const ROTULO_VER_NO_SE_PAGAN = "Ver los que no se pagan";
+export const ROTULO_VER_NO_SE_PAGAN = "Mostrar no pagables";
 export const ROTULO_VER_MENOS = "Ver menos";
 
 /** «Ver los que no se pagan (2)» — con cuántos hay, para no abrir a ciegas. */

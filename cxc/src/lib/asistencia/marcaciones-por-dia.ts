@@ -62,7 +62,7 @@ export const MARCACIONES_POR_DIA = true;
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Las TRES columnas de la computadora, en este orden. */
-export const COLUMNAS_POR_DIA = ["Colaborador", "Sus marcas del día", "Lugar"] as const;
+export const COLUMNAS_POR_DIA = ["Colaborador", "Marcaciones", "Lugar"] as const;
 
 /** El único desplegable que queda al lado del período. */
 export const ROTULO_TODOS = "Colaborador: todos";

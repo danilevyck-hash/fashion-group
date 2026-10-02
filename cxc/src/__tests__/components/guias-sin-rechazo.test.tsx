@@ -219,7 +219,7 @@ describe("⚠️ lo que NO se tocó sigue en pie", () => {
     expect(container.textContent).not.toContain("despachada");
     const { container: pend } = lista({ estado: "Pendiente Bodega" });
     expect(pend.querySelector(".border-l-amber-400")).not.toBeNull();
-    expect(pend.textContent).toContain("pendiente");
+    expect(pend.textContent).toMatch(/pendiente/i); // 🔄 1-oct-2026: el chip dice «Pendiente» (nombres de ERP)
   });
 
   // El flujo que Daniel describió, entero: "se marca como despachado / se

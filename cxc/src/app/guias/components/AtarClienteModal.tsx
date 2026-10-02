@@ -93,11 +93,11 @@ export default function AtarClienteModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Atar cliente"
+        aria-label="Vincular cliente"
         className="bg-white sm:rounded-lg rounded-t-2xl w-full max-w-md mx-0 sm:mx-4 border border-gray-200 max-h-[90vh] overflow-y-auto"
       >
         <header className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-          <h2 className="text-base font-medium">Atar cliente</h2>
+          <h2 className="text-base font-medium">Vincular cliente</h2>
           <button
             type="button"
             onClick={onClose}
@@ -109,7 +109,7 @@ export default function AtarClienteModal({
         </header>
 
         <div className="px-5 py-4">
-          <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">En la guía dice</p>
+          <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Cliente en la guía</p>
           <p className="text-sm font-medium text-black mb-4 break-words">{clienteTexto || "—"}</p>
 
           {/* El "no cambia nada de la guía" NO se borra — es lo que hace que

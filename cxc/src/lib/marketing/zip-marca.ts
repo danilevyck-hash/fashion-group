@@ -679,7 +679,7 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
   if (perRes.error || selloRes.error) {
     throw new ErrorZipMarca(
       "SIN_TABLAS_DE_PERIODO",
-      "Todavía no están creados los períodos de marketing. Hay que correr la migración antes de bajar el reporte.",
+      "Todavía no están creados los períodos de marketing. Hay que correr la migración antes de descargar el reporte.",
     );
   }
   if (factRes.error) throw new Error(`facturas: ${factRes.error.message}`);
@@ -1004,7 +1004,7 @@ async function prepararDescargaMultifashion(): Promise<PrepDescarga> {
   if (gastos.length === 0 || total === 0) {
     throw new ErrorZipMarca(
       "MARCA_SIN_GASTO",
-      "Multifashion no tiene gastos registrados, así que no hay archivo que bajar.",
+      "Multifashion no tiene gastos registrados, así que no hay archivo que descargar.",
     );
   }
 
@@ -1464,7 +1464,7 @@ export function elegirPeriodo(
   }
   throw new ErrorZipMarca(
     "SIN_PERIODO_ABIERTO",
-    `${marcaNombre} no tiene un período abierto. Hay que abrir uno antes de bajar el reporte.`,
+    `${marcaNombre} no tiene un período abierto. Hay que abrir uno antes de descargar el reporte.`,
   );
 }
 

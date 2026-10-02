@@ -310,7 +310,8 @@ describe("8. las dos vistas de la pestaña", () => {
 
   it("son dos, en el orden del mockup", () => {
     expect(VISTAS_PRESTAMOS.map(([k]) => k)).toEqual([VISTA_DEUDA, VISTA_MOVIMIENTOS]);
-    expect(VISTAS_PRESTAMOS.map(([, l]) => l)).toEqual(["Quiénes deben", "Movimientos"]);
+    // 1-oct-2026, Daniel: nombres normales de ERP («toEqual(["Quiénes deben", "Movimientos"])» → «toEqual(["Saldos", "Movimientos"])»).
+    expect(VISTAS_PRESTAMOS.map(([, l]) => l)).toEqual(["Saldos", "Movimientos"]);
   });
 
   it("la pestaña monta las dos vistas y conserva el selector de empresa", () => {

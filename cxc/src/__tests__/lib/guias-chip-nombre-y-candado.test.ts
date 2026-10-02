@@ -9,6 +9,9 @@
 // lo que se protege es que estas dos cosas no desaparezcan en un refactor.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// 🔄 1-oct-2026: nombres de ERP en Guías (Daniel aprobó el audit): rótulos en tipo oración
+// («Guardar guía», «Nueva guía de despacho», «Tipo de despacho», «Vincular cliente»…).
+// Este candado leía los textos viejos y se actualiza a propósito.
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -78,7 +81,7 @@ describe("el chip dice el NOMBRE del cliente, no solo el código", () => {
   it("el chip SIGUE siendo un botón — una línea mal atada tiene que poder corregirse", () => {
     // Regla del PR #443: sin esto, un código equivocado sería para siempre.
     expect((LISTA.match(/puedeAtarCliente && item\.id/g) ?? []).length).toBe(2);
-    const celda = LISTA.slice(LISTA.indexOf("item.cliente_codigo ? ("), LISTA.indexOf("Atar cliente"));
+    const celda = LISTA.slice(LISTA.indexOf("item.cliente_codigo ? ("), LISTA.indexOf("Vincular cliente"));
     expect(celda).toContain("<button");
     expect(celda).toContain("onAtarCliente?.(item)");
   });

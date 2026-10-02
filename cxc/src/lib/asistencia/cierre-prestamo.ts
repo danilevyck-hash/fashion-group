@@ -268,7 +268,7 @@ export function textoPlan(plan: PlanDeCierre): string | null {
   if (!plan.pagos.length) return null;
   const personas = new Set(plan.pagos.map((p) => p.codigo)).size;
   const q = personas === 1 ? "1 colaborador" : `${personas} colaboradores`;
-  return `Al cerrar se anota el pago del préstamo de ${q}, por $${plan.total.toFixed(2)} en total. La deuda baja sola: nadie lo teclea a mano.`;
+  return `Al cerrar se registra el pago del préstamo de ${q}, por $${plan.total.toFixed(2)} en total. La deuda baja sola: nadie lo teclea a mano.`;
 }
 
 /** Cómo se explica cada omisión. Un solo lugar, para que no haya dos redacciones. */
@@ -276,7 +276,7 @@ export const TEXTO_OMISION: Readonly<Record<MotivoOmision, string>> = {
   "casilla-en-cero": "debe, pero esta quincena no se le descontó nada",
   "sin-descontar": "esta quincena no se le descuenta, a propósito (casilla en 0)",
   "neto-no-alcanzo": "el neto no alcanzó para la cuota: esta quincena no se le descontó y sigue debiendo",
-  "ya-registrado": "el pago de esta quincena ya estaba anotado en Préstamos",
+  "ya-registrado": "el pago de esta quincena ya estaba registrado en Préstamos",
   "sin-saldo": "se le descontó, pero ya no debe nada",
-  "sin-ficha": "se le descontó, pero no está atado a ninguna ficha de Préstamos",
+  "sin-ficha": "se le descontó, pero no está vinculado a ninguna ficha de Préstamos",
 };

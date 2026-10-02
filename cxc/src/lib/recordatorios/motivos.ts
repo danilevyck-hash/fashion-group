@@ -91,7 +91,7 @@ export const FICHA_MOTIVO: Record<Motivo, FichaMotivo> = {
     icono: "🔔",
     tabla: TABLA_DE_MOTIVO.nota,
     queHace: "Te aviso el día que elijas, a las 9:00 de la mañana.",
-    pide: ["Qué hay que recordar", "Fecha"],
+    pide: ["Descripción", "Fecha"],
   },
 };
 

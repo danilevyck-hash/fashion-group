@@ -275,7 +275,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar empleado..."
+            placeholder="Buscar colaborador..."
             className="min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition w-40"
           />
           <select
@@ -291,7 +291,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
         {loading ? (
           <SkeletonTable rows={5} cols={4} />
         ) : filtered.length === 0 && otrosResultados.length === 0 ? (
-          <EmptyState title={search ? "No se encontró a nadie con ese nombre" : "Nadie debe nada ahora mismo"} actionLabel="+ Nuevo préstamo" onAction={() => setShowElegirPersona(true)} />
+          <EmptyState title={search ? "No se encontró a nadie con ese nombre" : "Sin saldos pendientes"} actionLabel="+ Nuevo préstamo" onAction={() => setShowElegirPersona(true)} />
         ) : (
           <div className="space-y-6">
             {porEmpresa.map(([empresa, items]) => (
@@ -299,7 +299,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
                 <div className="mb-2 flex items-baseline justify-between">
                   <h2 className="text-xs uppercase tracking-wide text-gray-400">{empresa}</h2>
                   <span className="text-xs tabular-nums text-gray-400">
-                    {items.length} {items.length === 1 ? "persona" : "personas"} · ${fmt(items.reduce((s, f) => s + f.saldo, 0))}
+                    {items.length} {items.length === 1 ? "colaborador" : "colaboradores"} · ${fmt(items.reduce((s, f) => s + f.saldo, 0))}
                   </span>
                 </div>
                 <ul className="space-y-2">
@@ -309,7 +309,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
                     const pendienteDed = emp.trabaja && !deducida && emp.saldo > 0 && cuota > 0;
 
                     const badges = [
-                      !emp.trabaja ? <span key="notrabaja" className="shrink-0 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-md">Ya no trabaja · no se descuenta</span> : null,
+                      !emp.trabaja ? <span key="notrabaja" className="shrink-0 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-md">Inactivo</span> : null,
                     ].filter(Boolean);
 
                     const chipQuincena = !emp.trabaja || cuota <= 0 ? null
@@ -378,7 +378,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
 
             {otrosResultados.length > 0 && (
               <section>
-                <h2 className="mb-2 text-xs uppercase tracking-wide text-gray-400">No deben nada</h2>
+                <h2 className="mb-2 text-xs uppercase tracking-wide text-gray-400">Sin saldo</h2>
                 <ul className="space-y-2">
                   {otrosResultados.map((c) => (
                     <li
@@ -438,10 +438,10 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
       {preguntaExcel && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setPreguntaExcel(false)}>
           <div className="bg-white rounded-lg p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
-            <h2 className="font-medium mb-1">¿Qué quieres bajar?</h2>
-            <p className="mb-5 text-sm text-gray-500">Solo quien debe algo, o todos los colaboradores con su historial completo.</p>
+            <h2 className="font-medium mb-1">Descargar historial</h2>
+            <p className="mb-5 text-sm text-gray-500">Solo los colaboradores con saldo, o todos con su historial completo.</p>
             <div className="space-y-2">
-              <button onClick={() => descargarHistorial("deben")} className="w-full inline-flex min-h-[44px] items-center justify-center bg-black text-white rounded-md text-sm hover:bg-gray-800 transition">Solo los que deben</button>
+              <button onClick={() => descargarHistorial("deben")} className="w-full inline-flex min-h-[44px] items-center justify-center bg-black text-white rounded-md text-sm hover:bg-gray-800 transition">Solo con saldo</button>
               <button onClick={() => descargarHistorial("todos")} className="w-full inline-flex min-h-[44px] items-center justify-center border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Todos</button>
               <button onClick={() => setPreguntaExcel(false)} className="w-full inline-flex min-h-[44px] items-center justify-center text-sm text-gray-500 hover:text-black transition">Cancelar</button>
             </div>

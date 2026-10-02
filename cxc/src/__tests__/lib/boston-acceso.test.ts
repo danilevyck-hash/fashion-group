@@ -686,10 +686,12 @@ describe("las pestañas de /boston", () => {
   });
 
   it("la pestaña de la cartera se llama igual que la tarjeta que lleva a ella", () => {
-    // La puerta (el KPI «Por cobrar» del Inicio) y el destino dicen lo mismo.
-    expect(PESTANAS_BOSTON.find(p => p.key === "cxc")?.label).toBe("Por cobrar");
+    // La puerta (el KPI del Inicio) y el destino dicen lo mismo.
+    // 1-oct-2026, Daniel: nombres normales de ERP: la tarjeta dice «Cuentas por cobrar» y la
+    // pestaña su sigla «CxC», porque el nombre completo no cabe en la tira.
+    expect(PESTANAS_BOSTON.find(p => p.key === "cxc")?.label).toBe("CxC");
     const inicio = sinComentarios(leer("src/app/boston/tabs/InicioBoston.tsx"));
-    expect(inicio).toContain('titulo="Por cobrar"');
+    expect(inicio).toContain('titulo="Cuentas por cobrar"');
   });
 
   it("⛔ Catálogos NO es una pestaña (las 4 marcas son de Fashion Group)", () => {

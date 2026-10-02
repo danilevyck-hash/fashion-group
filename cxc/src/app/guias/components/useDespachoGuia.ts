@@ -20,6 +20,8 @@ import { numeroCabeceraAlDespachar } from "@/lib/guias/falta-para-despachar";
 import { guiaYaDespachada, tipoDespachoEfectivo } from "@/lib/guias/modo-despacho";
 import type { JuegoDespacho } from "@/lib/guias/juegos-despacho";
 import { bultosTecleados, correccionesDeBultos } from "@/lib/guias/bultos-correccion";
+import { entregadoPorElegido } from "@/lib/guias/despachado-por";
+import { GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
 
 interface Draft {
   placa?: string;
@@ -30,6 +32,8 @@ interface Draft {
   numerosTransp?: string[];
   /** Los bultos que bodega contó, uno por línea (5-sep-2026). */
   bultos?: number[];
+  /** «Despachado por», elegido al despachar (1-oct-2026). */
+  despachadoPor?: string;
 }
 
 function leerDraft(id: string): Draft {
@@ -61,6 +65,13 @@ export function useDespachoGuia(id: string | null) {
   const [bReceptor, _setBReceptor] = useState("");
   const [bCedula, _setBCedula] = useState("");
   const [bChofer, _setBChofer] = useState("");
+  /**
+   * 🔴 «DESPACHADO POR» SE ELIGE AQUÍ (1-oct-2026, Daniel aprobó el mockup):
+   * salió de la creación de la guía. Arranca VACÍO —nadie preseleccionado, como
+   * pidió Daniel el 19-sep: *«porque puede que alguien deje ese por error»*—,
+   * salvo una guía vieja que ya lo traía guardado: eso es el dato.
+   */
+  const [despachadoPor, _setDespachadoPor] = useState("");
   const [numerosTransp, _setNumerosTransp] = useState<string[]>([]);
   /**
    * 🔴 LOS BULTOS QUE BODEGA CUENTA AL DESPACHAR (5-sep-2026). Daniel: *«porque
@@ -124,6 +135,7 @@ export function useDespachoGuia(id: string | null) {
       _setBReceptor(g.receptor_nombre || "");
       _setBCedula(g.cedula || "");
       _setBChofer(g.nombre_chofer || "");
+      _setDespachadoPor(entregadoPorElegido(g.entregado_por) ? String(g.entregado_por).trim() : "");
       // 🔴 EL MODO ARRANCA EN LO QUE SE ELIGIÓ AL CREAR LA GUÍA.
       // Acá vivía `(g.tipo_despacho as TipoDespacho) || "externo"`, que nunca
       // miraba `modo_entrega`. Y no era un `??` faltante: `tipo_despacho` tiene
@@ -145,6 +157,7 @@ export function useDespachoGuia(id: string | null) {
         if (d.receptor && !g.receptor_nombre) _setBReceptor(d.receptor);
         if (d.cedula && !g.cedula) _setBCedula(d.cedula);
         if (d.chofer && !g.nombre_chofer) _setBChofer(d.chofer);
+        if (d.despachadoPor && !entregadoPorElegido(g.entregado_por)) _setDespachadoPor(d.despachadoPor);
         // El borrador manda mientras la guía NO haya salido: es lo que la
         // persona eligió con "cambiar". La condición vieja era
         // `!g.tipo_despacho`, o sea NUNCA (la columna trae DEFAULT 'externo'):
@@ -205,6 +218,7 @@ export function useDespachoGuia(id: string | null) {
   const setBReceptor = (v: string) => { _setBReceptor(v); if (id) escribirDraft(id, "receptor", v); };
   const setBCedula = (v: string) => { _setBCedula(v); if (id) escribirDraft(id, "cedula", v); };
   const setBChofer = (v: string) => { _setBChofer(v); if (id) escribirDraft(id, "chofer", v); };
+  const setDespachadoPor = (v: string) => { _setDespachadoPor(v); if (id) escribirDraft(id, "despachadoPor", v); };
   const setTipoDespacho = (v: TipoDespacho) => { _setTipoDespacho(v); if (id) escribirDraft(id, "tipoDespacho", v); };
   /** Teclear bultos: entero ≥ 0, y al borrador — como todo lo del despacho. */
   const setBultos = (idx: number, v: string) => {
@@ -295,6 +309,8 @@ export function useDespachoGuia(id: string | null) {
       firma_entregador_base64: firma2,
     };
     if (bultosCorregidos.length > 0) payload.items_bultos = bultosCorregidos;
+    // 🔴 1-oct-2026: quien despacha viaja con el despacho; el servidor lo exige.
+    if (GUIA_NUEVA_2026_10) payload.entregado_por = despachadoPor.trim();
 
     if (tipoDespacho === "externo") {
       payload.placa = bPlaca;
@@ -358,6 +374,7 @@ export function useDespachoGuia(id: string | null) {
     bReceptor, setBReceptor,
     bCedula, setBCedula,
     bChofer, setBChofer,
+    despachadoPor, setDespachadoPor,
     juegos, usarJuego,
     numerosTransp, setNumeroTransp,
     bultosPorLinea, setBultos,

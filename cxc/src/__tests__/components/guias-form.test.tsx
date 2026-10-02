@@ -17,6 +17,9 @@
  * Y el riesgo del cambio: una guía vieja con empresa sucia tiene que poder
  * abrirse y guardarse igual.
  */
+// 🔄 1-oct-2026: nombres de ERP en Guías (Daniel aprobó el audit): rótulos en tipo oración
+// («Guardar guía», «Nueva guía de despacho», «Tipo de despacho», «Vincular cliente»…).
+// Este candado leía los textos viejos y se actualiza a propósito.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { useState } from "react";
 import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
@@ -201,7 +204,7 @@ describe("Cliente · cerrado contra la lista", () => {
     fireEvent.change(input, { target: { value: "Tienda del barrio" } });
 
     // 🔑 El rótulo dice que es LA SALIDA, no un cliente más de la lista.
-    const salida = screen.getAllByText(/No está en la lista — escribir a mano/)[0];
+    const salida = screen.getAllByText(/Ingresar manualmente/ /* 1-oct-2026, Daniel: nombres normales de ERP */)[0];
     fireEvent.mouseDown(salida);
 
     expect(vistos.at(-1)?.[0]).toMatchObject({ cliente: "Tienda del barrio", cliente_codigo: "" });
@@ -211,7 +214,7 @@ describe("Cliente · cerrado contra la lista", () => {
     render(<Harness itemsIniciales={[filaBase()]} />);
     fireEvent.focus(campo("cliente", "a"));
     expect(screen.getAllByText(/Escribe el nombre y elige/).length).toBeGreaterThan(0);
-    expect(screen.queryByText(/No está en la lista — escribir a mano/)).toBeNull();
+    expect(screen.queryByText("➕ Ingresar manualmente")).toBeNull(); // 1-oct-2026, Daniel: nombres normales de ERP (la ayuda sí nombra la opción)
   });
 
   // 🩸 ACÁ SE EXIGÍA EL SELLO ÁMBAR «A mano» sobre el cliente escrito a mano.
@@ -281,7 +284,7 @@ describe("Empresa · cerrada a las 8, pero las guías viejas se pueden guardar",
     render(<Harness itemsIniciales={[filaBase()]} />);
     const select = campo("empresa", "a") as HTMLSelectElement;
     expect(select.tagName).toBe("SELECT");
-    expect(select.options).toHaveLength(9); // "Elegir empresa…" + 8
+    expect(select.options).toHaveLength(9); // "Seleccionar empresa…" + 8
     expect(Array.from(select.options).map((o) => o.value)).toContain("Fashion Wear");
   });
 

@@ -168,7 +168,7 @@ export default function SeccionVacaciones({ codigo, refresco }: {
                   {fmtDate(v.desde)}{v.hasta !== v.desde ? ` al ${fmtDate(v.hasta)}` : ""}
                 </span>
                 {v.ya_pagadas && (
-                  <span className="block text-[12px] text-amber-800">Ya las había cobrado</span>
+                  <span className="block text-[12px] text-amber-800">Pagadas por adelantado</span>
                 )}
               </span>
               <button type="button" onClick={() => void quitar(v.id)}

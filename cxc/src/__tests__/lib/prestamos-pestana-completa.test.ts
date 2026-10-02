@@ -114,7 +114,8 @@ describe("3. la cuota se pregunta con el monto y va a la FICHA en una segunda ll
     expect(ficha).toMatch(/cuotaActual=\{\{\s*prestamo: Number\(empleado\.deduccion_quincenal \?\? 0\),\s*terceros: Number\(empleado\.deduccion_terceros \?\? 0\),\s*dano: Number\(empleado\.deduccion_dano \?\? 0\),\s*\}\}/);
     expect(ficha).toMatch(/setConceptoInicial\(CONCEPTO_PAGO\)/);
     expect(ficha).toMatch(/setConceptoInicial\(CONCEPTO_PRESTAMO\)/);
-    expect(ficha).toContain("Anotar abono");
+    // 1-oct-2026, Daniel: nombres normales de ERP («expect(ficha).toContain("Anotar abono");» → «expect(ficha).toContain("Registrar abono");»).
+    expect(ficha).toContain("Registrar abono");
     expect(ficha).toContain("+ Nuevo préstamo a");
   });
 });
@@ -151,6 +152,7 @@ describe("6. la secretaria solo mira", () => {
 describe("7. con la planilla unida, «Pago Quincenal» no se ofrece en la ficha", () => {
   it("el botón cuelga de `!PLANILLA_UNIDA`: el descuento de la quincena lo escribe el cierre", () => {
     const ficha = sinComentarios(FICHA);
-    expect(ficha).toMatch(/\{!PLANILLA_UNIDA && \(\s*<button[\s\S]*?Pago Quincenal/);
+    // 1-oct-2026, Daniel: nombres normales de ERP («<button[sS]*?Pago Quincenal/» → «<button[sS]*?Pago quincenal/»).
+    expect(ficha).toMatch(/\{!PLANILLA_UNIDA && \(\s*<button[\s\S]*?Pago quincenal/);
   });
 });

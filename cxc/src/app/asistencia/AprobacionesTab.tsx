@@ -445,7 +445,7 @@ export default function AprobacionesTab({ empresa = "" }: {
             ) : (
               <>
                 <span className="text-[30px] font-semibold leading-none tracking-tight">{porDecidirVistas.length}</span>
-                <span className="text-sm text-gray-600">por decidir · {hm(minutosVistos)} h</span>
+                <span className="text-sm text-gray-600">pendientes · {hm(minutosVistos)} h</span>
               </>
             )}
           </div>

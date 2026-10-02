@@ -86,7 +86,7 @@ export const CLASES_AIRE_PARA_EL_BOTON = "pb-36";
 
 /** Lo que dice el botón cuando ya no hay nada que marcar. Reemplaza al «Ya
  *  marcaste hoy» de antes: dice que está LISTO, no que se acabó algo. */
-export const TEXTO_LISTO_POR_HOY = "Listo por hoy";
+export const TEXTO_LISTO_POR_HOY = "Jornada completa";
 
 /** Mientras la marca viaja. El botón se apaga en el MISMO lugar. */
 export const TEXTO_MARCANDO = "Marcando…";

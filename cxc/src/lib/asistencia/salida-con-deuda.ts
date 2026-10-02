@@ -24,7 +24,7 @@ const plata = (n: number) => `$${n.toFixed(2)}`;
 export function avisoSalidaConDeuda(deuda: number | null | undefined): string | null {
   const d = Number(deuda ?? 0);
   if (!(d > 0)) return null;
-  return `Debe ${plata(d)} en Préstamos — descuéntalo de la liquidación.`;
+  return `Saldo de ${plata(d)} en Préstamos — descuéntalo de la liquidación.`;
 }
 
 /**

@@ -64,7 +64,7 @@ export default function SummaryCards({
           )}
 
           <div className="text-xs text-gray-400 uppercase tracking-wide">
-            {saldo < 0 ? "Saldo a favor" : "Debe"}
+            {saldo < 0 ? "Saldo a favor" : "Saldo"}
           </div>
           <div className={`text-3xl font-semibold tabular-nums mt-0.5 ${saldoColor}`}>
             ${fmt(Math.abs(saldo))}

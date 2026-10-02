@@ -194,7 +194,7 @@ describe("1. 🔴 LOS ATAJOS DEL PERÍODO — un toque, no dos en un calendario"
     // ⚠️ `getAllBy…`: `RangoFechas` monta su botón dos veces —uno para
     // escritorio y otro para el teléfono, uno escondido por CSS—, y eso es de
     // siempre.
-    expect(screen.getAllByRole("button", { name: "Elegir un día o un rango" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "Seleccionar un día o un rango" }).length).toBeGreaterThan(0); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(adelante).toBeTruthy();
     // 🩸 Y los cuatro atajos viejos ya no se dibujan, en ninguna de sus formas.
     expect(screen.queryByRole("button", { name: "Hoy" })).toBeNull();

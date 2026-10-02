@@ -4,7 +4,7 @@ import { PERSONA_EN_EL_CENTRO } from "@/lib/asistencia/persona-en-el-centro";
 import PersonaPagina from "../PersonaPagina";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Colaborador · Asistencia · Fashion Group" };
+export const metadata = { title: "Colaborador · Asistencia y planilla · Fashion Group" };
 
 /**
  * LA PÁGINA DE UN COLABORADOR — ruta propia, como la ficha del cliente.

@@ -170,7 +170,7 @@ export default function NuevoMovimientoModal({
       <div className="space-y-4">
         {esPago && debeLasDos && (
           <div>
-            <label className="text-xs text-gray-400 uppercase">Baja de</label>
+            <label className="text-xs text-gray-400 uppercase">Cuenta</label>
             <div className="mt-1 flex flex-wrap gap-2">
               {([CUENTA_PRESTAMO, CUENTA_DANO] as CuentaPrestamo[]).map((c) => (
                 <button
@@ -208,7 +208,7 @@ export default function NuevoMovimientoModal({
 
         {esPago && (
           <div>
-            <label className="text-xs text-gray-400 uppercase">De dónde salió</label>
+            <label className="text-xs text-gray-400 uppercase">Origen del pago</label>
             <div className="mt-1 flex flex-wrap gap-2">
               {ORIGENES_QUE_SE_OFRECEN.map((o) => (
                 <button

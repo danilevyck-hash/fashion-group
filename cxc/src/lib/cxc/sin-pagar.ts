@@ -57,7 +57,7 @@ export function avisaSinPagar(dias: number | null): boolean {
 
 /** Lo que se lee al lado del nombre del cliente, en gris chico. */
 export function textoSinPagar(dias: number | null): string {
-  return dias === null ? "nunca ha pagado" : `no paga hace ${dias} d`;
+  return dias === null ? "Sin pagos" : `Último pago: hace ${dias} d`; // 1-oct-2026, Daniel: nombres normales de ERP
 }
 
 /** El rótulo de la celda 1 de la tira de totales. Singular y plural. */

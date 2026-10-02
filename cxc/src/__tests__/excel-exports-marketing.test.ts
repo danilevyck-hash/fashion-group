@@ -283,7 +283,7 @@ describe("exportarExcelGlobal (inventario-excel)", () => {
     expect(wb.SheetNames).toEqual(["Resumen", "Tienda Centro"]);
 
     const res = wb.Sheets["Resumen"];
-    expect(cell(res, "A1").v).toBe("Cliente");
+    expect(cell(res, "A1").v).toBe("Tienda"); // 1-oct-2026, Daniel: nombres normales de ERP (era «Cliente»)
     expect(cell(res, "C1").v).toBe("$ Tommy Hilfiger");
     expect(cell(res, "C2").t).toBe("n");
     expect(cell(res, "C2").v).toBe(200);

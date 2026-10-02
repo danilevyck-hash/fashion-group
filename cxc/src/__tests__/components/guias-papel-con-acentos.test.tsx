@@ -224,8 +224,12 @@ describe("🔴 los DOS papeles de la guía están escritos con acentos", () => {
       expect(hoja, `la hoja no dice «${rotulo}»`).toContain(rotulo);
       expect(pdf, `el PDF no dice «${rotulo}»`).toContain(rotulo);
     }
-    expect(hoja.toLowerCase()).toContain("observaciones generales del envío");
-    expect(pdf.toLowerCase()).toContain("observaciones generales del envío");
+    // 🔄 1-oct-2026: nombres de ERP (Daniel): «Observaciones Generales del
+    // Envío» pasó a «Observaciones», en los DOS papeles a la vez.
+    expect(hoja.toLowerCase()).toContain("observaciones");
+    expect(pdf.toLowerCase()).toContain("observaciones");
+    expect(hoja.toLowerCase()).not.toContain("observaciones generales");
+    expect(pdf.toLowerCase()).not.toContain("observaciones generales");
   });
 
   it("⚠️ lo que el papel nuevo SÍ separó, y nada más que eso", () => {

@@ -195,7 +195,7 @@ export default function HomePage() {
         {frequents.length > 0 && (
           <div className="mb-6">
             <h2 className={`text-xs font-semibold uppercase tracking-wide mb-2 px-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-              Tus frecuentes
+              Accesos frecuentes
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
               {frequents.map((m) => {

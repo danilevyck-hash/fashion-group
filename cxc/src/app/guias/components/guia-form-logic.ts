@@ -14,6 +14,7 @@ import { entregadoPorElegido } from "@/lib/guias/despachado-por";
 // «Traslado» como valor válido de FACTURA(S) — vive con el resto del atajo y
 // cuelga del mismo interruptor.
 import { GUIAS_ATAJOS_NUEVOS, esTraslado } from "@/lib/guias/atajos-facturas";
+import { GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
 import type { GuiaItem, ModoEntrega } from "./types";
 
 /**
@@ -113,7 +114,11 @@ export function validarGuia(estado: EstadoGuia): Set<string> {
   if (estado.modoEntrega === "transportista" && !estado.transportistaId) errores.add("transportista");
   // 🔴 `__other__` NO es un nombre: es el centinela de "Otro…". Sin esto se
   // guardaba tal cual y se IMPRIMÍA en el papel que alguien firma.
-  if (!entregadoPorElegido(estado.entregadoPor)) errores.add("entregadoPor");
+  // 🔴 1-oct-2026 (Daniel aprobó el mockup): «Despachado por» SALE de la guía y
+  // se elige al DESPACHAR, donde es obligatorio (`faltaParaDespachar` y el PUT
+  // que completa). Guardar la guía ya no lo pide. Con `GUIA_NUEVA_2026_10` en
+  // `false`, vuelve a ser obligatorio aquí.
+  if (!GUIA_NUEVA_2026_10 && !entregadoPorElegido(estado.entregadoPor)) errores.add("entregadoPor");
 
   if (filasConDatos(estado.items).length === 0) errores.add("items-empty");
 
@@ -213,7 +218,8 @@ export function faltaParaGuardar(estado: EstadoGuia): string[] {
   if (errores.has("transportista")) falta.push("el transportista");
   if (errores.has("entregadoPor")) falta.push("quién despacha");
   if (errores.has("items-empty")) {
-    falta.push("por lo menos un envío");
+    // 1-oct-2026: el texto del mockup aprobado, «al menos un envío».
+    falta.push(GUIA_NUEVA_2026_10 ? "al menos un envío" : "por lo menos un envío");
     return falta;
   }
 
@@ -245,4 +251,16 @@ export function faltaParaGuardar(estado: EstadoGuia): string[] {
   }
 
   return falta;
+}
+
+/**
+ * 🔴 EL AVISO AL TOCAR «GUARDAR GUÍA» (1-oct-2026, Daniel aprobó el mockup):
+ * UNA línea con TODO lo que falta, separado por puntos medios —«Falta: el
+ * transportista · al menos un envío»—, no solo lo primero. Sale recién al
+ * intentar guardar: antes no hay aviso en naranja. Las faltas son las MISMAS
+ * de `faltaParaGuardar` (que llama a `validarGuia`): no hay otra lista.
+ */
+export function textoFaltaAlGuardar(faltantes: readonly string[]): string {
+  if (faltantes.length === 0) return "";
+  return `Falta: ${faltantes.join(" · ")}`;
 }

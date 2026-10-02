@@ -56,20 +56,20 @@ export function DetalleCheque({
             <div>
               <Fila label="Cliente" value={cheque.cliente} />
               <Fila label="Empresa" value={getCompanyDisplay(cheque.empresa)} />
-              <Fila label="N° Cheque" value={cheque.numero_cheque} />
+              <Fila label="N° de cheque" value={cheque.numero_cheque} />
               <Fila
                 label="Monto"
                 value={<span className="font-medium tabular-nums">${fmt(cheque.monto)}</span>}
               />
-              <Fila label="Vence" value={fmtDate(cheque.fecha_deposito)} />
+              <Fila label="Fecha de depósito" value={fmtDate(cheque.fecha_deposito)} />
               <Fila
                 label="Depositado"
                 value={cheque.fecha_depositado ? fmtDate(cheque.fecha_depositado) : "—"}
               />
               <Fila label="Estado" value={<StatusBadge estado={ve} />} />
               {cheque.vendedor && <Fila label="Vendedor" value={cheque.vendedor} />}
-              {cheque.notas && <Fila label="Notas" value={cheque.notas} />}
-              {cheque.motivo_rebote && <Fila label="Motivo rebote" value={cheque.motivo_rebote} />}
+              {cheque.notas && <Fila label="Observaciones" value={cheque.notas} />}
+              {cheque.motivo_rebote && <Fila label="Motivo de devolución" value={cheque.motivo_rebote} />}
               <div className="flex flex-wrap gap-3 mt-5">
                 <button
                   onClick={() => onEditar(cheque.id)}
@@ -174,7 +174,7 @@ export function ModalRebote({
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" {...backdrop}>
       <div ref={panelRef} className="bg-white rounded-lg p-6 w-full max-w-md border border-gray-200">
         <div className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-4">
-          Marcar como Rebotado
+          Marcar como devuelto
         </div>
         <label className="text-xs uppercase tracking-[0.05em] text-gray-400">
           Motivo (opcional)
@@ -191,7 +191,7 @@ export function ModalRebote({
             onClick={onConfirmar}
             className="bg-red-600 text-white px-5 min-h-[44px] inline-flex items-center justify-center rounded-md text-sm font-medium hover:bg-red-700 transition"
           >
-            Confirmar rebotado
+            Confirmar devolución
           </button>
           <button
             onClick={onCancelar}

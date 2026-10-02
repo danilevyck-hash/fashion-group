@@ -98,7 +98,7 @@ export default function TiendasCelular({
       <NumeroGrande valor={montoCelular(total)} />
 
       {chips.length > 0 && (
-        <ChipsDePeriodoCelular chips={chips} elegido={periodo} onElegir={onPeriodo} etiqueta="Elegir el período" />
+        <ChipsDePeriodoCelular chips={chips} elegido={periodo} onElegir={onPeriodo} etiqueta="Seleccionar período" />
       )}
 
       {cargando ? (
@@ -123,7 +123,7 @@ export default function TiendasCelular({
         </GrupoCelular>
       )}
 
-      <RotuloDeGrupo>También</RotuloDeGrupo>
+      <RotuloDeGrupo>Otras secciones</RotuloDeGrupo>
       <GrupoCelular className="mt-0">
         {PUERTAS_DEL_CELULAR.map((p) => (
           <FilaCelular

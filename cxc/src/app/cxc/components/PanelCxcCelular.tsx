@@ -148,7 +148,7 @@ export default function PanelCxcCelular({
       {/* ── Título grande + la empresa que se mira ────────────────────────── */}
       <div className="px-4">
         <h1 className="text-[32px] font-bold leading-tight tracking-tight text-gray-900">
-          Por cobrar
+          Cuentas por cobrar
         </h1>
         <button
           type="button"
@@ -255,7 +255,7 @@ export default function PanelCxcCelular({
               }}
               className="mt-2 min-h-[44px] text-[15px] font-medium text-blue-600"
             >
-              Quitar los filtros
+              Limpiar filtros
             </button>
           )}
         </div>

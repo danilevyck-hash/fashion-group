@@ -257,7 +257,8 @@ describe("F. lo que se LEE: la ficha, el Excel y el comprobante", () => {
     expect(exp).toContain('{ name: "Otros servicios", ws: hojaOtros }');
     expect(exp).toContain("if (!renglones.length) return null;");
     // Las cinco columnas del mockup.
-    for (const h of ["Colaborador", "Código", "Concepto", "Se aplica a", "Monto", "Lo anotó"]) {
+    // 1-oct-2026, Daniel: nombres normales de ERP («"Se aplica a", "Monto", "Lo anotó"]» → «"Se aplica a", "Monto", "Registrado por"]»).
+    for (const h of ["Colaborador", "Código", "Concepto", "Se aplica a", "Monto", "Registrado por"]) {
       expect(exp).toContain(`header: "${h}"`);
     }
   });

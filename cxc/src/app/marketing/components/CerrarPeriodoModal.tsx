@@ -277,7 +277,7 @@ function CerrarPeriodoModalDeAntes({
             disabled={!puedeCerrar}
             className="rounded-md bg-black text-white px-4 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {cerrando ? "Cerrando…" : "Cerrar y bajar reporte"}
+            {cerrando ? "Cerrando…" : "Cerrar y descargar reporte"}
           </button>
         </div>
       </div>

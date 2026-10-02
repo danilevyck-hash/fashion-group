@@ -11,6 +11,8 @@ import {
 import { ETIQUETA_TIPO_DESPACHO } from "@/lib/guias/modo-despacho";
 import { juegosQueCoinciden, type JuegoDespacho } from "@/lib/guias/juegos-despacho";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
+import { GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
+import { useDespachadores } from "./useDespachadores";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EL DESPACHO — ahora vive en la PÁGINA de la guía, no dentro de la lista.
@@ -88,6 +90,13 @@ interface DespachoFormProps {
   setBCedula: (v: string) => void;
   bChofer: string;
   setBChofer: (v: string) => void;
+  /**
+   * 🔴 «DESPACHADO POR» (1-oct-2026, Daniel aprobó el mockup): salió de la
+   * creación de la guía y se elige AQUÍ, obligatorio para completar. Arranca
+   * vacío —nadie preseleccionado—, salvo una guía vieja que ya lo traía.
+   */
+  despachadoPor?: string;
+  setDespachadoPor?: (v: string) => void;
   /** Los juegos MÁS USADOS con ESTE transportista. Vacío = no se dibuja nada. */
   juegos?: readonly JuegoDespacho[];
   onUsarJuego?: (j: JuegoDespacho) => void;
@@ -108,6 +117,7 @@ export default function DespachoForm({
   tipoDespacho, setTipoDespacho, mostrarModo = true,
   bPlaca, setBPlaca, bReceptor, setBReceptor, bCedula, setBCedula,
   bChofer, setBChofer,
+  despachadoPor = "", setDespachadoPor,
   juegos = [], onUsarJuego,
   bSaving, onConfirmar,
   pendingFirma1, pendingFirma2, onFirma1Change, onFirma2Change,
@@ -116,6 +126,8 @@ export default function DespachoForm({
   const receptorRef = useRef<HTMLInputElement>(null);
   const canvas1Ref = useRef<HTMLCanvasElement>(null);
   const canvas2Ref = useRef<HTMLCanvasElement>(null);
+  // La lista del equipo; con el interruptor apagado el campo no existe aquí.
+  const despachadores = useDespachadores(GUIA_NUEVA_2026_10);
   // El selector aparece solo si se toca "Cambiar". Ver la cabecera.
   const [cambiandoModo, setCambiandoModo] = useState(false);
   /**
@@ -151,6 +163,7 @@ export default function DespachoForm({
     chofer: bChofer,
     tieneFirma1: !!pendingFirma1,
     tieneFirma2: !!pendingFirma2,
+    despachadoPor,
   });
   const puedeDespachar = faltantes.length === 0;
 
@@ -187,7 +200,7 @@ export default function DespachoForm({
       {mostrarModo && (
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         <span className="text-xs uppercase tracking-wide text-gray-400 mb-2 block">
-          Cómo sale
+          Tipo de despacho
         </span>
         {cambiandoModo ? (
           <div className="flex rounded-lg bg-gray-100 p-0.5">
@@ -314,6 +327,29 @@ export default function DespachoForm({
             <input id="despacho-cedula" type="text" value={bCedula}
               onChange={(e) => setBCedula(e.target.value)} className={CAMPO} />
           </div>
+          {/* 🔴 «DESPACHADO POR», AQUÍ Y OBLIGATORIO (1-oct-2026). Solo el
+              desplegable del equipo (Guías › Configuración), sin «Otro…», y
+              sin nadie elegido de antemano. */}
+          {GUIA_NUEVA_2026_10 && (
+            <div>
+              <label htmlFor="despacho-despachado-por" className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">
+                Despachado por
+              </label>
+              <select
+                id="despacho-despachado-por"
+                value={despachadoPor}
+                onChange={(e) => setDespachadoPor?.(e.target.value)}
+                className={`${CAMPO} appearance-none bg-white`}
+              >
+                <option value="">Seleccionar…</option>
+                {/* Una guía vieja trae un nombre que quizá ya no está en la lista: se ofrece igual. */}
+                {despachadoPor && !despachadores.includes(despachadoPor) && (
+                  <option value={despachadoPor}>{despachadoPor}</option>
+                )}
+                {despachadores.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 

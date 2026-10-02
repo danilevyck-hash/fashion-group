@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «Elegir fecha» → «Seleccionar fecha».
 // ─────────────────────────────────────────────────────────────────────────────
 // RECORDATORIOS — EL REDISEÑO (5-sep-2026). Candados de las reglas NUEVAS.
 //
@@ -215,7 +216,7 @@ describe("B · EL CUÁNDO — seis pastillas, y «Hoy» no es una de ellas", () 
       "manana", "lunes", "elegir", "cada_dia", "cada_semana", "cada_mes",
     ]);
     expect(OPCIONES_CUANDO.map((o) => ETIQUETA_CUANDO[o])).toEqual([
-      "Mañana", "Lunes", "Elegir fecha", "Cada día", "Cada semana", "Cada mes",
+      "Mañana", "Lunes", "Seleccionar fecha", "Cada día", "Cada semana", "Cada mes",
     ]);
   });
 

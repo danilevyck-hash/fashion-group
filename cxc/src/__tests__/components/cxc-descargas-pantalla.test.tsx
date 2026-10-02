@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «Detalle por empresa».
 /**
  * ─────────────────────────────────────────────────────────────────────────────
  * 🔴 CXC — LAS DESCARGAS Y EL SALDO A FAVOR, MIRANDO LA PANTALLA (8-sep-2026).
@@ -51,7 +52,7 @@ describe("🔴 el menú «Descargar» dibuja DOS líneas y CUATRO botones", () =
     render(<MenuDescargar onDescargar={noop} />);
     expect(screen.getByText("Todos los clientes")).toBeTruthy();
     expect(screen.getByText("Total por cliente")).toBeTruthy();
-    expect(screen.getByText("Detallado por compañía")).toBeTruthy();
+    expect(screen.getByText("Detalle por empresa")).toBeTruthy();
     expect(screen.getAllByRole("menuitem")).toHaveLength(4);
     // 🩸 Los subtítulos grises del menú viejo no vuelven.
     expect(screen.queryByText(/Hoja de cálculo/)).toBeNull();
@@ -69,7 +70,7 @@ describe("🔴 el menú «Descargar» dibuja DOS líneas y CUATRO botones", () =
     const espia = vi.fn();
     render(<MenuDescargar onDescargar={espia} />);
     fireEvent.click(screen.getByLabelText("Total por cliente en PDF"));
-    fireEvent.click(screen.getByLabelText("Detallado por compañía en EXCEL"));
+    fireEvent.click(screen.getByLabelText("Detalle por empresa en EXCEL"));
     expect(espia.mock.calls).toEqual([
       ["total-por-cliente", "pdf"],
       ["por-compania", "excel"],

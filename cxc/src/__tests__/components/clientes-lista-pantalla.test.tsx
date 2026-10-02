@@ -108,7 +108,7 @@ describe("🔴 LOS CHIPS, CON SU CONTEO CALCULADO", () => {
       "Sin cómo contactarlos 2",
       "Sin correo 3",
       "Sin teléfono 3",
-      "Deben 3",
+      "Con saldo 3", // 1-oct-2026, Daniel: nombres normales de ERP («Deben» → «Con saldo»)
     ]);
   });
 
@@ -152,7 +152,8 @@ describe("🔴 LAS CUATRO COLUMNAS", () => {
       const enc = [...document.querySelectorAll('[data-vista="tabla"] thead th')].map((t) =>
         (t.textContent ?? "").replace(/[↕↓↑]/g, "").trim(),
       );
-      expect(enc).toEqual(["Cliente", "Compró 2026", "Debe", "Cómo contactarlo"]);
+      // 1-oct-2026, Daniel: nombres normales de ERP («Compró · Debe · Cómo contactarlo»).
+      expect(enc).toEqual(["Cliente", "Compras 2026", "Saldo", "Contacto"]);
     });
   });
 
@@ -185,7 +186,7 @@ describe("🔴 LAS CUATRO COLUMNAS", () => {
 
   it("un saldo a favor del cliente no se pinta como deuda", () => {
     pintar();
-    expect(document.body.textContent).toContain("A favor $250.00");
+    expect(document.body.textContent).toContain("Saldo a favor $250.00"); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 });
 
@@ -204,23 +205,23 @@ describe("🔴 ORDENAR TOCANDO EL ENCABEZADO", () => {
 
   it("«Debe» ordena de MAYOR a menor al primer toque, y el segundo invierte", () => {
     pintar();
-    fireEvent.click(encabezado("Debe"));
+    fireEvent.click(encabezado("Saldo")); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(nombresEnTabla()[0]).toBe("City Mall Paso Canoa");
-    fireEvent.click(encabezado("Debe"));
+    fireEvent.click(encabezado("Saldo"));
     expect(nombresEnTabla()[0]).toBe("City Mall David"); // el −250
   });
 
   it("«Compró» también arranca de mayor a menor", async () => {
     pintar();
     await waitFor(() => expect(document.body.textContent).toContain("$700,000.00"));
-    fireEvent.click(encabezado("Compró"));
+    fireEvent.click(encabezado("Compras")); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(nombresEnTabla()[0]).toBe("City Mall Paso Canoa");
   });
 
   it("el encabezado dice cuál manda, para lectores de pantalla también", () => {
     pintar();
-    fireEvent.click(encabezado("Debe"));
-    const th = encabezado("Debe").closest("th")!;
+    fireEvent.click(encabezado("Saldo")); // 1-oct-2026, Daniel: nombres normales de ERP
+    const th = encabezado("Saldo").closest("th")!;
     expect(th.getAttribute("aria-sort")).toBe("descending");
   });
 });

@@ -390,7 +390,8 @@ describe("3. el mueble ofrece foto, y cuelga de la TIENDA", () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-describe("4. «Lo que ya se mandó»: la lista de ZIPs del período", () => {
+// 1-oct-2026, Daniel: nombres normales de ERP («Lo que ya se mandó» → «Historial de envíos»)
+describe("4. «Historial de envíos»: la lista de ZIPs del período", () => {
   const ZIP_A = {
     bajado_en: "2026-09-10T14:00:00.000Z",
     bajado_por: "Daniela",
@@ -429,7 +430,7 @@ describe("4. «Lo que ya se mandó»: la lista de ZIPs del período", () => {
       </ToastProvider>,
     );
     await waitFor(() => expect(container.querySelector('[data-testid="zips-bajados"]')).toBeNull());
-    expect(screen.queryByText("Lo que ya se mandó")).toBeNull();
+    expect(screen.queryByText("Historial de envíos")).toBeNull();
   });
 
   it("🔴 con un ZIP anotado se lista, y «Volver a firmar» llama a la ruta de firmar de nuevo", async () => {
@@ -457,7 +458,7 @@ describe("4. «Lo que ya se mandó»: la lista de ZIPs del período", () => {
         <ZipsBajados periodoId="p-1" />
       </ToastProvider>,
     );
-    await screen.findByText("Lo que ya se mandó");
+    await screen.findByText("Historial de envíos");
     expect(screen.getByText("40 gastos · $94,104.43")).toBeTruthy();
 
     fireEvent.click(screen.getByText("Volver a firmar"));

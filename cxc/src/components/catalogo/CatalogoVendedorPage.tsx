@@ -491,9 +491,9 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   // del layout público (`theme.ogImage`, URL absoluta y fija por marca).
   function handleCopyLink() {
     navigator.clipboard.writeText(theme.publicoShareUrl).then(() => {
-      setToast("Link copiado");
+      setToast("Enlace copiado");
     }).catch(() => {
-      setToast("No se pudo copiar el link");
+      setToast("No se pudo copiar el enlace");
     });
     setShowShareMenu(false);
   }

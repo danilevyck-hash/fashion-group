@@ -311,7 +311,7 @@ function EtiquetasUnaALaVez() {
                               disabled: !puedeCorregirse(e),
                             },
                             {
-                              label: bloqueo ? "Borrar — bloqueado" : "Borrar",
+                              label: bloqueo ? "Eliminar — bloqueado" : "Eliminar",
                               onClick: () => setBorrando(e),
                               destructive: true,
                               disabled: !puedeCorregirse(e),
@@ -362,7 +362,7 @@ function EtiquetasUnaALaVez() {
       {borrando && (
         <ModalOverlay onBackdropClick={() => setBorrando(null)}>
           <div className="relative w-full max-w-sm rounded-t-2xl border border-gray-200 bg-white p-6 sm:rounded-lg">
-            <h3 className="mb-1 text-base font-semibold">Borrar las etiquetas</h3>
+            <h3 className="mb-1 text-base font-semibold">Eliminar etiquetas</h3>
             <p className="mb-1 text-sm text-gray-600">
               Se quitan las {borrando.cajas} etiquetas de la factura {borrando.secuencial}. Esa factura
               se puede volver a etiquetar después.
@@ -370,7 +370,7 @@ function EtiquetasUnaALaVez() {
             <p className="mb-4 text-xs text-gray-400">Queda guardado como historial: nada se borra de verdad.</p>
             <div className="flex gap-3">
               <button type="button" onClick={() => void borrar()} className={`${BOTON_NEGRO} flex-1 bg-red-600 hover:bg-red-700`}>
-                Borrar
+                Eliminar
               </button>
               <button type="button" onClick={() => setBorrando(null)} className={`${BOTON_BLANCO} flex-1`}>
                 Cancelar
@@ -586,7 +586,7 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
 
       {/* ── 1 · La factura ── */}
       <div className="rounded-lg border border-gray-200 p-4">
-        <Paso n={1} titulo="La factura" ayuda="El mismo buscador de siempre: eliges el cliente y salen sus facturas por día. Una a la vez." />
+        <Paso n={1} titulo="Factura" ayuda="El mismo buscador de siempre: eliges el cliente y salen sus facturas por día. Una a la vez." />
         <div className="max-w-sm">
           <ClientePicker
             id="etiquetas-cliente"
@@ -717,7 +717,7 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
       {!yaEtiquetada && (
         <>
           <div className="mt-3 rounded-lg border border-gray-200 p-4">
-            <Paso n={2} titulo="Cuántos bultos" ayuda="Lo único que se escribe." />
+            <Paso n={2} titulo="Bultos" ayuda="Lo único que se escribe." />
             <input
               type="number"
               inputMode="numeric"
@@ -725,7 +725,7 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
               max={MAX_CAJAS}
               value={cajas}
               onChange={(e) => { setCajas(e.target.value); setError(null); }}
-              aria-label="Cuántos bultos"
+              aria-label="Bultos"
               className="w-[130px] rounded-md border border-gray-200 px-3 text-center font-mono text-xl font-semibold outline-none transition focus:border-black min-h-[44px]"
             />
 
@@ -831,7 +831,7 @@ function ModalReimprimir({
         <Opcion
           elegida={modo === "juego"}
           onElegir={() => setModo("juego")}
-          titulo="El juego completo"
+          titulo="Todas las etiquetas"
           detalle={`Las ${etiqueta.cajas} etiquetas.`}
         />
         <Opcion
@@ -939,7 +939,7 @@ function ModalCorregir({
           max={MAX_CAJAS}
           value={cajas}
           onChange={(e) => { setCajas(e.target.value); setError(null); }}
-          aria-label="Cuántos bultos"
+          aria-label="Bultos"
           className="w-[130px] rounded-md border border-gray-200 px-3 text-center font-mono text-xl font-semibold outline-none transition focus:border-black min-h-[44px]"
         />
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}

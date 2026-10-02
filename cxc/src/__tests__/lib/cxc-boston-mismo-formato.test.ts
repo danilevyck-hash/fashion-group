@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «Copiar mensaje».
 // ─────────────────────────────────────────────────────────────────────────────
 // LA CARTERA DE BOSTON — MISMO FORMATO, SIN MEZCLARSE (5-sep-2026).
 //
@@ -143,7 +144,7 @@ describe("🔴 Boston sigue sin mezclarse con el grupo, en las dos direcciones",
     expect(hoja).not.toMatch(/"\/api\/cxc\/enviar-email"/);
     expect(hoja).toContain("Correo");
     expect(hoja).toContain("WhatsApp");
-    expect(hoja).toContain("Copiar el mensaje");
+    expect(hoja).toContain("Copiar mensaje");
   });
 
   it("🔴 el mensaje de Boston lo firma Boston, y no dice «vencido»", () => {

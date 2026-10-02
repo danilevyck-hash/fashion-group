@@ -109,7 +109,7 @@ export const NOVEDADES: readonly Novedad[] = [
     modulo: "comisiones",
     fecha: "2026-09-06",
     desde: ARRANQUE,
-    texto: "Oficina y Daniel Levy están detrás de «Ver los que no se pagan», así lo que ves en la tabla suma exactamente lo que se paga.",
+    texto: "Oficina y Daniel Levy están detrás de «Mostrar no pagables», así lo que ves en la tabla suma exactamente lo que se paga.",
   },
 
   /* ── Referencia — módulo `referencia` ───────────────────────────────────── */

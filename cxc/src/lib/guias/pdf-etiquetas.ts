@@ -79,6 +79,7 @@ import { jsPDF } from "jspdf";
 import {
   ROTULO_BULTO,
   fechaDeLaEtiqueta,
+  fechaImpresa,
   hojasDeEtiquetas,
   partesDelNumeroDeBulto,
   type EtiquetaFila,
@@ -198,6 +199,10 @@ const BULTO_ANTES_DEL_TOTAL = 2.6;
 /** Lo que una etiqueta necesita saber para dibujarse. */
 export interface DatosEtiqueta {
   empresa: string;
+  /**
+   * La fecha que se imprime (YYYY-MM-DD). ⚠️ El nombre es histórico: desde el
+   * 1-oct-2026 es el día de la IMPRESIÓN (`fechaImpresa`), no el de la factura.
+   */
   fecha_factura: string;
   secuencial: string;
   cliente_nombre: string;
@@ -213,7 +218,8 @@ export interface DatosEtiqueta {
 export function datosDeEtiqueta(e: EtiquetaFila): DatosEtiqueta {
   return {
     empresa: e.empresa,
-    fecha_factura: e.fecha_factura,
+    // 🔴 1-oct-2026: el día en que se imprimió (Panamá), no el de la factura.
+    fecha_factura: fechaImpresa(e),
     secuencial: e.secuencial,
     cliente_nombre: e.cliente_nombre,
     destino: e.destino,

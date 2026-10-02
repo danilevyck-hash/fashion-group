@@ -316,7 +316,7 @@ function CategoriasRubroInner() {
 
         {/* La lista */}
         <section className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5" data-testid="rubros-config">
-          <h2 className="mb-3 text-sm font-medium text-gray-900">A qué cajón va cada rubro</h2>
+          <h2 className="mb-3 text-sm font-medium text-gray-900">Rubros por categoría</h2>
 
           {cargando && <p className="text-sm text-gray-400">Cargando…</p>}
           {errorCarga && <p className="text-sm text-red-600">{errorCarga}</p>}
@@ -333,8 +333,8 @@ function CategoriasRubroInner() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                  <th className="pb-2">Rubro de Switch</th>
-                  <th className="pb-2">Va a</th>
+                  <th className="pb-2">Rubro</th>
+                  <th className="pb-2">Categoría</th>
                   <th className="pb-2" />
                 </tr>
               </thead>

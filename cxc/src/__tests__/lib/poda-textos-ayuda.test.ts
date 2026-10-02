@@ -107,7 +107,8 @@ const EN_UN_AYUDA: Array<[string, string]> = [
   // existe. No se "perdieron": se fueron con la pantalla que los alojaba.
 
   // ── Usuarios ─────────────────────────────────────────────────────────────
-  ["app/admin/usuarios/page.tsx", "los deja ver en Cuentas por Cobrar únicamente los clientes de esa empresa"],
+  // 1-oct-2026, Daniel: nombres normales de ERP («Cuentas por Cobrar» → «Cuentas por cobrar»).
+  ["app/admin/usuarios/page.tsx", "los deja ver en Cuentas por cobrar únicamente los clientes de esa empresa"],
   ["app/admin/usuarios/page.tsx", "la lista reemplaza a la del rol, no se suma"],
   ["app/admin/usuarios/VendedorSwitchSection.tsx", "el pedido sale a Switch a nombre del vendedor que elijas"],
 ];

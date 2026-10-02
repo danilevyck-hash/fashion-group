@@ -66,7 +66,7 @@ describe("La pestaña «Quién usa qué»", () => {
     expect(screen.getByText("2 personas · 8 visitas")).toBeTruthy();
     expect(screen.getByText("1 persona · 2 visitas")).toBeTruthy();
     // La persona, su rol y el aparato.
-    expect(screen.getByText("secretaria")).toBeTruthy();
+    expect(screen.getByText("Secretaria")).toBeTruthy(); // 1-oct-2026, Daniel: nombres normales de ERP (el rol con su nombre, no la clave)
     expect(screen.getByText("3 en el teléfono")).toBeTruthy();
     expect(screen.getByText("computadora")).toBeTruthy();
     // 🔴 El módulo que nadie abrió también se dice.

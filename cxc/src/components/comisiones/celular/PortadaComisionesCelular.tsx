@@ -244,7 +244,7 @@ export function PortadaComisionesCelular({
             (o.clave === "excel-mes" && excelDisabled),
           detalle:
             o.clave === "pdf-vendedor"
-              ? "Toca su fila y usa «PDF» o «Mandar»"
+              ? "Toca su fila y usa «PDF» o «Enviar»"
               : undefined,
           onClick: () => {
             if (o.clave === "pdf-mes") onPdf();

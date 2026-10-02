@@ -262,7 +262,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
                 onClick={() => setHojaCobrar(true)}
                 className="inline-flex min-h-[44px] items-center justify-center bg-black text-white text-sm font-medium rounded-md px-4 py-2 transition active:scale-[0.97]"
               >
-                Cobrar
+                Enviar estado de cuenta
               </button>
             )}
           </div>
@@ -270,7 +270,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
 
         {/* ── 2. LAS CUATRO TARJETAS ─────────────────────────────────────── */}
         <div data-bloque="tarjetas" className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          <Tarjeta titulo={`Compró ${anio}`}>
+          <Tarjeta titulo={`Compras ${anio}`}>
             {compro.monto != null ? (
               <p className="text-xl font-semibold tabular-nums text-gray-900">{dinero(compro.monto)}</p>
             ) : (
@@ -287,7 +287,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
             )}
           </Tarjeta>
 
-          <Tarjeta titulo="Debe">
+          <Tarjeta titulo="Saldo pendiente">
             {debe.monto != null ? (
               <p className="text-xl font-semibold tabular-nums text-red-700">{dinero(debe.monto)}</p>
             ) : (
@@ -318,7 +318,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
         {/* ── 3. EMPRESA POR EMPRESA ─────────────────────────────────────── */}
         <section className="border border-gray-200 rounded-lg p-4 mb-4">
           <div className="flex items-center gap-1 mb-3">
-            <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400">Empresa por empresa</h2>
+            <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400">Detalle por empresa</h2>
             {/* 🩸 POR QUÉ «COMPRÓ» Y «DEBE» NO CUADRAN ENTRE SÍ — la pregunta que
                 se hace cualquiera al ver las dos cifras juntas. Daniel lo dijo
                 así: *«cxc si se muestra con itbms, porq es lo que tengo q
@@ -329,9 +329,9 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
                 mención; la explicación quedó, más corta, con las dos columnas
                 que hoy están en pantalla. */}
             <Ayuda titulo="Por qué las cifras no cuadran entre sí">
-              <span className="font-medium text-gray-900">Compró</span> va sin ITBMS — el impuesto se
+              <span className="font-medium text-gray-900">Compras</span> va sin ITBMS — el impuesto se
               cobra para el fisco, no es venta de la empresa.{" "}
-              <span className="font-medium text-gray-900">Debe</span> va con ITBMS, porque es la plata
+              <span className="font-medium text-gray-900">Saldo</span> va con ITBMS, porque es la plata
               que falta cobrar.
             </Ayuda>
           </div>
@@ -354,8 +354,8 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
                     <th className="py-2 font-normal">Empresa</th>
                     <th className="py-2 font-normal text-right whitespace-nowrap">{anio}</th>
                     <th className="py-2 font-normal text-right whitespace-nowrap">{anio - 1}</th>
-                    <th className="py-2 font-normal text-right whitespace-nowrap">vs {anio - 1}</th>
-                    <th className="py-2 font-normal text-right whitespace-nowrap">Debe</th>
+                    <th className="py-2 font-normal text-right whitespace-nowrap">Variación %</th>
+                    <th className="py-2 font-normal text-right whitespace-nowrap">Saldo</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -436,7 +436,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
           </div>
           <div className="mt-3 border-t border-gray-100 pt-3">
             <CampoEnLinea
-              campo="notas" rotulo="Notas" valor={cliente.notas} multilinea
+              campo="notas" rotulo="Observaciones" valor={cliente.notas} multilinea
               puedeEditar={puedeEditar} editando={editando} setEditando={setEditando} onGuardar={guardar}
             />
           </div>
@@ -454,8 +454,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
               onClick={() => setCajonDocs(true)}
               className="block min-h-[44px] w-full text-left text-sm text-blue-600 hover:underline"
             >
-              Ver los {initialData.documentos_con_saldo}{" "}
-              {initialData.documentos_con_saldo === 1 ? "documento" : "documentos"} ›
+              Estado de cuenta ({initialData.documentos_con_saldo}) ›
             </button>
           )}
 
@@ -492,7 +491,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
               href={`/cxc?search=${encodeURIComponent(cliente.nombre)}`}
               className="block min-h-[44px] text-sm leading-[44px] text-blue-600 hover:underline"
             >
-              Ver en Cuentas por Cobrar ›
+              Ver en Cuentas por cobrar ›
             </Link>
           )}
           {veVentas && (
@@ -507,7 +506,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
 
         {cliente.last_synced_at && (
           <p className="mt-4 text-xs text-gray-400">
-            Actualizado desde Switch el {fmtDate(cliente.last_synced_at.slice(0, 10))}
+            Última sincronización: {fmtDate(cliente.last_synced_at.slice(0, 10))}
           </p>
         )}
       </main>

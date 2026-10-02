@@ -336,9 +336,9 @@ export function debeEnRojo(meses: number): boolean {
  * ya existe y enseñarle a leer fotos, no solo PDF.
  */
 export const PUERTAS_DE_LA_FACTURA = [
-  { clave: "escanear", titulo: "Escanear con la cámara", detalle: "tomas la foto y se llena solo" },
-  { clave: "pdf", titulo: "Elegir el PDF", detalle: "de Archivos o del correo · también se llena solo" },
-  { clave: "mano", titulo: "Escribirlo a mano", detalle: "sin papel" },
+  { clave: "escanear", titulo: "Escanear", detalle: "tomas la foto y se llena solo" },
+  { clave: "pdf", titulo: "Subir PDF", detalle: "de Archivos o del correo · también se llena solo" },
+  { clave: "mano", titulo: "Ingreso manual", detalle: "sin papel" },
 ] as const;
 
 export type PuertaDeLaFactura = (typeof PUERTAS_DE_LA_FACTURA)[number]["clave"];

@@ -64,7 +64,7 @@ function mensajeDeCobro(nombre: string, porEmpresa: [string, number][], total: n
     "",
     "Le escribimos de Fashion Group para informarle sobre su estado de cuenta actualizado.",
     "",
-    `Estado de Cuenta - ${nombre}`,
+    `Estado de cuenta - ${nombre}`,
     "",
   ];
   for (const [empresa, monto] of porEmpresa) {
@@ -153,7 +153,7 @@ export default function CobrarEnFicha({
         }}
         onCopiar={() => {
           navigator.clipboard
-            .writeText(`Estado de Cuenta - ${client.nombre_normalized} - Fashion Group\n\n${cuerpo()}`)
+            .writeText(`Estado de cuenta - ${client.nombre_normalized} - Fashion Group\n\n${cuerpo()}`)
             .then(() => { avisar("Mensaje copiado — pégalo en WhatsApp o correo"); anotar("copia"); })
             .catch(() => avisar("No se pudo copiar. Intenta de nuevo."));
         }}

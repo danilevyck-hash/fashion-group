@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 /**
  * ─────────────────────────────────────────────────────────────────────────────
  * CANDADO DE CONDUCTA — LA PANTALLA DE COMPROBANTES DESPUÉS DEL REDISEÑO
@@ -189,8 +190,8 @@ describe("1. 🔴 los DOS filtros tienen el MISMO aspecto y su rótulo", () => {
 
   it("cada grupo lleva su rótulo chico", () => {
     const { container } = pintar([EN_SWITCH, DEL_CLIENTE]);
-    expect(grupo(container, "filtro-origen-comprobante").textContent).toContain("Quién lo armó");
-    expect(grupo(container, "filtro-tipo-comprobante").textContent).toContain("Qué es");
+    expect(grupo(container, "filtro-origen-comprobante").textContent).toContain("Origen");
+    expect(grupo(container, "filtro-tipo-comprobante").textContent).toContain("Tipo");
   });
 
   it("🔴 lo que está en cero NO aparece", () => {
@@ -319,8 +320,8 @@ describe("4. 🔴 la columna «Vendedor»", () => {
 describe("5. 🔴 el pedido trabado se NOTA", () => {
   it("el chip «Sin mandar» aparece con su conteo y filtra", () => {
     const { container } = pintar([EN_SWITCH, TRABADO, BORRADOR]);
-    expect(chipsDe(container, "filtro-tipo-comprobante")).toContain("Sin mandar1");
-    tocarChip(container, "filtro-tipo-comprobante", "Sin mandar");
+    expect(chipsDe(container, "filtro-tipo-comprobante")).toContain("No enviado1");
+    tocarChip(container, "filtro-tipo-comprobante", "No enviado");
     abrirMeses(container);
     expect(trs(container)).toHaveLength(1);
     expect(trs(container)[0].textContent).toContain("PED-004");
@@ -332,7 +333,7 @@ describe("5. 🔴 el pedido trabado se NOTA", () => {
     const marca = filaDe(container, "PED-004").querySelector('[data-medir="sin-mandar"]') as HTMLElement;
     expect(marca, "la fila no marca que está sin mandar").toBeTruthy();
     expect(marca.className).toContain("text-red-600");
-    expect(marca.textContent).toMatch(/^Sin mandar a Switch · hace \d+ días$/);
+    expect(marca.textContent).toMatch(/^No enviado a Switch · hace \d+ días$/);
   });
 
   it("🔴 un BORRADOR conserva su frase gris: no se mandó porque no se terminó", () => {
@@ -340,7 +341,7 @@ describe("5. 🔴 el pedido trabado se NOTA", () => {
     tocarChip(container, "filtro-tipo-comprobante", "Borradores");
     const f = filaDe(container, "PED-018");
     expect(f.querySelector('[data-medir="sin-mandar"]')).toBeNull();
-    expect(f.textContent).toContain("No se ha mandado a Switch");
+    expect(f.textContent).toContain("Pendiente de envío");
   });
 
   it("y uno que SÍ salió no lleva ninguna marca roja", () => {

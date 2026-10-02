@@ -698,14 +698,14 @@ export function ProductosSubtab({
                   otra hasta `lg` — ver las decisiones de ancho del encabezado. */}
               <div className="grid gap-3 lg:grid-cols-2">
                 <ListaTop
-                  titulo="Lo que más se vende"
-                  ayuda={`Por piezas. Suman el ${fmtPctTotal(sumaPct(topUnidades))} de las unidades del período.`}
+                  titulo="Más vendidos"
+                  ayuda={`Por unidades. Suman el ${fmtPctTotal(sumaPct(topUnidades))} de las unidades del período.`}
                   filas={topUnidades}
                   unidad="piezas"
                   vista={vista}
                 />
                 <ListaTop
-                  titulo="Lo que más plata deja"
+                  titulo="Mayor utilidad"
                   ayuda={`Por utilidad. Suman el ${fmtPctTotal(sumaPct(topUtilidad))} de la utilidad del período.`}
                   filas={topUtilidad}
                   unidad="plata"
@@ -767,7 +767,7 @@ function Pulso({
           valor={fmtUnidades(totales.unidades)}
           tono="volumen"
           delta={c ? variacion(totales.unidades, c.unidades) : null}
-          anterior={c ? `${fmtUnidades(c.unidades)} piezas` : null}
+          anterior={c ? `${fmtUnidades(c.unidades)} unidades` : null}
           fmtAbs={fmtUnidadesConSigno}
         />
         <CeldaPulso
@@ -896,7 +896,7 @@ function ListaTop({
             <p className="mt-0.5 pl-6 text-xs text-gray-500">
               {esPlata ? (
                 <>
-                  {fmtUnidades(f.unidades)} piezas · margen{" "}
+                  {fmtUnidades(f.unidades)} unidades · margen{" "}
                   <span className="font-mono tabular-nums">{fmtMargen(f.margen)}</span>
                 </>
               ) : (
@@ -932,7 +932,7 @@ function MargenFlojo({
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" strokeWidth={1.75} />
         <div className="flex min-w-0 items-center gap-1">
           <h4 className="font-display text-sm font-semibold text-amber-950">
-            Se vende mucho pero deja poco
+            Alta venta, bajo margen
           </h4>
           {/* 🩸 LA REGLA SE SIGUE PUDIENDO LEER COMPLETA — una advertencia cuyo
               criterio no se puede consultar es una advertencia en la que nadie
@@ -957,7 +957,7 @@ function MargenFlojo({
               {fmtMargen(f.margen)}
             </span>
             <p className="w-full text-xs text-gray-500">
-              N.º {f.puesto} en unidades · {fmtUnidades(f.unidades)} piezas ·{" "}
+              N.º {f.puesto} en unidades · {fmtUnidades(f.unidades)} unidades ·{" "}
               {fmtMoney(f.venta)} de venta · {fmtMoney(f.utilidad)} de utilidad
             </p>
           </li>
@@ -987,7 +987,7 @@ function Movimientos({
     <Card data-bloque="movimientos" className="overflow-hidden p-0">
       <div className="border-b border-gray-100 px-4 py-3">
         <div className="flex items-center gap-1">
-          <h4 className="font-display text-sm font-semibold text-gray-950">Lo que más cambió</h4>
+          <h4 className="font-display text-sm font-semibold text-gray-950">Mayores variaciones</h4>
           {/* 🩸 Contra QUÉ se compara se queda en pantalla (las dos fechas son
               del período, cambian con él). Por qué se rankea en dólares y no en
               porcentaje se aprende una vez: va al ⓘ. */}
@@ -1019,7 +1019,7 @@ function ColumnaMovimiento({
     <div className="px-4 py-3">
       <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{titulo}</p>
       {filas.length === 0 ? (
-        <p className="mt-1 text-xs text-gray-400">Nada por aquí.</p>
+        <p className="mt-1 text-xs text-gray-400">Sin registros.</p>
       ) : (
         <ul className="mt-1.5 space-y-2">
           {filas.map(m => (
@@ -1313,7 +1313,7 @@ function VistaMarca({
                 <th className="w-10 border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">#</th>
                 <th className="border-b border-gray-200 px-3.5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Departamento</th>
                 <th className="border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Unidades</th>
-                <th className="border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Monto</th>
+                <th className="border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Venta</th>
                 <th className="border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">% del total</th>
               </tr>
             </thead>
@@ -1510,7 +1510,7 @@ function FilaMarcaFiltro({
       <div className="mt-0.5 flex items-baseline justify-between gap-2 text-xs text-gray-500">
         <span className="min-w-0 truncate">
           <span className="font-mono tabular-nums">{fmtPctTotal(pct)}</span> del total ·{" "}
-          <span className="font-mono tabular-nums">{fmtUnidades(unidades)}</span> piezas
+          <span className="font-mono tabular-nums">{fmtUnidades(unidades)}</span> unidades
         </span>
         <span className="shrink-0">
           margen{" "}

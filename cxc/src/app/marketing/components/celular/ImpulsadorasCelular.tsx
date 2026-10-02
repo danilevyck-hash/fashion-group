@@ -199,7 +199,7 @@ function DetalleDeLaImpulsadora({
       )}
 
       <RotuloDeGrupo>
-        {meses.length === 0 ? "Sin meses pendientes" : `Los meses sin pagar · ${meses.length}`}
+        {meses.length === 0 ? "Sin meses pendientes" : `Meses pendientes (${meses.length})`}
       </RotuloDeGrupo>
       {meses.length > 0 && (
         <GrupoCelular className="mt-0">

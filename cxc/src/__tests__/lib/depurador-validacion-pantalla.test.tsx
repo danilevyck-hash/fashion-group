@@ -137,7 +137,7 @@ async function aoaDe(d: (typeof descargas)[number]): Promise<(string | number)[]
 
 /** Abre el desplegable «cambiar» y elige una compañía por su etiqueta. */
 async function cambiarCompania(label: string) {
-  fireEvent.click(screen.getByRole("button", { name: "Cambiar compañía" }));
+  fireEvent.click(screen.getByRole("button", { name: "Cambiar empresa" })); // 1-oct-2026, Daniel: nombres normales de ERP
   const opcion = await screen.findByRole("option", { name: label });
   fireEvent.click(opcion);
 }
@@ -464,8 +464,8 @@ describe("compañía reconocida de la marca del archivo — «¿para qué elegir
   it("«cambiar» abre las 6 compañías y la elegida SOBREESCRIBE (proveedor y historial)", async () => {
     const descargasHist: { empresa: string }[] = [];
     await montar(archivo("a.xlsx", [CABECERA, FILA_A]), (p) => descargasHist.push(p));
-    fireEvent.click(screen.getByRole("button", { name: "Cambiar compañía" }));
-    const lista = await screen.findByRole("listbox", { name: "Compañía" });
+    fireEvent.click(screen.getByRole("button", { name: "Cambiar empresa" })); // 1-oct-2026, Daniel: nombres normales de ERP
+    const lista = await screen.findByRole("listbox", { name: "Empresa" });
     const opciones = within(lista).getAllByRole("option").map((o) => o.textContent);
     expect(opciones).toEqual([
       "Vistana International", "Fashion Wear", "Fashion Shoes",
@@ -481,12 +481,12 @@ describe("compañía reconocida de la marca del archivo — «¿para qué elegir
 
   it("🔴 marcas de DOS compañías: se dice en pantalla y NO se adivina", async () => {
     await montar(archivo("mixto.xlsx", [CABECERA, FILA_A, FILA_TH]));
-    expect(screen.getByText(/marcas de 2 compañías/)).toBeTruthy();
+    expect(screen.getByText(/marcas de 2 empresas/)).toBeTruthy(); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(screen.getByText(/Vistana International y Fashion Wear/)).toBeTruthy();
-    expect(screen.getByText("Elige la compañía")).toBeTruthy();
+    expect(screen.getByText("Seleccionar empresa")).toBeTruthy(); // 1-oct-2026, Daniel: nombres normales de ERP
     // Elegir a mano resuelve (no se bloquea en silencio).
     await cambiarCompania("Vistana International");
-    expect(screen.queryByText("Elige la compañía")).toBeNull();
+    expect(screen.queryByText("Seleccionar empresa")).toBeNull();
   });
 
   it("la compañía NO se recuerda entre corridas: la del archivo manda", async () => {

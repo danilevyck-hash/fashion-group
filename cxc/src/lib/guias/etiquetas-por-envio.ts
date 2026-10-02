@@ -32,6 +32,7 @@ import {
 } from "@/lib/guias/etiquetas";
 import { normalizarEmpresaGuia, numerosDeFacturas, type RenglonDeGuia } from "@/lib/guias/atajos-facturas";
 import { claveDeFactura } from "@/lib/guias/numero-factura";
+import { GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
 
 /** 🔴 El interruptor. `false` = Etiquetas y la guía como estaban el 30-sep-2026. */
 export const ETIQUETAS_POR_ENVIO = true;
@@ -285,6 +286,12 @@ export type RenglonConEtiquetas = RenglonDeGuia & {
    * guardada lo DERIVA el servidor de `guias_etiquetas.guia_item_id`.
    */
   con_etiquetas?: boolean;
+  /**
+   * 🔴 UN RENGLÓN POR ENVÍO (1-oct-2026): el envío que llenó este renglón. Solo
+   * vive en la pantalla (el POST no lo guarda): sirve para desmarcar ESE envío
+   * y no otro del mismo cliente + empresa + destino.
+   */
+  envio_id?: string;
 };
 
 /** ¿Los bultos de este renglón están bloqueados por venir de etiquetas? */
@@ -319,13 +326,23 @@ function filaVacia(r: RenglonDeGuia): boolean {
 }
 
 /**
- * Marca un envío entero: TODAS sus facturas van a UN renglón —el del mismo
- * cliente + empresa + destino si ya hay uno de etiquetas— con los bultos
+ * Marca un envío entero: TODAS sus facturas van a UN renglón, con los bultos
  * sumados y bloqueados. Nunca se mezcla con un renglón escrito a mano.
+ *
+ * 🔴 UN RENGLÓN POR ENVÍO (1-oct-2026, Daniel aprobó el mockup): el envío va
+ * SIEMPRE a su propio renglón (la primera fila vacía o una nueva al final). 🩸
+ * Antes dos envíos del mismo cliente + empresa + destino se JUNTABAN en un
+ * renglón, y la numeración «1 de 10» se repetía en la misma línea de la guía.
+ * Con `unoPorEnvio` en `false` se juntan como el 30-sep-2026.
  */
-export function marcarEnvio<R extends RenglonConEtiquetas>(items: readonly R[], envio: Envio): R[] {
+export function marcarEnvio<R extends RenglonConEtiquetas>(
+  items: readonly R[],
+  envio: Envio,
+  unoPorEnvio: boolean = GUIA_NUEVA_2026_10,
+): R[] {
   const secs = envio.filas.map((f) => f.secuencial.trim());
-  const idx = items.findIndex((r) => esRenglonDelEnvio(r, envio));
+  if (unoPorEnvio && items.some((r) => r.envio_id === envio.envio_id)) return [...items];
+  const idx = unoPorEnvio ? -1 : items.findIndex((r) => esRenglonDelEnvio(r, envio));
   if (idx >= 0) {
     return items.map((r, i) => {
       if (i !== idx) return r;
@@ -346,6 +363,7 @@ export function marcarEnvio<R extends RenglonConEtiquetas>(items: readonly R[], 
     facturas: secs.join(", "),
     bultos: envio.total,
     con_etiquetas: true,
+    ...(unoPorEnvio ? { envio_id: envio.envio_id } : {}),
   });
   const idxVacia = items.findIndex(filaVacia);
   if (idxVacia >= 0) return items.map((r, i) => (i === idxVacia ? relleno(r) : r));
@@ -364,6 +382,14 @@ export function marcarEnvio<R extends RenglonConEtiquetas>(items: readonly R[], 
 
 /** Desmarca un envío: salen sus facturas y sus bultos; sin nada, el renglón se va. */
 export function desmarcarEnvio<R extends RenglonConEtiquetas>(items: readonly R[], envio: Envio): R[] {
+  // 🔴 1-oct-2026: el renglón que es de ESTE envío (y de ningún otro) se va entero.
+  const suyo = items.findIndex((r) => r.envio_id !== undefined && r.envio_id === envio.envio_id);
+  if (suyo >= 0) {
+    const sin = items.filter((_, i) => i !== suyo);
+    if (sin.length > 0) return sin;
+    const r = items[suyo];
+    return [{ ...r, cliente: "", cliente_codigo: "", direccion: "", empresa: "", facturas: "", bultos: 0, con_etiquetas: undefined, envio_id: undefined }];
+  }
   const claves = new Set(envio.filas.map((f) => claveDeFactura(f.secuencial)).filter(Boolean));
   const idx = items.findIndex(
     (r) => esRenglonDelEnvio(r, envio) && numerosDeFacturas(r.facturas).some((k) => claves.has(k)),
@@ -391,6 +417,8 @@ export interface RenglonParaAtar {
   cliente_codigo: string | null;
   empresa: string | null;
   direccion: string | null;
+  /** Las facturas del renglón (texto «A, B»). Con ellas se ata POR ENVÍO. */
+  facturas?: string | null;
 }
 
 const trio = (r: Pick<RenglonParaAtar, "cliente_codigo" | "empresa" | "direccion">) =>
@@ -418,4 +446,43 @@ export function renglonNuevoDe<R extends RenglonParaAtar>(
   if (exacto) return exacto;
   const delPar = nuevos.filter((n) => par(n) === par(viejo));
   return delPar[delPar.length - 1] ?? null;
+}
+
+/**
+ * 🔴 ATAR POR ENVÍO, NO POR CLIENTE + EMPRESA (1-oct-2026). Con un renglón por
+ * envío, dos envíos del mismo cliente + empresa + destino viven en DOS
+ * renglones: buscar «el renglón del trío» los ataba a los dos al PRIMERO.
+ *
+ * El renglón de un envío es el que lleva SUS facturas (mismo cliente y empresa,
+ * pareo por `claveDeFactura`, exacto): una factura tiene una sola etiqueta viva,
+ * así que ese renglón es uno solo. Si nadie lleva sus facturas (alguien las
+ * reescribió a mano), cae a la regla de antes (`renglonNuevoDe`) pero SOLO entre
+ * los renglones que todavía no se llevó otro envío (`usados`).
+ *
+ * Lo usan `importarEtiquetas` (al crear la guía) y `reatarEtiquetas` (el PUT).
+ */
+export function renglonDelEnvio<R extends RenglonParaAtar>(
+  envio: Pick<RenglonParaAtar, "cliente_codigo" | "empresa" | "direccion"> & { secuenciales: readonly string[] },
+  nuevos: readonly R[],
+  usados: ReadonlySet<string> = new Set(),
+): R | null {
+  const claves = new Set(envio.secuenciales.map((s) => claveDeFactura(s)).filter(Boolean));
+  const conSusFacturas = nuevos.find(
+    (n) => par(n) === par(envio) && numerosDeFacturas(n.facturas).some((k) => claves.has(k)),
+  );
+  if (conSusFacturas) return conSusFacturas;
+  return renglonNuevoDe(envio, nuevos.filter((n) => !usados.has(n.id)));
+}
+
+/**
+ * 🔴 EL ORDEN DE LOS BULTOS SE CAMBIA CON ↑ ↓ (1-oct-2026). Mueve el elemento
+ * `i` un lugar arriba (`-1`) o abajo (`+1`); en el borde no hace nada. Nunca
+ * muta: devuelve un arreglo nuevo. El orden del arreglo ES `orden_en_envio`.
+ */
+export function moverEnElEnvio<T>(lista: readonly T[], i: number, paso: -1 | 1): T[] {
+  const j = i + paso;
+  if (i < 0 || i >= lista.length || j < 0 || j >= lista.length) return [...lista];
+  const copia = [...lista];
+  [copia[i], copia[j]] = [copia[j], copia[i]];
+  return copia;
 }

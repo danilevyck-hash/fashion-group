@@ -487,7 +487,7 @@ export default function PuertaGasto({
         {/* ─── PASO 1 — ¿Qué es? ─────────────────────────────────────────── */}
         {paso === "tipo" && (
           <div className="p-5 space-y-3">
-            <p className="text-sm text-gray-600">¿Qué es el gasto?</p>
+            <p className="text-sm text-gray-600">Tipo de gasto</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {OPCIONES_DE_TIPO.map((o) => (
                 <button
@@ -509,7 +509,7 @@ export default function PuertaGasto({
           <>
             <div className="p-5 space-y-5">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-gray-500">Qué es</span>
+                <span className="text-xs text-gray-500">Tipo</span>
                 <span className="text-sm font-medium text-gray-900">{ROTULO_DE_TIPO[tipo]}</span>
                 <button
                   type="button"
@@ -571,7 +571,7 @@ export default function PuertaGasto({
                   escribirlo a mano. En la computadora, el campo de siempre. */}
               {enCelular && tipo === "factura" ? (
                 <div>
-                  <div className="text-sm font-medium text-gray-700">La factura</div>
+                  <div className="text-sm font-medium text-gray-700">Factura</div>
                   <input
                     ref={camaraRef}
                     type="file"

@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 /**
  * Candado del correo de pedido de catálogo — es lo que lee el CLIENTE, casi
  * siempre en el teléfono.
@@ -107,12 +108,12 @@ describe("correo de pedido — secciones por marca", () => {
   it("Reebok separa Pedido y Pre-orden", () => {
     const html = buildOrderEmailHtml(base);
     expect(html).toContain(">Pedido<");
-    expect(html).toContain(">Pre-orden<");
+    expect(html).toContain(">Preventa<");
   });
 
   it("Joybees/Tommy van en una sola tabla, sin pre-orden", () => {
     const html = buildOrderEmailHtml({ ...base, marcaLabel: "Tommy Hilfiger", itemsHasPreorder: false });
-    expect(html).not.toContain(">Pre-orden<");
+    expect(html).not.toContain(">Preventa<");
     expect(html).toContain("del catálogo Tommy Hilfiger");
   });
 });

@@ -366,8 +366,8 @@ export default function EnviarProveedorModal({
                                 segunda ventana encima de ésta. */}
                             {borrandoId === ct.id ? (
                               <div className="flex items-center gap-2 shrink-0">
-                                <span className="text-xs text-gray-600">¿Borrar de la libreta?</span>
-                                <button type="button" onClick={() => deleteContacto(ct.id)} className="text-xs px-3 min-h-[44px] inline-flex items-center rounded-md bg-red-600 text-white font-medium hover:bg-red-700 transition">Borrar</button>
+                                <span className="text-xs text-gray-600">¿Eliminar de la libreta?</span>
+                                <button type="button" onClick={() => deleteContacto(ct.id)} className="text-xs px-3 min-h-[44px] inline-flex items-center rounded-md bg-red-600 text-white font-medium hover:bg-red-700 transition">Eliminar</button>
                                 <button type="button" onClick={() => setBorrandoId(null)} className="text-xs px-3 min-h-[44px] inline-flex items-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 transition">Cancelar</button>
                               </div>
                             ) : (
@@ -375,7 +375,7 @@ export default function EnviarProveedorModal({
                                 <button type="button" onClick={() => setTo((v) => appendEmail(v, ct.email))} title="Agregar a Para" className="text-xs border border-gray-200 px-3 min-h-[44px] inline-flex items-center rounded-md text-gray-600 hover:text-black hover:border-gray-400 transition">+ Para</button>
                                 <button type="button" onClick={() => setCc((v) => appendEmail(v, ct.email))} title="Agregar a CC" className="text-xs border border-gray-200 px-3 min-h-[44px] inline-flex items-center rounded-md text-gray-600 hover:text-black hover:border-gray-400 transition">+ CC</button>
                                 <button type="button" onClick={() => { setEditId(ct.id); setEditEmail(ct.email); setEditNombre(ct.nombre || ""); setLibretaErr(null); }} title="Editar" aria-label="Editar contacto" className="w-11 h-11 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-black hover:bg-gray-50 transition">{IconPencil}</button>
-                                <button type="button" onClick={() => { setBorrandoId(ct.id); setLibretaErr(null); }} title="Borrar de la libreta" aria-label="Borrar contacto de la libreta" className="ml-1 w-11 h-11 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition">{IconTrash}</button>
+                                <button type="button" onClick={() => { setBorrandoId(ct.id); setLibretaErr(null); }} title="Eliminar de la libreta" aria-label="Eliminar contacto de la libreta" className="ml-1 w-11 h-11 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition">{IconTrash}</button>
                               </div>
                             )}
                           </div>

@@ -939,7 +939,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
 
           {/* Config de salida */}
           <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-stone-200 bg-white p-4 sm:grid-cols-3">
-            <Field label="¿Qué quieres generar?">
+            <Field label="Tipo de salida">
               <div className="flex overflow-hidden rounded-lg border border-stone-300">
                 <PriceBtn active={salida === "catalogo"} onClick={() => setSalida("catalogo")} label="Pedido para cliente" />
                 <PriceBtn active={salida === "switch"} onClick={() => setSalida("switch")} label="Plantilla Switch" last />

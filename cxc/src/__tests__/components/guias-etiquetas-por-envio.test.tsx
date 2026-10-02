@@ -20,6 +20,9 @@
  *   5. El celular de bodega: sin caja de bultos para el envío etiquetado.
  * ─────────────────────────────────────────────────────────────────────────────
  */
+// 🔄 1-oct-2026: nombres de ERP en Guías (Daniel aprobó el audit): rótulos en tipo oración
+// («Guardar guía», «Nueva guía de despacho», «Tipo de despacho», «Vincular cliente»…).
+// Este candado leía los textos viejos y se actualiza a propósito.
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { useState } from "react";
 import { render, screen, fireEvent, cleanup, act, waitFor } from "@testing-library/react";
@@ -175,7 +178,7 @@ describe("🔴 1. la lista: una fila por ENVÍO, y lo impreso no se corrige", ()
     fireEvent.click((await screen.findAllByRole("menuitem"))[0]);
     expect(await screen.findByText("Las 20 etiquetas, iguales a las impresas.")).toBeTruthy();
     fireEvent.click(screen.getByText("Un solo bulto"));
-    fireEvent.change(screen.getByLabelText("Cuál bulto"), { target: { value: "15" } });
+    fireEvent.change(screen.getByLabelText("Bulto"), { target: { value: "15" } });
     expect(screen.getByText("Es de la factura 11-000000002.")).toBeTruthy();
   });
 });
@@ -253,6 +256,72 @@ describe("🔴 2. el panel: varias facturas, bultos y nota por factura, imprimir
     expect(posts).toHaveLength(0);
   });
 });
+
+// ─── 2b · el orden de los bultos (1-oct-2026) ───────────────────────────────
+
+describe("🔴 2b. cada factura marcada lleva su NÚMERO DE ORDEN y se reordena con ↑ ↓ (1-oct-2026)", () => {
+  it("1 y 2 al marcar; ↑ en la segunda la pone primera, los rangos se mueven y el POST sale en ese orden", async () => {
+    await abrirPanel([]);
+    const [c1, c2] = screen.getAllByRole("checkbox") as HTMLInputElement[];
+    fireEvent.click(c1);
+    fireEvent.click(c2);
+    expect([...document.querySelectorAll("[data-orden]")].map((e) => e.textContent)).toEqual(["1", "2"]);
+    fireEvent.change(document.getElementById("envio-bultos-fashion_shoes-11-000000031")!, { target: { value: "10" } });
+    fireEvent.change(document.getElementById("envio-bultos-fashion_shoes-11-000000032")!, { target: { value: "5" } });
+    const resumen = () => screen.getByTestId("resumen-envio").textContent ?? "";
+    expect(resumen()).toMatch(/11-000000031bultos 1–10 de 15.*11-000000032bultos 11–15 de 15/);
+    // El primero no sube y el último no baja.
+    expect((screen.getByRole("button", { name: "Subir 11-000000031" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Bajar 11-000000032" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Subir 11-000000032" }));
+    expect(resumen()).toMatch(/11-000000032bultos 1–5 de 15.*11-000000031bultos 6–15 de 15/);
+    // El número de orden de la lista sigue al cambio.
+    const orden = (sec: string) =>
+      screen.getAllByText(sec).map((el) => el.closest("label")?.querySelector("[data-orden]")?.textContent).find(Boolean);
+    expect(orden("11-000000032")).toBe("1");
+    expect(orden("11-000000031")).toBe("2");
+    fireEvent.change(screen.getByLabelText("Destino del envío"), { target: { value: "David" } });
+    fireEvent.click(screen.getByRole("button", { name: /Imprimir 15 etiquetas/ }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect((posts[0].facturas as Array<Record<string, unknown>>).map((f) => f.secuencial)).toEqual([
+      "11-000000032",
+      "11-000000031",
+    ]);
+  });
+
+  it("🔴 no se ofrece la factura que ya salió en una guía, y se dice", async () => {
+    servirConYaSalida();
+    render(<EtiquetasView />);
+    fireEvent.click(await screen.findByRole("button", { name: /Nuevo envío/ }));
+    const campo = document.getElementById("etiquetas-cliente") as HTMLInputElement;
+    fireEvent.focus(campo);
+    fireEvent.change(campo, { target: { value: "Nova" } });
+    const opcion = await screen.findByText(NOVA.nombre, { selector: "[data-desplegable] *" });
+    fireEvent.mouseDown(opcion.closest("button") ?? opcion);
+    await asentar();
+    await screen.findByText("11-000000032");
+    expect(screen.queryByText("11-000000031")).toBeNull();
+    expect(screen.getByText("1 factura de este cliente ya salió en una guía")).toBeTruthy();
+  });
+});
+
+/** La 31 ya salió en GT-271 (una guía hecha a mano). */
+function servirConYaSalida() {
+  servir([]);
+  const base = globalThis.fetch as unknown as (u: string, i?: unknown) => Promise<unknown>;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string, init?: unknown) => {
+      if (String(url).startsWith("/api/guias/facturas-cliente")) {
+        return {
+          ok: true,
+          json: async () => ({ facturas: [{ ...FACTURAS[0], yaSalioEn: 271 }, FACTURAS[1]], hasta: null }),
+        } as unknown as Response;
+      }
+      return base(url, init);
+    }),
+  );
+}
 
 // ─── 3 · Nueva guía ──────────────────────────────────────────────────────────
 

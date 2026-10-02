@@ -17,6 +17,9 @@
  *   B. el formulario que se ponía rojo solo mientras la persona escribía;
  *   C. el botón apagado que no decía por qué.
  */
+// 🔄 1-oct-2026: nombres de ERP en Guías (Daniel aprobó el audit): rótulos en tipo oración
+// («Guardar guía», «Nueva guía de despacho», «Tipo de despacho», «Vincular cliente»…).
+// Este candado leía los textos viejos y se actualiza a propósito.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, act, fireEvent, waitFor } from "@testing-library/react";
 
@@ -144,7 +147,7 @@ async function tocarEditar() {
   await act(async () => { fireEvent.click(editar); });
   // El formulario es `dynamic()`: hasta que no resuelve hay esqueleto.
   await waitFor(() => {
-    expect(screen.queryByText(/Editar Guía de Transporte/i)).not.toBeNull();
+    expect(screen.queryByText(/Editar guía de despacho/i)).not.toBeNull();
     expect(document.querySelector(".animate-pulse")).toBeNull();
   });
 }
@@ -174,7 +177,7 @@ describe("la guía pendiente se edita ACÁ, con el formulario del alta", () => {
   it("antes de tocar nada hay «Editar» y NO hay formulario", async () => {
     await abrirLaGuia();
     expect(screen.getByRole("button", { name: /^Editar$/i })).toBeTruthy();
-    expect(screen.queryByText(/Guardar Cambios/i)).toBeNull();
+    expect(screen.queryByText(/Guardar cambios/i)).toBeNull();
     expect(screen.queryByText(/\+ Agregar envío/i)).toBeNull();
   });
 
@@ -184,7 +187,7 @@ describe("la guía pendiente se edita ACÁ, con el formulario del alta", () => {
 
     // El MISMO formulario del alta: su título, su "+ Agregar envío" y los
     // campos del envío escribibles uno por uno.
-    expect(screen.getByText(/Editar Guía de Transporte/i)).toBeTruthy();
+    expect(screen.getByText(/Editar guía de despacho/i)).toBeTruthy();
     expect(screen.getByText(/\+ Agregar envío/i)).toBeTruthy();
 
     const cliente = visible('input[id^="cliente-"]') as HTMLInputElement;
@@ -212,7 +215,7 @@ describe("la guía pendiente se edita ACÁ, con el formulario del alta", () => {
     await tocarEditar();
     // 🔴 Lo pedido: «Despachar» es otro botón DENTRO de la misma pantalla.
     expect(screen.getByRole("button", { name: /Despachar/i })).toBeTruthy();
-    expect(screen.getAllByText(/Guardar Cambios/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Guardar cambios/i).length).toBeGreaterThan(0);
   });
 
   it("mientras se edita, los envíos NO se dibujan dos veces", async () => {
@@ -236,17 +239,17 @@ describe("la guía pendiente se edita ACÁ, con el formulario del alta", () => {
     await tocarEditar();
     const obs = visible("textarea") as HTMLTextAreaElement;
     await act(async () => { fireEvent.change(obs, { target: { value: "va con hielo" } }); });
-    const guardar = screen.getAllByText(/Guardar Cambios/i)[0] as HTMLButtonElement;
+    const guardar = screen.getAllByText(/Guardar cambios/i)[0] as HTMLButtonElement;
     await act(async () => { fireEvent.click(guardar); });
     // Se espera a que el PUT salga, la edición se cierre y la guía vuelva a
     // dibujarse —al guardar se relee—, no a que pasen 300 ms.
     await waitFor(() => expect(puts().length).toBeGreaterThan(0));
-    await waitFor(() => expect(screen.queryByText(/Editar Guía de Transporte/i)).toBeNull());
+    await waitFor(() => expect(screen.queryByText(/Editar guía de despacho/i)).toBeNull());
     await esperarLaPantallaDeLectura();
     expect(puts().length).toBeGreaterThan(0);
     // 🔴 Nada de volver al listado: quien estaba por despachar sigue en su guía.
     expect(push).not.toHaveBeenCalledWith("/guias");
-    expect(screen.queryByText(/Editar Guía de Transporte/i)).toBeNull();
+    expect(screen.queryByText(/Editar guía de despacho/i)).toBeNull();
     expect(screen.getByRole("button", { name: /^Editar$/i })).toBeTruthy();
   });
 });
@@ -272,7 +275,7 @@ describe("🔴 el N° del transportista de la CABECERA no se puede borrar sin qu
     await tocarEditar();
     const obs = visible("textarea") as HTMLTextAreaElement;
     await act(async () => { fireEvent.change(obs, { target: { value: "va con hielo" } }); });
-    await act(async () => { fireEvent.click(screen.getAllByText(/Guardar Cambios/i)[0]); });
+    await act(async () => { fireEvent.click(screen.getAllByText(/Guardar cambios/i)[0]); });
     await waitFor(() => expect(puts().length).toBeGreaterThan(0));
     expect(puts().length).toBeGreaterThan(0);
     expect(puts()[0].cuerpo.numero_guia_transp).toBe("TR-900");
@@ -283,7 +286,7 @@ describe("🔴 el N° del transportista de la CABECERA no se puede borrar sin qu
     await tocarEditar();
     const caja = document.querySelector<HTMLInputElement>('input[id^="numtransp-"][id$="-m"]')!;
     await act(async () => { fireEvent.change(caja, { target: { value: "TR-4471" } }); });
-    await act(async () => { fireEvent.click(screen.getAllByText(/Guardar Cambios/i)[0]); });
+    await act(async () => { fireEvent.click(screen.getAllByText(/Guardar cambios/i)[0]); });
     await waitFor(() => expect(puts().length).toBeGreaterThan(0));
     expect(puts()[0].cuerpo.numero_guia_transp).toBe("TR-4471");
   });
@@ -312,7 +315,7 @@ describe("🔴 una guía YA DESPACHADA se abre igual, con TRES cosas editables",
     await abrirLaGuia();
     expect(screen.queryByRole("button", { name: /^Editar$/i })).not.toBeNull();
     await tocarEditar();
-    expect(screen.queryByText(/Editar Guía de Transporte/i)).not.toBeNull();
+    expect(screen.queryByText(/Editar guía de despacho/i)).not.toBeNull();
   });
 
   it("🔴 pero NO se le agregan envíos ni se le tocan los bultos", async () => {
@@ -350,7 +353,7 @@ describe("A · si se cae la red al guardar, el botón NO se queda en «Guardando
     await act(async () => { fireEvent.change(obs, { target: { value: "va con hielo" } }); });
 
     laRedSeCae = true;
-    const guardar = screen.getAllByText(/Guardar Cambios/i)[0] as HTMLButtonElement;
+    const guardar = screen.getAllByText(/Guardar cambios/i)[0] as HTMLButtonElement;
     await act(async () => { fireEvent.click(guardar); });
     // El aviso es lo que se espera: sin él, lo de abajo mediría una pantalla
     // que todavía no terminó de reaccionar al error.
@@ -363,7 +366,7 @@ describe("A · si se cae la red al guardar, el botón NO se queda en «Guardando
     // Y no miente: lo que no se guardó sigue diciendo que no se guardó.
     expect(document.body.textContent).not.toMatch(/Listo, guardado/);
     // El botón vuelve a estar tocable: se puede reintentar sin recargar.
-    const otraVez = screen.getAllByText(/Guardar Cambios/i)[0] as HTMLButtonElement;
+    const otraVez = screen.getAllByText(/Guardar cambios/i)[0] as HTMLButtonElement;
     expect(otraVez.disabled).toBe(false);
   }, 20000);
 });
@@ -402,7 +405,7 @@ describe("B · el formulario no se pone rojo mientras la persona escribe", () =>
     await tocarEditar();
     const direccion = visible('input[id^="direccion-"]') as HTMLInputElement;
     await act(async () => { fireEvent.change(direccion, { target: { value: "" } }); });
-    const guardar = screen.getAllByText(/Guardar Cambios/i)[0] as HTMLButtonElement;
+    const guardar = screen.getAllByText(/Guardar cambios/i)[0] as HTMLButtonElement;
     // Apagado, porque falta la dirección — y por eso se toca el de verdad:
     // el click no hace nada, así que se llama al guardado por el camino que la
     // persona tiene, que es corregir. Lo que se prueba acá es que el aviso
@@ -415,10 +418,10 @@ describe("B · el formulario no se pone rojo mientras la persona escribe", () =>
 describe("C · el botón apagado dice POR QUÉ está apagado", () => {
   beforeEach(() => { guiaServida = INCOMPLETA; });
 
-  it("«Guardar Cambios» va deshabilitado y debajo dice qué falta", async () => {
+  it("«Guardar cambios» va deshabilitado y debajo dice qué falta", async () => {
     await abrirLaGuia();
     await tocarEditar();
-    const guardar = screen.getAllByText(/Guardar Cambios/i)[0] as HTMLButtonElement;
+    const guardar = screen.getAllByText(/Guardar cambios/i)[0] as HTMLButtonElement;
     expect(guardar.disabled).toBe(true);
     // 🩸 Antes se apagaba y no decía nada. Ahora usa las MISMAS palabras que la
     // pantalla de despachar ("Falta: …").
@@ -430,7 +433,7 @@ describe("C · el botón apagado dice POR QUÉ está apagado", () => {
     await tocarEditar();
     const facturas = visible('input[id^="facturas-"]') as HTMLInputElement;
     await act(async () => { fireEvent.change(facturas, { target: { value: "10234" } }); });
-    const guardar = screen.getAllByText(/Guardar Cambios/i)[0] as HTMLButtonElement;
+    const guardar = screen.getAllByText(/Guardar cambios/i)[0] as HTMLButtonElement;
     expect(guardar.disabled).toBe(false);
     expect(document.body.textContent).not.toMatch(/Falta: la factura/i);
   });
@@ -465,7 +468,7 @@ describe("«Editar» de la fila aterriza con el formulario ABIERTO", () => {
     // query, la de lectura. En los dos casos se espera a la pantalla.
     if (query.includes("editar=1")) {
       await waitFor(() => {
-        expect(screen.queryByText(/Editar Guía de Transporte/i)).not.toBeNull();
+        expect(screen.queryByText(/Editar guía de despacho/i)).not.toBeNull();
         expect(document.querySelector(".animate-pulse")).toBeNull();
       });
     } else {
@@ -505,19 +508,19 @@ describe("«Editar» de la fila aterriza con el formulario ABIERTO", () => {
 // directas quedaran grabadas como transportista externo (14-ago-2026).
 // ─────────────────────────────────────────────────────────────────────────────
 describe("el modo de entrega no se pregunta dos veces", () => {
-  it("en lectura, «Cómo sale» con su «Cambiar» sigue ahí", async () => {
+  it("en lectura, «Tipo de despacho» con su «Cambiar» sigue ahí", async () => {
     await abrirLaGuia();
-    expect(screen.getByText(/Cómo sale/i)).toBeTruthy();
+    expect(screen.getByText(/Tipo de despacho/i)).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Cambiar$/i })).toBeTruthy();
   });
 
   it("editando, el modo lo pregunta SOLO el formulario", async () => {
     await abrirLaGuia();
     await tocarEditar();
-    // El del formulario, vivo: es donde se elige.
-    expect(screen.getByText(/Modo de entrega/i)).toBeTruthy();
-    // El segundo control, afuera.
-    expect(screen.queryByText(/Cómo sale/i)).toBeNull();
+    // 🔄 1-oct-2026: nombres de ERP — el formulario y el bloque del despacho
+    // dicen los dos «Tipo de despacho» (era «Modo de entrega» / «Cómo sale»).
+    // Se exige UNO solo: el del formulario, vivo, que es donde se elige.
+    expect(screen.getAllByText(/^Tipo de despacho/i)).toHaveLength(1);
     expect(screen.queryByRole("button", { name: /^Cambiar$/i })).toBeNull();
     // Y «Despachar» sigue en la misma pantalla: lo que se fue es el duplicado,
     // no el despacho.

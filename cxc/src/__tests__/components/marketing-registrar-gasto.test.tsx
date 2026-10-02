@@ -209,7 +209,7 @@ describe("cliente OBLIGATORIO y DE LA LISTA en Factura y Mueble", () => {
     abrir();
     fireEvent.click(document.querySelector('[data-camino="factura"]')!);
     await buscarCliente("Cliente inventado");
-    expect(screen.queryByText(/No está en la lista — escribir a mano/)).toBeNull();
+    expect(screen.queryByText(/Ingresar manualmente/)).toBeNull(); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(
       screen.getByText(/Solo clientes de la lista — si no está, hay que darlo de alta/),
     ).toBeTruthy();

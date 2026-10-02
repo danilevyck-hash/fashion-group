@@ -29,7 +29,7 @@ export default function OfflineBanner() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="20 6 9 17 4 12" />
           </svg>
-          Conexion restaurada
+          Conexión restablecida
         </span>
       </div>
     );
@@ -48,7 +48,7 @@ export default function OfflineBanner() {
           <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
           <line x1="12" y1="20" x2="12.01" y2="20" />
         </svg>
-        Sin conexion — los datos mostrados pueden no estar actualizados
+        Sin conexión — los datos mostrados pueden no estar actualizados
       </span>
     </div>
   );

@@ -20,6 +20,9 @@
  * última parte de este archivo es el CONTROL de eso.
  * ────────────────────────────────────────────────────────────────────────── */
 
+// 🔄 1-oct-2026: nombres de ERP en Guías (Daniel aprobó el audit): rótulos en tipo oración
+// («Guardar guía», «Nueva guía de despacho», «Tipo de despacho», «Vincular cliente»…).
+// Este candado leía los textos viejos y se actualiza a propósito.
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "fs";
 import path from "path";
@@ -53,13 +56,13 @@ const reglas = sinComentarios(leer("src/lib/guias/destinos-config.ts"));
 
 describe("🔴 las dos tarjetas ya no se llaman igual", () => {
   it("la de arriba dice a dónde entrega CADA CLIENTE", () => {
-    expect(ROTULO_DONDE_ENTREGA_CADA_CLIENTE).toBe("Dónde entrega cada cliente");
+    expect(ROTULO_DONDE_ENTREGA_CADA_CLIENTE).toBe("Destinos por cliente");
     expect(vista).toContain("{ROTULO_DONDE_ENTREGA_CADA_CLIENTE}");
     expect(vista).not.toContain("Destinos por cliente");
   });
 
   it("la de abajo dice que son las direcciones que sugiere el sistema", () => {
-    expect(ROTULO_DIRECCIONES_QUE_SUGIERE).toBe("Direcciones que sugiere el sistema");
+    expect(ROTULO_DIRECCIONES_QUE_SUGIERE).toBe("Direcciones sugeridas");
     expect(lista).toContain("{ROTULO_DIRECCIONES_QUE_SUGIERE}");
     expect(lista).not.toContain("Destinos que ofrece el campo Dirección");
   });
@@ -112,7 +115,7 @@ describe("🔴 «el de siempre» no vuelve como texto suelto", () => {
 
   it("el estado y la acción son DOS palabras distintas", () => {
     expect(MARCA_SIEMPRE).toBe("Siempre");
-    expect(ACCION_PONER_SIEMPRE).toBe("Poner siempre");
+    expect(ACCION_PONER_SIEMPRE).toBe("Predeterminar");
     expect(MARCA_SIEMPRE).not.toBe(ACCION_PONER_SIEMPRE);
     expect(palabraDeLaMarca(true)).toBe(MARCA_SIEMPRE);
     expect(palabraDeLaMarca(false)).toBe(ACCION_PONER_SIEMPRE);
@@ -134,7 +137,7 @@ describe("🔴 «el de siempre» no vuelve como texto suelto", () => {
   });
 });
 
-describe("🔴 el chip dice la verdad: si dice «Poner siempre», pone siempre", () => {
+describe("🔴 el chip dice la verdad: si dice «Predeterminar», pone siempre", () => {
   it("solo cuando el cliente todavía no tiene NINGÚN destino definido", () => {
     // Con destinos ya definidos sigue diciendo «Definir» y hace lo de antes:
     // mover la marca de un cliente ya configurado es otra decisión.

@@ -160,8 +160,8 @@ export default function LineaNueva({
             es lo mismo que tocar el botón, no un atajo escondido. */}
         <input
           type="text"
-          aria-label="¿Qué te recuerdo?"
-          placeholder="¿Qué te recuerdo?"
+          aria-label="Nuevo recordatorio"
+          placeholder="Nuevo recordatorio"
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
           onKeyDown={(e) => {

@@ -73,11 +73,11 @@ export default function DeletedGastosModal({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
-        throw new Error(err?.error ?? "No se pudo devolver el gasto.");
+        throw new Error(err?.error ?? "No se pudo restaurar el gasto.");
       }
       onRestaurado?.();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo devolver el gasto.");
+      setError(e instanceof Error ? e.message : "No se pudo restaurar el gasto.");
     } finally {
       setRestaurando(null);
     }
@@ -132,19 +132,19 @@ export default function DeletedGastosModal({
           {/* El encabezado ya dice "Gastos eliminados (0)": acá alcanza con que
               la lista vacía tenga algo que mirar. */}
           {deletedGastos.length === 0 ? (
-            <p className="text-sm text-gray-400 p-8 text-center">Ninguno.</p>
+            <p className="text-sm text-gray-400 p-8 text-center">Sin gastos eliminados.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs min-w-[640px]">
                 <thead>
                   <tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-400">
                     <th className="text-left py-2 px-3 font-normal">Fecha</th>
-                    <th className="text-left py-2 px-3 font-normal">Descripción</th>
+                    <th className="text-left py-2 px-3 font-normal">Nota</th>
                     <th className="text-left py-2 px-3 font-normal">Proveedor</th>
                     <th className="text-right py-2 px-3 font-normal">Total</th>
-                    <th className="text-left py-2 px-3 font-normal">Borrado por</th>
-                    <th className="text-left py-2 px-3 font-normal">Borrado cuándo</th>
-                    {periodoAbierto && <th className="py-2 px-3"><span className="sr-only">Devolver</span></th>}
+                    <th className="text-left py-2 px-3 font-normal">Eliminado por</th>
+                    <th className="text-left py-2 px-3 font-normal">Fecha de eliminación</th>
+                    {periodoAbierto && <th className="py-2 px-3"><span className="sr-only">Restaurar</span></th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -164,7 +164,7 @@ export default function DeletedGastosModal({
                             disabled={restaurando === g.id}
                             className="text-xs text-gray-700 hover:text-black underline underline-offset-2 min-h-[44px] inline-flex items-center disabled:opacity-50"
                           >
-                            {restaurando === g.id ? "Devolviendo…" : "Restaurar"}
+                            {restaurando === g.id ? "Restaurando…" : "Restaurar"}
                           </button>
                         </td>
                       )}

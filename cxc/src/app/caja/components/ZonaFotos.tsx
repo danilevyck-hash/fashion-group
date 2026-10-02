@@ -149,7 +149,7 @@ export default function ZonaFotos({ gastoId, pendientes = [], onPendientes, solo
           <span className="text-xs" style={{ color: "var(--caja-fg-muted)" }}>
             {subiendo
               ? "Guardando…"
-              : "Arrastra la foto del recibo aquí, o tócalo para elegirla o sacarla. Es opcional."}
+              : "Arrastra la foto del recibo aquí, o tócalo para seleccionarla o tomarla. Es opcional."}
           </span>
           <input
             ref={inputRef}

@@ -42,7 +42,8 @@ describe("el menú ··· de la fila de proyecto", () => {
   it("tiene exactamente las tres acciones aprobadas", () => {
     expect(src).toContain('label: "Editar"');
     expect(src).toContain('label: "Descargar ZIP"');
-    expect(src).toContain('label: "Registrado por error — eliminar"');
+    // 1-oct-2026, Daniel: nombres normales de ERP («Registrado por error — eliminar» → «Eliminar»)
+    expect(src).toContain('label: "Eliminar"');
   });
 
   it('"Cerrar proyecto" y "Reabrir proyecto" no pueden volver', () => {
@@ -60,7 +61,7 @@ describe("el menú ··· de la fila de proyecto", () => {
     expect(src).toContain("/api/marketing/papelera/restaurar");
     expect(src).toContain("Deshacer");
     // …y en rojo (destructive) dentro del menú.
-    expect(src).toMatch(/label: "Registrado por error — eliminar",[\s\S]{0,400}?destructive: true/);
+    expect(src).toMatch(/label: "Eliminar",[\s\S]{0,400}?destructive: true/);
   });
 
   it("el badge 'Cerrado' y el filtro por estado se fueron con el estado", () => {

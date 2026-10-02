@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «N° de reclamo».
 /* ─────────────────────────────────────────────────────────────────────────────
  * CANDADO — EL PAPEL QUE SALE DE LA CASA NO LLEVA NUESTRAS PALABRAS DE ADENTRO
  * NI TRES FECHAS DISTINTAS (20-sep-2026).
@@ -169,7 +170,7 @@ describe("A. «ESTADO» NO SALE DE LA CASA", () => {
       .filter((k) => /^[A-Z]+1$/.test(k))
       .map((k) => String((resumen[k] as Celda).v ?? ""));
     expect(encabezados).toEqual([
-      "N° Reclamo", "Factura", "Fecha", "Subtotal", "Importación", "ITBMS", "Total", "# Fotos",
+      "N° de reclamo", "Factura", "Fecha", "Subtotal", "Importación", "ITBMS", "Total", "# Fotos",
     ]);
     expect(encabezados).not.toContain("Estado");
   });
@@ -185,7 +186,7 @@ describe("A. «ESTADO» NO SALE DE LA CASA", () => {
 
   it("la portada del PDF tampoco los dibuja, ni el rótulo ni los valores", async () => {
     const cadenas = await cadenasDelPdf();
-    expect(cadenas).toContain("N° Reclamo");
+    expect(cadenas).toContain("N° de reclamo");
     expect(cadenas).not.toContain("Estado");
     expect(cadenas).not.toContain("Creado");
     expect(cadenas).not.toContain("Pagado");

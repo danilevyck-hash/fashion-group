@@ -372,7 +372,7 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
                 aria-label="Vendedor"
                 className="min-h-[44px] w-full rounded-md border border-gray-200 bg-white px-3 text-sm outline-none transition focus:border-black disabled:opacity-50"
               >
-                <option value="">Elige el vendedor</option>
+                <option value="">Selecciona el vendedor</option>
                 <option value={VENDEDOR_TODOS}>{ROTULO_VENDEDOR_TODOS}</option>
                 {vendedoresDeEmpresa.map((v) => (
                   <option key={v} value={v}>{nombreVendedorEnPantalla(v)}</option>
@@ -425,10 +425,10 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
                 {ningunaCasilla
                   ? AVISO_NINGUNA_CASILLA
                   : sinEmpresas
-                    ? "Falta elegir al menos una empresa"
+                    ? "Falta seleccionar al menos una empresa"
                     : !clienteCodigo
-                      ? "Falta elegir el cliente"
-                      : "Falta elegir el vendedor"}
+                      ? "Falta seleccionar el cliente"
+                      : "Falta seleccionar el vendedor"}
               </span>
             )}
           </div>
@@ -501,7 +501,7 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
                 <th className="py-2 pr-3.5 font-medium">Cliente</th>
                 <th className="px-3.5 py-2 font-medium">Vendedor</th>
                 <th className="px-3.5 py-2 font-medium">Empresas</th>
-                <th className="px-3.5 py-2 font-medium">Qué no comisiona</th>
+                <th className="px-3.5 py-2 font-medium">Excluye</th>
                 <th className="py-2 pl-3.5"><span className="sr-only">Quitar</span></th>
               </tr>
             </thead>
@@ -523,7 +523,7 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
                     </span>
                   </td>
                   <td className="px-3.5 py-2.5 text-gray-900">
-                    No comisiona <b className="font-semibold">{loQueNoComisiona(r.que)}</b>
+                    Excluido: <b className="font-semibold">{loQueNoComisiona(r.que)}</b>
                     {avisoFila?.llave === r.llave && (
                       <span role="alert" className="mt-1 block text-[11px] text-rose-600">{avisoFila.texto}</span>
                     )}
@@ -533,7 +533,7 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
                       ariaLabel={`Opciones de ${r.clienteNombre}`}
                       items={[
                         {
-                          label: "Cambiar qué no comisiona",
+                          label: "Editar exclusión",
                           onClick: () => {
                             setEditando(r);
                             setEdVenta(r.que !== "solo-el-cobro");

@@ -91,7 +91,7 @@ describe("1 · el chip verde «despachada» se fue", () => {
 
   it("🔴 pero la que ESPERA sí se pinta — el color se reserva para eso", () => {
     const { container } = pintar([PENDIENTE]);
-    expect(container.textContent).toContain("pendiente");
+    expect(container.textContent).toMatch(/pendiente/i); // 🔄 1-oct-2026: el chip dice «Pendiente» (nombres de ERP)
   });
 });
 

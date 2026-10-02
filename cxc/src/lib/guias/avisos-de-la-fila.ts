@@ -27,7 +27,8 @@ import { despachadaIncompleta } from "./faltantes-despacho";
 /** La guía salió, pero el transportista no dio su número. */
 export const AVISO_SIN_NUMERO_TRANSP = "Falta N° transportista";
 /** La guía salió sin placa, sin quién recibió o sin cédula. */
-export const AVISO_SALIO_INCOMPLETA = "Salió incompleta";
+// 1-oct-2026: nombres de ERP (Daniel): era «Salió incompleta».
+export const AVISO_SALIO_INCOMPLETA = "Despacho incompleto";
 
 type GuiaConAvisos = Parameters<typeof guiaSinNumeroTransp>[0] &
   Parameters<typeof despachadaIncompleta>[0];

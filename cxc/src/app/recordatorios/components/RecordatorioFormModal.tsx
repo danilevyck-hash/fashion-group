@@ -201,9 +201,9 @@ export default function RecordatorioFormModal({
         </header>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
-          <Campo label="Qué hay que recordar">
+          <Campo label="Descripción">
             <textarea
-              aria-label="Qué hay que recordar"
+              aria-label="Descripción"
               value={v.texto}
               onChange={(e) => set("texto", e.target.value)}
               rows={2}
@@ -240,8 +240,8 @@ export default function RecordatorioFormModal({
             />
           </Campo>
 
-          <Campo label="¿Se repite?">
-            <div className="flex flex-wrap gap-2 pt-1" role="group" aria-label="Se repite">
+          <Campo label="Frecuencia">
+            <div className="flex flex-wrap gap-2 pt-1" role="group" aria-label="Frecuencia">
               {REPETICIONES.map((r) => (
                 <button
                   key={r}
@@ -272,7 +272,7 @@ export default function RecordatorioFormModal({
           {/* El «hasta» solo existe con una repetición: sin ella no significa
               nada y el servidor lo descartaría igual. */}
           {v.repeticion !== "una_vez" && (
-            <Campo label="Hasta" hint="— opcional; sin fecha, corre hasta que lo borres">
+            <Campo label="Hasta" hint="— opcional; sin fecha, corre hasta que lo elimines">
               <input
                 type="date"
                 aria-label="Hasta"
@@ -287,8 +287,8 @@ export default function RecordatorioFormModal({
           {/* 🔴 Solo los admin. Lo que escribe una secretaria va SIEMPRE al
               equipo, y eso lo fuerza el servidor — acá solo se esconde. */}
           {puedeElegirDestino && (
-            <Campo label="A quién le llega">
-              <div className="flex flex-wrap gap-2 pt-1" role="group" aria-label="A quién le llega">
+            <Campo label="Destinatario">
+              <div className="flex flex-wrap gap-2 pt-1" role="group" aria-label="Destinatario">
                 {DESTINOS.map((d) => (
                   <button
                     key={d}

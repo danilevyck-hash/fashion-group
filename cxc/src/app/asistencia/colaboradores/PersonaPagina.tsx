@@ -251,7 +251,7 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
 
   return (
     <>
-      <AppHeader module="Asistencia" />
+      <AppHeader module="Asistencia y planilla" />
       <div className="mx-auto max-w-4xl px-4 py-6">
         {/* Volver: una sola salida, arriba, sin competir con nada. */}
         <Link

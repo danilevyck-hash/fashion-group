@@ -293,10 +293,10 @@ export default function GuiasList({
           onClick={() => onAtarCliente?.(item)}
           className={`inline-flex items-center min-h-[44px] pr-3 ${claseTexto} text-gray-400 hover:text-black underline underline-offset-2 transition`}
         >
-          Atar cliente
+          Vincular cliente
         </button>
       ) : (
-        <span className={`${claseTexto} text-gray-300`}>sin atar</span>
+        <span className={`${claseTexto} text-gray-300`}>Sin vincular</span>
       )}
     </span>
 
@@ -498,7 +498,7 @@ export default function GuiasList({
             la página sin encabezado, y la fila pasa a `justify-end` para que
             los botones no se corran a la izquierda al quedar solos. */}
         <div className="flex items-center justify-end mb-6 flex-wrap gap-4">
-          <h1 className="sr-only">Guías de Despacho</h1>
+          <h1 className="sr-only">Guías de despacho</h1>
           <div className="flex items-center gap-2 flex-wrap">
             {selectionMode ? (
               <>
@@ -541,7 +541,7 @@ export default function GuiasList({
                     onClick={onNewGuia}
                     className="text-sm bg-black text-white px-6 py-3 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all"
                   >
-                    Nueva Guía
+                    Nueva guía
                   </button>
                 )}
               </>
@@ -577,7 +577,7 @@ export default function GuiasList({
         ) : guias.length === 0 ? (
           <EmptyState
             title="No hay guías registradas"
-            actionLabel={canCreate ? "+ Nueva Guía" : undefined}
+            actionLabel={canCreate ? "+ Nueva guía" : undefined}
             onAction={canCreate ? onNewGuia : undefined}
           />
         ) : (
@@ -1052,7 +1052,7 @@ export default function GuiasList({
                                         <tr className="text-xs uppercase tracking-wide text-gray-400 border-b border-gray-200">
                                           <th className="text-left py-2 px-2 font-normal">#</th>
                                           <th className="text-left py-2 px-2 font-normal">Cliente</th>
-                                          <th className="text-left py-2 px-2 font-normal">Direccion</th>
+                                          <th className="text-left py-2 px-2 font-normal">Destino</th>
                                           <th className="text-left py-2 px-2 font-normal">Empresa</th>
                                           <th className="text-left py-2 px-2 font-normal">Facturas</th>
                                           <th className="text-center py-2 px-2 font-normal">Bultos</th>
@@ -1153,7 +1153,7 @@ export default function GuiasList({
                                     <div className="mt-4 pt-4 border-t border-gray-200">
                                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                                         <div>
-                                          <span className="text-gray-400 block">Tipo</span>
+                                          <span className="text-gray-400 block">Tipo de despacho</span>
                                           <span className="font-medium">{ETIQUETA_TIPO_DESPACHO[tipoDespachoEfectivo(expandedGuia)]}</span>
                                         </div>
                                         {/* Sin placa en entrega directa, y un "0" no es una placa. */}
@@ -1188,11 +1188,11 @@ export default function GuiasList({
                                           </div>
                                         )}
                                         <div>
-                                          <span className="text-gray-400 block">Receptor</span>
+                                          <span className="text-gray-400 block">Recibido por</span>
                                           <span className="font-medium">{expandedGuia.receptor_nombre || "—"}</span>
                                         </div>
                                         <div>
-                                          <span className="text-gray-400 block">Cedula</span>
+                                          <span className="text-gray-400 block">Cédula</span>
                                           <span className="font-medium">{cedulaParaMostrar(expandedGuia.cedula) || "—"}</span>
                                         </div>
                                       </div>

@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «Sin pagos» / «Último pago: hace N d».
 // ─────────────────────────────────────────────────────────────────────────────
 // «SIN PAGAR HACE +90 D» — el único dato NUEVO del rediseño de Cuentas por
 // Cobrar (5-sep-2026), y la mejora que Daniel eligió primero.
@@ -81,8 +82,8 @@ describe("🔴 quién avisa", () => {
 
 describe("lo que se lee en pantalla", () => {
   it("la fila dice los días, o que nunca pagó", () => {
-    expect(textoSinPagar(298)).toBe("no paga hace 298 d");
-    expect(textoSinPagar(null)).toBe("nunca ha pagado");
+    expect(textoSinPagar(298)).toBe("Último pago: hace 298 d");
+    expect(textoSinPagar(null)).toBe("Sin pagos");
   });
 
   it("la tira dice cuántos son y con qué umbral", () => {

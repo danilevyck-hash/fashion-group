@@ -802,7 +802,7 @@ export default function FacturasSection({
                       >
                         {restaurando === f.id
                           ? "Restaurando…"
-                          : "Restaurar esta factura"}
+                          : "Restaurar"}
                       </button>
                     </div>
                   )}

@@ -33,6 +33,7 @@ import { congelarEncabezadosXlsx } from "@/lib/excel-panel-fijo";
 import { construirExcelPlanilla, type DatosPlanillaExport } from "@/lib/asistencia/planilla-exportar";
 import { TOTALES_CERO, type Quincena, type Periodo } from "@/lib/asistencia/planilla";
 import { REGLAS_DEFAULT } from "@/lib/asistencia/config";
+// 1-oct-2026, Daniel: nombres normales de ERP (aprobó «Comprado · Vendido · Stock · % vendido»; el % se rotula «% vendido»; «Llegada» → «Recepción»; «Más info» → «Detalle»).
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -320,7 +321,7 @@ describe("6 · la `nota` es la EXCEPCIÓN, no la puerta de atrás", () => {
   it("🔴 la de Referencia dice lo único que no se deduce mirando la tabla", async () => {
     const { buildReferenciaSheet } = await import("@/lib/ventas/referencia-excel");
     const ws = await buildReferenciaSheet([], true, "2026-08");
-    const nota = celdasDe(ws).filter((t) => t.includes("ÚLTIMA llegada"));
+    const nota = celdasDe(ws).filter((t) => t.includes("ÚLTIMA recepción"));
     expect(nota, "la hoja Referencia perdió la aclaración").toHaveLength(1);
     expect(nota[0]).toContain("Stock es siempre la existencia total");
     // ⚠️ Y NO vuelve el manual de 900 caracteres que Daniel mandó sacar.

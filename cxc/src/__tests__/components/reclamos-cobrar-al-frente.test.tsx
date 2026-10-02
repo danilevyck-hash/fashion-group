@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — «Enviar al proveedor», «Marcar como pendiente».
 /* ─────────────────────────────────────────────────────────────────────────────
  * 🔴 CANDADO — «MARCAR COMO PAGADO» ES EL BOTÓN PRINCIPAL DEL RECLAMO
  * (20-sep-2026, aprobado por Daniel).
@@ -83,7 +84,7 @@ describe("🔴 en un reclamo POR COBRAR, el botón negro es «Marcar como cobrad
 
   it("«Correo» sigue estando, al lado, con borde — no se fue a ninguna parte", () => {
     pintar();
-    const correo = screen.getByRole("button", { name: "Correo" });
+    const correo = screen.getByRole("button", { name: "Enviar al proveedor" });
     expect(correo.className).toContain("border");
     expect(correo.className).not.toContain("bg-black");
   });
@@ -91,7 +92,7 @@ describe("🔴 en un reclamo POR COBRAR, el botón negro es «Marcar como cobrad
   it("los dos están en la MISMA fila, y el cobrado va primero", () => {
     pintar();
     const pagar = screen.getByRole("button", { name: new RegExp(MARCAR_COBRADO) });
-    const correo = screen.getByRole("button", { name: "Correo" });
+    const correo = screen.getByRole("button", { name: "Enviar al proveedor" });
     expect(pagar.parentElement).toBe(correo.parentElement);
     // `compareDocumentPosition` = 4 → `correo` viene DESPUÉS de `pagar`.
     expect(pagar.compareDocumentPosition(correo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -116,7 +117,7 @@ describe("⚠️ en un reclamo COBRADO no cambió NADA", () => {
 
   it("no hay «Correo» — cobrarle dos veces al proveedor sigue prohibido", () => {
     pintar(cobrado);
-    expect(screen.queryByRole("button", { name: "Correo" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Enviar al proveedor" })).toBeNull();
   });
 
   it("tampoco «Marcar como cobrado»: ya está cobrado", () => {
@@ -126,7 +127,7 @@ describe("⚠️ en un reclamo COBRADO no cambió NADA", () => {
 
   it("y «Volver a por cobrar» sigue en su esquina, por si fue un error", () => {
     pintar(cobrado);
-    const volver = screen.getByRole("button", { name: /Volver a por cobrar/ });
+    const volver = screen.getByRole("button", { name: /Marcar como pendiente/ });
     expect(volver.className).toContain("ml-auto");
   });
 

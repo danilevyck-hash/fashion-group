@@ -109,9 +109,9 @@ export default function JustificacionesTab() {
   async function borrar(id: string) {
     try {
       const res = await fetch(`/api/asistencia/justificaciones?id=${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo borrar");
+      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo eliminar");
       await cargar();
-    } catch (e) { toast(e instanceof Error ? e.message : "No se pudo borrar", "error"); }
+    } catch (e) { toast(e instanceof Error ? e.message : "No se pudo eliminar", "error"); }
   }
 
   const campo = "min-h-[44px] w-full rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm";
@@ -138,7 +138,7 @@ export default function JustificacionesTab() {
                 Siguen siendo ELEGIBLES: son gente que marca y a la que hay que
                 poder justificarle un día. Solo se ven como lo que son. */}
             <select value={codigo} onChange={(e) => setCodigo(e.target.value)} className={campo}>
-              <option value="">Elegir…</option>
+              <option value="">Seleccionar…</option>
               {conNombre.length > 0 && (
                 <optgroup label="Colaboradores">
                   {conNombre.map((p) => (
@@ -172,14 +172,14 @@ export default function JustificacionesTab() {
             <>
               <div>
                 <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">
-                  Desde qué hora <span className="normal-case text-gray-400">(opcional)</span>
+                  Hora inicio <span className="normal-case text-gray-400">(opcional)</span>
                 </label>
                 <input type="time" value={horaDesde} disabled={!puedeHoras} className={`${campo} disabled:opacity-40`}
                   onChange={(e) => setHoraDesde(e.target.value)} />
               </div>
               <div>
                 <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">
-                  Hasta qué hora <span className="normal-case text-gray-400">(opcional)</span>
+                  Hora fin <span className="normal-case text-gray-400">(opcional)</span>
                 </label>
                 <input type="time" value={horaHasta} disabled={!puedeHoras} className={`${campo} disabled:opacity-40`}
                   onChange={(e) => setHoraHasta(e.target.value)} />
@@ -235,7 +235,7 @@ export default function JustificacionesTab() {
               <th className="px-3 py-2.5 text-left font-medium">Días</th>
               <th className="px-3 py-2.5 text-left font-medium">Motivo</th>
               <th className="px-3 py-2.5 text-left font-medium">Nota</th>
-              <th className="px-3 py-2.5 text-left font-medium">Registró</th>
+              <th className="px-3 py-2.5 text-left font-medium">Registrado por</th>
               <th></th>
             </tr></thead>
             <tbody>

@@ -144,9 +144,10 @@ describe("Marketing › escanear la factura", () => {
 
   it("1 · en el celular hay TRES puertas, y la de escanear abre la cámara de atrás", () => {
     abrirLaFactura();
-    expect(screen.getByText("Escanear con la cámara")).toBeTruthy();
-    expect(screen.getByText("Elegir el PDF")).toBeTruthy();
-    expect(screen.getByText("Escribirlo a mano")).toBeTruthy();
+    // 1-oct-2026, Daniel: nombres normales de ERP
+    expect(screen.getByText("Escanear")).toBeTruthy();
+    expect(screen.getByText("Subir PDF")).toBeTruthy();
+    expect(screen.getByText("Ingreso manual")).toBeTruthy();
 
     const input = screen.getByTestId("escanear-la-factura") as HTMLInputElement;
     // 🔴 `capture` = la cámara de atrás, la que mira al papel.
@@ -213,7 +214,7 @@ describe("Marketing › escanear la factura", () => {
     ponerCelular(false);
     abrirLaFactura();
     expect(screen.queryByTestId("escanear-la-factura")).toBeNull();
-    expect(screen.queryByText("Escanear con la cámara")).toBeNull();
+    expect(screen.queryByText("Escanear")).toBeNull();
     expect(screen.getByTestId("subir-archivo-de-la-puerta")).toBeTruthy();
   });
 });

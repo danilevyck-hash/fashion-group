@@ -20,6 +20,9 @@
  * chip con nombre que lo reemplace — línea sin atar, o directorio no leído.
  * ─────────────────────────────────────────────────────────────────────────────
  */
+// 🔄 1-oct-2026: nombres de ERP en Guías (Daniel aprobó el audit): rótulos en tipo oración
+// («Guardar guía», «Nueva guía de despacho», «Tipo de despacho», «Vincular cliente»…).
+// Este candado leía los textos viejos y se actualiza a propósito.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, cleanup } from "@testing-library/react";
 import GuiasList from "@/app/guias/components/GuiasList";
@@ -149,7 +152,7 @@ describe("🔴 sin chip que lo reemplace, el texto escrito VUELVE", () => {
     const { container } = pintar(NOMBRES);
     const celda = celdasCliente(container)[2];
     expect(celda).toContain("Tienda del barrio");
-    expect(celda).toContain("Atar cliente");
+    expect(celda).toContain("Vincular cliente");
   });
 
   it("🔴 con el directorio SIN leer, el chip degrada al código y el texto se queda", () => {

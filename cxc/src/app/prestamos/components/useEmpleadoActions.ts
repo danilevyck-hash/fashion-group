@@ -86,7 +86,7 @@ export function useEmpleadoActions({ empleadoId, empleado, onSuccess, onDeleted,
   // de UN toque. Cuando la fecha importa —contabilidad registra 1-4 días después
   // del pago— se usa «Aplicar quincena», que SÍ la pregunta.
   async function pagoQuincenal(cuota: number, cuenta: CuentaPrestamo | null) {
-    if (!cuota || cuota <= 0) { showToast("Esta persona no tiene cuota quincenal"); return; }
+    if (!cuota || cuota <= 0) { showToast("Este colaborador no tiene cuota quincenal"); return; }
     try {
       const res = await fetch("/api/prestamos/movimientos", {
         method: "POST",
@@ -125,7 +125,7 @@ export function useEmpleadoActions({ empleadoId, empleado, onSuccess, onDeleted,
    * `activity_logs`—. Ahora el servidor hace soft delete y lo registra.
    */
   async function clearHistory() {
-    setClearProgress("Borrando historial...");
+    setClearProgress("Eliminando historial...");
     try {
       const res = await fetch("/api/prestamos/movimientos", {
         method: "DELETE",
@@ -133,7 +133,7 @@ export function useEmpleadoActions({ empleadoId, empleado, onSuccess, onDeleted,
         body: JSON.stringify({ empleado_id: empleadoId }),
       });
       if (res.ok) showToast("Historial borrado");
-      else { const err = await res.json().catch(() => null); showToast(err?.error || "Error al borrar historial"); }
+      else { const err = await res.json().catch(() => null); showToast(err?.error || "Error al eliminar historial"); }
     } catch {
       showToast("Sin conexión. Verifica tu internet e intenta de nuevo.");
     }

@@ -257,7 +257,8 @@ describe("Vista General › Rentabilidad por empresa — tarjetas en iPhone, tab
   });
 
   it("la píldora de estado conserva sus textos", () => {
-    for (const label of ["Sana", "Al límite", "Pierde plata"]) {
+    // 1-oct-2026, Daniel: nombres normales de ERP («Sana · Al límite · Pierde plata»).
+    for (const label of ["Rentable", "En equilibrio", "Pérdida"]) {
       expect(vistaGeneral).toContain(`label: "${label}"`);
     }
     // 🔑 Sin número, la píldora dice POR QUÉ y no un genérico: los cuatro

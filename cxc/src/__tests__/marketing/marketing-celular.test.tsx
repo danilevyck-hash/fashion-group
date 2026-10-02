@@ -347,7 +347,7 @@ describe("Marketing en el celular", () => {
     expect(within(ana).getByRole("button", { name: "Pagar" })).toBeTruthy();
     // 🔴 Los 24 chips NO están en la lista: viven adentro.
     expect(screen.queryByText("Eliminar impulsadora")).toBeNull();
-    expect(screen.queryByText(/Los meses sin pagar/)).toBeNull();
+    expect(screen.queryByText(/Meses pendientes \(/)).toBeNull(); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   // ── 7b ────────────────────────────────────────────────────────────────────

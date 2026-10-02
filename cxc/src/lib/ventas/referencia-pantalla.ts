@@ -47,23 +47,25 @@ export const REFERENCIA_2026_09 = true;
 export const LARGO_COLOR = 3;
 
 /**
- * Los rótulos del oficio. Daniel: *«los rótulos del oficio: Compré · Vendí ·
- * Stock · % vendido»*.
+ * Los rótulos del oficio. 1-oct-2026, Daniel aprobó «Comprado · Vendido ·
+ * Stock · % vendido» y «80 % vendido en» (antes había elegido «Compré · Vendí
+ * · Stock · % vendido» y «El 80 % en»): nombres normales de ERP. «Llegada»
+ * pasa a «Recepción», «Piezas» a «Cantidad» y «Queda» a «Stock».
  *
  * 🔴 «Queda» NO aparece en ninguna cabecera de la pantalla: la palabra del
  * negocio es **Stock**, y la que dice cuánto se movió es **% vendido**.
  */
 export const ROTULOS = {
-  comprado: "Compré",
-  vendido: "Vendí",
+  comprado: "Comprado",
+  vendido: "Vendido",
   stock: "Stock",
   pctVendido: "% vendido",
-  llegada: "Llegada",
-  piezas: "Piezas",
-  ochenta: "El 80 % en",
-  queda: "Queda",
+  llegada: "Recepción",
+  piezas: "Cantidad",
+  ochenta: "80 % vendido en",
+  queda: "Stock",
   color: "Color",
-  ultimaLlegada: "Última llegada",
+  ultimaLlegada: "Última recepción",
 } as const;
 
 /** El buscador vacío: placeholder corto y UNA línea de ayuda. */

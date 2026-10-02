@@ -140,7 +140,7 @@ export default function InventarioPorEmpresa({ inv }: { inv: InventarioData | nu
         </span>
       </div>
       <div className="mt-0.5 flex flex-wrap items-baseline justify-between gap-x-3 text-xs text-stone-400">
-        <span>A precio de etiqueta — potencial, no plata que tengas</span>
+        <span>Valor a precio de venta</span>
         <span data-col="total-precio" className="tabular-nums">{money(inv.totalPrecio)}</span>
       </div>
 
@@ -166,7 +166,7 @@ export default function InventarioPorEmpresa({ inv }: { inv: InventarioData | nu
         href="/referencia"
         className="mt-1 inline-flex min-h-[44px] min-w-[44px] items-center text-xs font-medium text-teal-600 hover:text-teal-700"
       >
-        Ver artículo por artículo →
+        Ver detalle por artículo →
       </Link>
     </div>
   );

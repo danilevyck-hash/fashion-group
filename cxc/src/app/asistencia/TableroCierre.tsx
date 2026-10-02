@@ -204,7 +204,7 @@ export default function TableroCierre({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-baseline gap-x-3">
-        <h2 className="text-sm font-medium text-gray-900">Cómo va la quincena</h2>
+        <h2 className="text-sm font-medium text-gray-900">Estado de cierre</h2>
         <span className="text-[12px] text-gray-500">{encabezadoDelTablero(filas)}</span>
       </div>
       <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
@@ -217,7 +217,7 @@ export default function TableroCierre({
                   personas, sino colaboradores»*), y hay barrido que lo exige. */}
               <th className="px-2 py-2.5 text-right font-medium">Colabor.</th>
               <th className="px-2 py-2.5 text-right font-medium">Neto</th>
-              <th className="px-2 py-2.5 text-left font-medium">Qué falta para cerrar</th>
+              <th className="px-2 py-2.5 text-left font-medium">Pendientes</th>
               <th className="px-2 py-2.5 text-right font-medium"></th>
             </tr>
           </thead>

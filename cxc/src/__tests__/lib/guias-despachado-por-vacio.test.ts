@@ -80,9 +80,16 @@ describe("🔴 el campo nace vacío", () => {
 });
 
 describe("🔴 y sigue siendo OBLIGATORIO", () => {
-  it("la validación lo exige antes de guardar", () => {
-    expect(logica).toContain('if (!entregadoPorElegido(estado.entregadoPor)) errores.add("entregadoPor");');
-    expect(logica).toContain('falta.push("quién despacha")');
+  it("la validación lo exige… AL DESPACHAR, no al guardar la guía", () => {
+    // 🔄 1-oct-2026: Daniel aprobó (sobre el mockup) sacar «Despachado por» de la
+    // creación de la guía y pedirlo al DESPACHAR. Este candado fijaba lo viejo
+    // y se reescribe a propósito: guardar la guía YA NO lo exige; el despacho
+    // sí (`faltaParaDespachar` y el PUT que completa, ver
+    // `guias-nueva-guia-2026-10.test.ts`).
+    expect(logica).toContain('if (!GUIA_NUEVA_2026_10 && !entregadoPorElegido(estado.entregadoPor)) errores.add("entregadoPor");');
+    expect(leer("src/lib/guias/falta-para-despachar.ts")).toContain(
+      'if (GUIA_NUEVA_2026_10 && !entregadoPorElegido(e.despachadoPor)) falta.push("despachado por");',
+    );
   });
 
   it("el campo lleva el rótulo de obligatorio", () => {

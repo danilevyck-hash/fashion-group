@@ -82,8 +82,8 @@ export interface GastoEgresosMostrable {
 /** Etiqueta corta para la píldora. Tiene que caber al lado del nombre. */
 export const ETIQUETA_SIN_GASTO_EGRESOS: Record<MotivoSinGastoEgresos, string> = {
   sin_movimientos: "Sin cargar",
-  sin_datos: "Sin traer",
-  no_automatico: "No se baja sola",
+  sin_datos: "Sin datos",
+  no_automatico: "Carga manual",
   sin_gasto: "Nada es gasto",
 };
 

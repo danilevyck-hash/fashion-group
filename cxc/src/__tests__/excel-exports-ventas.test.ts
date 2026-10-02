@@ -155,7 +155,7 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
     expect(s["C10"].v).toBe(300);
 
     // CIERRE
-    expect(s["A12"].v).toBe("CIERRE");
+    expect(s["A12"].v).toBe("RESUMEN"); // 1-oct-2026, Daniel: nombres normales de ERP (era «CIERRE»)
     expect(s["A13"].v).toBe("Ventas");
     expect(s["B13"].t).toBe("n");
     expect(s["B13"].v).toBe(500);
@@ -294,7 +294,7 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
     const s = wb.Sheets["Comisiones"];
 
     expect(s[`A${HDR}`].v).toBe("Vendedor");
-    expect(s[`F${HDR}`].v).toBe("Com. Total");
+    expect(s[`F${HDR}`].v).toBe("Com. total"); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(s[`B${DATA}`].t).toBe("n");
     expect(s[`B${DATA}`].z).toBe(MONEY_FMT);
     const tr = totalsRow(2);
@@ -329,7 +329,7 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
     // Decía «Sin asignar» hasta el 3-sep-2026. Desde que el cobro se paga a
     // quien registró el recibo, la fila DEFAULT es la OFICINA (y se lista con
     // su número, aunque no se pague — ver sin-pago.ts).
-    expect(s[`A${DATA + 1}`].v).toBe("Oficina (DEFAULT)");
+    expect(s[`A${DATA + 1}`].v).toBe("Oficina (sin vendedor)"); // 1-oct-2026, Daniel: nombres normales de ERP
     const tr = totalsRow(2);
     expect(s[`A${tr}`].v).toBe("Total");
     expect(s[`B${tr}`].v).toBe(12);

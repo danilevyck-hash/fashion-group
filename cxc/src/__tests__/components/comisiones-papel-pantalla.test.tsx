@@ -42,6 +42,7 @@ import { ComisionesPorEmpresaView } from "@/components/comisiones/ComisionesPorE
 import { ComisionesView } from "@/components/comisiones/ComisionesView";
 import { ROTULO_NO_SE_PAGA } from "@/lib/comisiones/sin-pago";
 import { ROTULO_TODO_EL_ANIO } from "@/lib/comisiones/periodo";
+// 1-oct-2026, Daniel: nombres normales de ERP («Oficina (DEFAULT)» → «Oficina (sin vendedor)», «no se paga» → «No pagable», «Cierre» → «Resumen», «Clientes que no comisionan» → «Exclusiones de comisión»).
 
 const REYNALDO = "REYNALDO ESPINOSA";
 
@@ -162,7 +163,7 @@ describe("🔴 Oficina y Daniel Levy: escondidos en la tabla, presentes en el pa
     const apagadas = papel.filas.filter((f) => f.apagada);
     expect(apagadas.length).toBe(2);
     for (const f of apagadas) expect(f.celdas[0]).toContain(ROTULO_NO_SE_PAGA);
-    expect(apagadas.map((f) => f.celdas[0]).join(" ")).toContain("Oficina (DEFAULT)");
+    expect(apagadas.map((f) => f.celdas[0]).join(" ")).toContain("Oficina (sin vendedor)");
     expect(apagadas.map((f) => f.celdas[0]).join(" ")).toContain("Daniel Levy");
     // Y el pie sigue sumando SOLO lo pagable: $41.77, no $58.77.
     expect(papel.totales.at(-1)).toBe("$41.77");

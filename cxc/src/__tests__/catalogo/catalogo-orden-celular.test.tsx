@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 // ─────────────────────────────────────────────────────────────────────────────
 // 🔴 CATÁLOGOS EN EL CELULAR — «lo mismo, ordenado» (24-sep-2026)
 //
@@ -118,8 +119,8 @@ describe("2 · link para clientes", () => {
     expect(HUB).toContain("URL_CATALOGOS_PUBLICOS");
   });
 
-  it("⚠️ el rótulo del botón no se tocó: sigue diciendo «Copiar link» en las dos", () => {
-    expect(HUB).toContain("Copiar link");
+  it("⚠️ el rótulo del botón no se tocó: sigue diciendo «Copiar enlace» en las dos", () => {
+    expect(HUB).toContain("Copiar enlace");
     expect(HUB).not.toMatch(/>\s*Copiar\s*</);
   });
 });
@@ -252,8 +253,8 @@ describe("6 · comprobantes", () => {
 
   it("🔴 los rótulos no cambiaron", () => {
     expect(CHIPS_COMPROBANTES).toContain("{grupo.rotulo}");
-    expect(leer("src/lib/catalogo/origen-comprobante.ts")).toContain("Quién lo armó");
-    expect(leer("src/lib/catalogo/chips-comprobantes.ts")).toContain("Qué es");
+    expect(leer("src/lib/catalogo/origen-comprobante.ts")).toContain("Origen");
+    expect(leer("src/lib/catalogo/chips-comprobantes.ts")).toContain("Tipo");
   });
 
   it("🔴 el blanco que se toca mide 44 px", () => {
@@ -392,7 +393,7 @@ describe("10 · lo que se ve", () => {
     expect(container.textContent).not.toContain("En bodega: 14");
     // Y los dos botones, en una caja de dos columnas.
     const subir = screen.getByRole("button", { name: /Subir/ });
-    const esconder = screen.getByRole("button", { name: "Esconder" });
+    const esconder = screen.getByRole("button", { name: "Ocultar" });
     const caja = subir.parentElement!;
     expect(caja, "los dos botones tienen que compartir caja").toBe(esconder.parentElement);
     expect(caja.className).toContain("grid-cols-2");
@@ -469,7 +470,7 @@ async function pedidoQueSale(prendido: boolean): Promise<unknown> {
   const llamadas = stubCheckout();
   await act(async () => { render(<CheckoutClient marca="tommy" />); });
   await waitFor(() => expect(document.querySelector('[data-medir="documento-pedido"]')).not.toBeNull());
-  fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
+  fireEvent.click(screen.getByRole("button", { name: "Seleccionar" }));
   fireEvent.click(await screen.findByRole("button", { name: /Sporting Shoes/ }));
   const boton = () => document.querySelector('[data-medir="documento-pedido"]') as HTMLButtonElement;
   await waitFor(() => expect(boton().disabled).toBe(false));

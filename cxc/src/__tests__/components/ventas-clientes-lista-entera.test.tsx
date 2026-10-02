@@ -125,7 +125,7 @@ describe("2 · 🔴 «Otros clientes» va EN la lista, no detrás de un clic", (
 
   it("y un renglón lo separa y dice cuántos son", () => {
     pintar();
-    expect(screen.getAllByText(/Otros clientes \(1\)/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Clientes no registrados \(1\)/) /* 1-oct-2026, Daniel: nombres normales de ERP */.length).toBeGreaterThanOrEqual(1);
   });
 
   it("🩸 ya no hay diálogo que abrir", () => {

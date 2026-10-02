@@ -133,7 +133,7 @@ export default function PaginaMarcaCelular({
           {gastos > 0 && (
             <div className="flex-1">
               <BotonAncho tono="blanco" onClick={() => onZip()} disabled={bajando === `${marca.key}:abierto`}>
-                {bajando === `${marca.key}:abierto` ? "Armando…" : "Bajar ZIP"}
+                {bajando === `${marca.key}:abierto` ? "Armando…" : "Descargar ZIP"}
               </BotonAncho>
             </div>
           )}

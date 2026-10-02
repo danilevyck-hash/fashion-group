@@ -134,14 +134,14 @@ export async function buildReferenciaSheet(
     // Va al PIE y fuera del rango del filtro (`nota`), así que filtrar no la
     // esconde y no se mete entre los encabezados y los datos.
     nota:
-      "Cuando la bodega quedó en 0 y volvió a llegar mercancía, Compré · Vendí · "
-      + "Vendido · Meses son de la ÚLTIMA llegada. Stock es siempre la existencia total.",
+      "Cuando la bodega quedó en 0 y volvió a llegar mercancía, Comprado · Vendido · "
+      + "% vendido · Meses son de la ÚLTIMA recepción. Stock es siempre la existencia total.",
     columns: [
       { header: "Referencia", wch: 18 },
       { header: "Descripción", wch: 26 },
       // ── Los tres grandes de la pantalla ──
-      { header: "Compré", wch: 10, align: "right", fmt: "#,##0" },
-      { header: "Vendí", wch: 10, align: "right", fmt: "#,##0" },
+      { header: "Comprado", wch: 10, align: "right", fmt: "#,##0" },
+      { header: "Vendido", wch: 10, align: "right", fmt: "#,##0" },
       { header: "Stock", wch: 11, align: "right", fmt: "#,##0" },
       // 🔴 "Vendido" · "Meses" son LAS MISMAS dos celdas del modo pedido
       // (`medirVendidoMeses`, una sola función para pantalla y Excel):
@@ -149,7 +149,7 @@ export async function buildReferenciaSheet(
       // comprado; Meses = el tiempo de venta (hasta la última venta si está
       // agotado — cerrado ahí — o hasta hoy si sigue vivo). Vacío = no se
       // puede afirmar.
-      { header: "Vendido", wch: 9, align: "right", fmt: "0%" },
+      { header: "% vendido", wch: 9, align: "right", fmt: "0%" },
       { header: "Meses", wch: 8, align: "right", fmt: "#,##0" },
       { header: "Última compra", wch: 14 },
       // Precio prom · Lista juntos, como en la ficha (¿estoy descontando?).
@@ -230,7 +230,7 @@ export async function buildComprasSheet(
       { header: "Descripción", wch: 26 },
       { header: "Empresa", wch: 14 },
       { header: "Llegó", wch: 12 },
-      { header: "Cuánto", wch: 9, align: "right", fmt: "#,##0" },
+      { header: "Cantidad", wch: 9, align: "right", fmt: "#,##0" },
       { header: "CIF", wch: 10, align: "right", fmt: MONEY_FMT },
       { header: "FOB", wch: 10, align: "right", fmt: MONEY_FMT },
       { header: "FOB de dónde", wch: 22 },

@@ -24,6 +24,9 @@
  * explicaba el cambio.
  * ─────────────────────────────────────────────────────────────────────────────
  */
+// 🔄 1-oct-2026: nombres de ERP en Guías (Daniel aprobó el audit): rótulos en tipo oración
+// («Guardar guía», «Nueva guía de despacho», «Tipo de despacho», «Vincular cliente»…).
+// Este candado leía los textos viejos y se actualiza a propósito.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 
@@ -129,7 +132,7 @@ async function montarDespachada(over: Record<string, unknown> = {}) {
   window.history.replaceState({}, "", `/guias/${GUIA_ID}?editar=1`);
   stubFetch(over);
   const r = render(<GuiaPage />);
-  await screen.findByText(/Editar Guía de Transporte/i);
+  await screen.findByText(/Editar guía de despacho/i);
   await waitFor(() => expect(campo("cliente")).not.toBeNull());
   return r;
 }
@@ -138,7 +141,7 @@ async function montarPendiente() {
   window.history.replaceState({}, "", `/guias/${GUIA_ID}?editar=1`);
   stubFetch({ estado: "Pendiente Bodega", firma_base64: "", firma_entregador_base64: "" });
   const r = render(<GuiaPage />);
-  await screen.findByText(/Editar Guía de Transporte/i);
+  await screen.findByText(/Editar guía de despacho/i);
   await waitFor(() => expect(campo("cliente")).not.toBeNull());
   return r;
 }
@@ -254,7 +257,7 @@ describe("🔴 lo bloqueado SE VE bloqueado, y lo editable SE VE editable", () =
 describe("🔴 la cabecera se ve como la del alta", () => {
   it("mismos rótulos que al crear, los cuatro bloqueados", async () => {
     await montarDespachada();
-    for (const t of ["Fecha", "Modo de entrega", "Transportista", "Despachado por"]) {
+    for (const t of ["Fecha", "Tipo de despacho", "Transportista", "Despachado por"]) {
       const fila = rotulo(t).parentElement!;
       expect(fila.textContent, `«${t}» sin candado`).toContain("bloqueado");
     }
@@ -291,7 +294,7 @@ describe('🔴 el «Falta: …» se dice UNA SOLA VEZ, y es la de abajo', () => 
       firma_entregador_base64: "",
     });
     render(<GuiaPage />);
-    await screen.findByText(/Editar Guía de Transporte/i);
+    await screen.findByText(/Editar guía de despacho/i);
     const textos = (await screen.findAllByText(/^Falta:/)).map((e) => (e.textContent || "").trim());
 
     // 🔴 EL INVARIANTE ES QUE NINGÚN AVISO SE REPITA, no que haya uno solo en
@@ -315,7 +318,7 @@ describe('🔴 el «Falta: …» se dice UNA SOLA VEZ, y es la de abajo', () => 
       firma_entregador_base64: "",
     });
     render(<GuiaPage />);
-    await screen.findByText(/Editar Guía de Transporte/i);
+    await screen.findByText(/Editar guía de despacho/i);
     const aviso = (await screen.findAllByText(/^Falta:/)).find(
       (e) => (e.textContent || "").trim() === "Falta: el transportista",
     )!;
@@ -329,7 +332,7 @@ describe('🔴 el «Falta: …» se dice UNA SOLA VEZ, y es la de abajo', () => 
     }
     expect(dentroDeLaBarra).toBe(false);
     // Y el botón apagado sigue explicándose al pasar por encima.
-    const guardar = screen.getAllByRole("button", { name: /Guardar Cambios/i });
+    const guardar = screen.getAllByRole("button", { name: /Guardar cambios/i });
     expect(guardar.some((b) => (b.getAttribute("title") || "").startsWith("Falta:"))).toBe(true);
   });
 });
@@ -400,10 +403,10 @@ describe('🔴 «Agregar destino» vive PEGADO AL CAMPO de Dirección', () => {
   // nadie va a suponer que es para agregar uno nuevo, debería estar a la
   // derecha del mismo campo cuando se cree"*. Ahora está donde dice.
 
-  it("el encabezado «Detalle de Envío» sigue sin ningún botón pegado", async () => {
+  it("el encabezado «Detalle de envío» sigue sin ningún botón pegado", async () => {
     await montarPendiente();
     const enc = Array.from(document.querySelectorAll("div")).find(
-      (d) => (d.textContent || "").trim() === "Detalle de Envío",
+      (d) => (d.textContent || "").trim() === "Detalle de envío",
     );
     expect(enc, "no se encontró el encabezado de la sección").not.toBeUndefined();
     expect(enc!.querySelector("button")).toBeNull();
@@ -464,8 +467,16 @@ describe('🔴 «Agregar destino» vive PEGADO AL CAMPO de Dirección', () => {
   it("🔴 «Despachado por» es SOLO un desplegable: ni ＋ ni «Otro…»", async () => {
     await montarPendiente();
     expect(screen.queryByRole("button", { name: /Agregar quien despacha/i })).toBeNull();
-    const select = document.getElementById("guia-entregado-por") as HTMLSelectElement;
-    expect(select).not.toBeNull();
+    // 🔄 1-oct-2026: Daniel aprobó sacar «Despachado por» de la guía y pedirlo
+    // al DESPACHAR. En el formulario ya no está; el desplegable vive en el
+    // bloque de despacho de esta misma pantalla, con la misma regla: SOLO el
+    // desplegable del equipo, sin «Otro…».
+    expect(document.getElementById("guia-entregado-por")).toBeNull();
+    const select = (await waitFor(() => {
+      const el = document.getElementById("despacho-despachado-por");
+      expect(el).not.toBeNull();
+      return el;
+    })) as HTMLSelectElement;
     const opciones = [...select.options].map((o) => o.textContent || "");
     expect(opciones.some((o) => /Otro/i.test(o))).toBe(false);
     expect(opciones).toContain("Julio");

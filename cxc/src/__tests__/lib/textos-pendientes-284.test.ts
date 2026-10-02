@@ -41,11 +41,12 @@ const VISTAS_DEL_RESUMEN = [
 ];
 
 describe("#284 · pill de sincronización con un solo vocabulario", () => {
-  it("la vista que monta SyncStatus usa prefix=\"Sincronizado\"", () => {
+  // 1-oct-2026, Daniel: nombres normales de ERP («Sincronizado» → «Última sincronización»).
+  it("la vista que monta SyncStatus usa prefix=\"Última sincronización\"", () => {
     for (const p of VISTAS_CON_PILL) {
       const code = src(...p);
       expect(code, `${p.join("/")} monta SyncStatus`).toContain("<SyncStatus");
-      expect(code, `${p.join("/")} usa el prefix nuevo`).toContain('prefix="Sincronizado"');
+      expect(code, `${p.join("/")} usa el prefix nuevo`).toContain('prefix="Última sincronización"');
     }
   });
 
@@ -87,7 +88,7 @@ describe("🔴 Ventas › Resumen ya NO lleva píldora de sincronización (4-sep
     const desktop = src("components", "ventas", "ResumenView.tsx");
     expect(desktop).toContain("<SyncNowButton");
     expect(desktop).toContain("<FilaDetalleTr");
-    expect(desktop).toContain("Total Grupo");
+    expect(desktop).toContain("Total grupo"); // 1-oct-2026, Daniel: nombres normales de ERP
     const movil = src("components", "ventas", "ResumenViewMobile.tsx");
     expect(movil).toContain("<SyncNowButton");
     expect(movil).toContain("<MobileKpis");

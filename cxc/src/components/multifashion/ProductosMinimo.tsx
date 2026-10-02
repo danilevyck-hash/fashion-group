@@ -56,7 +56,7 @@ export function PulsoSinVenta({
           valor={fmtUnidades(totales.unidades)}
           tono="volumen"
           delta={c ? variacion(totales.unidades, c.unidades) : null}
-          anterior={c ? `${fmtUnidades(c.unidades)} piezas` : null}
+          anterior={c ? `${fmtUnidades(c.unidades)} unidades` : null}
           fmtAbs={fmtUnidadesConSigno}
         />
         <CeldaPulso
@@ -173,9 +173,9 @@ export function TablaTop({
             <tr className="bg-gray-100 text-xs font-medium uppercase tracking-wide text-gray-500">
               <th className="w-8 border-b border-gray-200 px-3 py-2 text-right">#</th>
               <th className="border-b border-gray-200 px-3 py-2 text-left">{titulo}</th>
-              <th className="border-b border-gray-200 px-3 py-2 text-right">Piezas</th>
+              <th className="border-b border-gray-200 px-3 py-2 text-right">Cantidad</th>
               <th className="border-b border-gray-200 px-3 py-2 text-right">Venta</th>
-              <th className="border-b border-gray-200 px-3 py-2 text-right">Deja</th>
+              <th className="border-b border-gray-200 px-3 py-2 text-right">Utilidad</th>
               <th className="border-b border-gray-200 px-3 py-2 text-right">Margen</th>
             </tr>
           </thead>

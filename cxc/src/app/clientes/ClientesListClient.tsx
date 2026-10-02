@@ -222,9 +222,9 @@ export default function ClientesListClient({ initialClientes }: { initialCliente
                     <thead>
                       <tr className="text-left text-xs uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
                         <Encabezado columna="cliente" orden={orden} onClick={tocarColumna}>Cliente</Encabezado>
-                        <Encabezado columna="compras" orden={orden} onClick={tocarColumna} derecha>Compró {anio}</Encabezado>
-                        <Encabezado columna="debe" orden={orden} onClick={tocarColumna} derecha>Debe</Encabezado>
-                        <th className="py-2 px-1.5 xl:px-3 font-normal">Cómo contactarlo</th>
+                        <Encabezado columna="compras" orden={orden} onClick={tocarColumna} derecha>Compras {anio}</Encabezado>
+                        <Encabezado columna="debe" orden={orden} onClick={tocarColumna} derecha>Saldo</Encabezado>
+                        <th className="py-2 px-1.5 xl:px-3 font-normal">Contacto</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -267,7 +267,7 @@ export default function ClientesListClient({ initialClientes }: { initialCliente
                       </div>
                       <div className="mt-1 flex items-baseline justify-between gap-3 text-xs tabular-nums">
                         <span className="text-gray-500">
-                          Compró{" "}
+                          Compras{" "}
                           {c.compras === undefined ? (
                             <span className="text-gray-300">…</span>
                           ) : (
@@ -277,7 +277,7 @@ export default function ClientesListClient({ initialClientes }: { initialCliente
                           )}
                         </span>
                         <span className={c.debe > 0 ? "font-medium text-red-700" : c.debe < 0 ? "text-blue-600" : "text-gray-400"}>
-                          {c.debe === 0 ? "No debe" : c.debe < 0 ? `A favor ${dinero(Math.abs(c.debe))}` : `Debe ${dinero(c.debe)}`}
+                          {c.debe === 0 ? "Sin saldo" : c.debe < 0 ? `Saldo a favor ${dinero(Math.abs(c.debe))}` : `Saldo ${dinero(c.debe)}`}
                         </span>
                       </div>
                       <div className="mt-1 text-xs">
@@ -335,7 +335,7 @@ function CeldaMonto({ valor }: { valor: number | undefined }) {
 /** Saldo a favor del CLIENTE (negativo) en azul: no es deuda, es crédito. */
 function CeldaDebe({ valor }: { valor: number }) {
   if (valor < 0) {
-    return <td className="py-2 px-1.5 xl:px-3 text-right tabular-nums text-blue-600">A favor {dinero(Math.abs(valor))}</td>;
+    return <td className="py-2 px-1.5 xl:px-3 text-right tabular-nums text-blue-600">Saldo a favor {dinero(Math.abs(valor))}</td>;
   }
   return (
     <td className={`py-2 px-1.5 xl:px-3 text-right tabular-nums ${valor > 0 ? "text-red-700" : "text-gray-400"}`}>

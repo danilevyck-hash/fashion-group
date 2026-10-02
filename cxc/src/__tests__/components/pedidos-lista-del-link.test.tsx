@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 /**
  * ─────────────────────────────────────────────────────────────────────────────
  * EL PEDIDO DEL LINK, EN LA LISTA QUE VE EL VENDEDOR (14-ago-2026)
@@ -210,7 +211,7 @@ describe("🔴 el pedido del LINK se ve en la lista", () => {
 
   it("🔴 y su fila dice que NO se ha mandado a Switch (no un guion)", async () => {
     const { container } = await pintar();
-    expect(filaDe(container, "ab12cd34").textContent).toContain("No se ha mandado a Switch");
+    expect(filaDe(container, "ab12cd34").textContent).toContain("Pendiente de envío");
     expect(filaDe(container, "PED-022").textContent).toMatch(/Pedido en Switch: 16-000000507/);
   });
 });

@@ -195,7 +195,7 @@ describe("🔴 la pantalla: la barra de quincena, el corte a la vista, Generar n
     expect(screen.queryByText("Otro rango")).toBeNull();
     expect(screen.queryByTestId("rango")).toBeNull();
     expect(screen.queryByText(/Elige el período$/)).toBeNull();
-    expect(screen.queryByRole("button", { name: "Elegir un día o un rango" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Seleccionar un día o un rango" })).toBeNull(); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   // ⚠️ 11-sep-2026: Excel, PDF y Comprobantes viven en UN botón «Descargar ⌄»

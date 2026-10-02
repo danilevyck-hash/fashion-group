@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP — Borrar → Eliminar en la libreta de Reclamos.
 /**
  * ============================================================================
  * CANDADOS DE CONDUCTA — Marketing y Reclamos, arreglos de flujo (24-ago-2026).
@@ -321,7 +322,7 @@ describe("🔴 el correo al proveedor no se pierde ni se borra un contacto sin q
     pintarCorreo();
     fireEvent.click(await screen.findByRole("button", { name: /Libreta de contactos/i }));
     const tacho = await screen.findByRole("button", {
-      name: /Borrar contacto de la libreta/i,
+      name: /Eliminar contacto de la libreta/i,
     });
     expect(esTactil(tacho) || /(?:^|\s)h-11(?:\s|$)/.test(tacho.className)).toBe(true);
     fireEvent.click(tacho);
@@ -331,11 +332,11 @@ describe("🔴 el correo al proveedor no se pierde ni se borra un contacto sin q
         ([, init]) => (init as RequestInit | undefined)?.method === "DELETE",
       );
     expect(deletes()).toHaveLength(0);
-    const pregunta = await screen.findByText(/¿Borrar de la libreta\?/);
+    const pregunta = await screen.findByText(/¿Eliminar de la libreta\?/);
     // Y se puede arrepentir (el Cancelar de la FILA, no el del pie del modal).
     const fila = pregunta.parentElement as HTMLElement;
     fireEvent.click(within(fila).getByRole("button", { name: "Cancelar" }));
-    expect(screen.queryByText(/¿Borrar de la libreta\?/)).toBeNull();
+    expect(screen.queryByText(/¿Eliminar de la libreta\?/)).toBeNull();
     expect(deletes()).toHaveLength(0);
   });
 
@@ -343,9 +344,9 @@ describe("🔴 el correo al proveedor no se pierde ni se borra un contacto sin q
     pintarCorreo();
     fireEvent.click(await screen.findByRole("button", { name: /Libreta de contactos/i }));
     fireEvent.click(
-      await screen.findByRole("button", { name: /Borrar contacto de la libreta/i }),
+      await screen.findByRole("button", { name: /Eliminar contacto de la libreta/i }),
     );
-    fireEvent.click(await screen.findByRole("button", { name: "Borrar" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Eliminar" }));
     await waitFor(() =>
       expect(
         fetchMock.mock.calls.filter(

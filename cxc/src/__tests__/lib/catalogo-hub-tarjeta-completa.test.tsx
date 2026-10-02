@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 // ─────────────────────────────────────────────────────────────────────────────
 // CONDUCTA — LA TARJETA DEL HUB: EL NÚMERO QUE EL CLIENTE VE, Y EL PULSO
 // (22-sep-2026)
@@ -183,8 +184,8 @@ describe("🔴 el hub ofrece el link de los cuatro catálogos", () => {
     const writeText = vi.fn(async () => undefined);
     vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
     const { fireEvent } = await import("@testing-library/react");
-    fireEvent.click(screen.getByRole("button", { name: "Copiar link" }));
+    fireEvent.click(screen.getByRole("button", { name: "Copiar enlace de los 4 catálogos" }));
     expect(writeText).toHaveBeenCalledWith(URL_CATALOGOS_PUBLICOS);
-    expect(await screen.findByText("Link de los 4 catálogos copiado")).toBeTruthy();
+    expect(await screen.findByText("Enlace de los 4 catálogos copiado")).toBeTruthy();
   });
 });

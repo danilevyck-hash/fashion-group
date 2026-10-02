@@ -578,7 +578,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
           la matriz y el detalle sí los restaba. */}
       <p className="flex items-center gap-1.5 text-xs text-gray-400">
         <Coins className="h-3.5 w-3.5" />
-        {conDetalle ? "Toca para ver el detalle" : "Elige un mes para ver el detalle"}
+        {conDetalle ? "Toca para ver el detalle" : "Selecciona un mes para ver el detalle"}
         <Ayuda titulo="Cómo se calcula">
           <p>Ya están descontados lo devuelto y los descuentos.</p>
         </Ayuda>

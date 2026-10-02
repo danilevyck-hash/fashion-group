@@ -672,7 +672,7 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
               <table className="w-full border-collapse text-[13px]">
                 <thead>
                   <tr>
-                    {["Marca en esta factura", "Estado", "Divisor", "Extra $", "Redondeo", ""].map((h, i) => (
+                    {["Marca", "Estado", "Divisor", "Extra $", "Redondeo", ""].map((h, i) => (
                       <th key={i} className="border-b-[1.5px] border-stone-300 px-2.5 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">{h}</th>
                     ))}
                   </tr>

@@ -56,8 +56,10 @@ function montarFicha(deuda: number) {
 
 describe("🔴 el texto, dicho UNA vez", () => {
   it("«Debe $100.00 en Préstamos — descuéntalo de la liquidación.»", () => {
-    expect(avisoSalidaConDeuda(100)).toBe("Debe $100.00 en Préstamos — descuéntalo de la liquidación.");
-    expect(avisoSalidaConDeuda(12.5)).toBe("Debe $12.50 en Préstamos — descuéntalo de la liquidación.");
+    // 1-oct-2026, Daniel: nombres normales de ERP («Debe $100.00 en Préstamos — descuéntalo de la liquidación."» → «Saldo de $100.00 en Préstamos — descuéntalo de la liquidació»).
+    expect(avisoSalidaConDeuda(100)).toBe("Saldo de $100.00 en Préstamos — descuéntalo de la liquidación.");
+    // 1-oct-2026, Daniel: nombres normales de ERP («toBe("Debe $12.50 en Préstamos» → «toBe("Saldo de $12.50 en Préstamos»).
+    expect(avisoSalidaConDeuda(12.5)).toBe("Saldo de $12.50 en Préstamos — descuéntalo de la liquidación.");
   });
   it("sin deuda no hay aviso — ni con cero, ni con saldo a favor, ni sin dato", () => {
     expect(avisoSalidaConDeuda(0)).toBeNull();
@@ -66,7 +68,7 @@ describe("🔴 el texto, dicho UNA vez", () => {
   });
   it("el aviso de «guardado» con fecha de salida lleva nombre, fecha y —si debe— el monto", () => {
     expect(avisoGuardadoConSalida("Briceida Montero", "2026-09-30", 100))
-      .toBe("Listo. Briceida Montero no sale en las quincenas posteriores al 2026-09-30; las anteriores quedan igual. Debe $100.00 en Préstamos — descuéntalo de la liquidación.");
+      .toBe("Listo. Briceida Montero no sale en las quincenas posteriores al 2026-09-30; las anteriores quedan igual. Saldo de $100.00 en Préstamos — descuéntalo de la liquidación.");
     expect(avisoGuardadoConSalida("Briceida Montero", "2026-09-30", 0))
       .toBe("Listo. Briceida Montero no sale en las quincenas posteriores al 2026-09-30; las anteriores quedan igual.");
   });
@@ -78,13 +80,14 @@ describe("🔴 la PANTALLA VIVA: Editar › «Dar de baja…» dice lo que debe"
     expect(screen.queryByTestId("aviso-salida-con-deuda")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /Dar de baja/ }));
     expect(screen.getByTestId("aviso-salida-con-deuda").textContent)
-      .toBe("Debe $100.00 en Préstamos — descuéntalo de la liquidación.");
+      .toBe("Saldo de $100.00 en Préstamos — descuéntalo de la liquidación.");
   });
   it("⚠️ CONTROL: sin deuda, el formulario de baja abre sin aviso", () => {
     montarFicha(0);
     fireEvent.click(screen.getByRole("button", { name: /Dar de baja/ }));
     expect(screen.queryByTestId("aviso-salida-con-deuda")).toBeNull();
-    expect(screen.getByText(/Su último día/)).toBeTruthy();
+    // 1-oct-2026, Daniel: nombres normales de ERP («getByText(/Su último día/)» → «getByText(/Fecha de salida/)»).
+    expect(screen.getByText(/Fecha de salida/)).toBeTruthy();
   });
   it("la página de la persona le PASA la deuda a la ficha y la repite en el aviso de guardado", () => {
     const p = puro(personaPagina);

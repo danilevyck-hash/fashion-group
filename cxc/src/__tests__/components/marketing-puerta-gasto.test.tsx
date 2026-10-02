@@ -292,7 +292,7 @@ describe("1 · 🔴 la puerta ofrece EXACTAMENTE los tres tipos de gasto.ts", ()
 
   it("en pantalla hay tres botones, uno por tipo, y ninguno de los caminos viejos", () => {
     abrir();
-    expect(screen.getByText("¿Qué es el gasto?")).toBeTruthy();
+    expect(screen.getByText("Tipo de gasto")).toBeTruthy(); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(document.querySelectorAll("[data-tipo]")).toHaveLength(3);
     for (const t of TIPOS_DE_GASTO) expect(tipo(t).textContent).toContain(ROTULO_DE_TIPO[t]);
     expect(document.querySelector("[data-camino]")).toBeNull();

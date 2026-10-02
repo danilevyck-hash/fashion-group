@@ -20,6 +20,9 @@
  *      Completada) tampoco aparece: es solo para CREAR.
  * ─────────────────────────────────────────────────────────────────────────────
  */
+// 🔄 1-oct-2026: nombres de ERP en Guías (Daniel aprobó el audit): rótulos en tipo oración
+// («Guardar guía», «Nueva guía de despacho», «Tipo de despacho», «Vincular cliente»…).
+// Este candado leía los textos viejos y se actualiza a propósito.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { useState } from "react";
 import { render, screen, fireEvent, cleanup, act, within } from "@testing-library/react";
@@ -29,6 +32,13 @@ import type { GuiaItem } from "@/app/guias/components/types";
 // 🔴 El interruptor de reversión, controlable por test: el resto del módulo es
 // el REAL (las funciones de marcar/desmarcar son las de producción).
 let atajosEncendidos = true;
+// 🔄 1-oct-2026: Daniel aprobó Nueva guía en UNA tabla (`GUIA_NUEVA_2026_10`):
+// el panel «Facturas del cliente» de arriba ya no se dibuja y su buscador vive
+// dentro de «+ Agregar sin etiquetas» (candado nuevo:
+// `guias-nueva-guia-2026-10.test.tsx`). Este archivo sigue fijando la pantalla
+// de ANTES, que es la que vuelve con el interruptor apagado: por eso lo apaga.
+vi.mock("@/lib/guias/guias-2026-10", () => ({ GUIA_NUEVA_2026_10: false, ETIQUETAS_2026_10: true }));
+
 vi.mock("@/lib/guias/atajos-facturas", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/guias/atajos-facturas")>();
   return {
@@ -344,7 +354,7 @@ describe("el atajo encendido, al crear", () => {
       />,
     );
     await asentar();
-    const guardar = screen.getAllByRole("button", { name: "Guardar Guía" });
+    const guardar = screen.getAllByRole("button", { name: "Guardar guía" });
     for (const b of guardar) expect((b as HTMLButtonElement).disabled).toBe(false);
   });
 });
@@ -382,7 +392,7 @@ describe("🔴 CONTROL — la constante apagada deja la pantalla EXACTAMENTE com
   it("la pantalla de hoy sigue entera y escribir a mano funciona igual", async () => {
     render(<Harness itemsIniciales={[filaVacia()]} />);
     await asentar();
-    expect(screen.getByText("Detalle de Envío")).toBeTruthy();
+    expect(screen.getByText("Detalle de envío")).toBeTruthy();
     expect(screen.getByText("+ Agregar envío")).toBeTruthy();
     // escribir la dirección a mano — el flujo de siempre
     const direccion = document.getElementById("direccion-a-m") as HTMLInputElement;

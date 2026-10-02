@@ -126,7 +126,8 @@ describe("el guard del endpoint, con cookies firmadas de verdad", () => {
 describe("las pestañas del CXC", () => {
   it("las dos pestañas son las dos carteras, en orden", () => {
     expect(PESTANAS_CXC.map((p) => p.key)).toEqual([...CARTERAS]);
-    expect(PESTANAS_CXC.map((p) => p.label)).toEqual(["Grupo · 6 empresas", "Confecciones Boston"]);
+    // 1-oct-2026, Daniel: nombres normales de ERP («Grupo · 6 empresas» → «Fashion Group»).
+    expect(PESTANAS_CXC.map((p) => p.label)).toEqual(["Fashion Group", "Confecciones Boston"]);
   });
 
   it("admin y el gerente de Boston ven las dos", () => {

@@ -28,6 +28,7 @@ import { ComisionesPorEmpresaView } from "@/components/comisiones/ComisionesPorE
 import { ComisionesConsolidadoView } from "@/components/comisiones/ComisionesConsolidadoView";
 import { buildComisionesResumenSheet, buildComisionesConsolidadoSheet } from "@/lib/ventas/comisionExcel";
 import type { ExcelApi } from "@/components/comisiones/ComisionesView";
+// 1-oct-2026, Daniel: nombres normales de ERP («Oficina (DEFAULT)» → «Oficina (sin vendedor)», «no se paga» → «No pagable», «Cierre» → «Resumen», «Clientes que no comisionan» → «Exclusiones de comisión»).
 
 const fila = (vendedor: string, cobro: number, se_paga: boolean) => ({
   vendedor,
@@ -78,7 +79,7 @@ const filasMarcadas = (tabla: HTMLElement, valor: "si" | "no") =>
  * y el Excel los sigue llevando con su «(no se paga)».
  */
 const verLosQueNoSePagan = (tabla: HTMLElement) => {
-  const enlace = within(tabla).getByRole("button", { name: /Ver los que no se pagan \(2\)/ });
+  const enlace = within(tabla).getByRole("button", { name: /Mostrar no pagables \(2\)/ });
   fireEvent.click(enlace);
 };
 
@@ -91,9 +92,9 @@ describe("🔴 Por empresa: la fila se ve, dice «no se paga» y el pie no la su
     verLosQueNoSePagan(tabla);
     const sinPago = filasMarcadas(tabla, "no");
     expect(sinPago).toHaveLength(2);
-    for (const r of sinPago) expect(within(r).getByText("no se paga")).toBeTruthy();
+    for (const r of sinPago) expect(within(r).getByText("No pagable")).toBeTruthy();
     // La oficina se llama por su nombre, no «Sin asignar».
-    expect(within(tabla).getByText("Oficina (DEFAULT)")).toBeTruthy();
+    expect(within(tabla).getByText("Oficina (sin vendedor)")).toBeTruthy();
     expect(within(tabla).queryByText("Sin asignar")).toBeNull();
     // La plata se ve: $40.00 y $25.00 están en la tabla.
     expect(within(tabla).getAllByText("$40.00").length).toBeGreaterThan(0);
@@ -126,11 +127,11 @@ describe("🔴 Por empresa: la fila se ve, dice «no se paga» y el pie no la su
       vendedores: excelRecibido.resumen!.vendedores as never,
     });
     const celdas = Object.entries(ws).filter(([k]) => !k.startsWith("!")).map(([, c]) => (c as { v: unknown }).v);
-    expect(celdas).toContain("Oficina (DEFAULT) (no se paga)");
+    expect(celdas).toContain("Oficina (sin vendedor) (No pagable)");
     // Capitalizado desde el 3-sep-2026 («si capitiliza reynaldo»): la celda
     // del nombre se muestra «Daniel Levy», la marca sigue pegada.
-    expect(celdas).toContain("Daniel Levy (no se paga)");
-    expect(celdas).not.toContain("DANIEL LEVY (no se paga)");
+    expect(celdas).toContain("Daniel Levy (No pagable)");
+    expect(celdas).not.toContain("DANIEL LEVY (No pagable)");
     expect(celdas).toContain("Total a pagar");
     // La fila de totales: Com. Total = 100 (no 165). Se busca la fila cuyo A es "Total a pagar".
     const filaTotal = Object.entries(ws).find(([k, c]) => /^A\d+$/.test(k) && (c as { v: unknown }).v === "Total a pagar")![0].slice(1);
@@ -147,8 +148,8 @@ describe("🔴 Todas las empresas: la matriz marca las filas y el pie suma lo pa
     const sinPago = filasMarcadas(tabla, "no");
     // DANIEL LEVY + la fila única de la oficina (DEFAULT de las dos empresas junta).
     expect(sinPago).toHaveLength(2);
-    expect(within(tabla).getByText("Oficina (DEFAULT)")).toBeTruthy();
-    for (const r of sinPago) expect(within(r).getByText("no se paga")).toBeTruthy();
+    expect(within(tabla).getByText("Oficina (sin vendedor)")).toBeTruthy();
+    for (const r of sinPago) expect(within(r).getByText("No pagable")).toBeTruthy();
     expect(filasMarcadas(tabla, "si")).toHaveLength(2);
   });
 

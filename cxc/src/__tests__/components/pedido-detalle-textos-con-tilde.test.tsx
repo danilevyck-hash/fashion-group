@@ -1,3 +1,4 @@
+// 1-oct-2026, Daniel: nombres normales de ERP (rótulos renombrados en este archivo)
 /**
  * ─────────────────────────────────────────────────────────────────────────────
  * LOS AVISOS DEL PEDIDO SE ESCRIBEN BIEN — Y EL PDF QUE SALE AL CLIENTE TAMBIÉN
@@ -108,15 +109,16 @@ describe("🔴 el PDF que recibe el cliente se llama Cotización, con tilde", ()
 });
 
 describe("🔴 los avisos se escriben con tilde", () => {
-  it("«Ingresa un email válido» al mandar un correo mal escrito", async () => {
+  // 1-oct-2026, Daniel: nombres normales de ERP (email → correo)
+  it("«Ingresa un correo válido» al mandar un correo mal escrito", async () => {
     await pintar("confirmado");
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Enviar por email al cliente/i })); });
-    const campo = await screen.findByPlaceholderText("cliente@email.com");
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Enviar por correo al cliente/i })); });
+    const campo = await screen.findByPlaceholderText("cliente@correo.com");
     fireEvent.change(campo, { target: { value: "sin-arroba" } });
     await act(async () => {
       fireEvent.click(screen.getAllByRole("button", { name: /^Enviar$/i })[0]);
     });
-    const aviso = await screen.findByText(/Ingresa un email/);
+    const aviso = await screen.findByText(/Ingresa un correo/);
     expect(aviso.textContent).toContain("válido");
     expect(aviso.textContent).not.toContain("valido");
   });

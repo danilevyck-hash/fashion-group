@@ -239,12 +239,12 @@ export default function HojaCobrar({
           onClick={() => { onWhatsApp(client); onClose(); }}
         />
         <FilaAccion
-          titulo="Copiar el mensaje"
+          titulo="Copiar mensaje"
           detalle="Para pegarlo donde quieras"
           onClick={() => { onCopiar(client); onClose(); }}
         />
         <FilaAccion
-          titulo="Ver o bajar el PDF"
+          titulo="Descargar PDF"
           detalle={datos ? `${preview?.totalDocs ?? 0} documentos con saldo` : "Preparando…"}
           apagada={!datos || ocupado}
           onClick={entregarPdf}
@@ -257,7 +257,7 @@ export default function HojaCobrar({
         onClick={() => { onEscribirloYo(client); onClose(); }}
         className="inline-flex items-center min-h-[44px] text-sm font-medium text-blue-600 hover:text-blue-800 transition"
       >
-        Escribirlo yo ›
+        Editar mensaje ›
       </button>
       {/* Los documentos se MIRAN, no se mandan: por eso es un enlace y no una
           quinta salida de la lista de arriba. */}
@@ -267,7 +267,7 @@ export default function HojaCobrar({
           onClick={onClose}
           className="inline-flex items-center min-h-[44px] text-sm font-medium text-blue-600 hover:text-blue-800 transition"
         >
-          Ver los documentos ›
+          Estado de cuenta ›
         </Link>
       )}
       </div>
@@ -283,7 +283,7 @@ export default function HojaCobrar({
     <ModalOverlay onBackdropClick={onClose} align="center">
       <div className="bg-white rounded-t-2xl sm:rounded-lg w-full sm:max-w-md mx-0 sm:mx-4 mb-0 sm:my-16 border border-gray-200 max-h-[92vh] overflow-y-auto">
         <div className="flex items-start justify-between px-5 pt-5 pb-3 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-900">Cobrar</h2>
+          <h2 className="text-base font-semibold text-gray-900">Enviar estado de cuenta</h2>
           <button
             type="button"
             onClick={onClose}

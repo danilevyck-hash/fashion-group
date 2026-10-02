@@ -36,7 +36,7 @@ export interface DatoDeTarjeta {
 }
 
 /** Lo que la tarjeta dice cuando no hay nada que mirar. */
-export const SIN_NADA_QUE_REVISAR = "sin nada que revisar";
+export const SIN_NADA_QUE_REVISAR = "sin pendientes";
 
 /** Los minutos, con el mismo formato de la tabla (dos decimales). */
 function min(n: number): string {
@@ -167,14 +167,14 @@ export function filasDeLaPortada(
       const n = c.porDecidir;
       out.push({
         clave, rotulo,
-        detalle: n === null ? null : n === 0 ? "nada por decidir" : `${n} por decidir${c.horasPorDecidir ? ` · ${c.horasPorDecidir}` : ""}`,
+        detalle: n === null ? null : n === 0 ? "sin pendientes" : `${n} pendientes${c.horasPorDecidir ? ` · ${c.horasPorDecidir}` : ""}`,
         cuenta: n ? String(n) : null,
         urgente: !!n,
       });
     } else if (clave === "planilla") {
       out.push({
         clave, rotulo,
-        detalle: c.quincenaCerrada === null ? null : c.quincenaCerrada ? "cerrada" : "sin cerrar",
+        detalle: c.quincenaCerrada === null ? null : c.quincenaCerrada ? "cerrada" : "abierta",
         cuenta: null,
         urgente: c.quincenaCerrada === false,
       });
@@ -182,7 +182,7 @@ export function filasDeLaPortada(
       const n = c.conDeuda;
       out.push({
         clave, rotulo,
-        detalle: n === null ? null : n === 0 ? "nadie debe" : `${n} ${n === 1 ? "debe" : "deben"}`,
+        detalle: n === null ? null : n === 0 ? "sin saldo" : `${n} con saldo`,
         cuenta: n ? (c.deudaTotal ?? String(n)) : null,
         urgente: false,
       });
@@ -194,7 +194,7 @@ export function filasDeLaPortada(
 }
 
 /** El rótulo de la sección de la portada. */
-export const PORTADA_PANTALLAS = "Las pantallas";
+export const PORTADA_PANTALLAS = "Secciones";
 export const PORTADA_EMPRESA = "Empresa";
 
 // ─────────────────────────────────────────────────────────────────────────────

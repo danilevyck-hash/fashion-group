@@ -26,6 +26,7 @@ import { render, screen, cleanup } from "@testing-library/react";
 import { MultifashionResumenView } from "@/components/multifashion/MultifashionResumenView";
 import { PeriodoSelect } from "@/components/multifashion/PeriodoSelect";
 import { opcionesPeriodo } from "@/lib/multifashion/periodo";
+// 1-oct-2026, Daniel: nombres normales de ERP («tiquetes» → «tickets», «Cierra en» → «Proyección de cierre», «Cuándo vende la tienda» → «Ventas por día y hora», «Lo que más…» → «Más vendidos / Mayor utilidad / Mayores variaciones», «Dormidos» → «Inactivos», «Compró/Veces» → «Total compras/Visitas»).
 
 // Los números son los MEDIDOS contra producción el 6-sep-2026.
 const DETALLE = {
@@ -95,7 +96,7 @@ async function pintar() {
     <MultifashionResumenView overview={OVERVIEW} selectedYear={2026} isClosedYear={false} mes={9} />,
   );
   // El detalle llega por fetch: hay que esperarlo.
-  await screen.findByText("Cuándo vende la tienda");
+  await screen.findByText("Ventas por día y hora");
 }
 
 describe("Resumen · las cuatro tarjetas", () => {
@@ -107,7 +108,7 @@ describe("Resumen · las cuatro tarjetas", () => {
       screen.getByText(rotulo).parentElement as HTMLElement;
     expect(tarjeta("Ventas del mes").textContent).toContain("$10,867.09");
     expect(tarjeta("Tickets").textContent).toContain("213");
-    expect(tarjeta("Cierra en").textContent).toContain("$65,202.51");
+    expect(tarjeta("Proyección de cierre").textContent).toContain("$65,202.51");
     expect(tarjeta("Año 2026").textContent).toContain("$369,153.24");
   });
 
@@ -128,7 +129,7 @@ describe("Resumen · las cuatro tarjetas", () => {
 describe("Resumen · «Cuándo vende la tienda»", () => {
   it("es UNA sección con las cuatro líneas", async () => {
     await pintar();
-    expect(screen.getByText("Cuándo vende la tienda")).toBeTruthy();
+    expect(screen.getByText("Ventas por día y hora")).toBeTruthy();
     for (const t of ["Mejor día", "Peor día", "Día más fuerte", "Hora pico"]) {
       expect(screen.getByText(new RegExp(`^${t}$`)), `falta «${t}»`).toBeTruthy();
     }
@@ -144,7 +145,7 @@ describe("Resumen · «Cuándo vende la tienda»", () => {
     await pintar();
     // Mejor día del mes: $3.364,19 (el sábado 5). Día más fuerte: $2.640,52 de
     // promedio sobre DIEZ sábados. Antes las dos decían $3.364,19.
-    const seccion = screen.getByText("Cuándo vende la tienda").parentElement as HTMLElement;
+    const seccion = screen.getByText("Ventas por día y hora").parentElement as HTMLElement;
     expect(seccion.textContent).toContain("$3,364.19");
     // El promedio de los 10 sábados sale compacto: $2,641 (de $2.640,52).
     expect(seccion.textContent).toContain("$2,641 promedio");

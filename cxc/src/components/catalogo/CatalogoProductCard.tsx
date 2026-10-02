@@ -345,7 +345,7 @@ export default function CatalogoProductCard({
                     : t.addBtn
               }`}
             >
-              {isPreOrder ? "Pre-ordenar" : "Agregar"}
+              {isPreOrder ? "Agregar a preventa" : "Agregar"}
             </button>
           )}
         </div>

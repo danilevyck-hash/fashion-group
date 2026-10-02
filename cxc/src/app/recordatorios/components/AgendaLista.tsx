@@ -109,7 +109,7 @@ function FilaCheque({
             con cero filas en toda la historia del módulo. */}
         {ve === "rebotado" && (
           <div className="text-xs text-red-600 mt-1">
-            Este cheque rebotó{c.motivo_rebote ? ` — ${c.motivo_rebote}` : ""}
+            Cheque devuelto{c.motivo_rebote ? ` — ${c.motivo_rebote}` : ""}
           </div>
         )}
       </div>
@@ -128,7 +128,7 @@ function FilaCheque({
             title="Cheque devuelto por el banco"
             className="text-xs text-red-500 hover:underline min-h-[44px] inline-flex items-center"
           >
-            Rebotado
+            Devuelto
           </button>
         )}
         {ve === "rebotado" && (
@@ -136,7 +136,7 @@ function FilaCheque({
             onClick={() => onRedepositar(c.id)}
             className="text-xs text-emerald-600 hover:underline min-h-[44px] inline-flex items-center"
           >
-            Re-depositar
+            Redepositar
           </button>
         )}
       </div>

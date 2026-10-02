@@ -1024,7 +1024,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
           ⚠️ El nombre TÉCNICO sigue siendo `divisor40` / `divisor48`, en el
           código y en las columnas `divisor_40` / `divisor_48` de la base. */}
       <Bloque
-        titulo="Horas que se trabajan al mes"
+        titulo="Horas mensuales"
         ayuda="El salario mensual se divide entre estas horas para sacar la rata por hora."
       >
         <Campo label="40 horas por semana" ayuda="Total de horas al mes de quien trabaja 40 horas por semana."
@@ -1267,7 +1267,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                   <span>Empresa</span>
                   <span className="text-right">Jornada</span>
                   <span className="text-right">Salario</span>
-                  <span>Qué falta</span>
+                  <span>Datos pendientes</span>
                 </div>
 
                 {visiblesEnPantalla.map((p, iFila) => {
@@ -1756,7 +1756,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                                   está definida: inventarla sería inventar plata. Eso
                                   se aprende una vez → ⓘ. */}
                               <Etiqueta
-                                texto="Empezó a trabajar"
+                                texto="Fecha de ingreso"
                                 ayuda="Opcional. El sueldo de la quincena no se reparte por días."
                               />
                               <input
@@ -1840,7 +1840,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
             {bajas.length > 0 && (
               <details className="rounded-lg border border-gray-200 bg-gray-50">
                 <summary className="flex min-h-[44px] cursor-pointer items-center px-3 py-2.5 text-sm text-gray-700">
-                  Ya no trabajan aquí ({bajas.length})
+                  Inactivos ({bajas.length})
                 </summary>
                 <div className="border-t border-gray-200 bg-white">
                   <div className="px-1 py-0.5">
@@ -1874,7 +1874,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                         onClick={() => void guardarBaja(p, "", "")}
                         className={`${PILL_BASE} ${PILL_OFF} disabled:opacity-50`}
                       >
-                        Volvió a trabajar aquí
+                        Reactivar
                       </button>
                     </div>
                   ))}
@@ -2093,7 +2093,7 @@ function BloqueBaja({
   return (
     <div className="mt-3 rounded-lg border border-gray-200 bg-white p-3">
       <div className="flex flex-wrap items-center gap-1">
-        <h4 className="text-sm font-medium text-gray-900">¿Se fue de la empresa?</h4>
+        <h4 className="text-sm font-medium text-gray-900">Baja</h4>
         {/* Qué le pasa a sus quincenas se aprende una vez. El aviso de que
             todavía no se puede guardar (falta la migración) NO se esconde: va
             abajo, en pantalla. */}
@@ -2120,7 +2120,7 @@ function BloqueBaja({
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div>
-          <Etiqueta texto="Último día de trabajo" />
+          <Etiqueta texto="Fecha de salida" />
           <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)}
             className={`${CAMPO} tabular-nums`} />
         </div>
@@ -2129,7 +2129,7 @@ function BloqueBaja({
               ahí un despido injustificado paga indemnización y una renuncia no.
               La planilla trata los tres motivos exactamente igual. */}
           <Etiqueta
-            texto="¿Por qué salió?"
+            texto="Motivo de salida"
             ayuda="La planilla se calcula igual en los tres casos. Se guarda para la liquidación."
           />
           <div className="flex flex-wrap gap-2">

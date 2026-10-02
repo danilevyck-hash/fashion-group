@@ -279,12 +279,12 @@ export default function ReclamoDetail({
               </div>
               {!esActiveShoes(editEmpresa) && (
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs text-gray-500">N° Pedido *</span>
+                  <span className="text-xs text-gray-500">N° de pedido *</span>
                   <input type="text" value={editPedido} onChange={(e) => setEditPedido(e.target.value)} className="border-b border-gray-200 py-2.5 sm:py-1.5 text-base sm:text-sm outline-none min-h-[44px] xl:min-h-0" />
                 </label>
               )}
               <label className="flex flex-col gap-1 sm:col-span-2">
-                <span className="text-xs text-gray-500">Notas</span>
+                <span className="text-xs text-gray-500">Observaciones</span>
                 <textarea
                   value={editNotas}
                   onChange={(e) => { setEditNotas(e.target.value); e.target.style.height = "auto"; e.target.style.height = `${e.target.scrollHeight}px`; }}
@@ -359,7 +359,7 @@ export default function ReclamoDetail({
             </button>
           )}
           {pendiente && (
-            <button onClick={() => setCorreoOpen(true)} className="text-sm border border-gray-200 px-4 rounded-md text-gray-600 hover:text-black hover:border-gray-400 transition inline-flex items-center justify-center min-h-[44px]">Correo</button>
+            <button onClick={() => setCorreoOpen(true)} className="text-sm border border-gray-200 px-4 rounded-md text-gray-600 hover:text-black hover:border-gray-400 transition inline-flex items-center justify-center min-h-[44px]">Enviar al proveedor</button>
           )}
           <button ref={descargaRef} onClick={() => setDescargaOpen((v) => !v)} disabled={excelBusy || pdfBusy || facturaBusy} aria-haspopup="menu" aria-expanded={descargaOpen} className="text-sm border border-gray-200 px-4 rounded-md text-gray-600 hover:text-black hover:border-gray-400 transition inline-flex items-center justify-center gap-1 min-h-[44px] disabled:opacity-40">
             {excelBusy ? "Armando el Excel…" : pdfBusy ? "Armando el PDF…" : facturaBusy ? "Bajando la factura…" : "Descargar"} <span aria-hidden className="text-gray-400">⌄</span>
@@ -382,7 +382,7 @@ export default function ReclamoDetail({
             ]}
           />
           {!pendiente && (
-            <button onClick={() => onChangeEstado("Creado")} className="ml-auto text-xs text-gray-400 hover:text-gray-700 transition inline-flex items-center justify-center min-h-[44px] px-2" title="Si fue un error: vuelve a la lista de por cobrar">← Volver a por cobrar</button>
+            <button onClick={() => onChangeEstado("Creado")} className="ml-auto text-xs text-gray-400 hover:text-gray-700 transition inline-flex items-center justify-center min-h-[44px] px-2" title="Si fue un error: vuelve a la lista de pendientes">Marcar como pendiente</button>
           )}
         </div>
       )}
@@ -449,7 +449,7 @@ export default function ReclamoDetail({
       {/* Renglones — UNA sola tabla: editable in-place cuando editMode, read-only si no */}
       {(editMode || items.length > 0) && (
         <div className="mb-8">
-          <div className="text-sm font-semibold text-gray-700 mb-3">Renglones</div>
+          <div className="text-sm font-semibold text-gray-700 mb-3">Líneas</div>
           {editMode ? (
             <>
               <ScrollableTable minWidth={700} className="mb-4">
@@ -461,7 +461,7 @@ export default function ReclamoDetail({
                       <th className="pb-2 font-medium text-left" style={{ minWidth: 70 }}>Talla *</th>
                       <th className="pb-2 font-medium text-left" style={{ minWidth: 90 }}>Género *</th>
                       <th className="pb-2 font-medium text-right" style={{ minWidth: 60 }}>Cant. *</th>
-                      <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Precio U. *</th>
+                      <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Precio unitario *</th>
                       <th className="pb-2 font-medium text-left">Motivo *</th>
                       <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Subtotal</th>
                       <th className="pb-2 w-6"></th>
@@ -489,14 +489,14 @@ export default function ReclamoDetail({
                           </select>
                         </td>
                         <td className="py-2 text-right tabular-nums text-gray-500 text-xs">${fmt((Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0))}</td>
-                        <td className="py-2 text-center">{editItems.length > 1 && <button aria-label="Quitar renglón" title="Quitar renglón" onClick={() => setEditItems((p) => p.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-black text-sm inline-flex items-center justify-center min-w-[44px] min-h-[44px]">×</button>}</td>
+                        <td className="py-2 text-center">{editItems.length > 1 && <button aria-label="Quitar línea" title="Quitar línea" onClick={() => setEditItems((p) => p.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-black text-sm inline-flex items-center justify-center min-w-[44px] min-h-[44px]">×</button>}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </ScrollableTable>
               <div className="flex flex-wrap items-center gap-x-4">
-                <button onClick={() => setEditItems((p) => [...p, emptyItem()])} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2">+ Agregar renglón</button>
+                <button onClick={() => setEditItems((p) => [...p, emptyItem()])} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2">+ Agregar línea</button>
                 <button onClick={() => setEditItems((p) => (p.length ? [...p, filaRepetida(p[p.length - 1])] : [emptyItem()]))} className="text-sm text-gray-700 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2 font-medium">Repetir el anterior</button>
               </div>
             </>
@@ -527,7 +527,7 @@ export default function ReclamoDetail({
                         {item.genero && <div className="flex justify-between gap-2"><dt className="text-gray-400">Género</dt><dd className="text-gray-600 truncate">{generoLabel(item.genero)}</dd></div>}
                         {item.motivo && <div className="col-span-2 flex justify-between gap-2"><dt className="text-gray-400 shrink-0">Motivo</dt><dd className="text-gray-600 text-right">{motivoEnPantalla(item.motivo)}</dd></div>}
                         {item.nro_factura && <div className="flex justify-between gap-2"><dt className="text-gray-400">Factura</dt><dd className="text-gray-600 truncate">{item.nro_factura}</dd></div>}
-                        {item.nro_orden_compra && <div className="flex justify-between gap-2"><dt className="text-gray-400">PO</dt><dd className="text-gray-600 truncate">{item.nro_orden_compra}</dd></div>}
+                        {item.nro_orden_compra && <div className="flex justify-between gap-2"><dt className="text-gray-400">N° de pedido</dt><dd className="text-gray-600 truncate">{item.nro_orden_compra}</dd></div>}
                       </dl>
                     </li>
                   );
@@ -547,7 +547,7 @@ export default function ReclamoDetail({
                         <th className="text-right pb-2 font-medium">Subtotal</th>
                         <th className="text-left pb-2 font-medium">Motivo</th>
                         {conFactura && <th className="text-left pb-2 font-medium">Factura</th>}
-                        {conPO && <th className="text-left pb-2 font-medium">PO</th>}
+                        {conPO && <th className="text-left pb-2 font-medium">N° de pedido</th>}
                       </tr>
                     </thead>
                     <tbody>

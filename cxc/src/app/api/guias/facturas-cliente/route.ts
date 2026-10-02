@@ -29,15 +29,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
-import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { B2B_EMPRESA_KEYS, mapEmpresaName } from "@/lib/empresa-mapping";
 import { esCodigoDeCliente } from "@/lib/clientes/mundos";
-import {
-  TIPO_FACTURA,
-  indiceYaSalio,
-  yaSalioEn,
-  type RenglonVivo,
-} from "@/lib/guias/atajos-facturas";
+import { TIPO_FACTURA, yaSalioEn } from "@/lib/guias/atajos-facturas";
+import { leerIndiceYaSalio } from "@/lib/guias/ya-salio-server";
 
 export const dynamic = "force-dynamic";
 
@@ -61,11 +56,6 @@ interface FacturaFila {
   secuencial: string | null;
   fecha: string | null;
   total: number | string | null;
-}
-
-interface GuiaVivaFila {
-  numero: number;
-  guia_items: Array<{ empresa: string | null; facturas: string | null; deleted: boolean | null }> | null;
 }
 
 export async function GET(req: NextRequest) {
@@ -121,26 +111,8 @@ export async function GET(req: NextRequest) {
   //     orden estable — db-max-rows corta en 1000 EN SILENCIO.
   let indice: ReadonlyMap<string, number>;
   try {
-    const guias = await leerTodoPaginado<GuiaVivaFila>(
-      "guia_transporte (ya salió en otra guía)",
-      (pedirCount, desde, hasta) =>
-        supabaseServer
-          .from("guia_transporte")
-          .select("numero, guia_items(empresa, facturas, deleted)", pedirCount ? { count: "exact" } : {})
-          .eq("deleted", false)
-          .order("id", { ascending: true })
-          .range(desde, hasta),
-    );
-    const renglones: RenglonVivo[] = [];
-    for (const g of guias) {
-      for (const it of g.guia_items ?? []) {
-        // ⚠️ guia_items tiene su PROPIO `deleted`, independiente del de la
-        // cabecera: filtrar solo la guía deja pasar renglones borrados.
-        if (it.deleted) continue;
-        renglones.push({ empresa: it.empresa, facturas: it.facturas, guiaNumero: g.numero });
-      }
-    }
-    indice = indiceYaSalio(renglones);
+    // La lectura vive en `ya-salio-server.ts`: Etiquetas lee la MISMA (1-oct-2026).
+    indice = await leerIndiceYaSalio();
   } catch (e) {
     // Fail-open: sin índice no hay aviso, pero la lista de facturas sale igual.
     console.error("[guias/facturas-cliente] ya-salió:", e instanceof Error ? e.message : String(e));

@@ -200,7 +200,6 @@ function ProveedoresList() {
               <div className="text-xs text-gray-500 tabular-nums mb-2">
                 {cartera.proveedores_con_saldo}{" "}
                 {cartera.proveedores_con_saldo === 1 ? "proveedor con saldo" : "proveedores con saldo"}
-                {" · toca una empresa para ver a quién le debe"}
               </div>
 
               {/* ── Escritorio ──────────────────────────────────────────────
