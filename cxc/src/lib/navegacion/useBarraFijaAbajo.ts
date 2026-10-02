@@ -27,6 +27,7 @@
 
 import { useEffect, type RefObject } from "react";
 import { VAR_ALTO_BARRA_FIJA } from "@/lib/navegacion/barra-celular";
+import { aPxDeEstilo } from "@/lib/ui/escala-raiz";
 
 /**
  * Mide la barra fija de abajo y publica su alto en `--fg-alto-barra-fija`.
@@ -51,7 +52,8 @@ export function usePublicarAltoBarraFija(
     const raiz = document.documentElement;
 
     const publicar = () => {
-      const alto = el.getBoundingClientRect().height;
+      // Con la escala de la pantalla, lo medido se divide antes de escribirlo (`escala-raiz.ts`).
+      const alto = aPxDeEstilo(el.getBoundingClientRect().height);
       raiz.style.setProperty(VAR_ALTO_BARRA_FIJA, `${Math.round(alto)}px`);
     };
 

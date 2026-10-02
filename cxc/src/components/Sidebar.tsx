@@ -22,6 +22,8 @@ import { BotonCambiarContrasena } from "@/components/CambiarContrasena";
 import { ESTRUCTURA_APPLE_2026_10 } from "@/lib/navegacion/estructura-2026-10";
 import BarraLateral2026 from "@/components/estructura/BarraLateral2026";
 import { CONTENIDO_ANCHO_2026_10, CLASE_CONTENIDO_ANCHO } from "@/lib/navegacion/contenido-ancho";
+import { ESCALA_PANTALLA_2026_10, CLASE_ESCALA_PANTALLA } from "@/lib/navegacion/escala-pantalla";
+import { aPxDeEstilo } from "@/lib/ui/escala-raiz";
 
 // Cómo se llama cada rol: UN solo lugar, `lib/roles-etiquetas.ts` (11-sep-2026).
 
@@ -288,7 +290,7 @@ function SidebarHoy() {
               <div key={g.key}>
                 <button
                   onClick={(e) => {
-                    const t = e.currentTarget.getBoundingClientRect().top;
+                    const t = aPxDeEstilo(e.currentTarget.getBoundingClientRect().top);
                     setFlyout(prev => (prev?.key === g.key ? null : { key: g.key, top: t }));
                   }}
                   title={g.label}
@@ -433,7 +435,7 @@ export function SidebarAwareMain({ children }: { children: React.ReactNode }) {
     <div
       className={`transition-[margin] duration-200 ease-out ${
         collapsed ? "md:ml-16" : "md:ml-56"
-      }${CONTENIDO_ANCHO_2026_10 ? ` ${CLASE_CONTENIDO_ANCHO}` : ""}`}
+      }${CONTENIDO_ANCHO_2026_10 ? ` ${CLASE_CONTENIDO_ANCHO}` : ""}${ESCALA_PANTALLA_2026_10 ? ` ${CLASE_ESCALA_PANTALLA}` : ""}`}
     >
       {children}
     </div>

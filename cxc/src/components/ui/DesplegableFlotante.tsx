@@ -78,6 +78,7 @@ import {
   type PosicionDesplegable,
 } from "@/lib/ui/posicion-desplegable";
 import { vidrioSobre } from "@/lib/ui/vidrio";
+import { escalaRaiz } from "@/lib/ui/escala-raiz";
 
 export interface DesplegableFlotanteProps extends OpcionesDesplegable {
   abierto: boolean;
@@ -136,10 +137,12 @@ export default function DesplegableFlotante({
     const el = anclaRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
+    // Con la escala de la pantalla, lo medido se divide antes de escribirlo (`escala-raiz.ts`).
+    const z = escalaRaiz();
     setPos(
       calcularPosicionDesplegable(
-        { top: r.top, bottom: r.bottom, left: r.left, width: r.width },
-        { width: window.innerWidth, height: window.innerHeight },
+        { top: r.top / z, bottom: r.bottom / z, left: r.left / z, width: r.width / z },
+        { width: window.innerWidth / z, height: window.innerHeight / z },
         { altoDeseado, ancho, anchoMinimo, alinear },
       ),
     );

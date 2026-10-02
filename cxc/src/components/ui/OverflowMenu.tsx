@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CLASE_VIDRIO, RADIO_VIDRIO, conVidrio } from "@/lib/ui/vidrio";
+import { escalaRaiz } from "@/lib/ui/escala-raiz";
 
 export interface OverflowMenuItem {
   label: string;
@@ -45,9 +46,12 @@ export default function OverflowMenu({
   const computeCoords = useCallback(() => {
     const btn = triggerRef.current;
     if (!btn) return;
-    const r = btn.getBoundingClientRect();
+    // Con la escala de la pantalla, lo medido se divide antes de escribirlo (`escala-raiz.ts`).
+    const z = escalaRaiz();
+    const m = btn.getBoundingClientRect();
+    const r = { top: m.top / z, bottom: m.bottom / z, left: m.left / z, right: m.right / z };
     const openUp =
-      r.bottom + estHeight > window.innerHeight && r.top > estHeight;
+      r.bottom + estHeight > window.innerHeight / z && r.top > estHeight;
     const top = openUp ? r.top - estHeight - 4 : r.bottom + 4;
     const left = align === "right" ? r.right - MENU_WIDTH : r.left;
     setCoords({ top, left: Math.max(8, left) });

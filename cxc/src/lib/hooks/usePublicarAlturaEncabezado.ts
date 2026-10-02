@@ -2,6 +2,7 @@
 
 import { useEffect, type RefObject } from "react";
 import { VAR_ALTURA_ENCABEZADO, ALTURA_ENCABEZADO_INICIAL } from "@/lib/ui/barra-pegajosa";
+import { aPxDeEstilo } from "@/lib/ui/escala-raiz";
 
 /**
  * Mide el encabezado pegajoso y publica su alto en `--fg-altura-encabezado`,
@@ -27,7 +28,8 @@ export function usePublicarAlturaEncabezado(ref: RefObject<HTMLElement | null>):
     if (!el) return;
 
     const publicar = () => {
-      const alto = el.getBoundingClientRect().height;
+      // Con la escala de la pantalla, lo medido se divide antes de escribirlo (`escala-raiz.ts`).
+      const alto = aPxDeEstilo(el.getBoundingClientRect().height);
       raiz.style.setProperty(VAR_ALTURA_ENCABEZADO, `${Math.round(alto)}px`);
     };
 

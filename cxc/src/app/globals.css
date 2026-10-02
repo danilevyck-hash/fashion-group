@@ -350,3 +350,28 @@ input, button, select, textarea {
     --ancho-columna: 1100px;
   }
 }
+
+/* 🔴 TODO CRECE EN PROPORCIÓN CON LA PANTALLA, NADA SE ESTIRA (2-oct-2026, v3,
+   ESCALA_PANTALLA_2026_10 en lib/navegacion/escala-pantalla.ts). La clase la
+   pone SidebarAwareMain; la escala se aplica a la RAÍZ para que también crezca
+   lo que se pinta fuera del contenedor (desplegables, calendarios, el vidrio,
+   los paneles). Hasta 1279 px, como hoy; la letra base 14 px pasa a 15 desde
+   1280, a 16 desde 1600 y a 18 desde 1920, y todo lo demás en la misma
+   proporción. Cada pantalla conserva su forma y su ancho relativo. Solo en
+   pantalla: en el celular y en el papel nada cambia. */
+@media screen and (min-width: 1280px) {
+  html:has(.escala-pantalla) {
+    --escala-pantalla: 1.0714;
+    zoom: var(--escala-pantalla);
+  }
+}
+@media screen and (min-width: 1600px) {
+  html:has(.escala-pantalla) {
+    --escala-pantalla: 1.1429;
+  }
+}
+@media screen and (min-width: 1920px) {
+  html:has(.escala-pantalla) {
+    --escala-pantalla: 1.2857;
+  }
+}
