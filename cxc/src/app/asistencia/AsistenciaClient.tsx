@@ -85,7 +85,7 @@ import MarcacionesTab from "./MarcacionesTab";
 import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
 import {
   PERSONA_EN_EL_CENTRO,
-  pestanaPorDefecto,
+  pestanaPorDefecto as pestanaPorDefectoDeHoy,
   claveQueSeReescribe,
   pestanaQueSeAbre,
   pestanasDeAsistencia,
@@ -105,6 +105,9 @@ import { ASISTENCIA_PANTALLA_2026_09 } from "@/lib/asistencia/pantalla-2026-09";
 import { usePeriodoAsistencia } from "@/components/asistencia/SelectorPeriodo";
 import { aparatoDeQuienMira } from "@/lib/aparato";
 import PortadaCelular from "./PortadaCelular";
+// 🔴 ESTILO APPLE (1-oct-2026): abre en Asistencia y las pestañas van en el
+// orden del trabajo. La regla vive en el módulo puro; aquí solo se aplica.
+import { ASISTENCIA_APPLE_2026_10, pestanaAlAbrir, pestanasEnOrdenDelTrabajo } from "@/lib/asistencia/apple-2026-10";
 
 // 🩸 ESTA LISTA SE MUDÓ A UN MÓDULO PURO (10-sep-2026). Vivía acá abajo, con
 // todas sus notas, y `asistencia-pestanas.test.ts` la leía como TEXTO de este
@@ -118,6 +121,10 @@ import PortadaCelular from "./PortadaCelular";
 
 
 type Tab = ClavePestana;
+
+/** 🔴 Estilo Apple: con el interruptor prendido abre en Asistencia; apagado, la de hoy. */
+const pestanaPorDefecto = (personaEnElCentro: boolean): Tab =>
+  pestanaAlAbrir(pestanaPorDefectoDeHoy(personaEnElCentro), ASISTENCIA_APPLE_2026_10);
 
 // ── 🔴 5a — ⚙ CONFIGURACIÓN (29-sep-2026, audit visual aprobado por Daniel) ──
 //
@@ -231,10 +238,10 @@ function AsistenciaInner() {
   // El período del módulo, para que la portada diga de qué quincena habla.
   const periodo = usePeriodoAsistencia();
 
-  const visibles = pestanasDeAsistencia({
+  const visibles = pestanasEnOrdenDelTrabajo(pestanasDeAsistencia({
     personaEnElCentro: PERSONA_EN_EL_CENTRO,
     planillaUnida: PLANILLA_UNIDA,
-  }).filter(([k]) => vePestana(rol, k));
+  }), ASISTENCIA_APPLE_2026_10).filter(([k]) => vePestana(rol, k));
   // Una pestaña que no se ve tampoco se abre por la URL: cae en la primera que
   // esta persona SÍ puede ver. 🔑 No en "planilla" a secas: quien solo aprueba
   // aterrizaría en una pantalla que su propio rol no puede cargar, y vería un
