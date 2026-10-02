@@ -40,7 +40,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/components/NotificationCenter", () => ({
   default: () => <button aria-label="Notificaciones">🔔</button>,
 }));
-vi.mock("@/components/NovedadesAviso", () => ({ default: () => null }));
+vi.mock("@/components/NovedadesAviso", () => ({ default: () => null, NOVEDADES_AVISO: false }));
 vi.mock("@/components/SearchBar", () => ({
   default: () => <div data-testid="lupa" />,
   SEARCH_ROLES: ["admin", "secretaria", "vendedor", "bodega", "contabilidad"],

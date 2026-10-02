@@ -150,6 +150,7 @@ Cuando se afirma algo de una pantalla, **se mira la pantalla**, no solo el códi
 - **Mapear → definir juntos → ejecutar.** Nunca al revés.
 - Toda sugerencia **numerada**, con **ahora vs recomendación** lado a lado, y las opciones **a·b·c** cuando hay que elegir. Él aprueba una por una.
 - 🔴 **SIEMPRE mockup «hoy vs propuesta»** antes de programar una pantalla (Daniel, 1-oct-2026: *«siempre mockup»*), con capturas reales de hoy; nunca datos inventados.
+- 🔴 **A cada pregunta de Daniel: primero su pregunta citada, después la respuesta directa; si algo era pregunta nuestra, se dice.** Los mockups siempre son **«HOY vs RECOMENDACIÓN»**: una sola propuesta, nunca opciones A/B, con el porqué en 2 líneas (Daniel, 1-oct-2026: *"así para siempre para que haya orden"*).
 - **Se dice el riesgo, no las horas.** Cuánto se toca y qué puede romperse, no cuánto tarda.
 - 🔴 **El trabajo lo hacen AGENTES en segundo plano, divididos por módulo o tarea; en la conversación, solo resúmenes. Nada de comandos a la vista** (Daniel, 1-oct-2026: *«acuérdate usar agentes… dividir el trabajo y no mandarme los textos como ⏺ Bash… nada de bash»*). Hasta los commits, las pruebas y el chequeo de GitHub y Vercel los corre un agente.
 

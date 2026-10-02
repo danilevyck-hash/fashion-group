@@ -36,6 +36,14 @@ import { novedadesParaMostrar, type Novedad } from "@/lib/novedades/seleccion";
 import DibujoNovedad from "@/components/novedades/DibujoNovedad";
 
 /**
+ * 🔴 LA FRANJA YA NO SE DIBUJA (1-oct-2026). Daniel: *«elimina lo de novedades,
+ * así nadie lo lee»*. `false` = `AppHeader` no la monta. No se borra nada: la
+ * lista, `novedades_vistas` y Usuarios › Novedades siguen como estaban.
+ * `true` = la franja de antes.
+ */
+export const NOVEDADES_AVISO = false;
+
+/**
  * 🔴 EL AVISO ESPERA A QUE LA PANTALLA CARGUE (9-sep-2026).
  *
  * 🩸 Sin esta espera, la tira pedía lo suyo EN EL MISMO instante en que el

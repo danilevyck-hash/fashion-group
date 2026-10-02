@@ -24,7 +24,8 @@
 //      chip «Ya salió en GT-xxx» de Nueva guía).
 //
 // 3. NUEVA GUÍA ESTILO APPLE (`GUIA_APPLE_2026_10`, 1-oct-2026, «Propuesta estilo Apple»
-//    del mockup, APAGADA hasta el «sí» de Daniel; reglas en docs/diseno.md):
+//    del mockup, PRENDIDA: Daniel aprobó las capturas reales el 1-oct-2026,
+//    «aprobado»; reglas en docs/diseno.md):
 //    · «Nueva guía» + GT-xxx; en UNA línea la fecha (hoy), «Transportista
 //      externo / Entrega directa» y el transportista (nace VACÍO) solo si es
 //      externo.
@@ -46,5 +47,5 @@ export const GUIA_NUEVA_2026_10 = true;
 export const ETIQUETAS_2026_10 = true;
 
 /** 🔴 Nueva guía estilo Apple (tarjetas y barra fija). `false` = la de una tabla.
- *  1-oct-2026: apagado hasta el "sí" de Daniel a las capturas. */
-export const GUIA_APPLE_2026_10 = false;
+ *  Daniel aprobó las capturas reales el 1-oct-2026: "aprobado". */
+export const GUIA_APPLE_2026_10 = true;

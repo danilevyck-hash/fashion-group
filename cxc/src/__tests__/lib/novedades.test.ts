@@ -353,6 +353,13 @@ describe("🔴 7 · nunca sale una novedad de un módulo dentro de otro", () => 
     expect(moduloDeRuta("/ventas-viejo", ALL_MODULES)).toBe(null);
   });
 
+  it("🔴 1-oct-2026: la franja está APAGADA (Daniel: «elimina lo de novedades, así nadie lo lee»)", async () => {
+    const { NOVEDADES_AVISO } = await import("@/components/NovedadesAviso");
+    expect(NOVEDADES_AVISO).toBe(false);
+    const header = leer("src/components/AppHeader.tsx");
+    expect(header).toContain("{NOVEDADES_AVISO && <NovedadesAviso");
+  });
+
   it("la tira le pasa la KEY, no el rótulo que se lee", () => {
     const header = leer("src/components/AppHeader.tsx");
     expect(header).toContain("moduloDeRuta(pathname, ALL_MODULES)");

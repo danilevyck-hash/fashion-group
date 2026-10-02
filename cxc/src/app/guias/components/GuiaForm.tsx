@@ -369,7 +369,7 @@ export default function GuiaForm({
    */
   const tablaUnica = GUIA_NUEVA_2026_10 && atajosDeLaGuiaNueva;
   /**
-   * 🔴 1-oct-2026 («Propuesta estilo Apple», APAGADA hasta el «sí» de Daniel): la MISMA guía
+   * 🔴 1-oct-2026 («Propuesta estilo Apple», prendida: Daniel aprobó las capturas, «aprobado»): la MISMA guía
    * nueva, con tarjetas y una barra fija abajo. Solo al crear; `false` = la
    * tabla única de arriba. Lo que se guarda no cambia.
    */
@@ -978,7 +978,7 @@ export default function GuiaForm({
   }
 
   // ── 🔴 NUEVA GUÍA ESTILO APPLE (1-oct-2026, `GUIA_APPLE_2026_10`) ─────────
-  // «Propuesta estilo Apple» del mockup (docs/diseno.md), apagada hasta el «sí» de Daniel:
+  // «Propuesta estilo Apple» del mockup (docs/diseno.md), prendida el 1-oct-2026 (Daniel: «aprobado»):
   // una pregunta —¿qué va en esta guía?—, lo obvio ya puesto (la fecha de hoy),
   // el transportista VACÍO y solo con transportista externo, los envíos como
   // tarjetas que se tocan y UNA acción, abajo, con el total en vivo.

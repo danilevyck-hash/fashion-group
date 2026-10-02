@@ -41,7 +41,7 @@ vi.mock("@/components/SearchBar", async (original) => ({
   default: () => null,
 }));
 vi.mock("@/components/NotificationCenter", () => ({ default: () => null }));
-vi.mock("@/components/NovedadesAviso", () => ({ default: () => null }));
+vi.mock("@/components/NovedadesAviso", () => ({ default: () => null, NOVEDADES_AVISO: false }));
 
 import AppHeader from "@/components/AppHeader";
 import {

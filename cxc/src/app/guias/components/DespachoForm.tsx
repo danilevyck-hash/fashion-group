@@ -153,7 +153,9 @@ export default function DespachoForm({
   // 🩸 Las firmas se miran por su ESTADO, no preguntándole al canvas: el botón
   // tiene que apagarse y prenderse solo mientras se firma, y un `ref` no
   // dispara un re-render. `SignatureCanvas` avisa por `onChange` al levantar el
-  // dedo, así que `pendingFirma*` siempre refleja lo dibujado.
+  // dedo, así que `pendingFirma*` siempre refleja lo dibujado (y también la
+  // firma guardada que se restauró tras una recarga, que en el canvas no deja
+  // trazos: 1-oct-2026, Daniel aprobó guardar solo las firmas).
   const faltantes = faltaParaDespachar({
     tipoDespacho,
     placa: bPlaca,
@@ -169,8 +171,8 @@ export default function DespachoForm({
   function handleConfirmar() {
     if (!puedeDespachar || bSaving) return;
     // Se prefiere lo que tiene el canvas; si está limpio, lo último que avisó
-    // `onChange`. (Ya no hay firma recuperada de un borrador: se quitó el
-    // 1-oct-2026 — Daniel: *«son par de clics»*.)
+    // `onChange` o la firma guardada que se restauró tras una recarga
+    // (1-oct-2026: de todo el despacho, solo las firmas se guardan).
     const firma1 = !isCanvasClear(canvas1Ref.current)
       ? (canvas1Ref.current?.toDataURL() || "")
       : (pendingFirma1 || "");

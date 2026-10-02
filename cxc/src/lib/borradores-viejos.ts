@@ -5,6 +5,10 @@
 // reclamos y cheques. Esto solo barre lo que quedó guardado en los navegadores
 // de antes, para que no queden datos huérfanos. Es idempotente: si no hay nada,
 // no hace nada.
+//
+// ⚠️ Las firmas del despacho (`guia_firma_*`) NO se barren aquí: desde el
+// 1-oct-2026 se guardan a propósito, con vencimiento de 24 h. Daniel aprobó
+// guardar solo las firmas. Ver `@/lib/guias/firmas-despacho`.
 
 /** Borra del navegador toda clave que empiece con alguno de los prefijos. */
 export function limpiarBorradoresViejos(...prefijos: string[]): void {

@@ -10,7 +10,7 @@ import { getModuleColor, getModuleColorByKey } from "@/lib/moduleColors";
 import { ALL_MODULES, getVisibleGroups, type AppGroup } from "@/lib/modules";
 import { casaDelRol, yaEstaEnSuCasa } from "@/lib/navegacion/casa-del-rol";
 import { hrefDelModulo } from "@/lib/navegacion/href-del-modulo";
-import NovedadesAviso from "@/components/NovedadesAviso";
+import NovedadesAviso, { NOVEDADES_AVISO } from "@/components/NovedadesAviso";
 import { moduloDeRuta } from "@/lib/novedades/seleccion";
 import { usePublicarAlturaEncabezado } from "@/lib/hooks/usePublicarAlturaEncabezado";
 import { Z_ENCABEZADO } from "@/lib/ui/barra-pegajosa";
@@ -348,8 +348,10 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
           una barra: se lee y se va con el scroll.
           El módulo se saca de la DIRECCIÓN (`moduloDeRuta`), no del rótulo que
           llega por prop: el rótulo es texto para leer («Cuentas por Cobrar») y
-          lo que la novedad guarda es la `key` (`cxc`). */}
-      <NovedadesAviso moduloKey={moduloDeRuta(pathname, ALL_MODULES)} />
+          lo que la novedad guarda es la `key` (`cxc`).
+          🔴 1-oct-2026: apagada (`NOVEDADES_AVISO = false`). Daniel: «elimina lo
+          de novedades, así nadie lo lee». */}
+      {NOVEDADES_AVISO && <NovedadesAviso moduloKey={moduloDeRuta(pathname, ALL_MODULES)} />}
 
       {/* Mobile search overlay */}
       {mobileSearchOpen && (

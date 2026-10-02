@@ -67,7 +67,7 @@ vi.mock("@/components/SearchBar", async (original) => ({
   ...(await original<typeof import("@/components/SearchBar")>()),
   default: () => null,
 }));
-vi.mock("@/components/NovedadesAviso", () => ({ default: () => null }));
+vi.mock("@/components/NovedadesAviso", () => ({ default: () => null, NOVEDADES_AVISO: false }));
 
 import AppHeader from "@/components/AppHeader";
 import { VAR_ALTURA_ENCABEZADO } from "@/lib/ui/barra-pegajosa";

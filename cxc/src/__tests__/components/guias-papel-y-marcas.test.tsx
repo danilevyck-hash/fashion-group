@@ -37,6 +37,13 @@ vi.mock("@/lib/hooks/useAuth", () => ({
   useAuth: () => ({ authChecked: true, role: "secretaria" }),
 }));
 vi.mock("@/components/AppHeader", () => ({ default: () => <div /> }));
+// 1-oct-2026: el bloque 12 llena la Nueva guía de UNA tabla; la estilo Apple
+// (prendida ese día, Daniel: «aprobado») tiene su candado propio
+// (`guias-nueva-guia-apple.test.tsx`). Aquí se fuerza la de una tabla.
+vi.mock("@/lib/guias/guias-2026-10", async (orig) => ({
+  ...(await orig<typeof import("@/lib/guias/guias-2026-10")>()),
+  GUIA_APPLE_2026_10: false,
+}));
 
 /** El papel se arma de verdad; acá solo se mira QUIÉN lo pide y con qué guía. */
 const impresas: Guia[] = [];

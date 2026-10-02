@@ -8,13 +8,14 @@
 // propia pantalla, la lista dejó de necesitarlo: quedarse con esos campos allá
 // habría dejado el estado del despacho vivo en una pantalla que ya no despacha.
 //
-// 🔴 SIN BORRADOR EN EL NAVEGADOR (1-oct-2026). Daniel: *«¿y si lo quitamos?
-// Igual no es mucha info en caso de emergencia, son par de clics»*. Antes lo
-// tecleado, los N° del transportista, los bultos y las DOS FIRMAS se guardaban
-// por guía en localStorage (`guia_despacho_<id>`, `guia_firma_<id>_*`) y se
-// recuperaban solos al volver. Ya no: si se recarga la pantalla, se vuelve a
-// llenar. Lo que quedó guardado se barre una vez al montar. El aviso de salir
-// con cambios (`beforeunload` en DespachoForm) sigue.
+// 🔴 SIN BORRADOR EN EL NAVEGADOR, SALVO LAS FIRMAS (1-oct-2026). Daniel: *«¿y si
+// lo quitamos? Igual no es mucha info en caso de emergencia, son par de clics»*.
+// Lo tecleado, los N° del transportista y los bultos ya NO se guardan
+// (`guia_despacho_<id>` se barre al montar). Las DOS FIRMAS sí, aprobado por
+// Daniel el mismo 1-oct-2026: firmar de nuevo exige volver a buscar al
+// transportista. Se restauran solas, sin aviso, y se borran al completar el
+// despacho o a las 24 h (`@/lib/guias/firmas-despacho`). El aviso de salir con
+// cambios (`beforeunload` en DespachoForm) sigue.
 
 import { useCallback, useEffect, useState } from "react";
 import type { Guia, GuiaItem } from "./types";
@@ -26,6 +27,7 @@ import { bultosTecleados, correccionesDeBultos } from "@/lib/guias/bultos-correc
 import { entregadoPorElegido } from "@/lib/guias/despachado-por";
 import { GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
 import { limpiarBorradoresViejos } from "@/lib/borradores-viejos";
+import { barrerFirmasVencidas, borrarFirmas, guardarFirma, leerFirma } from "@/lib/guias/firmas-despacho";
 
 export function useDespachoGuia(id: string | null) {
   const [guia, setGuia] = useState<Guia | null>(null);
@@ -54,8 +56,8 @@ export function useDespachoGuia(id: string | null) {
    */
   const [bultosPorLinea, _setBultosPorLinea] = useState<number[]>([]);
   const [bSaving, setBSaving] = useState(false);
-  const [pendingFirma1, setPendingFirma1] = useState<string | null>(null);
-  const [pendingFirma2, setPendingFirma2] = useState<string | null>(null);
+  const [pendingFirma1, _setPendingFirma1] = useState<string | null>(null);
+  const [pendingFirma2, _setPendingFirma2] = useState<string | null>(null);
   const [despachada, setDespachada] = useState(false);
   // Los juegos MÁS USADOS (recibido por + cédula + placa) de ESTE transportista.
   // Best-effort: si no llegan, los tres campos se escriben a mano como siempre.
@@ -117,7 +119,11 @@ export function useDespachoGuia(id: string | null) {
       setTipoDespacho(tipoDespachoEfectivo(g));
       _setNumerosTransp(desdeServidor);
       _setBultosPorLinea(bultosServidor);
-
+      // Las firmas guardadas vuelven solas y sin aviso, solo si la guía no salió.
+      if (!yaSalio) {
+        _setPendingFirma1(leerFirma(id, "transportista"));
+        _setPendingFirma2(leerFirma(id, "entregador"));
+      }
     } catch {
       setError("Error al cargar la guía");
     } finally {
@@ -126,7 +132,10 @@ export function useDespachoGuia(id: string | null) {
   }, [id]);
 
   useEffect(() => { void cargar(); }, [cargar]);
-  useEffect(() => { limpiarBorradoresViejos("guia_despacho_", "guia_firma_"); }, []);
+  useEffect(() => {
+    limpiarBorradoresViejos("guia_despacho_");
+    barrerFirmasVencidas();
+  }, []);
 
   // Los juegos del transportista de ESTA guía, del más usado al menos. Solo
   // tiene sentido mientras la guía no haya salido: después, lo que se ve es lo
@@ -167,6 +176,16 @@ export function useDespachoGuia(id: string | null) {
     setBReceptor(j.receptor);
     setBCedula(j.cedula);
     setBPlaca(j.placa);
+  };
+
+  /** Cada trazo de firma se guarda por guía (1-oct-2026, ver arriba). */
+  const setPendingFirma1 = (v: string | null) => {
+    _setPendingFirma1(v);
+    if (id) guardarFirma(id, "transportista", v);
+  };
+  const setPendingFirma2 = (v: string | null) => {
+    _setPendingFirma2(v);
+    if (id) guardarFirma(id, "entregador", v);
   };
 
 
@@ -252,6 +271,7 @@ export function useDespachoGuia(id: string | null) {
       });
       if (res.ok) {
         showToast(`Guía GT-${String(guia.numero).padStart(3, "0")} despachada`);
+        borrarFirmas(id);
         setDespachada(true);
         await cargar();
         return true;
