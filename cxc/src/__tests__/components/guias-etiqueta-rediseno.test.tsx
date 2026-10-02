@@ -163,7 +163,9 @@ describe("🔴 1. la etiqueta: el rótulo ARRIBA del dato", () => {
     // cuadro y a la izquierda como los otros»*: es un CUARTO campo y sale de la
     // MISMA función. La definición + los cuatro campos.
     expect(usos).toHaveLength(5);
-    for (const rotulo of ['"Factura"', '"Cliente"', '"Destino"', '"Nota"']) {
+    // 🔄 2-oct-2026 — en un TRASLADO la nota es el contenido y su rótulo dice
+    // «Contenido» (`ETIQUETAS_TRASLADO_2026_10`); sigue saliendo de la MISMA función.
+    for (const rotulo of ['"Factura"', '"Cliente"', '"Destino"', 'd.rotuloNota ?? "Nota"']) {
       expect(sinComentarios).toContain(`bloqueDeCampo(doc, ${rotulo},`);
     }
   });

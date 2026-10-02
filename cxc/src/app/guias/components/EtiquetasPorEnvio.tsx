@@ -25,7 +25,9 @@
 // (`EtiquetasView.tsx`), que no se tocó.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
+import { ATRIBUTO_BARRA_FIJA } from "@/lib/navegacion/barra-celular";
 import ClientePicker from "@/components/ClientePicker";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import { ModalOverlay, Toast } from "@/components/ui";
@@ -72,7 +74,10 @@ import {
   type Envio,
 } from "@/lib/guias/etiquetas-por-envio";
 import { abrirPdfEnPestana } from "@/lib/guias/pdf-en-pestana";
-import { ETIQUETAS_2026_10 } from "@/lib/guias/guias-2026-10";
+import { ETIQUETAS_2026_10, ETIQUETAS_TRASLADO_2026_10 } from "@/lib/guias/guias-2026-10";
+import { TEXTO_TRASLADO } from "@/lib/guias/atajos-facturas";
+import { B2B_EMPRESA_KEYS, mapEmpresaName } from "@/lib/empresa-mapping";
+import { hoyPanama } from "@/lib/fecha-panama";
 import {
   BOTON_BLANCO,
   BOTON_NEGRO,
@@ -347,6 +352,15 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
   const [guardando, setGuardando] = useState(false);
   const [formato, setFormato] = useFormatoEtiquetas();
   const [error, setError] = useState<string | null>(null);
+  // 🔴 TRASLADO SIN FACTURA (2-oct-2026, `ETIQUETAS_TRASLADO_2026_10`): la fila
+  // «+ Traslado» al final de la lista de facturas. Va solo o con facturas (mismo
+  // camión); solo, la empresa es opcional. El contenido va en la línea de la nota.
+  const [traslado, setTraslado] = useState(false);
+  const [trasladoEmpresa, setTrasladoEmpresa] = useState<string | null>(null);
+  const [contenido, setContenido] = useState("");
+  const [trasladoBultos, setTrasladoBultos] = useState("");
+  const barra = useRef<HTMLDivElement | null>(null);
+  usePublicarAltoBarraFija(barra, ETIQUETAS_TRASLADO_2026_10);
 
   const [historicos, setHistoricos] = useState<Record<string, string[]>>({});
   const [definidos, setDefinidos] = useState<DefinidosPorCliente>({});
@@ -422,13 +436,22 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
       clave: m.clave,
       nota: normalizarNota(m.nota),
     }));
+    // El traslado va AL FINAL del envío: factura A 1–10, traslado 11–13.
+    if (traslado) {
+      const n = filas.length + 1;
+      const cajas = validarCajas(trasladoBultos).ok ? Number(trasladoBultos) : 0;
+      filas.push({ id: n, orden_en_envio: n, cajas, clave: TEXTO_TRASLADO, nota: normalizarNota(contenido) });
+    }
     return rangosDelEnvio(filas);
-  }, [enElEnvio]);
+  }, [enElEnvio, traslado, trasladoBultos, contenido]);
 
-  const botones = cliente ? botonesDeDestino(cliente.codigo, historicos[cliente.codigo] ?? [], definidos) : [];
+  const botones = cliente?.codigo ? botonesDeDestino(cliente.codigo, historicos[cliente.codigo] ?? [], definidos) : [];
 
   function elegirCliente(nombre: string, codigo: string) {
-    setCliente(codigo ? { nombre, codigo } : null);
+    // Con el traslado se acepta un cliente fuera del directorio («Ingresar manualmente»).
+    const aMano = ETIQUETAS_TRASLADO_2026_10 && nombre.trim() !== "";
+    setCliente(codigo || aMano ? { nombre: nombre.trim(), codigo } : null);
+    setTraslado(false);
     setFacturas(null);
     setMarcadas([]);
     setEmpresaKey(null);
@@ -472,7 +495,16 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
   /** Lo que falta para imprimir, o `null`. Las validaciones son SINCRÓNICAS a propósito. */
   function faltaAlgo(): string | null {
     if (!cliente) return "Selecciona el cliente";
-    if (enElEnvio.length === 0) return "Marca al menos una factura";
+    if (traslado) {
+      const n = normalizarNota(contenido);
+      if (!n.ok) return `Contenido: ${n.error}`;
+      if (!n.valor) return "Escribe el contenido del traslado";
+      const v = validarCajas(trasladoBultos);
+      if (!v.ok) return `Traslado: ${v.error}`;
+    }
+    if (enElEnvio.length === 0 && !traslado) {
+      return ETIQUETAS_TRASLADO_2026_10 ? "Marca una factura o agrega un traslado" : "Marca al menos una factura";
+    }
     for (const m of enElEnvio) {
       const f = porClave.get(m.clave) as Factura;
       const v = validarCajas(m.bultos);
@@ -486,17 +518,19 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
   }
 
   async function imprimirEnvio() {
-    if (guardando || !cliente) return;
+    if (guardando) return;
     const falta = faltaAlgo();
-    if (falta) { setError(falta); return; }
+    if (falta || !cliente) { setError(falta ?? "Selecciona el cliente"); return; }
     setGuardando(true);
     setError(null);
     const cuerpo = {
-      empresa_key: empresaElegida,
+      // Solo traslado: la empresa es opcional (Daniel, 2-oct-2026) y vacía viaja "".
+      // Con facturas, el traslado va con la empresa del envío.
+      empresa_key: enElEnvio.length > 0 ? empresaElegida : (trasladoEmpresa ?? ""),
       cliente_codigo: cliente.codigo,
       cliente_nombre: cliente.nombre,
       destino: destino.trim(),
-      facturas: enElEnvio.map((m) => {
+      facturas: [...enElEnvio.map((m) => {
         const f = porClave.get(m.clave) as Factura;
         return {
           switch_factura_id: f.switch_factura_id,
@@ -506,6 +540,14 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
           nota: (normalizarNota(m.nota) as { ok: true; valor: string | null }).valor,
         };
       }),
+      // 🔴 El traslado es UNA fila sin factura, AL FINAL: «Traslado», hoy y el contenido.
+      ...(traslado ? [{
+        switch_factura_id: null,
+        secuencial: TEXTO_TRASLADO,
+        fecha_factura: hoyPanama(),
+        cajas: Number(trasladoBultos),
+        nota: (normalizarNota(contenido) as { ok: true; valor: string | null }).valor,
+      }] : [])],
     };
     // 🔴 LA PESTAÑA DEL PDF NACE DENTRO DEL CLIC, ANTES DEL POST (Safari bloquea
     // una ventana que nace después de un `await`). Si el servidor dice que no,
@@ -542,43 +584,93 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
     }
   }
 
-  return (
-    <div>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold">Nuevo envío</h2>
-        <button type="button" onClick={onCerrar} className="text-sm text-gray-500 transition hover:text-black min-h-[44px]">
-          Volver a la lista
-        </button>
-      </div>
-
-      {/* ── 1 · Cliente y facturas ── */}
-      <div className="rounded-lg border border-gray-200 p-4">
-        <Paso
-          n={1}
-          titulo="Cliente y facturas"
-          ayuda="Marca las facturas que van juntas en este envío y escribe los bultos de cada una."
-        />
+  // ── Las piezas, una sola vez: las dibujan las dos pantallas (la de hoy y la
+  // ordenada de `ETIQUETAS_TRASLADO_2026_10`). ──
+  const clientePicker = (
         <div className="max-w-sm">
           <ClientePicker
             id="etiquetas-cliente"
             value={cliente?.nombre ?? ""}
             codigo={cliente?.codigo ?? ""}
             codigosOcultos={CODIGOS_RETIRADOS_DE_GUIAS}
-            permitirOtro={false}
+            permitirOtro={ETIQUETAS_TRASLADO_2026_10}
             onChange={elegirCliente}
           />
         </div>
-
-        {cliente && (
-          <div className="mt-4">
+  );
+  const bloqueTraslado = cliente && traslado && (
+          <div className="space-y-4" data-testid="traslado-form">
+            {enElEnvio.length === 0 && (
+            <div>
+              <div className="mb-1.5 text-xs text-gray-500">Empresa (opcional)</div>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Empresa del traslado">
+                {/* 🔴 Daniel, 2-oct-2026: «puede ser solamente traslado». Sin empresa,
+                    el papel dice FASHION GROUP arriba. */}
+                <button
+                  type="button"
+                  aria-pressed={trasladoEmpresa === null}
+                  onClick={() => { setTrasladoEmpresa(null); setError(null); }}
+                  className={`${CHIP} ${trasladoEmpresa === null ? "border-gray-900 bg-gray-900 font-medium text-white" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
+                >
+                  Sin empresa (solo traslado)
+                </button>
+                {B2B_EMPRESA_KEYS.map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    aria-pressed={trasladoEmpresa === k}
+                    onClick={() => { setTrasladoEmpresa(k); setError(null); }}
+                    className={`${CHIP} ${trasladoEmpresa === k ? "border-gray-900 bg-gray-900 font-medium text-white" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
+                  >
+                    {mapEmpresaName(k)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            )}
+            <div className="flex flex-wrap items-start gap-3">
+              <div className="min-w-[180px] flex-1">
+                <label htmlFor="traslado-contenido" className="mb-1 block text-xs text-gray-500">Contenido</label>
+                <input
+                  id="traslado-contenido"
+                  type="text"
+                  maxLength={MAX_NOTA}
+                  value={contenido}
+                  autoCapitalize="characters"
+                  onChange={(e) => { setContenido(e.target.value.toUpperCase()); setError(null); }}
+                  placeholder="Ej.: 3 MUEBLES CK"
+                  className="w-full max-w-[240px] rounded-md border border-gray-300 px-3 text-base uppercase sm:text-sm outline-none transition focus:border-black min-h-[44px]"
+                />
+              </div>
+              <div>
+                <label htmlFor="traslado-bultos" className="mb-1 block text-xs text-gray-500">Bultos</label>
+                <input
+                  id="traslado-bultos"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  value={trasladoBultos}
+                  onChange={(e) => { setTrasladoBultos(e.target.value); setError(null); }}
+                  className="w-[96px] rounded-md border border-gray-300 px-3 text-center font-mono text-lg font-semibold outline-none transition focus:border-black min-h-[44px]"
+                />
+              </div>
+            </div>
+          </div>
+        );
+  // Sin facturas que mostrar (Daniel, 2-oct-2026): la lista lo dice y «+ Traslado» sigue a la vista.
+  const sinPendientes = ETIQUETAS_TRASLADO_2026_10 && cliente && !cargando && !sinLista &&
+    (!cliente.codigo || (facturas !== null && visibles.length === 0));
+  const bloqueFacturas = cliente && (ETIQUETAS_TRASLADO_2026_10 || !traslado) && (
+          <div className={ETIQUETAS_TRASLADO_2026_10 ? "" : "mt-4"}>
+            {sinPendientes && <p className="text-sm text-gray-500">Sin facturas pendientes</p>}
             {cargando && <p className="text-sm text-gray-400">Buscando facturas…</p>}
             {!cargando && sinLista && (
               <p className="text-sm text-amber-700">No se pudieron cargar las facturas. Intenta de nuevo en unos segundos.</p>
             )}
-            {!cargando && facturas && facturas.length === 0 && (
+            {!ETIQUETAS_TRASLADO_2026_10 && !cargando && facturas && facturas.length === 0 && (
               <p className="text-sm text-gray-500">Este cliente no tiene facturas registradas.</p>
             )}
-            {!cargando && facturas && facturas.length > 0 && visibles.length === 0 && (
+            {!ETIQUETAS_TRASLADO_2026_10 && !cargando && facturas && facturas.length > 0 && visibles.length === 0 && (
               <p className="text-sm text-gray-500">
                 {yaSalieron > 0
                   ? "Este cliente no tiene facturas por etiquetar."
@@ -733,22 +825,20 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
               <p className="mt-1 text-xs text-gray-500">{textoEscondidasPorGuia(yaSalieron)}</p>
             )}
 
-            {!cargando && (
+            {!cargando && cliente.codigo && (
               <Aviso tono="info" className="mt-3" accion={{ texto: actualizando ? TEXTO_ACTUALIZANDO : TEXTO_ACTUALIZAR_AHORA, onClick: () => void actualizarAhora(), disabled: actualizando }}>
                 {TEXTO_TRAER_DE_SWITCH}
               </Aviso>
             )}
           </div>
-        )}
-      </div>
-
-      {/* ── 2 · Destino: UNO por envío ── */}
-      <div className="mt-3 rounded-lg border border-gray-200 p-4">
-        <Paso n={2} titulo="Destino" ayuda="Uno para todo el envío." />
+        );
+  const campoDestino = (
+    <>
         <input
           type="text"
           value={destino}
           onChange={(e) => { setDestino(e.target.value); setDestinoTocado(true); }}
+          id="envio-destino"
           placeholder="A dónde va el envío"
           aria-label="Destino del envío"
           className="w-full max-w-sm rounded-md border border-gray-200 px-3 text-base sm:text-sm outline-none transition focus:border-black min-h-[44px]"
@@ -772,23 +862,23 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
             ))}
           </div>
         )}
-        {!destinoTocado && destino && (
+        {!ETIQUETAS_TRASLADO_2026_10 && !destinoTocado && destino && (
           <p className="mt-1.5 text-xs text-gray-500">Se llenó solo con el destino de siempre de este cliente.</p>
         )}
-      </div>
-
-      {/* ── 3 · Imprimir: al final, con el envío completo ── */}
-      <div className="mt-3 rounded-lg border border-gray-200 p-4">
-        <Paso n={3} titulo="Imprimir" ayuda={`${AYUDA_FORMATO[formato]} Al imprimir, el envío queda cerrado.`} />
-        <ElegirPapel formato={formato} onElegir={setFormato} />
-        {enElEnvio.length > 0 && (
+    </>
+  );
+  const resumenEnvio = enElEnvio.length + (traslado ? 1 : 0) > 0 && (
           <ul data-testid="resumen-envio" className="mb-3 text-sm">
             {previa.rangos.map((r, i) => {
-              const f = porClave.get(r.fila.clave) as Factura;
+              const esElTraslado = traslado && r.fila.clave === TEXTO_TRASLADO;
+              const f = (porClave.get(r.fila.clave) ?? { secuencial: TEXTO_TRASLADO }) as Factura;
               const nota = r.fila.nota;
               return (
                 <li key={r.fila.clave} className="flex flex-wrap items-center gap-2 py-0.5">
-                  {ETIQUETAS_2026_10 && (
+                  {ETIQUETAS_2026_10 && esElTraslado && (
+                    <span className="w-5 shrink-0 text-right text-xs font-semibold tabular-nums text-gray-500">{i + 1}</span>
+                  )}
+                  {ETIQUETAS_2026_10 && !esElTraslado && (
                     <>
                       <span className="w-5 shrink-0 text-right text-xs font-semibold tabular-nums text-gray-500">{i + 1}</span>
                       <button
@@ -803,7 +893,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
                       <button
                         type="button"
                         aria-label={`Bajar ${f.secuencial}`}
-                        disabled={i === previa.rangos.length - 1}
+                        disabled={i === enElEnvio.length - 1}
                         onClick={() => mover(r.fila.clave, 1)}
                         className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-gray-200 text-gray-600 transition hover:text-black disabled:opacity-30 md:[@media(pointer:fine)]:min-h-[32px] md:[@media(pointer:fine)]:min-w-[32px]"
                       >
@@ -822,13 +912,144 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
               );
             })}
           </ul>
+        );
+
+  // 🔴 2-oct-2026 — «NUEVO ENVÍO» EN EL ORDEN DEL TRABAJO (Daniel: *«¿por qué
+  // "Facturas | Traslado" está abajo del cliente? … mejóralo ya»*). Primero QUÉ
+  // se manda (define el resto), después A QUIÉN (cliente y destino en una
+  // fila), después el CONTENIDO según la opción, y abajo UNA acción fija.
+  // Fuera: los pasos numerados con su ayuda, «Cancelar» (ya está «Volver a la
+  // lista»), el texto del papel y «Se llenó solo…». Solo con el interruptor.
+  if (ETIQUETAS_TRASLADO_2026_10) {
+    return (
+      <div className="pb-32 md:pb-0">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-base font-semibold">Nuevo envío</h2>
+          <button type="button" onClick={onCerrar} className="text-sm text-gray-500 transition hover:text-black min-h-[44px]">
+            Volver a la lista
+          </button>
+        </div>
+
+        <section className="rounded-lg border border-gray-200 p-4" aria-label="Cliente y destino">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="etiquetas-cliente" className="mb-1 block text-xs text-gray-500">Cliente</label>
+              {clientePicker}
+            </div>
+            <div>
+              <label htmlFor="envio-destino" className="mb-1 block text-xs text-gray-500">Destino</label>
+              {campoDestino}
+            </div>
+          </div>
+        </section>
+
+        {/* 🔴 Daniel, 2-oct-2026: «en el mismo buscador del cliente buscas el
+            cliente, escoges la factura o escoges la opción traslado». Las
+            facturas pendientes y, al final, la fila «+ Traslado (sin factura)». */}
+        {cliente && (
+          <section className="mt-3 rounded-lg border border-gray-200 p-4" aria-label="Facturas">
+            {bloqueFacturas}
+            <div className="mt-3 border-t border-gray-100 pt-3">
+              {traslado ? (
+                <div>
+                  <div className="mb-3 flex min-h-[44px] items-center justify-between gap-3">
+                    <span className="text-sm font-medium">Traslado (sin factura)</span>
+                    <button
+                      type="button"
+                      onClick={() => { setTraslado(false); setError(null); }}
+                      className="min-h-[44px] text-sm text-gray-500 transition hover:text-black"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                  {bloqueTraslado}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { setTraslado(true); setError(null); }}
+                  className="flex min-h-[44px] w-full items-center text-left text-sm font-medium text-gray-900 transition hover:text-black"
+                >
+                  + Traslado (sin factura)
+                </button>
+              )}
+            </div>
+          </section>
         )}
+
+        {(traslado || enElEnvio.length > 0) && (
+          <section className="mt-3 rounded-lg border border-gray-200 p-4" aria-label="Etiquetas">
+            <ElegirPapel formato={formato} onElegir={setFormato} />
+            {resumenEnvio}
+          </section>
+        )}
+
+        {/* 🔴 UNA acción principal, fija abajo, con el resultado en vivo. */}
+        <div
+          ref={barra}
+          {...{ [ATRIBUTO_BARRA_FIJA]: "" }}
+          className="fixed inset-x-0 bottom-0 z-20 mt-6 border-t border-gray-200 bg-white px-4 pt-3 md:sticky md:px-0"
+          style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+        >
+          {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
+          <div className="flex items-center gap-3">
+            <p aria-live="polite" className="min-w-0 flex-1 text-sm text-gray-500">
+              <span className="text-base font-semibold tabular-nums text-black">{previa.total}</span>{" "}
+              {previa.total === 1 ? "bulto" : "bultos"}
+            </p>
+            <button
+              type="button"
+              onClick={() => void imprimirEnvio()}
+              disabled={guardando || deshabilitado}
+              className={BOTON_NEGRO}
+            >
+              {guardando ? "Generando…" : "Generar etiquetas"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-base font-semibold">Nuevo envío</h2>
+        <button type="button" onClick={onCerrar} className="text-sm text-gray-500 transition hover:text-black min-h-[44px]">
+          Volver a la lista
+        </button>
+      </div>
+
+      {/* ── 1 · Cliente y facturas ── */}
+      <div className="rounded-lg border border-gray-200 p-4">
+        <Paso
+          n={1}
+          titulo="Cliente y facturas"
+          ayuda="Marca las facturas que van juntas en este envío y escribe los bultos de cada una."
+        />
+        {clientePicker}
+
+        {bloqueTraslado}
+        {bloqueFacturas}
+      </div>
+
+      {/* ── 2 · Destino: UNO por envío ── */}
+      <div className="mt-3 rounded-lg border border-gray-200 p-4">
+        <Paso n={2} titulo="Destino" ayuda="Uno para todo el envío." />
+        {campoDestino}
+      </div>
+
+      {/* ── 3 · Imprimir: al final, con el envío completo ── */}
+      <div className="mt-3 rounded-lg border border-gray-200 p-4">
+        <Paso n={3} titulo="Imprimir" ayuda={`${AYUDA_FORMATO[formato]} Al imprimir, el envío queda cerrado.`} />
+        <ElegirPapel formato={formato} onElegir={setFormato} />
+        {resumenEnvio}
         {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => void imprimirEnvio()}
-            disabled={guardando || deshabilitado || enElEnvio.length === 0}
+            disabled={guardando || deshabilitado || (traslado ? !cliente : enElEnvio.length === 0)}
             className={BOTON_NEGRO}
           >
             {guardando ? "Guardando…" : previa.total > 0 ? textoImprimir(previa.total, formato) : "Imprimir"}

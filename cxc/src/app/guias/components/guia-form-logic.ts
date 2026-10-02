@@ -14,7 +14,7 @@ import { entregadoPorElegido } from "@/lib/guias/despachado-por";
 // «Traslado» como valor válido de FACTURA(S) — vive con el resto del atajo y
 // cuelga del mismo interruptor.
 import { GUIAS_ATAJOS_NUEVOS, esTraslado } from "@/lib/guias/atajos-facturas";
-import { GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
+import { ETIQUETAS_TRASLADO_2026_10, GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
 import type { GuiaItem, ModoEntrega } from "./types";
 
 /**
@@ -126,7 +126,11 @@ export function validarGuia(estado: EstadoGuia): Set<string> {
     if (!filaTieneDatos(item)) continue;
     if (!item.cliente) errores.add(claveCampo(item, "cliente"));
     if (!item.direccion) errores.add(claveCampo(item, "direccion"));
-    if (!item.empresa) errores.add(claveCampo(item, "empresa"));
+    // 🔴 Un renglón que es SOLO traslado puede ir sin empresa (Daniel, 2-oct-2026:
+    // «puede ser solamente traslado»). Con facturas, la empresa sigue obligatoria.
+    if (!item.empresa && !(ETIQUETAS_TRASLADO_2026_10 && esSoloTraslado(item.facturas))) {
+      errores.add(claveCampo(item, "empresa"));
+    }
     if (!item.facturas) {
       errores.add(claveCampo(item, "facturas"));
     } else {
@@ -148,6 +152,12 @@ export function validarGuia(estado: EstadoGuia): Set<string> {
   }
 
   return errores;
+}
+
+/** ¿El campo facturas dice solo «Traslado» (una o más veces)? */
+export function esSoloTraslado(facturas: string | null | undefined): boolean {
+  const partes = (facturas ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  return partes.length > 0 && partes.every((p) => esTraslado(p));
 }
 
 /** Renumera `orden` sin tocar `uid`. */

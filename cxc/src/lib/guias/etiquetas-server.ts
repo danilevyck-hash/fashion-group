@@ -62,8 +62,9 @@ function errorDeTabla(code: string | undefined, message: string | undefined): Er
 
 interface FilaCruda {
   id: number;
-  empresa_key: string;
-  switch_factura_id: number;
+  /** NULL = traslado sin empresa (migración 20261227120000). */
+  empresa_key: string | null;
+  switch_factura_id: number | null;
   secuencial: string;
   fecha_factura: string;
   cliente_codigo: string;
@@ -88,6 +89,9 @@ const COLUMNAS_ATADAS = "id, guia_item_id, cajas";
 /** Las de siempre MÁS las del envío (1-oct-2026). */
 const COLUMNAS_ENVIO = COLUMNAS + ", envio_id, orden_en_envio, nota";
 
+export const AVISO_MIGRACION_TRASLADO =
+  "Falta correr la migración de traslados sin factura (20261226120000 y 20261227120000)";
+
 export const AVISO_MIGRACION_ENVIO =
   "Falta correr la migración de envíos de etiquetas (20261224120000)";
 
@@ -103,9 +107,11 @@ export function esColumnaAusente(code: string | undefined, message: string | und
 function aEtiqueta(f: FilaCruda, guiaNumero: number | null): EtiquetaFila {
   return {
     id: Number(f.id),
-    empresa_key: f.empresa_key,
-    empresa: mapEmpresaName(f.empresa_key),
-    switch_factura_id: Number(f.switch_factura_id),
+    // Traslado sin empresa (2-oct-2026): `""` en vez de NULL, para que nada aguas abajo cambie de tipo.
+    empresa_key: f.empresa_key ?? "",
+    empresa: f.empresa_key ? mapEmpresaName(f.empresa_key) : "",
+    // `null` = traslado sin factura (2-oct-2026): nunca se vuelve 0.
+    switch_factura_id: f.switch_factura_id == null ? null : Number(f.switch_factura_id),
     secuencial: String(f.secuencial),
     fecha_factura: String(f.fecha_factura ?? "").slice(0, 10),
     cliente_codigo: String(f.cliente_codigo),
@@ -522,6 +528,7 @@ export async function crearEnvio(
     if (indice) {
       const empresa = mapEmpresaName(envio.empresa_key);
       for (const f of envio.facturas) {
+        if (f.switch_factura_id == null) continue; // traslado: no hay factura que haya salido
         const gt = yaSalioEn(indice, empresa, f.secuencial);
         if (gt !== null) {
           return {
@@ -541,13 +548,15 @@ export async function crearEnvio(
     if ((e as ErrorConTabla).tablaAusente) return { ok: false, status: 503, error: AVISO_MIGRACION };
     return { ok: false, status: 500, error: errorGuardar() };
   }
-  const pedidas = new Set(envio.facturas.map((f) => f.switch_factura_id));
-  const ya = vivas.filter((e) => e.empresa_key === envio.empresa_key && pedidas.has(e.switch_factura_id));
+  // Un traslado (`null`) no choca con nada: cada uno es un envío propio.
+  const pedidas = new Set(envio.facturas.map((f) => f.switch_factura_id).filter((v): v is number => v != null));
+  const ya = vivas.filter((e) => e.empresa_key === envio.empresa_key && e.switch_factura_id != null && pedidas.has(e.switch_factura_id));
   if (ya.length > 0) return { ok: false, status: 409, error: textoYaEtiquetadas(ya), yaEtiquetadas: ya };
 
   const envioId = crypto.randomUUID();
   const base = {
-    empresa_key: envio.empresa_key,
+    empresa_key: envio.empresa_key || null, // traslado sin empresa → NULL
+
     cliente_codigo: envio.cliente_codigo,
     cliente_nombre: envio.cliente_nombre,
     destino: envio.destino,
@@ -572,9 +581,14 @@ export async function crearEnvio(
     ({ data, error } = await supabaseServer.from(TABLA_ETIQUETAS).insert(sinEnvio).select(COLUMNAS));
   }
   if (error) {
+    // 🔴 Sin la migración `20261226120000` la columna sigue NOT NULL: el traslado
+    // no se guarda y se DICE (falla abierta: lo demás funciona igual).
+    if (error.code === "23502" && envio.facturas.some((f) => f.switch_factura_id == null)) {
+      return { ok: false, status: 503, error: AVISO_MIGRACION_TRASLADO };
+    }
     if (error.code === "23505") {
       const otras = (await leerEtiquetas().catch(() => [] as EtiquetaFila[])).filter(
-        (e) => e.empresa_key === envio.empresa_key && pedidas.has(e.switch_factura_id),
+        (e) => e.empresa_key === envio.empresa_key && e.switch_factura_id != null && pedidas.has(e.switch_factura_id),
       );
       return {
         ok: false,

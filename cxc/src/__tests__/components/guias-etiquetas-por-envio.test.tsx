@@ -30,6 +30,12 @@ import { render, screen, fireEvent, cleanup, act, waitFor } from "@testing-libra
 // El PDF no se arma en jsdom: se deja que `armar` corra (el POST es lo que se
 // mira) y se traga lo que el navegador de mentira no sabe hacer.
 const pdf = vi.hoisted(() => ({ llamadas: 0 }));
+// Prueba el «Nuevo envío» de ANTES del traslado (Daniel lo prendió el 2-oct-2026):
+// se fuerza apagado para que siga cuidando esa versión.
+vi.mock("@/lib/guias/guias-2026-10", async (orig) => ({
+  ...(await orig<typeof import("@/lib/guias/guias-2026-10")>()),
+  ETIQUETAS_TRASLADO_2026_10: false,
+}));
 vi.mock("@/lib/guias/pdf-en-pestana", () => ({
   abrirPdfEnPestana: async (armar: () => Promise<unknown>) => {
     pdf.llamadas++;

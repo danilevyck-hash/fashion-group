@@ -21,7 +21,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { GuiaItem } from "./types";
 import type { ClienteHit } from "@/lib/hooks/useBusquedaClientes";
 import type { EtiquetaFila } from "@/lib/guias/etiquetas";
-import { agruparEnEnvios, desmarcarEnvio, facturasDelEnvio, marcarEnvio, type Envio } from "@/lib/guias/etiquetas-por-envio";
+import { agruparEnEnvios, contenidoDelTraslado, desmarcarEnvio, facturasDelEnvio, lineaDeTraslado, marcarEnvio, type Envio } from "@/lib/guias/etiquetas-por-envio";
 import { envioTomadoPorUnRenglon } from "@/lib/guias/anti-doble-captura";
 import { facturasParaMostrar } from "@/lib/guias/numero-factura";
 import { filaTieneDatos } from "./guia-form-logic";
@@ -86,10 +86,12 @@ interface Props {
   editor: (item: GuiaItem, idx: number) => ReactNode;
   clientesTop?: ClienteHit[];
   destinoAutollenadoDe?: (codigo: string) => string | null;
+  /** 🔴 Un traslado marcado deja su contenido en Observaciones (2-oct-2026). */
+  onLineaDeTraslado?: (linea: string, poner: boolean) => void;
 }
 
 export default function EnviosApple({
-  items, etiquetas, onReemplazarItems, onSeleccion, onQuitar, editor, clientesTop, destinoAutollenadoDe,
+  items, etiquetas, onReemplazarItems, onSeleccion, onQuitar, editor, clientesTop, destinoAutollenadoDe, onLineaDeTraslado,
 }: Props) {
   const [editando, setEditando] = useState<string | null>(null);
   const [agregando, setAgregando] = useState(false);
@@ -115,8 +117,14 @@ export default function EnviosApple({
     .filter(({ item }) => !item.envio_id && !item.con_etiquetas && (filaTieneDatos(item) || item.uid === editando));
 
   function alternar(v: Envio) {
-    if (marcados.has(v.envio_id)) onReemplazarItems(desmarcarEnvio(items, v));
-    else if (!envioTomadoPorUnRenglon(aMano, v.filas)) onReemplazarItems(marcarEnvio(items, v));
+    const linea = lineaDeTraslado(v);
+    if (marcados.has(v.envio_id)) {
+      onReemplazarItems(desmarcarEnvio(items, v));
+      if (linea) onLineaDeTraslado?.(linea, false);
+    } else if (!envioTomadoPorUnRenglon(aMano, v.filas)) {
+      onReemplazarItems(marcarEnvio(items, v));
+      if (linea) onLineaDeTraslado?.(linea, true);
+    }
   }
   function quitar(idx: number) {
     if (items.length > 1) onQuitar(idx);
@@ -163,7 +171,7 @@ export default function EnviosApple({
                     {circulo(marcado)}
                     <Contenido
                       cliente={v.cliente_nombre}
-                      detalle={linea(v.empresa, v.destino, facturasParaMostrar(facturasDelEnvio(v)))}
+                      detalle={linea(v.empresa, v.destino, facturasParaMostrar(facturasDelEnvio(v)), contenidoDelTraslado(v) ?? "")}
                       titulo={facturasDelEnvio(v)}
                       bultos={v.total}
                       candado

@@ -74,7 +74,8 @@ export interface EtiquetaFila {
   empresa_key: string;
   /** Nombre de display de la empresa — el MISMO que escribe el `<select>` de la guía. */
   empresa: string;
-  switch_factura_id: number;
+  /** `null` = TRASLADO sin factura (2-oct-2026): el `secuencial` dice «Traslado». */
+  switch_factura_id: number | null;
   secuencial: string;
   /** YYYY-MM-DD, la fecha de la FACTURA (nunca «hoy»). */
   fecha_factura: string;

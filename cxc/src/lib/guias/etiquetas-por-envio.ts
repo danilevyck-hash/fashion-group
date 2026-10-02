@@ -29,9 +29,10 @@ import {
   type EtiquetaFila,
   type Validacion,
 } from "@/lib/guias/etiquetas";
-import { normalizarEmpresaGuia, numerosDeFacturas, type RenglonDeGuia } from "@/lib/guias/atajos-facturas";
+import { TEXTO_TRASLADO, esTraslado, normalizarEmpresaGuia, numerosDeFacturas, type RenglonDeGuia } from "@/lib/guias/atajos-facturas";
 import { claveDeFactura } from "@/lib/guias/numero-factura";
-import { GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
+import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
+import { ETIQUETAS_TRASLADO_2026_10, GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
 
 /** 🔴 El interruptor. `false` = Etiquetas y la guía como estaban el 30-sep-2026. */
 export const ETIQUETAS_POR_ENVIO = true;
@@ -61,7 +62,8 @@ export function normalizarNota(v: unknown): Validacion<string | null> {
 // ─── Lo que viaja en el POST de un envío ─────────────────────────────────────
 
 export interface FacturaDelEnvio {
-  switch_factura_id: number;
+  /** `null` = TRASLADO sin factura (`secuencial` = «Traslado», la nota = el contenido). */
+  switch_factura_id: number | null;
   secuencial: string;
   fecha_factura: string;
   cajas: number;
@@ -69,6 +71,7 @@ export interface FacturaDelEnvio {
 }
 
 export interface EnvioNuevo {
+  /** `""` = traslado SIN empresa (2-oct-2026); en la tabla va NULL. */
   empresa_key: string;
   cliente_codigo: string;
   cliente_nombre: string;
@@ -83,15 +86,24 @@ export interface EnvioNuevo {
  *
  * El total del envío no tiene tope (Daniel, 2-oct-2026: «quita el límite ya»).
  */
-export function validarEnvioNuevo(body: unknown): Validacion<EnvioNuevo> {
+export function validarEnvioNuevo(
+  body: unknown,
+  conTraslado: boolean = ETIQUETAS_TRASLADO_2026_10,
+): Validacion<EnvioNuevo> {
   const b = (body ?? {}) as Record<string, unknown>;
   const lista = Array.isArray(b.facturas) ? (b.facturas as unknown[]) : [];
   if (lista.length === 0) return { ok: false, error: "Marca al menos una factura" };
+  // 🔴 Un envío puede llevar facturas Y un traslado (Daniel, 2-oct-2026: van en
+  // el mismo camión). Uno solo por envío; solo traslado = empresa opcional.
+  const traslados = conTraslado ? lista.filter(esFilaDeTraslado) : [];
+  if (traslados.length > 1) return { ok: false, error: "Un envío lleva un solo traslado" };
+  if (traslados.length === 1 && lista.length === 1) return validarTraslado(b, lista[0]);
 
   const facturas: FacturaDelEnvio[] = [];
   let cabecera: Omit<EnvioNuevo, "facturas"> | null = null;
   const vistas = new Set<number>();
   for (const f of lista) {
+    if (traslados.includes(f)) continue;
     const fila = (f ?? {}) as Record<string, unknown>;
     const v = validarEtiquetaNueva({ ...b, ...fila, facturas: undefined });
     if (!v.ok) return { ok: false, error: v.error };
@@ -115,7 +127,95 @@ export function validarEnvioNuevo(body: unknown): Validacion<EnvioNuevo> {
       nota: nota.valor,
     });
   }
-  return { ok: true, valor: { ...(cabecera as Omit<EnvioNuevo, "facturas">), facturas } };
+  const cab = cabecera as Omit<EnvioNuevo, "facturas">;
+  if (traslados.length === 1) {
+    // El traslado va con la cabecera de sus facturas (misma empresa y cliente)
+    // y en el lugar en que vino: así los bultos se numeran seguidos.
+    const t = validarTraslado({ ...b, ...cab }, traslados[0]);
+    if (!t.ok) return t;
+    facturas.splice(lista.indexOf(traslados[0]), 0, t.valor.facturas[0]);
+  }
+  return { ok: true, valor: { ...cab, facturas } };
+}
+
+// ─── TRASLADO SIN FACTURA (2-oct-2026, `ETIQUETAS_TRASLADO_2026_10`) ─────────
+
+/** Lo más largo que se escribe en «Contenido»: va en la línea de la nota. */
+export const MAX_CONTENIDO = MAX_NOTA;
+
+/** ¿La fila que llega en el POST es un traslado? Sin id de Switch y «Traslado». */
+function esFilaDeTraslado(f: unknown): boolean {
+  const fila = (f ?? {}) as Record<string, unknown>;
+  return fila.switch_factura_id == null && esTraslado(typeof fila.secuencial === "string" ? fila.secuencial : "");
+}
+
+/**
+ * 🔴 UN TRASLADO NO PIDE FACTURA. Daniel, 2-oct-2026: *«¿y si quiero mandar algo
+ * extra de la bodega que no está en el sistema?»*. Es un envío de UNA fila: la
+ * empresa elegida a mano, el cliente, el destino, los bultos y el CONTENIDO
+ * (obligatorio, ≤ 15, se guarda en `nota`). Lo demás pasa por las MISMAS reglas
+ * de una etiqueta (`validarEtiquetaNueva`), con el id de Switch puesto en un
+ * marcador solo para validar: se guarda `null`.
+ */
+function validarTraslado(b: Record<string, unknown>, f: unknown): Validacion<EnvioNuevo> {
+  const fila = (f ?? {}) as Record<string, unknown>;
+  // 🔴 La empresa es OPCIONAL en un traslado (Daniel, 2-oct-2026: «puede ser
+  // solamente traslado»). Vacía = sin empresa (`""`, se guarda NULL); si viene,
+  // pasa por la MISMA lista cerrada de siempre.
+  const sinEmpresa = typeof b.empresa_key !== "string" || !b.empresa_key.trim();
+  // 🔴 El CLIENTE es obligatorio (Daniel, 2-oct-2026: «en traslado también
+  // importa el cliente»). Puede no estar en el directorio («Ingresar
+  // manualmente»): entonces viaja sin código, como un renglón a mano de la guía.
+  const clienteNombre = typeof b.cliente_nombre === "string" ? b.cliente_nombre.trim() : "";
+  if (!clienteNombre) return { ok: false, error: "Falta el cliente" };
+  const sinCodigo = typeof b.cliente_codigo !== "string" || !b.cliente_codigo.trim();
+  const v = validarEtiquetaNueva({
+    ...b, ...fila, facturas: undefined, switch_factura_id: 1, secuencial: TEXTO_TRASLADO,
+    ...(sinEmpresa ? { empresa_key: B2B_EMPRESA_KEYS[0] } : {}),
+    ...(sinCodigo ? { cliente_codigo: "-" } : {}),
+  });
+  if (!v.ok) return { ok: false, error: v.error };
+  const contenido = normalizarNota(fila.nota);
+  if (!contenido.ok) return { ok: false, error: `Contenido: ${contenido.error}` };
+  if (!contenido.valor) return { ok: false, error: "Escribe el contenido del traslado" };
+  const { cliente_nombre, destino, fecha_factura, cajas } = v.valor;
+  const cliente_codigo = sinCodigo ? "" : v.valor.cliente_codigo;
+  return {
+    ok: true,
+    valor: {
+      empresa_key: sinEmpresa ? "" : v.valor.empresa_key, cliente_codigo, cliente_nombre, destino,
+      facturas: [{ switch_factura_id: null, secuencial: TEXTO_TRASLADO, fecha_factura, cajas, nota: contenido.valor }],
+    },
+  };
+}
+
+/** ¿Esta etiqueta es de un traslado? */
+export function esEtiquetaDeTraslado(e: Pick<EtiquetaFila, "switch_factura_id" | "secuencial">): boolean {
+  return e.switch_factura_id == null && esTraslado(e.secuencial);
+}
+
+/** El contenido del traslado del envío («3 MUEBLES CK»), o `null`. Solo o con facturas. */
+export function contenidoDelTraslado(envio: Pick<Envio, "filas">): string | null {
+  const f = envio.filas.find(esEtiquetaDeTraslado);
+  return f ? (f.nota ?? null) : null;
+}
+
+/** La línea que el traslado deja en Observaciones de la guía. */
+export function lineaDeTraslado(envio: Pick<Envio, "filas" | "cliente_nombre">): string | null {
+  const c = contenidoDelTraslado(envio);
+  return c ? `${TEXTO_TRASLADO} ${envio.cliente_nombre.trim()}: ${c}` : null;
+}
+
+/**
+ * Pone o quita esa línea en Observaciones. Lo escrito a mano nunca se pisa: se
+ * agrega en una línea propia, y al quitar solo sale la línea EXACTA.
+ */
+export function observacionesConTraslado(obs: string, linea: string, poner: boolean): string {
+  const lineas = obs.split("\n");
+  const sin = lineas.filter((l) => l.trim() !== linea);
+  if (!poner) return sin.join("\n").replace(/\n+$/, "");
+  if (sin.length !== lineas.length) return obs;
+  return obs.trim() ? `${obs.replace(/\n+$/, "")}\n${linea}` : linea;
 }
 
 // ─── Los rangos: CALCULADOS, nunca guardados ─────────────────────────────────

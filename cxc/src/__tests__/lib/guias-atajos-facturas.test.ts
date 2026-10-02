@@ -22,7 +22,15 @@
  * Fechas FIJAS, nunca `new Date()` (Panamá es UTC−5 fijo).
  * ─────────────────────────────────────────────────────────────────────────────
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+// Prueba la validación de ANTES del traslado sin empresa (Daniel prendió
+// ETIQUETAS_TRASLADO_2026_10 el 2-oct-2026): se fuerza apagado. Lo nuevo vive en
+// guias-etiquetas-traslado.test.ts.
+vi.mock("@/lib/guias/guias-2026-10", async (orig) => ({
+  ...(await orig<typeof import("@/lib/guias/guias-2026-10")>()),
+  ETIQUETAS_TRASLADO_2026_10: false,
+}));
 import {
   DIAS_CON_FACTURA_VISIBLES,
   DIAS_POR_VER_MAS,

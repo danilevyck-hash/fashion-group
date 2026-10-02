@@ -86,7 +86,7 @@ import {
 } from "@/lib/guias/etiquetas";
 import { MAY_DESTINO_MINIMO, acomodarDestino } from "@/lib/guias/etiqueta-destino";
 import type { FormatoEtiquetas } from "@/lib/guias/etiquetas";
-import { rangosDelEnvio } from "@/lib/guias/etiquetas-por-envio";
+import { esEtiquetaDeTraslado, rangosDelEnvio } from "@/lib/guias/etiquetas-por-envio";
 
 // Hoja carta en milímetros.
 const HOJA_W = 215.9;
@@ -213,14 +213,27 @@ export interface DatosEtiqueta {
    * Sin nota el dibujo es IDÉNTICO al de antes: no se reserva ningún espacio.
    */
   nota?: string | null;
+  /**
+   * 🔴 TRASLADO SIN FACTURA (2-oct-2026): la nota es el CONTENIDO y su rótulo
+   * dice «Contenido». Sin esto, «Nota» como siempre.
+   */
+  rotuloNota?: string;
 }
 
+/** El encabezado de un traslado sin empresa: el mismo nombre que el papel de la guía. */
+export const CASA_DEL_GRUPO = "FASHION GROUP";
+
 export function datosDeEtiqueta(e: EtiquetaFila): DatosEtiqueta {
+  // 🔴 Un traslado dice TRASLADO donde va la factura y su contenido va en la
+  // línea de la nota. Una factura sale EXACTAMENTE como antes.
+  const traslado = esEtiquetaDeTraslado(e);
   return {
-    empresa: e.empresa,
+    // Traslado SIN empresa (Daniel, 2-oct-2026): arriba va la casa del grupo.
+    empresa: traslado && !e.empresa_key ? CASA_DEL_GRUPO : e.empresa,
     // 🔴 1-oct-2026: el día en que se imprimió (Panamá), no el de la factura.
     fecha_factura: fechaImpresa(e),
-    secuencial: e.secuencial,
+    secuencial: traslado ? "TRASLADO" : e.secuencial,
+    ...(traslado ? { rotuloNota: "Contenido" } : {}),
     cliente_nombre: e.cliente_nombre,
     destino: e.destino,
     cajas: e.cajas,
@@ -533,7 +546,7 @@ function dibujarEtiqueta(
   if (nota) {
     const acomodo = acomodarNota(doc, nota, yDestino, yRaya - AIRE_SOBRE_LA_RAYA, ancho);
     falta = acomodo.falta;
-    bloqueDeCampo(doc, "Nota", nota, { ...campo, y: acomodo.y, mayuscula: acomodo.mayuscula, maxLineas: 1 });
+    bloqueDeCampo(doc, d.rotuloNota ?? "Nota", nota, { ...campo, y: acomodo.y, mayuscula: acomodo.mayuscula, maxLineas: 1 });
   }
 
   // ── «BULTO» y su número, abajo del todo, centrados y con su raya ──

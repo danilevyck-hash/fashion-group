@@ -2391,3 +2391,12 @@ Daniel aprobó el mockup «Nueva guía, en orden» (1-oct-2026). Interruptores e
 **Nombres de ERP en Guías** (mismo día, audit aprobado por Daniel): «Tipo de despacho» (era Modo de entrega / Cómo sale / Cómo salió / Tipo), «Nueva/Editar guía de despacho», «Guardar guía», «Vincular cliente» / «Sin vincular», «Cliente en la guía», «Recibido por», «Destino», «Cédula», «Despacho incompleto», «Despachadores», «Destinos por cliente», «Direcciones sugeridas», «Predeterminar», «Observaciones» (vista previa y PDF), «Factura» / «Bultos» / «Todas las etiquetas», «Eliminar etiquetas», «Envío completo» / «Bulto», «Seleccionar empresa…», títulos en tipo oración. Solo texto: nada de lo que se guarda cambió.
 
 Sin migración. Candados: `lib/guias-nueva-guia-2026-10` · `components/guias-nueva-guia-2026-10` · `api/guias-despachado-por-al-despachar` · `components/guias-etiquetas-por-envio` (2b). Los que fijaban lo viejo se reescribieron con comentario fechado; `guia-form-marcar-facturas` y `guias-varios-clientes-y-dias` siguen fijando la pantalla de ANTES con el interruptor apagado.
+
+## Etiquetas · Traslado sin factura (2-oct-2026, propuesta)
+
+Daniel: *«¿y si quiero mandar algo extra de la bodega que no está en el sistema?»* (muebles, ganchos, paneles). Interruptor `ETIQUETAS_TRASLADO_2026_10` en `lib/guias/guias-2026-10.ts`, **hoy `false`**.
+
+- **Cómo era**: Etiquetas exigía una factura de Switch (`validarEtiquetaNueva`: sin `switch_factura_id` → 400; la columna es `NOT NULL`). El único traslado sin factura vivía en Nueva guía (texto `Traslado` en `facturas`, empresa a mano), **sin etiquetas** y con bultos editables.
+- **Propuesta**: en Etiquetas › Nuevo envío, debajo del cliente, «Facturas | Traslado (sin factura)». El traslado pide empresa (a mano, nace vacía) · «Contenido» (≤ 15, se guarda en `nota`) · bultos · destino. Se guarda UNA fila: `switch_factura_id` NULL y `secuencial` = `Traslado`. El papel dice **TRASLADO** donde va la factura y el contenido en la línea de la nota, con rótulo «Contenido». En Nueva guía entra como un envío más (`marcarEnvio`): `Traslado` en facturas, bultos 🔒 y el contenido como una línea en Observaciones («Traslado <cliente>: <contenido>», que sale al desmarcar; lo escrito no se pisa).
+- 🔴 La numeración 1..N del envío y «lo impreso no se cambia» son las de todo envío. Sin columna nueva: solo la migración `20261226120000` (**escrita, SIN aplicar**), que afloja `switch_factura_id` y exige contenido al traslado. Sin ella, el POST contesta 503 y lo dice.
+- Candado `guias-etiquetas-traslado`.

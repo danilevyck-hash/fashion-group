@@ -79,7 +79,7 @@ import { textoFalta } from "@/lib/guias/falta-para-despachar";
 import { textoYaSeDespacho } from "@/lib/guias/campos-editables";
 import { sugerenciasDireccion } from "@/lib/guias/direccion-sugerida";
 import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
-import { bultosBloqueadosPorEtiquetas } from "@/lib/guias/etiquetas-por-envio";
+import { bultosBloqueadosPorEtiquetas, observacionesConTraslado } from "@/lib/guias/etiquetas-por-envio";
 
 interface GuiaFormProps {
   editingId: string | null;
@@ -1061,6 +1061,7 @@ export default function GuiaForm({
           destinoAutollenadoDe={(codigo) =>
             destinoParaAutollenar(codigo, destinosPorCliente[(codigo || "").trim()] ?? [], definidosPorCliente)
           }
+          onLineaDeTraslado={(lineaT, poner) => setObservaciones(observacionesConTraslado(observaciones, lineaT, poner))}
         />
 
         {/* Observaciones: siempre a la vista — se escribieron en 34 de 74 guías. */}

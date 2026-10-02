@@ -61,3 +61,15 @@ export const GUIA_APPLE_2026_10 = true;
  *  despacho es idéntico (candado `guias-detalle-apple.test.tsx`).
  *  `false` = la pantalla de hoy. */
 export const GUIA_DETALLE_APPLE_2026_10 = false;
+
+/** 🔴 ETIQUETAS · TRASLADO SIN FACTURA (2-oct-2026). Daniel aprobó el
+ *  2-oct-2026 («sigue»); migración `20261226120000` aplicada el mismo día. Daniel: «¿y si
+ *  quiero mandar algo extra de la bodega que no está en el sistema?» (muebles,
+ *  ganchos, paneles). En Etiquetas › Nuevo envío, al lado de las facturas, la
+ *  opción «Traslado (sin factura)»: empresa a mano, «Contenido» (≤ 15, va en la
+ *  línea de la nota), destino y bultos. El papel dice TRASLADO donde va la
+ *  factura; en Nueva guía entra como un envío más, con «Traslado» en facturas,
+ *  sus bultos 🔒 y el contenido en Observaciones.
+ *  Necesita la migración `20261226120000` (factura opcional); sin ella el
+ *  servidor contesta 503 y lo dice. `false` = Etiquetas como hoy. */
+export const ETIQUETAS_TRASLADO_2026_10 = true;
