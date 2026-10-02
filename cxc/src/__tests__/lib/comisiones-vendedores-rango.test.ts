@@ -39,7 +39,8 @@ const AGOSTO_MF = [
 ] as const;
 
 describe("VENDEDORES_RANGO_2026_10", () => {
-  it("el interruptor está prendido en esta rama", () => {
+  // Daniel aprobó las capturas el 2-oct-2026: «sí».
+  it("el interruptor está prendido (2-oct-2026)", () => {
     expect(VENDEDORES_RANGO_2026_10).toBe(true);
   });
 

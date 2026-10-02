@@ -1,8 +1,9 @@
 /**
  * MARCACIÓN ESTILO APPLE — el candado (1-oct-2026).
  *
- *   1. El interruptor nace APAGADO: hasta el «sí» de Daniel, la pantalla es la
- *      de hoy (la pastilla verde, el aviso ámbar de la cola).
+ *   1. El interruptor está PRENDIDO: Daniel aprobó las capturas el 2-oct-2026:
+ *      «sí». Apagado (cada prueba lo fuerza con `pantallaCon(false)`), la
+ *      pantalla es la de antes (la pastilla verde, el aviso ámbar de la cola).
  *   2. Prendido, el día son renglones fijos con su hora o «—», la marca en la
  *      cola lleva «Pendiente de envío» y «Deshacer» va en el renglón de la
  *      ÚLTIMA marca.
@@ -57,11 +58,13 @@ afterEach(() => {
 });
 
 describe("el interruptor", () => {
-  it("🔴 nace APAGADO hasta el «sí» de Daniel", async () => {
+  // 2-oct-2026: antes fijaba «nace apagado». Daniel aprobó las capturas el
+  // 2-oct-2026: «sí».
+  it("🔴 PRENDIDO desde el «sí» de Daniel (2-oct-2026)", async () => {
     const real = await vi.importActual<typeof import("@/lib/marcacion/apple-2026-10")>(
       "@/lib/marcacion/apple-2026-10",
     );
-    expect(real.MARCACION_APPLE_2026_10).toBe(false);
+    expect(real.MARCACION_APPLE_2026_10).toBe(true);
   });
 });
 

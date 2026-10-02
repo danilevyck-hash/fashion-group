@@ -31,6 +31,18 @@
 11. **Impresos.** Las etiquetas de la Zebra (térmica) no llevan fondos negros sólidos: van en texto negro sobre blanco, con negrita para lo importante.
 12. **Rollback.** Todo rediseño entra detrás de un interruptor (`false` = como antes) y con un test candado de lo que no debe cambiar (datos, PDF, reglas).
 
+## Detalles aprendidos (se aplican en TODO el sistema)
+
+Daniel, 2-oct-2026: *«cada vez que encontramos algo así de detalle, para que siga esa línea»*. Cuando aparece un detalle en un módulo, se escribe aquí y **se revisa en qué otros módulos pasa lo mismo**.
+
+- **El logo o título va en la misma línea que «← Volver/Inicio»**. No se le dedica una franja propia. Lo primero que se ve tiene que ser el contenido: fotos, lista o tabla.
+- **Nunca dos veces la misma marca o logo en pantalla.** Pasó en Reebok, con un logo arriba y otro en el encabezado.
+- **Nunca dos veces la misma palabra seguida.** Por ejemplo, el rótulo «Marca» encima de un desplegable que dice «Seleccionar marca»: o el rótulo, o el texto del desplegable.
+- **Nombres de personas como se escriben: «Daniel Levy»**, nunca «DANIEL LEVY». La capitalización se hace en pantalla, sin tocar el dato.
+- **Un cero que dice que falta algo SÍ se muestra.** Por ejemplo, «Fotos · 0» avisa que la tienda no tiene fotos. Solo se esconde el cero que no le dice nada a nadie, como un contador de filtros.
+- **Los mismos colores en todos los módulos.** Botones, chips, estados y acentos salen de los mismos tokens. Un módulo no inventa su paleta: todo el sistema se tiene que sentir como uno solo.
+- **Las tarjetas de una lista dicen lo esencial en dos líneas.** El detalle va al tocarlas, no en una pared de chips (por ejemplo, 23 meses pendientes dibujados uno por uno).
+
 ## Mockup: siempre, con capturas reales
 
 Daniel, 1-oct-2026: *«siempre mockup»* y *«dejamos fijo que las propuestas se muestran con capturas reales»*.

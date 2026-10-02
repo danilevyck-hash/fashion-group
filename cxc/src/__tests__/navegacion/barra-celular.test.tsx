@@ -47,6 +47,15 @@ vi.mock("next/navigation", () => ({
 //
 // El interruptor se lee en cada render y en cada corrida del gancho, así que un
 // getter alcanza para probar las dos caras sin duplicar el componente.
+// 2-oct-2026: ESTRUCTURA_APPLE_2026_10 quedó prendida (Daniel aprobó las
+// capturas el 2-oct-2026: «sí») y en la computadora saca la campana. Este
+// candado cuenta la campana de la computadora para distinguirla de la del
+// celular, así que fuerza la estructura de antes; la nueva la vigila
+// `estructura-2026-10.test.tsx`. En el celular las dos son iguales.
+vi.mock("@/lib/navegacion/estructura-2026-10", async (original) => ({
+  ...(await original<typeof import("@/lib/navegacion/estructura-2026-10")>()),
+  ESTRUCTURA_APPLE_2026_10: false,
+}));
 const interruptor = vi.hoisted(() => ({ prendido: true }));
 vi.mock("@/lib/navegacion/barra-celular", async (original) => {
   const real = await original<typeof import("@/lib/navegacion/barra-celular")>();

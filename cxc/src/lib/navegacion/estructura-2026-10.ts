@@ -38,7 +38,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** 🔴 Estructura común estilo Apple. `false` = la de hoy. */
-export const ESTRUCTURA_APPLE_2026_10 = false;
+// 🔴 2-oct-2026: PRENDIDO. Daniel aprobó las capturas el 2-oct-2026: «sí».
+export const ESTRUCTURA_APPLE_2026_10 = true;
 
 /** Lo que abre el botón del usuario, en este orden. */
 export const OPCIONES_DEL_USUARIO = ["Cambiar contraseña", "Cerrar sesión"] as const;

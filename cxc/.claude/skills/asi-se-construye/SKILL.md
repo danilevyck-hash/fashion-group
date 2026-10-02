@@ -148,7 +148,7 @@ Cuando se afirma algo de una pantalla, **se mira la pantalla**, no solo el códi
 - **Resumido.** Es el dueño, no programador. Sin nombres de tabla ni jerga.
 - **Dónde estamos parados, cómo está hoy y cómo quedaría.**
 - **Mapear → definir juntos → ejecutar.** Nunca al revés.
-- Toda sugerencia **numerada**, con **ahora vs recomendación** lado a lado, y las opciones **a·b·c** cuando hay que elegir. Él aprueba una por una.
+- Toda sugerencia **numerada**, con **ahora vs recomendación** lado a lado, y opciones **a·b·c SOLO si de verdad hace falta elegir**, con la recomendada marcada; si no, una sola recomendación (Daniel, 2-oct-2026: *«abc es solo de ser necesario»*). Él aprueba una por una.
 - 🔴 **SIEMPRE mockup «hoy vs propuesta»** antes de programar una pantalla (Daniel, 1-oct-2026: *«siempre mockup»*), con capturas reales de hoy; nunca datos inventados.
 - 🔴 **A cada pregunta de Daniel: primero su pregunta citada, después la respuesta directa; si algo era pregunta nuestra, se dice.** Los mockups siempre son **«HOY vs RECOMENDACIÓN»**: una sola propuesta, nunca opciones A/B, con el porqué en 2 líneas (Daniel, 1-oct-2026: *"así para siempre para que haya orden"*).
 - **Se dice el riesgo, no las horas.** Cuánto se toca y qué puede romperse, no cuánto tarda.

@@ -2,7 +2,9 @@
 // 🔴 ESTRUCTURA COMÚN ESTILO APPLE (1-oct-2026, `ESTRUCTURA_APPLE_2026_10`).
 //
 // Lo que este candado congela:
-//   1. El interruptor nace APAGADO, y apagado todo queda como hoy: la campana,
+//   1. (2-oct-2026: Daniel aprobó las capturas el 2-oct-2026: «sí»; el
+//      interruptor queda PRENDIDO.) Apagado —el control al revés, que cada
+//      prueba fuerza con `sw.apple = false`— todo queda como hoy: la campana,
 //      la llave y «Cerrar sesión» sueltos, el camino de migas en su tira, la
 //      barra lateral de grupos y, en el Inicio, «Accesos frecuentes» y el modo
 //      oscuro.
@@ -36,7 +38,7 @@ vi.mock("@/components/SearchBar", async (original) => ({
   default: () => null,
 }));
 vi.mock("@/components/NotificationCenter", () => ({ default: () => <span data-campana /> }));
-vi.mock("@/components/NovedadesAviso", () => ({ default: () => null }));
+vi.mock("@/components/NovedadesAviso", () => ({ default: () => null, NOVEDADES_AVISO: false }));
 
 import AppHeader from "@/components/AppHeader";
 import Sidebar from "@/components/Sidebar";
@@ -89,12 +91,14 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-describe("🔴 el interruptor nace apagado y apagado todo queda como hoy", () => {
-  it("el valor del archivo es false", async () => {
+describe("🔴 el interruptor está prendido (2-oct-2026) y apagado todo queda como hoy", () => {
+  // 2-oct-2026: antes fijaba «nace apagado». Daniel aprobó las capturas el
+  // 2-oct-2026: «sí». Las pruebas de la versión de hoy fuerzan false solas.
+  it("el valor del archivo es true", async () => {
     const real = await vi.importActual<typeof import("@/lib/navegacion/estructura-2026-10")>(
       "@/lib/navegacion/estructura-2026-10",
     );
-    expect(real.ESTRUCTURA_APPLE_2026_10).toBe(false);
+    expect(real.ESTRUCTURA_APPLE_2026_10).toBe(true);
   });
 
   it("encabezado de hoy: campana, llave, «Cerrar sesión» y la tira del camino", () => {

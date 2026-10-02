@@ -29,7 +29,8 @@ import { enDoceHoras } from "./marcacion";
 import { MARCACION_CUATRO_MARCAS } from "./cuatro-marcas";
 
 /** 🔴 El interruptor. `false` = la pantalla de hoy. */
-export const MARCACION_APPLE_2026_10 = false;
+// 🔴 2-oct-2026: PRENDIDO. Daniel aprobó las capturas el 2-oct-2026: «sí».
+export const MARCACION_APPLE_2026_10 = true;
 
 /** Los renglones del día, en el orden en que se marcan. */
 export function rotulosDelDia(): readonly string[] {

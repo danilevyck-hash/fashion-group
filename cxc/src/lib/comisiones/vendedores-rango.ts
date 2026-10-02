@@ -24,6 +24,7 @@ import { estaRetirado } from "./retirados";
 import { variacionPct } from "@/lib/variacion";
 
 /** El interruptor. `false` = el selector de período de siempre, sin atajos. */
+// 🔴 2-oct-2026: PRENDIDO. Daniel aprobó las capturas el 2-oct-2026: «sí».
 export const VENDEDORES_RANGO_2026_10 = true;
 
 export type ClaveAtajo = "semana" | "mes" | "3m" | "6m" | "anio";

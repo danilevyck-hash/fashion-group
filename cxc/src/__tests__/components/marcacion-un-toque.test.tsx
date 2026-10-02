@@ -45,6 +45,21 @@ vi.mock("@/components/NotificationCenter", () => ({
   default: () => <button aria-label="Notificaciones">🔔</button>,
 }));
 vi.mock("@/components/NovedadesAviso", () => ({ default: () => null, NOVEDADES_AVISO: false }));
+// 2-oct-2026: MARCACION_APPLE_2026_10 quedó prendida (Daniel aprobó las
+// capturas el 2-oct-2026: «sí»). Este candado vigila la pantalla de antes (la
+// pastilla verde), así que fuerza el interruptor en false; la nueva la vigila
+// `marcacion-apple-2026-10.test.tsx`.
+// Ídem ESTRUCTURA_APPLE_2026_10 (2-oct-2026, mismo «sí»): prendida saca la
+// campana para TODOS los roles, y la prueba 6 cuenta la campana del admin
+// para probar que la regla de quien solo marca es por rol.
+vi.mock("@/lib/navegacion/estructura-2026-10", async (original) => ({
+  ...(await original<typeof import("@/lib/navegacion/estructura-2026-10")>()),
+  ESTRUCTURA_APPLE_2026_10: false,
+}));
+vi.mock("@/lib/marcacion/apple-2026-10", async (original) => ({
+  ...(await original<typeof import("@/lib/marcacion/apple-2026-10")>()),
+  MARCACION_APPLE_2026_10: false,
+}));
 vi.mock("@/components/SearchBar", () => ({
   default: () => <div data-testid="lupa" />,
   SEARCH_ROLES: ["admin", "secretaria", "vendedor", "bodega", "contabilidad"],
