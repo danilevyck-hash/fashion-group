@@ -43,7 +43,7 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, within } from "@testing-library/react";
 import GastoTable from "@/app/caja/components/GastoTable";
 import type { CajaGasto } from "@/app/caja/components/types";
 import DetalleEgresos from "@/app/gastos-contabilidad/components/DetalleEgresos";
@@ -329,6 +329,33 @@ describe("🔴 Boston › Préstamos: el buscador y las tres tarjetas", () => {
     teclearEn(PLACEHOLDER_COLABORADOR, "zzzz");
     expect(screen.getByText(new RegExp(VACIO_BUSQUEDA))).toBeTruthy();
     expect(screen.queryByText(/No hay préstamos activos/)).toBeNull();
+  });
+});
+
+// 🔴 Daniel, 2-oct-2026: quitar la línea de resumen de Boston › Préstamos.
+// La fila es nombre y saldo; el detalle se abre al tocar (el rol de Boston no
+// entra a /prestamos, así que no puede desaparecer).
+describe("🔴 Boston › Préstamos: sin la línea de resumen en la fila", () => {
+  it("la fila no dice «Prestado · pagado · descuenta · último mov.»", async () => {
+    await montarBoston();
+    const filas = screen.getAllByTestId("prestamo-boston");
+    expect(filas.length).toBe(3);
+    for (const f of filas) {
+      const fila = f.querySelector("summary")!.textContent!;
+      expect(fila).not.toMatch(/prestado|pagado|descuenta|último mov|por quincena/i);
+    }
+    expect(document.body.textContent).not.toMatch(/último mov\.|descuenta \$/);
+  });
+
+  it("el detalle sigue ahí, en lo que se abre al tocar la persona", async () => {
+    await montarBoston();
+    const andrea = screen.getAllByTestId("prestamo-boston")[0];
+    expect(andrea.tagName).toBe("DETAILS");
+    const detalle = within(andrea).getByTestId("detalle-prestamo-boston").textContent!;
+    expect(detalle).toContain("Prestado$400.00");
+    expect(detalle).toContain("Pagado$200.00");
+    expect(detalle).toContain("Cuota quincenal$50.00");
+    expect(detalle).toContain("Último movimiento");
   });
 });
 

@@ -141,7 +141,13 @@ export default function PrestamosBoston() {
 
       <div className="space-y-2">
         {visibles.map((e) => (
-          <div key={e.id} className="rounded-xl border border-gray-200 bg-white p-3">
+          // 🔴 Daniel, 2-oct-2026: quitar la línea de resumen de Boston › Préstamos.
+          // La fila queda en nombre y saldo; prestado, pagado, cuota y último
+          // movimiento se abren al tocar la persona. NO se borran: el rol de
+          // Boston no entra a /prestamos, así que este es el único lugar donde
+          // los ve. `<details>` nativo: igual en el celular y en la computadora.
+          <details key={e.id} data-testid="prestamo-boston" className="group rounded-xl border border-gray-200 bg-white p-3">
+            <summary className="list-none cursor-pointer [&::-webkit-details-marker]:hidden">
             <div className="flex items-baseline justify-between gap-2">
               <span className="min-w-0">
                 <span className="block font-medium text-gray-900 truncate">{e.nombre}</span>
@@ -168,12 +174,27 @@ export default function PrestamosBoston() {
               </span>
             )}
 
-            <p className="mt-1 text-xs text-gray-500 tabular-nums">
-              Prestado ${fmt(e.prestado)} · pagado ${fmt(e.pagado)}
-              {e.deduccionQuincenal > 0 && ` · descuenta $${fmt(e.deduccionQuincenal)} por quincena`}
-              {e.ultimoMovimiento && ` · último mov. ${fmtDate(e.ultimoMovimiento)}`}
-            </p>
-          </div>
+            </summary>
+
+            <dl data-testid="detalle-prestamo-boston" className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs tabular-nums">
+              <dt className="text-gray-500">Prestado</dt>
+              <dd className="text-right text-gray-900">${fmt(e.prestado)}</dd>
+              <dt className="text-gray-500">Pagado</dt>
+              <dd className="text-right text-gray-900">${fmt(e.pagado)}</dd>
+              {e.deduccionQuincenal > 0 && (
+                <>
+                  <dt className="text-gray-500">Cuota quincenal</dt>
+                  <dd className="text-right text-gray-900">${fmt(e.deduccionQuincenal)}</dd>
+                </>
+              )}
+              {e.ultimoMovimiento && (
+                <>
+                  <dt className="text-gray-500">Último movimiento</dt>
+                  <dd className="text-right text-gray-900">{fmtDate(e.ultimoMovimiento)}</dd>
+                </>
+              )}
+            </dl>
+          </details>
         ))}
         {/* 🔴 Con la búsqueda sin resultados ya se dijo arriba: repetir «no hay
             préstamos activos» diría algo que no es cierto. */}

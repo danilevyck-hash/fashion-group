@@ -76,8 +76,13 @@ describe("GET /api/boston/prestamos", () => {
     expect(k.deduccionDano).toBe(5);
     expect(j.totales.saldo).toBe(270);
   });
-  it("la pantalla dibuja esa cuota como «descuenta $X por quincena»", () => {
+  // ⚠️ Daniel, 2-oct-2026: quitar la línea de resumen de Boston › Préstamos.
+  // Antes exigía «descuenta $X por quincena» en la fila; ahora la cuota (esa
+  // misma suma) va en el detalle que se abre al tocar la persona.
+  it("la pantalla dibuja esa cuota como «Cuota quincenal» en el detalle", () => {
     const src = readFileSync(join(process.cwd(), "src", "app", "boston", "tabs", "PrestamosBoston.tsx"), "utf8");
-    expect(src).toContain("descuenta $${fmt(e.deduccionQuincenal)} por quincena");
+    expect(src).toContain("Cuota quincenal");
+    expect(src).toContain("${fmt(e.deduccionQuincenal)}");
+    expect(src).not.toContain("por quincena`");
   });
 });
