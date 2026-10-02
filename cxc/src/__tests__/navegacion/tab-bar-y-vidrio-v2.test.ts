@@ -4,7 +4,7 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
-import { PESTANAS_DE_MODULO, TAB_BAR_2026_10, pestanasDelRol } from "@/lib/navegacion/tab-bar";
+import { PESTANAS_DE_MODULO, TAB_BAR_2026_10, ordenPorUso, pestanasDelRol, ventanaDeLaSemana } from "@/lib/navegacion/tab-bar";
 import { gruposDelCajon } from "@/lib/navegacion/cajon-por-grupos";
 import { VIDRIO_V2_2026_10 } from "@/lib/ui/vidrio";
 
@@ -28,9 +28,34 @@ describe("barra de pestañas", () => {
     expect(pestanasDelRol("")).toEqual([]);
   });
 
-  it("el orden sale del uso medido", () => {
-    expect(pestanasDelRol("admin").map((m) => m.key)).toEqual(["asistencia", "catalogos", "multifashion", "ventas"]);
+  it("sin datos de la persona, el orden de su rol", () => {
+    expect(pestanasDelRol("admin").map((m) => m.key)).toEqual(["asistencia", "catalogos", "multifashion"]);
     expect(pestanasDelRol("bodega").map((m) => m.key)[0]).toBe("guias");
+  });
+
+  it("con datos, manda la persona; lo que no está en su menú no entra", () => {
+    expect(pestanasDelRol("vendedor", null, ["usuarios", "guias", "catalogos"]).map((m) => m.key)).toEqual(["guias", "catalogos", "referencia"]);
+  });
+
+  it("la casa del rol es «Inicio» y no se repite como pestaña", () => {
+    expect(pestanasDelRol("admin", null, ["ventas"], "/ventas").map((m) => m.key)).not.toContain("ventas");
+  });
+
+  it("primero el celular, después el total", () => {
+    expect(ordenPorUso([
+      { modulo: "guias", aparato: "computadora", visitas: 40 },
+      { modulo: "catalogos", aparato: "celular", visitas: 3 },
+      { modulo: "guias", aparato: "celular", visitas: 1 },
+      { modulo: "caja", aparato: "computadora", visitas: 2 },
+    ])).toEqual(["catalogos", "guias", "caja"]);
+  });
+
+  it("la ventana es fija toda la semana (lunes a domingo)", () => {
+    const lunes = ventanaDeLaSemana("2026-09-28");
+    expect(lunes).toEqual({ desde: "2026-08-31", hasta: "2026-09-28" });
+    expect(ventanaDeLaSemana("2026-10-02")).toEqual(lunes);
+    expect(ventanaDeLaSemana("2026-10-04")).toEqual(lunes);
+    expect(ventanaDeLaSemana("2026-10-05").hasta).toBe("2026-10-05");
   });
 
   it("se esconde con una acción fija abajo (CSS)", () => {

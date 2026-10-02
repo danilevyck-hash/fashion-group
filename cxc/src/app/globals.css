@@ -396,33 +396,55 @@ input, button, select, textarea {
   }
 }
 
-/* 🔴 VIDRIO v2 (2-oct-2026, `VIDRIO_V2_2026_10` en src/lib/ui/vidrio.ts).
-   Daniel: «esto no es liquid glass como Apple». Más cerca del de iOS 26 sin
-   tocar ninguna pieza: solo la receta, prendida desde <html data-vidrio="v2">.
-   - fondo 40 % (era 55) con desenfoque 36 px y saturación 200 %;
-   - `contrast(.72)` en lo de atrás = la «capa interna sutil»: sube los negros
-     de una foto oscura y el texto negro no baja de 4,5:1 (medido);
-   - filo de vidrio: brillo blanco/60 arriba que se desvanece hacia abajo;
-   - sombra amplia con un leve tinte azul pizarra; radio 20 px. */
+/* 🔴 VIDRIO v2 = EL LIQUID GLASS DE APPLE (2-oct-2026, `VIDRIO_V2_2026_10`).
+   Daniel: «quiero liquid glass como es». Lo que tiene el material real
+   (WWDC25 «Meet Liquid Glass» y las HIG) y cómo se aproxima aquí:
+   1. Variante «regular»: lo de atrás se RECONOCE, apenas difuso → blanco 52 %,
+      desenfoque corto (12 px) y saturación 180 %: color vivo, nunca gris.
+   2. Se adapta a lo de atrás → `brightness(1.06)` levanta un poco lo oscuro y
+      la sombra es suave; CSS no puede leer lo de atrás, así que el blanco ya
+      deja el texto negro sobre 4,5:1 encima de una foto negra (medido).
+   3. Brillo especular que sigue la forma → filo blanco arriba e izquierda, más
+      tenue abajo y a la derecha.
+   4. Lente en los bordes (concentra la luz) → un halo blanco interno de 8 px
+      que aclara solo el borde; sin refracción real: Safari no deja deformar
+      lo de atrás (`backdrop-filter: url()` es solo de Chrome).
+   5. Sombra suave y amplia, esquinas continuas (`corner-shape: squircle`
+      donde el navegador la conoce) y texto negro, el «label» primario.
+   Con «reducir transparencia» o «más contraste» del teléfono, blanco sólido. */
 html[data-vidrio="v2"] .vidrio {
-  background-color: rgb(255 255 255 / 0.4);
-  background-image: linear-gradient(to bottom, rgb(255 255 255 / 0.22), rgb(255 255 255 / 0) 45%);
-  -webkit-backdrop-filter: blur(36px) saturate(200%) contrast(0.72);
-  backdrop-filter: blur(36px) saturate(200%) contrast(0.72);
+  background-color: rgb(255 255 255 / 0.52);
+  background-image: none;
+  -webkit-backdrop-filter: blur(12px) saturate(180%) brightness(1.06);
+  backdrop-filter: blur(12px) saturate(180%) brightness(1.06);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.6),
-    inset 1px 0 0 rgb(255 255 255 / 0.18),
-    inset -1px 0 0 rgb(255 255 255 / 0.18),
-    inset 0 -1px 0 rgb(255 255 255 / 0.06),
-    0 0 0 0.5px rgb(15 23 42 / 0.10),
-    0 24px 56px -12px rgb(15 23 42 / 0.30),
-    0 4px 12px rgb(15 23 42 / 0.08);
+    inset 1px 1px 0 rgb(255 255 255 / 0.9),
+    inset -1px -1px 0 rgb(255 255 255 / 0.35),
+    inset 0 0 8px 1px rgb(255 255 255 / 0.45),
+    0 0 0 0.5px rgb(0 0 0 / 0.06),
+    0 10px 30px -6px rgb(0 0 0 / 0.16),
+    0 2px 6px rgb(0 0 0 / 0.05);
+  color: rgb(0 0 0);
 }
 html[data-vidrio="v2"] .vidrio.rounded-2xl {
-  border-radius: 20px;
+  border-radius: 22px;
+}
+@supports (corner-shape: squircle) {
+  html[data-vidrio="v2"] .vidrio.rounded-2xl {
+    corner-shape: squircle;
+    border-radius: 32px;
+  }
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   html[data-vidrio="v2"] .vidrio {
     background-color: rgb(255 255 255 / 0.95);
+  }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  html[data-vidrio="v2"] .vidrio {
+    background-color: rgb(255 255 255);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 0.6), 0 10px 30px -6px rgb(0 0 0 / 0.16);
   }
 }

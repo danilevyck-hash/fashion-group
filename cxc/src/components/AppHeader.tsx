@@ -44,7 +44,7 @@ import {
 } from "@/lib/navegacion/barra-celular";
 import { useColchonDelFlotante } from "@/lib/navegacion/useColchonDelFlotante";
 import { ALTO_TAB_BAR, MARGEN_TAB_BAR, TAB_BAR_2026_10, pestanasDelRol, rotuloDePestana } from "@/lib/navegacion/tab-bar";
-import { MoreHorizontal } from "lucide-react";
+import { House, MoreHorizontal } from "lucide-react";
 import { useBarraCelular } from "@/lib/navegacion/useBarraCelular";
 import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
 import type { ModuleGroup } from "@/lib/modules";
@@ -205,8 +205,28 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
   // Montado SOLO como menú (el catálogo), sin ningún módulo que ofrecer no se
   // dibuja: un botón que abre una lista vacía no hace nada.
   // 🔴 La barra de pestañas (`TAB_BAR_2026_10`) reemplaza al botón redondo
-  // donde el rol tiene más de un módulo; los módulos salen del MISMO menú.
-  const pestanas = TAB_BAR_2026_10 && !soloMarca ? pestanasDelRol(userRole, fgModules) : [];
+  // donde el rol tiene más de un módulo: Inicio + 3 módulos de la PERSONA +
+  // «Más». Los módulos salen del MISMO menú.
+  // El orden de ESTA persona lo da el servidor (fijo por semana); mientras
+  // llega, o sin datos, manda el de su rol. Una vez por sesión.
+  const [ordenPersona, setOrdenPersona] = useState<string[]>([]);
+  useEffect(() => {
+    if (!TAB_BAR_2026_10 || !userRole) return;
+    try {
+      const guardado = sessionStorage.getItem("fg_orden_pestanas");
+      if (guardado) { setOrdenPersona(JSON.parse(guardado)); return; }
+    } catch { /* sin memoria: se pide */ }
+    fetch("/api/visitas/mis-modulos")
+      .then(r => (r.ok ? r.json() : { orden: [] }))
+      .then((d: { orden?: string[] }) => {
+        const orden = Array.isArray(d.orden) ? d.orden : [];
+        setOrdenPersona(orden);
+        try { sessionStorage.setItem("fg_orden_pestanas", JSON.stringify(orden)); } catch { /* sin memoria */ }
+      })
+      .catch(() => { /* falla abierta: orden del rol */ });
+  }, [userRole]);
+  const pestanas = TAB_BAR_2026_10 && !soloMarca ? pestanasDelRol(userRole, fgModules, ordenPersona, casa) : [];
+  const enInicio = pathname === "/home" || yaEstaEnSuCasa(pathname, casa);
   const hayTabBar = pestanas.length > 0;
   const hayFlotante = SIN_BARRA_ARRIBA && !soloMarca && !hayTabBar && (!soloMenuDelCelular || visibleNav.length > 0);
   useColchonDelFlotante(hayFlotante);
@@ -574,7 +594,8 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
       )}
 
       {/* ── LA BARRA DE PESTAÑAS DE iOS (`TAB_BAR_2026_10`) ──
-          4 módulos medidos del rol + «Más», que abre el MISMO menú entero.
+          Inicio + los 3 módulos que más usa la persona + «Más», que abre el MISMO
+          menú entero. No cambia de pantalla en pantalla, como en iOS.
           Cápsula de vidrio sobre la franja de iOS; z-30 como el botón que
           reemplaza. Se esconde sola con una acción fija abajo (globals.css). */}
       {hayTabBar && (
@@ -584,6 +605,14 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
           className="vidrio fixed z-30 flex items-stretch rounded-full px-1 sm:hidden"
           style={{ left: 12, right: 12, height: ALTO_TAB_BAR, bottom: `max(${MARGEN_TAB_BAR}px, env(safe-area-inset-bottom))` }}
         >
+          <button
+            onClick={() => router.push(casa)}
+            aria-current={enInicio && !drawerOpen ? "page" : undefined}
+            className={`my-1 flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-[10px] font-medium transition active:scale-[0.97] ${enInicio && !drawerOpen ? "bg-black/[0.06] text-gray-950" : "text-gray-600"}`}
+          >
+            <House size={22} strokeWidth={enInicio && !drawerOpen ? 2 : 1.6} />
+            <span>Inicio</span>
+          </button>
           {pestanas.map(m => {
             const Icon = m.icon;
             const aqui = m.key === moduloAqui && !drawerOpen;
