@@ -49,3 +49,15 @@ export const ETIQUETAS_2026_10 = true;
 /** 🔴 Nueva guía estilo Apple (tarjetas y barra fija). `false` = la de una tabla.
  *  Daniel aprobó las capturas reales el 1-oct-2026: "aprobado". */
 export const GUIA_APPLE_2026_10 = true;
+
+/** 🔴 DETALLE DE GUÍA ESTILO APPLE (2-oct-2026, propuesta; Daniel: «mira que hay
+ *  mucho espacio vacío, ¿qué opinas?»). Solo `/guias/[id]` en modo lectura:
+ *  · el MISMO marco que Nueva guía Apple, alineado a la izquierda;
+ *  · la tarjeta de arriba compacta: datos en una línea y las acciones a la derecha;
+ *  · cada envío en UNA fila en la computadora (cliente · línea gris · bultos
+ *    angosto o «🔒 9 bultos» · N° del transportista de 160–200 px); en el
+ *    celular se apila.
+ *  🔴 Solo cambia la pantalla: mismas cajas, mismos setters, el PUT del
+ *  despacho es idéntico (candado `guias-detalle-apple.test.tsx`).
+ *  `false` = la pantalla de hoy. */
+export const GUIA_DETALLE_APPLE_2026_10 = false;

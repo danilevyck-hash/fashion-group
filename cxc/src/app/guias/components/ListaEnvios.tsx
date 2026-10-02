@@ -45,12 +45,14 @@ import ResumenEnvio from "./ResumenEnvio";
 import { numeroTranspImpreso } from "@/lib/guias/modo-despacho";
 import { textoCorreccionEnVivo, textoCorreccionGuardada } from "@/lib/guias/bultos-correccion";
 import { bultosBloqueadosPorEtiquetas } from "@/lib/guias/etiquetas-por-envio";
+import { GUIA_DETALLE_APPLE_2026_10 } from "@/lib/guias/guias-2026-10";
+import ListaEnviosApple from "./ListaEnviosApple";
 
 /** Campo de texto: 44 px con el dedo, denso solo cuando hay mouse. */
 const CAMPO =
   "w-full border border-gray-200 rounded-lg px-3 py-2.5 text-base md:text-sm outline-none focus:border-black transition min-h-[44px]";
 
-interface ListaEnviosProps {
+export interface ListaEnviosProps {
   items: GuiaItem[];
   /** El N° de la cabecera: una línea sin el suyo hereda ése, igual que el papel. */
   numeroGuiaCabecera?: string | null;
@@ -88,6 +90,21 @@ export default function ListaEnvios({
   setBultos,
   rol,
 }: ListaEnviosProps) {
+  if (GUIA_DETALLE_APPLE_2026_10) {
+    return (
+      <ListaEnviosApple
+        items={items}
+        numeroGuiaCabecera={numeroGuiaCabecera}
+        numerosTransp={numerosTransp}
+        setNumeroTransp={setNumeroTransp}
+        editable={editable}
+        externo={externo}
+        bultosPorLinea={bultosPorLinea}
+        setBultos={setBultos}
+        rol={rol}
+      />
+    );
+  }
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4">
       {/* "de esta guía" se fue: se está DENTRO de la guía. */}

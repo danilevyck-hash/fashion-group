@@ -112,3 +112,24 @@ export function totalAPagarMultifashion(
   }
   return { comisiones, bonos, total: comisiones + bonos };
 }
+
+/**
+ * 🔴 EL TOTAL DE CADA PERSONA, EN SU FILA (2-oct-2026). Daniel: *«¿cómo harías
+ * aquí para que se vea el total de la persona?»*.
+ *
+ * Comisiones › Multifashion, con el mes CERRADO: dos columnas al final, «Bono»
+ * y «Total a pagar» (comisión + bono); el chip deja de decir el monto (un ícono
+ * chico, para no decir el número dos veces) y el pie pone comisiones y bonos
+ * bajo sus columnas. Con el mes abierto, nada de eso.
+ * 🔴 Solo cambia la pantalla: el número sale de `totalDeFila`, el MISMO que usa
+ * el Excel. `false` = la pantalla de hoy.
+ */
+export const MULTIFASHION_TOTAL_PERSONA_2026_10 = false;
+
+/** Lo que se le paga a UNA persona: su comisión + su bono. Pantalla y Excel. */
+export function totalDeFila(
+  v: { nombre: string; manager: boolean; comision: number | null },
+  resp: BonosMultifashion | null | undefined,
+): number {
+  return (v.comision ?? 0) + bonoDeFila(v, resp);
+}

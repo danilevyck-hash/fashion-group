@@ -16,7 +16,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { BonosMultifashion, VendedoraDetalle } from "@/components/ventas/types";
-import { bonoDeFila, totalAPagarMultifashion } from "./bono-linea";
+import { bonoDeFila, totalAPagarMultifashion, totalDeFila } from "./bono-linea";
 import {
   MONEY_FMT, PCT_FMT, buildReportSheet, exportFilename, filtroDesdeA1, workbookFromSheets,
 } from "@/lib/excel-export";
@@ -61,7 +61,7 @@ export function filasExcelVendedoras(
       variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct),
       v.comision,
       bono,
-      (v.comision ?? 0) + bono,
+      totalDeFila(v, bonos),
     ];
   });
 }

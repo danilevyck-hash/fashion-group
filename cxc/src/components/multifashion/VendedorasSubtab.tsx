@@ -53,7 +53,14 @@ import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { variacionPctDesdeRatio } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
 import { BonosSection, ChipBono } from "./BonosSection";
-import { chipDeBono, totalAPagarMultifashion, type ChipDeBono } from "@/lib/multifashion/bono-linea";
+import {
+  MULTIFASHION_TOTAL_PERSONA_2026_10,
+  bonoDeFila,
+  chipDeBono,
+  totalAPagarMultifashion,
+  totalDeFila,
+  type ChipDeBono,
+} from "@/lib/multifashion/bono-linea";
 import { MetasSubtab } from "./MetasSubtab";
 import { MetasEnVendedoras } from "./MetasEnVendedoras";
 import { nombreEnPantalla } from "@/lib/multifashion/nombres";
@@ -258,6 +265,11 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
   // el bono del mes CERRADO es un chip junto al nombre (tabla, tarjetas y
   // celular). En un rango no hay bono: la respuesta vieja no se usa.
   const bonosDelChip = esRango || conBono ? null : bonos;
+  // 🔴 2-oct-2026 (`MULTIFASHION_TOTAL_PERSONA_2026_10`): en Comisiones ›
+  // Multifashion, con el mes CERRADO, «Bono» y «Total a pagar» por persona.
+  const totalPersona =
+    MULTIFASHION_TOTAL_PERSONA_2026_10 && conTotalAPagar === true &&
+    !!bonosDelChip && !bonosDelChip.sin_data && bonosDelChip.es_elegible;
   const esUnMes = rpcPeriodo === "mes";
   const excelDisponible = RETAIL_AL_FRENTE && esUnMes && corte != null && mesCerrado(year, rpcMes, corte);
   const periodoExcel = etiquetaPeriodo({ tipo: "mes", anio: year, mes: rpcMes });
@@ -379,6 +391,12 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
                     {conBono && (
                       <th className="border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Bono</th>
                     )}
+                    {totalPersona && (
+                      <>
+                        <th className="border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Bono</th>
+                        <th className="border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Total a pagar</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -391,9 +409,13 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
                       conBono={conBono}
                       pendiente={bonoPendiente}
                       chip={chipDeBono(v, bonosDelChip)}
+                      totalPersona={totalPersona ? bonosDelChip : undefined}
                     />
                   ))}
                 </tbody>
+                {totalPersona && (
+                  <PieTotalPersona pagar={totalAPagarMultifashion(sortedVendedoras, bonosDelChip)} />
+                )}
               </table>
             </div>
           </Card>
@@ -428,6 +450,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
                 pendiente={bonoPendiente}
                 chip={chipDeBono(v, bonosDelChip)}
                 rotuloDelta={rotuloDelta.corto}
+                totalPersona={totalPersona ? bonosDelChip : undefined}
               />
             ))}
           </div>
@@ -442,7 +465,10 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
               bonos del mes cerrado (`totalAPagarMultifashion`, la misma del
               Excel). */}
           {conTotalAPagar && sortedVendedoras.length > 0 && (
-            <BarraTotalMultifashion pagar={totalAPagarMultifashion(sortedVendedoras, bonosDelChip)} />
+            <BarraTotalMultifashion
+              pagar={totalAPagarMultifashion(sortedVendedoras, bonosDelChip)}
+              desgloseEnLaTabla={totalPersona}
+            />
           )}
 
         </div>
@@ -480,11 +506,15 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
  * las comisiones y no se dibuja desglose (sería el mismo número dos veces).
  * 🔴 Solo Multifashion: nunca se suma con el total del grupo.
  */
-export function BarraTotalMultifashion({ pagar }: { pagar: { comisiones: number; bonos: number; total: number } }) {
+export function BarraTotalMultifashion({ pagar, desgloseEnLaTabla }: {
+  pagar: { comisiones: number; bonos: number; total: number };
+  /** Con la tabla de la computadora, el desglose va bajo sus columnas (`PieTotalPersona`). */
+  desgloseEnLaTabla?: boolean;
+}) {
   return (
     <div className="mt-2">
       {pagar.bonos > 0 && (
-        <div data-desglose-multifashion className="space-y-0.5 px-3 pb-1 text-xs text-gray-500">
+        <div data-desglose-multifashion className={cn("space-y-0.5 px-3 pb-1 text-xs text-gray-500", desgloseEnLaTabla && "lg:hidden")}>
           <div className="flex justify-between"><span>Comisiones</span><span className="font-mono tabular-nums">{fmtMoney(pagar.comisiones)}</span></div>
           <div className="flex justify-between"><span>Bonos</span><span className="font-mono tabular-nums">{fmtMoney(pagar.bonos)}</span></div>
         </div>
@@ -523,11 +553,33 @@ function rowHighlight(v: VendedoraDetalle, badge?: BonoBadge): boolean {
 // El payload no trae las ventas del período previo, así que la base se despeja
 // del propio ratio (prev = ventas / (1 + pct)) y se le aplica la MISMA regla.
 // Una vendedora que el año pasado vendió $8 en el mes no genera un +40000%.
+/**
+ * 🔴 EL PIE DE LA TABLA CON EL TOTAL POR PERSONA (2-oct-2026): comisiones,
+ * bonos y total, cada uno bajo SU columna. Mismo `totalAPagarMultifashion` de
+ * la barra negra y del Excel.
+ */
+function PieTotalPersona({ pagar }: { pagar: { comisiones: number; bonos: number; total: number } }) {
+  const celda = "px-3.5 py-2.5 text-right font-mono text-sm tabular-nums";
+  return (
+    <tfoot data-pie-total-persona>
+      <tr className="bg-gray-50">
+        <td colSpan={6} className="px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Total</td>
+        <td className={cn(celda, "text-gray-700")}>{fmtMoney(pagar.comisiones)}</td>
+        <td className={cn(celda, "text-gray-700")}>{fmtMoney(pagar.bonos)}</td>
+        <td className={cn(celda, "font-semibold text-gray-950")}>{fmtMoney(pagar.total)}</td>
+      </tr>
+    </tfoot>
+  );
+}
+
 function VendedoraRow({
-  v, rank, badge, conBono, pendiente, chip,
+  v, rank, badge, conBono, pendiente, chip, totalPersona,
 }: {
   v: VendedoraDetalle; rank: number; badge?: BonoBadge; conBono: boolean; pendiente: boolean; chip: ChipDeBono | null;
+  /** Los bonos del mes cerrado cuando van «Bono» y «Total a pagar» en la fila. */
+  totalPersona?: BonosMultifashion | null;
 }) {
+  const bonoFila = totalPersona ? bonoDeFila(v, totalPersona) : 0;
   const dv = formatDeltaRatio(variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct));
   const bono = textoBono(v, badge, pendiente);
   // «Sheynee $11,674.57 · Redes $375.30» — solo en la fila de quien vendió por
@@ -545,7 +597,7 @@ function VendedoraRow({
           {v.manager && (
             <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-xs font-medium text-teal-700">Gerente</span>
           )}
-          <ChipBono chip={chip} />
+          <ChipBono chip={chip} sinMonto={!!totalPersona} />
         </div>
         {desglose && (
           <p data-desglose-canal className="mt-0.5 font-mono text-xs text-gray-500 tabular-nums">{desglose}</p>
@@ -558,6 +610,16 @@ function VendedoraRow({
         {dv.arrow && <span className="mr-1">{dv.arrow}</span>}{dv.displayValue}
       </td>
       <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-gray-950 tabular-nums">${v.comision.toFixed(2)}</td>
+      {totalPersona && (
+        <>
+          <td data-celda="bono" className={cn("border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm tabular-nums", bonoFila > 0 ? "text-gray-950" : "text-gray-400")}>
+            {bonoFila > 0 ? fmtMoney(bonoFila) : "—"}
+          </td>
+          <td data-celda="total-a-pagar" className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm font-semibold text-gray-950 tabular-nums">
+            {fmtMoney(totalDeFila(v, totalPersona))}
+          </td>
+        </>
+      )}
       {conBono && (
         <td className={cn(
           "border-b border-gray-200 px-3.5 py-3 text-right text-sm tabular-nums",
@@ -571,10 +633,12 @@ function VendedoraRow({
 }
 
 function VendedoraCard({
-  v, rank, badge, conBono, pendiente, chip, rotuloDelta,
+  v, rank, badge, conBono, pendiente, chip, rotuloDelta, totalPersona,
 }: {
   v: VendedoraDetalle; rank: number; badge?: BonoBadge; conBono: boolean; pendiente: boolean; chip: ChipDeBono | null; rotuloDelta: string;
+  totalPersona?: BonosMultifashion | null;
 }) {
+  const bonoFila = totalPersona ? bonoDeFila(v, totalPersona) : 0;
   const dv = formatDeltaRatio(variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct));
   const bono = textoBono(v, badge, pendiente);
   const desglose = desgloseCanales(v.ventas, v.por_canal, v.nombre);
@@ -589,7 +653,7 @@ function VendedoraCard({
         {v.manager && (
           <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-xs font-medium text-teal-700">Gerente</span>
         )}
-        <ChipBono chip={chip} />
+        <ChipBono chip={chip} sinMonto={!!totalPersona} />
       </div>
       <div className="mt-2 flex items-baseline gap-3">
         <span className="font-mono text-base font-medium tabular-nums text-gray-950">{fmtMoneyCompact(v.ventas)}</span>
@@ -607,6 +671,17 @@ function VendedoraCard({
         <span className="font-mono tabular-nums">${v.comision.toFixed(2)}</span> comisión
         {conBono && <> · bono <span className={cn(bono === BONO_AL_CIERRE || bono === "—" ? "text-gray-400" : "font-mono font-semibold text-amber-700")}>{bono}</span></>}
       </div>
+      {totalPersona && (
+        <div data-total-persona className="mt-1.5 flex items-baseline justify-between gap-3 text-sm">
+          <span className="text-xs text-gray-500">
+            Bono <span className="font-mono tabular-nums">{bonoFila > 0 ? fmtMoney(bonoFila) : "—"}</span>
+          </span>
+          <span className="text-xs text-gray-500">
+            Total a pagar{" "}
+            <span className="font-mono text-sm font-semibold tabular-nums text-gray-950">{fmtMoney(totalDeFila(v, totalPersona))}</span>
+          </span>
+        </div>
+      )}
     </div>
   );
 }

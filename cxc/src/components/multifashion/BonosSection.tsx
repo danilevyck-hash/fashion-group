@@ -175,10 +175,28 @@ function GerenteLinea({ resp }: { resp: BonosMultifashion }) {
  * el trofeo para la vendedora que ganó, verde con el visto para la gerente. Lo
  * usan la tabla, las tarjetas y el celular del módulo.
  */
-export function ChipBono({ chip }: { chip: ChipDeBono | null }) {
+export function ChipBono({ chip, sinMonto }: { chip: ChipDeBono | null; sinMonto?: boolean }) {
   if (!chip) return null;
   const gerente = chip.tipo === "gerente";
   const Icono = gerente ? Check : Award;
+  // 🔴 2-oct-2026 (`MULTIFASHION_TOTAL_PERSONA_2026_10`): con la columna «Bono»
+  // en la fila, el chip es solo el ícono: el monto no se dice dos veces.
+  if (sinMonto) {
+    const nombre = gerente ? "Bono gerente" : "Bono";
+    return (
+      <span
+        data-chip-bono={chip.tipo}
+        title={nombre}
+        aria-label={nombre}
+        className={cn(
+          "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full",
+          gerente ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800",
+        )}
+      >
+        <Icono className="h-3 w-3" aria-hidden />
+      </span>
+    );
+  }
   return (
     <span
       data-chip-bono={chip.tipo}

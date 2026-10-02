@@ -67,6 +67,7 @@ import {
 } from "@/lib/guias/modo-despacho";
 import { abrirEnEdicion, urlDeLaGuia } from "@/lib/guias/abrir-en-edicion";
 import { textoFaltantesDespachada } from "@/lib/guias/faltantes-despacho";
+import { GUIA_DETALLE_APPLE_2026_10 } from "@/lib/guias/guias-2026-10";
 // ⚠️ `papel-de-la-guia` arrastra jsPDF (~148 kB) y se pide con `await import`,
 // nunca de arriba: estático acá la carga inicial de esta pantalla pasaba de 204
 // kB a 351 kB, y es la que bodega abre desde el celular. Se PRECARGA al montar
@@ -209,6 +210,9 @@ export default function GuiaPage() {
   const g = s.guia;
   const items = g?.guia_items || [];
   const titulo = g ? `Guía ${fmtGuia(g.numero)}` : "Guía";
+  const totalBultos = items.reduce((a, i) => a + (i.bultos || 0), 0);
+  /** Detalle de guía estilo Apple (2-oct-2026); `false` = la pantalla de hoy. */
+  const apple = GUIA_DETALLE_APPLE_2026_10;
 
   /**
    * 🔴 A UNA GUÍA DESPACHADA **TAMBIÉN** SE ENTRA Y SE ABRE EL FORMULARIO — con
@@ -363,7 +367,11 @@ export default function GuiaPage() {
           <div className="max-w-4xl mx-auto px-4 sm:px-6 pb-6">{bloqueDespacho}</div>
         </>
       ) : (
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
+        // 🔴 2-oct-2026 (`GUIA_DETALLE_APPLE_2026_10`): el MISMO marco que Nueva
+        // guía Apple —`max-w-6xl` y adentro 820 px a la IZQUIERDA—: centrado
+        // dejaba un blanco grande a los costados.
+        <div className={apple ? "max-w-6xl mx-auto px-4 sm:px-6 py-6" : "max-w-4xl mx-auto px-4 sm:px-6 py-6"}>
+        <div className={apple ? "max-w-[820px]" : undefined}>
           {/* Encabezado: ‹ Atrás · Guía GT-190 */}
           <div className="flex items-center gap-3 mb-5">
             <button
@@ -373,7 +381,7 @@ export default function GuiaPage() {
             >
               ‹ Atrás
             </button>
-            <h1 className="text-lg font-semibold tracking-tight truncate">{titulo}</h1>
+            <h1 className={apple ? "text-[26px] font-semibold tracking-tight truncate" : "text-lg font-semibold tracking-tight truncate"}>{titulo}</h1>
           </div>
 
           {s.loading ? (
@@ -386,7 +394,24 @@ export default function GuiaPage() {
           ) : (
             <div className="space-y-4">
               {/* Datos de la guía */}
-              <div className="rounded-lg border border-gray-200 bg-white p-4">
+              <div
+                data-guia-datos
+                className={apple
+                  ? "rounded-lg border border-gray-200 bg-white px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+                  : "rounded-lg border border-gray-200 bg-white p-4"}
+              >
+                {apple ? (
+                  /* 🔴 2-oct-2026 (`GUIA_DETALLE_APPLE_2026_10`): los cuatro datos
+                     en UNA línea y las acciones a la derecha. */
+                  <p className="min-w-0 text-sm text-gray-700">
+                    {[
+                      fmtDate(g.fecha),
+                      g.transportista || ETIQUETA_TIPO_DESPACHO[tipoDespachoEfectivo(g)],
+                      `${items.length} ${items.length === 1 ? "envío" : "envíos"}`,
+                      `${totalBultos} ${totalBultos === 1 ? "bulto" : "bultos"}`,
+                    ].join(" · ")}
+                  </p>
+                ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <Dato etiqueta="Fecha" valor={fmtDate(g.fecha)} />
                   <Dato etiqueta="Transportista" valor={g.transportista || ""} />
@@ -395,8 +420,9 @@ export default function GuiaPage() {
                       corrige acá mismo y el total tiene que moverse con ellos.
                       (`guia_transporte` no tiene columna de total; el listado la
                       calcula igual.) */}
-                  <Dato etiqueta="Bultos" valor={String(items.reduce((a, i) => a + (i.bultos || 0), 0))} />
+                  <Dato etiqueta="Bultos" valor={String(totalBultos)} />
                 </div>
+                )}
                 {/* 🔴 TRES BOTONES, TRES TAREAS, UN TOQUE CADA UNA.
                     · «Editar» abre el MISMO formulario del alta, acá mismo.
                     · «Imprimir» manda el papel a la impresora SIN pantalla
@@ -404,7 +430,7 @@ export default function GuiaPage() {
                       buscar otro «Imprimir»).
                     · «Compartir» abre la hoja del celular con el PDF.
                     Daniel, puntos 10 y 11. */}
-                <div className="mt-3 flex flex-wrap items-center gap-2">
+                <div className={apple ? "flex flex-wrap items-center gap-2 sm:shrink-0" : "mt-3 flex flex-wrap items-center gap-2"}>
                   {puedeEditar && (
                     <button
                       type="button"
@@ -568,6 +594,7 @@ export default function GuiaPage() {
               {bloqueDespacho}
             </div>
           )}
+        </div>
         </div>
       )}
       <Toast message={s.toast} />
