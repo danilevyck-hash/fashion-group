@@ -45,6 +45,8 @@ import { useColchonDelFlotante } from "@/lib/navegacion/useColchonDelFlotante";
 import { useBarraCelular } from "@/lib/navegacion/useBarraCelular";
 import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
 import type { ModuleGroup } from "@/lib/modules";
+import { ESTRUCTURA_APPLE_2026_10 } from "@/lib/navegacion/estructura-2026-10";
+import MenuDelUsuario from "@/components/estructura/MenuDelUsuario";
 
 // Cómo se llama cada rol: UN solo lugar, `lib/roles-etiquetas.ts` (11-sep-2026).
 
@@ -190,6 +192,34 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
   const moduleColor = getModuleColor(pathname);
   const currentNav = ALL_MODULES.find(m => moduleColor && pathname.startsWith(m.href));
 
+  // 🔴 La dirección del módulo la dice `modules.ts`, no el primer tramo
+  // de la URL: recortando, Plantilla Switch apuntaba a `/productos`
+  // (404) y Usuarios a `/admin` (que redirige a Cuentas por Cobrar).
+  const moduleBaseHref = hrefDelModulo(pathname);
+  const segments: { label: string; onClick?: () => void }[] = [
+    ...(enSuCasa ? [] : [{ label: "Inicio", onClick: () => router.push(casa) }]),
+    ...(grupo ? [{ label: grupo.label, onClick: () => router.push(grupo.href) }] : []),
+    { label: module, onClick: () => router.push(moduleBaseHref) },
+    ...(breadcrumbs ?? []).map(b => ({ label: b.label, onClick: b.onClick })),
+  ];
+  const lastIndex = segments.length - 1;
+  const dibujarSegmentos = () => segments.map((seg, i) => {
+    const isLast = i === lastIndex;
+    return (
+      <span key={i} className="flex items-center gap-1">
+        {i > 0 && <span>›</span>}
+        {isLast || !seg.onClick ? (
+          <span className="text-gray-600 font-medium cursor-default">{seg.label}</span>
+        ) : (
+          <button onClick={seg.onClick} className="-my-[13px] inline-flex min-h-[44px] min-w-[44px] items-center justify-center hover:text-gray-700 hover:underline transition cursor-pointer">{seg.label}</button>
+        )}
+      </span>
+    );
+  });
+  // 🔴 Estructura estilo Apple (1-oct-2026): en la computadora, una sola fila
+  // con el camino de migas, «Buscar ⌘K» y el botón del usuario.
+  const apple = ESTRUCTURA_APPLE_2026_10;
+
   return (
     <>
       <div
@@ -211,8 +241,8 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
         }}
       >
         <div className="h-11 flex items-center px-4 sm:px-6 gap-3">
-          <FGLogo variant="icon" theme="light" size={22} />
-          <div className="w-px h-4 bg-gray-200" />
+          {!apple && <FGLogo variant="icon" theme="light" size={22} />}
+          {!apple && <div className="w-px h-4 bg-gray-200" />}
           <div className="flex items-center gap-1 text-sm text-gray-500 flex-1 min-w-0">
             {currentNav && (() => {
               const Icon = currentNav.icon;
@@ -224,14 +254,20 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
                 breadcrumb, y esta barra es sticky: al hacer scroll es lo único
                 que recuerda en qué módulo estás. */}
             <span className="truncate sm:hidden">{module}</span>
+            {apple && !hideBreadcrumbBar && (
+              <nav aria-label="Camino de migas" className="hidden sm:flex min-w-0 items-center gap-1 text-sm text-gray-400" data-camino-arriba>
+                {dibujarSegmentos()}
+              </nav>
+            )}
             {/* breadcrumbs inline removidos — fuente única: breadcrumb bar inferior */}
           </div>
           <div className="hidden sm:block">
             <SearchBar compact />
           </div>
-          {!soloMarca && <div className="hidden sm:block"><NotificationCenter /></div>}
+          {!soloMarca && !apple && <div className="hidden sm:block"><NotificationCenter /></div>}
+          {apple && <div className="hidden sm:block"><MenuDelUsuario nombre={userName} rol={userRole} /></div>}
           {/* Desktop: user info */}
-          {userName && (
+          {userName && !apple && (
             <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
               <div className="text-right">
                 <div className="text-sm text-gray-700 font-medium leading-tight">{userName.split(" ")[0]}</div>
@@ -278,36 +314,11 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
         </div>
         {/* Breadcrumb bar único — desktop only, siempre visible. hideBreadcrumbBar queda como escape hatch.
             Todos los segmentos excepto el último son clicables. El último (página actual) es texto plano. */}
-        {!hideBreadcrumbBar && (() => {
-          // 🔴 La dirección del módulo la dice `modules.ts`, no el primer tramo
-          // de la URL: recortando, Plantilla Switch apuntaba a `/productos`
-          // (404) y Usuarios a `/admin` (que redirige a Cuentas por Cobrar).
-          const moduleBaseHref = hrefDelModulo(pathname);
-          const segments: { label: string; onClick?: () => void }[] = [
-            ...(enSuCasa ? [] : [{ label: "Inicio", onClick: () => router.push(casa) }]),
-            ...(grupo ? [{ label: grupo.label, onClick: () => router.push(grupo.href) }] : []),
-            { label: module, onClick: () => router.push(moduleBaseHref) },
-            ...(breadcrumbs ?? []).map(b => ({ label: b.label, onClick: b.onClick })),
-          ];
-          const lastIndex = segments.length - 1;
-          return (
-            <div className="hidden sm:flex flex-wrap px-6 py-1 text-xs text-gray-400 items-center gap-1">
-              {segments.map((seg, i) => {
-                const isLast = i === lastIndex;
-                return (
-                  <span key={i} className="flex items-center gap-1">
-                    {i > 0 && <span>›</span>}
-                    {isLast || !seg.onClick ? (
-                      <span className="text-gray-600 font-medium cursor-default">{seg.label}</span>
-                    ) : (
-                      <button onClick={seg.onClick} className="-my-[13px] inline-flex min-h-[44px] min-w-[44px] items-center justify-center hover:text-gray-700 hover:underline transition cursor-pointer">{seg.label}</button>
-                    )}
-                  </span>
-                );
-              })}
-            </div>
-          );
-        })()}
+        {!hideBreadcrumbBar && !apple && (
+          <div className="hidden sm:flex flex-wrap px-6 py-1 text-xs text-gray-400 items-center gap-1">
+            {dibujarSegmentos()}
+          </div>
+        )}
       </div>
 
       {/* ── EL NOMBRE DEL MÓDULO ES EL TÍTULO DE LA PÁGINA (24-sep-2026) ──

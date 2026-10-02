@@ -12,6 +12,11 @@ import { casaDelRol, INICIO } from "@/lib/navegacion/casa-del-rol";
 import { recordModuleClick, getFrequentModules } from "@/lib/module-frequents";
 import { fmtDate } from "@/lib/format";
 import { hoyPanama } from "@/lib/fecha-panama";
+import { ESTRUCTURA_APPLE_2026_10 } from "@/lib/navegacion/estructura-2026-10";
+import MenuDelUsuario from "@/components/estructura/MenuDelUsuario";
+
+// 🔴 Estructura estilo Apple (1-oct-2026): saludo y fecha con el botón del
+// usuario; sin «Accesos frecuentes», sin modo oscuro y sin el logo grande.
 
 // Caché del nombre para saludar (fg_users.nombre_completo). Se guarda para que
 // el saludo aparezca instantáneo en las siguientes visitas y se refresca en
@@ -25,7 +30,9 @@ export default function HomePage() {
   const [userName, setUserName] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [fgModules, setFgModules] = useState<string[] | null>(null);
-  const [darkMode, setDarkMode] = useState(false);
+  const apple = ESTRUCTURA_APPLE_2026_10;
+  const [modoOscuro, setDarkMode] = useState(false);
+  const darkMode = modoOscuro && !apple;
   const [frequents, setFrequents] = useState<AppModule[]>([]);
 
   // El botón de arriba a la derecha tiene que REVOCAR la sesión en el server
@@ -137,8 +144,8 @@ export default function HomePage() {
         {/* Encabezado: saludo en serif + fecha del día */}
         <div className="flex items-start justify-between gap-4 mb-6">
           <div className="min-w-0">
-            <FGLogo variant="horizontal" theme="light" size={28} />
-            <h1 className={`font-display text-2xl sm:text-3xl font-medium tracking-tight mt-3 truncate ${darkMode ? "text-gray-50" : "text-gray-950"}`}>
+            {!apple && <FGLogo variant="horizontal" theme="light" size={28} />}
+            <h1 className={`font-display text-2xl sm:text-3xl font-medium tracking-tight ${apple ? "" : "mt-3"} truncate ${darkMode ? "text-gray-50" : "text-gray-950"}`}>
               {saludo}
             </h1>
             <p className={`text-sm mt-0.5 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
@@ -150,7 +157,8 @@ export default function HomePage() {
               22×21 y 29×21 en el iPhone — y son los de la primera pantalla que ve
               todo el mundo al entrar. El -mr-2 compensa el ancho nuevo contra el
               borde del contenedor. */}
-          <div className="flex items-center shrink-0 -mr-2">
+          {apple && <MenuDelUsuario nombre={userName} rol={role} />}
+          {!apple && <div className="flex items-center shrink-0 -mr-2">
             <IconButton
               onClick={() => {
                 const next = !darkMode;
@@ -174,7 +182,7 @@ export default function HomePage() {
             >
               Cerrar sesión
             </button>
-          </div>
+          </div>}
         </div>
 
         {/* 🔴 LA CAJA DE BUSCAR ES DE LOS MISMOS CINCO ROLES EN TODAS PARTES.
@@ -192,7 +200,7 @@ export default function HomePage() {
         {/* Tus frecuentes: los módulos más usados por el usuario (aprendido de
             sus clics reales). Fila arriba de los grupos, misma ficha pero
             HORIZONTAL. Solo aparece si ya hay historial. */}
-        {frequents.length > 0 && (
+        {frequents.length > 0 && !apple && (
           <div className="mb-6">
             <h2 className={`text-xs font-semibold uppercase tracking-wide mb-2 px-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
               Accesos frecuentes

@@ -19,6 +19,8 @@ import { sinBarraLateral } from "@/lib/catalogo/rutas-publicas";
 import { recordModuleClick } from "@/lib/module-frequents";
 import { etiquetaDeRol } from "@/lib/roles-etiquetas";
 import { BotonCambiarContrasena } from "@/components/CambiarContrasena";
+import { ESTRUCTURA_APPLE_2026_10 } from "@/lib/navegacion/estructura-2026-10";
+import BarraLateral2026 from "@/components/estructura/BarraLateral2026";
 
 // Cómo se llama cada rol: UN solo lugar, `lib/roles-etiquetas.ts` (11-sep-2026).
 
@@ -129,7 +131,13 @@ function CollapsedFlyout({
   );
 }
 
+/** 🔴 Estructura estilo Apple (1-oct-2026): con el interruptor en `true`, la
+ *  barra de los módulos a la vista; en `false`, la de hoy, intacta. */
 export default function Sidebar() {
+  return ESTRUCTURA_APPLE_2026_10 ? <BarraLateral2026 /> : <SidebarHoy />;
+}
+
+function SidebarHoy() {
   const pathname = usePathname() || "";
   const router = useRouter();
   const [userRole, setUserRole] = useState("");
