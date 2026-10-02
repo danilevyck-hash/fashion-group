@@ -14,6 +14,10 @@
 //   3. En el celular no cambia nada: la regla vive SOLO en pantalla desde
 //      768 px, y las 2 columnas son SOLO clases `lg:`.
 //   4. Las rutas sin barra lateral (catálogo, pedidos públicos) no la llevan.
+//   5. (2-oct-2026, Daniel: «no quiero dos columnas… ¿agrandar la letra?»)
+//      Formularios y fichas van en UNA columna centrada que ESCALA con la
+//      pantalla (16/14 desde 1280 px, 18/14 desde 1600; 820 → 960 → 1100 px).
+//      Las 2 columnas quedan guardadas detrás de `DOS_COLUMNAS_2026_10`, apagado.
 // ============================================================================
 
 import { describe, it, expect, afterEach, vi } from "vitest";
@@ -91,16 +95,24 @@ describe("contenido ancho: el interruptor", () => {
   });
 });
 
-describe("contenido ancho: la regla de globals.css", () => {
+describe("contenido ancho: la regla de las listas en globals.css", () => {
   const bloque = bloqueDeLaRegla();
 
   it("vive SOLO en pantalla desde 768 px: en el celular y en el papel no cambia nada", () => {
     expect(bloque.startsWith("@media screen and (min-width: 768px)")).toBe(true);
-    expect(CSS.replace(bloque, "")).not.toContain(".contenido-ancho");
+    // Toda regla con `.contenido-ancho` vive dentro de un `@media screen and (min-width: …)`
+    // de 768 px o más.
+    const medias = [...CSS.matchAll(/@media ([^{]*)\{/g)];
+    let i = CSS.indexOf(".contenido-ancho");
+    while (i !== -1) {
+      const previa = medias.filter((m) => (m.index ?? 0) < i).pop();
+      expect(previa?.[1]).toMatch(/^screen and \(min-width: (768|1280|1600)px\)\s*$/);
+      i = CSS.indexOf(".contenido-ancho", i + 1);
+    }
   });
 
-  it("la caja de la pantalla llega a 1600 px con 24 px a cada lado, y no las de adentro ni las de un modal", () => {
-    expect(bloque).toMatch(/:not\(\.mx-auto\[class\*="max-w-"\] \*\):not\(\.fixed \*\)\s*\{[^}]*max-width:\s*1600px;[^}]*padding-left:\s*24px;[^}]*padding-right:\s*24px;/);
+  it("la caja de una lista llega a 1600 px con 24 px a cada lado, y no las de adentro, las de un modal ni las columnas que escalan", () => {
+    expect(bloque).toMatch(/:not\(\.mx-auto\[class\*="max-w-"\] \*\):not\(\.fixed \*\):not\(\.columna-que-escala\)\s*\{[^}]*max-width:\s*1600px;[^}]*padding-left:\s*24px;[^}]*padding-right:\s*24px;/);
     // Centrada: la regla no toca los márgenes, así que `mx-auto` sigue centrando.
     expect(bloque).not.toMatch(/margin-(left|right)/);
   });
@@ -112,50 +124,74 @@ describe("contenido ancho: la regla de globals.css", () => {
   });
 });
 
-describe("contenido ancho: las 2 columnas de Nueva guía y del detalle de guía", () => {
-  it("son SOLO clases desde 1024 px (`lg:`): en el celular el orden y el aire son los de siempre", () => {
-    for (const clase of `${real.DOS_COLUMNAS} ${real.EN_LA_DERECHA}`.split(/\s+/)) {
-      expect(clase.startsWith("lg:")).toBe(true);
-    }
+describe("contenido ancho: formularios y fichas en UNA columna que escala", () => {
+  const escala = (min: number) => {
+    const i = CSS.indexOf(`@media screen and (min-width: ${min}px) {\n  .contenido-ancho {`);
+    expect(i).toBeGreaterThan(-1);
+    return CSS.slice(i, CSS.indexOf("}", i) + 1);
+  };
+
+  it("UNA escala compartida: 1 hasta 1279 px, 16/14 desde 1280 y 18/14 desde 1600; la columna 820 → 960 → 1100", () => {
+    expect(escala(768)).toMatch(/--escala-contenido:\s*1;[^}]*--ancho-columna:\s*820px;/);
+    expect(escala(1280)).toMatch(/--escala-contenido:\s*1\.143;[^}]*--ancho-columna:\s*960px;/);
+    expect(escala(1600)).toMatch(/--escala-contenido:\s*1\.286;[^}]*--ancho-columna:\s*1100px;/);
   });
 
-  it("apagado, Nueva guía conserva su formulario de 820 px y no envuelve nada", () => {
-    expect(GUIA_FORM).toContain('className={ancho ? undefined : "max-w-[820px]"}');
-    expect(GUIA_FORM).toMatch(/ancho \? <div className=\{DOS_COLUMNAS\} data-dos-columnas>\{nodo\}<\/div> : nodo/);
-    expect(GUIA_FORM).toMatch(/ancho \? <div className=\{`\$\{EN_LA_DERECHA\} lg:pt-4`\}>\{nodo\}<\/div> : nodo/);
-    expect(GUIA_FORM).toMatch(/const ancho = CONTENIDO_ANCHO_2026_10;/);
+  it("la columna se centra, mide lo que dice la escala y escala todo junto", () => {
+    expect(CSS).toMatch(/\.contenido-ancho \.columna-que-escala \{[^}]*max-width:\s*calc\(var\(--ancho-columna\) \/ var\(--escala-contenido\)\);[^}]*margin-left:\s*auto;[^}]*margin-right:\s*auto;[^}]*zoom:\s*var\(--escala-contenido\);/);
+    expect(CSS).toMatch(/\.contenido-ancho \.panel-que-escala \{[^}]*zoom:\s*var\(--escala-contenido\);/);
   });
 
-  it("tipo c (fichas y formularios): también SOLO clases desde 1024 px", () => {
-    for (const clase of `${real.CAMPOS_A_SU_ANCHO} ${real.BLOQUES_DE_A_DOS}`.split(/\s+/)) {
-      expect(clase.startsWith("lg:")).toBe(true);
-    }
-  });
-
-  it("tipo c, apagado: ficha de cliente, ficha de colaborador y Nuevo gasto quedan como hoy", () => {
+  it("la llevan, solo con el interruptor, Nueva guía, detalle de guía, ficha de cliente, colaborador y Nuevo gasto", () => {
     const leer = (p: string) => readFileSync(join(SRC, p), "utf8");
-    const cliente = leer("app/clientes/[codigo]/ClienteDetail.tsx");
-    expect(cliente).toMatch(/ancho \? <div className=\{DETALLE_Y_PAGOS\} data-dos-columnas>\{nodo\}<\/div> : nodo/);
-    expect(cliente).toContain('sm:grid-cols-3 gap-y-3 gap-x-6 text-sm${ancho ? " lg:grid-cols-');
-    expect(cliente).toMatch(/const ancho = CONTENIDO_ANCHO_2026_10;/);
-    const ficha = leer("app/asistencia/colaboradores/FichaTexto.tsx");
-    expect(ficha).toContain('sm:grid-cols-3${CONTENIDO_ANCHO_2026_10 ? ` ${CAMPOS_A_SU_ANCHO}` : ""}');
-    const persona = leer("app/asistencia/colaboradores/PersonaPagina.tsx");
-    expect(persona).toMatch(/CONTENIDO_ANCHO_2026_10 \? <div className=\{`space-y-4 \$\{BLOQUES_DE_A_DOS\}`\} data-dos-columnas>\{nodo\}<\/div> : nodo/);
+    expect(GUIA_FORM).toContain("${escala ? ` ${CLASE_COLUMNA_QUE_ESCALA}` : \"\"}");
+    expect(GUIA_FORM).toMatch(/const escala = CONTENIDO_ANCHO_2026_10;/);
+    expect(GUIA_DETALLE).toMatch(/const escala = CONTENIDO_ANCHO_2026_10 \? ` \$\{CLASE_COLUMNA_QUE_ESCALA\}` : "";/);
+    expect(leer("app/clientes/[codigo]/ClienteDetail.tsx")).toContain("${CONTENIDO_ANCHO_2026_10 ? ` ${CLASE_COLUMNA_QUE_ESCALA}` : \"\"}");
+    expect(leer("app/asistencia/colaboradores/PersonaPagina.tsx")).toContain("${CONTENIDO_ANCHO_2026_10 ? ` ${CLASE_COLUMNA_QUE_ESCALA}` : \"\"}");
+    expect(leer("app/caja/components/NuevoGastoDrawer.tsx")).toContain("escala={CONTENIDO_ANCHO_2026_10}");
     const drawer = leer("components/Drawer.tsx");
-    expect(drawer).toContain("ancho = false }: DrawerProps");
+    expect(drawer).toContain("escala = false }: DrawerProps");
+    expect(drawer).toContain("${escala ? ` ${CLASE_PANEL_QUE_ESCALA}` : \"\"}");
+  });
+
+  it("las listas (CxC) NO la llevan: siguen a todo el ancho", () => {
+    expect(readFileSync(join(SRC, "app/cxc/page.tsx"), "utf8")).not.toContain("CLASE_COLUMNA_QUE_ESCALA");
+  });
+});
+
+describe("las 2 columnas (tipos b y c): guardadas detrás de su propio interruptor, APAGADO", () => {
+  it("DOS_COLUMNAS_2026_10 se commitea apagado", async () => {
+    const { DOS_COLUMNAS_2026_10 } = await vi.importActual<typeof import("@/lib/navegacion/contenido-ancho")>("@/lib/navegacion/contenido-ancho");
+    expect(DOS_COLUMNAS_2026_10).toBe(false);
+  });
+
+  it("son SOLO clases desde 1024 px (`lg:`): en el celular el orden y el aire son los de siempre", () => {
+    for (const clase of `${real.DOS_COLUMNAS} ${real.EN_LA_DERECHA} ${real.CAMPOS_A_SU_ANCHO} ${real.BLOQUES_DE_A_DOS}`.split(/\s+/)) {
+      expect(clase.startsWith("lg:")).toBe(true);
+    }
+  });
+
+  it("cuelgan de DOS_COLUMNAS_2026_10, no del interruptor del ancho", () => {
+    const leer = (p: string) => readFileSync(join(SRC, p), "utf8");
+    expect(GUIA_FORM).toMatch(/const ancho = DOS_COLUMNAS_2026_10;/);
+    expect(GUIA_FORM).toContain('className={ancho || escala ? undefined : "max-w-[820px]"}');
+    expect(GUIA_FORM).toMatch(/ancho \? <div className=\{DOS_COLUMNAS\} data-dos-columnas>\{nodo\}<\/div> : nodo/);
+    expect(GUIA_DETALLE).toMatch(/const ancho = DOS_COLUMNAS_2026_10;/);
+    expect(GUIA_DETALLE).toContain('className={ancho ? `space-y-4 ${DOS_COLUMNAS}` : "space-y-4"}');
+    const cliente = leer("app/clientes/[codigo]/ClienteDetail.tsx");
+    expect(cliente).toMatch(/const ancho = DOS_COLUMNAS_2026_10;/);
+    expect(cliente).toMatch(/ancho \? <div className=\{DETALLE_Y_PAGOS\} data-dos-columnas>\{nodo\}<\/div> : nodo/);
+    expect(leer("app/asistencia/colaboradores/FichaTexto.tsx")).toContain('sm:grid-cols-3${DOS_COLUMNAS_2026_10 ? ` ${CAMPOS_A_SU_ANCHO}` : ""}');
+    expect(leer("app/asistencia/colaboradores/PersonaPagina.tsx")).toMatch(/DOS_COLUMNAS_2026_10 \? <div className=\{`space-y-4 \$\{BLOQUES_DE_A_DOS\}`\} data-dos-columnas>/);
+    const nuevo = leer("app/caja/components/NuevoGastoDrawer.tsx");
+    expect(nuevo).toContain("ancho={DOS_COLUMNAS_2026_10}");
+    expect(nuevo).toContain("dosColumnas={DOS_COLUMNAS_2026_10}");
+    const drawer = leer("components/Drawer.tsx");
+    expect(drawer).toContain("ancho = false, escala = false }: DrawerProps");
     expect(drawer).toContain('${ancho ? "lg:w-[min(960px,75vw)]" : "lg:w-[480px]"}');
     const form = leer("app/caja/components/GastoForm.tsx");
     expect(form).toContain("dosColumnas = false,");
     expect(form).toContain('className={dosColumnas ? "lg:grid lg:grid-cols-2 lg:gap-x-10 lg:items-start" : undefined}');
-    const nuevo = leer("app/caja/components/NuevoGastoDrawer.tsx");
-    expect(nuevo).toContain("ancho={CONTENIDO_ANCHO_2026_10}");
-    expect(nuevo).toContain("dosColumnas={CONTENIDO_ANCHO_2026_10}");
-  });
-
-  it("apagado, el detalle de guía conserva su caja de una columna", () => {
-    expect(GUIA_DETALLE).toContain('className={ancho ? `space-y-4 ${DOS_COLUMNAS}` : "space-y-4"}');
-    expect(GUIA_DETALLE).toMatch(/ancho \? <div className=\{EN_LA_DERECHA\}>\{nodo\}<\/div> : nodo/);
-    expect(GUIA_DETALLE).toMatch(/const ancho = CONTENIDO_ANCHO_2026_10;/);
   });
 });

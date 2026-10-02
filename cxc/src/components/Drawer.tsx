@@ -3,6 +3,7 @@
 import { ReactNode, useEffect, useRef } from "react";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { useAutofocusPrimerCampo } from "@/lib/hooks/useAutofocusPrimerCampo";
+import { CLASE_PANEL_QUE_ESCALA } from "@/lib/navegacion/contenido-ancho";
 
 interface DrawerProps {
   open: boolean;
@@ -13,6 +14,8 @@ interface DrawerProps {
   /** 🔴 2-oct-2026 (tipo c de `CONTENIDO_ANCHO_2026_10`): desde 1024 px el panel
    *  pasa de 480 px a lo que pide un formulario en 2 columnas. En el celular nada cambia. */
   ancho?: boolean;
+  /** 🔴 2-oct-2026 (`CONTENIDO_ANCHO_2026_10`): la letra y los campos escalan con la pantalla. */
+  escala?: boolean;
 }
 
 /**
@@ -33,7 +36,7 @@ interface DrawerProps {
  * 3. **Pie pegado al borde en iPhone.** Sin `env(safe-area-inset-bottom)` los
  *    botones caían debajo de la barra de gestos.
  */
-export default function Drawer({ open, onClose, title, children, footer, ancho = false }: DrawerProps) {
+export default function Drawer({ open, onClose, title, children, footer, ancho = false, escala = false }: DrawerProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Espejo de `onClose` para que el listener de Escape no dependa de su
@@ -75,7 +78,7 @@ export default function Drawer({ open, onClose, title, children, footer, ancho =
         // vertical (768) el panel tapaba el 62 % y en horizontal (1024) el 47 %,
         // con el resto de la pantalla oscurecido sin usar. Ahora el ancho
         // acompaña a la pantalla y 480 px pasa a ser el MÍNIMO, no el total.
-        className={`fixed top-0 right-0 h-full w-full sm:w-[min(560px,60vw)] ${ancho ? "lg:w-[min(960px,75vw)]" : "lg:w-[480px]"} bg-white z-50 shadow-xl transition-[transform,visibility] duration-200 ease-out flex flex-col ${open ? "translate-x-0 visible" : "translate-x-full invisible pointer-events-none"}`}
+        className={`fixed top-0 right-0 h-full w-full sm:w-[min(560px,60vw)] ${ancho ? "lg:w-[min(960px,75vw)]" : "lg:w-[480px]"}${escala ? ` ${CLASE_PANEL_QUE_ESCALA}` : ""} bg-white z-50 shadow-xl transition-[transform,visibility] duration-200 ease-out flex flex-col ${open ? "translate-x-0 visible" : "translate-x-full invisible pointer-events-none"}`}
         // El panel arranca en top:0, así que su cabecera (con el ✕) cae debajo
         // de la Dynamic Island en cuanto la PWA use status bar translúcida. Hoy
         // el inset es 0 (`apple-mobile-web-app-status-bar-style: black`) y esto

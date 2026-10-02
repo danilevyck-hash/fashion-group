@@ -69,7 +69,7 @@ import { abrirEnEdicion, urlDeLaGuia } from "@/lib/guias/abrir-en-edicion";
 import { textoFaltantesDespachada } from "@/lib/guias/faltantes-despacho";
 import { GUIA_DETALLE_APPLE_2026_10 } from "@/lib/guias/guias-2026-10";
 import { Aviso } from "@/components/ui/Aviso";
-import { CONTENIDO_ANCHO_2026_10, DOS_COLUMNAS, EN_LA_DERECHA } from "@/lib/navegacion/contenido-ancho";
+import { CONTENIDO_ANCHO_2026_10, DOS_COLUMNAS_2026_10, DOS_COLUMNAS, EN_LA_DERECHA, CLASE_COLUMNA_QUE_ESCALA } from "@/lib/navegacion/contenido-ancho";
 // ⚠️ `papel-de-la-guia` arrastra jsPDF (~148 kB) y se pide con `await import`,
 // nunca de arriba: estático acá la carga inicial de esta pantalla pasaba de 204
 // kB a 351 kB, y es la que bodega abre desde el celular. Se PRECARGA al montar
@@ -216,11 +216,13 @@ export default function GuiaPage() {
   /** Detalle de guía estilo Apple (2-oct-2026); `false` = la pantalla de hoy. */
   const apple = GUIA_DETALLE_APPLE_2026_10;
   /**
-   * 🔴 2-oct-2026 (`CONTENIDO_ANCHO_2026_10`): desde 1024 px, 2 columnas —los
+   * 🔴 2-oct-2026 (`DOS_COLUMNAS_2026_10`, apagado: Daniel las rechazó): desde 1024 px, 2 columnas —los
    * datos, avisos, observaciones y despacho a la izquierda; los envíos a la
    * derecha—. Solo cambia dónde se dibuja: el orden en el celular es el mismo.
    */
-  const ancho = CONTENIDO_ANCHO_2026_10;
+  const ancho = DOS_COLUMNAS_2026_10;
+  /** 🔴 2-oct-2026 (`CONTENIDO_ANCHO_2026_10`): UNA columna centrada que escala con la pantalla. */
+  const escala = CONTENIDO_ANCHO_2026_10 ? ` ${CLASE_COLUMNA_QUE_ESCALA}` : "";
   const enLaDerecha = (nodo: React.ReactNode) =>
     ancho ? <div className={EN_LA_DERECHA}>{nodo}</div> : nodo;
 
@@ -380,7 +382,7 @@ export default function GuiaPage() {
         // 🔴 2-oct-2026 (`GUIA_DETALLE_APPLE_2026_10`): el MISMO marco que Nueva
         // guía Apple —`max-w-6xl` y adentro 820 px a la IZQUIERDA—: centrado
         // dejaba un blanco grande a los costados.
-        <div className={apple ? "max-w-6xl mx-auto px-4 sm:px-6 py-6" : "max-w-4xl mx-auto px-4 sm:px-6 py-6"}>
+        <div className={`${apple ? "max-w-6xl mx-auto px-4 sm:px-6 py-6" : "max-w-4xl mx-auto px-4 sm:px-6 py-6"}${escala}`}>
         <div className={apple && !ancho ? "max-w-[820px]" : undefined}>
           {/* Encabezado: ‹ Atrás · Guía GT-190 */}
           <div className="flex items-center gap-3 mb-5">

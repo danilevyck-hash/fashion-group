@@ -21,7 +21,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import AppHeader from "@/components/AppHeader";
-import { CONTENIDO_ANCHO_2026_10, BLOQUES_DE_A_DOS } from "@/lib/navegacion/contenido-ancho";
+import { CONTENIDO_ANCHO_2026_10, DOS_COLUMNAS_2026_10, BLOQUES_DE_A_DOS, CLASE_COLUMNA_QUE_ESCALA } from "@/lib/navegacion/contenido-ancho";
 import { useToast } from "@/components/ToastSystem";
 import { puedeCerrar } from "@/lib/asistencia/roles";
 import {
@@ -251,12 +251,12 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
   }
 
   const deADos = (nodo: React.ReactNode) =>
-    CONTENIDO_ANCHO_2026_10 ? <div className={`space-y-4 ${BLOQUES_DE_A_DOS}`} data-dos-columnas>{nodo}</div> : nodo;
+    DOS_COLUMNAS_2026_10 ? <div className={`space-y-4 ${BLOQUES_DE_A_DOS}`} data-dos-columnas>{nodo}</div> : nodo;
 
   return (
     <>
       <AppHeader module="Asistencia y planilla" />
-      <div className="mx-auto max-w-4xl px-4 py-6">
+      <div className={`mx-auto max-w-4xl px-4 py-6${CONTENIDO_ANCHO_2026_10 ? ` ${CLASE_COLUMNA_QUE_ESCALA}` : ""}`}>
         {/* Volver: una sola salida, arriba, sin competir con nada. */}
         <Link
           href="/asistencia?tab=colaboradores"
@@ -313,7 +313,7 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
                 guardada: mientras no exista no hay a quién prestarle ni a quién
                 justificarle nada, y dibujar cuatro secciones vacías arriba de
                 un formulario de alta es ruido. */}
-            {/* 🔴 2-oct-2026 (`CONTENIDO_ANCHO_2026_10`, tipo c): desde 1024 px
+            {/* 🔴 2-oct-2026 (`DOS_COLUMNAS_2026_10`, apagado, tipo c): desde 1024 px
                 las secciones van de a dos por fila; en el celular, una debajo
                 de la otra como siempre. */}
             {!nueva && persona && deADos(

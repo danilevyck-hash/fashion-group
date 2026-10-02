@@ -62,7 +62,7 @@ import { lineaFiscal, ROTULO_DIRECCION_SWITCH } from "@/lib/clientes/direccion-s
 import { textoYaNoEstaEnSwitch } from "@/lib/clientes/lista";
 import type { FilaAgingCliente } from "@/lib/clientes/cliente-para-cobrar";
 import CobrarEnFicha from "./CobrarEnFicha";
-import { CONTENIDO_ANCHO_2026_10 } from "@/lib/navegacion/contenido-ancho";
+import { CONTENIDO_ANCHO_2026_10, DOS_COLUMNAS_2026_10, CLASE_COLUMNA_QUE_ESCALA } from "@/lib/navegacion/contenido-ancho";
 
 /** Tipo c (2-oct-2026): detalle por empresa (3 partes) y últimos pagos (2), lado a lado desde 1024 px. */
 const DETALLE_Y_PAGOS = "lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-4 lg:items-start";
@@ -224,14 +224,14 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
   });
 
   const opcionesSync = opcionesFichaCliente(activas.map((e) => e.empresa));
-  const ancho = CONTENIDO_ANCHO_2026_10;
+  const ancho = DOS_COLUMNAS_2026_10;
   const deADos = (nodo: React.ReactNode) =>
     ancho ? <div className={DETALLE_Y_PAGOS} data-dos-columnas>{nodo}</div> : nodo;
 
   return (
     <div className="min-h-screen bg-white">
       <AppHeader module="Clientes" breadcrumbs={[{ label: cliente.codigo }]} />
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
+      <main className={`max-w-4xl mx-auto px-4 sm:px-6 py-6${CONTENIDO_ANCHO_2026_10 ? ` ${CLASE_COLUMNA_QUE_ESCALA}` : ""}`}>
         <div className="mb-2">
           <Link href="/clientes" className="inline-flex min-h-[44px] items-center text-xs text-gray-500 hover:text-black transition">
             ← Clientes
@@ -322,7 +322,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
           </Tarjeta>
         </div>
 
-        {/* 🔴 2-oct-2026 (`CONTENIDO_ANCHO_2026_10`, tipo c): desde 1024 px el
+        {/* 🔴 2-oct-2026 (`DOS_COLUMNAS_2026_10`, apagado, tipo c): desde 1024 px el
             detalle por empresa y los últimos pagos van lado a lado. */}
         {deADos(<>
         {/* ── 3. EMPRESA POR EMPRESA ─────────────────────────────────────── */}

@@ -14,8 +14,12 @@
 //   · La caja de cada pantalla (la primera `mx-auto max-w-*`, de 4xl para
 //     arriba) usa todo el ancho con 24 px a cada lado —los mismos del camino
 //     de migas de arriba— hasta 1600 px; en un monitor más grande se centra.
-//   · Nueva guía y el detalle de guía pasan a 2 columnas desde 1024 px: los
-//     datos a la izquierda y los envíos a la derecha.
+//   · Formularios, fichas y pantallas de trabajo (las que llevan
+//     `CLASE_COLUMNA_QUE_ESCALA`) van en UNA columna centrada cuya letra,
+//     campos y aire escalan con la pantalla: 16/14 desde 1280 px, 18/14 desde
+//     1600; la columna mide 820 → 960 → 1100 px.
+//   · Las 2 columnas que se probaron antes quedan apagadas en
+//     `DOS_COLUMNAS_2026_10`.
 //   · `max-w-3xl` o menos (formularios de una sola columna) no se toca.
 //   · En el celular no cambia nada.
 //
@@ -30,6 +34,27 @@ export const CONTENIDO_ANCHO_2026_10 = false;
 
 /** La clase que activa la regla de `globals.css`. */
 export const CLASE_CONTENIDO_ANCHO = "contenido-ancho";
+
+/**
+ * 🔴 FORMULARIOS, FICHAS Y PANTALLAS DE TRABAJO: UNA SOLA COLUMNA QUE ESCALA
+ * (2-oct-2026). Daniel rechazó las 2 columnas: *«no quiero dos columnas, quiero
+ * algo que vaya con nuestra filosofía, ¿agrandar la letra?»*. La caja de la
+ * pantalla lleva esta clase y `globals.css` le aplica UNA escala compartida
+ * (`--escala-contenido`, `--ancho-columna`): desde 1280 px todo —letra,
+ * campos, aire— crece 16/14, y desde 1600 px 18/14; la columna pasa de 820 a
+ * 960 y a 1100 px, centrada. Las listas no la llevan: siguen a todo el ancho.
+ */
+export const CLASE_COLUMNA_QUE_ESCALA = "columna-que-escala";
+
+/** Lo mismo para un panel lateral (Nuevo gasto): escala la letra, no el ancho de la pantalla. */
+export const CLASE_PANEL_QUE_ESCALA = "panel-que-escala";
+
+/**
+ * 🔴 LAS 2 COLUMNAS (tipos b y c) QUEDAN GUARDADAS, APAGADAS (2-oct-2026).
+ * Daniel las rechazó; no se borran. `true` = Nueva guía, detalle de guía y las
+ * fichas vuelven a partirse en 2 columnas desde 1024 px.
+ */
+export const DOS_COLUMNAS_2026_10 = false;
 
 /**
  * Las 2 columnas de un formulario o detalle, desde 1024 px: datos a la

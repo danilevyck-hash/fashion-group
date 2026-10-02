@@ -79,7 +79,7 @@ import { textoFalta } from "@/lib/guias/falta-para-despachar";
 import { textoYaSeDespacho } from "@/lib/guias/campos-editables";
 import { sugerenciasDireccion } from "@/lib/guias/direccion-sugerida";
 import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
-import { CONTENIDO_ANCHO_2026_10, DOS_COLUMNAS, EN_LA_DERECHA } from "@/lib/navegacion/contenido-ancho";
+import { CONTENIDO_ANCHO_2026_10, DOS_COLUMNAS_2026_10, DOS_COLUMNAS, EN_LA_DERECHA, CLASE_COLUMNA_QUE_ESCALA } from "@/lib/navegacion/contenido-ancho";
 import { bultosBloqueadosPorEtiquetas, observacionesConTraslado } from "@/lib/guias/etiquetas-por-envio";
 
 interface GuiaFormProps {
@@ -990,10 +990,12 @@ export default function GuiaForm({
     const envios = items.filter(filaTieneDatos).length;
     const SEGMENTO = "flex-1 sm:flex-none whitespace-nowrap rounded-md px-3 text-sm font-medium transition inline-flex items-center justify-center min-h-[40px]";
     const PILDORA = "rounded-full border bg-transparent px-4 text-base sm:text-sm outline-none transition focus:border-black min-h-[44px]";
-    // 🔴 2-oct-2026 (`CONTENIDO_ANCHO_2026_10`): desde 1024 px, 2 columnas —fecha,
+    // 🔴 2-oct-2026 (`DOS_COLUMNAS_2026_10`, apagado: Daniel las rechazó): desde 1024 px, 2 columnas —fecha,
     // despacho y observaciones a la izquierda; los envíos a la derecha—. Apagado,
     // el árbol es el mismo de siempre (un fragmento no dibuja nada).
-    const ancho = CONTENIDO_ANCHO_2026_10;
+    const ancho = DOS_COLUMNAS_2026_10;
+    // 🔴 2-oct-2026 (`CONTENIDO_ANCHO_2026_10`): UNA columna centrada que escala con la pantalla.
+    const escala = CONTENIDO_ANCHO_2026_10;
     const dosColumnas = (nodo: React.ReactNode) =>
       ancho ? <div className={DOS_COLUMNAS} data-dos-columnas>{nodo}</div> : nodo;
     const enLaDerecha = (nodo: React.ReactNode) =>
@@ -1002,8 +1004,8 @@ export default function GuiaForm({
       // 🔴 1-oct-2026 (Daniel, sobre las capturas): el MISMO marco que Reclamos, CxC y
       // Asistencia (`max-w-6xl mx-auto px-4 sm:px-6`) y, adentro, el formulario a la
       // IZQUIERDA con un ancho legible: centrado dejaba un blanco grande junto al menú.
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 pb-28 md:pb-0">
-      <div className={ancho ? undefined : "max-w-[820px]"}>
+      <div className={`max-w-6xl mx-auto px-4 sm:px-6 pt-4 pb-28 md:pb-0${escala ? ` ${CLASE_COLUMNA_QUE_ESCALA}` : ""}`}>
+      <div className={ancho || escala ? undefined : "max-w-[820px]"}>
         <button type="button" onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2">{etiquetaVolver}</button>
         <div className="flex items-baseline gap-2.5">
           <h1 className="text-[26px] font-semibold tracking-tight">Nueva guía</h1>

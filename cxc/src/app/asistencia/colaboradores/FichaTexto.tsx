@@ -25,7 +25,7 @@ import {
 } from "@/lib/asistencia/ficha-persona";
 import CedulaFoto from "./CedulaFoto";
 import type { PersonaDeLaPagina } from "./tipos";
-import { CONTENIDO_ANCHO_2026_10, CAMPOS_A_SU_ANCHO } from "@/lib/navegacion/contenido-ancho";
+import { DOS_COLUMNAS_2026_10, CAMPOS_A_SU_ANCHO } from "@/lib/navegacion/contenido-ancho";
 
 export default function FichaTexto({
   persona, codigo, puedeEditar, onEditar, onIgnorar,
@@ -106,7 +106,7 @@ export default function FichaTexto({
       {/* Texto, no cajas. Dos columnas en el celular y tres de sm para arriba:
           son datos cortos y en una sola columna la ficha se vuelve una lista
           larga que hay que recorrer con el dedo. */}
-      <dl className={`grid grid-cols-2 gap-x-4 gap-y-3 px-4 py-3 sm:grid-cols-3${CONTENIDO_ANCHO_2026_10 ? ` ${CAMPOS_A_SU_ANCHO}` : ""}`}>
+      <dl className={`grid grid-cols-2 gap-x-4 gap-y-3 px-4 py-3 sm:grid-cols-3${DOS_COLUMNAS_2026_10 ? ` ${CAMPOS_A_SU_ANCHO}` : ""}`}>
         {datos.map((d) => (
           <div key={d.clave}>
             <dt className="text-[10.5px] uppercase tracking-wide text-gray-400">{d.etiqueta}</dt>

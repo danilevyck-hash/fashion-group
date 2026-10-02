@@ -306,9 +306,47 @@ input, button, select, textarea {
    monitor más grande se queda centrada. max-w-3xl o menos no se toca. Solo en
    pantalla desde 768 px: en el celular y en el papel nada cambia. */
 @media screen and (min-width: 768px) {
-  .contenido-ancho .mx-auto:is([class~="max-w-4xl"], [class~="max-w-5xl"], [class~="max-w-6xl"], [class~="max-w-7xl"], [class~="max-w-[1280px]"]):not(.mx-auto[class*="max-w-"] *):not(.fixed *) {
+  .contenido-ancho .mx-auto:is([class~="max-w-4xl"], [class~="max-w-5xl"], [class~="max-w-6xl"], [class~="max-w-7xl"], [class~="max-w-[1280px]"]):not(.mx-auto[class*="max-w-"] *):not(.fixed *):not(.columna-que-escala) {
     max-width: 1600px;
     padding-left: 24px;
     padding-right: 24px;
+  }
+}
+
+/* 🔴 FORMULARIOS, FICHAS Y PANTALLAS DE TRABAJO: UNA COLUMNA QUE ESCALA
+   (2-oct-2026, mismo interruptor). Daniel: «no quiero dos columnas, quiero algo
+   que vaya con nuestra filosofía, ¿agrandar la letra?». UNA escala compartida,
+   como macOS en pantallas grandes: hasta 1279 px todo queda como hoy; desde
+   1280 px letra, campos y aire crecen 16/14 y la columna mide 960 px; desde
+   1600 px, 18/14 y 1100 px. `zoom` escala todo junto —letra, campos, iconos y
+   espacios— sin tocar ninguna pantalla por dentro. La columna se queda
+   centrada; las listas no llevan la clase y siguen a todo el ancho. */
+@media screen and (min-width: 768px) {
+  .contenido-ancho {
+    --escala-contenido: 1;
+    --ancho-columna: 820px;
+  }
+  .contenido-ancho .columna-que-escala {
+    max-width: calc(var(--ancho-columna) / var(--escala-contenido));
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 24px;
+    padding-right: 24px;
+    zoom: var(--escala-contenido);
+  }
+  .contenido-ancho .panel-que-escala {
+    zoom: var(--escala-contenido);
+  }
+}
+@media screen and (min-width: 1280px) {
+  .contenido-ancho {
+    --escala-contenido: 1.143;
+    --ancho-columna: 960px;
+  }
+}
+@media screen and (min-width: 1600px) {
+  .contenido-ancho {
+    --escala-contenido: 1.286;
+    --ancho-columna: 1100px;
   }
 }
