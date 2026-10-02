@@ -43,3 +43,14 @@ export const DOS_COLUMNAS =
 
 /** El bloque que va a la columna derecha, de arriba abajo. */
 export const EN_LA_DERECHA = "lg:col-start-2 lg:row-start-1 lg:row-span-6 lg:!mt-0";
+
+/**
+ * Tipo c · fichas y formularios de UNA sola cosa (2-oct-2026). Los datos cortos
+ * (código, cédula, teléfono, fecha) se acomodan en tantas columnas como quepan,
+ * cada una del ancho que pide su dato: nunca una columna angosta con blanco a
+ * los costados ni un campo de 1.300 px para un teléfono. Solo desde 1024 px.
+ */
+export const CAMPOS_A_SU_ANCHO = "lg:grid-cols-[repeat(auto-fill,minmax(200px,1fr))]";
+
+/** Tipo c · los bloques de una ficha, de a dos por fila desde 1024 px. */
+export const BLOQUES_DE_A_DOS = "lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start lg:space-y-0";

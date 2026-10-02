@@ -126,6 +126,33 @@ describe("contenido ancho: las 2 columnas de Nueva guía y del detalle de guía"
     expect(GUIA_FORM).toMatch(/const ancho = CONTENIDO_ANCHO_2026_10;/);
   });
 
+  it("tipo c (fichas y formularios): también SOLO clases desde 1024 px", () => {
+    for (const clase of `${real.CAMPOS_A_SU_ANCHO} ${real.BLOQUES_DE_A_DOS}`.split(/\s+/)) {
+      expect(clase.startsWith("lg:")).toBe(true);
+    }
+  });
+
+  it("tipo c, apagado: ficha de cliente, ficha de colaborador y Nuevo gasto quedan como hoy", () => {
+    const leer = (p: string) => readFileSync(join(SRC, p), "utf8");
+    const cliente = leer("app/clientes/[codigo]/ClienteDetail.tsx");
+    expect(cliente).toMatch(/ancho \? <div className=\{DETALLE_Y_PAGOS\} data-dos-columnas>\{nodo\}<\/div> : nodo/);
+    expect(cliente).toContain('sm:grid-cols-3 gap-y-3 gap-x-6 text-sm${ancho ? " lg:grid-cols-');
+    expect(cliente).toMatch(/const ancho = CONTENIDO_ANCHO_2026_10;/);
+    const ficha = leer("app/asistencia/colaboradores/FichaTexto.tsx");
+    expect(ficha).toContain('sm:grid-cols-3${CONTENIDO_ANCHO_2026_10 ? ` ${CAMPOS_A_SU_ANCHO}` : ""}');
+    const persona = leer("app/asistencia/colaboradores/PersonaPagina.tsx");
+    expect(persona).toMatch(/CONTENIDO_ANCHO_2026_10 \? <div className=\{`space-y-4 \$\{BLOQUES_DE_A_DOS\}`\} data-dos-columnas>\{nodo\}<\/div> : nodo/);
+    const drawer = leer("components/Drawer.tsx");
+    expect(drawer).toContain("ancho = false }: DrawerProps");
+    expect(drawer).toContain('${ancho ? "lg:w-[min(960px,75vw)]" : "lg:w-[480px]"}');
+    const form = leer("app/caja/components/GastoForm.tsx");
+    expect(form).toContain("dosColumnas = false,");
+    expect(form).toContain('className={dosColumnas ? "lg:grid lg:grid-cols-2 lg:gap-x-10 lg:items-start" : undefined}');
+    const nuevo = leer("app/caja/components/NuevoGastoDrawer.tsx");
+    expect(nuevo).toContain("ancho={CONTENIDO_ANCHO_2026_10}");
+    expect(nuevo).toContain("dosColumnas={CONTENIDO_ANCHO_2026_10}");
+  });
+
   it("apagado, el detalle de guía conserva su caja de una columna", () => {
     expect(GUIA_DETALLE).toContain('className={ancho ? `space-y-4 ${DOS_COLUMNAS}` : "space-y-4"}');
     expect(GUIA_DETALLE).toMatch(/ancho \? <div className=\{EN_LA_DERECHA\}>\{nodo\}<\/div> : nodo/);

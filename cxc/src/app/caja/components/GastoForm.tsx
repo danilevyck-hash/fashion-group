@@ -62,6 +62,8 @@ interface Props {
   setShowManageCat: (v: boolean) => void;
   /** La foto del recibo: opcional, se arrastra o se toca. Lo pone el llamador. */
   zonaFotos?: ReactNode;
+  /** 🔴 2-oct-2026 (tipo c): desde 1024 px las cuatro secciones van de a dos por fila. */
+  dosColumnas?: boolean;
   /**
    * 🔴 EL RECIBO VIEJO SE DICE EN UNA LÍNEA, NO EN UNA VENTANA (20-sep-2026).
    * 🩸 El aviso de «este recibo es de antes de que abriera el período» saltaba
@@ -362,6 +364,7 @@ export default function GastoForm({
   setShowManageCat,
   zonaFotos,
   notaFecha,
+  dosColumnas = false,
 }: Props) {
   const {
     gFecha, gDescripcion, gProveedor, gNroFactura,
@@ -436,7 +439,7 @@ export default function GastoForm({
   const itbmsAmount = Math.round(subtotalNum * (parseFloat(gItbmsPct) / 100) * 100) / 100;
 
   return (
-    <div>
+    <div className={dosColumnas ? "lg:grid lg:grid-cols-2 lg:gap-x-10 lg:items-start" : undefined} data-dos-columnas={dosColumnas || undefined}>
       {/* Comprobante */}
       <Section eyebrow="Comprobante">
         <div

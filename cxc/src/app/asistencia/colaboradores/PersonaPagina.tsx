@@ -21,6 +21,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import AppHeader from "@/components/AppHeader";
+import { CONTENIDO_ANCHO_2026_10, BLOQUES_DE_A_DOS } from "@/lib/navegacion/contenido-ancho";
 import { useToast } from "@/components/ToastSystem";
 import { puedeCerrar } from "@/lib/asistencia/roles";
 import {
@@ -249,6 +250,9 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
     }
   }
 
+  const deADos = (nodo: React.ReactNode) =>
+    CONTENIDO_ANCHO_2026_10 ? <div className={`space-y-4 ${BLOQUES_DE_A_DOS}`} data-dos-columnas>{nodo}</div> : nodo;
+
   return (
     <>
       <AppHeader module="Asistencia y planilla" />
@@ -309,7 +313,10 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
                 guardada: mientras no exista no hay a quién prestarle ni a quién
                 justificarle nada, y dibujar cuatro secciones vacías arriba de
                 un formulario de alta es ruido. */}
-            {!nueva && persona && (
+            {/* 🔴 2-oct-2026 (`CONTENIDO_ANCHO_2026_10`, tipo c): desde 1024 px
+                las secciones van de a dos por fila; en el celular, una debajo
+                de la otra como siempre. */}
+            {!nueva && persona && deADos(
               <>
                 <SeccionPrestamos codigo={codigo} refresco={refresco} />
                 {/* 🔴 APARTE de Préstamos, a propósito: lo que debe por un día

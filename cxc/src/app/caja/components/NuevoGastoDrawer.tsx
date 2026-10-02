@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Drawer from "@/components/Drawer";
+import { CONTENIDO_ANCHO_2026_10 } from "@/lib/navegacion/contenido-ancho";
 import { fmt } from "@/lib/format";
 import GastoForm, { normalizeStr } from "./GastoForm";
 import AvisoSaldoNegativo from "./AvisoSaldoNegativo";
@@ -281,7 +282,7 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
   );
 
   return (
-    <Drawer open={open} onClose={onClose} title="Nuevo gasto" footer={footer}>
+    <Drawer open={open} onClose={onClose} title="Nuevo gasto" footer={footer} ancho={CONTENIDO_ANCHO_2026_10}>
       <div className="skin-caja px-5 py-5">
         {error && (
           <p className="text-sm mb-4 px-3 py-2 rounded-md" style={{ color: "var(--caja-danger-onSoft)", background: "var(--caja-danger-soft)", border: "1px solid var(--caja-danger-border)" }}>
@@ -305,6 +306,7 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
           setShowManageCat={setShowManageCat}
           zonaFotos={<ZonaFotos pendientes={fotos} onPendientes={setFotos} />}
           notaFecha={notaFecha}
+          dosColumnas={CONTENIDO_ANCHO_2026_10}
         />
       </div>
 

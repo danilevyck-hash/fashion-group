@@ -62,6 +62,10 @@ import { lineaFiscal, ROTULO_DIRECCION_SWITCH } from "@/lib/clientes/direccion-s
 import { textoYaNoEstaEnSwitch } from "@/lib/clientes/lista";
 import type { FilaAgingCliente } from "@/lib/clientes/cliente-para-cobrar";
 import CobrarEnFicha from "./CobrarEnFicha";
+import { CONTENIDO_ANCHO_2026_10 } from "@/lib/navegacion/contenido-ancho";
+
+/** Tipo c (2-oct-2026): detalle por empresa (3 partes) y últimos pagos (2), lado a lado desde 1024 px. */
+const DETALLE_Y_PAGOS = "lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-4 lg:items-start";
 
 export type FilaAging = FilaAgingCliente;
 
@@ -220,6 +224,9 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
   });
 
   const opcionesSync = opcionesFichaCliente(activas.map((e) => e.empresa));
+  const ancho = CONTENIDO_ANCHO_2026_10;
+  const deADos = (nodo: React.ReactNode) =>
+    ancho ? <div className={DETALLE_Y_PAGOS} data-dos-columnas>{nodo}</div> : nodo;
 
   return (
     <div className="min-h-screen bg-white">
@@ -315,6 +322,9 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
           </Tarjeta>
         </div>
 
+        {/* 🔴 2-oct-2026 (`CONTENIDO_ANCHO_2026_10`, tipo c): desde 1024 px el
+            detalle por empresa y los últimos pagos van lado a lado. */}
+        {deADos(<>
         {/* ── 3. EMPRESA POR EMPRESA ─────────────────────────────────────── */}
         <section className="border border-gray-200 rounded-lg p-4 mb-4">
           <div className="flex items-center gap-1 mb-3">
@@ -412,11 +422,12 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
             </ul>
           )}
         </section>
+        </>)}
 
         {/* ── 5. CONTACTO — se edita TOCANDO el dato ──────────────────────── */}
         <section className="border border-gray-200 rounded-lg p-4 mb-4">
           <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-3">Contacto</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-y-3 gap-x-6 text-sm">
+          <div className={`grid grid-cols-1 sm:grid-cols-3 gap-y-3 gap-x-6 text-sm${ancho ? " lg:grid-cols-[repeat(3,minmax(0,320px))]" : ""}`}>
             {/* 🔴 «Contacto» va PRIMERO: es lo que se pregunta al llamar a
                 cobrar («¿con quién hablo?»). */}
             <CampoEnLinea
