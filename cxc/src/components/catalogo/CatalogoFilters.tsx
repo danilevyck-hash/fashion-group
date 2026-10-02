@@ -117,6 +117,7 @@ import {
 } from "@/lib/catalogo/filtros-extra";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import FiltroPrecioChip from "./FiltroPrecioChip";
+import ChipFiltro from "./ChipFiltro";
 import { grupoTieneOpciones, type OpcionFiltro } from "@/lib/catalogo/filtros-derivados";
 import { CATALOGO_ORDEN_CELULAR, FILA_QUE_SE_DESLIZA, cuantosFiltrosPuestos, textoBotonFiltros } from "@/lib/catalogo/orden-celular";
 import { clasesBarraFiltros, textoOrdenCorto } from "@/lib/catalogo/catalogos-2026-10";
@@ -134,8 +135,9 @@ interface FiltroDesplegableProps {
   /** Propuesta estilo Apple: sin nada elegido dice solo «Género», no
    *  «Género: Todos» (así los tres entran en una fila del celular). */
   compacto?: boolean;
-  /** v4 (`CATALOGOS_APPLE_2026_10_B`): el tamaño del chip compacto. */
-  tam?: string;
+  /** v4 (`CATALOGOS_APPLE_2026_10_B`): el chip compacto (`ChipFiltro`), que
+   *  dice lo elegido («Women ▾») en vez de «Género: Women». */
+  chip?: boolean;
 }
 
 /**
@@ -154,7 +156,7 @@ interface FiltroDesplegableProps {
  * terminarían dando dos listas de opciones distintas.
  */
 export function FiltroDesplegable({
-  etiqueta, valor, opciones, onChange, chipActive, chipInactive, compacto = false, tam,
+  etiqueta, valor, opciones, onChange, chipActive, chipInactive, compacto = false, chip = false,
 }: FiltroDesplegableProps) {
   const [abierto, setAbierto] = useState(false);
   const anclaRef = useRef<HTMLButtonElement>(null);
@@ -163,13 +165,27 @@ export function FiltroDesplegable({
 
   return (
     <>
+      {chip ? (
+      <ChipFiltro
+        ref={anclaRef}
+        onClick={() => setAbierto(a => !a)}
+        aria-haspopup="listbox"
+        aria-expanded={abierto}
+        activo={activo}
+        chipActive={chipActive}
+        chipInactive={chipInactive}
+        conFlecha
+      >
+        {activo ? (elegida?.label ?? etiqueta) : etiqueta}
+      </ChipFiltro>
+      ) : (
       <button
         ref={anclaRef}
         type="button"
         onClick={() => setAbierto(a => !a)}
         aria-haspopup="listbox"
         aria-expanded={abierto}
-        className={`${tam ? `inline-flex items-center gap-1 ${tam}` : "inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px]"} ${
+        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
           activo ? chipActive : chipInactive
         }`}
       >
@@ -178,6 +194,7 @@ export function FiltroDesplegable({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
+      )}
 
       <DesplegableFlotante
         abierto={abierto}
@@ -458,7 +475,13 @@ export default function CatalogoFilters({
   const buscadorPiezas = buscador(f.searchPlaceholder);
   const desplegablesPiezas = (
     <>
-    {conBultos && (
+    {conBultos && unaFila && (
+      <ChipFiltro onClick={() => onBultosFilterChange!(!bultosFilter)} aria-pressed={bultosFilter}
+        activo={bultosFilter} chipActive={f.chipActive} chipInactive={f.chipInactive}>
+        2+ bultos
+      </ChipFiltro>
+    )}
+    {conBultos && !unaFila && (
       <button
         onClick={() => onBultosFilterChange!(!bultosFilter)}
         aria-pressed={bultosFilter}
@@ -466,7 +489,7 @@ export default function CatalogoFilters({
           bultosFilter ? f.chipActive : f.chipInactive
         }`}
       >
-        {unaFila ? "2+ bultos" : BULTOS_CHIP_LABEL}
+        {BULTOS_CHIP_LABEL}
       </button>
     )}
 
@@ -479,7 +502,7 @@ export default function CatalogoFilters({
         chipActive={f.chipActive}
         chipInactive={f.chipInactive}
         compacto={apple || unaFila}
-        tam={unaFila ? CHIP_V4 : undefined}
+        chip={unaFila}
       />
     )}
 
@@ -492,7 +515,7 @@ export default function CatalogoFilters({
         chipActive={f.chipActive}
         chipInactive={f.chipInactive}
         compacto={apple || unaFila}
-        tam={unaFila ? CHIP_V4 : undefined}
+        chip={unaFila}
       />
     )}
 
@@ -628,34 +651,33 @@ export default function CatalogoFilters({
   // y «pon precio al nivel de categoría y género». El buscador va en su línea,
   // con la cantidad en gris adentro; debajo, UNA fila de chips a la vista que
   // se DESLIZA de lado si no cabe (nunca la página): «2+ bultos» · Género ·
-  // Categoría · Precio; el orden, al lado del buscador. En la computadora Género y Categoría siguen
-  // como píldoras: lo que hoy se ve, se sigue viendo. Nada se duplica.
+  // Categoría · Precio · orden. Igual en el celular y
+  // en la computadora: cada grupo es un chip con su menú. Nada se duplica.
   if (unaFila) {
     const ordenado = sortBy !== "relevancia";
     return (
       <div className="mb-3 space-y-1">
-        {/* Línea 1: el buscador y, al lado, el orden (en el celular solo «↕»
-            mientras sea el de siempre). Línea 2: los filtros. */}
-        <div className="flex items-center gap-2">
-          <div className="relative min-w-0 flex-1">
-            {buscador("Buscar", searchInput ? "9.5rem" : "7rem",
+        {/* Línea 1: el buscador, con la cantidad adentro. Línea 2: los filtros
+            y el orden, en UNA fila (celular y computadora). */}
+        <div className="relative">
+          {buscador("Buscar nombre o código", searchInput ? "9.5rem" : "7rem",
               <span data-cantidad className={`pointer-events-none absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-xs text-gray-400 ${searchInput ? "right-11" : "right-3.5"}`}>
                 {filteredCount} {filteredCount === 1 ? "producto" : "productos"}
               </span>)}
-          </div>
-          <div title={textoOrdenCorto(sortBy)} className={`${CHIP_V4} gap-1 ${ordenado ? f.chipActive : f.chipInactive}`}>
-            <span aria-hidden="true" className="pointer-events-none">↕<span className={ordenado ? " ml-1" : " ml-1 hidden lg:inline"}>{textoOrdenCorto(sortBy)}</span></span>
-            <span className="absolute inset-0 opacity-0 [&>select]:h-full [&>select]:w-full">{selectOrden}</span>
-          </div>
         </div>
         <div data-fila-filtros className={`${FILA_QUE_SE_DESLIZA} items-center py-1 lg:flex-wrap lg:overflow-x-visible`}>
-          <div className="contents lg:hidden">{desplegablesPiezas}</div>
-          <div className="hidden lg:contents">{pildorasPiezas}</div>
-          {/* «Precio ▾» es un chip más de la fila, con el mismo estilo. */}
+          {/* Celular y computadora IGUAL (2-oct-2026, Daniel: «¿los chips y un
+              dropdown con opciones sería más Apple?»): un chip con menú por
+              grupo, no las filas de píldoras «Todos · Women · Men…». */}
+          {desplegablesPiezas}
           {conPrecio && (
             <FiltroPrecioChip precio={precio} onChange={onPrecioChange!} precios={preciosDisponibles}
-              chipActive={f.chipActive} chipInactive={f.chipInactive} tam={CHIP_V4} />
+              chipActive={f.chipActive} chipInactive={f.chipInactive} chip />
           )}
+          <div title={textoOrdenCorto(sortBy)} className={`${CHIP_V4} gap-1 ${ordenado ? f.chipActive : f.chipInactive}`}>
+            <span aria-hidden="true" className="pointer-events-none">↕<span className="ml-1">{textoOrdenCorto(sortBy)}</span></span>
+            <span className="absolute inset-0 opacity-0 [&>select]:h-full [&>select]:w-full">{selectOrden}</span>
+          </div>
           {hasActiveFilters && <span className="shrink-0 whitespace-nowrap">{botonLimpiar}</span>}
         </div>
       </div>

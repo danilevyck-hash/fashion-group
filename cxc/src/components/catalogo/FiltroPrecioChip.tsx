@@ -13,6 +13,7 @@
 
 import { useRef, useState } from "react";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
+import ChipFiltro from "./ChipFiltro";
 import { mensajeFiltroPrecio, PRECIO_VACIO, type FiltroPrecio } from "@/lib/catalogo/filtros-extra";
 import { precioAlAplicar, textoChipPrecio } from "@/lib/catalogo/catalogos-2026-10-b";
 
@@ -22,13 +23,13 @@ interface Props {
   precios: number[];
   chipActive: string;
   chipInactive: string;
-  /** El tamaño del chip compacto de la v4. */
-  tam?: string;
+  /** v4: el chip compacto compartido (`ChipFiltro`). */
+  chip?: boolean;
 }
 
 const CAMPO = "w-full min-h-[44px] rounded-md border border-gray-300 bg-white px-3 text-sm tabular-nums text-gray-900 outline-none focus:border-gray-900 placeholder:text-gray-400";
 
-export default function FiltroPrecioChip({ precio, onChange, precios, chipActive, chipInactive, tam }: Props) {
+export default function FiltroPrecioChip({ precio, onChange, precios, chipActive, chipInactive, chip = false }: Props) {
   const [abierto, setAbierto] = useState(false);
   const [borrador, setBorrador] = useState<FiltroPrecio>(precio);
   const anclaRef = useRef<HTMLButtonElement>(null);
@@ -51,19 +52,26 @@ export default function FiltroPrecioChip({ precio, onChange, precios, chipActive
 
   return (
     <>
+      {chip ? (
+        <ChipFiltro ref={anclaRef} onClick={abrir} aria-haspopup="dialog" aria-expanded={abierto}
+          activo={!!texto} chipActive={chipActive} chipInactive={chipInactive} conFlecha>
+          {texto ?? "Precio"}
+        </ChipFiltro>
+      ) : (
       <button
         ref={anclaRef}
         type="button"
         onClick={abrir}
         aria-haspopup="dialog"
         aria-expanded={abierto}
-        className={`inline-flex items-center gap-1 ${tam ?? "px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px]"} ${texto ? chipActive : chipInactive}`}
+        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${texto ? chipActive : chipInactive}`}
       >
         <span>{texto ?? "Precio"}</span>
         <svg className="w-3 h-3 shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
+      )}
 
       <DesplegableFlotante
         abierto={abierto}

@@ -153,15 +153,36 @@ describe("4 · 🔴 el buscador en una fila manda lo mismo", () => {
     const fila = container.querySelector("[data-fila-filtros]")!;
     expect(fila.className).toContain("overflow-x-auto");
     expect(screen.queryByRole("button", { name: /^Filtros/ })).toBeNull();
-    // Género, Categoría y Precio viven en la MISMA fila, sin abrir nada; el
-    // orden, al lado del buscador.
-    for (const t of ["2+ bultos", "Género", "Categoría", "Precio"]) {
+    // Bultos, Género, Categoría, Precio y el orden viven en la MISMA fila, sin
+    // abrir nada, en el celular y en la computadora (sin píldoras de opciones).
+    for (const t of ["2+ bultos", "Género", "Categoría", "Precio", "Relevancia"]) {
       expect(fila.textContent, t).toContain(t);
     }
     // Chip compacto: 36 de alto a la vista y 44 de toque.
     expect(CHIP_V4).toContain("h-9");
     expect(CHIP_V4).toContain("before:-inset-y-1");
     expect(screen.getByRole("combobox").closest("div[title]")!.className).toContain("h-9");
+    expect(screen.queryByText("Women")).toBeNull(); // las opciones viven en el menú
+  });
+
+  it("v4: el chip dice lo elegido («Women ▾»), se resalta, y el menú trae «Todos» y ✓", () => {
+    const onGenderChange = vi.fn();
+    render(
+      <CatalogoFilters
+        marca="tommy" searchInput="" gender="women" category="" sortBy="relevancia" filteredCount={10}
+        onSearchChange={vi.fn()} onGenderChange={onGenderChange} onCategoryChange={vi.fn()}
+        onSortByChange={vi.fn()} onClearAll={vi.fn()}
+        genderOptions={[{ value: "", label: "Todos" }, { value: "women", label: "Women" }, { value: "men", label: "Men" }]}
+        apple unaFila
+      />,
+    );
+    const chip = screen.getByRole("button", { name: "Women" });
+    expect(chip.getAttribute("aria-haspopup")).toBe("listbox");
+    fireEvent.click(chip);
+    expect(screen.getByRole("option", { name: "Todos" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Women" }).getAttribute("aria-selected")).toBe("true");
+    fireEvent.click(screen.getByRole("option", { name: "Men" }));
+    expect(onGenderChange).toHaveBeenCalledWith("men");
   });
 });
 
