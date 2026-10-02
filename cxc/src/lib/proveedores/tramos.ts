@@ -56,9 +56,9 @@ export const TRAMOS: readonly {
   label: string;
   buckets: readonly string[];
 }[] = [
-  { key: "t0_90", label: "0-90D", buckets: ["0-30", "31-60", "61-90"] },
-  { key: "t91_120", label: "91-120D", buckets: ["91-120"] },
-  { key: "t121_365", label: "121-365D", buckets: ["121-180", "181-270", "271-365"] },
+  { key: "t0_90", label: "0-90 d", buckets: ["0-30", "31-60", "61-90"] },
+  { key: "t91_120", label: "91-120 d", buckets: ["91-120"] },
+  { key: "t121_365", label: "121-365 d", buckets: ["121-180", "181-270", "271-365"] },
   { key: "tMas365", label: "+1 año", buckets: ["Mas de 365"] },
 ] as const;
 
@@ -128,7 +128,7 @@ export function totalDeTramos(t: Tramos): number {
 // (`lib/cxc/descargas.ts`, 20-sep-2026): **el neto se queda igual, pero se dice
 // de qué está hecho**.
 //
-//     Le debes X · Tienes a favor Y · Por pagar Z       con Z = X − Y
+//     Pendiente X · Saldo a favor Y · Por pagar Z       con Z = X − Y (1-oct-2026, Daniel: nombres normales de ERP)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface SaldoPartido {
@@ -155,7 +155,7 @@ export function partirSaldo(
 }
 
 /**
- * 🔴 LA FRASE QUE LO DICE, EN UN SOLO LUGAR: «Le debes X · Tienes a favor Y ·
+ * 🔴 LA FRASE QUE LO DICE, EN UN SOLO LUGAR: «Pendiente X · Saldo a favor Y ·
  * Por pagar Z». Devuelve `null` cuando no hay nada a favor — ahí el «Por pagar»
  * solo ya lo dice todo, y una frase de tres partes con un cero adentro es
  * ruido.
@@ -165,7 +165,7 @@ export function frasePartida(
   fmt: (n: number) => string,
 ): string | null {
   if (s.a_favor === 0) return null;
-  return `Le debes $${fmt(s.debes)} · Tienes a favor $${fmt(s.a_favor)} · Por pagar $${fmt(s.por_pagar)}`;
+  return `Pendiente $${fmt(s.debes)} · Saldo a favor $${fmt(s.a_favor)} · Por pagar $${fmt(s.por_pagar)}`;
 }
 
 /** Suma dos particiones (empresa → pie del grupo) conservando la resta. */

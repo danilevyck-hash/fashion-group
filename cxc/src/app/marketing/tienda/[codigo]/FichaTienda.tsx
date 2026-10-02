@@ -239,7 +239,7 @@ export default function FichaTienda({ codigo, role }: { codigo: string; role: st
             vivas.length === 0
               ? "Todavía no hay gastos cargados a esta tienda."
               : delPeriodo.length === 0
-                ? "Nada abierto: todo lo de esta tienda ya se le pasó a la marca. Mira «Todos» para ver la historia."
+                ? "Sin gastos abiertos · Historial en «Todos»."
                 : null
           }
           escribe={escribe}
@@ -362,7 +362,7 @@ export default function FichaTienda({ codigo, role }: { codigo: string; role: st
             {vivas.length === 0 ? (
               <Aviso texto="Todavía no hay gastos cargados a esta tienda." />
             ) : delPeriodo.length === 0 ? (
-              <Aviso texto="Nada abierto: todo lo de esta tienda ya se le pasó a la marca. Mira «Todos» para ver la historia." />
+              <Aviso texto="Sin gastos abiertos · Historial en «Todos»." />
             ) : (
               <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
                 <ScrollableTable minWidth={760}>

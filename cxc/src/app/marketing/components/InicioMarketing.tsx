@@ -323,7 +323,7 @@ function InicioDeAntes({
                 b.key === MULTIFASHION_KEY
                   ? "Tienda propia · sin período"
                   : b.key === SIN_BLOQUE
-                    ? "Falta decidir a qué marca se le reporta este gasto"
+                    ? "Pendiente de asignar marca"
                     : sinGasto && cerradosCount === 0
                       ? "Sin gasto este período"
                       : plural(nPeriodos, "período", "períodos");

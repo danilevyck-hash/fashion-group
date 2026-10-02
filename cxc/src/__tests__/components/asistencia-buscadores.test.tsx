@@ -35,8 +35,8 @@
  *      salen con TODAS las líneas —ese candado no cambió de dirección— y ahora
  *      no hay forma de recortar la pantalla que pudiera contagiarlos.
  *   7. 🔴 EN APROBACIONES, EL BOTÓN DE LOTE DICE A CUÁNTOS AFECTA. Sin búsqueda
- *      es «Sí a todo lo pendiente» y manda todo; con búsqueda es «Sí a los 3
- *      que ves» y manda esos tres. Las dos direcciones son plata: decir «todo»
+ *      es «Aprobar pendientes» y manda todo; con búsqueda es «Aprobar 3 visibles» (antes «Sí a los 3
+ *      que ves»; 1-oct-2026, Daniel: nombres normales de ERP) y manda esos tres. Las dos direcciones son plata: decir «todo»
  *      y mandar menos deja horas sin resolver; decir «los 3» y mandar quince
  *      aprueba horas que nadie miró.
  *   8. Sin resultados se dice con palabras y se ofrece la salida.
@@ -71,7 +71,7 @@ vi.mock("@/components/ui/RangoFechas", () => ({
   }) => (
     <div>
       <button type="button" onClick={() => onChange(desde, hasta)}>
-        {vacio ? "Elige el período" : `${desde} – ${hasta}`}
+        {vacio ? "Seleccionar período" : `${desde} – ${hasta}`}
       </button>
       {accion}
     </div>
@@ -288,7 +288,7 @@ const RESPUESTA_PLANILLA = {
 };
 
 /**
- * 🩸 15-sep-2026: acá se tocaba «Elige el período» del doble del calendario.
+ * 🩸 15-sep-2026: acá se tocaba «Seleccionar período» del doble del calendario.
  * La Planilla ya no monta el calendario (Daniel: *«si la quincena es fija, que
  * no haya opción de rango, solo las opciones»*): se elige con CUATRO botones —
  * las dos quincenas del mes anterior y las dos del mes en curso—.
@@ -453,9 +453,9 @@ describe("🔴 Préstamos: el TOTAL SIGUE AL FILTRO", () => {
 
   it("🔴 y el encabezado dice cuántos se ven, no cuántos hay", async () => {
     await abrirPrestamos();
-    expect(document.body.textContent).toContain("2 colaboradores con deuda");
+    expect(document.body.textContent).toContain("2 colaboradores con saldo");
     teclear("alejandra");
-    await waitFor(() => expect(document.body.textContent).toContain("1 colaborador con deuda"));
+    await waitFor(() => expect(document.body.textContent).toContain("1 colaborador con saldo"));
     // 🔴 Y el buscador dice contra qué se recortó: sin eso, «$100.00» se lee
     // como la deuda de la empresa entera.
     expect(screen.getByTestId("conteo-busqueda").textContent).toBe("1 de 2 colaboradores");
@@ -518,10 +518,10 @@ describe("🔴 Aprobaciones › Colaborador: el botón DICE a cuántos afecta", 
    * exactamente a cuántos afecta y afecte solo a esos**.
    *
    * 🔑 Las dos direcciones son plata y las dos están probadas acá:
-   *   · **Sin búsqueda** el botón dice «Sí a todo lo pendiente» y manda TODO lo
+   *   · **Sin búsqueda** el botón dice «Aprobar pendientes» y manda TODO lo
    *     pendiente de la empresa elegida. Que dijera «todo» y mandara menos
    *     dejaría horas sin decidir sin que nadie se entere.
-   *   · **Con búsqueda** el botón dice «Sí a los N que ves» y manda exactamente
+   *   · **Con búsqueda** el botón dice «Aprobar N visibles» y manda exactamente
    *     esos N. Que dijera «los 3 que ves» y aprobara quince sería peor: son
    *     horas extra aprobadas que nadie miró.
    * El contador grande sigue la misma regla del total que las demás listas.
@@ -534,34 +534,34 @@ describe("🔴 Aprobaciones › Colaborador: el botón DICE a cuántos afecta", 
     expect(screen.getAllByText(/Andrea Perez/i).length).toBeGreaterThan(0);
   });
 
-  it("🔴 SIN BÚSQUEDA: el botón dice «Sí a todo lo pendiente» y manda LAS DOS", async () => {
+  it("🔴 SIN BÚSQUEDA: el botón dice «Aprobar pendientes» y manda LAS DOS", async () => {
     const llamadas: Array<{ url: string; body: unknown }> = [];
     await abrirAprobaciones(llamadas);
-    fireEvent.click(screen.getByRole("button", { name: /Sí a todo lo pendiente/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Aprobar pendientes/ }));
     await waitFor(() => expect(llamadas.some((l) => l.url.includes("/api/asistencia/aprobaciones"))).toBe(true));
     const post = llamadas.find((l) => l.url.includes("/api/asistencia/aprobaciones"))!;
     expect((post.body as { dias: Array<{ codigo: string }> }).dias.map((d) => d.codigo).sort()).toEqual(["16", "22"]);
   });
 
-  it("🔴 CON BÚSQUEDA: el botón DICE «Sí al que ves» y manda SOLO a esa persona", async () => {
+  it("🔴 CON BÚSQUEDA: el botón DICE «Aprobar 1 visible» y manda SOLO a esa persona", async () => {
     const llamadas: Array<{ url: string; body: unknown }> = [];
     await abrirAprobaciones(llamadas);
     teclear("andrea");
     await waitFor(() => expect(screen.queryAllByText(/Alejandra Camaño/i).length).toBe(0));
     // 🔴 El rótulo cambió: nadie aprieta «todo» creyendo que es todo.
-    expect(screen.queryByRole("button", { name: /Sí a todo lo pendiente/ })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /Sí al que ves/ }));
+    expect(screen.queryByRole("button", { name: /Aprobar pendientes/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Aprobar 1 visible/ }));
     await waitFor(() => expect(llamadas.some((l) => l.url.includes("/api/asistencia/aprobaciones"))).toBe(true));
     const post = llamadas.find((l) => l.url.includes("/api/asistencia/aprobaciones"))!;
     expect((post.body as { dias: Array<{ codigo: string }> }).dias.map((d) => d.codigo)).toEqual(["16"]);
   });
 
-  it("🔴 con DOS a la vista el rótulo los cuenta: «Sí a los 2 que ves»", async () => {
+  it("🔴 con DOS a la vista el rótulo los cuenta: «Aprobar 2 visibles»", async () => {
     await abrirAprobaciones();
     // «a» aparece en los dos nombres: la búsqueda deja a las dos personas.
     teclear("a");
     await waitFor(() => expect(screen.getByTestId("conteo-busqueda").textContent).toBe("2 de 2 colaboradores"));
-    expect(screen.getByRole("button", { name: /Sí a los 2 que ves/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Aprobar 2 visibles/ })).toBeTruthy();
   });
 
   it("🔴 el contador grande SIGUE AL FILTRO, y el buscador dice contra qué", async () => {
@@ -578,7 +578,7 @@ describe("🔴 Aprobaciones › Colaborador: el botón DICE a cuántos afecta", 
     await abrirAprobaciones();
     teclear("zzzz");
     await waitFor(() => expect(screen.getByText(new RegExp(VACIO_BUSQUEDA))).toBeTruthy());
-    const boton = screen.getByRole("button", { name: /Sí a/ }) as HTMLButtonElement;
+    const boton = screen.getByRole("button", { name: /Aprobar/ }) as HTMLButtonElement;
     expect(boton.disabled).toBe(true);
   });
 });
@@ -617,9 +617,10 @@ describe("🔴 la regla del total: o sigue al filtro, o no hay buscador", () => 
   });
 
   it("🔴 el rótulo del lote: sin búsqueda el de siempre; con búsqueda, cuántos", () => {
-    expect(rotuloDeLote("Sí a todo lo pendiente", 5, false)).toBe("Sí a todo lo pendiente");
-    expect(rotuloDeLote("Sí a todo lo pendiente", 3, true)).toBe("Sí a los 3 que ves");
-    expect(rotuloDeLote("Sí a todo lo pendiente", 1, true)).toBe("Sí al que ves");
+    // 1-oct-2026, Daniel: nombres normales de ERP («Sí a todo lo pendiente / Sí a los 3 que ves» → «Aprobar pendientes / Aprobar 3 visibles»).
+    expect(rotuloDeLote("Aprobar pendientes", 5, false)).toBe("Aprobar pendientes");
+    expect(rotuloDeLote("Aprobar pendientes", 3, true)).toBe("Aprobar 3 visibles");
+    expect(rotuloDeLote("Aprobar pendientes", 1, true)).toBe("Aprobar 1 visible");
   });
 
   it("🔴 `toquesDeEstos` recorta por CÓDIGO, nunca por nombre", () => {

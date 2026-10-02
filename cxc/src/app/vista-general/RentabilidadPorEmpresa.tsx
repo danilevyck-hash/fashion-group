@@ -114,7 +114,7 @@ export default function RentabilidadPorEmpresa({
           todo, que no hay un total. Sin ella, alguien suma las filas de cabeza
           y se arma el número del grupo que Daniel pidió no tener. */}
       <p className="mt-0.5 mb-3 text-xs text-stone-500">
-        Cada empresa contra lo suyo: su utilidad bruta menos sus gastos. No hay un total del grupo.
+        Utilidad bruta menos gastos, por empresa. Sin total consolidado.
       </p>
 
       {/* ─── Tarjetas (< md): iPhone ──────────────────────────────────────

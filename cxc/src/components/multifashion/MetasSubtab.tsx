@@ -166,7 +166,7 @@ export function MetasSubtab() {
       {data.metas.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
           <Target className="mx-auto h-8 w-8 text-gray-300" />
-          <p className="mt-2 text-sm font-medium text-gray-800">Todavía no hay ninguna meta</p>
+          <p className="mt-2 text-sm font-medium text-gray-800">Sin metas registradas</p>
           <p className="mt-1 text-xs text-gray-500">
             Una meta es un monto a alcanzar entre dos fechas. Al crearla, aquí se ve cuánto
             llevan, cuánto falta y si el ritmo alcanza.
@@ -177,7 +177,7 @@ export function MetasSubtab() {
               onClick={abrirNueva}
               className="mt-4 inline-flex min-h-[44px] items-center gap-1.5 rounded-md bg-black px-4 text-sm font-medium text-white transition active:scale-[0.97]"
             >
-              <Plus className="h-4 w-4" /> Crear la primera meta
+              <Plus className="h-4 w-4" /> Nueva meta
             </button>
           )}
         </div>
@@ -207,7 +207,7 @@ export function MetasSubtab() {
             ))}
             {vivas.length === 0 && (
               <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
-                <p className="text-sm text-gray-700">No hay ninguna meta andando ahora.</p>
+                <p className="text-sm text-gray-700">Sin metas en curso.</p>
               </div>
             )}
           </div>

@@ -107,13 +107,13 @@ describe("🔴 los dos botones de arriba están con el mes Y con el año", () =>
   const abrirShell = async () => {
     render(<ComisionesView availableYears={[2026, 2025]} />);
     // Las vistas cargan con `next/dynamic`: se espera a que la barra exista.
-    await screen.findByRole("button", { name: /Descargar el mes en PDF/ });
+    await screen.findByRole("button", { name: /Descargar PDF del mes/ });
   };
 
-  it("con un mes: «Descargar el mes en PDF» y «…en Excel»", async () => {
+  it("con un mes: «Descargar PDF del mes» y «…en Excel»", async () => {
     await abrirShell();
-    expect(screen.getByRole("button", { name: /Descargar el mes en PDF/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Descargar el mes en Excel/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Descargar PDF del mes/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Descargar Excel del mes/ })).toBeTruthy();
   });
 
   it("🔴 y con «Todo el año» los DOS siguen ahí, diciendo «el año»", async () => {
@@ -127,10 +127,10 @@ describe("🔴 los dos botones de arriba están con el mes Y con el año", () =>
     await act(async () => {
       fireEvent.click(await screen.findByRole("button", { name: ROTULO_TODO_EL_ANIO }));
     });
-    expect(await screen.findByRole("button", { name: /Descargar el año en PDF/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Descargar el año en Excel/ })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: /Descargar PDF del año/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Descargar Excel del año/ })).toBeTruthy();
     // Y ya no queda ningún botón hablando del mes.
-    expect(screen.queryByRole("button", { name: /Descargar el mes/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Descargar (PDF|Excel) del mes/ })).toBeNull();
   });
 });
 

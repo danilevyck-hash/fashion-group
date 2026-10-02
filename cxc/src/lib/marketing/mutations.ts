@@ -254,7 +254,7 @@ export async function restaurarProyecto(id: string): Promise<void> {
  * no un error de Postgres.
  */
 export const MSG_SIN_CLIENTE_SIN_DDL =
-  "Para registrar un gasto sin cliente falta correr la actualización de la base de datos. Mientras tanto, elige un cliente.";
+  "Para registrar un gasto sin cliente falta correr la actualización de la base de datos. Mientras tanto, selecciona un cliente.";
 
 /**
  * El `insert` de la factura CON las columnas del rediseño y, si la base dijera

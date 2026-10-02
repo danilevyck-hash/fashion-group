@@ -307,7 +307,7 @@ describe("Comisiones — lo que Daniel usa sigue a un toque", () => {
     // original más abajo: las vistas hijas siguen sin dibujar su propio botón.
     expect(barra).toContain("rotuloDescargarExcel(mes)");
     // 🔄 9-SEP-2026 — el rótulo del PDF pasó de constante a función, porque el
-    // botón también existe con «Todo el año» («Descargar el año en PDF»). Sigue
+    // botón también existe con «Todo el año» («Descargar PDF del año»). Sigue
     // saliendo del módulo puro, nunca escrito a mano en la barra.
     expect(barra).toContain("rotuloDescargarPdf(mes)");
     // Las vistas hijas ya no dibujan su propio botón Excel (era una fila de
@@ -338,8 +338,9 @@ describe("Comisiones — Criterios y la fecha de sincronizado NO se borraron", (
 
   it("la frescura del dato sigue en pantalla, adentro del mismo ⓘ", () => {
     expect(shell).toContain("<SyncStatus");
-    // 1-oct-2026, Daniel: nombres normales de ERP («Sincronizado» → «Última sincronización»).
-    expect(shell).toContain('prefix="Última sincronización"');
+    // 1-oct-2026, Daniel: nombres normales de ERP — se vuelve a «Actualizado…»
+    // (el rótulo por omisión de SyncStatus), sin «sincroniz» en pantalla.
+    expect(shell).not.toMatch(/prefix="[^"]*[Ss]incroniz/);
     // Y si alguna empresa quedó sin actualizar, el ⓘ lo avisa sin abrirlo.
     expect(shell).toContain("onStale={setSyncStale}");
     expect(criterios).toContain("bg-amber-500");

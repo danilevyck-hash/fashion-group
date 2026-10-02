@@ -122,15 +122,15 @@ export default function InicioBoston({ onIr }: { onIr: (t: TabBoston) => void })
           <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Antigüedad de saldos</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
             <p className="flex items-baseline justify-between gap-2">
-              <span className="text-emerald-600">Al día (0-90)</span>
+              <span className="text-emerald-600">0-90 días</span>
               <span className="tabular-nums font-medium">${fmt(c.d0_90)}</span>
             </p>
             <p className="flex items-baseline justify-between gap-2">
-              <span className="text-amber-600">91-120</span>
+              <span className="text-amber-600">91-120 días</span>
               <span className="tabular-nums font-medium">${fmt(c.d91_120)}</span>
             </p>
             <p className="flex items-baseline justify-between gap-2">
-              <span className="text-red-600">121 y más</span>
+              <span className="text-red-600">+120 días</span>
               <span className="tabular-nums font-medium">${fmt(c.d121_plus)}</span>
             </p>
           </div>

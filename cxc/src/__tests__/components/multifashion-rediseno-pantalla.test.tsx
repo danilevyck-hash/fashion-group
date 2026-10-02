@@ -121,7 +121,7 @@ describe("Resumen · las cuatro tarjetas", () => {
     await pintar();
     expect(screen.queryByText(/Panorama del año/)).toBeNull();
     // Y lo que ese desplegable traía sigue a la vista.
-    expect(screen.getByText(/cierra en/)).toBeTruthy();
+    expect(screen.getByText(/proyección/)).toBeTruthy();
     expect(screen.getByText(/margen tienda/)).toBeTruthy();
   });
 });

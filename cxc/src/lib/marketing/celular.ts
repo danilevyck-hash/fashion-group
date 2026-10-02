@@ -106,7 +106,7 @@ export function subtituloTiendaCelular(f: Pick<FilaTienda, "cantidad" | "esGener
 export const PUERTAS_DEL_CELULAR = [
   { clave: "marcas", titulo: "Marcas", detalle: "cerrar y mandar el ZIP" },
   { clave: "impulsadoras", titulo: "Impulsadoras", detalle: "meses sin pagar" },
-  { clave: "mobiliario", titulo: "Mobiliario", detalle: "inventario en piezas" },
+  { clave: "mobiliario", titulo: "Mobiliario", detalle: "inventario en unidades" },
 ] as const;
 
 export type PuertaDelCelular = (typeof PUERTAS_DEL_CELULAR)[number]["clave"];
@@ -336,8 +336,8 @@ export function debeEnRojo(meses: number): boolean {
  * ya existe y enseñarle a leer fotos, no solo PDF.
  */
 export const PUERTAS_DE_LA_FACTURA = [
-  { clave: "escanear", titulo: "Escanear", detalle: "tomas la foto y se llena solo" },
-  { clave: "pdf", titulo: "Subir PDF", detalle: "de Archivos o del correo · también se llena solo" },
+  { clave: "escanear", titulo: "Escanear", detalle: "foto de la factura · campos automáticos" },
+  { clave: "pdf", titulo: "Subir PDF", detalle: "de Archivos o del correo · campos automáticos" },
   { clave: "mano", titulo: "Ingreso manual", detalle: "sin papel" },
 ] as const;
 

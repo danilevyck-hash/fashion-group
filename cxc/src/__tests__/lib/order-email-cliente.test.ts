@@ -69,7 +69,7 @@ describe("correo al cliente — lo que sí tiene que decir", () => {
     expect(html).toContain("Camisa Oxford");
     expect(html).toContain("$17.50");
     // Sin `.00`: el correo usa el formato de precio de los catálogos.
-    expect(html).toContain("Total: 10 bultos (120 piezas) — $4,422");
+    expect(html).toContain("Total: 10 bultos (120 unidades) — $4,422");
     expect(html).not.toContain("$4,422.00");
   });
 

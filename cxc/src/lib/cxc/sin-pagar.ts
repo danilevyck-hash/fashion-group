@@ -62,7 +62,7 @@ export function textoSinPagar(dias: number | null): string {
 
 /** El rótulo de la celda 1 de la tira de totales. Singular y plural. */
 export function rotuloSinPagar(cuantos: number): string {
-  return `${cuantos} sin pagar hace +${DIAS_SIN_PAGAR_UMBRAL} d`;
+  return `${cuantos} sin pago en +${DIAS_SIN_PAGAR_UMBRAL} días`; // 1-oct-2026, Daniel: nombres normales de ERP
 }
 
 /** Cuando no hay ninguno, la misma celda vuelve a decir cuántos clientes son. */

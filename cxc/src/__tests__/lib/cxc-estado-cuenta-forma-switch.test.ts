@@ -152,7 +152,8 @@ describe("🔴 solo los documentos ABIERTOS (saldo ≠ 0)", () => {
 describe("🔴 los TRES tramos de la pantalla, no los ocho de Switch", () => {
   it("son exactamente tres y salen de `cxc-aging`", () => {
     expect(AGING_ORDER).toHaveLength(3);
-    expect(AGING_ORDER.map(tramoRango)).toEqual(["0 a 90 días", "91 a 120 días", "121 días y más"]);
+    // 1-oct-2026, Daniel: nombres normales de ERP — un solo formato de rango.
+    expect(AGING_ORDER.map(tramoRango)).toEqual(["0-90 días", "91-120 días", "+120 días"]);
   });
 
   it("el papel no escribe los rótulos a mano: los deriva", () => {
@@ -177,7 +178,7 @@ describe("🔴 los TRES tramos de la pantalla, no los ocho de Switch", () => {
     expect(tramosDelPapel([{ debito: 0, credito: 300, dias: 10 }]).current).toBe(-300);
   });
 
-  it("los 31 documentos de D-25 caen los 31 en «0 a 90 días»", () => {
+  it("los 31 documentos de D-25 caen los 31 en «0-90 días»", () => {
     // Medido: los tres primeros tramos de Switch suman exactamente esto.
     const t = tramosDelPapel(D25.empresas[0].documentos);
     expect(t.current).toBe(5579.91);
@@ -185,10 +186,10 @@ describe("🔴 los TRES tramos de la pantalla, no los ocho de Switch", () => {
     expect(t.overdue).toBe(0);
   });
 
-  it("⚠️ dentro de la casa `tramoLabel()` NO cambió", () => {
-    expect(AGING_ORDER.map(tramoLabel)).toEqual([
-      "Por vencer 0-90d", "Vencido reciente 91-120d", "Vencido crítico 121d+",
-    ]);
+  it("🔄 dentro de la casa `tramoLabel()` dice lo MISMO que el papel: solo el rango", () => {
+    // 1-oct-2026, Daniel: nombres normales de ERP — se fueron «Por vencer /
+    // Vencido reciente / Vencido crítico» también adentro de la casa.
+    expect(AGING_ORDER.map(tramoLabel)).toEqual(AGING_ORDER.map(tramoRango));
   });
 });
 

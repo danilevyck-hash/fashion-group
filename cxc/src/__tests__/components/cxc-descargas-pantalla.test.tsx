@@ -106,13 +106,14 @@ describe("🩸 al saldo A FAVOR no se le cobra", () => {
 
   it("el que DEBE tiene su botón «Cobrar»", () => {
     pintarFila(DEBE);
-    expect(screen.getByRole("button", { name: "Cobrar" })).toBeTruthy();
+    // 1-oct-2026, Daniel: nombres normales de ERP — «Cobrar» pasó a «Enviar estado de cuenta» (y «Enviar» donde no cabe).
+    expect(screen.getByRole("button", { name: "Enviar estado de cuenta" })).toBeTruthy();
     cleanup();
   });
 
   it("🔴 el que tiene saldo a favor NO lo tiene", () => {
     pintarFila(A_FAVOR);
-    expect(screen.queryByRole("button", { name: "Cobrar" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Enviar estado de cuenta" })).toBeNull();
     cleanup();
   });
 
@@ -149,7 +150,7 @@ describe("🩸 al saldo A FAVOR no se le cobra", () => {
     // Dentro de SU bloque no hay un solo «Cobrar» (ni el de la fila ni el del
     // panel desplegable, que el acordeón dibuja aunque esté cerrado).
     const bloque = titulo.parentElement as HTMLElement;
-    expect([...bloque.querySelectorAll("button")].map((b) => b.textContent)).not.toContain("Cobrar");
+    expect([...bloque.querySelectorAll("button")].map((b) => b.textContent)).not.toContain("Enviar");
     cleanup();
   });
 });

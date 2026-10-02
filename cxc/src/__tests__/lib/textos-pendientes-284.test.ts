@@ -41,12 +41,13 @@ const VISTAS_DEL_RESUMEN = [
 ];
 
 describe("#284 · pill de sincronización con un solo vocabulario", () => {
-  // 1-oct-2026, Daniel: nombres normales de ERP («Sincronizado» → «Última sincronización»).
-  it("la vista que monta SyncStatus usa prefix=\"Última sincronización\"", () => {
+  // 1-oct-2026, Daniel: nombres normales de ERP — vuelve «Actualizado…» (el
+  // rótulo por omisión de SyncStatus); ninguna vista le pasa «sincroniz».
+  it("la vista que monta SyncStatus usa el rótulo «Actualizado»", () => {
     for (const p of VISTAS_CON_PILL) {
       const code = src(...p);
       expect(code, `${p.join("/")} monta SyncStatus`).toContain("<SyncStatus");
-      expect(code, `${p.join("/")} usa el prefix nuevo`).toContain('prefix="Última sincronización"');
+      expect(code, `${p.join("/")} no dice «sincroniz»`).not.toMatch(/prefix="[^"]*[Ss]incroniz/);
     }
   });
 

@@ -54,7 +54,7 @@ type Linea = LineaSinDinero | LineaPlanilla;
 
 /** ¿Esta fila trae el bloque de dinero? Es la pregunta que decide qué se dibuja
  *  — no `sinSueldos`, que es de la RESPUESTA: una persona «fuera de planilla» o
- *  «Tú decides» viene con `dinero: null` aunque el resto sí lo traiga. */
+ *  «Pago por definir» viene con `dinero: null` aunque el resto sí lo traiga. */
 function conDinero(l: Linea): l is LineaPlanilla & { dinero: DineroLinea } {
   return (l as LineaPlanilla).dinero != null;
 }
@@ -180,7 +180,7 @@ export default function PlanillaBoston() {
 
       {!elegido && !cargando && (
         <div className="rounded-xl border border-dashed border-gray-200 px-4 py-12 text-center">
-          <p className="text-sm font-medium text-gray-700">Elige el período que vas a pagar</p>
+          <p className="text-sm font-medium text-gray-700">Selecciona el período</p>
           <p className="mt-1 text-[13px] text-gray-500">
             La quincena se calcula con las fechas que elijas arriba.
           </p>
@@ -259,7 +259,7 @@ export default function PlanillaBoston() {
                     <>
                       <th className="text-right font-normal px-3">Extra 1,25</th>
                       <th className="text-right font-normal px-3">Extra 1,50</th>
-                      <th className="text-right font-normal px-3">Tarde</th>
+                      <th className="text-right font-normal px-3">Tardanza</th>
                       <th className="text-right font-normal px-4">Ausencia</th>
                     </>
                   )}

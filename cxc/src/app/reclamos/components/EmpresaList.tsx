@@ -247,7 +247,7 @@ export default function EmpresaList({
           «Cobrados» cualquier fila abría el modal con «Adjuntamos 1 reclamo
           pendiente…» y lo mandaba. El servidor ahora también lo rechaza. */}
       {esPendiente(r) && (
-        <button type="button" onClick={() => setMailRec(r)} className={accion} aria-label={`Enviar por correo el reclamo ${r.nro_reclamo}`}>Correo</button>
+        <button type="button" onClick={() => setMailRec(r)} className={accion} aria-label={`Enviar por correo el reclamo ${r.nro_reclamo}`}>Enviar</button>
       )}
       <button type="button" onClick={() => descargarUno(r, "excel")} disabled={filaBusy !== null} className={accion} aria-label={`Descargar el Excel del reclamo ${r.nro_reclamo}`}>{filaBusy === r.id ? "…" : "Descargar"}</button>
       <OverflowMenu
@@ -278,7 +278,7 @@ export default function EmpresaList({
           {selectionMode && <span className="text-sm text-gray-500">{selCount > 0 ? `${selCount} seleccionado${selCount === 1 ? "" : "s"}` : "Selecciona reclamos…"}</span>}
           {/* Correo y descargas: sobre la selección, o sobre lo que se está mirando. */}
           {filtro === "por-cobrar" && idsObjetivo.length > 0 && (
-            <button onClick={() => setSendOpen(true)} disabled={busy !== null} className={accion} aria-label="Enviar por correo al proveedor">Correo</button>
+            <button onClick={() => setSendOpen(true)} disabled={busy !== null} className={accion} aria-label="Enviar por correo al proveedor">Enviar al proveedor</button>
           )}
           {idsObjetivo.length > 0 && (
             <>
@@ -303,7 +303,7 @@ export default function EmpresaList({
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <button onClick={() => setFiltroUrl("")} aria-pressed={filtro === "por-cobrar"} className={`${pill} ${filtro === "por-cobrar" ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
-          Por cobrar <span className="ml-1 opacity-70 tabular-nums">{porCobrar.length} · ${fmt(montoPorCobrar)}</span>
+          Pendientes <span className="ml-1 opacity-70 tabular-nums">{porCobrar.length} · ${fmt(montoPorCobrar)}</span>
         </button>
         <button onClick={() => setFiltroUrl("cobrados")} aria-pressed={filtro === "cobrados"} className={`${pill} ${filtro === "cobrados" ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
           Cobrados <span className="ml-1 opacity-70 tabular-nums">{cobrados.length}</span>
@@ -316,7 +316,7 @@ export default function EmpresaList({
         if (allEmpresaRecs.length === 0) return <EmptyState title="Todavía sin reclamos" />;
         if (filtro === "por-cobrar") return (
           <div className="flex flex-col items-center py-16 text-center">
-            <p className="text-sm font-medium text-gray-600 mb-1">Nada por cobrar a {nombreCorto}</p>
+            <p className="text-sm font-medium text-gray-600 mb-1">Sin pendientes con {nombreCorto}</p>
             <p className="text-sm text-emerald-600">{cobrados.length} reclamo{cobrados.length === 1 ? "" : "s"} cobrado{cobrados.length === 1 ? "" : "s"}</p>
           </div>
         );

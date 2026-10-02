@@ -397,7 +397,8 @@ describe("barrido estático", () => {
     const modal = leer("app/marketing/components/CerrarPeriodoModal.tsx");
     expect(modal).toMatch(/sinComprobante: bloque\.sinComprobante \?\? 0/);
     expect(modal).toMatch(/sinFoto: bloque\.sinFoto \?\? 0/);
-    expect(modal).toContain("Antes de cerrar, fíjate");
+    // 1-oct-2026, Daniel: nombres normales de ERP («Antes de cerrar, fíjate» → «Documentación pendiente»).
+    expect(modal).toContain("Documentación pendiente");
     // Puede cerrar igual: el botón no se apaga por tener pendientes.
     expect(modal).toMatch(
       /const puedeCerrar = nombreSiguiente\.trim\(\)\.length > 0 && !cerrando;/,

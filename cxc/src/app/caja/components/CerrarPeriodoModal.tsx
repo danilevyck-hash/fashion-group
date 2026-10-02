@@ -98,7 +98,7 @@ export default function CerrarPeriodoModal({ open, onClose, onConfirm, fondo, ga
             className="block text-sm mb-1.5"
             style={{ color: "var(--caja-fg-default)", fontWeight: 500 }}
           >
-            ¿Cuánto dinero hay en la caja? <span style={{ color: "var(--caja-danger)" }}>*</span>
+            Efectivo contado <span style={{ color: "var(--caja-danger)" }}>*</span>
           </label>
           <div style={{ position: "relative" }}>
             <span
@@ -151,7 +151,7 @@ export default function CerrarPeriodoModal({ open, onClose, onConfirm, fondo, ga
           )}
           {tocado && contado === null && (
             <p className="text-xs mt-2" style={{ color: "var(--caja-danger-onSoft)" }}>
-              Escribe cuánta plata hay en la caja para poder cerrar.
+              Ingresa el efectivo contado para cerrar.
             </p>
           )}
         </div>

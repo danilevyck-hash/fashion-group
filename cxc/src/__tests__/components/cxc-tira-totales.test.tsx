@@ -83,9 +83,10 @@ describe("🔴 el chip dice SOLO el rango", () => {
 
 describe("⚠️ NINGÚN número ni corte se movió", () => {
   it("los tramos siguen siendo 0-90 / 91-120 / 121+", () => {
-    expect(AGING.current.colLabel).toBe("0-90d");
-    expect(AGING.watch.colLabel).toBe("91-120d");
-    expect(AGING.overdue.colLabel).toBe("121d+");
+    // 1-oct-2026, Daniel: nombres normales de ERP — la antigüedad va SOLO en rangos.
+    expect(AGING.current.colLabel).toBe("0-90 d");
+    expect(AGING.watch.colLabel).toBe("91-120 d");
+    expect(AGING.overdue.colLabel).toBe("+120 d");
   });
 
   it("las sumas por tramo son las de siempre (600 · 300 · 150 · 150)", () => {
@@ -120,7 +121,7 @@ describe("🔴 la celda 1: el aviso «sin pagar hace +90 d»", () => {
   it("dice cuántos son y cuánto deben, y es TOCABLE", () => {
     const toggle = vi.fn();
     pintar({ sinPagar: { cuantos: 37, monto: 647944.31 }, onToggleSinPagar: toggle });
-    const aviso = screen.getByText("37 sin pagar hace +90 d");
+    const aviso = screen.getByText("37 sin pago en +90 días");
     expect(screen.getByText("$647,944.31")).toBeTruthy();
     fireEvent.click(aviso.closest("button")!);
     expect(toggle).toHaveBeenCalled();
@@ -128,7 +129,7 @@ describe("🔴 la celda 1: el aviso «sin pagar hace +90 d»", () => {
 
   it("encendido se ve encendido (aria-pressed), y dice cómo apagarlo", () => {
     pintar({ sinPagar: { cuantos: 37, monto: 647944.31 }, sinPagarActivo: true });
-    const boton = screen.getByText("37 sin pagar hace +90 d").closest("button")!;
+    const boton = screen.getByText("37 sin pago en +90 días").closest("button")!;
     expect(boton.getAttribute("aria-pressed")).toBe("true");
     expect(boton.getAttribute("title")).toContain("volver a ver a todos");
   });

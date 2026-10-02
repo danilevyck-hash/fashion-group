@@ -139,7 +139,7 @@ describe("🔑 CONTROL — dar de baja no se rompió", () => {
     const fechaSalida = fechas.find((i) => i.type === "date");
     expect(fechaSalida).toBeTruthy();
     fireEvent.change(fechaSalida!, { target: { value: "2026-09-30" } });
-    fireEvent.click(screen.getAllByRole("button", { name: /Renunció/ })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: /Renuncia/ })[0]);
     fireEvent.click(screen.getAllByRole("button", { name: /Dar de baja|Guardar/ })[0]);
     await waitFor(() => expect(enviados.length).toBeGreaterThan(0));
     expect(enviados.some((e) => e.fechaSalida === "2026-09-30")).toBe(true);

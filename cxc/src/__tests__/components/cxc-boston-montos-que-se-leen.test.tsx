@@ -65,7 +65,7 @@ describe("🔴 1 · la fila de la tabla lleva UN botón, no dos", () => {
   it("y queda solo «Cobrar», como en la cartera del grupo", () => {
     const botones = tabla.match(/<button/g) ?? [];
     expect(botones).toHaveLength(1);
-    expect(tabla).toContain("Cobrar");
+    expect(tabla).toContain("Enviar");
   });
 
   it("🔴 tocar la FILA abre los documentos", () => {
@@ -108,7 +108,8 @@ describe("🔴 2 · el monto no puede encimarse a ningún ancho", () => {
 describe("⚠️ 3 · lo que NO se tocó", () => {
   it("las tarjetas del celular conservan sus DOS botones", () => {
     const tarjetas = vistaTarjetas(src);
-    expect(tarjetas).toContain("Cobrar");
+    // 1-oct-2026, Daniel: nombres normales de ERP — «Cobrar» pasó a «Enviar estado de cuenta» (y «Enviar» donde no cabe).
+    expect(tarjetas).toContain("Enviar estado de cuenta");
     expect(tarjetas).toContain("Documentos");
     // Van a ancho completo, uno al lado del otro: ahí nunca se encimaron.
     expect(tarjetas).toContain("flex-1");
@@ -133,6 +134,6 @@ describe("⚠️ 3 · lo que NO se tocó", () => {
   it("🔑 y la fila del GRUPO sigue con su botón único, sin cambios", () => {
     const grupo = plano(GRUPO);
     expect((grupo.match(/<button/g) ?? [])).toHaveLength(1);
-    expect(grupo).toContain("Cobrar");
+    expect(grupo).toContain("Enviar");
   });
 });

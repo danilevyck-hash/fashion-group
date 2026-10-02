@@ -84,7 +84,7 @@ describe("buildPedidosWorkbook — Reebok (con Origen)", () => {
   });
 
   it("headers correctos con fill navy 1A2656", () => {
-    const headers = ["Origen", "Cliente", "Vendedor", "Items", "Total", "Fecha", "N° pedido", "Switch", "Tipo", "En Switch"];
+    const headers = ["Origen", "Cliente", "Vendedor", "Líneas", "Total", "Fecha", "N° pedido", "Switch", "Tipo", "En Switch"];
     headers.forEach((h, c) => {
       expect(ws[A(HDR_ROW, c)].v).toBe(h);
       expect(ws[A(HDR_ROW, c)].s.fill.fgColor.rgb).toBe(NAVY);
@@ -295,7 +295,7 @@ describe("buildPedidosWorkbook — Joybees (sin Origen)", () => {
     // La banda es del GRIS de Joybees, no del navy de Reebok.
     expect(ws[A(0, 0)].s.fill.fgColor.rgb).toBe(JOYBEES_PALETTE.pri);
     expect(ws[A(0, 0)].s.fill.fgColor.rgb).not.toBe(NAVY);
-    const headers = ["Cliente", "Vendedor", "Items", "Total", "Fecha", "N° pedido", "Switch", "Tipo", "En Switch"];
+    const headers = ["Cliente", "Vendedor", "Líneas", "Total", "Fecha", "N° pedido", "Switch", "Tipo", "En Switch"];
     headers.forEach((h, c) => {
       expect(ws[A(HDR_ROW, c)].v).toBe(h);
       expect(ws[A(HDR_ROW, c)].s.fill.fgColor.rgb).toBe(JOYBEES_PALETTE.pri);

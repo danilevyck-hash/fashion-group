@@ -119,7 +119,7 @@ export default function AtarClienteModal({
             <label htmlFor="atar-cliente-picker" className="block text-xs uppercase tracking-wide text-gray-400">
               Es este cliente
             </label>
-            <Ayuda titulo="Qué se guarda" className="-my-2">
+            <Ayuda titulo="Información" className="-my-2">
               <p>
                 Lo que dice la guía no cambia. Solo se guarda a qué cliente
                 corresponde.

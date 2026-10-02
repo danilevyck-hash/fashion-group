@@ -454,7 +454,7 @@ export function validarEmpresa(v: unknown): Resultado<EmpresaAsistencia> {
   if (!(EMPRESAS_ASISTENCIA as readonly string[]).includes(s)) {
     return {
       ok: false,
-      error: `Elige la empresa: ${EMPRESAS_ASISTENCIA.map(etiquetaEmpresa).join(", ")}.`,
+      error: `Selecciona la empresa: ${EMPRESAS_ASISTENCIA.map(etiquetaEmpresa).join(", ")}.`,
     };
   }
   return { ok: true, valor: s as EmpresaAsistencia };

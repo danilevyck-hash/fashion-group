@@ -95,7 +95,7 @@ describe("🔴 1 · La caja dice qué archivo reconoció, y lo que no reconoce N
     const rec = reconocerArchivo("mixto.xlsx", [{ nombre: "H", filas }], NADA);
     expect(rec.camino).toBe("ckth");
     expect(rec.empresas.length).toBe(2);
-    expect(rec.texto).toContain("eliges una adentro");
+    expect(rec.texto).toContain("selecciona una adentro");
   });
 
   it("Reebok (compra y despacho) y Facturas de tienda se nombran con su compañía", () => {

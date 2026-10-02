@@ -155,8 +155,9 @@ describe("Las palabras del celular", () => {
   });
 
   it("la portada dice cuántos son y cuántos pasan del corte", () => {
-    expect(subtituloPortada(19, 6)).toEqual({ texto: "19 por cobrar", viejos: "6 pasan de 120 días" });
-    expect(subtituloPortada(1, 1)).toEqual({ texto: "1 por cobrar", viejos: "1 pasa de 120 días" });
+    // 1-oct-2026, Daniel: nombres normales de ERP — «Por cobrar» → «Pendientes».
+    expect(subtituloPortada(19, 6)).toEqual({ texto: "19 pendientes", viejos: "6 pasan de 120 días" });
+    expect(subtituloPortada(1, 1)).toEqual({ texto: "1 pendiente", viejos: "1 pasa de 120 días" });
     expect(subtituloPortada(3, 0).viejos).toBeNull();
   });
 
@@ -187,7 +188,7 @@ describe("Las palabras del celular", () => {
   it("🔴 10c · el título de la selección dice cuántos van Y cuánto suman", () => {
     expect(tituloSeleccion(2, 11, 2872.35, false)).toEqual({
       titulo: "2 seleccionados",
-      sub: "de 11 por cobrar · $2,872.35",
+      sub: "de 11 pendientes · $2,872.35",
     });
   });
 });
@@ -218,7 +219,7 @@ describe("🔴 1b · La portada del celular", () => {
     pintar();
     const total = reclamoTaxes("Fashion Wear", 2304).total + reclamoTaxes("Fashion Wear", 790).total;
     expect(screen.getAllByText(montoCel(total)).length).toBeGreaterThan(0);
-    expect(screen.getByText("por cobrar")).toBeTruthy();
+    expect(screen.getByText("pendiente de cobro")).toBeTruthy(); // 1-oct-2026, Daniel: nombres normales de ERP — «Por cobrar» → «Pendientes».
   });
 
   it("hay UNA fila por empresa, y Fashion Wear trae el chip rojo del más viejo", () => {
@@ -250,7 +251,7 @@ describe("🔴 1b · La portada del celular", () => {
     const filas = document.querySelectorAll('[data-lista="reclamos-buscar"] li');
     expect(filas.length).toBe(1);
     expect(filas[0].textContent).toContain("FW-2026-0007");
-    expect(filas[0].textContent).toContain("por cobrar");
+    expect(filas[0].textContent).toContain("pendiente");
     expect(filas[0].textContent).toContain("$2,711.81");
   });
 
@@ -329,7 +330,7 @@ describe("🔴 2c · La lista de una empresa no tiene botones en la fila", () =>
   it("🔴 10c · elegir se pide UNA vez desde arriba, y el título dice cuántos y cuánto", () => {
     pintar({ selectionMode: true, selectedIds: ["a"] });
     expect(screen.getByText("1 seleccionado")).toBeTruthy();
-    expect(document.body.textContent).toContain("de 2 por cobrar · $2,711.81");
+    expect(document.body.textContent).toContain("de 2 pendientes · $2,711.81");
     expect(screen.getByRole("button", { name: /Enviar el reclamo al proveedor/ })).toBeTruthy();
   });
 
@@ -447,7 +448,8 @@ describe("🔴 7b · Cobrar es una hoja que sube", () => {
 
   it("un solo botón negro, y DICE cuánto cobra", () => {
     pintar();
-    expect(screen.getByRole("button", { name: "Cobrar $153.01" })).toBeTruthy();
+    // 1-oct-2026, Daniel: nombres normales de ERP — «Cobrar $X» → «Registrar cobro $X».
+    expect(screen.getByRole("button", { name: "Registrar cobro $153.01" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Cancelar" })).toBeNull();
   });
 
@@ -459,7 +461,7 @@ describe("🔴 7b · Cobrar es una hoja que sube", () => {
   it("🔴 manda las MISMAS filas que la ventana de la computadora", () => {
     const onCobrar = vi.fn();
     pintar({ onCobrar });
-    fireEvent.click(screen.getByRole("button", { name: "Cobrar $153.01" }));
+    fireEvent.click(screen.getByRole("button", { name: "Registrar cobro $153.01" }));
     expect(onCobrar).toHaveBeenCalledTimes(1);
     const [filas, comprobante] = onCobrar.mock.calls[0];
     expect(filas).toHaveLength(1);
@@ -473,14 +475,14 @@ describe("🔴 7b · Cobrar es una hoja que sube", () => {
     const onCobrar = vi.fn();
     pintar({ onCobrar });
     fireEvent.change(screen.getByLabelText("Monto recuperado"), { target: { value: "100" } });
-    fireEvent.click(screen.getByRole("button", { name: "Cobrar $100.00" }));
+    fireEvent.click(screen.getByRole("button", { name: "Registrar cobro $100.00" }));
     expect(onCobrar.mock.calls[0][0][0].monto).toBe(100);
   });
 
   it("⚠️ el comprobante sigue siendo obligatorio cuando el reclamo no lo tiene", () => {
     const onCobrar = vi.fn();
     pintar({ requiereComprobante: true, onCobrar });
-    fireEvent.click(screen.getByRole("button", { name: "Cobrar $153.01" }));
+    fireEvent.click(screen.getByRole("button", { name: "Registrar cobro $153.01" }));
     expect(onCobrar).not.toHaveBeenCalled();
     expect(document.body.textContent).toContain("obligatorio para marcar cobrado");
   });

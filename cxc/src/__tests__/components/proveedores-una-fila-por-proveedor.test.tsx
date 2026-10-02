@@ -144,9 +144,9 @@ describe("🔴 la lista son las empresas", () => {
   it("🔴 los CUATRO tramos son los encabezados, no los tres del CXC", async () => {
     await pintar();
     const t = within(tabla());
-    expect(t.getByText("0-90D")).toBeTruthy();
-    expect(t.getByText("91-120D")).toBeTruthy();
-    expect(t.getByText("121-365D")).toBeTruthy();
+    expect(t.getByText("0-90 d")).toBeTruthy();
+    expect(t.getByText("91-120 d")).toBeTruthy();
+    expect(t.getByText("121-365 d")).toBeTruthy();
     expect(t.getByText("+1 año")).toBeTruthy();
     // 🩸 «121d+» juntaba cuatro meses con tres años.
     expect(t.queryByText("121d+")).toBeNull();
@@ -221,7 +221,7 @@ describe("🔴 lo que está a favor se ve", () => {
     fireEvent.click(within(tabla()).getByText("Fashion Wear"));
     expect(
       within(tabla()).getAllByText(
-        "Le debes $2,405,128.08 · Tienes a favor $426,927.46 · Por pagar $1,978,200.62",
+        "Pendiente $2,405,128.08 · Saldo a favor $426,927.46 · Por pagar $1,978,200.62",
       ).length,
     ).toBeGreaterThan(0);
   });
@@ -231,7 +231,7 @@ describe("🔴 lo que está a favor se ve", () => {
     fireEvent.click(within(tabla()).getByText("Fashion Wear"));
     expect(
       within(tabla()).getByText(
-        "Le debes $2,359,017.72 · Tienes a favor $420,201.51 · Por pagar $1,938,816.21",
+        "Pendiente $2,359,017.72 · Saldo a favor $420,201.51 · Por pagar $1,938,816.21",
       ),
     ).toBeTruthy();
   });
@@ -239,7 +239,7 @@ describe("🔴 lo que está a favor se ve", () => {
   it("🔑 sin nada a favor no se dibuja la frase: un cero adentro es ruido", async () => {
     await pintar();
     fireEvent.click(within(tabla()).getByText("Fashion Shoes"));
-    const frases = within(tabla()).queryAllByText(/Tienes a favor \$0\.00/);
+    const frases = within(tabla()).queryAllByText(/Saldo a favor \$0\.00/);
     expect(frases).toHaveLength(0);
   });
 });

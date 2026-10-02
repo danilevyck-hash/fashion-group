@@ -227,7 +227,8 @@ describe("🔴 C. el Excel dice quién marcó de más", () => {
     expect(COL_TODAS_LAS_MARCAS).toBe(7);
     expect(COL_CUANTAS_MARCAS).toBe(8);
     expect(celda(0, 7)).toBe("Todas las marcas");
-    expect(celda(0, 8)).toBe("Cuántas marcas");
+    // 1-oct-2026, Daniel: nombres normales de ERP («Cuántas marcas» → «Cantidad de marcas»).
+    expect(celda(0, 8)).toBe("Cantidad de marcas");
     expect(celda(1, 7)).toBe(textoTodasLasMarcas(RAMON));
     // 🔴 La que NO se veía por ningún lado, ahora está en el archivo.
     expect(String(celda(1, 7))).toContain("14:23:39");
@@ -244,7 +245,7 @@ describe("🔴 C. el Excel dice quién marcó de más", () => {
 
   it("⚠️ el archivo explica las columnas nuevas en la hoja de la guía", async () => {
     const fuente = fs.readFileSync(path.join(RAIZ, "lib/asistencia/exportar.ts"), "utf8");
-    expect(fuente).toContain("Todas las marcas / Cuántas marcas");
+    expect(fuente).toContain("Todas las marcas / Cantidad de marcas");
     // Y «A revisar» dice la regla NUEVA, no «sin las 4».
     expect(fuente).toContain("EXACTAMENTE 4 marcas");
   });
@@ -409,7 +410,7 @@ describe("🔴 E. quitar una marcación del reloj", () => {
   it("🔴 no se quita una marcación que no existe: sin `marcacionId`, 400", async () => {
     const r = await postear({ quita: true, motivo: "sobra", codigo: "21", fecha: "2026-08-26" });
     expect(r.status).toBe(400);
-    expect(String(r.json.error)).toContain("Elige cuál marcación");
+    expect(String(r.json.error)).toContain("Selecciona cuál marcación") /* 1-oct-2026, Daniel: nombres normales de ERP */;
     expect(escrituras).toEqual([]);
   });
 

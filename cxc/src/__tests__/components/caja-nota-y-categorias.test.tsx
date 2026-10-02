@@ -99,14 +99,14 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 describe("🔴 «DESCRIPCIÓN» ES «NOTA», Y ES OPCIONAL", () => {
   it("el campo se llama Nota, y el viejo «Descripción» ya no está", () => {
     montar();
-    expect(screen.getByLabelText("Nota")).toBeTruthy();
+    expect(screen.getByLabelText("Observaciones")).toBeTruthy();
     expect(screen.queryByLabelText("Descripción")).toBeNull();
   });
 
   it("no lleva el asterisco rojo: se ve que es opcional", () => {
     montar();
     const etiquetas = Array.from(document.querySelectorAll("label"));
-    const nota = etiquetas.find((l) => l.textContent?.trim().startsWith("Nota"));
+    const nota = etiquetas.find((l) => l.textContent?.trim().startsWith("Observaciones"));
     expect(nota).toBeTruthy();
     expect(nota!.textContent).not.toContain("*");
     // CONTROL: lo que SÍ es obligatorio lo sigue diciendo.
@@ -126,7 +126,7 @@ describe("🔴 «DESCRIPCIÓN» ES «NOTA», Y ES OPCIONAL", () => {
   it("y con nota, se guarda en la misma columna de siempre", async () => {
     montar();
     await llenarSinNota();
-    fireEvent.change(screen.getByLabelText("Nota"), { target: { value: "Era para la visita" } });
+    fireEvent.change(screen.getByLabelText("Observaciones"), { target: { value: "Era para la visita" } });
     fireEvent.click(screen.getByRole("button", { name: "Guardar gasto" }));
     await waitFor(() => expect(posts).toHaveLength(1));
     expect(posts[0].descripcion).toBe("Era para la visita");
@@ -136,7 +136,7 @@ describe("🔴 «DESCRIPCIÓN» ES «NOTA», Y ES OPCIONAL", () => {
     montar();
     fireEvent.change(screen.getByLabelText("Subtotal"), { target: { value: "10.59" } });
     // Sin proveedor no se guarda, por más nota que haya.
-    fireEvent.change(screen.getByLabelText("Nota"), { target: { value: "Comida" } });
+    fireEvent.change(screen.getByLabelText("Observaciones"), { target: { value: "Comida" } });
     expect((screen.getByRole("button", { name: "Guardar gasto" }) as HTMLButtonElement).disabled).toBe(true);
   });
 });
@@ -193,7 +193,7 @@ describe("🩸 LAS CUATRO REGLAS DE SUGERENCIA MUERTAS SE BORRARON", () => {
     }
     montar();
     await llenarSinNota();
-    fireEvent.change(screen.getByLabelText("Nota"), { target: { value: "Taxi al banco" } });
+    fireEvent.change(screen.getByLabelText("Observaciones"), { target: { value: "Taxi al banco" } });
     fireEvent.click(screen.getByRole("button", { name: "Guardar gasto" }));
     await waitFor(() => expect(posts).toHaveLength(1));
     expect(posts[0].categoria).toBe("Transporte");

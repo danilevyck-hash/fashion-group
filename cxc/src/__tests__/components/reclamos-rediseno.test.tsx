@@ -65,7 +65,7 @@ describe("la portada", () => {
   it("tres números: por cobrar, sin reclamar (rojo) y cobrado del año", () => {
     pintar();
     const portada = document.querySelector('[data-medir="reclamos-portada"]')!;
-    expect(portada.textContent).toContain("Por cobrar");
+    expect(portada.textContent).toContain("Pendiente de cobro"); // 1-oct-2026, Daniel: nombres normales de ERP — «Por cobrar» → «Pendientes».
     expect(portada.textContent).toContain("3 reclamos");
     const sin = within(portada as HTMLElement).getByText("Sin reclamar").parentElement!;
     expect(sin.className).toContain("border-red-200");
@@ -120,7 +120,7 @@ describe("la página de una empresa", () => {
   // fecha de factura va al FINAL**— no cambió.
   it("abre en «Por cobrar N · $» y muestra solo los por cobrar, la factura más RECIENTE primero y los sin fecha al final", () => {
     pintar();
-    expect(screen.getByRole("button", { name: /Por cobrar/ }).textContent).toContain("4 · $");
+    expect(screen.getByRole("button", { name: /Pendientes/ }).textContent).toContain("4 · $");
     expect(screen.getByRole("button", { name: /Cobrados/ }).textContent).toContain("1");
     const nros = filasTabla().map((tr) => tr.querySelector("td")!.textContent);
     expect(nros).toEqual(["FW-0007", "FW-0001", "REC-0020", "SINFECHA"]);

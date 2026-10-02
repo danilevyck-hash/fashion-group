@@ -111,14 +111,14 @@ function buildEmailBody(client: ConsolidatedClient) {
   // solo tono: `dias` es la EDAD del documento desde su emisión, NO días de
   // mora — no sabemos el plazo de crédito de cada factura, así que llamar
   // "vencido" a un documento de 121 días es afirmar algo que el dato no dice.
-  // Se rotula por ANTIGÜEDAD, exactamente como la columna "Más de 90 días" del
+  // Se rotula por ANTIGÜEDAD, exactamente como la columna "+90 días" del
   // correo aprobado.
   //
   // ⚠️ LOS TRAMOS Y LAS CIFRAS NO CAMBIAN: siguen siendo current / watch /
   // overdue (0-90 · 91-120 · 121+), los mismos campos que suma la pantalla.
-  if (client.current > 0) lines.push(`Hasta 90 días: $${fmt(client.current)}`);
-  if (client.watch > 0) lines.push(`De 91 a 120 días: $${fmt(client.watch)}`);
-  if (client.overdue > 0) lines.push(`Más de 120 días: $${fmt(client.overdue)}`);
+  if (client.current > 0) lines.push(`0-90 días: $${fmt(client.current)}`);
+  if (client.watch > 0) lines.push(`91-120 días: $${fmt(client.watch)}`);
+  if (client.overdue > 0) lines.push(`+120 días: $${fmt(client.overdue)}`);
   lines.push(`Total: $${fmt(client.total)}`);
   lines.push(``);
   lines.push(`Agradecemos su pronta atención a este saldo. Quedamos a su disposición para cualquier consulta.`);
@@ -149,7 +149,7 @@ function buildEmailBody(client: ConsolidatedClient) {
  */
 function textoUltimoPagoDe(client: ConsolidatedClient, hoy: string): string {
   const pago = ultimoPagoDelCliente(client);
-  if (!pago) return "Nunca ha pagado";
+  if (!pago) return "Sin pagos"; // 1-oct-2026, Daniel: nombres normales de ERP
   return `Último pago ${fechaCortaPago(pago.fecha, hoy)} · $${fmt(pago.monto)}`;
 }
 
@@ -854,7 +854,7 @@ function AdminDashboardInner() {
           )}
           <SyncNowButton
             opciones={[{ modulo: "estadocuenta", empresa: companyFilter }]}
-            disabledReason={companyFilter === "all" ? "Elige una empresa en el filtro para actualizarla" : null}
+            disabledReason={companyFilter === "all" ? "Selecciona una empresa en el filtro para actualizarla" : null}
             onSuccess={() => loadData()}
           />
         </div>
@@ -874,7 +874,7 @@ function AdminDashboardInner() {
             <path d="M12 8v4m0 4h.01" />
           </svg>
           <p className="text-sm font-medium text-gray-500 mb-1">No hay datos de cartera cargados</p>
-          <p className="text-xs text-gray-400 mb-4 max-w-xs">Los datos de cartera se sincronizan automáticamente desde Switch.</p>
+          <p className="text-xs text-gray-400 mb-4 max-w-xs">Los datos de cartera se actualizan automáticamente desde Switch.</p>
           {/* Botón "Importar archivo de cartera" → /upload OCULTO: upload manual
               de CSV deprecado (el sync de Switch cubre la carga). La página
               /upload sigue viva y accesible por URL directa. */}

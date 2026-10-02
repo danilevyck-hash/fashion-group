@@ -97,20 +97,21 @@ describe("piezasParaStock — 🔴 lo único que puede mover el inventario", () 
 });
 
 describe("textoPiezasBultos — cómo lo lee la gente", () => {
+  // 1-oct-2026, Daniel: nombres normales de ERP («piezas/pzas» → «unidades/u», «Piezas» → «Cantidad»).
   it("el formato que escribió Daniel", () => {
-    expect(textoPiezasBultos(150, 5)).toBe("150 piezas en 5 bultos");
+    expect(textoPiezasBultos(150, 5)).toBe("150 unidades en 5 bultos");
   });
   it("sin bultos anotados no inventa un 'en 0 bultos'", () => {
-    expect(textoPiezasBultos(150, null)).toBe("150 piezas");
-    expect(textoPiezasBultos(150)).toBe("150 piezas");
+    expect(textoPiezasBultos(150, null)).toBe("150 unidades");
+    expect(textoPiezasBultos(150)).toBe("150 unidades");
     expect(textoPiezasBultos(150, null)).not.toContain("bulto");
   });
   it("singular donde corresponde", () => {
-    expect(textoPiezasBultos(1, 1)).toBe("1 pieza en 1 bulto");
-    expect(textoPiezasBultos(30, 1)).toBe("30 piezas en 1 bulto");
+    expect(textoPiezasBultos(1, 1)).toBe("1 unidad en 1 bulto");
+    expect(textoPiezasBultos(30, 1)).toBe("30 unidades en 1 bulto");
   });
   it("un 0 de bultos escrito a mano sí se dice", () => {
-    expect(textoPiezasBultos(10, 0)).toBe("10 piezas en 0 bultos");
+    expect(textoPiezasBultos(10, 0)).toBe("10 unidades en 0 bultos");
   });
 });
 

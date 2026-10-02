@@ -155,7 +155,7 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
             raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null }) as SheetRow[];
           }
         }
-        if (!raw) throw new Error("No pude leer el archivo.");
+        if (!raw) throw new Error("No se pudo leer el archivo.");
         rawRef.current = raw;
         runRows(raw, temporadaFallback, catalogo);
       } catch (err) {
@@ -553,7 +553,7 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
           </div>
           {/* De dónde sale la temporada según el formato: se aprende una vez. */}
           <div className="pb-1">
-            <Ayuda titulo="De dónde sale la temporada" etiqueta="De dónde sale la temporada">
+            <Ayuda titulo="Origen de la temporada" etiqueta="Origen de la temporada">
               <p>
                 La factura .xls no trae fecha — la temporada sale de aquí ({temporadaFallback}). El
                 CSV/XLSX trae FECHA y la usa directo.
@@ -732,7 +732,7 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
             </div>
             {/* Jerarquía de precios: se aprende una vez → ⓘ. */}
             <div className="mt-2 -ml-2">
-              <Ayuda titulo="Qué precio gana" etiqueta="Qué precio gana">
+              <Ayuda titulo="Prioridad de precios" etiqueta="Prioridad de precios">
                 <p>
                   Jerarquía: precio fijo &gt; fórmula de la descripción &gt; fórmula de la marca (se
                   configuran en la pestaña &ldquo;Fórmulas por marca&rdquo; → Tienda).
@@ -798,7 +798,7 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
                               value={String(d.cols["Marca *"])}
                               onChange={(e) => onMarcaChange(ri, e.target.value)}
                               className="rounded-md border border-amber-600 bg-amber-50 px-1 py-0.5 text-xs font-semibold text-amber-800 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
-                              title="Marca ambigua: elige la correcta"
+                              title="Marca ambigua: selecciona la correcta"
                             >
                               {d.marcaCandidatas.map((m) => (
                                 <option key={m} value={m.toUpperCase()}>{m.toUpperCase()}</option>

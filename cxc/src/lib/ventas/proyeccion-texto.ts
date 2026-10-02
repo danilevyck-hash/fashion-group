@@ -101,7 +101,7 @@ export function buildSlotsProyeccion(
   };
   const vas: SlotDetalle = {
     key: "ytd",
-    label: dia ? `Vas al ${dia}` : "Vas",
+    label: dia ? `Acumulado al ${dia}` : "Acumulado",
     valor: formatCompactCurrency(ytd),
     prev: opts.compacto || ytdP <= 0 ? null : formatCompactCurrency(ytdP),
     delta: ratio == null ? SIN_COMPARATIVO : `${ratio >= 0 ? "+" : "−"}${Math.abs(ratio * 100).toFixed(0)}%`,
@@ -116,7 +116,7 @@ export function buildSlotsProyeccion(
     cierra,
     {
       key: "cierre-prev",
-      label: `Cerró ${prevYear}`,
+      label: `Cierre ${prevYear}`,
       valor: formatCompactCurrency(p.cierre_anio_anterior),
       prev: null,
       delta: "",
@@ -201,7 +201,7 @@ export function buildSlotsProyeccionGrupo(
   return [
     {
       key: "ytd",
-      label: dia ? `Vas al ${dia}` : "Vas",
+      label: dia ? `Acumulado al ${dia}` : "Acumulado",
       valor: fmtMoneyCompact(g.ventas_ytd),
       prev: g.ventas_prev_ytd_sp > 0 ? fmtMoneyCompact(g.ventas_prev_ytd_sp) : null,
       delta: ratio == null ? SIN_COMPARATIVO : `${ratio >= 0 ? "+" : "−"}${Math.abs(ratio * 100).toFixed(0)}%`,
@@ -219,7 +219,7 @@ export function buildSlotsProyeccionGrupo(
     },
     {
       key: "cierre-prev",
-      label: `Cerró ${prevYear}`,
+      label: `Cierre ${prevYear}`,
       valor: fmtMoneyCompact(g.cierre_anio_anterior_total),
       prev: null,
       delta: "",

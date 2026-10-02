@@ -10,7 +10,8 @@
 // Puro (sin I/O) — testeable con vitest.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** "1 bulto · 8 pzas" · "2 bultos" · "8 pzas" · "0 pzas". */
+/** "1 bulto · 8 u" · "2 bultos" · "8 u" · "0 u".
+ *  1-oct-2026, Daniel: nombres normales de ERP («pzas» → «u»). */
 export function formatBultosPiezas(piezas: number, bultoSize: number): string {
   const total = Math.max(0, Math.floor(Number(piezas) || 0));
   const size = Math.max(1, Math.floor(Number(bultoSize) || 1));
@@ -19,6 +20,6 @@ export function formatBultosPiezas(piezas: number, bultoSize: number): string {
 
   const partes: string[] = [];
   if (bultos > 0) partes.push(`${bultos} bulto${bultos === 1 ? "" : "s"}`);
-  if (sueltas > 0 || bultos === 0) partes.push(`${sueltas} pza${sueltas === 1 ? "" : "s"}`);
+  if (sueltas > 0 || bultos === 0) partes.push(`${sueltas} u`);
   return partes.join(" · ");
 }

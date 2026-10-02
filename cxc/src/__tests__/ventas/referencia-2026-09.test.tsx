@@ -197,7 +197,7 @@ describe("🔴 al buscar un MODELO sale su tarjeta y debajo sus colores", () => 
 
   it("🔴 los colores van por STOCK de mayor a menor", async () => {
     await buscar("NB2570", TODOS);
-    const tabla = screen.getByText("Sus colores · 4 con mercancía").parentElement!;
+    const tabla = screen.getByText("Colores · 4 con stock").parentElement!;
     const filas = [...tabla.querySelectorAll("tbody tr")];
     const colores = filas.map((tr) => tr.querySelector("td")!.textContent);
     expect(colores).toEqual(["001", "902", "400", "923"]);
@@ -210,7 +210,7 @@ describe("🔴 al buscar un MODELO sale su tarjeta y debajo sus colores", () => 
     await buscar("NB2570", TODOS);
     const boton = screen.getByRole("button", { name: /22 sin stock/ });
     expect(boton.getAttribute("aria-expanded")).toBe("false");
-    const tabla = screen.getByText("Sus colores · 4 con mercancía").parentElement!;
+    const tabla = screen.getByText("Colores · 4 con stock").parentElement!;
     expect(tabla.querySelectorAll("tbody tr")).toHaveLength(4);
     fireEvent.click(boton);
     expect(screen.getByRole("button", { name: /22 sin stock/ }).getAttribute("aria-expanded")).toBe("true");
@@ -261,7 +261,7 @@ describe("🔴 al buscar un código COMPLETO sale una sola fila y su tarjeta", (
     await buscar("NB2570001", uno);
     expect(screen.getByRole("heading", { name: "NB2570001" })).toBeTruthy();
     expect(screen.getAllByText("color 001").length).toBeGreaterThan(0);
-    expect(screen.queryByText(/Sus colores/)).toBeNull();
+    expect(screen.queryByText(/Colores ·/)).toBeNull();
     expect(screen.getAllByText("935").length).toBeGreaterThan(0);
     expect(screen.getAllByText("552").length).toBeGreaterThan(0);
     expect(screen.getAllByText("345").length).toBeGreaterThan(0);

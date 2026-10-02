@@ -256,7 +256,7 @@ export default function FotosSection({
         aria-label={PREGUNTA_DE_LA_MARCA}
         className="hidden sm:block w-full max-w-xs rounded-md border border-gray-300 px-2 py-2 text-sm"
       >
-        <option value="">Elige la marca…</option>
+        <option value="">Seleccionar marca…</option>
         {marcas.map((m) => (
           <option key={m.periodoId} value={m.periodoId}>
             {m.nombre}
@@ -265,7 +265,7 @@ export default function FotosSection({
       </select>
       {faltaElegirLaMarca && (
         <p className="text-xs text-gray-500">
-          Elige la marca y aparece el botón para subir la foto.
+          Selecciona la marca para subir la foto.
         </p>
       )}
     </div>
@@ -300,7 +300,7 @@ export default function FotosSection({
           {tiendaCodigo ? "Fotos de la tienda" : "Fotos del proyecto"}
         </h2>
         {/* Para qué sirven las fotos: se aprende una vez → ⓘ. */}
-        <Ayuda titulo="Para qué sirven" className="-my-2">
+        <Ayuda titulo="Información" className="-my-2">
           <p>Respaldo visual que se adjunta a la cobranza a la marca.</p>
         </Ayuda>
         {MARKETING_CELULAR && !readonly && fotos.length > 0 && (

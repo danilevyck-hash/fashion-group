@@ -13,7 +13,7 @@ import { Ayuda } from "@/components/shared/Ayuda";
 
 /** Lo que se lee de una descripción que entró sola: nadie la aprobó, pasó el
  *  veredicto y quedó registrada para poder darle fórmula. */
-export const ROTULO_AUTOMATICA = "Entró sola al pasar";
+export const ROTULO_AUTOMATICA = "Alta automática"; // 1-oct-2026, Daniel: nombres normales de ERP
 
 interface DescRow {
   id: string;
@@ -92,7 +92,7 @@ export default function CatalogoDescripcionesAdmin() {
         <div className="flex items-center gap-1">
           <h2 className="font-serif text-2xl font-semibold tracking-tight text-stone-900">Catálogo de descripciones</h2>
           {/* Qué es y qué pasa al desactivar: se aprende una vez → ⓘ. */}
-          <Ayuda titulo="Qué es este catálogo" className="-my-2">
+          <Ayuda titulo="Información" className="-my-2">
             <p>
               La fuente de verdad de Plantilla Switch y Facturas Tienda. Desactivar no borra: la descripción
               deja de valer en el catálogo pero el histórico queda.

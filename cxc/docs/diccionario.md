@@ -110,7 +110,7 @@ Es el caso a favor de tener dos palabras.
 
 | Concepto | Se usa hoy | Propongo | Dónde cambiarla |
 |---|---|---|---|
-| Todavía no hay nada | **Todavía no hay X** (5) · **Aún no hay X** (4) · **Sin X** (~40) · **No hay X** (3) | **«Todavía no hay X»** cuando va a haber · **«Sin X»** cuando es una celda o un chip | `marketing/mobiliario/page.tsx:783,919` «Aún no hay entregas registradas» · `marketing/ImpulsadorasView.tsx:194` «Aún no hay impulsadoras» · `ventas/ComisionesConfiguracionView.tsx:163` «Aún no hay vendedores» — **Marketing usa las DOS formas** (`PorClienteModal.tsx:93` dice «Todavía no hay gasto que mostrar») |
+| Todavía no hay nada | **Todavía no hay X** (5) · **Aún no hay X** (4) · **Sin X** (~40) · **No hay X** (3) | **«Sin X»** («Sin descuentos registrados.») — 1-oct-2026, Daniel: nombres normales de ERP; reemplaza «Todavía no hay X», que aquí se proponía. Se queda §0 n.º 10 («Esto todavía no está encendido. Avísame.») | `marketing/mobiliario/page.tsx:783,919` «Aún no hay entregas registradas» · `marketing/ImpulsadorasView.tsx:194` «Aún no hay impulsadoras» · `ventas/ComisionesConfiguracionView.tsx:163` «Aún no hay vendedores» — **Marketing usa las DOS formas** (`PorClienteModal.tsx:93` dice «Todavía no hay gasto que mostrar») |
 | Gastos vacíos | **Todavía no hay gastos registrados** (Gastos) · **Sin gastos registrados** (Caja) · **Todavía no hay gastos cargados de esta empresa para este mes** (Vista General) · **Todavía no hay gasto que mostrar** (Marketing) | Una sola: **«Todavía no hay gastos»** | `gastos-contabilidad/ResumenEgresos.tsx:52` · `caja/GastoTable.tsx:250,342` · `vista-general/RentabilidadPorEmpresa.tsx:197` · `marketing/PorClienteModal.tsx:93` + `PorMarcaModal.tsx:78` |
 
 ### 1.11 Puntuación y símbolos
@@ -344,11 +344,13 @@ migración · Supabase · SUPABASE_SERVICE_ROLE_KEY · RLS · JSON · HTTP · SK
 
 ## 7. Lo que ya está bien — no tocar
 
-- **Los tramos de la cartera.** `src/lib/cxc-aging.ts` es fuente única: *Por vencer 0-90d · Vencido
-  reciente 91-120d · Vencido crítico 121d+*, y el escritorio, el celular, el PDF y Boston leen de ahí.
-  Es el modelo de lo que este archivo propone para todo lo demás.
+- **Los tramos de la cartera.** `src/lib/cxc-aging.ts` es fuente única y dice **solo rangos**:
+  *0-90 días · 91-120 días · +120 días* (en columnas angostas *0-90 d · 91-120 d · +120 d*); el
+  escritorio, el celular, el PDF, el Excel y Boston leen de ahí. Sin «Por vencer», «Vencido…» ni
+  «Al día» (1-oct-2026, Daniel: nombres normales de ERP; ver `docs/nombres-erp.md`).
 - **Los mensajes de Telegram de 🔧 SISTEMA** ya dicen *qué pasó / qué significa / qué hacer*, sin
   nombres de tabla. Solo les falta la tilde de «avísame».
 - **Los encabezados de Excel** son consistentes (Total · Cliente · Fecha · Código · Empresa…).
-- **El tono.** «Listo, guardado» (14) · «Excel listo — revisa tu carpeta de descargas» (8) ·
-  «Sin conexión» — la voz de la casa está y se reconoce.
+- **El tono de los avisos.** Forma de ERP: **«<Cosa> guardado / cobrado / quitado»** («Reclamo
+  cobrado», «Descuento guardado»), nunca «Listo, …» (1-oct-2026, Daniel: nombres normales de ERP;
+  reemplaza lo que aquí decía el 5-sep, que no era decisión suya).

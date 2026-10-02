@@ -68,9 +68,9 @@ describe("order-pdf-core — PDF de pedido único Reebok/Joybees", () => {
     const pages = await extractPagesText(docBytes(doc));
     expect(pages.length).toBeGreaterThan(1);
 
-    // Línea de total: "120 bultos · 1440 piezas" y "$14,400" (sin `.00`:
+    // Línea de total: "120 bultos · 1440 unidades" y "$14,400" (sin `.00`:
     // los catálogos usan el formato de precio de src/lib/catalogo/precio.ts)
-    const totalLine = "120 bultos · 1440 piezas";
+    const totalLine = "120 bultos · 1440 unidades";
     const withTotal = pages.filter((t) => t.includes(totalLine));
     expect(withTotal.length).toBe(1);
     expect(pages[pages.length - 1]).toContain(totalLine);
@@ -100,7 +100,7 @@ describe("order-pdf-core — PDF de pedido único Reebok/Joybees", () => {
     expect(pages.length).toBeGreaterThan(1);
     expect(pages[0]).not.toContain("JOYBEES");
 
-    const totalLine = "110 bultos · 1320 piezas";
+    const totalLine = "110 bultos · 1320 unidades";
     expect(pages.filter((t) => t.includes(totalLine)).length).toBe(1);
     expect(pages[pages.length - 1]).toContain(totalLine);
     // "Panamá" con tilde (auditoría 26-jul-2026: el pie y la banda del PDF que
@@ -123,7 +123,7 @@ describe("order-pdf-core — PDF de pedido único Reebok/Joybees", () => {
     expect(text).toContain("Pedido");
     expect(text).toContain("Preventa");
     // El total sigue sumando TODO (regulares + pre-orden)
-    expect(text).toContain("20 bultos · 240 piezas");
+    expect(text).toContain("20 bultos · 240 unidades");
   });
 
   // Antes este test fijaba que la sección se titulara "Detalle". Se podó

@@ -645,12 +645,13 @@ describe("🔴 El archivo LLEGA a la pantalla, y la pantalla DICE cuál se subi�
   it("🔴 la pantalla dice CUÁL de los dos archivos se subió", () => {
     // Son dos documentos distintos del proveedor: de cada uno sale otro costo.
     expect(cliente).toContain("ROTULO_FORMATO[formato]");
-    expect(cliente).toMatch(/confirmacion:\s*"[^"]*va a llegar/);
-    expect(cliente).toMatch(/despacho:\s*"[^"]*llegó/);
+    // 1-oct-2026, Daniel: nombres normales de ERP («Proyectado» / «Recibido»).
+    expect(cliente).toMatch(/confirmacion:\s*"[^"]*Proyectado/);
+    expect(cliente).toMatch(/despacho:\s*"[^"]*Recibido/);
   });
 
   it("en el despacho no se pregunta por la columna de mes: se dice `Quantity`", () => {
-    expect(cliente).toMatch(/formato === "confirmacion" \? \(\s*<Field label="Columna de piezas \(mes\)">/);
+    expect(cliente).toMatch(/formato === "confirmacion" \? \(\s*<Field label="Columna de cantidad \(mes\)">/);
     expect(cliente).toContain("Quantity (del despacho)");
   });
 

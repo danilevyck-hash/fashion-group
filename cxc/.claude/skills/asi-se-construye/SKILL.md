@@ -6,6 +6,8 @@ user-invocable: true
 
 # Así se construye aquí
 
+> 🔴 Esta skill dice **cómo funciona por dentro**. **Cómo se VE** lo manda [docs/diseno.md](../../../docs/diseno.md) (estilo Apple) y **cómo se NOMBRA**, [docs/nombres-erp.md](../../../docs/nombres-erp.md). Las tres van juntas, siempre.
+
 Daniel, textual (7-sep-2026):
 
 > *«¿Cómo hacemos una skill o algo que cada vez que en esta sesión o en una nueva ya sepa todo, y que cuando me recomiende o construyamos algo lo haga con estos principios de eficiencia, así no tengo que repetir y que se sienta que todo el sistema es uno solo?»*
@@ -37,7 +39,7 @@ Vale para clientes, colaboradores, proveedores, vendedores y transportistas. El 
 
 Daniel: *«lo de solo ver en mi pantalla no tiene lógica, el sistema debe de trabajar todo igual»*.
 
-Nada que una persona escriba se guarda solo en su navegador. `localStorage` sirve para **comodidades de esa persona** — qué pestaña dejó abierta, qué filtro tenía, un borrador a medio escribir. **Nunca** para datos que otro necesita ver.
+Nada que una persona escriba se guarda solo en su navegador. `localStorage` sirve para **comodidades de esa persona** — qué pestaña dejó abierta, qué filtro tenía. 🩸 **Sin borrador automático** (1-oct-2026, Daniel: *«son par de clics»*). **Nunca** para datos que otro necesita ver.
 
 🩸 El `+` de destinos de Guías guardaba en `localStorage`: un destino agregado por Angela no lo veía nadie más, y **no se podía borrar desde ninguna pantalla** — se podía agregar, no quitar. Así quedó un destino de prueba llamado «hola» vivo para siempre en un solo navegador.
 
@@ -109,7 +111,7 @@ Y **la lista abre con lo reciente** (30 o 90 días según el módulo), el resto 
 
 ## 11. Un cero grande se lee como dato roto
 
-Nunca `$0.00` en letra grande. Se dice qué pasó: «Sin comprar en 2026», «No debe nada», «Nunca ha pagado», «Todavía no hay gastos registrados».
+Nunca `$0.00` en letra grande. Se dice qué pasó, con nombres de ERP ([docs/nombres-erp.md](../../../docs/nombres-erp.md)): «Sin compras en 2026», «Sin saldo», «Sin pagos», «Sin gastos registrados».
 
 ⚠️ Y **un cero con algo adentro sí muestra su número**: tapar una celda en cero que tiene un descuento adentro esconde plata.
 
@@ -147,7 +149,8 @@ Cuando se afirma algo de una pantalla, **se mira la pantalla**, no solo el códi
 - **Dónde estamos parados, cómo está hoy y cómo quedaría.**
 - **Mapear → definir juntos → ejecutar.** Nunca al revés.
 - Toda sugerencia **numerada**, con **ahora vs recomendación** lado a lado, y las opciones **a·b·c** cuando hay que elegir. Él aprueba una por una.
-- **Mockup visual** cuando hace falta verlo; nunca datos inventados en un mockup.
+- 🔴 **SIEMPRE mockup «hoy vs propuesta»** antes de programar una pantalla (Daniel, 1-oct-2026: *«siempre mockup»*), con capturas reales de hoy; nunca datos inventados.
 - **Se dice el riesgo, no las horas.** Cuánto se toca y qué puede romperse, no cuánto tarda.
+- 🔴 **El trabajo lo hacen AGENTES en segundo plano, divididos por módulo o tarea; en la conversación, solo resúmenes. Nada de comandos a la vista** (Daniel, 1-oct-2026: *«acuérdate usar agentes… dividir el trabajo y no mandarme los textos como ⏺ Bash… nada de bash»*). Hasta los commits, las pruebas y el chequeo de GitHub y Vercel los corre un agente.
 
 🔴 **Aprobar un cambio NO es aprobar que se ejecute.** Son dos permisos distintos y hacen falta los dos, **módulo por módulo**. Daniel puede decir «sí» a las 16 cosas de una pantalla y todavía no querer que se toque el código hoy. Antes de lanzar un agente a construir se pregunta, con esas palabras: **«¿lo lanzo?»**. Es el tercer paso de *mapear → definir juntos → ejecutar*, y es suyo.

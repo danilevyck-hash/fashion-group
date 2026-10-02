@@ -667,7 +667,7 @@ describe("10 · lo que el encargo dice NO tocar", () => {
   });
 
   it("🔴 la línea de cobertura y el bucket anónimo siguen en la pestaña", () => {
-    expect(pestana).toContain("Mostrador anónimo va aparte");
+    expect(pestana).toContain("Excluye consumidor final");
     expect(pestana).toContain("Consumidor final");
   });
 

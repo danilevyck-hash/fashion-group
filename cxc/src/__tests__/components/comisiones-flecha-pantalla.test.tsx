@@ -291,7 +291,7 @@ describe("🔴 tocar el número sigue abriendo el detalle", () => {
 
 // ═══ 5 · El botón de arriba: las 6 empresas ════════════════════════════════
 
-describe("🔴 «Descargar el mes en PDF» trae las 6 empresas", () => {
+describe("🔴 «Descargar PDF del mes» trae las 6 empresas", () => {
   // 🔄 9-SEP-2026 — CAMBIA DE DIRECCIÓN, NO SE BORRA. Las mismas afirmaciones,
   // sobre el mismo papel: lo que cambió es que ya no se leen del DOM de una hoja
   // HTML montada para `window.print()`, sino de lo que se le entrega al

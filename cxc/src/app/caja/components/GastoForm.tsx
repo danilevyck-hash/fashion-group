@@ -456,13 +456,14 @@ export default function GastoForm({
               🩸 Medido: decía «Comida» en 38 de los 77 recibos, con la
               categoría al lado diciendo «Alimentación» — el mismo dato dos
               veces. Se guarda en la MISMA columna `descripcion`: nada de lo ya
-              escrito se toca. */}
-          <Field label="Nota">
+              escrito se toca.
+              1-oct-2026, Daniel: nombres normales de ERP — el rótulo pasó a «Observaciones» (como en Guías); la columna `descripcion` no cambia. */}
+          <Field label="Observaciones">
             <TextInput
               value={gDescripcion}
               onChange={handleDescripcionChange}
-              placeholder="Algo que quieras apuntar (opcional)"
-              ariaLabel="Nota"
+              placeholder="Opcional"
+              ariaLabel="Observaciones"
             />
           </Field>
         </div>

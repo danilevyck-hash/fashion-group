@@ -258,8 +258,8 @@ describe("🔴 B. el motor olvida la repetida y calcula TODO sobre las buenas", 
 // C. SE VE — el Excel
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("🔴 C. el Excel lleva la repetida, dicha, y «Cuántas marcas» cuenta las que cuentan", () => {
-  it("«Todas las marcas» dice «(repetida, no cuenta)» y «Cuántas marcas» da 4", async () => {
+describe("🔴 C. el Excel lleva la repetida, dicha, y «Cantidad de marcas» cuenta las que cuentan", () => {
+  it("«Todas las marcas» dice «(repetida, no cuenta)» y «Cantidad de marcas» da 4", async () => {
     const XLSX = await import("xlsx-js-style");
     const { construirExcel, COL_TODAS_LAS_MARCAS, COL_CUANTAS_MARCAS } = await import("@/lib/asistencia/exportar");
     const [p] = motor(RAMON.map((h) => marca("21", "2026-08-03", h)), "2026-08-03", "2026-08-03");

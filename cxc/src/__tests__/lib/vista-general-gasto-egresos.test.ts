@@ -178,12 +178,11 @@ describe("🔴 el vocabulario es el de la FUENTE NUEVA", () => {
   });
 
   it("el texto DICE hasta qué mes llegan los gastos de esa empresa", () => {
+    // 1-oct-2026, Daniel: nombres normales de ERP.
     expect(textoSinGastoEgresos("sin_movimientos", "julio 2026")).toBe(
-      "Los gastos de esta empresa llegan hasta julio 2026.",
+      "Sin egresos este mes. Último mes con movimientos: julio 2026.",
     );
-    expect(textoSinGastoEgresos("sin_movimientos", null)).toBe(
-      "Todavía no hay gastos registrados de esta empresa.",
-    );
+    expect(textoSinGastoEgresos("sin_movimientos", null)).toBe("Sin egresos registrados.");
   });
 
   it("las cuatro etiquetas se distinguen entre sí", () => {
@@ -215,7 +214,7 @@ describe("🔴 Boston no se baja sola, y la pantalla lo DICE", () => {
 
   it("su texto manda a la otra fuente sin prometer que va a llegar sola", () => {
     const t = textoSinGastoEgresos("no_automatico", "mayo 2026");
-    expect(t).toContain("no se traen solos");
+    expect(t).toContain("Carga manual: no se actualiza automáticamente"); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(t).toContain("mayo 2026");
   });
 });

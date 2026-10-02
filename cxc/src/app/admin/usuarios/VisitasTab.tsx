@@ -118,7 +118,7 @@ export default function VisitasTab() {
               <li key={m.modulo} className="flex items-baseline justify-between gap-4 px-3 py-2">
                 <span className="text-sm text-gray-900">{m.moduloLabel}</span>
                 <span className="text-sm tabular-nums text-gray-600">
-                  {m.personas} {m.personas === 1 ? "persona" : "personas"} · {m.visitas}{" "}
+                  {m.personas} {m.personas === 1 ? "usuario" : "usuarios"} · {m.visitas}{" "}
                   {m.visitas === 1 ? "visita" : "visitas"}
                 </span>
               </li>

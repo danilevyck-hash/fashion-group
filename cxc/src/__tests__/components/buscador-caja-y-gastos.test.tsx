@@ -261,7 +261,7 @@ describe("🔴 Gastos: el buscador de las cuentas de una empresa", () => {
     expect(screen.getByText(new RegExp(VACIO_CUENTA))).toBeTruthy();
     expect(screen.queryByText(/Total que salió/)).toBeNull();
     // 🔴 Y no se dice «nada de eso fue un gasto», que sería falso del mes.
-    expect(screen.queryByText(/nada de eso fue un gasto/)).toBeNull();
+    expect(screen.queryByText(/ninguno es gasto/)).toBeNull();
   });
 
   it("🔴 la regla de la casa no se toca: acá no aparece ninguna otra empresa", () => {

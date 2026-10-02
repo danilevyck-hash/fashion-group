@@ -52,7 +52,7 @@ describe("🔴 UN CERO GRANDE SE LEE COMO DATO ROTO", () => {
   it("sin comprar, la tarjeta dice palabras — nunca $0.00 en letra grande", () => {
     const t = tarjetaComproDelAnio(0, 0, null, 2026);
     expect(t.monto).toBeNull();
-    expect(t.frase).toBe("Sin comprar en 2026");
+    expect(t.frase).toBe("Sin compras en 2026");
   });
 
   // 1-oct-2026, Daniel: nombres normales de ERP («No debe nada» → «Sin saldo»).
@@ -96,11 +96,11 @@ describe("🩸 «SIN COMPRAR» NO ES SIEMPRE «NUNCA COMPRÓ»", () => {
   it("la tarjeta de D-119 dice cuánto compró y que se le acreditó", () => {
     const t = tarjetaComproDelAnio(0, 21_826, null, 2026);
     expect(t.monto).toBeNull();
-    expect(t.frase).toBe("Compró $21,826.00 y se le acreditó todo");
+    expect(t.frase).toBe("Facturado $21,826.00 · 100% en notas de crédito");
   });
 
   it("la tarjeta de D-135, con sus $140,00", () => {
-    expect(tarjetaComproDelAnio(0, 140, null, 2026).frase).toBe("Compró $140.00 y se le acreditó todo");
+    expect(tarjetaComproDelAnio(0, 140, null, 2026).frase).toBe("Facturado $140.00 · 100% en notas de crédito");
   });
 });
 
@@ -110,7 +110,7 @@ describe("🔴 «DEBE» TRAE QUÉ PORCENTAJE ES DE LO QUE TE COMPRÓ", () => {
   // cuánto compró, y nadie los divide. Deber $100.000 al que te compró un millón
   // y al que te compró $150.000 no es lo mismo.
   it("lo dice en palabras y sin decimal (diccionario § 0, #5)", () => {
-    expect(tarjetaDebe(380, 1000).proporcion).toBe("el 38% de lo que te compró");
+    expect(tarjetaDebe(380, 1000).proporcion).toBe("38% de las compras del año");
   });
 
   it("sin compras del año NO se divide entre cero: la proporción no sale", () => {
@@ -296,7 +296,7 @@ describe("🔴 LOS CONTEOS DE LOS CHIPS SE CALCULAN, NUNCA SE ESCRIBEN A MANO", 
 
   it("las etiquetas son las que decidió Daniel", () => {
     expect(contarChips([]).map((c) => c.etiqueta)).toEqual([
-      "Todos", "Sin cómo contactarlos", "Sin correo", "Sin teléfono", "Con saldo", /* 1-oct-2026, Daniel: nombres normales de ERP */
+      "Todos", "Sin contacto", "Sin correo", "Sin teléfono", "Con saldo", /* 1-oct-2026, Daniel: nombres normales de ERP */
     ]);
   });
 

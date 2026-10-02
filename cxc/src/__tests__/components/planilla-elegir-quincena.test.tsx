@@ -194,7 +194,7 @@ describe("🔴 la pantalla: la barra de quincena, el corte a la vista, Generar n
     // calendario, porque acá solo se pagan quincenas.
     expect(screen.queryByText("Otro rango")).toBeNull();
     expect(screen.queryByTestId("rango")).toBeNull();
-    expect(screen.queryByText(/Elige el período$/)).toBeNull();
+    expect(screen.queryByText(/Seleccionar período$/)).toBeNull(); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(screen.queryByRole("button", { name: "Seleccionar un día o un rango" })).toBeNull(); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
@@ -222,7 +222,7 @@ describe("🔴 la pantalla: la barra de quincena, el corte a la vista, Generar n
     // 🔴 LO QUE NO CAMBIÓ, Y ES LO QUE IMPORTA: la plata NO se dibuja sola.
     // Elegir la quincena no le pide el cuadro a nadie.
     expect(urlDelCuadro(ll)).toBeNull();
-    expect(screen.getByText("Esta quincena todavía no se generó")).toBeTruthy();
+    expect(screen.getByText("Quincena sin generar")).toBeTruthy();
   });
 
   it("la quincena 1 – 15 sep trae el corte del 13 con su frase, y Generar es NEGRO", async () => {

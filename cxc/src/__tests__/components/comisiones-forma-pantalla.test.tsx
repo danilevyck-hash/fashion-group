@@ -260,7 +260,7 @@ describe("🔴 el detalle se abre ABAJO de la tabla, no encima", () => {
       />,
     );
     const panel = await waitFor(() => document.querySelector('[data-comision-detalle="inline"]') as HTMLElement);
-    expect(within(panel).getByRole("button", { name: /Descargar el detalle/ })).toBeTruthy();
+    expect(within(panel).getByRole("button", { name: /Descargar detalle/ })).toBeTruthy();
   });
 });
 

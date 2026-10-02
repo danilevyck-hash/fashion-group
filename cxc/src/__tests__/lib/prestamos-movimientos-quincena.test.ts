@@ -101,7 +101,9 @@ describe("1. los bloques se derivan de las listas del saldo", () => {
 
   it("los dos bloques se llaman como en el mockup aprobado", () => {
     expect(NOMBRE_BLOQUE.descuento).toBe("Descuentos");
-    expect(NOMBRE_BLOQUE.deuda).toBe("Deudas nuevas");
+    // 1-oct-2026, Daniel: nombres normales de ERP («Deudas nuevas» → «Cargos»; origen
+    // «del cierre / a mano» → «Cierre de planilla / Manual»; variación → «Aumento del saldo»).
+    expect(NOMBRE_BLOQUE.deuda).toBe("Cargos");
   });
 });
 
@@ -176,22 +178,22 @@ describe("4. la columna «Origen»", () => {
     // Lo que se retiró es MOSTRARLO en esta columna.
     const m = mov({ concepto: CONCEPTO_PAGO, monto: 125, fecha: "2026-09-07", origen_pago: "Liquidación" });
     expect(origenDelMovimiento(m, new Set())).toBe("mano");
-    expect(fila(m).origenEtiqueta).toBe("a mano");
+    expect(fila(m).origenEtiqueta).toBe("Manual");
   });
 
   it("la celda tiene DOS etiquetas y ninguna más", () => {
-    expect(etiquetaDeOrigen("mano")).toBe("a mano");
-    expect(etiquetaDeOrigen("cierre")).toBe("del cierre");
+    expect(etiquetaDeOrigen("mano")).toBe("Manual");
+    expect(etiquetaDeOrigen("cierre")).toBe("Cierre de planilla");
     // Ningún origen escrito se cuela por el costado, venga el que venga.
     for (const o of ["Liquidación", "Décimo", "Vacaciones", "Abono", "Quincena", null]) {
       const f = fila(mov({ concepto: CONCEPTO_PAGO, monto: 10, fecha: "2026-09-07", origen_pago: o }));
-      expect(["a mano", "del cierre"]).toContain(f.origenEtiqueta);
+      expect(["Manual", "Cierre de planilla"]).toContain(f.origenEtiqueta);
     }
   });
 
   it("los dos rótulos son los del mockup aprobado", () => {
-    expect(ETIQUETA_ORIGEN.cierre).toBe("del cierre");
-    expect(ETIQUETA_ORIGEN.mano).toBe("a mano");
+    expect(ETIQUETA_ORIGEN.cierre).toBe("Cierre de planilla");
+    expect(ETIQUETA_ORIGEN.mano).toBe("Manual");
   });
 });
 
@@ -224,7 +226,7 @@ describe("5. la quincena del 16 al 30 de agosto de 2026, medida contra producci�
 
   it("la deuda del grupo creció $657,28 — la línea que no existía", () => {
     expect(agrupado.resumen.variacion).toBe(657.28);
-    expect(rotuloDeLaVariacion(agrupado.resumen.variacion)).toBe("La deuda creció");
+    expect(rotuloDeLaVariacion(agrupado.resumen.variacion)).toBe("Aumento del saldo");
   });
 
   it("los 13 descuentos son del cierre y las 6 deudas, a mano", () => {
@@ -279,15 +281,15 @@ describe("6. el total sigue al filtro", () => {
 describe("7. cómo se lee el pie", () => {
   it("el signo se dice con palabras y el monto va en positivo", () => {
     const plata = (x: number) => `$${x.toFixed(2)}`;
-    expect(fraseDeLaVariacion(657.28, plata)).toBe("La deuda creció $657.28");
-    expect(fraseDeLaVariacion(-420, plata)).toBe("La deuda bajó $420.00");
-    expect(fraseDeLaVariacion(0, plata)).toBe("La deuda quedó igual");
+    expect(fraseDeLaVariacion(657.28, plata)).toBe("Aumento del saldo $657.28");
+    expect(fraseDeLaVariacion(-420, plata)).toBe("Disminución del saldo $420.00");
+    expect(fraseDeLaVariacion(0, plata)).toBe("Saldo sin variación");
   });
 
   it("medio centavo no es un cambio", () => {
-    expect(rotuloDeLaVariacion(0.004)).toBe("La deuda quedó igual");
-    expect(rotuloDeLaVariacion(0.01)).toBe("La deuda creció");
-    expect(rotuloDeLaVariacion(-0.01)).toBe("La deuda bajó");
+    expect(rotuloDeLaVariacion(0.004)).toBe("Saldo sin variación");
+    expect(rotuloDeLaVariacion(0.01)).toBe("Aumento del saldo");
+    expect(rotuloDeLaVariacion(-0.01)).toBe("Disminución del saldo");
   });
 
   it("el concepto se lee como en pantalla: «Daño de mercancía»", () => {
@@ -450,16 +452,16 @@ describe("14. el Excel baja lo que está en pantalla", () => {
     const t = textos(ws);
     expect(t.filter((x) => x === NOMBRE_BLOQUE.descuento)).toHaveLength(13);
     expect(t.filter((x) => x === NOMBRE_BLOQUE.deuda)).toHaveLength(6);
-    expect(t.filter((x) => x === "del cierre")).toHaveLength(13);
-    expect(t.filter((x) => x === "a mano")).toHaveLength(6);
+    expect(t.filter((x) => x === "Cierre de planilla")).toHaveLength(13);
+    expect(t.filter((x) => x === "Manual")).toHaveLength(6);
   });
 
   it("el pie dice cuánto se descontó, cuánto se prestó y cuánto creció la deuda", async () => {
     const ws = await armar(AGOSTO_2.map((m) => fila(m)));
     const t = textos(ws);
     expect(t.some((x) => x.includes("Descuentos $752.72 (13)"))).toBe(true);
-    expect(t.some((x) => x.includes("Deudas nuevas $1,410.00 (6)"))).toBe(true);
-    expect(t).toContain("La deuda creció");
+    expect(t.some((x) => x.includes("Cargos $1,410.00 (6)"))).toBe(true);
+    expect(t).toContain("Aumento del saldo");
     // La variación va como NÚMERO, nunca como texto: se suma en Excel.
     const montos = Object.entries(ws)
       .filter(([k]) => !k.startsWith("!"))

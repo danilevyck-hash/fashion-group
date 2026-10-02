@@ -120,7 +120,7 @@ describe("2 · las cuatro tarjetas, lo primero que se ve", () => {
   it("«Debe» dice qué porcentaje es de lo que te compró", () => {
     pintar();
     expect(texto()).toContain("$380,000.00");
-    expect(texto()).toContain("el 54% de lo que te compró");
+    expect(texto()).toContain("54% de las compras del año");
   });
 
   it("«Último pago» y «Última compra» dicen cuánto hace, con su detalle", () => {
@@ -140,7 +140,7 @@ describe("2 · las cuatro tarjetas, lo primero que se ve", () => {
       ultimo_pago: null,
       pagos_por_fecha: [],
     });
-    expect(texto()).toContain("Sin comprar en 2026");
+    expect(texto()).toContain("Sin compras en 2026");
     expect(texto()).toContain("Sin saldo"); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(texto()).toContain("Sin pagos");
     expect(texto()).toContain("Sin compras registradas");
@@ -155,8 +155,8 @@ describe("2 · las cuatro tarjetas, lo primero que se ve", () => {
       ultimo_pago: null,
       pagos_por_fecha: [],
     });
-    expect(texto()).toContain("Compró $21,826.00 y se le acreditó todo");
-    expect(texto()).not.toContain("Sin comprar en 2026");
+    expect(texto()).toContain("Facturado $21,826.00 · 100% en notas de crédito");
+    expect(texto()).not.toContain("Sin compras en 2026");
   });
 });
 

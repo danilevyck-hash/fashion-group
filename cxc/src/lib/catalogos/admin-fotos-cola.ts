@@ -177,7 +177,7 @@ export function agregarFotos<F extends ArchivoElegido, P extends ProductoParaEmp
       salida.push({
         clave, archivo, productoId: null, sku: null, nombreProducto: null,
         reemplaza: false, estado: "pendiente",
-        motivo: "El nombre no coincide con ningún código — elige el producto",
+        motivo: "El nombre no coincide con ningún código. Selecciona el producto",
       });
       continue;
     }
@@ -185,7 +185,7 @@ export function agregarFotos<F extends ArchivoElegido, P extends ProductoParaEmp
       salida.push({
         clave, archivo, productoId: null, sku: null, nombreProducto: null,
         reemplaza: false, estado: "pendiente",
-        motivo: `Ya hay otra foto para ${hit.sku} — elige el producto`,
+        motivo: `Ya hay otra foto para ${hit.sku} . Selecciona el producto`,
       });
       continue;
     }

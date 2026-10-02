@@ -211,7 +211,7 @@ describe("cliente OBLIGATORIO y DE LA LISTA en Factura y Mueble", () => {
     await buscarCliente("Cliente inventado");
     expect(screen.queryByText(/Ingresar manualmente/)).toBeNull(); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(
-      screen.getByText(/Solo clientes de la lista — si no está, hay que darlo de alta/),
+      screen.getByText(/Solo clientes registrados. Si no aparece, dalo de alta en Switch./ /* 1-oct-2026, Daniel: nombres normales de ERP */),
     ).toBeTruthy();
   });
 

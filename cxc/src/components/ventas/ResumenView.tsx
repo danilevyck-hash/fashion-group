@@ -484,7 +484,7 @@ export function ResumenView({
             options={MODO_OPCIONES}
             active={viewMode}
             onChange={onToggleMode}
-            ariaLabel="Qué mostrar en la matriz"
+            ariaLabel="Indicador"
             ancho="contenido"
           />
         </div>

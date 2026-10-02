@@ -635,7 +635,7 @@ describe("las pantallas grandes: el texto se fue del CÓDIGO y lo de al lado sig
       sigue: [
         // 1-oct-2026, Daniel: nombres normales de ERP
         'label="Tipo de salida"',
-        'label="Columna de piezas (mes)"',
+        'label="Columna de cantidad (mes)"', // 1-oct-2026, Daniel: nombres normales de ERP
         "Vacío = hereda la fórmula de marca",
       ],
     },
@@ -663,8 +663,8 @@ describe("las pantallas grandes: el texto se fue del CÓDIGO y lo de al lado sig
       // dato (`CampoEnLinea rotulo="…"`), y «Última sincronización» pasó a
       // «Actualizado desde Switch el» por el diccionario. Los TRES siguen
       // estando: cambió cómo se escriben, no que estén.
-      // 1-oct-2026, Daniel: nombres normales de ERP («Actualizado desde Switch el» → «Última sincronización»).
-      sigue: [">Contacto</h2>", 'rotulo="Teléfono"', "Última sincronización"],
+      // 1-oct-2026, Daniel: nombres normales de ERP — «Actualizado el {fecha}».
+      sigue: [">Contacto</h2>", 'rotulo="Teléfono"', "Actualizado el"],
     },
   ];
 

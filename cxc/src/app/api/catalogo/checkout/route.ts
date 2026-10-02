@@ -67,7 +67,7 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
   const documento = normalizarDocumento(body?.documento);
 
   if (!Number.isInteger(clienteId) || clienteId <= 0 || !clienteNombre) {
-    return NextResponse.json({ error: "Elige el cliente del pedido" }, { status: 400 });
+    return NextResponse.json({ error: "Selecciona el cliente del pedido" }, { status: 400 });
   }
   if (!items.length) return NextResponse.json({ error: "El carrito está vacío" }, { status: 400 });
   for (const it of items) {
@@ -199,7 +199,7 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
     clienteNombre,
     vendedorId,
     vendedorNombre,
-    // 🔴 Va DESPUÉS del 400 de "Elige el cliente del pedido": una cotización
+    // 🔴 Va DESPUÉS del 400 de "Selecciona el cliente del pedido": una cotización
     // pasa por el MISMO candado que un pedido. Sin cliente no sale ninguna de
     // las dos.
     documento,

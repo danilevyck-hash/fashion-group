@@ -169,10 +169,10 @@ export default function ProductoFila({
             ) : (
               <>
                 <span className={`tabular-nums ${agotado ? "text-gray-400" : "text-gray-700"}`}>
-                  {agotado ? "Agotado" : `Disponible: ${disponible}`}
+                  {agotado ? "Agotado" : `Disponibilidad: ${disponible}`}
                 </span>
                 {product.existencia != null && (
-                  <span className="text-gray-400 tabular-nums">En bodega: {product.existencia}</span>
+                  <span className="text-gray-400 tabular-nums">Existencia: {product.existencia}</span>
                 )}
               </>
             )}

@@ -87,8 +87,9 @@ type Salida = "catalogo" | "switch";
 type FormatoReebok = "confirmacion" | "despacho";
 
 const ROTULO_FORMATO: Record<FormatoReebok, string> = {
-  confirmacion: "Confirmación de compra · lo que va a llegar",
-  despacho: "Despacho · lo que llegó",
+  // 1-oct-2026, Daniel: nombres normales de ERP.
+  confirmacion: "Confirmación de compra · Proyectado",
+  despacho: "Despacho · Recibido",
 };
 
 interface ReebokClientProps {
@@ -946,13 +947,13 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
               </div>
             </Field>
             {formato === "confirmacion" ? (
-              <Field label="Columna de piezas (mes)">
+              <Field label="Columna de cantidad (mes)">
                 <select
                   value={monthColIdx}
                   onChange={(e) => onMonthChange(parseInt(e.target.value))}
                   className={selectCls}
                 >
-                  <option value={-1}>— Sin piezas —</option>
+                  <option value={-1}>— Sin cantidad —</option>
                   {months.map((m) => (
                     <option key={m.idx} value={m.idx}>{m.label}{m.isMonth ? " (mes)" : ""}</option>
                   ))}
@@ -961,7 +962,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
             ) : (
               /* En el despacho no hay nada que elegir: la cantidad es la que
                  llegó, y por eso se DICE en vez de preguntarse. */
-              <Field label="Piezas" note="Es lo que llegó, no una proyección.">
+              <Field label="Cantidad" note="Cantidad recibida, no proyectada.">
                 <div className="rounded-lg border border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-900">
                   Quantity (del despacho)
                 </div>
@@ -1071,7 +1072,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                 ))}
               </div>
               <span className="text-[12px] text-stone-500">
-                {guardandoFlete ? "Guardando…" : flashFlete ? "Listo, guardado" : "Es el que viene puesto arriba, para todo el equipo."}
+                {guardandoFlete ? "Guardando…" : flashFlete ? "Flete guardado" : "Es el que viene puesto arriba, para todo el equipo."}
               </span>
             </div>
             {errorFlete && <p className="mt-1 text-[12px] font-semibold text-red-700">{errorFlete}</p>}
@@ -1095,7 +1096,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
               <div className="border-t border-stone-200 p-3">
                 {/* Jerarquía de precios: se aprende una vez → ⓘ. */}
                 <div className="mb-2 -ml-2">
-                  <Ayuda titulo="Qué gana a qué" etiqueta="Qué gana a qué">
+                  <Ayuda titulo="Prioridad de precios" etiqueta="Prioridad de precios">
                     <p>
                       Vacío = hereda la fórmula de marca. <b>Precio fijo</b> gana a todo. El precio del
                       modelo aplica a Precio A, Precio B y a la plantilla Switch.
@@ -1198,11 +1199,11 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                     onClick={() => carpetaRef.current?.click()}
                     className="min-h-[44px] rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-900 transition hover:border-red-600 hover:text-red-700 active:scale-[0.97]"
                   >
-                    Elegir carpeta de fotos
+                    Seleccionar carpeta de fotos
                   </button>
                   <div className="mt-2 text-[12px] text-stone-500">
                     Cada foto tiene que llamarse igual que el código: <b>100262385.jpg</b>.
-                    Si no eliges carpeta, el Excel sale como siempre.
+                    Si no seleccionas carpeta, el Excel sale como siempre.
                   </div>
                 </>
               ) : (
@@ -1245,16 +1246,16 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
 
           {formato === "confirmacion" && monthColIdx === -1 && (
             <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] font-medium text-amber-800">
-              No detecté una columna de mes. Elige arriba cuál tiene las piezas por artículo.
-              Mientras tanto todo sale con 0 piezas y <b>se incluyen todos los artículos</b>,
+              No se detectó una columna de mes. Selecciona arriba la que tiene la cantidad por artículo.
+              Mientras tanto todo sale con cantidad 0 y <b>se incluyen todos los artículos</b>,
               porque no hay forma de saber cuáles pidió el proveedor.
             </div>
           )}
           {quedoVacio && (
             <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-[13px] font-medium text-red-800">
               {formato === "despacho"
-                ? "Ningún artículo del despacho trae piezas recibidas, así que el archivo saldría vacío y no se puede descargar. Revisa que el archivo sea el correcto."
-                : `Ningún artículo tiene piezas en ${monthLabel || "el mes elegido"}, así que el archivo saldría vacío y no se puede descargar. Revisa arriba si la columna de piezas es la correcta.`}
+                ? "Ningún artículo del despacho trae cantidad recibida, así que el archivo saldría vacío y no se puede descargar. Revisa que el archivo sea el correcto."
+                : `Ningún artículo tiene cantidad en ${monthLabel || "el mes seleccionado"}, así que el archivo saldría vacío y no se puede descargar. Revisa arriba si la columna de cantidad es la correcta.`}
             </div>
           )}
           {salida === "switch" && revisar > 0 && (
@@ -1269,7 +1270,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
             <span className="text-stone-300">·</span>
             <span><b className="font-semibold text-stone-900">{vista.skus.toLocaleString()}</b> tallas/SKUs</span>
             <span className="text-stone-300">·</span>
-            <span><b className="font-semibold text-stone-900">{vista.piezas.toLocaleString()}</b> piezas{piezasLabel ? ` (${piezasLabel})` : ""}</span>
+            <span><b className="font-semibold text-stone-900">{vista.piezas.toLocaleString()}</b> unidades{piezasLabel ? ` (${piezasLabel})` : ""}</span>
             {/* 🔴 El costo del archivo: es el número con el que se cuadra contra
                 la factura del proveedor. Mismas filas que el Excel. */}
             <CostoDelArchivo costo={costo} />
@@ -1304,8 +1305,8 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
           {/* Aviso discreto: no se perdió nada, simplemente no se pidieron esas piezas */}
           {vista.omitidos > 0 && (
             <div className="mb-3 px-1 text-[12px] text-stone-500">
-              {vista.omitidos.toLocaleString()} artículo{vista.omitidos === 1 ? "" : "s"} sin piezas
-              {formato === "despacho" ? " recibidas" : ` en ${monthLabel || "el mes elegido"}`} no se {vista.omitidos === 1 ? "incluyó" : "incluyeron"}.
+              {vista.omitidos.toLocaleString()} artículo{vista.omitidos === 1 ? "" : "s"} sin cantidad
+              {formato === "despacho" ? " recibidas" : ` en ${monthLabel || "el mes seleccionado"}`} no se {vista.omitidos === 1 ? "incluyó" : "incluyeron"}.
             </div>
           )}
 
@@ -1321,7 +1322,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                 <table className="w-full table-auto border-collapse text-[12px] tabular-nums">
                   <thead>
                     <tr>
-                      {["PO", "New Article", "Name", "Depto", "Género", "WP", "Costo", "Precio A", "Precio B", "Piezas"].map((h, i) => (
+                      {["PO", "New Article", "Name", "Depto", "Género", "WP", "Costo", "Precio A", "Precio B", "Cantidad"].map((h, i) => (
                         <Th key={i} narrow={i >= 5}>{h}</Th>
                       ))}
                     </tr>

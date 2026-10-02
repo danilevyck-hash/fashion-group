@@ -208,7 +208,7 @@ function DetalleDeLaImpulsadora({
               key={m.mes}
               data-fila="mes-sin-pagar"
               titulo={etiquetaMes(m.mes)}
-              detalle={m.estado === "parcial" ? `a medias · falta ${m.faltan}` : "sin pagar"}
+              detalle={m.estado === "parcial" ? `Parcial · falta ${m.faltan}` : "Pendiente"}
             />
           ))}
         </GrupoCelular>

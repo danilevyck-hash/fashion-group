@@ -59,7 +59,7 @@ export default function SeccionAsistencia({ codigo, refresco }: {
       resumen={
         listo && persona
           ? `${r?.diasTrabajados ?? 0} día${(r?.diasTrabajados ?? 0) === 1 ? "" : "s"} con marcas`
-          : listo ? "No marcó en este período" : "…"
+          : listo ? "Sin marcaciones en el período" : "…"
       }
       boton={null}
     >

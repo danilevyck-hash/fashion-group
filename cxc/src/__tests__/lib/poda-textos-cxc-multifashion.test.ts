@@ -524,7 +524,7 @@ const EN_PANTALLA: { archivo: string; por_que: string; texto: string }[] = [
   {
     archivo: "components/multifashion/ClientesMultifashionSubtab.tsx",
     por_que: "el mostrador anónimo va aparte y eso cambia cómo se lee el top",
-    texto: "Mostrador anónimo va aparte",
+    texto: "Excluye consumidor final", // 1-oct-2026, Daniel: nombres normales de ERP
   },
   {
     archivo: "components/multifashion/CajaSubtab.tsx",
@@ -572,14 +572,14 @@ const EN_PANTALLA: { archivo: string; por_que: string; texto: string }[] = [
     // decidido por Daniel) sacó la palabra «sincronizar» de la pantalla:
     // «Actualizar ahora» en el botón y «Actualizado …» en el rótulo. El aviso
     // sigue A LA VISTA, nunca detrás del ⓘ, que es lo que este candado protege.
-    // 1-oct-2026, Daniel: nombres normales de ERP — un término por concepto
-    // (docs/nombres-erp.md): «Última sincronización», igual que Proveedores.
-    texto: "Última sincronización",
+    // 1-oct-2026, Daniel: nombres normales de ERP — vuelve «Actualizado el
+    // {fecha}», igual que Proveedores (sin «sincroniz» en pantalla).
+    texto: "Actualizado el",
   },
   {
     archivo: "app/proveedores/[key]/ProveedorDetail.tsx",
     por_que: "la frescura del dato cambia cuánto se le cree a la ficha",
-    texto: "Última sincronización",
+    texto: "Actualizado el",
   },
 ];
 

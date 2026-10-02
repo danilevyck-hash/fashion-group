@@ -315,8 +315,9 @@ describe("5 · la ficha del cliente deja de usar la sigla y la jerga", () => {
     pintar();
     // NO SE BORRA NUNCA: sin ella la tabla se lee como un error de la app. Y
     // hace más falta que antes, porque la tarjeta «Debe» divide una cifra por
-    // la otra («el 38% de lo que te compró»).
-    fireEvent.click(screen.getByRole("button", { name: /Por qué las cifras no cuadran/i }));
+    // la otra («38% de las compras del año»).
+    // 1-oct-2026, Daniel: nombres normales de ERP — el ⓘ se titula «Cómo se calcula».
+    fireEvent.click(screen.getByRole("button", { name: /Cómo se calcula/i }));
     const ayuda = screen.getByText(/va sin ITBMS/).closest("div")!;
     // 1-oct-2026, Daniel: nombres normales de ERP («Compró · Debe» → «Compras · Saldo»).
     expect(ayuda.textContent).toContain("Compras");

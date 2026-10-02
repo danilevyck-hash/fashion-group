@@ -187,11 +187,10 @@ function GastosContabilidadInner() {
             ) : data && !data.instalado ? (
               <div className="rounded-lg border border-gray-200 bg-white p-4">
                 <p className="text-sm font-medium text-gray-900">
-                  Esta parte todavía no está encendida.
+                  Esto todavía no está encendido. Avísame.
                 </p>
                 <p className="mt-1 text-sm text-gray-600">
-                  Falta el último paso de instalación. Cuando esté listo, aquí vas
-                  a ver lo que salió de caja y del banco de cada empresa, mes por mes.
+                  Aquí verás los egresos de caja y banco de cada empresa, por mes.
                 </p>
               </div>
             ) : egresos.data ? (

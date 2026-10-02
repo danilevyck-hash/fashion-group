@@ -145,7 +145,7 @@ export default function TransportistasConfig({ onAviso }: { onAviso: (m: string)
         throw new Error(b.error ?? "No se pudo guardar. Intenta de nuevo en unos segundos.");
       }
       setNuevo("");
-      onAviso("Listo, guardado");
+      onAviso("Transportista guardado");
       void cargar();
     } catch (err) {
       setErrorAlta(err instanceof Error ? err.message : "No se pudo guardar. Intenta de nuevo en unos segundos.");
@@ -165,7 +165,7 @@ export default function TransportistasConfig({ onAviso }: { onAviso: (m: string)
         const b = await res.json().catch(() => ({}));
         throw new Error(b.error ?? "No se pudo quitar. Intenta de nuevo en unos segundos.");
       }
-      onAviso("Listo, quitado");
+      onAviso("Transportista quitado");
       setAQuitar(null);
       void cargar();
     } catch (err) {
@@ -183,7 +183,7 @@ export default function TransportistasConfig({ onAviso }: { onAviso: (m: string)
     >
       <h2 id="transportistas-titulo" className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-900">
         Transportistas
-        <Ayuda titulo="Qué hace esta lista">
+        <Ayuda titulo="Información">
           <p>Son los que ofrece el desplegable «Transportista» al armar una guía.</p>
           <p>La ve todo el equipo: lo que agregues aquí —o desde el ＋ del desplegable, al armar la guía— le aparece a todos.</p>
           <p>Quitar uno no borra nada: las guías que ya lo usan siguen diciendo su nombre.</p>

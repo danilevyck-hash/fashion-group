@@ -206,7 +206,7 @@ describe("Reclamos › Por empresa — la columna ACCIONES entra en iPad", () =>
     const src = leer(EMPRESA_LIST);
     expect(src).not.toContain("after:-inset-[9px]");
     expect(src).not.toContain('title="Enviar al proveedor" aria-label="Enviar al proveedor"');
-    expect(src).toContain(">Correo</button>");
+    expect(src).toContain(">Enviar</button>"); // 1-oct-2026, Daniel: nombres normales de ERP («Correo» → «Enviar»)
     expect(src).toContain('{filaBusy === r.id ? "…" : "Descargar"}');
     expect(src).toContain("<OverflowMenu");
   });

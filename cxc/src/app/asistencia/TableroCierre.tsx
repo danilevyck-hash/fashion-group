@@ -188,7 +188,7 @@ export default function TableroCierre({
           : "";
         throw new Error(frenos || j.error || "No se pudo cerrar");
       }
-      toast(`Listo, ${fila.etiqueta} quedó cerrada`, "success");
+      toast(`Quincena cerrada: ${fila.etiqueta}`, "success");
       onCerrada();
       await leer();
     } catch (e) {
@@ -215,7 +215,7 @@ export default function TableroCierre({
               {/* 🔴 «Colaboradores», nunca «Personas»: es la palabra del
                   módulo entero desde el 10-sep-2026 (Daniel: *«no lo llames
                   personas, sino colaboradores»*), y hay barrido que lo exige. */}
-              <th className="px-2 py-2.5 text-right font-medium">Colabor.</th>
+              <th className="px-2 py-2.5 text-right font-medium"><span className="sm:hidden">Colab.</span><span className="hidden sm:inline">Colaboradores</span></th>
               <th className="px-2 py-2.5 text-right font-medium">Neto</th>
               <th className="px-2 py-2.5 text-left font-medium">Pendientes</th>
               <th className="px-2 py-2.5 text-right font-medium"></th>

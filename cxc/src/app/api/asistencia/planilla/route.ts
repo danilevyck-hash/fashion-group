@@ -626,7 +626,7 @@ export async function GET(req: NextRequest) {
     // 🔴 (a) QUIEN ENTRÓ O SALIÓ A MITAD DEL PERÍODO COBRA LOS DÍAS TRABAJADOS
     // (10-sep-2026, Daniel: *«c, se paga días trabajados»*): sueldo quincenal ÷
     // días hábiles de la quincena × días hábiles desde que entró (o hasta que
-    // salió). Hasta ese día salía en «Tú decides» sin número. Ver
+    // salió). Hasta ese día salía en «Pago por definir» sin número. Ver
     // `prorrateo-ingreso.ts`; el motivo sigue escrito al lado del pago.
     const decidirAMano = new Map<string, string>();
     const prorrateo = new Map<string, { factor: number; texto: string }>();
@@ -726,7 +726,7 @@ export async function GET(req: NextRequest) {
     // 🔑 Se arma sobre las líneas que SÍ produjeron dinero, que son las únicas
     // donde la planilla de verdad descontó algo. A quien el sistema no le
     // calculó pago (una vacación que cubre el período entero, sin una sola
-    // marca) no se le "dejó de pagar" nada: sale en «Tú decides» con su
+    // marca) no se le "dejó de pagar" nada: sale en «Pago por definir» con su
     // motivo escrito, que es otra cosa y ya se dice ahí.
     const rangosMarcadosDe = new Map<string, Array<{ desde: string; hasta: string }>>();
     for (const v of vRes.filas) {

@@ -150,11 +150,12 @@ describe("3f · hace cuánto compró, en palabras", () => {
 
   it("🔴 sale de la ÚLTIMA COMPRA real, y «hoy» llega por parámetro", () => {
     // Los seis clientes medidos el 25-sep-2026.
-    expect(ultimaCompraEnPalabras("2026-09-24", HOY)).toEqual({ texto: "compró ayer", avisa: false });
-    expect(ultimaCompraEnPalabras("2026-09-25", HOY)).toEqual({ texto: "compró hoy", avisa: false });
-    expect(ultimaCompraEnPalabras("2026-09-17", HOY)).toEqual({ texto: "compró hace 8 días", avisa: false });
+    // 1-oct-2026, Daniel: nombres normales de ERP — un prefijo, «Última compra: …».
+    expect(ultimaCompraEnPalabras("2026-09-24", HOY)).toEqual({ texto: "Última compra: ayer", avisa: false });
+    expect(ultimaCompraEnPalabras("2026-09-25", HOY)).toEqual({ texto: "Última compra: hoy", avisa: false });
+    expect(ultimaCompraEnPalabras("2026-09-17", HOY)).toEqual({ texto: "Última compra: hace 8 días", avisa: false });
     // La Frontera Duty Free: 25-jun.
-    expect(ultimaCompraEnPalabras("2026-06-25", HOY)).toEqual({ texto: "3 meses sin comprar", avisa: true });
+    expect(ultimaCompraEnPalabras("2026-06-25", HOY)).toEqual({ texto: "Última compra: hace 3 meses", avisa: true });
     // Y acá nadie mira el reloj: el módulo no importa `fecha-panama`.
     expect(leer("src/lib/ventas/celular.ts")).not.toContain("hoyPanama");
   });
@@ -181,8 +182,8 @@ describe("3f · hace cuánto compró, en palabras", () => {
   });
 
   it("la línea gris no deja un « · » suelto cuando falta una parte", () => {
-    expect(lineaGrisDelCliente("D-25", 6, { texto: "compró ayer", avisa: false }))
-      .toBe("D-25 · 6 empresas · compró ayer");
+    expect(lineaGrisDelCliente("D-25", 6, { texto: "Última compra: ayer", avisa: false }))
+      .toBe("D-25 · 6 empresas · Última compra: ayer");
     expect(lineaGrisDelCliente("D-25", 1, null)).toBe("D-25 · 1 empresa");
     expect(lineaGrisDelCliente(null, 0, null)).toBe("");
   });

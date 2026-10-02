@@ -202,13 +202,14 @@ describe.each([
 
   it("🔴 tiene el botón «Cobrar», visible sin abrir nada", () => {
     pintar();
-    expect(screen.getAllByText("Cobrar").length).toBeGreaterThan(0);
+    // 1-oct-2026, Daniel: nombres normales de ERP — «Cobrar» → «Enviar estado de cuenta».
+    expect(screen.getAllByRole("button", { name: "Enviar estado de cuenta" }).length).toBeGreaterThan(0);
   });
 
   it("tocar «Cobrar» avisa con ESE cliente", () => {
     const llamados: string[] = [];
     pintar((c) => llamados.push(c.nombre_normalized));
-    fireEvent.click(screen.getAllByText("Cobrar")[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Enviar estado de cuenta" })[0]);
     expect(llamados).toEqual([CLIENTE.nombre_normalized]);
   });
 

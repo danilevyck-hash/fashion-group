@@ -81,14 +81,14 @@ export function MetaAvanceCompacta({ meta, puedeEditar, onEditar }: Props) {
           <span className="text-sm text-gray-600">· quedan {a.diasQueFaltan} {a.diasQueFaltan === 1 ? "día" : "días"}</span>
         )}
       </p>
-      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-200" role="img" aria-label={`Llevan ${pct(a.pctVendido)} de la meta`}>
+      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-200" role="img" aria-label={`Avance ${pct(a.pctVendido)}`}>
         <div className={`h-full rounded-full ${a.cumplida ? "bg-emerald-600" : "bg-teal-700"}`} style={{ width: `${anchoBarra}%` }} />
       </div>
 
       {/* ¿Así como vamos, llegamos? — una línea, y de dónde sale la cuenta. */}
       <p className="mt-2 flex flex-wrap items-center gap-x-1.5 text-sm">
         {a.cumplida ? (
-          <span className="font-medium text-emerald-800">¡Meta cumplida! Llevan {fmtMoney(a.vendido - a.objetivo)} de más.</span>
+          <span className="font-medium text-emerald-800">Meta cumplida (+{fmtMoney(a.vendido - a.objetivo)})</span>
         ) : a.estado === "por-empezar" ? (
           <span className="text-gray-600">Esta meta todavía no empieza.</span>
         ) : a.motivoSinProyeccion === "muy-temprano" || a.proyeccion == null ? (
@@ -96,10 +96,10 @@ export function MetaAvanceCompacta({ meta, puedeEditar, onEditar }: Props) {
         ) : (
           <>
             {a.alcanza ? <TrendingUp className="h-4 w-4 shrink-0 text-emerald-700" /> : <TrendingDown className="h-4 w-4 shrink-0 text-amber-700" />}
-            <span className="font-medium text-gray-900">{a.estado === "cerrada" ? "Cerraron en" : "Así como van, cierran en"}</span>
+            <span className="font-medium text-gray-900">{a.estado === "cerrada" ? "Cierre" : "Proyección de cierre"}</span>
             <span className="font-mono font-semibold tabular-nums text-gray-950">{fmtMoney(a.proyeccion)}</span>
             <span className={a.alcanza ? "text-emerald-800" : "text-amber-800"}>
-              · {a.alcanza ? `sobran ${fmtMoney(Math.abs(a.brechaProyectada ?? 0))}` : `faltarían ${fmtMoney(Math.abs(a.brechaProyectada ?? 0))}`}
+              · {`${a.alcanza ? "Excedente" : "Faltante"}${a.estado === "cerrada" ? "" : " proyectado"} ${fmtMoney(Math.abs(a.brechaProyectada ?? 0))}`}
             </span>
             <span className="text-xs text-gray-500">
               {a.base === "temporada"

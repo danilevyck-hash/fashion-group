@@ -137,8 +137,9 @@ describe("C. 🔴 la dirección es /asistencia/colaboradores/[codigo], y la viej
 
   it("el título de la página y el alta dicen «Colaborador»", () => {
     expect(puro("src/app/asistencia/colaboradores/[codigo]/page.tsx")).toMatch(/Colaborador · Asistencia/);
-    expect(puro("src/app/asistencia/colaboradores/PersonaPagina.tsx")).toMatch(/"Colaborador nuevo"/);
-    expect(puro("src/app/asistencia/colaboradores/FichaEditar.tsx")).toMatch(/"Colaborador nuevo"/);
+    expect(puro("src/app/asistencia/colaboradores/PersonaPagina.tsx")).toMatch(/"Nuevo colaborador"/);
+    // 1-oct-2026, Daniel: nombres normales de ERP («Colaborador nuevo» → «Nuevo colaborador»).
+    expect(puro("src/app/asistencia/colaboradores/FichaEditar.tsx")).toMatch(/"Nuevo colaborador"/);
   });
 });
 

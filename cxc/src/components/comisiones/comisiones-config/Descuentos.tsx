@@ -194,7 +194,7 @@ export function Descuentos({ onSaved }: { onSaved: (msg: string) => void }) {
         const b = await res.json().catch(() => ({}));
         throw new Error(b.error ?? `HTTP ${res.status}`);
       }
-      onSaved("Listo, guardado");
+      onSaved("Descuento guardado");
       cerrarForm();
       void load();
     } catch (err) {
@@ -213,7 +213,7 @@ export function Descuentos({ onSaved }: { onSaved: (msg: string) => void }) {
         const b = await res.json().catch(() => ({}));
         throw new Error(b.error ?? `HTTP ${res.status}`);
       }
-      onSaved("Listo, ya no se descuenta");
+      onSaved("Descuento quitado");
       setAQuitar(null);
       void load();
     } catch (err) {
@@ -372,7 +372,7 @@ export function Descuentos({ onSaved }: { onSaved: (msg: string) => void }) {
         </div>
       ) : filas.length === 0 ? (
         <div className="py-10 text-center text-sm text-gray-500">
-          Todavía no hay descuentos.
+          Sin descuentos registrados.
         </div>
       ) : (
         <div className="overflow-x-auto">

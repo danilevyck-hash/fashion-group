@@ -659,7 +659,7 @@ export function parteDeTanda(t: Pick<Tanda, "llegaron" | "vendidas">): number | 
  *  bodega quedó en 0 y volvió a llegar mercancía. Los CUÁNTO/CUÁNTO VA/CUÁNTO
  *  TIEMPO son los números grandes de arriba: acá no se repiten. */
 export function fraseLlegadaActual(t: Tanda): string {
-  return `Llegaron ${fmtNum(t.llegaron)} u en ${fmtMesAnio(t.desdeMes)}`;
+  return `Recepción de ${fmtNum(t.llegaron)} u en ${fmtMesAnio(t.desdeMes)}`;
 }
 
 /** "La anterior (oct 2025): 36 u — se vendió toda en 2 meses" — la historia,
@@ -883,8 +883,8 @@ export function textoAvance(n: LineaAvance): string | null {
     }
     case "agregado":
       return n.van < 0
-        ? `Desde ${fmtMesAnio(n.desdeMes)} llegaron ${fmtNum(n.llegaron)} u · van devueltas ${fmtNum(-n.van)}`
-        : `Desde ${fmtMesAnio(n.desdeMes)} llegaron ${fmtNum(n.llegaron)} u · van vendidas ${fmtNum(n.van)}`;
+        ? `Recepción de ${fmtNum(n.llegaron)} u desde ${fmtMesAnio(n.desdeMes)} · devueltas ${fmtNum(-n.van)}`
+        : `Recepción de ${fmtNum(n.llegaron)} u desde ${fmtMesAnio(n.desdeMes)} · vendidas ${fmtNum(n.van)}`;
     case "sin-dato":
       return null;
   }
@@ -1115,8 +1115,8 @@ export function fmtRitmo(porMes: number): string {
  *  sin ventas (no se dice "Vendo 0"). */
 export function textoVendoPorMes(porMes: number | null): string | null {
   if (porMes == null || !(porMes > 0)) return null;
-  if (porMes < 0.05) return "Vendo menos de 0.1 u por mes";
-  return `Vendo ${fmtRitmo(porMes)} u por mes`;
+  if (porMes < 0.05) return "Venta promedio: menos de 0.1 u por mes";
+  return `Venta promedio: ${fmtRitmo(porMes)} u por mes`;
 }
 
 /** La línea secundaria completa, tal como se lee bajo los cuatro grandes:
@@ -1132,7 +1132,7 @@ export function textoLineaVenta(
   // Cuando el ritmo NO sale de la llegada (sin compra registrada), se dice de
   // dónde sale — un número con otra base sin rotular sería una mentirita.
   const vendoRotulado =
-    vendo && ritmo.base === "ventana-12" ? `${vendo} (promedio de los últimos 12 meses)` : vendo;
+    vendo && ritmo.base === "ventana-12" ? `${vendo} (últimos 12 meses)` : vendo;
   // 🔴 Con 2+ llegadas sobre bodega en 0, la línea es la FECHA de la última
   // llegada + el ritmo: "Llegaron 36 u en mar 2026 · vendo 8.7 u por mes". El
   // % y los meses NO se repiten acá — son los números grandes de arriba. La
@@ -1283,7 +1283,7 @@ export function subDesdeLlegada(v: VistaBarras, hoyMes: string): string | null {
   const meses = diffMeses(hoyMes, v.llegada.fecha.slice(0, 7));
   const partes = [
     `${textoMeses(meses)} en bodega`,
-    `van vendidas ${fmtNum(v.vanVendidas ?? 0)} de ${fmtNum(v.llegada.unidades)}`,
+    `vendidas ${fmtNum(v.vanVendidas ?? 0)} de ${fmtNum(v.llegada.unidades)}`,
   ];
   if (v.recortada) partes.push("se muestran los primeros 12 meses");
   return partes.join(" · ");

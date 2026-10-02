@@ -61,7 +61,7 @@ export default function BultoSelector({
       setGuardado(true);
       setTimeout(() => setGuardado(false), 2000);
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "No se pudo guardar las piezas por bulto.");
+      showToast(e instanceof Error ? e.message : "No se pudo guardar las unidades por bulto.");
     } finally {
       setGuardando(false);
     }
@@ -71,7 +71,7 @@ export default function BultoSelector({
     <div className={compacto ? "flex items-center gap-1.5" : ""}>
       <div className="flex items-center justify-between mb-1">
         {!compacto && (
-          <span className="text-[11px] font-medium text-gray-500">Piezas por bulto</span>
+          <span className="text-[11px] font-medium text-gray-500">Unidades por bulto</span>
         )}
         {guardando ? (
           <span className="text-[10px] text-gray-400">Guardando…</span>
@@ -79,7 +79,7 @@ export default function BultoSelector({
           <span className="text-[10px] font-medium text-emerald-600">✓ Guardado</span>
         ) : null}
       </div>
-      <div className="flex gap-1" role="group" aria-label={`Piezas por bulto de ${productName}`}>
+      <div className="flex gap-1" role="group" aria-label={`Unidades por bulto de ${productName}`}>
         {OPCIONES.map((n) => (
           <button
             key={n}

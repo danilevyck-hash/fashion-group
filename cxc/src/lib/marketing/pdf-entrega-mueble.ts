@@ -36,9 +36,11 @@
 //     norte colgador en 1 bulto. o 20 norte colgador en un bulto"*. Son dos
 //     datos distintos: las piezas son la mercancía (y lo que descuenta el
 //     inventario), los bultos son cuántos paquetes bajaron del camión, que es
-//     justo lo que cuenta quien recibe. La columna "Cantidad" pasó a llamarse
-//     "Piezas" para que nadie las confunda. Sin bultos anotados la celda va
-//     en blanco, NUNCA en 0 (ver ./piezas-bultos.ts).
+//     justo lo que cuenta quien recibe. Sin bultos anotados la celda va en
+//     blanco, NUNCA en 0 (ver ./piezas-bultos.ts).
+//     🔄 1-oct-2026, Daniel: nombres normales de ERP. La columna vuelve a
+//     llamarse "Cantidad" (antes "Piezas"), al lado de "Bultos": son dos
+//     columnas con su nombre de ERP y siguen separadas.
 //
 // ── SON DOS PAPELES, PERO UN SOLO GENERADOR (12-ago-2026) ────────────────────
 //   Daniel, textual: *"lo de los bultos no es para el comprobante que le mando
@@ -288,7 +290,7 @@ export function buildComprobanteEntregaDoc(
       [
         "",
         "Artículo",
-        "Piezas",
+        "Cantidad",
         ...(incluirBultos ? ["Bultos"] : []),
         "Precio unitario",
         "Importe",
@@ -321,7 +323,8 @@ export function buildComprobanteEntregaDoc(
         cellPadding: 2,
         minCellHeight: hayFotos ? FOTO_MM + 4 : 0,
       },
-      2: { halign: "center", cellWidth: 18 },
+      // 22 mm: «Cantidad» (1-oct-2026) en 18 mm partía en dos renglones.
+      2: { halign: "center", cellWidth: 22 },
       ...(incluirBultos
         ? {
             3: { halign: "center" as const, cellWidth: 18 },

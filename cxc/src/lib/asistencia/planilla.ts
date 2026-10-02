@@ -1927,7 +1927,7 @@ export function armarLinea(
    * 🔴 EL PRORRATEO DE QUIEN ENTRÓ O SALIÓ A MITAD DEL PERÍODO (10-sep-2026,
    * Daniel: *«c, se paga días trabajados»*). El FACTOR ya viene multiplicado en
    * `factorBase`; acá solo viaja el texto para decirlo en pantalla y en el papel.
-   * Reemplaza a la regla del 25-ago («ni completo ni prorrateado: Tú decides»).
+   * Reemplaza a la regla del 25-ago («ni completo ni prorrateado: Pago por definir»).
    */
   prorrateoTexto: string | null = null,
 ): LineaPlanilla {
@@ -2309,7 +2309,7 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
     // hay NI UNA marca en todo el período.
     // 🔴 A QUIEN NO MARCA NO SE LE BUSCA JUSTIFICACIÓN. Que no haya marcas no
     // es un hecho a explicar: es su forma de trabajar. Preguntarle a
-    // `justificados` lo mandaría a «Tú decides» —con un texto de vacaciones
+    // `justificados` lo mandaría a «Pago por definir» —con un texto de vacaciones
     // que además sería falso— justo el caso que esta bandera existe para sacar
     // de ahí. La de vigencia SÍ sigue mandando: entrar o salir a mitad del
     // período es otra cosa, no tiene nada que ver con el reloj.
@@ -2378,7 +2378,7 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
       // `h` es `HORAS_CERO`: sin ausencias, sin extras, el quincenal tal cual.
       // ⚠️ A diferencia de `noMarcaReloj`, `motivo` SÍ se le miró arriba: una
       // justificación de período completo (una incapacidad de quince días)
-      // sigue mandándola a «Tú decides», porque eso no es trabajar afuera.
+      // sigue mandándola a «Pago por definir», porque eso no es trabajar afuera.
       if (linea.fueraDePlanilla || linea.noMarcaReloj || linea.trabajaAfuera) {
         lineas.push(linea);
         continue;
@@ -2502,7 +2502,7 @@ export function totalizar(lineas: readonly LineaPlanilla[]): TotalesPlanilla {
  *
  * 🔑 Cuatro cajones y no dos, y la diferencia entre los dos últimos es de la que
  * se queja la contadora: «falta un dato» es algo que ELLA tiene que arreglar en
- * Configuración; «Tú decides» es algo que el sistema no puede saber y que
+ * Configuración; «Pago por definir» es algo que el sistema no puede saber y que
  * decide una persona. Mezclarlos manda a buscar un arreglo que no existe.
  *
  * ⚠️ Si a alguien le falta un dato Y además hay que decidirlo, gana «falta»: sin

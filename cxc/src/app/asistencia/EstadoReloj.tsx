@@ -155,7 +155,7 @@ export default function EstadoReloj({ onLlegaron, resumen = false, empresa = nul
     teniaPedido.current = conPedido;
     if (cumplidos.length === 0) return;
     setPidiendo((p) => p.filter((d) => !cumplidos.includes(d)));
-    toast("Listo, ya trajo las marcaciones", "success");
+    toast("Marcaciones actualizadas", "success");
     onLlegaron?.();
     // `huella` es la dependencia real: `relojes` cambia de identidad en cada
     // render y volvería a entrar sin que nada haya pasado.

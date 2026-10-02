@@ -98,7 +98,7 @@ describe("🔴 «Sin reclamar» en CERO no ocupa un tercio de la fila", () => {
   it("con todos reclamados, la caja NO existe y quedan dos columnas", () => {
     pintar([mk({ id: "FW-1", precio: 3000, fecha_factura: haceDias(30) })]);
     const portada = document.querySelector('[data-medir="reclamos-portada"]')!;
-    expect(portada.textContent).toContain("Por cobrar");
+    expect(portada.textContent).toContain("Pendiente de cobro"); // 1-oct-2026, Daniel: nombres normales de ERP — «Por cobrar» → «Pendientes».
     expect(portada.textContent).not.toContain("Sin reclamar");
     expect(portada.textContent).not.toContain("Nada sin reclamar");
     expect(portada.className).toContain("sm:grid-cols-2");
@@ -188,7 +188,7 @@ describe("🔴 los días del más viejo, en un chip rojo", () => {
       mk({ id: "FW-3", precio: 100, fecha_factura: haceDias(DIAS_RECLAMO_VIEJO - 1) }),
     ]);
     const portada = document.querySelector('[data-medir="reclamos-portada"]')!;
-    const caja = within(portada as HTMLElement).getByText("Por cobrar").parentElement!;
+    const caja = within(portada as HTMLElement).getByText("Pendiente de cobro").parentElement!;
     expect(caja.textContent).toContain(`2 pasan de ${DIAS_RECLAMO_VIEJO} días`);
   });
 

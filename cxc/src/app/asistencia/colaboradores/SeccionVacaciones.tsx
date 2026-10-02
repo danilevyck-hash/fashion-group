@@ -83,7 +83,7 @@ export default function SeccionVacaciones({ codigo, refresco }: {
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error ?? "No se pudo guardar");
-      toast("Listo, guardado", "success");
+      toast("Vacaciones guardadas", "success");
       setAbierto(false);
       setYaPagadas(false);
       await leer();
@@ -101,7 +101,7 @@ export default function SeccionVacaciones({ codigo, refresco }: {
         method: "DELETE",
       });
       if (!r.ok) throw new Error("");
-      toast("Listo, quitadas", "success");
+      toast("Vacaciones quitadas", "success");
       await leer();
     } catch {
       toast("No se pudo quitar. Intenta de nuevo.", "error");

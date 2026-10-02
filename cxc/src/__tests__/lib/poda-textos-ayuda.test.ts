@@ -99,7 +99,7 @@ const EN_UN_AYUDA: Array<[string, string]> = [
   // funcionalidad que explicaba (Daniel mandó quitar el autorrelleno por
   // curva): no es una poda de texto, es una función eliminada. El candado
   // inverso —que la curva no VUELVA— vive abajo en este mismo archivo.
-  ["components/marketing/AyudaClienteVinculado.tsx", "Elige del directorio para vincular"],
+  ["components/marketing/AyudaClienteVinculado.tsx", "Selecciona del directorio para vincular"], // 1-oct-2026, Daniel: nombres normales de ERP («Elige» → «Selecciona»)
   ["app/marketing/components/FotosSection.tsx", "Respaldo visual que se adjunta a la cobranza a la marca"],
 
   // ── Gastos de Empresa: el módulo se retiró (11-ago-2026) ─────────────────
@@ -154,7 +154,7 @@ describe("🩸 el 'cómo se guarda el cliente' de Marketing es UNO, no dos copia
   });
 
   it.each(CONSUMIDORES)("%s no vuelve a escribir la frase a mano", (archivo) => {
-    expect(aplanar(leer(archivo))).not.toContain("Elige del directorio para vincular");
+    expect(aplanar(leer(archivo))).not.toContain("Selecciona del directorio para vincular");
   });
 });
 

@@ -157,7 +157,7 @@ describe("⛔ sin autorrelleno del kit", () => {
     });
     // Con la curva vieja, Tablas diría 30. Tiene que seguir vacío.
     const tablas = screen.getByLabelText(
-      "Piezas de Tablas",
+      "Cantidad de Tablas",
     ) as HTMLInputElement;
     expect(tablas.value).toBe("");
     expect(screen.queryByText(/Sugerido:/)).toBeNull();
@@ -291,11 +291,11 @@ describe("🔴 se puede registrar una entrega SIN paneles", () => {
   it("con tablas y paneles en blanco, el botón se enciende", async () => {
     abrir();
     await waitFor(() =>
-      expect(screen.getByLabelText("Piezas de Tablas")).toBeTruthy(),
+      expect(screen.getByLabelText("Cantidad de Tablas")).toBeTruthy(),
     );
     const guardar = screen.getByRole("button", { name: "Registrar entrega" });
     expect((guardar as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.change(screen.getByLabelText("Piezas de Tablas"), {
+    fireEvent.change(screen.getByLabelText("Cantidad de Tablas"), {
       target: { value: "24" },
     });
     await waitFor(() =>
@@ -306,9 +306,9 @@ describe("🔴 se puede registrar una entrega SIN paneles", () => {
   it("lo que se GUARDA es sólo el renglón escrito: paneles no viaja", async () => {
     abrir();
     await waitFor(() =>
-      expect(screen.getByLabelText("Piezas de Tablas")).toBeTruthy(),
+      expect(screen.getByLabelText("Cantidad de Tablas")).toBeTruthy(),
     );
-    fireEvent.change(screen.getByLabelText("Piezas de Tablas"), {
+    fireEvent.change(screen.getByLabelText("Cantidad de Tablas"), {
       target: { value: "24" },
     });
     fireEvent.change(screen.getByLabelText("Bultos de Tablas"), {

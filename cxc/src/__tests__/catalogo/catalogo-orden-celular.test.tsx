@@ -207,7 +207,7 @@ describe("4 · los tres datos de la tarjeta, en una línea", () => {
 // ═════════════════════════════════════════════════════════════════════════════
 // 5 · EL CARRITO Y EL PEDIDO — el aviso pegado a su caja
 // ═════════════════════════════════════════════════════════════════════════════
-describe("5 · «Falta: elegir el cliente», pegado a la caja del cliente", () => {
+describe("5 · «Falta: seleccionar el cliente», pegado a la caja del cliente", () => {
   it("🔴 el aviso vive DENTRO del recuadro del cliente", () => {
     const caja = CHECKOUT.indexOf('data-medir="cliente-checkout"');
     const aviso = CHECKOUT.indexOf('data-medir="falta-cliente-en-la-caja"');
@@ -219,7 +219,7 @@ describe("5 · «Falta: elegir el cliente», pegado a la caja del cliente", () =
 
   it("🔴 es el MISMO texto de siempre, no una frase nueva", () => {
     expect(CHECKOUT).toContain("textoFaltaEnviar([FALTA_EL_CLIENTE])");
-    expect(leer("src/lib/catalogo/cliente-elegido.ts")).toContain('export const FALTA_EL_CLIENTE = "elegir el cliente"');
+    expect(leer("src/lib/catalogo/cliente-elegido.ts")).toContain('export const FALTA_EL_CLIENTE = "seleccionar el cliente"');
   });
 
   it("🔴 no se dice dos veces: el de abajo se calla en el celular cuando ya lo dijo la caja", () => {
@@ -275,10 +275,11 @@ describe("6 · comprobantes", () => {
 // ═════════════════════════════════════════════════════════════════════════════
 describe("7 · administrar: cero textos encimados", () => {
   it("los dos números van en una línea, con los mismos valores", () => {
-    expect(lineaDeExistencias(14, 14)).toBe("Disponible 14 · En bodega 14");
-    expect(lineaDeExistencias(6, null)).toBe("Disponible 6");
-    expect(lineaDeExistencias(null, 12)).toBe("En bodega 12");
-    expect(lineaDeExistencias(0, 0)).toBe("Disponible 0 · En bodega 0");
+    // 1-oct-2026, Daniel: nombres normales de ERP («Disponibilidad · Existencia», diccionario §1.9).
+    expect(lineaDeExistencias(14, 14)).toBe("Disponibilidad 14 · Existencia 14");
+    expect(lineaDeExistencias(6, null)).toBe("Disponibilidad 6");
+    expect(lineaDeExistencias(null, 12)).toBe("Existencia 12");
+    expect(lineaDeExistencias(0, 0)).toBe("Disponibilidad 0 · Existencia 0");
     expect(lineaDeExistencias(null, null)).toBe("");
   });
 
@@ -310,8 +311,9 @@ describe("7 · administrar: cero textos encimados", () => {
   });
 
   it("apagado = los dos textos sueltos de antes", () => {
-    expect(FILA_ADMIN).toContain("`Disponible: ${disponible}`");
-    expect(FILA_ADMIN).toContain("En bodega: {product.existencia}");
+    // 1-oct-2026, Daniel: nombres normales de ERP («Disponibilidad: N» · «Existencia: N»).
+    expect(FILA_ADMIN).toContain("`Disponibilidad: ${disponible}`");
+    expect(FILA_ADMIN).toContain("Existencia: {product.existencia}");
     expect(FILA_ADMIN).toContain('"shrink-0 flex flex-wrap items-center gap-2"');
   });
 });
@@ -388,9 +390,9 @@ describe("10 · lo que se ve", () => {
       />,
     );
     // Los dos números en UN solo nodo, sin un segundo texto que compita.
-    expect(container.textContent).toContain("Disponible 14 · En bodega 14");
-    expect(container.textContent).not.toContain("Disponible: 14");
-    expect(container.textContent).not.toContain("En bodega: 14");
+    expect(container.textContent).toContain("Disponibilidad 14 · Existencia 14");
+    expect(container.textContent).not.toContain("Disponibilidad: 14");
+    expect(container.textContent).not.toContain("Existencia: 14");
     // Y los dos botones, en una caja de dos columnas.
     const subir = screen.getByRole("button", { name: /Subir/ });
     const esconder = screen.getByRole("button", { name: "Ocultar" });
@@ -416,7 +418,7 @@ describe("10 · lo que se ve", () => {
     // fila apretada. Están en dos hermanos distintos del contenedor, y el de
     // los textos se lleva el ancho completo hasta `sm`.
     const numeros = Array.from(container.querySelectorAll("span"))
-      .find((s) => s.textContent === "Disponible 12 · En bodega 12")!;
+      .find((s) => s.textContent === "Disponibilidad 12 · Existencia 12")!;
     const boton = screen.getByRole("button", { name: /Subir/ });
     expect(numeros).toBeTruthy();
     expect(boton.parentElement!.contains(numeros), "los números no pueden vivir en la caja de los botones").toBe(false);

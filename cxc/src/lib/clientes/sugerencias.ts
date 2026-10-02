@@ -346,7 +346,7 @@ export function sugerirClientes(
 
 /** El texto de cada aviso, en español simple. Sin jerga y sin códigos. */
 export const TEXTO_AVISO: Readonly<Record<AvisoSugerencia, string>> = {
-  "numeros-distintos": "Ojo: los números no son los mismos. Puede ser otra tienda.",
-  "falta-numero": "Ojo: uno lleva número y el otro no. Fíjate si es la misma tienda.",
-  "nombres-distintos": "Ojo: los nombres no son iguales del todo.",
+  "numeros-distintos": "Atención: los números no coinciden. Puede ser otra tienda.",
+  "falta-numero": "Atención: uno lleva número y el otro no. Verifica si es la misma tienda.",
+  "nombres-distintos": "Atención: los nombres no coinciden del todo.",
 };

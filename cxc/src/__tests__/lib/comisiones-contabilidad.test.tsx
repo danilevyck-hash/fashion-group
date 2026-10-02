@@ -381,10 +381,10 @@ describe("contabilidad ENTRA a /comisiones y la pantalla renderiza con datos", (
     // 🔄 8-sep-2026 — CAMBIA DE DIRECCIÓN, NO SE BORRA: ahora son DOS botones
     // (el mes en PDF y el mes en Excel), así que hay que nombrar cuál. La regla
     // no cambió: contabilidad se lleva el mes.
-    const excel = await screen.findByRole("button", { name: /Descargar el mes en Excel/i });
+    const excel = await screen.findByRole("button", { name: /Descargar Excel del mes/i });
     await waitFor(() => expect((excel as HTMLButtonElement).disabled).toBe(false), { timeout: 5000 });
     // CONTROL: y el de PDF, que es el mismo mes, también le sirve.
-    const pdf = await screen.findByRole("button", { name: /Descargar el mes en PDF/i });
+    const pdf = await screen.findByRole("button", { name: /Descargar PDF del mes/i });
     await waitFor(() => expect((pdf as HTMLButtonElement).disabled).toBe(false), { timeout: 5000 });
   }, 20000);
 

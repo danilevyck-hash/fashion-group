@@ -87,7 +87,7 @@ export default function DuplicarPedidoModal({
       >
         <h3 className="text-base font-medium mb-1">Duplicar pedido {orderNumber}</h3>
 
-        <p className="text-sm text-gray-500 mb-2">¿Para quién es el pedido nuevo?</p>
+        <p className="text-sm text-gray-500 mb-2">Cliente del pedido nuevo</p>
         <ClienteSwitchPicker
           api={api}
           directorioLabel={directorioLabel}
@@ -102,7 +102,7 @@ export default function DuplicarPedidoModal({
             que el botón sea una verificación y no una repetición. */}
         {cliente && (
           <p className="text-sm text-gray-800 mt-3">
-            Cliente elegido: <span className="font-medium">{nombreDeCliente(cliente)}</span>
+            Cliente seleccionado: <span className="font-medium">{nombreDeCliente(cliente)}</span>
           </p>
         )}
 

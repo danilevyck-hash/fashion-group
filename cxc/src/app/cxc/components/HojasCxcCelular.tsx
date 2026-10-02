@@ -122,7 +122,7 @@ export function HojaPorEmpresa({
     <Hoja titulo="Por empresa" onCerrar={onCerrar}>
       <p className="px-5 pt-3 text-[13px] text-gray-500">
         {montoExacto(total)} · {filas.length} {filas.length === 1 ? "empresa" : "empresas"}
-        {" · "}verde hasta 90 días · ámbar 91 a 120 · rojo más de 120
+        {" · "}verde 0-90 días · ámbar 91-120 días · rojo +120 días
       </p>
       <ul data-lista="cxc-por-empresa" className="mt-2 divide-y divide-gray-100">
         {filas.map((f) => (
@@ -192,7 +192,7 @@ export function HojaMasOpciones({
         <SyncNowButton
           className="mt-2"
           opciones={[{ modulo: "estadocuenta", empresa: companyFilter }]}
-          disabledReason={companyFilter === "all" ? "Elige una empresa arriba para actualizarla" : null}
+          disabledReason={companyFilter === "all" ? "Selecciona una empresa arriba para actualizarla" : null}
           onSuccess={() => onSyncedNow?.()}
         />
       </div>

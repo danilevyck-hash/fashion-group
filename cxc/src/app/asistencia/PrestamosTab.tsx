@@ -268,7 +268,7 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
   );
 
   if (fichas === null) {
-    return <p className="text-sm text-gray-500">Leyendo la deuda…</p>;
+    return <p className="text-sm text-gray-500">Cargando…</p>;
   }
 
   // 🔴 LA COLUMNA «Descuento a terceros» SOLO CUANDO ALGUIEN LO TIENE (10-sep-2026,
@@ -388,7 +388,7 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-gray-600">
-          {visibles.length === 1 ? "1 colaborador con deuda" : `${visibles.length} colaboradores con deuda`}
+          {visibles.length === 1 ? "1 colaborador con saldo" : `${visibles.length} colaboradores con saldo`}
           <span className="text-gray-400"> · </span>
           <span className="text-gray-500">Total </span>
           <span className="font-medium tabular-nums text-gray-900">{money(total)}</span>

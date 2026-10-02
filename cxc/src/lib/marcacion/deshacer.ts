@@ -140,7 +140,7 @@ export function rotuloDeshacer(tipo: TipoMarca): string {
 
 /** Lo que dice la pantalla después. Nunca «se borró»: no se borró nada. */
 export function avisoDeshecha(tipo: TipoMarca): string {
-  return `Listo, se deshizo la ${tipo}. Puedes marcar de nuevo.`;
+  return `Marcación deshecha: ${tipo}. Puedes marcar de nuevo.`;
 }
 
 // ── LO QUE TODAVÍA NO SALIÓ DEL TELÉFONO ─────────────────────────────────────

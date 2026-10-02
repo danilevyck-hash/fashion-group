@@ -185,9 +185,9 @@ export const ROTULO_FILTRO_VENDEDOR = "Vendedor: todos";
 /** El título de la hoja de alta. Va al derecho: lo que se prende es lo que NO comisiona. */
 // 1-oct-2026, Daniel: nombres normales de ERP («¿Qué no comisiona?» → «Excluir de»).
 export const PREGUNTA_DEL_ALTA = "Excluir de";
-export const ROTULO_LA_VENTA = "La venta";
-export const ROTULO_EL_COBRO = "El cobro";
-export const AVISO_AL_MENOS_UNO = "Tiene que quedar prendido al menos uno.";
+export const ROTULO_LA_VENTA = "Venta";
+export const ROTULO_EL_COBRO = "Cobro";
+export const AVISO_AL_MENOS_UNO = "Selecciona al menos una opción.";
 
 /**
  * La explicación de abajo del alta. Dice la consecuencia, no la mecánica.

@@ -454,7 +454,7 @@ describe("🔴 9 · el archivo dice qué es, de quién y de cuándo", () => {
     expect(subtituloDelPapel("total-por-cliente", "Vistana International"))
       .toBe("Total por cliente — Vistana International");
     expect(subtituloDelPapel("por-compania", null))
-      .toBe("Detalle por empresa — Fashion Group · 6 empresas");
+      .toBe("Detalle por empresa — Fashion Group"); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 });
 

@@ -179,11 +179,11 @@ export interface GastoNuevo {
  */
 export function faltantesDelGasto(g: GastoNuevo): string[] {
   const faltan: string[] = [];
-  if (!esTipoDeGasto(g.tipo)) faltan.push("Elige qué tipo de gasto es.");
-  if (String(g.marcaCodigo ?? "").trim().length === 0) faltan.push("Elige la marca.");
+  if (!esTipoDeGasto(g.tipo)) faltan.push("Selecciona el tipo de gasto.");
+  if (String(g.marcaCodigo ?? "").trim().length === 0) faltan.push("Selecciona la marca.");
   const tienda = String(g.tiendaCodigo ?? "").trim();
   if (g.esDeTienda === true && tienda.length === 0) {
-    faltan.push("Elige la tienda del directorio.");
+    faltan.push("Selecciona la tienda del directorio.");
   }
   const monto = Number(g.monto);
   if (!Number.isFinite(monto) || monto <= 0) faltan.push("Escribe el monto.");

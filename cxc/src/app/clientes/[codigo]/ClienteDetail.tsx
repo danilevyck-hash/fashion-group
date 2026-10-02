@@ -169,8 +169,8 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
       // demás SÍ se guardó y hay que decir qué no.
       setToast(
         campo === "contacto" && json.contactoGuardado === false && valor.trim() !== ""
-          ? "Guardado — el contacto todavía no se puede guardar"
-          : "Listo, guardado",
+          ? "Cliente guardado. El contacto todavía no se puede guardar"
+          : "Cliente guardado",
       );
     } catch {
       setError("No se pudo guardar. Intenta de nuevo en unos segundos.");
@@ -253,7 +253,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
               secuencial
               engancharRunning
               roles={ROLES_SYNC_FICHA_CLIENTE}
-              resumenExito="Listo, cliente actualizado"
+              resumenExito="Cliente actualizado"
               onSuccess={() => router.refresh()}
             />
             {veCxc && (
@@ -328,7 +328,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
                 ⚠️ Lo que se fue el 5-sep-2026 fue la columna «Cobrado» y su
                 mención; la explicación quedó, más corta, con las dos columnas
                 que hoy están en pantalla. */}
-            <Ayuda titulo="Por qué las cifras no cuadran entre sí">
+            <Ayuda titulo="Cómo se calcula">
               <span className="font-medium text-gray-900">Compras</span> va sin ITBMS — el impuesto se
               cobra para el fisco, no es venta de la empresa.{" "}
               <span className="font-medium text-gray-900">Saldo</span> va con ITBMS, porque es la plata
@@ -506,7 +506,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
 
         {cliente.last_synced_at && (
           <p className="mt-4 text-xs text-gray-400">
-            Última sincronización: {fmtDate(cliente.last_synced_at.slice(0, 10))}
+            Actualizado el {fmtDate(cliente.last_synced_at.slice(0, 10))}
           </p>
         )}
       </main>

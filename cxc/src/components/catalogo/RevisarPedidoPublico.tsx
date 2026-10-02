@@ -254,7 +254,7 @@ export default function RevisarPedidoPublico({ marca }: { marca: MarcaUiKey }) {
               <div className="text-xs uppercase tracking-[0.05em] text-gray-400">Total del pedido</div>
               <div className="text-2xl font-semibold tabular-nums">${fmt(resumen.total)}</div>
               <div className="text-xs text-gray-400 tabular-nums">
-                {resumen.referencias} producto{resumen.referencias === 1 ? "" : "s"} · {resumen.bultos} bulto{resumen.bultos === 1 ? "" : "s"} · {resumen.piezas} piezas
+                {resumen.referencias} producto{resumen.referencias === 1 ? "" : "s"} · {resumen.bultos} bulto{resumen.bultos === 1 ? "" : "s"} · {resumen.piezas} unidades
               </div>
             </section>
 

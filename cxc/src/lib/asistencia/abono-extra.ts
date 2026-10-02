@@ -82,7 +82,7 @@ export function validarAbono(body: unknown): Validacion {
 
   const fecha = String(b.fecha ?? "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
-    return { ok: false, error: "Elige la fecha del abono." };
+    return { ok: false, error: "Selecciona la fecha del abono." };
   }
 
   const origenRaw = String(b.origen ?? "").trim();

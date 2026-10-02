@@ -131,7 +131,7 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
 
   const titulo = useMemo(
     () => (nueva
-      ? "Colaborador nuevo"
+      ? "Nuevo colaborador"
       : tituloDePersona({ nombre: persona?.nombre ?? null, codigo })),
     [nueva, persona, codigo],
   );
@@ -218,7 +218,7 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
       if (b.fechaSalida) {
         toast(avisoGuardadoConSalida(titulo, b.fechaSalida, deuda), deuda > 0 ? "warning" : "success");
       } else {
-        toast("Listo, guardado", "success");
+        toast("Ficha guardada", "success");
       }
       await cargar();
       setRefresco((n) => n + 1);
@@ -242,7 +242,7 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
         body: JSON.stringify({ codigo }),
       });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? "No se pudo");
-      toast("Listo, ya no sale en la lista", "success");
+      toast("Código oculto", "success");
       router.push("/asistencia?tab=colaboradores");
     } catch {
       toast("No se pudo ignorar el código. Intenta de nuevo.", "error");

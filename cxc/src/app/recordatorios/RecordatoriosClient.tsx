@@ -334,7 +334,7 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
         const editaba = editingId;
         cerrarForm();
         loadCheques();
-        showToast(editaba ? "Listo, cheque actualizado" : "Listo, cheque guardado");
+        showToast(editaba ? "Cheque actualizado" : "Cheque guardado");
       } else {
         const err = await res.json().catch(() => null);
         setError(err?.error || "Error al guardar.");
@@ -379,7 +379,7 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
       });
       if (res.ok) {
         await loadRecordatorios();
-        showToast("Listo, te lo recuerdo");
+        showToast("Recordatorio guardado");
       } else {
         const err = await res.json().catch(() => null);
         showToast(err?.error || "No se pudo guardar. Intenta de nuevo.");
@@ -437,7 +437,7 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
         setShowRecForm(false);
         setEditingRecId(null);
         await loadRecordatorios();
-        showToast(editaba ? "Listo, recordatorio actualizado" : "Listo, te lo recuerdo");
+        showToast(editaba ? "Recordatorio actualizado" : "Recordatorio guardado");
       } else {
         const err = await res.json().catch(() => null);
         setErrorRec(err?.error || "No se pudo guardar. Intenta de nuevo.");

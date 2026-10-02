@@ -136,7 +136,7 @@ export default function AccionesComprobante({
     items.push({ label: "Duplicar", onClick: onDuplicar });
   }
   if (puedeEditar && esOrders) {
-    items.push({ label: "Reenviar el correo", onClick: onReenviarCorreo });
+    items.push({ label: "Reenviar correo", onClick: onReenviarCorreo });
   }
   if (puedeAdministrar) {
     items.push({ label: "Eliminar", onClick: onEliminar, destructive: true });

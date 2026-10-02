@@ -120,18 +120,18 @@ export interface EstadoCheckout {
  * aviso que va PEGADO a la caja del cliente (24-sep-2026) diga exactamente lo
  * mismo que el de abajo del total, sin una segunda redacción.
  */
-export const FALTA_EL_CLIENTE = "elegir el cliente";
+export const FALTA_EL_CLIENTE = "seleccionar el cliente"; // 1-oct-2026, Daniel: nombres normales de ERP («elegir» → «seleccionar»).
 
 export function faltaParaEnviar(e: EstadoCheckout): string[] {
   const falta: string[] = [];
   if (!e.hayItems) falta.push("agregar productos");
   if (!e.clienteElegido) falta.push(FALTA_EL_CLIENTE);
-  if (!e.vendedorElegido) falta.push("elegir el vendedor");
+  if (!e.vendedorElegido) falta.push("seleccionar el vendedor");
   if (e.preordersEnCarrito > 0) falta.push("quitar los productos en preventa");
   return falta;
 }
 
-/** "Falta: elegir el cliente y elegir el vendedor". Sin faltantes, "". */
+/** "Falta: seleccionar el cliente y seleccionar el vendedor". Sin faltantes, "". */
 export function textoFaltaEnviar(faltantes: readonly string[]): string {
   if (faltantes.length === 0) return "";
   if (faltantes.length === 1) return `Falta: ${faltantes[0]}`;
@@ -144,7 +144,7 @@ export function textoFaltaEnviar(faltantes: readonly string[]): string {
  * NO dice "Contado": decirlo sería volver a poner el default silencioso, esta
  * vez de mentira.
  */
-export const SIN_CLIENTE_ELEGIDO = "Elige el cliente";
+export const SIN_CLIENTE_ELEGIDO = "Selecciona el cliente"; // 1-oct-2026, Daniel: nombres normales de ERP («Elige» → «Selecciona»)
 
 /**
  * Etiqueta VISIBLE de la venta de mostrador. Dice "venta de mostrador" con

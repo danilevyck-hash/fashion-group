@@ -23,6 +23,19 @@
 //    · No se ofrecen facturas que ya salieron en una guía (la MISMA regla del
 //      chip «Ya salió en GT-xxx» de Nueva guía).
 //
+// 3. NUEVA GUÍA ESTILO APPLE (`GUIA_APPLE_2026_10`, 1-oct-2026, «Propuesta estilo Apple»
+//    del mockup, APAGADA hasta el «sí» de Daniel; reglas en docs/diseno.md):
+//    · «Nueva guía» + GT-xxx; en UNA línea la fecha (hoy), «Transportista
+//      externo / Entrega directa» y el transportista (nace VACÍO) solo si es
+//      externo.
+//    · «Etiquetados»: cada envío pendiente es una TARJETA que se toca para
+//      marcarla; «Facturas» con el chip «Sin etiqueta» y «+ Agregar factura».
+//    · «Observaciones» siempre visible y una barra fija abajo con
+//      «N bultos · M envíos» y «Guardar guía» (apagado sin envíos).
+//    · 🔴 SOLO CAMBIA LA PANTALLA: lo que se guarda es idéntico (candado
+//      `guias-nueva-guia-apple.test.tsx`). Editar una guía no cambia.
+//    · Depende de `GUIA_NUEVA_2026_10`: sin él, no aplica.
+//
 // 🔴 `false` = la pantalla y las reglas como estaban el 30-sep-2026.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -31,3 +44,7 @@ export const GUIA_NUEVA_2026_10 = true;
 
 /** 🔴 Etiquetas: orden ↑↓, fecha de impresión y sin facturas ya despachadas. */
 export const ETIQUETAS_2026_10 = true;
+
+/** 🔴 Nueva guía estilo Apple (tarjetas y barra fija). `false` = la de una tabla.
+ *  1-oct-2026: apagado hasta el "sí" de Daniel a las capturas. */
+export const GUIA_APPLE_2026_10 = false;

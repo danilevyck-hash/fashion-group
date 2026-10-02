@@ -667,7 +667,7 @@ describe("8 · el desplegable dice QUIÉN lo compra", () => {
     fireEvent.click(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!);
     const texto = await waitFor(() => {
       const t = document.body.textContent ?? "";
-      expect(t).toContain("Todavía no tenemos el detalle");
+      expect(t).toContain("Detalle por cliente no disponible");
       return t;
     });
     // Fashion Wear está terminando de bajar su detalle: decir "no lo compra
@@ -684,7 +684,7 @@ describe("8 · el desplegable dice QUIÉN lo compra", () => {
     await waitFor(() => {
       expect(document.body.textContent).toContain("No se pudo cargar quién lo compra");
     });
-    expect(document.body.textContent).not.toContain("Todavía no tenemos el detalle");
+    expect(document.body.textContent).not.toContain("Detalle por cliente no disponible");
   });
 
   it("los códigos NO se perdieron: están en su pestaña, a un toque", async () => {

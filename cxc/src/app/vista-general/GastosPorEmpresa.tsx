@@ -83,8 +83,8 @@ export default function GastosPorEmpresa({ gastos, mes }: { gastos: GastosData; 
           o lo que salió del banco?); sin lo segundo, alguien suma las filas de
           cabeza y se arma el número del grupo que Daniel pidió no tener. */}
       <p className="mt-0.5 text-xs text-stone-500">
-        Lo que salió de caja y banco, sin contar transferencias ni préstamos. Cada empresa con lo
-        suyo: no hay un total, porque los gastos van cargados hasta un mes distinto en cada una.
+        Egresos de caja y banco, sin transferencias ni préstamos. Sin total consolidado: cada
+        empresa tiene cargado un mes distinto.
       </p>
 
       {!gastos.disponible ? (

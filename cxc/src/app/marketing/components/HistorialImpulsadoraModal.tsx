@@ -124,7 +124,7 @@ export default function HistorialImpulsadoraModal({ impulsadora, onClose, onChan
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(data.error ?? "No se pudo guardar");
-      toast("Listo, guardado", "success");
+      toast("Impulsadora guardada", "success");
       setEditando(false);
       onChanged();
     } catch (e) {

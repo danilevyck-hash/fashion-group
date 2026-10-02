@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
 
   if (fechaElegida !== undefined && fechaElegida !== null && !esFechaISO(fechaElegida)) {
     return NextResponse.json(
-      { error: "La fecha de pago no es válida. Elige una fecha real (AAAA-MM-DD)." },
+      { error: "La fecha de pago no es válida. Selecciona una fecha real (AAAA-MM-DD)." },
       { status: 400 },
     );
   }

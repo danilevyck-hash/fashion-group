@@ -472,7 +472,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
 
   /** Lo que falta para imprimir, o `null`. Las validaciones son SINCRÓNICAS a propósito. */
   function faltaAlgo(): string | null {
-    if (!cliente) return "Elige el cliente";
+    if (!cliente) return "Selecciona el cliente";
     if (enElEnvio.length === 0) return "Marca al menos una factura";
     for (const m of enElEnvio) {
       const f = porClave.get(m.clave) as Factura;

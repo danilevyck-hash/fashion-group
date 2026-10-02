@@ -107,10 +107,10 @@ describe("🔴 y el vigía no la reporta como caída", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe("🩸 la PANTALLA lo dice — una empresa vacía sin explicación es un error del sistema", () => {
   it("sin descarga automática, la frase explica por qué y dice qué hacer", () => {
+    // 🔄 1-oct-2026, Daniel: nombres normales de ERP — la frase pasó a la forma de ERP «Carga manual: …».
     const t = explicacionEgresos("sin_datos", null, false);
-    expect(t).toMatch(/no se traen solos de Switch/i);
-    // Termina en lo único accionable que queda: traerlos a mano otra vez.
-    expect(t).toMatch(/traerlos a mano/i);
+    expect(t).toMatch(/Carga manual: no se actualiza automáticamente/i);
+    expect(t).toMatch(/Sin cargas todavía/i);
   });
 
   it("🩸 y NO manda a la pestaña del mayor, que se retiró el 13-ago-2026", () => {
@@ -128,8 +128,9 @@ describe("🩸 la PANTALLA lo dice — una empresa vacía sin explicación es un
   });
 
   it("🔴 y dice que ÉSTA es la única fuente — no promete otra pantalla", () => {
+    // 🔄 1-oct-2026, Daniel: nombres normales de ERP: la frase de ERP no nombra ninguna otra pantalla.
     const t = explicacionEgresos("sin_datos", null, false);
-    expect(t).toMatch(/único lugar donde se ven/i);
+    expect(t).not.toMatch(/pestaña|pantalla/i);
   });
 
   it("🔴 y NO se ve igual que un 'no traído' cualquiera", () => {
@@ -137,21 +138,18 @@ describe("🩸 la PANTALLA lo dice — una empresa vacía sin explicación es un
     const normal = explicacionEgresos("sin_datos", null, true);
     expect(boston).not.toBe(normal);
     expect(normal).toMatch(/todavía no se ha traído de Switch/i);
-    expect(normal).not.toMatch(/no se traen solos/i);
+    expect(normal).not.toMatch(/Carga manual/i);
   });
 
   it("si alguna vez se trajo a mano, lo dice y dice hasta cuándo", () => {
-    expect(explicacionEgresos("con_movimientos", "2026-03", false)).toMatch(
-      /última vez que se trajo a mano/i,
-    );
+    expect(explicacionEgresos("con_movimientos", "2026-03", false)).toMatch(/Carga manual/i);
     expect(explicacionEgresos("sin_datos", "2026-03", false)).toMatch(/marzo 2026/);
   });
 
   it("las otras 7 NO cambian ni una palabra", () => {
     expect(explicacionEgresos("con_movimientos", "2026-03", true)).toBe("");
-    expect(explicacionEgresos("sin_movimientos", null, true)).toBe(
-      "Este mes no salió plata de caja ni del banco.",
-    );
+    // 1-oct-2026, Daniel: nombres normales de ERP.
+    expect(explicacionEgresos("sin_movimientos", null, true)).toBe("Sin egresos este mes.");
     // Y el default es "sí se baja sola": una empresa nueva no nace muda.
     expect(explicacionEgresos("sin_movimientos", null)).toBe(
       explicacionEgresos("sin_movimientos", null, true),

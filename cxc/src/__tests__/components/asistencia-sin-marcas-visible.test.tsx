@@ -176,7 +176,7 @@ describe("C · la planilla no se mueve", () => {
     const [l] = armarPlanilla({
       personas: [], fichas: new Map([[COD, FICHA]]), jornadaDiariaMin: () => 480, reglas: REGLAS_DEFAULT,
     });
-    // Sin explicación y con la ficha completa: va a «Tú decides», sin pago
+    // Sin explicación y con la ficha completa: va a «Pago por definir», sin pago
     // calculado — y sin un solo dólar de descuento por ausencia.
     expect(l.faltaConfigurar).toContain(FALTA.sinMarcaciones);
     expect(l.dinero).toBeNull();

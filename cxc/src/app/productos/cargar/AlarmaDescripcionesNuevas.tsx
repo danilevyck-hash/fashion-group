@@ -204,7 +204,7 @@ export default function AlarmaDescripcionesNuevas({ items, pasaronSolas = 0, onA
                 onChange={(e) => setConfirm((c) => (c ? { ...c, avisado: e.target.checked } : c))}
                 className="mt-0.5 h-4 w-4 accent-teal-600"
               />
-              <span>Ya le avisé a Daniel</span>
+              <span>Notificado a Daniel</span>
             </label>
             {confirm.error && (
               <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800">

@@ -28,7 +28,7 @@ describe("la etiqueta del control cerrado", () => {
     expect(etiquetaRango("2026-08-03", "2026-08-03")).toBe("3 ago 2026 · 1 día");
   });
   it("sin rango, invita en vez de mostrar vacío", () => {
-    expect(etiquetaRango("", "")).toBe("Elige el período");
+    expect(etiquetaRango("", "")).toBe("Seleccionar período");
   });
 });
 
@@ -134,7 +134,7 @@ describe("🔴 el calendario en línea", () => {
 
   it("sin período elegido, invita a elegir el PRIMER día (y no afirma un rango)", () => {
     render(<RangoFechas desde="2026-10-28" hasta="2026-11-10" onChange={vi.fn()} inline vacio />);
-    expect(screen.getByText("Elige el primer día")).toBeTruthy();
+    expect(screen.getByText("Selecciona el primer día")).toBeTruthy();
     expect(screen.queryByText(/14 días/)).toBeNull();
   });
 
@@ -225,7 +225,7 @@ describe("🔴 el primer toque es el día en que EMPIEZA", () => {
 
   it("el encabezado dice cuál fecha se está eligiendo, en tuteo", () => {
     render(<RangoFechas desde="2026-08-01" hasta="2026-08-15" onChange={vi.fn()} inline vacio />);
-    expect(screen.getByText("Elige el primer día")).toBeTruthy();
+    expect(screen.getByText("Selecciona el primer día")).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/elegí/i);
   });
 });

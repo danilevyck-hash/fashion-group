@@ -107,6 +107,7 @@ export function resumenDeLoQueDebe(
   if (meses.length === 0) return "";
   const n = meses.length;
   const aMedias = meses.filter((m) => m.estado === "parcial").length;
-  const medio = aMedias > 0 ? ` (${aMedias} a medias)` : "";
-  return `Debe ${n} ${n === 1 ? "mes" : "meses"}${medio} — el más viejo, ${etiqueta(meses[0].mes)}`;
+  // 1-oct-2026, Daniel: nombres normales de ERP.
+  const medio = aMedias > 0 ? ` (${aMedias} ${aMedias === 1 ? "parcial" : "parciales"})` : "";
+  return `${n} ${n === 1 ? "mes pendiente" : "meses pendientes"}${medio} · más antiguo: ${etiqueta(meses[0].mes)}`;
 }

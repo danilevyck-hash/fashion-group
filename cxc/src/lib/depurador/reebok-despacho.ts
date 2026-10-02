@@ -374,7 +374,7 @@ export function indiceDespacho(headers: Cell[]): IndiceDespacho {
 export function parseDespacho(rows: SheetRow[]): ParseDespachoResult {
   const headerRow = findHeaderRowDespacho(rows);
   if (headerRow === -1) {
-    throw new Error("No encontré la fila de encabezados del despacho (busco SKU Father + Quantity). ¿Es el Excel de despacho de Reebok?");
+    throw new Error("No se encontró la fila de encabezados del despacho (se buscan SKU Father + Quantity). Revisa que sea el Excel de despacho de Reebok.");
   }
   const headers = rows[headerRow];
   const indice = indiceDespacho(headers);

@@ -87,8 +87,8 @@ export default function FichaGasto({
         />
         <input
           type="text"
-          aria-label="Nota"
-          placeholder="Nota (opcional)"
+          aria-label="Observaciones"
+          placeholder="Observaciones (opcional)"
           value={editGasto.descripcion || ""}
           onChange={(e) => setEditGasto({ ...editGasto, descripcion: e.target.value })}
           style={campoStyle}

@@ -120,8 +120,8 @@ describe("1-3. las dos columnas nuevas, al final, con las palabras de la pantall
     const ws = await hojaDeLaRespuesta(await post("reebok")(makeReq("/x", { role: "admin" })));
 
     // Las 6 de siempre, donde estaban.
-    expect(["Origen", "Cliente", "Vendedor", "Items", "Total", "Fecha"].map((_, c) => ws[A(HDR_ROW, c)].v))
-      .toEqual(["Origen", "Cliente", "Vendedor", "Items", "Total", "Fecha"]);
+    expect(["Origen", "Cliente", "Vendedor", "Líneas", "Total", "Fecha"].map((_, c) => ws[A(HDR_ROW, c)].v))
+      .toEqual(["Origen", "Cliente", "Vendedor", "Líneas", "Total", "Fecha"]);
     // Y las nuevas, AL FINAL. 🔄 22-sep-2026: eran dos (6 y 7) y ahora son
     // cuatro — «Tipo» y «En Switch» entran DETRÁS, por la misma razón por la
     // que aquéllas fueron al final: no se corre ninguna columna vieja.

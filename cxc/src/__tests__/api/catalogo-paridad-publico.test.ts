@@ -382,7 +382,7 @@ describe("POST /pedido-publico/[id]/confirmar — auto-conversión del cliente",
     // 2 avisos: la confirmación + el aviso de piezas faltantes al equipo.
     expect(mockTelegram).toHaveBeenCalledTimes(2);
     expect(String(mockTelegram.mock.calls[0][0])).toContain("PED-050");
-    expect(String(mockTelegram.mock.calls[1][0])).toContain("pidió 2 bultos, hay 8 pzas");
+    expect(String(mockTelegram.mock.calls[1][0])).toContain("pidió 2 bultos, hay 8 u");
   });
 
   it("reebok: con stock suficiente confirma directo", async () => {

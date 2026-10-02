@@ -549,8 +549,8 @@ export function construirMensajeEscalado(items: ErrorEscalado[], nota = ""): str
   const detalle = [...new Set(items.map((e) => shortError(e.error)))].join(" · ");
   const encabezado =
     items.length === 1
-      ? "Una sincronización con Switch no se está recuperando sola."
-      : `${items.length} sincronizaciones con Switch no se están recuperando solas.`;
+      ? "Una actualización de Switch no se está recuperando sola."
+      : `${items.length} actualizaciones de Switch no se están recuperando solas.`;
 
   return (
     `${encabezado}\n${lineas.join("\n")}\n` +

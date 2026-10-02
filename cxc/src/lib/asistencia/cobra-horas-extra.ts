@@ -39,8 +39,8 @@ import type { Resultado } from "./config";
 // LAS PALABRAS
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Cómo se pregunta en la ficha. */
-export const PREGUNTA_COBRA_HORAS_EXTRA = "¿Cobra horas extra?";
+/** El rótulo en la ficha. 1-oct-2026, Daniel: nombres normales de ERP (antes «¿Cobra horas extra?»). */
+export const PREGUNTA_COBRA_HORAS_EXTRA = "Aplica horas extra";
 export const ETIQUETA_COBRA_HORAS_EXTRA = "Sí, pasan por Aprobaciones";
 export const ETIQUETA_NO_COBRA_HORAS_EXTRA = "No cobra horas extra";
 
@@ -85,5 +85,5 @@ export function validarCobraHorasExtra(body: unknown): Resultado<boolean> {
   if (v === undefined || v === null || v === "") return { ok: true, valor: true };
   if (v === true || v === false) return { ok: true, valor: v };
   if (v === "true" || v === "false") return { ok: true, valor: v === "true" };
-  return { ok: false, error: "Elige si cobra horas extra o no." };
+  return { ok: false, error: "Selecciona si cobra horas extra o no." };
 }

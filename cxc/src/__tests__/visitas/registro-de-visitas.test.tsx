@@ -63,8 +63,9 @@ describe("La pestaña «Quién usa qué»", () => {
     await waitFor(() => expect(screen.getByText("Angela")).toBeTruthy());
 
     // El resumen por módulo, en plata de conteos: personas y visitas.
-    expect(screen.getByText("2 personas · 8 visitas")).toBeTruthy();
-    expect(screen.getByText("1 persona · 2 visitas")).toBeTruthy();
+    // 1-oct-2026, Daniel: nombres normales de ERP — «personas» → «usuarios».
+    expect(screen.getByText("2 usuarios · 8 visitas")).toBeTruthy();
+    expect(screen.getByText("1 usuario · 2 visitas")).toBeTruthy();
     // La persona, su rol y el aparato.
     expect(screen.getByText("Secretaria")).toBeTruthy(); // 1-oct-2026, Daniel: nombres normales de ERP (el rol con su nombre, no la clave)
     expect(screen.getByText("3 en el teléfono")).toBeTruthy();
@@ -80,7 +81,7 @@ describe("La pestaña «Quién usa qué»", () => {
     await waitFor(() =>
       expect(screen.getByText(/falta correr el cambio de base/i)).toBeTruthy(),
     );
-    expect(screen.queryByText("0 personas · 0 visitas")).toBeNull();
+    expect(screen.queryByText("0 usuarios · 0 visitas")).toBeNull();
   });
 
   it("todavía sin visitas: lo dice con palabras, no con una tabla vacía", async () => {

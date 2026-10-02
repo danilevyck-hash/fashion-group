@@ -209,7 +209,7 @@ describe("POST enviar-switch — validaciones previas al motor", () => {
       params: { id: OID },
     });
     expect(res.status).toBe(422);
-    expect((await res.json()).error).toContain("Elige el cliente");
+    expect((await res.json()).error).toContain("Selecciona el cliente");
     expect(mockEnviar).not.toHaveBeenCalled(); // nada llegó al ERP
     expect(mockLogout).toHaveBeenCalledTimes(1); // higiene de sesión igual
   });
@@ -226,7 +226,7 @@ describe("POST enviar-switch — validaciones previas al motor", () => {
       params: { id: OID },
     });
     expect(res.status).toBe(422);
-    expect((await res.json()).error).toContain("Elige el cliente");
+    expect((await res.json()).error).toContain("Selecciona el cliente");
     expect(mockEnviar).not.toHaveBeenCalled(); // nada llegó al ERP
     expect(mockLogout).toHaveBeenCalledTimes(1);
   });
@@ -274,7 +274,7 @@ describe("POST enviar-switch — validaciones previas al motor", () => {
       { params: { id: OID } },
     );
     expect(res.status).toBe(422);
-    expect((await res.json()).error).toContain("Elige el cliente");
+    expect((await res.json()).error).toContain("Selecciona el cliente");
     expect(mockEnviar).not.toHaveBeenCalled(); // nada llegó al ERP
     expect(mockLogout).toHaveBeenCalledTimes(1);
   });

@@ -175,7 +175,7 @@ describe("A. 🔴 la regla pura: una quincena pasa, cualquier otro rango se rech
 
   it("el texto tutea y no lleva jerga", () => {
     const t = frenoSoloQuincenas(periodoDesdeRango("2026-08-15", "2026-08-28")!) ?? "";
-    expect(t).toContain("Elige");
+    expect(t).toContain("Selecciona"); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(t).not.toMatch(/elegí|rango libre|factorBase|null/i);
   });
 });

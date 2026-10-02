@@ -310,7 +310,7 @@ export default function ReclamoDetail({
                 : <span className="text-red-600">{FALTA_FECHA_FACTURA}</span>}
               {" · "}{current.proveedor || "—"}{current.marca ? ` · ${current.marca}` : ""}
               {dias !== null && <> · <span className="text-gray-900 font-medium tabular-nums">{dias} día{dias === 1 ? "" : "s"}</span></>}
-              {!esActiveShoes(current.empresa) && current.nro_orden_compra && <> · OC {current.nro_orden_compra}</>}
+              {!esActiveShoes(current.empresa) && current.nro_orden_compra && <> · N° de pedido {current.nro_orden_compra}</>}
               {seDiceCreadoEl(current.fecha_factura, current.created_at) && <> · creado el {fmtDate(current.created_at!.slice(0, 10))}</>}
             </p>
           )}

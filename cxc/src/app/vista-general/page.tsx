@@ -283,7 +283,7 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
             <span className="text-stone-400">Todavía no está conectado</span>
           ) : (
             <span className={inventario.viejo ? "text-amber-600 font-medium" : "text-stone-400"}>
-              {piezas(inventario.totalUnidades)} piezas · {textoFrescura(inventario.medidoEn, inventario.viejo)}
+              {piezas(inventario.totalUnidades)} unidades · {textoFrescura(inventario.medidoEn, inventario.viejo)}
             </span>
           )
         }
@@ -381,9 +381,9 @@ function Atencion({ data }: { data: VistaGeneral }) {
           escritorio no cambia. */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
         {/* CXC +90d */}
-        <AlertCard title="Clientes vencidos +90 días" href="/cxc" linkLabel="Ir a Cuentas por cobrar" count={data.cxc.topClientes.length}>
+        <AlertCard title="Clientes +90 días" href="/cxc" linkLabel="Ir a Cuentas por cobrar" count={data.cxc.topClientes.length}>
           {data.cxc.topClientes.length === 0 ? (
-            <Empty>Nada vencido a +90 días.</Empty>
+            <Empty>Sin saldos a +90 días</Empty>
           ) : (
             data.cxc.topClientes.map((c) => (
               <Link key={`${c.empresa}-${c.codigo}-${c.nombre}`} href="/cxc" className={FILA_ALERTA}>
@@ -395,9 +395,9 @@ function Atencion({ data }: { data: VistaGeneral }) {
         </AlertCard>
 
         {/* Proveedores vencidos +90d */}
-        <AlertCard title="Proveedores vencidos +90 días" href="/proveedores" linkLabel="Ir a Proveedores" count={data.cxp.topProveedores.length}>
+        <AlertCard title="Proveedores +90 días" href="/proveedores" linkLabel="Ir a Proveedores" count={data.cxp.topProveedores.length}>
           {data.cxp.topProveedores.length === 0 ? (
-            <Empty>Nada vencido a +90 días.</Empty>
+            <Empty>Sin saldos a +90 días</Empty>
           ) : (
             data.cxp.topProveedores.map((p) => (
               <Link key={`${p.empresa}-${p.nombre}`} href="/proveedores" className={FILA_ALERTA}>

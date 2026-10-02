@@ -95,14 +95,14 @@ export default function MiExcelFotosClient() {
       if (a.lectura.filas.length === 0) {
         setAnalisis(null);
         setError(
-          "No encontré ningún código en la columna B. El código tiene que ir en la columna B, y la fila 1 es el encabezado.",
+          "No se encontró ningún código en la columna B. El código tiene que ir en la columna B, y la fila 1 es el encabezado.",
         );
         return;
       }
       setAnalisis(a);
     } catch (e) {
       setAnalisis(null);
-      setError(e instanceof Error ? e.message : "No pude leer el archivo.");
+      setError(e instanceof Error ? e.message : "No se pudo leer el archivo.");
     } finally {
       setLeyendo(false);
     }
@@ -275,7 +275,7 @@ export default function MiExcelFotosClient() {
               onClick={() => carpetaRef.current?.click()}
               className="min-h-[44px] rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-900 transition hover:border-teal-600 hover:text-teal-700 active:scale-[0.97]"
             >
-              Elegir carpeta de fotos
+              Seleccionar carpeta de fotos
             </button>
             <div className="mt-2 text-[12px] text-stone-500">
               Cada foto tiene que llamarse igual que el código: <b>100262385.jpg</b>. Se comparan
@@ -366,7 +366,7 @@ export default function MiExcelFotosClient() {
           {bajando ? "Armando el archivo…" : "Descargar con las fotos pegadas"}
         </button>
         {!emparejado && (
-          <div className="mt-2 text-[12px] text-stone-500">Falta: elegir la carpeta de fotos.</div>
+          <div className="mt-2 text-[12px] text-stone-500">Falta: seleccionar la carpeta de fotos.</div>
         )}
         {progreso && (
           <div className="mt-2 text-[12px] text-stone-600">

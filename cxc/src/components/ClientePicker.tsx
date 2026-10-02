@@ -343,7 +343,7 @@ export default function ClientePicker({
       {!abierto && vinculado && (
         <span
           className="absolute right-0 top-1/2 -translate-y-1/2 text-xs px-1.5 py-0.5 rounded font-mono text-emerald-700 bg-emerald-50 pointer-events-none"
-          title={`Vinculado al directorio (${codigo})`}
+          title={`Cliente vinculado (${codigo})`}
         >
           {codigo}
         </span>
@@ -396,8 +396,8 @@ export default function ClientePicker({
           <div className="border-t border-gray-100">
             {!permitirOtro ? (
               <div className="px-3 py-2 text-xs text-gray-400">
-                Solo clientes de la lista — si no está, hay que darlo de alta
-                en Switch.
+                {/* 1-oct-2026, Daniel: nombres normales de ERP. */}
+                Solo clientes registrados. Si no aparece, dalo de alta en Switch.
               </div>
             ) : q ? (
               <Opcion destacada onElegir={() => elegir(q, "")}>
@@ -410,7 +410,7 @@ export default function ClientePicker({
               </Opcion>
             ) : (
               <div className="px-3 py-2 text-xs text-gray-400">
-                ¿No está en la lista? Escribe el nombre y elige &ldquo;Ingresar
+                ¿No está en la lista? Escribe el nombre y selecciona &ldquo;Ingresar
                 manualmente&rdquo;.
               </div>
             )}

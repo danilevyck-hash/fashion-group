@@ -187,7 +187,7 @@ export function notaOtrosServicios(
  * 🔑 SE SUMA AL NETO Y NADA MÁS. No toca `totalBruto`, ni los seguros, ni el
  * total de deducciones: es la MISMA cuenta que `calcularDinero`
  * (`neto = bruto − deducciones + otros servicios`). Sin `dinero` (servicio
- * profesional, «Tú decides») no se toca nada, y sin nada que meter vuelve la
+ * profesional, «Pago por definir») no se toca nada, y sin nada que meter vuelve la
  * MISMA referencia.
  */
 export function aplicarOtrosServiciosEnLinea<

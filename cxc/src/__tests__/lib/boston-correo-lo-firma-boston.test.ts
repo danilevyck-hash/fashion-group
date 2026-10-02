@@ -184,9 +184,10 @@ describe("🔴 el correo de Boston lo firma Boston", () => {
 
   it("el resumen rotula los tramos por su RANGO, con la lista de siempre", () => {
     const html = resumenBoston(DOCS, "Almacen La Fe");
-    expect(html).toContain("0 a 90 días");
-    expect(html).toContain("91 a 120 días");
-    expect(html).toContain("121 días y más");
+    // 1-oct-2026, Daniel: nombres normales de ERP — un solo formato de rango.
+    expect(html).toContain("0-90 días");
+    expect(html).toContain("91-120 días");
+    expect(html).toContain("+120 días");
     // 1.200 − 200 = 1.000 en el primer tramo; 500 en el último; total 1.500.
     expect(html).toContain("$1,000.00");
     expect(html).toContain("$500.00");

@@ -179,7 +179,7 @@ export function UtilidadView({
             Margen <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMargenPantalla(data.totales.margen)}</span>
           </span>
           <span data-alcance-utilidad className="text-xs text-gray-500">
-            {alcanceEmpresas(data.empresas)} · Boston y Multifashion no entran a esta pestaña
+            {alcanceEmpresas(data.empresas)} · Excluye Boston y Multifashion
             {/* 🔴 UNA SOLA VENTA: el cuadre contra el Resumen, dicho. «El mismo
                 total que el Resumen», o cuánto falta y por qué. */}
             {UNA_SOLA_VENTA && textoCuadreUtilidad(data.cuadre) && (

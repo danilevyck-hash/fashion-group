@@ -256,7 +256,7 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
       // "Cliente / Pedido / Fecha" tiene su base en y=26 y pegarle la tabla la
       // pisaría. 30 deja 4 mm de aire y recupera igual el alto del rótulo.
       startY: title ? startY + 3 : startY - 2,
-      head: [["", "Producto", "SKU", "Bultos", "Piezas", "Precio/u", "Subtotal"]],
+      head: [["", "Producto", "SKU", "Bultos", "Cantidad", "Precio/u", "Subtotal"]],
       // Cada celda LEE de la línea resuelta: acá no se multiplica nada.
       body: resolverLineas(sectionItems, { bultoSize }).map((l) => [
         "", l.name, l.sku, String(l.bultos), String(l.piezas), `$${fmt(l.unit_price)}`, `$${fmt(l.subtotal)}`,
@@ -301,7 +301,7 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
   let fy = cursor + 8;
   if (fy + 12 > hoja.alto - 7) { doc.addPage(); fy = 20; }
   doc.setFontSize(10); doc.setTextColor(26); doc.setFont("helvetica", "bold");
-  doc.text(`${totalBultos} bultos · ${totalPiezas} piezas`, 14, fy);
+  doc.text(`${totalBultos} bultos · ${totalPiezas} unidades`, 14, fy);
   doc.text(`$${fmt(total)}`, hoja.derecha, fy, { align: "right" });
   doc.setFontSize(7); doc.setTextColor(160); doc.setFont("helvetica", "normal");
   doc.text(

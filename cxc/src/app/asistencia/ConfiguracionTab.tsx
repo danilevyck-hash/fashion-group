@@ -429,7 +429,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
         body: JSON.stringify({ codigo }),
       });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? "No se pudo");
-      toast("Listo, ya no sale en la lista", "success");
+      toast("Código oculto", "success");
       await cargar();
     } catch {
       toast("No se pudo ignorar el código. Intenta de nuevo.", "error");
@@ -442,7 +442,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
         method: "DELETE",
       });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? "No se pudo");
-      toast("Listo, vuelve a salir", "success");
+      toast("Código visible", "success");
       await cargar();
     } catch {
       toast("No se pudo volver a mostrarlo. Intenta de nuevo.", "error");
@@ -833,7 +833,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
       if (!res.ok) throw new Error(d.error ?? "No se pudo guardar");
       // 🔴 Sin las columnas del 24-sep-2026 se guardaron las de siempre: se DICE.
       if (typeof d.avisoNuevas === "string" && d.avisoNuevas) toast(d.avisoNuevas, "error");
-      else toast("Listo, las reglas quedaron guardadas", "success");
+      else toast("Reglas guardadas", "success");
       await cargar();
     } catch (e) {
       toast(e instanceof Error ? e.message : "No se pudo guardar", "error");
@@ -956,16 +956,17 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
         <FormatoTiempoSelector />
       </div>
       <div className="-ml-2 -mt-1">
-        <Ayuda titulo="Para qué sirven estos números" etiqueta="Para qué sirven">
+        <Ayuda titulo="Parámetros del cálculo" etiqueta="Información">
           <p>
             Todos los números con los que se calcula. Si la ley o un acuerdo cambia,
             se cambia aquí y el reporte lo usa de inmediato — no hay que tocar el sistema.
           </p>
-          {/* ⛔ 19 — «Esto no se cambia desde aquí» era un recuadro fijo al pie;
+          {/* ⛔ 19 — «Esto no se cambia desde aquí» (hoy «Parámetros fijos», 1-oct-2026,
+              Daniel: nombres normales de ERP) era un recuadro fijo al pie;
               desde el 29-sep-2026 vive en este ⓘ: se aprende una vez. Se dice
               para que nadie lo pida como campo: son la FORMA del cálculo, no
               números sueltos. Ver `config.ts`. */}
-          <p className="mt-2 font-medium text-gray-900">Esto no se cambia desde aquí</p>
+          <p className="mt-2 font-medium text-gray-900">Parámetros fijos</p>
           <p>
             No son números: es la forma del cálculo. Si alguna vez cambia, se cambia
             en el sistema — así nadie rompe la planilla sin querer.
@@ -1844,7 +1845,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                 </summary>
                 <div className="border-t border-gray-200 bg-white">
                   <div className="px-1 py-0.5">
-                    <Ayuda titulo="Qué pasa con quien ya no trabaja aquí" etiqueta="Qué pasa con sus quincenas">
+                    <Ayuda titulo="Colaboradores inactivos" etiqueta="Información">
                       <ExplicacionBaja />
                     </Ayuda>
                   </div>
@@ -2097,7 +2098,7 @@ function BloqueBaja({
         {/* Qué le pasa a sus quincenas se aprende una vez. El aviso de que
             todavía no se puede guardar (falta la migración) NO se esconde: va
             abajo, en pantalla. */}
-        <Ayuda titulo="Qué pasa al dar de baja" className="-my-3">
+        <Ayuda titulo="Baja de colaborador" className="-my-3">
           <ExplicacionBaja conFecha />
         </Ayuda>
       </div>
@@ -2151,7 +2152,7 @@ function BloqueBaja({
         </button>
         {!listo && (
           <span className="text-[12px] text-gray-400">
-            Elige la fecha y el motivo.
+            Selecciona la fecha y el motivo.
           </span>
         )}
       </div>

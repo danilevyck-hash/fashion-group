@@ -16,7 +16,7 @@
 //      entrada). Columna propia.
 //   3. Quien entra (o sale) a mitad de la quincena cobra los DÍAS TRABAJADOS:
 //      quincenal ÷ hábiles de la quincena × hábiles trabajados. Reemplaza al
-//      «Tú decides» del 25-ago. Caso real: Yeritza (51), entró el 27-jul-2026.
+//      «Pago por definir» del 25-ago. Caso real: Yeritza (51), entró el 27-jul-2026.
 //   4. Las horas extra son EXACTAS del reloj: nada se redondea a cuartos.
 //   5. Aprobadores por empresa: daniel y Contabilidad en las cuatro, david solo
 //      Boston, Bodega en Fashion Wear y Vistana (migración 20261103120000).
@@ -206,7 +206,7 @@ describe("3. 🔴 quien entra a mitad de la quincena cobra los días trabajados"
     expect(prorrateoPorVigencia(null, "2026-08-16", "2026-08-31")).toBeNull();
   });
 
-  it("🔴 la ruta ya no manda a «Tú decides» por entrar o salir: usa el prorrateo", () => {
+  it("🔴 la ruta ya no manda a «Pago por definir» por entrar o salir: usa el prorrateo", () => {
     const r = puro("src/app/api/asistencia/planilla/route.ts");
     // ⚠️ 18-sep-2026: el prorrateo recibe los días laborables de ESA persona
     // (Multifashion, lunes a sábado; Daniel: «obvio todo de lunes a sábado con

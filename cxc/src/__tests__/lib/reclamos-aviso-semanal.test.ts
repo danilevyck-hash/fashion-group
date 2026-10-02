@@ -129,7 +129,7 @@ describe("🔴 el mensaje dice cuántos son, cuánto suman y los tres más viejo
   it("dice DÓNDE están, sin jerga ni nombres de tabla", () => {
     const m = mensajeReclamosViejos(reclamos, HOY)!;
     expect(m).toContain("Reclamos");
-    expect(m).toContain("Por cobrar");
+    expect(m).toContain("«Pendientes»"); // 1-oct-2026, Daniel: nombres normales de ERP — «Por cobrar» → «Pendientes».
     expect(m).not.toMatch(/reclamo_items|fecha_factura|supabase|SELECT/i);
     // 🔴 Y NO lleva el prefijo de SISTEMA: es negocio.
     expect(m).not.toContain("🔧 SISTEMA");

@@ -163,7 +163,7 @@ export default function SyncNowButton({
       // terminó — sin toasts de "espera".
       const r = await syncConEnganche(opcion);
       if (r.tipo === "ok") {
-        showToast(r.resumen ? `Listo, actualizado. ${r.resumen}` : "Listo, actualizado", false);
+        showToast(r.resumen ? `Datos actualizados. ${r.resumen}` : "Datos actualizados", false);
         await refrescarVista();
       } else if (r.tipo === "fresco") {
         // 🩸 "Fresco" NO es un error: significa que la BASE ya está al día. Lo
@@ -225,10 +225,10 @@ export default function SyncNowButton({
       } else if (omitidas === 0 && fallidas === 0) {
         partes.push(
           actualizadas === 1
-            ? "Listo, 1 empresa actualizada"
+            ? "1 empresa actualizada"
             : actualizadas === 0
-              ? "Listo, actualizado"
-              : `Listo, ${actualizadas} empresas actualizadas`,
+              ? "Datos actualizados"
+              : `${actualizadas} empresas actualizadas`,
         );
       } else {
         partes.push(`${actualizadas} actualizadas`);

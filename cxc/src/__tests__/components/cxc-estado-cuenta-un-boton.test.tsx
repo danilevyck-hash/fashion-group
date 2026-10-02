@@ -232,11 +232,12 @@ describe("🔴 desde el papel se puede mandar el papel", () => {
         onCobrar={(c) => llamados.push(c.nombre_normalized)}
       />,
     );
-    await waitFor(() => expect(screen.getByText("Cobrar")).toBeTruthy());
+    // 1-oct-2026, Daniel: nombres normales de ERP — «Cobrar» pasó a «Enviar estado de cuenta» (y «Enviar» donde no cabe).
+    await waitFor(() => expect(screen.getByText("Enviar estado de cuenta")).toBeTruthy());
     // Y el botón viejo, que solo bajaba un PDF, ya no está.
     expect(screen.queryByText("Descargar PDF")).toBeNull();
     expect(screen.queryByText("Compartir")).toBeNull();
-    fireEvent.click(screen.getByText("Cobrar"));
+    fireEvent.click(screen.getByText("Enviar estado de cuenta"));
     expect(llamados).toEqual([CLIENTE.nombre_normalized]);
   });
 });

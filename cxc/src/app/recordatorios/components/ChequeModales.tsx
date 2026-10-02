@@ -63,7 +63,7 @@ export function DetalleCheque({
               />
               <Fila label="Fecha de depósito" value={fmtDate(cheque.fecha_deposito)} />
               <Fila
-                label="Depositado"
+                label="Fecha de depósito real"
                 value={cheque.fecha_depositado ? fmtDate(cheque.fecha_depositado) : "—"}
               />
               <Fila label="Estado" value={<StatusBadge estado={ve} />} />

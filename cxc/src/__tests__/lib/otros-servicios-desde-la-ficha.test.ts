@@ -158,7 +158,7 @@ describe("C. 🔴 el total entra SOLO a la casilla, y lo escrito a mano manda", 
     expect(aplicarOtrosServiciosEnLinea(l, 0)).toBe(l);
   });
 
-  it("sin `dinero` no se toca nada: servicio profesional, «Tú decides»", () => {
+  it("sin `dinero` no se toca nada: servicio profesional, «Pago por definir»", () => {
     const l = linea({ dinero: null });
     expect(aplicarOtrosServiciosEnLinea(l, 151)).toBe(l);
   });

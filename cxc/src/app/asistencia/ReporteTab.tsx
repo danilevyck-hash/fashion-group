@@ -1012,13 +1012,13 @@ export default function ReporteTab({ empresa = "" }: {
                     la izquierda del nombre»*. Once columnas pasan a diez. */}
                 {!ASISTENCIA_PANTALLA_2026_09 && <th className="px-2 py-2.5 text-center font-medium">Sale</th>}
                 <th className="px-2 py-2.5 text-right font-medium">Días</th>
-                <th className="px-2 py-2.5 text-right font-medium">Ausen.</th>
+                <th className="px-2 py-2.5 text-right font-medium">Ausencias</th>
                 <th className="px-2 py-2.5 text-right font-medium">Tardanzas</th>
                 {/* 🔴 29-sep-2026: sin «Min»; la unidad la dice el número (h:mm o minutos). */}
-                <th className="px-2 py-2.5 text-right font-medium">Tarde</th>
-                <th className="px-2 py-2.5 text-right font-medium">Exceso<br />almuerzo</th>
+                <th className="px-2 py-2.5 text-right font-medium">Tardanza</th>
+                <th className="px-2 py-2.5 text-right font-medium">Exceso de<br />almuerzo</th>
                 <th className="px-2 py-2.5 text-right font-medium">Salida<br />temprana</th>
-                <th className="px-2 py-2.5 text-right font-medium">No trabajado</th>
+                <th className="px-2 py-2.5 text-right font-medium">Tiempo no<br />trabajado</th>
                 <th className="px-2 py-2.5 text-right font-medium">Extras</th>
                 {/* ══════════════════════════════════════════════════════════
                     🔴 «SOLO A REVISAR» VIVE EN SU COLUMNA (25-sep-2026)
@@ -1263,8 +1263,8 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
                 <th className="px-2 py-2 text-right font-medium">Salida almuerzo</th>
                 <th className="px-2 py-2 text-right font-medium">Regreso almuerzo</th>
                 <th className="px-2 py-2 text-right font-medium">Salida</th>
-                <th className="px-2 py-2 text-right font-medium">Tarde</th>
-                <th className="px-2 py-2 text-right font-medium">Almz.</th>
+                <th className="px-2 py-2 text-right font-medium">Tardanza</th>
+                <th className="px-2 py-2 text-right font-medium">Exceso de<br />almuerzo</th>
                 <th className="px-2 py-2 text-right font-medium">Extra</th>
                 <th className="px-2 py-2 text-left font-medium"></th>
               </tr></thead>
@@ -1886,7 +1886,7 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
       const res = await fetch(`/api/asistencia/correcciones?id=${encodeURIComponent(id)}`, { method: "DELETE" });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error ?? "No se pudo deshacer");
-      toast("Listo, se deshizo. Vuelve a valer la hora del reloj.", "success");
+      toast("Corrección deshecha. Vuelve a valer la hora del reloj.", "success");
       onGuardadoElDia();
     } catch (e) {
       toast(e instanceof Error ? e.message : "No se pudo deshacer.", "error");
@@ -1902,7 +1902,7 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
       const res = await fetch(`/api/asistencia/correcciones?entrada=${encodeURIComponent(id)}`, { method: "DELETE" });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error ?? "No se pudo quitar");
-      toast("Listo, se quitó la entrada autorizada. Ese día vuelve a medirse como siempre.", "success");
+      toast("Entrada autorizada quitada. Ese día vuelve a medirse como siempre.", "success");
       onGuardadoElDia();
     } catch (e) {
       toast(e instanceof Error ? e.message : "No se pudo quitar.", "error");

@@ -240,7 +240,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
           rows: XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: null }) as NamedSheet["rows"],
         }));
         const best = pickBestSheet(sheets);
-        if (!best) throw new Error("No encontré ninguna hoja con datos de productos.");
+        if (!best) throw new Error("No se encontró ninguna hoja con datos de productos.");
         const { rows, warnings: w, omitidosSinCantidad, marcasDesconocidas, corregidas } =
           processRows(best, { ...cfg, catalogo: catalogoRef.current });
         setProcessed(rows);
@@ -972,7 +972,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
           {empresasArchivo.length > 1 && (
             <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
               El archivo trae marcas de {empresasArchivo.length} empresas
-              ({empresasArchivo.map((k) => companiaLabel(k)).join(" y ")}). Toca «cambiar» y elige una.
+              ({empresasArchivo.map((k) => companiaLabel(k)).join(" y ")}). Toca «cambiar» y selecciona una.
             </p>
           )}
 

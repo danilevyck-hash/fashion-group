@@ -64,7 +64,7 @@ const SUMAN = new Set<string>(CONCEPTOS_SUMAN);
 /** Cómo se llama cada bloque en pantalla. Un solo lugar. */
 export const NOMBRE_BLOQUE: Readonly<Record<Bloque, string>> = {
   descuento: "Descuentos",
-  deuda: "Deudas nuevas",
+  deuda: "Cargos",
 };
 
 /**
@@ -118,8 +118,8 @@ export type OrigenMovimiento = "cierre" | "mano";
 
 /** Cómo se lee cada origen. DOS palabras y ninguna más (ver `etiquetaDeOrigen`). */
 export const ETIQUETA_ORIGEN: Readonly<Record<OrigenMovimiento, string>> = {
-  cierre: "del cierre",
-  mano: "a mano",
+  cierre: "Cierre de planilla",
+  mano: "Manual",
 };
 
 /** Lo mínimo de un movimiento para poder decir de dónde salió. */
@@ -322,21 +322,23 @@ export function agruparMovimientos(filas: readonly FilaMovimiento[]): Movimiento
 }
 
 /**
- * «La deuda creció» · «La deuda bajó» · «La deuda quedó igual».
+ * «Aumento del saldo» · «Disminución del saldo» · «Saldo sin variación»
+ * (1-oct-2026, Daniel: nombres normales de ERP; antes «La deuda creció / bajó /
+ * quedó igual»).
  *
  * 🔑 EL SIGNO SE DICE CON PALABRAS y el monto va siempre en positivo: un
  * «−$657,28» al lado de «creció» es la clase de renglón que se lee al revés.
- * Medio centavo no es un cambio: por debajo de eso se dice «quedó igual».
+ * Medio centavo no es un cambio: por debajo de eso se dice «sin variación».
  */
 export function rotuloDeLaVariacion(variacion: number): string {
-  if (Math.abs(variacion) < 0.005) return "La deuda quedó igual";
-  return variacion > 0 ? "La deuda creció" : "La deuda bajó";
+  if (Math.abs(variacion) < 0.005) return "Saldo sin variación";
+  return variacion > 0 ? "Aumento del saldo" : "Disminución del saldo";
 }
 
-/** El rótulo + el monto, en positivo. «La deuda creció $657.28». */
+/** El rótulo + el monto, en positivo. «Aumento del saldo $657.28». */
 export function fraseDeLaVariacion(variacion: number, plata: (n: number) => string): string {
   const rotulo = rotuloDeLaVariacion(variacion);
-  if (rotulo === "La deuda quedó igual") return rotulo;
+  if (rotulo === "Saldo sin variación") return rotulo;
   return `${rotulo} ${plata(Math.abs(variacion))}`;
 }
 

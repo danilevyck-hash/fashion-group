@@ -109,7 +109,7 @@ export default function AplicarQuincenaModal({
               No hay a quién aplicar con esta fecha: ya tienen el descuento de esa quincena o su saldo está en $0.
             </p>
           )}
-          {!fechaValida && <p className="text-gray-500">Elige una fecha para ver el resumen.</p>}
+          {!fechaValida && <p className="text-gray-500">Selecciona una fecha para ver el resumen.</p>}
         </div>
 
         <div className="flex gap-3 mt-5">

@@ -202,8 +202,8 @@ describe("la base no cambia; la pantalla sí", () => {
   it("🔴 CERO casillas en la lista, y la pregunta del alta va al derecho", () => {
     expect(pantalla).not.toContain('type="checkbox"');
     expect(PREGUNTA_DEL_ALTA).toBe("Excluir de"); // 1-oct-2026, Daniel: nombres normales de ERP
-    expect(ROTULO_LA_VENTA).toBe("La venta");
-    expect(ROTULO_EL_COBRO).toBe("El cobro");
+    expect(ROTULO_LA_VENTA).toBe("Venta"); // 1-oct-2026, Daniel: nombres normales de ERP
+    expect(ROTULO_EL_COBRO).toBe("Cobro");
     expect(pantalla).toContain('role="switch"');
   });
 

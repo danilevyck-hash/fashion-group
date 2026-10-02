@@ -10,7 +10,7 @@
  *
  * Lo que se sostiene:
  *   1. el aviso del período sin terminar se ve ARRIBA, sin abrir nada;
- *   2. RODRIGO y ELOYN salen en «Tú decides», con el motivo y el quincenal
+ *   2. RODRIGO y ELOYN salen en «Pago por definir», con el motivo y el quincenal
  *      que les correspondería, y NO se les manda a Configuración;
  *   3. quien de verdad tiene un dato faltante SIGUE en ámbar y SIGUE mandando
  *      a Configuración — partir la bolsa no puede tapar los pendientes reales;
@@ -79,7 +79,7 @@ vi.mock("@/components/ui/RangoFechas", () => ({
   }) => (
     <div>
       <button type="button" onClick={() => onChange(desde, hasta)}>
-        {vacio ? "Elige el período" : `${desde} – ${hasta}`}
+        {vacio ? "Seleccionar período" : `${desde} – ${hasta}`}
       </button>
       {accion}
     </div>
@@ -158,7 +158,7 @@ function servir(json: unknown) {
 const montar = () => render(<ToastProvider><PlanillaTab /></ToastProvider>);
 
 /**
- * 🩸 15-sep-2026: acá se tocaba «Elige el período» del doble del calendario.
+ * 🩸 15-sep-2026: acá se tocaba «Seleccionar período» del doble del calendario.
  * La Planilla ya no monta el calendario (Daniel: *«si la quincena es fija, que
  * no haya opción de rango, solo las opciones»*): se elige con CUATRO botones —
  * las dos quincenas del mes anterior y las dos del mes en curso—.
@@ -229,8 +229,8 @@ describe("🔴 arreglo 1 · el aviso del período sin terminar se ve arriba", ()
   });
 });
 
-// El rótulo decía «Decidilo vos» hasta el 1-sep-2026; se renombró a «Tú decides» porque era voseo y el sistema habla tuteo neutro (candado `nada-de-voseo`).
-describe("🔴 arreglo 2 y 3 · «Tú decides» es su propio grupo, en gris", () => {
+// El rótulo decía «Decidilo vos» hasta el 1-sep-2026; se renombró a «Tú decides» (y el 1-oct-2026, Daniel: nombres normales de ERP, a «Pago por definir») porque era voseo y el sistema habla tuteo neutro (candado `nada-de-voseo`).
+describe("🔴 arreglo 2 y 3 · «Pago por definir» es su propio grupo, en gris", () => {
   it("RODRIGO sale con su motivo escrito y con el quincenal que le tocaría", async () => {
     servir(respuesta());
     montar();
@@ -254,12 +254,12 @@ describe("🔴 arreglo 2 y 3 · «Tú decides» es su propio grupo, en gris", ()
     expect(fila.textContent).not.toContain("133");
   });
 
-  it("🔴 a los de «Tú decides» NO se les manda a Configuración", async () => {
+  it("🔴 a los de «Pago por definir» NO se les manda a Configuración", async () => {
     servir(respuesta());
     montar();
     elegirPeriodo();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
-    const resumen = screen.getByText(/Tú decides:/).parentElement!;
+    const resumen = screen.getByText(/Pago por definir:/).parentElement!;
     expect(resumen.textContent).toContain("no hay nada que arreglar");
     expect(resumen.textContent).not.toContain("Configuración");
     // El camino para pagarles sí se dice: el rango de fechas, que ya existe.
@@ -292,7 +292,7 @@ describe("🔴 arreglo 2 y 3 · «Tú decides» es su propio grupo, en gris", ()
     montar();
     elegirPeriodo();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
-    expect(screen.getByText(/Tú decides:/)).toBeTruthy();
+    expect(screen.getByText(/Pago por definir:/)).toBeTruthy();
     expect(screen.getByText(/Falta un dato:/)).toBeTruthy();
   });
 });

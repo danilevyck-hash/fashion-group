@@ -9,7 +9,7 @@
  * Lo que este archivo sostiene, sobre la pantalla de verdad:
  *   1. La pestaña abre en «Quiénes deben» — lo de siempre no se movió.
  *   2. Tocando «Movimientos» se ven los DOS bloques con su conteo y su total.
- *   3. 🔴 La columna «Origen» dice «del cierre» o «a mano».
+ *   3. 🔴 La columna «Origen» dice «Cierre de planilla» o «Manual» (1-oct-2026, Daniel: nombres normales de ERP).
  *   4. 🔴 El pie dice cuánto se prestó, cuánto se descontó y cuánto creció la
  *      deuda del grupo — la línea que no existía en ninguna pantalla.
  *   5. 🔴 Cambiar de quincena vuelve a preguntar, con la ventana que INCLUYE
@@ -59,7 +59,7 @@ const f = (p: Partial<FilaMovimiento> & { monto: number; fecha: string }): FilaM
     fecha: p.fecha,
     dia: Number(p.fecha.slice(8, 10)),
     origen: cierre ? "cierre" : "mano",
-    origenEtiqueta: cierre ? "del cierre" : "a mano",
+    origenEtiqueta: cierre ? "Cierre de planilla" : "Manual",
     bloque: cierre ? "descuento" : "deuda",
   };
 };
@@ -155,7 +155,7 @@ describe("Movimientos — los números del 16 al 30 de agosto de 2026", () => {
     irA16_30Agosto();
     const descuentos = await screen.findByRole("heading", { name: /Descuentos/ });
     expect(descuentos.textContent).toContain("13");
-    const deudas = screen.getByRole("heading", { name: /Deudas nuevas/ });
+    const deudas = screen.getByRole("heading", { name: /Cargos/ });
     expect(deudas.textContent).toContain("6");
     // Los dos totales, con centavos.
     expect(screen.getAllByText("$752.72").length).toBeGreaterThan(0);
@@ -169,8 +169,8 @@ describe("Movimientos — los números del 16 al 30 de agosto de 2026", () => {
     irA16_30Agosto();
     await screen.findByRole("heading", { name: /Descuentos/ });
     // 13 en la tabla + 13 en las tarjetas del celular (las dos se montan).
-    expect(screen.getAllByText("del cierre")).toHaveLength(26);
-    expect(screen.getAllByText("a mano")).toHaveLength(12);
+    expect(screen.getAllByText("Cierre de planilla")).toHaveLength(26);
+    expect(screen.getAllByText("Manual")).toHaveLength(12);
   });
 
   it("🔴 el pie dice cuánto creció la deuda del grupo", async () => {
@@ -178,9 +178,11 @@ describe("Movimientos — los números del 16 al 30 de agosto de 2026", () => {
     montar();
     irAMovimientos();
     irA16_30Agosto();
-    await screen.findByText("La deuda creció");
-    expect(screen.getByText("Se prestó")).toBeTruthy();
-    expect(screen.getByText("Se descontó")).toBeTruthy();
+    // 1-oct-2026, Daniel: nombres normales de ERP («Se prestó / Se descontó /
+    // La deuda creció» → «Cargos / Descuentos / Aumento del saldo»).
+    await screen.findByText("Aumento del saldo");
+    expect(screen.getAllByText("Cargos").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Descuentos").length).toBeGreaterThan(0);
     expect(screen.getAllByText("$657.28").length).toBeGreaterThan(0);
   });
 
@@ -189,7 +191,7 @@ describe("Movimientos — los números del 16 al 30 de agosto de 2026", () => {
     render(<ToastProvider><PrestamosTab empresa="vistana_international" /></ToastProvider>);
     irAMovimientos();
     irA16_30Agosto();
-    const deudas = await screen.findByRole("heading", { name: /Deudas nuevas/ });
+    const deudas = await screen.findByRole("heading", { name: /Cargos/ });
     expect(deudas.textContent).toContain("3");
     expect(screen.getByText("No se le descontó nada a nadie en esta quincena.")).toBeTruthy();
     expect(screen.getAllByText("$410.00").length).toBeGreaterThan(0);
@@ -200,7 +202,7 @@ describe("Movimientos — los números del 16 al 30 de agosto de 2026", () => {
     montar();
     irAMovimientos();
     await screen.findByText("En esta quincena no se descontó ni se prestó nada.");
-    expect(screen.queryByText("La deuda creció")).toBeNull();
+    expect(screen.queryByText("Aumento del saldo")).toBeNull();
   });
 
   it("🔴 no escribe nada: ningún pedido lleva método", async () => {

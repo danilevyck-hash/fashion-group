@@ -187,11 +187,11 @@ export const PREGUNTA_DE_LA_MARCA = "¿De qué marca es la foto?";
 
 /** Falta elegir: la pantalla no la abrió, o el servidor no recibió nada. */
 export const AVISO_ELIGE_LA_MARCA =
-  "Esta tienda tiene más de una marca abierta. Elige a cuál va la foto antes de subirla.";
+  "Esta tienda tiene más de una marca abierta. Selecciona la marca antes de subir la foto.";
 
 /** La marca que llegó no tiene gastos abiertos en esta tienda. */
 export const AVISO_MARCA_AJENA =
-  "Esa marca no tiene gastos abiertos en esta tienda. Elige una de las que salen.";
+  "Esa marca no tiene gastos abiertos en esta tienda. Selecciona una de la lista.";
 
 /** 🔴 A un período cerrado no entra ni sale nada. */
 export const AVISO_PERIODO_CERRADO =

@@ -83,11 +83,11 @@ function textoCkth(empresas: string[]): string {
   }
   if (empresas.length > 1) {
     const marcas = empresas.map(marcaDeEmpresa).filter(Boolean).join(" y ");
-    return reconocido(marcas, `${empresas.length} empresas, eliges una adentro`);
+    return reconocido(marcas, `${empresas.length} empresas, selecciona una adentro`);
   }
   // Las columnas están pero ninguna marca del catálogo opinó: el archivo es
   // válido y la compañía se elige adentro. No se adivina ninguna.
-  return reconocido("archivo del proveedor", "la empresa se elige adentro");
+  return reconocido("archivo del proveedor", "la empresa se selecciona adentro");
 }
 
 /**

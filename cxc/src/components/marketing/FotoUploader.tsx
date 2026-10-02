@@ -241,7 +241,7 @@ export function FotoUploader({
               onClick={() => inputRef.current?.click()}
               className="rounded-md bg-black text-white px-3 py-2 text-sm active:scale-[0.97] transition"
             >
-              Elegir {multiple ? "fotos" : "foto"}
+              Seleccionar {multiple ? "fotos" : "foto"}
             </button>
             <div className="text-xs text-gray-400 mt-2">
               Máximo {maxSizeMb}MB por foto

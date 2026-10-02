@@ -155,7 +155,7 @@ describe("3 · «Hoy» pasa de bloque a una línea", () => {
 
   it("🔴 la frescura sigue viajando SIEMPRE — el monto sin ella es media verdad", () => {
     const src = sinComentarios(ventaHoy);
-    expect(src).toContain("no pudimos confirmar cuándo se actualizó");
+    expect(src).toContain("Sin hora de actualización");
     expect(src).toContain("sin actualizar desde las ");
   });
 });

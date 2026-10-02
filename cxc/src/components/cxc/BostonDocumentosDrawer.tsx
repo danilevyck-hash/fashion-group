@@ -126,7 +126,7 @@ export default function BostonDocumentosDrawer({
             <div className="col-span-4">Documento</div>
             <div className="col-span-2">Fecha</div>
             <div className="col-span-1 text-right">Días</div>
-            <div className="col-span-2 text-right">Original</div>
+            <div className="col-span-2 text-right">Monto</div>
             <div className="col-span-3 text-right">Saldo</div>
           </div>
           <ul className="divide-y divide-gray-100">

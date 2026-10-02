@@ -207,8 +207,9 @@ describe("impulsadoras — TODOS los meses sin pagar", () => {
   it("el resumen dice cuántos debe, cuántos a medias y cuál es el más viejo", () => {
     const faltan = mesesSinPagar([mes("2026-06", 30), { desde: "2026-08-01", hasta: "2026-08-15" }], "2026-09-22");
     const texto = resumenDeLoQueDebe(faltan, (m) => etiquetaMes(m).toLowerCase());
-    expect(texto).toContain("3 meses");
-    expect(texto).toContain("1 a medias");
+    // 1-oct-2026, Daniel: nombres normales de ERP («pendientes», «parcial»).
+    expect(texto).toContain("3 meses pendientes");
+    expect(texto).toContain("1 parcial");
     expect(texto).toContain("julio 2026");
     expect(resumenDeLoQueDebe([], etiquetaMes)).toBe("");
   });

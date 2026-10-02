@@ -73,8 +73,9 @@ export function etiquetaPeriodoCorta(year: number, mes: number): string {
  * bajar, como esté en todos los módulos»*). Medido: el sistema dice
  * **«Descargar»** 23 veces contra 5 formas raras.
  */
-export function rotuloDescargarPeriodo(mes: number): string {
-  return esTodoElAnio(mes) ? "Descargar el año" : "Descargar el mes";
+// 1-oct-2026, Daniel: nombres normales de ERP — «Descargar PDF del mes».
+export function rotuloDescargarPeriodo(mes: number, formato: "PDF" | "Excel"): string {
+  return `Descargar ${formato} ${esTodoElAnio(mes) ? "del año" : "del mes"}`;
 }
 
 /** El trozo de fecha del nombre de archivo: `2026-08` · `2026`. */

@@ -49,7 +49,7 @@ export default function DangerZone({ isAdmin, hasMovs, onDeleteEmployee, onClear
           <line x1="12" y1="9" x2="12" y2="13"/>
           <line x1="12" y1="17" x2="12.01" y2="17"/>
         </svg>
-        Zona de acciones peligrosas
+        Acciones irreversibles
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`transition-transform ${dangerOpen ? "rotate-180" : ""}`}>
           <polyline points="6 9 12 15 18 9"/>
         </svg>

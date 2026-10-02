@@ -50,7 +50,7 @@ export default function FichaTexto({
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="button" onClick={onEditar}
               className="min-h-[44px] rounded-md bg-black px-3 text-sm text-white transition active:scale-[0.97]">
-              Llenar la ficha
+              Crear ficha
             </button>
             <button type="button" onClick={onIgnorar}
               className="min-h-[44px] rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]">

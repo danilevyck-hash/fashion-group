@@ -94,7 +94,7 @@ export function buildResumenHtml(empresas: EstadoCuentaEmpresa[], cliente: strin
         <tr>
           <th style="${TH};text-align:left">Empresa</th>
           <th style="${TH};text-align:right">Saldo total</th>
-          <th style="${TH};text-align:right">Más de 90 días</th>
+          <th style="${TH};text-align:right">+90 días</th>
         </tr>
       </thead>
       <tbody>

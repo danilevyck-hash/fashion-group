@@ -129,8 +129,8 @@ describe("A · la regla pura", () => {
   });
 
   it("🔴 lo que NO se guardó se NOMBRA, y el toast va en rojo", () => {
-    expect(resumenDelLote(13, [])).toEqual({ texto: "Listo, 13 justificados", tipo: "success" });
-    expect(resumenDelLote(1, [])).toEqual({ texto: "Listo, 1 justificado", tipo: "success" });
+    expect(resumenDelLote(13, [])).toEqual({ texto: "13 colaboradores justificados", tipo: "success" } /* 1-oct-2026, Daniel: nombres normales de ERP */);
+    expect(resumenDelLote(1, [])).toEqual({ texto: "1 colaborador justificado", tipo: "success" });
     const conFallo = resumenDelLote(11, [
       { etiqueta: "Andrea Perez", error: "x" },
       { etiqueta: "Jenifer Gomez", error: "y" },

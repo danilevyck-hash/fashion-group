@@ -198,7 +198,7 @@ export function TarjetaAnio({
         </p>
         <p className="mt-0.5 text-xs text-gray-500">
           {proy.tiene_proyeccion ? (
-            <>cierra en <span className="font-mono tabular-nums text-gray-700">{fmtMoney(proy.proyeccion ?? 0)}</span></>
+            <>proyección <span className="font-mono tabular-nums text-gray-700">{fmtMoney(proy.proyeccion ?? 0)}</span></>
           ) : (
             <>acumulado <span className="font-mono tabular-nums text-gray-700">{fmtMoney(acumulado)}</span>{isClosedYear ? ` de ${year}` : ""}</>
           )}

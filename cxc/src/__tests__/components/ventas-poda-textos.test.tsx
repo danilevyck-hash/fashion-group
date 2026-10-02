@@ -383,7 +383,7 @@ describe("Referencia · los cuatro grandes y la línea de ritmo", () => {
     // 60 + 120 + 180 = 360 llegadas y 295 vendidas desde entonces. El ritmo va
     // PRIMERO y usa la MISMA ancla: 295 ÷ 10 meses = 29,5 → "30".
     expect(
-      screen.getAllByText("Vendo 30 u por mes · Desde oct 2025 llegaron 360 u · van vendidas 295").length,
+      screen.getAllByText("Venta promedio: 30 u por mes · Recepción de 360 u desde oct 2025 · vendidas 295").length,
     ).toBeGreaterThan(0);
   });
 
@@ -393,7 +393,7 @@ describe("Referencia · los cuatro grandes y la línea de ritmo", () => {
     // u/mes. NO son los 33 meses de calendario hasta hoy: la cola en bodega
     // vacía no infla el tiempo de venta.
     await buscarUnaReferencia();
-    expect(screen.getAllByText("Vendo 16 u por mes · Se vendió todo en 18 meses").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Venta promedio: 16 u por mes · Se vendió todo en 18 meses").length).toBeGreaterThan(0);
     expect(screen.queryByText(/[Vv]endo 0/)).toBeNull();
     // El cuarto grande dice cuánto TARDÓ, no cuánto lleva en bodega.
     expect(screen.getAllByText("en venderse").length).toBeGreaterThan(0);
@@ -559,7 +559,7 @@ describe("Referencia · la frase de la última llegada (la bodega tocó 0)", () 
     // (61 vendidas ÷ 7 meses CON mercancía = 8.7 — los meses sin stock no
     // dividen).
     expect(
-      screen.getAllByText("Llegaron 36 u en mar 2026 · vendo 8.7 u por mes").length,
+      screen.getAllByText("Recepción de 36 u en mar 2026 · venta promedio: 8.7 u por mes").length,
     ).toBeGreaterThan(0);
     // La historia, en gris, debajo.
     expect(screen.getAllByText("La anterior (oct 2025): 36 u — se vendió toda en 2 meses").length).toBeGreaterThan(0);
@@ -612,7 +612,7 @@ function filaDePlata(): string {
   const marca = screen.getAllByText("Precio prom")[0];
   const fila = marca.closest("div.flex") as HTMLElement;
   return (fila.textContent ?? "")
-    .replace(/De dónde salen estos números.*$/s, "")
+    .replace(/Cómo se calcula.*$/s, "")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -662,7 +662,7 @@ describe("Referencia · la fila de plata, agrupada", () => {
   it("el ⓘ cerrado no deja su texto en pantalla; al tocarlo dice de dónde sale cada número", async () => {
     await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
     expect(screen.queryByText(/error de carga conocido/)).toBeNull();
-    tocarAyuda("De dónde salen estos números");
+    tocarAyuda("Cómo se calcula");
     expect(screen.getByText(/Costo CIF ÷ 1,10/)).toBeTruthy();
     expect(screen.getByText(/igual al CIF en 93 de cada 100 líneas/)).toBeTruthy();
   });
@@ -713,7 +713,7 @@ describe("Utilidad · el alcance se dice EN PANTALLA (antes en el ⓘ)", () => {
     // número dejaba sin contestar.
     // Desde el 23-sep-2026 (UNA SOLA VENTA) la línea dice que no entran, y
     // sigue con el cuadre contra el Resumen.
-    expect(linea).toContain("Boston y Multifashion no entran");
+    expect(linea).toContain("Excluye Boston y Multifashion"); // 1-oct-2026, Daniel: nombres normales de ERP
     // El ⓘ se retiró: lo que decía ahora está en pantalla.
     expect(screen.queryByRole("button", { name: "Cómo se calcula" })).toBeNull();
   });
@@ -858,8 +858,8 @@ describe("Comisiones detalle · fórmula en el ⓘ, límite del dato en pantalla
     expect(screen.getByText(/Comisión de cada línea = monto × 0\.50%/)).toBeTruthy();
   });
 
-  it("'El API de Switch no expone el número de recibo' QUEDA en pantalla", async () => {
+  it("'Switch no envía el número de recibo' QUEDA en pantalla (1-oct-2026, Daniel: nombres normales de ERP)", async () => {
     await montar();
-    expect(screen.getByText("El API de Switch no expone el número de recibo.")).toBeTruthy();
+    expect(screen.getByText("Switch no envía el número de recibo.")).toBeTruthy();
   });
 });

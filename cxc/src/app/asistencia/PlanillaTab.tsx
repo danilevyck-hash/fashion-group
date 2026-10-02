@@ -1145,7 +1145,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
   // Con la lista partida acá a mano, la pantalla y el papel podían discrepar
   // sobre en qué cajón cae una persona.
   //
-  // 🩸 «Falta un dato» y «Tú decides» eran UNA SOLA bolsa ámbar, y por eso
+  // 🩸 «Falta un dato» y «Pago por definir» eran UNA SOLA bolsa ámbar, y por eso
   // RODRIGO MIRANDA (trabajo fuera de la oficina) y ELOYN MENDOZA (vacaciones)
   // salían pidiendo que los arreglaran en Configuración, donde no hay nada que
   // arreglarles. Ámbar dice "arreglame"; esto es una decisión, y va en gris.
@@ -1438,7 +1438,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
       {vieja && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5">
           <p className="text-sm font-medium text-amber-900">
-            Los números que ves son de antes
+            Planilla desactualizada
           </p>
           <p className="mt-0.5 text-[13px] text-amber-900">
             {!coincide
@@ -1480,7 +1480,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
               que vale sigue siendo lo cerrado. */}
           {!!data && Math.abs(data.totales.netoPagar - cerrada.totalNeto) > 0.005 && (
             <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[12px] text-amber-900">
-              Ojo: el cuadro que ves ahora da <b>${$(data.totales.netoPagar)}</b> y lo que se cerró
+              Atención: el cuadro que ves ahora da <b>${$(data.totales.netoPagar)}</b> y lo que se cerró
               fue <b>${$(cerrada.totalNeto)}</b>. Cambió algo después del cierre. Vale lo cerrado;
               si hay que rehacerlo, hay que reabrir la quincena.
             </p>
@@ -1657,7 +1657,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           un «no hay datos»: es que nadie eligió todavía qué quincena pagar. */}
       {!elegido && !cargando && (
         <div className="rounded-lg border border-dashed border-gray-200 px-4 py-12 text-center">
-          <p className="text-sm font-medium text-gray-700">Elige el período que vas a pagar</p>
+          <p className="text-sm font-medium text-gray-700">Selecciona el período</p>
           <p className="mt-1 text-[13px] text-gray-500">
             Toca la quincena arriba y después <b>Generar</b>.
           </p>
@@ -1668,7 +1668,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           dibujarse sola** — la regla de Daniel del 1-sep-2026 no se toca. */}
       {ASISTENCIA_PANTALLA_2026_09 && elegido && !pedido && !cargando && !sinEmpresa && (
         <div className="rounded-lg border border-dashed border-gray-200 px-4 py-12 text-center">
-          <p className="text-sm font-medium text-gray-700">Esta quincena todavía no se generó</p>
+          <p className="text-sm font-medium text-gray-700">Quincena sin generar</p>
           <p className="mt-1 text-[13px] text-gray-500">
             Toca <b>Generar</b> para armar el cuadro de lo que se va a pagar.
           </p>
@@ -1697,7 +1697,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           {data.avisos.rangoLibre && (
             <p className="text-[13px] text-gray-500">
               Este período no es una quincena: los montos a mano no se aplican y no se puede
-              cerrar. Elige una de las quincenas de arriba y vuelve a generar.
+              cerrar. Selecciona una de las quincenas de arriba y vuelve a generar.
             </p>
           )}
 
@@ -1892,14 +1892,15 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
             </p>
           )}
 
-          {/* 🔴 DOS listas con nombre propio, no una bolsa. «Tú decides» va en
+          {/* 🔴 DOS listas con nombre propio, no una bolsa. «Pago por definir» va en
               GRIS y sin mandar a Configuración: ahí no hay nada que arreglar.
               El rótulo se llamó «Decidilo vos» hasta el 1-sep-2026; se renombró
-              porque era voseo y este sistema habla tuteo neutro. Es el MISMO
-              grupo (`grupoDeLinea === "decidir"`), solo cambió cómo se lee. */}
+              porque era voseo y este sistema habla tuteo neutro; «Tú decides» pasó a
+              «Pago por definir» (1-oct-2026, Daniel: nombres normales de ERP). Es el
+              MISMO grupo (`grupoDeLinea === "decidir"`), solo cambió cómo se lee. */}
           {!!decidir.length && (
             <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
-              <b>Tú decides:</b> {decidir.length}{" "}
+              <b>Pago por definir:</b> {decidir.length}{" "}
               {decidir.length === 1 ? "colaborador quedó" : "colaboradores quedaron"} fuera del total porque
               el sistema no puede saber cuánto le toca —está justificada, o entró o salió a mitad
               del período—. <b>No es un error y no hay nada que arreglar</b>: al lado de cada una

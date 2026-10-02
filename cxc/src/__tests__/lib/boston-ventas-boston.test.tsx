@@ -404,7 +404,7 @@ describe("🔴 2c · el DOM de la cartera de Boston: saldo a favor y sin pagar +
     expect(texto).toContain("(1)");
     expect(texto).toContain("Cliente A Favor");
     // 2 sin pagar hace +90 d: Aladdin (2024) y Panda Store (nunca pagó).
-    expect(texto).toContain("2 sin pagar hace +90 d");
+    expect(texto).toContain("2 sin pago en +90 días");
     // 1-oct-2026, Daniel: nombres normales de ERP («nunca ha pagado» → «Sin pagos»).
     expect(texto).toContain("Sin pagos");
     expect(texto).toMatch(/Último pago: hace \d+ d/);

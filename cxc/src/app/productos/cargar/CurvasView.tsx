@@ -38,7 +38,7 @@ export default function CurvasView() {
         rows: XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: null }) as NamedSheet["rows"],
       }));
       const best = pickCurvasSheet(sheets);
-      if (!best) throw new Error("No encontré ninguna hoja con datos de curvas (prepack).");
+      if (!best) throw new Error("No se encontró ninguna hoja con datos de curvas (prepack).");
       const r = parseCurvas(best);
       setResult(r);
       setSelected(new Set()); // arranca sin selección
@@ -232,7 +232,7 @@ export default function CurvasView() {
                     />
                     <span className="w-14 text-sm font-semibold text-stone-900">{c.codigo}</span>
                     <span className="text-[13px] text-stone-500 tabular-nums">
-                      {c.bultos} bultos · {c.ordXPp} pzs/bulto · {c.totalPiezas} pzs
+                      {c.bultos} bultos · {c.ordXPp} u/bulto · {c.totalPiezas} u
                     </span>
                     <span className="flex flex-wrap gap-1.5">
                       {c.tallas.map((t) => (

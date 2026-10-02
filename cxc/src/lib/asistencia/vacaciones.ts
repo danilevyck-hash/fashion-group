@@ -124,7 +124,7 @@ export function textoDiaVacaciones(yaPagadas: boolean): string {
 }
 
 /**
- * El rango escrito, para la línea de «Tú decides» de la planilla.
+ * El rango escrito, para la línea de «Pago por definir» de la planilla.
  * «Vacaciones del 16 jul 2026 al 13 ago 2026».
  */
 export function textoVacacion(desde: string, hasta: string, yaPagadas: boolean): string {
@@ -149,7 +149,9 @@ export function textoVacacion(desde: string, hasta: string, yaPagadas: boolean):
  * formulario de carga y cada fila ya cargada), y dos copias de un texto que
  * costó esto son dos copias que se separan.
  */
-export const PREGUNTA_YA_COBRADAS = "¿Ya cobró estos días antes?";
+// 1-oct-2026, Daniel: nombres normales de ERP (antes «¿Ya cobró estos días antes?»; la línea de abajo decía
+// «Sí → no se le pagan, ya los cobró.»).
+export const PREGUNTA_YA_COBRADAS = "Días pagados por adelantado";
 
 /**
  * La línea que va debajo del interruptor, o `null` cuando no hay nada que
@@ -164,7 +166,7 @@ export const PREGUNTA_YA_COBRADAS = "¿Ya cobró estos días antes?";
  * 🔑 UNA línea y corta. Daniel odia los párrafos didácticos.
  */
 export function efectoDelInterruptor(yaPagadas: boolean): string | null {
-  return yaPagadas ? "Sí → no se le pagan, ya los cobró." : null;
+  return yaPagadas ? "No se pagan en esta planilla" : null;
 }
 
 /** Los días de calendario que cubre la vacación, `desde` y `hasta` incluidos. */

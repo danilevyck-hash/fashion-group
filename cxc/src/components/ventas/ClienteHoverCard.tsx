@@ -357,13 +357,13 @@ function CxcChip({ state }: { state: CxcState }) {
   }
 
   let cls = "bg-emerald-50 text-emerald-800";
-  let label = "Al día";
+  // 1-oct-2026, Daniel: nombres normales de ERP — la antigüedad va solo en
+  // rangos; el color dice el tramo más viejo, el rótulo no lo juzga.
+  const label = "Saldo";
   if (monto_121_plus > 0) {
     cls = "bg-red-50 text-red-800";
-    label = "Atención";
   } else if (monto_91_120 > 0) {
     cls = "bg-amber-50 text-amber-800";
-    label = "Cuentas pendientes";
   }
 
   return (
@@ -373,11 +373,11 @@ function CxcChip({ state }: { state: CxcState }) {
     )}>
       <span>{label}</span>
       <span aria-hidden className="opacity-50">·</span>
-      <span>0-90 <span className="font-mono tabular-nums">{fmtBucketK(monto_0_90)}</span></span>
+      <span>0-90 d <span className="font-mono tabular-nums">{fmtBucketK(monto_0_90)}</span></span>
       <span aria-hidden className="opacity-50">·</span>
-      <span>91-120 <span className="font-mono tabular-nums">{fmtBucketK(monto_91_120)}</span></span>
+      <span>91-120 d <span className="font-mono tabular-nums">{fmtBucketK(monto_91_120)}</span></span>
       <span aria-hidden className="opacity-50">·</span>
-      <span>121+ <span className="font-mono tabular-nums">{fmtBucketK(monto_121_plus)}</span></span>
+      <span>+120 d <span className="font-mono tabular-nums">{fmtBucketK(monto_121_plus)}</span></span>
     </div>
   );
 }

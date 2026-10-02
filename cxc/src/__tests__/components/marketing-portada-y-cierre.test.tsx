@@ -373,7 +373,7 @@ describe("3 · 🔴 el total excluye lo no reportado, y lo apagado se dice apart
     expect(th.noReportado).toBe(40);
     expect(th.diasAbierto).toBe(42);
     expect(textoDiasAbierto(42)).toBe("42 días abierto");
-    expect(textoDiasAbierto(0)).toBe("Abrió hoy");
+    expect(textoDiasAbierto(0)).toBe("Abierto hoy"); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(diasDesde(null, "2026-09-22")).toBeNull();
   });
 

@@ -205,7 +205,7 @@ describe("B · los motivos son de la casilla, no del día", () => {
     expect([...MOTIVO_DE_LA_CASILLA]).toEqual([
       "No marcó entrada",
       "No marcó salida a almuerzo",
-      "No marcó vuelta de almuerzo",
+      "No marcó regreso de almuerzo",
       "No marcó salida",
     ]);
     expect(motivoDeLaCasilla(0)).toBe("No marcó entrada");
@@ -229,7 +229,7 @@ describe("B · los motivos son de la casilla, no del día", () => {
     await screen.findByRole("button", { name: "No marcó salida" });
     expect(screen.queryByRole("button", { name: "No marcó entrada" })).toBeNull();
     expect(screen.queryByRole("button", { name: "No marcó salida a almuerzo" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "No marcó vuelta de almuerzo" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "No marcó regreso de almuerzo" })).toBeNull();
     // 🩸 Y los cuatro frecuentes mal escritos NO están: viven bajo «Otro…».
     expect(screen.queryByRole("button", { name: "no marco salida almuerzo" })).toBeNull();
   });

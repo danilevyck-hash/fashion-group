@@ -159,7 +159,7 @@ export const MIGRACION_AMARRE_PRESTAMOS =
  */
 export function avisoMigracionAmarrePrestamos(): string {
   return (
-    "La casilla de Préstamo todavía no se llena sola: falta preparar la base. "
+    "La casilla de Préstamo todavía no se completa automáticamente: falta preparar la base. "
     + `Pídele a Daniel que corra el archivo ${MIGRACION_AMARRE_PRESTAMOS} en Supabase. `
     + "Mientras tanto se escribe a mano, como hasta ahora."
   );
@@ -636,7 +636,7 @@ function cuotaPropuesta(sugerido: number, automatico: boolean): number {
  * 🔑 Misma forma que `aplicarAjusteEnLinea`: el monto mueve el total de
  * deducciones y el neto por la MISMA cuenta del motor
  * (`neto = bruto − deducciones + otros servicios`), sin recalcular nada más.
- * Sin `dinero` (servicio profesional, «Tú decides») no se toca nada. Sin nada
+ * Sin `dinero` (servicio profesional, «Pago por definir») no se toca nada. Sin nada
  * que meter, vuelve la MISMA referencia.
  */
 export function aplicarPrestamoEnLinea<

@@ -157,13 +157,14 @@ describe("AppHeader · el menú a pantalla completa", () => {
     expect(within(menu).queryByRole("tablist")).toBeNull();
   });
 
-  it("el módulo de aquí está marcado y dice «aquí»", async () => {
+  // 1-oct-2026, Daniel: nombres normales de ERP — «aquí» → «Actual», «Salir» → «Cerrar sesión».
+  it("el módulo de aquí está marcado y dice «Actual»", async () => {
     montarComoAdmin("/asistencia");
     const menu = await abrirElMenu();
 
     const aqui = within(menu).getByRole("button", { name: /^Asistencia y planilla/ });
     expect(aqui.getAttribute("aria-current")).toBe("page");
-    expect(aqui.textContent).toContain("aquí");
+    expect(aqui.textContent).toContain("Actual");
 
     const otro = within(menu).getByRole("button", { name: /^Guías de despacho/ });
     expect(otro.getAttribute("aria-current")).toBeNull();
@@ -202,7 +203,7 @@ describe("AppHeader · el menú a pantalla completa", () => {
     expect(nav.push).not.toHaveBeenCalled();
 
     fireEvent.change(within(menu).getByLabelText("Buscar un módulo"), { target: { value: "zzz" } });
-    await within(menu).findByText("Ningún módulo se llama así.");
+    await within(menu).findByText("Sin resultados");
   });
 
   it("«Inicio» arriba y el pie con nombre · rol · Contraseña · Salir", async () => {
@@ -212,7 +213,7 @@ describe("AppHeader · el menú a pantalla completa", () => {
     within(menu).getByRole("button", { name: /^Inicio/ });
     within(menu).getByText("daniel");
     within(menu).getByText("Administrador");
-    within(menu).getByRole("button", { name: "Salir" });
+    within(menu).getByRole("button", { name: "Cerrar sesión" });
     // El botón de cambiar la contraseña es el de siempre, en su variante texto.
     expect(menu.textContent).toContain("Contraseña");
   });

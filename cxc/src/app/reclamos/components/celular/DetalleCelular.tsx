@@ -154,7 +154,7 @@ export default function DetalleCelular({
               : <span className="text-[#A32D2D]">{FALTA_FECHA_FACTURA}</span>}
             {current.marca ? ` · ${current.marca}` : ""}
             {dias !== null && ` · ${dias} día${dias === 1 ? "" : "s"}`}
-            {!esActiveShoes(current.empresa) && current.nro_orden_compra ? ` · OC ${current.nro_orden_compra}` : ""}
+            {!esActiveShoes(current.empresa) && current.nro_orden_compra ? ` · N° de pedido ${current.nro_orden_compra}` : ""}
           </p>
           {pendiente && (
             <p className="mt-1 text-[13px] text-gray-400">{textoReclamado(current)}</p>

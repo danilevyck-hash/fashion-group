@@ -89,7 +89,7 @@ export function textoPiezasBultos(
   bultos?: number | null,
 ): string {
   const p = normalizarPiezas(piezas);
-  const base = `${p} ${p === 1 ? "pieza" : "piezas"}`;
+  const base = `${p} ${p === 1 ? "unidad" : "unidades"}`; // 1-oct-2026, Daniel: nombres normales de ERP
   const b = normalizarBultos(bultos);
   if (b === null) return base;
   return `${base} en ${b} ${b === 1 ? "bulto" : "bultos"}`;

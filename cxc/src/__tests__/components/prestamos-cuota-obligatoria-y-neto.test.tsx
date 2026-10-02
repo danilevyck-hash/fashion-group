@@ -270,7 +270,7 @@ describe("C. 🔴 el neto nunca queda en negativo: se descuenta lo que alcance",
     expect(recortarAlNeto(justo)).toBe(justo);
     const sobra = conCuotas(260, { prestamo: 70 });
     expect(recortarAlNeto(sobra)).toBe(sobra);
-    // Sin dinero (servicio profesional, «Tú decides») ni sugerencia: tal cual.
+    // Sin dinero (servicio profesional, «Pago por definir») ni sugerencia: tal cual.
     const sinDinero = linea(MANUAL(), null);
     expect(recortarAlNeto(sinDinero)).toBe(sinDinero);
     const sinCuota = linea(MANUAL(), DINERO({ netoPagar: -10 }));

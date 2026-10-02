@@ -302,7 +302,7 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
                     onKeyDown={(e) => { if (e.key === "Enter") commitPrice(l.product_id); if (e.key === "Escape") setEditingPrice(null); }}
                     className="w-24 rounded-md border-2 border-black bg-white px-2 min-h-[40px] text-sm font-medium tabular-nums outline-none"
                   />
-                  /pza
+                  /u
                 </span>
               ) : (
                 <button
@@ -310,7 +310,7 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
                   className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-gray-50 px-2.5 min-h-[40px] text-sm font-medium tabular-nums text-gray-800 hover:border-gray-400 hover:bg-gray-100 active:scale-[0.97] transition"
                   title="Tocar para cambiar el precio"
                 >
-                  ${fmt(l.unit_price)}<span className="text-xs font-normal text-gray-400">/pza</span>
+                  ${fmt(l.unit_price)}<span className="text-xs font-normal text-gray-400">/u</span>
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
                     <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
                   </svg>
@@ -412,7 +412,7 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
                 mapeo sigue siendo lo que corresponde arreglar. */}
             {vendedor === null && (
               <p className="mt-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                No tienes vendedor de Switch asignado — elige uno para este pedido, o pídele al admin asignarlo en Sistema → Usuarios.
+                No tienes vendedor de Switch asignado — selecciona uno para este pedido, o pídele al admin asignarlo en Sistema → Usuarios.
               </p>
             )}
             {(vendedorPickerOpen || vendedor === null) && (
@@ -449,7 +449,7 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
             <div>
               <div className="text-xs uppercase tracking-[0.05em] text-gray-400">Total del pedido</div>
               <div className="text-2xl font-semibold tabular-nums">${fmt(total)}</div>
-              <div className="text-xs text-gray-400 tabular-nums">{cart.length} producto(s) · {totalPiezas} piezas</div>
+              <div className="text-xs text-gray-400 tabular-nums">{cart.length} producto(s) · {totalPiezas} unidades</div>
             </div>
             {/* 🔴 Las dos salidas, directo. Antes acá había UN botón "Enviar a
                 Switch" a la derecha del total que abría una ventana; en 390 px

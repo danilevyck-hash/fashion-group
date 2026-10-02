@@ -556,7 +556,7 @@ function FilaPlata({
             ))}
           </Fragment>
         ))}
-        <Ayuda titulo="De dónde salen estos números">
+        <Ayuda titulo="Cómo se calcula">
           <b>Precio prom</b> es la venta real dividida entre las unidades reales de los últimos{" "}
           {ficha.promedio.meses} {ficha.promedio.meses === 1 ? "mes completo" : "meses completos"} — con los
           descuentos ya adentro y las devoluciones (notas de crédito) ya restadas. El precio de lista no es a lo

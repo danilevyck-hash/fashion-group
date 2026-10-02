@@ -33,6 +33,12 @@ vi.mock("@/lib/hooks/useAuth", () => ({
   useAuth: () => ({ authChecked: true, role: "secretaria" }),
 }));
 vi.mock("@/components/AppHeader", () => ({ default: () => <div /> }));
+// 1-oct-2026: este candado es el de la tabla única; la versión Apple tiene el suyo
+// (`guias-nueva-guia-apple.test.tsx`). Con `GUIA_APPLE_2026_10` en false, esto es lo de hoy.
+vi.mock("@/lib/guias/guias-2026-10", async (orig) => ({
+  ...(await orig<typeof import("@/lib/guias/guias-2026-10")>()),
+  GUIA_APPLE_2026_10: false,
+}));
 
 function memStorage(): Storage {
   let m: Record<string, string> = {};

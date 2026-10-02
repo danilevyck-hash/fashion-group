@@ -98,7 +98,7 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
             <div className="h-40 bg-gray-100 rounded-lg" />
           </div>
         ) : notFound || !data ? (
-          <EmptyState title="Proveedor no encontrado" subtitle="Puede que aún no esté sincronizado." />
+          <EmptyState title="Proveedor no encontrado" subtitle="Puede que aún no se haya recibido de Switch." />
         ) : (
           <>
             {/* Header */}
@@ -175,7 +175,7 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
               return (
                 <section className="border border-gray-200 rounded-lg p-4 mb-4">
                   {/* "· sincronizados de Switch" se fue: el pie de esta misma
-                      sección ya dice "Última sincronización: {fecha}", que
+                      sección ya dice "Actualizado el {fecha}", que
                       además dice CUÁNDO. */}
                   <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-3">Datos</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-6 text-sm">
@@ -185,7 +185,7 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
                   </div>
                   {data.synced_at && (
                     <div className="text-xs text-gray-400 mt-3">
-                      Última sincronización: {fmtDate(data.synced_at.slice(0, 10))}
+                      Actualizado el {fmtDate(data.synced_at.slice(0, 10))}
                     </div>
                   )}
                 </section>
@@ -240,7 +240,7 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
                         <span className="font-medium">{r.nro_reclamo || "Reclamo"}</span>
                         <span className="text-gray-500">
                           {r.empresa ? ` · ${getCompanyDisplay(r.empresa)}` : ""}{r.marca ? ` · ${r.marca}` : ""}
-                          {r.nro_factura ? ` · Fac ${r.nro_factura}` : ""}
+                          {r.nro_factura ? ` · Factura ${r.nro_factura}` : ""}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">

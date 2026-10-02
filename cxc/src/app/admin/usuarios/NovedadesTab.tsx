@@ -83,8 +83,8 @@ export default function NovedadesTab() {
               {!tablaLista
                 ? "—"
                 : n.vieron.length === 0
-                  ? "Todavía no la ha leído nadie"
-                  : `${n.vieron.length} ${n.vieron.length === 1 ? "persona la leyó" : "personas la leyeron"}: ${n.vieron.join(", ")}`}
+                  ? "Sin lecturas"
+                  : `Leída por ${n.vieron.length}: ${n.vieron.join(", ")}`}
             </p>
           </li>
         ))}

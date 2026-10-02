@@ -112,7 +112,7 @@ describe("🔴 la palabra 'vencido' no llega a lo que ve el cliente", () => {
     const html = buildResumenHtml(ESTADO.empresas, "American Classics Store");
     expect(html).not.toMatch(PROHIBIDO);
     // …y sigue rotulando por ANTIGÜEDAD, que es lo que reemplaza a "vencido".
-    expect(html).toContain("Más de 90 días");
+    expect(html).toContain("+90 días");
   });
 
   it("🩸 el mensaje de 'Copiar mensaje'/WhatsApp — decía VENCIDO CRITICO en mayúsculas", () => {
@@ -131,16 +131,17 @@ describe("🔴 la palabra 'vencido' no llega a lo que ve el cliente", () => {
     expect(hasta, "se movió el corte del bloque de helpers").toBeGreaterThan(desde);
     const cuerpo = fuente.slice(desde, hasta);
     expect(cuerpo, "el mensaje al cliente volvió a decir 'vencido'").not.toMatch(PROHIBIDO);
-    expect(cuerpo).toContain("Hasta 90 días");
-    expect(cuerpo).toContain("De 91 a 120 días");
-    expect(cuerpo).toContain("Más de 120 días");
+    // 1-oct-2026, Daniel: nombres normales de ERP — un solo formato de rango.
+    expect(cuerpo).toContain("0-90 días");
+    expect(cuerpo).toContain("91-120 días");
+    expect(cuerpo).toContain("+120 días");
   });
 
   it("…y las tres líneas siguen saliendo de current / watch / overdue (ningún tramo se movió)", () => {
     const cuerpo = plano(leer("app/cxc/page.tsx"));
-    expect(cuerpo).toContain("if (client.current > 0) lines.push(`Hasta 90 días: $${fmt(client.current)}`)");
-    expect(cuerpo).toContain("if (client.watch > 0) lines.push(`De 91 a 120 días: $${fmt(client.watch)}`)");
-    expect(cuerpo).toContain("if (client.overdue > 0) lines.push(`Más de 120 días: $${fmt(client.overdue)}`)");
+    expect(cuerpo).toContain("if (client.current > 0) lines.push(`0-90 días: $${fmt(client.current)}`)");
+    expect(cuerpo).toContain("if (client.watch > 0) lines.push(`91-120 días: $${fmt(client.watch)}`)");
+    expect(cuerpo).toContain("if (client.overdue > 0) lines.push(`+120 días: $${fmt(client.overdue)}`)");
   });
 });
 
@@ -259,9 +260,10 @@ describe("los reportes de Exportar no se escriben sus propios rótulos", () => {
 
 describe("⚠️ los tramos y las cifras quedaron intactos", () => {
   it("los tres cortes siguen siendo 0-90 / 91-120 / 121+", () => {
-    expect(AGING.current.colLabel).toBe("0-90d");
-    expect(AGING.watch.colLabel).toBe("91-120d");
-    expect(AGING.overdue.colLabel).toBe("121d+");
+    // 1-oct-2026, Daniel: nombres normales de ERP — la antigüedad va SOLO en rangos.
+    expect(AGING.current.colLabel).toBe("0-90 d");
+    expect(AGING.watch.colLabel).toBe("91-120 d");
+    expect(AGING.overdue.colLabel).toBe("+120 d");
   });
 
   it("los totales del reporte siguen saliendo de current / watch / overdue", () => {

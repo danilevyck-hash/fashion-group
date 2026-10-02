@@ -149,7 +149,7 @@ describe("el motivo: se guarda hoy para la liquidación de mañana", () => {
   it("es obligatorio al dar de baja — media baja no sirve", () => {
     const r = validarVigencia({ fechaSalida: "2026-08-12" });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toContain("por qué salió");
+    if (!r.ok) expect(r.error).toContain("motivo de salida"); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   it("solo los tres del negocio", () => {

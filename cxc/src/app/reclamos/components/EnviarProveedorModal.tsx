@@ -244,7 +244,7 @@ export default function EnviarProveedorModal({
           <div className="flex items-center gap-1">
             <h2 className="text-base font-medium">Enviar al proveedor</h2>
             {/* Qué viaja en el correo se aprende una vez: al ⓘ. */}
-            <Ayuda titulo="Qué se envía" className="-my-2">
+            <Ayuda titulo="Contenido del correo" className="-my-2">
               <p className="mb-1.5">
                 Se adjuntan el Excel, la factura en PDF de cada reclamo y sus fotos.
               </p>

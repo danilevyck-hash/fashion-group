@@ -222,7 +222,7 @@ export default function GuiasConfiguracionView() {
     setErrorAlta(null);
     try {
       await definir(altaCodigo, altaDestino.trim(), parsearTiendas(altaTiendas));
-      setToast("Listo, guardado");
+      setToast("Destino guardado");
       cerrarAlta();
       void cargar(true);
     } catch (err) {
@@ -255,7 +255,7 @@ export default function GuiasConfiguracionView() {
           body: JSON.stringify({ elDeSiempre: true }),
         });
       }
-      setToast("Listo, guardado");
+      setToast("Destino guardado");
       void cargar(true);
     } catch (err) {
       setToast(err instanceof Error ? err.message : "No se pudo guardar. Intenta de nuevo en unos segundos.");
@@ -284,7 +284,7 @@ export default function GuiasConfiguracionView() {
         const b = await res.json().catch(() => ({}));
         throw new Error(b.error ?? "No se pudo guardar. Intenta de nuevo en unos segundos.");
       }
-      setToast("Listo, guardado");
+      setToast("Destino guardado");
       setEditandoId(null);
       void cargar(true);
     } catch (err) {
@@ -313,7 +313,7 @@ export default function GuiasConfiguracionView() {
         const b = await res.json().catch(() => ({}));
         throw new Error(b.error ?? "No se pudo guardar. Intenta de nuevo en unos segundos.");
       }
-      setToast("Listo, guardado");
+      setToast("Destino guardado");
       void cargar(true);
     } catch (err) {
       setToast(err instanceof Error ? err.message : "No se pudo guardar. Intenta de nuevo en unos segundos.");
@@ -333,7 +333,7 @@ export default function GuiasConfiguracionView() {
         const b = await res.json().catch(() => ({}));
         throw new Error(b.error ?? "No se pudo quitar. Intenta de nuevo en unos segundos.");
       }
-      setToast("Listo, quitado");
+      setToast("Destino quitado");
       setAQuitar(null);
       void cargar(true);
     } catch (err) {
@@ -357,8 +357,8 @@ export default function GuiasConfiguracionView() {
               las palabras. */}
           <h2 id="destinos-config-titulo" className="flex items-center gap-1 text-sm font-medium text-gray-900">
             {ROTULO_DONDE_ENTREGA_CADA_CLIENTE}
-            <Ayuda titulo="Qué hace esta lista">
-              <p>Al hacer una guía, el destino marcado «{MARCA_SIEMPRE}» se llena solo al elegir el cliente; los demás salen como botones. Sin ninguno marcado, no se llena nada.</p>
+            <Ayuda titulo="Información">
+              <p>Al hacer una guía, el destino marcado «{MARCA_SIEMPRE}» se completa automáticamente al seleccionar el cliente; los demás aparecen como botones. Sin ninguno marcado, el campo queda vacío.</p>
               <p>El campo Dirección sigue siendo libre: quien quiera puede escribir otra cosa.</p>
               <p>Quitar un destino no borra nada: queda guardado como historial.</p>
             </Ayuda>

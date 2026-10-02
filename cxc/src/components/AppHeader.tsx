@@ -383,7 +383,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
                     recupera el aire que suma el área táctil para que el botón siga
                     alineado con el borde de la fila. */}
                 <BotonCambiarContrasena variante="texto" />
-                <button onClick={() => { handleLogout(); setDrawerOpen(false); }} className="min-h-[44px] min-w-[44px] -mr-2 flex items-center justify-center text-xs text-gray-400 hover:text-red-600 transition">Salir</button>
+                <button onClick={() => { handleLogout(); setDrawerOpen(false); }} className="min-h-[44px] min-w-[44px] -mr-2 flex items-center justify-center text-xs text-gray-400 hover:text-red-600 transition">Cerrar sesión</button>
               </div>
             )}
             {acciones && (
@@ -471,7 +471,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
                   <div className="text-xs text-gray-400">{etiquetaDeRol(userRole)}</div>
                 </div>
                 <BotonCambiarContrasena variante="texto" />
-                <button onClick={() => { handleLogout(); setDrawerOpen(false); }} className="-mr-2 flex min-h-[44px] min-w-[44px] items-center justify-center text-xs text-gray-400 transition hover:text-red-600">Salir</button>
+                <button onClick={() => { handleLogout(); setDrawerOpen(false); }} className="-mr-2 flex min-h-[44px] min-w-[44px] items-center justify-center text-xs text-gray-400 transition hover:text-red-600">Cerrar sesión</button>
               </div>
             )}
           </div>
@@ -591,7 +591,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
                       >
                         <Icon size={18} strokeWidth={1.75} className={`flex-shrink-0 ${tono ? tono.text : "text-gray-400"}`} />
                         <span className="min-w-0 flex-1 truncate">{m.label}</span>
-                        <span className={`flex-shrink-0 text-xs ${aqui ? "text-gray-500" : "text-gray-300"}`}>{aqui ? "aquí" : "›"}</span>
+                        <span className={`flex-shrink-0 text-xs ${aqui ? "text-gray-500" : "text-gray-300"}`}>{aqui ? "Actual" : "›"}</span>
                       </button>
                     );
                   })}
@@ -600,7 +600,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
             ))}
 
             {cuantosModulos(gruposFiltrados) === 0 && (
-              <p className="px-3.5 py-8 text-center text-sm text-gray-500">Ningún módulo se llama así.</p>
+              <p className="px-3.5 py-8 text-center text-sm text-gray-500">Sin resultados</p>
             )}
           </nav>
 
@@ -614,7 +614,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
                 <div className="text-xs text-gray-400">{etiquetaDeRol(userRole)}</div>
               </div>
               <BotonCambiarContrasena variante="texto" />
-              <button onClick={() => { handleLogout(); setDrawerOpen(false); }} className="-mr-2 flex min-h-[44px] min-w-[44px] items-center justify-center text-xs text-gray-400 transition hover:text-red-600">Salir</button>
+              <button onClick={() => { handleLogout(); setDrawerOpen(false); }} className="-mr-2 flex min-h-[44px] min-w-[44px] items-center justify-center text-xs text-gray-400 transition hover:text-red-600">Cerrar sesión</button>
             </div>
           )}
         </div>

@@ -67,7 +67,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (body.origen_pago !== undefined && mov.concepto === CONCEPTO_PAGO) {
     const o = body.origen_pago ?? ORIGEN_POR_DEFECTO;
     if (!esOrigenPago(o)) {
-      return NextResponse.json({ error: "Elige de dónde salió el pago." }, { status: 400 });
+      return NextResponse.json({ error: "Selecciona de dónde salió el pago." }, { status: 400 });
     }
     update.origen_pago = o;
   }

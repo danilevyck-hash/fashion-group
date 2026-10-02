@@ -100,7 +100,7 @@ export async function leerMarcasDeLaQuincena(
   quincena: { desde: string; hasta: string };
   marcas: MarcaDeLaQuincena[];
   /** Lo que se puede deshacer ahora mismo, o `null`. `indice` es qué número de
-   *  marca del día es: de ahí sale su nombre («la vuelta de almuerzo»). */
+   *  marca del día es: de ahí sale su nombre («el regreso de almuerzo»). */
   deshacer: (Deshacible & { id: string; indice: number }) | null;
 }> {
   const quincena = quincenaDeHoy(hoy);

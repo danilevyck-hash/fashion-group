@@ -311,7 +311,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
           disabled={!data}
           className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md bg-black px-3 text-sm text-white transition active:scale-[0.97] disabled:opacity-40"
         >
-          <Download className="h-3.5 w-3.5" /> Descargar el detalle
+          <Download className="h-3.5 w-3.5" /> Descargar detalle
         </button>
         {/* 🔴 UN SOLO botón, y dice «PDF»: de un PDF ya se imprime. */}
         <button
@@ -506,7 +506,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
             </div>
             {/* SE QUEDA: explica por qué la columna del número de recibo
                 viene vacía. Sin eso parece un dato perdido. */}
-            <p className="mt-1 text-xs text-gray-400">El API de Switch no expone el número de recibo.</p>
+            <p className="mt-1 text-xs text-gray-400">Switch no envía el número de recibo.</p>
 
             {/* Suma de las BASES sobre las que se comisiona (no de las comisiones). */}
             <div className="mt-3 flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-900">

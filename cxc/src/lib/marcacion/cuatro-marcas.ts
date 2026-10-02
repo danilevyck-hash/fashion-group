@@ -13,7 +13,7 @@
 // LAS REGLAS, todas de Daniel:
 //
 //   1. 🔴 EL BOTÓN VA SOLO EN ORDEN, COMO EL RELOJ. «Marcar entrada» →
-//      «Marcar salida a almuerzo» → «Marcar vuelta de almuerzo» → «Marcar
+//      «Marcar salida a almuerzo» → «Marcar regreso de almuerzo» → «Marcar
 //      salida», y tras la cuarta queda gris en «Listo por hoy».
 //      🔴 LA PERSONA NUNCA ELIGE CUÁL MARCA ES: la decide el orden del día.
 //      Es la MISMA regla que ya usaba el motor de Asistencia —la primera del
@@ -78,21 +78,21 @@ export const MARCAS_POR_DIA_CUATRO = 4;
 export const ROTULOS_DEL_BOTON = [
   "Marcar entrada",
   "Marcar salida a almuerzo",
-  "Marcar vuelta de almuerzo",
+  "Marcar regreso de almuerzo",
   "Marcar salida",
 ] as const;
 
 /** Cómo se NOMBRA cada marca en una frase: «Deshacer la salida a almuerzo»,
- *  «Listo, se deshizo la vuelta de almuerzo». */
+ *  «Marcación deshecha: regreso de almuerzo». (1-oct-2026, Daniel: nombres normales de ERP: «vuelta» → «regreso».) */
 export const NOMBRES_DE_LA_MARCA = [
   "entrada",
   "salida a almuerzo",
-  "vuelta de almuerzo",
+  "regreso de almuerzo",
   "salida",
 ] as const;
 
 /** El rótulo corto de la pastilla verde, donde el espacio es de un renglón. */
-export const ROTULOS_CORTOS = ["Entrada", "Almuerzo", "Vuelta", "Salida"] as const;
+export const ROTULOS_CORTOS = ["Entrada", "Almuerzo", "Regreso", "Salida"] as const;
 
 /**
  * 🔴 QUÉ MARCAS PIDEN FOTO. La entrada (0) y la salida (3); las dos del
@@ -171,12 +171,14 @@ export function avisoDiaCompleto(): string {
 /** «Deshacer la salida a almuerzo». Con el interruptor apagado dice lo de
  *  siempre («Deshacer la entrada» · «Deshacer la salida»). */
 export function rotuloDeshacerDeLaMarca(indice: number, tipo: TipoMarca): string {
-  return `Deshacer la ${nombreDeLaMarca(indice, tipo)}`;
+  const nombre = nombreDeLaMarca(indice, tipo);
+  // «el regreso de almuerzo» es masculino; las otras tres, femeninas.
+  return `Deshacer ${nombre.startsWith("regreso") ? "el" : "la"} ${nombre}`;
 }
 
-/** «Listo, se deshizo la vuelta de almuerzo. Puedes marcar de nuevo.» */
+/** «Marcación deshecha: regreso de almuerzo. Puedes marcar de nuevo.» */
 export function avisoDeshechaDeLaMarca(indice: number, tipo: TipoMarca): string {
-  return `Listo, se deshizo la ${nombreDeLaMarca(indice, tipo)}. Puedes marcar de nuevo.`;
+  return `Marcación deshecha: ${nombreDeLaMarca(indice, tipo)}. Puedes marcar de nuevo.`;
 }
 
 /**

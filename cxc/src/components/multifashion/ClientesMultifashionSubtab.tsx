@@ -351,7 +351,7 @@ export function ClientesMultifashionSubtab({ selectedYear, mes, periodo }: Clien
             {cobertura.texto && (
               <p className="text-sm text-gray-700">{cobertura.texto}</p>
             )}
-            <p className="mt-0.5 text-xs text-gray-400">Mostrador anónimo va aparte</p>
+            <p className="mt-0.5 text-xs text-gray-400">Excluye consumidor final</p>
           </div>
 
           {/* Fidelización ACS: 4 segmentos (snapshot hoy, independiente del rango) */}
@@ -438,7 +438,7 @@ export function ClientesMultifashionSubtab({ selectedYear, mes, periodo }: Clien
                 <p className="text-sm font-medium text-gray-900">Consumidor final</p>
                 {/* Qué códigos de Switch caen en este bucket es composición: se
                     aprende una vez y no cambia con el período. */}
-                <Ayuda titulo="Qué entra aquí">
+                <Ayuda titulo="Información">
                   Ventas de CONTADO / CONSUMIDOR FINAL, sin cliente identificado.
                 </Ayuda>
               </div>

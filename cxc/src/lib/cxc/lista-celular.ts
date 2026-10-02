@@ -59,18 +59,19 @@ export function textoSinPagarLargo(dias: number | null): string {
  *   2. el que hace rato no paga (la misma regla del aviso, `avisaSinPagar`);
  *   3. plata de 91 a 120 días;
  *   4. cuándo pagó, si hace poco;
- *   5. «al día».
+ *   5. pagó hoy («Último pago: hoy») o, sin pagos registrados, «0-90 días»
+ *      (1-oct-2026, Daniel: nombres normales de ERP — sin «al día»).
  *
  * 🔴 Nunca dice «vencido»: `dias` es la EDAD del documento, no mora. Los rangos
  * son los de `cxc-aging` escritos en palabras, los mismos del papel.
  */
 export function loQueUrge(c: ClienteOrdenable, dias: number | null): string {
-  if (c.total < 0) return "tiene saldo a favor";
-  if (c.overdue > 0) return `${montoExacto(c.overdue)} con más de 120 días`;
+  if (c.total < 0) return "Saldo a favor";
+  if (c.overdue > 0) return `${AGING.overdue.label}: ${montoExacto(c.overdue)}`;
   if (avisaSinPagar(dias)) return textoSinPagarLargo(dias);
-  if (c.watch > 0) return `${montoExacto(c.watch)} con 91 a 120 días`;
-  if (dias !== null && dias > 0) return textoSinPagarLargo(dias);
-  return "al día";
+  if (c.watch > 0) return `${AGING.watch.label}: ${montoExacto(c.watch)}`;
+  if (dias !== null) return textoSinPagarLargo(dias);
+  return AGING.current.label;
 }
 
 /** ¿Este renglón pide atención? (para pintarlo en rojo, no para filtrar). */
@@ -130,14 +131,14 @@ export function totalDeLaPortada(
   return totals.total;
 }
 
-/** «más de 120 días» · «91 a 120 días» · «hasta 90 días» — en palabras. */
+/** «0-90 días» · «91-120 días» · «+120 días» (1-oct-2026, Daniel: nombres normales de ERP). */
 export function rangoEnPalabras(k: AgingKey): string {
-  return k === "overdue" ? "más de 120 días" : k === "watch" ? "91 a 120 días" : "hasta 90 días";
+  return AGING[k].label;
 }
 
-/** El rótulo corto del chip («0–90» · «91–120» · «más de 120»). */
+/** El rótulo corto del chip («0-90 d» · «91-120 d» · «+120 d»), el mismo de la computadora. */
 export function chipCorto(k: AgingKey): string {
-  return k === "overdue" ? "más de 120" : AGING[k].colLabel.replace("-", "–");
+  return AGING[k].colLabel;
 }
 
 /**

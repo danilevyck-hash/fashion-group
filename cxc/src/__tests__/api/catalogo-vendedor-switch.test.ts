@@ -127,7 +127,7 @@ describe("parsearVendedorSwitchId", () => {
     // es una operación que exista.
     const r = parsearVendedorSwitchId(null);
     expect(r.ok).toBe(false);
-    expect(r.ok === false && r.error).toContain("Elige el vendedor");
+    expect(r.ok === false && r.error).toContain("Selecciona el vendedor");
   });
 
   it("rechaza 0, negativos, decimales y basura", () => {

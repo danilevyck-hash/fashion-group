@@ -80,7 +80,7 @@ describe("Reebok — Salida A (pedido cliente)", () => {
     const aoa = buildCatalogoAoa(buildCatalogo(items, CFG), "JULIO");
     expect(aoa[0]).toEqual([
       "PO NAME", "New Article", "Name", "Department", "CATEGORY", "AGE GROUP", "GENDER",
-      "Precio A", "Precio B", "Piezas JULIO",
+      "Precio A", "Precio B", "Cantidad JULIO", // 1-oct-2026, Daniel: nombres normales de ERP
     ]);
     expect(aoa[0]).not.toContain("WholesalePrice");
     expect(aoa[0]).not.toContain("Costo");

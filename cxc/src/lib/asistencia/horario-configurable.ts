@@ -303,7 +303,7 @@ export function validarHoraOpcional(v: unknown, que: string): Resultado<string |
 export function validarDiasLaborables(v: unknown): Resultado<number[] | null> {
   if (v === undefined) return { ok: true, valor: null };
   if (v === null || (Array.isArray(v) && v.length === 0)) return { ok: true, valor: null };
-  if (!Array.isArray(v)) return { ok: false, error: "Elige los días que trabaja." };
+  if (!Array.isArray(v)) return { ok: false, error: "Selecciona los días que trabaja." };
   return { ok: true, valor: normalizarDiasLaborables(v) };
 }
 

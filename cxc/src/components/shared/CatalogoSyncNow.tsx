@@ -114,7 +114,7 @@ export default function CatalogoSyncNow({ catalogo, onSuccess, className }: Cata
       // queda en "Actualizando…" y se resuelve solo cuando el sync terminó.
       const r = await syncConEnganche({ modulo });
       if (r.tipo === "ok") {
-        showToast(r.resumen ? `Listo, actualizado. ${r.resumen}` : "Listo, actualizado", false);
+        showToast(r.resumen ? `Catálogo actualizado. ${r.resumen}` : "Catálogo actualizado", false);
         await fetchStatus();
         await onSuccess?.();
       } else if (r.tipo === "fresco") {

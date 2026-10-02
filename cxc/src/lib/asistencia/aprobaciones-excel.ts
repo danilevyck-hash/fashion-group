@@ -47,8 +47,8 @@ const COLUMNAS: ReportColumn[] = [
   // 🔴 Sí / No / Pendiente (10-sep-2026): «Sin aprobar» no distingue a quien
   // dijo «No» de quien todavía no miró, y esa diferencia es toda la pestaña.
   { header: "Decisión", wch: 11, align: "center" },
-  { header: "Aprobó", wch: 16 },
-  { header: "Cuándo", wch: 12, align: "center" },
+  { header: "Aprobado por", wch: 16 },
+  { header: "Fecha de aprobación", wch: 14, align: "center" },
 ];
 
 /** «2026-08-27T15:19:15.158+00:00» → «2026-08-27». Vacío si no hay dato. */

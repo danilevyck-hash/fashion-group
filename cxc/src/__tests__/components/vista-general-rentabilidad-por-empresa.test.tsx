@@ -144,7 +144,7 @@ describe("🔴 ningún número junta dos empresas", () => {
   it("la sección DICE que no hay total del grupo", () => {
     // No es decoración: sin la frase, alguien suma las filas de cabeza.
     pintar();
-    expect(screen.getByText(/No hay un total del grupo/i)).toBeTruthy();
+    expect(screen.getByText(/Sin total consolidado/i)).toBeTruthy(); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   it("y se llama por lo que es, no 'Semáforo' (jerga que nadie busca)", () => {

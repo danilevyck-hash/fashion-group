@@ -87,7 +87,7 @@ describe("lo que se lee en pantalla", () => {
   });
 
   it("la tira dice cuántos son y con qué umbral", () => {
-    expect(rotuloSinPagar(37)).toBe("37 sin pagar hace +90 d");
+    expect(rotuloSinPagar(37)).toBe("37 sin pago en +90 días");
   });
 
   it("sin ninguno, la misma celda vuelve a contar clientes (singular y plural)", () => {

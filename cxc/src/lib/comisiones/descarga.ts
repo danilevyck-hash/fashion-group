@@ -123,15 +123,15 @@ export function tituloDescarga(
  * MATRIZ, que existe igual para el año. Daniel: *«Los paso a PDF también, para
  * que todo el módulo se comporte igual»*.
  *
- * 🔴 EL «EL MES» / «EL AÑO» SIGUE SALIENDO DE UN SOLO LUGAR: los dos rótulos le
- * pegan « en PDF» o « en Excel» al que ya existía (`rotuloDescargarPeriodo`).
- * Escribir de nuevo esas dos palabras acá es cómo se llega a que un botón diga
- * «el mes» y el de al lado «este mes».
+ * 🔴 «DEL MES» / «DEL AÑO» SIGUE SALIENDO DE UN SOLO LUGAR (`rotuloDescargarPeriodo`):
+ * «Descargar PDF del mes» (1-oct-2026, Daniel: nombres normales de ERP).
+ * Escribir de nuevo esas palabras acá es cómo se llega a que un botón diga
+ * «del mes» y el de al lado «este mes».
  */
 export function rotuloDescargarPdf(mes: number): string {
-  return `${rotuloDescargarPeriodo(mes)} en PDF`;
+  return rotuloDescargarPeriodo(mes, "PDF");
 }
 
 export function rotuloDescargarExcel(mes: number): string {
-  return `${rotuloDescargarPeriodo(mes)} en Excel`;
+  return rotuloDescargarPeriodo(mes, "Excel");
 }

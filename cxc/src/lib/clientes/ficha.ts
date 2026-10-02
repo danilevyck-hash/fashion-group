@@ -9,7 +9,7 @@
 // admin, secretaria y vendedor).
 //
 // 🔴 UN CERO GRANDE SE LEE COMO DATO ROTO. Cuando un dato no existe, la tarjeta
-// lo dice EN PALABRAS («Sin comprar en 2026», «Nunca ha pagado»), nunca
+// lo dice EN PALABRAS («Sin compras en 2026», «Nunca ha pagado»), nunca
 // `$0.00` en letra grande. Es la regla que dio origen a este módulo: todas las
 // tarjetas salen de acá para que ninguna se olvide de aplicarla.
 //
@@ -21,7 +21,7 @@
 // Las notas de crédito RESTAN —es el invariante de Ventas— así que el cero es
 // CORRECTO, no un defecto de la vista. Por eso `estadoDeCompras` distingue
 // «nunca compró» de «compró y se le devolvió todo»: son dos verdades distintas
-// y decir «Sin comprar en 2026» de un cliente al que se le facturaron $21.826
+// y decir «Sin compras en 2026» de un cliente al que se le facturaron $21.826
 // y se le acreditaron $21.826 esconde la mitad de la historia.
 //
 // PURO: nada de `new Date()` adentro, nada de Supabase. Los candados fijan las
@@ -147,8 +147,8 @@ export function tarjetaComproDelAnio(
       estado === "compro"
         ? null
         : estado === "devuelto"
-          ? `Compró ${dinero(bruto)} y se le acreditó todo`
-          : `Sin comprar en ${anio}`,
+          ? `Facturado ${dinero(bruto)} · 100% en notas de crédito`
+          : `Sin compras en ${anio}`,
     delta: delta != null ? `${dineroConSigno(delta)} vs ${anio - 1}` : null,
     tendencia: delta == null || delta === 0 ? null : delta > 0 ? "sube" : "baja",
   };
@@ -157,7 +157,7 @@ export function tarjetaComproDelAnio(
 export interface TarjetaDebe {
   monto: number | null;
   frase: string | null;
-  /** «el 38% de lo que te compró», o `null`. */
+  /** «38% de las compras del año», o `null`. */
   proporcion: string | null;
 }
 
@@ -186,7 +186,7 @@ export function tarjetaDebe(saldo: number, comprasDelAnio: number): TarjetaDebe 
     frase: null,
     proporcion:
       comprasDelAnio > 0
-        ? `el ${porcentajeEntero(saldo / comprasDelAnio)} de lo que te compró`
+        ? `${porcentajeEntero(saldo / comprasDelAnio)} de las compras del año`
         : null,
   };
 }

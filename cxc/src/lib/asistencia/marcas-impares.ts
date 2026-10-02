@@ -323,7 +323,7 @@ export function textoFrenoMarcasImpares(
     `${quien} (${partes.join(" y ")}): ${detalle}. `
     + `Un día se marca de a pares —entra y sale— y nunca pasa de ${MARCAS_MAXIMO} marcaciones. `
     + "Ve a la pestaña «Asistencia», abre al colaborador y toca la hora: pon la que falta con «Agregar hora», "
-    + "o abre la que sobra y elige «Quitar esta marcación». Después vuelve a cerrar. "
+    + "o abre la que sobra y selecciona «Quitar esta marcación». Después vuelve a cerrar. "
     + "Si se cierra así, el sistema lee como salida una marca que no lo es y descuenta horas que la persona sí trabajó."
   );
 }

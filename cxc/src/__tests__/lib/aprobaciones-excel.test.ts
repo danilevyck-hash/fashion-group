@@ -67,7 +67,8 @@ describe("la hoja", () => {
     expect(filas[0]).toEqual([
       "Colaborador", "Código", "Empresa", "Fecha", "Salida",
       "Extra 1.25 (min)", "Extra 1.50 (min)", "Total (min)",
-      "Estado", "Decisión", "Aprobó", "Cuándo",
+      // 1-oct-2026, Daniel: nombres normales de ERP («Aprobó · Cuándo» → «Aprobado por · Fecha de aprobación»).
+      "Estado", "Decisión", "Aprobado por", "Fecha de aprobación",
     ]);
   });
 

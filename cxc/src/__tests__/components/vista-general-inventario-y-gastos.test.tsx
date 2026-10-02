@@ -144,7 +144,7 @@ describe("🔴 lo que quedó sin valorizar se dice, no se suma como cero", () =>
   it("las 873 piezas sin costo salen en pantalla", () => {
     render(<InventarioPorEmpresa inv={INV} />);
     const t = document.querySelector('[data-col="sin-costo"]')!.textContent!;
-    expect(t).toContain("873 piezas");
+    expect(t).toContain("873 unidades"); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(t).toContain("7 artículos");
     expect(t).toContain("no tienen costo cargado");
   });
@@ -190,7 +190,7 @@ const GASTOS: GastosData = {
     { key: "vistana", name: "Vistana International", gasto: 100_000, motivo: null, texto: null, ultimoMesCerrado: "2026-07" },
     { key: "fashion_wear", name: "Fashion Wear", gasto: 200_000, motivo: null, texto: null, ultimoMesCerrado: "2026-07" },
     { key: "fashion_shoes", name: "Fashion Shoes", gasto: null, motivo: "sin_movimientos", texto: "Los gastos de esta empresa llegan hasta abril 2026.", ultimoMesCerrado: "2026-04" },
-    { key: "active_wear", name: "Active Wear", gasto: null, motivo: "sin_gasto", texto: "Este mes salió plata, pero nada de eso quedó registrado como gasto.", ultimoMesCerrado: "2026-04" },
+    { key: "active_wear", name: "Active Wear", gasto: null, motivo: "sin_gasto", texto: "Hay egresos este mes, pero ninguno es gasto.", ultimoMesCerrado: "2026-04" },
     { key: "confecciones_boston", name: "Confecciones Boston", gasto: null, motivo: "no_automatico", texto: "Los gastos de esta empresa no se traen solos de Switch, así que todavía no hay nada.", ultimoMesCerrado: null },
   ],
 };
@@ -212,7 +212,7 @@ describe("🔴 el gasto es POR EMPRESA y no existe ningún número que las junte
 
   it("y la pantalla DICE que no hay total, para que nadie lo sume de cabeza", () => {
     render(<GastosPorEmpresa gastos={GASTOS} mes="2026-08" />);
-    expect(textoPintado()).toContain("no hay un total");
+    expect(textoPintado()).toContain("Sin total consolidado"); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 });
 
@@ -222,7 +222,7 @@ describe("🩸 a la empresa sin gasto NO se le pinta $0: se le pinta el MOTIVO",
 
     const shoes = document.querySelector('[data-fila-gasto="fashion_shoes"]')!;
     expect(shoes.querySelector('[data-col="gasto"]')).toBeNull();
-    expect(shoes.querySelector('[data-col="sin-gasto"]')!.textContent).toBe("Sin cargar");
+    expect(shoes.querySelector('[data-col="sin-gasto"]')!.textContent).toBe("Sin movimientos"); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(shoes.textContent).toContain("llegan hasta abril 2026");
     expect(shoes.textContent).not.toContain("$0");
 
@@ -239,8 +239,8 @@ describe("🩸 a la empresa sin gasto NO se le pinta $0: se le pinta el MOTIVO",
     render(<GastosPorEmpresa gastos={GASTOS} mes="2026-08" />);
     const aw = document.querySelector('[data-fila-gasto="active_wear"]')!;
     expect(aw.querySelector('[data-col="gasto"]')).toBeNull();
-    expect(aw.querySelector('[data-col="sin-gasto"]')!.textContent).toBe("Nada es gasto");
-    expect(aw.textContent).toContain("nada de eso quedó registrado como gasto");
+    expect(aw.querySelector('[data-col="sin-gasto"]')!.textContent).toBe("Sin gastos"); // 1-oct-2026, Daniel: nombres normales de ERP
+    expect(aw.textContent).toContain("pero ninguno es gasto");
     expect(aw.textContent).not.toContain("$0");
   });
 
@@ -253,8 +253,9 @@ describe("🩸 a la empresa sin gasto NO se le pinta $0: se le pinta el MOTIVO",
     // Sin esto, "gastos" es ambiguo: ¿lo que la contadora cerró o lo que salió
     // del banco? Y el reporte trae TODO lo que sale, no sólo el gasto.
     render(<GastosPorEmpresa gastos={GASTOS} mes="2026-08" />);
-    expect(textoPintado()).toContain("Lo que salió de caja y banco");
-    expect(textoPintado()).toContain("sin contar transferencias ni préstamos");
+    // 1-oct-2026, Daniel: nombres normales de ERP — misma bajada, en palabras de ERP.
+    expect(textoPintado()).toContain("Egresos de caja y banco");
+    expect(textoPintado()).toContain("sin transferencias ni préstamos");
   });
 
   it("🔴 el vocabulario del MAYOR no aparece por ningún lado", () => {

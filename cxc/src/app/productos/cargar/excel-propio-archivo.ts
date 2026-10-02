@@ -72,14 +72,14 @@ export async function analizarLibro(file: File): Promise<AnalisisLibro> {
 
   const wb = await zip.file("xl/workbook.xml")?.async("string");
   const rels = await zip.file("xl/_rels/workbook.xml.rels")?.async("string");
-  if (!wb || !rels) throw new Error("No pude leer el archivo. ¿Seguro que es un Excel (.xlsx o .xlsm)?");
+  if (!wb || !rels) throw new Error("No se pudo leer el archivo. ¿Seguro que es un Excel (.xlsx o .xlsm)?");
 
   const hojas = resolverHojas(wb, rels);
   const hoja = hojas[0];
   if (!hoja) throw new Error("El archivo no tiene ninguna hoja.");
 
   const sheetXml = await zip.file(hoja.ruta)?.async("string");
-  if (!sheetXml) throw new Error("No pude leer la hoja del archivo.");
+  if (!sheetXml) throw new Error("No se pudo leer la hoja del archivo.");
   const sst = leerSharedStrings(await zip.file("xl/sharedStrings.xml")?.async("string"));
 
   return {
@@ -111,7 +111,7 @@ export async function armarLibroConFotos(
   const zip = await JSZip.loadAsync(analisis.bytes);
 
   const sheetXml = await zip.file(analisis.hoja.ruta)?.async("string");
-  if (!sheetXml) throw new Error("No pude leer la hoja del archivo.");
+  if (!sheetXml) throw new Error("No se pudo leer la hoja del archivo.");
   zip.file(analisis.hoja.ruta, escribirColumnaFoto(sheetXml, plan));
 
   const conColumna = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });

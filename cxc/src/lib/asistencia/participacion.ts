@@ -58,13 +58,14 @@ import type { Resultado } from "./config";
 // LAS PALABRAS — en español simple, las de Daniel
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** El rótulo de la opción normal. */
-export const ETIQUETA_EN_PLANILLA = "Va en la planilla";
-/** El rótulo de la otra. Son las palabras de Daniel, sin jerga. */
-export const ETIQUETA_SERVICIO_PROFESIONAL = "Servicio profesional";
+/** El rótulo de la opción normal. Solo texto: la base guarda lo mismo. */
+export const ETIQUETA_EN_PLANILLA = "Sí";
+/** El rótulo de la otra. */
+export const ETIQUETA_SERVICIO_PROFESIONAL = "No, servicio profesional";
 
-/** Cómo se pregunta en la ficha. */
-export const PREGUNTA_PARTICIPACION = "¿Se le paga por planilla?";
+/** El rótulo en la ficha. 1-oct-2026, Daniel: nombres normales de ERP (antes «¿Se le paga por planilla?»,
+ *  opciones «Va en la planilla / Servicio profesional»). */
+export const PREGUNTA_PARTICIPACION = "Pago por planilla";
 
 /**
  * Qué significa, dicho una sola vez y usado en los tres lugares donde hace
@@ -126,7 +127,7 @@ export function validarServicioProfesional(body: unknown): Resultado<boolean> {
   if (v === "true" || v === "false") return { ok: true, valor: v === "true" };
   return {
     ok: false,
-    error: "Elige si va en la planilla o si es servicio profesional.",
+    error: "Selecciona si va en la planilla o si es servicio profesional.",
   };
 }
 

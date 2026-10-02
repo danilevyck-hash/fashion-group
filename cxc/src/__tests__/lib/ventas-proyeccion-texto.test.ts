@@ -101,12 +101,12 @@ describe("buildSlotsProyeccion", () => {
   it("escritorio lleva los 3 números que sostienen la frase", () => {
     const s = buildSlotsProyeccion(estacional, 2025, { fechaCorte: "2026-07-26" });
     expect(s.map(x => x.key)).toEqual(["ytd", "cierre", "cierre-prev"]);
-    expect(s[0].label).toBe("Vas al 26 jul");
+    expect(s[0].label).toBe("Acumulado al 26 jul");
     expect(s[0].valor).toBe("$1.20M");
     expect(s[0].delta).toBe("+20%");
     expect(s[1].valor).toBe("$2.13M");
     expect(s[1].destacado).toBe(true);
-    expect(s[2].label).toBe("Cerró 2025");
+    expect(s[2].label).toBe("Cierre 2025");
   });
 
   it("no hay slot con el nombre del método: en 1440px truncaba la frase", () => {

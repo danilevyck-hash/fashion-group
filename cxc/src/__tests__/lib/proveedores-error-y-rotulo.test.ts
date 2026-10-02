@@ -84,7 +84,7 @@ describe("🔴 una lectura que falla se dice y se puede reintentar", () => {
   });
 
   it("CONTROL: el vacío de verdad sigue diciendo lo suyo", () => {
-    expect(VISTA).toContain("No hay datos sincronizados aún.");
+    expect(VISTA).toContain("Sin datos recibidos de Switch."); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   it("el botón de reintentar se toca en 44 px", () => {

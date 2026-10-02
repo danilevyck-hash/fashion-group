@@ -158,7 +158,7 @@ export function ResumenViewMobile({
         options={MODO_OPCIONES}
         active={viewMode}
         onChange={setViewMode}
-        ariaLabel="Qué mostrar"
+        ariaLabel="Indicador"
       />
       <MobileTarjetas
         data={data}

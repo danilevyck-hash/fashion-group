@@ -905,8 +905,8 @@ const REEBOK: MarcaTheme = {
   admin: {
     titulo: "Administrar",
     subtituloSync: (lastSync) => {
-      const rel = relativo(lastSync);
-      return `Última sincronización: ${rel} · 1×/día`;
+      if (!lastSync) return "Sin actualizar · 1×/día";
+      return `Actualizado ${relativo(lastSync)} · 1×/día`; // 1-oct-2026, Daniel: nombres normales de ERP
     },
     productsUrl: "/api/catalogo/reebok/products?scope=admin",
     excelSinFoto: async (sin) => {
@@ -1206,9 +1206,9 @@ const JOYBEES: MarcaTheme = {
   admin: {
     titulo: "Administrar",
     subtituloSync: (lastSync) =>
-      `Se llena solo desde Switch por existencia · tú solo subes fotos${
+      `Productos con existencia en Switch${
         lastSync
-          ? ` · última sincronización: ${new Date(lastSync).toLocaleString("es-PA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
+          ? ` · Actualizado el ${new Date(lastSync).toLocaleString("es-PA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
           : ""
       }`,
     productsUrl: "/api/catalogo/joybees/products",
@@ -1540,9 +1540,9 @@ const TOMMY: MarcaTheme = {
   admin: {
     titulo: "Administrar",
     subtituloSync: (lastSync) =>
-      `Se llena solo desde Switch por existencia · tú solo subes fotos${
+      `Productos con existencia en Switch${
         lastSync
-          ? ` · última sincronización: ${new Date(lastSync).toLocaleString("es-PA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
+          ? ` · Actualizado el ${new Date(lastSync).toLocaleString("es-PA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
           : ""
       }`,
     productsUrl: "/api/catalogo/tommy/products",
@@ -1872,9 +1872,9 @@ const CALVIN: MarcaTheme = {
   admin: {
     titulo: "Administrar",
     subtituloSync: (lastSync) =>
-      `Se llena solo desde Switch por existencia · tú solo subes fotos${
+      `Productos con existencia en Switch${
         lastSync
-          ? ` · última sincronización: ${new Date(lastSync).toLocaleString("es-PA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
+          ? ` · Actualizado el ${new Date(lastSync).toLocaleString("es-PA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
           : ""
       }`,
     productsUrl: "/api/catalogo/calvin/products",

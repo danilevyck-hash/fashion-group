@@ -38,8 +38,8 @@ const COLUMNS: ReportColumn[] = [
   { header: "Empresa / Proveedor", wch: 38 },
   ...TRAMOS.map((t): ReportColumn => ({ header: t.label, wch: 14, align: "right", fmt: MONEY_FMT })),
   { header: "Por pagar", wch: 15, align: "right", fmt: MONEY_FMT },
-  { header: "Le debes", wch: 14, align: "right", fmt: MONEY_FMT },
-  { header: "Tienes a favor", wch: 14, align: "right", fmt: MONEY_FMT },
+  { header: "Pendiente", wch: 14, align: "right", fmt: MONEY_FMT },
+  { header: "Saldo a favor", wch: 14, align: "right", fmt: MONEY_FMT },
   { header: "Último pago", wch: 13, align: "right" },
   { header: "También en", wch: 34 },
 ];

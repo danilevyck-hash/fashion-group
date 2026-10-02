@@ -193,7 +193,7 @@ export default function MobiliarioCelular({
         valor={String(piezasEnBodega)}
         detalle={
           <>
-            piezas en bodega · <b className="text-gray-900">{montoCelular(metricas.enBodega)}</b>
+            unidades disponibles · <b className="text-gray-900">{montoCelular(metricas.enBodega)}</b>
           </>
         }
       />

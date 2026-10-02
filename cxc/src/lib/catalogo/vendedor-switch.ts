@@ -112,7 +112,7 @@ export function _resetCacheVendedores(): void {
 export function parsearVendedorSwitchId(
   valor: unknown,
 ): { ok: true; id: number } | { ok: false; error: string } {
-  if (valor == null) return { ok: false, error: "Elige el vendedor del pedido" };
+  if (valor == null) return { ok: false, error: "Selecciona el vendedor del pedido" };
   const n = Number(valor);
   if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) {
     return { ok: false, error: "vendedorSwitchId inválido" };

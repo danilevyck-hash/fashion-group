@@ -527,7 +527,7 @@ export default function PuertaGasto({
               {tipo === "impulsadora" && (
                 <div>
                   <div className="text-sm font-medium text-gray-700 mb-1">
-                    ¿A quién le pagas?<span className="text-red-500 ml-0.5">*</span>
+                    Beneficiario<span className="text-red-500 ml-0.5">*</span>
                   </div>
                   {impulsadoras === null ? (
                     <div className="h-11 rounded-md bg-gray-100 animate-pulse" />

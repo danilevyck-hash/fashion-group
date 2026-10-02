@@ -131,7 +131,7 @@ export function TasasPorVendedor({ onSaved }: { onSaved: (msg: string) => void }
         const b = await res.json().catch(() => ({}));
         throw new Error(b.error ?? `HTTP ${res.status}`);
       }
-      onSaved("Listo, guardado");
+      onSaved("Tasa guardada");
       void load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar. Intenta de nuevo.");
@@ -162,7 +162,7 @@ export function TasasPorVendedor({ onSaved }: { onSaved: (msg: string) => void }
         <div className="py-10 text-center text-sm text-gray-500">Cargando…</div>
       ) : rows.length === 0 ? (
         <div className="py-10 text-center text-sm text-gray-500">
-          Aún no hay vendedores. Aparecerán tras el próximo sync de Switch.
+          Sin vendedores. Se cargan con la próxima actualización de Switch.
         </div>
       ) : (
         <div className="overflow-x-auto">

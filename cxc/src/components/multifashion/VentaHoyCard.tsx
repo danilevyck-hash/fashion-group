@@ -125,7 +125,7 @@ export function VentaHoyCard({ syncTick = 0, habilitado = true }: VentaHoyCardPr
   const sinFrescura = data.sync.estado === "sin_dato";
   const alerta = rezagado || sinFrescura;
   const frescura = sinFrescura
-    ? "no pudimos confirmar cuándo se actualizó"
+    ? "Sin hora de actualización"
     : rezagado
       ? `sin actualizar desde las ${horaSync(data.sync.ultimo as string, data.fecha)}`
       : horaSync(data.sync.ultimo as string, data.fecha);

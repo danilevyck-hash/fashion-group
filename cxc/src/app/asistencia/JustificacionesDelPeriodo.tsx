@@ -81,7 +81,7 @@ export default function JustificacionesDelPeriodo({ desde, hasta, empresa = "", 
         method: "DELETE",
       });
       if (!r.ok) throw new Error("");
-      toast("Listo, quitada", "success");
+      toast("Justificación quitada", "success");
       await leer();
     } catch {
       toast("No se pudo quitar. Intenta de nuevo.", "error");

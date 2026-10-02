@@ -80,9 +80,9 @@ export function mensajeBoston(c: ClienteCobrarBoston): string {
     `Estado de cuenta - ${c.nombre}`,
     "",
   ];
-  if (c.d0_90 > 0) lineas.push(`Hasta 90 días: $${fmt(c.d0_90)}`);
-  if (c.d91_120 > 0) lineas.push(`De 91 a 120 días: $${fmt(c.d91_120)}`);
-  if (c.d121_plus > 0) lineas.push(`Más de 120 días: $${fmt(c.d121_plus)}`);
+  if (c.d0_90 > 0) lineas.push(`0-90 días: $${fmt(c.d0_90)}`);
+  if (c.d91_120 > 0) lineas.push(`91-120 días: $${fmt(c.d91_120)}`);
+  if (c.d121_plus > 0) lineas.push(`+120 días: $${fmt(c.d121_plus)}`);
   lineas.push(`Total: $${fmt(c.total)}`);
   lineas.push("");
   lineas.push("Agradecemos su pronta atención a este saldo. Quedamos a su disposición para cualquier consulta.");
@@ -223,7 +223,6 @@ export default function BostonHojaCobrar({
                 className="w-full text-left px-4 py-3 min-h-[44px] transition hover:bg-gray-50"
               >
                 <span className="block text-sm font-medium text-gray-900">Copiar mensaje</span>
-                <span className="block text-xs text-gray-500 mt-0.5">Para pegarlo donde quieras</span>
               </button>
             </li>
             <li>

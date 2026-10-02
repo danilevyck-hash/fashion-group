@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       // 🔴 SE DICE POR SU NOMBRE. Con cuatro marcas, la segunda es «la salida a
-      // almuerzo» y la tercera «la vuelta de almuerzo»; con el interruptor
+      // almuerzo» y la tercera «el regreso de almuerzo»; con el interruptor
       // apagado, «la entrada» o «la salida» como siempre.
       aviso: avisoDeshechaDeLaMarca(deshacer.indice, deshacer.tipo),
       ...(await armarEstadoDeLaPantalla(codigo, nombre)),

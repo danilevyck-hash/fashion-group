@@ -150,7 +150,7 @@ export default function FichaTiendaCelular({
           <button
             type="button"
             onClick={onRegistrarGasto}
-            aria-label="Registrar un gasto"
+            aria-label="Registrar gasto"
             className="grid h-11 w-11 place-items-center rounded-full text-[30px] font-light leading-none text-blue-600 active:opacity-60"
           >
             ＋

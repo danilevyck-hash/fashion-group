@@ -86,7 +86,7 @@ export default function SeccionPrestamos({ codigo, refresco }: { codigo: string;
           ))}
         </dl>
       ) : (
-        listo && <Vacio texto="Sin nada pendiente." />
+        listo && <Vacio texto="Sin saldo." />
       )}
 
       <div className="mt-3 flex flex-wrap gap-2">

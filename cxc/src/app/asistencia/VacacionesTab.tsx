@@ -104,7 +104,7 @@ export default function VacacionesTab() {
   const elegido = codigo ? (corresponden.find((s) => s.codigo === codigo) ?? null) : null;
 
   async function agregar() {
-    if (!codigo) return toast("Elige al colaborador", "error");
+    if (!codigo) return toast("Selecciona el colaborador", "error");
     if (hasta < desde) return toast("La fecha final es anterior a la inicial", "error");
     setGuardando(true);
     try {
@@ -115,7 +115,7 @@ export default function VacacionesTab() {
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "No se pudo guardar");
-      toast("Listo, guardado", "success");
+      toast("Vacaciones guardadas", "success");
       setCodigo("");
       setYaPagadas(false);
       await cargar();

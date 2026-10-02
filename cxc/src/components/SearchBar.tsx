@@ -444,13 +444,13 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
           {loading && <div className="flex justify-center py-8"><div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" /></div>}
           {!loading && searched && items.length === 0 && !quickAction && (
             <div className="text-center py-8">
-              <p className="text-sm text-gray-400">No encontramos nada para &ldquo;{query}&rdquo;</p>
+              <p className="text-sm text-gray-400">Sin resultados para &laquo;{query}&raquo;</p>
               {(() => {
                 const suggestions = getModuleSuggestions(query, visibleHrefs);
                 if (suggestions.length === 0) return null;
                 return (
                   <div className="mt-4">
-                    <p className="text-xs text-gray-400 mb-2">Tal vez buscas en:</p>
+                    <p className="text-xs text-gray-400 mb-2">Ir a:</p>
                     <div className="flex flex-wrap justify-center gap-2">
                       {suggestions.map(s => (
                         <button key={s.href} onClick={() => { router.push(s.href); onClose?.(); }} className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-black transition">
@@ -599,13 +599,13 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
             </div>
           ) : (
             <div className="px-4 py-6 text-center">
-              <p className="text-sm text-gray-400">No encontramos nada para &quot;{query}&quot;</p>
+              <p className="text-sm text-gray-400">Sin resultados para &laquo;{query}&raquo;</p>
               {(() => {
                 const suggestions = getModuleSuggestions(query, visibleHrefs);
                 if (suggestions.length === 0) return null;
                 return (
                   <div className="mt-3">
-                    <p className="text-xs text-gray-400 mb-2">Tal vez buscas en:</p>
+                    <p className="text-xs text-gray-400 mb-2">Ir a:</p>
                     <div className="flex flex-wrap justify-center gap-1.5">
                       {suggestions.map(s => (
                         <button key={s.href} onClick={() => navigate({ module: s.label, label: s.label, sub: "", href: s.href, icon: "" })} className="text-xs px-2.5 py-1 rounded-full border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-black transition">

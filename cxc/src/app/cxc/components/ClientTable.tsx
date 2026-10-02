@@ -142,14 +142,14 @@ export default function ClientTable({
               Cliente{sortArrow("name")}
             </span>
           </div>
-          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Por vencer (0-90d) · clic para ordenar la lista sin filtrarla" onClick={() => toggleSort("current")}>
-            0-90d{sortArrow("current")}
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="0-90 días · clic para ordenar la lista sin filtrarla" onClick={() => toggleSort("current")}>
+            0-90 d{sortArrow("current")}
           </div>
-          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Vencido reciente (91-120d) · clic para ordenar la lista sin filtrarla" onClick={() => toggleSort("watch")}>
-            91-120d{sortArrow("watch")}
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="91-120 días · clic para ordenar la lista sin filtrarla" onClick={() => toggleSort("watch")}>
+            91-120 d{sortArrow("watch")}
           </div>
-          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition font-semibold text-gray-600" data-tooltip="Vencido crítico (+120d) · clic para ordenar la lista sin filtrarla" onClick={() => toggleSort("overdue")}>
-            121d+{sortArrow("overdue")}
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition font-semibold text-gray-600" data-tooltip="+120 días · clic para ordenar la lista sin filtrarla" onClick={() => toggleSort("overdue")}>
+            +120 d{sortArrow("overdue")}
           </div>
           <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Saldo total · clic para ordenar la lista sin filtrarla" onClick={() => toggleSort("total")}>
             Total{sortArrow("total")}

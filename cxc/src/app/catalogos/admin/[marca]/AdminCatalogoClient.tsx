@@ -59,8 +59,8 @@ interface VariantesResp {
 /** Opciones del filtro de bulto. Los dos tamaños que existen en el negocio. */
 const BULTO_FILTRO_OPCIONES = [
   { value: "", label: "Todos" },
-  { value: "12", label: "12 piezas" },
-  { value: "8", label: "8 piezas" },
+  { value: "12", label: "Bulto de 12" },
+  { value: "8", label: "Bulto de 8" },
 ];
 
 const ADMIN_SWR_OPTS = { dedupingInterval: 60_000, revalidateOnFocus: true } as const;

@@ -153,7 +153,7 @@ export async function resolvePublicoSwitchActor(
   if (vendedorId == null) {
     return {
       ok: false,
-      motivo: `No se encontró el vendedor ${NOMBRE_VENDEDOR_DEFAULT} de ${empresaKey} — asignarlo en ${TABLA_OVERRIDE} o correr el sync de vendedores`,
+      motivo: `No se encontró el vendedor ${NOMBRE_VENDEDOR_DEFAULT} de ${empresaKey} — asignarlo en ${TABLA_OVERRIDE} o correr la actualización de vendedores`,
     };
   }
 

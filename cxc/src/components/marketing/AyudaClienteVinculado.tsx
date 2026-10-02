@@ -12,7 +12,7 @@ export function AyudaClienteVinculado() {
   return (
     <Ayuda titulo="Cómo se guarda el cliente" className="-my-2">
       <p>
-        Elige del directorio para vincular; si no está, se guarda como texto (sin vincular).
+        Selecciona del directorio para vincular; si no está, se guarda como texto (sin vincular).
       </p>
     </Ayuda>
   );

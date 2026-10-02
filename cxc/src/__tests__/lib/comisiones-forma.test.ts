@@ -474,8 +474,8 @@ describe("🔴 18 · se fue el renglón que decía que no hay nada que decir", (
 
 describe("🔴 19 · los botones dicen QUÉ traen, y el verbo es «Descargar»", () => {
   it("el del período dice el mes o el año", () => {
-    expect(rotuloDescargarPeriodo(8)).toBe("Descargar el mes");
-    expect(rotuloDescargarPeriodo(MES_TODO_EL_ANIO)).toBe("Descargar el año");
+    expect(rotuloDescargarPeriodo(8, "Excel")).toBe("Descargar Excel del mes"); // 1-oct-2026, Daniel: nombres normales de ERP
+    expect(rotuloDescargarPeriodo(MES_TODO_EL_ANIO, "PDF")).toBe("Descargar PDF del año");
     // 🔄 8-sep-2026 — CAMBIA DE DIRECCIÓN, NO SE BORRA. Daniel pidió el mes en
     // los DOS formatos, así que la barra ya no llama a `rotuloDescargarPeriodo`
     // directo: llama a `rotuloDescargarExcel`, que le pega « en Excel» a ESTE
@@ -487,12 +487,12 @@ describe("🔴 19 · los botones dicen QUÉ traen, y el verbo es «Descargar»",
     // tiene los dos archivos. El «el mes» / «el año» sigue saliendo de UN solo
     // lugar: los dos rótulos se lo pegan a `rotuloDescargarPeriodo`.
     expect(rotuloDescargarExcel(MES_TODO_EL_ANIO))
-      .toBe(`${rotuloDescargarPeriodo(MES_TODO_EL_ANIO)} en Excel`);
-    expect(rotuloDescargarExcel(8)).toBe("Descargar el mes en Excel");
+      .toBe(rotuloDescargarPeriodo(MES_TODO_EL_ANIO, "Excel"));
+    expect(rotuloDescargarExcel(8)).toBe("Descargar Excel del mes");
   });
 
   it("el del detalle dice que es el detalle", () => {
-    expect(plano(leer("src/components/comisiones/ComisionesDetalleModal.tsx"))).toContain("Descargar el detalle");
+    expect(plano(leer("src/components/comisiones/ComisionesDetalleModal.tsx"))).toContain("Descargar detalle");
   });
 
   it("🔴 y los 5 botones del sistema que decían «Exportar» o «Bajar» ya dicen «Descargar»", () => {

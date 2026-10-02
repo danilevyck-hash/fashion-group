@@ -115,20 +115,20 @@ describe("faltaParaEnviar / textoFaltaEnviar", () => {
   });
 
   it("🔴 sin cliente, lo dice", () => {
-    expect(faltaParaEnviar({ ...completo, clienteElegido: false })).toEqual(["elegir el cliente"]);
-    expect(textoFaltaEnviar(["elegir el cliente"])).toBe("Falta: elegir el cliente");
+    expect(faltaParaEnviar({ ...completo, clienteElegido: false })).toEqual(["seleccionar el cliente"]);
+    expect(textoFaltaEnviar(["seleccionar el cliente"])).toBe("Falta: seleccionar el cliente");
   });
 
   it("faltando varias cosas se nombran TODAS de una vez, no una por toque", () => {
     const falta = faltaParaEnviar({ clienteElegido: false, vendedorElegido: false, hayItems: false, preordersEnCarrito: 2 });
-    expect(falta).toEqual(["agregar productos", "elegir el cliente", "elegir el vendedor", "quitar los productos en preventa"]);
+    expect(falta).toEqual(["agregar productos", "seleccionar el cliente", "seleccionar el vendedor", "quitar los productos en preventa"]);
     expect(textoFaltaEnviar(falta))
-      .toBe("Falta: agregar productos, elegir el cliente, elegir el vendedor y quitar los productos en preventa");
+      .toBe("Falta: agregar productos, seleccionar el cliente, seleccionar el vendedor y quitar los productos en preventa");
   });
 
   it('se lee como se habla: "y" antes del último', () => {
-    expect(textoFaltaEnviar(["elegir el cliente", "elegir el vendedor"]))
-      .toBe("Falta: elegir el cliente y elegir el vendedor");
+    expect(textoFaltaEnviar(["seleccionar el cliente", "seleccionar el vendedor"]))
+      .toBe("Falta: seleccionar el cliente y seleccionar el vendedor");
   });
 });
 
@@ -136,7 +136,7 @@ describe("los textos", () => {
   it("🔴 lo que se muestra sin cliente NO dice Contado", () => {
     // Decirlo sería volver a poner el default silencioso, esta vez de mentira.
     expect(SIN_CLIENTE_ELEGIDO).not.toMatch(/contado/i);
-    expect(SIN_CLIENTE_ELEGIDO).toBe("Elige el cliente");
+    expect(SIN_CLIENTE_ELEGIDO).toBe("Selecciona el cliente"); // 1-oct-2026, Daniel: nombres normales de ERP («Elige» → «Selecciona»)
   });
 
   it("🔴 la venta de mostrador se dice con todas las letras", () => {

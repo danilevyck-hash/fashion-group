@@ -264,5 +264,5 @@ export function nombreArchivoDescarga(clave: ClaveDescarga, ext: "pdf" | "xlsx",
  * Con «Todas mis empresas» dice las seis por su nombre corto de grupo.
  */
 export function subtituloDelPapel(clave: ClaveDescarga, empresa: string | null): string {
-  return `${ROTULO_DESCARGA[clave]} — ${empresa ?? "Fashion Group · 6 empresas"}`;
+  return `${ROTULO_DESCARGA[clave]} — ${empresa ?? "Fashion Group"}`; // 1-oct-2026, Daniel: nombres normales de ERP
 }

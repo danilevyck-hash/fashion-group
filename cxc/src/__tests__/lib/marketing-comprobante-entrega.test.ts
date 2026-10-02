@@ -290,10 +290,12 @@ describe("nota de entrega — foto de cada mueble", () => {
 describe("nota de entrega — PIEZAS y BULTOS en columnas separadas", () => {
   it("las dos columnas existen y se llaman por su nombre", () => {
     const buf = buildComprobanteEntregaPdf(conFotoYBultos);
-    expect(contiene(buf, "Piezas")).toBe(true);
+    // 🔄 1-oct-2026, Daniel: nombres normales de ERP. Antes: «"Cantidad" era
+    // ambiguo: se retiró» y se exigía «Piezas». Ahora la columna es «Cantidad»
+    // (nombre de ERP) y «Piezas» no vuelve; siguen siendo DOS columnas.
+    expect(contiene(buf, "Cantidad")).toBe(true);
     expect(contiene(buf, "Bultos")).toBe(true);
-    // "Cantidad" era ambiguo: se retiró justamente para no confundirlas.
-    expect(contiene(buf, "Cantidad")).toBe(false);
+    expect(contiene(buf, "Piezas")).toBe(false);
   });
 
   it("las piezas mandan el importe — los bultos NO lo tocan", () => {
@@ -345,7 +347,7 @@ describe("nota de entrega — PIEZAS y BULTOS en columnas separadas", () => {
     const buf = buildComprobanteEntregaPdf(conFotoYBultos, {
       incluirBultos: false,
     });
-    expect(contiene(buf, "Piezas")).toBe(true);
+    expect(contiene(buf, "Cantidad")).toBe(true); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(contiene(buf, "Norte colgador")).toBe(true);
     expect(contiene(buf, "150")).toBe(true);
     expect(contiene(buf, "14,630.00")).toBe(true);

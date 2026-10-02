@@ -27,7 +27,7 @@
  * asigna `HORAS_CERO` — **cero ausencias, cero tardanzas, cero descuentos**.
  * Con la ficha completa y sin explicación, la línea sale además con
  * `FALTA.sinMarcaciones` («no marcó ni un día en esta quincena») y
- * **`dinero: null`**: va a «Tú decides», sin pago calculado. O sea que hoy la
+ * **`dinero: null`**: va a «Pago por definir», sin pago calculado. O sea que hoy la
  * planilla **no le cobra una sola ausencia** a quien no marcó nada, y eso
  * **no se toca**. La fila gris del Reporte lo DICE y no cuenta ni una
  * ausencia; contarlas aquí haría que la pantalla y el pago dijeran cosas
@@ -112,7 +112,7 @@ export const TEXTO_SIN_MARCAS = "sin marcas en el período";
  */
 export const NOTA_SIN_MARCAS =
   "No marcó ni un día en este período. La planilla no le descuenta ausencias por esto: la deja en " +
-  "«Tú decides» y no le calcula el pago. Toca un día de abajo para agregarle las horas.";
+  "«Pago por definir» y no le calcula el pago. Toca un día de abajo para agregarle las horas.";
 
 /**
  * Lo que dice cada uno de sus días. 🔴 NUNCA «Ausencia sin justificar»: la
@@ -120,7 +120,7 @@ export const NOTA_SIN_MARCAS =
  *
  * ⚠️ Su día NO dice si tenía vacaciones o una justificación: la fila existe
  * para verla y poder corregirla, y TODO su veredicto está suspendido. Lo que
- * explica el período sigue estando en la Planilla («Tú decides») y en
+ * explica el período sigue estando en la Planilla («Pago por definir») y en
  * Justificaciones.
  */
 export const TEXTO_DIA_SIN_MARCAS = "Sin marcas — no se cuenta como ausencia";

@@ -30,7 +30,7 @@ export type ColumnaPapel =
 /** Cómo se lee cada columna en el papel. Un solo lugar. */
 export const ROTULO_COLUMNA: Record<ColumnaPapel, string> = {
   fecha: "Fecha",
-  nota: "Nota",
+  nota: "Observaciones", // 1-oct-2026, Daniel: nombres normales de ERP — el rótulo pasó a «Observaciones» (como en Guías); la columna `descripcion` no cambia.
   proveedor: "Proveedor",
   categoria: "Categoría",
   factura: "N° de factura",

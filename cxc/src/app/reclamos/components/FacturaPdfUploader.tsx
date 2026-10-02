@@ -233,7 +233,7 @@ export default function FacturaPdfUploader({ pdfUrl, onUploaded, onExtracted }: 
             ? "Subiendo…"
             : dragging
               ? "Suelta la factura aquí"
-              : `Arrastra o elige el PDF o la foto de la factura (máx ${MAX_MB}MB)`}
+              : `Arrastra o selecciona el PDF o la foto de la factura (máx ${MAX_MB}MB)`}
         </span>
         <input
           ref={inputRef}

@@ -203,14 +203,14 @@ export async function updateProductBulto(
     });
     if (!res.ok) {
       const body = await res.json().catch(() => null);
-      throw new Error(body?.error || "No se pudo guardar las piezas por bulto.");
+      throw new Error(body?.error || "No se pudo guardar las unidades por bulto.");
     }
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") {
       throw new Error("Tardó demasiado. Revisa tu conexión e intenta de nuevo.");
     }
     if (err instanceof Error) throw err;
-    throw new Error("No se pudo guardar las piezas por bulto.");
+    throw new Error("No se pudo guardar las unidades por bulto.");
   } finally {
     clearTimeout(timer);
   }

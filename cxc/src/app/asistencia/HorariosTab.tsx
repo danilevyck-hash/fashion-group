@@ -177,7 +177,7 @@ export default function HorariosTab() {
           aprende una vez y no cambia ninguna decisión al abrirla. Pasa al ⓘ;
           lo que SÍ pide acción («N sin confirmar») se queda abajo, a la vista. */}
       <div className="-ml-2 -mt-2">
-        <Ayuda titulo="De dónde sale la hora sugerida" etiqueta="De dónde sale la sugerencia">
+        <Ayuda titulo="Hora de salida sugerida" etiqueta="Información">
           <p>
             Lo que fijes aquí manda sobre lo que diga el reloj. Arranca con la hora a la que
             <b> cada quien sale de verdad</b>, medida de sus marcaciones.

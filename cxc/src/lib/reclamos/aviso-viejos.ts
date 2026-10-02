@@ -70,6 +70,6 @@ export function mensajeReclamosViejos(
 
   return (
     `${titulo}\n\nLos más viejos:\n${lineas.join("\n")}${cola}\n\n` +
-    `Están en Reclamos, en «Por cobrar» de cada empresa.`
+    `Están en Reclamos, en «Pendientes» de cada empresa.`
   );
 }

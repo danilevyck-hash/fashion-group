@@ -147,7 +147,7 @@ export function validarRubroNuevo(body: unknown): ValidacionRubro {
   if (!rubro) return { ok: false, error: "Escribe el rubro tal como llega de Switch" };
   if (rubro.length > MAX_LARGO_RUBRO) return { ok: false, error: "El rubro es demasiado largo" };
   if (!esCategoriaReebok(b.categoria)) {
-    return { ok: false, error: "Elige a qué categoría va: Calzado, Ropa o Accesorios" };
+    return { ok: false, error: "Selecciona la categoría: Calzado, Ropa o Accesorios" };
   }
   return { ok: true, valor: { rubro, categoria: b.categoria } };
 }

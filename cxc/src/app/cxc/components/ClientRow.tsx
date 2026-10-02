@@ -7,9 +7,9 @@ import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
 
 function riskInfo(total: number, current: number, watch: number, overdue: number): { border: string; tooltip: string } {
   if (total < 0) return { border: "border-l-blue-400", tooltip: "Saldo a favor: saldo negativo (nota de crédito o sobrepago)" };
-  if (overdue > 0) return { border: "border-l-red-500", tooltip: "Vencido crítico: deuda con más de 120 días" };
-  if (watch > 0) return { border: "border-l-amber-400", tooltip: "Vencido reciente: deuda con 91 a 120 días" };
-  return { border: "border-l-emerald-500", tooltip: "Por vencer: deuda dentro del plazo (0 a 90 días)" };
+  if (overdue > 0) return { border: "border-l-red-500", tooltip: "+120 días: saldo con más de 120 días" };
+  if (watch > 0) return { border: "border-l-amber-400", tooltip: "91-120 días: saldo con 91 a 120 días" };
+  return { border: "border-l-emerald-500", tooltip: "0-90 días: todo el saldo tiene hasta 90 días" };
 }
 
 interface Props {
@@ -103,9 +103,11 @@ export default function ClientRow({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onCobrar(client); }}
+              aria-label="Enviar estado de cuenta"
+              title="Enviar estado de cuenta"
               className="shrink-0 rounded-md bg-black px-2.5 py-1 text-xs font-medium text-white transition active:scale-[0.97] hover:bg-gray-800"
             >
-              Cobrar
+              Enviar
             </button>
           )}
         </div>

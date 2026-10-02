@@ -130,7 +130,7 @@ export default function SugerenciasCliente({
             <span className="font-mono text-xs text-gray-500">({uno.codigo})</span>?
           </>
         ) : (
-          "¿Es alguno de estos?"
+          "Clientes similares"
         )}
       </p>
 
@@ -183,7 +183,7 @@ export default function SugerenciasCliente({
                 onClick={onDescartar}
                 className={`${BOTON} border-gray-200 bg-white text-gray-600 hover:bg-gray-50`}
               >
-                No, es otro
+                Ninguno
               </button>
             </div>
           )}
@@ -191,7 +191,7 @@ export default function SugerenciasCliente({
       )}
 
       <p className="text-xs text-gray-400 mt-1.5">
-        Tocar una solo la elige. Nada se guarda hasta que aprietes Guardar.
+        No se guarda hasta tocar Guardar.
       </p>
     </div>
   );

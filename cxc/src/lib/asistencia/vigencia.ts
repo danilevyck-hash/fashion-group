@@ -54,10 +54,11 @@ export const ETIQUETA_MOTIVO: Record<MotivoSalida, string> = {
   otro: "Salió",
 };
 
-/** Lo que se elige al dar de baja, dicho como lo diría Daniel. */
+/** Lo que se elige al dar de baja. Solo texto: la base guarda renuncia|despido|otro.
+ *  1-oct-2026, Daniel: nombres normales de ERP (antes «Renunció · Lo despedimos · Otro»). */
 export const OPCION_MOTIVO: Record<MotivoSalida, string> = {
-  renuncia: "Renunció",
-  despido: "Lo despedimos",
+  renuncia: "Renuncia",
+  despido: "Despido",
   otro: "Otro",
 };
 
@@ -296,7 +297,7 @@ export function fraseBaja(v: Vigencia | null | undefined, hoy: string): string |
     motivo === "renuncia"
       ? futura ? "Renuncia" : "Renunció"
       : motivo === "despido"
-        ? futura ? "Lo despedimos" : "Despedido"
+        ? futura ? "Despido" : "Despedido"
         : futura ? "Sale" : "Salió";
   return `${verbo} el ${fechaLegible(fecha)}`;
 }
@@ -430,7 +431,7 @@ export function validarVigencia(body: unknown): Resultado<Vigencia> {
   if (motivo === null) {
     return {
       ok: false,
-      error: "Elige por qué salió: renunció, lo despedimos, u otro.",
+      error: "Selecciona el motivo de salida: renuncia, despido u otro.",
     };
   }
   if (ingreso.valor !== null && salida.valor < ingreso.valor) {

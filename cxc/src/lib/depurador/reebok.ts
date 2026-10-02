@@ -335,7 +335,7 @@ export function valoresInesperados(
 export function parseReebok(rows: SheetRow[], monthColIdx: number): ParseResult {
   const headerRow = findHeaderRow(rows);
   if (headerRow === -1) {
-    throw new Error("No encontré la fila de encabezados (busco New Article + SKU + WholesalePrice). ¿Es el Excel de Reebok?");
+    throw new Error("No se encontró la fila de encabezados (se buscan New Article + SKU + WholesalePrice). Revisa que sea el Excel de Reebok.");
   }
   const headers = rows[headerRow];
   const cols = findReebokCols(headers);
@@ -573,7 +573,7 @@ export function buildCatalogoAoa(
 ): (string | number)[][] {
   const head = [
     "PO NAME", "New Article", "Name", "Department", "CATEGORY", "AGE GROUP", "GENDER",
-    "Precio A", "Precio B", `Piezas ${monthLabel}`.trim(),
+    "Precio A", "Precio B", `Cantidad ${monthLabel}`.trim(), // 1-oct-2026, Daniel: nombres normales de ERP
   ];
   if (tieneFoto) head.unshift(COL_FOTO);
   const aoa: (string | number)[][] = [head];

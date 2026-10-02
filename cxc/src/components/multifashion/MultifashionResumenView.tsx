@@ -626,7 +626,7 @@ function TarjetasDelMes({
         <div className="mt-2 space-y-0.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
           {overview.proyeccionCierre.tiene_proyeccion ? (
             <p>
-              cierra en <span className="font-mono tabular-nums text-gray-700">{fmtMoney(proyRetail)}</span>{" "}
+              proyección <span className="font-mono tabular-nums text-gray-700">{fmtMoney(proyRetail)}</span>{" "}
               <span className={deltaToneCierre(deltaCierreRetail)}>{deltaStrCierre(deltaCierreRetail)}</span>{" "}
               vs {year - 1}
             </p>

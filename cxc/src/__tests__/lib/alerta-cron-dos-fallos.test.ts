@@ -200,7 +200,7 @@ describe("fallos de empresas DISTINTAS no cuentan como racha", () => {
     ]);
     expect(enviarSistemaMock).toHaveBeenCalledTimes(1);
     const t = mensaje()!;
-    expect(t).toContain("2 sincronizaciones");
+    expect(t).toContain("2 actualizaciones"); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(t).toContain("Vistana");
     expect(t).toContain("Joystep");
   });

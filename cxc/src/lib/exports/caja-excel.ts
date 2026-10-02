@@ -62,7 +62,7 @@ export function buildCajaWorkbook(periodo: CajaPeriodo, gastos: CajaGasto[]): XL
   const ws = buildReportSheet({
     columns: [
       { header: "Fecha", wch: 11 },
-      { header: "Descripción", wch: 26 },
+      { header: "Observaciones", wch: 26 }, // 1-oct-2026, Daniel: nombres normales de ERP (el mismo rótulo de la pantalla y el papel)
       { header: "Proveedor", wch: 16 },
       { header: "Categoría", wch: 14 },
       { header: "N° Factura", wch: 14 },

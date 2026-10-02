@@ -76,7 +76,7 @@ function filaDe(nombre: string): HTMLElement {
 describe("🩸 el saldo copiado SE VE", () => {
   it("el aviso de arriba nombra a las TRES empresas que copiaron", () => {
     pintar();
-    expect(screen.getByText(/3 saldos quedaron igualitos al anterior/i)).toBeTruthy();
+    expect(screen.getByText(/3 saldos sin cambios/i)).toBeTruthy();
     const aviso = screen.getByText(/el monto es\s+exactamente el mismo/i);
     for (const nombre of ["Active Shoes", "Active Wear", "Fashion Shoes"]) {
       expect(aviso.textContent).toContain(nombre);
@@ -97,7 +97,7 @@ describe("🩸 el saldo copiado SE VE", () => {
   it("sin ningún repetido, el aviso NO aparece (no es un cartel decorativo)", () => {
     pintar(FILAS.filter((f) => f.empresa_key === "fashion_wear"));
     expect(screen.queryByText(/igualito/i)).toBeNull();
-    expect(screen.queryByText(/igualitos/i)).toBeNull();
+    expect(screen.queryByText(/sin cambios/i)).toBeNull();
   });
 });
 

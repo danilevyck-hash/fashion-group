@@ -73,7 +73,7 @@ export default function SeccionOtrosServicios({ codigo, refresco }: {
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error ?? "");
-      toast("Listo, guardado", "success");
+      toast("Servicio guardado", "success");
       setMonto(""); setConcepto(""); setAbierto(false);
       await leer();
     } catch (e) {
@@ -91,7 +91,7 @@ export default function SeccionOtrosServicios({ codigo, refresco }: {
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error((d as { error?: string }).error ?? "");
-      toast("Listo, quitado", "success");
+      toast("Servicio quitado", "success");
       await leer();
     } catch (e) {
       toast(e instanceof Error && e.message ? e.message : "No se pudo quitar. Intenta de nuevo.", "error");
@@ -159,7 +159,7 @@ export default function SeccionOtrosServicios({ codigo, refresco }: {
       )}
 
       {lista.length === 0 ? (
-        <Vacio texto="Todavía no tiene nada esta quincena." />
+        <Vacio texto="Sin registros en esta quincena." />
       ) : (
         <ul className="divide-y divide-gray-100">
           {lista.map((s) => (

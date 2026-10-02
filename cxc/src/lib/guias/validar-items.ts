@@ -54,7 +54,7 @@ export function validarEmpresasItems(
     // Este guard es sobre valores INVENTADOS, no sobre campos sin llenar.
     if (!empresa) continue;
     if (!ok.has(empresa)) {
-      return `La empresa "${empresa}" no es una de las del grupo. Elige una de la lista.`;
+      return `La empresa "${empresa}" no es una de las del grupo. Selecciona una de la lista.`;
     }
   }
   return null;

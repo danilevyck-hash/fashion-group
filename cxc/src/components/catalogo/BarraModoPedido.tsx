@@ -6,7 +6,7 @@
 // pedido o al carrito — y la diferencia entre las dos cosas es un pedido que
 // aparece y otro que no.
 //
-// La salida ("Listo, volver al pedido") vive EN la barra: es el único camino de
+// La salida («Volver al pedido») vive EN la barra: es el único camino de
 // vuelta, y es el mismo botón en las 4 marcas.
 
 import Link from "next/link";
@@ -63,7 +63,7 @@ export default function BarraModoPedido({
               : "bg-white text-black hover:bg-gray-100"
           }`}
         >
-          {problema ? "Volver al pedido" : "Listo, volver al pedido"}
+          Volver al pedido
         </Link>
       </div>
     </div>

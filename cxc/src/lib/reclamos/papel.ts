@@ -100,7 +100,7 @@ const TODAS: ColumnaPapel[] = [
   { clave: "subtotal", rotulo: "Subtotal", tipo: "dinero", wch: 13, mm: 20 },
   { clave: "motivo", rotulo: "Motivo", tipo: "texto", wch: 20, mm: 26 },
   { clave: "nro_factura", rotulo: "Factura", tipo: "texto", wch: 16, mm: 24 },
-  { clave: "nro_orden_compra", rotulo: "PO", tipo: "texto", wch: 12, mm: 18 },
+  { clave: "nro_orden_compra", rotulo: "N° de pedido", tipo: "texto", wch: 14, mm: 22 },
 ];
 
 /** Las tres columnas que solo salen si alguna fila las trae. */
@@ -191,7 +191,7 @@ export function datosDelPapel(rec: ReclamoDePapel, contacto?: ContactoDePapel | 
     { rotulo: facturas.includes("·") ? "Facturas" : "Factura", valor: facturas },
     ...(ocultaPedido(rec.empresa)
       ? []
-      : [{ rotulo: "PO", valor: String(rec.nro_orden_compra ?? "").trim() }]),
+      : [{ rotulo: "N° de pedido", valor: String(rec.nro_orden_compra ?? "").trim() }]),
     { rotulo: "Contacto", valor: String(contacto?.nombre_contacto ?? "").trim() },
   ];
   return pares.filter((p) => !!p.valor);

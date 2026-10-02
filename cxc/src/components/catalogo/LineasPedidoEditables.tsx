@@ -76,7 +76,7 @@ export default function LineasPedidoEditables({
                     /* Solo lectura: mismo dato, sin borde ni lápiz — nada que
                        insinúe que se puede cambiar. */
                     <span className="text-sm font-medium tabular-nums text-gray-800">
-                      ${fmt(l.unit_price)}<span className="text-xs font-normal text-gray-400">/pza</span>
+                      ${fmt(l.unit_price)}<span className="text-xs font-normal text-gray-400">/u</span>
                     </span>
                   )}
                 </div>
@@ -91,7 +91,7 @@ export default function LineasPedidoEditables({
                 <button onClick={() => onQty(l.product_id, 0)} className="ml-2 min-h-[44px] px-2 text-xs text-gray-400 hover:text-red-600 transition">Quitar</button>
               </div>
               <div className="text-right text-xs tabular-nums">
-                <span className="text-gray-400">{l.piezas} pzas</span>
+                <span className="text-gray-400">{l.piezas} u</span>
                 {l.is_preorder && <span className="ml-2 text-amber-700 font-medium">Preventa</span>}
               </div>
             </div>

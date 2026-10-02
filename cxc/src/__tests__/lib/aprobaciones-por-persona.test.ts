@@ -386,7 +386,7 @@ describe("e. la pantalla, por barrido", () => {
     const todo = ["AprobacionesTab.tsx", "aprobaciones/PorColaborador.tsx", "aprobaciones/PorDia.tsx", "aprobaciones/YaDecididas.tsx"]
       .map((f) => leer(`src/app/asistencia/${f}`)).join("\n");
     expect(todo).not.toMatch(/No a todo/i);
-    expect(todo).toContain("Sí a todo lo pendiente");
+    expect(todo).toContain("Aprobar pendientes"); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   it("la ficha ofrece la casilla y el PUT la escribe", () => {

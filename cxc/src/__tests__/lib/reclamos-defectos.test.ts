@@ -81,7 +81,8 @@ describe("6 · un reclamo cobrado no se vuelve a mandar", () => {
   );
 
   it("🔴 la FILA solo ofrece «Correo» sobre un reclamo pendiente", () => {
-    expect(LISTA).toMatch(/esPendiente\(r\) &&[\s\S]{0,200}Correo/);
+    // 1-oct-2026, Daniel: nombres normales de ERP — el botón de la fila dice «Enviar».
+    expect(LISTA).toMatch(/esPendiente\(r\) &&[\s\S]{0,200}>Enviar</);
   });
 
   it("🔴 y el SERVIDOR lo rechaza, que es el freno de verdad", () => {

@@ -139,7 +139,7 @@ export default function DeletedGastosModal({
                 <thead>
                   <tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-400">
                     <th className="text-left py-2 px-3 font-normal">Fecha</th>
-                    <th className="text-left py-2 px-3 font-normal">Nota</th>
+                    <th className="text-left py-2 px-3 font-normal">Observaciones</th>
                     <th className="text-left py-2 px-3 font-normal">Proveedor</th>
                     <th className="text-right py-2 px-3 font-normal">Total</th>
                     <th className="text-left py-2 px-3 font-normal">Eliminado por</th>

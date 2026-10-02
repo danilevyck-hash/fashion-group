@@ -119,7 +119,7 @@ export default function EstadoCuentaDrawer({ client, companyFilter, onClose, onC
                 onClick={() => onCobrar(client)}
                 className="w-full inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-md bg-black px-3 text-sm font-medium text-white transition active:scale-[0.97]"
               >
-                Cobrar
+                Enviar estado de cuenta
               </button>
             )}
           </div>
@@ -217,7 +217,7 @@ export default function EstadoCuentaDrawer({ client, companyFilter, onClose, onC
             <div className="col-span-4">Documento</div>
             <div className="col-span-2">Fecha</div>
             <div className="col-span-1 text-right">Días</div>
-            <div className="col-span-2 text-right">Original</div>
+            <div className="col-span-2 text-right">Monto</div>
             <div className="col-span-3 text-right">Saldo</div>
           </div>
 

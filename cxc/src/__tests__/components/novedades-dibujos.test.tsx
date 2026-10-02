@@ -289,7 +289,8 @@ describe("🔴 el botón de la casa se dibuja negro, y solo donde LO ES", () => 
     // de la barra del CXC (`cxc/page.tsx`) es `bg-black text-white` y su propio
     // comentario dice «mismo botón, mismo lugar, mismo color»; y el Guardar de
     // la ficha era `bg-black text-white` antes de que lo quitaran (`0b2701d5`).
-    const cobrar = cajasDe("una-sola-puerta-cobrar").find((c) => c.texto === "Cobrar");
+    // 1-oct-2026, Daniel: nombres normales de ERP — el botón de la fila dice «Enviar».
+    const cobrar = cajasDe("una-sola-puerta-cobrar").find((c) => c.texto === "Enviar");
     const guardar = cajasDe("se-edita-tocando-el-dato").find((c) => c.texto === "Guardar");
     const descargar = cajasDe("exportar-a-descargar").find((c) => c.texto === "Descargar ⌄");
     const exportar = cajasDe("exportar-a-descargar").find((c) => c.texto === "Exportar");
@@ -325,7 +326,7 @@ describe("🔴 el botón de la casa se dibuja negro, y solo donde LO ES", () => 
 
   it("el botón negro se RELLENA y su letra va al revés", () => {
     const { container } = render(<DibujoNovedad clave="una-sola-puerta-cobrar" modulo="cxc" />);
-    const cobrar = [...container.querySelectorAll("g")].find((g) => g.textContent === "Cobrar")!;
+    const cobrar = [...container.querySelectorAll("g")].find((g) => g.textContent === "Enviar")!;
     expect(cobrar.getAttribute("class")).toContain("text-black");
     expect(cobrar.querySelector("rect")!.getAttribute("class")).toContain("fill-current");
     expect(cobrar.querySelector("rect")!.getAttribute("fill")).not.toBe("none");
@@ -334,7 +335,7 @@ describe("🔴 el botón de la casa se dibuja negro, y solo donde LO ES", () => 
 
   it("⚠️ y se invierte si la pantalla cambia de fondo, no se apaga", () => {
     const { container } = render(<DibujoNovedad clave="una-sola-puerta-cobrar" modulo="cxc" />);
-    const cobrar = [...container.querySelectorAll("g")].find((g) => g.textContent === "Cobrar")!;
+    const cobrar = [...container.querySelectorAll("g")].find((g) => g.textContent === "Enviar")!;
     expect(cobrar.getAttribute("class")).toContain("dark:text-white");
     expect(cobrar.querySelector("text")!.getAttribute("class")).toContain("dark:fill-black");
   });

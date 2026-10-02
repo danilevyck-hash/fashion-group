@@ -140,7 +140,7 @@ describe("el campo de la base, en la ficha", () => {
 
   it("🔑 va AL LADO del interruptor de los seguros, no en otra pantalla", async () => {
     await abrirFicha();
-    expect(screen.getAllByText(/¿Se le descuentan los seguros\?/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Descuento de seguros \(SS y SE\)/) /* 1-oct-2026, Daniel: nombres normales de ERP */.length).toBeGreaterThan(0);
     expect(screen.getAllByText(new RegExp(PREGUNTA_BASE_SEGUROS, "i")).length).toBeGreaterThan(0);
   });
 
@@ -232,7 +232,7 @@ describe("🔴 LO QUE SE ESCRIBE VIAJA — el cuerpo del PUT, leído", () => {
     const fechaSalida = fechas.find((i) => i.type === "date");
     expect(fechaSalida).toBeTruthy();
     fireEvent.change(fechaSalida!, { target: { value: "2026-09-30" } });
-    fireEvent.click(screen.getAllByRole("button", { name: /Renunció/ })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: /Renuncia/ })[0]);
     fireEvent.click(screen.getAllByRole("button", { name: /Dar de baja|Guardar/ })[0]);
     await waitFor(() => expect(enviados.length).toBeGreaterThan(0));
     const baja = enviados.find((e) => e.fechaSalida === "2026-09-30")!;

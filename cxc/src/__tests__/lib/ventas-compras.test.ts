@@ -908,20 +908,20 @@ describe("el Excel de Referencia", () => {
       "Referencia",
       "Descripción",
       "Empresa",
-      "Llegó",
+      "Fecha de recepción",
       "Cantidad",
       "CIF",
       "FOB",
-      "FOB de dónde",
+      "Origen del FOB",
       "Lista",
       "Proveedor",
       "Documento",
     ]);
     expect(cuerpo).toHaveLength(2);
-    const vieja = cuerpo.find((f) => f["Llegó"] === "2025-04-01")!;
+    const vieja = cuerpo.find((f) => f["Fecha de recepción"] === "2025-04-01")!;
     expect(vieja["Cantidad"]).toBe(240);
     expect(vieja["CIF"]).toBe(5);
-    const nueva = cuerpo.find((f) => f["Llegó"] === "2026-02-19")!;
+    const nueva = cuerpo.find((f) => f["Fecha de recepción"] === "2026-02-19")!;
     expect(nueva["Cantidad"]).toBe(180);
   });
 

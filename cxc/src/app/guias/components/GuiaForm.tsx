@@ -65,11 +65,14 @@ import { CODIGOS_RETIRADOS_DE_GUIAS } from "@/lib/guias/american-classics";
 import ClientePicker from "@/components/ClientePicker";
 import { GUIAS_ATAJOS_NUEVOS } from "@/lib/guias/atajos-facturas";
 import { ScrollableTable } from "@/components/ui";
-import { EMPRESAS_CANONICAS, claveCampo, faltaParaGuardar, opcionesEmpresa, textoFaltaAlGuardar } from "./guia-form-logic";
+import { EMPRESAS_CANONICAS, claveCampo, faltaParaGuardar, filaTieneDatos, opcionesEmpresa, textoFaltaAlGuardar } from "./guia-form-logic";
 import DetalleDeEnvio from "./DetalleDeEnvio";
 import { entregadoPorElegido, nombreDespachadoPor } from "@/lib/guias/despachado-por";
 import { useDespachadores } from "./useDespachadores";
-import { GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
+import { GUIA_APPLE_2026_10, GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
+import EnviosApple from "./EnviosApple";
+import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
+import { ATRIBUTO_BARRA_FIJA } from "@/lib/navegacion/barra-celular";
 import { ETIQUETA_TIPO_DESPACHO } from "@/lib/guias/modo-despacho";
 import { textoFalta } from "@/lib/guias/falta-para-despachar";
 import { textoYaSeDespacho } from "@/lib/guias/campos-editables";
@@ -365,6 +368,15 @@ export default function GuiaForm({
    * etiquetas». Editar una guía sigue con la tabla de siempre.
    */
   const tablaUnica = GUIA_NUEVA_2026_10 && atajosDeLaGuiaNueva;
+  /**
+   * 🔴 1-oct-2026 («Propuesta estilo Apple», APAGADA hasta el «sí» de Daniel): la MISMA guía
+   * nueva, con tarjetas y una barra fija abajo. Solo al crear; `false` = la
+   * tabla única de arriba. Lo que se guarda no cambia.
+   */
+  const apple = GUIA_APPLE_2026_10 && tablaUnica;
+  /** La barra fija de abajo dice cuánto mide, para que el botón del menú se le suba encima. */
+  const barraGuardar = useRef<HTMLDivElement | null>(null);
+  usePublicarAltoBarraFija(barraGuardar, apple);
   /** ¿Ya se tocó «Guardar guía»? Recién entonces se dice lo que falta. */
   const [intentoGuardar, setIntentoGuardar] = useState(false);
 
@@ -536,7 +548,7 @@ export default function GuiaForm({
     return onSave(opts);
   }
 
-  // "Listo, guardado" sale de la hora que dejó un guardado ACEPTADO por el
+  // "Guía guardada" sale de la hora que dejó un guardado ACEPTADO por el
   // servidor. Antes se ponía apenas se disparaba el pedido, así que un guardado
   // rechazado igual decía "listo".
   const saveStatus = saving ? "saving" : hayCambios ? "dirty" : guardadoEn ? "saved" : null;
@@ -621,7 +633,7 @@ export default function GuiaForm({
   function StatusBadge() {
     if (saveStatus === "saving") return <span className="text-sm text-gray-400">Guardando...</span>;
     if (saveStatus === "dirty") return <span className="text-sm text-orange-500">Sin guardar</span>;
-    if (saveStatus === "saved") return <span className="text-sm text-green-600 animate-save-flash">Listo, guardado {guardadoEn}</span>;
+    if (saveStatus === "saved") return <span className="text-sm text-green-600 animate-save-flash">Guía guardada {guardadoEn}</span>;
     return null;
   }
 
@@ -904,7 +916,7 @@ export default function GuiaForm({
   }
 
   /** El desplegable de transportista con su «＋». UNO solo, lo dibuje quien lo dibuje. */
-  function campoTransportista() {
+  function campoTransportista(clase = ctrl(Boolean(transportistaError), "appearance-none"), fila = "flex items-center gap-1") {
     return (
       <>
                 {/* 🔴 EL ＋ PARA AGREGAR UN TRANSPORTISTA NUEVO (9-sep-2026).
@@ -919,12 +931,12 @@ export default function GuiaForm({
                     quitar en Guías › Configuración. Con rótulo VISIBLE: el
                     `title` solo aparece pasando el mouse por encima, y en el
                     iPad —donde se arman las guías— no hay mouse. */}
-                <div className="flex items-center gap-1">
+                <div className={fila}>
                   <select
                     id="guia-transportista"
                     value={transportistaId || ""}
                     onChange={e => { setTransportistaId(e.target.value || null); marcarTocado("transportista"); }}
-                    className={ctrl(Boolean(transportistaError), "appearance-none")}
+                    className={clase}
                   >
                     <option value="">Seleccionar transportista…</option>
                     {transportistas.map(t => (
@@ -947,18 +959,169 @@ export default function GuiaForm({
    * la tabla única (✎). Son los MISMOS campos de la tarjeta de siempre.
    */
   function editorDeRenglon(item: GuiaItem, idx: number) {
+    // 1-oct-2026: en la versión Apple, sin asteriscos (docs/diseno.md regla 8).
+    const req = !apple;
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Campo label="Cliente" requerido htmlFor={idCampo(item, "cliente", "m")}>{campoCliente(item, idx, "m")}</Campo>
-        <Campo label="Dirección" requerido htmlFor={idCampo(item, "direccion", "m")}>{campoDireccion(item, idx, "m")}</Campo>
-        <Campo label="Empresa" requerido htmlFor={idCampo(item, "empresa", "m")}>{campoEmpresa(item, idx, "m")}</Campo>
-        <Campo label="Factura(s)" requerido nota="ej: 10234, 10235" htmlFor={idCampo(item, "facturas", "m")}>{campoFacturas(item, idx, "m")}</Campo>
-        <Campo label="Bultos" requerido htmlFor={idCampo(item, "bultos", "m")}>{campoBultos(item, idx, "m")}</Campo>
+        <Campo label="Cliente" requerido={req} htmlFor={idCampo(item, "cliente", "m")}>{campoCliente(item, idx, "m")}</Campo>
+        <Campo label="Dirección" requerido={req} htmlFor={idCampo(item, "direccion", "m")}>{campoDireccion(item, idx, "m")}</Campo>
+        <Campo label="Empresa" requerido={req} htmlFor={idCampo(item, "empresa", "m")}>{campoEmpresa(item, idx, "m")}</Campo>
+        <Campo label="Factura(s)" requerido={req} nota="ej: 10234, 10235" htmlFor={idCampo(item, "facturas", "m")}>{campoFacturas(item, idx, "m")}</Campo>
+        <Campo label="Bultos" requerido={req} htmlFor={idCampo(item, "bultos", "m")}>{campoBultos(item, idx, "m")}</Campo>
         {pideNumeroTransp && (
           <Campo label="N° guía del transportista" htmlFor={idCampo(item, "numtransp", "m")}>
             {campoNumeroTransp(item, idx, "m")}
           </Campo>
         )}
+      </div>
+    );
+  }
+
+  // ── 🔴 NUEVA GUÍA ESTILO APPLE (1-oct-2026, `GUIA_APPLE_2026_10`) ─────────
+  // «Propuesta estilo Apple» del mockup (docs/diseno.md), apagada hasta el «sí» de Daniel:
+  // una pregunta —¿qué va en esta guía?—, lo obvio ya puesto (la fecha de hoy),
+  // el transportista VACÍO y solo con transportista externo, los envíos como
+  // tarjetas que se tocan y UNA acción, abajo, con el total en vivo.
+  // 🔴 Solo cambia la pantalla: los datos, la validación, el aviso de lo que
+  // falta y el guardado son los de arriba.
+  if (apple) {
+    const envios = items.filter(filaTieneDatos).length;
+    const SEGMENTO = "flex-1 sm:flex-none whitespace-nowrap rounded-md px-3 text-sm font-medium transition inline-flex items-center justify-center min-h-[40px]";
+    const PILDORA = "rounded-full border bg-transparent px-4 text-base sm:text-sm outline-none transition focus:border-black min-h-[44px]";
+    return (
+      // 🔴 1-oct-2026 (Daniel, sobre las capturas): el MISMO marco que Reclamos, CxC y
+      // Asistencia (`max-w-6xl mx-auto px-4 sm:px-6`) y, adentro, el formulario a la
+      // IZQUIERDA con un ancho legible: centrado dejaba un blanco grande junto al menú.
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 pb-28 md:pb-0">
+      <div className="max-w-[820px]">
+        <button type="button" onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2">{etiquetaVolver}</button>
+        <div className="flex items-baseline gap-2.5">
+          <h1 className="text-[26px] font-semibold tracking-tight">Nueva guía</h1>
+          <span className="text-sm text-gray-400 font-mono">GT-{String(formNumero).padStart(3, "0")}</span>
+        </div>
+
+        {/* Fecha · tipo de despacho · transportista: UNA línea; en el celular se apilan. */}
+        <div className="mt-4 mb-8 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center">
+          <input
+            id="guia-fecha"
+            type="date"
+            aria-label="Fecha"
+            value={fecha}
+            onChange={e => { setFecha(e.target.value); marcarTocado("fecha"); }}
+            className={`${PILDORA} ${hayError("fecha", fecha) ? "border-red-400" : "border-gray-200"}`}
+          />
+          <div role="group" aria-label="Tipo de despacho" className="flex rounded-lg bg-gray-100 p-0.5">
+            <button
+              type="button"
+              aria-pressed={modoEntrega === "transportista"}
+              onClick={() => setModoEntrega("transportista")}
+              className={`${SEGMENTO} ${modoEntrega === "transportista" ? "bg-white text-black border border-gray-200" : "text-gray-500 hover:text-black"}`}
+            >
+              {ETIQUETA_TIPO_DESPACHO.externo}
+            </button>
+            <button
+              type="button"
+              aria-pressed={modoEntrega === "entrega_directa"}
+              onClick={() => { setModoEntrega("entrega_directa"); setTransportistaId(null); }}
+              className={`${SEGMENTO} ${modoEntrega === "entrega_directa" ? "bg-white text-black border border-gray-200" : "text-gray-500 hover:text-black"}`}
+            >
+              {ETIQUETA_TIPO_DESPACHO.directo}
+            </button>
+          </div>
+          {modoEntrega === "transportista" && (
+            // Sin espacio, baja a su propia línea, debajo del tipo de despacho (docs/diseno.md regla 9).
+            <div className="min-w-0 sm:flex-1 sm:min-w-[420px]">
+              {campoTransportista(
+                `${PILDORA} min-w-[200px] flex-1 appearance-none ${transportistaError ? "border-red-400" : transportistaId ? "border-black dark:border-white" : "border-gray-200 text-gray-500"}`,
+                "flex flex-wrap items-center gap-x-2 gap-y-1 [&>button]:shrink-0",
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* La lista de destinos, para el campo de la factura escrita a mano. */}
+        <datalist id="direcciones-list">{direcciones.map(d => <option key={d} value={d} />)}</datalist>
+        {codigosConDireccion.map((codigo) => (
+          <datalist key={codigo} id={`direcciones-list-${codigo}`}>
+            {sugerenciasDireccion(direccionPorCliente[codigo], direcciones).map((d) => (
+              <option key={d} value={d} />
+            ))}
+          </datalist>
+        ))}
+
+        <EnviosApple
+          items={items}
+          etiquetas={etiquetasVivas}
+          onReemplazarItems={onReemplazarItems as (items: GuiaItem[]) => void}
+          onSeleccion={onEtiquetasSeleccionadas}
+          onQuitar={handleRemoveRow}
+          editor={editorDeRenglon}
+          clientesTop={clientesTop}
+          destinoAutollenadoDe={(codigo) =>
+            destinoParaAutollenar(codigo, destinosPorCliente[(codigo || "").trim()] ?? [], definidosPorCliente)
+          }
+        />
+
+        {/* Observaciones: siempre a la vista — se escribieron en 34 de 74 guías. */}
+        <div className="mt-7">
+          <label htmlFor="guia-observaciones" className="mb-2 block text-[15px] font-semibold">Observaciones</label>
+          <textarea
+            id="guia-observaciones"
+            value={observaciones}
+            onChange={e => setObservaciones(e.target.value)}
+            rows={2}
+            placeholder="Ej. 3 muebles para la tienda"
+            className="w-full min-h-[44px] resize-none rounded-lg border border-gray-200 bg-transparent px-3 py-2.5 text-base md:text-sm outline-none transition focus:border-black"
+          />
+        </div>
+
+        {/* 🔴 LA ÚNICA ACCIÓN, ABAJO Y CON EL TOTAL EN VIVO. Apagada sin envíos;
+            con faltantes se toca y sale UNA línea con TODO lo que falta. */}
+        <div
+          ref={barraGuardar}
+          data-testid="barra-guardar"
+          {...{ [ATRIBUTO_BARRA_FIJA]: "" }}
+          // 🔴 1-oct-2026: en el celular va FIJA al piso de la pantalla (como Reclamos): pegajosa,
+          // al llegar al final de la página el colchón de abajo la subía y el ☰ (que flota a
+          // «8 px + el alto de esta barra» del piso) le caía encima a «Guardar guía». En la
+          // computadora no hay ☰ y sigue pegajosa, para no tapar la barra lateral.
+          className="fixed inset-x-0 bottom-0 md:sticky z-20 mt-8 border-t border-gray-200 bg-white px-4 md:px-0 pt-3"
+          style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+        >
+          {error && <p className="mb-2 text-sm text-red-500">{error}</p>}
+          <AvisoFalta className="mb-2 text-sm" />
+          <div className="flex items-center gap-3">
+            <p aria-live="polite" data-testid="total-en-vivo" className="min-w-0 flex-1 text-sm text-gray-500">
+              {envios === 0 ? (
+                "Toca un envío para agregarlo"
+              ) : (
+                <>
+                  <b className="text-lg font-semibold tabular-nums text-black">{totalBultos}</b>{" "}
+                  {totalBultos === 1 ? "bulto" : "bultos"} · {envios} {envios === 1 ? "envío" : "envíos"}
+                </>
+              )}
+            </p>
+            <button
+              type="button"
+              disabled={saving || envios === 0}
+              onClick={() => {
+                if (!puedeGuardar) { setIntentoGuardar(true); return; }
+                void handleSave();
+              }}
+              className="shrink-0 bg-black text-white px-6 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 inline-flex items-center justify-center min-h-[44px]"
+            >
+              {saving ? "Guardando..." : "Guardar guía"}
+            </button>
+          </div>
+        </div>
+
+        {undoRow && (
+          <div className="fixed bottom-28 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2.5 rounded-lg border border-gray-700 flex items-center gap-3 z-50 text-sm">
+            <span>Envío eliminado</span>
+            <button onClick={handleUndoRemove} className="font-medium underline hover:no-underline inline-flex items-center min-h-[44px] px-2 -my-2">Deshacer</button>
+          </div>
+        )}
+      </div>
       </div>
     );
   }
@@ -991,7 +1154,7 @@ export default function GuiaForm({
               formulario, que es donde se termina de llenar.
 
               ⚠️ La barra pegajosa NO se quedó muda: sigue diciendo «Sin
-              guardar» / «Listo, guardado» (`StatusBadge`), que es lo que hace
+              guardar» / «Guía guardada» (`StatusBadge`), que es lo que hace
               falta saber sin bajar. */}
         </div>
       </div>

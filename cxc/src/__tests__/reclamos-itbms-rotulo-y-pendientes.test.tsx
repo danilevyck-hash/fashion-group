@@ -459,7 +459,7 @@ describe("BUG 2 · LA PANTALLA: se hace clic en «Descargar Excel» y «Descarga
     const f = pintar([mk("R-P9", "Pagado", 500)]);
     expect(botonesDeFashionShoes().excel).toBeNull();
     expect(botonesDeFashionShoes().pdf).toBeNull();
-    await screen.findByText("Nada por cobrar a Fashion Shoes");
+    await screen.findByText("Sin pendientes con Fashion Shoes"); // 1-oct-2026, Daniel: nombres normales de ERP — «Por cobrar» → «Pendientes».
     expect(f).not.toHaveBeenCalled();
   });
 });

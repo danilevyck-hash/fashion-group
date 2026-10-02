@@ -82,6 +82,6 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  if (error) return respuestaErrorEscritura(error, { tabla: "caja_responsables", accion: "Caja Menuda › responsables" });
+  if (error) return respuestaErrorEscritura(error, { tabla: "caja_responsables", accion: "Caja menuda › responsables" });
   return NextResponse.json(data);
 }

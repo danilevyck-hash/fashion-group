@@ -1232,7 +1232,7 @@ function BloqueClientes({ clientes, conDescargo = true }: {
     // nadie compra sería una respuesta falsa dicha con toda seguridad.
     return (
       <div className="py-2 text-xs text-gray-500">
-        Todavía no tenemos el detalle por cliente de estas ventas.
+        Detalle por cliente no disponible.
       </div>
     );
   }
@@ -1430,7 +1430,7 @@ function DejoDeComprar({
                     f.seSigueVendiendo ? "bg-amber-50 text-amber-800" : "bg-gray-100 text-gray-500"
                   }`}
                 >
-                  {f.seSigueVendiendo ? "se sigue vendiendo" : "ya no se vende"}
+                  {f.seSigueVendiendo ? "Con ventas" : "Sin ventas"}
                 </span>
               </td>
             </tr>

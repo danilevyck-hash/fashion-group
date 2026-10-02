@@ -452,7 +452,7 @@ export function ReferenciaModelo({
       {!soloColor && (
         <section className="rounded-xl border border-gray-200 bg-white px-3.5 py-3">
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-600">
-            Sus colores · {fmtInt(t.filas.length)} con mercancía
+            Colores · {fmtInt(t.filas.length)} con stock
           </p>
           <TablaColores filas={t.filas} hoyMes={hoyMes} mostrarMargen={mostrarMargen} />
           {t.sinStock.length > 0 && (

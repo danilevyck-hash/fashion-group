@@ -217,7 +217,7 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
         const b = await res.json().catch(() => ({}));
         throw new Error(b.error ?? `HTTP ${res.status}`);
       }
-      onSaved("Listo, guardado");
+      onSaved("Exclusión guardada");
       cancelarAlta();
       void load();
     } catch (err) {
@@ -254,7 +254,7 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
           throw new Error(b.error ?? `HTTP ${res.status}`);
         }
       }
-      onSaved("Listo, guardado");
+      onSaved("Exclusión guardada");
       setEditando(null);
       void load();
     } catch (err) {
@@ -278,7 +278,7 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
           throw new Error(b.error ?? `HTTP ${res.status}`);
         }
       }
-      onSaved("Listo, ya vuelve a comisionar");
+      onSaved("Exclusión quitada");
       setAQuitar(null);
       void load();
     } catch (err) {
@@ -305,7 +305,7 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
       <div className="mb-3 flex items-center justify-between gap-2">
         <h3 id="sin-comision-titulo" className="flex items-center gap-1 text-sm font-medium text-gray-900">
           {ROTULO_CLIENTES_SIN_COMISION}
-          <Ayuda titulo="Qué hace esta lista">
+          <Ayuda titulo="Información">
             <p>Ese vendedor no cobra comisión por ese cliente en esa empresa. Cada renglón dice qué es lo que no comisiona: la venta, el cobro, o los dos.</p>
             <p>Si otro vendedor le vende o le cobra al mismo cliente, ese otro sí comisiona.</p>
           </Ayuda>
@@ -486,7 +486,7 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
         </div>
       ) : reglas.length === 0 ? (
         <div className="py-10 text-center text-sm text-gray-500">
-          Todavía no hay clientes en esta lista: todos comisionan.
+          Sin exclusiones: todos los clientes comisionan.
         </div>
       ) : visibles.length === 0 ? (
         <div className="py-10 text-center text-sm text-gray-500">

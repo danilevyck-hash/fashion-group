@@ -92,7 +92,7 @@ function validarTextoDestino(v: unknown): string | null {
 export function validarDestinoNuevo(body: unknown): ValidacionDestino {
   const b = (body ?? {}) as Record<string, unknown>;
   const codigo = typeof b.cliente_codigo === "string" ? normalizarCodigoDestino(b.cliente_codigo) : "";
-  if (!codigo) return { ok: false, error: "Elige el cliente" };
+  if (!codigo) return { ok: false, error: "Selecciona el cliente" };
   if (codigo.length > 40) return { ok: false, error: "El código del cliente no es válido" };
   const destino = validarTextoDestino(b.destino);
   if (!destino) return { ok: false, error: "Escribe el destino tal como debe salir en la guía" };
@@ -148,8 +148,8 @@ export function validarDestinoEdicion(body: unknown): ValidacionEdicion {
 export function comoSeUsa(n: number, conElDeSiempre: boolean): string {
   if (conElDeSiempre) {
     return n === 1
-      ? "Se llena solo al elegir el cliente."
-      : `El marcado «${MARCA_SIEMPRE}» se llena solo al elegir el cliente; los demás salen como botones.`;
+      ? "Se completa automáticamente al seleccionar el cliente."
+      : `El marcado «${MARCA_SIEMPRE}» se completa automáticamente al seleccionar el cliente; los demás aparecen como botones.`;
   }
   return n === 1
     ? `Se ofrece como botón y la persona elige. Toca «${ACCION_PONER_SIEMPRE}» para que se llene solo.`

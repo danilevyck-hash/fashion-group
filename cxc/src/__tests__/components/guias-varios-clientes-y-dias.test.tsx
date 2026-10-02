@@ -35,7 +35,7 @@ let atajosEncendidos = true;
 // dentro de «+ Agregar sin etiquetas» (candado nuevo:
 // `guias-nueva-guia-2026-10.test.tsx`). Este archivo sigue fijando la pantalla
 // de ANTES, que es la que vuelve con el interruptor apagado: por eso lo apaga.
-vi.mock("@/lib/guias/guias-2026-10", () => ({ GUIA_NUEVA_2026_10: false, ETIQUETAS_2026_10: true }));
+vi.mock("@/lib/guias/guias-2026-10", () => ({ GUIA_NUEVA_2026_10: false, ETIQUETAS_2026_10: true, GUIA_APPLE_2026_10: false }));
 
 vi.mock("@/lib/guias/atajos-facturas", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/guias/atajos-facturas")>();
@@ -286,7 +286,7 @@ describe("🔴 «+ Otro cliente»: un cliente a la vez, y los de antes SE QUEDAN
     const campo = document.getElementById("facturas-cliente") as HTMLInputElement;
     fireEvent.focus(campo);
     fireEvent.change(campo, { target: { value: "Tienda que no existe" } });
-    expect(screen.getByText(/Solo clientes de la lista/)).toBeTruthy();
+    expect(screen.getByText(/Solo clientes registrados/)).toBeTruthy(); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(screen.queryByText(/Ingresar manualmente/)).toBeNull(); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 

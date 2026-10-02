@@ -153,7 +153,7 @@ describe("🔴 solo Tommy lo marca a mano", () => {
 
   it("un valor inválido se RECHAZA, no se guarda un 0", () => {
     expect(route).toContain("normalizarBultoPzas(v)");
-    expect(route).toContain("Piezas por bulto inválidas");
+    expect(route).toContain("Unidades por bulto inválidas");
   });
 
   it("vaciar el campo vuelve al default, no a un error", () => {

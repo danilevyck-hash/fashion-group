@@ -76,10 +76,12 @@ const pintarTira = () =>
   );
 
 describe("los tres tramos se llaman igual en todas partes", () => {
-  it("`tramoLabel` dice el nombre Y el rango, para los tres", () => {
-    expect(tramoLabel("current")).toBe("Por vencer 0-90d");
-    expect(tramoLabel("watch")).toBe("Vencido reciente 91-120d");
-    expect(tramoLabel("overdue")).toBe("Vencido crítico 121d+");
+  it("🔴 `tramoLabel` dice SOLO el rango, para los tres", () => {
+    // 1-oct-2026, Daniel: nombres normales de ERP — la antigüedad va SOLO en rangos.
+    // Sin «Por vencer / Vencido reciente / Vencido crítico / Al día».
+    expect(tramoLabel("current")).toBe("0-90 días");
+    expect(tramoLabel("watch")).toBe("91-120 días");
+    expect(tramoLabel("overdue")).toBe("+120 días");
   });
 
   it("🔄 el ESCRITORIO dice el rango en el chip y el nombre COMPLETO en su `title` (5-sep-2026)", () => {
@@ -138,9 +140,10 @@ describe("los tres tramos se llaman igual en todas partes", () => {
 
 describe("⚠️ NINGÚN corte ni número se movió", () => {
   it("los tres tramos siguen siendo 0-90 / 91-120 / 121+", () => {
-    expect(AGING.current.colLabel).toBe("0-90d");
-    expect(AGING.watch.colLabel).toBe("91-120d");
-    expect(AGING.overdue.colLabel).toBe("121d+");
+    // 1-oct-2026, Daniel: nombres normales de ERP — la antigüedad va SOLO en rangos.
+    expect(AGING.current.colLabel).toBe("0-90 d");
+    expect(AGING.watch.colLabel).toBe("91-120 d");
+    expect(AGING.overdue.colLabel).toBe("+120 d");
   });
 
   it("las píldoras del escritorio siguen sumando lo mismo, tramo por tramo", () => {

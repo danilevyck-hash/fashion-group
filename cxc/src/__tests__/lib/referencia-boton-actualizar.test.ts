@@ -140,7 +140,7 @@ describe("🔴 el botón existe en /referencia", () => {
     // descargar, no bajar, como esté en todos los módulos»). Medido: el sistema
     // dice «Descargar» 23 veces contra 5 formas raras. El botón es el mismo.
     expect(src).toContain("Descargar Excel");
-    expect(src).toContain("aria-label=\"Buscar referencia\"");
+    expect(src).toContain("aria-label=\"Buscar artículo\"");
   });
 
   it("🔴 SIN AVISO: no aparece ninguna advertencia sobre el panel de Switch", () => {

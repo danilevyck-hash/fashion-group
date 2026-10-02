@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
   const codigoOk = validarCodigoParaAtar(v.valor.cliente_codigo, codigos);
   if (!codigoOk.ok || !codigoOk.codigo) {
     return NextResponse.json(
-      { error: codigoOk.ok ? "Elige el cliente" : codigoOk.error },
+      { error: codigoOk.ok ? "Selecciona el cliente" : codigoOk.error },
       { status: 400 },
     );
   }

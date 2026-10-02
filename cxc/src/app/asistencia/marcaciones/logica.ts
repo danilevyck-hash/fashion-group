@@ -125,7 +125,7 @@ export function selloCorto(aparatoId: string | null | undefined): string {
 
 /**
  * Cómo se llama la marca número `indice` del día de esa persona: «Entrada»,
- * «Salida a almuerzo», «Vuelta de almuerzo», «Salida». Más allá de la cuarta
+ * «Salida a almuerzo», «Regreso de almuerzo», «Salida». Más allá de la cuarta
  * —o con un `tipo` que no se reconoce— se dice lo que trae la base, capitalizado.
  */
 export function rotuloDeLaMarca(indice: number, tipo: string | null | undefined): string {

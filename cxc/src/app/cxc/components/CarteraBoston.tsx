@@ -119,7 +119,7 @@ function DetalleBoston({
             onClick={(e) => { e.stopPropagation(); onCobrar(client); }}
             className="inline-flex items-center gap-1.5 rounded-md bg-black px-3 py-1.5 text-xs font-medium text-white transition active:scale-[0.97]"
           >
-            Cobrar
+            Enviar estado de cuenta
           </button>
         )}
         <button

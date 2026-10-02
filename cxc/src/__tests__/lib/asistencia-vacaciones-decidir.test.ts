@@ -12,7 +12,7 @@
 //     DESPUÉS: decidirAMano=0  sinConfigurar=1
 //     ELOYN MENDOZA  29  SIN DINERO -> falta=[no marcó ni un día en esta quincena]
 //
-// O sea: pasó del cajón «Tú decides» (GRIS, con el motivo escrito al lado) al
+// O sea: pasó del cajón «Pago por definir» (GRIS, con el motivo escrito al lado) al
 // cajón «Falta un dato» (ÁMBAR, con el botón a Configuración). El color es la
 // mitad del mensaje: ámbar dice *«arreglame»*, y ahí no hay nada que arreglar —
 // la persona está de vacaciones y su vacación está bien cargada. Peor: el texto
@@ -109,8 +109,8 @@ describe("🔴 ELOYN MENDOZA, la fila real: vacación viva y cero marcas", () =>
     expect(l.faltaConfigurar).toEqual([]);
   });
 
-  // El rótulo decía «Decidilo vos» hasta el 1-sep-2026; se renombró a «Tú decides» porque era voseo y el sistema habla tuteo neutro (candado `nada-de-voseo`).
-  it("cae en «Tú decides» (gris), NO en «Falta un dato» (ámbar)", () => {
+  // El rótulo decía «Decidilo vos» hasta el 1-sep-2026; se renombró a «Tú decides» (y el 1-oct-2026, Daniel: nombres normales de ERP, a «Pago por definir») porque era voseo y el sistema habla tuteo neutro (candado `nada-de-voseo`).
+  it("cae en «Pago por definir» (gris), NO en «Falta un dato» (ámbar)", () => {
     // El color es la mitad del mensaje: ámbar manda a Configuración, y ahí no
     // hay nada que arreglarle.
     expect(grupoDeLinea(lineaDe({ vacaciones: [vacacionDeEloyn()] }))).toBe("decidir");

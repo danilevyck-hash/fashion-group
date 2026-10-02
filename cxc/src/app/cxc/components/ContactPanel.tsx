@@ -75,9 +75,9 @@ export default function ContactPanel({
               <thead>
                 <tr className="text-xs text-gray-400 uppercase tracking-wide">
                   {roleCompanies.length > 1 && <th className="text-left py-1.5 font-medium">Empresa</th>}
-                  <th className="text-right py-1.5 font-medium text-emerald-600" title="0-30 + 31-60 + 61-90 días">Por vencer</th>
-                  <th className="text-right py-1.5 font-medium text-amber-600" title="91-120 días">Vencido reciente</th>
-                  <th className="text-right py-1.5 font-medium text-red-500" title="121-180 + 181-270 + 271-365 + +365 días">Vencido crítico</th>
+                  <th className="text-right py-1.5 font-medium text-emerald-600" title="0-30 + 31-60 + 61-90 días">0-90 días</th>
+                  <th className="text-right py-1.5 font-medium text-amber-600" title="91-120 días">91-120 días</th>
+                  <th className="text-right py-1.5 font-medium text-red-500" title="121-180 + 181-270 + 271-365 + +365 días">+120 días</th>
                   <th className="text-right py-1.5 font-medium">Total</th>
                   <th className="text-right py-1.5 font-medium" title="Cobro real más reciente del cliente en esta empresa (excluye retenciones y recibos en cero)">Último pago</th>
                   <th className="text-right py-1.5 font-medium" title="Última factura del cliente en esta empresa (las notas de crédito no son compras)">Última compra</th>
@@ -157,7 +157,7 @@ export default function ContactPanel({
             onClick={(e) => { e.stopPropagation(); onCobrar(client); }}
             className="inline-flex items-center gap-1.5 rounded-md bg-black px-3 py-1.5 text-xs font-medium text-white transition active:scale-[0.97]"
           >
-            Cobrar
+            Enviar estado de cuenta
           </button>
         )}
         {onOpenEstado && (

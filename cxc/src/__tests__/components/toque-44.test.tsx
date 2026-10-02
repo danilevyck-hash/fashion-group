@@ -85,11 +85,13 @@ describe("AppHeader — botones móviles", () => {
     expect((src.match(/<NotificationCenter \/>/g) ?? []).length).toBe(2);
   });
 
-  it("el botón Salir del drawer es táctil (el drawer es 100% móvil)", async () => {
+  // 1-oct-2026, Daniel: nombres normales de ERP — «Salir» pasó a «Cerrar sesión».
+  // Se busca el botón de texto (no el `title` del ícono, que va antes).
+  it("el botón Cerrar sesión del drawer es táctil (el drawer es 100% móvil)", async () => {
     const { readFileSync } = await import("node:fs");
     const { resolve } = await import("node:path");
     const src = readFileSync(resolve(process.cwd(), "src/components/AppHeader.tsx"), "utf8");
-    expect(botonDe(src, "Salir")).toMatch(/min-h-\[44px\][\s\S]*min-w-\[44px\]|min-w-\[44px\][\s\S]*min-h-\[44px\]/);
+    expect(botonDe(src, ">Cerrar sesión</button>")).toMatch(/min-h-\[44px\][\s\S]*min-w-\[44px\]|min-w-\[44px\][\s\S]*min-h-\[44px\]/);
   });
 });
 
@@ -202,9 +204,9 @@ describe("/home — el encabezado propio, que no pasa por AppHeader", () => {
     expect(src).toMatch(/<IconButton[\s\S]*?label=\{darkMode \? "Modo claro" : "Modo oscuro"\}/);
   });
 
-  it("el botón Salir del home pide 44×44", async () => {
+  it("el botón Cerrar sesión del home pide 44×44", async () => {
     const src = await leer();
-    expect(botonDe(src, "Salir")).toMatch(/min-h-\[44px\][\s\S]*min-w-\[44px\]|min-w-\[44px\][\s\S]*min-h-\[44px\]/);
+    expect(botonDe(src, "Cerrar sesión\n")).toMatch(/min-h-\[44px\][\s\S]*min-w-\[44px\]|min-w-\[44px\][\s\S]*min-h-\[44px\]/);
   });
 
   it("ninguno de los dos vuelve al px-1 suelto de antes", async () => {

@@ -28,7 +28,7 @@ describe("POST · una guía NUEVA no tiene excusa histórica", () => {
 
   it("el mensaje de error dice qué hacer, en español simple", () => {
     const msg = validarEmpresasItems([{ empresa: "VISTANA" }]);
-    expect(msg).toBe('La empresa "VISTANA" no es una de las del grupo. Elige una de la lista.');
+    expect(msg).toBe('La empresa "VISTANA" no es una de las del grupo. Selecciona una de la lista.'); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   it("basta UNA fila mala para rechazar toda la guía", () => {

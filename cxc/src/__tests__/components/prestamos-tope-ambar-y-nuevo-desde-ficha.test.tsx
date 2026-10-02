@@ -62,9 +62,9 @@ describe("1. 🔴 el aviso del tope: ámbar, 8 s, y el tipo lo dice el hook", ()
     expect(avisos.at(-1)).toEqual(["Movimiento registrado", "success"]);
 
     // un error del servidor: «error», aunque el texto no empiece con «Error»
-    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 400, json: async () => ({ error: "Elige a la persona de la lista." }) })) as unknown as typeof fetch);
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 400, json: async () => ({ error: "Selecciona el colaborador de la lista." }) })) as unknown as typeof fetch);
     await act(async () => { await result.current.crear({ empleado_id: "e1", concepto: "Préstamo", monto: 10 }); });
-    expect(avisos.at(-1)).toEqual(["Elige a la persona de la lista.", "error"]);
+    expect(avisos.at(-1)).toEqual(["Selecciona el colaborador de la lista.", "error"]);
   });
 
   it("y la pestaña ya no clasifica por el texto", () => {

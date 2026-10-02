@@ -83,7 +83,7 @@ export function CajaSubtab() {
             {/* Cada cuánto se refresca solo estaba escrito al pie de la pantalla,
                 lejos de la única línea que habla de frescura. Ahora vive acá y a
                 un toque: es metodología, no un aviso. */}
-            <Ayuda titulo="Cada cuánto se actualiza">
+            <Ayuda titulo="Frecuencia de actualización">
               El día en curso se refresca cada 10 minutos.
             </Ayuda>
             <button

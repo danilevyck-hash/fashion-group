@@ -197,8 +197,8 @@ export function ReferenciaView() {
 
       {resp && resp.noEncontrados.length > 0 && (
         <p className="mt-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-          No encontré {resp.noEncontrados.length === 1 ? "el código" : "los códigos"}{" "}
-          <span className="font-medium">{resp.noEncontrados.join(", ")}</span> — ni en ventas ni en compras.
+          {resp.noEncontrados.length === 1 ? "No se encontró el código" : "No se encontraron los códigos"}{" "}
+          <span className="font-medium">{resp.noEncontrados.join(", ")}</span> en ventas ni en compras.
         </p>
       )}
 
@@ -218,7 +218,7 @@ export function ReferenciaView() {
       )}
 
       {resp && !hayResultados && !resp.coincidencias?.length && resp.noEncontrados.length === 0 && (
-        <p className="mt-4 text-sm text-gray-600">No hay nada con eso.</p>
+        <p className="mt-4 text-sm text-gray-600">Sin resultados.</p>
       )}
     </>
   );
@@ -245,7 +245,7 @@ export function ReferenciaView() {
                   value={texto}
                   onChange={(e) => setTexto(e.target.value)}
                   placeholder={PLACEHOLDER_BUSCADOR}
-                  aria-label="Buscar referencia"
+                  aria-label="Buscar artículo"
                   className="min-h-[44px] w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 text-sm outline-none focus:border-gray-900"
                 />
               </div>
@@ -290,7 +290,7 @@ export function ReferenciaView() {
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
             placeholder="Código, modelo o descripción — puedes pegar varios"
-            aria-label="Buscar referencia"
+            aria-label="Buscar artículo"
             className="min-h-[44px] flex-1 rounded-md border border-gray-300 px-3 text-sm outline-none focus:border-gray-900"
           />
           <Button type="submit" disabled={cargando} className="min-h-[44px] shrink-0">
@@ -368,8 +368,8 @@ export function ReferenciaView() {
 
       {resp && resp.noEncontrados.length > 0 && (
         <p className="mt-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-          No encontré {resp.noEncontrados.length === 1 ? "el código" : "los códigos"}{" "}
-          <span className="font-medium">{resp.noEncontrados.join(", ")}</span> — ni en ventas ni en compras.
+          {resp.noEncontrados.length === 1 ? "No se encontró el código" : "No se encontraron los códigos"}{" "}
+          <span className="font-medium">{resp.noEncontrados.join(", ")}</span> en ventas ni en compras.
         </p>
       )}
 
@@ -397,7 +397,7 @@ export function ReferenciaView() {
       )}
 
       {resp && !hayResultados && !resp.coincidencias?.length && resp.noEncontrados.length === 0 && (
-        <p className="mt-4 text-sm text-gray-600">No hay nada con eso.</p>
+        <p className="mt-4 text-sm text-gray-600">Sin resultados.</p>
       )}
     </div>
   );

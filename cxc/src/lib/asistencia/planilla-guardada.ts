@@ -221,7 +221,7 @@ export type FilaLineaGuardada = Record<string, unknown>;
  *
  * 🔴 EL BLOQUE DE DINERO VA EN `null` CUANDO NO HUBO PAGO, nunca en 0. Un 0
  * dice «se le pagó cero»; `null` dice «el sistema se abstuvo». Esa diferencia es
- * media pantalla de este módulo (servicio profesional, «Tú decides», «falta un
+ * media pantalla de este módulo (servicio profesional, «Pago por definir», «falta un
  * dato») y perderla al congelar sería tirar la parte que hay que explicar.
  */
 export function filaDeLinea(planillaId: string, empresa: string, l: LineaPlanilla): FilaLineaGuardada {
@@ -663,7 +663,7 @@ export function validarGuardado(empresaRaw: unknown, desdeRaw: unknown, hastaRaw
   if (!(EMPRESAS_ASISTENCIA as readonly string[]).includes(empresa)) {
     // 🔴 La empresa NO es opcional. Sin ella el cuadro sería de las tres a la
     // vez —el reloj es uno solo— y ni el solapamiento ni el pago tendrían dueño.
-    return { ok: false, error: "Elige una empresa para cerrar la quincena." };
+    return { ok: false, error: "Selecciona una empresa para cerrar la quincena." };
   }
   const desde = typeof desdeRaw === "string" ? desdeRaw.trim() : "";
   const hasta = typeof hastaRaw === "string" ? hastaRaw.trim() : "";
@@ -713,7 +713,7 @@ export function frenoSoloQuincenas(
   return (
     `Solo se cierran quincenas. Llegó del ${fechaCorta(periodo.desde)} al ` +
     `${fechaCorta(periodo.hasta)}, y eso no es una quincena. ` +
-    `Elige una de las quincenas de arriba y vuelve a generar. No se cerró nada.`
+    `Selecciona una de las quincenas de arriba y vuelve a generar. No se cerró nada.`
   );
 }
 

@@ -64,7 +64,7 @@ describe("🔴 se manda por la hoja del teléfono, como en Guías", () => {
     const puerta = puro("src/lib/compartir-archivo.ts");
     expect(puerta).toContain("descargarArchivo(archivo)");
     expect(puerta).toContain("puedeCompartirArchivos");
-    expect(PAPEL_DESCARGADO).toBe("Listo, el papel se bajó");
+    expect(PAPEL_DESCARGADO).toBe("PDF descargado"); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   it("el título y el texto dicen de quién es y de qué mes", () => {

@@ -212,7 +212,7 @@ export default function EnviarEmailModal({ client, onClose, onSent }: Props) {
                     vive en el ⓘ, no ocupando un renglón en cada envío. */}
                 <div className="flex items-center gap-1 mb-1">
                   <label className="block text-xs font-medium text-gray-600">Mensaje</label>
-                  <Ayuda titulo="Qué se envía">
+                  <Ayuda titulo="Contenido del correo">
                     La tabla de saldos se arma automáticamente y no se edita. Se adjunta un PDF por empresa.
                   </Ayuda>
                 </div>

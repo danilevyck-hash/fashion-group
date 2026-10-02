@@ -150,7 +150,7 @@ export default function CorregirMarcacionModal({
   async function guardar() {
     // Botón apagado + este guard: el botón puede apagarse por CSS, la regla no.
     if (!razonOk) return toast(quitando ? "Escribe por qué se quita" : "Escribe por qué se corrige", "error");
-    if (!quitando && !horaGuardar) return toast("Elige la hora", "error");
+    if (!quitando && !horaGuardar) return toast("Selecciona la hora", "error");
     setGuardando(true);
     try {
       const res = await fetch("/api/asistencia/correcciones", {
@@ -170,7 +170,7 @@ export default function CorregirMarcacionModal({
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d.error ?? "No se pudo guardar");
-      toast(quitando ? "Listo, esa marcación ya no cuenta" : "Listo, guardado", "success");
+      toast(quitando ? "Marcación quitada" : "Corrección guardada", "success");
       onGuardado();
       onCerrar();
     } catch (e) {
@@ -190,7 +190,7 @@ export default function CorregirMarcacionModal({
       );
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d.error ?? "No se pudo deshacer");
-      toast("Listo, se deshizo. Vuelve a valer la hora del reloj.", "success");
+      toast("Corrección deshecha. Vuelve a valer la hora del reloj.", "success");
       onGuardado();
       onCerrar();
     } catch (e) {

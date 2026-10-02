@@ -378,7 +378,7 @@ export default function BostonTab() {
                   onClick={() => setCobrarA(c)}
                   className="flex-1 inline-flex min-h-[44px] items-center justify-center rounded-md bg-black px-3 text-xs font-medium text-white active:scale-[0.97]"
                 >
-                  Cobrar
+                  Enviar estado de cuenta
                 </button>
                 <button
                   type="button"
@@ -466,9 +466,11 @@ export default function BostonTab() {
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setCobrarA(c); }}
+                  aria-label="Enviar estado de cuenta"
+                  title="Enviar estado de cuenta"
                   className="shrink-0 rounded-md bg-black px-2.5 py-1 text-xs font-medium text-white transition active:scale-[0.97] hover:bg-gray-800"
                 >
-                  Cobrar
+                  Enviar
                 </button>
               </div>
             </div>

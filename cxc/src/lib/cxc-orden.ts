@@ -104,7 +104,7 @@ export interface ClienteOrdenable {
 
 /**
  * ¿Este cliente pertenece al tramo elegido? Un cliente sin deuda en el tramo NO
- * aparece. "Por vencer" es el cliente cuya deuda está ENTERA dentro del plazo
+ * aparece. "0-90 días" es el cliente cuya deuda está ENTERA dentro del plazo
  * (nada en 91-120 ni en 121+), no el que tiene algo ahí.
  */
 export function pasaFiltroRiesgo(c: ClienteOrdenable, risk: RiskFilter): boolean {
@@ -190,14 +190,14 @@ export function ordenarClientes<T extends ClienteOrdenable>(
 }
 
 /**
- * Cómo se lee el orden activo en pantalla ("ordenados por 121d+"). Los rangos
+ * Cómo se lee el orden activo en pantalla ("ordenados por +120 d"). Los rangos
  * son los mismos de las columnas para que el texto y el encabezado digan igual.
  */
 export function etiquetaOrden(key: SortKey): string {
   if (key === "name") return "nombre";
-  if (key === "current") return "0-90d";
-  if (key === "watch") return "91-120d";
-  if (key === "overdue") return "121d+";
+  if (key === "current") return "0-90 d";
+  if (key === "watch") return "91-120 d";
+  if (key === "overdue") return "+120 d";
   if (key === "sinPagar") return "días sin pagar";
   return "total";
 }

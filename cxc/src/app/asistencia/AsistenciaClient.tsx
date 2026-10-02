@@ -450,7 +450,7 @@ function AsistenciaInner() {
               </div>
               <ControlSegmentado
                 ancho="contenido"
-                ariaLabel="Qué configurar"
+                ariaLabel="Secciones de configuración"
                 options={AJUSTES}
                 active={config}
                 onChange={(v) => cambiarConfig(v)}

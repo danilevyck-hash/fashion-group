@@ -107,7 +107,7 @@ export function MetaAvanceCard({ meta, puedeEditar, onEditar }: Props) {
       <div
         className="mt-2.5 h-2.5 w-full overflow-hidden rounded-full bg-gray-200"
         role="img"
-        aria-label={`Llevan ${pct(a.pctVendido)} de la meta`}
+        aria-label={`Avance ${pct(a.pctVendido)}`}
       >
         <div
           className={`h-full rounded-full transition-all ${a.cumplida ? "bg-emerald-600" : "bg-teal-700"}`}
@@ -119,7 +119,7 @@ export function MetaAvanceCard({ meta, puedeEditar, onEditar }: Props) {
       <p className="mt-2 text-sm text-gray-700">
         {a.cumplida ? (
           <span className="font-medium text-emerald-800">
-            ¡Meta cumplida! Llevan {fmtMoney(a.vendido - a.objetivo)} de más.
+            Meta cumplida (+{fmtMoney(a.vendido - a.objetivo)})
           </span>
         ) : (
           <>
@@ -155,7 +155,7 @@ export function MetaAvanceCard({ meta, puedeEditar, onEditar }: Props) {
                 <TrendingDown className="h-4 w-4 shrink-0 self-center text-amber-700" />
               )}
               <span className="font-medium text-gray-900">
-                {a.estado === "cerrada" ? "Cerraron en" : "Así como van, cierran en"}
+                {a.estado === "cerrada" ? "Cierre" : "Proyección de cierre"}
               </span>
               <span className="font-mono text-lg font-semibold tabular-nums text-gray-950">
                 {fmtMoney(a.proyeccion)}
@@ -166,9 +166,9 @@ export function MetaAvanceCard({ meta, puedeEditar, onEditar }: Props) {
                 a.alcanza ? "text-emerald-800" : "text-amber-800"
               }`}
             >
-              {a.alcanza
-                ? `Alcanza — y sobran ${fmtMoney(Math.abs(a.brechaProyectada ?? 0))}.`
-                : `Así no alcanza: faltarían ${fmtMoney(Math.abs(a.brechaProyectada ?? 0))}.`}
+              {/* 1-oct-2026, Daniel: nombres normales de ERP. Con la meta cerrada
+                  la proyección ES lo vendido: ahí no es «proyectado». */}
+              {`${a.alcanza ? "Excedente" : "Faltante"}${a.estado === "cerrada" ? "" : " proyectado"} ${fmtMoney(Math.abs(a.brechaProyectada ?? 0))}`}
             </p>
 
             {/* 🔑 De dónde sale la cuenta. Sin esto el número parece magia. */}

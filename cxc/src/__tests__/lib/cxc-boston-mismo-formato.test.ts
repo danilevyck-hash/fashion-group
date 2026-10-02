@@ -86,7 +86,8 @@ describe("la pestaña de Boston", () => {
   });
 
   it("«Cobrar» se VE en cada fila", () => {
-    expect(src).toMatch(/>\s*Cobrar\s*</);
+    // 1-oct-2026, Daniel: nombres normales de ERP — «Cobrar» → «Enviar».
+    expect(src).toMatch(/>\s*Enviar\s*</);
     expect(src).toContain("setCobrarA");
   });
 

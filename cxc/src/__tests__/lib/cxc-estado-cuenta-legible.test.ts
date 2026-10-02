@@ -113,7 +113,7 @@ describe("el cajón del GRUPO", () => {
     expect(src).toContain(">Documento<");
     expect(src).toContain(">Fecha<");
     expect(src).toContain(">Días<");
-    expect(src).toContain(">Original<");
+    expect(src).toContain(">Monto<"); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(src).toContain(">Saldo<");
   });
 
@@ -135,7 +135,8 @@ describe("el cajón del GRUPO", () => {
   });
 
   it("🔴 el pie dice «Cobrar» — desde el papel se puede mandar el papel", () => {
-    expect(src).toContain(">\n                Cobrar\n              </button>");
+    // 1-oct-2026, Daniel: nombres normales de ERP — «Cobrar» → «Enviar estado de cuenta».
+    expect(src).toContain(">\n                Enviar estado de cuenta\n              </button>");
     expect(src).not.toContain("Descargar PDF");
     expect(src).not.toMatch(/"Compartir"/);
   });
@@ -148,7 +149,7 @@ describe("el cajón de la cartera de BOSTON", () => {
   // dejaron de plegar juntos para que sigan diciendo lo mismo.
   it("tiene los MISMOS encabezados y TAMPOCO pliega nada", () => {
     expect(src).toContain(">Documento<");
-    expect(src).toContain(">Original<");
+    expect(src).toContain(">Monto<"); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(src).toContain(">Saldo<");
     expect(src, "Boston volvió a plegar y el grupo no").not.toContain("partirDocumentos");
   });

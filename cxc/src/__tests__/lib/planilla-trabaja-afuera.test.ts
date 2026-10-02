@@ -28,7 +28,7 @@
  *    un día»): cobra su quincenal. Sin la casilla, sigue siendo pendiente.
  * 6. El dato: solo `true` cuenta; la columna nace con la migración SIN APLICAR
  *    y por eso se lee APARTE de las fichas y falla abierta a «nadie».
- * 7. Se dice en pantalla: chip «Trabaja afuera» en la ficha y en la planilla.
+ * 7. Se dice en pantalla: chip «Fuera de oficina» en la ficha y en la planilla (1-oct-2026, Daniel: nombres normales de ERP).
  *
  * Fechas fijas, nunca `new Date()`.
  * ─────────────────────────────────────────────────────────────────────────── */
@@ -312,7 +312,7 @@ describe("6. el dato y la regla, puros", () => {
     expect(validarTrabajaAfuera({ trabajaAfuera: "false" })).toEqual({ ok: true, valor: false });
     const r = validarTrabajaAfuera({ trabajaAfuera: "quizás" });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toMatch(/Elige/);
+    if (!r.ok) expect(r.error).toMatch(/Selecciona/); // 1-oct-2026, Daniel: nombres normales de ERP
   });
   it("la regla: exactamente la condición que habría hecho ausencia, y nada más", () => {
     const habil = { trabajaAfuera: true, habil: true, feriado: null, enCurso: false, justificado: null };
@@ -344,7 +344,7 @@ describe("7. se dice en pantalla, y la columna se lee APARTE de las fichas", () 
     codigo: COD, nombre: "ANA TREJOS", empresa: "american_classic", salarioMensual: 800, jornadaSemanal: 40,
     fechaIngreso: null, noMarcaReloj: false, pagaSeguros: true, baseSeguros: null, servicioProfesional: false,
   };
-  it("la ficha lleva el chip «Trabaja afuera» solo con la casilla prendida", () => {
+  it("la ficha lleva el chip «Fuera de oficina» solo con la casilla prendida", () => {
     expect(excepcionesDeLaFicha({ ...ficha, trabajaAfuera: true }).map((e) => e.texto)).toContain(CHIP_TRABAJA_AFUERA);
     expect(excepcionesDeLaFicha(ficha).map((e) => e.texto)).not.toContain(CHIP_TRABAJA_AFUERA);
     expect(excepcionesDeLaFicha({ ...ficha, trabajaAfuera: false })).toEqual([]);
@@ -354,7 +354,8 @@ describe("7. se dice en pantalla, y la columna se lee APARTE de las fichas", () 
     expect(src).toContain("PREGUNTA_TRABAJA_AFUERA");
     expect(src).toContain("PREGUNTA_COBRA_HORAS_EXTRA");
     expect(src).toContain('set({ trabajaAfuera: e.target.value === "si" })');
-    expect(PREGUNTA_TRABAJA_AFUERA).toBe("¿Trabaja afuera?");
+    // 1-oct-2026, Daniel: nombres normales de ERP (antes «¿Trabaja afuera?»).
+    expect(PREGUNTA_TRABAJA_AFUERA).toBe("Trabajo fuera de oficina");
     expect(leer("src/app/asistencia/colaboradores/PersonaPagina.tsx")).toContain("trabajaAfuera: b.trabajaAfuera");
     expect(leer("src/app/asistencia/PlanillaTab.tsx")).toContain("CHIP_TRABAJA_AFUERA");
   });

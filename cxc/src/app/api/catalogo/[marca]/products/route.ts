@@ -207,7 +207,7 @@ async function editProducto(cfg: MarcaConfig, req: NextRequest): Promise<NextRes
       const n = normalizarBultoPzas(v);
       if (n === null) {
         return NextResponse.json(
-          { error: `Piezas por bulto inválidas (un número entero de 1 a ${BULTO_TOMMY_MAX}).` },
+          { error: `Unidades por bulto inválidas (un número entero de 1 a ${BULTO_TOMMY_MAX}).` },
           { status: 400 },
         );
       }

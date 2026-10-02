@@ -51,7 +51,7 @@ export default function FeriadosTab() {
         body: JSON.stringify(f),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo guardar");
-      toast("Listo, guardado", "success");
+      toast("Feriado guardado", "success");
       await cargar();
       return true;
     } catch (e) {
@@ -61,7 +61,7 @@ export default function FeriadosTab() {
   }
 
   async function agregar() {
-    if (!fecha) return toast("Elige la fecha", "error");
+    if (!fecha) return toast("Selecciona la fecha", "error");
     if (!nombre.trim()) return toast("Ponle un nombre", "error");
     if (await guardar({ fecha, nombre: nombre.trim(), tipo })) {
       setFecha(""); setNombre(""); setTipo("feriado");
@@ -84,7 +84,7 @@ export default function FeriadosTab() {
           pantalla. El aviso de que estos días no cuentan como ausencia sigue
           alcanzable de un toque, sin ocupar lugar en cada carga. */}
       <div className="-ml-2 -mt-2">
-        <Ayuda titulo="Para qué sirven los feriados" etiqueta="Para qué sirven">
+        <Ayuda titulo="Feriados" etiqueta="Información">
           <p>
             Estos días <b>no cuentan como ausencia de nadie</b>. Los feriados de Panamá ya
             están cargados; agrega aquí tus cierres propios (inventario, capacitación).

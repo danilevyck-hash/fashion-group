@@ -150,7 +150,7 @@ describe("1 · el interruptor y los números del celular", () => {
     expect(lineaDelMes({ periodo: SEPTIEMBRE, deltaAnioPasado: 0.29335, cierraEn: 47117.38 })).toEqual({
       delta: { texto: "▲ 29 %", tono: "sube" },
       contra: "contra septiembre 2025",
-      cierra: "cierra en $47,117",
+      cierra: "proyección $47,117",
     });
     // Mes cerrado (sin proyección): no se escribe «cierra en».
     expect(lineaDelMes({ periodo: AGOSTO, deltaAnioPasado: null, cierraEn: null }))
@@ -167,7 +167,7 @@ describe("1 · el interruptor y los números del celular", () => {
     });
     expect(r.map((x) => x.clave)).toEqual(["anio", "vendedoras", "productos", "clientes"]);
     expect(r[0]).toEqual({
-      clave: "anio", titulo: "Año 2026", detalle: "retail · cierra en $756,974",
+      clave: "anio", titulo: "Año 2026", detalle: "retail · proyección $756,974",
       monto: "$391,232", delta: { texto: "▲ 16 %", tono: "sube" },
     });
     expect(r[1]).toMatchObject({ titulo: "Vendedoras", detalle: "4 · 690 tickets", monto: "$32,649" });
@@ -214,7 +214,7 @@ describe("1 · el interruptor y los números del celular", () => {
 
   it("🔴 la meta es UN renglón, con los mismos números de la tarjeta", () => {
     expect(renglonMeta({ vendido: 32945.68, objetivo: 420000, proyeccion: 440643.43, pctVendido: 0.07844, cerrada: false }))
-      .toEqual({ titulo: "$32,946 de $420,000", detalle: "así como van cierran en $440,643", pct: "8 %" });
+      .toEqual({ titulo: "$32,946 de $420,000", detalle: "Proyección de cierre $440,643", pct: "8 %" });
     expect(renglonMeta({ vendido: 1, objetivo: 2, proyeccion: null, pctVendido: 0.5, cerrada: false }).detalle).toBeNull();
   });
 });
@@ -376,7 +376,7 @@ describe("2 · al abrir: el mes es el número", () => {
     const linea = inicio.querySelector('[data-celular="linea-del-mes"]')!.textContent;
     expect(linea).toContain("▲ 29 %");
     expect(linea).toContain("contra septiembre 2025");
-    expect(linea).toContain("cierra en $47,117");
+    expect(linea).toContain("proyección $47,117");
   });
 
   it("las barras son 30 y las 7 que faltan van apagadas; los hábitos son la línea de siempre", async () => {
@@ -395,7 +395,7 @@ describe("2 · al abrir: el mes es el número", () => {
     expect(filas.map((f) => f.getAttribute("data-renglon")))
       .toEqual(["anio", "vendedoras", "productos", "clientes"]);
     expect(filas[0].textContent).toContain("Año 2026");
-    expect(filas[0].textContent).toContain("retail · cierra en $756,974");
+    expect(filas[0].textContent).toContain("retail · proyección $756,974");
     expect(filas[0].textContent).toContain("$391,232");
     expect(filas[0].textContent).toContain("▲ 16 %");
     expect(await screen.findByText("4 · 690 tickets")).toBeTruthy();
@@ -458,7 +458,7 @@ describe("3 · 🔴 ningún número se mueve entre la vista de antes y la nueva"
     const nueva = container.querySelector('[data-celular="inicio"]') as HTMLElement;
     expect(nueva.querySelector('[data-celular="numero-del-mes"]')!.textContent).toBe(montoCorto(mesViejo));
     expect(nueva.querySelector('[data-celular="linea-del-mes"]')!.textContent)
-      .toContain(`cierra en ${montoCorto(cierreViejo)}`);
+      .toContain(`proyección ${montoCorto(cierreViejo)}`);
     const filaAnio = nueva.querySelector('[data-renglon="anio"]')!.textContent!;
     expect(filaAnio).toContain(montoCorto(anioViejo));
 
@@ -519,7 +519,7 @@ describe("4 · Vendedoras en el celular", () => {
   it("🔴 la meta es UN renglón, y al tocarlo se abre la tarjeta de metas de siempre", async () => {
     const { container } = await pintarVendedoras();
     const renglon = await screen.findByText("$32,946 de $420,000");
-    expect(renglon.parentElement!.textContent).toContain("así como van cierran en $440,643");
+    expect(renglon.parentElement!.textContent).toContain("Proyección de cierre $440,643");
     const boton = container.querySelector('[data-celular="meta-renglon"]') as HTMLElement;
     expect(boton.textContent).toContain("8 %");
     const cajon = container.querySelector('[data-celular="metas"]') as HTMLElement;

@@ -173,12 +173,12 @@ export function ultimaCompraEnPalabras(
 ): UltimaCompraEnPalabras | null {
   const dias = diasEntre(ultimaCompraIso, hoyIso);
   if (dias == null || dias < 0) return null;
-  if (dias === 0) return { texto: "compró hoy", avisa: false };
-  if (dias === 1) return { texto: "compró ayer", avisa: false };
-  if (dias < 30) return { texto: `compró hace ${dias} días`, avisa: false };
+  if (dias === 0) return { texto: "Última compra: hoy", avisa: false };
+  if (dias === 1) return { texto: "Última compra: ayer", avisa: false };
+  if (dias < 30) return { texto: `Última compra: hace ${dias} días`, avisa: false };
   const meses = Math.floor(dias / 30);
   return {
-    texto: `${meses} ${meses === 1 ? "mes" : "meses"} sin comprar`,
+    texto: `Última compra: hace ${meses} ${meses === 1 ? "mes" : "meses"}`,
     avisa: meses >= MESES_SIN_COMPRAR_AVISA,
   };
 }

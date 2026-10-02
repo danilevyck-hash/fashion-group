@@ -380,7 +380,7 @@ describe("🔴 la cuota entra SOLA — la aprobación quincenal se retiró el 11
     expect(con.prestamoAutomatico).toEqual({ prestamo: 0, terceros: 40, mercancia: 0 });
   });
 
-  it("sin `dinero` (servicio profesional, «Tú decides») no se toca nada", () => {
+  it("sin `dinero` (servicio profesional, «Pago por definir») no se toca nada", () => {
     const [sug] = sugerirPrestamos({ fichas: [fichas[1]], personas: [personas[1]] });
     const linea = { codigo: "53", manuales: MANUAL(), dinero: null };
     expect(aplicarPrestamoEnLinea(linea, sug, true)).toBe(linea);

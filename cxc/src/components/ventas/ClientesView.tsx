@@ -640,7 +640,7 @@ export function ClientesView({
           options={MODO_OPCIONES}
           active={modo}
           onChange={onModo}
-          ariaLabel="Qué mostrar de cada cliente"
+          ariaLabel="Indicador"
           className="lg:hidden"
         />
 
@@ -649,7 +649,7 @@ export function ClientesView({
             options={MODO_OPCIONES}
             active={modo}
             onChange={onModo}
-            ariaLabel="Qué mostrar de cada cliente"
+            ariaLabel="Indicador"
             ancho="contenido"
             className="hidden lg:inline-flex"
           />

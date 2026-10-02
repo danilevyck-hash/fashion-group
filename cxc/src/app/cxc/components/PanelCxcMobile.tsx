@@ -302,7 +302,7 @@ function MobileHeader({
         <SyncNowButton
           className="mt-2"
           opciones={[{ modulo: "estadocuenta", empresa: companyFilter }]}
-          disabledReason={companyFilter === "all" ? "Elige una empresa en el filtro para actualizarla" : null}
+          disabledReason={companyFilter === "all" ? "Selecciona una empresa en el filtro para actualizarla" : null}
           onSuccess={() => onSyncedNow?.()}
         />
       </div>
@@ -619,7 +619,7 @@ function MobileClientCard({
           onClick={e => { e.stopPropagation(); onCobrar(); }}
           className="flex-1 inline-flex min-h-[44px] items-center justify-center rounded-md bg-black px-3 text-xs font-medium text-white active:scale-[0.97]"
         >
-          Cobrar
+          Enviar estado de cuenta
         </button>
         )}
         <button
@@ -772,7 +772,7 @@ function MobileClientExpanded({
           onClick={onCobrar}
           className="inline-flex min-h-[44px] items-center rounded-md bg-black px-3 text-xs font-medium text-white active:scale-[0.97]"
         >
-          Cobrar
+          Enviar estado de cuenta
         </button>
         )}
         <button

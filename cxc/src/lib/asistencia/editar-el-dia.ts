@@ -309,5 +309,5 @@ export function resumenDelPlan(plan: PlanDelDia): string | null {
 /** Lo que se le dice a la persona cuando el día se guardó. */
 export function textoGuardado(plan: PlanDelDia): string {
   const r = resumenDelPlan(plan);
-  return r ? `Listo, guardado — ${r}` : "Listo, guardado";
+  return r ? `Día guardado — ${r}` : "Día guardado";
 }

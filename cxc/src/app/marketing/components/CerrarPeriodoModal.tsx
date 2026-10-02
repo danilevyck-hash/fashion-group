@@ -202,7 +202,7 @@ function CerrarPeriodoModalDeAntes({
           {hayPendientes && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
               <div className="text-sm font-semibold text-amber-900">
-                Antes de cerrar, fíjate
+                Documentación pendiente
               </div>
               <ul className="space-y-2 text-sm text-amber-900">
                 {pendientes.sinComprobante > 0 && (
@@ -212,8 +212,7 @@ function CerrarPeriodoModalDeAntes({
                       comprobante.
                     </span>{" "}
                     <span className="text-amber-800">
-                      Es el papel que respalda la plata. Un reporte sin
-                      comprobantes le va a rebotar al encargado.
+                      Requerido para el reporte a la marca.
                     </span>
                   </li>
                 )}
@@ -400,14 +399,14 @@ function CerrarPeriodoModalRediseno({ bloque, periodoId, onClose, onCerrado }: P
 
           {hayPendientes && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
-              <div className="text-sm font-semibold text-amber-900">Antes de cerrar, fíjate</div>
+              <div className="text-sm font-semibold text-amber-900">Documentación pendiente</div>
               <ul className="space-y-2 text-sm text-amber-900">
                 {pendientes.sinComprobante > 0 && (
                   <li>
                     <span className="font-medium">
                       {plural(pendientes.sinComprobante, "gasto", "gastos")} sin comprobante.
                     </span>{" "}
-                    <span className="text-amber-800">Es el papel que respalda la plata.</span>
+                    <span className="text-amber-800">Requerido para el reporte a la marca.</span>
                   </li>
                 )}
                 {pendientes.sinFoto > 0 && (

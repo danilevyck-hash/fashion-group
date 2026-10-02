@@ -82,8 +82,8 @@ export default function SaldosBancarios({ bancos, historial, onGuardado, titulo 
             <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
               <p className="text-sm font-medium text-amber-900">
                 {repetidas.length === 1
-                  ? "Un saldo quedó igualito al anterior"
-                  : `${repetidas.length} saldos quedaron igualitos al anterior`}
+                  ? "1 saldo sin cambios"
+                  : `${repetidas.length} saldos sin cambios`}
               </p>
               <p className="mt-1 text-xs text-amber-800">
                 {repetidas.map((k) => empresaNombre(k)).join(", ")} — el monto es
@@ -152,7 +152,7 @@ function BancoRow({
       });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.ok) throw new Error("err");
-      toast(corrigiendo ? `Listo, corregido el ${fechaCorta(fecha)}` : "Listo, guardado");
+      toast(corrigiendo ? `Saldo corregido del ${fechaCorta(fecha)}` : "Saldo guardado");
       await onGuardado();
     } catch {
       toast("No se pudo guardar. Intenta de nuevo.", "error");
@@ -175,7 +175,7 @@ function BancoRow({
           <span className="text-sm font-medium text-gray-900 truncate">{empresaNombre(empresaKey)}</span>
           {viejo && (
             <span className="shrink-0 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-1.5 py-px">
-              dato viejo
+              Desactualizado
             </span>
           )}
           {ultimaRepite && (

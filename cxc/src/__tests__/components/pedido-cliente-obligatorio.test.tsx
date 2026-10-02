@@ -151,7 +151,7 @@ describe("Checkout del catálogo — el cliente arranca vacío", () => {
     await pintarCheckout();
     expect(botonEnviar().disabled).toBe(true);
     expect(document.querySelector('[data-medir="falta-enviar"]')!.textContent)
-      .toBe("Falta: elegir el cliente");
+      .toBe("Falta: seleccionar el cliente");
   });
 
   it("🔴 tocar las salidas apagadas NO manda NADA a Switch — ninguna de las dos", async () => {
@@ -288,7 +288,7 @@ describe("Checkout del catálogo — el cliente arranca vacío", () => {
     stubCheckout({ vendedor: null });
     await pintarCheckout();
     expect(document.querySelector('[data-medir="falta-enviar"]')!.textContent)
-      .toBe("Falta: elegir el cliente y elegir el vendedor");
+      .toBe("Falta: seleccionar el cliente y seleccionar el vendedor");
   });
 });
 
@@ -388,7 +388,7 @@ describe("Detalle del pedido — el cliente es UNO SOLO", () => {
     const llamadas = await pintarDetalle({ clienteSwitchId: null });
     const boton = opcionDoc("pedido")!;
     expect(boton.disabled).toBe(true);
-    expect(document.querySelector('[data-medir="falta-enviar"]')!.textContent).toBe("Falta: elegir el cliente");
+    expect(document.querySelector('[data-medir="falta-enviar"]')!.textContent).toBe("Falta: seleccionar el cliente");
     await act(async () => { fireEvent.click(boton); });
     expect(hayEleccion()).toBe(false); // ninguna salida se ofrece
     expect(enviosASwitch(llamadas)).toHaveLength(0);
@@ -472,7 +472,7 @@ describe("Detalle del pedido — el cliente es UNO SOLO", () => {
     const llamadas = await pintarDetalle({ origenShortId: "ab12cd34", clientName: "Nathalie", clienteSwitchId: null });
     const boton = opcionDoc("pedido")!;
     expect(boton.disabled).toBe(true);
-    expect(document.querySelector('[data-medir="falta-enviar"]')?.textContent).toContain("elegir el cliente");
+    expect(document.querySelector('[data-medir="falta-enviar"]')?.textContent).toContain("seleccionar el cliente");
     await act(async () => { fireEvent.click(boton); });
     expect(hayEleccion()).toBe(false);
     expect(enviosASwitch(llamadas)).toHaveLength(0);

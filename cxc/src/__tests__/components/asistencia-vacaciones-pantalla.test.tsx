@@ -77,7 +77,7 @@ vi.mock("@/components/ui/RangoFechas", () => ({
   }) => (
     <div>
       <button type="button" onClick={() => onChange(desde, hasta)}>
-        {vacio ? "Elige el período" : `${desde} – ${hasta}`}
+        {vacio ? "Seleccionar período" : `${desde} – ${hasta}`}
       </button>
       {accion}
     </div>
@@ -102,7 +102,7 @@ function servir(respuestas: Array<[string, unknown]>) {
 const montar = (ui: React.ReactElement) => render(<ToastProvider>{ui}</ToastProvider>);
 
 /**
- * 🩸 15-sep-2026: acá se tocaba «Elige el período» del doble del calendario.
+ * 🩸 15-sep-2026: acá se tocaba «Seleccionar período» del doble del calendario.
  * La Planilla ya no monta el calendario (Daniel: *«si la quincena es fija, que
  * no haya opción de rango, solo las opciones»*): se elige con CUATRO botones —
  * las dos quincenas del mes anterior y las dos del mes en curso—.
@@ -395,14 +395,14 @@ describe("la pestaña: persona + desde + hasta + un interruptor, y nada más", (
     // pagan, y ese default decide una quincena.
     const casillas = screen.getAllByRole("checkbox") as HTMLInputElement[];
     expect(casillas[0].checked).toBe(false);
-    expect(screen.getAllByText("¿Ya cobró estos días antes?").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Días pagados por adelantado") /* 1-oct-2026, Daniel: nombres normales de ERP */.length).toBeGreaterThan(0);
     // ⛔ Desmarcada NO dice nada: ni la frase vieja, ni una nueva.
     expect(screen.queryByText(/Se le pagan estos días/)).toBeNull();
     expect(screen.queryByText(/no se le pagan/i)).toBeNull();
 
     fireEvent.click(casillas[0]);
     await waitFor(() =>
-      expect(screen.getAllByText("Sí → no se le pagan, ya los cobró.").length).toBeGreaterThan(0),
+      expect(screen.getAllByText("No se pagan en esta planilla").length).toBeGreaterThan(0),
     );
   });
 

@@ -142,5 +142,5 @@ export function rotuloDeLote(
   buscando: boolean,
 ): string {
   if (!buscando) return rotuloCompleto;
-  return visibles === 1 ? "Sí al que ves" : `Sí a los ${visibles} que ves`;
+  return visibles === 1 ? "Aprobar 1 visible" : `Aprobar ${visibles} visibles`;
 }

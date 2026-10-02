@@ -135,7 +135,7 @@ describe("🔴 lo que mandan los botones", () => {
     expect(enviados[0].dias).toEqual([{ codigo: "11", fecha: "2026-08-24", minutos: 107 }]);
   });
 
-  it("«Sí a todo lo pendiente»: las cuatro de una, con decision 'si'", async () => {
+  it("«Aprobar pendientes»: las cuatro de una, con decision 'si'", async () => {
     await montar();
     await toca(screen.getByRole("button", { name: ROTULO_SI_A_TODO }));
     expect((enviados[0].dias as unknown[]).length).toBe(4);
@@ -246,7 +246,7 @@ describe("sin nada que decidir", () => {
   it("lo dice y apaga el botón", async () => {
     vi.stubGlobal("fetch", servidor([]));
     render(<ToastProvider><AprobacionesTab /></ToastProvider>);
-    await waitFor(() => expect(screen.getByText(/Nadie hizo horas extra/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/Sin horas extra en el período/)).toBeTruthy());
     expect((screen.getByRole("button", { name: ROTULO_SI_A_TODO }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.queryByTestId("ya-decididas")).toBeNull();
   });

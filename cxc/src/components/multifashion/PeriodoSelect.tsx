@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import type { OpcionPeriodo } from "@/lib/multifashion/periodo";
 
-export const PLACEHOLDER_PERIODO = "Elige el período";
+export const PLACEHOLDER_PERIODO = "Seleccionar período";
 
 interface PeriodoSelectProps {
   valor: string;

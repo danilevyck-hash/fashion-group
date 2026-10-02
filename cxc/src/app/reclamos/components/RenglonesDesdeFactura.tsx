@@ -54,7 +54,7 @@ export default function RenglonesDesdeFactura({ lineas, seleccion, setSeleccion 
 
   return (
     <div>
-      <div className="text-sm font-semibold text-gray-900 mb-2">¿Qué reclamas? Busca en la factura</div>
+      <div className="text-sm font-semibold text-gray-900 mb-2">Líneas de la factura</div>
       <div className="flex items-center gap-3 mb-3 max-w-xl">
         <input
           type="search"

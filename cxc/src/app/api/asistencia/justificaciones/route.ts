@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
   // atrás. La lista vive en `motivos.ts`, no repetida acá.
   if (!motivoSeOfrece(motivo)) {
     return NextResponse.json(
-      { error: `Ese motivo ya no se usa. Elige uno de: ${MOTIVOS_JUSTIFICACION.join(" · ")}.` },
+      { error: `Ese motivo ya no se usa. Selecciona uno de: ${MOTIVOS_JUSTIFICACION.join(" · ")}.` },
       { status: 400 },
     );
   }

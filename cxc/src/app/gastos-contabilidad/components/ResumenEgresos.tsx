@@ -88,23 +88,19 @@ export function explicacionEgresos(
   ultimoMesConMovimientos: string | null,
   descargaAutomatica: boolean = true,
 ): string {
+  // 1-oct-2026, Daniel: nombres normales de ERP — una frase por caso, sin «plata».
   if (!descargaAutomatica) {
-    const traido =
-      estado === "con_movimientos"
-        ? "Lo que ves es de la última vez que se trajo a mano."
-        : ultimoMesConMovimientos
-          ? `Lo último que se trajo a mano es de ${mesLargo(ultimoMesConMovimientos)}.`
-          // 🔴 Decía "nada de esta fuente", y "esta fuente" solo tenía sentido
-          // mientras hubiera otra. Con el mayor retirado, nombrarla insinúa una
-          // segunda que no existe — justo lo que este arreglo vino a sacar.
-          : "Todavía no se ha traído nada.";
-    return `Los gastos de esta empresa no se traen solos de Switch, para no quitarle el panel a quien lo esté usando. ${traido} Esta pantalla es el único lugar donde se ven: para ponerlos al día hay que traerlos a mano otra vez.`;
+    const base = "Carga manual: no se actualiza automáticamente.";
+    if (estado === "con_movimientos") return base;
+    return ultimoMesConMovimientos
+      ? `${base} Última carga: ${mesLargo(ultimoMesConMovimientos)}.`
+      : `${base} Sin cargas todavía.`;
   }
   switch (estado) {
     case "con_movimientos":
       return "";
     case "sin_movimientos":
-      return "Este mes no salió plata de caja ni del banco.";
+      return "Sin egresos este mes.";
     case "sin_datos":
       // 🔴 La coletilla "Lo último que hay es de …" SE FUE (13-ago-2026): la
       // línea de "Cargado hasta …" que ahora lleva cada empresa dice exactamente

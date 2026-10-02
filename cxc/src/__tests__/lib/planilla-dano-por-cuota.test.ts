@@ -41,7 +41,7 @@
  *      NADA: misma referencia, mismo neto, la casilla sigue a mano.
  *   C. Un 0 explícito en «Mercancía» no descuenta, y se DICE (celda y «Antes de
  *      cerrar»). Lo escrito a mano manda.
- *   D. Sin `dinero` (servicio profesional, «Tú decides») no se toca nada.
+ *   D. Sin `dinero` (servicio profesional, «Pago por definir») no se toca nada.
  *   E. La casilla tiene los tres estados de punta a punta: `valorTecleado`,
  *      `normalizarManuales`, la lectura del servidor y la migración.
  *   F. Se registra COMO UN PRÉSTAMO: el formulario pregunta la cuota en «Daño de
@@ -327,7 +327,7 @@ describe("C. un 0 explícito en «Mercancía» no descuenta, y se dice", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("D. sin `dinero` (servicio profesional, «Tú decides») no se toca nada", () => {
+describe("D. sin `dinero` (servicio profesional, «Pago por definir») no se toca nada", () => {
   it("la línea vuelve tal cual, con o sin sugerencia", () => {
     const [sug] = sugerirPrestamos({ fichas: [ficha({ ...STEPHANY, cuotaDano: 25 })], personas: [persona("30", "STEPHANY MORALES")] });
     const l = { codigo: "30", manuales: MANUAL(), dinero: null };

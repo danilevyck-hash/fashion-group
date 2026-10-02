@@ -227,7 +227,7 @@ export default function AgendaLista({
       <div data-agenda="busqueda" className="space-y-1.5">
         {resultados.length === 0 ? (
           <p className="text-sm text-gray-500 py-16 text-center">
-            No encontramos nada para “{termino}”
+            Sin resultados para «{termino}»
           </p>
         ) : (
           resultados.map((item) => (
@@ -244,7 +244,7 @@ export default function AgendaLista({
         <span aria-hidden className="text-3xl mb-3">
           🔔
         </span>
-        <p className="text-sm text-gray-500">Todo al día</p>
+        <p className="text-sm text-gray-500">Sin pendientes</p>
       </div>
     );
   }

@@ -123,8 +123,7 @@ export default function PrestamosBoston() {
       </div>
 
       <p className="text-xs text-gray-500 mb-3">
-        Son los préstamos de las tres empresas que tienen gente con préstamo, no solo los de
-        Confecciones Boston.
+        Incluye colaboradores de todas las empresas, no solo de Boston.
       </p>
 
       <BuscadorDeLista

@@ -82,7 +82,7 @@ export const FICHA_MOTIVO: Record<Motivo, FichaMotivo> = {
     label: "Cheque",
     icono: "💵",
     tabla: TABLA_DE_MOTIVO.cheque,
-    queHace: "Te aviso el día que se puede depositar.",
+    queHace: "Aviso en la fecha de depósito.",
     pide: ["Cliente", "Monto", "Fecha en que se puede depositar"],
   },
   nota: {
@@ -90,7 +90,7 @@ export const FICHA_MOTIVO: Record<Motivo, FichaMotivo> = {
     label: "Nota",
     icono: "🔔",
     tabla: TABLA_DE_MOTIVO.nota,
-    queHace: "Te aviso el día que elijas, a las 9:00 de la mañana.",
+    queHace: "Aviso en la fecha seleccionada, 9:00 a. m.",
     pide: ["Descripción", "Fecha"],
   },
 };

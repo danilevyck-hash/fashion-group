@@ -559,7 +559,7 @@ describe("🔴 UNA SOLA PUERTA — «＋ Recordar» (22-sep-2026)", () => {
     expect([...puerta.querySelectorAll("[data-motivo]")].map((n) => n.getAttribute("data-motivo")))
       .toEqual(["cheque", "nota"]);
     // Y cada uno dice qué va a pasar ANTES de elegirlo.
-    expect(puerta.textContent).toContain("Te aviso el día que se puede depositar.");
+    expect(puerta.textContent).toContain("Aviso en la fecha de depósito."); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   it("🔴 abrir la puerta NO guarda nada", async () => {

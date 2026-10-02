@@ -219,9 +219,10 @@ describe("reglas que mandan antes del orden elegido (no se tocaron)", () => {
 
 describe("etiqueta del orden en pantalla", () => {
   it("usa los mismos rangos que las columnas (0-90 / 91-120 / 121+, los de Daniel)", () => {
-    expect(etiquetaOrden("current")).toBe("0-90d");
-    expect(etiquetaOrden("watch")).toBe("91-120d");
-    expect(etiquetaOrden("overdue")).toBe("121d+");
+    // 1-oct-2026, Daniel: nombres normales de ERP — el rango angosto de las columnas.
+    expect(etiquetaOrden("current")).toBe("0-90 d");
+    expect(etiquetaOrden("watch")).toBe("91-120 d");
+    expect(etiquetaOrden("overdue")).toBe("+120 d");
     expect(etiquetaOrden("total")).toBe("total");
     expect(etiquetaOrden("name")).toBe("nombre");
   });

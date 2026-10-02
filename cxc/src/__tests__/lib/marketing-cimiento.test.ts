@@ -595,11 +595,11 @@ describe("7 · 🔴 el proyecto no vuelve a decidir la tienda", () => {
   it("qué le falta a un gasto se dice en palabras, y la tienda solo se exige si «es de una tienda»", () => {
     expect(faltantesDelGasto({ tipo: "factura", marcaCodigo: "TH", monto: 10, fecha: "2026-09-22" })).toEqual([]);
     expect(faltantesDelGasto({ tipo: "factura", marcaCodigo: "TH", monto: 10, fecha: "2026-09-22", esDeTienda: true })).toEqual([
-      "Elige la tienda del directorio.",
+      "Selecciona la tienda del directorio.", // 1-oct-2026, Daniel: nombres normales de ERP («Elige» → «Selecciona»)
     ]);
     expect(faltantesDelGasto({ tipo: "x", marcaCodigo: "", monto: 0, fecha: "hoy" })).toEqual([
-      "Elige qué tipo de gasto es.",
-      "Elige la marca.",
+      "Selecciona el tipo de gasto.",
+      "Selecciona la marca.",
       "Escribe el monto.",
       "Pon la fecha.",
     ]);

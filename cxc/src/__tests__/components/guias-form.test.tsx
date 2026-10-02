@@ -213,7 +213,7 @@ describe("Cliente · cerrado contra la lista", () => {
   it("sin escribir nada, la salida a mano no se puede elegir — dice qué hacer", () => {
     render(<Harness itemsIniciales={[filaBase()]} />);
     fireEvent.focus(campo("cliente", "a"));
-    expect(screen.getAllByText(/Escribe el nombre y elige/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Escribe el nombre y selecciona/).length).toBeGreaterThan(0); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(screen.queryByText("➕ Ingresar manualmente")).toBeNull(); // 1-oct-2026, Daniel: nombres normales de ERP (la ayuda sí nombra la opción)
   });
 
@@ -224,7 +224,7 @@ describe("Cliente · cerrado contra la lista", () => {
   it("un cliente vinculado dice su código; uno a mano no lleva ningún sello", () => {
     cleanup();
     render(<Harness itemsIniciales={[filaBase({ cliente: "City Mall", cliente_codigo: "D-101" })]} />);
-    expect(screen.getAllByTitle(/Vinculado al directorio/).length).toBeGreaterThan(0);
+    expect(screen.getAllByTitle(/Cliente vinculado/).length).toBeGreaterThan(0); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(screen.getAllByText("D-101").length).toBeGreaterThan(0);
 
     cleanup();

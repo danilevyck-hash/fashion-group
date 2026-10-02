@@ -14,9 +14,11 @@
 //
 // Dos bloques y un pie:
 //   · **Descuentos** — lo que se le bajó a la gente.
-//   · **Deudas nuevas** — lo que nació.
-//   · el pie dice cuánto se prestó, cuánto se descontó y **cuánto creció o bajó
-//     la deuda del grupo**, que es la línea que hoy no existe en ninguna pantalla.
+//   · **Cargos** — lo que nació (préstamo, daño, descuento a terceros).
+//   · el pie dice los cargos, los descuentos y **cuánto aumentó o disminuyó
+//     el saldo del grupo**, que es la línea que hoy no existe en ninguna pantalla.
+//   (1-oct-2026, Daniel: nombres normales de ERP — «Deudas nuevas / Se prestó /
+//   Se descontó / La deuda creció» pasaron a «Cargos / Descuentos / Aumento del saldo».)
 //
 // 🔴 La columna «Origen» es la razón de ser de todo esto: dice si el movimiento
 // lo anotó el CIERRE o lo escribió alguien A MANO. La regla vive en
@@ -176,8 +178,8 @@ export default function MovimientosQuincenaTab(props: { empresa?: string }) {
           {/* 🔴 EL PIE: la línea que hoy no existe en ninguna pantalla. */}
           <div className="rounded-lg border border-gray-200 px-4 py-3">
             <div className="flex flex-wrap gap-x-8 gap-y-3">
-              <Dato rotulo="Se prestó" valor={money(resumen.deudas.total)} />
-              <Dato rotulo="Se descontó" valor={money(resumen.descuentos.total)} />
+              <Dato rotulo="Cargos" valor={money(resumen.deudas.total)} />
+              <Dato rotulo="Descuentos" valor={money(resumen.descuentos.total)} />
               <Dato
                 rotulo={rotuloDeLaVariacion(resumen.variacion)}
                 valor={money(Math.abs(resumen.variacion))}
@@ -196,8 +198,8 @@ export default function MovimientosQuincenaTab(props: { empresa?: string }) {
       )}
 
       <p className="text-sm text-gray-500">
-        «Del cierre» quiere decir que lo registró el cierre de la planilla de esa
-        quincena. «A mano» quiere decir que alguien lo escribió en Préstamos.
+        «Cierre de planilla» quiere decir que lo registró el cierre de la planilla de esa
+        quincena. «Manual» quiere decir que alguien lo escribió en Préstamos.
       </p>
     </div>
   );

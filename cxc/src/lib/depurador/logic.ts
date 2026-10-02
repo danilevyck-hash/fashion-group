@@ -466,7 +466,7 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
 
   const missing = columnasQueFaltan(headers);
   if (missing.length) {
-    throw new Error("No encontré estas columnas en el archivo: " + missing.join(", ") +
+    throw new Error("No se encontraron estas columnas en el archivo: " + missing.join(", ") +
       ". Revisa que sea el Excel correcto del proveedor.");
   }
 

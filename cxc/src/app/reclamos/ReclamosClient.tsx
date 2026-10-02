@@ -477,7 +477,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
         setEditSaving(false); return;
       }
       setEditMode(false); await loadDetail(current.id); loadReclamos();
-      setToast("Listo, guardado"); setTimeout(() => setToast(null), 3000);
+      setToast("Reclamo guardado"); setTimeout(() => setToast(null), 3000);
     } catch { setToast("Sin conexión. Verifica tu internet e intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
     setEditSaving(false);
   }

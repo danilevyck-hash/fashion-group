@@ -113,7 +113,7 @@ const ALTO_CALENDARIO = 420;
 
 /** «28 oct – 10 nov 2026 · 14 días». El año se dice UNA vez si es el mismo. */
 export function etiquetaRango(desde: string, hasta: string): string {
-  if (!desde || !hasta) return "Elige el período";
+  if (!desde || !hasta) return "Seleccionar período";
   const [a1, m1, d1] = desde.split("-").map(Number);
   const [a2, m2, d2] = hasta.split("-").map(Number);
   const dias = Math.round((deIso(hasta).getTime() - deIso(desde).getTime()) / 86_400_000) + 1;
@@ -157,7 +157,7 @@ interface Props {
    */
   sugerido?: string | null;
   /**
-   * Lo que dice el botón cuando está vacío. «Elige el período» de siempre; la
+   * Lo que dice el botón cuando está vacío. «Seleccionar período» de siempre; la
    * Planilla lo llama «Otro rango» porque la quincena se elige con dos botones
    * y el calendario queda para lo que no es una quincena (10-sep-2026).
    */
@@ -172,7 +172,7 @@ interface Props {
 }
 
 export default function RangoFechas({
-  desde, hasta, onChange, recordarComo, label = "Período", vacio = false, textoVacio = "Elige el período",
+  desde, hasta, onChange, recordarComo, label = "Período", vacio = false, textoVacio = "Seleccionar período",
   inline = false, accion, sugerido = null, iconoSolo = false,
 }: Props) {
   const [abierto, setAbierto] = useState(false);
@@ -226,9 +226,9 @@ export default function RangoFechas({
   // encabezado es lo único que distingue «ya se eligió el inicio» de «no pasó
   // nada».
   const titulo = ancla
-    ? `${etiquetaRango(ancla, ancla).split(" · ")[0]} — ahora elige el último día`
+    ? `${etiquetaRango(ancla, ancla).split(" · ")[0]} — ahora selecciona el último día`
     : vacio
-      ? "Elige el primer día"
+      ? "Selecciona el primer día"
       : etiquetaRango(desde, hasta);
 
   const cuerpo = () => (

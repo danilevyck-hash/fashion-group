@@ -128,7 +128,7 @@ describe("🩸 el avance de la contadora se ve, empresa por empresa", () => {
     render(<ResumenEgresos empresas={PRODUCCION} onAbrir={() => {}} />);
     const fila = filaDe("Confecciones Boston");
     expect(within(fila).queryByText("Todavía no hay gastos registrados")).toBeNull();
-    expect(fila.textContent).toMatch(/no se traen solos de Switch/);
+    expect(fila.textContent).toMatch(/Carga manual: no se actualiza automáticamente/); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   it("🔴 la línea está en las DOS formas de la lista (tarjetas Y tabla)", () => {

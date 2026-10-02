@@ -73,7 +73,7 @@ export default function EmpresaSelector({
         {(role === "admin" || role === "secretaria") && (
           <div className={`grid grid-cols-1 ${cajas} gap-2 mb-5`} data-medir="reclamos-portada">
             <div className="border border-gray-200 rounded-lg p-4">
-              <div className="text-xs text-gray-400 uppercase tracking-widest">Por cobrar</div>
+              <div className="text-xs text-gray-400 uppercase tracking-widest">Pendiente de cobro</div>
               <div className="text-xl font-semibold mt-1 tabular-nums">${fmt(resumen.porCobrar.monto)}</div>
               <div className="text-sm text-gray-500 mt-0.5">{resumen.porCobrar.n} reclamo{resumen.porCobrar.n === 1 ? "" : "s"}</div>
               {/* Lo viejo se dice AQUÍ, donde está la plata que se debe cobrar.
@@ -114,7 +114,7 @@ export default function EmpresaSelector({
                 <p className="text-sm text-gray-500">{results.length} resultado{results.length === 1 ? "" : "s"} para &quot;{globalSearch}&quot;</p>
                 <button onClick={() => setGlobalSearch("")} className="text-sm text-gray-400 hover:text-black transition min-h-[44px] px-2">× Limpiar</button>
               </div>
-              {results.length === 0 ? <EmptyState title={`No encontramos nada para "${globalSearch}"`} /> : (
+              {results.length === 0 ? <EmptyState title={`Sin resultados para «${globalSearch}»`} /> : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm min-w-[560px]">
                     <thead><tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-400">
@@ -133,7 +133,7 @@ export default function EmpresaSelector({
                           </td>
                           <td className="py-3 text-gray-500">{nombreCorto(r.empresa)}</td>
                           <td className={`py-3 ${esPendiente(r) && !estaReclamado(r) ? "text-red-600" : "text-gray-500"}`}>{esPendiente(r) ? textoReclamado(r) : "—"}</td>
-                          <td className="py-3 text-gray-500">{esPendiente(r) ? "Por cobrar" : "Cobrado"}</td>
+                          <td className="py-3 text-gray-500">{esPendiente(r) ? "Pendiente" : "Cobrado"}</td>
                           <td className="py-3 text-right tabular-nums">${fmt(reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total)}</td>
                         </tr>
                       ))}
@@ -171,7 +171,7 @@ export default function EmpresaSelector({
                     )}
                   </div>
                   {sinNada ? (
-                    <p className="text-sm text-gray-400 mt-1">{t.tieneHistoria ? "Nada por cobrar" : TODAVIA_SIN_RECLAMOS}</p>
+                    <p className="text-sm text-gray-400 mt-1">{t.tieneHistoria ? "Sin pendientes" : TODAVIA_SIN_RECLAMOS}</p>
                   ) : (
                     <>
                       {detalle && <p className="text-sm text-gray-500 mt-1">{detalle}</p>}

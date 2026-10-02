@@ -137,7 +137,7 @@ export default function CatalogoStickyCartBar({
       <div key={item.product_id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
         <div className="flex-1 min-w-0 mr-3">
           <span className={c.itemName}>{item.name}</span>
-          <span className={c.itemMeta}>x{item.quantity} bulto{item.quantity !== 1 ? "s" : ""} ({l.piezas} pzas)</span>
+          <span className={c.itemMeta}>x{item.quantity} bulto{item.quantity !== 1 ? "s" : ""} ({l.piezas} u)</span>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <div className="flex items-center gap-0.5">

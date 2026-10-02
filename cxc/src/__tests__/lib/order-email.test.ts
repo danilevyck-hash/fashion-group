@@ -42,7 +42,7 @@ describe("correo de pedido — español", () => {
     // ningún otro lado. Sus tildes ya no se pueden verificar acá porque los
     // textos no existen; el candado de que no vuelvan vive en
     // lib/poda-textos-cxc-multifashion.test.ts.
-    expect(html).toContain("Total: 3 bultos (36 piezas)");
+    expect(html).toContain("Total: 3 bultos (36 unidades)");
   });
 
   it("no quedó ninguna palabra sin tilde de las que estaban mal", () => {

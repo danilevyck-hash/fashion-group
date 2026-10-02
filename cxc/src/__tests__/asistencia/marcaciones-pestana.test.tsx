@@ -223,7 +223,7 @@ describe("🔴 en el celular, una tarjeta por colaborador y por día", () => {
     const t = tarjetasDeMarcaciones(MISMO_LUGAR);
     expect(t).toHaveLength(1);
     expect(t[0].marcas.map((m) => m.rotulo)).toEqual([
-      "Entrada", "Salida a almuerzo", "Vuelta de almuerzo", "Salida",
+      "Entrada", "Salida a almuerzo", "Regreso de almuerzo", "Salida",
     ]);
   });
 
@@ -285,7 +285,7 @@ describe("🔴 en la computadora, las seis columnas", () => {
     }
     // 🔴 La columna «Marca» dice qué marca es, por su ORDEN en el día — no
     // «entrada / salida / entrada / salida», que es lo único que guarda la base.
-    for (const rotulo of ["Entrada", "Salida a almuerzo", "Vuelta de almuerzo", "Salida"]) {
+    for (const rotulo of ["Entrada", "Salida a almuerzo", "Regreso de almuerzo", "Salida"]) {
       expect(screen.getAllByRole("cell", { name: rotulo })).toHaveLength(1);
     }
   });

@@ -101,7 +101,7 @@ function textoCorrecciones(d: { correcciones: DiaReporte["correcciones"] }): str
  * de la G rompe la forma de leer el archivo que ella tiene hace meses.
  *
  *   D(3) Entrada · E(4) Sale almuerzo · F(5) Vuelve · G(6) Salida
- *   H(7) Todas las marcas · I(8) Cuántas marcas   ← NUEVAS, al lado
+ *   H(7) Todas las marcas · I(8) Cantidad de marcas   ← NUEVAS, al lado
  */
 export const COL_ENTRADA = 3;
 export const COL_SALIDA = 6;
@@ -156,13 +156,13 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
     // salen max 4 marcaciones el excel que descargo»*. 🩸 Tenía razón: las
     // cuatro columnas de arriba se llenan por índice, así que un día de 5
     // marcas escribía la 1.ª, la 2.ª, la 3.ª y la 5.ª y la CUARTA no aparecía
-    // en ningún lado. Con «Cuántas marcas» el filtro de la fila 1 le da en dos
+    // en ningún lado. Con «Cantidad de marcas» el filtro de la fila 1 le da en dos
     // clics los días de más de 4, y al lado están sus horas.
     // ⚠️ LAS CUATRO DE SIEMPRE NO SE TOCAN: ella las lee por POSICIÓN (D, E, F
     // y G) y siguen donde estaban, con el mismo contenido. Lo nuevo se INSERTA
     // después, nunca en el medio de ellas.
-    "Todas las marcas","Cuántas marcas",
-    "Tarde (min)","Exceso almuerzo (min)","Salida temprana (min)","Extra (min)",
+    "Todas las marcas","Cantidad de marcas",
+    "Tardanza (min)","Exceso de almuerzo (min)","Salida temprana (min)","Extra (min)",
     // 🔑 «Ausencia» a secas ya no alcanza: un día de trabajo fuera de la
     // oficina cae en esta misma columna y NO es una ausencia.
     "Trabajado (min)","Revisar","Ausencia / justificación","Corregido a mano",
@@ -241,11 +241,11 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
 
   // Hoja 2 — Resumen. Es la que se mira.
   const resumen: unknown[][] = [[
-    "Colaborador","Código","Sale","Días trabajados","Ausencias sin justificar",
+    "Colaborador","Código","Horario de salida","Días trabajados","Ausencias sin justificar",
     // 🔑 Columna propia, no sumada a las ausencias justificadas: son días
     // TRABAJADOS y meterlos en la misma cifra es lo que este motivo eliminó.
     "Ausencias justificadas","Días trabajando fuera","Tardanzas","Minutos tarde","…de días a revisar",
-    "Exceso almuerzo (min)","Salida temprana (min)","Tiempo no trabajado (min)",
+    "Exceso de almuerzo (min)","Salida temprana (min)","Tiempo no trabajado (min)",
     "Extras (min)","Días a revisar","Días corregidos a mano",
     // 🔴 AL FINAL, no intercaladas: la columna «…de días a revisar» se pinta
     // en rojo por POSICIÓN (índice 9) y meter algo en el medio teñiría los
@@ -331,10 +331,10 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
     // hasta que llegue a 4 maximo. cuando hay 5 o mas es porq es error»*. El
     // texto dice EXACTAMENTE 4 y nombra las dos formas de estar mal.
     ["Días a revisar", "El día no tiene EXACTAMENTE 4 marcas: le falta alguna, o marcó de más. Los minutos SÍ cuentan; la marca es para corregirlo."],
-    ["Todas las marcas / Cuántas marcas", "Todas las horas que marcó ese día, en orden, y cuántas son. Las cuatro columnas de la izquierda solo tienen lugar para cuatro, así que la quinta y la sexta se leen aquí. Filtra «Cuántas marcas» por 5 o más para ver quién marcó de más."],
+    ["Todas las marcas / Cantidad de marcas", "Todas las horas que marcó ese día, en orden, y cuántas son. Las cuatro columnas de la izquierda solo tienen lugar para cuatro, así que la quinta y la sexta se leen aquí. Filtra «Cantidad de marcas» por 5 o más para ver quién marcó de más."],
     // 🔴 18-sep-2026 — Daniel: *«quiero que el sistema agarre la primera
     // marcación y olvide la próxima si es en x cantidad de tiempo»* · «1 minuto».
-    ["Marca repetida", `Una marca a ${SEGUNDOS_MARCA_REPETIDA} segundos o menos de la anterior es el dedo que tocó dos veces: se conserva la primera y la repetida NO cuenta para nada. Sale en «Todas las marcas» como «(repetida, no cuenta)» y no entra en «Cuántas marcas». El reloj la sigue teniendo guardada.`],
+    ["Marca repetida", `Una marca a ${SEGUNDOS_MARCA_REPETIDA} segundos o menos de la anterior es el dedo que tocó dos veces: se conserva la primera y la repetida NO cuenta para nada. Sale en «Todas las marcas» como «(repetida, no cuenta)» y no entra en «Cantidad de marcas». El reloj la sigue teniendo guardada.`],
     ["Corregido a mano", "La hora que marcó el reloj NUNCA se borra: la corrección va encima y es la que cuenta. La columna dice la hora del reloj, la corregida, por qué y quién la puso."],
     [],
     ["Todo en MINUTOS, no en horas decimales."],
@@ -401,8 +401,8 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
     // 🔴 «Corregidos» va en el papel QUE SE FIRMA. Este PDF es el que llega a
     // planilla: un total que se lee sin saber que hay horas escritas a mano es
     // exactamente lo que no puede pasar.
-    head: [["Colaborador", "Sale", "Días", "Ausen.", "Tardan-\nzas", "Min\ntarde",
-            "Exceso\nalmuerzo", "Salida\ntemprana", "No trabajado\n(min)", "Extras\n(min)", "A\nrevisar", "Días\ncorreg."]],
+    head: [["Colaborador", "Horario\nde salida", "Días", "Ausen-\ncias", "Tardan-\nzas", "Min\ntarde",
+            "Exceso de\nalmuerzo", "Salida\ntemprana", "Tiempo no\ntrabajado (min)", "Extras\n(min)", "A\nrevisar", "Días\ncorreg."]],
     body: personas.map((p) => {
       const r = p.resumen;
       return [

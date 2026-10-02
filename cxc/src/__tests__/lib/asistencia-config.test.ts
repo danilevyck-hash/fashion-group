@@ -152,7 +152,7 @@ describe("los valores por defecto son los que confirmó la contable", () => {
     expect(claves).not.toMatch(/quincena|dia31|dia_31|ausencia/i);
     // Y la pantalla se lo dice al usuario en vez de dejarlo adivinando.
     // 1-sep-2026: el texto de pantalla pasó a tuteo neutro (sin voseo) — candado en `nada-de-voseo.test.ts`.
-    expect(leer("src/app/asistencia/ConfiguracionTab.tsx")).toContain("Esto no se cambia desde aquí");
+    expect(leer("src/app/asistencia/ConfiguracionTab.tsx")).toContain("Parámetros fijos") /* 1-oct-2026, Daniel: nombres normales de ERP */;
   });
 
   it("la migración documenta las DOS condiciones y la trampa del Excel viejo", () => {

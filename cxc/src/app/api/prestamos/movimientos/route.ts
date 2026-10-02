@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
   if (concepto === CONCEPTO_PAGO) {
     const o = body?.origen_pago ?? ORIGEN_POR_DEFECTO;
     if (!esOrigenPago(o)) {
-      return NextResponse.json({ error: "Elige de dónde salió el pago." }, { status: 400 });
+      return NextResponse.json({ error: "Selecciona de dónde salió el pago." }, { status: 400 });
     }
     origenPago = o;
   }

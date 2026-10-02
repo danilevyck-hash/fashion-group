@@ -52,8 +52,8 @@ import type { Resultado } from "./config";
 // LAS PALABRAS — en español simple, sin jerga
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Cómo se pregunta en la ficha. */
-export const PREGUNTA_SEGUROS = "¿Se le descuentan los seguros?";
+/** El rótulo en la ficha. 1-oct-2026, Daniel: nombres normales de ERP (antes «¿Se le descuentan los seguros?»). */
+export const PREGUNTA_SEGUROS = "Descuento de seguros (SS y SE)";
 
 /** El rótulo de lo normal, y de lo que pasa si nadie toca nada. */
 export const ETIQUETA_PAGA_SEGUROS = "Sí — seguro social y educativo";
@@ -102,7 +102,7 @@ export function validarPagaSeguros(body: unknown): Resultado<boolean> {
   if (v === undefined || v === null || v === "") return { ok: true, valor: true };
   if (v === true || v === false) return { ok: true, valor: v };
   if (v === "true" || v === "false") return { ok: true, valor: v === "true" };
-  return { ok: false, error: "Elige si se le descuentan los seguros o no." };
+  return { ok: false, error: "Selecciona si se le descuentan los seguros o no." };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

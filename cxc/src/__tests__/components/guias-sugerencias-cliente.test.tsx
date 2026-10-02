@@ -107,7 +107,7 @@ describe("🔴 el aviso de números se VE en pantalla", () => {
   it("Sporting Shoes N7 muestra el candidato con su advertencia", () => {
     abrir({ clienteTexto: "Sporting Shoes N7 " });
     expect(screen.getAllByText(/Sporting Shoes N 4/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/los números no son los mismos/i)).toBeTruthy();
+    expect(screen.getByText(/los números no coinciden/i)).toBeTruthy(); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   it("y aun así no ata: hay que tocar y después Guardar", () => {
@@ -144,7 +144,7 @@ describe("la ventana sigue haciendo lo de antes", () => {
   /**
    * 🩸 "Lo que dice la guía no cambia" es lo que hace que alguien se anime a
    * tocar una guía CERRADA. Desde la poda de textos (ago-2026) no está suelto
-   * en la ventana: vive dentro del ⓘ "Qué se guarda". Escondido detrás de un
+   * en la ventana: vive dentro del ⓘ "Información" (1-oct-2026, Daniel: nombres normales de ERP; antes «Qué se guarda»). Escondido detrás de un
    * toque sigue valiendo; BORRADO, no. Por eso el candado ya no busca el texto
    * a secas —eso volvería a ponerse verde el día que alguien lo dejara en un
    * comentario— sino que ABRE el ⓘ y comprueba que se puede leer.
@@ -153,7 +153,7 @@ describe("la ventana sigue haciendo lo de antes", () => {
     abrir();
     expect(screen.queryByText(/Lo que dice la guía no cambia/i)).toBeNull();
 
-    const ayuda = screen.getByRole("button", { name: "Qué se guarda" });
+    const ayuda = screen.getByRole("button", { name: "Información" }); // 1-oct-2026, Daniel: nombres normales de ERP
     fireEvent.click(ayuda);
 
     expect(screen.getByText(/Lo que dice la guía no cambia/i)).toBeTruthy();

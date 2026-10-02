@@ -539,7 +539,7 @@ export function MetaFormModal({
                   onClick={() => onRetirar(meta.id)}
                   className="min-h-[44px] rounded-md border border-rose-300 bg-rose-50 px-3 text-sm font-medium text-rose-800 transition active:scale-[0.97]"
                 >
-                  Sí, retirar
+                  Sí, anular
                 </button>
               ) : (
                 <button
@@ -547,7 +547,7 @@ export function MetaFormModal({
                   onClick={() => setConfirmarRetiro(true)}
                   className="min-h-[44px] rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition active:scale-[0.97] hover:border-gray-400"
                 >
-                  Retirar
+                  Anular
                 </button>
               ))}
           </div>

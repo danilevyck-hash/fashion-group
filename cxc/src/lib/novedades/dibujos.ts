@@ -191,14 +191,14 @@ export const DIBUJOS = {
     ],
   },
   "una-sola-puerta-cobrar": {
-    alt: "Se fueron el menú «···» y el clic derecho: en cada fila está el botón «Cobrar».",
+    alt: "Se fueron el menú «···» y el clic derecho: en cada fila está el botón «Enviar».",
     piezas: [
       // «Menú ···» y no «···» a secas: medido en pantalla, tres puntos tenues
       // dentro de una caja tachada se leen como una caja VACÍA.
       { t: "caja", texto: "Menú ···", apagado: true, tachado: true },
       { t: "flecha" },
       // Medido: `ClientRow.tsx` lo pinta `rounded-md bg-black … text-white`.
-      { t: "caja", texto: "Cobrar", boton: true },
+      { t: "caja", texto: "Enviar", boton: true },
     ],
   },
 

@@ -76,7 +76,7 @@ vi.mock("@/components/ui/RangoFechas", () => ({
   }) => (
     <div>
       <button type="button" onClick={() => onChange(desde, hasta)}>
-        {vacio ? "Elige el período" : `${desde} – ${hasta}`}
+        {vacio ? "Seleccionar período" : `${desde} – ${hasta}`}
       </button>
       {accion}
     </div>
@@ -115,7 +115,7 @@ function montar(ui: React.ReactElement) {
 }
 
 /**
- * 🩸 15-sep-2026: acá se tocaba «Elige el período» del doble del calendario.
+ * 🩸 15-sep-2026: acá se tocaba «Seleccionar período» del doble del calendario.
  * La Planilla ya no monta el calendario (Daniel: *«si la quincena es fija, que
  * no haya opción de rango, solo las opciones»*): se elige con CUATRO botones —
  * las dos quincenas del mes anterior y las dos del mes en curso—.
@@ -201,7 +201,7 @@ describe("Horarios — el porqué pasó al ⓘ; lo que hay que confirmar se qued
     montar(<HorariosTab />);
     await screen.findByText(/Ángela García/);
     esperaDetrasDelInfo(
-      "De dónde sale la hora sugerida",
+      "Hora de salida sugerida", // 1-oct-2026, Daniel: nombres normales de ERP
       // 1-sep-2026: el texto de pantalla pasó a tuteo neutro (sin voseo) — candado en `nada-de-voseo.test.ts`.
       /Lo que fijes aquí manda sobre lo que diga el reloj/,
     );
@@ -226,7 +226,7 @@ describe("Feriados", () => {
     servir([["/api/asistencia/feriados", { feriados: [{ fecha: "2026-11-03", nombre: "Separación de Colombia" }] }]]);
     montar(<FeriadosTab />);
     await screen.findByText("Separación de Colombia");
-    esperaDetrasDelInfo("Para qué sirven los feriados", /Los feriados de Panamá ya/);
+    esperaDetrasDelInfo("Feriados", /* 1-oct-2026, Daniel: nombres normales de ERP */ /Los feriados de Panamá ya/);
   });
 
   it("el empty state genérico se fue — no describía nada que no se viera", async () => {
@@ -555,7 +555,7 @@ describe("Configuración — metodología al ⓘ, pendientes y bajas en pantalla
     await abrirConfiguracion();
     abrirFicha();
     esperaDetrasDelInfo(
-      "Qué pasa al dar de baja",
+      "Baja de colaborador", // 1-oct-2026, Daniel: nombres normales de ERP
       /Sigue apareciendo entera en las quincenas en que trabajó/,
     );
     esperaDetrasDelInfo(
@@ -611,14 +611,15 @@ describe("Configuración — metodología al ⓘ, pendientes y bajas en pantalla
     expect(nota.textContent).toMatch(/1\.50/);
   });
 
-  it("las reglas que no se pueden cambiar viven en el ⓘ «Para qué sirven» (19, 29-sep-2026)", async () => {
+  it("las reglas que no se pueden cambiar viven en el ⓘ «Parámetros del cálculo» (19, 29-sep-2026)", async () => {
     await abrirConfiguracion();
     fireEvent.click(screen.getByText("Reglas del cálculo"));
     // 🔴 29-sep-2026 (audit visual «19», aprobado por Daniel): el recuadro
     // «Esto no se cambia desde aquí» pasó al ⓘ «Para qué sirven». Se aprende
-    // una vez; siguen alcanzables de un toque.
-    esperaDetrasDelInfo("Para qué sirven estos números", /La quincena va del 1 al 15 y del 16 al 30/);
-    expect(screen.getByText("Esto no se cambia desde aquí")).toBeTruthy();
+    // una vez; siguen alcanzables de un toque. 1-oct-2026, Daniel: nombres normales de ERP: el ⓘ pasó a
+    // «Parámetros del cálculo» y el subtítulo a «Parámetros fijos».
+    esperaDetrasDelInfo("Parámetros del cálculo", /La quincena va del 1 al 15 y del 16 al 30/);
+    expect(screen.getByText("Parámetros fijos")).toBeTruthy();
     // 🔴 El almuerzo pasó de ser una CASILLA a ser una regla declarada: es lo
     // que impide que vuelva a haber dos lugares diciendo cuánto dura.
     // 🔴 10-sep-2026: el almuerzo es por EMPRESA (60 en Multifashion, Daniel:
@@ -652,7 +653,7 @@ describe("Configuración — metodología al ⓘ, pendientes y bajas en pantalla
     // 1-oct-2026, Daniel: nombres normales de ERP («{ name: "Volvió a trabajar aquí" }» → «{ name: "Reactivar" }»).
     expect(within(detalle).getByRole("button", { name: "Reactivar" })).toBeTruthy();
     esperaDetrasDelInfo(
-      "Qué pasa con quien ya no trabaja aquí",
+      "Colaboradores inactivos", // 1-oct-2026, Daniel: nombres normales de ERP
       /Sigue apareciendo entera en las quincenas en que trabajó/,
     );
   });

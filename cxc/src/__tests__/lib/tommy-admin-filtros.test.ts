@@ -98,8 +98,9 @@ describe("🔴 el filtro de bulto mira el tamaño EFECTIVO, no la columna", () =
   });
 
   it("ofrece los dos tamaños que existen en el negocio", () => {
-    expect(shell).toContain('{ value: "12", label: "12 piezas" }');
-    expect(shell).toContain('{ value: "8", label: "8 piezas" }');
+    // 1-oct-2026, Daniel: nombres normales de ERP («piezas/pzas» → «unidades/u», «Piezas» → «Cantidad»).
+    expect(shell).toContain('{ value: "12", label: "Bulto de 12" }');
+    expect(shell).toContain('{ value: "8", label: "Bulto de 8" }');
   });
 });
 

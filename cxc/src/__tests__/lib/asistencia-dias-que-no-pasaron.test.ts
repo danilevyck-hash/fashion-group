@@ -340,8 +340,8 @@ describe("🔴 arreglo 2 · el sistema se abstiene cuando no puede saber", () =>
 // ARREGLO 3 — LA BOLSA ÁMBAR SE PARTE EN DOS, Y EL SIN FICHA VA UNA SOLA VEZ
 // ═════════════════════════════════════════════════════════════════════════════
 
-// El rótulo decía «Decidilo vos» hasta el 1-sep-2026; se renombró a «Tú decides» porque era voseo y el sistema habla tuteo neutro (candado `nada-de-voseo`).
-describe("🔴 arreglo 3 · «falta un dato» y «Tú decides» son dos cosas distintas", () => {
+// El rótulo decía «Decidilo vos» hasta el 1-sep-2026; se renombró a «Tú decides» (y el 1-oct-2026, Daniel: nombres normales de ERP, a «Pago por definir») porque era voseo y el sistema habla tuteo neutro (candado `nada-de-voseo`).
+describe("🔴 arreglo 3 · «falta un dato» y «Pago por definir» son dos cosas distintas", () => {
   it("🩸 RODRIGO (trabajo fuera) sale del cajón ámbar y con su motivo al lado", () => {
     const rodrigo = ficha({ codigo: "13", nombre: "RODRIGO MIRANDA", salarioMensual: 800, empresa: "vistana" });
     const texto = textoJustificacion("Trabajo fuera de la oficina", "2026-08-01", "2026-08-13");
@@ -600,7 +600,7 @@ describe("🔴 LA RUTA de la planilla — el bug original y los tres arreglos", 
   it("🔴 YEISHKA (ingreso 10-ago) cobra los DÍAS TRABAJADOS: 5 días × (600 ÷ 26) = $115,38", async () => {
     // 🔴 CAMBIÓ DE DIRECCIÓN el 10-sep-2026. Daniel, textual, sobre el backtest
     // contra los Excel de la contable: *«c, se paga días trabajados»*. Hasta ese
-    // día quien entraba a mitad de la quincena salía en «Tú decides» sin número
+    // día quien entraba a mitad de la quincena salía en «Pago por definir» sin número
     // (la regla del 25-ago: ni completo ni prorrateado). Ahora: sueldo quincenal
     // hábil desde que entró × (sueldo mensual ÷ 26, 10-sep-2026 noche) — y se DICE
     // al lado del nombre. Lo que este candado sigue protegiendo: YEISHKA NO

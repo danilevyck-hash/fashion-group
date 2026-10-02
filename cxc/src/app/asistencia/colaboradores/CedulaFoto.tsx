@@ -69,7 +69,7 @@ export default function CedulaFoto({
       const r = await fetch("/api/asistencia/cedula-foto", { method: "POST", body: form });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error ?? "No se pudo guardar la foto");
-      toast("Listo, guardada", "success");
+      toast("Cédula guardada", "success");
       await leer();
       onCambio?.();
     } catch (e) {
@@ -88,7 +88,7 @@ export default function CedulaFoto({
         method: "DELETE",
       });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? "No se pudo quitar");
-      toast("Listo, quitada", "success");
+      toast("Cédula quitada", "success");
       await leer();
       onCambio?.();
     } catch (e) {
@@ -117,7 +117,7 @@ export default function CedulaFoto({
           </>
         )}
         {!tiene && (
-          <span className="text-sm text-gray-300">Todavía no se cargó</span>
+          <span className="text-sm text-gray-300">Sin archivo</span>
         )}
 
         {puedeCambiar && (

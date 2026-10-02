@@ -159,13 +159,13 @@ export default function NovedadesAviso({ moduloKey }: Props) {
   return (
     <aside
       role="status"
-      aria-label="Qué cambió"
+      aria-label="Novedades"
       data-novedades
       className="w-full border-b border-gray-200 bg-gray-50"
     >
       <div className="flex items-start gap-3 px-4 py-2 sm:px-6">
         <span className="mt-1.5 hidden flex-shrink-0 text-[11px] font-semibold uppercase tracking-wide text-teal-700 sm:block">
-          Qué cambió
+          Novedades
         </span>
         <ul className="flex-1 space-y-1 py-1">
           {aMostrar.map((n) => (

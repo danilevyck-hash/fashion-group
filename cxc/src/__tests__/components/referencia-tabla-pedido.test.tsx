@@ -202,7 +202,7 @@ describe("modo pedido — la tabla", () => {
     // El detalle es CuerpoArticulo: los cuatro grandes + la línea del ritmo + la plata.
     expect(screen.getAllByText("Comprado").length).toBeGreaterThan(1); // th + dt
     expect(screen.getAllByText("en bodega").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Vendo 9.6 u por mes · En 10 meses va el 80%").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Venta promedio: 9.6 u por mes · En 10 meses va el 80%").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Precio prom").length).toBeGreaterThan(0);
     // Y las filas siguen todas, en el mismo orden.
     const codigos = [...document.querySelectorAll("tbody td:first-child")].map(
@@ -242,7 +242,7 @@ describe("modo pedido — la tabla", () => {
     // y NO sale la tabla de colores: un código completo es UN color.
     expect(screen.getAllByText("Comprado").length).toBeGreaterThan(0);
     expect(screen.getAllByText("% vendido").length).toBeGreaterThan(0);
-    expect(screen.queryByText(/Sus colores/)).toBeNull();
+    expect(screen.queryByText(/Colores ·/)).toBeNull();
     // Y sigue sin ser el modo pedido: ninguna columna de esa tabla.
     expect(screen.queryByText("Últ. compra")).toBeNull();
   });

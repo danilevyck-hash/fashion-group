@@ -282,9 +282,9 @@ describe("excel-proveedores — buildProveedoresSheet", () => {
 
     // Encabezados en la fila 1, con los CUATRO tramos.
     expect(ws.A1.v).toBe("Empresa / Proveedor");
-    expect(ws.B1.v).toBe("0-90D");
-    expect(ws.C1.v).toBe("91-120D");
-    expect(ws.D1.v).toBe("121-365D");
+    expect(ws.B1.v).toBe("0-90 d");
+    expect(ws.C1.v).toBe("91-120 d");
+    expect(ws.D1.v).toBe("121-365 d");
     expect(ws.E1.v).toBe("+1 año");
     expect(ws.F1.v).toBe("Por pagar");
 
@@ -319,7 +319,7 @@ describe("excel-proveedores — buildProveedoresSheet", () => {
 
     // Lo que está a favor se ve también en el archivo.
     expect(ws.G8.v).toBeCloseTo(350.25, 2);
-    expect(ws.H1.v).toBe("Tienes a favor");
+    expect(ws.H1.v).toBe("Saldo a favor"); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(ws.H8.v).toBeCloseTo(25, 2);
 
     // Candado viejo que sigue: ni un encabezado con "YTD".

@@ -105,7 +105,7 @@ function plural(n: number, uno: string, varios: string): string {
 
 /** El subtítulo de una marca abierta: cuántos gastos, desde cuándo, lo apagado. */
 function subtituloAbierta(f: FilaAbierta): string {
-  if (f.sinMarca) return "Falta decidir a qué marca se le reporta este gasto";
+  if (f.sinMarca) return "Pendiente de asignar marca";
   const partes: string[] = [f.periodoNombre];
   if (f.cantidadReportada > 0) partes.push(plural(f.cantidadReportada, "gasto", "gastos"));
   else partes.push("Sin gasto este período");

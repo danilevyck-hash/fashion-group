@@ -139,8 +139,9 @@ export const BLANCO_CASILLA = "inline-flex min-h-[44px] min-w-[44px] items-cente
 // ── 7 · Administrar ──────────────────────────────────────────────────────────
 
 /**
- * «Disponible 14 · En bodega 14» — los dos números de la fila de Administrar en
- * una línea, con los mismos valores de hoy.
+ * «Disponibilidad 14 · Existencia 14» — los dos números de la fila de Administrar
+ * en una línea, con los mismos valores de hoy (1-oct-2026, Daniel: nombres
+ * normales de ERP; el par de diccionario §1.9).
  *
  * 🩸 Hoy «En bodega: 14» cae encima de «Subir otra» (34 × 37 px) y de
  * «Esconder» (9 × 37 px), y «Disponible: 14» tapa «Subir otra» 42 × 28 px.
@@ -150,8 +151,8 @@ export function lineaDeExistencias(
   enBodega: number | null | undefined,
 ): string {
   const partes: string[] = [];
-  if (disponible !== null && disponible !== undefined) partes.push(`Disponible ${disponible}`);
-  if (enBodega !== null && enBodega !== undefined) partes.push(`En bodega ${enBodega}`);
+  if (disponible !== null && disponible !== undefined) partes.push(`Disponibilidad ${disponible}`);
+  if (enBodega !== null && enBodega !== undefined) partes.push(`Existencia ${enBodega}`);
   return partes.join(" · ");
 }
 

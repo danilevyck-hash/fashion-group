@@ -159,9 +159,10 @@ describe("🔴 2. a bodega no se le ofrece lo que el servidor le niega", () => {
     expect(opcionesDeTodasLasFilas()).not.toContain("Duplicar");
   });
 
-  it("sin «Reenviar el correo» (send-order no es de bodega)", async () => {
+  it("sin «Reenviar correo» (send-order no es de bodega)", async () => {
+    // 1-oct-2026, Daniel: nombres normales de ERP («Reenviar el correo» → «Reenviar correo»).
     await montarComo("bodega");
-    expect(opcionesDeTodasLasFilas()).not.toContain("Reenviar el correo");
+    expect(opcionesDeTodasLasFilas()).not.toContain("Reenviar correo");
   });
 
   it("sin «Exportar Excel» (pedidos-export → 403)", async () => {

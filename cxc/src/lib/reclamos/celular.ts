@@ -53,10 +53,10 @@ export function montoCel(n: number): string {
   return `$${fmt(n)}`;
 }
 
-/** «19 por cobrar» + «6 pasan de 120 días» (esto último, en rojo y aparte). */
+/** «19 pendientes» + «6 pasan de 120 días» (esto último, en rojo y aparte). */
 export function subtituloPortada(porCobrar: number, viejos: number): { texto: string; viejos: string | null } {
   return {
-    texto: `${porCobrar} por cobrar`,
+    texto: `${porCobrar} ${porCobrar === 1 ? "pendiente" : "pendientes"}`,
     viejos: viejos > 0 ? `${viejos} pasa${viejos === 1 ? "" : "n"} de ${DIAS_RECLAMO_VIEJO} días` : null,
   };
 }
@@ -117,7 +117,7 @@ export function tituloSeleccion(elegidos: number, deCuantos: number, monto: numb
 } {
   return {
     titulo: elegidos === 0 ? "Seleccionar reclamos" : `${elegidos} seleccionado${elegidos === 1 ? "" : "s"}`,
-    sub: `de ${deCuantos} ${cobrados ? "cobrados" : "por cobrar"} · ${montoCel(monto)}`,
+    sub: `de ${deCuantos} ${cobrados ? "cobrados" : "pendientes"} · ${montoCel(monto)}`,
   };
 }
 

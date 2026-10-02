@@ -237,7 +237,7 @@ export async function avisarMontosImposibles<T>(opts: {
       `Qué pasó: al sincronizar ${GUARDS[familia].que}, Switch devolvió una cifra que ninguna ` +
       `operación real alcanza (el tope para esta empresa es ${fmtMonto(umbral)}).\n` +
       `Qué significa: eso NO se guardó, así que las ventas, el margen y las comisiones quedaron ` +
-      `limpios. Todo lo demás de esa sincronización entró normal.\n` +
+      `limpios. Todo lo demás de esa actualización entró normal.\n` +
       `Qué hacer: revisar ese dato en Switch — hay algo mal cargado. Mientras siga mal, este ` +
       `aviso se repite una vez por semana, no todos los días.`,
   );

@@ -147,7 +147,7 @@ export default function DestinosListaConfig({ onAviso }: { onAviso: (m: string) 
         throw new Error(b.error ?? "No se pudo guardar. Intenta de nuevo en unos segundos.");
       }
       setNuevo("");
-      onAviso("Listo, guardado");
+      onAviso("Destino guardado");
       void cargar();
     } catch (err) {
       setErrorAlta(err instanceof Error ? err.message : "No se pudo guardar. Intenta de nuevo en unos segundos.");
@@ -167,7 +167,7 @@ export default function DestinosListaConfig({ onAviso }: { onAviso: (m: string) 
         const b = await res.json().catch(() => ({}));
         throw new Error(b.error ?? "No se pudo quitar. Intenta de nuevo en unos segundos.");
       }
-      onAviso("Listo, quitado");
+      onAviso("Destino quitado");
       setAQuitar(null);
       void cargar();
     } catch (err) {
@@ -189,7 +189,7 @@ export default function DestinosListaConfig({ onAviso }: { onAviso: (m: string) 
           permisos distintos—: lo único que cambió son las palabras. */}
       <h2 id="destinos-lista-titulo" className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-900">
         {ROTULO_DIRECCIONES_QUE_SUGIERE}
-        <Ayuda titulo="Qué hace esta lista">
+        <Ayuda titulo="Información">
           <p>Es la lista que se despliega al escribir la dirección de un envío, para cualquier cliente.</p>
           <p>La ve todo el equipo: lo que agregues aquí —o desde el ＋ del campo al armar una guía— le aparece a todos.</p>
           <p>Quitar una dirección no borra nada ni cambia las guías que ya la usan.</p>

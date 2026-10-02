@@ -83,7 +83,7 @@ describe("DuplicarPedidoModal", () => {
     stubClientes();
     renderDup();
     expect(screen.getByText("Duplicar pedido PED-100")).toBeTruthy();
-    expect(screen.getByText("¿Para quién es el pedido nuevo?")).toBeTruthy();
+    expect(screen.getByText("Cliente del pedido nuevo")).toBeTruthy(); // 1-oct-2026, Daniel: nombres normales de ERP
     // El buscador del selector es el ÚNICO campo, y es un `search`; un campo de
     // texto suelto sería el "Nombre que sale en el pedido" volviendo.
     expect(screen.queryAllByRole("textbox")).toEqual([]);
@@ -109,7 +109,7 @@ describe("DuplicarPedidoModal", () => {
     // El dedo equivocado ya no crea el pedido: solo eligió.
     expect(onElegir).not.toHaveBeenCalled();
     // Y se VE cuál eligió, escrito, además de la fila marcada.
-    expect(screen.getByText(/Cliente elegido:/).textContent).toContain("Sporting Shoes");
+    expect(screen.getByText(/Cliente seleccionado:/).textContent).toContain("Sporting Shoes");
     expect(screen.getByRole("button", { name: /Sporting Shoes/ }).getAttribute("aria-pressed")).toBe("true");
   });
 
@@ -131,8 +131,8 @@ describe("DuplicarPedidoModal", () => {
     expect(btn.disabled).toBe(true);
     fireEvent.click(btn);
     expect(onElegir).not.toHaveBeenCalled();
-    // Y no hay ningún "Cliente elegido:" mintiendo antes de elegir.
-    expect(screen.queryByText(/Cliente elegido:/)).toBeNull();
+    // Y no hay ningún "Cliente seleccionado:" mintiendo antes de elegir.
+    expect(screen.queryByText(/Cliente seleccionado:/)).toBeNull();
   });
 
   it("🔴 el toque equivocado SE CORRIGE sin salir: elegir otro cliente reemplaza al anterior", async () => {
@@ -141,7 +141,7 @@ describe("DuplicarPedidoModal", () => {
     renderDup({ onElegir });
     fireEvent.click(await screen.findByText("Sporting Shoes"));
     fireEvent.click(screen.getByText("City Mall David"));
-    expect(screen.getByText(/Cliente elegido:/).textContent).toContain("City Mall David");
+    expect(screen.getByText(/Cliente seleccionado:/).textContent).toContain("City Mall David");
     fireEvent.click(screen.getByRole("button", { name: "Usar este cliente" }));
     expect(onElegir).toHaveBeenCalledTimes(1);
     expect(onElegir).toHaveBeenCalledWith("City Mall David", { id: 77, nombre: "City Mall David", codigo: "D-77" });
@@ -154,7 +154,7 @@ describe("DuplicarPedidoModal", () => {
     expect(onElegir).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Contado (venta de mostrador)" }));
     expect(onElegir).not.toHaveBeenCalled();
-    expect(screen.getByText(/Cliente elegido:/).textContent).toContain("Contado (venta de mostrador)");
+    expect(screen.getByText(/Cliente seleccionado:/).textContent).toContain("Contado (venta de mostrador)");
     fireEvent.click(screen.getByRole("button", { name: "Usar este cliente" }));
     expect(onElegir).toHaveBeenCalledWith("Contado (venta de mostrador)", { id: null, nombre: "Contado (venta de mostrador)", codigo: null });
   });
@@ -320,10 +320,10 @@ describe("candados estáticos", () => {
     // un "¿Duplicar PED-100?" volvería a pedir dos veces la misma decisión.
     expect(modal).toMatch(/\{duplicando \? "Duplicando\.\.\." : "Usar este cliente"\}/);
     // El botón apagado no vuelve a explicarse con la etiqueta que se retiró.
-    expect(modal).not.toContain("Elige el cliente");
+    expect(modal).not.toContain("Selecciona el cliente"); // 1-oct-2026, Daniel: nombres normales de ERP («Elige» → «Selecciona»)
     // Y el elegido se LEE antes de aplicarlo (el selector tiene scroll propio:
     // la fila marcada se puede quedar fuera de vista).
-    expect(modal).toContain("Cliente elegido:");
+    expect(modal).toContain("Cliente seleccionado:");
   });
 
   it("los DOS caminos mandan el cliente de Switch elegido al servidor", () => {

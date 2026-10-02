@@ -95,7 +95,7 @@ vi.mock("@/components/ui/RangoFechas", () => ({
     <div>
       <button type="button" onClick={() => onChange(desde, hasta)}>
         {vacio
-          ? "Elige el período"
+          ? "Seleccionar período"
           : `${desde} – ${hasta} · ${
               Math.round((Date.parse(hasta) - Date.parse(desde)) / 86400000) + 1
             } días`}
@@ -292,7 +292,7 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
   it("🔴 abre con la quincena puesta, pero SIN un solo número de plata", async () => {
     const llamadas = servir(respuestaQuincena());
     montar();
-    await waitFor(() => expect(screen.getByText("Esta quincena todavía no se generó")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Quincena sin generar")).toBeTruthy());
     // La quincena se lee entera en la barra…
     expect(loElegidoSeVe()).toBe(true);
     // …y no se pidió ni un cuadro.
@@ -327,12 +327,12 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
     vi.setSystemTime(new Date("2026-08-10T15:00:00Z"));
     const llamadas = servir(respuestaQuincena());
     montar();
-    await waitFor(() => expect(screen.getByText("Esta quincena todavía no se generó")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Quincena sin generar")).toBeTruthy());
     // Ni una llamada al CUADRO. (La pantalla pregunta qué hay cerrado para
     // recomendar por dónde empezar: esa URL también empieza con
     // `/api/asistencia/planilla`, de ahí el `?`.)
     expect(llamadas.filter((c) => c.url.includes("/api/asistencia/planilla?"))).toEqual([]);
-    expect(screen.getByText("Esta quincena todavía no se generó")).toBeTruthy();
+    expect(screen.getByText("Quincena sin generar")).toBeTruthy();
     vi.useRealTimers();
   });
 

@@ -336,12 +336,12 @@ export async function DELETE(req: NextRequest) {
   const auth = requireRole(req, rolesQueEntranAMetas());
   if (auth instanceof NextResponse) return auth;
   if (!puedeEditarMetas(auth.role)) {
-    return NextResponse.json({ error: "Sin permiso para retirar metas." }, { status: 403 });
+    return NextResponse.json({ error: "Sin permiso para anular metas." }, { status: 403 });
   }
 
   const body = (await req.json().catch(() => ({}))) as { id?: unknown };
   const id = typeof body.id === "string" ? body.id : "";
-  if (id === "") return NextResponse.json({ error: "Falta la meta a retirar." }, { status: 400 });
+  if (id === "") return NextResponse.json({ error: "Falta la meta a anular." }, { status: 400 });
 
   try {
     // 🔴 SOFT DELETE. Una meta anunciada al personal no se borra: se retira. La
@@ -356,6 +356,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[multifashion/metas] DELETE", e);
-    return NextResponse.json({ error: "No se pudo retirar la meta." }, { status: 500 });
+    return NextResponse.json({ error: "No se pudo anular la meta." }, { status: 500 });
   }
 }

@@ -70,7 +70,7 @@ export default function SeccionJustificaciones({ codigo, empresa = null, refresc
         method: "DELETE",
       });
       if (!r.ok) throw new Error("");
-      toast("Listo, quitada", "success");
+      toast("Justificación quitada", "success");
       await leer();
     } catch {
       toast("No se pudo quitar. Intenta de nuevo.", "error");

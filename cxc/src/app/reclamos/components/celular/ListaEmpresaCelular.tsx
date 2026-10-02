@@ -129,7 +129,7 @@ export default function ListaEmpresaCelular({
       ? [{ label: `Eliminar ${elegidos.length === 1 ? "el reclamo" : `los ${elegidos.length}`}`, onClick: () => onDeleteSelected(elegidos), destructive: true }]
       : []),
     ...(c?.correo
-      ? [{ label: `Escribirle a ${c.nombre_contacto || c.nombre || "el proveedor"}`, onClick: () => { window.location.href = `mailto:${c.correo}`; } }]
+      ? [{ label: c.nombre_contacto || c.nombre ? `Enviar correo a ${c.nombre_contacto || c.nombre}` : "Enviar correo al proveedor", onClick: () => { window.location.href = `mailto:${c.correo}`; } }]
       : []),
   ];
 
@@ -145,7 +145,7 @@ export default function ListaEmpresaCelular({
           <p className="mt-0.5 text-[15px] text-gray-500">
             {selectionMode
               ? seleccion.sub
-              : `${(c?.nombre_contacto || c?.nombre || "").trim() || "Sin contacto"} · ${montoCel(montoPorCobrar)} por cobrar`}
+              : `${(c?.nombre_contacto || c?.nombre || "").trim() || "Sin contacto"} · ${montoCel(montoPorCobrar)} pendiente`}
           </p>
         </div>
         <div className="flex shrink-0 items-center">
@@ -166,9 +166,9 @@ export default function ListaEmpresaCelular({
         </div>
       </div>
 
-      {/* Las dos pestañas de siempre: abre en «Por cobrar». */}
+      {/* Las dos pestañas de siempre: abre en «Pendientes». */}
       <div className="mx-4 mt-3 flex rounded-xl bg-[#E9E9EB] p-1">
-        {([["por-cobrar", `Por cobrar · ${porCobrar.length}`], ["cobrados", `Cobrados · ${cobrados.length}`]] as const).map(
+        {([["por-cobrar", `Pendientes · ${porCobrar.length}`], ["cobrados", `Cobrados · ${cobrados.length}`]] as const).map(
           ([k, txt]) => (
             <button
               key={k}
@@ -187,7 +187,7 @@ export default function ListaEmpresaCelular({
 
       {visibles.length === 0 ? (
         <p className="mx-4 mt-4 rounded-2xl bg-white px-4 py-10 text-center text-[15px] text-gray-500">
-          {filtro === "por-cobrar" ? `Nada por cobrar a ${nombreCorto}` : "Todavía no se cobró ninguno"}
+          {filtro === "por-cobrar" ? `Sin pendientes con ${nombreCorto}` : "Todavía no se cobró ninguno"}
         </p>
       ) : (
         <ul data-lista="reclamos-empresa" className="mx-4 mt-4 overflow-hidden rounded-2xl bg-white">
@@ -238,7 +238,7 @@ export default function ListaEmpresaCelular({
 
       {hoja === "mas" && (
         <HojaOpciones
-          titulo={`${nombreCorto} · ${porCobrar.length} por cobrar`}
+          titulo={`${nombreCorto} · ${porCobrar.length} ${porCobrar.length === 1 ? "pendiente" : "pendientes"}`}
           opciones={opciones}
           onCerrar={() => setHoja(null)}
         />

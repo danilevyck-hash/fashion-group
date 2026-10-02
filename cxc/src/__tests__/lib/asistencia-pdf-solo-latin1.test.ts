@@ -195,7 +195,7 @@ function persona(i: number): PersonaReporte {
 
 /**
  * Las CUATRO clases de línea de la Planilla, porque cada una escribe un texto
- * distinto en la columna 2: la calculada (números), la de «Tú decides» (el
+ * distinto en la columna 2: la calculada (números), la de «Pago por definir» (el
  * motivo + el quincenal de referencia), la de servicio profesional y la que
  * tiene un dato sin configurar.
  *

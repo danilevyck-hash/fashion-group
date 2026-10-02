@@ -88,7 +88,7 @@ export default function PortadaCelular({
         <span className="block text-[34px] font-light leading-none tracking-tight tabular-nums text-gray-900">
           {montoCel(resumen.porCobrar.monto)}
         </span>
-        <span className="mt-1 block text-[14px] text-gray-500">por cobrar</span>
+        <span className="mt-1 block text-[14px] text-gray-500">pendiente de cobro</span>
       </div>
 
       <div className="px-4 pt-4">
@@ -110,7 +110,7 @@ export default function PortadaCelular({
           </p>
           {resultados.length === 0 ? (
             <p className="mx-4 mt-2 rounded-2xl bg-white px-4 py-8 text-center text-[15px] text-gray-500">
-              No encontramos nada para «{buscando}»
+              Sin resultados para «{buscando}»
             </p>
           ) : (
             <ul data-lista="reclamos-buscar" className="mx-4 mt-2 overflow-hidden rounded-2xl bg-white">
@@ -118,7 +118,7 @@ export default function PortadaCelular({
                 <FilaCel
                   key={r.id}
                   titulo={r.nro_reclamo}
-                  sub={`${nombreCorto(r.empresa)} · ${esPendiente(r) ? "por cobrar" : "cobrado"}`}
+                  sub={`${nombreCorto(r.empresa)} · ${esPendiente(r) ? "pendiente" : "cobrado"}`}
                   monto={montoCel(totalDe(r))}
                   izquierda={esPendiente(r) ? null : <Visto />}
                   onClick={() => onLoadDetail(r.id, r.empresa)}
@@ -140,7 +140,7 @@ export default function PortadaCelular({
                   titulo={t.nombreCorto}
                   sub={
                     t.n === 0 ? (
-                      <span className="text-gray-400">{t.tieneHistoria ? "Nada por cobrar" : TODAVIA_SIN_RECLAMOS}</span>
+                      <span className="text-gray-400">{t.tieneHistoria ? "Sin pendientes" : TODAVIA_SIN_RECLAMOS}</span>
                     ) : (
                       <>
                         {linea.texto}

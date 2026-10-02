@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
   const desde = String(url.searchParams.get("desde") ?? "").trim();
   const hasta = String(url.searchParams.get("hasta") ?? "").trim();
   if (!ES_FECHA.test(desde) || !ES_FECHA.test(hasta) || desde > hasta) {
-    return NextResponse.json({ error: "Elige la quincena que quieres mirar." }, { status: 400 });
+    return NextResponse.json({ error: "Selecciona la quincena que quieres ver." }, { status: 400 });
   }
 
   try {

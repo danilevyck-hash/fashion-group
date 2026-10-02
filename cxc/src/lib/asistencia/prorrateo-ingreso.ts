@@ -3,7 +3,7 @@
 // (10-sep-2026). Módulo PURO.
 //
 // Daniel, textual, sobre el backtest contra los Excel de la contable: *«c, se
-// paga días trabajados»*. Hasta ese día esa persona salía en «Tú decides» sin
+// paga días trabajados»*. Hasta ese día esa persona salía en «Pago por definir» sin
 // número (la regla del 25-ago: ni completo ni prorrateado). Ahora:
 //
 //     días hábiles trabajados × (sueldo mensual ÷ 26)

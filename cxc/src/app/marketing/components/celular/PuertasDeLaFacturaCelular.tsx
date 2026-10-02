@@ -75,7 +75,7 @@ export default function PuertasDeLaFacturaCelular({ onElegir, leyendo, archivo, 
           />
         ))}
       </GrupoCelular>
-      <RotuloDeGrupo>Lo que se llena solo</RotuloDeGrupo>
+      <RotuloDeGrupo>Campos automáticos</RotuloDeGrupo>
       <p className="px-4 pb-1 text-[14px] text-gray-500">
         Proveedor · número · fecha · concepto · subtotal · ITBMS — los seis que el sistema ya lee del
         PDF.

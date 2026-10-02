@@ -270,7 +270,7 @@ describe("C · el porqué sigue siendo obligatorio", () => {
       }),
     );
     expect(resumenDelPlan(plan)).toBe("2 horas corregidas · 1 agregada · 1 quitada");
-    expect(textoGuardado(plan)).toContain("Listo, guardado");
+    expect(textoGuardado(plan)).toContain("Día guardado"); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(resumenDelPlan({ cambios: [], invalidas: [] })).toBeNull();
   });
 

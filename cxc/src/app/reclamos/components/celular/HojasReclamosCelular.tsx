@@ -166,7 +166,7 @@ export function HojaCobrar({
   }
 
   return (
-    <Hoja titulo={`Cobrar ${nroReclamo}`} onCerrar={onCerrar} marca="cobrar">
+    <Hoja titulo={`Registrar cobro · ${nroReclamo}`} onCerrar={onCerrar} marca="cobrar">
       {/* 🔴 El monto es el número grande, y se toca para cambiarlo: el cobro
           parcial sigue siendo posible, solo deja de ser el caso por el que se
           diseña (14 de 14 cobros fueron el total exacto, al centavo). */}
@@ -245,7 +245,7 @@ export function HojaCobrar({
       {error && <p className="px-5 pt-3 text-[13px] text-red-600">{error}</p>}
 
       <button type="button" onClick={cobrar} disabled={guardando} className={NEGRO}>
-        {guardando ? "Cobrando…" : `Cobrar ${montoCel(listo ? valor : reclamado)}`}
+        {guardando ? "Registrando…" : `Registrar cobro ${montoCel(listo ? valor : reclamado)}`}
       </button>
       <p className="px-5 pb-5 text-center text-[13px] text-gray-400">{SE_DESHACE}</p>
     </Hoja>
@@ -320,20 +320,20 @@ export function HojaCorreo({
         <li>
           {verCc ? (
             <label className={`${FILA} text-[17px] text-gray-900`}>
-              <span className="shrink-0 text-gray-500">Copia</span>
+              <span className="shrink-0 text-gray-500">CC</span>
               <input
                 type="text"
                 inputMode="email"
                 value={cc}
                 onChange={(e) => setCc(e.target.value)}
                 placeholder="copia@correo.com"
-                aria-label="Copia"
+                aria-label="CC"
                 className="min-w-0 flex-1 bg-transparent text-right text-[16px] text-gray-900 outline-none"
               />
             </label>
           ) : (
             <button type="button" onClick={() => setVerCc(true)} className={`${FILA} text-[17px] active:bg-gray-50`}>
-              <span className="text-gray-500">Copia</span>
+              <span className="text-gray-500">CC</span>
               <span className="text-blue-600">Agregar</span>
             </button>
           )}

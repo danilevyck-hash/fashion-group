@@ -940,7 +940,7 @@ function MargenFlojo({
               definición de bucket (se aprende una vez), así que vive a UN toque
               en vez de ocupar dos renglones arriba de la lista. El AVISO —la
               tarjeta ámbar y sus filas— sigue entero y a la vista. */}
-          <Ayuda titulo="Qué entra en esta lista">
+          <Ayuda titulo="Cómo se calcula">
             {sustantivo === "categorías" ? "Categorías" : "Artículos"} entre los {ALERTA_ENTRE} más vendidos
             del período con margen por debajo del margen general (
             <span className="font-mono tabular-nums">{fmtMargen(margenGeneral)}</span>).
@@ -991,7 +991,7 @@ function Movimientos({
           {/* 🩸 Contra QUÉ se compara se queda en pantalla (las dos fechas son
               del período, cambian con él). Por qué se rankea en dólares y no en
               porcentaje se aprende una vez: va al ⓘ. */}
-          <Ayuda titulo="Por qué en dólares">
+          <Ayuda titulo="Cómo se calcula">
             Se ordena por la diferencia en dólares, no en porcentaje: lo que sube 400% desde $40 no mueve el mes.
           </Ayuda>
         </div>
@@ -1034,9 +1034,9 @@ function ColumnaMovimiento({
               </div>
               <p className="text-xs text-gray-500">
                 {m.nuevo ? (
-                  <>no se vendía el año pasado</>
+                  <>Nuevo</>
                 ) : m.desaparecido ? (
-                  <>dejó de venderse · el año pasado {fmtMoney(m.ventaAnterior)}</>
+                  <>Sin ventas en el período · año anterior {fmtMoney(m.ventaAnterior)}</>
                 ) : (
                   <>
                     <span className={cn("font-mono tabular-nums", tonoVariacion(m.pct))}>
@@ -1412,7 +1412,7 @@ function SelectorMarcas({
       <div className="flex items-center gap-1 border-b border-gray-100 px-4 py-3">
         <h4 className="font-display text-sm font-semibold text-gray-950">Marcas</h4>
         {margenGeneral != null && (
-          <Ayuda titulo="Qué significa el ámbar">
+          <Ayuda titulo="Leyenda">
             En <span className="text-amber-700">ámbar</span>, el margen por debajo del general del
             período (<span className="font-mono tabular-nums">{fmtMargen(margenGeneral)}</span>).
           </Ayuda>

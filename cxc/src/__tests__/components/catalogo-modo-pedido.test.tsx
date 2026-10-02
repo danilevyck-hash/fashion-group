@@ -125,7 +125,7 @@ describe("la barra dice a qué pedido se está agregando", () => {
     await waitFor(() => expect(screen.getByText("TOM-010 · Aidy Shop No.2")).toBeTruthy());
     expect(screen.getByText("Agregando al pedido")).toBeTruthy();
     expect(screen.getByText("9 bultos en el pedido")).toBeTruthy();
-    const volver = screen.getByRole("link", { name: "Listo, volver al pedido" });
+    const volver = screen.getByRole("link", { name: "Volver al pedido" }); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(volver.getAttribute("href")).toBe("/catalogo/tommy/pedido/ORD-1");
   });
 

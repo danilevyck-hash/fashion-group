@@ -55,7 +55,8 @@ function montar(extra: Partial<React.ComponentProps<typeof CerrarPeriodoModal>> 
   return onConfirm;
 }
 
-const casilla = () => screen.getByLabelText(/Cuánto dinero hay en la caja/) as HTMLInputElement;
+// 1-oct-2026, Daniel: nombres normales de ERP — el rótulo es «Efectivo contado».
+const casilla = () => screen.getByLabelText(/Efectivo contado/) as HTMLInputElement;
 const botonCerrar = () => screen.getByRole("button", { name: /Cerrar y abrir el 4/ }) as HTMLButtonElement;
 
 describe("🔴 SE PREGUNTA CUÁNTA PLATA HAY, Y ES OBLIGATORIO", () => {

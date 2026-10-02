@@ -115,7 +115,7 @@ export default function ClientesBoston() {
               <th className="text-left font-normal px-4 py-3">Cliente</th>
               <th className="text-left font-normal px-3">Código</th>
               <th className="text-left font-normal px-3">Teléfono</th>
-              <th className="text-right font-normal px-3">121 y más</th>
+              <th className="text-right font-normal px-3">+120 días</th>
               <th className="text-right font-normal px-4">Saldo</th>
             </tr>
           </thead>

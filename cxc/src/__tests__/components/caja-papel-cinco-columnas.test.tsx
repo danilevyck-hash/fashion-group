@@ -52,9 +52,10 @@ describe("🔴 CINCO COLUMNAS CUANDO NO HAY NOTAS NI ITBMS", () => {
     expect(encabezados(doc)).toEqual(["Fecha", "Proveedor", "Categoría", "N° de factura", "Total"]);
   });
 
+  // 1-oct-2026, Daniel: nombres normales de ERP — la columna se rotula «Observaciones».
   it("🩸 no se dibuja la columna de la NOTA…", () => {
     const doc = montar(P3);
-    expect(within(doc).queryByText("Nota")).toBeNull();
+    expect(within(doc).queryByText("Observaciones")).toBeNull();
   });
 
   it("🩸 …ni Sub-total ni ITBMS, que repetían el Total en las 26 filas", () => {
@@ -73,7 +74,7 @@ describe("🔴 CONTROL: la columna vuelve sola cuando hay dato", () => {
       caja_gastos: [{ ...GASTOS_P3[0], descripcion: "Era para la visita" }, GASTOS_P3[1]],
     };
     const doc = montar(conNota);
-    expect(encabezados(doc)).toContain("Nota");
+    expect(encabezados(doc)).toContain("Observaciones");
     expect(doc.textContent).toContain("Era para la visita");
   });
 

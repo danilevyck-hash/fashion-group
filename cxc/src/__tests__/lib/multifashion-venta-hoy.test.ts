@@ -332,7 +332,7 @@ describe("ruta /api/multifashion/venta-hoy", () => {
     expect(iMonto).toBeGreaterThan(-1);
     expect(iMonto).toBeLessThan(iSinVentas);
     // Y la hora del sync se pinta en los tres estados, sin rama que la omita.
-    expect(src).toContain("no pudimos confirmar cuándo se actualizó");
+    expect(src).toContain("Sin hora de actualización");
     expect(src).toMatch(/sin actualizar desde las \$\{horaSync/);
     expect(src).toMatch(/: horaSync\(data\.sync\.ultimo as string, data\.fecha\)/);
   });

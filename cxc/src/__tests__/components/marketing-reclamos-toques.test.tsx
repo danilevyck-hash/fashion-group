@@ -503,7 +503,7 @@ describe("🔴 el botón de entregar muebles dice POR QUÉ está apagado", () =>
       expect(screen.getByLabelText("Cantidad de paneles")).toBeTruthy(),
     );
     // Paneles queda en blanco a propósito: es el caso de Daniel.
-    fireEvent.change(screen.getByLabelText("Piezas de Barra plana"), {
+    fireEvent.change(screen.getByLabelText("Cantidad de Barra plana"), {
       target: { value: "12" },
     });
     await waitFor(() =>
@@ -677,7 +677,8 @@ describe("🔴 Mobiliario: los rótulos no pueden mentir", () => {
 
   it("«Valor total» y «Disponible» ya no conviven diciendo el MISMO número", async () => {
     pintarMobiliario();
-    await waitFor(() => expect(screen.getByText(/En bodega/)).toBeTruthy());
+    // 1-oct-2026, Daniel: nombres normales de ERP («En bodega» → «Valor disponible»).
+    await waitFor(() => expect(screen.getByText(/Valor disponible/)).toBeTruthy());
     const texto = document.body.textContent ?? "";
     // 🩸 Los dos salían de `precio × stock_total` — el mismo peso, dos nombres.
     // `stock_total` YA es lo disponible (cada entrega se lo descuenta), así que

@@ -65,7 +65,7 @@ export default function SettlementModal({
   open,
   reclamado,
   submitting,
-  title = "Registrar recuperación",
+  title = "Registrar cobro",
   confirmLabel = MARCAR_COBRADO,
   requireComprobante = false,
   onClose,

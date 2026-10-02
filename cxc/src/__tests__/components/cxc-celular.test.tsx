@@ -338,13 +338,14 @@ describe("🔴 3 · el celular abre por plata", () => {
   });
 
   it("y el subtítulo dice cuántos son y de qué tramo, con «ver todo»", () => {
+    // 1-oct-2026, Daniel: nombres normales de ERP — rangos «0-90 días · 91-120 días · +120 días».
     const { container } = pintar({ riskFilter: "overdue" });
-    expect(container.textContent).toContain("con más de 120 días");
+    expect(container.textContent).toContain("con +120 días");
     expect(screen.getByRole("button", { name: "ver todo" })).toBeTruthy();
     expect(subtituloDeLaPortada({ cuantos: 95, risk: "all", empresas: 6, unaEmpresa: null }))
       .toBe("95 clientes en las 6 empresas · ordenado por saldo");
     expect(subtituloDeLaPortada({ cuantos: 40, risk: "overdue", empresas: 6, unaEmpresa: null }))
-      .toBe("40 clientes con más de 120 días");
+      .toBe("40 clientes con +120 días");
   });
 });
 
@@ -368,7 +369,7 @@ describe("🔴 4 · cada fila son dos renglones y el monto va exacto", () => {
 
   it("debajo del nombre va lo que urge, y nunca la palabra «vencido»", () => {
     const { container } = pintar();
-    expect(container.textContent).toContain("con más de 120 días");
+    expect(container.textContent).toContain("+120 días: $");
     expect(container.textContent?.toLowerCase(), "«vencido» está prohibido").not.toContain("vencid");
   });
 
@@ -381,15 +382,16 @@ describe("🔴 4 · cada fila son dos renglones y el monto va exacto", () => {
   });
 
   it("«lo que urge» dice una sola cosa, la más urgente", () => {
-    expect(loQueUrge(FRONTERA, 313)).toBe("$370,622 con más de 120 días");
+    // 1-oct-2026, Daniel: nombres normales de ERP — sin «al día» ni frases.
+    expect(loQueUrge(FRONTERA, 313)).toBe("+120 días: $370,622");
     // 🔴 Paso Canoa debe en los TRES tramos: manda el de más de 120 días, que
     // es el que se reclama, aunque sea el más chico de los tres.
     expect(PASO_CANOA.watch).toBeGreaterThan(PASO_CANOA.overdue);
-    expect(loQueUrge(PASO_CANOA, 35)).toBe("$46,376 con más de 120 días");
+    expect(loQueUrge(PASO_CANOA, 35)).toBe("+120 días: $46,376");
     expect(loQueUrge(NOVA, 1)).toBe("Último pago: hace 1 día");
-    expect(loQueUrge(NOVA, 0)).toBe("al día");
+    expect(loQueUrge(NOVA, 0)).toBe("Último pago: hoy");
     expect(loQueUrge({ ...NOVA, watch: 0, overdue: 0 } as ConsolidatedClient, null)).toBe("Sin pagos");
-    expect(loQueUrge(A_FAVOR, null)).toBe("tiene saldo a favor");
+    expect(loQueUrge(A_FAVOR, null)).toBe("Saldo a favor");
   });
 
   it("la rayita es el tramo DONDE ESTÁ LA PLATA, no el peor con algo adentro", () => {

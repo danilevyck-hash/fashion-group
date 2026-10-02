@@ -172,7 +172,7 @@ export default function HomePage() {
               onClick={cerrarSesion}
               className="min-h-[44px] min-w-[44px] flex items-center justify-center text-sm text-gray-400 hover:text-black transition active:scale-[0.97]"
             >
-              Salir
+              Cerrar sesión
             </button>
           </div>
         </div>

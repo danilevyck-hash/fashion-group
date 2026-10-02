@@ -130,7 +130,7 @@ export default function JustificarForm({
       // cuántos entraron y NOMBRA a los que no.
       if (!varios && fallos.length > 0) throw new Error(fallos[0].error);
       if (!varios) {
-        toast("Listo, guardado", "success");
+        toast("Justificación guardada", "success");
       } else {
         const r = resumenDelLote(guardados, fallos);
         toast(r.texto, r.tipo);

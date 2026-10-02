@@ -193,7 +193,7 @@ function ProveedoresList() {
           ) : empresas.length === 0 ? (
             <EmptyState
               title={falloLectura ? "No se pudo cargar" : "Sin proveedores"}
-              subtitle={falloLectura ? "Intenta de nuevo en unos segundos." : "No hay datos sincronizados aún."}
+              subtitle={falloLectura ? "Intenta de nuevo en unos segundos." : "Sin datos recibidos de Switch."}
             />
           ) : (
             <>
@@ -334,7 +334,7 @@ function FilaEmpresa({
       {abierta && vacia && (
         <tr>
           <td colSpan={COLUMNAS} className="pb-3 pl-6 pr-1.5 xl:pl-9 xl:pr-3 text-xs text-gray-500">
-            Todavía no hay proveedores traídos de Switch para esta empresa.
+            Sin proveedores recibidos de Switch para esta empresa.
           </td>
         </tr>
       )}
@@ -500,7 +500,7 @@ function TarjetaEmpresa({
             ))}
             {empresa.proveedores.length === 0 && (
               <li className="py-2 text-xs text-gray-500">
-                Todavía no hay proveedores traídos de Switch para esta empresa.
+                Sin proveedores recibidos de Switch para esta empresa.
               </li>
             )}
           </ul>

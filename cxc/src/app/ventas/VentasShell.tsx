@@ -448,7 +448,7 @@ function ErrorState({
         No se pudieron cargar los datos de <strong>{scope}</strong>.
       </p>
       <p className="mt-1 text-xs text-gray-500">
-        Ya lo intentamos varias veces. Vuelve a probar en unos segundos.
+        Intenta de nuevo en unos segundos.
       </p>
       {onRetry && (
         /* min-h-[44px]: mismo motivo que el botón de descarga — size="sm" da 32px. */

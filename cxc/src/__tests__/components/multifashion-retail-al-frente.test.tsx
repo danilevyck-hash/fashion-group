@@ -457,7 +457,7 @@ describe("5 · Resumen: 6 elementos", () => {
     const anio = screen.getByText("Año 2026 · retail").parentElement as HTMLElement;
     expect(anio.textContent).toContain("$390,120.61");
     expect(anio.textContent).toContain("▲ +15.8% vs 2025");
-    expect(anio.textContent).toContain("cierra en $755,341.55");
+    expect(anio.textContent).toContain("proyección $755,341.55");
     expect(anio.textContent).not.toContain("$418,486.51 ▲"); // el total NO es el número grande
     const mesCard = screen.getByText("Ventas del mes").parentElement as HTMLElement;
     expect(mesCard.textContent).toContain("$31,834.45");

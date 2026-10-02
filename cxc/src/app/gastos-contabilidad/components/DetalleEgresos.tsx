@@ -239,7 +239,7 @@ export default function DetalleEgresos({ empresa, onVolver }: Props) {
               <div className="rounded-lg border border-gray-200 bg-white px-3 py-1">
                 {gastoVistas.length === 0 ? (
                   <p className="py-2.5 text-sm text-gray-600">
-                    Este mes salió plata, pero nada de eso fue un gasto.
+                    Hay egresos este mes, pero ninguno es gasto.
                   </p>
                 ) : (
                   gastoVistas.map((c) => <FilaCuenta key={c.cuenta} c={c} />)
@@ -255,8 +255,7 @@ export default function DetalleEgresos({ empresa, onVolver }: Props) {
               </h2>
               {/* Sin esta frase, alguien lee "salió plata" y anota gasto. */}
               <p className="mb-2 text-sm text-gray-600">
-                Plata que salió de caja o del banco y no es un gasto: pasa de una cuenta a otra
-                (transferencias, anticipos), paga algo que ya se debía o cancela un préstamo.
+                Egresos que no son gasto: transferencias, anticipos, pagos de deudas y préstamos.
               </p>
               <div className="rounded-lg border border-gray-200 bg-white px-3 py-1">
                 {noGastoVistas.map((c) => (

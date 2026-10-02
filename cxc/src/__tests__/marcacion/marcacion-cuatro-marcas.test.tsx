@@ -15,7 +15,7 @@
  *      al tocar el botón, sin abrirla. 🔴 LA UBICACIÓN VIAJA EN LAS CUATRO, y
  *      quién pide foto lo decide el SERVIDOR por el orden del día.
  *   4. «DESHACER» ES SOBRE LA ÚLTIMA y la nombra bien: «la salida a almuerzo»,
- *      «la vuelta de almuerzo».
+ *      «el regreso de almuerzo» (1-oct-2026, Daniel: nombres normales de ERP; antes «vuelta»).
  *   5. APAGADO = LAS DOS MARCAS DE SIEMPRE, byte a byte: cada pieza nueva
  *      cuelga del interruptor y el camino viejo sigue escrito.
  *   6. 🔴 NADA DE LO QUE SE GUARDA CAMBIA: el `tipo` sigue siendo `entrada` o
@@ -191,7 +191,7 @@ describe("1 · el botón va SOLO en orden, como el reloj", () => {
     expect(vistos).toEqual([
       "Marcar entrada",
       "Marcar salida a almuerzo",
-      "Marcar vuelta de almuerzo",
+      "Marcar regreso de almuerzo",
       "Marcar salida",
       TEXTO_LISTO_POR_HOY,
     ]);
@@ -223,7 +223,7 @@ describe("1 · el botón va SOLO en orden, como el reloj", () => {
   it("la regla pura: 0 → entrada · 1 → a almuerzo · 2 → vuelta · 3 → salida", () => {
     expect(botonCuatroMarcas(0)).toEqual({ tipo: "entrada", texto: "Marcar entrada", apagado: false });
     expect(botonCuatroMarcas(1)).toEqual({ tipo: "salida", texto: "Marcar salida a almuerzo", apagado: false });
-    expect(botonCuatroMarcas(2)).toEqual({ tipo: "entrada", texto: "Marcar vuelta de almuerzo", apagado: false });
+    expect(botonCuatroMarcas(2)).toEqual({ tipo: "entrada", texto: "Marcar regreso de almuerzo", apagado: false });
     expect(botonCuatroMarcas(3)).toEqual({ tipo: "salida", texto: "Marcar salida", apagado: false });
     expect(botonCuatroMarcas(4).apagado).toBe(true);
     expect(botonCuatroMarcas(4).tipo).toBeNull();
@@ -363,7 +363,7 @@ describe("4 · la pastilla y el «Deshacer» nombran la marca correcta", () => {
     render(<MarcacionClient inicial={semilla(LAS_CUATRO)} />);
     expect(
       screen.getByText(
-        /Entrada 8:00 a\. m\. · Almuerzo 12:00 p\. m\. · Vuelta 1:00 p\. m\. · Salida 6:00 p\. m\./,
+        /Entrada 8:00 a\. m\. · Almuerzo 12:00 p\. m\. · Regreso 1:00 p\. m\. · Salida 6:00 p\. m\./,
       ),
     ).toBeTruthy();
   });
@@ -374,7 +374,7 @@ describe("4 · la pastilla y el «Deshacer» nombran la marca correcta", () => {
     const casos: [string[], "entrada" | "salida", string][] = [
       [[ENTRADA], "entrada", "Deshacer la entrada"],
       [[ENTRADA, A_ALMUERZO], "salida", "Deshacer la salida a almuerzo"],
-      [[ENTRADA, A_ALMUERZO, DE_ALMUERZO], "entrada", "Deshacer la vuelta de almuerzo"],
+      [[ENTRADA, A_ALMUERZO, DE_ALMUERZO], "entrada", "Deshacer el regreso de almuerzo"],
       [LAS_CUATRO, "salida", "Deshacer la salida"],
     ];
     for (const [marcas, tipo, rotulo] of casos) {
@@ -400,7 +400,7 @@ describe("4 · la pastilla y el «Deshacer» nombran la marca correcta", () => {
     );
     expect(r).toMatchObject({ id: "m3", indice: 2, tipo: "entrada" });
     expect(avisoDeshechaDeLaMarca(r!.indice, r!.tipo)).toBe(
-      "Listo, se deshizo la vuelta de almuerzo. Puedes marcar de nuevo.",
+      "Marcación deshecha: regreso de almuerzo. Puedes marcar de nuevo.",
     );
   });
 
@@ -408,10 +408,10 @@ describe("4 · la pastilla y el «Deshacer» nombran la marca correcta", () => {
     expect([...NOMBRES_DE_LA_MARCA]).toEqual([
       "entrada",
       "salida a almuerzo",
-      "vuelta de almuerzo",
+      "regreso de almuerzo",
       "salida",
     ]);
-    expect([...ROTULOS_CORTOS]).toEqual(["Entrada", "Almuerzo", "Vuelta", "Salida"]);
+    expect([...ROTULOS_CORTOS]).toEqual(["Entrada", "Almuerzo", "Regreso", "Salida"]);
     expect(rotuloDeshacerDeLaMarca(1, "salida")).toBe("Deshacer la salida a almuerzo");
     // Fuera de las cuatro se dice lo de siempre, nunca «Marca 7».
     expect(nombreDeLaMarca(9, "salida")).toBe("salida");

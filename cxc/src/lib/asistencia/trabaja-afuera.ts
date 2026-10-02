@@ -70,8 +70,8 @@ import { MOTIVO_TRABAJO_VENDEDOR } from "./motivos";
 // LAS PALABRAS
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Cómo se pregunta en la ficha. */
-export const PREGUNTA_TRABAJA_AFUERA = "¿Trabaja afuera?";
+/** El rótulo en la ficha. 1-oct-2026, Daniel: nombres normales de ERP (antes «¿Trabaja afuera?» y el chip «Trabaja afuera»). */
+export const PREGUNTA_TRABAJA_AFUERA = "Trabajo fuera de oficina";
 export const ETIQUETA_NO_TRABAJA_AFUERA = "No, el día sin marca es ausencia";
 export const ETIQUETA_TRABAJA_AFUERA = "Sí, el día sin marca se paga completo";
 
@@ -81,7 +81,7 @@ export const EXPLICACION_TRABAJA_AFUERA =
   + "Cuando marca, manda el reloj: tardanzas y horas extra se miden como siempre.";
 
 /** La etiqueta de excepción en la ficha, la lista y la planilla. */
-export const CHIP_TRABAJA_AFUERA = "Trabaja afuera";
+export const CHIP_TRABAJA_AFUERA = "Fuera de oficina";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EL DATO
@@ -116,7 +116,7 @@ export function validarTrabajaAfuera(body: unknown): Resultado<boolean> {
   if (v === undefined || v === null || v === "") return { ok: true, valor: false };
   if (v === true || v === false) return { ok: true, valor: v };
   if (v === "true" || v === "false") return { ok: true, valor: v === "true" };
-  return { ok: false, error: "Elige si trabaja afuera o no." };
+  return { ok: false, error: "Selecciona si trabaja fuera de oficina o no." };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

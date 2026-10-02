@@ -113,7 +113,8 @@ describe("Escribir a mano algo que SÍ está en la lista se atrapa ahí mismo", 
 
   it("con varios parecidos ofrece la lista, sin elegir por nadie", () => {
     render(<EnLaFila inicial="City Mall" />);
-    expect(screen.getByText(/¿Es alguno de estos/)).toBeTruthy();
+    // 1-oct-2026, Daniel: nombres normales de ERP — «¿Es alguno de estos?» → «Clientes similares».
+    expect(screen.getByText(/Clientes similares/)).toBeTruthy();
     expect(screen.getByRole("button", { name: /City Mall Paso Canoa/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /City Mall David/ })).toBeTruthy();
   });
@@ -129,14 +130,15 @@ describe("🔴 la sugerencia NUNCA ata sola", () => {
 
   it("y lo dice en pantalla: se guarda recién al apretar Guardar", () => {
     render(<EnLaFila inicial="City Mal Paso Canoas" />);
-    expect(screen.getByText(/Nada se guarda hasta que aprietes Guardar/)).toBeTruthy();
+    // 1-oct-2026, Daniel: nombres normales de ERP — la frase se acortó, el candado sigue.
+    expect(screen.getByText(/No se guarda hasta tocar Guardar/)).toBeTruthy();
   });
 });
 
 describe("🔴 las reglas del motor se ven en el selector", () => {
   it("una diferencia de NÚMERO se avisa: N7 y N4 son tiendas distintas", () => {
     render(<EnLaFila inicial="Sporting Shoes N7" />);
-    expect(screen.getByText(/los números no son los mismos/i)).toBeTruthy();
+    expect(screen.getByText(/los números no coinciden/i)).toBeTruthy(); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   it("D-201 no se recomienda — la sugerencia lleva al American Classics bueno", () => {

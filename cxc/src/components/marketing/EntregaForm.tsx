@@ -935,7 +935,7 @@ export default function EntregaForm({
                       className="w-full rounded-md border border-gray-300 px-3 py-3 text-lg font-mono tabular-nums focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
                       placeholder="0"
                     />
-                    <div className="text-xs text-gray-400 mt-0.5">Piezas</div>
+                    <div className="text-xs text-gray-400 mt-0.5">Cantidad</div>
                   </div>
                   <div className="w-24 shrink-0">
                     <input
@@ -984,7 +984,7 @@ export default function EntregaForm({
                               value={value}
                               onChange={(e) => setAccesorio(cat, e.target.value)}
                               disabled={guardando || !prod}
-                              aria-label={`Piezas de ${labelAccesorio(cat)}`}
+                              aria-label={`Cantidad de ${labelAccesorio(cat)}`}
                               className="flex-1 min-w-0 rounded-md border border-gray-300 px-3 min-h-[44px] text-sm font-mono tabular-nums focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
                               placeholder="0"
                             />
@@ -1002,14 +1002,14 @@ export default function EntregaForm({
                             />
                           </div>
                           <div className="flex items-center justify-between text-xs text-gray-400 mt-0.5">
-                            <span>Piezas</span>
+                            <span>Cantidad</span>
                             <span className="w-20 shrink-0 text-right">
                               Bultos
                             </span>
                           </div>
                           {prod && (
                             <div className="text-xs text-gray-400 mt-0.5">
-                              Stock disponible: {prod.stock_total}
+                              Disponible: {prod.stock_total}
                             </div>
                           )}
                         </div>
@@ -1040,7 +1040,7 @@ export default function EntregaForm({
                               }))
                             }
                             disabled={guardando}
-                            aria-label={`Piezas de ${p.nombre}`}
+                            aria-label={`Cantidad de ${p.nombre}`}
                             className="flex-1 min-w-0 rounded-md border border-gray-300 px-3 min-h-[44px] text-sm font-mono tabular-nums focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
                             placeholder="0"
                           />
@@ -1063,7 +1063,7 @@ export default function EntregaForm({
                           />
                         </div>
                         <div className="flex items-center justify-between text-xs text-gray-400 mt-0.5">
-                          <span>Piezas · Stock disponible: {p.stock_total}</span>
+                          <span>Cantidad · Disponible: {p.stock_total}</span>
                           <span className="w-20 shrink-0 text-right">Bultos</span>
                         </div>
                       </div>
@@ -1078,7 +1078,7 @@ export default function EntregaForm({
                   sistema lo muestra en vez de esconderlo. */}
               {warningsStock.length > 0 && (
                 <div className="rounded-md border border-orange-200 bg-orange-50 p-3 text-xs text-orange-900">
-                  ⚠ Vas a entregar más piezas de las que hay en el inventario:{" "}
+                  ⚠ Vas a entregar más unidades de las que hay en el inventario:{" "}
                   {warningsStock
                     .map(
                       (w) =>

@@ -105,8 +105,7 @@ export default function InventarioPorEmpresa({ inv }: { inv: InventarioData | nu
       {/* La bajada dice CUÁL de los dos números es plata. Sin ella, los $4,06M
           de abajo se leen como parte de lo que tiene. */}
       <p className="mt-0.5 text-xs text-stone-500">
-        Lo que costó la mercancía que hay en bodega. El valor a precio de etiqueta va aparte:
-        es lo que valdría si se vendiera todo, no plata que ya tengas.
+        Valorizado al costo. El valor a precio de venta es referencial, no realizado.
       </p>
 
       <div className="mt-3 space-y-2">
@@ -115,7 +114,7 @@ export default function InventarioPorEmpresa({ inv }: { inv: InventarioData | nu
             <div className="min-w-0">
               <div data-col="empresa" className="truncate text-sm font-medium text-stone-800">{e.name}</div>
               <div className="text-xs text-stone-400 tabular-nums">
-                <span data-col="unidades">{piezas(e.unidades)} piezas</span>
+                <span data-col="unidades">{piezas(e.unidades)} unidades</span>
                 {" · a precio "}
                 <span data-col="precio">{money(e.precio)}</span>
               </div>
@@ -133,7 +132,7 @@ export default function InventarioPorEmpresa({ inv }: { inv: InventarioData | nu
           pantalla donde se puede recortar. */}
       <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t border-stone-100 pt-3">
         <span className="text-xs font-medium text-stone-500">
-          Total al costo <span className="text-stone-400">· {piezas(inv.totalUnidades)} piezas</span>
+          Total al costo <span className="text-stone-400">· {piezas(inv.totalUnidades)} unidades</span>
         </span>
         <span data-col="total-costo" className="text-lg font-bold tabular-nums text-stone-900">
           {money(inv.totalCosto)}
@@ -154,7 +153,7 @@ export default function InventarioPorEmpresa({ inv }: { inv: InventarioData | nu
           ))}
           {inv.sinCosto.articulos > 0 && (
             <p data-col="sin-costo" className="text-xs text-stone-500 tabular-nums">
-              {piezas(inv.sinCosto.unidades)} piezas ({inv.sinCosto.articulos}{" "}
+              {piezas(inv.sinCosto.unidades)} unidades ({inv.sinCosto.articulos}{" "}
               {inv.sinCosto.articulos === 1 ? "artículo" : "artículos"}) no tienen costo cargado en Switch:
               quedan fuera del valor de arriba.
             </p>

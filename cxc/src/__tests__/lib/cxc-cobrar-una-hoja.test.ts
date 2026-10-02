@@ -162,12 +162,13 @@ describe("🩸 las seis puertas viejas ya no existen", () => {
   it("🔴 «Cobrar» se VE en la fila, sin abrir nada", () => {
     const fila = leer("src/app/cxc/components/ClientRow.tsx");
     expect(fila).toContain("onCobrar");
-    expect(fila).toMatch(/>\s*Cobrar\s*</);
+    // 1-oct-2026, Daniel: nombres normales de ERP — en la fila no cabe más que «Enviar».
+    expect(fila).toMatch(/>\s*Enviar\s*</);
   });
 
   it("y también en la tarjeta del celular", () => {
     const movil = leer("src/app/cxc/components/PanelCxcMobile.tsx");
-    expect(movil).toMatch(/>\s*Cobrar\s*</);
+    expect(movil).toMatch(/>\s*Enviar estado de cuenta\s*</);
   });
 
   it("🩸 se fue la línea «N de M clientes · ordenados por …»", () => {

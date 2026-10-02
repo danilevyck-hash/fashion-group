@@ -343,7 +343,7 @@ describe("🔴 el cuadro único de subir fotos", () => {
   it("🔴 la que no coincide con ningún código NO se descarta: se queda y se elige", () => {
     const cola = agregarFotos([], [f("foto-rara.jpg")], P, ok);
     expect(cola[0].estado).toBe("pendiente");
-    expect(cola[0].motivo).toContain("elige el producto");
+    expect(cola[0].motivo).toContain("Selecciona el producto"); // 1-oct-2026, Daniel: nombres normales de ERP («Elige» → «Selecciona»)
     const elegida = asignarProducto(cola, cola[0].clave, P[0]);
     expect(elegida[0].estado).toBe("esperando");
     expect(elegida[0].productoId).toBe("p1");

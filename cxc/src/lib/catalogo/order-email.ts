@@ -113,7 +113,7 @@ export function buildOrderEmailHtml(opts: OrderEmailOpts): string {
   const tableHead = `<thead><tr style="background:${tableHeadBg};color:white">
         <th style="padding:6px 4px;width:44px"></th>
         <th style="padding:6px 4px;text-align:left">Producto</th>
-        <th style="padding:6px 4px;text-align:center">Bultos</th><th style="padding:6px 4px;text-align:center">Piezas</th>
+        <th style="padding:6px 4px;text-align:center">Bultos</th><th style="padding:6px 4px;text-align:center">Cantidad</th>
         <th style="padding:6px 4px;text-align:right">Precio/u</th><th style="padding:6px 4px;text-align:right">Subtotal</th>
       </tr></thead>`;
 
@@ -192,7 +192,7 @@ export function buildOrderEmailHtml(opts: OrderEmailOpts): string {
         ${sectionsHtml}
         ${preordenHtml}
         <div style="background:#f5f5f5;padding:12px 16px;border-radius:6px;margin:16px 0">
-          <strong style="font-size:14px">Total: ${totalBultos} bultos (${totalPiezas} piezas) — $${fmt(total)}</strong>
+          <strong style="font-size:14px">Total: ${totalBultos} bultos (${totalPiezas} unidades) — $${fmt(total)}</strong>
         </div>
         ${queSigueHtml}
         ${pieHtml}

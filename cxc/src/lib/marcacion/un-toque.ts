@@ -97,7 +97,7 @@ export const TEXTO_MARCANDO = "Marcando…";
  * Lo único que cambia acá es el texto del estado apagado.
  *
  * 🔴 DESDE EL 24-sep-2026 LAS MARCAS SON CUATRO (`cuatro-marcas.ts`): el botón
- * las va pidiendo en orden —entrada, salida a almuerzo, vuelta de almuerzo,
+ * las va pidiendo en orden —entrada, salida a almuerzo, regreso de almuerzo,
  * salida— y se apaga tras la cuarta. Con ese interruptor apagado, las dos de
  * siempre. La regla no se escribe dos veces: esta función sigue sin contar
  * nada, solo rebautiza el estado apagado.

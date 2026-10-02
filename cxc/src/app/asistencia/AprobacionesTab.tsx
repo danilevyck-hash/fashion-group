@@ -96,8 +96,9 @@ interface Respuesta {
 /** La recarga completa del período va UNA vez, este tiempo después del último toque. */
 export const RECARGA_MS = 1500;
 
-/** El rótulo del botón de arriba. Era «Aprobar todo»; hace lo mismo. */
-export const ROTULO_SI_A_TODO = "Sí a todo lo pendiente";
+/** El rótulo del botón de arriba. Solo aprueba lo PENDIENTE: los «No» no se tocan.
+ *  1-oct-2026, Daniel: nombres normales de ERP («Sí a todo lo pendiente» → «Aprobar pendientes»). */
+export const ROTULO_SI_A_TODO = "Aprobar pendientes";
 
 export default function AprobacionesTab({ empresa = "" }: {
   /** El selector de arriba de las pestañas (10-sep-2026). «todas» o vacío = todas. */
@@ -456,7 +457,7 @@ export default function AprobacionesTab({ empresa = "" }: {
 
       {!cargando && dias !== null && dias.length === 0 && (
         <div className="rounded-lg border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-500">
-          Nadie hizo horas extra en estas fechas.
+          Sin horas extra en el período.
         </div>
       )}
 

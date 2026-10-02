@@ -27,7 +27,7 @@ describe("buildCajaWorkbook", () => {
     const ws = wb.Sheets["Gastos"];
     // Headers en la fila 1: no hay nada arriba de ellos.
     expect(ws["A1"].v).toBe("Fecha");
-    expect(ws["B1"].v).toBe("Descripción");
+    expect(ws["B1"].v).toBe("Observaciones"); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(ws["H1"].v).toBe("Total");
 
     // Primera fila de datos: fecha dd/mm/yyyy y moneda como número real

@@ -105,7 +105,7 @@ describe("Excel del pedido · la columna de foto", () => {
     const aoa = buildCatalogoAoa(rows, "JULIO");
     expect(aoa[0]).toEqual([
       "PO NAME", "New Article", "Name", "Department", "CATEGORY", "AGE GROUP", "GENDER",
-      "Precio A", "Precio B", "Piezas JULIO",
+      "Precio A", "Precio B", "Cantidad JULIO", // 1-oct-2026, Daniel: nombres normales de ERP («Piezas» → «Cantidad»)
     ]);
     expect(aoa[0][0]).not.toBe(COL_FOTO);
     expect(aoa[1]).toHaveLength(10);

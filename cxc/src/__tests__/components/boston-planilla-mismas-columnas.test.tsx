@@ -30,7 +30,7 @@ import { quincena } from "@/lib/asistencia/planilla";
 vi.mock("@/components/ui/RangoFechas", () => ({
   __esModule: true,
   default: ({ desde, hasta, vacio, onChange }: { desde: string; hasta: string; vacio?: boolean; onChange: (d: string, h: string) => void }) => (
-    <button type="button" onClick={() => onChange(desde, hasta)}>{vacio ? "Elige el período" : `${desde} – ${hasta}`}</button>
+    <button type="button" onClick={() => onChange(desde, hasta)}>{vacio ? "Seleccionar período" : `${desde} – ${hasta}`}</button>
   ),
 }));
 
@@ -69,7 +69,7 @@ function responder(planilla: Record<string, unknown>, guardada: Record<string, u
   }) as unknown as typeof fetch);
   return llamadas;
 }
-const elegir = () => fireEvent.click(screen.getAllByRole("button", { name: /Elige el período/ })[0]);
+const elegir = () => fireEvent.click(screen.getAllByRole("button", { name: /Seleccionar período/ })[0]);
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });

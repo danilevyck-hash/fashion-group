@@ -185,7 +185,7 @@ export function fechaYaPaso(fecha: string, hoy: string): boolean {
 
 /** Lo que se le dice a la persona cuando eligió un día que ya pasó. */
 export const AVISO_FECHA_PASADA =
-  "El aviso sale a las 9:00 de la mañana, así que hoy ya pasó. Elige de mañana en adelante.";
+  "El aviso sale a las 9:00 de la mañana, así que hoy ya pasó. Selecciona de mañana en adelante.";
 
 /** Y cuando el «hasta» queda antes de la fecha en que arranca. */
 export const AVISO_HASTA_ANTES =

@@ -165,7 +165,7 @@ export async function handlePostEnvio(req: NextRequest, marca: string, orderId: 
   // un botón verde con un servidor que rechaza (o peor, al revés).
   if (!tieneClienteElegido(order)) {
     return NextResponse.json(
-      { error: "Este pedido no tiene cliente. Elige el cliente antes de enviarlo a Switch." },
+      { error: "Este pedido no tiene cliente. Selecciona el cliente antes de enviarlo a Switch." },
       { status: 422 },
     );
   }

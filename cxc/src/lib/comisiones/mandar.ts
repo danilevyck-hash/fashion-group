@@ -87,4 +87,4 @@ export async function compartirComision(
 }
 
 /** Lo que se dice cuando el papel quedó bajado (computadora, o sin hoja). */
-export const PAPEL_DESCARGADO = "Listo, el papel se bajó";
+export const PAPEL_DESCARGADO = "PDF descargado";

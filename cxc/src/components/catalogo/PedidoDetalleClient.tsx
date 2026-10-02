@@ -882,7 +882,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   // diferencia del cliente, que sin elección explícita no existe.
   const faltaEnviar: string[] = [];
   if (!items.length) faltaEnviar.push("agregar productos");
-  if (!clienteElegido) faltaEnviar.push("elegir el cliente");
+  if (!clienteElegido) faltaEnviar.push("seleccionar el cliente");
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
@@ -1040,7 +1040,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                     390 px: con w-14 la página arrastraba 1 px, con w-12 arrastra
                     0. La columna solo muestra un número corto (456 en el caso
                     más grande de hoy), así que 48 px le sobran. */}
-                <th className="py-2 text-center text-xs uppercase text-gray-400 font-normal w-12">Piezas</th>
+                <th className="py-2 text-center text-xs uppercase text-gray-400 font-normal w-12">Cantidad</th>
                 <th className="py-2 text-right text-xs uppercase text-gray-400 font-normal w-14">Precio</th>
                 <th className="py-2 text-right text-xs uppercase text-gray-400 font-normal w-20">Subtotal</th>
                 {canEdit && <th className="w-8"></th>}
@@ -1123,7 +1123,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
 
       {/* Totals */}
       <div className="flex items-center justify-between py-3 border-t border-gray-200 mb-6">
-        <span className="text-sm text-gray-500">{totalBultos} bultos · {totalPiezas} piezas</span>
+        <span className="text-sm text-gray-500">{totalBultos} bultos · {totalPiezas} unidades</span>
         <span className="text-lg font-semibold tabular-nums">${fmt(totalMoney)}</span>
       </div>
 
@@ -1429,7 +1429,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                   <thead>
                     <tr className="border-b border-gray-200 text-gray-400">
                       <th className="py-1.5 text-left font-normal">SKU</th>
-                      <th className="py-1.5 text-center font-normal">Piezas</th>
+                      <th className="py-1.5 text-center font-normal">Cantidad</th>
                       <th className="py-1.5 text-right font-normal">Precio Switch</th>
                     </tr>
                   </thead>

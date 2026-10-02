@@ -335,7 +335,7 @@ function UsuariosPageInner() {
                           {u.active ? "Activo" : "Inactivo"}
                         </div>
                         <div className="text-xs text-gray-400 mt-0.5" title={lastSeen ? new Date(lastSeen).toLocaleString("es-PA") : undefined}>
-                          {lastSeen ? `Última sesión ${relativeTime(lastSeen)}` : "Nunca ha entrado"}
+                          {lastSeen ? `Última sesión ${relativeTime(lastSeen)}` : "Sin sesiones"}
                         </div>
                       </div>
                       {/* Editar y Desactivar: 44x44 con 8px de separación. Antes
@@ -486,7 +486,7 @@ function UsuariosPageInner() {
                     <label htmlFor="usuario-empresa" className="text-xs font-medium text-gray-700 uppercase tracking-[0.08em]">
                       Empresa <span className="font-normal text-gray-400 normal-case">(opcional)</span>
                     </label>
-                    <Ayuda titulo="Para qué sirve" className="-my-2 shrink-0">
+                    <Ayuda titulo="Información" className="-my-2 shrink-0">
                       <p>Solo cambia algo para los vendedores: los deja ver en Cuentas por cobrar únicamente los clientes de esa empresa. En blanco, ven las de todas.</p>
                     </Ayuda>
                   </div>

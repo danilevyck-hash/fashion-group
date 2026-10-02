@@ -130,10 +130,10 @@ describe("🔴 con «Todo el año» no hay flecha por vendedor (el papel del per
 
   it("🔴 «Descargar el año» ahora también dice en qué formato", () => {
     // 🔄 9-SEP-2026 — antes acá decía «se queda como está: Excel y nada más».
-    expect(rotuloDescargarExcel(MES_TODO_EL_ANIO)).toBe("Descargar el año en Excel");
-    expect(rotuloDescargarExcel(8)).toBe("Descargar el mes en Excel");
-    expect(rotuloDescargarPdf(MES_TODO_EL_ANIO)).toBe("Descargar el año en PDF");
-    expect(rotuloDescargarPdf(8)).toBe("Descargar el mes en PDF");
+    expect(rotuloDescargarExcel(MES_TODO_EL_ANIO)).toBe("Descargar Excel del año");
+    expect(rotuloDescargarExcel(8)).toBe("Descargar Excel del mes");
+    expect(rotuloDescargarPdf(MES_TODO_EL_ANIO)).toBe("Descargar PDF del año");
+    expect(rotuloDescargarPdf(8)).toBe("Descargar PDF del mes");
   });
 });
 

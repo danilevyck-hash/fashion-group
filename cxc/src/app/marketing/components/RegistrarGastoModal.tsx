@@ -307,7 +307,7 @@ function RegistrarGastoModalAnterior({
     const codigo = clienteCodigo.trim();
     if (!nombre || !codigo) {
       throw new Error(
-        "Elige un cliente de la lista — si no está, hay que darlo de alta en Switch.",
+        "Selecciona un cliente de la lista. Si no aparece, dalo de alta en Switch.",
       );
     }
 
@@ -749,7 +749,7 @@ function RegistrarGastoModalAnterior({
                 <>
                   <div>
                     <div className="text-sm font-medium text-gray-700 mb-1">
-                      ¿Qué tipo de gasto es?
+                      Tipo de gasto
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {SUB_GASTOS.map((s) => (
@@ -779,7 +779,7 @@ function RegistrarGastoModalAnterior({
                   {subGasto === "impulsadora" && (
                     <div>
                       <div className="text-sm font-medium text-gray-700 mb-1">
-                        ¿A quién le pagas?
+                        Beneficiario
                       </div>
                       {impulsadoras === null ? (
                         <div className="h-11 rounded-md bg-gray-100 animate-pulse" />
@@ -838,8 +838,8 @@ function RegistrarGastoModalAnterior({
                       inputClassName="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] pr-16 text-base sm:text-sm focus:border-black focus:outline-none"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Elige la tienda de la lista — si no está, hay que darla
-                      de alta en Switch. Si el gasto es para la marca en
+                      Selecciona la tienda de la lista. Si no aparece, dala de
+                      alta en Switch. Si el gasto es para la marca en
                       general (vallas, eventos), usa &ldquo;Gasto de la
                       marca&rdquo;.
                     </p>

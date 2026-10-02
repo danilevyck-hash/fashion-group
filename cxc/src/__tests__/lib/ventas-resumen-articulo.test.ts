@@ -513,7 +513,7 @@ describe("la línea de venta", () => {
     expect(valorGrandeMeses(f.ritmo)).toBe("2");
     expect(pieGrandeMeses(f.ritmo)).toBe("en venderse");
     // La línea completa, tal como se lee en la ficha.
-    expect(textoLineaVenta(f.avance, f.ritmo)).toBe("Vendo 18 u por mes · Se vendió todo en 2 meses");
+    expect(textoLineaVenta(f.avance, f.ritmo)).toBe("Venta promedio: 18 u por mes · Se vendió todo en 2 meses");
     // La mutación que esto caza: el reloj vivo diría 10 (oct-2025 → ago-2026).
     expect(f.ritmo.meses).not.toBe(10);
   });
@@ -550,7 +550,7 @@ describe("la línea de venta", () => {
     // bodega = 9.6 — no el promedio de la ventana de 12 meses (11).
     expect(f.ritmo).toEqual({ meses: 10, porMes: 9.6, base: "unica-viva", desdeMes: "2025-10" });
     expect(textoLineaVenta(f.avance, f.ritmo)).toBe(
-      "Vendo 9.6 u por mes · En 10 meses va el 80%",
+      "Venta promedio: 9.6 u por mes · En 10 meses va el 80%",
     );
     expect(textoAvanceCorto(f.avance)).toBe("va el 80%");
   });
@@ -620,7 +620,7 @@ describe("la línea de venta", () => {
     // El ritmo usa LA MISMA ancla del agregado: 295 ÷ 10 meses = 29,5 → "30".
     expect(f.ritmo).toEqual({ meses: 10, porMes: 29.5, base: "agregado", desdeMes: "2025-10" });
     expect(textoLineaVenta(f.avance, f.ritmo)).toBe(
-      "Vendo 30 u por mes · Desde oct 2025 llegaron 360 u · van vendidas 295",
+      "Venta promedio: 30 u por mes · Recepción de 360 u desde oct 2025 · vendidas 295",
     );
     expect(textoAvanceCorto(f.avance)).toBe("van 295 de 360");
   });
@@ -725,7 +725,7 @@ describe("la línea de venta", () => {
     // de su vida en la ventana (7,7).
     expect(f.ritmo).toEqual({ meses: 8, porMes: 6.75, base: "unica-viva", desdeMes: "2025-12" });
     expect(textoLineaVenta(f.avance, f.ritmo)).toBe(
-      "Vendo 6.8 u por mes · En 8 meses va el 30%",
+      "Venta promedio: 6.8 u por mes · En 8 meses va el 30%",
     );
   });
 
@@ -746,7 +746,7 @@ describe("la línea de venta", () => {
     expect(r.meses).toBeNull();
     // 40 u en su único mes vivo, promediadas entre sus 3 meses de vida en la
     // ventana (may→jul) = 13,3 → "13".
-    expect(textoLineaVenta(n, r)).toBe("Vendo 13 u por mes (promedio de los últimos 12 meses)");
+    expect(textoLineaVenta(n, r)).toBe("Venta promedio: 13 u por mes (últimos 12 meses)");
     // Sin ventas, la línea entera desaparece.
     expect(textoLineaVenta(n, { meses: null, porMes: null, base: null, desdeMes: null })).toBeNull();
   });
@@ -786,15 +786,15 @@ describe("la línea de venta", () => {
     expect(textoAvance({ tipo: "en-curso", meses: 4, parte: 0.004 })).toBe(
       "En 4 meses va menos del 1%",
     );
-    expect(textoVendoPorMes(0)).toBeNull(); // "Vendo 0 u por mes" no se dice
+    expect(textoVendoPorMes(0)).toBeNull(); // "Venta promedio: 0 u por mes" no se dice
     // 🔴 El redondeo de Daniel: 1 decimal por debajo de 10, entero de ahí para
     // arriba — 3.6 y 9.6 son la diferencia entre comprar y no comprar.
-    expect(textoVendoPorMes(0.3)).toBe("Vendo 0.3 u por mes");
-    expect(textoVendoPorMes(3.6)).toBe("Vendo 3.6 u por mes");
-    expect(textoVendoPorMes(9.6)).toBe("Vendo 9.6 u por mes");
-    expect(textoVendoPorMes(4)).toBe("Vendo 4 u por mes");
-    expect(textoVendoPorMes(28.4)).toBe("Vendo 28 u por mes");
-    expect(textoVendoPorMes(0.01)).toBe("Vendo menos de 0.1 u por mes");
+    expect(textoVendoPorMes(0.3)).toBe("Venta promedio: 0.3 u por mes");
+    expect(textoVendoPorMes(3.6)).toBe("Venta promedio: 3.6 u por mes");
+    expect(textoVendoPorMes(9.6)).toBe("Venta promedio: 9.6 u por mes");
+    expect(textoVendoPorMes(4)).toBe("Venta promedio: 4 u por mes");
+    expect(textoVendoPorMes(28.4)).toBe("Venta promedio: 28 u por mes");
+    expect(textoVendoPorMes(0.01)).toBe("Venta promedio: menos de 0.1 u por mes");
   });
 
   it("🔴 el CUARTO grande es MESES, con su pie por forma", () => {
@@ -814,7 +814,7 @@ describe("la línea de venta", () => {
 
   it("van vendidas NEGATIVAS (devoluciones netas desde el ancla) se dicen como lo que son", () => {
     expect(textoAvance({ tipo: "agregado", desdeMes: "2026-02", llegaron: 100, van: -5 })).toBe(
-      "Desde feb 2026 llegaron 100 u · van devueltas 5",
+      "Recepción de 100 u desde feb 2026 · devueltas 5",
     );
   });
 });
@@ -1266,7 +1266,7 @@ describe("la vista de las barras", () => {
     expect(vista.acumulado).toEqual([0, 12, 36, 36, 36, 72, 72, 96, 96, 96]);
     expect(vista.recortada).toBe(false);
     expect(tituloDesdeLlegada(vista.llegada!)).toBe("Desde que llegó · 23 oct 2025 · 120 u");
-    expect(subDesdeLlegada(vista, HOY_MES)).toBe("10 meses en bodega · van vendidas 96 de 120");
+    expect(subDesdeLlegada(vista, HOY_MES)).toBe("10 meses en bodega · vendidas 96 de 120");
     // Desde que llegó, la mercancía está en la calle: no hay "antes de empezar".
     expect(vista.barras.every((b) => !b.antesDeEmpezar)).toBe(true);
     // Oct·nov·dic siguen resaltados.
@@ -1582,7 +1582,7 @@ describe("cambioDeCosto", () => {
 // El caso de la captura de Daniel (4G5004G001): compró 36 en oct-2025 (30 + 6
 // el MISMO día), vendió TODO en oct-nov (bodega en 0), estuvo dic-mar sin
 // mercancía y en mar-2026 llegaron 36 más. La ficha decía "Meses: 10" y
-// "Vendo 6.1 u por mes". Daniel, textual: *"no me hace sentido que me dice 10
+// "Venta promedio: 6.1 u por mes". Daniel, textual: *"no me hace sentido que me dice 10
 // meses de venta… pero me lo suma y me lo aplaza"*, y la regla es suya: *"si
 // llego a 0 y llego mercancia, cual es la logica q me muestre 10 meses? me
 // debe de mostrar la ultima (y mira q hubo dos el mismo dia (se tienen que
@@ -1681,13 +1681,13 @@ describe("TANDAS — el caso de la captura (4G5004G001)", () => {
     const f = armarFicha(G4G5004G001(), HOY_MES);
     expect(f.ritmo.porMes!).toBeCloseTo(61 / 7, 4);
     expect(f.ritmo.porMes!).not.toBeCloseTo(6.1, 1); // la cuenta vieja
-    expect(textoVendoPorMes(f.ritmo.porMes)).toBe("Vendo 8.7 u por mes");
+    expect(textoVendoPorMes(f.ritmo.porMes)).toBe("Venta promedio: 8.7 u por mes");
   });
 
   it("🔴 la FRASE aprobada por Daniel — y sin la palabra 'tanda'", () => {
     const f = armarFicha(G4G5004G001(), HOY_MES);
     expect(textoLineaVenta(f.avance, f.ritmo, f.tandas)).toBe(
-      "Llegaron 36 u en mar 2026 · vendo 8.7 u por mes",
+      "Recepción de 36 u en mar 2026 · venta promedio: 8.7 u por mes",
     );
     // La historia, en gris, debajo.
     expect(textoLlegadaAnterior(f.tandas)).toBe("La anterior (oct 2025): 36 u — se vendió toda en 2 meses");
@@ -1711,14 +1711,14 @@ describe("TANDAS — el caso de la captura (4G5004G001)", () => {
     // meses son el KPI "Meses". La frase aporta la FECHA y el ritmo.
     const f = armarFicha(G4G5004G001(), HOY_MES);
     const frase = fraseLlegadaActual(f.tandas![1]);
-    expect(frase).toBe("Llegaron 36 u en mar 2026");
+    expect(frase).toBe("Recepción de 36 u en mar 2026");
     const linea = textoLineaVenta(f.avance, f.ritmo, f.tandas)!;
     for (const repetido of ["me quedan", "68%", "5 meses", "se vendió"]) {
       expect(linea, `la línea repite "${repetido}"`).not.toContain(repetido);
     }
     // Lo que sí tiene que estar: cuándo llegó y a qué ritmo se vende.
     expect(linea).toContain("mar 2026");
-    expect(linea).toContain("vendo 8.7 u por mes");
+    expect(linea).toContain("venta promedio: 8.7 u por mes");
     expect(f.grandes.quedan).toBe(12);
     expect(f.grandes.quedan).not.toBe(f.tandas![1].llegaron - f.tandas![1].vendidas); // 11
   });
@@ -1738,7 +1738,7 @@ describe("TANDAS — el caso de la captura (4G5004G001)", () => {
     expect(textoParteVendida(g.parteVendida)).toBe("el 68% de lo que hubo");
     // Y las tres cifras dicen LO MISMO que la frase y que la tabla del pedido.
     expect(textoVendidoCelda(medirVendidoMeses(f))).toBe("68%");
-    expect(fraseLlegadaActual(f.tandas![1])).toContain("Llegaron 36 u");
+    expect(fraseLlegadaActual(f.tandas![1])).toContain("Recepción de 36 u");
   });
 
   it("🔴 STOCK sigue siendo la existencia REAL de bodega, nunca la de la llegada", () => {
@@ -1799,7 +1799,7 @@ describe("TANDAS — cuándo abre, cuándo suma, cuándo no se puede afirmar", (
     expect(f.tandas).toHaveLength(2);
     expect(f.tandas![0]).toMatchObject({ desdeMes: "2026-01", llegaron: 24, vendidas: 24, cerrada: true, meses: 2 });
     expect(f.tandas![1]).toMatchObject({ desdeMes: "2026-04", llegaron: 24, vendidas: 0, cerrada: false, meses: 4 });
-    expect(fraseLlegadaActual(f.tandas![1])).toBe("Llegaron 24 u en abr 2026");
+    expect(fraseLlegadaActual(f.tandas![1])).toBe("Recepción de 24 u en abr 2026");
   });
 
   it("⚠️ el umbral del 'quedó en 0' tolera la cola de ruido (±2) en tandas de tamaño real…", () => {
@@ -1880,7 +1880,7 @@ describe("TANDAS — cuándo abre, cuándo suma, cuándo no se puede afirmar", (
     expect(fqd.tandas).toBeNull();
     expect(fqd.avance).toEqual({ tipo: "en-curso", meses: 8, parte: 0.3 });
     expect(textoLineaVenta(fqd.avance, fqd.ritmo, fqd.tandas)).toBe(
-      "Vendo 6.8 u por mes · En 8 meses va el 30%",
+      "Venta promedio: 6.8 u por mes · En 8 meses va el 30%",
     );
   });
 
@@ -1901,7 +1901,7 @@ describe("TANDAS — cuándo abre, cuándo suma, cuándo no se puede afirmar", (
     );
     expect(textoLineaVenta(f.avance, f.ritmo, f.tandas)).toBe(
       // 60 vendidas ÷ 11 meses CON stock (2 + 2 + 7) = 5.5
-      "Llegaron 24 u en ene 2026 · vendo 5.5 u por mes",
+      "Recepción de 24 u en ene 2026 · venta promedio: 5.5 u por mes",
     );
   });
 
@@ -1921,7 +1921,7 @@ describe("TANDAS — cuándo abre, cuándo suma, cuándo no se puede afirmar", (
     expect(vm).toEqual({ parte: 1, meses: 2, terminado: true });
     // La frase NO repite ni el % ni los meses: los dice el par Vendí/Meses de
     // los grandes (100% · 2). Lo que aporta es CUÁNDO llegó.
-    expect(fraseLlegadaActual(f.tandas![1])).toBe("Llegaron 24 u en abr 2026");
+    expect(fraseLlegadaActual(f.tandas![1])).toBe("Recepción de 24 u en abr 2026");
     expect(fraseLlegadaActual(f.tandas![1])).not.toContain("me quedan");
     expect(fraseLlegadaActual(f.tandas![1])).not.toContain("se vendió");
     expect(pieGrandeMeses(f.ritmo)).toBe("en venderse");

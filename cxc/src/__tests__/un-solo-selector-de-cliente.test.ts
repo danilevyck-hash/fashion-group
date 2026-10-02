@@ -361,7 +361,7 @@ describe("🔴 la salida a mano no puede volver a llamarse solo \"Otro\"", () =>
     expect(codigo).not.toMatch(/>\s*A mano\s*</);
     expect(codigo).not.toContain("Escrito a mano — no está en el directorio");
     // El chip del código es la prueba de que la línea está amarrada a Switch.
-    expect(codigo).toContain("Vinculado al directorio (${codigo})");
+    expect(codigo).toContain("Cliente vinculado (${codigo})"); // 1-oct-2026, Daniel: nombres normales de ERP
     // Y quien no ve la pantalla sigue sabiendo cómo quedó.
     // 1-oct-2026, Daniel: nombres normales de ERP («Cliente escrito a mano» → «Cliente manual»).
     expect(codigo).toContain("Cliente manual");

@@ -126,7 +126,7 @@ describe("🔴 1. la pantalla muestra lo que el cliente va a pedir", () => {
     expect(texto).toContain("$288.00");
     expect(texto).toContain("$720.00");
     // Y las piezas, que es en lo que trabaja Switch (3×8 = 24 · 2×12 = 24).
-    expect(texto).toContain("24 pzas");
+    expect(texto).toContain("24 u"); // 1-oct-2026, Daniel: nombres normales de ERP
     // El total del pedido, fuera de la lista: $288 + $720 = $1,008.
     expect(document.body.textContent).toContain("$1,008");
   });

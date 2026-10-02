@@ -128,10 +128,10 @@ export function diasDesde(iso: string | null | undefined, hoyPanama: string): nu
   return Math.max(0, Math.round((b - a) / 86_400_000));
 }
 
-/** «Abrió hoy» · «1 día abierto» · «41 días abierto». Vacío sin fecha. */
+/** «Abierto hoy» · «1 día abierto» · «41 días abierto». Vacío sin fecha. */
 export function textoDiasAbierto(dias: number | null): string {
   if (dias === null) return "";
-  if (dias === 0) return "Abrió hoy";
+  if (dias === 0) return "Abierto hoy";
   return dias === 1 ? "1 día abierto" : `${dias} días abierto`;
 }
 

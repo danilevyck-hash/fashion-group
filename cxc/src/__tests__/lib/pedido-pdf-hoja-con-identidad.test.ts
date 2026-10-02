@@ -219,8 +219,8 @@ describe("🔴 4. la cabecera es UNA sola, y se dibuja UNA vez por hoja", () => 
 
   it("el total sigue escribiéndose UNA sola vez, en la última hoja", async () => {
     const paginas = await hojas(papel("reebok", 60));
-    const conTotal = paginas.filter((t) => t.includes("60 bultos · 720 piezas"));
+    const conTotal = paginas.filter((t) => t.includes("60 bultos · 720 unidades"));
     expect(conTotal).toHaveLength(1);
-    expect(paginas[paginas.length - 1]).toContain("60 bultos · 720 piezas");
+    expect(paginas[paginas.length - 1]).toContain("60 bultos · 720 unidades");
   });
 });

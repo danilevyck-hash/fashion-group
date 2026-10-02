@@ -87,7 +87,7 @@ const PRUEBA: Record<ChipId, (c: ClienteDeLista) => boolean> = {
 
 const ETIQUETA: Record<ChipId, string> = {
   todos: "Todos",
-  "sin-contacto": "Sin cómo contactarlos",
+  "sin-contacto": "Sin contacto",
   "sin-correo": "Sin correo",
   "sin-telefono": "Sin teléfono",
   deben: "Con saldo",
@@ -229,7 +229,7 @@ export function sinLosQueYaNoEstan<T extends { ausente_desde?: string | null }>(
 }
 
 export function textoYaNoEstaEnSwitch(fechaLegible: string): string {
-  return `Ya no está en Switch desde el ${fechaLegible} — se conserva por sus guías y facturas viejas.`;
+  return `Ya no está en Switch desde el ${fechaLegible} · Se conserva por su historial.`;
 }
 
 export function contarClientes(n: number): string {

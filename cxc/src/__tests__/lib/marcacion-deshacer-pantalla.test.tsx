@@ -79,7 +79,7 @@ beforeEach(() => {
   respuesta = estadoServidor();
   respuestaPost = { ok: true };
   statusDeshacer = 200;
-  respuestaDeshacer = { ok: true, aviso: "Listo, se deshizo la entrada. Puedes marcar de nuevo.", ...estadoServidor() };
+  respuestaDeshacer = { ok: true, aviso: "Marcación deshecha: entrada. Puedes marcar de nuevo.", ...estadoServidor() };
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     pedidos.push(`${init?.method ?? "GET"} ${url}`);
     if (String(url).includes("/deshacer")) {
@@ -183,7 +183,7 @@ describe("🔴 B. deshacer la última marca", () => {
       expect(pedidos.some((p) => p === "POST /api/marcacion/deshacer")).toBe(true),
     );
     expect(await screen.findByRole("button", { name: "Marcar entrada" })).toBeTruthy();
-    expect(screen.getByText("Listo, se deshizo la entrada. Puedes marcar de nuevo.")).toBeTruthy();
+    expect(screen.getByText("Marcación deshecha: entrada. Puedes marcar de nuevo.")).toBeTruthy();
   });
 
   it("🔴 el teléfono NO le dice al servidor QUÉ marca deshacer", async () => {

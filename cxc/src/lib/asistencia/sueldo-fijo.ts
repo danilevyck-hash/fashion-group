@@ -58,8 +58,8 @@ export const ETIQUETA_MARCA_RELOJ = "Marca el reloj";
 /** El rótulo de la otra. Las palabras de Daniel, sin jerga. */
 export const ETIQUETA_NO_MARCA_RELOJ = "No marca el reloj (sueldo fijo)";
 
-/** Cómo se pregunta en la ficha. */
-export const PREGUNTA_MARCA_RELOJ = "¿Marca en el reloj?";
+/** El rótulo en la ficha. 1-oct-2026, Daniel: nombres normales de ERP (antes «¿Marca en el reloj?»). */
+export const PREGUNTA_MARCA_RELOJ = "Marcación en reloj";
 
 /**
  * Qué significa, dicho UNA sola vez y usado en los lugares donde hace falta (la
@@ -110,7 +110,7 @@ export function validarNoMarcaReloj(body: unknown): Resultado<boolean> {
   if (v === undefined || v === null || v === "") return { ok: true, valor: false };
   if (v === true || v === false) return { ok: true, valor: v };
   if (v === "true" || v === "false") return { ok: true, valor: v === "true" };
-  return { ok: false, error: "Elige si marca el reloj o si cobra sueldo fijo." };
+  return { ok: false, error: "Selecciona si marca el reloj o si cobra sueldo fijo." };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

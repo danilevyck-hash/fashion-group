@@ -574,7 +574,7 @@ export default function MobiliarioPage() {
 
         {/* Resumen sutil — sin cards grandes, solo línea de texto. */}
         <div className="text-xs text-gray-500 tabular-nums">
-          En bodega:{" "}
+          Valor disponible:{" "}
           <span className="text-emerald-700">
             {formatearMonto(metricas.enBodega)}
           </span>{" "}
@@ -1137,7 +1137,7 @@ export default function MobiliarioPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">Stock total</label>
+                  <label className="block text-sm text-gray-600 mb-1">Disponible</label>
                   <input
                     type="number"
                     step="1"

@@ -173,9 +173,10 @@ export default function ClienteCxc({ codigo }: { codigo: string }) {
             <button
               type="button"
               onClick={() => setHoja(true)}
+              aria-label="Enviar estado de cuenta"
               className="min-h-[44px] px-3 text-[17px] font-medium text-blue-600 active:opacity-60"
             >
-              Cobrar
+              Enviar
             </button>
           )}
         </div>
@@ -208,7 +209,7 @@ export default function ClienteCxc({ codigo }: { codigo: string }) {
               Por empresa · {filas.length}
             </h2>
             <p className="px-5 pb-2 text-[12px] text-gray-400">
-              verde hasta 90 días · ámbar 91 a 120 · rojo más de 120
+              verde 0-90 días · ámbar 91-120 días · rojo +120 días
             </p>
             <ul data-lista="cxc-cliente-empresas" className="mx-4 overflow-hidden rounded-2xl bg-white">
               {filas.map((f) => (

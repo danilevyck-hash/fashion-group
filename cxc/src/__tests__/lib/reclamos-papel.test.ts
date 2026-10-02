@@ -140,7 +140,7 @@ describe("(1) las columnas son las de la pantalla, y las vacías no se dibujan",
       { ...RENGLONES_0026[0], genero: "Men", nro_factura: "F-1", nro_orden_compra: "PO-9" },
     ]).map((c) => c.rotulo);
     expect(cols).toEqual([
-      "Estilo", "Descripción", "Talla", "Género", "Cant.", "Precio", "Subtotal", "Motivo", "Factura", "PO",
+      "Estilo", "Descripción", "Talla", "Género", "Cant.", "Precio", "Subtotal", "Motivo", "Factura", "N° de pedido", // 1-oct-2026, Daniel: nombres normales de ERP
     ]);
   });
 
@@ -272,7 +272,7 @@ describe("(4) el papel dice lo que el mockup pide, y en ese orden", () => {
 
   it("Active Shoes no ofrece PO en la línea de datos", () => {
     const datos = datosDelPapel({ ...REC_0026, empresa: "Active Shoes", nro_orden_compra: "PO-1" }, null).map((d) => d.rotulo);
-    expect(datos).not.toContain("PO");
+    expect(datos).not.toContain("N° de pedido");
   });
 
   it("sin fecha de factura la cabecera cae a la del reclamo, NUNCA a «hoy»", () => {

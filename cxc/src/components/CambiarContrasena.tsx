@@ -66,7 +66,7 @@ export function CambiarContrasenaModal({ open, onClose }: { open: boolean; onClo
     <Modal open={open} onClose={cerrar} title="Cambiar mi contraseña">
       {listo ? (
         <div className="space-y-4">
-          <p className="text-sm text-gray-800">Listo, contraseña cambiada.</p>
+          <p className="text-sm text-gray-800">Contraseña actualizada.</p>
           {listo.sesionesCerradas > 0 && (
             <p className="text-sm text-gray-600">
               {listo.sesionesCerradas === 1

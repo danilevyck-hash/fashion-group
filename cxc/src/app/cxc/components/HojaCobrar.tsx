@@ -240,7 +240,6 @@ export default function HojaCobrar({
         />
         <FilaAccion
           titulo="Copiar mensaje"
-          detalle="Para pegarlo donde quieras"
           onClick={() => { onCopiar(client); onClose(); }}
         />
         <FilaAccion
@@ -306,7 +305,7 @@ function FilaAccion({
   onClick,
 }: {
   titulo: string;
-  detalle: string;
+  detalle?: string;
   apagada?: boolean;
   onClick: () => void;
 }) {
@@ -319,7 +318,7 @@ function FilaAccion({
         className="w-full text-left px-4 py-3 min-h-[44px] transition hover:bg-gray-50 disabled:opacity-50 disabled:hover:bg-transparent disabled:cursor-not-allowed"
       >
         <span className="block text-sm font-medium text-gray-900">{titulo}</span>
-        <span className="block text-xs text-gray-500 mt-0.5 truncate">{detalle}</span>
+        {detalle && <span className="block text-xs text-gray-500 mt-0.5 truncate">{detalle}</span>}
       </button>
     </li>
   );

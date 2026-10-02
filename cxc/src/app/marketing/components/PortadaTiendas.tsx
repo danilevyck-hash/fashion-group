@@ -156,7 +156,7 @@ export default function PortadaTiendas({ refreshKey, celular = null }: Props) {
         </div>
       ) : filas.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 bg-white p-10 text-center">
-          <p className="text-sm text-gray-600">Nada abierto: todo lo registrado ya se le pasó a la marca.</p>
+          <p className="text-sm text-gray-600">Sin gastos abiertos.</p>
         </div>
       ) : visibles.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 bg-white p-10 text-center">

@@ -179,14 +179,14 @@ describe("Elegir de la lista deja el cliente VINCULADO", () => {
     await escribir("CI");
     fireEvent.mouseDown(screen.getByText("C.I.A.D.S.A"));
     expect(campo().value).toBe("C.I.A.D.S.A");
-    expect(screen.getByTitle("Vinculado al directorio (D-170)").textContent).toBe("D-170");
+    expect(screen.getByTitle("Cliente vinculado (D-170)").textContent).toBe("D-170"); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   it("el chip del código es VERDE (vinculado)", async () => {
     render(<EnLaTabla />);
     await escribir("CI");
     fireEvent.mouseDown(screen.getByText("C.I.A.D.S.A"));
-    expect(screen.getByTitle("Vinculado al directorio (D-170)").className).toContain("emerald");
+    expect(screen.getByTitle("Cliente vinculado (D-170)").className).toContain("emerald"); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   // 🩸 ACÁ SE EXIGÍA EL CHIP ÁMBAR «A mano». Daniel lo mandó sacar el
@@ -239,7 +239,7 @@ describe("Un cliente ya elegido no se borra al seguir llenando la fila", () => {
     fireEvent.change(screen.getByLabelText("Dirección"), { target: { value: "Calle 19" } });
 
     expect(campo().value).toBe("C.I.A.D.S.A");
-    expect(screen.getByTitle("Vinculado al directorio (D-170)")).toBeTruthy();
+    expect(screen.getByTitle("Cliente vinculado (D-170)")).toBeTruthy(); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   it("cerrar sin elegir NO ensucia la fila con lo tecleado a medias", async () => {
@@ -251,7 +251,7 @@ describe("Un cliente ya elegido no se borra al seguir llenando la fila", () => {
     await dejarBuscar();
     fireEvent.mouseDown(document.body);
     expect(campo().value).toBe("C.I.A.D.S.A");
-    expect(screen.getByTitle("Vinculado al directorio (D-170)")).toBeTruthy();
+    expect(screen.getByTitle("Cliente vinculado (D-170)")).toBeTruthy(); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 
   it("tocar una opción NO se lo come el cierre por click de afuera", async () => {

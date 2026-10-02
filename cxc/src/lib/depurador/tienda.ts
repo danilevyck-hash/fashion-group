@@ -545,7 +545,7 @@ export function processFactura(rows: SheetRow[], cfg: FacturaConfig): FacturaPro
         } else if (candidatas.length > 1) {
           marca = candidatas[0];
           marcaCandidatas = candidatas;
-          revisar = revisar ?? `Marca ambigua (${candidatas.join(" / ")}) — elige en el dropdown`;
+          revisar = revisar ?? `Marca ambigua (${candidatas.join(" / ")}) — selecciona en la lista`;
         } else {
           // Descripción nueva: no está en el catálogo de ninguna marca de la
           // empresa → BLOQUEA la descarga hasta que Daniel la apruebe.

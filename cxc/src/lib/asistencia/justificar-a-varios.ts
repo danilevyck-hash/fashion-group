@@ -79,7 +79,7 @@ export interface FalloDelLote {
 /**
  * Lo que se le dice al terminar el lote.
  *
- * 🔴 LO QUE NO SE GUARDÓ SE NOMBRA. Un «Listo, guardado» después de que dos de
+ * 🔴 LO QUE NO SE GUARDÓ SE NOMBRA. Un «Guardado» después de que dos de
  * trece fallaron es la peor respuesta posible: nadie vuelve a mirar.
  */
 export function resumenDelLote(guardados: number, fallos: readonly FalloDelLote[]): {
@@ -89,7 +89,7 @@ export function resumenDelLote(guardados: number, fallos: readonly FalloDelLote[
   const ok = Math.max(0, Math.trunc(guardados));
   if (fallos.length === 0) {
     return {
-      texto: ok === 1 ? "Listo, 1 justificado" : `Listo, ${ok} justificados`,
+      texto: ok === 1 ? "1 colaborador justificado" : `${ok} colaboradores justificados`,
       tipo: "success",
     };
   }

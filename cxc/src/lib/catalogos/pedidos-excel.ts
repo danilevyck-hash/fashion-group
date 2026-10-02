@@ -123,7 +123,7 @@ export const ROJO_FALTA = "B91C1C";
  * link, donde no hubo vendedor. Una celda en blanco se lee como «falta
  * cargarlo». Se dice lo que es, con la misma palabra de la pantalla.
  */
-export const VENDEDOR_DEL_CLIENTE = "Lo armó el cliente";
+export const VENDEDOR_DEL_CLIENTE = "Del cliente"; // 1-oct-2026, Daniel: nombres normales de ERP
 /** Un pedido interno sin vendedor sí es un dato que falta, y se dice distinto. */
 export const VENDEDOR_SIN_DATO = "Sin vendedor";
 
@@ -174,7 +174,7 @@ export function buildPedidosWorkbook(opts: PedidosWorkbookOpts): XLSX.WorkBook {
     ...(conOrigen ? [{ header: "Origen", wch: 14 } as ReportColumn] : []),
     { header: "Cliente", wch: 28 },
     { header: "Vendedor", wch: 20 },
-    { header: "Items", wch: 8, align: "right", fmt: "0" },
+    { header: "Líneas", wch: 8, align: "right", fmt: "0" },
     { header: "Total", wch: 13, align: "right", fmt: MONEY_FMT },
     { header: "Fecha", wch: 12 },
     ...(conNumeros

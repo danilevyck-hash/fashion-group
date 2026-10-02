@@ -12,7 +12,7 @@
 //
 // 🔴 EL BOTÓN NO PREGUNTA NADA, Y VA SOLO EN ORDEN. Desde el 24-sep-2026 son
 // CUATRO marcas también en el teléfono: «Marcar entrada» → «Marcar salida a
-// almuerzo» → «Marcar vuelta de almuerzo» → «Marcar salida», y después se
+// almuerzo» → «Marcar regreso de almuerzo» → «Marcar salida», y después se
 // apaga. Qué dice lo decide `estadoDelBotonHoy` del módulo puro
 // (`cuatro-marcas.ts`), contando las marcas del día — las del teléfono, las del
 // reloj físico y las que todavía esperan señal, todas juntas. La persona NUNCA

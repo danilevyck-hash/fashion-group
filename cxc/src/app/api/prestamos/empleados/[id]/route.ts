@@ -97,7 +97,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (body.empleado_codigo !== undefined) {
     const cod = String(body.empleado_codigo ?? "").trim();
     if (!cod) {
-      return NextResponse.json({ error: "Elige a la persona de la lista." }, { status: 400 });
+      return NextResponse.json({ error: "Selecciona el colaborador de la lista." }, { status: 400 });
     }
     const { data: persona } = await supabaseServer
       .from("asistencia_personas")
@@ -106,7 +106,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       .maybeSingle();
     if (!persona) {
       return NextResponse.json(
-        { error: "Esa persona no está en Asistencia. Elige a alguien de la lista." },
+        { error: "Esa persona no está en Asistencia. Selecciona un colaborador de la lista." },
         { status: 400 },
       );
     }

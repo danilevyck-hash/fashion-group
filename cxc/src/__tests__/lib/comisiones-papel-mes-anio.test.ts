@@ -134,23 +134,23 @@ describe("🔴 1. el papel del período se BAJA, no se manda al diálogo del nav
 
 describe("🔴 2. «Descargar el año» tiene los DOS formatos, igual que el mes", () => {
   it("los dos rótulos dicen el período y el formato", () => {
-    expect(rotuloDescargarPdf(8)).toBe("Descargar el mes en PDF");
-    expect(rotuloDescargarPdf(MES_TODO_EL_ANIO)).toBe("Descargar el año en PDF");
-    expect(rotuloDescargarExcel(8)).toBe("Descargar el mes en Excel");
-    expect(rotuloDescargarExcel(MES_TODO_EL_ANIO)).toBe("Descargar el año en Excel");
+    expect(rotuloDescargarPdf(8)).toBe("Descargar PDF del mes");
+    expect(rotuloDescargarPdf(MES_TODO_EL_ANIO)).toBe("Descargar PDF del año");
+    expect(rotuloDescargarExcel(8)).toBe("Descargar Excel del mes");
+    expect(rotuloDescargarExcel(MES_TODO_EL_ANIO)).toBe("Descargar Excel del año");
   });
 
   it("🔴 y el «el mes» / «el año» sigue saliendo de UN solo lugar", () => {
     for (const mes of [1, 8, 12, MES_TODO_EL_ANIO]) {
-      expect(rotuloDescargarPdf(mes)).toBe(`${rotuloDescargarPeriodo(mes)} en PDF`);
-      expect(rotuloDescargarExcel(mes)).toBe(`${rotuloDescargarPeriodo(mes)} en Excel`);
+      expect(rotuloDescargarPdf(mes)).toBe(rotuloDescargarPeriodo(mes, "PDF"));
+      expect(rotuloDescargarExcel(mes)).toBe(rotuloDescargarPeriodo(mes, "Excel"));
     }
     // La barra no escribe ninguno de los dos a mano.
     const shell = plano(leer(SHELL));
     expect(shell).toContain("rotuloDescargarPdf(mes)");
     expect(shell).toContain("rotuloDescargarExcel(mes)");
-    expect(shell).not.toContain('"Descargar el mes');
-    expect(shell).not.toContain('"Descargar el año');
+    expect(shell).not.toContain('"Descargar PDF del mes');
+    expect(shell).not.toContain('"Descargar PDF del año');
   });
 
   it("⚠️ CONTROL: el reporte por VENDEDOR sigue siendo de un mes", () => {

@@ -471,11 +471,13 @@ describe("cómo se lee un día de vacaciones", () => {
   // vacaciones en producción, ninguna) y el único que descuenta plata: es lo
   // que merece una línea. La regla de negocio NO se tocó.
   it("el interruptor solo habla cuando está marcado, y con UNA línea corta", () => {
-    expect(efectoDelInterruptor(true)).toBe("Sí → no se le pagan, ya los cobró.");
+    // 1-oct-2026, Daniel: nombres normales de ERP.
+    expect(efectoDelInterruptor(true)).toBe("No se pagan en esta planilla");
     // 🔴 Sin marcar no dice nada: no se descuenta, no hay nada que avisar.
     expect(efectoDelInterruptor(false)).toBeNull();
-    // 🔑 La pregunta es una pregunta, no un estado que haya que interpretar.
-    expect(PREGUNTA_YA_COBRADAS).toContain("?");
+    // 🔑 El rótulo nombra el caso, no un estado que haya que interpretar.
+    // 1-oct-2026, Daniel: nombres normales de ERP (antes «¿Ya cobró estos días antes?»).
+    expect(PREGUNTA_YA_COBRADAS).toBe("Días pagados por adelantado");
     // 🔑 Corta: Daniel odia los párrafos didácticos, en la UI y en las
     // respuestas. Si alguien le agrega media frase «para que se entienda
     // mejor», vuelve a ser lo que se sacó.

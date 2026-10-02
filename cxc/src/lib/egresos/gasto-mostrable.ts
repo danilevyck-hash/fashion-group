@@ -81,10 +81,11 @@ export interface GastoEgresosMostrable {
 
 /** Etiqueta corta para la píldora. Tiene que caber al lado del nombre. */
 export const ETIQUETA_SIN_GASTO_EGRESOS: Record<MotivoSinGastoEgresos, string> = {
-  sin_movimientos: "Sin cargar",
+  // 1-oct-2026, Daniel: nombres normales de ERP.
+  sin_movimientos: "Sin movimientos",
   sin_datos: "Sin datos",
   no_automatico: "Carga manual",
-  sin_gasto: "Nada es gasto",
+  sin_gasto: "Sin gastos",
 };
 
 /**
@@ -141,17 +142,17 @@ export function textoSinGastoEgresos(
   switch (motivo) {
     case "sin_movimientos":
       return hastaMes
-        ? `Los gastos de esta empresa llegan hasta ${hastaMes}.`
-        : "Todavía no hay gastos registrados de esta empresa.";
+        ? `Sin egresos este mes. Último mes con movimientos: ${hastaMes}.`
+        : "Sin egresos registrados.";
     case "sin_datos":
       return hastaMes
         ? `Este mes todavía no se ha traído de Switch. Lo último que hay es de ${hastaMes}.`
         : "Este mes todavía no se ha traído de Switch.";
     case "no_automatico":
       return hastaMes
-        ? `Los gastos de esta empresa no se traen solos de Switch. Lo último que se trajo a mano es de ${hastaMes}.`
-        : "Los gastos de esta empresa no se traen solos de Switch, así que todavía no hay nada.";
+        ? `Carga manual: no se actualiza automáticamente. Última carga: ${hastaMes}.`
+        : "Carga manual: no se actualiza automáticamente. Sin cargas todavía.";
     case "sin_gasto":
-      return "Este mes salió plata, pero nada de eso quedó registrado como gasto.";
+      return "Hay egresos este mes, pero ninguno es gasto.";
   }
 }

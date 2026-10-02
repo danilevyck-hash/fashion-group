@@ -35,7 +35,7 @@ export const FALTA_COMPROBANTE =
 export const NO_SE_PUDO_COBRAR = "No se pudo marcar como cobrado.";
 
 /** El aviso de que salió bien. */
-export const LISTO_COBRADO = "Listo, cobrado";
+export const LISTO_COBRADO = "Reclamo cobrado"; // 1-oct-2026, Daniel: nombres normales de ERP
 
 /**
  * «cobrado el 17 sept 2026» — la línea de la lista de cobrados y del reclamo ya

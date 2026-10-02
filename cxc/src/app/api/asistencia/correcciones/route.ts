@@ -157,7 +157,7 @@ export async function POST(req: NextRequest) {
     // mano, y ésa se deshace con DELETE (`anulada_en`), que es otra cosa.
     if (quita && !marcacionId) {
       return NextResponse.json(
-        { error: "Elige cuál marcación se quita. Solo se puede quitar una que el reloj registró." },
+        { error: "Selecciona cuál marcación se quita. Solo se puede quitar una que el reloj registró." },
         { status: 400 },
       );
     }

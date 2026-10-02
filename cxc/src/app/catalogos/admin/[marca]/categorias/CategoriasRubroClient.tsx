@@ -178,7 +178,7 @@ function CategoriasRubroInner() {
         throw new Error(b.error ?? "No se pudo guardar. Intenta de nuevo en unos segundos.");
       }
       setRubro("");
-      setAviso("Listo, guardado");
+      setAviso("Rubro guardado");
       void cargar();
     } catch (err) {
       setErrorAlta(err instanceof Error ? err.message : "No se pudo guardar. Intenta de nuevo en unos segundos.");
@@ -198,7 +198,7 @@ function CategoriasRubroInner() {
         const b = await res.json().catch(() => ({}));
         throw new Error(b.error ?? "No se pudo quitar. Intenta de nuevo en unos segundos.");
       }
-      setAviso("Listo, quitado");
+      setAviso("Rubro quitado");
       setAQuitar(null);
       void cargar();
     } catch (err) {
@@ -227,24 +227,24 @@ function CategoriasRubroInner() {
       <div className="mx-auto max-w-3xl px-4 py-6">
         <h1 className="mb-1 flex items-center gap-1 text-xl font-bold text-gray-900">
           Categorías del catálogo Reebok
-          <Ayuda titulo="Qué hace esta lista">
+          <Ayuda titulo="Información">
             <p>
-              Switch manda un <b>rubro</b> con cada artículo (SHOES, APPAREL, BAGS…). Esta lista dice a qué
-              cajón del catálogo va cada uno.
+              Switch manda un <b>rubro</b> con cada artículo (SHOES, APPAREL, BAGS…). Esta lista dice qué
+              categoría le corresponde a cada uno.
             </p>
             <p>
               Antes el <b>Department</b> del archivo (FOOTWEAR, APPAREL, HARDWARE): esta lista es el plan B,
               para cuando ese campo viene vacío. Y es la que decide si la Plantilla Switch avisa o se calla.
             </p>
-            <p>Los cajones son tres y no se agregan desde aquí: cambiarlos mueve filtros, pantallas y el bulto.</p>
+            <p>Las categorías son tres y no se agregan desde aquí: cambiarlos mueve filtros, pantallas y el bulto.</p>
           </Ayuda>
         </h1>
         <p className="mb-5 text-xs text-gray-500">
-          El rubro lo manda Switch. Los cajones son tres: Calzado, Ropa y Accesorios.
+          El rubro lo manda Switch. Las categorías son tres: Calzado, Ropa y Accesorios.
         </p>
 
         {/* 🔴 LO QUE PIDIÓ LA PLANTILLA SWITCH, listo para confirmar uno por uno.
-            Nada se guarda solo: cada uno necesita que se elija su cajón. */}
+            Nada se guarda solo: cada uno necesita que se seleccione su categoría. */}
         {faltan.length > 0 && (
           <section
             className="mb-5 rounded-lg border border-stone-300 bg-stone-50 p-4"
@@ -254,7 +254,7 @@ function CategoriasRubroInner() {
               {faltan.length === 1 ? "Este rubro viene del archivo" : `Estos ${faltan.length} rubros vienen del archivo`}
             </b>
             <p className="mb-3 mt-0.5 text-xs text-stone-600">
-              Elige a qué cajón va cada uno. Hasta que lo hagas, el catálogo no los conoce.
+              Selecciona la categoría de cada uno. Sin categoría, el catálogo no los reconoce.
             </p>
             <ul className="flex flex-col gap-2">
               {faltan.map((r) => (
@@ -296,7 +296,7 @@ function CategoriasRubroInner() {
             <select
               value={categoria}
               onChange={(e) => setCategoria(e.target.value as CategoriaReebok)}
-              aria-label="A qué categoría va"
+              aria-label="Categoría"
               className={`${CAMPO} w-auto shrink-0`}
             >
               {CATEGORIAS_REEBOK.map((c) => (

@@ -257,7 +257,7 @@ export default function PreciosProveedorAyuda() {
         const err = await res.json().catch(() => null);
         throw new Error(err?.error ?? "No se pudo guardar");
       }
-      toast("Listo, guardado", "success");
+      toast("Precio guardado", "success");
       setEdicion(null);
       setOriginal(null);
       await cargar();

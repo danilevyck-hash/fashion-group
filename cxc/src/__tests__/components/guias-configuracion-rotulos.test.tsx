@@ -132,7 +132,7 @@ describe("🔴 «el de siempre» no vuelve como texto suelto", () => {
   it("el texto de «cómo se usa» habla de la marca, no de la frase vieja", () => {
     expect(comoSeUsa(2, true)).toContain(`«${MARCA_SIEMPRE}»`);
     expect(comoSeUsa(1, false)).toContain(`«${ACCION_PONER_SIEMPRE}»`);
-    expect(comoSeUsa(1, true)).toBe("Se llena solo al elegir el cliente.");
+    expect(comoSeUsa(1, true)).toBe("Se completa automáticamente al seleccionar el cliente."); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(comoSeUsa(2, false)).toBe("Se ofrecen como botones y la persona elige.");
   });
 });

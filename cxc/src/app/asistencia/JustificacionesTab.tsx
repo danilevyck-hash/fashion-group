@@ -78,8 +78,8 @@ export default function JustificacionesTab() {
   const sinNombre = personas.filter((p) => !p.configurado);
 
   async function agregar() {
-    if (!codigo) return toast("Elige al colaborador", "error");
-    if (!motivo) return toast("Elige el motivo", "error");
+    if (!codigo) return toast("Selecciona el colaborador", "error");
+    if (!motivo) return toast("Selecciona el motivo", "error");
     if (hasta < desde) return toast("La fecha final es anterior a la inicial", "error");
     // La MISMA función que usa el motor decide si la ventana sirve: una regla
     // escrita dos veces es una regla que se contradice.
@@ -98,7 +98,7 @@ export default function JustificacionesTab() {
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "No se pudo guardar");
-      toast("Listo, guardado", "success");
+      toast("Justificación guardada", "success");
       setNota(""); setCodigo(""); setHoraDesde(""); setHoraHasta("");
       await cargar();
     } catch (e) {

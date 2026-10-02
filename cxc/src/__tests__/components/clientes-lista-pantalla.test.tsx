@@ -105,7 +105,7 @@ describe("🔴 LOS CHIPS, CON SU CONTEO CALCULADO", () => {
     );
     expect(chips).toEqual([
       "Todos 5",
-      "Sin cómo contactarlos 2",
+      "Sin contacto 2",
       "Sin correo 3",
       "Sin teléfono 3",
       "Con saldo 3", // 1-oct-2026, Daniel: nombres normales de ERP («Deben» → «Con saldo»)
@@ -114,7 +114,7 @@ describe("🔴 LOS CHIPS, CON SU CONTEO CALCULADO", () => {
 
   it("tocar un chip filtra la lista a esos clientes", () => {
     pintar();
-    fireEvent.click(screen.getByRole("button", { name: /Sin cómo contactarlos/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Sin contacto/ }));
     // El chip viaja a la URL con REPLACE (es un filtro del mismo nivel).
     expect(REPLACE.mock.calls.at(-1)![0]).toContain("filtro=sin-contacto");
     expect(PUSH).not.toHaveBeenCalled();

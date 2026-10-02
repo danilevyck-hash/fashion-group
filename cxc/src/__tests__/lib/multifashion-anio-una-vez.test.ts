@@ -90,7 +90,7 @@ describe("9 · Jennifer, la lista del shell y el desplegable", () => {
   });
 
   it("el desplegable de período tiene placeholder", () => {
-    expect(PLACEHOLDER_PERIODO).toBe("Elige el período");
+    expect(PLACEHOLDER_PERIODO).toBe("Seleccionar período");
     const sel = sinComentarios(leer("src/components/multifashion/PeriodoSelect.tsx"));
     expect(sel).toContain("<SelectValue placeholder={PLACEHOLDER_PERIODO} />");
   });

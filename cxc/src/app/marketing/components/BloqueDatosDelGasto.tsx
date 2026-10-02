@@ -100,7 +100,7 @@ export default function BloqueDatosDelGasto({
             {marcaDeImpulsadora ? (
               <span className="text-gray-900 font-medium">{marcaDeImpulsadora.nombre}</span>
             ) : (
-              <span className="text-gray-500">Elige a quién le pagas: la marca es la de ella.</span>
+              <span className="text-gray-500">Selecciona la impulsadora: la marca es la de ella.</span>
             )}
           </div>
         ) : marcaFijaVisible ? (
@@ -124,7 +124,7 @@ export default function BloqueDatosDelGasto({
             onChange={(e) => cambiar({ marcaId: e.target.value })}
             className={CAMPO}
           >
-            <option value="">Elige la marca</option>
+            <option value="">Seleccionar marca</option>
             {marcas.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.nombre}

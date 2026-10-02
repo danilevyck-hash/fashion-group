@@ -101,7 +101,7 @@ describe("Los rótulos viven en UN solo lugar", () => {
   it("y dicen cobrado", () => {
     expect(MARCAR_COBRADO).toBe("Marcar como cobrado");
     expect(CHIP_COBRADO).toBe("Cobrado");
-    expect(LISTO_COBRADO).toBe("Listo, cobrado");
+    expect(LISTO_COBRADO).toBe("Reclamo cobrado"); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(NO_SE_PUDO_COBRAR).toBe("No se pudo marcar como cobrado.");
     expect(COMPROBANTE_OBLIGATORIO).toContain("marcar cobrado");
     expect(FALTA_COMPROBANTE).toContain("marcar cobrado");

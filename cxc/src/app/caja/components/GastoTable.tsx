@@ -354,8 +354,9 @@ export default function GastoTable({
                 }}
               >
                 <th className="text-left py-2.5 px-4 font-medium">Fecha</th>
-                {/* 🔴 «Descripción» pasó a «Nota», opcional (20-sep-2026). */}
-                <th className="text-left py-2.5 px-4 font-medium">Nota</th>
+                {/* 🔴 «Descripción» pasó a «Nota», opcional (20-sep-2026); y a
+                    «Observaciones» el 1-oct-2026 (Daniel: nombres normales de ERP). */}
+                <th className="text-left py-2.5 px-4 font-medium">Observaciones</th>
                 <th className="text-left py-2.5 px-4 font-medium">Proveedor</th>
                 <th className="text-left py-2.5 px-4 font-medium">Categoría</th>
                 {showFiscal && (

@@ -140,7 +140,7 @@ describe("🔴 el ⚙ «Configuración»: solo admin, solo en el módulo /comisi
     expect(engranaje.getAttribute("aria-pressed")).toBe("true");
     await screen.findByText("Tasas por vendedor");
     await screen.findByText("Exclusiones de comisión");
-    expect(screen.queryByRole("button", { name: /Descargar el mes/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Descargar (PDF|Excel) del mes/i })).toBeNull();
     // Y el selector de empresa NO se va: elegir una es la forma de salir.
     expect(screen.getByLabelText("Empresa")).toBeTruthy();
   });
@@ -287,8 +287,8 @@ describe("🔴 la pestaña Configuración", () => {
     fireEvent.click(await screen.findByRole("menuitem", { name: "Editar exclusión" }));
     const hoja = await screen.findByLabelText("Excluir de");
     // Arranca diciendo lo que la regla dice hoy: las dos.
-    const venta = within(hoja).getByRole("switch", { name: /La venta/ });
-    const cobro = within(hoja).getByRole("switch", { name: /El cobro/ });
+    const venta = within(hoja).getByRole("switch", { name: /^Venta/ });
+    const cobro = within(hoja).getByRole("switch", { name: /^Cobro/ });
     expect(venta.getAttribute("aria-checked")).toBe("true");
     expect(cobro.getAttribute("aria-checked")).toBe("true");
     // Apagar las dos: Guardar se apaga y nada viaja.
@@ -338,8 +338,8 @@ describe("🔴 la pestaña Configuración", () => {
     // «arranca con las dos marcadas pero yo deselecciono».
     // 🔁 Desde el 25-sep-2026 son INTERRUPTORES bajo la pregunta «¿Qué no
     // comisiona?», no casillas bajo un encabezado que decía «VENTA».
-    const venta = within(alta).getByRole("switch", { name: "La venta" });
-    const cobro = within(alta).getByRole("switch", { name: "El cobro" });
+    const venta = within(alta).getByRole("switch", { name: "Venta" });
+    const cobro = within(alta).getByRole("switch", { name: "Cobro" });
     expect(venta.getAttribute("aria-checked")).toBe("true");
     expect(cobro.getAttribute("aria-checked")).toBe("true");
     expect(within(alta).getByText("Excluir de")).toBeTruthy();
@@ -357,7 +357,7 @@ describe("🔴 la pestaña Configuración", () => {
     const post = llamadas.find((c) => c.method === "POST")!;
     expect(post.url).toContain("/api/ventas/comisiones/exclusiones");
     expect(post.body).toEqual({ empresa_keys: ["vistana"], cliente_codigo: "D-84", vendedor: "EDWIN", excluye_venta: true, excluye_cobro: true });
-    await screen.findByText("Listo, guardado");
+    await screen.findByText("Exclusión guardada");
   });
 
   it("🔴 las 4 combinaciones: solo Venta y solo Cobro viajan al POST; las dos apagadas no se guardan y se avisa", async () => {
@@ -368,8 +368,8 @@ describe("🔴 la pestaña Configuración", () => {
     const guardar = within(alta).getByRole("button", { name: "Guardar" }) as HTMLButtonElement;
     fireEvent.click(await within(alta).findByRole("button", { name: /Kheriddine/ }));
     fireEvent.change(within(alta).getByLabelText("Vendedor"), { target: { value: "EDWIN" } });
-    const venta = within(alta).getByRole("switch", { name: "La venta" });
-    const cobro = within(alta).getByRole("switch", { name: "El cobro" });
+    const venta = within(alta).getByRole("switch", { name: "Venta" });
+    const cobro = within(alta).getByRole("switch", { name: "Cobro" });
 
     // Solo Venta.
     fireEvent.click(cobro);
@@ -377,14 +377,14 @@ describe("🔴 la pestaña Configuración", () => {
     await act(async () => { fireEvent.click(guardar); });
     let post = llamadas.filter((c) => c.method === "POST").at(-1)!;
     expect(post.body).toMatchObject({ excluye_venta: true, excluye_cobro: false });
-    await screen.findByText("Listo, guardado");
+    await screen.findByText("Exclusión guardada");
 
     // La fila se cierra al guardar: se vuelve a abrir, y arranca de nuevo con las dos marcadas.
     agregarEnClientes();
     const alta2 = await screen.findByTestId("alta-sin-comision");
     const guardar2 = within(alta2).getByRole("button", { name: "Guardar" }) as HTMLButtonElement;
-    const venta2 = within(alta2).getByRole("switch", { name: "La venta" });
-    const cobro2 = within(alta2).getByRole("switch", { name: "El cobro" });
+    const venta2 = within(alta2).getByRole("switch", { name: "Venta" });
+    const cobro2 = within(alta2).getByRole("switch", { name: "Cobro" });
     expect(venta2.getAttribute("aria-checked")).toBe("true");
     expect(cobro2.getAttribute("aria-checked")).toBe("true");
     fireEvent.click(await within(alta2).findByRole("button", { name: /Metro Shoes/ }));

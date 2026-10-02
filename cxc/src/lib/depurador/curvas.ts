@@ -120,7 +120,7 @@ export function parseCurvas(rows: SheetRow[]): CurvasResult {
   if (col.curva === -1) missing.push("CODIGO_PREPACK");
   if (col.ordXPp === -1) missing.push("CANTIDAD_ORD_X_PP");
   if (missing.length) {
-    throw new Error("No encontré estas columnas en el archivo: " + missing.join(", ") +
+    throw new Error("No se encontraron estas columnas en el archivo: " + missing.join(", ") +
       ". Revisa que sea el Excel de Fashion Shoes con curvas (prepack).");
   }
 
@@ -179,7 +179,7 @@ export function parseCurvas(rows: SheetRow[]): CurvasResult {
     const bultosExacto = ordXPp > 0 ? totalPiezas / ordXPp : 0;
     let bultos = Math.round(bultosExacto);
     if (ordXPp > 0 && !Number.isInteger(bultosExacto)) {
-      avisos.push(`Total ${totalPiezas} pzs no es múltiplo de ${ordXPp} pzs/bulto (da ${bultosExacto.toFixed(2)} bultos).`);
+      avisos.push(`Total ${totalPiezas} u no es múltiplo de ${ordXPp} u/bulto (da ${bultosExacto.toFixed(2)} bultos).`);
       cuadra = false;
     }
     if (bultos <= 0) bultos = 1; // evita división por 0; ya quedó marcada
@@ -194,7 +194,7 @@ export function parseCurvas(rows: SheetRow[]): CurvasResult {
 
     const sumaPorBulto = tallas.reduce((s, t) => s + t.porBulto, 0);
     if (ordXPp > 0 && sumaPorBulto !== ordXPp) {
-      avisos.push(`La suma por bulto da ${sumaPorBulto} pzs y el archivo dice ${ordXPp} pzs/bulto.`);
+      avisos.push(`La suma por bulto da ${sumaPorBulto} u y el archivo dice ${ordXPp} u/bulto.`);
       cuadra = false;
     }
 

@@ -31,10 +31,16 @@
 11. **Impresos.** Las etiquetas de la Zebra (térmica) no llevan fondos negros sólidos: van en texto negro sobre blanco, con negrita para lo importante.
 12. **Rollback.** Todo rediseño entra detrás de un interruptor (`false` = como antes) y con un test candado de lo que no debe cambiar (datos, PDF, reglas).
 
-## Cuándo hacer mockup
+## Mockup: siempre, con capturas reales
 
-- **Sí:** cuando cambia el flujo o el orden de una pantalla, o hay más de una forma razonable de hacerlo. El mockup se dibuja **con el estilo real de la pantalla** y con datos reales; si algo es de ejemplo, se rotula así.
-- **No:** en los ajustes que solo aplican estas reglas (mover un campo, renombrar según el glosario, quitar ruido). Esos se hacen directo y se muestran ya publicados.
+Daniel, 1-oct-2026: *«siempre mockup»* y *«dejamos fijo que las propuestas se muestran con capturas reales»*.
+
+1. **Hoy**: captura real de cada pestaña (computadora y celular, 390 px), sacada con Playwright sobre el servidor local como admin, **en solo lectura** (se bloquea todo POST/PUT/PATCH/DELETE, incluido el registro de visitas).
+2. **Propuesta**: se programa en local detrás de su interruptor, **sin publicar**, y se captura igual. Lo que Daniel ve es lo que va a recibir, con sus datos.
+3. Se muestra «hoy | propuesta» lado a lado, uno por módulo. Con su «sí» se publica; con un «no» se descarta y no se publicó nada.
+4. Para un ajuste chico (un nombre, mover un campo) basta un dibujo rápido con el estilo real.
+5. **En la computadora, la captura va con el menú lateral PLEGADO** (Daniel, 1-oct-2026).
+6. **Lo que cambia se marca con un recuadro ROJO** sobre la captura (borde rojo de 3 px y un número que se explica en una línea debajo), en «hoy» y en «propuesta». Así se ve qué mirar sin revisar cada detalle de la pantalla. Daniel: *«ponle un cuadro rojo para saber qué mirar»*.
 
 ## Checklist antes de entregar
 

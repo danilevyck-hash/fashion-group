@@ -210,7 +210,7 @@ export interface LineaDelMes {
   delta: { texto: string; tono: TonoCelular } | null;
   /** «contra septiembre 2025» — `null` cuando no hay con qué comparar. */
   contra: string | null;
-  /** «cierra en $47,117» — `null` en un mes cerrado o sin proyección. */
+  /** «proyección $47,117» — `null` en un mes cerrado o sin proyección. */
   cierra: string | null;
 }
 
@@ -228,7 +228,7 @@ export function lineaDelMes(args: {
   return {
     delta,
     contra,
-    cierra: cierraEn != null && Number.isFinite(cierraEn) ? `cierra en ${montoCorto(cierraEn)}` : null,
+    cierra: cierraEn != null && Number.isFinite(cierraEn) ? `proyección ${montoCorto(cierraEn)}` : null,
   };
 }
 
@@ -267,7 +267,7 @@ export function renglonesDelInicio(d: DatosRenglones): RenglonCelular[] {
     titulo: `Año ${d.anio?.anio ?? d.anioDelPeriodo}`,
     detalle: d.anio
       ? d.anio.cierra != null
-        ? `retail · cierra en ${montoCorto(d.anio.cierra)}`
+        ? `retail · proyección ${montoCorto(d.anio.cierra)}`
         : "retail"
       : null,
     monto: d.anio ? montoCorto(d.anio.ventas) : null,
@@ -384,7 +384,7 @@ export function renglonMeta(args: {
   const titulo = `${montoCorto(args.vendido)} de ${montoCorto(args.objetivo)}`;
   const detalle =
     args.proyeccion != null && Number.isFinite(args.proyeccion)
-      ? `${args.cerrada ? "cerraron en" : "así como van cierran en"} ${montoCorto(args.proyeccion)}`
+      ? `${args.cerrada ? "Cierre" : "Proyección de cierre"} ${montoCorto(args.proyeccion)}`
       : null;
   return { titulo, detalle, pct: `${Math.round(args.pctVendido * 100)} %` };
 }

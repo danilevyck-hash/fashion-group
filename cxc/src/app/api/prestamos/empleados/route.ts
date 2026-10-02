@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
 
   if (!codigo) {
     return NextResponse.json(
-      { error: "Elige a la persona de la lista de colaboradores." },
+      { error: "Selecciona el colaborador de la lista." },
       { status: 400 },
     );
   }
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
   }
   if (!persona) {
     return NextResponse.json(
-      { error: "Esa persona no está en Asistencia. Elige a alguien de la lista." },
+      { error: "Esa persona no está en Asistencia. Selecciona un colaborador de la lista." },
       { status: 400 },
     );
   }

@@ -86,7 +86,7 @@ export const COLUMNAS_DEL_DIA = ["Entrada", "Salida almuerzo", "Regreso almuerzo
 export const MOTIVO_DE_LA_CASILLA = [
   "No marcó entrada",
   "No marcó salida a almuerzo",
-  "No marcó vuelta de almuerzo",
+  "No marcó regreso de almuerzo",
   "No marcó salida",
 ] as const;
 

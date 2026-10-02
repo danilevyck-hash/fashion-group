@@ -161,7 +161,7 @@ export function ResumenCelular({
         opciones={MODO_OPCIONES}
         activo={viewMode}
         onChange={setViewMode}
-        ariaLabel="Qué mostrar"
+        ariaLabel="Indicador"
       />
 
       {/* ── 2a · LA TABLA COMPACTA ────────────────────────────────────────────

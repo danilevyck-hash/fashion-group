@@ -101,7 +101,7 @@ export default function ReclamoForm({
   }
 
   const leidaTexto = leida
-    ? [leida.proveedor, leida.nro_factura ? `factura ${leida.nro_factura}` : null, leida.fecha_factura ? fmtDate(leida.fecha_factura) : null, leida.nro_orden_compra ? `OC ${leida.nro_orden_compra}` : null, `${leida.lineas.length} línea${leida.lineas.length === 1 ? "" : "s"}`].filter(Boolean).join(" · ")
+    ? [leida.proveedor, leida.nro_factura ? `factura ${leida.nro_factura}` : null, leida.fecha_factura ? fmtDate(leida.fecha_factura) : null, leida.nro_orden_compra ? `N° de pedido ${leida.nro_orden_compra}` : null, `${leida.lineas.length} línea${leida.lineas.length === 1 ? "" : "s"}`].filter(Boolean).join(" · ")
     : null;
 
   return (

@@ -582,11 +582,11 @@ describe("🔴 DESACTUALIZADA — nada se recalcula por debajo", () => {
     await waitFor(() => expect(llamadas.some((c) => c.init?.method === "POST")).toBe(true));
     // Se espera al cartel de «viejo», que es lo que la pantalla hace en lugar
     // de recargar. Sin esperarlo, lo de abajo mediría una pantalla a medias.
-    await screen.findByText(/Los números que ves son de antes/);
+    await screen.findByText(/Planilla desactualizada/);
     // …y NO se volvió a pedir el cuadro.
     expect(cuadrosPedidos()).toBe(antes);
     // Se dice, y se ofrece rehacerlo a mano.
-    expect(screen.getByText(/Los números que ves son de antes/)).toBeTruthy();
+    expect(screen.getByText(/Planilla desactualizada/)).toBeTruthy();
     expect(screen.getAllByRole("button", { name: /^Regenerar$/ }).length).toBeGreaterThan(0);
     // Y no se puede cerrar un cuadro que ya no es el que se está mirando.
     expect(screen.queryByRole("button", { name: "Cerrar quincena" })).toBeNull();
@@ -600,14 +600,14 @@ describe("🔴 DESACTUALIZADA — nada se recalcula por debajo", () => {
     const isr = screen.getAllByDisplayValue("25.5")[0] as HTMLInputElement;
     fireEvent.change(isr, { target: { value: "30" } });
     fireEvent.blur(isr);
-    await screen.findByText(/Los números que ves son de antes/);
+    await screen.findByText(/Planilla desactualizada/);
 
     const antes = llamadas.filter((c) => c.url.includes("/api/asistencia/planilla?")).length;
     fireEvent.click(screen.getAllByRole("button", { name: /^Regenerar$/ })[0]);
     await waitFor(() => {
       expect(llamadas.filter((c) => c.url.includes("/api/asistencia/planilla?")).length).toBe(antes + 1);
     });
-    await waitFor(() => expect(screen.queryByText(/Los números que ves son de antes/)).toBeNull());
+    await waitFor(() => expect(screen.queryByText(/Planilla desactualizada/)).toBeNull());
   });
 
   it("🔴 cambiar la empresa también deja el cuadro viejo — no se recarga solo", async () => {
@@ -667,7 +667,7 @@ describe("🔴 el inicio sugerido después de cerrar", () => {
     // 🔴 LA REGLA NO CAMBIÓ, y son las dos que importan: la sugerencia **no le
     // mueve el período a nadie** y **no pide ningún cuadro**.
     expect(enLaBarra("2026-08-01", "2026-08-15")).toBeTruthy();
-    expect(screen.getByText("Esta quincena todavía no se generó")).toBeTruthy();
+    expect(screen.getByText("Quincena sin generar")).toBeTruthy();
     expect(llamadas.filter((c) => c.url.includes("/api/asistencia/planilla?"))).toEqual([]);
   });
 
