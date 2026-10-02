@@ -158,8 +158,12 @@ describe("🔴 2 · Los avisos salen completos y se pueden bajar", () => {
     expect(src).toMatch(/!TRES_DETALLES && warnings\.length > 8/);
   });
 
+  // 🔁 Cambió de dirección (2-oct-2026, AVISOS_2026_10): la caja vieja con su
+  // ternario «aviso(s)» se borró con el aviso en línea. Lo esencial se queda:
+  // el plural bien dicho y nunca «aviso(s)» en pantalla.
   it("ya no dice «aviso(s)» con el interruptor prendido", () => {
-    expect(src).toContain('TRES_DETALLES ? plural(warnings.length, "aviso", "avisos") : "aviso(s)"');
+    expect(src).toContain('plural(warnings.length, "aviso", "avisos")');
+    expect(src).not.toContain('"aviso(s)"');
   });
 
   it("🔴 el Excel de avisos sale por el camino común de la casa", () => {

@@ -241,11 +241,6 @@ export function AvisoCelular({ children }: { children: ReactNode }) {
   return (
     <Aviso
       className="mx-4 mt-3"
-      legado={
-        <div className="mx-4 mt-3 rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 text-[14px] text-amber-800">
-          {children}
-        </div>
-      }
     >
       {children}
     </Aviso>

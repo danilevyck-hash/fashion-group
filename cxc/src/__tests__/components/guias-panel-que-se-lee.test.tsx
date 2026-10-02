@@ -105,7 +105,9 @@ describe("2 · arriba, la línea con lo que falta", () => {
   it("🔴 lleva a esa guía", () => {
     const abrir = vi.fn();
     pintar([guia(), PENDIENTE], { onToggleExpand: abrir });
-    fireEvent.click(screen.getByText("1 guía sin despachar — hace 4 días"));
+    // cambió de dirección (2-oct-2026, AVISOS_2026_10): la línea dejó de ser un
+    // botón entero; la lleva a la guía su acción «Ver guía», a la derecha.
+    fireEvent.click(screen.getByRole("button", { name: "Ver guía" }));
     expect(abrir).toHaveBeenCalledWith("g239");
   });
 

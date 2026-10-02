@@ -184,11 +184,6 @@ export function BorradorFacturaCard({
       {borrador.estado.tipo === "error" && (
         <Aviso
           tono="error"
-          legado={
-            <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
-              <strong>No se guardó:</strong> {borrador.estado.razon}
-            </div>
-          }
         >
           No se guardó: {borrador.estado.razon}
         </Aviso>
@@ -346,28 +341,6 @@ export function BorradorFacturaCard({
       {duplicados.length > 0 && (
         <Aviso
           tono={borrador.permitirDuplicado ? "info" : "aviso"}
-          legado={
-            <div
-              className={`rounded-md border px-3 py-2 text-xs ${
-                borrador.permitirDuplicado
-                  ? "border-gray-300 bg-gray-50 text-gray-700"
-                  : "border-amber-300 bg-amber-50 text-amber-900"
-              }`}
-            >
-              {borrador.permitirDuplicado ? "✓" : "⚠"} Ya existe esta factura (
-              {borrador.numeroFactura} de &ldquo;{borrador.proveedor}&rdquo;) en{" "}
-              {duplicados
-                .map(
-                  (d) =>
-                    `"${d.proyecto_nombre}"${d.es_mismo_proyecto ? " (este mismo)" : ""}`,
-                )
-                .join(", ")}
-              .
-              {borrador.permitirDuplicado
-                ? " Confirmaste guardar igual."
-                : " Confirma al guardar para registrarla de todos modos."}
-            </div>
-          }
         >
           Factura ya registrada ({borrador.numeroFactura} de «{borrador.proveedor}») en{" "}
           {duplicados.map((d) => `«${d.proyecto_nombre}»${d.es_mismo_proyecto ? " (este mismo)" : ""}`).join(", ")}.

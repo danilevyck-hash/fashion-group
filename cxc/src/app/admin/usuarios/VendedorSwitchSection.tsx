@@ -124,13 +124,8 @@ export default function VendedorSwitchSection({ userId, showToast }: { userId: s
           que saber a quién avisarle. */}
       {ddlPendiente ? (
         <Aviso
-          legado={
-            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-              Todavía no se puede asignar el vendedor de Switch: falta activar esta función en el sistema. Avísale a Daniel.
-            </p>
-          }
         >
-          Asignación de vendedor de Switch sin activar. Avísale a Daniel.
+          Todavía no se puede asignar el vendedor de Switch: falta activar esta función en el sistema. Avísale a Daniel.
         </Aviso>
       ) : (
         <div className="space-y-2">

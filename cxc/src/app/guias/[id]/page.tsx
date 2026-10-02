@@ -499,16 +499,7 @@ export default function GuiaPage() {
                   escribe UNA columna de UNA línea. El candado del PUT sobre una
                   guía despachada NO se tocó. */}
               {guiaSinNumeroTransp(g) && (
-                <Aviso
-                  legado={
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                      <p className="text-sm text-amber-900">
-                        Esta guía salió sin el N° del transportista.{" "}
-                        {puedeEditar ? "Cuando lo tengas, anótalo con «Editar»." : ""}
-                      </p>
-                    </div>
-                  }
-                >
+                <Aviso>
                   Guía despachada sin N° del transportista.{puedeEditar ? " Anótalo con «Editar»." : ""}
                 </Aviso>
               )}
@@ -528,13 +519,7 @@ export default function GuiaPage() {
                   candado del PUT las rechaza igual. Marcarlas es lo que permite
                   encontrarlas. */}
               {faltaEnLaDespachada && (
-                <Aviso
-                  legado={
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                      <p className="text-sm text-amber-900">{faltaEnLaDespachada}.</p>
-                    </div>
-                  }
-                >
+                <Aviso>
                   {faltaEnLaDespachada}.
                 </Aviso>
               )}

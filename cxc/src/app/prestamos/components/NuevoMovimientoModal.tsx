@@ -230,11 +230,6 @@ export default function NuevoMovimientoModal({
         {pasaElTope && evaluacion && (
           <Aviso
             tono="aviso"
-            legado={
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            {textoAvisoTope(evaluacion)}
-          </div>
-            }
           >
             {textoAvisoTope(evaluacion)}
           </Aviso>

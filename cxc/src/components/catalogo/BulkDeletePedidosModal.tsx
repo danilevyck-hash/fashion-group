@@ -101,36 +101,10 @@ export default function BulkDeletePedidosModal({
           <Aviso
             className="mb-3"
             accion={{ texto: copied ? "Números copiados" : "Copiar números", onClick: handleCopy }}
-            legado={
-              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                <p className="text-sm text-amber-800 mb-2">
-                  {enviados.length === 1
-                    ? "1 ya está en Switch — se ocultará de fashiongr pero SIGUE en Switch: anúlalo en el panel."
-                    : `${enviados.length} ya están en Switch — se ocultarán de fashiongr pero SIGUEN en Switch: anúlalos en el panel.`}
-                </p>
-                <ul className="max-h-40 overflow-y-auto divide-y divide-amber-100 mb-2">
-                  {enviados.map((e) => (
-                    <li key={e.key} className="py-1.5 flex items-baseline gap-2 text-sm">
-                      <span className="font-semibold text-amber-900 tabular-nums whitespace-nowrap">#{e.numero}</span>
-                      <span className="text-amber-700 truncate">{e.cliente}</span>
-                    </li>
-                  ))}
-                </ul>
-                <button
-                  onClick={handleCopy}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-amber-300 bg-white text-xs font-medium text-amber-800 hover:bg-amber-100 active:scale-[0.97] transition"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                  {copied ? "Números copiados" : "Copiar números"}
-                </button>
-              </div>
-            }
           >
             {enviados.length === 1
               ? "1 ya está en Switch: se oculta aquí, pero hay que anularlo en Switch."
-              : `${enviados.length} ya están en Switch: se ocultan aquí, pero hay que anularlos en Switch.`}
+              : `${enviados.length} ya están en Switch: se ocultan aquí, pero SIGUEN en Switch. Anúlalos en el panel.`}
             <ul className="mt-1 max-h-40 overflow-y-auto text-sm">
               {enviados.map((e) => (
                 <li key={e.key} className="flex items-baseline gap-2 py-0.5">

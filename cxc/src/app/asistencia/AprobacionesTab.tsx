@@ -374,11 +374,6 @@ export default function AprobacionesTab({ empresa = "" }: {
       {avisoMigracion && (
         <Aviso
           className="mb-4"
-          legado={
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          {avisoMigracion}
-        </div>
-          }
         >
           {avisoMigracion}
         </Aviso>
@@ -386,11 +381,6 @@ export default function AprobacionesTab({ empresa = "" }: {
       {avisoAprobador && (
         <Aviso
           className="mb-4"
-          legado={
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          {avisoAprobador}
-        </div>
-          }
         >
           {avisoAprobador}
         </Aviso>
@@ -398,11 +388,6 @@ export default function AprobacionesTab({ empresa = "" }: {
       {error && (
         <Aviso
           tono="error" className="mb-4"
-          legado={
-        <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-          }
         >
           {error}
         </Aviso>
@@ -410,30 +395,11 @@ export default function AprobacionesTab({ empresa = "" }: {
 
       {personaCodigo && !cargando && dias !== null && (
         <Aviso
-          tono="info" className="mb-4" accion={{ texto: "Ver a todos", onClick: () => setPersona("") }}
-          legado={
-        <div
-          data-testid="chip-persona"
-          className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900"
-        >
-          <span>
-            {primerDiaPendiente
-              ? <>Mostrando a <b>{personaEtiqueta}</b></>
-              : <><b>{personaEtiqueta}</b> no tiene horas extra pendientes en este período.</>}
-          </span>
-          <button
-            type="button"
-            onClick={() => setPersona("")}
-            className="inline-flex min-h-[44px] items-center gap-1 font-medium underline underline-offset-2 hover:text-amber-950"
-          >
-            ver a todos <span aria-hidden="true">×</span>
-          </button>
-        </div>
-          }
+          tono="info" className="mb-4" testId="chip-persona" accion={{ texto: "Ver a todos", onClick: () => setPersona("") }}
         >
           {primerDiaPendiente
             ? <>Mostrando a <b>{personaEtiqueta}</b></>
-            : <><b>{personaEtiqueta}</b> sin horas extra pendientes en este período.</>}
+            : <><b>{personaEtiqueta}</b> no tiene horas extra pendientes en este período.</>}
         </Aviso>
       )}
 

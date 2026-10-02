@@ -820,18 +820,6 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
         <Aviso
           tono="error" className="mb-4"
           accion={{ texto: "Reintentar", onClick: reintentarCatalogo }}
-          legado={
-            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-              <span>No se pudo cargar el catálogo de descripciones. Intenta de nuevo.</span>
-              <button
-                type="button"
-                onClick={reintentarCatalogo}
-                className="rounded-md border border-red-300 bg-white px-3 py-1 text-[13px] font-semibold text-red-700 transition hover:bg-red-100 active:scale-[0.97]"
-              >
-                Reintentar
-              </button>
-            </div>
-          }
         >
           No se pudo cargar el catálogo de descripciones.
         </Aviso>
@@ -919,12 +907,6 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
       {error && (
         <Aviso
           tono="error" className="mb-5"
-          legado={
-            <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-              <span aria-hidden>✕</span>
-              <div><b className="font-semibold">No se pudo procesar.</b> {error}</div>
-            </div>
-          }
         >
           No se pudo procesar. {error}
         </Aviso>
@@ -945,36 +927,6 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                   {!TRES_DETALLES && warnings.length > 8 && <div className="mt-1">…y {warnings.length - 8} más.</div>}
                 </>
               }
-              legado={
-                <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  <span aria-hidden>!</span>
-                  <div className="min-w-0 flex-1">
-                    <b className="font-semibold" data-avisos-titulo>
-                      {warnings.length} {TRES_DETALLES ? plural(warnings.length, "aviso", "avisos") : "aviso(s)"}
-                    </b>{" "}
-                    de datos faltantes (puedes corregirlos en el Excel antes de subir):
-                    {/* 🔴 COMPLETOS. Antes se dibujaban 8 y el resto se escondía
-                        detrás de un «…y N más» que no llevaba a ningún lado: con 40
-                        artículos sin código de barra se arreglaban ocho. */}
-                    <ul
-                      className={`ml-4 mt-1.5 list-disc ${TRES_DETALLES ? "max-h-56 overflow-y-auto pr-2" : ""}`}
-                      data-avisos-lista
-                    >
-                      {(TRES_DETALLES ? warnings : warnings.slice(0, 8)).map((x, i) => <li key={i}>{x}</li>)}
-                    </ul>
-                    {!TRES_DETALLES && warnings.length > 8 && <div className="mt-1">…y {warnings.length - 8} más.</div>}
-                    {TRES_DETALLES && (
-                      <button
-                        type="button"
-                        onClick={() => { void bajarAvisos(); }}
-                        className="mt-2 rounded-md border border-amber-400 bg-white px-2.5 py-1 text-[12px] font-semibold text-amber-800 transition hover:bg-amber-100 active:scale-[0.97]"
-                      >
-                        {ROTULO_BAJAR_AVISOS}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              }
             >
               <span data-avisos-titulo>{warnings.length} {plural(warnings.length, "aviso", "avisos")}</span> de datos faltantes. Puedes corregirlos en el Excel antes de subir.
             </Aviso>
@@ -983,25 +935,6 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
             <Aviso
               tono="aviso" className="mb-5"
               accion={{ texto: `Ver solo ${plural(revisar, "ese", "esos")} ${revisar}`, onClick: () => onFilterChange(FILTRO_AMBAR) }}
-              legado={
-                <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  <span aria-hidden>!</span>
-                  <div>
-                    <b className="font-semibold">{revisar} {plural(revisar, "estilo", "estilos")} en ámbar</b>: la
-                    regla no encontró la talla esperada y usó la más chica.
-                    {/* 🔴 El aviso LLEVA a los estilos en vez de pedir que se busquen
-                        a mano: escribe el valor especial en el MISMO desplegable de
-                        la vista previa, sin un segundo mecanismo de filtrado. */}
-                    <button
-                      type="button"
-                      onClick={() => onFilterChange(FILTRO_AMBAR)}
-                      className="ml-2 rounded-md border border-amber-400 bg-white px-2 py-0.5 text-[12px] font-semibold text-amber-800 transition hover:bg-amber-100 active:scale-[0.97]"
-                    >
-                      Ver solo {plural(revisar, "ese", "esos")} {revisar}
-                    </button>
-                  </div>
-                </div>
-              }
             >
               {revisar} {plural(revisar, "estilo", "estilos")} en ámbar: no se encontró la talla esperada y se usó la más chica.
             </Aviso>
@@ -1012,12 +945,6 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
           {empresasArchivo.length > 1 && (
             <Aviso
               tono="aviso" className="mb-3"
-              legado={
-                <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
-                  El archivo trae marcas de {empresasArchivo.length} empresas
-                  ({empresasArchivo.map((k) => companiaLabel(k)).join(" y ")}). Toca «cambiar» y selecciona una.
-                </p>
-              }
             >
               El archivo trae marcas de {empresasArchivo.length} empresas ({empresasArchivo.map((k) => companiaLabel(k)).join(" y ")}). Toca «cambiar» y selecciona una.
             </Aviso>
@@ -1053,20 +980,8 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
             <Aviso
               tono="error" className="mb-3"
               accion={{ texto: "Ver y aprobar", onClick: () => setOrphanSeen(false) }}
-              legado={
-                <p className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-semibold text-red-700">
-                  <span>🔒 Bloqueado: hay {descsNuevas.length} descripción(es) nueva(s) sin aprobar.</span>
-                  <button
-                    type="button"
-                    onClick={() => setOrphanSeen(false)}
-                    className="rounded-md border border-red-300 bg-white px-2 py-0.5 text-[12px] font-semibold text-red-700 transition hover:bg-red-100 active:scale-[0.97]"
-                  >
-                    Ver y aprobar
-                  </button>
-                </p>
-              }
             >
-              Descarga bloqueada: {descsNuevas.length} {plural(descsNuevas.length, "descripción nueva", "descripciones nuevas")} sin aprobar.
+              Bloqueado: hay {descsNuevas.length} {plural(descsNuevas.length, "descripción nueva", "descripciones nuevas")} sin aprobar.
             </Aviso>
           )}
 
@@ -1077,16 +992,6 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
           {marcasDesconocidas.map((m) => (
             <Aviso
               key={m.marca} tono="aviso" className="mb-3"
-              legado={
-                <p
-                  key={m.marca}
-                  data-marca-desconocida={m.marca}
-                  className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] text-amber-900"
-                >
-                  Marca desconocida: <b className="font-semibold">«{m.marca}»</b> — {m.productos.toLocaleString()}{" "}
-                  producto{m.productos === 1 ? "" : "s"} {m.productos === 1 ? "va" : "van"} a salir sin precio
-                </p>
-              }
             >
               <span data-marca-desconocida={m.marca}>Marca desconocida «{m.marca}»: {m.productos.toLocaleString()} {plural(m.productos, "producto saldrá", "productos saldrán")} sin precio.</span>
             </Aviso>
@@ -1095,15 +1000,6 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
           {corregidas.map((c) => (
             <Aviso
               key={`${c.marca}|||${c.de}`} tono="info" className="mb-3"
-              legado={
-                <p
-                  key={`${c.marca}|||${c.de}`}
-                  className="mb-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-[13px] text-sky-900"
-                >
-                  Corregida: {c.marca} · «{c.de}» → <b className="font-semibold">«{c.a}»</b> — {c.productos.toLocaleString()}{" "}
-                  producto{c.productos === 1 ? "" : "s"}
-                </p>
-              }
             >
               Corregida: {c.marca} · «{c.de}» → <b className="font-semibold">«{c.a}»</b> · {c.productos.toLocaleString()} {plural(c.productos, "producto", "productos")}
             </Aviso>
@@ -1113,11 +1009,6 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
           {pasaronSolas > 0 && (
             <Aviso
               tono="info" className="mb-3"
-              legado={
-                <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
-                  {pasaronSolas} descripción(es) nueva(s) pasaron solas · las dos mitades ya existen
-                </p>
-              }
             >
               {pasaronSolas} {plural(pasaronSolas, "descripción nueva pasó sola", "descripciones nuevas pasaron solas")}: las dos mitades ya existen.
             </Aviso>

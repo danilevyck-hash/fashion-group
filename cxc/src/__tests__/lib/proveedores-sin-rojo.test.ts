@@ -84,7 +84,9 @@ describe("🔴 un solo tono: ni rojo ni ámbar en los montos de CxP", () => {
   });
 
   it("CONTROL: el aviso de lectura caída sigue siendo rojo — eso sí falló", () => {
-    expect(sinComentarios(leer(PANTALLAS[0]))).toContain("border-red-200");
+    // cambió de dirección (2-oct-2026, AVISOS_2026_10): el rojo lo pone <Aviso tono="error">.
+    expect(sinComentarios(leer(PANTALLAS[0]))).toContain('tono="error"');
+    expect(leer("src/components/ui/Aviso.tsx")).toContain("border-red-200");
     expect(sinComentarios(leer(PANTALLAS[0]))).toContain("No se pudo cargar");
   });
 });

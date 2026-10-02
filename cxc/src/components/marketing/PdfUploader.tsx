@@ -209,33 +209,6 @@ export function PdfUploader({
       <Aviso
         tono="error"
         accion={{ texto: "Reintentar", onClick: reintentar }}
-        legado={
-          <div className="rounded-md border border-red-200 bg-red-50 p-3 flex items-center gap-3">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#dc2626"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            <div className="flex-1 text-sm text-red-700">{estado.message}</div>
-            <button
-              type="button"
-              onClick={reintentar}
-              className="text-sm text-red-700 underline hover:text-red-900"
-            >
-              Reintentar
-            </button>
-          </div>
-        }
       >
         {estado.message}
       </Aviso>

@@ -194,18 +194,6 @@ export default function ReglasView() {
           <Aviso
             tono="error" className="mb-4"
             accion={{ texto: "Reintentar", onClick: reintentar }}
-            legado={
-              <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-800">
-                <span>No se pudo cargar el catálogo de descripciones. Intenta de nuevo.</span>
-                <button
-                  type="button"
-                  onClick={reintentar}
-                  className="min-h-[44px] rounded-md border border-red-300 bg-white px-2.5 text-[12px] font-semibold text-red-700 transition hover:bg-red-100 active:scale-[0.97]"
-                >
-                  Reintentar
-                </button>
-              </div>
-            }
           >
             No se pudo cargar el catálogo de descripciones.
           </Aviso>
@@ -213,9 +201,6 @@ export default function ReglasView() {
         {error && (
           <Aviso
             tono="error" className="mb-3"
-            legado={
-              <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-800">{error}</div>
-            }
           >
             {error}
           </Aviso>

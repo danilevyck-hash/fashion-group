@@ -4,9 +4,10 @@
 // (src/components/ui/Aviso.tsx), detrás de AVISOS_2026_10.
 //
 // El candado: ninguna caja de aviso NUEVA (fondo amber/red/blue/yellow-50 con
-// borde) fuera del componente. Techo POR ARCHIVO que solo baja: hoy cuenta las
-// cajas viejas que viven en `legado` y los usos que no son avisos (chips,
-// campos inválidos, celdas). Al prender el interruptor y borrar el legado, baja.
+// borde) fuera del componente. Techo POR ARCHIVO que solo baja: cuenta los usos
+// que no son avisos (chips, campos inválidos, celdas) y la excepción de
+// Usuarios › Editar usuario. 2-oct-2026: con el «sí» de Daniel se borraron las
+// cajas de antes (`legado`) y el techo bajó de 185 a 71.
 import { describe, it, expect, vi } from "vitest";
 import { readdirSync, readFileSync, statSync } from "fs";
 import { join } from "path";
@@ -15,60 +16,30 @@ import { textoDelAviso } from "@/lib/asistencia/relojes-en-la-fila";
 
 const CAJA = /bg-(amber|red|blue|yellow)-50(?![0-9/])/;
 const TECHO: Record<string, number> = {
-  "app/admin/usuarios/NovedadesTab.tsx": 1,
-  "app/admin/usuarios/VendedorSwitchSection.tsx": 1,
-  "app/admin/usuarios/VisitasTab.tsx": 1,
   "app/admin/usuarios/page.tsx": 1,
-  "app/asistencia/AprobacionesTab.tsx": 4,
-  "app/asistencia/ConfiguracionTab.tsx": 3,
-  "app/asistencia/CorregirMarcacionModal.tsx": 2,
   "app/asistencia/EstadoReloj.tsx": 2,
-  "app/asistencia/MovimientosQuincenaTab.tsx": 1,
-  "app/asistencia/PlanillaTab.tsx": 8,
+  "app/asistencia/PlanillaTab.tsx": 2,
   "app/asistencia/PrestamosTab.tsx": 1,
   "app/asistencia/aprobaciones/PorColaborador.tsx": 2,
-  "app/asistencia/colaboradores/SeccionOtrosServicios.tsx": 1,
-  "app/boston/tabs/PlanillaBoston.tsx": 2,
-  "app/cxc/components/EnviarEmailModal.tsx": 2,
-  "app/cxc/components/EstadoCuentaDrawer.tsx": 1,
-  "app/cxc/components/HojaCobrar.tsx": 2,
   "app/cxc/components/TiraTotales.tsx": 1,
-  "app/gastos-contabilidad/GastosContabilidadClient.tsx": 1,
   "app/gastos-contabilidad/components/ResumenEgresos.tsx": 1,
-  "app/gastos-contabilidad/components/saldos/SaldosBancarios.tsx": 3,
-  "app/gastos-contabilidad/components/saldos/SaldosBancoTab.tsx": 1,
-  "app/guias/[id]/page.tsx": 3,
-  "app/guias/components/AtarClienteModal.tsx": 1,
+  "app/gastos-contabilidad/components/saldos/SaldosBancarios.tsx": 2,
+  "app/guias/[id]/page.tsx": 1,
   "app/guias/components/EtiquetasPendientes.tsx": 2,
-  "app/guias/components/EtiquetasPorEnvio.tsx": 4,
-  "app/guias/components/EtiquetasView.tsx": 5,
+  "app/guias/components/EtiquetasPorEnvio.tsx": 1,
+  "app/guias/components/EtiquetasView.tsx": 1,
   "app/guias/components/FacturasDelCliente.tsx": 1,
-  "app/guias/components/GuiasConfiguracionView.tsx": 1,
-  "app/guias/components/GuiasList.tsx": 2,
-  "app/marcacion/MarcacionClient.tsx": 1,
-  "app/marketing/components/CerrarPeriodoModal.tsx": 4,
-  "app/marketing/components/DetallePeriodoView.tsx": 1,
+  "app/guias/components/GuiasList.tsx": 1,
   "app/marketing/components/EntregasSection.tsx": 3,
   "app/marketing/components/FacturasSection.tsx": 1,
-  "app/marketing/components/FotosSection.tsx": 1,
-  "app/marketing/components/celular/PiezasCelular.tsx": 1,
   "app/marketing/mobiliario/page.tsx": 1,
   "app/prestamos/PrestamosClient.tsx": 1,
-  "app/prestamos/components/AplicarQuincenaModal.tsx": 1,
-  "app/prestamos/components/NuevoMovimientoModal.tsx": 1,
   "app/prestamos/components/types.ts": 2,
-  "app/productos/cargar/AlarmaDescripcionesNuevas.tsx": 3,
-  "app/productos/cargar/CatalogoDescripcionesAdmin.tsx": 2,
-  "app/productos/cargar/CurvasView.tsx": 3,
-  "app/productos/cargar/DepuradorClient.tsx": 12,
-  "app/productos/cargar/DepuradorDispatcher.tsx": 1,
-  "app/productos/cargar/FacturasTiendaClient.tsx": 9,
-  "app/productos/cargar/FormulasConfig.tsx": 2,
-  "app/productos/cargar/HistorialView.tsx": 1,
-  "app/productos/cargar/MiExcelFotosClient.tsx": 3,
-  "app/productos/cargar/ReebokClient.tsx": 14,
-  "app/productos/cargar/ReglasView.tsx": 2,
-  "app/proveedores/ProveedoresListClient.tsx": 1,
+  "app/productos/cargar/AlarmaDescripcionesNuevas.tsx": 1,
+  "app/productos/cargar/CurvasView.tsx": 1,
+  "app/productos/cargar/DepuradorClient.tsx": 4,
+  "app/productos/cargar/FacturasTiendaClient.tsx": 3,
+  "app/productos/cargar/ReebokClient.tsx": 5,
   "app/reclamos/components/EmpresaList.tsx": 1,
   "app/reclamos/components/EmpresaSelector.tsx": 3,
   "app/reclamos/components/ReclamoDetail.tsx": 1,
@@ -78,29 +49,18 @@ const TECHO: Record<string, number> = {
   "app/recordatorios/components/LineaNueva.tsx": 1,
   "app/recordatorios/components/RecordatorioFormModal.tsx": 2,
   "components/Sidebar.tsx": 1,
-  "components/SugerenciasCliente.tsx": 1,
   "components/catalogo/BarraModoPedido.tsx": 1,
-  "components/catalogo/BulkDeletePedidosModal.tsx": 1,
   "components/catalogo/CatalogoStickyCartBar.tsx": 1,
-  "components/catalogo/CheckoutClient.tsx": 3,
-  "components/catalogo/ConfirmacionClient.tsx": 2,
+  "components/catalogo/CheckoutClient.tsx": 2,
+  "components/catalogo/ConfirmacionClient.tsx": 1,
   "components/catalogo/EnviarDocumentoSwitch.tsx": 1,
-  "components/catalogo/PedidoDetalleClient.tsx": 5,
-  "components/catalogo/PedidoPublicoClient.tsx": 1,
-  "components/marketing/BorradorFacturaCard.tsx": 2,
-  "components/marketing/EntregaForm.tsx": 1,
   "components/marketing/FacturaCard.tsx": 3,
-  "components/marketing/FacturaForm.tsx": 1,
-  "components/marketing/PdfUploader.tsx": 1,
   "components/marketing/PreciosProveedorAyuda.tsx": 2,
   "components/multifashion/ClientesMultifashionSubtab.tsx": 2,
-  "components/multifashion/MetasSubtab.tsx": 2,
   "components/multifashion/MultifashionResumenView.tsx": 1,
-  "components/multifashion/ProductosSubtab.tsx": 2,
+  "components/multifashion/ProductosSubtab.tsx": 1,
   "components/multifashion/VentaHoyCard.tsx": 1,
-  "components/referencia/ReferenciaView.tsx": 4,
   "components/ui/Chip.tsx": 2,
-  "components/ventas/ProductosView.tsx": 1,
 };
 
 function* archivos(dir: string): Generator<string> {
@@ -131,13 +91,29 @@ describe("aviso en línea: candado", () => {
     expect(pasados).toEqual([]);
   });
 
-  it("el interruptor nace apagado: la pantalla de hoy, al pie de la letra", async () => {
+  // 🔁 CAMBIÓ DE DIRECCIÓN (2-oct-2026): nacía apagado («la pantalla de hoy, al
+  // pie de la letra»). Daniel aprobó y se prendió. El control al revés se queda:
+  // con el interruptor apagado, una caja con `legado` sigue dibujando lo de antes.
+  it("el interruptor está prendido: Daniel aprobó el 2-oct-2026", async () => {
     const src = readFileSync("src/lib/ui/avisos-2026-10.ts", "utf8");
-    expect(src).toMatch(/export const AVISOS_2026_10 = false;/);
+    expect(src).toMatch(/Daniel aprobó el 2-oct-2026/);
+    expect(src).toMatch(/export const AVISOS_2026_10 = true;/);
+  });
+
+  it("control al revés: apagado, `legado` sigue mandando", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/ui/avisos-2026-10", () => ({ AVISOS_2026_10: false }));
     const { Aviso } = await import("@/components/ui/Aviso");
     render(<Aviso legado={<p>caja de antes</p>}>texto nuevo</Aviso>);
     expect(screen.getByText("caja de antes")).toBeTruthy();
     expect(screen.queryByText("texto nuevo")).toBeNull();
+    vi.doUnmock("@/lib/ui/avisos-2026-10");
+  });
+
+  it("excepción documentada: la nota del rol propio en Usuarios queda chica", () => {
+    const u = readFileSync("src/app/admin/usuarios/page.tsx", "utf8");
+    expect(u).toMatch(/EXCEPCIÓN a <Aviso>/);
+    expect(u).toMatch(/Cambiar tu propio rol te quitará acceso de administrador\./);
   });
 
   it("los dos avisos de Daniel ya pasaron al componente", () => {

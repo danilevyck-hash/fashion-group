@@ -355,7 +355,9 @@ describe("🔴 APROBACIONES con ?persona= en la URL", () => {
     const chip = screen.getByTestId("chip-persona");
     expect(chip.textContent).toContain("Mostrando a");
     expect(chip.textContent).toContain("KEVIN LUBO");
-    await act(async () => { within(chip).getByRole("button", { name: /ver a todos/ }).click(); });
+    // 🔁 Cambió de dirección (2-oct-2026, AVISOS_2026_10): el chip es el <Aviso>
+    // y su acción dice «Ver a todos» (con mayúscula, sin la ×). Sigue limpiando `persona`.
+    await act(async () => { within(chip).getByRole("button", { name: /ver a todos/i }).click(); });
     expect(replace).toHaveBeenCalled();
     const url = String(replace.mock.calls[replace.mock.calls.length - 1][0]);
     expect(url).not.toContain("persona=");

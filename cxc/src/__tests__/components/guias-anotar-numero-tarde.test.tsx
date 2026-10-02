@@ -296,19 +296,21 @@ describe("🔴 lo que se corrige se escribe POR COLUMNA — nunca por el PUT", (
 // ─────────────────────────────────────────────────────────────────────────────
 describe("🔴 la guía que salió sin el N° queda MARCADA", () => {
   it("el aviso ámbar está, y dice con qué completarlo", async () => {
+    // cambió de dirección (2-oct-2026, AVISOS_2026_10): «Esta guía salió sin el N°…»
+    // pasó a «Guía despachada sin N° del transportista. Anótalo con «Editar».»
     await montar();
-    expect(screen.getByText(/salió sin el N° del transportista/i)).toBeTruthy();
+    expect(screen.getByText(/despachada sin N° del transportista/i)).toBeTruthy();
     expect(screen.getByText(/anótalo con «Editar»/i)).toBeTruthy();
   });
 
   it("en ENTREGA DIRECTA no se marca: no hay transportista a quien pedírselo", async () => {
     await montar({ tipo_despacho: "directo", modo_entrega: "entrega_directa", placa: "", nombre_chofer: "Julio" });
-    expect(screen.queryByText(/salió sin el N° del transportista/i)).toBeNull();
+    expect(screen.queryByText(/despachada sin N° del transportista/i)).toBeNull();
   });
 
   it("una guía que YA tiene su número no se marca", async () => {
     await montar({ numero_guia_transp: "TR-900" });
-    expect(screen.queryByText(/salió sin el N° del transportista/i)).toBeNull();
+    expect(screen.queryByText(/despachada sin N° del transportista/i)).toBeNull();
   });
 
   it("🩸 la guía con el N° ANOTADO TARDE no nace «Sin guardar»", async () => {

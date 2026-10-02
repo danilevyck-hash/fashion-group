@@ -152,7 +152,6 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
           {retryMsg && (
             <Aviso
               tono="error"
-              legado={<p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{retryMsg}</p>}
             >
               {retryMsg}
             </Aviso>

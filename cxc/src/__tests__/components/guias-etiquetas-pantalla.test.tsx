@@ -103,6 +103,8 @@ describe("🔴 1. sin la migración corrida, la pantalla NO se rompe", () => {
     });
     expect(screen.getByText("20261207120000_guias_etiquetas")).toBeTruthy();
     // Y lo dice sin asustar: Guías sigue funcionando igual.
+    // cambió de dirección (2-oct-2026, AVISOS_2026_10): esa frase va en el ⓘ del aviso.
+    fireEvent.click(screen.getByRole("button", { name: "Más información" }));
     expect(screen.getByText(/Guías sigue funcionando igual/i)).toBeTruthy();
   });
 

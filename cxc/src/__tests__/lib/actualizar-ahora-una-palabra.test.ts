@@ -125,9 +125,11 @@ describe("🔴 E. la frase de Etiquetas es la de Daniel, y no cambió", () => {
   });
 
   it("la pantalla la sigue DIBUJANDO de la constante, no solo importándola", () => {
-    // Importarla y no usarla no cuenta: lo que se ve es el `<span>`.
-    expect(leer("app/guias/components/EtiquetasView.tsx")).toContain(
-      "<span>{TEXTO_TRAER_DE_SWITCH}</span>",
+    // Importarla y no usarla no cuenta: lo que se ve es el texto del aviso.
+    // cambió de dirección (2-oct-2026, AVISOS_2026_10): era `<span>{…}</span>`;
+    // ahora es el texto del <Aviso>, con «Actualizar ahora» como su acción.
+    expect(leer("app/guias/components/EtiquetasView.tsx")).toMatch(
+      />\s*\{TEXTO_TRAER_DE_SWITCH\}\s*<\/Aviso>/,
     );
   });
 

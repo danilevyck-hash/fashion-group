@@ -12,8 +12,11 @@
  * cabe, la acción baja alineada a la derecha. Tonos de la paleta: aviso ámbar,
  * error rojo, información gris, éxito verde.
  *
- * `false` = cada pantalla dibuja su caja de hoy, al pie de la letra (`legado`).
+ * `false` = cada pantalla dibujaba su caja de antes (`legado`). Con el «sí» de
+ * Daniel las cajas de antes se borraron: apagarlo ya no las trae de vuelta.
  * Candado: `src/__tests__/components/aviso-en-linea.test.tsx`.
  * ──────────────────────────────────────────────────────────────────────────── */
 
-export const AVISOS_2026_10 = false;
+// Daniel aprobó el 2-oct-2026: «todo lo demás ok, arregla lo que empeoraste y
+// aprobado». Excepción: la nota del rol propio en Usuarios › Editar usuario.
+export const AVISOS_2026_10 = true;

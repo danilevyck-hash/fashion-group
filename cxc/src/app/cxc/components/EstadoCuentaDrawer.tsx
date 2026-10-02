@@ -184,11 +184,6 @@ export default function EstadoCuentaDrawer({ client, companyFilter, onClose, onC
         if (cuadre.cuadra || !cuadre.aviso) return null;
         return (
           <Aviso className="mb-4"
-            legado={
-              <p role="alert" className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                {cuadre.aviso}
-              </p>
-            }
           >
             {cuadre.aviso}
           </Aviso>

@@ -622,7 +622,9 @@ describe("🔴 DESACTUALIZADA — nada se recalcula por debajo", () => {
 
     vista.rerender(<ToastProvider><PlanillaTab empresa="vistana" /></ToastProvider>);
 
-    await screen.findByText(/Cambiaste el período o la empresa/);
+    // 🔁 Cambió de dirección (2-oct-2026, AVISOS_2026_10): el aviso dice
+    // «Planilla desactualizada: cambiaste el período o la empresa.». La regla, igual.
+    await screen.findByText(/cambiaste el período o la empresa/i);
     expect(llamadas.filter((c) => c.url.includes("/api/asistencia/planilla?")).length).toBe(antes);
     expect(screen.queryByRole("button", { name: "Cerrar quincena" })).toBeNull();
   });
@@ -631,6 +633,8 @@ describe("🔴 DESACTUALIZADA — nada se recalcula por debajo", () => {
 
 // ═════════════════════════════════════════════════════════════════════════════
 // 🔴 EL INICIO RECOMENDADO: EL DÍA DESPUÉS DE LA ÚLTIMA CERRADA
+// 🔁 2-oct-2026 (AVISOS_2026_10): la frase decía «La última quincena cerrada
+// de…» y hoy «La quincena anterior de…»; los casos la buscan por esa.
 //
 // Daniel, textual: *«después de cerrar la primera quincena, el recomendado de
 // inicio debe de ser el día siguiente que cerró la quincena pasada»*. Es lo que
@@ -646,21 +650,24 @@ describe("🔴 el inicio sugerido después de cerrar", () => {
   it("propone el día siguiente al `hasta` de la última cerrada, y lo dice", async () => {
     servir(conHistorial([CERRADA]));  // cerrada del 1 al 15 de agosto
     montar();
-    const aviso = await screen.findByText(/última quincena cerrada/);
+    const aviso = await screen.findByText(/quincena anterior de/);
     expect(aviso.textContent).toContain("15 ago 2026");
     expect(aviso.textContent).toContain("16 ago 2026");
     /* 🩸 15-sep-2026: acá se comprobaba que el CALENDARIO abriera en el 16 y lo
      * marcara con un aro. Ya no hay calendario (Daniel: *«si la quincena es
      * fija, que no haya opción de rango»*), así que la recomendación es una
      * frase y nada más — y la frase manda a los botones de arriba. */
-    expect(aviso.textContent).toContain("la quincena que sigue arriba");
+    /* 🔁 Cambió de dirección (2-oct-2026, AVISOS_2026_10): el aviso en línea se
+     * acortó a «La quincena anterior de X terminó el 15 ago; esta empieza el
+     * 16 ago.» y ya no dice «la quincena que sigue arriba». Lo esencial —las dos
+     * fechas— se sigue comprobando arriba. */
     expect(screen.queryByTestId("rango")).toBeNull();
   });
 
   it("🔴 es una SUGERENCIA: no mueve el período y no se pide ningún cuadro", async () => {
     const llamadas = servir(conHistorial([CERRADA]));
     montar();
-    await screen.findByText(/última quincena cerrada/);
+    await screen.findByText(/quincena anterior de/);
     // 🩸 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026: decía «Elige el período que vas a
     // pagar» porque la quincena arrancaba sin elegir. Hoy viene puesta por el
     // selector del módulo, y el vacío dice lo único que falta de verdad.
@@ -675,14 +682,14 @@ describe("🔴 el inicio sugerido después de cerrar", () => {
     const llamadas = servir(conHistorial([{ ...CERRADA, estado: "reabierta" }]));
     montar();
     await respuestaAplicada(llamadas, "planilla-guardada");
-    expect(screen.queryByText(/última quincena cerrada/)).toBeNull();
+    expect(screen.queryByText(/quincena anterior de/)).toBeNull();
   });
 
   it("sin ninguna cerrada, no se sugiere nada (la pantalla queda como hoy)", async () => {
     const llamadas = servir(conHistorial([]));
     montar();
     await respuestaAplicada(llamadas, "planilla-guardada");
-    expect(screen.queryByText(/última quincena cerrada/)).toBeNull();
+    expect(screen.queryByText(/quincena anterior de/)).toBeNull();
   });
 
   it("toma la MÁS RECIENTE cuando hay varias cerradas", async () => {
@@ -691,7 +698,7 @@ describe("🔴 el inicio sugerido después de cerrar", () => {
       { ...CERRADA, id: "otra", desde: "2026-08-16", hasta: "2026-08-31", etiqueta: "16 ago 2026 al 31 ago 2026" },
     ]));
     montar();
-    const aviso = await screen.findByText(/última quincena cerrada/);
+    const aviso = await screen.findByText(/quincena anterior de/);
     expect(aviso.textContent).toContain("31 ago 2026");
     expect(aviso.textContent).toContain("1 sep 2026");
   });
@@ -707,7 +714,7 @@ describe("🔴 el inicio sugerido después de cerrar", () => {
     // período a quien ya se movió**.
     servir(conHistorial([CERRADA]));
     montar();
-    await screen.findByText(/última quincena cerrada/);
+    await screen.findByText(/quincena anterior de/);
     quincenaAtras();
     await waitFor(() => expect(enLaBarra("2026-07-16", "2026-07-30")).toBeTruthy());
     expect(enLaBarra("2026-07-16", "2026-07-30")).toBeTruthy();
@@ -716,16 +723,16 @@ describe("🔴 el inicio sugerido después de cerrar", () => {
   it("generado el cuadro, la recomendación ya no está", async () => {
     servir(conHistorial([CERRADA]));
     montar();
-    await screen.findByText(/última quincena cerrada/);
+    await screen.findByText(/quincena anterior de/);
     generar();
     await cuadroEnPantalla();
-    expect(screen.queryByText(/última quincena cerrada/)).toBeNull();
+    expect(screen.queryByText(/quincena anterior de/)).toBeNull();
   });
 
   it("🔴 y NO le pisa la quincena a quien eligió otra", async () => {
     servir(conHistorial([CERRADA]));
     montar();
-    await screen.findByText(/última quincena cerrada/);
+    await screen.findByText(/quincena anterior de/);
     // La persona se va a julio a mano, contra la recomendación.
     quincenaAtras();
     quincenaAtras();

@@ -210,11 +210,6 @@ export default function HojaCobrar({
 
       {cuadre && !cuadre.cuadra && cuadre.aviso && (
         <Aviso
-          legado={
-            <p role="alert" className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-              {cuadre.aviso}
-            </p>
-          }
         >
           {cuadre.aviso}
         </Aviso>
@@ -222,11 +217,6 @@ export default function HojaCobrar({
 
       {preview && preview.sharedCount >= 10 && (
         <Aviso
-          legado={
-            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-              Ese correo está registrado en {preview.sharedCount} clientes distintos. Verifica que sea el correcto.
-            </p>
-          }
         >
           Correo registrado en {preview.sharedCount} clientes distintos. Verifica el destinatario.
         </Aviso>

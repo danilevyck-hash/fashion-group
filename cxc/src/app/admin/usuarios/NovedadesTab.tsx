@@ -62,12 +62,6 @@ export default function NovedadesTab() {
 
       {!tablaLista && (
         <Aviso ayuda="Los avisos salen y se cierran igual."
-          legado={
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              Todavía no se puede contar quién los leyó: falta correr el cambio de
-              base. Los avisos salen igual y se cierran igual.
-            </div>
-          }
         >
           Lectura de avisos sin registrar: falta correr el cambio de base.
         </Aviso>

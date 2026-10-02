@@ -94,13 +94,6 @@ export default function AplicarQuincenaModal({
           {resumen && resumen.yaTienen.length > 0 && (
             <Aviso
               tono="aviso"
-              legado={
-            <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-              {resumen.yaTienen.length === 1
-                ? "1 colaborador ya tiene el descuento de esta quincena; no se le vuelve a aplicar."
-                : `${resumen.yaTienen.length} ya tienen el descuento de esta quincena; no se les vuelve a aplicar.`}
-            </p>
-              }
             >
               {resumen.yaTienen.length === 1
                 ? "1 colaborador ya tiene el descuento de esta quincena; no se repite."

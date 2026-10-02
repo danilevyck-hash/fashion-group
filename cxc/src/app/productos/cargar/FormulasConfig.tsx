@@ -292,18 +292,6 @@ export default function FormulasConfig({ scope = "depurador", apple = false, emb
         <Aviso
           tono="error" className="mb-4"
           accion={{ texto: "Reintentar", onClick: reintentarDescs }}
-          legado={
-            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-800">
-              <span>No se pudo cargar el catálogo de descripciones. Intenta de nuevo.</span>
-              <button
-                type="button"
-                onClick={reintentarDescs}
-                className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-red-300 bg-white px-2.5 text-[12px] font-semibold text-red-700 transition hover:bg-red-100 active:scale-[0.97]"
-              >
-                Reintentar
-              </button>
-            </div>
-          }
         >
           No se pudo cargar el catálogo de descripciones.
         </Aviso>
@@ -312,7 +300,6 @@ export default function FormulasConfig({ scope = "depurador", apple = false, emb
       {error && (
         <Aviso
           tono="error" className="mb-4"
-          legado={<div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
         >
           {error}
         </Aviso>

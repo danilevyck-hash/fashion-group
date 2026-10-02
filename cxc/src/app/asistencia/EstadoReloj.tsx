@@ -260,34 +260,6 @@ export default function EstadoReloj({ onLlegaron, resumen = false, empresa = nul
           disabled: puedenPedir.length === 0,
           icono: <RefreshCw aria-hidden="true" className={`h-3.5 w-3.5 ${esperando ? "animate-spin" : ""}`} />,
         }}
-        legado={
-          <div className={`flex min-h-[44px] max-w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-3 py-1.5 ${apagado ? COLOR.al_dia : COLOR[peor.salud]}`}>
-            <span className={`h-2 w-2 shrink-0 rounded-full ${apagado ? "bg-gray-300" : PUNTO[peor.salud]}`} />
-            <span className={`min-w-0 text-[13px] ${apagado ? "text-gray-500" : "text-gray-900"}`}>
-              {apagado ?? textoDeLaPastilla(relojes)}
-            </span>
-            {avisoDeLaPastilla(relojes) && (
-              <span className="text-[12px] font-medium text-amber-800">{avisoDeLaPastilla(relojes)}</span>
-            )}
-            {faltaMigracion && datos?.avisoMigracion && (
-              <span className="text-[12px] text-amber-800">{datos.avisoMigracion}</span>
-            )}
-            {/* 🔴 UN SOLO «Traer ahora» PARA LOS DOS (25-sep-2026). Daniel: *«¿que
-                Traer ahora al tocar sea a los dos?»*. Son las MISMAS llamadas que
-                hacía cada caja por su lado: un POST por dispositivo, uno detrás del
-                otro. Nada nuevo viaja al servidor. */}
-            <button
-              type="button"
-              onClick={() => void pedirATodos(puedenPedir.map((r) => r.dispositivo))}
-              disabled={puedenPedir.length === 0}
-              title={faltaMigracion ? (datos?.avisoMigracion ?? undefined) : undefined}
-              className="inline-flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-md border border-gray-300 bg-white px-2.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 active:scale-[0.97] disabled:opacity-50"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${esperando ? "animate-spin" : ""}`} />
-              {esperando ? ESPERANDO_A_LA_PC : TRAER_AHORA}
-            </button>
-          </div>
-        }
       >
         {apagado ?? textoDelAviso(relojes)}
         {avisoDeLaPastilla(relojes) && <span className="block font-medium">{avisoDeLaPastilla(relojes)}</span>}

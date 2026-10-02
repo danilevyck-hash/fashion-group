@@ -72,8 +72,10 @@ describe("🔴 una lectura que falla se dice y se puede reintentar", () => {
   });
 
   it("el aviso dice qué pasó y ofrece intentar otra vez", () => {
-    expect(VISTA).toContain("No se pudo cargar. Intenta de nuevo en unos segundos.");
-    expect(VISTA).toContain("Intentar de nuevo");
+    // cambió de dirección (2-oct-2026, AVISOS_2026_10): «No se pudo cargar la
+    // lista de proveedores.» con «Intentar de nuevo» como acción del <Aviso>.
+    expect(VISTA).toContain("No se pudo cargar la lista de proveedores.");
+    expect(VISTA).toContain('texto: "Intentar de nuevo"');
     // 20-sep-2026: la lista ya no lleva filtros, así que `fetchList` no toma
     // parámetros. Lo que este candado cuida es que el botón VUELVA A PEDIR.
     expect(VISTA).toContain("void fetchList()");
@@ -88,8 +90,10 @@ describe("🔴 una lectura que falla se dice y se puede reintentar", () => {
   });
 
   it("el botón de reintentar se toca en 44 px", () => {
-    expect(VISTA).toMatch(/Intentar de nuevo[\s\S]{0,40}<\/button>/);
+    // cambió de dirección (2-oct-2026, AVISOS_2026_10): el botón lo dibuja <Aviso>,
+    // que da a toda acción 44 px de toque.
     const bloque = VISTA.slice(VISTA.indexOf("falloLectura && ("), VISTA.indexOf("Intentar de nuevo"));
-    expect(bloque).toContain("min-h-[44px]");
+    expect(bloque).toContain("<Aviso");
+    expect(leer("src/components/ui/Aviso.tsx")).toContain("min-h-[44px]");
   });
 });

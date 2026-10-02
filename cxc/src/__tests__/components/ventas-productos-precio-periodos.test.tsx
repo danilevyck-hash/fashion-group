@@ -433,11 +433,13 @@ describe("4 · un período sin comparativo lo DICE, no inventa un porcentaje", (
     render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     const aviso = await waitFor(() => {
-      const el = document.querySelector("[data-sin-comparativo]");
+      // cambió de dirección (2-oct-2026, AVISOS_2026_10): el aviso es <Aviso> y se
+      // busca por su data-testid; el texto dice «Sin ventas en el período…».
+      const el = document.querySelector("[data-testid=sin-comparativo]");
       expect(el).toBeTruthy();
       return el as HTMLElement;
     });
-    expect(aviso.textContent).toContain("no tiene");
+    expect(aviso.textContent).toContain("Sin ventas en el período de comparación");
     expect(aviso.textContent).toContain("1 ene 2025");
   });
 
@@ -540,7 +542,8 @@ describe("6 · la pantalla distingue «falló» de «no había nada»", () => {
     productosPrevios = [];
     render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
-    await waitFor(() => expect(document.querySelector("[data-sin-comparativo]")).toBeTruthy());
+    // cambió de dirección (2-oct-2026, AVISOS_2026_10): <Aviso> ámbar con data-testid.
+    await waitFor(() => expect(document.querySelector("[data-testid=sin-comparativo][data-aviso=aviso]")).toBeTruthy());
     expect(document.querySelector("[data-comparativo-fallo]")).toBeNull();
   });
 

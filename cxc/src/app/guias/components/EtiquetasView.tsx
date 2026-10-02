@@ -191,25 +191,12 @@ function EtiquetasUnaALaVez() {
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
       {/* 🔴 SIN LA MIGRACIÓN NO SE ROMPE NADA: la pestaña se dibuja y lo dice. */}
       {sinTabla && (
-        <Aviso className="mb-4" ayuda="Guías sigue funcionando igual."
-          legado={
-            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              Las etiquetas todavía no están encendidas: falta correr la migración{" "}
-              <span className="font-mono">20261207120000_guias_etiquetas</span>. Guías sigue funcionando igual.
-            </div>
-          }
-        >
+        <Aviso className="mb-4" ayuda="Guías sigue funcionando igual.">
           Etiquetas sin activar: falta correr la migración <span className="font-mono">20261207120000_guias_etiquetas</span>.
         </Aviso>
       )}
       {errorLista && (
-        <Aviso className="mb-4"
-          legado={
-            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              {errorLista}
-            </div>
-          }
-        >
+        <Aviso className="mb-4">
           {errorLista}
         </Aviso>
       )}
@@ -693,21 +680,7 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
             )}
 
             {!cargando && (
-              <Aviso tono="info" className="mt-3" accion={{ texto: actualizando ? TEXTO_ACTUALIZANDO : TEXTO_ACTUALIZAR_AHORA, onClick: () => void actualizarAhora(), disabled: actualizando }}
-                legado={
-                  <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
-                    <span>{TEXTO_TRAER_DE_SWITCH}</span>
-                    <button
-                      type="button"
-                      onClick={() => void actualizarAhora()}
-                      disabled={actualizando}
-                      className={`${BOTON_BLANCO} ml-auto min-h-[36px] px-3 text-[13px]`}
-                    >
-                      {actualizando ? TEXTO_ACTUALIZANDO : TEXTO_ACTUALIZAR_AHORA}
-                    </button>
-                  </div>
-                }
-              >
+              <Aviso tono="info" className="mt-3" accion={{ texto: actualizando ? TEXTO_ACTUALIZANDO : TEXTO_ACTUALIZAR_AHORA, onClick: () => void actualizarAhora(), disabled: actualizando }}>
                 {TEXTO_TRAER_DE_SWITCH}
               </Aviso>
             )}
@@ -840,13 +813,7 @@ function ModalReimprimir({
         </p>
 
         {aviso && (
-          <Aviso className="mb-4"
-            legado={
-              <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                {aviso}
-              </p>
-            }
-          >
+          <Aviso className="mb-4">
             {aviso}
           </Aviso>
         )}

@@ -221,9 +221,6 @@ export default function MiExcelFotosClient() {
         {error && (
           <AvisoEnLinea
             tono="error" className="mt-4"
-            legado={
-              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
-            }
           >
             {error}
           </AvisoEnLinea>
@@ -389,11 +386,6 @@ export default function MiExcelFotosClient() {
         {error && (
           <AvisoEnLinea
             tono="error" className="mt-2"
-            legado={
-              <div className="mt-2 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-[13px] font-medium text-red-800">
-                {error}
-              </div>
-            }
           >
             {error}
           </AvisoEnLinea>
@@ -407,11 +399,6 @@ function Aviso({ children }: { children: React.ReactNode }) {
   return (
     <AvisoEnLinea
       tono="aviso" className="mb-4"
-      legado={
-        <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] font-medium text-amber-800">
-          {children}
-        </div>
-      }
     >
       {children}
     </AvisoEnLinea>

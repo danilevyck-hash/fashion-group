@@ -560,18 +560,7 @@ export default function GuiasList({
         {(() => {
           if (!avisoPendientes) return null;
           return (
-            <Aviso className="mb-6" accion={{ texto: "Ver guía", onClick: () => irALaPendiente(avisoPendientes.guiaId) }}
-              legado={
-                <button
-                  type="button"
-                  onClick={() => irALaPendiente(avisoPendientes.guiaId)}
-                  className="w-full bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-900 mb-6 flex items-center justify-between gap-3 text-left hover:bg-amber-100 transition min-h-[44px]"
-                >
-                  <span className="font-medium">{avisoPendientes.texto}</span>
-                  <span aria-hidden className="text-amber-700 shrink-0">›</span>
-                </button>
-              }
-            >
+            <Aviso className="mb-6" accion={{ texto: "Ver guía", onClick: () => irALaPendiente(avisoPendientes.guiaId) }}>
               {avisoPendientes.texto}
             </Aviso>
           );

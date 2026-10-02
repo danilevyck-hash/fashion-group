@@ -737,15 +737,7 @@ export function ProductosView({ periodo: periodoElegido, anioEnCurso, onDescarga
             )}
           </p>
           {comparativo === "vacio" && data.comparativo && (
-            <Aviso
-              className="mb-3"
-              legado={
-                <p data-sin-comparativo className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  El período de comparación ({fmtDia(data.comparativo.desde)} – {fmtDia(data.comparativo.hasta)}) no tiene
-                  ventas de esta empresa: la columna de cambio no está comparando contra nada.
-                </p>
-              }
-            >
+            <Aviso className="mb-3" testId="sin-comparativo">
               Sin ventas en el período de comparación ({fmtDia(data.comparativo.desde)} – {fmtDia(data.comparativo.hasta)}): la columna de cambio no compara contra nada.
             </Aviso>
           )}

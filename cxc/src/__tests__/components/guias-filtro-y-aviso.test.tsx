@@ -120,6 +120,9 @@ describe("🔴 el filtro «solo pendientes» se ve y se apaga", () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("🔴 el aviso de arriba lleva a la guía", () => {
+  // cambió de dirección (2-oct-2026, AVISOS_2026_10): la línea dejó de ser un
+  // botón entero; la lleva a la guía su acción «Ver guía», a la derecha.
+  const verGuia = () => screen.getByRole("button", { name: "Ver guía" });
   const pendiente = () =>
     guia({ id: "gp", numero: 239, fecha: "2026-09-01", estado: "Pendiente Bodega" });
 
@@ -135,7 +138,7 @@ describe("🔴 el aviso de arriba lleva a la guía", () => {
 
   it("🩸 con algo escrito en el buscador, tocarlo LIMPIA el buscador (antes no hacía nada)", () => {
     const espias = pintar([guia(), pendiente()], { search: "zzz" });
-    fireEvent.click(screen.getByText(/1 guía sin despachar/));
+    fireEvent.click(verGuia());
     expect(espias.setSearch).toHaveBeenCalledWith("");
     expect(espias.onToggleExpand).toHaveBeenCalledWith("gp");
   });
@@ -145,7 +148,7 @@ describe("🔴 el aviso de arriba lleva a la guía", () => {
     const vieja = guia({ id: "gv", numero: 100, fecha: "2026-07-01", estado: "Pendiente Bodega" });
     const espias = pintar([guia(), vieja]);
     expect(screen.getByText(/Ver guías más viejas/)).toBeTruthy();
-    fireEvent.click(screen.getByText(/1 guía sin despachar/));
+    fireEvent.click(verGuia());
     expect(screen.queryByText(/Ver guías más viejas/)).toBeNull();
     expect(espias.onToggleExpand).toHaveBeenCalledWith("gv");
     // Y el buscador NO se toca: no había nada escrito.
@@ -154,7 +157,7 @@ describe("🔴 el aviso de arriba lleva a la guía", () => {
 
   it("con la fila ya a la vista, solo se expande", () => {
     const espias = pintar([guia(), pendiente()]);
-    fireEvent.click(screen.getByText(/1 guía sin despachar/));
+    fireEvent.click(verGuia());
     expect(espias.setSearch).not.toHaveBeenCalled();
     expect(espias.onToggleExpand).toHaveBeenCalledWith("gp");
   });

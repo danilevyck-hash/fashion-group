@@ -144,18 +144,6 @@ export function MetasSubtab() {
       <Aviso
         tono="aviso"
         ayuda={<>Falta correr <code className="font-mono">20260813170000_multifashion_metas.sql</code> en Supabase. Lo demás de Multifashion funciona igual.</>}
-        legado={
-          <div className="rounded-lg border border-amber-300 bg-amber-50 p-5">
-            <p className="text-sm font-medium text-amber-900">Las metas todavía no están instaladas.</p>
-            <p className="mt-1 text-sm text-amber-800">
-              Falta correr el archivo{" "}
-              <code className="rounded bg-amber-100 px-1 py-0.5 font-mono text-xs">
-                20260813170000_multifashion_metas.sql
-              </code>{" "}
-              en Supabase. Todo lo demás de Multifashion funciona igual.
-            </p>
-          </div>
-        }
       >
         Metas sin instalar.
       </Aviso>
@@ -169,11 +157,6 @@ export function MetasSubtab() {
       {aviso && (
         <Aviso
           className="mb-4"
-          legado={
-            <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              {aviso}
-            </div>
-          }
         >
           {aviso}
         </Aviso>

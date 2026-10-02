@@ -177,9 +177,6 @@ export default function CurvasView() {
       {error && (
         <Aviso
           tono="error" className="mb-4"
-          legado={
-            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-          }
         >
           {error}
         </Aviso>
@@ -214,9 +211,6 @@ export default function CurvasView() {
           {result.warnings.map((w, i) => (
             <Aviso
               key={i} tono="aviso" className="mb-3"
-              legado={
-                <div key={i} className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-800">{w}</div>
-              }
             >
               {w}
             </Aviso>

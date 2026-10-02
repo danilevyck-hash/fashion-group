@@ -179,9 +179,6 @@ export function ReferenciaView() {
         <Aviso
           tono="error"
           className="mt-4"
-          legado={
-            <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
-          }
         >
           {error}
         </Aviso>
@@ -191,12 +188,6 @@ export function ReferenciaView() {
         <Aviso
           className="mt-4"
           ayuda="Las ventas de abajo sí son reales."
-          legado={
-            <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              Todavía no están cargados los ingresos de mercancía, así que no se puede decir qué llegó ni cuándo.
-              Las ventas de abajo sí son reales.
-            </p>
-          }
         >
           Ingresos de mercancía sin cargar: no se puede decir qué llegó ni cuándo.
         </Aviso>
@@ -366,9 +357,6 @@ export function ReferenciaView() {
         <Aviso
           tono="error"
           className="mt-4"
-          legado={
-            <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
-          }
         >
           {error}
         </Aviso>
@@ -378,12 +366,6 @@ export function ReferenciaView() {
         <Aviso
           className="mt-4"
           ayuda="Las ventas de abajo sí son reales."
-          legado={
-            <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              Todavía no están cargados los ingresos de mercancía, así que no se puede decir qué llegó ni cuándo. Las
-              ventas de abajo sí son reales.
-            </p>
-          }
         >
           Ingresos de mercancía sin cargar: no se puede decir qué llegó ni cuándo.
         </Aviso>

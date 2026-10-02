@@ -483,14 +483,8 @@ export default function CheckoutClient({ marca, tituloEnLaBarra = false, listaAg
             {vendedor === null && (
               <Aviso
                 className="mt-2"
-                ayuda="El admin lo puede asignar en Sistema › Usuarios."
-                legado={
-                  <p className="mt-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                    No tienes vendedor de Switch asignado — selecciona uno para este pedido, o pídele al admin asignarlo en Sistema → Usuarios.
-                  </p>
-                }
               >
-                No tienes vendedor de Switch asignado. Selecciona uno para este pedido.
+                No tienes vendedor de Switch asignado. Selecciona uno para este pedido, o pídele al admin asignarlo en Sistema → Usuarios.
               </Aviso>
             )}
             {(vendedorPickerOpen || vendedor === null) && (
@@ -510,11 +504,6 @@ export default function CheckoutClient({ marca, tituloEnLaBarra = false, listaAg
           {preorders.length > 0 && (
             <Aviso
               tono="error"
-              legado={
-                <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
-                  {preorders.length} producto(s) en preventa — quítalos para enviar a Switch (se piden aparte).
-                </p>
-              }
             >
               {preorders.length === 1 ? "1 producto" : `${preorders.length} productos`} en preventa. Quítalos para enviar a Switch: se piden aparte.
             </Aviso>
@@ -523,14 +512,6 @@ export default function CheckoutClient({ marca, tituloEnLaBarra = false, listaAg
           {error && (
             <Aviso
               tono="error"
-              legado={
-                <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
-                  {error}
-                  {erroresDetalle.length > 0 && (
-                    <ul className="mt-1 list-disc pl-4 text-xs">{erroresDetalle.map((e, i) => <li key={i}>{e}</li>)}</ul>
-                  )}
-                </div>
-              }
             >
               {error}
               {erroresDetalle.length > 0 && (

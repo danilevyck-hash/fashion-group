@@ -70,6 +70,7 @@ export function Aviso({
   ayuda,
   legado,
   className = "",
+  testId,
 }: {
   tono?: TonoAviso;
   children: ReactNode;
@@ -80,6 +81,8 @@ export function Aviso({
   legado?: ReactNode;
   /** Solo margen o ancho (`mb-4`, `mt-3`): el aspecto lo pone el componente. */
   className?: string;
+  /** `data-testid` de la caja, para las pruebas que la buscan. */
+  testId?: string;
 }) {
   const [abierta, setAbierta] = useState(false);
   if (!AVISOS_2026_10 && legado !== undefined) return <>{legado}</>;
@@ -90,6 +93,7 @@ export function Aviso({
     <div
       role={tono === "error" ? "alert" : "status"}
       data-aviso={tono}
+      data-testid={testId}
       className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm ${t.caja} ${className}`}
     >
       <t.Icono aria-hidden="true" className={`mt-0.5 h-4 w-4 shrink-0 ${t.icono}`} />

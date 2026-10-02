@@ -778,51 +778,6 @@ export function FacturaForm({
       {duplicados.length > 0 && (
         <Aviso
           tono="aviso"
-          legado={
-            <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-4">
-              <div className="flex items-start gap-3">
-                <div className="shrink-0 mt-0.5 text-amber-600">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                    <line x1="12" y1="9" x2="12" y2="13" />
-                    <line x1="12" y1="17" x2="12.01" y2="17" />
-                  </svg>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-amber-900 mb-1">
-                    Esta factura ya existe en el sistema
-                  </div>
-                  <div className="text-xs text-amber-800 mb-2">
-                    {numeroFactura} de &ldquo;{proveedor}&rdquo; ya está en:
-                  </div>
-                  <ul className="space-y-1 mb-2">
-                    {duplicados.map((d) => (
-                      <li key={d.id} className="text-xs text-amber-900 flex items-center gap-2">
-                        <span className="text-amber-600">•</span>
-                        <span>
-                          Proyecto &ldquo;{d.proyecto_nombre}&rdquo;
-                          {d.es_mismo_proyecto ? (
-                            <span className="font-semibold"> (este mismo proyecto)</span>
-                          ) : null}
-                        </span>
-                        <a
-                          href={`/marketing?proyecto=${d.proyecto_id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-amber-700 hover:text-amber-900 underline font-medium"
-                        >
-                          Ver →
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="text-xs text-amber-800">
-                    ¿Quieres continuar de todas formas? Puedes guardar igual.
-                  </div>
-                </div>
-              </div>
-            </div>
-          }
         >
           <span className="font-medium">Factura ya registrada:</span> {numeroFactura} de «{proveedor}». Puedes guardar igual.
           <ul className="mt-1 space-y-1">

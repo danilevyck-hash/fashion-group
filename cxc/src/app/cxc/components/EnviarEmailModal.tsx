@@ -174,11 +174,6 @@ export default function EnviarEmailModal({ client, onClose, onSent }: Props) {
             <>
               {preview.totalDocs === 0 && (
                 <Aviso
-                  legado={
-                    <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                      Este cliente no tiene documentos con saldo.
-                    </p>
-                  }
                 >
                   Cliente sin documentos con saldo.
                 </Aviso>
@@ -186,13 +181,8 @@ export default function EnviarEmailModal({ client, onClose, onSent }: Props) {
 
               {preview.sharedCount >= 10 && (
                 <Aviso
-                  legado={
-                    <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                      Este correo está registrado en {preview.sharedCount} clientes distintos. Verifica que sea el destinatario correcto.
-                    </div>
-                  }
                 >
-                  Correo registrado en {preview.sharedCount} clientes distintos. Verifica el destinatario.
+                  Este correo está registrado en {preview.sharedCount} clientes distintos. Verifica que sea el destinatario correcto.
                 </Aviso>
               )}
 

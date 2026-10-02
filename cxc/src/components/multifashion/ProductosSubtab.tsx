@@ -514,15 +514,6 @@ export function ProductosSubtab({
   {vista === "marca" && resp && !resp.marcaDisponible && (
     <Aviso
       tono="aviso"
-      legado={
-        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>
-            Todavía no está cargado el catálogo de marcas de la tienda, así que todo aparece como{" "}
-            <strong>Sin marca</strong>. Se llena solo en la próxima actualización diaria.
-          </span>
-        </div>
-      }
     >
       Catálogo de marcas sin cargar: todo aparece como <strong>Sin marca</strong>. Se llena en la próxima actualización diaria.
     </Aviso>

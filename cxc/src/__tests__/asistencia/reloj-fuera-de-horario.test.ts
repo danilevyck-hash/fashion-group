@@ -238,9 +238,11 @@ describe("la pantalla", () => {
     const pantalla = leer("src/app/asistencia/EstadoReloj.tsx");
     expect(pantalla).toContain("textoRelojApagado");
     expect(pantalla).toContain("TRAER_AHORA");
-    // El gris sale de la misma caja blanca de «al día», no de un color nuevo.
-    expect(pantalla).toContain("apagado ? COLOR.al_dia : COLOR[peor.salud]");
-    expect(pantalla).toContain('apagado ? "bg-gray-300"');
+    // 🔁 Cambió de dirección (2-oct-2026, AVISOS_2026_10): la pastilla es el
+    // <Aviso> del sistema. Lo esencial no cambia: apagado de noche va en GRIS
+    // (tono «info», el mismo de «al día»), nunca en ámbar.
+    expect(pantalla).toContain('apagado || peor.salud === "al_dia"');
+    expect(pantalla).toMatch(/\?\s*"info"/);
   });
 
   it("🔑 la hora del último contacto viaja desde la ruta, no se estima", () => {

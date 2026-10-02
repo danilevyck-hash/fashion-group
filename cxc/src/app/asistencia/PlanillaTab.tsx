@@ -1415,13 +1415,6 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
       {sugerido && (ASISTENCIA_PANTALLA_2026_09 ? !pedido : !elegido && !pedido) && (
         <Aviso
           tono="info"
-          legado={
-        <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[13px] text-blue-900">
-          La última quincena cerrada de <b>{etiquetaEmpresa(empresa)}</b> terminó el{" "}
-          <b>{fechaCorta(sugerido.ultimaHasta)}</b>, así que esta empieza el{" "}
-          <b>{fechaCorta(sugerido.inicio)}</b> — es la quincena que sigue arriba.
-        </p>
-          }
         >
           La quincena anterior de <b>{etiquetaEmpresa(empresa)}</b> terminó el <b>{fechaCorta(sugerido.ultimaHasta)}</b>; esta empieza el <b>{fechaCorta(sugerido.inicio)}</b>.
         </Aviso>
@@ -1436,11 +1429,6 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
       {faltaMigracionCierre && (
         <Aviso
           tono="aviso"
-          legado={
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
-          {faltaMigracionCierre}
-        </p>
-          }
         >
           {faltaMigracionCierre}
         </Aviso>
@@ -1453,19 +1441,6 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
       {vieja && (
         <Aviso
           accion={{ texto: cargando ? "Generando…" : data && coincide ? "Regenerar" : "Generar", onClick: generar, disabled: !elegido || cargando || sinEmpresa }}
-          legado={
-        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5">
-          <p className="text-sm font-medium text-amber-900">
-            Planilla desactualizada
-          </p>
-          <p className="mt-0.5 text-[13px] text-amber-900">
-            {!coincide
-              ? "Cambiaste el período o la empresa, así que este cuadro ya no es el de lo que está elegido arriba."
-              : "Cambiaste algo que mueve la plata (un monto a mano, un préstamo aprobado) y el cuadro no se rehace solo."}
-            {" "}Toca <b>{data && coincide ? "Regenerar" : "Generar"}</b> para verlo con ese cambio.
-          </p>
-        </div>
-          }
         >
           <span className="font-medium">Planilla desactualizada:</span>{" "}
           {!coincide ? "cambiaste el período o la empresa." : "cambiaste algo que mueve la plata."}
@@ -1504,13 +1479,6 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           {!!data && Math.abs(data.totales.netoPagar - cerrada.totalNeto) > 0.005 && (
             <Aviso
               className="mt-2"
-              legado={
-            <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[12px] text-amber-900">
-              Atención: el cuadro que ves ahora da <b>${$(data.totales.netoPagar)}</b> y lo que se cerró
-              fue <b>${$(cerrada.totalNeto)}</b>. Cambió algo después del cierre. Vale lo cerrado;
-              si hay que rehacerlo, hay que reabrir la quincena.
-            </p>
-              }
             >
               El cuadro de hoy da <b>${$(data.totales.netoPagar)}</b> y lo cerrado <b>${$(cerrada.totalNeto)}</b>. Vale lo cerrado; para rehacerlo, reabre la quincena.
             </Aviso>
@@ -1564,23 +1532,6 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
         <Aviso
           tono="error"
           accion={solapadas.map((c) => ({ texto: `Ver la del ${c.etiqueta || etiquetaRangoGuardado(c)}`, onClick: () => irACerrada(c) }))}
-          legado={
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
-          <p className="text-[13px] text-red-800">{textoSolapamiento(solapadas)}</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {solapadas.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => irACerrada(c)}
-                className="min-h-[44px] rounded-md border border-red-300 bg-white px-3 text-[13px] font-medium text-red-800 transition hover:border-red-500 active:scale-[0.97]"
-              >
-                Ver la del {c.etiqueta || etiquetaRangoGuardado(c)}
-              </button>
-            ))}
-          </div>
-        </div>
-          }
         >
           {textoSolapamiento(solapadas)}
         </Aviso>
@@ -1657,12 +1608,6 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
         return (
           <Aviso
             tono="error"
-            legado={
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
-                <p className="text-sm font-medium text-red-900">No se puede cerrar la quincena todavía</p>
-                {listaFrenos}
-              </div>
-            }
           >
             <span className="font-medium">No se puede cerrar la quincena todavía</span>
             {listaFrenos}

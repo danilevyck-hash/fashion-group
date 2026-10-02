@@ -177,12 +177,6 @@ export default function AlarmaDescripcionesNuevas({ items, pasaronSolas = 0, onA
             <h3 className="text-center text-lg font-bold text-stone-900">Aprobar descripción</h3>
             <Aviso
               tono="aviso" className="mt-2"
-              legado={
-                <p className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
-                  ⚠️ Esta descripción quedará <b>PERMANENTE</b> en el catálogo de{" "}
-                  <b>{confirm.marcaElegida || "…"}</b>. Avísale a Daniel antes de aprobar.
-                </p>
-              }
             >
               Quedará <b>permanente</b> en el catálogo de <b>{confirm.marcaElegida || "…"}</b>. Avísale a Daniel antes de aprobar.
             </Aviso>
@@ -217,11 +211,6 @@ export default function AlarmaDescripcionesNuevas({ items, pasaronSolas = 0, onA
             {confirm.error && (
               <Aviso
                 tono="error" className="mt-3"
-                legado={
-                  <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800">
-                    {confirm.error}
-                  </p>
-                }
               >
                 {confirm.error}
               </Aviso>

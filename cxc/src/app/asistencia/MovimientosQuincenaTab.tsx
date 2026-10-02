@@ -161,11 +161,6 @@ export default function MovimientosQuincenaTab(props: { empresa?: string }) {
       {filas !== null && error && (
         <Aviso
           tono="error"
-          legado={
-        <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          No se pudieron leer los movimientos de esta quincena. Vuelve a intentarlo.
-        </p>
-          }
         >
           No se pudieron leer los movimientos de esta quincena. Vuelve a intentarlo.
         </Aviso>

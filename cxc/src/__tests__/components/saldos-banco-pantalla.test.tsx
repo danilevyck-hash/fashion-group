@@ -76,8 +76,9 @@ function filaDe(nombre: string): HTMLElement {
 describe("🩸 el saldo copiado SE VE", () => {
   it("el aviso de arriba nombra a las TRES empresas que copiaron", () => {
     pintar();
-    expect(screen.getByText(/3 saldos sin cambios/i)).toBeTruthy();
-    const aviso = screen.getByText(/el monto es\s+exactamente el mismo/i);
+    // cambió de dirección (2-oct-2026, AVISOS_2026_10): una sola línea con los
+    // nombres; la explicación («el monto es igual…») pasó al ⓘ.
+    const aviso = screen.getByText(/3 saldos sin cambios/i);
     for (const nombre of ["Active Shoes", "Active Wear", "Fashion Shoes"]) {
       expect(aviso.textContent).toContain(nombre);
     }
