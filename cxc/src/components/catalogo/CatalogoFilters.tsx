@@ -116,9 +116,11 @@ import {
   type FiltroPrecio,
 } from "@/lib/catalogo/filtros-extra";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
+import FiltroPrecioChip from "./FiltroPrecioChip";
 import { grupoTieneOpciones, type OpcionFiltro } from "@/lib/catalogo/filtros-derivados";
 import { CATALOGO_ORDEN_CELULAR, cuantosFiltrosPuestos, textoBotonFiltros } from "@/lib/catalogo/orden-celular";
 import { clasesBarraFiltros, textoOrdenCorto } from "@/lib/catalogo/catalogos-2026-10";
+import { textoChipPrecio } from "@/lib/catalogo/catalogos-2026-10-b";
 
 interface FiltroDesplegableProps {
   /** Nombre del grupo, tal cual se lee en el botón: "Género", "Categoría"… */
@@ -624,6 +626,11 @@ export default function CatalogoFilters({
     const hayFiltros = conGenero || conCategorias || conBultos || conPrecio;
     const ordenado = sortBy !== "relevancia";
     const icono = "relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition";
+    // El precio es UN chip: cuenta uno, aunque lleve «desde» y «hasta».
+    const puestos = cuantosFiltrosPuestos({
+      genero: gender, categoria: category, soloVariosBultos: conBultos && bultosFilter,
+      precioMin: conPrecio && textoChipPrecio(precio) ? "1" : "",
+    });
     return (
       <div className="mb-4">
         <div className="flex items-center gap-2">
@@ -634,11 +641,11 @@ export default function CatalogoFilters({
               </span>)}
           </div>
           {hayFiltros && (
-            <button type="button" aria-label={textoBotonFiltros(filtrosPuestos)} aria-expanded={filtrosAbiertos}
+            <button type="button" aria-label={textoBotonFiltros(puestos)} aria-expanded={filtrosAbiertos}
               onClick={() => setFiltrosAbiertos((v) => !v)}
-              className={`${icono} ${filtrosPuestos > 0 || filtrosAbiertos ? f.chipActive : f.chipInactive}`}>
+              className={`${icono} ${puestos > 0 || filtrosAbiertos ? f.chipActive : f.chipInactive}`}>
               <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" /></svg>
-              {filtrosPuestos > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full bg-black px-1 text-center text-[11px] leading-[18px] text-white">{filtrosPuestos}</span>}
+              {puestos > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full bg-black px-1 text-center text-[11px] leading-[18px] text-white">{puestos}</span>}
             </button>
           )}
           <div title={textoOrdenCorto(sortBy)} className={`${icono} ${ordenado ? f.chipActive : f.chipInactive}`}>
@@ -648,9 +655,13 @@ export default function CatalogoFilters({
         </div>
         {filtrosAbiertos && (
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <div className="flex flex-wrap items-center gap-2 lg:hidden">{desplegablesPiezas}</div>
-            <div className="hidden lg:flex flex-wrap items-center gap-2">{pildorasPiezas}</div>
-            {precioPieza}
+            <div className="contents lg:hidden">{desplegablesPiezas}</div>
+            <div className="hidden lg:contents">{pildorasPiezas}</div>
+            {/* «Precio ▾» es un chip más de la fila, con el mismo estilo. */}
+            {conPrecio && (
+              <FiltroPrecioChip precio={precio} onChange={onPrecioChange!} precios={preciosDisponibles}
+                chipActive={f.chipActive} chipInactive={f.chipInactive} />
+            )}
             {botonLimpiar}
           </div>
         )}

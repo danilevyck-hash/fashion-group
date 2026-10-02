@@ -39,6 +39,8 @@
 // 🔴 `false` = la pantalla de hoy.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { parsePrecio, type FiltroPrecio } from "./filtros-extra";
+
 export interface InterruptoresB {
   readonly buscadorEnUnaFila: boolean;
   readonly catalogoPublico: boolean;
@@ -86,4 +88,28 @@ export function barraDeSubruta(
     return { tipo: "volver", href: rutas.catalogoHref, label: "Catálogo", titulo: "Confirmar pedido" };
   }
   return null;
+}
+
+// ── «Precio ▾» como chip (buscadorEnUnaFila, 2-oct-2026) ─────────────────────
+// Daniel: «al tocar filtro, precio desde/hasta ¿no debería estar al nivel de
+// categoría? Y desde/hasta no combina con el módulo».
+
+/** Lo que se manda al tocar «Aplicar»: el MISMO par que escribía el filtro de
+ *  antes. Con solo «Desde», «Hasta» toma el mismo número (el espejo del
+ *  24-ago-2026: escribir un precio filtra ese precio exacto). */
+export function precioAlAplicar(b: FiltroPrecio): FiltroPrecio {
+  const desde = b.desde.trim();
+  const hasta = b.hasta.trim();
+  return { desde, hasta: hasta || desde };
+}
+
+/** El texto del chip con el filtro puesto: «$25», «$20–$40», «Desde $20» o
+ *  «Hasta $40». `null` = sin filtro (el chip dice «Precio»). */
+export function textoChipPrecio(p: FiltroPrecio): string | null {
+  const min = parsePrecio(p.desde);
+  const max = parsePrecio(p.hasta);
+  const $ = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
+  if (min === null && max === null) return null;
+  if (min !== null && max !== null) return min === max ? $(min) : `${$(min)}–${$(max)}`;
+  return min !== null ? `Desde ${$(min)}` : `Hasta ${$(max as number)}`;
 }

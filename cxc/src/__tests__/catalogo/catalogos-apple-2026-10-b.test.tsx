@@ -15,7 +15,8 @@ import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import fs from "fs";
 import path from "path";
 import CatalogoFilters from "@/components/catalogo/CatalogoFilters";
-import { CATALOGOS_APPLE_2026_10_B, barraDeSubruta } from "@/lib/catalogo/catalogos-2026-10-b";
+import { CATALOGOS_APPLE_2026_10_B, barraDeSubruta, precioAlAplicar, textoChipPrecio } from "@/lib/catalogo/catalogos-2026-10-b";
+import { precioEnFiltro } from "@/lib/catalogo/filtros-extra";
 
 const RAIZ = process.cwd();
 const leer = (p: string) => fs.readFileSync(path.join(RAIZ, p), "utf8");
@@ -167,5 +168,57 @@ describe("5 · apagado = la pantalla de hoy, literal", () => {
   });
   it("Administrar conserva su encabezado", () => {
     expect(leer("src/app/catalogos/admin/[marca]/AdminCatalogoClient.tsx")).toContain('"flex items-start justify-between gap-3 mb-6 flex-wrap"');
+  });
+});
+
+describe("6 · 🔴 «Precio ▾» como chip filtra LO MISMO", () => {
+  function montarPrecio(desde = "", hasta = "") {
+    const onPrecioChange = vi.fn();
+    render(
+      <CatalogoFilters
+        marca="tommy" searchInput="" gender="" category="" sortBy="relevancia" filteredCount={10}
+        onSearchChange={vi.fn()} onGenderChange={vi.fn()} onCategoryChange={vi.fn()}
+        onSortByChange={vi.fn()} onClearAll={vi.fn()}
+        precio={{ desde, hasta }} onPrecioChange={onPrecioChange} preciosDisponibles={[20, 25, 34, 40]}
+        apple unaFila
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Filtros/ }));
+    return onPrecioChange;
+  }
+
+  it("el par que manda es el MISMO que el filtro de antes, y `precioEnFiltro` decide igual", () => {
+    // Antes: escribir 34 en «desde» llenaba «hasta» con 34 (el espejo).
+    expect(precioAlAplicar({ desde: "34", hasta: "" })).toEqual({ desde: "34", hasta: "34" });
+    expect(precioAlAplicar({ desde: " 20 ", hasta: "40" })).toEqual({ desde: "20", hasta: "40" });
+    expect(precioAlAplicar({ desde: "", hasta: "40" })).toEqual({ desde: "", hasta: "40" });
+    const precios = [19.99, 20, 25, 34, 40, 40.01, null];
+    const pasa = (f: { desde: string; hasta: string }) => precios.map((p) => precioEnFiltro(p, f.desde, f.hasta));
+    expect(pasa(precioAlAplicar({ desde: "34", hasta: "" }))).toEqual(pasa({ desde: "34", hasta: "34" }));
+    expect(pasa(precioAlAplicar({ desde: "20", hasta: "40" }))).toEqual([false, true, true, true, true, false, true]);
+  });
+
+  it("el chip abre Desde/Hasta; «Aplicar» manda el par y «Limpiar» lo vacía", () => {
+    const onPrecioChange = montarPrecio();
+    fireEvent.click(screen.getByRole("button", { name: /^Precio/ }));
+    fireEvent.change(screen.getByLabelText("Precio desde"), { target: { value: "20" } });
+    fireEvent.change(screen.getByLabelText("Precio hasta"), { target: { value: "40" } });
+    fireEvent.click(screen.getByText("Aplicar"));
+    expect(onPrecioChange).toHaveBeenLastCalledWith({ desde: "20", hasta: "40" });
+    fireEvent.click(screen.getByRole("button", { name: /^Precio/ }));
+    fireEvent.click(screen.getByText("Limpiar"));
+    expect(onPrecioChange).toHaveBeenLastCalledWith({ desde: "", hasta: "" });
+  });
+
+  it("con el filtro puesto el chip lo dice, y no queda la fila vieja «PRECIO desde/hasta»", () => {
+    montarPrecio("20", "40");
+    expect(screen.getByRole("button", { name: "$20–$40" })).toBeTruthy();
+    // El precio es UN filtro puesto, no dos (desde + hasta).
+    expect(screen.getByRole("button", { name: "Filtros · 1" })).toBeTruthy();
+    expect(screen.queryByText("Quitar precio")).toBeNull();
+    expect(screen.queryByLabelText("Precio desde")).toBeNull();
+    expect(textoChipPrecio({ desde: "25", hasta: "25" })).toBe("$25");
+    expect(textoChipPrecio({ desde: "17.5", hasta: "" })).toBe("Desde $17.50");
+    expect(textoChipPrecio({ desde: "", hasta: "" })).toBeNull();
   });
 });
