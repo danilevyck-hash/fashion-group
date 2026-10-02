@@ -396,43 +396,48 @@ input, button, select, textarea {
   }
 }
 
-/* 🔴 VIDRIO v2 = EL LIQUID GLASS DE APPLE (2-oct-2026, `VIDRIO_V2_2026_10`).
-   Daniel: «quiero liquid glass como es». Lo que tiene el material real
-   (WWDC25 «Meet Liquid Glass» y las HIG) y cómo se aproxima aquí:
-   1. Variante «regular»: lo de atrás se RECONOCE, apenas difuso → blanco 52 %,
-      desenfoque corto (12 px) y saturación 180 %: color vivo, nunca gris.
-   2. Se adapta a lo de atrás → `brightness(1.06)` levanta un poco lo oscuro y
-      la sombra es suave; CSS no puede leer lo de atrás, así que el blanco ya
-      deja el texto negro sobre 4,5:1 encima de una foto negra (medido).
-   3. Brillo especular que sigue la forma → filo blanco arriba e izquierda, más
-      tenue abajo y a la derecha.
-   4. Lente en los bordes (concentra la luz) → un halo blanco interno de 8 px
-      que aclara solo el borde; sin refracción real: Safari no deja deformar
-      lo de atrás (`backdrop-filter: url()` es solo de Chrome).
-   5. Sombra suave y amplia, esquinas continuas (`corner-shape: squircle`
-      donde el navegador la conoce) y texto negro, el «label» primario.
+/* 🔴 VIDRIO v2 = EL LIQUID GLASS DE iOS 26 (2-oct-2026, `VIDRIO_V2_2026_10`).
+   Daniel: «hazlo como Apple, último software». Cada valor sale de las fotos
+   oficiales de Apple (Newsroom, WWDC25: el dock, las notificaciones de la
+   pantalla bloqueada y el reproductor de Música), guardadas como ref-*.png:
+   - CASI TRANSPARENTE sobre lo claro: el dock deja ver el fondo casi tal cual
+     → solo 22 % de blanco.
+   - SE VE LO DE ATRÁS, apenas difuso y con su color: los íconos del dock y el
+     fondo se reconocen → desenfoque corto (10 px) y saturación 200 %.
+   - ACLARADO ADAPTATIVO: sobre lo oscuro (el reproductor sobre la foto en
+     sombra) el vidrio levanta los negros y sobre lo claro no cambia nada →
+     `contrast(.6) brightness(1.6)`: el blanco sigue blanco (se recorta en 1)
+     y el negro sube a gris claro, así el texto negro no baja de 4,5:1 sin
+     poner una capa gris encima de todo.
+   - BRILLO ESPECULAR más marcado ARRIBA: el filo de luz de las notificaciones
+     y del dock → línea blanca de 1 px arriba, filo tenue alrededor y un
+     brillo que baja desde arriba y se apaga al 40 %.
+   - LENTE EN EL BORDE: el borde del dock concentra la luz → halo blanco
+     interno de 10 px.
+   - ESQUINAS GRANDES y sombra apenas visible: 28 px (continuas donde el
+     navegador las conoce) y una sombra amplia y clara.
    Con «reducir transparencia» o «más contraste» del teléfono, blanco sólido. */
 html[data-vidrio="v2"] .vidrio {
-  background-color: rgb(255 255 255 / 0.52);
-  background-image: none;
-  -webkit-backdrop-filter: blur(12px) saturate(180%) brightness(1.06);
-  backdrop-filter: blur(12px) saturate(180%) brightness(1.06);
+  background-color: rgb(255 255 255 / 0.22);
+  background-image: linear-gradient(to bottom, rgb(255 255 255 / 0.28), rgb(255 255 255 / 0) 40%);
+  -webkit-backdrop-filter: blur(10px) saturate(200%) contrast(0.6) brightness(1.6);
+  backdrop-filter: blur(10px) saturate(200%) contrast(0.6) brightness(1.6);
   box-shadow:
-    inset 1px 1px 0 rgb(255 255 255 / 0.9),
-    inset -1px -1px 0 rgb(255 255 255 / 0.35),
-    inset 0 0 8px 1px rgb(255 255 255 / 0.45),
-    0 0 0 0.5px rgb(0 0 0 / 0.06),
-    0 10px 30px -6px rgb(0 0 0 / 0.16),
-    0 2px 6px rgb(0 0 0 / 0.05);
+    inset 0 1px 0 rgb(255 255 255 / 0.95),
+    inset 0 0 0 1px rgb(255 255 255 / 0.35),
+    inset 0 -1px 0 rgb(255 255 255 / 0.2),
+    inset 0 0 10px 0 rgb(255 255 255 / 0.4),
+    0 0 0 0.5px rgb(0 0 0 / 0.05),
+    0 12px 40px -8px rgb(0 0 0 / 0.14);
   color: rgb(0 0 0);
 }
 html[data-vidrio="v2"] .vidrio.rounded-2xl {
-  border-radius: 22px;
+  border-radius: 28px;
 }
 @supports (corner-shape: squircle) {
   html[data-vidrio="v2"] .vidrio.rounded-2xl {
     corner-shape: squircle;
-    border-radius: 32px;
+    border-radius: 40px;
   }
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {

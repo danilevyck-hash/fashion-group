@@ -31,12 +31,13 @@
  *  Daniel aprobó el 2-oct-2026 el liquid glass en los menús: prendido. */
 export const VIDRIO_2026_10 = true;
 
-/** 🔴 VIDRIO v2 (2-oct-2026): el Liquid Glass de Apple, variante «regular»
- *  (WWDC25 «Meet Liquid Glass»): blanco 52 %, desenfoque corto de 12 px,
- *  saturación 180 %, brillo especular en el filo, halo de lente en el borde,
- *  sombra suave, esquinas continuas y texto negro. Cambia SOLO la receta de
- *  `.vidrio` en `globals.css` (se prende con `<html data-vidrio="v2">` en
- *  `app/layout.tsx`): todas las piezas la heredan. `false` = la de hoy. */
+/** 🔴 VIDRIO v2 (2-oct-2026): el Liquid Glass de iOS 26, calibrado contra las
+ *  fotos oficiales de Apple: 22 % de blanco, desenfoque 10 px, saturación
+ *  200 %, aclarado adaptativo (`contrast(.6) brightness(1.6)`: el blanco sigue
+ *  blanco y el negro sube), brillo especular más marcado arriba, halo de lente
+ *  en el borde, esquinas de 28 px y texto negro. Cambia SOLO la receta de
+ *  `.vidrio` en `globals.css` (se prende con `<html data-vidrio="v2">`):
+ *  todas las piezas la heredan. `false` = la de hoy. */
 export const VIDRIO_V2_2026_10 = false;
 
 /** La clase compartida (definida en `globals.css`). */
