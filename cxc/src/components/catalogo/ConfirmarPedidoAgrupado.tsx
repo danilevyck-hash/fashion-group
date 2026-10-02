@@ -144,7 +144,7 @@ export default function ConfirmarPedidoAgrupado(p: Props) {
           <div className="flex items-center gap-3">
             <div className="min-w-0">
               <div className="text-lg font-semibold tabular-nums leading-tight">${fmt(p.total)}</div>
-              <div className="text-xs text-gray-500 tabular-nums">{p.totalPiezas} u · {textoProductos(p.lineas.length)}</div>
+              <div className="text-xs text-gray-500 tabular-nums">{p.totalPiezas} u</div>
             </div>
             {p.enviando ? (
               <div data-medir="enviando-switch" className="ml-auto flex min-h-[48px] items-center rounded-lg bg-black px-5 text-sm font-medium text-white opacity-60">Enviando…</div>
@@ -154,10 +154,10 @@ export default function ConfirmarPedidoAgrupado(p: Props) {
                   className="ml-auto flex min-h-[44px] flex-col items-end justify-center px-2 text-right leading-tight text-blue-600 hover:text-blue-800">
                   <span className="text-sm font-medium">Cotización</span>
                   {/* 🔴 La etiqueta de siempre: la cotización no aparta mercancía. */}
-                  <span className="text-[11px] text-gray-500">{NOTA_COTIZACION}</span>
+                  <span className="whitespace-nowrap text-[11px] text-gray-500">{NOTA_COTIZACION}</span>
                 </button>
                 <button type="button" data-medir="documento-pedido" onClick={() => enviar("pedido")}
-                  className="min-h-[48px] rounded-lg bg-black px-5 text-sm font-medium text-white hover:bg-gray-800 active:scale-[0.97] transition">
+                  className="min-h-[48px] shrink-0 whitespace-nowrap rounded-lg bg-black px-4 text-sm font-medium text-white hover:bg-gray-800 active:scale-[0.97] transition">
                   Enviar pedido
                 </button>
               </>
