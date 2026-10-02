@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import useSWR from "swr";
 import { opcionesDelServidor, useSembrarDelServidor } from "@/lib/swr-servidor";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { ConfirmDeleteModal, PullToRefresh } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
-import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
+import { limpiarBorradoresViejos } from "@/lib/borradores-viejos";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { Reclamo, RItem, LocalFoto, Contacto, RView } from "./components/types";
 import { validateFotoFile, uploadReclamoFoto, compressImage } from "./components/fotoUpload";
@@ -146,33 +146,12 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   // lista al instante → 5 s para «Deshacer» → recién ahí se borra en la base.
   const { pendingUndo: pendingUndoReclamo, scheduleAction: scheduleUndoReclamo, undoAction: undoActionReclamo } = useUndoAction();
 
-  // Borrador del reclamo NUEVO (reintroducido 4-jul a pedido de Daniel — es el
-  // form más largo del sistema). Dos guardas: (1) post-guardado el autosave se
-  // considera vacío y no re-crea el borrador, y (2) el save exitoso lo limpia.
-  const reclamoDraftData = useMemo(
-    () => ({ fEmpresa, fFacturas, fFechaFactura, fPedido, fNotas, fItems, fLineas, fSeleccion, fFacturaPdfPath }),
-    [fEmpresa, fFacturas, fFechaFactura, fPedido, fNotas, fItems, fLineas, fSeleccion, fFacturaPdfPath],
-  );
-  const isReclamoDraftEmpty = useCallback((d: typeof reclamoDraftData) => {
-    if (savedReclamoId) return true;
-    return !d.fEmpresa && d.fFacturas.length === 0 && !d.fPedido && !d.fNotas && !d.fFacturaPdfPath &&
-      d.fItems.every(i => !i.referencia && !i.descripcion && !i.motivo && !(Number(i.precio_unitario) > 0));
-  }, [savedReclamoId]);
-  const { draft: reclamoDraft, hasDraft: hasReclamoDraft, clearDraft: clearReclamoDraft, draftTimeAgo: reclamoDraftTimeAgo } =
-    useDraftAutoSave("reclamo", reclamoDraftData, isReclamoDraftEmpty);
-  function restoreReclamoDraft() {
-    if (!reclamoDraft) return;
-    setFEmpresa(reclamoDraft.fEmpresa || "");
-    setFFacturas(Array.isArray(reclamoDraft.fFacturas) ? reclamoDraft.fFacturas : []);
-    setFFechaFactura(reclamoDraft.fFechaFactura || "");
-    setFPedido(reclamoDraft.fPedido || "");
-    setFNotas(reclamoDraft.fNotas || "");
-    setFItems(reclamoDraft.fItems?.length ? reclamoDraft.fItems : [emptyItem()]);
-    setFLineas(Array.isArray(reclamoDraft.fLineas) ? reclamoDraft.fLineas : []);
-    setFSeleccion(reclamoDraft.fSeleccion && typeof reclamoDraft.fSeleccion === "object" ? reclamoDraft.fSeleccion : {});
-    setFFacturaPdfPath(reclamoDraft.fFacturaPdfPath || null);
-    clearReclamoDraft();
-  }
+  // 🔴 SIN BORRADOR AUTOMÁTICO (1-oct-2026). Daniel: *«¿y si lo quitamos? Igual
+  // no es mucha info en caso de emergencia, son par de clics»*. Aquí vivía el
+  // guardado en el navegador del reclamo NUEVO y su aviso «¿Restaurar?». Solo
+  // queda barrer, una vez al montar, lo que quedó guardado. ⚠️ Esto NO toca
+  // los reclamos que la base guarda como borrador: eso es otra cosa.
+  useEffect(() => { limpiarBorradoresViejos("fg_draft_reclamo_"); }, []);
 
   function buildUrl(v: RView, id: string | null | undefined, empresa: string | null): string {
     const params = new URLSearchParams();
@@ -333,7 +312,6 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
         const saved = await res.json();
         reclamoId = saved.id;
         setSavedReclamoId(saved.id); setSavedNroReclamo(saved.nro_reclamo || "");
-        clearReclamoDraft();
         loadReclamos();
       }
       if (reclamoId) {
@@ -632,15 +610,6 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
     return (
       <>
       <ReclamoForm
-        draftBanner={!savedReclamoId && hasReclamoDraft ? (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-6 flex items-center justify-between gap-4">
-            <p className="text-sm text-amber-800">Tienes un borrador guardado de {reclamoDraftTimeAgo}. ¿Restaurar?</p>
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <button onClick={restoreReclamoDraft} className="bg-black text-white text-sm px-4 py-1.5 rounded-md hover:bg-gray-800 transition min-h-[44px]">Restaurar</button>
-              <button onClick={clearReclamoDraft} className="text-sm text-amber-700 hover:text-amber-900 transition min-h-[44px] px-2">Descartar</button>
-            </div>
-          </div>
-        ) : null}
         fEmpresa={fEmpresa} setFEmpresa={setFEmpresa}
         fFacturas={fFacturas} setFFacturas={setFFacturas}
         fFechaFactura={fFechaFactura} setFFechaFactura={setFFechaFactura}

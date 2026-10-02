@@ -97,7 +97,6 @@ import { rutaDelMotivo, type Motivo } from "@/lib/recordatorios/motivos";
 import { manana } from "@/lib/recordatorios/cuando";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { borrarBorrador } from "@/lib/hooks/useDraftAutoSave";
 import { useOnline } from "@/lib/OnlineContext";
 import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
@@ -332,9 +331,6 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
         body: JSON.stringify(body),
       });
       if (res.ok) {
-        // El borrador se borra desde acá: el modal (que es quien lo escribe) se
-        // desmonta al cerrar, y si no, ofrecería restaurar lo que ya se guardó.
-        borrarBorrador("cheque");
         const editaba = editingId;
         cerrarForm();
         loadCheques();

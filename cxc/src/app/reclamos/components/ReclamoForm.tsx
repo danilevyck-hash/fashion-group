@@ -15,8 +15,6 @@ import { itemsAGuardar, resumenRenglones, type LineaFactura } from "@/lib/reclam
 import { FALTA_PDF } from "@/lib/reclamos/validate";
 
 interface Props {
-  /** Banner de restaurar borrador (lo arma el padre). */
-  draftBanner?: React.ReactNode;
   fEmpresa: string;
   setFEmpresa: (v: string) => void;
   fFacturas: string[];
@@ -74,7 +72,7 @@ export default function ReclamoForm({
   facturaPdfPath, setFacturaPdfPath,
   savedReclamoId, savedNroReclamo, pendingFotos, onAddFoto, onRemoveFoto, onRetryFotos,
   saving, error, onSave, onCancel, onViewSaved, onResetAndCreateAnother,
-  isEditing, draftBanner,
+  isEditing,
 }: Props) {
   const formFotoRef = useRef<HTMLInputElement>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
@@ -113,7 +111,6 @@ export default function ReclamoForm({
         <span className="text-gray-300">/</span>
         <span className="text-gray-600 font-medium">Nuevo reclamo</span>
       </nav>
-      {draftBanner}
       <h1 className="sr-only">Nuevo reclamo</h1>
 
       {/* ── 1. La factura (PDF), obligatoria y primero ──

@@ -8,10 +8,13 @@
 // propia pantalla, la lista dejó de necesitarlo: quedarse con esos campos allá
 // habría dejado el estado del despacho vivo en una pantalla que ya no despacha.
 //
-// ⚠️ EL BORRADOR SE GUARDA POR GUÍA, igual que antes. La PWA se recarga sola al
-// haber build nuevo y en la bodega el WiFi se cae: lo tipeado y lo firmado
-// sobreviven a eso. Lo nuevo es que los N° del transportista también, uno por
-// línea (`numerosTransp`).
+// 🔴 SIN BORRADOR EN EL NAVEGADOR (1-oct-2026). Daniel: *«¿y si lo quitamos?
+// Igual no es mucha info en caso de emergencia, son par de clics»*. Antes lo
+// tecleado, los N° del transportista, los bultos y las DOS FIRMAS se guardaban
+// por guía en localStorage (`guia_despacho_<id>`, `guia_firma_<id>_*`) y se
+// recuperaban solos al volver. Ya no: si se recarga la pantalla, se vuelve a
+// llenar. Lo que quedó guardado se barre una vez al montar. El aviso de salir
+// con cambios (`beforeunload` en DespachoForm) sigue.
 
 import { useCallback, useEffect, useState } from "react";
 import type { Guia, GuiaItem } from "./types";
@@ -22,37 +25,7 @@ import type { JuegoDespacho } from "@/lib/guias/juegos-despacho";
 import { bultosTecleados, correccionesDeBultos } from "@/lib/guias/bultos-correccion";
 import { entregadoPorElegido } from "@/lib/guias/despachado-por";
 import { GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
-
-interface Draft {
-  placa?: string;
-  receptor?: string;
-  cedula?: string;
-  chofer?: string;
-  tipoDespacho?: TipoDespacho;
-  numerosTransp?: string[];
-  /** Los bultos que bodega contó, uno por línea (5-sep-2026). */
-  bultos?: number[];
-  /** «Despachado por», elegido al despachar (1-oct-2026). */
-  despachadoPor?: string;
-}
-
-function leerDraft(id: string): Draft {
-  try {
-    return JSON.parse(localStorage.getItem(`guia_despacho_${id}`) || "{}") as Draft;
-  } catch {
-    return {};
-  }
-}
-
-function escribirDraft(id: string, campo: keyof Draft, valor: unknown) {
-  try {
-    const cur = leerDraft(id) as Record<string, unknown>;
-    cur[campo] = valor;
-    localStorage.setItem(`guia_despacho_${id}`, JSON.stringify(cur));
-  } catch {
-    /* sin borrador; la pantalla sigue funcionando */
-  }
-}
+import { limpiarBorradoresViejos } from "@/lib/borradores-viejos";
 
 export function useDespachoGuia(id: string | null) {
   const [guia, setGuia] = useState<Guia | null>(null);
@@ -60,30 +33,29 @@ export function useDespachoGuia(id: string | null) {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const [tipoDespacho, _setTipoDespacho] = useState<TipoDespacho>("externo");
-  const [bPlaca, _setBPlaca] = useState("");
-  const [bReceptor, _setBReceptor] = useState("");
-  const [bCedula, _setBCedula] = useState("");
-  const [bChofer, _setBChofer] = useState("");
+  const [tipoDespacho, setTipoDespacho] = useState<TipoDespacho>("externo");
+  const [bPlaca, setBPlaca] = useState("");
+  const [bReceptor, setBReceptor] = useState("");
+  const [bCedula, setBCedula] = useState("");
+  const [bChofer, setBChofer] = useState("");
   /**
    * 🔴 «DESPACHADO POR» SE ELIGE AQUÍ (1-oct-2026, Daniel aprobó el mockup):
    * salió de la creación de la guía. Arranca VACÍO —nadie preseleccionado, como
    * pidió Daniel el 19-sep: *«porque puede que alguien deje ese por error»*—,
    * salvo una guía vieja que ya lo traía guardado: eso es el dato.
    */
-  const [despachadoPor, _setDespachadoPor] = useState("");
+  const [despachadoPor, setDespachadoPor] = useState("");
   const [numerosTransp, _setNumerosTransp] = useState<string[]>([]);
   /**
    * 🔴 LOS BULTOS QUE BODEGA CUENTA AL DESPACHAR (5-sep-2026). Daniel: *«porque
    * bodega si al despachar cuentan más bultos de lo que puso la secretaria,
    * quiero que lo pueda cambiar en caso de algún error»*. Arranca con lo que la
-   * secretaria puso; lo tecleado sobrevive a que se caiga el WiFi de la bodega,
-   * igual que el N° del transportista.
+   * secretaria puso.
    */
   const [bultosPorLinea, _setBultosPorLinea] = useState<number[]>([]);
   const [bSaving, setBSaving] = useState(false);
-  const [pendingFirma1, _setPendingFirma1] = useState<string | null>(null);
-  const [pendingFirma2, _setPendingFirma2] = useState<string | null>(null);
+  const [pendingFirma1, setPendingFirma1] = useState<string | null>(null);
+  const [pendingFirma2, setPendingFirma2] = useState<string | null>(null);
   const [despachada, setDespachada] = useState(false);
   // Los juegos MÁS USADOS (recibido por + cédula + placa) de ESTE transportista.
   // Best-effort: si no llegan, los tres campos se escriben a mano como siempre.
@@ -131,62 +103,21 @@ export function useDespachoGuia(id: string | null) {
 
       const yaSalio = guiaYaDespachada(g.estado);
       setDespachada(yaSalio);
-      _setBPlaca(g.placa || "");
-      _setBReceptor(g.receptor_nombre || "");
-      _setBCedula(g.cedula || "");
-      _setBChofer(g.nombre_chofer || "");
-      _setDespachadoPor(entregadoPorElegido(g.entregado_por) ? String(g.entregado_por).trim() : "");
+      setBPlaca(g.placa || "");
+      setBReceptor(g.receptor_nombre || "");
+      setBCedula(g.cedula || "");
+      setBChofer(g.nombre_chofer || "");
+      setDespachadoPor(entregadoPorElegido(g.entregado_por) ? String(g.entregado_por).trim() : "");
       // 🔴 EL MODO ARRANCA EN LO QUE SE ELIGIÓ AL CREAR LA GUÍA.
       // Acá vivía `(g.tipo_despacho as TipoDespacho) || "externo"`, que nunca
       // miraba `modo_entrega`. Y no era un `??` faltante: `tipo_despacho` tiene
       // DEFAULT 'externo' en la base, así que la rama de respaldo era
       // inalcanzable. Medido: 50 de 51 guías creadas como entrega directa
       // terminaron grabadas como transportista externo. Ver `modo-despacho.ts`.
-      _setTipoDespacho(tipoDespachoEfectivo(g));
+      setTipoDespacho(tipoDespachoEfectivo(g));
       _setNumerosTransp(desdeServidor);
       _setBultosPorLinea(bultosServidor);
 
-      try {
-        const f1 = localStorage.getItem(`guia_firma_${id}_transportista`);
-        const f2 = localStorage.getItem(`guia_firma_${id}_entregador`);
-        if (f1) _setPendingFirma1(f1);
-        if (f2) _setPendingFirma2(f2);
-        // El borrador solo pisa lo que el servidor NO trae.
-        const d = leerDraft(id);
-        if (d.placa && !g.placa) _setBPlaca(d.placa);
-        if (d.receptor && !g.receptor_nombre) _setBReceptor(d.receptor);
-        if (d.cedula && !g.cedula) _setBCedula(d.cedula);
-        if (d.chofer && !g.nombre_chofer) _setBChofer(d.chofer);
-        if (d.despachadoPor && !entregadoPorElegido(g.entregado_por)) _setDespachadoPor(d.despachadoPor);
-        // El borrador manda mientras la guía NO haya salido: es lo que la
-        // persona eligió con "cambiar". La condición vieja era
-        // `!g.tipo_despacho`, o sea NUNCA (la columna trae DEFAULT 'externo'):
-        // cambiar el modo y perder la conexión te devolvía al modo del alta.
-        if (d.tipoDespacho && !yaSalio) _setTipoDespacho(d.tipoDespacho);
-        if (Array.isArray(d.numerosTransp)) {
-          _setNumerosTransp(
-            desdeServidor.map((v, i) => (v ? v : (d.numerosTransp?.[i] ?? "")))
-          );
-        }
-        // ⚠️ El borrador de bultos SOLO manda mientras la guía no salió, y solo
-        // si tiene el mismo largo que los renglones: con una línea agregada o
-        // quitada, las posiciones ya no son las mismas y aplicarlo movería
-        // bultos de un cliente a otro.
-        if (
-          !yaSalio &&
-          Array.isArray(d.bultos) &&
-          d.bultos.length === bultosServidor.length
-        ) {
-          _setBultosPorLinea(
-            bultosServidor.map((v, i) => {
-              const guardado = Number(d.bultos?.[i]);
-              return Number.isFinite(guardado) && guardado >= 0 ? guardado : v;
-            }),
-          );
-        }
-      } catch {
-        /* sin borrador */
-      }
     } catch {
       setError("Error al cargar la guía");
     } finally {
@@ -195,6 +126,7 @@ export function useDespachoGuia(id: string | null) {
   }, [id]);
 
   useEffect(() => { void cargar(); }, [cargar]);
+  useEffect(() => { limpiarBorradoresViejos("guia_despacho_", "guia_firma_"); }, []);
 
   // Los juegos del transportista de ESTA guía, del más usado al menos. Solo
   // tiene sentido mientras la guía no haya salido: después, lo que se ve es lo
@@ -213,19 +145,11 @@ export function useDespachoGuia(id: string | null) {
     return () => { cancel = true; };
   }, [transportistaId, despachada]);
 
-  // ── setters que además guardan el borrador ────────────────────────────────
-  const setBPlaca = (v: string) => { _setBPlaca(v); if (id) escribirDraft(id, "placa", v); };
-  const setBReceptor = (v: string) => { _setBReceptor(v); if (id) escribirDraft(id, "receptor", v); };
-  const setBCedula = (v: string) => { _setBCedula(v); if (id) escribirDraft(id, "cedula", v); };
-  const setBChofer = (v: string) => { _setBChofer(v); if (id) escribirDraft(id, "chofer", v); };
-  const setDespachadoPor = (v: string) => { _setDespachadoPor(v); if (id) escribirDraft(id, "despachadoPor", v); };
-  const setTipoDespacho = (v: TipoDespacho) => { _setTipoDespacho(v); if (id) escribirDraft(id, "tipoDespacho", v); };
-  /** Teclear bultos: entero ≥ 0, y al borrador — como todo lo del despacho. */
+  /** Teclear bultos: entero ≥ 0. */
   const setBultos = (idx: number, v: string) => {
     _setBultosPorLinea((prev) => {
       const next = [...prev];
       next[idx] = bultosTecleados(v);
-      if (id) escribirDraft(id, "bultos", next);
       return next;
     });
   };
@@ -233,14 +157,11 @@ export function useDespachoGuia(id: string | null) {
     _setNumerosTransp((prev) => {
       const next = [...prev];
       next[idx] = v;
-      if (id) escribirDraft(id, "numerosTransp", next);
       return next;
     });
   };
   /**
-   * Un toque llena los TRES campos — y los tres quedan editables. Pasa por los
-   * setters de siempre, así que el borrador también los guarda: si se corta el
-   * WiFi en la bodega, lo tomado no se pierde.
+   * Un toque llena los TRES campos — y los tres quedan editables.
    */
   const usarJuego = (j: JuegoDespacho) => {
     setBReceptor(j.receptor);
@@ -248,22 +169,6 @@ export function useDespachoGuia(id: string | null) {
     setBPlaca(j.placa);
   };
 
-  const setPendingFirma1 = (v: string | null) => {
-    _setPendingFirma1(v);
-    try {
-      if (!id) return;
-      if (v) localStorage.setItem(`guia_firma_${id}_transportista`, v);
-      else localStorage.removeItem(`guia_firma_${id}_transportista`);
-    } catch { /* */ }
-  };
-  const setPendingFirma2 = (v: string | null) => {
-    _setPendingFirma2(v);
-    try {
-      if (!id) return;
-      if (v) localStorage.setItem(`guia_firma_${id}_entregador`, v);
-      else localStorage.removeItem(`guia_firma_${id}_entregador`);
-    } catch { /* */ }
-  };
 
   // ─────────────────────────────────────────────────────────────────────────
   // 🔴 ACÁ VIVÍAN `corregirItem` Y `anotarNumeroTransp`, Y LOS DOS SE FUERON.
@@ -347,11 +252,6 @@ export function useDespachoGuia(id: string | null) {
       });
       if (res.ok) {
         showToast(`Guía GT-${String(guia.numero).padStart(3, "0")} despachada`);
-        try {
-          localStorage.removeItem(`guia_firma_${id}_transportista`);
-          localStorage.removeItem(`guia_firma_${id}_entregador`);
-          localStorage.removeItem(`guia_despacho_${id}`);
-        } catch { /* */ }
         setDespachada(true);
         await cargar();
         return true;
@@ -359,7 +259,7 @@ export function useDespachoGuia(id: string | null) {
       const err = await res.json().catch(() => ({}));
       showToast(err.error || "No se pudo guardar. Intenta de nuevo en unos segundos.");
     } catch {
-      showToast("Sin conexión. Tus datos y firmas quedaron guardados — intenta de nuevo.");
+      showToast("Sin conexión. No cierres esta pantalla: intenta de nuevo en unos segundos.");
     } finally {
       setBSaving(false);
     }

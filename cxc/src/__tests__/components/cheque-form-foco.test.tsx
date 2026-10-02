@@ -39,7 +39,8 @@ function pasarElTiempo(ms = 300) {
 /**
  * En este arnés `localStorage`/`sessionStorage` son objetos pelados (`{}`) sin
  * los métodos de Storage, así que hay que darles una implementación de verdad:
- * el borrador y la lista de vendedores del navegador los usan.
+ * la lista de vendedores del navegador (y la limpieza de borradores viejos)
+ * los usan.
  */
 function almacenFalso(): Storage {
   const m = new Map<string, string>();
@@ -289,12 +290,21 @@ describe("Formulario de cheques — editar uno viejo", () => {
     expect((screen.getByLabelText("Vendedor") as HTMLInputElement).value).toBe("Julio");
   });
 
-  it("el borrador NO se ofrece cuando se está editando un cheque existente", async () => {
+  // 🔴 SIN BORRADOR (1-oct-2026). Daniel, sobre «Tienes un borrador guardado de
+  // hace 1 hora. ¿Restaurar?»: *«¿y si lo quitamos? Igual no es mucha info en
+  // caso de emergencia, son par de clics»*. Este caso antes fijaba que el aviso
+  // no saliera AL EDITAR; ahora no sale nunca, y lo que quedó guardado en el
+  // navegador se barre al abrir.
+  it("el cheque nuevo ya no ofrece borrador, y el viejo guardado se limpia", async () => {
     localStorage.setItem(
       "fg_draft_cheque_anon",
       JSON.stringify({ data: { cliente: "OTRO", empresa: "", numero: "1", monto: "5", fecha: "2026-01-01" }, savedAt: Date.now() }),
     );
-    await montarFormulario({ editingId: "abc", initial: CHEQUE_VIEJO });
+    localStorage.setItem("otra_cosa", "se queda");
+    await montarFormulario();
     expect(screen.queryByText("Restaurar")).toBeNull();
+    expect(screen.queryByText(/borrador guardado/)).toBeNull();
+    expect(localStorage.getItem("fg_draft_cheque_anon")).toBeNull();
+    expect(localStorage.getItem("otra_cosa")).toBe("se queda");
   });
 });

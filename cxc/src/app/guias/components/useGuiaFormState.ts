@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
+import { limpiarBorradoresViejos } from "@/lib/borradores-viejos";
 import type { Guia, GuiaItem, ModoEntrega, Transportista } from "./types";
 import { emptyItem } from "./constants";
 import { DESTINOS_BASE, listaParaElCampo, yaEstaEnLaLista } from "@/lib/guias/destinos-lista";
@@ -339,8 +339,7 @@ export function useGuiaFormState({ editingId = null, alGuardar, despuesDeCrear, 
   // como nace (con los valores que recuerda el navegador: modo, transportista y
   // quién despacha). Sin esto, `/guias/nueva` no podría decir "Sin guardar"
   // nunca. No hay PUT en esta pantalla: lo único que gobierna es el aviso de
-  // salir con cambios y el rótulo, y el borrador de localStorage sigue
-  // guardándose solo cada 5 s como siempre, sin mirar esto.
+  // salir con cambios y el rótulo.
   useEffect(() => {
     if (editingId) return;
     setGuardado(
@@ -377,30 +376,11 @@ export function useGuiaFormState({ editingId = null, alGuardar, despuesDeCrear, 
   );
   const hayCambios = calcularHayCambios(guardado, instantanea);
 
-  // Draft auto-save (incluye modo + FK)
-  const guiaDraftData = useMemo(() => ({
-    modoEntrega, transportistaId, entregadoPor, items, observaciones,
-  }), [modoEntrega, transportistaId, entregadoPor, items, observaciones]);
-  const isGuiaDraftEmpty = useCallback((d: typeof guiaDraftData) => {
-    return !d.transportistaId && !d.entregadoPor && !d.observaciones && d.items.every(i => !i.cliente && !i.direccion && !i.facturas && (!i.bultos || i.bultos === 0));
-  }, []);
-  // Auto-save del borrador + restaurar (banner en /guias/nueva, patrón cheques).
-  // Antes el borrador se guardaba pero el banner de restaurar estaba eliminado
-  // → trabajo perdido si se cerraba la pestaña en una guía nueva.
-  const { draft: guiaDraft, hasDraft: hasGuiaDraft, clearDraft: clearGuiaDraft, draftTimeAgo: guiaDraftTimeAgo } =
-    useDraftAutoSave("guia", guiaDraftData, isGuiaDraftEmpty);
-  function restoreGuiaDraft() {
-    if (!guiaDraft) return;
-    setModoEntrega(guiaDraft.modoEntrega || "transportista");
-    setTransportistaId(guiaDraft.transportistaId || "");
-    setEntregadoPor(guiaDraft.entregadoPor || "");
-    setObservaciones(guiaDraft.observaciones || "");
-    // Un borrador guardado antes de jul-2026 no trae `uid`.
-    if (guiaDraft.items?.length) {
-      setItems(guiaDraft.items.map((item) => ({ ...item, uid: item.uid ?? nuevoUid() })));
-    }
-    clearGuiaDraft();
-  }
+  // 🔴 SIN BORRADOR AUTOMÁTICO (1-oct-2026). Daniel: *«¿y si lo quitamos? Igual
+  // no es mucha info en caso de emergencia, son par de clics»*. Aquí vivía el
+  // guardado cada 5 s y el aviso «¿Restaurar?» de /guias/nueva. Solo queda
+  // barrer, una vez al montar, lo que quedó guardado en el navegador.
+  useEffect(() => { limpiarBorradoresViejos("fg_draft_guia_"); }, []);
 
   // 🔴 AGREGAR UN TRANSPORTISTA DESDE LA GUÍA MISMA (9-sep-2026). Daniel:
   // *«Ponme opción en configuración de guía para poder agregar un transportista
@@ -720,7 +700,6 @@ export function useGuiaFormState({ editingId = null, alGuardar, despuesDeCrear, 
         // Recién ahora lo enviado ES lo que el servidor tiene.
         setGuardado(enviada);
         setGuardadoEn(new Date().toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit" }));
-        clearGuiaDraft();
         // ⚠️ El cuerpo de la respuesta se lee UNA SOLA VEZ: un `Response` no se
         // puede consumir dos veces, y `res.clone()` no existe en todos los
         // dobles de prueba. De acá salen las dos cosas que necesitan el id de
@@ -813,7 +792,5 @@ export function useGuiaFormState({ editingId = null, alGuardar, despuesDeCrear, 
     guardadoEn,
     updateItem, updateItemFields, reemplazarItems, addRow, removeRow, restoreRow,
     saveGuia,
-    // draft: banner de restaurar en /guias/nueva + limpieza al guardar
-    hasGuiaDraft, guiaDraftTimeAgo, restoreGuiaDraft, clearGuiaDraft,
   };
 }

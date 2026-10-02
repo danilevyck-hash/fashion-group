@@ -487,8 +487,9 @@ export default function GuiaForm({
   //
   // 🔑 EL AUTOGUARDADO SE QUEDA, y es a propósito: bodega despacha desde el
   // celular y una pestaña que se cierra no puede llevarse los renglones que ya
-  // se escribieron. `/guias/nueva` NO tiene PUT que la pise (su red es el
-  // borrador de localStorage) y por eso `editingId` sigue siendo condición.
+  // se escribieron. `/guias/nueva` NO tiene PUT que la pise y por eso
+  // `editingId` sigue siendo condición (su borrador de localStorage se quitó el
+  // 1-oct-2026 — Daniel: *«son par de clics»*).
   /**
    * Lo último que este autoguardado YA intentó mandar. Es el freno anti-bucle:
    * un guardado que el servidor RECHAZA (una guía ya despachada, por ejemplo)

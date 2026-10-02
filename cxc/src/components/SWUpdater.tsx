@@ -29,7 +29,7 @@ const RELOAD_GUARD_MS = 60_000;
 /**
  * true si el usuario está a media escritura: un control editable con foco y
  * contenido. En ese caso el swap/reload se difiere para no perderle el trabajo
- * (los drafts de useDraftAutoSave cubren el resto como red de seguridad).
+ * (ya no hay borrador en el navegador como red: se quitó el 1-oct-2026).
  */
 function isFormDirty(): boolean {
   if (typeof document === "undefined") return false;

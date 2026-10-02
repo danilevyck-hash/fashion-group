@@ -28,7 +28,7 @@ import SearchableSelect from "@/components/ui/SearchableSelect";
 import type { ClienteHit } from "@/lib/hooks/useBusquedaClientes";
 import { useFormGuard } from "@/lib/hooks/useModalDismiss";
 import { useAutofocusPrimerCampo } from "@/lib/hooks/useAutofocusPrimerCampo";
-import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
+import { limpiarBorradoresViejos } from "@/lib/borradores-viejos";
 import { ALL_COMPANIES } from "@/lib/companies";
 import { LS_CHEQUE_VENDEDORES, VENDEDORES_POR_DEFECTO } from "@/lib/cheques-vendedores";
 
@@ -241,29 +241,11 @@ export default function ChequeFormModal({
     return () => { cancel = true; };
   }, [open]);
 
-  // ── Borrador (solo en alta) ───────────────────────────────────────────────
-  const datosBorrador = useMemo(
-    () => ({ cliente: v.cliente, empresa: v.empresa, numero: v.numero_cheque, monto: v.monto, fecha: v.fecha_deposito }),
-    [v.cliente, v.empresa, v.numero_cheque, v.monto, v.fecha_deposito],
-  );
-  const borradorVacio = useCallback(
-    (d: typeof datosBorrador) => !d.cliente && !d.empresa && !d.numero && !d.monto,
-    [],
-  );
-  const { draft, hasDraft, clearDraft, draftTimeAgo } = useDraftAutoSave("cheque", datosBorrador, borradorVacio);
-
-  function restaurarBorrador() {
-    if (!draft) return;
-    setV((prev) => ({
-      ...prev,
-      cliente: draft.cliente || "",
-      empresa: draft.empresa || "",
-      numero_cheque: draft.numero || "",
-      monto: draft.monto || "",
-      fecha_deposito: draft.fecha || hoyStr(),
-    }));
-    clearDraft();
-  }
+  // ── Sin borrador automático (1-oct-2026) ──────────────────────────────────
+  // Daniel: *«¿y si lo quitamos? Igual no es mucha info en caso de emergencia,
+  // son par de clics»*. Aquí vivía el guardado del cheque nuevo en el navegador
+  // y su aviso «¿Restaurar?». Solo queda barrer lo que quedó guardado.
+  useEffect(() => { limpiarBorradoresViejos("fg_draft_cheque_"); }, []);
 
   const marcar = (campo: string) => setTocado((p) => ({ ...p, [campo]: true }));
   const err = (campo: string, valor: string) => Boolean(tocado[campo]) && !valor.trim();
@@ -297,16 +279,6 @@ export default function ChequeFormModal({
         </header>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
-          {hasDraft && !editingId && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-amber-800">Tienes un borrador guardado de {draftTimeAgo}. ¿Restaurar?</p>
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <button type="button" onClick={restaurarBorrador} className="bg-black text-white text-sm px-4 min-h-[44px] inline-flex items-center rounded-md hover:bg-gray-800 transition">Restaurar</button>
-                <button type="button" onClick={clearDraft} className="text-sm text-amber-700 hover:text-amber-900 transition min-h-[44px] px-2 inline-flex items-center">Descartar</button>
-              </div>
-            </div>
-          )}
-
           {/* 2 columnas recién en `lg`: en iPad vertical (768) no hay ancho para
               dos campos y quedarían apretados, igual que en Guías. */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">

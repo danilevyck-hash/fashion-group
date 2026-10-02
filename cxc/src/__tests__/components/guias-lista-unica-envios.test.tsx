@@ -136,7 +136,7 @@ async function montar(over: Record<string, unknown> = {}) {
   return r;
 }
 
-/** jsdom trae un `localStorage` a medias; el formulario guarda borradores. */
+/** jsdom trae un `localStorage` a medias; el formulario recuerda lo último elegido (el borrador se quitó el 1-oct-2026). */
 function memStorage(): Storage {
   let m: Record<string, string> = {};
   return {

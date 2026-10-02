@@ -637,7 +637,7 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 
 - **Búsqueda global:** 8 módulos (CXC, Reclamos, Guías, Directorio, Cheques, Ventas, Préstamos, Caja) y los mismos CINCO roles de siempre (`SEARCH_ROLES`). 🔴 **Cada resultado LLEVA a donde dice**: la guía a `/guias/<id>`, el cliente a `/clientes/<codigo>`, el de Ventas a `?tab=clientes&cliente=<CÓDIGO>` y el gasto de Caja a su período `/caja/<id>`. 🔴 El código del cliente de Ventas sale del **puente por ID** (`switch_facturas` → `switch_clientes` → `codigo`), **nunca del nombre**. ⚠️ El gasto de Caja no queda resaltado dentro de su período: pendiente, no olvido.
 - 🩸 **Tres cosas que esta lista prometía y NO EXISTÍAN EN NINGUNA PANTALLA** (retiradas el 11-sep-2026): el feed «Acciones pendientes», los contadores del 🔔 y las 💡 sugerencias. ⚠️ La **campana 🔔 SÍ funciona** (`NotificationCenter`). Candado `inicio-sin-promesas.test.ts`.
-- Spotlight («cheques que vencen mañana» → ⚡ deep link) · búsquedas recientes · Smart defaults (`fg_last_*`) · draft auto-save de 5 s · time grouping · inline previews · **hover preview solo en Ventas › Clientes** (`ClienteHoverCard`), NO en CXC · filtros en la URL y filas/scroll que sobreviven la navegación · banner «Sin conexión» informativo, **sin lectura offline**.
+- Spotlight («cheques que vencen mañana» → ⚡ deep link) · búsquedas recientes · Smart defaults (`fg_last_*`) · sin borrador automático (1-oct-2026) · time grouping · inline previews · **hover preview solo en Ventas › Clientes** (`ClienteHoverCard`), NO en CXC · filtros en la URL y filas/scroll que sobreviven la navegación · banner «Sin conexión» informativo, **sin lectura offline**.
 ## Exports
 - Todos los PDFs tienen logo Fashion Group (src/lib/pdf-logo.ts, base64)
 - Reebok PDFs/emails tienen logo Reebok (src/lib/reebok-logo.ts, base64)
@@ -649,7 +649,7 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 **AppHeader** (sticky, acento de módulo, usuario, búsqueda, notificaciones) · **SearchBar** (⌘K, full-screen móvil, recientes, spotlight) · **NotificationCenter** (🔔 con historial de toasts) · **SessionWarning** (banner antes de expirar) · **OfflineBanner** · **ContextMenuWrapper** · **UndoToast** (5 s) · **TimeGroupHeader** · **OverflowMenu** ("···") · **ScrollableTable** (gradientes de scroll) · **SwipeableRow** · **PullToRefresh** · **BottomSheet** (half/full draggable) · **AccordionContent** · **AnimatedNumber**. 🩸 **MobileBottomBar ELIMINADO** (abril 2026).
 
 ## Hooks (src/lib/hooks/)
-**useAuth** · **useUrlState** (state ↔ URL) · **useLastUsed** · **useDraftAutoSave** (5 s) · **usePersistedState** (sessionStorage) · **useUndoAction** (ventana de 5 s) · **useOnlineStatus**.
+**useAuth** · **useUrlState** (state ↔ URL) · **useLastUsed** · **usePersistedState** (sessionStorage) · **useUndoAction** (ventana de 5 s) · **useOnlineStatus**.
 - **useSessionCheck** — ⚠️ **SIN USO**: no tiene importadores desde el 11-abr-2026, así que el chequeo de sesión cada 2 min NO corre. Se conserva rotulado (candado: `ganchos-sin-uso.test.ts`); enchufarlo es una decisión de Daniel que no está tomada.
 
 ## Testing
