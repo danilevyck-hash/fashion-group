@@ -350,6 +350,17 @@ export type VendedorasPeriodo = {
    *  duplicada de `dia_corte_periodo_anterior` mientras Vercel propaga
    *  el frontend nuevo. Eliminar en sesión 4+. */
   dia_corte_anio_anterior: string | null;
+  /**
+   * 🔴 2-oct-2026 (`MULTIFASHION_TOTAL_PERSONA_2026_10`): la venta de cada
+   * vendedora en el MISMO MES DEL AÑO PASADO (mismos días si el mes va
+   * abierto). Solo con `?vsAnio=1` y periodo=mes; la arma la ruta, no la RPC.
+   */
+  anio_pasado?: {
+    desde: string;
+    hasta: string;
+    parcial: boolean;
+    por_vendedora: Record<string, number>;
+  };
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -38,6 +38,10 @@ import { VendedorasSubtab } from "@/components/multifashion/VendedorasSubtab";
 import { filasExcelVendedoras } from "@/lib/multifashion/vendedoras-excel";
 import { totalAPagarMultifashion, totalDeFila } from "@/lib/multifashion/bono-linea";
 import { nombreEnPantalla } from "@/lib/multifashion/nombres";
+import {
+  deltaVsAnioPasado, notaAnioPasado, participacion, rotuloDeltaAnioPasado,
+  ventanaMesAnioPasado, ventasPorVendedora,
+} from "@/lib/multifashion/vendedoras-vs-anio";
 import type { BonosMultifashion, VendedoraDetalle } from "@/components/ventas/types";
 
 const fila = (nombre: string, comision: number, manager = false): VendedoraDetalle => ({
@@ -65,14 +69,18 @@ const SEP_ABIERTO = { ...SEP_CERRADO, es_elegible: false } as BonosMultifashion;
 
 const respuesta = (body: unknown) => ({ ok: true, status: 200, json: async () => body });
 
-async function pintar(bonos: BonosMultifashion, conTotalAPagar = true) {
+let urlsPedidas: string[] = [];
+async function pintar(bonos: BonosMultifashion, conTotalAPagar = true, anioPasado?: unknown) {
+  urlsPedidas = [];
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
+    urlsPedidas.push(url);
     if (url.includes("/api/multifashion/vendedoras")) {
       return respuesta({
         vendedoras: FILAS, total_vendedoras_periodo: 4, ventas_total: 42702, tickets_total: 400,
         ventas_total_prev: 0, tickets_total_prev: 0, fecha_corte: "2026-09-30", es_periodo_parcial: false,
         dia_corte_periodo_anterior: "2026-08-31",
+        ...(anioPasado && url.includes("vsAnio=1") ? { anio_pasado: anioPasado } : {}),
       });
     }
     if (url.includes("/api/multifashion/bonos")) return respuesta(bonos);
@@ -200,5 +208,107 @@ describe("🔴 2 · mes abierto y apagado", () => {
   it("CONTROL — en Multifashion › Vendedoras (sin la barra) tampoco cambia", async () => {
     await pintar(SEP_CERRADO, false);
     expect(document.querySelectorAll("[data-celda='total-a-pagar']")).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 CANDADO · LA Δ CONTRA EL MISMO MES DEL AÑO PASADO Y LA PARTE DE CADA UNA
+// (Daniel aprobó el 2-oct-2026, con dos cambios). Septiembre 2026 se mide
+// contra septiembre 2025 completo; un mes abierto, contra los MISMOS días. Sin
+// ventas ese mes del año pasado: «Nueva». Debajo de Ventas, su parte del mes.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Septiembre 2025 de prueba: Ana no vendió (→ «Nueva»).
+const SEP_2025 = {
+  desde: "2025-09-01", hasta: "2025-09-30", parcial: false,
+  por_vendedora: { "SHEYNEE BATISTA": 12000, "LUISA GOMEZ": 9418, "JENNIFER MIRANDA": 9000 } as Record<string, number>,
+};
+
+describe("🔴 3 · la Δ contra el mismo mes del año pasado (puro)", () => {
+  const ahora = new Date("2026-10-02T15:00:00Z");
+
+  it("mes cerrado: septiembre 2026 contra septiembre 2025 entero", () => {
+    expect(ventanaMesAnioPasado(2026, 9, "2026-09-30", ahora)).toMatchObject({
+      desde: "2025-09-01", hasta: "2025-09-30", parcial: false,
+    });
+  });
+
+  it("mes abierto: los MISMOS días (último día cargado), nunca el mes entero", () => {
+    expect(ventanaMesAnioPasado(2026, 10, "2026-10-01", ahora)).toMatchObject({
+      desde: "2025-10-01", hasta: "2025-10-01", parcial: true,
+    });
+  });
+
+  it("CONTROL — el año pasado se suma por vendedora canónica, sin vacío ni DEFAULT", () => {
+    expect(ventasPorVendedora([
+      { vendedor: "Sheynee", vendedor_canonico: "SHEYNEE BATISTA", subtotal: "100.50" },
+      { vendedor: "REDES Sheynee", vendedor_canonico: "SHEYNEE BATISTA", subtotal: 20 },
+      { vendedor: "DEFAULT", vendedor_canonico: "DEFAULT", subtotal: 999 },
+      { vendedor: " ", vendedor_canonico: "X", subtotal: 999 },
+      { vendedor: "Ana", vendedor_canonico: "ANA PEREZ", subtotal: -40.5 },
+    ])).toEqual({ "SHEYNEE BATISTA": 120.5, "ANA PEREZ": -40.5 });
+  });
+
+  it("«Nueva» sin ventas ese mes; si no, el % de siempre (base mínima $100)", () => {
+    expect(deltaVsAnioPasado(500, undefined)).toEqual({ tipo: "nueva" });
+    expect(deltaVsAnioPasado(500, 0)).toEqual({ tipo: "nueva" });
+    expect(deltaVsAnioPasado(15046, 12000)).toEqual({ tipo: "pct", ratio: (15046 - 12000) / 12000 });
+    expect(deltaVsAnioPasado(500, 50)).toEqual({ tipo: "pct", ratio: null });
+  });
+
+  it("rótulo «Δ vs sep 2025», la nota y la parte", () => {
+    expect(rotuloDeltaAnioPasado(2026, 9).columna).toBe("Δ vs sep 2025");
+    expect(notaAnioPasado(2026, 9, { hasta: "2025-09-30", parcial: false })).toBe("La Δ compara contra septiembre 2025 completo.");
+    expect(notaAnioPasado(2026, 10, { hasta: "2025-10-01", parcial: true })).toBe("La Δ compara contra octubre 2025, los mismos días (del 1 al 1).");
+    expect(participacion(15046, 42702)).toBeCloseTo(0.3523, 4);
+    expect(participacion(1, 0)).toBeNull();
+  });
+});
+
+describe("🔴 4 · la pantalla y el Excel con el año pasado", () => {
+  it("pide el año pasado SOLO con el interruptor y en Comisiones", async () => {
+    await pintar(SEP_CERRADO, true, SEP_2025);
+    expect(urlsPedidas.some((u) => u.includes("/api/multifashion/vendedoras") && u.includes("vsAnio=1"))).toBe(true);
+    cleanup(); vi.unstubAllGlobals();
+    await pintar(SEP_CERRADO, false, SEP_2025);
+    expect(urlsPedidas.some((u) => u.includes("vsAnio=1"))).toBe(false);
+  });
+
+  it("encabezado «Δ vs sep 2025», «Nueva» para Ana y los % contra el año pasado", async () => {
+    await pintar(SEP_CERRADO, true, SEP_2025);
+    await screen.findByText("Δ vs sep 2025");
+    const d = (n: string) => filaDe(n).querySelector("[data-celda='delta']")!.textContent;
+    expect(d("Ana Perez")).toBe("Nueva");
+    expect(d("Sheynee Batista")).toContain("+25%");
+    expect(d("Jennifer Miranda")).toContain("-8%");
+    expect(document.body.textContent).toContain("La Δ compara contra septiembre 2025 completo.");
+  });
+
+  it("la parte de cada una bajo Ventas, en gris y sin negrita", async () => {
+    await pintar(SEP_CERRADO, true, SEP_2025);
+    await screen.findByText("Δ vs sep 2025");
+    const p = filaDe("Sheynee Batista").querySelector("[data-celda='ventas'] [data-parte]")!;
+    expect(p.textContent).toBe("35%");
+    expect(p.className).toContain("text-gray-500");
+    expect(p.className).toContain("font-normal");
+    expect(filaDe("Jennifer Miranda").querySelector("[data-parte]")!.textContent).toBe("19%");
+  });
+
+  it("🔴 los números de pago NO cambian con el año pasado", async () => {
+    await pintar(SEP_CERRADO, true, SEP_2025);
+    await screen.findByText("Δ vs sep 2025");
+    expect(celda(filaDe("Sheynee Batista"), "total-a-pagar")).toBe("$125.23");
+    expect(celda(filaDe("Jennifer Miranda"), "total-a-pagar")).toBe("$141.19");
+    expect(document.querySelector("[data-total-multifashion]")!.textContent).toContain("$363.51");
+  });
+
+  it("el Excel lleva la MISMA Δ contra el año pasado («Nueva» incluida)", () => {
+    const deltas = new Map(FILAS.map((v) => [v.nombre, deltaVsAnioPasado(v.ventas, SEP_2025.por_vendedora[v.nombre])]));
+    const filas = filasExcelVendedoras(FILAS, SEP_CERRADO, deltas);
+    const porNombre = new Map(filas.map((f) => [String(f[1]).replace(" (gerente)", ""), f[5]]));
+    expect(porNombre.get("Ana Perez")).toBe("Nueva");
+    expect(Number(porNombre.get("Sheynee Batista"))).toBeCloseTo((15046 - 12000) / 12000, 6);
+    // Sin deltas, la de siempre (de la RPC): el Excel del módulo Multifashion no cambia.
+    expect(filasExcelVendedoras(FILAS, SEP_CERRADO)[0][5]).toBeNull();
   });
 });

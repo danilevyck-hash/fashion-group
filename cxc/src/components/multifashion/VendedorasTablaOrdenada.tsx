@@ -20,7 +20,8 @@
 
 import type { BonosMultifashion, VendedoraDetalle } from "@/components/ventas/types";
 import { Card } from "@/components/ui/card";
-import { fmtMoney } from "@/lib/ventas/format";
+import { fmtMoney, fmtPorcentaje } from "@/lib/ventas/format";
+import { participacion, type DeltaAnioPasado } from "@/lib/multifashion/vendedoras-vs-anio";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { variacionPctDesdeRatio } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
@@ -59,8 +60,12 @@ function Encabezado({ col, children, ordenarPor, dir, onOrdenar }: {
   );
 }
 
-export function VendedorasTablaOrdenada({ filas, bonos, rotuloDelta, ordenarPor, dir, onOrdenar }: {
+export function VendedorasTablaOrdenada({ filas, bonos, rotuloDelta, ordenarPor, dir, onOrdenar, deltas, ventasTotal }: {
   filas: VendedoraDetalle[];
+  /** Δ contra el mismo mes del año pasado (2-oct-2026); «nueva» = no vendió ese mes. */
+  deltas?: Map<string, DeltaAnioPasado>;
+  /** La venta del mes, para la parte de cada una («34%»). */
+  ventasTotal?: number;
   /** Los bonos del mes CERRADO; `null` con el mes abierto o en un rango (sin Bono ni Total). */
   bonos: BonosMultifashion | null;
   rotuloDelta: string;
@@ -71,6 +76,7 @@ export function VendedorasTablaOrdenada({ filas, bonos, rotuloDelta, ordenarPor,
   const conPago = bonos != null;
   const pagar = conPago ? totalAPagarMultifashion(filas, bonos) : null;
   const h = { ordenarPor, dir, onOrdenar };
+  const parte = (ventas: number) => (ventasTotal != null ? participacion(ventas, ventasTotal) : null);
   return (
     <Card data-vista="tabla" data-tabla-ordenada className="hidden p-0 lg:block">
       <div className="overflow-x-auto">
@@ -100,7 +106,7 @@ export function VendedorasTablaOrdenada({ filas, bonos, rotuloDelta, ordenarPor,
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="font-medium">{nombreEnPantalla(v.nombre)}</span>
                       {v.manager && (
-                        <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-xs font-medium text-teal-700">Gerente</span>
+                        <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-xs font-medium text-emerald-700">Gerente</span>
                       )}
                       <ChipBono chip={chipDeBono(v, bonos)} sinMonto />
                     </div>
@@ -108,12 +114,21 @@ export function VendedorasTablaOrdenada({ filas, bonos, rotuloDelta, ordenarPor,
                       <p data-desglose-canal className="mt-0.5 text-xs text-gray-500 tabular-nums">{desglose}</p>
                     )}
                   </td>
-                  <td data-celda="ventas" className={cn(NUM, "font-semibold text-gray-950")}>{fmtMoney(v.ventas)}</td>
+                  <td data-celda="ventas" className={cn(NUM, "font-semibold text-gray-950")}>
+                    {fmtMoney(v.ventas)}
+                    {parte(v.ventas) != null && (
+                      <span data-parte className="block text-xs font-normal text-gray-500">{fmtPorcentaje(parte(v.ventas))}</span>
+                    )}
+                  </td>
                   <td data-celda="tickets" className={cn(NUM, "text-gray-500")}>{v.tickets.toLocaleString()}</td>
                   <td data-celda="ticket-promedio" className={cn(NUM, "text-gray-500")}>${v.ticket_promedio.toFixed(2)}</td>
                   <td data-celda="delta" className={cn(NUM, "text-gray-500")}>
-                    {dv.arrow && <span className={cn("mr-1 text-xs", FLECHA[dv.tone])}>{dv.arrow}</span>}
-                    {dv.displayValue}
+                    {deltas?.get(v.nombre)?.tipo === "nueva" ? "Nueva" : (
+                      <>
+                        {dv.arrow && <span className={cn("mr-1 text-xs", FLECHA[dv.tone])}>{dv.arrow}</span>}
+                        {dv.displayValue}
+                      </>
+                    )}
                   </td>
                   <td data-celda="comision" className={cn(NUM, "text-gray-950")}>${v.comision.toFixed(2)}</td>
                   {conPago && (

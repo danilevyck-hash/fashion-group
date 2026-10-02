@@ -22,6 +22,7 @@ import {
 } from "@/lib/excel-export";
 import { variacionPctDesdeRatio } from "@/lib/variacion";
 import { nombreEnPantalla } from "./nombres";
+import type { DeltaAnioPasado } from "./vendedoras-vs-anio";
 
 export interface EntradaExcelVendedoras {
   filas: readonly VendedoraDetalle[];
@@ -31,6 +32,9 @@ export interface EntradaExcelVendedoras {
   rotuloDelta: string;
   /** Los bonos del mes (`multifashion_bonos_v5`); `null` = sin bonos. */
   bonos?: BonosMultifashion | null;
+  /** 🔴 2-oct-2026: la Δ contra el MISMO MES DEL AÑO PASADO, la misma de la
+   *  pantalla («Nueva» = no vendió ese mes). Sin esto, la Δ de la RPC. */
+  deltas?: ReadonlyMap<string, DeltaAnioPasado>;
 }
 
 const COLUMNAS = (rotuloDelta: string) => [
@@ -45,10 +49,17 @@ const COLUMNAS = (rotuloDelta: string) => [
   { header: "Total a pagar", wch: 14, align: "right" as const, fmt: MONEY_FMT },
 ];
 
+function deltaDeFila(v: VendedoraDetalle, deltas?: ReadonlyMap<string, DeltaAnioPasado>): string | number | null {
+  const d = deltas?.get(v.nombre);
+  if (!d) return variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct);
+  return d.tipo === "nueva" ? "Nueva" : d.ratio;
+}
+
 /** Las filas del Excel, en el MISMO orden en que se ven. Puro. */
 export function filasExcelVendedoras(
   filas: readonly VendedoraDetalle[],
   bonos: BonosMultifashion | null = null,
+  deltas?: ReadonlyMap<string, DeltaAnioPasado>,
 ): (string | number | null)[][] {
   return filas.map((v, i) => {
     const bono = bonoDeFila(v, bonos);
@@ -58,7 +69,7 @@ export function filasExcelVendedoras(
       v.tickets,
       v.ventas,
       v.ticket_promedio,
-      variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct),
+      deltaDeFila(v, deltas),
       v.comision,
       bono,
       totalDeFila(v, bonos),
@@ -68,7 +79,7 @@ export function filasExcelVendedoras(
 
 export function libroVendedoras(e: EntradaExcelVendedoras) {
   const columns = COLUMNAS(e.rotuloDelta);
-  const rows = filasExcelVendedoras(e.filas, e.bonos ?? null);
+  const rows = filasExcelVendedoras(e.filas, e.bonos ?? null, e.deltas);
   const pagar = totalAPagarMultifashion(e.filas, e.bonos);
   const ws = buildReportSheet({
     columns,

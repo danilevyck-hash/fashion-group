@@ -47,7 +47,7 @@ import type {
   VendedorasPeriodoTipo,
   BonosMultifashion,
 } from "@/components/ventas/types";
-import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
+import { fmtMoney, fmtMoneyCompact, fmtPorcentaje } from "@/lib/ventas/format";
 import { ROTULO_TOTAL_MULTIFASHION } from "@/lib/comisiones/celular";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { variacionPctDesdeRatio } from "@/lib/variacion";
@@ -62,6 +62,13 @@ import {
   type ChipDeBono,
 } from "@/lib/multifashion/bono-linea";
 import { VendedorasTablaOrdenada } from "./VendedorasTablaOrdenada";
+import {
+  deltaVsAnioPasado,
+  notaAnioPasado,
+  participacion,
+  rotuloDeltaAnioPasado,
+  type DeltaAnioPasado,
+} from "@/lib/multifashion/vendedoras-vs-anio";
 import { MetasSubtab } from "./MetasSubtab";
 import { MetasEnVendedoras } from "./MetasEnVendedoras";
 import { nombreEnPantalla } from "@/lib/multifashion/nombres";
@@ -193,6 +200,11 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
   const params = new URLSearchParams({ year: String(year), periodo: rpcPeriodo });
   if (rpcPeriodo === "mes") params.set("mes", String(rpcMes));
   if (rpcPeriodo === "ultimos") { params.set("n", String(rangoN)); params.set("mes", String(rpcMes)); }
+  // 🔴 2-oct-2026 (`MULTIFASHION_TOTAL_PERSONA_2026_10`): en Comisiones ›
+  // Multifashion, la Δ va contra el MISMO MES DEL AÑO PASADO. La ruta trae la
+  // venta de ese mes por vendedora; sin el interruptor, la URL es la de siempre.
+  const vsAnio = MULTIFASHION_TOTAL_PERSONA_2026_10 && conTotalAPagar === true && rpcPeriodo === "mes";
+  if (vsAnio) params.set("vsAnio", "1");
   const vendedorasUrl = `/api/multifashion/vendedoras?${params.toString()}`;
 
   const { data: resp, error, isLoading, mutate } = useSWR<VendedorasPeriodo>(
@@ -228,9 +240,25 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
   // en vez de un guion, que se leería como «no le toca».
   const bonoPendiente = !esRango && (!bonos || bonos.sin_data || !bonos.es_elegible);
 
+  // 🔴 2-oct-2026: con el año pasado a mano, la Δ de cada fila es contra el
+  // MISMO MES DEL AÑO PASADO (la tabla, las tarjetas, el orden y el Excel leen
+  // de aquí). «Nueva» = no vendió ese mes del año pasado.
+  const anioPasado = vsAnio ? resp?.anio_pasado ?? null : null;
+  const deltasAnio = useMemo(() => {
+    const m = new Map<string, DeltaAnioPasado>();
+    if (!resp || !anioPasado) return m;
+    for (const v of resp.vendedoras) m.set(v.nombre, deltaVsAnioPasado(v.ventas, anioPasado.por_vendedora[v.nombre]));
+    return m;
+  }, [resp, anioPasado]);
+
   const sortedVendedoras = useMemo(() => {
     if (!resp) return [];
-    const arr = resp.vendedoras.slice();
+    const arr = anioPasado
+      ? resp.vendedoras.map((v) => {
+          const d = deltasAnio.get(v.nombre);
+          return { ...v, delta_ventas_pct: d?.tipo === "pct" ? d.ratio : null };
+        })
+      : resp.vendedoras.slice();
     const sign = sortDir === "asc" ? 1 : -1;
     arr.sort((a, b) => {
       switch (sortBy) {
@@ -247,7 +275,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
       }
     });
     return arr;
-  }, [resp, sortBy, sortDir]);
+  }, [resp, sortBy, sortDir, anioPasado, deltasAnio]);
 
   const onSort = (col: SortKey) => {
     if (sortBy === col) setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -255,7 +283,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
   };
 
   // Contra qué compara la Δ en el período activo (ver el encabezado del archivo).
-  const rotuloDelta = rotuloDeltaVendedoras(chip, rpcMes, year);
+  const rotuloDelta = anioPasado ? rotuloDeltaAnioPasado(year, rpcMes) : rotuloDeltaVendedoras(chip, rpcMes, year);
 
   // 🔴 RETAIL AL FRENTE (23-sep-2026): la columna «Bono» se va (decía «al
   // cierre» ×4 durante 29 días de cada 30) y pasa a UNA línea debajo de la
@@ -279,12 +307,17 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
   const periodoExcel = etiquetaPeriodo({ tipo: "mes", anio: year, mes: rpcMes });
   const bajarExcel = () => {
     if (!resp) return;
-    const wb = libroVendedoras({ filas: sortedVendedoras, periodo: periodoExcel, rotuloDelta: rotuloDelta.columna, bonos: bonosDelChip });
+    const wb = libroVendedoras({
+      filas: sortedVendedoras, periodo: periodoExcel, rotuloDelta: rotuloDelta.columna, bonos: bonosDelChip,
+      deltas: anioPasado ? deltasAnio : undefined,
+    });
     saveAs(workbookBlob(wb), nombreArchivoVendedoras(periodoExcel));
   };
 
   const notaComparacion = resp
-    ? notaComparacionVendedoras(chip, rpcMes, year, resp.es_periodo_parcial, resp.dia_corte_periodo_anterior)
+    ? anioPasado
+      ? notaAnioPasado(year, rpcMes, anioPasado)
+      : notaComparacionVendedoras(chip, rpcMes, year, resp.es_periodo_parcial, resp.dia_corte_periodo_anterior)
     : null;
 
   const chipLabel: Record<ChipKey, string> = {
@@ -386,6 +419,8 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
               ordenarPor={sortBy}
               dir={sortDir}
               onOrdenar={onSort}
+              deltas={anioPasado ? deltasAnio : undefined}
+              ventasTotal={resp?.ventas_total}
             />
           ) : (
           <Card data-vista="tabla" className="hidden p-0 lg:block">
@@ -457,6 +492,8 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
                 rotuloDelta={rotuloDelta.corto}
                 ordenada={ordenada}
                 totalPersona={totalPersona ? bonosDelChip : undefined}
+                nueva={deltasAnio.get(v.nombre)?.tipo === "nueva"}
+                parte={ordenada && resp ? participacion(v.ventas, resp.ventas_total) : null}
               />
             ))}
           </div>
@@ -611,13 +648,17 @@ function VendedoraRow({
 }
 
 function VendedoraCard({
-  v, rank, badge, conBono, pendiente, chip, rotuloDelta, ordenada, totalPersona,
+  v, rank, badge, conBono, pendiente, chip, rotuloDelta, ordenada, totalPersona, nueva, parte,
 }: {
   v: VendedoraDetalle; rank: number; badge?: BonoBadge; conBono: boolean; pendiente: boolean; chip: ChipDeBono | null; rotuloDelta: string;
   /** `MULTIFASHION_TOTAL_PERSONA_2026_10`: una sola tipografía (sin monoespaciada). */
   ordenada?: boolean;
   /** Los bonos del mes CERRADO: la tarjeta suma «Bono» y «Total a pagar». */
   totalPersona?: BonosMultifashion | null;
+  /** No vendió ese mes del año pasado: «Nueva» en vez del %. */
+  nueva?: boolean;
+  /** Su parte de la venta del mes (fracción). */
+  parte?: number | null;
 }) {
   const dv = formatDeltaRatio(variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct));
   const bono = textoBono(v, badge, pendiente);
@@ -639,8 +680,9 @@ function VendedoraCard({
       </div>
       <div className="mt-2 flex items-baseline gap-3">
         <span className={cn(M, "text-base font-medium tabular-nums text-gray-950", ordenada && "font-semibold")}>{fmtMoneyCompact(v.ventas)}</span>
+        {parte != null && <span data-parte className="text-xs tabular-nums text-gray-500">{fmtPorcentaje(parte)}</span>}
         <span className={cn(M, "text-xs tabular-nums", ordenada ? "text-gray-500" : TONE_LIGHT[dv.tone])}>
-          {dv.arrow && <span className={cn("mr-0.5", ordenada && TONE_LIGHT[dv.tone])}>{dv.arrow}</span>}{dv.displayValue}
+          {nueva ? "Nueva" : <>{dv.arrow && <span className={cn("mr-0.5", ordenada && TONE_LIGHT[dv.tone])}>{dv.arrow}</span>}{dv.displayValue}</>}
           <span className="ml-1 text-gray-400">{rotuloDelta}</span>
         </span>
       </div>

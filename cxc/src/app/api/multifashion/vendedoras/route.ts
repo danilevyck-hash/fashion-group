@@ -19,6 +19,12 @@ import { requireRole } from "@/lib/requireRole";
 import { ROLES_VENDEDORAS_ESPEJO } from "@/lib/multifashion/acceso";
 import { supabaseServer } from "@/lib/supabase-server";
 import type { VendedorasPeriodo } from "@/components/ventas/types";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
+import {
+  ventanaMesAnioPasado,
+  ventasPorVendedora,
+  type FilaVentaAnioPasado,
+} from "@/lib/multifashion/vendedoras-vs-anio";
 
 export const dynamic = "force-dynamic";
 
@@ -113,6 +119,42 @@ export async function GET(req: NextRequest) {
   if (error) {
     console.error("[multifashion/vendedoras] rpc error", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // 🔴 2-oct-2026 (`MULTIFASHION_TOTAL_PERSONA_2026_10`): con `?vsAnio=1`, la
+  // venta de cada vendedora en el MISMO MES DEL AÑO PASADO (mismos días si el
+  // mes va abierto), leída de la MISMA vista que la RPC, paginada. La RPC no se
+  // toca; sin el parámetro la respuesta es la de siempre.
+  if (periodoRaw === "mes" && mes != null && sp.get("vsAnio") === "1") {
+    const resp = data as VendedorasPeriodo;
+    const ventana = ventanaMesAnioPasado(year, mes, resp.fecha_corte, new Date());
+    try {
+      const filas = await leerTodoPaginado<FilaVentaAnioPasado>(
+        "multifashion/vendedoras año pasado",
+        (conCount, desde, hasta) =>
+          supabaseServer
+            .from("_multifashion_sf_vw")
+            .select("vendedor, vendedor_canonico, subtotal", conCount ? { count: "exact" } : undefined)
+            .gte("fecha", ventana.desde)
+            .lte("fecha", ventana.hasta)
+            .order("fecha_ts", { ascending: true })
+            .order("n_sistema", { ascending: true })
+            .range(desde, hasta),
+      );
+      return NextResponse.json({
+        ...resp,
+        anio_pasado: {
+          desde: ventana.desde,
+          hasta: ventana.hasta,
+          parcial: ventana.parcial,
+          por_vendedora: ventasPorVendedora(filas),
+        },
+      } satisfies VendedorasPeriodo);
+    } catch (e) {
+      // Falla ABIERTA: sin el año pasado la pantalla dice «—», nunca un número inventado.
+      console.error("[multifashion/vendedoras] año pasado", e);
+      return NextResponse.json(resp);
+    }
   }
 
   return NextResponse.json(data as VendedorasPeriodo);

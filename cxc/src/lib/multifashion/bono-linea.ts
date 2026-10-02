@@ -122,9 +122,13 @@ export function totalAPagarMultifashion(
  * chico, para no decir el número dos veces) y el pie pone comisiones y bonos
  * bajo sus columnas. Con el mes abierto, nada de eso.
  * 🔴 Solo cambia la pantalla: el número sale de `totalDeFila`, el MISMO que usa
- * el Excel. `false` = la pantalla de hoy.
+ * el Excel. `false` = la pantalla de antes.
+ *
+ * 🔁 Daniel aprobó el 2-oct-2026 la tabla ordenada, con dos cambios: la Δ
+ * contra el MISMO MES DEL AÑO PASADO (`vendedoras-vs-anio.ts`) y la parte de
+ * cada vendedora bajo Ventas. PRENDIDO.
  */
-export const MULTIFASHION_TOTAL_PERSONA_2026_10 = false;
+export const MULTIFASHION_TOTAL_PERSONA_2026_10 = true;
 
 /** Lo que se le paga a UNA persona: su comisión + su bono. Pantalla y Excel. */
 export function totalDeFila(
