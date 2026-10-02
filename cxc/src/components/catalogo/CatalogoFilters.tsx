@@ -118,6 +118,7 @@ import {
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import FiltroPrecioChip from "./FiltroPrecioChip";
 import ChipFiltro from "./ChipFiltro";
+import { VIDRIO } from "@/lib/ui/vidrio";
 import { grupoTieneOpciones, type OpcionFiltro } from "@/lib/catalogo/filtros-derivados";
 import { CATALOGO_ORDEN_CELULAR, FILA_QUE_SE_DESLIZA, cuantosFiltrosPuestos, textoBotonFiltros } from "@/lib/catalogo/orden-celular";
 import { clasesBarraFiltros, textoOrdenCorto } from "@/lib/catalogo/catalogos-2026-10";
@@ -204,7 +205,7 @@ export function FiltroDesplegable({
         role="listbox"
         aria-label={etiqueta}
         anchoMinimo={200}
-        className="bg-white rounded-xl border border-black/10 shadow-lg py-1"
+        className={chip ? `${VIDRIO} py-1` : "bg-white rounded-xl border border-black/10 shadow-lg py-1"}
       >
         {opciones.map(o => (
           <button

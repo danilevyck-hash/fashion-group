@@ -180,6 +180,8 @@ describe("4 · 🔴 el buscador en una fila manda lo mismo", () => {
     expect(chip.getAttribute("aria-haspopup")).toBe("listbox");
     fireEvent.click(chip);
     expect(screen.getByRole("option", { name: "Todos" })).toBeTruthy();
+    // Vidrio (2-oct-2026): el menú es translúcido y con fondo blanco si no hay desenfoque.
+    expect(screen.getByRole("listbox").className).toContain("backdrop-blur");
     expect(screen.getByRole("option", { name: "Women" }).getAttribute("aria-selected")).toBe("true");
     fireEvent.click(screen.getByRole("option", { name: "Men" }));
     expect(onGenderChange).toHaveBeenCalledWith("men");
@@ -256,5 +258,21 @@ describe("6 · 🔴 «Precio ▾» como chip filtra LO MISMO", () => {
     expect(textoChipPrecio({ desde: "25", hasta: "25" })).toBe("$25");
     expect(textoChipPrecio({ desde: "17.5", hasta: "" })).toBe("Desde $17.50");
     expect(textoChipPrecio({ desde: "", hasta: "" })).toBeNull();
+  });
+});
+
+describe("7 · el detalle del pedido en el celular y el vidrio", () => {
+  it("el detalle tiene su ficha por renglón detrás del interruptor (sin tabla que se deslice)", () => {
+    const d = leer("src/components/catalogo/PedidoDetalleClient.tsx");
+    expect(d).toContain('data-medir="fichas-pedido"');
+    expect(d).toContain("items.length > 0 && enFicha ?");
+    expect(d).toMatch(/if \(!CATALOGOS_APPLE_2026_10_B\.subpaginasInternas/);
+  });
+  it("el vidrio cae a blanco sólido sin desenfoque y es UNA receta", async () => {
+    const { VIDRIO } = await import("@/lib/ui/vidrio");
+    expect(VIDRIO.startsWith("bg-white ")).toBe(true);
+    expect(VIDRIO).toContain("supports-[backdrop-filter:blur(1px)]:bg-white/70");
+    expect(VIDRIO).toContain("backdrop-blur-xl");
+    expect(leer("src/components/catalogo/FiltroPrecioChip.tsx")).toContain("VIDRIO");
   });
 });

@@ -125,6 +125,19 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
 
   const [role, setRole] = useState("");
   const [order, setOrder] = useState<Order | null>(null);
+  // v4 (`CATALOGOS_APPLE_2026_10_B`): en el celular los renglones van en FICHA,
+  // no en una tabla que se desliza de lado (Daniel, 2-oct-2026: «en el iPhone
+  // se tapa contenido y hay que deslizar a la derecha»). Un solo árbol: se
+  // pregunta el ancho en un efecto y arranca en la tabla de la computadora.
+  const [enFicha, setEnFicha] = useState(false);
+  useEffect(() => {
+    if (!CATALOGOS_APPLE_2026_10_B.subpaginasInternas || typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(max-width: 639px)");
+    setEnFicha(mq.matches);
+    const cambiar = (e: MediaQueryListEvent) => setEnFicha(e.matches);
+    mq.addEventListener?.("change", cambiar);
+    return () => mq.removeEventListener?.("change", cambiar);
+  }, []);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [clientName, setClientName] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -1001,7 +1014,63 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
       ) : null}
 
       {/* Items table */}
-      {items.length > 0 ? (
+      {items.length > 0 && enFicha ? (
+        /* Ficha por renglón (v4, celular): foto · nombre y subtotal · código ·
+           bultos, unidades y precio en una línea que baja si no cabe. Los
+           MISMOS controles y las MISMAS cuentas que la tabla. */
+        <ul data-medir="fichas-pedido" className="mb-4 divide-y divide-gray-100">
+          {items.map((item, idx) => (
+            <li key={idx} className="flex gap-3 py-3">
+              <div className="w-12 h-12 shrink-0 bg-gray-50 rounded overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {item.image_url ? <img src={supabaseThumb(item.image_url, 160) ?? item.image_url} alt="" className="w-full h-full object-contain" onError={(e) => { const el = e.currentTarget; if (el.src !== item.image_url) el.src = item.image_url; }} /> : null}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="min-w-0 break-words text-sm">{item.name}</span>
+                  <span className="shrink-0 text-sm font-medium tabular-nums">${fmt(linea(item).subtotal)}</span>
+                </div>
+                <div className="text-xs text-gray-400 font-mono break-all">{item.sku}</div>
+                {typeof item.disponible_pzas === "number" && item.disponible_pzas < linea(item).piezas && (
+                  <div className="mt-1 inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 tabular-nums">
+                    Disponible al confirmar: {formatBultosPiezas(item.disponible_pzas, item.bulto_pzas || bs(item))}
+                  </div>
+                )}
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-600">
+                  {canEdit ? (
+                    <label className="inline-flex items-center gap-1.5">
+                      <input type="number" min={1} step={1} value={item.quantity} aria-label="Bultos"
+                        onChange={e => updateItem(idx, "quantity", parseInt(e.target.value) || 1)}
+                        className={theme.pedido.qtyInputClass} />
+                      <span className="text-xs text-gray-400">bultos</span>
+                    </label>
+                  ) : (
+                    <span className="tabular-nums">{item.quantity} {item.quantity === 1 ? "bulto" : "bultos"}</span>
+                  )}
+                  <span className="text-xs text-gray-400 tabular-nums">{linea(item).piezas} u</span>
+                  {canEdit ? (
+                    <label className="inline-flex items-center gap-1">
+                      <span className="text-xs text-gray-400">$</span>
+                      <input type="number" step={1} min={0} value={item.unit_price} aria-label="Precio"
+                        onChange={e => updateItem(idx, "unit_price", parseFloat(e.target.value) || 0)}
+                        className="w-16 min-h-[44px] text-right border-b border-gray-200 text-base outline-none focus:border-black tabular-nums" />
+                      <span className="text-xs text-gray-400">c/u</span>
+                    </label>
+                  ) : (
+                    <span className="tabular-nums">${fmt(item.unit_price)} c/u</span>
+                  )}
+                  {precioDeLista(item) !== null && (
+                    <span className="text-xs text-amber-600 tabular-nums">← lista {fmtPrecio(precioDeLista(item)!)}</span>
+                  )}
+                  {canEdit && (
+                    <button onClick={() => removeItem(idx)} aria-label="Quitar" className="ml-auto min-h-[44px] min-w-[44px] text-gray-400 hover:text-red-500 transition text-xs">Quitar</button>
+                  )}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : items.length > 0 ? (
         /* `overflow-x-auto`: la tabla se desplaza DENTRO de su caja en vez de
            arrastrar la página entera. Al subir las casillas al mínimo táctil,
            el pedido más largo de producción (TOM-023, 38 líneas) pasó a medir
