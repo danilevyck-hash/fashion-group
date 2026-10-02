@@ -22,6 +22,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { CajaAviso, CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos } from "@/components/CajaAviso";
 import { RefreshCw } from "lucide-react";
 import { syncConEnganche } from "./syncNowClient";
 
@@ -148,22 +149,14 @@ export default function CatalogoSyncNow({ catalogo, onSuccess, className }: Cata
       </button>
 
       {toast && (
-        <div
-          role="status"
-          className={`fixed bottom-6 left-1/2 z-[9999] max-w-[90vw] -translate-x-1/2 rounded-full px-5 py-2.5 text-sm text-white shadow-lg ${
-            toast.error ? "bg-red-600" : "bg-black"
-          }`}
-        >
-          {toast.msg}
-          <button
-            type="button"
-            aria-label="Cerrar"
-            onClick={() => setToast(null)}
-            className="ml-3 font-semibold opacity-70 hover:opacity-100"
-          >
-            ×
-          </button>
-        </div>
+        <EnLaPilaDeAvisos>
+          <CajaAviso
+            message={toast.msg}
+            type={toast.error ? "error" : "success"}
+            onDismiss={() => setToast(null)}
+            className={CLASE_AVISO_EN_PILA}
+          />
+        </EnLaPilaDeAvisos>
       )}
     </div>
   );

@@ -33,6 +33,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useRef, useState } from "react";
+import { CajaAviso, CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos } from "@/components/CajaAviso";
 import { RefreshCw } from "lucide-react";
 import { postSyncNow, syncConEnganche } from "./syncNowClient";
 // 🔴 Los DOS textos del botón salen de un solo lugar desde el 18-sep-2026:
@@ -293,22 +294,14 @@ export default function SyncNowButton({
       )}
 
       {toast && (
-        <div
-          role="status"
-          className={`fixed bottom-6 left-1/2 z-[9999] max-w-[90vw] -translate-x-1/2 rounded-full px-5 py-2.5 text-sm text-white shadow-lg ${
-            toast.error ? "bg-red-600" : "bg-black"
-          }`}
-        >
-          {toast.msg}
-          <button
-            type="button"
-            aria-label="Cerrar"
-            onClick={() => setToast(null)}
-            className="ml-3 font-semibold opacity-70 hover:opacity-100"
-          >
-            ×
-          </button>
-        </div>
+        <EnLaPilaDeAvisos>
+          <CajaAviso
+            message={toast.msg}
+            type={toast.error ? "error" : "success"}
+            onDismiss={() => setToast(null)}
+            className={CLASE_AVISO_EN_PILA}
+          />
+        </EnLaPilaDeAvisos>
       )}
     </div>
   );

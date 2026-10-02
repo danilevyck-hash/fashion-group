@@ -7,6 +7,7 @@
 // persona, "4,92 horas" no le dice nada a nadie.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CajaAviso, CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos } from "@/components/CajaAviso";
 import type { DragEvent as EventoArrastre } from "react";
 import { useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ToastSystem";
@@ -950,9 +951,9 @@ export default function ReporteTab({ empresa = "" }: {
       {/* 🔴 FIJA, no en el flujo: una línea que aparece y desaparece arriba de
           la tabla empuja la página y mueve el lugar donde se estaba mirando. */}
       {refrescando && (
-        <p className="fixed bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full bg-gray-900 px-3 py-1.5 text-xs text-white shadow-lg">
-          {TEXTO_ACTUALIZANDO}
-        </p>
+        <EnLaPilaDeAvisos>
+          <CajaAviso message={TEXTO_ACTUALIZANDO} sinIcono className={CLASE_AVISO_EN_PILA} />
+        </EnLaPilaDeAvisos>
       )}
       {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {!cargando && !error && personas?.length === 0 && (

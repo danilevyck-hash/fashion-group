@@ -54,6 +54,7 @@
 //   6. Click "Guardar" final sí debe redirigir al listado
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { CajaAviso, CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos } from "@/components/CajaAviso";
 import type { GuiaItem, ModoEntrega, Transportista } from "./types";
 import AddNewInline from "./AddNewInline";
 import DestinosDelCliente from "./DestinosDelCliente";
@@ -1116,10 +1117,11 @@ export default function GuiaForm({
         </div>
 
         {undoRow && (
-          <div className="fixed bottom-28 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2.5 rounded-lg border border-gray-700 flex items-center gap-3 z-50 text-sm">
-            <span>Envío eliminado</span>
-            <button onClick={handleUndoRemove} className="font-medium underline hover:no-underline inline-flex items-center min-h-[44px] px-2 -my-2">Deshacer</button>
-          </div>
+          <EnLaPilaDeAvisos>
+            <CajaAviso message="Envío eliminado" sinIcono className={CLASE_AVISO_EN_PILA}>
+              <button onClick={handleUndoRemove} className="font-medium underline hover:no-underline inline-flex items-center min-h-[44px] px-2 -my-2">Deshacer</button>
+            </CajaAviso>
+          </EnLaPilaDeAvisos>
         )}
       </div>
       </div>
@@ -1518,10 +1520,11 @@ export default function GuiaForm({
 
       {/* Undo delete row toast */}
       {undoRow && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2.5 rounded-lg border border-gray-700 flex items-center gap-3 z-50 text-sm">
-          <span>Envío eliminado</span>
-          <button onClick={handleUndoRemove} className="font-medium underline hover:no-underline inline-flex items-center min-h-[44px] px-2 -my-2">Deshacer</button>
-        </div>
+        <EnLaPilaDeAvisos>
+          <CajaAviso message="Envío eliminado" sinIcono className={CLASE_AVISO_EN_PILA}>
+            <button onClick={handleUndoRemove} className="font-medium underline hover:no-underline inline-flex items-center min-h-[44px] px-2 -my-2">Deshacer</button>
+          </CajaAviso>
+        </EnLaPilaDeAvisos>
       )}
     </div>
   );

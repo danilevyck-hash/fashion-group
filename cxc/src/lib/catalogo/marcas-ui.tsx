@@ -566,7 +566,6 @@ export interface MarcaTheme {
     categoriaDe?: (p: AdminProducto) => string | null;
     syncModulo: string;
     syncSubtext: string;
-    toastBg: string;
     tabActive: string;
     spinner: string;
     metricValue: string;
@@ -931,7 +930,6 @@ const REEBOK: MarcaTheme = {
     // 🔴 Solo Reebok: el mapa `rubro → categoría` se administra desde el
     // 17-sep-2026 (`reebok_rubro_categoria`). Ver `RUTA_CATEGORIAS_REEBOK`.
     rutaCategorias: RUTA_CATEGORIAS_REEBOK,
-    toastBg: "fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#1A2656] text-white text-sm px-5 py-2.5 rounded-full shadow-lg z-[9999]",
     tabActive: "bg-white text-[#1A2656] shadow-sm",
     spinner: "w-8 h-8 border-2 border-[#E4002B] border-t-transparent rounded-full animate-spin",
     metricValue: "text-[#1A2656]",
@@ -1246,7 +1244,6 @@ const JOYBEES: MarcaTheme = {
     },
     syncModulo: "catalogo-joybees",
     syncSubtext: "tarda ~1-2 min",
-    toastBg: "fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#404041] text-white text-sm px-5 py-2.5 rounded-full shadow-lg z-[9999]",
     tabActive: "bg-white text-[#404041] shadow-sm",
     spinner: "w-8 h-8 border-2 border-[#FFE443] border-t-transparent rounded-full animate-spin",
     metricValue: "text-[#404041]",
@@ -1577,7 +1574,6 @@ const TOMMY: MarcaTheme = {
     },
     syncModulo: "catalogo-tommy",
     syncSubtext: "tarda ~2-3 min",
-    toastBg: "fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#152342] text-white text-sm px-5 py-2.5 rounded-full shadow-lg z-[9999]",
     tabActive: "bg-white text-[#152342] shadow-sm",
     spinner: "w-8 h-8 border-2 border-[#AE0029] border-t-transparent rounded-full animate-spin",
     metricValue: "text-[#152342]",
@@ -1910,7 +1906,6 @@ const CALVIN: MarcaTheme = {
     },
     syncModulo: "catalogo-calvin",
     syncSubtext: "tarda ~2-3 min",
-    toastBg: "fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#1A1A1A] text-white text-sm px-5 py-2.5 rounded-full shadow-lg z-[9999]",
     tabActive: "bg-white text-[#1A1A1A] shadow-sm",
     spinner: "w-8 h-8 border-2 border-[#1A1A1A] border-t-transparent rounded-full animate-spin",
     metricValue: "text-[#1A1A1A]",

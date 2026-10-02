@@ -3,7 +3,8 @@
 // ahora `CajaAviso`: éxito negro, error rojo, aviso ámbar.
 import { describe, it, expect } from "vitest";
 import { render, screen, act } from "@testing-library/react";
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
+import { join } from "path";
 import { ToastProvider, useToast } from "@/components/ToastSystem";
 import { COLOR_AVISO, ABAJO_DE_LOS_AVISOS_CSS, ATRIBUTO_PILA_AVISOS } from "@/components/CajaAviso";
 import { Toast } from "@/components/ui";
@@ -59,13 +60,48 @@ describe("aviso único", () => {
     expect(ABAJO_DE_LOS_AVISOS_CSS).toContain("env(safe-area-inset-bottom)");
   });
 
-  it("nadie vuelve a posicionar un aviso por su cuenta", () => {
-    for (const f of ["src/components/ToastSystem.tsx", "src/components/ui.tsx", "src/components/UndoToast.tsx"]) {
-      const src = readFileSync(f, "utf8");
-      expect(src).toContain("EnLaPilaDeAvisos");
-      expect(src).not.toContain("top-4 right-4");
-      expect(src).not.toMatch(/fixed bottom-6 left-1\/2/);
+  it("los avisos sueltos de antes entran a la pila", () => {
+    for (const f of [
+      "src/components/ToastSystem.tsx", "src/components/ui.tsx", "src/components/UndoToast.tsx",
+      "src/app/guias/components/GuiaForm.tsx", "src/components/shared/SyncNowButton.tsx",
+      "src/components/shared/CatalogoSyncNow.tsx", "src/app/catalogos/admin/[marca]/categorias/CategoriasRubroClient.tsx",
+      "src/app/asistencia/ReporteTab.tsx", "src/app/catalogos/admin/[marca]/AdminCatalogoClient.tsx",
+    ]) {
+      expect(readFileSync(f, "utf8"), f).toContain("EnLaPilaDeAvisos");
     }
+    expect(readFileSync("src/lib/hooks/useAuth.ts", "utf8")).toContain("pilaDeAvisos()");
+  });
+
+  // 🔴 BARRIDO: ningún archivo de `src/` (menos los tests y `CajaAviso`) vuelve
+  // a darle posición propia a un aviso. Un aviso suelto era siempre una caja
+  // `fixed` centrada con `left-1/2` (abajo) o en la esquina `top-4 right-4`
+  // (un panel pegado al borde, `top-0 right-0`, no es un aviso).
+  // Lo que necesite avisar entra con `EnLaPilaDeAvisos` + `CajaAviso`.
+  it("nadie vuelve a posicionar un aviso por su cuenta (barre src/)", () => {
+    const archivos: string[] = [];
+    const andar = (dir: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const p = join(dir, e.name);
+        if (e.isDirectory()) { if (e.name !== "__tests__") andar(p); }
+        else if (/\.(tsx?|jsx?)$/.test(e.name) && !/\.test\./.test(e.name)) archivos.push(p);
+      }
+    };
+    andar("src");
+    expect(archivos.length).toBeGreaterThan(500);
+    const culpables: string[] = [];
+    for (const f of archivos) {
+      if (f.endsWith(join("components", "CajaAviso.tsx"))) continue;
+      const src = readFileSync(f, "utf8");
+      // Solo dentro de una misma cadena de clases (sin cruzar comillas).
+      for (const m of src.matchAll(/["'`][^"'`\n]*\bfixed\b[^"'`\n]*["'`]/g)) {
+        const clases = m[0];
+        if (/left-1\/2/.test(clases) || /\btop-[1-9]\d* right-[1-9]\d*\b|\bright-[1-9]\d* top-[1-9]\d*\b/.test(clases)) {
+          culpables.push(`${f}: ${clases.slice(0, 80)}`);
+        }
+      }
+      if (/\btoastBg\b/.test(src)) culpables.push(`${f}: toastBg`);
+    }
+    expect(culpables).toEqual([]);
   });
 
   it("nadie vuelve a escribir el color del aviso a mano", () => {

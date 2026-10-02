@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { CLASE_AVISO_EN_PILA, CLASE_CAJA_AVISO, COLOR_AVISO, pilaDeAvisos } from "@/components/CajaAviso";
 import { useRouter } from "next/navigation";
 import { hasModuleAccess } from "@/lib/auth-check";
 import { accesoConSemilla } from "@/lib/sesion-semilla";
@@ -48,10 +49,14 @@ export function useAuth({ moduleKey, allowedRoles }: UseAuthOptions) {
       setIsOwner(false);
       if (r) {
         // User is logged in but doesn't have access — show message briefly
+        // Armado a mano (no hay React aquí), pero con la MISMA caja y en la
+        // MISMA pila que todos los avisos (ver CajaAviso).
         const div = document.createElement("div");
-        div.className = "fixed bottom-6 left-1/2 -translate-x-1/2 bg-red-600 text-white text-sm px-5 py-2.5 rounded-full shadow-lg z-[9999]";
-        div.textContent = "No tienes acceso a este modulo";
-        document.body.appendChild(div);
+        div.setAttribute("role", "status");
+        div.setAttribute("data-aviso", "error");
+        div.className = `${COLOR_AVISO.error} ${CLASE_CAJA_AVISO} ${CLASE_AVISO_EN_PILA}`;
+        div.textContent = "No tienes acceso a este módulo";
+        pilaDeAvisos().appendChild(div);
         setTimeout(() => { div.remove(); router.push("/home"); }, 2000);
       } else {
         router.push("/");

@@ -218,9 +218,10 @@ describe("B · la tabla se queda dibujada mientras llegan los datos nuevos", () 
     expect(document.querySelector("table")).not.toBeNull();
     expect(screen.getByText("Andrea Perez")).toBeTruthy();
 
-    // 🔴 El aviso es una pastilla FIJA: fuera del flujo, no mueve un píxel.
-    const pastilla = screen.getByText(TEXTO_ACTUALIZANDO);
-    expect(pastilla.className).toContain("fixed");
+    // 🔴 El aviso es FIJO: fuera del flujo, no mueve un píxel. Desde el
+    // 2-oct-2026 vive en la pila única de avisos (`fixed`, en <body>).
+    const pila = screen.getByText(TEXTO_ACTUALIZANDO).closest("[data-pila-avisos]");
+    expect(pila?.className).toContain("fixed");
 
     arnes.soltar();
     await waitFor(() => expect(screen.queryByText(TEXTO_ACTUALIZANDO)).toBeNull());

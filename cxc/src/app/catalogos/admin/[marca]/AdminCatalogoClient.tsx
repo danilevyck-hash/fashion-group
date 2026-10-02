@@ -25,6 +25,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useMemo, useState, Suspense } from "react";
+import { CajaAviso, CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos } from "@/components/CajaAviso";
+import { duracionToastMs } from "@/lib/ui/toast-duracion";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { useUrlState } from "@/lib/hooks/useUrlState";
@@ -95,10 +97,10 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
   const [busqueda, setBusqueda] = useState("");
   const [genero, setGenero] = useState("");
   const [bulto, setBulto] = useState("");
-  const [toast, setToast] = useState<string | null>(null);
-  const showToast = useCallback((msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3500);
+  const [toast, setToast] = useState<{ msg: string; tipo: "success" | "error" } | null>(null);
+  const showToast = useCallback((msg: string, tipo: "success" | "error" = "success") => {
+    setToast({ msg, tipo });
+    setTimeout(() => setToast(null), duracionToastMs(tipo));
   }, []);
 
   const { data: productsData, isLoading: productsLoading, mutate: mutateProducts } = useSWR<AdminProducto[]>(
@@ -209,7 +211,7 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
       await theme.admin.excelSinFoto(sinFoto);
       showToast("Excel listo — revisa tu carpeta de descargas");
     } catch {
-      showToast("No se pudo generar el Excel. Intenta de nuevo.");
+      showToast("No se pudo generar el Excel. Intenta de nuevo.", "error");
     }
   }
 
@@ -227,7 +229,11 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
         breadcrumbs={migasDeAppHeader(tramosDeAdministrar(marca), (href) => router.push(href))}
       />
 
-      {toast && <div className={theme.admin.toastBg}>{toast}</div>}
+      {toast && (
+        <EnLaPilaDeAvisos>
+          <CajaAviso message={toast.msg} type={toast.tipo} onDismiss={() => setToast(null)} className={CLASE_AVISO_EN_PILA} />
+        </EnLaPilaDeAvisos>
+      )}
 
       <div className="max-w-5xl mx-auto px-4 py-6">
         {/* Encabezado */}

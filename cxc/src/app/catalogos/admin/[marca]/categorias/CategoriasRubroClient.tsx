@@ -23,6 +23,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { CajaAviso, CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos } from "@/components/CajaAviso";
 import { useRouter, useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { Ayuda } from "@/components/shared/Ayuda";
@@ -219,9 +220,9 @@ function CategoriasRubroInner() {
       />
 
       {aviso && (
-        <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-md bg-black px-4 py-2 text-sm text-white">
-          {aviso}
-        </div>
+        <EnLaPilaDeAvisos>
+          <CajaAviso message={aviso} className={CLASE_AVISO_EN_PILA} />
+        </EnLaPilaDeAvisos>
       )}
 
       <div className="mx-auto max-w-3xl px-4 py-6">
