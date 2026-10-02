@@ -12,6 +12,7 @@
 
 import { useMemo, useState } from "react";
 import { sugerirProveedores } from "@/lib/marketing/proveedor";
+import { vidrioSobre } from "@/lib/ui/vidrio";
 
 interface Props {
   id: string;
@@ -56,7 +57,7 @@ export function ProveedorInput({ id, value, onChange, historico, required, class
           id={`${id}-sugerencias`}
           role="listbox"
           data-testid="proveedor-sugerencias"
-          className="absolute left-0 right-0 z-20 mt-1 max-h-56 overflow-y-auto rounded-md border border-gray-200 bg-white py-1 text-sm"
+          className={vidrioSobre("absolute left-0 right-0 z-20 mt-1 max-h-56 overflow-y-auto rounded-md border border-gray-200 bg-white py-1 text-sm")}
         >
           {visibles.map((s) => (
             <li key={s.nombre} role="option" aria-selected={false}>

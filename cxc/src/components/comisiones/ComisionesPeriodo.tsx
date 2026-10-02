@@ -50,6 +50,7 @@ import {
   rangoDeAtajo,
   type RangoConsulta,
 } from "@/lib/comisiones/vendedores-rango";
+import { vidrioSobre } from "@/lib/ui/vidrio";
 
 interface Props {
   mes: number;
@@ -136,7 +137,7 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
             ref={panelRef}
             role="dialog"
             aria-label="Seleccionar período"
-            className={`absolute ${alDerecha ? "right-0" : "left-0"} top-full z-20 mt-1 w-[276px] max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white p-2 shadow-lg`}
+            className={vidrioSobre(`absolute ${alDerecha ? "right-0" : "left-0"} top-full z-20 mt-1 w-[276px] max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white p-2 shadow-lg`)}
           >
             {/* 🔴 VENDEDORES_RANGO_2026_10: los atajos para CONSULTAR van arriba;
                 los meses de abajo siguen siendo el período que se PAGA. */}

@@ -37,6 +37,7 @@
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import { Info } from "lucide-react";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
+import { vidrioSobre } from "@/lib/ui/vidrio";
 
 interface Props {
   /** Título del panel. Corto, en español simple ("Cómo se calcula"). */
@@ -83,7 +84,7 @@ export function Ayuda({ titulo, children, etiqueta, className }: Props) {
         aria-label={titulo}
         marca="ayuda"
         ancho={290}
-        className="rounded-xl border border-gray-200 bg-white p-3 text-xs leading-relaxed text-gray-600 shadow-lg"
+        className={vidrioSobre("rounded-xl border border-gray-200 bg-white p-3 text-xs leading-relaxed text-gray-600 shadow-lg")}
       >
         <p className="mb-1.5 text-sm font-medium text-gray-900">{titulo}</p>
         {children}

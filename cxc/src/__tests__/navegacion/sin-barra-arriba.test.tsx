@@ -64,6 +64,19 @@ vi.mock("@/components/NovedadesAviso", () => ({ default: () => null, NOVEDADES_A
 import AppHeader from "@/components/AppHeader";
 import { CLASE_COLCHON_FLOTANTE } from "@/lib/navegacion/useColchonDelFlotante";
 
+// 2-oct-2026: CATALOGOS_APPLE_2026_10_B se prendió (Daniel aprobó el
+// catálogo v4). Esta prueba es de la versión de antes y la fuerza en false.
+vi.mock("@/lib/catalogo/catalogos-2026-10-b", async (original) => {
+  const real = await original<typeof import("@/lib/catalogo/catalogos-2026-10-b")>();
+  return {
+    ...real,
+    CATALOGOS_APPLE_2026_10_B: {
+      buscadorEnUnaFila: false, catalogoPublico: false, revisarPedido: false,
+      subpaginasInternas: false, administrar: false, tituloCelularChico: false,
+    },
+  };
+});
+
 const RAIZ = process.cwd();
 const leer = (ruta: string) => readFileSync(resolve(RAIZ, ruta), "utf8");
 const FUENTE_REGLA = leer("src/lib/navegacion/barra-celular.ts");

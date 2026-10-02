@@ -51,14 +51,15 @@ export interface InterruptoresB {
   readonly tituloCelularChico: boolean;
 }
 
-/** 🔴 Los interruptores. Todos en `false` = las pantallas de hoy. */
+/** 🔴 Los interruptores. Todos en `false` = las pantallas de antes.
+ *  Daniel aprobó el 2-oct-2026 el catálogo v4: todos prendidos. */
 export const CATALOGOS_APPLE_2026_10_B: InterruptoresB = {
-  buscadorEnUnaFila: false,
-  catalogoPublico: false,
-  revisarPedido: false,
-  subpaginasInternas: false,
-  administrar: false,
-  tituloCelularChico: false,
+  buscadorEnUnaFila: true, // Daniel aprobó el 2-oct-2026
+  catalogoPublico: true, // Daniel aprobó el 2-oct-2026
+  revisarPedido: true, // Daniel aprobó el 2-oct-2026
+  subpaginasInternas: true, // Daniel aprobó el 2-oct-2026
+  administrar: true, // Daniel aprobó el 2-oct-2026
+  tituloCelularChico: true, // Daniel aprobó el 2-oct-2026
 };
 
 /** Lo que dibuja la barra de arriba del catálogo con sesión en cada sub-ruta.

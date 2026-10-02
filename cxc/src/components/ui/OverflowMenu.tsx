@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { CLASE_VIDRIO, RADIO_VIDRIO, conVidrio } from "@/lib/ui/vidrio";
 
 export interface OverflowMenuItem {
   label: string;
@@ -117,7 +118,7 @@ export default function OverflowMenu({
               left: coords.left,
               width: MENU_WIDTH,
             }}
-            className="bg-white border border-gray-200 rounded-lg shadow-lg z-[200] py-1"
+            className={conVidrio("bg-white border border-gray-200 rounded-lg shadow-lg z-[200] py-1", `${CLASE_VIDRIO} ${RADIO_VIDRIO} z-[200] py-1`)}
           >
             {items.map((item, i) => (
               <button

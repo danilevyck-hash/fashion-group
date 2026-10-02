@@ -155,6 +155,7 @@ import { Download, Search } from "lucide-react";
 import { formatoTiempo, tiempoDelDia, type ModoTiempo } from "@/lib/asistencia/formato-tiempo";
 import { useFormatoTiempo } from "@/components/asistencia/FormatoTiempoSelector";
 import { PLACEHOLDER_COLABORADOR } from "@/lib/buscar-en-lista";
+import { vidrioSobre } from "@/lib/ui/vidrio";
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 const DOW = ["dom","lun","mar","mié","jue","vie","sáb"];
@@ -689,7 +690,7 @@ export default function ReporteTab({ empresa = "" }: {
                 {DESCARGAR}
               </button>
               {descargasAbiertas && (
-                <div role="menu" className="absolute right-0 z-20 mt-1 w-52 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                <div role="menu" className={vidrioSobre("absolute right-0 z-20 mt-1 w-52 rounded-lg border border-gray-200 bg-white py-1 shadow-lg")}>
                   <button type="button" role="menuitem"
                     onClick={() => { setDescargasAbiertas(false); void bajarExcel(); }}
                     className="block min-h-[44px] w-full px-3 py-2.5 text-left text-sm text-gray-700 transition hover:bg-gray-50">

@@ -60,6 +60,7 @@ import { CalendarDays } from "lucide-react";
 // 🔴 DEL MÓDULO PURO, NUNCA de `./CalendarioRango`: un import estático a ese
 // archivo trae `react-day-picker` al bundle inicial y anula el `dynamic()`.
 import { aIso, deIso } from "./rango-fechas-iso";
+import { vidrioSobre, conVidrio, CLASE_VIDRIO, RADIO_VIDRIO } from "@/lib/ui/vidrio";
 
 const CalendarioRango = dynamic(() => import("./CalendarioRango"), {
   ssr: false,
@@ -318,7 +319,7 @@ export default function RangoFechas({
           onCerrar={() => { setAbierto(false); setAncla(null); }}
           ancho={ANCHO_CALENDARIO}
           altoDeseado={ALTO_CALENDARIO}
-          className="rounded-xl border border-gray-200 bg-white p-3 shadow-lg"
+          className={vidrioSobre("rounded-xl border border-gray-200 bg-white p-3 shadow-lg")}
         >
           {/* El título solo mientras se está eligiendo: cerrado, el botón ya lo
               dice y repetirlo era ruido (se veía duplicado en la captura). */}
@@ -336,7 +337,7 @@ export default function RangoFechas({
       {abierto && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-black/40" onClick={() => { setAbierto(false); setAncla(null); }} />
-          <div className="absolute inset-x-0 bottom-0 flex max-h-[88vh] flex-col rounded-t-2xl bg-white shadow-xl">
+          <div className={conVidrio("absolute inset-x-0 bottom-0 flex max-h-[88vh] flex-col rounded-t-2xl bg-white shadow-xl", `absolute inset-x-2 bottom-2 flex max-h-[88vh] flex-col ${CLASE_VIDRIO} ${RADIO_VIDRIO}`)}>
             <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
               <span className="text-sm font-medium text-gray-900">{titulo}</span>
               <button

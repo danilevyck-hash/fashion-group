@@ -50,6 +50,22 @@ vi.mock("@/lib/hooks/usePublicarAlturaEncabezado", () => ({
 import CatalogoNavbar from "@/components/catalogo/CatalogoNavbar";
 import RutaArriba from "@/app/catalogo/[marca]/pedidos/RutaArriba";
 
+// 2-oct-2026: CATALOGOS_APPLE_2026_10_B se prendió (Daniel aprobó el
+// catálogo v4). Esta prueba es de la versión de antes y la fuerza en false.
+vi.mock("@/lib/catalogo/catalogos-2026-10-b", async (original) => {
+  const real = await original<typeof import("@/lib/catalogo/catalogos-2026-10-b")>();
+  return {
+    ...real,
+    // La barra lee el interruptor por su parámetro por omisión: también apagado.
+    barraDeSubruta: (p: Parameters<typeof real.barraDeSubruta>[0], r: Parameters<typeof real.barraDeSubruta>[1]) =>
+      real.barraDeSubruta(p, r, false),
+    CATALOGOS_APPLE_2026_10_B: {
+      buscadorEnUnaFila: false, catalogoPublico: false, revisarPedido: false,
+      subpaginasInternas: false, administrar: false, tituloCelularChico: false,
+    },
+  };
+});
+
 const leer = (rel: string) => readFileSync(join(process.cwd(), rel), "utf8");
 
 afterEach(() => {

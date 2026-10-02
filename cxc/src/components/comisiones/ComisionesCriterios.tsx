@@ -17,6 +17,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { Info } from "lucide-react";
+import { vidrioSobre } from "@/lib/ui/vidrio";
 
 interface Props {
   /** Frescura del sync (SyncStatus) — se muestra dentro del popover. */
@@ -67,7 +68,7 @@ export function ComisionesCriterios({ children, aviso, className }: Props) {
         role="dialog"
         aria-label="Criterios de la comisión"
         aria-hidden={!open}
-        className={`absolute right-0 top-full z-20 mt-1 w-[300px] max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white p-3 text-xs leading-relaxed text-gray-600 shadow-lg ${open ? "" : "hidden"}`}
+        className={vidrioSobre(`absolute right-0 top-full z-20 mt-1 w-[300px] max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white p-3 text-xs leading-relaxed text-gray-600 shadow-lg ${open ? "" : "hidden"}`)}
       >
         <p className="mb-1.5 text-sm font-medium text-gray-900">Criterios</p>
         {/* Dos personas distintas a propósito. Daniel, 3-sep-2026: «el que

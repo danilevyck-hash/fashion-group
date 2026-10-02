@@ -77,6 +77,7 @@ import {
   type OpcionesDesplegable,
   type PosicionDesplegable,
 } from "@/lib/ui/posicion-desplegable";
+import { vidrioSobre } from "@/lib/ui/vidrio";
 
 export interface DesplegableFlotanteProps extends OpcionesDesplegable {
   abierto: boolean;
@@ -202,7 +203,7 @@ export default function DesplegableFlotante({
         width: pos.width,
         maxHeight: pos.maxHeight,
       }}
-      className={`${zIndex} overflow-y-auto overscroll-contain ${className}`}
+      className={`${zIndex} overflow-y-auto overscroll-contain ${vidrioSobre(className)}`}
       {...rest}
     >
       {children}

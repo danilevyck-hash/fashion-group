@@ -47,6 +47,7 @@ import {
 } from "@/lib/comisiones/celular";
 import { ComisionesPeriodo } from "../ComisionesPeriodo";
 import type { RangoConsulta } from "@/lib/comisiones/vendedores-rango";
+import { vidrioSobre } from "@/lib/ui/vidrio";
 
 interface OpcionVista {
   valor: string;
@@ -219,7 +220,7 @@ export function PortadaComisionesCelular({
         >
           <button type="button" aria-label="Cerrar" onClick={() => setMenu(false)} className="absolute inset-0 bg-black/30" />
           <div
-            className="relative mx-2 mb-2 overflow-hidden rounded-2xl bg-white p-3"
+            className={vidrioSobre("relative mx-2 mb-2 overflow-hidden rounded-2xl bg-white p-3")}
             style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
           >
             {conDescarga && (

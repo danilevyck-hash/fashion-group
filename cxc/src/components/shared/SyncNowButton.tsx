@@ -40,6 +40,7 @@ import { postSyncNow, syncConEnganche } from "./syncNowClient";
 // «Actualizar ahora» es la palabra de la casa y Guías tenía otras dos. Ver
 // `lib/ui/actualizar-ahora.ts`.
 import { TEXTO_ACTUALIZANDO, TEXTO_ACTUALIZAR_AHORA } from "@/lib/ui/actualizar-ahora";
+import { vidrioSobre } from "@/lib/ui/vidrio";
 
 export interface SyncNowOpcion {
   /** Módulo del endpoint: estadocuenta | facturas | recibos | clientes-master |
@@ -277,7 +278,7 @@ export default function SyncNowButton({
       {esMenu && menuOpen && (
         <div
           role="menu"
-          className="absolute left-0 top-full z-20 mt-1 w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg"
+          className={vidrioSobre("absolute left-0 top-full z-20 mt-1 w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg")}
         >
           {opciones.map((op) => (
             <button

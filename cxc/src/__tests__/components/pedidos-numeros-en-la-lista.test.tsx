@@ -24,6 +24,19 @@ import { render, screen, cleanup, fireEvent, within } from "@testing-library/rea
 import ComprobantesPanel, { type UnifiedPedido } from "@/components/catalogo/ComprobantesPanel";
 import { MARCAS_UI, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 
+// 2-oct-2026: CATALOGOS_APPLE_2026_10_B se prendió (Daniel aprobó el
+// catálogo v4). Esta prueba es de la versión de antes y la fuerza en false.
+vi.mock("@/lib/catalogo/catalogos-2026-10-b", async (original) => {
+  const real = await original<typeof import("@/lib/catalogo/catalogos-2026-10-b")>();
+  return {
+    ...real,
+    CATALOGOS_APPLE_2026_10_B: {
+      buscadorEnUnaFila: false, catalogoPublico: false, revisarPedido: false,
+      subpaginasInternas: false, administrar: false, tituloCelularChico: false,
+    },
+  };
+});
+
 const ROUTER = { push: vi.fn(), replace: vi.fn(), refresh: vi.fn() };
 vi.mock("next/navigation", () => ({
   useRouter: () => ROUTER,

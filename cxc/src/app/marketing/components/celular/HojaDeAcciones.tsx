@@ -14,6 +14,7 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import type { OverflowMenuItem } from "@/components/ui/OverflowMenu";
+import { vidrioSobre } from "@/lib/ui/vidrio";
 
 interface Props {
   titulo?: string;
@@ -41,7 +42,7 @@ export default function HojaDeAcciones({ titulo, opciones, onCerrar }: Props) {
         className="absolute inset-0 bg-black/40"
       />
       <div className="relative mx-2 mb-2">
-        <div className="overflow-hidden rounded-[14px] bg-white/95 backdrop-blur">
+        <div className={vidrioSobre("overflow-hidden rounded-[14px] bg-white/95 backdrop-blur")}>
           {titulo && (
             <div className="border-b border-gray-200 px-4 py-3 text-center text-[13px] text-gray-500">
               {titulo}

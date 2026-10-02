@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
+import { vidrioSobre } from "@/lib/ui/vidrio";
 
 /**
  * Sheet mobile para picker de ordenamiento. Reemplaza los headers
@@ -56,7 +57,7 @@ export function SortSheet({ open, onClose, sortBy, sortDir, onChange }: SortShee
         onClick={onClose}
       />
       <div
-        className="absolute inset-x-0 bottom-0 flex flex-col rounded-t-2xl bg-white shadow-xl transition-transform duration-300 ease-out"
+        className={vidrioSobre("absolute inset-x-0 bottom-0 flex flex-col rounded-t-2xl bg-white shadow-xl transition-transform duration-300 ease-out")}
         style={{ transform: visible ? "translateY(0)" : "translateY(100%)" }}
       >
         <button

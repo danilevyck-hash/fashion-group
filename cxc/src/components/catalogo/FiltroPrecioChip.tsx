@@ -14,7 +14,7 @@
 import { useRef, useState } from "react";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import ChipFiltro from "./ChipFiltro";
-import { VIDRIO } from "@/lib/ui/vidrio";
+import { vidrioSobre } from "@/lib/ui/vidrio";
 import { mensajeFiltroPrecio, PRECIO_VACIO, type FiltroPrecio } from "@/lib/catalogo/filtros-extra";
 import { precioAlAplicar, textoChipPrecio } from "@/lib/catalogo/catalogos-2026-10-b";
 
@@ -82,7 +82,7 @@ export default function FiltroPrecioChip({ precio, onChange, precios, chipActive
         role="dialog"
         aria-label="Precio"
         anchoMinimo={260}
-        className={chip ? `${VIDRIO} p-3` : "bg-white rounded-lg border border-gray-200 shadow-lg p-3"}
+        className={vidrioSobre("bg-white rounded-lg border border-gray-200 shadow-lg p-3")}
       >
         <form onSubmit={(e) => { e.preventDefault(); aplicar(); }} className="space-y-3">
           <div className="grid grid-cols-2 gap-2">

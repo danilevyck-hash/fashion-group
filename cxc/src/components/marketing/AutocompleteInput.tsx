@@ -9,6 +9,7 @@ import {
   useState,
   KeyboardEvent,
 } from "react";
+import { vidrioSobre } from "@/lib/ui/vidrio";
 
 interface AutocompleteInputProps {
   label: string;
@@ -180,7 +181,7 @@ export function AutocompleteInput({
         <ul
           id={listboxId}
           role="listbox"
-          className="absolute z-20 mt-1 w-full max-h-60 overflow-auto rounded-md border border-gray-200 bg-white shadow-lg"
+          className={vidrioSobre("absolute z-20 mt-1 w-full max-h-60 overflow-auto rounded-md border border-gray-200 bg-white shadow-lg")}
         >
           {loading && visibles.length === 0 && (
             <li className="px-3 py-2 text-sm text-gray-400">Buscando…</li>

@@ -269,3 +269,31 @@ input, button, select, textarea {
     display: none !important;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   🔴 EL VIDRIO DE iOS 26 (2-oct-2026, `VIDRIO_2026_10` en src/lib/ui/vidrio.ts).
+   Una sola clase para menús, hojas, el ☰ y la barra fija de abajo. Va DESPUÉS
+   de las utilidades de Tailwind a propósito: gana sobre un `bg-white` suelto.
+   Sin `backdrop-filter`, blanco sólido: nunca un fondo que deje leer lo de atrás.
+   ───────────────────────────────────────────────────────────────────────────── */
+.vidrio {
+  /* 55 % de blanco: lo de atrás se VE desenfocado, no tapado (Daniel, 2-oct-2026). */
+  background-color: rgb(255 255 255 / 0.55);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
+  border: 0;
+  /* Borde blanco/40 POR DENTRO, un filo oscuro casi invisible por fuera para
+     que el panel no se pierda sobre blanco, y una sombra suave y amplia. */
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.4),
+    0 0 0 0.5px rgb(0 0 0 / 0.08),
+    0 16px 48px -8px rgb(0 0 0 / 0.22),
+    0 2px 6px rgb(0 0 0 / 0.06);
+  /* El texto sigue negro sobre el vidrio: contraste de lectura. */
+  color: rgb(17 24 39);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .vidrio {
+    background-color: rgb(255 255 255 / 0.95);
+  }
+}

@@ -37,6 +37,7 @@ import {
   ROTULO_DESCARGAR_PDF,
   ROTULO_FLECHA,
 } from "@/lib/comisiones/descarga";
+import { vidrioSobre } from "@/lib/ui/vidrio";
 
 interface Props {
   /** Lo que dice el encabezado del menú (`lib/comisiones/descarga`). */
@@ -103,7 +104,7 @@ export function MenuDescargaComision({ titulo, onPdf, onExcel, mensajeError, com
         alinear="derecha"
         ancho={260}
         aria-label={titulo}
-        className="rounded-lg border border-gray-200 bg-white py-1 text-left shadow-lg"
+        className={vidrioSobre("rounded-lg border border-gray-200 bg-white py-1 text-left shadow-lg")}
       >
         <p className="truncate px-3 py-1.5 text-xs text-gray-500">{titulo}</p>
         <button

@@ -75,6 +75,7 @@ import MenuDescargar from "./MenuDescargar";
 import PanelCxcMobile from "./PanelCxcMobile";
 import { SkeletonRow } from "./Skeleton";
 import { useDescargasCartera } from "../hooks/useDescargasCartera";
+import { vidrioSobre } from "@/lib/ui/vidrio";
 
 /** Solo Boston: la lista se DERIVA (`estadoCuenta:true` + `cxc:false`), nunca se escribe. */
 const EMPRESAS_BOSTON = empresasCarteraAparte();
@@ -313,7 +314,7 @@ export default function CarteraBoston() {
                 </button>
                 {showExport && (<>
                   <div className="fixed inset-0 z-10" onClick={() => setShowExport(false)} />
-                  <div className="absolute right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-20 w-80 py-1">
+                  <div className={vidrioSobre("absolute right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-20 w-80 py-1")}>
                     <MenuDescargar onDescargar={(clave, formato) => { setShowExport(false); void descargar(clave, formato); }} />
                   </div>
                 </>)}

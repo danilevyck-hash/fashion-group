@@ -16,6 +16,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { COLCHON_LATERAL_FLOTANTE } from "@/lib/navegacion/barra-celular";
+import { CLASE_VIDRIO, RADIO_VIDRIO, conVidrio } from "@/lib/ui/vidrio";
 
 /** El lienzo: fondo de iOS y sitio para el botón flotante. */
 export function PantallaCel({ children }: { children: ReactNode }) {
@@ -231,7 +232,7 @@ export function HojaCel({
       />
       <div
         ref={caja}
-        className="relative mx-2 mb-2 overflow-hidden rounded-2xl bg-white"
+        className={conVidrio("relative mx-2 mb-2 overflow-hidden rounded-2xl bg-white", `relative mx-2 mb-2 overflow-hidden ${CLASE_VIDRIO} ${RADIO_VIDRIO}`)}
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div className="px-4 py-3 text-center text-[13px] leading-snug text-gray-500">

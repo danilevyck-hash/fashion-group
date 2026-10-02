@@ -72,6 +72,7 @@ import {
 import ElegirPersonaModal from "@/app/prestamos/components/ElegirPersonaModal";
 import NuevoMovimientoModal from "@/app/prestamos/components/NuevoMovimientoModal";
 import { useMovimientoForm } from "@/app/prestamos/components/useMovimientoForm";
+import { vidrioSobre } from "@/lib/ui/vidrio";
 
 interface FichaDeuda {
   id: string;
@@ -307,7 +308,7 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
           {descargando ? "Descargando…" : "Descargar"}
         </button>
         {descargaAbierta && (
-          <div role="menu" className="absolute right-0 z-20 mt-1 w-52 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+          <div role="menu" className={vidrioSobre("absolute right-0 z-20 mt-1 w-52 rounded-lg border border-gray-200 bg-white py-1 shadow-lg")}>
             <button type="button" role="menuitem" onClick={() => void descargar("deben")}
               className="block min-h-[44px] w-full px-3 py-2.5 text-left text-sm text-gray-700 transition hover:bg-gray-50">
               Solo con saldo

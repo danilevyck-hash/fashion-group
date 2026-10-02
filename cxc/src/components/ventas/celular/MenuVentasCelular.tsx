@@ -29,6 +29,7 @@ import {
 } from "@/lib/ventas/descarga-un-boton";
 import { ROTULO_DESCARGAR } from "@/lib/ventas/celular";
 import { BotonPuntos, HojaCel } from "./PiezasVentas";
+import { vidrioSobre } from "@/lib/ui/vidrio";
 
 interface Props {
   pestana: PestanaDescarga;
@@ -74,7 +75,7 @@ export function MenuVentasCelular({
             className="absolute inset-0 bg-black/30"
           />
           <div
-            className="relative mx-2 mb-2 overflow-hidden rounded-2xl bg-white p-3"
+            className={vidrioSobre("relative mx-2 mb-2 overflow-hidden rounded-2xl bg-white p-3")}
             style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
           >
             <button

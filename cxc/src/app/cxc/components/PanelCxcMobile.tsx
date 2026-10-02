@@ -44,6 +44,7 @@ import type { ClaveDescarga } from "@/lib/cxc/descargas";
 import type { FormatoDescarga } from "../hooks/useDescargasCartera";
 import type { Cartera } from "@/lib/cxc/cartera";
 import { empresasCarteraAparte } from "@/lib/switch-api/empresas";
+import { vidrioSobre } from "@/lib/ui/vidrio";
 
 // 🩸 Acá vivían `haceCuanto`, `ultimoPagoLabel` y `ultimaCompraLabel`: las tres
 // líneas de texto que llevaba CADA empresa dentro de la tarjeta abierta. Con
@@ -321,7 +322,7 @@ function MobileHeader({
             </svg>
           </button>
           {open && (
-            <div className="absolute right-0 top-12 z-30 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+            <div className={vidrioSobre("absolute right-0 top-12 z-30 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg")}>
               <MenuDescargar
                 onDescargar={(clave, formato) => { setOpen(false); onDescargar(clave, formato); }}
               />

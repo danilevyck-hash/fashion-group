@@ -1,7 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // 🔴 CANDADO · Catálogos estilo Apple, tercera vuelta (`CATALOGOS_APPLE_2026_10_B`,
 // 2-oct-2026). El interruptor solo cambia el LUGAR de las cosas:
-//   1. Hoy los cinco grupos están apagados (`false` = la pantalla de hoy).
+//   1. Los seis grupos están PRENDIDOS: Daniel aprobó el 2-oct-2026 el
+//      catálogo v4 (`false` sigue siendo la pantalla de antes).
 //   2. La barra de las sub-rutas decide con la dirección EXACTA, nunca con
 //      `includes`, y apagada no dibuja nada distinto.
 //   3. Ni el carrito, ni el checkout, ni el precio, ni una ruta del servidor
@@ -31,15 +32,19 @@ function listar(dir: string): string[] {
 }
 
 describe("1 · los interruptores", () => {
-  it("los seis están APAGADOS hasta el «sí» de Daniel", () => {
+  // 2-oct-2026: Daniel aprobó el catálogo v4. Antes esta prueba exigía los
+  // seis en false («nace apagado»); ahora exige los seis en true, y el control
+  // al revés queda: ninguno está apagado.
+  it("los seis están PRENDIDOS (Daniel aprobó el 2-oct-2026)", () => {
     expect(CATALOGOS_APPLE_2026_10_B).toEqual({
-      buscadorEnUnaFila: false,
-      catalogoPublico: false,
-      revisarPedido: false,
-      subpaginasInternas: false,
-      administrar: false,
-      tituloCelularChico: false,
+      buscadorEnUnaFila: true,
+      catalogoPublico: true,
+      revisarPedido: true,
+      subpaginasInternas: true,
+      administrar: true,
+      tituloCelularChico: true,
     });
+    expect(Object.values(CATALOGOS_APPLE_2026_10_B).filter((v) => v === false)).toEqual([]);
   });
 });
 
@@ -180,8 +185,8 @@ describe("4 · 🔴 el buscador en una fila manda lo mismo", () => {
     expect(chip.getAttribute("aria-haspopup")).toBe("listbox");
     fireEvent.click(chip);
     expect(screen.getByRole("option", { name: "Todos" })).toBeTruthy();
-    // Vidrio (2-oct-2026): el menú es translúcido y con fondo blanco si no hay desenfoque.
-    expect(screen.getByRole("listbox").className).toContain("backdrop-blur");
+    // Vidrio (2-oct-2026): el menú usa la clase compartida `vidrio`, una sola vez.
+    expect(screen.getByRole("listbox").className.split(/\s+/).filter((c) => c === "vidrio")).toHaveLength(1);
     expect(screen.getByRole("option", { name: "Women" }).getAttribute("aria-selected")).toBe("true");
     fireEvent.click(screen.getByRole("option", { name: "Men" }));
     expect(onGenderChange).toHaveBeenCalledWith("men");
@@ -268,12 +273,14 @@ describe("7 · el detalle del pedido en el celular y el vidrio", () => {
     expect(d).toContain("items.length > 0 && enFicha ?");
     expect(d).toMatch(/if \(!CATALOGOS_APPLE_2026_10_B\.subpaginasInternas/);
   });
-  it("el vidrio cae a blanco sólido sin desenfoque y es UNA receta", async () => {
+  // 2-oct-2026: UNA sola fuente de vidrio. La receta propia del catálogo se
+  // fue; el chip de precio y los chips usan la clase compartida `vidrio`
+  // (globals.css, con su respaldo a blanco/95: lo vigila su candado).
+  it("el vidrio es la clase compartida, sin receta propia del catálogo", async () => {
     const { VIDRIO } = await import("@/lib/ui/vidrio");
-    expect(VIDRIO.startsWith("bg-white ")).toBe(true);
-    expect(VIDRIO).toContain("supports-[backdrop-filter:blur(1px)]:bg-white/70");
-    expect(VIDRIO).toContain("backdrop-blur-xl");
-    expect(leer("src/components/catalogo/FiltroPrecioChip.tsx")).toContain("VIDRIO");
+    expect(VIDRIO).toBe("vidrio rounded-2xl");
+    expect(leer("src/components/catalogo/FiltroPrecioChip.tsx")).toContain("vidrioSobre(");
+    expect(leer("src/components/catalogo/CatalogoFilters.tsx")).toContain("vidrioSobre(");
   });
 });
 

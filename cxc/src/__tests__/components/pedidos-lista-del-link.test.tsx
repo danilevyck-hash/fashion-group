@@ -28,6 +28,19 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor, act } from "@testing-library/react";
 import PedidosListClient from "@/components/catalogo/PedidosListClient";
 
+// 2-oct-2026: CATALOGOS_APPLE_2026_10_B se prendió (Daniel aprobó el
+// catálogo v4). Esta prueba es de la versión de antes y la fuerza en false.
+vi.mock("@/lib/catalogo/catalogos-2026-10-b", async (original) => {
+  const real = await original<typeof import("@/lib/catalogo/catalogos-2026-10-b")>();
+  return {
+    ...real,
+    CATALOGOS_APPLE_2026_10_B: {
+      buscadorEnUnaFila: false, catalogoPublico: false, revisarPedido: false,
+      subpaginasInternas: false, administrar: false, tituloCelularChico: false,
+    },
+  };
+});
+
 const push = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: (...a: unknown[]) => push(...a), refresh: vi.fn() }),
