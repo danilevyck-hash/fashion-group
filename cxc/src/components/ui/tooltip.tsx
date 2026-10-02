@@ -5,8 +5,40 @@ import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { cn } from "@/lib/utils";
 
 export const TooltipProvider = TooltipPrimitive.Provider;
-export const Tooltip = TooltipPrimitive.Root;
-export const TooltipTrigger = TooltipPrimitive.Trigger;
+
+// 🔴 EL GLOBO TAMBIÉN SE ABRE AL TOCAR (2-oct-2026). El de Radix solo se abre
+// al pasar el mouse por encima, y en el iPad y el iPhone no hay mouse: tocar
+// «6 empresas» en Ventas › Clientes no hacía nada (lo encontró la auditoría de
+// botones, `scripts/auditar-botones.ts`). Ahora tocar lo abre; se cierra como
+// siempre (al salir, con Escape o al deslizar).
+const AbrirAlTocar = React.createContext<((abierto: boolean) => void) | null>(null);
+
+export function Tooltip({ open, onOpenChange, ...props }: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Root>) {
+  const [abierto, setAbierto] = React.useState(false);
+  const cambiar = React.useCallback((v: boolean) => { setAbierto(v); onOpenChange?.(v); }, [onOpenChange]);
+  return (
+    <AbrirAlTocar.Provider value={cambiar}>
+      <TooltipPrimitive.Root open={open ?? abierto} onOpenChange={cambiar} {...props} />
+    </AbrirAlTocar.Provider>
+  );
+}
+
+export const TooltipTrigger = React.forwardRef<
+  React.ElementRef<typeof TooltipPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Trigger>
+>(({ onClick, ...props }, ref) => {
+  const abrir = React.useContext(AbrirAlTocar);
+  return (
+    <TooltipPrimitive.Trigger
+      ref={ref}
+      // 🔑 `preventDefault` le dice a Radix que no lo cierre: su propio clic
+      // cierra el globo justo después de abrirlo.
+      onClick={(e) => { onClick?.(e); if (!abrir) return; e.preventDefault(); abrir(true); }}
+      {...props}
+    />
+  );
+});
+TooltipTrigger.displayName = TooltipPrimitive.Trigger.displayName;
 
 export const TooltipContent = React.forwardRef<
   React.ElementRef<typeof TooltipPrimitive.Content>,

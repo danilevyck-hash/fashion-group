@@ -57,7 +57,13 @@ const PEDIDOS = [
   { id: "8", order_number: "PED-022", client_name: "Cliente H", vendor_name: null, status: "confirmado", total: 100, item_count: 1, created_at: "2026-08-05T12:00:00Z", en_switch: true, switch_numero: null, switch_documento: "pedido", fuente: "orders", del_link: false },
 ];
 
+// 🩸 2-oct-2026: las fechas de abajo son fijas y la ventana de Comprobantes
+// (90 días) se mide contra HOY: el 2-oct a mediodía PED-004 (4-jul) salió de la
+// ventana y el candado se puso rojo solo. El reloj se congela en el día en que
+// se escribieron estas filas; solo `Date`, los temporizadores siguen reales.
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-01T15:00:00Z"));
   sessionStorage.setItem("cxc_role", "admin");
   global.fetch = vi.fn(async (url: string) => {
     if (String(url).includes("/orders")) {
@@ -67,6 +73,7 @@ beforeEach(() => {
   }) as unknown as typeof fetch;
 });
 afterEach(() => {
+  vi.useRealTimers();
   cleanup();
   vi.restoreAllMocks();
   sessionStorage.clear();

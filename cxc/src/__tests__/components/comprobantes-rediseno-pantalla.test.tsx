@@ -148,7 +148,13 @@ function abrirMenu(f: HTMLElement): string[] {
   return items;
 }
 
+// 🩸 2-oct-2026: las fechas de abajo son fijas y la ventana de Comprobantes
+// (90 días) se mide contra HOY: el 2-oct a mediodía PED-004 (4-jul) salió de la
+// ventana y el candado se puso rojo solo. El reloj se congela en el día en que
+// se escribieron estas filas; solo `Date`, los temporizadores siguen reales.
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-01T15:00:00Z"));
   ROUTER.push.mockClear();
   PDF.mockClear();
   vi.stubGlobal(
@@ -167,6 +173,7 @@ beforeEach(() => {
   );
 });
 afterEach(() => {
+  vi.useRealTimers();
   cleanup();
   vi.unstubAllGlobals();
 });

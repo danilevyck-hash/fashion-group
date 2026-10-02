@@ -37,7 +37,7 @@
  * Toda la regla vive en `lib/asistencia/marcaciones-por-dia.ts`, que es puro.
  * ────────────────────────────────────────────────────────────────────────── */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import SelectorPeriodo, { usePeriodoAsistencia } from "@/components/asistencia/SelectorPeriodo";
 // 🔴 El encabezado de la tabla se pega DEBAJO del de la app (29-sep-2026): la
 // única forma de hacerlo es esta clase (`lib/ui/barra-pegajosa.ts`).
@@ -111,13 +111,18 @@ function Horas({ t }: { t: TramoDibujado }) {
 function Marcas({ fila }: { fila: FilaPorDia<MarcaDeTelefono> }) {
   return (
     <>
+      {/* 🩸 El « · » va AFUERA del tramo que no se parte (2-oct-2026): adentro,
+          la línea entera era un solo bloque sin dónde cortar y a 390 px se
+          salía 30 px de la pantalla —y empujaba el ☰ fuera del dedo—. */}
       {fila.tramos.map((t, i) => (
-        <span key={t.clave} className="whitespace-nowrap">
+        <Fragment key={t.clave}>
           {i > 0 && <span className="text-gray-300"> · </span>}
-          {t.aviso && <PuntoSinSenal aviso={t.aviso} />}
-          <span className="text-gray-700">{t.rotulo} </span>
-          <Horas t={t} />
-        </span>
+          <span className="whitespace-nowrap">
+            {t.aviso && <PuntoSinSenal aviso={t.aviso} />}
+            <span className="text-gray-700">{t.rotulo} </span>
+            <Horas t={t} />
+          </span>
+        </Fragment>
       ))}
     </>
   );

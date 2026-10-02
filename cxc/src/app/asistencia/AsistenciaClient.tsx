@@ -366,20 +366,35 @@ function AsistenciaInner() {
             // y se cambia desde ahí, con la lista nativa del teléfono. Elegir
             // pasa por `irAPestana`, la MISMA puerta de la tira (push en el
             // celular). Ver `lib/asistencia/apple-2026-10.ts`.
-            <label className="relative flex min-w-0 basis-full items-center">
-              <span className="sr-only">Sección</span>
-              <select
-                aria-label="Sección"
-                value={tab}
-                onChange={(e) => irAPestana(e.target.value as Tab)}
-                className={`min-h-[44px] w-auto max-w-full appearance-none truncate bg-transparent pr-7 text-2xl font-semibold text-gray-900 ${FOCO_TECLADO}`}
+            //
+            // 🩸 2-oct-2026, Daniel desde el iPhone: «toco Aprobaciones ▾ y no
+            // pasa nada». La fila entera era un <label> de 358 px y la lista
+            // solo medía lo que su texto (143 px): el ▾ y el resto de la fila
+            // eran el rótulo, y en iOS Safari tocar un rótulo enfoca la lista
+            // pero NO la abre. Ahora la lista, invisible, cubre exactamente lo
+            // que se ve («Aprobaciones ▾») y el toque siempre cae en ella.
+            // Candado: `asistencia-selector-seccion-toque.test.ts`.
+            <div className="flex min-w-0 basis-full">
+              <div
+                data-selector-seccion
+                className="relative inline-flex min-h-[44px] min-w-0 max-w-full items-center gap-1.5 rounded-md has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-gray-400 has-[:focus-visible]:ring-offset-1"
               >
-                {visibles.map(([k, label]) => (
-                  <option key={k} value={k}>{label}</option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none -ml-6 h-5 w-5 shrink-0 text-gray-500" strokeWidth={2} aria-hidden />
-            </label>
+                <span aria-hidden className="truncate text-2xl font-semibold text-gray-900">
+                  {visibles.find(([k]) => k === tab)?.[1] ?? ""}
+                </span>
+                <ChevronDown className="h-5 w-5 shrink-0 text-gray-500" strokeWidth={2} aria-hidden />
+                <select
+                  aria-label="Sección"
+                  value={tab}
+                  onChange={(e) => irAPestana(e.target.value as Tab)}
+                  className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0 outline-none"
+                >
+                  {visibles.map(([k, label]) => (
+                    <option key={k} value={k}>{label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
           ) : (
           <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
             {visibles.map(([k, label]) => (

@@ -87,9 +87,20 @@ interface AppHeaderProps {
    * Es OPCIONAL y aditivo: quien no lo pasa recibe el título del layout.
    */
   tituloEnLaPantalla?: boolean;
+  /**
+   * 🔴 SOLO EL BOTÓN ☰ DEL CELULAR Y SU MENÚ (2-oct-2026).
+   *
+   * Para las pantallas que ya tienen su propio encabezado y no llevan este
+   * (el catálogo interno de cada marca, Comprobantes, el pedido): se dibuja
+   * el botón redondo de abajo y el menú entero, y NADA más —ni la franja de la
+   * computadora, ni el título grande, ni el camino de migas—. Daniel: el
+   * catálogo sin el ☰ «no hace sentido». ⚠️ El catálogo PÚBLICO no lo monta:
+   * lo ve el cliente sin sesión. Candado `catalogo-boton-menu-celular`.
+   */
+  soloMenuDelCelular?: boolean;
 }
 
-export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acciones, grupo, tituloEnLaPantalla }: AppHeaderProps) {
+export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acciones, grupo, tituloEnLaPantalla, soloMenuDelCelular }: AppHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -186,7 +197,9 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
   // 🔴 El botón redondo flotante: solo cuando la franja se fue y el rol TIENE
   // menú. Quien solo marca no lo ve —no tiene a dónde ir— y en la computadora
   // no existe (`sm:hidden`).
-  const hayFlotante = SIN_BARRA_ARRIBA && !soloMarca;
+  // Montado SOLO como menú (el catálogo), sin ningún módulo que ofrecer no se
+  // dibuja: un botón que abre una lista vacía no hace nada.
+  const hayFlotante = SIN_BARRA_ARRIBA && !soloMarca && (!soloMenuDelCelular || visibleNav.length > 0);
   useColchonDelFlotante(hayFlotante);
 
   const moduleColor = getModuleColor(pathname);
@@ -222,6 +235,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
 
   return (
     <>
+      {!soloMenuDelCelular && (<>
       <div
         ref={encabezadoRef}
         data-encabezado
@@ -363,6 +377,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
           🔴 1-oct-2026: apagada (`NOVEDADES_AVISO = false`). Daniel: «elimina lo
           de novedades, así nadie lo lee». */}
       {NOVEDADES_AVISO && <NovedadesAviso moduloKey={moduloDeRuta(pathname, ALL_MODULES)} />}
+      </>)}
 
       {/* Mobile search overlay */}
       {mobileSearchOpen && (

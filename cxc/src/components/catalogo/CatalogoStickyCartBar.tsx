@@ -12,6 +12,7 @@ import { ConfirmDeleteModal } from "@/components/ui";
 import { validarNombreCliente } from "@/lib/catalogo/nombre-cliente";
 import type { CatalogoCartItem, CatalogoProducto } from "./types";
 import { fmtPrecio } from "@/lib/catalogo/precio";
+import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
 
 interface CatalogoStickyCartBarProps {
   marca: MarcaUiKey;
@@ -94,6 +95,9 @@ export default function CatalogoStickyCartBar({
     avisarAlto(el.getBoundingClientRect().height);
     return () => ro.disconnect();
   }, [avisarAlto, cartCount, miniCartOpen, saving, clientName]);
+  // 🔴 Y publica su alto en `--fg-alto-barra-fija` (2-oct-2026): el ☰ redondo
+  // del celular se sienta ENCIMA del carrito, nunca sobre «Crear pedido».
+  usePublicarAltoBarraFija(barraRef, cartCount > 0);
 
   if (cartCount === 0) return null;
 

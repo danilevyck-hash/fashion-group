@@ -7,6 +7,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import CatalogoAuthGuard from "@/components/catalogo/CatalogoAuthGuard";
 import CatalogoNavbar from "@/components/catalogo/CatalogoNavbar";
+import AppHeader from "@/components/AppHeader";
 import { ToastProvider } from "@/components/ToastSystem";
 import { getMarcaTheme } from "@/lib/catalogo/marcas-ui";
 
@@ -31,6 +32,11 @@ export default function CatalogoMarcaLayout({
       <ToastProvider>
         <div className="min-h-screen flex flex-col" style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
           <CatalogoNavbar marca={theme.marca} />
+          {/* 🔴 El ☰ redondo del celular, como en el resto del sistema
+              (2-oct-2026). Solo el botón y su menú: el encabezado de aquí es
+              la navbar de la marca. El catálogo PÚBLICO y el pedido público
+              viven en otras rutas y no lo llevan. */}
+          <AppHeader module="Catálogos" soloMenuDelCelular />
           <main className="flex-1">{children}</main>
         </div>
       </ToastProvider>
