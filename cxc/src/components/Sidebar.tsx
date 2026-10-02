@@ -21,6 +21,7 @@ import { etiquetaDeRol } from "@/lib/roles-etiquetas";
 import { BotonCambiarContrasena } from "@/components/CambiarContrasena";
 import { ESTRUCTURA_APPLE_2026_10 } from "@/lib/navegacion/estructura-2026-10";
 import BarraLateral2026 from "@/components/estructura/BarraLateral2026";
+import { CONTENIDO_ANCHO_2026_10, CLASE_CONTENIDO_ANCHO } from "@/lib/navegacion/contenido-ancho";
 
 // Cómo se llama cada rol: UN solo lugar, `lib/roles-etiquetas.ts` (11-sep-2026).
 
@@ -432,7 +433,7 @@ export function SidebarAwareMain({ children }: { children: React.ReactNode }) {
     <div
       className={`transition-[margin] duration-200 ease-out ${
         collapsed ? "md:ml-16" : "md:ml-56"
-      }`}
+      }${CONTENIDO_ANCHO_2026_10 ? ` ${CLASE_CONTENIDO_ANCHO}` : ""}`}
     >
       {children}
     </div>

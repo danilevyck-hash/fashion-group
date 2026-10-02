@@ -69,6 +69,7 @@ import { abrirEnEdicion, urlDeLaGuia } from "@/lib/guias/abrir-en-edicion";
 import { textoFaltantesDespachada } from "@/lib/guias/faltantes-despacho";
 import { GUIA_DETALLE_APPLE_2026_10 } from "@/lib/guias/guias-2026-10";
 import { Aviso } from "@/components/ui/Aviso";
+import { CONTENIDO_ANCHO_2026_10, DOS_COLUMNAS, EN_LA_DERECHA } from "@/lib/navegacion/contenido-ancho";
 // ⚠️ `papel-de-la-guia` arrastra jsPDF (~148 kB) y se pide con `await import`,
 // nunca de arriba: estático acá la carga inicial de esta pantalla pasaba de 204
 // kB a 351 kB, y es la que bodega abre desde el celular. Se PRECARGA al montar
@@ -214,6 +215,14 @@ export default function GuiaPage() {
   const totalBultos = items.reduce((a, i) => a + (i.bultos || 0), 0);
   /** Detalle de guía estilo Apple (2-oct-2026); `false` = la pantalla de hoy. */
   const apple = GUIA_DETALLE_APPLE_2026_10;
+  /**
+   * 🔴 2-oct-2026 (`CONTENIDO_ANCHO_2026_10`): desde 1024 px, 2 columnas —los
+   * datos, avisos, observaciones y despacho a la izquierda; los envíos a la
+   * derecha—. Solo cambia dónde se dibuja: el orden en el celular es el mismo.
+   */
+  const ancho = CONTENIDO_ANCHO_2026_10;
+  const enLaDerecha = (nodo: React.ReactNode) =>
+    ancho ? <div className={EN_LA_DERECHA}>{nodo}</div> : nodo;
 
   /**
    * 🔴 A UNA GUÍA DESPACHADA **TAMBIÉN** SE ENTRA Y SE ABRE EL FORMULARIO — con
@@ -372,7 +381,7 @@ export default function GuiaPage() {
         // guía Apple —`max-w-6xl` y adentro 820 px a la IZQUIERDA—: centrado
         // dejaba un blanco grande a los costados.
         <div className={apple ? "max-w-6xl mx-auto px-4 sm:px-6 py-6" : "max-w-4xl mx-auto px-4 sm:px-6 py-6"}>
-        <div className={apple ? "max-w-[820px]" : undefined}>
+        <div className={apple && !ancho ? "max-w-[820px]" : undefined}>
           {/* Encabezado: ‹ Atrás · Guía GT-190 */}
           <div className="flex items-center gap-3 mb-5">
             <button
@@ -393,7 +402,7 @@ export default function GuiaPage() {
           ) : s.error || !g ? (
             <p className="text-sm text-red-500">{s.error || "No encontrada"}</p>
           ) : (
-            <div className="space-y-4">
+            <div className={ancho ? `space-y-4 ${DOS_COLUMNAS}` : "space-y-4"} data-dos-columnas={ancho || undefined}>
               {/* Datos de la guía */}
               <div
                 data-guia-datos
@@ -539,7 +548,7 @@ export default function GuiaPage() {
                   otra forma de editar, son parte de DESPACHAR — se llenan con
                   el papel del chofer en la mano y se confirman con las firmas,
                   en el mismo acto. */}
-              <ListaEnvios
+              {enLaDerecha(<ListaEnvios
                 items={items}
                 numeroGuiaCabecera={g.numero_guia_transp}
                 numerosTransp={s.numerosTransp}
@@ -556,7 +565,7 @@ export default function GuiaPage() {
                 bultosPorLinea={s.bultosPorLinea}
                 setBultos={s.setBultos}
                 rol={role}
-              />
+              />)}
 
               {/* 🔴 LAS OBSERVACIONES, DONDE SE CARGA EL CAMIÓN.
                   Se escriben al crear la guía y vivían SOLO en el acordeón de la

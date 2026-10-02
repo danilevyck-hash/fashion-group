@@ -297,3 +297,18 @@ input, button, select, textarea {
     background-color: rgb(255 255 255 / 0.95);
   }
 }
+
+/* 🔴 EL CONTENIDO USA EL ANCHO DE LA PANTALLA, CENTRADO (2-oct-2026,
+   CONTENIDO_ANCHO_2026_10 en lib/navegacion/contenido-ancho.ts). La clase la
+   pone SidebarAwareMain. La caja de cada pantalla (el primer mx-auto max-w-*
+   de 4xl para arriba, no las de adentro ni las de un modal) usa todo el ancho
+   con 24 px a cada lado, igual que el camino de migas, hasta 1600 px; en un
+   monitor más grande se queda centrada. max-w-3xl o menos no se toca. Solo en
+   pantalla desde 768 px: en el celular y en el papel nada cambia. */
+@media screen and (min-width: 768px) {
+  .contenido-ancho .mx-auto:is([class~="max-w-4xl"], [class~="max-w-5xl"], [class~="max-w-6xl"], [class~="max-w-7xl"], [class~="max-w-[1280px]"]):not(.mx-auto[class*="max-w-"] *):not(.fixed *) {
+    max-width: 1600px;
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+}

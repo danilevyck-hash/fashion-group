@@ -79,6 +79,7 @@ import { textoFalta } from "@/lib/guias/falta-para-despachar";
 import { textoYaSeDespacho } from "@/lib/guias/campos-editables";
 import { sugerenciasDireccion } from "@/lib/guias/direccion-sugerida";
 import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
+import { CONTENIDO_ANCHO_2026_10, DOS_COLUMNAS, EN_LA_DERECHA } from "@/lib/navegacion/contenido-ancho";
 import { bultosBloqueadosPorEtiquetas, observacionesConTraslado } from "@/lib/guias/etiquetas-por-envio";
 
 interface GuiaFormProps {
@@ -989,20 +990,30 @@ export default function GuiaForm({
     const envios = items.filter(filaTieneDatos).length;
     const SEGMENTO = "flex-1 sm:flex-none whitespace-nowrap rounded-md px-3 text-sm font-medium transition inline-flex items-center justify-center min-h-[40px]";
     const PILDORA = "rounded-full border bg-transparent px-4 text-base sm:text-sm outline-none transition focus:border-black min-h-[44px]";
+    // 🔴 2-oct-2026 (`CONTENIDO_ANCHO_2026_10`): desde 1024 px, 2 columnas —fecha,
+    // despacho y observaciones a la izquierda; los envíos a la derecha—. Apagado,
+    // el árbol es el mismo de siempre (un fragmento no dibuja nada).
+    const ancho = CONTENIDO_ANCHO_2026_10;
+    const dosColumnas = (nodo: React.ReactNode) =>
+      ancho ? <div className={DOS_COLUMNAS} data-dos-columnas>{nodo}</div> : nodo;
+    const enLaDerecha = (nodo: React.ReactNode) =>
+      ancho ? <div className={`${EN_LA_DERECHA} lg:pt-4`}>{nodo}</div> : nodo;
     return (
       // 🔴 1-oct-2026 (Daniel, sobre las capturas): el MISMO marco que Reclamos, CxC y
       // Asistencia (`max-w-6xl mx-auto px-4 sm:px-6`) y, adentro, el formulario a la
       // IZQUIERDA con un ancho legible: centrado dejaba un blanco grande junto al menú.
       <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 pb-28 md:pb-0">
-      <div className="max-w-[820px]">
+      <div className={ancho ? undefined : "max-w-[820px]"}>
         <button type="button" onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2">{etiquetaVolver}</button>
         <div className="flex items-baseline gap-2.5">
           <h1 className="text-[26px] font-semibold tracking-tight">Nueva guía</h1>
           <span className="text-sm text-gray-400 font-mono">GT-{String(formNumero).padStart(3, "0")}</span>
         </div>
 
-        {/* Fecha · tipo de despacho · transportista: UNA línea; en el celular se apilan. */}
-        <div className="mt-4 mb-8 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center">
+        {dosColumnas(<>
+        {/* Fecha · tipo de despacho · transportista: UNA línea; en el celular se apilan.
+            En 2 columnas se apilan también, uno debajo del otro (docs/diseno.md regla 9). */}
+        <div className={`mt-4 mb-8 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center${ancho ? " lg:flex-col lg:flex-nowrap lg:items-stretch" : ""}`}>
           <input
             id="guia-fecha"
             type="date"
@@ -1011,7 +1022,7 @@ export default function GuiaForm({
             onChange={e => { setFecha(e.target.value); marcarTocado("fecha"); }}
             className={`${PILDORA} ${hayError("fecha", fecha) ? "border-red-400" : "border-gray-200"}`}
           />
-          <div role="group" aria-label="Tipo de despacho" className="flex rounded-lg bg-gray-100 p-0.5">
+          <div role="group" aria-label="Tipo de despacho" className={`flex rounded-lg bg-gray-100 p-0.5${ancho ? " lg:[&>button]:flex-1" : ""}`}>
             <button
               type="button"
               aria-pressed={modoEntrega === "transportista"}
@@ -1031,7 +1042,7 @@ export default function GuiaForm({
           </div>
           {modoEntrega === "transportista" && (
             // Sin espacio, baja a su propia línea, debajo del tipo de despacho (docs/diseno.md regla 9).
-            <div className="min-w-0 sm:flex-1 sm:min-w-[420px]">
+            <div className={`min-w-0 sm:flex-1 sm:min-w-[420px]${ancho ? " lg:min-w-0" : ""}`}>
               {campoTransportista(
                 `${PILDORA} min-w-[200px] flex-1 appearance-none ${transportistaError ? "border-red-400" : transportistaId ? "border-black dark:border-white" : "border-gray-200 text-gray-500"}`,
                 "flex flex-wrap items-center gap-x-2 gap-y-1 [&>button]:shrink-0",
@@ -1050,7 +1061,7 @@ export default function GuiaForm({
           </datalist>
         ))}
 
-        <EnviosApple
+        {enLaDerecha(<EnviosApple
           items={items}
           etiquetas={etiquetasVivas}
           onReemplazarItems={onReemplazarItems as (items: GuiaItem[]) => void}
@@ -1062,10 +1073,10 @@ export default function GuiaForm({
             destinoParaAutollenar(codigo, destinosPorCliente[(codigo || "").trim()] ?? [], definidosPorCliente)
           }
           onLineaDeTraslado={(lineaT, poner) => setObservaciones(observacionesConTraslado(observaciones, lineaT, poner))}
-        />
+        />)}
 
         {/* Observaciones: siempre a la vista — se escribieron en 34 de 74 guías. */}
-        <div className="mt-7">
+        <div className={ancho ? "mt-7 lg:mt-0" : "mt-7"}>
           <label htmlFor="guia-observaciones" className="mb-2 block text-[15px] font-semibold">Observaciones</label>
           <textarea
             id="guia-observaciones"
@@ -1076,6 +1087,7 @@ export default function GuiaForm({
             className="w-full min-h-[44px] resize-none rounded-lg border border-gray-200 bg-transparent px-3 py-2.5 text-base md:text-sm outline-none transition focus:border-black"
           />
         </div>
+        </>)}
 
         {/* 🔴 LA ÚNICA ACCIÓN, ABAJO Y CON EL TOTAL EN VIVO. Apagada sin envíos;
             con faltantes se toca y sale UNA línea con TODO lo que falta. */}
