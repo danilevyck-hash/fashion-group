@@ -352,10 +352,14 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
   const [guardando, setGuardando] = useState(false);
   const [formato, setFormato] = useFormatoEtiquetas();
   const [error, setError] = useState<string | null>(null);
-  // 🔴 TRASLADO SIN FACTURA (2-oct-2026, `ETIQUETAS_TRASLADO_2026_10`): la fila
-  // «+ Traslado» al final de la lista de facturas. Va solo o con facturas (mismo
-  // camión); solo, la empresa es opcional. El contenido va en la línea de la nota.
+  // 🔴 TRASLADO SIN FACTURA (2-oct-2026, `ETIQUETAS_TRASLADO_2026_10`): «Traslado»
+  // es un chip más de la fila de EMPRESA (Daniel: «traslado sin factura es como si
+  // fuese una empresa»). Va solo o con facturas (mismo camión); solo, la empresa
+  // es opcional. El contenido va en la línea de la nota.
+  // `traslado` = va en el envío; `verTraslado` = el chip «Traslado» está elegido
+  // (se ven sus campos en vez de las facturas, que siguen marcadas).
   const [traslado, setTraslado] = useState(false);
+  const [verTraslado, setVerTraslado] = useState(false);
   const [trasladoEmpresa, setTrasladoEmpresa] = useState<string | null>(null);
   const [contenido, setContenido] = useState("");
   const [trasladoBultos, setTrasladoBultos] = useState("");
@@ -452,6 +456,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
     const aMano = ETIQUETAS_TRASLADO_2026_10 && nombre.trim() !== "";
     setCliente(codigo || aMano ? { nombre: nombre.trim(), codigo } : null);
     setTraslado(false);
+    setVerTraslado(false);
     setFacturas(null);
     setMarcadas([]);
     setEmpresaKey(null);
@@ -463,8 +468,17 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
   }
 
   function elegirEmpresa(key: string) {
+    // Volver a la MISMA empresa (desde «Traslado») no borra lo marcado.
+    if (key !== empresaElegida) setMarcadas([]); // un envío es de UNA empresa: lo marcado de otra no viaja
     setEmpresaKey(key);
-    setMarcadas([]); // un envío es de UNA empresa: lo marcado de otra no viaja
+    setVerTraslado(false);
+    setError(null);
+  }
+
+  /** El chip «Traslado»: lo agrega al envío SIN borrar las facturas marcadas. */
+  function elegirTraslado() {
+    setTraslado(true);
+    setVerTraslado(true);
     setError(null);
   }
 
@@ -600,35 +614,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
   );
   const bloqueTraslado = cliente && traslado && (
           <div className="space-y-4" data-testid="traslado-form">
-            {enElEnvio.length === 0 && (
-            <div>
-              <div className="mb-1.5 text-xs text-gray-500">Empresa (opcional)</div>
-              <div className="flex flex-wrap gap-2" role="group" aria-label="Empresa del traslado">
-                {/* 🔴 Daniel, 2-oct-2026: «puede ser solamente traslado». Sin empresa,
-                    el papel dice FASHION GROUP arriba. */}
-                <button
-                  type="button"
-                  aria-pressed={trasladoEmpresa === null}
-                  onClick={() => { setTrasladoEmpresa(null); setError(null); }}
-                  className={`${CHIP} ${trasladoEmpresa === null ? "border-gray-900 bg-gray-900 font-medium text-white" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
-                >
-                  Sin empresa (solo traslado)
-                </button>
-                {B2B_EMPRESA_KEYS.map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    aria-pressed={trasladoEmpresa === k}
-                    onClick={() => { setTrasladoEmpresa(k); setError(null); }}
-                    className={`${CHIP} ${trasladoEmpresa === k ? "border-gray-900 bg-gray-900 font-medium text-white" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
-                  >
-                    {mapEmpresaName(k)}
-                  </button>
-                ))}
-              </div>
-            </div>
-            )}
-            <div className="flex flex-wrap items-start gap-3">
+            <div className="flex flex-wrap items-end gap-3">
               <div className="min-w-[180px] flex-1">
                 <label htmlFor="traslado-contenido" className="mb-1 block text-xs text-gray-500">Contenido</label>
                 <input
@@ -654,6 +640,23 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
                   className="w-[96px] rounded-md border border-gray-300 px-3 text-center font-mono text-lg font-semibold outline-none transition focus:border-black min-h-[44px]"
                 />
               </div>
+              {/* 🔴 Daniel, 2-oct-2026: la empresa del traslado es el caso raro —
+                  un desplegable CHICO, opcional, que nace en «Ninguna» (el papel
+                  dice FASHION GROUP arriba). Con facturas marcadas, el traslado
+                  va con la empresa del envío y no se pregunta. */}
+              {enElEnvio.length === 0 && (
+                <select
+                  aria-label="Empresa del traslado"
+                  value={trasladoEmpresa ?? ""}
+                  onChange={(e) => { setTrasladoEmpresa(e.target.value || null); setError(null); }}
+                  className="min-h-[44px] rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700 outline-none transition focus:border-black"
+                >
+                  <option value="">Empresa: Ninguna</option>
+                  {B2B_EMPRESA_KEYS.map((k) => (
+                    <option key={k} value={k}>{`Empresa: ${mapEmpresaName(k)}`}</option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
         );
@@ -678,7 +681,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
               </p>
             )}
 
-            {!cargando && empresas.length > 1 && (
+            {!ETIQUETAS_TRASLADO_2026_10 && !cargando && empresas.length > 1 && (
               <div className="mb-3">
                 <div className="mb-1.5 text-xs uppercase tracking-[0.05em] text-gray-400">Empresa</div>
                 <div className="flex flex-wrap gap-2" role="group" aria-label="Empresa del envío">
@@ -943,37 +946,52 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
           </div>
         </section>
 
-        {/* 🔴 Daniel, 2-oct-2026: «en el mismo buscador del cliente buscas el
-            cliente, escoges la factura o escoges la opción traslado». Las
-            facturas pendientes y, al final, la fila «+ Traslado (sin factura)». */}
+        {/* 🔴 Daniel, 2-oct-2026: «traslado sin factura es como si fuese una
+            empresa». UNA fila de EMPRESA: las empresas del cliente y, al final,
+            el chip «Traslado». Empresa → sus facturas; Traslado → contenido,
+            bultos y la empresa opcional. Tocar «Traslado» con facturas marcadas
+            lo AGREGA al mismo envío y no borra nada. */}
         {cliente && (
           <section className="mt-3 rounded-lg border border-gray-200 p-4" aria-label="Facturas">
-            {bloqueFacturas}
-            <div className="mt-3 border-t border-gray-100 pt-3">
-              {traslado ? (
-                <div>
-                  <div className="mb-3 flex min-h-[44px] items-center justify-between gap-3">
-                    <span className="text-sm font-medium">Traslado (sin factura)</span>
+            <div className="mb-3">
+              <div className="mb-1.5 text-xs uppercase tracking-[0.05em] text-gray-400">Empresa</div>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Empresa del envío">
+                {!cargando && empresas.map((e) => {
+                  const elegida = !verTraslado && empresaElegida === e.key;
+                  return (
                     <button
+                      key={e.key}
                       type="button"
-                      onClick={() => { setTraslado(false); setError(null); }}
-                      className="min-h-[44px] text-sm text-gray-500 transition hover:text-black"
+                      aria-pressed={elegida}
+                      onClick={() => elegirEmpresa(e.key)}
+                      className={`${CHIP} ${elegida ? "border-gray-900 bg-gray-900 font-medium text-white" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
                     >
-                      Quitar
+                      {e.nombre}
                     </button>
-                  </div>
-                  {bloqueTraslado}
-                </div>
-              ) : (
+                  );
+                })}
                 <button
                   type="button"
-                  onClick={() => { setTraslado(true); setError(null); }}
-                  className="flex min-h-[44px] w-full items-center text-left text-sm font-medium text-gray-900 transition hover:text-black"
+                  aria-pressed={verTraslado}
+                  onClick={elegirTraslado}
+                  className={`${CHIP} ${verTraslado ? "border-gray-900 bg-gray-900 font-medium text-white" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
                 >
-                  + Traslado (sin factura)
+                  Traslado
                 </button>
-              )}
+              </div>
             </div>
+            {verTraslado ? (
+              <div>
+                {bloqueTraslado}
+                <button
+                  type="button"
+                  onClick={() => { setTraslado(false); setVerTraslado(false); setError(null); }}
+                  className="mt-2 min-h-[44px] text-sm text-gray-500 transition hover:text-black"
+                >
+                  Quitar traslado
+                </button>
+              </div>
+            ) : bloqueFacturas}
           </section>
         )}
 
