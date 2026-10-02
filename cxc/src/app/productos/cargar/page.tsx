@@ -192,11 +192,13 @@ function CargarInner() {
         {/* PLANTILLA_APPLE_2026_10: sin filas de pestañas. La caja abre sola,
             «Configuración» es un enlace y las demás vistas vuelven con «← Plantilla». */}
         {nav.enlaces && (
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-5">
+            <button type="button" onClick={() => irA("tallas", "curvas")} className={enlace}>Tallas por bulto</button>
             <button type="button" onClick={() => irA("config", "formulas")} className={enlace}>Configuración</button>
           </div>
         )}
-        {nav.volver && (
+        {/* En Configuración, «← Plantilla» va en la MISMA línea que sus vistas. */}
+        {nav.volver && !nav.vistas && (
           <button type="button" onClick={() => irA("plantilla", "nuevo")} className={enlace}>← Plantilla</button>
         )}
 
@@ -204,10 +206,15 @@ function CargarInner() {
             Fórmulas/Descripciones/Reglas), en TODOS los anchos. «Tallas por
             bulto» quedó con UNA sola vista, así que su fila no se dibuja. */}
         {nav.vistas && (
-          <div className="mt-3 flex w-full flex-nowrap overflow-x-auto rounded-lg border border-stone-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className={nav.volver ? "flex items-center gap-4" : ""}>
+          {nav.volver && (
+            <button type="button" onClick={() => irA("plantilla", "nuevo")} className={`${enlace} shrink-0`}>← Plantilla</button>
+          )}
+          <div className={`${nav.volver ? "" : "mt-3 "}flex w-full flex-nowrap overflow-x-auto rounded-lg border border-stone-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}>
             {vistas.map((v) => (
               <TabBtn key={v.id} active={vista === v.id} onClick={() => cambiarVista(v.id)}>{v.label}</TabBtn>
             ))}
+          </div>
           </div>
         )}
       </div>
@@ -223,10 +230,7 @@ function CargarInner() {
             <div className="mt-6">
               <h2 className="mb-2 text-sm font-semibold text-stone-900">Cargas recientes</h2>
               <HistorialView refreshKey={refreshKey} limite={CARGAS_RECIENTES} />
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <button type="button" onClick={() => irA("plantilla", "historial")} className={enlace}>Ver historial completo</button>
-                <button type="button" onClick={() => irA("tallas", "curvas")} className={`${enlace} text-stone-500`}>Tallas por bulto</button>
-              </div>
+              <button type="button" onClick={() => irA("plantilla", "historial")} className={`${enlace} mt-2`}>Ver historial completo</button>
             </div>
           ) : undefined}
         />
@@ -257,25 +261,9 @@ function CargarInner() {
  *  re-sembrar el catálogo. */
 function FormulasScopeRow() {
   const [formulasScope, setFormulasScope] = useState<FormulasScope>("depurador");
-  // PLANTILLA_APPLE_2026_10: las de importación directo; las de tienda (0
-  // fórmulas y 0 facturas de tienda descargadas al 1-oct-2026), en un enlace.
-  if (PLANTILLA_APPLE_2026_10) {
-    const otra: FormulasScope = formulasScope === "depurador" ? "tienda" : "depurador";
-    return (
-      <>
-        <FormulasConfig key={formulasScope} scope={formulasScope} />
-        <div className="mx-auto max-w-4xl px-4 pb-8">
-          <button
-            type="button"
-            onClick={() => setFormulasScope(otra)}
-            className="inline-flex min-h-[44px] items-center text-sm font-medium text-stone-500 hover:text-teal-800"
-          >
-            {otra === "tienda" ? "Fórmulas de facturas de tienda" : "← Fórmulas de importación"}
-          </button>
-        </div>
-      </>
-    );
-  }
+  // PLANTILLA_APPLE_2026_10: sin selector. UNA lista de empresas, con Active
+  // Shoes (Reebok) y Multifashion (facturas de tienda) como una más.
+  if (PLANTILLA_APPLE_2026_10) return <FormulasConfig scope="depurador" apple />;
   return (
     <>
       <div className="mx-auto max-w-4xl px-4 pt-4">

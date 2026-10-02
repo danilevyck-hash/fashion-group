@@ -11,7 +11,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, waitFor } from "@testing-library/react";
-import { navegacion } from "@/lib/depurador/plantilla-apple-2026-10";
+import { navegacion, formulasApple, valorInicialDeMarca } from "@/lib/depurador/plantilla-apple-2026-10";
+import { REEBOK_EMPRESA, REEBOK_MARCA_A, REEBOK_MARCA_B, REEBOK_FORMULA_A_DEFAULT, REEBOK_FORMULA_B_DEFAULT } from "@/lib/depurador/reebok";
+import { MARCA_CATALOGO, EMPRESAS_DESTINO } from "@/lib/depurador/logic";
 
 const estado = vi.hoisted(() => ({ apple: false, params: "", onDownloaded: null as null | ((p: unknown) => Promise<void>) }));
 
@@ -59,6 +61,26 @@ describe("navegacion (puro)", () => {
   });
 });
 
+describe("fórmulas en una lista (puro)", () => {
+  const base = { catalogo: MARCA_CATALOGO, grupos: [...EMPRESAS_DESTINO.map((e) => ({ label: e.label, marca: e.marca })), { label: "", marca: "" }] };
+  it("suma Active Shoes con las MISMAS filas que guarda la pantalla de Reebok", () => {
+    const cfg = formulasApple(base);
+    expect(cfg.grupos.map((g) => g.label)).toEqual([...EMPRESAS_DESTINO.map((e) => e.label), "Active Shoes", ""]);
+    expect(cfg.catalogo.slice(-2)).toEqual([
+      { marca: REEBOK_MARCA_A, empresa: REEBOK_EMPRESA },
+      { marca: REEBOK_MARCA_B, empresa: REEBOK_EMPRESA },
+    ]);
+    // No toca la configuración de hoy.
+    expect(base.catalogo).toBe(MARCA_CATALOGO);
+    expect(base.grupos).toHaveLength(EMPRESAS_DESTINO.length + 1);
+  });
+  it("sin fórmula guardada, Reebok muestra el valor que el cálculo usa; el resto, vacío como hoy", () => {
+    expect(valorInicialDeMarca(REEBOK_MARCA_A)).toEqual(REEBOK_FORMULA_A_DEFAULT);
+    expect(valorInicialDeMarca(REEBOK_MARCA_B)).toEqual(REEBOK_FORMULA_B_DEFAULT);
+    expect(valorInicialDeMarca("TH Kids")).toEqual({ divisor: 0, extra: 0, redondeo: "int" });
+  });
+});
+
 describe("pantalla", () => {
   it("false: la de hoy", async () => {
     await montar(false);
@@ -71,6 +93,7 @@ describe("pantalla", () => {
     await montar(true);
     expect(screen.queryByRole("button", { name: "Nuevo" })).toBeNull();
     expect(screen.getByRole("button", { name: "Configuración" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Tallas por bulto" })).toBeTruthy();
     expect(screen.getByText("Cargas recientes")).toBeTruthy();
     expect(screen.getByTestId("recientes")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Ver historial completo" })).toBeTruthy();

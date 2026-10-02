@@ -14,13 +14,21 @@
 //   2. Debajo de la caja, «Cargas recientes» (las 5 últimas, con Descargar) y
 //      «Ver historial completo».
 //   3. «Tallas por bulto» pasa a un enlace al pie.
-//   4. Fórmulas abre en las de importación; las de tienda, detrás de un enlace.
+//   4. Fórmulas: UNA lista de empresas. Se suman Active Shoes (Reebok Precio A
+//      y B, las MISMAS filas que guarda la pantalla de Reebok) y Multifashion
+//      (las fórmulas de facturas de tienda, que ya existían aparte).
+//   (2-oct-2026, con el «sí» de Daniel: «Tallas por bulto» va arriba, junto a
+//   «Configuración», y no al pie.)
 //
 // 🔴 El Excel de 25 columnas, las fórmulas, el registro del Historial y las
 // direcciones (?tab= / ?vista=) NO cambian. `false` = la pantalla de hoy.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Tab, Vista } from "@/app/productos/cargar/pestanas";
+import type { MarcaCatalogo, Redondeo } from "@/lib/depurador/logic";
+import {
+  REEBOK_EMPRESA, REEBOK_FORMULA_A_DEFAULT, REEBOK_FORMULA_B_DEFAULT, REEBOK_MARCA_A, REEBOK_MARCA_B,
+} from "@/lib/depurador/reebok";
 
 /** `false` = la pantalla de hoy, exactamente. */
 export const PLANTILLA_APPLE_2026_10 = false;
@@ -41,4 +49,26 @@ export function navegacion(apple: boolean, tab: Tab, vista: Vista, nVistas: numb
     volver: !inicio,
     enlaces: inicio,
   };
+}
+
+/** Fórmulas en UNA lista de empresas: se suma Active Shoes con sus dos fórmulas
+ *  de Reebok. Multifashion la agrega la pantalla (son otras tablas). */
+export function formulasApple<T extends { catalogo: MarcaCatalogo[]; grupos: { label: string; marca: string }[] }>(cfg: T): T {
+  const otras = cfg.grupos.filter((g) => !g.label);
+  return {
+    ...cfg,
+    catalogo: [
+      ...cfg.catalogo,
+      { marca: REEBOK_MARCA_A, empresa: REEBOK_EMPRESA },
+      { marca: REEBOK_MARCA_B, empresa: REEBOK_EMPRESA },
+    ],
+    grupos: [...cfg.grupos.filter((g) => g.label), { label: REEBOK_EMPRESA, marca: "Reebok" }, ...otras],
+  };
+}
+
+/** Lo que se ve en una marca sin fórmula guardada: el valor que el cálculo usa. */
+export function valorInicialDeMarca(marca: string): { divisor: number; extra: number; redondeo: Redondeo } {
+  if (marca === REEBOK_MARCA_A) return { ...REEBOK_FORMULA_A_DEFAULT };
+  if (marca === REEBOK_MARCA_B) return { ...REEBOK_FORMULA_B_DEFAULT };
+  return { divisor: 0, extra: 0, redondeo: "int" };
 }

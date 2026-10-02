@@ -6,6 +6,7 @@ import {
   type CatalogoDescripciones, type Redondeo, type MarcaFormula, type MarcaRubroFormula,
 } from "@/lib/depurador/logic";
 import { TIENDA_MARCA_CATALOGO } from "@/lib/depurador/tienda";
+import { formulasApple, valorInicialDeMarca } from "@/lib/depurador/plantilla-apple-2026-10";
 import { useCatalogoDescripciones } from "@/lib/hooks/useCatalogoDescripciones";
 import BulkExcel from "./BulkExcel";
 
@@ -82,9 +83,12 @@ function compactFormula(d: { divisor: number; extra: number; redondeo: Redondeo 
   return `TECHO(CIF ÷ ${d.divisor || "—"})${d.extra > 0 ? ` + ${d.extra}` : ""} → ${r}`;
 }
 function mkRow(marca: string, empresa: string | null, saved?: MarcaFormula): MarcaRow {
+  // Sin fórmula guardada, Reebok Precio A/B muestran lo que el cálculo usa
+  // de verdad (su valor por omisión), nunca un 0 que no se aplica.
+  const ini = valorInicialDeMarca(marca);
   return {
     id: `m-${marcaKey(marca)}`, marca, empresa,
-    divisor: saved?.divisor ?? 0, extra: saved?.extra ?? 0, redondeo: saved?.redondeo ?? "int",
+    divisor: saved?.divisor ?? ini.divisor, extra: saved?.extra ?? ini.extra, redondeo: saved?.redondeo ?? ini.redondeo,
     saved: !!saved, isNew: false, dirty: false,
   };
 }
@@ -103,10 +107,19 @@ const selCls = "min-h-[44px] rounded-md border border-stone-300 bg-stone-50 px-1
 // [appearance:textfield] + sin spin-buttons → el divisor de 2 decimales se ve completo (no lo tapan las flechitas).
 const numCls = "min-h-[44px] rounded-md border border-stone-300 bg-stone-50 px-2 text-right font-mono text-[13px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
 
-export default function FormulasConfig({ scope = "depurador" }: { scope?: FormulasScope }) {
+export default function FormulasConfig({ scope = "depurador", apple = false, embebido = false }: {
+  scope?: FormulasScope;
+  /** `PLANTILLA_APPLE_2026_10`: Active Shoes y Multifashion como una empresa más. */
+  apple?: boolean;
+  /** Dentro del grupo «Multifashion»: solo la lista, sin ayuda, buscador ni «+ Agregar marca». */
+  embebido?: boolean;
+}) {
   // Si el scope cambia, el padre debe remontar con key={scope} (el estado inicial
   // del catálogo se siembra una sola vez).
-  const cfg = SCOPE_CONFIG[scope];
+  const cfg = useMemo(
+    () => (apple && scope === "depurador" ? formulasApple(SCOPE_CONFIG.depurador) : SCOPE_CONFIG[scope]),
+    [apple, scope],
+  );
   // Catálogo de descripciones por marca (tabla depurador_descripciones).
   const { catalogo: catalogoDescs, cargando: descsCargando, fallo: descsFallo, reintentar: reintentarDescs } = useCatalogoDescripciones();
   const descsCatalogo = catalogoDescs ?? CATALOGO_VACIO;
@@ -264,10 +277,10 @@ export default function FormulasConfig({ scope = "depurador" }: { scope?: Formul
   const nuevas = rows.filter((r) => r.isNew && rowMatch(r));
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6">
-      <FormulasAyuda scope={scope} />
+    <div className={embebido ? "pl-4" : "mx-auto max-w-4xl px-4 py-6"}>
+      {!embebido && <FormulasAyuda scope={scope} />}
 
-      {scope === "depurador" && <BulkExcel catalogo={catalogoDescs} onDone={() => setReloadKey((k) => k + 1)} />}
+      {!embebido && scope === "depurador" && <BulkExcel catalogo={catalogoDescs} onDone={() => setReloadKey((k) => k + 1)} />}
 
       {descsCargando && (
         <div className="mb-4 rounded-lg border border-stone-200 bg-white px-3.5 py-2.5 text-[13px] text-stone-600">
@@ -289,7 +302,7 @@ export default function FormulasConfig({ scope = "depurador" }: { scope?: Formul
 
       {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
 
-      <div className="mb-5 flex items-center justify-between gap-3">
+      {!embebido && <div className="mb-5 flex items-center justify-between gap-3">
         <input
           value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar marca o descripción…"
           className="min-h-[44px] w-full max-w-xs rounded-lg border border-stone-300 bg-white px-3 text-sm focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
@@ -298,7 +311,7 @@ export default function FormulasConfig({ scope = "depurador" }: { scope?: Formul
           className="inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg bg-teal-600 px-4 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97]">
           + Agregar marca
         </button>
-      </div>
+      </div>}
 
       {/* Nuevas marcas (aún sin guardar) */}
       {nuevas.length > 0 && (
@@ -354,6 +367,30 @@ export default function FormulasConfig({ scope = "depurador" }: { scope?: Formul
           </div>
         );
       })}
+
+      {/* PLANTILLA_APPLE_2026_10: Multifashion (las facturas de tienda) es una
+          empresa más de la lista, con el mismo encabezado. Adentro, las fórmulas
+          de tienda de siempre (otras tablas, otro markup). */}
+      {apple && scope === "depurador" && (
+        <div className="mb-7">
+          <button
+            type="button"
+            onClick={() => toggleGrupo("multifashion")}
+            aria-expanded={gruposAbiertos.has("multifashion")}
+            className="mb-2 flex min-h-[44px] w-full items-center gap-2 border-b border-stone-200 py-1.5 text-left text-[13px] font-bold uppercase tracking-wide text-teal-800 transition hover:bg-stone-50"
+          >
+            <span aria-hidden className="text-stone-400">{gruposAbiertos.has("multifashion") ? "▾" : "▸"}</span>
+            <span className="min-w-0 flex-1 truncate">
+              Multifashion
+              <span className="ml-2 text-[12px] font-normal normal-case tracking-normal text-stone-500">· Facturas de tienda</span>
+            </span>
+            <span className="shrink-0 text-[12px] font-normal normal-case tracking-normal text-stone-400">
+              {rotuloMarcas(TIENDA_MARCA_CATALOGO.length)}
+            </span>
+          </button>
+          {gruposAbiertos.has("multifashion") && <FormulasConfig scope="tienda" embebido />}
+        </div>
+      )}
     </div>
   );
 }
