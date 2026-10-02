@@ -51,9 +51,12 @@ function empresaCanonica(empresa: string): string {
 interface HistorialViewProps {
   /** Cambia para forzar un refetch (ej. tras una descarga). */
   refreshKey?: number;
+  /** `PLANTILLA_APPLE_2026_10`: solo las N más recientes, sin filtros (debajo
+   *  de la caja de soltar el archivo). Sin él, el Historial de siempre. */
+  limite?: number;
 }
 
-export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
+export default function HistorialView({ refreshKey = 0, limite }: HistorialViewProps) {
   const [rows, setRows] = useState<CargaRow[] | null>(null);
   const [error, setError] = useState("");
   // Filtro por compañía: Todas + las 6. Todos ven todo (Daniel: «todos»).
@@ -107,6 +110,9 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
     [rows],
   );
 
+  // Las recientes: el chip se calculó arriba sobre TODAS, así que no cambia.
+  const filas = limite ? (rows ?? []).slice(0, limite) : visibles;
+
   const chipDe = (r: CargaRow): MarcaDeRepeticion => repetidas.get(r.id) ?? null;
 
   const Chip = ({ marca }: { marca: MarcaDeRepeticion }) =>
@@ -132,7 +138,7 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
     ) : null;
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6">
+    <div className={limite ? "" : "mx-auto max-w-5xl px-4 py-6"}>
 
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -140,7 +146,7 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
         </div>
       )}
 
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      {!limite && <div className="mb-3 flex flex-wrap items-center gap-2">
         <select
           value={empresaFiltro}
           aria-label="Empresa"
@@ -161,13 +167,13 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
         />
         {/* El plazo se DERIVA de la constante, nunca se escribe a mano: la fila con los totales queda igual. */}
         <span className="text-[12px] text-stone-500">El Excel se puede volver a descargar por {textoRetencion()}.</span>
-      </div>
+      </div>}
 
       {rows === null ? (
         <div className="py-16 text-center text-stone-500">Cargando…</div>
-      ) : sinResultados ? (
+      ) : !limite && sinResultados ? (
         <VacioDeBusqueda texto={VACIO_DESCARGA} onLimpiar={() => setBusqueda("")} rotulo={LIMPIAR_BUSQUEDA} />
-      ) : visibles.length === 0 ? (
+      ) : filas.length === 0 ? (
         <div className="py-16 text-center text-stone-500">Todavía no hay cargas registradas.</div>
       ) : (
         /* ── 🩸 EL HISTORIAL, MEDIDO (30-jul-2026) ────────────────────────
@@ -176,8 +182,8 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
            El escritorio no cambia. */
         <div className="overflow-hidden rounded-xl border border-stone-200 bg-white" data-medir="depurador-historial">
           {/* Celular e iPad vertical: una tarjeta por carga. */}
-          <ul className="lg:hidden max-h-[560px] overflow-y-auto divide-y divide-stone-100" data-vista="tarjetas">
-            {visibles.map((r) => (
+          <ul className={`lg:hidden ${limite ? "" : "max-h-[560px] overflow-y-auto"} divide-y divide-stone-100`} data-vista="tarjetas">
+            {filas.map((r) => (
               <li key={r.id} className={`px-3 py-3 ${r.tiene_archivo ? "" : "opacity-60"} ${chipDe(r) === "repetida" ? "text-stone-400" : ""}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -202,7 +208,7 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
             ))}
           </ul>
 
-          <div className="hidden lg:block max-h-[560px] overflow-auto" data-vista="tabla">
+          <div className={`hidden lg:block ${limite ? "" : "max-h-[560px] overflow-auto"}`} data-vista="tabla">
             <table className="w-full border-collapse whitespace-nowrap text-[13px] tabular-nums">
               <thead>
                 <tr>
@@ -219,7 +225,7 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
                 </tr>
               </thead>
               <tbody>
-                {visibles.map((r) => (
+                {filas.map((r) => (
                   <tr
                     key={r.id}
                     data-repeticion={chipDe(r) ?? ""}

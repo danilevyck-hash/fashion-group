@@ -13,6 +13,7 @@ import ReglasView from "./ReglasView";
 import CurvasView from "./CurvasView";
 import CatalogoDescripcionesAdmin from "./CatalogoDescripcionesAdmin";
 import { PESTANAS, VISTAS_POR_TAB, resolverTab, type Tab, type Vista } from "./pestanas";
+import { CARGAS_RECIENTES, PLANTILLA_APPLE_2026_10, navegacion } from "@/lib/depurador/plantilla-apple-2026-10";
 
 type FormulasScope = "depurador" | "tienda";
 
@@ -127,6 +128,15 @@ function CargarInner() {
 
   const cambiarVista = (v: Vista) => setVista(v);
 
+  // Pestaña y vista en UN solo replace (dos setValue seguidos se pisarían).
+  const irA = (t: Tab, v: Vista) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", t);
+    if (v !== VISTAS_POR_TAB[t][0].id) params.set("vista", v);
+    else params.delete("vista");
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
   // Registra la carga en el server al descargar (lo único que toca backend).
   // Desde el 4-sep-2026 viaja también EL ARCHIVO descargado (los mismos bytes),
   // que queda en Storage (RETENCION_ARCHIVO_DIAS) para volver a bajarlo del Historial.
@@ -156,6 +166,8 @@ function CargarInner() {
   };
 
   const vistas = VISTAS_POR_TAB[tab].filter((v) => !v.soloAdmin || esAdmin);
+  const nav = navegacion(PLANTILLA_APPLE_2026_10, tab, vista, vistas.length);
+  const enlace = "inline-flex min-h-[44px] items-center text-sm font-medium text-teal-700 hover:text-teal-900";
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -168,19 +180,30 @@ function CargarInner() {
             pestañas la fila entra sobrada, pero el patrón se conserva: es el
             de toda la casa y el candado `depurador-reclamos-datahealth-anchos`
             lo exige. */}
-        <SelectorPestanas tab={tab} onChange={setTab} />
+        {nav.pestanas && <SelectorPestanas tab={tab} onChange={setTab} />}
 
         {/* ≥lg: la fila de píldoras de siempre, ahora con 3. */}
-        <div className="hidden lg:flex w-full flex-nowrap overflow-x-auto rounded-lg border border-stone-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {nav.pestanas && <div className="hidden lg:flex w-full flex-nowrap overflow-x-auto rounded-lg border border-stone-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {PESTANAS.map(p => (
             <TabBtn key={p.id} active={tab === p.id} onClick={() => setTab(p.id)}>{p.label}</TabBtn>
           ))}
-        </div>
+        </div>}
+
+        {/* PLANTILLA_APPLE_2026_10: sin filas de pestañas. La caja abre sola,
+            «Configuración» es un enlace y las demás vistas vuelven con «← Plantilla». */}
+        {nav.enlaces && (
+          <div className="flex justify-end">
+            <button type="button" onClick={() => irA("config", "formulas")} className={enlace}>Configuración</button>
+          </div>
+        )}
+        {nav.volver && (
+          <button type="button" onClick={() => irA("plantilla", "nuevo")} className={enlace}>← Plantilla</button>
+        )}
 
         {/* Vistas de la pestaña activa (Nuevo/Historial, Tallas/Fotos,
             Fórmulas/Descripciones/Reglas), en TODOS los anchos. «Tallas por
             bulto» quedó con UNA sola vista, así que su fila no se dibuja. */}
-        {vistas.length > 1 && (
+        {nav.vistas && (
           <div className="mt-3 flex w-full flex-nowrap overflow-x-auto rounded-lg border border-stone-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {vistas.map((v) => (
               <TabBtn key={v.id} active={vista === v.id} onClick={() => cambiarVista(v.id)}>{v.label}</TabBtn>
@@ -194,7 +217,19 @@ function CargarInner() {
           de vista (FIX 1). El dispatcher reconoce el formato (CK/TH, Reebok o
           Facturas Tienda) en la misma dropzone — los caminos ya no se nombran. */}
       <div className={tab === "plantilla" && vista === "nuevo" ? "" : "hidden"}>
-        <DepuradorDispatcher onDownloaded={handleDownloaded} />
+        <DepuradorDispatcher
+          onDownloaded={handleDownloaded}
+          pie={nav.enlaces ? (
+            <div className="mt-6">
+              <h2 className="mb-2 text-sm font-semibold text-stone-900">Cargas recientes</h2>
+              <HistorialView refreshKey={refreshKey} limite={CARGAS_RECIENTES} />
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <button type="button" onClick={() => irA("plantilla", "historial")} className={enlace}>Ver historial completo</button>
+                <button type="button" onClick={() => irA("tallas", "curvas")} className={`${enlace} text-stone-500`}>Tallas por bulto</button>
+              </div>
+            </div>
+          ) : undefined}
+        />
       </div>
       {tab === "plantilla" && vista === "historial" && <HistorialView refreshKey={refreshKey} />}
 
@@ -222,6 +257,25 @@ function CargarInner() {
  *  re-sembrar el catálogo. */
 function FormulasScopeRow() {
   const [formulasScope, setFormulasScope] = useState<FormulasScope>("depurador");
+  // PLANTILLA_APPLE_2026_10: las de importación directo; las de tienda (0
+  // fórmulas y 0 facturas de tienda descargadas al 1-oct-2026), en un enlace.
+  if (PLANTILLA_APPLE_2026_10) {
+    const otra: FormulasScope = formulasScope === "depurador" ? "tienda" : "depurador";
+    return (
+      <>
+        <FormulasConfig key={formulasScope} scope={formulasScope} />
+        <div className="mx-auto max-w-4xl px-4 pb-8">
+          <button
+            type="button"
+            onClick={() => setFormulasScope(otra)}
+            className="inline-flex min-h-[44px] items-center text-sm font-medium text-stone-500 hover:text-teal-800"
+          >
+            {otra === "tienda" ? "Fórmulas de facturas de tienda" : "← Fórmulas de importación"}
+          </button>
+        </div>
+      </>
+    );
+  }
   return (
     <>
       <div className="mx-auto max-w-4xl px-4 pt-4">

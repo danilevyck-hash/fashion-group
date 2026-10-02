@@ -29,6 +29,9 @@ export interface DescargaHistorial {
 
 interface DispatcherProps {
   onDownloaded?: (payload: DescargaHistorial) => void;
+  /** Lo que va debajo de la caja mientras no hay archivo
+   *  (`PLANTILLA_APPLE_2026_10`: las cargas recientes). */
+  pie?: React.ReactNode;
 }
 
 /** El CSV se reconoce por la extensión: nadie le pregunta nada a las hojas. */
@@ -46,7 +49,7 @@ const SIN_DETECTORES = {
  *   · Facturas Tienda = .csv (';') o la factura/reporte que reconoce
  *     detectFactura (4-sep-2026 — antes era una pestaña propia).
  *   · Todo lo demás = CK/TH/KL (DepuradorClient). */
-export default function DepuradorDispatcher({ onDownloaded }: DispatcherProps) {
+export default function DepuradorDispatcher({ onDownloaded, pie }: DispatcherProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -174,6 +177,7 @@ export default function DepuradorDispatcher({ onDownloaded }: DispatcherProps) {
       {error && (
         <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
       )}
+      {pie}
     </div>
   );
 }
