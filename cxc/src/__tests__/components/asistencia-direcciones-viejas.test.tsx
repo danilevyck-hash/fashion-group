@@ -30,6 +30,8 @@ import {
   claveQueSeReescribe, pestanaMudada, pestanaQueSeAbre,
   type ClavePestana, type Pestana,
 } from "@/lib/asistencia/persona-en-el-centro";
+import { pestanasDeAsistencia } from "@/lib/asistencia/persona-en-el-centro";
+import { pestanasEnOrdenDelTrabajo } from "@/lib/asistencia/apple-2026-10";
 
 const RAIZ = process.cwd();
 const puro = (f: string) =>
@@ -84,6 +86,18 @@ describe("A · cuándo se reescribe la URL", () => {
   it("una dirección que no existe también se corrige, en vez de mentir", () => {
     const mostrada = pestanaQueSeAbre("zzz-no-existe", VISIBLES);
     expect(claveQueSeReescribe("zzz-no-existe", mostrada, VISIBLES)).toBe(mostrada);
+  });
+
+  // 🔄 2-oct-2026: ASISTENCIA_APPLE_2026_10 se prendió (Daniel aprobó las
+  // capturas: "sí"). Las pestañas van en el orden del trabajo, y un `?tab=`
+  // desconocido cae en Asistencia, ya no en Colaboradores.
+  it("🔴 con la propuesta, un `?tab=` desconocido cae en Asistencia", () => {
+    const produccion = pestanasDeAsistencia({ personaEnElCentro: true, planillaUnida: true });
+    const ordenadas = pestanasEnOrdenDelTrabajo(produccion, true);
+    expect(pestanaQueSeAbre("zzz-no-existe", ordenadas)).toBe("asistencia");
+    expect(claveQueSeReescribe("zzz-no-existe", "asistencia", ordenadas)).toBe("asistencia");
+    // CONTROL AL REVÉS: la versión de antes (false) seguía cayendo en Colaboradores.
+    expect(pestanaQueSeAbre("zzz-no-existe", pestanasEnOrdenDelTrabajo(produccion, false))).toBe("colaboradores");
   });
 });
 
@@ -174,14 +188,24 @@ describe("C · la URL se corrige sola", () => {
   // B lo exige. Lo que sí se puede mirar en la pantalla real es la MECÁNICA: una
   // dirección que esta persona no puede abrir se corrige sola en la URL. Las
   // cuatro con el acomodo prendido están cubiertas, una por una, en el bloque A.
+  // 🔄 2-oct-2026 (ASISTENCIA_APPLE_2026_10 prendido): la primera pestaña ya no
+  // es la de por defecto de `useUrlState`, así que la corrección ESCRIBE la
+  // primera del orden del trabajo en vez de sacar el `tab`. En producción
+  // (acomodo prendido) es «asistencia» —bloque A—; en este arnés, con el acomodo
+  // apagado, «aprobaciones». Lo que se exige es lo mismo: la clave mala se va.
+  const primeraEnElArnes = pestanasEnOrdenDelTrabajo(
+    pestanasDeAsistencia({ personaEnElCentro: false, planillaUnida: false }), true,
+  )[0][0];
+  const seCorrigio = () => seSacoElTab() || tabsEscritos().includes(primeraEnElArnes);
+
   it("🔴 una dirección que no existe deja de existir: la URL se corrige sola", async () => {
     montar("tab=zzz-no-existe");
-    await waitFor(() => expect(seSacoElTab()).toBe(true));
+    await waitFor(() => expect(seCorrigio()).toBe(true));
   });
 
   it("🔴 `?tab=personas` —la clave de una tarde de septiembre— también se corrige", async () => {
     montar("tab=personas");
-    await waitFor(() => expect(seSacoElTab()).toBe(true));
+    await waitFor(() => expect(seCorrigio()).toBe(true));
   });
 
   it("🔴 una pestaña que esta persona NO ve se corrige a la suya", async () => {

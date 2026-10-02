@@ -21,6 +21,8 @@
  * agregó es el CONTROL AL REVÉS: un servicio profesional con la casilla en SÍ
  * ve su número — la regla de antes (la bandera sola apagaba) ya no vale.
  * ─────────────────────────────────────────────────────────────────────────── */
+// 2-oct-2026: con ASISTENCIA_APPLE_2026_10 prendido el Excel escribe los nombres como se
+// escriben («Yulissa…», no «YULISSA…»); las filas se buscan sin importar mayúsculas.
 import { describe, it, expect } from "vitest";
 import * as XLSX from "xlsx-js-style";
 
@@ -81,7 +83,7 @@ describe("el motor mide igual; la bandera decide qué se cuenta", () => {
     // Y en el Excel sale el número, no «—».
     const f = filas(construirExcel({ personas: reporteServicioProfesionalQueCobra(), desde: DESDE, hasta: HASTA, reglas: R }), "Resumen");
     const c = (f[0] as string[]).indexOf("Extras (min)");
-    const fila = f.find((r) => String(r[0]).includes("YULISSA"))!;
+    const fila = f.find((r) => String(r[0]).toUpperCase().includes("YULISSA"))!;
     expect(Number(fila[c])).toBeCloseTo(60, 6);
   });
 
@@ -105,7 +107,7 @@ describe("el Excel y el PDF muestran «—», nunca 0 ni el número", () => {
     const f = filas(construirExcel({ personas: reporte(true), desde: DESDE, hasta: HASTA, reglas: R }), "Resumen");
     const c = col(f, "Extras (min)");
     expect(c).toBeGreaterThan(-1);
-    const fila = f.find((r) => String(r[0]).includes("YULISSA"))!;
+    const fila = f.find((r) => String(r[0]).toUpperCase().includes("YULISSA"))!;
     expect(fila[c]).toBe("—");
     const total = f.find((r) => String(r[0]).toUpperCase().includes("TOTAL"))!;
     expect(total[c] === "" || total[c] === undefined || total[c] === 0).toBe(true);
@@ -117,14 +119,14 @@ describe("el Excel y el PDF muestran «—», nunca 0 ni el número", () => {
   it("CONTROL Resumen: sin la bandera sale 60", () => {
     const f = filas(construirExcel({ personas: reporte(false), desde: DESDE, hasta: HASTA, reglas: R }), "Resumen");
     const c = col(f, "Extras (min)");
-    const fila = f.find((r) => String(r[0]).includes("YULISSA"))!;
+    const fila = f.find((r) => String(r[0]).toUpperCase().includes("YULISSA"))!;
     expect(Number(fila[c])).toBeCloseTo(60, 6);
   });
 
   it("Detalle: el día con extra dice «—»", () => {
     const f = filas(construirExcel({ personas: reporte(true), desde: DESDE, hasta: HASTA, reglas: R }), "Detalle");
     const c = col(f, "Extra (min)");
-    const dia = f.find((r) => String(r[0]).includes("YULISSA") && String(r[3] ?? "").startsWith("08:"))!;
+    const dia = f.find((r) => String(r[0]).toUpperCase().includes("YULISSA") && String(r[3] ?? "").startsWith("08:"))!;
     expect(dia[c]).toBe("—");
   });
 

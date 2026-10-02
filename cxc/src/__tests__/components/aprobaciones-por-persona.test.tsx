@@ -19,6 +19,19 @@ import type { DiaAprobacion, Decision } from "@/lib/asistencia/aprobaciones";
 
 let URL_ACTUAL = "";
 const replace = vi.fn();
+// 2-oct-2026: ASISTENCIA_APPLE_2026_10 se prendió (Daniel: "sí"). Esta prueba es
+// de la versión de antes y la fuerza en false; también las funciones, porque su
+// valor por defecto lee la constante del propio módulo, no la del mock.
+vi.mock("@/lib/asistencia/apple-2026-10", async (original) => {
+  const o = await original<typeof import("@/lib/asistencia/apple-2026-10")>();
+  return {
+    ...o,
+    ASISTENCIA_APPLE_2026_10: false,
+    selectorDeSeccionEnCelular: (celular: boolean) => o.selectorDeSeccionEnCelular(celular, false),
+    nombreDePersona: (nombre: string) => o.nombreDePersona(nombre, false),
+    aprobacionesConNombres: (dias: Parameters<typeof o.aprobacionesConNombres>[0]) => o.aprobacionesConNombres(dias, false),
+  };
+});
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace, refresh: vi.fn(), prefetch: vi.fn() }),
   usePathname: () => "/asistencia",

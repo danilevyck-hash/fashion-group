@@ -31,7 +31,8 @@ import {
 } from "@/lib/depurador/reebok";
 
 /** `false` = la pantalla de hoy, exactamente. */
-export const PLANTILLA_APPLE_2026_10 = false;
+// Daniel aprobó las capturas el 2-oct-2026: "sí".
+export const PLANTILLA_APPLE_2026_10 = true;
 
 /** Cuántas cargas se ven debajo de la caja. */
 export const CARGAS_RECIENTES = 5;

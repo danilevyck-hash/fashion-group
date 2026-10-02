@@ -46,6 +46,12 @@ import { totalDeTiendas } from "@/lib/marketing/periodo-manda";
 import { filasDeTiendas } from "@/lib/marketing/tiendas-y-marcas";
 import type { FilaDeTienda } from "@/lib/marketing/vista-tienda";
 
+// 2-oct-2026: MARKETING_APPLE_2026_10 se prendió (Daniel aprobó las capturas:
+// "sí"). Esta prueba es de la versión de antes y la fuerza en false.
+vi.mock("@/lib/marketing/marketing-2026-10", async (original) => ({
+  ...(await original<typeof import("@/lib/marketing/marketing-2026-10")>()),
+  MARKETING_APPLE_2026_10: false,
+}));
 vi.mock("next/navigation", () => ({
   usePathname: () => "/marketing",
   useSearchParams: () => new URLSearchParams(""),

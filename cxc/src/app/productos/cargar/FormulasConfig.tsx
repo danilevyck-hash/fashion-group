@@ -342,14 +342,14 @@ export default function FormulasConfig({ scope = "depurador", apple = false, emb
               type="button"
               onClick={() => toggleGrupo(idGrupo)}
               aria-expanded={grupoAbierto}
-              className="mb-2 flex min-h-[44px] w-full items-center gap-2 border-b border-stone-200 py-1.5 text-left text-[13px] font-bold uppercase tracking-wide text-teal-800 transition hover:bg-stone-50"
+              className="mb-2 flex min-h-[44px] w-full items-center gap-2 border-b border-gray-200 py-1.5 text-left text-[13px] font-bold uppercase tracking-wide text-gray-900 transition hover:bg-gray-50"
             >
-              <span aria-hidden className="text-stone-400">{grupoAbierto ? "▾" : "▸"}</span>
+              <span aria-hidden className="text-gray-400">{grupoAbierto ? "▾" : "▸"}</span>
               <span className="min-w-0 flex-1 truncate">
                 {g.label || "Otras"}
-                {g.marca && <span className="ml-2 text-[12px] font-normal normal-case tracking-normal text-stone-500">· {g.marca}</span>}
+                {g.marca && <span className="ml-2 text-[12px] font-normal normal-case tracking-normal text-gray-500">· {g.marca}</span>}
               </span>
-              <span className="shrink-0 text-[12px] font-normal normal-case tracking-normal text-stone-400">
+              <span className="shrink-0 text-[12px] font-normal normal-case tracking-normal text-gray-400">
                 {rotuloMarcas(groupRows.length)}
               </span>
             </button>
@@ -377,14 +377,14 @@ export default function FormulasConfig({ scope = "depurador", apple = false, emb
             type="button"
             onClick={() => toggleGrupo("multifashion")}
             aria-expanded={gruposAbiertos.has("multifashion")}
-            className="mb-2 flex min-h-[44px] w-full items-center gap-2 border-b border-stone-200 py-1.5 text-left text-[13px] font-bold uppercase tracking-wide text-teal-800 transition hover:bg-stone-50"
+            className="mb-2 flex min-h-[44px] w-full items-center gap-2 border-b border-gray-200 py-1.5 text-left text-[13px] font-bold uppercase tracking-wide text-gray-900 transition hover:bg-gray-50"
           >
-            <span aria-hidden className="text-stone-400">{gruposAbiertos.has("multifashion") ? "▾" : "▸"}</span>
+            <span aria-hidden className="text-gray-400">{gruposAbiertos.has("multifashion") ? "▾" : "▸"}</span>
             <span className="min-w-0 flex-1 truncate">
               Multifashion
-              <span className="ml-2 text-[12px] font-normal normal-case tracking-normal text-stone-500">· Facturas de tienda</span>
+              <span className="ml-2 text-[12px] font-normal normal-case tracking-normal text-gray-500">· Facturas de tienda</span>
             </span>
-            <span className="shrink-0 text-[12px] font-normal normal-case tracking-normal text-stone-400">
+            <span className="shrink-0 text-[12px] font-normal normal-case tracking-normal text-gray-400">
               {rotuloMarcas(TIENDA_MARCA_CATALOGO.length)}
             </span>
           </button>

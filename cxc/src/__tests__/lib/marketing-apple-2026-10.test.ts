@@ -25,8 +25,10 @@ import {
 const leer = (rel: string) => fs.readFileSync(path.join(process.cwd(), rel), "utf8");
 
 describe("🔴 MARKETING_APPLE_2026_10", () => {
-  it("nace en false: la pantalla de hoy", () => {
-    expect(MARKETING_APPLE_2026_10).toBe(false);
+  it("está PRENDIDO desde el 2-oct-2026", () => {
+    // 🔄 2-oct-2026: Daniel aprobó las capturas: "sí". El interruptor se prende;
+    // el control al revés queda: la rama de antes se sigue probando con `false`.
+    expect(MARKETING_APPLE_2026_10).toBe(true);
   });
 
   it("cada pantalla tocada conserva su rama de hoy detrás del interruptor", () => {

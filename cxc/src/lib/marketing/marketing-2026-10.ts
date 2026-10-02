@@ -35,7 +35,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** 🔴 Marketing estilo Apple. `false` = como el 30-sep-2026. */
-export const MARKETING_APPLE_2026_10 = false;
+// Daniel aprobó las capturas el 2-oct-2026: "sí".
+export const MARKETING_APPLE_2026_10 = true;
 
 /** Con más tiendas que esto en la lista, aparece el buscador. */
 export const TIENDAS_PARA_BUSCADOR = 10;

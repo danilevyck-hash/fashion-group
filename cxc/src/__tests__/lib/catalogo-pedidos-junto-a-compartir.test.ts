@@ -51,7 +51,13 @@ describe("🔴 'Comprobantes' se mudó, no se duplicó", () => {
 
   it("la pantalla del catálogo lo dibuja UNA sola vez", () => {
     const s = leer(VENDEDOR);
-    expect((s.match(/>Comprobantes</g) || []).length).toBe(1);
+    // 🔄 2-oct-2026 (CATALOGOS_APPLE_2026_10 prendido): el archivo lo escribe
+    // DOS veces, pero nunca se ven las dos: `pedidosBtn` en la computadora y
+    // una entrada dentro del «···» del celular (`masAbierto`). Lo que sigue
+    // prohibido es una tercera copia, o que la del menú viva fuera del «···».
+    expect((s.match(/>Comprobantes</g) || []).length).toBe(2);
+    const menu = s.slice(s.indexOf("{masAbierto && ("));
+    expect((menu.match(/>Comprobantes</g) || []).length).toBe(1);
     expect(s).toContain("theme.vendorShare.pedidosBtn");
     // CONTROL: el rótulo viejo no vuelve — un solo lugar, un solo nombre.
     expect((s.match(/>Pedidos</g) || []).length).toBe(0);

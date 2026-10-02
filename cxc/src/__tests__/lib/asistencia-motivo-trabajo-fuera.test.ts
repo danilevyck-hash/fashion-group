@@ -22,6 +22,8 @@
 // Fechas FIJAS, nunca `new Date()`.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// 2-oct-2026: con ASISTENCIA_APPLE_2026_10 prendido el Excel escribe los nombres como se
+// escriben («Yulissa…», no «YULISSA…»); las filas se buscan sin importar mayúsculas.
 import { describe, it, expect } from "vitest";
 import * as XLSX from "xlsx-js-style";
 import {
@@ -361,7 +363,7 @@ describe("El EXCEL dice lo mismo que la pantalla", () => {
     const cAusJ = head.indexOf("Ausencias justificadas");
     expect(cFuera).toBeGreaterThan(-1);
     expect(cAusJ).toBeGreaterThan(-1);
-    const fila = f.find((r) => String(r[0] ?? "").includes("RODRIGO"))!;
+    const fila = f.find((r) => String(r[0] ?? "").toUpperCase().includes("RODRIGO"))!;
     expect(fila[cFuera]).toBe(1);
     expect(fila[cAusJ] ?? "").not.toBe(1);
   });

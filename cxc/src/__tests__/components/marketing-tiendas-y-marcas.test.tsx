@@ -51,6 +51,12 @@ const perilla = vi.hoisted(() => ({
   replace: vi.fn(),
 }));
 
+// 2-oct-2026: MARKETING_APPLE_2026_10 se prendió (Daniel aprobó las capturas:
+// "sí"). Esta prueba es de la versión de antes y la fuerza en false.
+vi.mock("@/lib/marketing/marketing-2026-10", async (original) => ({
+  ...(await original<typeof import("@/lib/marketing/marketing-2026-10")>()),
+  MARKETING_APPLE_2026_10: false,
+}));
 vi.mock("@/lib/marketing/tiendas-y-marcas", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/marketing/tiendas-y-marcas")>();
   return {

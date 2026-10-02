@@ -167,7 +167,7 @@ function CargarInner() {
 
   const vistas = VISTAS_POR_TAB[tab].filter((v) => !v.soloAdmin || esAdmin);
   const nav = navegacion(PLANTILLA_APPLE_2026_10, tab, vista, vistas.length);
-  const enlace = "inline-flex min-h-[44px] items-center text-sm font-medium text-teal-700 hover:text-teal-900";
+  const enlace = "inline-flex min-h-[44px] items-center text-sm font-medium text-blue-600 hover:text-blue-800";
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -183,7 +183,7 @@ function CargarInner() {
         {nav.pestanas && <SelectorPestanas tab={tab} onChange={setTab} />}
 
         {/* ≥lg: la fila de píldoras de siempre, ahora con 3. */}
-        {nav.pestanas && <div className="hidden lg:flex w-full flex-nowrap overflow-x-auto rounded-lg border border-stone-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {nav.pestanas && <div className="hidden lg:flex w-full flex-nowrap overflow-x-auto rounded-lg border border-gray-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {PESTANAS.map(p => (
             <TabBtn key={p.id} active={tab === p.id} onClick={() => setTab(p.id)}>{p.label}</TabBtn>
           ))}
@@ -210,7 +210,7 @@ function CargarInner() {
           {nav.volver && (
             <button type="button" onClick={() => irA("plantilla", "nuevo")} className={`${enlace} shrink-0`}>← Plantilla</button>
           )}
-          <div className={`${nav.volver ? "" : "mt-3 "}flex w-full flex-nowrap overflow-x-auto rounded-lg border border-stone-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}>
+          <div className={`${nav.volver ? "" : "mt-3 "}flex w-full flex-nowrap overflow-x-auto rounded-lg border border-gray-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}>
             {vistas.map((v) => (
               <TabBtn key={v.id} active={vista === v.id} onClick={() => cambiarVista(v.id)}>{v.label}</TabBtn>
             ))}
@@ -228,7 +228,7 @@ function CargarInner() {
           onDownloaded={handleDownloaded}
           pie={nav.enlaces ? (
             <div className="mt-6">
-              <h2 className="mb-2 text-sm font-semibold text-stone-900">Cargas recientes</h2>
+              <h2 className="mb-2 text-sm font-semibold text-gray-900">Cargas recientes</h2>
               <HistorialView refreshKey={refreshKey} limite={CARGAS_RECIENTES} />
               <button type="button" onClick={() => irA("plantilla", "historial")} className={`${enlace} mt-2`}>Ver historial completo</button>
             </div>

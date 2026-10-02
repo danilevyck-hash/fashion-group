@@ -45,7 +45,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** 🔴 El interruptor. `false` = la pantalla de hoy. */
-export const CATALOGOS_APPLE_2026_10 = false;
+// Daniel aprobó las capturas el 2-oct-2026: "sí".
+export const CATALOGOS_APPLE_2026_10 = true;
 
 /**
  * Las clases de cada pieza de la barra de filtros con la propuesta. Un solo

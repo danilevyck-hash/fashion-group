@@ -48,11 +48,12 @@ const login = read("app", "page.tsx");
 
 describe("Depurador · la barra de pestañas no puede volver a desbordar la página", () => {
   it("ninguna barra de pestañas usa inline-flex (era lo que empujaba el layout)", () => {
-    expect(depurador).not.toMatch(/className="inline-flex rounded-lg border border-stone-200/);
+    expect(depurador).not.toMatch(/className="inline-flex rounded-lg border border-(?:stone|gray)-200/);
   });
 
   it("las barras de pestañas scrollean solas: flex-nowrap + overflow-x-auto", () => {
-    const barras = depurador.match(/className="[^"]*rounded-lg border border-stone-200 bg-white p-1[^"]*"/g) ?? [];
+    // 2-oct-2026: la paleta única cambia `stone` por `gray`; la barra es la misma.
+    const barras = depurador.match(/className="[^"]*rounded-lg border border-(?:stone|gray)-200 bg-white p-1[^"]*"/g) ?? [];
     expect(barras.length).toBeGreaterThanOrEqual(2); // pestañas del módulo + scope de fórmulas
     for (const b of barras) {
       expect(b).toContain("flex-nowrap");

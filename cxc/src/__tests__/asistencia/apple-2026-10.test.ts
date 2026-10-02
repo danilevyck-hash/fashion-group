@@ -34,8 +34,10 @@ const claves = (p: readonly (readonly [string, string])[]) => p.map(([k]) => k);
 const comoProduccion = () => pestanasDeAsistencia({ personaEnElCentro: true, planillaUnida: true });
 
 describe("apagado = la pantalla de hoy", () => {
-  it("el interruptor se entrega apagado hasta que Daniel diga sí", () => {
-    expect(ASISTENCIA_APPLE_2026_10).toBe(false);
+  it("el interruptor está PRENDIDO desde el 2-oct-2026", () => {
+    // 🔄 2-oct-2026: Daniel aprobó las capturas: "sí". El interruptor se prende;
+    // el control al revés queda: la rama de antes se sigue probando con `false`.
+    expect(ASISTENCIA_APPLE_2026_10).toBe(true);
   });
 
   it("devuelve la MISMA lista, en el mismo orden", () => {
@@ -93,7 +95,8 @@ describe("ningún número se mueve", () => {
 
   it("ninguna ruta ni el motor importan el interruptor", () => {
     const quienes = [...archivos(join(raiz, "app")), ...archivos(join(raiz, "lib"))]
-      .filter((p) => !p.endsWith("apple-2026-10.ts") && readFileSync(p, "utf8").includes("apple-2026-10"))
+      // 2-oct-2026: Marcación y Plantilla tienen su propio `apple-2026-10`; se busca el de Asistencia.
+      .filter((p) => !p.endsWith("asistencia/apple-2026-10.ts") && /(asistencia\/|\.\/)apple-2026-10"/.test(readFileSync(p, "utf8")))
       .map((p) => p.slice(raiz.length + 1));
     // 2-oct-2026: se suman las tres pantallas que muestran nombres. Ninguna ruta
     // (`app/api`) ni el motor (planilla · reporte · aprobaciones · corte).

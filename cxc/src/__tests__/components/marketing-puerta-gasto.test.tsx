@@ -734,9 +734,11 @@ async function llenarFactura() {
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("8 · 🔴 MARKETING_APPLE_2026_10: cambia la PANTALLA, no lo que se envía", () => {
-  it("el interruptor nace APAGADO (false = la pantalla de hoy)", () => {
+  // 🔄 2-oct-2026: Daniel aprobó las capturas: "sí". Se prende; el control al
+  // revés queda: el resto de este archivo sigue probando la rama de antes (false).
+  it("el interruptor está PRENDIDO desde el 2-oct-2026", () => {
     const src = sinComentarios(leer("src/lib/marketing/marketing-2026-10.ts"));
-    expect(src).toMatch(/export const MARKETING_APPLE_2026_10 = false;/);
+    expect(src).toMatch(/export const MARKETING_APPLE_2026_10 = true;/);
   });
 
   it("apagado: asterisco, casilla y nota a la vista, y «Falta:» antes de tocar (control)", () => {

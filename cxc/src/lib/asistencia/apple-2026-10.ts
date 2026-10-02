@@ -31,7 +31,8 @@ import type { ClavePestana, Pestana } from "@/lib/asistencia/persona-en-el-centr
 import type { DiaAprobacion } from "@/lib/asistencia/aprobaciones";
 import { capitalizarNombre, esGritado } from "@/lib/nombre-en-pantalla";
 
-export const ASISTENCIA_APPLE_2026_10 = false;
+// Daniel aprobó las capturas el 2-oct-2026: "sí".
+export const ASISTENCIA_APPLE_2026_10 = true;
 
 /** El orden de la quincena. Lo que no esté aquí queda al final, en su orden. */
 export const ORDEN_DEL_TRABAJO: readonly ClavePestana[] = [

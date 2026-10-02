@@ -35,8 +35,10 @@ function listar(dir: string): string[] {
 }
 
 describe("1 · el interruptor", () => {
-  it("hoy está APAGADO: la pantalla de hoy hasta el «sí» de Daniel", () => {
-    expect(CATALOGOS_APPLE_2026_10).toBe(false);
+  it("está PRENDIDO desde el 2-oct-2026", () => {
+    // 🔄 2-oct-2026: Daniel aprobó las capturas: "sí". El interruptor se prende;
+    // el control al revés queda: la rama de antes se sigue probando con `false`.
+    expect(CATALOGOS_APPLE_2026_10).toBe(true);
   });
 
   it("🔴 solo lo leen los archivos de pantalla, nunca el carrito, el checkout ni el envío", () => {
