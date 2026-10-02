@@ -610,7 +610,7 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 > 📄 Detalle, mediciones y citas: [docs/postmortems/diseno-y-ux.md](docs/postmortems/diseno-y-ux.md) › «Lo que decía CLAUDE.md hasta el 22-sep-2026».
 
 - Usuarios: secretarias, bodegueros, vendedores en Panamá. NO tech-savvy.
-- 🔴 **Al diseñar o nombrar cualquier pantalla, [docs/nombres-erp.md](docs/nombres-erp.md) es OBLIGATORIO**: nombres normales de ERP, nada inventado ni coloquial, mayúscula solo en la primera palabra.
+- 🔴 **Al diseñar o nombrar cualquier pantalla, [docs/diseno.md](docs/diseno.md) (estilo Apple) y [docs/nombres-erp.md](docs/nombres-erp.md) son OBLIGATORIOS**: nombres de ERP, nada coloquial.
 - 🔴 **«Pedido» para Daniel es la orden de un CLIENTE, nunca una petición HTTP.** Para hablar de red: **«no escribe nada», «no guarda nada», «solo lee»**. Igual de cargadas: factura · traslado · abono · pago.
 - 🔴 **Traer datos frescos se dice «Actualizar ahora» en TODO el sistema** (`lib/ui/actualizar-ahora.ts`). ⚠️ **«Traer ahora» de Asistencia es OTRA cosa** —le pide a una PC que empuje las marcas de su reloj— y no se toca.
 - 🔴 **La línea de «más de 4 marcas» NO dice cuál sobra** (18-sep-2026): «El día tiene N marcas, y son 4 — quita la que sobra», con las horas como BOTONES. 🩸 Decía «Marca de más: HH:MM:SS» —elegida por POSICIÓN— y la contadora quitó la equivocada. ⚠️ Con 3 marcas el texto NO cambia: ahí sí falta una.
