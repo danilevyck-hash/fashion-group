@@ -45,6 +45,13 @@ import {
   TONO_BOTON_VIVO,
   textoAvisarA,
 } from "@/lib/marcacion/un-toque";
+import {
+  MARCACION_APPLE_2026_10,
+  renglonesDelDia,
+  TEXTO_PENDIENTE_DE_ENVIO,
+  TEXTO_SIN_SENAL_APPLE,
+  textoPendientesDeEnvio,
+} from "@/lib/marcacion/apple-2026-10";
 
 export interface PantallaUnToqueProps {
   /** Cómo se llama, ya capitalizado. Vacío = no se dibuja. */
@@ -59,6 +66,9 @@ export interface PantallaUnToqueProps {
   /** Las horas de HOY, en orden, como «HH:MM». Con cuatro marcas la pastilla
    *  las nombra una por una; con dos, se sigue leyendo `hoyMarcado`. */
   horasHoy: readonly string[];
+  /** Las horas de HOY que todavía esperan señal («HH:MM»). Solo las lee la
+   *  pantalla estilo Apple, para el chip «Pendiente de envío». */
+  horasPendientesHoy?: readonly string[];
   /** Cuántas marcas lleva HOY. Lo usa el rótulo de «Deshacer», que nombra la
    *  ÚLTIMA: su número es `marcasHoy - 1`. */
   marcasHoy: number;
@@ -83,6 +93,7 @@ export default function PantallaUnToque({
   enLinea,
   hoyMarcado,
   horasHoy,
+  horasPendientesHoy = [],
   marcasHoy,
   sePuedeDeshacer,
   deshaciendo,
@@ -117,12 +128,48 @@ export default function PantallaUnToque({
           data-sin-senal
           className="mt-5 rounded-xl border border-gray-200 px-3 py-2.5 text-[14px] text-gray-600"
         >
-          {TEXTO_SIN_SENAL}
+          {MARCACION_APPLE_2026_10 ? TEXTO_SIN_SENAL_APPLE : TEXTO_SIN_SENAL}
         </p>
       )}
 
+      {/* 🔴 ESTILO APPLE (1-oct-2026): el día en renglones fijos, con «Deshacer»
+          en el renglón de la marca que deshace. Ver `apple-2026-10.ts`. */}
+      {MARCACION_APPLE_2026_10 && (
+        <ul data-renglones-del-dia className="mt-6 divide-y divide-gray-100 rounded-xl border border-gray-200">
+          {renglonesDelDia(horasHoy, horasPendientesHoy).map((r, i) => (
+            <li key={r.rotulo} className="flex min-h-[52px] items-center gap-3 px-4 py-2 text-[16px]">
+              <div className="min-w-0 flex-1">
+                <p className={r.hora ? "text-gray-900" : "text-gray-400"}>
+                  {r.hora && !r.pendiente && <span className="mr-1.5 text-green-600">✓</span>}
+                  {r.rotulo}
+                </p>
+                {/* Lo que dura poco va debajo, en chico: el renglón no se ensancha. */}
+                {(r.pendiente || (sePuedeDeshacer && i === marcasHoy - 1)) && (
+                  <p className="flex items-center gap-3 text-[13px] leading-[18px]">
+                    {r.pendiente && <span className="font-medium text-amber-700">{TEXTO_PENDIENTE_DE_ENVIO}</span>}
+                    {sePuedeDeshacer && i === marcasHoy - 1 && (
+                      <button
+                        type="button"
+                        onClick={onDeshacer}
+                        disabled={deshaciendo}
+                        className="-my-3 min-h-[44px] font-medium text-gray-600 underline decoration-dotted underline-offset-2 disabled:text-gray-400"
+                      >
+                        {deshaciendo ? "Deshaciendo…" : `Deshacer · ${cuentaRegresiva(sePuedeDeshacer.restanMs)}`}
+                      </button>
+                    )}
+                  </p>
+                )}
+              </div>
+              <span className={`whitespace-nowrap tabular-nums ${r.hora ? "font-medium text-gray-900" : "text-gray-300"}`}>
+                {r.hora ?? "—"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
       {/* 🔴 LA ÚNICA CONFIRMACIÓN, y «Deshacer» vive ADENTRO de ella. */}
-      {hoyMarcado && (
+      {!MARCACION_APPLE_2026_10 && hoyMarcado && (
         <div
           data-pastilla
           className="mt-6 flex items-center justify-between gap-3 rounded-xl bg-green-50 px-4 py-3.5 text-[17px] font-semibold text-green-800"
@@ -169,7 +216,13 @@ export default function PantallaUnToque({
         </p>
       )}
 
-      {pendientes > 0 && (
+      {MARCACION_APPLE_2026_10 && pendientes > 0 && (
+        <p data-pendientes-de-envio className="mt-3 text-[14px] text-gray-500">
+          {textoPendientesDeEnvio(pendientes)}
+        </p>
+      )}
+
+      {!MARCACION_APPLE_2026_10 && pendientes > 0 && (
         <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-[14px] font-medium text-amber-900">
           {pendientes === 1
             ? "Una marca está esperando señal. Se va a enviar sola."

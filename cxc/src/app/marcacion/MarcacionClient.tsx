@@ -344,6 +344,10 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
   // («Entrada · Almuerzo · Vuelta · Salida»); la primera y la última ya no
   // alcanzan. Sale de la MISMA lista con la que se cuenta el botón.
   const horasHoy = horasDelDia(todas, hoy);
+  const horasPendientesHoy = horasDelDia(
+    pendientes.map((p) => ({ ocurrioEn: p.horaTelefono })),
+    hoy,
+  );
 
   // 🔴 QUÉ SE PUEDE DESHACER — la última marca, dos minutos. La regla entera
   // vive en el módulo puro; acá solo se le pasan las dos fuentes y los dos
@@ -680,6 +684,7 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
             enLinea={enLinea}
             hoyMarcado={hoyMarcado}
             horasHoy={horasHoy}
+            horasPendientesHoy={horasPendientesHoy}
             marcasHoy={marcasHoy}
             sePuedeDeshacer={sePuedeDeshacer}
             deshaciendo={deshaciendo}
