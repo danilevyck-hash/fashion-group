@@ -40,6 +40,7 @@ import {
 } from "@/lib/marketing/periodo-manda";
 import { filtrarTiendas, subtituloDeTienda, type FilaTienda } from "@/lib/marketing/tiendas-y-marcas";
 import BarraDePeriodos from "./BarraDePeriodos";
+import { MARKETING_APPLE_2026_10, mostrarBuscadorDeTiendas } from "@/lib/marketing/marketing-2026-10";
 import { FilaNivel, ListaCard } from "./FilaNivel";
 import TiendasCelular from "./celular/TiendasCelular";
 import { useEsCelular } from "./celular/useEsCelular";
@@ -126,6 +127,7 @@ export default function PortadaTiendas({ refreshKey, celular = null }: Props) {
 
       {/* Solo filtra lo que ya está en pantalla. text-base en mobile: con
           14px Safari hace zoom al enfocar. */}
+      {(!MARKETING_APPLE_2026_10 || mostrarBuscadorDeTiendas((filas ?? []).length)) && (
       <input
         type="search"
         value={texto}
@@ -134,6 +136,7 @@ export default function PortadaTiendas({ refreshKey, celular = null }: Props) {
         aria-label="Buscar una tienda"
         className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none"
       />
+      )}
 
       {loading && datos === null ? (
         <div className="h-64 rounded-lg bg-gray-100 animate-pulse" />
@@ -187,9 +190,11 @@ export default function PortadaTiendas({ refreshKey, celular = null }: Props) {
         </section>
       )}
 
+      {!MARKETING_APPLE_2026_10 && (
       <p className="text-[12px] text-gray-500">
         Una tienda nueva se elige del directorio al registrar su primer gasto, con «＋ Gasto».
       </p>
+      )}
     </div>
   );
 }

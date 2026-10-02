@@ -33,6 +33,7 @@
 // (el agregador único) y las filas las arma `portada-rediseno.ts`, puro.
 // ============================================================================
 
+import { MARKETING_APPLE_2026_10, marcasConGastoPrimero } from "@/lib/marketing/marketing-2026-10";
 import { useEffect, useMemo, useState } from "react";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
@@ -315,8 +316,8 @@ export default function PortadaAbiertosCerrados({
           </button>
         </div>
       ) : pestana === "abiertos" ? (
-        <ListaCard titulo="Marcas">
-          {abiertas.map((f) => (
+        <ListaCard titulo={MARKETING_APPLE_2026_10 ? undefined : "Marcas"}>
+          {(MARKETING_APPLE_2026_10 ? marcasConGastoPrimero(abiertas) : abiertas).map((f) => (
             <FilaNivel
               key={f.key}
               titulo={f.nombre}

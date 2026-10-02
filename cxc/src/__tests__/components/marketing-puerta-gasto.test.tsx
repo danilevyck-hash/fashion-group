@@ -128,6 +128,18 @@ vi.mock("@/lib/marketing/puerta-gasto", async (importOriginal) => {
   };
 });
 
+// 🔴 MARKETING_APPLE_2026_10 (1-oct-2026): apagado salvo en el bloque 8.
+const perillaApple = vi.hoisted(() => ({ encendido: false }));
+vi.mock("@/lib/marketing/marketing-2026-10", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/marketing/marketing-2026-10")>();
+  return {
+    ...real,
+    get MARKETING_APPLE_2026_10() {
+      return perillaApple.encendido;
+    },
+  };
+});
+
 // La factura en PDF obligatoria la cubre `marketing-pdf-en-la-puerta.test.tsx`;
 // acá se dobla para poder llegar a «Guardar factura» sin subir un archivo.
 vi.mock("@/lib/marketing/pdf-en-la-puerta", async (importOriginal) => {
@@ -272,6 +284,7 @@ let llamadas: Llamada[];
 
 beforeEach(() => {
   perilla.encendido = true;
+  perillaApple.encendido = false;
   db.reiniciar();
   marcasEscritas.llamadas = [];
   invalidarDirectorioClientes();
@@ -717,3 +730,75 @@ async function llenarFactura() {
     expect((screen.getByRole("button", { name: /Guardar factura/ }) as HTMLButtonElement).disabled).toBe(false),
   );
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+describe("8 · 🔴 MARKETING_APPLE_2026_10: cambia la PANTALLA, no lo que se envía", () => {
+  it("el interruptor nace APAGADO (false = la pantalla de hoy)", () => {
+    const src = sinComentarios(leer("src/lib/marketing/marketing-2026-10.ts"));
+    expect(src).toMatch(/export const MARKETING_APPLE_2026_10 = false;/);
+  });
+
+  it("apagado: asterisco, casilla y nota a la vista, y «Falta:» antes de tocar (control)", () => {
+    abrir();
+    fireEvent.click(tipo("factura"));
+    expect(document.querySelector(".text-red-500")).not.toBeNull();
+    expect(casillaReporta()).not.toBeNull();
+    expect(document.querySelector('input[name="nota"]')).not.toBeNull();
+    expect(falta()).toBe("Falta: la marca y la tienda");
+    expect(continuar().disabled).toBe(true);
+  });
+
+  it("prendido: sin asteriscos; casilla y observaciones detrás de un enlace; «Falta:» al tocar Continuar", () => {
+    perillaApple.encendido = true;
+    abrir();
+    fireEvent.click(tipo("factura"));
+    expect(document.querySelector(".text-red-500")).toBeNull();
+    expect(casillaReporta()).toBeNull();
+    expect(document.querySelector('input[name="nota"]')).toBeNull();
+    expect(falta()).toBe("");
+    fireEvent.click(continuar());
+    // La MISMA regla de qué falta, y no se avanza.
+    expect(falta()).toBe("Falta: la marca y la tienda");
+    expect(screen.queryByRole("button", { name: /Guardar factura/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "No se reporta a la marca…" }));
+    expect(casillaReporta().checked).toBe(true); // nace PRENDIDA, igual que hoy
+    fireEvent.click(screen.getByRole("button", { name: "+ Agregar observaciones" }));
+    expect(document.querySelector('input[name="nota"]')).not.toBeNull();
+  });
+
+  it("prendido: el POST de la factura es IDÉNTICO al de hoy (mismo flujo del bloque 6)", async () => {
+    perillaApple.encendido = true;
+    const { onSaved } = abrir();
+    fireEvent.click(tipo("factura"));
+    fireEvent.change(selectMarca(), { target: { value: "m-ck" } });
+    await elegirTienda("City Mall David");
+    fireEvent.click(screen.getByRole("button", { name: "No se reporta a la marca…" }));
+    fireEvent.click(casillaReporta());
+    fireEvent.click(screen.getByRole("button", { name: "+ Agregar observaciones" }));
+    fireEvent.change(document.querySelector('input[name="nota"]')!, { target: { value: "Apertura" } });
+    fireEvent.click(continuar());
+    await llenarFactura();
+    fireEvent.click(screen.getByRole("button", { name: /Guardar factura/ }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    const post = llamadas.find((l) => l.url.includes("/api/marketing/facturas") && l.metodo === "POST")!;
+    expect(post.cuerpo).toMatchObject({
+      proyectoId: null,
+      marcaId: "m-ck",
+      tiendaCodigo: "D-24",
+      seReporta: false,
+      nota: "Apertura",
+      proveedor: "Premium Paint",
+    });
+  });
+
+  it("prendido y sin tocar los enlaces: el mueble viaja con seReporta true y nota null, como hoy", async () => {
+    perillaApple.encendido = true;
+    abrir();
+    fireEvent.click(tipo("mueble"));
+    fireEvent.change(selectMarca(), { target: { value: "m-th" } });
+    await elegirTienda();
+    fireEvent.click(continuar());
+    const form = screen.getByTestId("entrega-form");
+    expect(JSON.parse(form.getAttribute("data-gasto")!)).toEqual({ tiendaCodigo: "D-30", seReporta: true, nota: null });
+  });
+});

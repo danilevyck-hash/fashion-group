@@ -59,6 +59,11 @@ import type {
   MkProyecto,
   ProyectoConMarcas,
 } from "@/lib/marketing/types";
+import OverflowMenu from "@/components/ui/OverflowMenu";
+import { MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
+
+/** 🔴 MARKETING_APPLE_2026_10: el resumen usa la misma letra que Productos. */
+const MONO = MARKETING_APPLE_2026_10 ? "" : "font-mono ";
 
 interface ProductoEditState {
   id: string | null; // null = nuevo
@@ -725,7 +730,7 @@ export default function MobiliarioPage() {
                   <th className="text-right font-medium px-3 py-2 w-24">Entregado</th>
                   <th className="text-right font-medium px-3 py-2 w-24">Disponible</th>
                   <th className="text-right font-medium px-3 py-2 w-28">Valor</th>
-                  <th className="text-right font-medium px-3 py-2 w-28">Acciones</th>
+                  <th className="text-right font-medium px-3 py-2 w-28">{MARKETING_APPLE_2026_10 ? "" : "Acciones"}</th>
                 </tr>
               </thead>
               <tbody>
@@ -774,6 +779,22 @@ export default function MobiliarioPage() {
                           <td data-fg-campo="valor" className="px-3 py-2 text-right tabular-nums">
                             {formatearMonto(valor)}
                           </td>
+                          {/* 🔴 MARKETING_APPLE_2026_10: «···» con Editar · Eliminar. */}
+                          {MARKETING_APPLE_2026_10 ? (
+                          <td className="px-3 py-2 text-right">
+                            {(escribe || role === "admin") && (
+                              <OverflowMenu
+                                ariaLabel={`Más opciones de ${p.nombre}`}
+                                items={[
+                                  ...(escribe ? [{ label: "Editar", onClick: () => abrirEditarProducto(p) }] : []),
+                                  ...(role === "admin"
+                                    ? [{ label: "Eliminar", onClick: () => setDeleteProd(p), destructive: true }]
+                                    : []),
+                                ]}
+                              />
+                            )}
+                          </td>
+                          ) : (
                           <td className="px-3 py-2 text-right space-x-2">
                             {escribe && (
                             <button
@@ -794,6 +815,7 @@ export default function MobiliarioPage() {
                               </button>
                             )}
                           </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -1009,7 +1031,7 @@ export default function MobiliarioPage() {
                         <td data-fg-campo="cliente" className="px-3 py-2 text-gray-900">
                           {tiendaEnPantalla(f)}
                         </td>
-                        <td data-fg-campo="paneles" className="px-3 py-2 text-right font-mono tabular-nums text-gray-700">
+                        <td data-fg-campo="paneles" className={`px-3 py-2 text-right ${MONO}tabular-nums text-gray-700`}>
                           {f.totalPaneles > 0 ? (
                             f.totalPaneles
                           ) : (
@@ -1022,7 +1044,7 @@ export default function MobiliarioPage() {
                             <td
                               key={m.id}
                               data-fg-campo={`marca:${m.id}`}
-                              className="px-3 py-2 text-right font-mono tabular-nums"
+                              className={`px-3 py-2 text-right ${MONO}tabular-nums`}
                             >
                               {monto > 0 ? (
                                 formatearMonto(monto)
@@ -1032,7 +1054,7 @@ export default function MobiliarioPage() {
                             </td>
                           );
                         })}
-                        <td data-fg-campo="total" className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-gray-900">
+                        <td data-fg-campo="total" className={`px-3 py-2 text-right ${MONO}tabular-nums font-semibold text-gray-900`}>
                           {f.totalMonto > 0 ? (
                             formatearMonto(f.totalMonto)
                           ) : (
@@ -1044,12 +1066,12 @@ export default function MobiliarioPage() {
                     {/* Fila TOTAL — fondo oscuro para contraste con el módulo. */}
                     <tr
                       data-fg-fila="Total"
-                      className="border-t border-gray-300 bg-gray-900 text-white"
+                      className={MARKETING_APPLE_2026_10 ? "border-t border-gray-200 bg-gray-50/50 font-semibold text-gray-900" : "border-t border-gray-300 bg-gray-900 text-white"}
                     >
-                      <td className="px-3 py-2.5 font-bold uppercase text-xs tracking-wide">
+                      <td className={MARKETING_APPLE_2026_10 ? "px-3 py-2" : "px-3 py-2.5 font-bold uppercase text-xs tracking-wide"}>
                         Total
                       </td>
-                      <td data-fg-campo="paneles" className="px-3 py-2.5 text-right font-mono tabular-nums font-bold">
+                      <td data-fg-campo="paneles" className={`px-3 py-2.5 text-right ${MONO}tabular-nums font-bold`}>
                         {totalResumen.totalPaneles || (
                           <span className="opacity-50">—</span>
                         )}
@@ -1060,13 +1082,13 @@ export default function MobiliarioPage() {
                           <td
                             key={m.id}
                             data-fg-campo={`marca:${m.id}`}
-                            className="px-3 py-2.5 text-right font-mono tabular-nums font-bold"
+                            className={`px-3 py-2.5 text-right ${MONO}tabular-nums font-bold`}
                           >
                             {monto > 0 ? formatearMonto(monto) : "—"}
                           </td>
                         );
                       })}
-                      <td data-fg-campo="total" className="px-3 py-2.5 text-right font-mono tabular-nums font-bold">
+                      <td data-fg-campo="total" className={`px-3 py-2.5 text-right ${MONO}tabular-nums font-bold`}>
                         {totalResumen.totalMonto > 0
                           ? formatearMonto(totalResumen.totalMonto)
                           : "—"}

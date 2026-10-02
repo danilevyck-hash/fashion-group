@@ -27,6 +27,11 @@ import ClientePicker from "@/components/ClientePicker";
 import { TIENDA_GENERAL } from "@/lib/marketing/gasto";
 import type { DatosDelGasto } from "@/lib/marketing/puerta-gasto";
 import type { MkMarca } from "@/lib/marketing/types";
+import {
+  MARKETING_APPLE_2026_10,
+  observacionesAbiertas,
+  seReportaAbierto,
+} from "@/lib/marketing/marketing-2026-10";
 
 export interface TiendaElegida {
   codigo: string;
@@ -66,6 +71,12 @@ export default function BloqueDatosDelGasto({
   sinMarca = false,
 }: Props) {
   const [cambiandoMarca, setCambiandoMarca] = useState(false);
+  // 🔴 MARKETING_APPLE_2026_10: lo que casi nunca se toca va detrás de un
+  // enlace (medido: «se reporta» prendido en 104 de 104; nota en 4 de 103).
+  const [abrioSeReporta, setAbrioSeReporta] = useState(false);
+  const [abrioObservaciones, setAbrioObservaciones] = useState(false);
+  const verSeReporta = !MARKETING_APPLE_2026_10 || seReportaAbierto(datos.seReporta, abrioSeReporta);
+  const verNota = !MARKETING_APPLE_2026_10 || observacionesAbiertas(datos.nota, abrioObservaciones);
   const esImpulsadora = marcaDeImpulsadora !== undefined;
   const marcaElegida = marcas.find((m) => m.id === datos.marcaId) ?? null;
   const marcaFijaVisible =
@@ -90,7 +101,7 @@ export default function BloqueDatosDelGasto({
       {!sinMarca && (
       <div>
         <label htmlFor="gasto-marca" className="block text-sm font-medium text-gray-700 mb-1">
-          Marca<span className="text-red-500 ml-0.5">*</span>
+          Marca{!MARKETING_APPLE_2026_10 && <span className="text-red-500 ml-0.5">*</span>}
         </label>
         {esImpulsadora ? (
           <div
@@ -139,7 +150,7 @@ export default function BloqueDatosDelGasto({
       <div>
         <div className="block text-sm font-medium text-gray-700 mb-1">
           Tienda
-          {datos.esDeTienda && !tiendaInicial && <span className="text-red-500 ml-0.5">*</span>}
+          {!MARKETING_APPLE_2026_10 && datos.esDeTienda && !tiendaInicial && <span className="text-red-500 ml-0.5">*</span>}
         </div>
         {tiendaInicial ? (
           <div
@@ -199,6 +210,29 @@ export default function BloqueDatosDelGasto({
       </div>
 
       {/* ─── SE REPORTA ────────────────────────────────────────────────── */}
+      {!verSeReporta || !verNota ? (
+        <div className="flex flex-wrap gap-x-5">
+          {!verNota && (
+            <button
+              type="button"
+              onClick={() => setAbrioObservaciones(true)}
+              className="text-sm text-teal-700 hover:text-teal-900 min-h-[44px] inline-flex items-center"
+            >
+              + Agregar observaciones
+            </button>
+          )}
+          {!verSeReporta && (
+            <button
+              type="button"
+              onClick={() => setAbrioSeReporta(true)}
+              className="text-sm text-gray-500 hover:text-gray-800 min-h-[44px] inline-flex items-center"
+            >
+              No se reporta a la marca…
+            </button>
+          )}
+        </div>
+      ) : null}
+      {verSeReporta && (
       <div className="rounded-md border border-gray-200 bg-gray-50/60 px-3 py-1">
         <label className="flex items-center gap-2 cursor-pointer min-h-[44px]">
           <input
@@ -216,11 +250,19 @@ export default function BloqueDatosDelGasto({
           </p>
         )}
       </div>
+      )}
 
       {/* ─── NOTA ──────────────────────────────────────────────────────── */}
+      {verNota && (
       <div>
         <label htmlFor="gasto-nota" className="block text-sm font-medium text-gray-700 mb-1">
-          Nota <span className="font-normal text-gray-400">(opcional)</span>
+          {MARKETING_APPLE_2026_10 ? (
+            "Observaciones"
+          ) : (
+            <>
+              Nota <span className="font-normal text-gray-400">(opcional)</span>
+            </>
+          )}
         </label>
         <input
           id="gasto-nota"
@@ -231,8 +273,10 @@ export default function BloqueDatosDelGasto({
           maxLength={120}
           placeholder="Apertura, Remodelación…"
           className={CAMPO}
+          autoFocus={MARKETING_APPLE_2026_10 && abrioObservaciones}
         />
       </div>
+      )}
     </div>
   );
 }

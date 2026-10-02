@@ -77,6 +77,7 @@ import BarraDePeriodos from "../../components/BarraDePeriodos";
 import { useMarcasCatalogo } from "../../components/useMarcaPeriodos";
 import FichaTiendaAcciones, { type AccionDeFila } from "./FichaTiendaAcciones";
 import { descargarExcelDeLaTienda } from "./excel-de-la-tienda";
+import { MARKETING_APPLE_2026_10, montoDelChip } from "@/lib/marketing/marketing-2026-10";
 
 interface Datos {
   codigo: string | null;
@@ -303,12 +304,15 @@ export default function FichaTienda({ codigo, role }: { codigo: string; role: st
             >
               Excel
             </button>
+            {/* 🔴 MARKETING_APPLE_2026_10: «Fotos · 0» no se dibuja en cero. */}
+            {(!MARKETING_APPLE_2026_10 || (datos?.fotos ?? 0) > 0) && (
             <a
               href={`#${ANCLA_FOTOS}`}
               className="rounded-md border border-gray-300 bg-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm text-gray-800 hover:border-gray-500 transition"
             >
               Fotos{datos ? ` · ${datos.fotos}` : ""}
             </a>
+            )}
           </div>
         </div>
 
@@ -331,6 +335,9 @@ export default function FichaTienda({ codigo, role }: { codigo: string; role: st
               etiqueta="Seleccionar período"
             />
 
+            {/* 🔴 MARKETING_APPLE_2026_10: la tarjeta se va; su total y sus
+                montos por marca pasan a los chips de abajo. */}
+            {!MARKETING_APPLE_2026_10 && (
             <Cabecera
               rotulo={rotuloDelKpi(periodo, chipsPeriodo)}
               total={pie.total}
@@ -339,6 +346,7 @@ export default function FichaTienda({ codigo, role }: { codigo: string; role: st
               porMarca={porMarca}
               gastos={delPeriodo.length}
             />
+            )}
 
             <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Filtrar por marca">
               {chips.map((c) => (
@@ -348,13 +356,22 @@ export default function FichaTienda({ codigo, role }: { codigo: string; role: st
                   role="tab"
                   aria-selected={filtro === c.clave}
                   onClick={() => setFiltro(c.clave)}
-                  className={`inline-flex min-h-[44px] items-center gap-1.5 px-3 rounded-lg text-xs font-medium border transition ${
+                  className={`inline-flex min-h-[44px] items-center ${MARKETING_APPLE_2026_10 ? "gap-2 px-4 text-sm" : "gap-1.5 px-3 text-xs"} rounded-lg font-medium border transition ${
                     filtro === c.clave
                       ? "bg-fuchsia-600 border-fuchsia-600 text-white"
                       : "bg-white border-gray-200 text-gray-700 hover:border-gray-400"
                   }`}
                 >
                   {c.rotulo}
+                  {MARKETING_APPLE_2026_10 &&
+                    (() => {
+                      const monto = montoDelChip(c.clave, FILTRO_TODOS, pie.total, porMarca);
+                      return monto === null ? null : (
+                        <span className={`tabular-nums font-semibold ${filtro === c.clave ? "text-white" : "text-gray-900"}`}>
+                          {formatearMonto(monto)}
+                        </span>
+                      );
+                    })()}
                 </button>
               ))}
             </div>

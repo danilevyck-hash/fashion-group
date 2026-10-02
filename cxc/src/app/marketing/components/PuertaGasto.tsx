@@ -88,6 +88,7 @@ import type {
   MkInventarioProducto,
   MkMarca,
 } from "@/lib/marketing/types";
+import { MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
 
 type Paso = "tipo" | "datos" | "form";
 
@@ -239,6 +240,10 @@ export default function PuertaGasto({
   const faltantes = queFaltaEnLaPuerta({ tipo, datos, impulsadoraId: impulsadoraSel?.id ?? null });
   const textoFalta = textoFaltaEnLaPuerta(faltantes);
   const puedeContinuar = faltantes.length === 0;
+  // 🔴 MARKETING_APPLE_2026_10 (computadora): lo que falta se dice al tocar
+  // «Continuar», no antes. La regla de qué falta es la MISMA.
+  const [intentoContinuar, setIntentoContinuar] = useState(false);
+  const verFalta = !MARKETING_APPLE_2026_10 || intentoContinuar;
   const comun = paraGuardar(datos);
   const resumen = resumenDelGasto(datos, marcaEfectiva?.nombre ?? null);
 
@@ -674,7 +679,7 @@ export default function PuertaGasto({
               </div>
             ) : (
             <div className="border-t border-gray-100 px-5 py-4 flex items-center justify-end gap-3">
-              {textoFalta && (
+              {textoFalta && verFalta && (
                 <span className="text-xs text-amber-700 mr-auto" data-testid="falta-para-continuar">
                   {textoFalta}
                 </span>
@@ -688,8 +693,11 @@ export default function PuertaGasto({
               </button>
               <button
                 type="button"
-                onClick={() => puedeContinuar && setPaso("form")}
-                disabled={!puedeContinuar}
+                onClick={() => {
+                  setIntentoContinuar(true);
+                  if (puedeContinuar) setPaso("form");
+                }}
+                disabled={!puedeContinuar && !MARKETING_APPLE_2026_10}
                 className="rounded-md bg-black text-white px-4 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Continuar

@@ -36,6 +36,7 @@ import PortadaTiendas from "./PortadaTiendas";
 import { useEsCelular } from "./celular/useEsCelular";
 import PortadaAbiertosCerrados from "./PortadaAbiertosCerrados";
 import ImpulsadorasView from "./ImpulsadorasView";
+import { MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
 
 interface Props {
   role: string;
@@ -78,7 +79,7 @@ export default function PortadaTiendasYMarcas({
 
   return (
     <div className="space-y-5">
-      {!cel && (
+      {!cel && !MARKETING_APPLE_2026_10 && (
       <div className="flex items-center justify-end gap-4">
         <h1 className="sr-only">Marketing</h1>
         {escribe ? (
@@ -115,6 +116,25 @@ export default function PortadaTiendasYMarcas({
             {ROTULO_PESTANA_TM[p]}
           </button>
         ))}
+        {/* 🔴 MARKETING_APPLE_2026_10: «＋ Gasto» en la línea de las pestañas. */}
+        {MARKETING_APPLE_2026_10 && (
+          <div className="ml-auto pb-1 pl-4 shrink-0">
+            <h1 className="sr-only">Marketing</h1>
+            {escribe ? (
+              <button
+                type="button"
+                onClick={onRegistrarGasto}
+                className="rounded-md bg-black text-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition"
+              >
+                ＋ Gasto
+              </button>
+            ) : (
+              <span className="text-xs text-gray-500 rounded-md border border-gray-200 px-2 py-1">
+                {TEXTO_SOLO_LECTURA}
+              </span>
+            )}
+          </div>
+        )}
       </div>
       )}
 

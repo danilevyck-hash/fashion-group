@@ -18,6 +18,7 @@ import NuevaImpulsadoraModal from "./NuevaImpulsadoraModal";
 import RegistrarPagoModal from "./RegistrarPagoModal";
 import ImpulsadorasCelular from "./celular/ImpulsadorasCelular";
 import { useEsCelular } from "./celular/useEsCelular";
+import { MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
 
 interface Props {
   marcas: MkMarca[];
@@ -232,6 +233,7 @@ export default function ImpulsadorasView({ marcas, escribe = true, celular = nul
         />
       ) : (
       <div className="space-y-5">
+      {!MARKETING_APPLE_2026_10 && (
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Impulsadoras</h1>
@@ -246,8 +248,35 @@ export default function ImpulsadorasView({ marcas, escribe = true, celular = nul
           </button>
         )}
       </div>
+      )}
 
-      {!loading && (items?.length ?? 0) > 0 && (
+      {/* 🔴 MARKETING_APPLE_2026_10: sin título repetido (ya lo dice la
+          pestaña) y «+ Nueva impulsadora» secundario: 2 creadas en total. */}
+      {MARKETING_APPLE_2026_10 && (
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <h1 className="sr-only">Impulsadoras</h1>
+          <div className="text-sm text-gray-600">
+            {!loading && (items?.length ?? 0) > 0 && (pendientes === 0 ? (
+              <span className="text-emerald-700">Todo al día ✓</span>
+            ) : (
+              <span>
+                <span className="font-semibold text-amber-700">{pendientes}</span> con meses sin pagar
+              </span>
+            ))}
+          </div>
+          {escribe && (
+            <button
+              type="button"
+              onClick={() => setShowNueva(true)}
+              className="rounded-md border border-gray-300 bg-white px-3 min-h-[44px] text-sm text-gray-700 hover:border-gray-500 active:scale-[0.97] transition"
+            >
+              + Nueva impulsadora
+            </button>
+          )}
+        </div>
+      )}
+
+      {!MARKETING_APPLE_2026_10 && !loading && (items?.length ?? 0) > 0 && (
         <div className="text-sm text-gray-600">
           {pendientes === 0 ? (
             <span className="text-emerald-700">
@@ -326,8 +355,16 @@ export default function ImpulsadorasView({ marcas, escribe = true, celular = nul
                 )}
               </div>
 
-              <div className="shrink-0 text-right flex flex-col items-end gap-2">
-                <div>
+              {/* 🔴 MARKETING_APPLE_2026_10: los tres botones en UNA fila, los
+                  tres a la vista; «Registrar pago» es el que manda. */}
+              <div
+                className={
+                  MARKETING_APPLE_2026_10
+                    ? "shrink-0 self-center flex flex-row items-center gap-2"
+                    : "shrink-0 text-right flex flex-col items-end gap-2"
+                }
+              >
+                <div className={MARKETING_APPLE_2026_10 ? "text-right mr-3" : undefined}>
                   <div className="font-semibold text-gray-900 tabular-nums">
                     {formatearMonto(imp.monto_mensual)}
                   </div>
@@ -346,7 +383,11 @@ export default function ImpulsadorasView({ marcas, escribe = true, celular = nul
                   <button
                     type="button"
                     onClick={() => setPagando(imp)}
-                    className="min-h-[44px] rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:border-black hover:text-black transition"
+                    className={
+                      MARKETING_APPLE_2026_10
+                        ? "min-h-[44px] rounded-md border border-gray-900 px-3 py-1.5 text-sm font-medium text-gray-900 hover:bg-gray-50 active:scale-[0.97] transition"
+                        : "min-h-[44px] rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:border-black hover:text-black transition"
+                    }
                   >
                     Registrar pago
                   </button>

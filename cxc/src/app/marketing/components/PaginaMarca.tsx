@@ -26,6 +26,7 @@
 // quien ESCRIBE los ve. Con el interruptor apagado esta pantalla no se monta.
 // ============================================================================
 
+import { MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
@@ -98,7 +99,7 @@ export default function PaginaMarca({
             title={`Descargar ZIP de ${etiqueta}`}
             className="rounded-md border border-gray-200 bg-white px-2.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-xs text-gray-600 hover:text-gray-900 hover:border-gray-400 active:scale-[0.97] transition disabled:opacity-40"
           >
-            {bajando === zipClave ? "Armando…" : "ZIP"}
+            {bajando === zipClave ? "Armando…" : MARKETING_APPLE_2026_10 ? "Descargar ZIP" : "ZIP"}
           </button>
         )}
         {!abierto && s.id && (
@@ -117,7 +118,7 @@ export default function PaginaMarca({
             onClick={() => setCerrando(true)}
             className="rounded-md border border-teal-600 bg-teal-50 px-2.5 min-h-[44px] inline-flex items-center justify-center text-xs font-semibold text-teal-800 hover:bg-teal-100 active:scale-[0.97] transition"
           >
-            Cerrar
+            {MARKETING_APPLE_2026_10 ? "Cerrar período" : "Cerrar"}
           </button>
         )}
       </>
@@ -207,9 +208,11 @@ export default function PaginaMarca({
       {/* Lo que ya se le mandó a la marca (los ZIPs bajados del abierto). */}
       {ZIP_E_IMPULSADORAS_NUEVO && abierta && <ZipsBajados periodoId={abierta.id ?? null} />}
 
+      {!MARKETING_APPLE_2026_10 && (
       <p className="text-[12px] text-gray-500">
         Multifashion no aparece en ninguna marca: sus gastos no se le pasan a nadie.
       </p>
+      )}
       </div>
       )}
 
