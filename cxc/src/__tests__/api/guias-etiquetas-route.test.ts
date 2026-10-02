@@ -302,7 +302,9 @@ describe("🔴 3. pendiente: se corrige y se borra — el borrado es SOFT y FIRM
   it("PATCH con un número imposible: 400 y nada escrito", async () => {
     const { PATCH } = await una();
     expect((await PATCH(req({ cajas: 0 }), { params: { id: "1" } })).status).toBe(400);
-    expect((await PATCH(req({ cajas: 301 }), { params: { id: "1" } })).status).toBe(400);
+    expect((await PATCH(req({ cajas: 2.5 }), { params: { id: "1" } })).status).toBe(400);
+    // 🔴 Daniel, 2-oct-2026: «quita el límite ya». 301 ya no es imposible
+    // (antes daba 400 por el tope de 300); lo prueba el test de validarCajas.
     expect(escrituras.filter((e) => e.op === "update")).toHaveLength(0);
   });
 

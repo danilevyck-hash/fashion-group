@@ -36,7 +36,6 @@ import { TABLAS_PERSONAS } from "@/lib/backup/tablas";
 import {
   ETIQUETAS_ROLES,
   ETIQUETAS_POR_HOJA,
-  MAX_CAJAS,
   agruparEtiquetasEnRenglones,
   cajasDelJuego,
   cuantasHojas,
@@ -287,17 +286,25 @@ describe("la validación es fail-closed y con texto para la pantalla", () => {
     expect(validarEtiquetaNueva({ ...bodyOk(), switch_factura_id: 0 })).toMatchObject({ ok: false });
   });
 
-  it("las cajas: entero de 1 a 300, ni 0 ni 301 ni «tres»", () => {
+  // 🔴 Daniel, 2-oct-2026: «quita el límite ya». Antes este candado fijaba el
+  // tope de 300; ahora fija que NO hay tope: 301 y 1.000 pasan.
+  it("las cajas: entero desde 1, SIN TOPE; ni 0 ni «tres»", () => {
     expect(validarCajas(1)).toMatchObject({ ok: true, valor: 1 });
-    expect(validarCajas(MAX_CAJAS)).toMatchObject({ ok: true });
+    expect(validarCajas(300)).toMatchObject({ ok: true, valor: 300 });
+    expect(validarCajas(301)).toMatchObject({ ok: true, valor: 301 });
+    expect(validarCajas(1000)).toMatchObject({ ok: true, valor: 1000 });
+    expect(validarCajas("1000")).toMatchObject({ ok: true, valor: 1000 });
     expect(validarCajas(0)).toMatchObject({ ok: false });
-    expect(validarCajas(MAX_CAJAS + 1)).toMatchObject({ ok: false });
+    expect(validarCajas(-5)).toMatchObject({ ok: false });
     expect(validarCajas("tres")).toMatchObject({ ok: false });
     expect(validarCajas(2.5)).toMatchObject({ ok: false });
   });
 
-  it("el CHECK de la base dice el MISMO rango que la pantalla", () => {
-    expect(migracion).toContain(`cajas >= 1 AND cajas <= ${MAX_CAJAS}`);
+  it("el CHECK de la base queda sin tope: solo cajas >= 1 (Daniel, 2-oct-2026)", () => {
+    const sinTope = leer("supabase/migrations/20261225120000_guias_etiquetas_sin_tope_cajas.sql");
+    expect(sinTope).toContain("DROP CONSTRAINT IF EXISTS guias_etiquetas_cajas_rango");
+    expect(sinTope).toMatch(/CHECK \(cajas >= 1\);/);
+    expect(sinTope).not.toMatch(/cajas <=/);
   });
 });
 

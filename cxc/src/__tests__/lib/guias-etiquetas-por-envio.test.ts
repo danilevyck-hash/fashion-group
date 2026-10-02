@@ -381,16 +381,33 @@ describe("🔴 4. el envío se valida ENTERO: todo o nada", () => {
     if (!v.ok) expect(v.error).toContain("11-000000002");
   });
 
-  it("sin facturas, sin destino, factura repetida, empresa ajena o más de 300 bultos: no", () => {
+  it("sin facturas, sin destino, factura repetida o empresa ajena: no", () => {
     expect(validarEnvioNuevo(cuerpo({ facturas: [] })).ok).toBe(false);
     expect(validarEnvioNuevo(cuerpo({ destino: " " })).ok).toBe(false);
     expect(validarEnvioNuevo(cuerpo({ empresa_key: "confecciones_boston" })).ok).toBe(false);
     const repetida = cuerpo();
     (repetida.facturas as Array<Record<string, unknown>>)[1].switch_factura_id = 1;
     expect(validarEnvioNuevo(repetida).ok).toBe(false);
-    const grande = cuerpo();
-    for (const f of grande.facturas as Array<Record<string, unknown>>) f.cajas = 200;
-    expect(validarEnvioNuevo(grande).ok).toBe(false);
+  });
+
+  // 🔴 Daniel, 2-oct-2026: «quita el límite ya». Antes «más de 300 bultos: no».
+  it("sin tope de bultos: un envío de 301 y uno de 1.000 se aceptan", () => {
+    for (const n of [301, 1000]) {
+      const grande = cuerpo();
+      const fs = grande.facturas as Array<Record<string, unknown>>;
+      fs.forEach((f, i) => { f.cajas = i === 0 ? n - (fs.length - 1) : 1; });
+      const v = validarEnvioNuevo(grande);
+      expect(v.ok).toBe(true);
+      if (v.ok) expect(v.valor.facturas.reduce((s, f) => s + f.cajas, 0)).toBe(n);
+    }
+  });
+
+  it("1.000 etiquetas en un PDF: se genera entero (250 hojas carta, 1.000 en 4×6)", () => {
+    const t0 = Date.now();
+    const cajas = Array.from({ length: 1000 }, (_, i) => i + 1);
+    expect(construirPdfEtiquetas({ ...PEOR, cajas: 1000 }, cajas, "carta").getNumberOfPages()).toBe(250);
+    expect(construirPdfEtiquetas({ ...PEOR, cajas: 1000 }, cajas, "4x6").getNumberOfPages()).toBe(1000);
+    expect(Date.now() - t0).toBeLessThan(20000);
   });
 });
 

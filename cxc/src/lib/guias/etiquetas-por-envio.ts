@@ -24,7 +24,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
-  MAX_CAJAS,
   estaImportada,
   validarEtiquetaNueva,
   type EtiquetaFila,
@@ -82,9 +81,7 @@ export interface EnvioNuevo {
  * factura con las MISMAS reglas que una etiqueta suelta (`validarEtiquetaNueva`).
  * 🔴 Todo o nada: una sola factura mal y no se guarda ninguna.
  *
- * ⚠️ El total del envío tiene el mismo tope que una factura (`MAX_CAJAS`): es
- * lo que se imprime como «de N», y 300 ya pasa el récord real de una guía
- * entera (291 bultos).
+ * El total del envío no tiene tope (Daniel, 2-oct-2026: «quita el límite ya»).
  */
 export function validarEnvioNuevo(body: unknown): Validacion<EnvioNuevo> {
   const b = (body ?? {}) as Record<string, unknown>;
@@ -117,10 +114,6 @@ export function validarEnvioNuevo(body: unknown): Validacion<EnvioNuevo> {
       cajas: v.valor.cajas,
       nota: nota.valor,
     });
-  }
-  const total = facturas.reduce((s, f) => s + f.cajas, 0);
-  if (total > MAX_CAJAS) {
-    return { ok: false, error: `Son demasiados bultos para un envío (el tope es ${MAX_CAJAS})` };
   }
   return { ok: true, valor: { ...(cabecera as Omit<EnvioNuevo, "facturas">), facturas } };
 }

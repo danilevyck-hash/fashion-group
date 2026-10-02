@@ -48,7 +48,6 @@ import {
 } from "@/lib/guias/destinos-clientes";
 import {
   AYUDA_FORMATO,
-  MAX_CAJAS,
   TEXTO_TRAER_DE_SWITCH,
   facturasParaEtiquetar,
   rotuloEstado,
@@ -482,7 +481,6 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
       if (!n.ok) return `${f.secuencial}: ${n.error}`;
       if (f.switch_factura_id == null) return `${f.secuencial} todavía no tiene su número interno. Toca «Actualizar ahora».`;
     }
-    if (previa.total > MAX_CAJAS) return `Son demasiados bultos para un envío (el tope es ${MAX_CAJAS})`;
     if (!destino.trim()) return "Escribe el destino del envío";
     return null;
   }
@@ -664,7 +662,6 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
                                         type="number"
                                         inputMode="numeric"
                                         min={1}
-                                        max={MAX_CAJAS}
                                         value={m.bultos}
                                         onChange={(e) => cambiar(clave, "bultos", e.target.value)}
                                         className="w-[96px] rounded-md border border-gray-200 px-3 text-center font-mono text-lg font-semibold outline-none transition focus:border-black min-h-[44px]"

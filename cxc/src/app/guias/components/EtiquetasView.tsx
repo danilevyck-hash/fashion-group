@@ -67,7 +67,6 @@ import {
 } from "@/lib/guias/destinos-clientes";
 import {
   AYUDA_FORMATO,
-  MAX_CAJAS,
   TEXTO_TRAER_DE_SWITCH,
   avisoDeReimpresion,
   cajasDelJuego,
@@ -722,7 +721,6 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
               type="number"
               inputMode="numeric"
               min={1}
-              max={MAX_CAJAS}
               value={cajas}
               onChange={(e) => { setCajas(e.target.value); setError(null); }}
               aria-label="Bultos"
@@ -936,7 +934,6 @@ function ModalCorregir({
           type="number"
           inputMode="numeric"
           min={1}
-          max={MAX_CAJAS}
           value={cajas}
           onChange={(e) => { setCajas(e.target.value); setError(null); }}
           aria-label="Bultos"

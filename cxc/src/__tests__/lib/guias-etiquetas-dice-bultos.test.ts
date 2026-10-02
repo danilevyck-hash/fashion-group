@@ -66,8 +66,7 @@ const RE_CAJA = /(?<![\p{L}\p{M}])cajas?(?![\p{L}\p{M}])/giu;
  *   · `cajas` .............. la COLUMNA `guias_etiquetas.cajas` y el campo del
  *                            payload del API (POST y PATCH). Cambiarla pide
  *                            migración + versión nueva de la ruta.
- *   · `MIN_CAJAS` / `MAX_CAJAS` ... el tope 1..300, que el CHECK de la
- *                            migración repite palabra por palabra.
+ *   · `MIN_CAJAS` .......... el mínimo 1 (sin tope desde el 2-oct-2026).
  *   · `validarCajas` ....... la validación compartida por pantalla y servidor.
  *   · `corregirCajas` ...... el UPDATE del PATCH.
  *   · `cajasDelJuego` ...... los números 1..N del juego completo.
@@ -80,7 +79,6 @@ const NOMBRES_DE_CODIGO = new Set([
   "cajas",
   "caja",
   "MIN_CAJAS",
-  "MAX_CAJAS",
   "validarCajas",
   "corregirCajas",
   "cajasDelJuego",

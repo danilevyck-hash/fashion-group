@@ -57,13 +57,13 @@ export function puedeEtiquetar(role: string | null | undefined): boolean {
 }
 
 /**
- * Cuántas cajas se admiten. El récord REAL medido es 291 bultos en una guía
- * entera y 79 en un renglón (GT-256, Nova Lux); 300 deja aire sin dejar pasar
- * un dedo que se apoyó en el teclado. El mismo rango está en el CHECK de la
- * tabla: pantalla y base dicen lo mismo.
+ * Cuántas cajas se admiten: un entero desde 1, SIN TOPE.
+ * 🔴 Daniel, 2-oct-2026: «quita el límite ya». Había un tope de 300 (récord
+ * medido: 291 bultos en una guía) y frenó una impresión real. No se pone otro
+ * tope: ni en pantalla, ni en el servidor, ni en el CHECK de la base
+ * (migración 20261225120000_guias_etiquetas_sin_tope_cajas.sql).
  */
 export const MIN_CAJAS = 1;
-export const MAX_CAJAS = 300;
 
 /** Hoja carta partida en cuartos: cuatro etiquetas por hoja. */
 export const ETIQUETAS_POR_HOJA = 4;
@@ -177,14 +177,13 @@ function texto(v: unknown): string {
 }
 
 /**
- * Las cajas: entero entre 1 y `MAX_CAJAS`. Fail-closed y con texto para la
+ * Las cajas: entero desde 1, sin tope (Daniel, 2-oct-2026). Fail-closed y con texto para la
  * pantalla — nunca una fila «más o menos».
  */
 export function validarCajas(v: unknown): Validacion<number> {
   const n = typeof v === "number" ? v : Number(texto(v));
   if (!Number.isInteger(n)) return { ok: false, error: "Escribe cuántos bultos son" };
   if (n < MIN_CAJAS) return { ok: false, error: "Tiene que ser al menos un bulto" };
-  if (n > MAX_CAJAS) return { ok: false, error: `Son demasiados bultos (el tope es ${MAX_CAJAS})` };
   return { ok: true, valor: n };
 }
 
