@@ -1,4 +1,5 @@
 "use client";
+import { Aviso } from "@/components/ui/Aviso";
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * APROBACIONES — una sola lista de decisiones (10-sep-2026).
@@ -371,22 +372,46 @@ export default function AprobacionesTab({ empresa = "" }: {
       </div>
 
       {avisoMigracion && (
+        <Aviso
+          className="mb-4"
+          legado={
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           {avisoMigracion}
         </div>
+          }
+        >
+          {avisoMigracion}
+        </Aviso>
       )}
       {avisoAprobador && (
+        <Aviso
+          className="mb-4"
+          legado={
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           {avisoAprobador}
         </div>
+          }
+        >
+          {avisoAprobador}
+        </Aviso>
       )}
       {error && (
+        <Aviso
+          tono="error" className="mb-4"
+          legado={
         <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
+          }
+        >
+          {error}
+        </Aviso>
       )}
 
       {personaCodigo && !cargando && dias !== null && (
+        <Aviso
+          tono="info" className="mb-4" accion={{ texto: "Ver a todos", onClick: () => setPersona("") }}
+          legado={
         <div
           data-testid="chip-persona"
           className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900"
@@ -404,6 +429,12 @@ export default function AprobacionesTab({ empresa = "" }: {
             ver a todos <span aria-hidden="true">×</span>
           </button>
         </div>
+          }
+        >
+          {primerDiaPendiente
+            ? <>Mostrando a <b>{personaEtiqueta}</b></>
+            : <><b>{personaEtiqueta}</b> sin horas extra pendientes en este período.</>}
+        </Aviso>
       )}
 
       {/* ── El control de dos opciones y el contador, en una línea ──────────── */}

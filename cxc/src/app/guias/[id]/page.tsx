@@ -68,6 +68,7 @@ import {
 import { abrirEnEdicion, urlDeLaGuia } from "@/lib/guias/abrir-en-edicion";
 import { textoFaltantesDespachada } from "@/lib/guias/faltantes-despacho";
 import { GUIA_DETALLE_APPLE_2026_10 } from "@/lib/guias/guias-2026-10";
+import { Aviso } from "@/components/ui/Aviso";
 // ⚠️ `papel-de-la-guia` arrastra jsPDF (~148 kB) y se pide con `await import`,
 // nunca de arriba: estático acá la carga inicial de esta pantalla pasaba de 204
 // kB a 351 kB, y es la que bodega abre desde el celular. Se PRECARGA al montar
@@ -498,12 +499,18 @@ export default function GuiaPage() {
                   escribe UNA columna de UNA línea. El candado del PUT sobre una
                   guía despachada NO se tocó. */}
               {guiaSinNumeroTransp(g) && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                  <p className="text-sm text-amber-900">
-                    Esta guía salió sin el N° del transportista.{" "}
-                    {puedeEditar ? "Cuando lo tengas, anótalo con «Editar»." : ""}
-                  </p>
-                </div>
+                <Aviso
+                  legado={
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                      <p className="text-sm text-amber-900">
+                        Esta guía salió sin el N° del transportista.{" "}
+                        {puedeEditar ? "Cuando lo tengas, anótalo con «Editar»." : ""}
+                      </p>
+                    </div>
+                  }
+                >
+                  Guía despachada sin N° del transportista.{puedeEditar ? " Anótalo con «Editar»." : ""}
+                </Aviso>
               )}
 
               {/* 🔴 LO QUE FALTÓ AL DESPACHAR, DICHO — no arreglado acá.
@@ -521,9 +528,15 @@ export default function GuiaPage() {
                   candado del PUT las rechaza igual. Marcarlas es lo que permite
                   encontrarlas. */}
               {faltaEnLaDespachada && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                  <p className="text-sm text-amber-900">{faltaEnLaDespachada}.</p>
-                </div>
+                <Aviso
+                  legado={
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                      <p className="text-sm text-amber-900">{faltaEnLaDespachada}.</p>
+                    </div>
+                  }
+                >
+                  {faltaEnLaDespachada}.
+                </Aviso>
               )}
 
               {/* 🔴 UNA SOLA LISTA DE ENVÍOS, Y **UNA SOLA FORMA DE EDITARLA**.

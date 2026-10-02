@@ -85,6 +85,7 @@ import {
   fmtMonto,
   useFormatoEtiquetas,
 } from "./etiquetas-ui";
+import { Aviso } from "@/components/ui/Aviso";
 
 /**
  * 🔴 EL PDF DEL ENVÍO, en pestaña nueva (la MISMA puerta que la pantalla de
@@ -153,15 +154,27 @@ export default function EtiquetasPorEnvio() {
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
       {sinTabla && (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Las etiquetas todavía no están encendidas: falta correr la migración{" "}
-          <span className="font-mono">20261207120000_guias_etiquetas</span>. Guías sigue funcionando igual.
-        </div>
+        <Aviso className="mb-4" ayuda="Guías sigue funcionando igual."
+          legado={
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Las etiquetas todavía no están encendidas: falta correr la migración{" "}
+              <span className="font-mono">20261207120000_guias_etiquetas</span>. Guías sigue funcionando igual.
+            </div>
+          }
+        >
+          Etiquetas sin activar: falta correr la migración <span className="font-mono">20261207120000_guias_etiquetas</span>.
+        </Aviso>
       )}
       {errorLista && (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <Aviso className="mb-4"
+          legado={
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {errorLista}
+            </div>
+          }
+        >
           {errorLista}
-        </div>
+        </Aviso>
       )}
 
       {panel ? (
@@ -734,17 +747,23 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
             )}
 
             {!cargando && (
-              <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
-                <span>{TEXTO_TRAER_DE_SWITCH}</span>
-                <button
-                  type="button"
-                  onClick={() => void actualizarAhora()}
-                  disabled={actualizando}
-                  className={`${BOTON_BLANCO} ml-auto px-3 text-[13px]`}
-                >
-                  {actualizando ? TEXTO_ACTUALIZANDO : TEXTO_ACTUALIZAR_AHORA}
-                </button>
-              </div>
+              <Aviso tono="info" className="mt-3" accion={{ texto: actualizando ? TEXTO_ACTUALIZANDO : TEXTO_ACTUALIZAR_AHORA, onClick: () => void actualizarAhora(), disabled: actualizando }}
+                legado={
+                  <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+                    <span>{TEXTO_TRAER_DE_SWITCH}</span>
+                    <button
+                      type="button"
+                      onClick={() => void actualizarAhora()}
+                      disabled={actualizando}
+                      className={`${BOTON_BLANCO} ml-auto px-3 text-[13px]`}
+                    >
+                      {actualizando ? TEXTO_ACTUALIZANDO : TEXTO_ACTUALIZAR_AHORA}
+                    </button>
+                  </div>
+                }
+              >
+                {TEXTO_TRAER_DE_SWITCH}
+              </Aviso>
             )}
           </div>
         )}

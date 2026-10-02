@@ -18,6 +18,7 @@ import { buildPedidoWhatsappUrl, WHATSAPP_CONTACTOS } from "@/lib/catalogo/whats
 import { formatBultosPiezas } from "@/lib/catalogo/piezas";
 import type { StockLinea } from "./types";
 import { precioTexto } from "@/lib/catalogo/precio";
+import { Aviso } from "@/components/ui/Aviso";
 
 interface OrderItem {
   product_id: string;
@@ -431,24 +432,40 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
               Toca a la persona a la que le quieres escribir por WhatsApp.
             </p>
             {lineasCortas.length > 0 && (
-              <div className="mb-3 rounded-lg bg-amber-50 border border-amber-200 p-3 text-left">
-                <p className="text-xs font-semibold text-amber-900">
-                  Atención: hay {lineasCortas.length} producto{lineasCortas.length === 1 ? "" : "s"} con
-                  menos unidades de las que pediste
-                </p>
-                <ul className="mt-1.5 space-y-0.5">
+              <Aviso
+                className="mb-3 text-left"
+                legado={
+                  <div className="mb-3 rounded-lg bg-amber-50 border border-amber-200 p-3 text-left">
+                    <p className="text-xs font-semibold text-amber-900">
+                      Atención: hay {lineasCortas.length} producto{lineasCortas.length === 1 ? "" : "s"} con
+                      menos unidades de las que pediste
+                    </p>
+                    <ul className="mt-1.5 space-y-0.5">
+                      {lineasCortas.map((l) => (
+                        <li key={l.product_id} className="text-xs text-amber-800 tabular-nums">
+                          <span className="font-medium">{l.sku || l.name}</span> — pediste{" "}
+                          {formatBultosPiezas(l.pedido_pzas, l.bulto_pzas || 12)}, hay{" "}
+                          {formatBultosPiezas(l.disponible_pzas, l.bulto_pzas || 12)}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-1.5 text-xs text-amber-700">
+                      Te contactamos por la diferencia.
+                    </p>
+                  </div>
+                }
+              >
+                {lineasCortas.length === 1 ? "1 producto" : `${lineasCortas.length} productos`} con menos unidades de las pedidas. Te contactamos por la diferencia.
+                <ul className="mt-1 space-y-0.5 text-xs tabular-nums">
                   {lineasCortas.map((l) => (
-                    <li key={l.product_id} className="text-xs text-amber-800 tabular-nums">
+                    <li key={l.product_id}>
                       <span className="font-medium">{l.sku || l.name}</span> — pediste{" "}
                       {formatBultosPiezas(l.pedido_pzas, l.bulto_pzas || 12)}, hay{" "}
                       {formatBultosPiezas(l.disponible_pzas, l.bulto_pzas || 12)}
                     </li>
                   ))}
                 </ul>
-                <p className="mt-1.5 text-xs text-amber-700">
-                  Te contactamos por la diferencia.
-                </p>
-              </div>
+              </Aviso>
             )}
             {/* El cliente elige a quién le avisa: las dos personas, con nombre
                 y número visibles, para que sepa a quién le está escribiendo. */}

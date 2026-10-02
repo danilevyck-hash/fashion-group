@@ -7,6 +7,7 @@ import { useFormGuard } from "@/lib/hooks/useModalDismiss";
 import type { ConsolidatedClient } from "@/lib/types";
 import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
 import { composeEmailHtml } from "@/lib/cxc/estado-cuenta-email";
+import { Aviso } from "@/components/ui/Aviso";
 
 // El código Switch (D-XXX) es el mismo en todas las empresas del cliente.
 function codigoDe(client: ConsolidatedClient): string | null {
@@ -172,15 +173,27 @@ export default function EnviarEmailModal({ client, onClose, onSent }: Props) {
           {preview && !loading && (
             <>
               {preview.totalDocs === 0 && (
-                <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                  Este cliente no tiene documentos con saldo.
-                </p>
+                <Aviso
+                  legado={
+                    <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                      Este cliente no tiene documentos con saldo.
+                    </p>
+                  }
+                >
+                  Cliente sin documentos con saldo.
+                </Aviso>
               )}
 
               {preview.sharedCount >= 10 && (
-                <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                  Este correo está registrado en {preview.sharedCount} clientes distintos. Verifica que sea el destinatario correcto.
-                </div>
+                <Aviso
+                  legado={
+                    <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                      Este correo está registrado en {preview.sharedCount} clientes distintos. Verifica que sea el destinatario correcto.
+                    </div>
+                  }
+                >
+                  Correo registrado en {preview.sharedCount} clientes distintos. Verifica el destinatario.
+                </Aviso>
               )}
 
               <div>

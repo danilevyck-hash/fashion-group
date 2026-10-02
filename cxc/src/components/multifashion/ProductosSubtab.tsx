@@ -133,6 +133,7 @@ import {
   type TotalesMarca,
 } from "@/lib/multifashion/productos-marca";
 import type { Periodo } from "@/lib/multifashion/periodo";
+import { Aviso } from "@/components/ui/Aviso";
 
 type Vista = "categoria" | "articulo" | "marca";
 /** Lo que entiende la ruta: `periodo=mes|12m`. Nada más. */
@@ -511,13 +512,20 @@ export function ProductosSubtab({
       Si todavía no está cargado se DICE — la alternativa sería deducir la
       marca del código del proveedor, o sea inventarla. */}
   {vista === "marca" && resp && !resp.marcaDisponible && (
-    <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-      <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-      <span>
-        Todavía no está cargado el catálogo de marcas de la tienda, así que todo aparece como{" "}
-        <strong>Sin marca</strong>. Se llena solo en la próxima actualización diaria.
-      </span>
-    </div>
+    <Aviso
+      tono="aviso"
+      legado={
+        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            Todavía no está cargado el catálogo de marcas de la tienda, así que todo aparece como{" "}
+            <strong>Sin marca</strong>. Se llena solo en la próxima actualización diaria.
+          </span>
+        </div>
+      }
+    >
+      Catálogo de marcas sin cargar: todo aparece como <strong>Sin marca</strong>. Se llena en la próxima actualización diaria.
+    </Aviso>
   )}
   {vista === "marca" && resp && resp.marcaDisponible && resp.sinMarca.articulos > 0 && (
     <div className="flex items-start gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">

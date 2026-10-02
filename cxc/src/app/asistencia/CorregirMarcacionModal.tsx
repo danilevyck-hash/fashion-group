@@ -1,4 +1,5 @@
 "use client";
+import { Aviso } from "@/components/ui/Aviso";
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * CORREGIR UNA MARCACIÓN — la ventana.
@@ -235,6 +236,9 @@ export default function CorregirMarcacionModal({
           {/* Si ya hay una corrección viva, esta ventana es para DESHACERLA. */}
           {marca.correccionId ? (
             <div className="space-y-3">
+              <Aviso
+                tono="info"
+                legado={
               <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2.5">
                 <p className="text-xs uppercase tracking-wide text-blue-500">Corregida</p>
                 <p className="mt-0.5 text-[13px] text-blue-900">
@@ -245,6 +249,11 @@ export default function CorregirMarcacionModal({
                   {marca.correccionEn ? ` · ${cuandoBonito(marca.correccionEn)}` : ""}
                 </p>
               </div>
+                }
+              >
+                Corregida: <b>{marca.correccionMotivo}</b>
+                <span className="block text-xs text-gray-500">{marca.correccionPor}{marca.correccionEn ? ` · ${cuandoBonito(marca.correccionEn)}` : ""}</span>
+              </Aviso>
               <p className="text-[13px] text-gray-600">
                 Para poner otra hora, primero deshaz ésta. Al deshacerla vuelve a valer
                 {marca.relojHora ? ` la del reloj (${marca.relojHora})` : " el día sin esa marcación"},
@@ -283,6 +292,9 @@ export default function CorregirMarcacionModal({
               {/* 🔴 QUÉ PASA AL QUITARLA, DICHO ANTES DE TOCAR NADA. «Quitada»,
                   nunca «borrada»: la fila del reloj se queda donde está. */}
               {quitando ? (
+                <Aviso
+                  ayuda="No se borra nada: la marcación del reloj queda guardada y se puede deshacer."
+                  legado={
                 <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-[13px] text-amber-900">
                   La marcación de las <b className="tabular-nums">{marca.relojHora}</b> deja de contar:
                   el día pasa a tener una marca menos y los minutos se recalculan con las que quedan.
@@ -290,6 +302,10 @@ export default function CorregirMarcacionModal({
                     No se borra nada — la marcación del reloj queda guardada, y esto se puede deshacer.
                   </span>
                 </p>
+                  }
+                >
+                  La marcación de las <b className="tabular-nums">{marca.relojHora}</b> deja de contar y los minutos se recalculan.
+                </Aviso>
               ) : (
               <label className="block">
                 <span className="text-[13px] font-medium text-gray-700">

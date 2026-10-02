@@ -56,6 +56,7 @@ import { TiendasDelPeriodo } from "./PaginaMarca";
 import type { BloqueResumen } from "./InicioMarketing";
 import type { ProyectoListItem } from "./useMarcaPeriodos";
 import { MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
+import { Aviso } from "@/components/ui/Aviso";
 
 interface Props {
   marca: { key: string; nombre: string; slug: string };
@@ -312,27 +313,38 @@ export default function DetallePeriodoView({
 
       {/* La vuelta atrás de anular. Ver el comentario del state. */}
       {deshacerAnular && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="text-sm text-amber-900">
-            Eliminaste &ldquo;{deshacerAnular.nombre}&rdquo;. Ya no aparece en Marketing.
-          </span>
-          <button
-            type="button"
-            onClick={ejecutarDeshacerAnular}
-            disabled={deshaciendo}
-            className="text-sm font-semibold text-amber-900 underline min-h-[44px] inline-flex items-center disabled:opacity-50"
-          >
-            {deshaciendo ? "Devolviendo…" : "Deshacer"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setDeshacerAnular(null)}
-            className="text-sm text-amber-800 min-h-[44px] min-w-[44px] inline-flex items-center justify-center ml-auto"
-            aria-label="Cerrar aviso"
-          >
-            ✕
-          </button>
-        </div>
+        <Aviso
+          tono="info"
+          accion={[
+    { texto: deshaciendo ? "Devolviendo…" : "Deshacer", onClick: ejecutarDeshacerAnular, disabled: deshaciendo },
+    { texto: "Cerrar", onClick: () => setDeshacerAnular(null) },
+  ]}
+          legado={
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="text-sm text-amber-900">
+                Eliminaste &ldquo;{deshacerAnular.nombre}&rdquo;. Ya no aparece en Marketing.
+              </span>
+              <button
+                type="button"
+                onClick={ejecutarDeshacerAnular}
+                disabled={deshaciendo}
+                className="text-sm font-semibold text-amber-900 underline min-h-[44px] inline-flex items-center disabled:opacity-50"
+              >
+                {deshaciendo ? "Devolviendo…" : "Deshacer"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeshacerAnular(null)}
+                className="text-sm text-amber-800 min-h-[44px] min-w-[44px] inline-flex items-center justify-center ml-auto"
+                aria-label="Cerrar aviso"
+              >
+                ✕
+              </button>
+            </div>
+          }
+        >
+          Eliminaste «{deshacerAnular.nombre}».
+        </Aviso>
       )}
 
       {/* Búsqueda — filtra DENTRO del período; los totales de arriba no

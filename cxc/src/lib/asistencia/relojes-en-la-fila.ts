@@ -140,6 +140,34 @@ export function textoDeLaPastilla(relojes: readonly RelojParaLaFila[]): string {
 }
 
 /**
+ * 🔴 LO QUE DICE EL AVISO EN LÍNEA (`AVISOS_2026_10`, 2-oct-2026). La misma
+ * regla que la pastilla, más corta: «Reloj de» una sola vez y el «hace» después
+ * de un punto medio.
+ *
+ *   · «Relojes de Multifashion y Boston sin señal · hace 1 día»
+ *   · «Reloj de Boston sin señal · hace 2 horas»
+ *
+ * Un reloj con nombre desconocido (llave tal cual) cae a `textoDeLaPastilla`.
+ */
+export function textoDelAviso(relojes: readonly RelojParaLaFila[]): string {
+  const malos = delPeorAlMejor(relojes.filter((r) => r.salud !== "al_dia"));
+  if (malos.length === 0) return textoDeLaPastilla(relojes);
+  const PREFIJO = "Reloj de ";
+  const nombres = malos.map((r) => nombreRelojEnPantalla(r.dispositivo));
+  if (!nombres.every((n) => n.startsWith(PREFIJO))) return textoDeLaPastilla(relojes);
+  const cortos = nombres.map((n) => n.slice(PREFIJO.length));
+  const lista = cortos.length === 1
+    ? cortos[0]
+    : `${cortos.slice(0, -1).join(", ")} y ${cortos[cortos.length - 1]}`;
+  const peor = malos[0];
+  const estado = peor.salud === "callado" ? "sin señal" : queLePasa(peor.salud, null);
+  const cuando = peor.salud === "callado" && typeof peor.minutosSinNoticias === "number"
+    ? ` · ${hace(peor.minutosSinNoticias)}`
+    : "";
+  return `${cortos.length === 1 ? "Reloj de" : "Relojes de"} ${lista} ${estado}${cuando}`;
+}
+
+/**
  * 🔴 EL PEDIDO QUE NADIE RECOGIÓ SE SIGUE DICIENDO, Y CON LAS MISMAS PALABRAS.
  * Era lo único de las dos cajas amarillas que no cabía en la pastilla, y es
  * accionable: la PC está apagada y hay que prenderla. `null` sin ninguno.

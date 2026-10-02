@@ -1,4 +1,5 @@
 "use client";
+import { Aviso } from "@/components/ui/Aviso";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MOVIMIENTOS DE LA QUINCENA — la pantalla de LECTURA de Préstamos.
@@ -158,9 +159,16 @@ export default function MovimientosQuincenaTab(props: { empresa?: string }) {
       {filas === null && <p className="text-sm text-gray-500">Leyendo los movimientos…</p>}
 
       {filas !== null && error && (
+        <Aviso
+          tono="error"
+          legado={
         <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           No se pudieron leer los movimientos de esta quincena. Vuelve a intentarlo.
         </p>
+          }
+        >
+          No se pudieron leer los movimientos de esta quincena. Vuelve a intentarlo.
+        </Aviso>
       )}
 
       {filas !== null && !error && !hayAlgo && (

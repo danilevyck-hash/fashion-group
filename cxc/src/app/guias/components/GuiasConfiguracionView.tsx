@@ -46,6 +46,7 @@ import {
   type DestinoConfigurado,
   type GrupoConfig,
 } from "@/lib/guias/destinos-config";
+import { Aviso } from "@/components/ui/Aviso";
 
 interface RespuestaConfig {
   destinos: DestinoConfigurado[];
@@ -458,15 +459,21 @@ export default function GuiasConfiguracionView() {
         )}
 
         {errorCarga && (
-          <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+          <Aviso className="mb-4" ayuda={/falta correr la migración/i.test(errorCarga) ? "Mientras tanto, los destinos salen del código y las guías funcionan igual." : undefined}
+            legado={
+              <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+                {errorCarga}
+                {/* Con la migración pendiente, que se sepa que nada está roto. */}
+                {/falta correr la migración/i.test(errorCarga) && (
+                  <span className="block text-xs text-amber-700 mt-0.5">
+                    Mientras tanto, los destinos definidos siguen saliendo del código y las guías funcionan igual.
+                  </span>
+                )}
+              </div>
+            }
+          >
             {errorCarga}
-            {/* Con la migración pendiente, que se sepa que nada está roto. */}
-            {/falta correr la migración/i.test(errorCarga) && (
-              <span className="block text-xs text-amber-700 mt-0.5">
-                Mientras tanto, los destinos definidos siguen saliendo del código y las guías funcionan igual.
-              </span>
-            )}
-          </div>
+          </Aviso>
         )}
 
         {cargando ? (

@@ -1,4 +1,5 @@
 "use client";
+import { Aviso } from "@/components/ui/Aviso";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIGURACIÓN — todo lo que hay que dejar puesto para que la planilla salga.
@@ -1081,6 +1082,9 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
   return (
     <div className="space-y-3">
       {datos?.faltaMigracion && (
+        <Aviso
+          ayuda={datos.avisoMigracion}
+          legado={
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-[13px] text-amber-900">
           <b>Falta un paso antes de poder guardar.</b>
           <p className="mt-1">{datos.avisoMigracion}</p>
@@ -1089,6 +1093,10 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
             no se va a guardar.
           </p>
         </div>
+          }
+        >
+          Falta un paso antes de poder guardar: lo que escribas no se guarda.
+        </Aviso>
       )}
 
       {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
@@ -1139,6 +1147,9 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                 en ROJO y arriba de la lista porque las dos explicaciones posibles
                 —volvió, o alguien usa su huella— piden que alguien haga algo. */}
             {datos.avisoBajas && (
+              <Aviso
+                tono="error"
+                legado={
               <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-900">
                 <b>{datos.avisoBajas.titulo}</b>
                 <ul className="mt-1 space-y-0.5 text-red-800">
@@ -1147,6 +1158,11 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                   ))}
                 </ul>
               </div>
+                }
+              >
+                <span className="font-medium">{datos.avisoBajas.titulo}</span>
+                <ul className="mt-1 space-y-0.5">{datos.avisoBajas.detalle.map((d) => <li key={d}>{d}</li>)}</ul>
+              </Aviso>
             )}
 
             {datos.avisoMigracionBajas && (
@@ -1440,10 +1456,17 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                               esa persona está cobrando en UNA sola planilla y
                               sin esto nadie se enteraría. */}
                           {p.motivoReparto && (
+                            <Aviso
+                              className="mb-3"
+                              legado={
                             <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
                               El reparto de su sueldo entre dos empresas no se aplicó ({p.motivoReparto}):
                               cobra en una sola planilla, como antes.
                             </p>
+                              }
+                            >
+                              Reparto entre dos empresas no aplicado ({p.motivoReparto}). Cobra en una sola planilla.
+                            </Aviso>
                           )}
 
                           <div className="grid gap-3 sm:grid-cols-2">

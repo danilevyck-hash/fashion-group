@@ -37,6 +37,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useMemo } from "react";
+import { Aviso as AvisoEnLinea } from "@/components/ui/Aviso";
 import {
   sugerirClientes,
   TEXTO_AVISO,
@@ -105,14 +106,22 @@ export default function SugerenciasCliente({
   if (sugerencias.length === 0) {
     if (!avisarSinParecidos) return null;
     return (
-      <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
-        <p className="text-sm text-amber-900">
-          No hay ningún cliente parecido en el directorio.
-        </p>
-        <p className="text-xs text-amber-800 mt-1">
-          Hay que darlo de alta en Switch. Mientras tanto queda escrito a mano.
-        </p>
-      </div>
+      <AvisoEnLinea
+        className="mt-2"
+        ayuda="Queda escrito a mano mientras se da de alta en Switch."
+        legado={
+          <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
+            <p className="text-sm text-amber-900">
+              No hay ningún cliente parecido en el directorio.
+            </p>
+            <p className="text-xs text-amber-800 mt-1">
+              Hay que darlo de alta en Switch. Mientras tanto queda escrito a mano.
+            </p>
+          </div>
+        }
+      >
+        Sin clientes parecidos en el directorio. Hay que darlo de alta en Switch.
+      </AvisoEnLinea>
     );
   }
 

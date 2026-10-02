@@ -20,6 +20,7 @@ import {
 import { PERIODO_ABIERTO, PERIODO_TODOS, ROTULO_ABIERTO } from "@/lib/marketing/periodo-manda";
 import { subirAdjunto } from "./uploadHelpers";
 import { Ayuda } from "@/components/shared/Ayuda";
+import { Aviso } from "@/components/ui/Aviso";
 
 // ============================================================================
 // 🔴 LAS FOTOS CUELGAN DE LA TIENDA (22-sep-2026), no del proyecto.
@@ -315,9 +316,16 @@ export default function FotosSection({
       </div>
 
       {errorCarga && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+        <Aviso
+          tono="error"
+          legado={
+            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+              {errorCarga}
+            </div>
+          }
+        >
           {errorCarga}
-        </div>
+        </Aviso>
       )}
       {loading ? (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">

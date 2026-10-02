@@ -52,6 +52,7 @@ import { MSG_FALTA_NOMBRE } from "@/lib/marketing/periodo-estado";
 import { MARKETING_PORTADA_REDISENO } from "@/lib/marketing/portada-rediseno";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import type { BloqueResumen } from "./InicioMarketing";
+import { Aviso } from "@/components/ui/Aviso";
 
 interface Props {
   bloque: BloqueResumen;
@@ -200,39 +201,51 @@ function CerrarPeriodoModalDeAntes({
           {/* no se confundan. Se puede cerrar igual — pero enterado.           */}
           {/* --------------------------------------------------------------- */}
           {hayPendientes && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
-              <div className="text-sm font-semibold text-amber-900">
-                Documentación pendiente
-              </div>
-              <ul className="space-y-2 text-sm text-amber-900">
-                {pendientes.sinComprobante > 0 && (
-                  <li>
-                    <span className="font-medium">
-                      {plural(pendientes.sinComprobante, "gasto", "gastos")} sin
-                      comprobante.
-                    </span>{" "}
-                    <span className="text-amber-800">
-                      Requerido para el reporte a la marca.
-                    </span>
-                  </li>
-                )}
-                {pendientes.sinFoto > 0 && (
-                  <li>
-                    <span className="font-medium">
-                      {plural(pendientes.sinFoto, "gasto", "gastos")} sin foto.
-                    </span>{" "}
-                    <span className="text-amber-800">
-                      Es la foto de la instalación — el letrero puesto, el mueble
-                      armado. Solo se cuentan los gastos que tienen cliente.
-                    </span>
-                  </li>
-                )}
-              </ul>
-              <p className="text-xs text-amber-800">
-                Puedes cerrar igual. La foto se puede agregar después, aunque el
-                período ya esté cerrado; la plata no.
-              </p>
-            </div>
+            <Aviso
+              tono="aviso"
+              ayuda="El comprobante es requerido para el reporte a la marca. La foto se puede agregar después, aunque el período ya esté cerrado; la plata no."
+              legado={
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+                  <div className="text-sm font-semibold text-amber-900">
+                    Documentación pendiente
+                  </div>
+                  <ul className="space-y-2 text-sm text-amber-900">
+                    {pendientes.sinComprobante > 0 && (
+                      <li>
+                        <span className="font-medium">
+                          {plural(pendientes.sinComprobante, "gasto", "gastos")} sin
+                          comprobante.
+                        </span>{" "}
+                        <span className="text-amber-800">
+                          Requerido para el reporte a la marca.
+                        </span>
+                      </li>
+                    )}
+                    {pendientes.sinFoto > 0 && (
+                      <li>
+                        <span className="font-medium">
+                          {plural(pendientes.sinFoto, "gasto", "gastos")} sin foto.
+                        </span>{" "}
+                        <span className="text-amber-800">
+                          Es la foto de la instalación — el letrero puesto, el mueble
+                          armado. Solo se cuentan los gastos que tienen cliente.
+                        </span>
+                      </li>
+                    )}
+                  </ul>
+                  <p className="text-xs text-amber-800">
+                    Puedes cerrar igual. La foto se puede agregar después, aunque el
+                    período ya esté cerrado; la plata no.
+                  </p>
+                </div>
+              }
+            >
+              <span className="font-medium">Documentación pendiente:</span>{" "}
+              {[
+                pendientes.sinComprobante > 0 ? `${plural(pendientes.sinComprobante, "gasto", "gastos")} sin comprobante` : null,
+                pendientes.sinFoto > 0 ? `${plural(pendientes.sinFoto, "gasto", "gastos")} sin foto` : null,
+              ].filter(Boolean).join(" · ")}. Puedes cerrar igual.
+            </Aviso>
           )}
 
           <div>
@@ -255,10 +268,18 @@ function CerrarPeriodoModalDeAntes({
             />
           </div>
 
-          <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-3">
-            Después de cerrarlo no se puede deshacer: los montos de adentro ya no
-            se pueden editar. La foto sí se puede agregar después.
-          </p>
+          <Aviso
+            tono="error"
+            ayuda="La foto sí se puede agregar después."
+            legado={
+              <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-3">
+                Después de cerrarlo no se puede deshacer: los montos de adentro ya no
+                se pueden editar. La foto sí se puede agregar después.
+              </p>
+            }
+          >
+            No se puede deshacer: al cerrarlo, los montos ya no se pueden editar.
+          </Aviso>
         </div>
 
         <div className="border-t border-gray-100 px-5 py-4 flex items-center justify-end gap-3">
@@ -398,25 +419,36 @@ function CerrarPeriodoModalRediseno({ bloque, periodoId, onClose, onCerrado }: P
           </div>
 
           {hayPendientes && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
-              <div className="text-sm font-semibold text-amber-900">Documentación pendiente</div>
-              <ul className="space-y-2 text-sm text-amber-900">
-                {pendientes.sinComprobante > 0 && (
-                  <li>
-                    <span className="font-medium">
-                      {plural(pendientes.sinComprobante, "gasto", "gastos")} sin comprobante.
-                    </span>{" "}
-                    <span className="text-amber-800">Requerido para el reporte a la marca.</span>
-                  </li>
-                )}
-                {pendientes.sinFoto > 0 && (
-                  <li>
-                    <span className="font-medium">{plural(pendientes.sinFoto, "gasto", "gastos")} sin foto.</span>{" "}
-                    <span className="text-amber-800">La de la instalación. Se puede agregar después.</span>
-                  </li>
-                )}
-              </ul>
-            </div>
+            <Aviso
+              tono="aviso"
+              legado={
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+                  <div className="text-sm font-semibold text-amber-900">Documentación pendiente</div>
+                  <ul className="space-y-2 text-sm text-amber-900">
+                    {pendientes.sinComprobante > 0 && (
+                      <li>
+                        <span className="font-medium">
+                          {plural(pendientes.sinComprobante, "gasto", "gastos")} sin comprobante.
+                        </span>{" "}
+                        <span className="text-amber-800">Requerido para el reporte a la marca.</span>
+                      </li>
+                    )}
+                    {pendientes.sinFoto > 0 && (
+                      <li>
+                        <span className="font-medium">{plural(pendientes.sinFoto, "gasto", "gastos")} sin foto.</span>{" "}
+                        <span className="text-amber-800">La de la instalación. Se puede agregar después.</span>
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              }
+            >
+              <span className="font-medium">Documentación pendiente:</span>{" "}
+              {[
+                pendientes.sinComprobante > 0 ? `${plural(pendientes.sinComprobante, "gasto", "gastos")} sin comprobante` : null,
+                pendientes.sinFoto > 0 ? `${plural(pendientes.sinFoto, "gasto", "gastos")} sin foto` : null,
+              ].filter(Boolean).join(" · ")}.
+            </Aviso>
           )}
 
           <div>
@@ -455,9 +487,16 @@ function CerrarPeriodoModalRediseno({ bloque, periodoId, onClose, onCerrado }: P
             />
           </div>
 
-          <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-3">
-            Después de cerrarlo no se puede deshacer: los montos de adentro ya no se pueden editar.
-          </p>
+          <Aviso
+            tono="error"
+            legado={
+              <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-3">
+                Después de cerrarlo no se puede deshacer: los montos de adentro ya no se pueden editar.
+              </p>
+            }
+          >
+            No se puede deshacer: al cerrarlo, los montos ya no se pueden editar.
+          </Aviso>
         </div>
 
         {/* En el celular «Cerrar período» es ancho y Cancelar baja debajo; en la

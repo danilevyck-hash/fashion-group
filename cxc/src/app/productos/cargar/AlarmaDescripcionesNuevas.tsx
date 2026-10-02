@@ -6,6 +6,7 @@ import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { useEscapeClose, useBackdropDismiss, useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { marcasCandidatasDeEmpresa } from "@/lib/depurador/tienda";
 import { normalizarEspacios } from "@/lib/depurador/veredicto";
+import { Aviso } from "@/components/ui/Aviso";
 
 // Alarma bloqueante de descripciones NUEVAS, compartida por el Depurador y
 // Facturas Tienda. Solo llegan acá las de veredicto "alerta" (ver
@@ -174,10 +175,17 @@ export default function AlarmaDescripcionesNuevas({ items, pasaronSolas = 0, onA
         <div {...backdropConfirm} className="fade-in fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4">
           <div ref={confirmPanelRef} className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6">
             <h3 className="text-center text-lg font-bold text-stone-900">Aprobar descripción</h3>
-            <p className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
-              ⚠️ Esta descripción quedará <b>PERMANENTE</b> en el catálogo de{" "}
-              <b>{confirm.marcaElegida || "…"}</b>. Avísale a Daniel antes de aprobar.
-            </p>
+            <Aviso
+              tono="aviso" className="mt-2"
+              legado={
+                <p className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+                  ⚠️ Esta descripción quedará <b>PERMANENTE</b> en el catálogo de{" "}
+                  <b>{confirm.marcaElegida || "…"}</b>. Avísale a Daniel antes de aprobar.
+                </p>
+              }
+            >
+              Quedará <b>permanente</b> en el catálogo de <b>{confirm.marcaElegida || "…"}</b>. Avísale a Daniel antes de aprobar.
+            </Aviso>
             <div className="mt-3 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[13px] text-stone-800">
               {confirm.item.desc}
             </div>
@@ -207,9 +215,16 @@ export default function AlarmaDescripcionesNuevas({ items, pasaronSolas = 0, onA
               <span>Notificado a Daniel</span>
             </label>
             {confirm.error && (
-              <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800">
+              <Aviso
+                tono="error" className="mt-3"
+                legado={
+                  <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800">
+                    {confirm.error}
+                  </p>
+                }
+              >
                 {confirm.error}
-              </p>
+              </Aviso>
             )}
             <div className="mt-5 flex gap-2">
               <button

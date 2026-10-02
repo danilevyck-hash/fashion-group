@@ -6,6 +6,7 @@ import { norm } from "@/lib/depurador/logic";
 import { fmtDate } from "@/lib/format";
 import { CATALOGO_DESCRIPCIONES_KEY } from "@/lib/hooks/useCatalogoDescripciones";
 import { Ayuda } from "@/components/shared/Ayuda";
+import { Aviso } from "@/components/ui/Aviso";
 
 // Vista SOLO admin: catálogo completo de descripciones del Depurador (tabla
 // depurador_descripciones), con origen, quién aprobó y cuándo, y toggle
@@ -107,20 +108,35 @@ export default function CatalogoDescripcionesAdmin() {
         </div>
       )}
       {fallo && (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          <span>No se pudo cargar el catálogo de descripciones. Intenta de nuevo.</span>
-          <button
-            type="button"
-            onClick={() => setReloadKey((k) => k + 1)}
-            className="rounded-md border border-red-300 bg-white px-3 py-1 text-[13px] font-semibold text-red-700 transition hover:bg-red-100 active:scale-[0.97]"
-          >
-            Reintentar
-          </button>
-        </div>
+        <Aviso
+          tono="error"
+          accion={{ texto: "Reintentar", onClick: () => setReloadKey((k) => k + 1) }}
+          legado={
+            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              <span>No se pudo cargar el catálogo de descripciones. Intenta de nuevo.</span>
+              <button
+                type="button"
+                onClick={() => setReloadKey((k) => k + 1)}
+                className="rounded-md border border-red-300 bg-white px-3 py-1 text-[13px] font-semibold text-red-700 transition hover:bg-red-100 active:scale-[0.97]"
+              >
+                Reintentar
+              </button>
+            </div>
+          }
+        >
+          No se pudo cargar el catálogo de descripciones.
+        </Aviso>
       )}
 
       {error && (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-800">{error}</div>
+        <Aviso
+          tono="error" className="mb-3"
+          legado={
+            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-800">{error}</div>
+          }
+        >
+          {error}
+        </Aviso>
       )}
 
       {rows !== null && (

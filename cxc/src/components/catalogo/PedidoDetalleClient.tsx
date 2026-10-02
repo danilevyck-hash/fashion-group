@@ -25,6 +25,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { fmt } from "@/lib/format";
 import { ConfirmDeleteModal, ModalOverlay, Toast } from "@/components/ui";
+import { Aviso } from "@/components/ui/Aviso";
 import DuplicarPedidoModal from "@/components/catalogo/DuplicarPedidoModal";
 import EnviarDocumentoSwitch from "@/components/catalogo/EnviarDocumentoSwitch";
 import {
@@ -963,29 +964,44 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
       <p className="text-xs text-gray-400 mb-4">{new Date(order.created_at).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "")}</p>
       )}
 
-      {/* Candado post-envío a Switch: solo lectura + salida clara (duplicar) */}
+      {/* Candado post-envío a Switch: solo lectura + salida clara (duplicar).
+          Con AVISOS_2026_10: una sola fila, la acción a la derecha y «o edítalo
+          en el panel de Switch» detrás del ⓘ. */}
       {switchLock && switchEnvio && (
-        <div className="bg-amber-50 border border-amber-300 rounded-lg px-4 py-3 mb-4">
-          <p className="text-sm text-amber-900 font-medium">
-            Este pedido ya está en Switch como {etiquetaDocumento(documentoEnSwitch).toLowerCase()} #{switchEnvio.numero_interno || switchEnvio.pedido_switch_id || "?"} — no se puede editar aquí.
-          </p>
-          {reemplazadoPor ? (
-            <p className="text-sm text-amber-800 mt-2">
-              Reemplazado por{" "}
-              <Link href={`/catalogo/${marca}/pedido/${reemplazadoPor.id}`} className="font-medium underline hover:text-black transition">
-                {reemplazadoPor.order_number}
-              </Link>
-            </p>
-          ) : isEditorRole ? (
-            <div className="mt-3">
-              <button onClick={() => setShowDupModal(true)} disabled={duplicando}
-                className="bg-black text-white text-sm font-medium px-4 py-2.5 rounded-md hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-50 min-h-[44px]">
-                {duplicando ? "Duplicando..." : "Duplicar y corregir"}
-              </button>
-              <p className="text-xs text-amber-700 mt-2">o edítalo directamente en el panel de Switch</p>
+        <Aviso
+          className="mb-4"
+          ayuda={!reemplazadoPor && isEditorRole ? "También puedes editarlo directamente en el panel de Switch." : undefined}
+          accion={reemplazadoPor
+            ? { texto: `Reemplazado por ${reemplazadoPor.order_number}`, href: `/catalogo/${marca}/pedido/${reemplazadoPor.id}` }
+            : isEditorRole
+              ? { texto: duplicando ? "Duplicando..." : "Duplicar y corregir", onClick: () => setShowDupModal(true), disabled: duplicando }
+              : null}
+          legado={
+            <div className="bg-amber-50 border border-amber-300 rounded-lg px-4 py-3 mb-4">
+              <p className="text-sm text-amber-900 font-medium">
+                Este pedido ya está en Switch como {etiquetaDocumento(documentoEnSwitch).toLowerCase()} #{switchEnvio.numero_interno || switchEnvio.pedido_switch_id || "?"} — no se puede editar aquí.
+              </p>
+              {reemplazadoPor ? (
+                <p className="text-sm text-amber-800 mt-2">
+                  Reemplazado por{" "}
+                  <Link href={`/catalogo/${marca}/pedido/${reemplazadoPor.id}`} className="font-medium underline hover:text-black transition">
+                    {reemplazadoPor.order_number}
+                  </Link>
+                </p>
+              ) : isEditorRole ? (
+                <div className="mt-3">
+                  <button onClick={() => setShowDupModal(true)} disabled={duplicando}
+                    className="bg-black text-white text-sm font-medium px-4 py-2.5 rounded-md hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-50 min-h-[44px]">
+                    {duplicando ? "Duplicando..." : "Duplicar y corregir"}
+                  </button>
+                  <p className="text-xs text-amber-700 mt-2">o edítalo directamente en el panel de Switch</p>
+                </div>
+              ) : null}
             </div>
-          ) : null}
-        </div>
+          }
+        >
+          {etiquetaDocumento(documentoEnSwitch)} ya {esCotizacion(documentoEnSwitch) ? "enviada" : "enviado"} a Switch (#{switchEnvio.numero_interno || switchEnvio.pedido_switch_id || "?"}). No se puede editar.
+        </Aviso>
       )}
 
       {/* Señal de guardado — DISCRETA (12-ago-2026).
@@ -998,15 +1014,24 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
           lo que está en pantalla.
           Lo único que sigue pidiendo acción es el FALLO, con su Reintentar. */}
       {canEdit && autoSaveStatus === "error" ? (
-        <div className="flex items-center justify-between gap-3 mb-4 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5">
-          <span className="text-sm text-red-700 font-medium">No se pudo guardar tu cambio</span>
-          <button
-            onClick={() => performSave()}
-            className="bg-black text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-gray-800 active:scale-[0.97] transition min-h-[44px]"
-          >
-            Reintentar
-          </button>
-        </div>
+        <Aviso
+          tono="error"
+          className="mb-4"
+          accion={{ texto: "Reintentar", onClick: () => performSave() }}
+          legado={
+            <div className="flex items-center justify-between gap-3 mb-4 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5">
+              <span className="text-sm text-red-700 font-medium">No se pudo guardar tu cambio</span>
+              <button
+                onClick={() => performSave()}
+                className="bg-black text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-gray-800 active:scale-[0.97] transition min-h-[44px]"
+              >
+                Reintentar
+              </button>
+            </div>
+          }
+        >
+          No se pudo guardar tu cambio.
+        </Aviso>
       ) : canEdit && (autoSaveStatus === "saving" || autoSaveStatus === "dirty") ? (
         <p className="text-xs text-gray-400 mb-4">Guardando…</p>
       ) : canEdit && autoSaveStatus === "saved" && lastSavedAt ? (
@@ -1342,9 +1367,17 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                     editable, no al final. El botón NO se apaga — el pedido se
                     puede enviar con los precios de lista. */}
                 {hayPrecioEditado && permisoPrecio && !permisoPrecio.permiso && permisoPrecio.mensaje && (
-                  <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2 mb-3">
-                    <p className="text-xs text-red-700">{permisoPrecio.mensaje}</p>
-                  </div>
+                  <Aviso
+                    tono="error"
+                    className="mb-3"
+                    legado={
+                        <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2 mb-3">
+                          <p className="text-xs text-red-700">{permisoPrecio.mensaje}</p>
+                        </div>
+                    }
+                  >
+                    {permisoPrecio.mensaje}
+                  </Aviso>
                 )}
 
                 {/* Recordatorio anti-duplicado ANTES del toque: este pedido
@@ -1352,11 +1385,19 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                     modal de preview; con un solo toque ese modal ya no aparece
                     en el caso normal, así que el aviso se habría perdido. */}
                 {pedidoOriginal?.switch_numero && (
-                  <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2 mb-3">
-                    <p className="text-xs text-red-700 font-medium">
-                      Este pedido reemplaza al {pedidoOriginal.order_number}. Borra el pedido #{pedidoOriginal.switch_numero} en el panel de Switch para no duplicar.
-                    </p>
-                  </div>
+                  <Aviso
+                    tono="error"
+                    className="mb-3"
+                    legado={
+                        <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2 mb-3">
+                          <p className="text-xs text-red-700 font-medium">
+                            Este pedido reemplaza al {pedidoOriginal.order_number}. Borra el pedido #{pedidoOriginal.switch_numero} en el panel de Switch para no duplicar.
+                          </p>
+                        </div>
+                    }
+                  >
+                    Reemplaza al {pedidoOriginal.order_number}. Borra el pedido #{pedidoOriginal.switch_numero} en Switch para no duplicar.
+                  </Aviso>
                 )}
 
                 {/* UN SOLO TOQUE, sobre la salida que se quiere: confirma,
@@ -1492,11 +1533,20 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
               </ul>
             )}
             {switchProblema.avisos.length > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-4">
+              <Aviso
+                className="mb-4"
+                legado={
+                  <div className="bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-4">
+                    {switchProblema.avisos.map((a, i) => (
+                      <p key={i} className="text-xs text-amber-700 py-0.5">⚠ {a.texto}</p>
+                    ))}
+                  </div>
+                }
+              >
                 {switchProblema.avisos.map((a, i) => (
-                  <p key={i} className="text-xs text-amber-700 py-0.5">⚠ {a.texto}</p>
+                  <p key={i}>{a.texto}</p>
                 ))}
-              </div>
+              </Aviso>
             )}
 
             {/* Las líneas que SÍ cruzaron con Switch, debajo del problema. */}

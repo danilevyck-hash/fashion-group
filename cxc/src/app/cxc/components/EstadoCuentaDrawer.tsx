@@ -23,6 +23,7 @@ export type {
   FichaCliente,
 } from "@/lib/cxc/estado-cuenta-tipos";
 import type { EstadoCuenta } from "@/lib/cxc/estado-cuenta-tipos";
+import { Aviso } from "@/components/ui/Aviso";
 
 /** El código Switch (D-XXX) es el mismo en todas las empresas del cliente. */
 function codigoDe(client: ConsolidatedClient): string | null {
@@ -182,9 +183,15 @@ export default function EstadoCuentaDrawer({ client, companyFilter, onClose, onC
         const cuadre = cuadrarConSwitch(data.total, saldoSwitch);
         if (cuadre.cuadra || !cuadre.aviso) return null;
         return (
-          <p role="alert" className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <Aviso className="mb-4"
+            legado={
+              <p role="alert" className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                {cuadre.aviso}
+              </p>
+            }
+          >
             {cuadre.aviso}
-          </p>
+          </Aviso>
         );
       })()}
 

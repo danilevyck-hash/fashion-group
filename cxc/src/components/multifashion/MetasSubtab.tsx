@@ -24,6 +24,7 @@ import { RETAIL_AL_FRENTE } from "@/lib/multifashion/retail-al-frente";
 import { MetaFormModal, type MetaGuardar } from "./MetaFormModal";
 import type { VendedoraAgrupada } from "@/lib/multifashion/metas-clave";
 import type { MetaConAvance } from "@/lib/multifashion/metas-lectura";
+import { Aviso } from "@/components/ui/Aviso";
 
 // 🔴 UNA tarjeta de meta, compacta, con `RETAIL_AL_FRENTE` (23-sep-2026): en
 // Vendedoras la meta se dibujaba dos veces. Con el interruptor apagado, la de
@@ -140,16 +141,24 @@ export function MetasSubtab() {
   // (algo roto), y se nombra el archivo para que Daniel sepa qué correr.
   if (!data.instalado) {
     return (
-      <div className="rounded-lg border border-amber-300 bg-amber-50 p-5">
-        <p className="text-sm font-medium text-amber-900">Las metas todavía no están instaladas.</p>
-        <p className="mt-1 text-sm text-amber-800">
-          Falta correr el archivo{" "}
-          <code className="rounded bg-amber-100 px-1 py-0.5 font-mono text-xs">
-            20260813170000_multifashion_metas.sql
-          </code>{" "}
-          en Supabase. Todo lo demás de Multifashion funciona igual.
-        </p>
-      </div>
+      <Aviso
+        tono="aviso"
+        ayuda={<>Falta correr <code className="font-mono">20260813170000_multifashion_metas.sql</code> en Supabase. Lo demás de Multifashion funciona igual.</>}
+        legado={
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-5">
+            <p className="text-sm font-medium text-amber-900">Las metas todavía no están instaladas.</p>
+            <p className="mt-1 text-sm text-amber-800">
+              Falta correr el archivo{" "}
+              <code className="rounded bg-amber-100 px-1 py-0.5 font-mono text-xs">
+                20260813170000_multifashion_metas.sql
+              </code>{" "}
+              en Supabase. Todo lo demás de Multifashion funciona igual.
+            </p>
+          </div>
+        }
+      >
+        Metas sin instalar.
+      </Aviso>
     );
   }
 
@@ -158,9 +167,16 @@ export function MetasSubtab() {
   return (
     <div className="w-full">
       {aviso && (
-        <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <Aviso
+          className="mb-4"
+          legado={
+            <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              {aviso}
+            </div>
+          }
+        >
           {aviso}
-        </div>
+        </Aviso>
       )}
 
       {data.metas.length === 0 ? (

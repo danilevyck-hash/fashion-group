@@ -69,6 +69,7 @@ import { useRubrosDelCatalogoReebok } from "@/lib/hooks/useRubrosDelCatalogoReeb
 import { useNuevosEnSwitch } from "@/lib/hooks/useNuevosEnSwitch";
 import { CostoDelArchivo, FacturasDelArchivo, NuevosEnSwitch } from "./ResumenDelArchivo";
 import { workbookBlob, workbookBytes, filtroDesdeA1, XLSX_MIME } from "@/lib/excel-export";
+import { Aviso } from "@/components/ui/Aviso";
 
 type NameMode = "formula" | "fijo";
 interface NameEdit { divisor: number; extra: number; redondeo: Redondeo; precioFijo: number | null; modo: NameMode; dirty: boolean }
@@ -810,26 +811,48 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
 
       {/* Error */}
       {error && (
-        <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          <span aria-hidden>✕</span>
-          <div><b className="font-semibold">No se pudo procesar.</b> {error}</div>
-        </div>
+        <Aviso
+          tono="error" className="mb-5"
+          legado={
+            <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              <span aria-hidden>✕</span>
+              <div><b className="font-semibold">No se pudo procesar.</b> {error}</div>
+            </div>
+          }
+        >
+          No se pudo procesar. {error}
+        </Aviso>
       )}
 
       {items && items.length > 0 && (
         <>
           {/* Avisos */}
           {warnings.length > 0 && (
-            <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              <span aria-hidden>!</span>
-              <div>
-                <b className="font-semibold">{warnings.length} aviso(s)</b> de datos faltantes:
-                <ul className="ml-4 mt-1.5 list-disc">
-                  {warnings.slice(0, 8).map((x, i) => <li key={i}>{x}</li>)}
-                </ul>
-                {warnings.length > 8 && <div className="mt-1">…y {warnings.length - 8} más.</div>}
-              </div>
-            </div>
+            <Aviso
+              tono="aviso" className="mb-4"
+              ayuda={
+                <>
+                  <ul className="ml-4 list-disc">
+                    {warnings.slice(0, 8).map((x, i) => <li key={i}>{x}</li>)}
+                  </ul>
+                  {warnings.length > 8 && <div className="mt-1">…y {warnings.length - 8} más.</div>}
+                </>
+              }
+              legado={
+                <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  <span aria-hidden>!</span>
+                  <div>
+                    <b className="font-semibold">{warnings.length} aviso(s)</b> de datos faltantes:
+                    <ul className="ml-4 mt-1.5 list-disc">
+                      {warnings.slice(0, 8).map((x, i) => <li key={i}>{x}</li>)}
+                    </ul>
+                    {warnings.length > 8 && <div className="mt-1">…y {warnings.length - 8} más.</div>}
+                  </div>
+                </div>
+              }
+            >
+              {warnings.length} {plural(warnings.length, "aviso", "avisos")} de datos faltantes.
+            </Aviso>
           )}
 
           {/* 🩸 LAS CATEGORÍAS QUE LE FALTAN AL CATÁLOGO (17-sep-2026).
@@ -863,25 +886,42 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
               proveedor, así que sigue pidiendo que se revise antes de subir.
               AVISA, NO CORRIGE: el archivo sale con el valor del proveedor. */}
           {aRevisar.length > 0 && (
-            <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              <span aria-hidden>!</span>
-              <div>
-                <b className="font-semibold">
-                  {aRevisar.length} valor(es) de Department/GENDER que el catálogo no conoce.
-                </b>{" "}
-                Estos artículos van a quedar sin categoría o sin género en el catálogo, y un producto
-                sin categoría se cobra por bulto de 6 y no de 12. Revísalos antes de subir el archivo:
-                <ul className="ml-4 mt-1.5 list-disc">
-                  {aRevisar.slice(0, 8).map((v, i) => (
-                    <li key={i}>
-                      <b>{v.columna}</b> «{v.valor}» — {v.articulos.length} artículo(s):{" "}
-                      {v.articulos.slice(0, 3).join(", ")}{v.articulos.length > 3 ? "…" : ""}
-                    </li>
-                  ))}
-                </ul>
-                {aRevisar.length > 8 && <div className="mt-1">…y {aRevisar.length - 8} más.</div>}
-              </div>
-            </div>
+            <Aviso
+              tono="aviso" className="mb-4"
+              ayuda={
+                <>
+                  <ul className="ml-4 list-disc">
+                    {aRevisar.slice(0, 8).map((v, i) => (
+                      <li key={i}><b>{v.columna}</b> «{v.valor}» — {v.articulos.length} artículo(s): {v.articulos.slice(0, 3).join(", ")}{v.articulos.length > 3 ? "…" : ""}</li>
+                    ))}
+                  </ul>
+                  {aRevisar.length > 8 && <div className="mt-1">…y {aRevisar.length - 8} más.</div>}
+                </>
+              }
+              legado={
+                <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  <span aria-hidden>!</span>
+                  <div>
+                    <b className="font-semibold">
+                      {aRevisar.length} valor(es) de Department/GENDER que el catálogo no conoce.
+                    </b>{" "}
+                    Estos artículos van a quedar sin categoría o sin género en el catálogo, y un producto
+                    sin categoría se cobra por bulto de 6 y no de 12. Revísalos antes de subir el archivo:
+                    <ul className="ml-4 mt-1.5 list-disc">
+                      {aRevisar.slice(0, 8).map((v, i) => (
+                        <li key={i}>
+                          <b>{v.columna}</b> «{v.valor}» — {v.articulos.length} artículo(s):{" "}
+                          {v.articulos.slice(0, 3).join(", ")}{v.articulos.length > 3 ? "…" : ""}
+                        </li>
+                      ))}
+                    </ul>
+                    {aRevisar.length > 8 && <div className="mt-1">…y {aRevisar.length - 8} más.</div>}
+                  </div>
+                </div>
+              }
+            >
+              {aRevisar.length} {plural(aRevisar.length, "valor", "valores")} de Department/GENDER sin categoría en el catálogo: se cobrarían por bulto de 6. Revísalos antes de subir.
+            </Aviso>
           )}
 
           {/* 🔴 LAS COLUMNAS QUE NO VINIERON, Y DE DÓNDE SALIÓ CADA COSA.
@@ -918,24 +958,41 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
               dice FTW, APP ni ACC HW, NO se adivina: la fila sale con la Marca
               vacía y acá se dice con el valor crudo. */}
           {segmentosRaros.length > 0 && (
-            <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              <span aria-hidden>!</span>
-              <div>
-                <b className="font-semibold">
-                  {segmentosRaros.length} «Segmento de negocio» que no dice FTW, APP ni ACC HW.
-                </b>{" "}
-                Esos artículos salen con la <b>Marca</b> vacía y hay que ponérsela en Switch:
-                <ul className="ml-4 mt-1.5 list-disc">
-                  {segmentosRaros.slice(0, 8).map((v) => (
-                    <li key={v.valor}>
-                      «{v.valor}» — {v.articulos.length} artículo(s):{" "}
-                      {v.articulos.slice(0, 3).join(", ")}{v.articulos.length > 3 ? "…" : ""}
-                    </li>
-                  ))}
-                </ul>
-                {segmentosRaros.length > 8 && <div className="mt-1">…y {segmentosRaros.length - 8} más.</div>}
-              </div>
-            </div>
+            <Aviso
+              tono="aviso" className="mb-4"
+              ayuda={
+                <>
+                  <ul className="ml-4 list-disc">
+                    {segmentosRaros.slice(0, 8).map((v) => (
+                      <li key={v.valor}>«{v.valor}» — {v.articulos.length} artículo(s): {v.articulos.slice(0, 3).join(", ")}{v.articulos.length > 3 ? "…" : ""}</li>
+                    ))}
+                  </ul>
+                  {segmentosRaros.length > 8 && <div className="mt-1">…y {segmentosRaros.length - 8} más.</div>}
+                </>
+              }
+              legado={
+                <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  <span aria-hidden>!</span>
+                  <div>
+                    <b className="font-semibold">
+                      {segmentosRaros.length} «Segmento de negocio» que no dice FTW, APP ni ACC HW.
+                    </b>{" "}
+                    Esos artículos salen con la <b>Marca</b> vacía y hay que ponérsela en Switch:
+                    <ul className="ml-4 mt-1.5 list-disc">
+                      {segmentosRaros.slice(0, 8).map((v) => (
+                        <li key={v.valor}>
+                          «{v.valor}» — {v.articulos.length} artículo(s):{" "}
+                          {v.articulos.slice(0, 3).join(", ")}{v.articulos.length > 3 ? "…" : ""}
+                        </li>
+                      ))}
+                    </ul>
+                    {segmentosRaros.length > 8 && <div className="mt-1">…y {segmentosRaros.length - 8} más.</div>}
+                  </div>
+                </div>
+              }
+            >
+              {segmentosRaros.length} «Segmento de negocio» sin FTW, APP ni ACC HW: salen con la Marca vacía. Pónsela en Switch.
+            </Aviso>
           )}
 
           {/* Config de salida */}
@@ -1029,23 +1086,37 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
               30 % a la ropa— y no lo decía en ningún lado: la cotización podía
               salir equivocada y nadie tenía cómo enterarse. */}
           {descuentoIlegible && (
-            <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900" data-descuento-ilegible>
-              <b className="font-semibold">Ese descuento no se entiende y no se está aplicando.</b>{" "}
-              Escribe un número entre 0 y {DESCUENTO_MAX} (por ejemplo, 25). Mientras tanto el costo
-              se estima, como abajo.
-            </div>
+            <Aviso
+              tono="aviso" className="mb-4"
+              legado={
+                <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900" data-descuento-ilegible>
+                  <b className="font-semibold">Ese descuento no se entiende y no se está aplicando.</b>{" "}
+                  Escribe un número entre 0 y {DESCUENTO_MAX} (por ejemplo, 25). Mientras tanto el costo
+                  se estima, como abajo.
+                </div>
+              }
+            >
+              <span data-descuento-ilegible>Descuento no válido: escribe un número entre 0 y {DESCUENTO_MAX}. Mientras tanto el costo se estima.</span>
+            </Aviso>
           )}
           {avisoDelDescuento && (
-            <div
-              className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
-                avisoDelDescuento.tono === "ambar"
-                  ? "border-amber-300 bg-amber-50 text-amber-900"
-                  : "border-stone-300 bg-stone-50 text-stone-700"
-              }`}
-              data-aviso-descuento={avisoDelDescuento.tono}
+            <Aviso
+              tono={avisoDelDescuento.tono === "ambar" ? "aviso" : "info"} className="mb-4"
+              legado={
+                <div
+                  className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+                    avisoDelDescuento.tono === "ambar"
+                      ? "border-amber-300 bg-amber-50 text-amber-900"
+                      : "border-stone-300 bg-stone-50 text-stone-700"
+                  }`}
+                  data-aviso-descuento={avisoDelDescuento.tono}
+                >
+                  {avisoDelDescuento.texto}
+                </div>
+              }
             >
-              {avisoDelDescuento.texto}
-            </div>
+              <span data-aviso-descuento={avisoDelDescuento.tono}>{avisoDelDescuento.texto}</span>
+            </Aviso>
           )}
 
           {/* Fórmulas de precio Reebok (editables, guardadas por marca) */}
@@ -1245,23 +1316,51 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
           )}
 
           {formato === "confirmacion" && monthColIdx === -1 && (
-            <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] font-medium text-amber-800">
-              No se detectó una columna de mes. Selecciona arriba la que tiene la cantidad por artículo.
-              Mientras tanto todo sale con cantidad 0 y <b>se incluyen todos los artículos</b>,
-              porque no hay forma de saber cuáles pidió el proveedor.
-            </div>
+            <Aviso
+              tono="aviso" className="mb-4"
+              ayuda={
+                <>
+                  Mientras tanto todo sale con cantidad 0 y se incluyen todos los artículos.
+                </>
+              }
+              legado={
+                <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] font-medium text-amber-800">
+                  No se detectó una columna de mes. Selecciona arriba la que tiene la cantidad por artículo.
+                  Mientras tanto todo sale con cantidad 0 y <b>se incluyen todos los artículos</b>,
+                  porque no hay forma de saber cuáles pidió el proveedor.
+                </div>
+              }
+            >
+              Sin columna de mes. Selecciona arriba la que tiene la cantidad por artículo.
+            </Aviso>
           )}
           {quedoVacio && (
-            <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-[13px] font-medium text-red-800">
-              {formato === "despacho"
-                ? "Ningún artículo del despacho trae cantidad recibida, así que el archivo saldría vacío y no se puede descargar. Revisa que el archivo sea el correcto."
-                : `Ningún artículo tiene cantidad en ${monthLabel || "el mes seleccionado"}, así que el archivo saldría vacío y no se puede descargar. Revisa arriba si la columna de cantidad es la correcta.`}
-            </div>
+            <Aviso
+              tono="error" className="mb-4"
+              legado={
+                <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-[13px] font-medium text-red-800">
+                  {formato === "despacho"
+                    ? "Ningún artículo del despacho trae cantidad recibida, así que el archivo saldría vacío y no se puede descargar. Revisa que el archivo sea el correcto."
+                    : `Ningún artículo tiene cantidad en ${monthLabel || "el mes seleccionado"}, así que el archivo saldría vacío y no se puede descargar. Revisa arriba si la columna de cantidad es la correcta.`}
+                </div>
+              }
+            >
+              No se puede descargar: {formato === "despacho"
+                ? "ningún artículo del despacho trae cantidad recibida. Revisa que sea el archivo correcto."
+                : `ningún artículo tiene cantidad en ${monthLabel || "el mes seleccionado"}. Revisa la columna de cantidad.`}
+            </Aviso>
           )}
           {salida === "switch" && revisar > 0 && (
-            <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] font-medium text-amber-800">
-              {revisar} {plural(revisar, "artículo", "artículos")} en ámbar: no se halló la talla-muestra exacta (9/7) y se usó la más cercana. Revísalos.
-            </div>
+            <Aviso
+              tono="aviso" className="mb-4"
+              legado={
+                <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] font-medium text-amber-800">
+                  {revisar} {plural(revisar, "artículo", "artículos")} en ámbar: no se halló la talla-muestra exacta (9/7) y se usó la más cercana. Revísalos.
+                </div>
+              }
+            >
+              {revisar} {plural(revisar, "artículo", "artículos")} en ámbar: se usó la talla-muestra más cercana a 9/7. Revísalos.
+            </Aviso>
           )}
 
           {/* Stats + acción */}

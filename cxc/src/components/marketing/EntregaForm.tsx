@@ -54,6 +54,7 @@ import { useToast } from "@/components/ToastSystem";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import NotaEntregaAcciones from "@/components/marketing/NotaEntregaAcciones";
+import { Aviso } from "@/components/ui/Aviso";
 import {
   bultosParaInput,
   normalizarBultos,
@@ -770,10 +771,17 @@ export default function EntregaForm({
               <span className="underline">/marketing/mobiliario</span>.
             </div>
           ) : marcasOpciones.length === 0 ? (
-            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              No hay marcas en el catálogo. Crea marcas en Marketing antes de
-              registrar la entrega.
-            </div>
+            <Aviso
+              tono="aviso"
+              legado={
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  No hay marcas en el catálogo. Crea marcas en Marketing antes de
+                  registrar la entrega.
+                </div>
+              }
+            >
+              Sin marcas en el catálogo. Créalas en Marketing antes de registrar la entrega.
+            </Aviso>
           ) : (
             <>
               {/* Nombre de la entrega */}

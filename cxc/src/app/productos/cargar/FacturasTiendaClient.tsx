@@ -41,6 +41,7 @@ import {
 } from "@/lib/depurador/tienda";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { workbookBlob, workbookBytes, filtroDesdeA1 } from "@/lib/excel-export";
+import { Aviso } from "@/components/ui/Aviso";
 
 const BLANK_FORMULA: MarcaFormula = { marca: "", divisor: 0, extra: 0, redondeo: "int" };
 
@@ -473,16 +474,24 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
         </div>
       )}
       {catalogoFallo && (
-        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          <span>No se pudo cargar el catálogo de descripciones. Intenta de nuevo.</span>
-          <button
-            type="button"
-            onClick={reintentarCatalogo}
-            className="rounded-md border border-red-300 bg-white px-3 py-1 text-[13px] font-semibold text-red-700 transition hover:bg-red-100 active:scale-[0.97]"
-          >
-            Reintentar
-          </button>
-        </div>
+        <Aviso
+          tono="error" className="mb-4"
+          accion={{ texto: "Reintentar", onClick: reintentarCatalogo }}
+          legado={
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              <span>No se pudo cargar el catálogo de descripciones. Intenta de nuevo.</span>
+              <button
+                type="button"
+                onClick={reintentarCatalogo}
+                className="rounded-md border border-red-300 bg-white px-3 py-1 text-[13px] font-semibold text-red-700 transition hover:bg-red-100 active:scale-[0.97]"
+              >
+                Reintentar
+              </button>
+            </div>
+          }
+        >
+          No se pudo cargar el catálogo de descripciones.
+        </Aviso>
       )}
 
       {/* Compañía reconocida por el formato (modo dispatcher): la factura de
@@ -565,35 +574,69 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
 
       {/* Error */}
       {error && (
-        <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          <span aria-hidden>✕</span>
-          <div><b className="font-semibold">No se pudo procesar.</b> {error}</div>
-        </div>
+        <Aviso
+          tono="error" className="mb-5"
+          legado={
+            <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              <span aria-hidden>✕</span>
+              <div><b className="font-semibold">No se pudo procesar.</b> {error}</div>
+            </div>
+          }
+        >
+          No se pudo procesar. {error}
+        </Aviso>
       )}
 
       {result && rows.length > 0 && (
         <>
           {/* Avisos */}
           {result.warnings.length > 0 && (
-            <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              <span aria-hidden>!</span>
-              <div>
-                <b className="font-semibold">{result.warnings.length} aviso(s)</b>:
-                <ul className="ml-4 mt-1.5 list-disc">
-                  {result.warnings.slice(0, 8).map((x, i) => <li key={i}>{x}</li>)}
-                </ul>
-                {result.warnings.length > 8 && <div className="mt-1">…y {result.warnings.length - 8} más.</div>}
-              </div>
-            </div>
+            <Aviso
+              tono="aviso" className="mb-5"
+              ayuda={
+                <>
+                  <ul className="ml-4 list-disc">
+                    {result.warnings.slice(0, 8).map((x, i) => <li key={i}>{x}</li>)}
+                  </ul>
+                  {result.warnings.length > 8 && <div className="mt-1">…y {result.warnings.length - 8} más.</div>}
+                </>
+              }
+              legado={
+                <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  <span aria-hidden>!</span>
+                  <div>
+                    <b className="font-semibold">{result.warnings.length} aviso(s)</b>:
+                    <ul className="ml-4 mt-1.5 list-disc">
+                      {result.warnings.slice(0, 8).map((x, i) => <li key={i}>{x}</li>)}
+                    </ul>
+                    {result.warnings.length > 8 && <div className="mt-1">…y {result.warnings.length - 8} más.</div>}
+                  </div>
+                </div>
+              }
+            >
+              {result.warnings.length} {result.warnings.length === 1 ? "aviso" : "avisos"} en el archivo.
+            </Aviso>
           )}
           {revisar > 0 && (
-            <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              <span aria-hidden>!</span>
-              <div>
-                <b className="font-semibold">{revisar} fila(s) en ámbar</b> para revisar (marca ambigua,
-                código de barra ilegible o género no identificado). Revísalas en la tabla antes de descargar.
-              </div>
-            </div>
+            <Aviso
+              tono="aviso" className="mb-5"
+              ayuda={
+                <>
+                  Marca ambigua, código de barra ilegible o género no identificado.
+                </>
+              }
+              legado={
+                <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  <span aria-hidden>!</span>
+                  <div>
+                    <b className="font-semibold">{revisar} fila(s) en ámbar</b> para revisar (marca ambigua,
+                    código de barra ilegible o género no identificado). Revísalas en la tabla antes de descargar.
+                  </div>
+                </div>
+              }
+            >
+              {revisar} {revisar === 1 ? "fila" : "filas"} en ámbar. Revísalas en la tabla antes de descargar.
+            </Aviso>
           )}
 
           {/* Barra de acciones */}
@@ -620,33 +663,55 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
           </div>
 
           {bloqueos.length > 0 && (
-            <p className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-semibold text-red-700">
-              <span>🔒 Bloqueado: hay {bloqueos.length} descripción(es) nueva(s) sin aprobar.</span>
-              <button
-                type="button"
-                onClick={() => setOrphanSeen(false)}
-                className="rounded-md border border-red-300 bg-white px-2 py-0.5 text-[12px] font-semibold text-red-700 transition hover:bg-red-100 active:scale-[0.97]"
-              >
-                Ver y aprobar
-              </button>
-            </p>
+            <Aviso
+              tono="error" className="mb-3"
+              accion={{ texto: "Ver y aprobar", onClick: () => setOrphanSeen(false) }}
+              legado={
+                <p className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-semibold text-red-700">
+                  <span>🔒 Bloqueado: hay {bloqueos.length} descripción(es) nueva(s) sin aprobar.</span>
+                  <button
+                    type="button"
+                    onClick={() => setOrphanSeen(false)}
+                    className="rounded-md border border-red-300 bg-white px-2 py-0.5 text-[12px] font-semibold text-red-700 transition hover:bg-red-100 active:scale-[0.97]"
+                  >
+                    Ver y aprobar
+                  </button>
+                </p>
+              }
+            >
+              Descarga bloqueada: {bloqueos.length} {bloqueos.length === 1 ? "descripción nueva" : "descripciones nuevas"} sin aprobar.
+            </Aviso>
           )}
 
           {corregidas.map((c) => (
-            <p
-              key={c.de}
-              className="mb-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-[13px] text-sky-900"
+            <Aviso
+              key={c.de} tono="info" className="mb-3"
+              legado={
+                <p
+                  key={c.de}
+                  className="mb-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-[13px] text-sky-900"
+                >
+                  Corregida: «{c.de}» → <b className="font-semibold">«{c.a}»</b> — {c.productos.toLocaleString()}{" "}
+                  producto{c.productos === 1 ? "" : "s"}
+                </p>
+              }
             >
-              Corregida: «{c.de}» → <b className="font-semibold">«{c.a}»</b> — {c.productos.toLocaleString()}{" "}
-              producto{c.productos === 1 ? "" : "s"}
-            </p>
+              Corregida: «{c.de}» → <b className="font-semibold">«{c.a}»</b> · {c.productos.toLocaleString()} {c.productos === 1 ? "producto" : "productos"}
+            </Aviso>
           ))}
 
           {/* Nada se descarta en silencio: las que no alertaron se dicen igual. */}
           {pasaronSolas > 0 && (
-            <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
-              {pasaronSolas} descripción(es) nueva(s) pasaron solas · las dos mitades ya existen
-            </p>
+            <Aviso
+              tono="info" className="mb-3"
+              legado={
+                <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+                  {pasaronSolas} descripción(es) nueva(s) pasaron solas · las dos mitades ya existen
+                </p>
+              }
+            >
+              {pasaronSolas} {pasaronSolas === 1 ? "descripción nueva pasó sola" : "descripciones nuevas pasaron solas"}: las dos mitades ya existen.
+            </Aviso>
           )}
 
           {/* Stats */}

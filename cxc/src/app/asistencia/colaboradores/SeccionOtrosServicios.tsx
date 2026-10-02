@@ -1,4 +1,5 @@
 "use client";
+import { Aviso } from "@/components/ui/Aviso";
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * «OTROS SERVICIOS» — lo que se le suma al neto, con su porqué (15-sep-2026).
@@ -109,9 +110,16 @@ export default function SeccionOtrosServicios({ codigo, refresco }: {
           y con qué archivo se arregla. Nadie deduce un DDL de una sección que
           no está. */}
       {faltaMigracion && (
+        <Aviso
+          className="mb-3"
+          legado={
         <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
           {faltaMigracion}
         </p>
+          }
+        >
+          {faltaMigracion}
+        </Aviso>
       )}
 
       {abierto && !faltaMigracion && (

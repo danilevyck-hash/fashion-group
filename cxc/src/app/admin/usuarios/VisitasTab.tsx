@@ -23,6 +23,7 @@ import { useEffect, useState } from "react";
 import { SkeletonTable } from "@/components/ui";
 import { etiquetaDeRol } from "@/lib/roles-etiquetas";
 import type { VisitaDeModulo, VisitaDePersona } from "@/lib/visitas/resumen";
+import { Aviso } from "@/components/ui/Aviso";
 
 interface Respuesta {
   tablaLista: boolean;
@@ -97,10 +98,16 @@ export default function VisitasTab() {
       </p>
 
       {!datos.tablaLista && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Todavía no se está anotando nada: falta correr el cambio de base. El
-          sistema funciona igual; la medición empieza el día que corra.
-        </div>
+        <Aviso ayuda="El sistema funciona igual; la medición empieza el día que corra."
+          legado={
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              Todavía no se está anotando nada: falta correr el cambio de base. El
+              sistema funciona igual; la medición empieza el día que corra.
+            </div>
+          }
+        >
+          Registro de visitas sin activar: falta correr el cambio de base.
+        </Aviso>
       )}
 
       {datos.tablaLista && sinNada && (

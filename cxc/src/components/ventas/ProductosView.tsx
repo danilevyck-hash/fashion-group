@@ -58,6 +58,7 @@ import {
 // 🔴 UNA SOLA VENTA (23-sep-2026): el total es el del Resumen y la línea de
 // abajo dice qué incluye; un período sin datos dice desde cuándo los hay.
 import { UNA_SOLA_VENTA, textoCuadreProductos, textoDatosDesde } from "@/lib/ventas/una-sola-venta";
+import { Aviso } from "@/components/ui/Aviso";
 
 // "precio" NO es una columna de la RPC: sale de venta ÷ cantidad. Por eso el
 // orden pasa por `valorOrden` y no por `p[sort.key]` — indexar un campo que no
@@ -736,10 +737,17 @@ export function ProductosView({ periodo: periodoElegido, anioEnCurso, onDescarga
             )}
           </p>
           {comparativo === "vacio" && data.comparativo && (
-            <p data-sin-comparativo className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              El período de comparación ({fmtDia(data.comparativo.desde)} – {fmtDia(data.comparativo.hasta)}) no tiene
-              ventas de esta empresa: la columna de cambio no está comparando contra nada.
-            </p>
+            <Aviso
+              className="mb-3"
+              legado={
+                <p data-sin-comparativo className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  El período de comparación ({fmtDia(data.comparativo.desde)} – {fmtDia(data.comparativo.hasta)}) no tiene
+                  ventas de esta empresa: la columna de cambio no está comparando contra nada.
+                </p>
+              }
+            >
+              Sin ventas en el período de comparación ({fmtDia(data.comparativo.desde)} – {fmtDia(data.comparativo.hasta)}): la columna de cambio no compara contra nada.
+            </Aviso>
           )}
           {/* 🔴 "No se pudo cargar" NO es "no hubo ventas". Va en gris y no en
               ámbar —no hay nada roto en los datos, se cayó una consulta— y

@@ -1,4 +1,5 @@
 "use client";
+import { Aviso } from "@/components/ui/Aviso";
 
 // LA PLANILLA QUINCENAL — el cuadro que la contable armaba a mano en Excel.
 //
@@ -1412,11 +1413,18 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           decir dónde quedó la quincena pasada, para no dejar días sin pagar ni
           pisar una que ya se pagó. */}
       {sugerido && (ASISTENCIA_PANTALLA_2026_09 ? !pedido : !elegido && !pedido) && (
+        <Aviso
+          tono="info"
+          legado={
         <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[13px] text-blue-900">
           La última quincena cerrada de <b>{etiquetaEmpresa(empresa)}</b> terminó el{" "}
           <b>{fechaCorta(sugerido.ultimaHasta)}</b>, así que esta empieza el{" "}
           <b>{fechaCorta(sugerido.inicio)}</b> — es la quincena que sigue arriba.
         </p>
+          }
+        >
+          La quincena anterior de <b>{etiquetaEmpresa(empresa)}</b> terminó el <b>{fechaCorta(sugerido.ultimaHasta)}</b>; esta empieza el <b>{fechaCorta(sugerido.inicio)}</b>.
+        </Aviso>
       )}
 
       {/* ═══ EL ESTADO DE ESTA QUINCENA ═════════════════════════════════════ */}
@@ -1426,9 +1434,16 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           hay todavía es dónde registrar el cierre. Por eso va en ÁMBAR y con el
           nombre del archivo, que es lo que hay que correr. */}
       {faltaMigracionCierre && (
+        <Aviso
+          tono="aviso"
+          legado={
         <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
           {faltaMigracionCierre}
         </p>
+          }
+        >
+          {faltaMigracionCierre}
+        </Aviso>
       )}
 
       {/* 🔴 EL CUADRO QUEDÓ VIEJO. Pasa por dos motivos y se dicen los dos: o
@@ -1436,6 +1451,9 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           ninguno de los dos se recalcula solo: el número se mueve cuando la
           persona lo pide. */}
       {vieja && (
+        <Aviso
+          accion={{ texto: cargando ? "Generando…" : data && coincide ? "Regenerar" : "Generar", onClick: generar, disabled: !elegido || cargando || sinEmpresa }}
+          legado={
         <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5">
           <p className="text-sm font-medium text-amber-900">
             Planilla desactualizada
@@ -1447,6 +1465,11 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
             {" "}Toca <b>{data && coincide ? "Regenerar" : "Generar"}</b> para verlo con ese cambio.
           </p>
         </div>
+          }
+        >
+          <span className="font-medium">Planilla desactualizada:</span>{" "}
+          {!coincide ? "cambiaste el período o la empresa." : "cambiaste algo que mueve la plata."}
+        </Aviso>
       )}
 
       {/* 🔴 YA ESTÁ CERRADA. Dice quién y cuándo, y lo que quedó congelado. */}
@@ -1479,11 +1502,18 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
               lo mismo, algo cambió después del pago y hay que saberlo — pero lo
               que vale sigue siendo lo cerrado. */}
           {!!data && Math.abs(data.totales.netoPagar - cerrada.totalNeto) > 0.005 && (
+            <Aviso
+              className="mt-2"
+              legado={
             <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[12px] text-amber-900">
               Atención: el cuadro que ves ahora da <b>${$(data.totales.netoPagar)}</b> y lo que se cerró
               fue <b>${$(cerrada.totalNeto)}</b>. Cambió algo después del cierre. Vale lo cerrado;
               si hay que rehacerlo, hay que reabrir la quincena.
             </p>
+              }
+            >
+              El cuadro de hoy da <b>${$(data.totales.netoPagar)}</b> y lo cerrado <b>${$(cerrada.totalNeto)}</b>. Vale lo cerrado; para rehacerlo, reabre la quincena.
+            </Aviso>
           )}
         </div>
       )}
@@ -1531,6 +1561,10 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           veces por el mismo día: no se puede cerrar, y se NOMBRA cuál estorba
           con un botón para ir a verla. */}
       {!cerrada && solapadas.length > 0 && (
+        <Aviso
+          tono="error"
+          accion={solapadas.map((c) => ({ texto: `Ver la del ${c.etiqueta || etiquetaRangoGuardado(c)}`, onClick: () => irACerrada(c) }))}
+          legado={
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
           <p className="text-[13px] text-red-800">{textoSolapamiento(solapadas)}</p>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -1546,14 +1580,18 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
             ))}
           </div>
         </div>
+          }
+        >
+          {textoSolapamiento(solapadas)}
+        </Aviso>
       )}
 
       {/* 🔴 LOS FRENOS. No es un aviso: es un NO. Lo que quedó sin aprobar no se
           paga, y una vez cerrada la quincena el aviso no le devuelve la plata a
           nadie. El texto viene del servidor y ya nombra la pestaña. */}
-      {frenos.length > 0 && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
-          <p className="text-sm font-medium text-red-900">No se puede cerrar la quincena todavía</p>
+      {frenos.length > 0 && (() => {
+        // La misma lista en las dos versiones: con AVISOS_2026_10 cambia la caja, no los enlaces.
+        const listaFrenos = (
           <ul className="mt-1 space-y-1.5">
             {frenos.map((f) => (
               <li key={f.tipo} className="text-[13px] text-red-800">
@@ -1615,8 +1653,22 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
               </li>
             ))}
           </ul>
-        </div>
-      )}
+        );
+        return (
+          <Aviso
+            tono="error"
+            legado={
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
+                <p className="text-sm font-medium text-red-900">No se puede cerrar la quincena todavía</p>
+                {listaFrenos}
+              </div>
+            }
+          >
+            <span className="font-medium">No se puede cerrar la quincena todavía</span>
+            {listaFrenos}
+          </Aviso>
+        );
+      })()}
 
       {/* 🔴 «ANTES DE CERRAR» — UNA lista, no siete cajas (11-sep-2026, mockup
           aprobado por Daniel). Arriba lo que hay que ARREGLAR (número en negrita,

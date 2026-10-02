@@ -30,6 +30,7 @@ import { separarPendientes, resumenPendientes } from "@/lib/guias/pendientes-arr
 import { cedulaParaMostrar } from "@/lib/guias/cedula";
 import { CHIP_SOLO_PENDIENTES, urlSinPendientes } from "@/lib/guias/filtro-pendientes";
 import { planParaLlegar } from "@/lib/guias/llegar-a-la-guia";
+import { Aviso } from "@/components/ui/Aviso";
 
 /**
  * 🔴 LOS AVISOS DE LA FILA, CALLADOS Y SIN MOVER NADA (19-sep-2026).
@@ -559,14 +560,20 @@ export default function GuiasList({
         {(() => {
           if (!avisoPendientes) return null;
           return (
-            <button
-              type="button"
-              onClick={() => irALaPendiente(avisoPendientes.guiaId)}
-              className="w-full bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-900 mb-6 flex items-center justify-between gap-3 text-left hover:bg-amber-100 transition min-h-[44px]"
+            <Aviso className="mb-6" accion={{ texto: "Ver guía", onClick: () => irALaPendiente(avisoPendientes.guiaId) }}
+              legado={
+                <button
+                  type="button"
+                  onClick={() => irALaPendiente(avisoPendientes.guiaId)}
+                  className="w-full bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-900 mb-6 flex items-center justify-between gap-3 text-left hover:bg-amber-100 transition min-h-[44px]"
+                >
+                  <span className="font-medium">{avisoPendientes.texto}</span>
+                  <span aria-hidden className="text-amber-700 shrink-0">›</span>
+                </button>
+              }
             >
-              <span className="font-medium">{avisoPendientes.texto}</span>
-              <span aria-hidden className="text-amber-700 shrink-0">›</span>
-            </button>
+              {avisoPendientes.texto}
+            </Aviso>
           );
         })()}
 

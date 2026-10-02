@@ -15,6 +15,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { Aviso } from "@/components/ui/Aviso";
 
 /** El lienzo: fondo de iOS, sitio para la barra de abajo. */
 export function PantallaCelular({ children }: { children: ReactNode }) {
@@ -238,9 +239,16 @@ export function BotonAncho({
 /** Una línea de aviso en ámbar (lo que hay que mirar antes de cerrar). */
 export function AvisoCelular({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-4 mt-3 rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 text-[14px] text-amber-800">
+    <Aviso
+      className="mx-4 mt-3"
+      legado={
+        <div className="mx-4 mt-3 rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 text-[14px] text-amber-800">
+          {children}
+        </div>
+      }
+    >
       {children}
-    </div>
+    </Aviso>
   );
 }
 

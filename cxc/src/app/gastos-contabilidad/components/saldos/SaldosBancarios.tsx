@@ -36,6 +36,7 @@ import {
   type BancoSaldo,
   type CargaSaldo,
 } from "./types";
+import { Aviso } from "@/components/ui/Aviso";
 
 interface Props {
   bancos: BancoSaldo[];
@@ -79,19 +80,25 @@ export default function SaldosBancarios({ bancos, historial, onGuardado, titulo 
       {visible && (
         <>
           {repetidas.length > 0 && (
-            <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-              <p className="text-sm font-medium text-amber-900">
-                {repetidas.length === 1
-                  ? "1 saldo sin cambios"
-                  : `${repetidas.length} saldos sin cambios`}
-              </p>
-              <p className="mt-1 text-xs text-amber-800">
-                {repetidas.map((k) => empresaNombre(k)).join(", ")} — el monto es
-                exactamente el mismo de la carga de antes. Puede estar bien, pero
-                suele pasar cuando se copia el saldo del mes pasado. Revisa y
-                corrige abajo si hace falta.
-              </p>
-            </div>
+            <Aviso className="mb-3" ayuda="El monto es igual al de la carga anterior. Suele pasar al copiar el saldo del mes pasado: revisa y corrige abajo si hace falta."
+              legado={
+                <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-sm font-medium text-amber-900">
+                    {repetidas.length === 1
+                      ? "1 saldo sin cambios"
+                      : `${repetidas.length} saldos sin cambios`}
+                  </p>
+                  <p className="mt-1 text-xs text-amber-800">
+                    {repetidas.map((k) => empresaNombre(k)).join(", ")} — el monto es
+                    exactamente el mismo de la carga de antes. Puede estar bien, pero
+                    suele pasar cuando se copia el saldo del mes pasado. Revisa y
+                    corrige abajo si hace falta.
+                  </p>
+                </div>
+              }
+            >
+              {repetidas.length === 1 ? "1 saldo sin cambios" : `${repetidas.length} saldos sin cambios`}: {repetidas.map((k) => empresaNombre(k)).join(", ")}.
+            </Aviso>
           )}
 
           {/* "una cuenta por empresa" se ve solo: son las 8 filas de abajo. El

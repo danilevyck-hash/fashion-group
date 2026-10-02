@@ -1,4 +1,5 @@
 "use client";
+import { Aviso } from "@/components/ui/Aviso";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // El diálogo de «Aplicar quincena»: pregunta la FECHA DE PAGO antes de aplicar.
@@ -91,11 +92,20 @@ export default function AplicarQuincenaModal({
         {/* Resumen por la fecha elegida — recalcula al cambiarla. */}
         <div className="mt-4 space-y-2 text-sm">
           {resumen && resumen.yaTienen.length > 0 && (
+            <Aviso
+              tono="aviso"
+              legado={
             <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
               {resumen.yaTienen.length === 1
                 ? "1 colaborador ya tiene el descuento de esta quincena; no se le vuelve a aplicar."
                 : `${resumen.yaTienen.length} ya tienen el descuento de esta quincena; no se les vuelve a aplicar.`}
             </p>
+              }
+            >
+              {resumen.yaTienen.length === 1
+                ? "1 colaborador ya tiene el descuento de esta quincena; no se repite."
+                : `${resumen.yaTienen.length} ya tienen el descuento de esta quincena; no se repite.`}
+            </Aviso>
           )}
           {resumen && n > 0 && (
             <p className="text-gray-600">

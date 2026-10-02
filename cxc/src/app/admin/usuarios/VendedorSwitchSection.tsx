@@ -32,6 +32,7 @@ import { useEffect, useState } from "react";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { MARCAS_UI, getMarcaTheme } from "@/lib/catalogo/marcas-ui";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+import { Aviso } from "@/components/ui/Aviso";
 
 const EMPRESAS = MARCAS_UI.map((marca) => {
   const theme = getMarcaTheme(marca)!;
@@ -122,9 +123,15 @@ export default function VendedorSwitchSection({ userId, showToast }: { userId: s
           usa esta pantalla no tiene por qué ver una ruta de migración, tiene
           que saber a quién avisarle. */}
       {ddlPendiente ? (
-        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-          Todavía no se puede asignar el vendedor de Switch: falta activar esta función en el sistema. Avísale a Daniel.
-        </p>
+        <Aviso
+          legado={
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+              Todavía no se puede asignar el vendedor de Switch: falta activar esta función en el sistema. Avísale a Daniel.
+            </p>
+          }
+        >
+          Asignación de vendedor de Switch sin activar. Avísale a Daniel.
+        </Aviso>
       ) : (
         <div className="space-y-2">
           {EMPRESAS.map((e) => {

@@ -20,6 +20,7 @@ import {
   type EmpresaCxp,
   type ProveedorEnEmpresa,
 } from "@/lib/proveedores/por-empresa";
+import { Aviso } from "@/components/ui/Aviso";
 
 // Las empresas con CxP (empresasConCxp): 6 B2B + Multifashion (american_classic).
 // ⚠️ Boston NO está: `cxp: false`, 0 filas, excluida a propósito.
@@ -176,16 +177,23 @@ function ProveedoresList() {
           <AvisoRechazosSwitch texto={avisoMontos} className="mb-3" />
 
           {falloLectura && (
-            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-              <span>No se pudo cargar. Intenta de nuevo en unos segundos.</span>
-              <button
-                type="button"
-                onClick={() => { void fetchList(); }}
-                className="min-h-[44px] rounded-md border border-red-300 bg-white px-3 text-sm font-medium text-red-800 transition active:scale-[0.97]"
-              >
-                Intentar de nuevo
-              </button>
-            </div>
+            <Aviso tono="error" className="mb-4"
+              legado={
+                <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                  <span>No se pudo cargar. Intenta de nuevo en unos segundos.</span>
+                  <button
+                    type="button"
+                    onClick={() => { void fetchList(); }}
+                    className="min-h-[44px] rounded-md border border-red-300 bg-white px-3 text-sm font-medium text-red-800 transition active:scale-[0.97]"
+                  >
+                    Intentar de nuevo
+                  </button>
+                </div>
+              }
+              accion={{ texto: "Intentar de nuevo", onClick: () => { void fetchList(); } }}
+            >
+              No se pudo cargar la lista de proveedores.
+            </Aviso>
           )}
 
           {loading && empresas.length === 0 ? (

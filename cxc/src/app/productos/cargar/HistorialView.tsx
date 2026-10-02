@@ -19,6 +19,7 @@ import {
   type MarcaDeRepeticion,
 } from "@/lib/depurador/corridas-repetidas";
 import { TRES_DETALLES } from "@/lib/depurador/tres-detalles";
+import { Aviso } from "@/components/ui/Aviso";
 
 interface CargaRow {
   id: string;
@@ -141,9 +142,16 @@ export default function HistorialView({ refreshKey = 0, limite }: HistorialViewP
     <div className={limite ? "" : "mx-auto max-w-5xl px-4 py-6"}>
 
       {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <Aviso
+          tono="error" className="mb-4"
+          legado={
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              {error}
+            </div>
+          }
+        >
           {error}
-        </div>
+        </Aviso>
       )}
 
       {!limite && <div className="mb-3 flex flex-wrap items-center gap-2">

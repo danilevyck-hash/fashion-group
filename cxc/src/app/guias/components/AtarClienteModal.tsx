@@ -24,6 +24,7 @@ import { Ayuda } from "@/components/shared/Ayuda";
 import ClientePicker from "@/components/ClientePicker";
 import { CODIGOS_RETIRADOS_DE_GUIAS } from "@/lib/guias/american-classics";
 import type { ClienteHit } from "@/lib/hooks/useBusquedaClientes";
+import { Aviso } from "@/components/ui/Aviso";
 
 interface Props {
   open: boolean;
@@ -157,9 +158,15 @@ export default function AtarClienteModal({
           />
 
           {error && (
-            <div className="mt-3 rounded-md bg-red-50 border border-red-100 px-3 py-2">
-              <p className="text-xs text-red-700">{error}</p>
-            </div>
+            <Aviso tono="error" className="mt-3"
+              legado={
+                <div className="mt-3 rounded-md bg-red-50 border border-red-100 px-3 py-2">
+                  <p className="text-xs text-red-700">{error}</p>
+                </div>
+              }
+            >
+              {error}
+            </Aviso>
           )}
         </div>
 

@@ -11,6 +11,7 @@
 import useSWR from "swr";
 import SaldosBancarios from "./SaldosBancarios";
 import { API_BASE, type RespuestaSaldos } from "./types";
+import { Aviso } from "@/components/ui/Aviso";
 
 const fetcher = (url: string) =>
   fetch(url, { cache: "no-store" }).then((r) => {
@@ -28,15 +29,21 @@ export default function SaldosBancoTab() {
       {isLoading && !data ? (
         <SkeletonSaldos />
       ) : error && !data ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="text-sm text-red-700">No se pudo cargar la información. Revisa tu conexión.</p>
-          <button
-            onClick={() => mutate()}
-            className="mt-3 min-h-[44px] rounded-md bg-black text-white px-4 py-2.5 text-sm font-medium active:scale-[0.97] transition"
-          >
-            Reintentar
-          </button>
-        </div>
+        <Aviso tono="error" accion={{ texto: "Reintentar", onClick: () => void mutate() }}
+          legado={
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+              <p className="text-sm text-red-700">No se pudo cargar la información. Revisa tu conexión.</p>
+              <button
+                onClick={() => mutate()}
+                className="mt-3 min-h-[44px] rounded-md bg-black text-white px-4 py-2.5 text-sm font-medium active:scale-[0.97] transition"
+              >
+                Reintentar
+              </button>
+            </div>
+          }
+        >
+          No se pudo cargar la información. Revisa tu conexión.
+        </Aviso>
       ) : data ? (
         <SaldosBancarios
           bancos={data.bancos}

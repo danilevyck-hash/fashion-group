@@ -1,4 +1,5 @@
 "use client";
+import { Aviso } from "@/components/ui/Aviso";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MARCACIÓN — la pantalla del teléfono (14-sep-2026). Mockup aprobado por
@@ -667,9 +668,16 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
         )}
 
         {sinCodigo && (
+          <Aviso
+            tono="aviso"
+            legado={
           <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
             {estado?.aviso}
           </p>
+            }
+          >
+            {estado?.aviso}
+          </Aviso>
         )}
 
         {/* ── «UN TOQUE» (24-sep-2026) ───────────────────────────────────────

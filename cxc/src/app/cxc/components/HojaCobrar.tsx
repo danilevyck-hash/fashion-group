@@ -36,6 +36,7 @@ import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
 import { fmt, fmtDate } from "@/lib/format";
 import type { EstadoCuenta } from "./EstadoCuentaDrawer";
 import { cuadrarConSwitch } from "@/lib/cxc/estado-cuenta-switch";
+import { Aviso } from "@/components/ui/Aviso";
 
 /** El código Switch (D-XXX) es el mismo en todas las empresas del cliente. */
 function codigoDe(client: ConsolidatedClient): string | null {
@@ -208,15 +209,27 @@ export default function HojaCobrar({
       </div>
 
       {cuadre && !cuadre.cuadra && cuadre.aviso && (
-        <p role="alert" className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+        <Aviso
+          legado={
+            <p role="alert" className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+              {cuadre.aviso}
+            </p>
+          }
+        >
           {cuadre.aviso}
-        </p>
+        </Aviso>
       )}
 
       {preview && preview.sharedCount >= 10 && (
-        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-          Ese correo está registrado en {preview.sharedCount} clientes distintos. Verifica que sea el correcto.
-        </p>
+        <Aviso
+          legado={
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+              Ese correo está registrado en {preview.sharedCount} clientes distintos. Verifica que sea el correcto.
+            </p>
+          }
+        >
+          Correo registrado en {preview.sharedCount} clientes distintos. Verifica el destinatario.
+        </Aviso>
       )}
 
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}

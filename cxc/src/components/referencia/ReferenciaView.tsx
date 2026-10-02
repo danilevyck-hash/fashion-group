@@ -50,6 +50,7 @@ import { textoMeses } from "@/lib/ventas/resumen-articulo";
 import { exportComprasToExcel } from "@/lib/ventas/referencia-excel";
 import { TarjetaArticulo } from "./ReferenciaTarjeta";
 import { ReferenciaTablaPedido } from "./ReferenciaTablaPedido";
+import { Aviso } from "@/components/ui/Aviso";
 
 // ─── Vista ───────────────────────────────────────────────────────────────────
 
@@ -175,14 +176,30 @@ export function ReferenciaView() {
   const resultados = (
     <>
       {error && (
-        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
+        <Aviso
+          tono="error"
+          className="mt-4"
+          legado={
+            <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
+          }
+        >
+          {error}
+        </Aviso>
       )}
 
       {resp?.comprasDisponibles === false && (
-        <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Todavía no están cargados los ingresos de mercancía, así que no se puede decir qué llegó ni cuándo.
-          Las ventas de abajo sí son reales.
-        </p>
+        <Aviso
+          className="mt-4"
+          ayuda="Las ventas de abajo sí son reales."
+          legado={
+            <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              Todavía no están cargados los ingresos de mercancía, así que no se puede decir qué llegó ni cuándo.
+              Las ventas de abajo sí son reales.
+            </p>
+          }
+        >
+          Ingresos de mercancía sin cargar: no se puede decir qué llegó ni cuándo.
+        </Aviso>
       )}
 
       {resp?.coincidencias && resp.coincidencias.length > 0 && (
@@ -346,14 +363,30 @@ export function ReferenciaView() {
       </div>
 
       {error && (
-        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
+        <Aviso
+          tono="error"
+          className="mt-4"
+          legado={
+            <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
+          }
+        >
+          {error}
+        </Aviso>
       )}
 
       {resp?.comprasDisponibles === false && (
-        <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Todavía no están cargados los ingresos de mercancía, así que no se puede decir qué llegó ni cuándo. Las
-          ventas de abajo sí son reales.
-        </p>
+        <Aviso
+          className="mt-4"
+          ayuda="Las ventas de abajo sí son reales."
+          legado={
+            <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              Todavía no están cargados los ingresos de mercancía, así que no se puede decir qué llegó ni cuándo. Las
+              ventas de abajo sí son reales.
+            </p>
+          }
+        >
+          Ingresos de mercancía sin cargar: no se puede decir qué llegó ni cuándo.
+        </Aviso>
       )}
 
       {resp?.coincidencias && resp.coincidencias.length > 0 && (

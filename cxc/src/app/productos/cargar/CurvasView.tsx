@@ -15,6 +15,7 @@ import {
 import { Ayuda } from "@/components/shared/Ayuda";
 import { logActivityClient } from "@/lib/logActivityClient";
 import { downloadWorkbook } from "@/lib/excel-export";
+import { Aviso } from "@/components/ui/Aviso";
 
 const keyDe = (c: Curva) => `${c.referencia}|||${c.codigo}`;
 
@@ -174,7 +175,14 @@ export default function CurvasView() {
       )}
 
       {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        <Aviso
+          tono="error" className="mb-4"
+          legado={
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+          }
+        >
+          {error}
+        </Aviso>
       )}
 
       {result && (
@@ -204,7 +212,14 @@ export default function CurvasView() {
           </div>
 
           {result.warnings.map((w, i) => (
-            <div key={i} className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-800">{w}</div>
+            <Aviso
+              key={i} tono="aviso" className="mb-3"
+              legado={
+                <div key={i} className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-800">{w}</div>
+              }
+            >
+              {w}
+            </Aviso>
           ))}
 
           {/* Una tarjeta por referencia, sus curvas adentro */}

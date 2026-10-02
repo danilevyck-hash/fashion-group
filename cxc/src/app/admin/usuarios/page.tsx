@@ -16,6 +16,7 @@ import { modulosOfrecibles, moduloOfrecible } from "@/lib/modulos-ofrecibles";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { etiquetaDeRol } from "@/lib/roles-etiquetas";
+import { Aviso } from "@/components/ui/Aviso";
 
 // Cargar Playfair Display sin contaminar otros módulos —
 // el <link> queda inerte si ya está en cache desde otra página.
@@ -473,9 +474,15 @@ function UsuariosPageInner() {
                     <option value="marcacion">Marcación — solo marca desde el teléfono</option>
                   </select>
                   {editUserId === currentUserId && uRole !== "admin" && (
-                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5 mt-2">
-                      Cambiar tu propio rol te quitará acceso de administrador.
-                    </p>
+                    <Aviso className="mt-2"
+                      legado={
+                        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5 mt-2">
+                          Cambiar tu propio rol te quitará acceso de administrador.
+                        </p>
+                      }
+                    >
+                      Cambiar tu propio rol te quita el acceso de administrador.
+                    </Aviso>
                   )}
                 </div>
 

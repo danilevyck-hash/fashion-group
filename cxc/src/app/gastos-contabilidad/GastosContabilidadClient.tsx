@@ -33,6 +33,7 @@ import SelectorMes from "./components/SelectorMes";
 import ResumenEgresos from "./components/ResumenEgresos";
 import DetalleEgresos from "./components/DetalleEgresos";
 import SaldosBancoTab from "./components/saldos/SaldosBancoTab";
+import { Aviso } from "@/components/ui/Aviso";
 
 // Las dos pestañas. `?tab=` en la URL (mismo patrón que Usuarios, Ventas y
 // Multifashion) para que un marcador, un refresh y el back/forward caigan donde
@@ -173,17 +174,23 @@ function GastosContabilidadInner() {
             {isLoading && !data ? (
               <Esqueleto />
             ) : error && !data ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                <p className="text-sm text-red-700">
-                  No se pudo cargar la información. Revisa tu conexión.
-                </p>
-                <button
-                  onClick={() => mutate()}
-                  className="mt-3 min-h-[44px] rounded-md bg-black px-4 py-2.5 text-sm font-medium text-white transition active:scale-[0.97]"
-                >
-                  Reintentar
-                </button>
-              </div>
+              <Aviso tono="error" accion={{ texto: "Reintentar", onClick: () => void mutate() }}
+                legado={
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+                    <p className="text-sm text-red-700">
+                      No se pudo cargar la información. Revisa tu conexión.
+                    </p>
+                    <button
+                      onClick={() => mutate()}
+                      className="mt-3 min-h-[44px] rounded-md bg-black px-4 py-2.5 text-sm font-medium text-white transition active:scale-[0.97]"
+                    >
+                      Reintentar
+                    </button>
+                  </div>
+                }
+              >
+                No se pudo cargar la información. Revisa tu conexión.
+              </Aviso>
             ) : data && !data.instalado ? (
               <div className="rounded-lg border border-gray-200 bg-white p-4">
                 <p className="text-sm font-medium text-gray-900">
