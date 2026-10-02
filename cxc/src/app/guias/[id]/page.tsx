@@ -69,6 +69,7 @@ import { abrirEnEdicion, urlDeLaGuia } from "@/lib/guias/abrir-en-edicion";
 import { textoFaltantesDespachada } from "@/lib/guias/faltantes-despacho";
 import { GUIA_DETALLE_APPLE_2026_10 } from "@/lib/guias/guias-2026-10";
 import { Aviso } from "@/components/ui/Aviso";
+import { ESCALA_PANTALLA_2026_10 } from "@/lib/navegacion/escala-pantalla";
 import { CONTENIDO_ANCHO_2026_10, DOS_COLUMNAS_2026_10, DOS_COLUMNAS, EN_LA_DERECHA, CLASE_COLUMNA_QUE_ESCALA } from "@/lib/navegacion/contenido-ancho";
 // ⚠️ `papel-de-la-guia` arrastra jsPDF (~148 kB) y se pide con `await import`,
 // nunca de arriba: estático acá la carga inicial de esta pantalla pasaba de 204
@@ -383,7 +384,7 @@ export default function GuiaPage() {
         // guía Apple —`max-w-6xl` y adentro 820 px a la IZQUIERDA—: centrado
         // dejaba un blanco grande a los costados.
         <div className={`${apple ? "max-w-6xl mx-auto px-4 sm:px-6 py-6" : "max-w-4xl mx-auto px-4 sm:px-6 py-6"}${escala}`}>
-        <div className={apple && !ancho ? "max-w-[820px]" : undefined}>
+        <div className={apple && !ancho ? `max-w-[820px]${ESCALA_PANTALLA_2026_10 ? " mx-auto" : ""}` : undefined}>
           {/* Encabezado: ‹ Atrás · Guía GT-190 */}
           <div className="flex items-center gap-3 mb-5">
             <button

@@ -175,7 +175,7 @@ describe("las 2 columnas (tipos b y c): guardadas detrás de su propio interrupt
   it("cuelgan de DOS_COLUMNAS_2026_10, no del interruptor del ancho", () => {
     const leer = (p: string) => readFileSync(join(SRC, p), "utf8");
     expect(GUIA_FORM).toMatch(/const ancho = DOS_COLUMNAS_2026_10;/);
-    expect(GUIA_FORM).toContain('className={ancho || escala ? undefined : "max-w-[820px]"}');
+    expect(GUIA_FORM).toContain('className={ancho || escala ? undefined : `max-w-[820px]${ESCALA_PANTALLA_2026_10 ? " mx-auto" : ""}`}');
     expect(GUIA_FORM).toMatch(/ancho \? <div className=\{DOS_COLUMNAS\} data-dos-columnas>\{nodo\}<\/div> : nodo/);
     expect(GUIA_DETALLE).toMatch(/const ancho = DOS_COLUMNAS_2026_10;/);
     expect(GUIA_DETALLE).toContain('className={ancho ? `space-y-4 ${DOS_COLUMNAS}` : "space-y-4"}');

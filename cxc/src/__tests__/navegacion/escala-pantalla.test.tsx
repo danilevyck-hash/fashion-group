@@ -100,6 +100,13 @@ describe("escala de la pantalla: la regla de globals.css", () => {
   });
 });
 
+describe("escala de la pantalla: todo centrado", () => {
+  it("con la escala, el formulario de 820 px de Nueva guía (y del detalle Apple) va centrado en su caja", () => {
+    expect(leer("app/guias/components/GuiaForm.tsx")).toContain('`max-w-[820px]${ESCALA_PANTALLA_2026_10 ? " mx-auto" : ""}`');
+    expect(leer("app/guias/[id]/page.tsx")).toContain('`max-w-[820px]${ESCALA_PANTALLA_2026_10 ? " mx-auto" : ""}`');
+  });
+});
+
 describe("escala de la pantalla: lo flotante queda en su lugar", () => {
   it("lo medido en la pantalla se divide entre la escala antes de escribirlo", () => {
     expect(aPxDeEstilo(1414, 1.0714)).toBeCloseTo(1319.77, 1);

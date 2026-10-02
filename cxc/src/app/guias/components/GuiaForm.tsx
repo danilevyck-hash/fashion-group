@@ -79,6 +79,7 @@ import { textoFalta } from "@/lib/guias/falta-para-despachar";
 import { textoYaSeDespacho } from "@/lib/guias/campos-editables";
 import { sugerenciasDireccion } from "@/lib/guias/direccion-sugerida";
 import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
+import { ESCALA_PANTALLA_2026_10 } from "@/lib/navegacion/escala-pantalla";
 import { CONTENIDO_ANCHO_2026_10, DOS_COLUMNAS_2026_10, DOS_COLUMNAS, EN_LA_DERECHA, CLASE_COLUMNA_QUE_ESCALA } from "@/lib/navegacion/contenido-ancho";
 import { bultosBloqueadosPorEtiquetas, observacionesConTraslado } from "@/lib/guias/etiquetas-por-envio";
 
@@ -1005,7 +1006,9 @@ export default function GuiaForm({
       // Asistencia (`max-w-6xl mx-auto px-4 sm:px-6`) y, adentro, el formulario a la
       // IZQUIERDA con un ancho legible: centrado dejaba un blanco grande junto al menú.
       <div className={`max-w-6xl mx-auto px-4 sm:px-6 pt-4 pb-28 md:pb-0${escala ? ` ${CLASE_COLUMNA_QUE_ESCALA}` : ""}`}>
-      <div className={ancho || escala ? undefined : "max-w-[820px]"}>
+      {/* 🔴 2-oct-2026 (`ESCALA_PANTALLA_2026_10`, v3): el formulario de 820 px va CENTRADO en
+          su caja, como el detalle de guía; la barra de «Guardar guía» vive adentro y lo sigue. */}
+      <div className={ancho || escala ? undefined : `max-w-[820px]${ESCALA_PANTALLA_2026_10 ? " mx-auto" : ""}`}>
         <button type="button" onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2">{etiquetaVolver}</button>
         <div className="flex items-baseline gap-2.5">
           <h1 className="text-[26px] font-semibold tracking-tight">Nueva guía</h1>
