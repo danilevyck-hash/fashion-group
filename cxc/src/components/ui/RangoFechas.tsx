@@ -311,7 +311,9 @@ export default function RangoFechas({
             el padding. `altoDeseado` por el mismo motivo: sin él el panel se
             recorta a lo alto y las últimas semanas quedan abajo del corte. */}
         <DesplegableFlotante
-          abierto={abierto}
+          // 🩸 Bajo `lg` el ancla está oculta y abre la hoja de abajo: sin esto
+          // salían DOS calendarios a la vez (2-oct-2026, Comisiones a 390 px).
+          abierto={abierto && !!anclaRef.current?.offsetParent}
           anclaRef={anclaRef}
           onCerrar={() => { setAbierto(false); setAncla(null); }}
           ancho={ANCHO_CALENDARIO}

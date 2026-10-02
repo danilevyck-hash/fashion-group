@@ -42,6 +42,14 @@ import {
   etiquetaPeriodo,
   etiquetaPeriodoCorta,
 } from "@/lib/comisiones/periodo";
+import RangoFechas, { etiquetaRango } from "@/components/ui/RangoFechas";
+import {
+  ATAJOS_RANGO,
+  ROTULO_RANGO_LIBRE,
+  VENDEDORES_RANGO_2026_10,
+  rangoDeAtajo,
+  type RangoConsulta,
+} from "@/lib/comisiones/vendedores-rango";
 
 interface Props {
   mes: number;
@@ -49,9 +57,22 @@ interface Props {
   availableYears: number[];
   onChange: (year: number, mes: number) => void;
   className?: string;
+  /** 🔴 VENDEDORES_RANGO_2026_10: un rango para CONSULTAR. null = se mira un mes. */
+  rango?: RangoConsulta | null;
+  /** Sin esto (o con el interruptor apagado) el control es el de siempre. */
+  onRango?: (r: RangoConsulta) => void;
+  /** En el celular el control va a la derecha: el panel se abre hacia adentro. */
+  alDerecha?: boolean;
 }
 
-export function ComisionesPeriodo({ mes, year, availableYears, onChange, className }: Props) {
+/** Lo que dice el control cerrado cuando se consulta un rango. */
+export function etiquetaDeRango(r: RangoConsulta): string {
+  return ATAJOS_RANGO.find((a) => a.clave === r.atajo)?.rotulo ?? etiquetaRango(r.desde, r.hasta).split(" · ")[0];
+}
+
+export function ComisionesPeriodo({ mes, year, availableYears, onChange, className, rango = null, onRango, alDerecha = false }: Props) {
+  const conRango = VENDEDORES_RANGO_2026_10 && !!onRango;
+  const enRango = conRango && !!rango;
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -86,19 +107,25 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="dialog"
-        aria-label={`Período: ${etiquetaPeriodo(year, mes)}`}
+        aria-label={`Período: ${enRango ? etiquetaDeRango(rango!) : etiquetaPeriodo(year, mes)}`}
         /* Ancho FIJO en iPhone (w-[110px]): así el control mide lo mismo en
            mayo que en julio y la fila no se reacomoda al cambiar de mes. Con
            ancho automático, "May 2026" es 8.6px más ancho que "Jul 2026" —
            suficiente para que "Actualizar ahora" se partiera en dos líneas y el
            encabezado creciera 6px. Medido, no supuesto. */
-        className="inline-flex min-h-[44px] w-[110px] shrink-0 items-center justify-between gap-1 rounded-lg border border-gray-200 bg-white px-2.5 text-sm font-medium text-gray-900 transition hover:border-gray-300 active:scale-[0.97] sm:w-auto sm:justify-start sm:gap-1.5 sm:px-3"
+        className={`inline-flex min-h-[44px] ${enRango ? "w-auto max-w-[180px]" : "w-[110px]"} shrink-0 items-center justify-between gap-1 rounded-lg border border-gray-200 bg-white px-2.5 text-sm font-medium text-gray-900 transition hover:border-gray-300 active:scale-[0.97] sm:w-auto sm:justify-start sm:gap-1.5 sm:px-3`}
       >
         {/* En iPhone el mes va abreviado para que el ancho del control NO
             dependa del mes: con "Septiembre 2026" la fila se partía en dos y
             el encabezado crecía 52px en septiembre y no en julio. */}
-        <span className="whitespace-nowrap sm:hidden">{etiquetaPeriodoCorta(year, mes)}</span>
-        <span className="hidden whitespace-nowrap sm:inline">{etiquetaPeriodo(year, mes)}</span>
+        {enRango ? (
+          <span className="truncate whitespace-nowrap">{etiquetaDeRango(rango!)}</span>
+        ) : (
+          <>
+            <span className="whitespace-nowrap sm:hidden">{etiquetaPeriodoCorta(year, mes)}</span>
+            <span className="hidden whitespace-nowrap sm:inline">{etiquetaPeriodo(year, mes)}</span>
+          </>
+        )}
         <ChevronDown className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
@@ -109,8 +136,43 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
             ref={panelRef}
             role="dialog"
             aria-label="Seleccionar período"
-            className="absolute left-0 top-full z-20 mt-1 w-[276px] max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white p-2 shadow-lg"
+            className={`absolute ${alDerecha ? "right-0" : "left-0"} top-full z-20 mt-1 w-[276px] max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white p-2 shadow-lg`}
           >
+            {/* 🔴 VENDEDORES_RANGO_2026_10: los atajos para CONSULTAR van arriba;
+                los meses de abajo siguen siendo el período que se PAGA. */}
+            {conRango && (
+              <div className="mb-2 border-b border-gray-100 pb-2" data-atajos-rango>
+                <div className="grid grid-cols-2 gap-1">
+                  {ATAJOS_RANGO.map((a) => {
+                    const activo = enRango && rango!.atajo === a.clave;
+                    return (
+                      <button
+                        key={a.clave}
+                        type="button"
+                        aria-pressed={activo}
+                        onClick={() => { onRango!(rangoDeAtajo(a.clave, hoyPanama())); setOpen(false); }}
+                        className={`inline-flex min-h-[44px] items-center justify-center rounded-lg px-2 text-sm transition active:scale-[0.97] ${
+                          activo ? "bg-gray-900 font-medium text-white" : "text-gray-700 hover:bg-gray-100"
+                        }`}
+                      >
+                        {a.rotulo}
+                      </button>
+                    );
+                  })}
+                  <div className="[&_button]:min-h-[44px] [&_button]:justify-center [&_button]:border-0 [&>div]:min-w-0">
+                    <RangoFechas
+                      desde={enRango && !rango!.atajo ? rango!.desde : ""}
+                      hasta={enRango && !rango!.atajo ? rango!.hasta : ""}
+                      vacio={!(enRango && !rango!.atajo)}
+                      textoVacio={ROTULO_RANGO_LIBRE}
+                      label={null}
+                      onChange={(d, h) => { onRango!({ desde: d, hasta: h, atajo: null }); setOpen(false); }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Año — stepper, como el selector de mes del calendario de iOS. */}
             <div className="flex items-center justify-between px-1 pb-2">
               <button
@@ -138,10 +200,10 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
                 que va arriba de los doce meses y a todo el ancho. */}
             <button
               type="button"
-              aria-pressed={esTodoElAnio(mes)}
+              aria-pressed={!enRango && esTodoElAnio(mes)}
               onClick={() => { onChange(year, MES_TODO_EL_ANIO); setOpen(false); }}
               className={`mb-1 inline-flex min-h-[44px] w-full items-center justify-center rounded-lg text-sm transition active:scale-[0.97] ${
-                esTodoElAnio(mes) ? "bg-gray-900 font-medium text-white" : "text-gray-700 hover:bg-gray-100"
+                !enRango && esTodoElAnio(mes) ? "bg-gray-900 font-medium text-white" : "text-gray-700 hover:bg-gray-100"
               }`}
             >
               {ROTULO_TODO_EL_ANIO}
@@ -150,7 +212,7 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
             <div className="grid grid-cols-3 gap-1">
               {MESES_CORTOS.map((corto, i) => {
                 const m = i + 1;
-                const activo = m === mes;
+                const activo = !enRango && m === mes;
                 return (
                   <button
                     key={corto}

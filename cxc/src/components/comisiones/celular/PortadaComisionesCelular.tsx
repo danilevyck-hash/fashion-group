@@ -45,6 +45,8 @@ import {
   mesEnPalabras,
   mesesAlrededor,
 } from "@/lib/comisiones/celular";
+import { ComisionesPeriodo } from "../ComisionesPeriodo";
+import type { RangoConsulta } from "@/lib/comisiones/vendedores-rango";
 
 interface OpcionVista {
   valor: string;
@@ -73,6 +75,10 @@ interface Props {
   onActualizado: () => void;
   avisoMontos?: string | null;
   children: ReactNode;
+  /** 🔴 VENDEDORES_RANGO_2026_10: con `onRango` el mes se toca y abre el MISMO control de la computadora. */
+  rango?: RangoConsulta | null;
+  onRango?: (r: RangoConsulta) => void;
+  availableYears?: number[];
 }
 
 export function PortadaComisionesCelular({
@@ -95,6 +101,9 @@ export function PortadaComisionesCelular({
   onActualizado,
   avisoMontos,
   children,
+  rango = null,
+  onRango,
+  availableYears = [],
 }: Props) {
   const [menu, setMenu] = useState(false);
   const [descarga, setDescarga] = useState(false);
@@ -151,6 +160,7 @@ export function PortadaComisionesCelular({
         </button>
         {conPeriodo && (
           <div className="flex shrink-0 items-center gap-1" data-mes-celular>
+            {!rango && (
             <button
               type="button"
               aria-label={anterior ? `Ir a ${mesEnPalabras(anterior)}` : "Mes anterior"}
@@ -159,11 +169,24 @@ export function PortadaComisionesCelular({
             >
               ‹
             </button>
+            )}
+            {onRango ? (
+              <ComisionesPeriodo
+                mes={mes}
+                year={year}
+                availableYears={availableYears}
+                onChange={onPeriodo}
+                rango={rango}
+                onRango={onRango}
+                alDerecha
+              />
+            ) : (
             <span className="whitespace-nowrap text-[14px] font-medium text-gray-900">
               {mesEnPalabras(mesTexto)}
             </span>
+            )}
             {/* 🔴 NUNCA AL FUTURO: sin mes siguiente, la flecha no se dibuja. */}
-            {siguiente ? (
+            {rango ? null : siguiente ? (
               <button
                 type="button"
                 aria-label={`Ir a ${mesEnPalabras(siguiente)}`}

@@ -79,6 +79,7 @@ import {
   resolverVista,
 } from "@/lib/comisiones/vistas";
 import dynamic from "next/dynamic";
+import { VENDEDORES_RANGO_2026_10, type RangoConsulta } from "@/lib/comisiones/vendedores-rango";
 
 // Vistas LAZY: solo la que se está mirando descarga su JS, en su propio chunk →
 // fuera del bundle inicial de /comisiones. Skeleton mientras carga.
@@ -91,6 +92,11 @@ const ComisionesConsolidadoView = dynamic(
 );
 const ComisionesPorEmpresaView = dynamic(
   () => import("./ComisionesPorEmpresaView").then((m) => m.ComisionesPorEmpresaView),
+  { ssr: false, loading: () => <ViewSkeleton /> },
+);
+// 🔴 VENDEDORES_RANGO_2026_10: ventas y comisión de una fecha a otra (consulta).
+const ComisionesVendedoresRango = dynamic(
+  () => import("./ComisionesVendedoresRango").then((m) => m.ComisionesVendedoresRango),
   { ssr: false, loading: () => <ViewSkeleton /> },
 );
 const ComisionesConfiguracionView = dynamic(
@@ -176,6 +182,9 @@ export function ComisionesView({
   const [refreshKey, setRefreshKey] = useState(0);
   const [year, setYear] = useState<number>(inicial.year);
   const [mes, setMes] = useState<number>(inicial.mes);
+  /** Un rango para CONSULTAR (null = se mira el mes que se paga). */
+  const [rango, setRango] = useState<RangoConsulta | null>(null);
+  const onRango = VENDEDORES_RANGO_2026_10 ? setRango : undefined;
   const [syncStale, setSyncStale] = useState(false);
   /**
    * 🔴 EL TOTAL DEL MES, ARRIBA Y CHICO (la «1b»). Lo REPORTA la vista del
@@ -234,6 +243,8 @@ export function ComisionesView({
   const handlePeriodo = (y: number, m: number) => {
     setYear(y);
     setMes(m);
+    // Elegir un mes vuelve a lo que se paga.
+    setRango(null);
   };
 
   const opciones = OPCIONES_VISTA.filter(
@@ -252,11 +263,16 @@ export function ComisionesView({
   // un Excel, así que los botones de descarga y el «Actualizar ahora» de los
   // RECIBOS del grupo no se dibujan ahí (un control que no ofrece nada no se
   // dibuja). Cuando exista una descarga en Multifashion, se monta ESA.
+  // Un rango es CONSULTA: sin papel ni «Actualizar ahora».
+  const enRango = !!rango && conPeriodo;
   const conDescarga = conPeriodo && !enMultifashion;
+  const conPapel = conDescarga && !enRango;
 
   /** El cuerpo, uno solo: lo dibujan igual la computadora y el celular. */
   const cuerpo = enConfig && hayConfig ? (
     <ComisionesConfiguracionView />
+  ) : enRango ? (
+    <ComisionesVendedoresRango vista={vista} rango={rango!} />
   ) : esVistaMultifashion(vista) ? (
     /* Multifashion, con SU año y SUS chips de período: la MISMA vista del
        módulo Multifashion, no una copia.
@@ -312,11 +328,14 @@ export function ComisionesView({
         mes={mes}
         onPeriodo={handlePeriodo}
         conPeriodo={conPeriodo}
-        conDescarga={conDescarga}
+        conDescarga={conPapel}
         hayConfig={hayConfig}
         enConfig={enConfig}
         onConfig={() => setEnConfig((v) => !v)}
-        total={total}
+        total={enRango ? null : total}
+        rango={enRango ? rango : null}
+        onRango={onRango}
+        availableYears={availableYears}
         onPdf={() => pdfRef.current?.()}
         onExcel={() => excelRef.current?.()}
         pdfDisabled={pdfDisabled}
@@ -393,12 +412,14 @@ export function ComisionesView({
           year={year}
           availableYears={availableYears}
           onChange={handlePeriodo}
+          rango={rango}
+          onRango={onRango}
         />
 
         {/* "Actualizar ahora" de RECIBOS (cobros) — vive acá porque la comisión
             sobre cobro lee switch_recibos. Menú para elegir la empresa (una por
             disparo — sesión única Switch). */}
-        {conDescarga && (
+        {conPapel && (
         <SyncNowButton
           opciones={SYNC_NOW_RECIBOS_OPCIONES}
           className="shrink-0"
@@ -415,7 +436,7 @@ export function ComisionesView({
             todo el módulo se comporte igual»*. La flechita de la celda SÍ sigue
             sin aparecer con «Todo el año»: ese reporte es de UN mes, éste es la
             matriz. */}
-        {conDescarga && (
+        {conPapel && (
         <>
         <button
           type="button"
