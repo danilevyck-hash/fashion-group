@@ -40,7 +40,8 @@
 //    en el iPad las acciones quedaban fuera de la pantalla.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { ConfirmModal, ConfirmDeleteModal } from "@/components/ui";
 import BulkDeletePedidosModal from "@/components/catalogo/BulkDeletePedidosModal";
@@ -73,6 +74,8 @@ import {
   VACIO_SIN_COMPROBANTES,
 } from "@/lib/catalogo/numeros-pedido";
 import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
+import { CATALOGOS_APPLE_2026_10_B } from "@/lib/catalogo/catalogos-2026-10-b";
+import { ID_ACCIONES_EN_LA_BARRA } from "@/lib/catalogo/catalogos-2026-10";
 
 // La fila que se pinta. Su forma vive en `lib/catalogo/fila-comprobante.ts`.
 export type { FilaComprobante, FilaDeOrders };
@@ -504,8 +507,49 @@ export default function ComprobantesPanel({
     showToast,
   });
 
+  // `CATALOGOS_APPLE_2026_10_B` · v4: «Descargar Excel» sube a la barra de
+  // arriba (en el celular, solo el ícono) y los chips y el buscador comparten
+  // fila: todo lo que cabe en una línea, en una línea.
+  const v4 = CATALOGOS_APPLE_2026_10_B.subpaginasInternas;
+  const [barra, setBarra] = useState<HTMLElement | null>(null);
+  useEffect(() => { if (v4) setBarra(document.getElementById(ID_ACCIONES_EN_LA_BARRA)); }, [v4]);
+  const botonExcelV4 = puedeAdministrar ? (
+    <button
+      onClick={handleExport}
+      disabled={exporting || pedidos.length === 0}
+      aria-label="Descargar Excel"
+      className="inline-flex items-center justify-center gap-2 min-h-[44px] min-w-[44px] sm:px-4 text-sm font-medium rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50 active:scale-[0.97] transition disabled:opacity-50"
+    >
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+      </svg>
+      <span className="hidden sm:inline">{exporting ? "Generando..." : "Descargar Excel"}</span>
+    </button>
+  ) : null;
+  const buscadorV4 = (
+    <div className="relative sm:flex-1">
+      <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+      <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por cliente o número…" className={theme.admin.pedidos.searchFocus} />
+    </div>
+  );
+
   return (
     <div>
+      {v4 ? (
+        <>
+          {barra ? (botonExcelV4 && createPortal(botonExcelV4, barra)) : botonExcelV4 && <div className="flex justify-end mb-2">{botonExcelV4}</div>}
+          <FiltrosComprobantes
+            origen={chips.origen}
+            vista={chips.vista}
+            onOrigen={setOrigenFilter}
+            onVista={setVista}
+            enUnaFila={buscadorV4}
+          />
+        </>
+      ) : (
+      <>
       {/* Acciones. «Descargar Excel» es de admin/secretaria: al vendedor el
           endpoint le responde 403 (medido). */}
       {puedeAdministrar && (
@@ -545,6 +589,8 @@ export default function ComprobantesPanel({
           className={theme.admin.pedidos.searchFocus}
         />
       </div>
+      </>
+      )}
 
       {visibles.length === 0 ? (
         <div className="text-center py-16">

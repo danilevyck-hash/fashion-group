@@ -22,11 +22,13 @@ interface Props {
   precios: number[];
   chipActive: string;
   chipInactive: string;
+  /** El tamaño del chip compacto de la v4. */
+  tam?: string;
 }
 
 const CAMPO = "w-full min-h-[44px] rounded-md border border-gray-300 bg-white px-3 text-sm tabular-nums text-gray-900 outline-none focus:border-gray-900 placeholder:text-gray-400";
 
-export default function FiltroPrecioChip({ precio, onChange, precios, chipActive, chipInactive }: Props) {
+export default function FiltroPrecioChip({ precio, onChange, precios, chipActive, chipInactive, tam }: Props) {
   const [abierto, setAbierto] = useState(false);
   const [borrador, setBorrador] = useState<FiltroPrecio>(precio);
   const anclaRef = useRef<HTMLButtonElement>(null);
@@ -55,7 +57,7 @@ export default function FiltroPrecioChip({ precio, onChange, precios, chipActive
         onClick={abrir}
         aria-haspopup="dialog"
         aria-expanded={abierto}
-        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${texto ? chipActive : chipInactive}`}
+        className={`inline-flex items-center gap-1 ${tam ?? "px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px]"} ${texto ? chipActive : chipInactive}`}
       >
         <span>{texto ?? "Precio"}</span>
         <svg className="w-3 h-3 shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

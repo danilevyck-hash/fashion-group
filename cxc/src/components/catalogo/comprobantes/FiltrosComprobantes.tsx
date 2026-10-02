@@ -6,7 +6,9 @@
 // escribirlo acá sería una segunda definición de la misma pregunta.
 
 import type { Chip, GrupoChips } from "@/lib/catalogo/chips-comprobantes";
+import { Fragment, type ReactNode } from "react";
 import { CATALOGO_ORDEN_CELULAR, FILA_QUE_SE_DESLIZA } from "@/lib/catalogo/orden-celular";
+import { CHIP_V4 } from "@/lib/catalogo/catalogos-2026-10-b";
 
 function GrupoDeChips<K extends string>({
   grupo,
@@ -61,12 +63,42 @@ export default function FiltrosComprobantes<O extends string, V extends string>(
   vista,
   onOrigen,
   onVista,
+  enUnaFila,
 }: {
   origen: GrupoChips<O>;
   vista: GrupoChips<V>;
   onOrigen: (clave: O) => void;
   onVista: (clave: V) => void;
+  /** `CATALOGOS_APPLE_2026_10_B` (v4): los dos grupos en UNA fila que se
+   *  desliza en el celular, y esto (el buscador) al lado en la computadora. */
+  enUnaFila?: ReactNode;
 }) {
+  if (enUnaFila !== undefined) {
+    const grupos = [
+      { g: origen as GrupoChips<string>, on: onOrigen as (c: string) => void, medir: "filtro-origen-comprobante" },
+      { g: vista as GrupoChips<string>, on: onVista as (c: string) => void, medir: "filtro-tipo-comprobante" },
+    ].filter((x) => x.g.opciones.length > 0);
+    return (
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className={`${FILA_QUE_SE_DESLIZA} items-center py-1 sm:shrink-0`}>
+          {grupos.map(({ g, on, medir }, i) => (
+            <Fragment key={medir}>
+              {i > 0 && <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-gray-200" />}
+              <span data-medir={medir} className="shrink-0 text-xs text-gray-400">{g.rotulo}</span>
+              {g.opciones.map((c) => (
+                <button key={c.clave} onClick={() => on(c.clave)} aria-pressed={c.activo}
+                  className={`${CHIP_V4} gap-1.5 border ${c.activo ? "border-gray-900 bg-gray-900 text-white" : "border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700"}`}>
+                  {c.label}
+                  <span className={`tabular-nums text-xs ${c.activo ? "text-white/70" : "text-gray-400"}`}>{c.conteo}</span>
+                </button>
+              ))}
+            </Fragment>
+          ))}
+        </div>
+        {enUnaFila}
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:gap-8">
       <GrupoDeChips grupo={origen} onElegir={onOrigen} medir="filtro-origen-comprobante" />

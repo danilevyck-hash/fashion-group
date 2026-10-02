@@ -60,7 +60,11 @@ export default function CatalogoNavbar({ marca }: { marca: MarcaUiKey }) {
         ? "max-w-7xl mx-auto px-4 min-h-14 py-1 flex items-center gap-3 sm:gap-4 border-b border-gray-100"
         : "max-w-7xl mx-auto px-4 h-14 flex items-center gap-3 sm:gap-4 border-b border-gray-100"}>
         {subruta?.tipo === "migas" ? (
-          <RutaArriba marca={marca} enLaBarra />
+          <>
+            <RutaArriba marca={marca} enLaBarra />
+            {/* Aquí Comprobantes monta «Descargar Excel» (v4). */}
+            <div id={ID_ACCIONES_EN_LA_BARRA} className="ml-auto flex shrink-0 items-center" />
+          </>
         ) : subruta?.tipo === "volver" ? (
           <>
             <Link href={subruta.href} className={`${theme.navbar.inicioLink} shrink-0`}>← {subruta.label}</Link>

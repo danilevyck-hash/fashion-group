@@ -15,7 +15,7 @@ import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import fs from "fs";
 import path from "path";
 import CatalogoFilters from "@/components/catalogo/CatalogoFilters";
-import { CATALOGOS_APPLE_2026_10_B, barraDeSubruta, precioAlAplicar, textoChipPrecio } from "@/lib/catalogo/catalogos-2026-10-b";
+import { CATALOGOS_APPLE_2026_10_B, CHIP_V4, barraDeSubruta, precioAlAplicar, textoChipPrecio } from "@/lib/catalogo/catalogos-2026-10-b";
 import { precioEnFiltro } from "@/lib/catalogo/filtros-extra";
 
 const RAIZ = process.cwd();
@@ -31,13 +31,14 @@ function listar(dir: string): string[] {
 }
 
 describe("1 · los interruptores", () => {
-  it("los cinco están APAGADOS hasta el «sí» de Daniel", () => {
+  it("los seis están APAGADOS hasta el «sí» de Daniel", () => {
     expect(CATALOGOS_APPLE_2026_10_B).toEqual({
       buscadorEnUnaFila: false,
       catalogoPublico: false,
       revisarPedido: false,
       subpaginasInternas: false,
       administrar: false,
+      tituloCelularChico: false,
     });
   });
 });
@@ -126,8 +127,6 @@ describe("4 · 🔴 el buscador en una fila manda lo mismo", () => {
       const cb = montar(unaFila);
       fireEvent.change(screen.getByPlaceholderText(/Buscar/), { target: { value: "ABC" } });
       fireEvent.change(screen.getByRole("combobox"), { target: { value: "precio-asc" } });
-      // En una fila, «Limpiar filtros» vive adentro de «Filtros».
-      if (unaFila) fireEvent.click(screen.getByRole("button", { name: /Filtros/ }));
       fireEvent.click(screen.getByText("Limpiar filtros"));
       expect(cb.onSearchChange).toHaveBeenCalledWith("ABC");
       expect(cb.onSortByChange).toHaveBeenCalledWith("precio-asc");
@@ -138,12 +137,31 @@ describe("4 · 🔴 el buscador en una fila manda lo mismo", () => {
     });
   }
 
-  it("unaFila: «Filtros» y el orden miden 44 px y el botón dice cuántos filtros hay puestos", () => {
-    montar(true);
-    const filtros = screen.getByRole("button", { name: /Filtros/ });
-    expect(filtros.className).toContain("h-11 w-11");
-    expect(filtros.textContent).toContain("1");
-    expect(screen.getByRole("combobox").closest("div[title]")!.className).toContain("h-11 w-11");
+  it("v4: los filtros están A LA VISTA en una fila que se desliza, sin botón «Filtros»", () => {
+    const { container } = render(
+      <CatalogoFilters
+        marca="tommy" searchInput="" gender="" category="" sortBy="relevancia" filteredCount={420}
+        onSearchChange={vi.fn()} onGenderChange={vi.fn()} onCategoryChange={vi.fn()}
+        onSortByChange={vi.fn()} onClearAll={vi.fn()}
+        bultosFilter={false} onBultosFilterChange={vi.fn()}
+        precio={{ desde: "", hasta: "" }} onPrecioChange={vi.fn()}
+        genderOptions={[{ value: "women", label: "Women" }, { value: "men", label: "Men" }]}
+        categoryOptions={[{ value: "sneakers", label: "Sneakers" }, { value: "boots", label: "Boots" }]}
+        apple unaFila
+      />,
+    );
+    const fila = container.querySelector("[data-fila-filtros]")!;
+    expect(fila.className).toContain("overflow-x-auto");
+    expect(screen.queryByRole("button", { name: /^Filtros/ })).toBeNull();
+    // Género, Categoría y Precio viven en la MISMA fila, sin abrir nada; el
+    // orden, al lado del buscador.
+    for (const t of ["2+ bultos", "Género", "Categoría", "Precio"]) {
+      expect(fila.textContent, t).toContain(t);
+    }
+    // Chip compacto: 36 de alto a la vista y 44 de toque.
+    expect(CHIP_V4).toContain("h-9");
+    expect(CHIP_V4).toContain("before:-inset-y-1");
+    expect(screen.getByRole("combobox").closest("div[title]")!.className).toContain("h-9");
   });
 });
 
@@ -183,7 +201,6 @@ describe("6 · 🔴 «Precio ▾» como chip filtra LO MISMO", () => {
         apple unaFila
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /^Filtros/ }));
     return onPrecioChange;
   }
 
@@ -213,8 +230,6 @@ describe("6 · 🔴 «Precio ▾» como chip filtra LO MISMO", () => {
   it("con el filtro puesto el chip lo dice, y no queda la fila vieja «PRECIO desde/hasta»", () => {
     montarPrecio("20", "40");
     expect(screen.getByRole("button", { name: "$20–$40" })).toBeTruthy();
-    // El precio es UN filtro puesto, no dos (desde + hasta).
-    expect(screen.getByRole("button", { name: "Filtros · 1" })).toBeTruthy();
     expect(screen.queryByText("Quitar precio")).toBeNull();
     expect(screen.queryByLabelText("Precio desde")).toBeNull();
     expect(textoChipPrecio({ desde: "25", hasta: "25" })).toBe("$25");

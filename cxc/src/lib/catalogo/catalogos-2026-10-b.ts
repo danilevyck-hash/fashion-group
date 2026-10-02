@@ -47,6 +47,8 @@ export interface InterruptoresB {
   readonly revisarPedido: boolean;
   readonly subpaginasInternas: boolean;
   readonly administrar: boolean;
+  /** b7 (aprobado): el título del módulo en el celular, de 34 a 22 px. */
+  readonly tituloCelularChico: boolean;
 }
 
 /** 🔴 Los interruptores. Todos en `false` = las pantallas de hoy. */
@@ -56,6 +58,7 @@ export const CATALOGOS_APPLE_2026_10_B: InterruptoresB = {
   revisarPedido: false,
   subpaginasInternas: false,
   administrar: false,
+  tituloCelularChico: false,
 };
 
 /** Lo que dibuja la barra de arriba del catálogo con sesión en cada sub-ruta.
@@ -89,6 +92,12 @@ export function barraDeSubruta(
   }
   return null;
 }
+
+// ── v4 · los chips compactos (buscadorEnUnaFila, 2-oct-2026) ─────────────────
+// 13 px de letra y 36 de alto a la vista; el toque mide 44 porque el `before`
+// se extiende 4 px arriba y abajo (la fila lleva `py-1` para no recortarlo).
+export const CHIP_V4 =
+  "relative inline-flex h-9 shrink-0 items-center px-3 rounded-full text-[13px] font-medium transition whitespace-nowrap before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']";
 
 // ── «Precio ▾» como chip (buscadorEnUnaFila, 2-oct-2026) ─────────────────────
 // Daniel: «al tocar filtro, precio desde/hasta ¿no debería estar al nivel de

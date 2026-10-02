@@ -47,7 +47,9 @@ export default function RutaArriba({ marca, enLaBarra = false }: { marca: MarcaU
   const tramos = tramosDeComprobantes(marca);
   const ultimo = tramos.length - 1;
   return (
-    <nav aria-label="Dónde estás" className={enLaBarra ? "flex min-w-0 flex-wrap items-center gap-x-1 text-xs text-gray-400" : "flex flex-wrap items-center gap-1 px-6 py-1 text-xs text-gray-400"}>
+    // En la barra (v4) el camino va en UNA línea que se desliza; arranca al
+    // final para que se lea dónde estás («… › Comprobantes»).
+    <nav ref={enLaBarra ? (el) => { if (el) new ResizeObserver(() => { el.scrollLeft = el.scrollWidth; }).observe(el); } : undefined} aria-label="Dónde estás" className={enLaBarra ? "flex min-w-0 flex-1 items-center gap-x-1 overflow-x-auto whitespace-nowrap text-xs text-gray-400 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" : "flex flex-wrap items-center gap-1 px-6 py-1 text-xs text-gray-400"}>
       {tramos.map((t, i) => (
         <span key={t.label} className="flex items-center gap-1">
           {i > 0 && <span aria-hidden>›</span>}

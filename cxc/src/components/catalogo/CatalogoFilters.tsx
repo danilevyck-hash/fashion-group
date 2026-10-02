@@ -118,9 +118,9 @@ import {
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import FiltroPrecioChip from "./FiltroPrecioChip";
 import { grupoTieneOpciones, type OpcionFiltro } from "@/lib/catalogo/filtros-derivados";
-import { CATALOGO_ORDEN_CELULAR, cuantosFiltrosPuestos, textoBotonFiltros } from "@/lib/catalogo/orden-celular";
+import { CATALOGO_ORDEN_CELULAR, FILA_QUE_SE_DESLIZA, cuantosFiltrosPuestos, textoBotonFiltros } from "@/lib/catalogo/orden-celular";
 import { clasesBarraFiltros, textoOrdenCorto } from "@/lib/catalogo/catalogos-2026-10";
-import { textoChipPrecio } from "@/lib/catalogo/catalogos-2026-10-b";
+import { CHIP_V4 } from "@/lib/catalogo/catalogos-2026-10-b";
 
 interface FiltroDesplegableProps {
   /** Nombre del grupo, tal cual se lee en el botón: "Género", "Categoría"… */
@@ -134,6 +134,8 @@ interface FiltroDesplegableProps {
   /** Propuesta estilo Apple: sin nada elegido dice solo «Género», no
    *  «Género: Todos» (así los tres entran en una fila del celular). */
   compacto?: boolean;
+  /** v4 (`CATALOGOS_APPLE_2026_10_B`): el tamaño del chip compacto. */
+  tam?: string;
 }
 
 /**
@@ -152,7 +154,7 @@ interface FiltroDesplegableProps {
  * terminarían dando dos listas de opciones distintas.
  */
 export function FiltroDesplegable({
-  etiqueta, valor, opciones, onChange, chipActive, chipInactive, compacto = false,
+  etiqueta, valor, opciones, onChange, chipActive, chipInactive, compacto = false, tam,
 }: FiltroDesplegableProps) {
   const [abierto, setAbierto] = useState(false);
   const anclaRef = useRef<HTMLButtonElement>(null);
@@ -167,7 +169,7 @@ export function FiltroDesplegable({
         onClick={() => setAbierto(a => !a)}
         aria-haspopup="listbox"
         aria-expanded={abierto}
-        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
+        className={`${tam ? `inline-flex items-center gap-1 ${tam}` : "inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px]"} ${
           activo ? chipActive : chipInactive
         }`}
       >
@@ -426,6 +428,8 @@ export default function CatalogoFilters({
   // Las piezas se arman UNA vez y se acomodan según el interruptor: así no
   // se duplica ningún control (candado `catalogo-orden-celular`).
   const puestosVisibles = filtrosPuestos;
+  // v4: chips compactos (13 px, 36 de alto, 44 de toque). Sin la v4, el literal de hoy.
+  const chipTam = unaFila ? CHIP_V4 : "px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px]";
   const buscador = (placeholder: string, rellenoDerecho?: string, adentro?: ReactNode) => (
     <>
       {/* Search bar */}
@@ -458,11 +462,11 @@ export default function CatalogoFilters({
       <button
         onClick={() => onBultosFilterChange!(!bultosFilter)}
         aria-pressed={bultosFilter}
-        className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
+        className={`${chipTam} ${
           bultosFilter ? f.chipActive : f.chipInactive
         }`}
       >
-        {BULTOS_CHIP_LABEL}
+        {unaFila ? "2+ bultos" : BULTOS_CHIP_LABEL}
       </button>
     )}
 
@@ -475,6 +479,7 @@ export default function CatalogoFilters({
         chipActive={f.chipActive}
         chipInactive={f.chipInactive}
         compacto={apple || unaFila}
+        tam={unaFila ? CHIP_V4 : undefined}
       />
     )}
 
@@ -487,6 +492,7 @@ export default function CatalogoFilters({
         chipActive={f.chipActive}
         chipInactive={f.chipInactive}
         compacto={apple || unaFila}
+        tam={unaFila ? CHIP_V4 : undefined}
       />
     )}
 
@@ -510,11 +516,11 @@ export default function CatalogoFilters({
           <button
             onClick={() => onBultosFilterChange!(!bultosFilter)}
             aria-pressed={bultosFilter}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
+            className={`${chipTam} ${
               bultosFilter ? f.chipActive : f.chipInactive
             }`}
           >
-            {BULTOS_CHIP_LABEL}
+            {unaFila ? "2+ bultos" : BULTOS_CHIP_LABEL}
           </button>
         </div>
 
@@ -530,7 +536,7 @@ export default function CatalogoFilters({
         <button
           key={opt.value}
           onClick={() => onGenderChange(gender === opt.value ? "" : opt.value)}
-          className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
+          className={`${chipTam} ${
             gender === opt.value ? f.chipActive : f.chipInactive
           }`}
         >
@@ -551,7 +557,7 @@ export default function CatalogoFilters({
             <button
               key={opt.value}
               onClick={() => onCategoryChange(category === opt.value ? "" : opt.value)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
+              className={`${chipTam} ${
                 category === opt.value ? f.chipActive : f.chipInactive
               }`}
             >
@@ -617,54 +623,41 @@ export default function CatalogoFilters({
     </span>
   );
 
-  // ── UNA SOLA FILA (`CATALOGOS_APPLE_2026_10_B`, 2-oct-2026) ──
-  // Daniel: «¿el buscador no puede ir al nivel de los filtros?». Celular y
-  // computadora igual: el campo ocupa lo que sobra, «Filtros» y el orden son
-  // botones de 44 px y la cantidad va en gris dentro del campo. Abiertos, los
-  // filtros son los MISMOS controles de siempre, debajo. Nada se duplica.
+  // ── v4 (`CATALOGOS_APPLE_2026_10_B` · buscadorEnUnaFila, 2-oct-2026) ──
+  // Daniel rechazó la v3: «escondes mucho, mejor hacer plegables los filtros»
+  // y «pon precio al nivel de categoría y género». El buscador va en su línea,
+  // con la cantidad en gris adentro; debajo, UNA fila de chips a la vista que
+  // se DESLIZA de lado si no cabe (nunca la página): «2+ bultos» · Género ·
+  // Categoría · Precio; el orden, al lado del buscador. En la computadora Género y Categoría siguen
+  // como píldoras: lo que hoy se ve, se sigue viendo. Nada se duplica.
   if (unaFila) {
-    const hayFiltros = conGenero || conCategorias || conBultos || conPrecio;
     const ordenado = sortBy !== "relevancia";
-    const icono = "relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition";
-    // El precio es UN chip: cuenta uno, aunque lleve «desde» y «hasta».
-    const puestos = cuantosFiltrosPuestos({
-      genero: gender, categoria: category, soloVariosBultos: conBultos && bultosFilter,
-      precioMin: conPrecio && textoChipPrecio(precio) ? "1" : "",
-    });
     return (
-      <div className="mb-4">
+      <div className="mb-3 space-y-1">
+        {/* Línea 1: el buscador y, al lado, el orden (en el celular solo «↕»
+            mientras sea el de siempre). Línea 2: los filtros. */}
         <div className="flex items-center gap-2">
           <div className="relative min-w-0 flex-1">
-            {buscador("Buscar…", searchInput ? "8.5rem" : "6rem",
+            {buscador("Buscar", searchInput ? "9.5rem" : "7rem",
               <span data-cantidad className={`pointer-events-none absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-xs text-gray-400 ${searchInput ? "right-11" : "right-3.5"}`}>
                 {filteredCount} {filteredCount === 1 ? "producto" : "productos"}
               </span>)}
           </div>
-          {hayFiltros && (
-            <button type="button" aria-label={textoBotonFiltros(puestos)} aria-expanded={filtrosAbiertos}
-              onClick={() => setFiltrosAbiertos((v) => !v)}
-              className={`${icono} ${puestos > 0 || filtrosAbiertos ? f.chipActive : f.chipInactive}`}>
-              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" /></svg>
-              {puestos > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full bg-black px-1 text-center text-[11px] leading-[18px] text-white">{puestos}</span>}
-            </button>
-          )}
-          <div title={textoOrdenCorto(sortBy)} className={`${icono} ${ordenado ? f.chipActive : f.chipInactive}`}>
-            <span aria-hidden="true" className="pointer-events-none text-base leading-none">↕</span>
+          <div title={textoOrdenCorto(sortBy)} className={`${CHIP_V4} gap-1 ${ordenado ? f.chipActive : f.chipInactive}`}>
+            <span aria-hidden="true" className="pointer-events-none">↕<span className={ordenado ? " ml-1" : " ml-1 hidden lg:inline"}>{textoOrdenCorto(sortBy)}</span></span>
             <span className="absolute inset-0 opacity-0 [&>select]:h-full [&>select]:w-full">{selectOrden}</span>
           </div>
         </div>
-        {filtrosAbiertos && (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <div className="contents lg:hidden">{desplegablesPiezas}</div>
-            <div className="hidden lg:contents">{pildorasPiezas}</div>
-            {/* «Precio ▾» es un chip más de la fila, con el mismo estilo. */}
-            {conPrecio && (
-              <FiltroPrecioChip precio={precio} onChange={onPrecioChange!} precios={preciosDisponibles}
-                chipActive={f.chipActive} chipInactive={f.chipInactive} />
-            )}
-            {botonLimpiar}
-          </div>
-        )}
+        <div data-fila-filtros className={`${FILA_QUE_SE_DESLIZA} items-center py-1 lg:flex-wrap lg:overflow-x-visible`}>
+          <div className="contents lg:hidden">{desplegablesPiezas}</div>
+          <div className="hidden lg:contents">{pildorasPiezas}</div>
+          {/* «Precio ▾» es un chip más de la fila, con el mismo estilo. */}
+          {conPrecio && (
+            <FiltroPrecioChip precio={precio} onChange={onPrecioChange!} precios={preciosDisponibles}
+              chipActive={f.chipActive} chipInactive={f.chipInactive} tam={CHIP_V4} />
+          )}
+          {hasActiveFilters && <span className="shrink-0 whitespace-nowrap">{botonLimpiar}</span>}
+        </div>
       </div>
     );
   }

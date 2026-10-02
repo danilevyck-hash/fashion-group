@@ -4,6 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { useBackdropDismiss, useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import FGLogo from "@/components/FGLogo";
+import { CATALOGOS_APPLE_2026_10_B } from "@/lib/catalogo/catalogos-2026-10-b";
 import SearchBar, { SEARCH_ROLES } from "@/components/SearchBar";
 import NotificationCenter from "@/components/NotificationCenter";
 import { getModuleColor, getModuleColorByKey } from "@/lib/moduleColors";
@@ -354,11 +355,15 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
               encabezados con la MISMA palabra se leen dos veces en voz alta.
               Es el mismo patrón que ya usaba el título del celular de
               Multifashion (`data-celular="titulo"`). */}
-          <p className="flex items-start gap-2.5 text-[34px] font-semibold leading-[1.08] tracking-tight text-gray-950">
+          {/* `CATALOGOS_APPLE_2026_10_B` · tituloCelularChico (el b7 que Daniel
+              aprobó el 2-oct-2026): 22 px en vez de 34. */}
+          <p className={CATALOGOS_APPLE_2026_10_B.tituloCelularChico
+            ? "flex items-start gap-2 text-[22px] font-semibold leading-[1.2] tracking-tight text-gray-950"
+            : "flex items-start gap-2.5 text-[34px] font-semibold leading-[1.08] tracking-tight text-gray-950"}>
             {moduleColor && (
               <span
                 aria-hidden="true"
-                className="mt-[15px] inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full"
+                className={CATALOGOS_APPLE_2026_10_B.tituloCelularChico ? "mt-[10px] inline-block h-2 w-2 flex-shrink-0 rounded-full" : "mt-[15px] inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full"}
                 style={{ backgroundColor: moduleColor.hex }}
               />
             )}

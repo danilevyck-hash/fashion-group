@@ -928,6 +928,9 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
               <span data-medir="titulo-pedido" className="text-xl font-semibold">{clientName}</span>
             )}
           </div>
+          {CATALOGOS_APPLE_2026_10_B.subpaginasInternas && (
+            <span className="shrink-0 text-xs text-gray-400">{new Date(order.created_at).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "")}</span>
+          )}
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
           {/* Add more products — lleva al CATÁLOGO de la marca en modo
@@ -942,7 +945,10 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         </div>
       </div>
 
+      {/* v4 (`CATALOGOS_APPLE_2026_10_B`): la fecha va en la línea del cliente. */}
+      {!CATALOGOS_APPLE_2026_10_B.subpaginasInternas && (
       <p className="text-xs text-gray-400 mb-4">{new Date(order.created_at).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "")}</p>
+      )}
 
       {/* Candado post-envío a Switch: solo lectura + salida clara (duplicar) */}
       {switchLock && switchEnvio && (
