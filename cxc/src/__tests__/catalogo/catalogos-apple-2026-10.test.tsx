@@ -18,7 +18,7 @@ import CatalogoFilters from "@/components/catalogo/CatalogoFilters";
 import {
   CATALOGOS_APPLE_2026_10,
   clasesBarraFiltros,
-  puestosConOrden,
+  textoOrdenCorto,
 } from "@/lib/catalogo/catalogos-2026-10";
 
 const RAIZ = process.cwd();
@@ -47,6 +47,7 @@ describe("1 · el interruptor", () => {
     expect(quienes).toEqual([
       "src/app/catalogos/marcas/page.tsx",
       "src/components/catalogo/CatalogoFilters.tsx",
+      "src/components/catalogo/CatalogoNavbar.tsx",
       "src/components/catalogo/CatalogoVendedorPage.tsx",
       "src/lib/catalogo/catalogos-2026-10.ts",
     ]);
@@ -71,22 +72,23 @@ describe("1 · el interruptor", () => {
   });
 });
 
-describe("2 · la cuenta de «Filtros»", () => {
-  it("el orden de siempre no cuenta; otro orden suma uno", () => {
-    expect(puestosConOrden(0, "relevancia")).toBe(0);
-    expect(puestosConOrden(0, "")).toBe(0);
-    expect(puestosConOrden(0, "precio-asc")).toBe(1);
-    expect(puestosConOrden(2, "nombre-az")).toBe(3);
+describe("2 · la fila de «Filtros»", () => {
+  it("el chip del orden dice el orden corto, y ante un valor raro, «Relevancia»", () => {
+    expect(textoOrdenCorto("relevancia")).toBe("Relevancia");
+    expect(textoOrdenCorto("precio-asc")).toBe("Precio ↑");
+    expect(textoOrdenCorto("nombre-az")).toBe("A-Z");
+    expect(textoOrdenCorto("otro")).toBe("Relevancia");
   });
 
-  it("cerrado, en el celular solo se ven el buscador, «Filtros» y la cantidad", () => {
+  it("cerrado, en el celular se ven el buscador, «Filtros», el orden y la cantidad", () => {
     const c = clasesBarraFiltros(false);
     expect(c.desplegables.startsWith("hidden ")).toBe(true);
     expect(c.precio.startsWith("hidden ")).toBe(true);
-    expect(c.orden.startsWith("hidden ")).toBe(true);
+    // El orden queda SIEMPRE a la vista (chip en el celular): no se mide su uso.
+    expect(c.orden).not.toMatch(/\bhidden\b/);
     const a = clasesBarraFiltros(true);
     expect(a.desplegables.startsWith("hidden ")).toBe(false);
-    expect(a.orden.startsWith("hidden ")).toBe(false);
+    expect(a.precio.startsWith("hidden ")).toBe(false);
   });
 });
 

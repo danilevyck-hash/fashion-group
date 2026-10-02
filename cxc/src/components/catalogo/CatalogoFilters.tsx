@@ -118,7 +118,7 @@ import {
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import { grupoTieneOpciones, type OpcionFiltro } from "@/lib/catalogo/filtros-derivados";
 import { CATALOGO_ORDEN_CELULAR, cuantosFiltrosPuestos, textoBotonFiltros } from "@/lib/catalogo/orden-celular";
-import { clasesBarraFiltros, puestosConOrden } from "@/lib/catalogo/catalogos-2026-10";
+import { clasesBarraFiltros, textoOrdenCorto } from "@/lib/catalogo/catalogos-2026-10";
 
 interface FiltroDesplegableProps {
   /** Nombre del grupo, tal cual se lee en el botón: "Género", "Categoría"… */
@@ -129,6 +129,9 @@ interface FiltroDesplegableProps {
   /** Clases del tema de la marca para el estado encendido/apagado. */
   chipActive: string;
   chipInactive: string;
+  /** Propuesta estilo Apple: sin nada elegido dice solo «Género», no
+   *  «Género: Todos» (así los tres entran en una fila del celular). */
+  compacto?: boolean;
 }
 
 /**
@@ -147,7 +150,7 @@ interface FiltroDesplegableProps {
  * terminarían dando dos listas de opciones distintas.
  */
 export function FiltroDesplegable({
-  etiqueta, valor, opciones, onChange, chipActive, chipInactive,
+  etiqueta, valor, opciones, onChange, chipActive, chipInactive, compacto = false,
 }: FiltroDesplegableProps) {
   const [abierto, setAbierto] = useState(false);
   const anclaRef = useRef<HTMLButtonElement>(null);
@@ -166,7 +169,7 @@ export function FiltroDesplegable({
           activo ? chipActive : chipInactive
         }`}
       >
-        <span>{etiqueta}: {elegida?.label ?? opciones[0]?.label ?? "Todos"}</span>
+        <span>{compacto && !activo ? etiqueta : `${etiqueta}: ${elegida?.label ?? opciones[0]?.label ?? "Todos"}`}</span>
         <svg className="w-3 h-3 shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
@@ -416,7 +419,7 @@ export default function CatalogoFilters({
 
   // Las piezas se arman UNA vez y se acomodan según el interruptor: así no
   // se duplica ningún control (candado `catalogo-orden-celular`).
-  const puestosVisibles = apple ? puestosConOrden(filtrosPuestos, sortBy) : filtrosPuestos;
+  const puestosVisibles = filtrosPuestos;
   const buscadorPiezas = (
     <>
       {/* Search bar */}
@@ -462,6 +465,7 @@ export default function CatalogoFilters({
         onChange={onGenderChange}
         chipActive={f.chipActive}
         chipInactive={f.chipInactive}
+        compacto={apple}
       />
     )}
 
@@ -473,6 +477,7 @@ export default function CatalogoFilters({
         onChange={onCategoryChange}
         chipActive={f.chipActive}
         chipInactive={f.chipInactive}
+        compacto={apple}
       />
     )}
 
@@ -614,11 +619,16 @@ export default function CatalogoFilters({
         <div className={c.buscador}>{buscadorPiezas}</div>
         <span className={c.botonFiltros}>{botonFiltros}</span>
         <span className={c.limpiar}>{botonLimpiar}</span>
+        <div className={c.orden}>
+          <span aria-hidden="true" className={`${c.ordenChip} items-center gap-1 min-h-[44px] px-3 rounded-full text-xs font-medium whitespace-nowrap ${sortBy !== "relevancia" ? f.chipActive : f.chipInactive}`}>
+            ↕ {textoOrdenCorto(sortBy)}
+          </span>
+          <span className={c.ordenSelect}>{selectOrden}</span>
+        </div>
         <span className={c.cantidad}>{cantidad}</span>
         <div className={c.desplegables}>{desplegablesPiezas}</div>
         <div className={c.pildoras}>{pildorasPiezas}</div>
         {precioPieza && <div className={c.precio}>{precioPieza}</div>}
-        <div className={c.orden}>{selectOrden}</div>
       </div>
     );
   }

@@ -30,7 +30,8 @@ import { Toast } from "@/components/ui";
 import CatalogoHeader from "./CatalogoHeader";
 import CatalogoSyncNow from "@/components/shared/CatalogoSyncNow";
 import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
-import { ACCIONES_EN_EL_ENCABEZADO, CATALOGOS_APPLE_2026_10 } from "@/lib/catalogo/catalogos-2026-10";
+import { CATALOGOS_APPLE_2026_10, ID_ACCIONES_EN_LA_BARRA, CLASES_MENU_MAS } from "@/lib/catalogo/catalogos-2026-10";
+import { createPortal } from "react-dom";
 import CatalogoFilters from "./CatalogoFilters";
 import CatalogoProductCard from "./CatalogoProductCard";
 import CatalogoGroupedCard from "./CatalogoGroupedCard";
@@ -674,6 +675,22 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   );
 
   // Menú compartir (mismo dropdown, clases por tema — ver theme.vendorShare).
+  // Copiar enlace + Descargar PDF: las MISMAS dos opciones en «Compartir» y,
+  // con la propuesta, dentro del «···» del celular.
+  const shareMenuItems = (
+    <>
+      <button onClick={handleCopyLink} className={theme.vendorShare.item}>
+        <svg xmlns="http://www.w3.org/2000/svg" width={theme.vendorShare.iconSize} height={theme.vendorShare.iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        {theme.vendorShare.copyLabel}
+      </button>
+      <button onClick={() => { setShowShareMenu(false); handleDownloadCatalog(); }} disabled={downloading}
+        className={`${theme.vendorShare.item} disabled:opacity-40 disabled:cursor-not-allowed`}>
+        <svg xmlns="http://www.w3.org/2000/svg" width={theme.vendorShare.iconSize} height={theme.vendorShare.iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        {downloading ? "Generando..." : "Descargar PDF"}
+      </button>
+    </>
+  );
+
   const shareMenu = (
     <div className="relative" ref={shareRef}>
       <button onClick={() => setShowShareMenu(prev => !prev)} className={theme.vendorShare.btn}>
@@ -689,15 +706,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
            empuja la lista 104 px y no tapa nada. Es el MISMO panel, con las
            mismas dos opciones — de `sm` para arriba flota como siempre. */
         <div className={`${theme.vendorShare.panel}${CATALOGO_ORDEN_CELULAR ? " max-sm:static" : ""}`}>
-          <button onClick={handleCopyLink} className={theme.vendorShare.item}>
-            <svg xmlns="http://www.w3.org/2000/svg" width={theme.vendorShare.iconSize} height={theme.vendorShare.iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            {theme.vendorShare.copyLabel}
-          </button>
-          <button onClick={() => { setShowShareMenu(false); handleDownloadCatalog(); }} disabled={downloading}
-            className={`${theme.vendorShare.item} disabled:opacity-40 disabled:cursor-not-allowed`}>
-            <svg xmlns="http://www.w3.org/2000/svg" width={theme.vendorShare.iconSize} height={theme.vendorShare.iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            {downloading ? "Generando..." : "Descargar PDF"}
-          </button>
+          {shareMenuItems}
         </div>
       )}
     </div>
@@ -726,9 +735,53 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     <Link href={theme.pedidosHref} className={theme.vendorShare.pedidosBtn}>Comprobantes</Link>
   ) : null;
 
+  // ── Propuesta estilo Apple: las acciones en la barra de «← Inicio» ──
+  // Computadora: «hace X h» · Comprobantes · Compartir, como siempre.
+  // Celular: un solo «···» con las mismas cuatro cosas adentro.
+  // `undefined` = todavía no se buscó; `null` = no hay barra (se dibujan aquí).
+  const [barraAcciones, setBarraAcciones] = useState<HTMLElement | null | undefined>(undefined);
+  const [masAbierto, setMasAbierto] = useState(false);
+  useEffect(() => {
+    if (CATALOGOS_APPLE_2026_10) setBarraAcciones(document.getElementById(ID_ACCIONES_EN_LA_BARRA));
+  }, []);
+  const accionesEnLaBarra = (
+    <>
+      <div data-medir="acciones-catalogo" className={CLASES_MENU_MAS.computadora}>
+        <CatalogoSyncNow catalogo={marca} onSuccess={loadProducts} />
+        {pedidosBtn}
+        {(theme.vendorShare.enHeader || filteredCount > 0) && shareMenu}
+      </div>
+      <div className={CLASES_MENU_MAS.celular}>
+        <button
+          type="button"
+          aria-label="Más opciones"
+          aria-expanded={masAbierto}
+          onClick={() => setMasAbierto((v) => !v)}
+          className={CLASES_MENU_MAS.boton}
+        >
+          ···
+        </button>
+        {masAbierto && (
+          <>
+            <button type="button" aria-label="Cerrar" className="fixed inset-0 z-40 cursor-default" onClick={() => setMasAbierto(false)} />
+            <div className={CLASES_MENU_MAS.panel}>
+              <div className="px-3 py-1">
+                <CatalogoSyncNow catalogo={marca} onSuccess={loadProducts} />
+              </div>
+              {puedeVerPedidos && (
+                <Link href={theme.pedidosHref} className={theme.vendorShare.item}>Comprobantes</Link>
+              )}
+              <div onClick={() => setMasAbierto(false)}>{shareMenuItems}</div>
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  );
+
   return (
     <div className={theme.grid.pageBg}>
-      <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className={CATALOGOS_APPLE_2026_10 ? "max-w-7xl mx-auto px-4 pt-3 pb-6" : "max-w-7xl mx-auto px-4 py-6"}>
         {/* Barra del modo pedido — pegada arriba, con la salida adentro. */}
         {modo.activo && (
           <BarraModoPedido
@@ -739,17 +792,13 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
           />
         )}
         {CATALOGOS_APPLE_2026_10 ? (
-          /* Propuesta estilo Apple: las 4 marcas igual. «hace X h» ·
-             Comprobantes · Compartir en la línea del logo; se va la fila suelta
-             del «hace X h». Mismos botones, mismos permisos. */
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-4 [&>*:first-child]:mb-0">
-            <CatalogoHeader marca={marca} variant="vendor" />
-            <div data-medir="acciones-catalogo" className={ACCIONES_EN_EL_ENCABEZADO}>
-              <CatalogoSyncNow catalogo={marca} onSuccess={loadProducts} />
-              {pedidosBtn}
-              {(theme.vendorShare.enHeader || filteredCount > 0) && shareMenu}
-            </div>
-          </div>
+          /* Propuesta estilo Apple (v2, 2-oct-2026): el logo y las acciones
+             viven en la barra de «← Inicio» (ver `CatalogoNavbar`), así que
+             aquí no se dibuja ninguna franja: lo primero es el buscador. Las
+             acciones se montan en el hueco de la barra con un portal. */
+          barraAcciones ? createPortal(accionesEnLaBarra, barraAcciones)
+            : barraAcciones === null ? <div className="flex justify-end mb-3">{accionesEnLaBarra}</div>
+            : null
         ) : theme.vendorShare.enHeader ? (
           /* Layout heredado Joybees: header + [Pedidos | Compartir].
              `flex-wrap` + `justify-end`: a 390 px el logo de Tommy es ancho y

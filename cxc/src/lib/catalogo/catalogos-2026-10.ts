@@ -21,6 +21,21 @@
 //      lo ancho con «Copiar enlace» al lado (solo el ícono); «Comprobantes ·
 //      Administrar» como enlaces de texto debajo.
 //
+// v2 (2-oct-2026, Daniel aprobó y pidió más: «siento que ocupa mucho espacio
+// arriba antes de ver fotos, digo poner el logo al nivel de inicio… En Reebok
+// veo doble logo»). Reglas en docs/diseno.md › «Detalles aprendidos»:
+//   · El logo vive en la barra de «← Inicio» y es el ÚNICO de la pantalla
+//     (Reebok tenía dos). El catálogo no dibuja franja de logo.
+//   · Las acciones también van en esa barra: en la computadora «hace X h» ·
+//     Comprobantes · Compartir; en el celular un solo «···» con lo mismo.
+//   · Celular: «Filtros › · ↕ Relevancia … N productos» en UNA fila; el orden
+//     queda a la vista como chip (el `select` real va encima, transparente).
+//     Abiertos, los filtros son UNA fila de chips («Género», no «Género:
+//     Todos») y UNA de precio.
+//   · Medido: la primera foto sube de 455 → 219 px (Tommy) y 399 → 219
+//     (Reebok) en el celular; de 467 → 271 (Tommy) y 463 → 271 (Reebok) en la
+//     computadora.
+//
 // 🔴 NINGÚN PRECIO, NINGÚN NÚMERO Y NADA DE LO QUE SE GUARDA O ENVÍA CAMBIA.
 // El carrito, el checkout y el payload del pedido no importan este archivo
 // (candado `catalogos-apple-2026-10.test.tsx`). Los mismos filtros, el mismo
@@ -32,18 +47,6 @@
 /** 🔴 El interruptor. `false` = la pantalla de hoy. */
 export const CATALOGOS_APPLE_2026_10 = false;
 
-/** El orden por defecto del catálogo: no cuenta como filtro puesto. */
-export const ORDEN_POR_DEFECTO = "relevancia";
-
-/**
- * Cuántas cosas cambió la persona dentro de «Filtros». Con la propuesta,
- * «Ordenar» vive adentro en el celular, así que un orden distinto del de
- * siempre suma uno: si no, el botón diría «Filtros» con el orden cambiado.
- */
-export function puestosConOrden(filtrosPuestos: number, sortBy: string): number {
-  return filtrosPuestos + (sortBy && sortBy !== ORDEN_POR_DEFECTO ? 1 : 0);
-}
-
 /**
  * Las clases de cada pieza de la barra de filtros con la propuesta. Un solo
  * contenedor `flex-wrap` y el ORDEN de cada pieza según el ancho:
@@ -54,21 +57,48 @@ export function puestosConOrden(filtrosPuestos: number, sortBy: string): number 
 export function clasesBarraFiltros(abiertos: boolean) {
   const adentro = abiertos ? "" : "hidden ";
   return {
-    contenedor: "flex flex-wrap items-center gap-2 mb-6",
+    contenedor: "flex flex-wrap items-center gap-2 mb-4",
     buscador: "relative w-full order-1",
-    botonFiltros: "sm:hidden order-2",
+    botonFiltros: "max-sm:inline-flex hidden order-2",
+    // Celular: el orden es un chip al lado de «Filtros» (el `select` real va
+    // encima, transparente: se toca y abre la lista nativa del teléfono).
+    orden: "relative order-2 sm:order-6 sm:ml-auto",
+    ordenChip: "max-sm:inline-flex hidden pointer-events-none",
+    ordenSelect: "max-sm:absolute max-sm:inset-0 max-sm:opacity-0 max-sm:[&>select]:h-full max-sm:[&>select]:w-full",
     limpiar: "order-2 sm:order-5",
     cantidad: "order-2 ml-auto sm:order-7 sm:ml-0",
     desplegables: `${adentro}sm:flex lg:hidden w-full flex-wrap items-center gap-2 order-3`,
     pildoras: "hidden lg:flex w-full flex-wrap items-center gap-2 order-3",
     precio: `${adentro}sm:block w-full sm:w-auto order-4 sm:order-5`,
-    orden: `${adentro}sm:block order-5 sm:order-6 sm:ml-auto`,
   };
 }
 
-/** Las acciones de la línea del logo: «hace X h» · Comprobantes · Compartir. */
-export const ACCIONES_EN_EL_ENCABEZADO =
-  "flex flex-wrap items-center justify-end gap-2 ml-auto";
+// ── v2 (2-oct-2026, Daniel: «poner el logo al nivel de inicio») ──────────────
+
+/** El hueco de la barra de «← Inicio» donde el catálogo monta sus acciones. */
+export const ID_ACCIONES_EN_LA_BARRA = "catalogo-acciones-en-la-barra";
+
+/** Las acciones en la barra: en la computadora las tres de siempre; en el
+ *  celular un solo «···» con las mismas cosas adentro. */
+export const CLASES_MENU_MAS = {
+  computadora: "hidden sm:flex items-center gap-2",
+  celular: "relative max-sm:block hidden",
+  boton:
+    "inline-flex h-11 w-11 items-center justify-center rounded-lg border border-black/10 text-lg leading-none tracking-widest",
+  panel:
+    "absolute right-0 top-full z-50 mt-1 w-60 rounded-xl border border-gray-200 bg-white py-1.5 shadow-lg",
+} as const;
+
+/** El orden visible en el chip del celular: corto, sin «Ordenar:». */
+const ORDEN_CORTO: Record<string, string> = {
+  relevancia: "Relevancia",
+  "precio-asc": "Precio ↑",
+  "precio-desc": "Precio ↓",
+  "nombre-az": "A-Z",
+};
+export function textoOrdenCorto(sortBy: string): string {
+  return ORDEN_CORTO[sortBy] ?? ORDEN_CORTO.relevancia;
+}
 
 /** Hub: «Ver catálogo» a lo ancho (con «Copiar enlace» al lado, solo el
  *  ícono) y Comprobantes · Administrar como enlaces de texto debajo. */
