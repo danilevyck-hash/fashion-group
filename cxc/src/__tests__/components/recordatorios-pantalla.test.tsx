@@ -571,9 +571,9 @@ describe("🔴 UNA SOLA PUERTA — «＋ Recordar» (22-sep-2026)", () => {
   });
 
   it("🔴 el motivo «Cheque» abre el formulario de CHEQUE", async () => {
-    const { container } = pintar();
+    pintar();
     fireEvent.click(screen.getByRole("button", { name: /＋ Nuevo/ }));
-    fireEvent.click(container.querySelector('[data-motivo="cheque"]') as HTMLElement);
+    fireEvent.click(document.querySelector('[data-motivo="cheque"]') as HTMLElement);
     await act(async () => { await Promise.resolve(); });
     expect(screen.getByRole("dialog", { name: /Nuevo cheque/i })).toBeTruthy();
     // Y pide lo del cheque, no lo de una nota.
@@ -582,9 +582,9 @@ describe("🔴 UNA SOLA PUERTA — «＋ Recordar» (22-sep-2026)", () => {
   });
 
   it("🔴 el motivo «Nota» abre el formulario de NOTA, y guarda en su tabla", async () => {
-    const { container } = pintar();
+    pintar();
     fireEvent.click(screen.getByRole("button", { name: /＋ Nuevo/ }));
-    fireEvent.click(container.querySelector('[data-motivo="nota"]') as HTMLElement);
+    fireEvent.click(document.querySelector('[data-motivo="nota"]') as HTMLElement);
     await act(async () => { await Promise.resolve(); });
 
     const dialogo = screen.getByRole("dialog", { name: /Nuevo recordatorio/ });

@@ -489,7 +489,7 @@ describe("🔴 6 · «Por empresa» cuadra con la portada", () => {
   });
 
   it("la hoja dice el pulso de cada empresa: quién pagó y cuándo", () => {
-    const { container } = render(
+    render(
       <HojaPorEmpresa
         clientes={CARTERA}
         empresas={EMPRESAS}
@@ -497,13 +497,14 @@ describe("🔴 6 · «Por empresa» cuadra con la portada", () => {
         onCerrar={vi.fn()}
       />,
     );
-    expect(container.textContent).toContain("Último pago: City Mall Paso Canoa");
-    expect(container.textContent).toContain("Última venta:");
+    // La hoja sale por portal a <body> (2-oct-2026), no queda en `container`.
+    expect(document.body.textContent).toContain("Último pago: City Mall Paso Canoa");
+    expect(document.body.textContent).toContain("Última venta:");
   });
 
   it("tocar una empresa deja la portada filtrada en ella", () => {
     const onElegirEmpresa = vi.fn();
-    const { container } = render(
+    render(
       <HojaPorEmpresa
         clientes={CARTERA}
         empresas={EMPRESAS}
@@ -511,7 +512,7 @@ describe("🔴 6 · «Por empresa» cuadra con la portada", () => {
         onCerrar={vi.fn()}
       />,
     );
-    const filaFW = [...container.querySelectorAll('[data-lista="cxc-por-empresa"] > li button')]
+    const filaFW = [...document.querySelectorAll('[data-lista="cxc-por-empresa"] > li button')]
       .find((b) => b.textContent?.includes("Fashion Wear"))!;
     fireEvent.click(filaFW);
     expect(onElegirEmpresa).toHaveBeenCalledWith("fashion_wear");

@@ -186,6 +186,20 @@ describe("🔴 prendido, SOLO cambia la pantalla", () => {
     expect(sessionStorage.getItem("cxc_role")).toBeNull();
   });
 
+  // 🩸 2-oct-2026: la ventana salió cortada arriba porque se dibujaba ADENTRO
+  // del encabezado (sticky + transform + z-index 10). Tiene que vivir en <body>.
+  it("«Cambiar contraseña» se abre en un portal, fuera del encabezado", () => {
+    sesion("admin");
+    render(<AppHeader module="Guías de despacho" />);
+    fireEvent.click(document.querySelector("[data-menu-usuario] button")!);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Cambiar contraseña" }));
+    const titulo = screen.getByRole("heading", { name: "Cambiar mi contraseña" });
+    const overlay = titulo.closest("[data-modal-overlay]")!;
+    expect(overlay).not.toBeNull();
+    expect(overlay.parentElement).toBe(document.body);
+    expect(document.querySelector("[data-encabezado]")!.contains(titulo)).toBe(false);
+  });
+
   it("Inicio: sin «Accesos frecuentes» ni modo oscuro; los módulos siguen", async () => {
     sesion("admin");
     localStorage.setItem("fg_module_clicks_daniel", JSON.stringify({ guias: 3 }));

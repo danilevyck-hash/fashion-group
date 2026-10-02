@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, ReactNode, createContext, useContext } from "react";
+import { useEffect, useRef, useState, useCallback, useSyncExternalStore, ReactNode, createContext, useContext } from "react";
+import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { useSidebarCollapsed } from "@/lib/hooks/useSidebarCollapsed";
 import { sinBarraLateral } from "@/lib/catalogo/rutas-publicas";
@@ -128,6 +129,24 @@ export function Toast({ message, type = "success", onDismiss }: { message: strin
   );
 }
 
+// ── 🩸 MODALES Y HOJAS VIVEN EN <body> (2-oct-2026) ──
+// Daniel abrió «Cambiar contraseña» desde su nombre en la barra nueva y la
+// ventana salió CORTADA ARRIBA: el título y el primer campo quedaban fuera de
+// la pantalla. El modal se dibujaba ADENTRO del encabezado, que es `sticky`
+// con `transform` (se esconde al bajar) y `z-index: 10`. Un `transform` vuelve
+// a ese bloque el marco de todo `position: fixed` de adentro, así que el
+// `fixed inset-0` medía lo que la barra y no la pantalla; y el z-index del
+// encabezado le ponía techo al del modal. Ningún z-index lo arregla.
+// Por eso el overlay de TODOS los modales y la BottomSheet salen por portal a
+// <body>, como ya hace `DesplegableFlotante`. En el servidor y durante la
+// hidratación se dibuja en el lugar (no hay `document`); apenas hidrata, va
+// al portal.
+const sinSuscripcion = () => () => {};
+export function EnElCuerpo({ children }: { children: ReactNode }) {
+  const enElCliente = useSyncExternalStore(sinSuscripcion, () => true, () => false);
+  return enElCliente ? createPortal(children, document.body) : <>{children}</>;
+}
+
 // ── ESTÉTICA 7: Modal Component ──
 // ── Overlay compartido de modales ──
 // Centra el panel sobre el ÁREA VISIBLE (descontando el ancho del sidebar en
@@ -176,12 +195,15 @@ export function ModalOverlay({
   // tampoco pierde el formulario. Ver src/lib/hooks/useModalDismiss.ts.
   const backdrop = useBackdropDismiss(onBackdropClick);
   return (
-    <div
-      {...backdrop}
-      className={`fixed inset-0 z-50 flex justify-center ${items} ${sidebarPad} print:!pl-0 ${backdropClassName} ${className}`}
-    >
-      {children}
-    </div>
+    <EnElCuerpo>
+      <div
+        {...backdrop}
+        data-modal-overlay
+        className={`fixed inset-0 z-50 flex justify-center ${items} ${sidebarPad} print:!pl-0 ${backdropClassName} ${className}`}
+      >
+        {children}
+      </div>
+    </EnElCuerpo>
   );
 }
 
@@ -1109,6 +1131,7 @@ export function BottomSheet({
       : "calc(5dvh + env(safe-area-inset-top))";
 
   return (
+    <EnElCuerpo>
     <div className="fixed inset-0 z-50 sm:hidden">
       {/* Backdrop */}
       <div
@@ -1146,6 +1169,7 @@ export function BottomSheet({
         </div>
       </div>
     </div>
+    </EnElCuerpo>
   );
 }
 
