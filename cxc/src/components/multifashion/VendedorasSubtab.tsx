@@ -61,6 +61,7 @@ import {
   totalDeFila,
   type ChipDeBono,
 } from "@/lib/multifashion/bono-linea";
+import { VendedorasTablaOrdenada } from "./VendedorasTablaOrdenada";
 import { MetasSubtab } from "./MetasSubtab";
 import { MetasEnVendedoras } from "./MetasEnVendedoras";
 import { nombreEnPantalla } from "@/lib/multifashion/nombres";
@@ -265,11 +266,14 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
   // el bono del mes CERRADO es un chip junto al nombre (tabla, tarjetas y
   // celular). En un rango no hay bono: la respuesta vieja no se usa.
   const bonosDelChip = esRango || conBono ? null : bonos;
-  // 🔴 2-oct-2026 (`MULTIFASHION_TOTAL_PERSONA_2026_10`): en Comisiones ›
-  // Multifashion, con el mes CERRADO, «Bono» y «Total a pagar» por persona.
+  // 🔴 2-oct-2026 (`MULTIFASHION_TOTAL_PERSONA_2026_10`), solo en Comisiones ›
+  // Multifashion: la tabla ordenada (`VendedorasTablaOrdenada`) y, con el mes
+  // CERRADO, «Bono» y «Total a pagar» por persona.
+  const ordenada = MULTIFASHION_TOTAL_PERSONA_2026_10 && conTotalAPagar === true && !conBono;
   const totalPersona =
-    MULTIFASHION_TOTAL_PERSONA_2026_10 && conTotalAPagar === true &&
-    !!bonosDelChip && !bonosDelChip.sin_data && bonosDelChip.es_elegible;
+    ordenada && !!bonosDelChip && !bonosDelChip.sin_data && bonosDelChip.es_elegible;
+  /** Con la tabla ordenada, todo número en la fuente del sistema (sin monoespaciada). */
+  const MONO = ordenada ? "" : "font-mono";
   const esUnMes = rpcPeriodo === "mes";
   const excelDisponible = RETAIL_AL_FRENTE && esUnMes && corte != null && mesCerrado(year, rpcMes, corte);
   const periodoExcel = etiquetaPeriodo({ tipo: "mes", anio: year, mes: rpcMes });
@@ -333,9 +337,9 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
         {resp && (
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
             <span>
-              <span className="font-mono tabular-nums text-gray-700">{resp.total_vendedoras_periodo}</span> vendedoras ·{" "}
-              <span className="font-mono tabular-nums text-gray-700">{fmtMoney(resp.ventas_total)}</span> ventas ·{" "}
-              <span className="font-mono tabular-nums text-gray-700">{resp.tickets_total.toLocaleString()}</span> {resp.tickets_total === 1 ? "ticket" : "tickets"}
+              <span className={cn(MONO, "tabular-nums text-gray-700")}>{resp.total_vendedoras_periodo}</span> vendedoras ·{" "}
+              <span className={cn(MONO, "tabular-nums text-gray-700")}>{fmtMoney(resp.ventas_total)}</span> ventas ·{" "}
+              <span className={cn(MONO, "tabular-nums text-gray-700")}>{resp.tickets_total.toLocaleString()}</span> {resp.tickets_total === 1 ? "ticket" : "tickets"}
             </span>
             {/* 🔴 Excel SOLO en mes cerrado (23-sep-2026). */}
             {excelDisponible && resp.vendedoras.length > 0 && (
@@ -374,6 +378,16 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
         <div data-elemento="tabla" className={cn(loading && "opacity-60 pointer-events-none transition-opacity")}>
           {/* Escritorio. El corte es `lg` y no `md` porque lo que decide es el
               ancho ÚTIL: la barra lateral se lleva 224 px. */}
+          {ordenada ? (
+            <VendedorasTablaOrdenada
+              filas={sortedVendedoras}
+              bonos={totalPersona ? bonosDelChip : null}
+              rotuloDelta={rotuloDelta.columna}
+              ordenarPor={sortBy}
+              dir={sortDir}
+              onOrdenar={onSort}
+            />
+          ) : (
           <Card data-vista="tabla" className="hidden p-0 lg:block">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse" style={{ minWidth: 720 }}>
@@ -391,12 +405,6 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
                     {conBono && (
                       <th className="border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Bono</th>
                     )}
-                    {totalPersona && (
-                      <>
-                        <th className="border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Bono</th>
-                        <th className="border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Total a pagar</th>
-                      </>
-                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -409,16 +417,13 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
                       conBono={conBono}
                       pendiente={bonoPendiente}
                       chip={chipDeBono(v, bonosDelChip)}
-                      totalPersona={totalPersona ? bonosDelChip : undefined}
                     />
                   ))}
                 </tbody>
-                {totalPersona && (
-                  <PieTotalPersona pagar={totalAPagarMultifashion(sortedVendedoras, bonosDelChip)} />
-                )}
               </table>
             </div>
           </Card>
+          )}
 
           {/* 🔴 CELULAR: una fila por vendedora (24-sep-2026). */}
           {celular && resp && (
@@ -450,6 +455,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
                 pendiente={bonoPendiente}
                 chip={chipDeBono(v, bonosDelChip)}
                 rotuloDelta={rotuloDelta.corto}
+                ordenada={ordenada}
                 totalPersona={totalPersona ? bonosDelChip : undefined}
               />
             ))}
@@ -468,6 +474,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
             <BarraTotalMultifashion
               pagar={totalAPagarMultifashion(sortedVendedoras, bonosDelChip)}
               desgloseEnLaTabla={totalPersona}
+              mono={!ordenada}
             />
           )}
 
@@ -506,17 +513,20 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
  * las comisiones y no se dibuja desglose (sería el mismo número dos veces).
  * 🔴 Solo Multifashion: nunca se suma con el total del grupo.
  */
-export function BarraTotalMultifashion({ pagar, desgloseEnLaTabla }: {
+export function BarraTotalMultifashion({ pagar, desgloseEnLaTabla, mono = true }: {
   pagar: { comisiones: number; bonos: number; total: number };
-  /** Con la tabla de la computadora, el desglose va bajo sus columnas (`PieTotalPersona`). */
+  /** Con la tabla ordenada de la computadora, el desglose va bajo sus columnas. */
   desgloseEnLaTabla?: boolean;
+  /** `false` = los números en la fuente del sistema, como la tabla ordenada. */
+  mono?: boolean;
 }) {
+  const num = mono ? "font-mono tabular-nums" : "tabular-nums";
   return (
     <div className="mt-2">
       {pagar.bonos > 0 && (
         <div data-desglose-multifashion className={cn("space-y-0.5 px-3 pb-1 text-xs text-gray-500", desgloseEnLaTabla && "lg:hidden")}>
-          <div className="flex justify-between"><span>Comisiones</span><span className="font-mono tabular-nums">{fmtMoney(pagar.comisiones)}</span></div>
-          <div className="flex justify-between"><span>Bonos</span><span className="font-mono tabular-nums">{fmtMoney(pagar.bonos)}</span></div>
+          <div className="flex justify-between"><span>Comisiones</span><span className={num}>{fmtMoney(pagar.comisiones)}</span></div>
+          <div className="flex justify-between"><span>Bonos</span><span className={num}>{fmtMoney(pagar.bonos)}</span></div>
         </div>
       )}
       <div
@@ -526,7 +536,7 @@ export function BarraTotalMultifashion({ pagar, desgloseEnLaTabla }: {
         <span className="text-xs font-medium uppercase tracking-wide text-gray-400">
           {ROTULO_TOTAL_MULTIFASHION}
         </span>
-        <span className="font-mono text-base font-semibold tabular-nums text-white">
+        <span className={cn(num, "text-base font-semibold text-white")}>
           {fmtMoney(pagar.total)}
         </span>
       </div>
@@ -553,33 +563,11 @@ function rowHighlight(v: VendedoraDetalle, badge?: BonoBadge): boolean {
 // El payload no trae las ventas del período previo, así que la base se despeja
 // del propio ratio (prev = ventas / (1 + pct)) y se le aplica la MISMA regla.
 // Una vendedora que el año pasado vendió $8 en el mes no genera un +40000%.
-/**
- * 🔴 EL PIE DE LA TABLA CON EL TOTAL POR PERSONA (2-oct-2026): comisiones,
- * bonos y total, cada uno bajo SU columna. Mismo `totalAPagarMultifashion` de
- * la barra negra y del Excel.
- */
-function PieTotalPersona({ pagar }: { pagar: { comisiones: number; bonos: number; total: number } }) {
-  const celda = "px-3.5 py-2.5 text-right font-mono text-sm tabular-nums";
-  return (
-    <tfoot data-pie-total-persona>
-      <tr className="bg-gray-50">
-        <td colSpan={6} className="px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Total</td>
-        <td className={cn(celda, "text-gray-700")}>{fmtMoney(pagar.comisiones)}</td>
-        <td className={cn(celda, "text-gray-700")}>{fmtMoney(pagar.bonos)}</td>
-        <td className={cn(celda, "font-semibold text-gray-950")}>{fmtMoney(pagar.total)}</td>
-      </tr>
-    </tfoot>
-  );
-}
-
 function VendedoraRow({
-  v, rank, badge, conBono, pendiente, chip, totalPersona,
+  v, rank, badge, conBono, pendiente, chip,
 }: {
   v: VendedoraDetalle; rank: number; badge?: BonoBadge; conBono: boolean; pendiente: boolean; chip: ChipDeBono | null;
-  /** Los bonos del mes cerrado cuando van «Bono» y «Total a pagar» en la fila. */
-  totalPersona?: BonosMultifashion | null;
 }) {
-  const bonoFila = totalPersona ? bonoDeFila(v, totalPersona) : 0;
   const dv = formatDeltaRatio(variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct));
   const bono = textoBono(v, badge, pendiente);
   // «Sheynee $11,674.57 · Redes $375.30» — solo en la fila de quien vendió por
@@ -597,7 +585,7 @@ function VendedoraRow({
           {v.manager && (
             <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-xs font-medium text-teal-700">Gerente</span>
           )}
-          <ChipBono chip={chip} sinMonto={!!totalPersona} />
+          <ChipBono chip={chip} />
         </div>
         {desglose && (
           <p data-desglose-canal className="mt-0.5 font-mono text-xs text-gray-500 tabular-nums">{desglose}</p>
@@ -610,16 +598,6 @@ function VendedoraRow({
         {dv.arrow && <span className="mr-1">{dv.arrow}</span>}{dv.displayValue}
       </td>
       <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-gray-950 tabular-nums">${v.comision.toFixed(2)}</td>
-      {totalPersona && (
-        <>
-          <td data-celda="bono" className={cn("border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm tabular-nums", bonoFila > 0 ? "text-gray-950" : "text-gray-400")}>
-            {bonoFila > 0 ? fmtMoney(bonoFila) : "—"}
-          </td>
-          <td data-celda="total-a-pagar" className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm font-semibold text-gray-950 tabular-nums">
-            {fmtMoney(totalDeFila(v, totalPersona))}
-          </td>
-        </>
-      )}
       {conBono && (
         <td className={cn(
           "border-b border-gray-200 px-3.5 py-3 text-right text-sm tabular-nums",
@@ -633,22 +611,26 @@ function VendedoraRow({
 }
 
 function VendedoraCard({
-  v, rank, badge, conBono, pendiente, chip, rotuloDelta, totalPersona,
+  v, rank, badge, conBono, pendiente, chip, rotuloDelta, ordenada, totalPersona,
 }: {
   v: VendedoraDetalle; rank: number; badge?: BonoBadge; conBono: boolean; pendiente: boolean; chip: ChipDeBono | null; rotuloDelta: string;
+  /** `MULTIFASHION_TOTAL_PERSONA_2026_10`: una sola tipografía (sin monoespaciada). */
+  ordenada?: boolean;
+  /** Los bonos del mes CERRADO: la tarjeta suma «Bono» y «Total a pagar». */
   totalPersona?: BonosMultifashion | null;
 }) {
-  const bonoFila = totalPersona ? bonoDeFila(v, totalPersona) : 0;
   const dv = formatDeltaRatio(variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct));
   const bono = textoBono(v, badge, pendiente);
   const desglose = desgloseCanales(v.ventas, v.por_canal, v.nombre);
+  const M = ordenada ? "" : "font-mono";
+  const bonoFila = totalPersona ? bonoDeFila(v, totalPersona) : 0;
   return (
     <div className={cn(
       "rounded-lg border bg-white px-4 py-3.5",
       conBono && rowHighlight(v, badge) ? "border-amber-200 bg-amber-50/40" : "border-gray-200"
     )}>
       <div className="flex flex-wrap items-baseline gap-1.5">
-        <span className="font-mono text-xs text-gray-500 tabular-nums">{rank}.</span>
+        <span className={cn(M, "text-xs text-gray-500 tabular-nums")}>{rank}.</span>
         <span className="truncate text-[15px] font-medium leading-tight text-gray-950">{nombreEnPantalla(v.nombre)}</span>
         {v.manager && (
           <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-xs font-medium text-teal-700">Gerente</span>
@@ -656,30 +638,25 @@ function VendedoraCard({
         <ChipBono chip={chip} sinMonto={!!totalPersona} />
       </div>
       <div className="mt-2 flex items-baseline gap-3">
-        <span className="font-mono text-base font-medium tabular-nums text-gray-950">{fmtMoneyCompact(v.ventas)}</span>
-        <span className={cn("font-mono text-xs tabular-nums", TONE_LIGHT[dv.tone])}>
-          {dv.arrow && <span className="mr-0.5">{dv.arrow}</span>}{dv.displayValue}
+        <span className={cn(M, "text-base font-medium tabular-nums text-gray-950", ordenada && "font-semibold")}>{fmtMoneyCompact(v.ventas)}</span>
+        <span className={cn(M, "text-xs tabular-nums", ordenada ? "text-gray-500" : TONE_LIGHT[dv.tone])}>
+          {dv.arrow && <span className={cn("mr-0.5", ordenada && TONE_LIGHT[dv.tone])}>{dv.arrow}</span>}{dv.displayValue}
           <span className="ml-1 text-gray-400">{rotuloDelta}</span>
         </span>
       </div>
       {desglose && (
-        <p data-desglose-canal className="mt-0.5 font-mono text-xs text-gray-500 tabular-nums">{desglose}</p>
+        <p data-desglose-canal className={cn(M, "mt-0.5 text-xs text-gray-500 tabular-nums")}>{desglose}</p>
       )}
       <div className="mt-1 text-xs text-gray-500">
-        <span className="font-mono tabular-nums">{v.tickets.toLocaleString()}</span> {v.tickets === 1 ? "ticket" : "tickets"} ·{" "}
-        <span className="font-mono tabular-nums">${v.ticket_promedio.toFixed(2)}</span> ticket promedio ·{" "}
-        <span className="font-mono tabular-nums">${v.comision.toFixed(2)}</span> comisión
+        <span className={cn(M, "tabular-nums")}>{v.tickets.toLocaleString()}</span> {v.tickets === 1 ? "ticket" : "tickets"} ·{" "}
+        <span className={cn(M, "tabular-nums")}>${v.ticket_promedio.toFixed(2)}</span> ticket promedio ·{" "}
+        <span className={cn(M, "tabular-nums")}>${v.comision.toFixed(2)}</span> comisión
         {conBono && <> · bono <span className={cn(bono === BONO_AL_CIERRE || bono === "—" ? "text-gray-400" : "font-mono font-semibold text-amber-700")}>{bono}</span></>}
       </div>
       {totalPersona && (
-        <div data-total-persona className="mt-1.5 flex items-baseline justify-between gap-3 text-sm">
-          <span className="text-xs text-gray-500">
-            Bono <span className="font-mono tabular-nums">{bonoFila > 0 ? fmtMoney(bonoFila) : "—"}</span>
-          </span>
-          <span className="text-xs text-gray-500">
-            Total a pagar{" "}
-            <span className="font-mono text-sm font-semibold tabular-nums text-gray-950">{fmtMoney(totalDeFila(v, totalPersona))}</span>
-          </span>
+        <div data-total-persona className="mt-1.5 flex items-baseline justify-between gap-3 text-xs text-gray-500">
+          <span>Bono <span className="tabular-nums text-gray-950">{bonoFila > 0 ? fmtMoney(bonoFila) : "—"}</span></span>
+          <span>Total a pagar <span className="text-sm font-semibold tabular-nums text-gray-950">{fmtMoney(totalDeFila(v, totalPersona))}</span></span>
         </div>
       )}
     </div>

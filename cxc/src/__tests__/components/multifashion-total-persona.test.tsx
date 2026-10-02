@@ -152,6 +152,34 @@ describe("🔴 1 · septiembre 2026: el total de cada persona", () => {
   });
 });
 
+describe("🔴 1b · la tabla ordenada (Daniel: «no se siente ordenado»)", () => {
+  it("columnas de lo que vendió a lo que se paga", async () => {
+    await pintar(SEP_CERRADO);
+    const ths = [...document.querySelectorAll("[data-vista='tabla'] thead th")].map((t) => t.textContent!.replace(/[↑↓]/g, ""));
+    expect(ths).toEqual(["#", "Vendedora", "Ventas", "Tickets", "Ticket prom.", "Δ vs agosto 2026", "Comisión", "Bono", "Total a pagar"]);
+  });
+
+  it("UNA tipografía: ningún número de la tabla, del resumen ni de la barra en monoespaciada", async () => {
+    await pintar(SEP_CERRADO);
+    expect(document.querySelectorAll("[data-vista='tabla'] .font-mono")).toHaveLength(0);
+    expect(document.querySelectorAll("[data-elemento='resumen'] .font-mono")).toHaveLength(0);
+    expect(document.querySelectorAll("[data-total-multifashion] .font-mono, [data-desglose-multifashion] .font-mono")).toHaveLength(0);
+  });
+
+  it("solo Ventas y Total a pagar en negrita; Tickets, Ticket prom. y Δ en gris; todo a la derecha", async () => {
+    await pintar(SEP_CERRADO);
+    const tr = filaDe("Sheynee Batista");
+    const c = (n: string) => tr.querySelector(`[data-celda='${n}']`)!.className;
+    for (const n of ["ventas", "total-a-pagar"]) expect(c(n)).toContain("font-semibold");
+    for (const n of ["tickets", "ticket-promedio", "delta", "comision", "bono"]) expect(c(n)).not.toContain("font-semibold");
+    for (const n of ["tickets", "ticket-promedio", "delta"]) expect(c(n)).toContain("text-gray-500");
+    for (const n of ["ventas", "tickets", "ticket-promedio", "delta", "comision", "bono", "total-a-pagar"]) {
+      expect(c(n)).toContain("text-right");
+      expect(c(n)).toContain("tabular-nums");
+    }
+  });
+});
+
 describe("🔴 2 · mes abierto y apagado", () => {
   it("mes abierto: sin columnas de bono ni total por persona", async () => {
     await pintar(SEP_ABIERTO);
