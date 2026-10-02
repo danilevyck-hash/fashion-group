@@ -60,6 +60,7 @@ import {
   type Periodo,
 } from "./planilla";
 import { EMPRESAS_ASISTENCIA } from "./config";
+import { tiempoDelDia } from "./formato-tiempo";
 import { asistenciaRoles } from "./roles";
 import { extrasNoAprobadas } from "./aprobaciones";
 import { marcasImparesDeLineas, textoFrenoMarcasImpares } from "./marcas-impares";
@@ -609,7 +610,7 @@ export function frenosParaCerrar(lineas: readonly LineaPlanilla[]): FrenoCierre[
       codigos: extras.map((e) => e.codigo),
       texto:
         `${extras.length === 1 ? "1 colaborador tiene" : `${extras.length} colaboradores tienen`} horas extra sin aprobar `
-        + `(${lista(extras.map((e) => `${e.etiqueta} · ${e.minutos.toFixed(2)} min`))}). `
+        + `(${lista(extras.map((e) => `${e.etiqueta} · ${tiempoDelDia(e.minutos)}`))}). `
         + "Ve a la pestaña «Aprobaciones», aprueba o deja sin aprobar esas horas, y vuelve a cerrar. "
         + "Si se cierra así, esas horas no se pagan y no hay forma de arreglarlo después sin reabrir.",
     });

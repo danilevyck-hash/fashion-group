@@ -214,7 +214,7 @@ describe("B · Asistencia en el celular", () => {
     await screen.findByText("Ana Trejos");
     expect(screen.getByText(lineaDeDias(1, "17:00"))).toBeTruthy();
     // Ana llegó 17 minutos tarde: la tarjeta lo dice con el mismo formato.
-    expect(screen.getByText(/1 tardanza de 17\.00 min/)).toBeTruthy();
+    expect(screen.getByText(/1 tardanza de 17m$/)).toBeTruthy();
     // Jailine no tiene nada: se dice en verde, nunca con un cero.
     expect(screen.getByText(SIN_NADA_QUE_REVISAR)).toBeTruthy();
   });
@@ -341,7 +341,7 @@ describe("D · lo que dice la tarjeta", () => {
   it("lo que falló va en su orden, con el mismo formato de la tabla", () => {
     expect(datosDeLaTarjeta({
       ausenciasSinJustificar: 3, vecesTarde: 1, minutosTarde: 16.85, extraMin: 0, diasARevisar: 3,
-    }).map((d) => d.texto)).toEqual(["3 ausencias", "1 tardanza de 16.85 min", "3 a revisar"]);
+    }).map((d) => d.texto)).toEqual(["3 ausencias", "1 tardanza de 16m 51s", "3 a revisar"]);
   });
   it("sin nada que mirar lo dice en verde, nunca con ceros", () => {
     const d = datosDeLaTarjeta({

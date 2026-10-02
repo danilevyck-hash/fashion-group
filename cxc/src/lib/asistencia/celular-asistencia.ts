@@ -26,6 +26,8 @@
  *      ya hacía cada pestaña.
  * ────────────────────────────────────────────────────────────────────────── */
 
+import { tiempoDelDia } from "./formato-tiempo";
+
 /** El tono de un dato de la tarjeta. Los mismos tres de todo el sistema. */
 export type Tono = "rojo" | "ambar" | "gris" | "verde";
 
@@ -38,10 +40,11 @@ export interface DatoDeTarjeta {
 /** Lo que la tarjeta dice cuando no hay nada que mirar. */
 export const SIN_NADA_QUE_REVISAR = "sin pendientes";
 
-/** Los minutos, con el mismo formato de la tabla (dos decimales). */
-function min(n: number): string {
-  return (Math.round(n * 100) / 100).toFixed(2);
-}
+/**
+ * Los minutos como se leen en la marcación: «27m 50s», nunca «27.83 min»
+ * (Daniel, 2-oct-2026). Solo se MUESTRA así; el cálculo sigue al segundo.
+ */
+const min = tiempoDelDia;
 
 /**
  * La segunda línea de la tarjeta: «6 días · sale 18:30».
@@ -79,11 +82,11 @@ export function datosDeLaTarjeta(r: {
     out.push({
       clave: "tarde",
       tono: "ambar",
-      texto: (r.minutosTarde || 0) > 0 ? `${t} de ${min(r.minutosTarde)} min` : t,
+      texto: (r.minutosTarde || 0) > 0 ? `${t} de ${min(r.minutosTarde)}` : t,
     });
   }
   if ((opts?.cuentaHorasExtra ?? true) && (r.extraMin || 0) > 0) {
-    out.push({ clave: "extras", tono: "gris", texto: `${min(r.extraMin)} min extra` });
+    out.push({ clave: "extras", tono: "gris", texto: `${min(r.extraMin)} de extra` });
   }
   const rev = Math.max(0, Math.trunc(r.diasARevisar || 0));
   if (rev > 0) {
@@ -93,7 +96,7 @@ export function datosDeLaTarjeta(r: {
   return out;
 }
 
-/** El pie del celular: «8 colaboradores · 11 ausencias · 34.17 min». */
+/** El pie del celular: «8 colaboradores · 11 ausencias · 34m 10s tarde». */
 export function pieDelCelular(opts: {
   colaboradores: number;
   ausencias: number;
@@ -102,7 +105,7 @@ export function pieDelCelular(opts: {
   const n = Math.max(0, Math.trunc(opts.colaboradores || 0));
   const partes = [`${n} ${n === 1 ? "colaborador" : "colaboradores"}`];
   if (opts.ausencias > 0) partes.push(`${Math.trunc(opts.ausencias)} ${opts.ausencias === 1 ? "ausencia" : "ausencias"}`);
-  if (opts.minutosTarde > 0) partes.push(`${min(opts.minutosTarde)} min tarde`);
+  if (opts.minutosTarde > 0) partes.push(`${min(opts.minutosTarde)} tarde`);
   return partes.join(" · ");
 }
 

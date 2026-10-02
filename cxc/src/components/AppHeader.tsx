@@ -51,6 +51,8 @@ import type { ModuleGroup } from "@/lib/modules";
 import { ESTRUCTURA_APPLE_2026_10 } from "@/lib/navegacion/estructura-2026-10";
 import MenuDelUsuario from "@/components/estructura/MenuDelUsuario";
 import AvatarDelUsuario from "@/components/estructura/AvatarDelUsuario";
+import HojaMas from "@/components/estructura/HojaMas";
+import { useNombreVisible } from "@/lib/hooks/useNombreVisible";
 import { BARRA_CELULAR_2026_10, tituloCelular } from "@/lib/navegacion/barra-controles-celular";
 import { CLASE_VIDRIO, conVidrio } from "@/lib/ui/vidrio";
 
@@ -111,7 +113,8 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
-  const [userName, setUserName] = useState("");
+  // El nombre VISIBLE («Daniel Levy»), no el usuario de login («daniel»).
+  const userName = useNombreVisible();
   const [userRole, setUserRole] = useState("");
   const [fgModules, setFgModules] = useState<string[] | null>(null);
 
@@ -128,7 +131,6 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
   const barra = useBarraCelular(encabezadoRef);
 
   useEffect(() => {
-    setUserName(sessionStorage.getItem("fg_user_name") || "");
     setUserRole(sessionStorage.getItem("cxc_role") || "");
     try {
       const mods = sessionStorage.getItem("fg_modules");
@@ -229,6 +231,12 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
   const pestanas = TAB_BAR_2026_10 && !soloMarca ? pestanasDelRol(userRole, fgModules, ordenPersona, casa) : [];
   const enInicio = pathname === "/home" || yaEstaEnSuCasa(pathname, casa);
   const hayTabBar = pestanas.length > 0;
+  // 🔴 «Más» (2-oct-2026): una hoja SOBRE la pantalla con lo que NO está en la
+  // barra (ni Inicio ni las 3 pestañas), por grupo. Ver `HojaMas`.
+  const enLaBarra = new Set([casa, ...pestanas.map(m => m.href)]);
+  const gruposMas = hayTabBar
+    ? gruposHoja.map(g => ({ ...g, modulos: g.modulos.filter(m => !enLaBarra.has(m.href)) })).filter(g => g.modulos.length > 0)
+    : [];
   // 🔴 Con `TAB_BAR_2026_10` el ☰ redondo no vuelve NUNCA, ni para quien no
   // tiene barra (Gerente Multifashion, Marcación): su menú del usuario es el
   // avatar de arriba a la derecha (`AvatarDelUsuario`), y su único módulo es
@@ -644,13 +652,29 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
             aria-label="Más módulos"
             className={`my-1 flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-[10px] font-medium transition active:scale-[0.97] ${drawerOpen ? "bg-black/[0.06] text-gray-950" : "text-gray-600"}`}
           >
-            <MoreHorizontal size={22} strokeWidth={1.6} />
+            <MoreHorizontal size={22} strokeWidth={drawerOpen ? 2 : 1.6} />
             <span>Más</span>
           </button>
         </nav>
       )}
 
-      {esMenuDePantalla() && drawerOpen && (
+      {/* Con la barra, «Más» abre la hoja; el menú a pantalla completa queda
+          para quien no tiene barra. */}
+      {hayTabBar && (
+        <HojaMas
+          abierta={drawerOpen}
+          onCerrar={cerrarDrawer}
+          grupos={gruposMas}
+          moduloAqui={moduloAqui}
+          onIr={irAlModulo}
+          nombre={userName}
+          rol={userRole}
+          onCerrarSesion={() => void handleLogout()}
+          acciones={acciones}
+        />
+      )}
+
+      {esMenuDePantalla() && drawerOpen && !hayTabBar && (
         <div
           data-menu-pantalla
           role="dialog"

@@ -19,7 +19,8 @@ import Link from "next/link";
 
 import RangoFechas from "@/components/ui/RangoFechas";
 import { hoyPanama } from "@/lib/fecha-panama";
-import { fmtMin, type PersonaReporte } from "@/lib/asistencia/reporte";
+import { type PersonaReporte } from "@/lib/asistencia/reporte";
+import { tiempoDelDia } from "@/lib/asistencia/formato-tiempo";
 import Seccion, { Vacio } from "./Seccion";
 
 export default function SeccionAsistencia({ codigo, refresco }: {
@@ -79,11 +80,11 @@ export default function SeccionAsistencia({ codigo, refresco }: {
               está a un toque. */}
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
             <Numero etiqueta="Días trabajados" valor={String(r.diasTrabajados ?? 0)} />
-            <Numero etiqueta="Tardanza" valor={fmtMin(Number(r.minutosTarde ?? 0))}
+            <Numero etiqueta="Tardanza" valor={tiempoDelDia(Number(r.minutosTarde ?? 0))}
               ojo={Number(r.minutosTarde ?? 0) > 0} />
             <Numero etiqueta="Faltas sin justificar" valor={String(r.ausenciasSinJustificar ?? 0)}
               ojo={Number(r.ausenciasSinJustificar ?? 0) > 0} />
-            <Numero etiqueta="Horas extra" valor={fmtMin(Number(r.extraMin ?? 0))} />
+            <Numero etiqueta="Horas extra" valor={tiempoDelDia(Number(r.extraMin ?? 0))} />
           </dl>
 
           <Link

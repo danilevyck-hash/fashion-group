@@ -82,7 +82,8 @@ describe("el avatar del usuario en el celular", () => {
     expect(h.className).toContain("flex");
     expect(h.querySelector(".vidrio")).not.toBeNull();
     const d = within(h);
-    expect(d.getByText("daniel levy")).toBeTruthy();
+    // 2-oct-2026: el nombre VISIBLE, capitalizado (`nombre-en-pantalla.ts`).
+    expect(d.getByText("Daniel Levy")).toBeTruthy();
     expect(d.getByText("Administrador")).toBeTruthy();
     expect(d.getByRole("button", { name: "Cambiar contraseña" })).toBeTruthy();
     expect(d.getByRole("button", { name: "Cerrar sesión" })).toBeTruthy();
@@ -126,7 +127,8 @@ describe("el avatar del usuario en el celular", () => {
     const mas = await screen.findByRole("button", { name: "Más módulos" });
     fireEvent.click(mas);
     const menu = await waitFor(() => {
-      const el = document.querySelector("[data-menu-pantalla]");
+      // 2-oct-2026: «Más» es una hoja sobre la pantalla (`HojaMas`).
+      const el = document.querySelector("[data-hoja-mas-modulos]");
       if (!el) throw new Error("«Más» no abrió");
       return el as HTMLElement;
     });

@@ -176,7 +176,7 @@ describe("el pie", () => {
       .filter((k) => !k.startsWith("!"))
       .map((k) => String((ws[k] as { v?: unknown }).v ?? ""))
       .join(" | ");
-    expect(txt).toContain("sin aprobar por 41.07 minutos");
+    expect(txt).toContain("sin aprobar por 41m 4s");
     expect(txt).toContain("la planilla NO los pagó");
   });
 

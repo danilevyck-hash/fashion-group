@@ -119,6 +119,15 @@ export function usePeriodoAsistencia(): {
  * Barra del celular v3.1: el período mide 36 px como los demás controles y se
  * toca en 44 (franja invisible arriba y abajo). Aplica a las flechas y al 📅.
  */
+/**
+ * 🩸 v3.3 (2-oct-2026): con una base encogible de 200 px el renglón creía que
+ * el período cabía en 200 px y subía «Empresa: Todas ▾» a su lado; el período
+ * real mide ~256 (‹ fecha › + 📅) y el 📅 quedaba DEBAJO del chip: en el iPhone
+ * se veía un «[» suelto a la izquierda de «Empresa». Ahora el período nunca se
+ * encoge por debajo de lo que mide (`flex-[1_0_auto]`): si no cabe al lado, el
+ * chip baja solo. Candado `renglon-2-sin-encimar`.
+ */
+export const CLASE_PERIODO_EN_LA_BARRA = "min-h-11 flex-[1_0_auto]";
 const ALTO_EN_LA_BARRA =
   "[&_button]:relative [&_button]:!h-9 [&_button]:!min-h-0 [&_button]:before:absolute [&_button]:before:inset-x-0 [&_button]:before:-inset-y-1 [&_button]:before:content-['']";
 
@@ -141,7 +150,7 @@ export default function SelectorPeriodo({
     onElegir(p.desde, p.hasta);
   };
   return (
-    <div className={`flex shrink-0 items-center gap-2 ${anchoCompleto ? `min-h-11 min-w-0 flex-[1_1_200px] ${ALTO_EN_LA_BARRA}` : ""} ${className}`}>
+    <div className={`flex shrink-0 items-center gap-2 ${anchoCompleto ? `${CLASE_PERIODO_EN_LA_BARRA} ${ALTO_EN_LA_BARRA}` : ""} ${className}`}>
       <div className={`flex items-center rounded-md border border-gray-300 bg-white ${anchoCompleto ? "h-9 flex-1 justify-between" : ""}`}>
         <button
           type="button"

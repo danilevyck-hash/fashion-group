@@ -91,7 +91,8 @@ import { etiquetaPersona } from "./directorio";
 // solo de RESPALDO para un día que no lo traiga (una llamada vieja): volver a
 // preguntarle al calendario por un día que sí lo trae haría que el Reporte y
 // la Planilla dijeran cosas distintas del mismo sábado.
-import { esHabil, fmtMin, type DiaReporte, type PersonaReporte } from "./reporte";
+import { esHabil, type DiaReporte, type PersonaReporte } from "./reporte";
+import { tiempoDelDia } from "./formato-tiempo";
 import { minutosExtraAutomaticos } from "./extra-automatico";
 import { ultimoDiaQueSePaga } from "./dia-31";
 import { diasConMarcasImpares, type DiaImpar } from "./marcas-impares";
@@ -582,7 +583,8 @@ export function textoAusencias(h: HorasPersona): string {
  * celda al entero haría que la columna no sumara su propio total.
  */
 export function textoTardanzas(h: HorasPersona): string {
-  return `${fmtMin(minutosTardanzaMostrados(h))} min`;
+  // 🔴 2-oct-2026: «27m 50s», nunca «27.83 min» (Daniel). El monto no cambia.
+  return tiempoDelDia(minutosTardanzaMostrados(h));
 }
 
 /**

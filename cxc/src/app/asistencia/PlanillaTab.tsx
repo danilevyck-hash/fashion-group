@@ -141,7 +141,7 @@ import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { textoExtraAutomatico } from "@/lib/asistencia/extra-automatico";
 import type { VacacionNoPagada } from "@/lib/asistencia/vacaciones";
-import { fmtMin } from "@/lib/asistencia/reporte";
+import { tiempoDelDia } from "@/lib/asistencia/formato-tiempo";
 // 🔴 QUIÉN CIERRA SALE DEL MISMO MÓDULO QUE EL CANDADO DEL SERVIDOR
 // (`cerrarPlanillaRoles()` = Asistencia menos secretaria). Escribir acá
 // `["admin","contabilidad"]` habría estrenado la cuarta lista de roles del
@@ -2600,7 +2600,7 @@ function Tarjeta({
                   así que llamarlos «de tardanza» ya no cuadraría con el monto
                   que la columna «Tardanzas» muestra al lado. */}
               {h.tardanzaDeDiasARevisarMin > 0 && (
-                <> — de ahí salen <b>{fmtMin(h.tardanzaDeDiasARevisarMin)}</b> de los {fmtMin(h.tardanzaMin)} minutos
+                <> — de ahí salen <b>{tiempoDelDia(h.tardanzaDeDiasARevisarMin)}</b> de los {tiempoDelDia(h.tardanzaMin)}
                 que llegó tarde. Míralos antes de descontar.</>
               )}
             </p>

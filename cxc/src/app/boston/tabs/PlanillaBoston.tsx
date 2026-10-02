@@ -39,7 +39,8 @@ import { Aviso } from "@/components/ui/Aviso";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { periodoDesdeRango, quincenasHasta } from "@/lib/asistencia/planilla";
-import { fmtMin } from "@/lib/asistencia/reporte";
+import { formatoTiempo, tiempoDelDia } from "@/lib/asistencia/formato-tiempo";
+import { useFormatoTiempo } from "@/components/asistencia/FormatoTiempoSelector";
 import { fmtDate } from "@/lib/format";
 import type { LineaSinDinero } from "@/lib/boston/planilla-sin-dinero";
 import type { DineroLinea, LineaPlanilla, TotalesPlanilla } from "@/lib/asistencia/planilla";
@@ -98,6 +99,9 @@ interface Horas {
 export default function PlanillaBoston() {
   const hoy = useMemo(() => hoyPanama(), []);
   const quincena = useMemo(() => quincenasHasta(hoy, 1)[0], [hoy]);
+  // Los minutos, nunca con decimales (2-oct-2026): h:mm o minutos según la preferencia.
+  const [modoTiempo] = useFormatoTiempo();
+  const tiempo = (v: number) => formatoTiempo(v, modoTiempo);
   const [desde, setDesde] = useState(quincena.desde);
   const [hasta, setHasta] = useState(quincena.hasta);
   // 🔴 IGUAL QUE LA PLANILLA DEL GRUPO: abre VACÍA. Daniel: *«la quincena se
@@ -230,13 +234,13 @@ export default function PlanillaBoston() {
                       <span className="text-gray-600">Deducc. {$$(l.dinero.totalDeducciones)}</span>
                     )}
                     <span className="text-gray-600">
-                      Extra {fmtMin(h.extraDiurnoMin + h.extraNocturnoMin)} min
+                      Extra {tiempoDelDia(h.extraDiurnoMin + h.extraNocturnoMin)}
                     </span>
                     <span className={h.tardanzaMin ? "text-amber-600" : "text-gray-400"}>
-                      Tarde {fmtMin(h.tardanzaMin)} min
+                      Tarde {tiempoDelDia(h.tardanzaMin)}
                     </span>
                     <span className={h.ausenciaMin ? "text-red-600" : "text-gray-400"}>
-                      Ausencia {fmtMin(h.ausenciaMin)} min
+                      Ausencia {tiempoDelDia(h.ausenciaMin)}
                     </span>
                   </div>
                   {l.faltaConfigurar.length > 0 && (
@@ -306,13 +310,13 @@ export default function PlanillaBoston() {
                         )
                       ) : (
                         <>
-                          <td className="px-3 text-right tabular-nums">{fmtMin(h.extraDiurnoMin)}</td>
-                          <td className="px-3 text-right tabular-nums">{fmtMin(h.extraNocturnoMin)}</td>
+                          <td className="px-3 text-right tabular-nums">{tiempo(h.extraDiurnoMin)}</td>
+                          <td className="px-3 text-right tabular-nums">{tiempo(h.extraNocturnoMin)}</td>
                           <td className={`px-3 text-right tabular-nums ${h.tardanzaMin ? "text-amber-600" : "text-gray-300"}`}>
-                            {fmtMin(h.tardanzaMin)}
+                            {tiempo(h.tardanzaMin)}
                           </td>
                           <td className={`px-4 text-right tabular-nums ${h.ausenciaMin ? "text-red-600" : "text-gray-300"}`}>
-                            {fmtMin(h.ausenciaMin)}
+                            {tiempo(h.ausenciaMin)}
                           </td>
                         </>
                       )}

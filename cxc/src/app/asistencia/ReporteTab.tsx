@@ -1271,7 +1271,7 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
               nadie descuente sin saber de dónde sale el número. */}
           {r.minutosTardeDeDiasARevisar > 0 && (
             <p className="mb-2 text-[13px] text-amber-800">
-              De los <b>{fmtMin(r.minutosTarde)}</b> minutos tarde, <b>{fmtMin(r.minutosTardeDeDiasARevisar)}</b> vienen
+              De los <b>{tiempoDelDia(r.minutosTarde)}</b> de tardanza, <b>{tiempoDelDia(r.minutosTardeDeDiasARevisar)}</b> vienen
               de días que no tienen exactamente 4 marcas. Míralos antes de descontar.
             </p>
           )}
@@ -2729,7 +2729,7 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
           <td colSpan={8} className="px-2 pb-1.5 text-[12px] text-blue-900">
             {textoEntradaAutorizada(d.entradaAutorizada)}
             {(d.extraEntradaMin ?? 0) > 0 && d.entradaAutorizada.desde
-              ? ` · ${fmtMin(d.extraEntradaMin ?? 0)} min de extra medidos de ${d.entradaAutorizada.desde} a ${d.entradaAutorizada.hasta}`
+              ? ` · ${tiempoDelDia(d.extraEntradaMin ?? 0)} de extra medidos de ${d.entradaAutorizada.desde} a ${d.entradaAutorizada.hasta}`
               : " · sin extra de entrada ese día"}
             {puedeCorregir && (
               <button type="button" onClick={() => void deshacerEntradaAutorizada(d.entradaAutorizada!.id)}

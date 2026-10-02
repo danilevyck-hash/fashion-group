@@ -217,7 +217,7 @@ describe("AppHeader · el menú a pantalla completa", () => {
     const menu = await abrirElMenu();
 
     within(menu).getByRole("button", { name: /^Inicio/ });
-    within(menu).getByText("daniel");
+    within(menu).getByText("Daniel"); // el nombre visible, capitalizado (2-oct-2026)
     within(menu).getByText("Administrador");
     within(menu).getByRole("button", { name: "Cerrar sesión" });
     // El botón de cambiar la contraseña es el de siempre, en su variante texto.

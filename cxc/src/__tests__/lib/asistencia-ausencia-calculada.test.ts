@@ -210,7 +210,7 @@ describe("las etiquetas: los minutos tienen que cuadrar con los dólares", () =>
     // ver: los minutos no cuadrarían con los dólares.
     const h = horas(70, 45, 1);
     expect(minutosTardanzaMostrados(h)).toBe(25);
-    expect(textoTardanzas(h)).toBe("25 min");
+    expect(textoTardanzas(h)).toBe("25m");
   });
 
   it("«Ausencias» dice de dónde sale el monto cuando hay días de más de 30 min", () => {

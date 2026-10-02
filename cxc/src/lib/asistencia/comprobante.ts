@@ -35,7 +35,7 @@
 
 import type { HorasPersona, LineaPlanilla } from "./planilla";
 import { centavos, minutosTardanzaMostrados } from "./planilla";
-import { fmtMin } from "./reporte";
+import { tiempoDelDia } from "./formato-tiempo";
 import { notaAjuste } from "./corte-quincena";
 import { notaOtrosServicios } from "./otros-servicios";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
@@ -263,7 +263,8 @@ export function notaTardanza(horas: HorasPersona | null | undefined): string | n
   if (!horas) return null;
   const m = minutosTardanzaMostrados(horas);
   if (!(m > 0)) return null;
-  return `${fmtMin(m)} min`;
+  // 🔴 2-oct-2026: «27m 50s», nunca «27.83 min» (Daniel).
+  return tiempoDelDia(m);
 }
 
 /**

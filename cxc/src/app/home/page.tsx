@@ -16,6 +16,8 @@ import MenuDelUsuario from "@/components/estructura/MenuDelUsuario";
 import AvatarDelUsuario from "@/components/estructura/AvatarDelUsuario";
 import AppHeader from "@/components/AppHeader";
 import { TAB_BAR_2026_10 } from "@/lib/navegacion/tab-bar";
+import { CLAVE_NOMBRE_VISIBLE } from "@/lib/hooks/useNombreVisible";
+import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 
 // 🔴 Estructura estilo Apple (1-oct-2026): saludo y fecha con el botón del
 // usuario; sin «Accesos frecuentes», sin modo oscuro y sin el logo grande.
@@ -23,7 +25,7 @@ import { TAB_BAR_2026_10 } from "@/lib/navegacion/tab-bar";
 // Caché del nombre para saludar (fg_users.nombre_completo). Se guarda para que
 // el saludo aparezca instantáneo en las siguientes visitas y se refresca en
 // segundo plano contra /api/auth/perfil.
-const DISPLAY_NAME_KEY = "fg_user_display_name";
+const DISPLAY_NAME_KEY = CLAVE_NOMBRE_VISIBLE;
 
 export default function HomePage() {
   const router = useRouter();
@@ -154,9 +156,10 @@ export default function HomePage() {
               menú del usuario es el avatar con la inicial, como en las apps de
               Apple; en la computadora sigue el botón con el nombre. */}
           {apple && (TAB_BAR_2026_10
-            ? <div className="hidden sm:block"><MenuDelUsuario nombre={userName} rol={role} /></div>
-            : <MenuDelUsuario nombre={userName} rol={role} />)}
-          {TAB_BAR_2026_10 && <AvatarDelUsuario nombre={userName} rol={role} />}
+            ? <div className="hidden sm:block"><MenuDelUsuario nombre={capitalizarNombre(displayName)} rol={role} /></div>
+            : <MenuDelUsuario nombre={capitalizarNombre(displayName)} rol={role} />)}
+          {/* El nombre visible, capitalizado: «Daniel Levy», no «daniel». */}
+          {TAB_BAR_2026_10 && <AvatarDelUsuario nombre={capitalizarNombre(displayName)} rol={role} />}
           {!apple && <div className="flex items-center shrink-0 -mr-2">
             {/* Cambiar MI contraseña (14-sep-2026), para todos los roles. ⚠️ El
                   comentario no nombra al botón de cerrar sesión: el candado

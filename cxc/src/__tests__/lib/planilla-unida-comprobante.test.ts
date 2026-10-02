@@ -204,7 +204,7 @@ describe("D. LOS MINUTOS DE TARDANZA VAN AL LADO DEL NÚMERO", () => {
       PERIODO,
     );
     const t = c.renglones.find((r) => r.clave === "tardanzas")!;
-    expect(t.nota).toBe("45 min");
+    expect(t.nota).toBe("45m");
     expect(t.rotulo).not.toMatch(/45|minuto|\(/);
   });
 
@@ -218,7 +218,7 @@ describe("D. LOS MINUTOS DE TARDANZA VAN AL LADO DEL NÚMERO", () => {
   // que su propio monto no incluye.
   it("los minutos son los que se VALÚAN, no el total del reloj", () => {
     const h = { ...HORAS_CERO, tardanzaMin: 100, tardanzaGraveMin: 60 } as HorasPersona;
-    expect(notaTardanza(h)).toBe("40 min");
+    expect(notaTardanza(h)).toBe("40m");
   });
 });
 
@@ -402,7 +402,7 @@ describe("H. EL PAPEL DE VERDAD", () => {
     );
     const textos = textosDelPdf(construirPdfComprobantes([c]).output("arraybuffer") as ArrayBuffer);
     expect(textos).toContain("TARDANZAS");
-    expect(textos).toContain("45 min");
+    expect(textos).toContain("45m");
     // Nunca pegados: es la forma que produjo las 23 grafías.
     expect(textos.find((t) => /TARDANZA.*\(/.test(t))).toBeUndefined();
   });

@@ -748,3 +748,14 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 
 > Roles reales del sistema = los 8 de arriba (`src/lib/modules.ts` → `SYSTEM_ROLES`). No existen roles `director` ni `cliente` (el catálogo Reebok es público, sin login).
 > 🔴 **MARCAR DESDE EL TELÉFONO YA FUNCIONA SIN SEÑAL** (`marcacion/cola-offline.ts`; probado el 15-sep). Con señal la hora la pone el SERVIDOR; sin señal, la del teléfono, ni 10 min adelantada ni 7 días vieja. ⚠️ Con la app CERRADA no sale nada y la cola no está respaldada. 🔑 «Sin señal» **es la palabra del teléfono** y el servidor no puede probarlo — detalle y medición en el postmortem de asistencia.
+
+
+## «Más» es una hoja sobre la pantalla (2-oct-2026)
+
+Daniel, probando en su iPhone la barra de pestañas (`TAB_BAR_2026_10`): *«¿por qué Más me lleva a esa pantalla y no a la que estaba?»*. 🩸 «Más» abría el menú viejo a pantalla completa («Menú», con ×) y tapaba la pantalla de atrás.
+
+- 🔴 **«Más» no navega**: sube una hoja de vidrio de 70 % con agarre (`components/estructura/HojaMas.tsx`) con el buscador, **los módulos que NO están en la barra** (ni Inicio ni las 3 pestañas), por grupo, y al final la cuenta (nombre visible · «Cambiar contraseña» · «Cerrar sesión»). Se cierra deslizando, tocando afuera, con × o Escape, y **la pantalla de atrás queda donde estaba** (`useBodyScrollLock` guarda y devuelve el scroll). Elegir un módulo navega. «Más» se ve activo solo con la hoja abierta. El menú a pantalla completa queda para quien no tiene barra.
+- 🔴 **El nombre es el VISIBLE**: «Daniel Levy», no «daniel» (`lib/hooks/useNombreVisible.ts`: `/api/auth/perfil` + `capitalizarNombre`). Avatar, hoja de la cuenta, «Más» y el botón de la computadora. Lo que se guarda con el nombre (visitas, pedidos) sigue con `fg_user_name`.
+- 🩸 **El «[» suelto en Asistencia** (barra v3.3, renglón 2): el período se declaraba encogible a 200 px y el chip «Empresa» subía a su lado tapando el 📅. Ahora el período no se encoge (`CLASE_PERIODO_EN_LA_BARRA`) y el chip baja solo si no cabe. Ventas no lleva chip en ese renglón.
+- 🔴 **Los minutos nunca con decimales** («1 tardanza de 27.83 min» → «27m 50s»): tarjeta y pie del celular, «Tardanzas (…)» de la planilla, la nota del comprobante, el freno del cierre, la nota del Excel de Aprobaciones, Boston y los textos del Reporte salen por `formato-tiempo.ts`. ⚠️ La opción «minutos» de Configuración (`formatoTiempo(…, "min")`) sigue mostrando decimales en las tablas: pendiente de Daniel.
+- Candados `hoja-mas` · `renglon-2-sin-encimar` · `minutos-sin-decimales`.

@@ -29,6 +29,7 @@ import {
   type ReportColumn,
 } from "@/lib/excel-export";
 import { nombreArchivoPorEmpresa } from "./empresa-para-todo";
+import { tiempoDelDia } from "./formato-tiempo";
 import { decisionDe, textoDecision, type DiaAprobacion } from "./aprobaciones";
 
 /** Minutos con dos decimales: se miden AL SEGUNDO desde el 13-ago-2026. */
@@ -120,7 +121,7 @@ export function construirExcelAprobaciones(opts: OpcionesExcelAprobaciones) {
   // a mano la columna filtrando por «Sin aprobar».
   const nota =
     sin > 0
-      ? `${sin} día(s)-colaborador sin aprobar por ${minSin.toFixed(2)} minutos: la planilla NO los pagó.`
+      ? `${sin} día(s)-colaborador sin aprobar por ${tiempoDelDia(minSin)}: la planilla NO los pagó.`
       : undefined;
 
   const ws = buildReportSheet({ columns: COLUMNAS, rows, totals, nota });
