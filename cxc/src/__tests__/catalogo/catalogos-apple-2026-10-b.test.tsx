@@ -276,3 +276,35 @@ describe("7 · el detalle del pedido en el celular y el vidrio", () => {
     expect(leer("src/components/catalogo/FiltroPrecioChip.tsx")).toContain("VIDRIO");
   });
 });
+
+describe("8 · «Confirmar pedido» como lista agrupada", () => {
+  it("plural correcto y el checkout sigue sin leer el interruptor", async () => {
+    const { textoProductos } = await import("@/components/catalogo/ConfirmarPedidoAgrupado");
+    expect(textoProductos(1)).toBe("1 producto");
+    expect(textoProductos(3)).toBe("3 productos");
+    expect(leer("src/app/catalogo/[marca]/checkout/page.tsx")).toContain("listaAgrupada={CATALOGOS_APPLE_2026_10_B.subpaginasInternas}");
+    for (const f of ["src/components/catalogo/CheckoutClient.tsx", "src/components/catalogo/ConfirmarPedidoAgrupado.tsx"]) {
+      expect(leer(f)).not.toContain("catalogos-2026-10");
+    }
+  });
+
+  it("lo que falta se dice al tocar enviar, y las dos salidas son las de siempre", async () => {
+    const { default: Agrupado } = await import("@/components/catalogo/ConfirmarPedidoAgrupado");
+    const onElegir = vi.fn();
+    const base = {
+      lineas: [], onQty: () => {}, renderPrecio: () => null, cliente: null as string | null,
+      clienteAbierto: false, onCliente: () => {}, selectorCliente: null, vendedor: "Reinaldo Espinosa",
+      vendedorAbierto: false, onVendedor: () => {}, selectorVendedor: null, total: 408, totalPiezas: 12,
+      enviando: false, onElegir,
+    };
+    const { rerender } = render(<Agrupado {...base} faltaTexto="Falta: seleccionar el cliente" />);
+    expect(screen.queryByText("Falta: seleccionar el cliente")).toBeNull();
+    fireEvent.click(screen.getByText("Enviar pedido"));
+    expect(screen.getAllByText("Falta: seleccionar el cliente")).toHaveLength(1);
+    expect(onElegir).not.toHaveBeenCalled();
+    rerender(<Agrupado {...base} cliente="Almacén X" faltaTexto={null} />);
+    fireEvent.click(screen.getByText("Enviar pedido"));
+    fireEvent.click(screen.getByText("Cotización"));
+    expect(onElegir.mock.calls).toEqual([["pedido"], ["cotizacion"]]);
+  });
+});

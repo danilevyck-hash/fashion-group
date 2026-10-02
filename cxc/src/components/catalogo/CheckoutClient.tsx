@@ -35,6 +35,8 @@ import { resolverLineas } from "@/lib/catalogo/lineas-pedido";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { fmt } from "@/lib/format";
+import ConfirmarPedidoAgrupado from "./ConfirmarPedidoAgrupado";
+import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import LineasPedidoEditables, { type LineaEnPantalla } from "@/components/catalogo/LineasPedidoEditables";
 import { getMarcaTheme, type MarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { leerCarrito, guardarCarrito, limpiarCarrito } from "@/lib/catalogo/carrito";
@@ -95,7 +97,13 @@ function brandCfg(theme: MarcaTheme): BrandCfg {
 /** `tituloEnLaBarra`: el título y «← Catálogo» ya los dibuja la barra de
  *  arriba (lo decide la página, no este archivo); aquí queda el `<h1>` solo
  *  para el lector de pantalla. Nada del pedido depende de esto. */
-export default function CheckoutClient({ marca, tituloEnLaBarra = false }: { marca: MarcaUiKey; tituloEnLaBarra?: boolean }) {
+export default function CheckoutClient({ marca, tituloEnLaBarra = false, listaAgrupada = false }: {
+  marca: MarcaUiKey;
+  tituloEnLaBarra?: boolean;
+  /** «Confirmar pedido» como lista agrupada de iOS (`ConfirmarPedidoAgrupado`).
+   *  Lo decide la página; las dos salidas y el payload son los mismos. */
+  listaAgrupada?: boolean;
+}) {
   const theme = getMarcaTheme(marca)!;
   const cfg = brandCfg(theme);
   const router = useRouter();
@@ -257,40 +265,7 @@ export default function CheckoutClient({ marca, tituloEnLaBarra = false }: { mar
     );
   }
 
-  return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-6">
-      {tituloEnLaBarra ? <h1 className="sr-only">Confirmar pedido</h1> : (
-      <div className="mb-5 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Confirmar pedido</h1>
-          {/* Antes seguía "· revisa, elige cliente y envía a Switch": narraba los
-              tres bloques que la propia pantalla tiene a la vista (los items, el
-              selector de cliente y el botón "Enviar a Switch").
-              Queda la marca, que sí dice de qué catálogo es este pedido. */}
-          <p className="text-sm text-gray-500">{cfg.label}</p>
-        </div>
-        <Link href={cfg.catalogHref} className="text-sm text-gray-500 hover:text-black transition">← Catálogo</Link>
-      </div>
-      )}
-
-      {cart.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-10 text-center">
-          <p className="text-sm text-gray-500">El carrito está vacío.</p>
-          <Link href={cfg.catalogHref} className="mt-3 inline-block bg-black text-white text-sm px-4 py-2 rounded-md hover:bg-gray-800 transition">
-            Ir al catálogo
-          </Link>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {/* Items — la MISMA lista que revisa el cliente en el catálogo
-              público (`LineasPedidoEditables`, 7-sep-2026). Estas ~70 líneas
-              vivían acá; se MUDARON para que las dos pantallas se vean y se
-              toquen igual. Lo único propio del checkout es que el precio se
-              puede cambiar, y por eso viaja como `renderPrecio`. */}
-          <LineasPedidoEditables
-            lineas={lineas}
-            onQty={setQty}
-            renderPrecio={(l) => (
+  const renderPrecio = (l: LineaEnPantalla) => (
               /* Precio: campo tocable OBVIO (borde + fondo + lápiz), no un link
                  sutil — cualquiera debe intuir que se puede cambiar sin
                  explicárselo. */
@@ -323,7 +298,94 @@ export default function CheckoutClient({ marca, tituloEnLaBarra = false }: { mar
                   </svg>
                 </button>
               )
-            )}
+  );
+
+  return (
+    <div className="mx-auto w-full max-w-3xl px-4 py-6">
+      {tituloEnLaBarra ? <h1 className="sr-only">Confirmar pedido</h1> : (
+      <div className="mb-5 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Confirmar pedido</h1>
+          {/* Antes seguía "· revisa, elige cliente y envía a Switch": narraba los
+              tres bloques que la propia pantalla tiene a la vista (los items, el
+              selector de cliente y el botón "Enviar a Switch").
+              Queda la marca, que sí dice de qué catálogo es este pedido. */}
+          <p className="text-sm text-gray-500">{cfg.label}</p>
+        </div>
+        <Link href={cfg.catalogHref} className="text-sm text-gray-500 hover:text-black transition">← Catálogo</Link>
+      </div>
+      )}
+
+      {cart.length === 0 ? (
+        <div className="rounded-lg border border-gray-200 bg-white p-10 text-center">
+          <p className="text-sm text-gray-500">El carrito está vacío.</p>
+          <Link href={cfg.catalogHref} className="mt-3 inline-block bg-black text-white text-sm px-4 py-2 rounded-md hover:bg-gray-800 transition">
+            Ir al catálogo
+          </Link>
+        </div>
+      ) : listaAgrupada ? (
+        <ConfirmarPedidoAgrupado
+          lineas={lineas}
+          onQty={setQty}
+          renderPrecio={renderPrecio}
+          cliente={cliente === undefined ? null : `${nombreDeCliente(cliente)}${cliente.codigo && !esClienteDeMostrador(cliente) ? ` · ${cliente.codigo}` : ""}`}
+          clienteAbierto={clientePickerOpen}
+          onCliente={() => setClientePickerOpen((v) => !v)}
+          selectorCliente={
+            <ClienteSwitchPicker
+              api={theme.api}
+              directorioLabel={theme.switchDirectorioLabel}
+              valor={cliente}
+              onElegir={(c) => { setCliente(c); setClientePickerOpen(false); }}
+              disabled={sending}
+            />
+          }
+          vendedor={vendedor === undefined ? "Cargando…" : vendedor === null ? "Seleccionar" : capitalizarNombre(nombreDeVendedor(vendedor))}
+          vendedorAbierto={vendedorPickerOpen || vendedor === null}
+          onVendedor={() => setVendedorPickerOpen((v) => !v)}
+          selectorVendedor={
+            <VendedorSwitchPicker
+              empresa={theme.empresaKey}
+              directorioLabel={theme.switchDirectorioLabel}
+              valor={vendedor ?? null}
+              onElegir={(v) => { setVendedor(v); setVendedorPickerOpen(false); }}
+              disabled={sending}
+            />
+          }
+          avisos={(preorders.length > 0 || error) ? (
+            <div className="space-y-2">
+              {preorders.length > 0 && (
+                <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                  {preorders.length === 1 ? "1 producto en preventa" : `${preorders.length} productos en preventa`}: quítalo para enviar a Switch (se pide aparte).
+                </p>
+              )}
+              {error && (
+                <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                  {error}
+                  {erroresDetalle.length > 0 && (
+                    <ul className="mt-1 list-disc pl-4 text-xs">{erroresDetalle.map((e, i) => <li key={i}>{e}</li>)}</ul>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : null}
+          total={total}
+          totalPiezas={totalPiezas}
+          faltaTexto={falta.length > 0 ? textoFaltaEnviar(falta) : null}
+          enviando={sending}
+          onElegir={(d) => { void confirmar(d); }}
+        />
+      ) : (
+        <div className="space-y-4">
+          {/* Items — la MISMA lista que revisa el cliente en el catálogo
+              público (`LineasPedidoEditables`, 7-sep-2026). Estas ~70 líneas
+              vivían acá; se MUDARON para que las dos pantallas se vean y se
+              toquen igual. Lo único propio del checkout es que el precio se
+              puede cambiar, y por eso viaja como `renderPrecio`. */}
+          <LineasPedidoEditables
+            lineas={lineas}
+            onQty={setQty}
+            renderPrecio={renderPrecio}
           />
 
           {/* Cliente — ARRANCA VACÍO. Mientras no se elija, el borde va en
