@@ -119,12 +119,13 @@ describe("🔴 el interruptor está prendido (2-oct-2026) y apagado todo queda c
     for (const g of GROUPS) expect(screen.getAllByText(g.label).length).toBeGreaterThan(0);
   });
 
-  it("Inicio de hoy: «Accesos frecuentes» y el modo oscuro siguen", async () => {
+  // El modo oscuro se retiró del todo el 2-oct-2026 (`sin-modo-oscuro.test.ts`).
+  it("Inicio de hoy: «Accesos frecuentes» sigue", async () => {
     sesion("admin");
     localStorage.setItem("fg_module_clicks_daniel", JSON.stringify({ guias: 3 }));
     render(<HomePage />);
     await waitFor(() => expect(screen.getByText("Accesos frecuentes")).toBeTruthy());
-    expect(screen.getByLabelText("Modo oscuro")).toBeTruthy();
+    expect(screen.queryByLabelText("Modo oscuro")).toBeNull();
   });
 });
 

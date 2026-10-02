@@ -198,10 +198,9 @@ describe("/home — el encabezado propio, que no pasa por AppHeader", () => {
     return readFileSync(resolve(process.cwd(), "src/app/home/page.tsx"), "utf8");
   };
 
-  it("el botón de modo oscuro usa IconButton (44×44 garantizados)", async () => {
-    const src = await leer();
-    expect(src).toContain('import IconButton from "@/components/IconButton"');
-    expect(src).toMatch(/<IconButton[\s\S]*?label=\{darkMode \? "Modo claro" : "Modo oscuro"\}/);
+  // El botón de modo oscuro se retiró con el modo oscuro (2-oct-2026).
+  it("ya no hay botón de modo oscuro", async () => {
+    expect(await leer()).not.toContain("Modo oscuro");
   });
 
   it("el botón Cerrar sesión del home pide 44×44", async () => {

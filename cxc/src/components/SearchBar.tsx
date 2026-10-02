@@ -275,7 +275,7 @@ function getModuleSuggestions(q: string, visibleHrefs: Set<string>) {
     .slice(0, 3);
 }
 
-export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { darkMode?: boolean; compact?: boolean; fullScreen?: boolean; onClose?: () => void }) {
+export default function SearchBar({ compact, fullScreen, onClose }: { compact?: boolean; fullScreen?: boolean; onClose?: () => void }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResults | null>(null);
@@ -422,9 +422,9 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
     grouped[item.module].push(item);
   }
 
-  const bg = darkMode ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200";
-  const inputBg = darkMode ? "bg-gray-800 text-gray-100 placeholder-gray-500" : "bg-gray-50 text-gray-900 placeholder-gray-400";
-  const hoverBg = darkMode ? "bg-gray-800" : "bg-gray-50";
+  const bg = "bg-white border-gray-200";
+  const inputBg = "bg-gray-50 text-gray-900 placeholder-gray-400";
+  const hoverBg = "bg-gray-50";
 
   // Full-screen mobile mode
   if (fullScreen) {
@@ -511,7 +511,7 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
 
   return (
     <div ref={wrapperRef} className={`relative ${compact ? "w-56" : "w-full max-w-xl mx-auto mb-6"}`}>
-      <div className={`relative flex items-center rounded-lg border ${darkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"} transition focus-within:border-gray-400 focus-within:shadow-sm`}>
+      <div className={`relative flex items-center rounded-lg border border-gray-200 bg-gray-50 transition focus-within:border-gray-400 focus-within:shadow-sm`}>
         {/* Search icon */}
         <svg className="absolute left-3 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
           <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
@@ -551,18 +551,16 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
                 <button
                   onClick={() => navigateQuickAction(quickAction)}
                   onMouseEnter={() => setActiveIdx(0)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition border-b ${
-                    darkMode ? "border-gray-700" : "border-blue-100"
-                  } ${activeIdx === 0
-                    ? (darkMode ? "bg-blue-900/30" : "bg-blue-50")
-                    : (darkMode ? "bg-blue-900/10" : "bg-blue-50/50")
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition border-b border-blue-100 ${activeIdx === 0
+                    ? "bg-blue-50"
+                    : "bg-blue-50/50"
                   }`}
                 >
                   <span className="text-lg flex-shrink-0">⚡</span>
                   <div className="min-w-0 flex-1">
-                    <div className={`text-sm font-medium ${darkMode ? "text-blue-300" : "text-blue-700"}`}>{quickAction.label}</div>
+                    <div className={`text-sm font-medium text-blue-700`}>{quickAction.label}</div>
                   </div>
-                  <svg className={`w-3.5 h-3.5 flex-shrink-0 ${darkMode ? "text-blue-400" : "text-blue-400"}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" /></svg>
+                  <svg className={`w-3.5 h-3.5 flex-shrink-0 text-blue-400`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" /></svg>
                 </button>
               )}
               {/* Normal Results */}
@@ -570,7 +568,7 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
                 let idx = quickAction ? 1 : 0;
                 return Object.entries(grouped).map(([module, moduleItems]) => (
                   <div key={module}>
-                    <div className={`px-3 py-1.5 text-xs uppercase tracking-wide font-medium ${darkMode ? "text-gray-500 bg-gray-900" : "text-gray-400 bg-gray-50"}`}>
+                    <div className={`px-3 py-1.5 text-xs uppercase tracking-wide font-medium text-gray-400 bg-gray-50`}>
                       {module}
                     </div>
                     {moduleItems.map((item) => {
@@ -586,7 +584,7 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
                         >
                           <span className="text-lg flex-shrink-0">{item.icon}</span>
                           <div className="min-w-0 flex-1">
-                            <div className={`text-sm truncate ${darkMode ? "text-gray-100" : "text-gray-800"}`}>{item.label}</div>
+                            <div className={`text-sm truncate text-gray-800`}>{item.label}</div>
                             <div className="text-xs text-gray-400 truncate">{item.sub}</div>
                           </div>
                           <svg className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" /></svg>

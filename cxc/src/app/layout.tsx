@@ -61,7 +61,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-        <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem('fg_dark_mode')==='1')document.documentElement.classList.add('dark')}catch(e){}` }} />
+        {/* 🔴 SIN MODO OSCURO (Daniel, 2-oct-2026). Quien lo prendió antes quedaba en
+            oscuro sin forma de salir: se borra su clave vieja y nadie vuelve a entrar. */}
+        <script dangerouslySetInnerHTML={{ __html: `try{localStorage.removeItem('fg_dark_mode')}catch(e){}` }} />
         <link rel="apple-touch-icon" href="/icon-192.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black" />

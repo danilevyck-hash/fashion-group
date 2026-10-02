@@ -8,6 +8,7 @@ import { sinBarraLateral } from "@/lib/catalogo/rutas-publicas";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { useBackdropDismiss, useEscapeClose, useFormGuard } from "@/lib/hooks/useModalDismiss";
 import { duracionToastMs } from "@/lib/ui/toast-duracion";
+import { CajaAviso } from "@/components/CajaAviso";
 
 export { Avatar } from "./ui/Avatar";
 export type { AvatarProps } from "./ui/Avatar";
@@ -110,23 +111,7 @@ export function Toast({ message, type = "success", onDismiss }: { message: strin
   }, [message, type, seCierraSolo]);
 
   if (!message) return null;
-  return (
-    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-md text-sm border border-gray-200 z-50 flex items-center gap-2 ${
-      type === "error" ? "bg-red-900 text-white" : "bg-black text-white"
-    }`}>
-      {type === "error" ? (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-      ) : (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-      )}
-      <span className="flex-1">{message}</span>
-      {onDismiss && (
-        <button onClick={onDismiss} className="ml-2 p-1 rounded hover:bg-white/20 transition flex-shrink-0" aria-label="Cerrar">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      )}
-    </div>
-  );
+  return <CajaAviso message={message} type={type} onDismiss={onDismiss} className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50" />;
 }
 
 // ── 🩸 MODALES Y HOJAS VIVEN EN <body> (2-oct-2026) ──

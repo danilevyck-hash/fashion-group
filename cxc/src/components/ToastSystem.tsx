@@ -3,8 +3,7 @@
 import { duracionToastMs } from '@/lib/ui/toast-duracion'
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
 import { useBackdropDismiss, useEscapeClose } from '@/lib/hooks/useModalDismiss'
-
-type ToastType = 'success' | 'error' | 'warning'
+import { CajaAviso, type ToastType } from '@/components/CajaAviso'
 
 interface Toast {
   id: number
@@ -59,12 +58,6 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   useEscapeClose(!!confirmState, cancelConfirm)
   const backdropConfirm = useBackdropDismiss(confirmState ? cancelConfirm : undefined)
 
-  const colors: Record<ToastType, string> = {
-    success: 'bg-green-600',
-    error: 'bg-red-600',
-    warning: 'bg-amber-600',
-  }
-
   return (
     <ToastContext.Provider value={{ toast, confirm: confirmFn }}>
       {children}
@@ -72,11 +65,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {/* Toasts */}
       <div className="fixed top-4 right-4 z-[100] space-y-2 pointer-events-none">
         {toasts.map(t => (
-          <div key={t.id}
-            className={`${colors[t.type]} text-white text-sm px-4 py-2.5 rounded-lg shadow-lg pointer-events-auto flex items-center gap-3 animate-in slide-in-from-right fade-in duration-200 max-w-sm`}>
-            <span className="flex-1">{t.message}</span>
-            <button onClick={() => dismiss(t.id)} className="text-white/70 hover:text-white text-lg leading-none">&times;</button>
-          </div>
+          <CajaAviso key={t.id} message={t.message} type={t.type} onDismiss={() => dismiss(t.id)}
+            className="pointer-events-auto max-w-sm animate-in slide-in-from-right fade-in duration-200" />
         ))}
       </div>
 

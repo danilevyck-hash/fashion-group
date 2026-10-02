@@ -281,9 +281,14 @@ describe("🔴 5. el aviso no se queda pegado para siempre", () => {
     // 🩸 La ✕ se busca DENTRO del Toast: `aria-label="Cerrar"` aparece dos
     // veces en el archivo (el otro es el de los modales) y buscarlo suelto deja
     // pasar que se le quite justo al aviso.
+    // Desde el 2-oct-2026 el Toast dibuja `CajaAviso` (el aviso único): la ✕
+    // vive ahí, y el Toast le pasa su `onDismiss`.
     const toast = UI.slice(UI.indexOf("export function Toast"), UI.indexOf("// ── ESTÉTICA 7"));
-    expect(toast).toContain('aria-label="Cerrar"');
-    expect(toast).toContain("onClick={onDismiss}");
+    expect(toast).toContain("<CajaAviso");
+    expect(toast).toContain("onDismiss={onDismiss}");
+    const caja = src("src/components/CajaAviso.tsx");
+    expect(caja).toContain('aria-label="Cerrar"');
+    expect(caja).toContain("onClick={onDismiss}");
     // El reloj NO depende de `onDismiss` (que casi siempre es una función nueva
     // por render): si lo fuera, se reiniciaría y el aviso no se iría nunca.
     expect(UI).toContain("cerrarRef");

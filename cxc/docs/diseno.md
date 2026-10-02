@@ -41,6 +41,21 @@ Daniel, 2-oct-2026: *«cada vez que encontramos algo así de detalle, para que s
 - **Nombres de personas como se escriben: «Daniel Levy»**, nunca «DANIEL LEVY». La capitalización se hace en pantalla, sin tocar el dato.
 - **Un cero que dice que falta algo SÍ se muestra.** Por ejemplo, «Fotos · 0» avisa que la tienda no tiene fotos. Solo se esconde el cero que no le dice nada a nadie, como un contador de filtros.
 - **Los mismos colores en todos los módulos.** Botones, chips, estados y acentos salen de los mismos tokens. Un módulo no inventa su paleta: todo el sistema se tiene que sentir como uno solo.
+- **La paleta estándar** (Daniel la aprobó el 2-oct-2026). Cada rol tiene una sola clase:
+  - Neutro: familia `gray`. Fondo de página `bg-gray-50`, tarjeta `bg-white`.
+  - Botón principal: `bg-black text-white hover:bg-gray-800`.
+  - Enlace o acción de texto con color: `text-blue-600 hover:text-blue-800`.
+  - Éxito: `emerald` (texto `-700`, fondo `-50`, borde `-200`).
+  - Aviso: `amber` (texto `-700`, fondo `-50`, borde `-200`).
+  - Error y negativos: `red` (texto `-600`, fondo `-50`, borde `-200`).
+  - Borde: tarjeta `border-gray-200`, separador de filas `border-gray-100`, campo `border-gray-300`.
+  - Radios, solo tres: `rounded-md` en botones y campos, `rounded-lg` en tarjetas y modales, `rounded-full` en chips. Sin `rounded-[Npx]`.
+  - Seleccionado: `bg-gray-900 text-white` en chip; `border-b-2 border-gray-900 text-gray-900` en pestaña. Nunca el color del módulo.
+  - Título de sección: `text-xs font-medium uppercase tracking-wide text-gray-400`, y solo si el bloque no se entiende solo.
+
+  Prohibido en pantallas: `stone`, `slate`, `teal`, `green`, `rose`, `orange`, `sky`, `indigo`, `violet`, `purple`, `fuchsia` y los hex sueltos (`bg-[#…]`). El acento del módulo vive solo en `moduleColors.ts` (la raya del encabezado y el ícono del menú). Excepción: los colores de marca del catálogo público y los pedidos. Candado: `paleta-unica.test.ts`, con un techo que solo baja.
+- **Un solo aviso (toast)**: `CajaAviso` de `ToastSystem.tsx`, que usan `useToast()` y `<Toast>`. Éxito negro (3 s), error rojo y aviso ámbar (8 s).
+- **Sin modo oscuro** (retirado el 2-oct-2026) hasta que se decida hacerlo completo.
 - **Las tarjetas de una lista dicen lo esencial en dos líneas.** El detalle va al tocarlas, no en una pared de chips (por ejemplo, 23 meses pendientes dibujados uno por uno).
 
 ## Mockup: siempre, con capturas reales

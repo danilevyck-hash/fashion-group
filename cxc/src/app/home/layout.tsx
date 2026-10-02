@@ -35,12 +35,10 @@
 // atendiendo la sesión sin semilla, el rol `cliente` del catálogo público y el
 // caso en que la cookie y `sessionStorage` no dicen lo mismo.
 //
-// ⚠️ AQUÍ NO SE PINTA NADA, Y ESO ES A PROPÓSITO. El Inicio elige sus colores
-// con el modo oscuro, que vive en el `localStorage` del navegador y el
-// servidor no puede conocer: por eso `/home` quedó fuera del arreglo del
-// primer pintado del 19-sep-2026 (semilla), y sigue afuera. Este layout solo
-// DECIDE A DÓNDE VA la petición; quien se queda en el Inicio lo ve exactamente
-// como antes, sin destello de tema claro.
+// ⚠️ AQUÍ NO SE PINTA NADA. `/home` quedó fuera del arreglo del primer pintado
+// del 19-sep-2026 (semilla) porque elegía sus colores con el modo oscuro del
+// `localStorage`; el modo oscuro se retiró el 2-oct-2026. Este layout solo
+// DECIDE A DÓNDE VA la petición.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { redirect } from "next/navigation";

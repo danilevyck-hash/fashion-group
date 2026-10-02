@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import FGLogo from "@/components/FGLogo";
 import SearchBar, { SEARCH_ROLES } from "@/components/SearchBar";
-import IconButton from "@/components/IconButton";
 import { BotonCambiarContrasena } from "@/components/CambiarContrasena";
 import { getVisibleGroups, getModulesInGroup, type AppModule } from "@/lib/modules";
 import { casaDelRol, INICIO } from "@/lib/navegacion/casa-del-rol";
@@ -31,8 +30,6 @@ export default function HomePage() {
   const [displayName, setDisplayName] = useState("");
   const [fgModules, setFgModules] = useState<string[] | null>(null);
   const apple = ESTRUCTURA_APPLE_2026_10;
-  const [modoOscuro, setDarkMode] = useState(false);
-  const darkMode = modoOscuro && !apple;
   const [frequents, setFrequents] = useState<AppModule[]>([]);
 
   // El botón de arriba a la derecha tiene que REVOCAR la sesión en el server
@@ -54,10 +51,6 @@ export default function HomePage() {
     const login = sessionStorage.getItem("fg_user_name") || "";
     setUserName(login);
     setDisplayName(sessionStorage.getItem(DISPLAY_NAME_KEY) || login);
-    const isDark = localStorage.getItem("fg_dark_mode") === "1";
-    setDarkMode(isDark);
-    if (isDark) document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
 
     try {
       const mods = sessionStorage.getItem("fg_modules");
@@ -128,27 +121,21 @@ export default function HomePage() {
   // mínima. Alto uniforme (78px en la cuadrícula) — cómodo para el dedo.
   const fichaBase =
     "group flex rounded-lg border transition-all duration-150 active:scale-[0.97] " +
-    (darkMode
-      ? "border-gray-800 bg-gray-900 hover:border-teal-700 hover:bg-gray-800"
-      : "border-stone-200 bg-stone-50 hover:border-teal-500 hover:bg-white hover:shadow-sm");
-  const iconoBase = `shrink-0 transition-colors ${
-    darkMode ? "text-gray-400 group-hover:text-teal-400" : "text-stone-500 group-hover:text-teal-600"
-  }`;
-  const textoBase = `text-xs font-medium leading-tight transition-colors ${
-    darkMode ? "text-gray-100 group-hover:text-teal-200" : "text-gray-900 group-hover:text-teal-800"
-  }`;
+    "border-stone-200 bg-stone-50 hover:border-teal-500 hover:bg-white hover:shadow-sm";
+  const iconoBase = "shrink-0 transition-colors text-stone-500 group-hover:text-teal-600";
+  const textoBase = "text-xs font-medium leading-tight transition-colors text-gray-900 group-hover:text-teal-800";
 
   return (
-    <div className={`min-h-screen ${darkMode ? "bg-gray-950 text-gray-100" : "bg-white"}`}>
+    <div className="min-h-screen bg-white">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         {/* Encabezado: saludo en serif + fecha del día */}
         <div className="flex items-start justify-between gap-4 mb-6">
           <div className="min-w-0">
             {!apple && <FGLogo variant="horizontal" theme="light" size={28} />}
-            <h1 className={`font-display text-2xl sm:text-3xl font-medium tracking-tight ${apple ? "" : "mt-3"} truncate ${darkMode ? "text-gray-50" : "text-gray-950"}`}>
+            <h1 className={`font-display text-2xl sm:text-3xl font-medium tracking-tight ${apple ? "" : "mt-3"} truncate text-gray-950`}>
               {saludo}
             </h1>
-            <p className={`text-sm mt-0.5 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+            <p className="text-sm mt-0.5 text-gray-500">
               {fmtDate(hoyPanama())}
             </p>
           </div>
@@ -159,18 +146,6 @@ export default function HomePage() {
               borde del contenedor. */}
           {apple && <MenuDelUsuario nombre={userName} rol={role} />}
           {!apple && <div className="flex items-center shrink-0 -mr-2">
-            <IconButton
-              onClick={() => {
-                const next = !darkMode;
-                setDarkMode(next);
-                if (next) { document.documentElement.classList.add("dark"); localStorage.setItem("fg_dark_mode", "1"); }
-                else { document.documentElement.classList.remove("dark"); localStorage.setItem("fg_dark_mode", "0"); }
-              }}
-              label={darkMode ? "Modo claro" : "Modo oscuro"}
-              className="text-sm text-gray-400 hover:text-black"
-            >
-              {darkMode ? "☀" : "◑"}
-            </IconButton>
             {/* Cambiar MI contraseña (14-sep-2026), para todos los roles. ⚠️ El
                   comentario no nombra al botón de cerrar sesión: el candado
                   `toque-44` busca su texto por la PRIMERA vez que aparece en el
@@ -194,7 +169,7 @@ export default function HomePage() {
             cosas. Bodega aterriza en Guías, así que en la práctica los que
             recuperan la caja del Inicio son contabilidad y vendedor. */}
         {SEARCH_ROLES.includes(role) && (
-          <SearchBar darkMode={darkMode} />
+          <SearchBar />
         )}
 
         {/* Tus frecuentes: los módulos más usados por el usuario (aprendido de
@@ -202,7 +177,7 @@ export default function HomePage() {
             HORIZONTAL. Solo aparece si ya hay historial. */}
         {frequents.length > 0 && !apple && (
           <div className="mb-6">
-            <h2 className={`text-xs font-semibold uppercase tracking-wide mb-2 px-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+            <h2 className="text-xs font-semibold uppercase tracking-wide mb-2 px-1 text-gray-500">
               Accesos frecuentes
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
@@ -232,7 +207,7 @@ export default function HomePage() {
             const modules = getModulesInGroup(g.key, role, fgModules);
             return (
               <section key={g.key}>
-                <h2 className={`text-xs font-semibold uppercase tracking-wide mb-2 px-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                <h2 className="text-xs font-semibold uppercase tracking-wide mb-2 px-1 text-gray-500">
                   {g.label}
                 </h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-3">
