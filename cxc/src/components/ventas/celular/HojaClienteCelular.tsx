@@ -40,6 +40,7 @@ import {
   TituloVentas,
   colorDelTono,
 } from "./PiezasVentas";
+import { numeroSinNegrita } from "@/lib/navegacion/barra-controles-celular";
 
 /** Lo que devuelve `GET /api/clientes/[codigo]/por-empresa-anual`. */
 export interface EmpresaDelClienteVista {
@@ -147,7 +148,7 @@ export function HojaClienteCelular({ abierta, onCerrar, codigo, nombre, cuandoCo
         <>
           {/* 🔴 EL PORCENTAJE PRIMERO, LOS DOS MONTOS DEBAJO. */}
           <div className="px-4 pt-4 text-center">
-            <div className={`text-[36px] font-bold leading-none tabular-nums ${colorDelTono(pct.tono)}`}>
+            <div className={`${numeroSinNegrita("text-[36px] font-bold leading-none tabular-nums", "font-medium")} ${colorDelTono(pct.tono)}`}>
               {pct.texto}
             </div>
             <div className="mt-2 text-[14px] tabular-nums text-gray-600">
@@ -233,7 +234,7 @@ function MesAMesDeLaEmpresa({
       <TituloVentas titulo={empresa.empresaNombre} detalle={`${cliente} · ${codigo}`} />
 
       <div className="px-4 pt-3 text-center">
-        <div className={`text-[36px] font-bold leading-none tabular-nums ${colorDelTono(pct.tono)}`}>
+        <div className={`${numeroSinNegrita("text-[36px] font-bold leading-none tabular-nums", "font-medium")} ${colorDelTono(pct.tono)}`}>
           {pct.texto}
         </div>
         <div className="mt-2 text-[14px] tabular-nums text-gray-600">

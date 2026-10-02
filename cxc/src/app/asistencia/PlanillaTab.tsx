@@ -182,6 +182,7 @@ import {
   corteInicial, esLaQuincena, fechaCortaCorte, fraseCorte, quincenasElegibles, rotuloQuincena,
   textoDelDia31,
 } from "@/lib/asistencia/elegir-quincena";
+import { numeroSinNegrita } from "@/lib/navegacion/barra-controles-celular";
 interface Respuesta {
   quincena: Quincena;
   periodo: Periodo;
@@ -1877,7 +1878,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                 Total · {data.totales.personas}{" "}
                 {data.totales.personas === 1 ? "colaborador" : "colaboradores"}
               </p>
-              <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">
+              <p className={numeroSinNegrita("mt-1 text-2xl font-semibold tabular-nums text-gray-900")}>
                 ${$(data.totales.netoPagar)}
               </p>
               <p className="text-[13px] text-gray-500">

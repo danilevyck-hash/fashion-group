@@ -15,9 +15,13 @@
 
 import type { ReactNode } from "react";
 
-/** El total de una portada del celular: 36 px (era 46), a la izquierda. */
+/**
+ * El total de una portada del celular: 36 px (era 46), a la izquierda.
+ * v3.3 (2-oct-2026), Daniel: «que los números no sean en negrita, que no manden
+ * tanto» → peso normal (400), gris oscuro, cifras de ancho fijo.
+ */
 export const CLASE_TOTAL_CELULAR =
-  "block text-[36px] font-semibold leading-none tracking-tight tabular-nums text-gray-900";
+  "block text-[36px] font-normal leading-none tracking-tight tabular-nums text-gray-800";
 
 /** La línea gris bajo el total: UNA línea, nunca dos. */
 export const CLASE_LINEA_TOTAL = "block truncate pt-1 text-[13px] text-gray-500";
@@ -64,7 +68,9 @@ export function SegmentadoCelular<K extends string>({
               // 303 px de texto (326 con tabular) en 350 de ancho; así ninguno se corta
               "relative min-w-0 flex-auto truncate whitespace-nowrap rounded-md px-1 text-[13px] transition",
               "before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-['']",
-              prendida ? "bg-white font-semibold shadow-sm" : "font-medium active:bg-white/60",
+              // v3.3: los montos en peso medio, prendido o no; lo prendido lo dice el fondo blanco
+              "font-medium",
+              prendida ? "bg-white shadow-sm" : "active:bg-white/60",
               o.rojo ? "text-[#A32D2D]" : "text-gray-900",
             ].join(" ")}
           >

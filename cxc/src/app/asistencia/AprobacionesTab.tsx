@@ -90,6 +90,7 @@ import PorDia from "./aprobaciones/PorDia";
 import YaDecididas from "./aprobaciones/YaDecididas";
 // 🔴 Estilo Apple (2-oct-2026): el nombre como se escribe, solo en pantalla y en el Excel.
 import { aprobacionesConNombres } from "@/lib/asistencia/apple-2026-10";
+import { numeroSinNegrita } from "@/lib/navegacion/barra-controles-celular";
 
 interface Respuesta {
   aprobaciones: DiaAprobacion[] | null;
@@ -492,7 +493,7 @@ export default function AprobacionesTab({ empresa = "" }: {
               </>
             ) : (
               <>
-                <span className="text-[30px] font-semibold leading-none tracking-tight">{porDecidirVistas.length}</span>
+                <span className={numeroSinNegrita("text-[30px] font-semibold leading-none tracking-tight", "font-normal", barra)}>{porDecidirVistas.length}</span>
                 <span className="text-sm text-gray-600">pendientes · {hm(minutosVistos)} h</span>
               </>
             )}

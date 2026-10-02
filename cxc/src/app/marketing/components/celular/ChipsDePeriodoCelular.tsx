@@ -45,7 +45,7 @@ export default function ChipsDePeriodoCelular({ chips, elegido, onElegir, etique
                 data-fg-periodo={c.clave}
                 onClick={() => onElegir(c.clave)}
                 className={`relative flex-1 shrink-0 whitespace-nowrap rounded-md px-3 text-[13px] text-gray-900 transition before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-[''] ${
-                  activo ? "bg-white font-semibold shadow-sm" : "font-medium active:bg-white/60"
+                  activo ? "bg-white font-medium shadow-sm" : "font-medium active:bg-white/60"
                 }`}
               >
                 {c.rotulo}

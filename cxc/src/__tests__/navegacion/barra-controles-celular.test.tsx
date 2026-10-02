@@ -362,7 +362,7 @@ describe("lo que se envía no cambia: la barra llama a la misma función", () =>
       "app/marketing/components/celular/PiezasCelular.tsx",
       "app/asistencia/PortadaCelular.tsx",
       "app/multifashion/MultifashionShell.tsx",
-    ]) expect(leer(m), m).toMatch(/className=\{tituloCelular\("/);
+    ]) expect(leer(m), m).toMatch(/tituloCelular\("/);
   });
 });
 
@@ -410,9 +410,9 @@ describe("v3.1 · una sola medida para los controles", () => {
 });
 
 describe("v3.1 · el vidrio de iOS 26", () => {
-  it("va APAGADO en el commit y apagado devuelve la clase de hoy", () => {
-    expect(VIDRIO_2026_10).toBe(false);
-    expect(conVidrio("bg-white", "vidrio")).toBe("bg-white");
+  it("PRENDIDO (Daniel lo aprobó el 2-oct-2026) y apagado devuelve la clase de hoy", () => {
+    expect(VIDRIO_2026_10).toBe(true);
+    expect(conVidrio("bg-white", "vidrio", false)).toBe("bg-white");
     expect(conVidrio("bg-white", "vidrio", true)).toBe("vidrio");
   });
 

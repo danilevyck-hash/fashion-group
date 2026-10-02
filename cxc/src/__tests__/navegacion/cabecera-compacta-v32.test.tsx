@@ -25,6 +25,7 @@ import {
   SegmentadoCelular,
 } from "@/components/celular/CabeceraCompacta";
 import { subtituloCompacto } from "@/lib/cxc/lista-celular";
+import { numeroSinNegrita } from "@/lib/navegacion/barra-controles-celular";
 
 const SRC = join(__dirname, "../..");
 const leer = (r: string) => readFileSync(join(SRC, r), "utf8");
@@ -37,6 +38,26 @@ describe("el total y su línea", () => {
     expect(CLASE_TOTAL_CELULAR).not.toMatch(/text-center/);
     expect(CLASE_LINEA_TOTAL).toContain("truncate");
     expect(CLASE_LINEA_TOTAL).toContain("text-[13px]");
+  });
+
+  it("v3.3: el total NO va en negrita — peso normal, gris oscuro, cifras de ancho fijo", () => {
+    expect(CLASE_TOTAL_CELULAR).toContain("font-normal");
+    expect(CLASE_TOTAL_CELULAR).toContain("tabular-nums");
+    expect(CLASE_TOTAL_CELULAR).toContain("text-gray-800");
+    expect(CLASE_TOTAL_CELULAR).not.toMatch(/font-(bold|semibold|extrabold)/);
+  });
+
+  it("v3.3: numeroSinNegrita baja la negrita solo con la barra; apagada, la clase de siempre", () => {
+    const antes = "text-[36px] font-bold leading-none tabular-nums";
+    expect(numeroSinNegrita(antes, "font-medium", false)).toBe(antes);
+    expect(numeroSinNegrita(antes, "font-medium", true)).toBe("text-[36px] font-medium leading-none tabular-nums");
+    expect(numeroSinNegrita("mt-1 text-2xl font-semibold tabular-nums", "font-normal", true)).toBe("mt-1 text-2xl font-normal tabular-nums");
+  });
+
+  it("v3.3: los otros números grandes de la barra pasan por numeroSinNegrita", () => {
+    expect(leer("components/ventas/celular/HojaClienteCelular.tsx").match(/numeroSinNegrita\("text-\[36px\]/g)?.length).toBe(2);
+    expect(leer("app/asistencia/AprobacionesTab.tsx")).toMatch(/numeroSinNegrita\("text-\[30px\][^)]*barra\)/);
+    expect(leer("app/asistencia/PlanillaTab.tsx")).toMatch(/numeroSinNegrita\("mt-1 text-2xl font-semibold/);
   });
 
   it("la línea corta de CxC: «N clientes · por saldo», con empresa o con el tramo", () => {
@@ -59,6 +80,8 @@ describe("el control segmentado delgado", () => {
     expect(grupo.className).toContain("h-9");
     for (const b of Array.from(grupo.querySelectorAll("button"))) {
       expect(b.className).toContain("before:-inset-y-1.5");
+      expect(b.className).toContain("font-medium");
+      expect(b.className).not.toMatch(/font-(bold|semibold)/);
       expect(b.className).toContain("whitespace-nowrap");
     }
   });

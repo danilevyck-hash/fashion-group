@@ -53,6 +53,20 @@ export function subtituloDeLaBarra(partes: ReadonlyArray<string | null | undefin
 export const TITULO_CELULAR_PX = 22;
 
 /**
+ * v3.3 (2-oct-2026). Daniel: «los números en CxC y Reclamos no sean en
+ * negrita, que no manden tanto». Un número grande va a peso 400–500, nunca
+ * negrita; apagado devuelve la clase de siempre, letra por letra.
+ */
+export function numeroSinNegrita(
+  antes: string,
+  peso: "font-normal" | "font-medium" = "font-normal",
+  interruptor: boolean = BARRA_CELULAR_2026_10,
+): string {
+  if (!interruptor) return antes;
+  return antes.replace(/(^|\s)font-(?:bold|semibold|extrabold)(?=\s|$)/, `$1${peso}`);
+}
+
+/**
  * La clase de un título grande del celular. Apagado devuelve la de siempre,
  * letra por letra; prendido baja el tamaño a 22 px y el peso a semibold, y
  * conserva lo demás (color, `truncate`, `break-words`).
