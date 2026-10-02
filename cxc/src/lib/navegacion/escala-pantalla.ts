@@ -19,11 +19,15 @@
 // lateral (catálogo público, pedidos públicos) no la llevan.
 // Candado: `src/__tests__/navegacion/escala-pantalla.test.tsx`.
 //
-// 🔴 `false` = como hoy.
+// 🔴 PRENDIDO desde el 2-oct-2026 (Daniel aprobó). `false` = como antes.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** 🔴 Todo crece en proporción con la pantalla. `false` = como hoy. */
-export const ESCALA_PANTALLA_2026_10 = false;
+/**
+ * 🔴 Todo crece en proporción con la pantalla. `false` = como antes.
+ * Daniel aprobó el 2-oct-2026 («si te parece sí»), con Nuevo gasto en la misma
+ * ventana centrada de Reclamos y Marketing.
+ */
+export const ESCALA_PANTALLA_2026_10 = true;
 
 /** La clase que activa la escala en `globals.css`. */
 export const CLASE_ESCALA_PANTALLA = "escala-pantalla";

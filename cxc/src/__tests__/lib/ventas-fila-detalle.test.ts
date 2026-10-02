@@ -85,7 +85,9 @@ describe("la fila se transforma en su propio lugar", () => {
 describe("las reglas que sostienen el diseño", () => {
   it("el alto se mide en el clic y se fija — en las DOS formas", () => {
     expect(fila).toContain("export function medirFila");
-    expect(fila).toMatch(/alto: tr \? tr\.getBoundingClientRect\(\)\.height : 0/);
+    // 2-oct-2026 (escala v3): lo medido se divide entre la escala antes de
+    // escribirlo en el estilo (`escala-raiz.ts`); sin escala divide entre 1.
+    expect(fila).toMatch(/alto: tr \? aPxDeEstilo\(tr\.getBoundingClientRect\(\)\.height\) : 0/);
     expect(fila).toMatch(/style=\{\{ height: detalle\.alto \|\| undefined \}\}/);
     // Tarjetas: el "alto de la fila" es el del renglón tocado (no hay <tr>).
     expect(fila).toContain("export function medirRenglon");

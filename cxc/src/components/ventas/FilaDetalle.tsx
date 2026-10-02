@@ -24,6 +24,7 @@ import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SlotDetalle } from "@/lib/ventas/celda";
+import { aPxDeEstilo } from "@/lib/ui/escala-raiz";
 
 export interface FilaDetalle {
   /** Fila que se transforma: id de empresa, o TOTAL_GRUPO_ID. */
@@ -55,7 +56,7 @@ export function medirFila(e: ReactMouseEvent<HTMLElement>): { alto: number; anch
   const tr = el.closest("tr");
   const cont = el.closest<HTMLElement>(".overflow-x-auto");
   return {
-    alto: tr ? tr.getBoundingClientRect().height : 0,
+    alto: tr ? aPxDeEstilo(tr.getBoundingClientRect().height) : 0,
     ancho: cont ? cont.clientWidth : 0,
   };
 }
@@ -292,5 +293,5 @@ export function FilaDetalleBloque({
  */
 export function medirRenglon(e: ReactMouseEvent<HTMLElement>): { alto: number; ancho: number } {
   const el = e.currentTarget;
-  return { alto: el.getBoundingClientRect().height, ancho: 0 };
+  return { alto: aPxDeEstilo(el.getBoundingClientRect().height), ancho: 0 };
 }

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Drawer from "@/components/Drawer";
+import VentanaCentrada from "@/components/ui/VentanaCentrada";
+import { ESCALA_PANTALLA_2026_10 } from "@/lib/navegacion/escala-pantalla";
 import { CONTENIDO_ANCHO_2026_10, DOS_COLUMNAS_2026_10 } from "@/lib/navegacion/contenido-ancho";
 import { fmt } from "@/lib/format";
 import GastoForm, { normalizeStr } from "./GastoForm";
@@ -281,8 +283,8 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
     </div>
   );
 
-  return (
-    <Drawer open={open} onClose={onClose} title="Nuevo gasto" footer={footer} ancho={DOS_COLUMNAS_2026_10} escala={CONTENIDO_ANCHO_2026_10}>
+  const contenido = (
+    <>
       <div className="skin-caja px-5 py-5">
         {error && (
           <p className="text-sm mb-4 px-3 py-2 rounded-md" style={{ color: "var(--caja-danger-onSoft)", background: "var(--caja-danger-soft)", border: "1px solid var(--caja-danger-border)" }}>
@@ -331,6 +333,23 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
           sobreDrawer
         />
       )}
+    </>
+  );
+
+  // 🔴 2-oct-2026 (`ESCALA_PANTALLA_2026_10`, Daniel: «el panel abierto de Nuevo
+  // gasto debe ser como lo hace ya el sistema en Reclamos, Marketing»): con la
+  // escala, Nuevo gasto abre en la MISMA ventana centrada que «Registrar gasto»
+  // de Marketing (`VentanaCentrada`), no en un panel pegado al borde derecho.
+  if (ESCALA_PANTALLA_2026_10) {
+    return (
+      <VentanaCentrada open={open} onClose={onClose} title="Nuevo gasto" footer={footer}>
+        {contenido}
+      </VentanaCentrada>
+    );
+  }
+  return (
+    <Drawer open={open} onClose={onClose} title="Nuevo gasto" footer={footer} ancho={DOS_COLUMNAS_2026_10} escala={CONTENIDO_ANCHO_2026_10}>
+      {contenido}
     </Drawer>
   );
 }

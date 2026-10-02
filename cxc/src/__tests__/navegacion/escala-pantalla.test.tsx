@@ -6,8 +6,8 @@
 // a todo el ancho) y «no va con el sistema» (el panel con su propia escala).
 //
 // Lo que este candado congela:
-//   1. Apagado (el valor del commit), todo queda como hoy: el contenedor común
-//      no lleva la clase.
+//   1. PRENDIDO desde el 2-oct-2026 (Daniel aprobó); apagado, el contenedor
+//      común no lleva la clase.
 //   2. Prendido, la clase sale de UN solo lugar (`SidebarAwareMain`) y la
 //      escala va a la RAÍZ: 15/14 desde 1280 px, 16/14 desde 1600, 18/14 desde
 //      1920; nada debajo de 1280 (el celular no cambia).
@@ -63,9 +63,12 @@ function escalaDesde(min: number): string {
 afterEach(() => { cleanup(); sw.prendido = false; });
 
 describe("escala de la pantalla: el interruptor", () => {
-  it("se commitea APAGADO, y las versiones anteriores también", async () => {
+  // 🔴 CAMBIÓ DE DIRECCIÓN el 2-oct-2026: nacía apagado; Daniel aprobó la v3
+  // («si te parece sí») y ahora va PRENDIDO. Las dos versiones anteriores
+  // (tablas a todo el ancho y 2 columnas) siguen APAGADAS: ese es el control al revés.
+  it("va PRENDIDO (Daniel aprobó el 2-oct-2026); las versiones anteriores siguen apagadas", async () => {
     const e = await vi.importActual<typeof import("@/lib/navegacion/escala-pantalla")>("@/lib/navegacion/escala-pantalla");
-    expect(e.ESCALA_PANTALLA_2026_10).toBe(false);
+    expect(e.ESCALA_PANTALLA_2026_10).toBe(true);
     const c = await vi.importActual<typeof import("@/lib/navegacion/contenido-ancho")>("@/lib/navegacion/contenido-ancho");
     expect(c.CONTENIDO_ANCHO_2026_10).toBe(false);
     expect(c.DOS_COLUMNAS_2026_10).toBe(false);
@@ -97,6 +100,24 @@ describe("escala de la pantalla: la regla de globals.css", () => {
       expect(previa?.[1]).toMatch(/^screen and \(min-width: (1280|1600|1920)px\)\s*$/);
       i = CSS.indexOf(".escala-pantalla", i + 1);
     }
+  });
+});
+
+describe("escala de la pantalla: Nuevo gasto abre como Reclamos y Marketing", () => {
+  // Daniel, 2-oct-2026: «el panel abierto de Nuevo gasto debe ser como lo hace
+  // ya el sistema en Reclamos, Marketing; no es así».
+  it("la ventana compartida tiene la MISMA forma que «Registrar gasto» de Marketing", async () => {
+    const { CLASE_VENTANA } = await import("@/components/ui/VentanaCentrada");
+    expect(leer("app/marketing/components/RegistrarGastoModal.tsx")).toContain(`className="${CLASE_VENTANA.replace(" flex flex-col", " overflow-y-auto")}"`);
+    const ventana = leer("components/ui/VentanaCentrada.tsx");
+    expect(ventana).toContain('className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"');
+    expect(ventana).toContain('className="absolute inset-0 bg-black/40"');
+  });
+
+  it("con la escala, Nuevo gasto usa la ventana centrada; sin ella, el panel lateral de antes", () => {
+    const nuevo = leer("app/caja/components/NuevoGastoDrawer.tsx");
+    expect(nuevo).toMatch(/if \(ESCALA_PANTALLA_2026_10\) \{\s*return \(\s*<VentanaCentrada open=\{open\} onClose=\{onClose\} title="Nuevo gasto" footer=\{footer\}>/);
+    expect(nuevo).toContain('<Drawer open={open} onClose={onClose} title="Nuevo gasto"');
   });
 });
 

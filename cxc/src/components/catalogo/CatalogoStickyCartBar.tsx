@@ -13,6 +13,7 @@ import { validarNombreCliente } from "@/lib/catalogo/nombre-cliente";
 import type { CatalogoCartItem, CatalogoProducto } from "./types";
 import { fmtPrecio } from "@/lib/catalogo/precio";
 import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
+import { aPxDeEstilo } from "@/lib/ui/escala-raiz";
 
 interface CatalogoStickyCartBarProps {
   marca: MarcaUiKey;
@@ -78,7 +79,8 @@ export default function CatalogoStickyCartBar({
   // ResizeObserver es lo único que sigue todo eso. Los hooks van antes del
   // early return de `cartCount` (reglas de hooks).
   const barraRef = useRef<HTMLDivElement | null>(null);
-  const avisarAlto = useCallback((alto: number) => { onAltoChange?.(alto); }, [onAltoChange]);
+  // Con la escala de la pantalla, lo medido se divide antes de escribirlo (`escala-raiz.ts`).
+  const avisarAlto = useCallback((alto: number) => { onAltoChange?.(aPxDeEstilo(alto)); }, [onAltoChange]);
   useEffect(() => {
     const el = barraRef.current;
     if (!el) { avisarAlto(0); return; }
