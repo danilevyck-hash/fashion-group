@@ -30,6 +30,7 @@ import { Toast } from "@/components/ui";
 import CatalogoHeader from "./CatalogoHeader";
 import CatalogoSyncNow from "@/components/shared/CatalogoSyncNow";
 import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
+import { ACCIONES_EN_EL_ENCABEZADO, CATALOGOS_APPLE_2026_10 } from "@/lib/catalogo/catalogos-2026-10";
 import CatalogoFilters from "./CatalogoFilters";
 import CatalogoProductCard from "./CatalogoProductCard";
 import CatalogoGroupedCard from "./CatalogoGroupedCard";
@@ -737,7 +738,19 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
             estado={modo.estado}
           />
         )}
-        {theme.vendorShare.enHeader ? (
+        {CATALOGOS_APPLE_2026_10 ? (
+          /* Propuesta estilo Apple: las 4 marcas igual. «hace X h» ·
+             Comprobantes · Compartir en la línea del logo; se va la fila suelta
+             del «hace X h». Mismos botones, mismos permisos. */
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4 [&>*:first-child]:mb-0">
+            <CatalogoHeader marca={marca} variant="vendor" />
+            <div data-medir="acciones-catalogo" className={ACCIONES_EN_EL_ENCABEZADO}>
+              <CatalogoSyncNow catalogo={marca} onSuccess={loadProducts} />
+              {pedidosBtn}
+              {(theme.vendorShare.enHeader || filteredCount > 0) && shareMenu}
+            </div>
+          </div>
+        ) : theme.vendorShare.enHeader ? (
           /* Layout heredado Joybees: header + [Pedidos | Compartir].
              `flex-wrap` + `justify-end`: a 390 px el logo de Tommy es ancho y
              los botones no entran en la misma línea — el grupo baja ENTERO a
@@ -781,9 +794,11 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
           onClearAll={handleClearAll}
           genderOptions={generoOptions}
           categoryOptions={categoryOptions}
+          apple={CATALOGOS_APPLE_2026_10}
         />
 
         {/* ── Sync + Share/Download row ── */}
+        {!CATALOGOS_APPLE_2026_10 && (
         <div className="flex items-center justify-between gap-2 mb-4">
           {/* "Actualizar ahora" del catálogo (solo con sesión admin/secretaria/
               vendedor — el catálogo público jamás lo ve). */}
@@ -798,6 +813,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
             </div>
           )}
         </div>
+        )}
 
         {/* ── Grid ── */}
         {loading ? skeletonGrid : filteredCount === 0 ? emptyState : productGrid}

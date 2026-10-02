@@ -118,6 +118,7 @@ import {
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import { grupoTieneOpciones, type OpcionFiltro } from "@/lib/catalogo/filtros-derivados";
 import { CATALOGO_ORDEN_CELULAR, cuantosFiltrosPuestos, textoBotonFiltros } from "@/lib/catalogo/orden-celular";
+import { clasesBarraFiltros, puestosConOrden } from "@/lib/catalogo/catalogos-2026-10";
 
 interface FiltroDesplegableProps {
   /** Nombre del grupo, tal cual se lee en el botón: "Género", "Categoría"… */
@@ -357,6 +358,9 @@ interface CatalogoFiltersProps {
    *  fail-open: quien no las calcule ve exactamente lo de antes. */
   genderOptions?: OpcionFiltro[];
   categoryOptions?: OpcionFiltro[];
+  /** Propuesta estilo Apple (`CATALOGOS_APPLE_2026_10`). Solo la pasa el
+   *  catálogo interno: el público y Administrar siguen como hoy. */
+  apple?: boolean;
 }
 
 export default function CatalogoFilters({
@@ -369,6 +373,7 @@ export default function CatalogoFilters({
   sortBy, onSortByChange,
   filteredCount, onClearAll,
   genderOptions, categoryOptions,
+  apple = false,
 }: CatalogoFiltersProps) {
   const theme = getMarcaTheme(marca)!;
   const f = theme.filtros;
@@ -409,28 +414,220 @@ export default function CatalogoFilters({
     (conPrecio && (precio.desde.trim() || precio.hasta.trim()))
   );
 
+  // Las piezas se arman UNA vez y se acomodan según el interruptor: así no
+  // se duplica ningún control (candado `catalogo-orden-celular`).
+  const puestosVisibles = apple ? puestosConOrden(filtrosPuestos, sortBy) : filtrosPuestos;
+  const buscadorPiezas = (
+    <>
+      {/* Search bar */}
+    <svg className={f.searchIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+    </svg>
+    <input
+      value={searchInput}
+      onChange={e => onSearchChange(e.target.value)}
+      placeholder={f.searchPlaceholder}
+      className={f.searchInput}
+    />
+    {searchInput && (
+      <button
+        onClick={() => onSearchChange("")}
+        className={f.searchClear}
+        aria-label="Limpiar búsqueda"
+      >
+        &times;
+      </button>
+    )}
+    </>
+  );
+  const desplegablesPiezas = (
+    <>
+    {conBultos && (
+      <button
+        onClick={() => onBultosFilterChange!(!bultosFilter)}
+        aria-pressed={bultosFilter}
+        className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
+          bultosFilter ? f.chipActive : f.chipInactive
+        }`}
+      >
+        {BULTOS_CHIP_LABEL}
+      </button>
+    )}
+
+    {conGenero && (
+      <FiltroDesplegable
+        etiqueta="Género"
+        valor={gender}
+        opciones={generoOpts}
+        onChange={onGenderChange}
+        chipActive={f.chipActive}
+        chipInactive={f.chipInactive}
+      />
+    )}
+
+    {conCategorias && (
+      <FiltroDesplegable
+        etiqueta="Categoría"
+        valor={category}
+        opciones={categoriaOpts}
+        onChange={onCategoryChange}
+        chipActive={f.chipActive}
+        chipInactive={f.chipInactive}
+      />
+    )}
+
+    </>
+  );
+  const pildorasPiezas = (
+    <>
+    {conBultos && (
+      <>
+        {/* Chip "2 bultos o más" (feature filtroBultos) — PRIMERO de la fila
+            (Daniel, 26-jul-2026): al final quedaba detrás del Género y de
+            las 7 categorías, y en móvil había que arrastrar la fila para
+            encontrarlo. "Un filtro que no se ve no existe" — y este corta
+            123 de 490 productos en Tommy, no es decorativo.
+            Dice la REGLA y no un juicio de valor sobre el inventario: la
+            card no muestra Disponibilidad ni Existencia, así que el cliente
+            no tendría cómo saber por qué desaparecieron productos. "Bulto"
+            ya es vocabulario de la card. Umbral: 2 bultos COMPLETOS
+            (Tommy = 24 pzas). */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={() => onBultosFilterChange!(!bultosFilter)}
+            aria-pressed={bultosFilter}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
+              bultosFilter ? f.chipActive : f.chipInactive
+            }`}
+          >
+            {BULTOS_CHIP_LABEL}
+          </button>
+        </div>
+
+        <div className={f.divider} />
+      </>
+    )}
+
+    {/* Gender chips */}
+    {conGenero && (
+    <div className="flex items-center gap-1.5 shrink-0">
+      <span className={f.chipLabel}>Género</span>
+      {generoOpts.map(opt => (
+        <button
+          key={opt.value}
+          onClick={() => onGenderChange(gender === opt.value ? "" : opt.value)}
+          className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
+            gender === opt.value ? f.chipActive : f.chipInactive
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+    )}
+
+    {conCategorias && (
+      <>
+        <div className={f.divider} />
+
+        {/* Category chips */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className={f.chipLabel}>Categoría</span>
+          {categoriaOpts.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => onCategoryChange(category === opt.value ? "" : opt.value)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
+                category === opt.value ? f.chipActive : f.chipInactive
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </>
+    )}
+
+    </>
+  );
+  const precioPieza = conPrecio ? (
+    <FiltroPrecioExacto
+      precio={precio}
+      onChange={onPrecioChange!}
+      precios={preciosDisponibles}
+      chipLabel={f.chipLabel}
+      chipInactive={f.chipInactive}
+    />
+  ) : null;
+  const botonFiltros = (
+    <>
+    {enCelular && (conGenero || conCategorias || conBultos || conPrecio) && (
+      <button
+        type="button"
+        onClick={() => setFiltrosAbiertos((v) => !v)}
+        aria-expanded={filtrosAbiertos}
+        className={`sm:hidden inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-full text-xs font-medium transition whitespace-nowrap ${
+          puestosVisibles > 0 || filtrosAbiertos ? f.chipActive : f.chipInactive
+        }`}
+      >
+        {textoBotonFiltros(puestosVisibles)}
+        <span aria-hidden="true">{filtrosAbiertos ? "⌄" : "›"}</span>
+      </button>
+    )}
+    </>
+  );
+  const botonLimpiar = (
+    <>
+    {hasActiveFilters && (
+      <button onClick={onClearAll} className={f.clearAll}>
+        Limpiar filtros
+      </button>
+    )}
+    </>
+  );
+  const selectOrden = (
+    <select
+      value={sortBy}
+      onChange={e => onSortByChange(e.target.value)}
+      className={f.sortSelect}
+    >
+      <option value="relevancia">Ordenar: Relevancia</option>
+      <option value="precio-asc">Precio: menor a mayor</option>
+      <option value="precio-desc">Precio: mayor a menor</option>
+      <option value="nombre-az">Nombre A-Z</option>
+    </select>
+  );
+  const cantidad = (
+    <span className={f.count}>
+      {filteredCount} {filteredCount === 1 ? "producto" : "productos"}
+    </span>
+  );
+
+  // ── PROPUESTA ESTILO APPLE (`CATALOGOS_APPLE_2026_10`, solo catálogo interno) ──
+  // Celular: buscador · [Filtros  … N productos] y adentro de «Filtros» van
+  // Género, Categoría, el precio y Ordenar. Computadora: Precio, Ordenar y la
+  // cantidad en UNA fila. Mismos controles, mismo lugar del buscador.
+  if (apple) {
+    const c = clasesBarraFiltros(filtrosAbiertos);
+    return (
+      <div className={c.contenedor}>
+        <div className={c.buscador}>{buscadorPiezas}</div>
+        <span className={c.botonFiltros}>{botonFiltros}</span>
+        <span className={c.limpiar}>{botonLimpiar}</span>
+        <span className={c.cantidad}>{cantidad}</span>
+        <div className={c.desplegables}>{desplegablesPiezas}</div>
+        <div className={c.pildoras}>{pildorasPiezas}</div>
+        {precioPieza && <div className={c.precio}>{precioPieza}</div>}
+        <div className={c.orden}>{selectOrden}</div>
+      </div>
+    );
+  }
+
   return (
     <div className={enCelular ? "flex flex-col space-y-3 mb-6 sm:block" : "space-y-3 mb-6"}>
       {/* Search bar */}
       <div className={enCelular ? "relative order-1" : "relative"}>
-        <svg className={f.searchIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-        <input
-          value={searchInput}
-          onChange={e => onSearchChange(e.target.value)}
-          placeholder={f.searchPlaceholder}
-          className={f.searchInput}
-        />
-        {searchInput && (
-          <button
-            onClick={() => onSearchChange("")}
-            className={f.searchClear}
-            aria-label="Limpiar búsqueda"
-          >
-            &times;
-          </button>
-        )}
+        {buscadorPiezas}
       </div>
 
       {/* ── CELULAR Y iPAD (hasta lg): un desplegable por grupo, fila que ENVUELVE ──
@@ -441,40 +638,7 @@ export default function CatalogoFilters({
       <div className={enCelular
         ? `${filtrosAbiertos ? "flex" : "hidden"} sm:flex lg:hidden flex-wrap items-center gap-2 order-3`
         : "flex lg:hidden flex-wrap items-center gap-2"}>
-        {conBultos && (
-          <button
-            onClick={() => onBultosFilterChange!(!bultosFilter)}
-            aria-pressed={bultosFilter}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
-              bultosFilter ? f.chipActive : f.chipInactive
-            }`}
-          >
-            {BULTOS_CHIP_LABEL}
-          </button>
-        )}
-
-        {conGenero && (
-          <FiltroDesplegable
-            etiqueta="Género"
-            valor={gender}
-            opciones={generoOpts}
-            onChange={onGenderChange}
-            chipActive={f.chipActive}
-            chipInactive={f.chipInactive}
-          />
-        )}
-
-        {conCategorias && (
-          <FiltroDesplegable
-            etiqueta="Categoría"
-            valor={category}
-            opciones={categoriaOpts}
-            onChange={onCategoryChange}
-            chipActive={f.chipActive}
-            chipInactive={f.chipInactive}
-          />
-        )}
-
+        {desplegablesPiezas}
       </div>
 
       {/* ── iPAD HORIZONTAL Y ESCRITORIO (lg+): la fila de píldoras, que ENVUELVE ──
@@ -486,74 +650,7 @@ export default function CatalogoFilters({
           `overflow-x-auto` se queda como última red por si un grupo suelto
           fuera más ancho que la pantalla entera. */}
       <div className="hidden lg:flex flex-wrap items-center gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4">
-        {conBultos && (
-          <>
-            {/* Chip "2 bultos o más" (feature filtroBultos) — PRIMERO de la fila
-                (Daniel, 26-jul-2026): al final quedaba detrás del Género y de
-                las 7 categorías, y en móvil había que arrastrar la fila para
-                encontrarlo. "Un filtro que no se ve no existe" — y este corta
-                123 de 490 productos en Tommy, no es decorativo.
-                Dice la REGLA y no un juicio de valor sobre el inventario: la
-                card no muestra Disponibilidad ni Existencia, así que el cliente
-                no tendría cómo saber por qué desaparecieron productos. "Bulto"
-                ya es vocabulario de la card. Umbral: 2 bultos COMPLETOS
-                (Tommy = 24 pzas). */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                onClick={() => onBultosFilterChange!(!bultosFilter)}
-                aria-pressed={bultosFilter}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
-                  bultosFilter ? f.chipActive : f.chipInactive
-                }`}
-              >
-                {BULTOS_CHIP_LABEL}
-              </button>
-            </div>
-
-            <div className={f.divider} />
-          </>
-        )}
-
-        {/* Gender chips */}
-        {conGenero && (
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className={f.chipLabel}>Género</span>
-          {generoOpts.map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => onGenderChange(gender === opt.value ? "" : opt.value)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
-                gender === opt.value ? f.chipActive : f.chipInactive
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-        )}
-
-        {conCategorias && (
-          <>
-            <div className={f.divider} />
-
-            {/* Category chips */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <span className={f.chipLabel}>Categoría</span>
-              {categoriaOpts.map(opt => (
-                <button
-                  key={opt.value}
-                  onClick={() => onCategoryChange(category === opt.value ? "" : opt.value)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
-                    category === opt.value ? f.chipActive : f.chipInactive
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-
+        {pildorasPiezas}
       </div>
 
       {/* ── PRECIO: dos campos, pero se escribe uno solo (ver cabecera) ──
@@ -564,13 +661,7 @@ export default function CatalogoFilters({
         <div className={enCelular
           ? `${filtrosAbiertos ? "" : "hidden"} sm:block order-4`
           : undefined}>
-          <FiltroPrecioExacto
-            precio={precio}
-            onChange={onPrecioChange!}
-            precios={preciosDisponibles}
-            chipLabel={f.chipLabel}
-            chipInactive={f.chipInactive}
-          />
+          {precioPieza}
         </div>
       )}
 
@@ -589,43 +680,16 @@ export default function CatalogoFilters({
           {/* «Filtros ›» — SOLO hasta `sm`. Abre y cierra los mismos controles
               de siempre, que siguen viviendo donde vivían: no se duplicó ni un
               desplegable. El número dice cuántos hay puestos. */}
-          {enCelular && (conGenero || conCategorias || conBultos || conPrecio) && (
-            <button
-              type="button"
-              onClick={() => setFiltrosAbiertos((v) => !v)}
-              aria-expanded={filtrosAbiertos}
-              className={`sm:hidden inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-full text-xs font-medium transition whitespace-nowrap ${
-                filtrosPuestos > 0 || filtrosAbiertos ? f.chipActive : f.chipInactive
-              }`}
-            >
-              {textoBotonFiltros(filtrosPuestos)}
-              <span aria-hidden="true">{filtrosAbiertos ? "⌄" : "›"}</span>
-            </button>
-          )}
-          {hasActiveFilters && (
-            <button onClick={onClearAll} className={f.clearAll}>
-              Limpiar filtros
-            </button>
-          )}
+          {botonFiltros}
+          {botonLimpiar}
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2 ml-auto">
-          <select
-            value={sortBy}
-            onChange={e => onSortByChange(e.target.value)}
-            className={f.sortSelect}
-          >
-            <option value="relevancia">Ordenar: Relevancia</option>
-            <option value="precio-asc">Precio: menor a mayor</option>
-            <option value="precio-desc">Precio: mayor a menor</option>
-            <option value="nombre-az">Nombre A-Z</option>
-          </select>
+          {selectOrden}
           {/* El número suelto ("490") no le decía NADA al cliente: quedaba
               pegado al select de orden como si fuera parte de él. Con la
               palabra al lado se lee solo. */}
-          <span className={f.count}>
-            {filteredCount} {filteredCount === 1 ? "producto" : "productos"}
-          </span>
+          {cantidad}
         </div>
       </div>
       </div>

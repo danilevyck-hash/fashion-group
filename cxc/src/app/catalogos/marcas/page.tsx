@@ -11,6 +11,7 @@ import { textoPulso, type PulsoDelHub, type PulsoMarca } from "@/lib/catalogo/pu
 import { CATALOGO_ADMIN_ROLES, COMPROBANTES_ROLES, catalogoRoles } from "@/lib/catalogo/roles";
 import { URL_CATALOGOS_PUBLICOS } from "@/lib/catalogo/url-catalogos-publicos";
 import { CATALOGO_ORDEN_CELULAR, clasesBotonesDeLaMarca } from "@/lib/catalogo/orden-celular";
+import { CATALOGOS_APPLE_2026_10, HUB_APPLE } from "@/lib/catalogo/catalogos-2026-10";
 
 // Catálogos en UNA pantalla: una tarjeta por marca con sus acciones adentro
 // (Ver catálogo · Comprobantes · Administrar · Copiar enlace) + contadores en
@@ -304,6 +305,47 @@ export default function CatalogosMarcasPage() {
                       para arriba manda el `flex-wrap` de siempre. La tarjeta
                       mide lo mismo (287 → 285 px): los cuatro botones YA caían
                       en dos filas, lo que se arregla es el borde. */}
+                  {CATALOGOS_APPLE_2026_10 ? (
+                    /* Propuesta estilo Apple: UNA acción principal por marca.
+                       «Ver catálogo» a lo ancho con «Copiar enlace» al lado
+                       (mismo botón, solo el ícono), y Comprobantes ·
+                       Administrar como enlaces de texto. Mismos permisos. */
+                    <div className={HUB_APPLE.contenedor}>
+                      <div className={HUB_APPLE.filaPrincipal}>
+                        <Link
+                          href={b.catalogoHref}
+                          className={`inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold transition active:scale-[0.97] ${HUB_APPLE.principal} ${hub.primaryBtn}`}
+                        >
+                          Ver catálogo
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M5 12h14M12 5l7 7-7 7" />
+                          </svg>
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => copiarEnlace(b.key)}
+                          aria-label="Copiar enlace"
+                          title="Copiar enlace"
+                          className={`${HUB_APPLE.copiar} ${hub.outlineBtn}`}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                          </svg>
+                        </button>
+                      </div>
+                      {(puedeVerComprobantes || puedeAdministrar) && (
+                        <div className={HUB_APPLE.secundarios}>
+                          {puedeVerComprobantes && (
+                            <Link href={theme.pedidosHref} className={`${HUB_APPLE.enlace} ${hub.name}`}>Comprobantes</Link>
+                          )}
+                          {puedeAdministrar && (
+                            <Link href={b.adminHref} className={`${HUB_APPLE.enlace} ${hub.name}`}>Administrar</Link>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
                   <div className={clasesBotonesDeLaMarca()}>
                     <Link
                       href={b.catalogoHref}
@@ -342,6 +384,7 @@ export default function CatalogosMarcasPage() {
                       </Link>
                     )}
                   </div>
+                  )}
                 </div>
               </div>
             );
