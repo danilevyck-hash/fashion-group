@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { VIDRIO_V2_2026_10 } from "@/lib/ui/vidrio";
 import { GeistMono } from "geist/font/mono";
 import { Playfair_Display } from "next/font/google";
 
@@ -56,7 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   // nombre; nunca el token. Detalle en `lib/sesion-semilla.ts`.
   const semilla = leerSemillaDeSesion();
   return (
-    <html lang="es" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning data-vidrio={VIDRIO_V2_2026_10 ? "v2" : undefined}>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

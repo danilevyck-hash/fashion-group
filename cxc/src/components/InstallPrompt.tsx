@@ -134,7 +134,7 @@ export default function InstallPrompt() {
   if (!seVe) return null;
 
   return (
-    <div ref={cajon} {...{ [ATRIBUTO_BARRA_FIJA]: "" }} className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pointer-events-none">
+    <div ref={cajon} {...{ [ATRIBUTO_BARRA_FIJA]: "" }} data-aviso-instalar className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pointer-events-none">
       <div className="pointer-events-auto mx-auto max-w-md rounded-xl border border-gray-200 bg-white shadow-lg p-3.5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">

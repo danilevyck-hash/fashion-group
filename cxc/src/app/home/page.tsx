@@ -13,6 +13,8 @@ import { fmtDate } from "@/lib/format";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { ESTRUCTURA_APPLE_2026_10 } from "@/lib/navegacion/estructura-2026-10";
 import MenuDelUsuario from "@/components/estructura/MenuDelUsuario";
+import AppHeader from "@/components/AppHeader";
+import { TAB_BAR_2026_10 } from "@/lib/navegacion/tab-bar";
 
 // 🔴 Estructura estilo Apple (1-oct-2026): saludo y fecha con el botón del
 // usuario; sin «Accesos frecuentes», sin modo oscuro y sin el logo grande.
@@ -127,6 +129,9 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-white">
+      {/* La barra de pestañas también en Inicio (`TAB_BAR_2026_10`): solo la
+          barra y su menú, nada del encabezado de los módulos. */}
+      {TAB_BAR_2026_10 && <AppHeader module="Inicio" soloMenuDelCelular />}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         {/* Encabezado: saludo en serif + fecha del día */}
         <div className="flex items-start justify-between gap-4 mb-6">

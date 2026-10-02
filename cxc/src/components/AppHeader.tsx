@@ -43,6 +43,8 @@ import {
   transicionDeLaBarra,
 } from "@/lib/navegacion/barra-celular";
 import { useColchonDelFlotante } from "@/lib/navegacion/useColchonDelFlotante";
+import { ALTO_TAB_BAR, MARGEN_TAB_BAR, TAB_BAR_2026_10, pestanasDelRol, rotuloDePestana } from "@/lib/navegacion/tab-bar";
+import { MoreHorizontal } from "lucide-react";
 import { useBarraCelular } from "@/lib/navegacion/useBarraCelular";
 import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
 import type { ModuleGroup } from "@/lib/modules";
@@ -202,8 +204,17 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
   // no existe (`sm:hidden`).
   // Montado SOLO como menú (el catálogo), sin ningún módulo que ofrecer no se
   // dibuja: un botón que abre una lista vacía no hace nada.
-  const hayFlotante = SIN_BARRA_ARRIBA && !soloMarca && (!soloMenuDelCelular || visibleNav.length > 0);
+  // 🔴 La barra de pestañas (`TAB_BAR_2026_10`) reemplaza al botón redondo
+  // donde el rol tiene más de un módulo; los módulos salen del MISMO menú.
+  const pestanas = TAB_BAR_2026_10 && !soloMarca ? pestanasDelRol(userRole, fgModules) : [];
+  const hayTabBar = pestanas.length > 0;
+  const hayFlotante = SIN_BARRA_ARRIBA && !soloMarca && !hayTabBar && (!soloMenuDelCelular || visibleNav.length > 0);
   useColchonDelFlotante(hayFlotante);
+  useEffect(() => {
+    if (!hayTabBar) return;
+    document.body.classList.add("fg-con-tabbar");
+    return () => document.body.classList.remove("fg-con-tabbar");
+  }, [hayTabBar]);
 
   const moduleColor = getModuleColor(pathname);
   const currentNav = ALL_MODULES.find(m => moduleColor && pathname.startsWith(m.href));
@@ -560,6 +571,43 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
+      )}
+
+      {/* ── LA BARRA DE PESTAÑAS DE iOS (`TAB_BAR_2026_10`) ──
+          4 módulos medidos del rol + «Más», que abre el MISMO menú entero.
+          Cápsula de vidrio sobre la franja de iOS; z-30 como el botón que
+          reemplaza. Se esconde sola con una acción fija abajo (globals.css). */}
+      {hayTabBar && (
+        <nav
+          data-tab-bar
+          aria-label="Módulos frecuentes"
+          className="vidrio fixed z-30 flex items-stretch rounded-full px-1 sm:hidden"
+          style={{ left: 12, right: 12, height: ALTO_TAB_BAR, bottom: `max(${MARGEN_TAB_BAR}px, env(safe-area-inset-bottom))` }}
+        >
+          {pestanas.map(m => {
+            const Icon = m.icon;
+            const aqui = m.key === moduloAqui && !drawerOpen;
+            return (
+              <button
+                key={m.key}
+                onClick={() => router.push(m.href)}
+                aria-current={aqui ? "page" : undefined}
+                className={`my-1 flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-[10px] font-medium transition active:scale-[0.97] ${aqui ? "bg-black/[0.06] text-gray-950" : "text-gray-600"}`}
+              >
+                <Icon size={22} strokeWidth={aqui ? 2 : 1.6} />
+                <span className="max-w-full truncate px-0.5">{rotuloDePestana(m)}</span>
+              </button>
+            );
+          })}
+          <button
+            onClick={() => setDrawerOpen(true)}
+            aria-label="Más módulos"
+            className={`my-1 flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-[10px] font-medium transition active:scale-[0.97] ${drawerOpen ? "bg-black/[0.06] text-gray-950" : "text-gray-600"}`}
+          >
+            <MoreHorizontal size={22} strokeWidth={1.6} />
+            <span>Más</span>
+          </button>
+        </nav>
       )}
 
       {esMenuDePantalla() && drawerOpen && (

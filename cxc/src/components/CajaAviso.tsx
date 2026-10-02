@@ -3,6 +3,7 @@
 import { useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ABAJO_DEL_FLOTANTE_CSS, DIAMETRO_FLOTANTE, MARGEN_FLOTANTE } from '@/lib/navegacion/barra-celular'
+import { TAB_BAR_2026_10 } from '@/lib/navegacion/tab-bar'
 
 export type ToastType = 'success' | 'error' | 'warning'
 
@@ -60,7 +61,12 @@ export function CajaAviso({ message, type = 'success', onDismiss, className = ''
 // (`ABAJO_DEL_FLOTANTE_CSS`) + el alto del botón: el aviso no tapa ni el ☰ ni
 // «Cobrar»/«Nuevo reclamo». En escritorio (sin ☰) queda unos 60 px arriba del
 // piso: un solo número para todas las medidas. Candado: `aviso-unico.test.tsx`.
-export const ABAJO_DE_LOS_AVISOS_CSS = `calc(${ABAJO_DEL_FLOTANTE_CSS} + ${DIAMETRO_FLOTANTE + MARGEN_FLOTANTE}px)`
+const ABAJO_DEL_BOTON_CSS = `calc(${ABAJO_DEL_FLOTANTE_CSS} + ${DIAMETRO_FLOTANTE + MARGEN_FLOTANTE}px)`
+// Con la barra de pestañas (`TAB_BAR_2026_10`) el aviso se sienta encima de ella;
+// la barra publica su alto en `--fg-alto-tab-bar` (0 cuando se esconde).
+export const ABAJO_DE_LOS_AVISOS_CSS = TAB_BAR_2026_10
+  ? `max(${ABAJO_DEL_BOTON_CSS}, calc(var(--fg-alto-tab-bar, 0px) + 8px))`
+  : ABAJO_DEL_BOTON_CSS
 export const CLASE_PILA_AVISOS = 'fixed inset-x-0 z-[100] flex flex-col items-center gap-2 px-4 pointer-events-none'
 export const ATRIBUTO_PILA_AVISOS = 'data-pila-avisos'
 

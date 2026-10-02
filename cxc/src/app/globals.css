@@ -37,6 +37,26 @@
   }
 }
 
+/* 🔴 LA BARRA DE PESTAÑAS DEL CELULAR (`TAB_BAR_2026_10`, lib/navegacion/tab-bar.ts).
+   60 px de cápsula + su separación del piso. Publica su alto en
+   `--fg-alto-tab-bar` para que los avisos se sienten encima.
+   🔑 Con una acción principal fija abajo («Guardar guía», «Nuevo reclamo»,
+   el carrito) la barra SE ESCONDE, como iOS al redactar. El aviso de instalar
+   la app no cuenta: no es la acción de la pantalla. */
+@media (max-width: 639px) {
+  body.fg-con-tabbar {
+    --fg-alto-tab-bar: calc(60px + max(8px, env(safe-area-inset-bottom)));
+    padding-bottom: calc(var(--fg-alto-tab-bar) + 8px);
+  }
+  body.fg-con-tabbar:has([data-barra-fija-abajo]:not([data-aviso-instalar])) {
+    --fg-alto-tab-bar: 0px;
+    padding-bottom: 56px;
+  }
+  body:has([data-barra-fija-abajo]:not([data-aviso-instalar])) [data-tab-bar] {
+    display: none;
+  }
+}
+
 .fg-barra-pegajosa {
   position: sticky;
   top: var(--fg-altura-encabezado);
@@ -373,5 +393,36 @@ input, button, select, textarea {
 @media screen and (min-width: 1920px) {
   html:has(.escala-pantalla) {
     --escala-pantalla: 1.2857;
+  }
+}
+
+/* 🔴 VIDRIO v2 (2-oct-2026, `VIDRIO_V2_2026_10` en src/lib/ui/vidrio.ts).
+   Daniel: «esto no es liquid glass como Apple». Más cerca del de iOS 26 sin
+   tocar ninguna pieza: solo la receta, prendida desde <html data-vidrio="v2">.
+   - fondo 40 % (era 55) con desenfoque 36 px y saturación 200 %;
+   - `contrast(.72)` en lo de atrás = la «capa interna sutil»: sube los negros
+     de una foto oscura y el texto negro no baja de 4,5:1 (medido);
+   - filo de vidrio: brillo blanco/60 arriba que se desvanece hacia abajo;
+   - sombra amplia con un leve tinte azul pizarra; radio 20 px. */
+html[data-vidrio="v2"] .vidrio {
+  background-color: rgb(255 255 255 / 0.4);
+  background-image: linear-gradient(to bottom, rgb(255 255 255 / 0.22), rgb(255 255 255 / 0) 45%);
+  -webkit-backdrop-filter: blur(36px) saturate(200%) contrast(0.72);
+  backdrop-filter: blur(36px) saturate(200%) contrast(0.72);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.6),
+    inset 1px 0 0 rgb(255 255 255 / 0.18),
+    inset -1px 0 0 rgb(255 255 255 / 0.18),
+    inset 0 -1px 0 rgb(255 255 255 / 0.06),
+    0 0 0 0.5px rgb(15 23 42 / 0.10),
+    0 24px 56px -12px rgb(15 23 42 / 0.30),
+    0 4px 12px rgb(15 23 42 / 0.08);
+}
+html[data-vidrio="v2"] .vidrio.rounded-2xl {
+  border-radius: 20px;
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html[data-vidrio="v2"] .vidrio {
+    background-color: rgb(255 255 255 / 0.95);
   }
 }
