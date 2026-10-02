@@ -147,6 +147,7 @@ import {
 } from "@/lib/asistencia/pantalla-2026-09";
 import { datosDeLaTarjeta, lineaDeDias, pieDelCelular } from "@/lib/asistencia/celular-asistencia";
 import SelectorPeriodo, { usePeriodoAsistencia } from "@/components/asistencia/SelectorPeriodo";
+import { BuscarEnLaBarra, CLASE_FILA_MENU, EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { aparatoDeQuienMira } from "@/lib/aparato";
 // 🔴 ÍCONOS DE LÍNEA, NO EMOJIS, Y EL TIEMPO EN h:mm (29-sep-2026, audit visual
 // aprobado por Daniel). El formato es una preferencia de pantalla: el Excel, el
@@ -191,6 +192,7 @@ export default function ReporteTab({ empresa = "" }: {
   empresa?: string;
 } = {}) {
   const { toast } = useToast();
+  const barra = useHayBarraCelular();
   // 🔑 EL MISMO "hoy" QUE USA EL SERVIDOR. Acá había una segunda cuenta a mano
   // (`Date.now() - 5h`), correcta pero aparte: si las dos se separaran, la
   // pantalla podría pedir hasta un día y el servidor marcar como "en curso"
@@ -653,7 +655,30 @@ export default function ReporteTab({ empresa = "" }: {
       {ASISTENCIA_PANTALLA_2026_09 ? (
         <>
           <div ref={mandosRef} className="flex flex-wrap items-center gap-2">
-            <SelectorPeriodo desde={desde} hasta={hasta} hoy={hoy} onElegir={elegirPeriodo} />
+            {/* 🔴 En el celular con la barra nueva, el período vive arriba y
+                «Descargar» en el «···» (2-oct-2026). Mismas funciones. */}
+            {barra ? (
+              <EnLaBarra
+                pestana={["asistencia", "reporte"]}
+                iconos={
+                  <>
+                    <BuscarEnLaBarra valor={q} onCambiar={setQ} placeholder={PLACEHOLDER_COLABORADOR} etiqueta="Buscar colaborador" />
+                  </>
+                }
+                menu={
+                  <>
+                    <button type="button" disabled={!visibles?.length} onClick={() => void bajarExcel()} className={CLASE_FILA_MENU}>
+                      {DESCARGAR} {rotuloDescarga("Excel", visibles?.length ?? 0, soloARevisar)}
+                    </button>
+                    <button type="button" disabled={!visibles?.length} onClick={() => void bajarPdf()} className={CLASE_FILA_MENU}>
+                      {DESCARGAR} {rotuloDescarga("PDF", visibles?.length ?? 0, soloARevisar)}
+                    </button>
+                  </>
+                }
+              />
+            ) : (
+              <SelectorPeriodo desde={desde} hasta={hasta} hoy={hoy} onElegir={elegirPeriodo} />
+            )}
 
             {/* 🔴 EL BUSCADOR, ABIERTO (29-sep-2026). Daniel: *«buscar con la
                 barra abierta si hay espacio, como en los otros módulos»*. 🩸 Era
@@ -661,7 +686,7 @@ export default function ReporteTab({ empresa = "" }: {
                 Ahora es el campo con borde y la lupa adentro, igual que en
                 Préstamos y Cuentas por Cobrar; en el celular baja a su propio
                 renglón. Sigue filtrando contra el SERVIDOR, como siempre. */}
-            <div className="relative min-w-[180px] flex-1 sm:max-w-xs">
+            <div className={barra ? "hidden" : "relative min-w-[180px] flex-1 sm:max-w-xs"}>
               <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
                 type="search" value={q} onChange={(e) => setQ(e.target.value)}
@@ -676,7 +701,7 @@ export default function ReporteTab({ empresa = "" }: {
                 «⇧» de solo ícono: una flecha hacia ARRIBA para bajar dos
                 archivos. Ahora dice lo que hace y abre el mismo menú de siempre
                 con Excel y PDF, que siguen diciendo a cuántos afectan. */}
-            <div className="relative">
+            <div className={barra ? "hidden" : "relative"}>
               <button
                 type="button"
                 onClick={() => setDescargasAbiertas((v) => !v)}

@@ -52,6 +52,7 @@ import {
 } from "@/lib/multifashion/celular";
 import { useVentaHoy } from "@/lib/multifashion/venta-hoy-cliente";
 import type { Multifashion } from "@/components/ventas/types";
+import { tituloCelular } from "@/lib/navegacion/barra-controles-celular";
 
 // Fetcher puro del overview por año. SWR lo cachea por año → volver a un año ya
 // visto pinta al instante y revalida en background.
@@ -274,7 +275,7 @@ export function MultifashionShell({
               </button>
             )}
           </div>
-          <p data-celular="titulo" className="text-3xl font-bold leading-tight tracking-tight text-gray-950">
+          <p data-celular="titulo" className={tituloCelular("text-3xl font-bold leading-tight tracking-tight text-gray-950")}>
             {encabezado.titulo}
           </p>
           {subtituloCel && (

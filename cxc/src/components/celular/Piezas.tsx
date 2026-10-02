@@ -16,6 +16,8 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { COLCHON_LATERAL_FLOTANTE } from "@/lib/navegacion/barra-celular";
+import { EnLaBarra, useHayBarraCelular } from "./BarraDeControles";
+import { tituloCelular } from "@/lib/navegacion/barra-controles-celular";
 import { CLASE_VIDRIO, RADIO_VIDRIO, conVidrio } from "@/lib/ui/vidrio";
 
 /** El lienzo: fondo de iOS y sitio para el botón flotante. */
@@ -28,15 +30,37 @@ export function TituloCel({
   titulo,
   detalle,
   accion,
+  enLaBarra = false,
+  detalleEnLaBarra,
 }: {
   titulo: string;
   detalle?: ReactNode;
   accion?: ReactNode;
+  /**
+   * 🔴 Portada de una pestaña (2-oct-2026): con la barra del celular prendida,
+   * el título ya lo dice la barra; aquí queda solo la línea gris y el «···»
+   * sube a la fila del período. Apagada, todo igual.
+   */
+  enLaBarra?: boolean;
+  /** La línea gris cuando la barra ya dice el período (sin repetirlo). */
+  detalleEnLaBarra?: ReactNode;
 }) {
+  const hayBarra = useHayBarraCelular();
+  if (enLaBarra && hayBarra) {
+    if (detalleEnLaBarra !== undefined) detalle = detalleEnLaBarra;
+    return (
+      <>
+        {accion && <EnLaBarra iconos={accion} />}
+        {detalle != null && detalle !== "" && (
+          <p className="px-4 pt-1 text-[14px] text-gray-500 tabular-nums">{detalle}</p>
+        )}
+      </>
+    );
+  }
   return (
     <div className="flex items-start justify-between gap-3 px-4 pt-2">
       <div className="min-w-0">
-        <h1 className="text-[30px] font-bold leading-tight tracking-tight text-gray-900 break-words">
+        <h1 className={tituloCelular("text-[30px] font-bold leading-tight tracking-tight text-gray-900 break-words")}>
           {titulo}
         </h1>
         {detalle != null && detalle !== "" && (

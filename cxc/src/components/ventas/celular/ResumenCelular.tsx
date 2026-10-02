@@ -149,6 +149,8 @@ export function ResumenCelular({
   return (
     <PantallaVentas>
       <TituloVentas
+        enLaBarra
+        detalleEnLaBarra={data.fecha_corte ? `Datos al ${diaCorto(data.fecha_corte)}` : ""}
         titulo="Ventas"
         detalle={`Año ${selectedYear}${data.fecha_corte ? ` · al ${diaCorto(data.fecha_corte)}` : ""}`}
         accion={accion}

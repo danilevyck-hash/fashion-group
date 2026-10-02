@@ -126,6 +126,8 @@ import {
   queLeFalta,
 } from "@/lib/asistencia/que-le-falta";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { BuscarEnLaBarra, CLASE_SEGMENTADO_BARRA, EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { puedeCerrar } from "@/lib/asistencia/roles";
 import { textoConfirmar, textoIgnorados } from "@/lib/asistencia/codigos-ignorados";
 // 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
@@ -401,6 +403,8 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
   personaEnElCentro?: boolean;
 } = {}) {
   const { toast } = useToast();
+  const barra = useHayBarraCelular();
+  const router = useRouter();
   // 🔑 El rol sale de `sessionStorage`, igual que en `AppHeader` y en
   // `PlanillaTab`. Solo decide si se DIBUJAN el cargo y la cédula: el freno de
   // verdad está en el PUT, que no los escribe para quien no puede.
@@ -1102,7 +1106,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
           {/* ── 1. COLABORADORES (era «Personas» hasta el 10-sep-2026) ──────────────────────────────────────────────── */}
           <Seccion
             titulo="Colaboradores"
-            resumen={fraseDeLaLista(activos.length, pendientes, conteo.completar)}
+            resumen={barra && personaEnElCentro ? "" : fraseDeLaLista(activos.length, pendientes, conteo.completar)}
             alerta={pendientes > 0}
             abierta={!!seccion.personas}
             sinTarjeta={ASISTENCIA_PANTALLA_2026_09 && personaEnElCentro}
@@ -1111,7 +1115,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
             {/* Cómo se llena la lista se aprende una vez: al ⓘ. Lo que sí pide
                 acción —cuántas fichas faltan, quién sigue marcando después de
                 irse— se queda en pantalla, abajo. */}
-            <div className="-ml-2 -mt-1">
+            <div className={barra && personaEnElCentro ? "hidden" : "-ml-2 -mt-1"}>
               <Ayuda titulo="Cómo se llena esta lista" etiqueta="Cómo se llena">
                 <p>
                   El reloj solo manda un número por colaborador. Aquí le pones nombre, sueldo y
@@ -1180,7 +1184,49 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                 los dos botones NEGROS —«Todos (44)», que es un filtro, y
                 «+ Nuevo colaborador», que es una acción— ocupaban un renglón
                 entero cada uno. */}
-            <div className={ASISTENCIA_PANTALLA_2026_09 ? "flex flex-wrap items-center gap-2" : "flex flex-wrap gap-2"}>
+            {/* 🔴 En el celular con la barra nueva (2-oct-2026): el buscador a
+                todo el ancho y «+ Nuevo colaborador» fijo abajo (la MISMA ruta). */}
+            {barra && personaEnElCentro && (
+              <EnLaBarra
+                pestana="colaboradores"
+                menu={
+                  <div className="rounded-md border border-gray-200 bg-white p-3 text-[14px] text-gray-700">
+                    <p className="mb-1 font-medium text-gray-900">Cómo se llena esta lista</p>
+                    El reloj solo manda un número por colaborador. Aquí le pones nombre, sueldo y a qué empresa
+                    pertenece —eso separa la planilla de cada empresa, que comparten el mismo reloj—. Se guarda solo
+                    apenas cambias algo.
+                  </div>
+                }
+                filaIzq={
+                  <ControlSegmentado
+                    ancho="contenido"
+                    ariaLabel="Filtrar la lista"
+                    className={CLASE_SEGMENTADO_BARRA}
+                    active={filtro === "para-pagar" || filtro === "completar" ? filtro : "todos"}
+                    onChange={(v) => setFiltro(v)}
+                    options={[
+                      { value: "todos", label: `Todos ${activos.length}` },
+                      ...(conteo.paraPagar > 0
+                        ? [{ value: "para-pagar", label: `${CHIP_PARA_PAGAR} ${conteo.paraPagar}` }]
+                        : []),
+                      ...(conteo.completar > 0
+                        ? [{ value: "completar", label: `${CHIP_COMPLETAR} ${conteo.completar}` }]
+                        : []),
+                    ]}
+                  />
+                }
+                iconos={
+                  <BuscarEnLaBarra
+                    valor={busqueda}
+                    onCambiar={setBusqueda}
+                    placeholder={PLACEHOLDER_COLABORADOR}
+                    etiqueta="Buscar colaborador por nombre o código"
+                  />
+                }
+                accion={puedeTocarLaFicha ? { rotulo: "+ Nuevo colaborador", onClick: () => router.push(RUTA_PERSONA_NUEVA) } : null}
+              />
+            )}
+            <div className={barra && personaEnElCentro ? "hidden" : ASISTENCIA_PANTALLA_2026_09 ? "flex flex-wrap items-center gap-2" : "flex flex-wrap gap-2"}>
               {ASISTENCIA_PANTALLA_2026_09 && (
                 <BuscadorDeLista
                   valor={busqueda}
@@ -1218,7 +1264,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
             {/* 🔴 DAR DE ALTA A ALGUIEN ABRE DIRECTO EN EDITAR. Mostrarle una
                 ficha vacía en modo texto y pedirle además que toque «Editar»
                 es un paso de más para decir lo que la pantalla ya sabe. */}
-              {ASISTENCIA_PANTALLA_2026_09 && personaEnElCentro && puedeTocarLaFicha && (
+              {ASISTENCIA_PANTALLA_2026_09 && personaEnElCentro && puedeTocarLaFicha && !barra && (
                 <Link href={RUTA_PERSONA_NUEVA}
                   className="ml-auto inline-flex min-h-[44px] items-center rounded-md bg-black px-3 text-sm text-white transition active:scale-[0.97]">
                   + Nuevo colaborador
@@ -1995,7 +2041,7 @@ function Seccion({
     return (
       <section className="space-y-3">
         <h2 className="sr-only">{titulo}</h2>
-        <p className={`text-[12px] ${alerta ? "text-amber-700" : "text-gray-500"}`}>{resumen}</p>
+        {resumen && <p className={`text-[12px] ${alerta ? "text-amber-700" : "text-gray-500"}`}>{resumen}</p>}
         {children}
       </section>
     );

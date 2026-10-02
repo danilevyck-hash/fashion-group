@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
+import { useBarraCelular } from "@/components/celular/BarraDeControles";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { ComisionesView } from "@/components/comisiones/ComisionesView";
 
@@ -23,15 +24,21 @@ export function ComisionesPageClient({
   // multifashion · config) se resuelve a su vista nueva en `vistas.ts`. Ningún
   // enlace se rompe; nada se escribe de vuelta en la URL.
   const vistaPedida = useSearchParams().get("tab");
+  // 🔴 LA BARRA DEL CELULAR (2-oct-2026, `BARRA_CELULAR_2026_10`): la portada del
+  // celular ya trae su título con el «···» y el período en una fila; lo único
+  // que sobraba era el «Comisiones» del encabezado, dicho DOS veces, y el
+  // margen que dejaba la portada como una tarjeta dentro de otra.
+  const barra = useBarraCelular();
   if (!authChecked) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <AppHeader module="Comisiones" />
+      <AppHeader module="Comisiones" tituloEnLaPantalla={barra} />
       {/* Sin título grande: "Comisiones" ya lo dicen el header sticky (móvil) y
           el breadcrumb (escritorio) — repetirlo costaba 44px de la primera
           pantalla del iPhone. Mismo criterio que el encabezado de CXC. */}
       <main className="mx-auto w-full max-w-[1280px] px-4 pb-8 pt-2 md:px-7 md:pt-3">
+        <div className={barra ? "-mx-4 -mt-2" : undefined}>
         {/* El ⚙ de Configuración (solo admin) vive AQUÍ, en el módulo
             Comisiones, no en la pestaña Comisiones de Ventas. */}
         {/* `conMultifashion`: Multifashion es una opción más del selector y
@@ -44,6 +51,7 @@ export function ComisionesPageClient({
           conMultifashion
           vistaPedida={vistaPedida}
         />
+        </div>
       </main>
     </div>
   );

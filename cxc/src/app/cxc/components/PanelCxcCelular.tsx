@@ -36,6 +36,7 @@ import {
   loQueUrge,
   montoExacto,
   ordenDelCelular,
+  subtituloCompacto,
   subtituloDeLaPortada,
   totalDeLaPortada,
   tramoDominante,
@@ -44,6 +45,10 @@ import {
 import type { ClaveDescarga } from "@/lib/cxc/descargas";
 import type { FormatoDescarga } from "../hooks/useDescargasCartera";
 import { HojaElegirEmpresa, HojaPorEmpresa, HojaMasOpciones } from "./HojasCxcCelular";
+import { tituloCelular, usaBarraCelular } from "@/lib/navegacion/barra-controles-celular";
+import { ChevronDown, MoreHorizontal, Search } from "lucide-react";
+import { CLASE_TITULO_BARRA, IconoBarra } from "@/components/celular/BarraDeControles";
+import { CLASE_LINEA_TOTAL, CLASE_TOTAL_CELULAR, SegmentadoCelular } from "@/components/celular/CabeceraCompacta";
 
 /** El color de la rayita de la izquierda, por tramo dominante. */
 const RAYA: Record<AgingKey, string> = {
@@ -97,6 +102,10 @@ export default function PanelCxcCelular({
   onBoston,
 }: PanelCxcCelularProps) {
   const [hoja, setHoja] = useState<"empresa" | "porEmpresa" | "mas" | null>(null);
+  // v3.2: la cabecera compacta (tres renglones) vive detrás de la barra nueva.
+  const compacta = usaBarraCelular(true);
+  const [buscando, setBuscando] = useState(false);
+  const puedeElegirEmpresa = !empresaRestriction && cxcCompanies.length > 1;
 
   // Los totales de la tira: EXACTAMENTE los mismos que la computadora, sobre el
   // mismo universo (`roleClients` = `kpiClients`). Acá solo se suman.
@@ -121,6 +130,49 @@ export default function PanelCxcCelular({
 
   return (
     <div className="lg:hidden min-h-screen bg-[#F2F2F7] pb-10">
+      {compacta ? (
+        <div data-cabecera-cxc-v32 className="px-4">
+          {/* 1 · «Cuentas por cobrar ▾» (elige empresa) · Boston · 🔍 · «···» */}
+          <div className="relative flex h-11 min-w-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={() => { if (puedeElegirEmpresa) setHoja("empresa"); }}
+              disabled={!puedeElegirEmpresa}
+              className={`flex min-h-[44px] min-w-0 flex-1 items-center gap-1 text-left active:opacity-60 disabled:opacity-100 ${CLASE_TITULO_BARRA}`}
+            >
+              <span className="truncate">Cuentas por cobrar</span>
+              {puedeElegirEmpresa && <ChevronDown className="h-5 w-5 shrink-0 text-gray-400" aria-hidden />}
+            </button>
+            <IconoBarra etiqueta="Buscar cliente" onClick={() => setBuscando(true)}>
+              <Search className="h-5 w-5" strokeWidth={2} aria-hidden />
+            </IconoBarra>
+            <IconoBarra etiqueta="Más opciones" onClick={() => setHoja("mas")}>
+              <MoreHorizontal className="h-5 w-5" strokeWidth={2} aria-hidden />
+            </IconoBarra>
+          </div>
+          <AvisoRechazosSwitch texto={avisoMontos} />
+          {/* 2 · el total a 36 px; tocarlo abre la cartera por empresa */}
+          <button type="button" onClick={() => setHoja("porEmpresa")} className="block w-full pt-1 text-left active:opacity-60">
+            <span className={CLASE_TOTAL_CELULAR}>{montoExacto(totalDeLaPortada(totals, riskFilter))}</span>
+          </button>
+          <span className={CLASE_LINEA_TOTAL}>
+            {subtituloCompacto({ cuantos: lista.length, risk: riskFilter, unaEmpresa: empresaElegida })}
+          </span>
+          {/* 3 · los tres tramos, delgados; tocar el prendido lo apaga (como hoy) */}
+          <div className="pt-3">
+            <SegmentadoCelular
+              etiqueta="Tramos de antigüedad"
+              activa={riskFilter === "all" ? null : riskFilter}
+              onElegir={(k) => setRiskFilter(k)}
+              opciones={AGING_ORDER.map((k) => ({
+                clave: k,
+                rojo: k === "overdue",
+                rotulo: `${formatCompactCurrency(k === "current" ? totals.current : k === "watch" ? totals.watch : totals.overdue)} · ${chipCorto(k)}`,
+              }))}
+            />
+          </div>
+        </div>
+      ) : (<>
       {/* ── La barra: Boston a la derecha, y el «···» con lo que no es de todos
           los días (actualizar y las dos descargas). ─────────────────────── */}
       <div className="flex items-center justify-end gap-1 px-2 pt-1">
@@ -147,7 +199,7 @@ export default function PanelCxcCelular({
 
       {/* ── Título grande + la empresa que se mira ────────────────────────── */}
       <div className="px-4">
-        <h1 className="text-[32px] font-bold leading-tight tracking-tight text-gray-900">
+        <h1 className={tituloCelular("text-[32px] font-bold leading-tight tracking-tight text-gray-900")}>
           Cuentas por cobrar
         </h1>
         <button
@@ -228,7 +280,10 @@ export default function PanelCxcCelular({
         })}
       </div>
 
+      </>)}
+
       {/* ── Buscar ────────────────────────────────────────────────────────── */}
+      {(!compacta || buscando || search !== "") && (
       <div className="px-4 pt-3">
         <input
           type="search"
@@ -238,8 +293,11 @@ export default function PanelCxcCelular({
           placeholder="Buscar cliente"
           aria-label="Buscar cliente"
           className="w-full rounded-xl border border-transparent bg-[#E9E9EB] px-4 py-3 text-[16px] text-gray-900 placeholder:text-gray-500 focus:border-gray-400 focus:outline-none"
+          autoFocus={compacta && buscando && search === ""}
+          onBlur={() => { if (search === "") setBuscando(false); }}
         />
       </div>
+      )}
 
       {/* ── La lista ──────────────────────────────────────────────────────── */}
       {lista.length === 0 ? (
@@ -296,6 +354,7 @@ export default function PanelCxcCelular({
           onDescargar={(clave, formato) => { setHoja(null); onDescargar(clave, formato); }}
           onSyncedNow={onSyncedNow}
           onCerrar={() => setHoja(null)}
+          onBoston={compacta ? onBoston : null}
         />
       )}
     </div>

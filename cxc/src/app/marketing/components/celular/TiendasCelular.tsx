@@ -47,6 +47,7 @@ import {
   VacioCelular,
 } from "./PiezasCelular";
 import ChipsDePeriodoCelular from "./ChipsDePeriodoCelular";
+import { BARRA_CELULAR_2026_10 } from "@/lib/navegacion/barra-controles-celular";
 
 interface Props {
   /** Las filas YA filtradas por período (las mismas de la computadora). */
@@ -80,7 +81,7 @@ export default function TiendasCelular({
     <PantallaCelular>
       <TituloCelular
         titulo="Marketing"
-        detalle={textoDelPieDeTiendas(periodo, chips, filas.length)}
+        detalle={BARRA_CELULAR_2026_10 ? undefined : textoDelPieDeTiendas(periodo, chips, filas.length)}
         accion={
           escribe ? (
             <button
@@ -95,7 +96,11 @@ export default function TiendasCelular({
         }
       />
 
-      <NumeroGrande valor={montoCelular(total)} />
+      {/* v3.2: la línea gris va DEBAJO del total, en un renglón. */}
+      <NumeroGrande
+        valor={montoCelular(total)}
+        detalle={BARRA_CELULAR_2026_10 ? textoDelPieDeTiendas(periodo, chips, filas.length) : undefined}
+      />
 
       {chips.length > 0 && (
         <ChipsDePeriodoCelular chips={chips} elegido={periodo} onElegir={onPeriodo} etiqueta="Seleccionar período" />

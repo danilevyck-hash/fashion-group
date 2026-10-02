@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
+import { BarraDeControles, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, PullToRefresh } from "@/components/ui";
 import { useGuiasState } from "./components/useGuiasState";
@@ -104,6 +105,9 @@ export default function GuiasPage() {
   });
 
   const s = useGuiasState();
+  // 🔴 LA BARRA DEL CELULAR (2-oct-2026, `BARRA_CELULAR_2026_10`). Apagada o en
+  // la computadora, la lista queda como estaba.
+  const barra = useBarraCelular();
   // `D-XXX` → nombre, para que el chip de cada línea diga de quién se trata.
   // Comparte el caché del selector: si ya se abrió un ClientePicker, no hay red.
   const nombresPorCodigo = useNombresDeClientes(authChecked);
@@ -212,11 +216,20 @@ export default function GuiasPage() {
   return (
     <PullToRefresh onRefresh={s.loadGuias}>
       <div>
-        <AppHeader module="Guías de despacho" />
+        <AppHeader module="Guías de despacho" tituloEnLaPantalla={barra} />
+        <ProveedorBarraCelular activo={barra} activa={vista}>
+        {barra && (
+          <BarraDeControles
+            titulo="Guías"
+            pestanas={pestanas.map(([value, label]) => ({ value, label }))}
+            activa={vista}
+            onPestana={(v) => cambiarVista(v as Vista)}
+          />
+        )}
         {/* La fila de pestañas solo existe para quien puede configurar
             (admin y secretaria): para bodega y vendedor la pantalla es
             exactamente la de siempre, sin una fila extra. */}
-        {pestanas.length > 1 && (
+        {!barra && pestanas.length > 1 && (
           <div className="max-w-3xl mx-auto px-4 pt-3">
             <div className="flex items-center gap-1 border-b border-gray-200 overflow-x-auto">
               {pestanas.map(([v, label]) => (
@@ -294,6 +307,7 @@ export default function GuiasPage() {
         <Toast message={s.toast} />
         </>
         )}
+        </ProveedorBarraCelular>
       </div>
     </PullToRefresh>
   );

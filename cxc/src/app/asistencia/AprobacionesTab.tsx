@@ -44,6 +44,7 @@ import RangoFechas, { ultimoRango } from "@/components/ui/RangoFechas";
 // Asistencia no lo cambiaba acá, y al revés. Ahora es la misma clave de la
 // dirección y la misma memoria que las otras tres pestañas.
 import SelectorPeriodo, { usePeriodoAsistencia } from "@/components/asistencia/SelectorPeriodo";
+import { BuscarEnLaBarra, CLASE_FILA_MENU, CLASE_SEGMENTADO_BARRA, EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { ASISTENCIA_PANTALLA_2026_09 } from "@/lib/asistencia/pantalla-2026-09";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
@@ -108,6 +109,7 @@ export default function AprobacionesTab({ empresa = "" }: {
   empresa?: string;
 } = {}) {
   const { toast } = useToast();
+  const barra = useHayBarraCelular();
 
   const hoy = useMemo(
     () => new Date(Date.now() - 5 * 3_600_000).toISOString().slice(0, 10),
@@ -319,6 +321,51 @@ export default function AprobacionesTab({ empresa = "" }: {
           el número grande («5 por decidir · 10:36 h») quedaba metido ENTRE los
           botones en vez de encabezar la lista.
           ══════════════════════════════════════════════════════════════════ */}
+      {/* 🔴 EN EL CELULAR, LA BARRA DEL MÓDULO (2-oct-2026): el período ya
+          está arriba; «Colaborador | Día» y Excel van al «···»; el buscador a
+          todo el ancho y «Aprobar pendientes» fijo abajo. Los botones son LOS
+          MISMOS de la fila de la computadora: misma función, mismo envío. */}
+      {barra ? (
+        // 🔴 v2 «como Apple»: la lupa y la descarga son íconos de la barra
+        // (lo frecuente, a la vista); «Colaborador | Día» va junto al contador
+        // y «Aprobar pendientes» fijo abajo. Mismas funciones de siempre.
+        <EnLaBarra
+          pestana="aprobaciones"
+          iconos={
+            <>
+              {vista === "colaborador" && (
+                <BuscarEnLaBarra
+                  valor={busqueda}
+                  onCambiar={setBusqueda}
+                  placeholder={PLACEHOLDER_COLABORADOR}
+                  etiqueta="Buscar colaborador por nombre o código"
+                />
+              )}
+            </>
+          }
+          filaIzq={
+            <ControlSegmentado
+              ancho="contenido"
+              ariaLabel="Ver por"
+              className={CLASE_SEGMENTADO_BARRA}
+              options={VISTAS.map((v) => ({ value: v.key, label: v.etiqueta }))}
+              active={vista}
+              onChange={cambiarVista}
+            />
+          }
+          menu={
+            // 🔴 v3.1: descargar es ocasional → al «···» (Daniel, 2-oct-2026).
+            <button type="button" disabled={!dias || dias.length === 0} onClick={() => void bajarExcel()} className={CLASE_FILA_MENU}>
+              Descargar Excel
+            </button>
+          }
+          accion={{
+            rotulo: rotuloLote,
+            disabled: bloqueado || pendientes.length === 0,
+            onClick: () => void decidir(pendientes, "si"),
+          }}
+        />
+      ) : (
       <div className="mb-4 flex flex-wrap items-center gap-3">
         {ASISTENCIA_PANTALLA_2026_09 ? (
           <SelectorPeriodo desde={desde} hasta={hasta} hoy={compartido.hoy} onElegir={compartido.elegir} />
@@ -370,6 +417,7 @@ export default function AprobacionesTab({ empresa = "" }: {
           {rotuloLote}
         </button>
       </div>
+      )}
 
       {avisoMigracion && (
         <Aviso
@@ -449,6 +497,7 @@ export default function AprobacionesTab({ empresa = "" }: {
               </>
             )}
           </div>
+
         </div>
       )}
 

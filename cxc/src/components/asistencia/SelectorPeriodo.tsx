@@ -115,8 +115,15 @@ export function usePeriodoAsistencia(): {
   return { desde: elegido.desde, hasta: elegido.hasta, hoy, elegir };
 }
 
+/**
+ * Barra del celular v3.1: el período mide 36 px como los demás controles y se
+ * toca en 44 (franja invisible arriba y abajo). Aplica a las flechas y al 📅.
+ */
+const ALTO_EN_LA_BARRA =
+  "[&_button]:relative [&_button]:!h-9 [&_button]:!min-h-0 [&_button]:before:absolute [&_button]:before:inset-x-0 [&_button]:before:-inset-y-1 [&_button]:before:content-['']";
+
 export default function SelectorPeriodo({
-  desde, hasta, hoy, onElegir, conCalendario = true, className = "",
+  desde, hasta, hoy, onElegir, conCalendario = true, className = "", anchoCompleto = false,
 }: {
   desde: string;
   hasta: string;
@@ -125,6 +132,8 @@ export default function SelectorPeriodo({
   /** `false` en la Planilla: ahí solo se pagan quincenas, nunca un rango libre. */
   conCalendario?: boolean;
   className?: string;
+  /** Barra del celular v3: el período a todo el ancho, con la letra de la barra (13 px). */
+  anchoCompleto?: boolean;
 }) {
   const puedeAdelante = haySiguienteQuincena(desde, hoy);
   const ir = (d: -1 | 1) => {
@@ -132,8 +141,8 @@ export default function SelectorPeriodo({
     onElegir(p.desde, p.hasta);
   };
   return (
-    <div className={`flex shrink-0 items-center gap-2 ${className}`}>
-      <div className="flex items-center rounded-md border border-gray-300 bg-white">
+    <div className={`flex shrink-0 items-center gap-2 ${anchoCompleto ? `min-h-11 min-w-0 flex-[1_1_200px] ${ALTO_EN_LA_BARRA}` : ""} ${className}`}>
+      <div className={`flex items-center rounded-md border border-gray-300 bg-white ${anchoCompleto ? "h-9 flex-1 justify-between" : ""}`}>
         <button
           type="button"
           onClick={() => ir(-1)}
@@ -142,7 +151,7 @@ export default function SelectorPeriodo({
         >
           ‹
         </button>
-        <span className="min-w-[132px] px-1 text-center text-sm font-medium tabular-nums text-gray-900">
+        <span className={`min-w-[132px] px-1 text-center font-medium tabular-nums text-gray-900 ${anchoCompleto ? "flex-1 text-[13px]" : "text-sm"}`}>
           {rotuloDelPeriodo(desde, hasta)}
         </span>
         <button

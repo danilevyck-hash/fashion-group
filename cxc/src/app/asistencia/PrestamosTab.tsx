@@ -52,6 +52,7 @@ import { quincenasHasta } from "@/lib/asistencia/planilla";
 import { PARAM_NUEVO_PRESTAMO, enlaceAPrestamos } from "@/lib/prestamos-una-puerta";
 import type { Colaborador, DatosPrestamos } from "@/lib/prestamos-lista-server";
 import { VacioDeBusqueda } from "@/components/BuscadorDeLista";
+import { BuscarEnLaBarra, CLASE_FILA_MENU, CLASE_SEGMENTADO_BARRA, EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { Download, Search } from "lucide-react";
 import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
 import {
@@ -123,13 +124,31 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
   // Mismo nivel → `replace` (default): el Atrás del navegador no cicla por vistas.
   const [subUrl, setSub] = useUrlState(PARAM_VISTA, "");
   const vista = vistaDePrestamos(subUrl);
+  const barra = useHayBarraCelular();
 
   return (
-    <div className="space-y-4">
+    <div className={barra ? "space-y-3" : "space-y-4"}>
       {/* 🔴 ELEGIR UNA VISTA NO ES UNA ACCIÓN (29-sep-2026, audit visual que
           aprobó Daniel): eran dos botones, uno negro relleno, y el negro se
           reserva para lo que HACE algo («+ Nuevo préstamo»). Ahora es el mismo
           segmentado gris de Ventas, a lo ancho de su contenido. */}
+      {/* 🔴 v3.1: en el celular nuevo el segmentado va al renglón 3 de la barra,
+          con el alto de todos los segmentados (36 px, se toca en 44). */}
+      {barra ? (
+        <EnLaBarra
+          pestana="prestamos"
+          filaIzq={
+            <ControlSegmentado
+              ancho="contenido"
+              ariaLabel="Vista de Préstamos"
+              className={CLASE_SEGMENTADO_BARRA}
+              options={VISTAS_PRESTAMOS.map(([value, label]) => ({ value, label }))}
+              active={vista}
+              onChange={setSub}
+            />
+          }
+        />
+      ) : (
       <ControlSegmentado
         ancho="contenido"
         ariaLabel="Vista de Préstamos"
@@ -137,6 +156,7 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
         active={vista}
         onChange={setSub}
       />
+      )}
 
       {vista === VISTA_MOVIMIENTOS
         ? <MovimientosQuincenaTab empresa={props.empresa} />
@@ -147,6 +167,7 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
 
 function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string } = {}) {
   const { toast } = useToast();
+  const barra = useHayBarraCelular();
   // 🔑 Sin período dado, la quincena EN CURSO — y el «hoy» es el de PANAMÁ, no
   // el del navegador. Solo decide la columna «esta quincena»: el SALDO es
   // histórico y no se recorta por fecha.
@@ -298,7 +319,29 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
     setDescargando(false);
   }
 
-  const botonNuevo = puedeAnotar && (
+  // 🔴 En el celular con la barra nueva (2-oct-2026): «Descargar» va al «···»
+  // y «+ Nuevo préstamo» fijo abajo. Las MISMAS funciones de la computadora.
+  const botonNuevo = puedeAnotar && (barra ? (
+    <EnLaBarra
+      pestana="prestamos"
+      iconos={
+        <>
+          <BuscarEnLaBarra valor={busqueda} onCambiar={setBusqueda} placeholder={PLACEHOLDER_COLABORADOR} etiqueta="Buscar colaborador por nombre o código" />
+        </>
+      }
+      menu={
+        <>
+          <button type="button" disabled={descargando} onClick={() => void descargar("deben")} className={`${CLASE_FILA_MENU} min-h-[44px]`}>
+            Descargar · Solo con saldo
+          </button>
+          <button type="button" disabled={descargando} onClick={() => void descargar("todos")} className={`${CLASE_FILA_MENU} min-h-[44px]`}>
+            Descargar · Todos
+          </button>
+        </>
+      }
+      accion={{ rotulo: "+ Nuevo préstamo", onClick: () => void abrirNuevoPrestamo() }}
+    />
+  ) : (
     <div className="flex items-center gap-2">
       <div className="relative">
         <button type="button" onClick={() => setDescargaAbierta((v) => !v)} disabled={descargando}
@@ -325,7 +368,7 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
         + Nuevo préstamo
       </button>
     </div>
-  );
+  ));
 
   const filaDelModulo = personaElegida?.fichaId
     ? datosModulo?.filas.find((f) => f.id === personaElegida.fichaId) ?? null
@@ -402,7 +445,7 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
           de campos con caja. Mismo filtro y mismo conteo de `buscar-en-lista`;
           solo cambia el dibujo, y solo en esta pestaña. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <div className="relative w-full max-w-xs sm:w-64">
+        <div className={barra ? "hidden" : "relative w-full max-w-xs sm:w-64"}>
           <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             type="search"

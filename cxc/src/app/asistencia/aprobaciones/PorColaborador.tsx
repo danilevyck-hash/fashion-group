@@ -24,6 +24,8 @@ import {
   type PersonaAprobacion,
 } from "@/lib/asistencia/aprobaciones-vistas";
 import { BotonesSiNo, ChipTipo, Flecha } from "./BotonesSiNo";
+import { useHayBarraCelular } from "@/components/celular/BarraDeControles";
+import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 
 export interface PropsVista {
   /** Decide sobre esos días (el POST va detrás, optimista). */
@@ -88,6 +90,7 @@ export function DiasDePersona({
 export default function PorColaborador({
   personas, onDecidir, enVuelo, bloqueado, abiertos, onAbrir, personaResaltada, refResaltada,
 }: PropsVista & { personas: readonly PersonaAprobacion[] }) {
+  const barra = useHayBarraCelular();
   return (
     <div data-testid="vista-colaborador">
       {personas.map((p) => {
@@ -103,6 +106,31 @@ export default function PorColaborador({
               esLaBuscada ? "border-amber-300 bg-amber-50" : "border-gray-200 bg-white"
             }`}
           >
+            {barra ? (
+              // 🔴 Barra del celular v2 (2-oct-2026): el NOMBRE COMPLETO arriba y,
+              // debajo en gris, «8 días · 7:50 h»; Sí/No a la derecha, centrados.
+              // 🩸 En una sola línea el nombre salía cortado («Angel Pi…»).
+              <div className="flex min-h-[60px] items-center gap-3 px-3.5 py-2 tabular-nums">
+                <button
+                  type="button"
+                  onClick={() => onAbrir(p.codigo)}
+                  aria-expanded={abierta}
+                  className="flex min-h-[44px] min-w-0 flex-1 flex-col items-start justify-center text-left"
+                >
+                  <span className="flex w-full min-w-0 items-center gap-1.5">
+                    <span className="min-w-0 truncate text-[15px] font-semibold text-gray-900">{capitalizarNombre(p.etiqueta)}</span>
+                    <Flecha abierta={abierta} />
+                  </span>
+                  <span className="text-[13px] text-gray-500">{textoDiasYHoras(p.diasPendientes, p.minutosPendientes)}</span>
+                </button>
+                <BotonesSiNo
+                  decision={null}
+                  etiqueta={p.etiqueta}
+                  disabled={bloqueado || viajaAlguno}
+                  onDecidir={(dec) => onDecidir(toquesDePersona(p, true), dec)}
+                />
+              </div>
+            ) : (
             <div className="flex min-h-[56px] flex-wrap items-center gap-x-3 gap-y-1 px-3.5 py-1 tabular-nums">
               <button
                 type="button"
@@ -124,6 +152,7 @@ export default function PorColaborador({
                 onDecidir={(dec) => onDecidir(toquesDePersona(p, true), dec)}
               />
             </div>
+            )}
             {abierta && <DiasDePersona p={p} onDecidir={onDecidir} enVuelo={enVuelo} bloqueado={bloqueado} />}
           </div>
         );

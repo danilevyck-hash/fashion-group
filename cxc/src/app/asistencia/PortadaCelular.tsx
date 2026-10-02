@@ -33,6 +33,7 @@ import {
   PORTADA_EMPRESA, PORTADA_PANTALLAS, filasDeLaPortada, type ConteosPortada,
 } from "@/lib/asistencia/celular-asistencia";
 import { rotuloDelPeriodo } from "@/lib/asistencia/pantalla-2026-09";
+import { tituloCelular } from "@/lib/navegacion/barra-controles-celular";
 
 const money = (n: number) =>
   `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -133,7 +134,7 @@ export default function PortadaCelular({
   return (
     <div className="space-y-5 pb-8">
       <header>
-        <h2 className="text-[28px] font-semibold tracking-tight text-gray-900">Asistencia y planilla</h2>
+        <h2 className={tituloCelular("text-[28px] font-semibold tracking-tight text-gray-900")}>Asistencia y planilla</h2>
         <p className="text-[15px] text-gray-500">{rotuloDelPeriodo(desde, hasta) || hoyPanama()}</p>
       </header>
 

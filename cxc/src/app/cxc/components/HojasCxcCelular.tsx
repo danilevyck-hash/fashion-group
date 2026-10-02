@@ -174,15 +174,29 @@ export function HojaMasOpciones({
   onDescargar,
   onSyncedNow,
   onCerrar,
+  onBoston,
 }: {
   canExport: boolean;
   companyFilter: string;
   onDescargar: (clave: ClaveDescarga, formato: FormatoDescarga) => void;
   onSyncedNow?: () => void;
   onCerrar: () => void;
+  /** v3.2: con la cabecera compacta, «Boston» baja aquí para que el título se lea entero. */
+  onBoston?: (() => void) | null;
 }) {
   return (
     <Hoja titulo="Más" onCerrar={onCerrar}>
+      {onBoston && (
+        <div className="border-b border-gray-100 py-1">
+          <button
+            type="button"
+            onClick={() => { onCerrar(); onBoston(); }}
+            className="flex min-h-[44px] w-full items-center justify-between px-5 text-left text-[16px] text-gray-900 active:bg-gray-100"
+          >
+            Cartera de Confecciones Boston <span aria-hidden className="text-gray-400">›</span>
+          </button>
+        </div>
+      )}
       <div className="px-5 py-3">
         <SyncStatus
           tabla="estadocuenta"

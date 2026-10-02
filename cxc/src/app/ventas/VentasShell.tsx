@@ -11,6 +11,15 @@ import { TrendingUp, Contact, Package } from "lucide-react";
 import dynamic from "next/dynamic";
 import { PullToRefresh } from "@/components/ui";
 import AppHeader from "@/components/AppHeader";
+import { BarraDeControles, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
+
+
+/** Las tres pestañas, como selector del título en el celular. */
+const PESTANAS_VENTAS = [
+  { value: "resumen", label: "Resumen" },
+  { value: "clientes", label: "Clientes" },
+  { value: "productos", label: "Productos" },
+] as const;
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import { PeriodoSelect } from "@/components/multifashion/PeriodoSelect";
 import { fetchJsonWithRetry, describeFetchError } from "@/lib/fetch-retry";
@@ -152,6 +161,7 @@ export function VentasShell({
   // el `value` no tiene trigger. `?tab=referencia` y `?tab=comisiones` se
   // redirigen en next.config.js — esto es la red de abajo, no el camino.
   const [tabRaw, setTab] = useUrlState("tab", "resumen");
+  const barra = useBarraCelular();
   // El MODO de la pestaña Clientes (Ventas · Utilidad). Vive en la URL igual
   // que el tab para que un enlace guardado abra la misma vista.
   const [modoRaw, setModo] = useUrlState("modo", "ventas");
@@ -328,14 +338,37 @@ export function VentasShell({
     <>
     {/* Único chrome en móvil (drawer/búsqueda/logout/notifs) — el Sidebar es
         desktop-only, sin esto la página queda sin salida en la PWA. */}
-    <AppHeader module="Ventas" />
+    <AppHeader module="Ventas" tituloEnLaPantalla={barra} />
+    <ProveedorBarraCelular activo={barra} activa={tab}>
     <PullToRefresh onRefresh={onRefresh}>
-    <main className="mx-auto w-full max-w-[1280px] px-4 py-5 md:px-7 md:py-6">
+    {/* 🔴 LA BARRA DEL CELULAR (2-oct-2026, `BARRA_CELULAR_2026_10`): «Ventas»
+        con la pestaña como selector y el período en la fila 2, donde cae
+        también el «···» de cada pestaña. Las tres filas de antes (título,
+        período y la tira de pestañas) se vuelven dos. */}
+    {barra && (
+      <BarraDeControles
+        titulo="Ventas"
+        pestanas={PESTANAS_VENTAS}
+        activa={tab}
+        onPestana={setTab}
+        periodo={
+          <div className="w-full [&_button]:relative [&_button]:h-9 [&_button]:w-full [&_button]:text-[13px] [&_button]:before:absolute [&_button]:before:inset-x-0 [&_button]:before:-inset-y-1 [&_button]:before:content-['']">
+            <PeriodoSelect
+              valor={periodoAUrl(periodo)}
+              opciones={opciones}
+              onChange={onPeriodoChange}
+              disabled={loading}
+            />
+          </div>
+        }
+      />
+    )}
+    <main className={`mx-auto w-full max-w-[1280px] px-4 md:px-7 md:py-6 ${barra ? "pb-5 pt-0" : "py-5"}`}>
       {/* Page head — `relative z-20` para garantizar stacking context propio
           encima del TabsList (que tiene overflow-x-auto y crea su propio
           stacking en algunos browsers, tapando los controles del header en
           viewports angostos). */}
-      <header className="relative z-20 mb-5 flex flex-wrap items-center justify-between gap-3">
+      <header className={`relative z-20 mb-5 flex flex-wrap items-center justify-between gap-3 ${barra ? "hidden" : ""}`}>
         {/* Sin título grande: "Ventas" ya lo dicen la barra sticky (celular)
             y el breadcrumb (escritorio). Queda sr-only para no dejar la
             página sin encabezado. */}
@@ -372,6 +405,8 @@ export function VentasShell({
             ancho del que tiene un iPhone; por eso el icono está bajo `sm` y la
             letra baja a 13 px. Con TRES sobra ancho y aun así NO se revirtió
             nada (5-sep-2026). Desde `sm` no cambia nada. */}
+        {/* Con la barra del celular, las pestañas son el selector del título. */}
+        {!barra && (
         <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-0 rounded-none border-b border-gray-200 bg-transparent px-4 p-0 md:mx-0 md:px-0">
           <TabsTrigger value="resumen" className={TAB_TRIGGER_CLASS}>
             <TrendingUp className="hidden h-3.5 w-3.5 sm:block" /> Resumen
@@ -383,8 +418,9 @@ export function VentasShell({
             <Package className="hidden h-3.5 w-3.5 sm:block" /> Productos
           </TabsTrigger>
         </TabsList>
+        )}
 
-        <TabsContent value="resumen" className="mt-5">
+        <TabsContent value="resumen" className={barra ? "mt-0" : "mt-5"}>
           {resumen ? (
             <ResumenView
               data={resumen}
@@ -399,7 +435,7 @@ export function VentasShell({
             />
           ) : <ErrorState scope="resumen" detail={data?.resumenError ?? null} onRetry={() => mutate()} />}
         </TabsContent>
-        <TabsContent value="clientes" className="mt-5">
+        <TabsContent value="clientes" className={barra ? "mt-0" : "mt-5"}>
           {clientes ? (
             // key={período} fuerza remount al cambiar el período — resetea
             // state interno (search, empresa, sort) que asume el universo cargado.
@@ -420,7 +456,7 @@ export function VentasShell({
             />
           ) : <ErrorState scope="clientes" detail={data?.clientesError ?? null} onRetry={() => mutate()} />}
         </TabsContent>
-        <TabsContent value="productos" className="mt-5">
+        <TabsContent value="productos" className={barra ? "mt-2" : "mt-5"}>
           {/* 🔴 SIN `key`: remontar tiraría el buscador y el filtro de cliente
               al cambiar el período. El período le llega por prop y la vista
               vuelve a pedir sola lo suyo (ver su `load`). */}
@@ -429,6 +465,7 @@ export function VentasShell({
       </Tabs>
     </main>
     </PullToRefresh>
+    </ProveedorBarraCelular>
     </>
   );
 }

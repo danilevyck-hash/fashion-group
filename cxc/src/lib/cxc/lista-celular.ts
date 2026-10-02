@@ -158,6 +158,22 @@ export function subtituloDeLaPortada(opts: {
   return `${clientes} en las ${empresas} empresas · ordenado por saldo`;
 }
 
+/**
+ * v3.2 (2-oct-2026): la MISMA línea, corta, para que quepa en un renglón bajo
+ * el total de 36 px: «100 clientes · por saldo», «100 clientes · Vistana ·
+ * por saldo» o «12 clientes con +120 días».
+ */
+export function subtituloCompacto(opts: {
+  cuantos: number;
+  risk: RiskFilter;
+  unaEmpresa: string | null;
+}): string {
+  const { cuantos, risk, unaEmpresa } = opts;
+  const clientes = `${cuantos} ${cuantos === 1 ? "cliente" : "clientes"}`;
+  if (risk !== "all") return `${clientes} con ${rangoEnPalabras(risk)}`;
+  return unaEmpresa ? `${clientes} · ${unaEmpresa} · por saldo` : `${clientes} · por saldo`;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 5 · «Por empresa» — la cartera abierta por empresa
 // ─────────────────────────────────────────────────────────────────────────────

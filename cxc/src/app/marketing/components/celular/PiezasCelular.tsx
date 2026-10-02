@@ -16,6 +16,12 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Aviso } from "@/components/ui/Aviso";
+import { BARRA_CELULAR_2026_10, tituloCelular } from "@/lib/navegacion/barra-controles-celular";
+import { CLASE_TITULO_BARRA } from "@/components/celular/BarraDeControles";
+import { CLASE_LINEA_TOTAL, CLASE_TOTAL_CELULAR } from "@/components/celular/CabeceraCompacta";
+
+/** v3.2: la cabecera compacta (título 22 · total 36 · una línea), con la barra nueva. */
+const COMPACTA = BARRA_CELULAR_2026_10;
 
 /** El lienzo: fondo de iOS, sitio para la barra de abajo. */
 export function PantallaCelular({ children }: { children: ReactNode }) {
@@ -33,10 +39,22 @@ export function TituloCelular({
   /** Un botón a la derecha del título (＋, Editar…). */
   accion?: ReactNode;
 }) {
+  if (COMPACTA) {
+    // v3.2: renglón de 44 px con el título de 22 px; la línea gris, UNA.
+    return (
+      <div className="px-4">
+        <div className="flex h-11 min-w-0 items-center gap-1">
+          <h1 className={`min-w-0 flex-1 truncate ${CLASE_TITULO_BARRA}`}>{titulo}</h1>
+          {accion && <div className="shrink-0">{accion}</div>}
+        </div>
+        {detalle != null && detalle !== "" && <p className={`${CLASE_LINEA_TOTAL} tabular-nums`}>{detalle}</p>}
+      </div>
+    );
+  }
   return (
     <div className="flex items-start justify-between gap-3 px-4 pt-2">
       <div className="min-w-0">
-        <h1 className="text-[30px] font-bold leading-tight tracking-tight text-gray-900 break-words">
+        <h1 className={tituloCelular("text-[30px] font-bold leading-tight tracking-tight text-gray-900 break-words")}>
           {titulo}
         </h1>
         {detalle != null && detalle !== "" && (
@@ -64,6 +82,20 @@ export function NumeroGrande({
   detalle?: ReactNode;
   onClick?: () => void;
 }) {
+  if (COMPACTA) {
+    // v3.2: 36 px, a la izquierda, con UNA línea gris debajo.
+    const compacto = (
+      <>
+        <span className={CLASE_TOTAL_CELULAR}>{valor}</span>
+        {detalle != null && detalle !== "" && <span className={CLASE_LINEA_TOTAL}>{detalle}</span>}
+      </>
+    );
+    return onClick ? (
+      <button type="button" onClick={onClick} className="block w-full px-4 pt-1 text-left active:opacity-60">{compacto}</button>
+    ) : (
+      <div className="px-4 pt-1">{compacto}</div>
+    );
+  }
   const adentro = (
     <>
       <span className="block text-[34px] font-light leading-none tracking-tight tabular-nums text-gray-900">

@@ -52,6 +52,7 @@ import {
   type FilaDeCobro,
   type OpcionDeHoja,
 } from "./HojasReclamosCelular";
+import { tituloCelular } from "@/lib/navegacion/barra-controles-celular";
 
 /** Cuántos renglones se ven antes de plegar: la mitad de los reclamos tiene uno. */
 const RENGLONES_A_LA_VISTA = 3;
@@ -142,7 +143,7 @@ export default function DetalleCelular({
 
       <div className="flex items-start justify-between gap-2 px-4 pt-3">
         <div className="min-w-0">
-          <h1 className="truncate text-[27px] font-bold leading-tight tracking-tight text-gray-900">
+          <h1 className={tituloCelular("truncate text-[27px] font-bold leading-tight tracking-tight text-gray-900")}>
             {current.nro_reclamo}
           </h1>
           {/* La cabecera en DOS líneas, no en cinco: factura · fecha · marca · días. */}

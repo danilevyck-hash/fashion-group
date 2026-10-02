@@ -26,6 +26,7 @@
 // `ClientesView`, con los mismos montos y los mismos deltas de la computadora.
 // ============================================================================
 
+import { BuscarEnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { useState } from "react";
 import { Search } from "lucide-react";
 import type { Cliente } from "../types";
@@ -76,13 +77,28 @@ export function ClientesCelular({
   pie,
 }: Props) {
   const [buscando, setBuscando] = useState(busqueda.length > 0);
+  // 🔴 v2 de la barra del celular: la lupa se abre EN la barra y la empresa es
+  // un ícono de la misma barra; la línea gris dice cuál está puesta.
+  const hayBarra = useHayBarraCelular();
 
   return (
     <PantallaVentas>
       <TituloVentas
+        enLaBarra
         titulo="Clientes"
         detalle={`${total.toLocaleString("en-US")} clientes · año ${selectedYear}`}
-        accion={
+        detalleEnLaBarra={`${total.toLocaleString("en-US")} clientes`}
+        accion={hayBarra ? (
+          <>
+            <BuscarEnLaBarra
+              valor={busqueda}
+              onCambiar={onBusqueda}
+              placeholder="Buscar cliente o código…"
+              etiqueta="Buscar cliente o código"
+            />
+            {accion}
+          </>
+        ) : (
           <div className="flex items-center gap-1">
             {/* 🔴 BUSCAR ES UNA LUPA, NO UNA CAJA SIEMPRE ABIERTA: la caja se
                 llevaba un renglón entero en una lista de 115 nombres. */}
@@ -97,10 +113,10 @@ export function ClientesCelular({
             </button>
             {accion}
           </div>
-        }
+        )}
       />
 
-      {buscando && (
+      {buscando && !hayBarra && (
         <div className="px-4 pt-2">
           <input
             autoFocus

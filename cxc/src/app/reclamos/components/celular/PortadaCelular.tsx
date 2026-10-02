@@ -30,6 +30,11 @@ import { calcSub, empresaKeyDeReclamo, esPendiente, reclamoTaxes } from "../cons
 import { matchReclamo } from "../search";
 import type { Contacto, Reclamo } from "../types";
 import { Visto, CtaFija, FilaCel } from "./piezas";
+import { tituloCelular, usaBarraCelular } from "@/lib/navegacion/barra-controles-celular";
+import { useState } from "react";
+import { Search } from "lucide-react";
+import { CLASE_TITULO_BARRA, IconoBarra } from "@/components/celular/BarraDeControles";
+import { CLASE_LINEA_TOTAL, CLASE_TOTAL_CELULAR } from "@/components/celular/CabeceraCompacta";
 
 interface Props {
   role: string;
@@ -53,6 +58,9 @@ export default function PortadaCelular({
   const tarjetas = tarjetasPorEmpresa(reclamos, contactos, hoy);
   const sub = subtituloPortada(resumen.porCobrar.n, viejos.n);
   const buscando = globalSearch.trim();
+  // v3.2: la cabecera compacta vive detrás de la barra nueva.
+  const compacta = usaBarraCelular(true);
+  const [abrirBuscar, setAbrirBuscar] = useState(false);
 
   const resultados = buscando
     ? reclamos.filter((r) => {
@@ -73,8 +81,25 @@ export default function PortadaCelular({
 
   return (
     <div data-celular="reclamos-portada" className="min-h-screen bg-[#F2F2F7] pb-28">
+      {compacta ? (
+        <div data-cabecera-reclamos-v32 className="px-4">
+          {/* 1 · «Reclamos» · 🔍 */}
+          <div className="flex h-11 min-w-0 items-center gap-1">
+            <h1 className={`min-w-0 flex-1 truncate ${CLASE_TITULO_BARRA}`}>Reclamos</h1>
+            <IconoBarra etiqueta="Buscar factura, reclamo o estilo" onClick={() => setAbrirBuscar(true)}>
+              <Search className="h-5 w-5" strokeWidth={2} aria-hidden />
+            </IconoBarra>
+          </div>
+          {/* 2 · el total a 36 px y UNA línea gris */}
+          <span className={`${CLASE_TOTAL_CELULAR} pt-1`}>{montoCel(resumen.porCobrar.monto)}</span>
+          <span className={CLASE_LINEA_TOTAL}>
+            {resumen.porCobrar.n} {resumen.porCobrar.n === 1 ? "reclamo" : "reclamos"} por cobrar
+            {sub.viejos && <> · <span className="font-medium text-[#A32D2D]">{sub.viejos}</span></>}
+          </span>
+        </div>
+      ) : (<>
       <div className="px-4 pt-3">
-        <h1 className="text-[28px] font-bold leading-tight tracking-tight text-gray-900">Reclamos</h1>
+        <h1 className={tituloCelular("text-[28px] font-bold leading-tight tracking-tight text-gray-900")}>Reclamos</h1>
         <p className="mt-0.5 text-[15px] text-gray-500">
           {sub.texto}
           {sub.viejos && <> · <span className="font-medium text-[#A32D2D]">{sub.viejos}</span></>}
@@ -90,7 +115,9 @@ export default function PortadaCelular({
         </span>
         <span className="mt-1 block text-[14px] text-gray-500">pendiente de cobro</span>
       </div>
+      </>)}
 
+      {(!compacta || abrirBuscar || globalSearch !== "") && (
       <div className="px-4 pt-4">
         <input
           type="search"
@@ -100,8 +127,11 @@ export default function PortadaCelular({
           placeholder="Buscar factura, reclamo o estilo"
           aria-label="Buscar factura, reclamo o estilo"
           className="w-full rounded-xl border border-transparent bg-[#E9E9EB] px-4 py-3 text-[16px] text-gray-900 placeholder:text-gray-500 focus:border-gray-400 focus:outline-none"
+          autoFocus={compacta && abrirBuscar && globalSearch === ""}
+          onBlur={() => { if (globalSearch === "") setAbrirBuscar(false); }}
         />
       </div>
+      )}
 
       {buscando ? (
         <>

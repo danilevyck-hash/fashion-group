@@ -61,6 +61,7 @@ import {
   type FilaPorDia,
 } from "@/lib/asistencia/marcaciones-por-dia";
 import FotosDeLaMarcaModal, { type FotoParaVer } from "./FotosDeLaMarcaModal";
+import { ChipSelector, EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import MarcacionesDeAntes from "./marcaciones/PantallaDeAntes";
 import {
   SIN_COLUMNAS_NUEVAS,
@@ -203,6 +204,7 @@ export default function MarcacionesTab({ empresa }: { empresa: string }) {
 
 function PorDia({ empresa }: { empresa: string }) {
   const { desde, hasta, hoy, elegir } = usePeriodoAsistencia();
+  const barra = useHayBarraCelular();
 
   const [marcas, setMarcas] = useState<MarcaDeTelefono[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -307,7 +309,23 @@ function PorDia({ empresa }: { empresa: string }) {
   return (
     <div className="space-y-4">
       {/* ── ARRIBA: el período (con su 📅) y UN desplegable. Nada más (28a) ── */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* 🔴 En el celular con la barra nueva (2-oct-2026): el período vive
+          arriba, el desplegable va al «···» y, si hay alguien elegido, su
+          nombre sale como chip en la fila del período (× lo quita). */}
+      {barra && (
+        <EnLaBarra
+          pestana="marcaciones"
+          filaIzq={gente.length > 0 ? (
+            <ChipSelector
+              rotulo="Colaborador"
+              valor={quien}
+              opciones={[{ valor: "", etiqueta: "Todos" }, ...gente.map((g) => ({ valor: g.codigo, etiqueta: g.nombre }))]}
+              onCambiar={setQuien}
+            />
+          ) : null}
+        />
+      )}
+      <div className={barra ? "hidden" : "flex flex-wrap items-center gap-2"}>
         <SelectorPeriodo desde={desde} hasta={hasta} hoy={hoy} onElegir={elegir} />
         {gente.length > 0 && (
           <label className="flex items-center gap-2 text-sm">
@@ -356,7 +374,9 @@ function PorDia({ empresa }: { empresa: string }) {
                         {f.mismoTelefono && <AvisoMismoTelefono />}
                       </span>
                       {f.lugarEnLaFila && (
-                        <span className="min-w-0 text-[13px] text-gray-500">
+                        // 🩸 Sin `flex-1 overflow-hidden` el lugar largo empujaba la
+                        // página a 448 px y se deslizaba de lado (2-oct-2026).
+                        <span className="flex min-w-0 flex-1 justify-end overflow-hidden text-[13px] text-gray-500">
                           <Lugar lugar={lugarDeLaFilaDibujado(f)} />
                         </span>
                       )}

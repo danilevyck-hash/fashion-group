@@ -130,6 +130,7 @@ import AntesDeCerrar from "./AntesDeCerrar";
 // quincenas), el corte como línea gris con una «×», la tabla dentro de su caja
 // con la cabecera pegada, y el nombre de cada fila llevando a su Asistencia.
 import SelectorPeriodo, { usePeriodoAsistencia } from "@/components/asistencia/SelectorPeriodo";
+import { useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { aparatoDeQuienMira } from "@/lib/aparato";
 import {
   ASISTENCIA_PANTALLA_2026_09, VACIAR_EL_CORTE,
@@ -390,6 +391,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
   // render haría que la lista de quincenas cambiara sola a la medianoche
   // mientras alguien está escribiendo montos.
   const hoy = useMemo(() => new Date(Date.now() - 5 * 3_600_000).toISOString().slice(0, 10), []);
+  const barra = useHayBarraCelular();
   // ⛔ EL MODO «QUINCENA» SE RETIRÓ (25-ago-2026). Daniel, textual: *"quita
   // periodo quincena en planilla, eso no se usara asi. y sisi, que el usuario
   // eliga el rango"*. Con un solo modo, el control segmentado sobraba: los dos
@@ -1167,7 +1169,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
       type="button"
       onClick={generar}
       disabled={!elegido || cargando || sinEmpresa}
-      className={`min-h-[44px] rounded-md px-4 text-sm font-medium transition active:scale-[0.97] disabled:opacity-40 ${
+      className={`min-h-[44px] rounded-md ${barra ? "px-3" : "px-4"} text-sm font-medium transition active:scale-[0.97] disabled:opacity-40 ${
         data && !vieja
           ? "border border-gray-300 text-gray-700 hover:border-black hover:text-black"
           : "bg-black text-white"
@@ -1195,7 +1197,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
         </p>
       )}
       {/* ── Elegir qué se va a pagar ── */}
-      <div className="flex flex-wrap items-end gap-3">
+      <div className={barra ? "flex flex-wrap items-center gap-2" : "flex flex-wrap items-end gap-3"}>
         {/* 🔴 LA QUINCENA: cuatro botones —las dos del mes anterior y las dos
             del mes en curso—. El botón prendido es el que coincide EXACTO con
             lo elegido.
@@ -1204,14 +1206,18 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
             el 15-sep-2026 (Daniel: *«si la quincena es fija, que no haya opción
             de rango, solo las opciones»*). ⚠️ La RUTA sigue aceptando
             `desde`/`hasta` libres: los usa `medirAjusteAnterior`. */}
-        <div className="flex flex-col gap-1">
+        {/* 🔴 v3.1: con la barra del celular la quincena vive arriba; si no hay
+            aviso del día 31, este hueco no ocupa lugar y «Generar» cabe en la
+            misma línea del corte. */}
+        <div className={barra && !(elegido && textoDelDia31(hasta)) ? "hidden" : "flex flex-col gap-1"}>
           {!ASISTENCIA_PANTALLA_2026_09 && <span className="text-xs text-gray-500">Quincena</span>}
           <div className="flex flex-wrap items-center gap-2">
             {/* 🔴 LA MISMA BARRA DE LAS OTRAS PESTAÑAS (24-sep-2026), sin
                 calendario: acá solo se pagan quincenas. 🩸 Eran cuatro botones
                 con rótulo propio, al lado de otro control con rótulo propio
                 («Cortar el reloj el»), y por eso parecían dos períodos. */}
-            {ASISTENCIA_PANTALLA_2026_09 ? (
+            {/* 🔴 Con la barra del celular (2-oct-2026) la quincena vive arriba. */}
+            {barra ? null : ASISTENCIA_PANTALLA_2026_09 ? (
               <SelectorPeriodo
                 desde={desde}
                 hasta={hasta}

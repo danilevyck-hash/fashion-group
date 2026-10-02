@@ -11,6 +11,7 @@
 import { useRef, type ReactNode } from "react";
 import { ATRIBUTO_BARRA_FIJA } from "@/lib/navegacion/barra-celular";
 import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
+import { CLASE_VIDRIO, RADIO_VIDRIO, conVidrio } from "@/lib/ui/vidrio";
 
 export function Visto() {
   return (
@@ -106,7 +107,10 @@ export function CtaFija({
       ref={cajon}
       data-cta={marca ?? "principal"}
       {...{ [ATRIBUTO_BARRA_FIJA]: "" }}
-      className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white/95 px-4 pt-3 backdrop-blur"
+      className={conVidrio(
+        "fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white/95 px-4 pt-3 backdrop-blur",
+        `fixed inset-x-2 bottom-2 z-20 p-2 ${CLASE_VIDRIO} ${RADIO_VIDRIO}`,
+      )}
       style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
     >
       <button

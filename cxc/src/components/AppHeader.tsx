@@ -48,6 +48,8 @@ import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
 import type { ModuleGroup } from "@/lib/modules";
 import { ESTRUCTURA_APPLE_2026_10 } from "@/lib/navegacion/estructura-2026-10";
 import MenuDelUsuario from "@/components/estructura/MenuDelUsuario";
+import { BARRA_CELULAR_2026_10, tituloCelular } from "@/lib/navegacion/barra-controles-celular";
+import { CLASE_VIDRIO, conVidrio } from "@/lib/ui/vidrio";
 
 // Cómo se llama cada rol: UN solo lugar, `lib/roles-etiquetas.ts` (11-sep-2026).
 
@@ -356,14 +358,17 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
               Es el mismo patrón que ya usaba el título del celular de
               Multifashion (`data-celular="titulo"`). */}
           {/* `CATALOGOS_APPLE_2026_10_B` · tituloCelularChico (el b7 que Daniel
-              aprobó el 2-oct-2026): 22 px en vez de 34. */}
+              aprobó el 2-oct-2026): 22 px en vez de 34. Con él apagado, manda
+              la barra del celular (`tituloCelular`, también 22 px). */}
           <p className={CATALOGOS_APPLE_2026_10_B.tituloCelularChico
             ? "flex items-start gap-2 text-[22px] font-semibold leading-[1.2] tracking-tight text-gray-950"
-            : "flex items-start gap-2.5 text-[34px] font-semibold leading-[1.08] tracking-tight text-gray-950"}>
+            : tituloCelular("flex items-start gap-2.5 text-[34px] font-semibold leading-[1.08] tracking-tight text-gray-950")}>
             {moduleColor && (
               <span
                 aria-hidden="true"
-                className={CATALOGOS_APPLE_2026_10_B.tituloCelularChico ? "mt-[10px] inline-block h-2 w-2 flex-shrink-0 rounded-full" : "mt-[15px] inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full"}
+                className={CATALOGOS_APPLE_2026_10_B.tituloCelularChico
+                  ? "mt-[10px] inline-block h-2 w-2 flex-shrink-0 rounded-full"
+                  : `${BARRA_CELULAR_2026_10 ? "mt-[9px] h-2 w-2" : "mt-[15px] h-2.5 w-2.5"} inline-block flex-shrink-0 rounded-full`}
                 style={{ backgroundColor: moduleColor.hex }}
               />
             )}
@@ -542,7 +547,10 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
           onClick={() => setDrawerOpen(true)}
           aria-label="Abrir menú"
           data-boton-flotante
-          className="fixed z-30 flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-gray-900 text-white shadow-lg shadow-black/25 transition active:scale-[0.97] sm:hidden"
+          className={conVidrio(
+            "fixed z-30 flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-gray-900 text-white shadow-lg shadow-black/25 transition active:scale-[0.97] sm:hidden",
+            `fixed z-30 flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-gray-900 transition active:scale-[0.97] sm:hidden ${CLASE_VIDRIO}`,
+          )}
           style={{
             width: DIAMETRO_FLOTANTE,
             height: DIAMETRO_FLOTANTE,

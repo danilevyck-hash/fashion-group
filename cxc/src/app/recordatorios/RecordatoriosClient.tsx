@@ -66,6 +66,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from "react";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import AppHeader from "@/components/AppHeader";
+import { BarraAccionFija, BarraDeControles, BuscarEnLaBarra, CLASE_SEGMENTADO_BARRA, EnLaBarra, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
+import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
 import {
   SkeletonTable,
   Toast,
@@ -135,6 +137,7 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
     allowedRoles: ["admin", "secretaria"],
   });
   const isOnline = useOnline();
+  const barra = useBarraCelular();
   const hoy = initialData.hoy;
 
   const [cheques, setCheques] = useState<Cheque[]>(initialData.cheques);
@@ -508,11 +511,38 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
       }}
     >
       <div>
-        <AppHeader module="Recordatorios" />
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+        <AppHeader module="Recordatorios" tituloEnLaPantalla={barra} />
+        {/* 🔴 LA BARRA DEL CELULAR (2-oct-2026, `BARRA_CELULAR_2026_10`): «Lista |
+            Calendario» pasa a ser el selector del título, el buscador va a todo
+            el ancho y «＋ Nuevo» fijo abajo (abre la MISMA puerta). */}
+        {barra && (
+          <>
+            <ProveedorBarraCelular activo>
+              <BarraDeControles titulo="Recordatorios" />
+              <EnLaBarra
+                iconos={viewMode === "lista" ? (
+                  <BuscarEnLaBarra valor={search} onCambiar={setSearch} placeholder="Buscar cheque o cliente…" etiqueta="Buscar" />
+                ) : null}
+                filaIzq={
+                  <ControlSegmentado
+                    ancho="contenido"
+                    ariaLabel="Ver como"
+                    className={CLASE_SEGMENTADO_BARRA}
+                    options={[{ value: "lista", label: "Lista" }, { value: "calendario", label: "Calendario" }]}
+                    active={viewMode}
+                    onChange={(v) => setViewMode(v)}
+                  />
+                }
+              />
+            </ProveedorBarraCelular>
+            <BarraAccionFija rotulo="＋ Nuevo" disabled={!isOnline} onClick={() => setPuertaAbierta(true)} />
+          </>
+        )}
+        <div className={`max-w-6xl mx-auto px-4 sm:px-6 ${barra ? "pb-6 pt-3" : "py-6"}`}>
           {/* Sin título grande: "Recordatorios" ya lo dicen la barra sticky
               (celular) y el breadcrumb (escritorio). Queda sr-only para no
               dejar la página sin encabezado. */}
+          <div className={barra ? "hidden" : undefined}>
           <div className="flex items-center justify-end mb-5">
             <h1 className="sr-only">Recordatorios</h1>
             <div className="flex flex-wrap items-center gap-3">
@@ -533,10 +563,11 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
             </div>
           </div>
 
+          </div>
           {/* Modo (Lista / Calendario) + buscador. NO son pestañas: son dos
               formas de ver lo mismo. */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
-            <div className="flex gap-2 bg-gray-100 rounded-full p-0.5 w-fit">
+          <div className={barra ? "hidden" : "flex flex-col sm:flex-row sm:items-center gap-3 mb-6"}>
+            <div className={barra ? "hidden" : "flex gap-2 bg-gray-100 rounded-full p-0.5 w-fit"}>
               <button
                 type="button"
                 aria-pressed={viewMode === "lista"}
@@ -554,7 +585,7 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
                 Calendario
               </button>
             </div>
-            {viewMode === "lista" && (
+            {viewMode === "lista" && !barra && (
               <div className="sm:ml-auto w-full sm:w-auto">
                 {/* 🔴 La lupa es la ÚNICA puerta a lo depositado: la lista solo
                     muestra lo abierto. Por eso busca sobre TODO. */}

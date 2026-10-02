@@ -105,6 +105,12 @@ import { ASISTENCIA_PANTALLA_2026_09 } from "@/lib/asistencia/pantalla-2026-09";
 import { usePeriodoAsistencia } from "@/components/asistencia/SelectorPeriodo";
 import { aparatoDeQuienMira } from "@/lib/aparato";
 import PortadaCelular from "./PortadaCelular";
+import SelectorPeriodo from "@/components/asistencia/SelectorPeriodo";
+import {
+  BarraDeControles, CLASE_FILA_MENU, ChipSelector, ProveedorBarraCelular, useBarraCelular,
+} from "@/components/celular/BarraDeControles";
+import { esTodas } from "@/lib/asistencia/empresa-para-todo";
+import { MARCACIONES_POR_DIA } from "@/lib/asistencia/marcaciones-por-dia";
 // 🔴 ESTILO APPLE (1-oct-2026): abre en Asistencia y las pestañas van en el
 // orden del trabajo. La regla vive en el módulo puro; aquí solo se aplica.
 import { ASISTENCIA_APPLE_2026_10, pestanaAlAbrir, pestanasEnOrdenDelTrabajo, selectorDeSeccionEnCelular } from "@/lib/asistencia/apple-2026-10";
@@ -341,6 +347,11 @@ function AsistenciaInner() {
   // escribe `?tab=`, que en el celular empuja historial, así que el Atrás
   // devuelve esta lista. Nada se monta hasta que se toca algo.
   const enLaPortada = ASISTENCIA_PANTALLA_2026_09 && celular && !hayTab && visibles.length > 1;
+  // 🔴 LA BARRA DEL CELULAR (2-oct-2026, `BARRA_CELULAR_2026_10`): título con la
+  // sección como selector, el período con el «···» y la acción principal abajo.
+  // Apagada, o en la computadora, todo queda como estaba.
+  const barra = useBarraCelular() && !enLaPortada;
+  const conCalendario = !ayuda && !config ? PERIODO_EN_LA_BARRA[tab] : undefined;
 
   return (
     <>
@@ -350,7 +361,8 @@ function AsistenciaInner() {
       {/* 🔴 En la portada del celular el título grande «Asistencia» lo dibuja
           `PortadaCelular`; adentro de una pestaña no hay ninguno y lo pone el
           layout (24-sep-2026). */}
-      <AppHeader module="Asistencia y planilla" tituloEnLaPantalla={enLaPortada} />
+      <AppHeader module="Asistencia y planilla" tituloEnLaPantalla={enLaPortada || barra} />
+      <ProveedorBarraCelular activo={barra} activa={tab}>
       <div className="mx-auto max-w-6xl px-4 py-6">
         {/* Sin título grande: "Asistencia" ya lo dicen la barra sticky
             (celular) y el breadcrumb (escritorio). Queda sr-only para no dejar
@@ -370,6 +382,47 @@ function AsistenciaInner() {
           />
         ) : (
         <>
+        {barra ? (
+          <div className="-mx-4 -mt-6">
+            <BarraDeControles
+              titulo="Asistencia"
+              pestanas={visibles.map(([k, label]) => ({ value: k, label }))}
+              activa={tab}
+              onPestana={(k) => irAPestana(k as Tab)}
+              periodo={conCalendario === undefined ? undefined : (
+                <SelectorPeriodo
+                  desde={periodo.desde}
+                  hasta={periodo.hasta}
+                  hoy={periodo.hoy}
+                  onElegir={periodo.elegir}
+                  conCalendario={conCalendario}
+                  anchoCompleto
+                />
+              )}
+              fila={opciones.length > 1 ? (
+                <ChipSelector
+                  rotulo="Empresa"
+                  valor={empresa}
+                  opciones={opciones.map((o) => ({ valor: o.clave, etiqueta: o.etiqueta }))}
+                  onCambiar={elegirEmpresa}
+                />
+              ) : null}
+              menu={
+                <>
+                  {veConfig && (
+                    <button type="button" onClick={() => { setAyuda(false); abrirConfig("horarios"); }} className={CLASE_FILA_MENU}>
+                      <Settings className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
+                      Configuración
+                    </button>
+                  )}
+                  <button type="button" onClick={() => { if (config) cambiarConfig(""); setAyuda(true); }} className={CLASE_FILA_MENU}>
+                    Cómo funciona
+                  </button>
+                </>
+              }
+            />
+          </div>
+        ) : (
         <div className={`flex items-end gap-2 border-b border-gray-200 ${selectorDeSeccionEnCelular(celular) ? "flex-wrap justify-end" : ""}`}>
           {/* El arrastre lateral vive SOLO en las pestañas: si el «?» quedara
               adentro, en el iPhone habría que arrastrar para encontrar la ayuda. */}
@@ -475,8 +528,9 @@ function AsistenciaInner() {
             ?
           </button>
         </div>
+        )}
 
-        <div className="mt-5">
+        <div className={barra ? "mt-1" : "mt-5"}>
           {ayuda && (
             <div className="space-y-4">
               {/* El "Cómo funciona" DEL MEDIO se fue: el botón "?" que abre
@@ -583,6 +637,20 @@ function AsistenciaInner() {
         </>
         )}
       </div>
+      </ProveedorBarraCelular>
     </>
   );
 }
+
+/**
+ * Las pestañas que se leen por período y si llevan calendario. 🔴 La Planilla
+ * va sin calendario: ahí solo se pagan quincenas. Las demás no tienen período.
+ */
+const PERIODO_EN_LA_BARRA: Partial<Record<Tab, boolean>> = {
+  asistencia: true,
+  reporte: true,
+  aprobaciones: true,
+  // La pantalla de antes (`MARCACIONES_POR_DIA` apagado) trae su propio período.
+  ...(MARCACIONES_POR_DIA ? { marcaciones: true } : {}),
+  planilla: false,
+};

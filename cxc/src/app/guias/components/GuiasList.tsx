@@ -6,6 +6,7 @@ import type { Guia, GuiaItem } from "./types";
 import { clientesSummary, destinosSummary } from "./constants";
 import { SkeletonTable, EmptyState, StatusBadge, AccordionContent, ScrollableTable } from "@/components/ui";
 import OverflowMenu from "@/components/ui/OverflowMenu";
+import { BuscarEnLaBarra, CLASE_FILA_MENU, EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { groupByTimePeriod } from "@/lib/group-by-time";
 import TimeGroupHeader from "@/components/TimeGroupHeader";
 import ResumenEnvio from "./ResumenEnvio";
@@ -196,6 +197,7 @@ export default function GuiasList({
   nombresPorCodigo,
   readOnly,
 }: GuiasListProps) {
+  const barra = useHayBarraCelular();
   // Atar el cliente lo pueden hacer los mismos que despachan. NO depende del
   // estado de la guía: una guía Completada sigue estando cerrada a edición y
   // esto no la edita — ver `api/guias/[id]/cliente/route.ts`.
@@ -493,11 +495,46 @@ export default function GuiasList({
 
   return (
     <div>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+      <div className={`max-w-6xl mx-auto px-4 sm:px-6 ${barra ? "pb-6 pt-3" : "py-6"}`}>
         {/* Sin título grande: "Guías de Despacho" ya lo dicen la barra sticky
             (celular) y el breadcrumb (escritorio). Queda sr-only para no dejar
             la página sin encabezado, y la fila pasa a `justify-end` para que
             los botones no se corran a la izquierda al quedar solos. */}
+        {/* 🔴 En el celular con la barra nueva (2-oct-2026): «Seleccionar» y
+            Excel van al «···» y «Nueva guía» fija abajo. Los MISMOS botones
+            y funciones; elegir varias sigue mostrando su fila de siempre. */}
+        {barra && !selectionMode && (
+          <EnLaBarra
+            iconos={
+              <>
+                <BuscarEnLaBarra
+                  valor={search}
+                  onCambiar={setSearch}
+                  placeholder="Transportista, cliente, factura o N° de guía"
+                  etiqueta="Buscar guía"
+                />
+              </>
+            }
+            menu={guias.length > 0 ? (
+              <>
+                <button type="button" onClick={() => { setSelectionMode(true); setSelectedIds(new Set()); }} className={CLASE_FILA_MENU}>
+                  Seleccionar varias
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void import("./excel-guias").then(({ exportGuiasExcel }) => exportGuiasExcel(filtrarGuias(guias)));
+                  }}
+                  className={CLASE_FILA_MENU}
+                >
+                  Descargar Excel
+                </button>
+              </>
+            ) : null}
+            accion={canCreate ? { rotulo: "Nueva guía", onClick: onNewGuia } : null}
+          />
+        )}
+        <div className={barra && !selectionMode ? "hidden" : undefined}>
         <div className="flex items-center justify-end mb-6 flex-wrap gap-4">
           <h1 className="sr-only">Guías de despacho</h1>
           <div className="flex items-center gap-2 flex-wrap">
@@ -550,6 +587,7 @@ export default function GuiasList({
           </div>
         </div>
 
+        </div>
         {/* 🔴 ARRIBA, SOLO LO QUE ESPERA ALGO (5-sep-2026).
             🩸 Este banner decía «N guías pendientes de despachar» y **solo lo
             veía bodega** (`role === "bodega"`), justo el rol que ya aterriza en
@@ -591,7 +629,7 @@ export default function GuiasList({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar por transportista, cliente, factura o N° de guía…"
-                className="border border-gray-200 rounded-lg px-3 py-3 md:py-2 text-base md:text-sm outline-none focus:border-black w-full max-w-sm transition"
+                className={`border border-gray-200 rounded-lg px-3 py-3 md:py-2 text-base md:text-sm outline-none focus:border-black w-full transition max-w-sm ${barra && !selectionMode ? "hidden" : ""}`}
               />
               {/* 🔴 EL FILTRO QUE SE VE Y SE PUEDE QUITAR (11-sep-2026).
                   🩸 Desde ⌘K → «guías pendientes» (`/guias?pendientes=1`) la
@@ -876,11 +914,14 @@ export default function GuiasList({
                                       <input type="checkbox" checked={selectedIds.has(g.id)} onChange={() => toggleSelect(g.id)} className="accent-black" />
                                     </span>
                                   )}
-                                  <span className="font-medium truncate">
+                                  {/* 🔴 Barra v2: el cliente se lee ENTERO (puede bajar a una segunda línea). */}
+                                  <span className={`font-medium ${barra ? "min-w-[6rem] break-words" : "truncate"}`}>
                                     {clientesSummary(g.guia_items || []) || "Sin cliente"}
                                   </span>
                                 </div>
-                                {!isDispatched && (
+                                {/* Barra v3.1: «Despachar» y el borde ámbar ya dicen que está
+                                    pendiente; el chip tapaba el nombre del cliente. */}
+                                {!isDispatched && !barra && (
                                   <span className="shrink-0"><StatusBadge estado="pendiente" /></span>
                                 )}
                                 <svg
@@ -898,7 +939,7 @@ export default function GuiasList({
                               </div>
                               {/* El número y la fecha, chicos: sirven para nombrar
                                   la guía, no para elegirla. */}
-                              <div className="mt-1 text-xs text-gray-400 font-mono">
+                              <div className={`mt-1 text-xs text-gray-400 font-mono ${barra ? "whitespace-nowrap" : ""}`}>
                                 {fmtGuia(g.numero)} · {fmtDate(g.fecha)}
                               </div>
                               {avisosDeLaFila(g).length > 0 && (
