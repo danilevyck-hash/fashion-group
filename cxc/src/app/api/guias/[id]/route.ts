@@ -12,6 +12,12 @@ import {
   type CorreccionDeBultos,
   type RenglonBultos,
 } from "@/lib/guias/bultos-correccion";
+import {
+  marcarRenglonesConEtiquetas,
+  reatarEtiquetas,
+  totalesPorRenglon,
+} from "@/lib/guias/etiquetas-server";
+import { ETIQUETAS_POR_ENVIO, type RenglonParaAtar } from "@/lib/guias/etiquetas-por-envio";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const GUIAS_ROLES = ["admin", "secretaria", "bodega", "vendedor"]; // lectura (GET)
@@ -82,6 +88,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   if (data?.guia_items) {
     data.guia_items = data.guia_items.filter((i: { deleted?: boolean }) => !i.deleted);
     data.guia_items.sort((a: { orden: number }, b: { orden: number }) => a.orden - b.orden);
+    // 🔴 1-oct-2026: el renglón que es un envío etiquetado viaja con
+    // `con_etiquetas` y la pantalla le pone candado a sus bultos.
+    data.guia_items = await marcarRenglonesConEtiquetas(data.guia_items);
   }
   return NextResponse.json(data);
 }
@@ -132,7 +141,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   // línea, por el mismo camino que `items_guia_transp` — NUNCA por `items`,
   // que es un reemplazo completo y le rotaría el id a cada renglón en pleno
   // despacho.
-  const correccionesBultos: CorreccionDeBultos[] = Array.isArray(items_bultos)
+  let correccionesBultos: CorreccionDeBultos[] = Array.isArray(items_bultos)
     ? (items_bultos as Array<{ id?: unknown; bultos?: unknown }>)
         .map((f) => ({
           id: typeof f?.id === "string" ? f.id.trim() : "",
@@ -140,6 +149,14 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         }))
         .filter((f) => UUID_RE.test(f.id))
     : [];
+  // 🔴 LOS BULTOS DE UN ENVÍO ETIQUETADO NO SE CORRIGEN (1-oct-2026). Daniel: lo
+  // impreso no se cambia; el renglón lleva el total de sus etiquetas. Una
+  // corrección para ese renglón (un borrador viejo, un toque que no debía) se
+  // IGNORA aquí, en el servidor, aunque la pantalla ya no ofrezca la caja.
+  if (ETIQUETAS_POR_ENVIO && correccionesBultos.length > 0) {
+    const conEtiquetas = await totalesPorRenglon(correccionesBultos.map((c) => c.id));
+    correccionesBultos = correccionesBultos.filter((c) => !conEtiquetas.has(c.id));
+  }
 
   if (estado && (estado === "Completada" || estado === "Despachada")) {
     const { data: currentItems } = await supabaseServer.from("guia_items").select("id, bultos").eq("guia_id", id).eq("deleted", false);
@@ -203,6 +220,19 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (guiaErr) return NextResponse.json({ error: guiaErr.message }, { status: 500 });
 
   if (items !== undefined) {
+    // 🩸 EL BUG DEL 1-oct-2026: este reemplazo BORRA de verdad los renglones
+    // viejos, y por el `ON DELETE SET NULL` de `guias_etiquetas.guia_item_id`
+    // las etiquetas atadas a ellos se desataban EN SILENCIO —la guía seguía
+    // llevando el envío y la etiqueta volvía a «Pendiente»—. Ahora se leen los
+    // renglones viejos ANTES, y las etiquetas se mudan a los nuevos ANTES de
+    // borrar (`reatarEtiquetas`): cuando el DELETE llega, ya no apuntan ahí.
+    const { data: viejosLeidos } = await supabaseServer
+      .from("guia_items")
+      .select("id, cliente_codigo, empresa, direccion")
+      .eq("guia_id", id)
+      .gte("orden", 0);
+    const renglonesViejos = (viejosLeidos ?? []) as RenglonParaAtar[];
+
     // Safe replace: insert new items first, then delete old ones
     if (items && items.length > 0) {
       const rows = items.map((item: Record<string, unknown>, i: number) => ({
@@ -212,11 +242,24 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         empresa: item.empresa || "", facturas: item.facturas || "",
         bultos: item.bultos || 0, numero_guia_transp: item.numero_guia_transp || "",
       }));
-      const { error: itemsErr } = await supabaseServer.from("guia_items").insert(rows);
+      const { data: insertados, error: itemsErr } = await supabaseServer
+        .from("guia_items")
+        .insert(rows)
+        .select("id, cliente_codigo, empresa, direccion");
       if (itemsErr) {
         // Cleanup: remove any partially inserted new items
         await supabaseServer.from("guia_items").delete().eq("guia_id", id).lt("orden", 0);
         return NextResponse.json({ error: itemsErr.message }, { status: 500 });
+      }
+      // 🔴 Las etiquetas se mudan ANTES del DELETE. Con envíos, el renglón que
+      // se quedó con etiquetas lleva como bultos el total de ellas: lo impreso
+      // manda y no se edita, ni aunque el cuerpo traiga otro número.
+      const { bultosPorRenglon } = await reatarEtiquetas(
+        renglonesViejos,
+        (insertados ?? []) as RenglonParaAtar[],
+      );
+      for (const [renglonId, total] of bultosPorRenglon) {
+        await supabaseServer.from("guia_items").update({ bultos: total }).eq("id", renglonId).eq("guia_id", id);
       }
       // New items inserted successfully — delete old items (positive orden)
       await supabaseServer.from("guia_items").delete().eq("guia_id", id).gte("orden", 0);
@@ -350,6 +393,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (data?.guia_items) {
     data.guia_items = data.guia_items.filter((i: { deleted?: boolean }) => !i.deleted);
     data.guia_items.sort((a: { orden: number }, b: { orden: number }) => a.orden - b.orden);
+    data.guia_items = await marcarRenglonesConEtiquetas(data.guia_items);
   }
 
   const session = getSession(req);

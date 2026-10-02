@@ -37,6 +37,21 @@ vi.mock("@/lib/requireRole", () => ({
 
 vi.mock("@/lib/log-activity", () => ({ logActivity: async () => {} }));
 
+// 🔄 1-oct-2026 — Daniel: etiquetas POR ENVÍO (`ETIQUETAS_POR_ENVIO`). Con el
+// interruptor PRENDIDO lo impreso no se cambia (el PATCH contesta 409 siempre)
+// y borrar ANULA el envío entero. La perilla deja probar las dos posiciones
+// con el CÓDIGO de verdad: prendida (lo de hoy) y apagada (volver atrás).
+const perilla = vi.hoisted(() => ({ porEnvio: true }));
+vi.mock("@/lib/guias/etiquetas-por-envio", async (orig) => {
+  const real = await orig<typeof import("@/lib/guias/etiquetas-por-envio")>();
+  return {
+    ...real,
+    get ETIQUETAS_POR_ENVIO() {
+      return perilla.porEnvio;
+    },
+  };
+});
+
 // ── La base doblada ─────────────────────────────────────────────────────────
 interface Escritura {
   tabla: string;
@@ -145,6 +160,7 @@ function fila(over: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
+  perilla.porEnvio = true;
   rolActual = "admin";
   sinTabla = false;
   proximoErrorInsert = null;
@@ -235,8 +251,19 @@ describe("🔴 2. una etiqueta que ya salió en una guía no se corrige ni se bo
     const { PATCH } = await una();
     const res = await PATCH(req({ cajas: 20 }), { params: { id: "1" } });
     expect(res.status).toBe(409);
-    expect((await res.json()).error).toContain("GT-256");
+    // 🔄 1-oct-2026: con envíos el PATCH contesta «lo impreso no se cambia»
+    // antes de mirar la guía; con el interruptor apagado, el 409 de siempre.
+    expect((await res.json()).error).toContain("Lo impreso no se cambia");
     expect(escrituras.filter((e) => e.op === "update")).toHaveLength(0);
+    expect(etiquetas[0].cajas).toBe(14);
+  });
+
+  it("interruptor APAGADO: el 409 dice la guía, como antes", async () => {
+    perilla.porEnvio = false;
+    const { PATCH } = await una();
+    const res = await PATCH(req({ cajas: 20 }), { params: { id: "1" } });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toContain("GT-256");
     expect(etiquetas[0].cajas).toBe(14);
   });
 
@@ -250,7 +277,22 @@ describe("🔴 2. una etiqueta que ya salió en una guía no se corrige ni se bo
 });
 
 describe("🔴 3. pendiente: se corrige y se borra — el borrado es SOFT y FIRMADO", () => {
-  it("PATCH corrige los bultos", async () => {
+  // 🔄 1-oct-2026 — Daniel: *lo impreso no se cambia*. Con etiquetas por envío
+  // NO hay «Corregir bultos»: si hay un error se anula el envío y se hace de
+  // nuevo. Antes esta prueba exigía que el PATCH corrigiera (16 bultos); ahora
+  // exige el 409 sin escribir, y que lo de antes siga vivo con el interruptor
+  // apagado.
+  it("🔴 PATCH → 409 aunque esté pendiente: lo impreso no se cambia", async () => {
+    const { PATCH } = await una();
+    const res = await PATCH(req({ cajas: 16 }), { params: { id: "1" } });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toContain("anula el envío");
+    expect(escrituras.filter((e) => e.op === "update")).toHaveLength(0);
+    expect(etiquetas[0].cajas).toBe(14);
+  });
+
+  it("interruptor APAGADO: PATCH corrige los bultos, como antes", async () => {
+    perilla.porEnvio = false;
     const { PATCH } = await una();
     const res = await PATCH(req({ cajas: 16 }), { params: { id: "1" } });
     expect(res.status).toBe(200);

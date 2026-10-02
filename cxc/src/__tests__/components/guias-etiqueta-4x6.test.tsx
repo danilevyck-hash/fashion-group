@@ -22,6 +22,7 @@ import { describe, it, expect } from "vitest";
 import { construirPdfEtiquetas, datosDeEtiqueta } from "@/lib/guias/pdf-etiquetas";
 import {
   AYUDA_FORMATO,
+  FORMATO_POR_DEFECTO,
   OPCIONES_FORMATO,
   cajasDelJuego,
   nombreArchivoEtiquetas,
@@ -217,7 +218,10 @@ describe("🔴 3. con lo más largo y el bulto «300 de 300», nada se corta ni 
   });
 });
 
-describe("🔴 4. carta sigue igual y es el default", () => {
+// ⚠️ 1-oct-2026: el default de la PANTALLA es 4×6 (`FORMATO_POR_DEFECTO`, ver
+// el bloque 5). Lo que este bloque fija es el default de la FUNCIÓN, que sigue
+// siendo carta para que los candados del dibujo de carta midan la carta.
+describe("🔴 4. carta sigue igual y es el default de la función", () => {
   it("sin formato = carta: 4 por hoja, hoja carta", () => {
     const doc = construirPdfEtiquetas(datosDeEtiqueta(ETQ), cajasDelJuego(14));
     expect(doc.getNumberOfPages()).toBe(4);
@@ -241,7 +245,11 @@ describe("🔴 5. el botón, la ayuda y el archivo", () => {
   });
 
   it("las dos opciones y su ayuda", () => {
-    expect(OPCIONES_FORMATO.map((o) => o.label)).toEqual(["Hoja carta · 4 por hoja", "Etiqueta 4×6"]);
+    // 🔄 1-oct-2026 — Daniel: *«Se imprimirá SIEMPRE en 4 de ancho y 6 de alto
+    // pulgadas, vertical. Y ponlo como default, no la de 4 por hoja carta.»* El
+    // 4×6 va PRIMERO y es el que sale sin nada recordado; carta queda segunda.
+    expect(OPCIONES_FORMATO.map((o) => o.label)).toEqual(["Etiqueta 4×6", "Hoja carta · 4 por hoja"]);
+    expect(FORMATO_POR_DEFECTO).toBe("4x6");
     expect(AYUDA_FORMATO.carta).toBe("Hoja carta, 4 etiquetas por hoja, con líneas de corte.");
     expect(AYUDA_FORMATO["4x6"]).toBe("Una etiqueta por página de 4×6 pulgadas, para la impresora de etiquetas.");
   });

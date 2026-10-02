@@ -73,6 +73,7 @@ import { textoFalta } from "@/lib/guias/falta-para-despachar";
 import { textoYaSeDespacho } from "@/lib/guias/campos-editables";
 import { sugerenciasDireccion } from "@/lib/guias/direccion-sugerida";
 import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
+import { bultosBloqueadosPorEtiquetas } from "@/lib/guias/etiquetas-por-envio";
 
 interface GuiaFormProps {
   editingId: string | null;
@@ -247,17 +248,21 @@ const CAMPO_BLOQUEADO =
   "cursor-not-allowed select-text block";
 
 /** El valor de un campo que no se puede tocar. Ver el bloque de arriba. */
-function valorBloqueado(valor: string | number | null | undefined, alineado = false) {
+function valorBloqueado(valor: string | number | null | undefined, alineado = false, porEtiquetas = false) {
   const t = String(valor ?? "").trim();
   return (
     <span
       data-bloqueado="1"
+      data-bloqueado-por-etiquetas={porEtiquetas ? "1" : undefined}
       aria-disabled="true"
+      title={porEtiquetas ? "Bultos de las etiquetas impresas: no se cambian" : undefined}
       className={`${CAMPO_BLOQUEADO} px-2 ${alineado ? "text-right tabular-nums" : ""} ${
         t ? "text-gray-500" : "text-gray-300"
-      }`}
+      } ${porEtiquetas ? "inline-flex items-center gap-1.5" : ""}`}
     >
+      {porEtiquetas && <Candado />}
       {t || "—"}
+      {porEtiquetas && <span className="sr-only">, de las etiquetas impresas: no se cambian</span>}
     </span>
   );
 }
@@ -807,6 +812,9 @@ export default function GuiaForm({
     // transportista firmó"*. No están en la lista de tres de
     // `campos-editables.ts` y el servidor los rechaza igual.
     if (soloCorregible) return valorBloqueado(item.bultos ?? 0, alineado);
+    // 🔴 1-oct-2026: el renglón que es un ENVÍO ETIQUETADO lleva el total de sus
+    // etiquetas, y lo impreso no se cambia. Se lee, con candado, y no se edita.
+    if (bultosBloqueadosPorEtiquetas(item)) return valorBloqueado(item.bultos ?? 0, alineado, true);
     const clave = claveCampo(item, "bultos");
     const err = validationErrors.has(clave) || (touched.has(clave) && !item.bultos);
     return (
@@ -1146,7 +1154,7 @@ export default function GuiaForm({
                 <Campo label="Dirección" requerido={!soloCorregible} bloqueado={soloCorregible} htmlFor={idCampo(item, "direccion", "m")}>{campoDireccion(item, idx, "m")}</Campo>
                 <Campo label="Empresa" requerido={!soloCorregible} bloqueado={soloCorregible} htmlFor={idCampo(item, "empresa", "m")}>{campoEmpresa(item, idx, "m")}</Campo>
                 <Campo label="Factura(s)" requerido={!soloCorregible} nota="ej: 10234, 10235" htmlFor={idCampo(item, "facturas", "m")}>{campoFacturas(item, idx, "m")}</Campo>
-                <Campo label="Bultos" requerido={!soloCorregible} bloqueado={soloCorregible} htmlFor={idCampo(item, "bultos", "m")}>{campoBultos(item, idx, "m")}</Campo>
+                <Campo label="Bultos" requerido={!soloCorregible && !bultosBloqueadosPorEtiquetas(item)} bloqueado={soloCorregible || bultosBloqueadosPorEtiquetas(item)} htmlFor={idCampo(item, "bultos", "m")}>{campoBultos(item, idx, "m")}</Campo>
                 {/* 🔴 EL N° DEL TRANSPORTISTA, PEGADO A LOS BULTOS. Van juntos
                     porque se leen juntos del papel que trae el chofer. */}
                 {pideNumeroTransp && (

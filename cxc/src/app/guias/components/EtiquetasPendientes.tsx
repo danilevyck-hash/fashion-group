@@ -37,9 +37,18 @@ import {
 } from "@/lib/guias/etiquetas";
 import {
   MOTIVO_TOMADA_POR_EL_SELECTOR,
+  capturaDelEnvio,
   capturaEnEtiquetas,
   idsParaAtar,
 } from "@/lib/guias/anti-doble-captura";
+import {
+  ETIQUETAS_POR_ENVIO,
+  agruparEnEnvios,
+  desmarcarEnvio,
+  facturasDelEnvio,
+  marcarEnvio,
+  type Envio,
+} from "@/lib/guias/etiquetas-por-envio";
 
 interface Props {
   items: GuiaItem[];
@@ -71,6 +80,19 @@ export default function EtiquetasPendientes({
   }, [marcadas.join(",")]);
 
   if (etiquetas.length === 0) return null;
+
+  // 🔴 1-oct-2026: con etiquetas POR ENVÍO, una casilla por ENVÍO.
+  if (ETIQUETAS_POR_ENVIO) {
+    return (
+      <PendientesPorEnvio
+        items={items}
+        envios={agruparEnEnvios(etiquetas)}
+        mias={mias}
+        setMias={setMias}
+        onReemplazarItems={onReemplazarItems}
+      />
+    );
+  }
 
   function alternar(e: EtiquetaFila) {
     const estado = capturaEnEtiquetas(items, e, mias);
@@ -121,6 +143,86 @@ export default function EtiquetasPendientes({
                   {/* 🔴 EL BLOQUEO DICE POR QUÉ: una casilla apagada y muda se
                       lee como una falla del sistema. */}
                   {bloqueada && (
+                    <span className="shrink-0 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-xs text-amber-700">
+                      {MOTIVO_TOMADA_POR_EL_SELECTOR}
+                    </span>
+                  )}
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+// ─── Por ENVÍO (1-oct-2026) ──────────────────────────────────────────────────
+//
+// 🔴 Daniel, 1-oct-2026: en la guía el envío es UN renglón y sus bultos son el
+// total de las etiquetas — NO se editan (el renglón sale con candado). Una
+// casilla marca o desmarca TODAS las facturas del envío a la vez. Se juntan en
+// el mismo renglón solo los envíos de igual cliente + empresa + destino; nunca
+// con un renglón escrito a mano. La guía NO muestra rangos.
+
+function PendientesPorEnvio({
+  items,
+  envios,
+  mias,
+  setMias,
+  onReemplazarItems,
+}: {
+  items: GuiaItem[];
+  envios: Envio[];
+  mias: ReadonlySet<number>;
+  setMias: (f: (previas: ReadonlySet<number>) => ReadonlySet<number>) => void;
+  onReemplazarItems: (items: GuiaItem[]) => void;
+}) {
+  function alternar(v: Envio) {
+    const estado = capturaDelEnvio(items, v.filas, mias);
+    if (estado === "tomada-por-el-selector") return; // bloqueado: no se toca
+    const ids = v.filas.map((e) => e.id);
+    if (estado === "marcada") {
+      setMias((previas) => new Set([...previas].filter((id) => !ids.includes(id))));
+      onReemplazarItems(desmarcarEnvio(items, v));
+      return;
+    }
+    setMias((previas) => new Set([...previas, ...ids]));
+    onReemplazarItems(marcarEnvio(items, v));
+  }
+
+  return (
+    <div data-testid="etiquetas-pendientes" className="mb-8">
+      <div className="mb-4 text-xs uppercase tracking-[0.05em] text-gray-400">
+        Envíos etiquetados pendientes · {envios.length}
+      </div>
+      <div className="rounded-lg border border-gray-200 p-4">
+        <ul>
+          {envios.map((v) => {
+            const estado = capturaDelEnvio(items, v.filas, mias);
+            const bloqueado = estado === "tomada-por-el-selector";
+            return (
+              <li key={v.envio_id} className="border-t border-gray-100 first:border-t-0">
+                <label
+                  className={`flex min-h-[44px] flex-wrap items-center gap-3 py-1.5 text-sm lg:[@media(pointer:fine)]:min-h-0 lg:[@media(pointer:fine)]:py-1 ${
+                    bloqueado ? "cursor-default" : "cursor-pointer"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={estado === "marcada" || bloqueado}
+                    disabled={bloqueado}
+                    onChange={() => alternar(v)}
+                    className="h-4 w-4 shrink-0 accent-black disabled:opacity-60"
+                  />
+                  <span className="min-w-0 truncate font-medium">{v.cliente_nombre}</span>
+                  <span className="shrink-0 text-gray-500">{v.empresa}</span>
+                  <span className="min-w-0 truncate text-gray-500">→ {v.destino}</span>
+                  <span className="shrink-0 font-mono text-xs tabular-nums text-gray-500">{facturasDelEnvio(v)}</span>
+                  <span className="ml-auto shrink-0 tabular-nums text-gray-600">
+                    {v.total} {v.total === 1 ? "bulto" : "bultos"}
+                  </span>
+                  {bloqueado && (
                     <span className="shrink-0 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-xs text-amber-700">
                       {MOTIVO_TOMADA_POR_EL_SELECTOR}
                     </span>

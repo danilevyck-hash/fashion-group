@@ -24,6 +24,8 @@
 // mientras se despacha, y la línea discreta después) y en la bitácora.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { bultosBloqueadosPorEtiquetas } from "@/lib/guias/etiquetas-por-envio";
+
 /** Un renglón, reducido a lo que este módulo mira. */
 export interface RenglonBultos {
   id?: string | null;
@@ -32,6 +34,8 @@ export interface RenglonBultos {
   bultos_original?: number | null;
   /** Quién corrigió (el nombre de la sesión). */
   bultos_corregido_por?: string | null;
+  /** 🔴 1-oct-2026: renglón que es un envío etiquetado — sus bultos no se corrigen. */
+  con_etiquetas?: boolean;
 }
 
 /** Una corrección lista para viajar: UNA columna de UNA línea. */
@@ -71,6 +75,9 @@ export function correccionesDeBultos(
   items.forEach((it, i) => {
     const id = typeof it.id === "string" ? it.id : "";
     if (!id) return;
+    // 🔴 1-oct-2026: los bultos de un envío etiquetado no viajan nunca, ni de un
+    // borrador viejo del teléfono. El servidor los ignora igual.
+    if (bultosBloqueadosPorEtiquetas(it)) return;
     const antes = Number(it.bultos ?? 0) || 0;
     const ahora = Number(tecleados[i] ?? antes) || 0;
     if (ahora !== antes) salida.push({ id, bultos: ahora });

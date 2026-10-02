@@ -367,7 +367,12 @@ export function marcarFactura(
   if (facturaMarcada(items, cliente, f)) return [...items];
   const sec = (f.secuencial ?? "").trim();
 
-  const idxRenglon = items.findIndex((r) => esRenglonDe(r, cliente, f.empresa));
+  // 🔴 1-oct-2026: nunca se suma a un renglón que es un ENVÍO ETIQUETADO
+  // (`con_etiquetas`): sus bultos están bloqueados y son los de sus etiquetas.
+  // La factura suelta va a su propio renglón, con sus propios bultos.
+  const idxRenglon = items.findIndex(
+    (r) => esRenglonDe(r, cliente, f.empresa) && (r as { con_etiquetas?: boolean }).con_etiquetas !== true,
+  );
   if (idxRenglon >= 0) {
     return items.map((r, i) => {
       if (i !== idxRenglon) return r;

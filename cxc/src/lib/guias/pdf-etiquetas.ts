@@ -85,6 +85,7 @@ import {
 } from "@/lib/guias/etiquetas";
 import { MAY_DESTINO_MINIMO, acomodarDestino } from "@/lib/guias/etiqueta-destino";
 import type { FormatoEtiquetas } from "@/lib/guias/etiquetas";
+import { rangosDelEnvio } from "@/lib/guias/etiquetas-por-envio";
 
 // Hoja carta en milímetros.
 const HOJA_W = 215.9;
@@ -202,6 +203,11 @@ export interface DatosEtiqueta {
   cliente_nombre: string;
   destino: string;
   cajas: number;
+  /**
+   * 🔴 LA NOTA DE ESTA FACTURA (1-oct-2026), ≤ 15 letras en mayúsculas, o nada.
+   * Sin nota el dibujo es IDÉNTICO al de antes: no se reserva ningún espacio.
+   */
+  nota?: string | null;
 }
 
 export function datosDeEtiqueta(e: EtiquetaFila): DatosEtiqueta {
@@ -212,7 +218,40 @@ export function datosDeEtiqueta(e: EtiquetaFila): DatosEtiqueta {
     cliente_nombre: e.cliente_nombre,
     destino: e.destino,
     cajas: e.cajas,
+    nota: e.nota ?? null,
   };
+}
+
+/**
+ * 🔴 UNA ETIQUETA YA NUMERADA (1-oct-2026): el bulto `numero` «de `total`». En
+ * un envío de varias facturas el total es el del ENVÍO, no el de la factura
+ * (A 1–10, B 11–20, C 21–30, todas «de 30»), así que el número ya no puede
+ * salir de `d.cajas`.
+ */
+export interface EtiquetaNumerada {
+  d: DatosEtiqueta;
+  numero: number;
+  total: number;
+}
+
+/**
+ * Las etiquetas de un ENVÍO entero, numeradas corrido —o solo el bulto `solo`,
+ * para reimprimir uno—. Los rangos salen de `rangosDelEnvio`: el mismo cálculo
+ * que la pantalla, nunca un número guardado.
+ */
+export function paginasDelEnvio(
+  filas: readonly EtiquetaFila[],
+  solo?: number | null,
+): EtiquetaNumerada[] {
+  const { rangos, total } = rangosDelEnvio(filas);
+  const paginas: EtiquetaNumerada[] = [];
+  for (const r of rangos) {
+    const d = datosDeEtiqueta(r.fila);
+    for (let n = r.desde; n <= r.hasta; n++) {
+      if (solo == null || solo === n) paginas.push({ d, numero: n, total });
+    }
+  }
+  return paginas;
 }
 
 function nuevoDocumento(): jsPDF {
@@ -344,6 +383,51 @@ function bloqueDeCampo(
   return y;
 }
 
+/** 🔴 La nota se lee como el cliente: 5,5 mm de mayúscula, en negrita. */
+const MAY_NOTA = 5.5;
+/**
+ * El aire MÍNIMO entre la última línea del destino y el rótulo «Nota»: el
+ * descolgado de un destino de 7,5 mm (2,2 mm), un milímetro de respiro y la
+ * mayúscula del rótulo. Por debajo, el rótulo tocaría las comas del destino.
+ */
+const ENTRE_DESTINO_Y_NOTA_MINIMO = 0.207 * (MAY_DESTINO / ALTURA_DE_MAYUSCULA) + 1.0 + MAY_ROTULO;
+
+/**
+ * Dónde y a qué tamaño va la nota: el MAYOR tamaño (de 5,5 mm hacia abajo, de a
+ * 0,1) con el que entra en una línea y por encima de `piso`, achicando primero
+ * el aire sobre su rótulo (de `ENTRE_BLOQUES` hasta el mínimo). Nunca baja de
+ * `MAY_DESTINO_MINIMO` (3,4 mm, la misma regla de lectura a un metro): si ni
+ * así entra, se dibuja al mínimo pegada al destino — y eso no pasa con ningún
+ * caso real medido (el peor de carta entra, ver el candado).
+ */
+function acomodarNota(
+  doc: jsPDF,
+  nota: string,
+  yDestino: number,
+  piso: number,
+  ancho: number,
+): { y: number; mayuscula: number; falta: number } {
+  for (let mm = MAY_NOTA; mm >= MAY_DESTINO_MINIMO - 1e-9; mm -= 0.1) {
+    const m = Math.round(mm * 1000) / 1000;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(PT_PARA_MAYUSCULA(m));
+    if (doc.getTextWidth(nota) > ancho) continue;
+    const aire = Math.min(ENTRE_BLOQUES, piso - bajoElRotulo(m) - yDestino);
+    if (aire >= ENTRE_DESTINO_Y_NOTA_MINIMO) return { y: yDestino + aire, mayuscula: m, falta: 0 };
+  }
+  // Ni en el mínimo entra: se dice CUÁNTO falta, y quien dibuja aprieta el aire
+  // de arriba (ver `apretar` en `dibujarEtiqueta`).
+  const y = yDestino + ENTRE_DESTINO_Y_NOTA_MINIMO;
+  return { y, mayuscula: MAY_DESTINO_MINIMO, falta: y + bajoElRotulo(MAY_DESTINO_MINIMO) - piso };
+}
+
+/**
+ * 🔴 CUÁNTO SE PUEDE APRETAR EL AIRE DE ARRIBA, como mucho: los dos saltos
+ * «factura → cliente» y «cliente → destino» bajan de 12,5 mm hasta el mismo
+ * mínimo que separa el destino de la nota. Ni una letra cambia de tamaño.
+ */
+const APRETAR_MAXIMO = 2 * (ENTRE_BLOQUES - ENTRE_DESTINO_Y_NOTA_MINIMO);
+
 /**
  * Dibuja UNA etiqueta dentro de la celda que arranca en (x0, y0): el cuarto de
  * carta o la página 4×6. ⚠️ La celda se desarma con los nombres de siempre,
@@ -351,12 +435,18 @@ function bloqueDeCampo(
  */
 function dibujarEtiqueta(
   doc: jsPDF,
-  d: DatosEtiqueta,
-  caja: number,
+  { d, numero: caja, total }: EtiquetaNumerada,
   x0: number,
   y0: number,
   { w: CUARTO_W, h: CUARTO_H }: Celda = CELDA_CARTA,
-): void {
+  /**
+   * 🔴 Solo con nota y solo cuando ni al mínimo entra (el peor caso de CARTA:
+   * cliente en 2 líneas + destino en 3): los milímetros que se le quitan al
+   * aire ENTRE bloques de arriba —nunca al tamaño de nada— para que la nota no
+   * pise la raya del bulto. Sin nota vale 0 y el dibujo es el de siempre.
+   */
+  apretar = 0,
+): number {
   const izq = x0 + PAD_X;
   const der = x0 + CUARTO_W - PAD_X;
   const ancho = der - izq;
@@ -411,18 +501,34 @@ function dibujarEtiqueta(
   });
   y = bloqueDeCampo(doc, "Cliente", String(d.cliente_nombre ?? "").toUpperCase(), {
     ...campo,
-    y: y + ENTRE_BLOQUES,
+    y: y + ENTRE_BLOQUES - apretar / 2,
     mayuscula: MAY_CLIENTE,
     maxLineas: 2,
   });
-  bloqueDeCampo(doc, "Destino", String(d.destino ?? "").toUpperCase(), {
+  const yDestino = bloqueDeCampo(doc, "Destino", String(d.destino ?? "").toUpperCase(), {
     ...campo,
-    y: y + ENTRE_BLOQUES,
+    y: y + ENTRE_BLOQUES - apretar / 2,
     mayuscula: MAY_DESTINO,
     maxLineas: 2,
     hastaY: yRaya - AIRE_SOBRE_LA_RAYA,
     achicarHasta: MAY_DESTINO_MINIMO,
   });
+
+  // ── LA NOTA (1-oct-2026) ──
+  // 🔴 Daniel aprobó: *«Igual que hoy + NOTA después del destino, sin el cuadro
+  // y a la izquierda como los otros»*. Es un campo MÁS, con la MISMA
+  // `bloqueDeCampo`: rótulo gris «Nota» arriba, dato en negrita debajo, una
+  // línea. Sin nota no se dibuja nada y el papel es IDÉNTICO al de antes.
+  // 🔴 EL DESTINO MANDA: ya se dibujó con su hueco de siempre; la nota se
+  // acomoda en lo que queda hasta la raya, y si no entra cede ELLA — primero
+  // el aire sobre su rótulo, después su letra, hasta el piso legible.
+  const nota = String(d.nota ?? "").trim().toUpperCase();
+  let falta = 0;
+  if (nota) {
+    const acomodo = acomodarNota(doc, nota, yDestino, yRaya - AIRE_SOBRE_LA_RAYA, ancho);
+    falta = acomodo.falta;
+    bloqueDeCampo(doc, "Nota", nota, { ...campo, y: acomodo.y, mayuscula: acomodo.mayuscula, maxLineas: 1 });
+  }
 
   // ── «BULTO» y su número, abajo del todo, centrados y con su raya ──
   // 🔴 Se dibuja DESDE EL BORDE DE ABAJO, no desde donde terminó el destino: el
@@ -445,55 +551,83 @@ function dibujarEtiqueta(
   // `doc.text` porque son dos tamaños, pero comparten la base y se centran como
   // UN bloque: se mide el ancho de las dos piezas y se arranca a la izquierda
   // del centro, en vez de centrar cada una por su cuenta.
-  const { numero, total } = partesDelNumeroDeBulto(caja, d.cajas);
+  const { numero, total: deN } = partesDelNumeroDeBulto(caja, total);
   doc.setTextColor(17);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(F_BULTO);
   const anchoNumero = doc.getTextWidth(numero);
   doc.setFontSize(F_BULTO_TOTAL);
-  const anchoTotal = doc.getTextWidth(total);
+  const anchoTotal = doc.getTextWidth(deN);
   const xNumero = centro - (anchoNumero + BULTO_ANTES_DEL_TOTAL + anchoTotal) / 2;
   doc.setFontSize(F_BULTO);
   doc.text(numero, xNumero, yNumero);
   doc.setFontSize(F_BULTO_TOTAL);
-  doc.text(total, xNumero + anchoNumero + BULTO_ANTES_DEL_TOTAL, yNumero);
+  doc.text(deN, xNumero + anchoNumero + BULTO_ANTES_DEL_TOTAL, yNumero);
+  return falta;
 }
 
 /**
- * El PDF de las etiquetas que se le pidan. `cajas` son los NÚMEROS de caja a
- * imprimir: el juego completo es `[1..N]`, y reimprimir una sola es `[7]`.
+ * Cuánto hay que apretar el aire de arriba para que la nota de `d` entre en esa
+ * celda. Se MIDE dibujando en un papel de borrador (el mismo dibujo, así no hay
+ * una segunda cuenta que se pueda separar) y se recuerda por etiqueta: los
+ * bultos de una misma factura comparten todo lo de arriba.
+ */
+function apretarPara(d: DatosEtiqueta, celda: Celda, memoria: Map<DatosEtiqueta, number>): number {
+  if (!String(d.nota ?? "").trim()) return 0;
+  const ya = memoria.get(d);
+  if (ya !== undefined) return ya;
+  const borrador = new jsPDF({ unit: "mm", format: [celda.w, celda.h], orientation: "portrait" });
+  const falta = dibujarEtiqueta(borrador, { d, numero: 1, total: 1 }, 0, 0, celda);
+  const apretar = falta > 0 ? Math.min(APRETAR_MAXIMO, falta + 0.5) : 0;
+  memoria.set(d, apretar);
+  return apretar;
+}
+
+/**
+ * El PDF de las etiquetas que se le pidan. Dos formas de pedirlo, y UN SOLO
+ * generador:
+ *   · `(d, cajas, formato)` — una factura: `cajas` son los NÚMEROS a imprimir
+ *     (el juego completo es `[1..N]`, reimprimir una sola es `[7]`) y el «de N»
+ *     es `d.cajas`. Así se pedía hasta el 30-sep-2026 y sigue valiendo.
+ *   · `(paginas, formato)` — 🔴 un ENVÍO (1-oct-2026): cada página ya trae SU
+ *     factura, su número y el total del envío (`paginasDelEnvio`).
  *
- * ⚠️ Sin cajas devuelve el documento vacío y quien llama decide qué hacer:
+ * ⚠️ Sin páginas devuelve el documento vacío y quien llama decide qué hacer:
  * inventar una hoja en blanco sería peor.
  */
 export function construirPdfEtiquetas(
-  d: DatosEtiqueta,
-  cajas: readonly number[],
-  formato: FormatoEtiquetas = "carta",
+  a: DatosEtiqueta | readonly EtiquetaNumerada[],
+  b?: readonly number[] | FormatoEtiquetas,
+  c?: FormatoEtiquetas,
 ): jsPDF {
+  const paginas: readonly EtiquetaNumerada[] = Array.isArray(a)
+    ? (a as readonly EtiquetaNumerada[])
+    : (b as readonly number[]).map((caja) => ({ d: a as DatosEtiqueta, numero: caja, total: (a as DatosEtiqueta).cajas }));
+  const formato: FormatoEtiquetas = (Array.isArray(a) ? (b as FormatoEtiquetas | undefined) : c) ?? "carta";
+  const memoria = new Map<DatosEtiqueta, number>();
   if (formato === "4x6") {
     // 🔴 UNA etiqueta por página, sin líneas de corte: la impresora de etiquetas
     // ya trae el rollo partido.
     const tam: [number, number] = [ETIQUETA_4X6_W, ETIQUETA_4X6_H];
     const doc = new jsPDF({ unit: "mm", format: tam, orientation: "portrait" });
-    cajas.forEach((caja, i) => {
+    paginas.forEach((p, i) => {
       if (i > 0) doc.addPage(tam, "portrait");
-      dibujarEtiqueta(doc, d, caja, 0, 0, CELDA_4X6);
+      dibujarEtiqueta(doc, p, 0, 0, CELDA_4X6, apretarPara(p.d, CELDA_4X6, memoria));
     });
     return doc;
   }
   const doc = nuevoDocumento();
-  const hojas = hojasDeEtiquetas(cajas);
+  const hojas = hojasDeEtiquetas(paginas);
   hojas.forEach((hoja, i) => {
     // La primera va en la página que el documento ya trae: una `addPage()` de
     // más deja una hoja en blanco al principio de todo lo que se imprima.
     if (i > 0) doc.addPage();
     lineasDeCorte(doc);
-    hoja.forEach((caja, pos) => {
-      if (caja == null) return; // cuarto en blanco, a propósito
+    hoja.forEach((p, pos) => {
+      if (p == null) return; // cuarto en blanco, a propósito
       const x0 = (pos % 2) * CUARTO_W;
       const y0 = Math.floor(pos / 2) * CUARTO_H;
-      dibujarEtiqueta(doc, d, caja, x0, y0);
+      dibujarEtiqueta(doc, p, x0, y0, CELDA_CARTA, apretarPara(p.d, CELDA_CARTA, memoria));
     });
   });
   return doc;

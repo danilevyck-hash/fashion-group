@@ -30,6 +30,20 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import EtiquetasPorEnvio from "./EtiquetasPorEnvio";
+import {
+  BOTON_BLANCO,
+  BOTON_NEGRO,
+  CHIP,
+  ElegirPapel,
+  Opcion,
+  Paso,
+  claveFactura,
+  fechaCorta,
+  fmtMonto,
+  useFormatoEtiquetas,
+} from "./etiquetas-ui";
+import { ETIQUETAS_POR_ENVIO } from "@/lib/guias/etiquetas-por-envio";
 import ClientePicker from "@/components/ClientePicker";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import { ModalOverlay, Toast } from "@/components/ui";
@@ -54,7 +68,6 @@ import {
 import {
   AYUDA_FORMATO,
   MAX_CAJAS,
-  OPCIONES_FORMATO,
   TEXTO_TRAER_DE_SWITCH,
   avisoDeReimpresion,
   cajasDelJuego,
@@ -76,32 +89,6 @@ import {
   type FormatoEtiquetas,
 } from "@/lib/guias/etiquetas";
 import { abrirPdfEnPestana } from "@/lib/guias/pdf-en-pestana";
-import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
-
-const BOTON_NEGRO =
-  "inline-flex items-center justify-center gap-2 bg-black text-white rounded-md px-4 text-sm font-medium " +
-  "transition hover:bg-gray-800 active:scale-[0.97] disabled:opacity-40 min-h-[44px]";
-const BOTON_BLANCO =
-  "inline-flex items-center justify-center gap-2 border border-gray-200 text-gray-700 rounded-md px-4 text-sm " +
-  "transition hover:bg-gray-50 active:scale-[0.97] disabled:opacity-40 min-h-[44px]";
-const CHIP =
-  "inline-flex items-center rounded-full border px-3.5 text-sm transition min-h-[44px] " +
-  "md:[@media(pointer:fine)]:min-h-0 md:[@media(pointer:fine)]:py-1.5";
-
-function fmtMonto(n: number): string {
-  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function fechaCorta(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return new Intl.DateTimeFormat("es-PA", {
-    timeZone: "America/Panama",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(d);
-}
 
 /**
  * 🔴 EL PDF SE ABRE EN PESTAÑA NUEVA, NO SE BAJA (18-sep-2026). Daniel: *«abrir
@@ -138,45 +125,16 @@ function imprimir(e: EtiquetaFila, cajas: readonly number[], formato: FormatoEti
 }
 
 /**
- * 🔴 EL PAPEL SE RECUERDA POR NAVEGADOR (30-sep-2026): la computadora que está
- * al lado de la impresora de etiquetas queda en 4×6 y la de la oficina en
- * carta, sin elegir cada vez. Sin memoria (privado, bloqueado) = hoja carta.
+ * 🔴 EL INTERRUPTOR (1-oct-2026): con `ETIQUETAS_POR_ENVIO` prendido la pestaña
+ * es la de ENVÍOS —varias facturas, numeración corrida, nota, «Anular envío» y
+ * sin «Corregir bultos»—; apagado, vuelve EXACTAMENTE la de abajo, «Una a la
+ * vez», que no se tocó.
  */
-const CLAVE_FORMATO = "fg_guias_etiquetas_formato";
-
-function formatoRecordado(): FormatoEtiquetas {
-  try {
-    return localStorage.getItem(CLAVE_FORMATO) === "4x6" ? "4x6" : "carta";
-  } catch {
-    return "carta";
-  }
-}
-
-function useFormatoEtiquetas(): [FormatoEtiquetas, (f: FormatoEtiquetas) => void] {
-  // ⚠️ El panel y el modal nacen con un toque, nunca en el HTML del servidor:
-  // leer la memoria al arrancar no descuadra la hidratación.
-  const [formato, setFormato] = useState<FormatoEtiquetas>(formatoRecordado);
-  const elegir = useCallback((f: FormatoEtiquetas) => {
-    setFormato(f);
-    try { localStorage.setItem(CLAVE_FORMATO, f); } catch { /* sin memoria: solo esta vez */ }
-  }, []);
-  return [formato, elegir];
-}
-
-function ElegirPapel({ formato, onElegir }: { formato: FormatoEtiquetas; onElegir: (f: FormatoEtiquetas) => void }) {
-  return (
-    <ControlSegmentado
-      options={OPCIONES_FORMATO}
-      active={formato}
-      onChange={onElegir}
-      ariaLabel="Papel de las etiquetas"
-      ancho="contenido"
-      className="mb-3"
-    />
-  );
-}
-
 export default function EtiquetasView() {
+  return ETIQUETAS_POR_ENVIO ? <EtiquetasPorEnvio /> : <EtiquetasUnaALaVez />;
+}
+
+function EtiquetasUnaALaVez() {
   const [etiquetas, setEtiquetas] = useState<EtiquetaFila[]>([]);
   const [cargando, setCargando] = useState(true);
   const [sinTabla, setSinTabla] = useState(false);
@@ -829,24 +787,6 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
   );
 }
 
-function claveFactura(f: Factura): string {
-  return `${f.empresa_key}-${f.secuencial}`;
-}
-
-function Paso({ n, titulo, ayuda }: { n: number; titulo: string; ayuda: string }) {
-  return (
-    <div className="mb-2.5 flex items-start gap-3">
-      <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-gray-900 font-mono text-[12px] font-semibold text-white">
-        {n}
-      </span>
-      <div>
-        <div className="text-[13.5px] font-semibold">{titulo}</div>
-        <div className="mt-0.5 text-[12.5px] text-gray-600">{ayuda}</div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Reimprimir: el juego completo o una sola caja ───────────────────────────
 
 function ModalReimprimir({
@@ -939,40 +879,6 @@ function ModalReimprimir({
         </div>
       </div>
     </ModalOverlay>
-  );
-}
-
-function Opcion({
-  elegida,
-  onElegir,
-  titulo,
-  detalle,
-  children,
-}: {
-  elegida: boolean;
-  onElegir: () => void;
-  titulo: string;
-  detalle: string;
-  children?: React.ReactNode;
-}) {
-  return (
-    <div
-      role="radio"
-      aria-checked={elegida}
-      tabIndex={0}
-      onClick={onElegir}
-      onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); onElegir(); } }}
-      className={`mb-2 flex min-h-[44px] cursor-pointer items-start gap-3 rounded-lg border p-3 transition ${
-        elegida ? "border-gray-900 bg-gray-50" : "border-gray-200"
-      }`}
-    >
-      <span className={`mt-0.5 h-[17px] w-[17px] shrink-0 rounded-full ${elegida ? "border-[5px] border-gray-900" : "border border-gray-400"}`} />
-      <div>
-        <div className="text-[13.5px] font-medium">{titulo}</div>
-        <div className="mt-0.5 text-[12.5px] text-gray-600">{detalle}</div>
-        {children}
-      </div>
-    </div>
   );
 }
 

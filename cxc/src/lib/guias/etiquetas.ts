@@ -87,6 +87,16 @@ export interface EtiquetaFila {
    * `guiaQueSeLlevo` cada vez que se lee.
    */
   guia_numero: number | null;
+  /**
+   * 🔴 EL ENVÍO (1-oct-2026): las facturas del mismo envío —empresa + cliente +
+   * destino— comparten este id y se numeran CORRIDO. Opcional: sin la migración
+   * `20261224120000` no llega, y cada fila es un envío de una (`envioDe`).
+   */
+  envio_id?: string;
+  /** El orden de la factura dentro del envío (1, 2, 3…). Sin dato, 1. */
+  orden_en_envio?: number;
+  /** La nota de esta factura (≤ 15, mayúsculas), o `null`. */
+  nota?: string | null;
 }
 
 // ─── El estado, DERIVADO ─────────────────────────────────────────────────────
@@ -257,10 +267,10 @@ export function cajasDelJuego(total: number): number[] {
  * elemento: una hoja, la etiqueta en la POSICIÓN 1 (arriba izquierda) y el
  * resto en blanco. No hay un segundo dibujo del papel.
  */
-export function hojasDeEtiquetas(cajas: readonly number[]): Array<Array<number | null>> {
-  const hojas: Array<Array<number | null>> = [];
+export function hojasDeEtiquetas<T = number>(cajas: readonly T[]): Array<Array<T | null>> {
+  const hojas: Array<Array<T | null>> = [];
   for (let i = 0; i < cajas.length; i += ETIQUETAS_POR_HOJA) {
-    const hoja: Array<number | null> = [];
+    const hoja: Array<T | null> = [];
     for (let j = 0; j < ETIQUETAS_POR_HOJA; j++) {
       hoja.push(i + j < cajas.length ? cajas[i + j] : null);
     }
@@ -312,9 +322,16 @@ export function numeroDeCaja(n: number, total: number): string {
 // (mismos milímetros de mayúscula), una por página y sin líneas de corte.
 export type FormatoEtiquetas = "carta" | "4x6";
 
+//
+// 🔴 1-oct-2026, Daniel: *«Se imprimirá SIEMPRE en 4 de ancho y 6 de alto
+// pulgadas, vertical. Y ponlo como default, no la de 4 por hoja carta.»* El 4×6
+// va PRIMERO y es lo que se elige cuando el navegador no recuerda nada
+// (`FORMATO_POR_DEFECTO`); la hoja carta queda de segunda opción, funcionando.
+export const FORMATO_POR_DEFECTO: FormatoEtiquetas = "4x6";
+
 export const OPCIONES_FORMATO: ReadonlyArray<{ value: FormatoEtiquetas; label: string }> = [
-  { value: "carta", label: "Hoja carta · 4 por hoja" },
   { value: "4x6", label: "Etiqueta 4×6" },
+  { value: "carta", label: "Hoja carta · 4 por hoja" },
 ];
 
 /** La ayuda del paso «Imprimir», según el papel elegido. */

@@ -11,6 +11,11 @@
  *
  * 🔴 Borrar no borra: `deleted = true` con quién y cuándo. Por el índice único
  * PARCIAL de la tabla, esa misma factura se puede volver a etiquetar después.
+ *
+ * 🔴 CON ETIQUETAS POR ENVÍO (1-oct-2026, `ETIQUETAS_POR_ENVIO`): lo impreso
+ * NO se cambia — el PATCH contesta 409 siempre— y el DELETE ANULA EL ENVÍO
+ * ENTERO de esa etiqueta (todas sus facturas, firmado), 409 si ya salió en una
+ * guía. Lo decide `etiquetas-server.ts`, no esta ruta.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";

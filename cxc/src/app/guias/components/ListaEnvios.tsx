@@ -44,6 +44,7 @@ import type { GuiaItem } from "./types";
 import ResumenEnvio from "./ResumenEnvio";
 import { numeroTranspImpreso } from "@/lib/guias/modo-despacho";
 import { textoCorreccionEnVivo, textoCorreccionGuardada } from "@/lib/guias/bultos-correccion";
+import { bultosBloqueadosPorEtiquetas } from "@/lib/guias/etiquetas-por-envio";
 
 /** Campo de texto: 44 px con el dedo, denso solo cuando hay mouse. */
 const CAMPO =
@@ -121,14 +122,34 @@ export default function ListaEnvios({
           // (`editable`) y que la pantalla haya pasado las cajas. Sin el
           // `setBultos` no se dibuja nada — es la misma pantalla de siempre.
           const puedeContar = editable && Boolean(setBultos);
+          // 🔴 1-oct-2026 — EL CELULAR DE BODEGA, MÁS SIMPLE. Un renglón que es
+          // un ENVÍO ETIQUETADO trae sus bultos de las etiquetas impresas, y lo
+          // impreso no se cambia (Daniel): ni caja para contar ni la línea en
+          // vivo «↑ 7 → 8». Se LEE el número con su candado. El N° del
+          // transportista, el receptor, la cédula, la placa y las firmas siguen
+          // exactamente igual.
+          const fijos = bultosBloqueadosPorEtiquetas(item);
+          const conCaja = puedeContar && !fijos;
           return (
           <li key={item.id || idx} className="py-3">
             <div className="flex items-start justify-between gap-3">
               <ResumenEnvio item={item} />
               {/* En una guía firmada el número se LEE. Editable, la caja está
                   abajo junto a la del N° del transportista. */}
-              {!puedeContar && (
-                <span className="text-sm tabular-nums shrink-0">{item.bultos || 0} bultos</span>
+              {!conCaja && (
+                <span
+                  className="text-sm tabular-nums shrink-0 inline-flex items-center gap-1"
+                  data-bultos-de-etiquetas={fijos ? "1" : undefined}
+                >
+                  {fijos && (
+                    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5 text-gray-400" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="5" y="11" width="14" height="10" rx="2" />
+                      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                    </svg>
+                  )}
+                  {item.bultos || 0} bultos
+                  {fijos && <span className="sr-only">, de las etiquetas impresas: no se cambian</span>}
+                </span>
               )}
             </div>
 
@@ -140,7 +161,7 @@ export default function ListaEnvios({
               <p className="mt-0.5 text-xs text-gray-400">{textoCorreccionGuardada(item)}</p>
             )}
 
-            {puedeContar && (
+            {conCaja && (
               <div className="mt-2 flex items-end gap-2">
                 <div className="w-28 shrink-0">
                   <label htmlFor={`despacho-bultos-${idx}`} className="block text-xs text-gray-500 mb-1">

@@ -24,6 +24,16 @@ import { useState } from "react";
 import { render, screen, fireEvent, cleanup, act, waitFor } from "@testing-library/react";
 
 import EtiquetasView from "@/app/guias/components/EtiquetasView";
+
+// 🔄 1-oct-2026 — Daniel: las etiquetas pasan a ser POR ENVÍO
+// (`ETIQUETAS_POR_ENVIO`, prendido). Las pruebas de PANTALLA de este archivo
+// fijan «Una a la vez», que sigue viva detrás del interruptor APAGADO: se la
+// prueba apagada a propósito, para que volver atrás siga funcionando. La
+// pantalla de envíos tiene su propio candado (`guias-etiquetas-por-envio`).
+vi.mock("@/lib/guias/etiquetas-por-envio", async (orig) => ({
+  ...(await orig<typeof import("@/lib/guias/etiquetas-por-envio")>()),
+  ETIQUETAS_POR_ENVIO: false,
+}));
 import FacturasDelCliente from "@/app/guias/components/FacturasDelCliente";
 import EtiquetasPendientes from "@/app/guias/components/EtiquetasPendientes";
 import type { GuiaItem } from "@/app/guias/components/types";

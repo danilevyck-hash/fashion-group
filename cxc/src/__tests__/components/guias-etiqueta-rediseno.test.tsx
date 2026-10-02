@@ -34,6 +34,16 @@ import fs from "fs";
 import path from "path";
 
 import EtiquetasView from "@/app/guias/components/EtiquetasView";
+
+// 🔄 1-oct-2026 — Daniel: las etiquetas pasan a ser POR ENVÍO
+// (`ETIQUETAS_POR_ENVIO`, prendido). Las pruebas de PANTALLA de este archivo
+// fijan «Una a la vez», que sigue viva detrás del interruptor APAGADO: se la
+// prueba apagada a propósito, para que volver atrás siga funcionando. La
+// pantalla de envíos tiene su propio candado (`guias-etiquetas-por-envio`).
+vi.mock("@/lib/guias/etiquetas-por-envio", async (orig) => ({
+  ...(await orig<typeof import("@/lib/guias/etiquetas-por-envio")>()),
+  ETIQUETAS_POR_ENVIO: false,
+}));
 import { construirPdfEtiquetas, datosDeEtiqueta } from "@/lib/guias/pdf-etiquetas";
 import {
   ROTULO_BULTO,
@@ -149,9 +159,11 @@ describe("🔴 1. la etiqueta: el rótulo ARRIBA del dato", () => {
   it("🔴 los tres campos salen de UNA sola función: nadie puede pegar un rótulo en uno solo", () => {
     const sinComentarios = PDF.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     const usos = sinComentarios.match(/bloqueDeCampo\(/g) ?? [];
-    // La definición + los tres campos.
-    expect(usos).toHaveLength(4);
-    for (const rotulo of ['"Factura"', '"Cliente"', '"Destino"']) {
+    // 🔄 1-oct-2026 — Daniel aprobó la NOTA *«después del destino, sin el
+    // cuadro y a la izquierda como los otros»*: es un CUARTO campo y sale de la
+    // MISMA función. La definición + los cuatro campos.
+    expect(usos).toHaveLength(5);
+    for (const rotulo of ['"Factura"', '"Cliente"', '"Destino"', '"Nota"']) {
       expect(sinComentarios).toContain(`bloqueDeCampo(doc, ${rotulo},`);
     }
   });
@@ -199,7 +211,12 @@ describe("🔴 3. «BULTO» y su número, separados por una raya", () => {
     );
     // El número ya no se centra con `align`: son dos piezas de distinto tamaño
     // que se centran como UN bloque (`xNumero`).
-    expect(sinComentarios).toContain("partesDelNumeroDeBulto(caja, d.cajas)");
+    // 🔄 1-oct-2026 (etiquetas POR ENVÍO, Daniel): el «de N» ya no sale de las
+    // cajas de UNA factura sino del total del ENVÍO (A 1–10, B 11–20… «de 30»):
+    // viaja en la etiqueta numerada como `total`. Para una factura sola es el
+    // mismo número de antes (`total: d.cajas`).
+    expect(sinComentarios).toContain("partesDelNumeroDeBulto(caja, total)");
+    expect(sinComentarios).toContain("total: (a as DatosEtiqueta).cajas");
     expect(sinComentarios).toContain("doc.text(numero, xNumero, yNumero);");
   });
 

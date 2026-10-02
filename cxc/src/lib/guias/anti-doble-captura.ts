@@ -150,3 +150,24 @@ export function idsParaAtar(
 ): number[] {
   return etiquetas.filter((e) => etiquetaEstaMarcada(items, e, mias)).map((e) => e.id);
 }
+
+// ─── Por ENVÍO (1-oct-2026) ──────────────────────────────────────────────────
+
+/**
+ * 🔴 LA MISMA REGLA, PARA UN ENVÍO ENTERO. Con etiquetas por envío, en Nueva
+ * guía se marca el ENVÍO (todas sus facturas a la vez, en un renglón). Si
+ * alguna de sus facturas ya la tomó el selector de siempre, el envío entero se
+ * bloquea —marcarlo sumaría sus bultos encima—; si todas las marcó este panel,
+ * está marcado. Se arma con `capturaEnEtiquetas`, factura por factura: la regla
+ * sigue viviendo en UN lugar.
+ */
+export function capturaDelEnvio(
+  items: readonly RenglonDeGuia[],
+  filas: readonly EtiquetaFila[],
+  mias: ReadonlySet<number>,
+): CapturaEnEtiquetas {
+  const estados = filas.map((e) => capturaEnEtiquetas(items, e, mias));
+  if (estados.includes("tomada-por-el-selector")) return "tomada-por-el-selector";
+  if (estados.length > 0 && estados.every((x) => x === "marcada")) return "marcada";
+  return "libre";
+}

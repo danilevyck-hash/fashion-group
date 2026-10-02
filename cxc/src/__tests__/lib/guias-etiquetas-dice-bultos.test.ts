@@ -44,6 +44,9 @@ const leer = (rel: string) => readFileSync(path.join(RAIZ, rel), "utf8");
 /** Los archivos de la pestaña Etiquetas: pantalla, reglas, papel y rutas. */
 const ARCHIVOS = [
   "app/guias/components/EtiquetasView.tsx",
+  // 1-oct-2026: la pantalla de ENVÍOS y sus reglas entran al mismo barrido.
+  "app/guias/components/EtiquetasPorEnvio.tsx",
+  "lib/guias/etiquetas-por-envio.ts",
   "app/guias/components/EtiquetasPendientes.tsx",
   "lib/guias/etiquetas.ts",
   "lib/guias/etiquetas-server.ts",
@@ -99,6 +102,10 @@ const NOMBRES_DE_CODIGO = new Set([
 const LITERALES_EXENTOS = [
   "cliente_nombre, destino, cajas, creado_en, guia_item_id",
   "cajas",
+  // 1-oct-2026 (Daniel: etiquetas POR ENVÍO): la lista de columnas con la que
+  // el servidor suma los bultos etiquetados de cada renglón de la guía. Es SQL
+  // en una cadena, igual que la de arriba; no le habla a nadie.
+  "id, guia_item_id, cajas",
 ];
 
 /**
