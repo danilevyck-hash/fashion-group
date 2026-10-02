@@ -63,7 +63,7 @@ interface Props {
 }
 
 const CAMPO =
-  "min-h-[44px] w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-teal-600";
+  "min-h-[44px] w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-900";
 
 const FMT_MES = new Intl.DateTimeFormat("es-PA", {
   timeZone: "UTC",
@@ -359,7 +359,7 @@ export function MetaFormModal({
                   onClick={() => setTipo(valor)}
                   className={`min-h-[44px] flex-1 rounded-md border px-3 py-2 text-left text-xs transition active:scale-[0.97] ${
                     tipo === valor
-                      ? "border-teal-600 bg-teal-50 text-teal-900"
+                      ? "border-gray-900 bg-gray-100 text-gray-900"
                       : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
                   }`}
                 >
@@ -436,12 +436,12 @@ export function MetaFormModal({
                       onClick={() => alternar(v.clave)}
                       aria-pressed={marcada}
                       className={`flex min-h-[44px] w-full items-center gap-2.5 px-3 py-2 text-left transition ${
-                        marcada ? "bg-teal-50" : "bg-white hover:bg-gray-50"
+                        marcada ? "bg-gray-100" : "bg-white hover:bg-gray-50"
                       }`}
                     >
                       <span
                         className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
-                          marcada ? "border-teal-600 bg-teal-600 text-white" : "border-gray-300 bg-white"
+                          marcada ? "border-gray-900 bg-gray-900 text-white" : "border-gray-300 bg-white"
                         }`}
                       >
                         {marcada && <Check className="h-3.5 w-3.5" />}
@@ -493,7 +493,7 @@ export function MetaFormModal({
                           // Mismo motivo que el texto de arriba: el placeholder
                           // decía "el monto de arriba" y ese monto NO se hereda.
                           placeholder="sin esto no tiene meta"
-                          className="min-h-[44px] w-40 rounded-md border border-gray-300 px-2 py-1 font-mono text-sm tabular-nums outline-none focus:border-teal-600"
+                          className="min-h-[44px] w-40 rounded-md border border-gray-300 px-2 py-1 font-mono text-sm tabular-nums outline-none focus:border-gray-900"
                         />
                       </div>
                     )}
@@ -537,7 +537,7 @@ export function MetaFormModal({
                 <button
                   type="button"
                   onClick={() => onRetirar(meta.id)}
-                  className="min-h-[44px] rounded-md border border-rose-300 bg-rose-50 px-3 text-sm font-medium text-rose-800 transition active:scale-[0.97]"
+                  className="min-h-[44px] rounded-md bg-red-600 px-3 text-sm font-medium text-white transition hover:bg-red-700 active:scale-[0.97]"
                 >
                   Sí, anular
                 </button>

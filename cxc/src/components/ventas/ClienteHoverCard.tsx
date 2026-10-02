@@ -234,7 +234,7 @@ export function ClienteHoverCard({
       <div className="space-y-1.5">
         <Link
           href={`/clientes/${encodeURIComponent(codigo)}`}
-          className="block font-display text-[17px] font-medium leading-tight text-gray-950 hover:text-teal-700 transition"
+          className="block font-display text-[17px] font-medium leading-tight text-gray-950 hover:text-blue-600 transition"
         >
           {nombre}
         </Link>

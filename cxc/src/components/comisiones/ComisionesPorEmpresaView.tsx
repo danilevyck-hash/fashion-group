@@ -254,7 +254,7 @@ export function ComisionesPorEmpresaView({
       ) : error ? (
         <Card className="overflow-hidden rounded-lg border border-gray-200">
           <div className="p-8 text-center text-sm">
-            <p className="text-rose-600">{error}</p>
+            <p className="text-red-600">{error}</p>
             <button
               onClick={() => void load()}
               className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"

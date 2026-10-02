@@ -63,7 +63,7 @@ export function medirFila(e: ReactMouseEvent<HTMLElement>): { alto: number; anch
 
 function toneClass(tone: SlotDetalle["tone"], oscura: boolean): string {
   if (oscura) {
-    return tone === "emerald" ? "text-emerald-300" : tone === "orange" ? "text-rose-300" : "text-gray-300";
+    return tone === "emerald" ? "text-emerald-300" : tone === "orange" ? "text-red-300" : "text-gray-300";
   }
   return tone === "emerald" ? "text-emerald-700" : tone === "orange" ? "text-red-600" : "text-gray-500";
 }
@@ -214,7 +214,7 @@ export function FilaDetalleTr({
     <tr
       data-testid="fila-detalle"
       className={cn(
-        oscura ? "bg-indigo-500/25 text-white" : "bg-indigo-50",
+        oscura ? "bg-white/10 text-white" : "bg-gray-50",
         !oscura && "border-b border-gray-200",
       )}
     >
@@ -225,7 +225,7 @@ export function FilaDetalleTr({
         style={{ height: detalle.alto || undefined }}
         className={cn(
           "p-0 align-middle",
-          oscura ? "ring-2 ring-inset ring-indigo-300" : "ring-2 ring-inset ring-indigo-500",
+          oscura ? "ring-2 ring-inset ring-white/70" : "ring-2 ring-inset ring-gray-900",
         )}
       >
         <FilaDetalleContenido
@@ -268,8 +268,8 @@ export function FilaDetalleBloque({
       className={cn(
         "flex items-center",
         oscura
-          ? "bg-indigo-500/25 text-white ring-2 ring-inset ring-indigo-300"
-          : "bg-indigo-50 ring-2 ring-inset ring-indigo-500",
+          ? "bg-white/10 text-white ring-2 ring-inset ring-white/70"
+          : "bg-gray-50 ring-2 ring-inset ring-gray-900",
       )}
     >
       <div className="min-w-0 flex-1">

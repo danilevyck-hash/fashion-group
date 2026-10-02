@@ -24,7 +24,7 @@ export default function OfflineBanner() {
   // Connection restored — brief green banner
   if (isOnline && wasOffline) {
     return (
-      <div className="fixed top-0 left-0 right-0 z-40 bg-green-600 text-white text-center text-sm py-2 px-4 transition-all duration-300 animate-slideDown">
+      <div className="fixed top-0 left-0 right-0 z-40 bg-emerald-600 text-white text-center text-sm py-2 px-4 transition-all duration-300 animate-slideDown">
         <span className="inline-flex items-center gap-2">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="20 6 9 17 4 12" />

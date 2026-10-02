@@ -84,7 +84,7 @@ export default function VentasBoston() {
                         para que dos años se puedan comparar de un vistazo. */}
                     <span className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden">
                       <span
-                        className="block h-full rounded-full bg-stone-500"
+                        className="block h-full rounded-full bg-gray-500"
                         style={{ width: `${Math.max(0, (m.ventas / pico) * 100)}%` }}
                       />
                     </span>

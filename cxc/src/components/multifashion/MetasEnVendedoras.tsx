@@ -87,7 +87,7 @@ export function MetasEnVendedoras() {
               individuales a la vez, es lo único que evita leer un número como
               si fuera de la otra. */}
           <div className="mb-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <Target className="h-3.5 w-3.5 shrink-0 self-center text-teal-700" />
+            <Target className="h-3.5 w-3.5 shrink-0 self-center text-gray-500" />
             <h4 className="text-sm font-semibold text-gray-950">{meta.nombre}</h4>
             <span className="text-xs text-gray-500">
               {meta.tipo === "vendedora"
@@ -137,7 +137,7 @@ export function MetasEnVendedoras() {
                 <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
                   <div
                     className={`h-full rounded-full ${
-                      meta.tipo === "grupal" ? "bg-teal-600/70" : "bg-teal-700"
+                      meta.tipo === "grupal" ? "bg-gray-900/60" : "bg-gray-900"
                     }`}
                     style={{
                       width: `${Math.min(

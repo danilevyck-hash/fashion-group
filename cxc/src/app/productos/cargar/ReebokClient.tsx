@@ -760,8 +760,8 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
       {/* Masthead */}
-      <div className="mb-4 border-b border-stone-300 pb-2.5">
-        <h1 className="font-serif text-xl font-semibold tracking-tight text-stone-900">
+      <div className="mb-4 border-b border-gray-300 pb-2.5">
+        <h1 className="font-serif text-xl font-semibold tracking-tight text-gray-900">
           Reebok · Active Shoes
         </h1>
       </div>
@@ -778,11 +778,11 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
             if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
           }}
           className={`mb-4 flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed px-6 py-6 text-center transition ${
-            dragging ? "border-red-600 bg-red-50" : "border-stone-300 bg-white hover:border-red-600 hover:bg-red-50"
+            dragging ? "border-gray-900 bg-gray-100" : "border-gray-300 bg-white hover:border-gray-900 hover:bg-gray-50"
           }`}
         >
-          <UploadCloud className="mb-2 h-7 w-7 text-red-700" strokeWidth={1.6} />
-          <div className="text-base font-semibold text-stone-900">
+          <UploadCloud className="mb-2 h-7 w-7 text-gray-500" strokeWidth={1.6} />
+          <div className="text-base font-semibold text-gray-900">
             {fileName || "Suelta el archivo Reebok aquí o haz clic para buscar"}
           </div>
           <input
@@ -800,8 +800,8 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
           sale un costo distinto. La confirmación es lo que va a llegar; el
           despacho, lo que llegó. */}
       {items && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800">
-          <span className="rounded bg-red-600 px-1.5 py-0.5 text-[11px] font-bold text-white">REEBOK</span>
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[13px] text-gray-700">
+          <span className="rounded bg-gray-900 px-1.5 py-0.5 text-[11px] font-bold text-white">REEBOK</span>
           <span>
             <b>{ROTULO_FORMATO[formato]}</b>
             {fileName ? <> · {fileName}</> : null}
@@ -846,10 +846,10 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
               Ahora dice lo que hay que hacer, una sola vez, y sin ámbar. */}
           {faltanCategorias && (
             <div
-              className="mb-4 rounded-lg border border-stone-300 bg-stone-50 px-4 py-3 text-sm text-stone-700"
+              className="mb-4 rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-700"
               data-categorias-que-faltan={faltanCategorias.categorias.join(",")}
             >
-              <b className="font-semibold text-stone-900">
+              <b className="font-semibold text-gray-900">
                 {plural(faltanCategorias.categorias.length, "Falta", "Faltan")}{" "}
                 {faltanCategorias.categorias.length}{" "}
                 {plural(faltanCategorias.categorias.length, "categoría", "categorías")} en el catálogo.
@@ -895,14 +895,14 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                abierta ocupaba media pantalla arriba de los avisos que sí piden
                algo. El resumen dice todo lo que hace falta de un vistazo y el
                detalle se abre al tocarlo. */
-            <details className="group mb-4 rounded-lg border border-stone-300 bg-stone-50 px-4 py-2.5 text-sm text-stone-700">
+            <details className="group mb-4 rounded-lg border border-gray-300 bg-gray-50 px-4 py-2.5 text-sm text-gray-700">
               <summary className="cursor-pointer list-none select-none">
-                <b className="font-semibold text-stone-900">
+                <b className="font-semibold text-gray-900">
                   Este despacho no trae {ausentes.length} {plural(ausentes.length, "columna", "columnas")}
                 </b>
                 {" · "}
                 {listaConY(ausentes.map((c) => c.rotulo))}
-                <span className="ml-1 text-stone-400 transition group-open:hidden" aria-hidden>⌄</span>
+                <span className="ml-1 text-gray-400 transition group-open:hidden" aria-hidden>⌄</span>
               </summary>
               <div className="mt-2">
                 El archivo entra igual; esto es de dónde salió cada dato:
@@ -937,9 +937,9 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
           )}
 
           {/* Config de salida */}
-          <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-stone-200 bg-white p-4 sm:grid-cols-3">
+          <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-3">
             <Field label="Tipo de salida">
-              <div className="flex overflow-hidden rounded-lg border border-stone-300">
+              <div className="flex overflow-hidden rounded-lg border border-gray-300">
                 <PriceBtn active={salida === "catalogo"} onClick={() => setSalida("catalogo")} label="Pedido para cliente" />
                 <PriceBtn active={salida === "switch"} onClick={() => setSalida("switch")} label="Plantilla Switch" last />
               </div>
@@ -961,7 +961,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
               /* En el despacho no hay nada que elegir: la cantidad es la que
                  llegó, y por eso se DICE en vez de preguntarse. */
               <Field label="Cantidad" note="Cantidad recibida, no proyectada.">
-                <div className="rounded-lg border border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-900">
+                <div className="rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900">
                   Quantity (del despacho)
                 </div>
               </Field>
@@ -974,7 +974,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
               label="Flete (Costo CIF)"
               note={flete === fleteDefault ? "Costo FOB × flete = Costo CIF." : `Costo FOB × flete = Costo CIF. Por defecto es ${etiquetaFlete(fleteDefault)}.`}
             >
-              <div className="flex overflow-hidden rounded-lg border border-stone-300">
+              <div className="flex overflow-hidden rounded-lg border border-gray-300">
                 {FLETE_OPCIONES.map((f, i) => (
                   <PriceBtn
                     key={f}
@@ -1013,7 +1013,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
             )}
             {salida === "switch" && (
               <Field label="Precio de venta (Switch)" note="Usa la fórmula A o B (editables abajo).">
-                <div className="flex overflow-hidden rounded-lg border border-stone-300">
+                <div className="flex overflow-hidden rounded-lg border border-gray-300">
                   <PriceBtn active={precioAB === "A"} onClick={() => setPrecioAB("A")} label="Precio A" />
                   <PriceBtn active={precioAB === "B"} onClick={() => setPrecioAB("B")} label="Precio B" last />
                 </div>
@@ -1042,8 +1042,8 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
           )}
 
           {/* Fórmulas de precio Reebok (editables, guardadas por marca) */}
-          <div className="mb-4 rounded-xl border border-stone-200 bg-white p-3.5">
-            <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-stone-500">
+          <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3.5">
+            <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
               Fórmulas de precio (se guardan y se reusan)
             </div>
             <FormulaRow label="Precio A" f={formulaA} onChange={setFormulaA} onSave={() => saveFormula("A")} saving={savingF === "A"} flashed={flashF === "A"} divisorMsg={msgFormulaA} />
@@ -1051,9 +1051,9 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
 
             {/* El flete que viene PUESTO. Vive en la base, no en este navegador:
                 lo que Daniel deje acá lo ve también la secretaria. */}
-            <div className="mt-2.5 flex flex-wrap items-center gap-3 border-t border-stone-200 pt-2.5">
-              <span className="text-[13px] font-semibold text-stone-700">Flete por defecto</span>
-              <div className="flex overflow-hidden rounded-lg border border-stone-300">
+            <div className="mt-2.5 flex flex-wrap items-center gap-3 border-t border-gray-200 pt-2.5">
+              <span className="text-[13px] font-semibold text-gray-700">Flete por defecto</span>
+              <div className="flex overflow-hidden rounded-lg border border-gray-300">
                 {FLETE_OPCIONES.map((f, i) => (
                   <PriceBtn
                     key={f}
@@ -1064,7 +1064,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                   />
                 ))}
               </div>
-              <span className="text-[12px] text-stone-500">
+              <span className="text-[12px] text-gray-500">
                 {guardandoFlete ? "Guardando…" : flashFlete ? "Flete guardado" : "Es el que viene puesto arriba, para todo el equipo."}
               </span>
             </div>
@@ -1072,21 +1072,21 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
           </div>
 
           {/* Excepciones por modelo (Name): fórmula propia o precio fijo (gana a la marca) */}
-          <div className="mb-4 overflow-hidden rounded-xl border border-stone-200 bg-white">
+          <div className="mb-4 overflow-hidden rounded-xl border border-gray-200 bg-white">
             <button
               type="button" onClick={() => setExcOpen((o) => !o)}
               className="flex w-full items-center justify-between gap-2 px-3.5 py-2.5 text-left"
             >
               <span className="flex items-center gap-2">
-                <span className="text-stone-400">{excOpen ? "▾" : "▸"}</span>
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">Precios por modelo (Name)</span>
+                <span className="text-gray-400">{excOpen ? "▾" : "▸"}</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Precios por modelo (Name)</span>
               </span>
-              <span className="text-[11px] text-stone-500">
-                {conExc > 0 ? <span className="rounded bg-red-50 px-1.5 py-0.5 font-semibold text-red-700">{conExc} con precio propio</span> : `${namesPresent.length} modelos · todos heredan`}
+              <span className="text-[11px] text-gray-500">
+                {conExc > 0 ? <span className="rounded bg-gray-100 px-1.5 py-0.5 font-semibold text-gray-700">{conExc} con precio propio</span> : `${namesPresent.length} modelos · todos heredan`}
               </span>
             </button>
             {excOpen && (
-              <div className="border-t border-stone-200 p-3">
+              <div className="border-t border-gray-200 p-3">
                 {/* Jerarquía de precios: se aprende una vez → ⓘ. */}
                 <div className="mb-2 -ml-2">
                   <Ayuda titulo="Prioridad de precios" etiqueta="Prioridad de precios">
@@ -1098,20 +1098,20 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                 </div>
                 <input
                   value={excFilter} onChange={(e) => setExcFilter(e.target.value)} placeholder="Buscar modelo…"
-                  className="mb-2 w-full max-w-xs rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-[13px] focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600/20"
+                  className="mb-2 w-full max-w-xs rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-[13px] focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
                 />
                 <div className="max-h-72 overflow-auto">
-                  <div className="grid grid-cols-[minmax(0,1fr)_92px_70px_54px_86px_72px] items-center gap-2 px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-stone-400">
+                  <div className="grid grid-cols-[minmax(0,1fr)_92px_70px_54px_86px_72px] items-center gap-2 px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
                     <span>Modelo</span><span>Modo</span><span className="text-right">÷ / Fijo</span><span className="text-right">Extra</span><span>Redondeo</span><span></span>
                   </div>
                   {namesFiltered.map((name) => {
                     const r = nameRowFor(name);
                     const nameMsg = msgDeName(r);
                     return (
-                      <div key={name} className={`grid grid-cols-[minmax(0,1fr)_92px_70px_54px_86px_72px] items-center gap-2 px-1 py-0.5 ${r.propia ? "bg-red-50/40" : "hover:bg-stone-50"}`}>
-                        <span className={`truncate text-[13px] ${r.fija ? "font-semibold text-red-700" : r.propia ? "font-medium text-red-600" : "text-stone-700"}`} title={name}>
+                      <div key={name} className={`grid grid-cols-[minmax(0,1fr)_92px_70px_54px_86px_72px] items-center gap-2 px-1 py-0.5 ${r.propia ? "bg-gray-100" : "hover:bg-gray-50"}`}>
+                        <span className={`truncate text-[13px] ${r.fija ? "font-semibold text-amber-700" : r.propia ? "font-medium text-gray-900" : "text-gray-700"}`} title={name}>
                           {name}
-                          {r.fija && <span className="ml-1 rounded bg-red-100 px-1 py-0.5 text-[9px] font-semibold text-red-800">fijo</span>}
+                          {r.fija && <span className="ml-1 rounded bg-amber-100 px-1 py-0.5 text-[9px] font-semibold text-amber-800">fijo</span>}
                         </span>
                         <select value={r.modo} onChange={(e) => patchName(name, { modo: e.target.value as NameMode })} className={miniSelectCls}>
                           <option value="formula">Fórmula</option>
@@ -1120,7 +1120,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                         {r.modo === "fijo" ? (
                           <input type="number" step="0.01" value={r.precioFijo ?? ""} placeholder="$" aria-label={`Precio fijo ${name}`}
                             onChange={(e) => patchName(name, { precioFijo: e.target.value === "" ? null : Number(e.target.value) })}
-                            className={`${miniInputCls} w-full border-red-300 text-left`} />
+                            className={`${miniInputCls} w-full border-amber-300 text-left`} />
                         ) : (
                           <div>
                             <input type="number" step="0.01" value={r.divisor || ""} placeholder="—" aria-label={`Divisor ${name}`}
@@ -1148,7 +1148,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                         )}
                         <span className="whitespace-nowrap">
                           <button type="button" onClick={() => saveName(name)} disabled={savingName === name || nameMsg !== null}
-                            className="rounded-md px-1.5 py-1 text-[12px] font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50">
+                            className="rounded-md px-1.5 py-1 text-[12px] font-semibold text-blue-600 transition hover:bg-gray-50 disabled:opacity-50">
                             {savingName === name ? "…" : r.dirty ? "Guardar" : "✓"}
                           </button>
                           {flashName === name && <span className="ml-1 text-[11px] font-semibold text-emerald-600">✓</span>}
@@ -1156,7 +1156,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                       </div>
                     );
                   })}
-                  {namesFiltered.length === 0 && <div className="px-1 py-3 text-center text-[12px] text-stone-400">Sin modelos que coincidan.</div>}
+                  {namesFiltered.length === 0 && <div className="px-1 py-3 text-center text-[12px] text-gray-400">Sin modelos que coincidan.</div>}
                 </div>
               </div>
             )}
@@ -1165,10 +1165,10 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
           {/* Fotos del pedido — solo aplica al Excel para el cliente. La plantilla
               Switch no lleva fotos (se sube a Switch, no la mira nadie). */}
           {salida === "catalogo" && (
-            <div className="mb-4 rounded-xl border border-stone-200 bg-white p-3.5">
+            <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3.5">
               {/* 12 px y no los 11 de los rótulos vecinos: es texto NUEVO y la
                   regla de los 3 anchos es que nada nuevo baje de 12 px. */}
-              <div className="mb-2.5 text-[12px] font-semibold uppercase tracking-wide text-stone-500">
+              <div className="mb-2.5 text-[12px] font-semibold uppercase tracking-wide text-gray-500">
                 Fotos del pedido (opcional)
               </div>
               <input
@@ -1190,19 +1190,19 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                   <button
                     type="button"
                     onClick={() => carpetaRef.current?.click()}
-                    className="min-h-[44px] rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-900 transition hover:border-red-600 hover:text-red-700 active:scale-[0.97]"
+                    className="min-h-[44px] rounded-md border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-900 transition hover:border-gray-900 hover:text-black active:scale-[0.97]"
                   >
                     Seleccionar carpeta de fotos
                   </button>
-                  <div className="mt-2 text-[12px] text-stone-500">
+                  <div className="mt-2 text-[12px] text-gray-500">
                     Cada foto tiene que llamarse igual que el código: <b>100262385.jpg</b>.
                     Si no seleccionas carpeta, el Excel sale como siempre.
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="text-[13px] text-stone-700">
-                    <b className="font-semibold text-stone-900">
+                  <div className="text-[13px] text-gray-700">
+                    <b className="font-semibold text-gray-900">
                       {fotosIndice!.indice.size.toLocaleString()} fotos
                     </b>{" "}
                     en la carpeta · {textoEmparejado(emparejado.conFoto, emparejado.pares.length)}
@@ -1211,19 +1211,19 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                     <button
                       type="button"
                       onClick={() => carpetaRef.current?.click()}
-                      className="min-h-[44px] rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-900 transition hover:border-red-600 hover:text-red-700 active:scale-[0.97]"
+                      className="min-h-[44px] rounded-md border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-900 transition hover:border-gray-900 hover:text-black active:scale-[0.97]"
                     >
                       Cambiar carpeta
                     </button>
                     <button
                       type="button"
                       onClick={quitarFotos}
-                      className="min-h-[44px] rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-600 transition hover:border-stone-400 active:scale-[0.97]"
+                      className="min-h-[44px] rounded-md border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:border-gray-400 active:scale-[0.97]"
                     >
                       Quitar fotos
                     </button>
                   </div>
-                  <div className="mt-2 text-[12px] text-stone-500">
+                  <div className="mt-2 text-[12px] text-gray-500">
                     Las fotos se leen de tu computadora y <b>no se suben a ningún lado</b>: se
                     achican y se pegan dentro del Excel que descargas.
                   </div>
@@ -1267,12 +1267,12 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
           )}
 
           {/* Stats + acción */}
-          <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-stone-200 bg-white px-4 py-2.5 text-[13px] text-stone-600">
-            <span><b className="font-semibold text-stone-900">{vista.articulos}</b> artículos</span>
-            <span className="text-stone-300">·</span>
-            <span><b className="font-semibold text-stone-900">{vista.skus.toLocaleString()}</b> tallas/SKUs</span>
-            <span className="text-stone-300">·</span>
-            <span><b className="font-semibold text-stone-900">{vista.piezas.toLocaleString()}</b> unidades{piezasLabel ? ` (${piezasLabel})` : ""}</span>
+          <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-[13px] text-gray-600">
+            <span><b className="font-semibold text-gray-900">{vista.articulos}</b> artículos</span>
+            <span className="text-gray-300">·</span>
+            <span><b className="font-semibold text-gray-900">{vista.skus.toLocaleString()}</b> tallas/SKUs</span>
+            <span className="text-gray-300">·</span>
+            <span><b className="font-semibold text-gray-900">{vista.piezas.toLocaleString()}</b> unidades{piezasLabel ? ` (${piezasLabel})` : ""}</span>
             {/* 🔴 El costo del archivo: es el número con el que se cuadra contra
                 la factura del proveedor. Mismas filas que el Excel. */}
             <CostoDelArchivo costo={costo} />
@@ -1281,7 +1281,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
               <button
                 onClick={handleDownload}
                 disabled={!!downloading || quedoVacio || divisorBloqueaDescarga}
-                className="rounded-md bg-red-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-stone-300"
+                className="rounded-md bg-black px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-gray-800 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-gray-300"
               >
                 {fotoProgreso
                   ? `Achicando fotos… ${fotoProgreso.hechas} de ${fotoProgreso.total}`
@@ -1293,7 +1293,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
               </button>
               <button
                 onClick={reset}
-                className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-semibold text-stone-900 transition hover:border-red-600 hover:text-red-700 active:scale-[0.97]"
+                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-semibold text-gray-900 transition hover:border-gray-900 hover:text-black active:scale-[0.97]"
               >
                 {ROTULO_SUBIR_OTRO_ARCHIVO}
               </button>
@@ -1306,7 +1306,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
 
           {/* Aviso discreto: no se perdió nada, simplemente no se pidieron esas piezas */}
           {vista.omitidos > 0 && (
-            <div className="mb-3 px-1 text-[12px] text-stone-500">
+            <div className="mb-3 px-1 text-[12px] text-gray-500">
               {vista.omitidos.toLocaleString()} artículo{vista.omitidos === 1 ? "" : "s"} sin cantidad
               {formato === "despacho" ? " recibidas" : ` en ${monthLabel || "el mes seleccionado"}`} no se {vista.omitidos === 1 ? "incluyó" : "incluyeron"}.
             </div>
@@ -1314,9 +1314,9 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
 
           {/* Preview según la salida elegida */}
           {salida === "catalogo" ? (
-            <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
-              <div className="border-b border-stone-200 px-4 py-2.5">
-                <span className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+              <div className="border-b border-gray-200 px-4 py-2.5">
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                   Vista previa · pedido para cliente ({catalogo.length} artículos)
                 </span>
               </div>
@@ -1331,17 +1331,17 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                   </thead>
                   <tbody>
                     {catalogo.map((r, i) => (
-                      <tr key={i} className="hover:bg-red-50">
-                        <td className="border-b border-stone-100 px-2 py-2 font-mono text-[11px]">{r.po || "—"}</td>
-                        <td className="border-b border-stone-100 px-2 py-2 font-mono text-[11px]">{r.newArticle}</td>
-                        <td className="border-b border-stone-100 px-2 py-2">{r.name}</td>
-                        <td className="border-b border-stone-100 px-2 py-2 text-[11px]">{r.department}</td>
-                        <td className="border-b border-stone-100 px-2 py-2 text-[11px]">{r.gender}</td>
-                        <td className="border-b border-stone-100 px-2 py-2 text-right">{fmt(r.wholesale)}</td>
-                        <td className="border-b border-stone-100 px-2 py-2 text-right">{fmt(r.costo)}</td>
-                        <td className="border-b border-stone-100 px-2 py-2 text-right font-semibold text-stone-900">{fmt(r.precioA)}</td>
-                        <td className="border-b border-stone-100 px-2 py-2 text-right font-semibold text-stone-900">{fmt(r.precioB)}</td>
-                        <td className="border-b border-stone-100 px-2 py-2 text-right">{r.piezas}</td>
+                      <tr key={i} className="hover:bg-gray-50">
+                        <td className="border-b border-gray-100 px-2 py-2 font-mono text-[11px]">{r.po || "—"}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 font-mono text-[11px]">{r.newArticle}</td>
+                        <td className="border-b border-gray-100 px-2 py-2">{r.name}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 text-[11px]">{r.department}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 text-[11px]">{r.gender}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 text-right">{fmt(r.wholesale)}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 text-right">{fmt(r.costo)}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 text-right font-semibold text-gray-900">{fmt(r.precioA)}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 text-right font-semibold text-gray-900">{fmt(r.precioB)}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 text-right">{r.piezas}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1349,12 +1349,12 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
               </div>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 px-4 py-2.5">
-                <span className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-4 py-2.5">
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                   Vista previa · plantilla Switch ({switchRows.length} artículos)
                 </span>
-                <span className="text-[11px] text-stone-500">Temporada {temporada} · Precio {precioAB}</span>
+                <span className="text-[11px] text-gray-500">Temporada {temporada} · Precio {precioAB}</span>
               </div>
               <div className="max-h-[440px] overflow-auto">
                 <table className="w-full table-auto border-collapse text-[12px] tabular-nums">
@@ -1367,21 +1367,21 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                   </thead>
                   <tbody>
                     {switchRows.map((r, i) => (
-                      <tr key={i} className="hover:bg-red-50">
-                        <td className="border-b border-stone-100 px-2 py-2 font-mono text-[11px]">{num(r.cols["Código *"])}</td>
-                        <td className={`border-b border-stone-100 px-2 py-2 text-center text-[11px] ${r.fallback ? "bg-amber-50 font-semibold text-amber-800" : ""}`} title={r.fallback ? "No se halló la talla exacta; se usó la más cercana. Revisa." : undefined}>
+                      <tr key={i} className="hover:bg-gray-50">
+                        <td className="border-b border-gray-100 px-2 py-2 font-mono text-[11px]">{num(r.cols["Código *"])}</td>
+                        <td className={`border-b border-gray-100 px-2 py-2 text-center text-[11px] ${r.fallback ? "bg-amber-50 font-semibold text-amber-800" : ""}`} title={r.fallback ? "No se halló la talla exacta; se usó la más cercana. Revisa." : undefined}>
                           {r.talla || "—"}
                         </td>
-                        <td className="border-b border-stone-100 px-2 py-2 font-mono text-[11px] break-all">{num(r.cols["Código Barra *"])}</td>
-                        <td className="border-b border-stone-100 px-2 py-2">{num(r.cols["Descripción *"])}</td>
-                        <td className="border-b border-stone-100 px-2 py-2 text-[11px]">{num(r.cols["Marca *"])}</td>
-                        <td className="border-b border-stone-100 px-2 py-2 text-[11px]">{num(r.cols["rubro *"])}</td>
-                        <td className="border-b border-stone-100 px-2 py-2 text-[11px]">{num(r.cols["subrubro"])}</td>
-                        <td className="border-b border-stone-100 px-2 py-2 text-right">{num(r.cols["Costo FOB *"])}</td>
-                        <td className="border-b border-stone-100 px-2 py-2 text-right">{num(r.cols["Costo CIF *"])}</td>
-                        <td className="border-b border-stone-100 px-2 py-2 text-right font-semibold text-stone-900">{num(r.cols["Precio *"])}</td>
-                        <td className="border-b border-stone-100 px-2 py-2 text-[11px]">{num(r.cols["Unidad de medida *"])}</td>
-                        <td className="border-b border-stone-100 px-2 py-2 text-right">{num(r.cols["Stock Ideal"])}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 font-mono text-[11px] break-all">{num(r.cols["Código Barra *"])}</td>
+                        <td className="border-b border-gray-100 px-2 py-2">{num(r.cols["Descripción *"])}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 text-[11px]">{num(r.cols["Marca *"])}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 text-[11px]">{num(r.cols["rubro *"])}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 text-[11px]">{num(r.cols["subrubro"])}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 text-right">{num(r.cols["Costo FOB *"])}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 text-right">{num(r.cols["Costo CIF *"])}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 text-right font-semibold text-gray-900">{num(r.cols["Precio *"])}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 text-[11px]">{num(r.cols["Unidad de medida *"])}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 text-right">{num(r.cols["Stock Ideal"])}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1398,12 +1398,12 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
 
 // ── Subcomponentes / estilos ────────────────────────────────────────────────
 const inputCls =
-  "w-full rounded-lg border border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-900 focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600/20";
+  "w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 const selectCls = inputCls;
 const miniInputCls =
-  "h-8 w-20 rounded-md border border-stone-300 bg-stone-50 px-2 text-right font-mono text-[13px] text-stone-900 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600/20";
+  "h-8 w-20 rounded-md border border-gray-300 bg-gray-50 px-2 text-right font-mono text-[13px] text-gray-900 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 const miniSelectCls =
-  "h-8 rounded-md border border-stone-300 bg-stone-50 px-2 text-[13px] text-stone-900 focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600/20";
+  "h-8 rounded-md border border-gray-300 bg-gray-50 px-2 text-[13px] text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 
 function FormulaRow({ label, f, onChange, onSave, saving, flashed, divisorMsg }: {
   label: string; f: PriceFormula; onChange: (f: PriceFormula) => void;
@@ -1414,8 +1414,8 @@ function FormulaRow({ label, f, onChange, onSave, saving, flashed, divisorMsg }:
   return (
     <div className="py-1.5">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="w-20 text-[13px] font-semibold text-stone-900">{label}</span>
-        <label className="text-[11px] text-stone-500">÷</label>
+        <span className="w-20 text-[13px] font-semibold text-gray-900">{label}</span>
+        <label className="text-[11px] text-gray-500">÷</label>
         <input
           type="number" step="0.01" value={f.divisor || ""}
           aria-invalid={divisorMsg !== null}
@@ -1425,7 +1425,7 @@ function FormulaRow({ label, f, onChange, onSave, saving, flashed, divisorMsg }:
             : miniInputCls}
           aria-label={`Divisor ${label}`}
         />
-        <label className="ml-1 text-[11px] text-stone-500">+$</label>
+        <label className="ml-1 text-[11px] text-gray-500">+$</label>
         <select value={f.extra} onChange={(e) => onChange({ ...f, extra: parseInt(e.target.value) })} className={miniSelectCls} aria-label={`Extra ${label}`}>
           {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
@@ -1436,7 +1436,7 @@ function FormulaRow({ label, f, onChange, onSave, saving, flashed, divisorMsg }:
         </select>
         <button
           type="button" onClick={onSave} disabled={saving || divisorMsg !== null}
-          className="rounded-md px-2.5 py-1 text-[12px] font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+          className="rounded-md px-2.5 py-1 text-[12px] font-semibold text-blue-600 transition hover:bg-gray-50 disabled:opacity-50"
         >
           {saving ? "Guardando…" : "Guardar"}
         </button>
@@ -1476,7 +1476,7 @@ function AgregarlasAlCatalogo({ categorias }: { categorias: readonly string[] })
       target="_blank"
       rel="noopener noreferrer"
       data-testid="agregarlas-al-catalogo"
-      className="ml-2 inline-block rounded-md border border-stone-300 bg-white px-2 py-0.5 text-[12px] font-semibold text-stone-700 transition hover:border-stone-400 active:scale-[0.97]"
+      className="ml-2 inline-block rounded-md border border-gray-300 bg-white px-2 py-0.5 text-[12px] font-semibold text-gray-700 transition hover:border-gray-400 active:scale-[0.97]"
     >
       {plural(categorias.length, "Agregarla al catálogo", "Agregarlas al catálogo")}
     </a>
@@ -1488,8 +1488,8 @@ function PriceBtn({ active, onClick, label, last }: { active: boolean; onClick: 
     <button
       type="button"
       onClick={onClick}
-      className={`min-h-[44px] flex-1 px-3 py-2 text-sm font-semibold transition ${last ? "" : "border-r border-stone-300"} ${
-        active ? "bg-red-600 text-white" : "bg-white text-stone-700 hover:bg-stone-50"
+      className={`min-h-[44px] flex-1 px-3 py-2 text-sm font-semibold transition ${last ? "" : "border-r border-gray-300"} ${
+        active ? "bg-gray-900 text-white" : "bg-white text-gray-700 hover:bg-gray-50"
       }`}
     >
       {label}
@@ -1500,16 +1500,16 @@ function PriceBtn({ active, onClick, label, last }: { active: boolean; onClick: 
 function Field({ label, note, children }: { label: string; note?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-stone-500">{label}</label>
+      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">{label}</label>
       {children}
-      {note && <div className="mt-1 text-[11px] text-stone-500">{note}</div>}
+      {note && <div className="mt-1 text-[11px] text-gray-500">{note}</div>}
     </div>
   );
 }
 
 function Th({ children, narrow }: { children: React.ReactNode; narrow?: boolean }) {
   return (
-    <th className={`sticky top-0 border-b-[1.5px] border-stone-300 bg-stone-100 px-2 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-stone-600 ${narrow ? "whitespace-nowrap text-right" : "text-left"}`}>
+    <th className={`sticky top-0 border-b-[1.5px] border-gray-300 bg-gray-100 px-2 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-600 ${narrow ? "whitespace-nowrap text-right" : "text-left"}`}>
       {children}
     </th>
   );

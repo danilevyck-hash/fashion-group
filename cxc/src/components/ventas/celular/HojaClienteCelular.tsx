@@ -254,7 +254,7 @@ function MesAMesDeLaEmpresa({
                   <div className="flex h-1/2 items-end">
                     {!b.haciaAbajo && (
                       <div
-                        className="w-full rounded-t bg-teal-700"
+                        className="w-full rounded-t bg-gray-900"
                         style={{ height: `${b.alto}%` }}
                         aria-hidden
                       />

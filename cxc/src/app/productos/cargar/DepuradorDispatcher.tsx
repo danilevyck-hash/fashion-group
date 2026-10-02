@@ -138,11 +138,11 @@ export default function DepuradorDispatcher({ onDownloaded, pie }: DispatcherPro
               if (e.dataTransfer.files[0]) detect(e.dataTransfer.files[0]);
             }}
             className={`mb-3 flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed px-6 py-6 text-center transition ${
-              dragging ? "border-teal-600 bg-teal-50" : "border-stone-300 bg-white hover:border-teal-600 hover:bg-teal-50"
+              dragging ? "border-gray-900 bg-gray-100" : "border-gray-300 bg-white hover:border-gray-900 hover:bg-gray-50"
             }`}
           >
-            <UploadCloud className="mb-2 h-7 w-7 text-teal-800" strokeWidth={1.6} />
-            <div className="text-base font-semibold text-stone-900">
+            <UploadCloud className="mb-2 h-7 w-7 text-gray-500" strokeWidth={1.6} />
+            <div className="text-base font-semibold text-gray-900">
               {busy
                 ? "Leyendo archivo…"
                 : TRES_DETALLES && nombreSoltado
@@ -163,7 +163,7 @@ export default function DepuradorDispatcher({ onDownloaded, pie }: DispatcherPro
               </span>
             )}
             {TRES_DETALLES && !busy && rec && !rec.camino && (
-              <span className="mt-1.5 text-[12px] text-stone-500">
+              <span className="mt-1.5 text-[12px] text-gray-500">
                 Suelta el Excel del proveedor (Calvin, Tommy, Karl o Reebok) o el reporte de tienda.
               </span>
             )}

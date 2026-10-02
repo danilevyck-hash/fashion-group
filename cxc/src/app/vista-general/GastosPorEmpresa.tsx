@@ -64,17 +64,17 @@ export interface GastosData {
 export function pillGasto(g: GastoEmpresaRow): { label: string; cls: string } | null {
   if (g.gasto !== null) return null;
   if (g.motivo) {
-    return { label: ETIQUETA_SIN_GASTO_EGRESOS[g.motivo], cls: "bg-stone-100 text-stone-500" };
+    return { label: ETIQUETA_SIN_GASTO_EGRESOS[g.motivo], cls: "bg-gray-100 text-gray-500" };
   }
-  return { label: "Sin datos", cls: "bg-stone-100 text-stone-500" };
+  return { label: "Sin datos", cls: "bg-gray-100 text-gray-500" };
 }
 
 export default function GastosPorEmpresa({ gastos, mes }: { gastos: GastosData; mes: string }) {
   return (
-    <div data-panel="gastos" className="rounded-[14px] border border-stone-200 bg-white p-4">
+    <div data-panel="gastos" className="rounded-[14px] border border-gray-200 bg-white p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h3 className="text-xs font-semibold text-stone-700">Gastos por empresa</h3>
-        <span data-col="cobertura" className="text-xs text-stone-400 tabular-nums">
+        <h3 className="text-xs font-semibold text-gray-700">Gastos por empresa</h3>
+        <span data-col="cobertura" className="text-xs text-gray-400 tabular-nums">
           {gastos.empresasConGasto} de {gastos.empresasTotal} con gastos cargados
         </span>
       </div>
@@ -82,13 +82,13 @@ export default function GastosPorEmpresa({ gastos, mes }: { gastos: GastosData; 
           total. Sin lo primero, "gastos" es ambiguo (¿lo que la contadora cerró
           o lo que salió del banco?); sin lo segundo, alguien suma las filas de
           cabeza y se arma el número del grupo que Daniel pidió no tener. */}
-      <p className="mt-0.5 text-xs text-stone-500">
+      <p className="mt-0.5 text-xs text-gray-500">
         Egresos de caja y banco, sin transferencias ni préstamos. Sin total consolidado: cada
         empresa tiene cargado un mes distinto.
       </p>
 
       {!gastos.disponible ? (
-        <p className="mt-3 text-sm text-stone-500">
+        <p className="mt-3 text-sm text-gray-500">
           Los gastos de Switch todavía no están conectados.
         </p>
       ) : (
@@ -98,11 +98,11 @@ export default function GastosPorEmpresa({ gastos, mes }: { gastos: GastosData; 
             return (
               <div key={g.key} data-fila-gasto={g.key}>
                 <div className="flex items-baseline justify-between gap-3">
-                  <span data-col="empresa" className="min-w-0 truncate text-sm font-medium text-stone-800">
+                  <span data-col="empresa" className="min-w-0 truncate text-sm font-medium text-gray-800">
                     {g.name}
                   </span>
                   {g.gasto !== null ? (
-                    <span data-col="gasto" className="shrink-0 text-sm font-semibold tabular-nums text-stone-900">
+                    <span data-col="gasto" className="shrink-0 text-sm font-semibold tabular-nums text-gray-900">
                       {money(g.gasto)}
                     </span>
                   ) : (
@@ -117,7 +117,7 @@ export default function GastosPorEmpresa({ gastos, mes }: { gastos: GastosData; 
                 {/* 🔑 Cuando no hay número, la pantalla DICE POR QUÉ — y hasta
                     dónde llega la contabilidad de esa empresa. */}
                 {g.gasto === null && g.texto && (
-                  <p data-col="motivo" className="mt-0.5 text-xs text-stone-400">{g.texto}</p>
+                  <p data-col="motivo" className="mt-0.5 text-xs text-gray-400">{g.texto}</p>
                 )}
               </div>
             );
@@ -127,7 +127,7 @@ export default function GastosPorEmpresa({ gastos, mes }: { gastos: GastosData; 
 
       <Link
         href={`/gastos-contabilidad?mes=${mes}`}
-        className="mt-1 inline-flex min-h-[44px] min-w-[44px] items-center text-xs font-medium text-teal-600 hover:text-teal-700"
+        className="mt-1 inline-flex min-h-[44px] min-w-[44px] items-center text-xs font-medium text-blue-600 hover:text-blue-800"
       >
         Ir a Gastos →
       </Link>

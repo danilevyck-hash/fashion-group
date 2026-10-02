@@ -5,6 +5,11 @@ const config: Config = {
   content: ["./src/**/*.{ts,tsx}"],
   theme: { extend: {
     colors: {
+      // Los grises del iPhone en las pantallas de celular (antes hex sueltos):
+      // fondo de la página, campo/control y la pista del control segmentado.
+      "fondo-celular": "#F2F2F7",
+      "control-celular": "#E9E9EB",
+      "pista-celular": "#E3E3E8",
       reebok: {
         red: '#CC0000',
         dark: '#1a1a1a',
@@ -19,13 +24,6 @@ const config: Config = {
       gray: {
         400: '#6b7280',
         500: '#4b5563',
-      },
-      // Misma corrección para la rampa stone (Ventas/Multifashion usan stone),
-      // para no dejar la mitad del sistema sin mejorar.
-      //   stone-400 #a8a29e → #78716c (AA)   stone-500 #78716c → #57534e (AAA)
-      stone: {
-        400: '#78716c',
-        500: '#57534e',
       },
     },
     fontFamily: {

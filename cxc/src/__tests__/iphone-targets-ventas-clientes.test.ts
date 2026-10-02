@@ -130,10 +130,10 @@ describe("Nombres cortados — letra más chica, nunca por debajo de 12px", () =
   });
 
   it("Vista General: los nombres de las alertas bajan a text-xs (13px)", () => {
-    expect(vistaGeneral).toContain('const NOMBRE_ALERTA = "text-xs text-stone-700"');
+    expect(vistaGeneral).toContain('const NOMBRE_ALERTA = "text-xs text-gray-700"');
     // Las 3 listas (CXC, Proveedores, Reclamos) usan la MISMA constante.
     expect([...vistaGeneral.matchAll(/\$\{NOMBRE_ALERTA\} truncate/g)]).toHaveLength(3);
-    expect(vistaGeneral).not.toContain('className="text-sm text-stone-700 truncate"');
+    expect(vistaGeneral).not.toContain('className="text-sm text-gray-700 truncate"');
   });
 
   // ⚠️ 20-sep-2026: la tarjeta de celular de Proveedores ya no es un proveedor

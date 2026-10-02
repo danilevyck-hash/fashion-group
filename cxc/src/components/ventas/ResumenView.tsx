@@ -539,7 +539,7 @@ export function ResumenView({
                 // El fondo de las celdas fijas tiene que ser el MISMO que el de
                 // la fila (incluido el hover): si no, la fila se ve a través.
                 const fondoFijo = isMulti
-                  ? "bg-teal-50 group-hover:bg-teal-100"
+                  ? "bg-gray-50 group-hover:bg-gray-100"
                   : isOpen ? "bg-gray-50" : "bg-white group-hover:bg-gray-50";
                 // La fila abierta se TRANSFORMA: mismo lugar, mismo alto, sus
                 // números reemplazados por el detalle. Solo una a la vez.
@@ -558,7 +558,7 @@ export function ResumenView({
                   key={r.empresa.id}
                   className={cn(
                     "group transition-colors",
-                    isMulti ? "bg-teal-50/60 hover:bg-teal-100/60" : "hover:bg-gray-50",
+                    isMulti ? "bg-gray-50 hover:bg-gray-100" : "hover:bg-gray-50",
                     isOpen && !isMulti && "bg-gray-50",
                   )}
                 >
@@ -572,7 +572,7 @@ export function ResumenView({
                     // renglones. Partirlo no es abreviarlo —dice lo mismo— y es lo que más
                     // le baja el piso a la tabla: esa columna sola medía 189 px.
                     "sticky left-0 z-10 cursor-pointer border-b border-gray-200 px-2.5 py-3.5 text-sm text-gray-950",
-                    isMulti ? "bg-teal-50" : isOpen ? "bg-gray-50" : "bg-white"
+                    isMulti ? "bg-gray-50" : isOpen ? "bg-gray-50" : "bg-white"
                   )}>
                     <div className="flex items-center gap-1.5">
                       {isMulti && multiMayoreoNota ? (
@@ -726,7 +726,7 @@ function MesVsMesCard({
       <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="font-mono text-[26px] font-medium leading-tight tracking-tight tabular-nums text-gray-950">{fmtMoney(curr)}</span>
         {delta !== null && (
-          <span className={cn("font-mono text-sm font-medium tabular-nums", up ? "text-emerald-700" : "text-rose-600")}>
+          <span className={cn("font-mono text-sm font-medium tabular-nums", up ? "text-emerald-700" : "text-red-600")}>
             {up ? "▲" : "▼"} {Math.abs(delta * 100).toFixed(0)}%
           </span>
         )}
@@ -758,7 +758,7 @@ function KpiCard({
   detalle?: string;
 }) {
   const [abierta, setAbierta] = useState(false);
-  const tono = subTone == null ? "text-gray-500" : subTone > 0 ? "text-emerald-700" : subTone < 0 ? "text-rose-600" : "text-gray-500";
+  const tono = subTone == null ? "text-gray-500" : subTone > 0 ? "text-emerald-700" : subTone < 0 ? "text-red-600" : "text-gray-500";
   const cuerpo = (
     <>
       <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
@@ -776,7 +776,7 @@ function KpiCard({
         data-kpi-proyeccion="escritorio"
         aria-expanded={abierta}
         onClick={() => setAbierta(v => !v)}
-        className="w-full p-4 text-left outline-none transition-colors hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-teal-700/30"
+        className="w-full p-4 text-left outline-none transition-colors hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-gray-900/30"
       >
         {cuerpo}
       </button>
@@ -839,7 +839,7 @@ function EmpresaProjectionCell({
           slots: buildSlotsProyeccion(proyeccion, prevYear, { fechaCorte }),
           ...medirFila(e),
         })}
-        className="block w-full px-2 py-3.5 text-right outline-none transition-colors hover:bg-gray-100/70 focus-visible:ring-2 focus-visible:ring-teal-700/30"
+        className="block w-full px-2 py-3.5 text-right outline-none transition-colors hover:bg-gray-100/70 focus-visible:ring-2 focus-visible:ring-gray-900/30"
       >
         <span className="block text-sm font-medium text-gray-950">{fmtMoneyCompact(proyeccion.proyeccion_cierre)}</span>
         <p className={cn(
@@ -961,7 +961,7 @@ function HeatCell({
           slots: buildSlotsMetrica(cell, mode),
           ...medirFila(e),
         })}
-        className="block w-full px-1.5 py-3.5 text-right outline-none transition-colors hover:bg-gray-100/70 focus-visible:ring-2 focus-visible:ring-teal-700/30"
+        className="block w-full px-1.5 py-3.5 text-right outline-none transition-colors hover:bg-gray-100/70 focus-visible:ring-2 focus-visible:ring-gray-900/30"
       >
         {cur == null ? (
           <span className="text-gray-400">—</span>
@@ -989,7 +989,7 @@ function toneDelta(tone: DeltaCelda["tone"]): string {
 
 /** Idem en la fila oscura del TOTAL GRUPO. */
 function toneDeltaOscuro(tone: DeltaCelda["tone"]): string {
-  return tone === "emerald" ? "text-emerald-400" : tone === "orange" ? "text-orange-400" : "text-gray-400";
+  return tone === "emerald" ? "text-emerald-400" : tone === "orange" ? "text-red-400" : "text-gray-400";
 }
 
 /**
@@ -1052,7 +1052,7 @@ function EmpresaTotalCell({
           slots: buildSlotsMetrica(agg, mode),
           ...medirFila(e),
         })}
-        className="block w-full px-2 py-3.5 text-right outline-none transition-colors hover:bg-gray-100/70 focus-visible:ring-2 focus-visible:ring-teal-700/30"
+        className="block w-full px-2 py-3.5 text-right outline-none transition-colors hover:bg-gray-100/70 focus-visible:ring-2 focus-visible:ring-gray-900/30"
       >
         <span className="flex flex-col items-end leading-tight">
           <span className="text-sm font-medium text-gray-950">{fmtMoney(cur)}</span>

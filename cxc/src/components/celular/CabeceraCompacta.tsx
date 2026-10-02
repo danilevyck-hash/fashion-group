@@ -53,7 +53,7 @@ export function SegmentadoCelular<K extends string>({
       role="group"
       aria-label={etiqueta}
       data-segmentado-celular
-      className="flex h-9 w-full gap-0.5 rounded-lg bg-[#E3E3E8] p-0.5"
+      className="flex h-9 w-full gap-0.5 rounded-lg bg-pista-celular p-0.5"
     >
       {opciones.map((o) => {
         const prendida = o.clave === activa;
@@ -71,7 +71,7 @@ export function SegmentadoCelular<K extends string>({
               // v3.3: los montos en peso medio, prendido o no; lo prendido lo dice el fondo blanco
               "font-medium",
               prendida ? "bg-white shadow-sm" : "active:bg-white/60",
-              o.rojo ? "text-[#A32D2D]" : "text-gray-900",
+              o.rojo ? "text-red-600" : "text-gray-900",
             ].join(" ")}
           >
             {o.rotulo}

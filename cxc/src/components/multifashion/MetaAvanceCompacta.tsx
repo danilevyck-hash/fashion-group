@@ -82,7 +82,7 @@ export function MetaAvanceCompacta({ meta, puedeEditar, onEditar }: Props) {
         )}
       </p>
       <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-200" role="img" aria-label={`Avance ${pct(a.pctVendido)}`}>
-        <div className={`h-full rounded-full ${a.cumplida ? "bg-emerald-600" : "bg-teal-700"}`} style={{ width: `${anchoBarra}%` }} />
+        <div className={`h-full rounded-full ${a.cumplida ? "bg-emerald-600" : "bg-gray-900"}`} style={{ width: `${anchoBarra}%` }} />
       </div>
 
       {/* ¿Así como vamos, llegamos? — una línea, y de dónde sale la cuenta. */}

@@ -188,18 +188,18 @@ export default function BulkExcel({ catalogo, onDone }: { catalogo: CatalogoDesc
   };
 
   return (
-    <div className="mb-4 rounded-lg border border-stone-200 bg-white px-3.5 py-2.5">
+    <div className="mb-4 rounded-lg border border-gray-200 bg-white px-3.5 py-2.5">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[12px] font-semibold uppercase tracking-wide text-stone-500">Edición en masa</span>
+        <span className="text-[12px] font-semibold uppercase tracking-wide text-gray-500">Edición en masa</span>
         <button
           type="button" onClick={download} disabled={!!busy || !catalogo}
-          className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-stone-300 bg-white px-3 text-sm font-semibold text-stone-900 transition hover:border-teal-600 hover:text-teal-800 active:scale-[0.97] disabled:opacity-50"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-gray-300 bg-white px-3 text-sm font-semibold text-gray-900 transition hover:border-gray-900 hover:text-black active:scale-[0.97] disabled:opacity-50"
         >
           {busy === "download" ? "Generando…" : "Descargar Excel"}
         </button>
         <button
           type="button" onClick={() => inputRef.current?.click()} disabled={!!busy || !catalogo}
-          className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-teal-600 px-3 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97] disabled:opacity-50"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-black px-3 text-sm font-semibold text-white transition hover:bg-gray-800 active:scale-[0.97] disabled:opacity-50"
         >
           {busy === "upload" ? "Subiendo…" : "Subir Excel"}
         </button>
@@ -207,17 +207,17 @@ export default function BulkExcel({ catalogo, onDone }: { catalogo: CatalogoDesc
           ref={inputRef} type="file" accept=".xlsx,.xls" className="hidden"
           onChange={(e) => { if (e.target.files?.[0]) upload(e.target.files[0]); }}
         />
-        <span className="text-[12px] text-stone-500">2 hojas: &quot;Por marca&quot; y &quot;Por descripción&quot;.</span>
+        <span className="text-[12px] text-gray-500">2 hojas: &quot;Por marca&quot; y &quot;Por descripción&quot;.</span>
       </div>
 
       {summary && (
-        <div className="mt-2.5 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[13px] text-stone-700">
-          <b className="text-teal-800">{summary.marcaOk}</b> fórmulas de marca · <b className="text-teal-800">{summary.descOk}</b> excepciones
-          actualizadas/creadas · <b className="text-teal-800">{summary.delOk}</b> borradas
+        <div className="mt-2.5 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-[13px] text-gray-700">
+          <b className="text-gray-900">{summary.marcaOk}</b> fórmulas de marca · <b className="text-gray-900">{summary.descOk}</b> excepciones
+          actualizadas/creadas · <b className="text-gray-900">{summary.delOk}</b> borradas
           {summary.errors.length > 0 && (
             <>
               {" "}· <b className="text-amber-700">{summary.errors.length} con error</b>
-              <ul className="ml-4 mt-1 list-disc text-[12px] text-stone-500">
+              <ul className="ml-4 mt-1 list-disc text-[12px] text-gray-500">
                 {summary.errors.slice(0, 10).map((x, i) => <li key={i}>{x}</li>)}
                 {summary.errors.length > 10 && <li>…y {summary.errors.length - 10} más.</li>}
               </ul>

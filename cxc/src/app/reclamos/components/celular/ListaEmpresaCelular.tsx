@@ -137,7 +137,7 @@ export default function ListaEmpresaCelular({
   const seleccion = tituloSeleccion(elegidos.length, visibles.length, montoObjetivo, filtro === "cobrados");
 
   return (
-    <div data-celular="reclamos-lista" className="min-h-screen bg-[#F2F2F7] pb-28">
+    <div data-celular="reclamos-lista" className="min-h-screen bg-fondo-celular pb-28">
       <div data-fila-del-avatar className="flex items-start justify-between gap-2 px-4 pt-3">
         <div className="min-w-0">
           <h1 className={tituloCelular("truncate text-[28px] font-bold leading-tight tracking-tight text-gray-900")}>
@@ -168,7 +168,7 @@ export default function ListaEmpresaCelular({
       </div>
 
       {/* Las dos pestañas de siempre: abre en «Pendientes». */}
-      <div className="mx-4 mt-3 flex rounded-xl bg-[#E9E9EB] p-1">
+      <div className="mx-4 mt-3 flex rounded-xl bg-control-celular p-1">
         {([["por-cobrar", `Pendientes · ${porCobrar.length}`], ["cobrados", `Cobrados · ${cobrados.length}`]] as const).map(
           ([k, txt]) => (
             <button
@@ -209,7 +209,7 @@ export default function ListaEmpresaCelular({
                   cobrado ? (
                     lineaCobrado(fechaDeCobro(r), fotos)
                   ) : (
-                    <span className={linea.rojo ? "text-[#A32D2D]" : undefined}>{linea.texto}</span>
+                    <span className={linea.rojo ? "text-red-600" : undefined}>{linea.texto}</span>
                   )
                 }
                 monto={montoCel(totalDe(r))}

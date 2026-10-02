@@ -333,7 +333,7 @@ export function Descuentos({ onSaved }: { onSaved: (msg: string) => void }) {
           </span>
         )}
       </div>
-      {errorAlta && <p className="mt-2 text-xs text-rose-600">{errorAlta}</p>}
+      {errorAlta && <p className="mt-2 text-xs text-red-600">{errorAlta}</p>}
     </div>
   );
 
@@ -361,7 +361,7 @@ export function Descuentos({ onSaved }: { onSaved: (msg: string) => void }) {
         <div className="py-10 text-center text-sm text-gray-500">Cargando…</div>
       ) : error ? (
         <div className="py-8 text-center text-sm">
-          <p className="text-rose-600">{error}</p>
+          <p className="text-red-600">{error}</p>
           <button
             type="button"
             onClick={() => void load()}
@@ -406,7 +406,7 @@ export function Descuentos({ onSaved }: { onSaved: (msg: string) => void }) {
                       aria-expanded={abierto === f.id}
                       aria-label={`Detalle de ${f.concepto}`}
                       onClick={() => setAbierto((v) => (v === f.id ? null : f.id))}
-                      className="ml-1 align-middle text-xs text-teal-700 sm:hidden"
+                      className="ml-1 align-middle text-xs text-blue-600 sm:hidden"
                     >
                       {abierto === f.id ? "▾" : "›"}
                     </button>
@@ -436,7 +436,7 @@ export function Descuentos({ onSaved }: { onSaved: (msg: string) => void }) {
                       onClick={() => setAQuitar(f)}
                       aria-label={`Quitar ${f.concepto} de ${nombreVendedorEnPantalla(f.vendedor_nombre)}`}
                       title="Quitar"
-                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-lg text-gray-300 transition hover:text-rose-600 active:scale-[0.97]"
+                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-lg text-gray-300 transition hover:text-red-600 active:scale-[0.97]"
                     >
                       ×
                     </button>

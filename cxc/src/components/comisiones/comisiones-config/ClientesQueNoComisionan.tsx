@@ -421,7 +421,7 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
               Cancelar
             </button>
             {!puedeGuardar && !guardando && (
-              <span className={`text-xs ${ningunaCasilla ? "text-rose-600" : "text-gray-400"}`}>
+              <span className={`text-xs ${ningunaCasilla ? "text-red-600" : "text-gray-400"}`}>
                 {ningunaCasilla
                   ? AVISO_NINGUNA_CASILLA
                   : sinEmpresas
@@ -432,7 +432,7 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
               </span>
             )}
           </div>
-          {errorAlta && <p className="mt-2 text-xs text-rose-600">{errorAlta}</p>}
+          {errorAlta && <p className="mt-2 text-xs text-red-600">{errorAlta}</p>}
         </div>
       )}
 
@@ -475,7 +475,7 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
         <div className="py-10 text-center text-sm text-gray-500">Cargando…</div>
       ) : error ? (
         <div className="py-8 text-center text-sm">
-          <p className="text-rose-600">{error}</p>
+          <p className="text-red-600">{error}</p>
           <button
             type="button"
             onClick={() => void load()}
@@ -525,7 +525,7 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
                   <td className="px-3.5 py-2.5 text-gray-900">
                     Excluido: <b className="font-semibold">{loQueNoComisiona(r.que)}</b>
                     {avisoFila?.llave === r.llave && (
-                      <span role="alert" className="mt-1 block text-[11px] text-rose-600">{avisoFila.texto}</span>
+                      <span role="alert" className="mt-1 block text-[11px] text-red-600">{avisoFila.texto}</span>
                     )}
                   </td>
                   <td className="py-2.5 pl-3.5 text-right">
@@ -577,7 +577,7 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
             </div>
             <p className="mt-1.5 text-xs text-gray-500">{AVISO_AL_MENOS_UNO}</p>
             {avisoFila?.llave === editando.llave && (
-              <p role="alert" className="mt-1 text-xs text-rose-600">{avisoFila.texto}</p>
+              <p role="alert" className="mt-1 text-xs text-red-600">{avisoFila.texto}</p>
             )}
             <div className="mt-3 flex gap-2">
               <button

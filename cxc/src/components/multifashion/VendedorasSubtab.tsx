@@ -620,7 +620,7 @@ function VendedoraRow({
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="font-medium">{nombreEnPantalla(v.nombre)}</span>
           {v.manager && (
-            <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-xs font-medium text-teal-700">Gerente</span>
+            <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-700">Gerente</span>
           )}
           <ChipBono chip={chip} />
         </div>
@@ -674,7 +674,7 @@ function VendedoraCard({
         <span className={cn(M, "text-xs text-gray-500 tabular-nums")}>{rank}.</span>
         <span className="truncate text-[15px] font-medium leading-tight text-gray-950">{nombreEnPantalla(v.nombre)}</span>
         {v.manager && (
-          <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-xs font-medium text-teal-700">Gerente</span>
+          <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-700">Gerente</span>
         )}
         <ChipBono chip={chip} sinMonto={!!totalPersona} />
       </div>
@@ -717,7 +717,7 @@ function ChipPill({ active, onClick, children }: { active: boolean; onClick: () 
       aria-pressed={active}
       className={cn(
         "inline-flex min-h-[44px] items-center whitespace-nowrap rounded-full border px-4 py-2.5 text-xs font-medium transition",
-        active ? "border-teal-700 bg-teal-700 text-white" : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
+        active ? "border-gray-900 bg-gray-900 text-white" : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
       )}
     >
       {children}

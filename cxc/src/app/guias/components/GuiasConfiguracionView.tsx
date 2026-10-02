@@ -437,7 +437,7 @@ export default function GuiasConfiguracionView() {
                 className={CAMPO}
               />
             </div>
-            {errorAlta && <p className="text-xs text-rose-600">{errorAlta}</p>}
+            {errorAlta && <p className="text-xs text-red-600">{errorAlta}</p>}
             <div className="flex gap-2">
               <button
                 type="button"
@@ -610,7 +610,7 @@ function GrupoDeCliente({
                 placeholder="Tiendas (opcional, separadas por coma)"
                 className={CAMPO}
               />
-              {errorEdicion && <p className="text-xs text-rose-600">{errorEdicion}</p>}
+              {errorEdicion && <p className="text-xs text-red-600">{errorEdicion}</p>}
               <div className="flex gap-2">
                 <button
                   type="button"

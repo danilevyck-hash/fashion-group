@@ -29,7 +29,7 @@ export default function ChipsDePeriodoCelular({ chips, elegido, onElegir, etique
     return (
       <div className="px-4 pt-3">
         <div
-          className="flex h-9 gap-0.5 overflow-x-auto rounded-lg bg-[#E3E3E8] p-0.5"
+          className="flex h-9 gap-0.5 overflow-x-auto rounded-lg bg-pista-celular p-0.5"
           role="tablist"
           aria-label={etiqueta}
           data-fg-chips-periodo-celular
@@ -74,7 +74,7 @@ export default function ChipsDePeriodoCelular({ chips, elegido, onElegir, etique
             data-fg-periodo={c.clave}
             onClick={() => onElegir(c.clave)}
             className={`min-h-[44px] shrink-0 whitespace-nowrap rounded-full px-4 text-[14px] transition active:scale-[0.97] ${
-              activo ? "bg-gray-900 text-white" : "bg-[#E9E9EB] text-gray-900"
+              activo ? "bg-gray-900 text-white" : "bg-control-celular text-gray-900"
             }`}
           >
             {c.rotulo}

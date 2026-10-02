@@ -276,7 +276,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
           <p className="text-[11px] uppercase tracking-wide text-gray-500">
             {descActivos.length > 0 ? "Total a pagar" : "Comisión total"}
           </p>
-          <p className={`text-2xl font-semibold tabular-nums ${totalAPagar < 0 ? "text-rose-600" : "text-gray-900"}`}>
+          <p className={`text-2xl font-semibold tabular-nums ${totalAPagar < 0 ? "text-red-600" : "text-gray-900"}`}>
             {fmtMoney(totalAPagar)}
           </p>
           <p className="text-xs text-gray-500">
@@ -345,7 +345,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
       {loading ? (
         <div className="p-8 text-center text-sm text-gray-500">Cargando…</div>
       ) : error ? (
-        <div className="p-8 text-center text-sm text-rose-600">{error}</div>
+        <div className="p-8 text-center text-sm text-red-600">{error}</div>
       ) : data ? (
         <div className="space-y-6">
           {/* ══════════ VENTAS ══════════ */}
@@ -395,7 +395,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                     // $0.00 (atribuidas al vendedor de la factura) pero en gris.
                     // La NOTA DE CRÉDITO se reconoce por el rojo y el negativo:
                     // la columna «Tipo» (FA/NC) era decir dos veces lo mismo.
-                    <tr key={i} className={`border-b border-gray-100 last:border-0 ${v.subtotal < 0 ? "text-rose-600" : v.subtotal === 0 && v.tipo === "Factura" ? "text-gray-400" : "text-gray-800"}`}>
+                    <tr key={i} className={`border-b border-gray-100 last:border-0 ${v.subtotal < 0 ? "text-red-600" : v.subtotal === 0 && v.tipo === "Factura" ? "text-gray-400" : "text-gray-800"}`}>
                       {COLUMNAS_VENTA_EN_ORDEN(enCelular).map((c) => {
                         // Los últimos 4 dígitos de la factura: el largo de
                         // Switch partía la fila en dos líneas. En el Excel va
@@ -558,7 +558,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                           )}
                           <span className={d.activo ? "" : "text-gray-400 line-through"}>{d.concepto}</span>
                         </dt>
-                        <dd className={`tabular-nums ${d.activo ? "text-rose-600" : "text-gray-300"}`}>−{fmtMoney(d.monto)}</dd>
+                        <dd className={`tabular-nums ${d.activo ? "text-red-600" : "text-gray-300"}`}>−{fmtMoney(d.monto)}</dd>
                       </div>
                     ))}
                     <div className="flex justify-between border-t border-gray-300 pt-1.5 text-base font-semibold">

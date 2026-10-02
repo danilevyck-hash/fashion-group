@@ -87,7 +87,7 @@ function colorPct(pct: number | null): string {
   if (pct == null) return "text-gray-500";
   const v = Math.round(pct * 100);
   if (v > 0) return "text-emerald-700";
-  if (v < 0) return "text-rose-700";
+  if (v < 0) return "text-red-700";
   return "text-gray-600";
 }
 
@@ -134,10 +134,10 @@ export function VentaHoyCard({ syncTick = 0, habilitado = true }: VentaHoyCardPr
     <section
       aria-label="Venta de hoy"
       className={`mb-4 flex w-full flex-wrap items-baseline gap-x-2 gap-y-1 rounded-lg border px-3.5 py-2.5 text-sm ${
-        alerta ? "border-amber-300 bg-amber-50" : "border-teal-200 bg-teal-50/60"
+        alerta ? "border-amber-300 bg-amber-50" : "border-gray-200 bg-gray-50"
       }`}
     >
-      <span className="text-xs font-semibold uppercase tracking-wide text-teal-800">Hoy</span>
+      <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Hoy</span>
       <span className="text-xs text-gray-600">· {tituloDia(data.fecha)}</span>
 
       {data.hayVentas ? (

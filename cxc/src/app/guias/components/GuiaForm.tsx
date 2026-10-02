@@ -635,8 +635,8 @@ export default function GuiaForm({
 
   function StatusBadge() {
     if (saveStatus === "saving") return <span className="text-sm text-gray-400">Guardando...</span>;
-    if (saveStatus === "dirty") return <span className="text-sm text-orange-500">Sin guardar</span>;
-    if (saveStatus === "saved") return <span className="text-sm text-green-600 animate-save-flash">Guía guardada {guardadoEn}</span>;
+    if (saveStatus === "dirty") return <span className="text-sm text-amber-700">Sin guardar</span>;
+    if (saveStatus === "saved") return <span className="text-sm text-emerald-700 animate-save-flash">Guía guardada {guardadoEn}</span>;
     return null;
   }
 
@@ -1049,7 +1049,7 @@ export default function GuiaForm({
             // Sin espacio, baja a su propia línea, debajo del tipo de despacho (docs/diseno.md regla 9).
             <div className={`min-w-0 sm:flex-1 sm:min-w-[420px]${ancho ? " lg:min-w-0" : ""}`}>
               {campoTransportista(
-                `${PILDORA} min-w-[200px] flex-1 appearance-none ${transportistaError ? "border-red-400" : transportistaId ? "border-black dark:border-white" : "border-gray-200 text-gray-500"}`,
+                `${PILDORA} min-w-[200px] flex-1 appearance-none ${transportistaError ? "border-red-400" : transportistaId ? "border-black" : "border-gray-200 text-gray-500"}`,
                 "flex flex-wrap items-center gap-x-2 gap-y-1 [&>button]:shrink-0",
               )}
             </div>

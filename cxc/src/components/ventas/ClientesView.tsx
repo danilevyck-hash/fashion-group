@@ -579,7 +579,7 @@ export function ClientesView({
                 data-clientes-en-cero
                 aria-expanded={ceroAbierto}
                 onClick={() => setCeroAbierto((v) => !v)}
-                className="min-h-[44px] text-[13px] font-medium text-teal-700"
+                className="min-h-[44px] text-[13px] font-medium text-blue-600"
               >
                 {ceroAbierto ? "Ocultar" : "Ver"} los {sinCompras} {textoSinCompras(selectedYear, periodoServido)}
               </button>
@@ -901,7 +901,7 @@ export function ClientesView({
                     >
                       <span className="font-mono tabular-nums text-gray-950">{bloques.enCero.length}</span>
                       <span>{textoSinCompras(selectedYear, periodoServido)}</span>
-                      <span className="ml-auto font-medium text-teal-700">{ceroAbierto ? "ocultar" : "ver"}</span>
+                      <span className="ml-auto font-medium text-blue-600">{ceroAbierto ? "ocultar" : "ver"}</span>
                     </button>
                   </td>
                 </tr>
@@ -974,7 +974,7 @@ export function ClientesView({
           >
             <span className="font-mono tabular-nums text-gray-950">{bloques.enCero.length}</span>
             <span>{textoSinCompras(selectedYear, periodoServido)}</span>
-            <span className="ml-auto font-medium text-teal-700">{ceroAbierto ? "ocultar" : "ver"}</span>
+            <span className="ml-auto font-medium text-blue-600">{ceroAbierto ? "ocultar" : "ver"}</span>
           </button>
         )}
         {ceroAbierto && bloques.enCero.map(c => (
@@ -1043,7 +1043,7 @@ export function ClientesView({
 function DelGrupoBadge() {
   return (
     <span
-      className="ml-1.5 inline-flex shrink-0 items-center rounded-full border border-violet-200 bg-violet-50 px-1.5 py-px align-middle text-[10px] font-medium leading-4 text-violet-700"
+      className="ml-1.5 inline-flex shrink-0 items-center rounded-full border border-gray-200 bg-gray-50 px-1.5 py-px align-middle text-[10px] font-medium leading-4 text-gray-700"
       title="Empresa del grupo. Es una venta real y cuenta en los totales igual que cualquier cliente; la marca es sólo para reconocerla."
     >
       Intercompañía
@@ -1063,7 +1063,7 @@ export const ROTULO_NUEVO = "Nuevo";
 
 function CambioCelda({ c, className }: { c: Cliente; className?: string }) {
   if (c.delta == null) {
-    return <span data-col="delta" data-nuevo className={cn("font-sans text-xs font-medium text-teal-700", className)}>{ROTULO_NUEVO}</span>;
+    return <span data-col="delta" data-nuevo className={cn("font-sans text-xs font-medium text-emerald-700", className)}>{ROTULO_NUEVO}</span>;
   }
   const fmt = formatDeltaRatio(c.delta);
   return (
@@ -1115,7 +1115,7 @@ function ClienteRow({
     <tr
       data-fila-cliente={`${c.empresaKey}|${c.id}`}
       aria-current={resaltado ? "true" : undefined}
-      className={`cursor-pointer transition hover:bg-gray-50 ${resaltado ? "bg-teal-50/60" : ""}`}
+      className={`cursor-pointer transition hover:bg-gray-50 ${resaltado ? "bg-gray-100" : ""}`}
     >
       {mostrarRanking && (
         <td className="border-b border-gray-200 px-2.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{displayRank}</td>
@@ -1136,7 +1136,7 @@ function ClienteRow({
               href={`/clientes/${encodeURIComponent(c.id)}`}
               onMouseEnter={handleHoverEnter}
               onFocus={handleHoverEnter}
-              className="flex min-h-[44px] max-w-full flex-col justify-center text-left font-medium leading-tight hover:text-teal-700"
+              className="flex min-h-[44px] max-w-full flex-col justify-center text-left font-medium leading-tight hover:text-blue-600"
             >
               <span data-col="nombre">
                 {c.nombre}
@@ -1268,7 +1268,7 @@ function ClienteCard({
           <Link
             href={`/clientes/${encodeURIComponent(c.id)}`}
             onClick={(e) => e.stopPropagation()}
-            className="flex min-h-[44px] min-w-0 flex-1 items-center truncate text-[15px] font-medium leading-tight text-gray-950 hover:text-teal-700"
+            className="flex min-h-[44px] min-w-0 flex-1 items-center truncate text-[15px] font-medium leading-tight text-gray-950 hover:text-blue-600"
           >
             <span data-col="nombre" className="truncate">
               {c.nombre}

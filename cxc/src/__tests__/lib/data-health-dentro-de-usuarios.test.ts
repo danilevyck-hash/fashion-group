@@ -422,8 +422,8 @@ describe("las pestañas siguen el patrón de Ventas y Multifashion", () => {
     expect(src).toContain('useUrlState("tab", "usuarios")');
   });
 
-  it("el subrayado teal y los 44 px al tacto", () => {
-    expect(src).toContain("data-[state=active]:border-teal-700");
+  it("el subrayado gris oscuro (seleccionado estándar) y los 44 px al tacto", () => {
+    expect(src).toContain("data-[state=active]:border-gray-900");
     expect(src).toContain("min-h-[44px]");
   });
 

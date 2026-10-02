@@ -4,7 +4,7 @@
 // EL CHIP DE ORDENAR — UNO SOLO, DE UN SOLO COLOR (5-sep-2026).
 //
 // 🩸 QUÉ VINO A ARREGLAR. El chip activo era NEGRO en Productos
-// (`bg-gray-800`) y VERDE en Utilidad (`bg-teal-700`), en el mismo módulo y a
+// (`bg-gray-800`) y VERDE en Utilidad (teal), en el mismo módulo y a
 // una pestaña de distancia. Dos colores para el mismo estado enseñan que el
 // color significa algo, y acá no significaba nada: era que cada vista se
 // escribió por su lado.
@@ -46,7 +46,7 @@ export function ChipOrden<K extends string>({
       className={cn(
         "inline-flex min-h-[44px] items-center gap-1 rounded-full border px-3.5 text-xs font-medium transition active:scale-[0.97]",
         isActive
-          ? "border-teal-700 bg-teal-700 text-white"
+          ? "border-gray-900 bg-gray-900 text-white"
           : "border-gray-200 bg-white text-gray-700",
       )}
     >

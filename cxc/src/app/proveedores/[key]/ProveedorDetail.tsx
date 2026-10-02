@@ -132,7 +132,7 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
               <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
                 <div>
                   <div className="text-xs uppercase tracking-[0.05em] text-gray-400">Saldo por pagar (total)</div>
-                  <div className={`text-2xl font-semibold tabular-nums mt-1 ${data.total_grupo.por_pagar < 0 ? "text-blue-600" : "text-purple-700"}`}>
+                  <div className={`text-2xl font-semibold tabular-nums mt-1 ${data.total_grupo.por_pagar < 0 ? "text-blue-600" : "text-gray-900"}`}>
                     {data.total_grupo.por_pagar < 0
                       ? `Saldo a favor $${fmt(Math.abs(data.total_grupo.por_pagar))}`
                       : `$${fmt(data.total_grupo.por_pagar)}`}
@@ -265,7 +265,7 @@ function PorPagarCell({ value, className = "py-2" }: { value: number; className?
     return <td className={`${className} text-right tabular-nums text-blue-600`}>Saldo a favor ${fmt(Math.abs(value))}</td>;
   }
   return (
-    <td className={`${className} text-right tabular-nums ${value > 0 ? "text-purple-700" : "text-gray-400"}`}>
+    <td className={`${className} text-right tabular-nums ${value > 0 ? "text-gray-900" : "text-gray-400"}`}>
       ${fmt(value)}
     </td>
   );

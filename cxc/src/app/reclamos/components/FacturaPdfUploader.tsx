@@ -221,7 +221,7 @@ export default function FacturaPdfUploader({ pdfUrl, onUploaded, onExtracted }: 
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         className={`flex items-center gap-2 rounded-md border border-dashed px-3 py-2 transition ${
-          dragging ? "border-fuchsia-400 bg-fuchsia-50" : "border-gray-300 bg-white hover:border-gray-400"
+          dragging ? "border-gray-900 bg-gray-50" : "border-gray-300 bg-white hover:border-gray-400"
         }`}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-400 shrink-0">

@@ -74,10 +74,10 @@ import { FilaDetalleBloque, medirRenglon, TOTAL_GRUPO_ID, type FilaDetalle } fro
 
 /** Color del % bajo el monto en filas claras / en la fila oscura del total. */
 function toneDeltaClaro(tone: DeltaCelda["tone"]): string {
-  return tone === "emerald" ? "text-emerald-700" : tone === "orange" ? "text-rose-600" : "text-gray-400";
+  return tone === "emerald" ? "text-emerald-700" : tone === "orange" ? "text-red-600" : "text-gray-400";
 }
 function toneDeltaOscuro(tone: DeltaCelda["tone"]): string {
-  return tone === "emerald" ? "text-emerald-300" : tone === "orange" ? "text-rose-300" : "text-gray-400";
+  return tone === "emerald" ? "text-emerald-300" : tone === "orange" ? "text-red-300" : "text-gray-400";
 }
 
 /** Abridor de detalle que recibe cada celda clicable. */
@@ -260,7 +260,7 @@ function KpiTile({
   const [abierta, setAbierta] = useState(false);
   const subTone = sub == null || sub.sign == null
     ? "text-gray-500"
-    : sub.sign > 0 ? "text-emerald-700" : sub.sign < 0 ? "text-rose-700" : "text-gray-500";
+    : sub.sign > 0 ? "text-emerald-700" : sub.sign < 0 ? "text-red-700" : "text-gray-500";
   const cuerpo = (
     <>
       <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
@@ -815,7 +815,7 @@ function RenglonPeriodo({
       className={cn(
         "shrink-0 text-xs uppercase tracking-wide",
         renglon.fuerte ? "font-semibold" : "font-medium",
-        oscura ? "text-gray-300" : renglon.enCurso ? "text-teal-800" : "text-gray-500",
+        oscura ? "text-gray-300" : renglon.enCurso ? "text-gray-900" : "text-gray-500",
       )}
     >
       {renglon.etiqueta}

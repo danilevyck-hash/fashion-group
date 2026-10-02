@@ -80,7 +80,7 @@ export default function PortadaCelular({
   const totalDe = (r: Reclamo) => reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total;
 
   return (
-    <div data-celular="reclamos-portada" className="min-h-screen bg-[#F2F2F7] pb-28">
+    <div data-celular="reclamos-portada" className="min-h-screen bg-fondo-celular pb-28">
       {compacta ? (
         <div data-cabecera-reclamos-v32 className="px-4">
           {/* 1 · «Reclamos» · 🔍 */}
@@ -94,7 +94,7 @@ export default function PortadaCelular({
           <span className={`${CLASE_TOTAL_CELULAR} pt-1`}>{montoCel(resumen.porCobrar.monto)}</span>
           <span className={CLASE_LINEA_TOTAL}>
             {resumen.porCobrar.n} {resumen.porCobrar.n === 1 ? "reclamo" : "reclamos"} por cobrar
-            {sub.viejos && <> · <span className="font-medium text-[#A32D2D]">{sub.viejos}</span></>}
+            {sub.viejos && <> · <span className="font-medium text-red-600">{sub.viejos}</span></>}
           </span>
         </div>
       ) : (<>
@@ -102,7 +102,7 @@ export default function PortadaCelular({
         <h1 className={tituloCelular("text-[28px] font-bold leading-tight tracking-tight text-gray-900")}>Reclamos</h1>
         <p className="mt-0.5 text-[15px] text-gray-500">
           {sub.texto}
-          {sub.viejos && <> · <span className="font-medium text-[#A32D2D]">{sub.viejos}</span></>}
+          {sub.viejos && <> · <span className="font-medium text-red-600">{sub.viejos}</span></>}
         </p>
       </div>
 
@@ -126,7 +126,7 @@ export default function PortadaCelular({
           onChange={(e) => setGlobalSearch(e.target.value)}
           placeholder="Buscar factura, reclamo o estilo"
           aria-label="Buscar factura, reclamo o estilo"
-          className="w-full rounded-xl border border-transparent bg-[#E9E9EB] px-4 py-3 text-[16px] text-gray-900 placeholder:text-gray-500 focus:border-gray-400 focus:outline-none"
+          className="w-full rounded-xl border border-transparent bg-control-celular px-4 py-3 text-[16px] text-gray-900 placeholder:text-gray-500 focus:border-gray-400 focus:outline-none"
           autoFocus={compacta && abrirBuscar && globalSearch === ""}
           onBlur={() => { if (globalSearch === "") setAbrirBuscar(false); }}
         />
@@ -174,7 +174,7 @@ export default function PortadaCelular({
                     ) : (
                       <>
                         {linea.texto}
-                        {linea.dias && <> · <span className="text-[#A32D2D]">{linea.dias}</span></>}
+                        {linea.dias && <> · <span className="text-red-600">{linea.dias}</span></>}
                       </>
                     )
                   }

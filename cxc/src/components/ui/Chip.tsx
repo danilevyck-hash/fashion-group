@@ -22,8 +22,8 @@ const VARIANTS: Record<Variant, { idle: string; active: string }> = {
     active: "border-red-600 bg-red-600 text-white",
   },
   accent: {
-    idle:   "border-teal-200 bg-white text-teal-700 hover:bg-teal-50",
-    active: "border-teal-700 bg-teal-700 text-white",
+    idle:   "border-gray-200 bg-white text-gray-700 hover:bg-gray-50",
+    active: "border-gray-900 bg-gray-900 text-white",
   },
 };
 

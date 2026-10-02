@@ -125,19 +125,19 @@ export default function AlarmaDescripcionesNuevas({ items, pasaronSolas = 0, onA
         <h2 className="text-center text-xl font-bold text-red-700">
           {items.length} descripción(es) por revisar
         </h2>
-        <p className="mt-2 text-center text-sm text-stone-600">
+        <p className="mt-2 text-center text-sm text-gray-600">
           {puedeAprobar
             ? "Bloquean la descarga. Avísale a Daniel antes de aprobar."
             : "Bloquean la descarga hasta que Daniel las apruebe. Mándale una captura."}
         </p>
         {pasaronSolas > 0 && (
-          <p className="mt-2 text-center text-[13px] text-stone-500">
+          <p className="mt-2 text-center text-[13px] text-gray-500">
             {pasaronSolas} pasaron solas · las dos mitades ya existen
           </p>
         )}
         <div className="mt-4 max-h-64 overflow-auto rounded-lg border border-red-200 bg-red-50 p-3">
           {items.map((o, i) => (
-            <div key={i} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-1.5 text-[13px] text-stone-800">
+            <div key={i} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-1.5 text-[13px] text-gray-800">
               <div className="min-w-0">
                 <div>
                   <span className="font-semibold text-red-800">{o.marca}</span> → {o.desc}
@@ -145,7 +145,7 @@ export default function AlarmaDescripcionesNuevas({ items, pasaronSolas = 0, onA
                 {o.motivo && (
                   <div className="mt-0.5 text-[12px] text-amber-800">
                     ⚠ {o.motivo}
-                    {o.gemela && <b className="ml-1 font-semibold text-stone-900">{o.gemela}</b>}
+                    {o.gemela && <b className="ml-1 font-semibold text-gray-900">{o.gemela}</b>}
                   </div>
                 )}
               </div>
@@ -153,7 +153,7 @@ export default function AlarmaDescripcionesNuevas({ items, pasaronSolas = 0, onA
                 <button
                   type="button"
                   onClick={() => abrirConfirmacion(o)}
-                  className="shrink-0 rounded-md border border-teal-600 bg-white px-2.5 py-1 text-[12px] font-semibold text-teal-700 transition hover:bg-teal-50 active:scale-[0.97]"
+                  className="shrink-0 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-[12px] font-semibold text-gray-900 transition hover:bg-gray-50 active:scale-[0.97]"
                 >
                   Aprobar y agregar al catálogo
                 </button>
@@ -164,7 +164,7 @@ export default function AlarmaDescripcionesNuevas({ items, pasaronSolas = 0, onA
         <button
           type="button"
           onClick={onClose}
-          className="mt-5 w-full rounded-lg bg-stone-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-stone-800 active:scale-[0.98]"
+          className="mt-5 w-full rounded-lg bg-black px-4 py-2.5 text-sm font-bold text-white transition hover:bg-gray-800 active:scale-[0.98]"
         >
           Cerrar
         </button>
@@ -173,25 +173,25 @@ export default function AlarmaDescripcionesNuevas({ items, pasaronSolas = 0, onA
       {/* Confirmación de aprobación (encima de la alarma) */}
       {confirm && (
         <div {...backdropConfirm} className="fade-in fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4">
-          <div ref={confirmPanelRef} className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6">
-            <h3 className="text-center text-lg font-bold text-stone-900">Aprobar descripción</h3>
+          <div ref={confirmPanelRef} className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6">
+            <h3 className="text-center text-lg font-bold text-gray-900">Aprobar descripción</h3>
             <Aviso
               tono="aviso" className="mt-2"
             >
               Quedará <b>permanente</b> en el catálogo de <b>{confirm.marcaElegida || "…"}</b>. Avísale a Daniel antes de aprobar.
             </Aviso>
-            <div className="mt-3 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[13px] text-stone-800">
+            <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-[13px] text-gray-800">
               {confirm.item.desc}
             </div>
             {confirm.item.empresaKey && (
               <div className="mt-3">
-                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-stone-500">
+                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                   ¿A qué marca del catálogo pertenece?
                 </label>
                 <select
                   value={confirm.marcaElegida}
                   onChange={(e) => setConfirm((c) => (c ? { ...c, marcaElegida: e.target.value } : c))}
-                  className="w-full rounded-md border border-stone-300 bg-stone-50 px-2.5 py-1.5 text-sm text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
+                  className="w-full rounded-md border border-gray-300 bg-gray-50 px-2.5 py-1.5 text-sm text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
                 >
                   {marcasCandidatasDeEmpresa(confirm.item.empresaKey).map((m) => (
                     <option key={m} value={m}>{m}</option>
@@ -199,12 +199,12 @@ export default function AlarmaDescripcionesNuevas({ items, pasaronSolas = 0, onA
                 </select>
               </div>
             )}
-            <label className="mt-4 flex cursor-pointer items-start gap-2 text-sm text-stone-800">
+            <label className="mt-4 flex cursor-pointer items-start gap-2 text-sm text-gray-800">
               <input
                 type="checkbox"
                 checked={confirm.avisado}
                 onChange={(e) => setConfirm((c) => (c ? { ...c, avisado: e.target.checked } : c))}
-                className="mt-0.5 h-4 w-4 accent-teal-600"
+                className="mt-0.5 h-4 w-4 accent-gray-900"
               />
               <span>Notificado a Daniel</span>
             </label>
@@ -220,7 +220,7 @@ export default function AlarmaDescripcionesNuevas({ items, pasaronSolas = 0, onA
                 type="button"
                 onClick={() => setConfirm(null)}
                 disabled={confirm.enviando}
-                className="flex-1 rounded-md border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-900 transition hover:border-stone-400 active:scale-[0.98] disabled:opacity-50"
+                className="flex-1 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-900 transition hover:border-gray-400 active:scale-[0.98] disabled:opacity-50"
               >
                 Cancelar
               </button>
@@ -228,7 +228,7 @@ export default function AlarmaDescripcionesNuevas({ items, pasaronSolas = 0, onA
                 type="button"
                 onClick={aprobar}
                 disabled={!confirm.avisado || confirm.enviando || !confirm.marcaElegida}
-                className="flex-1 rounded-md bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-stone-300"
+                className="flex-1 rounded-md bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-300"
               >
                 {confirm.enviando ? "Aprobando…" : "Aprobar"}
               </button>

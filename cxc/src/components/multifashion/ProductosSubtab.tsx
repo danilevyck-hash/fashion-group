@@ -454,14 +454,14 @@ export function ProductosSubtab({
                   // 44 px de alto y letra de 16 px en celular: por
                   // debajo de 16, iOS hace zoom solo al enfocar y deja
                   // la pantalla corrida.
-                  className="h-11 w-full rounded-md border border-gray-200 bg-white pl-9 pr-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600 sm:text-sm"
+                  className="h-11 w-full rounded-md border border-gray-200 bg-white pl-9 pr-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 sm:text-sm"
                 />
               </div>
               <select
                 value={categoria}
                 onChange={e => { setCategoria(e.target.value); setVisibles(TANDA); }}
                 aria-label="Filtrar por categoría"
-                className="h-11 w-full rounded-md border border-gray-200 bg-white px-3 text-base text-gray-900 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600 sm:w-64 sm:text-sm"
+                className="h-11 w-full rounded-md border border-gray-200 bg-white px-3 text-base text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 sm:w-64 sm:text-sm"
               >
                 <option value="">Todas las categorías</option>
                 {categoriasDisponibles.map(c => (
@@ -871,7 +871,7 @@ function ListaTop({
               <span
                 className={cn(
                   "shrink-0 font-mono text-sm font-medium tabular-nums",
-                  esPlata ? "text-teal-800" : "text-gray-950",
+                  esPlata ? "text-gray-900" : "text-gray-950",
                 )}
               >
                 {esPlata ? fmtMoney(f.valor) : fmtUnidades(f.valor)}
@@ -882,7 +882,7 @@ function ListaTop({
             <div className="mt-1.5 flex items-center gap-2 pl-6">
               <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100" aria-hidden="true">
                 <div
-                  className={cn("h-full rounded-full", esPlata ? "bg-teal-600" : "bg-gray-400")}
+                  className={cn("h-full rounded-full", esPlata ? "bg-gray-900" : "bg-gray-400")}
                   style={{ width: `${(f.fraccion * 100).toFixed(1)}%` }}
                 />
               </div>
@@ -1115,7 +1115,7 @@ function VistaRanking({
           id="orden-productos"
           value={orden.col}
           onChange={e => onOrdenar(e.target.value as ColumnaRanking)}
-          className="h-11 flex-1 rounded-md border border-gray-200 bg-white px-3 text-base text-gray-900 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600 sm:text-sm"
+          className="h-11 flex-1 rounded-md border border-gray-200 bg-white px-3 text-base text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 sm:text-sm"
         >
           {cols.map(c => (
             <option key={c.col} value={c.col}>{c.titulo}</option>
@@ -1486,20 +1486,20 @@ function FilaMarcaFiltro({
       // módulo ya hubo píldoras de 26 px (CLAUDE.md).
       className={cn(
         "block min-h-[44px] w-full px-4 py-2.5 text-left transition",
-        activo ? "bg-teal-50" : "hover:bg-gray-50",
+        activo ? "bg-gray-100" : "hover:bg-gray-50",
       )}
     >
       <div className="flex items-baseline gap-2">
         <span
           className={cn(
             "min-w-0 flex-1 truncate text-sm",
-            activo ? "font-semibold text-teal-900" : "font-medium text-gray-950",
+            activo ? "font-semibold text-gray-950" : "font-medium text-gray-950",
           )}
         >
           {nombre}
         </span>
         {/* Teal = plata, como en toda la pantalla. */}
-        <span className="shrink-0 font-mono text-sm font-medium tabular-nums text-teal-800">
+        <span className="shrink-0 font-mono text-sm font-medium tabular-nums text-gray-900">
           {fmtMoney(venta)}
         </span>
       </div>

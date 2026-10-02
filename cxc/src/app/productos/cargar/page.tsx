@@ -44,7 +44,7 @@ function SelectorPestanas({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => v
         aria-haspopup="listbox"
         aria-expanded={abierto}
         aria-label="Sección de Plantilla Switch"
-        className="flex w-full items-center justify-between gap-2 rounded-lg border border-stone-200 bg-white px-4 min-h-[44px] text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+        className="flex w-full items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 min-h-[44px] text-sm font-medium text-gray-700 transition hover:bg-gray-50"
       >
         <span className="truncate">{actual.label}</span>
         <svg className="h-4 w-4 shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -70,7 +70,7 @@ function SelectorPestanas({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => v
             aria-selected={p.id === tab}
             onClick={() => { onChange(p.id); setAbierto(false); }}
             className={`w-full min-h-[44px] px-4 flex items-center justify-between gap-2 text-left text-sm transition hover:bg-black/5 ${
-              p.id === tab ? "font-semibold text-teal-700" : "text-stone-700"
+              p.id === tab ? "font-semibold text-gray-900" : "text-gray-700"
             }`}
           >
             <span>{p.label}</span>
@@ -170,7 +170,7 @@ function CargarInner() {
   const enlace = "inline-flex min-h-[44px] items-center text-sm font-medium text-blue-600 hover:text-blue-800";
 
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="min-h-screen bg-gray-50">
       <AppHeader module="Plantilla Switch" />
 
       <div className="mx-auto max-w-5xl px-4 pt-4">
@@ -267,7 +267,7 @@ function FormulasScopeRow() {
   return (
     <>
       <div className="mx-auto max-w-4xl px-4 pt-4">
-        <div className="flex w-full flex-nowrap overflow-x-auto rounded-lg border border-stone-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex w-full flex-nowrap overflow-x-auto rounded-lg border border-gray-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <TabBtn active={formulasScope === "depurador"} onClick={() => setFormulasScope("depurador")}>Plantilla (importación)</TabBtn>
           <TabBtn active={formulasScope === "tienda"} onClick={() => setFormulasScope("tienda")}>Tienda (facturas)</TabBtn>
         </div>
@@ -286,7 +286,7 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
       // pero la regla de verdad —44 px de alto, sin comprimirse, sin partir el
       // texto— se queda tal cual (candado iphone-targets-operacion).
       className={`shrink-0 whitespace-nowrap rounded-md px-2.5 xl:px-4 min-h-[44px] text-sm font-medium transition ${
-        active ? "bg-teal-600 text-white" : "text-stone-600 hover:bg-stone-100"
+        active ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"
       }`}
     >
       {children}

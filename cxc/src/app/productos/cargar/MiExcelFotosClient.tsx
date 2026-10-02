@@ -195,11 +195,11 @@ export default function MiExcelFotosClient() {
             if (e.dataTransfer.files[0]) cargarLibro(e.dataTransfer.files[0]);
           }}
           className={`mb-3 flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed px-6 py-6 text-center transition ${
-            dragging ? "border-teal-600 bg-teal-50" : "border-stone-300 bg-white hover:border-teal-600 hover:bg-teal-50"
+            dragging ? "border-gray-900 bg-gray-100" : "border-gray-300 bg-white hover:border-gray-900 hover:bg-gray-50"
           }`}
         >
-          <UploadCloud className="mb-2 h-7 w-7 text-teal-800" strokeWidth={1.6} />
-          <div className="text-base font-semibold text-stone-900">
+          <UploadCloud className="mb-2 h-7 w-7 text-gray-500" strokeWidth={1.6} />
+          <div className="text-base font-semibold text-gray-900">
             {leyendo ? "Leyendo archivo…" : "Suelta tu Excel aquí o haz clic para buscarlo"}
           </div>
           <input
@@ -210,8 +210,8 @@ export default function MiExcelFotosClient() {
             onChange={(e) => { if (e.target.files?.[0]) cargarLibro(e.target.files[0]); }}
           />
         </label>
-        <div className="rounded-xl border border-stone-200 bg-white p-3.5 text-[13px] leading-relaxed text-stone-700">
-          <div className="mb-1.5 text-[12px] font-semibold uppercase tracking-wide text-stone-500">
+        <div className="rounded-xl border border-gray-200 bg-white p-3.5 text-[13px] leading-relaxed text-gray-700">
+          <div className="mb-1.5 text-[12px] font-semibold uppercase tracking-wide text-gray-500">
             Cómo tiene que estar tu archivo
           </div>
           <ul className="list-disc space-y-1 pl-5">
@@ -235,11 +235,11 @@ export default function MiExcelFotosClient() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
       {/* Qué se leyó del archivo */}
-      <div className="mb-4 rounded-xl border border-stone-200 bg-white p-3.5">
+      <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3.5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="truncate text-[15px] font-semibold text-stone-900">{analisis.nombreArchivo}</div>
-            <div className="mt-1 text-[13px] text-stone-700">
+            <div className="truncate text-[15px] font-semibold text-gray-900">{analisis.nombreArchivo}</div>
+            <div className="mt-1 text-[13px] text-gray-700">
               Hoja <b>{hoja.nombre}</b> · <b>{lectura.filas.length.toLocaleString()}</b> códigos en la
               columna B{lectura.encabezadoCodigo ? ` (encabezado: «${lectura.encabezadoCodigo}»)` : ""}
             </div>
@@ -247,7 +247,7 @@ export default function MiExcelFotosClient() {
           <button
             type="button"
             onClick={empezarDeNuevo}
-            className="min-h-[44px] shrink-0 rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-600 transition hover:border-stone-400 active:scale-[0.97]"
+            className="min-h-[44px] shrink-0 rounded-md border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:border-gray-400 active:scale-[0.97]"
           >
             Cambiar archivo
           </button>
@@ -255,8 +255,8 @@ export default function MiExcelFotosClient() {
       </div>
 
       {/* Fotos */}
-      <div className="mb-4 rounded-xl border border-stone-200 bg-white p-3.5">
-        <div className="mb-2.5 text-[12px] font-semibold uppercase tracking-wide text-stone-500">
+      <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3.5">
+        <div className="mb-2.5 text-[12px] font-semibold uppercase tracking-wide text-gray-500">
           Carpeta de fotos
         </div>
         <input
@@ -278,33 +278,33 @@ export default function MiExcelFotosClient() {
             <button
               type="button"
               onClick={() => carpetaRef.current?.click()}
-              className="min-h-[44px] rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-900 transition hover:border-teal-600 hover:text-teal-700 active:scale-[0.97]"
+              className="min-h-[44px] rounded-md border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-900 transition hover:border-gray-900 hover:text-black active:scale-[0.97]"
             >
               Seleccionar carpeta de fotos
             </button>
-            <div className="mt-2 text-[12px] text-stone-500">
+            <div className="mt-2 text-[12px] text-gray-500">
               Cada foto tiene que llamarse igual que el código: <b>100262385.jpg</b>. Se comparan
               iguales, sin mayúsculas — nada de parecidos.
             </div>
           </>
         ) : (
           <>
-            <div className="text-[13px] text-stone-700">
-              <b className="font-semibold text-stone-900">{fotosIndice!.indice.size.toLocaleString()} fotos</b>{" "}
+            <div className="text-[13px] text-gray-700">
+              <b className="font-semibold text-gray-900">{fotosIndice!.indice.size.toLocaleString()} fotos</b>{" "}
               en la carpeta · {textoEmparejado(emparejado.conFoto, emparejado.pares.length)}
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => carpetaRef.current?.click()}
-                className="min-h-[44px] rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-900 transition hover:border-teal-600 hover:text-teal-700 active:scale-[0.97]"
+                className="min-h-[44px] rounded-md border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-900 transition hover:border-gray-900 hover:text-black active:scale-[0.97]"
               >
                 Cambiar carpeta
               </button>
               <button
                 type="button"
                 onClick={() => { setFotosArchivos(null); setResumen(""); if (carpetaRef.current) carpetaRef.current.value = ""; }}
-                className="min-h-[44px] rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-600 transition hover:border-stone-400 active:scale-[0.97]"
+                className="min-h-[44px] rounded-md border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:border-gray-400 active:scale-[0.97]"
               >
                 Quitar fotos
               </button>
@@ -314,11 +314,11 @@ export default function MiExcelFotosClient() {
       </div>
 
       {/* 🔴 LO QUE VA A PASAR, ANTES DE DESCARGAR. Enterarse después no sirve. */}
-      <div className="mb-4 rounded-xl border border-stone-200 bg-white p-3.5">
-        <div className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-stone-500">
+      <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3.5">
+        <div className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-gray-500">
           Qué le va a pasar a tu archivo
         </div>
-        <ul className="space-y-1.5 text-[13px] leading-relaxed text-stone-700">
+        <ul className="space-y-1.5 text-[13px] leading-relaxed text-gray-700">
           <li>
             {analisis.tieneMacro ? (
               <>
@@ -361,20 +361,20 @@ export default function MiExcelFotosClient() {
       )}
 
       {/* Descargar */}
-      <div className="rounded-xl border border-stone-200 bg-white p-3.5">
+      <div className="rounded-xl border border-gray-200 bg-white p-3.5">
         <button
           type="button"
           onClick={descargar}
           disabled={!emparejado || bajando}
-          className="min-h-[44px] w-full rounded-md bg-teal-600 px-4 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.99] disabled:opacity-50 sm:w-auto"
+          className="min-h-[44px] w-full rounded-md bg-black px-4 text-sm font-semibold text-white transition hover:bg-gray-800 active:scale-[0.99] disabled:opacity-50 sm:w-auto"
         >
           {bajando ? "Armando el archivo…" : "Descargar con las fotos pegadas"}
         </button>
         {!emparejado && (
-          <div className="mt-2 text-[12px] text-stone-500">Falta: seleccionar la carpeta de fotos.</div>
+          <div className="mt-2 text-[12px] text-gray-500">Falta: seleccionar la carpeta de fotos.</div>
         )}
         {progreso && (
-          <div className="mt-2 text-[12px] text-stone-600">
+          <div className="mt-2 text-[12px] text-gray-600">
             Achicando fotos… {progreso.hechas.toLocaleString()} de {progreso.total.toLocaleString()}
           </div>
         )}

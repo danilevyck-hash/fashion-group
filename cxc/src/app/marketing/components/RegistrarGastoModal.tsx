@@ -633,7 +633,7 @@ function RegistrarGastoModalAnterior({
           <button
             type="button"
             onClick={() => setCambiandoMarca(true)}
-            className="shrink-0 text-sm text-teal-700 hover:text-teal-900 transition min-h-[44px] -my-2 inline-flex items-center"
+            className="shrink-0 text-sm text-blue-600 hover:text-blue-800 transition min-h-[44px] -my-2 inline-flex items-center"
           >
             Cambiar
           </button>
@@ -739,7 +739,7 @@ function RegistrarGastoModalAnterior({
                     setSubGasto(null);
                     setImpulsadoraSel(null);
                   }}
-                  className="text-sm text-teal-700 hover:text-teal-900 transition min-h-[44px] -my-2 inline-flex items-center"
+                  className="text-sm text-blue-600 hover:text-blue-800 transition min-h-[44px] -my-2 inline-flex items-center"
                 >
                   Cambiar
                 </button>

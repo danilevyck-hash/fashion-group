@@ -138,13 +138,13 @@ export function LineaMarcas({
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-700">
         <span className="font-mono tabular-nums">{texto}</span>
         {elegida && (
-          <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-xs font-medium text-teal-700">viendo {elegida}</span>
+          <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-700">viendo {elegida}</span>
         )}
         <button
           type="button"
           onClick={() => setAbierto((v) => !v)}
           aria-expanded={abierto}
-          className="inline-flex min-h-[44px] items-center gap-0.5 text-xs font-medium text-teal-700 hover:text-teal-900"
+          className="inline-flex min-h-[44px] items-center gap-0.5 text-xs font-medium text-blue-600 hover:text-blue-800"
         >
           detalle <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", abierto && "rotate-90")} />
         </button>
@@ -189,7 +189,7 @@ export function TablaTop({
                 </td>
                 <td className="border-b border-gray-100 px-3 py-2 text-right font-mono text-sm tabular-nums text-gray-950">{fmtUnidades(f.unidades)}</td>
                 <td className="border-b border-gray-100 px-3 py-2 text-right font-mono text-sm tabular-nums text-gray-700">{fmtMoney(f.venta)}</td>
-                <td className="border-b border-gray-100 px-3 py-2 text-right font-mono text-sm tabular-nums text-teal-800">{fmtMoney(f.utilidad)}</td>
+                <td className="border-b border-gray-100 px-3 py-2 text-right font-mono text-sm tabular-nums text-gray-950">{fmtMoney(f.utilidad)}</td>
                 <td className="border-b border-gray-100 px-3 py-2 text-right font-mono text-sm tabular-nums text-gray-700">{fmtMargen(f.margen)}</td>
               </tr>
             ))}

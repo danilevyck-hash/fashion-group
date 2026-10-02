@@ -134,9 +134,9 @@ export function CajaSubtab() {
               <div className="mt-1 text-xl font-semibold tabular-nums text-gray-700">${fmt(impuestos)}</div>
               <div className="text-xs text-gray-400">impuesto ventas − NC</div>
             </div>
-            <div className="rounded-lg border-2 border-teal-700 p-4">
-              <div className="text-xs uppercase tracking-[0.05em] text-teal-700 font-medium">Gran total del día</div>
-              <div className="mt-1 text-xl font-semibold tabular-nums text-teal-800">${fmt(granTotal)}</div>
+            <div className="rounded-lg border-2 border-gray-900 p-4">
+              <div className="text-xs uppercase tracking-[0.05em] text-gray-900 font-medium">Gran total del día</div>
+              <div className="mt-1 text-xl font-semibold tabular-nums text-gray-900">${fmt(granTotal)}</div>
               {caja.horaUltimaVenta && (
                 <div className="text-xs text-gray-400 tabular-nums">última venta {caja.horaUltimaVenta.slice(0, 5)}</div>
               )}

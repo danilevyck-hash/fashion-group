@@ -148,7 +148,7 @@ export default function PrestamoDetallePage() {
               onClick={() => actions.pagoQuincenal(cuota, cuentaMasVieja(s))}
               disabled={s.saldo <= 0 || cuota <= 0}
               title={s.saldo <= 0 ? "Sin saldo por deducir" : cuota <= 0 ? "Este colaborador no tiene cuota quincenal" : undefined}
-              className="inline-flex min-h-[44px] items-center justify-center bg-emerald-600 text-white px-5 rounded-md text-sm hover:bg-emerald-700 transition font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex min-h-[44px] items-center justify-center bg-black text-white px-5 rounded-md text-sm hover:bg-gray-800 transition font-medium disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Pago quincenal · ${fmt(cuota)}
             </button>

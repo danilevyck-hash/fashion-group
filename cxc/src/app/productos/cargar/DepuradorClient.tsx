@@ -812,7 +812,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
 
       {/* Estado del catálogo de descripciones (bloquea procesar/descargar) */}
       {catalogoCargando && (
-        <div className="mb-4 rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm text-stone-600">
+        <div className="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
           Cargando catálogo de descripciones…
         </div>
       )}
@@ -838,12 +838,12 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
           }}
           className={`mb-4 flex flex-col items-center rounded-xl border-2 border-dashed px-6 py-6 text-center transition ${
             !catalogo
-              ? "cursor-not-allowed border-stone-200 bg-stone-100 opacity-60"
-              : dragging ? "cursor-pointer border-teal-600 bg-teal-50" : "cursor-pointer border-stone-300 bg-white hover:border-teal-600 hover:bg-teal-50"
+              ? "cursor-not-allowed border-gray-200 bg-gray-100 opacity-60"
+              : dragging ? "cursor-pointer border-gray-900 bg-gray-100" : "cursor-pointer border-gray-300 bg-white hover:border-gray-900 hover:bg-gray-50"
           }`}
         >
-          <UploadCloud className="mb-2 h-7 w-7 text-teal-800" strokeWidth={1.6} />
-          <div className="text-base font-semibold text-stone-900">
+          <UploadCloud className="mb-2 h-7 w-7 text-gray-500" strokeWidth={1.6} />
+          <div className="text-base font-semibold text-gray-900">
             {!catalogo
               ? "Espera a que cargue el catálogo de descripciones…"
               : fileName || "Suelta el archivo aquí o haz clic para buscar"}
@@ -860,11 +860,11 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
       )}
 
       {/* Config (colapsable — casi nunca cambia: factor 1.1, tasa 07) */}
-      <details className="mb-4 rounded-xl border border-stone-200 bg-white">
-        <summary className="cursor-pointer list-none px-4 py-2 text-[12px] font-medium text-stone-500 [&::-webkit-details-marker]:hidden">
-          <span className="text-stone-400">▸</span> Editar temporada y costos
+      <details className="mb-4 rounded-xl border border-gray-200 bg-white">
+        <summary className="cursor-pointer list-none px-4 py-2 text-[12px] font-medium text-gray-500 [&::-webkit-details-marker]:hidden">
+          <span className="text-gray-400">▸</span> Editar temporada y costos
         </summary>
-        <div className="grid grid-cols-2 gap-3.5 border-t border-stone-200 p-4 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3.5 border-t border-gray-200 p-4 sm:grid-cols-3">
         {/* 🔴 UN campo «Temporada» (era «Mes» + «Año», que parecían la fecha de
             la corrida). Arranca SIEMPRE en el mes actual de Panamá y no se
             recuerda: este dato entra a Switch. */}
@@ -953,7 +953,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
           {/* Barra compacta: compañía RECONOCIDA + acciones. La compañía ya no
               se elige: la dice la marca del archivo, con «cambiar» por si la
               marca es nueva o el reconocimiento falla (4-sep-2026). */}
-          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2">
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
             <CompaniaReconocida
               empresa={empresa}
               marca={marcaLinea}
@@ -963,13 +963,13 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
             <button
               onClick={download}
               disabled={downloading || descsNuevas.length > 0 || !catalogo || divisorBloqueaDescarga}
-              className="rounded-md bg-teal-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-stone-300"
+              className="rounded-md bg-black px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-gray-800 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-gray-300"
             >
               {downloading ? "Generando…" : ROTULO_DESCARGAR_PLANTILLA}
             </button>
             <button
               onClick={reset}
-              className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-semibold text-stone-900 transition hover:border-teal-600 hover:text-teal-800 active:scale-[0.97]"
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-semibold text-gray-900 transition hover:border-gray-900 hover:text-black active:scale-[0.97]"
             >
               {ROTULO_SUBIR_OTRO_ARCHIVO}
             </button>
@@ -1015,22 +1015,22 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
           )}
 
           {/* Stats slim — línea única fusionada (A1) */}
-          <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-stone-200 bg-white px-4 py-2 text-[13px] text-stone-600">
-            <span><b className="font-semibold text-stone-900">{processed.length}</b> estilos</span>
-            <span className="text-stone-300">·</span>
-            <span><b className="font-semibold text-stone-900">{totalUnits.toLocaleString()}</b> unidades</span>
-            <span className="text-stone-300">·</span>
-            <span><b className="font-semibold text-stone-900">{marcas.length}</b> {plural(marcas.length, "marca", "marcas")}</span>
+          <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-gray-200 bg-white px-4 py-2 text-[13px] text-gray-600">
+            <span><b className="font-semibold text-gray-900">{processed.length}</b> estilos</span>
+            <span className="text-gray-300">·</span>
+            <span><b className="font-semibold text-gray-900">{totalUnits.toLocaleString()}</b> unidades</span>
+            <span className="text-gray-300">·</span>
+            <span><b className="font-semibold text-gray-900">{marcas.length}</b> {plural(marcas.length, "marca", "marcas")}</span>
             {/* 🔴 El costo del archivo: es el número con el que se cuadra contra
                 la factura del proveedor. Se suma sobre las MISMAS filas que se
                 descargan, y el artículo sin costo se dice en vez de valer 0. */}
             <CostoDelArchivo costo={costoDelArchivo(processed)} />
             <FacturasDelArchivo facturas={facturas} />
-            <span className="text-stone-300">·</span>
-            <span className="font-semibold text-stone-900">{String(processed[0].cols["Temporada"])}</span>
-            <span className="text-stone-300">·</span>
+            <span className="text-gray-300">·</span>
+            <span className="font-semibold text-gray-900">{String(processed[0].cols["Temporada"])}</span>
+            <span className="text-gray-300">·</span>
             <span>tasa {tasa}</span>
-            <span className="text-stone-300">·</span>
+            <span className="text-gray-300">·</span>
             <span>factor {factor}</span>
           </div>
 
@@ -1040,7 +1040,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
 
           {/* Aviso discreto: no se perdió nada, el proveedor no pidió esos artículos */}
           {omitidosSinCantidad > 0 && (
-            <div className="mb-4 px-1 text-[12px] text-stone-500">
+            <div className="mb-4 px-1 text-[12px] text-gray-500">
               {omitidosSinCantidad.toLocaleString()} artículo{omitidosSinCantidad === 1 ? "" : "s"} sin
               cantidad en el archivo no se {omitidosSinCantidad === 1 ? "incluyó" : "incluyeron"}.
               Los servicios (ajustes, retenciones) sí se incluyen aunque vayan en 0.
@@ -1050,7 +1050,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
           {/* Los precios a mano sobrevivieron al re-proceso: se dice, y borrarlos
               es un botón — nunca automático. Daniel: «y también consérvalos». */}
           {editsConservados > 0 && (
-            <div className="mb-4 flex flex-wrap items-center gap-2 px-1 text-[12px] text-stone-500">
+            <div className="mb-4 flex flex-wrap items-center gap-2 px-1 text-[12px] text-gray-500">
               <span>
                 {editsConservados} precio{editsConservados === 1 ? "" : "s"} escrito{editsConservados === 1 ? "" : "s"} a
                 mano se conserv{editsConservados === 1 ? "ó" : "aron"}.
@@ -1058,7 +1058,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
               <button
                 type="button"
                 onClick={borrarPreciosAMano}
-                className="font-semibold text-stone-600 underline decoration-stone-300 underline-offset-2 transition hover:text-stone-900"
+                className="font-semibold text-gray-600 underline decoration-gray-300 underline-offset-2 transition hover:text-gray-900"
               >
                 Borrarlos todos
               </button>
@@ -1066,11 +1066,11 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
           )}
 
           {/* Cálculo de precio (Tarea 2 / A2) */}
-          <div className="mb-4 rounded-xl border border-stone-200 bg-white p-3.5">
-            <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-stone-500">
+          <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3.5">
+            <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
               ¿Cómo calcular los precios?
             </div>
-            <div className="mb-3 flex overflow-hidden rounded-lg border border-stone-300">
+            <div className="mb-3 flex overflow-hidden rounded-lg border border-gray-300">
               <ModeBtn
                 active={priceMode === "global"}
                 onClick={() => setPriceMode("global")}
@@ -1114,7 +1114,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                   </div>
                   <button
                     type="button" onClick={applyGlobal} disabled={draftDivisorMsg !== null}
-                    className="h-9 rounded-md bg-teal-600 px-5 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-stone-300"
+                    className="h-9 rounded-md bg-black px-5 text-sm font-semibold text-white transition hover:bg-gray-800 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-gray-300"
                   >
                     Aplicar a todo
                   </button>
@@ -1131,16 +1131,16 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                       key={h} type="button" onClick={() => setDraftDivisor(String(h))}
                       className={`rounded-md border px-2 py-0.5 text-[11px] transition ${
                         Number(draftDivisor) === h
-                          ? "border-teal-600 bg-teal-600 text-white"
-                          : "border-stone-300 bg-white text-stone-500 hover:border-teal-600 hover:bg-teal-50 hover:text-teal-800"
+                          ? "border-gray-900 bg-gray-900 text-white"
+                          : "border-gray-300 bg-white text-gray-500 hover:border-gray-900 hover:bg-gray-50 hover:text-black"
                       }`}
                     >
                       {h.toFixed(2)}
                     </button>
                   ))}
                 </div>
-                <div className="mt-2.5 rounded-md border border-stone-200 bg-stone-50 px-3 py-1.5 text-[12px] text-stone-600">
-                  precio = <b className="font-mono text-stone-800">{draftFormulaTxt}</b>
+                <div className="mt-2.5 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-[12px] text-gray-600">
+                  precio = <b className="font-mono text-gray-800">{draftFormulaTxt}</b>
                 </div>
               </>
             ) : (
@@ -1150,7 +1150,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                     <thead>
                       <tr>
                         {["Marca", "Estado", "Divisor", "Extra $", "Redondeo", ""].map((h, i) => (
-                          <th key={i} className="border-b-[1.5px] border-stone-300 px-2.5 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-stone-500">{h}</th>
+                          <th key={i} className="border-b-[1.5px] border-gray-300 px-2.5 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -1161,13 +1161,13 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                         const divisorMsg = marcasDivisorMsg[key] ?? null;
                         return (
                           <tr key={key}>
-                            <td className="border-b border-stone-100 px-2.5 py-2 font-semibold text-stone-900">{label}</td>
-                            <td className="border-b border-stone-100 px-2.5 py-2">
+                            <td className="border-b border-gray-100 px-2.5 py-2 font-semibold text-gray-900">{label}</td>
+                            <td className="border-b border-gray-100 px-2.5 py-2">
                               {saved
                                 ? <span className="rounded bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Guardada</span>
                                 : <span className="rounded bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Sin guardar</span>}
                             </td>
-                            <td className="border-b border-stone-100 px-2.5 py-2 align-top">
+                            <td className="border-b border-gray-100 px-2.5 py-2 align-top">
                               <input
                                 type="number" step="0.01" value={f.divisor || ""}
                                 aria-label={`Divisor ${label}`}
@@ -1181,21 +1181,21 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                                 <div className="mt-1 max-w-[220px] text-[11px] font-semibold text-red-700">{divisorMsg}</div>
                               )}
                             </td>
-                            <td className="border-b border-stone-100 px-2.5 py-2">
+                            <td className="border-b border-gray-100 px-2.5 py-2">
                               <select value={f.extra} onChange={(e) => onMarcaFormChange(key, { extra: parseInt(e.target.value) })} className={miniSelectCls}>
                                 {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
                               </select>
                             </td>
-                            <td className="border-b border-stone-100 px-2.5 py-2">
+                            <td className="border-b border-gray-100 px-2.5 py-2">
                               <select value={f.redondeo} onChange={(e) => onMarcaFormChange(key, { redondeo: e.target.value as Redondeo })} className={miniSelectCls}>
                                 <option value="int">Entero</option>
                                 <option value="half">.50</option>
                               </select>
                             </td>
-                            <td className="border-b border-stone-100 px-2.5 py-2">
+                            <td className="border-b border-gray-100 px-2.5 py-2">
                               <button
                                 type="button" onClick={() => saveMarca(key)} disabled={savingMarca === key || divisorMsg !== null}
-                                className="text-[12px] font-semibold text-teal-700 transition hover:text-teal-900 disabled:opacity-50"
+                                className="text-[12px] font-semibold text-blue-600 transition hover:text-blue-800 disabled:opacity-50"
                               >
                                 {savingMarca === key ? "Guardando…" : saved ? "Guardar cambios" : "Guardar fórmula"}
                               </button>
@@ -1215,16 +1215,16 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
           </div>
 
           {/* Preview */}
-          <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 px-4 py-2.5">
-              <span className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-2.5">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Vista previa · talla y precio editables
               </span>
               <div className="flex items-center gap-2">
                 <select
                   value={descFilter}
                   onChange={(e) => onFilterChange(e.target.value)}
-                  className="max-w-[280px] rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
+                  className="max-w-[280px] rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-[13px] focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
                 >
                   <option value="">Todas las descripciones</option>
                   {revisar > 0 && (
@@ -1232,28 +1232,28 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                   )}
                   {descripciones.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select>
-                <span className="whitespace-nowrap text-[12px] text-stone-500">
+                <span className="whitespace-nowrap text-[12px] text-gray-500">
                   {descFilter ? `${visibleRows.length} de ${processed.length}` : `${processed.length} filas`}
                 </span>
               </div>
             </div>
             {selected.size > 0 && (
-              <div className="flex flex-wrap items-center gap-2 border-b border-stone-200 bg-teal-50 px-4 py-2.5">
-                <span className="text-[13px] font-medium text-teal-900">{selected.size} seleccionada(s)</span>
+              <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 bg-gray-100 px-4 py-2.5">
+                <span className="text-[13px] font-medium text-gray-900">{selected.size} seleccionada(s)</span>
                 <input
                   value={massPrice}
                   onChange={(e) => setMassPrice(e.target.value)}
                   placeholder="Precio"
-                  className="w-24 rounded-md border border-stone-300 bg-white px-2 py-1 text-right font-mono text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
+                  className="w-24 rounded-md border border-gray-300 bg-white px-2 py-1 text-right font-mono text-[13px] focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
                 />
                 <button
                   type="button"
                   onClick={applyMassPrice}
-                  className="rounded-md bg-teal-600 px-3 py-1.5 text-[13px] font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97]"
+                  className="rounded-md bg-black px-3 py-1.5 text-[13px] font-semibold text-white transition hover:bg-gray-800 active:scale-[0.97]"
                 >
                   Poner precio a seleccionadas
                 </button>
-                <button type="button" onClick={() => setSelected(new Set())} className="text-[12px] font-medium text-stone-500 transition hover:text-stone-800">
+                <button type="button" onClick={() => setSelected(new Set())} className="text-[12px] font-medium text-gray-500 transition hover:text-gray-800">
                   Limpiar
                 </button>
               </div>
@@ -1262,13 +1262,13 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
               <table className="w-full table-auto border-collapse text-[12px] tabular-nums">
                 <thead>
                   <tr>
-                    <th className="sticky top-0 border-b-[1.5px] border-stone-300 bg-stone-100 px-2 py-2.5">
+                    <th className="sticky top-0 border-b-[1.5px] border-gray-300 bg-gray-100 px-2 py-2.5">
                       <input
                         type="checkbox"
                         ref={(el) => { if (el) el.indeterminate = someVisibleSelected && !allVisibleSelected; }}
                         checked={allVisibleSelected}
                         onChange={toggleAllVisible}
-                        className="h-3.5 w-3.5 accent-teal-600"
+                        className="h-3.5 w-3.5 accent-gray-900"
                         aria-label="Seleccionar todo lo visible"
                       />
                     </th>
@@ -1279,7 +1279,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                 <tbody>
                   {visibleRows.length === 0 ? (
                     <tr>
-                      <td colSpan={PREVIEW_COLS_RENDER.length + 2} className="px-4 py-8 text-center text-stone-400">
+                      <td colSpan={PREVIEW_COLS_RENDER.length + 2} className="px-4 py-8 text-center text-gray-400">
                         Ninguna fila coincide con &quot;{rotuloFiltro(descFilter)}&quot;.
                       </td>
                     </tr>
@@ -1287,17 +1287,17 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                     const tallas = Object.keys(d.tallaMap || {});
                     const edited = d.talla !== d.tallaAuto || d.fallback;
                     return (
-                      <tr key={ri} className="hover:bg-teal-50">
-                        <td className="border-b border-stone-100 px-2 py-2">
+                      <tr key={ri} className="hover:bg-gray-50">
+                        <td className="border-b border-gray-100 px-2 py-2">
                           <input
                             type="checkbox"
                             checked={selected.has(ri)}
                             onChange={() => toggleRow(ri)}
-                            className="h-3.5 w-3.5 accent-teal-600"
+                            className="h-3.5 w-3.5 accent-gray-900"
                             aria-label={`Seleccionar fila ${ri + 1}`}
                           />
                         </td>
-                        <td className="border-b border-stone-100 px-2 py-2">
+                        <td className="border-b border-gray-100 px-2 py-2">
                           {tallas.length > 1 ? (
                             <select
                               value={d.talla}
@@ -1306,13 +1306,13 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                               className={`rounded-md border px-1 py-0.5 text-xs ${
                                 edited
                                   ? "border-amber-600 bg-amber-50 font-semibold text-amber-800"
-                                  : "border-stone-300 bg-white text-stone-900"
-                              } focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20`}
+                                  : "border-gray-300 bg-white text-gray-900"
+                              } focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20`}
                             >
                               {tallas.map((t) => <option key={t} value={t}>{t}</option>)}
                             </select>
                           ) : (
-                            <span className="inline-block rounded bg-teal-50 px-1.5 py-0.5 text-[11px] font-semibold text-teal-800">
+                            <span className="inline-block rounded bg-gray-100 px-1.5 py-0.5 text-[11px] font-semibold text-gray-800">
                               {d.talla || "—"}
                             </span>
                           )}
@@ -1320,7 +1320,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                         {PREVIEW_COLS_RENDER.map((c) => {
                           if (c === "__calc") {
                             return (
-                              <td key="__calc" className="w-px whitespace-nowrap border-b border-stone-100 px-2 py-2 text-right font-mono text-[11px] text-stone-400">
+                              <td key="__calc" className="w-px whitespace-nowrap border-b border-gray-100 px-2 py-2 text-right font-mono text-[11px] text-gray-400">
                                 {calcCell(d)}
                               </td>
                             );
@@ -1328,7 +1328,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                           if (c === "Precio *") {
                             const priceEdited = priceEdits[refDe(d)] !== undefined;
                             return (
-                              <td key={c} className="border-b border-stone-100 px-2 py-2 text-right">
+                              <td key={c} className="border-b border-gray-100 px-2 py-2 text-right">
                                 <input
                                   value={displayPrice(d)}
                                   aria-label={`Precio ${refDe(d)}`}
@@ -1336,8 +1336,8 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                                   className={`w-14 rounded-md border px-1 py-0.5 text-right font-mono text-xs ${
                                     priceEdited
                                       ? "border-amber-600 bg-amber-50 font-semibold text-amber-800"
-                                      : "border-stone-300 bg-white text-stone-900"
-                                  } focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20`}
+                                      : "border-gray-300 bg-white text-gray-900"
+                                  } focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20`}
                                 />
                               </td>
                             );
@@ -1355,8 +1355,8 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                                 ? "whitespace-nowrap text-right"
                                 : "";
                           return (
-                            <td key={c} className={`border-b border-stone-100 px-2 py-2 ${cls}`}>
-                              {empty ? <span className="text-stone-300">—</span> : v}
+                            <td key={c} className={`border-b border-gray-100 px-2 py-2 ${cls}`}>
+                              {empty ? <span className="text-gray-300">—</span> : v}
                             </td>
                           );
                         })}
@@ -1410,9 +1410,9 @@ function CompaniaReconocida({ empresa, marca, fileName, onCambiar }: {
   return (
     <div className="min-w-0 flex-1">
       <div className="flex items-center gap-2">
-        <span className={`truncate text-sm font-semibold ${empresa ? "text-stone-900" : "text-amber-700"}`}>
+        <span className={`truncate text-sm font-semibold ${empresa ? "text-gray-900" : "text-amber-700"}`}>
           {empresa ? companiaLabel(empresa) : "Seleccionar empresa"}
-          {marca && <span className="font-normal text-stone-500"> · {marca}</span>}
+          {marca && <span className="font-normal text-gray-500"> · {marca}</span>}
         </span>
         <button
           ref={anclaRef}
@@ -1421,12 +1421,12 @@ function CompaniaReconocida({ empresa, marca, fileName, onCambiar }: {
           aria-haspopup="listbox"
           aria-expanded={abierto}
           aria-label="Cambiar empresa"
-          className="shrink-0 text-[12px] font-semibold text-teal-700 underline decoration-teal-300 underline-offset-2 transition hover:text-teal-900"
+          className="shrink-0 text-[12px] font-semibold text-blue-600 underline decoration-blue-300 underline-offset-2 transition hover:text-blue-800"
         >
           cambiar
         </button>
       </div>
-      {fileName && <div className="truncate text-[11px] text-stone-500">{fileName}</div>}
+      {fileName && <div className="truncate text-[11px] text-gray-500">{fileName}</div>}
       <DesplegableFlotante
         abierto={abierto}
         anclaRef={anclaRef}
@@ -1445,7 +1445,7 @@ function CompaniaReconocida({ empresa, marca, fileName, onCambiar }: {
             aria-selected={c.key === empresa}
             onClick={() => { onCambiar(c.key); setAbierto(false); }}
             className={`w-full min-h-[44px] px-4 flex items-center justify-between gap-2 text-left text-sm transition hover:bg-black/5 ${
-              c.key === empresa ? "font-semibold text-teal-700" : "text-stone-700"
+              c.key === empresa ? "font-semibold text-gray-900" : "text-gray-700"
             }`}
           >
             {c.label}
@@ -1458,27 +1458,27 @@ function CompaniaReconocida({ empresa, marca, fileName, onCambiar }: {
 
 // ── Subcomponentes / estilos ────────────────────────────────────────────────
 const inputCls =
-  "w-full rounded-lg border border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
+  "w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 const selectCls = inputCls;
-const priceLabelCls = "mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-stone-500";
+const priceLabelCls = "mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-gray-500";
 // Campo alineado del modo global (input/select misma altura).
 const priceFieldCls =
-  "h-9 w-full rounded-md border border-stone-300 bg-stone-50 px-3 text-sm text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
+  "h-9 w-full rounded-md border border-gray-300 bg-gray-50 px-3 text-sm text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 const miniInputCls =
-  "h-8 w-20 rounded-md border border-stone-300 bg-stone-50 px-2 text-right font-mono text-[13px] text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
+  "h-8 w-20 rounded-md border border-gray-300 bg-gray-50 px-2 text-right font-mono text-[13px] text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 const miniSelectCls =
-  "h-8 rounded-md border border-stone-300 bg-stone-50 px-2 text-[13px] text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
+  "h-8 rounded-md border border-gray-300 bg-gray-50 px-2 text-[13px] text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 
 function ModeBtn({ active, onClick, title, last }: { active: boolean; onClick: () => void; title: string; last?: boolean }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex-1 px-3 py-2 text-left transition ${last ? "" : "border-r border-stone-200"} ${active ? "bg-teal-50" : "bg-white hover:bg-stone-50"}`}
+      className={`flex-1 px-3 py-2 text-left transition ${last ? "" : "border-r border-gray-200"} ${active ? "bg-gray-100" : "bg-white hover:bg-gray-50"}`}
     >
       <div className="flex items-center gap-2">
-        <span className={`h-3.5 w-3.5 flex-shrink-0 rounded-full border-2 ${active ? "border-teal-600 bg-teal-600 ring-2 ring-inset ring-white" : "border-stone-300"}`} />
-        <span className={`text-[13px] font-semibold ${active ? "text-teal-800" : "text-stone-900"}`}>{title}</span>
+        <span className={`h-3.5 w-3.5 flex-shrink-0 rounded-full border-2 ${active ? "border-gray-900 bg-gray-900 ring-2 ring-inset ring-white" : "border-gray-300"}`} />
+        <span className="text-[13px] font-semibold text-gray-900">{title}</span>
       </div>
     </button>
   );
@@ -1487,16 +1487,16 @@ function ModeBtn({ active, onClick, title, last }: { active: boolean; onClick: (
 function Field({ label, note, children }: { label: string; note?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-stone-500">{label}</label>
+      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">{label}</label>
       {children}
-      {note && <div className="mt-1 text-[11px] text-stone-500">{note}</div>}
+      {note && <div className="mt-1 text-[11px] text-gray-500">{note}</div>}
     </div>
   );
 }
 
 function Th({ children, narrow, tight }: { children: React.ReactNode; narrow?: boolean; tight?: boolean }) {
   return (
-    <th className={`sticky top-0 border-b-[1.5px] border-stone-300 bg-stone-100 px-2 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-stone-600 ${narrow ? "whitespace-nowrap text-right" : "text-left"} ${tight ? "w-px" : ""}`}>
+    <th className={`sticky top-0 border-b-[1.5px] border-gray-300 bg-gray-100 px-2 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-600 ${narrow ? "whitespace-nowrap text-right" : "text-left"} ${tight ? "w-px" : ""}`}>
       {children}
     </th>
   );

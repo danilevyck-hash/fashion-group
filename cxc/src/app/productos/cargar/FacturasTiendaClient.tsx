@@ -469,7 +469,7 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
 
       {/* Estado del catálogo de descripciones (bloquea procesar/descargar) */}
       {catalogoCargando && (
-        <div className="mb-4 rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm text-stone-600">
+        <div className="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
           Cargando catálogo de descripciones…
         </div>
       )}
@@ -485,8 +485,8 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
       {/* Compañía reconocida por el formato (modo dispatcher): la factura de
           tienda siempre es Multifashion. */}
       {embedded && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-[13px] text-teal-900">
-          <span className="rounded bg-teal-600 px-1.5 py-0.5 text-[12px] font-bold text-white">MULTIFASHION</span>
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[13px] text-gray-700">
+          <span className="rounded bg-gray-900 px-1.5 py-0.5 text-[12px] font-bold text-white">MULTIFASHION</span>
           <span>Detecté una factura de tienda. <b>{fileName}</b></span>
         </div>
       )}
@@ -504,12 +504,12 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
         }}
         className={`mb-4 flex flex-col items-center rounded-xl border-2 border-dashed px-6 py-6 text-center transition ${
           !catalogo
-            ? "cursor-not-allowed border-stone-200 bg-stone-100 opacity-60"
-            : dragging ? "cursor-pointer border-teal-600 bg-teal-50" : "cursor-pointer border-stone-300 bg-white hover:border-teal-600 hover:bg-teal-50"
+            ? "cursor-not-allowed border-gray-200 bg-gray-100 opacity-60"
+            : dragging ? "cursor-pointer border-gray-900 bg-gray-100" : "cursor-pointer border-gray-300 bg-white hover:border-gray-900 hover:bg-gray-50"
         }`}
       >
-        <UploadCloud className="mb-2 h-7 w-7 text-teal-800" strokeWidth={1.6} />
-        <div className="text-base font-semibold text-stone-900">
+        <UploadCloud className="mb-2 h-7 w-7 text-gray-500" strokeWidth={1.6} />
+        <div className="text-base font-semibold text-gray-900">
           {!catalogo
             ? "Espera a que cargue el catálogo de descripciones…"
             : fileName || "Suelta la factura aquí (.xls, .csv o .xlsx) o haz clic para buscar"}
@@ -527,9 +527,9 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
 
       {/* Temporada manual (la usa la factura .xls, que no trae FECHA) */}
       {(!result || result.sinFecha) && (
-        <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-stone-200 bg-white p-4">
+        <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-4">
           <div>
-            <label className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wide text-stone-500">
+            <label className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wide text-gray-500">
               Mes de la factura (temporada)
             </label>
             <select
@@ -541,7 +541,7 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
             </select>
           </div>
           <div>
-            <label className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wide text-stone-500">Año</label>
+            <label className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wide text-gray-500">Año</label>
             <input
               type="number" min={2020} max={2099} value={anio}
               onChange={(e) => { setAnio(e.target.value); reprocess({ anio: e.target.value }); }}
@@ -601,9 +601,9 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
           )}
 
           {/* Barra de acciones */}
-          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2">
-            <span className="text-[12px] font-semibold uppercase tracking-wide text-stone-500">Salida</span>
-            <span className="flex-1 text-[13px] text-stone-600">
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
+            <span className="text-[12px] font-semibold uppercase tracking-wide text-gray-500">Salida</span>
+            <span className="flex-1 text-[13px] text-gray-600">
               {archivos === 1
                 ? "1 archivo (hoja “upload”)"
                 : `${archivos} archivos de máx. ${MAX_FILAS_SWITCH} filas → se descarga un ZIP`}
@@ -611,13 +611,13 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
             <button
               onClick={download}
               disabled={downloading || bloqueos.length > 0 || !catalogo || divisorBloqueaDescarga}
-              className="rounded-md bg-teal-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-stone-300"
+              className="rounded-md bg-black px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-gray-800 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-gray-300"
             >
               {downloading ? "Generando…" : archivos > 1 ? "Descargar ZIP" : "Descargar plantilla"}
             </button>
             <button
               onClick={reset}
-              className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-semibold text-stone-900 transition hover:border-teal-600 hover:text-teal-800 active:scale-[0.97]"
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-semibold text-gray-900 transition hover:border-gray-900 hover:text-black active:scale-[0.97]"
             >
               Otro archivo
             </button>
@@ -650,30 +650,30 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
           )}
 
           {/* Stats */}
-          <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-stone-200 bg-white px-4 py-2 text-[13px] text-stone-600">
-            <span><b className="font-semibold text-stone-900">{rows.length}</b> artículos</span>
-            <span className="text-stone-300">·</span>
-            <span><b className="font-semibold text-stone-900">{totalUnits.toLocaleString()}</b> unidades</span>
-            <span className="text-stone-300">·</span>
-            <span>Proveedor tienda: <b className="font-semibold text-stone-900">{empresasDetectadas.join(", ") || "—"}</b></span>
+          <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-gray-200 bg-white px-4 py-2 text-[13px] text-gray-600">
+            <span><b className="font-semibold text-gray-900">{rows.length}</b> artículos</span>
+            <span className="text-gray-300">·</span>
+            <span><b className="font-semibold text-gray-900">{totalUnits.toLocaleString()}</b> unidades</span>
+            <span className="text-gray-300">·</span>
+            <span>Proveedor tienda: <b className="font-semibold text-gray-900">{empresasDetectadas.join(", ") || "—"}</b></span>
             {result.nInterno && (
               <>
-                <span className="text-stone-300">·</span>
-                <span>N. Interno <b className="font-semibold text-stone-900">{result.nInterno}</b></span>
+                <span className="text-gray-300">·</span>
+                <span>N. Interno <b className="font-semibold text-gray-900">{result.nInterno}</b></span>
               </>
             )}
-            <span className="text-stone-300">·</span>
+            <span className="text-gray-300">·</span>
             <span>formato {result.formato === "A" ? ".xls factura" : "reporte CSV/XLSX"}</span>
           </div>
 
           {/* Fórmulas de tienda por marca presente */}
-          <div className="mb-4 rounded-xl border border-stone-200 bg-white p-3.5">
+          <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3.5">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-[13px]">
                 <thead>
                   <tr>
                     {["Marca", "Estado", "Divisor", "Extra $", "Redondeo", ""].map((h, i) => (
-                      <th key={i} className="border-b-[1.5px] border-stone-300 px-2.5 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">{h}</th>
+                      <th key={i} className="border-b-[1.5px] border-gray-300 px-2.5 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-gray-500">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -684,13 +684,13 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
                     const divisorMsg = marcasDivisorMsg[key] ?? null;
                     return (
                       <tr key={key}>
-                        <td className="border-b border-stone-100 px-2.5 py-2 font-semibold text-stone-900">{label}</td>
-                        <td className="border-b border-stone-100 px-2.5 py-2">
+                        <td className="border-b border-gray-100 px-2.5 py-2 font-semibold text-gray-900">{label}</td>
+                        <td className="border-b border-gray-100 px-2.5 py-2">
                           {saved
                             ? <span className="rounded bg-emerald-50 px-2 py-0.5 text-[12px] font-semibold text-emerald-700">Guardada</span>
                             : <span className="rounded bg-amber-50 px-2 py-0.5 text-[12px] font-semibold text-amber-700">Sin guardar</span>}
                         </td>
-                        <td className="border-b border-stone-100 px-2.5 py-2 align-top">
+                        <td className="border-b border-gray-100 px-2.5 py-2 align-top">
                           <input
                             type="number" step="0.01" value={f.divisor || ""}
                             aria-label={`Divisor ${label}`}
@@ -704,22 +704,22 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
                             <div className="mt-1 max-w-[220px] text-[12px] font-semibold text-red-700">{divisorMsg}</div>
                           )}
                         </td>
-                        <td className="border-b border-stone-100 px-2.5 py-2">
+                        <td className="border-b border-gray-100 px-2.5 py-2">
                           <select value={f.extra} onChange={(e) => onMarcaFormChange(key, { extra: parseInt(e.target.value) })} className={miniSelectCls}>
                             {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
                           </select>
                         </td>
-                        <td className="border-b border-stone-100 px-2.5 py-2">
+                        <td className="border-b border-gray-100 px-2.5 py-2">
                           <select value={f.redondeo} onChange={(e) => onMarcaFormChange(key, { redondeo: e.target.value as Redondeo })} className={miniSelectCls}>
                             <option value="int">Entero</option>
                             <option value="half">.50</option>
                             <option value="par">Par</option>
                           </select>
                         </td>
-                        <td className="border-b border-stone-100 px-2.5 py-2">
+                        <td className="border-b border-gray-100 px-2.5 py-2">
                           <button
                             type="button" onClick={() => saveMarca(key)} disabled={savingMarca === key || divisorMsg !== null}
-                            className="text-[12px] font-semibold text-teal-700 transition hover:text-teal-900 disabled:opacity-50"
+                            className="text-[12px] font-semibold text-blue-600 transition hover:text-blue-800 disabled:opacity-50"
                           >
                             {savingMarca === key ? "Guardando…" : saved ? "Guardar cambios" : "Guardar fórmula"}
                           </button>
@@ -742,8 +742,8 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
           </div>
 
           {/* Preview */}
-          <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
-            <div className="border-b border-stone-200 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-stone-500">
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+            <div className="border-b border-gray-200 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
               Vista previa · marca y precio editables
             </div>
             <div className="max-h-[440px] overflow-auto">
@@ -766,38 +766,38 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
                     const priceEdited = priceEdits[ri] !== undefined;
                     const amber = d.revisar !== null;
                     return (
-                      <tr key={ri} className={amber ? "bg-amber-50/60 hover:bg-amber-50" : "hover:bg-teal-50"} title={d.revisar ?? undefined}>
-                        <td className="border-b border-stone-100 px-2 py-2 font-mono text-[12px]">{String(d.cols["Código *"])}</td>
-                        <td className="border-b border-stone-100 px-2 py-2 font-mono text-[12px] break-all">{String(d.cols["Código Barra *"])}</td>
-                        <td className="border-b border-stone-100 px-2 py-2">
+                      <tr key={ri} className={amber ? "bg-amber-50/60 hover:bg-amber-50" : "hover:bg-gray-50"} title={d.revisar ?? undefined}>
+                        <td className="border-b border-gray-100 px-2 py-2 font-mono text-[12px]">{String(d.cols["Código *"])}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 font-mono text-[12px] break-all">{String(d.cols["Código Barra *"])}</td>
+                        <td className="border-b border-gray-100 px-2 py-2">
                           {String(d.cols["Descripción *"])}
                           {amber && <span className="ml-1.5 rounded bg-amber-100 px-1 py-0.5 text-[12px] font-semibold text-amber-800" title={d.revisar ?? ""}>revisar</span>}
                         </td>
-                        <td className="w-px whitespace-nowrap border-b border-stone-100 px-2 py-2 text-right font-mono text-[12px] text-stone-400">
+                        <td className="w-px whitespace-nowrap border-b border-gray-100 px-2 py-2 text-right font-mono text-[12px] text-gray-400">
                           {calcCell(ri, d)}
                         </td>
-                        <td className="whitespace-nowrap border-b border-stone-100 px-2 py-2 text-right">
-                          {costoOf(d) === null ? <span className="text-stone-300">—</span> : costoOf(d)}
+                        <td className="whitespace-nowrap border-b border-gray-100 px-2 py-2 text-right">
+                          {costoOf(d) === null ? <span className="text-gray-300">—</span> : costoOf(d)}
                         </td>
-                        <td className="border-b border-stone-100 px-2 py-2 text-right">
+                        <td className="border-b border-gray-100 px-2 py-2 text-right">
                           <input
                             value={displayPrice(ri, d)}
                             onChange={(e) => onPriceEdit(ri, e.target.value)}
                             className={`w-14 rounded-md border px-1 py-0.5 text-right font-mono text-xs ${
                               priceEdited
                                 ? "border-amber-600 bg-amber-50 font-semibold text-amber-800"
-                                : "border-stone-300 bg-white text-stone-900"
-                            } focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20`}
+                                : "border-gray-300 bg-white text-gray-900"
+                            } focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20`}
                           />
                         </td>
-                        <td className="whitespace-nowrap border-b border-stone-100 px-2 py-2 text-right">{String(d.cols["Stock Ideal"])}</td>
-                        <td className="border-b border-stone-100 px-2 py-2">{String(d.cols["rubro *"])}</td>
-                        <td className="border-b border-stone-100 px-2 py-2">
+                        <td className="whitespace-nowrap border-b border-gray-100 px-2 py-2 text-right">{String(d.cols["Stock Ideal"])}</td>
+                        <td className="border-b border-gray-100 px-2 py-2">{String(d.cols["rubro *"])}</td>
+                        <td className="border-b border-gray-100 px-2 py-2">
                           {d.marcaCandidatas.length > 1 ? (
                             <select
                               value={String(d.cols["Marca *"])}
                               onChange={(e) => onMarcaChange(ri, e.target.value)}
-                              className="rounded-md border border-amber-600 bg-amber-50 px-1 py-0.5 text-xs font-semibold text-amber-800 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
+                              className="rounded-md border border-amber-600 bg-amber-50 px-1 py-0.5 text-xs font-semibold text-amber-800 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
                               title="Marca ambigua: selecciona la correcta"
                             >
                               {d.marcaCandidatas.map((m) => (
@@ -824,15 +824,15 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
 
 // ── Estilos ──────────────────────────────────────────────────────────────────
 const inputCls =
-  "w-full min-h-[44px] rounded-lg border border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
+  "w-full min-h-[44px] rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 const miniInputCls =
-  "h-8 w-20 rounded-md border border-stone-300 bg-stone-50 px-2 text-right font-mono text-[13px] text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
+  "h-8 w-20 rounded-md border border-gray-300 bg-gray-50 px-2 text-right font-mono text-[13px] text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 const miniSelectCls =
-  "h-8 rounded-md border border-stone-300 bg-stone-50 px-2 text-[13px] text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
+  "h-8 rounded-md border border-gray-300 bg-gray-50 px-2 text-[13px] text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 
 function Th({ children, narrow }: { children: React.ReactNode; narrow?: boolean }) {
   return (
-    <th className={`sticky top-0 border-b-[1.5px] border-stone-300 bg-stone-100 px-2 py-2.5 text-[12px] font-semibold uppercase tracking-wide text-stone-600 ${narrow ? "whitespace-nowrap text-right" : "text-left"}`}>
+    <th className={`sticky top-0 border-b-[1.5px] border-gray-300 bg-gray-100 px-2 py-2.5 text-[12px] font-semibold uppercase tracking-wide text-gray-600 ${narrow ? "whitespace-nowrap text-right" : "text-left"}`}>
       {children}
     </th>
   );

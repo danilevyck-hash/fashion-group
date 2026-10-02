@@ -216,7 +216,7 @@ export default function PanelCxcMobile({
             {(search || riskFilter !== "all" || companyFilter !== "all") && (
               <button
                 onClick={() => { setSearch(""); setRiskFilter("all"); if (!empresaRestriction) setCompanyFilter("all"); }}
-                className="mt-2 text-xs font-medium text-teal-700 active:text-teal-900"
+                className="mt-2 text-xs font-medium text-blue-600 active:text-blue-800"
               >
                 Limpiar filtros
               </button>
@@ -353,26 +353,26 @@ function MobileHeader({
 // ─────────────────────────────────────────────────────────────────────────────
 const AGING_THEME = {
   current: {
-    border: "border-[#0F6E56]",
-    text: "text-[#0F6E56]",
-    bgActive: "bg-[#0F6E56]/10",
-    borderActive: "border-[#0F6E56]",
+    border: "border-emerald-700",
+    text: "text-emerald-700",
+    bgActive: "bg-emerald-700/10",
+    borderActive: "border-emerald-700",
     punto: "bg-emerald-400",
     chipActivo: "bg-emerald-500/25",
   },
   watch: {
-    border: "border-[#B45309]",
-    text: "text-[#B45309]",
-    bgActive: "bg-[#B45309]/10",
-    borderActive: "border-[#B45309]",
+    border: "border-amber-700",
+    text: "text-amber-700",
+    bgActive: "bg-amber-700/10",
+    borderActive: "border-amber-700",
     punto: "bg-amber-400",
     chipActivo: "bg-amber-500/25",
   },
   overdue: {
-    border: "border-[#A32D2D]",
-    text: "text-[#A32D2D]",
-    bgActive: "bg-[#A32D2D]/10",
-    borderActive: "border-[#A32D2D]",
+    border: "border-red-600",
+    text: "text-red-600",
+    bgActive: "bg-red-600/10",
+    borderActive: "border-red-600",
     punto: "bg-red-400",
     chipActivo: "bg-red-500/25",
   },
@@ -532,9 +532,9 @@ function MobileEmpresaSelect({
 
 function worstBucketBorder(client: ConsolidatedClient): string {
   if (client.total < 0) return "border-l-gray-400";
-  if (client.overdue > 0) return "border-l-[#A32D2D]";
-  if (client.watch > 0) return "border-l-[#B45309]";
-  return "border-l-[#0F6E56]";
+  if (client.overdue > 0) return "border-l-red-600";
+  if (client.watch > 0) return "border-l-amber-700";
+  return "border-l-emerald-700";
 }
 
 function MobileClientCard({

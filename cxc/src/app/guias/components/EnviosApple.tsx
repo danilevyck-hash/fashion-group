@@ -134,7 +134,7 @@ export default function EnviosApple({
   const tarjeta = (marcado: boolean) =>
     `flex w-full min-h-[64px] items-center gap-3.5 rounded-xl border px-4 py-3 text-left transition ${
       marcado
-        ? "border-black ring-1 ring-black dark:border-white dark:ring-white"
+        ? "border-black ring-1 ring-black"
         : "border-gray-200 hover:border-gray-400"
     }`;
   const circulo = (marcado: boolean) => (
@@ -258,7 +258,7 @@ export default function EnviosApple({
           type="button"
           onClick={() => setAgregando((a) => !a)}
           aria-expanded={agregando}
-          className="inline-flex min-h-[44px] items-center rounded-lg border border-black px-4 text-sm font-medium transition hover:bg-gray-50 active:scale-[0.97] dark:border-white"
+          className="inline-flex min-h-[44px] items-center rounded-lg border border-black px-4 text-sm font-medium transition hover:bg-gray-50 active:scale-[0.97]"
         >
           {BOTON_AGREGAR_FACTURA}
         </button>

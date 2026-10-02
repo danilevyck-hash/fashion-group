@@ -332,7 +332,7 @@ export default function ProyectoOverlay({
           {lineaContexto && (
             <div
               data-contexto-marca
-              className="rounded-lg border border-fuchsia-200 bg-fuchsia-50/60 px-3 py-2 text-[13px] text-gray-800"
+              className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[13px] text-gray-800"
             >
               {lineaContexto}
             </div>
@@ -505,7 +505,7 @@ export default function ProyectoOverlay({
               >
                 {label}
                 {tab === k && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-fuchsia-500" />
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900" />
                 )}
               </button>
             ))}

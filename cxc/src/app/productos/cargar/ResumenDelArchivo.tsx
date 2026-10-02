@@ -12,7 +12,7 @@ import { plural, type CostoDelArchivo as Costo, type ContraSwitch } from "@/lib/
 
 const dinero = (n: number): string => `$${n.toLocaleString("es-PA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const Separador = () => <span className="text-stone-300">·</span>;
+const Separador = () => <span className="text-gray-300">·</span>;
 
 /**
  * `FOB $X · CIF $Y` dentro de la fila de totales: el número con el que se cuadra
@@ -26,9 +26,9 @@ export function CostoDelArchivo({ costo }: { costo: Costo }) {
   return (
     <>
       <Separador />
-      <span data-costo-fob={fob}>FOB <b className="font-semibold text-stone-900">{dinero(fob)}</b></span>
+      <span data-costo-fob={fob}>FOB <b className="font-semibold text-gray-900">{dinero(fob)}</b></span>
       <Separador />
-      <span data-costo-cif={cif}>CIF <b className="font-semibold text-stone-900">{dinero(cif)}</b></span>
+      <span data-costo-cif={cif}>CIF <b className="font-semibold text-gray-900">{dinero(cif)}</b></span>
       {sinCosto > 0 && (
         <>
           <Separador />
@@ -50,7 +50,7 @@ export function FacturasDelArchivo({ facturas }: { facturas: readonly string[] }
       <Separador />
       <span data-facturas={facturas.join(",")}>
         {plural(facturas.length, "Factura", "Facturas")}{" "}
-        <b className="font-semibold text-stone-900">{facturas.join(" · ")}</b>
+        <b className="font-semibold text-gray-900">{facturas.join(" · ")}</b>
       </span>
     </>
   );
@@ -67,11 +67,11 @@ export function NuevosEnSwitch({ contra }: { contra: ContraSwitch | null }) {
   if (!contra) return null;
   const { nuevos, yaEstan } = contra;
   return (
-    <div className="mb-4 px-1 text-[12px] text-stone-500" data-nuevos-en-switch={`${nuevos}/${yaEstan}`}>
-      <b className="font-semibold text-stone-700">{nuevos.toLocaleString()}</b>{" "}
+    <div className="mb-4 px-1 text-[12px] text-gray-500" data-nuevos-en-switch={`${nuevos}/${yaEstan}`}>
+      <b className="font-semibold text-gray-700">{nuevos.toLocaleString()}</b>{" "}
       {plural(nuevos, "artículo nuevo", "artículos nuevos")}
       {" · "}
-      <b className="font-semibold text-stone-700">{yaEstan.toLocaleString()}</b>{" "}
+      <b className="font-semibold text-gray-700">{yaEstan.toLocaleString()}</b>{" "}
       {plural(yaEstan, "ya está", "ya están")} en Switch
     </div>
   );

@@ -71,7 +71,7 @@ const DOT: Record<RentabilidadEmpresaRow["estado"], string> = {
   verde: "bg-green-500",
   ambar: "bg-amber-500",
   rojo: "bg-red-500",
-  sin_gastos: "bg-stone-300",
+  sin_gastos: "bg-gray-300",
 };
 
 const PILL: Record<RentabilidadEmpresaRow["estado"], { label: string; cls: string }> = {
@@ -80,7 +80,7 @@ const PILL: Record<RentabilidadEmpresaRow["estado"], { label: string; cls: strin
   rojo: { label: "Pérdida", cls: "bg-red-50 text-red-700" },
   // Sin gasto utilizable la píldora DICE POR QUÉ (ver `pillDe`); esto es sólo el
   // caso en que ni siquiera hay gastos conectados.
-  sin_gastos: { label: "Sin datos", cls: "bg-stone-100 text-stone-500" },
+  sin_gastos: { label: "Sin datos", cls: "bg-gray-100 text-gray-500" },
 };
 
 /**
@@ -93,7 +93,7 @@ const PILL: Record<RentabilidadEmpresaRow["estado"], { label: string; cls: strin
 export function pillDe(e: RentabilidadEmpresaRow): { label: string; cls: string } {
   if (e.rentabilidad !== null) return PILL[e.estado];
   if (e.motivo) {
-    return { label: ETIQUETA_SIN_GASTO_EGRESOS[e.motivo], cls: "bg-stone-100 text-stone-500" };
+    return { label: ETIQUETA_SIN_GASTO_EGRESOS[e.motivo], cls: "bg-gray-100 text-gray-500" };
   }
   return PILL.sin_gastos;
 }
@@ -109,11 +109,11 @@ export default function RentabilidadPorEmpresa({
 
   return (
     <div className="mb-8">
-      <h2 className="text-sm font-semibold text-stone-900">Rentabilidad por empresa</h2>
+      <h2 className="text-sm font-semibold text-gray-900">Rentabilidad por empresa</h2>
       {/* La bajada NO es decorativa: dice de dónde sale cada número y, sobre
           todo, que no hay un total. Sin ella, alguien suma las filas de cabeza
           y se arma el número del grupo que Daniel pidió no tener. */}
-      <p className="mt-0.5 mb-3 text-xs text-stone-500">
+      <p className="mt-0.5 mb-3 text-xs text-gray-500">
         Utilidad bruta menos gastos, por empresa. Sin total consolidado.
       </p>
 
@@ -130,7 +130,7 @@ export default function RentabilidadPorEmpresa({
           576 y el mínimo 530 — entra, y de hecho ya medía 0. */}
       <div className="space-y-2 md:hidden">
         {rows.length === 0 ? (
-          <div className="rounded-[14px] border border-stone-200 bg-white px-4 py-6 text-center text-stone-400">
+          <div className="rounded-[14px] border border-gray-200 bg-white px-4 py-6 text-center text-gray-400">
             Sin datos este mes.
           </div>
         ) : rows.map((e) => {
@@ -148,10 +148,10 @@ export default function RentabilidadPorEmpresa({
         })}
       </div>
 
-      <div className="hidden rounded-[14px] border border-stone-200 bg-white overflow-x-auto md:block">
+      <div className="hidden rounded-[14px] border border-gray-200 bg-white overflow-x-auto md:block">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-xs text-stone-400 border-b border-stone-100">
+            <tr className="text-xs text-gray-400 border-b border-gray-100">
               <th className="text-left font-medium px-3 py-2.5">Empresa</th>
               <th className="text-right font-medium px-3 py-2.5">Ventas</th>
               <th className="text-right font-medium px-3 py-2.5">Rentabilidad</th>
@@ -160,7 +160,7 @@ export default function RentabilidadPorEmpresa({
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr><td colSpan={4} className="px-3 py-6 text-center text-stone-400">Sin datos este mes.</td></tr>
+              <tr><td colSpan={4} className="px-3 py-6 text-center text-gray-400">Sin datos este mes.</td></tr>
             ) : rows.map((e) => {
               const pill = pillDe(e);
               const abiertaEsta = abierta === e.key;
@@ -193,13 +193,13 @@ function Desglose({ e }: { e: RentabilidadEmpresaRow }) {
   // misma función para todas las empresas (`textoSinGasto`).
   if (e.rentabilidad == null || e.gasto == null) {
     return (
-      <p data-col="sin-gasto" className="text-sm text-stone-500">
+      <p data-col="sin-gasto" className="text-sm text-gray-500">
         {e.texto ?? "Todavía no hay gastos cargados de esta empresa para este mes."}
       </p>
     );
   }
   return (
-    <p className="text-sm text-stone-700 tabular-nums">
+    <p className="text-sm text-gray-700 tabular-nums">
       Utilidad bruta <span data-col="utilidad" className="font-medium">{money(e.utilidad)}</span>
       {" − "}Gastos <span data-col="gastos" className="font-medium">{money(e.gasto)}</span>
       {" = "}Rentabilidad <span data-col="rentabilidad-detalle" className={`font-semibold ${e.rentabilidad >= 0 ? "text-green-600" : "text-red-600"}`}>{money(e.rentabilidad)}</span>
@@ -213,7 +213,7 @@ function VerGastosLink({ e, mes }: { e: RentabilidadEmpresaRow; mes: string }) {
     <Link
       href={`/gastos-contabilidad?mes=${mes}&empresa=${e.key}`}
       onClick={(ev) => ev.stopPropagation()}
-      className="inline-flex min-h-[44px] items-center text-xs text-teal-600 hover:text-teal-700 font-medium"
+      className="inline-flex min-h-[44px] items-center text-xs text-blue-600 hover:text-blue-800 font-medium"
     >
       Ver gastos de {e.name} →
     </Link>
@@ -230,29 +230,29 @@ function Tarjeta({ e, pill, abierta, onToggle, mes }: {
   mes: string;
 }) {
   return (
-    <div data-fila-semaforo={e.key} className="rounded-[14px] border border-stone-200 bg-white">
+    <div data-fila-semaforo={e.key} className="rounded-[14px] border border-gray-200 bg-white">
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={abierta}
-        className="flex min-h-[44px] w-full items-center gap-2.5 px-4 py-3 text-left active:bg-stone-50"
+        className="flex min-h-[44px] w-full items-center gap-2.5 px-4 py-3 text-left active:bg-gray-50"
       >
         <span className={`w-2 h-2 rounded-full shrink-0 ${DOT[e.estado]}`} />
-        <span data-col="empresa" className="min-w-0 flex-1 font-medium text-stone-800">{e.name}</span>
-        <svg className={`w-3.5 h-3.5 shrink-0 text-stone-300 transition-transform ${abierta ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+        <span data-col="empresa" className="min-w-0 flex-1 font-medium text-gray-800">{e.name}</span>
+        <svg className={`w-3.5 h-3.5 shrink-0 text-gray-300 transition-transform ${abierta ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
       </button>
 
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1.5 px-4 pb-3 text-sm">
-        <span className="text-xs text-stone-400">Ventas</span>
-        <span data-col="ventas" className="tabular-nums text-stone-700">{moneyK(e.ventas)}</span>
-        <span className="text-xs text-stone-400">Rentabilidad</span>
+        <span className="text-xs text-gray-400">Ventas</span>
+        <span data-col="ventas" className="tabular-nums text-gray-700">{moneyK(e.ventas)}</span>
+        <span className="text-xs text-gray-400">Rentabilidad</span>
         <span data-col="rentabilidad" className="tabular-nums">
           {e.rentabilidad == null ? (
-            <span className="text-stone-400">—</span>
+            <span className="text-gray-400">—</span>
           ) : (
             <>
-              <span className={`font-semibold ${e.rentabilidad >= 0 ? "text-stone-900" : "text-red-600"}`}>{moneyK(e.rentabilidad)}</span>
-              <span data-col="pct" className="text-xs text-stone-400 ml-1.5">{pct(e.pct)}</span>
+              <span className={`font-semibold ${e.rentabilidad >= 0 ? "text-gray-900" : "text-red-600"}`}>{moneyK(e.rentabilidad)}</span>
+              <span data-col="pct" className="text-xs text-gray-400 ml-1.5">{pct(e.pct)}</span>
             </>
           )}
         </span>
@@ -260,7 +260,7 @@ function Tarjeta({ e, pill, abierta, onToggle, mes }: {
       </div>
 
       {abierta && (
-        <div className="border-t border-stone-100 bg-stone-50/60 px-4 py-3">
+        <div className="border-t border-gray-100 bg-gray-50/60 px-4 py-3">
           <Desglose e={e} />
           <div className="mt-0.5">
             <VerGastosLink e={e} mes={mes} />
@@ -290,23 +290,23 @@ function Fila({ e, pill, abierta, onToggle, mes }: {
       <tr
         data-fila-semaforo={e.key}
         onClick={onToggle}
-        className="border-b border-stone-50 last:border-0 hover:bg-stone-50 cursor-pointer transition"
+        className="border-b border-gray-50 last:border-0 hover:bg-gray-50 cursor-pointer transition"
       >
         <td className="px-3 py-3">
           <span className="inline-flex items-center gap-2.5">
             <span className={`w-2 h-2 rounded-full shrink-0 ${DOT[e.estado]}`} />
-            <span data-col="empresa" className="font-medium text-stone-800">{e.name}</span>
-            <svg className={`w-3.5 h-3.5 shrink-0 text-stone-300 transition-transform ${abierta ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            <span data-col="empresa" className="font-medium text-gray-800">{e.name}</span>
+            <svg className={`w-3.5 h-3.5 shrink-0 text-gray-300 transition-transform ${abierta ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
           </span>
         </td>
-        <td data-col="ventas" className="px-3 py-3 text-right tabular-nums text-stone-700">{moneyK(e.ventas)}</td>
+        <td data-col="ventas" className="px-3 py-3 text-right tabular-nums text-gray-700">{moneyK(e.ventas)}</td>
         <td data-col="rentabilidad" className="px-3 py-3 text-right tabular-nums">
           {e.rentabilidad == null ? (
-            <span className="text-stone-400">—</span>
+            <span className="text-gray-400">—</span>
           ) : (
             <>
-              <span className={`font-semibold ${e.rentabilidad >= 0 ? "text-stone-900" : "text-red-600"}`}>{moneyK(e.rentabilidad)}</span>
-              <span data-col="pct" className="text-xs text-stone-400 ml-1.5">{pct(e.pct)}</span>
+              <span className={`font-semibold ${e.rentabilidad >= 0 ? "text-gray-900" : "text-red-600"}`}>{moneyK(e.rentabilidad)}</span>
+              <span data-col="pct" className="text-xs text-gray-400 ml-1.5">{pct(e.pct)}</span>
             </>
           )}
         </td>
@@ -315,7 +315,7 @@ function Fila({ e, pill, abierta, onToggle, mes }: {
         </td>
       </tr>
       {abierta && (
-        <tr className="border-b border-stone-50 last:border-0 bg-stone-50/60">
+        <tr className="border-b border-gray-50 last:border-0 bg-gray-50/60">
           <td colSpan={4} className="px-3 py-3">
             <Desglose e={e} />
             <div className="mt-0.5">

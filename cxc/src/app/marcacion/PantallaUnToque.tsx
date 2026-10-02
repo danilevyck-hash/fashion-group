@@ -140,7 +140,7 @@ export default function PantallaUnToque({
             <li key={r.rotulo} className="flex min-h-[52px] items-center gap-3 px-4 py-2 text-[16px]">
               <div className="min-w-0 flex-1">
                 <p className={r.hora ? "text-gray-900" : "text-gray-400"}>
-                  {r.hora && !r.pendiente && <span className="mr-1.5 text-green-600">✓</span>}
+                  {r.hora && !r.pendiente && <span className="mr-1.5 text-emerald-700">✓</span>}
                   {r.rotulo}
                 </p>
                 {/* Lo que dura poco va debajo, en chico: el renglón no se ensancha. */}
@@ -172,7 +172,7 @@ export default function PantallaUnToque({
       {!MARCACION_APPLE_2026_10 && hoyMarcado && (
         <div
           data-pastilla
-          className="mt-6 flex items-center justify-between gap-3 rounded-xl bg-green-50 px-4 py-3.5 text-[17px] font-semibold text-green-800"
+          className="mt-6 flex items-center justify-between gap-3 rounded-xl bg-emerald-50 px-4 py-3.5 text-[17px] font-semibold text-emerald-700"
         >
           {/* 🔴 CADA MARCA CON SU NOMBRE (24-sep-2026). Con cuatro marcas, la
               primera y la última ya no alcanzan: a mediodía, «Entrada 8:00 ·
@@ -208,7 +208,7 @@ export default function PantallaUnToque({
             aviso.tono === "error"
               ? "bg-red-50 text-red-800"
               : aviso.tono === "listo"
-                ? "bg-green-50 text-green-800"
+                ? "bg-emerald-50 text-emerald-700"
                 : "bg-amber-50 text-amber-900"
           }`}
         >

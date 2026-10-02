@@ -324,7 +324,7 @@ export default function ReclamoDetail({
         {editMode ? (
           <span className="text-xs text-gray-400 whitespace-nowrap shrink-0">Editando</span>
         ) : (
-          <span className={`shrink-0 text-xs px-2.5 py-1 rounded-full border ${!pendiente ? "bg-green-50 text-green-700 border-green-200" : estaReclamado(current) ? "bg-gray-100 text-gray-600 border-gray-200" : "bg-red-50 text-red-600 border-red-100 font-medium"}`}>
+          <span className={`shrink-0 text-xs px-2.5 py-1 rounded-full border ${!pendiente ? "bg-emerald-50 text-emerald-700 border-emerald-200" : estaReclamado(current) ? "bg-gray-100 text-gray-600 border-gray-200" : "bg-red-50 text-red-600 border-red-100 font-medium"}`}>
             {!pendiente ? CHIP_COBRADO : textoReclamado(current)}
           </span>
         )}

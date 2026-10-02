@@ -121,7 +121,7 @@ export default function BloqueDatosDelGasto({
             <button
               type="button"
               onClick={() => setCambiandoMarca(true)}
-              className={`shrink-0 text-sm transition min-h-[44px] -my-2 inline-flex items-center ${MARKETING_APPLE_2026_10 ? ENLACE : "text-teal-700 hover:text-teal-900"}`}
+              className={`shrink-0 text-sm transition min-h-[44px] -my-2 inline-flex items-center ${MARKETING_APPLE_2026_10 ? ENLACE : "text-blue-600 hover:text-blue-800"}`}
             >
               Cambiar
             </button>

@@ -39,7 +39,7 @@ export function ReportesTabs() {
             onClick={() => setTab(t.value)}
             className={`inline-flex min-h-[44px] items-center px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               active.value === t.value
-                ? "border-fuchsia-500 text-fuchsia-700"
+                ? "border-gray-900 text-gray-900"
                 : "border-transparent text-gray-500 hover:text-gray-800"
             }`}
           >

@@ -55,12 +55,12 @@ export function CajaAviso({ message, type = 'success', onDismiss, className = ''
 // en <body>: si salen varios a la vez se apilan con su espacio, nunca uno
 // encima del otro.
 //
-// 🔑 DÓNDE: justo encima del botón ☰ redondo del celular, que a su vez se
-// sienta encima de la barra fija de abajo (`--fg-alto-barra-fija`) o de la
-// franja de iOS (`safe-area-inset-bottom`). Se reusa su misma regla
-// (`ABAJO_DEL_FLOTANTE_CSS`) + el alto del botón: el aviso no tapa ni el ☰ ni
-// «Cobrar»/«Nuevo reclamo». En escritorio (sin ☰) queda unos 60 px arriba del
-// piso: un solo número para todas las medidas. Candado: `aviso-unico.test.tsx`.
+// 🔑 DÓNDE: en el celular, encima de la barra de pestañas (abajo); nunca por
+// debajo de la barra fija de abajo (`--fg-alto-barra-fija`) ni de la franja de
+// iOS (`safe-area-inset-bottom`): se reusa la regla del flotante
+// (`ABAJO_DEL_FLOTANTE_CSS`) + su alto, así no tapa «Cobrar»/«Nuevo reclamo».
+// En escritorio queda unos 60 px arriba del piso: un solo número para todas
+// las medidas. Candado: `aviso-unico.test.tsx`.
 const ABAJO_DEL_BOTON_CSS = `calc(${ABAJO_DEL_FLOTANTE_CSS} + ${DIAMETRO_FLOTANTE + MARGEN_FLOTANTE}px)`
 // Con la barra de pestañas (`TAB_BAR_2026_10`) el aviso se sienta encima de ella;
 // la barra publica su alto en `--fg-alto-tab-bar` (0 cuando se esconde).

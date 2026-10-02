@@ -104,9 +104,9 @@ function mkRow(marca: string, empresa: string | null, saved?: MarcaFormula): Mar
 // Solo cambia el ALTO. El ancho de cada columna lo fija la grilla
 // (`grid-cols-[…_64px_50px_90px_96px]`, todas ya ≥44px), así que subir la
 // altura no mueve una sola columna ni agrega un píxel de arrastre horizontal.
-const selCls = "min-h-[44px] rounded-md border border-stone-300 bg-stone-50 px-1.5 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
+const selCls = "min-h-[44px] rounded-md border border-gray-300 bg-gray-50 px-1.5 text-[13px] focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 // [appearance:textfield] + sin spin-buttons → el divisor de 2 decimales se ve completo (no lo tapan las flechitas).
-const numCls = "min-h-[44px] rounded-md border border-stone-300 bg-stone-50 px-2 text-right font-mono text-[13px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
+const numCls = "min-h-[44px] rounded-md border border-gray-300 bg-gray-50 px-2 text-right font-mono text-[13px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 
 export default function FormulasConfig({ scope = "depurador", apple = false, embebido = false }: {
   scope?: FormulasScope;
@@ -284,7 +284,7 @@ export default function FormulasConfig({ scope = "depurador", apple = false, emb
       {!embebido && scope === "depurador" && <BulkExcel catalogo={catalogoDescs} onDone={() => setReloadKey((k) => k + 1)} />}
 
       {descsCargando && (
-        <div className="mb-4 rounded-lg border border-stone-200 bg-white px-3.5 py-2.5 text-[13px] text-stone-600">
+        <div className="mb-4 rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-[13px] text-gray-600">
           Cargando catálogo de descripciones…
         </div>
       )}
@@ -308,10 +308,10 @@ export default function FormulasConfig({ scope = "depurador", apple = false, emb
       {!embebido && <div className="mb-5 flex items-center justify-between gap-3">
         <input
           value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar marca o descripción…"
-          className="min-h-[44px] w-full max-w-xs rounded-lg border border-stone-300 bg-white px-3 text-sm focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
+          className="min-h-[44px] w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 text-sm focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
         />
         <button type="button" onClick={addMarca}
-          className="inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg bg-teal-600 px-4 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97]">
+          className="inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg bg-black px-4 text-sm font-semibold text-white transition hover:bg-gray-800 active:scale-[0.97]">
           + Agregar marca
         </button>
       </div>}
@@ -319,7 +319,7 @@ export default function FormulasConfig({ scope = "depurador", apple = false, emb
       {/* Nuevas marcas (aún sin guardar) */}
       {nuevas.length > 0 && (
         <div className="mb-6">
-          <div className="mb-2 text-[12px] font-bold uppercase tracking-wide text-teal-800">Nuevas marcas</div>
+          <div className="mb-2 text-[12px] font-bold uppercase tracking-wide text-gray-400">Nuevas marcas</div>
           {nuevas.map((row) => (
             <NuevaMarcaRow
               key={row.id} row={row} grupos={cfg.grupos} onPatch={patchMarca} onSave={saveMarca}
@@ -433,7 +433,7 @@ function RedondeoSelect({ value, onChange, cls, aria = "Redondeo" }: { value: Re
 function Campo({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block min-w-0" onClick={noPropagar}>
-      <span className="mb-0.5 block text-[12px] font-medium uppercase tracking-wide text-stone-500">{label}</span>
+      <span className="mb-0.5 block text-[12px] font-medium uppercase tracking-wide text-gray-500">{label}</span>
       {children}
     </label>
   );
@@ -448,7 +448,7 @@ function NuevaMarcaRow({ row, grupos, onPatch, onSave, saving, flashed }: {
   const nombre = (cls: string) => (
     <input value={row.marca} onChange={(e) => onPatch(row.id, { marca: e.target.value })} placeholder="Nombre de la marca"
       aria-label="Nombre de la marca"
-      className={`min-h-[44px] rounded-md border border-stone-300 bg-white px-2 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20 ${cls}`} />
+      className={`min-h-[44px] rounded-md border border-gray-300 bg-white px-2 text-[13px] focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 ${cls}`} />
   );
   const empresa = (cls: string) => (
     <select value={row.empresa ?? ""} onChange={(e) => onPatch(row.id, { empresa: e.target.value || null })} className={`${selCls} ${cls}`} aria-label="Empresa">
@@ -462,7 +462,7 @@ function NuevaMarcaRow({ row, grupos, onPatch, onSave, saving, flashed }: {
   const guardar = <SaveBtn label={saving ? "Guardando…" : "Guardar"} dirty onClick={() => onSave(row.id)} disabled={saving} flashed={flashed} />;
 
   return (
-    <div className="mb-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3">
+    <div className="mb-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
       {/* ── Móvil e iPad vertical (<lg): cada campo con su etiqueta ── */}
       <div data-layout="tarjetas" className="space-y-2 lg:hidden">
         <Campo label="Marca">{nombre("w-full")}</Campo>
@@ -513,23 +513,23 @@ function MarcaCard({
   const marcaLabel = savingMarca ? "Guardando…" : row.dirty ? "Guardar" : row.saved ? "Guardado" : "Guardar";
 
   const badge = descs.length === 0 ? null : conFormula > 0
-    ? <span className="shrink-0 rounded bg-teal-50 px-1.5 py-0.5 text-[12px] font-semibold text-teal-700 lg:text-[10px]">{conFormula} propia · {heredan} heredan</span>
-    : <span className="shrink-0 text-[12px] text-stone-500 lg:text-[11px]">{descs.length} desc · todas heredan</span>;
+    ? <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[12px] font-semibold text-gray-700 lg:text-[10px]">{conFormula} propia · {heredan} heredan</span>
+    : <span className="shrink-0 text-[12px] text-gray-500 lg:text-[11px]">{descs.length} desc · todas heredan</span>;
   const divisor = (cls: string) => <DivisorInput value={row.divisor} onChange={(n) => onPatchMarca(row.id, { divisor: n })} cls={cls} aria={`Divisor ${row.marca}`} />;
   const extra = (cls: string) => <ExtraSelect value={row.extra} onChange={(n) => onPatchMarca(row.id, { extra: n })} cls={cls} />;
   const redondeo = (cls: string) => <RedondeoSelect value={row.redondeo} onChange={(r) => onPatchMarca(row.id, { redondeo: r })} cls={cls} />;
   const guardar = <SaveBtn label={marcaLabel} dirty={row.dirty || !row.saved} onClick={() => onSaveMarca(row.id)} disabled={savingMarca} flashed={flashMarca} />;
 
   return (
-    <div className="mb-1.5 overflow-hidden rounded-xl border border-stone-200 bg-stone-50">
+    <div className="mb-1.5 overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
       {/* Header — toda el área expande/colapsa (salvo los campos de la fórmula). */}
       <div onClick={onToggle} title={compactFormula(row)} className="cursor-pointer select-none">
         {/* ── Móvil e iPad vertical (<lg): el nombre COMPLETO arriba, los campos con su etiqueta ── */}
         <div data-layout="tarjetas" className="px-3.5 py-3 lg:hidden">
           <div className="flex items-start justify-between gap-2">
             <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-              <span aria-hidden className="text-stone-400">{isOpen ? "▾" : "▸"}</span>
-              <span className="break-words text-[15px] font-bold text-stone-900">{row.marca}</span>
+              <span aria-hidden className="text-gray-400">{isOpen ? "▾" : "▸"}</span>
+              <span className="break-words text-[15px] font-bold text-gray-900">{row.marca}</span>
               {badge}
             </span>
             {guardar}
@@ -544,11 +544,11 @@ function MarcaCard({
         <div data-layout="fila" className="hidden grid-cols-[minmax(0,1fr)_64px_50px_90px_96px] items-center gap-2 px-3.5 py-2 lg:grid">
           <div className="flex min-w-0 items-center justify-between gap-2">
             <span className="flex min-w-0 items-center gap-2">
-              <span aria-hidden className="text-stone-400">{isOpen ? "▾" : "▸"}</span>
-              <span className="truncate text-[14px] font-bold text-stone-900">{row.marca}</span>
+              <span aria-hidden className="text-gray-400">{isOpen ? "▾" : "▸"}</span>
+              <span className="truncate text-[14px] font-bold text-gray-900">{row.marca}</span>
               {badge}
             </span>
-            <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-stone-400">Marca:</span>
+            <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Marca:</span>
           </div>
           {divisor("w-full")}
           {extra("w-full")}
@@ -559,8 +559,8 @@ function MarcaCard({
 
       {/* Cuerpo — al expandir. */}
       {isOpen && descs.length > 0 && (
-        <div className="border-t border-stone-200 py-1.5">
-          <div className="hidden grid-cols-[minmax(0,1fr)_64px_50px_90px_96px] items-center gap-2 px-3.5 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-400 lg:grid">
+        <div className="border-t border-gray-200 py-1.5">
+          <div className="hidden grid-cols-[minmax(0,1fr)_64px_50px_90px_96px] items-center gap-2 px-3.5 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400 lg:grid">
             <span>Descripción</span><span className="text-right">Divisor</span><span className="text-right">Extra</span><span>Redondeo</span><span></span>
           </div>
           {descs.map((desc) => (
@@ -586,9 +586,9 @@ function DescFila({ marca, desc, r, hl, onPatch, onSave, busy, flash }: {
   const chip = r.fija
     ? <span className="shrink-0 rounded bg-amber-100 px-1 py-0.5 text-[12px] font-semibold text-amber-800 lg:text-[9px]">precio fijo</span>
     : r.propia
-      ? <span className="shrink-0 rounded bg-teal-50 px-1 py-0.5 text-[12px] font-semibold text-teal-700 lg:text-[9px]">propia</span>
+      ? <span className="shrink-0 rounded bg-gray-100 px-1 py-0.5 text-[12px] font-semibold text-gray-700 lg:text-[9px]">propia</span>
       : null;
-  const color = r.fija ? "font-semibold text-amber-700" : r.propia ? "font-medium text-teal-700" : "text-stone-500";
+  const color = r.fija ? "font-semibold text-amber-700" : r.propia ? "font-medium text-gray-900" : "text-gray-500";
   const modo = (cls: string) => (
     <select value={r.modo} onChange={(e) => onPatch(marca, desc, { modo: e.target.value as DescModo })}
       className={`${selCls} ${cls} ${r.modo === "fijo" ? "border-amber-300 text-amber-800" : ""}`} aria-label={`Modo de precio ${desc}`}>
@@ -609,7 +609,7 @@ function DescFila({ marca, desc, r, hl, onPatch, onSave, busy, flash }: {
   return (
     <>
       {/* ── Móvil e iPad vertical (<lg): una tarjeta por descripción ── */}
-      <div data-layout="tarjetas" className={`border-t border-stone-200 px-3.5 py-2.5 lg:hidden ${hl ? "bg-teal-50" : ""}`}>
+      <div data-layout="tarjetas" className={`border-t border-gray-200 px-3.5 py-2.5 lg:hidden ${hl ? "bg-gray-100" : ""}`}>
         <div className="flex items-start justify-between gap-2">
           <span className={`flex min-w-0 flex-wrap items-center gap-1.5 text-[14px] ${color}`}>
             <span className="break-words">{desc}</span>
@@ -637,7 +637,7 @@ function DescFila({ marca, desc, r, hl, onPatch, onSave, busy, flash }: {
       </div>
 
       {/* ── Escritorio (lg+): la fila de siempre ── */}
-      <div data-layout="fila" className={`hidden grid-cols-[minmax(0,1fr)_64px_50px_90px_96px] items-center gap-2 px-3.5 py-0.5 lg:grid ${hl ? "bg-teal-50" : "hover:bg-white"}`}>
+      <div data-layout="fila" className={`hidden grid-cols-[minmax(0,1fr)_64px_50px_90px_96px] items-center gap-2 px-3.5 py-0.5 lg:grid ${hl ? "bg-gray-100" : "hover:bg-white"}`}>
         <div className="flex min-w-0 items-center justify-between gap-2">
           <span className={`flex min-w-0 items-center gap-1.5 truncate text-[13px] ${color}`}>
             <span className="truncate">{desc}</span>
@@ -667,7 +667,7 @@ function SaveBtn({ label, dirty, onClick, disabled, flashed, compact }: { label:
   return (
     <span className="whitespace-nowrap">
       <button type="button" onClick={(e) => { e.stopPropagation(); onClick(); }} disabled={disabled}
-        className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md ${compact ? "px-1.5" : "px-2.5"} text-[12px] font-semibold transition disabled:opacity-50 ${dirty ? "bg-amber-500 text-white hover:bg-amber-600" : "text-teal-700 hover:bg-teal-50"}`}>
+        className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md ${compact ? "px-1.5" : "px-2.5"} text-[12px] font-semibold transition disabled:opacity-50 ${dirty ? "bg-amber-500 text-white hover:bg-amber-600" : "text-blue-600 hover:bg-gray-50"}`}>
         {label}
       </button>
       {flashed && <span className="ml-1 text-[11px] font-semibold text-emerald-600">✓</span>}
@@ -682,27 +682,27 @@ function FormulasAyuda({ scope }: { scope: FormulasScope }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="mb-4 rounded-lg border border-stone-200 bg-stone-50 text-[13px] text-stone-600">
+    <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 text-[13px] text-gray-600">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex min-h-[44px] w-full items-center gap-2 px-3 text-left transition hover:bg-stone-100 active:scale-[0.99]"
+        className="flex min-h-[44px] w-full items-center gap-2 px-3 text-left transition hover:bg-gray-100 active:scale-[0.99]"
         aria-expanded={open}
       >
-        <span aria-hidden className="shrink-0 text-stone-400">ⓘ</span>
-        <span className="font-medium text-stone-700">Cómo funcionan las fórmulas</span>
-        <span className={`ml-auto shrink-0 text-stone-400 transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
+        <span aria-hidden className="shrink-0 text-gray-400">ⓘ</span>
+        <span className="font-medium text-gray-700">Cómo funcionan las fórmulas</span>
+        <span className={`ml-auto shrink-0 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
       </button>
       {open && (
-        <div className="space-y-2 border-t border-stone-200 px-3 py-2.5">
+        <div className="space-y-2 border-t border-gray-200 px-3 py-2.5">
           {scope === "tienda" ? (
             <p>
-              <b className="text-teal-800">Fórmulas de TIENDA (Facturas Tienda):</b> precio = TECHO(Costo ÷ divisor) + extra,
+              <b className="text-gray-900">Fórmulas de TIENDA (Facturas Tienda):</b> precio = TECHO(Costo ÷ divisor) + extra,
               redondeado hacia arriba. El costo es el PRECIO de la factura (lo que la empresa le cobra a la tienda).
             </p>
           ) : (
             <p>
-              <b className="text-teal-800">Fórmula:</b> precio = TECHO(Costo CIF ÷ divisor) + extra, redondeado
+              <b className="text-gray-900">Fórmula:</b> precio = TECHO(Costo CIF ÷ divisor) + extra, redondeado
               hacia arriba (al entero o a .50). El Costo CIF ya es costo × 1.1.
             </p>
           )}

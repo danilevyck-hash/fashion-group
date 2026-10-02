@@ -736,7 +736,7 @@ function ComparativoInteranualCard({
   // propia columna desde `md`.
   const CELDA_DELTA = "col-start-2 col-span-2 md:col-start-4 md:col-span-1";
   const deltaTone = (n: number | null) =>
-    n == null ? "text-gray-400" : n >= 0 ? "text-emerald-600" : "text-rose-600";
+    n == null ? "text-gray-400" : n >= 0 ? "text-emerald-600" : "text-red-600";
   const fmtPct = (p: number | null) => fmtVariacionPct(p, true, 1);
   const fmtAbs = (n: number | null) => (n == null ? "" : `${n >= 0 ? "+" : "−"}${fmtMoney(Math.abs(n))}`);
 
@@ -895,8 +895,8 @@ function CuandoVendeLaTienda({ data }: { data: DetalleMensualResp }) {
 const TONO_PATRON: Record<string, string> = {
   emerald: "border-emerald-100 bg-emerald-50 text-emerald-700",
   amber: "border-amber-100 bg-amber-50 text-amber-700",
-  teal: "border-teal-100 bg-teal-50 text-teal-700",
-  violet: "border-violet-100 bg-violet-50 text-violet-700",
+  teal: "border-gray-200 bg-gray-50 text-gray-700",
+  violet: "border-gray-200 bg-gray-50 text-gray-700",
 };
 
 /** Una línea de la sección. 🔑 El período va SIEMPRE, pegado al título. */
@@ -987,7 +987,7 @@ function ChartMesAnioMount({
                 year={year}
               />
               <p className="mt-2 px-1 text-xs text-gray-500">
-                <span className="mr-1 inline-block h-2 w-2 rounded-sm bg-teal-700" />
+                <span className="mr-1 inline-block h-2 w-2 rounded-sm bg-gray-900" />
                 {mes_label} {year}
                 {showPrevLine ? (
                   <>
@@ -1097,8 +1097,8 @@ function MiniBars({
   showLabels?: boolean;
 }) {
   const max = Math.max(...data.map((d) => d.value), 1);
-  const on = tone === "violet" ? "bg-violet-600" : "bg-teal-700";
-  const off = tone === "violet" ? "bg-violet-200" : "bg-teal-200";
+  const on = "bg-gray-900";
+  const off = "bg-gray-200";
   return (
     <div>
       <div className="flex h-12 items-end gap-px">

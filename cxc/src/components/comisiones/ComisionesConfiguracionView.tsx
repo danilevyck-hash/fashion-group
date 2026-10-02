@@ -35,7 +35,7 @@ export function ComisionesConfiguracionView() {
 
   return (
     <div className="space-y-4">
-      {msg && <p className="text-xs text-teal-700" role="status">{msg}</p>}
+      {msg && <p className="text-xs text-emerald-700" role="status">{msg}</p>}
       <TasasPorVendedor onSaved={avisar} />
       <ClientesQueNoComisionan onSaved={avisar} />
       <Descuentos onSaved={avisar} />

@@ -161,7 +161,7 @@ export function ListaSeguimientoClientes({ clientes, hoy, conMonto = false }: Pr
               className={cn(
                 "inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition",
                 chip === c
-                  ? "border-teal-700 bg-teal-700 text-white"
+                  ? "border-gray-900 bg-gray-900 text-white"
                   : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-gray-900",
               )}
             >

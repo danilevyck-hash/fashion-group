@@ -120,13 +120,13 @@ export default function HomePage() {
 
   if (!authChecked) return null;
 
-  // Ficha: fondo stone claro, borde sutil, acento teal al hover y elevación
+  // Ficha: fondo gris claro, borde sutil, borde más oscuro al hover y elevación
   // mínima. Alto uniforme (78px en la cuadrícula) — cómodo para el dedo.
   const fichaBase =
     "group flex rounded-lg border transition-all duration-150 active:scale-[0.97] " +
-    "border-stone-200 bg-stone-50 hover:border-teal-500 hover:bg-white hover:shadow-sm";
-  const iconoBase = "shrink-0 transition-colors text-stone-500 group-hover:text-teal-600";
-  const textoBase = "text-xs font-medium leading-tight transition-colors text-gray-900 group-hover:text-teal-800";
+    "border-gray-200 bg-gray-50 hover:border-gray-400 hover:bg-white hover:shadow-sm";
+  const iconoBase = "shrink-0 transition-colors text-gray-500 group-hover:text-gray-900";
+  const textoBase = "text-xs font-medium leading-tight transition-colors text-gray-900 group-hover:text-black";
 
   return (
     <div className="min-h-screen bg-white">

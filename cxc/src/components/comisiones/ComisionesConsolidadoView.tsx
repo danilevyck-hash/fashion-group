@@ -155,7 +155,7 @@ interface Props {
   refreshKey?: number;
 }
 
-const moneyClass = (n: number) => (n < 0 ? "text-rose-600" : "text-gray-700");
+const moneyClass = (n: number) => (n < 0 ? "text-red-600" : "text-gray-700");
 
 /** La marca de «se calcula pero no se paga» — DEFAULT y Daniel. Misma en tabla y tarjetas. */
 export function MarcaNoSePaga() {
@@ -419,7 +419,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
           </td>
         );
       })}
-      <td className={`bg-gray-50 px-3 py-2.5 text-right font-semibold tabular-nums xl:px-4 ${!r.se_paga ? "text-gray-400" : r.total < 0 ? "text-rose-600" : "text-gray-900"}`}>
+      <td className={`bg-gray-50 px-3 py-2.5 text-right font-semibold tabular-nums xl:px-4 ${!r.se_paga ? "text-gray-400" : r.total < 0 ? "text-red-600" : "text-gray-900"}`}>
         {/* 🔴 LA FLECHA DEL TOTAL BAJA TODAS LAS EMPRESAS DE ESA PERSONA, en un
             solo archivo — una hoja por empresa, en el orden de las columnas. */}
         {conDescarga && hayQueDescargarTotal(r.porEmpresa, r.descuentoPorEmpresa, EMPRESAS) && (
@@ -466,7 +466,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
       ) : error ? (
         <Card className="overflow-hidden rounded-lg border border-gray-200">
           <div className="p-8 text-center text-sm">
-            <p className="text-rose-600">{error}</p>
+            <p className="text-red-600">{error}</p>
             <button
               onClick={() => void load()}
               className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
@@ -558,9 +558,9 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
                   <td className="px-3 py-2.5 xl:px-4">{haySinPago ? "Total a pagar" : "Total"}</td>
                   {EMPRESAS.map((k) => {
                     const t = colTotal(k);
-                    return <td key={k} className={`px-2 py-2.5 text-right tabular-nums xl:px-3 ${t < 0 ? "text-rose-600" : ""}`}>{fmtMoney(t)}</td>;
+                    return <td key={k} className={`px-2 py-2.5 text-right tabular-nums xl:px-3 ${t < 0 ? "text-red-600" : ""}`}>{fmtMoney(t)}</td>;
                   })}
-                  <td className={`bg-gray-100 px-3 py-2.5 text-right font-semibold tabular-nums xl:px-4 ${grandTotal < 0 ? "text-rose-600" : "text-gray-900"}`}>{fmtMoney(grandTotal)}</td>
+                  <td className={`bg-gray-100 px-3 py-2.5 text-right font-semibold tabular-nums xl:px-4 ${grandTotal < 0 ? "text-red-600" : "text-gray-900"}`}>{fmtMoney(grandTotal)}</td>
                 </tr>
               </tfoot>
             </table>

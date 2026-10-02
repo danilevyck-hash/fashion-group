@@ -129,7 +129,7 @@ function VistaGeneralInner() {
   if (!authChecked) return null;
 
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="min-h-screen bg-gray-50">
       <AppHeader module="Vista general" />
       <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Encabezado + navegación de mes */}
@@ -144,17 +144,17 @@ function VistaGeneralInner() {
               type="button"
               onClick={() => setMesUrl(sumarMeses(mes, -1))}
               aria-label="Mes anterior"
-              className="w-11 h-11 inline-flex items-center justify-center rounded-full text-stone-500 hover:text-teal-700 hover:bg-stone-100 transition"
+              className="w-11 h-11 inline-flex items-center justify-center rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             </button>
-            <span className="text-base font-medium text-stone-900 tabular-nums min-w-[130px] text-center">{mesLabel(mes)}</span>
+            <span className="text-base font-medium text-gray-900 tabular-nums min-w-[130px] text-center">{mesLabel(mes)}</span>
             <button
               type="button"
               onClick={() => { if (!esMesActual) setMesUrl(sumarMeses(mes, 1)); }}
               disabled={esMesActual}
               aria-label="Mes siguiente"
-              className={`w-11 h-11 inline-flex items-center justify-center rounded-full transition ${esMesActual ? "text-stone-300 cursor-not-allowed" : "text-stone-500 hover:text-teal-700 hover:bg-stone-100"}`}
+              className={`w-11 h-11 inline-flex items-center justify-center rounded-full transition ${esMesActual ? "text-gray-300 cursor-not-allowed" : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"}`}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
             </button>
@@ -164,12 +164,12 @@ function VistaGeneralInner() {
         {isLoading && !data ? (
           <PageSkeleton />
         ) : error ? (
-          <div className="rounded-[14px] border border-stone-200 bg-white p-6 text-center">
-            <p className="text-sm text-stone-700">No se pudo cargar la vista general. Intenta de nuevo en unos segundos.</p>
+          <div className="rounded-[14px] border border-gray-200 bg-white p-6 text-center">
+            <p className="text-sm text-gray-700">No se pudo cargar la vista general. Intenta de nuevo en unos segundos.</p>
             <button
               type="button"
               onClick={() => mutate()}
-              className="mt-4 rounded-md bg-stone-900 text-white text-sm font-medium px-4 py-2 active:scale-[0.97] transition"
+              className="mt-4 rounded-md bg-black text-white text-sm font-medium px-4 py-2 hover:bg-gray-800 active:scale-[0.97] transition"
             >
               Reintentar
             </button>
@@ -210,11 +210,11 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
         tags={ventas?.parcial ? ["mes en curso"] : []}
         sub={
           !ventas ? (
-            <span className="text-stone-400">Sin datos de ventas</span>
+            <span className="text-gray-400">Sin datos de ventas</span>
           ) : ventas.yoyPct == null ? (
-            <span className="text-stone-400">sin dato del año pasado</span>
+            <span className="text-gray-400">sin dato del año pasado</span>
           ) : (
-            <span className={ventas.parcial ? "text-stone-400" : ventas.yoyPct >= 0 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+            <span className={ventas.parcial ? "text-gray-400" : ventas.yoyPct >= 0 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
               {/* Mes en curso: el año pasado va recortado a los MISMOS DÍAS
                   ("vs 1–3 sep 2025"), no el mes entero (3-sep-2026). */}
               {ventas.yoyPct >= 0 ? "▲" : "▼"} {pct(Math.abs(ventas.yoyPct))} vs {ventas.parcial && ventas.prevHasta ? `1–${fechaCorta(ventas.prevHasta)} ${ventas.prevHasta.slice(0, 4)}` : mesPrevAnio}{ventas.parcial && !ventas.prevHasta ? " (parcial)" : ""}
@@ -229,7 +229,7 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
         label="Margen bruto"
         hoverLabel="Ir a Ventas"
         value={margen ? pct(margen.pct) : "—"}
-        sub={margen ? <span className="text-stone-400">{moneyK(margen.utilidad)} utilidad bruta</span> : <span className="text-stone-400">Sin datos</span>}
+        sub={margen ? <span className="text-gray-400">{moneyK(margen.utilidad)} utilidad bruta</span> : <span className="text-gray-400">Sin datos</span>}
       />
 
       {/* 🔴 ACÁ ESTABA LA TARJETA "Gastos" CON UN TOTAL DEL GRUPO. SE FUE
@@ -262,8 +262,8 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
         hoverLabel="Ir a Saldos de banco"
         value={disponibilidad ? moneyK(disponibilidad.total) : "—"}
         sub={disponibilidad
-          ? <span className="text-stone-400">al {fechaCorta(disponibilidad.fechaMasVieja)}</span>
-          : <span className="text-stone-400">Sin saldos cargados</span>}
+          ? <span className="text-gray-400">al {fechaCorta(disponibilidad.fechaMasVieja)}</span>
+          : <span className="text-gray-400">Sin saldos cargados</span>}
       />
 
       {/* Inventario — al lado de la Disponibilidad a propósito: son las dos
@@ -278,11 +278,11 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
         tags={inventario?.disponible ? ["al costo"] : []}
         sub={
           !inventario ? (
-            <span className="text-stone-400">No se pudo medir</span>
+            <span className="text-gray-400">No se pudo medir</span>
           ) : !inventario.disponible ? (
-            <span className="text-stone-400">Todavía no está conectado</span>
+            <span className="text-gray-400">Todavía no está conectado</span>
           ) : (
-            <span className={inventario.viejo ? "text-amber-600 font-medium" : "text-stone-400"}>
+            <span className={inventario.viejo ? "text-amber-600 font-medium" : "text-gray-400"}>
               {piezas(inventario.totalUnidades)} unidades · {textoFrescura(inventario.medidoEn, inventario.viejo)}
             </span>
           )
@@ -296,7 +296,7 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
         hoverLabel="Ir a Cuentas por cobrar"
         value={moneyK(cxc.total)}
         sub={
-          <span className={cxc.vencido > 0 ? "text-red-600 font-medium" : "text-stone-400"}>
+          <span className={cxc.vencido > 0 ? "text-red-600 font-medium" : "text-gray-400"}>
             {moneyK(cxc.vencido)} con más de 90 días
           </span>
         }
@@ -309,7 +309,7 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
         hoverLabel="Ir a Proveedores"
         value={moneyK(cxp.total)}
         sub={
-          <span className={cxp.vencido > 0 ? "text-amber-600 font-medium" : "text-stone-400"}>
+          <span className={cxp.vencido > 0 ? "text-amber-600 font-medium" : "text-gray-400"}>
             {moneyK(cxp.vencido)} vencido +90d
           </span>
         }
@@ -328,14 +328,14 @@ function KpiCard({ href, label, hoverLabel, value, valueClass, tags = [], sub }:
   sub: React.ReactNode;
 }) {
   return (
-    <Link href={href} className="group rounded-[14px] border border-stone-200 bg-white p-4 hover:border-teal-600/40 transition">
+    <Link href={href} className="group rounded-[14px] border border-gray-200 bg-white p-4 hover:border-gray-300 transition">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs font-medium text-stone-500">{label}</span>
+        <span className="text-xs font-medium text-gray-500">{label}</span>
         {tags.map((t) => (
-          <span key={t} className="text-[12px] font-medium text-stone-500 bg-stone-100 px-1.5 py-0.5 rounded-full">{t}</span>
+          <span key={t} className="text-[12px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">{t}</span>
         ))}
       </div>
-      <div className={`text-2xl font-bold tabular-nums mt-1 ${valueClass ?? "text-stone-900"}`}>{value}</div>
+      <div className={`text-2xl font-bold tabular-nums mt-1 ${valueClass ?? "text-gray-900"}`}>{value}</div>
       {/* El subtítulo ENVUELVE, no se corta. En iPhone la tarjeta mide 175px y
           "▼ 20.3% vs julio 2025 (parcial)" necesita 148: con `truncate` se
           perdía justo el "(parcial)", que es el aviso de que la comparación
@@ -344,7 +344,7 @@ function KpiCard({ href, label, hoverLabel, value, valueClass, tags = [], sub }:
           sola línea, no la hace saltar). */}
       <div className="text-xs mt-1 tabular-nums min-h-[2rem] sm:min-h-0">
         <span className="group-hover:hidden">{sub}</span>
-        <span className="hidden group-hover:inline text-teal-600 font-medium">{hoverLabel} →</span>
+        <span className="hidden group-hover:inline text-blue-600 font-medium">{hoverLabel} →</span>
       </div>
     </Link>
   );
@@ -356,16 +356,16 @@ function KpiCard({ href, label, hoverLabel, value, valueClass, tags = [], sub }:
 // min-h-[44px] las lleva a la regla de la casa sin cambiar el ritmo visual de la
 // card (py-1.5 seguía dando 33px con una sola línea de texto).
 const FILA_ALERTA =
-  "flex min-h-[44px] items-center justify-between gap-2 py-1.5 px-2 -mx-2 rounded-md hover:bg-stone-50 transition";
+  "flex min-h-[44px] items-center justify-between gap-2 py-1.5 px-2 -mx-2 rounded-md hover:bg-gray-50 transition";
 // Decisión de Daniel: letra más chica antes que cortar el nombre (ni dos líneas
 // ni acortar). text-sm (14px) cortaba hasta 46px; text-xs (13px en este repo) es
 // lo JUSTO — por debajo de 12px no se baja, es el piso de legibilidad.
-const NOMBRE_ALERTA = "text-xs text-stone-700";
+const NOMBRE_ALERTA = "text-xs text-gray-700";
 
 function Atencion({ data }: { data: VistaGeneral }) {
   return (
     <div>
-      <h2 className="text-sm font-semibold text-stone-900 mb-3">Alertas</h2>
+      <h2 className="text-sm font-semibold text-gray-900 mb-3">Alertas</h2>
       {/* 🩸 A 1024 px las 3 columnas apretaban la tarjeta a 159 px y el nombre
           del cliente perdía 125 px con puntos suspensivos — 18 de las 21 filas.
           Es el ancho PEOR de todos, y no por casualidad: `lg` entra justo a
@@ -387,7 +387,7 @@ function Atencion({ data }: { data: VistaGeneral }) {
           ) : (
             data.cxc.topClientes.map((c) => (
               <Link key={`${c.empresa}-${c.codigo}-${c.nombre}`} href="/cxc" className={FILA_ALERTA}>
-                <span className={`${NOMBRE_ALERTA} truncate`}>{c.nombre}<span className="text-stone-400 text-[12px]"> · {c.empresa}</span></span>
+                <span className={`${NOMBRE_ALERTA} truncate`}>{c.nombre}<span className="text-gray-400 text-[12px]"> · {c.empresa}</span></span>
                 <span className="text-sm font-semibold text-red-600 tabular-nums shrink-0">{moneyK(c.saldo)}</span>
               </Link>
             ))
@@ -401,7 +401,7 @@ function Atencion({ data }: { data: VistaGeneral }) {
           ) : (
             data.cxp.topProveedores.map((p) => (
               <Link key={`${p.empresa}-${p.nombre}`} href="/proveedores" className={FILA_ALERTA}>
-                <span className={`${NOMBRE_ALERTA} truncate`}>{p.nombre}<span className="text-stone-400 text-[12px]"> · {p.empresa}</span></span>
+                <span className={`${NOMBRE_ALERTA} truncate`}>{p.nombre}<span className="text-gray-400 text-[12px]"> · {p.empresa}</span></span>
                 <span className="text-sm font-semibold text-red-600 tabular-nums shrink-0">{moneyK(p.saldo)}</span>
               </Link>
             ))
@@ -415,7 +415,7 @@ function Atencion({ data }: { data: VistaGeneral }) {
           ) : (
             data.reclamos.antiguos.map((r) => (
               <Link key={r.id} href={enlaceDetalleReclamo(r.id, r.empresa)} className={FILA_ALERTA}>
-                <span className={`${NOMBRE_ALERTA} truncate`}>{r.nro}<span className="text-stone-400 text-[12px]"> · {r.empresa}</span></span>
+                <span className={`${NOMBRE_ALERTA} truncate`}>{r.nro}<span className="text-gray-400 text-[12px]"> · {r.empresa}</span></span>
                 <span className="text-sm font-semibold text-amber-600 tabular-nums shrink-0">{r.dias}d</span>
               </Link>
             ))
@@ -428,21 +428,21 @@ function Atencion({ data }: { data: VistaGeneral }) {
 
 function AlertCard({ title, href, linkLabel, count, children }: { title: string; href: string; linkLabel: string; count: number; children: React.ReactNode }) {
   return (
-    <div className="rounded-[14px] border border-stone-200 bg-white p-4 flex flex-col">
+    <div className="rounded-[14px] border border-gray-200 bg-white p-4 flex flex-col">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-xs font-semibold text-stone-700">{title}</h3>
-        {count > 0 && <span className="text-[12px] font-bold text-white bg-stone-900 rounded-full min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center">{count}</span>}
+        <h3 className="text-xs font-semibold text-gray-700">{title}</h3>
+        {count > 0 && <span className="text-[12px] font-bold text-white bg-gray-900 rounded-full min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center">{count}</span>}
       </div>
       <div className="flex-1">{children}</div>
       {/* "Ir a CXC →" medía 18px de alto. self-start + min-h-[44px] lo lleva a
           44 sin estirarlo a todo el ancho de la card. */}
-      <Link href={href} className="text-xs text-teal-600 hover:text-teal-700 font-medium mt-1 inline-flex min-h-[44px] min-w-[44px] items-center self-start">{linkLabel} →</Link>
+      <Link href={href} className="text-xs text-blue-600 hover:text-blue-800 font-medium mt-1 inline-flex min-h-[44px] min-w-[44px] items-center self-start">{linkLabel} →</Link>
     </div>
   );
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="text-sm text-stone-400 py-2">{children}</p>;
+  return <p className="text-sm text-gray-400 py-2">{children}</p>;
 }
 
 // ── Skeleton de carga ────────────────────────────────────────────────────────
@@ -453,37 +453,37 @@ function PageSkeleton() {
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="rounded-[14px] border border-stone-200 bg-white p-4">
-            <div className="h-3 w-20 bg-stone-200 rounded" />
-            <div className="h-7 w-24 bg-stone-200 rounded mt-2" />
-            <div className="h-3 w-28 bg-stone-100 rounded mt-2" />
+          <div key={i} className="rounded-[14px] border border-gray-200 bg-white p-4">
+            <div className="h-3 w-20 bg-gray-200 rounded" />
+            <div className="h-7 w-24 bg-gray-200 rounded mt-2" />
+            <div className="h-3 w-28 bg-gray-100 rounded mt-2" />
           </div>
         ))}
       </div>
       {/* Equilibrio */}
-      <div className="rounded-[14px] border border-stone-200 bg-white p-5 mb-8">
-        <div className="h-3.5 w-36 bg-stone-200 rounded" />
-        <div className="h-3.5 w-72 max-w-full bg-stone-100 rounded mt-3" />
-        <div className="h-3 w-full bg-stone-100 rounded-full mt-3" />
+      <div className="rounded-[14px] border border-gray-200 bg-white p-5 mb-8">
+        <div className="h-3.5 w-36 bg-gray-200 rounded" />
+        <div className="h-3.5 w-72 max-w-full bg-gray-100 rounded mt-3" />
+        <div className="h-3 w-full bg-gray-100 rounded-full mt-3" />
       </div>
       {/* Semáforo */}
-      <div className="rounded-[14px] border border-stone-200 bg-white p-4 mb-8 space-y-3">
+      <div className="rounded-[14px] border border-gray-200 bg-white p-4 mb-8 space-y-3">
         {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-stone-200 shrink-0" />
-            <div className="h-3.5 w-36 bg-stone-200 rounded" />
-            <div className="h-3.5 w-16 bg-stone-100 rounded ml-auto" />
-            <div className="h-5 w-20 bg-stone-100 rounded-full" />
+            <div className="w-2 h-2 rounded-full bg-gray-200 shrink-0" />
+            <div className="h-3.5 w-36 bg-gray-200 rounded" />
+            <div className="h-3.5 w-16 bg-gray-100 rounded ml-auto" />
+            <div className="h-5 w-20 bg-gray-100 rounded-full" />
           </div>
         ))}
       </div>
       {/* Atención */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="rounded-[14px] border border-stone-200 bg-white p-4">
-            <div className="h-3 w-40 bg-stone-200 rounded" />
-            <div className="h-3.5 w-full bg-stone-100 rounded mt-3" />
-            <div className="h-3.5 w-3/4 bg-stone-100 rounded mt-2" />
+          <div key={i} className="rounded-[14px] border border-gray-200 bg-white p-4">
+            <div className="h-3 w-40 bg-gray-200 rounded" />
+            <div className="h-3.5 w-full bg-gray-100 rounded mt-3" />
+            <div className="h-3.5 w-3/4 bg-gray-100 rounded mt-2" />
           </div>
         ))}
       </div>

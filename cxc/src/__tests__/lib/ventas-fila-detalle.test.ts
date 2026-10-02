@@ -153,9 +153,9 @@ describe("cierre y foco", () => {
 });
 
 describe("la fila abierta se ve seleccionada", () => {
-  it("fondo indigo suave + borde indigo, claro y oscuro", () => {
-    expect(fila).toContain("bg-indigo-50");
-    expect(fila).toContain("ring-2 ring-inset ring-indigo-500");
-    expect(fila).toContain("ring-2 ring-inset ring-indigo-300");
+  it("seleccionada con la paleta: fondo gris + borde gris oscuro (claro) y blanco translúcido (oscuro)", () => {
+    expect(fila).toContain("bg-gray-50");
+    expect(fila).toContain("ring-2 ring-inset ring-gray-900");
+    expect(fila).toContain("ring-2 ring-inset ring-white/70");
   });
 });

@@ -292,14 +292,14 @@ function InicioDeAntes({
                 <button
                   type="button"
                   onClick={() => setVerPorCliente(true)}
-                  className="text-sm text-teal-700 hover:text-teal-900 transition min-h-[44px] inline-flex items-center"
+                  className="text-sm text-blue-600 hover:text-blue-800 transition min-h-[44px] inline-flex items-center"
                 >
                   Por cliente
                 </button>
                 <button
                   type="button"
                   onClick={() => setVerPorMarca(true)}
-                  className="text-sm text-teal-700 hover:text-teal-900 transition min-h-[44px] inline-flex items-center"
+                  className="text-sm text-blue-600 hover:text-blue-800 transition min-h-[44px] inline-flex items-center"
                 >
                   Por marca
                 </button>

@@ -53,15 +53,12 @@ import {
 export const ACENTO_SIN_COLOR = "text-gray-700";
 
 /**
- * El negro del botón principal de la casa (`bg-black text-white`).
- *
- * ⚠️ Lleva su variante oscura aunque hoy la tira viva siempre sobre claro
- * (`bg-gray-50`): un relleno negro clavado es exactamente lo que desaparece el
- * día que la pantalla cambie de fondo. Se invierte, no se apaga.
+ * El negro del botón principal de la casa (`bg-black text-white`). Sin
+ * variante oscura: el sistema no tiene modo oscuro (`docs/diseno.md`).
  */
-const NEGRO = "text-black dark:text-white";
+const NEGRO = "text-black";
 /** La letra de adentro del botón negro, que va al revés que el relleno. */
-const LETRA_DEL_BOTON = "fill-white dark:fill-black";
+const LETRA_DEL_BOTON = "fill-white";
 
 /**
  * 🔴 EL ACENTO SALE DEL MÓDULO, NUNCA SE ESCRIBE. Es la misma clase que pinta

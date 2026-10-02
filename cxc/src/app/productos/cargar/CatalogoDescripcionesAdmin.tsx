@@ -89,9 +89,9 @@ export default function CatalogoDescripcionesAdmin() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 pb-10">
-      <div className="mb-4 border-b-2 border-stone-900 pb-3">
+      <div className="mb-4 border-b-2 border-gray-900 pb-3">
         <div className="flex items-center gap-1">
-          <h2 className="font-serif text-2xl font-semibold tracking-tight text-stone-900">Catálogo de descripciones</h2>
+          <h2 className="font-serif text-2xl font-semibold tracking-tight text-gray-900">Catálogo de descripciones</h2>
           {/* Qué es y qué pasa al desactivar: se aprende una vez → ⓘ. */}
           <Ayuda titulo="Información" className="-my-2">
             <p>
@@ -103,7 +103,7 @@ export default function CatalogoDescripcionesAdmin() {
       </div>
 
       {rows === null && !fallo && (
-        <div className="rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm text-stone-600">
+        <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
           Cargando catálogo de descripciones…
         </div>
       )}
@@ -131,33 +131,33 @@ export default function CatalogoDescripcionesAdmin() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Buscar marca o descripción…"
-              className="min-h-[44px] w-full max-w-xs rounded-md border border-stone-300 bg-white px-3 text-sm focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
+              className="min-h-[44px] w-full max-w-xs rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
             />
-            <span className="text-[13px] text-stone-500">
-              <b className="font-semibold text-stone-900">{activas}</b> activas de{" "}
-              <b className="font-semibold text-stone-900">{total}</b>
+            <span className="text-[13px] text-gray-500">
+              <b className="font-semibold text-gray-900">{activas}</b> activas de{" "}
+              <b className="font-semibold text-gray-900">{total}</b>
             </span>
           </div>
 
           {grupos.length === 0 && (
-            <p className="py-8 text-center text-sm text-stone-400">Ninguna descripción coincide con &quot;{q}&quot;.</p>
+            <p className="py-8 text-center text-sm text-gray-400">Ninguna descripción coincide con &quot;{q}&quot;.</p>
           )}
 
           {grupos.map((g) => (
-            <div key={g.marca} className="mb-4 overflow-hidden rounded-lg border border-stone-200 bg-white">
-              <div className="border-b border-stone-200 bg-stone-50 px-3.5 py-2 text-[13px] font-bold text-stone-900">
+            <div key={g.marca} className="mb-4 overflow-hidden rounded-lg border border-gray-200 bg-white">
+              <div className="border-b border-gray-200 bg-gray-50 px-3.5 py-2 text-[13px] font-bold text-gray-900">
                 {g.marca}
-                <span className="ml-2 text-[12px] font-normal text-stone-400">
+                <span className="ml-2 text-[12px] font-normal text-gray-400">
                   ({g.items.filter((r) => r.activa).length} activas de {g.items.length})
                 </span>
               </div>
               {g.items.map((r) => (
                 <div
                   key={r.id}
-                  className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 px-3.5 py-1.5 last:border-b-0"
+                  className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-3.5 py-1.5 last:border-b-0"
                 >
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className={`text-[13px] ${r.activa ? "text-stone-900" : "text-stone-400 line-through"}`}>
+                    <span className={`text-[13px] ${r.activa ? "text-gray-900" : "text-gray-400 line-through"}`}>
                       {r.descripcion}
                     </span>
                     {r.origen === "aprobada" ? (
@@ -170,11 +170,11 @@ export default function CatalogoDescripcionesAdmin() {
                       // 🔴 17-sep-2026: la que entró SOLA (veredicto «pasa», las
                       // dos mitades ya existían en su marca). No la aprobó
                       // nadie, y decir «Catálogo original» sería mentir.
-                      <span className="rounded bg-teal-50 px-1.5 py-0.5 text-[12px] font-semibold text-teal-700">
+                      <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[12px] font-semibold text-gray-700">
                         {ROTULO_AUTOMATICA}
                       </span>
                     ) : (
-                      <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[12px] font-semibold text-stone-500">
+                      <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[12px] font-semibold text-gray-500">
                         Catálogo original
                       </span>
                     )}
@@ -186,7 +186,7 @@ export default function CatalogoDescripcionesAdmin() {
                     className={`inline-flex min-h-[44px] items-center justify-center rounded-md border px-2.5 text-[12px] font-semibold transition active:scale-[0.97] disabled:opacity-50 ${
                       r.activa
                         ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300"
-                        : "border-stone-300 bg-white text-stone-500 hover:border-stone-400"
+                        : "border-gray-300 bg-white text-gray-500 hover:border-gray-400"
                     }`}
                   >
                     {busyId === r.id ? "…" : r.activa ? "Activa" : "Inactiva"}

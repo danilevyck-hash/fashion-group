@@ -25,7 +25,7 @@ const COMPACTA = BARRA_CELULAR_2026_10;
 
 /** El lienzo: fondo de iOS, sitio para la barra de abajo. */
 export function PantallaCelular({ children }: { children: ReactNode }) {
-  return <div className="sm:hidden min-h-screen bg-[#F2F2F7] pb-12">{children}</div>;
+  return <div className="sm:hidden min-h-screen bg-fondo-celular pb-12">{children}</div>;
 }
 
 /** El título grande y su línea gris. */
@@ -257,7 +257,7 @@ export function BotonAncho({
       className={[
         "w-full rounded-[14px] px-4 py-4 text-center text-[17px] font-semibold transition active:scale-[0.98]",
         disabled
-          ? "bg-[#E9E9EB] text-gray-500"
+          ? "bg-control-celular text-gray-500"
           : tono === "negro"
             ? "bg-gray-900 text-white"
             : "border border-gray-200 bg-white text-gray-900",

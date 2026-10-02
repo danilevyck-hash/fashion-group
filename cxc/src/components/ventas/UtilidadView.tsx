@@ -190,7 +190,7 @@ export function UtilidadView({
       )}
 
       {data && !loading && negativos > 0 && (
-        <p className="mb-3 text-xs text-rose-600">
+        <p className="mb-3 text-xs text-red-600">
           {negativos} cliente{negativos === 1 ? "" : "s"} con utilidad negativa (devoluciones netas).
         </p>
       )}
@@ -319,15 +319,15 @@ function MarcaMostrador() {
 function UtilidadRow({ r }: { r: UtilidadClienteRow }) {
   const neg = r.utilidad < 0;
   // Negativo = devolución neta. Se ve claro (rojo) pero NO como error.
-  const utilCls = neg ? "text-rose-600" : "text-gray-900";
-  const margenCls = r.margen == null ? "text-gray-400" : r.margen < 0 ? "text-rose-600" : "text-gray-700";
+  const utilCls = neg ? "text-red-600" : "text-gray-900";
+  const margenCls = r.margen == null ? "text-gray-400" : r.margen < 0 ? "text-red-600" : "text-gray-700";
   return (
     <tr data-fila-utilidad={filaKey(r)} className="border-b border-gray-100 hover:bg-gray-50">
       <td data-col="cliente" className="px-3 py-2.5">
         <span className="text-gray-800">{r.cliente}</span>
         {UNA_SOLA_VENTA && r.mostrador && <MarcaMostrador />}
         {neg && (
-          <span className="ml-2 rounded bg-rose-50 px-1.5 py-0.5 text-xs font-medium text-rose-600" title="Devoluciones netas: las notas de crédito superan las ventas del período">
+          <span className="ml-2 rounded bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-600" title="Devoluciones netas: las notas de crédito superan las ventas del período">
             dev. neta
           </span>
         )}
@@ -349,8 +349,8 @@ function UtilidadRow({ r }: { r: UtilidadClienteRow }) {
  */
 function UtilidadCard({ r }: { r: UtilidadClienteRow }) {
   const neg = r.utilidad < 0;
-  const utilCls = neg ? "text-rose-600" : "text-gray-900";
-  const margenCls = r.margen == null ? "text-gray-400" : r.margen < 0 ? "text-rose-600" : "text-gray-700";
+  const utilCls = neg ? "text-red-600" : "text-gray-900";
+  const margenCls = r.margen == null ? "text-gray-400" : r.margen < 0 ? "text-red-600" : "text-gray-700";
   return (
     <div data-fila-utilidad={filaKey(r)} className="rounded-lg border border-gray-200 bg-white px-4 py-3">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
@@ -358,7 +358,7 @@ function UtilidadCard({ r }: { r: UtilidadClienteRow }) {
         {UNA_SOLA_VENTA && r.mostrador && <MarcaMostrador />}
         {neg && (
           <span
-            className="rounded bg-rose-50 px-1.5 py-0.5 text-xs font-medium text-rose-600"
+            className="rounded bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-600"
             title="Devoluciones netas: las notas de crédito superan las ventas del período"
           >
             dev. neta

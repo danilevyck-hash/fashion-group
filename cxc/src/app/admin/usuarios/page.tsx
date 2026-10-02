@@ -60,7 +60,7 @@ const TABS = ["usuarios", "novedades", "visitas"] as const;
 // Misma clase que las pestañas de Ventas y Multifashion. No se inventa un
 // patrón nuevo: subrayado teal, sin píldora, 44px de alto al tacto.
 const TAB_TRIGGER_CLASS =
-  "min-h-[44px] gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2.5 py-2 text-gray-500 sm:px-4 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none";
+  "min-h-[44px] gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2.5 py-2 text-gray-500 sm:px-4 data-[state=active]:border-gray-900 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none";
 
 // `useUrlState` usa `useSearchParams` → necesita su propio límite de Suspense.
 // Mismo envoltorio que /admin (CXC) y /asistencia.
@@ -323,7 +323,7 @@ function UsuariosPageInner() {
                           </div>
                         )}
                         {hasOverride && (
-                          <div className="text-xs text-teal-700 mt-1">Permisos personalizados</div>
+                          <div className="text-xs text-gray-500 mt-1">Permisos personalizados</div>
                         )}
                       </div>
                     </div>
@@ -418,7 +418,7 @@ function UsuariosPageInner() {
                     /* text-base en móvil: con letra < 16px Safari hace zoom al
                        enfocar y el modal se sale de pantalla. Desde sm vuelve
                        al text-sm de siempre (desktop igual que antes). */
-                    className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-base sm:text-sm placeholder:text-gray-400 focus:outline-none focus:border-teal-700 transition"
+                    className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-base sm:text-sm placeholder:text-gray-400 focus:outline-none focus:border-gray-900 transition"
                   />
                 </div>
 
@@ -434,7 +434,7 @@ function UsuariosPageInner() {
                       placeholder={editUserId ? "Dejar vacío para no cambiar" : "La que quieras"}
                       /* text-base en móvil (anti-zoom de Safari) y pr-12 para
                          dejarle 44px al botón del ojo, que antes cabía en 40. */
-                      className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 pr-12 text-base sm:text-sm font-mono placeholder:text-gray-400 placeholder:font-sans focus:outline-none focus:border-teal-700 transition"
+                      className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 pr-12 text-base sm:text-sm font-mono placeholder:text-gray-400 placeholder:font-sans focus:outline-none focus:border-gray-900 transition"
                     />
                     {/* iPhone: el ojo medía 28×28 (p-1.5 + ícono de 16) y es de
                         SOLO ícono → IconButton, que garantiza 44×44 y exige
@@ -463,7 +463,7 @@ function UsuariosPageInner() {
                   <select
                     value={uRole}
                     onChange={e => setURole(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-base sm:text-sm focus:outline-none focus:border-teal-700 transition"
+                    className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-base sm:text-sm focus:outline-none focus:border-gray-900 transition"
                   >
                     <option value="admin">Administrador — acceso total</option>
                     <option value="secretaria">Secretaria — operaciones diarias</option>
@@ -501,7 +501,7 @@ function UsuariosPageInner() {
                     placeholder="vistana, fashion_wear, etc."
                     /* text-base en móvil — anti-zoom de Safari, igual que los
                        demás campos del modal. */
-                    className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-base sm:text-sm placeholder:text-gray-400 focus:outline-none focus:border-teal-700 transition"
+                    className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-base sm:text-sm placeholder:text-gray-400 focus:outline-none focus:border-gray-900 transition"
                   />
                 </div>
 
@@ -528,7 +528,7 @@ function UsuariosPageInner() {
                           // perderían los demás módulos al guardar.
                           if (on && uModules.length === 0) setUModules(getDefaultModulesForRole(uRole));
                         }}
-                        className="accent-teal-700 w-4 h-4"
+                        className="accent-gray-900 w-4 h-4"
                       />
                     </label>
                     <Ayuda titulo="Permisos personalizados" className="-my-2 shrink-0">
@@ -546,13 +546,13 @@ function UsuariosPageInner() {
                              queda en 16 — es la casilla, no el target. */
                           <label
                             key={mod.key}
-                            className={`flex min-h-[44px] items-center gap-2.5 px-3 py-2 rounded-md border transition cursor-pointer ${checked ? "bg-teal-50 border-teal-200" : "border-gray-200 hover:bg-gray-50"}`}
+                            className={`flex min-h-[44px] items-center gap-2.5 px-3 py-2 rounded-md border transition cursor-pointer ${checked ? "bg-gray-50 border-gray-900" : "border-gray-200 hover:bg-gray-50"}`}
                           >
                             <input
                               type="checkbox"
                               checked={checked}
                               onChange={() => toggleOverrideModule(mod.key)}
-                              className="accent-teal-700 w-4 h-4"
+                              className="accent-gray-900 w-4 h-4"
                             />
                             <span className="text-sm text-gray-800">{mod.label}</span>
                           </label>

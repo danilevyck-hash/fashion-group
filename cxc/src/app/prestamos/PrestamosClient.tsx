@@ -243,14 +243,14 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
             <div className="text-xs text-gray-400 uppercase tracking-wide">Saldo pendiente total</div>
             <div className={`text-lg font-semibold tabular-nums ${totalSaldo > 0 ? "text-red-600" : "text-gray-400"}`}>$<AnimatedNumber value={totalSaldo} formatter={(n: number) => fmt(n)} /></div>
           </div>
-          <div className={`rounded-lg border px-3.5 py-2 ${deduccionesCompletas ? "border-green-200 bg-green-50" : "border-amber-200 bg-amber-50"}`}>
+          <div className={`rounded-lg border px-3.5 py-2 ${deduccionesCompletas ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
             <div className="text-xs text-gray-400 uppercase tracking-wide">Quincena · {quincena.label}</div>
-            <div className={`text-lg font-semibold tabular-nums ${deduccionesCompletas ? "text-green-600" : "text-amber-600"}`}>{deduccionesAplicadas} / {deduccionesTotal}</div>
+            <div className={`text-lg font-semibold tabular-nums ${deduccionesCompletas ? "text-emerald-700" : "text-amber-600"}`}>{deduccionesAplicadas} / {deduccionesTotal}</div>
           </div>
           {quincenaPendientesN > 0 && (
             <button
               onClick={() => setConfirmAplicarQ(true)}
-              className="sm:ml-auto inline-flex min-h-[44px] items-center justify-center bg-emerald-600 text-white px-5 rounded-md text-sm font-medium hover:bg-emerald-700 active:scale-[0.97] transition"
+              className="sm:ml-auto inline-flex min-h-[44px] items-center justify-center bg-black text-white px-5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition"
             >
               Aplicar quincena ({quincenaPendientesN})
             </button>

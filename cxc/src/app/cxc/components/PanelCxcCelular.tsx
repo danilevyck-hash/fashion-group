@@ -52,9 +52,9 @@ import { CLASE_LINEA_TOTAL, CLASE_TOTAL_CELULAR, SegmentadoCelular } from "@/com
 
 /** El color de la rayita de la izquierda, por tramo dominante. */
 const RAYA: Record<AgingKey, string> = {
-  current: "bg-[#0F6E56]",
-  watch: "bg-[#B45309]",
-  overdue: "bg-[#A32D2D]",
+  current: "bg-emerald-700",
+  watch: "bg-amber-700",
+  overdue: "bg-red-600",
 };
 
 export interface PanelCxcCelularProps {
@@ -129,7 +129,7 @@ export default function PanelCxcCelular({
     : cxcCompanies.find((c) => c.key === companyFilter)?.name ?? null;
 
   return (
-    <div className="lg:hidden min-h-screen bg-[#F2F2F7] pb-10">
+    <div className="lg:hidden min-h-screen bg-fondo-celular pb-10">
       {compacta ? (
         <div data-cabecera-cxc-v32 className="px-4">
           {/* 1 · «Cuentas por cobrar ▾» (elige empresa) · Boston · 🔍 · «···» */}
@@ -265,7 +265,7 @@ export default function PanelCxcCelular({
                 activo
                   ? "border-gray-900 bg-gray-900 text-white"
                   : k === "overdue"
-                    ? "border-[#A32D2D] bg-white text-[#A32D2D]"
+                    ? "border-red-600 bg-white text-red-600"
                     : "border-gray-200 bg-white text-gray-900",
               ].join(" ")}
             >
@@ -292,7 +292,7 @@ export default function PanelCxcCelular({
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar cliente"
           aria-label="Buscar cliente"
-          className="w-full rounded-xl border border-transparent bg-[#E9E9EB] px-4 py-3 text-[16px] text-gray-900 placeholder:text-gray-500 focus:border-gray-400 focus:outline-none"
+          className="w-full rounded-xl border border-transparent bg-control-celular px-4 py-3 text-[16px] text-gray-900 placeholder:text-gray-500 focus:border-gray-400 focus:outline-none"
           autoFocus={compacta && buscando && search === ""}
           onBlur={() => { if (search === "") setBuscando(false); }}
         />
@@ -398,7 +398,7 @@ function FilaCliente({
           <span className="block text-[17px] font-semibold leading-tight tracking-tight text-gray-900">
             {nombreDeCliente(client)}
           </span>
-          <span className={`mt-0.5 block text-[14px] ${rojo ? "text-[#A32D2D]" : "text-gray-500"}`}>
+          <span className={`mt-0.5 block text-[14px] ${rojo ? "text-red-600" : "text-gray-500"}`}>
             {urge}
           </span>
         </span>

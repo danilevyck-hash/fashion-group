@@ -90,7 +90,7 @@ describe("el control segmentado delgado", () => {
     const onElegir = vi.fn();
     render(<SegmentadoCelular etiqueta="Tramos" activa="overdue" onElegir={onElegir} opciones={opciones} />);
     const rojo = screen.getByRole("button", { name: "$1.95M · +120 d" });
-    expect(rojo.className).toContain("text-[#A32D2D]");
+    expect(rojo.className).toContain("text-red-600");
     expect(rojo.getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "$420K · 91-120 d" }));
     expect(onElegir).toHaveBeenCalledWith("watch");

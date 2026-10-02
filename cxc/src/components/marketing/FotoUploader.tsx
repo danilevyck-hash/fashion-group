@@ -204,7 +204,7 @@ export function FotoUploader({
           compact ? "p-2" : "p-6"
         } ${compact ? "" : "text-center"} ${
           dragging
-            ? MARKETING_APPLE_2026_10 ? "border-gray-900 bg-gray-50" : "border-fuchsia-500 bg-fuchsia-50"
+            ? MARKETING_APPLE_2026_10 ? "border-gray-900 bg-gray-50" : "border-gray-900 bg-gray-50"
             : "border-gray-300 bg-white hover:border-gray-400"
         }`}
       >

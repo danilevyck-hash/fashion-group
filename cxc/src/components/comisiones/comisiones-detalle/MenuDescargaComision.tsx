@@ -126,7 +126,7 @@ export function MenuDescargaComision({ titulo, onPdf, onExcel, mensajeError, com
           <FileSpreadsheet className="h-4 w-4 shrink-0 text-gray-400" /> {ROTULO_DESCARGAR_EXCEL}
         </button>
         {cargando && <p className="px-3 py-1.5 text-xs text-gray-500">Preparando…</p>}
-        {error && <p role="alert" className="px-3 py-1.5 text-xs text-rose-600">{error}</p>}
+        {error && <p role="alert" className="px-3 py-1.5 text-xs text-red-600">{error}</p>}
       </DesplegableFlotante>
     </span>
   );

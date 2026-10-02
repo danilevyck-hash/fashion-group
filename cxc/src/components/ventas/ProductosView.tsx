@@ -1514,7 +1514,7 @@ function DejoDeVenderse({
           data-dejados-de-vender-mas
           aria-expanded={abierto}
           onClick={() => setAbierto(v => !v)}
-          className="mt-1 min-h-[44px] text-xs font-medium text-teal-700"
+          className="mt-1 min-h-[44px] text-xs font-medium text-blue-600"
         >
           {abierto ? "ver menos" : `ver las ${filas.length}`}
         </button>

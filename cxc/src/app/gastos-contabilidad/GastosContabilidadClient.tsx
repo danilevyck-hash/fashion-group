@@ -43,7 +43,7 @@ const TABS = ["gastos", "saldos-banco"] as const;
 // Misma clase que las pestañas de Usuarios, Ventas y Multifashion. No se
 // inventa un patrón nuevo: subrayado teal, sin píldora, 44px de alto al tacto.
 const TAB_TRIGGER_CLASS =
-  "min-h-[44px] gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2.5 py-2 text-gray-500 sm:px-4 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none";
+  "min-h-[44px] gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2.5 py-2 text-gray-500 sm:px-4 data-[state=active]:border-gray-900 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none";
 
 function fetcher<T>(url: string): Promise<T> {
   return fetch(url, { cache: "no-store" }).then((r) => {

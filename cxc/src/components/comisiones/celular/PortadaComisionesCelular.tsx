@@ -166,7 +166,7 @@ export function PortadaComisionesCelular({
               type="button"
               aria-label={anterior ? `Ir a ${mesEnPalabras(anterior)}` : "Mes anterior"}
               onClick={() => irA(anterior)}
-              className="flex min-h-[36px] min-w-[32px] items-center justify-center text-[18px] text-teal-700 active:opacity-60"
+              className="flex min-h-[36px] min-w-[32px] items-center justify-center text-[18px] text-blue-600 active:opacity-60"
             >
               ‹
             </button>
@@ -192,7 +192,7 @@ export function PortadaComisionesCelular({
                 type="button"
                 aria-label={`Ir a ${mesEnPalabras(siguiente)}`}
                 onClick={() => irA(siguiente)}
-                className="flex min-h-[36px] min-w-[32px] items-center justify-center text-[18px] text-teal-700 active:opacity-60"
+                className="flex min-h-[36px] min-w-[32px] items-center justify-center text-[18px] text-blue-600 active:opacity-60"
               >
                 ›
               </button>

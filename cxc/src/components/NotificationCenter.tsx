@@ -19,7 +19,7 @@ function useNotifications() {
 }
 
 const TYPE_DOT: Record<NotificationType, string> = {
-  success: "bg-green-500",
+  success: "bg-emerald-500",
   error: "bg-red-500",
   warning: "bg-amber-500",
   info: "bg-blue-500",

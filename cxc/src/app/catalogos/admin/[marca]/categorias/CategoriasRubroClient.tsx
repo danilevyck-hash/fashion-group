@@ -248,26 +248,26 @@ function CategoriasRubroInner() {
             Nada se guarda solo: cada uno necesita que se seleccione su categoría. */}
         {faltan.length > 0 && (
           <section
-            className="mb-5 rounded-lg border border-stone-300 bg-stone-50 p-4"
+            className="mb-5 rounded-lg border border-gray-300 bg-gray-50 p-4"
             data-testid="rubros-pedidos"
           >
-            <b className="text-sm font-semibold text-stone-900">
+            <b className="text-sm font-semibold text-gray-900">
               {faltan.length === 1 ? "Este rubro viene del archivo" : `Estos ${faltan.length} rubros vienen del archivo`}
             </b>
-            <p className="mb-3 mt-0.5 text-xs text-stone-600">
+            <p className="mb-3 mt-0.5 text-xs text-gray-600">
               Selecciona la categoría de cada uno. Sin categoría, el catálogo no los reconoce.
             </p>
             <ul className="flex flex-col gap-2">
               {faltan.map((r) => (
                 <li key={r} className="flex flex-wrap items-center gap-2" data-testid={`rubro-pedido-${r}`}>
-                  <span className="min-w-[120px] font-mono text-sm font-semibold text-stone-900">{r}</span>
+                  <span className="min-w-[120px] font-mono text-sm font-semibold text-gray-900">{r}</span>
                   {CATEGORIAS_REEBOK.map((c) => (
                     <button
                       key={c}
                       type="button"
                       disabled={guardando}
                       onClick={() => void agregar(r, c)}
-                      className="min-h-[44px] rounded-md border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-stone-500 active:scale-[0.97] disabled:opacity-40 md:[@media(pointer:fine)]:min-h-0 md:[@media(pointer:fine)]:py-1.5"
+                      className="min-h-[44px] rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 transition hover:border-gray-500 active:scale-[0.97] disabled:opacity-40 md:[@media(pointer:fine)]:min-h-0 md:[@media(pointer:fine)]:py-1.5"
                     >
                       {ROTULO_CATEGORIA[c]}
                     </button>

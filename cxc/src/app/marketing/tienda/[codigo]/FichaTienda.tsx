@@ -357,7 +357,7 @@ export default function FichaTienda({ codigo, role }: { codigo: string; role: st
                   onClick={() => setFiltro(c.clave)}
                   className={`inline-flex min-h-[44px] items-center ${MARKETING_APPLE_2026_10 ? "gap-2 px-4 text-sm" : "gap-1.5 px-3 text-xs"} rounded-lg font-medium border transition ${
                     filtro === c.clave
-                      ? MARKETING_APPLE_2026_10 ? CHIP_ACTIVO : "bg-fuchsia-600 border-fuchsia-600 text-white"
+                      ? MARKETING_APPLE_2026_10 ? CHIP_ACTIVO : "bg-gray-900 border-gray-900 text-white"
                       : "bg-white border-gray-200 text-gray-700 hover:border-gray-400"
                   }`}
                 >

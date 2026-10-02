@@ -465,7 +465,7 @@ function SegCard({ icon, tone, valor, label, sub }: {
 }) {
   const toneCls = tone === "amber"
     ? "border-amber-100 bg-amber-50 text-amber-700"
-    : "border-teal-100 bg-teal-50 text-teal-700";
+    : "border-gray-200 bg-gray-50 text-gray-700";
   return (
     <Card className={cn("p-3.5", tone === "amber" && valor > 0 && "border-amber-200 bg-amber-50/40")}>
       <div className="flex items-center gap-2.5">
@@ -516,7 +516,7 @@ function ClientesSection({
 }) {
   const toneIcon = iconTone === "amber"
     ? "border-amber-100 bg-amber-50 text-amber-700"
-    : "border-teal-100 bg-teal-50 text-teal-700";
+    : "border-gray-200 bg-gray-50 text-gray-700";
 
   // «Ver los N» — nunca «Ver más», que no dice cuántos faltan.
   const [verTodos, setVerTodos] = useState(false);
@@ -724,7 +724,7 @@ function ClienteMesesLista({
               <span className="relative h-2 min-w-0 flex-1 overflow-hidden rounded-sm bg-gray-200">
                 {hasData && (
                   <span
-                    className="absolute inset-y-0 left-0 rounded-sm bg-teal-700/80"
+                    className="absolute inset-y-0 left-0 rounded-sm bg-gray-900/80"
                     style={{ width: `${Math.max(2, anchoPct)}%` }}
                   />
                 )}
@@ -837,7 +837,7 @@ function ClienteSparkline({
               <div className="relative flex h-12 w-full items-end justify-center rounded-sm bg-gray-100">
                 {hasData && (
                   <div
-                    className="w-full rounded-sm bg-teal-700/80 transition-all"
+                    className="w-full rounded-sm bg-gray-900/80 transition-all"
                     style={{ height: `${Math.max(4, heightPct)}%` }}
                     title={`${labelFor(m)}: ${fmtMoney(m.ventas)}`}
                   />

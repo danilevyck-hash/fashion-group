@@ -491,7 +491,7 @@ export function HojaSeguimiento({
           onChange={(e) => setNota(e.target.value)}
           placeholder="Agregar nota…"
           aria-label="Agregar nota"
-          className="mt-3 w-full rounded-xl border border-transparent bg-[#E9E9EB] px-4 py-3 text-[16px] text-gray-900 placeholder:text-gray-500 outline-none focus:border-gray-400"
+          className="mt-3 w-full rounded-xl border border-transparent bg-control-celular px-4 py-3 text-[16px] text-gray-900 placeholder:text-gray-500 outline-none focus:border-gray-400"
         />
       </div>
       <button type="button" onClick={onAgregar} disabled={!nota.trim()} className={NEGRO}>

@@ -139,7 +139,7 @@ export default function DetalleCelular({
   const comprobanteEsPdf = /\.pdf(\?|$)/i.test(current.comprobante_path || current.comprobante_url || "");
 
   return (
-    <div data-celular="reclamos-detalle" className="min-h-screen bg-[#F2F2F7] pb-28">
+    <div data-celular="reclamos-detalle" className="min-h-screen bg-fondo-celular pb-28">
 
       <div data-fila-del-avatar className="flex items-start justify-between gap-2 px-4 pt-3">
         <div className="min-w-0">
@@ -152,7 +152,7 @@ export default function DetalleCelular({
             {" · "}
             {current.fecha_factura
               ? fmtDate(current.fecha_factura)
-              : <span className="text-[#A32D2D]">{FALTA_FECHA_FACTURA}</span>}
+              : <span className="text-red-600">{FALTA_FECHA_FACTURA}</span>}
             {current.marca ? ` · ${current.marca}` : ""}
             {dias !== null && ` · ${dias} día${dias === 1 ? "" : "s"}`}
             {!esActiveShoes(current.empresa) && current.nro_orden_compra ? ` · N° de pedido ${current.nro_orden_compra}` : ""}

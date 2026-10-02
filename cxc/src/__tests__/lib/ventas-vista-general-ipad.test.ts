@@ -315,7 +315,7 @@ describe("blancos táctiles de 44 px en lo que se toca", () => {
   it("Vista General: el enlace a Gastos respeta los 44 px de alto", () => {
     // Era el enlace del punto de equilibrio (129×17), que se retiró con la
     // tarjeta entera; el que queda es "Ver gastos de <empresa> →" del semáforo.
-    expect(vistaGeneral).toContain("inline-flex min-h-[44px] items-center text-xs text-teal-600");
+    expect(vistaGeneral).toContain("inline-flex min-h-[44px] items-center text-xs text-blue-600");
   });
 });
 

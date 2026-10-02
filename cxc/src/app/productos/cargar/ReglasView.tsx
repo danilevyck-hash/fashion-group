@@ -133,39 +133,39 @@ export default function ReglasView() {
     <div className="mx-auto max-w-4xl px-4 py-6">
       {/* ── 1 · Cómo se elige la talla ─────────────────────────────────────── */}
       <section className="mb-8">
-        <h3 className="mb-2 text-[13px] font-bold uppercase tracking-wide text-teal-800">Reglas de talla</h3>
-        <p className="mb-3 text-[13px] text-stone-500">
+        <h3 className="mb-2 text-[13px] font-bold uppercase tracking-wide text-gray-400">Reglas de talla</h3>
+        <p className="mb-3 text-[13px] text-gray-500">
           Cada estilo colapsa a una fila y el código de barra que se sube a Switch es el de esta talla.
           Si la talla esperada no existe, se usa la más chica y la fila queda marcada en ámbar para revisar.
         </p>
-        <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
+        <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
           <table className="w-full border-collapse text-[13px]" aria-label="Reglas de talla">
             <thead>
               <tr>
-                <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Caso</th>
-                <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Criterio</th>
-                <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Talla asignada</th>
+                <th className="border-b border-gray-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-gray-500">Caso</th>
+                <th className="border-b border-gray-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-gray-500">Criterio</th>
+                <th className="border-b border-gray-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-gray-500">Talla asignada</th>
               </tr>
             </thead>
             <tbody>
               {[...CASOS_TALLA, CASO_TALLA_RESTO].map((r) => (
-                <tr key={r.caso} className="hover:bg-teal-50">
-                  <td className="border-b border-stone-100 px-3 py-1.5 font-medium text-stone-900">{r.caso}</td>
-                  <td className="border-b border-stone-100 px-3 py-1.5 text-stone-500">{r.detecta}</td>
-                  <td className="border-b border-stone-100 px-3 py-1.5 font-mono text-[12px] text-stone-900">{r.talla}</td>
+                <tr key={r.caso} className="hover:bg-gray-50">
+                  <td className="border-b border-gray-100 px-3 py-1.5 font-medium text-gray-900">{r.caso}</td>
+                  <td className="border-b border-gray-100 px-3 py-1.5 text-gray-500">{r.detecta}</td>
+                  <td className="border-b border-gray-100 px-3 py-1.5 font-mono text-[12px] text-gray-900">{r.talla}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        <div className="mt-4 rounded-lg border border-stone-200 bg-white px-3.5 py-3">
-          <div className="mb-2 text-[12px] font-bold uppercase tracking-wide text-teal-800">Reebok · Active Shoes (talla-muestra)</div>
+        <div className="mt-4 rounded-lg border border-gray-200 bg-white px-3.5 py-3">
+          <div className="mb-2 text-[12px] font-bold uppercase tracking-wide text-gray-400">Reebok · Active Shoes (talla-muestra)</div>
           <ul className="space-y-1.5">
             {CASOS_TALLA_REEBOK.map((r) => (
               <li key={r.id} className="text-[13px]">
-                <span className="font-medium text-stone-900">{r.caso}</span>
-                <span className="ml-2 text-stone-500">→ {r.talla}</span>
+                <span className="font-medium text-gray-900">{r.caso}</span>
+                <span className="ml-2 text-gray-500">→ {r.talla}</span>
               </li>
             ))}
           </ul>
@@ -175,18 +175,18 @@ export default function ReglasView() {
       {/* ── 2 · Descripciones por marca ────────────────────────────────────── */}
       <section>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-[13px] font-bold uppercase tracking-wide text-teal-800">Descripciones por marca</h3>
+          <h3 className="text-[13px] font-bold uppercase tracking-wide text-gray-400">Descripciones por marca</h3>
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar marca o descripción…"
             aria-label="Buscar marca o descripción"
-            className="min-h-[44px] w-full max-w-xs rounded-md border border-stone-300 bg-white px-3 text-sm focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
+            className="min-h-[44px] w-full max-w-xs rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
           />
         </div>
 
         {cargando && (
-          <div className="mb-4 rounded-lg border border-stone-200 bg-white px-3.5 py-2.5 text-[13px] text-stone-600">
+          <div className="mb-4 rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-[13px] text-gray-600">
             Cargando catálogo de descripciones…
           </div>
         )}
@@ -220,8 +220,8 @@ export default function ReglasView() {
           if (marcas.length === 0) return null;
           return (
             <div key={g.label} className="mb-5">
-              <div className="mb-2 border-b border-stone-200 py-1.5 text-[12px] font-bold uppercase tracking-wide text-teal-800">
-                {g.label}<span className="ml-2 font-normal normal-case tracking-normal text-stone-500">· {g.brand}</span>
+              <div className="mb-2 border-b border-gray-200 py-1.5 text-[12px] font-bold uppercase tracking-wide text-gray-400">
+                {g.label}<span className="ml-2 font-normal normal-case tracking-normal text-gray-500">· {g.brand}</span>
               </div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {marcas.map((m) => {
@@ -229,14 +229,14 @@ export default function ReglasView() {
                   const porBusqueda = !!s && !norm(m.marca).includes(s) && m.ds.length > 0;
                   const abierta = abiertas.has(m.marca) || porBusqueda;
                   return (
-                  <div key={m.marca} className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+                  <div key={m.marca} className="overflow-hidden rounded-lg border border-gray-200 bg-white">
                     {m.todas.length === 0 ? (
                       // 🔴 La marca se MUESTRA igual (Daniel: «no se esconden») y
                       // NO se pliega: adentro no hay nada que abrir, así que su
                       // texto se lee sin tocar nada.
                       <div className="px-3 py-2">
-                        <div className="text-[13px] font-semibold text-stone-900">{m.marca}</div>
-                        <div className="mt-1 text-[13px] italic text-stone-400">{SIN_DESCRIPCIONES}</div>
+                        <div className="text-[13px] font-semibold text-gray-900">{m.marca}</div>
+                        <div className="mt-1 text-[13px] italic text-gray-400">{SIN_DESCRIPCIONES}</div>
                       </div>
                     ) : (
                       <>
@@ -244,18 +244,18 @@ export default function ReglasView() {
                           type="button"
                           onClick={() => alternar(m.marca)}
                           aria-expanded={abierta}
-                          className="flex min-h-[44px] w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-stone-50"
+                          className="flex min-h-[44px] w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-gray-50"
                         >
-                          <span aria-hidden className="text-stone-400">{abierta ? "▾" : "▸"}</span>
-                          <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-stone-900">{m.marca}</span>
-                          <span className="shrink-0 text-[12px] font-normal text-stone-400">{rotuloConteo(m.todas.length)}</span>
+                          <span aria-hidden className="text-gray-400">{abierta ? "▾" : "▸"}</span>
+                          <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-gray-900">{m.marca}</span>
+                          <span className="shrink-0 text-[12px] font-normal text-gray-400">{rotuloConteo(m.todas.length)}</span>
                         </button>
                         {abierta && (
-                          <ul className="flex flex-wrap gap-x-1 gap-y-1 border-t border-stone-100 px-3 py-2">
+                          <ul className="flex flex-wrap gap-x-1 gap-y-1 border-t border-gray-100 px-3 py-2">
                             {m.ds.map((d) => {
                               const id = idPorClave.get(`${norm(m.marca)}|||${norm(d)}`);
                               return (
-                                <li key={d} className="inline-flex items-center gap-1 rounded bg-stone-50 pl-1.5 text-[13px] text-stone-600">
+                                <li key={d} className="inline-flex items-center gap-1 rounded bg-gray-50 pl-1.5 text-[13px] text-gray-600">
                                   <span>{d}</span>
                                   {id && (
                                     <button
@@ -264,7 +264,7 @@ export default function ReglasView() {
                                       disabled={quitando === id}
                                       aria-label={`Quitar ${d} de ${m.marca}`}
                                       title="Quitar del catálogo (no se borra: deja de valer)"
-                                      className="inline-flex h-[44px] w-[32px] items-center justify-center text-stone-400 transition hover:text-red-600 disabled:opacity-50"
+                                      className="inline-flex h-[44px] w-[32px] items-center justify-center text-gray-400 transition hover:text-red-600 disabled:opacity-50"
                                     >
                                       {quitando === id ? "…" : "×"}
                                     </button>
@@ -288,22 +288,22 @@ export default function ReglasView() {
             sale al Excel (normalizeDescripcion), nunca el valor crudo del mapa. */}
         {correccionesFiltradas.length > 0 && (
           <div className="mt-6">
-            <div className="mb-2 text-[12px] font-bold uppercase tracking-wide text-teal-800">
+            <div className="mb-2 text-[12px] font-bold uppercase tracking-wide text-gray-400">
               Correcciones automáticas ({correcciones.length})
             </div>
-            <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
+            <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
               <table className="w-full border-collapse text-[13px]" aria-label="Correcciones automáticas">
                 <thead>
                   <tr>
-                    <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Nombre del proveedor</th>
-                    <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Nombre en plantilla</th>
+                    <th className="border-b border-gray-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-gray-500">Nombre del proveedor</th>
+                    <th className="border-b border-gray-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-gray-500">Nombre en plantilla</th>
                   </tr>
                 </thead>
                 <tbody>
                   {correccionesFiltradas.map((r) => (
-                    <tr key={r.sucia} className="hover:bg-teal-50">
-                      <td className="border-b border-stone-100 px-3 py-1.5 font-mono text-[12px] text-stone-600">{r.sucia}</td>
-                      <td className="border-b border-stone-100 px-3 py-1.5 font-mono text-[12px] text-stone-900">{r.limpia}</td>
+                    <tr key={r.sucia} className="hover:bg-gray-50">
+                      <td className="border-b border-gray-100 px-3 py-1.5 font-mono text-[12px] text-gray-600">{r.sucia}</td>
+                      <td className="border-b border-gray-100 px-3 py-1.5 font-mono text-[12px] text-gray-900">{r.limpia}</td>
                     </tr>
                   ))}
                 </tbody>

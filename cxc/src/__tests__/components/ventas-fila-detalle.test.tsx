@@ -115,7 +115,7 @@ describe("cierre y foco", () => {
 });
 
 describe("fila oscura de totales", () => {
-  it("usa el borde indigo claro para que se lea sobre el fondo negro", () => {
+  it("usa el borde blanco translúcido para que se lea sobre el fondo negro", () => {
     renderFila({
       detalle: detalle({ filaId: TOTAL_GRUPO_ID, titulo: "Total grupo" }),
       colSpan: 10,
@@ -123,7 +123,7 @@ describe("fila oscura de totales", () => {
       oscura: true,
     });
     const td = screen.getByTestId("fila-detalle").querySelector("td")!;
-    expect(td.className).toContain("ring-indigo-300");
+    expect(td.className).toContain("ring-white/70");
     expect(screen.getByText("Total grupo")).toBeTruthy();
   });
 });

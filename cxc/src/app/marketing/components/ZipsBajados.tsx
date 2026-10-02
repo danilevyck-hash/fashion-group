@@ -117,7 +117,7 @@ export default function ZipsBajados({ periodoId }: Props) {
                   type="button"
                   onClick={() => void volverAFirmar(z.archivo_path)}
                   disabled={firmando === z.archivo_path}
-                  className={`ml-auto text-sm underline min-h-[44px] -my-2 inline-flex items-center disabled:opacity-50 ${MARKETING_APPLE_2026_10 ? "text-gray-600 hover:text-black" : "text-teal-700 hover:text-teal-900"}`}
+                  className={`ml-auto text-sm underline min-h-[44px] -my-2 inline-flex items-center disabled:opacity-50 ${MARKETING_APPLE_2026_10 ? "text-gray-600 hover:text-black" : "text-blue-600 hover:text-blue-800"}`}
                 >
                   {firmando === z.archivo_path ? "Firmando…" : "Volver a firmar"}
                 </button>

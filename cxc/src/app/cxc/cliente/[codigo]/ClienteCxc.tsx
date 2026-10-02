@@ -160,7 +160,7 @@ export default function ClienteCxc({ codigo }: { codigo: string }) {
     : null;
 
   return (
-    <div className="min-h-screen bg-[#F2F2F7]">
+    <div className="min-h-screen bg-fondo-celular">
       <AppHeader module="Cuentas por cobrar" />
 
       <div className="mx-auto max-w-2xl pb-12">
@@ -217,11 +217,11 @@ export default function ClienteCxc({ codigo }: { codigo: string }) {
                   <div className="min-w-0 flex-1">
                     <p className="text-[17px] font-semibold tracking-tight text-gray-900">{f.nombre}</p>
                     <p className="mt-0.5 text-[14px] tabular-nums">
-                      <span className="text-[#0F6E56]">{f.current > 0 ? montoExacto(f.current) : "—"}</span>
+                      <span className="text-emerald-700">{f.current > 0 ? montoExacto(f.current) : "—"}</span>
                       {" · "}
-                      <span className="text-[#B45309]">{f.watch > 0 ? montoExacto(f.watch) : "—"}</span>
+                      <span className="text-amber-700">{f.watch > 0 ? montoExacto(f.watch) : "—"}</span>
                       {" · "}
-                      <span className="text-[#A32D2D]">{f.overdue > 0 ? montoExacto(f.overdue) : "—"}</span>
+                      <span className="text-red-600">{f.overdue > 0 ? montoExacto(f.overdue) : "—"}</span>
                     </p>
                     <p className="mt-0.5 text-[13px] text-gray-500">
                       {f.documentos} {f.documentos === 1 ? "documento" : "documentos"}
@@ -269,7 +269,7 @@ export default function ClienteCxc({ codigo }: { codigo: string }) {
                     {d.dias != null && <> · {d.dias} {d.dias === 1 ? "día" : "días"}</>}
                   </p>
                 </div>
-                <span className={`shrink-0 text-[16px] tabular-nums ${d.saldo < 0 ? "text-[#0F6E56]" : "text-gray-900"}`}>
+                <span className={`shrink-0 text-[16px] tabular-nums ${d.saldo < 0 ? "text-emerald-700" : "text-gray-900"}`}>
                   {d.saldo < 0 ? `-$${fmt(Math.abs(d.saldo))}` : `$${fmt(d.saldo)}`}
                 </span>
               </li>

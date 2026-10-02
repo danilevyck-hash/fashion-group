@@ -54,7 +54,7 @@ import { celdaVacia, desgloseDeCelda } from "@/lib/comisiones/matriz-celda";
 import type { ClienteSinComisionConEmpresa } from "./MarcaClientesSinComision";
 
 /** Rojo para lo negativo, igual que la tabla. */
-const claseMonto = (n: number) => (n < 0 ? "text-rose-600" : "text-gray-900");
+const claseMonto = (n: number) => (n < 0 ? "text-red-600" : "text-gray-900");
 
 // ── Piezas compartidas ───────────────────────────────────────────────────────
 

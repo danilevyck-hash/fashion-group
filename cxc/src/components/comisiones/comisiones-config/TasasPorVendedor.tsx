@@ -203,7 +203,7 @@ export function TasasPorVendedor({ onSaved }: { onSaved: (msg: string) => void }
                           aria-expanded={abierta === r.vendedor_nombre}
                           aria-label={`Empresas de ${nombre}`}
                           onClick={() => setAbierta((v) => (v === r.vendedor_nombre ? null : r.vendedor_nombre))}
-                          className="ml-1 align-middle text-xs text-teal-700 sm:hidden"
+                          className="ml-1 align-middle text-xs text-blue-600 sm:hidden"
                         >
                           {abierta === r.vendedor_nombre ? "▾" : "›"}
                         </button>
@@ -268,7 +268,7 @@ export function TasasPorVendedor({ onSaved }: { onSaved: (msg: string) => void }
           </table>
         </div>
       )}
-      {error && <p className="mt-3 text-xs text-rose-600">{error}</p>}
+      {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
     </section>
   );
 }

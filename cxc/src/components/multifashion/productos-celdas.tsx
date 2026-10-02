@@ -49,7 +49,7 @@ export function fmtFecha(iso: string): string {
 export function tonoVariacion(n: number | null): string {
   if (n == null) return "text-gray-500";
   if (n > 0) return "text-emerald-700";
-  if (n < 0) return "text-rose-700";
+  if (n < 0) return "text-red-700";
   return "text-gray-500";
 }
 
@@ -82,7 +82,7 @@ export function CeldaPulso({
       <p
         className={cn(
           "mt-1 font-mono text-2xl font-medium leading-tight tabular-nums",
-          tono === "plata" ? "text-teal-800" : "text-gray-950",
+          tono === "plata" ? "text-gray-900" : "text-gray-950",
         )}
       >
         {valor}
@@ -117,7 +117,7 @@ export function Pill({
       className={cn(
         "-my-1.5 inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3.5 text-xs font-medium transition",
         activo
-          ? "border-teal-700 bg-teal-700 text-white"
+          ? "border-gray-900 bg-gray-900 text-white"
           : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-gray-900",
       )}
     >

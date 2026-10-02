@@ -214,7 +214,7 @@ export default function ReclamoForm({
                       </div>
                     )}
                     {f.status === "done" && (
-                      <div className="absolute -bottom-1.5 -left-1.5 w-6 h-6 bg-green-600 rounded-full flex items-center justify-center border-2 border-white">
+                      <div className="absolute -bottom-1.5 -left-1.5 w-6 h-6 bg-emerald-600 rounded-full flex items-center justify-center border-2 border-white">
                         <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" /></svg>
                       </div>
                     )}
@@ -277,13 +277,13 @@ export default function ReclamoForm({
       {/* ── Acciones ── */}
       {savedReclamoId ? (
         <div className="mt-8 border-t border-gray-200 pt-6">
-          <div className={`flex items-center gap-3 mb-6 p-4 rounded-lg ${saving ? "bg-gray-50" : fotosError ? "bg-amber-50" : "bg-green-50"}`}>
+          <div className={`flex items-center gap-3 mb-6 p-4 rounded-lg ${saving ? "bg-gray-50" : fotosError ? "bg-amber-50" : "bg-emerald-50"}`}>
             {saving ? (
               <span className="w-5 h-5 border-2 border-gray-300 border-t-black rounded-full animate-spin flex-shrink-0" />
             ) : fotosError ? (
               <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0 text-white text-xs font-bold leading-none">!</div>
             ) : (
-              <div className="w-5 h-5 rounded-full bg-green-600 flex items-center justify-center flex-shrink-0">
+              <div className="w-5 h-5 rounded-full bg-emerald-600 flex items-center justify-center flex-shrink-0">
                 <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" /></svg>
               </div>
             )}

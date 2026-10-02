@@ -333,11 +333,9 @@ describe("🔴 el botón de la casa se dibuja negro, y solo donde LO ES", () => 
     expect(cobrar.querySelector("text")!.getAttribute("class")).toContain("fill-white");
   });
 
-  it("⚠️ y se invierte si la pantalla cambia de fondo, no se apaga", () => {
+  it("sin clases dark: sueltas (el sistema no tiene modo oscuro)", () => {
     const { container } = render(<DibujoNovedad clave="una-sola-puerta-cobrar" modulo="cxc" />);
-    const cobrar = [...container.querySelectorAll("g")].find((g) => g.textContent === "Enviar")!;
-    expect(cobrar.getAttribute("class")).toContain("dark:text-white");
-    expect(cobrar.querySelector("text")!.getAttribute("class")).toContain("dark:fill-black");
+    expect(container.innerHTML).not.toContain("dark:");
   });
 
   it("el redondeo es el de un botón de la app, no una caja cuadrada", () => {

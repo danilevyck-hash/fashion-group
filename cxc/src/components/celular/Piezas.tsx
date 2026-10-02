@@ -22,7 +22,7 @@ import { CLASE_VIDRIO, RADIO_VIDRIO, conVidrio } from "@/lib/ui/vidrio";
 
 /** El lienzo: fondo de iOS y sitio para el botón flotante. */
 export function PantallaCel({ children }: { children: ReactNode }) {
-  return <div className="min-h-screen bg-[#F2F2F7] pb-8">{children}</div>;
+  return <div className="min-h-screen bg-fondo-celular pb-8">{children}</div>;
 }
 
 /** El título grande y su línea gris, con el «···» a la derecha. */
@@ -137,7 +137,7 @@ export function colorDelSigno(signo: number | null | undefined): string {
 export function colorDelTono(tono: "up" | "dn" | "fl" | "nv"): string {
   if (tono === "up") return "text-emerald-700";
   if (tono === "dn") return "text-red-700";
-  if (tono === "nv") return "text-teal-700";
+  if (tono === "nv") return "text-emerald-700";
   return "text-gray-500";
 }
 
@@ -319,14 +319,14 @@ export function PantallaQueSube({
       role="dialog"
       aria-modal="true"
       data-pantalla-ventas
-      className="fixed inset-0 z-[55] overflow-y-auto bg-[#F2F2F7]"
+      className="fixed inset-0 z-[55] overflow-y-auto bg-fondo-celular"
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
-      <div className="sticky top-0 z-10 bg-[#F2F2F7]/95 px-2 py-1 backdrop-blur">
+      <div className="sticky top-0 z-10 bg-fondo-celular/95 px-2 py-1 backdrop-blur">
         <button
           type="button"
           onClick={onCerrar}
-          className="flex min-h-[44px] items-center gap-1 px-2 text-[16px] text-teal-700 active:opacity-60"
+          className="flex min-h-[44px] items-center gap-1 px-2 text-[16px] text-blue-600 active:opacity-60"
         >
           ‹ <span className="max-w-[240px] truncate">{volverA}</span>
         </button>

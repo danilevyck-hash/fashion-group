@@ -110,7 +110,7 @@ export function MetaAvanceCard({ meta, puedeEditar, onEditar }: Props) {
         aria-label={`Avance ${pct(a.pctVendido)}`}
       >
         <div
-          className={`h-full rounded-full transition-all ${a.cumplida ? "bg-emerald-600" : "bg-teal-700"}`}
+          className={`h-full rounded-full transition-all ${a.cumplida ? "bg-emerald-600" : "bg-gray-900"}`}
           style={{ width: `${anchoBarra}%` }}
         />
       </div>

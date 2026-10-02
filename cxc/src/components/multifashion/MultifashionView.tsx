@@ -36,7 +36,7 @@ import { cn } from "@/lib/utils";
 // Con cuatro sobra aire, pero el ícono sigue oculto en celular por la misma
 // razón de siempre: es DECORACIÓN y el rótulo se lee igual sin él.
 const SUBTAB_TRIGGER_CLASS =
-  "min-h-[44px] gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2 py-2 text-xs text-gray-500 lg:px-3 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none";
+  "min-h-[44px] gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2 py-2 text-xs text-gray-500 lg:px-3 data-[state=active]:border-gray-900 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none";
 
 const SUBTAB_ICON_CLASS = "hidden h-3 w-3 lg:inline-block";
 

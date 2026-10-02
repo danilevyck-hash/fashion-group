@@ -100,7 +100,7 @@ export default function PantallaDeAntes({
 
           {/* Lo que ya marcó hoy. Nunca «0 marcas»: si no marcó, no se dice. */}
           {hoyMarcado && (
-            <p className="mt-4 rounded-md bg-green-50 px-3 py-2.5 text-sm font-medium text-green-800">
+            <p className="mt-4 rounded-md bg-emerald-50 px-3 py-2.5 text-sm font-medium text-emerald-700">
               ✓ {hoyMarcado.salida
                 ? `Entrada ${enDoceHoras(hoyMarcado.entrada)} · Salida ${enDoceHoras(hoyMarcado.salida)}`
                 : `Entrada de hoy: ${enDoceHoras(hoyMarcado.entrada)}`}
@@ -130,7 +130,7 @@ export default function PantallaDeAntes({
                 avisoVisible.tono === "error"
                   ? "bg-red-50 text-red-800"
                   : avisoVisible.tono === "listo"
-                    ? "bg-green-50 text-green-800"
+                    ? "bg-emerald-50 text-emerald-700"
                     : "bg-amber-50 text-amber-900"
               }`}
             >

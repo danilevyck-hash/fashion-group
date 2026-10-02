@@ -170,7 +170,7 @@ describe("🔴 6 · el detalle en PANTALLA no repite el tipo del documento", () 
   it("la nota de crédito ya se dice en rojo y con el monto en negativo", () => {
     const modal = plano(leer("src/components/comisiones/ComisionesDetalleModal.tsx"));
     expect(modal).not.toContain("tipoDocCorto");
-    expect(modal).toContain('text-rose-600');
+    expect(modal).toContain('text-red-600');
   });
 
   it("⚠️ en el Excel y en el papel SÍ se queda: ahí se concilia contra Switch", () => {

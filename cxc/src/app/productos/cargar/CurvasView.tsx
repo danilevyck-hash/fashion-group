@@ -132,9 +132,9 @@ export default function CurvasView() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
-      <div className="mb-5 border-b-2 border-stone-900 pb-4">
+      <div className="mb-5 border-b-2 border-gray-900 pb-4">
         <div className="flex items-center gap-1">
-          <h2 className="font-serif text-2xl font-semibold tracking-tight text-stone-900">Tallas por bulto</h2>
+          <h2 className="font-serif text-2xl font-semibold tracking-tight text-gray-900">Tallas por bulto</h2>
           {/* Los 3 pasos se aprenden una vez → ⓘ. */}
           <Ayuda titulo="Cómo se usa" className="-my-2">
             <p>
@@ -157,11 +157,11 @@ export default function CurvasView() {
             if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
           }}
           className={`mb-4 flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed px-6 py-6 text-center transition ${
-            dragging ? "border-teal-600 bg-teal-50" : "border-stone-300 bg-white hover:border-teal-600 hover:bg-teal-50"
+            dragging ? "border-gray-900 bg-gray-100" : "border-gray-300 bg-white hover:border-gray-900 hover:bg-gray-50"
           }`}
         >
-          <UploadCloud className="mb-2 h-7 w-7 text-teal-800" strokeWidth={1.6} />
-          <div className="text-base font-semibold text-stone-900">
+          <UploadCloud className="mb-2 h-7 w-7 text-gray-500" strokeWidth={1.6} />
+          <div className="text-base font-semibold text-gray-900">
             {fileName || "Suelta el archivo aquí o haz clic para buscar"}
           </div>
           <input
@@ -196,13 +196,13 @@ export default function CurvasView() {
             </button>
             <button
               onClick={() => setSelected(allSelected ? new Set() : new Set(allKeys))}
-              className="rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+              className="rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
             >
               {allSelected ? "Quitar selección" : "Seleccionar todas"}
             </button>
-            <div className="ml-auto flex items-center gap-2 text-xs text-stone-500">
+            <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
               <span className="max-w-[220px] truncate">{fileName}</span>
-              <button onClick={reset} title="Quitar archivo" className="rounded p-1 text-stone-400 transition hover:bg-stone-100 hover:text-stone-700">
+              <button onClick={reset} title="Quitar archivo" className="rounded p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -218,10 +218,10 @@ export default function CurvasView() {
 
           {/* Una tarjeta por referencia, sus curvas adentro */}
           {porReferencia.map(([ref, curvas]) => (
-            <div key={ref} className="mb-4 overflow-hidden rounded-xl border border-stone-200 bg-white">
-              <div className="border-b border-stone-200 bg-stone-50 px-4 py-2.5">
-                <span className="text-sm font-semibold text-stone-900">{ref}</span>
-                {curvas[0]?.estilo && <span className="ml-2 text-[13px] text-stone-500">{curvas[0].estilo}</span>}
+            <div key={ref} className="mb-4 overflow-hidden rounded-xl border border-gray-200 bg-white">
+              <div className="border-b border-gray-200 bg-gray-50 px-4 py-2.5">
+                <span className="text-sm font-semibold text-gray-900">{ref}</span>
+                {curvas[0]?.estilo && <span className="ml-2 text-[13px] text-gray-500">{curvas[0].estilo}</span>}
               </div>
               {curvas.map((c) => {
                 const k = keyDe(c);
@@ -229,23 +229,23 @@ export default function CurvasView() {
                 return (
                   <label
                     key={k}
-                    className={`flex cursor-pointer flex-wrap items-center gap-3 border-b border-stone-100 px-4 py-3 transition last:border-b-0 ${
-                      checked ? "bg-teal-50/60" : "hover:bg-stone-50"
+                    className={`flex cursor-pointer flex-wrap items-center gap-3 border-b border-gray-100 px-4 py-3 transition last:border-b-0 ${
+                      checked ? "bg-gray-100" : "hover:bg-gray-50"
                     }`}
                   >
                     <input
                       type="checkbox"
                       checked={checked}
                       onChange={() => toggle(k)}
-                      className="h-4 w-4 accent-teal-600"
+                      className="h-4 w-4 accent-gray-900"
                     />
-                    <span className="w-14 text-sm font-semibold text-stone-900">{c.codigo}</span>
-                    <span className="text-[13px] text-stone-500 tabular-nums">
+                    <span className="w-14 text-sm font-semibold text-gray-900">{c.codigo}</span>
+                    <span className="text-[13px] text-gray-500 tabular-nums">
                       {c.bultos} bultos · {c.ordXPp} u/bulto · {c.totalPiezas} u
                     </span>
                     <span className="flex flex-wrap gap-1.5">
                       {c.tallas.map((t) => (
-                        <span key={t.talla} className="rounded-md border border-stone-200 bg-stone-50 px-2 py-0.5 font-mono text-[12px] text-stone-700">
+                        <span key={t.talla} className="rounded-md border border-gray-200 bg-gray-50 px-2 py-0.5 font-mono text-[12px] text-gray-700">
                           {t.talla}×{t.porBulto}
                         </span>
                       ))}

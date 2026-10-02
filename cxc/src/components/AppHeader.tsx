@@ -656,7 +656,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
           role="dialog"
           aria-modal="true"
           aria-label="Menú"
-          className="fixed inset-0 z-50 flex flex-col bg-[#f2f2f7] sm:hidden"
+          className="fixed inset-0 z-50 flex flex-col bg-fondo-celular sm:hidden"
           style={{ paddingTop: "env(safe-area-inset-top)" }}
         >
           <div className="flex items-center justify-between px-4 pt-2">

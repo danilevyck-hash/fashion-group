@@ -88,9 +88,9 @@ export function SortSheet({ open, onClose, sortBy, sortDir, onChange }: SortShee
                   <span>{opt.label}</span>
                   <span
                     aria-hidden
-                    className={`flex h-5 w-5 items-center justify-center rounded-full border ${active ? "border-teal-700" : "border-gray-300"}`}
+                    className={`flex h-5 w-5 items-center justify-center rounded-full border ${active ? "border-gray-900" : "border-gray-300"}`}
                   >
-                    {active && <span className="h-2.5 w-2.5 rounded-full bg-teal-700" />}
+                    {active && <span className="h-2.5 w-2.5 rounded-full bg-gray-900" />}
                   </span>
                 </button>
               );
@@ -107,7 +107,7 @@ export function SortSheet({ open, onClose, sortBy, sortDir, onChange }: SortShee
                 onClick={() => { onChange(sortBy, "desc"); onClose(); }}
                 className={`rounded-md py-3 text-sm font-medium transition ${
                   sortDir === "desc"
-                    ? "bg-teal-700 text-white"
+                    ? "bg-gray-900 text-white"
                     : "bg-gray-100 text-gray-700"
                 }`}
               >
@@ -118,7 +118,7 @@ export function SortSheet({ open, onClose, sortBy, sortDir, onChange }: SortShee
                 onClick={() => { onChange(sortBy, "asc"); onClose(); }}
                 className={`rounded-md py-3 text-sm font-medium transition ${
                   sortDir === "asc"
-                    ? "bg-teal-700 text-white"
+                    ? "bg-gray-900 text-white"
                     : "bg-gray-100 text-gray-700"
                 }`}
               >

@@ -67,9 +67,9 @@ describe("2 · 🩸 el chip de ordenar es UNO, de un solo color", () => {
     expect(fuentes.utilidad).not.toContain("aria-pressed");
   });
 
-  it("y el componente compartido tiene UN activo, en teal", () => {
+  it("y el componente compartido tiene UN activo, el seleccionado estándar (gray-900)", () => {
     const chip = plano(leer("src/components/ventas/ChipOrden.tsx"));
-    expect(chip).toContain("bg-teal-700");
+    expect(chip).toContain("bg-gray-900");
     expect(chip).not.toContain("bg-gray-800");
     // 44 px táctiles: reemplaza al encabezado de columna cuando la tabla se
     // vuelve tarjetas, y errarle el dedo ordena por otra cosa.

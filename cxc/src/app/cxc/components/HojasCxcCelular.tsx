@@ -137,11 +137,11 @@ export function HojaPorEmpresa({
                   {f.nombre}
                 </span>
                 <span className="mt-0.5 block text-[14px] tabular-nums">
-                  <span className="text-[#0F6E56]">{f.current > 0 ? montoExacto(f.current) : "—"}</span>
+                  <span className="text-emerald-700">{f.current > 0 ? montoExacto(f.current) : "—"}</span>
                   {" · "}
-                  <span className="text-[#B45309]">{f.watch > 0 ? montoExacto(f.watch) : "—"}</span>
+                  <span className="text-amber-700">{f.watch > 0 ? montoExacto(f.watch) : "—"}</span>
                   {" · "}
-                  <span className="text-[#A32D2D]">{f.overdue > 0 ? montoExacto(f.overdue) : "—"}</span>
+                  <span className="text-red-600">{f.overdue > 0 ? montoExacto(f.overdue) : "—"}</span>
                 </span>
                 <span className="mt-0.5 block text-[13px] text-gray-500">
                   {f.clientes} {f.clientes === 1 ? "cliente" : "clientes"}
