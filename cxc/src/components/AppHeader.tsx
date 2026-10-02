@@ -50,6 +50,7 @@ import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
 import type { ModuleGroup } from "@/lib/modules";
 import { ESTRUCTURA_APPLE_2026_10 } from "@/lib/navegacion/estructura-2026-10";
 import MenuDelUsuario from "@/components/estructura/MenuDelUsuario";
+import AvatarDelUsuario from "@/components/estructura/AvatarDelUsuario";
 import { BARRA_CELULAR_2026_10, tituloCelular } from "@/lib/navegacion/barra-controles-celular";
 import { CLASE_VIDRIO, conVidrio } from "@/lib/ui/vidrio";
 
@@ -228,7 +229,15 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
   const pestanas = TAB_BAR_2026_10 && !soloMarca ? pestanasDelRol(userRole, fgModules, ordenPersona, casa) : [];
   const enInicio = pathname === "/home" || yaEstaEnSuCasa(pathname, casa);
   const hayTabBar = pestanas.length > 0;
-  const hayFlotante = SIN_BARRA_ARRIBA && !soloMarca && !hayTabBar && (!soloMenuDelCelular || visibleNav.length > 0);
+  // 🔴 Con `TAB_BAR_2026_10` el ☰ redondo no vuelve NUNCA, ni para quien no
+  // tiene barra (Gerente Multifashion, Marcación): su menú del usuario es el
+  // avatar de arriba a la derecha (`AvatarDelUsuario`), y su único módulo es
+  // donde ya está.
+  const hayFlotante = SIN_BARRA_ARRIBA && !TAB_BAR_2026_10 && !soloMarca && !hayTabBar && (!soloMenuDelCelular || visibleNav.length > 0);
+  // El avatar del usuario en el celular: en cada pantalla con su título; el
+  // Inicio dibuja el suyo en la fila del saludo, y el catálogo de una marca
+  // tiene su propia barra arriba (ahí queda la hoja «Más»).
+  const hayAvatar = TAB_BAR_2026_10 && !soloMenuDelCelular;
   useColchonDelFlotante(hayFlotante);
   useEffect(() => {
     if (!hayTabBar) return;
@@ -382,7 +391,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
           de color al lado del título, que es la identidad del módulo en el
           celular ahora que el borde del encabezado no está. */}
       {elLayoutPoneElTitulo({ tituloEnLaPantalla: !!tituloEnLaPantalla, soloMarca }) && (
-        <div data-titulo-modulo className="px-4 pb-1 pt-3 sm:hidden">
+        <div data-titulo-modulo data-fila-del-avatar className="px-4 pb-1 pt-3 sm:hidden">
           {/* 🔑 Es un `<p>`, no un `<h1>`: cada pantalla del sistema ya tiene
               su `<h1 className="sr-only">` con el nombre del módulo, y dos
               encabezados con la MISMA palabra se leen dos veces en voz alta.
@@ -419,6 +428,8 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
           de novedades, así nadie lo lee». */}
       {NOVEDADES_AVISO && <NovedadesAviso moduloKey={moduloDeRuta(pathname, ALL_MODULES)} />}
       </>)}
+
+      {hayAvatar && <AvatarDelUsuario flotante nombre={userName} rol={userRole} extra={hayTabBar ? undefined : acciones} />}
 
       {/* Mobile search overlay */}
       {mobileSearchOpen && (

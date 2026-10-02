@@ -1,5 +1,6 @@
 // Candado de la barra de pestañas (`TAB_BAR_2026_10`) y del vidrio v2
-// (`VIDRIO_V2_2026_10`): las dos propuestas nacen APAGADAS, la barra nunca
+// (`VIDRIO_V2_2026_10`): las dos nacieron APAGADAS y Daniel las aprobó el
+// 2-oct-2026 (van PRENDIDAS); la barra nunca
 // ofrece un módulo que el menú no ofrece, y quien tiene un solo módulo no la ve.
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -12,8 +13,9 @@ const ROLES = ["admin", "secretaria", "bodega", "vendedor", "contabilidad", "ger
 const delMenu = (rol: string) => gruposDelCajon(rol).flatMap((g) => g.modulos.map((m) => m.key));
 
 describe("barra de pestañas", () => {
-  it("nace apagada (Daniel decide)", () => {
-    expect(TAB_BAR_2026_10).toBe(false);
+  // 🔴 2-oct-2026: nació apagada; Daniel la aprobó ese mismo día.
+  it("va prendida (Daniel aprobó el 2-oct-2026)", () => {
+    expect(TAB_BAR_2026_10).toBe(true);
   });
 
   it.each(ROLES)("%s: solo módulos del menú, como mucho 4", (rol) => {
@@ -65,9 +67,10 @@ describe("barra de pestañas", () => {
 });
 
 describe("vidrio v2", () => {
-  it("nace apagado y solo cambia la receta de .vidrio", () => {
-    expect(VIDRIO_V2_2026_10).toBe(false);
+  // 🔴 2-oct-2026: nació apagado; Daniel lo aprobó ese mismo día.
+  it("va prendido (Daniel aprobó el 2-oct-2026) y la receta v2 está UNA sola vez", () => {
+    expect(VIDRIO_V2_2026_10).toBe(true);
     const css = readFileSync(join(__dirname, "../../app/globals.css"), "utf8");
-    expect(css).toContain('html[data-vidrio="v2"] .vidrio {');
+    expect(css.match(/^html\[data-vidrio="v2"\] \.vidrio \{/gm)?.length).toBe(1);
   });
 });

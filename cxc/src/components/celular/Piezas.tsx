@@ -58,7 +58,7 @@ export function TituloCel({
     );
   }
   return (
-    <div className="flex items-start justify-between gap-3 px-4 pt-2">
+    <div data-fila-del-avatar className="flex items-start justify-between gap-3 px-4 pt-2">
       <div className="min-w-0">
         <h1 className={tituloCelular("text-[30px] font-bold leading-tight tracking-tight text-gray-900 break-words")}>
           {titulo}

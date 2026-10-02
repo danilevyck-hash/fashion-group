@@ -253,7 +253,7 @@ export function MultifashionShell({
           NUNCA hacia el futuro. Reemplaza al desplegable de 57 meses. */}
       {MULTIFASHION_CELULAR && (
         <header data-celular="encabezado" className="mb-3 sm:hidden">
-          <div className="flex min-h-[44px] items-center justify-between">
+          <div data-fila-del-avatar className="flex min-h-[44px] items-center justify-between">
             {encabezado.atras ? (
               <button
                 type="button"

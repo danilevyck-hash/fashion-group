@@ -238,7 +238,7 @@ export function BarraDeControles({
   return (
     <div data-barra-celular className="flex flex-col gap-2 px-4 pb-1 pt-2">
       {/* 1 · Título-selector · 🔍 · «···». `relative`: buscar se abre encima. */}
-      <div data-renglon="titulo" className={`relative ${CLASE_RENGLON}`}>
+      <div data-renglon="titulo" data-fila-del-avatar className={`relative ${CLASE_RENGLON}`}>
         <p className={`flex min-w-0 flex-1 items-center gap-2 ${CLASE_TITULO_BARRA}`}>
           {color && <span aria-hidden="true" className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color.hex }} />}
           {conPestanas ? (
@@ -483,21 +483,24 @@ export function DescargarEnLaBarra({ opciones, apagado }: { opciones: readonly O
  * y queda montada aunque esté cerrada: es el destino del menú de cada pestaña.
  * Tocar un botón de adentro la cierra.
  */
-function HojaMenu({
+export function HojaMenu({
   abierta,
   onCerrar,
   titulo,
+  etiqueta,
   children,
 }: {
   abierta: boolean;
   onCerrar: () => void;
   titulo?: string;
+  /** Nombre de la hoja para el lector de pantalla, sin rótulo visible (la del avatar). */
+  etiqueta?: string;
   children: ReactNode;
 }) {
   const ctx = useContext(Contexto);
   const contenido = useRef<HTMLDivElement | null>(null);
   const poner = ctx?.ponerRanura;
-  const esElMenu = !titulo;
+  const esElMenu = !titulo && !etiqueta;
   const ponerMenu = useCallback((el: HTMLElement | null) => { if (esElMenu) poner?.("menu", el); }, [poner, esElMenu]);
 
   useEffect(() => {
@@ -524,7 +527,7 @@ function HojaMenu({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={titulo ?? "Más opciones"}
+      aria-label={titulo ?? etiqueta ?? "Más opciones"}
       aria-hidden={!abierta}
       data-hoja-mas={esElMenu ? "" : undefined}
       className={`fixed inset-0 z-[60] flex-col justify-end ${abierta ? "flex" : "hidden"}`}

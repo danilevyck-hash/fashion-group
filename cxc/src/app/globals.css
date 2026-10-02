@@ -57,6 +57,16 @@
   }
 }
 
+/* 🔴 EL AVATAR DEL USUARIO EN EL CELULAR (`TAB_BAR_2026_10`,
+   components/estructura/AvatarDelUsuario.tsx): flota arriba a la derecha, en
+   la línea del título. La fila del título (`data-fila-del-avatar`) le deja
+   44 px para que su 🔍 o su «···» no queden debajo. */
+@media (max-width: 639px) {
+  body.fg-con-avatar [data-fila-del-avatar] {
+    margin-right: 44px;
+  }
+}
+
 .fg-barra-pegajosa {
   position: sticky;
   top: var(--fg-altura-encabezado);

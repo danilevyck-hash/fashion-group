@@ -43,7 +43,7 @@ export function TituloCelular({
     // v3.2: renglón de 44 px con el título de 22 px; la línea gris, UNA.
     return (
       <div className="px-4">
-        <div className="flex h-11 min-w-0 items-center gap-1">
+        <div data-fila-del-avatar className="flex h-11 min-w-0 items-center gap-1">
           <h1 className={`min-w-0 flex-1 truncate ${CLASE_TITULO_BARRA}`}>{titulo}</h1>
           {accion && <div className="shrink-0">{accion}</div>}
         </div>
@@ -52,7 +52,7 @@ export function TituloCelular({
     );
   }
   return (
-    <div className="flex items-start justify-between gap-3 px-4 pt-2">
+    <div data-fila-del-avatar className="flex items-start justify-between gap-3 px-4 pt-2">
       <div className="min-w-0">
         <h1 className={tituloCelular("text-[30px] font-bold leading-tight tracking-tight text-gray-900 break-words")}>
           {titulo}

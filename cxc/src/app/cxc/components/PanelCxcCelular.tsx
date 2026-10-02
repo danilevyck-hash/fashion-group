@@ -133,7 +133,7 @@ export default function PanelCxcCelular({
       {compacta ? (
         <div data-cabecera-cxc-v32 className="px-4">
           {/* 1 · «Cuentas por cobrar ▾» (elige empresa) · Boston · 🔍 · «···» */}
-          <div className="relative flex h-11 min-w-0 items-center gap-1">
+          <div data-fila-del-avatar className="relative flex h-11 min-w-0 items-center gap-1">
             <button
               type="button"
               onClick={() => { if (puedeElegirEmpresa) setHoja("empresa"); }}
@@ -175,7 +175,7 @@ export default function PanelCxcCelular({
       ) : (<>
       {/* ── La barra: Boston a la derecha, y el «···» con lo que no es de todos
           los días (actualizar y las dos descargas). ─────────────────────── */}
-      <div className="flex items-center justify-end gap-1 px-2 pt-1">
+      <div data-fila-del-avatar className="flex items-center justify-end gap-1 px-2 pt-1">
         {onBoston && (
           <button
             type="button"

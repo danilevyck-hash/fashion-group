@@ -38,8 +38,9 @@ import type { AppModule } from "@/lib/modules";
 import { gruposDelCajon } from "@/lib/navegacion/cajon-por-grupos";
 import { esRolMarcacion } from "@/lib/marcacion/rol";
 
-/** `false` = el botón redondo ☰ de hoy. */
-export const TAB_BAR_2026_10 = false;
+/** `false` = el botón redondo ☰ de hoy (y el menú del usuario dentro del ☰).
+ *  Daniel aprobó el 2-oct-2026 la barra de pestañas y el avatar: prendida. */
+export const TAB_BAR_2026_10 = true;
 
 /** Cuántos módulos van en la barra: Inicio + 3 + «Más» = 5, el tope de iOS. */
 export const PESTANAS_DE_MODULO = 3;

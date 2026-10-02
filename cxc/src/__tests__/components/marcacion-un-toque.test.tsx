@@ -36,6 +36,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 // ── Lo que no se está probando, quieto ───────────────────────────────────────
+// 🔴 2-oct-2026: Daniel aprobó y prendió `TAB_BAR_2026_10`; esta prueba cuida la
+// versión de antes, así que lo fuerza apagado.
+vi.mock("@/lib/navegacion/tab-bar", async (original) => ({
+  ...(await original<typeof import("@/lib/navegacion/tab-bar")>()),
+  TAB_BAR_2026_10: false,
+}));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   usePathname: () => "/marcacion",

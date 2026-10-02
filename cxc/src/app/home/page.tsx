@@ -13,6 +13,7 @@ import { fmtDate } from "@/lib/format";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { ESTRUCTURA_APPLE_2026_10 } from "@/lib/navegacion/estructura-2026-10";
 import MenuDelUsuario from "@/components/estructura/MenuDelUsuario";
+import AvatarDelUsuario from "@/components/estructura/AvatarDelUsuario";
 import AppHeader from "@/components/AppHeader";
 import { TAB_BAR_2026_10 } from "@/lib/navegacion/tab-bar";
 
@@ -149,7 +150,13 @@ export default function HomePage() {
               22×21 y 29×21 en el iPhone — y son los de la primera pantalla que ve
               todo el mundo al entrar. El -mr-2 compensa el ancho nuevo contra el
               borde del contenedor. */}
-          {apple && <MenuDelUsuario nombre={userName} rol={role} />}
+          {/* 🔴 Con la barra de pestañas (`TAB_BAR_2026_10`), en el celular el
+              menú del usuario es el avatar con la inicial, como en las apps de
+              Apple; en la computadora sigue el botón con el nombre. */}
+          {apple && (TAB_BAR_2026_10
+            ? <div className="hidden sm:block"><MenuDelUsuario nombre={userName} rol={role} /></div>
+            : <MenuDelUsuario nombre={userName} rol={role} />)}
+          {TAB_BAR_2026_10 && <AvatarDelUsuario nombre={userName} rol={role} />}
           {!apple && <div className="flex items-center shrink-0 -mr-2">
             {/* Cambiar MI contraseña (14-sep-2026), para todos los roles. ⚠️ El
                   comentario no nombra al botón de cerrar sesión: el candado

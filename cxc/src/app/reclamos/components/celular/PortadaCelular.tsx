@@ -84,7 +84,7 @@ export default function PortadaCelular({
       {compacta ? (
         <div data-cabecera-reclamos-v32 className="px-4">
           {/* 1 · «Reclamos» · 🔍 */}
-          <div className="flex h-11 min-w-0 items-center gap-1">
+          <div data-fila-del-avatar className="flex h-11 min-w-0 items-center gap-1">
             <h1 className={`min-w-0 flex-1 truncate ${CLASE_TITULO_BARRA}`}>Reclamos</h1>
             <IconoBarra etiqueta="Buscar factura, reclamo o estilo" onClick={() => setAbrirBuscar(true)}>
               <Search className="h-5 w-5" strokeWidth={2} aria-hidden />
@@ -98,7 +98,7 @@ export default function PortadaCelular({
           </span>
         </div>
       ) : (<>
-      <div className="px-4 pt-3">
+      <div data-fila-del-avatar className="px-4 pt-3">
         <h1 className={tituloCelular("text-[28px] font-bold leading-tight tracking-tight text-gray-900")}>Reclamos</h1>
         <p className="mt-0.5 text-[15px] text-gray-500">
           {sub.texto}

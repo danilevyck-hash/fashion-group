@@ -84,8 +84,9 @@ afterEach(() => {
 });
 
 describe("el interruptor", () => {
-  it("va APAGADO en el commit", () => {
-    expect(BARRA_CELULAR_2026_10).toBe(false);
+  // 🔴 2-oct-2026: nació apagada; Daniel aprobó la v3.3 ese mismo día y va PRENDIDA.
+  it("va PRENDIDA (Daniel aprobó el 2-oct-2026)", () => {
+    expect(BARRA_CELULAR_2026_10).toBe(true);
   });
 
   it("solo prende con el interruptor Y en el celular", () => {
@@ -93,7 +94,7 @@ describe("el interruptor", () => {
     expect(usaBarraCelular(true, false)).toBe(false);
     expect(usaBarraCelular(false, true)).toBe(false);
     medio(true);
-    expect(renderHook(() => useBarraCelular()).result.current).toBe(false);
+    expect(renderHook(() => useBarraCelular(false)).result.current).toBe(false);
     expect(renderHook(() => useBarraCelular(true)).result.current).toBe(true);
     medio(false);
     expect(renderHook(() => useBarraCelular(true)).result.current).toBe(false);
@@ -120,8 +121,8 @@ describe("reglas puras", () => {
       "flex text-[22px] font-semibold leading-tight text-gray-950",
     );
     expect(tituloCelular("text-3xl font-bold", true)).toBe("text-[22px] font-semibold");
-    // El tamaño por defecto sale del interruptor, que va apagado.
-    expect(tituloCelular(antes)).toBe(antes);
+    // El tamaño por defecto sale del interruptor, prendido desde el 2-oct-2026.
+    expect(tituloCelular(antes)).toBe(tituloCelular(antes, true));
   });
 });
 

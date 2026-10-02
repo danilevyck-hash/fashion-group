@@ -37,8 +37,9 @@ export const VIDRIO_2026_10 = true;
  *  blanco y el negro sube), brillo especular más marcado arriba, halo de lente
  *  en el borde, esquinas de 28 px y texto negro. Cambia SOLO la receta de
  *  `.vidrio` en `globals.css` (se prende con `<html data-vidrio="v2">`):
- *  todas las piezas la heredan. `false` = la de hoy. */
-export const VIDRIO_V2_2026_10 = false;
+ *  todas las piezas la heredan. `false` = la de hoy.
+ *  Daniel aprobó el 2-oct-2026: prendido. */
+export const VIDRIO_V2_2026_10 = true;
 
 /** La clase compartida (definida en `globals.css`). */
 export const CLASE_VIDRIO = "vidrio";

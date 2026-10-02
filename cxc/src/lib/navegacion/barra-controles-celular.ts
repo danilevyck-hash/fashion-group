@@ -28,8 +28,9 @@
 // en `false` cada pantalla queda exactamente como hoy (títulos de 34 px incluidos).
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** `false` = cada pantalla del celular como estaba antes del 2-oct-2026. */
-export const BARRA_CELULAR_2026_10 = false;
+/** `false` = cada pantalla del celular como estaba antes del 2-oct-2026.
+ *  Daniel aprobó el 2-oct-2026 la barra v3.3: prendida. */
+export const BARRA_CELULAR_2026_10 = true;
 
 /** ¿Se dibuja la barra nueva? Solo con el interruptor prendido y en el celular. */
 export function usaBarraCelular(esCelular: boolean, interruptor: boolean = BARRA_CELULAR_2026_10): boolean {

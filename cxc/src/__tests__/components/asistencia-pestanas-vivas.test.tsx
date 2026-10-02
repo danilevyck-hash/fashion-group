@@ -154,6 +154,26 @@ describe("B · la quincena y el corte viajan en la dirección", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 let URL_ACTUAL = "";
+// 🔴 2-oct-2026: Daniel aprobó y prendió la barra del celular v3.3
+// (`BARRA_CELULAR_2026_10`); esta prueba cuida la pantalla de antes, así que la
+// fuerza apagada (también en los valores por defecto de sus reglas).
+// 🔴 2-oct-2026: Daniel aprobó y prendió `TAB_BAR_2026_10`. La pestaña
+// «Asistencia» de la barra se llama igual que la sección del módulo: se apaga
+// la barra para buscar la sección sin ambigüedad.
+vi.mock("@/lib/navegacion/tab-bar", async (original) => ({
+  ...(await original<typeof import("@/lib/navegacion/tab-bar")>()),
+  TAB_BAR_2026_10: false,
+}));
+vi.mock("@/lib/navegacion/barra-controles-celular", async (original) => {
+  const real = await original<typeof import("@/lib/navegacion/barra-controles-celular")>();
+  return {
+    ...real,
+    BARRA_CELULAR_2026_10: false,
+    usaBarraCelular: (celular: boolean, prendida = false) => real.usaBarraCelular(celular, prendida),
+    tituloCelular: (clase: string, prendida = false) => real.tituloCelular(clase, prendida),
+    numeroSinNegrita: (clase: string, peso: "font-normal" | "font-medium" = "font-normal", prendida = false) => real.numeroSinNegrita(clase, peso, prendida),
+  };
+});
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: vi.fn((u: string) => { URL_ACTUAL = String(u).split("?")[1] ?? ""; }),

@@ -29,6 +29,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 
 const nav = vi.hoisted(() => ({ push: vi.fn(), ruta: "/asistencia" }));
+// 🔴 2-oct-2026: Daniel aprobó y prendió `TAB_BAR_2026_10`; esta prueba cuida la
+// versión de antes, así que lo fuerza apagado.
+vi.mock("@/lib/navegacion/tab-bar", async (original) => ({
+  ...(await original<typeof import("@/lib/navegacion/tab-bar")>()),
+  TAB_BAR_2026_10: false,
+}));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: nav.push, replace: vi.fn() }),
   usePathname: () => nav.ruta,

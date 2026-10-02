@@ -133,7 +133,7 @@ export default function PortadaCelular({
 
   return (
     <div className="space-y-5 pb-8">
-      <header>
+      <header data-fila-del-avatar>
         <h2 className={tituloCelular("text-[28px] font-semibold tracking-tight text-gray-900")}>Asistencia y planilla</h2>
         <p className="text-[15px] text-gray-500">{rotuloDelPeriodo(desde, hasta) || hoyPanama()}</p>
       </header>

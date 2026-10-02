@@ -126,8 +126,11 @@ describe("🔴 la tarjeta NO lleva la línea de pulso (2-oct-2026)", () => {
   it("🔴 una sola petición para las cuatro tarjetas", async () => {
     await montar();
     const f = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
-    expect(f).toHaveBeenCalledTimes(1);
-    expect(f.mock.calls[0][0]).toBe("/api/catalogo/contadores");
+    // 2-oct-2026: la barra de pestañas (`TAB_BAR_2026_10`, prendida) pide UNA
+    // vez por sesión el orden de la persona; no es de las tarjetas.
+    const deLasTarjetas = f.mock.calls.filter((c) => c[0] !== "/api/visitas/mis-modulos");
+    expect(deLasTarjetas).toHaveLength(1);
+    expect(deLasTarjetas[0][0]).toBe("/api/catalogo/contadores");
   });
 });
 
