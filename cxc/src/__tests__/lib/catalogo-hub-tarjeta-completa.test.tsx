@@ -109,33 +109,21 @@ describe("🔴 el hub dice lo que el cliente VE", () => {
   });
 });
 
-describe("🔴 cada tarjeta dice su pulso", () => {
-  it("Joybees grita sus 29 días de silencio", async () => {
+// Daniel, 2-oct-2026: quitar la línea de pulso de la tarjeta. «me sigue
+// apareciendo mensaje como "15 comprobantes · $80,568.00 · último hace 4 días"
+// en los card». El dato sigue en Comprobantes; la tarjeta dice solo lo esencial.
+// Mutación que caza: volver a dibujar `textoPulso(p)` en la tarjeta.
+describe("🔴 la tarjeta NO lleva la línea de pulso (2-oct-2026)", () => {
+  it("aunque la ruta mande el pulso, ninguna tarjeta lo dibuja", async () => {
     await montar();
-    expect(within(tarjeta("joybees")).getByText(
-      "4 comprobantes · $4,020.00 · último hace 29 días",
-    )).toBeTruthy();
-  });
-
-  it("las cuatro traen su línea, con los números medidos", async () => {
-    await montar();
-    expect(within(tarjeta("reebok")).getByText(
-      "14 comprobantes · $79,968.00 · último hace 13 días")).toBeTruthy();
-    expect(within(tarjeta("tommy")).getByText(
-      "44 comprobantes · $326,686.00 · último hace 3 días")).toBeTruthy();
-    expect(within(tarjeta("calvin")).getByText(
-      "6 comprobantes · $17,658.00 · último hace 8 días")).toBeTruthy();
-  });
-
-  it("🔴 sin pulso la tarjeta NO se rompe: la línea no sale y los números sí", async () => {
-    await montar({ contadores: RESPUESTA.contadores });
-    expect(within(tarjeta("joybees")).getByText(/70 productos a la venta/)).toBeTruthy();
-    expect(within(tarjeta("joybees")).queryByText(/comprobantes ·/)).toBeNull();
+    for (const m of Object.keys(NOMBRE) as MarcaUiKey[]) {
+      expect(within(tarjeta(m)).queryByText(/comprobantes? ·/), m).toBeNull();
+      expect(within(tarjeta(m)).queryByText(/último hace|hoy/), m).toBeNull();
+      expect(within(tarjeta(m)).getByText(/productos a la venta/), m).toBeTruthy();
+    }
   });
 
   it("🔴 una sola petición para las cuatro tarjetas", async () => {
-    // El defecto de septiembre: bajarse el catálogo entero (462,8 KB) para
-    // escribir unos números. La línea nueva viaja en la MISMA petición.
     await montar();
     const f = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
     expect(f).toHaveBeenCalledTimes(1);
@@ -159,7 +147,7 @@ describe("🩸 los cuatro botones arrancan a la misma altura", () => {
     for (const m of Object.keys(NOMBRE) as MarcaUiKey[]) {
       const linea = within(tarjeta(m)).getByText(/productos a la venta/);
       const bloque = linea.closest("div")!;
-      expect(bloque.className, m).toContain("sm:min-h-[3.75rem]");
+      expect(bloque.className, m).toContain("sm:min-h-[2.5rem]");
     }
   });
 

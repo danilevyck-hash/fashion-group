@@ -538,12 +538,16 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
             <div className="flex gap-2 bg-gray-100 rounded-full p-0.5 w-fit">
               <button
+                type="button"
+                aria-pressed={viewMode === "lista"}
                 onClick={() => setViewMode("lista")}
                 className={`min-h-[44px] px-4 text-xs rounded-full transition inline-flex items-center justify-center ${viewMode === "lista" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}
               >
                 Lista
               </button>
               <button
+                type="button"
+                aria-pressed={viewMode === "calendario"}
                 onClick={() => setViewMode("calendario")}
                 className={`min-h-[44px] px-4 text-xs rounded-full transition inline-flex items-center justify-center ${viewMode === "calendario" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}
               >

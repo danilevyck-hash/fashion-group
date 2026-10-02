@@ -7,7 +7,6 @@ import AppHeader from "@/components/AppHeader";
 import { Toast } from "@/components/ui";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import type { ContadoresDelHub, ContadoresMarca } from "@/lib/catalogo/contadores";
-import { textoPulso, type PulsoDelHub, type PulsoMarca } from "@/lib/catalogo/pulso-pedidos";
 import { CATALOGO_ADMIN_ROLES, COMPROBANTES_ROLES, catalogoRoles } from "@/lib/catalogo/roles";
 import { URL_CATALOGOS_PUBLICOS } from "@/lib/catalogo/url-catalogos-publicos";
 import { CATALOGO_ORDEN_CELULAR, clasesBotonesDeLaMarca } from "@/lib/catalogo/orden-celular";
@@ -85,6 +84,12 @@ import { CATALOGOS_APPLE_2026_10, HUB_APPLE } from "@/lib/catalogo/catalogos-202
 // y no sabe qué hora es. Si el pulso no se pudo leer, la línea no se dibuja: la
 // tarjeta nunca se queda sin sus contadores por esto.
 //
+// 🔴 Daniel, 2-oct-2026: quitar la línea de pulso de la tarjeta. «me sigue
+// apareciendo mensaje como "15 comprobantes · $80,568.00 · último hace 4 días"
+// en los card». La tarjeta dice solo lo esencial (productos a la venta y sin
+// foto); el dato sigue en Comprobantes. La ruta lo sigue mandando y aquí ya no
+// se lee. Candado: `catalogo-hub-tarjeta-completa.test.tsx`.
+//
 // 🔴 LOS CUATRO BOTONES ARRANCAN A LA MISMA ALTURA. «TOMMY HILFIGER» ocupa dos
 // líneas y las otras tres una, así que su bloque entero bajaba ~36 px y la fila
 // de botones quedaba escalonada. El nombre y el bloque de números reservan su
@@ -141,8 +146,6 @@ export default function CatalogosMarcasPage() {
 
   // `undefined` = todavía cargando · `null` = no se pudo · objeto = los números.
   const [counters, setCounters] = useState<ContadoresDelHub | null | undefined>(undefined);
-  // El pulso viaja en la MISMA respuesta. Sin él, la línea simplemente no sale.
-  const [pulso, setPulso] = useState<PulsoDelHub | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -152,10 +155,9 @@ export default function CatalogosMarcasPage() {
     // (la base o las filas) y acá llega el resultado ya sumado.
     fetch("/api/catalogo/contadores", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(r)))
-      .then((json: { contadores?: ContadoresDelHub; pulso?: PulsoDelHub }) => {
+      .then((json: { contadores?: ContadoresDelHub }) => {
         if (cancelled) return;
         setCounters(json?.contadores ?? null);
-        setPulso(json?.pulso ?? null);
       })
       .catch(() => { if (!cancelled) setCounters(null); });
     return () => { cancelled = true; };
@@ -245,7 +247,6 @@ export default function CatalogosMarcasPage() {
             // sin entrada y cae en «Contadores no disponibles».
             const c: ContadoresMarca | null | undefined =
               counters === undefined ? undefined : (counters?.[b.key] ?? null);
-            const p: PulsoMarca | null = pulso?.[b.key] ?? null;
             // Paleta de la tarjeta desde el tema de la marca (no hardcodear).
             const theme = getMarcaTheme(b.key)!;
             const hub = theme.hub;
@@ -259,10 +260,10 @@ export default function CatalogosMarcasPage() {
                       para que los botones de las cuatro empiecen igual. */}
                   <h2 className={`text-3xl font-extrabold tracking-tight sm:min-h-[4.5rem] ${hub.name}`}>{b.name}</h2>
 
-                  {/* Contadores + pulso. El bloque reserva sus tres líneas
-                      (`sm:min-h-[3.75rem]`) por el mismo motivo que el nombre:
-                      el pulso de Tommy ocupa dos renglones y el de Joybees uno. */}
-                  <div className={`mt-4 text-sm font-medium tabular-nums sm:min-h-[3.75rem] ${hub.counter}`}>
+                  {/* Contadores. El bloque reserva dos líneas
+                      (`sm:min-h-[2.5rem]`) por el mismo motivo que el nombre:
+                      «… a la venta · N sin foto» puede bajar de renglón. */}
+                  <div className={`mt-4 text-sm font-medium tabular-nums sm:min-h-[2.5rem] ${hub.counter}`}>
                     {c === undefined ? (
                       <span className="opacity-50">Cargando…</span>
                     ) : c === null ? (
@@ -280,9 +281,6 @@ export default function CatalogosMarcasPage() {
                           </>
                         )}
                       </span>
-                    )}
-                    {p && (
-                      <div className="mt-1 opacity-75">{textoPulso(p)}</div>
                     )}
                   </div>
 

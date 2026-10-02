@@ -28,7 +28,12 @@
 //   2. Una cookie de sesión de admin en /tmp/fg-cookie.txt. La arma
 //      `node scripts/_cookie-medicion.mjs` (toma prestado, solo leyendo, el
 //      token de una sesión de admin viva). O pásala en COOKIE=… .
-//   3. npx tsx scripts/auditar-botones.ts
+//   3. npx tsx scripts/auditar-botones.ts            (Chromium)
+//      npx tsx scripts/auditar-botones.ts --webkit   (WebKit = Safari del iPhone)
+//
+//   🩸 2-oct-2026: la primera pasada con Chromium NO vio que «Asistencia» del
+//   selector de sección no abría nada en el iPhone. Antes de publicar algo
+//   para el celular, córrela con `--webkit` (npx playwright install webkit).
 //
 //   Variables (todas opcionales):
 //     BASE=http://localhost:3460      a dónde apunta
@@ -70,7 +75,7 @@ const PANTALLAS: string[] = [
   "/proveedores",
   "/catalogos/marcas", "/catalogo/reebok", "/catalogo/reebok/pedidos", "/catalogos/admin/reebok",
   "/guias",
-  "/asistencia?tab=asistencia", "/asistencia?tab=aprobaciones", "/asistencia?tab=planilla",
+  "/asistencia", "/asistencia?tab=asistencia", "/asistencia?tab=aprobaciones", "/asistencia?tab=planilla",
   "/asistencia?tab=prestamos", "/asistencia?tab=colaboradores", "/asistencia?tab=marcaciones",
   "/reclamos",
   "/productos/cargar",
@@ -99,6 +104,10 @@ interface Control {
   nombre: string;
   href: string | null;
   deshabilitado: boolean;
+  /** Un <select>: sus valores. Cada opción se prueba aparte (ver abajo). */
+  opciones?: string[];
+  /** La opción que esta fila elige. */
+  valor?: string;
 }
 
 interface Fila {
@@ -144,6 +153,7 @@ function marcarControles(selector: string): Control[] {
       nombre: nombre || `(${el.tagName.toLowerCase()} sin nombre)`,
       href: el.tagName === "A" ? (el as HTMLAnchorElement).getAttribute("href") : null,
       deshabilitado: (el as HTMLButtonElement).disabled === true || el.getAttribute("aria-disabled") === "true",
+      opciones: el.tagName === "SELECT" ? Array.from((el as HTMLSelectElement).options).map((o) => o.value) : undefined,
     });
     id++;
   }
@@ -288,14 +298,21 @@ async function probarPantalla(ctx: BrowserContext, ruta: string, ancho: number):
   if (anchoReal > ancho + 1) {
     filas.push({ pantalla: ruta, ancho, control: "(la pantalla)", resultado: "desborde", detalle: `mide ${anchoReal} px de ancho` });
   }
-    const controles = (await page.evaluate(marcarControles, SELECTOR)).slice(0, MAX);
+    // 🩸 2-oct-2026: un <select> se probaba con UNA opción distinta a la de
+    // ahora, y «Asistencia» del selector de sección (la de por defecto) nunca
+    // se eligió. Ahora cada opción es su propia fila (hasta 8 por lista), y la
+    // que se elige tiene que QUEDAR elegida.
+    const controles = (await page.evaluate(marcarControles, SELECTOR)).slice(0, MAX).flatMap((c) =>
+      c.tag === "select" && c.opciones && c.opciones.length > 1
+        ? c.opciones.slice(0, 8).map((v) => ({ ...c, valor: v }))
+        : [c]);
     let base = await page.evaluate(firma);
     let sucia = false;
     let ids = new Map(controles.map((c) => [c.clave, c.id]));
 
     for (const c of controles) {
       const fila = (resultado: Resultado, detalle?: string) =>
-        filas.push({ pantalla: ruta, ancho, control: `${c.tag} «${c.nombre}»`, resultado, detalle });
+        filas.push({ pantalla: ruta, ancho, control: `${c.tag} «${c.nombre}»${c.valor !== undefined ? ` = ${c.valor}` : ""}`, resultado, detalle });
 
       if (GUARDA.test(c.nombre) && c.tag !== "a") {
         fila("guarda", c.deshabilitado ? "deshabilitado" : "habilitado");
@@ -355,12 +372,13 @@ async function probarPantalla(ctx: BrowserContext, ruta: string, ancho: number):
         if (tapa === "oculto") continue;
       if (tapa) { fila("tapado", tapa); continue; }
 
+        let elegido: string | null = null;
         if (c.tag === "select") {
-          const valores = await loc.evaluate((s) => Array.from((s as HTMLSelectElement).options).map((o) => o.value));
           const actual = await loc.inputValue();
-          const otro = valores.find((v) => v !== actual);
-          if (otro === undefined) { fila("ok", "una sola opción"); continue; }
-          await loc.selectOption(otro, { timeout: 3000 });
+          if (c.valor === undefined) { fila("ok", "una sola opción"); continue; }
+          if (c.valor === actual) { fila("ok", "ya elegido"); continue; }
+          elegido = c.valor;
+          await loc.selectOption(c.valor, { timeout: 3000 });
         } else if (c.tag === "input") {
           await loc.fill("zzqx", { timeout: 3000 });
           await page.waitForTimeout(800);
@@ -374,6 +392,23 @@ async function probarPantalla(ctx: BrowserContext, ruta: string, ancho: number):
 
         const ahora = await page.evaluate(firma).catch(() => "navegó");
         const cambioUrl = page.url() !== urlBase;
+        // Lo elegido tiene que QUEDAR elegido: si en la MISMA pantalla la lista
+        // desaparece o vuelve a otro valor, el toque no llegó a donde se pidió.
+        // 🔑 Se mira DESPUÉS de que la navegación termine: en WebKit la lista
+        // mostraba «Asistencia» al instante (optimista) y al segundo la
+        // pantalla caía en la portada.
+        if (elegido !== null) await page.waitForTimeout(1500);
+        if (elegido !== null && new URL(page.url()).pathname === new URL(urlBase).pathname) {
+          // La misma lista; si se volvió a dibujar, la que tenga su mismo nombre.
+          const quedo =
+            (await loc.inputValue({ timeout: 1000 }).catch(() => null)) ??
+            (await page.locator(`select[aria-label="${c.nombre.replace(/"/g, '\\"')}"]`).first().inputValue({ timeout: 1000 }).catch(() => null));
+          if (quedo !== elegido) {
+            fila("nada", quedo === null ? `eligió «${elegido}» y la lista desapareció` : `eligió «${elegido}» y quedó «${quedo}»`);
+            sucia = true;
+            continue;
+          }
+        }
         if (cambioUrl || ahora !== base || bajo || otraPestana) {
           fila("ok", cambioUrl ? `→ ${page.url().replace(BASE, "")}` : bajo ? "descarga o archivo" : otraPestana ? "otra pestaña" : "cambió la pantalla");
           // Se intenta volver con Escape; si no alcanza, se recarga antes del siguiente.
@@ -400,7 +435,7 @@ async function probarPantalla(ctx: BrowserContext, ruta: string, ancho: number):
 async function main(): Promise<void> {
   if (!COOKIE) throw new Error("Falta la cookie: corre `node scripts/_cookie-medicion.mjs` o pasa COOKIE=…");
   if (!/localhost|127\.0\.0\.1/.test(BASE)) throw new Error("Solo contra un servidor local: BASE tiene que ser localhost.");
-  const tipo = process.env.NAVEGADOR === "webkit" ? webkit : chromium;
+  const tipo = process.argv.includes("--webkit") || process.env.NAVEGADOR === "webkit" ? webkit : chromium;
   const navegador = await tipo.launch(tipo === chromium ? { channel: "chromium" } : {});
   const todas: Fila[] = [];
   for (const ancho of ANCHOS) {

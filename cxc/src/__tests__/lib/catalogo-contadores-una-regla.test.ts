@@ -537,9 +537,9 @@ describe("EL PULSO — lo suma la base, y falla aparte de los contadores", () =>
     expect((FUENTE_RUTA.match(/contadores, pulso, fuente: "filas"/g) ?? []).length).toBe(1);
   });
 
-  it("la tarjeta sin pulso no se rompe: la línea simplemente no sale", () => {
-    expect(FUENTE_HUB).toContain("{p && (");
-    expect(FUENTE_HUB).toContain("textoPulso(p)");
+  // Daniel, 2-oct-2026: quitar la línea de pulso de la tarjeta.
+  it("la tarjeta ya no dibuja la línea de pulso", () => {
+    expect(FUENTE_HUB).not.toContain("textoPulso(");
   });
 });
 

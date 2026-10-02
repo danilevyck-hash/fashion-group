@@ -163,6 +163,9 @@ export default function AsistenciaClient() {
   );
 }
 
+/** El defecto de `?tab=` en el hook: vacío, para que ninguna pestaña elegida se borre. */
+const SIN_TAB_EN_URL = "" as Tab;
+
 function AsistenciaInner() {
   // La pestaña vive en la URL (?tab=reporte) → refresh y compartir-link
   // conservan la vista. Tab del MISMO nivel → replace (default): el Atrás del
@@ -171,7 +174,16 @@ function AsistenciaInner() {
   // 🔴 CON EL INTERRUPTOR APAGADO SIGUE SIENDO «reporte», al pie de la letra.
   // Prendido abre en Personas, que es el punto del acomodo nuevo. La decisión
   // vive en el módulo puro, no en este renglón.
-  const [tabRaw, setTab] = useUrlState<Tab>("tab", pestanaPorDefecto(PERSONA_EN_EL_CENTRO));
+  //
+  // 🩸 2-oct-2026, Daniel desde el iPhone: «Asistencia no se abre en el
+  // celular». `useUrlState` BORRA el parámetro cuando se escribe su valor por
+  // defecto, y la de por defecto era «asistencia»: elegirla (en la portada o en
+  // «Planilla ▾») dejaba la dirección SIN `?tab=`, y en el celular eso es la
+  // PORTADA. 🔑 Por eso el defecto del hook es "" (ninguna pestaña la iguala y
+  // la elegida SIEMPRE queda escrita) y la pestaña por defecto se aplica aquí.
+  // Candado: `asistencia-selector-seccion-toque.test.ts`.
+  const [tabEnUrl, setTab] = useUrlState<Tab>("tab", SIN_TAB_EN_URL);
+  const tabRaw: Tab = tabEnUrl || pestanaPorDefecto(PERSONA_EN_EL_CENTRO);
   const [ayuda, setAyuda] = useState(false);
   // 🔑 DOS lectores de la MISMA llave: abrir ⚙ es una pantalla (en el celular
   // empuja historial y el Atrás la cierra); cambiar Horarios ↔ Feriados adentro

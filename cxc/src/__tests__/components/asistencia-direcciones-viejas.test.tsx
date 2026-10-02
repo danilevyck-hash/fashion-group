@@ -248,7 +248,11 @@ describe("D · control", () => {
 
   it("🔴 es `replace`, no `push`: el Atrás no cicla por la dirección corregida", () => {
     const cliente = puro("app/asistencia/AsistenciaClient.tsx");
-    expect(cliente).toMatch(/useUrlState<Tab>\("tab", pestanaPorDefecto\(PERSONA_EN_EL_CENTRO\)\)/);
+    // Daniel, 2-oct-2026: «Asistencia no se abre en el celular». El defecto del
+    // hook pasó a "" (la pestaña elegida SIEMPRE queda escrita) y la de por
+    // defecto se aplica afuera. Ver `asistencia-seccion-celular-abre.test.tsx`.
+    expect(cliente).toMatch(/useUrlState<Tab>\("tab", SIN_TAB_EN_URL\)/);
+    expect(cliente).toMatch(/tabEnUrl \|\| pestanaPorDefecto\(PERSONA_EN_EL_CENTRO\)/);
     expect(cliente).not.toMatch(/useUrlState<Tab>\("tab"[^)]*history: "push"/);
   });
 });

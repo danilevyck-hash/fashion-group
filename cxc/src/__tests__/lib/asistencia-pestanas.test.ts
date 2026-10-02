@@ -231,7 +231,9 @@ describe("las 6 pestañas y su orden", () => {
     // decide `pestanaPorDefecto`, que con el interruptor apagado devuelve
     // exactamente eso. Se comprueba el VALOR, no el texto del archivo.
     expect(pestanaPorDefecto(false)).toBe("reporte");
-    expect(src).toMatch(/useUrlState<Tab>\("tab", pestanaPorDefecto\(/);
+    // Daniel, 2-oct-2026: «Asistencia no se abre en el celular». El defecto
+    // del hook pasó a "" y la pestaña por defecto se aplica al leer.
+    expect(src).toMatch(/tabEnUrl \|\| pestanaPorDefecto\(/);
   });
 
   it("Horarios y Feriados YA NO son pestañas de primer nivel", () => {
