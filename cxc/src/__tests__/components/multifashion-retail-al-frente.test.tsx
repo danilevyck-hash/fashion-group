@@ -287,13 +287,17 @@ describe("4 · Vendedoras: meta una vez, Excel al cerrar, bono en una línea", (
     expect(mesCerrado(2026, 10, corte)).toBe(false);
   });
 
-  it("el Excel lleva las filas de la tabla, sin Bono, y sale por `workbookBlob`", () => {
+  // 🔁 1-oct-2026 (Daniel, «sí» al mockup): el Excel suma «Bono» y «Total a
+  // pagar» (candado `multifashion-total-con-bonos`). Sin bonos, van en cero.
+  it("el Excel lleva las filas de la tabla, con Bono y Total a pagar, y sale por `workbookBlob`", () => {
     const filas = filasExcelVendedoras([
       { nombre: "SHEYNEE BATISTA", tickets: 251, ventas: 11320.43, ticket_promedio: 45.1, comision: 55.53, manager: false, top: true, delta_ventas_pct: -0.14, delta_tickets_pct: null },
     ]);
     expect(filas[0][1]).toBe("Sheynee Batista");
     expect(filas[0][3]).toBe(11320.43);
-    expect(filas[0]).toHaveLength(7);
+    expect(filas[0]).toHaveLength(9);
+    expect(filas[0][7]).toBe(0);
+    expect(filas[0][8]).toBe(55.53);
     expect(nombreArchivoVendedoras("Agosto 2026")).toMatch(/^vendedoras-multifashion-agosto-2026-\d{4}-\d{2}-\d{2}\.xlsx$/);
     const src = sinComentarios(leer("src/components/multifashion/VendedorasSubtab.tsx"));
     expect(src).toContain("saveAs(workbookBlob(wb)");

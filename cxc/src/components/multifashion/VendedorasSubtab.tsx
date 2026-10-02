@@ -53,7 +53,7 @@ import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { variacionPctDesdeRatio } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
 import { BonosSection, ChipBono } from "./BonosSection";
-import { chipDeBono, type ChipDeBono } from "@/lib/multifashion/bono-linea";
+import { chipDeBono, totalAPagarMultifashion, type ChipDeBono } from "@/lib/multifashion/bono-linea";
 import { MetasSubtab } from "./MetasSubtab";
 import { MetasEnVendedoras } from "./MetasEnVendedoras";
 import { nombreEnPantalla } from "@/lib/multifashion/nombres";
@@ -263,7 +263,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
   const periodoExcel = etiquetaPeriodo({ tipo: "mes", anio: year, mes: rpcMes });
   const bajarExcel = () => {
     if (!resp) return;
-    const wb = libroVendedoras({ filas: sortedVendedoras, periodo: periodoExcel, rotuloDelta: rotuloDelta.columna });
+    const wb = libroVendedoras({ filas: sortedVendedoras, periodo: periodoExcel, rotuloDelta: rotuloDelta.columna, bonos: bonosDelChip });
     saveAs(workbookBlob(wb), nombreArchivoVendedoras(periodoExcel));
   };
 
@@ -437,19 +437,12 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
               $255,27 en agosto que nunca se decían. Es la SUMA de las comisiones
               que ya están dibujadas —lo mismo que se ve—, y el rótulo lleva el
               nombre adentro para que NUNCA se lea como sumable con la del
-              grupo. */}
+              grupo.
+              🔁 1-oct-2026 (Daniel, «sí» al mockup): el total suma también los
+              bonos del mes cerrado (`totalAPagarMultifashion`, la misma del
+              Excel). */}
           {conTotalAPagar && sortedVendedoras.length > 0 && (
-            <div
-              data-total-multifashion
-              className="mt-2 flex items-center justify-between gap-2 rounded-xl bg-gray-900 px-3 py-3"
-            >
-              <span className="text-xs font-medium uppercase tracking-wide text-gray-400">
-                {ROTULO_TOTAL_MULTIFASHION}
-              </span>
-              <span className="font-mono text-base font-semibold tabular-nums text-white">
-                {fmtMoney(sortedVendedoras.reduce((s, v) => s + (v.comision ?? 0), 0))}
-              </span>
-            </div>
+            <BarraTotalMultifashion pagar={totalAPagarMultifashion(sortedVendedoras, bonosDelChip)} />
           )}
 
         </div>
@@ -479,6 +472,37 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
 // ─────────────────────────────────────────────────────────────────────────────
 // Fila y tarjeta
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * 🔴 LA BARRA «TOTAL A PAGAR · Multifashion» = COMISIONES + BONOS (1-oct-2026).
+ * Daniel dijo «sí» al mockup: agosto 2026 cierra en Comisiones $255.27 · Bonos
+ * $150.00 · Total $405.27. Con el mes abierto no hay bonos: el total es igual a
+ * las comisiones y no se dibuja desglose (sería el mismo número dos veces).
+ * 🔴 Solo Multifashion: nunca se suma con el total del grupo.
+ */
+export function BarraTotalMultifashion({ pagar }: { pagar: { comisiones: number; bonos: number; total: number } }) {
+  return (
+    <div className="mt-2">
+      {pagar.bonos > 0 && (
+        <div data-desglose-multifashion className="space-y-0.5 px-3 pb-1 text-xs text-gray-500">
+          <div className="flex justify-between"><span>Comisiones</span><span className="font-mono tabular-nums">{fmtMoney(pagar.comisiones)}</span></div>
+          <div className="flex justify-between"><span>Bonos</span><span className="font-mono tabular-nums">{fmtMoney(pagar.bonos)}</span></div>
+        </div>
+      )}
+      <div
+        data-total-multifashion
+        className="flex items-center justify-between gap-2 rounded-xl bg-gray-900 px-3 py-3"
+      >
+        <span className="text-xs font-medium uppercase tracking-wide text-gray-400">
+          {ROTULO_TOTAL_MULTIFASHION}
+        </span>
+        <span className="font-mono text-base font-semibold tabular-nums text-white">
+          {fmtMoney(pagar.total)}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 /** Lo que dice la celda Bono de una vendedora. */
 export function textoBono(

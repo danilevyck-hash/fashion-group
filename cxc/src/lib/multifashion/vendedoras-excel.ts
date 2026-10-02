@@ -6,11 +6,17 @@
 // A1) y `workbookBytes`/`workbookBlob` (panel fijo). Un ranking de un mes que
 // no cerró cambia mañana: no se baja.
 //
-// Las columnas son las de la tabla, sin «Bono» (que es una línea aparte) y con
-// la Δ ya como fracción para que Excel la muestre en %.
+// Las columnas son las de la tabla, con la Δ ya como fracción para que Excel la
+// muestre en %.
+//
+// 🔁 1-oct-2026 (Daniel, «sí» al mockup del total con bonos): columna «Bono» y
+// «Total a pagar» por vendedora o gerente, y la fila final «Total a pagar» =
+// comisión + bono, con la MISMA función que la barra de la pantalla
+// (`totalAPagarMultifashion`). Solo Multifashion.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { VendedoraDetalle } from "@/components/ventas/types";
+import type { BonosMultifashion, VendedoraDetalle } from "@/components/ventas/types";
+import { bonoDeFila, totalAPagarMultifashion } from "./bono-linea";
 import {
   MONEY_FMT, PCT_FMT, buildReportSheet, exportFilename, filtroDesdeA1, workbookFromSheets,
 } from "@/lib/excel-export";
@@ -23,6 +29,8 @@ export interface EntradaExcelVendedoras {
   periodo: string;
   /** El rótulo de la columna Δ («Δ vs julio 2026»). */
   rotuloDelta: string;
+  /** Los bonos del mes (`multifashion_bonos_v5`); `null` = sin bonos. */
+  bonos?: BonosMultifashion | null;
 }
 
 const COLUMNAS = (rotuloDelta: string) => [
@@ -33,33 +41,46 @@ const COLUMNAS = (rotuloDelta: string) => [
   { header: "Ticket promedio", wch: 13, align: "right" as const, fmt: MONEY_FMT },
   { header: rotuloDelta, wch: 16, align: "right" as const, fmt: PCT_FMT },
   { header: "Comisión", wch: 12, align: "right" as const, fmt: MONEY_FMT },
+  { header: "Bono", wch: 10, align: "right" as const, fmt: MONEY_FMT },
+  { header: "Total a pagar", wch: 14, align: "right" as const, fmt: MONEY_FMT },
 ];
 
 /** Las filas del Excel, en el MISMO orden en que se ven. Puro. */
-export function filasExcelVendedoras(filas: readonly VendedoraDetalle[]): (string | number | null)[][] {
-  return filas.map((v, i) => [
-    i + 1,
-    nombreEnPantalla(v.nombre) + (v.manager ? " (gerente)" : ""),
-    v.tickets,
-    v.ventas,
-    v.ticket_promedio,
-    variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct),
-    v.comision,
-  ]);
+export function filasExcelVendedoras(
+  filas: readonly VendedoraDetalle[],
+  bonos: BonosMultifashion | null = null,
+): (string | number | null)[][] {
+  return filas.map((v, i) => {
+    const bono = bonoDeFila(v, bonos);
+    return [
+      i + 1,
+      nombreEnPantalla(v.nombre) + (v.manager ? " (gerente)" : ""),
+      v.tickets,
+      v.ventas,
+      v.ticket_promedio,
+      variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct),
+      v.comision,
+      bono,
+      (v.comision ?? 0) + bono,
+    ];
+  });
 }
 
 export function libroVendedoras(e: EntradaExcelVendedoras) {
   const columns = COLUMNAS(e.rotuloDelta);
-  const rows = filasExcelVendedoras(e.filas);
+  const rows = filasExcelVendedoras(e.filas, e.bonos ?? null);
+  const pagar = totalAPagarMultifashion(e.filas, e.bonos);
   const ws = buildReportSheet({
     columns,
     rows,
     totals: [
-      null, "Total",
+      null, "Total a pagar",
       e.filas.reduce((s, v) => s + v.tickets, 0),
       e.filas.reduce((s, v) => s + v.ventas, 0),
       null, null,
-      e.filas.reduce((s, v) => s + v.comision, 0),
+      pagar.comisiones,
+      pagar.bonos,
+      pagar.total,
     ],
   });
   // El filtro desde A1 es la regla de la casa; `buildReportSheet` ya lo pone y

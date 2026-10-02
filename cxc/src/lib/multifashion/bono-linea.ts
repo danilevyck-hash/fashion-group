@@ -70,11 +70,45 @@ export function chipDeBono(
   v: { nombre: string; manager: boolean },
   resp: BonosMultifashion | null | undefined,
 ): ChipDeBono | null {
-  if (!resp || resp.sin_data || !resp.es_elegible) return null;
-  if (v.manager) {
-    const monto = resp.gerente?.bono ?? 0;
-    return monto > 0 ? { tipo: "gerente", texto: `Bono gerente $${monto}` } : null;
-  }
+  const monto = bonoDeFila(v, resp);
+  if (monto <= 0) return null;
+  return v.manager
+    ? { tipo: "gerente", texto: `Bono gerente $${monto}` }
+    : { tipo: "vendedora", texto: `Bono $${monto}` };
+}
+
+/**
+ * El bono de UNA fila, en dólares: el mismo dato del chip. 0 con el mes
+ * abierto, en un rango o sin respuesta de la RPC.
+ */
+export function bonoDeFila(
+  v: { nombre: string; manager: boolean },
+  resp: BonosMultifashion | null | undefined,
+): number {
+  if (!resp || resp.sin_data || !resp.es_elegible) return 0;
+  if (v.manager) return resp.gerente?.bono ?? 0;
   const fila = (resp.vendedoras ?? []).find((x) => x.nombre === v.nombre);
-  return fila?.bono_vendedora ? { tipo: "vendedora", texto: `Bono $${BONO_VENDEDORA}` } : null;
+  return fila?.bono_vendedora ? BONO_VENDEDORA : 0;
+}
+
+/**
+ * 🔴 «TOTAL A PAGAR» DE MULTIFASHION = COMISIONES + BONOS (1-oct-2026). Daniel
+ * aprobó el mockup con un «sí»: agosto 2026 decía $255.27 (solo comisiones) y
+ * se pagan $405.27 (+ $50 de Sheynee y $100 de Jennifer).
+ *
+ * UNA sola función para el mismo número: la usan la barra de la pantalla y el
+ * Excel. Con el mes abierto no hay bonos y el total es igual a las comisiones.
+ * 🔴 Es SOLO de Multifashion: nunca se suma con el total del grupo.
+ */
+export function totalAPagarMultifashion(
+  filas: readonly { nombre: string; manager: boolean; comision: number | null }[],
+  resp: BonosMultifashion | null | undefined,
+): { comisiones: number; bonos: number; total: number } {
+  let comisiones = 0;
+  let bonos = 0;
+  for (const v of filas) {
+    comisiones += v.comision ?? 0;
+    bonos += bonoDeFila(v, resp);
+  }
+  return { comisiones, bonos, total: comisiones + bonos };
 }
