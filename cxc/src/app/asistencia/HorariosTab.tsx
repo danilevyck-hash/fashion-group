@@ -30,6 +30,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { etiquetaPersona } from "@/lib/asistencia/directorio";
+import { nombreDePersona } from "@/lib/asistencia/apple-2026-10";
 import { textoAlmuerzo } from "@/lib/asistencia/config";
 import {
   DIAS_ELEGIBLES,
@@ -161,7 +162,7 @@ export default function HorariosTab() {
   function hora(f: Fila, campo: "entrada" | "salida" | "entradaAfuera" | "salidaAfuera", opcional = false) {
     return (
       <CampoHora
-        etiqueta={`${campo} de ${etiquetaPersona(f.codigo, f.nombre)}`}
+        etiqueta={`${campo} de ${(f.nombre ? nombreDePersona(etiquetaPersona(f.codigo, f.nombre)) : etiquetaPersona(f.codigo, f.nombre))}`}
         valor={f[campo]}
         opcional={opcional}
         // Vacío en el teléfono = el horario del reloj: se ve en gris adentro.
@@ -239,7 +240,7 @@ export default function HorariosTab() {
                   muestra el código y se dice qué falta: una celda en blanco
                   es una persona a la que nadie le va a fijar el horario. */}
               <div className="min-w-0 break-words text-sm">
-                {etiquetaPersona(f.codigo, f.nombre)}
+                {(f.nombre ? nombreDePersona(etiquetaPersona(f.codigo, f.nombre)) : etiquetaPersona(f.codigo, f.nombre))}
                 {f.nombre ? (
                   <span className="ml-1.5 text-xs text-gray-400">{f.codigo}</span>
                 ) : (

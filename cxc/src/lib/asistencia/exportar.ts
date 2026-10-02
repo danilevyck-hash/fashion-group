@@ -20,6 +20,7 @@ import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
 import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, cuentaHorasExtra, extraQueCuenta, type DiaReporte, type PersonaReporte, type ReglasReporte } from "./reporte";
 import { textoAlmuerzo } from "./config";
 import { etiquetaPersona } from "./directorio";
+import { nombreDePersona } from "./apple-2026-10";
 import { MOTIVO_TRABAJO_VENDEDOR, textoDiaJustificado } from "./motivos";
 import { textoDiaVacaciones } from "./vacaciones";
 // 🔑 El texto del permiso sale de un módulo PURO: el Excel y la pantalla
@@ -67,7 +68,9 @@ const n0 = (v: number) => (v === 0 ? "" : Math.round(v * 100) / 100);
  * pantalla que dice «8» son dos verdades para la misma persona, y el archivo es
  * justo el que se manda por correo y sobrevive a la discusión.
  */
-const quien = (p: PersonaReporte) => etiquetaPersona(p.codigo, p.nombre);
+// 🔴 Estilo Apple (2-oct-2026): con nombre, como se escribe («Daniel Levy»); sin nombre, el código.
+const quien = (p: PersonaReporte) =>
+  p.nombre ? nombreDePersona(etiquetaPersona(p.codigo, p.nombre)) : etiquetaPersona(p.codigo, p.nombre);
 
 /**
  * Lo que se tocó a mano ese día, en una celda.

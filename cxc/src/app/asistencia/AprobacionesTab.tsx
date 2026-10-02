@@ -86,6 +86,8 @@ import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
 import PorColaborador from "./aprobaciones/PorColaborador";
 import PorDia from "./aprobaciones/PorDia";
 import YaDecididas from "./aprobaciones/YaDecididas";
+// 🔴 Estilo Apple (2-oct-2026): el nombre como se escribe, solo en pantalla y en el Excel.
+import { aprobacionesConNombres } from "@/lib/asistencia/apple-2026-10";
 
 interface Respuesta {
   aprobaciones: DiaAprobacion[] | null;
@@ -170,7 +172,7 @@ export default function AprobacionesTab({ empresa = "" }: {
       const res = await fetch(`/api/asistencia/planilla?${p}`, { cache: "no-store" });
       const j = (await res.json()) as Respuesta & { error?: string };
       if (!res.ok) throw new Error(j.error ?? "No se pudo cargar");
-      setDias(j.aprobaciones ?? []);
+      setDias(aprobacionesConNombres(j.aprobaciones ?? []));
       setPuedeAprobar(j.puedeAprobar !== false);
       setAvisoMigracion(j.avisos?.faltaMigracionAprobaciones ?? null);
       setAvisoAprobador(j.avisos?.faltaMigracionAprobador ?? null);

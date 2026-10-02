@@ -66,7 +66,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Settings } from "lucide-react";
+import { ChevronDown, Settings } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import { modoDeHistorial, useUrlState } from "@/lib/hooks/useUrlState";
 import ReporteTab from "./ReporteTab";
@@ -107,7 +107,7 @@ import { aparatoDeQuienMira } from "@/lib/aparato";
 import PortadaCelular from "./PortadaCelular";
 // 🔴 ESTILO APPLE (1-oct-2026): abre en Asistencia y las pestañas van en el
 // orden del trabajo. La regla vive en el módulo puro; aquí solo se aplica.
-import { ASISTENCIA_APPLE_2026_10, pestanaAlAbrir, pestanasEnOrdenDelTrabajo } from "@/lib/asistencia/apple-2026-10";
+import { ASISTENCIA_APPLE_2026_10, pestanaAlAbrir, pestanasEnOrdenDelTrabajo, selectorDeSeccionEnCelular } from "@/lib/asistencia/apple-2026-10";
 
 // 🩸 ESTA LISTA SE MUDÓ A UN MÓDULO PURO (10-sep-2026). Vivía acá abajo, con
 // todas sus notas, y `asistencia-pestanas.test.ts` la leía como TEXTO de este
@@ -358,9 +358,29 @@ function AsistenciaInner() {
           />
         ) : (
         <>
-        <div className="flex items-end gap-2 border-b border-gray-200">
+        <div className={`flex items-end gap-2 border-b border-gray-200 ${selectorDeSeccionEnCelular(celular) ? "flex-wrap justify-end" : ""}`}>
           {/* El arrastre lateral vive SOLO en las pestañas: si el «?» quedara
               adentro, en el iPhone habría que arrastrar para encontrar la ayuda. */}
+          {selectorDeSeccionEnCelular(celular) ? (
+            // 🔴 Estilo Apple (2-oct-2026): en el celular la sección es el título
+            // y se cambia desde ahí, con la lista nativa del teléfono. Elegir
+            // pasa por `irAPestana`, la MISMA puerta de la tira (push en el
+            // celular). Ver `lib/asistencia/apple-2026-10.ts`.
+            <label className="relative flex min-w-0 basis-full items-center">
+              <span className="sr-only">Sección</span>
+              <select
+                aria-label="Sección"
+                value={tab}
+                onChange={(e) => irAPestana(e.target.value as Tab)}
+                className={`min-h-[44px] w-auto max-w-full appearance-none truncate bg-transparent pr-7 text-2xl font-semibold text-gray-900 ${FOCO_TECLADO}`}
+              >
+                {visibles.map(([k, label]) => (
+                  <option key={k} value={k}>{label}</option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none -ml-6 h-5 w-5 shrink-0 text-gray-500" strokeWidth={2} aria-hidden />
+            </label>
+          ) : (
           <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
             {visibles.map(([k, label]) => (
               <button key={k} type="button" onClick={() => irAPestana(k)}
@@ -374,6 +394,7 @@ function AsistenciaInner() {
               </button>
             ))}
           </div>
+          )}
 
           {/* La empresa, arriba de las pestañas y para TODAS: filtra lo que se
               mira en cada una y es el selector de la Planilla. */}

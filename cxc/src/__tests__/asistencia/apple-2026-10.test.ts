@@ -15,9 +15,13 @@ import { readFileSync, readdirSync, statSync } from "fs";
 import { join } from "path";
 import {
   ASISTENCIA_APPLE_2026_10,
+  aprobacionesConNombres,
+  nombreDePersona,
   pestanaAlAbrir,
   pestanasEnOrdenDelTrabajo,
+  selectorDeSeccionEnCelular,
 } from "@/lib/asistencia/apple-2026-10";
+import type { DiaAprobacion } from "@/lib/asistencia/aprobaciones";
 import {
   PESTANAS_HOY,
   PESTANAS_PERSONA_EN_EL_CENTRO,
@@ -91,6 +95,69 @@ describe("ningún número se mueve", () => {
     const quienes = [...archivos(join(raiz, "app")), ...archivos(join(raiz, "lib"))]
       .filter((p) => !p.endsWith("apple-2026-10.ts") && readFileSync(p, "utf8").includes("apple-2026-10"))
       .map((p) => p.slice(raiz.length + 1));
-    expect(quienes.sort()).toEqual(["app/asistencia/AsistenciaClient.tsx"]);
+    // 2-oct-2026: se suman las tres pantallas que muestran nombres. Ninguna ruta
+    // (`app/api`) ni el motor (planilla · reporte · aprobaciones · corte).
+    expect(quienes.sort()).toEqual([
+      "app/asistencia/AprobacionesTab.tsx",
+      "app/asistencia/AsistenciaClient.tsx",
+      "app/asistencia/HorariosTab.tsx",
+      "lib/asistencia/exportar.ts",
+    ]);
+    expect(quienes.some((q) => q.startsWith("app/api/"))).toBe(false);
+  });
+});
+
+// ── 2-oct-2026: el selector de sección del celular y los nombres ─────────────
+
+describe("en el celular la sección es el título", () => {
+  it("solo con el interruptor prendido y solo en el celular", () => {
+    expect(selectorDeSeccionEnCelular(true, false)).toBe(false);
+    expect(selectorDeSeccionEnCelular(false, true)).toBe(false);
+    expect(selectorDeSeccionEnCelular(true, true)).toBe(true);
+  });
+
+  it("cambia de pestaña por la MISMA puerta de la tira (push en el celular)", () => {
+    const src = readFileSync(join(__dirname, "..", "..", "app", "asistencia", "AsistenciaClient.tsx"), "utf8");
+    expect(src).toMatch(/aria-label="Sección"[\s\S]{0,200}onChange=\{\(e\) => irAPestana\(/);
+  });
+});
+
+describe("nombres como se escriben, solo en pantalla", () => {
+  it("apagado, el nombre sale tal cual", () => {
+    expect(nombreDePersona("KEVIN LUBO", false)).toBe("KEVIN LUBO");
+  });
+
+  it("prendido, el gritado se capitaliza y el bien escrito no se toca", () => {
+    expect(nombreDePersona("KEVIN LUBO", true)).toBe("Kevin Lubo");
+    expect(nombreDePersona("YERITZA YANETH SOLIS CASTRO", true)).toBe("Yeritza Yaneth Solis Castro");
+    expect(nombreDePersona("Luz López", true)).toBe("Luz López");
+  });
+
+  const dias = (): DiaAprobacion[] => [{
+    fecha: "2026-09-17", etiqueta: "jue 17 sep", semana: "2026-09-14", minutos: 90,
+    gente: [
+      { codigo: "6", etiqueta: "KEVIN LUBO", empresa: "fashion_wear", empresaEtiqueta: "Fashion Wear", salida: "18:30" },
+      { codigo: "V-EG", etiqueta: "V-EG", empresa: "vistana", empresaEtiqueta: "Vistana", salida: null },
+    ] as unknown as DiaAprobacion["gente"],
+  }];
+
+  it("Aprobaciones apagado devuelve la MISMA lista", () => {
+    const d = dias();
+    expect(aprobacionesConNombres(d, false)).toBe(d);
+  });
+
+  it("Aprobaciones prendido: cambia solo la etiqueta; el código sin nombre se queda", () => {
+    const [d] = aprobacionesConNombres(dias(), true);
+    expect(d.gente.map((g) => g.etiqueta)).toEqual(["Kevin Lubo", "V-EG"]);
+    expect(d.gente.map((g) => g.codigo)).toEqual(["6", "V-EG"]);
+  });
+
+  it("🔴 lo que se ENVÍA al aprobar no cambia: código, fecha y minutos", () => {
+    const toques = (ds: DiaAprobacion[]) =>
+      ds.flatMap((d) => d.gente.map((g) => ({ codigo: g.codigo, fecha: d.fecha, minutos: d.minutos })));
+    expect(toques(aprobacionesConNombres(dias(), true))).toEqual(toques(dias()));
+    // Y el POST de Aprobaciones solo manda la decisión y esos toques.
+    const src = readFileSync(join(__dirname, "..", "..", "app", "asistencia", "AprobacionesTab.tsx"), "utf8");
+    expect(src).toContain("body: JSON.stringify({ decision, dias: items })");
   });
 });
