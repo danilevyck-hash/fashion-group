@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos } from "@/components/CajaAviso";
 
 interface UndoToastProps {
   message: string;
@@ -31,8 +32,8 @@ export default function UndoToast({ message, startedAt, onUndo, durationMs = 500
   }, [startedAt, durationMs]);
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom fade-in duration-200">
-      <div className="bg-gray-900 text-white rounded-lg shadow-lg overflow-hidden min-w-[280px] max-w-sm">
+    <EnLaPilaDeAvisos>
+      <div className={`${CLASE_AVISO_EN_PILA} bg-gray-900 text-white rounded-lg shadow-lg overflow-hidden min-w-[280px]`}>
         <div className="flex items-center gap-3 px-4 py-3">
           <span className="text-sm flex-1">{message}</span>
           <button
@@ -49,6 +50,6 @@ export default function UndoToast({ message, startedAt, onUndo, durationMs = 500
           />
         </div>
       </div>
-    </div>
+    </EnLaPilaDeAvisos>
   );
 }

@@ -8,7 +8,7 @@ import { sinBarraLateral } from "@/lib/catalogo/rutas-publicas";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { useBackdropDismiss, useEscapeClose, useFormGuard } from "@/lib/hooks/useModalDismiss";
 import { duracionToastMs } from "@/lib/ui/toast-duracion";
-import { CajaAviso } from "@/components/CajaAviso";
+import { CajaAviso, CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos } from "@/components/CajaAviso";
 
 export { Avatar } from "./ui/Avatar";
 export type { AvatarProps } from "./ui/Avatar";
@@ -111,7 +111,7 @@ export function Toast({ message, type = "success", onDismiss }: { message: strin
   }, [message, type, seCierraSolo]);
 
   if (!message) return null;
-  return <CajaAviso message={message} type={type} onDismiss={onDismiss} className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50" />;
+  return <EnLaPilaDeAvisos><CajaAviso message={message} type={type} onDismiss={onDismiss} className={CLASE_AVISO_EN_PILA} /></EnLaPilaDeAvisos>;
 }
 
 // ── 🩸 MODALES Y HOJAS VIVEN EN <body> (2-oct-2026) ──

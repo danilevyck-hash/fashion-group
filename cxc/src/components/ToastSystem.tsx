@@ -3,7 +3,7 @@
 import { duracionToastMs } from '@/lib/ui/toast-duracion'
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
 import { useBackdropDismiss, useEscapeClose } from '@/lib/hooks/useModalDismiss'
-import { CajaAviso, type ToastType } from '@/components/CajaAviso'
+import { CajaAviso, CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos, type ToastType } from '@/components/CajaAviso'
 
 interface Toast {
   id: number
@@ -62,13 +62,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={{ toast, confirm: confirmFn }}>
       {children}
 
-      {/* Toasts */}
-      <div className="fixed top-4 right-4 z-[100] space-y-2 pointer-events-none">
+      {/* Avisos: la misma pila que `<Toast>`, abajo al centro (ver CajaAviso). */}
+      <EnLaPilaDeAvisos>
         {toasts.map(t => (
           <CajaAviso key={t.id} message={t.message} type={t.type} onDismiss={() => dismiss(t.id)}
-            className="pointer-events-auto max-w-sm animate-in slide-in-from-right fade-in duration-200" />
+            className={CLASE_AVISO_EN_PILA} />
         ))}
-      </div>
+      </EnLaPilaDeAvisos>
 
       {/* Confirm modal */}
       {confirmState && (

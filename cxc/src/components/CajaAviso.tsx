@@ -1,5 +1,9 @@
 'use client'
 
+import { useSyncExternalStore, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { ABAJO_DEL_FLOTANTE_CSS, DIAMETRO_FLOTANTE, MARGEN_FLOTANTE } from '@/lib/navegacion/barra-celular'
+
 export type ToastType = 'success' | 'error' | 'warning'
 
 // 🔴 UN SOLO AVISO EN TODO EL SISTEMA (Daniel, 2-oct-2026). Había dos: este
@@ -35,3 +39,41 @@ export function CajaAviso({ message, type = 'success', onDismiss, className = ''
     </div>
   )
 }
+
+// 🔴 TODOS LOS AVISOS SALEN EN EL MISMO LUGAR: ABAJO AL CENTRO (Daniel, 2-oct-2026).
+// Los de `useToast` salían arriba a la derecha y los de `<Toast>` abajo al
+// centro. Ahora los dos (y `UndoToast`) entran en UNA sola pila, un solo nodo
+// en <body>: si salen varios a la vez se apilan con su espacio, nunca uno
+// encima del otro.
+//
+// 🔑 DÓNDE: justo encima del botón ☰ redondo del celular, que a su vez se
+// sienta encima de la barra fija de abajo (`--fg-alto-barra-fija`) o de la
+// franja de iOS (`safe-area-inset-bottom`). Se reusa su misma regla
+// (`ABAJO_DEL_FLOTANTE_CSS`) + el alto del botón: el aviso no tapa ni el ☰ ni
+// «Cobrar»/«Nuevo reclamo». En escritorio (sin ☰) queda unos 60 px arriba del
+// piso: un solo número para todas las medidas. Candado: `aviso-unico.test.tsx`.
+export const ABAJO_DE_LOS_AVISOS_CSS = `calc(${ABAJO_DEL_FLOTANTE_CSS} + ${DIAMETRO_FLOTANTE + MARGEN_FLOTANTE}px)`
+export const CLASE_PILA_AVISOS = 'fixed inset-x-0 z-[100] flex flex-col items-center gap-2 px-4 pointer-events-none'
+export const ATRIBUTO_PILA_AVISOS = 'data-pila-avisos'
+
+function nodoPila(): HTMLElement {
+  let el = document.querySelector<HTMLElement>(`[${ATRIBUTO_PILA_AVISOS}]`)
+  if (!el) {
+    el = document.createElement('div')
+    el.setAttribute(ATRIBUTO_PILA_AVISOS, '')
+    el.className = CLASE_PILA_AVISOS
+    el.style.setProperty('bottom', ABAJO_DE_LOS_AVISOS_CSS)
+    document.body.appendChild(el)
+  }
+  return el
+}
+
+const sinSuscripcion = () => () => {}
+/** Manda sus hijos a la pila única de avisos. En el servidor no dibuja nada. */
+export function EnLaPilaDeAvisos({ children }: { children: ReactNode }) {
+  const enElCliente = useSyncExternalStore(sinSuscripcion, () => true, () => false)
+  return enElCliente ? createPortal(children, nodoPila()) : null
+}
+
+/** La clase de cada aviso adentro de la pila. */
+export const CLASE_AVISO_EN_PILA = 'pointer-events-auto max-w-sm animate-in slide-in-from-bottom fade-in duration-200'

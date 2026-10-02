@@ -5,7 +5,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 import { readFileSync } from "fs";
 import { ToastProvider, useToast } from "@/components/ToastSystem";
-import { COLOR_AVISO } from "@/components/CajaAviso";
+import { COLOR_AVISO, ABAJO_DE_LOS_AVISOS_CSS, ATRIBUTO_PILA_AVISOS } from "@/components/CajaAviso";
 import { Toast } from "@/components/ui";
 
 function Disparar({ tipo }: { tipo: "success" | "error" | "warning" }) {
@@ -34,6 +34,39 @@ describe("aviso único", () => {
       expect(delComponente).toContain(COLOR_AVISO[tipo]);
     });
   }
+
+  // 🔴 TODOS ABAJO AL CENTRO (Daniel, 2-oct-2026). `useToast` salía arriba a
+  // la derecha y `<Toast>` abajo al centro: ahora entran en la MISMA pila.
+  it("useToast y <Toast> salen en la misma pila, y se apilan sin taparse", () => {
+    render(<ToastProvider><Disparar tipo="success" /><Toast message="otro" type="error" /></ToastProvider>);
+    act(() => screen.getByText("disparar").click());
+    act(() => screen.getByText("disparar").click());
+    const pilas = document.querySelectorAll(`[${ATRIBUTO_PILA_AVISOS}]`);
+    expect(pilas).toHaveLength(1);
+    const pila = pilas[0] as HTMLElement;
+    expect(pila.className).toContain("fixed");
+    expect(pila.className).toContain("flex-col");
+    expect(pila.className).toContain("items-center");
+    expect(pila.className).toContain("gap-2");
+    expect(pila.querySelectorAll("[data-aviso]")).toHaveLength(3);
+    for (const el of pila.querySelectorAll("[data-aviso]")) {
+      expect(el.getAttribute("class")).not.toMatch(/\bfixed\b|top-4|right-4|bottom-6/);
+    }
+  });
+
+  it("la pila se sienta encima del ☰, de la barra fija y de la franja de iOS", () => {
+    expect(ABAJO_DE_LOS_AVISOS_CSS).toContain("var(--fg-alto-barra-fija, 0px)");
+    expect(ABAJO_DE_LOS_AVISOS_CSS).toContain("env(safe-area-inset-bottom)");
+  });
+
+  it("nadie vuelve a posicionar un aviso por su cuenta", () => {
+    for (const f of ["src/components/ToastSystem.tsx", "src/components/ui.tsx", "src/components/UndoToast.tsx"]) {
+      const src = readFileSync(f, "utf8");
+      expect(src).toContain("EnLaPilaDeAvisos");
+      expect(src).not.toContain("top-4 right-4");
+      expect(src).not.toMatch(/fixed bottom-6 left-1\/2/);
+    }
+  });
 
   it("nadie vuelve a escribir el color del aviso a mano", () => {
     for (const f of ["src/components/ToastSystem.tsx", "src/components/ui.tsx", "src/components/CajaAviso.tsx"]) {
