@@ -39,6 +39,7 @@ import { filasDeOrders, type FilaComprobante, type FilaDeOrders } from "@/lib/ca
 import { CATALOGO_ADMIN_ROLES, COMPROBANTES_EDITAR_ROLES } from "@/lib/catalogo/roles";
 import { PANEL_COMPROBANTES } from "@/lib/catalogo/numeros-pedido";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { CATALOGOS_APPLE_2026_10_B } from "@/lib/catalogo/catalogos-2026-10-b";
 
 export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
   const theme = getMarcaTheme(marca)!;
@@ -79,7 +80,8 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
           exactamente adonde lleva el tramo de la marca del camino de migas —y
           el logo de la navbar, que ya es un enlace ahí—. Era la tercera forma
           de volver en 100 píxeles de alto. Ver `lib/catalogo/camino-de-migas`. */}
-      <h1 className="text-2xl font-light mb-6">{PANEL_COMPROBANTES}</h1>
+      {/* `CATALOGOS_APPLE_2026_10_B`: el título es el último tramo del camino, que ya está en la barra; aquí queda solo para el lector de pantalla. */}
+      <h1 className={CATALOGOS_APPLE_2026_10_B.subpaginasInternas ? "sr-only" : "text-2xl font-light mb-6"}>{PANEL_COMPROBANTES}</h1>
 
       {loading ? (
         <div className="space-y-3">

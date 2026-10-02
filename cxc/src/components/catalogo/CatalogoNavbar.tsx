@@ -21,20 +21,9 @@ import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { hayCaminoDeMigas } from "@/lib/catalogo/camino-de-migas";
 import { usePublicarAlturaEncabezado } from "@/lib/hooks/usePublicarAlturaEncabezado";
 import { CATALOGOS_APPLE_2026_10, ID_ACCIONES_EN_LA_BARRA } from "@/lib/catalogo/catalogos-2026-10";
-
-/** El logo de la marca a la altura de la barra. Tommy es muy ancho (17:1):
- *  en el celular va solo la palabra, en la computadora con la bandera. */
-function LogoEnLaBarra({ marca }: { marca: MarcaUiKey }) {
-  if (marca === "tommy") {
-    return (
-      <span className="flex items-center gap-2.5">
-        <img src="/tommy/tommy-flag.png" alt="" className="hidden sm:block w-9 h-6 object-contain shrink-0" />
-        <img src="/tommy/tommy-horizontal.png" alt="TOMMY HILFIGER" className="h-3 sm:h-4 w-auto" />
-      </span>
-    );
-  }
-  return <>{getMarcaTheme(marca)!.logos.header()}</>;
-}
+import { barraDeSubruta } from "@/lib/catalogo/catalogos-2026-10-b";
+import LogoEnLaBarra from "./LogoEnLaBarra";
+import RutaArriba from "@/app/catalogo/[marca]/pedidos/RutaArriba";
 
 export default function CatalogoNavbar({ marca }: { marca: MarcaUiKey }) {
   const theme = getMarcaTheme(marca)!;
@@ -60,12 +49,24 @@ export default function CatalogoNavbar({ marca }: { marca: MarcaUiKey }) {
   // camino, y esta flecha es la única salida: ahí no se toca.
   const showInicio = permiteInicio && !hayCaminoDeMigas(pathname);
   const enElCatalogo = CATALOGOS_APPLE_2026_10 && pathname === theme.catalogoHref;
+  // `CATALOGOS_APPLE_2026_10_B` · sub-rutas: el camino, o «← Volver» con el
+  // título, viven en ESTA línea y la pantalla ya no los repite debajo.
+  const subruta = barraDeSubruta(pathname, theme);
 
   return (
     <nav ref={navRef} className="sticky top-0 z-50 bg-white">
       <div className={`h-[2px] ${theme.navbar.accentBar}`} />
-      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-3 sm:gap-4 border-b border-gray-100">
-        {showInicio && (
+      <div className={subruta
+        ? "max-w-7xl mx-auto px-4 min-h-14 py-1 flex items-center gap-3 sm:gap-4 border-b border-gray-100"
+        : "max-w-7xl mx-auto px-4 h-14 flex items-center gap-3 sm:gap-4 border-b border-gray-100"}>
+        {subruta?.tipo === "migas" ? (
+          <RutaArriba marca={marca} enLaBarra />
+        ) : subruta?.tipo === "volver" ? (
+          <>
+            <Link href={subruta.href} className={`${theme.navbar.inicioLink} shrink-0`}>← {subruta.label}</Link>
+            {subruta.titulo && <span aria-hidden="true" className="min-w-0 truncate text-base font-semibold text-gray-900">{subruta.titulo}</span>}
+          </>
+        ) : showInicio && (
           <Link href="/home" className={theme.navbar.inicioLink}>← Inicio</Link>
         )}
         {/* Logo de marca: opcional. Las marcas cuya identidad ya vive completa
@@ -82,7 +83,7 @@ export default function CatalogoNavbar({ marca }: { marca: MarcaUiKey }) {
             </Link>
             <div id={ID_ACCIONES_EN_LA_BARRA} className="ml-auto flex items-center" />
           </>
-        ) : theme.logos.navbar && (
+        ) : !subruta && theme.logos.navbar && (
           /* 6-sep-2026: el logo es un ENLACE al catálogo y medía 24-28 px de
              alto. `min-h-[44px]` lo sube al mínimo táctil; el logo se dibuja
              igual, solo gana aire arriba y abajo. */

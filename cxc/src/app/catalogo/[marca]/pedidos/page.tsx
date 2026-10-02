@@ -5,6 +5,7 @@ import RutaArriba from "./RutaArriba";
 import { getMarcaTheme } from "@/lib/catalogo/marcas-ui";
 import { verifySession } from "@/lib/session-cookie";
 import { puedeVerComprobantes } from "@/lib/catalogo/roles";
+import { CATALOGOS_APPLE_2026_10_B } from "@/lib/catalogo/catalogos-2026-10-b";
 
 // 🩸 ESTA PÁGINA NO TENÍA GUARD DE SERVIDOR (hasta el 11-sep-2026). Montaba la
 // lista y el navegador pedía `GET /orders`, que a quien no está en
@@ -26,7 +27,7 @@ export default async function PedidosPage({ params }: { params: { marca: string 
   // y cada una está en otro lugar del camino. Ver RutaArriba.tsx.
   return (
     <>
-      <RutaArriba marca={theme.marca} />
+      {!CATALOGOS_APPLE_2026_10_B.subpaginasInternas && <RutaArriba marca={theme.marca} />}
       <PedidosListClient marca={theme.marca} />
     </>
   );

@@ -43,11 +43,11 @@ import { tramosDeComprobantes } from "@/lib/catalogo/camino-de-migas";
  */
 export { tramosDeComprobantes };
 
-export default function RutaArriba({ marca }: { marca: MarcaUiKey }) {
+export default function RutaArriba({ marca, enLaBarra = false }: { marca: MarcaUiKey; enLaBarra?: boolean }) {
   const tramos = tramosDeComprobantes(marca);
   const ultimo = tramos.length - 1;
   return (
-    <nav aria-label="Dónde estás" className="flex flex-wrap items-center gap-1 px-6 py-1 text-xs text-gray-400">
+    <nav aria-label="Dónde estás" className={enLaBarra ? "flex min-w-0 flex-wrap items-center gap-x-1 text-xs text-gray-400" : "flex flex-wrap items-center gap-1 px-6 py-1 text-xs text-gray-400"}>
       {tramos.map((t, i) => (
         <span key={t.label} className="flex items-center gap-1">
           {i > 0 && <span aria-hidden>›</span>}

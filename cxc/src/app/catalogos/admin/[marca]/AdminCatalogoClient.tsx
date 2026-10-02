@@ -33,6 +33,7 @@ import { useUrlState } from "@/lib/hooks/useUrlState";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
 import SyncNowButton from "@/components/shared/SyncNowButton";
+import { CATALOGOS_APPLE_2026_10_B } from "@/lib/catalogo/catalogos-2026-10-b";
 import { FiltroDesplegable } from "@/components/catalogo/CatalogoFilters";
 import SubirFotos from "./SubirFotos";
 import ProductoFila from "./ProductoFila";
@@ -217,6 +218,19 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
 
   if (!authChecked) return null;
 
+  // `CATALOGOS_APPLE_2026_10_B`: «Actualizar ahora» en la línea del título.
+  const enUnaFila = CATALOGOS_APPLE_2026_10_B.administrar;
+  const botonActualizar = (className?: string) => (
+    <SyncNowButton
+      className={className}
+      opciones={[{ modulo: theme.admin.syncModulo }]}
+      subtext={theme.admin.syncSubtext}
+      onSuccess={async () => {
+        await Promise.all([mutateProducts(), mutateSyncStatus()]);
+      }}
+    />
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 🔴 EL CAMINO COMPLETO (22-sep-2026). Decía «Inicio › Catálogos» a
@@ -237,7 +251,7 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
 
       <div className="max-w-5xl mx-auto px-4 py-6">
         {/* Encabezado */}
-        <div className="flex items-start justify-between gap-3 mb-6 flex-wrap">
+        <div className={enUnaFila ? "flex items-center justify-between gap-3 mb-4 flex-wrap" : "flex items-start justify-between gap-3 mb-6 flex-wrap"}>
           <div className="flex items-center gap-3">
             {theme.logos.admin()}
             <div>
@@ -246,18 +260,13 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
                 {theme.admin.subtituloSync(syncData?.lastSync ?? null)}
               </p>
               {/* "Actualizar ahora" (admin/secretaria) — sync del catálogo desde
-                  Switch (empresa de la marca). */}
-              <SyncNowButton
-                className="mt-1.5"
-                opciones={[{ modulo: theme.admin.syncModulo }]}
-                subtext={theme.admin.syncSubtext}
-                onSuccess={async () => {
-                  await Promise.all([mutateProducts(), mutateSyncStatus()]);
-                }}
-              />
+                  Switch (empresa de la marca). Con `CATALOGOS_APPLE_2026_10_B`
+                  sube a la línea del título, con los demás botones. */}
+              {!enUnaFila && botonActualizar("mt-1.5")}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+          {enUnaFila && botonActualizar()}
           {/* 🔴 EL MAPA `rubro → categoría` SE ADMINISTRA (17-sep-2026), y solo
               lo edita admin: mueve el cajón de un producto y, con él, el bulto
               que se le cobra. ⚠️ Se le pregunta AL TEMA, nunca por el nombre de

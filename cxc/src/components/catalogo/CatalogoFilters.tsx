@@ -109,7 +109,7 @@
 // ancestro con overflow, y hay un candado (`__tests__/desplegables-flotan`) que
 // pone el build rojo si alguien escribe uno nuevo.
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import {
   BULTOS_CHIP_LABEL, PRECIO_VACIO, mensajeFiltroPrecio,
@@ -364,6 +364,9 @@ interface CatalogoFiltersProps {
   /** Propuesta estilo Apple (`CATALOGOS_APPLE_2026_10`). Solo la pasa el
    *  catálogo interno: el público y Administrar siguen como hoy. */
   apple?: boolean;
+  /** «[Buscar…] [Filtros] [↕]» en UNA fila (`CATALOGOS_APPLE_2026_10_B`):
+   *  la cantidad va en gris dentro del campo y los filtros se abren abajo. */
+  unaFila?: boolean;
 }
 
 export default function CatalogoFilters({
@@ -377,6 +380,7 @@ export default function CatalogoFilters({
   filteredCount, onClearAll,
   genderOptions, categoryOptions,
   apple = false,
+  unaFila = false,
 }: CatalogoFiltersProps) {
   const theme = getMarcaTheme(marca)!;
   const f = theme.filtros;
@@ -420,7 +424,7 @@ export default function CatalogoFilters({
   // Las piezas se arman UNA vez y se acomodan según el interruptor: así no
   // se duplica ningún control (candado `catalogo-orden-celular`).
   const puestosVisibles = filtrosPuestos;
-  const buscadorPiezas = (
+  const buscador = (placeholder: string, rellenoDerecho?: string, adentro?: ReactNode) => (
     <>
       {/* Search bar */}
     <svg className={f.searchIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -429,9 +433,11 @@ export default function CatalogoFilters({
     <input
       value={searchInput}
       onChange={e => onSearchChange(e.target.value)}
-      placeholder={f.searchPlaceholder}
+      placeholder={placeholder}
       className={f.searchInput}
+      style={rellenoDerecho ? { paddingRight: rellenoDerecho } : undefined}
     />
+    {adentro}
     {searchInput && (
       <button
         onClick={() => onSearchChange("")}
@@ -443,6 +449,7 @@ export default function CatalogoFilters({
     )}
     </>
   );
+  const buscadorPiezas = buscador(f.searchPlaceholder);
   const desplegablesPiezas = (
     <>
     {conBultos && (
@@ -465,7 +472,7 @@ export default function CatalogoFilters({
         onChange={onGenderChange}
         chipActive={f.chipActive}
         chipInactive={f.chipInactive}
-        compacto={apple}
+        compacto={apple || unaFila}
       />
     )}
 
@@ -477,7 +484,7 @@ export default function CatalogoFilters({
         onChange={onCategoryChange}
         chipActive={f.chipActive}
         chipInactive={f.chipInactive}
-        compacto={apple}
+        compacto={apple || unaFila}
       />
     )}
 
@@ -607,6 +614,49 @@ export default function CatalogoFilters({
       {filteredCount} {filteredCount === 1 ? "producto" : "productos"}
     </span>
   );
+
+  // ── UNA SOLA FILA (`CATALOGOS_APPLE_2026_10_B`, 2-oct-2026) ──
+  // Daniel: «¿el buscador no puede ir al nivel de los filtros?». Celular y
+  // computadora igual: el campo ocupa lo que sobra, «Filtros» y el orden son
+  // botones de 44 px y la cantidad va en gris dentro del campo. Abiertos, los
+  // filtros son los MISMOS controles de siempre, debajo. Nada se duplica.
+  if (unaFila) {
+    const hayFiltros = conGenero || conCategorias || conBultos || conPrecio;
+    const ordenado = sortBy !== "relevancia";
+    const icono = "relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition";
+    return (
+      <div className="mb-4">
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            {buscador("Buscar…", searchInput ? "8.5rem" : "6rem",
+              <span data-cantidad className={`pointer-events-none absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-xs text-gray-400 ${searchInput ? "right-11" : "right-3.5"}`}>
+                {filteredCount} {filteredCount === 1 ? "producto" : "productos"}
+              </span>)}
+          </div>
+          {hayFiltros && (
+            <button type="button" aria-label={textoBotonFiltros(filtrosPuestos)} aria-expanded={filtrosAbiertos}
+              onClick={() => setFiltrosAbiertos((v) => !v)}
+              className={`${icono} ${filtrosPuestos > 0 || filtrosAbiertos ? f.chipActive : f.chipInactive}`}>
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" /></svg>
+              {filtrosPuestos > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full bg-black px-1 text-center text-[11px] leading-[18px] text-white">{filtrosPuestos}</span>}
+            </button>
+          )}
+          <div title={textoOrdenCorto(sortBy)} className={`${icono} ${ordenado ? f.chipActive : f.chipInactive}`}>
+            <span aria-hidden="true" className="pointer-events-none text-base leading-none">↕</span>
+            <span className="absolute inset-0 opacity-0 [&>select]:h-full [&>select]:w-full">{selectOrden}</span>
+          </div>
+        </div>
+        {filtrosAbiertos && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 lg:hidden">{desplegablesPiezas}</div>
+            <div className="hidden lg:flex flex-wrap items-center gap-2">{pildorasPiezas}</div>
+            {precioPieza}
+            {botonLimpiar}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   // ── PROPUESTA ESTILO APPLE (`CATALOGOS_APPLE_2026_10`, solo catálogo interno) ──
   // Celular: buscador · [Filtros  … N productos] y adentro de «Filtros» van

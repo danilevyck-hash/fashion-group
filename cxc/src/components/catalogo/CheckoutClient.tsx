@@ -92,7 +92,10 @@ function brandCfg(theme: MarcaTheme): BrandCfg {
   };
 }
 
-export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
+/** `tituloEnLaBarra`: el título y «← Catálogo» ya los dibuja la barra de
+ *  arriba (lo decide la página, no este archivo); aquí queda el `<h1>` solo
+ *  para el lector de pantalla. Nada del pedido depende de esto. */
+export default function CheckoutClient({ marca, tituloEnLaBarra = false }: { marca: MarcaUiKey; tituloEnLaBarra?: boolean }) {
   const theme = getMarcaTheme(marca)!;
   const cfg = brandCfg(theme);
   const router = useRouter();
@@ -236,6 +239,7 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
   if (!loaded) {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-6">
+        {tituloEnLaBarra ? <h1 className="sr-only">Confirmar pedido</h1> : (
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Confirmar pedido</h1>
@@ -243,6 +247,7 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
           </div>
           <Link href={cfg.catalogHref} className="text-sm text-gray-500 hover:text-black transition">← Catálogo</Link>
         </div>
+        )}
         <div className="space-y-2" aria-hidden="true" data-esqueleto="checkout">
           {[0, 1, 2].map((i) => (
             <div key={i} className="h-16 w-full animate-pulse rounded-lg bg-gray-100" />
@@ -254,6 +259,7 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
+      {tituloEnLaBarra ? <h1 className="sr-only">Confirmar pedido</h1> : (
       <div className="mb-5 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Confirmar pedido</h1>
@@ -265,6 +271,7 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
         </div>
         <Link href={cfg.catalogHref} className="text-sm text-gray-500 hover:text-black transition">← Catálogo</Link>
       </div>
+      )}
 
       {cart.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-white p-10 text-center">

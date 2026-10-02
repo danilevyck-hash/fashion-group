@@ -56,6 +56,7 @@ import {
   tieneClienteElegido,
 } from "@/lib/catalogo/cliente-elegido";
 import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
+import { CATALOGOS_APPLE_2026_10_B } from "@/lib/catalogo/catalogos-2026-10-b";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; category?: string;
   /** Precio de lista del catálogo (`<marca>_products.price`, sincronizado de
@@ -886,10 +887,12 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
-      {/* Back button */}
+      {/* Back button — con `CATALOGOS_APPLE_2026_10_B` vive en la barra de arriba («← Comprobantes»). */}
+      {!CATALOGOS_APPLE_2026_10_B.subpaginasInternas && (
       <button onClick={() => router.push(theme.pedidosHref)} className="text-sm text-gray-400 hover:text-black transition mb-4 inline-block">
         ← Volver a {PANEL_COMPROBANTES}
       </button>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3" ref={theme.pedido.nameRefEnContenedor ? nameRef : undefined}>

@@ -42,6 +42,7 @@ import { rutaCatalogoPublico } from "@/lib/catalogo/rutas-publicas";
 import { precioTexto } from "@/lib/catalogo/precio";
 import { Toast } from "@/components/ui";
 import CatalogoHeader from "./CatalogoHeader";
+import { CATALOGOS_APPLE_2026_10_B } from "@/lib/catalogo/catalogos-2026-10-b";
 import CatalogoStickyCartBar from "./CatalogoStickyCartBar";
 import LineasPedidoEditables, { type LineaEnPantalla } from "./LineasPedidoEditables";
 import type { CatalogoCartItem, CatalogoProducto } from "./types";
@@ -198,10 +199,26 @@ export default function RevisarPedidoPublico({ marca }: { marca: MarcaUiKey }) {
   // es lo último que puede pasar ahí. El encabezado de la marca, el título y la
   // salida al catálogo no dependen de ningún dato y se dibujan ya; solo los
   // renglones esperan, ocupando su lugar.
+  // `CATALOGOS_APPLE_2026_10_B`: el logo, el sello y «← Seguir viendo» en UNA
+  // fila, y el título solo (la marca ya la dice el logo).
+  const enUnaFila = CATALOGOS_APPLE_2026_10_B.revisarPedido;
+  const encabezadoEnUnaFila = (
+    <>
+      <CatalogoHeader marca={marca} variant="public" enUnaFila={{ accion: (
+        <Link href={hrefCatalogo} className="shrink-0 min-h-[44px] inline-flex items-center text-sm text-gray-500 hover:text-black transition">
+          ← Seguir viendo
+        </Link>
+      ) }} />
+      <h1 className="mb-4 text-xl font-semibold tracking-tight">Revisa tu pedido</h1>
+    </>
+  );
+
   if (!cargado) {
     return (
       <div className={theme.grid.pageBg}>
         <div className="mx-auto w-full max-w-3xl px-4 py-6">
+          {enUnaFila ? encabezadoEnUnaFila : (
+          <>
           <CatalogoHeader marca={marca} variant="public" />
           <div className="mb-5 flex items-center justify-between gap-3">
             <div>
@@ -212,6 +229,8 @@ export default function RevisarPedidoPublico({ marca }: { marca: MarcaUiKey }) {
               ← Seguir viendo
             </Link>
           </div>
+          </>
+          )}
           <div className="space-y-2" aria-hidden="true" data-esqueleto="revisar-pedido">
             {[0, 1, 2].map((i) => (
               <div key={i} className="h-16 w-full animate-pulse rounded-lg bg-gray-100" />
@@ -225,6 +244,8 @@ export default function RevisarPedidoPublico({ marca }: { marca: MarcaUiKey }) {
   return (
     <div className={theme.grid.pageBg}>
       <div className="mx-auto w-full max-w-3xl px-4 py-6" style={{ paddingBottom: reservaAbajo || undefined }}>
+        {enUnaFila ? encabezadoEnUnaFila : (
+        <>
         <CatalogoHeader marca={marca} variant="public" />
 
         <div className="mb-5 flex items-center justify-between gap-3">
@@ -238,6 +259,8 @@ export default function RevisarPedidoPublico({ marca }: { marca: MarcaUiKey }) {
             ← Seguir viendo
           </Link>
         </div>
+        </>
+        )}
 
         {cart.length === 0 ? (
           <div className="rounded-lg border border-gray-200 bg-white p-10 text-center">

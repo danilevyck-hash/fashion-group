@@ -21,6 +21,7 @@ import {
 import type { CatalogoCartItem, CatalogoProducto } from "./types";
 import { Toast } from "@/components/ui";
 import CatalogoHeader from "./CatalogoHeader";
+import { CATALOGOS_APPLE_2026_10_B } from "@/lib/catalogo/catalogos-2026-10-b";
 import CatalogoFilters from "./CatalogoFilters";
 import CatalogoProductCard from "./CatalogoProductCard";
 import CatalogoGroupedCard from "./CatalogoGroupedCard";
@@ -578,22 +579,40 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
   return (
     <div className={theme.grid.pageBg}>
       <div className="max-w-7xl mx-auto px-4 py-6">
-        <CatalogoHeader marca={marca} variant="public" />
-
-        {/* «Descargar PDF» — el MISMO archivo que ofrece el vendedor. Solo se
-            dibuja si hay algo que bajar: un botón que descarga un PDF vacío no
-            se ofrece. */}
-        {filteredCount > 0 && (
-          <div className="-mt-3 mb-4 flex justify-end">
+        {CATALOGOS_APPLE_2026_10_B.catalogoPublico ? (
+          /* `CATALOGOS_APPLE_2026_10_B`: logo, sello y «Descargar PDF» en UNA
+             fila; en el celular el botón es solo el ícono (44 px). */
+          <CatalogoHeader marca={marca} variant="public" enUnaFila={{ accion: filteredCount > 0 ? (
             <button
               onClick={handleDescargarPdf}
               disabled={descargandoPdf}
-              className={`${theme.vendorShare.btn} disabled:opacity-40 disabled:cursor-not-allowed`}
+              aria-label="Descargar PDF"
+              className={`${theme.vendorShare.btn} shrink-0 max-sm:h-11 max-sm:w-11 max-sm:justify-center max-sm:px-0 disabled:opacity-40 disabled:cursor-not-allowed`}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width={theme.vendorShare.iconSize} height={theme.vendorShare.iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              {descargandoPdf ? "Generando..." : "Descargar PDF"}
+              <svg xmlns="http://www.w3.org/2000/svg" width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span className="hidden sm:inline">{descargandoPdf ? "Generando..." : "Descargar PDF"}</span>
             </button>
-          </div>
+          ) : null }} />
+        ) : (
+        <>
+          <CatalogoHeader marca={marca} variant="public" />
+
+          {/* «Descargar PDF» — el MISMO archivo que ofrece el vendedor. Solo se
+              dibuja si hay algo que bajar: un botón que descarga un PDF vacío no
+              se ofrece. */}
+          {filteredCount > 0 && (
+            <div className="-mt-3 mb-4 flex justify-end">
+              <button
+                onClick={handleDescargarPdf}
+                disabled={descargandoPdf}
+                className={`${theme.vendorShare.btn} disabled:opacity-40 disabled:cursor-not-allowed`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width={theme.vendorShare.iconSize} height={theme.vendorShare.iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                {descargandoPdf ? "Generando..." : "Descargar PDF"}
+              </button>
+            </div>
+          )}
+        </>
         )}
 
         <CatalogoFilters
@@ -615,6 +634,7 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
           onClearAll={handleClearAll}
           genderOptions={generoOptions}
           categoryOptions={categoryOptions}
+          unaFila={CATALOGOS_APPLE_2026_10_B.catalogoPublico}
         />
 
         {loading ? skeletonGrid : filteredCount === 0 ? emptyState : productGrid}

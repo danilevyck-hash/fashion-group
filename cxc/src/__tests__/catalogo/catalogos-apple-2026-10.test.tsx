@@ -43,7 +43,10 @@ describe("1 · el interruptor", () => {
 
   it("🔴 solo lo leen los archivos de pantalla, nunca el carrito, el checkout ni el envío", () => {
     const quienes = listar("src")
-      .filter((p) => leer(p).includes("CATALOGOS_APPLE_2026_10"))
+      // 🔄 2-oct-2026: con palabra completa. `CATALOGOS_APPLE_2026_10_B` es OTRO
+      // interruptor (la tercera vuelta) con su propio candado
+      // (`catalogos-apple-2026-10-b.test.tsx`); este sigue cazando el de la v1.
+      .filter((p) => /\bCATALOGOS_APPLE_2026_10\b/.test(leer(p)))
       .map((p) => p.split(path.sep).join("/"))
       .sort();
     expect(quienes).toEqual([
