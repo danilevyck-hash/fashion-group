@@ -14,6 +14,7 @@
 
 import type { KeyboardEvent, ReactNode } from "react";
 import Link from "next/link";
+import { MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
 
 export function ListaCard({
   titulo,
@@ -134,7 +135,7 @@ export function ChipEstado({ estado }: { estado: "abierto" | "cerrado" }) {
   // text-xs y no menos: la letra nunca baja de 12 px (regla de la casa,
   // candado iphone-targets-operacion).
   return estado === "abierto" ? (
-    <span className="shrink-0 rounded-md bg-teal-50 border border-teal-600 text-teal-800 text-xs font-bold uppercase tracking-wider px-2 py-0.5">
+    <span className={`shrink-0 rounded-md border text-xs font-bold uppercase tracking-wider px-2 py-0.5 ${MARKETING_APPLE_2026_10 ? "bg-white border-gray-900 text-gray-900" : "bg-teal-50 border-teal-600 text-teal-800"}`}>
       Abierto
     </span>
   ) : (

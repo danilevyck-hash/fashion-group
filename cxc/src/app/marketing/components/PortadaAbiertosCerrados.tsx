@@ -33,7 +33,7 @@
 // (el agregador único) y las filas las arma `portada-rediseno.ts`, puro.
 // ============================================================================
 
-import { MARKETING_APPLE_2026_10, marcasConGastoPrimero } from "@/lib/marketing/marketing-2026-10";
+import { MARKETING_APPLE_2026_10, PESTANA_ACTIVA, PESTANA_INACTIVA, marcasConGastoPrimero } from "@/lib/marketing/marketing-2026-10";
 import { useEffect, useMemo, useState } from "react";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
@@ -286,8 +286,8 @@ export default function PortadaAbiertosCerrados({
             onClick={() => setPestana(p)}
             className={`inline-flex min-h-[44px] items-center px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               pestana === p
-                ? "border-fuchsia-500 text-fuchsia-700"
-                : "border-transparent text-gray-500 hover:text-gray-800"
+                ? MARKETING_APPLE_2026_10 ? PESTANA_ACTIVA : "border-fuchsia-500 text-fuchsia-700"
+                : MARKETING_APPLE_2026_10 ? PESTANA_INACTIVA : "border-transparent text-gray-500 hover:text-gray-800"
             }`}
           >
             {ROTULO_PESTANA[p]}

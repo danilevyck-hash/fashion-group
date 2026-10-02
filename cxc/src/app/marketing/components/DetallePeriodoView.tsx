@@ -55,6 +55,7 @@ import { MARKETING_TIENDAS_Y_MARCAS } from "@/lib/marketing/tiendas-y-marcas";
 import { TiendasDelPeriodo } from "./PaginaMarca";
 import type { BloqueResumen } from "./InicioMarketing";
 import type { ProyectoListItem } from "./useMarcaPeriodos";
+import { MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
 
 interface Props {
   marca: { key: string; nombre: string; slug: string };
@@ -236,7 +237,7 @@ export default function DetallePeriodoView({
             <button
               type="button"
               onClick={() => setCerrando(true)}
-              className="rounded-md border border-teal-600 bg-teal-50 px-3 min-h-[44px] inline-flex items-center justify-center text-sm font-semibold text-teal-800 hover:bg-teal-100 active:scale-[0.97] transition"
+              className={`rounded-md border px-3 min-h-[44px] inline-flex items-center justify-center text-sm font-semibold active:scale-[0.97] transition ${MARKETING_APPLE_2026_10 ? "border-gray-900 bg-white text-gray-900 hover:bg-gray-50" : "border-teal-600 bg-teal-50 text-teal-800 hover:bg-teal-100"}`}
             >
               Cerrar
             </button>
@@ -370,7 +371,7 @@ export default function DetallePeriodoView({
             <button
               type="button"
               onClick={onRegistrarGasto}
-              className="text-sm text-fuchsia-600 hover:text-fuchsia-800 min-h-[44px] inline-flex items-center mt-2"
+              className={`text-sm min-h-[44px] inline-flex items-center mt-2 ${MARKETING_APPLE_2026_10 ? "text-gray-600 underline underline-offset-2 hover:text-black" : "text-fuchsia-600 hover:text-fuchsia-800"}`}
             >
               Registrar el primero
             </button>

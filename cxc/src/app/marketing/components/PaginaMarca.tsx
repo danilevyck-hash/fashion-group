@@ -116,7 +116,7 @@ export default function PaginaMarca({
           <button
             type="button"
             onClick={() => setCerrando(true)}
-            className="rounded-md border border-teal-600 bg-teal-50 px-2.5 min-h-[44px] inline-flex items-center justify-center text-xs font-semibold text-teal-800 hover:bg-teal-100 active:scale-[0.97] transition"
+            className={`rounded-md border px-2.5 min-h-[44px] inline-flex items-center justify-center text-xs font-semibold active:scale-[0.97] transition ${MARKETING_APPLE_2026_10 ? "border-gray-900 bg-white text-gray-900 hover:bg-gray-50" : "border-teal-600 bg-teal-50 text-teal-800 hover:bg-teal-100"}`}
           >
             {MARKETING_APPLE_2026_10 ? "Cerrar período" : "Cerrar"}
           </button>

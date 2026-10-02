@@ -80,3 +80,38 @@ export function seReportaAbierto(seReporta: boolean, tocado: boolean): boolean {
 export function observacionesAbiertas(nota: string, tocado: boolean): boolean {
   return tocado || nota.trim() !== "";
 }
+
+// ─── 2-oct-2026: lo que Daniel pidió al aprobar ─────────────────────────────
+// · «Fotos · 0» SÍ se ve: un cero que avisa que falta algo (docs/diseno.md).
+// · Una sola «Marca»: queda el rótulo y el desplegable dice «Seleccionar…».
+// · Los colores de todo el sistema: negro y grises, como Guías, Asistencia y
+//   Comisiones. Se van el teal, el azul y el fucsia de los controles.
+// · La tarjeta de impulsadora dice lo esencial en dos líneas; los meses, al
+//   tocar. Los chips de mes nunca se tocaron para pagar: el pago sigue en
+//   «Registrar pago», que abre en el mes más antiguo como hoy.
+
+/** Pestaña de una barra: seleccionada en negro, como Guías y Asistencia. */
+export const PESTANA_ACTIVA = "border-gray-900 text-gray-900";
+export const PESTANA_INACTIVA = "border-transparent text-gray-500 hover:text-gray-900";
+
+/** Chip de filtro (período, marca): seleccionado en negro, el resto en gris. */
+export const CHIP_ACTIVO = "bg-black border-black text-white";
+export const CHIP_INACTIVO = "bg-white border-gray-200 text-gray-700 hover:border-gray-400";
+
+/** Enlace de texto, como «Deshacer» de Guías o los enlaces de Asistencia. */
+export const ENLACE = "text-gray-600 underline underline-offset-2 hover:text-black";
+
+/**
+ * La línea corta de la tarjeta de impulsadora: «23 meses pendientes · desde
+ * mayo 2024». Cuenta los MISMOS meses que hoy (`mesesSinPagar`); los
+ * parciales y los días que faltan van al desplegar. No hay monto pendiente:
+ * la base no lo guarda y no se inventa.
+ */
+export function resumenCortoDeMeses(
+  meses: ReadonlyArray<{ mes: string }>,
+  etiqueta: (mesISO: string) => string,
+): string {
+  if (meses.length === 0) return "";
+  const n = meses.length;
+  return `${n} ${n === 1 ? "mes pendiente" : "meses pendientes"} · desde ${etiqueta(meses[0].mes)}`;
+}

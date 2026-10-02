@@ -77,7 +77,7 @@ import BarraDePeriodos from "../../components/BarraDePeriodos";
 import { useMarcasCatalogo } from "../../components/useMarcaPeriodos";
 import FichaTiendaAcciones, { type AccionDeFila } from "./FichaTiendaAcciones";
 import { descargarExcelDeLaTienda } from "./excel-de-la-tienda";
-import { MARKETING_APPLE_2026_10, montoDelChip } from "@/lib/marketing/marketing-2026-10";
+import { CHIP_ACTIVO, MARKETING_APPLE_2026_10, montoDelChip } from "@/lib/marketing/marketing-2026-10";
 
 interface Datos {
   codigo: string | null;
@@ -304,15 +304,14 @@ export default function FichaTienda({ codigo, role }: { codigo: string; role: st
             >
               Excel
             </button>
-            {/* 🔴 MARKETING_APPLE_2026_10: «Fotos · 0» no se dibuja en cero. */}
-            {(!MARKETING_APPLE_2026_10 || (datos?.fotos ?? 0) > 0) && (
+            {/* «Fotos · 0» SÍ se ve: avisa que la tienda no tiene fotos
+                (Daniel, 2-oct-2026). */}
             <a
               href={`#${ANCLA_FOTOS}`}
               className="rounded-md border border-gray-300 bg-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm text-gray-800 hover:border-gray-500 transition"
             >
               Fotos{datos ? ` · ${datos.fotos}` : ""}
             </a>
-            )}
           </div>
         </div>
 
@@ -358,7 +357,7 @@ export default function FichaTienda({ codigo, role }: { codigo: string; role: st
                   onClick={() => setFiltro(c.clave)}
                   className={`inline-flex min-h-[44px] items-center ${MARKETING_APPLE_2026_10 ? "gap-2 px-4 text-sm" : "gap-1.5 px-3 text-xs"} rounded-lg font-medium border transition ${
                     filtro === c.clave
-                      ? "bg-fuchsia-600 border-fuchsia-600 text-white"
+                      ? MARKETING_APPLE_2026_10 ? CHIP_ACTIVO : "bg-fuchsia-600 border-fuchsia-600 text-white"
                       : "bg-white border-gray-200 text-gray-700 hover:border-gray-400"
                   }`}
                 >

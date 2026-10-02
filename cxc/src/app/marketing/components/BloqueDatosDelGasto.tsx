@@ -28,6 +28,7 @@ import { TIENDA_GENERAL } from "@/lib/marketing/gasto";
 import type { DatosDelGasto } from "@/lib/marketing/puerta-gasto";
 import type { MkMarca } from "@/lib/marketing/types";
 import {
+  ENLACE,
   MARKETING_APPLE_2026_10,
   observacionesAbiertas,
   seReportaAbierto,
@@ -120,7 +121,7 @@ export default function BloqueDatosDelGasto({
             <button
               type="button"
               onClick={() => setCambiandoMarca(true)}
-              className="shrink-0 text-sm text-teal-700 hover:text-teal-900 transition min-h-[44px] -my-2 inline-flex items-center"
+              className={`shrink-0 text-sm transition min-h-[44px] -my-2 inline-flex items-center ${MARKETING_APPLE_2026_10 ? ENLACE : "text-teal-700 hover:text-teal-900"}`}
             >
               Cambiar
             </button>
@@ -135,7 +136,9 @@ export default function BloqueDatosDelGasto({
             onChange={(e) => cambiar({ marcaId: e.target.value })}
             className={CAMPO}
           >
-            <option value="">Seleccionar marca</option>
+            {/* 🔴 MARKETING_APPLE_2026_10: el rótulo ya dice «Marca»; el
+                desplegable no lo repite (docs/diseno.md › Detalles). */}
+            <option value="">{MARKETING_APPLE_2026_10 ? "Seleccionar…" : "Seleccionar marca"}</option>
             {marcas.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.nombre}
@@ -201,7 +204,11 @@ export default function BloqueDatosDelGasto({
                 codigo={datos.tiendaCodigo}
                 onChange={(nombre, codigo) => cambiar({ tiendaNombre: nombre, tiendaCodigo: codigo })}
                 permitirOtro={false}
-                placeholder={codigoSinNombre ? "Busca otra tienda…" : "Busca la tienda…"}
+                placeholder={
+                  MARKETING_APPLE_2026_10
+                    ? codigoSinNombre ? "Buscar otra…" : "Buscar…"
+                    : codigoSinNombre ? "Busca otra tienda…" : "Busca la tienda…"
+                }
                 inputClassName={`${CAMPO} pr-16`}
               />
             )}
@@ -216,7 +223,7 @@ export default function BloqueDatosDelGasto({
             <button
               type="button"
               onClick={() => setAbrioObservaciones(true)}
-              className="text-sm text-teal-700 hover:text-teal-900 min-h-[44px] inline-flex items-center"
+              className={`text-sm min-h-[44px] inline-flex items-center ${ENLACE}`}
             >
               + Agregar observaciones
             </button>
@@ -225,7 +232,7 @@ export default function BloqueDatosDelGasto({
             <button
               type="button"
               onClick={() => setAbrioSeReporta(true)}
-              className="text-sm text-gray-500 hover:text-gray-800 min-h-[44px] inline-flex items-center"
+              className={`text-sm min-h-[44px] inline-flex items-center ${ENLACE}`}
             >
               No se reporta a la marca…
             </button>

@@ -14,6 +14,12 @@ import {
   mostrarBuscadorDeTiendas,
   observacionesAbiertas,
   seReportaAbierto,
+  resumenCortoDeMeses,
+  PESTANA_ACTIVA,
+  PESTANA_INACTIVA,
+  CHIP_ACTIVO,
+  CHIP_INACTIVO,
+  ENLACE,
 } from "@/lib/marketing/marketing-2026-10";
 
 const leer = (rel: string) => fs.readFileSync(path.join(process.cwd(), rel), "utf8");
@@ -68,6 +74,25 @@ describe("🔴 MARKETING_APPLE_2026_10", () => {
     expect(mostrarBuscadorDeTiendas(6)).toBe(false);
     expect(mostrarBuscadorDeTiendas(10)).toBe(false);
     expect(mostrarBuscadorDeTiendas(11)).toBe(true);
+  });
+
+  it("2-oct: la tarjeta de impulsadora cuenta los MISMOS meses y dice desde cuándo", () => {
+    const meses = [{ mes: "2024-05-01" }, { mes: "2024-06-01" }, { mes: "2026-10-01" }];
+    expect(resumenCortoDeMeses(meses, (m) => m.slice(0, 7))).toBe("3 meses pendientes · desde 2024-05");
+    expect(resumenCortoDeMeses([{ mes: "2026-09-01" }], (m) => m)).toBe("1 mes pendiente · desde 2026-09-01");
+    expect(resumenCortoDeMeses([], (m) => m)).toBe("");
+  });
+
+  it("2-oct: «Fotos · 0» SÍ se dibuja (el botón no depende del interruptor ni del cero)", () => {
+    const src = leer("src/app/marketing/tienda/[codigo]/FichaTienda.tsx");
+    expect(src).not.toMatch(/datos\?\.fotos \?\? 0\) > 0/);
+    expect(src).toContain("Fotos{datos ? ` · ${datos.fotos}` : \"\"}");
+  });
+
+  it("2-oct: los colores salen de los tokens del sistema (negro y grises, sin teal/azul/fucsia)", () => {
+    for (const c of [PESTANA_ACTIVA, PESTANA_INACTIVA, CHIP_ACTIVO, CHIP_INACTIVO, ENLACE]) {
+      expect(c).not.toMatch(/teal|fuchsia|blue|emerald/);
+    }
   });
 
   it("lo escondido se abre solo si se toca o si ya tiene algo (editar no lo tapa)", () => {

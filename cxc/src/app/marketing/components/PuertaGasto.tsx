@@ -88,7 +88,7 @@ import type {
   MkInventarioProducto,
   MkMarca,
 } from "@/lib/marketing/types";
-import { MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
+import { ENLACE, MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
 
 type Paso = "tipo" | "datos" | "form";
 
@@ -523,7 +523,7 @@ export default function PuertaGasto({
                     setTipo(null);
                     setImpulsadoraSel(null);
                   }}
-                  className="text-sm text-teal-700 hover:text-teal-900 transition min-h-[44px] -my-2 inline-flex items-center"
+                  className={`text-sm transition min-h-[44px] -my-2 inline-flex items-center ${MARKETING_APPLE_2026_10 ? ENLACE : "text-teal-700 hover:text-teal-900"}`}
                 >
                   Cambiar
                 </button>

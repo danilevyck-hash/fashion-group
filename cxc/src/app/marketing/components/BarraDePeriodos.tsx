@@ -12,6 +12,7 @@
 // ============================================================================
 
 import type { ChipDePeriodo } from "@/lib/marketing/periodo-manda";
+import { CHIP_ACTIVO, CHIP_INACTIVO, MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
 
 interface Props {
   chips: ReadonlyArray<ChipDePeriodo>;
@@ -40,7 +41,9 @@ export default function BarraDePeriodos({ chips, elegido, onElegir, etiqueta }: 
             data-fg-periodo={c.clave}
             onClick={() => onElegir(c.clave)}
             className={`inline-flex min-h-[44px] shrink-0 items-center gap-1.5 px-3 rounded-lg text-xs font-medium border transition whitespace-nowrap ${
-              activo
+              MARKETING_APPLE_2026_10
+                ? activo ? CHIP_ACTIVO : CHIP_INACTIVO
+                : activo
                 ? "bg-blue-700 border-blue-700 text-white"
                 : c.cerrado
                   ? "bg-white border-blue-200 text-blue-700 hover:border-blue-500"

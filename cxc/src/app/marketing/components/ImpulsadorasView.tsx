@@ -18,7 +18,7 @@ import NuevaImpulsadoraModal from "./NuevaImpulsadoraModal";
 import RegistrarPagoModal from "./RegistrarPagoModal";
 import ImpulsadorasCelular from "./celular/ImpulsadorasCelular";
 import { useEsCelular } from "./celular/useEsCelular";
-import { MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
+import { MARKETING_APPLE_2026_10, resumenCortoDeMeses } from "@/lib/marketing/marketing-2026-10";
 
 interface Props {
   marcas: MkMarca[];
@@ -83,7 +83,7 @@ function ChipMes({ label, estado, faltan }: { label: string } & Pick<PagoMesEsta
 // cuántos son: veinticuatro chips de corrido tapan el monto y los botones.
 const MESES_A_LA_VISTA = 6;
 
-function MesesQueDebe({ meses }: { meses: ReadonlyArray<MesSinPagar> }) {
+function MesesQueDebe({ meses, sinResumen = false }: { meses: ReadonlyArray<MesSinPagar>; sinResumen?: boolean }) {
   const [todos, setTodos] = useState(false);
   if (meses.length === 0) {
     return <span className="text-xs text-emerald-700">Sin meses pendientes ✓</span>;
@@ -92,9 +92,11 @@ function MesesQueDebe({ meses }: { meses: ReadonlyArray<MesSinPagar> }) {
   const ocultos = meses.length - visibles.length;
   return (
     <div className="space-y-1.5">
+      {!sinResumen && (
       <div className="text-[12px] font-medium text-amber-800">
         {resumenDeLoQueDebe(meses, (m) => etiquetaMes(m).toLowerCase())}
       </div>
+      )}
       <div className="flex items-center gap-2 flex-wrap">
         {visibles.map((m) => (
           <ChipMes key={m.mes} label={etiquetaMes(m.mes)} estado={m.estado} faltan={m.faltan} />
@@ -117,6 +119,57 @@ function MesesQueDebe({ meses }: { meses: ReadonlyArray<MesSinPagar> }) {
 // con pagos registrados la impulsadora no se borra, se oculta, y el historial
 // de gastos queda. Prometer un borrado que no ocurre sería peor que no tener
 // el botón.
+/**
+ * 🔴 MARKETING_APPLE_2026_10 (2-oct-2026): la tarjeta dice lo esencial en DOS
+ * líneas —nombre y marca · «23 meses pendientes · desde mayo 2024»— y el
+ * detalle de meses (parciales, días que faltan, lo pagado) se despliega al
+ * tocar la segunda línea. Los chips nunca se tocaron para pagar: el pago
+ * sigue en «Registrar pago», que abre en el mes más antiguo.
+ */
+function TarjetaEnDosLineas({ imp }: { imp: ImpulsadoraConEstado }) {
+  const [abierto, setAbierto] = useState(false);
+  const meses = imp.mesesSinPagar ?? [];
+  const resumen = resumenCortoDeMeses(meses, (m) => etiquetaMes(m).toLowerCase());
+  const marcas =
+    imp.marcas.length > 0
+      ? imp.marcas.map((m) => `${m.marca.nombre} ${m.porcentaje}%`).join(" · ")
+      : "Sin marcas";
+  return (
+    <div className="min-w-0 flex-1">
+      <div className="flex items-baseline gap-2 flex-wrap">
+        <span className="font-semibold text-gray-900">{imp.nombre}</span>
+        <span className="text-sm text-gray-500 truncate">{marcas}</span>
+        {!imp.activa && (
+          <span className="rounded bg-gray-100 text-gray-500 text-xs px-1.5 py-0.5">Inactiva</span>
+        )}
+      </div>
+      {meses.length === 0 ? (
+        <div className="text-sm text-gray-500 mt-0.5">Sin meses pendientes</div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAbierto((v) => !v)}
+          aria-expanded={abierto}
+          className="min-h-[44px] -my-2 inline-flex items-center gap-1 text-sm text-amber-800 hover:text-amber-900"
+        >
+          {resumen}
+          <span aria-hidden className={`text-gray-400 transition-transform ${abierto ? "rotate-90" : ""}`}>›</span>
+        </button>
+      )}
+      {abierto && (
+        <div className="mt-2 space-y-1.5" data-fg-detalle-meses>
+          <MesesQueDebe meses={meses} sinResumen />
+          {imp.ultimosPeriodos.length > 0 && (
+            <div className="text-[12px] text-gray-500 leading-tight">
+              Pagado: {imp.ultimosPeriodos.join(" · ")}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function textoEliminar(imp: ImpulsadoraConEstado): {
   descripcion: string;
   confirmLabel: string;
@@ -308,12 +361,17 @@ export default function ImpulsadorasView({ marcas, escribe = true, celular = nul
           {items!.map((imp) => (
             <div
               key={imp.id}
-              className="rounded-xl border border-gray-200 bg-white p-4 flex items-start gap-4"
+              className={`rounded-xl border border-gray-200 bg-white p-4 flex gap-4 ${MARKETING_APPLE_2026_10 ? "items-center" : "items-start"}`}
             >
+              {!MARKETING_APPLE_2026_10 && (
               <div className="shrink-0 h-11 w-11 rounded-full bg-gray-900 text-white flex items-center justify-center text-sm font-semibold">
                 {iniciales(imp.nombre)}
               </div>
+              )}
 
+              {MARKETING_APPLE_2026_10 ? (
+                <TarjetaEnDosLineas imp={imp} />
+              ) : (
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-gray-900">{imp.nombre}</span>
@@ -354,6 +412,7 @@ export default function ImpulsadorasView({ marcas, escribe = true, celular = nul
                   </div>
                 )}
               </div>
+              )}
 
               {/* 🔴 MARKETING_APPLE_2026_10: los tres botones en UNA fila, los
                   tres a la vista; «Registrar pago» es el que manda. */}

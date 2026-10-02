@@ -273,7 +273,8 @@ const casillaReporta = () => document.querySelector('input[name="se-reporta"]') 
 const falta = () => screen.queryByTestId("falta-para-continuar")?.textContent ?? "";
 
 async function elegirTienda(nombre = "City Moda Chorrera") {
-  const campo = screen.getByPlaceholderText("Busca la tienda…") as HTMLInputElement;
+  // «Buscar…» con MARKETING_APPLE_2026_10 (el rótulo ya dice «Tienda»).
+  const campo = screen.getByPlaceholderText(/^(Busca la tienda|Buscar)…$/) as HTMLInputElement;
   fireEvent.focus(campo);
   fireEvent.change(campo, { target: { value: nombre.slice(0, 4) } });
   await waitFor(() => expect(screen.getByText(nombre)).toBeTruthy());
@@ -764,6 +765,9 @@ describe("8 · 🔴 MARKETING_APPLE_2026_10: cambia la PANTALLA, no lo que se en
     expect(casillaReporta().checked).toBe(true); // nace PRENDIDA, igual que hoy
     fireEvent.click(screen.getByRole("button", { name: "+ Agregar observaciones" }));
     expect(document.querySelector('input[name="nota"]')).not.toBeNull();
+    // Una sola «Marca» (2-oct-2026): el desplegable no repite el rótulo.
+    expect(selectMarca().options[0].text).toBe("Seleccionar…");
+    expect(document.querySelector('[class*="teal-"]')).toBeNull();
   });
 
   it("prendido: el POST de la factura es IDÉNTICO al de hoy (mismo flujo del bloque 6)", async () => {

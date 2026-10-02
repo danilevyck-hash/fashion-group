@@ -31,6 +31,7 @@ import {
   calcularItbms,
   calcularTotalFactura,
 } from "@/lib/marketing-calc";
+import { MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
 
 export interface FacturaFormValues {
   numeroFactura: string;
@@ -543,7 +544,7 @@ export function FacturaForm({
         />
         )}
         {leyendoIA && (
-          <div className="mt-3 flex items-center gap-2 text-sm text-fuchsia-700">
+          <div className={`mt-3 flex items-center gap-2 text-sm ${MARKETING_APPLE_2026_10 ? "text-gray-600" : "text-fuchsia-700"}`}>
             <svg
               className="animate-spin"
               width="16"

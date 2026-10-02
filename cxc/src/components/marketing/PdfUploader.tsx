@@ -5,6 +5,7 @@ import { useToast } from "@/components/ToastSystem";
 // El tope y su mensaje viven en UN solo lugar: la puerta de «Registrar gasto»
 // no puede dejar pasar lo que este paso rechaza (ni al revés).
 import { MAX_PDF_MB, mensajeArchivoPesado } from "@/lib/marketing/pdf-en-la-puerta";
+import { MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
 
 export interface UploadResult {
   url: string;
@@ -241,7 +242,7 @@ export function PdfUploader({
       onDragLeave={onDragLeave}
       className={`rounded-md border-2 border-dashed p-6 text-center transition ${
         dragging
-          ? "border-fuchsia-500 bg-fuchsia-50"
+          ? MARKETING_APPLE_2026_10 ? "border-gray-900 bg-gray-50" : "border-fuchsia-500 bg-fuchsia-50"
           : "border-gray-300 bg-white hover:border-gray-400"
       }`}
     >
