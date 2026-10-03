@@ -165,7 +165,7 @@ describe("🔴 1. la etiqueta: el rótulo ARRIBA del dato", () => {
     expect(usos).toHaveLength(5);
     // 🔄 2-oct-2026 — en un TRASLADO la nota es el contenido y su rótulo dice
     // «Contenido» (`ETIQUETAS_TRASLADO_2026_10`); sigue saliendo de la MISMA función.
-    for (const rotulo of ['"Factura"', '"Cliente"', '"Destino"', 'd.rotuloNota ?? "Nota"']) {
+    for (const rotulo of ['d.rotuloSecuencial ?? "Factura"', '"Cliente"', '"Destino"', 'd.rotuloNota ?? "Nota"']) {
       expect(sinComentarios).toContain(`bloqueDeCampo(doc, ${rotulo},`);
     }
   });

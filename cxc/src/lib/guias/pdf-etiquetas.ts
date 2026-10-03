@@ -218,6 +218,8 @@ export interface DatosEtiqueta {
    * dice «Contenido». Sin esto, «Nota» como siempre.
    */
   rotuloNota?: string;
+  /** 🔴 TRASLADO (2-oct-2026): el rótulo sobre «TRASLADO» dice «Documento». Sin esto, «Factura». */
+  rotuloSecuencial?: string;
 }
 
 /** El encabezado de un traslado sin empresa: el mismo nombre que el papel de la guía. */
@@ -233,7 +235,7 @@ export function datosDeEtiqueta(e: EtiquetaFila): DatosEtiqueta {
     // 🔴 1-oct-2026: el día en que se imprimió (Panamá), no el de la factura.
     fecha_factura: fechaImpresa(e),
     secuencial: traslado ? "TRASLADO" : e.secuencial,
-    ...(traslado ? { rotuloNota: "Contenido" } : {}),
+    ...(traslado ? { rotuloNota: "Contenido", rotuloSecuencial: "Documento" } : {}),
     cliente_nombre: e.cliente_nombre,
     destino: e.destino,
     cajas: e.cajas,
@@ -512,7 +514,7 @@ function dibujarEtiqueta(
 
   // ── Los tres campos: rótulo gris arriba, dato grande abajo ──
   const campo = { izq, ancho };
-  y = bloqueDeCampo(doc, "Factura", String(d.secuencial ?? ""), {
+  y = bloqueDeCampo(doc, d.rotuloSecuencial ?? "Factura", String(d.secuencial ?? ""), {
     ...campo,
     y: y + ARRIBA_DE_LOS_CAMPOS,
     mayuscula: MAY_FACTURA,

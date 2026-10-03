@@ -118,6 +118,14 @@ describe("🔴 3. el PDF dice TRASLADO", () => {
     expect(t).toContain("3 MUEBLES CK");
     expect(t).not.toContain("Traslado");
   });
+  it("🔴 candado (Daniel, 2-oct-2026): sobre TRASLADO el rótulo dice «Documento»; la factura sigue con «Factura»", () => {
+    const t = textos(construirPdfEtiquetas(paginasDelEnvio([etq()]), "4x6"));
+    expect(t).toContain("Documento");
+    expect(t).not.toContain("Factura");
+    const f = textos(construirPdfEtiquetas(paginasDelEnvio([etq({ switch_factura_id: 52558, secuencial: "11-000002558" })]), "4x6"));
+    expect(f).toContain("Factura");
+    expect(f).not.toContain("Documento");
+  });
   it("numera 1..N del envío, como todo envío", () => {
     expect(paginasDelEnvio([etq()]).map((p) => `${p.numero}/${p.total}`)).toEqual(["1/3", "2/3", "3/3"]);
   });
