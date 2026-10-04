@@ -101,7 +101,8 @@ async function pintar(bonos: BonosMultifashion, conTotalAPagar = true, anioPasad
   if (bonos.es_elegible) {
     await waitFor(() => expect(document.querySelector("[data-chip-bono]")).not.toBeNull());
   } else {
-    await screen.findByText(/se define al cerrar el mes/);
+    // 4-oct-2026: el bono del mes abierto va en la línea final de la tabla.
+    await waitFor(() => expect(document.querySelector("[data-pie-vendedoras]")?.textContent).toContain("bono al cierre del mes"));
   }
   return r;
 }
@@ -258,8 +259,9 @@ describe("🔴 3 · la Δ contra el mismo mes del año pasado (puro)", () => {
 
   it("rótulo «Δ vs sep 2025», la nota y la parte", () => {
     expect(rotuloDeltaAnioPasado(2026, 9).columna).toBe("Δ vs sep 2025");
-    expect(notaAnioPasado(2026, 9, { hasta: "2025-09-30", parcial: false })).toBe("La Δ compara contra septiembre 2025 completo.");
-    expect(notaAnioPasado(2026, 10, { hasta: "2025-10-01", parcial: true })).toBe("La Δ compara contra octubre 2025, los mismos días (del 1 al 1).");
+    // 🔁 4-oct-2026: la nota es corta y va en la línea final de la tabla.
+    expect(notaAnioPasado(2026, 9, { hasta: "2025-09-30", parcial: false })).toBe("vs sep 2025");
+    expect(notaAnioPasado(2026, 10, { hasta: "2025-10-01", parcial: true })).toBe("vs oct 2025, mismos días");
     expect(participacion(15046, 42702)).toBeCloseTo(0.3523, 4);
     expect(participacion(1, 0)).toBeNull();
   });
@@ -281,7 +283,7 @@ describe("🔴 4 · la pantalla y el Excel con el año pasado", () => {
     expect(d("Ana Perez")).toBe("Nueva");
     expect(d("Sheynee Batista")).toContain("+25%");
     expect(d("Jennifer Miranda")).toContain("-8%");
-    expect(document.body.textContent).toContain("La Δ compara contra septiembre 2025 completo.");
+    expect(document.querySelector("[data-pie-vendedoras]")!.textContent).toContain("vs sep 2025");
   });
 
   it("la parte de cada una bajo Ventas, en gris y sin negrita", async () => {

@@ -122,10 +122,6 @@ export default function PrestamosBoston() {
         </div>
       </div>
 
-      <p className="text-xs text-gray-500 mb-3">
-        Incluye colaboradores de todas las empresas, no solo de Boston.
-      </p>
-
       <BuscadorDeLista
         className="mb-3"
         valor={busqueda}
@@ -200,6 +196,10 @@ export default function PrestamosBoston() {
             préstamos activos» diría algo que no es cierto. */}
         {orden.length === 0 && !buscando && (
           <p className="text-sm text-gray-500 py-8">No hay préstamos activos.</p>
+        )}
+        {/* 4-oct-2026: antes un párrafo arriba de la lista; ahora UNA línea al final. */}
+        {visibles.length > 0 && (
+          <p data-pie-prestamos-boston className="pt-1 text-xs text-gray-500">Colaboradores de todas las empresas</p>
         )}
       </div>
     </div>

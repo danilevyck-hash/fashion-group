@@ -506,10 +506,15 @@ describe("4 · Vendedoras en el celular", () => {
     expect(filas[1].textContent).not.toContain("tienda $");
   });
 
-  it("el subtítulo y la comisión a un toque", async () => {
+  // 🔁 4-oct-2026: el resumen va DEBAJO de la lista, en una línea, con el bono
+  // del mes en curso y su ⓘ (Daniel: «o bien resumido abajo en una línea»).
+  it("el resumen al pie de la lista y la comisión a un toque", async () => {
     const { container } = await pintarVendedoras();
-    expect(container.querySelector('[data-celular="vendedoras-subtitulo"]')!.textContent)
-      .toBe("$32,649 · 690 tickets · contra agosto, mismos días");
+    const pie = container.querySelector('[data-celular="vendedoras-subtitulo"]')!;
+    expect(pie.textContent).toBe("$32,649 · 690 tickets · contra agosto, mismos días · bono al cierre del mes");
+    expect(pie.querySelector('[aria-label="Regla del bono"]')!.getAttribute("title")).toContain("Bono de septiembre: se define al cerrar el mes");
+    const lista = container.querySelector('[data-celular="vendedoras-lista"]')!;
+    expect(lista.compareDocumentPosition(pie) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(container.querySelector('[data-celular="vendedora-detalle"]')).toBeNull();
     fireEvent.click(container.querySelector('[data-vendedora="SHEYNEE BATISTA"]')!);
     expect(container.querySelector('[data-celular="vendedora-detalle"]')!.textContent)

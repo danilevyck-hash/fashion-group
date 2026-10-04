@@ -55,11 +55,6 @@ export default function NovedadesTab() {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-500">
-        Lo que cada persona ve al entrar a su módulo. Se muestran hasta tres a la
-        vez, las más nuevas, y cada una se va sola a los 30 días.
-      </p>
-
       {!tablaLista && (
         <Aviso ayuda="Los avisos salen y se cierran igual."
         >
@@ -90,6 +85,10 @@ export default function NovedadesTab() {
           </li>
         ))}
       </ul>
+      {/* 4-oct-2026: antes un párrafo arriba de la lista; ahora UNA línea al final. */}
+      <p data-pie-novedades className="text-xs text-gray-500">
+        Hasta tres a la vez, las más nuevas · cada una se va a los 30 días
+      </p>
     </div>
   );
 }

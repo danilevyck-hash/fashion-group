@@ -516,11 +516,9 @@ const EN_PANTALLA: { archivo: string; por_que: string; texto: string }[] = [
     por_que: "🩸 el mayoreo no entra al número y hay que poder verlo sin tocar nada",
     texto: "Retail (sin mayoreo)",
   },
-  {
-    archivo: "components/multifashion/VendedorasSubtab.tsx",
-    por_que: "acá SÍ entra el mayoreo, al revés que en el resto del módulo",
-    texto: "incluye mayoreo si lo hubo",
-  },
+  // 🔄 4-oct-2026: «incluye mayoreo si lo hubo» (VendedorasSubtab) se borró del
+  // código. Solo salía con `RETAIL_AL_FRENTE` apagado, que es `true` fijo desde
+  // el 23-sep, y era FALSO (la RPC excluye el mayoreo). Ver `textos-explicativos-al-pie`.
   {
     archivo: "components/multifashion/ClientesMultifashionSubtab.tsx",
     por_que: "el mostrador anónimo va aparte y eso cambia cómo se lee el top",

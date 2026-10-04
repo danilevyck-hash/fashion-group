@@ -212,7 +212,8 @@ describe("🔴 el gasto es POR EMPRESA y no existe ningún número que las junte
 
   it("y la pantalla DICE que no hay total, para que nadie lo sume de cabeza", () => {
     render(<GastosPorEmpresa gastos={GASTOS} mes="2026-08" />);
-    expect(textoPintado()).toContain("Sin total consolidado"); // 1-oct-2026, Daniel: nombres normales de ERP
+    // 4-oct-2026: va en la línea final, en minúscula tras el «·».
+    expect(textoPintado().toLowerCase()).toContain("sin total consolidado"); // 1-oct-2026, Daniel: nombres normales de ERP
   });
 });
 

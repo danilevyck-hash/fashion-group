@@ -154,9 +154,6 @@ export function HojaClienteCelular({ abierta, onCerrar, codigo, nombre, cuandoCo
             <div className="mt-2 text-[14px] tabular-nums text-gray-600">
               {fmtMoney(datos.total)} en {datos.year} · {fmtMoney(datos.totalPrevio)} en {datos.year - 1}
             </div>
-            <div className="mt-1 text-[12px] text-gray-500">
-              Los mismos días en los dos años, hasta el {diaLargo(datos.corte)}.
-            </div>
           </div>
 
           <RotuloVentas>Por empresa</RotuloVentas>
@@ -190,8 +187,10 @@ export function HojaClienteCelular({ abierta, onCerrar, codigo, nombre, cuandoCo
               );
             })}
           </GrupoVentas>
-          <p className="px-6 pt-3 text-[12.5px] text-gray-500">
-            Toca una empresa para ver su mes a mes.
+          {/* 🔴 4-oct-2026: lo de «mismos días» bajó aquí, en UNA línea; el
+              «Toca una empresa…» se fue (la fila ya lleva su ›). */}
+          <p data-pie-cliente className="px-6 pt-3 text-[12.5px] text-gray-500">
+            Mismos días en los dos años, hasta el {diaLargo(datos.corte)}
           </p>
         </>
       )}
@@ -310,8 +309,7 @@ function MesAMesDeLaEmpresa({
       </GrupoVentas>
 
       <p className="px-6 pt-3 text-[12.5px] leading-relaxed text-gray-500">
-        Cada mes contra <b className="font-semibold text-gray-700">el mismo mes de {year - 1}</b>.
-        {` ${MONTHS[hasta - 1]} va hasta el día ${Number(corte.slice(8, 10))} en los dos años.`}
+        vs mismo mes de {year - 1} · {MONTHS[hasta - 1]} hasta el día {Number(corte.slice(8, 10))}
       </p>
     </PantallaQueSube>
   );

@@ -16,6 +16,7 @@ import {
 // incluido), el cuadre se dice, el mostrador se marca y un año sin reporte de
 // utilidad dice desde cuándo lo hay.
 import { UNA_SOLA_VENTA, textoCuadreUtilidad, textoDatosDesde } from "@/lib/ventas/una-sola-venta";
+import { montoDeLaTabla } from "@/lib/ventas/celular";
 
 export type UtilidadSortKey = "ventas" | "utilidad" | "margen";
 type SortKey = UtilidadSortKey;
@@ -169,25 +170,6 @@ export function UtilidadView({
           de un texto fijo: decía 5 mientras la lista de verdad son las 6 de
           Fashion Group, y así es como joystep se volvió invisible en
           Comisiones. */}
-      {data && !loading && (
-        <p data-totales-utilidad className="mb-3 flex flex-wrap items-baseline gap-x-2 text-sm text-gray-600">
-          <span>
-            Ventas <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMoneySigned(data.totales.ventas)}</span>
-            <span className="mx-2 text-gray-300">·</span>
-            Utilidad <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMoneySigned(data.totales.utilidad)}</span>
-            <span className="mx-2 text-gray-300">·</span>
-            Margen <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMargenPantalla(data.totales.margen)}</span>
-          </span>
-          <span data-alcance-utilidad className="text-xs text-gray-500">
-            {alcanceEmpresas(data.empresas)} · Excluye Boston y Multifashion
-            {/* 🔴 UNA SOLA VENTA: el cuadre contra el Resumen, dicho. «El mismo
-                total que el Resumen», o cuánto falta y por qué. */}
-            {UNA_SOLA_VENTA && textoCuadreUtilidad(data.cuadre) && (
-              <span data-cuadre-utilidad> · {textoCuadreUtilidad(data.cuadre)}</span>
-            )}
-          </span>
-        </p>
-      )}
 
       {data && !loading && negativos > 0 && (
         <p className="mb-3 text-xs text-red-600">
@@ -269,6 +251,27 @@ export function UtilidadView({
         </div>
       )}
 
+      {/* 🔴 4-oct-2026 (Daniel: «o bien resumido abajo en una línea»): los
+          totales y el alcance bajaron a UNA línea gris al final de la lista. */}
+      {data && !loading && (
+        <p data-totales-utilidad className="mt-3 flex flex-wrap items-baseline gap-x-2 text-xs text-gray-500">
+          <span>
+            Ventas <span className="font-mono tabular-nums text-gray-900">{montoDeLaTabla(data.totales.ventas)}</span>
+            <span className="mx-2 text-gray-300">·</span>
+            Utilidad <span className="font-mono tabular-nums text-gray-900">{montoDeLaTabla(data.totales.utilidad)}</span>
+            <span className="mx-2 text-gray-300">·</span>
+            Margen <span className="font-mono tabular-nums text-gray-900">{fmtMargenPantalla(data.totales.margen)}</span>
+          </span>
+          <span data-alcance-utilidad>
+            {alcanceEmpresas(data.empresas)} · Excluye Boston y Multifashion
+            {/* 🔴 UNA SOLA VENTA: el cuadre contra el Resumen, dicho. «El mismo
+                total que el Resumen», o cuánto falta y por qué. */}
+            {UNA_SOLA_VENTA && textoCuadreUtilidad(data.cuadre) && (
+              <span data-cuadre-utilidad> · {textoCuadreUtilidad(data.cuadre)}</span>
+            )}
+          </span>
+        </p>
+      )}
       {/* ⛔ ACÁ VIVÍA «Mostrar más (184 restantes)». Ver el comentario de
           `visibleRows`: la lista se ve entera. */}
     </div>

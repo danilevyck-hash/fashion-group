@@ -40,7 +40,7 @@
 import { useCallback, useMemo, useState } from "react";
 import useSWR from "swr";
 import { Card } from "@/components/ui/card";
-import { Users } from "lucide-react";
+import { Info, Users } from "lucide-react";
 import type {
   VendedoraDetalle,
   VendedorasPeriodo,
@@ -52,11 +52,13 @@ import { ROTULO_TOTAL_MULTIFASHION } from "@/lib/comisiones/celular";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { variacionPctDesdeRatio } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
-import { BonosSection, ChipBono } from "./BonosSection";
+import { BonosSection, ChipBono, REGLA_BONO_RETAIL } from "./BonosSection";
 import {
   MULTIFASHION_TOTAL_PERSONA_2026_10,
+  bonoCorto,
   bonoDeFila,
   chipDeBono,
+  lineaBono,
   totalAPagarMultifashion,
   totalDeFila,
   type ChipDeBono,
@@ -77,7 +79,7 @@ import { notaComparacionVendedoras, rotuloDeltaVendedoras, type ChipVendedoras }
 import { etiquetaPeriodo, type CortePeriodo, type Periodo } from "@/lib/multifashion/periodo";
 import { RETAIL_AL_FRENTE, mesCerrado } from "@/lib/multifashion/retail-al-frente";
 import { libroVendedoras, nombreArchivoVendedoras } from "@/lib/multifashion/vendedoras-excel";
-import { MULTIFASHION_CELULAR } from "@/lib/multifashion/celular";
+import { MULTIFASHION_CELULAR, montoCorto } from "@/lib/multifashion/celular";
 import { VendedorasCelular } from "./celular/VendedorasCelular";
 import { workbookBlob } from "@/lib/excel-export";
 import { saveAs } from "file-saver";
@@ -320,6 +322,25 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
       : notaComparacionVendedoras(chip, rpcMes, year, resp.es_periodo_parcial, resp.dia_corte_periodo_anterior)
     : null;
 
+  // 🔴 LA LÍNEA FINAL (4-oct-2026): ventas · tickets · contra qué compara la Δ
+  // · el bono del mes en curso, con su regla detrás del ⓘ. El número de
+  // vendedoras no va: son las filas que se ven. Montos sin centavos.
+  const bonoPie = !esRango ? bonoCorto(bonos) : null;
+  const pie = resp && resp.vendedoras.length > 0
+    ? [
+        `${montoCorto(resp.ventas_total)} ventas`,
+        `${resp.tickets_total.toLocaleString()} ${resp.tickets_total === 1 ? "ticket" : "tickets"}`,
+        notaComparacion,
+        bonoPie,
+      ].filter(Boolean).join(" · ")
+    : null;
+  const detalleBono = bonoPie ? `${lineaBono(bonos)}. ${REGLA_BONO_RETAIL}` : null;
+  const iconoBono = detalleBono ? (
+    <span title={detalleBono} aria-label="Regla del bono" className="ml-1 inline-flex cursor-help align-[-2px] text-gray-400">
+      <Info className="h-3.5 w-3.5" />
+    </span>
+  ) : null;
+
   const chipLabel: Record<ChipKey, string> = {
     en_curso: `${MES_FULL[enCursoMes - 1]} ${year} (en curso)`,
     mes_anterior: `${MES_FULL[mesAnteriorMes - 1]} ${year}`,
@@ -364,42 +385,16 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
         </div>
       )}
 
-      <div data-elemento="resumen" className={cn(loading && "opacity-60 transition-opacity", celular && "hidden sm:block")}>
-        {/* `sr-only`: la pestaña dice "Vendedoras" y el período está arriba. */}
-        <h3 className="sr-only">Vendedoras · {chipLabel[chip]}</h3>
-        {resp && (
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
-            <span>
-              <span className={cn(MONO, "tabular-nums text-gray-700")}>{resp.total_vendedoras_periodo}</span> vendedoras ·{" "}
-              <span className={cn(MONO, "tabular-nums text-gray-700")}>{fmtMoney(resp.ventas_total)}</span> ventas ·{" "}
-              <span className={cn(MONO, "tabular-nums text-gray-700")}>{resp.tickets_total.toLocaleString()}</span> {resp.tickets_total === 1 ? "ticket" : "tickets"}
-            </span>
-            {/* 🔴 Excel SOLO en mes cerrado (23-sep-2026). */}
-            {excelDisponible && resp.vendedoras.length > 0 && (
-              <button
-                type="button"
-                data-boton="excel"
-                onClick={bajarExcel}
-                className="inline-flex min-h-[44px] items-center rounded-md border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-950 active:scale-[0.97]"
-              >
-                Excel
-              </button>
-            )}
-          </p>
-        )}
-        {/* 🩸 «(incluye mayoreo si lo hubo)» era FALSO: las 13 facturas de
-            mayoreo de la historia llevan vendedor DEFAULT y la RPC lo excluye.
-            Con `RETAIL_AL_FRENTE` la frase se va; queda contra qué compara la Δ. */}
-        <p className="mt-1 text-xs text-gray-400">
-          {!RETAIL_AL_FRENTE && "Ventas atribuidas a cada vendedor (incluye mayoreo si lo hubo)."}
-          {notaComparacion && <> {notaComparacion}</>}
-        </p>
-      </div>
+      {/* 🔴 4-oct-2026 (Daniel: «quítame estos mensajes que no son necesarios…
+          o bien resumido abajo en una línea»): arriba de la tabla ya no va el
+          resumen ni la nota de la Δ. Van en `pie`, UNA línea gris al final,
+          con el Excel del mes cerrado a la derecha. */}
+      {/* `sr-only`: la pestaña dice "Vendedoras" y el período está arriba. */}
+      <h3 className="sr-only">Vendedoras · {chipLabel[chip]}</h3>
 
-      {/* 🔴 EL BONO (1-oct-2026): con el mes EN CURSO, UNA línea ARRIBA de la
-          tabla con la regla; con el mes CERRADO no dibuja nada —lo dicen los
-          chips de las filas— pero sigue pidiendo los bonos y elevándolos. En
-          un rango, ni se monta. También en el celular. */}
+      {/* EL BONO: `BonosSection` ya no dibuja nada (4-oct-2026), pero sigue
+          pidiendo los bonos y elevándolos (chips, Total a pagar, `pie`). En un
+          rango, ni se monta. */}
       {!esRango && RETAIL_AL_FRENTE && (
         <BonosSection selectedYear={year} mes={bonoMes} onData={onBonosData} />
       )}
@@ -474,6 +469,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
                 onAbrirMeta={() => setMetaAbiertaCel((v) => !v)}
                 conMetas={conMetas === true}
                 bonos={bonosDelChip}
+                pieBono={bonoPie ? <>{` · ${bonoPie}`}{iconoBono}</> : null}
               />
             </div>
           )}
@@ -515,6 +511,25 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
             />
           )}
 
+        </div>
+      )}
+
+      {pie && (
+        <div data-elemento="resumen" className={cn("flex flex-wrap items-center justify-between gap-2", celular && "hidden sm:flex")}>
+          <p data-pie-vendedoras className="text-xs text-gray-500 tabular-nums">
+            {pie}{iconoBono}
+          </p>
+          {/* 🔴 Excel SOLO en mes cerrado (23-sep-2026). */}
+          {excelDisponible && (
+            <button
+              type="button"
+              data-boton="excel"
+              onClick={bajarExcel}
+              className="inline-flex min-h-[44px] items-center rounded-md border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-950 active:scale-[0.97]"
+            >
+              Excel
+            </button>
+          )}
         </div>
       )}
 

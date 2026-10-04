@@ -612,7 +612,7 @@ export function ProductosSubtab({
           {vista !== "marca" && !sinVentas && (
             <div data-elemento="cambios" className="space-y-4">
               {cambios && resp?.comparativo && (
-                <Movimientos cambios={cambios} comparativo={resp.comparativo} sustantivo={sustantivo} />
+                <Movimientos cambios={cambios} comparativo={resp.comparativo} />
               )}
               {verTodo}
             </div>
@@ -715,7 +715,7 @@ export function ProductosSubtab({
               <MargenFlojo filas={flojos} margenGeneral={totales?.margen ?? null} sustantivo={sustantivo} />
 
               {cambios && resp?.comparativo && (
-                <Movimientos cambios={cambios} comparativo={resp.comparativo} sustantivo={sustantivo} />
+                <Movimientos cambios={cambios} comparativo={resp.comparativo} />
               )}
 
               {verTodo}
@@ -820,7 +820,7 @@ function Pulso({
         {comparativo ? (
           <>
             Comparado con {fmtFecha(comparativo.desde)} – {fmtFecha(comparativo.hasta)}
-            {comparativo.parcial && " (los mismos días del año pasado, para que sea comparable)"}
+            {comparativo.parcial && ", mismos días"}
             {/* Una marca que no existía el año pasado no tiene contra qué
                 compararse, y decirlo es más útil que dejar tres "sin
                 comparación" sueltos arriba sin explicación. */}
@@ -971,11 +971,9 @@ function MargenFlojo({
 function Movimientos({
   cambios,
   comparativo,
-  sustantivo,
 }: {
   cambios: ReturnType<typeof movimientos>;
   comparativo: Comparativo;
-  sustantivo: string;
 }) {
   if (cambios.subieron.length === 0 && cambios.bajaron.length === 0) return null;
   return (
@@ -994,15 +992,16 @@ function Movimientos({
             Se ordena por la diferencia en dólares, no en porcentaje: lo que sube 400% desde $40 no mueve el mes.
           </Ayuda>
         </div>
-        <p className="mt-0.5 text-xs text-gray-500">
-          {sustantivo === "categorías" ? "Categorías" : "Artículos"} con la mayor diferencia de venta
-          contra {fmtFecha(comparativo.desde)} – {fmtFecha(comparativo.hasta)}.
-        </p>
       </div>
       <div className="grid divide-y divide-gray-100 lg:grid-cols-2 lg:divide-x lg:divide-y-0">
         <ColumnaMovimiento titulo="Subió" filas={cambios.subieron} />
         <ColumnaMovimiento titulo="Bajó" filas={cambios.bajaron} />
       </div>
+      {/* 4-oct-2026: contra qué se compara, en UNA línea al final (antes un
+          párrafo arriba de las columnas). */}
+      <p data-pie-movimientos className="border-t border-gray-100 px-4 py-2 text-xs text-gray-400">
+        vs {fmtFecha(comparativo.desde)} – {fmtFecha(comparativo.hasta)}
+      </p>
     </Card>
   );
 }

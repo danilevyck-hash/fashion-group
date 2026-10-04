@@ -353,8 +353,7 @@ export default function PlanillaBoston() {
               falso, así que se dibuja solo en el camino recortado. */}
           {data.sinSueldos && (
             <p className="text-xs text-gray-500 pt-3">
-              Aquí se ven las horas, las tardanzas y las ausencias. Los sueldos los lleva
-              contabilidad.
+              Solo horas, tardanzas y ausencias · los sueldos los lleva contabilidad
             </p>
           )}
         </>

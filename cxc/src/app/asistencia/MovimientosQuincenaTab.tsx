@@ -201,8 +201,7 @@ export default function MovimientosQuincenaTab(props: { empresa?: string }) {
       )}
 
       <p className="text-sm text-gray-500">
-        «Cierre de planilla» quiere decir que lo registró el cierre de la planilla de esa
-        quincena. «Manual» quiere decir que alguien lo escribió en Préstamos.
+        «Cierre de planilla»: lo registró el cierre · «Manual»: se escribió en Préstamos
       </p>
     </div>
   );

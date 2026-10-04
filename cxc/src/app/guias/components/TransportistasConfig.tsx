@@ -181,7 +181,7 @@ export default function TransportistasConfig({ onAviso }: { onAviso: (m: string)
       aria-labelledby="transportistas-titulo"
       data-testid="transportistas-config"
     >
-      <h2 id="transportistas-titulo" className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-900">
+      <h2 id="transportistas-titulo" className="mb-3 flex items-center gap-1 text-sm font-medium text-gray-900">
         Transportistas
         <Ayuda titulo="Información">
           <p>Son los que ofrece el desplegable «Transportista» al armar una guía.</p>
@@ -189,9 +189,6 @@ export default function TransportistasConfig({ onAviso }: { onAviso: (m: string)
           <p>Quitar uno no borra nada: las guías que ya lo usan siguen diciendo su nombre.</p>
         </Ayuda>
       </h2>
-      <p className="mb-3 text-xs text-gray-500">
-        La ve todo el equipo. También puedes agregar uno desde la guía misma.
-      </p>
 
       <div className="mb-4 flex flex-wrap items-start gap-2">
         <div className="min-w-[180px] flex-1">

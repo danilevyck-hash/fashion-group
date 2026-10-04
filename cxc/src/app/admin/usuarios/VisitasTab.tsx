@@ -91,12 +91,6 @@ export default function VisitasTab() {
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-gray-500">
-        Quién abrió cada módulo en los últimos {datos.dias} días. Se anota al
-        entrar, como mucho una vez cada 10 minutos por persona y módulo, y se
-        guarda {datos.diasQueSeGuardan} días.
-      </p>
-
       {!datos.tablaLista && (
         <Aviso ayuda="El sistema funciona igual; la medición empieza el día que corra."
         >
@@ -170,6 +164,11 @@ export default function VisitasTab() {
           </p>
         </section>
       )}
+
+      {/* 4-oct-2026: antes un párrafo arriba; ahora UNA línea al final. */}
+      <p data-pie-visitas className="text-xs text-gray-500">
+        Últimos {datos.dias} días · una visita cada 10 min por persona y módulo · se guarda {datos.diasQueSeGuardan} días
+      </p>
     </div>
   );
 }

@@ -226,7 +226,7 @@ function CategoriasRubroInner() {
       )}
 
       <div className="mx-auto max-w-3xl px-4 py-6">
-        <h1 className="mb-1 flex items-center gap-1 text-xl font-bold text-gray-900">
+        <h1 className="mb-5 flex items-center gap-1 text-xl font-bold text-gray-900">
           Categorías del catálogo Reebok
           <Ayuda titulo="Información">
             <p>
@@ -240,9 +240,6 @@ function CategoriasRubroInner() {
             <p>Las categorías son tres y no se agregan desde aquí: cambiarlos mueve filtros, pantallas y el bulto.</p>
           </Ayuda>
         </h1>
-        <p className="mb-5 text-xs text-gray-500">
-          El rubro lo manda Switch. Las categorías son tres: Calzado, Ropa y Accesorios.
-        </p>
 
         {/* 🔴 LO QUE PIDIÓ LA PLANTILLA SWITCH, listo para confirmar uno por uno.
             Nada se guarda solo: cada uno necesita que se seleccione su categoría. */}

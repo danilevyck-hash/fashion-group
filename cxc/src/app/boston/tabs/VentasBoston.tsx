@@ -56,10 +56,6 @@ export default function VentasBoston() {
 
   return (
     <div className="space-y-2">
-      <p className="text-xs text-gray-500">
-        Venta neta, sin ITBMS. Las notas de crédito ya están restadas.
-      </p>
-
       {años.map((a) => {
         const esteAbierto = a.anio === activo;
         return (
@@ -99,12 +95,12 @@ export default function VentasBoston() {
         );
       })}
 
-      {data && !data.utilidadDisponible && (
-        <p className="text-xs text-gray-500 pt-1">
-          De Confecciones Boston no se trae el costo desde Switch, así que aquí no hay utilidad ni
-          margen: solo lo vendido.
-        </p>
-      )}
+      {/* 4-oct-2026: lo de arriba («Venta neta, sin ITBMS…») y lo de abajo,
+          en UNA línea al final. */}
+      <p data-pie-ventas-boston className="text-xs text-gray-500 pt-1">
+        Venta neta, sin ITBMS ni notas de crédito
+        {data && !data.utilidadDisponible && " · Switch no trae el costo de Boston: sin utilidad ni margen"}
+      </p>
     </div>
   );
 }

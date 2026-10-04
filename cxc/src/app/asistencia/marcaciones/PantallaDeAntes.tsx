@@ -330,11 +330,9 @@ export default function MarcacionesDeAntes({ empresa }: { empresa: string }) {
 
       <FotosDeLaMarcaModal marcas={abierta ? [abierta] : null} onClose={() => setAbierta(null)} />
 
-      {/* Lo que esta pantalla NO hace, dicho donde se lee. */}
+      {/* Lo que esta pantalla NO hace, en UNA línea al final (4-oct-2026). */}
       <p className="text-xs text-gray-400">
-        Aquí solo se mira. Para corregir una hora, entra a Asistencia: la marca del teléfono no se
-        edita ni se borra, la corrección va encima y pide el porqué. Sin aparato, la celda dice «
-        {SIN_APARATO}».
+        Solo lectura · las horas se corrigen en Asistencia · «{SIN_APARATO}» = sin aparato
       </p>
     </div>
   );

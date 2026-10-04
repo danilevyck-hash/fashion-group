@@ -182,7 +182,7 @@ export default function DespachadoresConfig({ onAviso }: { onAviso: (m: string) 
       aria-labelledby="despachadores-titulo"
       data-testid="despachadores-config"
     >
-      <h2 id="despachadores-titulo" className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-900">
+      <h2 id="despachadores-titulo" className="mb-3 flex items-center gap-1 text-sm font-medium text-gray-900">
         Despachadores
         <Ayuda titulo="Información">
           <p>Son los nombres que ofrece el desplegable «Despachado por» al armar una guía.</p>
@@ -190,9 +190,6 @@ export default function DespachadoresConfig({ onAviso }: { onAviso: (m: string) 
           <p>Quitar uno no borra nada: las guías que ya lo dicen siguen con su nombre.</p>
         </Ayuda>
       </h2>
-      <p className="mb-3 text-xs text-gray-500">
-        Los nombres que ofrece «Despachado por» al armar una guía. La ve todo el equipo.
-      </p>
 
       <div className="mb-4 flex flex-wrap items-start gap-2">
         <div className="min-w-[180px] flex-1">

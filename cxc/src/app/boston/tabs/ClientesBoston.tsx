@@ -66,7 +66,7 @@ export default function ClientesBoston() {
             ? "Cargando…"
             : data?.modo === "busqueda"
               ? `${clientes.length} ${clientes.length === 1 ? "cliente" : "clientes"}${data.truncado ? " (hay más, afina la búsqueda)" : ""}`
-              : `${clientes.length} ${clientes.length === 1 ? "cliente" : "clientes"} con saldo abierto — busca por nombre para ver el resto`}
+              : `${clientes.length} ${clientes.length === 1 ? "cliente" : "clientes"} con saldo abierto`}
       </p>
 
       {error && (

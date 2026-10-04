@@ -78,15 +78,6 @@ export default function GastosPorEmpresa({ gastos, mes }: { gastos: GastosData; 
           {gastos.empresasConGasto} de {gastos.empresasTotal} con gastos cargados
         </span>
       </div>
-      {/* La bajada NO es decorativa: dice DE DÓNDE sale el número y que no hay
-          total. Sin lo primero, "gastos" es ambiguo (¿lo que la contadora cerró
-          o lo que salió del banco?); sin lo segundo, alguien suma las filas de
-          cabeza y se arma el número del grupo que Daniel pidió no tener. */}
-      <p className="mt-0.5 text-xs text-gray-500">
-        Egresos de caja y banco, sin transferencias ni préstamos. Sin total consolidado: cada
-        empresa tiene cargado un mes distinto.
-      </p>
-
       {!gastos.disponible ? (
         <p className="mt-3 text-sm text-gray-500">
           Los gastos de Switch todavía no están conectados.
@@ -123,6 +114,14 @@ export default function GastosPorEmpresa({ gastos, mes }: { gastos: GastosData; 
             );
           })}
         </div>
+      )}
+
+      {/* La bajada NO es decorativa: dice DE DÓNDE sale el número y que no hay
+          total. 4-oct-2026: UNA línea al final, no arriba. */}
+      {gastos.disponible && (
+        <p data-pie-gastos className="mt-2 text-xs text-gray-500">
+          Egresos de caja y banco, sin transferencias ni préstamos · sin total consolidado (cada empresa va en su mes)
+        </p>
       )}
 
       <Link

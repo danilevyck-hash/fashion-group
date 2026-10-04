@@ -38,7 +38,7 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { SWRConfig } from "swr";
 import {
   CODIGOS_FUERA_DEL_RANKING, ELEMENTOS_POR_PESTANA, RETAIL_AL_FRENTE, fmtDeltaRetail,
@@ -567,28 +567,42 @@ describe("5 · Vendedoras: 4 elementos", () => {
     return r;
   }
 
-  it("🔴 son CUATRO: resumen · tabla · «Nueva meta» · UNA tarjeta de meta", async () => {
+  // 🔁 4-oct-2026: el resumen va DEBAJO de la tabla, en una línea.
+  it("🔴 son CUATRO: tabla · resumen (al pie) · «Nueva meta» · UNA tarjeta de meta", async () => {
     const { container } = await pintarVendedoras(9);
     const elementos = [...container.querySelectorAll("[data-elemento]")].map((e) => e.getAttribute("data-elemento"));
-    expect(elementos).toEqual(["resumen", "tabla", "nueva-meta", "meta"]);
+    expect(elementos).toEqual(["tabla", "resumen", "nueva-meta", "meta"]);
     expect(elementos).toHaveLength(ELEMENTOS_POR_PESTANA.vendedoras);
     expect(screen.getAllByLabelText("Meta Viaje playa")).toHaveLength(1);
     expect(screen.queryByText(/cuánto aportó cada una/)).toBeNull();
   });
 
-  // 🔁 1-oct-2026 — Daniel: «Badge de bono sí, como antes». En curso: UNA
-  // línea ARRIBA de la tabla con la regla, y ningún chip ni «al cierre».
-  it("sin la frase falsa, sin columna Bono; en curso, la línea de la regla ARRIBA de la tabla y sin chips", async () => {
+  // 🔁 1-oct-2026 — Daniel: «Badge de bono sí, como antes». En curso, ningún
+  // chip ni «al cierre».
+  // 🔁 4-oct-2026 — Daniel: «quítame estos mensajes que no son necesarios… o
+  // bien resumido abajo en una línea». Arriba de la tabla no queda NADA: ni el
+  // resumen, ni la nota de la Δ, ni la regla del bono. Todo en UNA línea gris al
+  // final: «… · vs ago 2026, mismos días · bono al cierre del mes ⓘ», y la regla
+  // entera detrás del ⓘ.
+  it("sin la frase falsa, sin columna Bono; en curso, UNA línea AL PIE de la tabla con el bono y su ⓘ", async () => {
     const { container } = await pintarVendedoras(9);
     expect(screen.queryByText(/incluye mayoreo si lo hubo/)).toBeNull();
     expect(screen.queryByText("Bono")).toBeNull();
     expect(screen.queryByText("al cierre")).toBeNull();
-    const linea = await screen.findByText("Bono de septiembre: se define al cerrar el mes · $50 a la que más venda y $50/$100 a la gerente si la tienda crece ≥5 %/≥10 %");
-    const p = linea.closest("[data-linea-bono]") as HTMLElement;
-    expect(p.className).toContain("text-sm");
-    expect(p.className).not.toContain("text-xs");
+    expect(container.querySelector("[data-linea-bono]")).toBeNull();
+    expect(container.textContent).not.toContain("La Δ compara contra");
+    expect(container.textContent).not.toContain("vendedoras ·");
+    const pie = await waitFor(() => {
+      const p = container.querySelector("[data-pie-vendedoras]") as HTMLElement;
+      expect(p.textContent).toContain("bono al cierre del mes");
+      return p;
+    });
+    expect(pie.className).toContain("text-xs");
+    expect(pie.textContent).not.toMatch(/\.\d\d\b/); // sin centavos
+    expect(pie.querySelector('[aria-label="Regla del bono"]')!.getAttribute("title"))
+      .toContain("Bono de septiembre: se define al cerrar el mes · $50 a la que más venda y $50/$100 a la gerente si la tienda crece ≥5 %/≥10 %");
     const tabla = container.querySelector('[data-elemento="tabla"]')!;
-    expect(p.compareDocumentPosition(tabla) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(tabla.compareDocumentPosition(pie) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(container.querySelector("[data-chip-bono]")).toBeNull();
   });
 

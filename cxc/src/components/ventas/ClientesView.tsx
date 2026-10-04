@@ -94,8 +94,8 @@ const OTROS_CLIENTES_PISTA = "Tocar para ver el detalle";
  *  escritorio lo dice el encabezado «vs 2025» de la columna, a diez centímetros. */
 const textoComparativo = (anio: number, periodo: PeriodoVentas) =>
   periodo.tipo === "ultimos"
-    ? "El cambio compara contra los mismos meses del año anterior"
-    : `El cambio compara contra el mismo período de ${anio}`;
+    ? "vs mismos meses del año anterior"
+    : `vs mismo período de ${anio}`;
 
 /** «6 empresas» / «1 empresa». El número es lo que varía; la palabra acompaña.
  *  Una sola función para la tabla y para la tarjeta: dos formas de decirlo son
@@ -739,21 +739,14 @@ export function ClientesView({
           </div>
         </div>
 
-        {/* Counter mobile. */}
-        <div className="lg:hidden">
-          <div className="text-xs text-gray-500">
+        {/* Counter mobile, solo en Utilidad. En la lista, el conteo y contra
+            qué compara van en UNA línea al final (Daniel, 4-oct-2026). */}
+        {enUtilidad && (
+          <div className="text-xs text-gray-500 lg:hidden">
             <span className="font-mono text-gray-950">{cuantosClientes}</span> clientes
-            {frescura && !enUtilidad && <span data-frescura-clientes> · {frescura}</span>}
-            {enUtilidad && <span data-periodo-utilidad> · Año {selectedYear}</span>}
+            <span data-periodo-utilidad> · Año {selectedYear}</span>
           </div>
-          {/* En el celular no hay encabezado de columna que rotule el %: sin
-              esta línea, el "▲ +18%" de cada tarjeta no dice contra qué. */}
-          {!enUtilidad && (
-            <div data-comparativo-clientes className="mt-0.5 text-xs text-gray-500">
-              {textoComparativo(anioComparativo, periodoServido)}
-            </div>
-          )}
-        </div>
+        )}
 
         {/* ⛔ ACÁ VIVÍA LA TIRA DE SIETE PÍLDORAS DE EMPRESA. Se retiró el
             11-sep-2026: es el desplegable de arriba (Daniel: «B»). */}
@@ -992,6 +985,13 @@ export function ClientesView({
             No se encontraron clientes con esos filtros.
           </div>
         )}
+        {/* 🔴 UNA línea gris al final (Daniel, 4-oct-2026): cuántos, de cuándo
+            y contra qué compara el %. Nada de párrafos arriba de la lista. */}
+        <p data-comparativo-clientes className="px-1 pt-1 text-xs text-gray-500">
+          <span className="font-mono text-gray-950">{cuantosClientes}</span> clientes
+          {frescura && <span data-frescura-clientes> · {frescura}</span>}
+          {" · "}{textoComparativo(anioComparativo, periodoServido)}
+        </p>
       </div>
       </>
       )}

@@ -253,15 +253,16 @@ export default function DetalleEgresos({ empresa, onVolver }: Props) {
               <h2 className="mb-1 mt-4 text-sm font-semibold text-gray-900">
                 Otros egresos
               </h2>
-              {/* Sin esta frase, alguien lee "salió plata" y anota gasto. */}
-              <p className="mb-2 text-sm text-gray-600">
-                Egresos que no son gasto: transferencias, anticipos, pagos de deudas y préstamos.
-              </p>
               <div className="rounded-lg border border-gray-200 bg-white px-3 py-1">
                 {noGastoVistas.map((c) => (
                   <FilaCuenta key={c.cuenta} c={c} />
                 ))}
               </div>
+              {/* Sin esta frase, alguien lee "salió plata" y anota gasto.
+                  4-oct-2026: UNA línea al final de la lista, no arriba. */}
+              <p className="mt-1 text-xs text-gray-500">
+                No son gasto: transferencias, anticipos, pagos de deudas y préstamos
+              </p>
             </>
           )}
 

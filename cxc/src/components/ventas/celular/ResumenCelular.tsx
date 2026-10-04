@@ -309,17 +309,8 @@ function ResumenCelularDeSiempre({
         </div>
       </GrupoVentas>
 
-      {/* 🔴 EL COLCHÓN DE LA DERECHA: el botón flotante vive en esa esquina y
-          esta línea es la última de la pantalla. La medida sale de
-          `barra-celular.ts`, no de un número escrito acá. */}
-      <p
-        data-pie-resumen
-        className="px-6 pt-2 text-[12.5px] text-gray-500"
-        style={ESTILO_COLCHON_DERECHA}
-      >
-        Toca una empresa para ver mes por mes.
-      </p>
-
+      {/* 4-oct-2026: el «Toca una empresa para ver mes por mes» se fue (Daniel:
+          «quítame estos mensajes que no son necesarios»). */}
       {/* 🔴 EL «INCLUYE MAYOREO» BAJA A DONDE ESTÁ SU DESGLOSE. En la lista
           hacía que la fila de Multifashion midiera 112 px y cuatro líneas. */}
       {multiMayoreoNota && (
@@ -468,10 +459,6 @@ function ResumenCelularPorPeriodo({
           </tbody>
         </table>
       </GrupoVentas>
-
-      <p data-pie-resumen className="px-6 pt-2 text-[12.5px] text-gray-500" style={ESTILO_COLCHON_DERECHA}>
-        Toca una empresa para ver mes por mes.
-      </p>
 
       {/* La nota de mayoreo es del AÑO (no hay dato por mes): con un mes elegido no sale. */}
       {mes === 0 && multiMayoreoNota && (

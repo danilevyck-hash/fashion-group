@@ -29,7 +29,7 @@ import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { variacionPct, fmtVariacionPct } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
 import { RETAIL_AL_FRENTE } from "@/lib/multifashion/retail-al-frente";
-import { lineaBono, type ChipDeBono } from "@/lib/multifashion/bono-linea";
+import type { ChipDeBono } from "@/lib/multifashion/bono-linea";
 
 const MES_FULL = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -41,7 +41,7 @@ const REGLA_BONO =
 
 /** La regla con `RETAIL_AL_FRENTE` (23-sep-2026): retail contra retail. El
  *  monto y los escalones son los MISMOS; cambió contra qué se mide. */
-const REGLA_BONO_RETAIL =
+export const REGLA_BONO_RETAIL =
   "Crecimiento ≥ 5% y < 10% → $50 · ≥ 10% → $100. Retail contra retail: la tienda sin mayoreo vs el mismo mes del año anterior.";
 
 const TONE_LIGHT: Record<DeltaTone, string> = {
@@ -104,21 +104,11 @@ export function BonosSection({ selectedYear, mes, onData }: BonosSectionProps) {
 
   // 🔴 RETAIL AL FRENTE (23-sep-2026): la columna «Bono» se fue.
   // 🔁 1-oct-2026 (Daniel: «Badge de bono sí, como antes»): con el mes CERRADO
-  // aquí ya no se dibuja nada —quién ganó lo dice el CHIP de su fila
-  // (`ChipBono`)—; con el mes EN CURSO, UNA línea con la regla, ARRIBA de la
-  // tabla y del tamaño normal. La segunda lectura («En agosto: …») se fue.
-  if (RETAIL_AL_FRENTE) {
-    const texto = lineaBono(resp);
-    if (!texto) return null;
-    return (
-      <p data-linea-bono className={cn("flex flex-wrap items-center gap-x-1.5 text-sm text-gray-500", loading && "opacity-60 transition-opacity")}>
-        <span>{texto}</span>
-        <span title={REGLA_BONO_RETAIL} className="inline-flex cursor-help text-gray-400" aria-label="Regla del bono">
-          <Info className="h-3.5 w-3.5" />
-        </span>
-      </p>
-    );
-  }
+  // quién ganó lo dice el CHIP de su fila (`ChipBono`).
+  // 🔁 4-oct-2026 (Daniel: «quítame estos mensajes que no son necesarios»): con
+  // el mes EN CURSO tampoco se dibuja nada aquí. «bono al cierre del mes» va en
+  // la línea final de la tabla (`VendedorasSubtab`) y la regla, en su ⓘ.
+  if (RETAIL_AL_FRENTE) return null;
 
   // Mes todavía abierto: no hay nada que contar que la columna «Bono» no diga ya.
   if (!resp.es_elegible) return null;

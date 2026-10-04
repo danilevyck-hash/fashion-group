@@ -12,6 +12,9 @@
 // 🔁 1-oct-2026 (Daniel: «Badge de bono sí, como antes»): con el mes CERRADO
 // la frase de abajo se fue y el bono es un CHIP en la fila (`chipDeBono`); con
 // el mes EN CURSO queda UNA línea ARRIBA de la tabla con la regla (`lineaBono`).
+// 🔁 4-oct-2026 (Daniel: «quítame estos mensajes que no son necesarios»): ya no
+// va arriba. Al FINAL de la tabla dice solo «bono al cierre del mes» (`bonoCorto`)
+// y la regla entera (`lineaBono`) queda detrás del ⓘ.
 //
 // ⚠️ Ni el monto ni la regla del bono viven aquí: los decide la RPC
 // (`multifashion_bonos_v5`, retail contra retail; cae a la v4). Esto solo elige
@@ -34,8 +37,8 @@ const MES_LARGO = [
  * Jennifer Miranda $100 · Sheynee Batista $50.») y la fila ganadora solo tenía
  * un fondo ámbar tenue. Ahora, como en junio: un chip junto al nombre —«Bono
  * $50» ámbar para la vendedora, «Bono gerente $100» verde para la gerente— y la
- * frase de abajo se va. Con el mes EN CURSO, UNA línea arriba de la tabla con la
- * regla, sin chips. En un rango de meses, nada.
+ * frase de abajo se va. Con el mes EN CURSO, sin chips: «bono al cierre del mes»
+ * en la línea final de la tabla y la regla detrás del ⓘ. En un rango de meses, nada.
  *
  * ⚠️ La regla dicha en la línea es la de `multifashion_bonos_v5`: $50 a la
  * no-gerente que más vende el mes, y a la gerente $50 si la tienda (sin
@@ -54,6 +57,12 @@ const MONTO_GERENTE_10 = 100;
 export function lineaBono(visto: BonosMultifashion | null | undefined): string | null {
   if (!visto || visto.sin_data || visto.es_elegible) return null;
   return `Bono de ${MES_LARGO[visto.mes_evaluado.mes - 1]}: se define al cerrar el mes · $${BONO_VENDEDORA} a la que más venda y $${MONTO_GERENTE_5}/$${MONTO_GERENTE_10} a la gerente si la tienda crece ≥5 %/≥10 %`;
+}
+
+/** Lo corto que va en la línea final de la tabla (4-oct-2026); el detalle
+ *  (`lineaBono`) queda detrás del ⓘ. `null` = mes cerrado o sin datos. */
+export function bonoCorto(visto: BonosMultifashion | null | undefined): string | null {
+  return lineaBono(visto) ? "bono al cierre del mes" : null;
 }
 
 export interface ChipDeBono {

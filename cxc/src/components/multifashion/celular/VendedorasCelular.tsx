@@ -16,7 +16,7 @@
 // (±5 %) que la tabla de computadora. Acá no se calcula nada.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import useSWR from "swr";
 import { cn } from "@/lib/utils";
 import type { BonosMultifashion, VendedoraDetalle } from "@/components/ventas/types";
@@ -51,10 +51,12 @@ interface Props {
   /** 🔁 1-oct-2026: los bonos del mes; con el mes CERRADO la ganadora y la
    *  gerente llevan su chip junto al nombre. `null` = sin chips. */
   bonos?: BonosMultifashion | null;
+  /** «· bono al cierre del mes ⓘ» con el mes en curso; va al final de la línea de abajo. */
+  pieBono?: ReactNode;
 }
 
 export function VendedorasCelular({
-  vendedoras, ventasTotal, tiquetesTotal, rotuloDelta, anio, parcial, metaAbierta, onAbrirMeta, conMetas, bonos = null,
+  vendedoras, ventasTotal, tiquetesTotal, rotuloDelta, anio, parcial, metaAbierta, onAbrirMeta, conMetas, bonos = null, pieBono = null,
 }: Props) {
   const [abierta, setAbierta] = useState<string | null>(null);
 
@@ -73,11 +75,7 @@ export function VendedorasCelular({
 
   return (
     <section data-celular="vendedoras" className="pb-4">
-      <p data-celular="vendedoras-subtitulo" className="text-sm text-gray-500 tabular-nums">
-        {subtituloVendedoras({ ventas: ventasTotal, tiquetes: tiquetesTotal, rotuloDelta, anio, parcial })}
-      </p>
-
-      <ul data-celular="vendedoras-lista" className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <ul data-celular="vendedoras-lista" className="overflow-hidden rounded-xl border border-gray-200 bg-white">
         {vendedoras.map((v) => {
           const delta = deltaCorto(variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct));
           const desglose = desgloseCanales(v.ventas, v.por_canal, v.nombre);
@@ -127,6 +125,14 @@ export function VendedorasCelular({
           );
         })}
       </ul>
+
+      {/* 🔴 4-oct-2026: el resumen ya no va arriba de la lista. UNA línea gris
+          al final, con el bono del mes en curso y su ⓘ (Daniel: «o bien
+          resumido abajo en una línea»). */}
+      <p data-celular="vendedoras-subtitulo" className="mt-2 px-1 text-xs text-gray-500 tabular-nums">
+        {subtituloVendedoras({ ventas: ventasTotal, tiquetes: tiquetesTotal, rotuloDelta, anio, parcial })}
+        {pieBono}
+      </p>
 
       {conMetas && meta && (
         <>

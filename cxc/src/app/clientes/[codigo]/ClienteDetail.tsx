@@ -452,9 +452,6 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
             />
           </div>
           {error && <p role="alert" className="mt-2 text-xs text-red-600">{error}</p>}
-          {puedeEditar && (
-            <p className="mt-3 text-xs text-gray-400">Toca un dato para cambiarlo. Se guarda al salir del campo.</p>
-          )}
         </section>
 
         {/* ── 6. EL PIE: ENLACES, NO BOTONES ──────────────────────────────── */}

@@ -80,11 +80,8 @@ export function rotuloDeltaAnioPasado(year: number, mes: number): { columna: str
   return { columna: `Δ ${corto}`, corto };
 }
 
-/** La frase bajo el resumen: contra qué se compara y, si el mes va abierto, que son los mismos días. */
+/** La línea final de la tabla (4-oct-2026): contra qué se compara y, si el mes va abierto, que son los mismos días. */
 export function notaAnioPasado(year: number, mes: number, ventana: { hasta: string; parcial: boolean }): string {
-  const nombre = `${MES_LARGO[mes - 1]} ${year - 1}`;
-  if (ventana.parcial) {
-    return `La Δ compara contra ${nombre}, los mismos días (del 1 al ${Number(ventana.hasta.slice(8, 10))}).`;
-  }
-  return `La Δ compara contra ${nombre} completo.`;
+  const nombre = `${MES_CORTO[mes - 1]} ${year - 1}`;
+  return ventana.parcial ? `vs ${nombre}, mismos días` : `vs ${nombre}`;
 }

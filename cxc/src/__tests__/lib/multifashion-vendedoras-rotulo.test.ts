@@ -46,15 +46,15 @@ describe("los chips que SÍ comparan contra el año pasado lo siguen diciendo", 
   });
 });
 
-describe("la nota bajo el subtítulo", () => {
+describe("la nota de la línea final (4-oct-2026: corta y al pie)", () => {
   it("mes en curso: nombra el mes y dice que son los mismos días", () => {
     expect(notaComparacionVendedoras("en_curso", 9, 2026, true, "2026-08-03"))
-      .toBe("La Δ compara contra agosto 2026, los mismos días (del 1 al 3).");
+      .toBe("vs agosto 2026, mismos días");
   });
 
   it("mes cerrado: el mes anterior completo", () => {
     expect(notaComparacionVendedoras("mes_anterior", 8, 2026, false, "2026-07-31"))
-      .toBe("La Δ compara contra julio 2026 completo.");
+      .toBe("vs julio 2026");
   });
 
   it("en los chips de año no hay nota: el rótulo ya lo dice", () => {

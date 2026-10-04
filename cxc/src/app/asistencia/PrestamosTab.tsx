@@ -562,10 +562,9 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
       </div>
       )}
 
-      <p className="text-sm text-gray-500">
-        El descuento de la quincena lo registra el cierre de la planilla. Aquí van los
-        abonos que no salieron del sueldo y los préstamos nuevos; tocando el nombre
-        se ven todos los movimientos.
+      {/* 4-oct-2026: UNA línea al final (antes tres renglones de explicación). */}
+      <p data-pie-prestamos className="text-sm text-gray-500">
+        El descuento de la quincena lo registra el cierre de la planilla
       </p>
 
       {abonando && (

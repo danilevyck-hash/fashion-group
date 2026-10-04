@@ -140,12 +140,9 @@ export function ListaSeguimientoClientes({ clientes, hoy, conMonto = false }: Pr
       {conMonto ? (
         <h3 className="sr-only">Clientes identificados · {conteos.todos.toLocaleString()} con nombre y compras</h3>
       ) : (
-        <div>
-          <h3 className="font-display text-sm font-semibold text-gray-950">Clientes identificados</h3>
-          <p className="text-xs text-gray-500">
-            {conteos.todos.toLocaleString()} con nombre y compras · toca el nombre para ver su ficha
-          </p>
-        </div>
+        // 4-oct-2026: sin subtítulo. El conteo ya lo dice el chip «Todos» y el
+        // «toca el nombre…» sobraba (Daniel: «quítame estos mensajes»).
+        <h3 className="font-display text-sm font-semibold text-gray-950">Clientes identificados</h3>
       )}
 
       <Card className="overflow-hidden p-0">

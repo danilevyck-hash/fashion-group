@@ -23,7 +23,7 @@ export default function GaleriaView({
       <header className="mb-4">
         <h1 className="text-lg font-semibold text-gray-900">Fotos · {nombre}</h1>
         <p className="text-xs text-gray-500">
-          {fotos.length} {fotos.length === 1 ? "foto" : "fotos"} · solo para ver
+          {fotos.length} {fotos.length === 1 ? "foto" : "fotos"}
         </p>
       </header>
 

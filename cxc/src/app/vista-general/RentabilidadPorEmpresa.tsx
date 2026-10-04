@@ -109,13 +109,7 @@ export default function RentabilidadPorEmpresa({
 
   return (
     <div className="mb-8">
-      <h2 className="text-sm font-semibold text-gray-900">Rentabilidad por empresa</h2>
-      {/* La bajada NO es decorativa: dice de dónde sale cada número y, sobre
-          todo, que no hay un total. Sin ella, alguien suma las filas de cabeza
-          y se arma el número del grupo que Daniel pidió no tener. */}
-      <p className="mt-0.5 mb-3 text-xs text-gray-500">
-        Utilidad bruta menos gastos, por empresa. Sin total consolidado.
-      </p>
+      <h2 className="mb-3 text-sm font-semibold text-gray-900">Rentabilidad por empresa</h2>
 
       {/* ─── Tarjetas (< md): iPhone ──────────────────────────────────────
           🩸 POR QUÉ. Medido con scripts/_ancho-util-ventas.mjs: la tabla necesita
@@ -178,6 +172,12 @@ export default function RentabilidadPorEmpresa({
           </tbody>
         </table>
       </div>
+      {/* La bajada NO es decorativa: dice de dónde sale cada número y, sobre
+          todo, que no hay un total. 4-oct-2026: UNA línea al final, no arriba
+          (Daniel: «o bien resumido abajo en una línea»). */}
+      <p data-pie-rentabilidad className="mt-2 text-xs text-gray-500">
+        Utilidad bruta menos gastos · sin total consolidado
+      </p>
     </div>
   );
 }

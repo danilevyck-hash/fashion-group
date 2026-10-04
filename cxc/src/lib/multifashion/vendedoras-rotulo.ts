@@ -51,7 +51,7 @@ export function rotuloDeltaVendedoras(chip: ChipVendedoras, mes: number, year: n
 }
 
 /**
- * La frase bajo el subtítulo cuando el chip es de mes: dice contra qué mes se
+ * La línea final de la tabla (4-oct-2026) cuando el chip es de mes: contra qué mes se
  * compara y, si el mes está en curso, que son los mismos días.
  * `diaCortePrev` = `dia_corte_periodo_anterior` de la RPC (YYYY-MM-DD) o null.
  */
@@ -65,9 +65,5 @@ export function notaComparacionVendedoras(
   if (chip !== "en_curso" && chip !== "mes_anterior") return null;
   const c = mesComparadoVendedoras(mes, year);
   const nombre = `${MES_MINUSCULA[c.mes - 1]} ${c.year}`;
-  if (parcial && diaCortePrev) {
-    const dia = Number(diaCortePrev.slice(8, 10));
-    return `La Δ compara contra ${nombre}, los mismos días (del 1 al ${dia}).`;
-  }
-  return `La Δ compara contra ${nombre} completo.`;
+  return parcial && diaCortePrev ? `vs ${nombre}, mismos días` : `vs ${nombre}`;
 }
