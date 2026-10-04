@@ -14,11 +14,12 @@
 // dibujan.
 // ============================================================================
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { Children, useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { COLCHON_LATERAL_FLOTANTE } from "@/lib/navegacion/barra-celular";
 import { EnLaBarra, useHayBarraCelular } from "./BarraDeControles";
 import { tituloCelular } from "@/lib/navegacion/barra-controles-celular";
-import { CLASE_VIDRIO, RADIO_VIDRIO, conVidrio } from "@/lib/ui/vidrio";
+import { CLASE_VIDRIO, RADIO_VIDRIO, conVidrio, vidrioSobre } from "@/lib/ui/vidrio";
 
 /** El lienzo: fondo de iOS y sitio para el botón flotante. */
 export function PantallaCel({ children }: { children: ReactNode }) {
@@ -239,8 +240,10 @@ export function HojaCel({
     return () => document.removeEventListener("keydown", alTeclear);
   }, [abierta, onCerrar]);
 
-  if (!abierta) return null;
-  return (
+  if (!abierta || typeof document === "undefined") return null;
+  // 🔑 Al final de `<body>`: un `transform` o un `z-index` de un contenedor (el
+  // «tirar para actualizar») la dejaría debajo de la barra de pestañas.
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -287,7 +290,60 @@ export function HojaCel({
           Cancelar
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
+  );
+}
+
+/**
+ * 🔴 LA HOJA DEL «···» (4-oct-2026), UNA para Ventas y Comisiones: sus
+ * botones arriba y «Cancelar» abajo.
+ *
+ * 🩸 Daniel, en Comisiones › Multifashion: tocaba «···» y solo veía «Cancelar»
+ * sobre una franja borrosa. Dos causas: la hoja no traía NINGUNA opción (en
+ * Multifashion no hay papel ni «Actualizar ahora») y el vidrio v2, con 22 % de
+ * blanco, dejaba ver a través la barra de pestañas y la del total.
+ *  · Sin opciones, la hoja NO se dibuja (y quien la abre esconde su «···»).
+ *  · El panel es el vidrio grueso de `globals.css` (`.vidrio.rounded-2xl`).
+ *  · Va por portal al final de `<body>`, encima de la barra de pestañas.
+ * Candado: `hoja-menu-celular.test.tsx`.
+ */
+export function HojaMenuCel({
+  abierta,
+  onCerrar,
+  children,
+  ...datos
+}: {
+  abierta: boolean;
+  onCerrar: () => void;
+  children: ReactNode;
+} & { [dato: `data-${string}`]: string | boolean | undefined }) {
+  if (!abierta || typeof document === "undefined") return null;
+  if (Children.toArray(children).length === 0) return null;
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Más opciones"
+      {...datos}
+      className="fixed inset-0 z-[60] flex flex-col justify-end"
+    >
+      <button type="button" aria-label="Cerrar" onClick={onCerrar} className="absolute inset-0 bg-black/30" />
+      <div
+        className={vidrioSobre("relative mx-2 mb-2 overflow-hidden rounded-2xl bg-white p-3")}
+        style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+      >
+        {children}
+        <button
+          type="button"
+          onClick={onCerrar}
+          className="mt-2 block w-full rounded-xl px-4 py-3 text-center text-[17px] text-gray-600 active:bg-gray-100"
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

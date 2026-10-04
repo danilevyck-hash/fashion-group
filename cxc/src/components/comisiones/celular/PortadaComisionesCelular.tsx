@@ -35,6 +35,7 @@ import { hoyPanama } from "@/lib/fecha-panama";
 import {
   BotonPuntos,
   HojaCel,
+  HojaMenuCel,
   PantallaCel,
   TituloCel,
 } from "@/components/celular/Piezas";
@@ -47,7 +48,6 @@ import {
 } from "@/lib/comisiones/celular";
 import { ComisionesPeriodo } from "../ComisionesPeriodo";
 import type { RangoConsulta } from "@/lib/comisiones/vendedores-rango";
-import { vidrioSobre } from "@/lib/ui/vidrio";
 
 interface OpcionVista {
   valor: string;
@@ -144,7 +144,8 @@ export function PortadaComisionesCelular({
                 <Settings className="h-[18px] w-[18px]" />
               </button>
             )}
-            <BotonPuntos onClick={() => setMenu(true)} ariaLabel="Más opciones" />
+            {/* 🔴 Sin nada que ofrecer (Multifashion), no hay «···». */}
+            {conDescarga && <BotonPuntos onClick={() => setMenu(true)} ariaLabel="Más opciones" />}
           </div>
         }
       />
@@ -210,49 +211,28 @@ export function PortadaComisionesCelular({
       <div className="px-2 pt-1">{children}</div>
 
       {/* El «···»: Descargar y Actualizar ahora, nada más. */}
-      {menu && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Más opciones"
-          data-menu-comisiones
-          className="fixed inset-0 z-[60] flex flex-col justify-end"
-        >
-          <button type="button" aria-label="Cerrar" onClick={() => setMenu(false)} className="absolute inset-0 bg-black/30" />
-          <div
-            className={vidrioSobre("relative mx-2 mb-2 overflow-hidden rounded-2xl bg-white p-3")}
-            style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+      <HojaMenuCel abierta={menu} onCerrar={() => setMenu(false)} data-menu-comisiones>
+        {conDescarga && (
+          <button
+            type="button"
+            data-abrir-descargar
+            disabled={pdfDisabled && excelDisabled}
+            onClick={() => { setMenu(false); setDescarga(true); }}
+            className="mb-2 block w-full rounded-xl bg-gray-900 px-4 py-3 text-center text-[17px] font-semibold text-white active:scale-[0.97] disabled:bg-gray-300"
           >
-            {conDescarga && (
-              <button
-                type="button"
-                data-abrir-descargar
-                disabled={pdfDisabled && excelDisabled}
-                onClick={() => { setMenu(false); setDescarga(true); }}
-                className="mb-2 block w-full rounded-xl bg-gray-900 px-4 py-3 text-center text-[17px] font-semibold text-white active:scale-[0.97] disabled:bg-gray-300"
-              >
-                {ROTULO_DESCARGAR_COMISIONES}
-              </button>
-            )}
-            {conDescarga && (
-              <div className="[&>*]:w-full">
-                <SyncNowButton
-                  opciones={SYNC_NOW_RECIBOS_OPCIONES}
-                  className="w-full justify-center"
-                  onSuccess={() => { setMenu(false); onActualizado(); }}
-                />
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={() => setMenu(false)}
-              className="mt-2 block w-full rounded-xl px-4 py-3 text-center text-[17px] text-gray-600 active:bg-gray-100"
-            >
-              Cancelar
-            </button>
+            {ROTULO_DESCARGAR_COMISIONES}
+          </button>
+        )}
+        {conDescarga && (
+          <div className="[&>*]:w-full">
+            <SyncNowButton
+              opciones={SYNC_NOW_RECIBOS_OPCIONES}
+              className="w-full justify-center"
+              onSuccess={() => { setMenu(false); onActualizado(); }}
+            />
           </div>
-        </div>
-      )}
+        )}
+      </HojaMenuCel>
 
       {/* La hoja de «Descargar». «PDF de un vendedor…» abre el detalle, que es
           desde donde ya se baja el papel de una persona. */}

@@ -13,6 +13,7 @@ export {
   Segmentado,
   BotonPuntos,
   HojaCel,
+  HojaMenuCel,
   PantallaQueSube,
   colorDelSigno,
   colorDelTono,

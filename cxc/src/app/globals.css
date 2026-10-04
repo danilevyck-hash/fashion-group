@@ -443,6 +443,16 @@ html[data-vidrio="v2"] .vidrio {
 }
 html[data-vidrio="v2"] .vidrio.rounded-2xl {
   border-radius: 28px;
+  /* 🔴 LOS PANELES CON OPCIONES SE LEEN (4-oct-2026). Hojas que suben, menús
+     «···» y desplegables llevan `rounded-2xl` (RADIO_VIDRIO); la barra de
+     pestañas y el ☰ son `rounded-full` y siguen con el 22 % de arriba.
+     🩸 Con el 22 % de blanco, la hoja «···» de Comisiones dejaba ver a través
+     la barra de pestañas y la barra negra del total: Daniel solo leía
+     «Cancelar» encima de una franja borrosa. Material grueso de iOS: 92 % de
+     blanco y desenfoque largo, sin el aclarado que lavaba el texto. */
+  background-color: rgb(255 255 255 / 0.92);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
 }
 @supports (corner-shape: squircle) {
   html[data-vidrio="v2"] .vidrio.rounded-2xl {
@@ -456,7 +466,8 @@ html[data-vidrio="v2"] .vidrio.rounded-2xl {
   }
 }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  html[data-vidrio="v2"] .vidrio {
+  html[data-vidrio="v2"] .vidrio,
+  html[data-vidrio="v2"] .vidrio.rounded-2xl {
     background-color: rgb(255 255 255);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;

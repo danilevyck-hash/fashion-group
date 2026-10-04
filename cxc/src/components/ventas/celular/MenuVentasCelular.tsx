@@ -28,8 +28,7 @@ import {
   type PestanaDescarga,
 } from "@/lib/ventas/descarga-un-boton";
 import { ROTULO_DESCARGAR } from "@/lib/ventas/celular";
-import { BotonPuntos, HojaCel } from "./PiezasVentas";
-import { vidrioSobre } from "@/lib/ui/vidrio";
+import { BotonPuntos, HojaCel, HojaMenuCel } from "./PiezasVentas";
 
 interface Props {
   pestana: PestanaDescarga;
@@ -60,57 +59,31 @@ export function MenuVentasCelular({
     <>
       <BotonPuntos onClick={() => setMenu(true)} ariaLabel="Más opciones" />
 
-      {menu && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Más opciones"
-          data-menu-ventas
-          className="fixed inset-0 z-[60] flex flex-col justify-end"
+      <HojaMenuCel abierta={menu} onCerrar={() => setMenu(false)} data-menu-ventas>
+        <button
+          type="button"
+          disabled={apagada}
+          data-abrir-descargar
+          onClick={() => {
+            setMenu(false);
+            setDescarga(true);
+          }}
+          className="mb-2 block w-full rounded-xl bg-gray-900 px-4 py-3 text-center text-[17px] font-semibold text-white active:scale-[0.97] disabled:bg-gray-300"
         >
-          <button
-            type="button"
-            aria-label="Cerrar"
-            onClick={() => setMenu(false)}
-            className="absolute inset-0 bg-black/30"
+          {ROTULO_DESCARGAR}
+        </button>
+        <div className="[&>*]:w-full">
+          <SyncNowButton
+            opciones={SYNC_NOW_VENTAS_SECUENCIA}
+            secuencial
+            className="w-full justify-center"
+            onSuccess={() => {
+              setMenu(false);
+              onActualizado();
+            }}
           />
-          <div
-            className={vidrioSobre("relative mx-2 mb-2 overflow-hidden rounded-2xl bg-white p-3")}
-            style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
-          >
-            <button
-              type="button"
-              disabled={apagada}
-              data-abrir-descargar
-              onClick={() => {
-                setMenu(false);
-                setDescarga(true);
-              }}
-              className="mb-2 block w-full rounded-xl bg-gray-900 px-4 py-3 text-center text-[17px] font-semibold text-white active:scale-[0.97] disabled:bg-gray-300"
-            >
-              {ROTULO_DESCARGAR}
-            </button>
-            <div className="[&>*]:w-full">
-              <SyncNowButton
-                opciones={SYNC_NOW_VENTAS_SECUENCIA}
-                secuencial
-                className="w-full justify-center"
-                onSuccess={() => {
-                  setMenu(false);
-                  onActualizado();
-                }}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => setMenu(false)}
-              className="mt-2 block w-full rounded-xl px-4 py-3 text-center text-[17px] text-gray-600 active:bg-gray-100"
-            >
-              Cancelar
-            </button>
-          </div>
         </div>
-      )}
+      </HojaMenuCel>
 
       <HojaCel
         abierta={descarga}
