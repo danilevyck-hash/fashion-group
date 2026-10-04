@@ -70,6 +70,8 @@ import {
   type OrdenOverride,
 } from "@/lib/cxc-orden";
 import { vidrioSobre } from "@/lib/ui/vidrio";
+import { CXC_APPLE_2026_10 } from "@/lib/cxc/apple-2026-10";
+import CabeceraCxcApple from "./components/CabeceraCxcApple";
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -780,6 +782,13 @@ function AdminDashboardInner() {
 
       <div className="hidden lg:block max-w-6xl mx-auto px-6 py-8">
 
+      {/* Apple (4-oct-2026, apagado): el total y lo de +90 días primero, con
+          la frescura a la derecha. Reemplaza la frescura y «Actualizar ahora»
+          de la fila de filtros. */}
+      {CXC_APPLE_2026_10 && (
+        <CabeceraCxcApple clientes={kpiClients} companyFilter={companyFilter} onSuccess={() => loadData()} />
+      )}
+
       {/* ── UNA SOLA LÍNEA DE FILTROS (5-sep-2026) ──────────────────────────
           🩸 Eran SEIS bloques antes del primer cliente: la frescura por su
           cuenta, el aviso de rechazos, una línea que solo tenía el botón
@@ -823,11 +832,13 @@ function AdminDashboardInner() {
         {/* La frescura, empujada a la derecha y en texto tenue: se lee ANTES de
             creerle a un número, pero no compite con los controles. */}
         <div className="ml-auto flex items-center gap-3">
+          {!CXC_APPLE_2026_10 && (
           <SyncStatus
             tabla="estadocuenta"
             empresasEsperadas={CXC_GRUPO_EMPRESA_KEYS}
             empresaLabels={EMPRESA_KEY_TO_NAME}
           />
+          )}
           {canExport && (
             <div className="relative">
               {/* 🔴 «Descargar», no «Exportar» (8-sep-2026): el sistema entero
@@ -853,11 +864,13 @@ function AdminDashboardInner() {
               </>)}
             </div>
           )}
+          {!CXC_APPLE_2026_10 && (
           <SyncNowButton
             opciones={[{ modulo: "estadocuenta", empresa: companyFilter }]}
             disabledReason={companyFilter === "all" ? "Selecciona una empresa en el filtro para actualizarla" : null}
             onSuccess={() => loadData()}
           />
+          )}
         </div>
       </div>
 

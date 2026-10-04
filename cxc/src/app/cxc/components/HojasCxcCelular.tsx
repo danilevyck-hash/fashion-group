@@ -175,6 +175,7 @@ export function HojaMasOpciones({
   onSyncedNow,
   onCerrar,
   onBoston,
+  sinActualizar = false,
 }: {
   canExport: boolean;
   companyFilter: string;
@@ -183,6 +184,8 @@ export function HojaMasOpciones({
   onCerrar: () => void;
   /** v3.2: con la cabecera compacta, «Boston» baja aquí para que el título se lea entero. */
   onBoston?: (() => void) | null;
+  /** `CXC_APPLE_2026_10`: «Actualizar ahora» ya vive en la línea de frescura. */
+  sinActualizar?: boolean;
 }) {
   return (
     <Hoja titulo="Más" onCerrar={onCerrar}>
@@ -197,6 +200,7 @@ export function HojaMasOpciones({
           </button>
         </div>
       )}
+      {!sinActualizar && (
       <div className="px-5 py-3">
         <SyncStatus
           tabla="estadocuenta"
@@ -210,8 +214,9 @@ export function HojaMasOpciones({
           onSuccess={() => onSyncedNow?.()}
         />
       </div>
+      )}
       {canExport && (
-        <div className="border-t border-gray-100 py-1">
+        <div className={sinActualizar ? "py-1" : "border-t border-gray-100 py-1"}>
           <MenuDescargar onDescargar={onDescargar} />
         </div>
       )}

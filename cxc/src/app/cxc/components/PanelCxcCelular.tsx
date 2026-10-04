@@ -49,6 +49,9 @@ import { tituloCelular, usaBarraCelular } from "@/lib/navegacion/barra-controles
 import { ChevronDown, MoreHorizontal, Search } from "lucide-react";
 import { CLASE_TITULO_BARRA, IconoBarra } from "@/components/celular/BarraDeControles";
 import { CLASE_LINEA_TOTAL, CLASE_TOTAL_CELULAR, SegmentadoCelular } from "@/components/celular/CabeceraCompacta";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
+import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
+import { CXC_APPLE_2026_10, opcionesActualizarCxc, partirPorAtencion, saldoMas90 } from "@/lib/cxc/apple-2026-10";
 
 /** El color de la rayita de la izquierda, por tramo dominante. */
 const RAYA: Record<AgingKey, string> = {
@@ -80,6 +83,8 @@ export interface PanelCxcCelularProps {
   avisoMontos?: string | null;
   /** `null` = este rol no puede ver la cartera de Boston. */
   onBoston: (() => void) | null;
+  /** `CXC_APPLE_2026_10` (4-oct-2026). Solo cuenta con la barra v3.3. */
+  apple?: boolean;
 }
 
 export default function PanelCxcCelular({
@@ -100,10 +105,12 @@ export default function PanelCxcCelular({
   onSyncedNow,
   avisoMontos,
   onBoston,
+  apple: appleProp = CXC_APPLE_2026_10,
 }: PanelCxcCelularProps) {
   const [hoja, setHoja] = useState<"empresa" | "porEmpresa" | "mas" | null>(null);
   // v3.2: la cabecera compacta (tres renglones) vive detrás de la barra nueva.
   const compacta = usaBarraCelular(true);
+  const apple = compacta && appleProp;
   const [buscando, setBuscando] = useState(false);
   const puedeElegirEmpresa = !empresaRestriction && cxcCompanies.length > 1;
 
@@ -123,6 +130,11 @@ export default function PanelCxcCelular({
     () => ordenarClientes(filtered, { orden: ordenDelCelular(riskFilter) }),
     [filtered, riskFilter],
   );
+
+  // Apple: «Clientes +90 días» arriba y «Otros clientes» debajo, sin repetir a
+  // nadie. Solo mirando la cartera entera: un chip o una búsqueda ya acotan.
+  const secciones = apple && riskFilter === "all" && search === "" ? partirPorAtencion(lista) : null;
+  const mas90 = useMemo(() => roleClients.reduce((s, c) => s + (c.total > 0 ? saldoMas90(c) : 0), 0), [roleClients]);
 
   const empresaElegida = companyFilter === "all"
     ? null
@@ -155,9 +167,26 @@ export default function PanelCxcCelular({
           <button type="button" onClick={() => setHoja("porEmpresa")} className="block w-full pt-1 text-left active:opacity-60">
             <span className={CLASE_TOTAL_CELULAR}>{montoExacto(totalDeLaPortada(totals, riskFilter))}</span>
           </button>
+          {apple ? (
+            <span data-linea-cxc-apple className={CLASE_LINEA_TOTAL}>
+              {riskFilter === "all"
+                ? <span className="text-red-600">+90 días {montoExacto(mas90)}</span>
+                : subtituloCompacto({ cuantos: lista.length, risk: riskFilter, unaEmpresa: empresaElegida })}
+              {" · "}
+              <LineaDeFrescura
+                forma="celular"
+                tabla="estadocuenta"
+                empresas={CXC_GRUPO_EMPRESA_KEYS}
+                opciones={opcionesActualizarCxc(companyFilter)}
+                secuencial={companyFilter === "all"}
+                onSuccess={() => onSyncedNow?.()}
+              />
+            </span>
+          ) : (
           <span className={CLASE_LINEA_TOTAL}>
             {subtituloCompacto({ cuantos: lista.length, risk: riskFilter, unaEmpresa: empresaElegida })}
           </span>
+          )}
           {/* 3 · los tres tramos, delgados; tocar el prendido lo apaga (como hoy) */}
           <div className="pt-3">
             <SegmentadoCelular
@@ -317,6 +346,13 @@ export default function PanelCxcCelular({
             </button>
           )}
         </div>
+      ) : secciones && secciones.atencion.length > 0 ? (
+        <>
+          <SeccionClientes titulo="Clientes +90 días" clientes={secciones.atencion} diasSinPagarDe={diasSinPagarDe} onCobrar={onCobrar} />
+          {secciones.resto.length > 0 && (
+            <SeccionClientes titulo="Otros clientes" clientes={secciones.resto} diasSinPagarDe={diasSinPagarDe} onCobrar={onCobrar} />
+          )}
+        </>
       ) : (
         <ul data-lista="cxc-celular" className="mx-4 mt-3 overflow-hidden rounded-2xl bg-white">
           {lista.map((c) => (
@@ -355,9 +391,34 @@ export default function PanelCxcCelular({
           onSyncedNow={onSyncedNow}
           onCerrar={() => setHoja(null)}
           onBoston={compacta ? onBoston : null}
+          sinActualizar={apple}
         />
       )}
     </div>
+  );
+}
+
+/** Apple (4-oct-2026): una sección con su título gris, como Ajustes de iOS. */
+function SeccionClientes({
+  titulo,
+  clientes,
+  diasSinPagarDe,
+  onCobrar,
+}: {
+  titulo: string;
+  clientes: ConsolidatedClient[];
+  diasSinPagarDe: (client: ConsolidatedClient) => number | null;
+  onCobrar: (client: ConsolidatedClient) => void;
+}) {
+  return (
+    <section data-seccion-cxc={titulo}>
+      <h2 className="px-8 pt-5 pb-1.5 text-xs font-medium uppercase tracking-wide text-gray-400">{titulo}</h2>
+      <ul data-lista="cxc-celular" className="mx-4 overflow-hidden rounded-2xl bg-white">
+        {clientes.map((c) => (
+          <FilaCliente key={c.nombre_normalized} client={c} dias={diasSinPagarDe(c)} onAbrir={() => onCobrar(c)} />
+        ))}
+      </ul>
+    </section>
   );
 }
 
