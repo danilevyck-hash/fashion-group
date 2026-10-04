@@ -15,15 +15,15 @@
 // de la tarjeta «Clientes +90 días» de Vista general: 91-120 + 121 y más.
 // 🔑 El período no aplica: la cartera es una foto de hoy, no un rango.
 //
-// Interruptor `CXC_APPLE_2026_10`: `false` = todo como hoy. NACE APAGADO; se
-// prende solo con el «sí» de Daniel. Candado `cxc-apple-2026-10.test.tsx`.
+// Interruptor `CXC_APPLE_2026_10`: `false` = todo como antes. PRENDIDO el
+// 4-oct-2026: Daniel aprobó el mockup HOY vs RECOMENDACIÓN («aprobado»). Candado `cxc-apple-2026-10.test.tsx`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { SyncNowOpcion } from "@/components/shared/SyncNowButton";
 import { CXC_GRUPO_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 
-/** `false` = como hoy. Se prende con el «sí» de Daniel. */
-export const CXC_APPLE_2026_10 = false;
+/** `false` = como antes. Daniel aprobó el mockup el 4-oct-2026 («aprobado»): prendido. */
+export const CXC_APPLE_2026_10 = true;
 
 /** Cuántos clientes van en «Clientes +90 días». */
 export const CUANTOS_EN_ATENCION = 5;

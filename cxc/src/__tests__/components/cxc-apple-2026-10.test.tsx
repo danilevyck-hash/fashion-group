@@ -1,5 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// 🔴 CANDADO — CUENTAS POR COBRAR «COMO LO HARÍA APPLE» NACE APAGADO (4-oct-2026).
+// 🔴 CANDADO — CUENTAS POR COBRAR «COMO LO HARÍA APPLE» (4-oct-2026).
+// 4-oct-2026: Daniel aprobó el mockup («aprobado»): «+90 días», los 5 por saldo
+// y, con «Todas», actualizar las 6. El interruptor queda PRENDIDO.
 //
 // Propuesta detrás de `CXC_APPLE_2026_10` (lib/cxc/apple-2026-10.ts). Lo que
 // este archivo sostiene:
@@ -60,8 +62,8 @@ const CARTERA = [
 ];
 
 describe("CXC_APPLE_2026_10", () => {
-  it("nace apagado", () => {
-    expect(CXC_APPLE_2026_10).toBe(false);
+  it("prendido desde el 4-oct-2026 (Daniel: «aprobado»)", () => {
+    expect(CXC_APPLE_2026_10).toBe(true);
   });
 
   it("apagado, la computadora conserva la frescura y «Actualizar ahora» de la fila de filtros", () => {
