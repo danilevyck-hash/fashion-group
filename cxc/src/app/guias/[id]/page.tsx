@@ -68,6 +68,8 @@ import {
 import { abrirEnEdicion, urlDeLaGuia } from "@/lib/guias/abrir-en-edicion";
 import { textoFaltantesDespachada } from "@/lib/guias/faltantes-despacho";
 import { GUIA_DETALLE_APPLE_2026_10 } from "@/lib/guias/guias-2026-10";
+import { GUIAS_LISTA_APPLE_2026_10 } from "@/lib/guias/lista-apple-2026-10";
+import { StatusBadge } from "@/components/ui";
 import { Aviso } from "@/components/ui/Aviso";
 import { ESCALA_PANTALLA_2026_10 } from "@/lib/navegacion/escala-pantalla";
 import { CONTENIDO_ANCHO_2026_10, DOS_COLUMNAS_2026_10, DOS_COLUMNAS, EN_LA_DERECHA, CLASE_COLUMNA_QUE_ESCALA } from "@/lib/navegacion/contenido-ancho";
@@ -215,7 +217,9 @@ export default function GuiaPage() {
   const titulo = g ? `Guía ${fmtGuia(g.numero)}` : "Guía";
   const totalBultos = items.reduce((a, i) => a + (i.bultos || 0), 0);
   /** Detalle de guía estilo Apple (2-oct-2026); `false` = la pantalla de hoy. */
-  const apple = GUIA_DETALLE_APPLE_2026_10;
+  // 🔴 GUIAS_LISTA_APPLE_2026_10 (4-oct-2026): un toque en la lista trae aquí,
+  // así que el detalle toma el marco compacto del 2-oct y dice su estado.
+  const apple = GUIA_DETALLE_APPLE_2026_10 || GUIAS_LISTA_APPLE_2026_10;
   /**
    * 🔴 2-oct-2026 (`DOS_COLUMNAS_2026_10`, apagado: Daniel las rechazó): desde 1024 px, 2 columnas —los
    * datos, avisos, observaciones y despacho a la izquierda; los envíos a la
@@ -395,6 +399,9 @@ export default function GuiaPage() {
               ‹ Atrás
             </button>
             <h1 className={apple ? "text-[26px] font-semibold tracking-tight truncate" : "text-lg font-semibold tracking-tight truncate"}>{titulo}</h1>
+            {GUIAS_LISTA_APPLE_2026_10 && g && !s.despachada && (
+              <span data-estado-guia className="shrink-0"><StatusBadge estado="pendiente" /></span>
+            )}
           </div>
 
           {s.loading ? (

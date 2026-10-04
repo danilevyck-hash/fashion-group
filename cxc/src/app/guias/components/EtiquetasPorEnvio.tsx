@@ -90,6 +90,8 @@ import {
   useFormatoEtiquetas,
 } from "./etiquetas-ui";
 import { Aviso } from "@/components/ui/Aviso";
+import { GUIAS_LISTA_APPLE_2026_10, resumenDeEnvios } from "@/lib/guias/lista-apple-2026-10";
+import { diaPanama } from "@/lib/guias/pendientes-aviso";
 
 /**
  * 🔴 EL PDF DEL ENVÍO, en pestaña nueva (la MISMA puerta que la pantalla de
@@ -144,6 +146,26 @@ export default function EtiquetasPorEnvio() {
   const envios = useMemo(() => agruparEnEnvios(etiquetas), [etiquetas]);
   const pendientes = envios.filter((v) => v.guia_numero === null).length;
   const visibles = useMemo(() => filtrarEnvios(envios, filtro, buscar), [envios, filtro, buscar]);
+  // 🔴 GUIAS_LISTA_APPLE_2026_10 (4-oct-2026, propuesta): «4 envíos hoy · 1
+  // pendiente de guía» arriba (los chips dejan de contar) y tarjetas en el celular.
+  const apple = GUIAS_LISTA_APPLE_2026_10;
+  const resumen = apple && envios.length > 0
+    ? resumenDeEnvios(envios, hoyPanama(), (iso) => diaPanama(new Date(iso)))
+    : null;
+
+  /** El «···» de un envío: el MISMO en la tabla y en la tarjeta del celular. */
+  function menuDelEnvio(v: Envio) {
+    const enGuia = v.guia_numero !== null;
+    return [
+      { label: "Reimprimir", onClick: () => setReimprimiendo(v) },
+      {
+        label: enGuia ? "Anular envío — bloqueado" : "Anular envío",
+        onClick: () => setAnulando(v),
+        destructive: true,
+        disabled: enGuia,
+      },
+    ];
+  }
 
   async function anular() {
     if (!anulando) return;
@@ -179,6 +201,12 @@ export default function EtiquetasPorEnvio() {
       ) : (
         <>
           <div className="flex items-center justify-end mb-4 flex-wrap gap-4">
+            {resumen && (
+              <p data-resumen-envios className="mr-auto text-sm font-medium text-gray-900">
+                {resumen.hoy}
+                {resumen.pendientes && <span className="text-amber-700"> · {resumen.pendientes}</span>}
+              </p>
+            )}
             <button type="button" onClick={() => setPanel(true)} className={BOTON_NEGRO} disabled={sinTabla}>
               ＋ Nuevo envío
             </button>
@@ -200,7 +228,7 @@ export default function EtiquetasPorEnvio() {
                 onClick={() => setFiltro("pendientes")}
                 className={`${CHIP} ${filtro === "pendientes" ? "border-gray-900 bg-gray-900 font-medium text-white" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
               >
-                Pendientes de guía · {pendientes}
+                {apple ? "Pendientes de guía" : `Pendientes de guía · ${pendientes}`}
               </button>
               <button
                 type="button"
@@ -208,13 +236,37 @@ export default function EtiquetasPorEnvio() {
                 onClick={() => setFiltro("todas")}
                 className={`${CHIP} ${filtro === "todas" ? "border-gray-900 bg-gray-900 font-medium text-white" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
               >
-                Todos · {envios.length}
+                {apple ? "Todos" : `Todos · ${envios.length}`}
               </button>
             </div>
           </div>
 
           <div className="overflow-x-auto border border-gray-200 rounded-lg">
-            <table className="w-full text-sm" style={{ minWidth: 720 }}>
+            {apple && (
+              <ul data-envios-tarjetas className="md:hidden divide-y divide-gray-100">
+                {visibles.map((v) => {
+                  const enGuia = v.guia_numero !== null;
+                  const nota = v.filas.map((f) => f.nota).filter(Boolean).join(" · ");
+                  return (
+                    <li key={v.envio_id} data-envio={v.envio_id} className="flex items-start gap-2 py-2.5 pl-3 pr-1">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="min-w-0 truncate text-sm font-medium">{v.cliente_nombre}</span>
+                          <span className="shrink-0 text-sm tabular-nums">{v.total} {v.total === 1 ? "bulto" : "bultos"}</span>
+                        </div>
+                        <div className="mt-0.5 truncate text-xs text-gray-500">
+                          {[v.destino, v.filas.map((f) => f.secuencial).join(", "), nota].filter(Boolean).join(" · ")}
+                          {" · "}
+                          <span className={enGuia ? undefined : "text-amber-700"}>{rotuloEstado(v)}</span>
+                        </div>
+                      </div>
+                      <OverflowMenu items={menuDelEnvio(v)} />
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <table className={`w-full text-sm${apple ? " hidden md:table" : ""}`} style={{ minWidth: 720 }}>
               <thead>
                 <tr className="border-b border-gray-200">
                   {["Facturas", "Cliente", "Destino", "Bultos", "Estado", "Fecha", ""].map((h, i) => (
@@ -263,17 +315,7 @@ export default function EtiquetasPorEnvio() {
                       </td>
                       <td className="px-3 py-2.5 text-gray-400 whitespace-nowrap">{fechaCorta(v.creado_en)}</td>
                       <td className="px-3 py-2.5 text-right">
-                        <OverflowMenu
-                          items={[
-                            { label: "Reimprimir", onClick: () => setReimprimiendo(v) },
-                            {
-                              label: enGuia ? "Anular envío — bloqueado" : "Anular envío",
-                              onClick: () => setAnulando(v),
-                              destructive: true,
-                              disabled: enGuia,
-                            },
-                          ]}
-                        />
+                        <OverflowMenu items={menuDelEnvio(v)} />
                       </td>
                     </tr>
                   );

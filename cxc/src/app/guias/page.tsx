@@ -15,6 +15,11 @@ import { refrescarFacturasDelDia } from "./components/refrescarFacturasHoy";
 import { GUIAS_ATAJOS_NUEVOS } from "@/lib/guias/atajos-facturas";
 import { CONFIG_GUIAS_ROLES } from "@/lib/guias/destinos-config";
 import { puedeEtiquetar } from "@/lib/guias/etiquetas";
+import { ComisionesPeriodo } from "@/components/comisiones/ComisionesPeriodo";
+import { GUIAS_LISTA_APPLE_2026_10, aniosConGuias, type PeriodoGuias } from "@/lib/guias/lista-apple-2026-10";
+import { mesEnCurso } from "@/lib/comisiones/mes-inicial";
+import { hoyPanama } from "@/lib/fecha-panama";
+import { usePersistedState } from "@/lib/hooks/usePersistedState";
 
 // LAZY, como los modos de Comisiones: bodega abre /guias todo el día desde el
 // celular y la configuración es de admin/secretaria — su JS solo se descarga
@@ -116,6 +121,20 @@ export default function GuiasPage() {
   // agrega ni una lectura.
   const clientesDelGrupo = useClientesDelGrupo(authChecked);
   usePersistedScroll("guias", !s.loading && s.guias.length > 0);
+  // 🔴 GUIAS_LISTA_APPLE_2026_10: el período de la lista, el MISMO selector de
+  // Ventas y Comisiones. Abre en el mes en curso y se recuerda al volver del detalle.
+  const [periodo, setPeriodo] = usePersistedState<PeriodoGuias>("guias", "periodo", mesEnCurso(hoyPanama()));
+  const anios = aniosConGuias(s.guias.map((g) => g.fecha), mesEnCurso(hoyPanama()).year);
+  const selectorPeriodo = (
+    <ComisionesPeriodo
+      className={barra ? "w-full [&>button]:h-9 [&>button]:min-h-0 [&>button]:w-full [&>button]:text-[13px]" : undefined}
+      panelDelAnchoDelBoton={barra}
+      year={periodo.year}
+      mes={periodo.mes}
+      availableYears={anios}
+      onChange={(year, mes) => setPeriodo({ year, mes })}
+    />
+  );
 
   const [guiasReadonly, setGuiasReadonly] = useState(false);
   useEffect(() => {
@@ -224,6 +243,7 @@ export default function GuiasPage() {
             pestanas={pestanas.map(([value, label]) => ({ value, label }))}
             activa={vista}
             onPestana={(v) => cambiarVista(v as Vista)}
+            periodo={GUIAS_LISTA_APPLE_2026_10 && vista === "guias" ? selectorPeriodo : undefined}
           />
         )}
         {/* La fila de pestañas solo existe para quien puede configurar
@@ -281,6 +301,8 @@ export default function GuiasPage() {
           onAtarCliente={s.abrirAtarCliente}
           nombresPorCodigo={nombresPorCodigo}
           readOnly={guiasReadonly}
+          periodo={GUIAS_LISTA_APPLE_2026_10 ? periodo : undefined}
+          selectorPeriodo={GUIAS_LISTA_APPLE_2026_10 && !barra ? selectorPeriodo : undefined}
         />
         <AtarClienteModal
           open={!!s.atarItem}

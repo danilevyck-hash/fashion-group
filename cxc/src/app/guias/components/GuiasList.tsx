@@ -32,6 +32,8 @@ import { cedulaParaMostrar } from "@/lib/guias/cedula";
 import { CHIP_SOLO_PENDIENTES, urlSinPendientes } from "@/lib/guias/filtro-pendientes";
 import { planParaLlegar } from "@/lib/guias/llegar-a-la-guia";
 import { Aviso } from "@/components/ui/Aviso";
+import { GUIAS_LISTA_APPLE_2026_10, enElPeriodo, resumenDeGuias, type PeriodoGuias } from "@/lib/guias/lista-apple-2026-10";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 /**
  * 🔴 LOS AVISOS DE LA FILA, CALLADOS Y SIN MOVER NADA (19-sep-2026).
@@ -125,6 +127,10 @@ interface GuiasListProps {
    *  Si viene vacío (directorio no leído), el chip muestra solo el código. */
   nombresPorCodigo?: ReadonlyMap<string, string>;
   readOnly?: boolean;
+  /** 🔴 GUIAS_LISTA_APPLE_2026_10: el período que manda la lista. Sin él, la lista de hoy. */
+  periodo?: PeriodoGuias;
+  /** El selector de período para la computadora (en el celular vive en la barra). */
+  selectorPeriodo?: React.ReactNode;
 }
 
 /**
@@ -196,8 +202,13 @@ export default function GuiasList({
   onEditar, onDespachar, onDelete, onAtarCliente,
   nombresPorCodigo,
   readOnly,
+  periodo,
+  selectorPeriodo,
 }: GuiasListProps) {
   const barra = useHayBarraCelular();
+  // 🔴 GUIAS_LISTA_APPLE_2026_10 (4-oct-2026, propuesta): resumen arriba, período,
+  // y un toque abre el detalle. Sin período, todo como antes.
+  const apple = GUIAS_LISTA_APPLE_2026_10 && !!periodo;
   // Atar el cliente lo pueden hacer los mismos que despachan. NO depende del
   // estado de la guía: una guía Completada sigue estando cerrada a edición y
   // esto no la edita — ver `api/guias/[id]/cliente/route.ts`.
@@ -310,6 +321,13 @@ export default function GuiasList({
   /** Las que esperan algo, y desde cuándo. `null` cuando no hay ninguna. */
   const { pendientes: guiasPendientes } = separarPendientes(guias, (g) => !guiaYaDespachada(g.estado));
   const avisoPendientes = resumenPendientes(guiasPendientes, new Date());
+  const resumen = apple ? resumenDeGuias(guias, guiasPendientes.length, hoyPanama()) : null;
+  const lineaResumen = resumen && guias.length > 0 && (
+    <p data-resumen-guias className="mr-auto text-sm font-medium text-gray-900">
+      {resumen.hoy}
+      {resumen.pendientes && <span className="text-amber-700"> · {resumen.pendientes}</span>}
+    </p>
+  );
 
   /** «Ver guías más viejas» — arranca cerrado, con el último mes a la vista. */
   const [verViejas, setVerViejas] = useState(false);
@@ -537,6 +555,7 @@ export default function GuiasList({
         <div className={barra && !selectionMode ? "hidden" : undefined}>
         <div className="flex items-center justify-end mb-6 flex-wrap gap-4">
           <h1 className="sr-only">Guías de despacho</h1>
+          {!selectionMode && lineaResumen}
           <div className="flex items-center gap-2 flex-wrap">
             {selectionMode ? (
               <>
@@ -595,8 +614,9 @@ export default function GuiasList({
             vieron. Ahora lo ve todo el que abre la lista, dice hace cuánto
             espera la más vieja y LLEVA a esa guía.
             🔴 Si no hay ninguna, la línea no existe: nada de un cero grande. */}
+        {barra && !selectionMode && lineaResumen && <div className="mb-3">{lineaResumen}</div>}
         {(() => {
-          if (!avisoPendientes) return null;
+          if (!avisoPendientes || apple) return null;
           return (
             <Aviso className="mb-6" accion={{ texto: "Ver guía", onClick: () => irALaPendiente(avisoPendientes.guiaId) }}>
               {avisoPendientes.texto}
@@ -631,6 +651,7 @@ export default function GuiasList({
                 placeholder="Buscar por transportista, cliente, factura o N° de guía…"
                 className={`border border-gray-200 rounded-lg px-3 py-3 md:py-2 text-base md:text-sm outline-none focus:border-black w-full transition max-w-sm ${barra && !selectionMode ? "hidden" : ""}`}
               />
+              {selectorPeriodo}
               {/* 🔴 EL FILTRO QUE SE VE Y SE PUEDE QUITAR (11-sep-2026).
                   🩸 Desde ⌘K → «guías pendientes» (`/guias?pendientes=1`) la
                   lista quedaba en 1 de 229 sin un chip que lo dijera ni un
@@ -689,11 +710,18 @@ export default function GuiasList({
                 // ventana se abre entera. 🩸 Buscar una guía de hace tres meses
                 // dejaba la lista VACÍA y la única coincidencia escondida
                 // detrás de «Ver guías más viejas (1)».
-                const { recientes, viejas } = partirGuiasParaLaLista(filtered, new Date(), search);
+                // 🔴 GUIAS_LISTA_APPLE_2026_10: manda el PERÍODO, no la ventana de
+                // 30 días; buscar sigue abriendo todo. Las pendientes salen de
+                // TODAS las fechas: lo que espera algo no se esconde por mes.
+                const { recientes, viejas } = apple
+                  ? { recientes: search.trim() ? filtered : filtered.filter((g) => enElPeriodo(g.fecha, periodo!)), viejas: [] as Guia[] }
+                  : partirGuiasParaLaLista(filtered, new Date(), search);
                 // 🔴 Y LO QUE ESPERA ALGO VA ARRIBA, fuera de los grupos de
                 // fecha: una pendiente del 1-sep no puede quedar enterrada
                 // entre 221 despachadas.
-                const { pendientes, resto } = separarPendientes(recientes, (g) => !guiaYaDespachada(g.estado));
+                const esPendiente = (g: Guia) => !guiaYaDespachada(g.estado);
+                const { resto } = separarPendientes(recientes, esPendiente);
+                const { pendientes } = separarPendientes(apple ? filtered : recientes, esPendiente);
                 const visible = verViejas ? [...resto, ...viejas] : resto;
                 const hasMore = !verViejas && viejas.length > 0;
 
@@ -782,7 +810,7 @@ export default function GuiasList({
                               tiene su propia barra de acciones. */}
                           <div className="flex items-stretch">
                           <button
-                            onClick={() => selectionMode ? toggleSelect(g.id) : abrirFila(g.id)}
+                            onClick={() => selectionMode ? toggleSelect(g.id) : apple ? onDespachar(g.id) /* la página de la guía */ : abrirFila(g.id)}
                             className="flex-1 min-w-0 text-left text-sm min-h-[44px]"
                           >
                             {/* ── Fila de escritorio (lg+) ─────────────────
@@ -887,7 +915,7 @@ export default function GuiasList({
                                 </span>
                               )}
                               <svg
-                                className={`${COL_CHEVRON} text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                                className={`${COL_CHEVRON} text-gray-400 transition-transform ${apple ? "-rotate-90" : isExpanded ? "rotate-180" : ""}`}
                                 fill="none" stroke="currentColor" viewBox="0 0 24 24"
                               >
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -925,7 +953,7 @@ export default function GuiasList({
                                   <span className="shrink-0"><StatusBadge estado="pendiente" /></span>
                                 )}
                                 <svg
-                                  className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isExpanded ? "rotate-180" : ""}`}
+                                  className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${apple ? "-rotate-90" : isExpanded ? "rotate-180" : ""}`}
                                   fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                 >
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -967,7 +995,7 @@ export default function GuiasList({
                               {/* «Despachar» solo donde hay algo que despachar, y
                                   a la vista: es UNA guía de 222. NO despacha acá
                                   — navega, como siempre. */}
-                              {canEdit && !isDispatched && g.estado === "Pendiente Bodega" && (
+                              {!apple && canEdit && !isDispatched && g.estado === "Pendiente Bodega" && (
                                 <button
                                   type="button"
                                   onClick={() => onDespachar(g.id)}
@@ -1021,7 +1049,7 @@ export default function GuiasList({
                           </div>
 
                           {/* Expanded content */}
-                          <AccordionContent open={isExpanded}>
+                          {!apple && <AccordionContent open={isExpanded}>
                             <div className="px-4 pb-5 border-t border-gray-200">
                               {expandedLoading ? (
                                 <div className="py-6 flex justify-center"><svg className="animate-spin h-5 w-5 text-gray-300" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg></div>
@@ -1247,7 +1275,7 @@ export default function GuiasList({
                                 </>
                               ) : null}
                             </div>
-                          </AccordionContent>
+                          </AccordionContent>}
                         </div>
                       );
 
@@ -1287,7 +1315,12 @@ export default function GuiasList({
                     {/* 🔴 LO PENDIENTE, ARRIBA Y FUERA DE LOS GRUPOS. Es UNA
                         guía de 222 y es la única con algo que hacer. */}
                     {pendientes.length > 0 && (
-                      <div className="space-y-1 mb-3">{pendientes.map(_rc)}</div>
+                      <div className="space-y-1 mb-3">
+                        {apple && (
+                          <p className="px-1 pt-1 text-xs font-medium uppercase tracking-wide text-gray-400">Pendientes de despacho</p>
+                        )}
+                        {pendientes.map(_rc)}
+                      </div>
                     )}
                     {/* Sin la lista plana ya no hay una segunda rama: se dibujan
                         los grupos y nada más. */}

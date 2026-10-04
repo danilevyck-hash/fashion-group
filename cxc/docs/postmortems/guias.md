@@ -2401,3 +2401,12 @@ Daniel: *«¿y si quiero mandar algo extra de la bodega que no está en el siste
 - 🔴 La numeración 1..N del envío y «lo impreso no se cambia» son las de todo envío. Sin columna nueva: solo la migración `20261226120000` (**escrita, SIN aplicar**), que afloja `switch_factura_id` y exige contenido al traslado. Sin ella, el POST contesta 503 y lo dice.
 - Candado `guias-etiquetas-traslado`.
 - 🔴 **«Traslado» es un chip de la fila de EMPRESA** (2-oct-2026, Daniel: *«traslado sin factura es como si fuese una empresa»*): la pantalla preguntaba DOS veces por la empresa (la fila de las facturas y otra de chips dentro del traslado). Hoy hay UNA fila —las empresas del cliente y al final «Traslado»—: empresa → sus facturas; Traslado → Contenido · Bultos · un desplegable chico «Empresa: Ninguna» (solo sin facturas marcadas). Se fueron la fila «+ Traslado (sin factura)» y la segunda fila de chips. Tocar «Traslado» con facturas marcadas lo AGREGA al mismo envío sin borrarlas (volver a la empresa las muestra marcadas); «Quitar traslado» lo saca. Nada de lo que se guarda cambia. Candado `guias-etiquetas-traslado-orden` (una sola fila de empresa).
+
+## Lista, detalle y Etiquetas › envíos estilo Apple (4-oct-2026, propuesta)
+
+Interruptor `GUIAS_LISTA_APPLE_2026_10` en `lib/guias/lista-apple-2026-10.ts`, **hoy `false`**. Solo pantalla: ninguna lectura, guardado ni papel cambia.
+- **Lista**: arriba «3 guías hoy · 1 pendiente de despacho»; las pendientes de CUALQUIER fecha en su sección «Pendientes de despacho» (se va el aviso ámbar que repetía esas filas); el resto sigue al período con el MISMO selector de Ventas y Comisiones (`ComisionesPeriodo`, abre en el mes en curso, recordado en la sesión), en vez de «último mes + Ver guías más viejas»; buscar sigue buscando en todas. Un toque abre `/guias/[id]`: se van el acordeón (un segundo detalle) y el botón «Despachar» (iba a la misma página).
+- **Detalle**: toma el marco compacto del 2-oct (`GUIA_DETALLE_APPLE_2026_10`) y el chip «Pendiente» junto al título.
+- **Etiquetas › envíos**: arriba «4 envíos hoy · 1 pendiente de guía» (los chips dejan de contar); en el celular, tarjetas de dos líneas en vez de la tabla de 720 px con arrastre lateral.
+- ⚠️ «Vincular cliente» vivía solo en el acordeón: con el interruptor prendido, el cliente se corrige con «Editar» en el detalle (permitido también en una despachada).
+- Candado `guias-lista-apple-2026-10`.

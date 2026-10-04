@@ -46,6 +46,7 @@ import { numeroTranspImpreso } from "@/lib/guias/modo-despacho";
 import { textoCorreccionEnVivo, textoCorreccionGuardada } from "@/lib/guias/bultos-correccion";
 import { bultosBloqueadosPorEtiquetas } from "@/lib/guias/etiquetas-por-envio";
 import { GUIA_DETALLE_APPLE_2026_10 } from "@/lib/guias/guias-2026-10";
+import { GUIAS_LISTA_APPLE_2026_10 } from "@/lib/guias/lista-apple-2026-10";
 import ListaEnviosApple from "./ListaEnviosApple";
 
 /** Campo de texto: 44 px con el dedo, denso solo cuando hay mouse. */
@@ -90,7 +91,7 @@ export default function ListaEnvios({
   setBultos,
   rol,
 }: ListaEnviosProps) {
-  if (GUIA_DETALLE_APPLE_2026_10) {
+  if (GUIA_DETALLE_APPLE_2026_10 || GUIAS_LISTA_APPLE_2026_10) {
     return (
       <ListaEnviosApple
         items={items}
