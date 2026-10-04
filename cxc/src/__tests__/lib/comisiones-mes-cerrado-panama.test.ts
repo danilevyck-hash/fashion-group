@@ -17,7 +17,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { ultimoMesCerrado, mesEnCurso, periodoInicial } from "@/lib/comisiones/mes-inicial";
+import { ultimoMesCerrado, mesEnCurso, periodoInicial, ABRE_EN_EL_MES_EN_CURSO_2026_10 } from "@/lib/comisiones/mes-inicial";
 
 const RAIZ = process.cwd();
 const leer = (rel: string) => readFileSync(path.join(RAIZ, rel), "utf8");
@@ -39,12 +39,13 @@ describe("🔴 ultimoMesCerrado: el mes anterior al que corre hoy en Panamá", (
     expect(ultimoMesCerrado("2026-07-01")).toEqual(ultimoMesCerrado("2026-07-31"));
   });
 
-  it("periodoInicial se queda en el mes en curso si el año cerrado no está disponible", () => {
-    // App estrenada en enero, sin datos del año anterior: más vale abrir en un
-    // mes que existe que en uno que la pantalla no puede pedir.
-    expect(periodoInicial("2027-01-05", [2027])).toEqual({ year: 2027, mes: 1 });
-    expect(periodoInicial("2027-01-05", [2026, 2027])).toEqual({ year: 2026, mes: 12 });
-    expect(periodoInicial("2026-09-06", [])).toEqual({ year: 2026, mes: 8 });
+  // 🔴 4-oct-2026 (ABRE_EN_EL_MES_EN_CURSO_2026_10): Daniel pidió ver el mes en
+  // curso al abrir. El último mes cerrado sigue calculándose (arriba) y a un toque.
+  it("🔴 periodoInicial abre en el MES EN CURSO de Panamá", () => {
+    expect(ABRE_EN_EL_MES_EN_CURSO_2026_10).toBe(true);
+    expect(periodoInicial("2026-10-04", [2025, 2026])).toEqual({ year: 2026, mes: 10 });
+    expect(periodoInicial("2027-01-05", [2026, 2027])).toEqual({ year: 2027, mes: 1 });
+    expect(periodoInicial("2026-09-06", [])).toEqual({ year: 2026, mes: 9 });
   });
 });
 
@@ -65,7 +66,7 @@ describe("🔴 la pantalla no mira el reloj del navegador", () => {
     expect(periodo).toContain("mesEnCurso(hoyPanama())");
   });
 
-  it("🔴 el estado de arranque es el período inicial, no el mes en curso", () => {
+  it("🔴 el estado de arranque es el período inicial (hoy, el mes en curso)", () => {
     expect(shell).toContain("useState<number>(inicial.year)");
     expect(shell).toContain("useState<number>(inicial.mes)");
   });

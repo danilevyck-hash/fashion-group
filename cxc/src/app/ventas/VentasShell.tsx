@@ -22,6 +22,8 @@ const PESTANAS_VENTAS = [
 ] as const;
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import { PeriodoSelect } from "@/components/multifashion/PeriodoSelect";
+import { ComisionesPeriodo } from "@/components/comisiones/ComisionesPeriodo";
+import { RESUMEN_MES_2026_10, rotuloDelPeriodo } from "@/lib/ventas/resumen-mes";
 import { fetchJsonWithRetry, describeFetchError } from "@/lib/fetch-retry";
 import type { VentasResumen, Clientes, Multifashion } from "@/components/ventas/types";
 import {
@@ -193,6 +195,9 @@ export function VentasShell({
   // `src/lib/ventas/periodo.ts`, donde está el porqué de cada regla.
   const [periodoUrl, setPeriodoUrl] = useUrlState(PARAM_PERIODO_VENTAS, "");
   const [periodoMemoria, setPeriodoMemoria] = useLastUsed(MEMORIA_PERIODO_VENTAS, "");
+  // 🔴 RESUMEN_MES_2026_10: el MES del Resumen en el celular («0» = todo el
+  // año). Solo lo mira el Resumen; las otras pestañas siguen con su período.
+  const [mesResumen, setMesResumen] = useUrlState("mes", "0");
 
   // Lo que se pidió (URL o memoria), ANTES de ajustarlo a la pestaña: la
   // llave de la caché. Así «Últimos 12 meses» no se pierde por pasar un
@@ -352,6 +357,21 @@ export function VentasShell({
         activa={tab}
         onPestana={setTab}
         periodo={
+          RESUMEN_MES_2026_10 && tab === "resumen" ? (
+            // El selector de Comisiones: ‹ 2026 › · Todo el año · 12 meses.
+            <ComisionesPeriodo
+              className="w-full [&>button]:h-9 [&>button]:min-h-0 [&>button]:w-full [&>button]:text-[13px]"
+              year={selectedYear}
+              mes={Number(mesResumen) || 0}
+              rotulo={rotuloDelPeriodo(selectedYear, Number(mesResumen) || 0)}
+              panelDelAnchoDelBoton
+              availableYears={availableYears}
+              onChange={(y, m) => {
+                onPeriodoChange(String(y));
+                setMesResumen(String(m));
+              }}
+            />
+          ) : (
           <div className="w-full [&_button]:relative [&_button]:h-9 [&_button]:w-full [&_button]:text-[13px] [&_button]:before:absolute [&_button]:before:inset-x-0 [&_button]:before:-inset-y-1 [&_button]:before:content-['']">
             <PeriodoSelect
               valor={periodoAUrl(periodo)}
@@ -360,6 +380,7 @@ export function VentasShell({
               disabled={loading}
             />
           </div>
+          )
         }
       />
     )}
@@ -432,6 +453,7 @@ export function VentasShell({
               onReloadData={() => mutate()}
               onDescargarLasTres={descargarLasTres}
               periodoRotulo={rotuloCompras(periodo)}
+              mes={mesResumen}
             />
           ) : <ErrorState scope="resumen" detail={data?.resumenError ?? null} onRetry={() => mutate()} />}
         </TabsContent>

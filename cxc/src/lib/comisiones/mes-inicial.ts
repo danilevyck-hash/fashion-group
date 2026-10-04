@@ -20,6 +20,15 @@
 // pueden elegir. Enero abre en diciembre del año anterior.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// 🔴 4-oct-2026 — VUELVE A ABRIR EN EL MES EN CURSO. Daniel: «quiero que en
+// Comisiones y también en Multifashion se vea el mes en curso». Revisado ese
+// día: Comisiones (celular y computadora, y Multifashion dentro de Comisiones,
+// que sigue al mismo selector) abría en septiembre, el último mes cerrado; el
+// módulo Multifashion ya abría en el mes en curso y no se tocó. El mes sigue
+// siendo el de PANAMÁ y el mes cerrado queda a un toque. `false` = el último
+// mes cerrado, como desde el 6-sep-2026.
+export const ABRE_EN_EL_MES_EN_CURSO_2026_10 = true;
+
 export interface Periodo {
   year: number;
   mes: number;
@@ -47,6 +56,7 @@ export function ultimoMesCerrado(hoyYmd: string): Periodo {
  * más vale abrir en un mes que existe que en uno que la pantalla no puede pedir.
  */
 export function periodoInicial(hoyYmd: string, availableYears: readonly number[]): Periodo {
+  if (ABRE_EN_EL_MES_EN_CURSO_2026_10) return mesEnCurso(hoyYmd);
   const cerrado = ultimoMesCerrado(hoyYmd);
   if (availableYears.length === 0 || availableYears.includes(cerrado.year)) return cerrado;
   return mesEnCurso(hoyYmd);

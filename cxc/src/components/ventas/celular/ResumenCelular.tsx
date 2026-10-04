@@ -44,6 +44,7 @@ import {
   type NumeroDeLaTiraVista,
 } from "./PiezasVentas";
 import { MODO_OPCIONES, nombreEmpresaEnPantalla, type ViewMode } from "../ResumenView";
+import { RESUMEN_MES_2026_10, cifrasDelMes, delPeriodo, mesValido, rotuloDelPeriodo } from "@/lib/ventas/resumen-mes";
 
 interface Props {
   data: VentasResumen;
@@ -57,6 +58,8 @@ interface Props {
   multiMayoreoNota?: string | null;
   /** El «···» de arriba: «Descargar» y «Actualizar ahora». */
   accion?: React.ReactNode;
+  /** 🔴 RESUMEN_MES_2026_10: el mes de la URL (`?mes=`). Vacío o «0» = todo el año. */
+  mes?: string;
 }
 
 function suma(serie: (number | null)[]): number {
@@ -73,6 +76,46 @@ interface FilaEmpresa {
 }
 
 export function ResumenCelular({
+  data,
+  selectedYear,
+  isClosedYear,
+  viewMode,
+  setViewMode,
+  onOpenEmpresa,
+  multiMayoreoNota,
+  accion,
+  mes: mesRaw,
+}: Props) {
+  if (RESUMEN_MES_2026_10) {
+    return (
+      <ResumenCelularPorPeriodo
+        data={data}
+        selectedYear={selectedYear}
+        isClosedYear={isClosedYear}
+        viewMode={viewMode}
+        setViewMode={setViewMode}
+        onOpenEmpresa={onOpenEmpresa}
+        multiMayoreoNota={multiMayoreoNota}
+        accion={accion}
+        mes={mesRaw}
+      />
+    );
+  }
+  return (
+    <ResumenCelularDeSiempre
+      data={data}
+      selectedYear={selectedYear}
+      isClosedYear={isClosedYear}
+      viewMode={viewMode}
+      setViewMode={setViewMode}
+      onOpenEmpresa={onOpenEmpresa}
+      multiMayoreoNota={multiMayoreoNota}
+      accion={accion}
+    />
+  );
+}
+
+function ResumenCelularDeSiempre({
   data,
   selectedYear,
   isClosedYear,
@@ -274,6 +317,157 @@ export function ResumenCelular({
       {/* 🔴 EL «INCLUYE MAYOREO» BAJA A DONDE ESTÁ SU DESGLOSE. En la lista
           hacía que la fila de Multifashion midiera 112 px y cuatro líneas. */}
       {multiMayoreoNota && (
+        <>
+          <RotuloVentas>Multifashion</RotuloVentas>
+          <p className="px-6 text-[13px] text-gray-600" style={ESTILO_COLCHON_DERECHA}>
+            {multiMayoreoNota}
+          </p>
+        </>
+      )}
+    </PantallaVentas>
+  );
+}
+
+// ── 🔴 RESUMEN_MES_2026_10 · UNA COLUMNA DE PERÍODO (2-oct-2026) ─────────────
+// Daniel: «aquí sería bueno ver un mes específico». El período lo elige el
+// selector de Comisiones (lo dibuja `VentasShell`); acá la tabla queda en UNA
+// columna —Empresa · Ventas · % contra el mismo período de hace un año— y cabe
+// en 390 px sin deslizarse de lado. Se fue la columna «Oct en curso»: el mes en
+// curso se ve eligiéndolo. Ver `lib/ventas/resumen-mes.ts`.
+function ResumenCelularPorPeriodo({
+  data,
+  selectedYear,
+  isClosedYear,
+  viewMode,
+  setViewMode,
+  onOpenEmpresa,
+  multiMayoreoNota,
+  accion,
+  mes: mesRaw,
+}: Props) {
+  const anioPrevio = selectedYear - 1;
+  const mes = mesValido(mesRaw, data.mesActual, !isClosedYear);
+  const nombrePeriodo = rotuloDelPeriodo(selectedYear, mes);
+
+  const filas = useMemo(
+    () =>
+      data.empresas.map((e: EmpresaMonthlySales) => {
+        const act = viewMode === "utilidad" ? e.utilidad2026 : e.ventas2026;
+        const prev = viewMode === "utilidad" ? e.utilidad2025 : e.ventas2025;
+        return {
+          id: e.empresa.id,
+          nombre: nombreEmpresaEnPantalla(e.empresa.id, e.empresa.nombre),
+          valor: delPeriodo(act, mes),
+          previo: delPeriodo(prev, mes),
+        };
+      }),
+    [data.empresas, viewMode, mes],
+  );
+  const total = filas.reduce((s, f) => s + f.valor, 0);
+  const totalPrevio = filas.reduce((s, f) => s + f.previo, 0);
+  const pctTotal = porcentajeDeLaTabla(variacionPct(total, totalPrevio));
+
+  // Las cifras de arriba siguen al período. «Todo el año» = `data.kpis` tal cual.
+  const k = data.kpis;
+  const proy = mes === 0 && !isClosedYear && data.proyeccion ? data.proyeccion : null;
+  const numeros = useMemo<NumeroDeLaTiraVista[]>(() => {
+    const c =
+      mes > 0
+        ? cifrasDelMes(data.empresas, mes)
+        : {
+            ventas: k.ventasNetasYTD, ventasPrevio: k.ventas2025YTD,
+            utilidad: k.utilidadYTD, utilidadPrevio: k.utilidad2025YTD,
+            margen: k.margenYTD, margenPrevio: k.margen2025YTD,
+          };
+    const dVentas = variacionPct(c.ventas, c.ventasPrevio);
+    const dUtilidad = variacionPct(c.utilidad, c.utilidadPrevio);
+    const puntos = (c.margen - c.margenPrevio) * 100;
+    const salida: NumeroDeLaTiraVista[] = [
+      { rotulo: "Ventas", valor: cifraDeLaTira(c.ventas), cambio: cambioDeLaTira(dVentas), signo: dVentas },
+      { rotulo: "Utilidad", valor: cifraDeLaTira(c.utilidad), cambio: cambioDeLaTira(dUtilidad), signo: dUtilidad },
+      {
+        rotulo: "Margen",
+        valor: fmtPorcentaje(c.margen),
+        cambio: `${puntos >= 0 ? "▲ +" : "▼ −"}${Math.abs(puntos).toFixed(1)}`,
+        signo: puntos,
+      },
+    ];
+    if (proy) {
+      const delta = proy.totales_grupo.delta_vs_anio_anterior_total ?? null;
+      salida.push({
+        rotulo: "Proyección",
+        valor: cifraDeLaTira(proy.totales_grupo.proyeccion_cierre),
+        cambio: delta == null ? null : `${delta >= 0 ? "+" : "−"}${cifraDeLaTira(Math.abs(delta))}`,
+        signo: delta,
+      });
+    }
+    return salida;
+  }, [k, proy, mes, data.empresas]);
+
+  const th = "py-1.5 text-[9.5px] font-semibold uppercase tracking-wide text-gray-500";
+  return (
+    <PantallaVentas>
+      <TituloVentas
+        enLaBarra
+        detalleEnLaBarra={data.fecha_corte ? `Datos al ${diaCorto(data.fecha_corte)}` : ""}
+        titulo="Ventas"
+        detalle={`${nombrePeriodo}${data.fecha_corte ? ` · al ${diaCorto(data.fecha_corte)}` : ""}`}
+        accion={accion}
+      />
+
+      <TiraDeCuatro numeros={numeros} />
+
+      <Segmentado opciones={MODO_OPCIONES} activo={viewMode} onChange={setViewMode} ariaLabel="Indicador" />
+
+      <GrupoVentas className="px-0 py-1">
+        <table data-tabla-empresas className="w-full table-fixed border-collapse text-[13px]">
+          <colgroup>
+            <col />
+            <col className="w-[42%]" />
+            <col className="w-[22%]" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th className={`px-3 text-left ${th}`}>Empresa</th>
+              <th className={`px-1.5 text-right ${th}`}>{viewMode === "utilidad" ? "Utilidad" : "Ventas"}</th>
+              <th className={`pl-1 pr-3 text-right ${th}`}>vs {anioPrevio}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filas.map((f) => {
+              const p = porcentajeDeLaTabla(variacionPct(f.valor, f.previo));
+              return (
+                <tr
+                  key={f.id}
+                  data-fila-empresa={f.id}
+                  onClick={() => onOpenEmpresa(f.id)}
+                  className="border-t border-gray-100 active:bg-gray-50"
+                >
+                  <th scope="row" className="truncate px-3 py-2.5 text-left font-semibold text-gray-900">
+                    {f.nombre}
+                  </th>
+                  <td className="px-1.5 py-2.5 text-right tabular-nums text-gray-900">{montoDeLaTabla(f.valor)}</td>
+                  <td className={`whitespace-nowrap pl-1 pr-3 py-2.5 text-right text-[12px] ${colorDelTono(p.tono)}`}>{p.texto}</td>
+                </tr>
+              );
+            })}
+            <tr data-total-grupo className="border-t-2 border-gray-900">
+              <th scope="row" className="truncate px-3 py-2.5 text-left font-bold text-gray-900">Total grupo</th>
+              <td className="px-1.5 py-2.5 text-right font-bold tabular-nums text-gray-900">{montoDeLaTabla(total)}</td>
+              <td className={`whitespace-nowrap pl-1 pr-3 py-2.5 text-right text-[12px] font-semibold ${colorDelTono(pctTotal.tono)}`}>
+                {pctTotal.texto}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </GrupoVentas>
+
+      <p data-pie-resumen className="px-6 pt-2 text-[12.5px] text-gray-500" style={ESTILO_COLCHON_DERECHA}>
+        Toca una empresa para ver mes por mes.
+      </p>
+
+      {/* La nota de mayoreo es del AÑO (no hay dato por mes): con un mes elegido no sale. */}
+      {mes === 0 && multiMayoreoNota && (
         <>
           <RotuloVentas>Multifashion</RotuloVentas>
           <p className="px-6 text-[13px] text-gray-600" style={ESTILO_COLCHON_DERECHA}>

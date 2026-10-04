@@ -142,11 +142,13 @@ interface ResumenViewProps {
   onDescargarLasTres?: () => void | Promise<void>;
   /** «año 2026» — para el subtítulo de la hoja de descarga. */
   periodoRotulo?: string;
+  /** 🔴 RESUMEN_MES_2026_10: el mes elegido en el celular (`?mes=`). */
+  mes?: string;
 }
 
 export function ResumenView({
   data, multi, selectedYear, isClosedYear, loading, error, onReloadData,
-  onDescargarLasTres, periodoRotulo = "",
+  onDescargarLasTres, periodoRotulo = "", mes,
 }: ResumenViewProps) {
   // 🔴 EN EL CELULAR SE MONTA OTRA PANTALLA, NO LA MISMA ESCONDIDA: dibujar las
   // dos a la vez dejaría cada nombre de empresa DOS veces en el documento.
@@ -370,6 +372,7 @@ export function ResumenView({
           setViewMode={onToggleMode}
           onOpenEmpresa={setPanelEmpresaId}
           multiMayoreoNota={multiMayoreoNota?.texto ?? null}
+          mes={mes}
           accion={
             <MenuVentasCelular
               pestana="resumen"

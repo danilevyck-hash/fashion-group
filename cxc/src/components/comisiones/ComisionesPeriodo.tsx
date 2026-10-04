@@ -64,6 +64,10 @@ interface Props {
   onRango?: (r: RangoConsulta) => void;
   /** En el celular el control va a la derecha: el panel se abre hacia adentro. */
   alDerecha?: boolean;
+  /** Lo que dice el control cerrado, si la pantalla lo nombra distinto (Ventas: «Año 2026»). */
+  rotulo?: string;
+  /** El panel mide lo mismo que el botón (cuando el botón ocupa todo el ancho). */
+  panelDelAnchoDelBoton?: boolean;
 }
 
 /** Lo que dice el control cerrado cuando se consulta un rango. */
@@ -71,7 +75,7 @@ export function etiquetaDeRango(r: RangoConsulta): string {
   return ATAJOS_RANGO.find((a) => a.clave === r.atajo)?.rotulo ?? etiquetaRango(r.desde, r.hasta).split(" · ")[0];
 }
 
-export function ComisionesPeriodo({ mes, year, availableYears, onChange, className, rango = null, onRango, alDerecha = false }: Props) {
+export function ComisionesPeriodo({ mes, year, availableYears, onChange, className, rango = null, onRango, alDerecha = false, rotulo, panelDelAnchoDelBoton = false }: Props) {
   const conRango = VENDEDORES_RANGO_2026_10 && !!onRango;
   const enRango = conRango && !!rango;
   const [open, setOpen] = useState(false);
@@ -121,6 +125,8 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
             el encabezado crecía 52px en septiembre y no en julio. */}
         {enRango ? (
           <span className="truncate whitespace-nowrap">{etiquetaDeRango(rango!)}</span>
+        ) : rotulo ? (
+          <span className="truncate whitespace-nowrap">{rotulo}</span>
         ) : (
           <>
             <span className="whitespace-nowrap sm:hidden">{etiquetaPeriodoCorta(year, mes)}</span>
@@ -137,7 +143,7 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
             ref={panelRef}
             role="dialog"
             aria-label="Seleccionar período"
-            className={vidrioSobre(`absolute ${alDerecha ? "right-0" : "left-0"} top-full z-20 mt-1 w-[276px] max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white p-2 shadow-lg`)}
+            className={vidrioSobre(`absolute ${panelDelAnchoDelBoton ? "inset-x-0 w-auto" : `${alDerecha ? "right-0" : "left-0"} w-[276px]`} top-full z-20 mt-1 max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white p-2 shadow-lg`)}
           >
             {/* 🔴 VENDEDORES_RANGO_2026_10: los atajos para CONSULTAR van arriba;
                 los meses de abajo siguen siendo el período que se PAGA. */}
