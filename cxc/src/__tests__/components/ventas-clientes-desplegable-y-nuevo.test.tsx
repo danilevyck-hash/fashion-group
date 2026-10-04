@@ -37,6 +37,14 @@ import type { Clientes, Cliente } from "@/components/ventas/types";
 import { ROTULO_TODAS_LAS_EMPRESAS } from "@/lib/ventas/rotulo-empresas";
 import { B2B_EMPRESA_KEYS, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 
+// 4-oct-2026: VENTAS_APPLE_2026_10 se prendió (Daniel: «aprobado»). Esta prueba
+// es de la pantalla de antes (el rollback) y la fuerza en false.
+vi.mock("@/lib/ventas/ventas-apple", async (original) => ({
+  ...(await original<typeof import("@/lib/ventas/ventas-apple")>()),
+  VENTAS_APPLE_2026_10: false,
+}));
+
+
 // Radix Select necesita estas APIs del navegador que jsdom no trae.
 beforeAll(() => {
   window.HTMLElement.prototype.scrollIntoView = vi.fn();

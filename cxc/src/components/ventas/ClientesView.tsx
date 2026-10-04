@@ -22,6 +22,7 @@ import { ClientesCelular } from "./celular/ClientesCelular";
 import { HojaClienteCelular } from "./celular/HojaClienteCelular";
 import { FrescuraVentasCel, MenuVentasCelular } from "./celular/MenuVentasCelular";
 import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
+import { VENTAS_APPLE_2026_10 } from "@/lib/ventas/ventas-apple";
 import { HojaCel } from "./celular/PiezasVentas";
 import { esPantallaDeCelularVentas, ultimaCompraEnPalabras } from "@/lib/ventas/celular";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -243,7 +244,8 @@ export function ClientesView({
     : { tipo: "anio", anio: selectedYear };
   const ventanaPedida = ventanaParaClientes(periodo);
   const qsVentana = ventanaPedida ? `&ventana=${ventanaPedida}` : "";
-  const frescura = textoFrescura(data.actualizadoAt);
+  // 🔴 VENTAS_APPLE_2026_10: la hora la dice la línea de frescura común; «datos de hoy …» se iba a repetir.
+  const frescura = VENTAS_APPLE_2026_10 ? null : textoFrescura(data.actualizadoAt);
 
   // 🔴 EL AÑO DEL RÓTULO SALE DEL MISMO DATO QUE HACE LA CUENTA. Antes decía
   // "Δ vs 2025" clavado: con 2025 elegido arriba, la pantalla decía

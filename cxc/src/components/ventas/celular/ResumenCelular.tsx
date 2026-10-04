@@ -44,7 +44,9 @@ import {
   type NumeroDeLaTiraVista,
 } from "./PiezasVentas";
 import { MODO_OPCIONES, nombreEmpresaEnPantalla, type ViewMode } from "../ResumenView";
-import { RESUMEN_MES_2026_10, cifrasDelMes, delPeriodo, mesValido, rotuloDelPeriodo } from "@/lib/ventas/resumen-mes";
+import { RESUMEN_MES_2026_10, delPeriodo, mesValido, numerosDelResumen, rotuloDelPeriodo } from "@/lib/ventas/resumen-mes";
+import { VENTAS_APPLE_2026_10 } from "@/lib/ventas/ventas-apple";
+import { NumeroDelResumen } from "../NumeroDelResumen";
 
 interface Props {
   data: VentasResumen;
@@ -366,41 +368,10 @@ function ResumenCelularPorPeriodo({
   const pctTotal = porcentajeDeLaTabla(variacionPct(total, totalPrevio));
 
   // Las cifras de arriba siguen al período. «Todo el año» = `data.kpis` tal cual.
-  const k = data.kpis;
-  const proy = mes === 0 && !isClosedYear && data.proyeccion ? data.proyeccion : null;
-  const numeros = useMemo<NumeroDeLaTiraVista[]>(() => {
-    const c =
-      mes > 0
-        ? cifrasDelMes(data.empresas, mes)
-        : {
-            ventas: k.ventasNetasYTD, ventasPrevio: k.ventas2025YTD,
-            utilidad: k.utilidadYTD, utilidadPrevio: k.utilidad2025YTD,
-            margen: k.margenYTD, margenPrevio: k.margen2025YTD,
-          };
-    const dVentas = variacionPct(c.ventas, c.ventasPrevio);
-    const dUtilidad = variacionPct(c.utilidad, c.utilidadPrevio);
-    const puntos = (c.margen - c.margenPrevio) * 100;
-    const salida: NumeroDeLaTiraVista[] = [
-      { rotulo: "Ventas", valor: cifraDeLaTira(c.ventas), cambio: cambioDeLaTira(dVentas), signo: dVentas },
-      { rotulo: "Utilidad", valor: cifraDeLaTira(c.utilidad), cambio: cambioDeLaTira(dUtilidad), signo: dUtilidad },
-      {
-        rotulo: "Margen",
-        valor: fmtPorcentaje(c.margen),
-        cambio: `${puntos >= 0 ? "▲ +" : "▼ −"}${Math.abs(puntos).toFixed(1)}`,
-        signo: puntos,
-      },
-    ];
-    if (proy) {
-      const delta = proy.totales_grupo.delta_vs_anio_anterior_total ?? null;
-      salida.push({
-        rotulo: "Proyección",
-        valor: cifraDeLaTira(proy.totales_grupo.proyeccion_cierre),
-        cambio: delta == null ? null : `${delta >= 0 ? "+" : "−"}${cifraDeLaTira(Math.abs(delta))}`,
-        signo: delta,
-      });
-    }
-    return salida;
-  }, [k, proy, mes, data.empresas]);
+  const numeros = useMemo<NumeroDeLaTiraVista[]>(
+    () => numerosDelResumen(data, mes, isClosedYear),
+    [data, mes, isClosedYear],
+  );
 
   const th = "py-1.5 text-[9.5px] font-semibold uppercase tracking-wide text-gray-500";
   return (
@@ -413,7 +384,7 @@ function ResumenCelularPorPeriodo({
         accion={accion}
       />
 
-      <TiraDeCuatro numeros={numeros} />
+      {VENTAS_APPLE_2026_10 ? <NumeroDelResumen numeros={numeros} forma="celular" /> : <TiraDeCuatro numeros={numeros} />}
 
       <Segmentado opciones={MODO_OPCIONES} activo={viewMode} onChange={setViewMode} ariaLabel="Indicador" />
 

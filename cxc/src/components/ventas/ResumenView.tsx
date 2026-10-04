@@ -41,6 +41,9 @@ import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { cn } from "@/lib/utils";
 import { variacionPct } from "@/lib/variacion";
 import { ResumenViewMobile } from "./ResumenViewMobile";
+import { NumeroDelResumen } from "./NumeroDelResumen";
+import { mesValido, numerosDelResumen } from "@/lib/ventas/resumen-mes";
+import { VENTAS_APPLE_2026_10 } from "@/lib/ventas/ventas-apple";
 import { EmpresaMesAnioPanel, useResumenMesAnio, type CurrentYtdSamePeriod } from "./ResumenMesAnio";
 
 // Mapeo ventas_id (short) → empresa key snake_case usado por la RPC de
@@ -385,7 +388,16 @@ export function ResumenView({
           }
         />
       ) : (
+      <>
+      {VENTAS_APPLE_2026_10 && (
+        <NumeroDelResumen
+          forma="computadora"
+          numeros={numerosDelResumen(data, mesValido(mes, data.mesActual, !isClosedYear), isClosedYear)}
+          derecha={<FrescuraVentasCel forma="computadora" onActualizado={() => onReloadData?.()} />}
+        />
+      )}
       <ResumenViewMobile
+        sinKpis={VENTAS_APPLE_2026_10}
         data={data}
         selectedYear={selectedYear}
         isClosedYear={isClosedYear}
@@ -400,6 +412,7 @@ export function ResumenView({
         bajando={bajando}
         multiMayoreoNota={multiMayoreoNota?.texto ?? null}
       />
+      </>
       )}
 
       {/* 🩸 EL CORTE NO ES `md` NI `lg` NI `xl`, Y EL MOTIVO ES UN NÚMERO.
@@ -423,6 +436,8 @@ export function ResumenView({
           año). Comparativo same-period vs prev year (ya viene aplicado desde la
           RPC ventas_dashboard_prev_same_period). El toggle de la matriz no
           afecta el banner: siempre muestra el panorama completo. */}
+      {/* 🔴 VENTAS_APPLE_2026_10: las cuatro tarjetas se vuelven el número grande de arriba. */}
+      {!VENTAS_APPLE_2026_10 && (
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="VENTAS" value={fmtMoney(k.ventasNetasYTD)} sub={kpiVentasSub} subTone={ventasDelta} title={vsTitle} />
         <KpiCard label="UTILIDAD" value={fmtMoney(k.utilidadYTD)} sub={kpiUtilidadSub} subTone={utilidadDelta} title={vsTitle} />
@@ -450,11 +465,13 @@ export function ResumenView({
           />
         )}
       </div>
+      )}
 
       {/* Mes en curso vs el mismo mes del año anterior (suma del grupo). Solo
           para año en curso. El mes en curso puede ir parcial → el pie de la
           matriz dice hasta qué día. */}
-      {mostrarMesVsMes && (
+      {/* Con un mes elegido (VENTAS_APPLE_2026_10), ese mes ya es el número grande. */}
+      {mostrarMesVsMes && !(VENTAS_APPLE_2026_10 && mesValido(mes, data.mesActual, !isClosedYear) > 0) && (
         <MesVsMesCard
           empresas={data.empresas}
           mesActual={data.mesActual}
@@ -470,7 +487,8 @@ export function ResumenView({
               empresas: UN clic actualiza facturas de las 8 EN SECUENCIA (sin
               menú; sesión única Switch — nunca 2 a la vez) + refresh-vistas
               como paso final (rollup mensual y vw de clientes al día). */}
-          <FrescuraVentasCel forma="computadora" onActualizado={() => onReloadData?.()} />
+          {/* VENTAS_APPLE_2026_10: la línea de frescura vive junto al número grande (una sola). */}
+          {!VENTAS_APPLE_2026_10 && <FrescuraVentasCel forma="computadora" onActualizado={() => onReloadData?.()} />}
 
           {/* 🔴 «Descargar en Excel», y baja LO QUE ESTÁS VIENDO (11-sep-2026).
               Decía «Excel» y bajaba siempre la matriz de Ventas, estuvieras

@@ -24,6 +24,14 @@ import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/re
 import { ResumenView, MODO_OPCIONES } from "@/components/ventas/ResumenView";
 import type { VentasResumen, ProyeccionResp } from "@/components/ventas/types";
 
+// 4-oct-2026: VENTAS_APPLE_2026_10 se prendió (Daniel: «aprobado»). Esta prueba
+// es de la pantalla de antes (el rollback) y la fuerza en false.
+vi.mock("@/lib/ventas/ventas-apple", async (original) => ({
+  ...(await original<typeof import("@/lib/ventas/ventas-apple")>()),
+  VENTAS_APPLE_2026_10: false,
+}));
+
+
 vi.mock("@/lib/hooks/useAuth", () => ({
   useAuth: () => ({ authChecked: true, role: "admin", userName: "Daniel" }),
 }));

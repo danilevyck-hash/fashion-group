@@ -94,6 +94,8 @@ const VENTAS_ID_TO_EMPRESA_KEY: Record<string, string> = {
 };
 
 interface ResumenViewMobileProps {
+  /** 🔴 VENTAS_APPLE_2026_10: arriba ya va el número grande (con su línea de frescura). */
+  sinKpis?: boolean;
   data: VentasResumen;
   selectedYear: number;
   isClosedYear: boolean;
@@ -134,6 +136,7 @@ export function ResumenViewMobile({
   onReloadData,
   onExcel,
   bajando = false,
+  sinKpis = false,
 }: ResumenViewMobileProps) {
   const prevYear = selectedYear - 1;
 
@@ -143,14 +146,14 @@ export function ResumenViewMobile({
         {/* 🔴 Sin píldora «Sincronizado» — ver el comentario de ResumenView. */}
         {/* "Actualizar ahora" (admin/secretaria) — un clic = las 8 empresas en
             secuencia + refresh-vistas como paso final. */}
-        <FrescuraVentasCel forma="computadora" onActualizado={() => onReloadData?.()} />
+        {!sinKpis && <FrescuraVentasCel forma="computadora" onActualizado={() => onReloadData?.()} />}
         {onExcel && (
           <Button variant="outline" size="sm" onClick={onExcel} disabled={bajando} className="min-h-[44px]">
             <Download className="mr-1.5 h-3.5 w-3.5" /> {ROTULO_DESCARGAR_EXCEL}
           </Button>
         )}
       </div>
-      <MobileKpis data={data} prevYear={prevYear} isClosedYear={isClosedYear} />
+      {!sinKpis && <MobileKpis data={data} prevYear={prevYear} isClosedYear={isClosedYear} />}
       {/* 🔴 EL CONTROL COMPARTIDO (`ControlSegmentado`, 5-sep-2026), con las
           MISMAS opciones que el escritorio (`MODO_OPCIONES`). */}
       <ControlSegmentado

@@ -23,8 +23,11 @@
 // el botón, y la nota de mayoreo (que es del año) sale solo con «Todo el año».
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { EmpresaMonthlySales } from "@/components/ventas/types";
+import type { EmpresaMonthlySales, VentasResumen } from "@/components/ventas/types";
 import { MESES_LARGOS } from "@/lib/comisiones/periodo";
+import { variacionPct } from "@/lib/variacion";
+import { fmtPorcentaje } from "@/lib/ventas/format";
+import { cambioDeLaTira, cifraDeLaTira } from "@/lib/ventas/celular";
 
 export const RESUMEN_MES_2026_10 = true;
 
@@ -77,4 +80,53 @@ export function cifrasDelMes(empresas: EmpresaMonthlySales[], m: number): Cifras
     margen: vM > 0 ? uM / vM : 0,
     margenPrevio: vMp > 0 ? uMp / vMp : 0,
   };
+}
+
+/** Un número de la tira de arriba, ya escrito (lo dibuja `TiraDeCuatro` o el número grande). */
+export interface NumeroDelResumen {
+  rotulo: string;
+  valor: string;
+  cambio: string | null;
+  signo: number | null;
+}
+
+/**
+ * Ventas · Utilidad · Margen (· Proyección, solo con «Todo el año» del año en
+ * curso) del período. La MISMA cuenta que hacía la tira del celular: se movió
+ * aquí para que la computadora (`VENTAS_APPLE_2026_10`) diga las mismas cifras.
+ */
+export function numerosDelResumen(data: VentasResumen, m: MesDelResumen, isClosedYear: boolean): NumeroDelResumen[] {
+  const k = data.kpis;
+  const proy = m === 0 && !isClosedYear && data.proyeccion ? data.proyeccion : null;
+  const c =
+    m > 0
+      ? cifrasDelMes(data.empresas, m)
+      : {
+          ventas: k.ventasNetasYTD, ventasPrevio: k.ventas2025YTD,
+          utilidad: k.utilidadYTD, utilidadPrevio: k.utilidad2025YTD,
+          margen: k.margenYTD, margenPrevio: k.margen2025YTD,
+        };
+  const dVentas = variacionPct(c.ventas, c.ventasPrevio);
+  const dUtilidad = variacionPct(c.utilidad, c.utilidadPrevio);
+  const puntos = (c.margen - c.margenPrevio) * 100;
+  const salida: NumeroDelResumen[] = [
+    { rotulo: "Ventas", valor: cifraDeLaTira(c.ventas), cambio: cambioDeLaTira(dVentas), signo: dVentas },
+    { rotulo: "Utilidad", valor: cifraDeLaTira(c.utilidad), cambio: cambioDeLaTira(dUtilidad), signo: dUtilidad },
+    {
+      rotulo: "Margen",
+      valor: fmtPorcentaje(c.margen),
+      cambio: `${puntos >= 0 ? "▲ +" : "▼ −"}${Math.abs(puntos).toFixed(1)}`,
+      signo: puntos,
+    },
+  ];
+  if (proy) {
+    const delta = proy.totales_grupo.delta_vs_anio_anterior_total ?? null;
+    salida.push({
+      rotulo: "Proyección",
+      valor: cifraDeLaTira(proy.totales_grupo.proyeccion_cierre),
+      cambio: delta == null ? null : `${delta >= 0 ? "+" : "−"}${cifraDeLaTira(Math.abs(delta))}`,
+      signo: delta,
+    });
+  }
+  return salida;
 }

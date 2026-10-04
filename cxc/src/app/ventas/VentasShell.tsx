@@ -24,6 +24,7 @@ import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import { PeriodoSelect } from "@/components/multifashion/PeriodoSelect";
 import { ComisionesPeriodo } from "@/components/comisiones/ComisionesPeriodo";
 import { RESUMEN_MES_2026_10, rotuloDelPeriodo } from "@/lib/ventas/resumen-mes";
+import { VENTAS_APPLE_2026_10 } from "@/lib/ventas/ventas-apple";
 import { fetchJsonWithRetry, describeFetchError } from "@/lib/fetch-retry";
 import type { VentasResumen, Clientes, Multifashion } from "@/components/ventas/types";
 import {
@@ -404,12 +405,27 @@ export function VentasShell({
             desplegable «Clientes: últimos 12 meses» y al «Período» propio de
             Productos. Cada pestaña ofrece solo lo que sabe servir. */}
         <div data-selector-periodo-ventas className="flex flex-wrap items-center gap-2">
+          {/* 🔴 VENTAS_APPLE_2026_10: en el Resumen, el MISMO selector de
+              Comisiones que ya tiene el celular (año · «Todo el año» · un mes). */}
+          {VENTAS_APPLE_2026_10 && tab === "resumen" ? (
+            <ComisionesPeriodo
+              year={selectedYear}
+              mes={Number(mesResumen) || 0}
+              rotulo={rotuloDelPeriodo(selectedYear, Number(mesResumen) || 0)}
+              availableYears={availableYears}
+              onChange={(y, m) => {
+                onPeriodoChange(String(y));
+                setMesResumen(String(m));
+              }}
+            />
+          ) : (
           <PeriodoSelect
             valor={periodoAUrl(periodo)}
             opciones={opciones}
             onChange={onPeriodoChange}
             disabled={loading}
           />
+          )}
         </div>
       </header>
 
