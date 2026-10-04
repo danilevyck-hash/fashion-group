@@ -15,8 +15,14 @@
 // solo con el «sí» de Daniel. Candado `frescura-visible.test.ts`.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** `false` = como hoy. Se prende con el «sí» de Daniel. */
-export const FRESCURA_VISIBLE_2026_10 = false;
+// ✅ PRENDIDO el 4-oct-2026: Daniel aprobó el mockup («Actualizado 4:00 pm ↻»
+// en el celular, «Actualizado hace 5 min · Actualizar» en la computadora) y
+// pidió *«tiene que estar así en TODO el sistema. No en uno sí y otro
+// diferente»*. Desde ese día `LineaDeFrescura` es la ÚNICA forma en todas las
+// pantallas que traen datos de Switch o del reloj (candado
+// `frescura-unica.test.ts`). `false` = vuelve el «Actualizar ahora» al «···»
+// de Ventas, Comisiones y «Más» de Multifashion.
+export const FRESCURA_VISIBLE_2026_10 = true;
 
 const HORA = new Intl.DateTimeFormat("es-PA", {
   timeZone: "America/Panama",

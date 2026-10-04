@@ -51,9 +51,10 @@ export const MULTIFASHION_CELULAR = true;
  *  · la línea gris pasa de «4 días · hoy $1,979» a «hoy $1,979 · ayer $X ·
  *    Actualizado 4:00 pm ↻» (el «ayer» es el de `venta-hoy.ts`; la hora y el ↻
  *    son la MISMA línea de frescura de `FRESCURA_VISIBLE_2026_10`: una sola).
- * `false` = como hoy. NACE APAGADO. Candado `multifashion-dia-tocado.test.ts`.
+ * `false` = como hoy. Candado `multifashion-dia-tocado.test.ts`.
+ * ✅ PRENDIDO el 4-oct-2026: Daniel aprobó «ver un día» del mockup («sí»).
  */
-export const MF_DIA_2026_10 = false;
+export const MF_DIA_2026_10 = true;
 
 const DIA_SEMANA = new Intl.DateTimeFormat("es-PA", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 

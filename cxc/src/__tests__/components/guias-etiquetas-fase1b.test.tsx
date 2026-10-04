@@ -362,7 +362,10 @@ describe("🔴 4. el selector para etiquetar no muestra las ya etiquetadas", () 
 
   it("🔴 5. el copy de Switch es el que dictó Daniel, letra por letra", async () => {
     await abrirPanel([ETIQUETA]);
-    expect(screen.getByText("¿No aparece la factura de hoy? Tráela de Switch")).toBeTruthy();
+    // 🔄 4-oct-2026: el aviso con «Actualizar ahora» se volvió la línea de
+    // frescura de todo el sistema (Daniel: «tiene que estar así en TODO el sistema»).
+    expect(screen.queryByText("¿No aparece la factura de hoy? Tráela de Switch")).toBeNull();
+    expect(document.querySelector("[data-frescura]")).toBeTruthy();
     expect(screen.queryByText(/entra una vez al día/)).toBeNull();
   });
 });

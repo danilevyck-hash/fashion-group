@@ -60,8 +60,8 @@ describe("🔴 se fueron las pestañas de empresa y el buscador", () => {
 });
 
 describe("🔴 arriba se dice de cuándo es el dato", () => {
-  it("la pantalla pinta «Actualizado: …» con la fecha del sync", () => {
-    expect(VISTA).toContain("textoActualizado(cartera.synced_at)");
+  it("🔄 4-oct-2026: la pantalla pinta la línea de frescura con la fecha del sync", () => {
+    expect(VISTA).toContain("actualizado={cartera.synced_at}");
   });
 
   it("el `synced_at` más reciente lo arma el servidor, con la cartera", () => {
@@ -91,11 +91,11 @@ describe("🔴 arriba se dice de cuándo es el dato", () => {
     expect(leer("src/components/shared/SyncStatus.tsx")).toContain('"Actualizado:"');
   });
 
-  it("Descargar Excel y Actualizar ahora comparten esa línea de arriba", () => {
+  it("Descargar Excel y la línea de frescura comparten esa línea de arriba", () => {
     const arriba = VISTA.slice(VISTA.indexOf("<h1"), VISTA.indexOf("<AvisoRechazosSwitch"));
-    expect(arriba).toContain("textoActualizado(cartera.synced_at)");
+    expect(arriba).toContain("actualizado={cartera.synced_at}");
     expect(arriba).toContain("Descargar Excel");
-    expect(arriba).toContain("<SyncNowButton");
+    expect(arriba).toContain("<LineaDeFrescura");
   });
 });
 

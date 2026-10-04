@@ -66,10 +66,11 @@ describe("CXC_APPLE_2026_10", () => {
     expect(CXC_APPLE_2026_10).toBe(true);
   });
 
-  it("apagado, la computadora conserva la frescura y «Actualizar ahora» de la fila de filtros", () => {
+  it("apagado, la computadora conserva la frescura en la fila de filtros (con la línea de todo el sistema)", () => {
     const page = fs.readFileSync(path.join(process.cwd(), "src/app/cxc/page.tsx"), "utf8");
     expect(page).toMatch(/\{!CXC_APPLE_2026_10 && \(\s*<SyncStatus/);
-    expect(page).toMatch(/\{!CXC_APPLE_2026_10 && \(\s*<SyncNowButton/);
+    // 🔄 4-oct-2026: el botón de antes se volvió `LineaDeFrescura` (frescura-unica).
+    expect(page).toMatch(/\{!CXC_APPLE_2026_10 && \(\s*<LineaDeFrescura/);
     expect(page).toMatch(/\{CXC_APPLE_2026_10 && \(\s*<CabeceraCxcApple/);
   });
 });

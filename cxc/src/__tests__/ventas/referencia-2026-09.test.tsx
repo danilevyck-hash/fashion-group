@@ -284,14 +284,14 @@ describe("🔴 el buscador: corto, pegajoso y con las acciones en el «···»"
     expect(document.querySelector(`.${CLASE_BARRA_PEGAJOSA}`)).toBeTruthy();
   });
 
-  it("🔴 «Actualizar datos de Switch» y «Descargar Excel» viven en el «···»", async () => {
+  it("🔴 «Descargar Excel» vive en el «···»; «Actualizar» es la línea de frescura, a la vista", async () => {
     await buscar("NB2570", TODOS);
-    // Fuera del menú no hay botones sueltos con esos nombres.
-    expect(screen.queryByRole("button", { name: /Actualizar datos de Switch/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Descargar Excel/ })).toBeNull();
+    // 🔄 4-oct-2026: «Actualizar» nunca se esconde en el «···».
+    expect(document.querySelector("[data-frescura]")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Más opciones" }));
     const menu = screen.getByRole("menu");
-    expect(within(menu).getByRole("menuitem", { name: /Actualizar datos de Switch/ })).toBeTruthy();
+    expect(within(menu).queryByRole("menuitem", { name: /Actualizar/ })).toBeNull();
     expect(within(menu).getByRole("menuitem", { name: /Descargar Excel/ })).toBeTruthy();
   });
 

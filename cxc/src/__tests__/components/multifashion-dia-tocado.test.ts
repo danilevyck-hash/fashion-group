@@ -10,8 +10,8 @@ import { describe, it, expect } from "vitest";
 import { MF_DIA_2026_10, lineaDelDia, subtituloDelMes, subtituloHoyAyer } from "@/lib/multifashion/celular";
 
 describe("MF_DIA_2026_10", () => {
-  it("nace apagado", () => {
-    expect(MF_DIA_2026_10).toBe(false);
+  it("prendido el 4-oct-2026 con el «sí» de Daniel", () => {
+    expect(MF_DIA_2026_10).toBe(true);
   });
 });
 

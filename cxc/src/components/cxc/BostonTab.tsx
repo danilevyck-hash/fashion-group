@@ -19,6 +19,7 @@ import { fmt } from "@/lib/format";
 import { AGING, AGING_ORDER, tramoLabel } from "@/lib/cxc-aging";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import SyncStatus from "@/components/shared/SyncStatus";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { empresasCarteraAparte } from "@/lib/switch-api/empresas";
 import BostonDocumentosDrawer from "@/components/cxc/BostonDocumentosDrawer";
@@ -218,6 +219,11 @@ export default function BostonTab() {
     <div>
       {/* De cuándo son las cifras de abajo. Va PRIMERO, igual que en el panel del
           grupo: lo primero que se lee antes de creerle a un número. */}
+      {/* 🔴 4-oct-2026: la hora con la línea de todo el sistema (Boston no se
+          actualiza a mano: la hora sola) y, aparte, el aviso si está viejo. */}
+      <div className="mb-3">
+        <LineaDeFrescura tabla="estadocuenta" empresas={EMPRESAS_CARTERA_BOSTON} />
+      </div>
       <SyncStatus
         tabla="estadocuenta"
         empresasEsperadas={EMPRESAS_CARTERA_BOSTON}

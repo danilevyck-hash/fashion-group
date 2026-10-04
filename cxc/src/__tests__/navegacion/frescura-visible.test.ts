@@ -1,5 +1,7 @@
 /**
- * 🔴 CANDADO — LA LÍNEA DE FRESCURA NACE APAGADA (4-oct-2026).
+ * 🔴 CANDADO — LA LÍNEA DE FRESCURA (4-oct-2026). Nació apagada y se PRENDIÓ
+ * el mismo día con el «sí» de Daniel; desde entonces es la única forma en todo
+ * el sistema (`frescura-unica.test.ts`).
  *
  * «Actualizado 4:00 pm ↻» (celular) y «Actualizado hace 5 min · Actualizar»
  * (computadora) son una PROPUESTA: se programaron detrás de
@@ -14,11 +16,11 @@ import { FRESCURA_VISIBLE_2026_10, haceCuantoFrescura, horaDeFrescura } from "@/
 const leer = (p: string) => readFileSync(join(__dirname, "../../..", p), "utf8");
 
 describe("FRESCURA_VISIBLE_2026_10", () => {
-  it("nace apagado", () => {
-    expect(FRESCURA_VISIBLE_2026_10).toBe(false);
+  it("prendido el 4-oct-2026 con el «sí» de Daniel", () => {
+    expect(FRESCURA_VISIBLE_2026_10).toBe(true);
   });
 
-  it("apagado, «Actualizar ahora» sigue donde estaba: el «···» de Ventas y Comisiones, la fila de la computadora y «Más» de Multifashion", () => {
+  it("el rollback sigue: apagado, «Actualizar ahora» sigue donde estaba: el «···» de Ventas y Comisiones, la fila de la computadora y «Más» de Multifashion", () => {
     expect(leer("src/components/ventas/celular/MenuVentasCelular.tsx")).toMatch(/!FRESCURA_VISIBLE_2026_10 && \(\s*<div className="\[&>\*\]:w-full">\s*<SyncNowButton/);
     expect(leer("src/components/comisiones/celular/PortadaComisionesCelular.tsx")).toContain("conDescarga && !FRESCURA_VISIBLE_2026_10 && (");
     expect(leer("src/components/comisiones/ComisionesView.tsx")).toContain("conPapel && !FRESCURA_VISIBLE_2026_10 && (");

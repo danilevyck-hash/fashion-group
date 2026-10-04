@@ -102,6 +102,12 @@ export default async function ClientesPage() {
   // lo que esta lista quiere desde el 5-sep-2026.
   const filas = await leerClientesDelGrupo("").catch(() => []);
   const debe = await saldoPorCodigo();
+  // De cuándo es el directorio: el último sync de Switch entre sus filas, para
+  // la línea de frescura (4-oct-2026). Sin fecha, la línea dice «Actualizar».
+  const actualizado = filas.reduce<string | null>(
+    (max, c) => (c.last_synced_at && (!max || c.last_synced_at > max) ? c.last_synced_at : max),
+    null,
+  );
 
   // ⚠️ `.slice()` OBLIGATORIO: `filas` puede ser el MISMO array que guarda el
   // caché en memoria. Acá se mapea (que ya crea uno nuevo), pero el orden se
@@ -120,5 +126,5 @@ export default async function ClientesPage() {
     }))
     .sort((a, b) => (a.nombre ?? "").localeCompare(b.nombre ?? "", "es"));
 
-  return <ClientesListClient initialClientes={clientes} />;
+  return <ClientesListClient initialClientes={clientes} actualizado={actualizado} />;
 }

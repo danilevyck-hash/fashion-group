@@ -87,11 +87,11 @@ describe("🔴 Ventas › Resumen ya NO lleva píldora de sincronización (4-sep
   it("CONTROL: el Resumen se sigue pintando", () => {
     // Sin esto, borrar la vista entera pasaría por verde.
     const desktop = src("components", "ventas", "ResumenView.tsx");
-    expect(desktop).toContain("<SyncNowButton");
+    expect(desktop).toContain("<FrescuraVentasCel"); // 🔄 4-oct-2026: la línea de frescura
     expect(desktop).toContain("<FilaDetalleTr");
     expect(desktop).toContain("Total grupo"); // 1-oct-2026, Daniel: nombres normales de ERP
     const movil = src("components", "ventas", "ResumenViewMobile.tsx");
-    expect(movil).toContain("<SyncNowButton");
+    expect(movil).toContain("<FrescuraVentasCel");
     expect(movil).toContain("<MobileKpis");
     expect(movil).toContain("<MobileTarjetas");
   });

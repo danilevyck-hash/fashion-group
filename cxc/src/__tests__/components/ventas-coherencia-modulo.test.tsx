@@ -146,18 +146,18 @@ describe("3b · 🔴 la píldora de empresa y el alcance viven en Utilidad tambi
   });
 });
 
-describe("4 · 🔴 «Actualizar ahora» está en las TRES pestañas", () => {
-  it("Resumen, Clientes y Productos, con la MISMA secuencia", () => {
+describe("4 · 🔴 «Actualizar» está en las TRES pestañas", () => {
+  // 🔄 4-oct-2026: es la línea de frescura (`FrescuraVentasCel`), que lleva
+  // por dentro la MISMA secuencia, `secuencial` (una sesión de Switch a la vez).
+  it("Resumen, Clientes y Productos, con la MISMA línea", () => {
     for (const k of ["resumen", "resumenMovil", "clientes", "productos"] as const) {
-      expect(fuentes[k], `${k} se quedó sin «Actualizar ahora»`).toContain("SyncNowButton");
-      expect(fuentes[k], `${k} usa otra secuencia`).toContain("SYNC_NOW_VENTAS_SECUENCIA");
+      expect(fuentes[k], `${k} se quedó sin «Actualizar»`).toContain('<FrescuraVentasCel forma="computadora"');
     }
   });
 
-  it("y va `secuencial` — Switch admite UNA sesión por empresa a la vez", () => {
-    for (const k of ["resumen", "clientes", "productos"] as const) {
-      expect(fuentes[k]).toMatch(/SYNC_NOW_VENTAS_SECUENCIA\}\s+secuencial/);
-    }
+  it("y la línea va `secuencial` con la secuencia de Ventas", () => {
+    const menu = leer("src/components/ventas/celular/MenuVentasCelular.tsx");
+    expect(menu).toMatch(/opciones=\{SYNC_NOW_VENTAS_SECUENCIA\}\s+secuencial/);
   });
 });
 
@@ -272,7 +272,7 @@ describe("8 · 🔴 las DOS vistas del Resumen muestran los mismos bloques", () 
     { nombre: "proyección por empresa",   escritorio: /buildSlotsProyeccion/,      celular: /buildSlotsProyeccion/ },
     { nombre: "detalle de la celda",      escritorio: /buildSlotsMetrica/,         celular: /buildSlotsMetrica/ },
     { nombre: "nota de mayoreo de Multifashion", escritorio: /multiMayoreoNota/,   celular: /multiMayoreoNota/ },
-    { nombre: "Actualizar ahora",         escritorio: /SyncNowButton/,             celular: /SyncNowButton/ },
+    { nombre: "Actualizar",               escritorio: /FrescuraVentasCel/,         celular: /FrescuraVentasCel/ },
     { nombre: "nombre corto de empresa",  escritorio: /nombreEmpresaEnPantalla/,   celular: /nombreEmpresaEnPantalla/ },
   ];
 

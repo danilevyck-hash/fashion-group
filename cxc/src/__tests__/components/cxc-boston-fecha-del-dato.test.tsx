@@ -119,10 +119,10 @@ describe("con el dato VIEJO, la pestaña lo dice", () => {
     const texto = textoPintado();
     // La pantalla habla en hora de Panamá (UTC−5), así que 08:10 UTC se lee como
     // las 3:10 a.m. del 19. Medido en el navegador contra producción, esta línea
-    // sale literal: «Actualizado: 19 ago 2026, 3:10 a m».
-    expect(texto).toMatch(/Actualizado:/);
-    expect(texto).toMatch(/19 ago 2026/);
-    expect(texto).toMatch(/3:10/);
+    // sale literal: «Actualizado: 19 ago 2026, 3:10 a m». 🔄 4-oct-2026: la
+    // línea de frescura de todo el sistema dice «Actualizado 19 ago» / «hace N días».
+    expect(texto).toMatch(/Actualizado /);
+    expect(texto).toMatch(/19 ago/);
     // Y la cifra congelada sigue en pantalla — no se esconde, se fecha.
     expect(texto).toContain("187,018.00");
   });
@@ -152,7 +152,7 @@ describe("con el dato VIEJO, la pestaña lo dice", () => {
 describe("con el dato FRESCO, el aviso NO aparece", () => {
   it("sin ámbar, sin ⚠️ — solo la fecha", async () => {
     montar(FRESCA_ISO, false);
-    await waitFor(() => expect(textoPintado()).toMatch(/Actualizado:/));
+    await waitFor(() => expect(textoPintado()).toMatch(/Actualizado /));
     expect(screen.queryByRole("status")).toBeNull();
     expect(textoPintado()).not.toContain("⚠️");
     expect(textoPintado()).not.toMatch(/sin actualizar desde/i);
@@ -183,7 +183,7 @@ describe("el aviso es un EXTRA: nunca se lleva puesta la cartera", () => {
     // cartera y la fecha de `/api/sync-status`. Que haya llegado una no quiere
     // decir que llegó la otra, y afirmarlo de una daba rojo al azar en la
     // máquina de GitHub. `waitFor` reintenta: si la fecha nunca se pinta, roja.
-    await waitFor(() => expect(textoPintado()).toMatch(/Actualizado:/));
+    await waitFor(() => expect(textoPintado()).toMatch(/Actualizado /));
     expect(screen.queryByRole("status")).toBeNull();
   });
 });

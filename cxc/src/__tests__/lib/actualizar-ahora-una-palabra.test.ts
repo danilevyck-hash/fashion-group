@@ -72,10 +72,17 @@ describe("🔴 A. la casa dice «Actualizar ahora»", () => {
 // ─── B · los tres botones lo leen de ahí ─────────────────────────────────────
 
 describe("🔴 B. ningún botón teclea el texto", () => {
+  // 🔄 4-oct-2026: Nueva guía y Etiquetas ya no dibujan su propio botón: usan
+  // `LineaDeFrescura`, la línea de todo el sistema (`frescura-unica.test.ts`).
+  for (const rel of [FACTURAS, ETIQUETAS]) {
+    it(`${rel} usa la línea de frescura y no teclea el texto`, () => {
+      const src = fs.readFileSync(path.join(process.cwd(), rel), "utf8");
+      expect(src).toContain("<LineaDeFrescura");
+      expect(sinComentarios(src)).not.toContain("Actualizar ahora");
+    });
+  }
   for (const [nombre, rel] of [
     ["el de los cinco módulos", BOTON],
-    ["el selector de facturas de Nueva guía", FACTURAS],
-    ["el de Etiquetas", ETIQUETAS],
   ] as const) {
     it(`${nombre} importa las dos palabras`, () => {
       const src = fs.readFileSync(path.join(process.cwd(), rel), "utf8");
@@ -124,13 +131,12 @@ describe("🔴 E. la frase de Etiquetas es la de Daniel, y no cambió", () => {
     expect(TEXTO_TRAER_DE_SWITCH).toBe("¿No aparece la factura de hoy? Tráela de Switch");
   });
 
-  it("la pantalla la sigue DIBUJANDO de la constante, no solo importándola", () => {
-    // Importarla y no usarla no cuenta: lo que se ve es el texto del aviso.
-    // cambió de dirección (2-oct-2026, AVISOS_2026_10): era `<span>{…}</span>`;
-    // ahora es el texto del <Aviso>, con «Actualizar ahora» como su acción.
-    expect(leer("app/guias/components/EtiquetasView.tsx")).toMatch(
-      />\s*\{TEXTO_TRAER_DE_SWITCH\}\s*<\/Aviso>/,
-    );
+  it("🔄 4-oct-2026: el aviso se volvió la línea de frescura de todo el sistema", () => {
+    // Daniel: «tiene que estar así en TODO el sistema». El aviso con
+    // «Actualizar ahora» en azul se fue; la constante queda sin dibujar.
+    const src = leer("app/guias/components/EtiquetasView.tsx");
+    expect(src).not.toMatch(/>\s*\{TEXTO_TRAER_DE_SWITCH\}\s*<\/Aviso>/);
+    expect(src).toContain("<LineaDeFrescura");
   });
 
   it("CONTROL: el botón de Etiquetas sigue usando la MISMA ruta de siempre", () => {

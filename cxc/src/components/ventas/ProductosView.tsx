@@ -9,8 +9,6 @@ import { Download, Search, ChevronRight } from "lucide-react";
 import { SkeletonTable } from "@/components/ui";
 import { MONTHS, fmtMoney } from "@/lib/ventas/format";
 import { TiraOrden } from "./ChipOrden";
-import SyncNowButton from "@/components/shared/SyncNowButton";
-import { SYNC_NOW_VENTAS_SECUENCIA } from "@/components/shared/syncNowOpciones";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { dejoDeVenderse, totalDejadoDeVender, type DejadoDeVender } from "@/lib/ventas/productos-dejados";
 import { variacionPct } from "@/lib/variacion";
@@ -652,7 +650,7 @@ export function ProductosView({ periodo: periodoElegido, anioEnCurso, onDescarga
             computadora no cambia nada. */}
         {!enCelular && (
           <>
-            <SyncNowButton opciones={SYNC_NOW_VENTAS_SECUENCIA} secuencial onSuccess={load} />
+            <FrescuraVentasCel forma="computadora" onActualizado={() => void load()} />
 
             <Button variant="outline" size="sm" onClick={onExcel} disabled={!data || loading} className="min-h-[44px]">
               <Download className="mr-1.5 h-3.5 w-3.5" /> {ROTULO_DESCARGAR_EXCEL}

@@ -422,8 +422,10 @@ describe("🔴 el pie es UNA línea, y no perdió ninguna función", () => {
     // (el espacio alrededor del punto lo pone el `gap` del renglón, no el texto)
     const linea = await pie();
     // 🔄 18-sep-2026: el tercer pedazo decía «Buscar otra vez» (misma función).
-    expect((linea.textContent || "").trim()).toBe("Traslado·Escribir el número·Actualizar ahora");
-    expect(linea.querySelectorAll("button")).toHaveLength(3);
+    // 🔄 4-oct-2026: la frescura y «Actualizar» salieron del pie a la línea
+    // de frescura de todo el sistema, junto al título «Facturas del cliente».
+    expect((linea.textContent || "").trim()).toBe("Traslado·Escribir el número");
+    expect(linea.querySelectorAll("button")).toHaveLength(2);
   });
 
   it("🔴 con frescura, «Actualizado» va A LA VISTA y en el MISMO renglón — no en un title", async () => {
@@ -432,11 +434,10 @@ describe("🔴 el pie es UNA línea, y no perdió ninguna función", () => {
     render(<Harness />);
     await asentar();
     await elegirCliente(CITY.nombre);
-    const linea = screen.getByTestId("pie-facturas");
-    expect((linea.textContent || "").trim()).toMatch(
-      /^Traslado·Escribir el número·Actualizado .+·Actualizar ahora$/,
-    );
-    expect(linea.querySelector("[title]")).toBeNull();
+    // 🔄 4-oct-2026: va en la línea de frescura, A LA VISTA y sin `title`.
+    const lineas = Array.from(document.querySelectorAll("[data-frescura]"));
+    expect(lineas.some((l) => /Actualizado .+/.test(l.textContent || ""))).toBe(true);
+    for (const l of lineas) expect(l.querySelector("[title]")).toBeNull();
   });
 
   it("🔴 «Traslado» sigue escribiendo el TEXTO Traslado y sigue sin pedir empresa", async () => {

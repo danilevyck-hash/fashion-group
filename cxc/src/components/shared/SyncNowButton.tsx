@@ -93,13 +93,18 @@ interface SyncNowButtonProps {
    * acelerador y avisos. Omitido = el botón de siempre.
    */
   variante?: "boton" | "linea";
-  /** Lo que dice la «linea» en reposo. */
-  rotulo?: ReactNode;
+  /** Lo que dice la «linea»: en reposo y mientras corre (con «(N/8)»). */
+  rotulo?: (corriendo: boolean, progreso: string) => ReactNode;
   /** Lo que se ve en lugar del botón para quien no puede actualizar. */
   sinPermiso?: ReactNode;
 }
 
 const ROLES_DEFAULT = ["admin", "secretaria"];
+
+/** El botón-texto de `LineaDeFrescura`: el mismo con `SyncNowButton` y con una
+ *  acción propia. 44 px con el dedo; en la computadora, del alto del texto. */
+export const CLASE_BOTON_LINEA =
+  "inline-flex min-h-[44px] items-center gap-1 text-left text-blue-600 transition hover:text-blue-800 active:opacity-60 disabled:cursor-not-allowed disabled:opacity-50 md:[@media(pointer:fine)]:min-h-0";
 
 export default function SyncNowButton({
   opciones,
@@ -279,17 +284,17 @@ export default function SyncNowButton({
         // mínimo táctil de la casa.
         className={
           variante === "linea"
-            ? "inline-flex min-h-[44px] items-center gap-1 text-left text-blue-600 transition hover:text-blue-800 active:opacity-60 disabled:cursor-not-allowed disabled:opacity-50 md:[@media(pointer:fine)]:min-h-0"
+            ? CLASE_BOTON_LINEA
             : "inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
         }
       >
         {variante !== "linea" && <RefreshCw className={`h-3.5 w-3.5 ${running ? "animate-spin" : ""}`} />}
-        {running
-          ? progreso
-            ? `${TEXTO_ACTUALIZANDO} (${progreso.actual}/${progreso.total})`
-            : TEXTO_ACTUALIZANDO
-          : variante === "linea" && rotulo != null
-            ? rotulo
+        {variante === "linea" && rotulo
+          ? rotulo(running, progreso ? ` (${progreso.actual}/${progreso.total})` : "")
+          : running
+            ? progreso
+              ? `${TEXTO_ACTUALIZANDO} (${progreso.actual}/${progreso.total})`
+              : TEXTO_ACTUALIZANDO
             : TEXTO_ACTUALIZAR_AHORA}
       </button>
       {subtext && <span className="mt-0.5 text-[12px] text-gray-400">{subtext}</span>}

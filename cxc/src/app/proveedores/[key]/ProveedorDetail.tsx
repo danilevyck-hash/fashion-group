@@ -9,7 +9,7 @@ import { fmt, fmtDate } from "@/lib/format";
 import { telHref, mailtoHref } from "@/lib/contact-links";
 import { getCompanyDisplay } from "@/lib/companies";
 import { tonoDeMonto, textoDeMonto } from "@/lib/proveedores/tono";
-import SyncNowButton from "@/components/shared/SyncNowButton";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { ROLES_SYNC_PROVEEDORES } from "@/components/shared/syncNowOpciones";
 import { empresasConCxp } from "@/lib/switch-api/empresas";
 import { EMPRESA_KEY_TO_NAME, nombreCortoEmpresa } from "@/lib/empresa-mapping";
@@ -118,7 +118,8 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
               {/* Actualiza el CxP de las empresas de ESTE proveedor (en
                   secuencia si son varias) y recarga la ficha. */}
               {syncOpciones.length > 0 && (
-                <SyncNowButton
+                <LineaDeFrescura
+                  actualizado={data.synced_at}
                   opciones={syncOpciones}
                   secuencial
                   roles={ROLES_SYNC_PROVEEDORES}
@@ -174,20 +175,14 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
               if (campos.length === 0) return null;
               return (
                 <section className="border border-gray-200 rounded-lg p-4 mb-4">
-                  {/* "· sincronizados de Switch" se fue: el pie de esta misma
-                      sección ya dice "Actualizado el {fecha}", que
-                      además dice CUÁNDO. */}
+                  {/* La fecha del dato la dice la línea de frescura junto al
+                      nombre (4-oct-2026). */}
                   <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-3">Datos</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-6 text-sm">
                     {campos.map((c) => (
                       <Field key={c.label} label={c.label} value={c.value} tabularNums={c.tabularNums} fullWidth={c.fullWidth} href={c.href} />
                     ))}
                   </div>
-                  {data.synced_at && (
-                    <div className="text-xs text-gray-400 mt-3">
-                      Actualizado el {fmtDate(data.synced_at.slice(0, 10))}
-                    </div>
-                  )}
                 </section>
               );
             })()}

@@ -612,7 +612,7 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 - Usuarios: secretarias, bodegueros, vendedores en Panamá. NO tech-savvy.
 - 🔴 **Al diseñar o nombrar cualquier pantalla, [docs/diseno.md](docs/diseno.md) (estilo Apple) y [docs/nombres-erp.md](docs/nombres-erp.md) son OBLIGATORIOS**: nombres de ERP, nada coloquial.
 - 🔴 **«Pedido» para Daniel es la orden de un CLIENTE, nunca una petición HTTP.** Para hablar de red: **«no escribe nada», «no guarda nada», «solo lee»**. Igual de cargadas: factura · traslado · abono · pago.
-- 🔴 **Traer datos frescos se dice «Actualizar ahora» en TODO el sistema** (`lib/ui/actualizar-ahora.ts`). ⚠️ **«Traer ahora» de Asistencia es OTRA cosa** —le pide a una PC que empuje las marcas de su reloj— y no se toca.
+- 🔴 **Traer datos frescos: UNA línea en todo el sistema, `LineaDeFrescura`** (4-oct-2026; `docs/diseno.md`, candado `frescura-unica`).
 - 🔴 **La línea de «más de 4 marcas» NO dice cuál sobra** (18-sep-2026): «El día tiene N marcas, y son 4 — quita la que sobra», con las horas como BOTONES. 🩸 Decía «Marca de más: HH:MM:SS» —elegida por POSICIÓN— y la contadora quitó la equivocada. ⚠️ Con 3 marcas el texto NO cambia: ahí sí falta una.
 - Botones descriptivos ("Guardar gasto", no "Guardar"). Errores accionables. Font size mínimo `text-sm` para datos; `text-gray-600` mínimo para montos.
 - Confirmación solo para acciones destructivas, NO para guardar. **Undo universal: 5 segundos.** **Optimistic UI**: actualizar antes de la respuesta y revertir si falla.

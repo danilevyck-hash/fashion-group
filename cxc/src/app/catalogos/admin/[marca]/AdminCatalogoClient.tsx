@@ -32,7 +32,7 @@ import useSWR from "swr";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
-import SyncNowButton from "@/components/shared/SyncNowButton";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { CATALOGOS_APPLE_2026_10_B } from "@/lib/catalogo/catalogos-2026-10-b";
 import { FiltroDesplegable } from "@/components/catalogo/CatalogoFilters";
 import SubirFotos from "./SubirFotos";
@@ -220,11 +220,13 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
 
   // `CATALOGOS_APPLE_2026_10_B`: «Actualizar ahora» en la línea del título.
   const enUnaFila = CATALOGOS_APPLE_2026_10_B.administrar;
-  const botonActualizar = (className?: string) => (
-    <SyncNowButton
-      className={className}
+  // 🔴 4-oct-2026: «Actualizado 4:00 pm ↻» bajo el título en el celular y
+  // «Actualizado hace 5 min · Actualizar» a su lado en la computadora, como en
+  // todo el sistema. Reemplaza al subtítulo «Actualizado el…» y al botón.
+  const frescura = (
+    <LineaDeFrescura
+      actualizado={syncData?.lastSync ?? null}
       opciones={[{ modulo: theme.admin.syncModulo }]}
-      subtext={theme.admin.syncSubtext}
       onSuccess={async () => {
         await Promise.all([mutateProducts(), mutateSyncStatus()]);
       }}
@@ -254,19 +256,12 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
         <div className={enUnaFila ? "flex items-center justify-between gap-3 mb-4 flex-wrap" : "flex items-start justify-between gap-3 mb-6 flex-wrap"}>
           <div className="flex items-center gap-3">
             {theme.logos.admin()}
-            <div>
+            <div className="flex flex-col md:flex-row md:items-baseline md:gap-3">
               <h1 className="text-xl font-bold text-gray-900">{theme.admin.titulo}</h1>
-              <p className="text-xs text-gray-400">
-                {theme.admin.subtituloSync(syncData?.lastSync ?? null)}
-              </p>
-              {/* "Actualizar ahora" (admin/secretaria) — sync del catálogo desde
-                  Switch (empresa de la marca). Con `CATALOGOS_APPLE_2026_10_B`
-                  sube a la línea del título, con los demás botones. */}
-              {!enUnaFila && botonActualizar("mt-1.5")}
+              {frescura}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-          {enUnaFila && botonActualizar()}
           {/* 🔴 EL MAPA `rubro → categoría` SE ADMINISTRA (17-sep-2026), y solo
               lo edita admin: mueve el cajón de un producto y, con él, el bulto
               que se le cobra. ⚠️ Se le pregunta AL TEMA, nunca por el nombre de

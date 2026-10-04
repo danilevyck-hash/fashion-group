@@ -299,9 +299,13 @@ describe("5 · una sola pastilla de relojes en la fila de mandos", () => {
   it("🔴 la pastilla vive en la fila de mandos, no en una caja aparte", async () => {
     aparato(false); servir(); montar();
     await screen.findByText("Ana Trejos");
-    const pastilla = await screen.findByText("Relojes al día · hace 3 minutos");
+    // 🔄 4-oct-2026 (`FRESCURA_VISIBLE_2026_10`): con todo al día ya no hay
+    // pastilla; queda la línea de frescura, en la MISMA fila de mandos.
+    const linea = (await screen.findAllByRole("button", { name: new RegExp(TRAER_AHORA) }))[0].closest("[data-frescura]");
     const mandos = screen.getByRole("button", { name: DESCARGAR }).closest("div.flex.flex-wrap");
-    expect(mandos?.contains(pastilla)).toBe(true);
+    expect(linea).toBeTruthy();
+    expect(mandos?.contains(linea!)).toBe(true);
+    expect(screen.queryByText("Relojes al día · hace 3 minutos")).toBeNull();
   });
 
   it("🔴 UN «Traer ahora» le deja el pedido a LOS DOS, con las llamadas de siempre", async () => {
@@ -312,7 +316,8 @@ describe("5 · una sola pastilla de relojes en la fila de mandos", () => {
       { dispositivo: "reloj acs", salud: "callado", titulo: "y", detalle: null, pedidoPendiente: false, pedidoSinRespuesta: false, leidoHasta: null, minutosSinNoticias: 130 },
     ], pedidos);
     montar();
-    fireEvent.click(await screen.findByRole("button", { name: new RegExp(TRAER_AHORA) }));
+    // Una línea en el celular y otra en la computadora (CSS): se toca una.
+    fireEvent.click((await screen.findAllByRole("button", { name: new RegExp(TRAER_AHORA) }))[0]);
     await waitFor(() => expect(pedidos.length).toBe(2));
     expect(new Set(pedidos)).toEqual(new Set(["reloj cboston", "reloj acs"]));
     // 🔴 El acuse nombra a quiénes salió. ⚠️ NO dice cuántas marcas trajo: el
@@ -325,7 +330,8 @@ describe("5 · una sola pastilla de relojes en la fila de mandos", () => {
   it("🔴 con la empresa filtrada, solo su reloj", async () => {
     aparato(false); servir();
     montar("american_classic");
-    expect(await screen.findByText(/Reloj de Multifashion al día/)).toBeTruthy();
+    // Al día no hay aviso: queda la línea, y nada de Boston.
+    expect((await screen.findAllByRole("button", { name: new RegExp(TRAER_AHORA) })).length).toBeGreaterThan(0);
     expect(screen.queryByText(/Reloj de Boston/)).toBeNull();
   });
 

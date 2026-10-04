@@ -550,7 +550,6 @@ export interface MarcaTheme {
   };
   admin: {
     titulo: string;
-    subtituloSync: (lastSync: string | null) => string;
     /** GET de products del admin (QUIRK 4 heredado: Reebok usa scope=admin). */
     productsUrl: string;
     /** Excel "sin foto" por marca (columnas y libs propias). Lanza si falla. */
@@ -565,7 +564,6 @@ export interface MarcaTheme {
     /** De qué categoría es un producto, para esos chips. Vacío = `p.category`. */
     categoriaDe?: (p: AdminProducto) => string | null;
     syncModulo: string;
-    syncSubtext: string;
     tabActive: string;
     spinner: string;
     metricValue: string;
@@ -903,10 +901,6 @@ const REEBOK: MarcaTheme = {
   },
   admin: {
     titulo: "Administrar",
-    subtituloSync: (lastSync) => {
-      if (!lastSync) return "Sin actualizar · 1×/día";
-      return `Actualizado ${relativo(lastSync)} · 1×/día`; // 1-oct-2026, Daniel: nombres normales de ERP
-    },
     productsUrl: "/api/catalogo/reebok/products?scope=admin",
     excelSinFoto: async (sin) => {
       // Imports dinámicos: xlsx-js-style no entra al bundle inicial de la página.
@@ -926,7 +920,6 @@ const REEBOK: MarcaTheme = {
       downloadWorkbook(wb, exportFilename("reebok-sin-foto"));
     },
     syncModulo: "catalogo-reebok",
-    syncSubtext: "tarda ~3 min",
     // 🔴 Solo Reebok: el mapa `rubro → categoría` se administra desde el
     // 17-sep-2026 (`reebok_rubro_categoria`). Ver `RUTA_CATEGORIAS_REEBOK`.
     rutaCategorias: RUTA_CATEGORIAS_REEBOK,
@@ -1203,12 +1196,6 @@ const JOYBEES: MarcaTheme = {
   },
   admin: {
     titulo: "Administrar",
-    subtituloSync: (lastSync) =>
-      `Productos con existencia en Switch${
-        lastSync
-          ? ` · Actualizado el ${new Date(lastSync).toLocaleString("es-PA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
-          : ""
-      }`,
     productsUrl: "/api/catalogo/joybees/products",
     // Joybees es 100% calzado y NO tiene columna de categoría: su
     // `categoryOptions` está vacía a propósito (el catálogo público
@@ -1243,7 +1230,6 @@ const JOYBEES: MarcaTheme = {
       downloadWorkbook(wb, exportFilename("joybees-sin-foto"));
     },
     syncModulo: "catalogo-joybees",
-    syncSubtext: "tarda ~1-2 min",
     tabActive: "bg-white text-[#404041] shadow-sm",
     spinner: "w-8 h-8 border-2 border-[#FFE443] border-t-transparent rounded-full animate-spin",
     metricValue: "text-[#404041]",
@@ -1536,12 +1522,6 @@ const TOMMY: MarcaTheme = {
   },
   admin: {
     titulo: "Administrar",
-    subtituloSync: (lastSync) =>
-      `Productos con existencia en Switch${
-        lastSync
-          ? ` · Actualizado el ${new Date(lastSync).toLocaleString("es-PA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
-          : ""
-      }`,
     productsUrl: "/api/catalogo/tommy/products",
     excelSinFoto: async (sin) => {
       // Imports dinámicos: xlsx-js-style no entra al bundle inicial de la página.
@@ -1573,7 +1553,6 @@ const TOMMY: MarcaTheme = {
       downloadWorkbook(wb, exportFilename("tommy-sin-foto"));
     },
     syncModulo: "catalogo-tommy",
-    syncSubtext: "tarda ~2-3 min",
     tabActive: "bg-white text-[#152342] shadow-sm",
     spinner: "w-8 h-8 border-2 border-[#AE0029] border-t-transparent rounded-full animate-spin",
     metricValue: "text-[#152342]",
@@ -1867,12 +1846,6 @@ const CALVIN: MarcaTheme = {
   },
   admin: {
     titulo: "Administrar",
-    subtituloSync: (lastSync) =>
-      `Productos con existencia en Switch${
-        lastSync
-          ? ` · Actualizado el ${new Date(lastSync).toLocaleString("es-PA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
-          : ""
-      }`,
     productsUrl: "/api/catalogo/calvin/products",
     excelSinFoto: async (sin) => {
       // Imports dinámicos: xlsx-js-style no entra al bundle inicial de la página.
@@ -1905,7 +1878,6 @@ const CALVIN: MarcaTheme = {
       downloadWorkbook(wb, exportFilename("calvin-sin-foto"));
     },
     syncModulo: "catalogo-calvin",
-    syncSubtext: "tarda ~2-3 min",
     tabActive: "bg-white text-[#1A1A1A] shadow-sm",
     spinner: "w-8 h-8 border-2 border-[#1A1A1A] border-t-transparent rounded-full animate-spin",
     metricValue: "text-[#1A1A1A]",
@@ -1946,19 +1918,6 @@ const CALVIN: MarcaTheme = {
     saveBtn: "flex-1 py-2 bg-[#1A1A1A] text-white rounded-full text-sm font-semibold hover:bg-black transition disabled:opacity-50",
   },
 };
-
-// "hace X" relativo del subtítulo del admin Reebok (heredado tal cual).
-function relativo(iso: string | null): string {
-  if (!iso) return "nunca";
-  const diff = Date.now() - new Date(iso).getTime();
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return "hace instantes";
-  if (min < 60) return `hace ${min} min`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `hace ${h} h`;
-  const d = Math.floor(h / 24);
-  return d === 1 ? "hace 1 día" : `hace ${d} días`;
-}
 
 export const MARCA_THEME: Record<string, MarcaTheme> = {
   reebok: REEBOK,

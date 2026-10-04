@@ -572,12 +572,13 @@ const EN_PANTALLA: { archivo: string; por_que: string; texto: string }[] = [
     // sigue A LA VISTA, nunca detrás del ⓘ, que es lo que este candado protege.
     // 1-oct-2026, Daniel: nombres normales de ERP — vuelve «Actualizado el
     // {fecha}», igual que Proveedores (sin «sincroniz» en pantalla).
-    texto: "Actualizado el",
+    // 🔄 4-oct-2026: la frescura es la línea de todo el sistema, a la vista.
+    texto: "<LineaDeFrescura",
   },
   {
     archivo: "app/proveedores/[key]/ProveedorDetail.tsx",
     por_que: "la frescura del dato cambia cuánto se le cree a la ficha",
-    texto: "Actualizado el",
+    texto: "<LineaDeFrescura", // 🔄 4-oct-2026: la línea de todo el sistema
   },
 ];
 

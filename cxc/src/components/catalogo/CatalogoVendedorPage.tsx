@@ -567,7 +567,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
       <div className={theme.grid.emptyIconWrap}>{theme.grid.emptyIcon}</div>
       <p className={theme.grid.emptyText}>Por ahora no hay productos disponibles</p>
       <p className={`${theme.grid.emptyText} mt-1 font-normal`}>
-        Vuelve a entrar más tarde o toca «Actualizar ahora».
+        Vuelve a entrar más tarde o toca «Actualizar».
       </p>
     </div>
   ) : (
@@ -748,7 +748,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   const accionesEnLaBarra = (
     <>
       <div data-medir="acciones-catalogo" className={CLASES_MENU_MAS.computadora}>
-        <CatalogoSyncNow catalogo={marca} onSuccess={loadProducts} />
+        <CatalogoSyncNow catalogo={marca} onSuccess={loadProducts} forma="computadora" />
         {pedidosBtn}
         {(theme.vendorShare.enHeader || filteredCount > 0) && shareMenu}
       </div>
@@ -766,9 +766,6 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
           <>
             <button type="button" aria-label="Cerrar" className="fixed inset-0 z-40 cursor-default" onClick={() => setMasAbierto(false)} />
             <div className={CLASES_MENU_MAS.panel}>
-              <div className="px-3 py-1">
-                <CatalogoSyncNow catalogo={marca} onSuccess={loadProducts} />
-              </div>
               {puedeVerPedidos && (
                 <Link href={theme.pedidosHref} className={theme.vendorShare.item}>Comprobantes</Link>
               )}
@@ -822,6 +819,14 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
           </div>
         ) : (
           <CatalogoHeader marca={marca} variant="vendor" />
+        )}
+
+        {/* 🔴 4-oct-2026: en el celular «Actualizar» ya no vive en el «···»:
+            es la línea de frescura, arriba del buscador. */}
+        {CATALOGOS_APPLE_2026_10 && (
+          <div className="hidden max-sm:block mb-2">
+            <CatalogoSyncNow catalogo={marca} onSuccess={loadProducts} forma="celular" />
+          </div>
         )}
 
         {/* ── Filters ── */}

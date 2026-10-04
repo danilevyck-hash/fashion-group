@@ -37,6 +37,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { useToast } from "@/components/ToastSystem";
 import { Aviso } from "@/components/ui/Aviso";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
+import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
 import { nombreRelojEnPantalla } from "@/lib/asistencia/agente";
 // 🔴 La pastilla de una sola fila sale del módulo puro: qué dice, a qué relojes
 // les toca la empresa que se mira y qué se anuncia al dejar el pedido.
@@ -250,6 +252,38 @@ export default function EstadoReloj({ onLlegaron, resumen = false, empresa = nul
     const tono = apagado || peor.salud === "al_dia" || peor.salud === "nunca"
       ? "info"
       : peor.salud === "con_error" ? "error" : "aviso";
+
+    // 🔴 4-oct-2026 (`FRESCURA_VISIBLE_2026_10`): «Sincronizar» va con el
+    // formato de todo el sistema —«Actualizado 4:00 pm ↻» en el celular,
+    // «Actualizado hace 5 min · Sincronizar» en la computadora—, con la hora
+    // del último contacto de la PC. El aviso del reloj sin señal (o apagado de
+    // noche) se queda como aviso, aparte y sin botón. Misma lógica: el mismo
+    // POST a los relojes que lo aceptan.
+    if (FRESCURA_VISIBLE_2026_10) {
+      const vistos = relojes.map((r) => r.vistoEn ?? r.leidoHasta).filter((x): x is string => !!x);
+      const ultimo = vistos.length ? vistos.reduce((a, b) => (Date.parse(a) > Date.parse(b) ? a : b)) : null;
+      const conAviso = peor.salud !== "al_dia" || !!avisoDeLaPastilla(relojes) || faltaMigracion;
+      return (
+        <>
+          {conAviso && (
+            <Aviso tono={tono} className="max-w-full">
+              {apagado ?? textoDelAviso(relojes)}
+              {avisoDeLaPastilla(relojes) && <span className="block font-medium">{avisoDeLaPastilla(relojes)}</span>}
+              {faltaMigracion && datos?.avisoMigracion && <span className="block text-xs">{datos.avisoMigracion}</span>}
+            </Aviso>
+          )}
+          <LineaDeFrescura
+            actualizado={ultimo}
+            accion={TRAER_AHORA}
+            ocupado={ESPERANDO_A_LA_PC}
+            onActualizar={() => pedirATodos(puedenPedir.map((r) => r.dispositivo))}
+            actualizando={esperando && !relojes.every((r) => r.pedidoSinRespuesta)}
+            deshabilitado={puedenPedir.length === 0}
+          />
+        </>
+      );
+    }
+
     return (
       <Aviso
         tono={tono}

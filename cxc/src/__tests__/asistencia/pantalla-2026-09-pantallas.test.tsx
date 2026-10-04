@@ -249,10 +249,10 @@ describe("B · Asistencia en el celular", () => {
     // 🔴 25-sep-2026: CON LA EMPRESA FILTRADA, SOLO SU RELOJ. Esta pantalla se
     // monta con `empresa="american_classic"`, así que de los dos relojes que
     // sirve el servidor la pastilla nombra el de Multifashion y nada más.
-    expect(await screen.findByText("Reloj de Multifashion al día")).toBeTruthy();
+    // 🔄 4-oct-2026 (`FRESCURA_VISIBLE_2026_10`): al día ya no hay pastilla;
+    // la línea de frescura «… · Sincronizar» se ve siempre.
+    expect((await screen.findAllByRole("button", { name: /Sincronizar/ })).length).toBeGreaterThan(0);
     expect(screen.queryByText(/Reloj de Boston/)).toBeNull();
-    // 1-oct-2026, Daniel: nombres normales de ERP («name: /Traer ahora/» → «name: /Sincronizar/»).
-    expect(screen.getByRole("button", { name: /Sincronizar/ })).toBeTruthy();
   });
 });
 
@@ -394,8 +394,8 @@ describe("E · el reloj en la computadora", () => {
     servirRelojes([RELOJ("al_dia", "Las marcaciones están entrando solas")]);
     montarReporte();
     await screen.findByText("Ana Trejos");
-    expect(await screen.findByText(/al día/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Sincronizar/ })).toBeTruthy();
+    // 🔄 4-oct-2026: al día no hay aviso; la línea con «Sincronizar», sí.
+    expect((await screen.findAllByRole("button", { name: /Sincronizar/ })).length).toBeGreaterThan(0);
   });
 
   it("🔴 y con uno callado NOMBRA al que falla — los números de abajo están incompletos", async () => {
@@ -431,7 +431,7 @@ describe("E · el reloj en la computadora", () => {
     }));
     // Con «Todas» se ven los dos relojes y el botón le pide a los dos.
     render(<ToastProvider><ReporteTab empresa="todas" /></ToastProvider>);
-    fireEvent.click(await screen.findByRole("button", { name: /Sincronizar/ }));
+    fireEvent.click((await screen.findAllByRole("button", { name: /Sincronizar/ }))[0]);
     await waitFor(() => expect(pedidos.length).toBe(2));
     expect(new Set(pedidos)).toEqual(new Set(["reloj cboston", "reloj acs"]));
   });

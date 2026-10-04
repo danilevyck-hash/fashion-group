@@ -664,7 +664,8 @@ describe("las pantallas grandes: el texto se fue del CÓDIGO y lo de al lado sig
       // «Actualizado desde Switch el» por el diccionario. Los TRES siguen
       // estando: cambió cómo se escriben, no que estén.
       // 1-oct-2026, Daniel: nombres normales de ERP — «Actualizado el {fecha}».
-      sigue: [">Contacto</h2>", 'rotulo="Teléfono"', "Actualizado el"],
+      // 🔄 4-oct-2026: la frescura es `LineaDeFrescura`, junto al nombre.
+      sigue: [">Contacto</h2>", 'rotulo="Teléfono"', "<LineaDeFrescura"],
     },
   ];
 

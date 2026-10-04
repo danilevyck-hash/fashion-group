@@ -51,8 +51,7 @@ import {
 } from "./ResumenView";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import SyncNowButton from "@/components/shared/SyncNowButton";
-import { SYNC_NOW_VENTAS_SECUENCIA } from "@/components/shared/syncNowOpciones";
+import { FrescuraVentasCel } from "./celular/MenuVentasCelular";
 import { ROTULO_DESCARGAR_EXCEL } from "@/lib/ventas/descarga";
 import {
   buildSlotsMetrica, cellValue, cellDelta, renderCellValue, celdaKey,
@@ -144,7 +143,7 @@ export function ResumenViewMobile({
         {/* 🔴 Sin píldora «Sincronizado» — ver el comentario de ResumenView. */}
         {/* "Actualizar ahora" (admin/secretaria) — un clic = las 8 empresas en
             secuencia + refresh-vistas como paso final. */}
-        <SyncNowButton opciones={SYNC_NOW_VENTAS_SECUENCIA} secuencial onSuccess={() => onReloadData?.()} />
+        <FrescuraVentasCel forma="computadora" onActualizado={() => onReloadData?.()} />
         {onExcel && (
           <Button variant="outline" size="sm" onClick={onExcel} disabled={bajando} className="min-h-[44px]">
             <Download className="mr-1.5 h-3.5 w-3.5" /> {ROTULO_DESCARGAR_EXCEL}

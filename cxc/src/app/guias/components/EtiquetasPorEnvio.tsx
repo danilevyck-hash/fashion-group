@@ -42,7 +42,7 @@ import {
   tituloDelDia,
   type FacturaDelCliente as Factura,
 } from "@/lib/guias/atajos-facturas";
-import { TEXTO_ACTUALIZANDO, TEXTO_ACTUALIZAR_AHORA } from "@/lib/ui/actualizar-ahora";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import {
   botonesDeDestino,
   destinoParaAutollenar,
@@ -50,7 +50,6 @@ import {
 } from "@/lib/guias/destinos-clientes";
 import {
   AYUDA_FORMATO,
-  TEXTO_TRAER_DE_SWITCH,
   facturasParaEtiquetar,
   rotuloEstado,
   rotuloGuia,
@@ -342,6 +341,8 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
   const [cargando, setCargando] = useState(false);
   const [sinLista, setSinLista] = useState(false);
   const [actualizando, setActualizando] = useState(false);
+  /** Hasta qué hora llegó la lista de facturas, para la línea de frescura. */
+  const [hasta, setHasta] = useState<string | null>(null);
   const [diasVisibles, setDiasVisibles] = useState(DIAS_CON_FACTURA_VISIBLES);
   const [diasAlternados, setDiasAlternados] = useState<ReadonlySet<string>>(new Set());
   const [empresaKey, setEmpresaKey] = useState<string | null>(null);
@@ -385,8 +386,9 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
     try {
       const r = await fetch(`/api/guias/facturas-cliente?codigo=${encodeURIComponent(codigo)}`, { cache: "no-store" });
       if (!r.ok) throw new Error("no ok");
-      const d = (await r.json()) as { facturas?: Factura[] };
+      const d = (await r.json()) as { facturas?: Factura[]; hasta?: string | null };
       setFacturas(Array.isArray(d.facturas) ? d.facturas : []);
+      setHasta(d.hasta ?? null);
     } catch {
       setFacturas(null);
       setSinLista(true);
@@ -525,7 +527,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
       if (!v.ok) return `${f.secuencial}: ${v.error}`;
       const n = normalizarNota(m.nota);
       if (!n.ok) return `${f.secuencial}: ${n.error}`;
-      if (f.switch_factura_id == null) return `${f.secuencial} todavía no tiene su número interno. Toca «Actualizar ahora».`;
+      if (f.switch_factura_id == null) return `${f.secuencial} todavía no tiene su número interno. Toca «Actualizar».`;
     }
     if (!destino.trim()) return "Escribe el destino del envío";
     return null;
@@ -665,6 +667,10 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
     (!cliente.codigo || (facturas !== null && visibles.length === 0));
   const bloqueFacturas = cliente && (ETIQUETAS_TRASLADO_2026_10 || !traslado) && (
           <div className={ETIQUETAS_TRASLADO_2026_10 ? "" : "mt-4"}>
+            {/* 🔴 4-oct-2026: la línea de frescura de todo el sistema, arriba de
+                las facturas del cliente (era el aviso «¿No aparece la factura
+                de hoy?» con «Actualizar ahora» en azul, al pie). */}
+            {cliente.codigo && !cargando && <div className="mb-2"><LineaDeFrescura actualizado={hasta} onActualizar={actualizarAhora} actualizando={actualizando} /></div>}
             {sinPendientes && <p className="text-sm text-gray-500">Sin facturas pendientes</p>}
             {cargando && <p className="text-sm text-gray-400">Buscando facturas…</p>}
             {!cargando && sinLista && (
@@ -828,11 +834,6 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
               <p className="mt-1 text-xs text-gray-500">{textoEscondidasPorGuia(yaSalieron)}</p>
             )}
 
-            {!cargando && cliente.codigo && (
-              <Aviso tono="info" className="mt-3" accion={{ texto: actualizando ? TEXTO_ACTUALIZANDO : TEXTO_ACTUALIZAR_AHORA, onClick: () => void actualizarAhora(), disabled: actualizando }}>
-                {TEXTO_TRAER_DE_SWITCH}
-              </Aviso>
-            )}
           </div>
         );
   const campoDestino = (

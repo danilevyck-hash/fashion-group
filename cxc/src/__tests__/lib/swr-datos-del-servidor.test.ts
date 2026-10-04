@@ -124,8 +124,10 @@ describe("🔁 la MISMA pantalla no pregunta lo mismo dos veces", () => {
   // CSS, pero montada— y las dos traen un `<SyncStatus>` con la MISMA URL.
   // Medido: `/api/sync-status` ×2 por visita, 733 ms sumados. Al CXC le pasa lo
   // mismo (`cxc/page.tsx` + `PanelCxcMobile`).
-  const sync = leer("src/components/shared/SyncStatus.tsx");
-  const syncCodigo = codigoDe("src/components/shared/SyncStatus.tsx");
+  // 🔄 4-oct-2026: la lectura se mudó a `useEstadoSync.ts` (la comparten
+  // `<SyncStatus>` y `LineaDeFrescura`); la regla es la misma.
+  const sync = leer("src/components/shared/useEstadoSync.ts");
+  const syncCodigo = codigoDe("src/components/shared/useEstadoSync.ts");
 
   it("comparte la petición EN VUELO por URL", () => {
     expect(syncCodigo).toContain("const enVuelo = new Map<string, Promise<SyncStatusData>>()");

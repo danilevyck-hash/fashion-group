@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Card } from "@/components/ui/card";
 import { ChevronRight } from "lucide-react";
-import SyncNowButton from "@/components/shared/SyncNowButton";
-import { SYNC_NOW_VENTAS_SECUENCIA } from "@/components/shared/syncNowOpciones";
 import type {
   VentasResumen, Multifashion, ProyeccionResp, ProyeccionEmpresa, ProyeccionGrupo,
   EmpresaMonthlySales,
@@ -472,7 +470,7 @@ export function ResumenView({
               empresas: UN clic actualiza facturas de las 8 EN SECUENCIA (sin
               menú; sesión única Switch — nunca 2 a la vez) + refresh-vistas
               como paso final (rollup mensual y vw de clientes al día). */}
-          <SyncNowButton opciones={SYNC_NOW_VENTAS_SECUENCIA} secuencial onSuccess={() => onReloadData?.()} />
+          <FrescuraVentasCel forma="computadora" onActualizado={() => onReloadData?.()} />
 
           {/* 🔴 «Descargar en Excel», y baja LO QUE ESTÁS VIENDO (11-sep-2026).
               Decía «Excel» y bajaba siempre la matriz de Ventas, estuvieras

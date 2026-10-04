@@ -40,7 +40,7 @@ import {
 } from "@/lib/guias/atajos-facturas";
 import { etiquetaPendienteDeLaFactura } from "@/lib/guias/anti-doble-captura";
 import { rotuloGuia, type EtiquetaFila } from "@/lib/guias/etiquetas";
-import { TEXTO_ACTUALIZANDO, TEXTO_ACTUALIZAR_AHORA } from "@/lib/ui/actualizar-ahora";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { emptyItem } from "./constants";
 import type { GuiaItem } from "./types";
 
@@ -91,6 +91,8 @@ export default function AgregarSinEtiquetas({
   const [cargando, setCargando] = useState(false);
   const [sinLista, setSinLista] = useState(false);
   const [actualizando, setActualizando] = useState(false);
+  /** Hasta qué hora llegó la lista de facturas, para la línea de frescura. */
+  const [hasta, setHasta] = useState<string | null>(null);
   const [diasVisibles, setDiasVisibles] = useState(DIAS_CON_FACTURA_VISIBLES);
   const [diasAlternados, setDiasAlternados] = useState<ReadonlySet<string>>(new Set());
   const [marcadas, setMarcadas] = useState<ReadonlySet<string>>(new Set());
@@ -104,8 +106,9 @@ export default function AgregarSinEtiquetas({
     try {
       const r = await fetch(`/api/guias/facturas-cliente?codigo=${encodeURIComponent(codigo)}`, { cache: "no-store" });
       if (!r.ok) throw new Error("no ok");
-      const d = (await r.json()) as { facturas?: Factura[] };
+      const d = (await r.json()) as { facturas?: Factura[]; hasta?: string | null };
       setFacturas(Array.isArray(d.facturas) ? d.facturas : []);
+      setHasta(d.hasta ?? null);
     } catch {
       setFacturas(null);
       setSinLista(true);
@@ -208,6 +211,9 @@ export default function AgregarSinEtiquetas({
 
       {cliente && (
         <div className="mt-4">
+          {/* 🔴 4-oct-2026: la línea de frescura de todo el sistema (era
+              «Actualizar ahora» suelto en el pie). */}
+          {!cargando && <div className="mb-2"><LineaDeFrescura actualizado={hasta} onActualizar={actualizarAhora} actualizando={actualizando} /></div>}
           {cargando && <p className="text-sm text-gray-400">Buscando facturas…</p>}
           {!cargando && sinLista && (
             <p className="text-sm text-amber-700">No se pudieron cargar las facturas. Escríbelas a mano.</p>
@@ -332,14 +338,6 @@ export default function AgregarSinEtiquetas({
         <button type="button" onClick={() => renglonAMano("")} className={LINK}>
           Escribir a mano
         </button>
-        {cliente && (
-          <>
-            <span aria-hidden="true">·</span>
-            <button type="button" onClick={() => void actualizarAhora()} disabled={actualizando} className={`${LINK} disabled:opacity-40`}>
-              {actualizando ? TEXTO_ACTUALIZANDO : TEXTO_ACTUALIZAR_AHORA}
-            </button>
-          </>
-        )}
         <span aria-hidden="true">·</span>
         <button type="button" onClick={onCerrar} className={LINK}>
           Cerrar

@@ -1,7 +1,8 @@
 "use client";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// <CatalogoSyncNow /> — botón discreto "hace X min" + refresh para la vista de
+// <CatalogoSyncNow /> — la línea de frescura (`LineaDeFrescura`, 4-oct-2026:
+// «Actualizado hace 3 h · Actualizar») para la vista de
 // CATÁLOGO DE VENDEDORES (Reebok /catalogo/reebok/productos y Joybees
 // /catalogo/joybees). Al tocarlo dispara POST /api/admin/sync-now con
 // {modulo: catalogo-reebok | catalogo-joybees} y al terminar refresca los
@@ -23,7 +24,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CajaAviso, CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos } from "@/components/CajaAviso";
-import { RefreshCw } from "lucide-react";
+import LineaDeFrescura from "./LineaDeFrescura";
 import { syncConEnganche } from "./syncNowClient";
 
 const ROLES_PERMITIDOS = ["admin", "secretaria", "vendedor"];
@@ -33,6 +34,8 @@ interface CatalogoSyncNowProps {
   /** Reload de los productos de la vista tras un sync exitoso. */
   onSuccess?: () => void | Promise<void>;
   className?: string;
+  /** Omitida = celular hasta `md` y computadora desde `md`. */
+  forma?: "celular" | "computadora";
 }
 
 const MODULO_POR_CATALOGO = {
@@ -42,25 +45,12 @@ const MODULO_POR_CATALOGO = {
   calvin: "catalogo-calvin",
 } as const;
 
-function relativo(iso: string | null): string {
-  if (!iso) return "sin datos";
-  const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
-  if (min < 1) return "hace instantes";
-  if (min < 60) return `hace ${min} min`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `hace ${h} h`;
-  const d = Math.floor(h / 24);
-  return d === 1 ? "hace 1 día" : `hace ${d} días`;
-}
-
-export default function CatalogoSyncNow({ catalogo, onSuccess, className }: CatalogoSyncNowProps) {
+export default function CatalogoSyncNow({ catalogo, onSuccess, className, forma }: CatalogoSyncNowProps) {
   const modulo = MODULO_POR_CATALOGO[catalogo];
   const [visible, setVisible] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [toast, setToast] = useState<{ msg: string; error: boolean } | null>(null);
-  // Tick por minuto para que el "hace X min" no se congele.
-  const [, setTick] = useState(0);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchStatus = useCallback(async (): Promise<void> => {
@@ -87,12 +77,6 @@ export default function CatalogoSyncNow({ catalogo, onSuccess, className }: Cata
     setVisible(true);
     void fetchStatus();
   }, [fetchStatus]);
-
-  useEffect(() => {
-    if (!visible) return;
-    const id = setInterval(() => setTick((t) => t + 1), 60_000);
-    return () => clearInterval(id);
-  }, [visible]);
 
   useEffect(() => () => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -129,24 +113,17 @@ export default function CatalogoSyncNow({ catalogo, onSuccess, className }: Cata
     }
   };
 
-  // Reebok es el sync más pesado (~3 min) — se avisa en el tooltip y mientras corre.
-  const esReebok = catalogo === "reebok";
-  const tooltip = esReebok
-    ? "Actualizar catálogo desde Switch (tarda ~3 min)"
-    : "Actualizar catálogo desde Switch";
-
   return (
-    <div className={`inline-flex flex-col ${className ?? ""}`}>
-      <button
-        type="button"
-        title={tooltip}
-        disabled={running}
-        onClick={disparar}
-        className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-black/10 px-3 py-1.5 text-xs text-black/50 transition hover:border-black/25 hover:text-black/70 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        <RefreshCw className={`h-3.5 w-3.5 ${running ? "animate-spin" : ""}`} />
-        {running ? (esReebok ? "Actualizando… (~3 min)" : "Actualizando…") : relativo(lastSync)}
-      </button>
+    <>
+      <LineaDeFrescura
+        forma={forma}
+        className={className}
+        actualizado={lastSync}
+        onActualizar={disparar}
+        actualizando={running}
+        // Reebok es el sync más pesado (~3 min): se dice mientras corre.
+        ocupado={catalogo === "reebok" ? "Actualizando… (~3 min)" : undefined}
+      />
 
       {toast && (
         <EnLaPilaDeAvisos>
@@ -158,6 +135,6 @@ export default function CatalogoSyncNow({ catalogo, onSuccess, className }: Cata
           />
         </EnLaPilaDeAvisos>
       )}
-    </div>
+    </>
   );
 }

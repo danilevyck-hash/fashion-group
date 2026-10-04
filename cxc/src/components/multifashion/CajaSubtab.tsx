@@ -9,6 +9,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import { fmt } from "@/lib/format";
 import { Ayuda } from "@/components/shared/Ayuda";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import type { SwitchDiarioVentas } from "@/lib/switch-api/client";
 
 interface CajaResponse {
@@ -31,9 +32,6 @@ async function fetchCaja(fecha: string): Promise<CajaResponse> {
   return json as CajaResponse;
 }
 
-function minutosDesde(iso: string): number {
-  return Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
-}
 
 const num = (v: string | number | null | undefined): number => {
   const n = typeof v === "number" ? v : parseFloat(v ?? "0");
@@ -79,22 +77,14 @@ export function CajaSubtab() {
         {data && (
           <div className="flex items-center gap-2 text-xs text-gray-400 tabular-nums">
             {data.stale && <span className="text-amber-600 font-medium">Switch no respondió — mostrando último dato</span>}
-            <span>Actualizado hace {minutosDesde(data.synced_at)} min</span>
+            {/* 🔴 4-oct-2026: la línea de frescura de todo el sistema. */}
+            <LineaDeFrescura actualizado={data.synced_at} onActualizar={async () => { await mutate(); }} actualizando={isValidating} />
             {/* Cada cuánto se refresca solo estaba escrito al pie de la pantalla,
                 lejos de la única línea que habla de frescura. Ahora vive acá y a
                 un toque: es metodología, no un aviso. */}
             <Ayuda titulo="Frecuencia de actualización">
               El día en curso se refresca cada 10 minutos.
             </Ayuda>
-            <button
-              onClick={() => mutate()}
-              disabled={isValidating}
-              /* Medía ~28px de alto: por debajo de los 44 de la regla táctil.
-                 min-h + inline-flex centra el texto sin cambiar el copy. */
-              className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-gray-200 px-2.5 text-xs font-medium text-gray-600 hover:border-gray-300 transition active:scale-[0.97] disabled:opacity-40"
-            >
-              {isValidating ? "Actualizando…" : "Actualizar"}
-            </button>
           </div>
         )}
       </div>

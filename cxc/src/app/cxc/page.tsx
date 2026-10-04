@@ -35,7 +35,7 @@ import { tabCxcPermitida, pestanasCxc } from "@/lib/cxc/boston-roles";
 import { veCxc } from "@/lib/cxc/roles";
 import { seLeCobra } from "@/lib/cxc/cobrable";
 import SyncStatus from "@/components/shared/SyncStatus";
-import SyncNowButton from "@/components/shared/SyncNowButton";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import {
   CXC_GRUPO_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
@@ -70,7 +70,7 @@ import {
   type OrdenOverride,
 } from "@/lib/cxc-orden";
 import { vidrioSobre } from "@/lib/ui/vidrio";
-import { CXC_APPLE_2026_10 } from "@/lib/cxc/apple-2026-10";
+import { CXC_APPLE_2026_10, opcionesActualizarCxc } from "@/lib/cxc/apple-2026-10";
 import CabeceraCxcApple from "./components/CabeceraCxcApple";
 
 // ── Helpers ──────────────────────────────────────────────
@@ -864,10 +864,15 @@ function AdminDashboardInner() {
               </>)}
             </div>
           )}
+          {/* 🔴 4-oct-2026: con `CXC_APPLE_2026_10` apagado, la misma línea de
+              frescura (con él, va en `CabeceraCxcApple`). */}
           {!CXC_APPLE_2026_10 && (
-          <SyncNowButton
-            opciones={[{ modulo: "estadocuenta", empresa: companyFilter }]}
-            disabledReason={companyFilter === "all" ? "Selecciona una empresa en el filtro para actualizarla" : null}
+          <LineaDeFrescura
+            forma="computadora"
+            tabla="estadocuenta"
+            empresas={CXC_GRUPO_EMPRESA_KEYS}
+            opciones={opcionesActualizarCxc(companyFilter)}
+            secuencial={companyFilter === "all"}
             onSuccess={() => loadData()}
           />
           )}

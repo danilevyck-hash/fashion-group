@@ -38,11 +38,21 @@ import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
  * la MISMA secuencia de «Actualizar ahora» que vivía en el «···». Va en la
  * línea gris de cada pestaña; con el interruptor apagado no se dibuja.
  */
-export function FrescuraVentasCel({ onActualizado }: { onActualizado: () => void }) {
-  if (!FRESCURA_VISIBLE_2026_10) return null;
+export function FrescuraVentasCel({
+  onActualizado,
+  forma = "celular",
+  className,
+}: {
+  onActualizado: () => void;
+  /** «computadora»: la barra de Resumen, Clientes y Productos (4-oct-2026). */
+  forma?: "celular" | "computadora";
+  className?: string;
+}) {
+  if (!FRESCURA_VISIBLE_2026_10 && forma === "celular") return null;
   return (
     <LineaDeFrescura
-      forma="celular"
+      forma={forma}
+      className={className}
       tabla="facturas"
       empresas={empresasConFacturas()}
       opciones={SYNC_NOW_VENTAS_SECUENCIA}

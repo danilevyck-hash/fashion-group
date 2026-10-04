@@ -21,10 +21,7 @@ import { useMemo } from "react";
 import { ModalOverlay } from "@/components/ui";
 import type { Company } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
-import SyncStatus from "@/components/shared/SyncStatus";
-import SyncNowButton from "@/components/shared/SyncNowButton";
 import MenuDescargar from "./MenuDescargar";
-import { CXC_GRUPO_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { carteraPorEmpresa, haceCuanto, montoExacto } from "@/lib/cxc/lista-celular";
 import type { ClaveDescarga } from "@/lib/cxc/descargas";
@@ -170,22 +167,15 @@ export function HojaPorEmpresa({
 
 export function HojaMasOpciones({
   canExport,
-  companyFilter,
   onDescargar,
-  onSyncedNow,
   onCerrar,
   onBoston,
-  sinActualizar = false,
 }: {
   canExport: boolean;
-  companyFilter: string;
   onDescargar: (clave: ClaveDescarga, formato: FormatoDescarga) => void;
-  onSyncedNow?: () => void;
   onCerrar: () => void;
   /** v3.2: con la cabecera compacta, «Boston» baja aquí para que el título se lea entero. */
   onBoston?: (() => void) | null;
-  /** `CXC_APPLE_2026_10`: «Actualizar ahora» ya vive en la línea de frescura. */
-  sinActualizar?: boolean;
 }) {
   return (
     <Hoja titulo="Más" onCerrar={onCerrar}>
@@ -200,23 +190,10 @@ export function HojaMasOpciones({
           </button>
         </div>
       )}
-      {!sinActualizar && (
-      <div className="px-5 py-3">
-        <SyncStatus
-          tabla="estadocuenta"
-          empresasEsperadas={CXC_GRUPO_EMPRESA_KEYS}
-          empresaLabels={EMPRESA_KEY_TO_NAME}
-        />
-        <SyncNowButton
-          className="mt-2"
-          opciones={[{ modulo: "estadocuenta", empresa: companyFilter }]}
-          disabledReason={companyFilter === "all" ? "Selecciona una empresa arriba para actualizarla" : null}
-          onSuccess={() => onSyncedNow?.()}
-        />
-      </div>
-      )}
+      {/* 🔴 4-oct-2026: «Actualizar» ya no vive aquí: es la línea de frescura
+          bajo el total (`PanelCxcCelular`). */}
       {canExport && (
-        <div className={sinActualizar ? "py-1" : "border-t border-gray-100 py-1"}>
+        <div className="py-1">
           <MenuDescargar onDescargar={onDescargar} />
         </div>
       )}

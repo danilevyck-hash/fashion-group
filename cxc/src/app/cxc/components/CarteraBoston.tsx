@@ -63,6 +63,7 @@ import {
 import { AGING } from "@/lib/cxc-aging";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import SyncStatus from "@/components/shared/SyncStatus";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import UndoToast from "@/components/UndoToast";
 import { Toast, PullToRefresh } from "@/components/ui";
 import BostonDocumentosDrawer from "@/components/cxc/BostonDocumentosDrawer";
@@ -301,6 +302,9 @@ export default function CarteraBoston() {
             </div>
             <div className="ml-auto flex items-center gap-3">
               <SyncStatus tabla="estadocuenta" empresasEsperadas={EMPRESAS_BOSTON} empresaLabels={EMPRESA_KEY_TO_NAME} />
+              {/* 🔴 4-oct-2026: la hora con la línea de todo el sistema. Boston
+                  no se actualiza a mano (~20 min): la hora sola. */}
+              <LineaDeFrescura forma="computadora" tabla="estadocuenta" empresas={EMPRESAS_BOSTON} />
               <div className="relative">
                 <button
                   type="button"

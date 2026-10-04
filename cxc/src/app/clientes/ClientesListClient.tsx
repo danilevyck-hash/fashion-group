@@ -26,7 +26,7 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { rolesClientes } from "@/lib/clientes/roles";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { EmptyState, PullToRefresh, ScrollableTable, SkeletonTable } from "@/components/ui";
-import SyncNowButton from "@/components/shared/SyncNowButton";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { telHref, mailtoHref } from "@/lib/contact-links";
 import { coincideBusqueda } from "@/lib/buscar-normalizado";
 import { dinero } from "@/lib/clientes/ficha";
@@ -63,7 +63,14 @@ interface YtdResp {
 
 const CHIPS_VALIDOS: ChipId[] = ["todos", "sin-contacto", "sin-correo", "sin-telefono", "deben"];
 
-export default function ClientesListClient({ initialClientes }: { initialClientes: Cliente[] }) {
+export default function ClientesListClient({
+  initialClientes,
+  actualizado = null,
+}: {
+  initialClientes: Cliente[];
+  /** El último sync del directorio (`clientes_master`), para la línea de frescura. */
+  actualizado?: string | null;
+}) {
   const { authChecked } = useAuth({
     moduleKey: "directorio",
     // 🔴 La MISMA lista que el guard SSR de la página y que el catálogo de
@@ -161,9 +168,10 @@ export default function ClientesListClient({ initialClientes }: { initialCliente
       <AppHeader module="Clientes" />
       <PullToRefresh onRefresh={onRefresh}>
         <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-          <div className="mb-4 flex flex-wrap items-start justify-end gap-3">
+          <div className="mb-3 flex flex-wrap items-center gap-3">
             <h1 className="sr-only">Clientes</h1>
-            <SyncNowButton
+            <LineaDeFrescura
+              actualizado={actualizado}
               opciones={[{ modulo: "clientes-master" }]}
               onSuccess={async () => { router.refresh(); await mutate(); }}
             />

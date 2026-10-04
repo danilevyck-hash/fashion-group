@@ -10,9 +10,8 @@ import { empresasConCxp } from "@/lib/switch-api/empresas";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { fmt } from "@/lib/format";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
-import SyncNowButton from "@/components/shared/SyncNowButton";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { ROLES_SYNC_PROVEEDORES } from "@/components/shared/syncNowOpciones";
-import { textoActualizado } from "@/lib/proveedores/actualizado";
 import { tonoDeMonto, textoDeMonto } from "@/lib/proveedores/tono";
 import { TRAMOS, TRAMOS_KEYS, frasePartida } from "@/lib/proveedores/tramos";
 import {
@@ -147,8 +146,15 @@ function ProveedoresList() {
               otra forma: saber de cuándo es el número y bajarlo. */}
           <div className="mb-5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <h1 className="sr-only">Proveedores</h1>
-            {/* 🔑 Sin fecha no se dibuja: nunca «Actualizado: —». */}
-            <p className="text-xs text-gray-500 tabular-nums">{textoActualizado(cartera.synced_at)}</p>
+            {/* 🔴 4-oct-2026: la línea de frescura de todo el sistema.
+                Actualiza el CxP de las 7 empresas en secuencia (N/7). */}
+            <LineaDeFrescura
+              actualizado={cartera.synced_at}
+              opciones={SYNC_PROVEEDORES_OPCIONES}
+              secuencial
+              roles={ROLES_SYNC_PROVEEDORES}
+              onSuccess={async () => { await fetchList(); }}
+            />
             <div className="flex flex-wrap items-center gap-3">
               {/* min-w fijo: el texto cambia a "Preparando…" mientras baja el
                   chunk de Excel y sin ancho fijo el botón daría un salto. */}
@@ -159,16 +165,6 @@ function ProveedoresList() {
               >
                 {exportando ? "Preparando…" : "Descargar Excel"}
               </button>
-              {/* "Actualizar ahora" (admin/secretaria/contabilidad — contabilidad
-                  es quien vive acá): un clic actualiza el CxP de las 7 empresas
-                  en secuencia desde Switch. */}
-              <SyncNowButton
-                opciones={SYNC_PROVEEDORES_OPCIONES}
-                secuencial
-                roles={ROLES_SYNC_PROVEEDORES}
-                subtext="tarda ~1 min"
-                onSuccess={async () => { await fetchList(); }}
-              />
             </div>
           </div>
 

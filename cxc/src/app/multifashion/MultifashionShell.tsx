@@ -269,7 +269,32 @@ export function MultifashionShell({
           <p className="text-sm font-medium text-gray-700">Multifashion</p>
           {/* Escritorio: la frescura y «Actualizar ahora», a la vista. En el
               teléfono viven en el menú ☰ (ver arriba). */}
-          <div className="hidden md:block">{accionesSync}</div>
+          {/* 🔴 4-oct-2026: con la línea de frescura, la computadora dice
+              «Actualizado hace 5 min · Actualizar» como todo el sistema. */}
+          {conFrescura ? (
+            <>
+            <SyncStatus
+              tabla="facturas"
+              empresasEsperadas={["american_classic"]}
+              empresaLabels={EMPRESA_KEY_TO_NAME}
+              className="hidden md:block"
+            />
+            <LineaDeFrescura
+              forma="computadora"
+              className="hidden md:inline-flex"
+              tabla="facturas"
+              empresas={["american_classic"]}
+              opciones={[{ modulo: "facturas", empresa: "american_classic" }]}
+              roles={ROLES_MULTIFASHION}
+              onSuccess={async () => {
+                await mutate();
+                setSyncTick((t) => t + 1);
+              }}
+            />
+            </>
+          ) : (
+            <div className="hidden md:block">{accionesSync}</div>
+          )}
         </div>
         <PeriodoSelect
           valor={periodoAUrl(periodo)}

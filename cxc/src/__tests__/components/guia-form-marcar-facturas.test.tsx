@@ -336,9 +336,11 @@ describe("el atajo encendido, al crear", () => {
     // ⚠️ NOTA 10-sep-2026 — la frescura pasó de «hasta las 12:05 p.m.» a
     // «Actualizado 12:05 p.m.» dentro del pie de una línea. Sigue A LA VISTA
     // (no en un `title`: en el iPad no hay mouse).
-    expect(screen.getByText(/Actualizado/)).toBeTruthy();
+    // 🔄 4-oct-2026: la línea de frescura de todo el sistema, junto al título
+    // (una para el celular y otra para la computadora, por CSS).
+    expect(screen.getAllByText(/Actualizado/).length).toBeGreaterThan(0);
     await act(async () => {
-      fireEvent.click(screen.getByText("Actualizar ahora"));
+      fireEvent.click(screen.getAllByRole("button", { name: /Actualizado|Actualizar/ })[0]);
       await Promise.resolve();
       await Promise.resolve();
     });

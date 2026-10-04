@@ -59,7 +59,7 @@ import {
   tituloDelDia,
   type FacturaDelCliente as Factura,
 } from "@/lib/guias/atajos-facturas";
-import { TEXTO_ACTUALIZANDO, TEXTO_ACTUALIZAR_AHORA } from "@/lib/ui/actualizar-ahora";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import {
   botonesDeDestino,
   destinoParaAutollenar,
@@ -67,7 +67,6 @@ import {
 } from "@/lib/guias/destinos-clientes";
 import {
   AYUDA_FORMATO,
-  TEXTO_TRAER_DE_SWITCH,
   avisoDeReimpresion,
   cajasDelJuego,
   cuantasPendientes,
@@ -399,6 +398,8 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
   const [cargando, setCargando] = useState(false);
   const [sinLista, setSinLista] = useState(false);
   const [actualizando, setActualizando] = useState(false);
+  /** Hasta qué hora llegó la lista de facturas, para la línea de frescura. */
+  const [hasta, setHasta] = useState<string | null>(null);
   const [diasVisibles, setDiasVisibles] = useState(DIAS_CON_FACTURA_VISIBLES);
   const [diasAlternados, setDiasAlternados] = useState<ReadonlySet<string>>(new Set());
   const [elegidaClave, setElegidaClave] = useState<string | null>(null);
@@ -433,8 +434,9 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
         cache: "no-store",
       });
       if (!r.ok) throw new Error("no ok");
-      const d = (await r.json()) as { facturas?: Factura[] };
+      const d = (await r.json()) as { facturas?: Factura[]; hasta?: string | null };
       setFacturas(Array.isArray(d.facturas) ? d.facturas : []);
+      setHasta(d.hasta ?? null);
     } catch {
       setFacturas(null);
       setSinLista(true);
@@ -519,7 +521,7 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
     if (!v.ok) { setError(v.error); return; }
     if (!destino.trim()) { setError("Escribe el destino del envío"); return; }
     if (elegida.switch_factura_id == null) {
-      setError("Esa factura todavía no tiene su número interno. Toca «Actualizar ahora».");
+      setError("Esa factura todavía no tiene su número interno. Toca «Actualizar».");
       return;
     }
     setGuardando(true);
@@ -599,6 +601,9 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
 
         {cliente && (
           <div className="mt-4">
+            {/* 🔴 4-oct-2026: la línea de frescura de todo el sistema (era el
+                aviso con «Actualizar ahora» en azul, al pie). */}
+            {!cargando && <div className="mb-2"><LineaDeFrescura actualizado={hasta} onActualizar={actualizarAhora} actualizando={actualizando} /></div>}
             {cargando && <p className="text-sm text-gray-400">Buscando facturas…</p>}
             {!cargando && sinLista && (
               <p className="text-sm text-amber-700">
@@ -679,11 +684,6 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
               <p className="mt-2 text-xs text-gray-500">{textoEscondidasPorEtiqueta(escondidas)}</p>
             )}
 
-            {!cargando && (
-              <Aviso tono="info" className="mt-3" accion={{ texto: actualizando ? TEXTO_ACTUALIZANDO : TEXTO_ACTUALIZAR_AHORA, onClick: () => void actualizarAhora(), disabled: actualizando }}>
-                {TEXTO_TRAER_DE_SWITCH}
-              </Aviso>
-            )}
           </div>
         )}
       </div>

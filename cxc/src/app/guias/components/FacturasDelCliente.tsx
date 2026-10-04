@@ -59,7 +59,7 @@ import {
   type FacturaDelCliente as Factura,
 } from "@/lib/guias/atajos-facturas";
 import { capturaEnElSelector } from "@/lib/guias/anti-doble-captura";
-import { TEXTO_ACTUALIZANDO, TEXTO_ACTUALIZAR_AHORA } from "@/lib/ui/actualizar-ahora";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import type { EtiquetaFila } from "@/lib/guias/etiquetas";
 
 interface Props {
@@ -239,8 +239,14 @@ export default function FacturasDelCliente({
 
   return (
     <div data-testid="facturas-del-cliente" className="mb-8">
-      <div className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-4">
-        Facturas del cliente
+      {/* 🔴 4-oct-2026: la frescura y «Actualizar» con la línea de todo el
+          sistema, junto al título (bajo él en el celular). Primero la lectura
+          corta de HOY, después la lista: lo mismo que antes. */}
+      <div className="mb-4 flex flex-col md:flex-row md:items-baseline md:gap-3">
+        <div className="text-xs uppercase tracking-[0.05em] text-gray-400">Facturas del cliente</div>
+        {cliente?.codigo && !cargando && (
+          <LineaDeFrescura actualizado={hasta} onActualizar={actualizarAhora} actualizando={actualizando} />
+        )}
       </div>
       <div className="border border-gray-200 rounded-lg p-4">
         <div className="max-w-sm">
@@ -442,21 +448,6 @@ export default function FacturasDelCliente({
                   className="hover:text-black transition inline-flex items-center min-h-[44px] md:[@media(pointer:fine)]:min-h-0 md:[@media(pointer:fine)]:py-1"
                 >
                   Escribir el número
-                </button>
-                {hasta && (
-                  <>
-                    <span aria-hidden="true">·</span>
-                    <span>Actualizado {horaCorta(hasta)}</span>
-                  </>
-                )}
-                <span aria-hidden="true">·</span>
-                <button
-                  type="button"
-                  onClick={() => void actualizarAhora()}
-                  disabled={actualizando}
-                  className="hover:text-black transition inline-flex items-center min-h-[44px] md:[@media(pointer:fine)]:min-h-0 md:[@media(pointer:fine)]:py-1 disabled:opacity-40"
-                >
-                  {actualizando ? TEXTO_ACTUALIZANDO : TEXTO_ACTUALIZAR_AHORA}
                 </button>
               </div>
             )}

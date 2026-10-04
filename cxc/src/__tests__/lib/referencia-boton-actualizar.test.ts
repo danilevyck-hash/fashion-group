@@ -92,34 +92,22 @@ function pedir(role: string, empresa = "vistana"): NextRequest {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("🔴 el botón existe en /referencia", () => {
-  it("la vista lo dibuja, con su estado mientras corre", () => {
+  // 🔄 4-oct-2026 (Daniel aprobó la línea de frescura para TODO el sistema):
+  // «Actualizar datos de Switch» es ahora `LineaDeFrescura`, y como actualiza
+  // SOLO lo buscado, aparece cuando hay una búsqueda con resultados. La acción
+  // es la misma: la ruta de siempre, empresa por empresa.
+  it("la vista lo dibuja con la línea de frescura, con su estado mientras corre", () => {
     const src = sinComentarios(VISTA);
-    expect(src).toContain("Actualizar datos de Switch");
-    expect(src).toContain("Actualizando…");
+    expect(src).toContain("<LineaDeFrescura");
+    expect(src).toContain("onActualizar={actualizar}");
+    expect(src).toContain("actualizando={actualizando}");
     expect(src).toContain('fetch("/api/ventas/referencia/actualizar"');
-    // ⚠️ CAMBIÓ DE DIRECCIÓN EL 11-sep-2026, no se borró. Decía
-    // `disabled={actualizando || cargando}` y el botón vivía DENTRO del bloque
-    // `{hayResultados && …}`: quien entraba al módulo y no buscaba nada no lo
-    // encontraba, mientras el aviso de novedades le decía que el botón volvió
-    // y «ahora lo ve todo el que entra al módulo». Ahora se dibuja siempre y
-    // lo que espera por la búsqueda es el `disabled`.
-    expect(src).toContain("disabled={!hayResultados || actualizando || cargando}");
+    expect(src).not.toContain("Actualizar datos de Switch");
   });
 
-  it("🔴 se dibuja SIEMPRE, no solo después de buscar", () => {
+  it("🔴 aparece con una búsqueda: actualiza lo buscado, no la pantalla", () => {
     const src = sinComentarios(VISTA);
-    // El botón NO puede estar dentro de un `{hayResultados && …}`: se comprueba
-    // que aparece ANTES del primer uso de esa bandera como condición de render.
-    const iBoton = src.indexOf("Actualizar datos de Switch");
-    const iCondicion = src.indexOf("{hayResultados && (");
-    expect(iBoton).toBeGreaterThan(-1);
-    expect(
-      iCondicion === -1 || iBoton < iCondicion,
-      "el botón volvió a quedar escondido detrás de una búsqueda con resultados",
-    ).toBe(true);
-    // Y el motivo de que arranque apagado se LEE en pantalla, no en un `title`:
-    // en el iPad no hay mouse que pasar por encima.
-    expect(src).toContain("Busca un código primero");
+    expect(src).toMatch(/const frescura = hayResultados \? \(\s*<LineaDeFrescura/);
   });
 
   it("CONTROL: el Excel sigue apagado mientras no haya resultados", () => {

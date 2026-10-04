@@ -93,3 +93,4 @@ export function opcionesFichaCliente(empresasActivas: string[]): SyncNowOpcion[]
     { modulo: "clientes-master", label: "Datos del cliente" },
   ];
 }
+

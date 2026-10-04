@@ -35,7 +35,7 @@ import { fmtDate } from "@/lib/format";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { telHref, mailtoHref } from "@/lib/contact-links";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
-import SyncNowButton from "@/components/shared/SyncNowButton";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { Ayuda } from "@/components/shared/Ayuda";
 import {
   opcionesFichaCliente,
@@ -255,7 +255,8 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
             )}
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <SyncNowButton
+            <LineaDeFrescura
+              actualizado={cliente.last_synced_at}
               opciones={opcionesSync}
               secuencial
               engancharRunning
@@ -512,11 +513,6 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
           )}
         </nav>
 
-        {cliente.last_synced_at && (
-          <p className="mt-4 text-xs text-gray-400">
-            Actualizado el {fmtDate(cliente.last_synced_at.slice(0, 10))}
-          </p>
-        )}
       </main>
 
       {veCxc && (

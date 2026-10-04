@@ -45,12 +45,13 @@ import {
 import type { ClaveDescarga } from "@/lib/cxc/descargas";
 import type { FormatoDescarga } from "../hooks/useDescargasCartera";
 import { HojaElegirEmpresa, HojaPorEmpresa, HojaMasOpciones } from "./HojasCxcCelular";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
+import SyncStatus from "@/components/shared/SyncStatus";
+import { CXC_GRUPO_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { tituloCelular, usaBarraCelular } from "@/lib/navegacion/barra-controles-celular";
 import { ChevronDown, MoreHorizontal, Search } from "lucide-react";
 import { CLASE_TITULO_BARRA, IconoBarra } from "@/components/celular/BarraDeControles";
 import { CLASE_LINEA_TOTAL, CLASE_TOTAL_CELULAR, SegmentadoCelular } from "@/components/celular/CabeceraCompacta";
-import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
-import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { CXC_APPLE_2026_10, opcionesActualizarCxc, partirPorAtencion, saldoMas90 } from "@/lib/cxc/apple-2026-10";
 
 /** El color de la rayita de la izquierda, por tramo dominante. */
@@ -140,6 +141,23 @@ export default function PanelCxcCelular({
     ? null
     : cxcCompanies.find((c) => c.key === companyFilter)?.name ?? null;
 
+  // 🔴 «Actualizado 4:00 pm ↻» (4-oct-2026): sale de la hoja «Más» y va bajo
+  // el total, como en Comisiones. Con una empresa, esa; con «Todas», las 6 una
+  // tras otra (N/6). El aviso de la empresa sin actualizar va aparte.
+  const frescura = (
+    <div data-frescura-cxc>
+      <LineaDeFrescura
+        forma="celular"
+        tabla="estadocuenta"
+        empresas={companyFilter === "all" ? CXC_GRUPO_EMPRESA_KEYS : [companyFilter]}
+        opciones={opcionesActualizarCxc(companyFilter)}
+        secuencial={companyFilter === "all"}
+        onSuccess={() => onSyncedNow?.()}
+      />
+      <SyncStatus tabla="estadocuenta" empresasEsperadas={CXC_GRUPO_EMPRESA_KEYS} empresaLabels={EMPRESA_KEY_TO_NAME} />
+    </div>
+  );
+
   return (
     <div className="lg:hidden min-h-screen bg-fondo-celular pb-10">
       {compacta ? (
@@ -158,9 +176,12 @@ export default function PanelCxcCelular({
             <IconoBarra etiqueta="Buscar cliente" onClick={() => setBuscando(true)}>
               <Search className="h-5 w-5" strokeWidth={2} aria-hidden />
             </IconoBarra>
+            {/* Sin nada que ofrecer no se dibuja el «···» (`diseno.md`). */}
+            {(canExport || onBoston) && (
             <IconoBarra etiqueta="Más opciones" onClick={() => setHoja("mas")}>
               <MoreHorizontal className="h-5 w-5" strokeWidth={2} aria-hidden />
             </IconoBarra>
+            )}
           </div>
           <AvisoRechazosSwitch texto={avisoMontos} />
           {/* 2 · el total a 36 px; tocarlo abre la cartera por empresa */}
@@ -187,6 +208,11 @@ export default function PanelCxcCelular({
             {subtituloCompacto({ cuantos: lista.length, risk: riskFilter, unaEmpresa: empresaElegida })}
           </span>
           )}
+          {/* 🔴 4-oct-2026: sin la barra Apple, la misma línea va bajo el total;
+              con ella, el aviso de la empresa sin actualizar, aparte. */}
+          {apple
+            ? <SyncStatus tabla="estadocuenta" empresasEsperadas={CXC_GRUPO_EMPRESA_KEYS} empresaLabels={EMPRESA_KEY_TO_NAME} />
+            : frescura}
           {/* 3 · los tres tramos, delgados; tocar el prendido lo apaga (como hoy) */}
           <div className="pt-3">
             <SegmentadoCelular
@@ -214,6 +240,7 @@ export default function PanelCxcCelular({
             Boston
           </button>
         )}
+        {canExport && (
         <button
           type="button"
           onClick={() => setHoja("mas")}
@@ -224,6 +251,7 @@ export default function PanelCxcCelular({
             <circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" />
           </svg>
         </button>
+        )}
       </div>
 
       {/* ── Título grande + la empresa que se mira ────────────────────────── */}
@@ -277,6 +305,8 @@ export default function PanelCxcCelular({
           </>
         )}
       </p>
+
+      <div className="px-4 text-center">{frescura}</div>
 
       {/* ── Los tres tramos. Tocar uno filtra Y ordena por su plata. ──────── */}
       <div className="flex gap-2 px-4 pt-3">
@@ -386,12 +416,9 @@ export default function PanelCxcCelular({
       {hoja === "mas" && (
         <HojaMasOpciones
           canExport={canExport}
-          companyFilter={companyFilter}
           onDescargar={(clave, formato) => { setHoja(null); onDescargar(clave, formato); }}
-          onSyncedNow={onSyncedNow}
           onCerrar={() => setHoja(null)}
           onBoston={compacta ? onBoston : null}
-          sinActualizar={apple}
         />
       )}
     </div>

@@ -35,8 +35,12 @@ import { requireAuth } from "@/lib/require-auth";
 export const dynamic = "force-dynamic";
 
 const STALE_HOURS = 26;
-const VALID_TABLAS = new Set(["facturas", "estadocuenta"] as const);
-type Tabla = "facturas" | "estadocuenta";
+// 🔴 4-oct-2026 (`LineaDeFrescura`): además de facturas y estado de cuenta, los
+// otros `sync_type` que una pantalla actualiza —cobros, CxP y el catálogo de
+// artículos de Consulta de artículos—. Todos salen del último success en
+// `switch_sync_log`; solo el estado de cuenta lee su propia tabla.
+const VALID_TABLAS = new Set(["facturas", "estadocuenta", "recibos", "proveedores", "articulo_info"] as const);
+type Tabla = "facturas" | "estadocuenta" | "recibos" | "proveedores" | "articulo_info";
 
 interface StaleEntry {
   empresa: string;

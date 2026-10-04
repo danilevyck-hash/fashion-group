@@ -37,8 +37,6 @@ import { ROTULO_DESCARGAR_EXCEL, anotarDescarga } from "@/lib/ventas/descarga";
 import { textoFrescura } from "@/lib/ventas/frescura";
 import { coincideBusqueda } from "@/lib/buscar-normalizado";
 import { esMostrador } from "@/lib/clientes/mostrador";
-import SyncNowButton from "@/components/shared/SyncNowButton";
-import { SYNC_NOW_VENTAS_SECUENCIA } from "@/components/shared/syncNowOpciones";
 
 type SortKey = "rank" | "nombre" | "empresa" | "ytd" | "delta" | "ultima";
 type SortDir = "asc" | "desc";
@@ -711,7 +709,7 @@ export function ClientesView({
           {/* "Actualizar ahora" (admin/secretaria) — la data de este tab sale
               del vw clientes_empresa_12m: misma secuencia completa que Resumen
               (facturas de las 8 + refresh-vistas al final) y refetch. */}
-          <SyncNowButton opciones={SYNC_NOW_VENTAS_SECUENCIA} secuencial onSuccess={reloadData} />
+          <FrescuraVentasCel forma="computadora" onActualizado={() => void reloadData()} />
 
           {/* 🔴 «Descargar en Excel» (11-sep-2026; decía «Excel»). Baja LO QUE
               ESTÁS VIENDO, con la búsqueda, la empresa y el orden puestos, y en

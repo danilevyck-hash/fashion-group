@@ -612,10 +612,11 @@ describe("🔴 8 · Boston aparte, y la pantalla sin lo que estorbaba", () => {
     expect(texto).not.toContain("Desglose por empresa");
   });
 
-  it("🩸 «Actualizar ahora» ya no ocupa un renglón: vive en el «···»", () => {
+  it("🔄 «Actualizar» es la línea de frescura bajo el total, nunca en el «···» (4-oct-2026)", () => {
     const { container } = pintar();
     expect(container.textContent).not.toContain("Actualizar ahora");
-    expect(leer("src/app/cxc/components/HojasCxcCelular.tsx")).toContain("SyncNowButton");
+    expect(container.querySelector("[data-frescura-cxc] [data-frescura]")).toBeTruthy();
+    expect(leer("src/app/cxc/components/HojasCxcCelular.tsx")).not.toContain("SyncNowButton");
   });
 
   it("el buscador se queda, y con él se limpian los filtros", () => {

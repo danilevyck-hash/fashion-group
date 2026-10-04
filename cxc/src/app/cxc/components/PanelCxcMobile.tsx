@@ -25,7 +25,8 @@ import type { ConsolidatedClient } from "@/lib/types";
 import type { Company } from "@/lib/companies";
 import SyncStatus from "@/components/shared/SyncStatus";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
-import SyncNowButton from "@/components/shared/SyncNowButton";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
+import { opcionesActualizarCxc } from "@/lib/cxc/apple-2026-10";
 import UltimosPagosPorFecha from "./UltimosPagosPorFecha";
 import { useUltimosPagosGrupo } from "../hooks/useUltimosPagosGrupo";
 import {
@@ -298,14 +299,20 @@ function MobileHeader({
           empresasEsperadas={cartera === "boston" ? empresasCarteraAparte() : CXC_GRUPO_EMPRESA_KEYS}
           empresaLabels={EMPRESA_KEY_TO_NAME}
         />
-        {/* "Actualizar ahora" (admin/secretaria) — estadocuenta de la empresa
-            del filtro; con "Todas" queda deshabilitado. */}
-        <SyncNowButton
-          className="mt-2"
-          opciones={[{ modulo: "estadocuenta", empresa: companyFilter }]}
-          disabledReason={companyFilter === "all" ? "Selecciona una empresa en el filtro para actualizarla" : null}
-          onSuccess={() => onSyncedNow?.()}
-        />
+        {/* 🔴 4-oct-2026: «Actualizado 4:00 pm ↻». Con una empresa, esa; con
+            «Todas», las 6 una tras otra. Boston no se actualiza a mano (~20
+            min, fuera del módulo estadocuenta): la hora sola. */}
+        {cartera === "boston" ? (
+          <LineaDeFrescura tabla="estadocuenta" empresas={empresasCarteraAparte()} />
+        ) : (
+          <LineaDeFrescura
+            tabla="estadocuenta"
+            empresas={companyFilter === "all" ? CXC_GRUPO_EMPRESA_KEYS : [companyFilter]}
+            opciones={opcionesActualizarCxc(companyFilter)}
+            secuencial={companyFilter === "all"}
+            onSuccess={() => onSyncedNow?.()}
+          />
+        )}
       </div>
       {canExport && (
         <div className="relative" ref={menuRef}>

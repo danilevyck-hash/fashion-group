@@ -48,6 +48,8 @@ export interface FilaCliente {
    *  selectores no lo ofrecen; la ficha y las guías viejas lo siguen viendo.
    *  `null` = vivo. Ver `lib/clientes/ausentes`. */
   ausente_desde: string | null;
+  /** Cuándo lo trajo el sync de Switch. Para la línea de frescura (4-oct-2026). */
+  last_synced_at?: string | null;
 }
 
 interface Entrada {
@@ -75,7 +77,7 @@ async function leerDelaBase(provincia: string): Promise<FilaCliente[]> {
         let sel = supabaseServer
           .from("clientes_master")
           .select(
-            "id, codigo, nombre, razon_social, telefono, celular, email, provincia" +
+            "id, codigo, nombre, razon_social, telefono, celular, email, provincia, last_synced_at" +
               (conAusencia ? ", ausente_desde" : ""),
             pedirCount ? { count: "exact" } : {},
           )

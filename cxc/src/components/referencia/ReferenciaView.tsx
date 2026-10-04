@@ -27,7 +27,8 @@
 
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Download, RefreshCw, Search } from "lucide-react";
+import { Download, Search } from "lucide-react";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { cn } from "@/lib/utils";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
@@ -154,12 +155,20 @@ export function ReferenciaView() {
   // Daniel: *"quita margen, lo demas dejalo"* — el servidor dice quién lo ve.
   const mostrarMargen = resp?.margenVisible !== false;
 
+  // 🔴 4-oct-2026: «Actualizar» salió del «···». Es la línea de frescura de
+  // todo el sistema, y aparece solo con una búsqueda: actualiza el catálogo de
+  // la empresa de lo buscado (la hora es la de esas empresas).
+  const frescura = hayResultados ? (
+    <LineaDeFrescura
+      tabla="articulo_info"
+      empresas={empresasDeLaBusqueda}
+      onActualizar={actualizar}
+      actualizando={actualizando}
+      deshabilitado={cargando}
+    />
+  ) : null;
+
   const acciones = [
-    {
-      label: actualizando ? "Actualizando…" : "Actualizar datos de Switch",
-      onClick: () => void actualizar(),
-      disabled: !hayResultados || actualizando || cargando,
-    },
     {
       label: "Descargar Excel",
       onClick: () =>
@@ -267,7 +276,8 @@ export function ReferenciaView() {
         </div>
 
         {hayResultados && (
-          <p className="mt-3 text-xs text-gray-600">
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3">
+          <p className="text-xs text-gray-600">
             {modo === "color"
               ? "1 artículo"
               : modo === "varios"
@@ -276,6 +286,8 @@ export function ReferenciaView() {
                     (porModelo[0]?.[1].length ?? 0) === 1 ? "color" : "colores"
                   }`}
           </p>
+          {frescura}
+          </div>
         )}
 
         {resultados}
@@ -326,20 +338,7 @@ export function ReferenciaView() {
           de esa empresa. El motivo va como TEXTO a la vista y no en un
           `title`: en el iPad no hay mouse que pasar por encima. */}
       <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-        {!hayResultados && (
-          <span className="mr-auto text-xs text-gray-600">
-            Busca un código primero — se actualiza la empresa de lo que encuentres.
-          </span>
-        )}
-        <Button
-          variant="outline"
-          className="min-h-[44px]"
-          disabled={!hayResultados || actualizando || cargando}
-          onClick={() => void actualizar()}
-        >
-          <RefreshCw className={cn("mr-1.5 h-4 w-4", actualizando && "animate-spin")} />
-          {actualizando ? "Actualizando…" : "Actualizar datos de Switch"}
-        </Button>
+        {frescura}
         {hayResultados && (
           <Button
             variant="outline"
