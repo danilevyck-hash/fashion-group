@@ -48,7 +48,7 @@ import { ROTULO_DESCARGAR_EXCEL, anotarDescarga } from "@/lib/ventas/descarga";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { subtituloDelProducto } from "@/lib/ventas/celular";
 import { useEsCelularVentas } from "./celular/useEsCelularVentas";
-import { MenuVentasCelular } from "./celular/MenuVentasCelular";
+import { FrescuraVentasCel, MenuVentasCelular } from "./celular/MenuVentasCelular";
 import {
   ESTILO_COLCHON_DERECHA,
   GrupoVentas,
@@ -659,6 +659,7 @@ export function ProductosView({ periodo: periodoElegido, anioEnCurso, onDescarga
             </Button>
           </>
         )}
+        {enCelular && <FrescuraVentasCel onActualizado={load} />}
         {enCelular && (
           <MenuVentasCelular
             pestana="productos"

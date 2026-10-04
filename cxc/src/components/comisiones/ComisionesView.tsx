@@ -53,6 +53,8 @@ import { FileSpreadsheet, FileText, Settings } from "lucide-react";
 import { EMPRESA_KEY_TO_NOMBRE_CORTO, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 import SyncStatus from "@/components/shared/SyncStatus";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
+import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import { SYNC_NOW_RECIBOS_OPCIONES } from "@/components/shared/syncNowOpciones";
@@ -389,7 +391,20 @@ export function ComisionesView({
           </button>
         )}
 
-        <ComisionesCriterios className="ml-auto" aviso={syncStale}>
+        {/* 🔴 «Actualizado hace 5 min · Actualizar» (4-oct-2026,
+            `FRESCURA_VISIBLE_2026_10`): la frescura se ve sin abrir el ⓘ y el botón con
+            borde de la fila 2 se vuelve esta línea, como en Nueva guía. */}
+        {FRESCURA_VISIBLE_2026_10 && conPapel && (
+          <LineaDeFrescura
+            forma="computadora"
+            className="ml-auto"
+            tabla="facturas"
+            empresas={EMPRESAS}
+            opciones={SYNC_NOW_RECIBOS_OPCIONES}
+            onSuccess={() => setRefreshKey((k) => k + 1)}
+          />
+        )}
+        <ComisionesCriterios className={FRESCURA_VISIBLE_2026_10 && conPapel ? undefined : "ml-auto"} aviso={syncStale}>
           <SyncStatus
             tabla="facturas"
             empresasEsperadas={EMPRESAS}
@@ -419,7 +434,7 @@ export function ComisionesView({
         {/* "Actualizar ahora" de RECIBOS (cobros) — vive acá porque la comisión
             sobre cobro lee switch_recibos. Menú para elegir la empresa (una por
             disparo — sesión única Switch). */}
-        {conPapel && (
+        {conPapel && !FRESCURA_VISIBLE_2026_10 && (
         <SyncNowButton
           opciones={SYNC_NOW_RECIBOS_OPCIONES}
           className="shrink-0"

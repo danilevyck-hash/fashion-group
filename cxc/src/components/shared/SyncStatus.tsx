@@ -120,27 +120,14 @@ function pedirEstado(url: string): Promise<SyncStatusData> {
   return p;
 }
 
-export default function SyncStatus({
-  tabla,
-  empresasEsperadas,
-  empresaLabels,
-  variant = "block",
-  prefix,
-  className,
-  onStale,
-}: SyncStatusProps) {
+/**
+ * La frescura del sync, con el MISMO fetch, foco y sondeo de `<SyncStatus>`.
+ * La usa también la línea de frescura (`LineaDeFrescura`, 4-oct-2026).
+ */
+export function useEstadoSync(tabla: SyncTable, empresasEsperadas: readonly string[]) {
   const [data, setData] = useState<SyncStatusData | null>(null);
   const [error, setError] = useState(false);
-
   const empresasKey = empresasEsperadas.join(",");
-
-  // El callback puede no ser estable en el llamador; se lee por ref para que no
-  // reinicie el fetch/polling de arriba.
-  const onStaleRef = useRef(onStale);
-  onStaleRef.current = onStale;
-  useEffect(() => {
-    onStaleRef.current?.((data?.stale?.length ?? 0) > 0);
-  }, [data]);
 
   useEffect(() => {
     let cancelled = false;
@@ -185,6 +172,28 @@ export default function SyncStatus({
       clearInterval(interval);
     };
   }, [tabla, empresasKey]);
+
+  return { data, error };
+}
+
+export default function SyncStatus({
+  tabla,
+  empresasEsperadas,
+  empresaLabels,
+  variant = "block",
+  prefix,
+  className,
+  onStale,
+}: SyncStatusProps) {
+  const { data, error } = useEstadoSync(tabla, empresasEsperadas);
+
+  // El callback puede no ser estable en el llamador; se lee por ref para que no
+  // reinicie el fetch/polling de arriba.
+  const onStaleRef = useRef(onStale);
+  onStaleRef.current = onStale;
+  useEffect(() => {
+    onStaleRef.current?.((data?.stale?.length ?? 0) > 0);
+  }, [data]);
 
   if (error || !data) return null;
 

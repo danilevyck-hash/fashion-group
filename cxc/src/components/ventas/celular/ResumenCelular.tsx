@@ -58,6 +58,8 @@ interface Props {
   multiMayoreoNota?: string | null;
   /** El «···» de arriba: «Descargar» y «Actualizar ahora». */
   accion?: React.ReactNode;
+  /** «Actualizado 9:41 ↻» (`FRESCURA_VISIBLE_2026_10`), pegado a «Datos al …». */
+  frescura?: React.ReactNode;
   /** 🔴 RESUMEN_MES_2026_10: el mes de la URL (`?mes=`). Vacío o «0» = todo el año. */
   mes?: string;
 }
@@ -84,6 +86,7 @@ export function ResumenCelular({
   onOpenEmpresa,
   multiMayoreoNota,
   accion,
+  frescura,
   mes: mesRaw,
 }: Props) {
   if (RESUMEN_MES_2026_10) {
@@ -97,6 +100,7 @@ export function ResumenCelular({
         onOpenEmpresa={onOpenEmpresa}
         multiMayoreoNota={multiMayoreoNota}
         accion={accion}
+        frescura={frescura}
         mes={mesRaw}
       />
     );
@@ -111,6 +115,7 @@ export function ResumenCelular({
       onOpenEmpresa={onOpenEmpresa}
       multiMayoreoNota={multiMayoreoNota}
       accion={accion}
+      frescura={frescura}
     />
   );
 }
@@ -124,6 +129,7 @@ function ResumenCelularDeSiempre({
   onOpenEmpresa,
   multiMayoreoNota,
   accion,
+  frescura,
 }: Props) {
   const [abierta, setAbierta] = useState<string | null>(null);
   const anioPrevio = selectedYear - 1;
@@ -193,7 +199,7 @@ function ResumenCelularDeSiempre({
     <PantallaVentas>
       <TituloVentas
         enLaBarra
-        detalleEnLaBarra={data.fecha_corte ? `Datos al ${diaCorto(data.fecha_corte)}` : ""}
+        detalleEnLaBarra={conFrescura(data.fecha_corte ? `Datos al ${diaCorto(data.fecha_corte)}` : "", frescura)}
         titulo="Ventas"
         detalle={`Año ${selectedYear}${data.fecha_corte ? ` · al ${diaCorto(data.fecha_corte)}` : ""}`}
         accion={accion}
@@ -343,6 +349,7 @@ function ResumenCelularPorPeriodo({
   onOpenEmpresa,
   multiMayoreoNota,
   accion,
+  frescura,
   mes: mesRaw,
 }: Props) {
   const anioPrevio = selectedYear - 1;
@@ -409,7 +416,7 @@ function ResumenCelularPorPeriodo({
     <PantallaVentas>
       <TituloVentas
         enLaBarra
-        detalleEnLaBarra={data.fecha_corte ? `Datos al ${diaCorto(data.fecha_corte)}` : ""}
+        detalleEnLaBarra={conFrescura(data.fecha_corte ? `Datos al ${diaCorto(data.fecha_corte)}` : "", frescura)}
         titulo="Ventas"
         detalle={`${nombrePeriodo}${data.fecha_corte ? ` · al ${diaCorto(data.fecha_corte)}` : ""}`}
         accion={accion}
@@ -480,6 +487,12 @@ function ResumenCelularPorPeriodo({
 }
 
 /** «24 sep» — el día del corte, corto. */
+/** La línea gris con «· Actualizado 9:41 ↻» al final, si la hay. */
+function conFrescura(texto: string, frescura: React.ReactNode): React.ReactNode {
+  if (!frescura) return texto;
+  return <>{texto}{texto && " · "}{frescura}</>;
+}
+
 function diaCorto(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
   if (!m) return iso;

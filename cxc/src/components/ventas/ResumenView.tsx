@@ -17,7 +17,8 @@ import { ROTULO_DESCARGAR_EXCEL, anotarDescarga } from "@/lib/ventas/descarga";
 import { ControlSegmentado } from "./ControlSegmentado";
 import { useEsCelularVentas } from "./celular/useEsCelularVentas";
 import { ResumenCelular } from "./celular/ResumenCelular";
-import { MenuVentasCelular } from "./celular/MenuVentasCelular";
+import { FrescuraVentasCel, MenuVentasCelular } from "./celular/MenuVentasCelular";
+import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { buildNotaMayoreo } from "@/lib/ventas/mayoreo";
 import {
@@ -373,6 +374,7 @@ export function ResumenView({
           onOpenEmpresa={setPanelEmpresaId}
           multiMayoreoNota={multiMayoreoNota?.texto ?? null}
           mes={mes}
+          frescura={FRESCURA_VISIBLE_2026_10 ? <FrescuraVentasCel onActualizado={() => onReloadData?.()} /> : undefined}
           accion={
             <MenuVentasCelular
               pestana="resumen"

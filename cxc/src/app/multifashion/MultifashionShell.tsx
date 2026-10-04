@@ -48,11 +48,13 @@ import {
 } from "@/lib/multifashion/periodo";
 import {
   MULTIFASHION_CELULAR, diasDelMesMirado, encabezadoCelular, esElMesDeHoy,
-  esPantallaCelular, mesAnterior, mesSiguiente, subtituloDelMes, type ClaveRenglon,
+  esPantallaCelular, mesAnterior, mesSiguiente, subtituloDelMes, subtituloHoyAyer, MF_DIA_2026_10, type ClaveRenglon,
 } from "@/lib/multifashion/celular";
 import { useVentaHoy } from "@/lib/multifashion/venta-hoy-cliente";
 import type { Multifashion } from "@/components/ventas/types";
 import { tituloCelular } from "@/lib/navegacion/barra-controles-celular";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
+import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
 
 // Fetcher puro del overview por año. SWR lo cachea por año → volver a un año ya
 // visto pinta al instante y revalida en background.
@@ -175,13 +177,23 @@ export function MultifashionShell({
 
   // 🔴 Lo de HOY solo en el mes de HOY: la banda vieja hablaba del día de hoy
   // aunque estuvieras mirando agosto.
+  const esHoy = esElMesDeHoy(periodo, corte);
+  const diasMirados = diasDelMesMirado(periodo, corte, hoyIso);
   const subtituloCel = tab === "resumen" && pantallaCel === "inicio"
-    ? subtituloDelMes({
-        dias: diasDelMesMirado(periodo, corte, hoyIso),
-        hoy: esElMesDeHoy(periodo, corte)
-          ? (ventaHoy ? { hayVentas: ventaHoy.hayVentas, ventas: ventaHoy.ventas } : undefined)
-          : null,
-      })
+    ? MF_DIA_2026_10
+      // 🔴 `MF_DIA_2026_10`: «hoy $1,979 · ayer $X» (y la frescura detrás).
+      ? subtituloHoyAyer({
+          dias: diasMirados,
+          hoy: esHoy
+            ? (ventaHoy ? { hayVentas: ventaHoy.hayVentas, ventas: ventaHoy.ventas, ayer: ventaHoy.ayer.ventas } : undefined)
+            : null,
+        })
+      : subtituloDelMes({
+          dias: diasMirados,
+          hoy: esHoy
+            ? (ventaHoy ? { hayVentas: ventaHoy.hayVentas, ventas: ventaHoy.ventas } : undefined)
+            : null,
+        })
     : null;
 
   // Las dos acciones de sync: en el teléfono viven en el menú ☰; desde `md`
@@ -209,6 +221,25 @@ export function MultifashionShell({
     </div>
   );
 
+  // 🔴 «Actualizado 9:41 ↻» (4-oct-2026, `FRESCURA_VISIBLE_2026_10`): en el
+  // celular «Actualizar ahora» sale del final de la hoja «Más» y se pega a la
+  // línea gris del mes. El botón es el MISMO, con los roles del módulo.
+  // Con `MF_DIA_2026_10` la misma línea lleva la hora y el ↻: no hay dos.
+  const conFrescura = FRESCURA_VISIBLE_2026_10 || MF_DIA_2026_10;
+  const frescuraCel = conFrescura ? (
+    <LineaDeFrescura
+      forma="celular"
+      tabla="facturas"
+      empresas={["american_classic"]}
+      opciones={[{ modulo: "facturas", empresa: "american_classic" }]}
+      roles={ROLES_MULTIFASHION}
+      onSuccess={async () => {
+        await mutate();
+        setSyncTick((t) => t + 1);
+      }}
+    />
+  ) : null;
+
   if (!authChecked) return null;
 
   const isClosedYear = selectedYear < currentYear;
@@ -220,7 +251,7 @@ export function MultifashionShell({
     {/* 🔴 En el celular el título grande es EL MES (`data-celular="titulo"`),
         que es lo que Daniel mira; el nombre del módulo sigue `sr-only`. El
         layout no agrega otro título arriba: volvería a empujar el número. */}
-    <AppHeader module="Multifashion" acciones={accionesSync} tituloEnLaPantalla={MULTIFASHION_CELULAR} />
+    <AppHeader module="Multifashion" acciones={conFrescura ? undefined : accionesSync} tituloEnLaPantalla={MULTIFASHION_CELULAR} />
     <PullToRefresh onRefresh={async () => { await mutate(); }}>
     <main className="mx-auto w-full max-w-[1280px] px-4 py-5 md:px-7 md:py-6">
       {/* Bloque 1 de 3: título + período. */}
@@ -278,8 +309,10 @@ export function MultifashionShell({
           <p data-celular="titulo" className={tituloCelular("text-3xl font-bold leading-tight tracking-tight text-gray-950")}>
             {encabezado.titulo}
           </p>
-          {subtituloCel && (
-            <p data-celular="subtitulo" className="mt-0.5 text-sm text-gray-500 tabular-nums">{subtituloCel}</p>
+          {(subtituloCel || frescuraCel) && (
+            <p data-celular="subtitulo" className="mt-0.5 text-sm text-gray-500 tabular-nums">
+              {subtituloCel}{subtituloCel && frescuraCel && " · "}{frescuraCel}
+            </p>
           )}
         </header>
       )}

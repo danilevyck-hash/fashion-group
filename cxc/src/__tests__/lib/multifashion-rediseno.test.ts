@@ -588,7 +588,9 @@ describe("11 · el encabezado del teléfono, de seis bloques a tres", () => {
     // 24-sep-2026: el encabezado puede llevar además `tituloEnLaPantalla`
     // (el celular sin barra de arriba). Lo que importa acá es que las acciones
     // viajen al menú ☰.
-    expect(shell).toMatch(/<AppHeader module="Multifashion" acciones=\{accionesSync\}/);
+    // 4-oct-2026: con la línea de frescura prendida (`FRESCURA_VISIBLE_2026_10`
+    // o `MF_DIA_2026_10`, los dos apagados) se pegan a la línea gris del mes.
+    expect(shell).toMatch(/<AppHeader module="Multifashion" acciones=\{conFrescura \? undefined : accionesSync\}/);
     // Y en el escritorio se quedan a la vista.
     expect(shell).toContain('<div className="hidden md:block">{accionesSync}</div>');
     const header = leer("src/components/AppHeader.tsx");

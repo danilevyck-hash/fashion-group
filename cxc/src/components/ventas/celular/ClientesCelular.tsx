@@ -59,6 +59,8 @@ interface Props {
   onTocarCliente: (c: Cliente) => void;
   /** El «···» de arriba: Ordenar · Actualizar ahora · Descargar. */
   accion?: React.ReactNode;
+  /** «Actualizado 9:41 ↻» (`FRESCURA_VISIBLE_2026_10`), al final de la línea gris. */
+  frescura?: React.ReactNode;
   /** Lo que está pasando abajo del todo (los sin compras, «Otros»…). */
   pie?: React.ReactNode;
 }
@@ -74,6 +76,7 @@ export function ClientesCelular({
   onEmpresa,
   onTocarCliente,
   accion,
+  frescura,
   pie,
 }: Props) {
   const [buscando, setBuscando] = useState(busqueda.length > 0);
@@ -86,8 +89,8 @@ export function ClientesCelular({
       <TituloVentas
         enLaBarra
         titulo="Clientes"
-        detalle={`${total.toLocaleString("en-US")} clientes · año ${selectedYear}`}
-        detalleEnLaBarra={`${total.toLocaleString("en-US")} clientes`}
+        detalle={<>{`${total.toLocaleString("en-US")} clientes · año ${selectedYear}`}{frescura && <> · {frescura}</>}</>}
+        detalleEnLaBarra={<>{`${total.toLocaleString("en-US")} clientes`}{frescura && <> · {frescura}</>}</>}
         accion={hayBarra ? (
           <>
             <BuscarEnLaBarra

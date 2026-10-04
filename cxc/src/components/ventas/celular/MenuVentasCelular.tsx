@@ -29,6 +29,28 @@ import {
 } from "@/lib/ventas/descarga-un-boton";
 import { ROTULO_DESCARGAR } from "@/lib/ventas/celular";
 import { BotonPuntos, HojaCel, HojaMenuCel } from "./PiezasVentas";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
+import { empresasConFacturas } from "@/lib/switch-api/empresas";
+import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
+
+/**
+ * 🔴 «Actualizado 9:41 ↻» de Ventas (4-oct-2026, `FRESCURA_VISIBLE_2026_10`):
+ * la MISMA secuencia de «Actualizar ahora» que vivía en el «···». Va en la
+ * línea gris de cada pestaña; con el interruptor apagado no se dibuja.
+ */
+export function FrescuraVentasCel({ onActualizado }: { onActualizado: () => void }) {
+  if (!FRESCURA_VISIBLE_2026_10) return null;
+  return (
+    <LineaDeFrescura
+      forma="celular"
+      tabla="facturas"
+      empresas={empresasConFacturas()}
+      opciones={SYNC_NOW_VENTAS_SECUENCIA}
+      secuencial
+      onSuccess={onActualizado}
+    />
+  );
+}
 
 interface Props {
   pestana: PestanaDescarga;
@@ -72,17 +94,20 @@ export function MenuVentasCelular({
         >
           {ROTULO_DESCARGAR}
         </button>
-        <div className="[&>*]:w-full">
-          <SyncNowButton
-            opciones={SYNC_NOW_VENTAS_SECUENCIA}
-            secuencial
-            className="w-full justify-center"
-            onSuccess={() => {
-              setMenu(false);
-              onActualizado();
-            }}
-          />
-        </div>
+        {/* Con la línea de frescura prendida, «Actualizar ahora» sale de aquí. */}
+        {!FRESCURA_VISIBLE_2026_10 && (
+          <div className="[&>*]:w-full">
+            <SyncNowButton
+              opciones={SYNC_NOW_VENTAS_SECUENCIA}
+              secuencial
+              className="w-full justify-center"
+              onSuccess={() => {
+                setMenu(false);
+                onActualizado();
+              }}
+            />
+          </div>
+        )}
       </HojaMenuCel>
 
       <HojaCel

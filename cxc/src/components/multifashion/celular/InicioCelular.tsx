@@ -17,7 +17,7 @@
 // forma más fácil de que dos números del mismo día no coincidan.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import useSWR from "swr";
 import type { Multifashion } from "@/components/ventas/types";
 import { variacionPct } from "@/lib/variacion";
@@ -26,7 +26,7 @@ import { conteoPorChip } from "@/lib/multifashion/clientes-seguimiento";
 import type { ClienteUniverso } from "@/lib/multifashion/clientes-universo";
 import { lineaHabitos } from "@/lib/multifashion/resumen-minimo";
 import {
-  barrasDelMes, lineaDelMes, montoCorto, renglonesDelInicio,
+  MF_DIA_2026_10, barrasDelMes, lineaDelDia, lineaDelMes, montoCorto, renglonesDelInicio,
   type ClaveRenglon, type RenglonCelular, type TonoCelular,
 } from "@/lib/multifashion/celular";
 import type { CortePeriodo, Periodo } from "@/lib/multifashion/periodo";
@@ -90,6 +90,21 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir }: Props
     [data.dias, data.is_mes_actual, data.dia_actual],
   );
 
+  // 🔴 `MF_DIA_2026_10`: el día tocado (null = el mes). Se toca la franja
+  // entera —cada barra mide ~11 px— y se elige por la posición del dedo.
+  const [tocado, setTocado] = useState<{ mes: string; dia: number } | null>(null);
+  const mesAqui = `${year}-${mes}`;
+  // Al cambiar de mes se vuelve al mes: el día tocado era de otro.
+  const diaTocado = tocado && tocado.mes === mesAqui ? tocado.dia : null;
+  const filaTocada = diaTocado == null ? null : data.dias.find((d) => d.dia === diaTocado) ?? null;
+  const tocarBarras = (e: React.MouseEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const i = Math.min(barras.length - 1, Math.max(0, Math.floor(((e.clientX - r.left) / r.width) * barras.length)));
+    const b = barras[i];
+    if (!b || b.futuro) return;
+    setTocado(diaTocado === b.dia ? null : { mes: mesAqui, dia: b.dia });
+  };
+
   // ── Los hábitos: la MISMA línea del Resumen de computadora ────────────────
   const patrones = data.patrones;
   const hayVentana = patrones != null && patrones.mesesUsados > 0;
@@ -148,6 +163,11 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir }: Props
       <p data-celular="numero-del-mes" className="text-center text-[52px] font-light leading-none tracking-tight tabular-nums text-gray-950">
         {montoCorto(totales.ventas)}
       </p>
+      {filaTocada ? (
+        <p data-celular="linea-del-dia" className="mt-2 text-center text-sm font-medium text-gray-950 tabular-nums">
+          {lineaDelDia({ anio: year, mes, dia: filaTocada.dia, ventas: filaTocada.ventas, tickets: filaTocada.n_tickets })}
+        </p>
+      ) : (
       <p data-celular="linea-del-mes" className="mt-2 text-center text-sm text-gray-600">
         {linea.delta && (
           <span className={cn("font-medium", TONO_CLASE[linea.delta.tono])}>{linea.delta.texto}</span>
@@ -157,18 +177,25 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir }: Props
         {(linea.delta || linea.contra) && linea.cierra && " · "}
         {linea.cierra && <span className="text-gray-900">{linea.cierra}</span>}
       </p>
+      )}
 
       {/* El día por día, sin ejes. */}
       <div
         data-celular="barras"
-        role="img"
-        aria-label="Ventas diarias del mes"
-        className="mt-5 flex h-[74px] items-end gap-[2px]"
+        role={MF_DIA_2026_10 ? "group" : "img"}
+        aria-label={MF_DIA_2026_10 ? "Ventas diarias del mes · toca un día" : "Ventas diarias del mes"}
+        onClick={MF_DIA_2026_10 ? tocarBarras : undefined}
+        className={cn("mt-5 flex h-[74px] items-end gap-[2px]", MF_DIA_2026_10 && "cursor-pointer")}
       >
         {barras.map((b) => (
           <span
             key={b.dia}
-            className={cn("flex-1 rounded-t-[2px] bg-gray-900", b.futuro && "opacity-20")}
+            data-dia={b.dia}
+            className={cn(
+              "flex-1 rounded-t-[2px] bg-gray-900",
+              b.futuro && "opacity-20",
+              diaTocado != null && !b.futuro && b.dia !== diaTocado && "opacity-30",
+            )}
             style={{ height: `${Math.max(3, Math.round(b.alto * 100))}%` }}
           />
         ))}

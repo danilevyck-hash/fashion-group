@@ -30,6 +30,10 @@ import { Settings } from "lucide-react";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { SYNC_NOW_RECIBOS_OPCIONES } from "@/components/shared/syncNowOpciones";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
+import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
+import { esVistaMultifashion, VISTA_MULTIFASHION } from "@/lib/comisiones/vistas";
+import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { fmtMoney } from "@/lib/ventas/format";
 import { hoyPanama } from "@/lib/fecha-panama";
 import {
@@ -118,6 +122,31 @@ export function PortadaComisionesCelular({
   };
   const etiquetaVista = opciones.find((o) => o.valor === vista)?.etiqueta ?? vista;
 
+  // 🔴 «Actualizado 9:41 ↻» (4-oct-2026, `FRESCURA_VISIBLE_2026_10`): el
+  // «Actualizar ahora» sale del «···» y se vuelve la línea chica. En
+  // Multifashion, que no tenía ninguno, actualiza SUS facturas.
+  const enMultifashion = esVistaMultifashion(vista);
+  const frescura = !FRESCURA_VISIBLE_2026_10 || enConfig ? null : enMultifashion ? (
+    <LineaDeFrescura
+      forma="celular"
+      tabla="facturas"
+      empresas={[VISTA_MULTIFASHION]}
+      opciones={[{ modulo: "facturas", empresa: VISTA_MULTIFASHION }]}
+      onSuccess={onActualizado}
+    />
+  ) : conDescarga ? (
+    <LineaDeFrescura
+      forma="celular"
+      tabla="facturas"
+      empresas={B2B_EMPRESA_KEYS}
+      opciones={SYNC_NOW_RECIBOS_OPCIONES}
+      onSuccess={onActualizado}
+    />
+  ) : null;
+  const totalTexto = total != null && !enConfig ? (
+    <b className="font-semibold text-gray-900">{fmtMoney(total)} {ROTULO_TOTAL_A_PAGAR}</b>
+  ) : null;
+
   return (
     <PantallaCel>
       <TituloCel
@@ -125,8 +154,8 @@ export function PortadaComisionesCelular({
         detalle={
           /* 🔴 EL TOTAL SE LEE SIN BAJAR. Sale de la vista del grupo; con el ⚙
              abierto o en una empresa no hay total que decir acá. */
-          total != null && !enConfig ? (
-            <b className="font-semibold text-gray-900">{fmtMoney(total)} {ROTULO_TOTAL_A_PAGAR}</b>
+          totalTexto || frescura ? (
+            <>{totalTexto}{frescura && <span className={totalTexto ? "block" : undefined}>{frescura}</span>}</>
           ) : undefined
         }
         accion={
@@ -223,7 +252,7 @@ export function PortadaComisionesCelular({
             {ROTULO_DESCARGAR_COMISIONES}
           </button>
         )}
-        {conDescarga && (
+        {conDescarga && !FRESCURA_VISIBLE_2026_10 && (
           <div className="[&>*]:w-full">
             <SyncNowButton
               opciones={SYNC_NOW_RECIBOS_OPCIONES}

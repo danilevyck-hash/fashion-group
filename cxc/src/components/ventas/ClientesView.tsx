@@ -20,7 +20,8 @@ import { ControlSegmentado } from "./ControlSegmentado";
 import { useEsCelularVentas } from "./celular/useEsCelularVentas";
 import { ClientesCelular } from "./celular/ClientesCelular";
 import { HojaClienteCelular } from "./celular/HojaClienteCelular";
-import { MenuVentasCelular } from "./celular/MenuVentasCelular";
+import { FrescuraVentasCel, MenuVentasCelular } from "./celular/MenuVentasCelular";
+import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
 import { HojaCel } from "./celular/PiezasVentas";
 import { esPantallaDeCelularVentas, ultimaCompraEnPalabras } from "@/lib/ventas/celular";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -562,6 +563,7 @@ export function ClientesView({
           empresaRotulo={rotuloEmpresa}
           onEmpresa={() => setEmpresaAbierta(true)}
           onTocarCliente={setSheetCliente}
+          frescura={FRESCURA_VISIBLE_2026_10 ? <FrescuraVentasCel onActualizado={() => { void reloadData(); onReloadData?.(); }} /> : undefined}
           accion={
             <MenuVentasCelular
               pestana="clientes"

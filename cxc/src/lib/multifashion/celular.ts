@@ -42,6 +42,44 @@ import { etiquetaPeriodo, type CortePeriodo, type Periodo } from "@/lib/multifas
  */
 export const MULTIFASHION_CELULAR = true;
 
+/**
+ * 🔴 EL DÍA QUE SE TOCA Y LO DE AYER (4-oct-2026, propuesta). Daniel: las
+ * barras del día por día no se podían tocar y no había forma de ver lo de
+ * ayer. Prendido:
+ *  · tocar una barra dice ARRIBA «Sáb 3 oct · $7,104 · 82 tickets» y la marca;
+ *    tocarla otra vez vuelve al mes. Son los MISMOS `dias` del detalle del mes.
+ *  · la línea gris pasa de «4 días · hoy $1,979» a «hoy $1,979 · ayer $X ·
+ *    Actualizado 4:00 pm ↻» (el «ayer» es el de `venta-hoy.ts`; la hora y el ↻
+ *    son la MISMA línea de frescura de `FRESCURA_VISIBLE_2026_10`: una sola).
+ * `false` = como hoy. NACE APAGADO. Candado `multifashion-dia-tocado.test.ts`.
+ */
+export const MF_DIA_2026_10 = false;
+
+const DIA_SEMANA = new Intl.DateTimeFormat("es-PA", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+
+/** «Sáb 3 oct · $7,104 · 82 tickets» — el día tocado, en una línea. */
+export function lineaDelDia(args: { anio: number; mes: number; dia: number; ventas: number; tickets: number }): string {
+  const fecha = DIA_SEMANA.format(new Date(Date.UTC(args.anio, args.mes - 1, args.dia))).replace(/[.,]/g, "");
+  const conMayuscula = fecha.charAt(0).toUpperCase() + fecha.slice(1);
+  const t = Math.max(0, Math.round(args.tickets));
+  return `${conMayuscula} · ${montoCorto(args.ventas)} · ${t} ${t === 1 ? "ticket" : "tickets"}`;
+}
+
+/**
+ * La línea gris con `MF_DIA_2026_10`: «hoy $1,979 · ayer $7,104» en el mes de
+ * hoy; en otro mes, los días (como `subtituloDelMes`).
+ */
+export function subtituloHoyAyer(args: {
+  dias: number;
+  /** `undefined` = todavía no llegó; `null` = el mes no es el de hoy. */
+  hoy?: { hayVentas: boolean; ventas: number; ayer: number } | null;
+}): string {
+  const { hoy } = args;
+  if (hoy === undefined || hoy === null) return subtituloDelMes({ dias: args.dias, hoy });
+  const deHoy = hoy.hayVentas ? `hoy ${montoCorto(hoy.ventas)}` : "hoy sin ventas todavía";
+  return `${deHoy} · ayer ${montoCorto(hoy.ayer)}`;
+}
+
 /** Las dos pantallas que el celular agrega adentro de «Resumen». */
 export type PantallaCelular = "inicio" | "anio";
 

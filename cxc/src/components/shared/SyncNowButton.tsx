@@ -32,7 +32,7 @@
 // El 409 cooldown DIRECTO (primer intento) sí muestra su detalle tal cual.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CajaAviso, CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos } from "@/components/CajaAviso";
 import { RefreshCw } from "lucide-react";
 import { postSyncNow, syncConEnganche } from "./syncNowClient";
@@ -87,6 +87,16 @@ interface SyncNowButtonProps {
    */
   onSuccess: () => void | Promise<void>;
   className?: string;
+  /**
+   * «linea» (4-oct-2026, `FRESCURA_VISIBLE_2026_10`): el botón es TEXTO, como
+   * en Mail —«Actualizado 9:41 ↻» o «Actualizar»—, sin borde. Mismos permisos,
+   * acelerador y avisos. Omitido = el botón de siempre.
+   */
+  variante?: "boton" | "linea";
+  /** Lo que dice la «linea» en reposo. */
+  rotulo?: ReactNode;
+  /** Lo que se ve en lugar del botón para quien no puede actualizar. */
+  sinPermiso?: ReactNode;
 }
 
 const ROLES_DEFAULT = ["admin", "secretaria"];
@@ -101,6 +111,9 @@ export default function SyncNowButton({
   subtext,
   onSuccess,
   className,
+  variante = "boton",
+  rotulo,
+  sinPermiso = null,
 }: SyncNowButtonProps) {
   const [visible, setVisible] = useState(false);
   const [running, setRunning] = useState(false);
@@ -140,7 +153,7 @@ export default function SyncNowButton({
     if (toastTimer.current) clearTimeout(toastTimer.current);
   }, []);
 
-  if (!visible) return null;
+  if (!visible) return <>{sinPermiso}</>;
 
   const showToast = (msg: string, error: boolean) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -264,14 +277,20 @@ export default function SyncNowButton({
         aria-expanded={esMenu ? menuOpen : undefined}
         // min-h-[44px]: aparece en 4 pantallas y medía 32px de alto — bajo el
         // mínimo táctil de la casa.
-        className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
+        className={
+          variante === "linea"
+            ? "inline-flex min-h-[44px] items-center gap-1 text-left text-blue-600 transition hover:text-blue-800 active:opacity-60 disabled:cursor-not-allowed disabled:opacity-50 md:[@media(pointer:fine)]:min-h-0"
+            : "inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
+        }
       >
-        <RefreshCw className={`h-3.5 w-3.5 ${running ? "animate-spin" : ""}`} />
+        {variante !== "linea" && <RefreshCw className={`h-3.5 w-3.5 ${running ? "animate-spin" : ""}`} />}
         {running
           ? progreso
             ? `${TEXTO_ACTUALIZANDO} (${progreso.actual}/${progreso.total})`
             : TEXTO_ACTUALIZANDO
-          : TEXTO_ACTUALIZAR_AHORA}
+          : variante === "linea" && rotulo != null
+            ? rotulo
+            : TEXTO_ACTUALIZAR_AHORA}
       </button>
       {subtext && <span className="mt-0.5 text-[12px] text-gray-400">{subtext}</span>}
 
