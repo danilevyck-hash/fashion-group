@@ -22,6 +22,8 @@ const PESTANAS_VENTAS = [
 ] as const;
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import { PeriodoSelect } from "@/components/multifashion/PeriodoSelect";
+import { PRODUCTOS_FILTROS_2026_10 } from "@/lib/productos/filtros";
+import { usePeriodoProductos } from "@/components/ventas/usePeriodoProductos";
 import { ComisionesPeriodo } from "@/components/comisiones/ComisionesPeriodo";
 import { RESUMEN_MES_2026_10, rotuloDelPeriodo } from "@/lib/ventas/resumen-mes";
 import { VENTAS_APPLE_2026_10 } from "@/lib/ventas/ventas-apple";
@@ -69,6 +71,10 @@ const ResumenView = dynamic(
 );
 const ClientesView = dynamic(
   () => import("@/components/ventas/ClientesView").then((m) => m.ClientesView),
+  { ssr: false, loading: () => <TabSkeleton /> },
+);
+const ProductosFiltros = dynamic(
+  () => import("@/components/ventas/ProductosFiltros").then((m) => m.ProductosFiltros),
   { ssr: false, loading: () => <TabSkeleton /> },
 );
 const ProductosView = dynamic(
@@ -335,6 +341,10 @@ export function VentasShell({
     anotarDescarga("resumen", { alcance: "las-tres", anio: selectedYear });
   }, [resumen, clientes, periodo, selectedYear, anioEnCurso, empresaProductos]);
 
+  // 🔴 PRODUCTOS_FILTROS_2026_10: Productos tiene SU período (‹ Oct 2026 › · Rango).
+  const prod = usePeriodoProductos(loading);
+  const productosNuevo = PRODUCTOS_FILTROS_2026_10 && tab === "productos";
+
   // Pull-to-refresh (mobile): revalida el período actual sin cambiarlo.
   const onRefresh = useCallback(async () => {
     await mutate();
@@ -358,6 +368,7 @@ export function VentasShell({
         activa={tab}
         onPestana={setTab}
         periodo={
+          productosNuevo ? prod.selector :
           RESUMEN_MES_2026_10 && tab === "resumen" ? (
             // El selector de Comisiones: ‹ 2026 › · Todo el año · 12 meses.
             <ComisionesPeriodo
@@ -390,7 +401,7 @@ export function VentasShell({
           encima del TabsList (que tiene overflow-x-auto y crea su propio
           stacking en algunos browsers, tapando los controles del header en
           viewports angostos). */}
-      <header className={`relative z-20 mb-5 flex flex-wrap items-center justify-between gap-3 ${barra ? "hidden" : ""}`}>
+      <header className={`relative z-20 mb-5 flex flex-wrap items-center justify-between gap-3 ${barra || productosNuevo ? "hidden" : ""}`}>
         {/* Sin título grande: "Ventas" ya lo dicen la barra sticky (celular)
             y el breadcrumb (escritorio). Queda sr-only para no dejar la
             página sin encabezado. */}
@@ -498,7 +509,11 @@ export function VentasShell({
           {/* 🔴 SIN `key`: remontar tiraría el buscador y el filtro de cliente
               al cambiar el período. El período le llega por prop y la vista
               vuelve a pedir sola lo suyo (ver su `load`). */}
+          {PRODUCTOS_FILTROS_2026_10 ? (
+            <ProductosFiltros desde={prod.desde} hasta={prod.hasta} periodo={barra ? null : prod.selector} enBarra={barra} />
+          ) : (
           <ProductosView periodo={periodo} anioEnCurso={anioEnCurso} />
+          )}
         </TabsContent>
       </Tabs>
     </main>

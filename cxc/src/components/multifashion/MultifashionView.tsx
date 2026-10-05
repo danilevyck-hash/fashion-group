@@ -28,6 +28,8 @@ import { PESTANAS_MULTIFASHION, type TabMultifashion } from "@/lib/multifashion/
 import { mesDelPeriodo, type CortePeriodo, type Periodo } from "@/lib/multifashion/periodo";
 import { MULTIFASHION_CELULAR, type ClaveRenglon, type PantallaCelular } from "@/lib/multifashion/celular";
 import { cn } from "@/lib/utils";
+import { PRODUCTOS_FILTROS_2026_10 } from "@/lib/productos/filtros";
+import { ProductosFiltrosMf } from "./ProductosFiltrosMf";
 
 // iPhone: los sub-tabs medían 36px de alto (py-2 + text-xs) — por debajo de los
 // 44 de la regla táctil, y son el control que más se toca del módulo. Con
@@ -135,7 +137,11 @@ export function MultifashionView({
           )}
         </TabsContent>
         <TabsContent value="productos" className={enCelular ? "mt-0 sm:mt-5" : "mt-5"}>
-          <ProductosSubtab selectedYear={selectedYear} mes={mes} periodo={periodo} />
+          {PRODUCTOS_FILTROS_2026_10 ? (
+            <ProductosFiltrosMf selectedYear={selectedYear} mes={mes} periodo={periodo} />
+          ) : (
+            <ProductosSubtab selectedYear={selectedYear} mes={mes} periodo={periodo} />
+          )}
         </TabsContent>
         <TabsContent value="clientes" className={enCelular ? "mt-0 sm:mt-5" : "mt-5"}>
           <ClientesMultifashionSubtab selectedYear={selectedYear} mes={mes} periodo={periodo} />

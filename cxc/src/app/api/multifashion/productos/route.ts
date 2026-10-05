@@ -83,6 +83,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
+import { PRODUCTOS_FILTROS_2026_10 } from "@/lib/productos/filtros";
+import { departamentosPorCodigo } from "@/lib/multifashion/productos-filtros";
 import { requireRole } from "@/lib/requireRole";
 import { ROLES_MULTIFASHION } from "@/lib/multifashion/acceso";
 import { supabaseServer } from "@/lib/supabase-server";
@@ -149,6 +151,7 @@ const aliviar = (filas: readonly RenglonRanking[]): RenglonComparativo[] =>
     venta: f.venta,
     utilidad: f.utilidad,
   }));
+
 
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ROLES_MULTIFASHION);
@@ -389,6 +392,15 @@ export async function GET(req: NextRequest) {
       // del spread de `resumen`, que ya trae su propio `marcas`.
       marcas: resumen.marcas.map(m => ({ ...m, grupo: grupoDeDepartamento(m.marca).id })),
       porMarca,
+      // 🔴 PRODUCTOS_FILTROS_2026_10: código → departamento, para los chips comunes.
+      ...(PRODUCTOS_FILTROS_2026_10 && marcaDisponible
+        ? {
+            departamentos: departamentosPorCodigo(
+              filasComp ? [...filas, ...filasComp] : filas,
+              new Map(marcasCanon.filter(m => m.marca_nombre).map(m => [m.articulo_id, m.marca_nombre as string])),
+            ),
+          }
+        : {}),
       ranking: {
         totales: porCategoria.totales,
         categorias: porCategoria.filas,
