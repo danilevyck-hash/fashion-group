@@ -14,10 +14,10 @@
 // módulo, cambio mi opinión de que sea un espejo.»* Y: *«el merge de los tabs no
 // es solo en el cel, sino también en desktop»*.
 //
-// 🔴 LA PRIMERA OPCIÓN SE LLAMA «FASHION GROUP», NO «TODAS». Daniel: *«entonces
-// a, pero en todas pon fashion group para no confundir»*. Con Multifashion en la
-// misma lista, «Todas» se leería como «todas incluyendo Multifashion» — y no lo
-// es.
+// 🔴 LA PRIMERA OPCIÓN SE LLAMA «TODAS» (Daniel, 5-oct-2026). Antes decía
+// «Fashion Group» porque Multifashion iba en la misma lista; desde que
+// Multifashion se fue a su módulo, «Todas» = las 6 del grupo, el MISMO nombre que
+// en todo selector de empresa del sistema (`ROTULO_TODAS`).
 //
 // 🔴 «FASHION GROUP» NO INCLUYE A MULTIFASHION, Y NUNCA SE SUMAN. Son dos
 // comisiones que se calculan DISTINTO: el grupo paga 0,5 % solo sobre las
@@ -32,6 +32,7 @@
 
 import { EMPRESAS_COMISIONAN } from "./empresas";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
+import { ROTULO_TODAS } from "@/lib/ventas/rotulo-empresas";
 
 /** La matriz vendedor × empresa de las 6 del grupo. */
 export const VISTA_GRUPO = "grupo";
@@ -40,8 +41,8 @@ export const VISTA_MULTIFASHION = "american_classic";
 /** La pestaña que se fue al engranaje. No es una empresa. */
 export const VISTA_CONFIG = "config";
 
-/** Cómo se llama la primera opción. NUNCA «Todas» — ver el encabezado. */
-export const ROTULO_GRUPO = "Fashion Group";
+/** Cómo se llama la primera opción: «Todas», como en todo el sistema. */
+export const ROTULO_GRUPO = ROTULO_TODAS;
 
 export interface OpcionVista {
   valor: string;

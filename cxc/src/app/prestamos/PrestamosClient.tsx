@@ -283,7 +283,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
             onChange={e => setFilterEmpresa(e.target.value)}
             className="min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition"
           >
-            <option value="all">Todas las empresas</option>
+            <option value="all">Todas</option>
             {empresas.map(e => <option key={e} value={e}>{e}</option>)}
           </select>
         </div>

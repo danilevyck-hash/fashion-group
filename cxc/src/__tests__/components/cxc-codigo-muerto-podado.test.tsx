@@ -109,7 +109,7 @@ describe("🔴 la tabla del CXC no tiene un segundo juego de filtros", () => {
     pintarTabla();
     expect(document.querySelector("select")).toBeNull();
     const pagina = leer("src/app/cxc/page.tsx");
-    expect((pagina.match(/Todas mis empresas/g) ?? []).length).toBe(1);
+    expect((pagina.match(/<option value="all">Todas<\/option>/g) ?? []).length).toBe(1);
   });
 
   it("la fila pinta el nombre del cliente UNA sola vez", () => {

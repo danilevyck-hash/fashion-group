@@ -32,7 +32,7 @@ import { exportClientesToExcel } from "@/lib/ventas/clientes-excel";
 import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
 import { exportUtilidadToExcel, type UtilidadClienteResponse, type UtilidadClienteRow } from "@/lib/ventas/utilidad-cliente";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
-import { opcionesEmpresaClientes, VALOR_TODAS } from "@/lib/ventas/rotulo-empresas";
+import { opcionesEmpresaClientes, ROTULO_TODAS, VALOR_TODAS } from "@/lib/ventas/rotulo-empresas";
 import { rotuloCompras, rotuloVs, ventanaParaClientes, type PeriodoVentas } from "@/lib/ventas/periodo";
 import { ROTULO_DESCARGAR_EXCEL, anotarDescarga } from "@/lib/ventas/descarga";
 import { textoFrescura } from "@/lib/ventas/frescura";
@@ -57,9 +57,8 @@ const TONE_LIGHT: Record<DeltaTone, string> = {
 // Daniel: «B». Siete chips en una fila —en el celular, cuatro líneas antes del
 // primer cliente— pasan a ser el mismo desplegable del resto del sistema.
 //
-// 🔴 Y LA PRIMERA OPCIÓN DICE «Todas las empresas», no «Fashion Group»: acá las
-// únicas que hay son las 6 del grupo (en Comisiones dice «Fashion Group» porque
-// ahí también está Multifashion). La regla vive en `lib/ventas/rotulo-empresas.ts`,
+// 🔴 Y LA PRIMERA OPCIÓN DICE «Todas», como en todo el sistema (Daniel,
+// 5-oct-2026). La regla vive en `lib/ventas/rotulo-empresas.ts`,
 // y las seis se DERIVAN de `B2B_EMPRESA_KEYS` — nunca una lista escrita a mano:
 // así fue como faltó Joystep hasta el 2-sep-2026. Boston y Multifashion no
 // están porque no son del grupo; sus clientes viven en su propio módulo.
@@ -549,7 +548,7 @@ export function ClientesView({
   if (enCelular && !enUtilidad) {
     const hoy = hoyPanama();
     const rotuloEmpresa =
-      EMPRESA_OPCIONES.find((o) => o.valor === empresa)?.etiqueta ?? "Todas las empresas";
+      EMPRESA_OPCIONES.find((o) => o.valor === empresa)?.etiqueta ?? ROTULO_TODAS;
     const sinCompras = bloques.enCero.length;
     return (
       <>

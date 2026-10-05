@@ -265,7 +265,7 @@ export default function PanelCxcCelular({
           disabled={!!empresaRestriction || cxcCompanies.length <= 1}
           className="mt-0.5 min-h-[44px] -ml-1 px-1 text-[15px] text-gray-500 active:opacity-60 disabled:opacity-100"
         >
-          {empresaElegida ?? "Todas mis empresas"}
+          {empresaElegida ?? "Todas"}
           {!empresaRestriction && cxcCompanies.length > 1 && " ▾"}
         </button>
       </div>

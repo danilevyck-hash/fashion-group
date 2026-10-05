@@ -82,7 +82,7 @@ describe("Préstamos · los 5 controles medidos por debajo de 44", () => {
   });
 
   it("el selector de empresa llega a 44 (medía 39)", () => {
-    const i = lista.indexOf('<option value="all">Todas las empresas</option>');
+    const i = lista.indexOf('<option value="all">Todas</option>');
     expect(i).toBeGreaterThan(-1);
     expect(lista.slice(i - 400, i)).toContain("min-h-[44px]");
   });

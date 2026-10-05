@@ -224,7 +224,7 @@ describe("las DOS vistas siguen ahí — «Fashion Group» y una empresa suelta"
     expect(within(tabla).getByText("Vistana")).toBeTruthy();
     expect(within(tabla).getByText("Fashion Wear")).toBeTruthy();
     // Y el selector dice dónde estás parado, con el rótulo que eligió Daniel.
-    expect(screen.getByLabelText("Empresa").textContent).toContain("Fashion Group");
+    expect(screen.getByLabelText("Empresa").textContent).toContain("Todas");
   });
 
   it("el modo viejo «empresa» abre la última empresa usada", async () => {

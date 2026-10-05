@@ -518,7 +518,7 @@ function MobileEmpresaSelect({
         disabled={disabled}
         className="w-full appearance-none rounded-lg border border-gray-200 bg-white min-h-[44px] pl-3 pr-8 text-sm text-gray-900 focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-400 disabled:opacity-60"
       >
-        <option value="all">Todas mis empresas</option>
+        <option value="all">Todas</option>
         {options.map(o => (
           <option key={o.key} value={o.key}>{o.name}</option>
         ))}

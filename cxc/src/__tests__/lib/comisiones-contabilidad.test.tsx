@@ -365,7 +365,7 @@ describe("contabilidad ENTRA a /comisiones y la pantalla renderiza con datos", (
     // 🔄 6-sep-2026: eran dos PESTAÑAS («Todas las empresas» / «Por empresa») y
     // hoy son dos opciones del único selector — Daniel: «opino eliminar los tabs».
     const selector = await screen.findByLabelText("Empresa");
-    expect(selector.textContent).toContain("Fashion Group");
+    expect(selector.textContent).toContain("Todas");
     // 2) Y llegó el DATO, no un esqueleto: el vendedor y su comisión.
     await waitFor(() => expect(screen.getAllByText(/REINALDO ESPINOSA/i).length).toBeGreaterThan(0), { timeout: 5000 });
     expect(screen.getAllByText(/1,234\.56/).length).toBeGreaterThan(0);

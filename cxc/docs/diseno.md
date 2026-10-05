@@ -84,6 +84,10 @@ Daniel, 2-oct-2026: *«cada vez que encontramos algo así de detalle, para que s
   - Arreglo común en `globals.css`: el envoltorio de Radix deshace la escala y su contenido la vuelve a poner. Lo propio de la casa ya dividía entre la escala (`escala-raiz.ts`).
   - Un selector arriba a la derecha abre alineado a la derecha de su botón (`align="end"`).
   - Medido en Chrome y WebKit a 1440 y 1920; Guías, Ventas y Comisiones (390 y 1440) ya cambiaban de mes bien. Candado `escala-flotantes.test.tsx`.
+- **La ✕ de un chip quita ese filtro, y solo ese** (Daniel, 5-oct-2026, en Multifashion › Productos en la computadora: *«Calvin Klein ✕ · Accessories ✕ · Hombre ✕ · Men-Bags ✕»* y tocar la ✕ no hacía nada). Causa: el chip agranda su toque a 44 px con un `::before` absoluto (`CHIP_V4`), y ese velo quedaba ENCIMA de la ✕; el clic caía en el chip y abría la lista.
+  - Todo lo que se toca DENTRO de un chip o un botón con `::before` va posicionado encima (`relative z-[1]`).
+  - Quitar o cambiar un chip suelta los que dependían de él y quedan sin opción (`podarElegidos`); los que siguen siendo válidos se quedan.
+  - Arreglado en la pantalla común (`ChipLista`): Ventas › Productos y Multifashion › Productos, en celular y computadora. Candado `productos-chip-quitar.test.tsx`.
 
 ## Mockup: siempre, con capturas reales
 

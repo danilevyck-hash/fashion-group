@@ -161,7 +161,7 @@ describe("🔴 el ⚙ «Configuración»: solo admin, solo en el módulo /comisi
     render(<ComisionesView availableYears={[2026]} />);
     const selector = await screen.findByLabelText("Empresa");
     expect(screen.queryByRole("button", { name: "Configuración", exact: true })).toBeNull();
-    expect(selector.textContent).toContain("Fashion Group");
+    expect(selector.textContent).toContain("Todas");
     await screen.findByRole("table");
   });
 

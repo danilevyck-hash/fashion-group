@@ -121,7 +121,7 @@ describe("Ventas › Clientes — el iPad deja de recibir la tabla de escritorio
     // (🔁 11-sep-2026: el rótulo se arma en `rotulo-empresas.ts`, y la primera
     // opción dice «Todas las empresas» por la regla `rotuloDeTodas`.)
     expect(rotulos).toContain("nombreCortoEmpresa(k)");
-    expect(rotulos).toContain("rotuloDeTodas(B2B_EMPRESA_KEYS)");
+    expect(rotulos).toContain("etiqueta: ROTULO_TODAS");
     expect(clientes).not.toMatch(/label:\s*"Vistana International"/);
     expect(rotulos).not.toMatch(/etiqueta:\s*"Vistana International"/);
     // Ningún rótulo abreviado a mano: si alguien vuelve a escribirlos, vuelve a

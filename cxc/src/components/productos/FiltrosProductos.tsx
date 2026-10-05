@@ -23,10 +23,10 @@ import { fmtPorcentaje } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
 import {
   coberturaDe,
-  diasDeInventario,
   filtrarArticulos,
   hayFiltro,
   opcionesDe,
+  podarElegidos,
   partesDelCodigo,
   porDescripcion,
   totalesDe,
@@ -76,7 +76,9 @@ export function ChipLista({
             role="button"
             aria-label={`Quitar ${etiqueta}`}
             onClick={e => { e.stopPropagation(); onCambiar(""); }}
-            className="-mr-1 inline-flex h-5 w-5 items-center justify-center rounded-full hover:bg-white/20"
+            // 🔴 `relative z-[1]`: el ::before de CHIP_V4 (absoluto, para los 44 px
+            // de toque) tapaba la ✕ y el clic abría la lista (Daniel, 5-oct-2026).
+            className="relative z-[1] -mr-1 inline-flex h-5 w-5 items-center justify-center rounded-full hover:bg-white/20"
           >
             <X className="h-3.5 w-3.5" />
           </span>
@@ -146,9 +148,8 @@ export interface PantallaProductosProps {
   antesCelular?: ReactNode;
   /** Al final de la línea en la computadora (frescura). */
   despues?: ReactNode;
-  /** Ventas: existencia, días de inventario y los dos chips de atención. */
+  /** Con inventario: la columna «Stock» y los dos chips de atención. */
   conInventario: boolean;
-  diasPeriodo: number;
   /** Sin ningún filtro, los totales de siempre (el Resumen). */
   totalesSinFiltro?: TotalesFiltro | null;
   notaTotales?: ReactNode;
@@ -211,7 +212,11 @@ export function PantallaProductos(p: PantallaProductosProps) {
     </button>
   );
 
-  const elegir = (campo: string, v: string) => { setElegidos(e => ({ ...e, [campo]: v })); setVisibles(TANDA); setAbierta(null); };
+  // Quitar o cambiar un chip limpia los que dependían de él y quedan sin opción.
+  const elegir = (campo: string, v: string) => {
+    setElegidos(e => podarElegidos(delModo, codigo, { ...e, [campo]: v }, campo));
+    setVisibles(TANDA); setAbierta(null);
+  };
 
   const chipsNodo = (
     <>
@@ -288,7 +293,7 @@ export function PantallaProductos(p: PantallaProductosProps) {
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
             <p data-totales-productos className="text-sm text-gray-600">
               {modo === "sin90" ? (
-                <>Existencia <b className="font-mono tabular-nums text-gray-900">{fmtU(existenciaTotal)}</b> u en <b className="font-mono tabular-nums text-gray-900">{fmtU(filtrados.length)}</b> artículos</>
+                <>Stock <b className="font-mono tabular-nums text-gray-900">{fmtU(existenciaTotal)}</b> u en <b className="font-mono tabular-nums text-gray-900">{fmtU(filtrados.length)}</b> artículos</>
               ) : (
                 <>
                   <b className="font-mono tabular-nums text-gray-900">{fmtU(totales.unidades)}</b> unidades
@@ -319,7 +324,6 @@ export function PantallaProductos(p: PantallaProductosProps) {
               abierta={abierta}
               onAbrir={d => setAbierta(a => (a === d ? null : d))}
               conInventario={p.conInventario}
-              diasPeriodo={p.diasPeriodo}
               vacio={filtro ? "Sin resultados para este filtro." : "Sin ventas en el período."}
             />
           )}
@@ -331,8 +335,8 @@ export function PantallaProductos(p: PantallaProductosProps) {
 
 // ── La lista ────────────────────────────────────────────────────────────────
 
-function Cifras({ unidades, venta, margen, existencia, dias, conInventario, className = "" }: {
-  unidades: number; venta: number; margen: number | null; existencia: number | null; dias: number | null;
+function Cifras({ unidades, venta, margen, existencia, conInventario, className = "" }: {
+  unidades: number; venta: number; margen: number | null; existencia: number | null;
   conInventario: boolean; className?: string;
 }) {
   return (
@@ -341,10 +345,7 @@ function Cifras({ unidades, venta, margen, existencia, dias, conInventario, clas
       <td className={cn("px-3 py-2.5 text-right font-mono tabular-nums", className)}>{fmtMoney(venta)}</td>
       <td className={cn("px-3 py-2.5 text-right font-mono tabular-nums", className)}>{fmtPorcentaje(margen)}</td>
       {conInventario && (
-        <>
-          <td className={cn("px-3 py-2.5 text-right font-mono tabular-nums", className)}>{existencia == null ? "—" : fmtU(existencia)}</td>
-          <td className={cn("px-3 py-2.5 text-right font-mono tabular-nums", className)}>{dias == null ? "—" : `${fmtU(dias)} d`}</td>
-        </>
+        <td className={cn("px-3 py-2.5 text-right font-mono tabular-nums", className)}>{existencia == null ? "—" : fmtU(existencia)}</td>
       )}
     </>
   );
@@ -368,12 +369,11 @@ function NombreCodigo({ a }: { a: ArticuloVendido }) {
   );
 }
 
-function ListaPorDescripcion({ renglones, total, onVerMas, abierta, onAbrir, conInventario, diasPeriodo, vacio }: {
+function ListaPorDescripcion({ renglones, total, onVerMas, abierta, onAbrir, conInventario, vacio }: {
   renglones: RenglonDescripcion[]; total: number; onVerMas: () => void;
   abierta: string | null; onAbrir: (d: string) => void;
-  conInventario: boolean; diasPeriodo: number; vacio: string;
+  conInventario: boolean; vacio: string;
 }) {
-  const dias = (existencia: number | null, unidades: number) => diasDeInventario(existencia, unidades, diasPeriodo);
   if (renglones.length === 0) {
     return <p className="rounded-lg border border-gray-200 bg-white px-3 py-8 text-center text-sm text-gray-500">{vacio}</p>;
   }
@@ -388,13 +388,12 @@ function ListaPorDescripcion({ renglones, total, onVerMas, abierta, onAbrir, con
               <th className="px-3 py-2.5 text-right font-normal">Unidades</th>
               <th className="px-3 py-2.5 text-right font-normal">Venta</th>
               <th className="px-3 py-2.5 text-right font-normal">Margen</th>
-              {conInventario && <th className="px-3 py-2.5 text-right font-normal">Existencia</th>}
-              {conInventario && <th className="px-3 py-2.5 text-right font-normal">Días de inventario</th>}
+              {conInventario && <th className="px-3 py-2.5 text-right font-normal">Stock</th>}
             </tr>
           </thead>
           <tbody>
             {renglones.map(r => (
-              <FilaDescripcion key={r.descripcion} r={r} abierta={abierta === r.descripcion} onAbrir={() => onAbrir(r.descripcion)} conInventario={conInventario} dias={dias} />
+              <FilaDescripcion key={r.descripcion} r={r} abierta={abierta === r.descripcion} onAbrir={() => onAbrir(r.descripcion)} conInventario={conInventario} />
             ))}
           </tbody>
         </table>
@@ -412,7 +411,7 @@ function ListaPorDescripcion({ renglones, total, onVerMas, abierta, onAbrir, con
                 </span>
                 <span className="block text-xs text-gray-500">
                   {fmtU(r.unidades)} u · margen {fmtPorcentaje(r.margen)}
-                  {conInventario && <> · exist. {r.existencia == null ? "—" : fmtU(r.existencia)} · {(() => { const d = dias(r.existencia, r.unidades); return d == null ? "—" : `${fmtU(d)} d`; })()}</>}
+                  {conInventario && <> · stock {r.existencia == null ? "—" : fmtU(r.existencia)}</>}
                 </span>
               </span>
             </button>
@@ -423,7 +422,7 @@ function ListaPorDescripcion({ renglones, total, onVerMas, abierta, onAbrir, con
                     <NombreCodigo a={a} />
                     <span className="shrink-0 text-right text-xs text-gray-500">
                       <span className="block font-mono text-[13px] tabular-nums text-gray-900">{fmtMoney(a.venta)}</span>
-                      {fmtU(a.unidades)} u{conInventario && <> · exist. {a.existencia == null ? "—" : fmtU(a.existencia)}</>}
+                      {fmtU(a.unidades)} u{conInventario && <> · stock {a.existencia == null ? "—" : fmtU(a.existencia)}</>}
                     </span>
                   </li>
                 ))}
@@ -441,9 +440,8 @@ function ListaPorDescripcion({ renglones, total, onVerMas, abierta, onAbrir, con
   );
 }
 
-function FilaDescripcion({ r, abierta, onAbrir, conInventario, dias }: {
+function FilaDescripcion({ r, abierta, onAbrir, conInventario }: {
   r: RenglonDescripcion; abierta: boolean; onAbrir: () => void; conInventario: boolean;
-  dias: (e: number | null, u: number) => number | null;
 }) {
   return (
     <>
@@ -455,14 +453,14 @@ function FilaDescripcion({ r, abierta, onAbrir, conInventario, dias }: {
             <span className="text-xs text-gray-400">{r.articulos.length}</span>
           </span>
         </td>
-        <Cifras unidades={r.unidades} venta={r.venta} margen={r.margen} existencia={r.existencia} dias={dias(r.existencia, r.unidades)} conInventario={conInventario} className="text-gray-900" />
+        <Cifras unidades={r.unidades} venta={r.venta} margen={r.margen} existencia={r.existencia} conInventario={conInventario} className="text-gray-900" />
       </tr>
       {abierta && r.articulos.map(a => {
         const t = totalesDe([a]);
         return (
           <tr key={a.codigo} data-articulo className="border-b border-gray-100 bg-gray-50/60">
             <td className="py-1.5 pl-10 pr-3"><NombreCodigo a={a} /></td>
-            <Cifras unidades={a.unidades} venta={a.venta} margen={t.margen} existencia={a.existencia ?? null} dias={dias(a.existencia ?? null, a.unidades)} conInventario={conInventario} className="py-1.5 text-gray-700" />
+            <Cifras unidades={a.unidades} venta={a.venta} margen={t.margen} existencia={a.existencia ?? null} conInventario={conInventario} className="py-1.5 text-gray-700" />
           </tr>
         );
       })}

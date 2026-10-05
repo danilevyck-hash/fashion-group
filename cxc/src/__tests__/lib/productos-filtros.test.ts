@@ -11,7 +11,6 @@ import {
   PRODUCTOS_FILTROS_2026_10,
   coberturaDe,
   departamentoSinMarca,
-  diasDeInventario,
   filtrarArticulos,
   generoDe,
   opcionesDe,
@@ -85,11 +84,6 @@ describe("departamento, género, color y días", () => {
   it("color = los 3 últimos caracteres del código", () => {
     expect(partesDelCodigo("MW0MW38616DW5")).toEqual({ modelo: "MW0MW38616", color: "DW5" });
     expect(partesDelCodigo("FW0FW06158-DW5")).toEqual({ modelo: "FW0FW06158", color: "DW5" });
-  });
-  it("días de inventario = existencia ÷ venta diaria", () => {
-    expect(diasDeInventario(30, 10, 30)).toBe(90);
-    expect(diasDeInventario(5, 0, 30)).toBeNull();
-    expect(diasDeInventario(0, 4, 30)).toBe(0);
   });
 });
 

@@ -58,8 +58,8 @@ vi.mock("@/lib/supabase-paginado", () => ({
 import { B2B_EMPRESA_KEYS, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 import {
-  ROTULO_FASHION_GROUP, ROTULO_TODAS_LAS_EMPRESAS, VALOR_TODAS,
-  opcionesEmpresaClientes, rotuloDeTodas,
+  ROTULO_TODAS, ROTULO_TODAS_LAS_EMPRESAS, VALOR_TODAS,
+  opcionesEmpresaClientes,
 } from "@/lib/ventas/rotulo-empresas";
 import { MODOS_CLIENTES, modoHeredado } from "@/lib/ventas/pestanas";
 import { rotuloCompras, rotuloVs } from "@/lib/ventas/periodo";
@@ -95,22 +95,12 @@ beforeEach(() => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("a · cómo se llama «todas» depende de la lista, no de la pantalla", () => {
-  it("🔴 solo las 6 del grupo → «Todas las empresas» (el caso de Ventas › Clientes)", () => {
-    expect(rotuloDeTodas(B2B_EMPRESA_KEYS)).toBe(ROTULO_TODAS_LAS_EMPRESAS);
-    expect(ROTULO_TODAS_LAS_EMPRESAS).toBe("Todas las empresas");
+  it("🔴 UN solo nombre en todo el sistema: «Todas» (Daniel, 5-oct-2026)", () => {
+    expect(ROTULO_TODAS).toBe("Todas");
+    expect(ROTULO_TODAS_LAS_EMPRESAS).toBe(ROTULO_TODAS);
   });
 
-  it("🔴 el grupo MÁS Multifashion → «Fashion Group» (el caso de Comisiones)", () => {
-    expect(rotuloDeTodas([...EMPRESAS_COMISIONAN, "american_classic"])).toBe(ROTULO_FASHION_GROUP);
-    expect(ROTULO_FASHION_GROUP).toBe("Fashion Group");
-  });
-
-  it("CONTROL — las dos frases no son la misma, y una lista vacía no nombra ningún grupo", () => {
-    expect(ROTULO_TODAS_LAS_EMPRESAS).not.toBe(ROTULO_FASHION_GROUP);
-    expect(rotuloDeTodas([])).toBe(ROTULO_TODAS_LAS_EMPRESAS);
-  });
-
-  it("las opciones del desplegable: «Todas las empresas» + las 6 con nombre corto, sin Boston ni Multifashion", () => {
+  it("las opciones del desplegable: «Todas» + las 6 con nombre corto, sin Boston ni Multifashion", () => {
     const opciones = opcionesEmpresaClientes();
     expect(opciones[0]).toEqual({ valor: VALOR_TODAS, etiqueta: ROTULO_TODAS_LAS_EMPRESAS });
     expect(opciones.slice(1)).toEqual(

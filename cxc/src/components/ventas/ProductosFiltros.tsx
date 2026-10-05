@@ -2,7 +2,7 @@
 
 // Ventas › Productos con la pantalla común (PRODUCTOS_FILTROS_2026_10).
 // Empresa ▾ (Todas o una de las 6, la última recordada) · Departamento ▾ ·
-// Género ▾ · Descripción ▾ · 🔍 código. Existencia, días de inventario y los dos
+// Género ▾ · Descripción ▾ · 🔍 código. Stock y los dos
 // chips de atención («Sin venta en 90 días» · «Agotados»).
 
 import { useMemo, type ReactNode } from "react";
@@ -19,7 +19,7 @@ import {
 } from "@/lib/ventas/productos";
 import { anotarDescarga } from "@/lib/ventas/descarga";
 import { textoCuadreProductos, type CuadreProductos } from "@/lib/ventas/una-sola-venta";
-import { diasEntre, type ArticuloVendido, type ChipFiltro, type TotalesFiltro } from "@/lib/productos/filtros";
+import { type ArticuloVendido, type ChipFiltro, type TotalesFiltro } from "@/lib/productos/filtros";
 
 const CHIPS_VENTAS: ChipFiltro[] = [
   { campo: "departamento", etiqueta: "Departamento" },
@@ -78,7 +78,6 @@ export function ProductosFiltros({ desde, hasta, periodo, enBarra }: {
       antesCelular={chipEmpresa}
       despues={<FrescuraVentasCel forma="computadora" onActualizado={() => void mutate()} />}
       conInventario
-      diasPeriodo={diasEntre(desde, hasta)}
       totalesSinFiltro={totalesSinFiltro}
       notaTotales={nota ? <> <Ayuda titulo="Información">{nota}</Ayuda></> : null}
       enBarra={enBarra}

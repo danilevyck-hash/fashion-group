@@ -9,7 +9,6 @@ import { useMemo } from "react";
 import useSWR from "swr";
 import { PantallaProductos } from "@/components/productos/FiltrosProductos";
 import { CHIPS_MULTIFASHION, articulosMultifashion, type DepartamentosPorCodigo } from "@/lib/multifashion/productos-filtros";
-import { diasEntre } from "@/lib/productos/filtros";
 import type { RenglonRanking } from "@/lib/multifashion/productos-ranking";
 import type { Periodo } from "@/lib/multifashion/periodo";
 
@@ -45,7 +44,6 @@ export function ProductosFiltrosMf({ selectedYear, mes, periodo }: { selectedYea
       onReintentar={() => void mutate()}
       chips={CHIPS_MULTIFASHION}
       conInventario={false}
-      diasPeriodo={data ? diasEntre(data.desde, data.hasta) : 30}
     />
   );
 }

@@ -101,6 +101,28 @@ export function opcionesDe(
   return [...venta.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0])).map(([v]) => v);
 }
 
+/**
+ * Después de quitar o cambiar un chip: suelta los demás elegidos que ya no tienen
+ * opción (Marca «Tommy» → el Departamento «Calvin Klein Jeans» se va). El chip que
+ * se acaba de tocar (`fijo`) se respeta. Repite hasta que nada cambie.
+ */
+export function podarElegidos(
+  articulos: readonly ArticuloVendido[],
+  codigo: string,
+  elegidos: Elegidos,
+  fijo?: string,
+): Elegidos {
+  const out: Elegidos = Object.fromEntries(Object.entries(elegidos).filter(([, v]) => v));
+  for (let cambio = true; cambio;) {
+    cambio = false;
+    for (const campo of Object.keys(out)) {
+      if (campo === fijo) continue;
+      if (!opcionesDe(articulos, campo, codigo, out).includes(out[campo])) { delete out[campo]; cambio = true; }
+    }
+  }
+  return out;
+}
+
 /** Qué parte de la venta tiene valor en el campo (0..1). Sin venta, 1. */
 export function coberturaDe(articulos: readonly ArticuloVendido[], campo: string): number {
   let total = 0, con = 0;
@@ -157,20 +179,6 @@ export function porDescripcion(articulos: readonly ArticuloVendido[]): RenglonDe
     });
   }
   return out.sort((a, b) => b.venta - a.venta || (b.existencia ?? 0) - (a.existencia ?? 0) || a.descripcion.localeCompare(b.descripcion));
-}
-
-/**
- * Días de inventario: la existencia ÷ lo que se vende por día en el período.
- * `null` sin existencia o sin unidades vendidas (no se puede medir).
- */
-export function diasDeInventario(existencia: number | null | undefined, unidades: number, diasPeriodo: number): number | null {
-  if (existencia == null || existencia <= 0 || unidades <= 0 || diasPeriodo <= 0) return existencia === 0 ? 0 : null;
-  return Math.round(existencia / (unidades / diasPeriodo));
-}
-
-/** Días de calendario entre dos fechas `YYYY-MM-DD`, ambas incluidas. */
-export function diasEntre(desde: string, hasta: string): number {
-  return Math.round((Date.parse(`${hasta}T00:00:00Z`) - Date.parse(`${desde}T00:00:00Z`)) / 86_400_000) + 1;
 }
 
 // ── Departamento y género ───────────────────────────────────────────────────

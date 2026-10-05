@@ -112,15 +112,15 @@ describe("b · el filtro de empresa es UN desplegable, y no quedan píldoras", (
     expect(triggers[0].className).toContain("h-11");
   });
 
-  it("abierto, ofrece «Todas las empresas» y las seis del grupo con nombre corto", async () => {
+  it("abierto, ofrece «Todas» y las seis del grupo con nombre corto", async () => {
     pintar();
     fireEvent.keyDown(document.querySelector("[data-empresa-clientes]") as HTMLElement, { key: "ArrowDown" });
     await screen.findByRole("option", { name: ROTULO_TODAS_LAS_EMPRESAS });
     const opciones = screen.getAllByRole("option").map((o) => (o.textContent ?? "").trim());
     expect(opciones).toEqual([ROTULO_TODAS_LAS_EMPRESAS, ...B2B_EMPRESA_KEYS.map((k) => nombreCortoEmpresa(k))]);
-    // Y NO dice «Fashion Group»: acá las únicas que hay son las del grupo.
+    // Y NO dice «Fashion Group» ni «Todas las empresas»: «Todas», como en todo el sistema.
     expect(opciones).not.toContain("Fashion Group");
-    expect(opciones).not.toContain("Todas");
+    expect(opciones).not.toContain("Todas las empresas");
   });
 
   it("🩸 no queda ni una píldora de empresa ni el desplegable del universo", () => {

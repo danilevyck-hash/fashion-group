@@ -812,7 +812,7 @@ function AdminDashboardInner() {
             aria-label="Empresa"
             className="border border-gray-200 rounded-lg px-3 min-h-[44px] text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 bg-white disabled:opacity-60"
           >
-            <option value="all">Todas mis empresas</option>
+            <option value="all">Todas</option>
             {cxcCompanies.map((co) => <option key={co.key} value={co.key}>{co.name}</option>)}
           </select>
         )}

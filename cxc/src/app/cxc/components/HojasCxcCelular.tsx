@@ -71,7 +71,7 @@ export function HojaElegirEmpresa({
   onElegir: (key: string) => void;
   onCerrar: () => void;
 }) {
-  const opciones = [{ key: "all", name: "Todas mis empresas" }, ...empresas];
+  const opciones = [{ key: "all", name: "Todas" }, ...empresas];
   return (
     <Hoja titulo="Seleccionar empresa" onCerrar={onCerrar}>
       <ul className="divide-y divide-gray-100">
