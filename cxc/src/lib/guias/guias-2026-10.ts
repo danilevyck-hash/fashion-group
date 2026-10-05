@@ -73,3 +73,11 @@ export const GUIA_DETALLE_APPLE_2026_10 = false;
  *  Necesita la migración `20261226120000` (factura opcional); sin ella el
  *  servidor contesta 503 y lo dice. `false` = Etiquetas como hoy. */
 export const ETIQUETAS_TRASLADO_2026_10 = true;
+
+/** 🔴 NUEVA GUÍA › «+ AGREGAR TRASLADO» (5-oct-2026, Daniel: «toda sugerencia
+ *  tuya es aceptada»). Al lado de «+ Agregar factura», mismo estilo: Cliente
+ *  (también a mano) · Contenido · Bultos · Destino («el de siempre») · «Empresa:
+ *  Ninguna ▾». Sale como tarjeta con el chip «Traslado». Se guarda IGUAL que
+ *  antes: `Traslado` en facturas y «Traslado <cliente>: <contenido>» en
+ *  Observaciones. `false` = el enlace gris «Traslado» dentro de «+ Agregar factura». */
+export const GUIA_AGREGAR_TRASLADO_2026_10 = true;

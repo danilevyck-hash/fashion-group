@@ -203,7 +203,13 @@ export function contenidoDelTraslado(envio: Pick<Envio, "filas">): string | null
 /** La línea que el traslado deja en Observaciones de la guía. */
 export function lineaDeTraslado(envio: Pick<Envio, "filas" | "cliente_nombre">): string | null {
   const c = contenidoDelTraslado(envio);
-  return c ? `${TEXTO_TRASLADO} ${envio.cliente_nombre.trim()}: ${c}` : null;
+  return c ? lineaDeTrasladoDe(envio.cliente_nombre, c) : null;
+}
+
+/** «Traslado <cliente>: <contenido>» — la MISMA regla para el envío etiquetado
+ *  y para «+ Agregar traslado» de Nueva guía. */
+export function lineaDeTrasladoDe(cliente: string, contenido: string): string {
+  return `${TEXTO_TRASLADO} ${cliente.trim()}: ${contenido.trim()}`;
 }
 
 /**

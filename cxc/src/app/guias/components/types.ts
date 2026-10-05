@@ -33,6 +33,12 @@ export interface GuiaItem {
   bultos_corregido_en?: string | null;
   numero_guia_transp: string;
   /**
+   * El contenido de un traslado agregado con «+ Agregar traslado» (5-oct-2026).
+   * Solo en pantalla: NO es columna, la API lo ignora. Sirve para la tarjeta y
+   * para sacar su línea de Observaciones al quitarlo.
+   */
+  contenido_traslado?: string;
+  /**
    * 🔴 ESTE RENGLÓN ES UN ENVÍO ETIQUETADO (1-oct-2026): sus bultos son el total
    * de sus etiquetas y NO se editan —ni en Nueva guía ni en el despacho de
    * bodega—. En Nueva guía lo pone `marcarEnvio`; en una guía guardada lo

@@ -2410,3 +2410,12 @@ Interruptor `GUIAS_LISTA_APPLE_2026_10` en `lib/guias/lista-apple-2026-10.ts`, *
 - **Etiquetas › envíos**: arriba «4 envíos hoy · 1 pendiente de guía» (los chips dejan de contar); en el celular, tarjetas de dos líneas en vez de la tabla de 720 px con arrastre lateral.
 - ⚠️ «Vincular cliente» vivía solo en el acordeón: con el interruptor prendido, el cliente se corrige con «Editar» en el detalle (permitido también en una despachada).
 - Candado `guias-lista-apple-2026-10`.
+
+## Nueva guía › «+ Agregar traslado» (5-oct-2026)
+
+Daniel aprobó (5-oct-2026, *«toda sugerencia tuya es aceptada»*). Interruptor `GUIA_AGREGAR_TRASLADO_2026_10` en `lib/guias/guias-2026-10.ts`, **`true`**; `false` = el enlace gris «Traslado» dentro de «+ Agregar factura», como antes.
+- **Cómo era**: el traslado de Nueva guía era un enlace gris «Traslado» escondido en el pie de `AgregarSinEtiquetas`, y solo aparecía después de elegir un cliente del directorio. Abría un renglón vacío con `Traslado` en facturas y el contenido se escribía a mano en Observaciones.
+- **Hoy**: «+ Agregar traslado» va al lado de «+ Agregar factura», con el mismo estilo y nivel (`EnviosApple`). Abre `AgregarTraslado`, con los MISMOS campos que el traslado de Etiquetas: Cliente (también escrito a mano, `permitirOtro`) · Contenido (≤ 15, mayúsculas, `normalizarNota`) · Bultos · Destino (prellenado con «el de siempre») · «Empresa: Ninguna ▾» opcional. Lo que falta sale todo junto al tocar «Agregar a la guía». Se abre un panel a la vez. Sale como tarjeta con el chip «Traslado». Si en la guía solo hay traslados, no se dibuja el título «Facturas · Sin etiqueta». Lo mismo en el celular: es el mismo componente.
+- 🔴 **Se guarda IGUAL**: un renglón con el TEXTO `Traslado` en facturas, empresa `""` con «Ninguna» o el nombre canónico, y en Observaciones la línea «Traslado <cliente>: <contenido>». Es la MISMA regla del envío etiquetado: `lineaDeTraslado` y el nuevo `lineaDeTrasladoDe` son una sola función. Lo escrito a mano en Observaciones no se pisa (`observacionesConTraslado`). Al quitar la tarjeta (✕), sale su línea. `contenido_traslado` vive solo en pantalla (`GuiaItem`), porque la API arma las filas campo por campo. Sin migración.
+- ⚠️ La pantalla de una tabla (`DetalleDeEnvio`, `GUIA_APPLE_2026_10 = false`) también pierde el enlace gris y no tiene el botón nuevo: hoy está apagada.
+- Candado `components/guias-agregar-traslado` (payload, línea idéntica a la del envío etiquetado, chip, quitar saca la línea, falta todo junto, sin el enlace gris).

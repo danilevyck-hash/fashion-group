@@ -17,8 +17,9 @@
 //     con su envío, arriba, con sus bultos impresos (`etiquetaPendienteDeLaFactura`).
 //   · «Ya está en la guía» — ya la lleva un renglón de esta guía.
 //
-// Siguen los dos caminos de siempre: «Traslado» y «Escribir a mano» (también
-// para un cliente que no está en el directorio).
+// Sigue «Escribir a mano» (también para un cliente que no está en el
+// directorio). 🔴 5-oct-2026 (`GUIA_AGREGAR_TRASLADO_2026_10`): el enlace gris
+// «Traslado» se fue: ahora es «+ Agregar traslado», al lado de este botón.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useState } from "react";
@@ -41,6 +42,7 @@ import {
 import { etiquetaPendienteDeLaFactura } from "@/lib/guias/anti-doble-captura";
 import { rotuloGuia, type EtiquetaFila } from "@/lib/guias/etiquetas";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
+import { GUIA_AGREGAR_TRASLADO_2026_10 } from "@/lib/guias/guias-2026-10";
 import { emptyItem } from "./constants";
 import type { GuiaItem } from "./types";
 
@@ -62,6 +64,19 @@ interface Props {
   onCerrar: () => void;
   clientesTop?: ClienteHit[];
   destinoAutollenadoDe?: (codigo: string) => string | null;
+}
+
+/**
+ * Pone `nuevo` en la primera fila vacía (la guía nace con una) o lo suma al
+ * final. Devuelve la lista y el `uid` con que quedó.
+ */
+export function conRenglonNuevo(items: readonly GuiaItem[], nuevo: GuiaItem): { items: GuiaItem[]; uid: string | undefined } {
+  const vacia = items.findIndex(
+    (r) => !r.cliente && !r.direccion && !r.empresa && !r.facturas && !(r.bultos > 0),
+  );
+  if (vacia < 0) return { items: [...items, nuevo], uid: nuevo.uid };
+  const uid = items[vacia].uid ?? nuevo.uid;
+  return { items: items.map((r, i) => (i === vacia ? { ...nuevo, uid } : r)), uid };
 }
 
 /** ¿Por qué no se puede marcar? `null` = se puede. */
@@ -181,12 +196,7 @@ export default function AgregarSinEtiquetas({
       direccion: cliente ? (destinoAutollenadoDe?.(cliente.codigo) ?? "") : "",
       facturas: facturasTexto,
     };
-    const vacia = items.findIndex(
-      (r) => !r.cliente && !r.direccion && !r.empresa && !r.facturas && !(r.bultos > 0),
-    );
-    const siguiente =
-      vacia >= 0 ? items.map((r, i) => (i === vacia ? { ...nuevo, uid: r.uid ?? nuevo.uid } : r)) : [...items, nuevo];
-    const uid = vacia >= 0 ? (items[vacia].uid ?? nuevo.uid) : nuevo.uid;
+    const { items: siguiente, uid } = conRenglonNuevo(items, nuevo);
     onReemplazarItems(siguiente);
     if (uid) onEditar(uid);
     onCerrar();
@@ -327,7 +337,7 @@ export default function AgregarSinEtiquetas({
       )}
 
       <div className="mt-3 flex flex-wrap items-center gap-x-2 border-t border-gray-100 pt-1 text-xs text-gray-400">
-        {cliente && (
+        {cliente && !GUIA_AGREGAR_TRASLADO_2026_10 && (
           <>
             <button type="button" onClick={() => renglonAMano(TEXTO_TRASLADO)} className={LINK}>
               Traslado

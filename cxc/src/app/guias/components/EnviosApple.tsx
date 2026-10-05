@@ -10,6 +10,9 @@
 //   · «Facturas» + chip «Sin etiqueta»: los renglones escritos a mano, también
 //     como tarjetas — tocar abre sus campos, ✕ los quita.
 //   · «+ Agregar factura» abre el MISMO `AgregarSinEtiquetas` de siempre.
+//   · «+ Agregar traslado» (5-oct-2026, `GUIA_AGREGAR_TRASLADO_2026_10`), a su
+//     lado y con el mismo estilo, abre `AgregarTraslado`; sale como tarjeta con
+//     el chip «Traslado» y su línea en Observaciones (sale al quitarlo).
 //
 // 🔴 ES SOLO LA PANTALLA. Marcar y desmarcar usan `marcarEnvio` /
 // `desmarcarEnvio` (un renglón por envío) y las etiquetas que se atan salen de
@@ -24,15 +27,21 @@ import type { EtiquetaFila } from "@/lib/guias/etiquetas";
 import { agruparEnEnvios, contenidoDelTraslado, desmarcarEnvio, facturasDelEnvio, lineaDeTraslado, marcarEnvio, type Envio } from "@/lib/guias/etiquetas-por-envio";
 import { envioTomadoPorUnRenglon } from "@/lib/guias/anti-doble-captura";
 import { facturasParaMostrar } from "@/lib/guias/numero-factura";
-import { filaTieneDatos } from "./guia-form-logic";
+import { esSoloTraslado, filaTieneDatos } from "./guia-form-logic";
+import { lineaDeTrasladoDe } from "@/lib/guias/etiquetas-por-envio";
+import { GUIA_AGREGAR_TRASLADO_2026_10 } from "@/lib/guias/guias-2026-10";
+import AgregarTraslado from "./AgregarTraslado";
 import { emptyItem } from "./constants";
 import AgregarSinEtiquetas from "./AgregarSinEtiquetas";
 import { CHIP_SIN_ETIQUETA, MOTIVO_FACTURA_EN_RENGLON, idsDeLosEnviosMarcados } from "./DetalleDeEnvio";
 
 export const TEXTO_SIN_ETIQUETADOS = "No hay envíos etiquetados pendientes.";
 export const BOTON_AGREGAR_FACTURA = "+ Agregar factura";
+export const BOTON_AGREGAR_TRASLADO = "+ Agregar traslado";
+export const CHIP_TRASLADO = "Traslado";
 
 const TITULO = "mb-2.5 flex items-center gap-2 text-[15px] font-semibold";
+const BOTON = "inline-flex min-h-[44px] items-center rounded-lg border border-black px-4 text-sm font-medium transition hover:bg-gray-50 active:scale-[0.97]";
 const CHIP = "rounded-full bg-gray-100 px-2 py-0.5 text-xs font-normal text-gray-500";
 
 function Candado() {
@@ -94,7 +103,8 @@ export default function EnviosApple({
   items, etiquetas, onReemplazarItems, onSeleccion, onQuitar, editor, clientesTop, destinoAutollenadoDe, onLineaDeTraslado,
 }: Props) {
   const [editando, setEditando] = useState<string | null>(null);
-  const [agregando, setAgregando] = useState(false);
+  /** Qué panel está abierto debajo de los botones: uno a la vez. */
+  const [agregando, setAgregando] = useState<null | "factura" | "traslado">(null);
 
   const envios = agruparEnEnvios(etiquetas);
   const porId = new Map(envios.map((v) => [v.envio_id, v]));
@@ -127,6 +137,8 @@ export default function EnviosApple({
     }
   }
   function quitar(idx: number) {
+    const r = items[idx];
+    if (r?.contenido_traslado) onLineaDeTraslado?.(lineaDeTrasladoDe(r.cliente, r.contenido_traslado), false);
     if (items.length > 1) onQuitar(idx);
     else onReemplazarItems([emptyItem(1)]);
   }
@@ -202,15 +214,19 @@ export default function EnviosApple({
       <section aria-labelledby="titulo-facturas" className="mt-7">
         {facturas.length > 0 && (
           <>
-            <h2 id="titulo-facturas" className={TITULO}>
-              Facturas <span className={CHIP}>{CHIP_SIN_ETIQUETA}</span>
-            </h2>
+            {/* Solo traslados: la tarjeta ya lo dice con su chip, sin título. */}
+            {facturas.some(({ item }) => !esSoloTraslado(item.facturas)) && (
+              <h2 id="titulo-facturas" className={TITULO}>
+                Facturas <span className={CHIP}>{CHIP_SIN_ETIQUETA}</span>
+              </h2>
+            )}
             <ul className="mb-3 space-y-2.5">
               {facturas.map(({ item, idx }) => {
                 const abierto = item.uid === editando;
                 const nombre = item.cliente || "Sin cliente";
+                const traslado = GUIA_AGREGAR_TRASLADO_2026_10 && esSoloTraslado(item.facturas);
                 return (
-                  <li key={item.uid ?? idx} data-renglon="sin-etiqueta">
+                  <li key={item.uid ?? idx} data-renglon={traslado ? "traslado" : "sin-etiqueta"}>
                     <div className={`${tarjeta(false)} !p-0 !gap-0`}>
                       <button
                         type="button"
@@ -221,9 +237,12 @@ export default function EnviosApple({
                       >
                         <Contenido
                           cliente={nombre}
-                          detalle={linea(item.empresa, item.direccion, facturasParaMostrar(item.facturas))}
+                          detalle={traslado
+                            ? linea(item.empresa, item.direccion, item.contenido_traslado ?? "")
+                            : linea(item.empresa, item.direccion, facturasParaMostrar(item.facturas))}
                           titulo={item.facturas}
                           bultos={item.bultos || 0}
+                          extra={traslado && <span className={`mt-1 inline-block ${CHIP}`}>{CHIP_TRASLADO}</span>}
                         />
                       </button>
                       <button
@@ -254,21 +273,43 @@ export default function EnviosApple({
             </ul>
           </>
         )}
-        <button
-          type="button"
-          onClick={() => setAgregando((a) => !a)}
-          aria-expanded={agregando}
-          className="inline-flex min-h-[44px] items-center rounded-lg border border-black px-4 text-sm font-medium transition hover:bg-gray-50 active:scale-[0.97]"
-        >
-          {BOTON_AGREGAR_FACTURA}
-        </button>
-        {agregando && (
+        <div className="flex flex-wrap gap-2.5">
+          <button
+            type="button"
+            onClick={() => setAgregando((a) => (a === "factura" ? null : "factura"))}
+            aria-expanded={agregando === "factura"}
+            className={BOTON}
+          >
+            {BOTON_AGREGAR_FACTURA}
+          </button>
+          {GUIA_AGREGAR_TRASLADO_2026_10 && (
+            <button
+              type="button"
+              onClick={() => setAgregando((a) => (a === "traslado" ? null : "traslado"))}
+              aria-expanded={agregando === "traslado"}
+              className={BOTON}
+            >
+              {BOTON_AGREGAR_TRASLADO}
+            </button>
+          )}
+        </div>
+        {agregando === "traslado" && (
+          <AgregarTraslado
+            items={items}
+            onReemplazarItems={onReemplazarItems}
+            onLineaDeTraslado={onLineaDeTraslado}
+            onCerrar={() => setAgregando(null)}
+            clientesTop={clientesTop}
+            destinoAutollenadoDe={destinoAutollenadoDe}
+          />
+        )}
+        {agregando === "factura" && (
           <AgregarSinEtiquetas
             items={items}
             etiquetas={etiquetas}
             onReemplazarItems={onReemplazarItems}
             onEditar={setEditando}
-            onCerrar={() => setAgregando(false)}
+            onCerrar={() => setAgregando(null)}
             clientesTop={clientesTop}
             destinoAutollenadoDe={destinoAutollenadoDe}
           />
