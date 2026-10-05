@@ -255,9 +255,9 @@ export default function EtiquetasPorEnvio() {
                           <span className="shrink-0 text-sm tabular-nums">{v.total} {v.total === 1 ? "bulto" : "bultos"}</span>
                         </div>
                         <div className="mt-0.5 truncate text-xs text-gray-500">
-                          {[v.destino, v.filas.map((f) => f.secuencial).join(", "), nota].filter(Boolean).join(" · ")}
-                          {" · "}
                           <span className={enGuia ? undefined : "text-amber-700"}>{rotuloEstado(v)}</span>
+                          {" · "}
+                          {[v.destino, v.filas.map((f) => f.secuencial).join(", "), nota].filter(Boolean).join(" · ")}
                         </div>
                       </div>
                       <OverflowMenu items={menuDelEnvio(v)} />
