@@ -18,6 +18,7 @@ import {
   filaDeArticulo,
   dedupePorCodigo,
   EXISTENCIA_MAX,
+  EMPRESAS_ARTICULO_INFO,
   syncArticuloInfo,
   type FilaArticuloInfo,
 } from "@/lib/switch-api/sync-articulo-info";
@@ -268,9 +269,10 @@ describe("frescura en hora Panamá — 'existencia al 9-ago, 3:10 pm'", () => {
 });
 
 describe("el sync respeta los límites del tab", () => {
-  it("Boston y Multifashion/ACS quedan FUERA — el sync los rechaza antes de tocar nada", async () => {
+  it("Boston queda FUERA — el sync la rechaza antes de tocar nada (Multifashion entra desde el 5-oct-2026)", async () => {
     await expect(syncArticuloInfo("confecciones_boston")).rejects.toThrow(/fuera del tab/);
-    await expect(syncArticuloInfo("american_classic")).rejects.toThrow(/fuera del tab/);
+    expect(EMPRESAS_ARTICULO_INFO).toContain("american_classic");
+    expect(EMPRESAS_ARTICULO_INFO).not.toContain("confecciones_boston");
   });
 
   it("el guard de montos tiene la familia articulo_info con simetría precio+costo", () => {
@@ -285,7 +287,7 @@ describe("el sync respeta los límites del tab", () => {
     expect(SYNC_LOG_TYPES).toContain("articulo_info");
   });
 
-  it("CON cron desde el 10-ago-2026: vercel.json programa las 3 entradas — y el botón sigue", () => {
+  it("CON cron desde el 10-ago-2026: vercel.json programa las 4 entradas — y el botón sigue", () => {
     // Daniel: "es que debería ser ya automático". El detalle del calendario
     // (grupos, horas, cobertura exacta de las 6 FG) vive en
     // cron-sync-articulo-info.test.ts; acá solo se fija que el cron EXISTE.
@@ -293,7 +295,7 @@ describe("el sync respeta los límites del tab", () => {
       crons: Array<{ path: string }>;
     };
     const entradas = vercel.crons.filter((c) => c.path.startsWith("/api/cron/sync-articulo-info"));
-    expect(entradas).toHaveLength(3);
+    expect(entradas).toHaveLength(4);
     // Y el botón manual no se retiró: el route del tab sigue existiendo.
     expect(fs.existsSync(path.resolve(process.cwd(), "src/app/api/ventas/referencia/actualizar/route.ts"))).toBe(true);
   });

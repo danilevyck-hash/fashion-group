@@ -1,9 +1,9 @@
 // Multifashion › Productos con la pantalla común (PRODUCTOS_FILTROS_2026_10).
 //
-// Multifashion no tiene líneas de factura ni inventario en la base: su
-// clasificación es el diccionario `switch_articulo_marca` (la «marca» de Switch
-// es el departamento, «TH MENSWEAR») y la marca real sale de él
-// (`grupoDeDepartamento`). Sin existencia, ni días de inventario.
+// Multifashion no tiene líneas de factura: su clasificación es el diccionario
+// `switch_articulo_marca` (la «marca» de Switch es el departamento, «TH
+// MENSWEAR») y la marca real sale de él (`grupoDeDepartamento`). El Stock sale
+// de `switch_articulo_info` (cron `sync-articulo-info`, desde el 5-oct-2026).
 //
 // El servidor manda `departamentos` (código → departamento de Switch); el
 // navegador arma los artículos con el ranking por código que ya viaja.
@@ -44,11 +44,24 @@ export function departamentosPorCodigo(
   return { n, c };
 }
 
+/** SERVIDOR: código (con la misma limpieza del ranking) → existencia de Switch. */
+export function stockPorCodigo(filas: readonly { codigo: string; existencia: number | string | null }[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const f of filas) {
+    const cod = textoAgrupable(f.codigo);
+    const n = Number(f.existencia);
+    if (cod && f.existencia != null && Number.isFinite(n)) out[cod] = (out[cod] ?? 0) + n;
+  }
+  return out;
+}
+
 /** NAVEGADOR: los artículos del período (el ranking por código). */
 export function articulosMultifashion(
   codigos: readonly RenglonRanking[],
   deps: DepartamentosPorCodigo,
+  stock: Readonly<Record<string, number>> = {},
 ): ArticuloVendido[] {
+  const conStock = Object.keys(stock).length > 0;
   return codigos.map(r => {
     const i = deps.c[r.clave];
     const dep = i === undefined ? "" : deps.n[i];
@@ -58,6 +71,7 @@ export function articulosMultifashion(
       unidades: r.unidades,
       venta: r.venta,
       costo: r.costo,
+      ...(conStock ? { existencia: stock[r.clave] ?? null } : {}),
       campos: {
         marca: dep ? grupoDeDepartamento(dep).nombre : "",
         departamento: departamentoSinMarca(dep),

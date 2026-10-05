@@ -152,10 +152,12 @@ describe("🔴 la medición no se tocó", () => {
     // `cron-telemetry.ts` y en `docs/crons.md`. Ver `guias/pedidos-bodega.test.ts`.
     // ⚠️ 5-oct-2026: son 89 — Daniel pidió `sync-pedidos` también de día (6
     // entradas más, ~cada 2 h como facturas).
+    // ⚠️ 5-oct-2026: son 90 — `sync-articulo-info` suma Multifashion sola a las
+    // 04:00 UTC (Stock en Multifashion › Productos). Ver `cron-sync-articulo-info.test.ts`.
     // Este candado cambió de número con nota, no de regla: la medición
     // (`integrity-check`) sigue intacta, y el caso de arriba lo comprueba.
     const vercel = JSON.parse(leer("vercel.json")) as { crons: unknown[] };
-    expect(vercel.crons).toHaveLength(89);
+    expect(vercel.crons).toHaveLength(90);
   });
 
   // Mismo motivo que la allowlist de checks: `cron-telemetry.ts` construye el

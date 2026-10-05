@@ -20,7 +20,7 @@ import {
   type ArticuloVendido,
 } from "@/lib/productos/filtros";
 import { ventanaDelPeriodo } from "@/components/ventas/usePeriodoProductos";
-import { departamentosPorCodigo, articulosMultifashion } from "@/lib/multifashion/productos-filtros";
+import { departamentosPorCodigo, articulosMultifashion, stockPorCodigo } from "@/lib/multifashion/productos-filtros";
 
 const a = (codigo: string, descripcion: string, marca: string, unidades: number, venta: number, costo: number, existencia: number | null = null): ArticuloVendido => ({
   codigo, descripcion, unidades, venta, costo, existencia,
@@ -107,5 +107,13 @@ describe("Multifashion: marca y departamento salen del diccionario", () => {
       deps,
     );
     expect(art.campos).toEqual({ marca: "Tommy Hilfiger", departamento: "Menswear", genero: "Hombre", descripcion: "Men-Shirts" });
+  });
+
+  it("Stock: el código del ranking (limpio) → existencia de Switch; sin filas, sin columna", () => {
+    const stock = stockPorCodigo([{ codigo: " TH-CAM ", existencia: "7.0000" }, { codigo: "X", existencia: null }]);
+    expect(stock).toEqual({ "TH-CAM": 7 });
+    const fila = { clave: "TH-CAM", etiqueta: "TH-CAM", detalle: "Men-Shirts", unidades: 1, venta: 1, costo: 0, utilidad: 1, margen: 1, articulos: 1 };
+    expect(articulosMultifashion([fila, { ...fila, clave: "OTRO" }], { n: [], c: {} }, stock).map(a => a.existencia)).toEqual([7, null]);
+    expect(articulosMultifashion([fila], { n: [], c: {} })[0].existencia).toBeUndefined();
   });
 });

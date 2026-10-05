@@ -97,6 +97,10 @@ export const EXISTENCIA_MAX = 500_000;
  * `sync-articulo-marca`): ese artículo queda sin ficha y se reintenta mañana.
  * Perder el snapshot entero de precios por una ficha sería peor.
  */
+/** Las empresas cuyo catálogo y existencia se traen: las 6 del grupo y, desde
+ *  el 5-oct-2026, Multifashion (Stock en Multifashion › Productos). Boston no. */
+export const EMPRESAS_ARTICULO_INFO: readonly string[] = [...B2B_EMPRESA_KEYS, "american_classic"];
+
 export const EMPRESAS_CON_FICHA: readonly string[] = ["active_shoes"];
 
 /** De a cuántas fichas en paralelo. Por debajo del 8 de `/stock`: esta fase
@@ -401,8 +405,8 @@ export async function syncArticuloInfo(
   empresaKey: string,
   triggeredBy: SwitchSyncTriggeredBy = "manual",
 ): Promise<ArticuloInfoSyncResult> {
-  // SOLO las 6 de Fashion Group — la misma lista del tab (Boston/ACS afuera).
-  if (!(B2B_EMPRESA_KEYS as readonly string[]).includes(empresaKey)) {
+  // Las 6 de Fashion Group y Multifashion (Boston afuera).
+  if (!EMPRESAS_ARTICULO_INFO.includes(empresaKey)) {
     throw new Error(`empresa fuera del tab Referencia: ${empresaKey}`);
   }
 

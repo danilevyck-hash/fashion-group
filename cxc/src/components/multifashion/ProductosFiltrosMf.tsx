@@ -1,9 +1,10 @@
 "use client";
 
 // Multifashion › Productos con la pantalla común (PRODUCTOS_FILTROS_2026_10):
-// Marca ▾ · Departamento ▾ · Género ▾ · Descripción ▾ · 🔍 código. Sin
-// existencia, días de inventario ni chips de atención: no hay inventario de
-// Multifashion en la base. Sin «Mayores variaciones». El período es el del módulo.
+// Marca ▾ · Departamento ▾ · Género ▾ · Descripción ▾ · 🔍 código. «Stock» de
+// Switch (cron `sync-articulo-info`) en cuanto hay filas; sin los chips de
+// atención (no hay «venta en 90 días» por código). Sin «Mayores variaciones».
+// El período es el del módulo.
 
 import { useMemo } from "react";
 import useSWR from "swr";
@@ -16,6 +17,7 @@ interface Resp {
   desde: string;
   hasta: string;
   departamentos?: DepartamentosPorCodigo;
+  stock?: Record<string, number>;
   ranking: { codigos: RenglonRanking[] };
 }
 
@@ -32,7 +34,7 @@ export function ProductosFiltrosMf({ selectedYear, mes, periodo }: { selectedYea
   }, { dedupingInterval: 5 * 60_000, revalidateOnFocus: false, keepPreviousData: true });
 
   const articulos = useMemo(
-    () => (data ? articulosMultifashion(data.ranking.codigos, data.departamentos ?? { n: [], c: {} }) : null),
+    () => (data ? articulosMultifashion(data.ranking.codigos, data.departamentos ?? { n: [], c: {} }, data.stock) : null),
     [data],
   );
 
@@ -43,7 +45,8 @@ export function ProductosFiltrosMf({ selectedYear, mes, periodo }: { selectedYea
       error={error ? "error" : null}
       onReintentar={() => void mutate()}
       chips={CHIPS_MULTIFASHION}
-      conInventario={false}
+      conInventario={!!data?.stock && Object.keys(data.stock).length > 0}
+      sinAtencion
     />
   );
 }

@@ -44,7 +44,8 @@ import {
 export const RPC_INVENTARIO = "inventario_valorizado_v1";
 
 /**
- * Las empresas que el cron `sync-articulo-info` cubre — las 6 de Fashion Group.
+ * Las 6 de Fashion Group (el cron `sync-articulo-info` también trae Multifashion
+ * desde el 5-oct-2026, pero la Vista general sigue mirando solo el grupo).
  * Se DERIVA, no se escribe a mano: el propio `syncArticuloInfo` rechaza
  * cualquier otra, así que sumar una empresa al cron achica sola la lista de
  * "sin inventario" que ve el usuario.

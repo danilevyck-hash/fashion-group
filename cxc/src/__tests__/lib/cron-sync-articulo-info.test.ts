@@ -30,7 +30,8 @@ vi.mock("@/lib/telegram", () => ({
   sendTelegramAlert: vi.fn(),
   shortError: (s: string) => s,
 }));
-vi.mock("@/lib/switch-api/sync-articulo-info", () => ({
+vi.mock("@/lib/switch-api/sync-articulo-info", async (orig) => ({
+  EMPRESAS_ARTICULO_INFO: (await orig<typeof import("@/lib/switch-api/sync-articulo-info")>()).EMPRESAS_ARTICULO_INFO,
   syncArticuloInfo: vi.fn(),
 }));
 vi.mock("@/lib/switch-api/client", () => ({
@@ -94,23 +95,23 @@ afterEach(() => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("A. las empresas — exactamente las 6 FG, nunca Boston/ACS", () => {
-  it("las 3 entradas cubren la unión EXACTA de B2B_EMPRESA_KEYS, sin repetir", () => {
-    expect(ENTRADAS).toHaveLength(3);
+describe("A. las empresas — las 6 FG y Multifashion (5-oct-2026), nunca Boston", () => {
+  it("las 4 entradas cubren la unión EXACTA de B2B_EMPRESA_KEYS + american_classic, sin repetir", () => {
+    expect(ENTRADAS).toHaveLength(4);
     const union = ENTRADAS.flatMap((e) => [...e.empresas]);
     expect(union.length).toBe(new Set(union).size); // grupos disjuntos
-    expect([...union].sort()).toEqual([...B2B_EMPRESA_KEYS].sort());
+    expect([...union].sort()).toEqual([...B2B_EMPRESA_KEYS, "american_classic"].sort());
   });
 
-  it("ni confecciones_boston ni american_classic aparecen en ningún grupo", () => {
+  it("confecciones_boston no aparece en ningún grupo", () => {
+    for (const e of ENTRADAS) expect(e.empresas).not.toContain("confecciones_boston");
+  });
+
+  it("cada grupo lleva 2 empresas; Multifashion va SOLA (el catálogo más grande, ~204 s)", () => {
     for (const e of ENTRADAS) {
-      expect(e.empresas).not.toContain("confecciones_boston");
-      expect(e.empresas).not.toContain("american_classic");
+      if (e.empresas.includes("american_classic")) expect(e.empresas).toEqual(["american_classic"]);
+      else expect(e.empresas).toHaveLength(2);
     }
-  });
-
-  it("cada grupo lleva 2 empresas — el barrido medido (155 s/empresa) no da para más de ~2 por entrada con margen", () => {
-    for (const e of ENTRADAS) expect(e.empresas).toHaveLength(2);
   });
 });
 
@@ -175,8 +176,8 @@ describe("C. el route", () => {
     expect(mockSync).not.toHaveBeenCalled();
   });
 
-  it("Boston y American Classic se rechazan con 400 antes de tocar nada", async () => {
-    for (const query of ["?empresas=confecciones_boston", "?empresas=vistana,american_classic", "?empresas=lo-que-sea"]) {
+  it("Boston y lo desconocido se rechazan con 400 antes de tocar nada", async () => {
+    for (const query of ["?empresas=confecciones_boston", "?empresas=vistana,confecciones_boston", "?empresas=lo-que-sea"]) {
       const res = await GET(reqCron(query));
       expect(res.status, query).toBe(400);
     }

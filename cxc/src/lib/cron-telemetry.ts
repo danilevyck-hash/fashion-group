@@ -695,6 +695,8 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   // cada grupo queda a 60/55/50 min de SU par del bloque all — la regla de la
   // casa para crons largos (≥50 min, no solo los 15 del test). 23:30-23:50
   // Panamá = tras el cierre: la existencia guardada es la del día completo.
+  // Multifashion sola (5-oct-2026): 3h45 tras su facturas de 00:15 y 2h30 antes del «all» de 06:30.
+  { cron: "sync-articulo-info", hhmmUtc: "0400", empresas: ["american_classic"] },
   { cron: "sync-articulo-info", hhmmUtc: "0430", empresas: ["vistana", "active_wear"] },
   { cron: "sync-articulo-info", hhmmUtc: "0440", empresas: ["fashion_shoes", "fashion_wear"] },
   { cron: "sync-articulo-info", hhmmUtc: "0450", empresas: ["active_shoes", "joystep"] },

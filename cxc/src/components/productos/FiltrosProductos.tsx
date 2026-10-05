@@ -150,6 +150,8 @@ export interface PantallaProductosProps {
   despues?: ReactNode;
   /** Con inventario: la columna «Stock» y los dos chips de atención. */
   conInventario: boolean;
+  /** Multifashion: la columna «Stock» sin los chips «Sin venta en 90 días» · «Agotados». */
+  sinAtencion?: boolean;
   /** Sin ningún filtro, los totales de siempre (el Resumen). */
   totalesSinFiltro?: TotalesFiltro | null;
   notaTotales?: ReactNode;
@@ -246,7 +248,7 @@ export function PantallaProductos(p: PantallaProductosProps) {
     </div>
   );
 
-  const atencion = p.conInventario && (
+  const atencion = p.conInventario && !p.sinAtencion && (
     <div className="flex items-center gap-2" data-chips-atencion>
       {([["sin90", "Sin venta en 90 días"], ["agotados", "Agotados"]] as const).map(([m, rotulo]) => (
         <button

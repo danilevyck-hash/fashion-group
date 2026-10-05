@@ -84,7 +84,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { PRODUCTOS_FILTROS_2026_10 } from "@/lib/productos/filtros";
-import { departamentosPorCodigo } from "@/lib/multifashion/productos-filtros";
+import { departamentosPorCodigo, stockPorCodigo } from "@/lib/multifashion/productos-filtros";
 import { requireRole } from "@/lib/requireRole";
 import { ROLES_MULTIFASHION } from "@/lib/multifashion/acceso";
 import { supabaseServer } from "@/lib/supabase-server";
@@ -297,7 +297,26 @@ export async function GET(req: NextRequest) {
     let marcaDisponible = true;
     let marcaError: string | null = null;
 
-    const [periodo1, comparativoLeido, dicc] = await Promise.all([
+    // 🔴 Stock de Multifashion (5-oct-2026): la existencia de Switch que trae el
+    // cron `sync-articulo-info` (04:00 UTC). Falla ABIERTA: sin filas, la
+    // pantalla no dibuja la columna.
+    const leerStock = async (): Promise<Record<string, number>> => {
+      if (!PRODUCTOS_FILTROS_2026_10) return {};
+      const filasStock = await leerTodoPaginado<{ codigo: string; existencia: number | string | null }>(
+        `switch_articulo_info (${EMPRESA})`,
+        (pedirCount, ini, fin) =>
+          supabaseServer
+            .from("switch_articulo_info")
+            .select("codigo, existencia", pedirCount ? { count: "exact" } : {})
+            .eq("empresa_key", EMPRESA)
+            .not("existencia", "is", null)
+            .order("codigo", { ascending: true })
+            .range(ini, fin),
+      );
+      return stockPorCodigo(filasStock);
+    };
+
+    const [periodo1, comparativoLeido, dicc, stock] = await Promise.all([
       leerPeriodoRpc(desde, hasta),
       leerComparativo().catch(err => {
         fallo.comparativo = err instanceof Error ? err.message : "error inesperado";
@@ -309,6 +328,10 @@ export async function GET(req: NextRequest) {
         marcaError = err instanceof Error ? err.message : "error inesperado";
         console.error("[multifashion/productos] diccionario de marcas no disponible", err);
         return null;
+      }),
+      leerStock().catch(err => {
+        console.error("[multifashion/productos] stock no disponible", err);
+        return {} as Record<string, number>;
       }),
     ]);
 
@@ -401,6 +424,7 @@ export async function GET(req: NextRequest) {
             ),
           }
         : {}),
+      stock,
       ranking: {
         totales: porCategoria.totales,
         categorias: porCategoria.filas,

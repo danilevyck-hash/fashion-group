@@ -89,6 +89,10 @@
       "schedule": "0 12 * * *"
     },
     {
+      "path": "/api/cron/sync-articulo-info?empresas=american_classic",
+      "schedule": "0 4 * * *"
+    },
+    {
       "path": "/api/cron/sync-articulo-info?empresas=vistana,active_wear",
       "schedule": "30 4 * * *"
     },

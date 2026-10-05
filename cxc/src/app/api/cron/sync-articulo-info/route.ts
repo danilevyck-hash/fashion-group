@@ -28,19 +28,20 @@
  *   • Fuera de las ventanas de deploy (23:50-00:20 y 05:50-06:10 UTC).
  *
  * Auth: `Authorization: Bearer ${CRON_SECRET}`.
- * Query: `empresas=a,b` — OBLIGATORIO y subconjunto de las 6 FG. Explícito a
+ * Query: `empresas=a,b` — OBLIGATORIO y subconjunto de las 6 FG + Multifashion. Explícito a
  * propósito: una invocación sin lista que corriera las 6 en serie es
  * exactamente el desborde de maxDuration que el diseño de 3 entradas evita.
- * Boston y American Classic NO entran (decisión de Daniel — el propio
- * syncArticuloInfo también las rechaza).
+ * Boston NO entra. Multifashion (american_classic) SÍ desde el 5-oct-2026
+ * (Stock en Multifashion › Productos), sola en su entrada de las 04:00 UTC:
+ * su catálogo es el más grande (~184 páginas, ~204 s) y a esa hora no tiene
+ * otra sesión de Switch (la anterior es la de 00:15 y la siguiente, 06:30).
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
-import { syncArticuloInfo, type ArticuloInfoSyncResult } from "@/lib/switch-api/sync-articulo-info";
+import { EMPRESAS_ARTICULO_INFO, syncArticuloInfo, type ArticuloInfoSyncResult } from "@/lib/switch-api/sync-articulo-info";
 import { recordCronHeartbeat } from "@/lib/cron-telemetry";
 import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
-import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 
 export const dynamic = "force-dynamic";
 // Techo del plan (Pro + Fluid). Medido: 155 s por empresa del tamaño de
@@ -69,14 +70,14 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  const invalidas = crudas.filter((e) => !(B2B_EMPRESA_KEYS as readonly string[]).includes(e));
+  const invalidas = crudas.filter((e) => !EMPRESAS_ARTICULO_INFO.includes(e));
   if (crudas.length === 0 || invalidas.length > 0) {
     return NextResponse.json(
       {
         ok: false,
         error:
           crudas.length === 0
-            ? "falta ?empresas=a,b (subconjunto de las 6 FG) — sin lista no se corre nada"
+            ? "falta ?empresas=a,b (subconjunto de las 6 FG y Multifashion) — sin lista no se corre nada"
             : `empresas fuera del tab Referencia: ${invalidas.join(", ")}`,
       },
       { status: 400 },
