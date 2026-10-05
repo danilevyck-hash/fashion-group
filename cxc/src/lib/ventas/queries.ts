@@ -10,6 +10,7 @@ import { RETAIL_AL_FRENTE } from "@/lib/multifashion/retail-al-frente";
 import { RPC_RETAIL, type RpcRetail } from "@/lib/multifashion/rpc-retail";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
+import { filasClientesRango } from "@/lib/ventas/clientes-rango-server";
 import { esEmpresaDelGrupo } from "@/lib/clientes/mundos";
 import { withDbRetry, isTransientDbError } from "@/lib/supabase-retry";
 import { rpcConFallbackDeVersion } from "@/lib/ventas/rpc-version";
@@ -447,6 +448,7 @@ export async function fetchClientes({
   year,
   empresaKey,
   ventana = null,
+  rango = null,
 }: {
   year: number;
   empresaKey?: string | null;
@@ -454,8 +456,19 @@ export async function fetchClientes({
    *  y solo si la vista trae las columnas (migración `20261121120000`); si no,
    *  se sirve el AÑO y la respuesta lo dice (`ventana: null`). */
   ventana?: 6 | 12 | null;
+  /** 🔴 «Rango de fechas» (5-oct-2026): desde–hasta contra los mismos días del año pasado. */
+  rango?: { desde: string; hasta: string } | null;
 }): Promise<Clientes> {
   const isTodas = !empresaKey || empresaKey === "todas";
+  if (rango) {
+    const { filas, anterior } = await filasClientesRango(rango.desde, rango.hasta, isTodas ? null : empresaKey ?? null);
+    const rows = armarClientes(filas as unknown as ClientesEmpresaRow[], isTodas, null);
+    return {
+      total: rows.length, pageSize: rows.length,
+      anioComparativo: Number(anterior.hasta.slice(0, 4)),
+      ventanasDisponibles: [], ventana: null, rango, actualizadoAt: null, rows,
+    };
+  }
   // El año en curso es el de PANAMÁ (11-sep-2026): con el reloj UTC del
   // servidor, después de las 7 p.m. del 31-dic el año «en curso» era el que
   // viene y la lista del año caía en la rama de año cerrado.
@@ -539,7 +552,29 @@ export async function fetchClientes({
   const ventanasDisponibles = isClosedYear ? [] : ventanasDeLasFilas(filasCrudas);
   const ventanaServida: 6 | 12 | null = ventana && ventanasDisponibles.includes(ventana) ? ventana : null;
 
-  const rows = filasCrudas.map((r, i) => {
+  const rows = armarClientes(filasCrudas, isTodas, ventanaServida);
+
+  return {
+    total: rows.length,
+    pageSize: rows.length,
+    // 🔴 EL AÑO CONTRA EL QUE SE COMPARA SALE DE ACÁ, NO DE UN LITERAL EN LA
+    // PANTALLA. Los rótulos decían "Δ vs 2025" fijo: con 2025 elegido en el
+    // selector, la pantalla mostraba "Compras 2025 · Δ vs 2025" mientras la
+    // cuenta comparaba contra 2024. Las DOS ramas de esta función comparan
+    // contra `year - 1` —la RPC `clientes_anio` con `p_year - 1`, y la vista
+    // rolling con `current_year - 1` sobre los mismos meses—, así que el año se
+    // deriva del MISMO dato que hace la división y no puede volver a mentir.
+    anioComparativo: year - 1,
+    ventanasDisponibles,
+    ventana: ventanaServida,
+    actualizadoAt,
+    rows,
+  };
+}
+
+/** Las filas de la vista (o de la RPC, o del rango) en las filas de la pantalla. */
+function armarClientes(filasCrudas: ClientesEmpresaRow[], isTodas: boolean, ventanaServida: 6 | 12 | null): Clientes["rows"] {
+  return filasCrudas.map((r, i) => {
     const ek = r.empresa ?? "";
     const empresasCount = isTodas ? Math.max(1, toNum(r.empresas_count)) : 1;
     const empresasBreakdown =
@@ -595,23 +630,6 @@ export async function fetchClientes({
       esDelGrupo: r.es_del_grupo === true,
     };
   });
-
-  return {
-    total: rows.length,
-    pageSize: rows.length,
-    // 🔴 EL AÑO CONTRA EL QUE SE COMPARA SALE DE ACÁ, NO DE UN LITERAL EN LA
-    // PANTALLA. Los rótulos decían "Δ vs 2025" fijo: con 2025 elegido en el
-    // selector, la pantalla mostraba "Compras 2025 · Δ vs 2025" mientras la
-    // cuenta comparaba contra 2024. Las DOS ramas de esta función comparan
-    // contra `year - 1` —la RPC `clientes_anio` con `p_year - 1`, y la vista
-    // rolling con `current_year - 1` sobre los mismos meses—, así que el año se
-    // deriva del MISMO dato que hace la división y no puede volver a mentir.
-    anioComparativo: year - 1,
-    ventanasDisponibles,
-    ventana: ventanaServida,
-    actualizadoAt,
-    rows,
-  };
 }
 
 /**

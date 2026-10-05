@@ -112,7 +112,9 @@ export async function buildClientesSheet(opts: ClientesExcelOpts): Promise<WorkS
 export async function exportClientesToExcel(opts: ClientesExcelOpts): Promise<void> {
   const ws = await buildClientesSheet(opts);
   const { workbookFromSheets, downloadWorkbook } = await import("@/lib/excel-export");
-  const sufijo = opts.periodo.tipo === "ultimos" ? `ultimos-${opts.periodo.n}-meses` : String(opts.year);
+  const sufijo = opts.periodo.tipo === "ultimos" ? `ultimos-${opts.periodo.n}-meses`
+    : opts.periodo.tipo === "rango" ? `${opts.periodo.desde}_${opts.periodo.hasta}`
+    : String(opts.year);
   downloadWorkbook(
     workbookFromSheets([{ name: "Clientes", ws }]),
     `ventas-clientes-${sufijo}.xlsx`,

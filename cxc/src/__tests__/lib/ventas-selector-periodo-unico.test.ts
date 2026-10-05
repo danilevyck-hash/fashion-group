@@ -330,7 +330,7 @@ describe("8 · el selector vive arriba, y lo que se fue no vuelve", () => {
     expect(page).toContain("searchParams?.[PARAM_PERIODO_VENTAS]");
     expect(page).toContain("periodoDesdeUrl(");
     expect(page).toContain("periodoServidor={periodoAUrl(periodo)}");
-    expect(page).toContain("fetchClientes({ year, ventana })");
+    expect(page).toContain("fetchClientes({ year, ventana, rango:");
   });
 
   it("el bundle se pide por lo PEDIDO y cada pestaña toma lo suyo", () => {

@@ -37,6 +37,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { TabVentas } from "@/lib/ventas/pestanas";
+import { etiquetaRangoCorta } from "@/lib/ui/calendario-simple";
 
 export type VentanaN = 6 | 12;
 
@@ -44,7 +45,10 @@ export type PeriodoVentas =
   /** Un año de calendario (en el año en curso, lo que va del año). */
   | { tipo: "anio"; anio: number }
   /** Ventana rodante de N meses de calendario que termina en el mes en curso. */
-  | { tipo: "ultimos"; n: VentanaN };
+  | { tipo: "ultimos"; n: VentanaN }
+  /** 🔴 Desde–hasta, días de Panamá (Daniel, 5-oct-2026). Resumen y Clientes;
+   *  se compara contra los MISMOS días del año pasado. */
+  | { tipo: "rango"; desde: string; hasta: string };
 
 /** Las ventanas que existen en el sistema, en el orden del desplegable. */
 export const VENTANAS: readonly VentanaN[] = [12, 6] as const;
@@ -72,11 +76,13 @@ export function ventanasDeTab(tab: TabVentas, cap: CapacidadesPeriodo): readonly
 /** ¿Esta pestaña sabe servir este período? Los años los sirven las tres. */
 export function periodoSirve(tab: TabVentas, p: PeriodoVentas, cap: CapacidadesPeriodo): boolean {
   if (p.tipo === "anio") return true;
+  if (p.tipo === "rango") return tab === "resumen" || tab === "clientes";
   return ventanasDeTab(tab, cap).includes(p.n);
 }
 
 /** El año con el que se pide cada lectura: el suyo, o el en curso. */
 export function anioDelPeriodo(p: PeriodoVentas, anioEnCurso: number): number {
+  if (p.tipo === "rango") return Number(p.hasta.slice(0, 4));
   return p.tipo === "anio" ? p.anio : anioEnCurso;
 }
 
@@ -99,9 +105,11 @@ export function ajustarPeriodo(
 }
 
 // ── URL ──────────────────────────────────────────────────────────────────────
-// `2026` · `u6` · `u12`. La misma gramática que `?mfPeriodo=` de Multifashion.
+// `2026` · `u6` · `u12` · `2026-09-15_2026-09-30`. La misma gramática que
+// `?mfPeriodo=` de Multifashion.
 
 export function periodoAUrl(p: PeriodoVentas): string {
+  if (p.tipo === "rango") return `${p.desde}_${p.hasta}`;
   return p.tipo === "anio" ? String(p.anio) : `u${p.n}`;
 }
 
@@ -109,6 +117,8 @@ export function periodoAUrl(p: PeriodoVentas): string {
 export function periodoDesdeUrl(raw: string | null | undefined): PeriodoVentas | null {
   const v = (raw ?? "").trim();
   if (!v) return null;
+  const rango = /^(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/.exec(v);
+  if (rango) return rango[1] <= rango[2] ? { tipo: "rango", desde: rango[1], hasta: rango[2] } : null;
   const ventana = /^u(6|12)$/.exec(v);
   if (ventana) return { tipo: "ultimos", n: Number(ventana[1]) as VentanaN };
   const anio = /^(\d{4})$/.exec(v);
@@ -140,6 +150,7 @@ export function resolverPeriodo(args: {
 
 /** Lo que dice el botón: «Año 2026», «Últimos 12 meses». */
 export function etiquetaPeriodo(p: PeriodoVentas): string {
+  if (p.tipo === "rango") return etiquetaRangoCorta(p.desde, p.hasta);
   return p.tipo === "anio" ? `Año ${p.anio}` : `Últimos ${p.n} meses`;
 }
 
@@ -153,7 +164,7 @@ export function rotuloCompras(p: PeriodoVentas): string {
  * número; una ventana, contra la misma ventana un año antes.
  */
 export function rotuloVs(p: PeriodoVentas, anioComparativo: number): string {
-  return p.tipo === "anio" ? `vs ${anioComparativo}` : "vs año anterior";
+  return p.tipo === "ultimos" ? "vs año anterior" : `vs ${anioComparativo}`;
 }
 
 export interface OpcionPeriodoVentas {
@@ -195,6 +206,7 @@ export function periodoParaProductos(
   anioEnCurso: number,
 ): { periodo: "ytd" | "6m" | "12m"; year: number } {
   if (p.tipo === "anio") return { periodo: "ytd", year: p.anio };
+  if (p.tipo === "rango") return { periodo: "ytd", year: Number(p.hasta.slice(0, 4)) };
   return { periodo: p.n === 6 ? "6m" : "12m", year: anioEnCurso };
 }
 

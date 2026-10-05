@@ -25,6 +25,7 @@ import { PeriodoSelect } from "@/components/multifashion/PeriodoSelect";
 import { PRODUCTOS_FILTROS_2026_10 } from "@/lib/productos/filtros";
 import { usePeriodoProductos } from "@/components/ventas/usePeriodoProductos";
 import { ComisionesPeriodo } from "@/components/comisiones/ComisionesPeriodo";
+import RangoFechas from "@/components/ui/RangoFechas";
 import { RESUMEN_MES_2026_10, rotuloDelPeriodo } from "@/lib/ventas/resumen-mes";
 import { VENTAS_APPLE_2026_10 } from "@/lib/ventas/ventas-apple";
 import { fetchJsonWithRetry, describeFetchError } from "@/lib/fetch-retry";
@@ -71,6 +72,10 @@ const ResumenView = dynamic(
 );
 const ClientesView = dynamic(
   () => import("@/components/ventas/ClientesView").then((m) => m.ClientesView),
+  { ssr: false, loading: () => <TabSkeleton /> },
+);
+const ResumenRango = dynamic(
+  () => import("@/components/ventas/ResumenRango").then((m) => m.ResumenRango),
   { ssr: false, loading: () => <TabSkeleton /> },
 );
 const ProductosFiltros = dynamic(
@@ -125,7 +130,8 @@ async function fetchVentasBundle(periodo: PeriodoVentas, anioEnCurso: number): P
     settle(fetchJsonWithRetry<VentasResumen>(`/api/ventas/resumen?year=${year}`)),
     // 🔴 La ventana viaja solo cuando el período es una: el año, sin parámetro.
     settle(fetchJsonWithRetry<Clientes>(
-      `/api/ventas/clientes-12m?year=${year}${ventana ? `&ventana=${ventana}` : ""}`,
+      `/api/ventas/clientes-12m?year=${year}${ventana ? `&ventana=${ventana}` : ""}${
+        periodo.tipo === "rango" ? `&desde=${periodo.desde}&hasta=${periodo.hasta}` : ""}`,
     )),
     // Multifashion overview: SOLO alimenta el indicador de mayoreo de la fila
     // Multifashion. Su fallo se traga en silencio — nunca debe apagar el Resumen.
@@ -222,7 +228,8 @@ export function VentasShell({
     const p = periodoDesdeUrl(valor);
     if (!p) return;
     setPeriodoUrl(periodoAUrl(p));
-    setPeriodoMemoria(periodoAUrl(p));
+    // Un rango no se recuerda: la próxima vez se abre en el año.
+    if (p.tipo !== "rango") setPeriodoMemoria(periodoAUrl(p));
   }, [setPeriodoUrl, setPeriodoMemoria]);
 
   // El bundle se pide por lo PEDIDO; cada pestaña toma de ahí lo que sabe
@@ -345,6 +352,30 @@ export function VentasShell({
   const prod = usePeriodoProductos(loading);
   const productosNuevo = PRODUCTOS_FILTROS_2026_10 && tab === "productos";
 
+  // 🔴 «Rango de fechas» (Daniel, 5-oct-2026) en Resumen y Clientes: el MISMO
+  // botón del calendario simple que Productos, Multifashion y Comisiones. Un
+  // período a la vez: con un rango, el selector se vuelve «15–30 sep ✕» y el ✕
+  // vuelve al mes (Resumen) o al año (Clientes) del rango.
+  const conRango = tab === "resumen" || tab === "clientes";
+  const enRango = conRango && periodo.tipo === "rango";
+  const botonRango = conRango ? (
+    <RangoFechas
+      enBarra
+      sinFuturo
+      desde={periodo.tipo === "rango" ? periodo.desde : ""}
+      hasta={periodo.tipo === "rango" ? periodo.hasta : ""}
+      vacio={periodo.tipo !== "rango"}
+      label={null}
+      diasDeAsistencia={false}
+      onChange={(d, h) => onPeriodoChange(`${d}_${h}`)}
+      onQuitar={() => {
+        if (periodo.tipo !== "rango") return;
+        onPeriodoChange(periodo.hasta.slice(0, 4));
+        if (tab === "resumen") setMesResumen(String(Number(periodo.hasta.slice(5, 7))));
+      }}
+    />
+  ) : null;
+
   // Pull-to-refresh (mobile): revalida el período actual sin cambiarlo.
   const onRefresh = useCallback(async () => {
     await mutate();
@@ -369,7 +400,9 @@ export function VentasShell({
         onPestana={setTab}
         periodo={
           productosNuevo ? prod.selector :
+          enRango ? botonRango :
           RESUMEN_MES_2026_10 && tab === "resumen" ? (
+            <div className="flex w-full items-center gap-1.5">
             // El selector de Comisiones: ‹ 2026 › · Todo el año · 12 meses.
             <ComisionesPeriodo
               className="w-full [&>button]:h-9 [&>button]:min-h-0 [&>button]:w-full [&>button]:text-[13px]"
@@ -383,14 +416,19 @@ export function VentasShell({
                 setMesResumen(String(m));
               }}
             />
+            {botonRango}
+            </div>
           ) : (
-          <div className="w-full [&_button]:relative [&_button]:h-9 [&_button]:w-full [&_button]:text-[13px] [&_button]:before:absolute [&_button]:before:inset-x-0 [&_button]:before:-inset-y-1 [&_button]:before:content-['']">
+          <div className="flex w-full items-center gap-1.5">
+          <div className="min-w-0 flex-1 [&_button]:relative [&_button]:h-9 [&_button]:w-full [&_button]:text-[13px] [&_button]:before:absolute [&_button]:before:inset-x-0 [&_button]:before:-inset-y-1 [&_button]:before:content-['']">
             <PeriodoSelect
               valor={periodoAUrl(periodo)}
               opciones={opciones}
               onChange={onPeriodoChange}
               disabled={loading}
             />
+          </div>
+          {botonRango}
           </div>
           )
         }
@@ -418,7 +456,8 @@ export function VentasShell({
         <div data-selector-periodo-ventas className="flex flex-wrap items-center gap-2">
           {/* 🔴 VENTAS_APPLE_2026_10: en el Resumen, el MISMO selector de
               Comisiones que ya tiene el celular (año · «Todo el año» · un mes). */}
-          {VENTAS_APPLE_2026_10 && tab === "resumen" ? (
+          {enRango ? botonRango : VENTAS_APPLE_2026_10 && tab === "resumen" ? (
+            <>
             <ComisionesPeriodo
               year={selectedYear}
               mes={Number(mesResumen) || 0}
@@ -429,13 +468,18 @@ export function VentasShell({
                 setMesResumen(String(m));
               }}
             />
+            {botonRango}
+            </>
           ) : (
+          <>
           <PeriodoSelect
             valor={periodoAUrl(periodo)}
             opciones={opciones}
             onChange={onPeriodoChange}
             disabled={loading}
           />
+          {botonRango}
+          </>
           )}
         </div>
       </header>
@@ -469,7 +513,9 @@ export function VentasShell({
         )}
 
         <TabsContent value="resumen" className={barra ? "mt-0" : "mt-5"}>
-          {resumen ? (
+          {periodo.tipo === "rango" && tab === "resumen" ? (
+            <ResumenRango desde={periodo.desde} hasta={periodo.hasta} celular={barra} />
+          ) : resumen ? (
             <ResumenView
               data={resumen}
               multi={multi}

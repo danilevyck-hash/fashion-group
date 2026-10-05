@@ -93,7 +93,9 @@ const OTROS_CLIENTES_PISTA = "Tocar para ver el detalle";
 const textoComparativo = (anio: number, periodo: PeriodoVentas) =>
   periodo.tipo === "ultimos"
     ? "vs mismos meses del año anterior"
-    : `vs mismo período de ${anio}`;
+    : periodo.tipo === "rango"
+      ? `vs mismos días de ${anio}`
+      : `vs mismo período de ${anio}`;
 
 /** «6 empresas» / «1 empresa». El número es lo que varía; la palabra acompaña.
  *  Una sola función para la tabla y para la tarjeta: dos formas de decirlo son
@@ -107,6 +109,7 @@ export function textoEmpresas(n: number): string {
  *  en las dos pantallas. */
 export function textoSinCompras(anio: number, periodo?: PeriodoVentas): string {
   if (periodo && periodo.tipo === "ultimos") return `clientes sin compras en los últimos ${periodo.n} meses`;
+  if (periodo && periodo.tipo === "rango") return "clientes sin compras en el rango";
   return `clientes sin compras en ${anio}`;
 }
 
@@ -238,11 +241,14 @@ export function ClientesView({
   // la vista todavía no trae esa suma (migración pendiente) o el año está
   // cerrado, el servidor sirvió el AÑO y la columna dice el año. Nunca se
   // rotula un período que no se sumó.
-  const periodoServido: PeriodoVentas = data.ventana
-    ? { tipo: "ultimos", n: data.ventana }
-    : { tipo: "anio", anio: selectedYear };
+  const periodoServido: PeriodoVentas = data.rango
+    ? { tipo: "rango", ...data.rango }
+    : data.ventana
+      ? { tipo: "ultimos", n: data.ventana }
+      : { tipo: "anio", anio: selectedYear };
   const ventanaPedida = ventanaParaClientes(periodo);
-  const qsVentana = ventanaPedida ? `&ventana=${ventanaPedida}` : "";
+  const qsVentana = (ventanaPedida ? `&ventana=${ventanaPedida}` : "")
+    + (periodo.tipo === "rango" ? `&desde=${periodo.desde}&hasta=${periodo.hasta}` : "");
   // 🔴 VENTAS_APPLE_2026_10: la hora la dice la línea de frescura común; «datos de hoy …» se iba a repetir.
   const frescura = VENTAS_APPLE_2026_10 ? null : textoFrescura(data.actualizadoAt);
 

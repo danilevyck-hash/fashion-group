@@ -215,6 +215,12 @@ const PERMITIDOS = new Set([path.join("lib", "variacion.ts")]);
  */
 const EXCEPCIONES = new Map<string, string>([
   [
+    path.join("lib", "ventas", "clientes-rango-server.ts"),
+    "Ventas › Clientes con «Rango de fechas» (5-oct-2026): es el ESPEJO de `clientes_anio` en SQL " +
+      "(`prev > 0 → (actual − prev) / prev`), igual que `deltaComoLaVista`; con otro umbral la columna " +
+      "no daría lo mismo que el año.",
+  ],
+  [
     path.join("lib", "ventas", "queries.ts"),
     "Ventas › Clientes, «Últimos 12/6 meses» (11-sep-2026): `deltaComoLaVista` es el ESPEJO de la regla " +
       "que la vista escribe en SQL para el año (`WHEN prev > 0`, sin el piso de $100). La columna de cambio " +

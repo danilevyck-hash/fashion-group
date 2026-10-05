@@ -6,6 +6,7 @@ import { lineaDeRechazos } from "@/lib/rechazos-de-switch";
 import { VentasShell } from "./VentasShell";
 import { verifySession } from "@/lib/session-cookie";
 import { hoyPanama } from "@/lib/fecha-panama";
+import { rangoValido } from "@/lib/ventas/rango-ventas";
 import { anioDelPeriodo, periodoAUrl, periodoDesdeUrl, ventanaParaClientes, PARAM_PERIODO_VENTAS } from "@/lib/ventas/periodo";
 
 export const dynamic = "force-dynamic";
@@ -41,8 +42,11 @@ export default async function VentasPage({
   // `?periodo=2025` o `?periodo=u12`, el servidor arma ESE período y no el año
   // en curso — así la pantalla no pide dos veces. Basura → el año en curso.
   const rawPeriodo = searchParams?.[PARAM_PERIODO_VENTAS];
-  const periodo = periodoDesdeUrl(Array.isArray(rawPeriodo) ? rawPeriodo[0] : rawPeriodo)
-    ?? { tipo: "anio" as const, anio: anioEnCurso };
+  const pedido = periodoDesdeUrl(Array.isArray(rawPeriodo) ? rawPeriodo[0] : rawPeriodo);
+  // Un rango que no sirve (futuro, más de 2 años) cae al año en curso.
+  const periodo = pedido && (pedido.tipo !== "rango" || rangoValido(pedido.desde, pedido.hasta, hoy))
+    ? pedido
+    : { tipo: "anio" as const, anio: anioEnCurso };
   const year = anioDelPeriodo(periodo, anioEnCurso);
   const ventana = ventanaParaClientes(periodo);
   // mes 1-indexed = mes en curso del calendario. multifashion_mensual_v6
@@ -61,7 +65,7 @@ export default async function VentasPage({
       console.error("[ventas] resumen error", err);
       return null;
     }),
-    fetchClientes({ year, ventana }).catch(err => {
+    fetchClientes({ year, ventana, rango: periodo.tipo === "rango" ? { desde: periodo.desde, hasta: periodo.hasta } : null }).catch(err => {
       console.error("[ventas] clientes error", err);
       return null;
     }),

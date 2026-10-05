@@ -264,6 +264,8 @@ export type Clientes = {
    *  no tiene, acá viene `null` y la columna dice el año: nunca se afirma un
    *  período que no se sumó. */
   ventana?: 6 | 12 | null;
+  /** 🔴 El rango que se SIRVIÓ (5-oct-2026), si se pidió uno. */
+  rango?: { desde: string; hasta: string } | null;
   /** Cuándo se refrescó por última vez la vista de la que sale la lista (ISO).
    *  null cuando no hay marca todavía. Alimenta la línea de frescura. */
   actualizadoAt?: string | null;

@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { fetchClientes } from "@/lib/ventas/queries";
+import { rangoValido } from "@/lib/ventas/rango-ventas";
 
 export const dynamic = "force-dynamic";
 // Mismo load anual de Ventas (cruza el empalme switch_facturas/ventas_raw).
@@ -29,8 +30,16 @@ export async function GET(req: NextRequest) {
   const ventanaRaw = req.nextUrl.searchParams.get("ventana");
   const ventana: 6 | 12 | null = ventanaRaw === "12" ? 12 : ventanaRaw === "6" ? 6 : null;
 
+  // 🔴 «Rango de fechas» (5-oct-2026): ?desde=&hasta= manda sobre el año.
+  const desde = req.nextUrl.searchParams.get("desde");
+  const hasta = req.nextUrl.searchParams.get("hasta");
+  const rango = desde || hasta ? rangoValido(desde, hasta) : null;
+  if ((desde || hasta) && !rango) {
+    return NextResponse.json({ error: "Rango de fechas inválido" }, { status: 400 });
+  }
+
   try {
-    const clientes = await fetchClientes({ year, empresaKey: empresa, ventana });
+    const clientes = await fetchClientes({ year, empresaKey: empresa, ventana, rango });
     return NextResponse.json(clientes);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "error inesperado";
