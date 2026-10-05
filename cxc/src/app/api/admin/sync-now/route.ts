@@ -33,6 +33,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
+import { logActivity } from "@/lib/log-activity";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import {
@@ -304,6 +305,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
   }
 
+  // Bitácora: cada clic que pasó la validación queda en activity_logs con el
+  // mismo formato que las entradas al sistema (login). Nunca rompe la respuesta.
+  const empresaLog = cfg.empresaFija ?? empresa;
+  const empresas = empresaLog ? [empresaLog] : [];
+  const registrar = (resultado: string, detalle?: string) =>
+    logActivity(
+      auth.role,
+      "sync_now",
+      "sync",
+      { userName: auth.userName, modulo, empresas, resultado, ...(detalle ? { detalle } : {}) },
+      auth.userName,
+    ).catch(() => {});
+
   const ahora = new Date();
 
   // ── Candado de 2 capas (running + cooldown) ────────────────────────────────
@@ -330,6 +344,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     lastSuccessFinishedAt,
   });
   if (bloqueo) {
+    await registrar(bloqueo.motivo);
     return NextResponse.json(bloqueo, { status: 409 });
   }
 
@@ -339,18 +354,27 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const r = await ejecutar(modulo, empresa);
     if ("error" in r) {
       // Raza contra el lock real: otro disparo ganó el insert de 'running'.
-      if (isRunningLockConflict(r.error)) return respuestaLockOcupado();
+      if (isRunningLockConflict(r.error)) {
+        await registrar("running");
+        return respuestaLockOcupado();
+      }
       console.error(`[sync-now] ${modulo}${empresa ? `/${empresa}` : ""} falló: ${r.error}`);
+      await registrar("error", r.error);
       return NextResponse.json(
         { error: "No se pudo actualizar. Intenta de nuevo en unos minutos." },
         { status: 500 },
       );
     }
+    await registrar("ok", r.resumen);
     return NextResponse.json({ ok: true, duracionMs: Date.now() - t0, resumen: r.resumen });
   } catch (err) {
-    if (isRunningLockConflict(err)) return respuestaLockOcupado();
+    if (isRunningLockConflict(err)) {
+      await registrar("running");
+      return respuestaLockOcupado();
+    }
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[sync-now] ${modulo}${empresa ? `/${empresa}` : ""} threw: ${msg}`);
+    await registrar("error", msg);
     return NextResponse.json(
       { error: "No se pudo actualizar. Intenta de nuevo en unos minutos." },
       { status: 500 },
