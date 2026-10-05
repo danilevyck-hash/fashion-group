@@ -202,6 +202,10 @@ describe("candado estructural — /api/multifashion/**", () => {
       "metas",
       "overview",
       "productos",
+      // 5-oct-2026 · NOTA FECHADA — `resumen-rango`: el Resumen con «Rango de
+      // fechas». `requireRole(req, ROLES_MULTIFASHION)`, solo lee, sin empresa
+      // de la URL.
+      "resumen-rango",
       "retail-recurrentes",
       "vendedoras",
       "venta-hoy",

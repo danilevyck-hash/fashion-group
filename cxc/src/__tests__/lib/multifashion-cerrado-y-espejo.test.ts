@@ -122,10 +122,11 @@ describe("🔴 /multifashion comprueba el rol ANTES de cargar la data", () => {
 describe("🔴 ninguna ruta de Multifashion escribe su lista de roles a mano", () => {
   const todas = rutas();
 
-  it("son las 12 de siempre (si nace una nueva, este número la delata)", () => {
+  // 5-oct-2026 · NOTA FECHADA — son 13: nació `resumen-rango` (ROLES_MULTIFASHION).
+  it("son las 13 de siempre (si nace una nueva, este número la delata)", () => {
     expect(todas.map((r) => r.grupo).sort()).toEqual([
       "bonos", "caja", "clientes-wholesale", "contactos", "detalle-mensual", "fidelizacion",
-      "metas", "overview", "productos", "retail-recurrentes", "vendedoras", "venta-hoy",
+      "metas", "overview", "productos", "resumen-rango", "retail-recurrentes", "vendedoras", "venta-hoy",
     ]);
   });
 

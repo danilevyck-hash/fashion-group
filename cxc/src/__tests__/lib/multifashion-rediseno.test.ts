@@ -191,13 +191,14 @@ describe("4 · un control de tiempo por pestaña", () => {
 
   it("🔴 cada pestaña ofrece SOLO lo que sabe servir", () => {
     // El Resumen es el detalle de UN mes; Productos consulta `periodo=mes|12m`.
-    expect(TIPOS_POR_TAB.resumen).toEqual({ mes: true, anio: false, ventanas: [] });
+    // 5-oct-2026 · NOTA FECHADA — el Resumen suma «Rango de fechas» (RESUMEN_RANGO_2026_10).
+    expect(TIPOS_POR_TAB.resumen).toEqual({ mes: true, anio: false, ventanas: [], rango: true });
     // 5-oct-2026 · NOTA FECHADA — Productos suma «Rango de fechas» (desde–hasta).
     expect(TIPOS_POR_TAB.productos).toEqual({ mes: true, anio: false, ventanas: [12], rango: true });
     expect(periodoSirve("productos", { tipo: "rango", desde: "2026-09-01", hasta: "2026-09-15" })).toBe(true);
     // 5-oct-2026 · NOTA FECHADA — Vendedoras y Clientes también sirven el rango.
     expect(periodoSirve("vendedoras", { tipo: "rango", desde: "2026-09-01", hasta: "2026-09-15" })).toBe(true);
-    expect(periodoSirve("resumen", { tipo: "rango", desde: "2026-09-01", hasta: "2026-09-15" })).toBe(false);
+    expect(periodoSirve("resumen", { tipo: "rango", desde: "2026-09-01", hasta: "2026-09-15" })).toBe(true);
     expect(TIPOS_POR_TAB.vendedoras.ventanas).toEqual([3, 6, 12]);
     expect(TIPOS_POR_TAB.clientes.ventanas).toEqual([3, 6, 12]);
     expect(periodoSirve("resumen", { tipo: "ultimos", n: 3 })).toBe(false);

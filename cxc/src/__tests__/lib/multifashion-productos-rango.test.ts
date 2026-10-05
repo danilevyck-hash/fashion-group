@@ -24,14 +24,14 @@ describe("el período «rango»", () => {
   });
   // 5-oct-2026 · NOTA FECHADA — Vendedoras y Clientes también ofrecen «Rango de
   // fechas» (Daniel: «flechita… acceso más rápido»). Solo el Resumen lo baja a su mes.
-  it("Productos, Vendedoras y Clientes lo ofrecen; el Resumen lo baja a su mes", () => {
+  // 5-oct-2026 · NOTA FECHADA — y el Resumen también (RESUMEN_RANGO_2026_10).
+  it("las cuatro pestañas lo ofrecen y ninguna lo baja a su mes", () => {
     const de = (tab: "productos" | "vendedoras" | "clientes" | "resumen") =>
       opcionesPeriodo({ tab, anios: [2026], corte }).filter((o) => o.valor === VALOR_RANGO);
-    for (const t of ["productos", "vendedoras", "clientes"] as const)
+    for (const t of ["productos", "vendedoras", "clientes", "resumen"] as const)
       expect(de(t)).toEqual([{ valor: VALOR_RANGO, label: ROTULO_RANGO, grupo: "Rangos" }]);
-    expect(de("resumen")).toEqual([]);
     expect(ajustarPeriodo({ tipo: "rango", desde: "2026-09-01", hasta: "2026-09-15" }, "resumen", corte))
-      .toEqual({ tipo: "mes", anio: 2026, mes: 9 });
+      .toEqual({ tipo: "rango", desde: "2026-09-01", hasta: "2026-09-15" });
   });
   it("al elegirlo abre con el mes que se miraba, nunca después de hoy", () => {
     expect(rangoInicial({ tipo: "mes", anio: 2026, mes: 10 }, corte, "2026-10-05"))

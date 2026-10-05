@@ -30,6 +30,7 @@ import { MULTIFASHION_CELULAR, type ClaveRenglon, type PantallaCelular } from "@
 import { cn } from "@/lib/utils";
 import { PRODUCTOS_FILTROS_2026_10 } from "@/lib/productos/filtros";
 import { ProductosFiltrosMf } from "./ProductosFiltrosMf";
+import { ResumenRangoMf } from "./ResumenRangoMf";
 
 // iPhone: los sub-tabs medían 36px de alto (py-2 + text-xs) — por debajo de los
 // 44 de la regla táctil, y son el control que más se toca del módulo. Con
@@ -100,6 +101,11 @@ export function MultifashionView({
         </TabsList>
 
         <TabsContent value="resumen" className={enCelular ? "mt-0 sm:mt-5" : "mt-5"}>
+          {/* 🔴 RESUMEN_RANGO_2026_10: con un rango, la venta retail del rango
+              contra los mismos días del año pasado. El mes no cambia. */}
+          {periodo.tipo === "rango" ? (
+            <ResumenRangoMf desde={periodo.desde} hasta={periodo.hasta} />
+          ) : (
           <MultifashionResumenView
             overview={data}
             selectedYear={selectedYear}
@@ -108,6 +114,7 @@ export function MultifashionView({
             syncTick={syncTick}
             celular={celular ? { ...celular, periodo, corte } : undefined}
           />
+          )}
         </TabsContent>
         <TabsContent value="vendedoras" className={enCelular ? "mt-0 sm:mt-5" : "mt-5"}>
           {/* `conMetas`: la pestaña Metas vive ADENTRO de ésta. La pestaña

@@ -192,7 +192,7 @@ export function MultifashionShell({
   // aunque estuvieras mirando agosto.
   const esHoy = esElMesDeHoy(periodo, corte);
   const diasMirados = diasDelMesMirado(periodo, corte, hoyIso);
-  const subtituloCel = tab === "resumen" && pantallaCel === "inicio"
+  const subtituloCel = tab === "resumen" && pantallaCel === "inicio" && periodo.tipo !== "rango"
     ? MF_DIA_2026_10
       // 🔴 `MF_DIA_2026_10`: «hoy $1,979 · ayer $X» (y la frescura detrás).
       ? subtituloHoyAyer({
@@ -416,6 +416,11 @@ export function MultifashionShell({
               {frescuraCel && <span className="text-sm text-gray-500">{frescuraCel}</span>}
             </div>
           ) : tab !== "resumen" && <div className="mt-2">{selectorPeriodo}</div>}
+          {/* 🔴 RESUMEN_RANGO_2026_10: el Resumen suma «Rango de fechas» bajo el mes;
+              con un rango dice «15–30 sep ✕» y el ✕ vuelve al mes. */}
+          {tab === "resumen" && pantallaCel === "inicio" && CALENDARIO_SIMPLE_2026_10 && TIPOS_POR_TAB.resumen.rango && (
+            <div className="mt-2">{botonRango}</div>
+          )}
           {(subtituloCel || (frescuraCel && !(tab !== "resumen" && CALENDARIO_SIMPLE_2026_10))) && (
             <p data-celular="subtitulo" className="mt-0.5 text-sm text-gray-500 tabular-nums">
               {subtituloCel}{subtituloCel && frescuraCel && " · "}{frescuraCel}

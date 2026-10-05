@@ -36,6 +36,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { TabMultifashion } from "@/lib/multifashion/pestanas";
+import { RESUMEN_RANGO_2026_10 } from "./resumen-rango";
 
 export type VentanaN = 3 | 6 | 12;
 
@@ -63,7 +64,9 @@ const MES_LARGO = [
 /** Qué tipos de período sabe servir cada pestaña. Ver la nota de arriba. */
 export const TIPOS_POR_TAB: Record<TabMultifashion, { mes: boolean; anio: boolean; ventanas: VentanaN[]; rango?: boolean }> = {
   // Detalle de UN mes: día por día, mejor/peor día, mismo mes del año anterior.
-  resumen:    { mes: true, anio: false, ventanas: [] },
+  // 🔴 5-oct-2026: «Rango de fechas» también acá (RESUMEN_RANGO_2026_10): la
+  // venta retail del rango contra los mismos días del año pasado.
+  resumen:    { mes: true, anio: false, ventanas: [], rango: RESUMEN_RANGO_2026_10 },
   // Reemplaza las SEIS píldoras: los meses cubren «en curso» y «cerrado», «Todo
   // el año» es el YTD de siempre, y las tres ventanas son las mismas de antes.
   // 🔴 5-oct-2026: «Rango de fechas» también acá, con la consulta por fechas de
