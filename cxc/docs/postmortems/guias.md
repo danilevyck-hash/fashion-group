@@ -2402,9 +2402,9 @@ Daniel: *«¿y si quiero mandar algo extra de la bodega que no está en el siste
 - Candado `guias-etiquetas-traslado`.
 - 🔴 **«Traslado» es un chip de la fila de EMPRESA** (2-oct-2026, Daniel: *«traslado sin factura es como si fuese una empresa»*): la pantalla preguntaba DOS veces por la empresa (la fila de las facturas y otra de chips dentro del traslado). Hoy hay UNA fila —las empresas del cliente y al final «Traslado»—: empresa → sus facturas; Traslado → Contenido · Bultos · un desplegable chico «Empresa: Ninguna» (solo sin facturas marcadas). Se fueron la fila «+ Traslado (sin factura)» y la segunda fila de chips. Tocar «Traslado» con facturas marcadas lo AGREGA al mismo envío sin borrarlas (volver a la empresa las muestra marcadas); «Quitar traslado» lo saca. Nada de lo que se guarda cambia. Candado `guias-etiquetas-traslado-orden` (una sola fila de empresa).
 
-## Lista, detalle y Etiquetas › envíos estilo Apple (4-oct-2026, propuesta)
+## Lista, detalle y Etiquetas › envíos estilo Apple (4-oct-2026, prendido el 5-oct-2026)
 
-Interruptor `GUIAS_LISTA_APPLE_2026_10` en `lib/guias/lista-apple-2026-10.ts`, **hoy `false`**. Solo pantalla: ninguna lectura, guardado ni papel cambia.
+Interruptor `GUIAS_LISTA_APPLE_2026_10` en `lib/guias/lista-apple-2026-10.ts`, **prendido el 5-oct-2026** (Daniel aprobó las capturas: «sigue»; «Vincular cliente» queda con «Editar» y el detalle compacto se prende con esto). Solo pantalla: ninguna lectura, guardado ni papel cambia.
 - **Lista**: arriba «3 guías hoy · 1 pendiente de despacho»; las pendientes de CUALQUIER fecha en su sección «Pendientes de despacho» (se va el aviso ámbar que repetía esas filas); el resto sigue al período con el MISMO selector de Ventas y Comisiones (`ComisionesPeriodo`, abre en el mes en curso, recordado en la sesión), en vez de «último mes + Ver guías más viejas»; buscar sigue buscando en todas. Un toque abre `/guias/[id]`: se van el acordeón (un segundo detalle) y el botón «Despachar» (iba a la misma página).
 - **Detalle**: toma el marco compacto del 2-oct (`GUIA_DETALLE_APPLE_2026_10`) y el chip «Pendiente» junto al título.
 - **Etiquetas › envíos**: arriba «4 envíos hoy · 1 pendiente de guía» (los chips dejan de contar); en el celular, tarjetas de dos líneas en vez de la tabla de 720 px con arrastre lateral.

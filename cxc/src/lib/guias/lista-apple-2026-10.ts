@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // GUÍAS · LA LISTA, EL DETALLE Y ETIQUETAS › ENVÍOS ESTILO APPLE (4-oct-2026,
-// propuesta «hoy vs recomendación», APAGADA hasta el «sí» de Daniel).
+// propuesta «hoy vs recomendación»; PRENDIDA el 5-oct-2026, Daniel: «sigue»).
 //
 // Daniel aprobó el 4-oct-2026 rediseñar todo el sistema «como lo haría Apple si
 // hiciera un ERP profesional». Las cuatro cosas que cambian:
@@ -26,8 +26,11 @@
 
 import { esTodoElAnio } from "@/lib/comisiones/periodo";
 
-/** 🔴 El interruptor. `false` = la lista, el detalle y Etiquetas de hoy. */
-export const GUIAS_LISTA_APPLE_2026_10 = false;
+/** 🔴 El interruptor. `false` = la lista, el detalle y Etiquetas del 4-oct-2026.
+ *  5-oct-2026: PRENDIDO. Daniel aprobó las capturas reales: «sigue». «Vincular
+ *  cliente» se hace con «Editar» en el detalle, y el detalle compacto del 2-oct
+ *  se prende junto con esto. */
+export const GUIAS_LISTA_APPLE_2026_10 = true;
 
 export interface PeriodoGuias {
   year: number;

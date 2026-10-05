@@ -1,6 +1,6 @@
 /**
  * CANDADO · GUÍAS: LA LISTA, EL DETALLE Y ETIQUETAS › ENVÍOS ESTILO APPLE
- * (4-oct-2026, `GUIAS_LISTA_APPLE_2026_10`, propuesta APAGADA).
+ * (4-oct-2026, `GUIAS_LISTA_APPLE_2026_10`; prendida el 5-oct-2026, Daniel: «sigue»).
  *
  * 1. Apagado, nada cambia: la fila abre el acordeón y el aviso ámbar sigue.
  * 2. Prendido: «N guías hoy · M pendientes de despacho» arriba; las pendientes
@@ -38,9 +38,11 @@ afterEach(() => {
 });
 
 describe("las cuentas", () => {
-  it("el interruptor nace apagado", async () => {
+  // 5-oct-2026: Daniel aprobó las capturas («sigue») y el interruptor se prendió.
+  // Antes este caso exigía `false`.
+  it("el interruptor está prendido (aprobado el 5-oct-2026)", async () => {
     const mod = await vi.importActual<typeof import("@/lib/guias/lista-apple-2026-10")>("@/lib/guias/lista-apple-2026-10");
-    expect(mod.GUIAS_LISTA_APPLE_2026_10).toBe(false);
+    expect(mod.GUIAS_LISTA_APPLE_2026_10).toBe(true);
   });
   it("período: mes exacto, o todo el año con mes 0", () => {
     expect(enElPeriodo("2026-10-01", { year: 2026, mes: 10 })).toBe(true);

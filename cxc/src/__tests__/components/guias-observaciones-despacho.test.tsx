@@ -21,6 +21,14 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
+// 5-oct-2026: `GUIAS_LISTA_APPLE_2026_10` se prendió (Daniel: «sigue»). Este
+// candado fija la pantalla de ANTES, así que la mira con el interruptor apagado;
+// la nueva la fija `guias-lista-apple-2026-10.test.tsx`.
+vi.mock("@/lib/guias/lista-apple-2026-10", async (orig) => ({
+  ...(await orig<typeof import("@/lib/guias/lista-apple-2026-10")>()),
+  GUIAS_LISTA_APPLE_2026_10: false,
+}));
 import { render, screen, cleanup, within } from "@testing-library/react";
 import type { Guia } from "@/app/guias/components/types";
 

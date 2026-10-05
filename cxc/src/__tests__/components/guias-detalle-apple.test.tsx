@@ -14,6 +14,14 @@
  * pasa (los setters y `onConfirmar`). El cuerpo del PUT lo arma el producto.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
+// 5-oct-2026: `GUIAS_LISTA_APPLE_2026_10` se prendió (Daniel: «sigue»). Este
+// candado fija la pantalla de ANTES, así que la mira con el interruptor apagado;
+// la nueva la fija `guias-lista-apple-2026-10.test.tsx`.
+vi.mock("@/lib/guias/lista-apple-2026-10", async (orig) => ({
+  ...(await orig<typeof import("@/lib/guias/lista-apple-2026-10")>()),
+  GUIAS_LISTA_APPLE_2026_10: false,
+}));
 import { render, screen, cleanup, fireEvent, act, waitFor } from "@testing-library/react";
 
 const flags = vi.hoisted(() => ({ detalle: false }));
