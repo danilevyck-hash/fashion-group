@@ -12,10 +12,11 @@
 // El de un solo día sigue la misma lógica: un toque elige y cierra.
 //
 // 🔴 `false` = todo como antes (los `<input type="date">` nativos y el texto de
-// siempre). Candado: `calendario-simple.test.ts`.
+// siempre). Candado: `calendario-simple.test.tsx`.
+// 🟢 PRENDIDO el 5-oct-2026: Daniel aprobó el mockup v5 («aprobado, dale»).
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const CALENDARIO_SIMPLE_2026_10 = false;
+export const CALENDARIO_SIMPLE_2026_10 = true;
 
 export const GUIA_PRIMER_DIA = "Toca el primer día";
 export const GUIA_ULTIMO_DIA = "Ahora el último día";

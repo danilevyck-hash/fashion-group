@@ -19,7 +19,7 @@ import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { CalendarDays } from "lucide-react";
 import DesplegableFlotante from "./DesplegableFlotante";
-import { ANCHO_CALENDARIO, ALTO_GUIA_Y_ATAJOS, Atajos } from "./RangoFechas";
+import { ALTO_GUIA_Y_ATAJOS, Atajos } from "./AtajosFecha";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { vidrioSobre, conVidrio, CLASE_VIDRIO, RADIO_VIDRIO } from "@/lib/ui/vidrio";
 import { CALENDARIO_SIMPLE_2026_10, GUIA_UN_DIA } from "@/lib/ui/calendario-simple";
@@ -50,10 +50,12 @@ export default function CampoFecha({ simple = CALENDARIO_SIMPLE_2026_10, rotulo,
   return <CampoFechaSimple {...props} rotulo={rotulo} />;
 }
 
-function CampoFechaSimple({
-  value = "", onChange, onBlur, min, max, disabled, className, style, id, placeholder,
-  "aria-label": ariaLabel, rotulo,
-}: Omit<Props, "simple">) {
+function CampoFechaSimple(props: Omit<Props, "simple">) {
+  const { value = "", onChange, onBlur, min, max, disabled, className, style, placeholder, rotulo } = props;
+  // El input nativo SE QUEDA, escondido: lleva el id, el rótulo, el valor y el
+  // `required` del formulario (un <label htmlFor> sigue apuntando a él, y al
+  // tocarlo abre el calendario). El botón solo dibuja.
+  const { className: _c, style: _s, placeholder: _p, rotulo: _r, type: _t, ...nativo } = props;
   const [abierto, setAbierto] = useState(false);
   const anclaRef = useRef<HTMLButtonElement>(null);
   useBodyScrollLock(abierto);
@@ -89,12 +91,18 @@ function CampoFechaSimple({
 
   return (
     <>
+      <input
+        {...nativo}
+        type="date"
+        value={value}
+        tabIndex={-1}
+        onFocus={() => { if (!disabled) setAbierto(true); }}
+        className="sr-only"
+      />
       <button
         ref={anclaRef}
         type="button"
-        id={id}
         disabled={disabled}
-        aria-label={ariaLabel}
         aria-haspopup="dialog"
         onClick={() => setAbierto((v) => !v)}
         style={style}
@@ -111,7 +119,8 @@ function CampoFechaSimple({
         abierto={abierto && typeof window !== "undefined" && !!window.matchMedia?.("(min-width: 1024px)").matches}
         anclaRef={anclaRef}
         onCerrar={cerrar}
-        ancho={ANCHO_CALENDARIO}
+        // El mismo ancho que el calendario de RangoFechas con atajos (7 × 44 + bordes + 48).
+        ancho={398}
         altoDeseado={420 + ALTO_GUIA_Y_ATAJOS}
         className={vidrioSobre("rounded-xl border border-gray-200 bg-white p-3 shadow-lg")}
       >

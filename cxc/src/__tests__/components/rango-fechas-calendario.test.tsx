@@ -279,7 +279,9 @@ describe("⛔ los presets ya no existen", () => {
     render(<RangoFechas desde="2026-08-01" hasta="2026-08-15" onChange={vi.fn()} />);
     fireEvent.click(screen.getAllByRole("button", { name: /15 días/ })[0]);
     await waitFor(() => expect(screen.queryAllByRole("dialog").length).toBeGreaterThan(0));
-    for (const t of ["Quincena en curso", "Quincena anterior", "Últimos 15 días", "Últimos 30 días", "Este mes"]) {
+    // «Este mes» volvió el 5-oct-2026 como atajo de FECHAS (CALENDARIO_SIMPLE_2026_10):
+    // del 1 a hoy, sin pretender ser una quincena. Los de quincena siguen fuera.
+    for (const t of ["Quincena en curso", "Quincena anterior", "Últimos 15 días", "Últimos 30 días"]) {
       expect(screen.queryByText(t), t).toBeNull();
     }
   });

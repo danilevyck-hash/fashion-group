@@ -12,8 +12,9 @@ import {
 } from "@/lib/ui/calendario-simple";
 
 describe("el interruptor", () => {
-  it("nace apagado hasta el «sí» de Daniel", () => {
-    expect(CALENDARIO_SIMPLE_2026_10).toBe(false);
+  // Prendido el 5-oct-2026: Daniel aprobó el mockup v5 («aprobado, dale»).
+  it("está prendido desde el 5-oct-2026 (Daniel: «aprobado, dale»)", () => {
+    expect(CALENDARIO_SIMPLE_2026_10).toBe(true);
   });
 });
 
@@ -45,7 +46,7 @@ describe("dos toques", () => {
 
 describe("CampoFecha", () => {
   it("apagado ES el input nativo, con las mismas props", () => {
-    const { container } = render(<CampoFecha value="2026-10-05" onChange={() => {}} max="2026-10-31" className="x" aria-label="Fecha" />);
+    const { container } = render(<CampoFecha simple={false} value="2026-10-05" onChange={() => {}} max="2026-10-31" className="x" aria-label="Fecha" />);
     const i = container.querySelector("input")!;
     expect(i.type).toBe("date");
     expect(i.value).toBe("2026-10-05");
@@ -56,7 +57,7 @@ describe("CampoFecha", () => {
   it("prendido: un toque elige el día, aplica y cierra", async () => {
     const onChange = vi.fn();
     render(<CampoFecha simple value="2026-10-05" onChange={onChange} aria-label="Fecha" />);
-    fireEvent.click(screen.getByRole("button", { name: "Fecha" }));
+    fireEvent.click(screen.getByRole("button", { name: /5 oct 2026/ }));
     expect(screen.getAllByText("Toca el día").length).toBeGreaterThan(0);
     const dia = await screen.findAllByRole("button", { name: /12 de octubre de 2026/ });
     fireEvent.click(dia[0]);

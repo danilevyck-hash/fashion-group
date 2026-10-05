@@ -52,7 +52,8 @@ describe("VENDEDORES_RANGO_2026_10", () => {
     expect(rangoDeAtajo("6m", hoy).desde).toBe("2026-04-02");
     expect(rangoDeAtajo("anio", hoy).desde).toBe("2026-01-01");
     expect(rangoDeAtajo("mes", "2026-03-31").desde).toBe("2026-03-01"); // 28-feb + 1
-    expect(periodoAnterior(rangoDeAtajo("semana", hoy))).toEqual({ desde: "2026-09-18", hasta: "2026-09-24" });
+    // CALENDARIO_SIMPLE_2026_10 (5-oct-2026): todo rango contra los MISMOS días del año pasado.
+    expect(periodoAnterior(rangoDeAtajo("semana", hoy))).toEqual({ desde: "2025-09-25", hasta: "2025-10-01" });
     expect(periodoAnterior(rangoDeAtajo("anio", hoy))).toEqual({ desde: "2025-01-01", hasta: "2025-10-01" });
     expect(periodoAnterior({ desde: "2028-01-01", hasta: "2028-02-29", atajo: "anio" }).hasta).toBe("2027-02-28");
   });
