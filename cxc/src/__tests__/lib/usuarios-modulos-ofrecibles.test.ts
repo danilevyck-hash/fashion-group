@@ -77,9 +77,13 @@ describe("🔴 la lista de módulos ofrecibles sale del catálogo, por rol", () 
     expect(puedeAbrirMarcacion({ role: "bodega", modules: ["guias"] })).toBe(false);
   });
 
-  it("🔴 el caso que lo destapó: Multifashion NO se le puede dar a una secretaria", () => {
-    expect(moduloOfrecible("secretaria", "multifashion")).toBe(false);
-    expect(modulosOfrecibles("secretaria").map((m) => m.key)).not.toContain("multifashion");
+  // 5-oct-2026 · NOTA FECHADA — la secretaria VE Multifashion (Daniel): el caso
+  // que lo destapó se resolvió abriéndole el módulo. Se sigue negando a quien no
+  // lo tiene en su rol.
+  it("🔴 el caso que lo destapó: Multifashion se ofrece solo a quien su rol lo abre", () => {
+    expect(moduloOfrecible("secretaria", "multifashion")).toBe(true);
+    expect(moduloOfrecible("vendedor", "multifashion")).toBe(false);
+    expect(modulosOfrecibles("bodega").map((m) => m.key)).not.toContain("multifashion");
     // Ni Boston, que es el otro módulo con guard por rol.
     expect(moduloOfrecible("secretaria", "boston")).toBe(false);
   });

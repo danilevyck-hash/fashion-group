@@ -45,7 +45,7 @@ export function PeriodoSelect({ valor, opciones, onChange, disabled }: PeriodoSe
             BLANCO (11-sep-2026). Con el placeholder, dice qué hacer. */}
         <SelectValue placeholder={PLACEHOLDER_PERIODO} />
       </SelectTrigger>
-      <SelectContent className="max-h-[60vh]">
+      <SelectContent align="end" className="max-h-[60vh]">
         {grupos.map((g) => (
           <div key={g.nombre}>
             <div className="px-2 py-1.5 text-xs font-medium uppercase tracking-wide text-gray-400">

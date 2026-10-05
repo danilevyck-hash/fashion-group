@@ -44,7 +44,7 @@ import { ROLES_MULTIFASHION } from "@/lib/multifashion/acceso";
 import { resolverTabMultifashion, type TabMultifashion } from "@/lib/multifashion/pestanas";
 import {
   ajustarPeriodo, anioDelPeriodo, etiquetaPeriodo, opcionesPeriodo, periodoAUrl,
-  periodoDesdeUrl, periodoPorDefecto, type CortePeriodo, type Periodo,
+  periodoDesdeUrl, periodoPorDefecto, rangoInicial, VALOR_RANGO, type CortePeriodo, type Periodo,
 } from "@/lib/multifashion/periodo";
 import {
   MULTIFASHION_CELULAR, diasDelMesMirado, encabezadoCelular, esElMesDeHoy,
@@ -54,6 +54,7 @@ import { useVentaHoy } from "@/lib/multifashion/venta-hoy-cliente";
 import type { Multifashion } from "@/components/ventas/types";
 import { tituloCelular } from "@/lib/navegacion/barra-controles-celular";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
+import RangoFechas from "@/components/ui/RangoFechas";
 import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
 
 // Fetcher puro del overview por año. SWR lo cachea por año → volver a un año ya
@@ -148,7 +149,12 @@ export function MultifashionShell({
     [tab, años, corte, mesesConDato],
   );
 
-  const onPeriodo = useCallback((valor: string) => setPeriodoRaw(valor), [setPeriodoRaw]);
+  // 🔴 «Rango de fechas» (5-oct-2026): elegirlo abre con el mes que se miraba
+  // y al lado aparece el calendario desde–hasta, el mismo de Comisiones.
+  const onPeriodo = useCallback(
+    (valor: string) => setPeriodoRaw(valor === VALOR_RANGO ? periodoAUrl(rangoInicial(periodo, corte, hoyIso)) : valor),
+    [setPeriodoRaw, periodo, corte, hoyIso],
+  );
   const onTab = useCallback((t: TabMultifashion) => setSubtabRaw(t), [setSubtabRaw]);
 
   // ── EL CELULAR: «un número y cuatro renglones» (24-sep-2026) ───────────────
@@ -242,6 +248,27 @@ export function MultifashionShell({
 
   if (!authChecked) return null;
 
+  const selectorPeriodo = (
+    <div className="flex flex-wrap items-center gap-2" data-selector-periodo>
+      <PeriodoSelect
+        valor={periodo.tipo === "rango" ? VALOR_RANGO : periodoAUrl(periodo)}
+        opciones={opciones}
+        onChange={onPeriodo}
+        disabled={loading}
+      />
+      {periodo.tipo === "rango" && (
+        <div className="min-w-[220px]">
+          <RangoFechas
+            desde={periodo.desde}
+            hasta={periodo.hasta}
+            label={null}
+            onChange={(d, h) => setPeriodoRaw(periodoAUrl({ tipo: "rango", desde: d, hasta: h }))}
+          />
+        </div>
+      )}
+    </div>
+  );
+
   const isClosedYear = selectedYear < currentYear;
 
   return (
@@ -296,12 +323,7 @@ export function MultifashionShell({
             <div className="hidden md:block">{accionesSync}</div>
           )}
         </div>
-        <PeriodoSelect
-          valor={periodoAUrl(periodo)}
-          opciones={opciones}
-          onChange={onPeriodo}
-          disabled={loading}
-        />
+        {selectorPeriodo}
       </header>
 
       {/* 🔴 EL ENCABEZADO DEL CELULAR (24-sep-2026): el mes es el título, «‹
@@ -334,6 +356,9 @@ export function MultifashionShell({
           <p data-celular="titulo" className={tituloCelular("text-3xl font-bold leading-tight tracking-tight text-gray-950")}>
             {encabezado.titulo}
           </p>
+          {/* 🔴 Productos elige su período también en el celular: mes, últimos
+              12 meses o «Rango de fechas» (5-oct-2026). */}
+          {tab === "productos" && <div className="mt-2">{selectorPeriodo}</div>}
           {(subtituloCel || frescuraCel) && (
             <p data-celular="subtitulo" className="mt-0.5 text-sm text-gray-500 tabular-nums">
               {subtituloCel}{subtituloCel && frescuraCel && " · "}{frescuraCel}

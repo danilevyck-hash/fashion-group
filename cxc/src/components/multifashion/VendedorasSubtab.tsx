@@ -139,6 +139,8 @@ interface VendedorasSubtabProps {
    * barras negras digan lo mismo y parezcan sumables. Hay barrido.
    */
   conTotalAPagar?: boolean;
+  /** La Δ contra el mismo mes del año pasado (la que tenía Comisiones). */
+  vsAnioPasado?: boolean;
 }
 
 /**
@@ -148,7 +150,7 @@ interface VendedorasSubtabProps {
  * hay que cambiarla, se cambia UNA vez y las dos puertas dicen lo mismo.
  * 🔴 Multifashion comisiona con OTRA base que el grupo: no se fusiona nada.
  */
-export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCelular, conTotalAPagar }: VendedorasSubtabProps) {
+export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCelular, conTotalAPagar, vsAnioPasado }: VendedorasSubtabProps) {
   const year = selectedYear;
   // La meta del celular abre la tarjeta de metas de siempre — no una nueva.
   const [metaAbiertaCel, setMetaAbiertaCel] = useState(false);
@@ -177,6 +179,8 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
       return { chip: `ultimos_${periodo.n}` as ChipKey, rpcMes: corte?.mes ?? enCursoMes };
     }
     if (periodo.tipo === "anio") return { chip: "ytd", rpcMes: enCursoMes };
+    // Vendedoras no ofrece rango (`ajustarPeriodo` lo baja a su mes).
+    if (periodo.tipo === "rango") return { chip: "mes_anterior", rpcMes: Number(periodo.hasta.slice(5, 7)) };
     // Un mes: «en curso» si es el mes de corte, «cerrado» si no. La distinción
     // solo cambia el RÓTULO — la RPC recibe el mismo `p_mes` en los dos casos.
     const esElDeCorte = corte != null && periodo.anio === corte.anio && periodo.mes === corte.mes;
@@ -205,7 +209,9 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
   // 🔴 2-oct-2026 (`MULTIFASHION_TOTAL_PERSONA_2026_10`): en Comisiones ›
   // Multifashion, la Δ va contra el MISMO MES DEL AÑO PASADO. La ruta trae la
   // venta de ese mes por vendedora; sin el interruptor, la URL es la de siempre.
-  const vsAnio = MULTIFASHION_TOTAL_PERSONA_2026_10 && conTotalAPagar === true && rpcPeriodo === "mes";
+  // 🔴 5-oct-2026: la Δ contra el año pasado es aparte (`vsAnioPasado`): el
+  // módulo sigue comparando contra el MES ANTERIOR aunque ahora traiga el total.
+  const vsAnio = MULTIFASHION_TOTAL_PERSONA_2026_10 && conTotalAPagar === true && vsAnioPasado === true && rpcPeriodo === "mes";
   if (vsAnio) params.set("vsAnio", "1");
   const vendedorasUrl = `/api/multifashion/vendedoras?${params.toString()}`;
 
@@ -469,6 +475,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
                 onAbrirMeta={() => setMetaAbiertaCel((v) => !v)}
                 conMetas={conMetas === true}
                 bonos={bonosDelChip}
+                totalPersona={totalPersona ? bonosDelChip : null}
                 pieBono={bonoPie ? <>{` · ${bonoPie}`}{iconoBono}</> : null}
               />
             </div>

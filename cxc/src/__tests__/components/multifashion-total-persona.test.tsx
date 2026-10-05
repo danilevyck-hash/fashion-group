@@ -70,7 +70,7 @@ const SEP_ABIERTO = { ...SEP_CERRADO, es_elegible: false } as BonosMultifashion;
 const respuesta = (body: unknown) => ({ ok: true, status: 200, json: async () => body });
 
 let urlsPedidas: string[] = [];
-async function pintar(bonos: BonosMultifashion, conTotalAPagar = true, anioPasado?: unknown) {
+async function pintar(bonos: BonosMultifashion, conTotalAPagar = true, anioPasado?: unknown, vsAnioPasado = anioPasado !== undefined) {
   urlsPedidas = [];
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
@@ -93,6 +93,7 @@ async function pintar(bonos: BonosMultifashion, conTotalAPagar = true, anioPasad
         periodo={{ tipo: "mes", anio: 2026, mes: 9 }}
         corte={{ anio: 2026, mes: 10 }}
         conTotalAPagar={conTotalAPagar}
+        vsAnioPasado={vsAnioPasado}
       />
     </SWRConfig>,
   );
@@ -274,6 +275,12 @@ describe("🔴 4 · la pantalla y el Excel con el año pasado", () => {
     cleanup(); vi.unstubAllGlobals();
     await pintar(SEP_CERRADO, false, SEP_2025);
     expect(urlsPedidas.some((u) => u.includes("vsAnio=1"))).toBe(false);
+    // 🔴 5-oct-2026: el módulo Multifashion trae el total a pagar pero sigue
+    // comparando contra el MES ANTERIOR (sin `vsAnioPasado`).
+    cleanup(); vi.unstubAllGlobals();
+    await pintar(SEP_CERRADO, true, SEP_2025, false);
+    expect(urlsPedidas.some((u) => u.includes("vsAnio=1"))).toBe(false);
+    expect(document.querySelector("[data-total-multifashion]")).not.toBeNull();
   });
 
   it("encabezado «Δ vs sep 2025», «Nueva» para Ana y los % contra el año pasado", async () => {

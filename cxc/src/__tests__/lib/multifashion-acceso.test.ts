@@ -253,7 +253,9 @@ describe("gerente_acs — un solo módulo, y sigue siendo ese", () => {
 
   it("y el módulo que sí es suyo no se le abrió a nadie más de rebote", () => {
     const mf = ALL_MODULES.find(m => m.key === "multifashion");
-    expect(mf?.roles).toEqual(["admin", ROL]);
+    // 5-oct-2026 · NOTA FECHADA — secretaria y contabilidad entran a MIRAR
+    // (Daniel). No es «de rebote»: es una lista escrita y decidida.
+    expect(mf?.roles).toEqual(["admin", ROL, "secretaria", "contabilidad"]);
     expect(mf?.href).toBe("/multifashion");
   });
 
@@ -263,7 +265,8 @@ describe("gerente_acs — un solo módulo, y sigue siendo ese", () => {
 
   it("los demás roles no ganaron ni perdieron Multifashion", () => {
     for (const rol of SYSTEM_ROLE_KEYS) {
-      if (rol === "admin" || rol === ROL) continue;
+      // 5-oct-2026: secretaria y contabilidad lo VEN (Daniel); nadie más.
+      if (rol === "admin" || rol === ROL || rol === "secretaria" || rol === "contabilidad") continue;
       expect(getDefaultModulesForRole(rol), `${rol} no debe ver Multifashion`)
         .not.toContain("multifashion");
     }

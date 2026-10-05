@@ -56,8 +56,12 @@ export const ROLES_ADMIN_METAS = ["admin"] as const;
  *
  * 🔴 Esta lista es la de VER. `ROLES_ADMIN_METAS` (crear/editar/retirar) no
  * cambió y sigue siendo solo admin.
+ *
+ * 🔁 5-oct-2026: VUELVE, con contabilidad. Daniel le abrió Multifashion a la
+ * secretaria para VER, y Comisiones dejó de ofrecer Multifashion: quien paga
+ * (contabilidad) mira el módulo. Las metas son parte de lo que se ve.
  */
-export const ROLES_LECTURA_METAS = ["admin", "gerente_acs"] as const;
+export const ROLES_LECTURA_METAS = ["admin", "gerente_acs", "secretaria", "contabilidad"] as const;
 
 /** ¿Este rol puede VER el avance de las metas? */
 export function puedeVerMetas(role: string | null | undefined): boolean {

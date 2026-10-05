@@ -717,3 +717,10 @@ Nueve mutaciones probadas a mano, **nueve cazadas**:
 - 🩸 La fila «YTD» pasa a «Año» con el total de la tarjeta (`fila-anio.ts`); el Δ va sobre los meses comparables. ⚠️ En el año en curso puede diferir por el día de corte.
 - 🩸 `SyncNowButton` con `roles={ROLES_MULTIFASHION}`; el rol sale de `lib/roles-etiquetas.ts`, derivado de `SYSTEM_ROLES`.
 - Candados: `acs-resumen-meta-ritmo.test.ts` · `multifashion-rediseno.test.ts` · `multifashion-rediseno-pantalla.test.tsx` · `multifashion-anio-una-vez.test.ts` · `roles-etiquetas.test.ts` · `multifashion-cerrado-y-espejo.test.ts`.
+
+## 5-oct-2026 — Rango de fechas en Productos, la secretaria lo ve y Comisiones lo suelta
+
+- **Productos › «Rango de fechas»** (`?mfPeriodo=2026-09-01_2026-09-15`): la ruta acepta `desde`/`hasta` (`leerRango`, tope 731 días) con las MISMAS lecturas y el comparativo del mismo rango un año antes. Medido: septiembre por mes y por rango 1–30 sep dan lo mismo (1.682 u · $44.372,86 · utilidad $13.941,16). Candado `multifashion-productos-rango`.
+- **Secretaria y contabilidad VEN el módulo** (Daniel: «que pueda VER Multifashion»): `modules.ts`, migración `20261228120000` (role_permissions + los overrides de Angela y andrea; revierte `20261118120000`). Escribe solo `ROLES_MULTIFASHION_ESCRITURA` (admin · `gerente_acs`); metas, solo admin. Multifashion va fija en la barra de la secretaria (`FIJAS_POR_ROL`).
+- **Comisiones ya no ofrece Multifashion** («para no enredar»): total por persona, bonos y la barra «TOTAL A PAGAR · Multifashion» viven en Multifashion › Vendedoras (`conTotalAPagar`); la Δ sigue contra el mes anterior (`vsAnioPasado` apagado). Septiembre 2026: $213,51 + $150 de bonos = $363,51.
+- **El selector «Octubre 2026» se abría fuera de la pantalla** en la computadora: ver `docs/diseno.md` › «Detalles aprendidos».

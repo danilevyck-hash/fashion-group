@@ -25,7 +25,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
-import { ROLES_MULTIFASHION } from "@/lib/multifashion/acceso";
+import { ROLES_MULTIFASHION, ROLES_MULTIFASHION_ESCRITURA } from "@/lib/multifashion/acceso";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { hoyPanama } from "@/lib/fecha-panama";
 import {
@@ -85,7 +85,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, ROLES_MULTIFASHION);
+  const auth = requireRole(req, ROLES_MULTIFASHION_ESCRITURA);
   if (auth instanceof NextResponse) return auth;
 
   let body: Record<string, unknown>;

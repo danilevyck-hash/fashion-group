@@ -212,12 +212,13 @@ describe("7p · Multifashion", () => {
     }
   });
 
-  it("su total es la SUMA de lo que se ve, y sale solo dentro de Comisiones", () => {
+  // 🔄 5-oct-2026 · NOTA FECHADA — Comisiones dejó de ofrecer Multifashion
+  // (Daniel: «para no enredar»): la barra se mudó a Multifashion › Vendedoras.
+  it("su total es la SUMA de lo que se ve, y sale en Multifashion › Vendedoras", () => {
     const fuente = leer("src/components/multifashion/VendedorasSubtab.tsx");
     expect(fuente).toContain("data-total-multifashion");
     expect(fuente).toContain("conTotalAPagar && sortedVendedoras.length > 0");
-    // El módulo Multifashion no la pide.
-    expect(leer("src/components/comisiones/ComisionesView.tsx")).toContain("conTotalAPagar={COMISIONES_CELULAR}");
+    expect(leer("src/components/multifashion/MultifashionView.tsx")).toMatch(/conTotalAPagar\s*\n?\s*\/?>/);
   });
 
   it("«1 ticket», no «1 tickets»", () => {

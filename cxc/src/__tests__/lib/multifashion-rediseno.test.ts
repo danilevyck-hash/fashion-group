@@ -192,7 +192,10 @@ describe("4 · un control de tiempo por pestaña", () => {
   it("🔴 cada pestaña ofrece SOLO lo que sabe servir", () => {
     // El Resumen es el detalle de UN mes; Productos consulta `periodo=mes|12m`.
     expect(TIPOS_POR_TAB.resumen).toEqual({ mes: true, anio: false, ventanas: [] });
-    expect(TIPOS_POR_TAB.productos).toEqual({ mes: true, anio: false, ventanas: [12] });
+    // 5-oct-2026 · NOTA FECHADA — Productos suma «Rango de fechas» (desde–hasta).
+    expect(TIPOS_POR_TAB.productos).toEqual({ mes: true, anio: false, ventanas: [12], rango: true });
+    expect(periodoSirve("productos", { tipo: "rango", desde: "2026-09-01", hasta: "2026-09-15" })).toBe(true);
+    expect(periodoSirve("vendedoras", { tipo: "rango", desde: "2026-09-01", hasta: "2026-09-15" })).toBe(false);
     expect(TIPOS_POR_TAB.vendedoras.ventanas).toEqual([3, 6, 12]);
     expect(TIPOS_POR_TAB.clientes.ventanas).toEqual([3, 6, 12]);
     expect(periodoSirve("resumen", { tipo: "ultimos", n: 3 })).toBe(false);
@@ -606,7 +609,9 @@ describe("11 · el encabezado del teléfono, de seis bloques a tres", () => {
 
   it("quedan tres bloques y en este orden: título+período · hoy · pestañas", () => {
     const cuerpo = shell.slice(shell.indexOf("<main"));
-    const iTitulo = cuerpo.indexOf("<PeriodoSelect");
+    // 5-oct-2026: el período va en `selectorPeriodo` (desplegable + rango).
+    expect(shell).toContain("<PeriodoSelect");
+    const iTitulo = cuerpo.indexOf("{selectorPeriodo}");
     const iHoy = cuerpo.indexOf("<VentaHoyCard");
     const iTabs = cuerpo.indexOf("<MultifashionView");
     expect(iTitulo).toBeGreaterThan(-1);

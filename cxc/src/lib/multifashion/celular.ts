@@ -405,8 +405,11 @@ export function lineaVendedora(args: {
 }
 
 /** Lo que se despliega al tocar el nombre: «Comisión $56.71 · tiquete promedio $43.94». */
-export function detalleVendedora(args: { comision: number; ticketPromedio: number }): string {
-  return `Comisión ${montoLargo(args.comision)} · tiquete promedio ${montoLargo(args.ticketPromedio)}`;
+export function detalleVendedora(args: { comision: number; ticketPromedio: number; bono?: number }): string {
+  const base = `Comisión ${montoLargo(args.comision)} · tiquete promedio ${montoLargo(args.ticketPromedio)}`;
+  // 🔴 5-oct-2026: lo que pagaba Comisiones › Multifashion, aquí. Con bono del
+  // mes cerrado, el total a pagar de la persona (comisión + bono).
+  return args.bono ? `${base} · bono ${montoLargo(args.bono)} · total a pagar ${montoLargo(args.comision + args.bono)}` : base;
 }
 
 /**

@@ -56,6 +56,13 @@ export const ROLES_VENDEDORAS_ESPEJO: string[] = [
   ...new Set([...ROLES_MULTIFASHION, ...ROLES_COMISIONES]),
 ];
 
+/**
+ * 🔴 Los que ESCRIBEN en el módulo (5-oct-2026): secretaria y contabilidad
+ * entraron a MIRAR. Hoy la única escritura del módulo fuera de las metas es
+ * anotar el contacto de la lista de llamar (`POST /api/multifashion/contactos`).
+ */
+export const ROLES_MULTIFASHION_ESCRITURA: string[] = ["admin", "gerente_acs"];
+
 /** ¿Este rol abre la PÁGINA /multifashion? */
 export function puedeAbrirMultifashion(role: string | null | undefined): boolean {
   return ROLES_MULTIFASHION.includes(role ?? "");

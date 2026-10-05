@@ -62,6 +62,15 @@ export const USO_MEDIDO_POR_ROL: Readonly<Record<string, readonly string[]>> = {
   contabilidad: ["asistencia", "prestamos"],
 };
 
+/**
+ * 🔴 Lo que va FIJO en la barra de un rol, antes del uso medido (5-oct-2026):
+ * Daniel le abrió Multifashion a la secretaria y pidió que esté en su barra.
+ * Sin esto quedaba detrás de sus módulos más usados, solo en «Más».
+ */
+export const FIJAS_POR_ROL: Readonly<Record<string, readonly string[]>> = {
+  secretaria: ["multifashion"],
+};
+
 /** El rótulo corto de la pestaña: «Guías de despacho» no cabe en 78 px. */
 const ROTULO_CORTO: Readonly<Record<string, string>> = {
   guias: "Guías",
@@ -95,7 +104,7 @@ export function pestanasDelRol(
   const todos = gruposDelCajon(role, fgModules).flatMap((g) => g.modulos);
   if (todos.length <= 1) return [];
   const delMenu = todos.filter((m) => m.href !== casaHref);
-  const uso = [...ordenDeLaPersona, ...(USO_MEDIDO_POR_ROL[role] ?? [])];
+  const uso = [...(FIJAS_POR_ROL[role] ?? []), ...ordenDeLaPersona, ...(USO_MEDIDO_POR_ROL[role] ?? [])];
   const rango = (k: string) => {
     const i = uso.indexOf(k);
     return i === -1 ? uso.length : i;

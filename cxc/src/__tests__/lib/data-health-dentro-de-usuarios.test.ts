@@ -126,7 +126,9 @@ const NO_ADMIN_ESPERADO: Record<string, string[]> = {
   // candado hizo lo suyo y frenó el build hasta acá. Detalle en
   // `cxc-secretaria-cobra.test.ts`.
   secretaria: ["catalogos", "guias", "asistencia", "reclamos", "cargar",
-    "comisiones", "marketing", "caja", "cheques", "directorio", "cxc"],
+    "comisiones", "marketing", "caja", "cheques", "directorio", "cxc",
+    // 5-oct-2026 · NOTA FECHADA — `multifashion` entra a MIRAR (Daniel). Cambio DELIBERADO.
+    "multifashion"],
   // 🔴 `asistencia` desde el 26-ago-2026: Daniel, textual *«julio usa el
   // usuario bodega, asi que ponlo ahi»* — para que Julio Garay apruebe las
   // horas extra que él mismo reporta. Cambio DELIBERADO, ajeno a esta mudanza.
@@ -142,7 +144,9 @@ const NO_ADMIN_ESPERADO: Record<string, string[]> = {
   // 23-sep-2026 · NOTA FECHADA — `marketing` entra por pedido de Daniel («lo ven
   // contabilidad, admin y secres»): entra a MIRAR. Cambio DELIBERADO; candado
   // `marketing-tiendas-y-marcas`.
-  contabilidad: ["proveedores", "asistencia", "gastos-contabilidad", "prestamos", "comisiones", "marketing"],
+  // 5-oct-2026 · NOTA FECHADA — `multifashion` entra a MIRAR: paga lo que salió
+  // de Comisiones › Multifashion. Cambio DELIBERADO.
+  contabilidad: ["proveedores", "asistencia", "gastos-contabilidad", "prestamos", "comisiones", "marketing", "multifashion"],
   vendedor: ["referencia", "cxc", "directorio", "catalogos", "guias"],
   gerente_acs: ["multifashion"],
 };

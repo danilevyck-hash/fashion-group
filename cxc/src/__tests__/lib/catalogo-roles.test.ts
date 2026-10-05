@@ -241,6 +241,11 @@ const MODULOS_POR_ROL_ESPERADOS: Record<string, string[]> = {
     // suyo y frenó el build hasta acá. Detalle en `cxc-secretaria-cobra.test.ts`
     // y migración `20261117120000_cxc_para_secretaria.sql`.
     "cxc",
+    // 5-oct-2026 · NOTA FECHADA — «multifashion» ENTRA, para MIRAR. Daniel:
+    // que la secretaria pueda ver Multifashion (y Comisiones deja de ofrecerlo).
+    // Lo que escribe sigue cerrado (`ROLES_MULTIFASHION_ESCRITURA`, metas solo
+    // admin). Migración `20261228120000_multifashion_para_secretaria_y_contabilidad.sql`.
+    "multifashion",
     // 10-sep-2026 · NOTA FECHADA — «packing-lists» salió de la lista porque el
     // MÓDULO se retiró (Daniel: «packing list no se usa, eliminar»;
     // `packing_lists` con 0 filas y una sola persona que lo usó, en abril). El
@@ -310,6 +315,10 @@ const MODULOS_POR_ROL_ESPERADOS: Record<string, string[]> = {
     "prestamos",
     "asistencia",
     "marketing",
+    // 5-oct-2026 · NOTA FECHADA — «multifashion» entra a MIRAR: el total a
+    // pagar de Multifashion salió de Comisiones y vive en Multifashion ›
+    // Vendedoras, y contabilidad es quien paga. Cambio DELIBERADO.
+    "multifashion",
   ],
   // `referencia` — mismo pedido del 12-ago-2026 de arriba (bodega).
   vendedor: ["cxc", "directorio", "catalogos", "guias", "referencia"],
@@ -347,7 +356,9 @@ describe("catálogos — los otros roles quedaron EXACTAMENTE igual", () => {
     // invariante: lo que se abrió es UN módulo decidido, no la compuerta.
     // ⚠️ CONTROL de que no se aflojó de más: `boston` entra a la lista, porque
     // la cartera de Boston sigue siendo de David y de nadie más.
-    const prohibidos = ["ventas", "vista-general", "multifashion", "boston", "proveedores",
+    // 5-oct-2026 · NOTA FECHADA — «multifashion» sale de los prohibidos (Daniel:
+    // que la secretaria lo VEA). Los demás se quedan.
+    const prohibidos = ["ventas", "vista-general", "boston", "proveedores",
       "gastos-contabilidad", "prestamos", "usuarios"];
     const suyos = getDefaultModulesForRole("secretaria");
     for (const m of prohibidos) {

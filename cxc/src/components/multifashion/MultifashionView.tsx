@@ -116,6 +116,10 @@ export function MultifashionView({
             corte={corte}
             conMetas
             enCelular={enCelular}
+            /* 🔴 5-oct-2026: lo que pagaba Comisiones › Multifashion vive aquí —
+               «Bono» y «Total a pagar» por persona y la barra «TOTAL A PAGAR ·
+               Multifashion»—. Comisiones ya no ofrece Multifashion. */
+            conTotalAPagar
           />
         </TabsContent>
         <TabsContent value="productos" className={enCelular ? "mt-0 sm:mt-5" : "mt-5"}>

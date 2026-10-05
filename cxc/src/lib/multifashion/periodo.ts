@@ -45,7 +45,9 @@ export type Periodo =
   /** El año entero (en el año en curso, lo que va del año). */
   | { tipo: "anio"; anio: number }
   /** Ventana rodante de N meses que TERMINA en el mes de corte. */
-  | { tipo: "ultimos"; n: VentanaN };
+  | { tipo: "ultimos"; n: VentanaN }
+  /** 🔴 Desde–hasta, días de Panamá (5-oct-2026). Solo Productos lo sabe servir. */
+  | { tipo: "rango"; desde: string; hasta: string };
 
 /** El mes más nuevo al que se puede llegar: hoy en Panamá, o el último cargado. */
 export interface CortePeriodo {
@@ -59,14 +61,16 @@ const MES_LARGO = [
 ];
 
 /** Qué tipos de período sabe servir cada pestaña. Ver la nota de arriba. */
-export const TIPOS_POR_TAB: Record<TabMultifashion, { mes: boolean; anio: boolean; ventanas: VentanaN[] }> = {
+export const TIPOS_POR_TAB: Record<TabMultifashion, { mes: boolean; anio: boolean; ventanas: VentanaN[]; rango?: boolean }> = {
   // Detalle de UN mes: día por día, mejor/peor día, mismo mes del año anterior.
   resumen:    { mes: true, anio: false, ventanas: [] },
   // Reemplaza las SEIS píldoras: los meses cubren «en curso» y «cerrado», «Todo
   // el año» es el YTD de siempre, y las tres ventanas son las mismas de antes.
   vendedoras: { mes: true, anio: true,  ventanas: [3, 6, 12] },
   // La ruta acepta `periodo=mes|12m` y nada más. No se inventan ventanas.
-  productos:  { mes: true, anio: false, ventanas: [12] },
+  // 🔴 «Rango de fechas» (Daniel, 5-oct-2026): los artículos vendidos entre
+  // dos fechas, con la ruta de siempre (`desde`/`hasta`).
+  productos:  { mes: true, anio: false, ventanas: [12], rango: true },
   // Reemplaza sus cuatro píldoras (Mes · 3m · 6m · 12m) y suma el año completo.
   clientes:   { mes: true, anio: true,  ventanas: [3, 6, 12] },
 };
@@ -76,6 +80,7 @@ export function periodoSirve(tab: TabMultifashion, p: Periodo): boolean {
   const t = TIPOS_POR_TAB[tab];
   if (p.tipo === "mes") return t.mes;
   if (p.tipo === "anio") return t.anio;
+  if (p.tipo === "rango") return !!t.rango;
   return t.ventanas.includes(p.n);
 }
 
@@ -83,6 +88,7 @@ export function periodoSirve(tab: TabMultifashion, p: Periodo): boolean {
 export function mesDelPeriodo(p: Periodo, corte: CortePeriodo): CortePeriodo {
   if (p.tipo === "mes") return { anio: p.anio, mes: p.mes };
   if (p.tipo === "anio") return { anio: p.anio, mes: p.anio === corte.anio ? corte.mes : 12 };
+  if (p.tipo === "rango") return { anio: Number(p.hasta.slice(0, 4)), mes: Number(p.hasta.slice(5, 7)) };
   return { anio: corte.anio, mes: corte.mes };
 }
 
@@ -102,12 +108,14 @@ export function ajustarPeriodo(p: Periodo, tab: TabMultifashion, corte: CortePer
 }
 
 // ── URL ──────────────────────────────────────────────────────────────────────
-// UN solo parámetro: `?mfPeriodo=`. `2026-09` · `2026` · `u3` · `u6` · `u12`.
+// UN solo parámetro: `?mfPeriodo=`. `2026-09` · `2026` · `u3` · `u6` · `u12`
+// · `2026-09-01_2026-10-04` (rango de fechas).
 // Es un filtro del MISMO nivel, así que va con `replace` (no cicla el back).
 
 export function periodoAUrl(p: Periodo): string {
   if (p.tipo === "mes") return `${p.anio}-${String(p.mes).padStart(2, "0")}`;
   if (p.tipo === "anio") return String(p.anio);
+  if (p.tipo === "rango") return `${p.desde}_${p.hasta}`;
   return `u${p.n}`;
 }
 
@@ -120,6 +128,10 @@ export function periodoDesdeUrl(raw: string | null | undefined): Periodo | null 
   if (!v) return null;
   const ventana = /^u(3|6|12)$/.exec(v);
   if (ventana) return { tipo: "ultimos", n: Number(ventana[1]) as VentanaN };
+  const rango = /^(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/.exec(v);
+  if (rango) return fechaValida(rango[1]) && fechaValida(rango[2]) && rango[1] <= rango[2]
+    ? { tipo: "rango", desde: rango[1], hasta: rango[2] }
+    : null;
   const mes = /^(\d{4})-(\d{2})$/.exec(v);
   if (mes) {
     const anio = Number(mes[1]);
@@ -136,12 +148,32 @@ export function periodoDesdeUrl(raw: string | null | undefined): Periodo | null 
   return null;
 }
 
+/** «2026-02-30» no es una fecha: se rechaza en vez de dejar que el servidor adivine. */
+function fechaValida(iso: string): boolean {
+  const d = new Date(`${iso}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === iso && iso >= "2000-01-01";
+}
+
+/** El valor de la opción «Rango de fechas» en el desplegable. */
+export const VALOR_RANGO = "rango";
+export const ROTULO_RANGO = "Rango de fechas";
+
+/** Al elegir «Rango de fechas» se abre con el mes que se miraba (hasta hoy). */
+export function rangoInicial(p: Periodo, corte: CortePeriodo, hoyIso: string): Periodo {
+  if (p.tipo === "rango") return p;
+  const m = mesDelPeriodo(p, corte);
+  const desde = `${m.anio}-${String(m.mes).padStart(2, "0")}-01`;
+  const fin = new Date(Date.UTC(m.anio, m.mes, 0)).toISOString().slice(0, 10);
+  return { tipo: "rango", desde, hasta: fin < hoyIso ? fin : hoyIso };
+}
+
 // ── Rótulos ──────────────────────────────────────────────────────────────────
 
 /** Lo que dice el botón del desplegable: «Septiembre 2026», «Últimos 3 meses». */
 export function etiquetaPeriodo(p: Periodo): string {
   if (p.tipo === "mes") return `${MES_LARGO[p.mes - 1]} ${p.anio}`;
   if (p.tipo === "anio") return `Todo el año ${p.anio}`;
+  if (p.tipo === "rango") return ROTULO_RANGO;
   return `Últimos ${p.n} meses`;
 }
 
@@ -179,6 +211,10 @@ export function opcionesPeriodo({ tab, anios, corte, mesesConDato }: ArgsOpcione
   }
 
   const listaAnios = [...new Set(anios.length > 0 ? anios : [corte.anio])].sort((a, b) => b - a);
+
+  if (t.rango) {
+    out.push({ valor: VALOR_RANGO, label: ROTULO_RANGO, grupo: "Rangos" });
+  }
 
   if (t.anio) {
     for (const a of listaAnios) {

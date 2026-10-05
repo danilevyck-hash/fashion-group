@@ -136,8 +136,8 @@ import type { Periodo } from "@/lib/multifashion/periodo";
 import { Aviso } from "@/components/ui/Aviso";
 
 type Vista = "categoria" | "articulo" | "marca";
-/** Lo que entiende la ruta: `periodo=mes|12m`. Nada más. */
-type PeriodoApi = "mes" | "12m";
+/** Lo que entiende la ruta: `periodo=mes|12m`, o `desde`/`hasta` (rango). */
+type PeriodoApi = "mes" | "12m" | "rango";
 
 interface RenglonMarca {
   marcaId: number | null;
@@ -232,7 +232,8 @@ export function ProductosSubtab({
 }: ProductosSubtabProps) {
   // El período del módulo, dicho en el vocabulario de la ruta.
   const periodo: PeriodoApi =
-    periodoModulo.tipo === "ultimos" && periodoModulo.n === 12 ? "12m" : "mes";
+    periodoModulo.tipo === "rango" ? "rango"
+      : periodoModulo.tipo === "ultimos" && periodoModulo.n === 12 ? "12m" : "mes";
   const [vista, setVista] = useState<Vista>("categoria");
   const [orden, setOrden] = useState<{ col: ColumnaRanking; dir: DireccionOrden }>(ORDEN_DEFAULT);
   const [texto, setTexto] = useState("");
@@ -242,7 +243,9 @@ export function ProductosSubtab({
   /** `null` = todas las marcas, que es como abre la pantalla. */
   const [marca, setMarca] = useState<GrupoMarcaId | null>(null);
 
-  const url = `/api/multifashion/productos?year=${selectedYear}&mes=${mes}&periodo=${periodo}`;
+  const url = periodoModulo.tipo === "rango"
+    ? `/api/multifashion/productos?desde=${periodoModulo.desde}&hasta=${periodoModulo.hasta}`
+    : `/api/multifashion/productos?year=${selectedYear}&mes=${mes}&periodo=${periodo}`;
   const { data: resp, error, isLoading, mutate } = useSWR<ProductosResp>(
     url,
     async (u: string) => {
@@ -263,12 +266,14 @@ export function ProductosSubtab({
   // no el estado local: para `gerente_acs` el servidor acota el pedido, y el
   // rótulo tiene que decir lo que se está viendo de verdad, no lo que se pidió.
   const rotuloPeriodo = resp
-    ? resp.periodo === "12m"
+    ? resp.periodo === "12m" || resp.periodo === "rango"
       ? `${fmtFecha(resp.desde)} – ${fmtFecha(resp.hasta)}`
       : `${MES_FULL[resp.mes - 1]} ${resp.year}`
     : periodo === "12m"
       ? "últimos 12 meses"
-      : `${MES_FULL[mes - 1]} ${selectedYear}`;
+      : periodoModulo.tipo === "rango"
+        ? `${fmtFecha(periodoModulo.desde)} – ${fmtFecha(periodoModulo.hasta)}`
+        : `${MES_FULL[mes - 1]} ${selectedYear}`;
 
   // ── EL FILTRO DE MARCA ────────────────────────────────────────────────────
   // Todo lo de abajo —el pulso, las dos listas, la alerta de margen, lo que más

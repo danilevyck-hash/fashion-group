@@ -80,6 +80,11 @@ Daniel, 2-oct-2026: *«cada vez que encontramos algo así de detalle, para que s
   - **No se quitan**: los avisos que piden actuar (errores, relojes sin señal, sin sincronizar), los estados vacíos y las etiquetas de campo.
   - Candado: `src/__tests__/textos-explicativos-al-pie.test.ts`.
 
+- **Una lista desplegable se abre pegada a su botón y dentro de la pantalla, también con la escala** (Daniel, 5-oct-2026, en Multifashion en la computadora: *«al tocar Octubre 2026 no me deja cambiar»*). La lista de meses se abría corrida 88 px a la derecha, cortada («Febrero 202…») y tapando el chip de «Ventas diarias». Causa: el `zoom` de la escala en `<html>` volvía a multiplicar la posición que Radix (Select, Popover, Tooltip) mide en píxeles de la pantalla.
+  - Arreglo común en `globals.css`: el envoltorio de Radix deshace la escala y su contenido la vuelve a poner. Lo propio de la casa ya dividía entre la escala (`escala-raiz.ts`).
+  - Un selector arriba a la derecha abre alineado a la derecha de su botón (`align="end"`).
+  - Medido en Chrome y WebKit a 1440 y 1920; Guías, Ventas y Comisiones (390 y 1440) ya cambiaban de mes bien. Candado `escala-flotantes.test.tsx`.
+
 ## Mockup: siempre, con capturas reales
 
 Daniel, 1-oct-2026: *«siempre mockup»* y *«dejamos fijo que las propuestas se muestran con capturas reales»*.

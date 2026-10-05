@@ -41,14 +41,14 @@ export function ComisionesPageClient({
         <div className={barra ? "-mx-4 -mt-2" : undefined}>
         {/* El ⚙ de Configuración (solo admin) vive AQUÍ, en el módulo
             Comisiones, no en la pestaña Comisiones de Ventas. */}
-        {/* `conMultifashion`: Multifashion es una opción más del selector y
-            vive SOLO en este módulo (6-sep-2026). Ventas ya tiene su propia
-            pestaña Multifashion. */}
+        {/* 🔴 SIN `conMultifashion` desde el 5-oct-2026 (Daniel: «para no
+            enredar»): Multifashion ya no es una opción del selector. Lo que se
+            pagaba aquí —total por persona, bonos y la barra «TOTAL A PAGAR ·
+            Multifashion»— vive en Multifashion › Vendedoras. */}
         <ComisionesView
           availableYears={availableYears}
           avisoMontos={avisoMontos}
           conConfiguracion
-          conMultifashion
           vistaPedida={vistaPedida}
         />
         </div>

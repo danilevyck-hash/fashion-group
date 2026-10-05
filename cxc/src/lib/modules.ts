@@ -148,7 +148,11 @@ export const ALL_MODULES: AppModule[] = [
   // ⚠️ Boston sigue afuera: esa cartera tiene su propia lista
   // (`ROLES_MODULO_BOSTON`) y la secretaria no está en ella.
   { key: "cxc",           label: "Cuentas por cobrar", href: "/cxc",            icon: CircleDollarSign, roles: [...ROLES_CXC],                                group: "ventas-clientes" },
-  { key: "multifashion",  label: "Multifashion",       href: "/multifashion",     icon: ShoppingBag,      roles: ["admin", "gerente_acs"],                      group: "ventas-clientes" },
+  // 🔴 5-oct-2026 (Daniel): la secretaria VE Multifashion, y contabilidad
+  // también —paga las comisiones, que salieron de Comisiones y viven en
+  // Multifashion › Vendedoras—. Las dos MIRAN: lo que escribe sigue con
+  // `ROLES_MULTIFASHION_ESCRITURA` (admin · gerente_acs) y metas, solo admin.
+  { key: "multifashion",  label: "Multifashion",       href: "/multifashion",     icon: ShoppingBag,      roles: ["admin", "gerente_acs", "secretaria", "contabilidad"], group: "ventas-clientes" },
   // 🔴 CONFECCIONES BOSTON — el módulo de David (27-ago-2026).
   //
   // Daniel, textual: *"si crea el usuario david, david debe de ver cxc boston…

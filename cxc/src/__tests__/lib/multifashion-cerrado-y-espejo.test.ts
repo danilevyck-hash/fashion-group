@@ -62,14 +62,19 @@ describe("🔴 una sola lista de roles, derivada del catálogo de módulos", () 
   it("ROLES_MULTIFASHION = lo que declara `src/lib/modules.ts` para la ficha", () => {
     const ficha = ALL_MODULES.find((m) => m.key === "multifashion")!;
     expect([...ROLES_MULTIFASHION].sort()).toEqual([...ficha.roles].sort());
-    expect([...ROLES_MULTIFASHION].sort()).toEqual(["admin", "gerente_acs"]);
+    // 5-oct-2026 · NOTA FECHADA — secretaria y contabilidad entran a MIRAR
+    // (Daniel: «que pueda VER Multifashion»; Comisiones deja de ofrecerlo).
+    expect([...ROLES_MULTIFASHION].sort()).toEqual(["admin", "contabilidad", "gerente_acs", "secretaria"]);
     expect(leer("src/lib/multifashion/acceso.ts")).toContain('ALL_MODULES.find((m) => m.key === "multifashion")');
   });
 
   it("🔴 quien NO tiene el módulo no abre la página; Jennifer sí", () => {
     expect(puedeAbrirMultifashion("gerente_acs")).toBe(true);
     expect(puedeAbrirMultifashion("admin")).toBe(true);
-    for (const rol of ["secretaria", "contabilidad", "vendedor", "bodega", "gerente_boston", "", null, undefined]) {
+    // 5-oct-2026: secretaria y contabilidad la abren para MIRAR.
+    expect(puedeAbrirMultifashion("secretaria")).toBe(true);
+    expect(puedeAbrirMultifashion("contabilidad")).toBe(true);
+    for (const rol of ["vendedor", "bodega", "gerente_boston", "", null, undefined]) {
       expect(puedeAbrirMultifashion(rol), `rol ${rol}`).toBe(false);
     }
   });
@@ -171,9 +176,10 @@ describe("🔴 ninguna ruta de Multifashion escribe su lista de roles a mano", (
 
 // ═══ 4. Las metas ════════════════════════════════════════════════════════════
 describe("🔴 metas: sale secretaria, se queda Jennifer, edita solo admin", () => {
-  it("la lista de lectura quedó en admin + gerente_acs", () => {
-    expect([...ROLES_LECTURA_METAS].sort()).toEqual(["admin", "gerente_acs"]);
-    expect(puedeVerMetas("secretaria")).toBe(false);
+  it("la lista de lectura: admin + gerente_acs, y desde el 5-oct-2026 secretaria y contabilidad (ver)", () => {
+    expect([...ROLES_LECTURA_METAS].sort()).toEqual(["admin", "contabilidad", "gerente_acs", "secretaria"]);
+    expect(puedeVerMetas("secretaria")).toBe(true);
+    expect(puedeVerMetas("vendedor")).toBe(false);
     expect(puedeVerMetas("gerente_acs")).toBe(true);
   });
 
@@ -243,12 +249,20 @@ describe("🔴 Multifashion en Comisiones: una opción más, nunca una suma", ()
       .toContain("const EMPRESAS = EMPRESAS_COMISIONAN;");
   });
 
-  it("Multifashion se ofrece SOLO en el módulo /comisiones, no en la pestaña de Ventas", () => {
+  it("🔄 5-oct-2026: Multifashion YA NO se ofrece en Comisiones (vive en su módulo)", () => {
+    // 🔄 NOTA FECHADA 5-oct-2026 — Daniel: quitar Multifashion del selector de
+    // Comisiones «para no enredar», porque ya se ve en el módulo Multifashion.
+    // Lo que se pagaba ahí (total por persona, bonos, la barra «TOTAL A PAGAR ·
+    // Multifashion») vive en Multifashion › Vendedoras (`conTotalAPagar`), y
+    // quien paga (contabilidad) entra al módulo. La bandera queda en la vista,
+    // apagada por defecto, y la página ya no la prende.
     // 🔄 CANDADO RE-APUNTADO EL 6-sep-2026: era una PESTAÑA y hoy es una opción
     // del único selector de empresa, debajo de una línea (Daniel: «multifashion
     // es una empresa más… cambio mi opinión de que sea un espejo»). La bandera
     // que la enciende es la misma.
-    expect(leer("src/app/comisiones/ComisionesPageClient.tsx")).toContain("conMultifashion");
+    expect(leer("src/app/comisiones/ComisionesPageClient.tsx")).not.toMatch(/^\s*conMultifashion\s*$/m);
+    expect(leer("src/components/multifashion/MultifashionView.tsx")).toContain("conTotalAPagar");
+    expect(ROLES_MULTIFASHION).toContain("contabilidad");
     expect(shell).toContain("conMultifashion = false");
     // Sin la bandera, la opción ni se ofrece ni se puede restaurar de memoria.
     expect(shell).toContain("conMultifashion || !esVistaMultifashion(o.valor)");

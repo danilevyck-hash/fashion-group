@@ -406,6 +406,23 @@ input, button, select, textarea {
   }
 }
 
+/* 🔴 LOS DESPLEGABLES DE RADIX (Select, Popover, Tooltip, HoverCard) TAMBIÉN
+   QUEDAN PEGADOS A SU BOTÓN CON LA ESCALA (5-oct-2026). Radix los ubica con un
+   `transform: translate(x, y)` medido en píxeles de la PANTALLA y el `zoom` de
+   <html> lo volvía a multiplicar. 🩸 Daniel, en Multifashion a 1440 con el menú
+   abierto: «al tocar Octubre 2026 no me deja cambiar» — la lista de meses se
+   corría 88 px a la derecha y se salía de la pantalla («Febrero 202…»), tapando
+   el chip de «Ventas diarias». El envoltorio deshace la escala (su translate
+   queda en píxeles de la pantalla, como lo midió Radix) y lo de adentro la
+   vuelve a poner: se ve igual de grande, pero en su lugar. Candado
+   `escala-flotantes.test.tsx`. */
+html:has(.escala-pantalla) [data-radix-popper-content-wrapper] {
+  zoom: calc(1 / var(--escala-pantalla, 1));
+}
+html:has(.escala-pantalla) [data-radix-popper-content-wrapper] > * {
+  zoom: var(--escala-pantalla, 1);
+}
+
 /* 🔴 VIDRIO v2 = EL LIQUID GLASS DE iOS 26 (2-oct-2026, `VIDRIO_V2_2026_10`).
    Daniel: «hazlo como Apple, último software». Cada valor sale de las fotos
    oficiales de Apple (Newsroom, WWDC25: el dock, las notificaciones de la

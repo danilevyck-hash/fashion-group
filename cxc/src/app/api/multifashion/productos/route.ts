@@ -11,6 +11,10 @@
 //   year    int — default: año actual
 //   mes     int — 1..12, default: mes en curso (año actual) / 12 (año cerrado)
 //   periodo "mes" | "12m" — default "mes"
+//   desde, hasta  YYYY-MM-DD — 🔴 «Rango de fechas» (5-oct-2026): si vienen los
+//                 dos, mandan sobre year/mes/periodo y la respuesta dice
+//                 `periodo: "rango"`. Mismas lecturas, mismas funciones, mismo
+//                 comparativo (el mismo rango un año antes): ninguna cuenta nueva.
 //
 // ⚠️ El default del PARÁMETRO es "mes" y el de la PANTALLA es "12m", y no es un
 // descuido: la ruta ya tenía llamadores (y candados) que piden un mes sin decir
@@ -90,6 +94,7 @@ import { ultimoDiaArticuloDiario } from "@/lib/ventas/ultimo-dia-cargado";
 import { agregarProductos, type FilaMarca } from "@/lib/multifashion/productos";
 import {
   agregarRanking,
+  leerRango,
   rango12Meses,
   rangoComparativo,
   type FilaArticuloDiario,
@@ -150,6 +155,10 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const sp = req.nextUrl.searchParams;
+  const rangoPedido = leerRango(sp.get("desde"), sp.get("hasta"));
+  if (rangoPedido && "error" in rangoPedido) {
+    return NextResponse.json({ error: rangoPedido.error }, { status: 400 });
+  }
   const yearParam = sp.get("year");
   const mesParam = sp.get("mes");
   const yearPedido = yearParam ? parseInt(yearParam, 10) : new Date().getFullYear();
@@ -174,16 +183,17 @@ export async function GET(req: NextRequest) {
   // acotada de `gerente_acs` se levantó el 13-ago-2026 (ver CLAUDE.md § Roles).
   // Lo que queda arriba es la validación de rango/enumerado, que protege a la
   // base de un parámetro absurdo y no depende del rol.
-  const periodo: "mes" | "12m" = periodoParam;
+  const periodo: "mes" | "12m" | "rango" = rangoPedido ? "rango" : periodoParam;
   const year = yearPedido;
   const mes = mesPedido;
 
   // `fecha` es DATE pelado, así que el período se acota con dos fechas de
   // calendario (nada de timestamps ni zonas horarias: no hay hora que correr).
   const ventana = rango12Meses(now);
-  const desde = periodo === "12m" ? ventana.desde : `${year}-${dd(mes)}-01`;
-  const hasta =
-    periodo === "12m"
+  const desde = rangoPedido ? rangoPedido.desde : periodo === "12m" ? ventana.desde : `${year}-${dd(mes)}-01`;
+  const hasta = rangoPedido
+    ? rangoPedido.hasta
+    : periodo === "12m"
       ? ventana.hasta
       : `${year}-${dd(mes)}-${dd(new Date(Date.UTC(year, mes, 0)).getUTCDate())}`;
 

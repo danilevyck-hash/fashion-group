@@ -162,6 +162,8 @@ export function computeRange(
   if (periodo.tipo === "anio") {
     return { fecha_inicio: `${periodo.anio}-01-01`, fecha_fin: `${periodo.anio}-12-31` };
   }
+  // Clientes no ofrece rango (`ajustarPeriodo` lo baja a su mes); si llega, se respeta tal cual.
+  if (periodo.tipo === "rango") return { fecha_inicio: periodo.desde, fecha_fin: periodo.hasta };
 
   const mm = String(mes).padStart(2, "0");
   const lastDay = new Date(selectedYear, mes, 0).getDate();

@@ -372,6 +372,25 @@ export interface RangoFechas {
  * PURO: recibe `ahora` explícito (nunca `new Date()` adentro) para poder probarlo
  * con fechas fijas — el bug de un borde de mes solo aparece 1 día de cada 30.
  */
+/** Un rango cabe en dos años: protege a la base de un pedido absurdo. */
+const MAX_DIAS_RANGO = 731;
+
+/** 🔴 «Rango de fechas» de Productos (5-oct-2026): `desde`/`hasta` → rango válido, `null` si no vino ninguno, o el error. */
+export function leerRango(
+  d: string | null,
+  h: string | null,
+): { desde: string; hasta: string } | { error: string } | null {
+  if (!d && !h) return null;
+  const ok = (v: string | null): v is string =>
+    !!v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`)) &&
+    new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v;
+  if (!ok(d) || !ok(h)) return { error: "desde/hasta inválidos (YYYY-MM-DD)" };
+  if (d < "2000-01-01" || d > h) return { error: "desde tiene que ser menor o igual que hasta" };
+  const dias = (Date.parse(`${h}T00:00:00Z`) - Date.parse(`${d}T00:00:00Z`)) / 86_400_000 + 1;
+  if (dias > MAX_DIAS_RANGO) return { error: `el rango no puede pasar de ${MAX_DIAS_RANGO} días` };
+  return { desde: d, hasta: h };
+}
+
 export function rango12Meses(ahora: Date): RangoFechas {
   const hoy = diaPanama(ahora);
   const anio = Number(hoy.slice(0, 4));

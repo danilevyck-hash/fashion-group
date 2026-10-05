@@ -137,3 +137,20 @@ describe("escala v3: el vidrio va sobre el mismo desplegable", () => {
     expect(desplegable).toMatch(/const z = escalaRaiz\(\);/);
   });
 });
+
+// 🔴 5-oct-2026 — LOS DESPLEGABLES DE RADIX TAMBIÉN. Daniel, en Multifashion a
+// 1440 con el menú abierto: «al tocar Octubre 2026 no me deja cambiar». Medido
+// en Chrome y WebKit: el `translate(1230px, …)` que Radix calcula en píxeles de
+// la pantalla se pintaba en x=1318 (×1,0714) y la lista se salía por la derecha.
+// Con la regla, la lista queda en x=1217–1410: pegada al borde DERECHO del botón.
+describe("escala v3: Select / Popover / Tooltip de Radix", () => {
+  const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
+  it("el envoltorio de Radix deshace la escala y su contenido la vuelve a poner", () => {
+    expect(css).toMatch(/html:has\(\.escala-pantalla\) \[data-radix-popper-content-wrapper\] \{\s*zoom: calc\(1 \/ var\(--escala-pantalla, 1\)\);/);
+    expect(css).toMatch(/html:has\(\.escala-pantalla\) \[data-radix-popper-content-wrapper\] > \* \{\s*zoom: var\(--escala-pantalla, 1\);/);
+  });
+  it("el período de Multifashion abre alineado a la DERECHA de su botón", () => {
+    const src = readFileSync(join(process.cwd(), "src/components/multifashion/PeriodoSelect.tsx"), "utf8");
+    expect(src).toContain('<SelectContent align="end"');
+  });
+});

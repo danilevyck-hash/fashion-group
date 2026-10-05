@@ -288,6 +288,7 @@ export function ComisionesView({
       periodo={multifashionConPeriodo ? periodoParaMultifashion(year, mes) : undefined}
       corte={multifashionConPeriodo ? corteParaMultifashion(hoyPanama()) : undefined}
       conTotalAPagar={COMISIONES_CELULAR}
+      vsAnioPasado
     />
   ) : esVistaGrupo(vista) ? (
     <ComisionesConsolidadoView

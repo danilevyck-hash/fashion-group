@@ -20,7 +20,7 @@ import { useState, type ReactNode } from "react";
 import useSWR from "swr";
 import { cn } from "@/lib/utils";
 import type { BonosMultifashion, VendedoraDetalle } from "@/components/ventas/types";
-import { chipDeBono } from "@/lib/multifashion/bono-linea";
+import { bonoDeFila, chipDeBono } from "@/lib/multifashion/bono-linea";
 import { ChipBono } from "../BonosSection";
 import { variacionPctDesdeRatio } from "@/lib/variacion";
 import { nombreEnPantalla } from "@/lib/multifashion/nombres";
@@ -51,12 +51,14 @@ interface Props {
   /** 🔁 1-oct-2026: los bonos del mes; con el mes CERRADO la ganadora y la
    *  gerente llevan su chip junto al nombre. `null` = sin chips. */
   bonos?: BonosMultifashion | null;
+  /** 🔴 5-oct-2026: con el mes CERRADO, el bono y el total a pagar al tocar. */
+  totalPersona?: BonosMultifashion | null;
   /** «· bono al cierre del mes ⓘ» con el mes en curso; va al final de la línea de abajo. */
   pieBono?: ReactNode;
 }
 
 export function VendedorasCelular({
-  vendedoras, ventasTotal, tiquetesTotal, rotuloDelta, anio, parcial, metaAbierta, onAbrirMeta, conMetas, bonos = null, pieBono = null,
+  vendedoras, ventasTotal, tiquetesTotal, rotuloDelta, anio, parcial, metaAbierta, onAbrirMeta, conMetas, bonos = null, pieBono = null, totalPersona = null,
 }: Props) {
   const [abierta, setAbierta] = useState<string | null>(null);
 
@@ -118,7 +120,7 @@ export function VendedorasCelular({
               </button>
               {estaAbierta && (
                 <p data-celular="vendedora-detalle" className="px-4 pb-3 text-sm text-gray-600 tabular-nums">
-                  {detalleVendedora({ comision: v.comision, ticketPromedio: v.ticket_promedio })}
+                  {detalleVendedora({ comision: v.comision, ticketPromedio: v.ticket_promedio, bono: bonoDeFila(v, totalPersona) })}
                 </p>
               )}
             </li>
