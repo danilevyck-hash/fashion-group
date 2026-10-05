@@ -677,6 +677,8 @@ export interface SwitchCronEntrada {
 }
 
 /** Espejo de vercel.json — entradas que tocan Switch, con sus empresas. */
+/** Empresas del cron sync-pedidos (Guías › Pedidos): las 6 del grupo. */
+const CRON_EMPRESAS_PEDIDOS = ["vistana", "fashion_wear", "fashion_shoes", "active_shoes", "active_wear", "joystep"];
 export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   // multifashion-sync (05:00, american_classic) se RETIRÓ el 26-jul-2026 junto
   // con la escritura de multifashion_tickets (tabla congelada, ver CLAUDE.md).
@@ -700,7 +702,7 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "switch-sync all", hhmmUtc: "0535", empresas: ["fashion_shoes", "fashion_wear"] },
   { cron: "switch-sync all", hhmmUtc: "0540", empresas: ["active_shoes", "joystep"] },
   // Guías › Pedidos (5-oct-2026): 30 min tras el «all» de 05:40 y 50 antes de sync-utilidad.
-  { cron: "sync-pedidos", hhmmUtc: "0610", empresas: ["vistana", "fashion_wear", "fashion_shoes", "active_shoes", "active_wear", "joystep"] },
+  { cron: "sync-pedidos", hhmmUtc: "0610", empresas: CRON_EMPRESAS_PEDIDOS },
   { cron: "switch-sync all", hhmmUtc: "0630", empresas: ["american_classic", "confecciones_boston"] },
   { cron: "sync-utilidad", hhmmUtc: "0700", empresas: CRON_EMPRESAS_UTILIDAD },
   { cron: "sync-recibos", hhmmUtc: "0750", empresas: CRON_EMPRESAS_RECIBOS },
@@ -828,6 +830,14 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "switch-sync facturas", hhmmUtc: "2300", empresas: CRON_EMPRESAS_VENTAS },
   { cron: "sync-recibos", hhmmUtc: "2315", empresas: CRON_EMPRESAS_RECIBOS },
   { cron: "switch-sync facturas", hhmmUtc: "0015", empresas: ["american_classic"] },
+  // Guías › Pedidos de día (5-oct-2026, Daniel): ~cada 2 h, como facturas, y
+  // a ≥15 min de toda entrada que comparta empresa.
+  { cron: "sync-pedidos", hhmmUtc: "1210", empresas: CRON_EMPRESAS_PEDIDOS },
+  { cron: "sync-pedidos", hhmmUtc: "1340", empresas: CRON_EMPRESAS_PEDIDOS },
+  { cron: "sync-pedidos", hhmmUtc: "1535", empresas: CRON_EMPRESAS_PEDIDOS },
+  { cron: "sync-pedidos", hhmmUtc: "1830", empresas: CRON_EMPRESAS_PEDIDOS },
+  { cron: "sync-pedidos", hhmmUtc: "2015", empresas: CRON_EMPRESAS_PEDIDOS },
+  { cron: "sync-pedidos", hhmmUtc: "2230", empresas: CRON_EMPRESAS_PEDIDOS },
 ];
 
 // ─── QUÉ ESCRIBE CADA ENTRADA DEL CRONOGRAMA, Y CUÁNTAS VECES AL DÍA ─────────

@@ -120,6 +120,11 @@ async function syncEmpresa(empresaKey: string, fichas: Set<string>, triggeredBy:
   }
 }
 
+/** UNA empresa, para «Actualizar» (sync-now). */
+export async function syncEmpresaPedidos(empresaKey: string, triggeredBy = "manual"): Promise<PedidosSyncResult> {
+  return syncEmpresa(empresaKey, await codigosConFicha(), triggeredBy);
+}
+
 export async function syncAllPedidos(triggeredBy = "cron"): Promise<PedidosSyncResult[]> {
   const fichas = await codigosConFicha();
   const out: PedidosSyncResult[] = [];

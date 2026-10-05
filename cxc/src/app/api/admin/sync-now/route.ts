@@ -41,6 +41,7 @@ import {
 } from "@/lib/switch-api/sync-empresa";
 import { syncEmpresaRecibos, mesesCronRecibos } from "@/lib/switch-api/sync-recibos";
 import { syncEmpresaProveedores } from "@/lib/switch-api/sync-proveedores";
+import { syncEmpresaPedidos } from "@/lib/switch-api/sync-pedidos";
 import { runRefreshVistas } from "@/lib/refresh-vistas";
 import { syncClientesMaster } from "@/lib/switch-api/sync-clientes-master";
 import { syncCatalogoReebok } from "@/lib/switch-api/sync-catalogo-reebok";
@@ -214,6 +215,11 @@ async function ejecutar(
       return {
         resumen: `${nombreEmpresa(r.empresaKey)}: cuentas por pagar al día (${r.proveedores} proveedores)`,
       };
+    }
+    case "pedidos": {
+      const r = await syncEmpresaPedidos(empresa as EmpresaKey, "manual");
+      if (!r.ok) return { error: r.error ?? "sync de pedidos falló" };
+      return { resumen: `${nombreEmpresa(r.empresaKey)}: ${r.pedidos} pedidos sin facturar` };
     }
     case "refresh-vistas": {
       // DB-only: rollup mensual + vw de clientes (paso final de la secuencia

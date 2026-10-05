@@ -15,7 +15,7 @@
 import { fechaPanamaDe } from "@/lib/fecha-panama";
 
 /** `false` = la pestaña no existe, la ruta contesta 404 y el cron no hace nada. */
-export const PEDIDOS_BODEGA_2026_10 = false;
+export const PEDIDOS_BODEGA_2026_10 = true;
 
 /** Quién ve la pestaña y marca (admin pasa siempre por `requireRole`). */
 export const PEDIDOS_BODEGA_ROLES = ["admin", "bodega"] as const;

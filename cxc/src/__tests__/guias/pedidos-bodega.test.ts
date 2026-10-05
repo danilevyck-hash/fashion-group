@@ -17,9 +17,12 @@ import {
 const leer = (p: string) => fs.readFileSync(path.resolve(__dirname, "../../..", p), "utf8");
 
 describe("pedidos de bodega — reglas de Daniel", () => {
-  it("nace APAGADO hasta su «sí»", () => {
-    expect(PEDIDOS_BODEGA_2026_10).toBe(false);
-    expect(puedeVerPedidosBodega("admin")).toBe(false);
+  it("prendido con el «sí» de Daniel (5-oct-2026); solo admin y bodega", () => {
+    expect(PEDIDOS_BODEGA_2026_10).toBe(true);
+    expect(puedeVerPedidosBodega("admin")).toBe(true);
+    expect(puedeVerPedidosBodega("bodega")).toBe(true);
+    expect(puedeVerPedidosBodega("secretaria")).toBe(false);
+    expect(puedeVerPedidosBodega("vendedor")).toBe(false);
   });
 
   it("SOLO dos estados", () => {

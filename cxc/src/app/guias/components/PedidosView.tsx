@@ -4,7 +4,8 @@
 // pantalla: «¿qué pedidos me faltan por preparar?». Lista del más viejo al más
 // nuevo; un toque cambia Pendiente ↔ Preparado. 🔴 Sin enlace a Etiquetas ni
 // a Guías (Daniel, 5-oct-2026). Solo LEE lo que trajo el cron de madrugada:
-// no abre Switch, por eso la línea de frescura va sin «Actualizar».
+// «Actualizar» trae las 6 empresas una tras otra por `sync-now` (módulo
+// «pedidos»), como Ventas y CxC con «Todas».
 
 import { useEffect, useState } from "react";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
@@ -13,8 +14,8 @@ import { useToast } from "@/components/ToastSystem";
 import { Aviso } from "@/components/ui/Aviso";
 import { fmtDate } from "@/lib/format";
 import { fechaPanamaDe, hoyPanama } from "@/lib/fecha-panama";
-import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
-import { ROTULO_ESTADO, lineaDePendientes, type EstadoPedido, type PedidoBodega } from "@/lib/guias/pedidos-bodega";
+import { B2B_EMPRESA_KEYS, nombreCortoEmpresa } from "@/lib/empresa-mapping";
+import { PEDIDOS_BODEGA_ROLES, ROTULO_ESTADO, lineaDePendientes, type EstadoPedido, type PedidoBodega } from "@/lib/guias/pedidos-bodega";
 
 type Filtro = EstadoPedido;
 const CHIPS: { value: Filtro; label: string }[] = [
@@ -32,18 +33,19 @@ export default function PedidosView() {
   const [error, setError] = useState(false);
   const [filtro, setFiltro] = useState<Filtro>("pendiente");
 
-  useEffect(() => {
-    let cancel = false;
-    fetch("/api/guias/pedidos", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-      .then((d: { pedidos: PedidoBodega[]; actualizado: string | null }) => {
-        if (cancel) return;
-        setPedidos(d.pedidos);
-        setActualizado(d.actualizado);
-      })
-      .catch(() => !cancel && setError(true));
-    return () => { cancel = true; };
-  }, []);
+  async function cargar() {
+    try {
+      const r = await fetch("/api/guias/pedidos", { cache: "no-store" });
+      if (!r.ok) throw new Error(String(r.status));
+      const d = (await r.json()) as { pedidos: PedidoBodega[]; actualizado: string | null };
+      setPedidos(d.pedidos);
+      setActualizado(d.actualizado);
+      setError(false);
+    } catch {
+      setError(true);
+    }
+  }
+  useEffect(() => { void cargar(); }, []);
 
   async function cambiar(p: PedidoBodega) {
     const nuevo: EstadoPedido = p.estado === "pendiente" ? "preparado" : "pendiente";
@@ -110,7 +112,14 @@ export default function PedidosView() {
           <p className="text-base font-semibold text-gray-900">
             {pedidos ? lineaDePendientes(pedidos, hoy) : " "}
           </p>
-          <LineaDeFrescura actualizado={actualizado} />
+          <LineaDeFrescura
+            actualizado={actualizado}
+            opciones={B2B_EMPRESA_KEYS.map((empresa) => ({ modulo: "pedidos", empresa, label: nombreCortoEmpresa(empresa) }))}
+            secuencial
+            engancharRunning
+            roles={[...PEDIDOS_BODEGA_ROLES]}
+            onSuccess={cargar}
+          />
         </div>
         {!barra && chips}
       </div>

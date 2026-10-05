@@ -35,6 +35,8 @@ import {
 import { RECIBOS_EMPRESA_KEYS } from "./sync-recibos";
 import { empresasConFacturas, empresasConCxp } from "./empresas";
 import { RUNNING_STALE_MIN } from "./sync-log";
+import { PEDIDOS_BODEGA_ROLES } from "@/lib/guias/pedidos-bodega";
+import { B2B_EMPRESA_KEYS as EMPRESAS_PEDIDOS } from "@/lib/empresa-mapping";
 import {
   REFRESH_VISTAS_HEARTBEAT,
   REFRESH_VISTAS_CRON_HEARTBEAT,
@@ -51,6 +53,7 @@ export const SYNC_NOW_MODULOS = [
   "catalogo-calvin",
   "proveedores",
   "refresh-vistas",
+  "pedidos",
 ] as const;
 
 export type SyncNowModulo = (typeof SYNC_NOW_MODULOS)[number];
@@ -72,6 +75,9 @@ export function isSyncNowModulo(s: string): s is SyncNowModulo {
 export function rolesSyncNow(modulo: SyncNowModulo): string[] {
   if (modulo === "proveedores") return ["admin", "secretaria", "contabilidad"];
   if (modulo === "refresh-vistas") return ["admin", "secretaria"];
+  // Guías › Pedidos: los que ven la pestaña (admin · bodega) más secretaria,
+  // que está en TODOS los módulos (candado `sync-now-candado`).
+  if (modulo === "pedidos") return ["secretaria", ...PEDIDOS_BODEGA_ROLES];
   return ["admin", "secretaria", "vendedor"];
 }
 
@@ -119,6 +125,8 @@ export function moduloConfig(modulo: SyncNowModulo): ModuloConfig {
     case "proveedores":
       // CxP por empresa: 6 B2B + Multifashion (empresasConCxp; Boston no tiene).
       return { empresas: empresasConCxp(), syncType: "proveedores", tocaSwitch: true };
+    case "pedidos":
+      return { empresas: EMPRESAS_PEDIDOS, syncType: "pedidos", tocaSwitch: true };
     case "refresh-vistas":
       // DB-only (RPCs de MVs de Ventas): sin empresa, sin Switch, sin lock de
       // switch_sync_log (CONCURRENTLY tolera corridas simultáneas). El cooldown

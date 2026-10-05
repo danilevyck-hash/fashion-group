@@ -39,6 +39,12 @@ vi.mock("@/lib/guias/lista-apple-2026-10", async (orig) => ({
   ...(await orig<typeof import("@/lib/guias/lista-apple-2026-10")>()),
   GUIAS_LISTA_APPLE_2026_10: false,
 }));
+// Este candado mira la LISTA de guías: con «Pedidos» prendido (5-oct-2026)
+// Guías abre en Pedidos, así que aquí la pestaña se apaga.
+vi.mock("@/lib/guias/pedidos-bodega", async (orig) => ({
+  ...(await orig<typeof import("@/lib/guias/pedidos-bodega")>()),
+  puedeVerPedidosBodega: () => false,
+}));
 import { render, cleanup, act, fireEvent, within, waitFor } from "@testing-library/react";
 
 const ROUTER = { push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), back: vi.fn(), prefetch: vi.fn() };

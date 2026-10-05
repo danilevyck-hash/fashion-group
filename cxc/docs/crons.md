@@ -14,7 +14,7 @@
 | /api/cron/switch-sync tipo=all (vistana, active_wear) | 05:30 |
 | /api/cron/switch-sync tipo=all (fashion_shoes, fashion_wear) | 05:35 |
 | /api/cron/switch-sync tipo=all (active_shoes, joystep) | 05:40 |
-| /api/cron/sync-pedidos | 06:10 (01:10 de Panamá) — Guías › Pedidos: los pedidos ACTIVOS (sin facturar) de Switch de las 6 del grupo → `switch_pedidos`; fuera TCKCTA, 12188 y quien no tiene ficha. A 30 min del `all` de 05:40 y 50 de `sync-utilidad`. Con `PEDIDOS_BODEGA_2026_10 = false` no abre Switch |
+| /api/cron/sync-pedidos | 06:10 (01:10 de Panamá) y de día **12:10, 13:40, 15:35, 18:30, 20:15, 22:30** (07:10 · 08:40 · 10:35 · 13:30 · 15:10 · 17:30 de Panamá; 7 entradas, ~cada 2 h como facturas, cada una a ≥15 min de los crons de las mismas empresas) — Guías › Pedidos: los pedidos ACTIVOS (sin facturar) de Switch de las 6 del grupo → `switch_pedidos`; fuera TCKCTA, 12188 y quien no tiene ficha. A 30 min del `all` de 05:40 y 50 de `sync-utilidad`. «Actualizar» en la pestaña dispara el mismo sync por `sync-now` (módulo `pedidos`, admin y bodega). Con `PEDIDOS_BODEGA_2026_10 = false` no abre Switch |
 | /api/cron/backup | 06:00, 10:30, 18:30 (3 entradas — las 2ª/3ª son "segunda oportunidad": no-op si una anterior ya registró success hoy) |
 | /api/cron/backup?grupo=switch | 06:45, 11:15, **23:30** (3 entradas, mismo guard no-op) |
 | /api/cron/backup?grupo=storage | 04:00, 15:30 (2 entradas — réplica off-site de los buckets de Storage a Cloudflare R2) |
