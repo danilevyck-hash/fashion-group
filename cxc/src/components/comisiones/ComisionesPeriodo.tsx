@@ -173,6 +173,7 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
                       vacio={!(enRango && !rango!.atajo)}
                       textoVacio={ROTULO_RANGO_LIBRE}
                       label={null}
+                      diasDeAsistencia={false}
                       onChange={(d, h) => { onRango!({ desde: d, hasta: h, atajo: null }); setOpen(false); }}
                     />
                   </div>

@@ -208,12 +208,19 @@ interface Props {
    * dos veces. El calendario que abre es EXACTAMENTE el mismo.
    */
   iconoSolo?: boolean;
+  /**
+   * `false` = no pintar en gris los días sin marcaciones del RELOJ. Lo apagan
+   * Multifashion y Comisiones: ahí el gris de Asistencia no dice nada y se leía
+   * como días que no se pueden elegir. Solo con CALENDARIO_SIMPLE_2026_10.
+   */
+  diasDeAsistencia?: boolean;
 }
 
 export default function RangoFechas({
   desde, hasta, onChange, recordarComo, label = "Período", vacio = false, textoVacio = "Seleccionar período",
-  inline = false, accion, sugerido = null, iconoSolo = false,
+  inline = false, accion, sugerido = null, iconoSolo = false, diasDeAsistencia = true,
 }: Props) {
+  const conGris = !CALENDARIO_SIMPLE_2026_10 || diasDeAsistencia;
   const [abierto, setAbierto] = useState(false);
   const [ancla, setAncla] = useState<string | null>(null);
   const [datos, setDatos] = useState<Set<string> | null>(null);
@@ -245,12 +252,12 @@ export default function RangoFechas({
 
   useEffect(() => {
     // En línea el calendario ya está a la vista: sus días se piden al pintar.
-    if (!abierto && !inline) return;
+    if ((!abierto && !inline) || !conGris) return;
     const base = deIso(desde || aIso(new Date()));
     const ini = new Date(base.getFullYear(), base.getMonth() - 1, 1);
     const fin = new Date(base.getFullYear(), base.getMonth() + 2, 0);
     void pedirDatos(aIso(ini), aIso(fin));
-  }, [abierto, inline, desde, pedirDatos]);
+  }, [abierto, inline, desde, pedirDatos, conGris]);
 
   const aplicar = useCallback((d: string, h: string) => {
     onChange(d, h);
@@ -277,7 +284,7 @@ export default function RangoFechas({
     <CalendarioRango
       desde={desde} hasta={hasta} diasConDatos={datos} vacio={vacio} sugerido={sugerido}
       onRango={aplicar} onAncla={setAncla}
-      onMesVisible={(i, f) => void pedirDatos(i, f)}
+      onMesVisible={(i, f) => { if (conGris) void pedirDatos(i, f); }}
     />
   );
 

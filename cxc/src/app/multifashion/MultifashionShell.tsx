@@ -264,6 +264,7 @@ export function MultifashionShell({
             desde={periodo.desde}
             hasta={periodo.hasta}
             label={null}
+            diasDeAsistencia={false}
             onChange={(d, h) => setPeriodoRaw(periodoAUrl({ tipo: "rango", desde: d, hasta: h }))}
           />
         </div>

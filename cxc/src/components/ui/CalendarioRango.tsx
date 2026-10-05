@@ -40,6 +40,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { Calendar } from "./calendar";
 import { aIso, deIso } from "./rango-fechas-iso";
+import { CALENDARIO_SIMPLE_2026_10 } from "@/lib/ui/calendario-simple";
 
 
 
@@ -112,6 +113,9 @@ export default function CalendarioRango({
 
   return (
     <Calendar
+      // CALENDARIO_SIMPLE_2026_10: ‹ › son `absolute`; sin esto se iban arriba
+      // del panel, encima del título.
+      className={CALENDARIO_SIMPLE_2026_10 ? "relative" : undefined}
       mode="range"
       selected={seleccion}
       defaultMonth={deIso(desde || aIso(new Date()))}
