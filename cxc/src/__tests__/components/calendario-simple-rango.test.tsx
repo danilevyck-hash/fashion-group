@@ -48,3 +48,15 @@ describe("rango en dos toques", () => {
     await waitFor(() => expect(screen.queryByText("Toca el primer día")).toBeNull());
   });
 });
+
+describe("el botón de la barra", () => {
+  it("vacío dice «Rango de fechas»; con rango, «15–30 sep» y el ✕ vuelve al mes", () => {
+    const onQuitar = vi.fn();
+    const { rerender } = render(<RangoFechas enBarra vacio desde="" hasta="" label={null} onChange={() => {}} onQuitar={onQuitar} />);
+    expect(screen.getAllByRole("button", { name: /Rango de fechas/ }).length).toBeGreaterThan(0);
+    rerender(<RangoFechas enBarra desde="2026-09-15" hasta="2026-09-30" label={null} onChange={() => {}} onQuitar={onQuitar} />);
+    expect(screen.getAllByText("15–30 sep").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole("button", { name: "Quitar el rango y volver al mes" })[0]);
+    expect(onQuitar).toHaveBeenCalled();
+  });
+});

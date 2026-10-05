@@ -23,11 +23,13 @@ interface PeriodoSelectProps {
   /** ‹ y › (5-oct-2026): el valor del mes vecino, o `null` para apagarla. */
   anterior?: string | null;
   siguiente?: string | null;
+  /** CALENDARIO_SIMPLE_2026_10: más angosto en el celular, para que «Rango» entre al lado. */
+  compacto?: boolean;
 }
 
 const FLECHA = "inline-flex h-11 w-9 shrink-0 items-center justify-center rounded-md text-lg text-gray-600 transition hover:bg-gray-100 active:scale-[0.97] disabled:pointer-events-none disabled:text-gray-300";
 
-export function PeriodoSelect({ valor, opciones, onChange, disabled, anterior, siguiente }: PeriodoSelectProps) {
+export function PeriodoSelect({ valor, opciones, onChange, disabled, anterior, siguiente, compacto = false }: PeriodoSelectProps) {
   // Los grupos se dibujan en el orden en que aparecen (rangos primero, después
   // los años del más nuevo al más viejo) — el mismo orden que arma `opcionesPeriodo`.
   const grupos: { nombre: string; items: OpcionPeriodo[] }[] = [];
@@ -38,7 +40,8 @@ export function PeriodoSelect({ valor, opciones, onChange, disabled, anterior, s
   }
 
   return (
-    <div className="flex items-center">
+    // `compacto`: el trigger baja a 132 px en el celular (sin tocar su clase).
+    <div className={compacto ? "flex items-center [&_[role=combobox]]:min-w-[132px] sm:[&_[role=combobox]]:min-w-[168px]" : "flex items-center"}>
     <button
       type="button"
       aria-label="Mes anterior"

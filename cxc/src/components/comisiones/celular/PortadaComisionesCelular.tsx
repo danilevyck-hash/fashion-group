@@ -52,6 +52,7 @@ import {
 } from "@/lib/comisiones/celular";
 import { ComisionesPeriodo } from "../ComisionesPeriodo";
 import type { RangoConsulta } from "@/lib/comisiones/vendedores-rango";
+import { CALENDARIO_SIMPLE_2026_10 } from "@/lib/ui/calendario-simple";
 
 interface OpcionVista {
   valor: string;
@@ -180,7 +181,9 @@ export function PortadaComisionesCelular({
       />
 
       {/* 🔴 UNA FILA: la empresa y el mes con sus flechas. */}
-      <div className="mt-3 flex items-center justify-between gap-2 px-4">
+      {/* CALENDARIO_SIMPLE_2026_10: la empresa arriba y, debajo, el mes con
+          «Rango» en la misma línea (con los dos al lado no entraba la empresa). */}
+      <div className={`mt-3 flex items-center justify-between gap-2 px-4 ${CALENDARIO_SIMPLE_2026_10 && onRango ? "flex-wrap [&>[data-chip-vista]]:basis-full [&>[data-chip-vista]]:flex-none" : ""}`}>
         <button
           type="button"
           onClick={() => setEligiendoEmpresa(true)}

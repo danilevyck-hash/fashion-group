@@ -51,6 +51,7 @@ import {
   type RangoConsulta,
 } from "@/lib/comisiones/vendedores-rango";
 import { vidrioSobre } from "@/lib/ui/vidrio";
+import { CALENDARIO_SIMPLE_2026_10 } from "@/lib/ui/calendario-simple";
 
 interface Props {
   mes: number;
@@ -77,7 +78,12 @@ export function etiquetaDeRango(r: RangoConsulta): string {
 
 export function ComisionesPeriodo({ mes, year, availableYears, onChange, className, rango = null, onRango, alDerecha = false, rotulo, panelDelAnchoDelBoton = false }: Props) {
   const conRango = VENDEDORES_RANGO_2026_10 && !!onRango;
-  const enRango = conRango && !!rango;
+  // 🔴 CALENDARIO_SIMPLE_2026_10 (Daniel, 5-oct-2026): el rango sale del panel
+  // y va como botón al lado, igual que en Multifashion. Adentro quedaban
+  // atajos repetidos («Última semana», «Últimos 3 meses»…): se van; quedan los
+  // cinco del calendario. El botón del mes sigue diciendo el mes.
+  const rangoAlLado = CALENDARIO_SIMPLE_2026_10 && conRango;
+  const enRango = conRango && !!rango && !rangoAlLado;
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -105,8 +111,8 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
     onChange(y, m);
   };
 
-  return (
-    <div className={`relative ${className ?? ""}`}>
+  const control = (
+    <div className={`relative ${rangoAlLado ? "" : className ?? ""}`}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -147,7 +153,7 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
           >
             {/* 🔴 VENDEDORES_RANGO_2026_10: los atajos para CONSULTAR van arriba;
                 los meses de abajo siguen siendo el período que se PAGA. */}
-            {conRango && (
+            {conRango && !rangoAlLado && (
               <div className="mb-2 border-b border-gray-100 pb-2" data-atajos-rango>
                 <div className="grid grid-cols-2 gap-1">
                   {ATAJOS_RANGO.map((a) => {
@@ -241,6 +247,23 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
           </div>
         </>
       )}
+    </div>
+  );
+
+  if (!rangoAlLado) return control;
+  return (
+    <div className={`flex items-center gap-1.5 ${className ?? ""}`} data-periodo-y-rango>
+      {control}
+      <RangoFechas
+        enBarra
+        desde={rango?.desde ?? ""}
+        hasta={rango?.hasta ?? ""}
+        vacio={!rango}
+        label={null}
+        diasDeAsistencia={false}
+        onChange={(d, h) => onRango!({ desde: d, hasta: h, atajo: null })}
+        onQuitar={() => onChange(year, mes)}
+      />
     </div>
   );
 }

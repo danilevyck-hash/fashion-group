@@ -63,6 +63,7 @@ import { aIso, deIso } from "./rango-fechas-iso";
 import { vidrioSobre, conVidrio, CLASE_VIDRIO, RADIO_VIDRIO } from "@/lib/ui/vidrio";
 import {
   CALENDARIO_SIMPLE_2026_10, GUIA_PRIMER_DIA, GUIA_ULTIMO_DIA, ATAJOS_FECHA, rangoDeAtajoFecha,
+  etiquetaRangoCorta, ROTULO_BOTON_RANGO,
 } from "@/lib/ui/calendario-simple";
 import { hoyPanama } from "@/lib/fecha-panama";
 
@@ -131,7 +132,9 @@ export function Atajos({ claves, onElegir, enRango }: {
 }) {
   const hoy = hoyPanama();
   return (
-    <div className="flex flex-wrap gap-1.5 px-1 pb-2" data-atajos-calendario>
+    // 🔴 UNA fila (Daniel, 5-oct-2026). Si un día no entra, se desliza ESTA fila,
+    // nunca la página.
+    <div className="flex flex-nowrap gap-1 overflow-x-auto px-1 pb-2 [scrollbar-width:none]" data-atajos-calendario>
       {ATAJOS_FECHA.filter((a) => !claves || claves.includes(a.clave)).map((a) => {
         const r = rangoDeAtajoFecha(a.clave, hoy);
         if (enRango && !enRango(r.desde, r.hasta)) return null;
@@ -140,7 +143,7 @@ export function Atajos({ claves, onElegir, enRango }: {
             key={a.clave}
             type="button"
             onClick={() => onElegir(r.desde, r.hasta)}
-            className="inline-flex min-h-[44px] items-center rounded-full bg-gray-100 px-3 text-sm text-gray-700 transition hover:bg-gray-200 active:scale-[0.97] lg:min-h-9"
+            className="inline-flex min-h-[44px] shrink-0 items-center whitespace-nowrap rounded-full bg-gray-100 px-2 text-sm sm:px-2.5 text-gray-700 transition hover:bg-gray-200 active:scale-[0.97] lg:min-h-9"
           >
             {a.rotulo}
           </button>
@@ -214,11 +217,20 @@ interface Props {
    * como días que no se pueden elegir. Solo con CALENDARIO_SIMPLE_2026_10.
    */
   diasDeAsistencia?: boolean;
+  /**
+   * 🔴 CALENDARIO_SIMPLE_2026_10 — el botón «Rango de fechas» de la barra, al
+   * lado del selector de meses (Multifashion y Comisiones). Vacío dice «Rango de
+   * fechas»; con un rango dice «15–30 sep» y su ✕ llama a esto (vuelve al mes).
+   */
+  onQuitar?: () => void;
+  /** Con `onQuitar`: el botón se dibuja como el de la barra. */
+  enBarra?: boolean;
 }
 
 export default function RangoFechas({
   desde, hasta, onChange, recordarComo, label = "Período", vacio = false, textoVacio = "Seleccionar período",
   inline = false, accion, sugerido = null, iconoSolo = false, diasDeAsistencia = true,
+  onQuitar, enBarra = false,
 }: Props) {
   const conGris = !CALENDARIO_SIMPLE_2026_10 || diasDeAsistencia;
   const [abierto, setAbierto] = useState(false);
@@ -288,7 +300,37 @@ export default function RangoFechas({
     />
   );
 
-  const boton = iconoSolo ? (
+  const boton = enBarra ? (
+    <span className="inline-flex shrink-0 items-center" data-boton-rango>
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        aria-haspopup="dialog"
+        className={`inline-flex min-h-[44px] items-center gap-1.5 whitespace-nowrap px-2.5 text-sm sm:px-3 transition active:scale-[0.97] ${
+          vacio
+            ? "rounded-md border border-gray-300 bg-white text-gray-700 hover:border-black hover:text-black"
+            : `${onQuitar ? "rounded-l-md" : "rounded-md"} bg-gray-900 font-medium text-white`
+        }`}
+      >
+        {/* En el celular: «Rango» y, con un rango, sin ícono — así entra en la
+            misma línea que ‹ Octubre 2026 ›. */}
+        <CalendarDays aria-hidden className={`h-4 w-4 shrink-0 ${vacio ? "text-gray-500" : "hidden text-white sm:block"}`} />
+        {vacio ? (
+          <><span className="sm:hidden">Rango</span><span className="hidden sm:inline">{ROTULO_BOTON_RANGO}</span></>
+        ) : etiquetaRangoCorta(desde, hasta)}
+      </button>
+      {!vacio && onQuitar && (
+        <button
+          type="button"
+          onClick={onQuitar}
+          aria-label="Quitar el rango y volver al mes"
+          className="inline-flex min-h-[44px] w-8 items-center justify-center rounded-r-md bg-gray-900 sm:w-9 text-white/80 transition hover:text-white active:scale-[0.97]"
+        >
+          ✕
+        </button>
+      )}
+    </span>
+  ) : iconoSolo ? (
     <button
       type="button"
       onClick={() => setAbierto((v) => !v)}
@@ -345,8 +387,8 @@ export default function RangoFechas({
   }
 
   return (
-    <div className={iconoSolo ? "shrink-0" : "min-w-[240px]"}>
-      {label && !iconoSolo && (
+    <div className={iconoSolo || enBarra ? "shrink-0" : "min-w-[240px]"}>
+      {label && !iconoSolo && !enBarra && (
         <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">{label}</label>
       )}
 
@@ -365,7 +407,8 @@ export default function RangoFechas({
           abierto={abierto && !!anclaRef.current?.offsetParent}
           anclaRef={anclaRef}
           onCerrar={() => { setAbierto(false); setAncla(null); }}
-          ancho={ANCHO_CALENDARIO}
+          // CALENDARIO_SIMPLE_2026_10: +48 para que los cinco atajos entren en una fila.
+          ancho={ANCHO_CALENDARIO + (CALENDARIO_SIMPLE_2026_10 ? 48 : 0)}
           altoDeseado={ALTO_CALENDARIO + (CALENDARIO_SIMPLE_2026_10 ? ALTO_GUIA_Y_ATAJOS : 0)}
           className={vidrioSobre("rounded-xl border border-gray-200 bg-white p-3 shadow-lg")}
         >

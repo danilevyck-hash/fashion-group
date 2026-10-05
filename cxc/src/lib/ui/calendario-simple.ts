@@ -7,7 +7,7 @@
 //     «Toca el primer día» → «Ahora el último día»;
 //   · el segundo toque pinta el rango, lo APLICA y CIERRA. Mismo día dos veces
 //     = ese día solo; si el segundo es anterior, se ordenan solos;
-//   · atajos de un toque: Hoy · Ayer · Últimos 7 días · Este mes · Mes pasado;
+//   · atajos de un toque, en UNA fila: Hoy · Ayer · 7 días · Este mes · Mes pasado;
 //   · en el celular, hoja desde abajo con el vidrio de la casa y 44 px.
 // El de un solo día sigue la misma lógica: un toque elige y cierra.
 //
@@ -26,7 +26,8 @@ export type ClaveAtajoFecha = "hoy" | "ayer" | "7d" | "mes" | "mes_pasado";
 export const ATAJOS_FECHA: readonly { clave: ClaveAtajoFecha; rotulo: string }[] = [
   { clave: "hoy", rotulo: "Hoy" },
   { clave: "ayer", rotulo: "Ayer" },
-  { clave: "7d", rotulo: "Últimos 7 días" },
+  // Corto a propósito (Daniel, 5-oct-2026): los cinco van en UNA fila.
+  { clave: "7d", rotulo: "7 días" },
   { clave: "mes", rotulo: "Este mes" },
   { clave: "mes_pasado", rotulo: "Mes pasado" },
 ];
@@ -58,3 +59,19 @@ export function rangoDeAtajoFecha(clave: ClaveAtajoFecha, hoy: string): { desde:
 export function ordenarRango(a: string, b: string): [string, string] {
   return a <= b ? [a, b] : [b, a];
 }
+
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+/**
+ * Lo que dice el botón «Rango de fechas» con un rango elegido: «15–30 sep»,
+ * «28 sep – 10 oct», «28 dic 2026 – 5 ene 2027», «15 sep».
+ */
+export function etiquetaRangoCorta(desde: string, hasta: string): string {
+  const [a1, m1, d1] = desde.split("-").map(Number);
+  const [a2, m2, d2] = hasta.split("-").map(Number);
+  if (desde === hasta) return `${d1} ${MESES_CORTOS[m1 - 1]}`;
+  if (a1 !== a2) return `${d1} ${MESES_CORTOS[m1 - 1]} ${a1} – ${d2} ${MESES_CORTOS[m2 - 1]} ${a2}`;
+  if (m1 !== m2) return `${d1} ${MESES_CORTOS[m1 - 1]} – ${d2} ${MESES_CORTOS[m2 - 1]}`;
+  return `${d1}–${d2} ${MESES_CORTOS[m1 - 1]}`;
+}
+
+export const ROTULO_BOTON_RANGO = "Rango de fechas";

@@ -19,7 +19,7 @@ describe("el interruptor", () => {
 
 describe("los atajos", () => {
   it("son los cinco aprobados, en orden", () => {
-    expect(ATAJOS_FECHA.map((a) => a.rotulo)).toEqual(["Hoy", "Ayer", "Últimos 7 días", "Este mes", "Mes pasado"]);
+    expect(ATAJOS_FECHA.map((a) => a.rotulo)).toEqual(["Hoy", "Ayer", "7 días", "Este mes", "Mes pasado"]);
   });
   it("cuentan desde hoy", () => {
     const hoy = "2026-10-05";
@@ -81,5 +81,15 @@ describe("🔴 ningún `<input type=\"date\">` suelto", () => {
     recorrer(raiz);
     // GastoForm: su `TextInput type="date"` ya rinde CampoFecha.
     expect(sueltos).toEqual(["app/asistencia/PlanillaTab.tsx:1", "app/caja/components/GastoForm.tsx:1"]);
+  });
+});
+
+describe("el botón «Rango de fechas» con un rango", () => {
+  it("dice el rango corto", async () => {
+    const { etiquetaRangoCorta } = await import("@/lib/ui/calendario-simple");
+    expect(etiquetaRangoCorta("2026-09-15", "2026-09-30")).toBe("15–30 sep");
+    expect(etiquetaRangoCorta("2026-09-28", "2026-10-10")).toBe("28 sep – 10 oct");
+    expect(etiquetaRangoCorta("2026-12-28", "2027-01-05")).toBe("28 dic 2026 – 5 ene 2027");
+    expect(etiquetaRangoCorta("2026-09-15", "2026-09-15")).toBe("15 sep");
   });
 });
