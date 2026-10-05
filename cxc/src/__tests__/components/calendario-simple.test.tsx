@@ -100,3 +100,27 @@ describe("el pie del rango", () => {
     expect(pieDelRango("2026-09-15", "2026-09-30", { desde: "2025-09-15", hasta: "2025-09-30" })).toBe("16 días · vs 15–30 sep 2025");
   });
 });
+
+describe("PanelPeriodo (la lista larga de meses, compacta)", () => {
+  it("sin meses ni años futuros; un toque aplica y cierra", async () => {
+    const { default: PanelPeriodo } = await import("@/components/ui/PanelPeriodo");
+    const onMes = vi.fn(); const onAnio = vi.fn(); const onU3 = vi.fn();
+    render(
+      <PanelPeriodo rotulo="Octubre 2026" anios={[2025, 2026]}
+        mesesDe={(a) => Array.from({ length: a === 2026 ? 10 : 12 }, (_, i) => i + 1)}
+        seleccion={{ anio: 2026, mes: 10 }} onMes={onMes}
+        todoElAnio={{ activo: null, onElegir: onAnio }}
+        ventanas={[{ clave: "u3", rotulo: "Últimos 3 meses", activo: false, onElegir: onU3 }]} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Período: Octubre 2026" }));
+    expect(screen.queryByRole("button", { name: "Noviembre 2026" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Año siguiente" }).className).toContain("invisible");
+    fireEvent.click(screen.getByRole("button", { name: "Septiembre 2026" }));
+    expect(onMes).toHaveBeenCalledWith(2026, 9);
+    expect(screen.queryByRole("button", { name: "Agosto 2026" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Período: Octubre 2026" }));
+    fireEvent.click(screen.getByRole("button", { name: "Año anterior" }));
+    fireEvent.click(screen.getByRole("button", { name: "Todo el año" }));
+    expect(onAnio).toHaveBeenCalledWith(2025);
+  });
+});

@@ -12,6 +12,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import type { OpcionPeriodo } from "@/lib/multifashion/periodo";
+import PanelPeriodo from "@/components/ui/PanelPeriodo";
 
 export const PLACEHOLDER_PERIODO = "Seleccionar período";
 
@@ -44,6 +45,27 @@ export function PeriodoSelect({ valor, opciones, onChange, disabled, anterior, s
   const rotulo = opciones.find((o) => o.valor === valor)?.label;
   const corto = rotulo?.replace(/^(\S{3})\S*( \d{4})$/, "$1$2");
 
+  // CALENDARIO_SIMPLE_2026_10: lo que el panel compacto necesita, sacado de
+  // las MISMAS opciones (así nunca ofrece algo que la lista no ofrecía).
+  const panel = (() => {
+    const meses = new Map<number, number[]>();
+    for (const o of opciones) {
+      const m = /^(\d{4})-(\d{2})$/.exec(o.valor);
+      if (m) meses.set(Number(m[1]), [...(meses.get(Number(m[1])) ?? []), Number(m[2])]);
+    }
+    const anios = [...meses.keys()];
+    const sel = /^(\d{4})-(\d{2})$/.exec(valor);
+    return {
+      meses,
+      anios: anios.length ? anios : [new Date().getFullYear()],
+      conAnio: opciones.some((o) => /^\d{4}$/.test(o.valor)),
+      ventanas: opciones.map((o) => /^u(\d+)$/.exec(o.valor)).filter(Boolean).map((m) => Number(m![1])),
+      seleccion: sel
+        ? { anio: Number(sel[1]), mes: Number(sel[2]) }
+        : { anio: /^\d{4}$/.test(valor) ? Number(valor) : Math.max(...(anios.length ? anios : [new Date().getFullYear()])), mes: null },
+    };
+  })();
+
   return (
     // `compacto`: el trigger baja en el celular (sin tocar su clase).
     <div className={compacto ? "flex items-center [&_[role=combobox]]:min-w-[112px] sm:[&_[role=combobox]]:min-w-[168px]" : "flex items-center"}>
@@ -57,6 +79,27 @@ export function PeriodoSelect({ valor, opciones, onChange, disabled, anterior, s
     >
       ‹
     </button>
+    {compacto ? (
+      <PanelPeriodo
+        rotulo={rotulo ?? PLACEHOLDER_PERIODO}
+        rotuloCorto={corto}
+        anios={panel.anios}
+        mesesDe={(a) => panel.meses.get(a) ?? []}
+        seleccion={panel.seleccion}
+        onMes={(a, m) => onChange(`${a}-${String(m).padStart(2, "0")}`)}
+        todoElAnio={panel.conAnio ? {
+          activo: /^\d{4}$/.test(valor) ? Number(valor) : null,
+          onElegir: (a) => { if (opciones.some((o) => o.valor === String(a))) onChange(String(a)); },
+        } : undefined}
+        ventanas={panel.ventanas.map((n, k) => ({
+          clave: `u${n}`,
+          rotulo: k === 0 ? `Últimos ${n} meses` : String(n),
+          activo: valor === `u${n}`,
+          onElegir: () => onChange(`u${n}`),
+        }))}
+        disabled={disabled}
+      />
+    ) : (
     <Select value={valor} onValueChange={onChange}>
       {/* h-11 = 44 px exactos, la regla táctil de la casa. */}
       <SelectTrigger
@@ -90,6 +133,7 @@ export function PeriodoSelect({ valor, opciones, onChange, disabled, anterior, s
         ))}
       </SelectContent>
     </Select>
+    )}
     <button
       type="button"
       aria-label="Mes siguiente"

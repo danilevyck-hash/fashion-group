@@ -52,6 +52,7 @@ import {
 } from "@/lib/comisiones/vendedores-rango";
 import { vidrioSobre } from "@/lib/ui/vidrio";
 import { CALENDARIO_SIMPLE_2026_10 } from "@/lib/ui/calendario-simple";
+import PanelPeriodo from "@/components/ui/PanelPeriodo";
 
 interface Props {
   mes: number;
@@ -137,7 +138,20 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
     onChange(y, m);
   };
 
-  const control = (
+  // 🔴 CALENDARIO_SIMPLE_2026_10: el MISMO panel compacto que Multifashion
+  // (‹ 2026 ›, 12 meses sin los futuros, «Todo el año»), hoja en el celular.
+  const control = CALENDARIO_SIMPLE_2026_10 ? (
+    <PanelPeriodo
+      rotulo={rotulo ?? etiquetaPeriodo(year, mes)}
+      rotuloCorto={rotulo ?? etiquetaPeriodoCorta(year, mes)}
+      anios={anios.length ? anios : [currentYear]}
+      mesesDe={(y) => Array.from({ length: y === currentYear ? currentMonth : 12 }, (_, i) => i + 1)}
+      seleccion={{ anio: year, mes: esTodoElAnio(mes) || enRango ? null : mes }}
+      onMes={(y, m) => onChange(y, m)}
+      todoElAnio={{ activo: !enRango && esTodoElAnio(mes) ? year : null, onElegir: (y) => onChange(y, MES_TODO_EL_ANIO) }}
+      botonClassName={`w-[110px] shrink-0 px-2.5 sm:w-auto sm:px-3 ${rangoAlLado ? "" : className ?? ""}`}
+    />
+  ) : (
     <div className={`relative ${rangoAlLado ? "" : className ?? ""}`}>
       <button
         type="button"
