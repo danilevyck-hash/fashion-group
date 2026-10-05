@@ -90,6 +90,7 @@ import {
   useFormatoEtiquetas,
 } from "./etiquetas-ui";
 import { Aviso } from "@/components/ui/Aviso";
+import { EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { GUIAS_LISTA_APPLE_2026_10, resumenDeEnvios } from "@/lib/guias/lista-apple-2026-10";
 import { diaPanama } from "@/lib/guias/pendientes-aviso";
 
@@ -152,6 +153,14 @@ export default function EtiquetasPorEnvio() {
   const resumen = apple && envios.length > 0
     ? resumenDeEnvios(envios, hoyPanama(), (iso) => diaPanama(new Date(iso)))
     : null;
+  const barra = useHayBarraCelular();
+  /** La MISMA línea que «N guías hoy» de la lista de Guías. */
+  const lineaResumen = resumen && (
+    <p data-resumen-envios className="mr-auto text-sm font-medium text-gray-900">
+      {resumen.hoy}
+      {resumen.pendientes && <span className="text-amber-700"> · {resumen.pendientes}</span>}
+    </p>
+  );
 
   /** El «···» de un envío: el MISMO en la tabla y en la tarjeta del celular. */
   function menuDelEnvio(v: Envio) {
@@ -178,7 +187,7 @@ export default function EtiquetasPorEnvio() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+    <div className={apple && !panel ? `max-w-6xl mx-auto px-4 sm:px-6 ${barra ? "pb-6 pt-3" : "py-6"}` : "max-w-5xl mx-auto px-4 sm:px-6 py-6"}>
       {sinTabla && (
         <Aviso className="mb-4" ayuda="Guías sigue funcionando igual.">
           Etiquetas sin activar: falta correr la migración <span className="font-mono">20261207120000_guias_etiquetas</span>.
@@ -200,17 +209,37 @@ export default function EtiquetasPorEnvio() {
         />
       ) : (
         <>
+          {apple ? (
+            <>
+              {/* 🔴 5-oct-2026, Daniel: «poné Nuevo envío al nivel». La MISMA fila
+                  que «Nueva guía» (GuiasList): mismo ancho, alto, estilo y texto;
+                  en el celular, fijo abajo con la barra, igual que Nueva guía. */}
+              {barra ? (
+                <>
+                  {lineaResumen && <div className="mb-3">{lineaResumen}</div>}
+                  <EnLaBarra accion={sinTabla ? null : { rotulo: "Nuevo envío", onClick: () => setPanel(true) }} />
+                </>
+              ) : (
+                <div className="flex items-center justify-end mb-6 flex-wrap gap-4">
+                  {lineaResumen}
+                  <button
+                    type="button"
+                    onClick={() => setPanel(true)}
+                    disabled={sinTabla}
+                    className="text-sm bg-black text-white px-6 py-3 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40"
+                  >
+                    Nuevo envío
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
           <div className="flex items-center justify-end mb-4 flex-wrap gap-4">
-            {resumen && (
-              <p data-resumen-envios className="mr-auto text-sm font-medium text-gray-900">
-                {resumen.hoy}
-                {resumen.pendientes && <span className="text-amber-700"> · {resumen.pendientes}</span>}
-              </p>
-            )}
             <button type="button" onClick={() => setPanel(true)} className={BOTON_NEGRO} disabled={sinTabla}>
               ＋ Nuevo envío
             </button>
           </div>
+          )}
 
           <div className="mb-4 flex flex-wrap items-center gap-4">
             <input

@@ -177,4 +177,16 @@ describe("Etiquetas › envíos", () => {
     expect(document.querySelectorAll("[data-envios-tarjetas] li")).toHaveLength(1);
     expect(document.querySelector("[data-envios-tarjetas]")?.textContent).toContain("Nova Lux");
   });
+
+  // 5-oct-2026, Daniel: «poné Nuevo envío al nivel» — igual que «Nueva guía».
+  it("prendido: «Nuevo envío» con el mismo texto, estilo y ancho de contenido que «Nueva guía»", async () => {
+    flags.apple = true;
+    servir(FILAS);
+    const { container } = render(<EtiquetasPorEnvio />);
+    const boton = await screen.findByRole("button", { name: "Nuevo envío" });
+    const nuevaGuia = "text-sm bg-black text-white px-6 py-3 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all";
+    expect(boton.className.startsWith(nuevaGuia)).toBe(true);
+    expect(boton.parentElement!.className).toBe("flex items-center justify-end mb-6 flex-wrap gap-4");
+    expect((container.firstElementChild as HTMLElement).className).toContain("max-w-6xl");
+  });
 });
