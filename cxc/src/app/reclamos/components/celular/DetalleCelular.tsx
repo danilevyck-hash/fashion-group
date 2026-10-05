@@ -53,6 +53,9 @@ import {
   type OpcionDeHoja,
 } from "./HojasReclamosCelular";
 import { tituloCelular } from "@/lib/navegacion/barra-controles-celular";
+import { RECLAMOS_APPLE_2026_10, diasEnRojo } from "@/lib/reclamos/apple-2026-10";
+import { estaReclamado } from "@/lib/reclamos/reclamado";
+import { CLASE_LINEA_TOTAL, CLASE_TOTAL_CELULAR } from "@/components/celular/CabeceraCompacta";
 
 /** Cuántos renglones se ven antes de plegar: la mitad de los reclamos tiene uno. */
 const RENGLONES_A_LA_VISTA = 3;
@@ -77,6 +80,8 @@ interface Props {
   onReload?: () => void;
   toast: string | null;
   showToast: (msg: string) => void;
+  /** `RECLAMOS_APPLE_2026_10` (5-oct-2026). Las pruebas lo fuerzan. */
+  apple?: boolean;
 }
 
 export default function DetalleCelular({
@@ -84,6 +89,7 @@ export default function DetalleCelular({
   onStartEdit, onDeleteReclamo, onAddNota, onVolverAPorCobrar,
   onCobrar, cobrando, onUploadFoto, uploadingFoto, onDeleteFoto, onReload,
   toast, showToast,
+  apple = RECLAMOS_APPLE_2026_10,
 }: Props) {
   const [hoja, setHoja] = useState<"mas" | "cobrar" | "correo" | "fotos" | "seguimiento" | null>(null);
   const [verTodos, setVerTodos] = useState(false);
@@ -154,18 +160,37 @@ export default function DetalleCelular({
               ? fmtDate(current.fecha_factura)
               : <span className="text-red-600">{FALTA_FECHA_FACTURA}</span>}
             {current.marca ? ` · ${current.marca}` : ""}
-            {dias !== null && ` · ${dias} día${dias === 1 ? "" : "s"}`}
+            {dias !== null && (apple && diasEnRojo(dias)
+              ? <> · <span className="text-red-600">{dias} días</span></>
+              : ` · ${dias} día${dias === 1 ? "" : "s"}`)}
             {!esActiveShoes(current.empresa) && current.nro_orden_compra ? ` · N° de pedido ${current.nro_orden_compra}` : ""}
           </p>
-          {pendiente && (
+          {!apple && pendiente && (
             <p className="mt-1 text-[13px] text-gray-400">{textoReclamado(current)}</p>
+          )}
+          {/* 🔴 Apple (5-oct-2026): el número grande con su línea gris, como la
+              portada y CxC. Pendiente = lo que se reclama; cobrado = lo que entró. */}
+          {apple && (
+            <div data-cabecera-apple>
+              <span className={`${CLASE_TOTAL_CELULAR} pt-2`}>{montoCel(pendiente ? tax.total : recuperado)}</span>
+              <span className={CLASE_LINEA_TOTAL}>
+                {pendiente
+                  ? <span className={estaReclamado(current) ? undefined : "font-medium text-red-600"}>{textoReclamado(current)}</span>
+                  : <span className="text-emerald-700">Cobrado{cobradoEnFecha ? ` el ${fmtDate(cobradoEnFecha)}` : ""} · {pct} % de {montoCel(reclamado)}</span>}
+              </span>
+            </div>
+          )}
+          {/* Las Observaciones suben aquí: es lo que se escribió del reclamo,
+              no una nota al pie (antes «Notas:» abajo de todo). */}
+          {apple && current.notas && (
+            <p data-observaciones className="mt-2 text-[14px] text-gray-700 whitespace-pre-wrap"><span className="text-gray-400">Observaciones · </span>{current.notas}</p>
           )}
         </div>
         <BotonMas onClick={() => setHoja("mas")} etiqueta="Más opciones del reclamo" />
       </div>
 
       {/* 6b · UNA línea verde: cuánto y cuándo, que es lo único que se pregunta. */}
-      {!pendiente && (
+      {!apple && !pendiente && (
         <div className="mx-4 mt-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
           <p className="text-[20px] font-semibold tabular-nums text-emerald-800">
             {montoCel(recuperado)} cobrado
@@ -206,7 +231,7 @@ export default function DetalleCelular({
       )}
 
       <p className="px-4 pb-1 pt-4 text-[13px] uppercase tracking-wide text-gray-500">
-        Líneas · {items.length} · total {montoCel(tax.total)}
+        {apple ? `Líneas · ${items.length}` : <>Líneas · {items.length} · total {montoCel(tax.total)}</>}
       </p>
       <ul data-lista="reclamo-renglones" className="mx-4 overflow-hidden rounded-2xl bg-white">
         {aLaVista.map((item, i) => {
@@ -257,7 +282,7 @@ export default function DetalleCelular({
         />
       </ul>
 
-      {current.notas && <p className="px-4 pt-4 text-[14px] text-gray-500">Notas: {current.notas}</p>}
+      {!apple && current.notas && <p className="px-4 pt-4 text-[14px] text-gray-500">Notas: {current.notas}</p>}
 
       {pendiente && (
         <CtaFija marca="cobrar" onClick={() => setHoja("cobrar")}>{MARCAR_COBRADO}</CtaFija>

@@ -11,6 +11,8 @@ interface Props {
   setItems: React.Dispatch<React.SetStateAction<RItem[]>>;
   /** Título de la sección (arriba de la tabla). */
   titulo?: string;
+  /** Apple (5-oct-2026): sin asteriscos de obligatorio; el aviso al guardar ya lo dice. */
+  sinAsteriscos?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -26,7 +28,8 @@ interface Props {
 //     siempre iguales.
 // La talla y el género se guardan igual que siempre.
 // ─────────────────────────────────────────────────────────────────────────────
-export default function ItemsEditor({ items, setItems, titulo = "Líneas del reclamo" }: Props) {
+export default function ItemsEditor({ items, setItems, titulo = "Líneas del reclamo", sinAsteriscos = false }: Props) {
+  const ast = sinAsteriscos ? "" : " *";
   function updateItem(idx: number, field: string, val: string | number) {
     setItems((prev) => prev.map((item, i) => {
       if (i !== idx) return item;
@@ -46,13 +49,13 @@ export default function ItemsEditor({ items, setItems, titulo = "Líneas del rec
         <table className={`w-full text-sm [&_td]:py-3 [&_th]:pb-3 ${AIRE_ENTRE_COLUMNAS}`}>
           <thead>
             <tr className="border-b border-gray-200 text-xs uppercase tracking-wide font-medium text-gray-500">
-              <th className="pb-2 font-medium text-left">Estilo *</th>
-              <th className="pb-2 font-medium text-left">Descripción *</th>
-              <th className="pb-2 font-medium text-left" style={{ minWidth: 70 }}>Talla *</th>
-              <th className="pb-2 font-medium text-left" style={{ minWidth: 90 }}>Género *</th>
-              <th className="pb-2 font-medium text-right" style={{ minWidth: 60 }}>Cant. *</th>
-              <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Precio unitario *</th>
-              <th className="pb-2 font-medium text-left">Motivo *</th>
+              <th className="pb-2 font-medium text-left">Estilo{ast}</th>
+              <th className="pb-2 font-medium text-left">Descripción{ast}</th>
+              <th className="pb-2 font-medium text-left" style={{ minWidth: 70 }}>Talla{ast}</th>
+              <th className="pb-2 font-medium text-left" style={{ minWidth: 90 }}>Género{ast}</th>
+              <th className="pb-2 font-medium text-right" style={{ minWidth: 60 }}>Cant.{ast}</th>
+              <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Precio unitario{ast}</th>
+              <th className="pb-2 font-medium text-left">Motivo{ast}</th>
               <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Subtotal</th>
               <th className="pb-2 w-6"></th>
             </tr>
@@ -110,16 +113,16 @@ export default function ItemsEditor({ items, setItems, titulo = "Líneas del rec
               )}
             </div>
             <label className="block">
-              <span className="text-xs text-gray-500">Estilo *</span>
+              <span className="text-xs text-gray-500">Estilo{ast}</span>
               <input type="text" value={item.referencia} onChange={(e) => updateItem(idx, "referencia", e.target.value)} className="w-full border-b border-gray-200 py-2.5 text-base outline-none focus:border-black min-h-[44px]" />
             </label>
             <label className="block">
-              <span className="text-xs text-gray-500">Descripción *</span>
+              <span className="text-xs text-gray-500">Descripción{ast}</span>
               <input type="text" value={item.descripcion} onChange={(e) => updateItem(idx, "descripcion", e.target.value)} className="w-full border-b border-gray-200 py-2.5 text-base outline-none focus:border-black min-h-[44px]" />
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
-                <span className="text-xs text-gray-500">Talla *</span>
+                <span className="text-xs text-gray-500">Talla{ast}</span>
                 {(!TALLAS.includes(item.talla) && item.talla !== "") ? (
                   <div className="flex items-center gap-1">
                     <input type="text" value={item.talla} onChange={(e) => updateItem(idx, "talla", e.target.value)} placeholder="Talla" className="w-full border-b border-gray-200 py-2.5 text-base outline-none focus:border-black min-h-[44px]" />
@@ -133,12 +136,12 @@ export default function ItemsEditor({ items, setItems, titulo = "Líneas del rec
                 )}
               </label>
               <label className="block">
-                <span className="text-xs text-gray-500">Cantidad *</span>
+                <span className="text-xs text-gray-500">Cantidad{ast}</span>
                 <input type="number" inputMode="numeric" min={0} value={item.cantidad} onChange={(e) => updateItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-2.5 text-base outline-none focus:border-black min-h-[44px]" />
               </label>
             </div>
             <label className="block">
-              <span className="text-xs text-gray-500">Género *</span>
+              <span className="text-xs text-gray-500">Género{ast}</span>
               <select value={item.genero} onChange={(e) => updateItem(idx, "genero", e.target.value)} className={`w-full border-b border-gray-200 py-2.5 text-base outline-none bg-transparent focus:border-black min-h-[44px] ${item.genero ? "text-black" : "text-gray-400"}`}>
                 <option value="">Género…</option>
                 {GENEROS.map((g) => <option key={g} value={g}>{generoLabel(g)}</option>)}
@@ -146,7 +149,7 @@ export default function ItemsEditor({ items, setItems, titulo = "Líneas del rec
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
-                <span className="text-xs text-gray-500">Precio unitario *</span>
+                <span className="text-xs text-gray-500">Precio unitario{ast}</span>
                 <input type="number" inputMode="decimal" step="0.50" min={0} value={item.precio_unitario} onChange={(e) => updateItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-2.5 text-base outline-none focus:border-black min-h-[44px]" />
               </label>
               <div className="block">
@@ -155,7 +158,7 @@ export default function ItemsEditor({ items, setItems, titulo = "Líneas del rec
               </div>
             </div>
             <label className="block">
-              <span className="text-xs text-gray-500">Motivo *</span>
+              <span className="text-xs text-gray-500">Motivo{ast}</span>
               <select value={item.motivo} onChange={(e) => updateItem(idx, "motivo", e.target.value)} className="w-full border-b border-gray-200 py-2.5 text-base outline-none bg-transparent min-h-[44px]">
                 <option value="">--</option>
                 {DEFAULT_MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}

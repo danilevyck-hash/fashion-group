@@ -30,6 +30,7 @@ import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { telHref, mailtoHref } from "@/lib/contact-links";
 import { coincideBusqueda } from "@/lib/buscar-normalizado";
 import { dinero } from "@/lib/clientes/ficha";
+import { CLIENTES_APPLE_2026_10 } from "@/lib/clientes/apple-2026-10";
 import {
   contarChips,
   contarClientes,
@@ -66,10 +67,13 @@ const CHIPS_VALIDOS: ChipId[] = ["todos", "sin-contacto", "sin-correo", "sin-tel
 export default function ClientesListClient({
   initialClientes,
   actualizado = null,
+  apple = CLIENTES_APPLE_2026_10,
 }: {
   initialClientes: Cliente[];
   /** El último sync del directorio (`clientes_master`), para la línea de frescura. */
   actualizado?: string | null;
+  /** `CLIENTES_APPLE_2026_10` (5-oct-2026). Las pruebas lo fuerzan. */
+  apple?: boolean;
 }) {
   const { authChecked } = useAuth({
     moduleKey: "directorio",
@@ -211,7 +215,9 @@ export default function ClientesListClient({
             })}
           </div>
 
-          <p className="mt-3 mb-2 text-xs text-gray-500 tabular-nums">{contarClientes(visibles.length)}</p>
+          {/* 🔴 Apple (5-oct-2026): «150 clientes» arriba repetía el chip «Todos
+              150». Se va; al buscar, «12 de 150» baja al pie. */}
+          {apple ? <div className="mb-2" /> : <p className="mt-3 mb-2 text-xs text-gray-500 tabular-nums">{contarClientes(visibles.length)}</p>}
 
           {!ytdData && initialClientes.length === 0 ? (
             <SkeletonTable rows={8} cols={4} />
@@ -233,15 +239,20 @@ export default function ClientesListClient({
                         <Encabezado columna="compras" orden={orden} onClick={tocarColumna} derecha>Compras {anio}</Encabezado>
                         <Encabezado columna="debe" orden={orden} onClick={tocarColumna} derecha>Saldo</Encabezado>
                         <th className="py-2 px-1.5 xl:px-3 font-normal">Contacto</th>
+                        {apple && <th className="w-4" aria-hidden />}
                       </tr>
                     </thead>
                     <tbody>
                       {visibles.map((c) => {
                         const contacto = comoContactarlo(c);
                         return (
-                          <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                          <tr
+                            key={c.id}
+                            onClick={apple ? () => router.push(`/clientes/${encodeURIComponent(c.codigo)}`) : undefined}
+                            className={`border-b border-gray-100 hover:bg-gray-50 transition${apple ? " cursor-pointer" : ""}`}
+                          >
                             <td className="py-2 px-1.5 xl:px-3">
-                              <Link href={`/clientes/${encodeURIComponent(c.codigo)}`} className="font-medium hover:underline">
+                              <Link href={`/clientes/${encodeURIComponent(c.codigo)}`} onClick={apple ? (e) => e.stopPropagation() : undefined} className="font-medium hover:underline">
                                 {c.nombre}
                               </Link>
                               <span className="ml-2 text-xs tabular-nums text-gray-400">{c.codigo}</span>
@@ -251,6 +262,7 @@ export default function ClientesListClient({
                             <td className="py-2 px-1.5 xl:px-3">
                               <Contacto c={contacto} nombre={c.nombre} />
                             </td>
+                            {apple && <td aria-hidden className="py-2 pl-1 pr-1.5 text-right text-gray-300">›</td>}
                           </tr>
                         );
                       })}
@@ -259,7 +271,55 @@ export default function ClientesListClient({
                 </ScrollableTable>
               </div>
 
-              {/* Celular e iPad: tarjetas. Toda la tarjeta navega a la ficha. */}
+              {/* Celular e iPad: tarjetas. Toda la tarjeta navega a la ficha.
+                  🔴 Apple (5-oct-2026): DOS renglones con ›, como el resto del
+                  sistema — nombre y saldo; código, cómo contactarlo (o lo que
+                  falta, en rojo) y lo comprado. El teléfono se toca sin abrir
+                  la ficha. */}
+              {apple ? (
+              <ul data-vista="tarjetas" data-dos-renglones className="border-t border-gray-100 lg:hidden">
+                {visibles.map((c) => {
+                  const contacto = comoContactarlo(c);
+                  return (
+                    <li
+                      key={c.id}
+                      onClick={() => router.push(`/clientes/${encodeURIComponent(c.codigo)}`)}
+                      className="flex items-center gap-3 border-b border-gray-100 px-1 py-2.5 active:bg-gray-50 cursor-pointer"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between gap-3">
+                          <span className="min-w-0 truncate font-medium">{c.nombre}</span>
+                          <span className={`shrink-0 text-sm tabular-nums ${c.debe > 0 ? "text-red-700" : c.debe < 0 ? "text-blue-600" : "text-gray-400"}`}>
+                            {c.debe === 0 ? "Sin saldo" : c.debe < 0 ? `Saldo a favor ${dinero(Math.abs(c.debe))}` : dinero(c.debe)}
+                          </span>
+                        </div>
+                        <div className="mt-0.5 flex items-center justify-between gap-3 text-xs tabular-nums">
+                          <span className="flex min-w-0 items-center gap-2 text-gray-400">
+                            <span className="shrink-0">{c.codigo}</span>
+                            {contacto.telefono ? (
+                              <a
+                                href={telHref(contacto.telefono) ?? undefined}
+                                aria-label={`Llamar a ${c.nombre}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="-my-3 inline-flex min-h-[44px] items-center truncate text-blue-600"
+                              >
+                                {contacto.telefono}
+                              </a>
+                            ) : contacto.falta ? (
+                              <span className="truncate text-red-600">{contacto.falta}</span>
+                            ) : null}
+                          </span>
+                          <span className="shrink-0 text-gray-500">
+                            {c.compras === undefined ? <span className="text-gray-300">…</span> : `Compras ${dinero(c.compras)}`}
+                          </span>
+                        </div>
+                      </div>
+                      <span aria-hidden className="shrink-0 text-gray-300">›</span>
+                    </li>
+                  );
+                })}
+              </ul>
+              ) : (
               <ul data-vista="tarjetas" className="border-t border-gray-100 lg:hidden">
                 {visibles.map((c) => {
                   const contacto = comoContactarlo(c);
@@ -295,7 +355,13 @@ export default function ClientesListClient({
                   );
                 })}
               </ul>
+              )}
             </>
+          )}
+          {apple && visibles.length > 0 && visibles.length !== conCompras.length && (
+            <p data-pie-clientes className="mt-3 text-xs text-gray-500 tabular-nums">
+              {visibles.length.toLocaleString("es")} de {contarClientes(conCompras.length)}
+            </p>
           )}
         </main>
       </PullToRefresh>

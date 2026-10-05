@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -12,6 +12,9 @@ import { calcSub, reclamoTaxes, esPendiente, empresaKeyDeReclamo } from "./const
 import { matchReclamo, matchHint } from "./search";
 import { EmptyState, Toast } from "@/components/ui";
 import OverflowMenu from "@/components/ui/OverflowMenu";
+import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
+import { RECLAMOS_APPLE_2026_10, diasEnRojo, lineaPendientes } from "@/lib/reclamos/apple-2026-10";
+import { resumenViejos } from "@/lib/reclamos/viejos";
 import FotoBadge from "./FotoBadge";
 import EnviarProveedorModal from "./EnviarProveedorModal";
 import { facturasEnPantalla } from "@/lib/reclamos/facturas";
@@ -54,6 +57,8 @@ interface Props {
   onReload: () => void;
   /** El celular dibuja su propio encabezado: el contenedor lo pone UNA vez. */
   sinEncabezado?: boolean;
+  /** `RECLAMOS_APPLE_2026_10` (5-oct-2026). Las pruebas lo fuerzan. */
+  apple?: boolean;
 }
 
 const IconTrash = (
@@ -130,6 +135,7 @@ export default function EmpresaList({
   role, activeEmpresa, reclamos, contactos,
   selectionMode, setSelectionMode, selectedIds, setSelectedIds,
   onBack, onNewReclamo, onLoadDetail, onEditReclamo, onDeleteReclamo, onDeleteSelected, onReload, sinEncabezado,
+  apple = RECLAMOS_APPLE_2026_10,
 }: Props) {
   const isAdmin = role === "admin";
   const hoy = hoyPanama();
@@ -147,6 +153,9 @@ export default function EmpresaList({
   const [filaBusy, setFilaBusy] = useState<string | null>(null);
   const [sendOpen, setSendOpen] = useState(false);
   const [mailRec, setMailRec] = useState<Reclamo | null>(null);
+  // Apple (5-oct-2026): un solo «Descargar ⌄» con Excel y PDF, como en el reclamo abierto.
+  const descargaRef = useRef<HTMLButtonElement>(null);
+  const [descargaOpen, setDescargaOpen] = useState(false);
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
   const allEmpresaRecs = reclamos.filter((r) => r.empresa === activeEmpresa);
@@ -154,6 +163,7 @@ export default function EmpresaList({
   const cobrados = filtrarPorEstado(allEmpresaRecs, "cobrados");
   const montoPorCobrar = porCobrar.reduce((s, r) => s + reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total, 0);
   const totalDe = (r: Reclamo) => reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total;
+  const lineaApple = lineaPendientes(porCobrar.length, resumenViejos(allEmpresaRecs, hoy).n, porCobrar.filter((r) => !estaReclamado(r)).length);
   const visibles = ordenarReclamos(
     filtrarPorEstado(allEmpresaRecs, filtro).filter((r) => !search || matchReclamo(r, search) !== null),
     orden,
@@ -216,7 +226,7 @@ export default function EmpresaList({
   function celdaDias(r: Reclamo) {
     const d = diasDesde(r.fecha_factura, hoy);
     if (d === null) return <span className="text-xs text-red-600">{FALTA_FECHA_FACTURA}</span>;
-    return <span className="tabular-nums">{d}</span>;
+    return <span className={`tabular-nums${apple && diasEnRojo(d) ? " text-red-600" : ""}`}>{d}</span>;
   }
   /**
    * 🔴 CUÁNDO SE COBRÓ, y SOLO en «Cobrados» (18-sep-2026). Daniel: *«en
@@ -237,7 +247,24 @@ export default function EmpresaList({
     const sin = !estaReclamado(r);
     return <span className={sin ? "text-red-600 font-medium" : "text-gray-500"}>{textoReclamado(r)}</span>;
   }
-  const acciones = (r: Reclamo) => (
+  // 🔴 Apple (5-oct-2026): la fila sin botones a la vista, solo el «···». Medido:
+  // 9 correos en TODA la historia del módulo; la fila ya abre el reclamo, donde
+  // viven las mismas acciones.
+  const accionesApple = (r: Reclamo) => (
+    <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+      <OverflowMenu
+        ariaLabel={`Más opciones del reclamo ${r.nro_reclamo}`}
+        items={[
+          ...(esPendiente(r) ? [{ label: "Enviar al proveedor", onClick: () => setMailRec(r) }] : []),
+          { label: "Descargar en Excel", onClick: () => { void descargarUno(r, "excel"); } },
+          { label: "Descargar en PDF", onClick: () => { void descargarUno(r, "pdf"); } },
+          { label: "Editar", onClick: () => onEditReclamo(r.id) },
+          ...(isAdmin ? [{ label: "Eliminar", onClick: () => onDeleteReclamo(r.id), destructive: true }] : []),
+        ]}
+      />
+    </div>
+  );
+  const acciones = (r: Reclamo) => apple ? accionesApple(r) : (
     <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
       {/* 🔴 «CORREO» NO SE OFRECE SOBRE UN RECLAMO YA COBRADO (11-sep-2026).
           🩸 La invariante de arriba lo dice desde el 10-sep —mandar un reclamo
@@ -270,17 +297,42 @@ export default function EmpresaList({
       </div>
 
       <div className="flex items-end justify-between mb-4 sm:mb-6 flex-wrap gap-4">
+        {apple ? (
+          /* 🔴 Apple (5-oct-2026): el monto pendiente grande y UNA línea gris
+             con lo que pide atención y el contacto (como la portada y CxC). */
+          <div data-cabecera-apple>
+            <h1 className="text-sm font-medium text-gray-500">{nombreCorto}</h1>
+            <p className="pt-1 text-[34px] font-normal leading-none tracking-tight tabular-nums text-gray-800">${fmt(montoPorCobrar)}</p>
+            <p className="pt-2 text-sm text-gray-500">
+              {lineaApple.texto}
+              {lineaApple.alertas.map((a) => <span key={a}> · <span className="text-red-600">{a}</span></span>)}
+              {c && <> · {c.nombre_contacto || c.nombre || "Contacto"} · {mailtoHref(c.correo) ? <a href={mailtoHref(c.correo)!} className="text-blue-600 hover:text-blue-800">{c.correo}</a> : c.correo}</>}
+            </p>
+          </div>
+        ) : (
         <div>
           <h1 className="text-xl font-light tracking-tight">{nombreCorto}</h1>
           {c && <p className="text-sm text-gray-500 mt-1">{c.nombre_contacto || c.nombre || "Contacto"} · {mailtoHref(c.correo) ? <a href={mailtoHref(c.correo)!} className="text-blue-600 hover:underline">{c.correo}</a> : c.correo}</p>}
         </div>
+        )}
         <div className="flex items-center gap-2 flex-wrap">
           {selectionMode && <span className="text-sm text-gray-500">{selCount > 0 ? `${selCount} seleccionado${selCount === 1 ? "" : "s"}` : "Selecciona reclamos…"}</span>}
           {/* Correo y descargas: sobre la selección, o sobre lo que se está mirando. */}
           {filtro === "por-cobrar" && idsObjetivo.length > 0 && (
             <button onClick={() => setSendOpen(true)} disabled={busy !== null} className={accion} aria-label="Enviar por correo al proveedor">Enviar al proveedor</button>
           )}
-          {idsObjetivo.length > 0 && (
+          {apple && idsObjetivo.length > 0 && (
+            <>
+              <button ref={descargaRef} onClick={() => setDescargaOpen((v) => !v)} disabled={busy !== null} aria-haspopup="menu" aria-expanded={descargaOpen} className={`${accion} gap-1`}>
+                {busy === "excel" ? "Armando el Excel…" : busy === "pdf" ? "Armando el PDF…" : "Descargar"} <span aria-hidden className="text-gray-400">⌄</span>
+              </button>
+              <DesplegableFlotante abierto={descargaOpen} anclaRef={descargaRef} onCerrar={() => setDescargaOpen(false)} role="menu" marca="reclamos-empresa-descargar" className="rounded-md border border-gray-200 bg-white shadow-lg py-1 min-w-[180px]">
+                <button role="menuitem" onClick={() => { setDescargaOpen(false); void descargarLote("excel"); }} className="block w-full text-left text-sm px-4 min-h-[44px] hover:bg-gray-50">Descargar en Excel</button>
+                <button role="menuitem" onClick={() => { setDescargaOpen(false); void descargarLote("pdf"); }} className="block w-full text-left text-sm px-4 min-h-[44px] hover:bg-gray-50">Descargar en PDF</button>
+              </DesplegableFlotante>
+            </>
+          )}
+          {!apple && idsObjetivo.length > 0 && (
             <>
               <button onClick={() => descargarLote("excel")} disabled={busy !== null} className={accion}>{busy === "excel" ? "Armando el Excel…" : "Descargar Excel"}</button>
               <button onClick={() => descargarLote("pdf")} disabled={busy !== null} className={accion}>{busy === "pdf" ? "Armando el PDF…" : "Descargar PDF"}</button>
@@ -303,7 +355,7 @@ export default function EmpresaList({
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <button onClick={() => setFiltroUrl("")} aria-pressed={filtro === "por-cobrar"} className={`${pill} ${filtro === "por-cobrar" ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
-          Pendientes <span className="ml-1 opacity-70 tabular-nums">{porCobrar.length} · ${fmt(montoPorCobrar)}</span>
+          Pendientes <span className="ml-1 opacity-70 tabular-nums">{apple ? porCobrar.length : `${porCobrar.length} · $${fmt(montoPorCobrar)}`}</span>
         </button>
         <button onClick={() => setFiltroUrl("cobrados")} aria-pressed={filtro === "cobrados"} className={`${pill} ${filtro === "cobrados" ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
           Cobrados <span className="ml-1 opacity-70 tabular-nums">{cobrados.length}</span>
@@ -312,7 +364,7 @@ export default function EmpresaList({
       </div>
 
       {visibles.length === 0 ? (() => {
-        if (search) return <div className="py-12 text-center text-sm text-gray-400">No encontramos reclamos para &quot;{search}&quot;</div>;
+        if (search) return <div className="py-12 text-center text-sm text-gray-400">{apple ? <>Sin resultados para «{search}»</> : <>No encontramos reclamos para &quot;{search}&quot;</>}</div>;
         if (allEmpresaRecs.length === 0) return <EmptyState title="Todavía sin reclamos" />;
         if (filtro === "por-cobrar") return (
           <div className="flex flex-col items-center py-16 text-center">
@@ -345,7 +397,7 @@ export default function EmpresaList({
                     <span className="text-sm font-semibold tabular-nums shrink-0">${fmt(total)}</span>
                   </div>
                   <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="text-gray-500">{d === null ? <span className="text-red-600">{FALTA_FECHA_FACTURA}</span> : `${d} día${d === 1 ? "" : "s"}`}</span>
+                    <span className={apple && diasEnRojo(d) ? "text-red-600" : "text-gray-500"}>{d === null ? <span className="text-red-600">{FALTA_FECHA_FACTURA}</span> : `${d} día${d === 1 ? "" : "s"}`}</span>
                     {filtro === "cobrados" ? celdaCobrado(r) : celdaReclamado(r)}
                   </div>
                   {!selectionMode && <div className="mt-3 pt-3 border-t border-gray-100">{acciones(r)}</div>}

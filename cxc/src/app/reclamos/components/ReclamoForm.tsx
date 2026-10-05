@@ -14,6 +14,9 @@ import RenglonesDesdeFactura from "./RenglonesDesdeFactura";
 import { itemsAGuardar, resumenRenglones, type LineaFactura } from "@/lib/reclamos/lineas-factura";
 import { FALTA_PDF } from "@/lib/reclamos/validate";
 import CampoFecha from "@/components/ui/CampoFecha";
+import { RECLAMOS_APPLE_2026_10 } from "@/lib/reclamos/apple-2026-10";
+import { ATRIBUTO_BARRA_FIJA } from "@/lib/navegacion/barra-celular";
+import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
 
 interface Props {
   fEmpresa: string;
@@ -50,6 +53,8 @@ interface Props {
   onViewSaved: () => void;
   onResetAndCreateAnother: () => void;
   isEditing?: boolean;
+  /** `RECLAMOS_APPLE_2026_10` (5-oct-2026). Las pruebas lo fuerzan. */
+  apple?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -74,6 +79,7 @@ export default function ReclamoForm({
   savedReclamoId, savedNroReclamo, pendingFotos, onAddFoto, onRemoveFoto, onRetryFotos,
   saving, error, onSave, onCancel, onViewSaved, onResetAndCreateAnother,
   isEditing,
+  apple = RECLAMOS_APPLE_2026_10,
 }: Props) {
   const formFotoRef = useRef<HTMLInputElement>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
@@ -87,6 +93,10 @@ export default function ReclamoForm({
   const resumen = resumenRenglones(itemsFinales);
   const fTax = reclamoTaxes(fEmpresa, resumen.subtotal);
   const faltaPdf = !hayPdf;
+  /** Apple: la barra fija de abajo dice cuánto mide (el ☰ y los avisos suben). */
+  const barraGuardar = useRef<HTMLDivElement | null>(null);
+  usePublicarAltoBarraFija(barraGuardar, apple && !savedReclamoId);
+  const ast = apple ? "" : " *";
 
   // Lo que leyó el lector va a la cabecera (campos editables) y a la lista de
   // renglones; NO marca ningún renglón: eso lo hace Andrea.
@@ -122,10 +132,12 @@ export default function ReclamoForm({
           el PDF que no va a tener que teclear proveedor, marca, factura, fecha
           ni pedido. Va bajo el título, en gris, y el ⓘ se retira. */}
       <div className="mb-10">
-        <div className="text-sm font-semibold text-gray-900">Factura del proveedor *</div>
+        <div className={`text-sm font-semibold text-gray-900${apple ? " mb-3" : ""}`}>Factura del proveedor{ast}</div>
+        {!apple && (
         <p className="text-sm text-gray-500 mt-1 mb-3 max-w-xl">
           Sube el PDF o una foto y se llenan solos el proveedor, la marca, la factura, la fecha y el pedido, más las líneas para que marques cuáles reclamas. Revisa y corrige.
         </p>
+        )}
         <div className="max-w-xl">
           <FacturaPdfUploader onUploaded={setFacturaPdfPath} onExtracted={aplicarIA} />
           {/* 🔴 EL AVISO, PEGADO A LA CAJA DEL ARCHIVO (20-sep-2026). Estaba al
@@ -133,7 +145,9 @@ export default function ReclamoForm({
               pie de foto de los botones y no como lo que le falta a ESTE
               campo. Lo que frena el guardado no cambió: es el mismo
               `faltaPdf`, y el botón sigue apagado. */}
-          {faltaPdf && !savedReclamoId && (
+          {/* Apple: lo que hace la pantalla, en UNA línea gris DEBAJO de la caja. */}
+          {apple && !leidaTexto && <p className="text-xs text-gray-500 mt-2">Se llenan solos el proveedor, la factura, la fecha, el pedido y las líneas.</p>}
+          {!apple && faltaPdf && !savedReclamoId && (
             <p className="text-sm text-red-600 mt-2" data-medir="reclamo-falta-pdf">{FALTA_PDF}</p>
           )}
         </div>
@@ -145,7 +159,7 @@ export default function ReclamoForm({
         <div className="mb-10">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-12 gap-y-5">
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500">Empresa *</label>
+              <label className="text-xs text-gray-500">Empresa{ast}</label>
               <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="border-b border-gray-200 py-3 xl:py-1.5 text-base xl:text-sm text-black outline-none bg-transparent">
                 <option value="">Seleccionar...</option>
                 {empresasParaElegir(fEmpresa).map((e) => <option key={e} value={e}>{e}</option>)}
@@ -153,17 +167,17 @@ export default function ReclamoForm({
               {empInfo && <p className="text-xs text-gray-400 mt-1">Proveedor: {empInfo.proveedor} | Marca: {empInfo.marca}</p>}
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500">Fecha de factura *</label>
+              <label className="text-xs text-gray-500">Fecha de factura{ast}</label>
               <CampoFecha value={fFechaFactura} onChange={(e) => setFFechaFactura(e.target.value)} className="border-b border-gray-200 py-3 xl:py-1.5 text-base xl:text-sm text-black outline-none" />
             </div>
             {!esActiveShoes(fEmpresa) && (
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-500">N° de pedido *</label>
+                <label className="text-xs text-gray-500">N° de pedido{ast}</label>
                 <input type="text" value={fPedido} onChange={(e) => setFPedido(e.target.value)} placeholder="Ej. 10059874" className="border-b border-gray-200 py-3 xl:py-1.5 text-base xl:text-sm text-black outline-none" />
               </div>
             )}
             <div className="sm:col-span-3">
-              <FacturasChips facturas={fFacturas} onChange={setFFacturas} />
+              <FacturasChips facturas={fFacturas} onChange={setFFacturas} {...(apple ? { rotulo: "Factura(s)" } : {})} />
             </div>
           </div>
         </div>
@@ -175,14 +189,14 @@ export default function ReclamoForm({
               <RenglonesDesdeFactura lineas={fLineas} seleccion={fSeleccion} setSeleccion={setFSeleccion} />
               <div className="mt-4">
                 {aMano ? (
-                  <ItemsEditor items={fItems} setItems={setFItems} titulo="Líneas adicionales" />
+                  <ItemsEditor items={fItems} setItems={setFItems} titulo="Líneas adicionales" sinAsteriscos={apple} />
                 ) : (
                   <button type="button" onClick={() => setAMano(true)} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2">¿No está en la factura? Agregar línea manual</button>
                 )}
               </div>
             </>
           ) : (
-            <ItemsEditor items={fItems} setItems={setFItems} />
+            <ItemsEditor items={fItems} setItems={setFItems} sinAsteriscos={apple} />
           )}
           <div className="mt-6 text-right text-sm space-y-1">
             <div className="text-gray-500">{resumen.renglones} línea{resumen.renglones === 1 ? "" : "s"} · {resumen.piezas} pieza{resumen.piezas === 1 ? "" : "s"}</div>
@@ -196,10 +210,12 @@ export default function ReclamoForm({
         {/* ── 4. Fotos (como estaban) ── */}
         <div className="mb-10">
           <div className="flex items-center gap-1 mb-3">
-            <div className="text-sm font-semibold text-gray-900">Fotos <span className="font-normal text-gray-400">(opcional)</span></div>
+            <div className="text-sm font-semibold text-gray-900">Fotos{!apple && <> <span className="font-normal text-gray-400">(opcional)</span></>}</div>
+            {!apple && (
             <Ayuda titulo="Cuándo se guardan" className="-my-2">
               <p>Adjunta las fotos ahora; se guardan junto con el reclamo en un solo paso.</p>
             </Ayuda>
+            )}
           </div>
 
           {pendingFotos.length > 0 && (
@@ -250,6 +266,9 @@ export default function ReclamoForm({
           {!savedReclamoId && (pendingFotos.length < 5 ? (
             <>
               <input ref={formFotoRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { const files = Array.from(e.target.files ?? []); if (files.length) onAddFoto(files); if (formFotoRef.current) formFotoRef.current.value = ""; }} />
+              {apple ? (
+                <button type="button" onClick={() => formFotoRef.current?.click()} disabled={saving} className="text-sm font-medium text-blue-600 hover:text-blue-800 inline-flex items-center min-h-[44px] px-2 -mx-2 disabled:opacity-50">+ Agregar fotos</button>
+              ) : (
               <button
                 type="button"
                 onClick={() => formFotoRef.current?.click()}
@@ -260,6 +279,7 @@ export default function ReclamoForm({
                 <span className="text-sm font-medium">Agregar fotos</span>
                 <span className="text-xs text-gray-300">({pendingFotos.length} de 5)</span>
               </button>
+              )}
             </>
           ) : (
             <p className="text-xs text-gray-400">Ya están las 5 fotos que caben en un reclamo.</p>
@@ -268,7 +288,7 @@ export default function ReclamoForm({
 
         {/* ── Notas ── */}
         <div className="mb-10">
-          <div className="text-sm font-semibold text-gray-900 mb-3">Observaciones <span className="font-normal text-gray-400">(opcional)</span></div>
+          <div className="text-sm font-semibold text-gray-900 mb-3">Observaciones{!apple && <> <span className="font-normal text-gray-400">(opcional)</span></>}</div>
           <div className="max-w-2xl">
             <textarea value={fNotas} onChange={(e) => setFNotas(e.target.value)} rows={2} placeholder="Algo más que el proveedor deba saber…" className="w-full border-b border-gray-200 py-3 xl:py-1.5 text-base xl:text-sm text-black outline-none resize-none" />
           </div>
@@ -300,6 +320,38 @@ export default function ReclamoForm({
           <button onClick={onViewSaved} disabled={saving} className="bg-black text-white px-6 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50 inline-flex items-center justify-center min-h-[44px]">Ver reclamo →</button>
           <button onClick={onResetAndCreateAnother} disabled={saving} className="text-sm text-gray-400 hover:text-black transition ml-2 disabled:opacity-50 inline-flex items-center justify-center min-h-[44px] px-2">Crear otro reclamo</button>
         </div>
+      ) : apple ? (
+        /* 🔴 Apple (5-oct-2026): LA ÚNICA ACCIÓN, ABAJO Y CON EL RESULTADO EN
+           VIVO, como «Guardar guía». Apagada sin factura (no hay nada que
+           guardar); lo que falte lo dice el servidor al tocarla, aquí mismo. */
+        <>
+          <div
+            ref={barraGuardar}
+            data-barra-guardar-reclamo
+            {...{ [ATRIBUTO_BARRA_FIJA]: "" }}
+            className="fixed inset-x-0 bottom-0 md:sticky z-20 mt-8 border-t border-gray-200 bg-white px-4 md:px-0 pt-3"
+            style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+          >
+            {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
+            <div className="flex items-center gap-3">
+              <p aria-live="polite" data-total-en-vivo className="min-w-0 flex-1 text-sm text-gray-500">
+                {faltaPdf ? (
+                  "Sube la factura para empezar"
+                ) : (
+                  <>
+                    {resumen.renglones} línea{resumen.renglones === 1 ? "" : "s"} ·{" "}
+                    <b className="text-lg font-semibold tabular-nums text-black">${fmt(fTax.total)}</b>
+                  </>
+                )}
+              </p>
+              <button onClick={onCancel} className="hidden sm:inline-flex text-sm text-gray-400 hover:text-black transition items-center justify-center min-h-[44px] px-2">Cancelar</button>
+              <button onClick={onSave} disabled={saving || faltaPdf} className="shrink-0 bg-black text-white px-6 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 inline-flex items-center justify-center min-h-[44px]">
+                {saving ? "Guardando…" : "Guardar reclamo"}
+              </button>
+            </div>
+          </div>
+          <div aria-hidden className="h-24 md:hidden" />
+        </>
       ) : (
         <div className="mt-8">
           {error && <p className="text-red-500 text-sm mb-4">{error}</p>}

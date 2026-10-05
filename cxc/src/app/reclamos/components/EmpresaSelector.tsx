@@ -12,6 +12,8 @@ import { resumenViejos, DIAS_RECLAMO_VIEJO } from "@/lib/reclamos/viejos";
 import { textoReclamado, estaReclamado } from "@/lib/reclamos/reclamado";
 import { TODAVIA_SIN_RECLAMOS } from "@/lib/reclamos/empresas-con-reclamos";
 import { SkeletonTable, EmptyState } from "@/components/ui";
+import { RECLAMOS_APPLE_2026_10, lineaPendientes } from "@/lib/reclamos/apple-2026-10";
+import { lineaEmpresa } from "@/lib/reclamos/celular";
 
 interface Props {
   role: string;
@@ -25,6 +27,8 @@ interface Props {
   onLoadDetail: (id: string, empresa: string) => void;
   /** El celular dibuja su propio encabezado: el contenedor lo pone UNA vez. */
   sinEncabezado?: boolean;
+  /** `RECLAMOS_APPLE_2026_10` (5-oct-2026). Las pruebas lo fuerzan. */
+  apple?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -47,6 +51,7 @@ interface Props {
 export default function EmpresaSelector({
   role, reclamos, loading, contactos, globalSearch, setGlobalSearch,
   onNewReclamo, onSelectEmpresa, onLoadDetail, sinEncabezado,
+  apple = RECLAMOS_APPLE_2026_10,
 }: Props) {
   const hoy = hoyPanama();
   const resumen = resumenPortada(reclamos, hoy);
@@ -60,17 +65,92 @@ export default function EmpresaSelector({
   const veSinReclamar = resumen.sinReclamar.n > 0;
   const cajas = veSinReclamar ? "sm:grid-cols-3" : "sm:grid-cols-2";
   const nombreCorto = (empresa: string) => { const k = empresaKeyDeReclamo(empresa); return k ? nombreCortoEmpresa(k) : empresa; };
+  const veTotales = role === "admin" || role === "secretaria";
+  const buscador = (clase: string) => (
+    <input type="text" value={globalSearch} onChange={(e) => setGlobalSearch(e.target.value)} placeholder="Buscar por N° factura, N° reclamo, estilo o empresa…" className={`border-b border-gray-200 py-2 min-h-[44px] text-base sm:text-sm outline-none focus:border-black transition max-w-md ${clase}`} />
+  );
+  const botonNuevo = (clase = "") => (
+    <button onClick={onNewReclamo} className={`text-sm bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all ${clase}`}>Nuevo reclamo</button>
+  );
+
+  // 🔴 «COMO LO HARÍA APPLE» (5-oct-2026, `RECLAMOS_APPLE_2026_10`, apagado):
+  // las cajas de totales pasan a UN número grande con su línea gris (como CxC y
+  // Multifashion); «Nuevo reclamo» va en la fila del buscador; las empresas son
+  // filas de dos renglones con ›; lo cobrado del año, una línea gris al pie.
+  // Los números son los MISMOS (`resumenPortada`, `resumenViejos`, `tarjetasPorEmpresa`).
+  const linea = lineaPendientes(resumen.porCobrar.n, viejos.n, resumen.sinReclamar.n);
+  const cabeceraApple = (
+    <>
+          {veTotales && (
+            <div data-cabecera-apple className="mb-5">
+              <p className="text-[34px] font-normal leading-none tracking-tight tabular-nums text-gray-800">${fmt(resumen.porCobrar.monto)}</p>
+              <p className="pt-2 text-sm text-gray-500">
+                {linea.texto}
+                {linea.alertas.map((a) => <span key={a}> · <span className="text-red-600">{a}</span></span>)}
+              </p>
+            </div>
+          )}
+    </>
+  );
+  const listaApple = (
+    <>
+              <ul data-lista="reclamos-empresas-apple" className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
+                {tarjetas.map((t) => {
+                  const l = lineaEmpresa(t.n, t.masViejoDias);
+                  return (
+                    <li key={t.empresa}>
+                      <button type="button" onClick={() => onSelectEmpresa(t.empresa)} className="flex w-full min-h-[56px] items-center gap-4 px-4 py-3 text-left transition hover:bg-gray-50">
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-medium text-gray-900">{t.nombreCorto}</span>
+                          <span className="mt-0.5 block truncate text-sm text-gray-500">
+                            {t.n === 0 ? (
+                              <span className="text-gray-400">{t.tieneHistoria ? "Sin pendientes" : TODAVIA_SIN_RECLAMOS}</span>
+                            ) : (
+                              <>
+                                {l.texto}
+                                {t.contacto && ` · ${t.contacto}`}
+                                {l.dias && <> · <span className="text-red-600">{l.dias}</span></>}
+                                {t.sinReclamar > 0 && <> · <span className="text-red-600">{t.sinReclamar} sin reclamar</span></>}
+                              </>
+                            )}
+                          </span>
+                        </span>
+                        {t.n > 0 && <span className="shrink-0 text-sm tabular-nums text-gray-900">${fmt(t.monto)}</span>}
+                        <span aria-hidden className="shrink-0 text-gray-300">›</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              {veTotales && (
+                <p data-pie="reclamos-cobrado" className="mt-3 text-xs text-gray-500 tabular-nums">
+                  {resumen.cobrado.n > 0
+                    ? `Cobrado en ${resumen.cobrado.anio}: $${fmt(resumen.cobrado.monto)} · ${resumen.cobrado.n} reclamo${resumen.cobrado.n === 1 ? "" : "s"}`
+                    : `Nada cobrado en ${resumen.cobrado.anio}`}
+                </p>
+              )}
+    </>
+  );
+
+  function resultadosDeBusqueda() {
+    return <ResultadosDeBusqueda reclamos={reclamos} globalSearch={globalSearch} setGlobalSearch={setGlobalSearch} onLoadDetail={onLoadDetail} nombreCorto={nombreCorto} />;
+  }
 
   return (
     <div>
       {!sinEncabezado && <AppHeader module="Reclamos" />}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        <div className="flex items-center justify-end mb-5">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6" data-reclamos-apple={apple ? "portada" : undefined}>
+        {apple && cabeceraApple}
+        {/* Apple: «Nuevo reclamo» va en la fila del buscador (antes, solo en una fila entera). */}
+        <div className="flex items-center justify-end mb-5 gap-3">
           <h1 className="sr-only">Reclamos</h1>
+          {apple && buscador("min-w-0 flex-1")}
+          {apple ? botonNuevo("ml-auto shrink-0") : (
           <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">Nuevo reclamo</button>
+          )}
         </div>
 
-        {(role === "admin" || role === "secretaria") && (
+        {!apple && (role === "admin" || role === "secretaria") && (
           <div className={`grid grid-cols-1 ${cajas} gap-2 mb-5`} data-medir="reclamos-portada">
             <div className="border border-gray-200 rounded-lg p-4">
               <div className="text-xs text-gray-400 uppercase tracking-widest">Pendiente de cobro</div>
@@ -99,53 +179,13 @@ export default function EmpresaSelector({
           </div>
         )}
 
-        <div className="mb-4">
+        {!apple && <div className="mb-4">
           <input type="text" value={globalSearch} onChange={(e) => setGlobalSearch(e.target.value)} placeholder="Buscar por N° factura, N° reclamo, estilo o empresa…" className="w-full border-b border-gray-200 py-2 min-h-[44px] text-base sm:text-sm outline-none focus:border-black transition max-w-md" />
-        </div>
+        </div>}
 
-        {globalSearch.trim() ? (() => {
-          const q = globalSearch.toLowerCase();
-          const results = reclamos
-            .map((r) => ({ r, via: matchReclamo(r, globalSearch) }))
-            .filter(({ r, via }) => via !== null || (r.empresa || "").toLowerCase().includes(q) || (r.notas || "").toLowerCase().includes(q));
-          return (
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-sm text-gray-500">{results.length} resultado{results.length === 1 ? "" : "s"} para &quot;{globalSearch}&quot;</p>
-                <button onClick={() => setGlobalSearch("")} className="text-sm text-gray-400 hover:text-black transition min-h-[44px] px-2">× Limpiar</button>
-              </div>
-              {results.length === 0 ? <EmptyState title={`Sin resultados para «${globalSearch}»`} /> : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm min-w-[560px]">
-                    <thead><tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-400">
-                      <th className="text-left pb-3 font-medium">N° de reclamo</th>
-                      <th className="text-left pb-3 font-medium">Empresa</th>
-                      <th className="text-left pb-3 font-medium">Reclamado</th>
-                      <th className="text-left pb-3 font-medium">Estado</th>
-                      <th className="text-right pb-3 font-medium">Total</th>
-                    </tr></thead>
-                    <tbody>
-                      {results.map(({ r, via }) => (
-                        <tr key={r.id} onClick={() => onLoadDetail(r.id, r.empresa)} className="border-b border-gray-200 hover:bg-gray-50/80 transition cursor-pointer">
-                          <td className="py-3 font-medium">
-                            {r.nro_reclamo}
-                            {matchHint(r, via) && <span className="block font-normal text-xs text-gray-400 mt-0.5">{matchHint(r, via)}</span>}
-                          </td>
-                          <td className="py-3 text-gray-500">{nombreCorto(r.empresa)}</td>
-                          <td className={`py-3 ${esPendiente(r) && !estaReclamado(r) ? "text-red-600" : "text-gray-500"}`}>{esPendiente(r) ? textoReclamado(r) : "—"}</td>
-                          <td className="py-3 text-gray-500">{esPendiente(r) ? "Pendiente" : "Cobrado"}</td>
-                          <td className="py-3 text-right tabular-nums">${fmt(reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          );
-        })() : loading ? (
+        {globalSearch.trim() ? resultadosDeBusqueda() : loading ? (
           <SkeletonTable rows={3} cols={2} />
-        ) : (
+        ) : apple ? listaApple : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" data-medir="reclamos-tarjetas">
             {tarjetas.map((t) => {
               const sinNada = t.n === 0;
@@ -192,4 +232,53 @@ export default function EmpresaSelector({
       </div>
     </div>
   );
+}
+
+/** Los resultados de buscar en la portada (la tabla de siempre). */
+function ResultadosDeBusqueda({ reclamos, globalSearch, setGlobalSearch, onLoadDetail, nombreCorto }: {
+  reclamos: Reclamo[];
+  globalSearch: string;
+  setGlobalSearch: (v: string) => void;
+  onLoadDetail: (id: string, empresa: string) => void;
+  nombreCorto: (empresa: string) => string;
+}) {
+          const q = globalSearch.toLowerCase();
+          const results = reclamos
+            .map((r) => ({ r, via: matchReclamo(r, globalSearch) }))
+            .filter(({ r, via }) => via !== null || (r.empresa || "").toLowerCase().includes(q) || (r.notas || "").toLowerCase().includes(q));
+          return (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm text-gray-500">{results.length} resultado{results.length === 1 ? "" : "s"} para &quot;{globalSearch}&quot;</p>
+                <button onClick={() => setGlobalSearch("")} className="text-sm text-gray-400 hover:text-black transition min-h-[44px] px-2">× Limpiar</button>
+              </div>
+              {results.length === 0 ? <EmptyState title={`Sin resultados para «${globalSearch}»`} /> : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm min-w-[560px]">
+                    <thead><tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-400">
+                      <th className="text-left pb-3 font-medium">N° de reclamo</th>
+                      <th className="text-left pb-3 font-medium">Empresa</th>
+                      <th className="text-left pb-3 font-medium">Reclamado</th>
+                      <th className="text-left pb-3 font-medium">Estado</th>
+                      <th className="text-right pb-3 font-medium">Total</th>
+                    </tr></thead>
+                    <tbody>
+                      {results.map(({ r, via }) => (
+                        <tr key={r.id} onClick={() => onLoadDetail(r.id, r.empresa)} className="border-b border-gray-200 hover:bg-gray-50/80 transition cursor-pointer">
+                          <td className="py-3 font-medium">
+                            {r.nro_reclamo}
+                            {matchHint(r, via) && <span className="block font-normal text-xs text-gray-400 mt-0.5">{matchHint(r, via)}</span>}
+                          </td>
+                          <td className="py-3 text-gray-500">{nombreCorto(r.empresa)}</td>
+                          <td className={`py-3 ${esPendiente(r) && !estaReclamado(r) ? "text-red-600" : "text-gray-500"}`}>{esPendiente(r) ? textoReclamado(r) : "—"}</td>
+                          <td className="py-3 text-gray-500">{esPendiente(r) ? "Pendiente" : "Cobrado"}</td>
+                          <td className="py-3 text-right tabular-nums">${fmt(reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
 }

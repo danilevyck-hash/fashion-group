@@ -62,6 +62,11 @@ import { lineaFiscal, ROTULO_DIRECCION_SWITCH } from "@/lib/clientes/direccion-s
 import { textoYaNoEstaEnSwitch } from "@/lib/clientes/lista";
 import type { FilaAgingCliente } from "@/lib/clientes/cliente-para-cobrar";
 import CobrarEnFicha from "./CobrarEnFicha";
+import { clienteParaCobrar } from "@/lib/clientes/cliente-para-cobrar";
+import { saldoMas90 } from "@/lib/cxc/apple-2026-10";
+import { Aviso } from "@/components/ui/Aviso";
+import { BarraAccionFija, useBarraCelular } from "@/components/celular/BarraDeControles";
+import { CLIENTES_APPLE_2026_10 } from "@/lib/clientes/apple-2026-10";
 import { CONTENIDO_ANCHO_2026_10, DOS_COLUMNAS_2026_10, CLASE_COLUMNA_QUE_ESCALA } from "@/lib/navegacion/contenido-ancho";
 
 /** Tipo c (2-oct-2026): detalle por empresa (3 partes) y últimos pagos (2), lado a lado desde 1024 px. */
@@ -127,7 +132,14 @@ export interface ClienteDetailData {
  *  editaría y el servidor lo rechazaría. */
 const EDITABLE_ROLES = ["admin", "secretaria"];
 
-export default function ClienteDetail({ initialData }: { initialData: ClienteDetailData }) {
+export default function ClienteDetail({
+  initialData,
+  apple = CLIENTES_APPLE_2026_10,
+}: {
+  initialData: ClienteDetailData;
+  /** `CLIENTES_APPLE_2026_10` (5-oct-2026). Las pruebas lo fuerzan. */
+  apple?: boolean;
+}) {
   const { authChecked, role } = useAuth({
     moduleKey: "directorio",
     // 🔴 La MISMA lista que el guard SSR de la ficha y que el catálogo de
@@ -143,6 +155,8 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
   const [cajonDocs, setCajonDocs] = useState(false);
   const [guiasAbiertas, setGuiasAbiertas] = useState(false);
   const [editando, setEditando] = useState<string | null>(null);
+  // Apple: en el celular «Enviar estado de cuenta» va fijo abajo.
+  const celular = useBarraCelular();
 
   // La página es server-rendered: tras «Actualizar ahora» llega un initialData
   // fresco. No se re-siembra mientras se está escribiendo en un campo.
@@ -224,9 +238,62 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
   });
 
   const opcionesSync = opcionesFichaCliente(activas.map((e) => e.empresa));
+  // 🔴 Apple: el saldo a +90 días es la MISMA cuenta que CxC (91-120 + 121 y
+  // más, de la hoja de cobro): ni un tramo ni una suma nuevos.
+  const mas90 = apple
+    ? saldoMas90(clienteParaCobrar({ codigo: cliente.codigo, nombre: cliente.nombre }, initialData.aging))
+    : 0;
+  const barraAbajo = apple && celular && veCxc;
   const ancho = DOS_COLUMNAS_2026_10;
   const deADos = (nodo: React.ReactNode) =>
     ancho ? <div className={DETALLE_Y_PAGOS} data-dos-columnas>{nodo}</div> : nodo;
+
+  const tablaEmpresas = () => (
+            /* 🔴 EL MONTO NO SE CORTA (24-sep-2026). Medido a 390 px: la
+               columna «Debe» mostraba `$43,806.1C` — el último dígito partido
+               por la mitad. `w-full` dentro de un `overflow-x-auto` NUNCA
+               desborda: la tabla se encoge hasta que las cifras no caben, y el
+               deslizamiento de lado no se activa jamás. Con `min-w-max` la
+               tabla pide su ancho de verdad y el contenedor la desliza (la
+               regla de la casa: una tabla ancha, en su propio deslizamiento),
+               y `whitespace-nowrap` impide que un monto se parta en dos.
+               ⚠️ No cambia una sola cifra. */
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-max text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
+                    <th className="py-2 font-normal">Empresa</th>
+                    <th className="py-2 font-normal text-right whitespace-nowrap">{anio}</th>
+                    <th className="py-2 font-normal text-right whitespace-nowrap">{anio - 1}</th>
+                    <th className="py-2 font-normal text-right whitespace-nowrap">Variación %</th>
+                    <th className="py-2 font-normal text-right whitespace-nowrap">Saldo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activas.map((e) => (
+                    <tr key={e.empresa} className="border-b border-gray-100">
+                      <td className="py-2 pr-4 text-gray-700 whitespace-nowrap">{nombreCortoEmpresa(e.empresa)}</td>
+                      <td className="py-2 pl-4 text-right tabular-nums whitespace-nowrap">{dinero(e.compras)}</td>
+                      <td className="py-2 pl-4 text-right tabular-nums whitespace-nowrap text-gray-500">
+                        {e.comprasAnterior != null ? dinero(e.comprasAnterior) : "—"}
+                      </td>
+                      <CeldaVariacion actual={e.compras} anterior={e.comprasAnterior} />
+                      <CeldaDebe valor={e.debe} />
+                    </tr>
+                  ))}
+                  <tr className="font-medium">
+                    <td className="py-2.5">Total</td>
+                    <td className="py-2.5 pl-4 text-right tabular-nums whitespace-nowrap">{dinero(total.compras)}</td>
+                    <td className="py-2.5 pl-4 text-right tabular-nums whitespace-nowrap text-gray-500">
+                      {total.comprasAnterior != null ? dinero(total.comprasAnterior) : "—"}
+                    </td>
+                    <CeldaVariacion actual={total.compras} anterior={total.comprasAnterior} className="py-2.5" />
+                    <CeldaDebe valor={total.debe} className="py-2.5" />
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+  );
 
   return (
     <div className="min-h-screen bg-white">
@@ -248,11 +315,13 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
                 {ROTULO_DIRECCION_SWITCH}: {cliente.direccion_switch}
               </p>
             )}
-            {cliente.ausente_desde && (
+            {cliente.ausente_desde && (apple ? (
+              <Aviso className="mt-2">{textoYaNoEstaEnSwitch(fmtDate(cliente.ausente_desde.slice(0, 10)))}</Aviso>
+            ) : (
               <div className="mt-2 inline-flex items-center rounded bg-amber-50 px-2 py-1 text-xs text-amber-800">
                 {textoYaNoEstaEnSwitch(fmtDate(cliente.ausente_desde.slice(0, 10)))}
               </div>
-            )}
+            ))}
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             <LineaDeFrescura
@@ -264,7 +333,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
               resumenExito="Cliente actualizado"
               onSuccess={() => router.refresh()}
             />
-            {veCxc && (
+            {veCxc && !barraAbajo && (
               <button
                 type="button"
                 onClick={() => setHojaCobrar(true)}
@@ -302,6 +371,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
               <p className="text-sm font-medium text-gray-500">{debe.frase}</p>
             )}
             {debe.proporcion && <p className="mt-1 text-xs text-gray-500">{debe.proporcion}</p>}
+            {mas90 > 0 && <p data-mas-90 className="mt-0.5 text-xs text-red-600 tabular-nums">+90 días {dinero(mas90)}</p>}
           </Tarjeta>
 
           <Tarjeta titulo="Último pago">
@@ -348,52 +418,34 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
           </div>
           {activas.length === 0 ? (
             <p className="text-sm text-gray-500">Todavía no hay movimientos de este cliente.</p>
-          ) : (
-            /* 🔴 EL MONTO NO SE CORTA (24-sep-2026). Medido a 390 px: la
-               columna «Debe» mostraba `$43,806.1C` — el último dígito partido
-               por la mitad. `w-full` dentro de un `overflow-x-auto` NUNCA
-               desborda: la tabla se encoge hasta que las cifras no caben, y el
-               deslizamiento de lado no se activa jamás. Con `min-w-max` la
-               tabla pide su ancho de verdad y el contenedor la desliza (la
-               regla de la casa: una tabla ancha, en su propio deslizamiento),
-               y `whitespace-nowrap` impide que un monto se parta en dos.
-               ⚠️ No cambia una sola cifra. */
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-max text-sm">
-                <thead>
-                  <tr className="text-left text-xs uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
-                    <th className="py-2 font-normal">Empresa</th>
-                    <th className="py-2 font-normal text-right whitespace-nowrap">{anio}</th>
-                    <th className="py-2 font-normal text-right whitespace-nowrap">{anio - 1}</th>
-                    <th className="py-2 font-normal text-right whitespace-nowrap">Variación %</th>
-                    <th className="py-2 font-normal text-right whitespace-nowrap">Saldo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activas.map((e) => (
-                    <tr key={e.empresa} className="border-b border-gray-100">
-                      <td className="py-2 pr-4 text-gray-700 whitespace-nowrap">{nombreCortoEmpresa(e.empresa)}</td>
-                      <td className="py-2 pl-4 text-right tabular-nums whitespace-nowrap">{dinero(e.compras)}</td>
-                      <td className="py-2 pl-4 text-right tabular-nums whitespace-nowrap text-gray-500">
-                        {e.comprasAnterior != null ? dinero(e.comprasAnterior) : "—"}
-                      </td>
-                      <CeldaVariacion actual={e.compras} anterior={e.comprasAnterior} />
-                      <CeldaDebe valor={e.debe} />
-                    </tr>
-                  ))}
-                  <tr className="font-medium">
-                    <td className="py-2.5">Total</td>
-                    <td className="py-2.5 pl-4 text-right tabular-nums whitespace-nowrap">{dinero(total.compras)}</td>
-                    <td className="py-2.5 pl-4 text-right tabular-nums whitespace-nowrap text-gray-500">
-                      {total.comprasAnterior != null ? dinero(total.comprasAnterior) : "—"}
-                    </td>
-                    <CeldaVariacion actual={total.compras} anterior={total.comprasAnterior} className="py-2.5" />
-                    <CeldaDebe valor={total.debe} className="py-2.5" />
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          )}
+          ) : apple ? (<>
+            {/* 🔴 Apple: en el celular, una fila por empresa en dos renglones —
+                sin tabla que se desliza de lado—. Los MISMOS números. */}
+            <ul data-empresas-filas className="divide-y divide-gray-100 sm:hidden">
+              {[...activas, null].map((e) => {
+                const f = e ?? { empresa: "", compras: total.compras, comprasAnterior: total.comprasAnterior, debe: total.debe };
+                const v = variacionVsAnterior(f.compras, f.comprasAnterior);
+                return (
+                  <li key={e?.empresa ?? "total"} className={`py-2 text-sm tabular-nums ${e ? "" : "font-medium"}`}>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-gray-700">{e ? nombreCortoEmpresa(e.empresa) : "Total"}</span>
+                      <span className="text-gray-900">{dinero(f.compras)}</span>
+                    </div>
+                    <div className="mt-0.5 flex items-baseline justify-between gap-3 text-xs">
+                      <span className="text-gray-500">
+                        {anio - 1} {f.comprasAnterior != null ? dinero(f.comprasAnterior) : "—"}
+                        {v && <> · <span className={v.startsWith("−") ? "text-red-600" : "text-emerald-700"}>{v}</span></>}
+                      </span>
+                      <span className={f.debe > 0 ? "text-red-700" : f.debe < 0 ? "text-blue-600" : "text-gray-400"}>
+                        {f.debe > 0 ? `Saldo ${dinero(f.debe)}` : f.debe < 0 ? `Saldo a favor ${dinero(Math.abs(f.debe))}` : "Sin saldo"}
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="hidden sm:block">{tablaEmpresas()}</div>
+          </>) : tablaEmpresas()}
         </section>
 
         {/* ── 4. ÚLTIMOS PAGOS — POR FECHA, no por empresa ────────────────
@@ -513,6 +565,13 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
           )}
         </nav>
 
+        {/* 🔴 Apple: la acción principal, fija abajo en el celular. */}
+        {barraAbajo && (
+          <>
+            <div aria-hidden className="h-24" />
+            <BarraAccionFija rotulo="Enviar estado de cuenta" onClick={() => setHojaCobrar(true)} />
+          </>
+        )}
       </main>
 
       {veCxc && (

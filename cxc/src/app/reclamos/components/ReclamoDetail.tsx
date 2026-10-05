@@ -23,6 +23,7 @@ import EnviarProveedorModal from "./EnviarProveedorModal";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import CampoFecha from "@/components/ui/CampoFecha";
+import { RECLAMOS_APPLE_2026_10, cobradoEntero, diasEnRojo } from "@/lib/reclamos/apple-2026-10";
 
 interface Props {
   current: Reclamo;
@@ -67,6 +68,8 @@ interface Props {
   showToast: (msg: string) => void;
   /** El celular dibuja su propio encabezado: el contenedor lo pone UNA vez. */
   sinEncabezado?: boolean;
+  /** `RECLAMOS_APPLE_2026_10` (5-oct-2026). Las pruebas lo fuerzan. */
+  apple?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -94,6 +97,7 @@ export default function ReclamoDetail({
   showToast,
   contacto,
   sinEncabezado,
+  apple = RECLAMOS_APPLE_2026_10,
 }: Props) {
   const fotoRef = useRef<HTMLInputElement>(null);
   const [deleteFotoTarget, setDeleteFotoTarget] = useState<{ id: string; path: string } | null>(null);
@@ -188,19 +192,21 @@ export default function ReclamoDetail({
   // del servidor (bucket privado). Foto → lightbox; PDF → se abre en otra pestaña.
   const comprobanteEsPdf = /\.pdf(\?|$)/i.test(current.comprobante_path || current.comprobante_url || "");
   const comprobanteCard = current.comprobante_url ? (
-    <div className="mb-3 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+    // 🔴 Apple (5-oct-2026): el comprobante NO es un aviso, así que no lleva el
+    // ámbar de aviso de la paleta: va en gris, como cualquier documento.
+    <div className={`mb-3 flex items-start gap-3 rounded-lg border p-3 ${apple ? "border-gray-200 bg-gray-50" : "border-amber-200 bg-amber-50/60"}`}>
       {comprobanteEsPdf ? (
-        <a href={current.comprobante_url} target="_blank" rel="noopener noreferrer" className="flex h-16 w-16 shrink-0 items-center justify-center rounded-md border border-amber-200 bg-white text-red-600" title="Ver comprobante (PDF)">
+        <a href={current.comprobante_url} target="_blank" rel="noopener noreferrer" className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-md border bg-white text-red-600 ${apple ? "border-gray-200" : "border-amber-200"}`} title="Ver comprobante (PDF)">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
         </a>
       ) : (
         <button type="button" onClick={() => setLightboxSrc(current.comprobante_url!)} className="shrink-0" title="Ver comprobante">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={current.comprobante_url} alt="Comprobante" className="h-16 w-16 rounded-md border border-amber-200 object-cover" />
+          <img src={current.comprobante_url} alt="Comprobante" className={`h-16 w-16 rounded-md border object-cover ${apple ? "border-gray-200" : "border-amber-200"}`} />
         </button>
       )}
       <div className="min-w-0">
-        <div className="text-xs font-semibold text-amber-800">Comprobante de pago{comprobanteEsPdf ? " (PDF)" : ""}</div>
+        <div className={`text-xs font-semibold ${apple ? "text-gray-700" : "text-amber-800"}`}>Comprobante de pago{comprobanteEsPdf ? " (PDF)" : ""}</div>
         {current.comprobante_nota
           ? <p className="mt-0.5 text-sm text-gray-600 whitespace-pre-wrap break-words">{current.comprobante_nota}</p>
           : <p className="mt-0.5 text-xs text-gray-400 italic">Sin nota</p>}
@@ -214,6 +220,9 @@ export default function ReclamoDetail({
   const reclamado = current.monto_reclamado_snapshot ?? reclamoTaxes(current.empresa, sub).total;
   const deltaRec = reclamado - recuperado;
   const pctRec = reclamado > 0 ? (recuperado / reclamado) * 100 : 0;
+  /** Apple: un cobro, UNA tarjeta — el comprobante va adentro de «Recuperación». */
+  const comprobanteEnTarjeta = apple && (!pendiente || settlements.length > 0);
+  const enteroApple = apple && cobradoEntero(reclamado, recuperado);
   const [ncOpen, setNcOpen] = useState(false);
   const [ncMonto, setNcMonto] = useState("");
   const [ncNum, setNcNum] = useState("");
@@ -310,10 +319,19 @@ export default function ReclamoDetail({
                 ? <span className="text-gray-900">{fmtDate(current.fecha_factura)}</span>
                 : <span className="text-red-600">{FALTA_FECHA_FACTURA}</span>}
               {" · "}{current.proveedor || "—"}{current.marca ? ` · ${current.marca}` : ""}
-              {dias !== null && <> · <span className="text-gray-900 font-medium tabular-nums">{dias} día{dias === 1 ? "" : "s"}</span></>}
+              {dias !== null && <> · <span className={`font-medium tabular-nums ${apple && diasEnRojo(dias) ? "text-red-600" : "text-gray-900"}`}>{dias} día{dias === 1 ? "" : "s"}</span></>}
               {!esActiveShoes(current.empresa) && current.nro_orden_compra && <> · N° de pedido {current.nro_orden_compra}</>}
               {seDiceCreadoEl(current.fecha_factura, current.created_at) && <> · creado el {fmtDate(current.created_at!.slice(0, 10))}</>}
             </p>
+          )}
+          {/* 🔴 Apple (5-oct-2026): el total del reclamo grande, bajo la cabecera
+              (como CxC y Multifashion); antes solo estaba al pie de las líneas. */}
+          {apple && !editMode && (
+            <p data-total-apple className="pt-3 text-[34px] font-normal leading-none tracking-tight tabular-nums text-gray-800">${fmt(reclamoTaxes(current.empresa, sub).total)}</p>
+          )}
+          {/* Las Observaciones suben aquí (antes «Notas:» al pie, en gris claro). */}
+          {apple && !editMode && current.notas && (
+            <p data-observaciones className="mt-3 text-sm text-gray-700 whitespace-pre-wrap"><span className="text-gray-400">Observaciones · </span>{current.notas}</p>
           )}
           {/* 🩸 El botón suelto «Ver factura» se RETIRÓ (mockup 11-sep-2026): la
               factura del proveedor vive ahora dentro de «Descargar», que la baja
@@ -388,7 +406,7 @@ export default function ReclamoDetail({
         </div>
       )}
 
-      {!editMode && comprobanteCard}
+      {!editMode && !comprobanteEnTarjeta && comprobanteCard}
 
       {/* Recuperación / notas de crédito */}
       {(!pendiente || settlements.length > 0) && (
@@ -397,6 +415,8 @@ export default function ReclamoDetail({
             <div className="text-sm font-semibold text-gray-700">Recuperación</div>
             <span className="text-xs font-medium text-emerald-700 tabular-nums">{pctRec.toFixed(0)}% recuperado</span>
           </div>
+          {comprobanteEnTarjeta && !editMode && comprobanteCard}
+          {!enteroApple && (<>
           <div className="grid grid-cols-3 gap-3 mb-3">
             <div className="text-center"><div className="text-xs text-gray-500">Reclamado</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(reclamado)}</div></div>
             <div className="text-center"><div className="text-xs text-gray-500">Recuperado</div><div className="text-sm font-semibold tabular-nums mt-1 text-emerald-700">${fmt(recuperado)}</div></div>
@@ -405,6 +425,7 @@ export default function ReclamoDetail({
           <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden mb-4">
             <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${Math.min(100, Math.max(0, pctRec))}%` }} />
           </div>
+          </>)}
           {settlements.length > 0 && (
             <ul className="divide-y divide-gray-100 mb-3">
               {settlements.map((s) => (
@@ -602,7 +623,14 @@ export default function ReclamoDetail({
             ))}
           </div>
         )}
-        {fotos.length < 5 ? (
+        {apple && fotos.length === 0 ? (
+          /* Apple: 28 de los 33 reclamos vivos no tienen fotos — la caja
+             punteada ocupaba sitio para nada. Un enlace que dice lo que agrega. */
+          <>
+            <input ref={fotoRef} type="file" accept="image/*" multiple className="hidden" disabled={uploadingFoto} onChange={(e) => { const files = Array.from(e.target.files ?? []); if (files.length) onUploadFoto(files); if (fotoRef.current) fotoRef.current.value = ""; }} />
+            <button onClick={() => fotoRef.current?.click()} disabled={uploadingFoto} className="text-sm font-medium text-blue-600 hover:text-blue-800 inline-flex items-center min-h-[44px] px-2 -mx-2 disabled:opacity-50">{uploadingFoto ? "Subiendo…" : "+ Agregar fotos"}</button>
+          </>
+        ) : fotos.length < 5 ? (
           <>
             <input ref={fotoRef} type="file" accept="image/*" multiple className="hidden" disabled={uploadingFoto} onChange={(e) => { const files = Array.from(e.target.files ?? []); if (files.length) onUploadFoto(files); if (fotoRef.current) fotoRef.current.value = ""; }} />
             <button onClick={() => fotoRef.current?.click()} disabled={uploadingFoto} className="w-full sm:w-auto border-2 border-dashed border-gray-300 hover:border-gray-400 rounded-lg px-6 py-4 sm:py-3 flex items-center justify-center gap-2 text-gray-400 hover:text-gray-600 transition active:bg-gray-50 min-h-[44px] disabled:opacity-50">
@@ -616,7 +644,7 @@ export default function ReclamoDetail({
         )}
       </div>
 
-      {!editMode && current.notas && <p className="text-sm text-gray-400 mb-6">Notas: {current.notas}</p>}
+      {!apple && !editMode && current.notas && <p className="text-sm text-gray-400 mb-6">Notas: {current.notas}</p>}
 
       {/* Seguimiento */}
       <div className="mb-8">

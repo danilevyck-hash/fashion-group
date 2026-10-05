@@ -35,6 +35,7 @@ import { useState } from "react";
 import { Search } from "lucide-react";
 import { CLASE_TITULO_BARRA, IconoBarra } from "@/components/celular/BarraDeControles";
 import { CLASE_LINEA_TOTAL, CLASE_TOTAL_CELULAR } from "@/components/celular/CabeceraCompacta";
+import { RECLAMOS_APPLE_2026_10, lineaPendientes } from "@/lib/reclamos/apple-2026-10";
 
 interface Props {
   role: string;
@@ -46,11 +47,14 @@ interface Props {
   onNewReclamo: () => void;
   onSelectEmpresa: (empresa: string) => void;
   onLoadDetail: (id: string, empresa: string) => void;
+  /** `RECLAMOS_APPLE_2026_10` (5-oct-2026). Las pruebas lo fuerzan. */
+  apple?: boolean;
 }
 
 export default function PortadaCelular({
   reclamos, loading, contactos, globalSearch, setGlobalSearch,
   onNewReclamo, onSelectEmpresa, onLoadDetail,
+  apple = RECLAMOS_APPLE_2026_10,
 }: Props) {
   const hoy = hoyPanama();
   const resumen = resumenPortada(reclamos, hoy);
@@ -92,10 +96,22 @@ export default function PortadaCelular({
           </div>
           {/* 2 · el total a 36 px y UNA línea gris */}
           <span className={`${CLASE_TOTAL_CELULAR} pt-1`}>{montoCel(resumen.porCobrar.monto)}</span>
+          {apple ? (() => {
+            // 🔴 5-oct-2026 (apagado): la línea también dice los SIN RECLAMAR,
+            // que en el celular no se veían en ningún lado.
+            const l = lineaPendientes(resumen.porCobrar.n, viejos.n, resumen.sinReclamar.n);
+            return (
+              <span className={CLASE_LINEA_TOTAL} data-linea-apple>
+                {l.texto}
+                {l.alertas.map((a) => <span key={a}> · <span className="font-medium text-red-600">{a}</span></span>)}
+              </span>
+            );
+          })() : (
           <span className={CLASE_LINEA_TOTAL}>
             {resumen.porCobrar.n} {resumen.porCobrar.n === 1 ? "reclamo" : "reclamos"} por cobrar
             {sub.viejos && <> · <span className="font-medium text-red-600">{sub.viejos}</span></>}
           </span>
+          )}
         </div>
       ) : (<>
       <div data-fila-del-avatar className="px-4 pt-3">
@@ -175,6 +191,7 @@ export default function PortadaCelular({
                       <>
                         {linea.texto}
                         {linea.dias && <> · <span className="text-red-600">{linea.dias}</span></>}
+                        {apple && t.sinReclamar > 0 && <> · <span className="text-red-600">{t.sinReclamar} sin reclamar</span></>}
                       </>
                     )
                   }
@@ -185,7 +202,16 @@ export default function PortadaCelular({
             })}
           </ul>
 
-          {/* Lo cobrado baja a UN renglón: es lo que ya no hay que perseguir. */}
+          {/* Lo cobrado baja a UN renglón: es lo que ya no hay que perseguir.
+              🔴 Apple (5-oct-2026): era una fila que parecía tocable y no
+              abría nada; ahora es UNA línea gris al pie. */}
+          {apple ? (
+            <p data-pie="reclamos-cobrado" className="px-5 pt-3 text-[13px] text-gray-500 tabular-nums">
+              {resumen.cobrado.n > 0
+                ? `Cobrado en ${resumen.cobrado.anio}: ${montoCel(resumen.cobrado.monto)} · ${resumen.cobrado.n} reclamo${resumen.cobrado.n === 1 ? "" : "s"}`
+                : `Nada cobrado en ${resumen.cobrado.anio}`}
+            </p>
+          ) : (
           <ul className="mx-4 mt-4 overflow-hidden rounded-2xl bg-white">
             <FilaCel
               titulo={`Cobrado en ${resumen.cobrado.anio}`}
@@ -198,6 +224,7 @@ export default function PortadaCelular({
               izquierda={resumen.cobrado.n > 0 ? <Visto /> : null}
             />
           </ul>
+          )}
         </>
       )}
 

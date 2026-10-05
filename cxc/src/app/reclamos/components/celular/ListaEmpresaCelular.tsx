@@ -37,7 +37,12 @@ import { bajar, pedirLote, mandarAlProveedor, textoDelEnvio, type Descarga } fro
 import type { Contacto, Reclamo } from "../types";
 import { BotonMas, Casilla, CtaFija, FilaCel, Visto } from "./piezas";
 import { HojaCorreo, HojaOpciones, type OpcionDeHoja } from "./HojasReclamosCelular";
-import { tituloCelular } from "@/lib/navegacion/barra-controles-celular";
+import { tituloCelular, usaBarraCelular } from "@/lib/navegacion/barra-controles-celular";
+import { RECLAMOS_APPLE_2026_10, lineaPendientes } from "@/lib/reclamos/apple-2026-10";
+import { resumenViejos } from "@/lib/reclamos/viejos";
+import { estaReclamado } from "@/lib/reclamos/reclamado";
+import { CLASE_TITULO_BARRA } from "@/components/celular/BarraDeControles";
+import { CLASE_LINEA_TOTAL, CLASE_TOTAL_CELULAR } from "@/components/celular/CabeceraCompacta";
 
 interface Props {
   role: string;
@@ -52,12 +57,15 @@ interface Props {
   onLoadDetail: (id: string) => void;
   onDeleteSelected: (ids: string[]) => void;
   onReload: () => void;
+  /** `RECLAMOS_APPLE_2026_10` (5-oct-2026). Las pruebas lo fuerzan. */
+  apple?: boolean;
 }
 
 export default function ListaEmpresaCelular({
   role, activeEmpresa, reclamos, contactos,
   selectionMode, setSelectionMode, selectedIds, setSelectedIds,
   onNewReclamo, onLoadDetail, onDeleteSelected, onReload,
+  apple: appleProp = RECLAMOS_APPLE_2026_10,
 }: Props) {
   const hoy = hoyPanama();
   const esAdmin = role === "admin";
@@ -135,9 +143,34 @@ export default function ListaEmpresaCelular({
   ];
 
   const seleccion = tituloSeleccion(elegidos.length, visibles.length, montoObjetivo, filtro === "cobrados");
+  // 🔴 Apple (5-oct-2026, apagado): la empresa abre como la portada —el monto
+  // grande y UNA línea gris con lo que pide atención y el contacto—. Solo con
+  // la barra v3.3 y fuera del modo «Seleccionar», que tiene su propio título.
+  const apple = appleProp && usaBarraCelular(true);
+  const cabeceraApple = apple && !selectionMode;
+  const lineaApple = lineaPendientes(
+    porCobrar.length,
+    resumenViejos(delEmpresa, hoy).n,
+    porCobrar.filter((r) => !estaReclamado(r)).length,
+  );
+  const contactoNombre = (c?.nombre_contacto || c?.nombre || "").trim();
 
   return (
     <div data-celular="reclamos-lista" className="min-h-screen bg-fondo-celular pb-28">
+      {cabeceraApple ? (
+        <div data-cabecera-apple className="px-4">
+          <div data-fila-del-avatar className="flex h-11 min-w-0 items-center gap-1">
+            <h1 className={`min-w-0 flex-1 truncate ${CLASE_TITULO_BARRA}`}>{nombreCorto}</h1>
+            <BotonMas onClick={() => setHoja("mas")} etiqueta="Más opciones" />
+          </div>
+          <span className={`${CLASE_TOTAL_CELULAR} pt-1`}>{montoCel(montoPorCobrar)}</span>
+          <span className={CLASE_LINEA_TOTAL}>
+            {lineaApple.texto}
+            {lineaApple.alertas.map((a) => <span key={a}> · <span className="font-medium text-red-600">{a}</span></span>)}
+            {contactoNombre && ` · ${contactoNombre}`}
+          </span>
+        </div>
+      ) : (
       <div data-fila-del-avatar className="flex items-start justify-between gap-2 px-4 pt-3">
         <div className="min-w-0">
           <h1 className={tituloCelular("truncate text-[28px] font-bold leading-tight tracking-tight text-gray-900")}>
@@ -166,6 +199,7 @@ export default function ListaEmpresaCelular({
           <BotonMas onClick={() => setHoja("mas")} etiqueta="Más opciones" />
         </div>
       </div>
+      )}
 
       {/* Las dos pestañas de siempre: abre en «Pendientes». */}
       <div className="mx-4 mt-3 flex rounded-xl bg-control-celular p-1">
@@ -209,7 +243,10 @@ export default function ListaEmpresaCelular({
                   cobrado ? (
                     lineaCobrado(fechaDeCobro(r), fotos)
                   ) : (
-                    <span className={linea.rojo ? "text-red-600" : undefined}>{linea.texto}</span>
+                    <>
+                      <span className={linea.rojo ? "text-red-600" : undefined}>{linea.texto}</span>
+                      {apple && !estaReclamado(r) && <> · <span className="text-red-600">sin reclamar</span></>}
+                    </>
                   )
                 }
                 monto={montoCel(totalDe(r))}
