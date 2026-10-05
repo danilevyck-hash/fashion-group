@@ -124,3 +124,15 @@ describe("PanelPeriodo (la lista larga de meses, compacta)", () => {
     expect(onAnio).toHaveBeenCalledWith(2025);
   });
 });
+
+describe("la variación del Total del rango es tienda contra tienda", () => {
+  it("cuenta a quien vendía el año pasado aunque hoy no esté", async () => {
+    const { ventaDelAmbito } = await import("@/lib/comisiones/vendedores-rango");
+    const previo = [
+      { empresa_key: "american_classic", vendedor: "JAILINE", ventas: 4500, comision: 0 },
+      { empresa_key: "american_classic", vendedor: "YA NO ESTA", ventas: 12000, comision: 0 },
+    ];
+    expect(ventaDelAmbito(previo)).toBe(16500);
+    expect(ventaDelAmbito(previo, "fashion_wear")).toBe(0);
+  });
+});

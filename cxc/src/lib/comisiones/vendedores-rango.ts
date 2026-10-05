@@ -186,6 +186,17 @@ const clave = (v: string) => v.trim().toUpperCase();
  * el período anterior y ordena por ventas. Nunca mezcla grupo y Multifashion:
  * cada uno llega en su propia respuesta.
  */
+/**
+ * La venta de TODA la tienda (o de la empresa elegida) en un período: todas
+ * las filas, vendan hoy o no, retirados incluidos. 🩸 La variación del Total se
+ * sacaba de la suma de `ventasAnterior` de las vendedoras de HOY: quien vendía
+ * el año pasado y ya no está quedaba fuera de la base y el total salía inflado
+ * (Multifashion 15–30 sep 2026: «+445 %», con 3 de 4 vendedoras «Nuevo»).
+ */
+export function ventaDelAmbito(filas: readonly FilaRango[], empresa: string | null = null): number {
+  return round2(filas.filter((f) => !empresa || f.empresa_key === empresa).reduce((a, f) => a + Number(f.ventas), 0));
+}
+
 export function porVendedor(
   actual: readonly FilaRango[],
   anterior: readonly FilaRango[],

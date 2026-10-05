@@ -10,7 +10,7 @@ import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { ROTULO_VER_MENOS, rotuloVerNoSePagan, sePagaComision } from "@/lib/comisiones/sin-pago";
 import { etiquetaRango } from "@/components/ui/RangoFechas";
 import { CALENDARIO_SIMPLE_2026_10, etiquetaRangoCorta } from "@/lib/ui/calendario-simple";
-import { diasDelRango, porVendedor, type FilaRango, type FilaVendedor, type RangoConsulta } from "@/lib/comisiones/vendedores-rango";
+import { diasDelRango, porVendedor, ventaDelAmbito, type FilaRango, type FilaVendedor, type RangoConsulta } from "@/lib/comisiones/vendedores-rango";
 import { esVistaDeEmpresa, esVistaMultifashion } from "@/lib/comisiones/vistas";
 import { variacionPct } from "@/lib/variacion";
 
@@ -59,7 +59,10 @@ export function ComisionesVendedoresRango({ vista, rango }: { vista: string; ran
   const noPagables = filas.filter((f) => !sePagaComision(f.vendedor));
   const visibles = verNoPagables ? [...pagables, ...noPagables] : pagables;
   const total = (k: "ventas" | "comision" | "ventasAnterior") => visibles.reduce((a, f) => a + f[k], 0);
-  const totalAnt = total("ventasAnterior");
+  // 🔴 La variación del Total es TIENDA contra TIENDA: toda la venta del
+  // ámbito ahora contra toda la del mismo período del año pasado.
+  const empresaVista = esVistaDeEmpresa(vista) ? vista : null;
+  const variacionTotal = variacionPct(ventaDelAmbito(datos.actual, empresaVista), ventaDelAmbito(datos.previo, empresaVista));
 
   const fila = (f: FilaVendedor) => (
     <tr key={f.vendedor} className={`border-t border-gray-100 ${sePagaComision(f.vendedor) ? "" : "text-gray-400"}`}>
@@ -117,11 +120,11 @@ export function ComisionesVendedoresRango({ vista, rango }: { vista: string; ran
                 <td className="px-3 py-2.5 text-right tabular-nums">
                   {fmtMoney(total("ventas"))}
                   <div className="text-xs font-normal sm:hidden">
-                    <Variacion v={variacionPct(total("ventas"), totalAnt)} />
+                    <Variacion v={variacionTotal} />
                   </div>
                 </td>
                 <td className="hidden px-3 py-2.5 text-right tabular-nums sm:table-cell">
-                  <Variacion v={variacionPct(total("ventas"), totalAnt)} />
+                  <Variacion v={variacionTotal} />
                 </td>
                 <td className="px-3 py-2.5 text-right tabular-nums">{fmtMoney(total("comision"))}</td>
               </tr>
