@@ -37,7 +37,7 @@ const ARTS: ArticuloVendido[] = [
 ];
 
 describe("interruptor", () => {
-  it("nace apagado", () => expect(PRODUCTOS_FILTROS_2026_10).toBe(false));
+  it("prendido el 5-oct-2026", () => expect(PRODUCTOS_FILTROS_2026_10).toBe(true));
 });
 
 describe("los filtros no inventan números", () => {

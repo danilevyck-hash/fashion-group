@@ -154,6 +154,11 @@ export interface PantallaProductosProps {
   notaTotales?: ReactNode;
   /** Ventas en el celular: el 🔍 y los chips van a la barra v3.3. */
   enBarra?: boolean;
+  /** Con una descripción elegida, cuánto vende cada valor de este campo
+   *  («Women-Sandals → Fashion Shoes $X · Vistana $Y»). Ventas: «empresa». */
+  desglosePor?: string;
+  /** «Descargar en Excel» con lo que está en pantalla (filtros incluidos). */
+  onDescargar?: (renglones: RenglonDescripcion[], totales: TotalesFiltro) => void;
 }
 
 const TANDA = 100;
@@ -186,6 +191,25 @@ export function PantallaProductos(p: PantallaProductosProps) {
   const filtro = hayFiltro(codigo, elegidos) || modo !== "todo";
   const totales = !filtro && p.totalesSinFiltro ? p.totalesSinFiltro : totalesDe(filtrados);
   const existenciaTotal = filtrados.reduce((s, a) => s + Math.max(a.existencia ?? 0, 0), 0);
+  // Una descripción elegida que venden varias empresas: cuánto cada una.
+  const desglose = useMemo(() => {
+    if (!p.desglosePor || !elegidos.descripcion) return null;
+    const por = new Map<string, number>();
+    for (const a of filtrados) {
+      const k = a.campos[p.desglosePor] ?? "";
+      if (k) por.set(k, (por.get(k) ?? 0) + a.venta);
+    }
+    return por.size > 1 ? [...por.entries()].sort((x, y) => y[1] - x[1]) : null;
+  }, [p.desglosePor, elegidos.descripcion, filtrados]);
+  const descargar = p.onDescargar && (
+    <button
+      type="button"
+      onClick={() => p.onDescargar!(renglones, totales)}
+      className="min-h-[44px] shrink-0 px-1 text-sm text-blue-600 hover:text-blue-800"
+    >
+      Descargar en Excel
+    </button>
+  );
 
   const elegir = (campo: string, v: string) => { setElegidos(e => ({ ...e, [campo]: v })); setVisibles(TANDA); setAbierta(null); };
 
@@ -240,6 +264,7 @@ export function PantallaProductos(p: PantallaProductosProps) {
           pestana="productos"
           iconos={<BuscarEnLaBarra valor={codigo} onCambiar={v => { setCodigo(v); setVisibles(TANDA); }} placeholder="Buscar un código…" etiqueta="Buscar un código" />}
           filaIzq={<div data-filtros-productos className={cn(FILA_QUE_SE_DESLIZA, "min-w-0 flex-[1_1_100%] items-center py-1")}>{p.antesCelular}{chipsNodo}</div>}
+          menu={descargar}
         />
       ) : (
         <div data-filtros-productos className={cn(FILA_QUE_SE_DESLIZA, "items-center py-1 sm:flex-wrap sm:overflow-visible")}>
@@ -248,6 +273,7 @@ export function PantallaProductos(p: PantallaProductosProps) {
           {buscarCodigo}
           {p.despues && <span className="hidden flex-1 sm:block" />}
           {p.despues && <span className="hidden sm:contents">{p.despues}</span>}
+          {descargar && <span className="hidden sm:contents">{descargar}</span>}
         </div>
       )}
 
@@ -275,6 +301,13 @@ export function PantallaProductos(p: PantallaProductosProps) {
             </p>
             {atencion}
           </div>
+          {desglose && (
+            <p data-desglose className="text-sm text-gray-600">
+              {desglose.map(([k, v], i) => (
+                <span key={k}>{i > 0 && <span className="mx-1.5 text-gray-300">·</span>}{k} <b className="font-mono tabular-nums text-gray-900">{fmtMoney(v)}</b></span>
+              ))}
+            </p>
+          )}
 
           {p.cargando && !p.articulos ? (
             <div className="h-64 animate-pulse rounded-lg border border-gray-200 bg-white" aria-busy="true" />

@@ -17,11 +17,13 @@
 //     tiene género, el chip NO se muestra (Active Wear: no es confiable).
 //   · Descripción: la de Switch, tal cual.
 //
-// `PRODUCTOS_FILTROS_2026_10 = false` → las dos pantallas quedan como estaban.
+// `PRODUCTOS_FILTROS_2026_10 = false` → las dos pantallas vuelven a como estaban.
 // Candado: `src/__tests__/lib/productos-filtros.test.ts`.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const PRODUCTOS_FILTROS_2026_10 = false;
+// 🔴 PRENDIDO el 5-oct-2026: Daniel aprobó el mockup («sí») y la migración
+// 20261229120000 quedó aplicada (camino rápido). `false` = Productos de antes.
+export const PRODUCTOS_FILTROS_2026_10 = true;
 
 /** Un código con su clasificación. Montos ya firmados (las NC restan). */
 export interface ArticuloVendido {

@@ -15,7 +15,9 @@ import {
   DEFAULT_PRODUCTOS_EMPRESA,
   MEMORIA_EMPRESA_PRODUCTOS,
   PRODUCTOS_EMPRESAS,
+  exportProductosToExcel,
 } from "@/lib/ventas/productos";
+import { anotarDescarga } from "@/lib/ventas/descarga";
 import { textoCuadreProductos, type CuadreProductos } from "@/lib/ventas/una-sola-venta";
 import { diasEntre, type ArticuloVendido, type ChipFiltro, type TotalesFiltro } from "@/lib/productos/filtros";
 
@@ -80,6 +82,19 @@ export function ProductosFiltros({ desde, hasta, periodo, enBarra }: {
       totalesSinFiltro={totalesSinFiltro}
       notaTotales={nota ? <> <Ayuda titulo="Información">{nota}</Ayuda></> : null}
       enBarra={enBarra}
+      desglosePor={empresa === "todas" ? "empresa" : undefined}
+      onDescargar={(renglones, totales) => {
+        // Baja lo que está en pantalla: los renglones y el total con los filtros.
+        void exportProductosToExcel({
+          empresa, year: Number(desde.slice(0, 4)), mes: null, periodo: "ytd", desde, hasta,
+          totales: { venta: totales.venta, costo: totales.costo, margen: totales.margen },
+          productos: renglones.map(r => ({
+            descripcion: r.descripcion, num_codigos: r.articulos.length,
+            cantidad: r.unidades, venta: r.venta, costo: r.costo, margen: r.margen,
+          })),
+        });
+        anotarDescarga("productos", { empresa, desde, hasta });
+      }}
     />
   );
 }
