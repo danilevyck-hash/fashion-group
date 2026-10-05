@@ -26,6 +26,10 @@
 // de MES la RPC compara contra el MES ANTERIOR, así que dice «Δ vs julio 2026» y
 // no «vs año pasado» (decisión de Daniel, 3-sep-2026 — `vendedoras-rotulo.ts`);
 // el año completo y las ventanas de N meses sí comparan contra el año pasado.
+// 🔴 5-oct-2026 (Daniel): en Multifashion › Vendedoras un MES compara contra
+// el MISMO MES DEL AÑO PASADO, mismos días si va abierto («Δ vs oct 2025»,
+// «Nueva» sin historia; `vsAnioPasado` prendido en `MultifashionView`). El
+// total, tienda contra tienda (`notaTotalAnioPasado`). Computadora y celular.
 //
 // Server-side: RPC multifashion_vendedoras_v5 (con el amarre de códigos de
 // `multifashion_vendedora_alias` y el desglose `por_canal`; cae a la v4 y a la
@@ -66,7 +70,7 @@ import {
 import { VendedorasTablaOrdenada } from "./VendedorasTablaOrdenada";
 import {
   deltaVsAnioPasado,
-  notaAnioPasado,
+  notaTotalAnioPasado,
   participacion,
   rotuloDeltaAnioPasado,
   type DeltaAnioPasado,
@@ -209,8 +213,8 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
   // 🔴 2-oct-2026 (`MULTIFASHION_TOTAL_PERSONA_2026_10`): en Comisiones ›
   // Multifashion, la Δ va contra el MISMO MES DEL AÑO PASADO. La ruta trae la
   // venta de ese mes por vendedora; sin el interruptor, la URL es la de siempre.
-  // 🔴 5-oct-2026: la Δ contra el año pasado es aparte (`vsAnioPasado`): el
-  // módulo sigue comparando contra el MES ANTERIOR aunque ahora traiga el total.
+  // 🔴 5-oct-2026: la Δ contra el año pasado es aparte (`vsAnioPasado`), y el
+  // módulo Multifashion la PRENDE (Daniel, 5-oct-2026).
   const vsAnio = MULTIFASHION_TOTAL_PERSONA_2026_10 && conTotalAPagar === true && vsAnioPasado === true && rpcPeriodo === "mes";
   if (vsAnio) params.set("vsAnio", "1");
   const vendedorasUrl = `/api/multifashion/vendedoras?${params.toString()}`;
@@ -324,7 +328,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
 
   const notaComparacion = resp
     ? anioPasado
-      ? notaAnioPasado(year, rpcMes, anioPasado)
+      ? notaTotalAnioPasado(year, rpcMes, anioPasado)
       : notaComparacionVendedoras(chip, rpcMes, year, resp.es_periodo_parcial, resp.dia_corte_periodo_anterior)
     : null;
 
@@ -332,14 +336,14 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
   // · el bono del mes en curso, con su regla detrás del ⓘ. El número de
   // vendedoras no va: son las filas que se ven. Montos sin centavos.
   const bonoPie = !esRango ? bonoCorto(bonos) : null;
-  const pie = resp && resp.vendedoras.length > 0
+  const pieSinBono = resp && resp.vendedoras.length > 0
     ? [
         `${montoCorto(resp.ventas_total)} ventas`,
         `${resp.tickets_total.toLocaleString()} ${resp.tickets_total === 1 ? "ticket" : "tickets"}`,
         notaComparacion,
-        bonoPie,
       ].filter(Boolean).join(" · ")
     : null;
+  const pie = pieSinBono && bonoPie ? `${pieSinBono} · ${bonoPie}` : pieSinBono;
   const detalleBono = bonoPie ? `${lineaBono(bonos)}. ${REGLA_BONO_RETAIL}` : null;
   const iconoBono = detalleBono ? (
     <span title={detalleBono} aria-label="Regla del bono" className="ml-1 inline-flex cursor-help align-[-2px] text-gray-400">
@@ -477,6 +481,8 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
                 bonos={bonosDelChip}
                 totalPersona={totalPersona ? bonosDelChip : null}
                 pieBono={bonoPie ? <>{` · ${bonoPie}`}{iconoBono}</> : null}
+                pie={anioPasado ? pieSinBono : null}
+                deltas={anioPasado ? deltasAnio : undefined}
               />
             </div>
           )}

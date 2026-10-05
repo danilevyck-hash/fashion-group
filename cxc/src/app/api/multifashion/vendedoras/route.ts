@@ -23,6 +23,7 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
   ventanaMesAnioPasado,
   ventasPorVendedora,
+  ventaTienda,
   type FilaVentaAnioPasado,
 } from "@/lib/multifashion/vendedoras-vs-anio";
 
@@ -128,19 +129,29 @@ export async function GET(req: NextRequest) {
   if (periodoRaw === "mes" && mes != null && sp.get("vsAnio") === "1") {
     const resp = data as VendedorasPeriodo;
     const ventana = ventanaMesAnioPasado(year, mes, resp.fecha_corte, new Date());
-    try {
-      const filas = await leerTodoPaginado<FilaVentaAnioPasado>(
-        "multifashion/vendedoras año pasado",
-        (conCount, desde, hasta) =>
+    // 🔴 5-oct-2026: el TOTAL compara TIENDA contra TIENDA (Daniel): toda la
+    // venta del mes ahora contra toda la del mismo mes del año pasado (mismos
+    // días), de la misma vista y SIN el filtro de vendedora.
+    const leer = (desde: string, hasta: string, cual: string) =>
+      leerTodoPaginado<FilaVentaAnioPasado>(
+        `multifashion/vendedoras ${cual}`,
+        (conCount, d, h) =>
           supabaseServer
             .from("_multifashion_sf_vw")
             .select("vendedor, vendedor_canonico, subtotal", conCount ? { count: "exact" } : undefined)
-            .gte("fecha", ventana.desde)
-            .lte("fecha", ventana.hasta)
+            .gte("fecha", desde)
+            .lte("fecha", hasta)
             .order("fecha_ts", { ascending: true })
             .order("n_sistema", { ascending: true })
-            .range(desde, hasta),
+            .range(d, h),
       );
+    const mm = String(mes).padStart(2, "0");
+    const finMes = new Date(Date.UTC(year, mes, 0)).getUTCDate();
+    try {
+      const [filas, filasActual] = await Promise.all([
+        leer(ventana.desde, ventana.hasta, "año pasado"),
+        leer(`${year}-${mm}-01`, `${year}-${mm}-${finMes}`, "tienda actual"),
+      ]);
       return NextResponse.json({
         ...resp,
         anio_pasado: {
@@ -148,6 +159,8 @@ export async function GET(req: NextRequest) {
           hasta: ventana.hasta,
           parcial: ventana.parcial,
           por_vendedora: ventasPorVendedora(filas),
+          tienda: ventaTienda(filas),
+          tienda_actual: ventaTienda(filasActual),
         },
       } satisfies VendedorasPeriodo);
     } catch (e) {

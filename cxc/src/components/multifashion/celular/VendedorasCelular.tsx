@@ -30,6 +30,7 @@ import {
   deltaCorto, detalleVendedora, lineaVendedora, montoCorto, renglonMeta, subtituloVendedoras,
 } from "@/lib/multifashion/celular";
 import { TONO_CLASE } from "./InicioCelular";
+import type { DeltaAnioPasado } from "@/lib/multifashion/vendedoras-vs-anio";
 
 interface RespuestaMetas {
   metas: MetaConAvance[];
@@ -55,10 +56,15 @@ interface Props {
   totalPersona?: BonosMultifashion | null;
   /** «· bono al cierre del mes ⓘ» con el mes en curso; va al final de la línea de abajo. */
   pieBono?: ReactNode;
+  /** 🔴 5-oct-2026: con el año pasado, la MISMA línea de la computadora
+   *  («… · +12% vs oct 2025, mismos días») en vez del subtítulo de siempre. */
+  pie?: string | null;
+  /** Δ contra el mismo mes del año pasado: «Nueva» si no vendió ese mes. */
+  deltas?: Map<string, DeltaAnioPasado>;
 }
 
 export function VendedorasCelular({
-  vendedoras, ventasTotal, tiquetesTotal, rotuloDelta, anio, parcial, metaAbierta, onAbrirMeta, conMetas, bonos = null, pieBono = null, totalPersona = null,
+  vendedoras, ventasTotal, tiquetesTotal, rotuloDelta, anio, parcial, metaAbierta, onAbrirMeta, conMetas, bonos = null, pieBono = null, totalPersona = null, pie = null, deltas,
 }: Props) {
   const [abierta, setAbierta] = useState<string | null>(null);
 
@@ -111,7 +117,9 @@ export function VendedorasCelular({
                   <span className="block text-base tabular-nums text-gray-950">
                     {montoCorto(v.ventas)}
                   </span>
-                  {delta && (
+                  {deltas?.get(v.nombre)?.tipo === "nueva" ? (
+                    <span data-celular="nueva" className="block text-sm font-medium text-gray-500">Nueva</span>
+                  ) : delta && (
                     <span className={cn("block text-sm font-medium tabular-nums", TONO_CLASE[delta.tono])}>
                       {delta.texto}
                     </span>
@@ -132,7 +140,7 @@ export function VendedorasCelular({
           al final, con el bono del mes en curso y su ⓘ (Daniel: «o bien
           resumido abajo en una línea»). */}
       <p data-celular="vendedoras-subtitulo" className="mt-2 px-1 text-xs text-gray-500 tabular-nums">
-        {subtituloVendedoras({ ventas: ventasTotal, tiquetes: tiquetesTotal, rotuloDelta, anio, parcial })}
+        {pie ?? subtituloVendedoras({ ventas: ventasTotal, tiquetes: tiquetesTotal, rotuloDelta, anio, parcial })}
         {pieBono}
       </p>
 

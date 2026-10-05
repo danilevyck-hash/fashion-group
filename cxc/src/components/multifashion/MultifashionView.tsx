@@ -129,6 +129,9 @@ export function MultifashionView({
             corte={corte}
             conMetas
             enCelular={enCelular}
+            /* 🔴 5-oct-2026 (Daniel): la Δ va contra el MISMO MES DEL AÑO
+               PASADO (mismos días si va abierto), no contra el mes anterior. */
+            vsAnioPasado
             /* 🔴 5-oct-2026: lo que pagaba Comisiones › Multifashion vive aquí —
                «Bono» y «Total a pagar» por persona y la barra «TOTAL A PAGAR ·
                Multifashion»—. Comisiones ya no ofrece Multifashion. */

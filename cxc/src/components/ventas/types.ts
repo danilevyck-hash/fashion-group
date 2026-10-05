@@ -360,6 +360,10 @@ export type VendedorasPeriodo = {
     hasta: string;
     parcial: boolean;
     por_vendedora: Record<string, number>;
+    /** 🔴 5-oct-2026: TODA la venta de la tienda en esa ventana (sin filtro de vendedora). */
+    tienda?: number;
+    /** Toda la venta de la tienda en el mes actual, para comparar tienda contra tienda. */
+    tienda_actual?: number;
   };
 };
 

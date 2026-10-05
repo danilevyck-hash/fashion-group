@@ -59,6 +59,11 @@ export function ventasPorVendedora(filas: readonly FilaVentaAnioPasado[]): Recor
   return out;
 }
 
+/** 🔴 5-oct-2026: toda la venta de la TIENDA (sin filtro de vendedora): el total compara tienda contra tienda. */
+export function ventaTienda(filas: readonly FilaVentaAnioPasado[]): number {
+  return filas.reduce((a, f) => a + Number(f.subtotal ?? 0), 0);
+}
+
 export type DeltaAnioPasado =
   | { tipo: "nueva" }
   | { tipo: "pct"; ratio: number | null };
@@ -84,4 +89,22 @@ export function rotuloDeltaAnioPasado(year: number, mes: number): { columna: str
 export function notaAnioPasado(year: number, mes: number, ventana: { hasta: string; parcial: boolean }): string {
   const nombre = `${MES_CORTO[mes - 1]} ${year - 1}`;
   return ventana.parcial ? `vs ${nombre}, mismos días` : `vs ${nombre}`;
+}
+
+/**
+ * 🔴 5-oct-2026 (Daniel): la línea del pie con la variación del TOTAL, tienda
+ * contra tienda: «+12% vs oct 2025, mismos días». Sin historia o sin la venta
+ * de la tienda, solo la nota (nunca un % inventado).
+ */
+export function notaTotalAnioPasado(
+  year: number,
+  mes: number,
+  ventana: { hasta: string; parcial: boolean; tienda?: number; tienda_actual?: number },
+): string {
+  const nota = notaAnioPasado(year, mes, ventana);
+  if (ventana.tienda == null || ventana.tienda_actual == null) return nota;
+  const d = deltaVsAnioPasado(ventana.tienda_actual, ventana.tienda);
+  if (d.tipo !== "pct" || d.ratio == null) return nota;
+  const pct = `${d.ratio >= 0 ? "+" : ""}${(d.ratio * 100).toFixed(0)}%`;
+  return `${pct} ${nota}`;
 }
