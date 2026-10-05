@@ -775,14 +775,15 @@ describe("5 · Productos: 5 elementos", () => {
     return r;
   }
 
-  it("🔴 son CINCO: alerta · banda · marcas · agrupador · cambios (+ Ver todo)", async () => {
+  // 5-oct-2026: eran CINCO con «Alta venta, bajo margen» arriba; Daniel la pidió
+  // quitar. El candado ahora exige que NO vuelva.
+  it("🔴 son CUATRO: banda · marcas · agrupador · cambios (+ Ver todo), sin «Alta venta, bajo margen»", async () => {
     const { container } = await pintarProductos();
     const pestana = container.querySelector('[data-pestana="productos-minimo"]') as HTMLElement;
     const elementos = [...pestana.querySelectorAll("[data-elemento]")].map((e) => e.getAttribute("data-elemento"));
-    expect(elementos).toEqual(["alerta", "banda", "marcas", "agrupador", "cambios"]);
+    expect(elementos).toEqual(["banda", "marcas", "agrupador", "cambios"]);
     expect(elementos).toHaveLength(ELEMENTOS_POR_PESTANA.productos);
-    // La alerta va ARRIBA de la banda.
-    expect(pestana.textContent!.indexOf("Alta venta, bajo margen")).toBeLessThan(pestana.textContent!.indexOf("Unidades"));
+    expect(pestana.textContent).not.toContain("Alta venta, bajo margen");
   });
 
   it("la banda no repite la VENTA; las marcas en una línea con el detalle a un toque; una sola tabla", async () => {

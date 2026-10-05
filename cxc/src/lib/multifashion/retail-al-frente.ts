@@ -123,6 +123,7 @@ export function fueraDelRanking(codigo: number | null | undefined): boolean {
 export const ELEMENTOS_POR_PESTANA = {
   resumen: 6,
   vendedoras: 4,
-  productos: 5,
+  // 5-oct-2026: 5 → 4, se quitó «Alta venta, bajo margen» (pedido de Daniel).
+  productos: 4,
   clientes: 5,
 } as const;

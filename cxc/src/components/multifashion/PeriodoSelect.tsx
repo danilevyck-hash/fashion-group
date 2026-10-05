@@ -20,9 +20,14 @@ interface PeriodoSelectProps {
   opciones: OpcionPeriodo[];
   onChange: (valor: string) => void;
   disabled?: boolean;
+  /** ‹ y › (5-oct-2026): el valor del mes vecino, o `null` para apagarla. */
+  anterior?: string | null;
+  siguiente?: string | null;
 }
 
-export function PeriodoSelect({ valor, opciones, onChange, disabled }: PeriodoSelectProps) {
+const FLECHA = "inline-flex h-11 w-9 shrink-0 items-center justify-center rounded-md text-lg text-gray-600 transition hover:bg-gray-100 active:scale-[0.97] disabled:pointer-events-none disabled:text-gray-300";
+
+export function PeriodoSelect({ valor, opciones, onChange, disabled, anterior, siguiente }: PeriodoSelectProps) {
   // Los grupos se dibujan en el orden en que aparecen (rangos primero, después
   // los años del más nuevo al más viejo) — el mismo orden que arma `opcionesPeriodo`.
   const grupos: { nombre: string; items: OpcionPeriodo[] }[] = [];
@@ -33,6 +38,17 @@ export function PeriodoSelect({ valor, opciones, onChange, disabled }: PeriodoSe
   }
 
   return (
+    <div className="flex items-center">
+    <button
+      type="button"
+      aria-label="Mes anterior"
+      data-flecha="anterior"
+      className={FLECHA}
+      disabled={disabled || !anterior}
+      onClick={() => anterior && onChange(anterior)}
+    >
+      ‹
+    </button>
     <Select value={valor} onValueChange={onChange}>
       {/* h-11 = 44 px exactos, la regla táctil de la casa. */}
       <SelectTrigger
@@ -60,5 +76,16 @@ export function PeriodoSelect({ valor, opciones, onChange, disabled }: PeriodoSe
         ))}
       </SelectContent>
     </Select>
+    <button
+      type="button"
+      aria-label="Mes siguiente"
+      data-flecha="siguiente"
+      className={FLECHA}
+      disabled={disabled || !siguiente}
+      onClick={() => siguiente && onChange(siguiente)}
+    >
+      ›
+    </button>
+    </div>
   );
 }

@@ -29,7 +29,6 @@ import {
 import {
   variacion,
   topPor,
-  margenFlojo,
   movimientos,
   type RenglonComparativo,
 } from "@/lib/multifashion/productos-resumen";
@@ -214,57 +213,8 @@ describe("topPor — la barra compara contra el LÍDER de su lista", () => {
   });
 });
 
-// ═════════════════════════════════════════════════════════════════════════════
-// 4. Se vende mucho pero deja poco
-// ═════════════════════════════════════════════════════════════════════════════
-
-describe("margenFlojo — la conclusión de negocio que nadie mostraba", () => {
-  const filas = [
-    // Los 4 más vendidos, en orden de unidades.
-    r({ clave: "MUCHO-POCO", unidades: 500, venta: 1000, costo: 900 }),   // margen 10%
-    r({ clave: "MUCHO-BIEN", unidades: 400, venta: 1000, costo: 400 }),   // margen 60%
-    r({ clave: "PEOR-AUN", unidades: 300, venta: 1000, costo: 950 }),     // margen 5%
-    r({ clave: "DEVUELTO", unidades: 200, venta: -100, costo: 50 }),      // margen null
-    // Fuera del pelotón: margen malísimo pero casi no se vende.
-    r({ clave: "IRRELEVANTE", unidades: 1, venta: 10, costo: 9.9 }),      // margen 1%
-  ];
-
-  it("muestra los de margen por debajo del general, el PEOR primero", () => {
-    const out = margenFlojo(filas, 0.3, { entreLosPrimeros: 4, maximo: 3 });
-    expect(out.map(f => f.clave)).toEqual(["PEOR-AUN", "MUCHO-POCO"]);
-    expect(out[0].margen).toBeCloseTo(0.05, 10);
-  });
-
-  it("🩸 solo mira a los MÁS VENDIDOS: lo que casi no se vende no es un hallazgo", () => {
-    // Sin el corte, la alerta se llenaría de artículos de $10 y dejaría de
-    // señalar lo que de verdad mueve el período.
-    const out = margenFlojo(filas, 0.3, { entreLosPrimeros: 4, maximo: 5 });
-    expect(out.map(f => f.clave)).not.toContain("IRRELEVANTE");
-  });
-
-  it("un margen '—' NUNCA entra: no tiene margen, no es que 'deje poco'", () => {
-    const out = margenFlojo(filas, 0.3, { entreLosPrimeros: 5, maximo: 5 });
-    expect(out.map(f => f.clave)).not.toContain("DEVUELTO");
-  });
-
-  it("guarda el puesto en el ranking de unidades, que es lo que lo hace grave", () => {
-    const out = margenFlojo(filas, 0.3, { entreLosPrimeros: 4, maximo: 3 });
-    expect(out.find(f => f.clave === "MUCHO-POCO")?.puesto).toBe(1);
-    expect(out.find(f => f.clave === "PEOR-AUN")?.puesto).toBe(3);
-  });
-
-  it("sin margen general no hay contra qué comparar: no se inventa un umbral", () => {
-    expect(margenFlojo(filas, null, { entreLosPrimeros: 10, maximo: 3 })).toEqual([]);
-  });
-
-  it("si nadie está por debajo, no hay alerta", () => {
-    expect(margenFlojo(filas, 0.01, { entreLosPrimeros: 4, maximo: 3 })).toEqual([]);
-  });
-
-  it("respeta el máximo que se muestra", () => {
-    expect(margenFlojo(filas, 0.9, { entreLosPrimeros: 5, maximo: 2 })).toHaveLength(2);
-  });
-});
+// 4. (5-oct-2026: las pruebas de `margenFlojo` se borraron con la tarjeta
+//    «Alta venta, bajo margen» de Productos, que Daniel pidió quitar.)
 
 // ═════════════════════════════════════════════════════════════════════════════
 // 5. Qué movió la aguja

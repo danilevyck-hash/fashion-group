@@ -26,8 +26,8 @@
 //   2. **Qué se vende más** y **qué deja más plata**, en dos listas separadas.
 //      Son dos preguntas distintas y antes competían en la misma fila de la
 //      tabla; separarlas hace visible cuando la respuesta NO es la misma.
-//   3. **Qué se vende mucho y deja poco** — la conclusión de negocio que los
-//      datos ya permitían y que nadie estaba mostrando.
+//   3. (Quitado el 5-oct-2026 a pedido de Daniel: la tarjeta «Alta venta, bajo
+//      margen». Se borró con su cálculo `margenFlojo` y sus pruebas.)
 //   4. **Qué movió la aguja** contra el año pasado, en dólares.
 //   5. El detalle completo, detrás de "Ver todo". Sigue entero: la tabla, el
 //      buscador, el filtro por categoría, el orden por columna y el paginado.
@@ -92,7 +92,7 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { Card } from "@/components/ui/card";
 import {
-  Package, Tag, Layers, Info, Search, ArrowUp, ArrowDown, ChevronDown, AlertTriangle,
+  Package, Tag, Layers, Info, Search, ArrowUp, ArrowDown, ChevronDown,
 } from "lucide-react";
 import { fmtMoney } from "@/lib/ventas/format";
 import { Ayuda } from "@/components/shared/Ayuda";
@@ -116,7 +116,6 @@ import {
 import {
   variacion,
   topPor,
-  margenFlojo,
   movimientos,
   type RenglonComparativo,
   type TopFila,
@@ -197,12 +196,6 @@ const TANDA = 100;
 /** Cuántos van en cada lista de arriba. Cinco es lo que se lee de un vistazo:
  *  con diez ya hay que recorrer, y recorrer es lo que hacía la tabla. */
 const TOP_VISIBLE = 5;
-
-/** La alerta de margen mira los 10 más vendidos y muestra hasta 3. Diez porque
- *  es el pelotón que de verdad mueve el período; tres porque una lista larga de
- *  advertencias deja de ser una advertencia. */
-const ALERTA_ENTRE = 10;
-const ALERTA_MAX = 3;
 
 /** Cuántos grupos se muestran de cada lado en "qué movió la aguja". */
 const MOVIMIENTOS_N = 3;
@@ -359,13 +352,6 @@ export function ProductosSubtab({
   );
   const topUtilidad = useMemo(
     () => (base && totales ? topPor(base, "utilidad", TOP_VISIBLE, totales.utilidad) : []),
-    [base, totales],
-  );
-  const flojos = useMemo(
-    () =>
-      base && totales
-        ? margenFlojo(base, totales.margen, { entreLosPrimeros: ALERTA_ENTRE, maximo: ALERTA_MAX })
-        : [],
     [base, totales],
   );
   const cambios = useMemo(
@@ -549,7 +535,7 @@ export function ProductosSubtab({
   );
 
   // ── LA PANTALLA MÍNIMA (23-sep-2026, mockup aprobado): 9 elementos → 5 ────
-  // 1. «Se vende mucho pero deja poco» ARRIBA (es lo accionable) · 2. la banda
+  // 1. (5-oct-2026: se quitó «Alta venta, bajo margen» a pedido de Daniel) · 2. la banda
   // UNIDADES · UTILIDAD · MARGEN sin VENTA · 3. las marcas en una línea con el
   // detalle a un toque · 4. el agrupador con UNA tabla de 5 filas · 5. «Lo que
   // más cambió» + «Ver todo». 🔴 Ningún número cambia: son los mismos `totales`,
@@ -563,12 +549,6 @@ export function ProductosSubtab({
         <h3 className="sr-only">Más vendido · {nombreMarca ? `${nombreMarca} · ` : ""}{rotuloPeriodo}</h3>
 
         <div className={cn("space-y-4", loading && "opacity-60 transition-opacity")}>
-          {vista !== "marca" && !sinVentas && flojos.length > 0 && totales?.margen != null && (
-            <div data-elemento="alerta">
-              <MargenFlojo filas={flojos} margenGeneral={totales.margen} sustantivo={sustantivo} />
-            </div>
-          )}
-
           {totales && (
             <PulsoSinVenta
               totales={totales}
@@ -716,8 +696,6 @@ export function ProductosSubtab({
                   vista={vista}
                 />
               </div>
-
-              <MargenFlojo filas={flojos} margenGeneral={totales?.margen ?? null} sustantivo={sustantivo} />
 
               {cambios && resp?.comparativo && (
                 <Movimientos cambios={cambios} comparativo={resp.comparativo} />
@@ -914,59 +892,6 @@ function ListaTop({
           </li>
         ))}
       </ol>
-    </Card>
-  );
-}
-
-// ── 3. Se vende mucho pero deja poco ────────────────────────────────────────
-
-function MargenFlojo({
-  filas,
-  margenGeneral,
-  sustantivo,
-}: {
-  filas: ReturnType<typeof margenFlojo>;
-  margenGeneral: number | null;
-  sustantivo: string;
-}) {
-  if (filas.length === 0 || margenGeneral == null) return null;
-  return (
-    <Card className="overflow-hidden border-amber-200 p-0">
-      <div className="flex items-start gap-2 border-b border-amber-100 bg-amber-50 px-4 py-3">
-        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" strokeWidth={1.75} />
-        <div className="flex min-w-0 items-center gap-1">
-          <h4 className="font-display text-sm font-semibold text-amber-950">
-            Alta venta, bajo margen
-          </h4>
-          {/* 🩸 LA REGLA SE SIGUE PUDIENDO LEER COMPLETA — una advertencia cuyo
-              criterio no se puede consultar es una advertencia en la que nadie
-              confía. Lo que cambió es que ya no se repite en cada carga: es una
-              definición de bucket (se aprende una vez), así que vive a UN toque
-              en vez de ocupar dos renglones arriba de la lista. El AVISO —la
-              tarjeta ámbar y sus filas— sigue entero y a la vista. */}
-          <Ayuda titulo="Cómo se calcula">
-            {sustantivo === "categorías" ? "Categorías" : "Artículos"} entre los {ALERTA_ENTRE} más vendidos
-            del período con margen por debajo del margen general (
-            <span className="font-mono tabular-nums">{fmtMargen(margenGeneral)}</span>).
-          </Ayuda>
-        </div>
-      </div>
-      <ul className="divide-y divide-gray-100">
-        {filas.map(f => (
-          <li key={f.clave} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-4 py-2.5">
-            <span className="min-w-0 flex-1 truncate text-sm text-gray-950" title={f.etiqueta}>
-              {f.etiqueta}
-            </span>
-            <span className="font-mono text-sm font-medium tabular-nums text-amber-800">
-              {fmtMargen(f.margen)}
-            </span>
-            <p className="w-full text-xs text-gray-500">
-              N.º {f.puesto} en unidades · {fmtUnidades(f.unidades)} unidades ·{" "}
-              {fmtMoney(f.venta)} de venta · {fmtMoney(f.utilidad)} de utilidad
-            </p>
-          </li>
-        ))}
-      </ul>
     </Card>
   );
 }

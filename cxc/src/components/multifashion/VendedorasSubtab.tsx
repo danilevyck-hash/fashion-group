@@ -179,7 +179,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
       return { chip: `ultimos_${periodo.n}` as ChipKey, rpcMes: corte?.mes ?? enCursoMes };
     }
     if (periodo.tipo === "anio") return { chip: "ytd", rpcMes: enCursoMes };
-    // Vendedoras no ofrece rango (`ajustarPeriodo` lo baja a su mes).
+    // El rango lo pinta `ComisionesVendedoresRango` (MultifashionView); acá no llega.
     if (periodo.tipo === "rango") return { chip: "mes_anterior", rpcMes: Number(periodo.hasta.slice(5, 7)) };
     // Un mes: «en curso» si es el mes de corte, «cerrado» si no. La distinción
     // solo cambia el RÓTULO — la RPC recibe el mismo `p_mes` en los dos casos.

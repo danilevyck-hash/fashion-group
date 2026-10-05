@@ -195,7 +195,9 @@ describe("4 · un control de tiempo por pestaña", () => {
     // 5-oct-2026 · NOTA FECHADA — Productos suma «Rango de fechas» (desde–hasta).
     expect(TIPOS_POR_TAB.productos).toEqual({ mes: true, anio: false, ventanas: [12], rango: true });
     expect(periodoSirve("productos", { tipo: "rango", desde: "2026-09-01", hasta: "2026-09-15" })).toBe(true);
-    expect(periodoSirve("vendedoras", { tipo: "rango", desde: "2026-09-01", hasta: "2026-09-15" })).toBe(false);
+    // 5-oct-2026 · NOTA FECHADA — Vendedoras y Clientes también sirven el rango.
+    expect(periodoSirve("vendedoras", { tipo: "rango", desde: "2026-09-01", hasta: "2026-09-15" })).toBe(true);
+    expect(periodoSirve("resumen", { tipo: "rango", desde: "2026-09-01", hasta: "2026-09-15" })).toBe(false);
     expect(TIPOS_POR_TAB.vendedoras.ventanas).toEqual([3, 6, 12]);
     expect(TIPOS_POR_TAB.clientes.ventanas).toEqual([3, 6, 12]);
     expect(periodoSirve("resumen", { tipo: "ultimos", n: 3 })).toBe(false);

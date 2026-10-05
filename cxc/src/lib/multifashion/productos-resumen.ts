@@ -13,8 +13,8 @@
 //
 //   1. `variacion`    — cuánto cambió contra el mismo período del año pasado.
 //   2. `topPor`       — los primeros N de un corte, con su barra proporcional.
-//   3. `margenFlojo`  — lo que se vende mucho y deja poco (la conclusión de
-//                       negocio que los datos ya permitían y nadie mostraba).
+//   3. (5-oct-2026: `margenFlojo` se borró junto con la tarjeta «Alta venta,
+//      bajo margen» de Productos, a pedido de Daniel. Nada más la usaba.)
 //   4. `movimientos`  — qué grupo movió la aguja, en plata, contra el año pasado.
 //
 // ── LO QUE ACÁ NO SE PUEDE HACER MAL ────────────────────────────────────────
@@ -137,68 +137,6 @@ export function topPor(
     fraccion: lider > 0 ? Math.max(0, Math.min(1, f[col] / lider)) : 0,
     pctDelTotal: total > 0 ? f[col] / total : null,
   }));
-}
-
-// ── 3. Se vende mucho pero deja poco ────────────────────────────────────────
-
-export interface FilaMargenFlojo {
-  clave: string;
-  etiqueta: string;
-  unidades: number;
-  venta: number;
-  utilidad: number;
-  /** Nunca `null`: los "—" quedan fuera por definición (punto 4). */
-  margen: number;
-  /** Puesto en el ranking por UNIDADES (1 = el más vendido del período). */
-  puesto: number;
-}
-
-export interface OpcionesMargenFlojo {
-  /** Cuántos de los más vendidos se miran. */
-  entreLosPrimeros: number;
-  /** Cuántos se muestran, de peor margen a mejor. */
-  maximo: number;
-}
-
-/**
- * De los `entreLosPrimeros` que más UNIDADES venden, los que quedaron por
- * debajo del margen general del período.
- *
- * La regla se dice en pantalla con estas dos palabras exactas — una alerta cuyo
- * criterio no se ve es una alerta en la que nadie confía. Se compara contra el
- * margen GENERAL del período (el mismo que ya mostraba el encabezado) y no
- * contra un umbral inventado: el número contra el que un dueño mide su producto
- * es su propio negocio.
- */
-export function margenFlojo(
-  filas: readonly RenglonRanking[],
-  margenGeneral: number | null,
-  opts: OpcionesMargenFlojo,
-): FilaMargenFlojo[] {
-  if (margenGeneral == null) return [];
-  const porUnidades = ordenarRanking(filas, "unidades", "desc").slice(
-    0,
-    Math.max(0, opts.entreLosPrimeros),
-  );
-  const flojos: FilaMargenFlojo[] = [];
-  porUnidades.forEach((f, i) => {
-    if (f.margen == null || f.margen >= margenGeneral) return;
-    flojos.push({
-      clave: f.clave,
-      etiqueta: f.etiqueta,
-      unidades: f.unidades,
-      venta: f.venta,
-      utilidad: f.utilidad,
-      margen: f.margen,
-      puesto: i + 1,
-    });
-  });
-  // De peor margen a mejor: lo que más urge mirar va primero. Desempate por
-  // etiqueta, igual que en todo el resto de la pantalla.
-  flojos.sort((a, b) =>
-    a.margen !== b.margen ? a.margen - b.margen : a.etiqueta.localeCompare(b.etiqueta, "es"),
-  );
-  return flojos.slice(0, Math.max(0, opts.maximo));
 }
 
 // ── 4. Qué movió la aguja contra el año pasado ──────────────────────────────

@@ -66,13 +66,16 @@ export const TIPOS_POR_TAB: Record<TabMultifashion, { mes: boolean; anio: boolea
   resumen:    { mes: true, anio: false, ventanas: [] },
   // Reemplaza las SEIS píldoras: los meses cubren «en curso» y «cerrado», «Todo
   // el año» es el YTD de siempre, y las tres ventanas son las mismas de antes.
-  vendedoras: { mes: true, anio: true,  ventanas: [3, 6, 12] },
+  // 🔴 5-oct-2026: «Rango de fechas» también acá, con la consulta por fechas de
+  // Comisiones (`/api/ventas/comisiones/rango`, ámbito Multifashion).
+  vendedoras: { mes: true, anio: true,  ventanas: [3, 6, 12], rango: true },
   // La ruta acepta `periodo=mes|12m` y nada más. No se inventan ventanas.
   // 🔴 «Rango de fechas» (Daniel, 5-oct-2026): los artículos vendidos entre
   // dos fechas, con la ruta de siempre (`desde`/`hasta`).
   productos:  { mes: true, anio: false, ventanas: [12], rango: true },
   // Reemplaza sus cuatro píldoras (Mes · 3m · 6m · 12m) y suma el año completo.
-  clientes:   { mes: true, anio: true,  ventanas: [3, 6, 12] },
+  // 🔴 5-oct-2026: y «Rango de fechas» (la consulta ya va por fecha_inicio/fin).
+  clientes:   { mes: true, anio: true,  ventanas: [3, 6, 12], rango: true },
 };
 
 /** ¿Esta pestaña sabe servir este período? */
@@ -238,6 +241,19 @@ export function opcionesPeriodo({ tab, anios, corte, mesesConDato }: ArgsOpcione
   }
 
   return out;
+}
+
+/**
+ * 🔴 Las flechas ‹ › del selector (Daniel, 5-oct-2026). Mueven UN MES entre los
+ * meses que el desplegable ofrece — así nunca van al futuro ni a un mes sin
+ * venta. Con año, últimos N o rango, `null`: la flecha se apaga.
+ */
+export function mesVecino(p: Periodo, paso: -1 | 1, opciones: readonly OpcionPeriodo[]): string | null {
+  if (p.tipo !== "mes") return null;
+  const meses = opciones.map((o) => o.valor).filter((v) => /^\d{4}-\d{2}$/.test(v)).sort();
+  const i = meses.indexOf(periodoAUrl(p));
+  if (i < 0) return null;
+  return meses[i + paso] ?? null;
 }
 
 /** El período con el que abre el módulo: el mes de corte. */

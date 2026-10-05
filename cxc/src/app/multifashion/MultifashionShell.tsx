@@ -43,7 +43,7 @@ import { hoyPanama } from "@/lib/fecha-panama";
 import { ROLES_MULTIFASHION } from "@/lib/multifashion/acceso";
 import { resolverTabMultifashion, type TabMultifashion } from "@/lib/multifashion/pestanas";
 import {
-  ajustarPeriodo, anioDelPeriodo, etiquetaPeriodo, opcionesPeriodo, periodoAUrl,
+  ajustarPeriodo, anioDelPeriodo, etiquetaPeriodo, mesVecino, opcionesPeriodo, periodoAUrl,
   periodoDesdeUrl, periodoPorDefecto, rangoInicial, VALOR_RANGO, type CortePeriodo, type Periodo,
 } from "@/lib/multifashion/periodo";
 import {
@@ -255,6 +255,8 @@ export function MultifashionShell({
         opciones={opciones}
         onChange={onPeriodo}
         disabled={loading}
+        anterior={mesVecino(periodo, -1, opciones)}
+        siguiente={mesVecino(periodo, 1, opciones)}
       />
       {periodo.tipo === "rango" && (
         <div className="min-w-[220px]">
@@ -356,9 +358,10 @@ export function MultifashionShell({
           <p data-celular="titulo" className={tituloCelular("text-3xl font-bold leading-tight tracking-tight text-gray-950")}>
             {encabezado.titulo}
           </p>
-          {/* 🔴 Productos elige su período también en el celular: mes, últimos
-              12 meses o «Rango de fechas» (5-oct-2026). */}
-          {tab === "productos" && <div className="mt-2">{selectorPeriodo}</div>}
+          {/* 🔴 Vendedoras, Productos y Clientes eligen su período también en
+              el celular, con ‹ › (5-oct-2026). El Resumen ya tiene sus flechas
+              arriba. */}
+          {tab !== "resumen" && <div className="mt-2">{selectorPeriodo}</div>}
           {(subtituloCel || frescuraCel) && (
             <p data-celular="subtitulo" className="mt-0.5 text-sm text-gray-500 tabular-nums">
               {subtituloCel}{subtituloCel && frescuraCel && " · "}{frescuraCel}

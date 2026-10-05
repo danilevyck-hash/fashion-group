@@ -22,6 +22,8 @@ import { VendedorasSubtab } from "./VendedorasSubtab";
 import { MultifashionResumenView } from "./MultifashionResumenView";
 import { ClientesMultifashionSubtab } from "./ClientesMultifashionSubtab";
 import { ProductosSubtab } from "./ProductosSubtab";
+import { ComisionesVendedoresRango } from "@/components/comisiones/ComisionesVendedoresRango";
+import { VISTA_MULTIFASHION } from "@/lib/comisiones/vistas";
 import { PESTANAS_MULTIFASHION, type TabMultifashion } from "@/lib/multifashion/pestanas";
 import { mesDelPeriodo, type CortePeriodo, type Periodo } from "@/lib/multifashion/periodo";
 import { MULTIFASHION_CELULAR, type ClaveRenglon, type PantallaCelular } from "@/lib/multifashion/celular";
@@ -110,6 +112,15 @@ export function MultifashionView({
               espejo de Comisiones monta el MISMO componente sin la prop — no
               tiene el módulo Multifashion y `/api/multifashion/metas` le
               contestaría 403. */}
+          {/* 🔴 5-oct-2026: «Rango de fechas» en Vendedoras = la consulta por
+              fechas de Comisiones (ventas y comisión, sin bonos: el bono es
+              por mes cerrado). */}
+          {periodo.tipo === "rango" ? (
+            <ComisionesVendedoresRango
+              vista={VISTA_MULTIFASHION}
+              rango={{ desde: periodo.desde, hasta: periodo.hasta, atajo: null }}
+            />
+          ) : (
           <VendedorasSubtab
             selectedYear={selectedYear}
             periodo={periodo}
@@ -121,6 +132,7 @@ export function MultifashionView({
                Multifashion»—. Comisiones ya no ofrece Multifashion. */
             conTotalAPagar
           />
+          )}
         </TabsContent>
         <TabsContent value="productos" className={enCelular ? "mt-0 sm:mt-5" : "mt-5"}>
           <ProductosSubtab selectedYear={selectedYear} mes={mes} periodo={periodo} />

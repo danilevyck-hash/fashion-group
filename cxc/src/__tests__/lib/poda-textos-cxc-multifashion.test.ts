@@ -65,11 +65,8 @@ const A_LA_AYUDA: { archivo: string; que: string; texto: string }[] = [
     que: "Productos · con qué vara se arma cada top-5",
     texto: "<Ayuda titulo=\"Cómo se arma esta lista\">{ayuda}</Ayuda>",
   },
-  {
-    archivo: "components/multifashion/ProductosSubtab.tsx",
-    que: "Productos · qué entra en la alerta ámbar de margen flojo",
-    texto: "con margen por debajo del margen general",
-  },
+  // 5-oct-2026: se quitó el candado de «Alta venta, bajo margen»: Daniel pidió
+  // quitar la tarjeta entera, con su ⓘ.
   {
     archivo: "components/multifashion/ProductosSubtab.tsx",
     que: "Productos · por qué 'lo que más cambió' se rankea en dólares",
