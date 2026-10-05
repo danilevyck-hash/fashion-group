@@ -21,6 +21,10 @@
       "schedule": "45 6 * * *"
     },
     {
+      "path": "/api/cron/sync-pedidos",
+      "schedule": "10 6 * * *"
+    },
+    {
       "path": "/api/cron/backup?grupo=switch",
       "schedule": "15 11 * * *"
     },

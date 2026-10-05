@@ -642,6 +642,15 @@ export interface SwitchClient {
    *  data.pedido (cabecera con cliente/vendedor/impuestos/urlswitchpay) +
    *  data.detalle[] (líneas con codigoBarraId, cantidad, precio, descuentos). */
   apipedidoInfo(pedidoId: number | string): Promise<SwitchPedidoInfoData>;
+  /** Lista de pedidos (/apipedido/lista, doc págs 47-48). Paginación de 50.
+   *  `estatus` opcional: "Activo" | "Inactivo". */
+  listPedidos(params: {
+    desde: string;
+    hasta: string;
+    porPagina: number;
+    paginaActual: number;
+    estatus?: string;
+  }): Promise<SwitchPedidosData>;
   /** Crea un pedido (POST /apipedido/terminar, doc págs 51-53). PRIMER endpoint
    *  POST de negocio del cliente (hasta ahora el único POST era /autenticacion).
    *  Los valores de articulos[] van como STRING con decimales (ej. cantidad
@@ -987,6 +996,24 @@ export interface SwitchPedidoDetalleLinea {
   [key: string]: unknown;
 }
 
+/** Fila de /apipedido/lista (data.pedidos[]). Montos como strings numéricos. */
+export interface SwitchPedidoListaRow {
+  id: number;
+  secuencial: string | number | null;
+  fecha: string | null;
+  total: string | number | null;
+  cliente: string | null;
+  clienteId: number | null;
+  vendedor: string | null;
+  vendedorId: number | null;
+  [key: string]: unknown;
+}
+
+export interface SwitchPedidosData {
+  pedidos: SwitchPedidoListaRow[];
+  paginacion?: SwitchPaginacion;
+}
+
 export interface SwitchPedidoInfoData {
   pedido: SwitchPedidoInfo;
   detalle: SwitchPedidoDetalleLinea[];
@@ -1311,6 +1338,22 @@ export function createSwitchClient(empresaKey: string): SwitchClient {
         empresaKey,
         cfg,
         `/apipedido/info?${qs.toString()}`,
+        "GET",
+      );
+    },
+
+    async listPedidos(params) {
+      const qs = new URLSearchParams({
+        desde: params.desde,
+        hasta: params.hasta,
+        porPagina: String(params.porPagina),
+        paginaActual: String(params.paginaActual),
+      });
+      if (params.estatus) qs.set("estatus", params.estatus);
+      return authedCall<SwitchPedidosData>(
+        empresaKey,
+        cfg,
+        `/apipedido/lista?${qs.toString()}`,
         "GET",
       );
     },

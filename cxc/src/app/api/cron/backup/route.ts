@@ -333,6 +333,8 @@ const DATASETS: Dataset[] = [
   // Las etiquetas de las cajas: cuántas lleva cada factura y con qué destino.
   // Lo escribe una persona antes de que exista la guía; no vuelve de ningún lado.
   { table: "guias_etiquetas" },
+  // Guías › Pedidos (5-oct-2026): lo que marcó bodega, con quién y cuándo.
+  { table: "pedidos_bodega_estado" },
   // Catálogo Reebok: a qué cajón va cada rubro de Switch (17-sep-2026). Lo
   // escribe Daniel a mano; Switch manda el rubro, no dice a qué categoría va.
   { table: "reebok_rubro_categoria" },
@@ -479,6 +481,8 @@ const ORDER_BY: Record<string, string[]> = {
   switch_articulo_marca: ["empresa_key", "articulo_id"],
   switch_estadocuenta_saldo: ["empresa_key", "cliente_switch_id"],
   switch_ingresos_mercancia: ["empresa_key", "n_interno", "linea"],
+  pedidos_bodega_estado: ["empresa_key", "pedido_switch_id"],
+  switch_pedidos: ["empresa_key", "pedido_switch_id"],
 };
 
 /** Trae TODAS las filas de una tabla paginando de a PAGE con orden estable,

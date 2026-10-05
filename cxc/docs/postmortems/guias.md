@@ -2419,3 +2419,7 @@ Daniel aprobó (5-oct-2026, *«toda sugerencia tuya es aceptada»*). Interruptor
 - 🔴 **Se guarda IGUAL**: un renglón con el TEXTO `Traslado` en facturas, empresa `""` con «Ninguna» o el nombre canónico, y en Observaciones la línea «Traslado <cliente>: <contenido>». Es la MISMA regla del envío etiquetado: `lineaDeTraslado` y el nuevo `lineaDeTrasladoDe` son una sola función. Lo escrito a mano en Observaciones no se pisa (`observacionesConTraslado`). Al quitar la tarjeta (✕), sale su línea. `contenido_traslado` vive solo en pantalla (`GuiaItem`), porque la API arma las filas campo por campo. Sin migración.
 - ⚠️ La pantalla de una tabla (`DetalleDeEnvio`, `GUIA_APPLE_2026_10 = false`) también pierde el enlace gris y no tiene el botón nuevo: hoy está apagada.
 - Candado `components/guias-agregar-traslado` (payload, línea idéntica a la del envío etiquetado, chip, quitar saca la línea, falta todo junto, sin el enlace gris).
+
+## Guías › «Pedidos» para bodega (5-oct-2026)
+
+- 🔴 **Guías › «Pedidos», PRIMERA pestaña de bodega y admin** (5-oct-2026, `PEDIDOS_BODEGA_2026_10`, hoy `false`): los pedidos **Activo** de Switch (= sin facturar; facturado pasa a Inactivo, medido) que trae `sync-pedidos` a las 06:10 UTC a `switch_pedidos`; fuera `TCKCTA`, `12188` y quien no tiene ficha. **Dos estados** (Pendiente · Preparado) en `pedidos_bodega_estado`, con quién y cuándo; **sin enlace a Etiquetas ni a Guías**. Migración `20261230120000` **SIN aplicar**. Candado `guias/pedidos-bodega`.

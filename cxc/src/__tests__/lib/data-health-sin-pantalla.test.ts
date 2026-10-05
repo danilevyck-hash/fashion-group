@@ -147,10 +147,13 @@ describe("🔴 la medición no se tocó", () => {
     // verdad los gastos de Marketing anulados hace más de 90 días), por OTRO
     // encargo y con su entrada registrada en `cron-telemetry.ts` y en
     // `docs/crons.md`. Ver `marketing-el-periodo-manda.test.tsx`.
+    // ⚠️ 5-oct-2026: son 83 — entró `sync-pedidos` (Guías › Pedidos, detrás de
+    // `PEDIDOS_BODEGA_2026_10`), por OTRO encargo y con su entrada registrada en
+    // `cron-telemetry.ts` y en `docs/crons.md`. Ver `guias/pedidos-bodega.test.ts`.
     // Este candado cambió de número con nota, no de regla: la medición
     // (`integrity-check`) sigue intacta, y el caso de arriba lo comprueba.
     const vercel = JSON.parse(leer("vercel.json")) as { crons: unknown[] };
-    expect(vercel.crons).toHaveLength(82);
+    expect(vercel.crons).toHaveLength(83);
   });
 
   // Mismo motivo que la allowlist de checks: `cron-telemetry.ts` construye el

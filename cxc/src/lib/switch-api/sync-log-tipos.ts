@@ -72,6 +72,7 @@ export const SYNC_LOG_TYPES = [
   // haría divergir el código de la base — que es exactamente lo que este candado
   // vigila. Barrer el CHECK es higiene opcional, no un pendiente.
   "mayor",
+  "pedidos",
 ] as const;
 
 export type SyncLogType = (typeof SYNC_LOG_TYPES)[number];

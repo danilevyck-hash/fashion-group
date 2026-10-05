@@ -204,6 +204,8 @@ export const TABLAS_PERSONAS = [
   // destino— y NO se pueden volver a conseguir de ningún lado: Switch no sabe
   // de cajas y `guia_items.bultos` es un número por renglón que nace después.
   "guias_etiquetas",
+  // Guías › Pedidos (5-oct-2026): lo que marcó bodega, con quién y cuándo.
+  "pedidos_bodega_estado",
   "transportistas",
   // 🔴 La lista de «Despachado por» (19-sep-2026). La escriben personas en
   // Guías › Configuración y NO se puede volver a conseguir: antes vivía mitad
@@ -302,6 +304,7 @@ export const TABLAS_CONGELADAS = [
 // Respaldar una de estas es una decisión de COSTO. Cuál se respalda y cuál no
 // está en `SWITCH_DATASETS` del route, con el motivo al lado.
 export const TABLAS_SWITCH = [
+  "switch_pedidos",
   "switch_facturas",
   "switch_factura_lineas",
   "switch_factura_utilidad",
@@ -469,11 +472,13 @@ export const PK_QUE_NO_ES_ID: Readonly<Record<string, readonly string[]>> = Obje
   fg_catalogo_publico_switch: ["empresa_key"],
   fg_user_switch_vendedor: ["user_id", "empresa_key"],
   login_attempts: ["ip"],
+  pedidos_bodega_estado: ["empresa_key", "pedido_switch_id"],
   multifashion_caja_diaria: ["fecha"],
   switch_articulo_info: ["empresa_key", "codigo"],
   switch_articulo_marca: ["empresa_key", "articulo_id"],
   switch_estadocuenta_saldo: ["empresa_key", "cliente_switch_id"],
   switch_ingresos_mercancia: ["empresa_key", "n_interno", "linea"],
+  switch_pedidos: ["empresa_key", "pedido_switch_id"],
   vendedores: ["empresa_key", "nombre"],
 });
 

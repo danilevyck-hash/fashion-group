@@ -481,6 +481,9 @@ export const PENDING_RECOVERY_MAX_HOURS = 30;
  * health-crons si se quiere la garantía dura.
  */
 export const SEED_TOLERANT_CRONS = [
+  // Guías › Pedidos (5-oct-2026): con `PEDIDOS_BODEGA_2026_10 = false` no
+  // corre ni siembra; al prenderlo, siembra en su primera madrugada.
+  "sync-pedidos",
   "backup-switch", // backup de tablas switch_* (3 entradas: 06:45 / 11:15 / 19:15 UTC)
   // Réplica off-site de los buckets de Storage a R2 (2 entradas: 04:00 / 15:30
   // UTC). Seed-tolerante hasta que lleve días sembrado; después se puede
@@ -696,6 +699,8 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "switch-sync all", hhmmUtc: "0530", empresas: ["vistana", "active_wear"] },
   { cron: "switch-sync all", hhmmUtc: "0535", empresas: ["fashion_shoes", "fashion_wear"] },
   { cron: "switch-sync all", hhmmUtc: "0540", empresas: ["active_shoes", "joystep"] },
+  // Guías › Pedidos (5-oct-2026): 30 min tras el «all» de 05:40 y 50 antes de sync-utilidad.
+  { cron: "sync-pedidos", hhmmUtc: "0610", empresas: ["vistana", "fashion_wear", "fashion_shoes", "active_shoes", "active_wear", "joystep"] },
   { cron: "switch-sync all", hhmmUtc: "0630", empresas: ["american_classic", "confecciones_boston"] },
   { cron: "sync-utilidad", hhmmUtc: "0700", empresas: CRON_EMPRESAS_UTILIDAD },
   { cron: "sync-recibos", hhmmUtc: "0750", empresas: CRON_EMPRESAS_RECIBOS },

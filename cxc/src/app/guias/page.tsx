@@ -20,6 +20,7 @@ import { GUIAS_LISTA_APPLE_2026_10, aniosConGuias, type PeriodoGuias } from "@/l
 import { mesEnCurso } from "@/lib/comisiones/mes-inicial";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { usePersistedState } from "@/lib/hooks/usePersistedState";
+import { puedeVerPedidosBodega } from "@/lib/guias/pedidos-bodega";
 
 // LAZY, como los modos de Comisiones: bodega abre /guias todo el día desde el
 // celular y la configuración es de admin/secretaria — su JS solo se descarga
@@ -32,6 +33,11 @@ const GuiasConfiguracionView = dynamic(() => import("./components/GuiasConfigura
 // La pestaña «Etiquetas» (18-sep-2026), LAZY por la misma razón: arrastra jsPDF
 // al imprimir y bodega abre /guias todo el día desde el celular.
 const EtiquetasView = dynamic(() => import("./components/EtiquetasView"), {
+  ssr: false,
+  loading: () => <div className="py-10 text-center text-sm text-gray-500">Cargando…</div>,
+});
+// La pestaña «Pedidos» (5-oct-2026, `PEDIDOS_BODEGA_2026_10`), LAZY igual.
+const PedidosView = dynamic(() => import("./components/PedidosView"), {
   ssr: false,
   loading: () => <div className="py-10 text-center text-sm text-gray-500">Cargando…</div>,
 });
@@ -155,8 +161,11 @@ export default function GuiasPage() {
   // puede esconder una función nueva que Daniel aprobó aparte. La ven los
   // MISMOS tres que escriben una guía (admin · secretaria · bodega,
   // `ETIQUETAS_ROLES` derivado de `GUIAS_WRITE_ROLES`); el vendedor no.
-  type Vista = "guias" | "config" | "etiquetas";
+  type Vista = "pedidos" | "guias" | "config" | "etiquetas";
   const [vista, setVista] = useState<Vista>("guias");
+  // 🔴 «Pedidos» es la PRIMERA pestaña para bodega y admin, y abre ahí
+  // (`?vista=guias` vuelve a la lista). Con el interruptor apagado no existe.
+  const hayPedidos = puedeVerPedidosBodega(role);
   const hayConfig =
     GUIAS_ATAJOS_NUEVOS && !!role && (CONFIG_GUIAS_ROLES as readonly string[]).includes(role);
   const hayEtiquetas = puedeEtiquetar(role);
@@ -164,20 +173,23 @@ export default function GuiasPage() {
     if (!authChecked) return;
     const v = new URLSearchParams(window.location.search).get("vista");
     if (v === "config" || v === "etiquetas") setVista(v);
+    else if (hayPedidos && v !== "guias") setVista("pedidos");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authChecked]);
   function cambiarVista(v: Vista) {
     setVista(v);
     const params = new URLSearchParams(window.location.search);
-    if (v === "guias") params.delete("vista");
+    if (v === "guias" && !hayPedidos) params.delete("vista");
     else params.set("vista", v);
     const qs = params.toString();
     window.history.replaceState(null, "", qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
   }
   const enConfig = hayConfig && vista === "config";
   const enEtiquetas = hayEtiquetas && vista === "etiquetas";
+  const enPedidos = hayPedidos && vista === "pedidos";
   /** Las pestañas que de verdad existen para este rol. Con una sola, no se dibuja la fila. */
   const pestanas: Array<[Vista, string]> = [
+    ...(hayPedidos ? ([["pedidos", "Pedidos"]] as Array<[Vista, string]>) : []),
     ["guias", "Guías"],
     ...(hayEtiquetas ? ([["etiquetas", "Etiquetas"]] as Array<[Vista, string]>) : []),
     ...(hayConfig ? ([["config", "Configuración"]] as Array<[Vista, string]>) : []),
@@ -270,7 +282,9 @@ export default function GuiasPage() {
             </div>
           </div>
         )}
-        {enConfig ? (
+        {enPedidos ? (
+          <PedidosView />
+        ) : enConfig ? (
           <GuiasConfiguracionView />
         ) : enEtiquetas ? (
           <EtiquetasView />
