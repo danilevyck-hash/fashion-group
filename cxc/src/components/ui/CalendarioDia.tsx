@@ -4,7 +4,7 @@
 // igual que `CalendarioRango` (ver su nota sobre `react-day-picker`).
 // CALENDARIO_SIMPLE_2026_10: un toque elige y el control cierra.
 
-import { Calendar } from "./calendar";
+import { Calendar, CALENDARIO_SIMPLE_PROPS } from "./calendar";
 import { aIso, deIso } from "./rango-fechas-iso";
 
 export default function CalendarioDia({ valor, min, max, onDia }: {
@@ -19,7 +19,7 @@ export default function CalendarioDia({ valor, min, max, onDia }: {
   ];
   return (
     <Calendar
-      className="relative"
+      {...CALENDARIO_SIMPLE_PROPS}
       mode="single"
       selected={valor ? deIso(valor) : undefined}
       defaultMonth={deIso(valor || max || aIso(new Date()))}

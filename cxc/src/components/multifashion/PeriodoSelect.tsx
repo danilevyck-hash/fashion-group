@@ -39,9 +39,14 @@ export function PeriodoSelect({ valor, opciones, onChange, disabled, anterior, s
     else grupos.push({ nombre: o.grupo, items: [o] });
   }
 
+  // CALENDARIO_SIMPLE_2026_10 (`compacto`): en el celular el mes va corto,
+  // «Oct 2026», igual que Comisiones; en la computadora, «Octubre 2026».
+  const rotulo = opciones.find((o) => o.valor === valor)?.label;
+  const corto = rotulo?.replace(/^(\S{3})\S*( \d{4})$/, "$1$2");
+
   return (
-    // `compacto`: el trigger baja a 132 px en el celular (sin tocar su clase).
-    <div className={compacto ? "flex items-center [&_[role=combobox]]:min-w-[132px] sm:[&_[role=combobox]]:min-w-[168px]" : "flex items-center"}>
+    // `compacto`: el trigger baja en el celular (sin tocar su clase).
+    <div className={compacto ? "flex items-center [&_[role=combobox]]:min-w-[112px] sm:[&_[role=combobox]]:min-w-[168px]" : "flex items-center"}>
     <button
       type="button"
       aria-label="Mes anterior"
@@ -62,7 +67,13 @@ export function PeriodoSelect({ valor, opciones, onChange, disabled, anterior, s
         {/* Si el mes de corte no tiene venta todavía (el día 1, antes del
             primer sync) la opción no existe y el desplegable quedaba EN
             BLANCO (11-sep-2026). Con el placeholder, dice qué hacer. */}
-        <SelectValue placeholder={PLACEHOLDER_PERIODO} />
+        {compacto && rotulo ? (
+          <SelectValue placeholder={PLACEHOLDER_PERIODO}>
+            <span className="sm:hidden">{corto}</span><span className="hidden sm:inline">{rotulo}</span>
+          </SelectValue>
+        ) : (
+          <SelectValue placeholder={PLACEHOLDER_PERIODO} />
+        )}
       </SelectTrigger>
       <SelectContent align="end" className="max-h-[60vh]">
         {grupos.map((g) => (
@@ -83,7 +94,9 @@ export function PeriodoSelect({ valor, opciones, onChange, disabled, anterior, s
       type="button"
       aria-label="Mes siguiente"
       data-flecha="siguiente"
-      className={FLECHA}
+      // `compacto`: sin mes siguiente (el mes en curso) la › no aparece, pero
+      // queda su lugar — así «Rango» no salta al cambiar de mes.
+      className={`${FLECHA} ${compacto && !siguiente ? "invisible" : ""}`}
       disabled={disabled || !siguiente}
       onClick={() => siguiente && onChange(siguiente)}
     >

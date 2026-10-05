@@ -69,6 +69,32 @@ interface Props {
   rotulo?: string;
   /** El panel mide lo mismo que el botón (cuando el botón ocupa todo el ancho). */
   panelDelAnchoDelBoton?: boolean;
+  /** CALENDARIO_SIMPLE_2026_10: el botón «Rango» lo dibuja el padre (`BotonRangoComisiones`). */
+  rangoAparte?: boolean;
+}
+
+/**
+ * CALENDARIO_SIMPLE_2026_10 — el botón «Rango de fechas» de Comisiones, el
+ * mismo de Multifashion. Con un rango dice «15–30 sep ✕» y el ✕ vuelve al mes.
+ */
+export function BotonRangoComisiones({ rango, onRango, onVolver }: {
+  rango: RangoConsulta | null;
+  onRango: (r: RangoConsulta) => void;
+  onVolver: () => void;
+}) {
+  return (
+    <RangoFechas
+      enBarra
+      sinFuturo
+      desde={rango?.desde ?? ""}
+      hasta={rango?.hasta ?? ""}
+      vacio={!rango}
+      label={null}
+      diasDeAsistencia={false}
+      onChange={(d, h) => onRango({ desde: d, hasta: h, atajo: null })}
+      onQuitar={onVolver}
+    />
+  );
 }
 
 /** Lo que dice el control cerrado cuando se consulta un rango. */
@@ -76,7 +102,7 @@ export function etiquetaDeRango(r: RangoConsulta): string {
   return ATAJOS_RANGO.find((a) => a.clave === r.atajo)?.rotulo ?? etiquetaRango(r.desde, r.hasta).split(" · ")[0];
 }
 
-export function ComisionesPeriodo({ mes, year, availableYears, onChange, className, rango = null, onRango, alDerecha = false, rotulo, panelDelAnchoDelBoton = false }: Props) {
+export function ComisionesPeriodo({ mes, year, availableYears, onChange, className, rango = null, onRango, alDerecha = false, rotulo, panelDelAnchoDelBoton = false, rangoAparte = false }: Props) {
   const conRango = VENDEDORES_RANGO_2026_10 && !!onRango;
   // 🔴 CALENDARIO_SIMPLE_2026_10 (Daniel, 5-oct-2026): el rango sale del panel
   // y va como botón al lado, igual que en Multifashion. Adentro quedaban
@@ -251,19 +277,12 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
   );
 
   if (!rangoAlLado) return control;
+  // 🔴 UN SOLO PERÍODO A LA VEZ: con un rango, el mes se va y queda «15–30 sep ✕».
+  if (rangoAparte) return rango ? null : control;
   return (
     <div className={`flex items-center gap-1.5 ${className ?? ""}`} data-periodo-y-rango>
-      {control}
-      <RangoFechas
-        enBarra
-        desde={rango?.desde ?? ""}
-        hasta={rango?.hasta ?? ""}
-        vacio={!rango}
-        label={null}
-        diasDeAsistencia={false}
-        onChange={(d, h) => onRango!({ desde: d, hasta: h, atajo: null })}
-        onQuitar={() => onChange(year, mes)}
-      />
+      {!rango && control}
+      <BotonRangoComisiones rango={rango} onRango={onRango!} onVolver={() => onChange(year, mes)} />
     </div>
   );
 }

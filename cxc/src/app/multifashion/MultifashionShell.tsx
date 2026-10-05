@@ -255,28 +255,36 @@ export function MultifashionShell({
   // ‹ Octubre 2026 › [Rango de fechas]. Con un rango, el desplegable muestra su
   // mes y el botón dice «15–30 sep ✕»; el ✕ vuelve a ese mes.
   const mesDelRango: Periodo | null = periodo.tipo === "rango" ? { tipo: "mes", ...mesDelPeriodo(periodo, corte) } : null;
+  // 🔴 UN SOLO PERÍODO A LA VEZ (Daniel, 5-oct-2026): con un rango, el selector
+  // de mes SE CONVIERTE en «15–30 sep ✕»; el ✕ vuelve a ese mes.
+  const botonRango = (
+    <RangoFechas
+      enBarra
+      sinFuturo
+      desde={periodo.tipo === "rango" ? periodo.desde : ""}
+      hasta={periodo.tipo === "rango" ? periodo.hasta : ""}
+      vacio={periodo.tipo !== "rango"}
+      label={null}
+      diasDeAsistencia={false}
+      onChange={(d, h) => setPeriodoRaw(periodoAUrl({ tipo: "rango", desde: d, hasta: h }))}
+      onQuitar={() => mesDelRango && setPeriodoRaw(periodoAUrl(mesDelRango))}
+    />
+  );
   const selectorPeriodoSimple = (
     <div className="flex flex-wrap items-center gap-1.5 sm:gap-2" data-selector-periodo>
-      <PeriodoSelect
-        valor={periodoAUrl(mesDelRango ?? periodo)}
-        opciones={opciones.filter((o) => o.valor !== VALOR_RANGO)}
-        onChange={onPeriodo}
-        disabled={loading}
-        anterior={mesVecino(mesDelRango ?? periodo, -1, opciones)}
-        siguiente={mesVecino(mesDelRango ?? periodo, 1, opciones)}
-        compacto
-      />
-      {TIPOS_POR_TAB[tab].rango && (
-        <RangoFechas
-          enBarra
-          desde={periodo.tipo === "rango" ? periodo.desde : ""}
-          hasta={periodo.tipo === "rango" ? periodo.hasta : ""}
-          vacio={periodo.tipo !== "rango"}
-          label={null}
-          diasDeAsistencia={false}
-          onChange={(d, h) => setPeriodoRaw(periodoAUrl({ tipo: "rango", desde: d, hasta: h }))}
-          onQuitar={() => mesDelRango && setPeriodoRaw(periodoAUrl(mesDelRango))}
-        />
+      {mesDelRango ? botonRango : (
+        <>
+          <PeriodoSelect
+            valor={periodoAUrl(periodo)}
+            opciones={opciones.filter((o) => o.valor !== VALOR_RANGO)}
+            onChange={onPeriodo}
+            disabled={loading}
+            anterior={mesVecino(periodo, -1, opciones)}
+            siguiente={mesVecino(periodo, 1, opciones)}
+            compacto
+          />
+          {TIPOS_POR_TAB[tab].rango && botonRango}
+        </>
       )}
     </div>
   );

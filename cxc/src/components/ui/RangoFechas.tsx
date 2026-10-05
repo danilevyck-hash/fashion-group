@@ -225,12 +225,14 @@ interface Props {
   onQuitar?: () => void;
   /** Con `onQuitar`: el botón se dibuja como el de la barra. */
   enBarra?: boolean;
+  /** CALENDARIO_SIMPLE_2026_10: los días después de hoy no aparecen (ventas). */
+  sinFuturo?: boolean;
 }
 
 export default function RangoFechas({
   desde, hasta, onChange, recordarComo, label = "Período", vacio = false, textoVacio = "Seleccionar período",
   inline = false, accion, sugerido = null, iconoSolo = false, diasDeAsistencia = true,
-  onQuitar, enBarra = false,
+  onQuitar, enBarra = false, sinFuturo = false,
 }: Props) {
   const conGris = !CALENDARIO_SIMPLE_2026_10 || diasDeAsistencia;
   const [abierto, setAbierto] = useState(false);
@@ -296,6 +298,7 @@ export default function RangoFechas({
     <CalendarioRango
       desde={desde} hasta={hasta} diasConDatos={datos} vacio={vacio} sugerido={sugerido}
       onRango={aplicar} onAncla={setAncla}
+      ultimoDia={sinFuturo ? hoyPanama() : null}
       onMesVisible={(i, f) => { if (conGris) void pedirDatos(i, f); }}
     />
   );
@@ -312,9 +315,9 @@ export default function RangoFechas({
             : `${onQuitar ? "rounded-l-md" : "rounded-md"} bg-gray-900 font-medium text-white`
         }`}
       >
-        {/* En el celular: «Rango» y, con un rango, sin ícono — así entra en la
-            misma línea que ‹ Octubre 2026 ›. */}
-        <CalendarDays aria-hidden className={`h-4 w-4 shrink-0 ${vacio ? "text-gray-500" : "hidden text-white sm:block"}`} />
+        {/* En el celular: «Rango», sin ícono — así entra en la misma línea que
+            la empresa y ‹ Oct 2026 ›. */}
+        <CalendarDays aria-hidden className={`hidden h-4 w-4 shrink-0 sm:block ${vacio ? "text-gray-500" : "text-white"}`} />
         {vacio ? (
           <><span className="sm:hidden">Rango</span><span className="hidden sm:inline">{ROTULO_BOTON_RANGO}</span></>
         ) : etiquetaRangoCorta(desde, hasta)}

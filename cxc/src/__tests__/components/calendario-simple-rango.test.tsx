@@ -60,3 +60,24 @@ describe("el botón de la barra", () => {
     expect(onQuitar).toHaveBeenCalled();
   });
 });
+
+describe("sin futuro (ventas)", () => {
+  it("en el mes en curso no aparecen los días después de hoy ni la › al mes siguiente", async () => {
+    render(<RangoFechas sinFuturo desde="2026-10-01" hasta="2026-10-05" label={null} onChange={() => {}} />);
+    fireEvent.click(screen.getAllByRole("button", { name: /oct/ })[0]);
+    await dia(5);
+    expect(screen.queryAllByRole("button", { name: /^6 de octubre de 2026/ })).toHaveLength(0);
+    expect(screen.queryAllByRole("button", { name: /^1 de noviembre de 2026/ })).toHaveLength(0);
+    const sig = screen.getAllByRole("button", { name: "Mes siguiente" })[0];
+    expect(sig.getAttribute("aria-disabled")).toBe("true");
+    expect(sig.className).toContain("aria-disabled:invisible");
+  });
+});
+
+describe("el rango compara contra el mismo período del año pasado", () => {
+  it("15–30 sep 2026 → 15–30 sep 2025; el 29-feb cae al 28-feb", async () => {
+    const { periodoAnterior } = await import("@/lib/comisiones/vendedores-rango");
+    expect(periodoAnterior({ desde: "2026-09-15", hasta: "2026-09-30", atajo: null })).toEqual({ desde: "2025-09-15", hasta: "2025-09-30" });
+    expect(periodoAnterior({ desde: "2028-02-01", hasta: "2028-02-29", atajo: null })).toEqual({ desde: "2027-02-01", hasta: "2027-02-28" });
+  });
+});

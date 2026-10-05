@@ -22,6 +22,7 @@
 
 import { estaRetirado } from "./retirados";
 import { variacionPct } from "@/lib/variacion";
+import { CALENDARIO_SIMPLE_2026_10 } from "@/lib/ui/calendario-simple";
 
 /** El interruptor. `false` = el selector de período de siempre, sin atajos. */
 // 🔴 2-oct-2026: PRENDIDO. Daniel aprobó las capturas el 2-oct-2026: «sí».
@@ -89,7 +90,20 @@ export function rangoDeAtajo(clave: ClaveAtajo, hoy: string): RangoConsulta {
  *     «vs año pasado»; 29-feb cae a 28-feb).
  *   · lo demás → los mismos días de largo, justo antes.
  */
+/** Las mismas fechas, un año antes. El 29-feb cae al 28-feb. */
+export function mismosDiasAnioPasado(desde: string, hasta: string): { desde: string; hasta: string } {
+  const menosUno = (iso: string) => {
+    const y = Number(iso.slice(0, 4)) - 1;
+    return iso.slice(5) === "02-29" ? `${y}-02-28` : `${y}${iso.slice(4)}`;
+  };
+  return { desde: menosUno(desde), hasta: menosUno(hasta) };
+}
+
 export function periodoAnterior(r: RangoConsulta): { desde: string; hasta: string } {
+  // 🔴 CALENDARIO_SIMPLE_2026_10 (Daniel, 5-oct-2026): un rango se compara contra
+  // los MISMOS días del año pasado (15–30 sep 2026 → 15–30 sep 2025), como el
+  // resto del sistema, no contra los días de justo antes.
+  if (CALENDARIO_SIMPLE_2026_10) return mismosDiasAnioPasado(r.desde, r.hasta);
   if (r.atajo === "anio") {
     const y = Number(r.desde.slice(0, 4)) - 1;
     const hasta = r.hasta.slice(5) === "02-29" ? `${y}-02-28` : `${y}${r.hasta.slice(4)}`;

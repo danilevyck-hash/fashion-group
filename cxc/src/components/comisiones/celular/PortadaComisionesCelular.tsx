@@ -50,7 +50,7 @@ import {
   mesEnPalabras,
   mesesAlrededor,
 } from "@/lib/comisiones/celular";
-import { ComisionesPeriodo } from "../ComisionesPeriodo";
+import { ComisionesPeriodo, BotonRangoComisiones } from "../ComisionesPeriodo";
 import type { RangoConsulta } from "@/lib/comisiones/vendedores-rango";
 import { CALENDARIO_SIMPLE_2026_10 } from "@/lib/ui/calendario-simple";
 
@@ -112,6 +112,8 @@ export function PortadaComisionesCelular({
   availableYears = [],
 }: Props) {
   const [menu, setMenu] = useState(false);
+  /** CALENDARIO_SIMPLE_2026_10 con rango: empresa, mes y «Rango» en una línea. */
+  const simple = CALENDARIO_SIMPLE_2026_10 && !!onRango;
   const [descarga, setDescarga] = useState(false);
   const [eligiendoEmpresa, setEligiendoEmpresa] = useState(false);
 
@@ -183,23 +185,25 @@ export function PortadaComisionesCelular({
       {/* 🔴 UNA FILA: la empresa y el mes con sus flechas. */}
       {/* CALENDARIO_SIMPLE_2026_10: la empresa arriba y, debajo, el mes con
           «Rango» en la misma línea (con los dos al lado no entraba la empresa). */}
-      <div className={`mt-3 flex items-center justify-between gap-2 px-4 ${CALENDARIO_SIMPLE_2026_10 && onRango ? "flex-wrap [&>[data-chip-vista]]:basis-full [&>[data-chip-vista]]:flex-none" : ""}`}>
+      {/* CALENDARIO_SIMPLE_2026_10: empresa, ‹ Oct 2026 › y «Rango» en UNA línea
+          (la empresa en 13 px; si un nombre largo no entra, se corta con «…»). */}
+      <div className={`mt-3 flex items-center justify-between px-4 ${simple ? "gap-1.5" : "gap-2"}`}>
         <button
           type="button"
           onClick={() => setEligiendoEmpresa(true)}
           data-chip-vista
-          className="min-h-[36px] min-w-0 flex-1 truncate rounded-full border border-gray-300 bg-white px-3 text-left text-[14px] font-medium text-gray-900 active:opacity-60"
+          className={`min-h-[36px] min-w-0 flex-1 truncate rounded-full border border-gray-300 bg-white text-left font-medium text-gray-900 active:opacity-60 ${simple ? "px-2.5 text-[13px]" : "px-3 text-[14px]"}`}
         >
           {etiquetaVista} ▾
         </button>
         {conPeriodo && (
-          <div className="flex shrink-0 items-center gap-1" data-mes-celular>
+          <div className={`flex shrink-0 items-center ${simple ? "gap-0.5" : "gap-1"}`} data-mes-celular>
             {!rango && (
             <button
               type="button"
               aria-label={anterior ? `Ir a ${mesEnPalabras(anterior)}` : "Mes anterior"}
               onClick={() => irA(anterior)}
-              className="flex min-h-[36px] min-w-[32px] items-center justify-center text-[18px] text-blue-600 active:opacity-60"
+              className={`flex min-h-[36px] items-center justify-center text-[18px] text-blue-600 active:opacity-60 ${simple ? "min-w-[24px]" : "min-w-[32px]"}`}
             >
               ‹
             </button>
@@ -213,6 +217,7 @@ export function PortadaComisionesCelular({
                 rango={rango}
                 onRango={onRango}
                 alDerecha
+                rangoAparte={simple}
               />
             ) : (
             <span className="whitespace-nowrap text-[14px] font-medium text-gray-900">
@@ -220,17 +225,22 @@ export function PortadaComisionesCelular({
             </span>
             )}
             {/* 🔴 NUNCA AL FUTURO: sin mes siguiente, la flecha no se dibuja. */}
+            {/* Sin mes siguiente la › no se dibuja, pero queda su lugar: así
+                «Rango» no salta al cambiar de mes. */}
             {rango ? null : siguiente ? (
               <button
                 type="button"
                 aria-label={`Ir a ${mesEnPalabras(siguiente)}`}
                 onClick={() => irA(siguiente)}
-                className="flex min-h-[36px] min-w-[32px] items-center justify-center text-[18px] text-blue-600 active:opacity-60"
+                className={`flex min-h-[36px] items-center justify-center text-[18px] text-blue-600 active:opacity-60 ${simple ? "min-w-[24px]" : "min-w-[32px]"}`}
               >
                 ›
               </button>
             ) : (
-              <span className="min-w-[32px]" aria-hidden />
+              <span className={simple ? "min-w-[24px]" : "min-w-[32px]"} aria-hidden />
+            )}
+            {simple && onRango && (
+              <BotonRangoComisiones rango={rango ?? null} onRango={onRango} onVolver={() => onPeriodo(year, mes)} />
             )}
           </div>
         )}

@@ -17,11 +17,29 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import * as React from "react";
-import { DayPicker } from "react-day-picker";
+import { DayPicker, type ClassNames } from "react-day-picker";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
+
+const FLECHA_MES =
+  "absolute top-0 inline-flex h-11 w-11 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-50 active:scale-[0.97] disabled:opacity-30";
+
+/**
+ * CALENDARIO_SIMPLE_2026_10: ‹ Octubre 2026 › en UNA línea (`navLayout="around"`
+ * pone las flechas dentro del mes) y, sin mes siguiente, la › NO aparece —
+ * queda su lugar, para que nada salte al cambiar de mes.
+ */
+export const CALENDARIO_SIMPLE_PROPS: { navLayout: "around"; classNames: Partial<ClassNames> } = {
+  navLayout: "around",
+  classNames: {
+    month: "relative",
+    month_grid: "mt-2 w-full border-collapse",
+    button_previous: `${FLECHA_MES} left-1 aria-disabled:invisible`,
+    button_next: `${FLECHA_MES} right-1 aria-disabled:invisible`,
+  },
+};
 
 export function Calendar({ className, classNames, ...props }: CalendarProps) {
   return (
