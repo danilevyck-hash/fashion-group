@@ -94,9 +94,9 @@ export function PeriodoSelect({ valor, opciones, onChange, disabled, anterior, s
       type="button"
       aria-label="Mes siguiente"
       data-flecha="siguiente"
-      // `compacto`: sin mes siguiente (el mes en curso) la › no aparece, pero
-      // queda su lugar — así «Rango» no salta al cambiar de mes.
-      className={`${FLECHA} ${compacto && !siguiente ? "invisible" : ""}`}
+      // `compacto`: sin mes siguiente (el mes en curso) la › no aparece y no
+      // deja hueco: «Rango» va pegado (Daniel, 5-oct-2026).
+      className={`${FLECHA} ${compacto && !siguiente ? "hidden" : ""}`}
       disabled={disabled || !siguiente}
       onClick={() => siguiente && onChange(siguiente)}
     >

@@ -48,7 +48,7 @@ import {
   mesDelPeriodo, TIPOS_POR_TAB,
 } from "@/lib/multifashion/periodo";
 import {
-  MULTIFASHION_CELULAR, diasDelMesMirado, encabezadoCelular, esElMesDeHoy,
+  MULTIFASHION_CELULAR, diasDelMesMirado, encabezadoCelular, esElMesDeHoy, etiquetaMesCorto,
   esPantallaCelular, mesAnterior, mesSiguiente, subtituloDelMes, subtituloHoyAyer, MF_DIA_2026_10, type ClaveRenglon,
 } from "@/lib/multifashion/celular";
 import { useVentaHoy } from "@/lib/multifashion/venta-hoy-cliente";
@@ -171,7 +171,12 @@ export function MultifashionShell({
     setSubtabRaw(clave);
   }, [setPantallaRaw, setSubtabRaw]);
 
-  const encabezado = encabezadoCelular({ tab, pantalla: pantallaCel, periodo, corte });
+  const encabezadoBase = encabezadoCelular({ tab, pantalla: pantallaCel, periodo, corte });
+  // CALENDARIO_SIMPLE_2026_10: con un rango, «‹» dice el MES al que vuelve (el
+  // Resumen del mes del rango), no «‹ Rango de fechas».
+  const encabezado = CALENDARIO_SIMPLE_2026_10 && periodo.tipo === "rango" && tab !== "resumen"
+    ? { ...encabezadoBase, atras: etiquetaMesCorto(ajustarPeriodo(periodo, "resumen", corte), corte) }
+    : encabezadoBase;
   const irAtras = useCallback(() => {
     if (tab !== "resumen") { setSubtabRaw("resumen"); return; }
     if (pantallaCel === "anio") { setPantallaRaw("inicio"); return; }
@@ -403,8 +408,15 @@ export function MultifashionShell({
           {/* 🔴 Vendedoras, Productos y Clientes eligen su período también en
               el celular, con ‹ › (5-oct-2026). El Resumen ya tiene sus flechas
               arriba. */}
-          {tab !== "resumen" && <div className="mt-2">{selectorPeriodo}</div>}
-          {(subtituloCel || frescuraCel) && (
+          {/* CALENDARIO_SIMPLE_2026_10: el período y «Actualizado 2:00 pm ↻» en
+              UNA línea si caben (si no, la frescura baja sola). */}
+          {tab !== "resumen" && CALENDARIO_SIMPLE_2026_10 ? (
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+              {selectorPeriodo}
+              {frescuraCel && <span className="text-sm text-gray-500">{frescuraCel}</span>}
+            </div>
+          ) : tab !== "resumen" && <div className="mt-2">{selectorPeriodo}</div>}
+          {(subtituloCel || (frescuraCel && !(tab !== "resumen" && CALENDARIO_SIMPLE_2026_10))) && (
             <p data-celular="subtitulo" className="mt-0.5 text-sm text-gray-500 tabular-nums">
               {subtituloCel}{subtituloCel && frescuraCel && " · "}{frescuraCel}
             </p>

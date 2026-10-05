@@ -225,7 +225,7 @@ interface Props {
   onQuitar?: () => void;
   /** Con `onQuitar`: el botón se dibuja como el de la barra. */
   enBarra?: boolean;
-  /** CALENDARIO_SIMPLE_2026_10: los días después de hoy no aparecen (ventas). */
+  /** CALENDARIO_SIMPLE_2026_10: los días después de hoy van apagados (ventas). */
   sinFuturo?: boolean;
 }
 

@@ -93,3 +93,10 @@ describe("el botón «Rango de fechas» con un rango", () => {
     expect(etiquetaRangoCorta("2026-09-15", "2026-09-15")).toBe("15 sep");
   });
 });
+
+describe("el pie del rango", () => {
+  it("«16 días · vs 15–30 sep 2025»", async () => {
+    const { pieDelRango } = await import("@/components/comisiones/ComisionesVendedoresRango");
+    expect(pieDelRango("2026-09-15", "2026-09-30", { desde: "2025-09-15", hasta: "2025-09-30" })).toBe("16 días · vs 15–30 sep 2025");
+  });
+});

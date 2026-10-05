@@ -63,8 +63,8 @@ export interface Props {
   onAncla?: (ancla: string | null) => void;
   onMesVisible?: (primerDia: string, ultimoDia: string) => void;
   /**
-   * CALENDARIO_SIMPLE_2026_10: el último día que EXISTE (hoy, en ventas). Los
-   * siguientes no aparecen —celdas vacías— y no se navega a meses futuros.
+   * CALENDARIO_SIMPLE_2026_10: el último día que se puede elegir (hoy, en
+   * ventas). Los siguientes se ven, apagados y sin poder tocarse.
    */
   ultimoDia?: string | null;
 }
@@ -121,12 +121,12 @@ export default function CalendarioRango({
     <Calendar
       // CALENDARIO_SIMPLE_2026_10: ‹ Octubre 2026 › en una línea y sin futuro.
       {...(CALENDARIO_SIMPLE_2026_10 ? CALENDARIO_SIMPLE_PROPS : {})}
-      {...(CALENDARIO_SIMPLE_2026_10 && ultimoDia ? { hidden: { after: deIso(ultimoDia) }, endMonth: deIso(ultimoDia) } : {})}
+      {...(CALENDARIO_SIMPLE_2026_10 && ultimoDia ? { disabled: { after: deIso(ultimoDia) } } : {})}
       mode="range"
       selected={seleccion}
       defaultMonth={deIso(desde || aIso(new Date()))}
       numberOfMonths={1}
-      onDayClick={tocar}
+      onDayClick={(d, m) => { if (!m.disabled) tocar(d); }}
       // ⚠️ El preview es de DESKTOP. En un teléfono no hay hover: el dedo toca
       // y listo, así que `onDayMouseEnter` no se dispara y no hay nada que
       // apagar. No hace falta preguntar por el ancho.

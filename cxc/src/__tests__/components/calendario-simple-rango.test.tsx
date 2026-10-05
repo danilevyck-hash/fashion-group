@@ -62,15 +62,16 @@ describe("el botón de la barra", () => {
 });
 
 describe("sin futuro (ventas)", () => {
-  it("en el mes en curso no aparecen los días después de hoy ni la › al mes siguiente", async () => {
-    render(<RangoFechas sinFuturo desde="2026-10-01" hasta="2026-10-05" label={null} onChange={() => {}} />);
+  it("los días después de hoy se ven apagados y tocarlos no hace nada", async () => {
+    const onChange = vi.fn();
+    render(<RangoFechas sinFuturo desde="2026-10-01" hasta="2026-10-05" label={null} onChange={onChange} />);
     fireEvent.click(screen.getAllByRole("button", { name: /oct/ })[0]);
-    await dia(5);
-    expect(screen.queryAllByRole("button", { name: /^6 de octubre de 2026/ })).toHaveLength(0);
-    expect(screen.queryAllByRole("button", { name: /^1 de noviembre de 2026/ })).toHaveLength(0);
-    const sig = screen.getAllByRole("button", { name: "Mes siguiente" })[0];
-    expect(sig.getAttribute("aria-disabled")).toBe("true");
-    expect(sig.className).toContain("aria-disabled:invisible");
+    const seis = await dia(6);
+    expect(seis.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(await dia(3));
+    fireEvent.click(seis);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByText("Ahora el último día")).toBeTruthy();
   });
 });
 

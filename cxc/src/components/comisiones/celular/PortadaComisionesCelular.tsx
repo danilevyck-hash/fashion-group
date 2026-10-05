@@ -225,8 +225,8 @@ export function PortadaComisionesCelular({
             </span>
             )}
             {/* 🔴 NUNCA AL FUTURO: sin mes siguiente, la flecha no se dibuja. */}
-            {/* Sin mes siguiente la › no se dibuja, pero queda su lugar: así
-                «Rango» no salta al cambiar de mes. */}
+            {/* Sin mes siguiente la › no se dibuja; con CALENDARIO_SIMPLE_2026_10
+                tampoco deja hueco: «Rango» va pegado. */}
             {rango ? null : siguiente ? (
               <button
                 type="button"
@@ -236,8 +236,8 @@ export function PortadaComisionesCelular({
               >
                 ›
               </button>
-            ) : (
-              <span className={simple ? "min-w-[24px]" : "min-w-[32px]"} aria-hidden />
+            ) : simple ? null : (
+              <span className="min-w-[32px]" aria-hidden />
             )}
             {simple && onRango && (
               <BotonRangoComisiones rango={rango ?? null} onRango={onRango} onVolver={() => onPeriodo(year, mes)} />

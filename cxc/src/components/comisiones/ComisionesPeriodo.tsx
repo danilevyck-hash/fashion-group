@@ -252,6 +252,8 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
             <div className="grid grid-cols-3 gap-1">
               {MESES_CORTOS.map((corto, i) => {
                 const m = i + 1;
+                // CALENDARIO_SIMPLE_2026_10: los meses futuros no aparecen.
+                if (CALENDARIO_SIMPLE_2026_10 && mesApagado(m)) return null;
                 const activo = !enRango && m === mes;
                 return (
                   <button

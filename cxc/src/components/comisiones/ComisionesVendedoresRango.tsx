@@ -9,7 +9,8 @@ import { fmtMoney, fmtPorcentaje } from "@/lib/ventas/format";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { ROTULO_VER_MENOS, rotuloVerNoSePagan, sePagaComision } from "@/lib/comisiones/sin-pago";
 import { etiquetaRango } from "@/components/ui/RangoFechas";
-import { porVendedor, type FilaRango, type FilaVendedor, type RangoConsulta } from "@/lib/comisiones/vendedores-rango";
+import { CALENDARIO_SIMPLE_2026_10, etiquetaRangoCorta } from "@/lib/ui/calendario-simple";
+import { diasDelRango, porVendedor, type FilaRango, type FilaVendedor, type RangoConsulta } from "@/lib/comisiones/vendedores-rango";
 import { esVistaDeEmpresa, esVistaMultifashion } from "@/lib/comisiones/vistas";
 import { variacionPct } from "@/lib/variacion";
 
@@ -74,9 +75,12 @@ export function ComisionesVendedoresRango({ vista, rango }: { vista: string; ran
 
   return (
     <div className="mt-3" data-vendedores-rango>
+      {/* CALENDARIO_SIMPLE_2026_10: la línea se va al pie, corta. */}
+      {!CALENDARIO_SIMPLE_2026_10 && (
       <p className="mb-2 px-1 text-sm text-gray-500">
         {etiquetaRango(rango.desde, rango.hasta)} · contra {etiquetaRango(datos.anterior.desde, datos.anterior.hasta).split(" · ")[0]}
       </p>
+      )}
       {filas.length === 0 ? (
         <p className="rounded-lg border border-gray-200 p-4 text-sm text-gray-600">Sin ventas en el período</p>
       ) : (
@@ -125,6 +129,19 @@ export function ComisionesVendedoresRango({ vista, rango }: { vista: string; ran
           </table>
         </div>
       )}
+      {CALENDARIO_SIMPLE_2026_10 && (
+        <p className="mt-2 px-1 text-xs text-gray-500" data-pie-rango>
+          {pieDelRango(rango.desde, rango.hasta, datos.anterior)}
+        </p>
+      )}
     </div>
   );
+}
+
+/** «16 días · vs 15–30 sep 2025». */
+export function pieDelRango(desde: string, hasta: string, anterior: { desde: string; hasta: string }): string {
+  const n = diasDelRango(desde, hasta);
+  const a = etiquetaRangoCorta(anterior.desde, anterior.hasta);
+  const anio = anterior.desde.slice(0, 4) === anterior.hasta.slice(0, 4) ? ` ${anterior.desde.slice(0, 4)}` : "";
+  return `${n} ${n === 1 ? "día" : "días"} · vs ${a}${anio}`;
 }
