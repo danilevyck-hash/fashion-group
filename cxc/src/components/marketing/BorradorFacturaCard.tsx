@@ -14,6 +14,7 @@ import {
   calcularItbms,
   calcularTotalFactura,
 } from "@/lib/marketing-calc";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 export type EstadoBorrador =
   | { tipo: "ocr-pendiente" }       // PDF subido, esperando OCR
@@ -209,8 +210,7 @@ export function BorradorFacturaCard({
           <label className="block text-xs text-gray-500 mb-1">
             Fecha<span className="text-red-500 ml-0.5">*</span>
           </label>
-          <input
-            type="date"
+          <CampoFecha
             value={borrador.fechaFactura}
             onChange={(e) =>
               onChange(borrador.cardId, { fechaFactura: e.target.value })

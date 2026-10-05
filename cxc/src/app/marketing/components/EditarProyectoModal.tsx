@@ -10,6 +10,7 @@ import { useToast } from "@/components/ToastSystem";
 import ClientePicker from "@/components/ClientePicker";
 import { AyudaClienteVinculado } from "@/components/marketing/AyudaClienteVinculado";
 import type { MkMarca, ProyectoConMarcas } from "@/lib/marketing/types";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 interface Props {
   open: boolean;
@@ -133,9 +134,8 @@ export default function EditarProyectoModal({
           <label htmlFor="ed-fecha" className="block text-xs text-gray-500 mb-1">
             Fecha de inicio <span className="text-red-500">*</span>
           </label>
-          <input
+          <CampoFecha
             id="ed-fecha"
-            type="date"
             value={fechaInicio}
             onChange={(e) => setFechaInicio(e.target.value)}
             disabled={guardando}

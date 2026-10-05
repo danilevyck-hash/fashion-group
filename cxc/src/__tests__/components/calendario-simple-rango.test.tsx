@@ -1,0 +1,50 @@
+// 🔴 CALENDARIO_SIMPLE_2026_10 PRENDIDO en RangoFechas: la guía de arriba, los
+// dos toques que aplican y cierran, y los atajos de un toque.
+
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+
+vi.mock("@/lib/ui/calendario-simple", async (orig) => ({
+  ...(await orig<typeof import("@/lib/ui/calendario-simple")>()),
+  CALENDARIO_SIMPLE_2026_10: true,
+}));
+vi.mock("@/lib/fecha-panama", () => ({ hoyPanama: () => "2026-10-05" }));
+
+import RangoFechas from "@/components/ui/RangoFechas";
+
+const abrir = (onChange: (d: string, h: string) => void) => {
+  render(<RangoFechas desde="2026-10-01" hasta="2026-10-05" label={null} onChange={onChange} />);
+  fireEvent.click(screen.getAllByRole("button", { name: /oct/ })[0]);
+};
+const dia = async (n: number) =>
+  (await screen.findAllByRole("button", { name: new RegExp(`^${n} de octubre de 2026`) }))[0];
+
+describe("rango en dos toques", () => {
+  it("guía, ordena solo, aplica y cierra", async () => {
+    const onChange = vi.fn();
+    abrir(onChange);
+    expect(screen.getByText("Toca el primer día")).toBeTruthy();
+    fireEvent.click(await dia(20));
+    expect(screen.getByText("Ahora el último día")).toBeTruthy();
+    fireEvent.click(await dia(8));
+    expect(onChange).toHaveBeenCalledWith("2026-10-08", "2026-10-20");
+    await waitFor(() => expect(screen.queryByText("Ahora el último día")).toBeNull());
+    expect(screen.queryByText("Toca el primer día")).toBeNull();
+  });
+
+  it("el mismo día dos veces es ese día solo", async () => {
+    const onChange = vi.fn();
+    abrir(onChange);
+    fireEvent.click(await dia(14));
+    fireEvent.click(await dia(14));
+    expect(onChange).toHaveBeenCalledWith("2026-10-14", "2026-10-14");
+  });
+
+  it("un atajo aplica y cierra al instante", async () => {
+    const onChange = vi.fn();
+    abrir(onChange);
+    fireEvent.click(screen.getByRole("button", { name: "Mes pasado" }));
+    expect(onChange).toHaveBeenCalledWith("2026-09-01", "2026-09-30");
+    await waitFor(() => expect(screen.queryByText("Toca el primer día")).toBeNull());
+  });
+});

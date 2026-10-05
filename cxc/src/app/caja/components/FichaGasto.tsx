@@ -8,6 +8,7 @@ import AutocompleteInput from "./AutocompleteInput";
 import ZonaFotos from "./ZonaFotos";
 import { centavos } from "@/lib/caja/dinero";
 import { accionesDelGasto, fotosSoloVer } from "@/lib/caja/menu-del-gasto";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 /**
  * UN GASTO EN PANTALLA ANGOSTA — la ficha (celular e iPad, por debajo de
@@ -77,8 +78,7 @@ export default function FichaGasto({
         className="rounded-lg p-4 space-y-3"
         style={{ background: "var(--caja-bg-page)", border: "1px solid var(--caja-accent)" }}
       >
-        <input
-          type="date"
+        <CampoFecha
           aria-label="Fecha"
           value={editGasto.fecha || ""}
           onChange={(e) => setEditGasto({ ...editGasto, fecha: e.target.value })}

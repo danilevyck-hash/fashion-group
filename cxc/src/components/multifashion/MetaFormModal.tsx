@@ -39,6 +39,7 @@ import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { fmtMoney } from "@/lib/ventas/format";
 import type { VendedoraAgrupada } from "@/lib/multifashion/metas-clave";
 import type { MetaConAvance, TipoMeta } from "@/lib/multifashion/metas-lectura";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 export interface MetaGuardar {
   id?: string;
@@ -275,9 +276,8 @@ export function MetaFormModal({
               <label htmlFor="meta-desde" className="mb-1 block text-xs font-medium text-gray-700">
                 Desde
               </label>
-              <input
+              <CampoFecha
                 id="meta-desde"
-                type="date"
                 value={desde}
                 onChange={(e) => setDesde(e.target.value)}
                 className={CAMPO}
@@ -287,9 +287,8 @@ export function MetaFormModal({
               <label htmlFor="meta-hasta" className="mb-1 block text-xs font-medium text-gray-700">
                 Hasta
               </label>
-              <input
+              <CampoFecha
                 id="meta-hasta"
-                type="date"
                 value={hasta}
                 onChange={(e) => setHasta(e.target.value)}
                 className={CAMPO}

@@ -19,6 +19,7 @@ import {
 } from "@/lib/buscar-en-lista";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { accionesDelGasto, fotosSoloVer } from "@/lib/caja/menu-del-gasto";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 interface Props {
   gastos: CajaGasto[];
@@ -391,8 +392,7 @@ export default function GastoTable({
                         }}
                       >
                         <td className="py-2 pr-1 px-4">
-                          <input
-                            type="date"
+                          <CampoFecha
                             value={editGasto.fecha || ""}
                             onChange={(e) => setEditGasto({ ...editGasto, fecha: e.target.value })}
                             className="w-full caja-mono py-1 text-xs outline-none bg-transparent"

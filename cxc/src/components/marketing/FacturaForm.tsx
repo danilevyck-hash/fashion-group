@@ -33,6 +33,7 @@ import {
 } from "@/lib/marketing-calc";
 import { MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
 import { Aviso } from "@/components/ui/Aviso";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 export interface FacturaFormValues {
   numeroFactura: string;
@@ -592,9 +593,8 @@ export function FacturaForm({
               >
                 Fecha<span className="text-red-500 ml-0.5">*</span>
               </label>
-              <input
+              <CampoFecha
                 id="factura-fecha"
-                type="date"
                 value={fechaFactura}
                 onChange={(e) => setFechaFactura(e.target.value)}
                 required

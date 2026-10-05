@@ -31,6 +31,7 @@ import { useAutofocusPrimerCampo } from "@/lib/hooks/useAutofocusPrimerCampo";
 import { limpiarBorradoresViejos } from "@/lib/borradores-viejos";
 import { ALL_COMPANIES } from "@/lib/companies";
 import { LS_CHEQUE_VENDEDORES, VENDEDORES_POR_DEFECTO } from "@/lib/cheques-vendedores";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 export interface ChequeFormValues {
   cliente: string;
@@ -335,8 +336,7 @@ export default function ChequeFormModal({
             </Campo>
 
             <Campo label="Fecha de depósito" requerido error={err("fecha", v.fecha_deposito)}>
-              <input
-                type="date"
+              <CampoFecha
                 aria-label="Fecha de depósito"
                 value={v.fecha_deposito}
                 onChange={(e) => set("fecha_deposito", e.target.value)}

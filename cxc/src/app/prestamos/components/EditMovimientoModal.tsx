@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { CONCEPTO_PAGO, ORIGENES_PAGO, etiquetaConcepto } from "@/lib/prestamos-conceptos";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 interface Props {
   show: boolean;
@@ -53,7 +54,7 @@ export default function EditMovimientoModal({
           </div>
           <div>
             <label className="text-xs text-gray-400 uppercase">Fecha *</label>
-            <input type="date" max={hoy} value={emFecha} onChange={e => onChangeFecha(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+            <CampoFecha max={hoy} value={emFecha} onChange={e => onChangeFecha(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
           </div>
           <div>
             <label className="text-xs text-gray-400 uppercase">Monto ($) *</label>

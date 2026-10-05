@@ -61,6 +61,10 @@ import { CalendarDays } from "lucide-react";
 // archivo trae `react-day-picker` al bundle inicial y anula el `dynamic()`.
 import { aIso, deIso } from "./rango-fechas-iso";
 import { vidrioSobre, conVidrio, CLASE_VIDRIO, RADIO_VIDRIO } from "@/lib/ui/vidrio";
+import {
+  CALENDARIO_SIMPLE_2026_10, GUIA_PRIMER_DIA, GUIA_ULTIMO_DIA, ATAJOS_FECHA, rangoDeAtajoFecha,
+} from "@/lib/ui/calendario-simple";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 const CalendarioRango = dynamic(() => import("./CalendarioRango"), {
   ssr: false,
@@ -111,6 +115,40 @@ export const ANCHO_CALENDARIO =
   ANCHO_DIA_CALENDARIO * COLUMNAS_CALENDARIO + PADDING_PANEL + BORDE_PANEL + BARRA_DE_SCROLL;
 /** 6 semanas + encabezado + el título: alcanza sin scroll para cualquier mes. */
 const ALTO_CALENDARIO = 420;
+/** CALENDARIO_SIMPLE_2026_10: la guía y los atajos van encima del mes. */
+export const ALTO_GUIA_Y_ATAJOS = 120;
+
+/**
+ * 🔴 CALENDARIO_SIMPLE_2026_10 — los atajos de un toque. Se aplican y cierran
+ * al instante, como el segundo toque del calendario. Los usa también
+ * `CampoFecha` (solo Hoy y Ayer, que son días sueltos).
+ */
+export function Atajos({ claves, onElegir, enRango }: {
+  claves?: readonly string[];
+  onElegir: (desde: string, hasta: string) => void;
+  /** El atajo cae dentro de los límites del campo (min/max). */
+  enRango?: (desde: string, hasta: string) => boolean;
+}) {
+  const hoy = hoyPanama();
+  return (
+    <div className="flex flex-wrap gap-1.5 px-1 pb-2" data-atajos-calendario>
+      {ATAJOS_FECHA.filter((a) => !claves || claves.includes(a.clave)).map((a) => {
+        const r = rangoDeAtajoFecha(a.clave, hoy);
+        if (enRango && !enRango(r.desde, r.hasta)) return null;
+        return (
+          <button
+            key={a.clave}
+            type="button"
+            onClick={() => onElegir(r.desde, r.hasta)}
+            className="inline-flex min-h-[44px] items-center rounded-full bg-gray-100 px-3 text-sm text-gray-700 transition hover:bg-gray-200 active:scale-[0.97] lg:min-h-9"
+          >
+            {a.rotulo}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 /** «28 oct – 10 nov 2026 · 14 días». El año se dice UNA vez si es el mismo. */
 export function etiquetaRango(desde: string, hasta: string): string {
@@ -220,13 +258,16 @@ export default function RangoFechas({
       try { localStorage.setItem(`fg_last_${recordarComo}`, `${d}|${h}`); } catch { /* modo privado */ }
     }
     setAbierto(false);
+    setAncla(null);
   }, [onChange, recordarComo]);
 
 
   // 🔴 DICE CUÁL DE LAS DOS FECHAS SE ESTÁ ELIGIENDO. Con el rango a medias, el
   // encabezado es lo único que distingue «ya se eligió el inicio» de «no pasó
   // nada».
-  const titulo = ancla
+  const titulo = CALENDARIO_SIMPLE_2026_10 && !inline
+    ? (ancla ? GUIA_ULTIMO_DIA : GUIA_PRIMER_DIA)
+    : ancla
     ? `${etiquetaRango(ancla, ancla).split(" · ")[0]} — ahora selecciona el último día`
     : vacio
       ? "Selecciona el primer día"
@@ -318,12 +359,13 @@ export default function RangoFechas({
           anclaRef={anclaRef}
           onCerrar={() => { setAbierto(false); setAncla(null); }}
           ancho={ANCHO_CALENDARIO}
-          altoDeseado={ALTO_CALENDARIO}
+          altoDeseado={ALTO_CALENDARIO + (CALENDARIO_SIMPLE_2026_10 ? ALTO_GUIA_Y_ATAJOS : 0)}
           className={vidrioSobre("rounded-xl border border-gray-200 bg-white p-3 shadow-lg")}
         >
           {/* El título solo mientras se está eligiendo: cerrado, el botón ya lo
               dice y repetirlo era ruido (se veía duplicado en la captura). */}
-          {ancla && <p className="px-1 pb-2 text-sm font-medium text-gray-900">{titulo}</p>}
+          {(ancla || CALENDARIO_SIMPLE_2026_10) && <p className="px-1 pb-2 text-sm font-medium text-gray-900" data-guia-calendario>{titulo}</p>}
+          {CALENDARIO_SIMPLE_2026_10 && <Atajos onElegir={aplicar} />}
           {/* 🔴 CENTRADO Y CON SU PROPIO DESLIZAMIENTO (25-sep-2026): con el
               ancho ya calculado el mes entra entero, y si algún día una pantalla
               angosta lo apretara, se desliza ESTA caja y no se recorta una
@@ -339,7 +381,7 @@ export default function RangoFechas({
           <div className="absolute inset-0 bg-black/40" onClick={() => { setAbierto(false); setAncla(null); }} />
           <div className={conVidrio("absolute inset-x-0 bottom-0 flex max-h-[88vh] flex-col rounded-t-2xl bg-white shadow-xl", `absolute inset-x-2 bottom-2 flex max-h-[88vh] flex-col ${CLASE_VIDRIO} ${RADIO_VIDRIO}`)}>
             <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-              <span className="text-sm font-medium text-gray-900">{titulo}</span>
+              <span className="text-sm font-medium text-gray-900" data-guia-calendario>{titulo}</span>
               <button
                 type="button"
                 onClick={() => { setAbierto(false); setAncla(null); }}
@@ -349,7 +391,10 @@ export default function RangoFechas({
                 ✕
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto px-3 pb-8 pt-2">{cuerpo()}</div>
+            <div className="flex-1 overflow-y-auto px-3 pb-8 pt-2">
+              {CALENDARIO_SIMPLE_2026_10 && <Atajos onElegir={aplicar} />}
+              {CALENDARIO_SIMPLE_2026_10 ? <div className="flex justify-center">{cuerpo()}</div> : cuerpo()}
+            </div>
           </div>
         </div>,
         document.body,

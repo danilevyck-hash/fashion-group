@@ -22,6 +22,7 @@ import { CHIP_COBRADO, MARCAR_COBRADO } from "@/lib/reclamos/rotulos";
 import EnviarProveedorModal from "./EnviarProveedorModal";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 interface Props {
   current: Reclamo;
@@ -272,7 +273,7 @@ export default function ReclamoDetail({
               </label>
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-gray-500">Fecha de factura *</span>
-                <input type="date" value={editFechaFactura} onChange={(e) => setEditFechaFactura(e.target.value)} className="border-b border-gray-200 py-2.5 sm:py-1.5 text-base sm:text-sm outline-none min-h-[44px] xl:min-h-0" />
+                <CampoFecha value={editFechaFactura} onChange={(e) => setEditFechaFactura(e.target.value)} className="border-b border-gray-200 py-2.5 sm:py-1.5 text-base sm:text-sm outline-none min-h-[44px] xl:min-h-0" />
               </label>
               <div className="sm:col-span-2">
                 <FacturasChips facturas={editFacturas} onChange={setEditFacturas} />
@@ -428,7 +429,7 @@ export default function ReclamoDetail({
                 </label>
                 <label className="block">
                   <span className="text-xs text-gray-500">Fecha *</span>
-                  <input type="date" value={ncFecha} onChange={(e) => setNcFecha(e.target.value)} className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-base sm:text-sm outline-none focus:border-black transition min-h-[44px]" />
+                  <CampoFecha value={ncFecha} onChange={(e) => setNcFecha(e.target.value)} className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-base sm:text-sm outline-none focus:border-black transition min-h-[44px]" />
                 </label>
                 <label className="col-span-2 block">
                   <span className="text-xs text-gray-500">N° nota de crédito (opcional)</span>

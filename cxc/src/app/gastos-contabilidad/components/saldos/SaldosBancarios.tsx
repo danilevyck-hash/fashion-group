@@ -37,6 +37,7 @@ import {
   type CargaSaldo,
 } from "./types";
 import { Aviso } from "@/components/ui/Aviso";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 interface Props {
   bancos: BancoSaldo[];
@@ -196,8 +197,7 @@ function BancoRow({
             invalido ? "border-red-400 focus:border-red-500" : "border-gray-200 focus:border-black"
           }`}
         />
-        <input
-          type="date"
+        <CampoFecha
           value={fecha}
           max={hoyISO()}
           onChange={(e) => setFecha(e.target.value)}

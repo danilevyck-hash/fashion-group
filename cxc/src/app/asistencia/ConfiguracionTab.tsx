@@ -151,6 +151,7 @@ import HorariosTab from "./HorariosTab";
 import { FormatoTiempoSelector } from "@/components/asistencia/FormatoTiempoSelector";
 import FeriadosTab from "./FeriadosTab";
 import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 /** 🔴 5a (29-sep-2026): las tres vistas de ⚙ Configuración. */
 export type AjusteDeAsistencia = "horarios" | "feriados" | "reglas";
@@ -1803,8 +1804,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                                 texto="Fecha de ingreso"
                                 ayuda="Opcional. El sueldo de la quincena no se reparte por días."
                               />
-                              <input
-                                type="date"
+                              <CampoFecha
                                 value={borrador.fechaIngreso}
                                 onChange={(e) =>
                                   setBorrador({ ...borrador, fechaIngreso: e.target.value })
@@ -2165,7 +2165,7 @@ function BloqueBaja({
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div>
           <Etiqueta texto="Fecha de salida" />
-          <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)}
+          <CampoFecha value={fecha} onChange={(e) => setFecha(e.target.value)}
             className={`${CAMPO} tabular-nums`} />
         </div>
         <div>

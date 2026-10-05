@@ -67,6 +67,7 @@ import {
 import { MOTIVOS_SALIDA, OPCION_MOTIVO } from "@/lib/asistencia/vigencia";
 import CedulaFoto from "./CedulaFoto";
 import type { HorarioDeLaPagina, PermisosDeLaPagina, PersonaDeLaPagina } from "./tipos";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 export interface BorradorFicha {
   codigo: string;
@@ -193,7 +194,7 @@ export default function FichaEditar({
           </select>
         </Campo>
         <Campo etiqueta="Fecha de ingreso" ayuda="Su primer día. De aquí salen sus días de vacaciones.">
-          <input type="date" className={CAMPO} value={b.fechaIngreso}
+          <CampoFecha className={CAMPO} value={b.fechaIngreso}
             onChange={(e) => set({ fechaIngreso: e.target.value })} />
         </Campo>
       </div>
@@ -389,7 +390,7 @@ export default function FichaEditar({
                 </p>
               )}
               <Campo etiqueta="Fecha de salida">
-                <input type="date" className={CAMPO} value={b.fechaSalida}
+                <CampoFecha className={CAMPO} value={b.fechaSalida}
                   disabled={!!permisos && !permisos.puedeDarDeBaja}
                   onChange={(e) => set({ fechaSalida: e.target.value })} />
               </Campo>

@@ -30,6 +30,7 @@ import { asuntoPorDefecto, loQueVaAdjunto, mensajePorDefecto } from "@/lib/recla
 import { notaEnPantalla } from "@/lib/reclamos/texto";
 import { validateComprobanteFile } from "../fotoUpload";
 import type { Foto, Seguimiento } from "../types";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // El envase
@@ -191,8 +192,7 @@ export function HojaCobrar({
         <li>
           <label className={`${FILA} text-[17px] text-gray-900`}>
             <span className="text-gray-500">Fecha</span>
-            <input
-              type="date"
+            <CampoFecha
               value={fecha}
               onChange={(e) => setFecha(e.target.value)}
               aria-label="Fecha del cobro"

@@ -10,6 +10,7 @@ import { Ayuda } from "@/components/shared/Ayuda";
 import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { ROTULO_TIPO, TIPOS_FERIADO, type TipoFeriado } from "@/lib/asistencia/feriados";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 interface Feriado { fecha: string; nombre: string; tipo?: TipoFeriado }
 
@@ -101,7 +102,7 @@ export default function FeriadosTab() {
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-[150px]">
             <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">Fecha</label>
-            <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className={campo} />
+            <CampoFecha value={fecha} onChange={(e) => setFecha(e.target.value)} className={campo} />
           </div>
           <div className="min-w-[200px] flex-1">
             <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">Descripción</label>

@@ -13,6 +13,7 @@ import ItemsEditor from "./ItemsEditor";
 import RenglonesDesdeFactura from "./RenglonesDesdeFactura";
 import { itemsAGuardar, resumenRenglones, type LineaFactura } from "@/lib/reclamos/lineas-factura";
 import { FALTA_PDF } from "@/lib/reclamos/validate";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 interface Props {
   fEmpresa: string;
@@ -153,7 +154,7 @@ export default function ReclamoForm({
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs text-gray-500">Fecha de factura *</label>
-              <input type="date" value={fFechaFactura} onChange={(e) => setFFechaFactura(e.target.value)} className="border-b border-gray-200 py-3 xl:py-1.5 text-base xl:text-sm text-black outline-none" />
+              <CampoFecha value={fFechaFactura} onChange={(e) => setFFechaFactura(e.target.value)} className="border-b border-gray-200 py-3 xl:py-1.5 text-base xl:text-sm text-black outline-none" />
             </div>
             {!esActiveShoes(fEmpresa) && (
               <div className="flex flex-col gap-1">

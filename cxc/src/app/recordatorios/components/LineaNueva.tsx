@@ -67,6 +67,7 @@ import {
   resolverCuando,
   type OpcionCuando,
 } from "@/lib/recordatorios/cuando";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 export interface RecordatorioRapido {
   texto: string;
@@ -202,8 +203,7 @@ export default function LineaNueva({
         ))}
 
         {cuando === "elegir" && (
-          <input
-            type="date"
+          <CampoFecha
             aria-label="Fecha"
             value={fechaElegida}
             min={hoy}
@@ -217,8 +217,7 @@ export default function LineaNueva({
         {puedeHasta && (
           <label className="inline-flex items-center gap-2 text-sm text-gray-500">
             Hasta
-            <input
-              type="date"
+            <CampoFecha
               aria-label="Hasta"
               value={hasta}
               min={resuelto.fecha || hoy}

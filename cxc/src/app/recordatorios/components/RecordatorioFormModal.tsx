@@ -39,6 +39,7 @@ import {
   type Destino,
   type Repeticion,
 } from "@/lib/recordatorios/recordatorio";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 export interface RecordatorioFormValues {
   fecha: string;
@@ -213,8 +214,7 @@ export default function RecordatorioFormModal({
           </Campo>
 
           <Campo label="Fecha">
-            <input
-              type="date"
+            <CampoFecha
               aria-label="Fecha"
               value={v.fecha}
               onChange={(e) => set("fecha", e.target.value)}
@@ -273,8 +273,7 @@ export default function RecordatorioFormModal({
               nada y el servidor lo descartaría igual. */}
           {v.repeticion !== "una_vez" && (
             <Campo label="Hasta" hint="— opcional; sin fecha, corre hasta que lo elimines">
-              <input
-                type="date"
+              <CampoFecha
                 aria-label="Hasta"
                 value={v.hasta}
                 min={v.fecha}

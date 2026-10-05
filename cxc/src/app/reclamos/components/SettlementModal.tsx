@@ -6,6 +6,7 @@ import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { validateComprobanteFile } from "./fotoUpload";
 import { COMPROBANTE_OBLIGATORIO, FALTA_COMPROBANTE, MARCAR_COBRADO } from "@/lib/reclamos/rotulos";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 export interface SettlementInput {
   monto: number;
@@ -207,8 +208,7 @@ export default function SettlementModal({
                 </label>
                 <label className="block">
                   <span className="text-xs text-gray-500">Fecha *</span>
-                  <input
-                    type="date"
+                  <CampoFecha
                     value={r.fecha}
                     onChange={(e) => updateRow(i, { fecha: e.target.value })}
                     className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-black transition"

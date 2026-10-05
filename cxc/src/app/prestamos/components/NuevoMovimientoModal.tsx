@@ -19,6 +19,7 @@ import {
 import { evaluarTopePrestamo, textoAvisoTope } from "@/lib/prestamos-tope";
 import { queFaltaParaRegistrar, textoFaltaRegistrar } from "@/lib/prestamos-registrar";
 import { MOV_TIPOS } from "./types";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 /**
  * REGISTRAR UN MOVIMIENTO — tres conceptos, y las preguntas justas.
@@ -191,7 +192,7 @@ export default function NuevoMovimientoModal({
 
         <div>
           <label className="text-xs text-gray-400 uppercase">Fecha *</label>
-          <input type="date" max={hoy} value={fecha} onChange={e => setFecha(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+          <CampoFecha max={hoy} value={fecha} onChange={e => setFecha(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
         </div>
 
         <div>

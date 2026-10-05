@@ -82,6 +82,7 @@ import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
 import { ESCALA_PANTALLA_2026_10 } from "@/lib/navegacion/escala-pantalla";
 import { CONTENIDO_ANCHO_2026_10, DOS_COLUMNAS_2026_10, DOS_COLUMNAS, EN_LA_DERECHA, CLASE_COLUMNA_QUE_ESCALA } from "@/lib/navegacion/contenido-ancho";
 import { bultosBloqueadosPorEtiquetas, observacionesConTraslado } from "@/lib/guias/etiquetas-por-envio";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 interface GuiaFormProps {
   editingId: string | null;
@@ -1019,9 +1020,8 @@ export default function GuiaForm({
         {/* Fecha · tipo de despacho · transportista: UNA línea; en el celular se apilan.
             En 2 columnas se apilan también, uno debajo del otro (docs/diseno.md regla 9). */}
         <div className={`mt-4 mb-8 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center${ancho ? " lg:flex-col lg:flex-nowrap lg:items-stretch" : ""}`}>
-          <input
+          <CampoFecha
             id="guia-fecha"
-            type="date"
             aria-label="Fecha"
             value={fecha}
             onChange={e => { setFecha(e.target.value); marcarTocado("fecha"); }}
@@ -1228,9 +1228,8 @@ export default function GuiaForm({
         ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-6">
           <Campo label="Fecha" requerido htmlFor="guia-fecha">
-            <input
+            <CampoFecha
               id="guia-fecha"
-              type="date"
               value={fecha}
               onChange={e => { setFecha(e.target.value); marcarTocado("fecha"); }}
               className={ctrl(hayError("fecha", fecha))}

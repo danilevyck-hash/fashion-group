@@ -74,6 +74,7 @@ import ElegirPersonaModal from "@/app/prestamos/components/ElegirPersonaModal";
 import NuevoMovimientoModal from "@/app/prestamos/components/NuevoMovimientoModal";
 import { useMovimientoForm } from "@/app/prestamos/components/useMovimientoForm";
 import { vidrioSobre } from "@/lib/ui/vidrio";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 interface FichaDeuda {
   id: string;
@@ -670,7 +671,7 @@ function AbonoModal(props: {
 
           <label className="block text-sm">
             <span className="text-gray-600">Fecha</span>
-            <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)}
+            <CampoFecha value={fecha} onChange={(e) => setFecha(e.target.value)}
               className="mt-1 min-h-[44px] w-full rounded-md border border-gray-300 px-3 text-sm" />
           </label>
 

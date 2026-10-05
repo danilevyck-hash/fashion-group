@@ -42,6 +42,7 @@ import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { estaRetirado } from "@/lib/comisiones/retirados";
 import { sePagaComision } from "@/lib/comisiones/sin-pago";
 import { fmtMoney } from "@/lib/ventas/format";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 /** Rótulo único de la sección. Nunca «descuento fijo». */
 export const ROTULO_DESCUENTOS = "Descuentos";
@@ -283,8 +284,7 @@ export function Descuentos({ onSaved }: { onSaved: (msg: string) => void }) {
         </label>
         <label className="block">
           <span className="mb-1 block text-[11px] uppercase tracking-wide text-gray-500">Desde</span>
-          <input
-            type="date"
+          <CampoFecha
             value={borrador.desde}
             onChange={(e) => setBorrador((b) => ({ ...b, desde: e.target.value }))}
             disabled={guardando}
@@ -296,8 +296,7 @@ export function Descuentos({ onSaved }: { onSaved: (msg: string) => void }) {
           <span className="mb-1 block text-[11px] uppercase tracking-wide text-gray-500">
             Hasta <span className="normal-case tracking-normal text-gray-400">(opcional)</span>
           </span>
-          <input
-            type="date"
+          <CampoFecha
             value={borrador.hasta}
             onChange={(e) => setBorrador((b) => ({ ...b, hasta: e.target.value }))}
             disabled={guardando}

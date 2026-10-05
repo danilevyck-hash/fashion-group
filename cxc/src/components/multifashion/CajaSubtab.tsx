@@ -11,6 +11,7 @@ import { fmt } from "@/lib/format";
 import { Ayuda } from "@/components/shared/Ayuda";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import type { SwitchDiarioVentas } from "@/lib/switch-api/client";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 interface CajaResponse {
   fecha: string;
@@ -62,9 +63,8 @@ export function CajaSubtab() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <label htmlFor="caja-fecha" className="text-xs uppercase tracking-[0.05em] text-gray-400">Día</label>
-          <input
+          <CampoFecha
             id="caja-fecha"
-            type="date"
             value={fecha}
             max={hoy}
             onChange={(e) => { if (e.target.value) setFecha(e.target.value); }}

@@ -183,6 +183,8 @@ import {
   textoDelDia31,
 } from "@/lib/asistencia/elegir-quincena";
 import { numeroSinNegrita } from "@/lib/navegacion/barra-controles-celular";
+import CampoFecha from "@/components/ui/CampoFecha";
+import { CALENDARIO_SIMPLE_2026_10 } from "@/lib/ui/calendario-simple";
 interface Respuesta {
   quincena: Quincena;
   periodo: Periodo;
@@ -1257,8 +1259,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           <label className="flex flex-col gap-1">
             <span className="text-xs text-gray-500">Cortar el reloj el</span>
             <div className="flex flex-wrap items-center gap-2">
-              <input
-                type="date"
+              <CampoFecha
                 value={corte}
                 min={elegido ? desde : undefined}
                 max={elegido ? hasta : undefined}
@@ -1303,6 +1304,17 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
             ══════════════════════════════════════════════════════════════════ */}
         {PLANILLA_UNIDA && ASISTENCIA_PANTALLA_2026_09 && (
           <div className="relative flex flex-wrap items-center gap-1">
+            {CALENDARIO_SIMPLE_2026_10 ? (
+              <CampoFecha
+                value={corte}
+                min={elegido ? desde : undefined}
+                max={elegido ? hasta : undefined}
+                onChange={(e) => elegirCorte(e.target.value)}
+                aria-label="Cortar el reloj el"
+                rotulo={lineaCorte ? `Reloj hasta ${fechaCortaCorte(lineaCorte.hastaQueLee)}` : "Cortar el reloj"}
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
+              />
+            ) : (<>
             <input
               ref={corteRef}
               type="date"
@@ -1327,6 +1339,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
               <CalendarDays className="h-4 w-4 shrink-0 text-gray-500" aria-hidden />
               {lineaCorte ? `Reloj hasta ${fechaCortaCorte(lineaCorte.hastaQueLee)}` : "Cortar el reloj"}
             </button>
+            </>)}
             {corte && (
               <button type="button" onClick={() => elegirCorte("")}
                 aria-label={VACIAR_EL_CORTE}

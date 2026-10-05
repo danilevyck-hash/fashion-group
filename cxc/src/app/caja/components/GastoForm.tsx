@@ -3,6 +3,7 @@
 import { ReactNode, useState, type CSSProperties } from "react";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { motivoParaNoCrear, normalizarCategoria } from "@/lib/caja/categorias";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 // Estilo que iguala el look de los <select> nativos de Caja para los
 // SearchableSelect (responsable/categoría).
@@ -145,8 +146,10 @@ function TextInput({
   ariaLabel?: string;
 }) {
   const [focus, setFocus] = useState(false);
+  // CampoFecha acepta las props de un input: con el interruptor apagado ES el input.
+  const Campo = (type === "date" ? CampoFecha : "input") as "input";
   return (
-    <input
+    <Campo
       type={type}
       value={value}
       aria-label={ariaLabel}

@@ -16,6 +16,7 @@ import {
 } from "@/lib/marketing/periodo";
 import type { ImpulsadoraConEstado } from "@/lib/marketing/types";
 import type { DatosDelGastoParaGuardar } from "@/lib/marketing/puerta-gasto";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 interface Props {
   impulsadora: ImpulsadoraConEstado;
@@ -254,9 +255,8 @@ export default function RegistrarPagoModal({
                 >
                   Desde
                 </label>
-                <input
+                <CampoFecha
                   id="periodo-desde"
-                  type="date"
                   value={desde}
                   onChange={(e) => setDesde(e.target.value)}
                   className="w-full min-h-[44px] rounded-md border border-gray-300 px-3 py-2 text-base sm:text-sm focus:border-black focus:outline-none"
@@ -269,9 +269,8 @@ export default function RegistrarPagoModal({
                 >
                   Hasta
                 </label>
-                <input
+                <CampoFecha
                   id="periodo-hasta"
-                  type="date"
                   value={hasta}
                   onChange={(e) => setHasta(e.target.value)}
                   className="w-full min-h-[44px] rounded-md border border-gray-300 px-3 py-2 text-base sm:text-sm focus:border-black focus:outline-none"

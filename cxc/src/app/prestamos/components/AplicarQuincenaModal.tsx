@@ -26,6 +26,7 @@ import {
   resumenAplicarQuincena,
   type PersonaQuincena,
 } from "@/lib/prestamos-quincena";
+import CampoFecha from "@/components/ui/CampoFecha";
 
 export default function AplicarQuincenaModal({
   open,
@@ -81,8 +82,7 @@ export default function AplicarQuincenaModal({
             </button>
           ))}
         </div>
-        <input
-          type="date"
+        <CampoFecha
           value={fecha}
           onChange={(e) => setFecha(e.target.value)}
           aria-label="Otra fecha de pago"
