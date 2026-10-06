@@ -38,7 +38,9 @@ import type { ResumenEgresosMes } from "@/lib/egresos/reglas";
 import type { CajaPeriodo } from "@/app/caja/components/types";
 import { fmt } from "@/lib/format";
 import { repartirEnTramos } from "@/lib/proveedores/tramos";
-import { PROVEEDORES_APPLE_2026_10, lineaCartera, lineaUltimoPago } from "@/lib/proveedores/apple-2026-10";
+import { PROVEEDORES_APPLE_2026_10, lineaCartera, lineaUltimoPago, nombreProveedorEnPantalla, contactoRepite } from "@/lib/proveedores/apple-2026-10";
+import { capitalizarNombre } from "@/lib/cxc/estado-cuenta-switch";
+import { tonoApple } from "@/app/proveedores/TramosApple";
 import {
   GASTOS_APPLE_2026_10, aniosDeGastos, mesesDeGastos, lineaPeriodoCaja,
 } from "@/lib/egresos/apple-2026-10";
@@ -120,6 +122,32 @@ describe("Proveedores › lista", () => {
 
   it("un solo h1 en la pantalla, prendida o apagada", () => {
     expect(leer("src/app/proveedores/ProveedoresListClient.tsx").match(/<h1\b/g)).toHaveLength(1);
+  });
+});
+
+describe("Proveedores v2 (Daniel: «veo desorden»)", () => {
+  it("nombres en mayúsculas pasan por la función común; siglas intactas; lo escrito con minúsculas no se toca", () => {
+    expect(nombreProveedorEnPantalla("THALIA INTERNACIONAL, S.A.", capitalizarNombre)).toBe("Thalia Internacional, S.A.");
+    expect(nombreProveedorEnPantalla("MOVADO GROUP, INC.", capitalizarNombre)).toBe("Movado Group, Inc.");
+    expect(nombreProveedorEnPantalla("AMERICAN FASHION WEAR SA", capitalizarNombre)).toBe("American Fashion Wear SA");
+    expect(nombreProveedorEnPantalla("American Fashion Wear, SA", capitalizarNombre)).toBe("American Fashion Wear, SA");
+  });
+  it("el contacto que repite el nombre no se dibuja", () => {
+    expect(contactoRepite("American Fashion Wear, SA", "AMERICAN FASHION WEAR SA")).toBe(true);
+    expect(contactoRepite("Ana Pérez", "AMERICAN FASHION WEAR SA")).toBe(false);
+  });
+  it("lo a favor en el verde de la paleta, nunca azul ni rojo", () => {
+    expect(tonoApple(-5)).toBe("text-emerald-700");
+    expect(tonoApple(5)).not.toMatch(/blue|red|amber/);
+  });
+  it("«también en» se fue de la lista prendida (queda en la ficha)", async () => {
+    const c = { ...CARTERA, empresas: CARTERA.empresas.map((e) => ({ ...e, proveedores: e.proveedores.map((p) => ({ ...p, tambien_en: ["joystep"] })) })) };
+    vi.stubGlobal("fetch", json(c));
+    const { container } = render(<ProveedoresListClient apple />);
+    await screen.findAllByText("Fashion Wear");
+    fireEvent.click(screen.getAllByText("Fashion Wear")[0]);
+    expect(container.textContent).not.toContain("también en");
+    expect(container.innerHTML).not.toContain("text-blue-600 tabular");
   });
 });
 

@@ -14,7 +14,9 @@ import { ROLES_SYNC_PROVEEDORES } from "@/components/shared/syncNowOpciones";
 import { empresasConCxp } from "@/lib/switch-api/empresas";
 import { EMPRESA_KEY_TO_NAME, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { TRAMOS, repartirEnTramos } from "@/lib/proveedores/tramos";
-import { PROVEEDORES_APPLE_2026_10, lineaUltimoPago } from "@/lib/proveedores/apple-2026-10";
+import { PROVEEDORES_APPLE_2026_10, lineaUltimoPago, nombreProveedorEnPantalla, contactoRepite } from "@/lib/proveedores/apple-2026-10";
+import { capitalizarNombre } from "@/lib/cxc/estado-cuenta-switch";
+import TramosApple from "../TramosApple";
 
 // Universo válido del módulo proveedores (7 empresas con CxP).
 const EMPRESAS_CXP = empresasConCxp() as readonly string[];
@@ -283,7 +285,8 @@ function FichaApple({
   const campos = [
     { label: "RUC", value: data.identificacion },
     { label: "DV", value: data.dv },
-    { label: "Contacto", value: data.contacto },
+    // v2: el contacto que repite el nombre del proveedor no se dibuja.
+    { label: "Contacto", value: contactoRepite(data.contacto, data.nombre) ? null : data.contacto },
     { label: "Teléfono", value: data.telefono, href: telHref(data.telefono) },
     { label: "Celular", value: data.celular, href: telHref(data.celular) },
     { label: "Correo", value: data.email, href: mailtoHref(data.email) },
@@ -296,36 +299,30 @@ function FichaApple({
         <div className="min-w-0">
           <div className="flex flex-wrap items-baseline gap-x-3">
             <Link href="/proveedores" className="inline-flex min-h-[44px] items-center text-sm text-blue-600 hover:text-blue-800">‹ Proveedores</Link>
-            <h1 className="text-2xl font-semibold tracking-tight">{data.nombre}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">{nombreProveedorEnPantalla(data.nombre, capitalizarNombre)}</h1>
           </div>
-          {(data.tipo_proveedor || (data.grafias ?? []).length > 0) && (
-            <p className="mt-0.5 text-sm text-gray-500">
-              {[data.tipo_proveedor, (data.grafias ?? []).length > 0 ? `En Switch también: ${(data.grafias ?? []).join(" · ")}` : null].filter(Boolean).join(" · ")}
-            </p>
-          )}
+          {/* v2: tipo, otras grafías y «Actualizado» en UNA línea gris. */}
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500">
+            {[data.tipo_proveedor, (data.grafias ?? []).length > 0 ? `En Switch también: ${(data.grafias ?? []).join(" · ")}` : null]
+              .filter(Boolean)
+              .map((t) => <span key={t as string}>{t} ·</span>)}
+            {syncOpciones.length > 0 && (
+              <LineaDeFrescura actualizado={data.synced_at} opciones={syncOpciones} secuencial roles={ROLES_SYNC_PROVEEDORES} onSuccess={onRecargar} />
+            )}
+          </div>
         </div>
-        {syncOpciones.length > 0 && (
-          <LineaDeFrescura actualizado={data.synced_at} opciones={syncOpciones} secuencial roles={ROLES_SYNC_PROVEEDORES} onSuccess={onRecargar} />
-        )}
       </div>
 
       <div data-numero-apple className="mb-6">
-        <p className={`text-[34px] font-normal leading-none tracking-tight tabular-nums ${total < 0 ? "text-blue-600" : "text-gray-800"}`}>
+        <p className={`text-[34px] font-normal leading-none tracking-tight tabular-nums ${total < 0 ? "text-emerald-700" : "text-gray-800"}`}>
           {total < 0 ? `Saldo a favor $${fmt(Math.abs(total))}` : `$${fmt(total)}`}
         </p>
         <p className="pt-2 text-sm text-gray-500">
           Por pagar · {conSaldo} {conSaldo === 1 ? "empresa" : "empresas"}
         </p>
-        {/* Los cuatro tramos de la lista, en una fila. Nunca rojo: es edad. */}
-        <div data-tramos-ficha className="mt-4 grid max-w-lg grid-cols-4 gap-3">
-          {TRAMOS.map((t) => (
-            <div key={t.key}>
-              <div className="text-xs text-gray-400">{t.label}</div>
-              <div className={`mt-0.5 text-sm tabular-nums ${tonoDeMonto(tramos[t.key])} ${t.key === "tMas365" && tramos[t.key] !== 0 ? "font-medium" : ""}`}>
-                {textoDeMonto(tramos[t.key], fmt)}
-              </div>
-            </div>
-          ))}
+        {/* Los cuatro tramos de la lista; en el celular, uno por renglón. Nunca rojo: es edad. */}
+        <div data-tramos-ficha className="mt-4 max-w-lg">
+          <TramosApple tramos={tramos} />
         </div>
       </div>
 
@@ -337,11 +334,11 @@ function FichaApple({
             <li key={e.empresa} className="flex min-h-[56px] items-center gap-4 px-4 py-2.5">
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-medium text-gray-900">{nombreCortoEmpresa(e.empresa)}</span>
-                <span className="mt-0.5 block truncate text-sm text-gray-500 tabular-nums" title={e.ultimo_pago_fecha ? fmtDate(e.ultimo_pago_fecha) : undefined}>
+                <span className="mt-0.5 block text-sm text-gray-500 tabular-nums" title={e.ultimo_pago_fecha ? fmtDate(e.ultimo_pago_fecha) : undefined}>
                   {pago ?? "Sin pagos registrados"}
                 </span>
               </span>
-              <span className={`shrink-0 text-sm tabular-nums ${e.por_pagar < 0 ? "text-blue-600" : e.por_pagar > 0 ? "text-gray-900" : "text-gray-400"}`}>
+              <span className={`shrink-0 text-sm tabular-nums ${e.por_pagar < 0 ? "text-emerald-700" : e.por_pagar > 0 ? "text-gray-900" : "text-gray-400"}`}>
                 {e.por_pagar < 0 ? `Saldo a favor $${fmt(Math.abs(e.por_pagar))}` : `$${fmt(e.por_pagar)}`}
               </span>
             </li>
@@ -373,16 +370,16 @@ function FichaApple({
           </div>
           <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
             {data.reclamos.map((r) => (
-              <li key={r.id} className="flex min-h-[56px] items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                <span className="min-w-0">
-                  <span className="block font-medium text-gray-900">{r.nro_reclamo || "Reclamo"}</span>
-                  <span className="mt-0.5 block truncate text-gray-500">
-                    {[r.empresa ? getCompanyDisplay(r.empresa) : null, r.marca, r.nro_factura ? `Factura ${r.nro_factura}` : null].filter(Boolean).join(" · ")}
+              <li key={r.id} className="min-h-[56px] px-4 py-2.5 text-sm">
+                {/* v2: el estado y la fecha en la primera línea; abajo, a todo el ancho y sin cortar. */}
+                <span className="flex items-baseline justify-between gap-3">
+                  <span className="font-medium text-gray-900">{r.nro_reclamo || "Reclamo"}</span>
+                  <span className="shrink-0 text-xs text-gray-500 tabular-nums">
+                    {[r.estado, r.fecha_reclamo ? fmtDate(r.fecha_reclamo.slice(0, 10)) : null].filter(Boolean).join(" · ")}
                   </span>
                 </span>
-                <span className="flex shrink-0 items-center gap-2">
-                  {r.estado && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{r.estado}</span>}
-                  {r.fecha_reclamo && <span className="text-xs tabular-nums text-gray-400">{fmtDate(r.fecha_reclamo.slice(0, 10))}</span>}
+                <span className="mt-0.5 block text-gray-500">
+                  {[r.empresa ? getCompanyDisplay(r.empresa) : null, r.marca, r.nro_factura ? `Factura ${r.nro_factura}` : null].filter(Boolean).join(" · ")}
                 </span>
               </li>
             ))}

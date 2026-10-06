@@ -14,6 +14,9 @@
 //     línea gris; la antigüedad en los MISMOS cuatro tramos de la lista (antes
 //     ocho); «Por empresa» en filas de dos renglones, sin la fila «Total» que
 //     repetía el número grande.
+//   · v2 (Daniel: «veo desorden» en el celular): tramos uno por renglón,
+//     nombres con la función común, lo a favor en verde, sin «también en» en
+//     la lista; en la ficha «Local · Actualizado» en una línea y sin cortes.
 //
 // 🔴 NO CAMBIA NINGÚN NÚMERO: todo sale de `buildPorEmpresa`, `repartirEnTramos`
 // y `frasePartida`. Los cuatro tramos de la ficha son la MISMA suma que la
@@ -41,4 +44,27 @@ export function lineaCartera(conSaldo: number, saldo: SaldoPartido, fmt: (n: num
 export function lineaUltimoPago(monto: number | null, dias: number | null, fmt: (n: number) => string): string | null {
   if (monto == null) return null;
   return dias == null ? `Último pago $${fmt(monto)}` : `Último pago $${fmt(monto)} · hace ${dias} d`;
+}
+
+/**
+ * v2 (6-oct-2026, Daniel: «veo desorden»). Lo a favor va en el verde de la
+ * paleta (el de CxC), no en azul, que es de enlace. Lo demás, el tono de siempre.
+ */
+export const TONO_A_FAVOR_APPLE = "text-emerald-700";
+
+/**
+ * El nombre del proveedor como se lee: si Switch lo escribe todo en mayúsculas
+ * («THALIA INTERNACIONAL, S.A.») se capitaliza con la función común de nombres;
+ * si ya trae minúsculas, tal cual. Las siglas «SA» y «S.A.» no se tocan. Solo
+ * cambia lo que se DIBUJA: el amarre y el Excel siguen con el dato.
+ */
+export function nombreProveedorEnPantalla(nombre: string, capitalizar: (n: string) => string): string {
+  if (!nombre || /\p{Ll}/u.test(nombre)) return nombre;
+  return capitalizar(nombre).replace(/\bSa\b/g, "SA");
+}
+
+/** ¿El contacto repite el nombre del proveedor? Entonces no se dibuja. */
+export function contactoRepite(contacto: string | null, nombre: string): boolean {
+  const n = (s: string) => s.toLocaleLowerCase("es").replace(/[^\p{L}\p{N}]/gu, "");
+  return !!contacto && n(contacto) === n(nombre);
 }

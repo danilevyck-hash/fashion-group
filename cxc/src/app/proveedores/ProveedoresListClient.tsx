@@ -22,7 +22,12 @@ import {
 import { Aviso } from "@/components/ui/Aviso";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import type { TramoKey } from "@/lib/proveedores/tramos";
-import { PROVEEDORES_APPLE_2026_10, lineaCartera } from "@/lib/proveedores/apple-2026-10";
+import { PROVEEDORES_APPLE_2026_10, lineaCartera, nombreProveedorEnPantalla } from "@/lib/proveedores/apple-2026-10";
+import { capitalizarNombre } from "@/lib/cxc/estado-cuenta-switch";
+import TramosApple, { tonoApple } from "./TramosApple";
+
+/** v2: el nombre del proveedor con la función común de nombres. */
+const nombreApple = (n: string) => nombreProveedorEnPantalla(n, capitalizarNombre);
 
 // Las empresas con CxP (empresasConCxp): 6 B2B + Multifashion (american_classic).
 // ⚠️ Boston NO está: `cxp: false`, 0 filas, excluida a propósito.
@@ -175,7 +180,7 @@ function ProveedoresList({ apple }: { apple: boolean }) {
               <div className="min-w-0">
                 {empresas.length > 0 && (
                   <>
-                    <p className={`text-[34px] font-normal leading-none tracking-tight tabular-nums ${total.saldo.por_pagar < 0 ? "text-blue-600" : "text-gray-800"}`}>
+                    <p className={`text-[34px] font-normal leading-none tracking-tight tabular-nums ${total.saldo.por_pagar < 0 ? "text-emerald-700" : "text-gray-800"}`}>
                       {textoDeMonto(total.saldo.por_pagar, fmt)}
                     </p>
                     <p className="pt-2 text-sm text-gray-500 tabular-nums">
@@ -287,9 +292,9 @@ function ProveedoresList({ apple }: { apple: boolean }) {
                       <tr className="border-t-2 border-gray-300 font-medium">
                         <td className="py-2.5 px-1.5 xl:px-3">Total</td>
                         {TRAMOS_KEYS.map((k) => (
-                          <MontoCell key={k} value={total.tramos[k]} viejo={k === "tMas365"} />
+                          <MontoCell key={k} value={total.tramos[k]} viejo={k === "tMas365"} apple={apple} />
                         ))}
-                        <MontoCell value={total.saldo.por_pagar} viejo />
+                        <MontoCell value={total.saldo.por_pagar} viejo apple={apple} />
                         {apple && <td />}
                       </tr>
                       {fraseTotal && !apple && (
@@ -376,9 +381,9 @@ function FilaEmpresa({
           )}
         </td>
         {TRAMOS_KEYS.map((k) => (
-          <MontoCell key={k} value={empresa.tramos[k]} viejo={k === "tMas365"} />
+          <MontoCell key={k} value={empresa.tramos[k]} viejo={k === "tMas365"} apple={apple} />
         ))}
-        <MontoCell value={empresa.saldo.por_pagar} viejo />
+        <MontoCell value={empresa.saldo.por_pagar} viejo apple={apple} />
         {apple && <td className="pr-2 text-right"><Flecha abierta={abierta} /></td>}
       </tr>
 
@@ -444,8 +449,9 @@ function FilaProveedor({
       className="border-t border-gray-100 cursor-pointer transition hover:bg-gray-50"
     >
       <td className="py-2 pl-6 pr-1.5 xl:pl-9 xl:pr-3">
-        <span className="text-gray-700">{p.nombre}</span>
-        {p.tambien_en.length > 0 && (
+        <span className="text-gray-700">{apple ? nombreApple(p.nombre) : p.nombre}</span>
+        {/* v2: «también en …» se va de la lista (ruido); queda en la ficha. */}
+        {!apple && p.tambien_en.length > 0 && (
           <span className="ml-2">
             <TambienEn empresas={p.tambien_en} onEmpresa={onEmpresa} />
           </span>
@@ -453,9 +459,9 @@ function FilaProveedor({
         {frase && <div className="mt-0.5 text-xs text-gray-400 tabular-nums">{frase}</div>}
       </td>
       {TRAMOS_KEYS.map((k) => (
-        <MontoCell key={k} value={p.tramos[k]} viejo={k === "tMas365"} />
+        <MontoCell key={k} value={p.tramos[k]} viejo={k === "tMas365"} apple={apple} />
       ))}
-      <MontoCell value={p.saldo.por_pagar} />
+      <MontoCell value={p.saldo.por_pagar} apple={apple} />
       {apple && <td className="pr-2 text-right"><Flecha /></td>}
     </tr>
   );
@@ -617,28 +623,19 @@ function TarjetaEmpresaApple({
       >
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-medium text-gray-900">{empresa.nombre}</span>
-          <span className="mt-0.5 block truncate text-sm text-gray-500 tabular-nums">
+          <span className="mt-0.5 block text-sm text-gray-500 tabular-nums">
             {n === 0 ? "Sin proveedores con saldo" : `${n} ${n === 1 ? "proveedor" : "proveedores"}`}
             {viejo !== 0 && ` · +1 año ${textoDeMonto(viejo, fmt)}`}
           </span>
         </span>
-        <span className={`shrink-0 text-sm tabular-nums ${tonoDeMonto(empresa.saldo.por_pagar)}`}>
+        <span className={`shrink-0 text-sm tabular-nums ${tonoApple(empresa.saldo.por_pagar)}`}>
           {textoDeMonto(empresa.saldo.por_pagar, fmt)}
         </span>
         <Flecha abierta={abierta} />
       </button>
       {abierta && (
         <div className="pb-3 pl-3 pr-1">
-          <div className="mb-2 grid grid-cols-4 gap-2">
-            {TRAMOS.map((t) => (
-              <div key={t.key}>
-                <div className="text-xs text-gray-400">{t.label}</div>
-                <div className={`text-xs tabular-nums ${tonoDeMonto(empresa.tramos[t.key])} ${t.key === "tMas365" && empresa.tramos[t.key] !== 0 ? "font-medium" : ""}`}>
-                  {textoDeMonto(empresa.tramos[t.key], fmt)}
-                </div>
-              </div>
-            ))}
-          </div>
+          <TramosApple tramos={empresa.tramos} className="mb-2" />
           <ul>
             {empresa.proveedores.map((p) => (
               <li key={p.key} className="border-t border-gray-100">
@@ -647,17 +644,12 @@ function TarjetaEmpresaApple({
                   onClick={() => onProveedor(p.key)}
                   className="flex min-h-[44px] w-full items-center gap-3 py-2 text-left active:bg-gray-50"
                 >
-                  <span className="min-w-0 flex-1 truncate text-sm text-gray-700">{p.nombre}</span>
-                  <span className={`shrink-0 text-sm tabular-nums ${tonoDeMonto(p.saldo.por_pagar)}`}>
+                  <span className="min-w-0 flex-1 truncate text-sm text-gray-700">{nombreApple(p.nombre)}</span>
+                  <span className={`shrink-0 text-sm tabular-nums ${tonoApple(p.saldo.por_pagar)}`}>
                     {textoDeMonto(p.saldo.por_pagar, fmt)}
                   </span>
                   <Flecha />
                 </button>
-                {p.tambien_en.length > 0 && (
-                  <div className="-mt-1 pb-2">
-                    <TambienEn empresas={p.tambien_en} onEmpresa={onEmpresa} />
-                  </div>
-                )}
               </li>
             ))}
             {n === 0 && (
@@ -675,10 +667,10 @@ function TarjetaEmpresaApple({
 // documento, no días de mora, así que el color no puede decir «vencido». El
 // porqué completo, en `lib/proveedores/tono.ts`. El peso lo da la negrita del
 // tramo más viejo, no el color.
-function MontoCell({ value, viejo = false }: { value: number; viejo?: boolean }) {
+function MontoCell({ value, viejo = false, apple = false }: { value: number; viejo?: boolean; apple?: boolean }) {
   return (
     <td
-      className={`py-2 px-1.5 xl:px-3 text-right tabular-nums ${tonoDeMonto(value)} ${viejo && value !== 0 ? "font-medium" : ""}`}
+      className={`py-2 px-1.5 xl:px-3 text-right tabular-nums ${apple ? tonoApple(value) : tonoDeMonto(value)} ${viejo && value !== 0 ? "font-medium" : ""}`}
     >
       {textoDeMonto(value, fmt)}
     </td>
