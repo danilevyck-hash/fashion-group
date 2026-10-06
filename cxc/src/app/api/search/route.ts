@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
     // CxC: buscar por nombre (agregado por cliente vía switch_estadocuenta_aging)
     supabaseServer
       .from("switch_estadocuenta_aging")
-      .select("id, nombre_normalized, total, company_key")
+      .select("id, nombre, nombre_normalized, total, company_key")
       .in("company_key", EMPRESAS_DEL_GRUPO)
       .ilike("nombre_normalized", pattern)
       .order("total", { ascending: false })
@@ -202,7 +202,7 @@ export async function GET(req: NextRequest) {
 
   // Deduplicate CxC by nombre_normalized — aggregate total across companies
   const cxcRaw = cxcRes.data || [];
-  const cxcMap = new Map<string, { id: string; nombre_normalized: string; total: number; company_key: string }>();
+  const cxcMap = new Map<string, { id: string; nombre?: string | null; nombre_normalized: string; total: number; company_key: string }>();
   for (const row of cxcRaw) {
     const existing = cxcMap.get(row.nombre_normalized);
     if (existing) {

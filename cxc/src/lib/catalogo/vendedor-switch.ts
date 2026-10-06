@@ -34,6 +34,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { MarcaConfig } from "@/lib/catalogo/marcas";
+import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 
 /** Cuánto vale una lista antes de volver a preguntarle a Switch. */
 export const TTL_VENDEDORES_MS = 15 * 60 * 1000;
@@ -232,7 +233,8 @@ export function errorVendedorNoExiste(cfg: MarcaConfig): string {
 /** Texto de UN vendedor — igual en el selector, en el detalle y en el checkout. */
 export function nombreDeVendedor(v: { id: number; nombre?: string | null } | null | undefined): string {
   if (!v) return "Sin vendedor asignado";
-  return v.nombre || `Vendedor ${v.id}`;
+  // Switch lo manda en mayúsculas («REINALDO ESPINOSA»): se muestra como en Comisiones.
+  return v.nombre ? nombreVendedorEnPantalla(v.nombre) : `Vendedor ${v.id}`;
 }
 
 /**

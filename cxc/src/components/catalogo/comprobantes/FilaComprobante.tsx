@@ -34,6 +34,7 @@ import {
 import type { FilaComprobante } from "@/lib/catalogo/fila-comprobante";
 import AccionesComprobante from "./AccionesComprobante";
 import { BLANCO_CASILLA, CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
+import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 
 /** La etiqueta de origen. Los DOS nombres viven en `origen-comprobante.ts`. */
 export function OrigenBadge({
@@ -179,7 +180,7 @@ function NombreCliente({ pedido, clienteLabel }: { pedido: FilaComprobante; clie
  */
 function TextoVendedor({ vendor }: { vendor: string | null }) {
   const v = (vendor ?? "").trim();
-  return v ? <>{v}</> : <span className="text-gray-300">—</span>;
+  return v ? <>{nombreVendedorEnPantalla(v)}</> : <span className="text-gray-300">—</span>;
 }
 
 /** La fila de la TABLA — de `lg` (1024 px) para arriba. */

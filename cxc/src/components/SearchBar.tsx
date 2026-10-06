@@ -6,7 +6,7 @@ import { getVisibleModules } from "@/lib/modules";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { hrefDelResultado, type TiendaDeMarketing } from "@/lib/search/marketing";
 
-interface CxcResult { id: string; nombre_normalized: string; total: number; company_key: string }
+interface CxcResult { id: string; nombre?: string | null; nombre_normalized: string; total: number; company_key: string }
 interface ReclamoResult { id: string; nro_reclamo: string; nro_factura: string; empresa: string; estado: string; fecha_reclamo: string }
 interface GuiaResult { id: string; numero: number; fecha: string; transportista: string; estado: string }
 interface DirResult { id: string; nombre: string; empresa: string; correo: string; celular: string }
@@ -137,7 +137,8 @@ function flatten(r: SearchResults): FlatItem[] {
   for (const c of r.cxc) {
     items.push({
       module: "Cuentas por cobrar",
-      label: c.nombre_normalized,
+      // El nombre como lo escribe Switch; `nombre_normalized` es la llave en MAYÚSCULAS, no se muestra.
+      label: c.nombre || c.nombre_normalized,
       sub: `$${fmtMoney(c.total)} — ${c.company_key}`,
       href: `/cxc?search=${encodeURIComponent(c.nombre_normalized)}`,
       icon: "📊",

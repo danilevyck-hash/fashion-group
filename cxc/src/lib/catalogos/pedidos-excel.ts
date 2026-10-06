@@ -23,6 +23,7 @@ import {
   type ReportCell,
   type ReportColumn,
 } from "@/lib/excel-export";
+import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 
 export interface PedidoExportRow {
   /** Solo Reebok: pedido creado por vendedor ("mio") o por el link público ("link"). */
@@ -158,7 +159,7 @@ function numerosDe(p: PedidoExportRow): NumerosDePedido {
 /** El vendedor tal como se lee: nunca una celda en blanco sin explicación. */
 export function textoVendedor(p: PedidoExportRow): string {
   const v = (p.vendor || "").trim();
-  if (v) return v;
+  if (v) return nombreVendedorEnPantalla(v);
   const delCliente = p.origen === "link" || p.fuente === "publicos";
   return delCliente ? VENDEDOR_DEL_CLIENTE : VENDEDOR_SIN_DATO;
 }

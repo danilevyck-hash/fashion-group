@@ -20,7 +20,7 @@ import { GUIAS_LISTA_APPLE_2026_10, aniosConGuias, type PeriodoGuias } from "@/l
 import { mesEnCurso } from "@/lib/comisiones/mes-inicial";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { usePersistedState } from "@/lib/hooks/usePersistedState";
-import { puedeVerPedidosBodega } from "@/lib/guias/pedidos-bodega";
+import { puedeMarcarPedidos, puedeVerPedidosBodega } from "@/lib/guias/pedidos-bodega";
 
 // LAZY, como los modos de Comisiones: bodega abre /guias todo el día desde el
 // celular y la configuración es de admin/secretaria — su JS solo se descarga
@@ -173,7 +173,8 @@ export default function GuiasPage() {
     if (!authChecked) return;
     const v = new URLSearchParams(window.location.search).get("vista");
     if (v === "config" || v === "etiquetas") setVista(v);
-    else if (hayPedidos && v !== "guias") setVista("pedidos");
+    else if (v === "pedidos" && hayPedidos) setVista("pedidos");
+    else if (hayPedidos && puedeMarcarPedidos(role) && v !== "guias") setVista("pedidos");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authChecked]);
   function cambiarVista(v: Vista) {
@@ -283,7 +284,7 @@ export default function GuiasPage() {
           </div>
         )}
         {enPedidos ? (
-          <PedidosView />
+          <PedidosView puedeMarcar={puedeMarcarPedidos(role)} />
         ) : enConfig ? (
           <GuiasConfiguracionView />
         ) : enEtiquetas ? (

@@ -13,15 +13,36 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { fechaPanamaDe } from "@/lib/fecha-panama";
+import { DEFAULT_VENDEDOR } from "@/lib/comisiones/vendedor-default";
+import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 
 /** `false` = la pestaña no existe, la ruta contesta 404 y el cron no hace nada. */
 export const PEDIDOS_BODEGA_2026_10 = true;
 
-/** Quién ve la pestaña y marca (admin pasa siempre por `requireRole`). */
+/**
+ * v2 (5-oct-2026, Daniel al ver el mockup): una tabla compacta también en el
+ * celular, SIN monto (la ve bodega), la antigüedad («hace 3 días») en vez de
+ * la fecha, chip «Empresa» simple (abre en Todas, sin acotar por persona), y la ven todos los
+ * que tienen Guías — menos contabilidad, que no tiene Guías. `false` = como
+ * antes. Se prende con el «sí» de Daniel.
+ */
+// 5-oct-2026: PRENDIDO. Daniel vio el mockup v2: «sí, me gustó».
+export const PEDIDOS_TABLA_2026_10 = true;
+
+/** Quién MARCA Pendiente ↔ Preparado y dispara «Actualizar» (admin pasa siempre por `requireRole`). */
 export const PEDIDOS_BODEGA_ROLES = ["admin", "bodega"] as const;
 
+/** Quién VE la pestaña: con v2, los mismos que entran a Guías (`modules.ts`); contabilidad no. */
+export const PEDIDOS_VER_ROLES: readonly string[] = PEDIDOS_TABLA_2026_10
+  ? ["admin", "secretaria", "bodega", "vendedor"]
+  : PEDIDOS_BODEGA_ROLES;
+
 export function puedeVerPedidosBodega(role: string | null | undefined): boolean {
-  return PEDIDOS_BODEGA_2026_10 && !!role && (PEDIDOS_BODEGA_ROLES as readonly string[]).includes(role);
+  return PEDIDOS_BODEGA_2026_10 && !!role && PEDIDOS_VER_ROLES.includes(role);
+}
+
+export function puedeMarcarPedidos(role: string | null | undefined): boolean {
+  return !!role && (PEDIDOS_BODEGA_ROLES as readonly string[]).includes(role);
 }
 
 /** Los DOS estados. Sin fila en `pedidos_bodega_estado` = «pendiente». */
@@ -73,6 +94,12 @@ export function diasDesde(fechaIso: string, hoy: string): number {
   return Math.max(0, Math.round((Date.parse(hoy) - Date.parse(dia)) / MS_DIA));
 }
 
+/** «hoy» · «ayer» · «hace N días», contra el día de Panamá. */
+export function haceDias(fechaIso: string, hoy: string): string {
+  const d = diasDesde(fechaIso, hoy);
+  return d === 0 ? "hoy" : d === 1 ? "ayer" : `hace ${d} días`;
+}
+
 /** «N pedidos pendientes · el más viejo, hace X días». */
 export function lineaDePendientes(rows: readonly Pick<PedidoBodega, "fecha" | "estado">[], hoy: string): string {
   const pend = rows.filter((r) => r.estado === "pendiente");
@@ -88,4 +115,22 @@ export function lineaDePendientes(rows: readonly Pick<PedidoBodega, "fecha" | "e
 export function fechaSwitchAIso(f: string): string {
   const m = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})/.exec(f.trim());
   return m ? `${m[1]}T${m[2]}-05:00` : f;
+}
+
+/**
+ * El vendedor como en el resto del sistema: DEFAULT es «Oficina» y el resto
+ * pasa por `nombreVendedorEnPantalla` de Comisiones («REYNALDO ESPINOSA» →
+ * «Reynaldo Espinosa»). La grafía de Switch ya viene colapsada por
+ * `comision_vendedor_alias` desde la ruta (REINALDO → REYNALDO).
+ */
+export function vendedorEnPantalla(v: string | null | undefined): string {
+  const n = (v ?? "").trim();
+  if (!n) return "—";
+  return n.toUpperCase() === DEFAULT_VENDEDOR ? "Oficina" : nombreVendedorEnPantalla(n);
+}
+
+/** «Fashion Shoes» → «F. Shoes»; una sola palabra queda igual. Para la columna angosta del celular. */
+export function abreviarEmpresa(nombre: string): string {
+  const [a, ...resto] = nombre.trim().split(/\s+/);
+  return resto.length ? `${a[0]}. ${resto.join(" ")}` : a;
 }

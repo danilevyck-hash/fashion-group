@@ -218,8 +218,8 @@ describe("🔴 4. ninguna celda en blanco sin explicación", () => {
     expect(VENDEDOR_SIN_DATO).not.toBe(VENDEDOR_DEL_CLIENTE);
   });
 
-  it("el vendedor de verdad se escribe tal cual", () => {
-    expect(ws[A(D0 + 1, COL.vendedor)].v).toBe("REINALDO ESPINOSA");
+  it("el vendedor de verdad se escribe capitalizado, como en Comisiones (5-oct-2026)", () => {
+    expect(ws[A(D0 + 1, COL.vendedor)].v).toBe("Reinaldo Espinosa");
   });
 });
 

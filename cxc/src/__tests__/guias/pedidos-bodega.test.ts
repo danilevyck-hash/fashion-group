@@ -6,23 +6,60 @@ import {
   CODIGOS_EXCLUIDOS,
   ESTADOS_PEDIDO,
   PEDIDOS_BODEGA_2026_10,
+  PEDIDOS_TABLA_2026_10,
+  abreviarEmpresa,
+  haceDias,
+  vendedorEnPantalla,
   diasDesde,
   fechaSwitchAIso,
   lineaDePendientes,
   ordenarPedidos,
   pedidoEntra,
+  puedeMarcarPedidos,
   puedeVerPedidosBodega,
 } from "@/lib/guias/pedidos-bodega";
 
 const leer = (p: string) => fs.readFileSync(path.resolve(__dirname, "../../..", p), "utf8");
 
 describe("pedidos de bodega — reglas de Daniel", () => {
-  it("prendido con el «sí» de Daniel (5-oct-2026); solo admin y bodega", () => {
+  it("la ven todos los que tienen Guías, contabilidad no; marcan solo admin y bodega", () => {
     expect(PEDIDOS_BODEGA_2026_10).toBe(true);
-    expect(puedeVerPedidosBodega("admin")).toBe(true);
-    expect(puedeVerPedidosBodega("bodega")).toBe(true);
-    expect(puedeVerPedidosBodega("secretaria")).toBe(false);
-    expect(puedeVerPedidosBodega("vendedor")).toBe(false);
+    for (const r of ["admin", "bodega", "secretaria", "vendedor"]) expect(puedeVerPedidosBodega(r)).toBe(true);
+    expect(puedeVerPedidosBodega("contabilidad")).toBe(false);
+    expect(puedeMarcarPedidos("bodega")).toBe(true);
+    expect(puedeMarcarPedidos("secretaria")).toBe(false);
+    expect(puedeMarcarPedidos("vendedor")).toBe(false);
+  });
+
+  it("v2 PRENDIDA con el «sí» de Daniel al mockup (5-oct-2026)", () => {
+    expect(PEDIDOS_TABLA_2026_10).toBe(true);
+  });
+
+  it("el vendedor se escribe como en Comisiones: alias en la ruta y capitalizado en pantalla", () => {
+    expect(vendedorEnPantalla("REYNALDO ESPINOSA")).toBe("Reynaldo Espinosa");
+    const ruta = leer("src/app/api/guias/pedidos/route.ts");
+    expect(ruta).toContain("leerAliasOVacio()");
+    expect(ruta).toMatch(/aplicarAlias\(p\.vendedor_nombre/);
+    expect(leer("src/app/guias/components/PedidosView.tsx")).not.toMatch(/\{p\.vendedor_nombre/);
+  });
+
+  it("sin montos: ni la ruta ni la pantalla mandan o dibujan el total", () => {
+    expect(leer("src/app/api/guias/pedidos/route.ts")).not.toMatch(/select\([^)]*total/);
+    expect(leer("src/app/guias/components/PedidosView.tsx")).not.toMatch(/\.total\b|fmt\(/);
+  });
+
+  it("DEFAULT se muestra «Oficina»; la empresa se abrevia en el celular", () => {
+    expect(vendedorEnPantalla("DEFAULT")).toBe("Oficina");
+    expect(vendedorEnPantalla("EDWIN")).toBe("Edwin");
+    expect(vendedorEnPantalla(null)).toBe("—");
+    expect(abreviarEmpresa("Fashion Shoes")).toBe("F. Shoes");
+    expect(abreviarEmpresa("Vistana")).toBe("Vistana");
+  });
+
+  it("la primera columna dice la antigüedad: hoy · ayer · hace N días", () => {
+    expect(haceDias("2026-10-05T08:00:00-05:00", "2026-10-05")).toBe("hoy");
+    expect(haceDias("2026-10-04T23:00:00-05:00", "2026-10-05")).toBe("ayer");
+    expect(haceDias("2026-10-02T11:00:00-05:00", "2026-10-05")).toBe("hace 3 días");
   });
 
   it("SOLO dos estados", () => {

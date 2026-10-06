@@ -63,6 +63,7 @@ import {
   type BaseAnioPasado,
   type PesoMes,
 } from "./metas-avance";
+import { nombreEnPantalla } from "@/lib/multifashion/nombres";
 
 // ── Tipos del dominio ────────────────────────────────────────────────────────
 
@@ -533,7 +534,7 @@ export async function avanceDeMeta(meta: Meta, hoy: string): Promise<MetaConAvan
     const objetivo = meta.tipo === "vendedora" ? p.objetivoIndividual : null;
     return {
       clave: p.clave,
-      nombre: p.nombre,
+      nombre: nombreEnPantalla(p.nombre),
       vendido,
       aporte,
       objetivo,

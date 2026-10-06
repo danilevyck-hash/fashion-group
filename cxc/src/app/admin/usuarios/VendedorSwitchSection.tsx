@@ -33,6 +33,7 @@ import { Ayuda } from "@/components/shared/Ayuda";
 import { MARCAS_UI, getMarcaTheme } from "@/lib/catalogo/marcas-ui";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { Aviso } from "@/components/ui/Aviso";
+import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 
 const EMPRESAS = MARCAS_UI.map((marca) => {
   const theme = getMarcaTheme(marca)!;
@@ -99,7 +100,7 @@ export default function VendedorSwitchSection({ userId, showToast }: { userId: s
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { showToast(data?.error || "No se pudo guardar el vendedor"); return; }
       setMapping((prev) => ({ ...prev, [empresaKey]: vendedorId ?? "" }));
-      showToast(vendedorId ? `Vendedor asignado: ${nombre}` : "Vendedor quitado");
+      showToast(vendedorId ? `Vendedor asignado: ${nombreVendedorEnPantalla(nombre ?? "")}` : "Vendedor quitado");
     } catch {
       showToast("Error de conexión al guardar el vendedor");
     } finally {
@@ -144,7 +145,7 @@ export default function VendedorSwitchSection({ userId, showToast }: { userId: s
                     {lista === undefined ? "Cargando vendedores…" : lista === null ? "Switch no respondió — reintenta" : "Sin asignar"}
                   </option>
                   {(lista ?? []).map((v) => (
-                    <option key={v.id} value={v.id}>{v.nombre}</option>
+                    <option key={v.id} value={v.id}>{nombreVendedorEnPantalla(v.nombre)}</option>
                   ))}
                 </select>
               </label>
