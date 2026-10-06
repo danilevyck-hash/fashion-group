@@ -314,7 +314,7 @@
     },
     {
       "path": "/api/cron/acs-resumen-diario",
-      "schedule": "0 1 * * *"
+      "schedule": "30 0 * * *"
     },
     {
       "path": "/api/cron/grupo-resumen-mensual",

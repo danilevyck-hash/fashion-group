@@ -192,7 +192,7 @@ export async function enviarNegocio(
  * ⚠️ Se pierde el fail-safe: `sendTelegramAlert` reintenta en el canal de
  *    siempre cuando falla un destino APARTE, y este destino ES el de siempre —
  *    no hay a quién reintentarle. Lo cubre la reconciliación, que reenvía el
- *    resumen en sus 3 pasadas del día si el de la 01:00 no quedó registrado.
+ *    resumen en sus 3 pasadas del día si el de las 00:30 no quedó registrado.
  */
 export async function enviarNegocioPrivado(
   texto: string,

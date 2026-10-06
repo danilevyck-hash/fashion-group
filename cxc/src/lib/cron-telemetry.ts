@@ -387,7 +387,7 @@ export function catalogoCicloSinceIso(cronName: string, now: Date = new Date()):
  * El backup pasó de 2 a 3 entradas (jul-2026, incidente del 25-jul): Vercel
  * re-registra los crons contra el deployment de producción más nuevo y las
  * invocaciones que caen en esa ventana se pierden — ese día se perdieron la de
- * 00:15, la de 01:00 y la de backup 06:00, todas a 2-9 min de un deploy. Con
+ * 00:15, la de 00:30 y la de backup 06:00, todas a 2-9 min de un deploy. Con
  * solo dos entradas (06:00/18:30) la exposición era de 12.5h; la entrada del
  * medio la baja a ~4.5h. La recuperación in-process desde la reconciliación NO
  * era viable bajo Hobby: la corrida core midió 248s de los 300s disponibles el

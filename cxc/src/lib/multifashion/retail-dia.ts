@@ -2,7 +2,7 @@
 // LA venta RETAIL de Multifashion (American Classics) en un rango de días.
 //
 // UNA sola implementación, DOS consumidores:
-//   · el resumen de las 8pm que sale por Telegram  → src/lib/acs-resumen-diario.ts
+//   · el resumen de las 7:30pm que sale por Telegram → src/lib/acs-resumen-diario.ts
 //   · la tarjeta "HOY" del módulo en pantalla      → /api/multifashion/venta-hoy
 //
 // 🩸 POR QUÉ VIVE ACÁ Y NO EN CADA UNO. El resumen de Telegram ya calculaba la

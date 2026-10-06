@@ -1,6 +1,6 @@
 // Ventana "success de hoy" de los colaterales de la reconciliación.
 //
-// Incidente 17-jul-2026: acs-resumen-diario corre 01:00 UTC (20:00 Panamá del
+// Incidente 17-jul-2026: acs-resumen-diario corre 00:30 UTC (19:30 Panamá del
 // día anterior). Su heartbeat (~01:01 UTC) caía ANTES del inicio del día Panamá
 // (05:00 UTC), así que findMissingColaterales lo declaraba "sin correr" TODOS
 // los días y la primera pasada de reconciliación re-enviaba el resumen con

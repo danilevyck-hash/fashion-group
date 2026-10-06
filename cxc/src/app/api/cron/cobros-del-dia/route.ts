@@ -6,10 +6,10 @@
 // del día (23:15 UTC). No toca Switch —lee solo Supabase—, así que la
 // separación de 15 min no le aplica. Sin cobros NO manda nada.
 //
-// Empresas: las 6 del grupo (cartera = la MV de CxC) y Confecciones Boston (su
-// cartera aparte); fuera el mostrador y las empresas del grupo como clientes
-// (`CLIENTES_FUERA`). Multifashion NO entra: sus cobros son el mostrador y abonos
-// de tienda, y no tiene cartera de la que sacar el +90 días.
+// 🔴 SOLO FASHION GROUP: las 6 empresas del grupo (`CXC_GRUPO_EMPRESA_KEYS`, la
+// misma lista y la misma cartera —la MV de CxC— del módulo). Daniel, 6-oct-2026:
+// Boston y Multifashion quedan FUERA. Afuera también el mostrador y las empresas
+// del grupo como clientes (`CLIENTES_FUERA`).
 // ⚠️ Un recibo registrado después de las 6:15 p.m. no sale ni hoy ni mañana.
 // El texto: `lib/cxc/cobros-del-dia.ts`.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -24,8 +24,6 @@ import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { mensajeCobrosDelDia, type CobroDelDia } from "@/lib/cxc/cobros-del-dia";
 
 const CRON_NAME = "cobros-del-dia";
-const BOSTON = "confecciones_boston";
-const EMPRESAS = [...CXC_GRUPO_EMPRESA_KEYS, BOSTON];
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -51,7 +49,7 @@ export async function GET(req: NextRequest) {
       .from("switch_recibos")
       .select("empresa_key, cliente_codigo, cliente_nombre, total, fecha_creacion")
       .eq("fecha", fecha)
-      .in("empresa_key", EMPRESAS)
+      .in("empresa_key", CXC_GRUPO_EMPRESA_KEYS)
       .eq("es_retencion", false)
       .neq("total", 0)
       .not("cliente_codigo", "is", null)
@@ -65,28 +63,23 @@ export async function GET(req: NextRequest) {
         creado: r.fecha_creacion,
       }));
 
-    const codigos = (b: boolean) => [...new Set(cobros.filter((c) => (c.empresa === BOSTON) === b).map((c) => c.codigo))];
-    const grupo = codigos(false);
-    const boston = codigos(true);
+    const codigos = [...new Set(cobros.map((c) => c.codigo))];
     const empresas = [...new Set(cobros.map((c) => c.empresa))];
 
-    const [mv, bo, ...cortes] = await Promise.all([
-      grupo.length
+    const [mv, ...cortes] = await Promise.all([
+      codigos.length
         ? supabaseServer
             .from("switch_estadocuenta_aging_mv")
             .select("company_key, codigo, d91_120, d121_180, d181_270, d271_365, mas_365")
             .in("company_key", CXC_GRUPO_EMPRESA_KEYS)
-            .in("codigo", grupo)
+            .in("codigo", codigos)
             .limit(1000)
-        : Promise.resolve({ data: [], error: null }),
-      boston.length
-        ? supabaseServer.from("switch_estadocuenta_aging_boston").select("codigo, d91_120, d121_plus").in("codigo", boston).limit(1000)
         : Promise.resolve({ data: [], error: null }),
       ...empresas.map((e) =>
         supabaseServer.from("switch_estadocuenta").select("synced_at").eq("empresa_key", e).order("synced_at", { ascending: false }).limit(1),
       ),
     ]);
-    const err = mv.error ?? bo.error ?? cortes.find((c) => c.error)?.error;
+    const err = mv.error ?? cortes.find((c) => c.error)?.error;
     if (err) throw new Error(err.message);
 
     // +90 días = 91-120 + 121 y más, la cuenta de CxC (`saldoMas90`).
@@ -94,9 +87,6 @@ export async function GET(req: NextRequest) {
     const sumar = (k: string, v: number) => mas90.set(k, (mas90.get(k) ?? 0) + v);
     for (const r of (mv.data ?? []) as Record<string, number | string>[]) {
       sumar(`${r.company_key}|${r.codigo}`, ["d91_120", "d121_180", "d181_270", "d271_365", "mas_365"].reduce((s, c) => s + (Number(r[c]) || 0), 0));
-    }
-    for (const r of (bo.data ?? []) as Record<string, number | string>[]) {
-      sumar(`${BOSTON}|${r.codigo}`, (Number(r.d91_120) || 0) + (Number(r.d121_plus) || 0));
     }
     const corte = Object.fromEntries(empresas.map((e, i) => [e, (cortes[i].data?.[0]?.synced_at as string | undefined) ?? null]));
 

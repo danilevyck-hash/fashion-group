@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Resumen diario ACS para Telegram (cron acs-resumen-diario, 01:00 UTC =
+// Resumen diario ACS para Telegram (cron acs-resumen-diario, 00:30 UTC =
 // 20:00 Panamá = 8pm, tras el sync ACS de cierre de 00:15 UTC = 19:15 Panamá).
 //
 // SEMÁNTICA = la del módulo Multifashion (validada al centavo contra
@@ -37,7 +37,7 @@
 // calcular se verifica en switch_sync_log que hubo un sync de facturas ACS
 // exitoso DESPUÉS del cierre de tienda (fecha+1 00:00 UTC = 19:00 Panamá =
 // cierre 7pm; el sync de 00:15 UTC lo satisface con ~45 min de margen antes del
-// resumen de 01:00). Si no lo hubo, el
+// resumen de 00:30). Si no lo hubo, el
 // mensaje omite la línea de "Hoy" y reporta el mes al último día completo
 // (1..D-1 vs 1..D-1, simétrico). Un $0 real con sync fresco (tienda cerrada,
 // domingo/feriado) se manda normal.

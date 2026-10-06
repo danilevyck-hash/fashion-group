@@ -17,9 +17,9 @@
  *
  * Este archivo cierra las TRES formas de romperlo:
  *
- *   1. 🔑 SON DOS LUGARES, NO UNO. El resumen sale del cron de la 01:00 y
+ *   1. 🔑 SON DOS LUGARES, NO UNO. El resumen sale del cron de las 00:30 y
  *      TAMBIÉN de la recuperación de switch-reconciliacion (incidente
- *      11-jul-2026: la invocación de la 01:00 se perdió tras una promoción de
+ *      11-jul-2026: la invocación de ese cron se perdió tras una promoción de
  *      deploy). Cambiar sólo el primero deja el resumen RECUPERADO —el que sale
  *      justo cuando algo falló— cayendo en el grupo. Acá se exige que los dos
  *      usen EXACTAMENTE la misma función de envío, para que no puedan
@@ -87,7 +87,7 @@ function bloqueRecuperacion(src: string, cron: string): string {
 const bloqueRecuperacionAcs = (src: string) => bloqueRecuperacion(src, "acs-resumen-diario");
 
 describe("🔑 los DOS lugares que mandan el resumen ACS apuntan al MISMO destino", () => {
-  it("el cron de la 01:00 y la recuperación usan la misma función de envío", () => {
+  it("el cron de las 00:30 y la recuperación usan la misma función de envío", () => {
     const enRoute = enviosUsados(leer(ROUTE_ACS));
     const enRecuperacion = enviosUsados(bloqueRecuperacionAcs(leer(ROUTE_RECON)));
 

@@ -2,7 +2,7 @@
 // "HOY" — la venta del día de Multifashion (American Classics), para pantalla.
 //
 // Hasta hoy ese número sólo le llegaba a Daniel por Telegram a las 8pm (cron
-// `acs-resumen-diario`, 01:00 UTC). Pedido textual: *"quiero ver también venta
+// `acs-resumen-diario`, 00:30 UTC). Pedido textual: *"quiero ver también venta
 // del día en multifashion"*, arriba del módulo, lo primero que se ve.
 //
 // EL MONTO NO SE VUELVE A CALCULAR ACÁ. Sale de `leerRetailRango`, la misma

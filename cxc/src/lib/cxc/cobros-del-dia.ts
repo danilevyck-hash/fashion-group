@@ -6,9 +6,9 @@
 // +90 días DESPUÉS del pago, con la MISMA cuenta de CxC (91-120 + 121 y más,
 // `saldoMas90`). Sin cobros devuelve `null`: no se manda nada.
 //
-// 🔴 La cartera es una FOTO (el estado de cuenta de las 4:10 p.m.; Boston, de la
-// madrugada). Un pago registrado DESPUÉS de esa foto todavía no la movió, así
-// que se le resta a su +90 días.
+// 🔴 La cartera es una FOTO (el estado de cuenta de las 4:10 p.m.). Un pago
+// registrado DESPUÉS de esa foto todavía no la movió, así que se le resta a su
+// +90 días.
 // ponytail: se asume que el pago baja lo más viejo primero; si en Switch se
 // aplicó a facturas nuevas, el +90 de ese cliente sale más bajo hasta la foto
 // siguiente.
@@ -22,12 +22,11 @@ export const URL_CXC = "https://www.fashiongr.com/cxc";
 
 /**
  * Clientes que NO son cobros, por CÓDIGO: el mostrador (TCKCTA) y las empresas
- * del grupo como clientes. Grupo: 12188 Active Shoes, D-108 Multi Fashion
- * Holding, D-38 Confecciones Boston. Boston: 213 Fashion Wear, 144040 Joystep,
- * 643 Vistana, 111380 American Classic Store, 113345 Confecciones Boston,
- * 115289 Fashion Shoes Holdings. Medido en `switch_recibos` el 6-oct-2026.
+ * del grupo como clientes — 12188 Active Shoes, D-108 Multi Fashion Holding,
+ * D-38 Confecciones Boston. Medido en `switch_recibos` el 6-oct-2026. Los
+ * códigos de Boston no van acá: desde el 6-oct-2026 Boston no entra al aviso.
  */
-export const CLIENTES_FUERA: readonly string[] = ["TCKCTA", "12188", "D-108", "D-38", "213", "144040", "643", "111380", "113345", "115289"];
+export const CLIENTES_FUERA: readonly string[] = ["TCKCTA", "12188", "D-108", "D-38"];
 
 export interface CobroDelDia {
   empresa: string;
@@ -66,9 +65,11 @@ export function mensajeCobrosDelDia(
     porCliente.set(key, fila);
   }
   const filas = [...porCliente.values()].sort((a, b) => b.monto - a.monto || a.cliente.localeCompare(b.cliente));
-  if (filas.length === 0) return null;
-
   const total = filas.reduce((s, f) => s + f.monto, 0);
+  // Sin cobros, o con lo cobrado y lo devuelto cancelándose, no se manda nada
+  // (Daniel, 6-oct-2026: «si el total queda en cero, no se manda nada»).
+  if (filas.length === 0 || Math.round(total) === 0) return null;
+
   const n = filas.length;
   const visibles = filas.slice(0, MAX_COBROS_EN_AVISO);
 

@@ -1,8 +1,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/cron/acs-resumen-diario — Resumen de ventas ACS del día a Telegram.
-// Corre 01:00 UTC (20:00 Panamá = 8pm), después del sync de cierre de facturas
-// ACS de 00:15 UTC (la tienda cierra 7pm sin más movimiento) → el número de
-// "hoy" ya incluye el día completo de la tienda.
+// Corre 00:30 UTC (19:30 Panamá = 7:30pm), después del sync de cierre de
+// facturas ACS de 00:15 UTC (la tienda cierra 7pm sin más movimiento) → el
+// número de "hoy" ya incluye el día completo de la tienda.
+//
+// 🔴 7:30 Y NO 7:00 (Daniel, 6-oct-2026). A las 7:00 p.m. el sync de cierre
+// todavía no arrancó —corre 15 min después— y la guardia de frescura
+// (`ventasAcsSyncFresco`, que exige un sync arrancado DESPUÉS del cierre de
+// tienda) daría "no fresco": el mensaje saldría SIN la línea de "Hoy". El
+// cierre arrancó 00:15:03 y terminó en ≤18 s los 16 días medidos, así que las
+// 00:30 dejan 15 min de margen.
 //
 // Los crons Hobby tienen jitter (el sync de 00:15 puede correr tarde o no
 // correr): antes de calcular se verifica en switch_sync_log que el sync de
@@ -22,7 +29,7 @@
 // la notificación del celular) y por eso el resto de 📊 NEGOCIO no se movió.
 //
 // ⚠️ SON DOS LUGARES: este route y la RECUPERACIÓN de switch-reconciliacion
-// (incidente 11-jul-2026, la invocación de la 01:00 se perdió). Si sólo se
+// (incidente 11-jul-2026, la invocación de ese cron se perdió). Si sólo se
 // cambia uno, el resumen recuperado sigue cayendo en el grupo. Candado que
 // exige que los dos apunten al mismo lado:
 // src/__tests__/lib/acs-resumen-canal-privado.test.ts

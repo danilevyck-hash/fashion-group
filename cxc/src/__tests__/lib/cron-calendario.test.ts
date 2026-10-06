@@ -228,7 +228,7 @@ describe("ventas intradía — cobertura de empresas", () => {
     expect(acs).toEqual(["0015", "1150", "1300", "1500", "1700", "1900", "2100", "2300"]);
   });
 
-  it("el sync de CIERRE de ACS (00:15) sigue en pie — el resumen de la 01:00 depende de él", () => {
+  it("el sync de CIERRE de ACS (00:15) sigue en pie — el resumen de las 00:30 depende de él", () => {
     expect(ventas.some((e) => e.hhmmUtc === "0015" && e.empresas.includes("american_classic"))).toBe(
       true,
     );
