@@ -19,6 +19,9 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
+// ⚠️ 6-oct-2026: con `PROVEEDORES_APPLE_2026_10` PRENDIDO, este archivo cuida la
+// pantalla de antes (el respaldo del interruptor) y la pinta con `apple={false}`.
+// La de hoy la cuida `proveedores-gastos-apple-2026-10.test.tsx`.
 import ProveedoresListClient from "@/app/proveedores/ProveedoresListClient";
 
 const setUrl = vi.fn();
@@ -124,7 +127,7 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); });
 
 async function pintar() {
-  const r = render(<ProveedoresListClient />);
+  const r = render(<ProveedoresListClient apple={false} />);
   await waitFor(() => expect(screen.getAllByText("Fashion Wear").length).toBeGreaterThan(0));
   return r;
 }

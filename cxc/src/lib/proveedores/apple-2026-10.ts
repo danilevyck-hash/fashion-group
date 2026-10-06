@@ -27,8 +27,8 @@
 
 import type { SaldoPartido } from "./tramos";
 
-/** `false` = como antes. */
-export const PROVEEDORES_APPLE_2026_10 = false;
+/** `false` = como antes. PRENDIDO el 6-oct-2026: Daniel aprobó el mockup HOY vs RECOMENDACIÓN (con la v2 del celular). */
+export const PROVEEDORES_APPLE_2026_10 = true;
 
 /**
  * La línea gris bajo el número grande: «31 proveedores con saldo» y, solo si lo

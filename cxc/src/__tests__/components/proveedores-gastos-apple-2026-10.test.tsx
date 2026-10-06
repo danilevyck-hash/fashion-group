@@ -2,7 +2,7 @@
  * 🔴 CANDADO — PROVEEDORES, GASTOS Y CAJA MENUDA «COMO LO HARÍA APPLE»
  * (6-oct-2026).
  *
- * APAGADOS hasta que Daniel vea el mockup. Aquí cada pantalla se pinta con
+ * PRENDIDOS el 6-oct-2026 (Daniel aprobó el mockup). Aquí cada pantalla se pinta con
  * `apple` forzado para comprobar que la propuesta se dibuja y que los NÚMEROS
  * son los de siempre (salen de los mismos módulos puros). Apagado, las pruebas
  * de siempre de cada pantalla siguen cuidando lo de hoy.
@@ -50,9 +50,12 @@ const leer = (p: string) => readFileSync(join(__dirname, "../../..", p), "utf8")
 const noop = () => {};
 
 describe("los interruptores", () => {
-  it("nacen APAGADOS: nada cambia hasta que Daniel vea el mockup", () => {
-    expect(PROVEEDORES_APPLE_2026_10).toBe(false);
-    expect(GASTOS_APPLE_2026_10).toBe(false);
+  // 6-oct-2026: Daniel aprobó el mockup. Lo sin decidir quedó como se propuso:
+  // 4 tramos en la ficha, «Cerrar período» en el «···», 2025 como el año más
+  // viejo del panel, y Gastos sin rango ni frescura por ahora.
+  it("están PRENDIDOS desde el 6-oct-2026 (Daniel aprobó el mockup)", () => {
+    expect(PROVEEDORES_APPLE_2026_10).toBe(true);
+    expect(GASTOS_APPLE_2026_10).toBe(true);
   });
 });
 

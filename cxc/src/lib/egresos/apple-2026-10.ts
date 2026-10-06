@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// GASTOS Y CAJA MENUDA «COMO LO HARÍA APPLE» (6-oct-2026). APAGADO hasta que
-// Daniel vea el mockup HOY vs RECOMENDACIÓN.
+// GASTOS Y CAJA MENUDA «COMO LO HARÍA APPLE» (6-oct-2026). PRENDIDO el 6-oct-2026
+// (Daniel aprobó el mockup HOY vs RECOMENDACIÓN).
 //
 // La MISMA pantalla con las reglas de docs/diseno.md, como en Ventas, CxC,
 // Guías, Reclamos y Clientes. Por pantalla:
@@ -29,8 +29,8 @@
 // estaba. Candado: `proveedores-gastos-apple-2026-10.test.tsx`.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** `false` = como antes. */
-export const GASTOS_APPLE_2026_10 = false;
+/** `false` = como antes. PRENDIDO el 6-oct-2026: Daniel aprobó el mockup HOY vs RECOMENDACIÓN. */
+export const GASTOS_APPLE_2026_10 = true;
 
 /** Desde qué año se ofrece en el panel de período (los egresos llegan desde 2025). */
 export const PRIMER_ANIO_GASTOS = 2025;
