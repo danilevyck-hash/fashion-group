@@ -484,6 +484,9 @@ export const SEED_TOLERANT_CRONS = [
   // Guías › Pedidos (5-oct-2026): con `PEDIDOS_BODEGA_2026_10 = false` no
   // corre ni siembra; al prenderlo, siembra en su primera madrugada.
   "sync-pedidos",
+  // Aviso de pedidos pendientes de más de 7 días (12:30 UTC = 7:30 a.m.
+  // Panamá, 6-oct-2026). Solo Supabase; sin viejos no manda nada pero siembra.
+  "pedidos-pendientes",
   "backup-switch", // backup de tablas switch_* (3 entradas: 06:45 / 11:15 / 19:15 UTC)
   // Réplica off-site de los buckets de Storage a R2 (2 entradas: 04:00 / 15:30
   // UTC). Seed-tolerante hasta que lleve días sembrado; después se puede
