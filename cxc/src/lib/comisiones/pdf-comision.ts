@@ -67,7 +67,7 @@ import {
   filasCobros,
   filasVentas,
   lineaDeComisionesDelPapel,
-  lineaDelPieDelPapel,
+  lineasDelCierre,
   seccionesDelPapel,
   totalAPagarComision,
   type HojaReporte,
@@ -87,10 +87,10 @@ function tituloSeccion(doc: jsPDF, y: number, texto: string): number {
 /**
  * 🔴 EL PAPEL, ALINEADO CON EL DETALLE v3 (6-oct-2026): el título, el total a
  * pagar grande con UNA línea gris («Comisión de ventas · de cobros» y los
- * descuentos), Ventas y Cobros SOLO si aplican (`seccionesDelPapel`) y UNA línea
- * al pie con tasas y bases. Se fueron «TOTAL VENTAS / COBROS / VENTAS + COBROS»
- * y la caja «Resumen», que repetían lo de arriba. Ningún número cambia: el
- * total es `totalAPagarComision`, la misma cuenta de la pantalla.
+ * descuentos), Ventas y Cobros SOLO si aplican (`seccionesDelPapel`) y al pie el
+ * RESUMEN del Excel (`dibujarResumen`; antes era UNA línea gris con tasas y
+ * bases). Se fueron «TOTAL VENTAS / COBROS / VENTAS + COBROS». Ningún número
+ * cambia: el total es `totalAPagarComision`, la misma cuenta de la pantalla.
  */
 // 🩸 6-oct-2026: el número arrancaba en la MISMA altura que el título y la raya
 // lo cruzaba («$40.67» de Rodrigo · Vistana · sep). Orden fijo: logo · título ·
@@ -114,13 +114,43 @@ function dibujarNumero(doc: jsPDF, hoja: HojaReporte, s: SeccionesDelPapel): num
   return yRaya + 6;
 }
 
-/** La línea gris del pie: tasas y bases de lo que aplica. */
-function dibujarPie(doc: jsPDF, y: number, hoja: HojaReporte, s: SeccionesDelPapel): void {
-  const yy = asegurarEspacio(doc, y + 4, 8);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(...GRIS);
-  doc.text(textoDePdf(lineaDelPieDelPapel(hoja.data, s)), MARGEN, yy);
+/**
+ * 🔴 EL RESUMEN AL PIE, EL MISMO DEL EXCEL (6-oct-2026).
+ *
+ * Daniel, textual: *«En Comisiones, al descargar el PDF quiero ver el resumen
+ * abajo, igual que en el Excel simple»*. 🩸 Al pie solo quedaba una línea gris
+ * («0.50% de $16,098 en ventas»), que dice la tasa y la base pero no la
+ * comisión de cada parte ni el total — en el Excel eso es el bloque RESUMEN.
+ *
+ * Mismas líneas y mismo orden que la hoja de Excel (`comisionExcel.ts` ›
+ * `section("RESUMEN")`): «Ventas $141,700.50 × 0.50%» con su comisión a la
+ * derecha, lo mismo con Cobros, los descuentos activos y el total en negrita
+ * con raya arriba. Solo las secciones que aplican.
+ *
+ * 🔑 La línea gris de la tasa se fue: el resumen dice lo mismo y con centavos.
+ * Ningún número se calcula acá — las líneas salen de `lineasDelCierre`, que lee
+ * los totales del RPC, así que el total cuadra con el número grande de arriba
+ * y con el Excel al centavo.
+ */
+function dibujarResumen(doc: jsPDF, y: number, hoja: HojaReporte, s: SeccionesDelPapel): void {
+  const lineas = lineasDelCierre(hoja.data, hoja.descuentos, s);
+  const w = doc.internal.pageSize.getWidth();
+  // 🔴 El resumen NUNCA se parte entre dos hojas: es lo que se lee primero.
+  let yy = tituloSeccion(doc, asegurarEspacio(doc, y + 6, 9 + lineas.length * 5), "Resumen") + 4;
+  for (const l of lineas) {
+    if (l.fuerte) {
+      yy += 2;
+      rayaGris(doc, yy - 3.4);
+    }
+    doc.setFont("helvetica", l.fuerte ? "bold" : "normal");
+    doc.setFontSize(l.fuerte ? 9 : 8);
+    // 🔴 El rojo se decide con el texto CRUDO (que sí lleva el «−»); lo que se
+    // dibuja va saneado. Al revés, el negativo dejaría de pintarse.
+    doc.setTextColor(...(l.monto.startsWith("−") ? ROJO : TINTA));
+    doc.text(textoDePdf(l.rotulo), MARGEN, yy);
+    doc.text(textoDePdf(l.monto), w - MARGEN, yy, { align: "right" });
+    yy += 5;
+  }
 }
 
 /**
@@ -200,7 +230,7 @@ export function construirPdfComision(hojasPedidas: HojaReporte[]): jsPDF {
       y = finDeTabla(doc) + 4;
     }
 
-    dibujarPie(doc, y, hoja, s);
+    dibujarResumen(doc, y, hoja, s);
   });
 
   piePorHoja(doc);

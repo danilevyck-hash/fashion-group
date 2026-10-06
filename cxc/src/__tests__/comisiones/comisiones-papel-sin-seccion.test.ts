@@ -7,7 +7,9 @@
 // Rodrigo cobraba. Y en el Excel «Total ventas 141700.5» era un valor fijo: si
 // se borraba una línea, nada se recalculaba.
 // Sostiene: (1) con tasa 0 % o «No pagable» la sección no sale en el PDF ni en
-// el Excel; (2) con las dos fuera, la persona no sale; (3) «TOTAL VENTAS +
+// el Excel —ni su línea del RESUMEN del pie, que es el mismo bloque del Excel
+// (Daniel, 6-oct-2026: «quiero ver el resumen abajo, igual que en el Excel
+// simple»)—; (2) con las dos fuera, la persona no sale; (3) «TOTAL VENTAS +
 // COBROS» no vuelve; (4) los totales del Excel son fórmulas con el MISMO valor.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -66,7 +68,12 @@ describe("🔴 el PDF sin cobros no tiene la sección", () => {
     expect(texto).not.toContain("TOTAL VENTAS + COBROS");
     expect(texto).not.toContain("Hafez");
     expect(texto).toContain("Comisión de ventas $40.67");
-    expect(texto).toContain("0.50% de $8,134 en ventas");
+    // 🔴 6-oct-2026: el RESUMEN del pie —el mismo del Excel— solo lleva la línea
+    // que aplica, y su total cuadra con el número grande de arriba.
+    expect(texto).toContain("RESUMEN");
+    expect(texto).toContain("Ventas $8,134.00 × 0.50% $40.67");
+    expect(texto).toContain("Comisión total $40.67");
+    expect(texto).not.toContain("Cobros $");
     expect(texto).not.toContain("en cobros");
   });
 

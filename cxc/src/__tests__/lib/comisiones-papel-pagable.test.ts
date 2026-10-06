@@ -27,7 +27,7 @@ import {
   renglonesDelPapel,
   ventasDelPapel,
 } from "@/lib/comisiones/papel-pagable";
-import { filasCobros, filasVentas, lineasDelCierre, totalesDelPapel, type HojaReporte } from "@/lib/comisiones/reporte-comision";
+import { filasCobros, filasVentas, lineasDelCierre, type HojaReporte } from "@/lib/comisiones/reporte-comision";
 import { construirPdfComision } from "@/lib/comisiones/pdf-comision";
 import { buildComisionDetalleSheet, ventasPagables, type ComisionDetalle } from "@/lib/ventas/comisionExcel";
 import {
@@ -192,9 +192,10 @@ describe("🔴 el PDF y el Excel comparten la función de renglones", () => {
 // 3 · NINGÚN TOTAL SE MUEVE
 // ═════════════════════════════════════════════════════════════════════════════
 describe("🔴 quitar los renglones en cero no cambia un centavo", () => {
-  it("las líneas del cierre y los totales del papel son idénticos con y sin ceros", () => {
-    expect(lineasDelCierre(CON_CEROS, hoja(CON_CEROS).descuentos)).toEqual(lineasDelCierre(LIMPIO, hoja(LIMPIO).descuentos));
-    expect(totalesDelPapel(CON_CEROS)).toEqual(totalesDelPapel(LIMPIO));
+  it("las líneas del resumen son idénticas con y sin ceros", () => {
+    const dos = { ventas: true, cobros: true };
+    expect(lineasDelCierre(CON_CEROS, hoja(CON_CEROS).descuentos, dos))
+      .toEqual(lineasDelCierre(LIMPIO, hoja(LIMPIO).descuentos, dos));
   });
 
   it("🔴 el PDF con los ceros del RPC es el MISMO PDF que sin ellos: ni «De Moda» ni «Jerusalem»", async () => {
@@ -206,11 +207,12 @@ describe("🔴 quitar los renglones en cero no cambia un centavo", () => {
     expect(conCeros).not.toContain("Jerusalem");
     // Lo que SÍ tiene que estar: la NC en negativo y los números del RPC.
     // 🔄 6-oct-2026 — el papel quedó como el detalle v3: el total a pagar es el
-    // número grande y las bases van en la línea del pie (ya no hay «TOTAL
-    // VENTAS / COBROS», que repetían lo de arriba). Los números son los mismos.
+    // número grande y al pie va el RESUMEN del Excel (ya no hay «TOTAL VENTAS /
+    // COBROS», que repetían lo de arriba). Los números son los mismos.
     expect(conCeros).toContain("11-000003044");
-    expect(conCeros).toContain("0.50% de $750 en ventas · 0.50% de $800 en cobros");
     expect(conCeros).toContain("$6.25 Comisión de ventas $3.75 · de cobros $4.00");
+    expect(conCeros).toContain("RESUMEN Ventas $750.00 × 0.50% $3.75 Cobros $800.00 × 0.50% $4.00");
+    expect(conCeros).toContain("Subtotal comisión $7.75 Anticipo -$1.50 Total a pagar $6.25");
     expect(conCeros).not.toContain("TOTAL VENTAS");
   });
 

@@ -64,6 +64,9 @@ async function textoDelPdf(doc: { output: (t: "arraybuffer") => ArrayBuffer }): 
   return texto.replace(/\s+/g, " ");
 }
 
+/** Edwin comisiona venta y cobro: las dos secciones entran al papel. */
+const LAS_DOS = { ventas: true, cobros: true };
+
 const EDWIN: ComisionDetalle = {
   empresa_key: "vistana",
   year: 2026,
@@ -248,11 +251,32 @@ describe("⚠️ 5. lo que el papel dice no cambió", () => {
   it("⚠️ los totales salen del RPC: acá no se recalcula ninguno", async () => {
     const texto = await textoDelPdf(construirPdfComision([hoja(EDWIN, "Vistana")]));
     // 🔄 6-oct-2026 — el papel quedó como el detalle v3: sin «TOTAL VENTAS /
-    // COBROS / VENTAS + COBROS» ni la caja «Resumen»; las bases del RPC van en
-    // la línea del pie y las comisiones del RPC bajo el número grande.
-    for (const t of ["TOTAL VENTAS", "TOTAL COBROS", "RESUMEN", "$1,550.00"]) expect(texto).not.toContain(t);
+    // COBROS / VENTAS + COBROS»; las comisiones del RPC van bajo el número
+    // grande y el RESUMEN del Excel volvió al pie (Daniel: «quiero ver el
+    // resumen abajo, igual que en el Excel simple»).
+    for (const t of ["TOTAL VENTAS", "TOTAL COBROS", "$1,550.00"]) expect(texto).not.toContain(t);
     expect(texto).toContain("Comisión de ventas $3.75 · de cobros $4.00");
-    expect(texto).toContain("0.50% de $750 en ventas · 0.50% de $800 en cobros");
+    // La línea gris de tasas y bases se fue: el resumen lo dice con centavos.
+    expect(texto).not.toContain("0.50% de $750 en ventas");
+  });
+
+  it("🔴 el RESUMEN del pie es el MISMO del Excel y cuadra al centavo", async () => {
+    const texto = await textoDelPdf(construirPdfComision([hoja(EDWIN, "Vistana")]));
+    expect(texto).toContain("RESUMEN");
+    expect(texto).toContain("Ventas $750.00 × 0.50% $3.75");
+    expect(texto).toContain("Cobros $800.00 × 0.50% $4.00");
+    expect(texto).toContain("Comisión total $7.75");
+    // Cuadra con el número grande de arriba: $3.75 + $4.00 = $7.75.
+    expect(totalAPagarComision(EDWIN, [])).toBe(7.75);
+  });
+
+  it("🔴 con descuento el resumen dice subtotal, el descuento y el total a pagar", async () => {
+    const con = hoja(EDWIN, "Vistana", [{ id: "d1", concepto: "Adelanto", monto: 1.75, activo: true }]);
+    const texto = await textoDelPdf(construirPdfComision([con]));
+    expect(texto).toContain("Subtotal comisión $7.75");
+    expect(texto).toContain("Adelanto -$1.75");
+    expect(texto).toContain("Total a pagar $6.00");
+    expect(totalAPagarComision(con.data, con.descuentos)).toBe(6);
   });
 
   it("🔴 el descuento se resta UNA vez y se ve en el cierre", () => {
@@ -261,7 +285,7 @@ describe("⚠️ 5. lo que el papel dice no cambió", () => {
       { id: "d2", concepto: "Apagado este mes", monto: 100, activo: false },
     ]);
     expect(totalAPagarComision(con.data, con.descuentos)).toBe(6);
-    const rotulos = lineasDelCierre(con.data, con.descuentos).map((l) => l.rotulo);
+    const rotulos = lineasDelCierre(con.data, con.descuentos, LAS_DOS).map((l) => l.rotulo);
     expect(rotulos).toContain("Subtotal comisión");
     expect(rotulos).toContain("Descuento");
     expect(rotulos).toContain("Total a pagar");
@@ -270,7 +294,7 @@ describe("⚠️ 5. lo que el papel dice no cambió", () => {
   });
 
   it("sin descuentos la última línea dice «Comisión total» (CONTROL)", () => {
-    const rotulos = lineasDelCierre(EDWIN, []).map((l) => l.rotulo);
+    const rotulos = lineasDelCierre(EDWIN, [], LAS_DOS).map((l) => l.rotulo);
     expect(rotulos).toContain("Comisión total");
     expect(rotulos).not.toContain("Total a pagar");
     expect(totalAPagarComision(EDWIN, [])).toBe(7.75);

@@ -125,32 +125,42 @@ export interface LineaCierre {
 }
 
 /**
- * La caja de cierre, igual que en la pantalla: de dónde sale cada comisión, los
- * descuentos activos uno por uno y el total.
+ * El RESUMEN del papel, el MISMO del Excel: de dónde sale cada comisión —base
+ * × tasa = comisión—, los descuentos activos uno por uno y el total.
  *
  * Sin descuentos la última línea dice «Comisión total»; con descuentos dice
  * «Subtotal comisión» arriba y «Total a pagar» abajo — la misma distinción que
  * hace la pantalla, para que no parezca que el descuento ya estaba adentro.
+ *
+ * 🔴 SOLO SALEN LAS LÍNEAS QUE APLICAN (6-oct-2026). Con la tasa de cobros en
+ * 0 % su línea no sale, igual que la sección: era el «Cobros $8,134 × 0.00% =
+ * $0» del PDF de Rodrigo. ⚠️ El total sigue cuadrando al centavo porque una
+ * sección que no aplica aporta $0 (tasa 0 %), y quien no tiene ninguna no sale
+ * en el papel (`entraAlPapel`).
  */
 export function lineasDelCierre(
   data: ComisionDetalle,
   descuentos: ComisionDescuento[],
+  s: SeccionesDelPapel,
 ): LineaCierre[] {
   const activos = descuentosActivos(descuentos);
   const pctV = (data.tasa_venta * 100).toFixed(2);
   const pctC = (data.tasa_cobro * 100).toFixed(2);
-  const lineas: LineaCierre[] = [
-    {
+  const lineas: LineaCierre[] = [];
+  if (s.ventas) {
+    lineas.push({
       rotulo: `Ventas ${fmtMoney(data.ventas_base)} × ${pctV}%`,
       monto: fmtMoney(data.comision_venta),
       fuerte: false,
-    },
-    {
+    });
+  }
+  if (s.cobros) {
+    lineas.push({
       rotulo: `Cobros ${fmtMoney(data.cobros_base)} × ${pctC}%`,
       monto: fmtMoney(data.comision_cobro),
       fuerte: false,
-    },
-  ];
+    });
+  }
   if (activos.length === 0) {
     lineas.push({
       rotulo: "Comisión total",
@@ -175,18 +185,10 @@ export function lineasDelCierre(
   return lineas;
 }
 
-/** Los tres totales que van entre las tablas y el cierre. */
-export function totalesDelPapel(data: ComisionDetalle): LineaCierre[] {
-  return [
-    { rotulo: "TOTAL VENTAS", monto: fmtMoney(data.ventas_base), fuerte: true },
-    { rotulo: "TOTAL COBROS", monto: fmtMoney(data.cobros_base), fuerte: true },
-    {
-      rotulo: "TOTAL VENTAS + COBROS",
-      monto: fmtMoney(round2(data.ventas_base + data.cobros_base)),
-      fuerte: true,
-    },
-  ];
-}
+// 🩸 `totalesDelPapel` («TOTAL VENTAS», «TOTAL COBROS», «TOTAL VENTAS + COBROS»)
+// se retiró el 6-oct-2026: el rediseño del papel se lo llevó de los dos papeles
+// y el candado `comisiones-papel-sin-seccion` prohíbe que vuelva. El resumen del
+// pie es `lineasDelCierre`, el mismo del Excel.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 🔴 LO QUE NO SE PAGA NO SALE EN EL PAPEL (6-oct-2026).
