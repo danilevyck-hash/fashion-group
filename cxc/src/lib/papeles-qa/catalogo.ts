@@ -197,10 +197,6 @@ const linea = (
   return {
     codigo_barra_id: 900000 + i,
     codigo,
-    // ⚠️ El API no manda la referencia: la columna va vacía. En el papel de
-    // Switch sí existe (`4RG822G200` → `4RG822G200-HMT`), y por eso la columna
-    // se queda — pendiente de que Daniel diga de dónde sale.
-    referencia: null,
     descripcion,
     talla: null,
     color: null,

@@ -157,6 +157,19 @@ export const ROLES_PREPARADO: readonly string[] = ["admin", "secretaria", "bodeg
  */
 export const ROLES_VERIFICADO: readonly string[] = ["admin", "secretaria"];
 
+/**
+ * 🔴 QUIÉN VE LA PLATA DEL PEDIDO (Daniel, 6-oct-2026): «bodega NO ve Precio ni
+ * Total, ni en la lista ni en el detalle; la secretaria y admin SÍ». 🔑 Lo
+ * decide el SERVIDOR: a bodega NO se le mandan esos números, no se le esconden
+ * columnas en el navegador — escondidas seguirían viajando y se leen en dos
+ * toques. El papel es la ÚNICA excepción, y por eso se dibuja en el servidor.
+ */
+export const ROLES_VEN_PRECIO: readonly string[] = ["admin", "secretaria"];
+
+export function veLaPlata(role: string | null | undefined): boolean {
+  return !!role && ROLES_VEN_PRECIO.includes(role);
+}
+
 export function rolesDelEstado(destino: EstadoBultos): readonly string[] {
   return destino === "verificado" ? ROLES_VERIFICADO : ROLES_PREPARADO;
 }
@@ -227,20 +240,22 @@ export interface LineaPedido {
   /** `codigoBarraId` de Switch: la identidad de la línea dentro del pedido. */
   codigo_barra_id: number;
   codigo: string;
-  /**
-   * ⚠️ La «Referencia» del papel de Switch. El API NO la manda (medido): queda
-   * en `null` y la columna se ve vacía. No se deriva ni se inventa.
-   */
-  referencia: string | null;
   /** La CATEGORÍA que manda Switch («Men-T-Shirts S/S»), no un nombre comercial. */
   descripcion: string;
   /** Vienen SEPARADAS del API; Switch manda «-» cuando la empresa no las usa. */
   talla: string | null;
   color: string | null;
   cantidad: number;
-  precio: number;
+  /**
+   * 🔴 LA PLATA DEPENDE DE QUIÉN MIRA (Daniel, 6-oct-2026): a BODEGA no le
+   * viajan ni el precio ni el total —`null`, decidido en el SERVIDOR, no
+   * escondiendo columnas en el navegador—. La secretaria y admin sí los reciben.
+   * 🔑 El papel SIEMPRE los lleva, lo imprima quien lo imprima: por eso se dibuja
+   * en el SERVIDOR (`/api/guias/pedidos/detalle/papel`).
+   */
+  precio: number | null;
   /** 🔑 El total de la línea lo CALCULA Switch, con sus descuentos. No se recalcula. */
-  total: number;
+  total: number | null;
   /** El bulto donde quedó, o `null` si todavía no se asignó. */
   bulto: number | null;
 }
@@ -251,21 +266,29 @@ export function dato(v: string | null | undefined): string | null {
   return !t || t === "-" ? null : t;
 }
 
-/** «Men-T-Shirts S/S · Talla M · Azul» — lo que se lee en pantalla y en el papel. */
+/** «Men-T-Shirts S/S · M · Azul» — lo que se lee en pantalla y en el papel. */
 export function descripcionCompleta(l: Pick<LineaPedido, "descripcion" | "talla" | "color">): string {
   return [l.descripcion, dato(l.talla), dato(l.color)].filter(Boolean).join(" · ");
 }
 
 /** Las columnas de la pantalla y del papel, en el orden del PDF de Switch. */
+/**
+ * 🔴 EL BULTO VA PRIMERO (Daniel, 6-oct-2026, al aprobar): «es lo que bodega
+ * llena, así que manda». El resto conserva el orden del papel de Switch.
+ */
 export const COLUMNAS_DETALLE = [
+  "Bulto",
   "Código",
-  "Referencia",
   "Descripción",
   "Cantidad",
   "Precio",
   "Total",
-  "Bulto",
 ] as const;
+
+/** Las que ve quien NO puede ver plata: las mismas, sin Precio ni Total. */
+export const COLUMNAS_DETALLE_SIN_PLATA = COLUMNAS_DETALLE.filter(
+  (c) => c !== "Precio" && c !== "Total",
+);
 
 export const MIN_BULTO = 1;
 /** Un envío real tuvo 416 bultos; el tope deja aire y atrapa un dedazo. */
@@ -374,6 +397,16 @@ export function firmaDelPaso(
   const quien = (por ?? "").trim();
   if (!quien || !en) return null;
   return `${ROTULO_ESTADO_BULTOS[paso]} por ${quien} · ${horaPanama(en)}`;
+}
+
+/**
+ * Lo que va en la columna «Preparado por» / «Verificado por» de la lista:
+ * «Julio · 10:42 a. m.». El rótulo lo pone el encabezado, así que acá no se
+ * repite. `null` = ese paso todavía no ocurrió.
+ */
+export function firmaEnColumna(por: string | null | undefined, en: string | null | undefined): string | null {
+  const quien = (por ?? "").trim();
+  return quien && en ? `${quien} · ${horaPanama(en)}` : null;
 }
 
 /** Las firmas que haya, de arriba abajo. Vacío = nadie marcó nada todavía. */

@@ -25,6 +25,7 @@ import {
   ESTADOS_BULTOS,
   ROTULO_ESTADO_BULTOS,
   estadoLeido,
+  firmaEnColumna,
   firmasEnOrden,
   siguienteEstado,
   type EstadoBultos,
@@ -314,7 +315,7 @@ export default function PedidosView({
   // «Marcar recibido». Así no conviven dos controles en la misma fila.
   const conCirculo = CIRCULO && (!BULTOS || filtro === "pendiente");
   const conEstado = BULTOS ? filtro !== "pendiente" : !CIRCULO;
-  const columnas = 3 + (conCirculo ? 1 : 0) + (conEstado ? 1 : 0);
+  const columnas = 3 + (conCirculo ? 1 : 0) + (conEstado ? 1 : 0) + (BULTOS ? 2 : 0);
 
   // Agrupada por empresa (Daniel, 6-oct-2026): el encabezado del grupo dice la
   // empresa y la cuenta; las filas ya no la repiten. Con una sola empresa, un solo grupo.
@@ -327,6 +328,11 @@ export default function PedidosView({
             <ThOrden col="antiguedad" api={orden} className={`py-2 pr-1 sm:px-3 ${conCirculo ? "pl-1" : "pl-3"}`}><span className="sm:hidden">Antig.</span><span className="hidden sm:inline">Antigüedad</span></ThOrden>
             <ThOrden col="cliente" api={orden} className="px-1 py-2 sm:px-3">Cliente</ThOrden>
             <ThOrden col="vendedor" api={orden} className={`py-2 sm:px-3 ${conCirculo ? "pl-1 pr-3" : "px-1"}`}>Vendedor</ThOrden>
+            {/* 🔴 Quién marcó cada paso va en SU columna (Daniel, 6-oct-2026, al
+                aprobar), no como una línea suelta bajo el pedido. En el celular
+                no caben: ahí siguen debajo del cliente. */}
+            {BULTOS && <th className="hidden px-3 py-2 sm:table-cell">Preparado por</th>}
+            {BULTOS && <th className="hidden px-3 py-2 sm:table-cell">Verificado por</th>}
             {conEstado && <th className="py-2 pl-0.5 pr-3 text-right sm:px-3">Estado</th>}
           </tr>
         </thead>
@@ -361,15 +367,16 @@ export default function PedidosView({
                     <button type="button" onClick={() => setAbierto(detalleDe(p))} className="text-left">
                       <span className="font-medium text-blue-600 hover:text-blue-800">{p.cliente_nombre}</span>
                       <span className="block whitespace-nowrap text-xs text-gray-500">{p.secuencial}</span>
-                      {/* 🔴 Quién marcó cada paso y cuándo, debajo del pedido. */}
-                      {firmasEnOrden({
+                      {/* En el CELULAR, debajo del pedido; en la computadora
+                          tienen su propia columna. */}
+                      <span className="sm:hidden">{firmasEnOrden({
                         preparado_por: p.preparado_por ?? null,
                         preparado_en: p.preparado_en ?? null,
                         verificado_por: p.verificado_por ?? null,
                         verificado_en: p.verificado_en ?? null,
                       }).map((t) => (
                         <span key={t} className="block text-xs text-gray-500">{t}</span>
-                      ))}
+                      ))}</span>
                     </button>
                   ) : (
                     <>
@@ -379,6 +386,16 @@ export default function PedidosView({
                   )}
                 </td>
                 <td className={`break-words py-2 text-gray-700 sm:px-3 ${conCirculo ? "pl-1 pr-3 pt-3" : "px-1"}`}>{vendedorEnPantalla(p.vendedor_nombre)}</td>
+                {BULTOS && (
+                  <td className={`hidden whitespace-nowrap px-3 py-2 text-gray-600 sm:table-cell ${conCirculo ? "pt-3" : ""}`}>
+                    {firmaEnColumna(p.preparado_por, p.preparado_en) ?? <span className="text-gray-300">—</span>}
+                  </td>
+                )}
+                {BULTOS && (
+                  <td className={`hidden whitespace-nowrap px-3 py-2 text-gray-600 sm:table-cell ${conCirculo ? "pt-3" : ""}`}>
+                    {firmaEnColumna(p.verificado_por, p.verificado_en) ?? <span className="text-gray-300">—</span>}
+                  </td>
+                )}
                 {conEstado && (
                   <td className="py-1.5 pl-0.5 pr-3 text-right sm:px-3">{BULTOS ? controlBultos(p) : chipEstado(p)}</td>
                 )}

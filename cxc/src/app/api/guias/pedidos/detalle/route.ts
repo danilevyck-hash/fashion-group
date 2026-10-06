@@ -23,6 +23,7 @@ import {
   resumenAsignacion,
   validarBulto,
   veLaEmpresa,
+  veLaPlata,
 } from "@/lib/guias/pedidos-bultos";
 import { PEDIDOS_VER_ROLES } from "@/lib/guias/pedidos-bodega";
 import { bajarLineas, hayQueBajar, leerLineas, ponerEnBulto, quitarDelBulto } from "@/lib/guias/pedido-detalle-server";
@@ -73,13 +74,18 @@ export async function GET(req: NextRequest) {
   const pedido = await pedidoVisible(claves.empresa, claves.id, auth.userName, auth.role);
   if (!pedido) return noEsTuyo();
 
+  // 🔴 LA PLATA LA DECIDE EL SERVIDOR (Daniel, 6-oct-2026): a bodega no le
+  // viajan ni el precio ni el total. No se esconden columnas en el navegador —
+  // escondidas igual viajarían y se leen en dos toques.
+  const conPlata = veLaPlata(auth.role);
+
   try {
-    let detalle = await leerLineas(claves.empresa, claves.id);
+    let detalle = await leerLineas(claves.empresa, claves.id, conPlata);
     if (!detalle.sinTabla && hayQueBajar(detalle)) {
       // Si Switch no contesta, se muestra lo que ya había: falla ABIERTA.
       try {
         await bajarLineas(claves.empresa, claves.id);
-        detalle = await leerLineas(claves.empresa, claves.id);
+        detalle = await leerLineas(claves.empresa, claves.id, conPlata);
       } catch {
         /* se sigue con lo guardado */
       }
@@ -122,7 +128,7 @@ export async function PATCH(req: NextRequest) {
   try {
     if (quitar) await quitarDelBulto(empresa, id, ids);
     else await ponerEnBulto(empresa, id, ids, v!.valor!, firma);
-    const detalle = await leerLineas(empresa, id);
+    const detalle = await leerLineas(empresa, id, veLaPlata(auth.role));
     return NextResponse.json({ ok: true, ...detalle, resumen: resumenAsignacion(detalle.lineas) });
   } catch {
     return NextResponse.json({ error: "No se pudo guardar el bulto" }, { status: 500 });

@@ -3,9 +3,19 @@
 //
 // 🔴 VA COMO EL PDF DE PEDIDO DE SWITCH, NO AGRUPADO POR BULTO (Daniel,
 // 6-oct-2026, mandando el papel de muestra `PEDIDO 16-000002275`). Mismas
-// columnas y mismo orden que ahí, **sin «Código barra»**, y el Bulto al final:
+// columnas y mismo orden que ahí, **sin «Código barra»** ni «Referencia» —que
+// Switch no manda—, y el **Bulto PRIMERO** —«es lo que bodega llena, así que
+// manda», al aprobar—:
 //
-//     Código · Referencia · Descripción · Cant. · Precio · Total · Bulto
+//     Bulto · Código · Descripción · Cant. · Precio · Total
+//
+// 🔴 EL PAPEL SIEMPRE LLEVA PRECIO Y TOTAL, LO IMPRIMA QUIEN LO IMPRIMA
+// (Daniel, 6-oct-2026) — también bodega, que en pantalla no los ve. Por eso el
+// papel se dibuja en el SERVIDOR (`/api/guias/pedidos/detalle/papel`): así los
+// números entran al PDF sin pasar nunca por el navegador de bodega.
+//
+// El papel y la pantalla van con el MISMO orden a propósito: bodega las compara
+// una contra otra, y dos órdenes distintos obligan a buscar la columna cada vez.
 //
 // 🩸 El primer borrador agrupaba por bulto («Bulto 1: artículo · cantidad») y lo
 // descartó: bodega compara este papel contra el de Switch renglón por renglón, y
@@ -48,19 +58,18 @@ import {
 
 /** Las columnas del papel de Switch, sin «Código barra» y con «Bulto» al final. */
 export const COLUMNAS_PAPEL_BULTOS = [
+  "Bulto",
   "Código",
-  "Referencia",
   "Descripción",
   "Cant.",
   "Precio",
   "Total",
-  "Bulto",
 ] as const;
 
 const SIN_BULTO = "—";
 
 const cantidad = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
-const monto = (n: number) => n.toFixed(2);
+const monto = (n: number | null) => (n == null ? "" : n.toFixed(2));
 
 export interface PapelDeBultos {
   secuencial: string;
@@ -80,35 +89,33 @@ export function construirPdfPedidoBultos(p: PapelDeBultos): jsPDF {
   });
 
   const body = p.lineas.map((l) => [
+    l.bulto == null ? SIN_BULTO : String(l.bulto),
     l.codigo,
-    // ⚠️ El API de Switch no manda la referencia (medido): la celda va vacía
-    // antes que repetir el código y hacerla pasar por otro dato.
-    l.referencia ?? "",
     descripcionCompleta(l),
     cantidad(l.cantidad),
+    // 🔴 El papel SIEMPRE los lleva: se dibuja en el servidor, que los lee
+    // aunque quien imprime no los vea en pantalla.
     monto(l.precio),
     monto(l.total),
-    l.bulto == null ? SIN_BULTO : String(l.bulto),
   ]);
 
   autoTable(doc, {
     startY: y,
     margin: { top: MARGEN_PAPEL, left: MARGEN_PAPEL, right: MARGEN_PAPEL, bottom: PIE_PAPEL },
     head: [[...COLUMNAS_PAPEL_BULTOS]],
-    body: body.length > 0 ? body : [["", "", "Este pedido todavía no tiene artículos", "", "", "", ""]],
+    body: body.length > 0 ? body : [["", "", "Este pedido todavía no tiene artículos", "", "", ""]],
     styles: { font: "helvetica", fontSize: 8, cellPadding: 1.6, valign: "middle" },
     columnStyles: {
-      0: { cellWidth: 24 },
+      0: { cellWidth: 16, halign: "right", fontStyle: "bold" },
       1: { cellWidth: 26 },
-      3: { cellWidth: 13, halign: "right" },
-      4: { cellWidth: 16, halign: "right" },
-      5: { cellWidth: 18, halign: "right" },
-      6: { cellWidth: 14, halign: "right", fontStyle: "bold" },
+      3: { cellWidth: 14, halign: "right" },
+      4: { cellWidth: 18, halign: "right" },
+      5: { cellWidth: 20, halign: "right" },
     },
     didParseCell: (d) => {
       // El bulto en el azul de la casa; lo que falta por asignar, en rojo, que
       // es el color de lo que hay que mirar.
-      if (d.section !== "body" || d.column.index !== 6) return;
+      if (d.section !== "body" || d.column.index !== 0) return;
       d.cell.styles.textColor = String(d.cell.raw ?? "") === SIN_BULTO ? PAPEL.rojo : PAPEL.azul;
     },
   });

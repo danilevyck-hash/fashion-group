@@ -42,6 +42,9 @@ import {
   ROLES_VERIFICADO,
   ROTULO_ESTADO_BULTOS,
   bultosDelPapel,
+  COLUMNAS_DETALLE,
+  COLUMNAS_DETALLE_SIN_PLATA,
+  ROLES_VEN_PRECIO,
   cuantosBultos,
   descripcionCompleta,
   empresasQueVe,
@@ -51,6 +54,7 @@ import {
   mismaPersona,
   notaDelPedido,
   firmaDelPaso,
+  firmaEnColumna,
   firmasEnOrden,
   puedeMover,
   resumenAsignacion,
@@ -59,6 +63,7 @@ import {
   todoAsignado,
   validarBulto,
   veLaEmpresa,
+  veLaPlata,
   type LineaPedido,
 } from "@/lib/guias/pedidos-bultos";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
@@ -66,7 +71,6 @@ import { ESTADOS_PEDIDO } from "@/lib/guias/pedidos-bodega";
 
 const linea = (p: Partial<LineaPedido> & { codigo_barra_id: number }): LineaPedido => ({
   codigo: "NB2570001",
-  referencia: null,
   descripcion: "Men-T-Shirts S/S",
   talla: null,
   color: null,
@@ -388,6 +392,106 @@ describe("🔴 8 y 9 · el papel, y lo medido", () => {
   });
 });
 
+describe("🔴 lo que Daniel pidió al APROBAR (6-oct-2026)", () => {
+  const leer = (f: string) => fs.readFileSync(path.resolve(__dirname, "../..", f), "utf8");
+
+  it("1 · el BULTO es la PRIMERA columna: «es lo que bodega llena, así que manda»", () => {
+    expect(COLUMNAS_DETALLE[0]).toBe("Bulto");
+    expect([...COLUMNAS_DETALLE]).toEqual(["Bulto", "Código", "Descripción", "Cantidad", "Precio", "Total"]);
+    // 🔴 Ni «Código barra» ni «Referencia»: Switch no manda la segunda (medido).
+    expect(COLUMNAS_DETALLE).not.toContain("Código barra");
+    expect(COLUMNAS_DETALLE).not.toContain("Referencia");
+  });
+
+  it("1b · y el PAPEL lleva el mismo orden, para poder comparar los dos", () => {
+    const papel = leer("lib/guias/pdf-pedido-bultos.ts");
+    expect(papel).toMatch(/COLUMNAS_PAPEL_BULTOS = \[\s*\n\s*"Bulto",/);
+    expect(papel).not.toContain('"Código barra"');
+    expect(papel).not.toContain('"Referencia"');
+  });
+
+  it("2 · «Preparado por» y «Verificado por» son COLUMNAS, no una línea suelta", () => {
+    const lista = leer("app/guias/components/PedidosView.tsx");
+    expect(lista).toContain("Preparado por</th>");
+    expect(lista).toContain("Verificado por</th>");
+    expect(lista).toContain("firmaEnColumna");
+  });
+
+  it("2b · la columna dice «quién · hora»; el rótulo ya lo pone el encabezado", () => {
+    expect(firmaEnColumna("Julio", "2026-10-06T10:42:00-05:00")).toBe("Julio · 10:42 a. m.");
+    // Sin el paso dado, no se inventa nada.
+    expect(firmaEnColumna(null, "2026-10-06T10:42:00-05:00")).toBeNull();
+    expect(firmaEnColumna("Julio", null)).toBeNull();
+    expect(firmaEnColumna("  ", "2026-10-06T10:42:00-05:00")).toBeNull();
+  });
+
+  it("3 · el bulto se ESCRIBE en la celda, sin abrir ninguna ventana", () => {
+    const detalle = leer("app/guias/components/PedidoBultos.tsx");
+    // Una casilla por línea que guarda al salir o con Enter — no en cada tecla.
+    expect(detalle).toContain("guardarUna");
+    expect(detalle).toContain("onBlur");
+    expect(detalle).toContain('e.key !== "Enter"');
+    // 🔴 Y las casillas con «Poner en bulto…» SIGUEN existiendo.
+    expect(detalle).toContain("Poner en bulto");
+    expect(detalle).toContain("marcarTodas");
+  });
+
+  it("3b · en el CELULAR no cambia: ahí mandan las casillas y el botón", () => {
+    const detalle = leer("app/guias/components/PedidoBultos.tsx");
+    // La casilla de escribir solo aparece desde `sm`; en el celular, el chip.
+    expect(detalle).toContain('className="hidden h-9 w-16 rounded-md border border-gray-300 px-2 text-right tabular-nums focus:border-gray-900 focus:outline-none sm:block"');
+    expect(detalle).toContain('<span className="sm:hidden">{chip}</span>');
+  });
+});
+
+describe("🔴 LA PLATA DEPENDE DE QUIÉN MIRA, Y LO DECIDE EL SERVIDOR (6-oct-2026)", () => {
+  // Daniel: «bodega NO ve Precio ni Total, ni en la lista ni en el detalle; la
+  // secretaria y admin SÍ; el papel SIEMPRE sale con Precio y Total, lo imprima
+  // quien lo imprima». 🔴 Y: «decídelo en el SERVIDOR, no escondiendo columnas
+  // en el navegador, para que a bodega no le viajen los precios».
+  const leer = (f: string) => fs.readFileSync(path.resolve(__dirname, "../..", f), "utf8");
+
+  it("bodega NO ve la plata; la secretaria y admin SÍ", () => {
+    expect(veLaPlata("bodega")).toBe(false);
+    expect(veLaPlata("vendedor")).toBe(false);
+    expect(veLaPlata("secretaria")).toBe(true);
+    expect(veLaPlata("admin")).toBe(true);
+    expect(veLaPlata(null)).toBe(false);
+    expect([...ROLES_VEN_PRECIO]).toEqual(["admin", "secretaria"]);
+  });
+
+  it("🔴 y el precio NO VIAJA: el servidor lo deja en null antes de mandarlo", () => {
+    // La lectura recibe `conPlata` y pone `null` ahí mismo, no en la pantalla.
+    const servidor = leer("lib/guias/pedido-detalle-server.ts");
+    expect(servidor).toContain("conPlata ? num(f.precio) : null");
+    expect(servidor).toContain("conPlata ? num(f.total) : null");
+    // Y la ruta lo decide con el ROL de la cookie firmada.
+    const ruta = leer("app/api/guias/pedidos/detalle/route.ts");
+    expect(ruta).toContain("veLaPlata(auth.role)");
+    // 🔴 Las dos lecturas que contestan al navegador lo pasan.
+    expect(ruta).toContain("leerLineas(claves.empresa, claves.id, conPlata)");
+    expect(ruta).toContain("leerLineas(empresa, id, veLaPlata(auth.role))");
+  });
+
+  it("🔴 el PAPEL siempre lleva plata, y por eso se dibuja en el SERVIDOR", () => {
+    // 🔑 Si el papel se armara en el navegador, para dibujar los precios habría
+    // que mandárselos a bodega — y «no los ve» sería mentira.
+    const papel = leer("app/api/guias/pedidos/detalle/papel/route.ts");
+    expect(papel).toContain("leerLineas(empresa, id, true)");
+    expect(papel).toContain("application/pdf");
+    // Y la pantalla ya NO arma el PDF: lo pide.
+    const detalle = leer("app/guias/components/PedidoBultos.tsx");
+    expect(detalle).toContain("/api/guias/pedidos/detalle/papel");
+    expect(detalle).not.toContain("construirPdfPedidoBultos");
+  });
+
+  it("la pantalla dibuja las columnas de plata SOLO si llegaron", () => {
+    const detalle = leer("app/guias/components/PedidoBultos.tsx");
+    expect(detalle).toContain("const conPlata = !!lineas?.some((l) => l.precio != null)");
+    expect([...COLUMNAS_DETALLE_SIN_PLATA]).toEqual(["Bulto", "Código", "Descripción", "Cantidad"]);
+  });
+});
+
 describe("🔴 el bulto se ESCRIBE: validación del número", () => {
   it("entero de 1 a 9999, porque 416 fue real", () => {
     expect(MAX_BULTO).toBeGreaterThanOrEqual(416);
@@ -404,15 +508,14 @@ describe("🔴 el bulto se ESCRIBE: validación del número", () => {
 });
 
 describe("el total y la referencia", () => {
-  it("⚠️ «Referencia» NO se inventa: el API no la manda y la línea la trae en null", () => {
-    // 🩸 El primer borrador la derivaba con `modeloDe` (quitar 3 caracteres).
-    // El PDF de Switch prueba que está MAL: ahí la referencia es más LARGA que
-    // el código (`4RG822G200` → `4RG822G200-HMT`), no más corta. Medido el
-    // 6-oct-2026 contra el API real: no viene con ningún nombre.
-    expect(linea({ codigo_barra_id: 1 }).referencia).toBeNull();
-    // Y no se deriva de ningún lado: el módulo no importa la regla del modelo.
+  it("⚠️ «Referencia» se QUITÓ: el API de Switch no la manda (Daniel, 6-oct-2026)", () => {
+    // 🩸 Un borrador la derivaba con `modeloDe` (quitar 3 caracteres). El PDF de
+    // Switch prueba que estaba MAL: ahí la referencia es más LARGA que el código
+    // (`4RG822G200` → `4RG822G200-HMT`). Medido contra el API real: no viene con
+    // ningún nombre, así que la columna se fue entera.
     const fuente = fs.readFileSync(path.resolve(__dirname, "../../lib/guias/pedidos-bultos.ts"), "utf8");
     expect(fuente).not.toMatch(/^import .*modeloDe/m);
+    expect(fuente).not.toContain("referencia:");
   });
 
   it("🔑 talla y color vienen SEPARADOS, y «-» es el «sin dato» de Switch", () => {

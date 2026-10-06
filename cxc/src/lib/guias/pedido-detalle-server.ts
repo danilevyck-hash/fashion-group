@@ -52,7 +52,6 @@ interface FilaLinea {
   codigo_barra_id: number;
   orden: number;
   codigo: string;
-  referencia: string | null;
   descripcion: string;
   talla: string | null;
   color: string | null;
@@ -69,12 +68,22 @@ const num = (v: unknown): number => {
 
 // ─── Leer ────────────────────────────────────────────────────────────────────
 
-/** Las líneas del pedido con el bulto de cada una. Falla ABIERTO. */
-export async function leerLineas(empresaKey: string, pedidoId: number): Promise<DetalleDelPedido> {
+/**
+ * Las líneas del pedido con el bulto de cada una. Falla ABIERTO.
+ *
+ * 🔴 `conPlata = false` deja `precio` y `total` en `null` ANTES de que salgan de
+ * aquí: a bodega esos números no le viajan (Daniel, 6-oct-2026). Esconder la
+ * columna en el navegador no alcanza — escondida igual viaja.
+ */
+export async function leerLineas(
+  empresaKey: string,
+  pedidoId: number,
+  conPlata = true,
+): Promise<DetalleDelPedido> {
   const [lin, bul] = await Promise.all([
     supabaseServer
       .from("pedidos_lineas")
-      .select("codigo_barra_id, orden, codigo, referencia, descripcion, talla, color, cantidad, precio, total, synced_at")
+      .select("codigo_barra_id, orden, codigo, descripcion, talla, color, cantidad, precio, total, synced_at")
       .eq("empresa_key", empresaKey)
       .eq("pedido_switch_id", pedidoId)
       .order("orden"),
@@ -99,13 +108,12 @@ export async function leerLineas(empresaKey: string, pedidoId: number): Promise<
     return {
       codigo_barra_id: Number(f.codigo_barra_id),
       codigo: f.codigo,
-      referencia: f.referencia,
       descripcion: f.descripcion,
       talla: f.talla,
       color: f.color,
       cantidad: num(f.cantidad),
-      precio: num(f.precio),
-      total: num(f.total),
+      precio: conPlata ? num(f.precio) : null,
+      total: conPlata ? num(f.total) : null,
       bulto: deBulto.get(Number(f.codigo_barra_id)) ?? null,
     };
   });
@@ -139,9 +147,6 @@ export async function bajarLineas(empresaKey: string, pedidoId: number): Promise
       orden: i + 1,
       articulo_id: Number.isFinite(Number(l.articuloId)) ? Number(l.articuloId) : null,
       codigo: String(l.codigoArticulo ?? "").trim() || "—",
-      // ⚠️ Medido el 6-oct-2026: el API no manda la referencia con ningún nombre.
-      // Se deja NULL. Si algún día la manda, se lee de aquí sin cambiar nada más.
-      referencia: null,
       // La CATEGORÍA de Switch, tal cual.
       descripcion: String(l.descripcion ?? "").trim() || "—",
       // 🔑 Talla y color SÍ vienen separados. Se guardan como vienen —«-»

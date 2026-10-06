@@ -28,7 +28,6 @@ import { Aviso } from "@/components/ui/Aviso";
 import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
 import { descargarArchivo } from "@/lib/compartir-archivo";
 import { fmt } from "@/lib/format";
-import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import {
   COLUMNAS_DETALLE,
   MAX_BULTO,
@@ -72,6 +71,8 @@ export default function PedidoBultos({
   const [pidiendoBulto, setPidiendoBulto] = useState(false);
   const [numero, setNumero] = useState("");
   const [guardando, setGuardando] = useState(false);
+  // Lo tecleado en cada celda mientras no se guarda (la verdad sigue en `lineas`).
+  const [enCelda, setEnCelda] = useState<Record<number, string>>({});
   // La barra de abajo publica su alto para que el ☰ redondo del celular se le
   // suba encima (`useBarraFijaAbajo`), como las otras cinco barras negras.
   const barraRef = useRef<HTMLDivElement | null>(null);
@@ -100,6 +101,9 @@ export default function PedidoBultos({
   }, [clave]);
 
   const resumen = useMemo(() => (lineas ? resumenAsignacion(lineas) : ""), [lineas]);
+  // 🔴 Las columnas de plata se dibujan solo si el SERVIDOR las mandó. A bodega
+  // no le viajan, así que acá no hay nada que esconder: no están.
+  const conPlata = !!lineas?.some((l) => l.precio != null);
 
   function alternar(id: number) {
     setMarcadas((s) => {
@@ -142,30 +146,126 @@ export default function PedidoBultos({
     }
   }
 
+  /**
+   * 🔴 MENOS CLICS EN LA COMPUTADORA (Daniel, 6-oct-2026, al aprobar): el número
+   * del bulto se escribe DIRECTO en la celda y con Tab se pasa a la siguiente,
+   * sin abrir ninguna ventana. Se guarda al salir de la casilla o con Enter —no
+   * en cada tecla—, así escribir «416» es UNA llamada y no tres.
+   * ⚠️ En el celular esto no cambia: ahí mandan las casillas y el botón.
+   */
+  async function guardarUna(id: number, texto: string) {
+    const crudo = texto.trim();
+    const linea = (lineas ?? []).find((x) => x.codigo_barra_id === id);
+    const antes = linea?.bulto ?? null;
+    // Vaciar la casilla saca la línea de su bulto; escribir lo mismo no hace nada.
+    const bulto = crudo === "" ? null : Number(crudo);
+    if (bulto === antes) return;
+    if (crudo !== "") {
+      const v = validarBulto(crudo);
+      if (!v.ok) {
+        toast(v.error, "warning");
+        setEnCelda((m) => ({ ...m, [id]: antes == null ? "" : String(antes) }));
+        return;
+      }
+    }
+    // Optimista: el número queda puesto mientras viaja, y se revierte si falla.
+    setLineas((xs) => (xs ?? []).map((x) => (x.codigo_barra_id === id ? { ...x, bulto } : x)));
+    try {
+      const r = await fetch("/api/guias/pedidos/detalle", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          empresa_key: pedido.empresa_key,
+          pedido_switch_id: pedido.pedido_switch_id,
+          codigo_barra_ids: [id],
+          bulto,
+        }),
+      });
+      const d = (await r.json().catch(() => null)) as Respuesta | null;
+      if (!r.ok) throw new Error(d?.error ?? String(r.status));
+      setLineas(d?.lineas ?? []);
+    } catch (e) {
+      setLineas((xs) => (xs ?? []).map((x) => (x.codigo_barra_id === id ? { ...x, bulto: antes } : x)));
+      setEnCelda((m) => ({ ...m, [id]: antes == null ? "" : String(antes) }));
+      toast(e instanceof Error && e.message.length < 90 ? e.message : "No se pudo guardar el bulto.", "error");
+    }
+  }
+
   function confirmarBulto() {
     const v = validarBulto(numero);
     if (!v.ok) return toast(v.error, "warning");
     void guardar(v.valor!);
   }
 
+  /**
+   * 🔴 EL PAPEL LO DIBUJA EL SERVIDOR (6-oct-2026). Daniel pidió que bodega no
+   * vea Precio ni Total y que el papel SIEMPRE los lleve: las dos cosas solo se
+   * cumplen si el PDF se arma allá, donde los números existen. Acá solo se pide
+   * y se abre.
+   */
   async function imprimir() {
     try {
-      const { construirPdfPedidoBultos } = await import("@/lib/guias/pdf-pedido-bultos");
-      const doc = construirPdfPedidoBultos({
-        secuencial: pedido.secuencial,
-        empresa: nombreCortoEmpresa(pedido.empresa_key),
-        cliente: pedido.cliente_nombre,
-        lineas: lineas ?? [],
-      });
-      doc.autoPrint();
-      if (!window.open(doc.output("bloburl") as unknown as string, "_blank")) {
-        descargarArchivo(new File([doc.output("blob")], `bultos-${pedido.secuencial}.pdf`, { type: "application/pdf" }));
+      const r = await fetch(`/api/guias/pedidos/detalle/papel?${clave}`, { cache: "no-store" });
+      if (!r.ok) throw new Error(String(r.status));
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const ventana = window.open(url, "_blank");
+      if (ventana) {
+        ventana.addEventListener("load", () => ventana.print(), { once: true });
+      } else {
+        descargarArchivo(new File([blob], `bultos-${pedido.secuencial}.pdf`, { type: "application/pdf" }));
         toast("Papel descargado — ábrelo para imprimir", "success");
       }
+      // El navegador necesita la URL viva mientras abre la pestaña.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch {
       toast("No se pudo preparar el papel. Intenta de nuevo.", "error");
     }
   }
+
+  /**
+   * El bulto de una línea. En la computadora es una casilla que se escribe
+   * (Tab pasa a la siguiente); en el celular, el chip de siempre, quieto —ahí
+   * se usan las casillas y «Poner en bulto…»—. Quien no puede poner bultos ve
+   * el chip en las dos.
+   */
+  const celdaBulto = (l: LineaPedido) => {
+    const chip =
+      l.bulto == null ? (
+        <span className="text-gray-400">—</span>
+      ) : (
+        <span className="inline-flex h-7 items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 text-xs font-medium text-emerald-700">
+          {l.bulto}
+        </span>
+      );
+    if (!puedePoner) return chip;
+    const valor = enCelda[l.codigo_barra_id] ?? (l.bulto == null ? "" : String(l.bulto));
+    return (
+      <>
+        <span className="sm:hidden">{chip}</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={MIN_BULTO}
+          max={MAX_BULTO}
+          value={valor}
+          aria-label={`Bulto de ${l.descripcion}`}
+          onChange={(e) => setEnCelda((m) => ({ ...m, [l.codigo_barra_id]: e.target.value }))}
+          onFocus={(e) => e.currentTarget.select()}
+          onBlur={(e) => void guardarUna(l.codigo_barra_id, e.target.value)}
+          onKeyDown={(e) => {
+            // Enter guarda y baja a la siguiente; Tab ya baja solo.
+            if (e.key !== "Enter") return;
+            e.preventDefault();
+            e.currentTarget.blur();
+            const casillas = [...(e.currentTarget.closest("tbody")?.querySelectorAll<HTMLInputElement>('input[type="number"]') ?? [])];
+            casillas[casillas.indexOf(e.currentTarget) + 1]?.focus();
+          }}
+          className="hidden h-9 w-16 rounded-md border border-gray-300 px-2 text-right tabular-nums focus:border-gray-900 focus:outline-none sm:block"
+        />
+      </>
+    );
+  };
 
   const todasMarcadas = !!lineas && lineas.length > 0 && marcadas.size === lineas.length;
 
@@ -220,17 +320,19 @@ export default function PedidoBultos({
                     />
                   </th>
                 )}
-                {/* 🩸 En el celular, Código y Referencia NO tienen columna propia: con
+                {/* 🔴 El BULTO va primero: es lo que bodega llena.
+                    🩸 En el celular, Código y Referencia NO tienen columna propia: con
                     las 7 columnas a 390 px el chip del Bulto quedaba CORTADO
                     («41» en vez de 416). El código va bajo la descripción, como
                     el n.º de pedido va bajo el cliente en la lista. */}
-                <th className="hidden px-3 py-2 sm:table-cell">{COLUMNAS_DETALLE[0]}</th>
+                <th className="w-20 py-2 pl-1 pr-1 sm:px-3">{COLUMNAS_DETALLE[0]}</th>
                 <th className="hidden px-3 py-2 sm:table-cell">{COLUMNAS_DETALLE[1]}</th>
                 <th className="py-2 pl-1 pr-1 sm:px-3">{COLUMNAS_DETALLE[2]}</th>
                 <th className="px-1 py-2 text-right sm:px-3">{COLUMNAS_DETALLE[3]}</th>
-                <th className="hidden px-3 py-2 text-right sm:table-cell">{COLUMNAS_DETALLE[4]}</th>
-                <th className="hidden px-3 py-2 text-right sm:table-cell">{COLUMNAS_DETALLE[5]}</th>
-                <th className="py-2 pl-1 pr-3 text-right sm:px-3">{COLUMNAS_DETALLE[6]}</th>
+                {/* 🔴 Precio y Total solo si el SERVIDOR los mandó: a bodega no
+                    le llegan, así que la columna ni se dibuja. */}
+                {conPlata && <th className="hidden px-3 py-2 text-right sm:table-cell">{COLUMNAS_DETALLE[4]}</th>}
+                {conPlata && <th className="hidden px-3 py-2 text-right sm:table-cell">{COLUMNAS_DETALLE[5]}</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 align-top">
@@ -249,34 +351,28 @@ export default function PedidoBultos({
                       </label>
                     </td>
                   )}
+                  <td className="whitespace-nowrap py-2 pl-1 pr-1 tabular-nums sm:px-3">{celdaBulto(l)}</td>
                   <td className="hidden whitespace-nowrap px-3 py-2 tabular-nums text-gray-700 sm:table-cell">{l.codigo}</td>
                   {/* ⚠️ El API de Switch NO manda la referencia (medido): la
                       celda va vacía antes que repetir el código y hacerla pasar
                       por otro dato. */}
-                  <td className="hidden whitespace-nowrap px-3 py-2 tabular-nums text-gray-500 sm:table-cell">
-                    {l.referencia ?? <span className="text-gray-300">—</span>}
-                  </td>
                   {/* La categoría de Switch, con su talla y su color si los manda. */}
                   <td className="break-words py-2 pl-1 pr-1 font-medium text-gray-900 sm:px-3">
                     {descripcionCompleta(l)}
                     <span className="block tabular-nums text-xs font-normal text-gray-500 sm:hidden">{l.codigo}</span>
                   </td>
                   <td className="whitespace-nowrap px-1 py-2 text-right tabular-nums text-gray-700 sm:px-3">{l.cantidad}</td>
-                  <td className="hidden whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-700 sm:table-cell">
-                    ${fmt(l.precio)}
-                  </td>
-                  <td className="hidden whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900 sm:table-cell">
-                    ${fmt(l.total)}
-                  </td>
-                  <td className="whitespace-nowrap py-2 pl-1 pr-3 text-right tabular-nums sm:px-3">
-                    {l.bulto == null ? (
-                      <span className="text-gray-400">—</span>
-                    ) : (
-                      <span className="inline-flex h-7 items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 text-xs font-medium text-emerald-700">
-                        {l.bulto}
-                      </span>
-                    )}
-                  </td>
+                  {conPlata && (
+                    <td className="hidden whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-700 sm:table-cell">
+                      ${fmt(l.precio ?? 0)}
+                    </td>
+                  )}
+                  {conPlata && (
+                    <td className="hidden whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900 sm:table-cell">
+                      ${fmt(l.total ?? 0)}
+                    </td>
+                  )}
+
                 </tr>
               ))}
             </tbody>
