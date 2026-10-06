@@ -371,7 +371,8 @@ describe("🩸 9. un número negativo se lee en el papel, no sale mangado", () =
     }]));
     expect(texto, "el renglón salió mangado").not.toContain("2 5 0 . 0 0");
     expect(texto).toContain("-$250.00");
-    // Y la línea del cierre se lee entera, con su «×» y su porcentaje.
-    expect(texto).toContain("× 0.50%");
+    // Y la línea del pie se lee entera, con su porcentaje (🔄 6-oct-2026: el
+    // cierre «× 0.50%» se fue con el papel v3; la tasa va en la línea del pie).
+    expect(texto).toContain("0.50% de -$250 en ventas");
   });
 });

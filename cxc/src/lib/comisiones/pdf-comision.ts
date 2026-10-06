@@ -45,12 +45,10 @@ import {
   ALTO_CABECERA,
   ALTO_CONTINUACION,
   MARGEN,
-  NAVY,
   PIE,
   ROJO,
   TINTA,
   GRIS,
-  LINEA,
   asegurarEspacio,
   cabecera,
   estilosDeTabla,
@@ -61,13 +59,19 @@ import {
 import {
   COLUMNAS_COBROS,
   COLUMNAS_VENTAS,
+  descuentosActivos,
   encabezadoReporte,
+  entraAlPapel,
   filasCobros,
   filasVentas,
-  lineasDelCierre,
-  totalesDelPapel,
+  lineaDeComisionesDelPapel,
+  lineaDelPieDelPapel,
+  seccionesDelPapel,
+  totalAPagarComision,
   type HojaReporte,
+  type SeccionesDelPapel,
 } from "./reporte-comision";
+import { fmtMoney } from "@/lib/ventas/format";
 
 /** El rótulo de una sección: «Ventas», «Cobros». */
 function tituloSeccion(doc: jsPDF, y: number, texto: string): number {
@@ -78,118 +82,113 @@ function tituloSeccion(doc: jsPDF, y: number, texto: string): number {
   return y + 3;
 }
 
-/** La caja de cierre: de dónde sale cada comisión y qué se paga. */
-function dibujarCierre(doc: jsPDF, y: number, hoja: HojaReporte): number {
-  const w = doc.internal.pageSize.getWidth();
-  const lineas = lineasDelCierre(hoja.data, hoja.descuentos);
-  const alto = 9 + lineas.length * 5 + 3;
-  // 🔴 El cierre NUNCA se parte entre dos hojas: es lo que se lee primero.
-  let yy = asegurarEspacio(doc, y, alto);
-
-  doc.setDrawColor(...LINEA);
-  doc.setLineWidth(0.3);
-  doc.rect(MARGEN, yy, w - MARGEN * 2, alto);
-
-  yy += 6;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
+/**
+ * 🔴 EL PAPEL, ALINEADO CON EL DETALLE v3 (6-oct-2026): el título, el total a
+ * pagar grande con UNA línea gris («Comisión de ventas · de cobros» y los
+ * descuentos), Ventas y Cobros SOLO si aplican (`seccionesDelPapel`) y UNA línea
+ * al pie con tasas y bases. Se fueron «TOTAL VENTAS / COBROS / VENTAS + COBROS»
+ * y la caja «Resumen», que repetían lo de arriba. Ningún número cambia: el
+ * total es `totalAPagarComision`, la misma cuenta de la pantalla.
+ */
+function dibujarNumero(doc: jsPDF, y: number, hoja: HojaReporte, s: SeccionesDelPapel): number {
+  const total = totalAPagarComision(hoja.data, hoja.descuentos);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(22);
+  doc.setTextColor(...(total < 0 ? ROJO : TINTA));
+  doc.text(textoDePdf(fmtMoney(total)), MARGEN, y + 7);
+  const partes = [lineaDeComisionesDelPapel(hoja.data, s)];
+  for (const d of descuentosActivos(hoja.descuentos)) partes.push(`${d.concepto} −${fmtMoney(d.monto)}`);
+  doc.setFontSize(9);
   doc.setTextColor(...GRIS);
-  doc.text("RESUMEN", MARGEN + 3, yy); // 1-oct-2026, Daniel: nombres normales de ERP
-  yy += 5;
-
-  for (const l of lineas) {
-    doc.setFont("helvetica", l.fuerte ? "bold" : "normal");
-    doc.setFontSize(l.fuerte ? 9 : 8);
-    // 🔴 El rojo se decide con el texto CRUDO (que sí lleva el «−»); lo que se
-    // dibuja va saneado. Al revés, el negativo dejaría de pintarse.
-    doc.setTextColor(...(l.monto.startsWith("−") ? ROJO : TINTA));
-    doc.text(textoDePdf(l.rotulo), MARGEN + 3, yy);
-    doc.text(textoDePdf(l.monto), w - MARGEN - 3, yy, { align: "right" });
-    yy += 5;
-  }
-  return yy + 4;
+  doc.text(textoDePdf(partes.filter(Boolean).join(" · ")), MARGEN, y + 13);
+  return y + 20;
 }
 
-/** Una línea de total a lo ancho, con su raya arriba. */
-function dibujarTotal(doc: jsPDF, y: number, rotulo: string, monto: string): number {
-  const w = doc.internal.pageSize.getWidth();
-  doc.setDrawColor(...NAVY);
-  doc.setLineWidth(0.5);
-  doc.line(MARGEN, y, w - MARGEN, y);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(...TINTA);
-  doc.text(textoDePdf(rotulo), MARGEN, y + 5);
-  doc.text(textoDePdf(monto), w - MARGEN, y + 5, { align: "right" });
-  return y + 9;
+/** La línea gris del pie: tasas y bases de lo que aplica. */
+function dibujarPie(doc: jsPDF, y: number, hoja: HojaReporte, s: SeccionesDelPapel): void {
+  const yy = asegurarEspacio(doc, y + 4, 8);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...GRIS);
+  doc.text(textoDePdf(lineaDelPieDelPapel(hoja.data, s)), MARGEN, yy);
 }
 
 /**
  * El documento completo. **Una hoja nueva por empresa**: los reportes nunca se
  * pegan a media página, y el de una empresa jamás arrastra el de otra porque el
- * documento se arma SOLO con lo que llega en `hojas`.
+ * documento se arma SOLO con lo que llega en `hojas`. Quien no tiene ninguna
+ * sección que aplique no sale.
  */
-export function construirPdfComision(hojas: HojaReporte[]): jsPDF {
+export function construirPdfComision(hojasPedidas: HojaReporte[]): jsPDF {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+  const conSecciones = hojasPedidas.map((h) => ({ hoja: h, s: seccionesDelPapel(h.data, h.vendedor) }));
+  const hojas = conSecciones.filter((x) => entraAlPapel(x.s));
 
-  hojas.forEach((hoja, i) => {
+  if (hojas.length === 0) {
+    cabecera(doc, hojasPedidas[0] ? encabezadoReporte(hojasPedidas[0]) : "Comisión");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(...GRIS);
+    doc.text(textoDePdf("Sin comisión que pagar en el período."), MARGEN, ALTO_CABECERA + 2);
+  }
+
+  hojas.forEach(({ hoja, s }, i) => {
     const titulo = encabezadoReporte(hoja);
     if (i > 0) doc.addPage();
     cabecera(doc, titulo);
 
-    const ventas = filasVentas(hoja.data);
-    const cobros = filasCobros(hoja.data);
-    const [totalVentas, totalCobros, totalJuntos] = totalesDelPapel(hoja.data);
+    let y = dibujarNumero(doc, ALTO_CABECERA - 6, hoja, s);
 
-    let y = tituloSeccion(doc, ALTO_CABECERA - 4, "Ventas");
+    if (s.ventas) {
+      const ventas = filasVentas(hoja.data);
+      y = tituloSeccion(doc, y, "Ventas");
+      autoTable(doc, {
+        startY: y,
+        margin: { top: ALTO_CONTINUACION, left: MARGEN, right: MARGEN, bottom: PIE },
+        head: [[...COLUMNAS_VENTAS]],
+        body: ventas.length
+          ? ventas.map((f) => f.celdas.map(textoDePdf))
+          : [["", "Sin ventas en el período.", "", "", ""]],
+        columnStyles: {
+          0: { cellWidth: 20 },
+          1: { cellWidth: "auto" },
+          2: { cellWidth: 28 },
+          3: { cellWidth: 12, halign: "center" },
+          4: { cellWidth: 26, halign: "right" },
+        },
+        didParseCell: (d) => {
+          if (d.section === "body" && ventas[d.row.index]?.negativo) d.cell.styles.textColor = ROJO;
+        },
+        ...estilosDeTabla(),
+      });
+      y = finDeTabla(doc) + 4;
+    }
 
-    autoTable(doc, {
-      startY: y,
-      margin: { top: ALTO_CONTINUACION, left: MARGEN, right: MARGEN, bottom: PIE },
-      head: [[...COLUMNAS_VENTAS]],
-      body: ventas.length
-        ? ventas.map((f) => f.celdas.map(textoDePdf))
-        : [["", "Sin ventas comisionables.", "", "", ""]],
-      columnStyles: {
-        0: { cellWidth: 20 },
-        1: { cellWidth: "auto" },
-        2: { cellWidth: 28 },
-        3: { cellWidth: 12, halign: "center" },
-        4: { cellWidth: 26, halign: "right" },
-      },
-      // La nota de crédito se lee en ROJO y en negativo, igual que en pantalla.
-      didParseCell: (d) => {
-        if (d.section === "body" && ventas[d.row.index]?.negativo) d.cell.styles.textColor = ROJO;
-      },
-      ...estilosDeTabla(),
-    });
+    if (s.cobros) {
+      const cobros = filasCobros(hoja.data);
+      y = asegurarEspacio(doc, y + 2, 24);
+      y = tituloSeccion(doc, y, "Cobros");
+      autoTable(doc, {
+        startY: y,
+        margin: { top: ALTO_CONTINUACION, left: MARGEN, right: MARGEN, bottom: PIE },
+        head: [[...COLUMNAS_COBROS]],
+        body: cobros.length
+          ? cobros.map((f) => f.celdas.map(textoDePdf))
+          : [["", "Sin cobros en el período.", ""]],
+        columnStyles: {
+          0: { cellWidth: 20 },
+          1: { cellWidth: "auto" },
+          2: { cellWidth: 26, halign: "right" },
+        },
+        didParseCell: (d) => {
+          if (d.section === "body" && cobros[d.row.index]?.negativo) d.cell.styles.textColor = ROJO;
+        },
+        ...estilosDeTabla(),
+      });
+      y = finDeTabla(doc) + 4;
+    }
 
-    y = dibujarTotal(doc, finDeTabla(doc) + 2, totalVentas.rotulo, totalVentas.monto);
-
-    y = asegurarEspacio(doc, y + 4, 24);
-    y = tituloSeccion(doc, y, "Cobros");
-
-    autoTable(doc, {
-      startY: y,
-      margin: { top: ALTO_CONTINUACION, left: MARGEN, right: MARGEN, bottom: PIE },
-      head: [[...COLUMNAS_COBROS]],
-      body: cobros.length
-        ? cobros.map((f) => f.celdas.map(textoDePdf))
-        : [["", "Sin cobros comisionables.", ""]],
-      columnStyles: {
-        0: { cellWidth: 20 },
-        1: { cellWidth: "auto" },
-        2: { cellWidth: 26, halign: "right" },
-      },
-      didParseCell: (d) => {
-        if (d.section === "body" && cobros[d.row.index]?.negativo) d.cell.styles.textColor = ROJO;
-      },
-      ...estilosDeTabla(),
-    });
-
-    y = dibujarTotal(doc, finDeTabla(doc) + 2, totalCobros.rotulo, totalCobros.monto);
-    y = dibujarTotal(doc, asegurarEspacio(doc, y, 12), totalJuntos.rotulo, totalJuntos.monto);
-    dibujarCierre(doc, y + 3, hoja);
+    dibujarPie(doc, y, hoja, s);
   });
 
   piePorHoja(doc);

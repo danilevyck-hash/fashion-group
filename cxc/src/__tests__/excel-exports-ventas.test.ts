@@ -208,7 +208,9 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
   // total no se mueve.
   it("comisión detalle Excel — omite las facturas con aporte $0 y el total no cambia", async () => {
     const d: ComisionDetalle = {
-      empresa_key: "vistana", year: 2026, mes: 7, vendedor: "DANIEL LEVY",
+      // 🔄 6-oct-2026: era DANIEL LEVY; desde que lo «No pagable» no sale en el
+      // papel, su Excel no lleva secciones. Este caso cuida los renglones en $0.
+      empresa_key: "vistana", year: 2026, mes: 7, vendedor: "EDWIN",
       tasa_venta: 0.005, tasa_cobro: 0.005,
       ventas: [
         { fecha: "2026-07-02", cliente: "Dana Mall", secuencial: "11-000002973", tipo: "Factura", subtotal: 1000, pct_utilidad: 30 },

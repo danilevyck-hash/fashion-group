@@ -247,11 +247,12 @@ describe("⚠️ 5. lo que el papel dice no cambió", () => {
 
   it("⚠️ los totales salen del RPC: acá no se recalcula ninguno", async () => {
     const texto = await textoDelPdf(construirPdfComision([hoja(EDWIN, "Vistana")]));
-    expect(texto).toContain("TOTAL VENTAS");
-    expect(texto).toContain("TOTAL COBROS");
-    expect(texto).toContain("RESUMEN");
-    // 750 + 800, el número del RPC — no la suma de las líneas redondeadas.
-    expect(texto).toContain("$1,550.00");
+    // 🔄 6-oct-2026 — el papel quedó como el detalle v3: sin «TOTAL VENTAS /
+    // COBROS / VENTAS + COBROS» ni la caja «Resumen»; las bases del RPC van en
+    // la línea del pie y las comisiones del RPC bajo el número grande.
+    for (const t of ["TOTAL VENTAS", "TOTAL COBROS", "RESUMEN", "$1,550.00"]) expect(texto).not.toContain(t);
+    expect(texto).toContain("Comisión de ventas $3.75 · de cobros $4.00");
+    expect(texto).toContain("0.50% de $750 en ventas · 0.50% de $800 en cobros");
   });
 
   it("🔴 el descuento se resta UNA vez y se ve en el cierre", () => {

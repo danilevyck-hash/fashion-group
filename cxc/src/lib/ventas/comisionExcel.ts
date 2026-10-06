@@ -13,7 +13,7 @@ import { ROTULO_NO_SE_PAGA, sumarPagable } from "@/lib/comisiones/sin-pago";
 import { sinRetirados } from "@/lib/comisiones/retirados";
 import { nombreArchivoComision, nombreArchivoComisionTodas } from "@/lib/comisiones/nombre-archivo";
 import { etiquetaPeriodo, sufijoArchivoPeriodo } from "@/lib/comisiones/periodo";
-import { renglonesDelPapel, ventasDelPapel } from "@/lib/comisiones/papel-pagable";
+import { entraAlPapel, renglonesDelPapel, seccionesDelPapel, ventasDelPapel } from "@/lib/comisiones/papel-pagable";
 
 export interface VentaDoc {
   fecha: string;
@@ -167,87 +167,108 @@ export async function buildComisionDetalleSheet(
   const renglones = renglonesDelPapel(d);
   const ventasExcel = ventasPagables(renglones.ventas);
   const cobrosExcel = renglones.cobros;
-  const filaEncabezados = r;
-  ["Fecha", "Cliente", "Factura", "Tipo", "Subtotal"].forEach((h, i) => {
-    ws[addr(r, i)] = hdr(h, i === 4 ? "right" : i === 3 ? "center" : "left");
-  });
-  heights[r] = 22; r++;
-  // El filtro cubre encabezados + facturas y NADA más: el total, los cobros y
-  // el cierre quedan afuera para que filtrar no los esconda. Es también lo que
-  // le dice a `congelarEncabezadosXlsx` qué fila dejar fija (ver
-  // `excel-panel-fijo.ts`).
-  const filtro = `A${filaEncabezados + 1}:${addr(filaEncabezados + ventasExcel.length, lastCol)}`;
-  ventasExcel.forEach((v, idx) => {
-    const alt = idx % 2 === 0;
-    ws[addr(r, 0)] = td(fmtDate(v.fecha), alt);
-    ws[addr(r, 1)] = td(v.cliente, alt);
-    ws[addr(r, 2)] = td(v.secuencial, alt);
-    ws[addr(r, 3)] = td(tipoDocCorto(v.tipo), alt, { ha: "center" });
-    ws[addr(r, 4)] = tdN(v.subtotal, alt, { fmt: MONEY_FMT });
-    heights[r] = 18; r++;
-  });
-  ws[addr(r, 0)] = tot("", { ha: "left" });
-  ws[addr(r, 1)] = tot("", { ha: "left" });
-  ws[addr(r, 2)] = tot("", { ha: "left" });
-  ws[addr(r, 3)] = tot("Total ventas", { ha: "right" });
-  ws[addr(r, 4)] = tot(d.ventas_base, { fmt: MONEY_FMT });
-  heights[r] = 22; r++;
-  spacer();
+  // 🔴 Lo que no se paga no sale (6-oct-2026): con tasa 0 % o «No pagable»,
+  // esa sección y su línea del resumen no se dibujan (`seccionesDelPapel`).
+  const sec = seccionesDelPapel(d, d.vendedor);
+  // 🔴 LOS TOTALES SON FÓRMULAS (6-oct-2026): si se borra una línea, Excel
+  // recalcula. Cada celda lleva su fórmula y el valor del sistema de respaldo,
+  // que es el mismo número: nada cambia al abrir el archivo.
+  const col = (c: number) => addr(0, c).replace(/\d+$/, "");
+  const ref = (rr: number, c: number) => `${col(c)}${rr + 1}`;
+  let filtro = `A1:${addr(0, lastCol)}`;
+  let celdaTotalVentas: string | null = null;
+  let celdaTotalCobros: string | null = null;
 
-  // ── COBROS ──
-  section("COBROS");
-  ["Fecha", "Cliente", "Monto"].forEach((h, i) => {
-    ws[addr(r, i)] = hdr(h, i === 2 ? "right" : "left");
-  });
-  heights[r] = 22; r++;
-  cobrosExcel.forEach((c, idx) => {
-    const alt = idx % 2 === 0;
-    ws[addr(r, 0)] = td(fmtDate(c.fecha), alt);
-    ws[addr(r, 1)] = td(c.cliente, alt);
-    ws[addr(r, 2)] = tdN(c.monto, alt, { fmt: MONEY_FMT });
-    heights[r] = 18; r++;
-  });
-  ws[addr(r, 0)] = tot("", { ha: "left" });
-  ws[addr(r, 1)] = tot("Total cobros", { ha: "right" });
-  ws[addr(r, 2)] = tot(d.cobros_base, { fmt: MONEY_FMT });
-  heights[r] = 22; r++;
-  spacer();
+  if (sec.ventas) {
+    const filaEncabezados = r;
+    ["Fecha", "Cliente", "Factura", "Tipo", "Subtotal"].forEach((h, i) => {
+      ws[addr(r, i)] = hdr(h, i === 4 ? "right" : i === 3 ? "center" : "left");
+    });
+    heights[r] = 22; r++;
+    filtro = `A${filaEncabezados + 1}:${addr(filaEncabezados + ventasExcel.length, lastCol)}`;
+    const primera = r;
+    ventasExcel.forEach((v, idx) => {
+      const alt = idx % 2 === 0;
+      ws[addr(r, 0)] = td(fmtDate(v.fecha), alt);
+      ws[addr(r, 1)] = td(v.cliente, alt);
+      ws[addr(r, 2)] = td(v.secuencial, alt);
+      ws[addr(r, 3)] = td(tipoDocCorto(v.tipo), alt, { ha: "center" });
+      ws[addr(r, 4)] = tdN(v.subtotal, alt, { fmt: MONEY_FMT });
+      heights[r] = 18; r++;
+    });
+    ws[addr(r, 0)] = tot("", { ha: "left" });
+    ws[addr(r, 1)] = tot("", { ha: "left" });
+    ws[addr(r, 2)] = tot("", { ha: "left" });
+    ws[addr(r, 3)] = tot("Total ventas", { ha: "right" });
+    ws[addr(r, 4)] = ventasExcel.length
+      ? { ...tot(d.ventas_base, { fmt: MONEY_FMT }), f: `SUM(${ref(primera, 4)}:${ref(r - 1, 4)})` }
+      : tot(d.ventas_base, { fmt: MONEY_FMT });
+    celdaTotalVentas = ref(r, 4);
+    heights[r] = 22; r++;
+    spacer();
+  }
 
-  // ── CIERRE ──
-  // 🔴 LA TASA ES UN PORCENTAJE DE VERDAD, NO UN TEXTO (6-sep-2026). Decía
-  // `× 0.50%` escrito como cadena dentro de la celda, así que la única columna
-  // que explica de dónde sale la comisión era la única que Excel no podía usar
-  // para recalcular. Ahora la base es número (ya lo era) y la tasa es un número
-  // con formato de porcentaje (PCT_FMT): se ve igual y se puede multiplicar.
+  if (sec.cobros) {
+    section("COBROS");
+    ["Fecha", "Cliente", "Monto"].forEach((h, i) => {
+      ws[addr(r, i)] = hdr(h, i === 2 ? "right" : "left");
+    });
+    heights[r] = 22; r++;
+    const primera = r;
+    cobrosExcel.forEach((c, idx) => {
+      const alt = idx % 2 === 0;
+      ws[addr(r, 0)] = td(fmtDate(c.fecha), alt);
+      ws[addr(r, 1)] = td(c.cliente, alt);
+      ws[addr(r, 2)] = tdN(c.monto, alt, { fmt: MONEY_FMT });
+      heights[r] = 18; r++;
+    });
+    ws[addr(r, 0)] = tot("", { ha: "left" });
+    ws[addr(r, 1)] = tot("Total cobros", { ha: "right" });
+    ws[addr(r, 2)] = cobrosExcel.length
+      ? { ...tot(d.cobros_base, { fmt: MONEY_FMT }), f: `SUM(${ref(primera, 2)}:${ref(r - 1, 2)})` }
+      : tot(d.cobros_base, { fmt: MONEY_FMT });
+    celdaTotalCobros = ref(r, 2);
+    heights[r] = 22; r++;
+    spacer();
+  }
+
   section("RESUMEN"); // 1-oct-2026, Daniel: nombres normales de ERP (era «CIERRE»)
-  const cierre: [string, number, number, number][] = [
-    ["Ventas", d.ventas_base, d.tasa_venta, d.comision_venta],
-    ["Cobros", d.cobros_base, d.tasa_cobro, d.comision_cobro],
-  ];
-  cierre.forEach(([label, base, tasa, comision], idx) => {
+  const cierre: [string, number, number, number, string | null][] = [];
+  if (sec.ventas) cierre.push(["Ventas", d.ventas_base, d.tasa_venta, d.comision_venta, celdaTotalVentas]);
+  if (sec.cobros) cierre.push(["Cobros", d.cobros_base, d.tasa_cobro, d.comision_cobro, celdaTotalCobros]);
+  const celdasComision: string[] = [];
+  cierre.forEach(([label, base, tasa, comision, celdaBase], idx) => {
     const alt = idx % 2 === 0;
     ws[addr(r, 0)] = td(label, alt);
-    ws[addr(r, 1)] = tdN(base, alt, { fmt: MONEY_FMT });
+    // La base es la del total de arriba; la tasa, en su celda y en %; la
+    // comisión, base × tasa redondeada como la RPC (por componente).
+    ws[addr(r, 1)] = celdaBase ? { ...tdN(base, alt, { fmt: MONEY_FMT }), f: celdaBase } : tdN(base, alt, { fmt: MONEY_FMT });
     ws[addr(r, 2)] = tdN(tasa, alt, { fmt: PCT_FMT });
-    ws[addr(r, 3)] = tdN(comision, alt, { fmt: MONEY_FMT });
+    ws[addr(r, 3)] = { ...tdN(comision, alt, { fmt: MONEY_FMT }), f: `ROUND(${ref(r, 1)}*${ref(r, 2)},2)` };
+    celdasComision.push(ref(r, 3));
     heights[r] = 18; r++;
   });
+  const sumaComisiones = celdasComision.length ? celdasComision.join("+") : null;
 
   const descActivos = descuentos.filter((x) => x.activo);
   if (descActivos.length === 0) {
-    // Sin descuentos: el total final es la comisión total (comportamiento previo).
     ws[addr(r, 0)] = tot("Comisión total", { ha: "left" });
     ws[addr(r, 1)] = tot("", { ha: "left" });
     ws[addr(r, 2)] = tot("", { ha: "left" });
-    ws[addr(r, 3)] = tot(d.comision_total, { fmt: MONEY_FMT });
+    ws[addr(r, 3)] = sumaComisiones
+      ? { ...tot(d.comision_total, { fmt: MONEY_FMT }), f: sumaComisiones }
+      : tot(d.comision_total, { fmt: MONEY_FMT });
     heights[r] = 22; r++;
   } else {
-    // Subtotal comisión → descuentos (negativos) → Total a pagar.
+    const filaSubtotal = r;
     ws[addr(r, 0)] = td("Subtotal comisión", true, { bold: true });
     ws[addr(r, 1)] = td("", true);
     ws[addr(r, 2)] = td("", true);
-    ws[addr(r, 3)] = tdN(d.comision_total, true, { fmt: MONEY_FMT, bold: true });
+    ws[addr(r, 3)] = sumaComisiones
+      ? { ...tdN(d.comision_total, true, { fmt: MONEY_FMT, bold: true }), f: sumaComisiones }
+      : tdN(d.comision_total, true, { fmt: MONEY_FMT, bold: true });
     heights[r] = 18; r++;
+    const primeraDesc = r;
     descActivos.forEach((dx, idx) => {
       const alt = idx % 2 === 0;
       ws[addr(r, 0)] = td(dx.concepto, alt);
@@ -260,7 +281,7 @@ export async function buildComisionDetalleSheet(
     ws[addr(r, 0)] = tot("Total a pagar", { ha: "left" });
     ws[addr(r, 1)] = tot("", { ha: "left" });
     ws[addr(r, 2)] = tot("", { ha: "left" });
-    ws[addr(r, 3)] = tot(totalAPagar, { fmt: MONEY_FMT });
+    ws[addr(r, 3)] = { ...tot(totalAPagar, { fmt: MONEY_FMT }), f: `${ref(filaSubtotal, 3)}+SUM(${ref(primeraDesc, 3)}:${ref(r - 1, 3)})` };
     heights[r] = 22; r++;
   }
 
@@ -302,7 +323,9 @@ export async function exportComisionDetalleVarias(
   mes: number,
 ): Promise<void> {
   const hojas = [];
-  for (const d of detalles) {
+  // Quien no tiene ninguna sección que aplique (tasa 0 % o «No pagable») no sale.
+  const conPapel = detalles.filter((d) => entraAlPapel(seccionesDelPapel(d.data, d.data.vendedor)));
+  for (const d of conPapel.length ? conPapel : detalles) {
     hojas.push({
       // Excel no admite más de 31 caracteres en el nombre de una hoja.
       name: d.empresaNombre.slice(0, 31),
@@ -380,6 +403,8 @@ export async function buildComisionesResumenSheet(r: ComisionResumen): Promise<W
       nombreEnExcel(v), v.base, v.comision, v.base_cobro, v.comision_cobro, v.comision_total,
     ]),
     totals: [haySinPago ? "Total a pagar" : "Total", tot.base, tot.comision, tot.base_cobro, tot.comision_cobro, tot.comision_total],
+    // El pie es fórmula y resta a quien no se paga (la misma cuenta de `sumarPagable`).
+    fueraDelTotal: vendedores.flatMap((v, i) => (v.se_paga === false ? [i] : [])),
   });
 }
 
@@ -444,6 +469,8 @@ export async function buildComisionesConsolidadoSheet(c: ComisionConsolidado): P
     ],
     rows,
     totals,
+    // El pie es fórmula y resta a quien no se paga (la misma cuenta de `sumarPagable`).
+    fueraDelTotal: allRows.flatMap((r, i) => (r.se_paga === false ? [i] : [])),
   });
 }
 

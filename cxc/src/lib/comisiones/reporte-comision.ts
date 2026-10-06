@@ -182,3 +182,43 @@ export function totalesDelPapel(data: ComisionDetalle): LineaCierre[] {
     },
   ];
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 LO QUE NO SE PAGA NO SALE EN EL PAPEL (6-oct-2026).
+// Daniel vio el PDF de Rodrigo (Vistana, sep): «Cobros $8,134 × 0.00% = $0», con
+// la sección COBROS entera y «TOTAL VENTAS + COBROS $16,268». Regla: si la tasa
+// de ventas (o de cobros) es 0 % o la persona está en «No pagable», esa sección
+// no sale en el PDF, ni en el Excel, ni en el detalle de pantalla, ni su línea
+// del resumen; con las dos fuera, la persona no sale en el papel. Ningún
+// número cambia: solo se deja de dibujar lo que vale cero por regla.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export { seccionesDelPapel, entraAlPapel, type SeccionesDelPapel } from "@/lib/comisiones/papel-pagable";
+import type { SeccionesDelPapel } from "@/lib/comisiones/papel-pagable";
+
+/** «Comisión de ventas $80.49 · de cobros $0.00», solo con lo que aplica. */
+export function lineaDeComisionesDelPapel(
+  d: { comision_venta: number; comision_cobro: number },
+  s: SeccionesDelPapel,
+): string {
+  if (s.ventas && s.cobros) return `Comisión de ventas ${fmtMoney(d.comision_venta)} · de cobros ${fmtMoney(d.comision_cobro)}`;
+  if (s.ventas) return `Comisión de ventas ${fmtMoney(d.comision_venta)}`;
+  if (s.cobros) return `Comisión de cobros ${fmtMoney(d.comision_cobro)}`;
+  return "";
+}
+
+const sinCentavos = (n: number) => {
+  const v = Math.round(Math.abs(n)).toLocaleString("en-US");
+  return n < 0 ? `−$${v}` : `$${v}`;
+};
+
+/** «0.50% de $16,099 en ventas · 0.50% de $0 en cobros», solo con lo que aplica. */
+export function lineaDelPieDelPapel(
+  d: { tasa_venta: number; tasa_cobro: number; ventas_base: number; cobros_base: number },
+  s: SeccionesDelPapel,
+): string {
+  const partes: string[] = [];
+  if (s.ventas) partes.push(`${(d.tasa_venta * 100).toFixed(2)}% de ${sinCentavos(d.ventas_base)} en ventas`);
+  if (s.cobros) partes.push(`${(d.tasa_cobro * 100).toFixed(2)}% de ${sinCentavos(d.cobros_base)} en cobros`);
+  return partes.join(" · ");
+}

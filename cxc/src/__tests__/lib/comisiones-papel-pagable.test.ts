@@ -204,11 +204,14 @@ describe("🔴 quitar los renglones en cero no cambia un centavo", () => {
     expect(conCeros).not.toContain("De Moda");
     expect(conCeros).not.toContain("11-000003024");
     expect(conCeros).not.toContain("Jerusalem");
-    // Lo que SÍ tiene que estar: la NC en negativo y los totales del RPC.
+    // Lo que SÍ tiene que estar: la NC en negativo y los números del RPC.
+    // 🔄 6-oct-2026 — el papel quedó como el detalle v3: el total a pagar es el
+    // número grande y las bases van en la línea del pie (ya no hay «TOTAL
+    // VENTAS / COBROS», que repetían lo de arriba). Los números son los mismos.
     expect(conCeros).toContain("11-000003044");
-    expect(conCeros).toContain("TOTAL VENTAS $750.00");
-    expect(conCeros).toContain("TOTAL COBROS $800.00");
-    expect(conCeros).toContain("Total a pagar $6.25");
+    expect(conCeros).toContain("0.50% de $750 en ventas · 0.50% de $800 en cobros");
+    expect(conCeros).toContain("$6.25 Comisión de ventas $3.75 · de cobros $4.00");
+    expect(conCeros).not.toContain("TOTAL VENTAS");
   });
 
   it("🔴 el Excel tampoco lista el recibo en cero ni la factura en $0, y sus totales son los del RPC", async () => {

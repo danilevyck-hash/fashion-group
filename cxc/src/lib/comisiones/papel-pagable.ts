@@ -1,3 +1,4 @@
+import { sePagaComision } from "@/lib/comisiones/sin-pago";
 // ─────────────────────────────────────────────────────────────────────────────
 // QUÉ RENGLONES VAN AL PAPEL DEL VENDEDOR — solo lo PAGABLE. (módulo PURO)
 //
@@ -65,4 +66,31 @@ export function renglonesDelPapel(
 ): RenglonesDelPapel {
   if (!soloPagable) return { ventas: [...(data.ventas ?? [])], cobros: [...(data.cobros ?? [])] };
   return { ventas: ventasDelPapel(data.ventas), cobros: cobrosDelPapel(data.cobros) };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 LO QUE NO SE PAGA NO SALE EN EL PAPEL (6-oct-2026). Con tasa 0 % o la
+// persona en «No pagable», la sección (Ventas o Cobros) no sale en el PDF, el
+// Excel ni el detalle de pantalla, ni su línea del resumen; con las dos fuera,
+// la persona no sale en el papel. 🩸 El PDF de Rodrigo (Vistana, sep) decía
+// «Cobros $8,134 × 0.00% = $0» con la sección entera. Ningún número cambia.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Qué secciones lleva el papel de una persona. */
+export interface SeccionesDelPapel {
+  ventas: boolean;
+  cobros: boolean;
+}
+
+export function seccionesDelPapel(
+  d: { tasa_venta: number; tasa_cobro: number },
+  vendedor: string,
+): SeccionesDelPapel {
+  const paga = sePagaComision(vendedor);
+  return { ventas: paga && Number(d.tasa_venta) > 0, cobros: paga && Number(d.tasa_cobro) > 0 };
+}
+
+/** ¿La persona sale en el papel? Con las dos secciones fuera, no. */
+export function entraAlPapel(s: SeccionesDelPapel): boolean {
+  return s.ventas || s.cobros;
 }

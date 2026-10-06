@@ -315,6 +315,52 @@ export interface ReportSheetOpts {
    */
   titulo?: string;
   palette?: ExcelPalette;
+  /**
+   * Filas (índices de `rows`) que el total NO suma: se listan, pero la fórmula
+   * del pie las resta (Comisiones: «No pagable»).
+   */
+  fueraDelTotal?: readonly number[];
+}
+
+/** El número de una celda de datos, o null si no es numérica. */
+function numeroDeCelda(cell: ReportCell): number | null {
+  if (typeof cell === "number") return cell;
+  if (cell && typeof cell === "object" && "v" in cell && typeof cell.v === "number") return cell.v;
+  return null;
+}
+
+/**
+ * 🔴 EL TOTAL DEL PIE ES UNA FÓRMULA CUANDO ES LA SUMA DE LAS FILAS (6-oct-2026).
+ * Daniel: en el Excel los totales eran valores fijos; si alguien borraba una
+ * línea, nada se recalculaba. Si el total que manda la pantalla es EXACTAMENTE
+ * la suma de su columna (menos `fueraDelTotal`), la celda lleva `=SUM(…)` con
+ * ese mismo valor de respaldo; si no (un margen, un promedio), queda el valor.
+ * Ningún número cambia: la fórmula da lo que ya decía la celda.
+ */
+export function formulaDelTotal(
+  col: number,
+  rows: readonly ReportCell[][],
+  primeraFila: number,
+  total: number,
+  fuera: readonly number[] = [],
+): string | null {
+  if (rows.length === 0) return null;
+  let suma = 0;
+  let hayNumeros = false;
+  rows.forEach((row, i) => {
+    const n = numeroDeCelda(row[col]);
+    if (n === null) return;
+    hayNumeros = true;
+    if (!fuera.includes(i)) suma += n;
+  });
+  if (!hayNumeros || Math.abs(suma - total) > 0.005) return null;
+  const letra = XLSX.utils.encode_col(col);
+  const ultima = primeraFila + rows.length - 1;
+  const restas = fuera
+    .filter((i) => i >= 0 && i < rows.length && numeroDeCelda(rows[i][col]) !== null)
+    .map((i) => `-${letra}${primeraFila + i}`)
+    .join("");
+  return `SUM(${letra}${primeraFila}:${letra}${ultima})${restas}`;
 }
 
 /**
@@ -379,16 +425,23 @@ export function buildReportSheet(opts: ReportSheetOpts): XLSX.WorkSheet {
 
   if (opts.totals) {
     heights[r] = 6; r++; // espaciador
+    const primeraFila = filaEncabezados + 1;
+    const conFormula = (c: number, v: number, celda: XLSX.CellObject): XLSX.CellObject => {
+      const f = formulaDelTotal(c, opts.rows, primeraFila, v, opts.fueraDelTotal);
+      return f ? { ...celda, f } : celda;
+    };
     opts.totals.forEach((cell, c) => {
       const col = opts.columns[c];
       if (cell === null || cell === undefined) { ws[addr(r, c)] = tot("", { ha: "left" }); return; }
       if (typeof cell === "object") {
         // Una fecha no se suma: en la fila de totales la celda va vacía.
         if ("fecha" in cell) { ws[addr(r, c)] = tot("", { ha: "left" }); return; }
-        ws[addr(r, c)] = tot(cell.v, { fmt: cell.fmt || col.fmt, ha: col.align });
+        const celda = tot(cell.v, { fmt: cell.fmt || col.fmt, ha: col.align });
+        ws[addr(r, c)] = typeof cell.v === "number" ? conFormula(c, cell.v, celda) : celda;
         return;
       }
-      ws[addr(r, c)] = tot(cell, { fmt: typeof cell === "number" ? col.fmt : undefined, ha: typeof cell === "number" ? col.align || "right" : "left" });
+      const celda = tot(cell, { fmt: typeof cell === "number" ? col.fmt : undefined, ha: typeof cell === "number" ? col.align || "right" : "left" });
+      ws[addr(r, c)] = typeof cell === "number" ? conFormula(c, cell, celda) : celda;
     });
     heights[r] = 22; r++;
   }

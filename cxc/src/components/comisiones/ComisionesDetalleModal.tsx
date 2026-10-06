@@ -73,6 +73,8 @@ import { useEsCelularComisiones } from "./celular/useEsCelularComisiones";
 import { MenuDescargaComision } from "./comisiones-detalle/MenuDescargaComision";
 import { ROTULO_NO_SE_PAGA } from "@/lib/comisiones/sin-pago";
 import { ROTULO_DESCARGAR_V2 } from "@/lib/comisiones/apple-v2";
+import { seccionesDelPapel } from "@/lib/comisiones/papel-pagable";
+import { lineaDeComisionesDelPapel, lineaDelPieDelPapel } from "@/lib/comisiones/reporte-comision";
 import {
   CHIP_NOTA_DE_CREDITO,
   COMISIONES_DETALLE_V3_2026_10,
@@ -664,6 +666,8 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
 
   // ── 🔴 COMISIONES_DETALLE_V3_2026_10 · el detalle en renglones ───────────
   if (v3) {
+    // 🔴 Con tasa 0 % o «No pagable», esa sección no se dibuja (`seccionesDelPapel`).
+    const sec = data ? seccionesDelPapel(data, vendedor) : { ventas: true, cobros: true };
     const descargar = (
       <MenuDescargaComision
         rotulo={ROTULO_DESCARGAR_V2}
@@ -706,7 +710,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
               </p>
               {data && (
                 <p className="mt-1.5 text-sm text-gray-500">
-                  {lineaDeComisiones(data.comision_venta, data.comision_cobro)}
+                  {sec.ventas && sec.cobros ? lineaDeComisiones(data.comision_venta, data.comision_cobro) : lineaDeComisionesDelPapel(data, sec)}
                   {descActivos.length > 0 && ` · Descuentos −${fmtMoney(descActivos.reduce((a, d) => a + d.monto, 0))}`}
                 </p>
               )}
@@ -737,6 +741,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
             <div className="p-8 text-center text-sm text-red-600">{error}</div>
           ) : data ? (
             <div className="space-y-5 p-4">
+              {sec.ventas && (
               <section data-ventas-v3>
                 <h3 className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-900">
                   Ventas
@@ -772,7 +777,9 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                   </ul>
                 )}
               </section>
+              )}
 
+              {sec.cobros && (
               <section data-cobros-v3>
                 <h3 className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-900">
                   Cobros
@@ -802,6 +809,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                   </ul>
                 )}
               </section>
+              )}
 
               {/* Los descuentos del mes, solo si hay: se apagan aquí (admin y secretaria). */}
               {descuentos.length > 0 && (
@@ -826,7 +834,11 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                 </section>
               )}
 
-              <p data-pie-detalle className="text-xs tabular-nums text-gray-500">{lineaDelPie(data)}</p>
+              {(sec.ventas || sec.cobros) && (
+                <p data-pie-detalle className="text-xs tabular-nums text-gray-500">
+                  {sec.ventas && sec.cobros ? lineaDelPie(data) : lineaDelPieDelPapel(data, sec)}
+                </p>
+              )}
             </div>
           ) : null}
         </section>
