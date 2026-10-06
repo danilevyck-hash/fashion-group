@@ -448,6 +448,32 @@ describe("🩸 «terminado» no se lee como «pendiente»", () => {
 
 });
 
+describe("🩸 la lista NO se cae mientras la migración no esté aplicada", () => {
+  // 🩸 MEDIDO CONTRA PRODUCCIÓN el 6-oct-2026: `pedidos_bodega_estado` tiene
+  // hoy solo `empresa_key · pedido_switch_id · estado · cambiado_por ·
+  // cambiado_en`. La ruta pedía además las cuatro columnas de firma a secas, así
+  // que PostgREST devolvía error, el GET contestaba 500 y la pantalla entera se
+  // iba al aviso rojo — justo en el estado en el que está producción. El
+  // comentario decía «falla abierta» y era mentira. Ahora se piden, y si no
+  // están se vuelve a pedir sin ellas.
+  const ruta = () =>
+    fs.readFileSync(path.resolve(__dirname, "../../app/api/guias/pedidos/route.ts"), "utf8");
+
+  it("la lista pide las firmas con respaldo, nunca a secas", () => {
+    const s = ruta();
+    expect(s).toContain("COLUMNAS_BASE");
+    expect(s).toContain("COLUMNAS_CON_FIRMAS");
+    expect(s).toContain("leerEstadoDeBodega");
+  });
+
+  it("y si las columnas nuevas no están, hay un segundo intento sin ellas", () => {
+    const s = ruta();
+    // Las dos lecturas tolerantes: la de la lista y la del PATCH.
+    expect(s).toContain("leerEstadoPrevio");
+    expect(s.match(/COLUMNAS_BASE/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+  });
+});
+
 describe("🔴 6 · el envío de Etiquetas que nace al recibir", () => {
   it("la nota entra en las 15 letras que acepta una etiqueta", () => {
     expect(notaDelPedido("2732")).toBe("PEDIDO 2732");

@@ -39,6 +39,58 @@ export const dynamic = "force-dynamic";
 
 const apagado = () => NextResponse.json({ error: "No disponible" }, { status: 404 });
 
+/** Lo que marcó bodega, con las dos firmas si la migración ya corrió. */
+interface EstadoDeBodega {
+  empresa_key: string;
+  pedido_switch_id: number;
+  estado: string | null;
+  cambiado_por: string | null;
+  cambiado_en: string | null;
+  preparado_por?: string | null;
+  preparado_en?: string | null;
+  verificado_por?: string | null;
+  verificado_en?: string | null;
+}
+
+const COLUMNAS_BASE = "empresa_key, pedido_switch_id, estado, cambiado_por, cambiado_en";
+const COLUMNAS_CON_FIRMAS = `${COLUMNAS_BASE}, preparado_por, preparado_en, verificado_por, verificado_en`;
+
+/**
+ * 🔴 FALLA ABIERTA SOBRE LAS COLUMNAS NUEVAS. 🩸 Pedirlas a secas devolvía un
+ * **500** y la pantalla entera se caía al aviso rojo mientras la migración
+ * `20261231120000` no estuviera aplicada —que es justo el estado de producción
+ * hoy—. Se piden; si no están, se vuelve a pedir sin ellas y las firmas
+ * simplemente no se dibujan.
+ */
+async function leerEstadoPrevio(
+  empresa: string,
+  id: number,
+): Promise<(EstadoDeBodega & { envio_id?: string | null }) | null> {
+  const pedir = (cols: string) =>
+    supabaseServer
+      .from("pedidos_bodega_estado")
+      .select(cols)
+      .eq("empresa_key", empresa)
+      .eq("pedido_switch_id", id)
+      .maybeSingle();
+  if (PEDIDOS_BULTOS_2026_10) {
+    const con = await pedir(`${COLUMNAS_CON_FIRMAS}, envio_id`);
+    if (!con.error) return con.data as unknown as EstadoDeBodega & { envio_id?: string | null };
+  }
+  // Falla ABIERTA igual que la lista: sin las columnas nuevas, se lee lo de siempre.
+  const sin = await pedir(`${COLUMNAS_BASE}, envio_id`);
+  return (sin.data as unknown as (EstadoDeBodega & { envio_id?: string | null }) | null) ?? null;
+}
+
+async function leerEstadoDeBodega(): Promise<{ data: EstadoDeBodega[] | null; error: unknown }> {
+  if (PEDIDOS_BULTOS_2026_10) {
+    const con = await supabaseServer.from("pedidos_bodega_estado").select(COLUMNAS_CON_FIRMAS).limit(5000);
+    if (!con.error) return { data: con.data as unknown as EstadoDeBodega[], error: null };
+  }
+  const sin = await supabaseServer.from("pedidos_bodega_estado").select(COLUMNAS_BASE).limit(5000);
+  return { data: sin.data as unknown as EstadoDeBodega[] | null, error: sin.error };
+}
+
 export async function GET(req: NextRequest) {
   if (!PEDIDOS_BODEGA_2026_10) return apagado();
   // VER: los de Guías (con v2); MARCAR (PATCH): solo admin y bodega.
@@ -59,10 +111,7 @@ export async function GET(req: NextRequest) {
       .in("empresa_key", [...empresas])
       .order("fecha")
       .limit(1000),
-    supabaseServer
-      .from("pedidos_bodega_estado")
-      .select("empresa_key, pedido_switch_id, estado, cambiado_por, cambiado_en, preparado_por, preparado_en, verificado_por, verificado_en")
-      .limit(5000),
+    leerEstadoDeBodega(),
     leerAliasOVacio(),
   ]);
   if (ped.error) return NextResponse.json({ error: "No se pudieron leer los pedidos" }, { status: 500 });
@@ -144,12 +193,7 @@ export async function PATCH(req: NextRequest) {
 
     // 🔑 `cambiado_por` del estado «terminado» ES quien lo terminó: de ahí sale
     // la regla «quien marcó Terminado solo marca Recibido si es admin».
-    const { data: previo } = await supabaseServer
-      .from("pedidos_bodega_estado")
-      .select("estado, cambiado_por, envio_id, preparado_por, preparado_en")
-      .eq("empresa_key", empresa)
-      .eq("pedido_switch_id", id)
-      .maybeSingle();
+    const previo = await leerEstadoPrevio(empresa, id);
     const desde = estadoLeido(previo?.estado);
     // Quien lo preparó sale de SU columna; antes de la migración cae a la vieja
     // `cambiado_por`, que con el pedido en «preparado» es la misma persona.
