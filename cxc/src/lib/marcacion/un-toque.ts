@@ -148,13 +148,26 @@ export function faltoLaSalidaDeAyer(dias: readonly DiaMarcado[], hoy: string): b
 export const TEXTO_AYER_SIN_SALIDA = "Ayer faltó la salida.";
 
 /**
- * «Avísale a Roxana ›». El nombre sale del MISMO lugar que lo decía antes al
+ * «Avísale a Roxana.» El nombre sale del MISMO lugar que lo decía antes al
  * pie de «Mis marcas» (`QUIEN_CORRIGE`); sin dato, se avisa sin nombre — nunca
  * se inventa a quién.
+ *
+ * 🔴 6-oct-2026 · NO LLEVA «›» NI AZUL, PORQUE NO ES TOCABLE. Nació con la
+ * flechita y el azul de un enlace, dentro de un `<span>` que no hacía nada:
+ * parecía un botón y al tocarlo no pasaba nada. El sistema **no guarda el
+ * teléfono de nadie** —`asistencia_personas` tiene nombre, salario, jornada,
+ * empresa, activo, fechas y los interruptores de pago, y ninguna tabla de
+ * empleados tiene `telefono`, `celular` ni `whatsapp`; los únicos teléfonos
+ * del sistema son de CLIENTES, en `directorio_clientes`—, así que no hay a
+ * dónde enlazar: ni `wa.me`, ni `tel:`. Queda como lo que es, una frase gris
+ * que dice a quién avisar. Candado en `marcacion-un-toque.test.tsx`.
+ *
+ * Si algún día la ficha guarda el celular, esto pasa a ser un enlace de
+ * verdad y ahí sí se llama «Notificar a Roxana», con nombre de ERP.
  */
 export function textoAvisarA(quien: string = QUIEN_CORRIGE): string {
   const n = String(quien ?? "").trim();
-  return n === "" ? "Avísale ›" : `Avísale a ${n} ›`;
+  return n === "" ? "Avísale." : `Avísale a ${n}.`;
 }
 
 // ── 3. LA CÁMARA ─────────────────────────────────────────────────────────────

@@ -23,6 +23,7 @@
 // exactamente el salto que se está evitando.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { hayFranjaEnElCelular } from "@/lib/navegacion/barra-celular";
 import {
   CLASES_CAJON_BOTON,
   MARCACION_UN_TOQUE,
@@ -74,11 +75,22 @@ export function BloquesDelEsqueleto() {
  * celular. Con `h-14`, que es lo que usan las otras seis pantallas de la casa
  * (todas de escritorio), el contenido bajaría 10 px al entrar el encabezado de
  * verdad — un salto, que es justo lo que se está evitando.
+ *
+ * 🔴 6-oct-2026 · Y EN EL CELULAR NO SE DIBUJA, PORQUE AHÍ NO HAY ENCABEZADO.
+ * Con `SIN_BARRA_ARRIBA` prendido, `AppHeader` se pone `hidden sm:block`: la
+ * franja del esqueleto aparecía 46 px y después se iba — el salto que esta
+ * medida vino a evitar, al revés. La condición se DERIVA del mismo
+ * `hayFranjaEnElCelular()` que usa `AppHeader`, así que apagar el interruptor
+ * devuelve la franja en los dos lados sin tocar esta línea.
  */
 export default function EsqueletoMarcacion() {
   return (
     <div className="min-h-screen bg-white">
-      <div className="h-11 w-full border-b-2 border-gray-200 bg-white" />
+      <div
+        className={`h-11 w-full border-b-2 border-gray-200 bg-white ${
+          hayFranjaEnElCelular() ? "" : "hidden sm:block"
+        }`}
+      />
       <div className="mx-auto w-full max-w-md px-4 pb-16 pt-6">
         <BloquesDelEsqueleto />
       </div>

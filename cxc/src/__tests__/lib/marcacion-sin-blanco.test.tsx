@@ -52,6 +52,7 @@ vi.mock("@/lib/marcacion/cola-offline", () => ({
 
 import MarcacionClient from "@/app/marcacion/MarcacionClient";
 import EsqueletoMarcacion, { BloquesDelEsqueleto } from "@/app/marcacion/EsqueletoMarcacion";
+import { hayFranjaEnElCelular } from "@/lib/navegacion/barra-celular";
 
 const RAIZ = path.resolve(__dirname, "../../..");
 const leer = (p: string) => readFileSync(path.join(RAIZ, p), "utf8");
@@ -62,6 +63,7 @@ const FUENTE_PANTALLA = leer("src/app/marcacion/MarcacionClient.tsx");
 // El esqueleto la sigue midiendo a ella, así que las medidas se leen de ahí.
 const FUENTE_PANTALLA_DE_ANTES = leer("src/app/marcacion/PantallaDeAntes.tsx");
 const FUENTE_ESQUELETO = leer("src/app/marcacion/EsqueletoMarcacion.tsx");
+const FUENTE_ENCABEZADO = leer("src/components/AppHeader.tsx");
 const FUENTE_LOADING = leer("src/app/marcacion/loading.tsx");
 const FUENTE_PAGINA = leer("src/app/marcacion/page.tsx");
 
@@ -220,6 +222,24 @@ describe("D · el esqueleto mide lo mismo que lo que reemplaza", () => {
     const barra = container.firstElementChild!.firstElementChild!;
     expect(barra!.className).toContain("h-11");
     expect(barra!.className).toContain("border-b-2");
+  });
+
+  // 🔴 6-oct-2026 · Y NO SE DIBUJA EN EL CELULAR SI EL ENCABEZADO TAMPOCO.
+  // Con `SIN_BARRA_ARRIBA` prendido, `AppHeader` se pone `hidden sm:block` y la
+  // franja del esqueleto aparecía 46 px para después irse: un salto, lo mismo
+  // que esta medida vino a evitar. La condición sale del MISMO
+  // `hayFranjaEnElCelular()` del encabezado, no de una clase escrita a mano.
+  it("🔴 y se esconde en el celular exactamente cuando el encabezado se esconde", () => {
+    const { container } = render(<EsqueletoMarcacion />);
+    const barra = container.firstElementChild!.firstElementChild!;
+    if (hayFranjaEnElCelular()) {
+      expect(barra!.className).not.toContain("hidden");
+    } else {
+      expect(barra!.className).toContain("hidden sm:block");
+    }
+    // Derivada del interruptor, nunca escrita dos veces.
+    expect(FUENTE_ESQUELETO).toContain("hayFranjaEnElCelular()");
+    expect(FUENTE_ENCABEZADO).toContain("hayFranjaEnElCelular()");
   });
 });
 

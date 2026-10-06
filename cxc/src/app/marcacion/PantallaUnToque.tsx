@@ -230,10 +230,15 @@ export default function PantallaUnToque({
         </p>
       )}
 
-      {/* 🔴 LO DE AYER SE DICE UNA VEZ Y SOLO CUANDO FALTA ALGO. */}
+      {/* 🔴 LO DE AYER SE DICE UNA VEZ Y SOLO CUANDO FALTA ALGO.
+          🔴 6-oct-2026: TODO EL RENGLÓN ES GRIS. «Avísale a Roxana» vivía en un
+          `<span className="text-blue-600">` con una «›» al final: se veía como
+          un botón y al tocarlo no pasaba nada. El sistema no guarda el teléfono
+          de ningún empleado, así que no hay a dónde enlazar (ver `textoAvisarA`
+          en `lib/marcacion/un-toque.ts`): se dice como frase, no como acción. */}
       {faltoAyer && (
         <p data-falto-ayer className="mt-4 text-[14px] text-gray-500">
-          {TEXTO_AYER_SIN_SALIDA} <span className="text-blue-600">{textoAvisarA()}</span>
+          {TEXTO_AYER_SIN_SALIDA} {textoAvisarA()}
         </p>
       )}
 

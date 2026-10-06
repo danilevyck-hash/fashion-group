@@ -401,7 +401,27 @@ describe("5 · una sola confirmación", () => {
 
     render(<MarcacionClient inicial={semilla([AYER_ENTRADA, AHORA_SERVIDOR])} />);
     expect(screen.getByText(/Ayer faltó la salida/)).toBeTruthy();
-    expect(screen.getByText(textoAvisarA())).toBeTruthy();
+    expect(screen.getByText(new RegExp(textoAvisarA().replace(".", "\\.")))).toBeTruthy();
+  });
+
+  // 🔴 6-oct-2026 · «Avísale a Roxana» NO ES UN BOTÓN Y NO FINGE SERLO.
+  // Nació como un `<span className="text-blue-600">` con una «›» al final:
+  // azul, con flechita, y al tocarlo no pasaba nada. El sistema no guarda el
+  // teléfono de ningún empleado, así que no hay `wa.me` ni `tel:` al que
+  // enlazar — queda como frase gris. Si algún día la ficha guarda el celular,
+  // esto pasa a ser un enlace de verdad y se llama «Notificar a Roxana».
+  it("🔴 «Avísale a Roxana» es texto gris: ni azul, ni «›», ni botón falso", () => {
+    render(<MarcacionClient inicial={semilla([AYER_ENTRADA, AHORA_SERVIDOR])} />);
+    const renglon = document.querySelector("[data-falto-ayer]")!;
+    expect(renglon).not.toBeNull();
+    expect(renglon.textContent).toContain("Avísale a Roxana");
+    expect(renglon.textContent).not.toContain("›");
+    expect(renglon.className).toContain("text-gray-500");
+    // Nada azul adentro, y ningún elemento tocable sin acción.
+    expect(renglon.innerHTML).not.toContain("blue");
+    expect(renglon.querySelector("button, a")).toBeNull();
+    // Y el texto mismo tampoco trae la flechita.
+    expect(textoAvisarA()).not.toContain("›");
   });
 
   it("la regla de «ayer» mira el día anterior y nada más", () => {
@@ -423,8 +443,8 @@ describe("5 · una sola confirmación", () => {
   });
 
   it("sin nombre de quien corrige, se avisa sin nombre — nunca se inventa", () => {
-    expect(textoAvisarA("Roxana")).toBe("Avísale a Roxana ›");
-    expect(textoAvisarA("  ")).toBe("Avísale ›");
+    expect(textoAvisarA("Roxana")).toBe("Avísale a Roxana.");
+    expect(textoAvisarA("  ")).toBe("Avísale.");
   });
 });
 
