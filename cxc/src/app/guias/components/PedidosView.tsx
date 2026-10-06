@@ -188,8 +188,12 @@ export default function PedidosView({
   }
   const sinNadaQueImprimir = visibles.length === 0;
 
+  // 🩸 Con TRES chips de estado, el de «Empresa» quedaba aplastado a «E. ⌄» en
+  // el celular: el grupo de estados no se encoge y el que sobraba era el otro.
+  // La fila corre de lado, como las de chips del resto del sistema, en vez de
+  // recortar un rótulo hasta dejarlo sin sentido.
   const chips = (
-    <div className="flex min-w-0 items-center gap-1.5">
+    <div className="-mx-4 flex min-w-0 items-center gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:overflow-visible sm:px-0">
       <div role="group" aria-label="Estado" className="flex shrink-0 gap-1.5">
         {CHIPS.map((c) => (
           <button
