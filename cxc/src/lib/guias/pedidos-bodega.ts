@@ -152,6 +152,15 @@ export function lineaDePendientes(rows: readonly Pick<PedidoBodega, "fecha" | "e
   return `${n} · el más viejo, ${hace}`;
 }
 
+/** `AJUSTES_APPLE_6_2026_10`: «8 pendientes · el más viejo, 43 d», para que el título entre en una línea. */
+export function lineaDePendientesCorta(rows: readonly Pick<PedidoBodega, "fecha" | "estado">[], hoy: string): string {
+  const pend = rows.filter((r) => r.estado === "pendiente");
+  if (pend.length === 0) return "Sin pedidos pendientes";
+  const masViejo = pend.reduce((m, r) => (r.fecha < m ? r.fecha : m), pend[0].fecha);
+  const n = `${pend.length} ${pend.length === 1 ? "pendiente" : "pendientes"}`;
+  return pend.length === 1 ? `${n} · ${haceDiasCorto(masViejo, hoy)}` : `${n} · el más viejo, ${haceDiasCorto(masViejo, hoy)}`;
+}
+
 /** Switch da «2026-10-05 12:03:11», hora de Panamá (UTC−5 fijo). */
 export function fechaSwitchAIso(f: string): string {
   const m = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})/.exec(f.trim());

@@ -95,7 +95,7 @@ describe("pedidos de bodega — reglas de Daniel", () => {
     expect(haceDiasCorto("2026-10-04T23:00:00-05:00", "2026-10-05")).toBe("ayer");
     expect(haceDiasCorto("2026-08-23T11:00:00-05:00", "2026-10-05")).toBe("43 d");
     const src = leer("src/app/guias/components/PedidosView.tsx");
-    expect(src).toMatch(/<td className="whitespace-nowrap py-2 pl-3/);
+    expect(src).toMatch(/<td className=\{?`?"?whitespace-nowrap py-2 pr-1/); // AJUSTES_APPLE_6: el padding izquierdo depende del círculo
   });
 
   it("Imprimir: lo filtrado, carta en blanco y negro, un bloque por empresa con firmas por pedido, sin montos", () => {

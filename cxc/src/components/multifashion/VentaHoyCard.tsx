@@ -40,6 +40,7 @@ import { Clock, AlertTriangle } from "lucide-react";
 import { fmtMoney } from "@/lib/ventas/format";
 import { SIN_COMPARATIVO } from "@/lib/variacion";
 import { useVentaHoy } from "@/lib/multifashion/venta-hoy-cliente";
+import { AJUSTES_APPLE_6_2026_10 } from "@/lib/ajustes-apple-6-2026-10";
 
 // "domingo 6 sep" — corto, para que la línea entre en el teléfono.
 const FMT_DIA = new Intl.DateTimeFormat("es-PA", {
@@ -129,6 +130,34 @@ export function VentaHoyCard({ syncTick = 0, habilitado = true }: VentaHoyCardPr
     : rezagado
       ? `sin actualizar desde las ${horaSync(data.sync.ultimo as string, data.fecha)}`
       : horaSync(data.sync.ultimo as string, data.fecha);
+
+  // AJUSTES_APPLE_6 (punto 4): la misma línea gris que el resto del sistema,
+  // «Hoy $869 · 16 tickets · ▼ 42% vs lunes pasado · 4:00 pm». Sin caja, sin
+  // monoespaciada. Rezagada, la hora va en ámbar y lo dice (regla 1). Mientras el
+  // día no cierra, el comparativo lo avisa al pasar el mouse (regla 3).
+  if (AJUSTES_APPLE_6_2026_10) {
+    return (
+      <p aria-label="Venta de hoy" data-venta-hoy className="mb-4 text-sm tabular-nums text-gray-500">
+        Hoy{" "}
+        {data.hayVentas ? (
+          <>
+            <span className="font-semibold text-gray-900">{fmtMoney(data.ventas)}</span>
+            {" · "}{data.documentos} {data.documentos === 1 ? "ticket" : "tickets"}
+            {data.semanaPasada && (
+              <span title={data.enCurso ? "El día todavía no cierra" : undefined}>
+                {" · "}<span className={colorPct(data.semanaPasada.pct).replace("text-red-700", "text-red-600")}>{fmtPctVariacion(data.semanaPasada.pct).replace("▼ -", "▼ ")}</span>
+                {" "}vs {nombreDia(data.semanaPasada.fecha)} pasado
+              </span>
+            )}
+          </>
+        ) : (
+          "· sin ventas todavía"
+        )}
+        {" · "}
+        <span className={alerta ? "font-medium text-amber-700" : undefined}>{frescura}</span>
+      </p>
+    );
+  }
 
   return (
     <section

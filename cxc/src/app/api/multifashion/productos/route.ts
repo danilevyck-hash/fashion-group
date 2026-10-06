@@ -84,7 +84,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { PRODUCTOS_FILTROS_2026_10 } from "@/lib/productos/filtros";
-import { departamentosPorCodigo, stockPorCodigo } from "@/lib/multifashion/productos-filtros";
+import { departamentosPorCodigo, stockPorCodigo, atencionMultifashion } from "@/lib/multifashion/productos-filtros";
+import { AJUSTES_APPLE_6_2026_10 } from "@/lib/ajustes-apple-6-2026-10";
+import { hoyPanama } from "@/lib/fecha-panama";
 import { requireRole } from "@/lib/requireRole";
 import { ROLES_MULTIFASHION } from "@/lib/multifashion/acceso";
 import { supabaseServer } from "@/lib/supabase-server";
@@ -300,14 +302,16 @@ export async function GET(req: NextRequest) {
     // 🔴 Stock de Multifashion (5-oct-2026): la existencia de Switch que trae el
     // cron `sync-articulo-info` (04:00 UTC). Falla ABIERTA: sin filas, la
     // pantalla no dibuja la columna.
+    type FilaStock = { codigo: string; existencia: number | string | null; articulo_id?: number; descripcion?: string | null };
+    let filasStock: FilaStock[] = [];
     const leerStock = async (): Promise<Record<string, number>> => {
       if (!PRODUCTOS_FILTROS_2026_10) return {};
-      const filasStock = await leerTodoPaginado<{ codigo: string; existencia: number | string | null }>(
+      filasStock = await leerTodoPaginado<FilaStock>(
         `switch_articulo_info (${EMPRESA})`,
         (pedirCount, ini, fin) =>
           supabaseServer
             .from("switch_articulo_info")
-            .select("codigo, existencia", pedirCount ? { count: "exact" } : {})
+            .select(AJUSTES_APPLE_6_2026_10 ? "codigo, existencia, articulo_id, descripcion" : "codigo, existencia", pedirCount ? { count: "exact" } : {})
             .eq("empresa_key", EMPRESA)
             .not("existencia", "is", null)
             .order("codigo", { ascending: true })
@@ -315,6 +319,18 @@ export async function GET(req: NextRequest) {
       );
       return stockPorCodigo(filasStock);
     };
+
+    // AJUSTES_APPLE_6 (punto 6): lo vendido en los últimos 90 días, con la MISMA
+    // venta por artículo (`switch_articulo_diario`). Falla ABIERTA: sin ella,
+    // la pantalla no dibuja los chips de atención.
+    const hoy = hoyPanama(now);
+    const desde90 = new Date(Date.parse(`${hoy}T00:00:00Z`) - 89 * 86_400_000).toISOString().slice(0, 10);
+    const leer90 = AJUSTES_APPLE_6_2026_10 && PRODUCTOS_FILTROS_2026_10
+      ? leerPeriodoRpc(desde90, hoy).then(l => l.filas).catch(err => {
+          console.error("[multifashion/productos] venta de 90 días no disponible", err);
+          return null;
+        })
+      : Promise.resolve(null);
 
     const [periodo1, comparativoLeido, dicc, stock] = await Promise.all([
       leerPeriodoRpc(desde, hasta),
@@ -425,6 +441,19 @@ export async function GET(req: NextRequest) {
           }
         : {}),
       stock,
+      // AJUSTES_APPLE_6 (punto 6): «Sin venta en 90 días» y los que solo tienen Stock.
+      ...(await (async () => {
+        const filas90 = await leer90;
+        if (!filas90 || filasStock.length === 0) return {};
+        return {
+          atencion: atencionMultifashion(
+            filas90,
+            filasStock,
+            new Set(porCodigo.filas.map(r => r.clave)),
+            new Map(marcasCanon.filter(m => m.marca_nombre).map(m => [m.articulo_id, m.marca_nombre as string])),
+          ),
+        };
+      })()),
       ranking: {
         totales: porCategoria.totales,
         categorias: porCategoria.filas,

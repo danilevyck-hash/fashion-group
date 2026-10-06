@@ -491,3 +491,16 @@ html[data-vidrio="v2"] .vidrio.rounded-2xl {
     box-shadow: 0 0 0 1px rgb(0 0 0 / 0.6), 0 10px 30px -6px rgb(0 0 0 / 0.16);
   }
 }
+
+/* ── Una sola tipografía (AJUSTES_APPLE_6_2026_10, punto 3) ────────────────
+   Los montos en monoespaciada («$174.75», «16 tickets») pasan a la letra del
+   sistema con cifras tabulares, para que las columnas sigan alineadas. Es la
+   ÚNICA palanca: todo `font-mono` y la cifra de Caja menuda pasan por aquí.
+   Candado: src/__tests__/lib/una-tipografia.test.ts. */
+html[data-cifras="sistema"] .font-mono {
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+}
+html[data-cifras="sistema"] .skin-caja {
+  --caja-font-mono: var(--caja-font-sans);
+}

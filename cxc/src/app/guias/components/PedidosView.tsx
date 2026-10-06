@@ -8,7 +8,8 @@
 // «pedidos»), como Ventas y CxC con «Todas».
 
 import { useEffect, useState } from "react";
-import { Printer } from "lucide-react";
+import { Check, Printer } from "lucide-react";
+import { AJUSTES_APPLE_6_2026_10 as CIRCULO } from "@/lib/ajustes-apple-6-2026-10";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { CLASE_BOTON_TEXTO, CLASE_FILA_MENU, ChipSelector, EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { useToast } from "@/components/ToastSystem";
@@ -27,6 +28,7 @@ import {
   haceDias,
   haceDiasCorto,
   lineaDePendientes,
+  lineaDePendientesCorta,
   tituloPedidosImpresos,
   vendedorEnPantalla,
   type EstadoPedido,
@@ -52,6 +54,9 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
   const [empresa, setEmpresa] = useState("todas");
   // La fecha exacta se ve al pasar el mouse (title) o al tocar la celda.
   const [fechaAbierta, setFechaAbierta] = useState<string | null>(null);
+  // AJUSTES_APPLE_6: el círculo se llena (o se vacía) un instante antes de que
+  // el pedido pase a la otra lista, como en Recordatorios de iOS.
+  const [enTransito, setEnTransito] = useState<ReadonlySet<string>>(new Set());
 
   async function cargar() {
     try {
@@ -156,6 +161,44 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
     );
   };
 
+  // AJUSTES_APPLE_6 (punto 1): un círculo ○ en vez del botón «Pendiente». Lleno ✓ = preparado.
+  // Quien no marca ve el mismo círculo, quieto.
+  const circulo = (p: PedidoBodega) => {
+    const k = clave(p);
+    const lleno = (p.estado === "preparado") !== enTransito.has(k);
+    const disco = (
+      <span
+        aria-hidden
+        className={`flex h-[22px] w-[22px] items-center justify-center rounded-full border-2 transition-colors ${
+          lleno ? "border-emerald-600 bg-emerald-600 text-white" : "border-gray-300 bg-white"
+        }`}
+      >
+        {lleno && <Check size={14} strokeWidth={3} />}
+      </span>
+    );
+    if (!puedeMarcar) return <span className="flex h-11 w-9 items-center justify-center">{disco}</span>;
+    return (
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={lleno}
+        aria-label={`${p.cliente_nombre} · ${p.secuencial}: ${lleno ? "preparado" : "pendiente"}`}
+        disabled={enTransito.has(k)}
+        onClick={() => {
+          setEnTransito((s) => new Set(s).add(k));
+          setTimeout(() => {
+            setEnTransito((s) => { const n = new Set(s); n.delete(k); return n; });
+            void cambiar(p);
+          }, 450);
+        }}
+        title={p.cambiado_por && p.cambiado_en ? `${p.cambiado_por} · ${fmtDate(fechaPanamaDe(p.cambiado_en))}` : undefined}
+        className="flex h-11 w-9 items-center justify-center transition active:scale-[0.9]"
+      >
+        {disco}
+      </button>
+    );
+  };
+
   // Agrupada por empresa (Daniel, 6-oct-2026): el encabezado del grupo dice la
   // empresa y la cuenta; las filas ya no la repiten. Con una sola empresa, un solo grupo.
   const tabla = (
@@ -163,10 +206,11 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
       <table className="w-full text-left text-xs sm:text-sm">
         <thead className="border-b border-gray-200 text-xs font-medium text-gray-400 sm:uppercase sm:tracking-wide">
           <tr>
-            <th className="py-2 pl-3 pr-1 sm:px-3"><span className="sm:hidden">Antig.</span><span className="hidden sm:inline">Antigüedad</span></th>
+            {CIRCULO && <th className="w-11 py-2 pl-1.5 sm:pl-2"><span className="sr-only">Preparado</span></th>}
+            <th className={`py-2 pr-1 sm:px-3 ${CIRCULO ? "pl-1" : "pl-3"}`}><span className="sm:hidden">Antig.</span><span className="hidden sm:inline">Antigüedad</span></th>
             <th className="px-1 py-2 sm:px-3">Cliente</th>
-            <th className="px-1 py-2 sm:px-3">Vendedor</th>
-            <th className="py-2 pl-0.5 pr-3 text-right sm:px-3">Estado</th>
+            <th className={`py-2 sm:px-3 ${CIRCULO ? "pl-1 pr-3" : "px-1"}`}>Vendedor</th>
+            {!CIRCULO && <th className="py-2 pl-0.5 pr-3 text-right sm:px-3">Estado</th>}
           </tr>
         </thead>
         {agruparPorEmpresa(visibles).map((g) => (
@@ -178,7 +222,8 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
             </tr>
             {g.pedidos.map((p) => (
               <tr key={clave(p)}>
-                <td className="whitespace-nowrap py-2 pl-3 pr-1 text-gray-700 sm:px-3">
+                {CIRCULO && <td className="py-0 pl-1.5 align-top sm:pl-2">{circulo(p)}</td>}
+                <td className={`whitespace-nowrap py-2 pr-1 text-gray-700 sm:px-3 ${CIRCULO ? "pl-1 pt-3" : "pl-3"}`}>
                   <button
                     type="button"
                     title={fmtDate(fechaPanamaDe(p.fecha))}
@@ -193,12 +238,12 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
                     )}
                   </button>
                 </td>
-                <td className="break-words px-1 py-2 sm:px-3">
+                <td className={`break-words px-1 py-2 sm:px-3 ${CIRCULO ? "pt-3" : ""}`}>
                   <span className="font-medium text-gray-900">{p.cliente_nombre}</span>
                   <span className="block whitespace-nowrap text-xs text-gray-500">{p.secuencial}</span>
                 </td>
-                <td className="break-words px-1 py-2 text-gray-700 sm:px-3">{vendedorEnPantalla(p.vendedor_nombre)}</td>
-                <td className="py-1.5 pl-0.5 pr-3 text-right sm:px-3">{chipEstado(p)}</td>
+                <td className={`break-words py-2 text-gray-700 sm:px-3 ${CIRCULO ? "pl-1 pr-3 pt-3" : "px-1"}`}>{vendedorEnPantalla(p.vendedor_nombre)}</td>
+                {!CIRCULO && <td className="py-1.5 pl-0.5 pr-3 text-right sm:px-3">{chipEstado(p)}</td>}
               </tr>
             ))}
           </tbody>
@@ -281,11 +326,13 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
       )}
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div>
+        {/* AJUSTES_APPLE_6 (punto 2): el título en una línea y la frescura al lado si cabe; si no, debajo, chica. */}
+        <div data-titulo-pedidos className={CIRCULO ? "flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5" : undefined}>
           <p className="text-base font-semibold text-gray-900">
-            {pedidos ? lineaDePendientes(deLaEmpresa, hoy) : " "}
+            {pedidos ? (CIRCULO ? lineaDePendientesCorta(deLaEmpresa, hoy) : lineaDePendientes(deLaEmpresa, hoy)) : " "}
           </p>
           <LineaDeFrescura
+            className={CIRCULO ? "!text-xs" : undefined}
             actualizado={actualizado}
             opciones={B2B_EMPRESA_KEYS.map((empresa) => ({ modulo: "pedidos", empresa, label: nombreCortoEmpresa(empresa) }))}
             secuencial

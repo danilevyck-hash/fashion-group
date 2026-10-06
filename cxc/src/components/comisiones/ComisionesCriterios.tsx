@@ -18,6 +18,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Info } from "lucide-react";
 import { vidrioSobre } from "@/lib/ui/vidrio";
+import { AJUSTES_APPLE_6_2026_10 } from "@/lib/ajustes-apple-6-2026-10";
 
 interface Props {
   /** Frescura del sync (SyncStatus) — se muestra dentro del popover. */
@@ -83,6 +84,7 @@ export function ComisionesCriterios({ children, aviso, className }: Props) {
           paga a quien registró el recibo en Switch (si lo registró la oficina,
           queda en «Oficina (sin vendedor)»). Ambas excluyen intercompañía y clientes
           internos. Fuente: reportes de Switch.
+          {AJUSTES_APPLE_6_2026_10 && " Ya están descontados lo devuelto y los descuentos."}
         </p>
         {children && <div className="mt-2.5 border-t border-gray-100 pt-2.5">{children}</div>}
       </div>

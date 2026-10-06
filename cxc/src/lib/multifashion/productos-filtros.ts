@@ -26,8 +26,8 @@ export interface DepartamentosPorCodigo {
 }
 
 /** SERVIDOR: el departamento canónico de cada código vendido. */
-export function departamentosPorCodigo(
-  filas: readonly FilaArticuloDiario[],
+export function departamentosPorCodigo<T extends Pick<FilaArticuloDiario, "codigo" | "articulo_id">>(
+  filas: readonly T[],
   depDeArticulo: ReadonlyMap<number, string>,
 ): DepartamentosPorCodigo {
   const n: string[] = [];
@@ -55,14 +55,51 @@ export function stockPorCodigo(filas: readonly { codigo: string; existencia: num
   return out;
 }
 
+/**
+ * AJUSTES_APPLE_6 (punto 6): lo que hace falta para «Sin venta en 90 días» y
+ * «Agotados», con lo que ya se trae: la venta por artículo de los últimos 90
+ * días (`switch_articulo_diario`) y el Stock de Switch (`switch_articulo_info`).
+ * `v90` = códigos vendidos en 90 días; `solo` = los que tienen Stock y no se
+ * vendieron en el período ([código, descripción]); `deps` = su departamento.
+ */
+export interface AtencionMultifashion {
+  v90: string[];
+  solo: [string, string][];
+  deps: DepartamentosPorCodigo;
+}
+
+/** SERVIDOR. */
+export function atencionMultifashion(
+  filas90: readonly Pick<FilaArticuloDiario, "codigo">[],
+  stock: readonly { codigo: string; existencia: number | string | null; articulo_id?: number; descripcion?: string | null }[],
+  vendidosEnPeriodo: ReadonlySet<string>,
+  depDeArticulo: ReadonlyMap<number, string>,
+): AtencionMultifashion {
+  // Vendió = tiene algún renglón en la ventana, la MISMA regla que Ventas (`productos-articulos-server.ts`).
+  const v90 = [...new Set(filas90.map(f => textoAgrupable(f.codigo)).filter(Boolean))];
+  const solo: [string, string][] = [];
+  const vistos = new Set<string>();
+  const conDep: { codigo: string; articulo_id: number }[] = [];
+  for (const s of stock) {
+    const c = textoAgrupable(s.codigo);
+    if (!c || vistos.has(c) || vendidosEnPeriodo.has(c) || !(Number(s.existencia) > 0)) continue;
+    vistos.add(c);
+    solo.push([c, textoAgrupable(s.descripcion) || c]);
+    if (s.articulo_id != null) conDep.push({ codigo: c, articulo_id: s.articulo_id });
+  }
+  return { v90, solo, deps: departamentosPorCodigo(conDep, depDeArticulo) };
+}
+
 /** NAVEGADOR: los artículos del período (el ranking por código). */
 export function articulosMultifashion(
   codigos: readonly RenglonRanking[],
   deps: DepartamentosPorCodigo,
   stock: Readonly<Record<string, number>> = {},
+  atencion?: AtencionMultifashion,
 ): ArticuloVendido[] {
   const conStock = Object.keys(stock).length > 0;
-  return codigos.map(r => {
+  const v90 = atencion ? new Set(atencion.v90) : null;
+  const vendidos = codigos.map(r => {
     const i = deps.c[r.clave];
     const dep = i === undefined ? "" : deps.n[i];
     return {
@@ -72,6 +109,7 @@ export function articulosMultifashion(
       venta: r.venta,
       costo: r.costo,
       ...(conStock ? { existencia: stock[r.clave] ?? null } : {}),
+      ...(v90 ? { vendio90: v90.has(r.clave) } : {}),
       campos: {
         marca: dep ? grupoDeDepartamento(dep).nombre : "",
         departamento: departamentoSinMarca(dep),
@@ -80,4 +118,22 @@ export function articulosMultifashion(
       },
     };
   });
+  if (!atencion || !v90) return vendidos;
+  // Los que solo tienen Stock: no suman venta, solo entran a «Sin venta en 90 días».
+  const quietos = atencion.solo.map(([codigo, descripcion]): ArticuloVendido => {
+    const i = atencion.deps.c[codigo];
+    const dep = i === undefined ? "" : atencion.deps.n[i];
+    return {
+      codigo, descripcion, unidades: 0, venta: 0, costo: 0,
+      existencia: stock[codigo] ?? null,
+      vendio90: v90.has(codigo),
+      campos: {
+        marca: dep ? grupoDeDepartamento(dep).nombre : "",
+        departamento: departamentoSinMarca(dep),
+        genero: generoDe(descripcion),
+        descripcion,
+      },
+    };
+  });
+  return [...vendidos, ...quietos];
 }

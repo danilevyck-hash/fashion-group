@@ -25,6 +25,7 @@
 // Switch ya vienen colapsadas en una persona (alias). Muestra a todos los
 // vendedores activos aunque base=$0; los sin actividad se colapsan al pie.
 
+import { AJUSTES_APPLE_6_2026_10 } from "@/lib/ajustes-apple-6-2026-10";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { SkeletonTable } from "@/components/ui";
@@ -366,7 +367,9 @@ export function ComisionesPorEmpresaView({
 
       {/* Mismo pie que la matriz de "Todas las empresas": las dos pestañas
           muestran el MISMO neto, así que tienen que explicarlo igual. */}
-      <p className="flex items-center gap-1.5 text-xs text-gray-400">
+      {/* AJUSTES_APPLE_6 (punto 5): en el celular la › de la fila ya dice que se abre;
+          el «Cómo se calcula» sigue en el ⓘ de «Criterios» del «···». */}
+      <p className={`${AJUSTES_APPLE_6_2026_10 ? "hidden sm:flex" : "flex"} items-center gap-1.5 text-xs text-gray-400`}>
         <Coins className="h-3.5 w-3.5" />
         {conDetalle ? "Toca para ver el detalle" : "Selecciona un mes para ver el detalle"}
         <Ayuda titulo="Cómo se calcula">

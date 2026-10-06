@@ -54,6 +54,7 @@
 // AGUAS → REY STOUTE AGUAS), así que acá llega una fila por persona. Una grafía
 // nueva que nadie cargó en el alias sí aparece partida — es dato, no estructura.
 
+import { AJUSTES_APPLE_6_2026_10 } from "@/lib/ajustes-apple-6-2026-10";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { SkeletonTable } from "@/components/ui";
@@ -576,7 +577,9 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
           🩸 Ese texto NO se borra nunca: antes decía solo "lo devuelto" y el
           número parecía mal, porque los descuentos fijos no estaban restados en
           la matriz y el detalle sí los restaba. */}
-      <p className="flex items-center gap-1.5 text-xs text-gray-400">
+      {/* AJUSTES_APPLE_6 (punto 5): en el celular la › de la fila ya dice que se abre;
+          el «Cómo se calcula» sigue en el ⓘ de «Criterios» del «···». */}
+      <p className={`${AJUSTES_APPLE_6_2026_10 ? "hidden sm:flex" : "flex"} items-center gap-1.5 text-xs text-gray-400`}>
         <Coins className="h-3.5 w-3.5" />
         {conDetalle ? "Toca para ver el detalle" : "Selecciona un mes para ver el detalle"}
         <Ayuda titulo="Cómo se calcula">

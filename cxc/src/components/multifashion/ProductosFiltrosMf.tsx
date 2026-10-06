@@ -9,7 +9,7 @@
 import { useMemo } from "react";
 import useSWR from "swr";
 import { PantallaProductos } from "@/components/productos/FiltrosProductos";
-import { CHIPS_MULTIFASHION, articulosMultifashion, type DepartamentosPorCodigo } from "@/lib/multifashion/productos-filtros";
+import { CHIPS_MULTIFASHION, articulosMultifashion, type AtencionMultifashion, type DepartamentosPorCodigo } from "@/lib/multifashion/productos-filtros";
 import type { RenglonRanking } from "@/lib/multifashion/productos-ranking";
 import type { Periodo } from "@/lib/multifashion/periodo";
 
@@ -18,6 +18,8 @@ interface Resp {
   hasta: string;
   departamentos?: DepartamentosPorCodigo;
   stock?: Record<string, number>;
+  /** AJUSTES_APPLE_6: para «Sin venta en 90 días» · «Agotados». */
+  atencion?: AtencionMultifashion;
   ranking: { codigos: RenglonRanking[] };
 }
 
@@ -34,7 +36,7 @@ export function ProductosFiltrosMf({ selectedYear, mes, periodo }: { selectedYea
   }, { dedupingInterval: 5 * 60_000, revalidateOnFocus: false, keepPreviousData: true });
 
   const articulos = useMemo(
-    () => (data ? articulosMultifashion(data.ranking.codigos, data.departamentos ?? { n: [], c: {} }, data.stock) : null),
+    () => (data ? articulosMultifashion(data.ranking.codigos, data.departamentos ?? { n: [], c: {} }, data.stock, data.atencion) : null),
     [data],
   );
 
@@ -46,7 +48,7 @@ export function ProductosFiltrosMf({ selectedYear, mes, periodo }: { selectedYea
       onReintentar={() => void mutate()}
       chips={CHIPS_MULTIFASHION}
       conInventario={!!data?.stock && Object.keys(data.stock).length > 0}
-      sinAtencion
+      sinAtencion={!data?.atencion}
     />
   );
 }
