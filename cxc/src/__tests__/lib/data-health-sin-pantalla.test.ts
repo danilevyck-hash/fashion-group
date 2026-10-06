@@ -159,7 +159,9 @@ describe("🔴 la medición no se tocó", () => {
     // Este candado cambió de número con nota, no de regla: la medición
     // (`integrity-check`) sigue intacta, y el caso de arriba lo comprueba.
     const vercel = JSON.parse(leer("vercel.json")) as { crons: unknown[] };
-    expect(vercel.crons).toHaveLength(91);
+    // ⚠️ 6-oct-2026: son 92 — `cobros-del-dia`, el resumen de las 7:00 p.m.
+    // de los cobros del día. Ver `cxc/cobros-del-dia.test.ts`.
+    expect(vercel.crons).toHaveLength(92);
   });
 
   // Mismo motivo que la allowlist de checks: `cron-telemetry.ts` construye el

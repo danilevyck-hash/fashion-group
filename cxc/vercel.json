@@ -305,6 +305,10 @@
       "schedule": "15 23 * * *"
     },
     {
+      "path": "/api/cron/cobros-del-dia",
+      "schedule": "0 0 * * *"
+    },
+    {
       "path": "/api/cron/switch-sync?tipo=facturas&empresa=american_classic&slot=facturas-0015",
       "schedule": "15 0 * * *"
     },
