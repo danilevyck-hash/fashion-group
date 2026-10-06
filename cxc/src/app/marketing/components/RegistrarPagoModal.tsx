@@ -17,6 +17,14 @@ import {
 import type { ImpulsadoraConEstado } from "@/lib/marketing/types";
 import type { DatosDelGastoParaGuardar } from "@/lib/marketing/puerta-gasto";
 import CampoFecha from "@/components/ui/CampoFecha";
+import { CHIP_ACTIVO, CHIP_INACTIVO } from "@/lib/marketing/marketing-2026-10";
+import {
+  MARKETING_APPLE_V2_2026_10,
+  atajoPrendido,
+  faltaParaGuardarPago,
+  lineaDistribucion,
+  textoFaltaPago,
+} from "@/lib/marketing/marketing-2026-10-v2";
 
 interface Props {
   impulsadora: ImpulsadoraConEstado;
@@ -129,6 +137,26 @@ export default function RegistrarPagoModal({
 
   const puedeGuardar =
     montoNum > 0 && !!comprobante && !errorPeriodo && !subiendo && !guardando;
+
+  // v2 (6-oct-2026): el período como chips con «Rango», y lo que falta se dice
+  // TODO al tocar «Guardar pago». La regla es la MISMA de `puedeGuardar`.
+  const v2 = MARKETING_APPLE_V2_2026_10;
+  const atajos = [
+    { clave: "q1", rotulo: "1ª quincena", ...primeraQuincena(mesBase) },
+    { clave: "q2", rotulo: "2ª quincena", ...segundaQuincena(mesBase) },
+    { clave: "mes", rotulo: "Mes completo", ...mesCompleto(mesBase) },
+  ];
+  const prendido = atajoPrendido(desde, hasta, atajos);
+  const [rangoAbierto, setRangoAbierto] = useState(false);
+  const verFechas = !v2 || rangoAbierto || prendido === null;
+  const [intento, setIntento] = useState(false);
+  const faltaTexto = textoFaltaPago(
+    faltaParaGuardarPago({ errorPeriodo, monto: montoNum, hayComprobante: !!comprobante }),
+  );
+  const alTocarGuardar = () => {
+    if (v2 && faltaTexto) { setIntento(true); return; }
+    void guardar();
+  };
 
   const guardar = async () => {
     if (!puedeGuardar || !comprobante) return;
@@ -247,6 +275,30 @@ export default function RegistrarPagoModal({
         <div className="p-6 space-y-5">
           <div>
             <div className="text-sm font-medium text-gray-700 mb-2">Período trabajado</div>
+            {v2 && (
+              <div data-periodo-v2 className="mb-3 flex flex-wrap gap-2">
+                {atajos.map((a) => (
+                  <button
+                    key={a.clave}
+                    type="button"
+                    aria-pressed={prendido === a.clave && !rangoAbierto}
+                    onClick={() => { aplicar(a); setRangoAbierto(false); }}
+                    className={`min-h-[44px] rounded-full border px-4 text-sm transition ${prendido === a.clave && !rangoAbierto ? CHIP_ACTIVO : CHIP_INACTIVO}`}
+                  >
+                    {a.rotulo}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  aria-pressed={verFechas}
+                  onClick={() => setRangoAbierto(true)}
+                  className={`min-h-[44px] rounded-full border px-4 text-sm transition ${verFechas ? CHIP_ACTIVO : CHIP_INACTIVO}`}
+                >
+                  Rango
+                </button>
+              </div>
+            )}
+            {verFechas && (
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label
@@ -277,6 +329,8 @@ export default function RegistrarPagoModal({
                 />
               </div>
             </div>
+            )}
+            {!v2 && (
             <div className="mt-2 flex flex-wrap gap-2">
               {[
                 { label: "1ª quincena", p: primeraQuincena(mesBase) },
@@ -297,6 +351,7 @@ export default function RegistrarPagoModal({
                 </button>
               ))}
             </div>
+            )}
             {errorPeriodo && (
               <p className="mt-2 text-sm text-red-600">{errorPeriodo}</p>
             )}
@@ -322,8 +377,16 @@ export default function RegistrarPagoModal({
                 className="w-full min-h-[44px] rounded-md border border-gray-300 pl-7 pr-3 py-2 text-base sm:text-sm tabular-nums focus:border-black focus:outline-none"
               />
             </div>
+            {v2 && (
+              <div data-distribucion-v2 className="mt-1.5 space-y-0.5 text-xs text-gray-500 tabular-nums">
+                <p>{lineaDistribucion(distribucion, formatearMonto)}</p>
+                <p className="truncate">{concepto}</p>
+              </div>
+            )}
           </div>
 
+          {!v2 && (
+          <>
           <div>
             <div className="text-sm font-medium text-gray-700 mb-1">Concepto</div>
             <div className="rounded-md bg-gray-50 border border-gray-200 px-3 py-2 text-sm text-gray-600">
@@ -344,12 +407,18 @@ export default function RegistrarPagoModal({
               ))}
             </div>
           </div>
+          </>
+          )}
 
           <div>
+            {v2 ? (
+              <div className="text-sm font-medium text-gray-700 mb-2">Comprobante</div>
+            ) : (
             <div className="text-sm font-medium text-gray-700 mb-2">
               Comprobante <span className="text-red-600">*</span>{" "}
               <span className="text-xs font-normal text-gray-400">(foto o PDF, obligatorio)</span>
             </div>
+            )}
             <input
               ref={fileRef}
               type="file"
@@ -390,7 +459,10 @@ export default function RegistrarPagoModal({
           )}
         </div>
 
-        <div className="sticky bottom-0 bg-white border-t border-gray-100 px-6 py-4 flex items-center justify-end gap-3">
+        <div className="sticky bottom-0 bg-white border-t border-gray-100 px-6 py-4 flex flex-wrap items-center justify-end gap-3">
+          {v2 && intento && faltaTexto && (
+            <p role="status" data-falta-pago className="mr-auto text-sm text-amber-700">{faltaTexto}</p>
+          )}
           <button
             type="button"
             onClick={onClose}
@@ -401,8 +473,8 @@ export default function RegistrarPagoModal({
           </button>
           <button
             type="button"
-            onClick={guardar}
-            disabled={!puedeGuardar}
+            onClick={v2 ? alTocarGuardar : guardar}
+            disabled={v2 ? guardando || subiendo : !puedeGuardar}
             className="rounded-md bg-black text-white px-4 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {guardando ? "Guardando…" : "Guardar pago"}

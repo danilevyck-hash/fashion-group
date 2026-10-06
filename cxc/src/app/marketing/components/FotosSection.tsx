@@ -21,6 +21,7 @@ import { PERIODO_ABIERTO, PERIODO_TODOS, ROTULO_ABIERTO } from "@/lib/marketing/
 import { subirAdjunto } from "./uploadHelpers";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { Aviso } from "@/components/ui/Aviso";
+import { MARKETING_APPLE_V2_2026_10, tituloGaleria } from "@/lib/marketing/marketing-2026-10-v2";
 
 // ============================================================================
 // 🔴 LAS FOTOS CUELGAN DE LA TIENDA (22-sep-2026), no del proyecto.
@@ -226,6 +227,7 @@ export default function FotosSection({
   };
 
   const hayFotos = fotos.length > 0;
+  const v2 = MARKETING_APPLE_V2_2026_10;
   // 🔴 Con dos o más marcas abiertas, primero se elige y después se abre el
   // selector de archivo. Ninguna viene puesta.
   const faltaElegirLaMarca = hayQueElegirMarca && !marcaDelToque;
@@ -298,7 +300,9 @@ export default function FotosSection({
     <section className="space-y-3">
       <div className="flex items-center gap-1">
         <h2 className="text-base font-semibold text-gray-900">
-          {tiendaCodigo ? "Fotos de la tienda" : "Fotos del proyecto"}
+          {v2 && !loading
+            ? tituloGaleria(tiendaCodigo ? "Fotos de la tienda" : "Fotos del proyecto", fotos.length)
+            : tiendaCodigo ? "Fotos de la tienda" : "Fotos del proyecto"}
         </h2>
         {/* Para qué sirven las fotos: se aprende una vez → ⓘ. */}
         <Ayuda titulo="Información" className="-my-2">
@@ -308,7 +312,7 @@ export default function FotosSection({
           <button
             type="button"
             onClick={() => setEditandoFotos((v) => !v)}
-            className="sm:hidden ml-auto min-h-[44px] px-2 text-[17px] text-blue-600 active:opacity-60"
+            className={`${v2 ? "" : "sm:hidden "}ml-auto min-h-[44px] px-2 text-[17px] text-blue-600 active:opacity-60`}
           >
             {editandoFotos ? "Listo" : "Editar"}
           </button>
@@ -393,7 +397,13 @@ export default function FotosSection({
                        por error desde el celular. Se muestra siempre en móvil y
                        se conserva el revelado por hover en escritorio, igual
                        que Editar/Anular/Eliminar en FacturasSection. */
-                    className={`absolute top-1 right-1 bg-white/90 rounded-full w-11 h-11 flex items-center justify-center text-red-600 shadow-sm transition sm:opacity-0 sm:pointer-events-auto sm:group-hover:opacity-100 sm:focus-within:opacity-100 focus-visible:opacity-100 ${
+                    className={v2
+                      // v2: en la computadora, como en el celular — la ✕ sale
+                      // solo con «Editar», nunca al pasar el mouse.
+                      ? `absolute top-1 right-1 bg-white/90 rounded-full w-11 h-11 flex items-center justify-center text-red-600 shadow-sm transition ${
+                          editandoFotos ? "opacity-100" : "opacity-0 pointer-events-none"
+                        }`
+                      : `absolute top-1 right-1 bg-white/90 rounded-full w-11 h-11 flex items-center justify-center text-red-600 shadow-sm transition sm:opacity-0 sm:pointer-events-auto sm:group-hover:opacity-100 sm:focus-within:opacity-100 focus-visible:opacity-100 ${
                       MARKETING_CELULAR && !editandoFotos
                         ? "opacity-0 pointer-events-none"
                         : "opacity-100"
@@ -429,7 +439,7 @@ export default function FotosSection({
           )}
         </>
       ) : readonly ? (
-        <div className="rounded-lg border border-dashed border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+        <div className={v2 ? "text-sm text-gray-500" : "rounded-lg border border-dashed border-gray-200 bg-white p-6 text-center text-sm text-gray-500"}>
           {avisoSinFotosDelPeriodo(clavePeriodo, !!tiendaCodigo)}
         </div>
       ) : (

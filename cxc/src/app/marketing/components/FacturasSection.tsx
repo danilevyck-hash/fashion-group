@@ -23,6 +23,7 @@ import {
 } from "./uploadHelpers";
 import { useBulkUploadFacturas } from "@/lib/marketing/useBulkUploadFacturas";
 import { MARKETING_PUERTA_GASTO } from "@/lib/marketing/puerta-gasto";
+import { MARKETING_APPLE_V2_2026_10 } from "@/lib/marketing/marketing-2026-10-v2";
 import {
   useBackdropDismiss,
   useEscapeClose,
@@ -497,8 +498,32 @@ export default function FacturasSection({
     await ejecutarGuardarBulk();
   };
 
+  // v2: «+ Agregar factura» es la única acción principal; subir varios PDFs
+  // es un enlace a su lado y arrastrar sobre la sección entera sigue subiendo.
+  const v2 = MARKETING_APPLE_V2_2026_10;
+  const entradaPdfs = (
+    <input
+      ref={fileInputRef}
+      type="file"
+      accept="application/pdf,.pdf"
+      multiple
+      onChange={(e) => {
+        aceptarArchivos(e.target.files);
+        e.target.value = "";
+      }}
+      className="hidden"
+    />
+  );
+  const arrastre = v2 && !readonly
+    ? {
+        onDragOver: (e: React.DragEvent) => { e.preventDefault(); setDragActivo(true); },
+        onDragLeave: () => setDragActivo(false),
+        onDrop: handleDrop,
+      }
+    : {};
+
   return (
-    <section className="space-y-3">
+    <section {...arrastre} className={v2 && dragActivo ? "space-y-3 rounded-lg outline-dashed outline-2 outline-gray-400 outline-offset-4" : "space-y-3"}>
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-gray-900">Facturas</h2>
@@ -507,6 +532,22 @@ export default function FacturasSection({
             {anuladas.length > 0 ? ` · ${anuladas.length} anuladas` : ""}
           </p>
         </div>
+        {v2 && !readonly && (
+          <div className="ml-auto flex items-center">
+            {entradaPdfs}
+            <button
+              type="button"
+              data-subir-pdfs-v2
+              onClick={() => fileInputRef.current?.click()}
+              disabled={bulk.progress.enProceso}
+              className="min-h-[44px] px-3 text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50 transition"
+            >
+              {bulk.progress.enProceso
+                ? `Procesando ${bulk.progress.procesados} de ${bulk.progress.totalArchivos}…`
+                : "Subir PDFs"}
+            </button>
+          </div>
+        )}
         {!showForm && !readonly && (
           <button
             type="button"
@@ -522,7 +563,7 @@ export default function FacturasSection({
       </div>
 
       {/* Drop zone multi-upload */}
-      {!readonly && (
+      {!v2 && !readonly && (
         <div>
           <div
             onDragOver={(e) => {
@@ -719,7 +760,29 @@ export default function FacturasSection({
 
             return (
               <div key={f.id} className="space-y-1">
-                <FacturaCard factura={f} porcentajesMarcas={marcasDeEsta} />
+                <FacturaCard
+                  factura={f}
+                  porcentajesMarcas={marcasDeEsta}
+                  v2={v2}
+                  acciones={v2 && !f.anulado_en && !readonly ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleAbrirEdicion(f); }}
+                        className="min-h-[44px] px-2 text-sm text-blue-600 hover:text-blue-800 transition"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setAnulando(f); setAnulandoMotivo(""); }}
+                        className="min-h-[44px] px-2 text-sm text-blue-600 hover:text-blue-800 transition"
+                      >
+                        Anular
+                      </button>
+                    </div>
+                  ) : null}
+                />
                 {/* 🩸 Las acciones vivían FLOTANDO sobre la esquina de la
                     tarjeta, de ~24 px de alto y a 4 px una de otra. Ahora van
                     en su propia FILA debajo de la tarjeta, de 44 px de alto
@@ -727,7 +790,7 @@ export default function FacturasSection({
                     en pantalla táctil el hover no existe.
                     «Eliminar definitivamente» se retiró el 22-sep-2026 (con
                     «Anular», que es reversible, basta). */}
-                {!f.anulado_en && !readonly && (
+                {!v2 && !f.anulado_en && !readonly && (
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"

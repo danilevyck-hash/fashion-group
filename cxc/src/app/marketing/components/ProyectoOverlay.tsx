@@ -44,6 +44,12 @@ import FacturasSection from "./FacturasSection";
 import FotosSection from "./FotosSection";
 import EntregasSection from "./EntregasSection";
 import EditarProyectoModal from "./EditarProyectoModal";
+import {
+  MARKETING_APPLE_V2_2026_10,
+  lineaDelProyecto,
+  lineaTotalesProyecto,
+} from "@/lib/marketing/marketing-2026-10-v2";
+import { CLASE_LINEA_TOTAL, CLASE_TOTAL_CELULAR } from "@/components/celular/CabeceraCompacta";
 import type { EntregaConItems } from "@/lib/marketing/types";
 
 type Tab = "facturas" | "fotos";
@@ -256,6 +262,8 @@ export default function ProyectoOverlay({
     marcasDelProyecto,
   ]);
 
+  const v2 = MARKETING_APPLE_V2_2026_10;
+
   if (loading || !proyecto) {
     return (
       <ModalOverlay backdropClassName="bg-black/30" onBackdropClick={onClose}>
@@ -332,7 +340,9 @@ export default function ProyectoOverlay({
           {lineaContexto && (
             <div
               data-contexto-marca
-              className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[13px] text-gray-800"
+              className={v2
+                ? "text-[13px] text-gray-500"
+                : "rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[13px] text-gray-800"}
             >
               {lineaContexto}
             </div>
@@ -341,6 +351,23 @@ export default function ProyectoOverlay({
           {/* Datos del proyecto */}
           <div className="rounded-lg border border-gray-200 p-4">
             <div className="flex items-start justify-between gap-3 mb-3">
+              {v2 ? (
+              <div className="min-w-0">
+                {/* v2: el nombre ya está en la barra de arriba; aquí, una línea. */}
+                <div className="text-sm text-gray-500 truncate">
+                  {lineaDelProyecto({
+                    tienda: proyecto.tienda,
+                    mostrarTienda: !!proyecto.nombre,
+                    inicio: formatearFecha(proyecto.fecha_inicio),
+                  })}
+                </div>
+                {marcasDelProyecto.length > 0 && (
+                  <div data-marcas-v2 className="text-sm text-gray-700 truncate mt-0.5">
+                    {marcasDelProyecto.map((m) => m.nombre).join(" · ")}
+                  </div>
+                )}
+              </div>
+              ) : (
               <div className="min-w-0">
                 <div className="text-lg font-semibold text-gray-900 truncate">
                   {proyecto.nombre || proyecto.tienda}
@@ -354,6 +381,7 @@ export default function ProyectoOverlay({
                   <span>Inicio: {formatearFecha(proyecto.fecha_inicio)}</span>
                 </div>
               </div>
+              )}
               <div className="flex flex-col items-end gap-1 shrink-0">
                 {proyecto.anulado_en && (
                   <span className="text-xs px-2 py-0.5 rounded bg-red-50 text-red-700 font-medium">
@@ -389,7 +417,7 @@ export default function ProyectoOverlay({
                 proyectos con facturas tienen más de una). En el inicio eso
                 hace que aparezca en VARIAS tarjetas de marca — correcto, pero
                 se lee raro si la ficha no lo dice. Acá se dice. */}
-            {marcasDelProyecto.length > 0 && (
+            {!v2 && marcasDelProyecto.length > 0 && (
               <div className="mt-3">
                 <div className="text-xs uppercase tracking-wide text-gray-400 mb-1">
                   Marcas
@@ -421,6 +449,15 @@ export default function ProyectoOverlay({
               </div>
             )}
 
+            {v2 ? (
+              <div data-total-proyecto-v2 className="mt-4 pt-3 border-t border-gray-100">
+                <div className="text-[13px] text-gray-500">Costo total</div>
+                <span className={CLASE_TOTAL_CELULAR}>{formatearMonto(totales.total)}</span>
+                <span className={CLASE_LINEA_TOTAL}>
+                  {lineaTotalesProyecto(totales, formatearMonto, PORCENTAJE_IMPORTACION_ZONA_LIBRE)}
+                </span>
+              </div>
+            ) : (
             <div
               className={`grid ${
                 GRID_TOTALES[
@@ -482,6 +519,7 @@ export default function ProyectoOverlay({
                 </div>
               </div>
             </div>
+            )}
 
           </div>
 
@@ -489,7 +527,7 @@ export default function ProyectoOverlay({
           <div className="flex items-center gap-1 border-b border-gray-200">
             {(
               [
-                { k: "facturas" as const, label: "Facturas" },
+                { k: "facturas" as const, label: v2 ? `Facturas · ${totales.conteo}` : "Facturas" },
                 { k: "fotos" as const, label: "Fotos" },
               ]
             ).map(({ k, label }) => (

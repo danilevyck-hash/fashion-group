@@ -32,6 +32,7 @@ import CatalogoSyncNow from "@/components/shared/CatalogoSyncNow";
 import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
 import { CATALOGOS_APPLE_2026_10, ID_ACCIONES_EN_LA_BARRA, CLASES_MENU_MAS } from "@/lib/catalogo/catalogos-2026-10";
 import { CATALOGOS_APPLE_2026_10_B } from "@/lib/catalogo/catalogos-2026-10-b";
+import { CATALOGOS_APPLE_V2_2026_10, lineaDelPedido } from "@/lib/catalogo/catalogos-2026-10-v2";
 import { createPortal } from "react-dom";
 import CatalogoFilters from "./CatalogoFilters";
 import CatalogoProductCard from "./CatalogoProductCard";
@@ -905,6 +906,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
             actionColor={theme.vendorShare.stickyActionColor ?? undefined}
           onAltoChange={setAltoBarra}
             formatTotal={fmt}
+            v2={CATALOGOS_APPLE_V2_2026_10 ? { linea: lineaDelPedido({ productos: cart.length, bultos: cartCount }) } : null}
           />
         )}
       </div>

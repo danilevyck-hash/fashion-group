@@ -14,6 +14,7 @@ import type { CatalogoCartItem, CatalogoProducto } from "./types";
 import { fmtPrecio } from "@/lib/catalogo/precio";
 import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
 import { aPxDeEstilo } from "@/lib/ui/escala-raiz";
+import { VIDRIO } from "@/lib/ui/vidrio";
 
 interface CatalogoStickyCartBarProps {
   marca: MarcaUiKey;
@@ -48,6 +49,14 @@ interface CatalogoStickyCartBarProps {
    * a una barra que crece: ahora el espacio sale de la MEDIDA.
    */
   onAltoChange?: (alto: number) => void;
+  /**
+   * El interruptor V2 de Catálogos (6-oct-2026), SOLO del vendedor: la barra de
+   * vidrio del checkout, el total como número con UNA línea gris (`linea`,
+   * «3 productos · 12 bultos») y el botón negro. Lo decide la página: este
+   * archivo no importa el diseño (candado `catalogos-apple-2026-10`) y el
+   * catálogo PÚBLICO no la pasa nunca. Mismo botón, mismo destino.
+   */
+  v2?: { linea: string } | null;
 }
 
 export default function CatalogoStickyCartBar({
@@ -55,7 +64,7 @@ export default function CatalogoStickyCartBar({
   onQtyChange, onClearCart,
   variant, onSubmitOrder, clientName, onClientNameChange, onCreateOrder,
   saving, actionLabel, actionColor,
-  miniCartLink, formatTotal, onAltoChange,
+  miniCartLink, formatTotal, onAltoChange, v2 = null,
 }: CatalogoStickyCartBarProps) {
   const theme = getMarcaTheme(marca)!;
   const c = theme.cart;
@@ -291,6 +300,33 @@ export default function CatalogoStickyCartBar({
       )}
 
       {/* Bottom bar */}
+      {v2 && variant === "vendor" ? (
+        <div data-medir="barra-armado-v2" className={`${VIDRIO} rounded-none border-x-0 border-b-0`}
+          style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
+          <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-4 pt-3">
+            <button
+              type="button"
+              onClick={() => setMiniCartOpen(prev => !prev)}
+              aria-expanded={miniCartOpen}
+              className="flex min-h-[48px] min-w-0 items-center gap-1.5 text-left"
+            >
+              <span className="min-w-0">
+                <span className="block text-lg font-medium tabular-nums leading-tight text-gray-900">${formatTotal(cartTotal)}</span>
+                <span className="block truncate text-xs text-gray-500 tabular-nums">{v2.linea}</span>
+              </span>
+              <span aria-hidden="true" className={`text-gray-400 transition ${miniCartOpen ? "rotate-90" : "-rotate-90"}`}>›</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleAction}
+              disabled={saving}
+              className="ml-auto min-h-[48px] shrink-0 whitespace-nowrap rounded-lg bg-black px-5 text-sm font-medium text-white hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-50"
+            >
+              {saving ? "Guardando..." : btnLabel}
+            </button>
+          </div>
+        </div>
+      ) : (
       <div className="p-3 bg-white border-t border-gray-100 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] flex items-center gap-2" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
         {/* Cart summary button */}
         <button
@@ -341,6 +377,7 @@ export default function CatalogoStickyCartBar({
           {showArrow && <span>&rarr;</span>}
         </button>
       </div>
+      )}
     </div>
 
     {/* HERMANO de la barra, no hijo: la barra es `fixed z-40` y crea su propio

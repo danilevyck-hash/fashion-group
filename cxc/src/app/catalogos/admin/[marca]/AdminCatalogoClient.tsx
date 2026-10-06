@@ -34,6 +34,7 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { CATALOGOS_APPLE_2026_10_B } from "@/lib/catalogo/catalogos-2026-10-b";
+import { CATALOGOS_APPLE_V2_2026_10, claseChipAdmin } from "@/lib/catalogo/catalogos-2026-10-v2";
 import { FiltroDesplegable } from "@/components/catalogo/CatalogoFilters";
 import SubirFotos from "./SubirFotos";
 import ProductoFila from "./ProductoFila";
@@ -220,6 +221,9 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
 
   // `CATALOGOS_APPLE_2026_10_B`: «Actualizar ahora» en la línea del título.
   const enUnaFila = CATALOGOS_APPLE_2026_10_B.administrar;
+  // `CATALOGOS_APPLE_V2_2026_10` (6-oct-2026): «Subir fotos» plegado, el
+  // buscador con Género y Bulto en UNA fila y los chips del catálogo.
+  const v2 = CATALOGOS_APPLE_V2_2026_10;
   // 🔴 4-oct-2026: «Actualizado 4:00 pm ↻» bajo el título en el celular y
   // «Actualizado hace 5 min · Actualizar» a su lado en la computadora, como en
   // todo el sistema. Reemplaza al subtítulo «Actualizado el…» y al botón.
@@ -231,6 +235,53 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
         await Promise.all([mutateProducts(), mutateSyncStatus()]);
       }}
     />
+  );
+
+  // Los MISMOS desplegables de siempre; con v2 viajan a la fila del buscador.
+  const filtrosDesplegables = (
+    <>
+              <FiltroDesplegable
+                etiqueta="Género"
+                valor={genero}
+                opciones={theme.filtros.genderOptions}
+                onChange={setGenero}
+                chipActive={theme.filtros.chipActive}
+                chipInactive={theme.filtros.chipInactive}
+              />
+              {theme.admin.bultoEditable && (
+                <FiltroDesplegable
+                  etiqueta="Bulto"
+                  valor={bulto}
+                  opciones={BULTO_FILTRO_OPCIONES}
+                  onChange={setBulto}
+                  chipActive={theme.filtros.chipActive}
+                  chipInactive={theme.filtros.chipInactive}
+                />
+              )}
+              {hayFiltros && (
+                <button
+                  type="button"
+                  onClick={() => { setGenero(""); setBulto(""); setBusqueda(""); }}
+                  className="min-h-[44px] px-3 text-xs font-medium text-gray-500 underline-offset-2 hover:underline hover:text-gray-700 transition"
+                >
+                  Limpiar filtros
+                </button>
+              )}
+    </>
+  );
+
+  const buscador = (
+            <div className={v2 ? "relative w-full sm:w-auto sm:flex-1 sm:min-w-[240px]" : "relative mb-3"}>
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Buscar por código o nombre…"
+                className="w-full min-h-[44px] pl-10 pr-4 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-gray-400 transition"
+              />
+            </div>
   );
 
   return (
@@ -309,20 +360,17 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
               onFotoSubida={recargar}
               onZipListo={recargarTrasZip}
               showToast={showToast}
+              plegable={v2}
             />
 
-            {/* Buscador */}
-            <div className="relative mb-3">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                placeholder="Buscar por código o nombre…"
-                className="w-full min-h-[44px] pl-10 pr-4 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-gray-400 transition"
-              />
-            </div>
+            {/* v2: buscador, Género y Bulto en UNA fila (en el celular el
+                buscador va a lo ancho y los desplegables bajan). */}
+            {v2 ? (
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                {buscador}
+                {filtrosDesplegables}
+              </div>
+            ) : buscador}
 
             {/* UNA fila de chips, con el número adentro. */}
             {/* 🔴 EN EL CELULAR, UNA FILA QUE SE DESLIZA (24-sep-2026): los
@@ -334,7 +382,19 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
             <div className={CATALOGO_ORDEN_CELULAR
               ? `${FILA_QUE_SE_DESLIZA} items-center mb-3 sm:flex-wrap sm:overflow-x-visible`
               : "flex flex-wrap items-center gap-2 mb-3"}>
-              {chips.map((c) => (
+              {chips.map((c) => v2 ? (
+                // v2: redondo y con la paleta del catálogo; el tamaño, el de hoy.
+                <button
+                  key={c.key}
+                  type="button"
+                  onClick={() => setVer(c.key)}
+                  aria-pressed={ver === c.key}
+                  className={`inline-flex min-h-[44px] items-center gap-1.5 px-3 font-medium transition active:scale-[0.97] ${claseChipAdmin(ver === c.key)}`}
+                >
+                  {c.label}
+                  <span className={`tabular-nums ${ver === c.key ? "text-white/60" : "text-gray-400"}`}>{c.count}</span>
+                </button>
+              ) : (
                 <button
                   key={c.key}
                   type="button"
@@ -355,35 +415,11 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
             </div>
 
             {/* Género y bulto — los MISMOS controles y opciones del catálogo. */}
+            {!v2 && (
             <div className="flex flex-wrap items-center gap-2 mb-4">
-              <FiltroDesplegable
-                etiqueta="Género"
-                valor={genero}
-                opciones={theme.filtros.genderOptions}
-                onChange={setGenero}
-                chipActive={theme.filtros.chipActive}
-                chipInactive={theme.filtros.chipInactive}
-              />
-              {theme.admin.bultoEditable && (
-                <FiltroDesplegable
-                  etiqueta="Bulto"
-                  valor={bulto}
-                  opciones={BULTO_FILTRO_OPCIONES}
-                  onChange={setBulto}
-                  chipActive={theme.filtros.chipActive}
-                  chipInactive={theme.filtros.chipInactive}
-                />
-              )}
-              {hayFiltros && (
-                <button
-                  type="button"
-                  onClick={() => { setGenero(""); setBulto(""); setBusqueda(""); }}
-                  className="min-h-[44px] px-3 text-xs font-medium text-gray-500 underline-offset-2 hover:underline hover:text-gray-700 transition"
-                >
-                  Limpiar filtros
-                </button>
-              )}
+              {filtrosDesplegables}
             </div>
+            )}
 
             {/* Que los filtros no dejen una pantalla vacía sin explicación: es la
                 diferencia entre "no hay ninguno así" y "algo se rompió". */}

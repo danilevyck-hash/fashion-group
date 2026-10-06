@@ -7,6 +7,8 @@ import {
   calcularImportacion,
 } from "@/lib/marketing-calc";
 import AdjuntosFactura from "./AdjuntosFactura";
+import type { ReactNode } from "react";
+import { lineaMontosFactura } from "@/lib/marketing/marketing-2026-10-v2";
 
 interface PorcentajeMarca {
   marca: MkMarca;
@@ -18,12 +20,19 @@ interface FacturaCardProps {
   factura: FacturaConAdjuntos;
   porcentajesMarcas: PorcentajeMarca[];
   onClick?: () => void;
+  /** `MARKETING_APPLE_V2_2026_10` (lo decide la sección): dos líneas con el
+   *  TOTAL arriba, los montos en gris y las marcas en gris. Mismos números. */
+  v2?: boolean;
+  /** v2: «Editar · Anular» en la fila de la tarjeta. */
+  acciones?: ReactNode;
 }
 
 export function FacturaCard({
   factura,
   porcentajesMarcas,
   onClick,
+  v2 = false,
+  acciones = null,
 }: FacturaCardProps) {
   const anulada = factura.anulado_en !== null;
   const tienePdf = factura.adjuntos.some((a) => a.tipo === "pdf_factura");
@@ -44,7 +53,72 @@ export function FacturaCard({
     return "bg-white text-gray-700 border-gray-200";
   }
 
-  const body = (
+  // El toggle Creado|Pagado se retiró del formulario (Daniel, 12-ago: "si
+  // quitalo"): toda factura nueva nace "creado", así que un badge gris
+  // "Creado" en todas sería ruido. El verde "Pagado" SE QUEDA — lo escriben
+  // los pagos de impulsadora (impulsadoras.ts) y las filas históricas.
+  const badges = (
+    <>
+      {!anulada && factura.estado_pago === "pagado" && (
+        <span className="text-xs px-1.5 py-0.5 rounded border font-medium bg-emerald-50 text-emerald-700 border-emerald-200">
+          Pagado
+        </span>
+      )}
+      {factura.tiene_importacion && !anulada && (
+        <span
+          className="text-xs px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-medium"
+          title={`Compra en zona libre · ${PORCENTAJE_IMPORTACION_ZONA_LIBRE}% de importación incluido en el total`}
+        >
+          Zona libre
+        </span>
+      )}
+      {tienePdf && (
+        <span className="text-xs px-1.5 py-0.5 rounded bg-gray-900 text-white font-semibold tracking-wide">
+          PDF
+        </span>
+      )}
+      {anulada && (
+        <span className="text-xs px-1.5 py-0.5 rounded bg-red-50 text-red-700 font-medium">
+          Anulada
+        </span>
+      )}
+    </>
+  );
+
+  // v2 (6-oct-2026): lo esencial en dos líneas — número y TOTAL; fecha ·
+  // proveedor · concepto; y en gris los montos y las marcas.
+  const cuerpoV2 = (
+    <div data-factura-v2 className="flex flex-col gap-0.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className={`text-sm font-medium truncate ${textoBase}`}>{factura.numero_factura}</span>
+          {badges}
+        </div>
+        <span className={`shrink-0 text-base font-medium tabular-nums ${textoBase}`}>{formatearMonto(factura.total)}</span>
+      </div>
+      <div className={`text-xs truncate ${textoSec}`}>
+        {[formatearFecha(factura.fecha_factura), factura.proveedor, factura.concepto].filter(Boolean).join(" · ")}
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <div className={`min-w-0 text-xs truncate tabular-nums ${anulada ? textoSec : "text-gray-500"}`}>
+          {[
+            lineaMontosFactura(
+              factura,
+              formatearMonto,
+              calcularImportacion(factura.subtotal, true),
+              PORCENTAJE_IMPORTACION_ZONA_LIBRE,
+            ),
+            !anulada && porcentajesMarcas.length > 0
+              ? porcentajesMarcas.map((m) => m.marca.nombre || m.marca.codigo).join(" · ")
+              : null,
+          ].filter(Boolean).join(" · ")}
+        </div>
+        {acciones && !onClick && <div className="-my-2 -mr-2 shrink-0">{acciones}</div>}
+      </div>
+    </div>
+  );
+
+  const body = v2 ? cuerpoV2 : (
     <div className="flex flex-col gap-2">
       <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
         <div className="min-w-0">
@@ -59,34 +133,7 @@ export function FacturaCard({
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* El toggle Creado|Pagado se retiró del formulario (Daniel, 12-ago:
-              "si quitalo"): toda factura nueva nace "creado", así que un badge
-              gris "Creado" en todas sería ruido. El verde "Pagado" SE QUEDA —
-              lo escriben los pagos de impulsadora (impulsadoras.ts) y las
-              filas históricas. */}
-          {!anulada && factura.estado_pago === "pagado" && (
-            <span className="text-xs px-1.5 py-0.5 rounded border font-medium bg-emerald-50 text-emerald-700 border-emerald-200">
-              Pagado
-            </span>
-          )}
-          {factura.tiene_importacion && !anulada && (
-            <span
-              className="text-xs px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-medium"
-              title={`Compra en zona libre · ${PORCENTAJE_IMPORTACION_ZONA_LIBRE}% de importación incluido en el total`}
-            >
-              Zona libre
-            </span>
-          )}
-          {tienePdf && (
-            <span className="text-xs px-1.5 py-0.5 rounded bg-gray-900 text-white font-semibold tracking-wide">
-              PDF
-            </span>
-          )}
-          {anulada && (
-            <span className="text-xs px-1.5 py-0.5 rounded bg-red-50 text-red-700 font-medium">
-              Anulada
-            </span>
-          )}
+          {badges}
         </div>
       </div>
 

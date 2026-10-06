@@ -98,9 +98,12 @@ function brandCfg(theme: MarcaTheme): BrandCfg {
 /** `tituloEnLaBarra`: el título y «← Catálogo» ya los dibuja la barra de
  *  arriba (lo decide la página, no este archivo); aquí queda el `<h1>` solo
  *  para el lector de pantalla. Nada del pedido depende de esto. */
-export default function CheckoutClient({ marca, tituloEnLaBarra = false, listaAgrupada = false }: {
+export default function CheckoutClient({ marca, tituloEnLaBarra = false, listaAgrupada = false, v2 = false }: {
   marca: MarcaUiKey;
   tituloEnLaBarra?: boolean;
+  /** El interruptor V2 de Catálogos: lo decide la página (este archivo no importa
+   *  el diseño). Solo mueve «Datos del pedido» y pasa los avisos a `<Aviso>`. */
+  v2?: boolean;
   /** «Confirmar pedido» como lista agrupada de iOS (`ConfirmarPedidoAgrupado`).
    *  Lo decide la página; las dos salidas y el payload son los mismos. */
   listaAgrupada?: boolean;
@@ -353,7 +356,24 @@ export default function CheckoutClient({ marca, tituloEnLaBarra = false, listaAg
               disabled={sending}
             />
           }
-          avisos={(preorders.length > 0 || error) ? (
+          v2={v2}
+          avisos={(preorders.length > 0 || error) ? v2 ? (
+            <div className="space-y-2">
+              {preorders.length > 0 && (
+                <Aviso tono="error">
+                  {preorders.length === 1 ? "1 producto en preventa" : `${preorders.length} productos en preventa`}: quítalo para enviar a Switch (se pide aparte).
+                </Aviso>
+              )}
+              {error && (
+                <Aviso tono="error">
+                  {error}
+                  {erroresDetalle.length > 0 && (
+                    <ul className="mt-1 list-disc pl-4 text-xs">{erroresDetalle.map((e, i) => <li key={i}>{e}</li>)}</ul>
+                  )}
+                </Aviso>
+              )}
+            </div>
+          ) : (
             <div className="space-y-2">
               {preorders.length > 0 && (
                 <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">

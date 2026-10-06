@@ -46,6 +46,9 @@ interface Props {
   faltaTexto: string | null;
   enviando: boolean;
   onElegir: (documento: DocumentoSwitch) => void;
+  /** Interruptor V2 de Catálogos (lo decide la página): «Datos del pedido»
+   *  arriba de los productos y «3 productos · 36 u» bajo el total. */
+  v2?: boolean;
 }
 
 /** Plural correcto: «1 producto» · «2 productos». */
@@ -77,10 +80,27 @@ export default function ConfirmarPedidoAgrupado(p: Props) {
   };
   const faltaCliente = intento && p.cliente === null;
 
+  const datos = (
+      <section data-medir="datos-del-pedido">
+        <h2 className="mb-1.5 px-4 text-[13px] text-gray-500">Datos del pedido</h2>
+        <div className={`divide-y divide-gray-100 rounded-lg bg-white border ${faltaCliente ? "border-amber-400" : "border-gray-200"}`}>
+          <div data-medir="cliente-checkout">
+            <Fila etiqueta="Cliente" valor={p.cliente ?? "Seleccionar"} vacio={p.cliente === null} abierto={p.clienteAbierto} onClick={p.onCliente} />
+            {p.clienteAbierto && <div className="border-t border-gray-100 p-3">{p.selectorCliente}</div>}
+          </div>
+          <div data-medir="vendedor-checkout">
+            <Fila etiqueta="Vendedor" valor={p.vendedor} abierto={p.vendedorAbierto} onClick={p.onVendedor} />
+            {p.vendedorAbierto && <div className="border-t border-gray-100 p-3">{p.selectorVendedor}</div>}
+          </div>
+        </div>
+      </section>
+  );
+
   return (
     <div data-medir="confirmar-agrupado" className="space-y-6 pb-32">
+      {p.v2 && datos}
       <section>
-        <h2 className="mb-1.5 px-4 text-[13px] text-gray-500">{textoProductos(p.lineas.length)}</h2>
+        <h2 className="mb-1.5 px-4 text-[13px] text-gray-500">{p.v2 ? "Productos" : textoProductos(p.lineas.length)}</h2>
         <div data-medir="lineas-pedido" className="divide-y divide-gray-100 rounded-lg bg-white border border-gray-200">
           {p.lineas.map((l) => (
             <div key={l.product_id} className="p-3">
@@ -118,19 +138,7 @@ export default function ConfirmarPedidoAgrupado(p: Props) {
         </div>
       </section>
 
-      <section>
-        <h2 className="mb-1.5 px-4 text-[13px] text-gray-500">Datos del pedido</h2>
-        <div className={`divide-y divide-gray-100 rounded-lg bg-white border ${faltaCliente ? "border-amber-400" : "border-gray-200"}`}>
-          <div data-medir="cliente-checkout">
-            <Fila etiqueta="Cliente" valor={p.cliente ?? "Seleccionar"} vacio={p.cliente === null} abierto={p.clienteAbierto} onClick={p.onCliente} />
-            {p.clienteAbierto && <div className="border-t border-gray-100 p-3">{p.selectorCliente}</div>}
-          </div>
-          <div data-medir="vendedor-checkout">
-            <Fila etiqueta="Vendedor" valor={p.vendedor} abierto={p.vendedorAbierto} onClick={p.onVendedor} />
-            {p.vendedorAbierto && <div className="border-t border-gray-100 p-3">{p.selectorVendedor}</div>}
-          </div>
-        </div>
-      </section>
+      {!p.v2 && datos}
 
       {p.avisos}
 
@@ -143,8 +151,18 @@ export default function ConfirmarPedidoAgrupado(p: Props) {
           )}
           <div className="flex items-center gap-3">
             <div className="min-w-0">
-              <div className="text-lg font-semibold tabular-nums leading-tight">${fmt(p.total)}</div>
-              <div className="text-xs text-gray-500 tabular-nums">{p.totalPiezas} u</div>
+              {p.v2 ? (
+                <>
+                  {/* v3.3: el número sin negrita y UNA línea gris. */}
+                  <div className="text-lg font-medium tabular-nums leading-tight text-gray-900">${fmt(p.total)}</div>
+                  <div className="truncate text-xs text-gray-500 tabular-nums">{textoProductos(p.lineas.length)} · {p.totalPiezas} u</div>
+                </>
+              ) : (
+                <>
+                  <div className="text-lg font-semibold tabular-nums leading-tight">${fmt(p.total)}</div>
+                  <div className="text-xs text-gray-500 tabular-nums">{p.totalPiezas} u</div>
+                </>
+              )}
             </div>
             {p.enviando ? (
               <div data-medir="enviando-switch" className="ml-auto flex min-h-[48px] items-center rounded-lg bg-black px-5 text-sm font-medium text-white opacity-60">Enviando…</div>

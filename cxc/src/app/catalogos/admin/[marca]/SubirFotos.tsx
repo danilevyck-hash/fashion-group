@@ -58,8 +58,11 @@ const FASE_LABEL: Record<ProgresoZip["fase"], string> = {
 };
 
 export default function SubirFotos({
-  marca, products, onFotoSubida, onZipListo, showToast,
+  marca, products, onFotoSubida, onZipListo, showToast, plegable = false,
 }: {
+  /** `CATALOGOS_APPLE_V2_2026_10`: sin nada subiendo, el cuadro es UNA fila
+   *  con › que lo abre. Arrastrar encima de la fila sube igual. */
+  plegable?: boolean;
   marca: MarcaUiKey;
   /** Catálogo completo de la marca — de aquí salen los códigos del pareo. */
   products: AdminProducto[];
@@ -166,6 +169,30 @@ export default function SubirFotos({
     zipProgreso && zipProgreso.total > 0
       ? Math.round((zipProgreso.hechas / zipProgreso.total) * 100)
       : null;
+
+  // v2: plegado mientras no haya nada en la lista, en el ZIP ni en sus avisos.
+  const [abierto, setAbierto] = useState(false);
+  const hayAlgo = cola.length > 0 || zipsEnEspera.length > 0 || zipTrabajando || !!zipResultado || !!zipError;
+  if (plegable && !abierto && !hayAlgo) {
+    return (
+      <section data-medir="subir-fotos-plegado" className="mb-4 rounded-lg border border-gray-200 bg-white">
+        <button
+          type="button"
+          onClick={() => setAbierto(true)}
+          onDragOver={(e) => { e.preventDefault(); setEncima(true); }}
+          onDragLeave={() => setEncima(false)}
+          onDrop={(e) => { e.preventDefault(); setEncima(false); recibir(e.dataTransfer.files); }}
+          className={`flex w-full min-h-[44px] py-2 items-center justify-between gap-3 rounded-lg px-4 text-left transition ${encima ? "bg-gray-50" : "hover:bg-gray-50"}`}
+        >
+          <span className="text-sm font-medium text-gray-900">Subir fotos</span>
+          <span className="flex items-center gap-1 text-xs text-gray-500">
+            ZIP o fotos
+            <span aria-hidden="true" className="text-gray-300">›</span>
+          </span>
+        </button>
+      </section>
+    );
+  }
 
   return (
     <section className="mb-6 rounded-xl border border-gray-200 bg-white p-4">
